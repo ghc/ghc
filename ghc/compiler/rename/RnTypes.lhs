@@ -567,7 +567,8 @@ forAllWarn doc ty tyvar
 	     InterfaceMode _ -> returnM () ; -- Don't warn of unused tyvars in interface files
 		                            -- unless DEBUG is on, in which case it is slightly
 					    -- informative.  They can arise from mkRhsTyLam,
-#endif					    -- leading to (say) 	f :: forall a b. [b] -> [b]
+					    -- leading to (say) 	f :: forall a b. [b] -> [b]
+#endif
 	     other ->
 		addWarn (
 		   sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),

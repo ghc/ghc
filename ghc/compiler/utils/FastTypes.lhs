@@ -40,7 +40,7 @@ fastOr 0# x = x
 fastAnd 0# x = 0#
 fastAnd 1# x = x
 
-#else {- ! __GLASGOW_HASKELL__ -}
+#else /* ! __GLASGOW_HASKELL__ */
 
 type FastInt = Int
 _ILIT x = x
@@ -61,5 +61,5 @@ type FastBool = Bool
 fastBool x = x
 _IS_TRUE_ x = x
 
-#endif  {- ! __GLASGOW_HASKELL__ -}
+#endif /* ! __GLASGOW_HASKELL__ */
 \end{code}

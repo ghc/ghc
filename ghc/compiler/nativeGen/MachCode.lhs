@@ -346,7 +346,7 @@ iselExpr64 (StCall fn cconv kind args)
 iselExpr64 expr
    = pprPanic "iselExpr64(i386)" (pprStixExpr expr)
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -438,7 +438,7 @@ iselExpr64 (StCall fn cconv kind args)
 iselExpr64 expr
    = pprPanic "iselExpr64(sparc)" (pprStixExpr expr)
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if powerpc_TARGET_ARCH
@@ -526,7 +526,7 @@ iselExpr64 (StCall fn cconv kind args)
 iselExpr64 expr
    = pprPanic "iselExpr64(powerpc)" (pprStixExpr expr)
 
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -891,7 +891,7 @@ getRegister leaf
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -1305,7 +1305,7 @@ getRegister leaf
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -1561,7 +1561,7 @@ getRegister leaf
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 getRegister (StMachOp mop [x]) -- unary MachOps
@@ -1785,7 +1785,7 @@ getRegister leaf
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -1868,7 +1868,7 @@ getAmode other
     in
     returnNat (Amode (AddrReg reg) code)
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -1936,7 +1936,7 @@ getAmode other
     in
     returnNat (Amode (AddrBaseIndex (Just reg) Nothing (ImmInt 0)) code)
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2000,7 +2000,7 @@ getAmode other
     in
     returnNat (Amode (AddrRegImm reg off) code)
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #ifdef powerpc_TARGET_ARCH
 getAmode (StMachOp MO_Nat_Sub [x, StInt i])
@@ -2046,7 +2046,7 @@ getAmode other
     	off  = ImmInt 0
     in
     returnNat (Amode (AddrRegImm reg off) code)
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
@@ -2075,7 +2075,7 @@ getCondCode :: StixExpr -> NatM CondCode
 
 #if alpha_TARGET_ARCH
 getCondCode = panic "MachCode.getCondCode: not on Alphas"
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2122,7 +2122,7 @@ getCondCode (StMachOp mop [x, y])
 
 getCondCode other =  pprPanic "getCondCode(2)(x86,sparc,powerpc)" (pprStixExpr other)
 
-#endif {- i386_TARGET_ARCH || sparc_TARGET_ARCH || powerpc_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH || sparc_TARGET_ARCH || powerpc_TARGET_ARCH */
 
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2139,7 +2139,7 @@ condIntCode, condFltCode :: Cond -> StixExpr -> StixExpr -> NatM CondCode
 #if alpha_TARGET_ARCH
 condIntCode = panic "MachCode.condIntCode: not on Alphas"
 condFltCode = panic "MachCode.condFltCode: not on Alphas"
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
@@ -2285,7 +2285,7 @@ condFltCode cond x y
     -- and true.  Hence we always supply EQQ as the condition to test.
     returnNat (CondCode True EQQ code__2)
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2351,7 +2351,7 @@ condFltCode cond x y
     in
     returnNat (CondCode True cond code__2)
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 
@@ -2400,7 +2400,7 @@ condFltCode cond x y
     in
     returnNat (CondCode False cond code__2)
 
-#endif {- powerpc_TARGET_ARCH -} 
+#endif /* powerpc_TARGET_ARCH */
 
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2458,7 +2458,7 @@ assignIntCode pk dst src
     in
     returnNat code__2
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2546,7 +2546,7 @@ assignReg_IntCode pk reg src
     in
     returnNat code
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2580,7 +2580,7 @@ assignReg_IntCode pk reg src
     in
     returnNat code__2
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 
@@ -2611,7 +2611,7 @@ assignReg_IntCode pk reg src
     in
     returnNat code__2
 
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
@@ -2651,7 +2651,7 @@ assignFltCode pk dst src
     in
     returnNat code__2
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2696,7 +2696,7 @@ assignReg_FltCode pk reg src
     returnNat code
 
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2751,7 +2751,7 @@ assignReg_FltCode pk reg src
     in
     returnNat code__2
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 
@@ -2789,7 +2789,7 @@ assignReg_FltCode pk reg src
                else c_src
     in
     returnNat code
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
@@ -2834,7 +2834,7 @@ genJump tree
     else
     returnNat (code . mkSeqInstr (JMP zeroh (AddrReg pv) 0))
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2864,7 +2864,7 @@ genJump dsts tree
     imm    = maybeImm tree
     target = case imm of Just x -> x
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2886,7 +2886,7 @@ genJump dsts tree
     in
     returnNat (code `snocOL` JMP dsts (AddrRegReg target g0) `snocOL` NOP)
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 genJump dsts (StCLbl lbl)
@@ -2901,7 +2901,7 @@ genJump dsts tree
     	target = registerName register tmp
     in
     returnNat (code `snocOL` MTCTR target `snocOL` BCTR dsts)
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -3082,7 +3082,7 @@ genCondJump lbl (StPrim op [x, y])
 	AddrLtOp -> (CMP ULT, NE)
 	AddrLeOp -> (CMP ULE, NE)
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -3096,7 +3096,7 @@ genCondJump lbl bool
     in
     returnNat (code `snocOL` JXX cond lbl)
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -3118,7 +3118,7 @@ genCondJump lbl bool
        )
     )
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 
@@ -3132,7 +3132,7 @@ genCondJump lbl bool
     returnNat (
        code `snocOL` BCC cond lbl    )
 
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -3228,7 +3228,7 @@ genCCall fn cconv kind args
 	in
 	returnNat (([], offset + 1), code . mkSeqInstr (ST sz src (spRel offset)))
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -3340,7 +3340,7 @@ genCCall fn cconv ret_rep args
 	in
 	returnNat (code, reg, sz)
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -3481,7 +3481,7 @@ genCCall fn cconv kind args
                    , 
                    [v1]
                 )
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 {-
@@ -3592,7 +3592,7 @@ genCCall fn cconv kind args
 		    `snocOL` storeWord vr_hi gprs stackOffset
 		    `snocOL` storeWord vr_lo (drop 1 gprs) (stackOffset+4))
 		((take 2 gprs) ++ accumUsed)
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
@@ -3623,7 +3623,7 @@ condIntReg, condFltReg :: Cond -> StixExpr -> StixExpr -> NatM Register
 #if alpha_TARGET_ARCH
 condIntReg = panic "MachCode.condIntReg (not on Alpha)"
 condFltReg = panic "MachCode.condFltReg (not on Alpha)"
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -3659,7 +3659,7 @@ condFltReg cond x y
     in
     returnNat (Any IntRep code__2)
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -3758,7 +3758,7 @@ condFltReg cond x y
     in
     returnNat (Any IntRep code__2)
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 condIntReg cond x y
@@ -3786,7 +3786,7 @@ condFltReg cond x y
 	    LABEL lbl]
     in
     returnNat (Any IntRep code__2)
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
@@ -3916,7 +3916,7 @@ trivialUFCode _ instr x
     in
     returnNat (Any DoubleRep code__2)
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -4097,7 +4097,7 @@ trivialUFCode pk instr x
     in
     returnNat (Any pk code__2)
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -4185,7 +4185,7 @@ trivialUFCode pk instr x
     in
     returnNat (Any pk code__2)
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 trivialCode instr x (StInt y)
@@ -4303,7 +4303,7 @@ remainderCode div x y
     in
     returnNat (Any IntRep code__2)
 
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
@@ -4365,7 +4365,7 @@ coerceFP2Int x
     in
     returnNat (Any IntRep code__2)
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -4400,7 +4400,7 @@ coerceFP2Int fprep x
 coerceDbl2Flt x = panic "MachCode.coerceDbl2Flt: unused on x86"
 coerceFlt2Dbl x = panic "MachCode.coerceFlt2Dbl: unused on x86"
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -4456,7 +4456,7 @@ coerceFlt2Dbl x
         returnNat (Any DoubleRep
                        (\dst -> code `snocOL` FxTOy F DF src dst)) 
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 coerceInt2FP pk x
@@ -4505,7 +4505,7 @@ coerceFP2Int fprep x
     returnNat (Any IntRep code__2)
 coerceDbl2Flt x		= panic "###PPC MachCode.coerceDbl2Flt"
 coerceFlt2Dbl x		= panic "###PPC MachCode.coerceFlt2Dbl"
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}

@@ -970,7 +970,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 	pprReg reg3
     ]
 
-#endif {-alpha_TARGET_ARCH-}
+#endif /* alpha_TARGET_ARCH */
 \end{code}
 
 %************************************************************************
@@ -1543,7 +1543,7 @@ pprCondInstr :: LitString -> Cond -> Doc -> Doc
 pprCondInstr name cond arg
   = hcat [ char '\t', ptext name, pprCond cond, space, arg]
 
-#endif {-i386_TARGET_ARCH-}
+#endif /* i386_TARGET_ARCH */
 \end{code}
 
 %************************************************************************
@@ -1830,7 +1830,7 @@ pp_rbracket_comma = text "],"
 pp_comma_lbracket = text ",["
 pp_comma_a	  = text ",a"
 
-#endif {-sparc_TARGET_ARCH-}
+#endif /* sparc_TARGET_ARCH */
 \end{code}
 
 %************************************************************************
@@ -2095,7 +2095,7 @@ pprDyldSymbolStub fn =
 #endif
 
 
-#endif {-powerpc_TARGET_ARCH-}
+#endif /* powerpc_TARGET_ARCH */
 \end{code}
 
 \begin{code}

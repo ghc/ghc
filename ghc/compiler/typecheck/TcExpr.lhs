@@ -632,7 +632,7 @@ tcMonoExpr (HsReify (Reify flavour name)) res_ty
 		   ReifyDecl -> DsMeta.decQTyConName
 		   ReifyType -> DsMeta.typQTyConName
 		   ReifyFixity -> pprPanic "tcMonoExpr: cant do reifyFixity yet" (ppr name)
-#endif GHCI
+#endif /* GHCI */
 \end{code}
 
 

@@ -157,7 +157,7 @@ addrOffset addr off
        
       _ -> Nothing
 
-#endif {-sparc-}
+#endif /* sparc */
 #if powerpc_TARGET_ARCH
       AddrRegImm r (ImmInt n)
        | fits16Bits n2 -> Just (AddrRegImm r (ImmInt n2))
@@ -174,7 +174,7 @@ addrOffset addr off
        | otherwise     -> Nothing
        
       _ -> Nothing
-#endif {-powerpc-}
+#endif /* powerpc */
 
 -----------------
 #if alpha_TARGET_ARCH
@@ -196,7 +196,7 @@ largeOffsetError i
            ++show i++");\nprobably because of large constant data structures;" ++ 
            "\nworkaround: use -fvia-C on this module.\n")
 
-#endif {-sparc-}
+#endif /* sparc */
 
 #if powerpc_TARGET_ARCH
 fits16Bits :: Integral a => a -> Bool
@@ -982,21 +982,21 @@ callClobberedRegs
      fReg 0, fReg 1, fReg 10, fReg 11, fReg 12, fReg 13, fReg 14, fReg 15,
      fReg 16, fReg 17, fReg 18, fReg 19, fReg 20, fReg 21, fReg 22, fReg 23,
      fReg 24, fReg 25, fReg 26, fReg 27, fReg 28, fReg 29, fReg 30]
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 #if i386_TARGET_ARCH
     -- caller-saves registers
     map RealReg [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 #if sparc_TARGET_ARCH
     map RealReg 
         ( oReg 7 :
           [oReg i | i <- [0..5]] ++
           [gReg i | i <- [1..7]] ++
           [fReg i | i <- [0..31]] )
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 #if powerpc_TARGET_ARCH
     map RealReg ([0..12] ++ map fReg [0..13])
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -------------------------------
 -- argRegs is the set of regs which are read for an n-argument call to C.
@@ -1018,7 +1018,7 @@ argRegs 4 = freeMappedRegs [16, 17, 18, 19, fReg 16, fReg 17, fReg 18, fReg 19]
 argRegs 5 = freeMappedRegs [16, 17, 18, 19, 20, fReg 16, fReg 17, fReg 18, fReg 19, fReg 20]
 argRegs 6 = freeMappedRegs [16, 17, 18, 19, 20, 21, fReg 16, fReg 17, fReg 18, fReg 19, fReg 20, fReg 21]
 argRegs _ = panic "MachRegs.argRegs(alpha): don't know about >6 arguments!"
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 #if sparc_TARGET_ARCH
 argRegs 0 = []
@@ -1029,7 +1029,7 @@ argRegs 4 = map (RealReg . oReg) [0,1,2,3]
 argRegs 5 = map (RealReg . oReg) [0,1,2,3,4]
 argRegs 6 = map (RealReg . oReg) [0,1,2,3,4,5]
 argRegs _ = panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
 argRegs 0 = []
@@ -1042,19 +1042,19 @@ argRegs 6 = map RealReg [3..8]
 argRegs 7 = map RealReg [3..9]
 argRegs 8 = map RealReg [3..10]
 argRegs _ = panic "MachRegs.argRegs(powerpc): don't know about >8 arguments!"
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 
 -------------------------------
 -- all of the arg regs ??
 #if alpha_TARGET_ARCH
 allArgRegs :: [(Reg, Reg)]
 allArgRegs = [(realReg i, realReg (fReg i)) | i <- [16..21]]
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 
 #if sparc_TARGET_ARCH
 allArgRegs :: [Reg]
 allArgRegs = map RealReg [oReg i | i <- [0..5]]
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 
 #if i386_TARGET_ARCH
 allArgRegs :: [Reg]
@@ -1066,7 +1066,7 @@ allArgRegs :: [Reg]
 allArgRegs = map RealReg [3..10]
 allFPArgRegs :: [Reg]
 allFPArgRegs = map (RealReg . fReg) [1..13]
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 \end{code}
 
 \begin{code}

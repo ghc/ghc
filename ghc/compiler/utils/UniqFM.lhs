@@ -153,7 +153,7 @@ ufmToList	:: UniqFM elt -> [(Unique, elt)]
 		 , UniqFM elt -> Unique -> Maybe elt
   #-}
 
-#endif {- __GLASGOW_HASKELL__ -}
+#endif /* __GLASGOW_HASKELL__ */
 #endif
 \end{code}
 
@@ -814,11 +814,11 @@ shiftR_ n p = word2Int#((int2Word# n) `shiftr` p)
     shiftr x y = shiftRL# x y
 #endif
 
-#else {- not GHC -}
+#else /* not GHC */
 shiftL_ n p = n * (2 ^ p)
 shiftR_ n p = n `quot` (2 ^ p)
 
-#endif {- not GHC -}
+#endif /* not GHC */
 \end{code}
 
 \begin{code}

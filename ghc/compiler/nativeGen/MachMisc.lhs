@@ -429,7 +429,7 @@ data RI
   = RIReg Reg
   | RIImm Imm
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 \end{code}
 
 Intel, in their infinite wisdom, selected a stack model for floating
@@ -630,7 +630,7 @@ is_G_instr instr
         GFREE -> panic "is_G_instr: GFREE (!)"
         other -> False
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 \end{code}
 
 \begin{code}
@@ -715,7 +715,7 @@ moveSp n
 fPair :: Reg -> Reg
 fPair (RealReg n) | n >= 32 && n `mod` 2 == 0  = RealReg (n+1)
 fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 \end{code}
 
 \begin{code}
@@ -783,6 +783,6 @@ condToSigned LU = LTT
 condToSigned GEU = GE
 condToSigned LEU = LE
 condToSigned x = x
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 \end{code}
 

@@ -16,4 +16,4 @@ extern void initParallelSystem(void);
 extern void SynchroniseSystem(void);
 extern void par_exit(I_);
 
-#endif PARINIT_H
+#endif /* PARINIT_H */

@@ -461,7 +461,7 @@ pp_stats (SaStats tlam dlam tc dc tlet dlet)
 	      ptext SLIT("; Let vars: "),  int (iBox dlet), char '/', int (iBox tlet)
 	]
 
-#else {-OMIT_STRANAL_STATS-}
+#else /* OMIT_STRANAL_STATS */
 -- identity monad
 type SaM a = a
 
@@ -475,7 +475,7 @@ tickLambda var  = panic "OMIT_STRANAL_STATS: tickLambda"
 tickCases  vars = panic "OMIT_STRANAL_STATS: tickCases"
 tickLet    var  = panic "OMIT_STRANAL_STATS: tickLet"
 
-#endif {-OMIT_STRANAL_STATS-}
+#endif /* OMIT_STRANAL_STATS */
 
 mapSa	      :: (a -> SaM b) -> [a] -> SaM [b]
 

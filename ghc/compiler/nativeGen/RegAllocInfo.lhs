@@ -224,7 +224,7 @@ regUsage instr = case instr of
     regRI (RIReg r) = [r]
     regRI  _	= []
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
@@ -333,7 +333,7 @@ regUsage instr = case instr of
     mkRU src dst = RU (regSetFromList (filter interesting src))
   	    	      (regSetFromList (filter interesting dst))
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
@@ -385,7 +385,7 @@ regUsage instr = case instr of
     regRI (RIReg r) = [r]
     regRI  _	= []
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if powerpc_TARGET_ARCH
 
@@ -433,7 +433,7 @@ regUsage instr = case instr of
 
     regRI (RIReg r) = [r]
     regRI  _	= []
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 \end{code}
 
 
@@ -559,7 +559,7 @@ insnFuture insn
     LABEL lbl		 -> RL live (FL (all `unionRegSets` live) (addToFM env lbl live))
     _			 -> info
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
@@ -581,7 +581,7 @@ insnFuture insn
 
     boring	-> Next
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
@@ -603,7 +603,7 @@ insnFuture insn
 
     boring -> Next
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if powerpc_TARGET_ARCH
     BCC ALWAYS clbl | isAsmTemp clbl -> Branch clbl
@@ -614,7 +614,7 @@ insnFuture insn
     BCTR (DestInfo dsts) -> MultiFuture dsts
     BCTR NoDestInfo -> NoFuture
     boring	-> Next
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 \end{code}
 
 %************************************************************************
@@ -685,7 +685,7 @@ patchRegs instr env = case instr of
     fixRI (RIReg r) = RIReg (env r)
     fixRI other	= other
 
-#endif {- alpha_TARGET_ARCH -}
+#endif /* alpha_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
@@ -776,7 +776,7 @@ patchRegs instr env = case instr of
 	lookupIndex Nothing      = Nothing
 	lookupIndex (Just (r,i)) = Just (env r, i)
 
-#endif {- i386_TARGET_ARCH -}
+#endif /* i386_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
@@ -819,7 +819,7 @@ patchRegs instr env = case instr of
     fixRI (RIReg r) = RIReg (env r)
     fixRI other	= other
 
-#endif {- sparc_TARGET_ARCH -}
+#endif /* sparc_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if powerpc_TARGET_ARCH
 
@@ -865,7 +865,7 @@ patchRegs instr env = case instr of
 
     fixRI (RIReg r) = RIReg (env r)
     fixRI other	= other
-#endif {- powerpc_TARGET_ARCH -}
+#endif /* powerpc_TARGET_ARCH */
 \end{code}
 
 %************************************************************************

@@ -1005,7 +1005,7 @@ run_phase Ilasm _basename _suff input_fn output_fn
 				SysTools.FileOption "" input_fn ])
 	return (Just output_fn)
 
-#endif -- ILX
+#endif /* ILX */
 
 -----------------------------------------------------------------------------
 -- MoveBinary sort-of-phase

@@ -743,7 +743,7 @@ When the FiniteMap module is used in GHC, we specialise it for
     IF_NCG(COMMA   (elt -> elt -> elt) -> FiniteMap Reg elt -> FiniteMap Reg elt -> FiniteMap Reg elt)
     #-}
 
-#endif {- compiling with ghc and have specialiser -}
+#endif /* compiling with ghc and have specialiser */
 
-#endif {- 0 -}
+#endif /* 0 */
 \end{code}
