@@ -365,10 +365,16 @@ rnExpr (HsLet binds expr)
     rnExpr expr			 `thenRn` \ (expr',fvExpr) ->
     returnRn (HsLet binds' expr', fvExpr)
 
-rnExpr (HsDo do_or_lc stmts src_loc)
+rnExpr e@(HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
     lookupImplicitOccRn monadClass_RDR		`thenRn` \ monad ->
     rnStmts rnExpr stmts			`thenRn` \ (stmts', fvs) ->
+	-- check the statement list ends in an expression
+    case last stmts' of {
+	ExprStmt _ _ -> returnRn () ;
+	ReturnStmt _ -> returnRn () ;	-- for list comprehensions
+	_            -> addErrRn (doStmtListErr e)
+    } 						`thenRn_`
     returnRn (HsDo do_or_lc stmts' src_loc, fvs `addOneFV` monad)
 
 rnExpr (ExplicitList exps)
@@ -864,5 +870,9 @@ pp_op (op, fix) = hcat [quotes (ppr op), space, parens (ppr fix)]
 
 patSynErr e 
   = sep [ptext SLIT("Pattern syntax in expression context:"),
+	 nest 4 (ppr e)]
+
+doStmtListErr e
+  = sep [ptext SLIT("`do' statements must end in expression:"),
 	 nest 4 (ppr e)]
 \end{code}

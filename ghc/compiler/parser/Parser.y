@@ -1,6 +1,10 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.12 1999/07/27 07:31:18 simonpj Exp $
+<<<<<<< Parser.y
+$Id: Parser.y,v 1.13 1999/07/27 09:25:49 simonmar Exp $
+=======
+$Id: Parser.y,v 1.13 1999/07/27 09:25:49 simonmar Exp $
+>>>>>>> 1.10
 
 Haskell grammar.
 
@@ -759,20 +763,21 @@ gdpat	:: { RdrNameGRHS }
 -- Statement sequences
 
 stmtlist :: { [RdrNameStmt] }
-	: '{'            	stmts '}'	{ $2 }
-	|     layout_on_for_do  stmts close	{ $2 }
+	: '{'            	stmts '}'	{ reverse $2 }
+	|     layout_on_for_do  stmts close	{ reverse $2 }
 
--- Stmt list must end in an expression
--- thought the H98 report doesn't currently say so in the syntax
+-- Stmt list should really end in an expression, but it's not
+-- convenient to enforce this here, so we throw out erroneous
+-- statement sequences in the renamer instead.
+
 stmts :: { [RdrNameStmt] }
-	: stmts1 srcloc exp		{ reverse (ExprStmt $3 $2 : $1) }
+	: ';' stmts1			{ $2 }
+	| stmts1			{ $1 }
 
--- A list of zero or more stmts, ending in semicolon
--- Returned in *reverse* order
 stmts1 :: { [RdrNameStmt] }
-	: stmts1 stmt ';'		{ $2 : $1 }
-	| stmts1 ';' 			{ $1 }
-	| 				{ [] }
+	: stmts1 ';' stmt		{ $3 : $1 }
+	| stmts1 ';'			{ $1 }
+	| stmt 				{ [$1] }
 
 stmt  :: { RdrNameStmt }
 	: srcloc infixexp '<-' exp	{% checkPattern $2 `thenP` \p ->
