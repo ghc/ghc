@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsParseUtils.lhs,v 1.2 2002/04/10 16:10:26 simonmar Exp $
+-- $Id: HsParseUtils.lhs,v 1.3 2002/05/27 09:03:52 simonmar Exp $
 --
 -- (c) The GHC Team 1997-2000
 --
@@ -17,6 +17,7 @@ module HsParseUtils (
 	, checkPrec 		-- String -> P String
 	, checkContext		-- HsType -> P HsContext
 	, checkAssertion	-- HsType -> P HsAsst
+	, checkInstHeader	-- HsType -> P (HsContext, HsAsst)
 	, checkDataHeader	-- HsType -> P (HsContext,HsName,[HsName])
 	, checkSimple		-- HsType -> [HsName] -> P ((HsName,[HsName]))
 	, checkPattern		-- HsExp -> P HsPat
@@ -72,6 +73,14 @@ checkAssertion = checkAssertion' []
 		checkAssertion' ts (HsTyApp a t) = checkAssertion' (t:ts) a
 		checkAssertion' _ _ = parseError "Illegal class assertion"
 
+
+checkInstHeader :: HsType -> P (HsContext, HsAsst)
+checkInstHeader (HsForAllType Nothing ctxt ty) =
+  checkAssertion ty `thenP` \asst ->
+  returnP (ctxt, asst)
+checkInstHeader ty =
+  checkAssertion ty `thenP` \asst ->
+  returnP ([], asst)
 
 checkDataHeader :: HsType -> P (HsContext,HsName,[HsName])
 checkDataHeader (HsForAllType Nothing cs t) =

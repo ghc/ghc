@@ -105,6 +105,10 @@ renameDecl decl
 	    ty <- renameType ty
 	    doc <- renameMaybeDoc doc
 	    return (HsForeignImport loc cc safe ent n ty doc)
+	HsInstDecl loc ctxt asst decls -> do
+	    ctxt <- mapM renamePred ctxt
+	    asst <- renamePred asst
+	    return (HsInstDecl loc ctxt asst decls)
 	_ -> 
 	    return decl
 
@@ -217,9 +221,9 @@ renameExportItems items = mapM rn items
  	rn (ExportGroup lev id doc) 
 	   = do doc <- renameDoc doc
 	        return (ExportGroup lev id doc)
-	rn (ExportDecl decl)
+	rn (ExportDecl x decl) -- x is an original name, don't rename it
 	   = do decl <- renameDecl decl
-		return (ExportDecl decl)
+		return (ExportDecl x decl)
 	rn (ExportDoc doc)
 	   = do doc <- renameDoc doc
 		return (ExportDoc doc)

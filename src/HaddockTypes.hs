@@ -7,8 +7,9 @@
 module HaddockTypes (
   -- * Module interfaces
   NameEnv, Interface(..), ExportItem(..), ModuleMap,
-  DocOption(..),
 
+  -- * Misc types
+  DocOption(..), InstHead,
  ) where
 
 import FiniteMap
@@ -39,6 +40,9 @@ data Interface
 		-- restricted to only those bits exported.
 		-- the map key is the "main name" of the decl.
 
+	iface_insts :: [HsDecl],
+		-- ^ instances from this module
+
 	iface_info :: Maybe ModuleInfo,
 		-- ^ information from the module header
 
@@ -52,10 +56,9 @@ data Interface
 data DocOption = OptHide | OptPrune | OptIgnoreExports 
   deriving (Eq)
 
-type DocString = String
-
 data ExportItem 
   = ExportDecl
+	HsQName		-- the original name
 	HsDecl		-- a declaration (with doc annotations)
 
   | ExportGroup		-- a section heading
@@ -71,3 +74,4 @@ data ExportItem
 
 type ModuleMap = FiniteMap Module Interface
 
+type InstHead = (HsContext,HsAsst)

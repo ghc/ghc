@@ -107,28 +107,29 @@ run flags files = do
   writeIORef saved_flags flags
   parsed_mods <- sequence (map parse_file files)
 
-  sorted_mods <- sortModules parsed_mods
+  sorted_mod_files <- sortModules (zip parsed_mods files)
 	-- emits an error message if there are recursive modules
 
   -- process the modules in sorted order, building up a mapping from
   -- modules to interfaces.
   let 
-	loop ifaces [] _ = return ifaces
-	loop ifaces (hsmod:hsmods) (file:files) = do 
+	loop ifaces [] = return ifaces
+	loop ifaces ((hsmod,file):mods)  = do 
 	   let ((mod,iface),msgs) = runWriter (mkInterface ifaces file hsmod)
 	       new_ifaces = addToFM ifaces mod iface
 	   mapM (hPutStrLn stderr) msgs
-	   loop new_ifaces hsmods files    
+	   loop new_ifaces mods
 
-  module_map <- loop emptyFM sorted_mods files
+  module_map <- loop emptyFM sorted_mod_files
   let mod_ifaces = fmToList module_map
 
 --  when (Flag_DocBook `elem` flags) $
 --    putStr (ppDocBook odir mod_ifaces)
 
-  when (Flag_Html `elem` flags) $
-    ppHtml title source_url mod_ifaces odir css_file libdir
+  let inst_maps = collectInstances mod_ifaces
 
+  when (Flag_Html `elem` flags) $
+    ppHtml title source_url mod_ifaces odir css_file libdir inst_maps
 
 parse_file file = do
   bracket 
@@ -201,9 +202,11 @@ mkInterface mod_map filename
      decl_map :: FiniteMap HsName HsDecl
      decl_map = listToFM [ (n,d) | d <- final_decls, n <- declBinders d ]
 
+     instances = [ d | d@HsInstDecl{} <- final_decls ]
+
   -- make the "export items", which will be converted into docs later
-  orig_export_list <- mkExportItems mod_map mod orig_env
-   			 decl_map final_decls options orig_exports
+  orig_export_list <- mkExportItems mod_map mod decl_map
+			 		final_decls options orig_exports
 
   let
      -- prune the export list to just those declarations that have
@@ -236,6 +239,7 @@ mkInterface mod_map filename
 		   iface_env          = name_env,
 		   iface_exports      = renamed_export_list,
 		   iface_orig_exports = pruned_export_list,
+		   iface_insts	      = instances,
 		   iface_decls        = decl_map,
 		   iface_info	      = maybe_info,
 		   iface_doc          = maybe_doc,
@@ -245,17 +249,19 @@ mkInterface mod_map filename
 
 -- -----------------------------------------------------------------------------
 -- Build the list of items that will become the documentation, from the
--- export list.  At the same time we rename *original* names in the declarations
--- to *imported* names.
+-- export list.  At this point, the list of ExportItems is in terms of
+-- original names.
 
-mkExportItems :: ModuleMap -> Module
-	-> FiniteMap HsQName HsQName	-- maps orig to imported names
+mkExportItems
+	:: ModuleMap
+	-> Module			-- this module
 	-> FiniteMap HsName HsDecl	-- maps local names to declarations
 	-> [HsDecl]			-- decls in the current module
 	-> [DocOption]
 	-> Maybe [HsExportSpec]
 	-> ErrMsgM [ExportItem]
-mkExportItems mod_map mod env decl_map decls options maybe_exps
+
+mkExportItems mod_map mod decl_map decls options maybe_exps
   | Nothing <- maybe_exps	    = everything_local_exported
   | OptIgnoreExports `elem` options = everything_local_exported
   | Just specs <- maybe_exps = do 
@@ -264,26 +270,21 @@ mkExportItems mod_map mod env decl_map decls options maybe_exps
   where
 
     everything_local_exported =
-	fullContentsOfThisModule mod decls env -- everything exported
+	return (fullContentsOfThisModule mod decl_map) -- everything exported
 
     lookupExport (HsEVar x) 
 	| Just decl <- findDecl x
-	= let decl' | HsTypeSig loc ns ty doc <- decl
-			= HsTypeSig loc [nameOfQName x] ty doc
-		    | otherwise
-		  	= decl
-	  in
-	  return [ ExportDecl decl' ]
+	= return [ ExportDecl x decl ]
 	  -- ToDo: cope with record selectors here
     lookupExport (HsEAbs t)
 	| Just decl <- findDecl t
-	= return [ ExportDecl (restrictTo [] decl) ]
+	= return [ ExportDecl t (restrictTo [] decl) ]
     lookupExport (HsEThingAll t)
 	| Just decl <- findDecl t
-	= return [ ExportDecl decl ]
+	= return [ ExportDecl t decl ]
     lookupExport (HsEThingWith t cs)
 	| Just decl <- findDecl t
-	= return [ ExportDecl (restrictTo (map nameOfQName cs) decl) ]
+	= return [ ExportDecl t (restrictTo (map nameOfQName cs) decl) ]
     lookupExport (HsEModuleContents m) = fullContentsOf m
     lookupExport (HsEGroup lev doc)
 	= return [ ExportGroup lev "" doc ]
@@ -298,7 +299,7 @@ mkExportItems mod_map mod env decl_map decls options maybe_exps
     lookupExport _ = return [] -- didn't find it?
 
     fullContentsOf m
-	| m == mod  = fullContentsOfThisModule mod decls env
+	| m == mod  = return (fullContentsOfThisModule mod decl_map)
 	| otherwise = 
 	   case lookupFM mod_map m of
 	     Just iface
@@ -318,12 +319,10 @@ mkExportItems mod_map mod env decl_map decls options maybe_exps
 		Just iface -> lookupFM (iface_decls iface) n
 		Nothing -> Nothing
 
-fullContentsOfThisModule mod decls env = 
-  mapM mkExportItem (filter keepDecl decls)
-  where mkExportItem (HsDocGroup loc lev doc) =
-	   return (ExportGroup lev "" doc)
-	mkExportItem decl = 
-	   return (ExportDecl decl)
+fullContentsOfThisModule mod decl_map = 
+  map mkExportItem (filter (keepDecl.snd) (fmToList decl_map))
+  where mkExportItem (x,HsDocGroup loc lev doc) = ExportGroup lev "" doc
+	mkExportItem (x,decl) = ExportDecl (Qual mod x) decl
 
 keepDecl HsTypeSig{}     = True
 keepDecl HsTypeDecl{}    = True
@@ -338,7 +337,7 @@ keepDecl _ = False
 
 pruneExportItems :: [ExportItem] -> [ExportItem]
 pruneExportItems items = filter has_doc items
-  where has_doc (ExportDecl d) = isJust (declDoc d)
+  where has_doc (ExportDecl x d) = isJust (declDoc d)
 	has_doc _ = True
 
 -- -----------------------------------------------------------------------------
@@ -510,22 +509,48 @@ parseOption other = do tell ["Unrecognised option: " ++ other]; return Nothing
 -- -----------------------------------------------------------------------------
 -- Topologically sort the modules
 
-sortModules :: [HsModule] -> IO [HsModule]
-sortModules hsmodules = mapM for_each_scc sccs
+sortModules :: [(HsModule,FilePath)] -> IO [(HsModule,FilePath)]
+sortModules mods = mapM for_each_scc sccs
   where
 	sccs = stronglyConnComp edges
 
-	edges :: [(HsModule, Module, [Module])]
-	edges = [ (hsmod, mod, [ imp | HsImportDecl _ imp _ _ _ <- impdecls ]) 
-		| hsmod@(HsModule mod _ impdecls _ _ _ _) <- hsmodules
+	edges :: [((HsModule,FilePath), Module, [Module])]
+	edges = [ ((hsmod,file), mod, get_imps impdecls)
+		| (hsmod@(HsModule mod _ impdecls _ _ _ _), file) <- mods
 		]
+
+        get_imps impdecls  = [ imp | HsImportDecl _ imp _ _ _ <- impdecls  ]
+
+	get_mods hsmodules = [ mod | HsModule mod _ _ _ _ _ _ <- hsmodules ]
 
 	for_each_scc (AcyclicSCC hsmodule) = return hsmodule
 	for_each_scc (CyclicSCC  hsmodules) = 
-	   dieMsg ("modules are recursive: " ++ 
-		   unwords (map show [ mod | HsModule mod _ _ _ _ _ _
-						<- hsmodules ]))
+	   dieMsg ("modules are recursive: " ++
+		   unwords (map show (get_mods (map fst hsmodules))))
 
+-- -----------------------------------------------------------------------------
+-- Collect instances
+
+collectInstances
+   :: [(Module,Interface)] 
+   -> (FiniteMap HsQName [InstHead],	-- maps class names to instances
+       FiniteMap HsQName [InstHead])	-- maps type names to instances
+
+collectInstances mod_ifaces
+  = (addListToFM_C (++) emptyFM class_inst_pairs, 
+     addListToFM_C (++) emptyFM ty_inst_pairs)
+  where
+    all_instances = concat (map (iface_insts.snd) mod_ifaces)
+
+    class_inst_pairs = [ (cls, [(ctxt,(cls,args))])
+		       | HsInstDecl _ ctxt (cls,args) _ <- all_instances ]
+			
+    ty_inst_pairs = [ (nm, [(ctxt,(cls,args))])
+		    | HsInstDecl _ ctxt (cls,args) _ <- all_instances,
+		      arg <- args,
+		      nm <- freeTyCons arg
+		    ]
+ 
 -- -----------------------------------------------------------------------------
 -- A monad which collects error messages
 

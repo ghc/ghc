@@ -9,7 +9,7 @@ module HaddockUtil (
 
   -- * Misc utilities
   nameOfQName, collectNames, declBinders, declMainBinder, splitTyConApp,
-  restrictTo, declDoc, parseModuleHeader,
+  restrictTo, declDoc, parseModuleHeader, freeTyCons,
 
   -- * Filename utilities
   basename, dirname, splitFilename3, 
@@ -75,6 +75,16 @@ splitTyConApp t = split t []
 	split (HsTyApp t u) ts = split t (u:ts)
 	split (HsTyCon t)   ts = (t,ts)
 	split _ _ = error "splitTyConApp"
+
+freeTyCons :: HsType -> [HsQName]
+freeTyCons ty = go ty []
+  where go (HsForAllType _ _ t) r = go t r
+	go (HsTyApp t u) r = go t (go u r)
+	go (HsTyCon c) r = c : r
+	go (HsTyFun f a) r = go f (go a r)
+	go (HsTyTuple b ts) r = foldr go r ts
+	go (HsTyVar v) r = r
+	go (HsTyDoc t _) r = go t r
 
 -- ---------------------------------------------------------------------------
 -- Making abstract declarations
