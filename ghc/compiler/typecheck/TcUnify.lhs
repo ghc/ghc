@@ -27,7 +27,7 @@ module TcUnify (
 import HsSyn		( HsExpr(..) )
 import TcHsSyn		( TypecheckedHsExpr, TcPat, 
 			  mkHsDictApp, mkHsTyApp, mkHsLet )
-import TypeRep		( Type(..), SourceType(..),
+import TypeRep		( Type(..), SourceType(..), TyNote(..),
 			  openKindCon, typeCon )
 
 import TcMonad          -- TcType, amongst others
@@ -40,7 +40,7 @@ import TcType		( TcKind, TcType, TcSigmaType, TcPhiType, TcTyVar, TcTauType,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys,
 			  isHoleTyVar, isSkolemTyVar, isUserTyVar, allDistinctTyVars, 
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
-			  eqKind, openTypeKind, liftedTypeKind, unliftedTypeKind, isTypeKind,
+			  eqKind, openTypeKind, liftedTypeKind, isTypeKind,
 			  hasMoreBoxityInfo, tyVarBindingInfo
 			)
 import qualified Type	( getTyVar_maybe )
@@ -597,48 +597,24 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
     checkTcM (not (isSkolemTyVar tv1))
 	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
 
+	-- Do the occurs check, and check that we are not
+	-- unifying a type variable with a polytype
+	-- Returns a zonked type ready for the update
+    checkValue tv1 ps_ty2 non_var_ty2	`thenTc` \ ty2 ->
+
    	-- Check that the kinds match
-    zonkTcType ps_ty2				`thenNF_Tc` \ ps_ty2' ->
-    checkKinds swapped tv1 ps_ty2'		`thenTc_`
+    checkKinds swapped tv1 ty2		`thenTc_`
 
-	-- Occurs check
-	-- Basically we want to update     tv1 := ps_ty2
-	-- because ps_ty2 has type-synonym info, which improves later error messages
-	-- 
-	-- But consider 
-	--	type A a = ()
-	--
-	--	f :: (A a -> a -> ()) -> ()
-	--	f = \ _ -> ()
-	--
-	-- 	x :: ()
-	-- 	x = f (\ x p -> p x)
-	--
-	-- In the application (p x), we try to match "t" with "A t".  If we go
-	-- ahead and bind t to A t (= ps_ty2), we'll lead the type checker into 
-	-- an infinite loop later.
- 	-- But we should not reject the program, because A t = ().
-	-- Rather, we should bind t to () (= non_var_ty2).
-	-- 
-	-- That's why we have this two-state occurs-check
-    if not (tv1 `elemVarSet` tyVarsOfType ps_ty2') then
-	putTcTyVar tv1 ps_ty2'				`thenNF_Tc_`
-	returnTc ()
-    else
-    zonkTcType non_var_ty2				`thenNF_Tc` \ non_var_ty2' ->
-    if not (tv1 `elemVarSet` tyVarsOfType non_var_ty2') then
-	-- This branch rarely succeeds, except in strange cases
-	-- like that in the example above
-	putTcTyVar tv1 non_var_ty2'			`thenNF_Tc_`
-	returnTc ()
-    else
-    failWithTcM (unifyOccurCheck tv1 ps_ty2')
+	-- Perform the update
+    putTcTyVar tv1 ty2			`thenNF_Tc_`
+    returnTc ()
+\end{code}
 
-
+\begin{code}
 checkKinds swapped tv1 ty2
 -- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
--- ty2 has been zonked at this stage.
-
+-- ty2 has been zonked at this stage, which ensures that
+-- its kind has as much boxity information visible as possible.
   | tk2 `hasMoreBoxityInfo` tk1 = returnTc ()
 
   | otherwise
@@ -656,6 +632,77 @@ checkKinds swapped tv1 ty2
     tk2 = typeKind ty2
 \end{code}
 
+\begin{code}
+checkValue tv1 ps_ty2 non_var_ty2
+-- Do the occurs check, and check that we are not
+-- unifying a type variable with a polytype
+-- Return the type to update the type variable with, or fail
+
+-- Basically we want to update     tv1 := ps_ty2
+-- because ps_ty2 has type-synonym info, which improves later error messages
+-- 
+-- But consider 
+--	type A a = ()
+--
+--	f :: (A a -> a -> ()) -> ()
+--	f = \ _ -> ()
+--
+-- 	x :: ()
+-- 	x = f (\ x p -> p x)
+--
+-- In the application (p x), we try to match "t" with "A t".  If we go
+-- ahead and bind t to A t (= ps_ty2), we'll lead the type checker into 
+-- an infinite loop later.
+-- But we should not reject the program, because A t = ().
+-- Rather, we should bind t to () (= non_var_ty2).
+-- 
+-- That's why we have this two-state occurs-check
+  = zonkTcType ps_ty2			`thenNF_Tc` \ ps_ty2' ->
+    case okToUnifyWith tv1 ps_ty2' of {
+	Nothing -> returnTc ps_ty2' ;	-- Success
+	other ->
+
+    zonkTcType non_var_ty2		`thenNF_Tc` \ non_var_ty2' ->
+    case okToUnifyWith tv1 non_var_ty2' of
+	Nothing -> 	-- This branch rarely succeeds, except in strange cases
+			-- like that in the example above
+		    returnTc non_var_ty2'
+
+	Just problem -> failWithTcM (unifyCheck problem tv1 ps_ty2')
+    }
+
+data Problem = OccurCheck | NotMonoType
+
+okToUnifyWith :: TcTyVar -> TcType -> Maybe Problem
+-- (okToUnifyWith tv ty) checks whether it's ok to unify
+-- 	tv :=: ty
+-- Nothing => ok
+-- Just p  => not ok, problem p
+
+okToUnifyWith tv ty
+  = ok ty
+  where
+    ok (TyVarTy tv') | tv == tv' = Just OccurCheck
+		     | otherwise = Nothing
+    ok (AppTy t1 t2)   		= ok t1 `and` ok t2
+    ok (FunTy t1 t2)   		= ok t1 `and` ok t2
+    ok (TyConApp _ ts) 		= oks ts
+    ok (ForAllTy _ _)  		= Just NotMonoType
+    ok (SourceTy st)   		= ok_st st
+    ok (NoteTy (FTVNote _) t)   = ok t
+    ok (NoteTy (SynNote t1) t2) = ok t1 `and` ok t2
+		-- Type variables may be free in t1 but not t2
+		-- A forall may be in t2 but not t1
+
+    oks ts = foldr (and . ok) Nothing ts
+
+    ok_st (ClassP _ ts) = oks ts
+    ok_st (IParam _ t)  = ok t
+    ok_st (NType _ ts)  = oks ts
+
+    Nothing `and` m = m
+    Just p  `and` m = Just p
+\end{code}
 
 %************************************************************************
 %*									*
@@ -883,12 +930,16 @@ unifyWithSigErr tyvar ty
     (env1, tidy_tyvar) = tidyOpenTyVar emptyTidyEnv tyvar
     (env2, tidy_ty)    = tidyOpenType  env1         ty
 
-unifyOccurCheck tyvar ty
-  = (env2, hang (ptext SLIT("Occurs check: cannot construct the infinite type:"))
+unifyCheck problem tyvar ty
+  = (env2, hang msg
 	      4 (sep [ppr tidy_tyvar, char '=', ppr tidy_ty]))
   where
     (env1, tidy_tyvar) = tidyOpenTyVar emptyTidyEnv tyvar
     (env2, tidy_ty)    = tidyOpenType  env1         ty
+
+    msg = case problem of
+	    OccurCheck  -> ptext SLIT("Occurs check: cannot construct the infinite type:")
+	    NotMonoType -> ptext SLIT("Cannot unify a type variable with a type scheme:")
 \end{code}
 
 
