@@ -13,6 +13,6 @@ all :: $(RUNTESTS)
 	$(RUNTEST) $< $(RUNTEST_OPTS)
 
 %.bin : %.o
-	$(HC) $(HC_OPTS) $< -o $@
+	$(HC) $(HC_OPTS) $($*_LD_OPTS) $< -o $@
 
 CLEAN_FILES += $(BINS)
