@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.78 2000/05/12 13:37:05 simonmar Exp $
+# $Id: Makefile,v 1.79 2000/05/28 16:06:52 panne Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -205,13 +205,13 @@ endif
 #	because it contains a 'ccall strlen', which gets inlined by
 # 	gcc, causing a lack of registers.
 #
-# -optC-funfolding-interface-threshold10
+# -optC-funfolding-interface-threshold7
 #	To stop the definition of 'strLength', which calls strlen, getting
 #	into the interface file and spreading the -monly-3-regs virus.
 #	We need -optC here because the driver before 3.02 didn't understand
 #	the -funfolding flags.
 
-utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -optC-funfolding-interface-threshold10
+utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -optC-funfolding-interface-threshold7
 
 # Strictness analyser misbehaving in 2.10, fails to terminate on
 # UpdAnal.lhs due to weird recursive datatype.  Bug was exposed by a
