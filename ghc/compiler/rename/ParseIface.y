@@ -723,14 +723,10 @@ id_info		:: { [HsIdInfo RdrName] }
 
 id_info_item	:: { HsIdInfo RdrName }
 		: '__A' INTEGER			{ HsArity (fromInteger $2) }
-		| '__U' inline_prag core_expr	{ HsUnfold $2 $3 }
+		| '__U' activation core_expr	{ HsUnfold $2 $3 }
 		| '__S'				{ HsStrictness $1 }
 		| '__C'                         { HsNoCafRefs }
 		| '__P' qvar_name INTEGER	{ HsWorker $2 (fromInteger $3) }
-
-inline_prag     :: { InlinePragInfo }
-                :  {- empty -}                  { AlwaysActive }
-		| '[' INTEGER ']'               { ActiveAfter (fromInteger $2) }
 
 -------------------------------------------------------
 core_expr	:: { UfExpr RdrName }
