@@ -1277,22 +1277,28 @@ we_have_sigpoll
 ], AC_DEFINE(HAVE_SIGPOLL) haveSIGPOLL=yes, haveSIGPOLL=no)
 AC_MSG_RESULT([$haveSIGPOLL])
 
-AC_MSG_CHECKING(for _SC_GETGR_R_SIZE_MAX)
+AC_MSG_CHECKING([for _SC_GETGR_R_SIZE_MAX])
 AC_EGREP_CPP(we_have_that_sysconf_thing,
 [
 #include <unistd.h>
 #ifdef _SC_GETGR_R_SIZE_MAX
 we_have_that_sysconf_thing
 #endif
-], AC_MSG_RESULT(yes) AC_DEFINE(HAVE_SC_GETGR_R_SIZE_MAX), AC_MSG_RESULT(no))    
+],
+[AC_MSG_RESULT([yes])
+AC_DEFINE(HAVE_SC_GETGR_R_SIZE_MAX)],
+[AC_MSG_RESULT([no])])
 
-AC_MSG_CHECKING(for _SC_GETPW_R_SIZE_MAX)
+AC_MSG_CHECKING([for _SC_GETPW_R_SIZE_MAX])
 AC_EGREP_CPP(we_have_that_sysconf_thing,
 [
 #include <unistd.h>
 #ifdef _SC_GETPW_R_SIZE_MAX
 we_have_that_sysconf_thing
 #endif
-], AC_MSG_RESULT(yes) AC_DEFINE(HAVE_SC_GETPW_R_SIZE_MAX), AC_MSG_RESULT(no))    
+],
+[AC_MSG_RESULT([yes])
+AC_DEFINE(HAVE_SC_GETPW_R_SIZE_MAX)],
+[AC_MSG_RESULT([no])])
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
