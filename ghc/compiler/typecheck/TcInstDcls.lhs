@@ -31,7 +31,7 @@ import TcType		( mkClassPred, mkTyVarTy, tcSplitForAllTys, tyVarsOfType,
 			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe, mkTyVarTys,
 			  TyVarDetails(..)
 			)
-import Inst		( InstOrigin(..), newMethod, newMethodAtLoc, 
+import Inst		( InstOrigin(..), newMethod, tcInstClassOp, 
 			  newDicts, instToId, showLIE )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcExtendGlobalValEnv, 
@@ -641,10 +641,12 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 
   where
     do_one inst_loc (sel_id, _)
-	= newMethodAtLoc inst_loc sel_id inst_tys'	`thenM` \ meth_inst ->
-		-- Like in mkMethodBind
+	= -- The binding is like "op @ NewTy = op @ RepTy"
+		-- Make the *binder*, like in mkMethodBind
+	  tcInstClassOp inst_loc sel_id inst_tys'	`thenM` \ meth_inst ->
+
+		-- Make the *occurrence on the rhs*
 	  newMethod InstanceDeclOrigin sel_id rep_tys'	`thenM` \ rhs_id ->
-		-- The binding is like "op @ NewTy = op @ RepTy"
 	  let
 	     meth_id = instToId meth_inst
 	  in

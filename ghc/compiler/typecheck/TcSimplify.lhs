@@ -33,7 +33,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  instToId, tyVarsOfInsts,  cloneDict,
 			  ipNamesOfInsts, ipNamesOfInst, dictPred,
 			  instBindingRequired, instCanBeGeneralised,
-			  newDictsFromOld, newMethodAtLoc,
+			  newDictsFromOld, tcInstClassOp,
 			  getDictClassTys, isTyVarDict,
 			  instLoc, pprInst, zonkInst, tidyInsts, tidyMoreInsts,
 			  Inst, pprInsts, pprInstsInFull,
@@ -1450,8 +1450,8 @@ addLinearAvailable avails avail wanted
 
   | otherwise
   = tcLookupId splitName			`thenM` \ split_id ->
-    newMethodAtLoc (instLoc wanted) split_id 
-		   [linearInstType wanted]	`thenM` \ split_inst ->
+    tcInstClassOp (instLoc wanted) split_id 
+		  [linearInstType wanted]	`thenM` \ split_inst ->
     returnM (addToFM avails wanted (Linear 2 split_inst avail), [split_inst])
 
   where

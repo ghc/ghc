@@ -14,7 +14,7 @@ module Inst (
 
 	newDictsFromOld, newDicts, cloneDict,
 	newMethod, newMethodFromName, newMethodWithGivenTy, 
-	newMethodWith, newMethodAtLoc,
+	newMethodWith, tcInstClassOp,
 	newOverloadedLit, newIPDict, 
 	tcInstCall, tcInstDataCon, tcSyntaxName,
 
@@ -58,7 +58,7 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
 		  isClassPred, isTyVarClassPred, isLinearPred, predHasFDs,
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
-		  isInheritablePred, isIPPred,
+		  isInheritablePred, isIPPred, tcSplitFunTy_maybe, tcSplitPredTy_maybe,
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy
 		)
 import CoreFVs	( idFreeTyVars )
@@ -330,10 +330,31 @@ newMethodWithGivenTy orig id tys theta tau
     returnM (instToId inst)
 
 --------------------------------------------
--- newMethodWith and newMethodAtLoc do *not* drop the 
+-- tcInstClassOp, and newMethodWith do *not* drop the 
 -- Inst into the LIE; they just returns the Inst
 -- This is important because they are used by TcSimplify
 -- to simplify Insts
+
+tcInstClassOp :: InstLoc -> Id -> [TcType] -> TcM Inst
+  -- Instantiate the specified class op, but *only* with the main
+  -- class dictionary. For example, given 'op' defined thus:
+  --	class Foo a where
+  --	  op :: (?x :: String) => a -> a
+  -- (tcInstClassOp op T) should return an Inst with type
+  --	(?x :: String) => T -> T
+  -- That is, the class-op's context is still there.  
+  -- This is really important in the use of tcInstClassOp in TcClassDcls.mkMethodBind
+tcInstClassOp inst_loc sel_id tys
+  = let
+	(tyvars,rho)  	   = tcSplitForAllTys (idType sel_id)
+	rho_ty	      	   = ASSERT( equalLength tyvars tys )
+		 	     substTy (mkTopTyVarSubst tyvars tys) rho
+	Just (pred_ty,tau) = tcSplitFunTy_maybe rho_ty
+	Just pred	   = tcSplitPredTy_maybe pred_ty
+		-- Split off exactly one predicate (see the example above)
+    in
+    ASSERT( isClassPred pred )
+    newMethodWith inst_loc sel_id tys [pred] tau
 
 newMethodWith inst_loc@(_,loc,_) id tys theta tau
   = newUnique		`thenM` \ new_uniq ->
@@ -342,20 +363,6 @@ newMethodWith inst_loc@(_,loc,_) id tys theta tau
 	inst    = Method meth_id id tys theta tau inst_loc
     in
     returnM inst
-
-newMethodAtLoc :: InstLoc
-	       -> Id -> [TcType]
-	       -> TcM Inst
-newMethodAtLoc inst_loc real_id tys
-	-- This actually builds the Inst
-  =   	-- Get the Id type and instantiate it at the specified types
-    let
-	(tyvars,rho)  = tcSplitForAllTys (idType real_id)
-	rho_ty	      = ASSERT( equalLength tyvars tys )
-			substTy (mkTopTyVarSubst tyvars tys) rho
-	(theta, tau)  = tcSplitPhiTy rho_ty
-    in
-    newMethodWith inst_loc real_id tys theta tau
 \end{code}
 
 In newOverloadedLit we convert directly to an Int or Integer if we
@@ -605,7 +612,7 @@ lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
   | otherwise
   = ASSERT( from_integer_name == fromIntegerName )	-- A LitInst invariant
     tcLookupId fromIntegerName			`thenM` \ from_integer ->
-    newMethodAtLoc loc from_integer [ty]	`thenM` \ method_inst ->
+    tcInstClassOp loc from_integer [ty]		`thenM` \ method_inst ->
     returnM (GenInst [method_inst]
 		     (HsApp (HsVar (instToId method_inst)) (HsLit (HsInteger i))))
 
@@ -617,7 +624,7 @@ lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
   | otherwise
   = ASSERT( from_rat_name == fromRationalName )	-- A LitInst invariant
     tcLookupId fromRationalName			`thenM` \ from_rational ->
-    newMethodAtLoc loc from_rational [ty]	`thenM` \ method_inst ->
+    tcInstClassOp loc from_rational [ty]	`thenM` \ method_inst ->
     mkRatLit f					`thenM` \ rat_lit ->
     returnM (GenInst [method_inst] (HsApp (HsVar (instToId method_inst)) rat_lit))
 \end{code}

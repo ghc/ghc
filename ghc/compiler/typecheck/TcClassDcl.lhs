@@ -24,7 +24,7 @@ import RnHsSyn		( RenamedTyClDecl, RenamedSig,
 import RnEnv		( lookupSysName )
 import TcHsSyn		( TcMonoBinds )
 
-import Inst		( Inst, InstOrigin(..), instToId, newDicts, newMethodAtLoc )
+import Inst		( Inst, InstOrigin(..), instToId, newDicts, tcInstClassOp )
 import TcEnv		( TyThingDetails(..), 
 			  tcLookupClass, tcExtendTyVarEnv2, 
 			  tcExtendTyVarEnv
@@ -518,7 +518,7 @@ mkMethodBind :: InstOrigin
 
 mkMethodBind origin clas inst_tys meth_binds (sel_id, dm_info)
   = getInstLoc origin				`thenM` \ inst_loc ->
-    newMethodAtLoc inst_loc sel_id inst_tys	`thenM` \ meth_inst ->
+    tcInstClassOp inst_loc sel_id inst_tys	`thenM` \ meth_inst ->
 	-- Do not dump anything into the LIE
     let
 	meth_id	   = instToId meth_inst
