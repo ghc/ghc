@@ -786,7 +786,7 @@ WAY_mg_HC_OPTS=-gransim
 
 # Way `dll': 
 WAY_dll_NAME=Win32 DLLs
-WAY_dll_HC_OPTS=
+WAY_dll_HC_OPTS=-dll
 
 #
 # Add user-way configurations here:
