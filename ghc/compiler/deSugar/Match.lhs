@@ -95,11 +95,11 @@ dsShadowWarn ctx@(DsMatchContext kind _ _) qs = dsWarn warn
 	where
 	  warn | length qs > maximum_output
                = pp_context ctx (ptext SLIT("are overlapped"))
-		      8    (vcat (map (ppr_eqn kind) (take maximum_output qs)) $$
+		      8    (\ f -> vcat (map (ppr_eqn f kind) (take maximum_output qs)) $$
 			    ptext SLIT("..."))
 	       | otherwise
                = pp_context ctx (ptext SLIT("are overlapped"))
-	             8     (vcat $ map (ppr_eqn kind) qs)
+	             8     (\ f -> vcat $ map (ppr_eqn f kind) qs)
 
 
 dsIncompleteWarn :: DsMatchContext -> [ExhaustivePat] -> DsM ()
@@ -107,47 +107,66 @@ dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn
 	where
 	  warn | length pats > maximum_output
                = pp_context ctx (ptext SLIT("are non-exhaustive"))
-                    8 (hang (ptext SLIT("Patterns not recognized:"))
-                        4 ((vcat $ map (ppr_incomplete_pats kind) (take maximum_output pats))
-                          $$ ptext SLIT("...")))
+                    8 (\ f -> hang (ptext SLIT("Patterns not recognized:"))
+                        4 (vcat (map (ppr_incomplete_pats kind)
+				     (take maximum_output pats))
+		            $$ ptext SLIT("...")))
 	       | otherwise
                = pp_context ctx (ptext SLIT("are non-exhaustive"))
-                    8 (hang (ptext SLIT("Patterns not recognized:"))
-                       4 (vcat $ map (ppr_incomplete_pats kind) pats))
+                    8 (\ f -> hang (ptext SLIT("Patterns not recognized:"))
+                                 4 (vcat $ map (ppr_incomplete_pats kind) pats))
 
-pp_context NoMatchContext msg ind rest_of_msg = dontAddErrLoc "" (ptext SLIT("Some match(es)") <+> hang msg ind rest_of_msg)
+pp_context NoMatchContext msg ind rest_of_msg_fun
+  = dontAddErrLoc "" (ptext SLIT("Some match(es)") <+> hang msg ind (rest_of_msg_fun id))
 
-pp_context (DsMatchContext kind pats loc) msg ind rest_of_msg
-  = addErrLocHdrLine loc message (hang (pp_match kind pats) ind rest_of_msg)
+pp_context (DsMatchContext kind pats loc) msg ind rest_of_msg_fun
+  = case pp_match kind pats of
+      (ppr_match, pref) ->
+          addErrLocHdrLine loc message (nest ind (rest_of_msg_fun pref))
+	where
+	  message = ptext SLIT("Pattern match(es)") <+> msg <+> ppr_match <> char ':'
  where
-    message = ptext SLIT("Pattern match(es)") <+> msg     
-
     pp_match (FunMatch fun) pats
-      = hsep [ptext SLIT("in the definition of function"), quotes (ppr fun)]
+      = let ppr_fun = ppr fun in
+        ( hsep [ptext SLIT("in the definition of function"), quotes ppr_fun]
+	, (\ x -> ppr_fun <+> x)
+	)
 
     pp_match CaseMatch pats
-      = hang (ptext SLIT("in a group of case alternatives beginning:"))
-	4 (ppr_pats pats)
+      = (hang (ptext SLIT("in a group of case alternatives beginning"))
+	   4 (ppr_pats pats)
+	, id
+	)
 
     pp_match PatBindMatch pats
-      = hang (ptext SLIT("in a pattern binding:"))
-	4 (ppr_pats pats)
+      = ( hang (ptext SLIT("in a pattern binding"))
+	    4 (ppr_pats pats)
+	, id
+	)
 
     pp_match LambdaMatch pats
-      = hang (ptext SLIT("in a lambda abstraction:"))
-	4 (ppr_pats pats)
+      = ( hang (ptext SLIT("in a lambda abstraction"))
+	    4 (ppr_pats pats)
+	, id
+	)
 
     pp_match DoBindMatch pats
-      = hang (ptext SLIT("in a `do' pattern binding:"))
-	4 (ppr_pats pats)
+      = ( hang (ptext SLIT("in a `do' pattern binding"))
+	     4 (ppr_pats pats)
+	, id
+	)
 
     pp_match ListCompMatch pats
-      = hang (ptext SLIT("in a `list comprension' pattern binding:"))
-	4 (ppr_pats pats)
+      = ( hang (ptext SLIT("in a `list comprension' pattern binding"))
+	     4 (ppr_pats pats)
+	, id
+	) 
 
     pp_match LetMatch pats
-      = hang (ptext SLIT("in a `let' pattern binding:"))
-	4 (ppr_pats pats)
+      = ( hang (ptext SLIT("in a `let' pattern binding"))
+	     4 (ppr_pats pats)
+	, id
+	)
 
 ppr_pats pats = sep (map ppr pats)
 
@@ -159,7 +178,8 @@ separator (DoBindMatch)   = SLIT("<-")
 separator (ListCompMatch) = SLIT("<-")  
 separator (LetMatch)      = SLIT("=")
                  
-ppr_shadow_pats kind pats = sep [ppr_pats pats, ptext (separator kind), ptext SLIT("...")]
+ppr_shadow_pats kind pats
+  = sep [ppr_pats pats, ptext (separator kind), ptext SLIT("...")]
     
 ppr_incomplete_pats kind (pats,[]) = ppr_pats pats
 ppr_incomplete_pats kind (pats,constraints) = 
@@ -169,7 +189,7 @@ ppr_incomplete_pats kind (pats,constraints) =
 
 ppr_constraint (var,pats) = sep [ppr var, ptext SLIT("`not_elem`"), ppr pats]
 
-ppr_eqn kind (EqnInfo _ _ pats _) = ppr_shadow_pats kind pats
+ppr_eqn prefixF kind (EqnInfo _ _ pats _) = prefixF (ppr_shadow_pats kind pats)
 \end{code}
 
 

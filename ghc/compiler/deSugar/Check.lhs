@@ -6,7 +6,7 @@
 \begin{code}
 
 
-module Check ( check , ExhaustivePat, WarningPat, BoxedString(..) ) where
+module Check ( check , ExhaustivePat ) where
 
 
 import HsSyn		
@@ -112,14 +112,8 @@ Then we need to use InPats.
    
 \begin{code}
 
-newtype BoxedString = BS Name
-
-type WarningPat = InPat BoxedString 
-type ExhaustivePat = ([WarningPat], [(BoxedString, [HsLit])])
-
-
-instance Outputable BoxedString where
-    ppr (BS n) = ppr n
+type WarningPat = InPat Name
+type ExhaustivePat = ([WarningPat], [(Name, [HsLit])])
 
 
 check :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
@@ -134,7 +128,7 @@ untidy_exhaustive ([pat], messages) =
 untidy_exhaustive (pats, messages) = 
 		  (map untidy_pars pats, map untidy_message messages)
 
-untidy_message :: (BoxedString, [HsLit]) -> (BoxedString, [HsLit])
+untidy_message :: (Name, [HsLit]) -> (Name, [HsLit])
 untidy_message (string, lits) = (string, map untidy_lit lits)
 \end{code}
 
@@ -393,7 +387,7 @@ remove_first_column (ConPat con _ _ _ con_pats) qs =
 make_row_vars :: [HsLit] -> EquationInfo -> ExhaustivePat
 make_row_vars used_lits (EqnInfo _ _ pats _ ) = 
    (VarPatIn new_var:take (length (tail pats)) (repeat new_wild_pat),[(new_var,used_lits)])
-  where new_var = BS hash_x
+  where new_var = hash_x
 
 hash_x = mkLocalName unboundKey {- doesn't matter much -}
 		     (varOcc SLIT("#x"))
@@ -520,8 +514,8 @@ not the second.
 
 isInfixCon con = isConSymOcc (getOccName con)
 
-is_nil (ConPatIn (BS con) []) = con == getName nilDataCon
-is_nil _                      = False
+is_nil (ConPatIn con []) = con == getName nilDataCon
+is_nil _                 = False
 
 is_list (ListPatIn _) = True
 is_list _             = False
@@ -536,7 +530,7 @@ make_con :: TypecheckedPat -> ExhaustivePat -> ExhaustivePat
 make_con (ConPat id _ _ _ _) (p:q:ps, constraints) 
      | return_list id q = (make_list p q : ps, constraints)
      | isInfixCon id = ((ConOpPatIn p name fixity q) : ps, constraints) 
-    where name   = BS (getName id)
+    where name   = getName id
           fixity = panic "Check.make_con: Guessing fixity"
 
 make_con (ConPat id _ _ _ pats) (ps,constraints) 
@@ -544,7 +538,7 @@ make_con (ConPat id _ _ _ pats) (ps,constraints)
       | isUnboxedTupleCon id = (TuplePatIn pats_con False : rest_pats, constraints)
       | otherwise     = (ConPatIn name pats_con : rest_pats, constraints)
     where num_args  = length pats
-          name      = BS (getName id)
+          name      = getName id
           pats_con  = take num_args ps
           rest_pats = drop num_args ps
 	  
@@ -554,7 +548,7 @@ make_whole_con con | isInfixCon con = ConOpPatIn new_wild_pat name fixity new_wi
                    | otherwise      = ConPatIn name pats
                 where 
                   fixity = panic "Check.make_whole_con: Guessing fixity"
-                  name   = BS (getName con)
+                  name   = getName con
                   arity  = dataConSourceArity con 
                   pats   = take arity (repeat new_wild_pat)
 

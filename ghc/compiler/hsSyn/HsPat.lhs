@@ -26,6 +26,7 @@ import BasicTypes	( Fixity )
 -- others:
 import Var		( Id, TyVar )
 import DataCon		( DataCon, dataConTyCon )
+import Name		( isConSymOcc, getOccName, NamedThing )
 import Maybes		( maybeToBool )
 import Outputable	
 import TyCon		( maybeTyConSingleCon )
@@ -67,15 +68,12 @@ data InPat name
 
 data OutPat id
   = WildPat	    Type	-- wild card
-
-  | VarPat	    id			-- variable (type is in the Id)
-
+  | VarPat	    id		-- variable (type is in the Id)
   | LazyPat	    (OutPat id)	-- lazy pattern
-
-  | AsPat	    id			-- as pattern
+  | AsPat	    id		-- as pattern
 		    (OutPat id)
 
-  | ListPat		 	    	-- syntactic list
+  | ListPat		 	-- syntactic list
 		    Type	-- the type of the elements
    	    	    [OutPat id]
 
@@ -86,7 +84,7 @@ data OutPat id
   | ConPat	    DataCon
 		    Type    	-- the type of the pattern
 		    [TyVar]	-- Existentially bound type variables
-		    [id]		-- Ditto dictionaries
+		    [id]	-- Ditto dictionaries
 		    [OutPat id]
 
   -- ConOpPats are only used on the input side
@@ -144,7 +142,7 @@ pprInPat (AsPatIn name pat) = parens (hcat [ppr name, char '@', ppr pat])
 
 pprInPat (ConPatIn c pats)
   | null pats = ppr c
-  | otherwise = hsep [ppr c, interppSP pats] -- ParPats put in the parens
+  | otherwise = hsep [ppr c, interppSP pats] -- inner ParPats supply the necessary parens.
 
 pprInPat (ConOpPatIn pat1 op fixity pat2)
  = hsep [ppr pat1, ppr op, ppr pat2] -- ParPats put in parens
@@ -182,7 +180,7 @@ pprInPat (RecPatIn con rpats)
 \end{code}
 
 \begin{code}
-instance (Outputable id) => Outputable (OutPat id) where
+instance (NamedThing id, Outputable id) => Outputable (OutPat id) where
     ppr = pprOutPat
 \end{code}
 
@@ -196,8 +194,16 @@ pprOutPat (AsPat name pat)
 pprOutPat (ConPat name ty [] [] [])
   = ppr name
 
+-- Kludge to get infix constructors to come out right
+-- when ppr'ing desugar warnings.
 pprOutPat (ConPat name ty tyvars dicts pats)
-  = parens (hsep [ppr name, interppSP tyvars, interppSP dicts, interppSP pats])
+  = getPprStyle $ \ sty ->
+    parens      $
+    case pats of
+      [p1,p2] 
+        | userStyle sty && isConSymOcc (getOccName name) ->
+	    hsep [ppr p1, ppr name, ppr p2]
+      _ -> hsep [ppr name, interppSP tyvars, interppSP dicts, interppSP pats]
 
 pprOutPat (ListPat ty pats)
   = brackets (interpp'SP pats)

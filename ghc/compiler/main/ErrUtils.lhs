@@ -60,7 +60,7 @@ dontAddErrLoc title rest_of_err_msg
 
 pprBagOfErrors :: Bag ErrMsg -> SDoc
 pprBagOfErrors bag_of_errors
-  = vcat [space $$ p | (_,p) <- sorted_errs ]
+  = vcat [p $$ text "" | (_,p) <- sorted_errs ]
     where
       bag_ls	  = bagToList bag_of_errors
       sorted_errs = sortLt occ'ed_before bag_ls
