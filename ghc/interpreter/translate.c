@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/10/26 17:27:36 $
+ * $Revision: 1.12 $
+ * $Date: 1999/10/27 11:57:32 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -996,7 +996,7 @@ Void implementForeignExport ( Name n )
              );
 
     v = mkStgVar(fun,NIL);
-    ppStg(v);
+    /* ppStg(v); */
 
     name(n).defn     = NIL;    
     name(n).stgVar   = v;
