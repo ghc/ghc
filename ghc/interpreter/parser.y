@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.16 $
- * $Date: 1999/12/03 12:39:42 $
+ * $Revision: 1.17 $
+ * $Date: 1999/12/03 17:01:22 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -25,7 +25,6 @@
 #define fixdecl(l,ops,a,p)       ap(FIXDECL,\
                                     triple(l,ops,mkInt(mkSyntax(a,intOf(p)))))
 #define grded(gs)                ap(GUARDED,gs)
-#define bang(t)                  ap(BANG,t)
 #define only(t)                  ap(ONLY,t)
 #define letrec(bs,e)             (nonNull(bs) ? ap(LETREC,pair(bs,e)) : e)
 #define qualify(ps,t)            (nonNull(ps) ? ap(QUAL,pair(ps,t)) : t)
@@ -121,8 +120,8 @@ start     : EXPR exp wherePart          {inputExpr = letrec($3,$2); sp-=2;}
  */
 
 /*- Top-level interface files -----------------------------*/
-iface     : INTERFACE ifName NUMLIT checkVersion WHERE ifDecls 
-                                        {$$ = gc6(NIL); }
+iface     : INTERFACE ifName NUMLIT orphans checkVersion WHERE ifDecls 
+                                        {$$ = gc7(NIL); }
           | INTERFACE error             {syntaxError("interface file");}
           ;
 ifDecls:                                {$$=gc0(NIL);}
@@ -132,12 +131,6 @@ varid_or_conid
           : VARID                       { $$=gc1($1); }
           | CONID                       { $$=gc1($1); }
           ;
-opt_bang  : '!'                         {$$=gc1(NIL);}
-          |                             {$$=gc0(NIL);}
-          ;
-opt_COCO  : COCO                        {$$=gc1(NIL);}
-          |                             {$$=gc0(NIL);}
-          ;
 
 ifName    : CONID                       {openGHCIface(textOf($1)); 
                                          $$ = gc1(NIL);}
@@ -145,7 +138,7 @@ checkVersion
           : NUMLIT                      {$$ = gc1(NIL); }
           ;
 ifDecl    
-          : IMPORT CONID NUMLIT opt_bang opt_COCO version_list_junk
+          : IMPORT CONID NUMLIT orphans opt_COCO version_list_junk
                                         { addGHCImports(intOf($3),textOf($2),
                                                        $6);
                                           $$ = gc6(NIL); 
@@ -194,6 +187,16 @@ ifDecl
           ;
 
 
+/*- Top-level misc interface stuff ------------------------*/
+orphans   : '!'                         {$$=gc1(NIL);}
+          |                             {$$=gc0(NIL);}
+          ;
+opt_COCO  : COCO                        {$$=gc1(NIL);}
+          |                             {$$=gc0(NIL);}
+          ;
+
+
+
 /*- Interface variable and constructor ids ----------------*/
 ifTyvar   : VARID                       {$$ = $1;}
           ;
@@ -228,7 +231,7 @@ ifCtxInst /* __forall [a b] {M.C1 a, M.C2 b} =>  */
           |                             {$$=gc0(NIL);}
           ;
 ifInstHd /* { Class aType }    :: (ConId, Type) */
-          : '{' ifCon ifAType '}'       {$$=gc4(ap(DICTAP,pair($2,singleton($3))));}
+          : '{' ifQCon ifAType '}'       {$$=gc4(ap(DICTAP,pair($2,singleton($3))));}
           ;
 
 ifInstHdL /* { C a1 } -> { C2 a2 } -> ... -> { Cn an }   :: [(ConId, Type)] */
@@ -257,35 +260,45 @@ ifCtxDeclLE /* M.C1 a   :: (QConId,VarId) */
 
 
 /*- Interface data declarations - constructor lists -------*/
-ifConstrs /* = Con1 | ... | ConN  :: [(ConId,[(Type,Text)],NIL)] */
+/* The (Type,Text,Int) are (field type, name (or NIL), strictness).
+   Strictness is a number: mkInt(0) indicates lazy, mkInt(1)
+   indicates a strict field (!type) as in standard H98, and 
+   mkInt(2) indicates unpacked -- a GHC extension.
+*/
+
+ifConstrs /* = Con1 | ... | ConN  :: [(ConId,[(Type,Text,Int)],NIL)] */
           :                             {$$ = gc0(NIL);}
           | '=' ifConstrL               {$$ = gc2($2);}
           ;
-ifConstrL /* [(ConId,[(Type,Text)],NIL)] */
+ifConstrL /* [(ConId,[(Type,Text,Int)],NIL)] */
           : ifConstr                    {$$ = gc1(singleton($1));}
           | ifConstr '|' ifConstrL      {$$ = gc3(cons($1,$3));}
           ;
-ifConstr /* (ConId,[(Type,Text)],NIL) */
+ifConstr /* (ConId,[(Type,Text,Int)],NIL) */
           : ifConData ifDataAnonFieldL  {$$ = gc2(triple($1,$2,NIL));}
           | ifConData '{' ifDataNamedFieldL '}' 
                                         {$$ = gc4(triple($1,$3,NIL));}
           ;
-ifDataAnonFieldL /* [(Type,Text)] */
+ifDataAnonFieldL /* [(Type,Text,Int)] */
           :                             {$$=gc0(NIL);}
           | ifDataAnonField ifDataAnonFieldL
                                         {$$=gc2(cons($1,$2));}
           ;
-ifDataNamedFieldL /* [(Type,Text)] */
+ifDataNamedFieldL /* [(Type,Text,Int)] */
           :                             {$$=gc0(NIL);}
           | ifDataNamedField            {$$=gc1(cons($1,NIL));}
           | ifDataNamedField ',' ifDataNamedFieldL 
                                         {$$=gc3(cons($1,$3));}
           ;
-ifDataAnonField /* (Type,Text) */
-          : ifAType                     {$$=gc1(pair($1,NIL));}
+ifDataAnonField /* (Type,Text,Int) */
+          : ifAType                     {$$=gc1(triple($1,NIL,mkInt(0)));}
+          | '!' ifAType                 {$$=gc2(triple($2,NIL,mkInt(1)));}
+          | '!' '!' ifAType             {$$=gc3(triple($3,NIL,mkInt(2)));}
           ;
-ifDataNamedField  /* (Type,Text) */
-          : VARID COCO ifAType          {$$=gc3(pair($3,$1));}
+ifDataNamedField  /* (Type,Text,Int) */
+          : VARID COCO ifAType          {$$=gc3(triple($3,$1,mkInt(0)));}
+          | VARID COCO '!' ifAType      {$$=gc4(triple($4,$1,mkInt(1)));}
+          | VARID COCO '!' '!' ifAType  {$$=gc5(triple($5,$1,mkInt(2)));}
           ;
 
 

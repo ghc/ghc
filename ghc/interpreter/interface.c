@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/12/03 12:39:40 $
+ * $Revision: 1.9 $
+ * $Date: 1999/12/03 17:01:21 $
  * ------------------------------------------------------------------------*/
 
 /* ToDo:
@@ -431,8 +431,8 @@ List   syms; {   /* [ConId | VarId] -- the names to import */
     printf("\naddGHCImport %s\n", textToStr(mn) );
 #   endif
   
-    // Hack to avoid chasing Prel* junk right now
-    if (strncmp(textToStr(mn), "Prel",4)==0) return;
+    /* Don't chase PrelGHC -- it doesn't exist */
+    if (strncmp(textToStr(mn), "PrelGHC",7)==0) return;
 
     found = FALSE;
     for (t=ifImports; nonNull(t); t=tl(t)) {
@@ -552,9 +552,10 @@ Int  line;
 List ctx0;      /* [(QConId,VarId)]              */
 Cell tycon;     /* ConId                         */
 List ktyvars;   /* [(VarId,Kind)] */
-List constrs0;  /* [(ConId,[(Type,Text)],NIL)]  
+List constrs0;  /* [(ConId,[(Type,Text,Int)],NIL)]  
                    The NIL will become the constr's type
-                   The Text is an optional field name */
+                   The Text is an optional field name
+                   The Int indicates strictness */
     /* ToDo: worry about being given a decl for (->) ?
      * and worry about qualidents for ()
      */
@@ -566,6 +567,7 @@ List constrs0;  /* [(ConId,[(Type,Text)],NIL)]
     Cell    conid;
     Pair    conArg, ctxElem;
     Text    conArgNm;
+    Int     conArgStrictness;
 
     Text t = textOf(tycon);
 #   ifdef DEBUG_IFACE
@@ -607,11 +609,13 @@ List constrs0;  /* [(ConId,[(Type,Text)],NIL)]
            tyvarsMentioned = NIL;  /* [VarId] */
            conArgs = reverse(fields);
            for (; nonNull(conArgs); conArgs=tl(conArgs)) {
-              conArg   = hd(conArgs); /* (Type,Text) */
-              conArgTy = fst(conArg);
-              conArgNm = snd(conArg);
+              conArg           = hd(conArgs); /* (Type,Text) */
+              conArgTy         = fst3(conArg);
+              conArgNm         = snd3(conArg);
+              conArgStrictness = intOf(thd3(conArg));
               tyvarsMentioned = dupListOnto(ifTyvarsIn(conArgTy),
                                             tyvarsMentioned);
+              if (conArgStrictness > 0) conArgTy = bang(conArgTy);
               ty = fn(conArgTy,ty);
               if (nonNull(conArgNm)) {
 		 /* a field name is mentioned too */
@@ -663,7 +667,7 @@ List constrs0;  /* [(ConId,[(Type,Text)],NIL)]
 
 static List local addGHCConstrs(line,cons,sels)
 Int  line;
-List cons;   /* [(ConId,[(Type,Text)],Type)] */
+List cons;   /* [(ConId,[(Type,Text,Int)],Type)] */
 List sels; { /* [(VarId,Type)]         */
     List cs, ss;
     Int  conNo = 0; /*  or maybe 1? */
@@ -707,7 +711,7 @@ Pair sel;    /* (VarId,Type)        */
 static Name local addGHCConstr(line,conNo,constr)
 Int    line;
 Int    conNo;
-Triple constr; { /* (ConId,[(Type,Text)],Type) */
+Triple constr; { /* (ConId,[(Type,Text,Int)],Type) */
     /* ToDo: add rank2 annotation and existential annotation
      * these affect how constr can be used.
      */
@@ -1052,6 +1056,8 @@ List ktyvars; { /* [(VarId|Text,Kind)] */
          return ap(DICTAP, tvsToOffsets(line,snd(type),ktyvars));
       case UNBOXEDTUP:  /* bogus?? */
          return ap(UNBOXEDTUP, tvsToOffsets(line,snd(type),ktyvars));
+      case BANG:  /* bogus?? */
+         return ap(BANG, tvsToOffsets(line,snd(type),ktyvars));
       case VARIDCELL: /* Ha! some real work to do! */
        { Int i = 0;
          Text tv = textOf(type);

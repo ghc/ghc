@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.15 $
- * $Date: 1999/12/03 12:39:48 $
+ * $Revision: 1.16 $
+ * $Date: 1999/12/03 17:01:25 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -515,6 +515,8 @@ extern Tycon addPrimTycon Args((Text,Kind,Int,Cell,Cell));
 #define isPolyOrQualType(t) (isPair(t) && (fst(t)==POLYTYPE || fst(t)==QUAL))
 #define polySigOf(t)    fst(snd(t))
 #define monotypeOf(t)   snd(snd(t))
+
+#define bang(t)         ap(BANG,t)
 
 /* --------------------------------------------------------------------------
  * Globally defined name values:

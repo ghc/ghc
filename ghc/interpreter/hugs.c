@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.27 $
- * $Date: 1999/12/03 14:38:39 $
+ * $Revision: 1.28 $
+ * $Date: 1999/12/03 17:01:20 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -97,7 +97,7 @@ static Void   local browse	      Args((Void));
  * Machine dependent code for Hugs interpreter:
  * ------------------------------------------------------------------------*/
 
-       Bool   combined      = FALSE;
+       Bool   combined      = TRUE;
 
 #include "machdep.c"
 #ifdef WANT_TIMER

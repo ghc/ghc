@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.20 $
- * $Date: 1999/12/03 12:39:46 $
+ * $Revision: 1.21 $
+ * $Date: 1999/12/03 17:01:23 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2045,6 +2045,11 @@ Int  depth; {
                 break;
         case UNBOXEDTUP:
                 Printf("(UNBOXEDTUP,");
+                print(snd(c),depth-1);
+                Putchar(')');
+                break;
+        case BANG:
+                Printf("(BANG,");
                 print(snd(c),depth-1);
                 Putchar(')');
                 break;

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.20 $
- * $Date: 1999/11/29 18:53:15 $
+ * $Revision: 1.21 $
+ * $Date: 1999/12/03 17:01:26 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -469,7 +469,7 @@ Void stgDefn( Name n, Int arity, Cell e )
 
 Void implementCfun(c,scs)               /* Build implementation for constr */
 Name c;                                 /* fun c.  scs lists integers (1..)*/
-List scs; {                             /* in incr order of strict comps.  */
+List scs; {                             /* in incr order of strict fields. */
     Int a = name(c).arity;
 
     if (a > 0) {
