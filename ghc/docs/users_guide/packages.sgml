@@ -25,8 +25,16 @@
       <indexterm><primary>packages</primary>
 	<secondary>using</secondary></indexterm>
       
-      <para>To use a package, add the <literal>-package</literal> flag
-      to the GHC command line:</para>
+      <para>Some packages are automatically available: you don't need
+      to specify any extra flags to use them (except in certain
+      circumstances; see below).  All the packages which contain
+      hierarchical libraries fall into this category.</para>
+
+      <para>Some other packages are <emphasis>not</emphasis>
+      automatically available: those are normally the packages
+      containing old non-hierarchical libraries.  To gain access to a
+      non-auto package, use the <option>-package</option> command-line
+      flag:</para>
 
       <variablelist>
 	<varlistentry>
@@ -41,6 +49,20 @@
 	  </listitem>
 	</varlistentry>
       </variablelist>
+
+      <para>There's one case where you need to use the
+      <option>-package</option> option even for auto packages: when
+      linking a program in batch mode<footnote><para>This is because
+      GHC can't figure out from the object files which packages are
+      required; in <option>&ndash;&ndash;make</option> mode and in
+      GHCi the compiler has more information available to figure out
+      the package dependencies.  We might try to lift this restriction
+      in the future.</para></footnote>.  For example, to link a
+      program consisting of objects <filename>Foo.o</filename> and
+      <filename>Main.o</filename>, where we made use of the
+      <literal>network</literal> package:</para>
+
+<screen>$ ghc -o myprog Foo.o Main.o -package network</screen>
 
       <para>Some packages depend on other packages, for example the
       <literal>text</literal> package makes use of some of the modules
@@ -254,11 +276,18 @@
 	  <indexterm><primary><option>&ndash;&ndash;config-file</option></primary>
 	      </indexterm>
 	  <listitem>
-	    <para>Use <replaceable>file</replaceable> instead of the
-	    default package configuration file.  This, in conjunction
-	    with GHC's <option>-package-conf</option> option, allows
-	    a user to have a local set of packages in addition to the
-	    system-wide installed set.</para>
+	    <para>Use <replaceable>file</replaceable> as an additional
+	    package configuration file. This is used to modify
+	    configuration files for use with GHC's
+	    <option>-package-conf</option> option.</para>
+
+	    <para>There may be any number of configuration files named
+            on the command line; files mentioned later on the
+            command-line override those mentioned earlier.  The
+            <emphasis>last</emphasis> configuration file mentioned on
+            the command-line is the only one that is actually modified
+            by <literal>ghc-pkg</literal>.</para>
+
 	  </listitem>
 	</varlistentry>
 
@@ -268,23 +297,27 @@
 	  <indexterm><primary><option>&ndash;&ndash;list-packages</option></primary></indexterm>
 	  <listitem>
 	    <para>This option displays the list of currently installed
-	    packages.</para>
+	    packages, including those in extra configuration files
+	    specified with the <option>&ndash;&ndash;config-file</option>
+	    option.</para>
 
 <screen>
   $ ghc-pkg &ndash;&ndash;list-packages
-  gmp, rts, std, lang, concurrent, data, net, posix, text, util
+  /usr/local/lib/ghc-5.05/package.conf:
+    hdirect, readline, lang, concurrent, posix, util, data, text, net,
+    hssource, rts, haskell98, network, haskell-src, unix, base
 </screen>
 
 	    <para>Note that your GHC installation might have a
             slightly different set of packages installed.</para>
 
-	    <para>The <literal>gmp</literal> and
-            <literal>rts</literal> packages are always present, and
-            represent the multi-precision integer and runtime system
-            libraries respectively.  The <literal>std</literal>
-            package contains the Haskell prelude and standard
-            libraries.  The rest of the packages are optional
-            libraries.</para>
+	    <para>The <literal>rts</literal> package is always
+            present, and represents the runtime system library.  The
+            <literal>base</literal> package contains the Haskell
+            prelude and basic hierarchical libraries, and the
+            <literal>haskell98</literal> package contains the Haskell
+            98 standard libraries.  The rest of the packages are
+            optional libraries.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -335,6 +368,7 @@
 <screen>
   Package {
      name            = "mypkg",
+     auto            = True,
      import_dirs     = ["${installdir}/imports/mypkg"],
      source_dirs     = [],
      library_dirs    = ["${installdir}"],
@@ -362,6 +396,21 @@
             the <literal>-package</literal> flag and as listed in the
             <literal>&ndash;&ndash;list-packages</literal> list. 
             </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>auto</literal></term>
+	  <indexterm><primary><literal>auto</literal></primary>
+	    <secondary>package specification</secondary>
+	  </indexterm>
+	  <listitem>
+	    <para>Set to <literal>True</literal> if the package should
+	    be automatically available (see <xref
+	    linkend="using-packages">).  This is normally set to
+	    <literal>True</literal> for packages which contain
+	    hierarchical libraries, because in that case there is no
+	    danger of polluting the module namespace.</para>
 	  </listitem>
 	</varlistentry>
 
