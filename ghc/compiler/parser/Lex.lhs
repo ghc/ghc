@@ -272,7 +272,6 @@ haskellKeywordsFM = listToUFM $
 	( "_scc_",	ITscc )
      ]
 
-
 ghcExtensionKeywordsFM = listToUFM $
 	map (\ (x,y) -> (_PK_ x,y))
      [	( "forall",	ITforall ),
@@ -1003,12 +1002,9 @@ lex_id3 cont glaexts mod buf just_a_conid
      in
      case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
     	    Just kwd_token -> just_a_conid; -- avoid M.where etc.
-    	    Nothing        -> 
-     if flag glaexts
-       then case lookupUFM ghcExtensionKeywordsFM lexeme of {
-    	    Just kwd_token -> just_a_conid;
-    	    Nothing        -> is_a_qvarid }
-       else is_a_qvarid
+    	    Nothing        -> is_a_qvarid
+	-- TODO: special ids (as, qualified, hiding) shouldn't be
+	-- recognised as keywords here.  ie.  M.as is a qualified varid.
      }}}
 
 
