@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: System.lhs,v 1.34 2001/09/21 11:55:56 simonmar Exp $
+-- $Id: System.lhs,v 1.35 2001/09/21 13:24:37 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -26,7 +26,6 @@ import PrelMarshalAlloc
 import PrelPtr
 import PrelStorable
 import PrelIOBase
-import PrelConc
 
 -- ---------------------------------------------------------------------------
 -- getArgs, getProgName, getEnv
@@ -39,7 +38,7 @@ getArgs =
   alloca $ \ p_argc ->  
   alloca $ \ p_argv -> do
    getProgArgv p_argc p_argv
-   p    <- peek p_argc
+   p    <- fromIntegral `liftM` peek p_argc
    argv <- peek p_argv
    peekArray (p - 1) (advancePtr argv 1) >>= mapM peekCString
    
