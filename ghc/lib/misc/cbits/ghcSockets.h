@@ -1,7 +1,7 @@
 #ifndef GHC_SOCKETS_H
 #define GHC_SOCKETS_H
 
-#ifdef HAVE_WINSOCK_H
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
 #include <winsock.h>
 #else
 
@@ -94,7 +94,7 @@ StgInt	setSocketOption__ (StgInt, StgInt, StgInt);
 StgInt	writeDescriptor (StgInt, StgAddr, StgInt);
 
 /* initWinSock.c */
-#ifdef _WIN32
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
 StgInt  initWinSock();
 void    shutdownWinSock();
 #endif

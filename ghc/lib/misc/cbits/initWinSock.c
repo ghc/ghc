@@ -5,10 +5,13 @@
 #include "stgio.h"
 
 
-#ifdef _WIN32
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#define USE_WINSOCK
+#endif
+
+#ifdef USE_WINSOCK
 
 /* Initialising WinSock... */
-
 StgInt
 initWinSock ()
 {

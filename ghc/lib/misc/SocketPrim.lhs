@@ -1252,7 +1252,7 @@ use @withSocketsDo@...:
 
 \begin{code}
 withSocketsDo :: IO a -> IO a
-#ifndef _WIN32
+#if !defined(HAVE_WINSOCK_H) || defined(__CYGWIN32__)
 withSocketsDo x = x
 #else
 withSocketsDo act = do
