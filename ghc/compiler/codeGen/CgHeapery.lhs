@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.14 1999/03/02 16:09:28 simonm Exp $
+% $Id: CgHeapery.lhs,v 1.15 1999/03/08 17:05:41 simonm Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -343,7 +343,7 @@ altHeapCheck is_fun regs [] AbsCNop Nothing code
 mkRegLiveness :: [MagicId] -> Word#
 mkRegLiveness []  =  int2Word# 0#
 mkRegLiveness (VanillaReg rep i : regs) | isFollowableRep rep 
-  =  ((int2Word# 1#) `shiftL#` (i -# 1#)) 
+  =  ((int2Word# 1#) `shiftL#` (i -# 1#)) `or#` mkRegLiveness regs
 mkRegLiveness (_ : regs)  =  mkRegLiveness regs
 
 -- Emit macro for simulating a fetch and then reschedule
