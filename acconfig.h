@@ -369,6 +369,9 @@
 /* Define if you need -ldl to get dlopen() */
 #undef HAVE_LIBDL
 
+/* Define if we can see RTLD_NEXT in dlfcn.h */
+#undef HAVE_RTLDNEXT
+
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
 

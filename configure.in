@@ -958,6 +958,8 @@ dnl ################################################################
 dnl Check for libraries
 dnl ################################################################
 
+dnl ** check for libdl & RTLD_NEXT
+
 AC_CHECK_LIB(dl, dlopen, 
 	[HaveLibDL=YES
 	 AC_DEFINE(HAVE_LIBDL)
@@ -965,6 +967,24 @@ AC_CHECK_LIB(dl, dlopen,
 	[HaveLibDL=NO])
 AC_CHECK_FUNCS(dlopen)
 AC_SUBST(HaveLibDL)
+
+dnl ** sometimes RTLD_NEXT is hidden in #ifdefs we really don't wan to set
+AC_MSG_CHECKING(for RTLD_NEXT from dlfcn.h)
+AC_EGREP_CPP(yes,
+[
+ #include <dlfcn.h>
+ #ifdef RTLD_NEXT
+        yes
+ #endif
+], [
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_RTLDNEXT)
+  HaveRtldNext=YES
+], [
+  AC_MSG_RESULT(no)
+  HaveRtldNext=NO
+  ])    
+AC_SUBST(HaveRtldNext)
 
 FPTOOLS_CHECK_LIB_NOWARN(m, atan)
 
