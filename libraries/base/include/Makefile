@@ -1,16 +1,16 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 2002/02/14 15:14:02 simonmar Exp $
+# $Id: Makefile,v 1.3 2002/06/20 16:11:45 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
 H_FILES = $(wildcard *.h)
 
-override datadir:=$(libdir)/include
-INSTALL_DATAS = $(H_FILES)
+includedir = $(libdir)/include
+INSTALL_INCLUDES = $(H_FILES)
 
 ifneq "$(HavePosixRegex)" "YES"
-INSTALL_DATAS += ../cbits/regex/regex.h
+INSTALL_INCLUDES += ../cbits/regex/regex.h
 endif
 
 include $(TOP)/mk/target.mk
