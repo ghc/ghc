@@ -2210,7 +2210,7 @@ Foo.o : Baz.hi
 
       <para> Do <emphasis>NOT</emphasis> use
       <filename>ghc/compiler/ghc</filename>, or
-      <filename>ghc/compiler/ghc-5.xx</filename>, as these are the
+      <filename>ghc/compiler/ghc-6.xx</filename>, as these are the
       scripts intended for installation, and contain hard-wired paths
       to the installed libraries, rather than the libraries in the
       build tree.</para>
@@ -3596,10 +3596,10 @@ $ make install-docs
       target machine, and compiling them using gcc to get a working
       GHC.</para>
 
-      <para><emphasis>NOTE: GHC version 5.xx is significantly harder
-      to bootstrap from C than previous versions.  We recommend
-      starting from version 4.08.2 if you need to bootstrap in this
-      way.</emphasis></para>
+      <para><emphasis>NOTE: GHC versions 5.xx and later are
+      significantly harder to bootstrap from C than earlier versions.
+      We recommend starting from version 4.08.2 if you need to
+      bootstrap in this way.</emphasis></para>
 
       <para>HC files are architecture-dependent (but not
       OS-dependent), so you have to get a set that were generated on
@@ -3721,11 +3721,11 @@ GhcWithRegisterised=NO
 </programlisting>
 
 <programlisting>
-# build.mk for GHC 5.xx
+# build.mk for GHC 5.xx and 6.x
 GhcUnregisterised=YES
 </programlisting>
 
-	<para>Version 5.xx only: use the option
+	<para>Versions 5.xx and 6.x only: use the option
 	<option>--enable-hc-boot-unregisterised</option> instead of
 	<option>--enable-hc-boot</option> when running
 	<filename>./configure</filename>.</para>
