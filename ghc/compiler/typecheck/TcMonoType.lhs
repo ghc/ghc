@@ -155,9 +155,19 @@ tc_type_kind (MonoDictTy class_name tys)
 tc_type_kind (HsForAllTy (Just tv_names) context ty)
   = tcExtendTyVarScope tv_names		$ \ tyvars -> 
     tcContext context			`thenTc` \ theta ->
-    tc_boxed_type ty			`thenTc` \ tau ->
-		-- Body of a for-all is a boxed type!
-    returnTc (boxedTypeKind, mkSigmaTy tyvars theta tau)
+    case theta of
+	[]    -> 	-- No context, so propagate body type
+		 tc_type_kind ty	`thenTc` \ (kind, tau) ->
+		 returnTc (kind, mkSigmaTy tyvars [] tau)
+
+	other -> 	-- Context; behave like a function type
+			-- This matters.  Return-unboxed-tuple analysis can
+			-- give overloaded functions like
+			--	f :: forall a. Num a => (# a->a, a->a #)
+			-- And we want these to get through the type checker
+
+		 tc_type ty		`thenTc` \ tau ->
+		 returnTc (boxedTypeKind, mkSigmaTy tyvars theta tau)
 \end{code}
 
 Help functions for type applications
