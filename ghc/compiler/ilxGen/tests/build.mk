@@ -126,9 +126,9 @@ debug:
 	@echo ""
 	@echo hs2ilx_suffix=$(hs2ilx_suffix)
 
-ILX2IL=//c/devel/fcom/src/bin/ilx2il.exe
-ILVALID=//c/devel/fcom/src/bin/ilvalid.exe
-ILVERIFY=//c/devel/fcom/src/bin/ilverify.exe
+ILX2IL=C:/devel/fcom/bin/ilx2il.exe
+ILVALID=C:/devel/fcom/bin/ilvalid.exe
+ILVERIFY=C:/devel/fcom/bin/ilverify.exe
 
 # We have new rules because only the Haskell-->ILX contribution to the whole "way"
 # forms the "way" for the purposes of these rules
