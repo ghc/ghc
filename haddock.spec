@@ -17,7 +17,7 @@
 # version label of your release tarball.
 
 %define name haddock
-%define version 0.5
+%define version 0.6
 %define release 1
 
 Summary: Haddock documentation tool for annotated Haskell source code
