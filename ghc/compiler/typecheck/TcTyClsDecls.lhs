@@ -31,12 +31,15 @@ import TcInstDcls	( tcAddDeclCtxt )
 import TcMonoType	( kcHsTyVars, kcHsType, kcHsLiftedSigType, kcHsContext, mkTyClTyVars )
 import TcMType		( unifyKind, newKindVar, zonkKindEnv )
 import TcType		( Type, Kind, mkArrowKind, liftedTypeKind, zipFunTys )
+import Type		( splitTyConApp_maybe )
 import Variance         ( calcTyConArgVrcs )
 import Class		( Class, mkClass, classTyCon )
 import TyCon		( TyCon, ArgVrcs, AlgTyConFlavour(..), 
-			  tyConKind, tyConDataCons,
+			  tyConKind, tyConTyVars, tyConDataCons, isNewTyCon,
 			  mkSynTyCon, mkAlgTyCon, mkClassTyCon, mkForeignTyCon, 
 			)
+import TysWiredIn	( unitTy )
+import Subst		( substTyWith )
 import DataCon		( dataConOrigArgTys )
 import Var		( varName )
 import FiniteMap
@@ -398,11 +401,35 @@ bogusVrcs = panic "Bogus tycon arg variances"
 \begin{code}
 mkNewTyConRep :: TyCon		-- The original type constructor
 	      -> Type		-- Chosen representation type
--- Find the representation type for this newtype TyCon
--- See notes on newypes in types/TypeRep about newtypes.
-mkNewTyConRep tc = head (dataConOrigArgTys (head (tyConDataCons tc)))
-\end{code}
+				-- (guaranteed not to be another newtype)
 
+-- Find the representation type for this newtype TyCon
+-- 
+-- The non-recursive newtypes are easy, because they look transparent
+-- to splitTyConApp_maybe, but recursive ones really are represented as
+-- TyConApps (see TypeRep).
+-- 
+-- The trick is to to deal correctly with recursive newtypes
+-- such as	newtype T = MkT T
+
+mkNewTyConRep tc
+  = go [] tc
+  where
+	-- Invariant: tc is a NewTyCon
+	-- 	      tcs have been seen before
+    go tcs tc 
+	| tc `elem` tcs = unitTy
+	| otherwise
+	= let
+	      rep_ty = head (dataConOrigArgTys (head (tyConDataCons tc)))
+	  in
+	  case splitTyConApp_maybe rep_ty of
+			Nothing -> rep_ty 
+			Just (tc', tys) | not (isNewTyCon tc') -> rep_ty
+				        | otherwise	       -> go1 (tc:tcs) tc' tys
+
+    go1 tcs tc tys = substTyWith (tyConTyVars tc) tys (go tcs tc)
+\end{code}
 
 %************************************************************************
 %*									*
