@@ -40,7 +40,6 @@ import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE
 			)
 import RdrName		( rdrNameOcc, setRdrNameSpace, emptyRdrEnv, foldRdrEnv, isQual )
-import SrcLoc		( noSrcLoc )
 import Outputable
 import Maybes		( maybeToBool, catMaybes )
 import ListSetOps	( removeDups )

@@ -20,12 +20,12 @@ import qualified Language.Haskell.THSyntax as M
 
 import HsSyn  	  ( Pat(..), HsExpr(..), Stmt(..), HsLit(..), HsOverLit(..),
 		    Match(..), GRHSs(..), GRHS(..), HsBracket(..),
-                    HsDoContext(ListComp,DoExpr), ArithSeqInfo(..),
+                    HsStmtContext(ListComp,DoExpr), ArithSeqInfo(..),
 		    HsBinds(..), MonoBinds(..), HsConDetails(..),
 		    HsDecl(..), TyClDecl(..), ForeignDecl(..),
 		    PendingSplice,
 		    placeHolderType, tyClDeclNames,
-		    collectHsBinders, collectMonoBinders, 
+		    collectHsBinders, 
 		    collectPatBinders, collectPatsBinders
 		  )
 

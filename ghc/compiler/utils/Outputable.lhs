@@ -445,7 +445,7 @@ instance Show FastString  where
 
 \begin{code}
 pprWithCommas :: (a -> SDoc) -> [a] -> SDoc
-pprWithCommas pp xs = hsep (punctuate comma (map pp xs))
+pprWithCommas pp xs = fsep (punctuate comma (map pp xs))
 
 interppSP  :: Outputable a => [a] -> SDoc
 interppSP  xs = hsep (map ppr xs)

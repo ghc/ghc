@@ -33,6 +33,7 @@ module ParseUtil (
 	, checkPattern	      -- HsExp -> P HsPat
 	, checkPatterns	      -- SrcLoc -> [HsExp] -> P [HsPat]
 	, checkDo	      -- [Stmt] -> P [Stmt]
+	, checkMDo	      -- [Stmt] -> P [Stmt]
 	, checkValDef	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 	, checkValSig	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
  ) where
@@ -177,12 +178,16 @@ checkDictTy _ _ = parseError "Malformed context in instance header"
 -- 	as [ExprStmt e1, ExprStmt e2]
 -- checkDo (a) checks that the last thing is an ExprStmt
 --	   (b) transforms it to a ResultStmt
+-- same comments apply for mdo as well
 
-checkDo []	         = parseError "Empty 'do' construct"
-checkDo [ExprStmt e _ l] = returnP [ResultStmt e l]
-checkDo [s] 	         = parseError "The last statement in a 'do' construct must be an expression"
-checkDo (s:ss)	         = checkDo ss	`thenP` \ ss' ->
-			   returnP (s:ss')
+checkDo	 = checkDoMDo "a " "'do'"
+checkMDo = checkDoMDo "an " "'mdo'"
+
+checkDoMDo _   nm []		   = parseError $ "Empty " ++ nm ++ " construct"
+checkDoMDo _   _  [ExprStmt e _ l] = returnP [ResultStmt e l]
+checkDoMDo pre nm [s]		   = parseError $ "The last statement in " ++ pre ++ nm ++ " construct must be an expression"
+checkDoMDo pre nm (s:ss)	   = checkDoMDo pre nm ss	`thenP` \ ss' ->
+			   	     returnP (s:ss')
 
 ---------------------------------------------------------------------------
 -- Checking Patterns.

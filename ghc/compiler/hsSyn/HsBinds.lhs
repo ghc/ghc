@@ -269,18 +269,18 @@ data Sig name
 
 \begin{code}
 okBindSig :: NameSet -> Sig Name -> Bool
-okBindSig ns (ClassOpSig _ _ _ _)				= False
-okBindSig ns sig = sigForThisGroup ns sig
+okBindSig ns (ClassOpSig _ _ _ _) = False
+okBindSig ns sig		  = sigForThisGroup ns sig
 
 okClsDclSig :: NameSet -> Sig Name -> Bool
-okClsDclSig ns (Sig _ _ _)					  = False
-okClsDclSig ns sig = sigForThisGroup ns sig
+okClsDclSig ns (Sig _ _ _) = False
+okClsDclSig ns sig 	   = sigForThisGroup ns sig
 
 okInstDclSig :: NameSet -> Sig Name -> Bool
-okInstDclSig ns (Sig _ _ _)					   = False
-okInstDclSig ns (FixSig _)					   = False
-okInstDclSig ns (SpecInstSig _ _)				   = True
-okInstDclSig ns sig = sigForThisGroup ns sig
+okInstDclSig ns (Sig _ _ _)	  = False
+okInstDclSig ns (FixSig _)	  = False
+okInstDclSig ns (SpecInstSig _ _) = True
+okInstDclSig ns sig		  = sigForThisGroup ns sig
 
 sigForThisGroup ns sig 
   = case sigName sig of

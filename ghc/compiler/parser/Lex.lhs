@@ -123,6 +123,7 @@ data Token
   | ITccallconv
   | ITdotnet
   | ITccall (Bool,Bool,Safety)	-- (is_dyn, is_casm, may_gc)
+  | ITmdo
 
   | ITspecialise_prag		-- Pragmas
   | ITsource_prag
@@ -276,6 +277,7 @@ isSpecial ITunsafe    	= True
 isSpecial ITwith      	= True
 isSpecial ITccallconv   = True
 isSpecial ITstdcallconv = True
+isSpecial ITmdo		= True
 isSpecial _             = False
 
 -- the bitmap provided as the third component indicates whether the
@@ -296,6 +298,7 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "threadsafe",	ITthreadsafe,	 bit ffiBit),
 	( "unsafe",	ITunsafe,	 bit ffiBit),
 	( "with",	ITwith,		 bit withBit),
+	( "mdo",	ITmdo,		 bit glaExtsBit),
 	( "stdcall",    ITstdcallconv,	 bit ffiBit),
 	( "ccall",      ITccallconv,	 bit ffiBit),
 	( "dotnet",     ITdotnet,	 bit ffiBit),

@@ -4,26 +4,41 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnTypes (  rnHsType, rnHsSigType, rnHsTypeFVs, rnHsSigTypeFVs, 
-		  rnContext, precParseErr, sectionPrecErr ) where
+module RnTypes ( rnHsType, rnContext, 
+		 rnHsSigType, rnHsTypeFVs, rnHsSigTypeFVs, 
+		 rnPat, rnPats, rnPatsAndThen,	-- Here because it's not part 
+		 rnOverLit, litFVs,		-- of any mutual recursion	
+		 precParseErr, sectionPrecErr, dupFieldErr, patSigErr
+  ) where
 
 import CmdLineOpts	( DynFlag(Opt_WarnMisc, Opt_WarnUnusedMatches, Opt_GlasgowExts) )
 
 import HsSyn
-import RdrHsSyn	( RdrNameContext, RdrNameHsType, extractHsTyRdrTyVars, extractHsCtxtRdrTyVars )
-import RnHsSyn	( RenamedContext, RenamedHsType, extractHsTyNames )
-import RnEnv	( lookupOccRn, newIPName, bindTyVarsRn, lookupFixityRn )
+import RdrHsSyn	( RdrNameContext, RdrNameHsType, RdrNamePat,
+		  extractHsTyRdrTyVars, extractHsCtxtRdrTyVars )
+import RnHsSyn	( RenamedContext, RenamedHsType, RenamedPat,
+		  extractHsTyNames, 
+		  parrTyCon_name, tupleTyCon_name, listTyCon_name, charTyCon_name )
+import RnEnv	( lookupOccRn, lookupBndrRn, lookupSyntaxName, lookupGlobalOccRn,
+		  newIPName, bindTyVarsRn, lookupFixityRn, mapFvRn,
+		  bindPatSigTyVars, bindLocalsFVRn, warnUnusedMatches )
 import TcRnMonad
 
-import PrelInfo	( cCallishClassKeys )
-import RdrName	( elemRdrEnv )
-import Name	( Name )
-import NameSet	( FreeVars )
+import PrelInfo	( cCallishClassKeys, eqStringName, eqClassName, ordClassName, 
+		  negateName, minusName, lengthPName, indexPName, plusIntegerName, fromIntegerName,
+		  timesIntegerName, ratioDataConName, fromRationalName, cCallableClassName )
+import TysWiredIn	( intTyCon )
+import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
+			  floatPrimTyCon, doublePrimTyCon )
+import RdrName	( RdrName, elemRdrEnv )
+import Name	( Name, NamedThing(..) )
+import NameSet
 import Unique	( Uniquable(..) )
 
+import Literal		( inIntRange, inCharRange )
 import BasicTypes	( compareFixity, arrowFixity )
 import List		( nub )
-import ListSetOps	( removeDupsEq )
+import ListSetOps	( removeDupsEq, removeDups )
 import Outputable
 
 #include "HsVersions.h"
@@ -274,6 +289,256 @@ rnPred doc (HsIParam n ty)
 \end{code}
 
 
+*********************************************************
+*							*
+\subsection{Patterns}
+*							*
+*********************************************************
+
+\begin{code}
+rnPatsAndThen :: HsMatchContext RdrName
+	      -> [RdrNamePat] 
+	      -> ([RenamedPat] -> RnM (a, FreeVars))
+	      -> RnM (a, FreeVars)
+-- Bring into scope all the binders and type variables
+-- bound by the patterns; then rename the patterns; then
+-- do the thing inside.
+--
+-- Note that we do a single bindLocalsRn for all the
+-- matches together, so that we spot the repeated variable in
+--	f x x = 1
+
+rnPatsAndThen ctxt pats thing_inside
+  = bindPatSigTyVars pat_sig_tys 	$
+    bindLocalsFVRn doc_pat bndrs	$ \ new_bndrs ->
+    rnPats pats				`thenM` \ (pats', pat_fvs) ->
+    thing_inside pats'			`thenM` \ (res, res_fvs) ->
+
+    let
+	unused_binders = filter (not . (`elemNameSet` res_fvs)) new_bndrs
+    in
+    warnUnusedMatches unused_binders	`thenM_`
+
+    returnM (res, res_fvs `plusFV` pat_fvs)
+  where
+    pat_sig_tys = collectSigTysFromPats pats
+    bndrs 	= collectPatsBinders    pats
+    doc_pat     = pprMatchContext ctxt
+
+rnPats :: [RdrNamePat] -> RnM ([RenamedPat], FreeVars)
+rnPats ps = mapFvRn rnPat ps
+
+rnPat :: RdrNamePat -> RnM (RenamedPat, FreeVars)
+
+rnPat (WildPat _) = returnM (WildPat placeHolderType, emptyFVs)
+
+rnPat (VarPat name)
+  = lookupBndrRn  name			`thenM` \ vname ->
+    returnM (VarPat vname, emptyFVs)
+
+rnPat (SigPatIn pat ty)
+  = doptM Opt_GlasgowExts `thenM` \ glaExts ->
+    
+    if glaExts
+    then rnPat pat		`thenM` \ (pat', fvs1) ->
+         rnHsTypeFVs doc ty	`thenM` \ (ty',  fvs2) ->
+         returnM (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
+
+    else addErr (patSigErr ty)	`thenM_`
+         rnPat pat
+  where
+    doc = text "In a pattern type-signature"
+    
+rnPat (LitPat s@(HsString _)) 
+  = returnM (LitPat s, unitFV eqStringName)
+
+rnPat (LitPat lit) 
+  = litFVs lit		`thenM` \ fvs ->
+    returnM (LitPat lit, fvs) 
+
+rnPat (NPatIn lit mb_neg) 
+  = rnOverLit lit			`thenM` \ (lit', fvs1) ->
+    (case mb_neg of
+	Nothing -> returnM (Nothing, emptyFVs)
+	Just _  -> lookupSyntaxName negateName	`thenM` \ (neg, fvs) ->
+		   returnM (Just neg, fvs)
+    )					`thenM` \ (mb_neg', fvs2) ->
+    returnM (NPatIn lit' mb_neg', 
+	      fvs1 `plusFV` fvs2 `addOneFV` eqClassName)	
+	-- Needed to find equality on pattern
+
+rnPat (NPlusKPatIn name lit _)
+  = rnOverLit lit			`thenM` \ (lit', fvs1) ->
+    lookupBndrRn name			`thenM` \ name' ->
+    lookupSyntaxName minusName		`thenM` \ (minus, fvs2) ->
+    returnM (NPlusKPatIn name' lit' minus, 
+	      fvs1 `plusFV` fvs2 `addOneFV` ordClassName)
+
+rnPat (LazyPat pat)
+  = rnPat pat		`thenM` \ (pat', fvs) ->
+    returnM (LazyPat pat', fvs)
+
+rnPat (AsPat name pat)
+  = rnPat pat		`thenM` \ (pat', fvs) ->
+    lookupBndrRn name	`thenM` \ vname ->
+    returnM (AsPat vname pat', fvs)
+
+rnPat (ConPatIn con stuff) = rnConPat con stuff
+
+
+rnPat (ParPat pat)
+  = rnPat pat		`thenM` \ (pat', fvs) ->
+    returnM (ParPat pat', fvs)
+
+rnPat (ListPat pats _)
+  = rnPats pats			`thenM` \ (patslist, fvs) ->
+    returnM (ListPat patslist placeHolderType, fvs `addOneFV` listTyCon_name)
+
+rnPat (PArrPat pats _)
+  = rnPats pats			`thenM` \ (patslist, fvs) ->
+    returnM (PArrPat patslist placeHolderType, 
+	      fvs `plusFV` implicit_fvs `addOneFV` parrTyCon_name)
+  where
+    implicit_fvs = mkFVs [lengthPName, indexPName]
+
+rnPat (TuplePat pats boxed)
+  = rnPats pats			`thenM` \ (patslist, fvs) ->
+    returnM (TuplePat patslist boxed, fvs `addOneFV` tycon_name)
+  where
+    tycon_name = tupleTyCon_name boxed (length pats)
+
+rnPat (TypePat name) =
+    rnHsTypeFVs (text "In a type pattern") name	`thenM` \ (name', fvs) ->
+    returnM (TypePat name', fvs)
+
+------------------------------
+rnConPat con (PrefixCon pats)
+  = lookupOccRn con 	`thenM` \ con' ->
+    rnPats pats		`thenM` \ (pats', fvs) ->
+    returnM (ConPatIn con' (PrefixCon pats'), fvs `addOneFV` con')
+
+rnConPat con (RecCon rpats)
+  = lookupOccRn con 	`thenM` \ con' ->
+    rnRpats rpats	`thenM` \ (rpats', fvs) ->
+    returnM (ConPatIn con' (RecCon rpats'), fvs `addOneFV` con')
+
+rnConPat con (InfixCon pat1 pat2)
+  = lookupOccRn con 	`thenM` \ con' ->
+    rnPat pat1		`thenM` \ (pat1', fvs1) ->
+    rnPat pat2		`thenM` \ (pat2', fvs2) ->
+
+    getModeRn		`thenM` \ mode ->
+	-- See comments with rnExpr (OpApp ...)
+    (if isInterfaceMode mode
+	then returnM (ConPatIn con' (InfixCon pat1' pat2'))
+	else lookupFixityRn con'	`thenM` \ fixity ->
+	     mkConOpPatRn con' fixity pat1' pat2'
+    )							`thenM` \ pat' ->
+    returnM (pat', fvs1 `plusFV` fvs2 `addOneFV` con')
+
+------------------------
+rnRpats rpats
+  = mappM_ field_dup_err dup_fields 	`thenM_`
+    mapFvRn rn_rpat rpats		`thenM` \ (rpats', fvs) ->
+    returnM (rpats', fvs)
+  where
+    (_, dup_fields) = removeDups compare [ f | (f,_) <- rpats ]
+
+    field_dup_err dups = addErr (dupFieldErr "pattern" dups)
+
+    rn_rpat (field, pat)
+      = lookupGlobalOccRn field	`thenM` \ fieldname ->
+	rnPat pat		`thenM` \ (pat', fvs) ->
+	returnM ((fieldname, pat'), fvs `addOneFV` fieldname)
+\end{code}
+
+\begin{code}
+mkConOpPatRn :: Name -> Fixity -> RenamedPat -> RenamedPat
+	     -> RnM RenamedPat
+
+mkConOpPatRn op2 fix2 p1@(ConPatIn op1 (InfixCon p11 p12)) p2
+  = lookupFixityRn op1		`thenM` \ fix1 ->
+    let
+	(nofix_error, associate_right) = compareFixity fix1 fix2
+    in
+    if nofix_error then
+	addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenM_`
+	returnM (ConPatIn op2 (InfixCon p1 p2))
+    else 
+    if associate_right then
+	mkConOpPatRn op2 fix2 p12 p2		`thenM` \ new_p ->
+	returnM (ConPatIn op1 (InfixCon p11 new_p))
+    else
+    returnM (ConPatIn op2 (InfixCon p1 p2))
+
+mkConOpPatRn op fix p1 p2 			-- Default case, no rearrangment
+  = ASSERT( not_op_pat p2 )
+    returnM (ConPatIn op (InfixCon p1 p2))
+
+not_op_pat (ConPatIn _ (InfixCon _ _)) = False
+not_op_pat other   	               = True
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection{Literals}
+%*									*
+%************************************************************************
+
+When literals occur we have to make sure
+that the types and classes they involve
+are made available.
+
+\begin{code}
+litFVs (HsChar c)
+   = checkErr (inCharRange c) (bogusCharError c) `thenM_`
+     returnM (unitFV charTyCon_name)
+
+litFVs (HsCharPrim c)         = returnM (unitFV (getName charPrimTyCon))
+litFVs (HsString s)           = returnM (mkFVs [listTyCon_name, charTyCon_name])
+litFVs (HsStringPrim s)       = returnM (unitFV (getName addrPrimTyCon))
+litFVs (HsInt i)	      = returnM (unitFV (getName intTyCon))
+litFVs (HsIntPrim i)          = returnM (unitFV (getName intPrimTyCon))
+litFVs (HsFloatPrim f)        = returnM (unitFV (getName floatPrimTyCon))
+litFVs (HsDoublePrim d)       = returnM (unitFV (getName doublePrimTyCon))
+litFVs (HsLitLit l bogus_ty)  = returnM (unitFV cCallableClassName)
+litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)	-- HsInteger and HsRat only appear 
+									-- in post-typechecker translations
+bogusCharError c
+  = ptext SLIT("character literal out of range: '\\") <> int c <> char '\''
+
+rnOverLit (HsIntegral i _)
+  = lookupSyntaxName fromIntegerName	`thenM` \ (from_integer_name, fvs) ->
+    if inIntRange i then
+	returnM (HsIntegral i from_integer_name, fvs)
+    else let
+	extra_fvs = mkFVs [plusIntegerName, timesIntegerName]
+	-- Big integer literals are built, using + and *, 
+	-- out of small integers (DsUtils.mkIntegerLit)
+	-- [NB: plusInteger, timesInteger aren't rebindable... 
+	--	they are used to construct the argument to fromInteger, 
+	--	which is the rebindable one.]
+    in
+    returnM (HsIntegral i from_integer_name, fvs `plusFV` extra_fvs)
+
+rnOverLit (HsFractional i _)
+  = lookupSyntaxName fromRationalName		`thenM` \ (from_rat_name, fvs) ->
+    let
+	extra_fvs = mkFVs [ratioDataConName, plusIntegerName, timesIntegerName]
+	-- We have to make sure that the Ratio type is imported with
+	-- its constructor, because literals of type Ratio t are
+	-- built with that constructor.
+	-- The Rational type is needed too, but that will come in
+	-- as part of the type for fromRational.
+	-- The plus/times integer operations may be needed to construct the numerator
+	-- and denominator (see DsUtils.mkIntegerLit)
+    in
+    returnM (HsFractional i from_rat_name, fvs `plusFV` extra_fvs)
+\end{code}
+
+
+
 %*********************************************************
 %*							*
 \subsection{Errors}
@@ -324,5 +589,15 @@ sectionPrecErr op arg_op section
 infixTyConWarn op
   = ftext FSLIT("Accepting non-standard infix type constructor") <+> quotes (ppr op)
 
+patSigErr ty
+  =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
+	$$ nest 4 (ptext SLIT("Use -fglasgow-exts to permit it"))
+
+dupFieldErr str (dup:rest)
+  = hsep [ptext SLIT("duplicate field name"), 
+          quotes (ppr dup),
+	  ptext SLIT("in record"), text str]
+
+ppr_op op = quotes (ppr op)	-- Here, op can be a Name or a (Var n), where n is a Name
 ppr_opfix (pp_op, fixity) = pp_op <+> brackets (ppr fixity)
 \end{code}

@@ -325,7 +325,7 @@ zonkMonoBinds env (AndMonoBinds mbinds1 mbinds2)
   = zonkMonoBinds env mbinds1		`thenM` \ (b1', ids1) ->
     zonkMonoBinds env mbinds2		`thenM` \ (b2', ids2) ->
     returnM (b1' `AndMonoBinds` b2', 
-		 ids1 `unionBags` ids2)
+	     ids1 `unionBags` ids2)
 
 zonkMonoBinds env (PatMonoBind pat grhss locn)
   = zonkPat env pat	`thenM` \ (new_pat, ids) ->
@@ -613,13 +613,14 @@ zonkArithSeq env (FromThenTo e1 e2 e3)
     zonkExpr env e3	`thenM` \ new_e3 ->
     returnM (FromThenTo new_e1 new_e2 new_e3)
 
+
 -------------------------------------------------------------------------
 zonkStmts :: ZonkEnv -> [TcStmt] -> TcM [TypecheckedStmt]
 
 zonkStmts env [] = returnM []
 
 zonkStmts env (ParStmtOut bndrstmtss : stmts)
-  = mappM (mappM zonkId) bndrss	`thenM` \ new_bndrss ->
+  = mappM (mappM zonkId) bndrss		`thenM` \ new_bndrss ->
     mappM (zonkStmts env) stmtss	`thenM` \ new_stmtss ->
     let 
 	new_binders = concat new_bndrss
@@ -629,6 +630,15 @@ zonkStmts env (ParStmtOut bndrstmtss : stmts)
     returnM (ParStmtOut (zip new_bndrss new_stmtss) : new_stmts)
   where
     (bndrss, stmtss) = unzip bndrstmtss
+
+zonkStmts env (RecStmt vs segStmts : stmts)
+  = mappM zonkId vs		`thenM` \ new_vs ->
+    let
+	env1 = extendZonkEnv env new_vs
+    in
+    zonkStmts env1 segStmts	`thenM` \ new_segStmts ->
+    zonkStmts env1 stmts	`thenM` \ new_stmts ->
+    returnM (RecStmt new_vs new_segStmts : new_stmts)
 
 zonkStmts env (ResultStmt expr locn : stmts)
   = zonkExpr env expr	`thenM` \ new_expr ->

@@ -16,9 +16,9 @@ module TcRnDriver (
 
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
-			  Stmt(..), Pat(VarPat), HsMatchContext(..), HsDoContext(..), RuleDecl(..),
+			  Stmt(..), Pat(VarPat), HsStmtContext(..), RuleDecl(..),
 			  mkSimpleMatch, placeHolderType, toHsType, andMonoBinds,
-			  isSrcRule
+			  isSrcRule, collectStmtsBinders
 			)
 import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameStmt, RdrNameHsExpr )
 
@@ -261,8 +261,8 @@ tcRnStmt hsc_env pcs ictxt rdr_stmt
     setInteractiveContext ictxt $ do {
 
     -- Rename; use CmdLineMode because tcRnStmt is only used interactively
-    ((bound_names, [rn_stmt]), fvs) <- initRnInteractive ictxt 
-						(rnStmts [rdr_stmt]) ;
+    ([rn_stmt], fvs) <- initRnInteractive ictxt 
+					(rnStmts DoExpr [rdr_stmt]) ;
     traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs]) ;
     failIfErrsM ;
     
@@ -281,7 +281,7 @@ tcRnStmt hsc_env pcs ictxt rdr_stmt
     setGblEnv tcg_env $ do {
     
     -- The real work is done here
-    ((bound_ids, tc_expr), lie) <- getLIE (tcUserStmt bound_names rn_stmt) ;
+    ((bound_ids, tc_expr), lie) <- getLIE (tcUserStmt rn_stmt) ;
     
     traceTc (text "tcs 1") ;
     let {	-- Make all the bound ids "global" ids, now that
@@ -344,10 +344,9 @@ Here is the grand plan, implemented in tcUserStmt
 
 \begin{code}
 ---------------------------
-tcUserStmt :: [Name] -> RenamedStmt -> TcM ([Id], TypecheckedHsExpr)
-tcUserStmt names (ExprStmt expr _ loc)
-  = ASSERT( null names )
-    newUnique 		`thenM` \ uniq ->
+tcUserStmt :: RenamedStmt -> TcM ([Id], TypecheckedHsExpr)
+tcUserStmt (ExprStmt expr _ loc)
+  = newUnique 		`thenM` \ uniq ->
     let 
 	fresh_it = itName uniq
         the_bind = FunMonoBind fresh_it False 
@@ -355,24 +354,24 @@ tcUserStmt names (ExprStmt expr _ loc)
     in
     tryTc_ (do { 	-- Try this if the other fails
 		traceTc (text "tcs 1b") ;
-		tc_stmts [fresh_it] [
+		tc_stmts [
 		    LetStmt (MonoBind the_bind [] NonRecursive),
 		    ExprStmt (HsApp (HsVar printName) (HsVar fresh_it)) 
 			     placeHolderType loc] })
 	  (do { 	-- Try this first 
 		traceTc (text "tcs 1a") ;
-		tc_stmts [fresh_it] [BindStmt (VarPat fresh_it) expr loc] })
+		tc_stmts [BindStmt (VarPat fresh_it) expr loc] })
 
-tcUserStmt names stmt
-  = tc_stmts names [stmt]
+tcUserStmt stmt = tc_stmts [stmt]
 
 ---------------------------
-tc_stmts names stmts
+tc_stmts stmts
  = do { io_ids <- mappM tcLookupId 
 			[returnIOName, failIOName, bindIOName, thenIOName] ;
 	ioTyCon <- tcLookupTyCon ioTyConName ;
 	res_ty  <- newTyVarTy liftedTypeKind ;
 	let {
+	    names      = collectStmtsBinders stmts ;
 	    return_id  = head io_ids ;	-- Rather gruesome
 
 	    io_ty = (\ ty -> mkTyConApp ioTyCon [ty], res_ty) ;
@@ -388,7 +387,7 @@ tc_stmts names stmts
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "tcs 2") ;
 	((ids, tc_stmts), lie) <- 
-		getLIE $ tcStmtsAndThen combine (DoCtxt DoExpr) io_ty stmts $ 
+		getLIE $ tcStmtsAndThen combine DoExpr io_ty stmts $ 
 		do {
 		    -- Look up the names right in the middle,
 		    -- where they will all be in scope

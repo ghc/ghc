@@ -38,7 +38,7 @@ import HscTypes		( VersionInfo(..), ModIface(..), HomeModInfo(..),
 
 import CmdLineOpts
 import Id		( idType, idInfo, isImplicitId, idCgInfo )
-import DataCon		( dataConWorkId, dataConSig, dataConFieldLabels, dataConStrictMarks )
+import DataCon		( dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
 import CoreSyn		( CoreRule(..), IdCoreRule )
 import CoreFVs		( ruleLhsFreeNames )

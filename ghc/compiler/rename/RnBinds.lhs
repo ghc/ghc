@@ -10,33 +10,31 @@ they may be affected by renaming (which isn't fully worked out yet).
 
 \begin{code}
 module RnBinds (
-	rnTopMonoBinds, rnMonoBinds, rnMethodBinds, 
-	renameSigs, renameSigsFVs, unknownSigErr
+	rnTopMonoBinds, rnMonoBinds, rnMonoBindsAndThen,
+	rnMethodBinds, renameSigs, checkSigs, unknownSigErr
    ) where
 
 #include "HsVersions.h"
 
 
 import HsSyn
-import HsBinds		( eqHsSig, sigName, hsSigDoc )
+import HsBinds		( eqHsSig, hsSigDoc )
 import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
-import RnTypes		( rnHsSigType, rnHsType )
-import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
+import RnTypes		( rnHsSigType, rnHsType, rnPat )
+import RnExpr		( rnMatch, rnGRHSs, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupInstDeclBndr,
 			  lookupSigOccRn, bindPatSigTyVars, bindLocalFixities,
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
 import CmdLineOpts	( DynFlag(..) )
-import Digraph		( stronglyConnComp, SCC(..) )
+import Digraph		( SCC(..), stronglyConnComp )
 import Name		( Name, nameOccName, nameSrcLoc )
 import NameSet
 import RdrName		( RdrName, rdrNameOcc )
-import BasicTypes	( RecFlag(..), FixitySig(..) )
-import List		( partition )
+import BasicTypes	( RecFlag(..) )
 import Outputable
-import PrelNames	( isUnboundName )
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -65,9 +63,6 @@ The vertag tag is a unique @Int@; the tags only need to be unique
 within one @MonoBinds@, so that unique-Int plumbing is done explicitly
 (heavy monad machinery not needed).
 
-\begin{code}
-type VertexTag	= Int
-\end{code}
 
 %************************************************************************
 %*									*
@@ -110,7 +105,7 @@ However, non-recursive expressions are currently not expected as
 \Haskell{} programs, and this code should not be executed.
 
 Monomorphic bindings contain information that is returned in a tuple
-(a @FlatMonoBindsInfo@) containing:
+(a @FlatMonoBinds@) containing:
 
 \begin{enumerate}
 \item
@@ -152,16 +147,20 @@ it expects the global environment to contain bindings for the binders
 contains bindings for the binders of this particular binding.
 
 \begin{code}
-rnTopMonoBinds mbinds sigs
- =  mappM lookupBndrRn binder_rdr_names			 `thenM` \ binder_names ->
-	-- No need to extend the environment; that has been done already
+rnTopMonoBinds :: RdrNameMonoBinds 
+	       -> [RdrNameSig]
+	       -> RnM (RenamedHsBinds, FreeVars)
 
-    bindPatSigTyVars (collectSigTysFromMonoBinds mbinds) $ 
+-- Assumes the binders of the binding are in scope already
+-- Very like rnMonoBinds, bu checks for missing signatures too
+
+rnTopMonoBinds mbinds sigs
+ =  bindPatSigTyVars (collectSigTysFromMonoBinds mbinds) $ 
 	-- Hmm; by analogy with Ids, this doesn't look right
-    let
-	bndr_name_set = mkNameSet binder_names
-    in
-    renameSigsFVs (okBindSig bndr_name_set) sigs 	`thenM` \ (siglist, sig_fvs) ->
+
+    renameSigs sigs			`thenM` \ siglist ->
+    rn_mono_binds siglist mbinds	`thenM` \ (binders, final_binds, bind_fvs) ->
+    checkSigs okBindSig binders siglist	`thenM_`
 
 	-- Warn about missing signatures, but not in interface mode
 	-- (This is important when renaming bindings from 'deriving' clauses.)
@@ -170,18 +169,17 @@ rnTopMonoBinds mbinds sigs
     (if warn_missing_sigs && not (isInterfaceMode mode) then
 	let
 	    type_sig_vars   = [n | Sig n _ _ <- siglist]
-	    un_sigd_binders = nameSetToList (delListFromNameSet bndr_name_set type_sig_vars)
+	    un_sigd_binders = filter (not . (`elem` type_sig_vars)) 
+				     (nameSetToList binders)
 	in
         mappM_ missingSigWarn un_sigd_binders
      else
 	returnM ()  
     )						`thenM_`
 
-    rn_mono_binds siglist mbinds		`thenM` \ (final_binds, bind_fvs) ->
-    returnM (final_binds, bind_fvs `plusFV` sig_fvs)
-  where
-    binder_rdr_names = collectMonoBinders mbinds
+    returnM (final_binds, bind_fvs `plusFV` hsSigsFVs siglist)
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -189,57 +187,57 @@ rnTopMonoBinds mbinds sigs
 %*									*
 %************************************************************************
 
-\subsubsection{Nested binds}
-
-@rnMonoBinds@
-\begin{itemize}
-\item collects up the binders for this declaration group,
-\item checks that they form a set
-\item extends the environment to bind them to new local names
-\item calls @rnMonoBinds@ to do the real work
-\end{itemize}
-%
 \begin{code}
-rnMonoBinds :: RdrNameMonoBinds 
-            -> [RdrNameSig]
-	    -> (RenamedHsBinds -> RnM (result, FreeVars))
-	    -> RnM (result, FreeVars)
+rnMonoBindsAndThen :: RdrNameMonoBinds 
+	           -> [RdrNameSig]
+	   	   -> (RenamedHsBinds -> RnM (result, FreeVars))
+		   -> RnM (result, FreeVars)
 
-rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
-  =	-- Extract all the binders in this group,
-	-- and extend current scope, inventing new names for the new binders
+rnMonoBindsAndThen mbinds sigs thing_inside -- Non-empty monobinds
+  =	-- Extract all the binders in this group, and extend the
+	-- current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
     bindLocatedLocalsRn doc mbinders_w_srclocs			$ \ new_mbinders ->
     bindPatSigTyVars (collectSigTysFromMonoBinds mbinds)	$ 
-    let
-	binder_set = mkNameSet new_mbinders
-    in
-	-- Rename the signatures
-    renameSigsFVs (okBindSig binder_set) sigs	`thenM` \ (siglist, sig_fvs) ->
 
-	-- Report the fixity declarations in this group that 
-	-- don't refer to any of the group's binders.
-	-- Then install the fixity declarations that do apply here
+	-- Then install local fixity declarations
 	-- Notice that they scope over thing_inside too
-    bindLocalFixities [sig | FixSig sig <- siglist ] 	$
+    bindLocalFixities [sig | FixSig sig <- sigs ] 	$
 
-    rn_mono_binds siglist mbinds	   `thenM` \ (binds, bind_fvs) ->
+	-- Do the business
+    rnMonoBinds mbinds sigs		`thenM` \ (binds, bind_fvs) ->
 
-    -- Now do the "thing inside", and deal with the free-variable calculations
+	-- Now do the "thing inside"
     thing_inside binds 			   `thenM` \ (result,result_fvs) ->
+
+	-- Final error checking
     let
-	all_fvs        = result_fvs `plusFV` bind_fvs `plusFV` sig_fvs
-	unused_binders = nameSetToList (binder_set `minusNameSet` all_fvs)
+	all_fvs        = result_fvs `plusFV` bind_fvs
+	unused_binders = filter (not . (`elemNameSet` all_fvs)) new_mbinders
     in
-    warnUnusedLocalBinds unused_binders	`thenM_`
+    warnUnusedLocalBinds unused_binders		`thenM_`
+
     returnM (result, delListFromNameSet all_fvs new_mbinders)
   where
     mbinders_w_srclocs = collectLocatedMonoBinders mbinds
-    doc = text "In the binding group for" <+> pp_bndrs mbinders_w_srclocs
-    pp_bndrs [(b,_)] = quotes (ppr b)
-    pp_bndrs bs      = fsep (punctuate comma [ppr b | (b,_) <- bs])
+    doc = text "In the binding group for:"
+	  <+> pprWithCommas ppr (map fst mbinders_w_srclocs)
 \end{code}
 
+
+\begin{code}
+rnMonoBinds :: RdrNameMonoBinds 
+	    -> [RdrNameSig]
+	    -> RnM (RenamedHsBinds, FreeVars)
+
+-- Assumes the binders of the binding are in scope already
+
+rnMonoBinds mbinds sigs
+ =  renameSigs sigs			`thenM` \ siglist ->
+    rn_mono_binds siglist mbinds	`thenM` \ (binders, final_binds, bind_fvs) ->
+    checkSigs okBindSig binders siglist	`thenM_`
+    returnM (final_binds, bind_fvs `plusFV` hsSigsFVs siglist)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -255,26 +253,27 @@ This is done {\em either} by pass 3 (for the top-level bindings),
 \begin{code}
 rn_mono_binds :: [RenamedSig]	        -- Signatures attached to this group
 	      -> RdrNameMonoBinds	
-	      -> RnM (RenamedHsBinds, 	-- Dependency analysed
-		       FreeVars)	-- Free variables
+	      -> RnM (NameSet,		-- Binders
+		      RenamedHsBinds, 	-- Dependency analysed
+		      FreeVars)		-- Free variables
 
 rn_mono_binds siglist mbinds
-  =
-	 -- Rename the bindings, returning a MonoBindsInfo
+  =	 -- Rename the bindings, returning a MonoBindsInfo
 	 -- which is a list of indivisible vertices so far as
 	 -- the strongly-connected-components (SCC) analysis is concerned
     flattenMonoBinds siglist mbinds		`thenM` \ mbinds_info ->
 
 	 -- Do the SCC analysis
     let 
-        edges	    = mkEdges (mbinds_info `zip` [(0::Int)..])
-	scc_result  = stronglyConnComp edges
+	scc_result  = rnSCC mbinds_info
 	final_binds = foldr (ThenBinds . reconstructCycle) EmptyBinds scc_result
 
-	 -- Deal with bound and free-var calculation
-	rhs_fvs = plusFVs [fvs | (_,fvs,_,_) <- mbinds_info]
+	-- Deal with bound and free-var calculation
+	-- Caller removes binders from free-var set
+	rhs_fvs = plusFVs [fvs  | (_,fvs,_)  <- mbinds_info]
+	bndrs   = plusFVs [defs | (defs,_,_) <- mbinds_info]
     in
-    returnM (final_binds, rhs_fvs)
+    returnM (bndrs, final_binds, rhs_fvs)
 \end{code}
 
 @flattenMonoBinds@ is ever-so-slightly magical in that it sticks
@@ -286,7 +285,7 @@ in case any of them \fbox{\ ???\ }
 \begin{code}
 flattenMonoBinds :: [RenamedSig]		-- Signatures
 		 -> RdrNameMonoBinds
-		 -> RnM [FlatMonoBindsInfo]
+		 -> RnM [FlatMonoBinds]
 
 flattenMonoBinds sigs EmptyMonoBinds = returnM []
 
@@ -308,9 +307,8 @@ flattenMonoBinds sigs (PatMonoBind pat grhss locn)
     returnM 
 	[(names_bound_here,
 	  fvs `plusFV` pat_fvs,
-	  PatMonoBind pat' grhss' locn,
-	  sigs_for_me
-	 )]
+	  (PatMonoBind pat' grhss' locn, sigs_for_me)
+	)]
 
 flattenMonoBinds sigs (FunMonoBind name inf matches locn)
   = addSrcLoc locn				 	$
@@ -324,9 +322,8 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
     returnM
       [(unitNameSet new_name,
 	fvs,
-	FunMonoBind new_name inf new_matches locn,
-	sigs_for_me
-	)]
+	(FunMonoBind new_name inf new_matches locn, sigs_for_me)
+      )]
 
 
 sigsForMe names_bound_here sigs
@@ -397,58 +394,53 @@ rnMethodBinds cls gen_tyvars mbind@(PatMonoBind other_pat _ locn)
 
 %************************************************************************
 %*									*
-\subsection[reconstruct-deps]{Reconstructing dependencies}
+	Strongly connected components
+
 %*									*
 %************************************************************************
 
-This @MonoBinds@- and @ClassDecls@-specific code is segregated here,
-as the two cases are similar.
-
-\begin{code}
-reconstructCycle :: SCC FlatMonoBindsInfo
-		 -> RenamedHsBinds
-
-reconstructCycle (AcyclicSCC (_, _, binds, sigs))
-  = MonoBind binds sigs NonRecursive
-
-reconstructCycle (CyclicSCC cycle)
-  = MonoBind this_gp_binds this_gp_sigs Recursive
-  where
-    this_gp_binds      = foldr1 AndMonoBinds [binds | (_, _, binds, _) <- cycle]
-    this_gp_sigs       = foldr1 (++)	     [sigs  | (_, _, _, sigs) <- cycle]
-\end{code}
-
-%************************************************************************
-%*									*
-\subsubsection{	Manipulating FlatMonoBindInfo}
-%*									*
-%************************************************************************
-
-During analysis a @MonoBinds@ is flattened to a @FlatMonoBindsInfo@.
+During analysis a @MonoBinds@ is flattened to a @FlatMonoBinds@.
 The @RenamedMonoBinds@ is always an empty bind, a pattern binding or
 a function binding, and has itself been dependency-analysed and
 renamed.
 
 \begin{code}
-type FlatMonoBindsInfo
-  = (NameSet,			-- Set of names defined in this vertex
-     NameSet,			-- Set of names used in this vertex
-     RenamedMonoBinds,
-     [RenamedSig])		-- Signatures, if any, for this vertex
+type BindWithSigs = (RenamedMonoBinds, [RenamedSig])
+			-- Signatures, if any, for this vertex
 
-mkEdges :: [(FlatMonoBindsInfo, VertexTag)] -> [(FlatMonoBindsInfo, VertexTag, [VertexTag])]
+type FlatMonoBinds = (NameSet,	-- Defs
+	 	      NameSet, 	-- Uses
+		      BindWithSigs)
 
-mkEdges flat_info
-  = [ (info, tag, dest_vertices (nameSetToList names_used))
-    | (info@(names_defined, names_used, mbind, sigs), tag) <- flat_info
+rnSCC :: [FlatMonoBinds] -> [SCC BindWithSigs]
+rnSCC nodes = stronglyConnComp (mkEdges nodes)
+
+type VertexTag	= Int
+
+mkEdges :: [FlatMonoBinds] -> [(BindWithSigs, VertexTag, [VertexTag])]
+mkEdges nodes
+  = [ (thing, tag, dest_vertices uses)
+    | ((defs, uses, thing), tag) <- tagged_nodes
     ]
   where
+    tagged_nodes = nodes `zip` [0::VertexTag ..]
+
  	 -- An edge (v,v') indicates that v depends on v'
-    dest_vertices src_mentions = [ target_vertex
-			         | ((names_defined, _, _, _), target_vertex) <- flat_info,
-				   mentioned_name <- src_mentions,
-				   mentioned_name `elemNameSet` names_defined
-			         ]
+    dest_vertices uses = [ target_vertex
+			 | ((defs, _, _), target_vertex) <- tagged_nodes,
+			   mentioned_name <- nameSetToList uses,
+			   mentioned_name `elemNameSet` defs
+			 ]
+
+reconstructCycle :: SCC BindWithSigs -> RenamedHsBinds
+reconstructCycle (AcyclicSCC (binds, sigs))
+  = MonoBind binds sigs NonRecursive
+reconstructCycle (CyclicSCC cycle)
+  = MonoBind this_gp_binds this_gp_sigs Recursive
+  where
+    (binds,sigs)  = unzip cycle
+    this_gp_binds = foldr1 AndMonoBinds binds
+    this_gp_sigs  = foldr1 (++)	        sigs
 \end{code}
 
 
@@ -469,31 +461,17 @@ At the moment we don't gather free-var info from the types in
 signatures.  We'd only need this if we wanted to report unused tyvars.
 
 \begin{code}
-renameSigsFVs ok_sig sigs
-  = renameSigs ok_sig sigs	`thenM` \ sigs' ->
-    returnM (sigs', hsSigsFVs sigs')
-
-renameSigs ::  (RenamedSig -> Bool)		-- OK-sig predicate
-	    -> [RdrNameSig]
-	    -> RnM [RenamedSig]
-
-renameSigs ok_sig [] = returnM []
-
-renameSigs ok_sig sigs
-  =	 -- Rename the signatures
-    mappM renameSig sigs   	`thenM` \ sigs' ->
-
+checkSigs :: (NameSet -> RenamedSig -> Bool)	-- OK-sig predicbate
+	  -> NameSet				-- Binders of this group
+	  -> [RenamedSig]
+	  -> RnM ()
+checkSigs ok_sig bndrs sigs
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
-    let
-	in_scope	 = filter is_in_scope sigs'
-	is_in_scope sig	 = case sigName sig of
-				Just n  -> not (isUnboundName n)
-				Nothing -> True
-	(goods, bads)	 = partition ok_sig in_scope
-    in
-    mappM_ unknownSigErr bads			`thenM_`
-    returnM goods
+	-- Well, I can't see the check for (b)... ToDo!
+  = mappM_ unknownSigErr bad_sigs
+  where
+    bad_sigs = filter (not . ok_sig bndrs) sigs
 
 -- We use lookupSigOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:
@@ -504,8 +482,12 @@ renameSigs ok_sig sigs
 -- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
 -- Doesn't seem worth much trouble to sort this.
 
+renameSigs :: [Sig RdrName] -> RnM [Sig Name]
+renameSigs sigs = mappM renameSig (filter (not . isFixitySig) sigs)
+	-- Remove fixity sigs which have been dealt with already
+
 renameSig :: Sig RdrName -> RnM (Sig Name)
--- ClassOpSig is renamed elsewhere.
+-- ClassOpSig, FixitSig is renamed elsewhere.
 renameSig (Sig v ty src_loc)
   = addSrcLoc src_loc $
     lookupSigOccRn v				`thenM` \ new_v ->
@@ -522,11 +504,6 @@ renameSig (SpecSig v ty src_loc)
     lookupSigOccRn v			`thenM` \ new_v ->
     rnHsSigType (quotes (ppr v)) ty	`thenM` \ new_ty ->
     returnM (SpecSig new_v new_ty src_loc)
-
-renameSig (FixSig (FixitySig v fix src_loc))
-  = addSrcLoc src_loc $
-    lookupSigOccRn v		`thenM` \ new_v ->
-    returnM (FixSig (FixitySig new_v fix src_loc))
 
 renameSig (InlineSig b v p src_loc)
   = addSrcLoc src_loc $

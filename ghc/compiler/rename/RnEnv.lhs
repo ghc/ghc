@@ -12,8 +12,7 @@ import {-# SOURCE #-} RnHiFiles( loadInterface )
 
 import FlattenInfo      ( namesNeededForFlattening )
 import HsSyn
-import RnHsSyn		( RenamedFixitySig )
-import RdrHsSyn		( RdrNameHsType, extractHsTyRdrTyVars )
+import RdrHsSyn		( RdrNameHsType, RdrNameFixitySig, extractHsTyRdrTyVars )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
 			  mkRdrUnqual, mkRdrQual, setRdrNameSpace, rdrNameOcc,
 			  lookupRdrEnv, rdrEnvToList, elemRdrEnv, 
@@ -36,12 +35,14 @@ import Name		( Name, getName, getSrcLoc, nameIsLocalOrFrom, isWiredInName,
 import NameSet
 import OccName		( OccName, tcName, isDataOcc, occNameUserString, occNameFlavour )
 import Module		( Module, ModuleName, moduleName, mkVanillaModule )
-import PrelNames	( mkUnboundName, intTyConName, qTyConName,
+import PrelNames	( mkUnboundName, intTyConName, 
 			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
 			  eqStringName, printName, 
-			  bindIOName, returnIOName, failIOName, thenIOName,
-			  templateHaskellNames
+			  bindIOName, returnIOName, failIOName, thenIOName
+#ifdef GHCI	
+			  , templateHaskellNames, qTyConName
+#endif
 			)
 import TysWiredIn	( unitTyCon )	-- A little odd
 import FiniteMap
@@ -483,15 +484,19 @@ unboundName rdr_name = addErr (unknownNameErr rdr_name)	`thenM_`
 
 \begin{code}
 --------------------------------
-bindLocalFixities :: [RenamedFixitySig] -> RnM a -> RnM a
+bindLocalFixities :: [RdrNameFixitySig] -> RnM a -> RnM a
 -- Used for nested fixity decls
 -- No need to worry about type constructors here,
 -- Should check for duplicates but we don't
 bindLocalFixities fixes thing_inside
   | null fixes = thing_inside
-  | otherwise  = extendFixityEnv new_bit thing_inside
+  | otherwise  = mappM rn_sig fixes	`thenM` \ new_bit ->
+		 extendFixityEnv new_bit thing_inside
   where
-    new_bit = [(n,s) | s@(FixitySig n _ _) <- fixes]
+    rn_sig (FixitySig v fix src_loc)
+	= addSrcLoc src_loc $
+	  lookupSigOccRn v		`thenM` \ new_v ->
+	  returnM (new_v, FixitySig new_v fix src_loc)
 \end{code}
 
 --------------------------------
@@ -578,10 +583,9 @@ mkTemplateHaskellFVs source_fvs
 -- they are needed in virtually every program
 ubiquitousNames 
   = mkFVs [unpackCStringName, unpackCStringFoldrName, 
-	   unpackCStringUtf8Name, eqStringName]
+	   unpackCStringUtf8Name, eqStringName,
 		-- Virtually every program has error messages in it somewhere
-	  `plusFV`
-    mkFVs [getName unitTyCon, funTyConName, boolTyConName, intTyConName]
+    	   getName unitTyCon, funTyConName, boolTyConName, intTyConName]
 		-- Add occurrences for very frequently used types.
 		--  	 (e.g. we don't want to be bothered with making 
 		--	  funTyCon a free var at every function application!)

@@ -56,7 +56,7 @@ import Var		( TyVar )
 import CmdLineOpts
 import UnicodeUtil	( stringToUtf8 )
 import ErrUtils		( dumpIfSet )
-import Util		( count, lengthIs, equalLength )
+import Util		( count, lengthIs )
 import Maybes		( seqMaybe )
 import Maybe		( isJust )
 import FastString

@@ -203,6 +203,9 @@ knownKeyNames
 	thenMName, bindMName, returnMName, failMName,
 	thenIOName, bindIOName, returnIOName, failIOName,
 
+	-- MonadRec stuff
+	mfixName,
+
 	-- Ix stuff
 	ixClassName, 
 
@@ -335,7 +338,7 @@ lEX_Name       = mkModuleName "Text.Read.Lex"
 mAIN_Name	  = mkModuleName "Main"
 pREL_INT_Name	  = mkModuleName "GHC.Int"
 pREL_WORD_Name	  = mkModuleName "GHC.Word"
-
+mONAD_FIX_Name	  = mkModuleName "Control.Monad.Fix"
 aDDR_Name	  = mkModuleName "Addr"
 
 gLA_EXTS_Name   = mkModuleName "GHC.Exts"
@@ -352,6 +355,7 @@ pREL_NUM     	= mkPrelModule pREL_NUM_Name
 pREL_REAL    	= mkPrelModule pREL_REAL_Name
 pREL_FLOAT   	= mkPrelModule pREL_FLOAT_Name
 pRELUDE		= mkPrelModule pRELUDE_Name
+
 
 iNTERACTIVE     = mkHomeModule (mkModuleName "$Interactive")
 
@@ -806,6 +810,9 @@ runSTRepName	   = varQual pREL_ST_Name  FSLIT("runSTRep") runSTRepIdKey
 
 -- The "split" Id for splittable implicit parameters
 splitName          = varQual gLA_EXTS_Name FSLIT("split") splitIdKey
+
+-- Recursive-do notation
+mfixName	   = varQual mONAD_FIX_Name FSLIT("mfix") mfixIdKey
 \end{code}
 
 %************************************************************************
@@ -1179,6 +1186,9 @@ valIdKey        = mkPreludeMiscIdUnique 159
 protoIdKey      = mkPreludeMiscIdUnique 160
 matchIdKey      = mkPreludeMiscIdUnique 161
 clauseIdKey     = mkPreludeMiscIdUnique 162
+
+-- Recursive do notation
+mfixIdKey	= mkPreludeMiscIdUnique 163
 \end{code}
 
 

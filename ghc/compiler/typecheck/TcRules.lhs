@@ -8,21 +8,20 @@ module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), collectRuleBndrSigTys )
+import HsSyn		( RuleDecl(..), RuleBndr(..), collectRuleBndrSigTys )
 import CoreSyn		( CoreRule(..) )
 import RnHsSyn		( RenamedRuleDecl )
-import TcHsSyn		( TypecheckedRuleDecl, TcExpr, mkHsLet )
+import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
-import TcType		( TcTyVarSet, tyVarsOfTypes, tyVarsOfType, openTypeKind )
+import TcType		( tyVarsOfTypes, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcMonoExpr )
 import TcEnv		( tcExtendLocalValEnv )
 import Inst		( instToId )
 import Id		( idType, mkLocalId )
-import VarSet
 import Outputable
 \end{code}
 

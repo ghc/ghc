@@ -7,12 +7,11 @@
 module RnSource ( 
 	rnSrcDecls, rnExtCoreDecls, checkModDeprec,
 	rnTyClDecl, rnIfaceRuleDecl, rnInstDecl, 
-	rnBinds, rnStats,
+	rnBinds, rnBindsAndThen, rnStats,
     ) where
 
 #include "HsVersions.h"
 
-import RnExpr
 import HsSyn
 import RdrName		( RdrName, isRdrDataCon, elemRdrEnv )
 import RdrHsSyn		( RdrNameConDecl, RdrNameTyClDecl, RdrNameHsDecl,
@@ -24,10 +23,11 @@ import RnHsSyn
 import HsCore
 
 import RnNames		( importsFromLocalDecls )
+import RnExpr		( rnExpr )
 import RnTypes		( rnHsType, rnHsSigType, rnHsTypeFVs, rnContext )
 
 import RnBinds		( rnTopMonoBinds, rnMonoBinds, rnMethodBinds, 
-			  renameSigs, renameSigsFVs )
+			  rnMonoBindsAndThen, renameSigs, checkSigs )
 import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupSysBndr,
 			  newLocalsRn, lookupGlobalOccRn,
 			  bindLocalsFVRn, bindPatSigTyVars,
@@ -271,12 +271,20 @@ rnTopBinds EmptyBinds		  = returnM (EmptyBinds, emptyFVs)
 rnTopBinds (MonoBind bind sigs _) = rnTopMonoBinds bind sigs
   -- The parser doesn't produce other forms
 
-rnBinds	:: RdrNameHsBinds 
-	-> (RenamedHsBinds -> RnM (result, FreeVars))
-	-> RnM (result, FreeVars)
-rnBinds EmptyBinds	       thing_inside = thing_inside EmptyBinds
-rnBinds (MonoBind bind sigs _) thing_inside = rnMonoBinds bind sigs thing_inside
-  -- the parser doesn't produce other forms
+rnBinds    :: RdrNameHsBinds -> RnM (RenamedHsBinds, FreeVars)
+-- This version assumes that the binders are already in scope
+rnBinds EmptyBinds	       = returnM (EmptyBinds, emptyFVs)
+rnBinds (MonoBind bind sigs _) = rnMonoBinds bind sigs
+  -- The parser doesn't produce other forms
+
+rnBindsAndThen	:: RdrNameHsBinds 
+		-> (RenamedHsBinds -> RnM (result, FreeVars))
+		-> RnM (result, FreeVars)
+-- This version (a) assumes that the binding vars are not already in scope
+--		(b) removes the binders from the free vars of the thing inside
+rnBindsAndThen EmptyBinds	      thing_inside = thing_inside EmptyBinds
+rnBindsAndThen (MonoBind bind sigs _) thing_inside = rnMonoBindsAndThen bind sigs thing_inside
+  -- The parser doesn't produce other forms
 \end{code}
 
 
@@ -353,8 +361,7 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
 	rnMethodBinds cls [] mbinds
     )						`thenM` \ (mbinds', meth_fvs) ->
     let 
-	binders    = collectMonoBinders mbinds'
-	binder_set = mkNameSet binders
+	binders = collectMonoBinders mbinds'
     in
 	-- Rename the prags and signatures.
 	-- Note that the type variables are not in scope here,
@@ -363,12 +370,11 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
 	-- works OK. 
 	--
 	-- But the (unqualified) method names are in scope
-    bindLocalNames binders (
-       renameSigsFVs (okInstDclSig binder_set) uprags
-    )							`thenM` \ (uprags', prag_fvs) ->
+    bindLocalNames binders (renameSigs uprags)			`thenM` \ uprags' ->
+    checkSigs okInstDclSig (mkNameSet binders) uprags'		`thenM_`
 
     returnM (InstDecl inst_ty mbinds' uprags' maybe_dfun_name src_loc,
-	      meth_fvs `plusFV` prag_fvs)
+	      meth_fvs `plusFV` hsSigsFVs uprags')
 \end{code}
 
 %*********************************************************
@@ -549,8 +555,8 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname,
     let
 	binders = mkNameSet [ nm | (ClassOpSig nm _ _ _) <- sigs' ]
     in
-    renameSigs (okClsDclSig binders) non_op_sigs	  `thenM` \ non_ops' ->
-
+    renameSigs non_op_sigs			`thenM` \ non_ops' ->
+    checkSigs okClsDclSig binders non_ops'	`thenM_`
 	-- Typechecker is responsible for checking that we only
 	-- give default-method bindings for things in this class.
 	-- The renamer *could* check this for class decls, but can't

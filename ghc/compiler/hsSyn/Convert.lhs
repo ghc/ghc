@@ -14,7 +14,7 @@ import Language.Haskell.THSyntax as Meta
 
 import HsSyn as Hs
 	(	HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-		HsDoContext(..), 
+		HsStmtContext(..), 
 		Match(..), GRHSs(..), GRHS(..), HsPred(..),
 		HsDecl(..), TyClDecl(..), InstDecl(..), ConDecl(..),
 		Stmt(..), HsBinds(..), MonoBinds(..), Sig(..),

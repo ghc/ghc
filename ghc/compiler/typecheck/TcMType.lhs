@@ -65,11 +65,10 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  eqKind, isTypeKind, 
 			  isFFIArgumentTy, isFFIImportResultTy
 			)
-import qualified Type	( splitFunTys )
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import Class		( Class, DefMeth(..), classArity, className, classBigSig )
 import TyCon		( TyCon, isSynTyCon, isUnboxedTupleTyCon, 
-			  tyConArity, tyConName, tyConKind, tyConTheta, 
+			  tyConArity, tyConName, tyConTheta, 
 			  getSynTyConDefn, tyConDataCons )
 import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, dataConFieldLabels )
 import FieldLabel	( fieldLabelName, fieldLabelType )
@@ -83,13 +82,9 @@ import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
 import ForeignCall	( Safety(..) )
 import FunDeps		( grow )
 import PprType		( pprPred, pprSourceType, pprTheta, pprClassPred )
-import Name		( Name, NamedThing(..), setNameUnique, 
-			  mkSystemTvNameEncoded,
-			)
+import Name		( Name, setNameUnique, mkSystemTvNameEncoded )
 import VarSet
-import BasicTypes	( Boxity(Boxed) )
 import CmdLineOpts	( dopt, DynFlag(..) )
-import SrcLoc		( noSrcLoc )
 import Util		( nOfThem, isSingleton, equalLength, notNull )
 import ListSetOps	( equivClasses, removeDups )
 import Outputable

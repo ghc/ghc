@@ -13,7 +13,7 @@ import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
 import BasicTypes	( Boxity(..) )
 import TyCon		( tyConName )
 import HsSyn		( Pat(..), HsExpr(..), Stmt(..),
-			  HsMatchContext(..), HsDoContext(..),
+			  HsMatchContext(..), HsStmtContext(..),
 			  collectHsBinders )
 import TcHsSyn		( TypecheckedStmt, TypecheckedPat, TypecheckedHsExpr,
 			  hsPatType )
@@ -202,7 +202,7 @@ deBindComp pat core_list1 quals core_list2
 	letrec_body = App (Var h) core_list1
     in
     deListComp quals core_fail			`thenDs` \ rest_expr ->
-    matchSimply (Var u2) (DoCtxt ListComp) pat
+    matchSimply (Var u2) (StmtCtxt ListComp) pat
 		rest_expr core_fail		`thenDs` \ core_match ->
     let
 	rhs = Lam u1 $
@@ -315,7 +315,7 @@ dfListComp c_id n_id (BindStmt pat list1 locn : quals)
     dfListComp c_id b quals			`thenDs` \ core_rest ->
 
     -- build the pattern match
-    matchSimply (Var x) (DoCtxt ListComp) 
+    matchSimply (Var x) (StmtCtxt ListComp) 
 		pat core_rest (Var b)		`thenDs` \ core_expr ->
 
     -- now build the outermost foldr, and return
@@ -395,7 +395,7 @@ dePArrComp (BindStmt p e _ : qs) pa cea =
       true   = Var trueId
   in
   newSysLocalDs ty'ce					  `thenDs` \v       ->
-  matchSimply (Var v) (DoCtxt PArrComp) p true false      `thenDs` \pred    ->
+  matchSimply (Var v) (StmtCtxt PArrComp) p true false      `thenDs` \pred    ->
   let cef    = mkApps (Var filterP) [Type ty'ce, mkLams [v] pred, ce]
       ty'cef = ty'ce				-- filterP preserves the type
       pa'    = TuplePat [pa, p] Boxed
@@ -421,7 +421,7 @@ dePArrComp (LetStmt ds : qs) pa cea =
       errMsg   = "DsListComp.dePArrComp: internal error!"
   in
   mkErrorAppDs pAT_ERROR_ID errTy errMsg                  `thenDs` \cerr    ->
-  matchSimply (Var v) (DoCtxt PArrComp) pa projBody cerr  `thenDs` \ccase   ->
+  matchSimply (Var v) (StmtCtxt PArrComp) pa projBody cerr  `thenDs` \ccase   ->
   let pa'    = TuplePat [pa, TuplePat (map VarPat xs) Boxed] Boxed
       proj   = mkLams [v] ccase
   in
@@ -459,7 +459,7 @@ deLambda ty p e  =
       errMsg   = "DsListComp.deLambda: internal error!"
   in
   mkErrorAppDs pAT_ERROR_ID errTy errMsg                  `thenDs` \cerr    ->
-  matchSimply (Var v) (DoCtxt PArrComp) p ce cerr	  `thenDs` \res	    ->
+  matchSimply (Var v) (StmtCtxt PArrComp) p ce cerr	  `thenDs` \res	    ->
   returnDs (mkLams [v] res, errTy)
 
 -- obtain the element type of the parallel array produced by the given Core

@@ -1,9 +1,12 @@
 module RnSource where
 
-rnBinds :: forall b . RdrHsSyn.RdrNameHsBinds
+rnBindsAndThen :: forall b . RdrHsSyn.RdrNameHsBinds
 	-> (RnHsSyn.RenamedHsBinds
  	-> TcRnTypes.RnM (b, NameSet.FreeVars))
 	-> TcRnTypes.RnM (b, NameSet.FreeVars) ;
+
+rnBinds :: RdrHsSyn.RdrNameHsBinds
+	-> TcRnTypes.RnM (RnHsSyn.RenamedHsBinds, NameSet.FreeVars) ;
 
 rnSrcDecls :: [RdrHsSyn.RdrNameHsDecl]
 	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, [RnHsSyn.RenamedHsDecl], NameSet.FreeVars)

@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.104 2002/09/25 12:47:42 simonmar Exp $
+$Id: Parser.y,v 1.105 2002/09/27 08:20:45 simonpj Exp $
 
 Haskell grammar.
 
@@ -126,6 +126,7 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
  'threadsafe'	{ ITthreadsafe }
  'unsafe'	{ ITunsafe }
  'with' 	{ ITwith }
+ 'mdo'		{ ITmdo }
  'stdcall'      { ITstdcallconv }
  'ccall'        { ITccallconv }
  'dotnet'       { ITdotnet }
@@ -999,6 +1000,8 @@ exp10 :: { RdrNameHsExpr }
 	| '-' fexp				{ mkHsNegApp $2 }
   	| srcloc 'do' stmtlist			{% checkDo $3  `thenP` \ stmts ->
 						   returnP (mkHsDo DoExpr stmts $1) }
+  	| srcloc 'mdo' stmtlist			{% checkMDo $3  `thenP` \ stmts ->
+						   returnP (mkHsDo MDoExpr stmts $1) }
 
 	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 PlayRisky False placeHolderType }
 	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 (PlaySafe False) False placeHolderType }

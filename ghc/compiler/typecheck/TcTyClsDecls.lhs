@@ -16,7 +16,7 @@ import HsSyn		( TyClDecl(..),
 			  isTypeOrClassDecl, isClassDecl, isSynDecl, isClassOpSig
 			)
 import RnHsSyn		( RenamedTyClDecl, tyClDeclFVs )
-import BasicTypes	( RecFlag(..), isNonRec, NewOrData(..) )
+import BasicTypes	( RecFlag(..), NewOrData(..) )
 import HscTypes		( implicitTyThingIds )
 
 import TcRnMonad
@@ -43,12 +43,11 @@ import DataCon		( dataConOrigArgTys )
 import Var		( varName )
 import FiniteMap
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( Name, getSrcLoc )
+import Name		( Name )
 import NameEnv
 import NameSet
 import Outputable
 import Maybes		( mapMaybe )
-import ErrUtils		( Message )
 \end{code}
 
 

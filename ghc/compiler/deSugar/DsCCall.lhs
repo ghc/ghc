@@ -19,7 +19,7 @@ import CoreSyn
 import DsMonad
 
 import CoreUtils	( exprType, mkCoerce2 )
-import Id		( Id, mkWildId, idType )
+import Id		( Id, mkWildId )
 import MkId		( mkFCallId, realWorldPrimId, mkPrimOpId )
 import Maybes		( maybeToBool )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety, CCallConv(..) )
@@ -29,14 +29,12 @@ import ForeignCall	( ForeignCall, CCallTarget(..) )
 import TcType		( tcSplitTyConApp_maybe )
 import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  tyVarsOfType, mkForAllTys, mkTyConApp, 
-			  isPrimitiveType, eqType,
-			  splitTyConApp_maybe, splitNewType_maybe
+			  isPrimitiveType, splitTyConApp_maybe, splitNewType_maybe
 			)
 
 import PrimOp		( PrimOp(..) )
-import TysPrim		( realWorldStatePrimTy,
-			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
-			  intPrimTy, foreignObjPrimTy
+import TysPrim		( realWorldStatePrimTy, intPrimTy,
+			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon
 			)
 import TyCon		( TyCon, tyConDataCons )
 import TysWiredIn	( unitDataConId,

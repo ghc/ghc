@@ -10,6 +10,7 @@ module NameSet (
 	emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
 	minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet, 
 	delFromNameSet, delListFromNameSet, isEmptyNameSet, foldNameSet, filterNameSet,
+	intersectsNameSet, intersectNameSet,
 	
 	-- Free variables
 	FreeVars, isEmptyFVs, emptyFVs, plusFVs, plusFV, 
@@ -46,6 +47,9 @@ delFromNameSet	   :: NameSet -> Name -> NameSet
 delListFromNameSet :: NameSet -> [Name] -> NameSet
 foldNameSet	   :: (Name -> b -> b) -> b -> NameSet -> b
 filterNameSet	   :: (Name -> Bool) -> NameSet -> NameSet
+intersectNameSet   :: NameSet -> NameSet -> NameSet
+intersectsNameSet  :: NameSet -> NameSet -> Bool 	-- True if non-empty intersection
+	-- (s1 `intersectsVarSet` s2) doesn't compute s2 if s1 is empty
 
 isEmptyNameSet    = isEmptyUniqSet
 emptyNameSet	  = emptyUniqSet
@@ -61,8 +65,11 @@ nameSetToList     = uniqSetToList
 delFromNameSet    = delOneFromUniqSet
 foldNameSet	  = foldUniqSet
 filterNameSet	  = filterUniqSet
+intersectNameSet  = intersectUniqSets
 
 delListFromNameSet set ns = foldl delFromNameSet set ns
+
+intersectsNameSet s1 s2 = not (isEmptyNameSet (s1 `intersectNameSet` s2))
 \end{code}
 
 

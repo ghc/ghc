@@ -88,7 +88,7 @@ data HsExpr id
 		Bool		-- True <=> this was a 'with' binding
 				--  (tmp, until 'with' is removed)
 
-  | HsDo	HsDoContext
+  | HsDo	HsStmtContext
 		[Stmt id]	-- "do":one or more stmts
 		[id]		-- Ids for [return,fail,>>=,>>]
 				--	Brutal but simple
@@ -572,9 +572,18 @@ data Stmt id
   | ResultStmt	(HsExpr id)	SrcLoc			-- See notes that follow
   | ExprStmt	(HsExpr id)	PostTcType SrcLoc	-- See notes that follow
 	-- The type is the *element type* of the expression
-  | ParStmt	[[Stmt id]]				-- List comp only: parallel set of quals
-  | ParStmtOut	[([id], [Stmt id])]			-- PLC after renaming; the ids are the binders
-							-- bound by the stmts
+
+	-- ParStmts only occur in a list comprehension
+  | ParStmt	[[Stmt id]]		-- List comp only: parallel set of quals
+  | ParStmtOut	[([id], [Stmt id])]	-- PLC after renaming; the ids are the binders
+					-- bound by the stmts
+
+	-- mdo-notation (only exists after renamer)
+	-- The ids are a subset of the variables bound by the stmts that
+	-- either (a) are used before they are bound in the stmts
+	-- or     (b) are used in stmts that follow the RecStmt
+  | RecStmt  [id] 	
+	     [Stmt id] 
 \end{code}
 
 ExprStmts and ResultStmts are a bit tricky, because what they mean
@@ -632,9 +641,11 @@ pprStmt (ParStmt stmtss)
  = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
 pprStmt (ParStmtOut stmtss)
  = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
+pprStmt (RecStmt _ segment) = vcat (map ppr segment)
 
-pprDo :: OutputableBndr id => HsDoContext -> [Stmt id] -> SDoc
+pprDo :: OutputableBndr id => HsStmtContext -> [Stmt id] -> SDoc
 pprDo DoExpr stmts   = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))
+pprDo MDoExpr stmts  = hang (ptext SLIT("mdo")) 3 (vcat (map ppr stmts))
 pprDo ListComp stmts = pprComp brackets   stmts
 pprDo PArrComp stmts = pprComp pa_brackets stmts
 
@@ -711,7 +722,7 @@ pp_dotdot = ptext SLIT(" .. ")
 
 \begin{code}
 data HsMatchContext id	-- Context of a Match or Stmt
-  = DoCtxt HsDoContext	-- Do-stmt or list comprehension
+  = StmtCtxt HsStmtContext	-- Do-stmt or list comprehension
   | FunRhs id		-- Function binding for f
   | CaseAlt		-- Guard on a case alternative
   | LambdaExpr		-- Lambda
@@ -719,14 +730,18 @@ data HsMatchContext id	-- Context of a Match or Stmt
   | RecUpd		-- Record update
   deriving ()
 
-data HsDoContext = ListComp 
-		 | DoExpr 
-		 | PArrComp	-- parallel array comprehension
+data HsStmtContext 
+	= ListComp 
+	| DoExpr 
+	| MDoExpr      -- recursive do-expression
+	| PArrComp	-- parallel array comprehension
+	| PatGuard	-- Never occurs in an HsDo expression, of course
 \end{code}
 
 \begin{code}
-isDoExpr (DoCtxt DoExpr) = True
-isDoExpr other 		 = False
+isDoExpr DoExpr  = True
+isDoExpr MDoExpr = True
+isDoExpr other   = False
 \end{code}
 
 \begin{code}
@@ -734,7 +749,7 @@ matchSeparator (FunRhs _)   = ptext SLIT("=")
 matchSeparator CaseAlt      = ptext SLIT("->") 
 matchSeparator LambdaExpr   = ptext SLIT("->") 
 matchSeparator PatBindRhs   = ptext SLIT("=") 
-matchSeparator (DoCtxt _)   = ptext SLIT("<-")  
+matchSeparator (StmtCtxt _)   = ptext SLIT("<-")  
 matchSeparator RecUpd       = panic "When is this used?"
 \end{code}
 
@@ -744,19 +759,23 @@ pprMatchContext CaseAlt	     	  = ptext SLIT("In a case alternative")
 pprMatchContext RecUpd	     	  = ptext SLIT("In a record-update construct")
 pprMatchContext PatBindRhs   	  = ptext SLIT("In a pattern binding")
 pprMatchContext LambdaExpr   	  = ptext SLIT("In a lambda abstraction")
-pprMatchContext (DoCtxt DoExpr)   = ptext SLIT("In a 'do' expression pattern binding")
-pprMatchContext (DoCtxt ListComp) = 
-  ptext SLIT("In a 'list comprehension' pattern binding")
-pprMatchContext (DoCtxt PArrComp) = 
-  ptext SLIT("In an 'array comprehension' pattern binding")
+pprMatchContext (StmtCtxt ctxt)   = pprStmtCtxt ctxt
+
+pprStmtCtxt PatGuard = ptext SLIT("In a pattern guard")
+pprStmtCtxt DoExpr   = ptext SLIT("In a 'do' expression pattern binding")
+pprStmtCtxt MDoExpr  = ptext SLIT("In an 'mdo' expression pattern binding")
+pprStmtCtxt ListComp = ptext SLIT("In a 'list comprehension' pattern binding")
+pprStmtCtxt PArrComp = ptext SLIT("In an 'array comprehension' pattern binding")
 
 -- Used to generate the string for a *runtime* error message
 matchContextErrString (FunRhs fun)    	= "function " ++ showSDoc (ppr fun)
 matchContextErrString CaseAlt	      	= "case"
 matchContextErrString PatBindRhs      	= "pattern binding"
 matchContextErrString RecUpd	      	= "record update"
-matchContextErrString LambdaExpr      	=  "lambda"
-matchContextErrString (DoCtxt DoExpr)   = "'do' expression"
-matchContextErrString (DoCtxt ListComp) = "list comprehension"
-matchContextErrString (DoCtxt PArrComp) = "array comprehension"
+matchContextErrString LambdaExpr      	= "lambda"
+matchContextErrString (StmtCtxt PatGuard) = "pattern gaurd"
+matchContextErrString (StmtCtxt DoExpr)   = "'do' expression"
+matchContextErrString (StmtCtxt MDoExpr)  = "'mdo' expression"
+matchContextErrString (StmtCtxt ListComp) = "list comprehension"
+matchContextErrString (StmtCtxt PArrComp) = "array comprehension"
 \end{code}

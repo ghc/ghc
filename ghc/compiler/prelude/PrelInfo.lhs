@@ -33,7 +33,7 @@ import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
 import Name		( nameOccName )
 import RdrName		( mkRdrUnqual, getRdrName )
-import HsSyn		( HsTyVarBndr(..), TyClDecl(..), HsType(..) )
+import HsSyn		( HsTyVarBndr(..) )
 import OccName		( mkVarOcc )
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )

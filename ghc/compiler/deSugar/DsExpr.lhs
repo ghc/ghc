@@ -25,9 +25,9 @@ import DsMeta		( dsBracket )
 
 import HsSyn		( failureFreePat,
 			  HsExpr(..), Pat(..), HsLit(..), ArithSeqInfo(..),
-			  Stmt(..), HsMatchContext(..), HsDoContext(..), 
+			  Stmt(..), HsMatchContext(..), HsStmtContext(..), 
 			  Match(..), HsBinds(..), MonoBinds(..), HsConDetails(..),
-			  mkSimpleMatch 
+			  mkSimpleMatch, isDoExpr
 			)
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds, TypecheckedStmt, hsPatType )
 
@@ -37,7 +37,8 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds, TypecheckedStmt, hsPatT
 -- Sigh.  This is a pain.
 
 import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppArgs,
-			  tcSplitTyConApp, isUnLiftedType, Type )
+			  tcSplitTyConApp, isUnLiftedType, Type,
+			  mkAppTy )
 import Type		( splitFunTys )
 import CoreSyn
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
@@ -49,9 +50,10 @@ import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArgTys )
 import DataCon		( isExistentialDataCon )
 import TyCon		( tyConDataCons )
-import TysWiredIn	( tupleCon )
+import TysWiredIn	( tupleCon, mkTupleTy )
 import BasicTypes	( RecFlag(..), Boxity(..), ipNameName )
 import PrelNames	( toPName )
+import SrcLoc		( noSrcLoc )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
 import FastString
@@ -274,9 +276,10 @@ dsExpr (HsDo ListComp stmts _ result_ty src_loc)
   where
     (_, [elt_ty]) = tcSplitTyConApp result_ty
 
-dsExpr (HsDo DoExpr stmts ids result_ty src_loc)
+dsExpr (HsDo do_or_lc stmts ids result_ty src_loc)
+  | isDoExpr do_or_lc
   = putSrcLocDs src_loc $
-    dsDo DoExpr stmts ids result_ty
+    dsDo do_or_lc stmts ids result_ty
 
 dsExpr (HsDo PArrComp stmts _ result_ty src_loc)
   =	-- Special case for array comprehensions
@@ -568,18 +571,17 @@ dsExpr (PArrSeqIn _)	    = panic "dsExpr:PArrSeqIn"
 Basically does the translation given in the Haskell~1.3 report:
 
 \begin{code}
-dsDo	:: HsDoContext
+dsDo	:: HsStmtContext
 	-> [TypecheckedStmt]
-	-> [Id]		-- id for: [return,fail,>>=,>>]
+	-> [Id]		-- id for: [return,fail,>>=,>>] and possibly mfixName
 	-> Type		-- Element type; the whole expression has type (m t)
 	-> DsM CoreExpr
 
-dsDo do_or_lc stmts ids@[return_id, fail_id, bind_id, then_id] result_ty
+dsDo do_or_lc stmts ids result_ty
   = let
-	(_, b_ty) = tcSplitAppTy result_ty	-- result_ty must be of the form (m b)
-	is_do	  = case do_or_lc of
-			DoExpr   -> True
-			_	 -> False
+  	(return_id : fail_id : bind_id : then_id : _) = ids
+	(m_ty, b_ty) = tcSplitAppTy result_ty	-- result_ty must be of the form (m b)
+	is_do	     = isDoExpr do_or_lc 	-- True for both MDo and Do
 	
 	-- For ExprStmt, see the comments near HsExpr.Stmt about 
 	-- exactly what ExprStmts mean!
@@ -629,12 +631,55 @@ dsDo do_or_lc stmts ids@[return_id, fail_id, bind_id, then_id] result_ty
 		      , mkSimpleMatch [WildPat a_ty] fail_expr result_ty locn
 		      ]
 	    in
-	    matchWrapper (DoCtxt do_or_lc) the_matches	`thenDs` \ (binders, matching_code) ->
+	    matchWrapper (StmtCtxt do_or_lc) the_matches	`thenDs` \ (binders, matching_code) ->
 	    returnDs (mkApps (Var bind_id) [Type a_ty, Type b_ty, expr2,
 				            mkLams binders matching_code])
+
+	go (RecStmt rec_vars rec_stmts : stmts)
+	  = go (bind_stmt : stmts)
+	  where
+	    bind_stmt = dsRecStmt m_ty ids rec_vars rec_stmts
+	    
     in
     go stmts
 
   where
     do_expr expr locn = putSrcLocDs locn (dsExpr expr)
+\end{code}
+
+Translation for RecStmt's: 
+-----------------------------
+We turn (RecStmt [v1,..vn] stmts) into:
+  
+  (v1,..,vn) <- mfix (\~(v1,..vn). do stmts
+				      return (v1,..vn))
+
+\begin{code}
+dsRecStmt :: Type		-- Monad type constructor :: * -> *
+	  -> [Id]		-- Ids for: [return,fail,>>=,>>,mfix]
+	  -> [Id] -> [TypecheckedStmt]	-- Guts of the RecStmt
+	  -> TypecheckedStmt
+dsRecStmt m_ty ids@[return_id, _, _, _, mfix_id] vars stmts
+  = BindStmt tup_pat mfix_app noSrcLoc
+  where 
+	(var1:rest) = vars		-- Always at least one
+	one_var     = null rest
+
+	mfix_app = HsApp (TyApp (HsVar mfix_id) [tup_ty]) mfix_arg
+	mfix_arg = HsLam (mkSimpleMatch [tup_pat] body tup_ty noSrcLoc)
+
+	tup_expr | one_var   = HsVar var1
+		 | otherwise = ExplicitTuple (map HsVar vars) Boxed
+	tup_ty   | one_var   = idType var1
+		 | otherwise = mkTupleTy Boxed (length vars) (map idType vars)
+	tup_pat  | one_var   = VarPat var1
+		 | otherwise = LazyPat (TuplePat (map VarPat vars) Boxed)
+
+	body = HsDo DoExpr (stmts ++ [return_stmt]) 
+			   ids	-- Don't need the mfix, but it does no harm
+			   (mkAppTy m_ty tup_ty)
+			   noSrcLoc
+
+	return_stmt = ResultStmt return_app noSrcLoc
+	return_app  = HsApp (TyApp (HsVar return_id) [tup_ty]) tup_expr
 \end{code}

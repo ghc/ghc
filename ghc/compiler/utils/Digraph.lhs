@@ -95,7 +95,7 @@ stronglyConnCompR
 	=> [(node, key, [key])]		-- The graph; its ok for the
 					-- out-list to contain keys which arent
 					-- a vertex key, they are ignored
-	-> [SCC (node, key, [key])]
+	-> [SCC (node, key, [key])]	-- Topologically sorted
 
 stronglyConnCompR [] = []  -- added to avoid creating empty array in graphFromEdges -- SOF
 stronglyConnCompR edges

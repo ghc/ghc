@@ -13,8 +13,8 @@ module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchLambda,
 import {-# SOURCE #-}	TcExpr( tcMonoExpr )
 
 import HsSyn		( HsExpr(..), HsBinds(..), Match(..), GRHSs(..), GRHS(..),
-			  MonoBinds(..), Stmt(..), HsMatchContext(..), HsDoContext(..),
-			  pprMatch, getMatchLoc, pprMatchContext, isDoExpr,
+			  MonoBinds(..), Stmt(..), HsMatchContext(..), HsStmtContext(..),
+			  pprMatch, getMatchLoc, pprMatchContext, pprStmtCtxt, isDoExpr,
 			  mkMonoBind, nullMonoBinds, collectSigTysFromPats, andMonoBindList
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, 
@@ -25,20 +25,20 @@ import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds,
 import TcRnMonad
 import TcMonoType	( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
 import Inst		( tcSyntaxName )
-import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv2 )
+import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendLocalValEnv2 )
 import TcPat		( tcPat, tcMonoPatBndr )
-import TcMType		( newTyVarTy, zonkTcType, zapToType )
+import TcMType		( newTyVarTy, newTyVarTys, zonkTcType, zapToType )
 import TcType		( TcType, TcTyVar, tyVarsOfType, tidyOpenTypes, tidyOpenType,
 			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind, 
 			  mkArrowKind, mkAppTy )
 import TcBinds		( tcBindsAndThen )
 import TcUnify		( unifyPArrTy,subFunTy, unifyListTy, unifyTauTy,
-			  checkSigTyVarsWrt, tcSubExp, isIdCoercion, (<$>) )
+			  checkSigTyVarsWrt, tcSubExp, isIdCoercion, (<$>), unifyTauTyLists )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import Name		( Name )
-import PrelNames	( monadNames )
+import PrelNames	( monadNames, mfixName )
 import TysWiredIn	( boolTy, mkListTy, mkPArrTy )
-import Id		( idType, mkSysLocal )
+import Id		( idType, mkSysLocal, mkLocalId )
 import CoreFVs		( idFreeTyVars )
 import BasicTypes	( RecFlag(..) )
 import VarSet
@@ -197,8 +197,8 @@ tcGRHSs ctxt (GRHSs grhss binds _) expected_ty
 	  returnM (GRHSs grhss' EmptyBinds expected_ty)
 
     tc_grhs (GRHS guarded locn)
-	= addSrcLoc locn				$
-	  tcStmts ctxt (\ty -> ty, expected_ty) guarded	`thenM` \ guarded' ->
+	= addSrcLoc locn					$
+	  tcStmts PatGuard (\ty -> ty, expected_ty) guarded	`thenM` \ guarded' ->
 	  returnM (GRHS guarded' locn)
 \end{code}
 
@@ -317,26 +317,24 @@ tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req match_ty
 %************************************************************************
 
 \begin{code}
-tcDoStmts :: HsDoContext -> [RenamedStmt] -> [Name] -> TcType
+tcDoStmts :: HsStmtContext -> [RenamedStmt] -> [Name] -> TcType
 	  -> TcM (TcMonoBinds, [TcStmt], [Id])
 tcDoStmts PArrComp stmts method_names res_ty
-  = unifyPArrTy res_ty			  `thenM` \elt_ty ->
-    tcStmts (DoCtxt PArrComp) 
-	    (mkPArrTy, elt_ty) stmts      `thenM` \ stmts' ->
+  = unifyPArrTy res_ty				  `thenM` \elt_ty ->
+    tcStmts PArrComp (mkPArrTy, elt_ty) stmts      `thenM` \ stmts' ->
     returnM (EmptyMonoBinds, stmts', [{- unused -}])
 
 tcDoStmts ListComp stmts method_names res_ty
-  = unifyListTy res_ty			`thenM` \ elt_ty ->
-    tcStmts (DoCtxt ListComp) 
-	    (mkListTy, elt_ty) stmts	`thenM` \ stmts' ->
+  = unifyListTy res_ty				`thenM` \ elt_ty ->
+    tcStmts ListComp (mkListTy, elt_ty) stmts	`thenM` \ stmts' ->
     returnM (EmptyMonoBinds, stmts', [{- unused -}])
 
-tcDoStmts DoExpr stmts method_names res_ty
+tcDoStmts do_or_mdo_expr stmts method_names res_ty
   = newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenM` \ m_ty ->
     newTyVarTy liftedTypeKind 					`thenM` \ elt_ty ->
     unifyTauTy res_ty (mkAppTy m_ty elt_ty)			`thenM_`
 
-    tcStmts (DoCtxt DoExpr) (mkAppTy m_ty, elt_ty) stmts	`thenM` \ stmts' ->
+    tcStmts do_or_mdo_expr (mkAppTy m_ty, elt_ty) stmts		`thenM` \ stmts' ->
 
 	-- Build the then and zero methods in case we need them
 	-- It's important that "then" and "return" appear just once in the final LIE,
@@ -347,9 +345,12 @@ tcDoStmts DoExpr stmts method_names res_ty
 	-- where the second "then" sees that it already exists in the "available" stuff.
 	--
     mapAndUnzipM (tc_syn_name m_ty) 
-	         (zipEqual "tcDoStmts" monadNames method_names)  `thenM` \ (binds, ids) ->
+	         (zipEqual "tcDoStmts" currentMonadNames method_names)  `thenM` \ (binds, ids) ->
     returnM (andMonoBindList binds, stmts', ids)
   where
+    currentMonadNames = case do_or_mdo_expr of
+    			  DoExpr  -> monadNames
+			  MDoExpr -> monadNames ++ [mfixName]
     tc_syn_name :: TcType -> (Name,Name) -> TcM (TcMonoBinds, Id)
     tc_syn_name m_ty (std_nm, usr_nm)
 	= tcSyntaxName DoOrigin m_ty std_nm usr_nm 	`thenM` \ (expr, expr_ty) ->
@@ -398,7 +399,7 @@ tcStmts do_or_lc m_ty stmts
 
 tcStmtsAndThen
 	:: (TcStmt -> thing -> thing)	-- Combiner
-	-> RenamedMatchContext
+	-> HsStmtContext
         -> (TcType -> TcType, TcType)	-- m, the relationship type of pat and rhs in pat <- rhs
 					-- elt_ty, where type of the comprehension is (m elt_ty)
         -> [RenamedStmt]
@@ -442,7 +443,7 @@ tcStmtAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s) thing_inside
 
     loop ((bndrs,stmts) : pairs)
       = tcStmtsAndThen 
-		combine_par (DoCtxt ListComp) m_ty stmts
+		combine_par ListComp m_ty stmts
 			-- Notice we pass on m_ty; the result type is used only
 			-- to get escaping type variables for checkExistentialPat
 		(tcLookupLocalIds bndrs	`thenM` \ bndrs' ->
@@ -452,6 +453,24 @@ tcStmtAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s) thing_inside
 	returnM ((bndrs',stmts') : pairs', thing)
 
     combine_par stmt (stmts, thing) = (stmt:stmts, thing)
+
+	-- RecStmt
+tcStmtAndThen combine do_or_lc m_ty (RecStmt recNames stmts) thing_inside
+  = newTyVarTys (length recNames) liftedTypeKind		`thenM` \ recTys ->
+    tcExtendLocalValEnv (zipWith mkLocalId recNames recTys)	$
+    tcStmtsAndThen combine_rec do_or_lc m_ty stmts (
+	tcLookupLocalIds recNames  `thenM` \ rn ->
+	returnM ([], rn)
+    )								`thenM` \ (stmts', recNames') ->
+
+    -- Unify the types of the "final" Ids with those of "knot-tied" Ids
+    unifyTauTyLists recTys (map idType recNames')	`thenM_`
+  
+    thing_inside					`thenM` \ thing ->
+  
+    returnM (combine (RecStmt recNames' stmts') thing)
+  where 
+    combine_rec stmt (stmts, thing) = (stmt:stmts, thing)
 
 	-- ExprStmt
 tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp _ locn) thing_inside
@@ -511,8 +530,8 @@ sameNoOfArgs matches = isSingleton (nub (map args_in_match matches))
 varyingArgsErr name matches
   = sep [ptext SLIT("Varying number of arguments for function"), quotes (ppr name)]
 
-matchCtxt ctxt  match  = hang (pprMatchContext ctxt     <> colon) 4 (pprMatch ctxt match)
-stmtCtxt do_or_lc stmt = hang (pprMatchContext do_or_lc <> colon) 4 (ppr stmt)
+matchCtxt ctxt  match  = hang (pprMatchContext ctxt <> colon) 4 (pprMatch ctxt match)
+stmtCtxt do_or_lc stmt = hang (pprStmtCtxt do_or_lc <> colon) 4 (ppr stmt)
 
 sigPatCtxt bound_tvs bound_ids match_ty tidy_env 
   = zonkTcType match_ty		`thenM` \ match_ty' ->

@@ -25,7 +25,7 @@ module HsSyn (
 
 	collectHsBinders,   collectLocatedHsBinders, 
 	collectMonoBinders, collectLocatedMonoBinders,
-	collectSigTysFromMonoBinds,
+	collectSigTysFromHsBinds, collectSigTysFromMonoBinds,
 	hsModule, hsImports
      ) where
 
@@ -151,15 +151,16 @@ collectMonoBinders binds
     go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Getting patterns out of bindings}
-%*									*
-%************************************************************************
-
 Get all the pattern type signatures out of a bunch of bindings
 
 \begin{code}
+collectSigTysFromHsBinds :: HsBinds name -> [HsType name]
+collectSigTysFromHsBinds EmptyBinds        = [] 
+collectSigTysFromHsBinds (MonoBind b _ _)  = collectSigTysFromMonoBinds b
+collectSigTysFromHsBinds (ThenBinds b1 b2) = collectSigTysFromHsBinds b1 ++
+					     collectSigTysFromHsBinds b2
+ 
+
 collectSigTysFromMonoBinds :: MonoBinds name -> [HsType name]
 collectSigTysFromMonoBinds bind
   = go bind []
@@ -175,5 +176,18 @@ collectSigTysFromMonoBinds bind
     go_matches []				 acc = acc
     go_matches (Match [] (Just sig) _ : matches) acc = sig : go_matches matches acc
     go_matches (match		      : matches) acc = go_matches matches acc
+\end{code}
+
+\begin{code}
+collectStmtsBinders :: [Stmt id] -> [id]
+collectStmtsBinders = concatMap collectStmtBinders
+
+collectStmtBinders :: Stmt id -> [id]
+  -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
+collectStmtBinders (BindStmt pat _ _) = collectPatBinders pat
+collectStmtBinders (LetStmt binds)    = collectHsBinders binds
+collectStmtBinders (ExprStmt _ _ _)   = []
+collectStmtBinders (ResultStmt _ _)   = []
+collectStmtBinders other              = panic "collectStmtBinders"
 \end{code}
 

@@ -28,7 +28,7 @@ module TcGenDeriv (
 
 import HsSyn		( Pat(..), HsConDetails(..), HsExpr(..), MonoBinds(..),
 			  Match(..), GRHSs(..), Stmt(..), HsLit(..),
-			  HsBinds(..), HsType(..), HsDoContext(..),
+			  HsBinds(..), HsType(..), HsStmtContext(..),
 			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList, placeHolderType
 			)
 import RdrName		( RdrName, mkUnqual, nameRdrName, getRdrName )
