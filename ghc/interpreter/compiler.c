@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.28 $
- * $Date: 2000/04/14 15:18:06 $
+ * $Revision: 1.29 $
+ * $Date: 2000/04/21 18:09:30 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -24,6 +24,7 @@
 #include "RtsAPI.h"                    /* for rts_eval and related stuff   */
 #include "SchedAPI.h"                  /* for RevertCAFs                   */
 #include "Schedule.h"
+#include "Weak.h"                      /* for finalizeWeakPointersNow      */
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
