@@ -21,7 +21,7 @@ module Var (
 	Id, DictId,
 	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
 	setIdName, setIdUnique, setIdInfo, lazySetIdInfo, 
-	setIdNoDiscard, zapSpecPragmaId,
+	setIdLocalExported, zapSpecPragmaId,
 
 	globalIdDetails, setGlobalIdDetails, 
 
@@ -41,7 +41,7 @@ import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId,
 
 import Name		( Name, OccName, NamedThing(..),
 			  setNameUnique, setNameOcc, nameUnique, 
-			  mkSysLocalName, isExternallyVisibleName
+			  mkSysLocalName
 			)
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
 import FastTypes
@@ -253,10 +253,8 @@ setIdUnique = setVarUnique
 setIdName :: Id -> Name -> Id
 setIdName = setVarName
 
-setIdNoDiscard :: Id -> Id
-setIdNoDiscard id 
-  = WARN( not (isLocalId id), ppr id )
-    id { varDetails = LocalId Exported }
+setIdLocalExported :: Id -> Id
+setIdLocalExported id = id { varDetails = LocalId Exported }
 
 zapSpecPragmaId :: Id -> Id
 zapSpecPragmaId id 

@@ -32,7 +32,7 @@ import SimplMonad
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( idName, isDataConWrapId, setIdNoDiscard, isImplicitId )
+import Id		( idName, isDataConWrapId, setIdLocalExported, isImplicitId )
 import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
@@ -285,9 +285,9 @@ updateBinders rule_ids rule_rhs_fvs is_exported binds
 
     update_bndr bndr 
 	| isImplicitId bndr = bndr	-- Constructors, selectors; doesn't 
-					-- make sense to call setIdNoDiscard
+					-- make sense to call setIdLocalExported
 					-- Also can't have rules
-	| dont_discard bndr = setIdNoDiscard bndr_with_rules
+	| dont_discard bndr = setIdLocalExported bndr_with_rules
 	| otherwise	    = bndr_with_rules
 	where
 	  bndr_with_rules = lookupVarSet rule_ids bndr `orElse` bndr

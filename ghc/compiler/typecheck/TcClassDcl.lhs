@@ -43,7 +43,7 @@ import Class		( classTyVars, classBigSig, classTyCon, className,
 			  Class, ClassOpItem, DefMeth (..) )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon )
-import Id		( idType, idName )
+import Id		( idType, idName, setIdLocalExported )
 import Module		( Module )
 import Name		( Name, NamedThing(..) )
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv )
@@ -201,7 +201,8 @@ checkDefaultBinds clas ops (Just mbs)
 tcClassSig :: RecTcEnv			-- Knot tying only!
 	   -> Class	    		-- ...ditto...
 	   -> [TyVar]		 	-- The class type variable, used for error check only
-	   -> Maybe (NameEnv Bool)	-- Info about default methods
+	   -> Maybe (NameEnv Bool)	-- Info about default methods; 
+					--	Nothing => imported class defn with no method binds
 	   -> RenamedClassOpSig
 	   -> TcM (Type,		-- Type of the method
 		     ClassOpItem)	-- Selector Id, default-method Id, True if explicit default binding
@@ -423,6 +424,8 @@ tcDefMeth clas tyvars binds_in prags op_item@(_, DefMeth dm_id)
   = tcInstTyVars tyvars			`thenNF_Tc` \ (clas_tyvars, inst_tys, _) ->
     let
         theta = [(mkClassPred clas inst_tys)]
+	local_dm_id = setIdLocalExported dm_id
+		-- Reason for setIdLocalExported: see notes with MkId.mkDictFunId
     in
     newDicts origin theta 		`thenNF_Tc` \ [this_dict] ->
 
@@ -447,7 +450,7 @@ tcDefMeth clas tyvars binds_in prags op_item@(_, DefMeth dm_id)
         full_bind = AbsBinds
     		    clas_tyvars'
     		    [instToId this_dict]
-    		    [(clas_tyvars', dm_id, instToId local_dm_inst)]
+    		    [(clas_tyvars', local_dm_id, instToId local_dm_inst)]
     		    emptyNameSet	-- No inlines (yet)
     		    (dict_binds `andMonoBinds` defm_bind)
     in

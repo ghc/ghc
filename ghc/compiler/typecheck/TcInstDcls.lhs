@@ -52,6 +52,7 @@ import DataCon		( classDataCon )
 import Class		( Class, DefMeth(..), classBigSig )
 import Var		( idName, idType )
 import VarSet		( emptyVarSet )
+import Id		( setIdLocalExported )
 import MkId		( mkDictFunId )
 import FunDeps		( checkInstFDs )
 import Generics		( validGenericInstanceType )
@@ -329,7 +330,7 @@ get_generics decl@(ClassDecl {tcdName = class_name, tcdMeths = Just def_methods,
   | null groups		
   = returnTc [] -- The comon case: no generic default methods
 
-  | otherwise	-- A local class decl with generic default methods
+  | otherwise	-- A source class decl with generic default methods
   = recoverNF_Tc (returnNF_Tc [])				$
     tcAddDeclCtxt decl						$
     tcLookupClass class_name					`thenTc` \ clas ->
@@ -603,6 +604,9 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
 
 	-- Create the result bindings
     let
+	local_dfun_id = setIdLocalExported dfun_id
+		-- Reason for setIdLocalExported: see notes with MkId.mkDictFunId
+
         dict_constr   = classDataCon clas
 	scs_and_meths = map instToId (sc_dicts ++ meth_insts)
 	this_dict_id  = instToId this_dict
