@@ -44,7 +44,7 @@ import Class		( classTyVars, classBigSig, classTyCon, className,
 			  Class, ClassOpItem, DefMeth (..) )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon )
-import Id		( idType, idName, setIdLocalExported )
+import Id		( Id, idType, idName, setIdLocalExported )
 import Module		( Module )
 import Name		( Name, NamedThing(..) )
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv )
@@ -223,32 +223,19 @@ tcClassSig unf_env clas clas_tyvars maybe_dm_env
 
     let
 	theta = [mkClassPred clas (mkTyVarTys clas_tyvars)]
-	global_ty = mkSigmaTy clas_tyvars theta local_ty
-          -- The default method's type should really come from the
-          -- iface file, since it could be usage-generalised, but this
-          -- requires altering the mess of knots in TcModule and I'm
-          -- too scared to do that.  Instead, I have disabled generalisation
-          -- of types of default methods (and dict funs) by annotating them
-          -- TyGenNever (in MkId).  Ugh!  KSW 1999-09.
 
 	-- Build the selector id and default method id
 	sel_id = mkDictSelId op_name clas
- 	dm_id  = mkDefaultMethodId dm_name global_ty
 	DefMeth dm_name = sig_dm
 
 	dm_info = case maybe_dm_env of
-		    Nothing     -> iface_dm_info
+		    Nothing     -> sig_dm
 		    Just dm_env -> mk_src_dm_info dm_env
-
-	iface_dm_info = case sig_dm of 
-			  NoDefMeth       -> NoDefMeth
-			  GenDefMeth      -> GenDefMeth
-			  DefMeth dm_name -> DefMeth (tcAddImportedIdInfo unf_env dm_id)
 
 	mk_src_dm_info dm_env = case lookupNameEnv dm_env op_name of
 				   Nothing    -> NoDefMeth
 				   Just True  -> GenDefMeth
-				   Just False -> DefMeth dm_id
+				   Just False -> DefMeth dm_name
     in
     returnTc (local_ty, (sel_id, dm_info))
 \end{code}
@@ -365,18 +352,19 @@ The function @tcClassDecls2@ just arranges to apply @tcClassDecl2@ to
 each local class decl.
 
 \begin{code}
-tcClassDecls2 :: Module -> [RenamedTyClDecl] -> NF_TcM (LIE, TcMonoBinds)
+tcClassDecls2 :: Module -> [RenamedTyClDecl] -> NF_TcM (LIE, TcMonoBinds, [Id])
 
 tcClassDecls2 this_mod decls
   = foldr combine
-	  (returnNF_Tc (emptyLIE, EmptyMonoBinds))
+	  (returnNF_Tc (emptyLIE, EmptyMonoBinds, []))
 	  [tcClassDecl2 cls_decl | cls_decl@(ClassDecl {tcdMeths = Just _}) <- decls] 
 		-- The 'Just' picks out source ClassDecls
   where
-    combine tc1 tc2 = tc1 `thenNF_Tc` \ (lie1, binds1) ->
-		      tc2 `thenNF_Tc` \ (lie2, binds2) ->
+    combine tc1 tc2 = tc1 `thenNF_Tc` \ (lie1, binds1, ids1) ->
+		      tc2 `thenNF_Tc` \ (lie2, binds2, ids2) ->
 		      returnNF_Tc (lie1 `plusLIE` lie2,
-				   binds1 `AndMonoBinds` binds2)
+				   binds1 `AndMonoBinds` binds2,
+				   ids1 ++ ids2)
 \end{code}
 
 @tcClassDecl2@ generates bindings for polymorphic default methods
@@ -384,12 +372,12 @@ tcClassDecls2 this_mod decls
 
 \begin{code}
 tcClassDecl2 :: RenamedTyClDecl		-- The class declaration
-	     -> NF_TcM (LIE, TcMonoBinds)
+	     -> NF_TcM (LIE, TcMonoBinds, [Id])
 
 tcClassDecl2 (ClassDecl {tcdName = class_name, tcdSigs = sigs, 
 			 tcdMeths = Just default_binds, tcdLoc = src_loc})
   = 	-- The 'Just' picks out source ClassDecls
-    recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds)) $ 
+    recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds, [])) $ 
     tcAddSrcLoc src_loc		     		          $
     tcLookupClass class_name				  `thenNF_Tc` \ clas ->
 
@@ -406,13 +394,13 @@ tcClassDecl2 (ClassDecl {tcdName = class_name, tcdSigs = sigs,
 	prags 			 = filter isPragSig sigs
 	tc_dm			 = tcDefMeth clas tyvars default_binds prags
     in
-    mapAndUnzipTc tc_dm op_items	`thenTc` \ (defm_binds, const_lies) ->
+    mapAndUnzip3Tc tc_dm op_items	`thenTc` \ (defm_binds, const_lies, dm_ids_s) ->
 
-    returnTc (plusLIEs const_lies, andMonoBindList defm_binds)
+    returnTc (plusLIEs const_lies, andMonoBindList defm_binds, concat dm_ids_s)
     
 
-tcDefMeth clas tyvars binds_in prags (_, NoDefMeth)  = returnTc (EmptyMonoBinds, emptyLIE)
-tcDefMeth clas tyvars binds_in prags (_, GenDefMeth) = returnTc (EmptyMonoBinds, emptyLIE)
+tcDefMeth clas tyvars binds_in prags (_, NoDefMeth)  = returnTc (EmptyMonoBinds, emptyLIE, [])
+tcDefMeth clas tyvars binds_in prags (_, GenDefMeth) = returnTc (EmptyMonoBinds, emptyLIE, [])
 	-- Generate code for polymorphic default methods only
 	-- (Generic default methods have turned into instance decls by now.)
 	-- This is incompatible with Hugs, which expects a polymorphic 
@@ -420,11 +408,20 @@ tcDefMeth clas tyvars binds_in prags (_, GenDefMeth) = returnTc (EmptyMonoBinds,
 	-- the programmer supplied an explicit default decl for the class.  
 	-- (If necessary we can fix that, but we don't have a convenient Id to hand.)
 
-tcDefMeth clas tyvars binds_in prags op_item@(_, DefMeth dm_id)
+tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
   = tcInstSigTyVars ClsTv tyvars			`thenNF_Tc` \ clas_tyvars ->
     let
+	dm_ty = idType sel_id	-- Same as dict selector!
+          -- The default method's type should really come from the
+          -- iface file, since it could be usage-generalised, but this
+          -- requires altering the mess of knots in TcModule and I'm
+          -- too scared to do that.  Instead, I have disabled generalisation
+          -- of types of default methods (and dict funs) by annotating them
+          -- TyGenNever (in MkId).  Ugh!  KSW 1999-09.
+
 	inst_tys    = mkTyVarTys clas_tyvars
         theta       = [mkClassPred clas inst_tys]
+ 	dm_id       = mkDefaultMethodId dm_name dm_ty
 	local_dm_id = setIdLocalExported dm_id
 		-- Reason for setIdLocalExported: see notes with MkId.mkDictFunId
     in
@@ -455,7 +452,7 @@ tcDefMeth clas tyvars binds_in prags op_item@(_, DefMeth dm_id)
     		    emptyNameSet	-- No inlines (yet)
     		    (dict_binds `andMonoBinds` defm_bind)
     in
-    returnTc (full_bind, const_lie)
+    returnTc (full_bind, const_lie, [dm_id])
   where
     origin = ClassDeclOrigin
 \end{code}
@@ -545,9 +542,9 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
      -- The user didn't supply a method binding, 
      -- so we have to make up a default binding
      -- The RHS of a default method depends on the default-method info
-mkDefMethRhs is_inst_decl clas inst_tys sel_id loc (DefMeth dm_id)
+mkDefMethRhs is_inst_decl clas inst_tys sel_id loc (DefMeth dm_name)
   =  -- An polymorphic default method
-    returnTc (HsVar (idName dm_id))
+    returnTc (HsVar dm_name)
 
 mkDefMethRhs is_inst_decl clas inst_tys sel_id loc NoDefMeth
   =  	-- No default method

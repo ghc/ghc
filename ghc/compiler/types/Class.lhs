@@ -56,7 +56,7 @@ data Class
 type FunDep a	  = ([a],[a])	--  e.g. class C a b c |  a b -> c, a c -> b  where ...
 				--  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
 
-type ClassOpItem = (Id, DefMeth Id)
+type ClassOpItem = (Id, DefMeth Name)
 	-- Selector function; contains unfolding
 	-- Default-method info
 

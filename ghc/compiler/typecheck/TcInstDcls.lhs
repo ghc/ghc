@@ -534,7 +534,6 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
 
         (class_tyvars, sc_theta, _, op_items) = classBigSig clas
 
-	dm_ids	  = [dm_id | (_, DefMeth dm_id) <- op_items]
 	sel_names = [idName sel_id | (sel_id, _) <- op_items]
 
         -- Instantiate the super-class context with inst_tys
@@ -555,14 +554,15 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
 	-- The type variable from the dict fun actually scope 
 	-- over the bindings.  They were gotten from
 	-- the original instance declaration
- 	tcExtendGlobalValEnv dm_ids (
-		-- Default-method Ids may be mentioned in synthesised RHSs 
+
+		-- Default-method Ids may be mentioned in synthesised RHSs,
+		-- but they'll already be in the environment.
 
 	mapAndUnzip3Tc (tcMethodBind clas origin inst_tyvars' inst_tys'
 				     dfun_theta'
 				     monobinds uprags True)
 		       op_items
-    ))		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_insts) ->
+    )		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_insts) ->
 
 	-- Deal with SPECIALISE instance pragmas by making them
 	-- look like SPECIALISE pragmas for the dfun
