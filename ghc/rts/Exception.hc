@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.6 2000/01/30 10:25:28 simonmar Exp $
+ * $Id: Exception.hc,v 1.7 2000/02/04 11:15:04 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -199,6 +199,7 @@ FN_(killThreadzh_fast)
    Catch frames
    -------------------------------------------------------------------------- */
 
+#ifdef REG_R1
 #define CATCH_FRAME_ENTRY_TEMPLATE(label,ret) 	\
    FN_(label);					\
    FN_(label)					\
@@ -209,16 +210,38 @@ FN_(killThreadzh_fast)
       JMP_(ret);				\
       FE_					\
    }
+#else
+#define CATCH_FRAME_ENTRY_TEMPLATE(label,ret) 	\
+   FN_(label);					\
+   FN_(label)					\
+   {						\
+      StgWord rval;				\
+      FB_					\
+      rval = Sp[0];				\
+      Sp++;					\
+      Su = ((StgCatchFrame *)Sp)->link;		\
+      Sp += sizeofW(StgCatchFrame) - 1;		\
+      Sp[0] = rval;				\
+      JMP_(ret);				\
+      FE_					\
+   }
+#endif
 
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_entry,ENTRY_CODE(Sp[0]));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_0_entry,RET_VEC(Sp[0],0));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_1_entry,RET_VEC(Sp[0],1));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_2_entry,RET_VEC(Sp[0],2));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_3_entry,RET_VEC(Sp[0],3));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_4_entry,RET_VEC(Sp[0],4));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_5_entry,RET_VEC(Sp[0],5));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_6_entry,RET_VEC(Sp[0],6));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_7_entry,RET_VEC(Sp[0],7));
+#ifdef REG_R1
+#define SP_OFF 0
+#else
+#define SP_OFF 1
+#endif
+
+CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_entry,ENTRY_CODE(Sp[SP_OFF]));
+CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_0_entry,RET_VEC(Sp[SP_OFF],0));
+CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_1_entry,RET_VEC(Sp[SP_OFF],1));
+CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_2_entry,RET_VEC(Sp[SP_OFF],2));
+CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_3_entry,RET_VEC(Sp[SP_OFF],3));
+CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_4_entry,RET_VEC(Sp[SP_OFF],4));
+CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_5_entry,RET_VEC(Sp[SP_OFF],5));
+CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_6_entry,RET_VEC(Sp[SP_OFF],6));
+CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_7_entry,RET_VEC(Sp[SP_OFF],7));
 
 #ifdef PROFILING
 #define CATCH_FRAME_BITMAP 7
