@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.11 2002/06/03 13:05:58 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.12 2002/07/19 09:59:02 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -27,6 +27,7 @@ module HsSyn (
     forall_name, unsafe_name, safe_name, threadsafe_name, export_name,
     stdcall_name, ccall_name, dotnet_name,
     unit_tycon_name, fun_tycon_name, list_tycon_name, tuple_tycon_name,
+    unit_tycon_qname, fun_tycon_qname, list_tycon_qname, tuple_tycon_qname,
     unit_tycon, fun_tycon, list_tycon, tuple_tycon,
 
     GenDoc(..), Doc, DocMarkup(..),
@@ -336,15 +337,20 @@ minus_name	      = HsVarName (HsSymbol "-")
 pling_name	      = HsVarName (HsSymbol "!")
 dot_name	      = HsVarName (HsSymbol ".")
 
-unit_tycon_name       = Qual prelude_mod (HsTyClsName unit_ident)
-fun_tycon_name        = Qual prelude_mod (HsTyClsName (HsSpecial "->"))
-list_tycon_name       = Qual prelude_mod (HsTyClsName (HsSpecial "[]"))
-tuple_tycon_name i    = Qual prelude_mod (HsTyClsName (tuple_ident i))
+unit_tycon_name       = HsTyClsName unit_ident
+fun_tycon_name        = HsTyClsName (HsSpecial "->")
+list_tycon_name       = HsTyClsName (HsSpecial "[]")
+tuple_tycon_name i    = HsTyClsName (tuple_ident i)
 
-unit_tycon	      = HsTyCon unit_tycon_name
-fun_tycon	      = HsTyCon fun_tycon_name
-list_tycon	      = HsTyCon list_tycon_name
-tuple_tycon i	      = HsTyCon (tuple_tycon_name i)
+unit_tycon_qname      = Qual prelude_mod unit_tycon_name   
+fun_tycon_qname       = Qual prelude_mod fun_tycon_name    
+list_tycon_qname      = Qual prelude_mod list_tycon_name   
+tuple_tycon_qname i   = Qual prelude_mod (tuple_tycon_name i)
+
+unit_tycon	      = HsTyCon unit_tycon_qname
+fun_tycon	      = HsTyCon fun_tycon_qname
+list_tycon	      = HsTyCon list_tycon_qname
+tuple_tycon i	      = HsTyCon (tuple_tycon_qname i)
 
 -- -----------------------------------------------------------------------------
 -- Doc strings and formatting
