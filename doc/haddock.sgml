@@ -1,0 +1,26 @@
+<!DOCTYPE BOOK PUBLIC "-//OASIS//DTD DocBook V3.1//EN">
+
+<book id="haddock">
+  <bookinfo>
+    <date>2002-4-10</date>
+    <title>Haddock User Guide</title>
+    <author>
+      <firstname>Simon</firstname>
+      <surname>Marlow</surname>
+    </author>
+    <address><email>simonmar@microsoft.com</email></address>
+    <copyright>
+      <year>2002</year>
+      <holder>Simon Marlow</holder>
+    </copyright>
+    <abstract>
+      <para>This document describes Haddock, a Haskell documentation tool.
+  </bookinfo>
+
+  <!-- Table of contents -->
+  <toc></toc>
+  
+  <chapter id="happy-introduction">
+  </chapter>
+
+</book>
