@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.63 1999/06/24 13:05:53 simonmar Exp $
+# $Id: Makefile,v 1.64 1999/07/14 20:29:34 panne Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -236,7 +236,7 @@ parser/hschooks.o : parser/hschooks.c
 
 
 # Interface-file parser uses Happy
-SRC_HAPPY_OPTS += +RTS -K2m -H10m -RTS
+SRC_HAPPY_OPTS += +RTS -K2m -H16m -RTS
 
 rename/ParseIface.hs : rename/ParseIface.y
 	@$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
