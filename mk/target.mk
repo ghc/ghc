@@ -424,7 +424,6 @@ endif
 # get one install rule
 #
 #	INSTALL_PROGS 	  executable programs in $(bindir)
-#	INSTALL_BIN_LINKS symbolic links to executable programs in $(bindir)
 #	INSTALL_SCRIPTS	  executable scripts in $(bindir)
 #	INSTALL_LIBS	  platform-dependent libraries in $(libdir) (ranlib'ed)
 #	INSTALL_LIBEXECS  platform-dependent execs in $(libdir)
@@ -465,14 +464,6 @@ install:: $(INSTALL_PROGS)
 	@$(INSTALL_DIR) $(bindir)
 	for i in $(INSTALL_PROGS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir); \
-	done
-endif
-
-ifneq "$(INSTALL_BIN_LINKS)" ""
-install:: $(INSTALL_BIN_LINKS)
-	@$(INSTALL_DIR) $(bindir)
-	for i in $(INSTALL_BIN_LINKS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i$(exeext) $(bindir); \
 	done
 endif
 
