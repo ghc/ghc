@@ -1,7 +1,5 @@
------------------------------------------------------------------------------
--- $Id: Main.hs,v 1.24 2001/03/04 11:18:03 qrczak Exp $
---
--- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
+------------------------------------------------------------------------
+-- $Id: Main.hs,v 1.25 2001/03/05 00:07:23 qrczak Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -15,10 +13,8 @@ import GetOpt
 import System        (getProgName, getArgs, ExitCode(..), exitWith, exitFailure)
 import KludgedSystem (system, defaultCompiler)
 import Directory     (removeFile)
-import Parsec
-import ParsecError
-import Monad         (liftM, liftM2, when)
-import Char          (ord, intToDigit, isSpace, isAlpha, isAlphaNum, toUpper)
+import Monad         (MonadPlus(..), liftM, liftM2, when, unless)
+import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit, ord)
 import List          (intersperse)
 
 version :: String
@@ -27,13 +23,13 @@ version = "hsc2hs-0.65"
 data Flag
     = Help
     | Version
-    | Template String
-    | Compiler String
-    | Linker   String
-    | CompFlag String
-    | LinkFlag String
-    | Keep
-    | Include  String
+    | Template  String
+    | Compiler  String
+    | Linker    String
+    | CompFlag  String
+    | LinkFlag  String
+    | NoCompile
+    | Include   String
 
 include :: String -> Flag
 include s@('\"':_) = Include s
@@ -42,17 +38,17 @@ include s          = Include ("\""++s++"\"")
 
 options :: [OptDescr Flag]
 options = [
-    Option "t" ["template"] (ReqArg Template   "FILE") "template file",
-    Option "c" ["cc"]       (ReqArg Compiler   "PROG") "C compiler to use",
-    Option "l" ["ld"]       (ReqArg Linker     "PROG") "linker to use",
-    Option "C" ["cflag"]    (ReqArg CompFlag   "FLAG") "flag to pass to the C compiler",
-    Option "I" []           (ReqArg (CompFlag . ("-I"++))
-                                               "DIR")  "passed to the C compiler",
-    Option "L" ["lflag"]    (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
-    Option ""  ["keep"]     (NoArg  Keep)              "don't delete *.hs_make.c",
-    Option "i" ["include"]  (ReqArg include    "FILE") "as if placed in the source",
-    Option ""  ["help"]     (NoArg  Help)              "display this help and exit",
-    Option ""  ["version"]  (NoArg  Version)           "output version information and exit"]
+    Option "t" ["template"]   (ReqArg Template   "FILE") "template file",
+    Option "c" ["cc"]         (ReqArg Compiler   "PROG") "C compiler to use",
+    Option "l" ["ld"]         (ReqArg Linker     "PROG") "linker to use",
+    Option "C" ["cflag"]      (ReqArg CompFlag   "FLAG") "flag to pass to the C compiler",
+    Option "I" []             (ReqArg (CompFlag . ("-I"++))
+                                                 "DIR")  "passed to the C compiler",
+    Option "L" ["lflag"]      (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
+    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *.hs_make.c",
+    Option "i" ["include"]    (ReqArg include    "FILE") "as if placed in the source",
+    Option ""  ["help"]       (NoArg  Help)              "display this help and exit",
+    Option ""  ["version"]    (NoArg  Version)           "output version information and exit"]
 
 main :: IO ()
 main = do
@@ -75,121 +71,321 @@ main = do
 
 processFile :: [Flag] -> String -> IO ()
 processFile flags name = do
-    parsed <- parseFromFile parser name
-    case parsed of
-        Left err   -> do print err; exitFailure
-        Right toks -> output flags name toks
+    s <- readFile name
+    case parser of
+        Parser p -> case p (SourcePos name 1) s of
+            Success _ _ _ toks -> output flags name toks
+            Failure (SourcePos name' line) msg -> do
+                putStrLn (name'++":"++show line++": "++msg)
+                exitFailure
+
+------------------------------------------------------------------------
+-- A deterministic parser which remembers the text which has been parsed.
+
+newtype Parser a = Parser (SourcePos -> String -> ParseResult a)
+
+data ParseResult a = Success !SourcePos String String a
+                   | Failure !SourcePos String
+
+data SourcePos = SourcePos String !Int
+
+updatePos :: SourcePos -> Char -> SourcePos
+updatePos pos@(SourcePos name line) ch = case ch of
+    '\n' -> SourcePos name (line + 1)
+    _    -> pos
+
+instance Monad Parser where
+    return a = Parser $ \pos s -> Success pos [] s a
+    Parser m >>= k =
+        Parser $ \pos s -> case m pos s of
+            Success pos' out1 s' a -> case k a of
+                Parser k' -> case k' pos' s' of
+                    Success pos'' out2 imp'' b ->
+                        Success pos'' (out1++out2) imp'' b
+                    Failure pos'' msg -> Failure pos'' msg
+            Failure pos' msg -> Failure pos' msg
+    fail msg = Parser $ \pos _ -> Failure pos msg
+
+instance MonadPlus Parser where
+    mzero                     = fail "mzero"
+    Parser m `mplus` Parser n =
+        Parser $ \pos s -> case m pos s of
+            success@(Success _ _ _ _) -> success
+            Failure _ _               -> n pos s
+
+getPos :: Parser SourcePos
+getPos = Parser $ \pos s -> Success pos [] s pos
+
+setPos :: SourcePos -> Parser ()
+setPos pos = Parser $ \_ s -> Success pos [] s ()
+
+message :: Parser a -> String -> Parser a
+Parser m `message` msg =
+    Parser $ \pos s -> case m pos s of
+        success@(Success _ _ _ _) -> success
+        Failure pos' _            -> Failure pos' msg
+
+catchOutput_ :: Parser a -> Parser String
+catchOutput_ (Parser m) =
+    Parser $ \pos s -> case m pos s of
+        Success pos' out s' _ -> Success pos' [] s' out
+        Failure pos' msg      -> Failure pos' msg
+
+fakeOutput :: Parser a -> String -> Parser a
+Parser m `fakeOutput` out =
+    Parser $ \pos s -> case m pos s of
+        Success pos' _ s' a -> Success pos' out s' a
+        Failure pos' msg    -> Failure pos' msg
+
+{-# INLINE lookAhead #-}
+lookAhead :: Parser String
+lookAhead = Parser $ \pos s -> Success pos [] s s
+
+{-# INLINE satisfy #-}
+satisfy :: (Char -> Bool) -> Parser Char
+satisfy p =
+    Parser $ \pos s -> case s of
+        c:cs | p c -> Success (updatePos pos c) [c] cs c
+        _          -> Failure pos "Bad character"
+
+char_ :: Char -> Parser ()
+char_ c = do
+    satisfy (== c) `message` (show c++" expected")
+    return ()
+
+anyChar_ :: Parser ()
+anyChar_ = do
+    satisfy (const True) `message` "Unexpected end of file"
+    return ()
+
+any2Chars_ :: Parser ()
+any2Chars_ = anyChar_ >> anyChar_
+
+many :: Parser a -> Parser [a]
+many p = many1 p `mplus` return []
+
+many1 :: Parser a -> Parser [a]
+many1 p = liftM2 (:) p (many p)
+
+many_ :: Parser a -> Parser ()
+many_ p = many1_ p `mplus` return ()
+
+many1_ :: Parser a -> Parser ()
+many1_ p = p >> many_ p
+
+manySatisfy, manySatisfy1 :: (Char -> Bool) -> Parser String
+manySatisfy  = many  . satisfy
+manySatisfy1 = many1 . satisfy
+
+manySatisfy_, manySatisfy1_ :: (Char -> Bool) -> Parser ()
+manySatisfy_  = many_  . satisfy
+manySatisfy1_ = many1_ . satisfy
+
+------------------------------------------------------------------------
+-- Parser of hsc syntax.
 
 data Token
     = Text    SourcePos String
     | Special SourcePos String String
 
 parser :: Parser [Token]
-parser = many (text <|> special)
+parser = do
+    pos <- getPos
+    t <- catchOutput_ text
+    s <- lookAhead
+    rest <- case s of
+        []  -> return []
+        _:_ -> liftM2 (:) (special `fakeOutput` []) parser
+    return (if null t then rest else Text pos t : rest)
 
-text :: Parser Token
+text :: Parser ()
 text = do
-    pos <- getPosition
-    liftM (Text pos . concat) $ many1
-        (   many1 (satisfy (\ch -> not (isAlpha ch || ch `elem` "\"#'-_{")))
-        <|> (do a <- satisfy (\ch -> isAlpha ch || ch == '_')
-                b <- many (satisfy (\ch -> isAlphaNum ch || ch == '_' || ch == '\''))
-                return (a:b))
-        <|> (do char '\"'; a <- hsString '\"'; char '\"'; return ("\""++a++"\""))
-        <|> (do try (string "##"); return "#")
-        <|> (do char '\''; a <- hsString '\''; char '\''; return ("\'"++a++"\'"))
-        <|> (do try (string "--"); a <- many (satisfy (/= '\n')); return ("--"++a))
-        <|> string "-"
-        <|> (do try (string "{-#"); optional (try linePragma); a <- hsComment; return ("{-#"++a))
-        <|> (do try (string "{-"); a <- hsComment; return ("{-"++a))
-        <|> string "{"
-        <?> "Haskell source")
+    s <- lookAhead
+    case s of
+        []        -> return ()
+        c:_ | isAlpha c || c == '_' -> do
+            anyChar_
+            manySatisfy_ (\c' -> isAlphaNum c' || c' == '_' || c' == '\'')
+            text
+        c:_ | isHsSymbol c -> do
+            symb <- catchOutput_ (manySatisfy_ isHsSymbol)
+            case symb of
+                "#" -> return ()
+                '-':'-':symb' | all (== '-') symb' -> do
+                    return () `fakeOutput` symb
+                    manySatisfy_ (/= '\n')
+                    text
+                _ -> do
+                    return () `fakeOutput` unescapeHashes symb
+                    text
+        '\"':_    -> do anyChar_; hsString '\"'; text
+        '\'':_    -> do anyChar_; hsString '\''; text
+        '{':'-':_ -> do any2Chars_; linePragma `mplus` hsComment; text
+        _:_       -> do anyChar_; text
+
+hsString :: Char -> Parser ()
+hsString quote = do
+    s <- lookAhead
+    case s of
+        []               -> return ()
+        c:_ | c == quote -> anyChar_
+        '\\':c:_
+            | isSpace c  -> do
+                anyChar_
+                manySatisfy_ isSpace
+                char_ '\\' `mplus` return ()
+                hsString quote
+            | otherwise  -> do any2Chars_; hsString quote
+        _:_              -> do anyChar_; hsString quote
+
+hsComment :: Parser ()
+hsComment = do
+    s <- lookAhead
+    case s of
+        []        -> return ()
+        '-':'}':_ -> any2Chars_
+        '{':'-':_ -> do any2Chars_; hsComment; hsComment
+        _:_       -> do anyChar_; hsComment
 
 linePragma :: Parser ()
 linePragma = do
-    state <- getState
-    spaces
-    string "LINE"
-    skipMany1 space
-    line <- many1 digit
-    skipMany1 space
-    char '\"'
-    file <- many (satisfy (/= '\"'))
-    char '\"'
-    spaces
-    string "#-}"
-    setState state
-    setPosition (newPos file (read line - 1) 1)
+    char_ '#'
+    manySatisfy_ isSpace
+    satisfy (\c -> c == 'L' || c == 'l')
+    satisfy (\c -> c == 'I' || c == 'i')
+    satisfy (\c -> c == 'N' || c == 'n')
+    satisfy (\c -> c == 'E' || c == 'e')
+    manySatisfy1_ isSpace
+    line <- liftM read $ manySatisfy1 isDigit
+    manySatisfy1_ isSpace
+    char_ '\"'
+    name <- manySatisfy (/= '\"')
+    char_ '\"'
+    manySatisfy_ isSpace
+    char_ '#'
+    char_ '-'
+    char_ '}'
+    setPos (SourcePos name (line - 1))
 
-hsComment :: Parser String
-hsComment =
-    (   (do a <- many1 (noneOf "-{"); b <- hsComment; return (a++b))
-    <|> try (string "-}")
-    <|> (do char '-'; b <- hsComment; return ('-':b))
-    <|> (do try (string "{-"); a <- hsComment; b <- hsComment; return ("{-"++a++b))
-    <|> (do char '{'; b <- hsComment; return ('{':b))
-    <?> "Haskell comment")
+isHsSymbol :: Char -> Bool
+isHsSymbol '!' = True; isHsSymbol '#' = True; isHsSymbol '$'  = True
+isHsSymbol '%' = True; isHsSymbol '&' = True; isHsSymbol '*'  = True
+isHsSymbol '+' = True; isHsSymbol '.' = True; isHsSymbol '/'  = True
+isHsSymbol '<' = True; isHsSymbol '=' = True; isHsSymbol '>'  = True
+isHsSymbol '?' = True; isHsSymbol '@' = True; isHsSymbol '\\' = True
+isHsSymbol '^' = True; isHsSymbol '|' = True; isHsSymbol '-'  = True
+isHsSymbol '~' = True
+isHsSymbol _   = False
 
-hsString :: Char -> Parser String
-hsString quote =
-    liftM concat $ many
-    (   many1 (noneOf (quote:"\n\\"))
-    <|> (do char '\\'; a <- escape; return ('\\':a))
-    <?> "Haskell character or string")
+unescapeHashes :: String -> String
+unescapeHashes []          = []
+unescapeHashes ('#':'#':s) = '#' : unescapeHashes s
+unescapeHashes (c:s)       = c   : unescapeHashes s
+
+{-# INLINE lookAheadC #-}
+lookAheadC :: Parser String
+lookAheadC = liftM joinLines lookAhead
     where
-    escape = (do a <- many1 (satisfy isSpace); char '\\'; return (a++"\\"))
-         <|> (do a <- anyChar; return [a])
+    joinLines []            = []
+    joinLines ('\\':'\n':s) = joinLines s
+    joinLines (c:s)         = c : joinLines s
+
+{-# INLINE satisfyC #-}
+satisfyC :: (Char -> Bool) -> Parser Char
+satisfyC p = do
+    s <- lookAhead
+    case s of
+        '\\':'\n':_ -> do any2Chars_ `fakeOutput` []; satisfyC p
+        _           -> satisfy p
+
+charC_ :: Char -> Parser ()
+charC_ c = do
+    satisfyC (== c) `message` (show c++" expected")
+    return ()
+
+anyCharC_ :: Parser ()
+anyCharC_ = do
+    satisfyC (const True) `message` "Unexpected end of file"
+    return ()
+
+any2CharsC_ :: Parser ()
+any2CharsC_ = anyCharC_ >> anyCharC_
+
+manySatisfyC :: (Char -> Bool) -> Parser String
+manySatisfyC = many . satisfyC
+
+manySatisfyC_ :: (Char -> Bool) -> Parser ()
+manySatisfyC_ = many_ . satisfyC
 
 special :: Parser Token
 special = do
-    pos <- getPosition
-    char '#'
-    skipMany (oneOf " \t")
-    keyArg pos pzero <|> do
-        char '{'
-        skipMany (oneOf " \t")
-        sp <- keyArg pos (string "\n")
-        char '}'
-        return sp
+    manySatisfyC_ (\c -> isSpace c && c /= '\n')
+    s <- lookAheadC
+    case s of
+        '{':_ -> do
+            anyCharC_
+            manySatisfyC_ isSpace
+            sp <- keyArg (== '\n')
+            charC_ '}'
+            return sp
+        _ -> keyArg (const False)
 
-keyArg :: SourcePos -> Parser String -> Parser Token
-keyArg pos eol = do
-    key <- liftM2 (:) (letter <|> char '_') (many (alphaNum <|> char '_'))
-        <?> "hsc directive"
-    skipMany (oneOf " \t")
-    arg <- argument eol
+keyArg :: (Char -> Bool) -> Parser Token
+keyArg eol = do
+    pos <- getPos
+    key <- keyword `message` "hsc keyword or '{' expected"
+    manySatisfyC_ (\c' -> isSpace c' && c' /= '\n' || eol c')
+    arg <- catchOutput_ (argument eol)
     return (Special pos key arg)
 
-argument :: Parser String -> Parser String
-argument eol =
-    liftM concat $ many
-    (   many1 (noneOf "\n\"\'()/[\\]{}")
-    <|> eol
-    <|> (do char '\"'; a <- cString '\"'; char '\"'; return ("\""++a++"\""))
-    <|> (do char '\''; a <- cString '\''; char '\''; return ("\'"++a++"\'"))
-    <|> (do char '('; a <- nested; char ')'; return ("("++a++")"))
-    <|> (do try (string "/*"); cComment; return " ")
-    <|> (do try (string "//"); skipMany (satisfy (/= '\n')); return " ")
-    <|> string "/"
-    <|> (do char '['; a <- nested; char ']'; return ("["++a++"]"))
-    <|> (do char '\\'; a <- anyChar; return $ if a == '\n' then [] else ['\\',a])
-    <|> (do char '{'; a <- nested; char '}'; return ("{"++a++"}"))
-    <?> "C expression")
-    where nested = argument (string "\n")
+keyword :: Parser String
+keyword = do
+    c  <- satisfyC (\c' -> isAlpha c' || c' == '_')
+    cs <- manySatisfyC (\c' -> isAlphaNum c' || c' == '_')
+    return (c:cs)
+
+argument :: (Char -> Bool) -> Parser ()
+argument eol = do
+    s <- lookAheadC
+    case s of
+        []          -> return ()
+        c:_ | eol c -> do anyCharC_;               argument eol
+        '\n':_      -> return ()
+        '\"':_      -> do anyCharC_; cString '\"'; argument eol
+        '\'':_      -> do anyCharC_; cString '\''; argument eol
+        '(':_       -> do anyCharC_; nested ')';   argument eol
+        ')':_       -> return ()
+        '/':'*':_   -> do any2CharsC_; cComment;   argument eol
+        '/':'/':_   -> do
+            any2CharsC_; manySatisfyC_ (/= '\n');  argument eol
+        '[':_       -> do anyCharC_; nested ']';   argument eol
+        ']':_       -> return ()
+        '{':_       -> do anyCharC_; nested '}';   argument eol
+        '}':_       -> return ()
+        _:_         -> do anyCharC_;               argument eol
+
+nested :: Char -> Parser ()
+nested c = do argument (== '\n'); charC_ c
 
 cComment :: Parser ()
-cComment =
-    (   (do skipMany1 (noneOf "*"); cComment)
-    <|> (do try (string "*/"); return ())
-    <|> (do char '*'; cComment)
-    <?> "C comment")
+cComment = do
+    s <- lookAheadC
+    case s of
+        []        -> return ()
+        '*':'/':_ -> do any2CharsC_
+        _:_       -> do anyCharC_; cComment
 
-cString :: Char -> Parser String
-cString quote =
-    liftM concat $ many
-    (   many1 (noneOf (quote:"\n\\"))
-    <|> (do char '\\'; a <- anyChar; return ['\\',a])
-    <?> "C character or string")
+cString :: Char -> Parser ()
+cString quote = do
+    s <- lookAheadC
+    case s of
+        []               -> return ()
+        c:_ | c == quote -> anyCharC_
+        '\\':_:_         -> do any2CharsC_; cString quote
+        _:_              -> do anyCharC_; cString quote
+
+------------------------------------------------------------------------
+-- Output the output files.
 
 output :: [Flag] -> String -> [Token] -> IO ()
 output flags name toks = let
@@ -227,16 +423,18 @@ output flags name toks = let
         []  -> return defaultCompiler
         [l] -> return l
         _   -> onlyOne "linker"
-        
+    
     writeFile cProgName $
         concat ["#include \""++t++"\"\n" | Template t <- flags]++
         concat ["#include "++f++"\n"     | Include  f <- flags]++
         outHeaderCProg specials++
         "\nint main (void)\n{\n"++
         outHeaderHs flags (if needsH then Just outHName else Nothing) specials++
-        outHsLine (newPos name 0 1)++
+        outHsLine (SourcePos name 0)++
         concatMap outTokenHs toks++
         "    return 0;\n}\n"
+    
+    unless (null [() | NoCompile <- flags]) $ exitWith ExitSuccess
     
     compilerStatus <- system $
         compiler++
@@ -247,7 +445,7 @@ output flags name toks = let
     case compilerStatus of
         e@(ExitFailure _) -> exitWith e
         _                 -> return ()
-    when (null [() | Keep <- flags]) $ removeFile cProgName
+    removeFile cProgName
     
     linkerStatus <- system $
         linker++
@@ -436,23 +634,19 @@ conditional "error"   = True
 conditional "warning" = True
 conditional _         = False
 
-sourceFileName :: SourcePos -> String
-sourceFileName pos = fileName (sourceName pos)
-    where
-    fileName s = case break (== '/') s of
-        (name, [])      -> name
-        (_,     _:rest) -> fileName rest
-
 outCLine :: SourcePos -> String
-outCLine pos =
-    "# "++show (sourceLine pos)++
-    " \""++showCString (sourceFileName pos)++"\"\n"
+outCLine (SourcePos name line) =
+    "# "++show line++" \""++showCString (basename name)++"\"\n"
 
 outHsLine :: SourcePos -> String
-outHsLine pos =
-    "    hsc_line ("++
-    show (sourceLine pos + 1)++", \""++
-    showCString (sourceFileName pos)++"\");\n"
+outHsLine (SourcePos name line) =
+    "    hsc_line ("++show (line + 1)++", \""++
+    showCString (basename name)++"\");\n"
+
+basename :: String -> String
+basename s = case break (== '/') s of
+    (name, [])      -> name
+    (_,     _:rest) -> basename rest
 
 showCString :: String -> String
 showCString = concatMap showCChar
