@@ -10,7 +10,7 @@ module DataCon (
 	mkDataCon,
 	dataConRepType, dataConSig, dataConName, dataConTag, dataConTyCon,
 	dataConArgTys, dataConOrigArgTys,
-	dataConRepArgTys,
+	dataConRepArgTys, dataConTheta,
 	dataConFieldLabels, dataConStrictMarks, 
 	dataConSourceArity, dataConRepArity,
 	dataConNumInstArgs, dataConId, dataConWrapId, dataConRepStrictness,
@@ -105,6 +105,9 @@ data DataCon
 	--	dcTyCon    = T
 
 	dcTyVars :: [TyVar], 		-- Type vars and context for the data type decl
+					-- These are ALWAYS THE SAME AS THE TYVARS 
+					-- FOR THE PARENT TyCon.  We occasionally rely on
+					-- this just to avoid redundant instantiation
 	dcTheta  ::  ClassContext,
 
 	dcExTyVars :: [TyVar], 		-- Ditto for the context of the constructor, 
@@ -353,6 +356,8 @@ dataConArgTys :: DataCon
 dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars, 
 		       dcExTyVars = ex_tyvars}) inst_tys
  = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) arg_tys
+
+dataConTheta (MkData {dcTheta = theta}) = theta
 \end{code}
 
 These two functions get the real argument types of the constructor,

@@ -52,7 +52,8 @@ import Module		( Module )
 import CoreUtils	( mkInlineMe )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
 import Subst		( mkTopTyVarSubst, substClasses )
-import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons, isDataTyCon, isProductTyCon, isUnboxedTupleTyCon )
+import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons, isDataTyCon, 
+                          tyConTheta, isProductTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classBigSig, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar )
 import VarSet		( isEmptyVarSet )
@@ -68,7 +69,8 @@ import PrimOp		( PrimOp(DataToTagOp, CCallOp),
 import Demand		( wwStrict, wwPrim )
 import DataCon		( DataCon, StrictnessMark(..), 
 			  dataConFieldLabels, dataConRepArity, dataConTyCon,
-			  dataConArgTys, dataConRepType, dataConRepStrictness, dataConName,
+			  dataConArgTys, dataConRepType, dataConRepStrictness, 
+                          dataConName, dataConTheta,
 			  dataConSig, dataConStrictMarks, dataConId
 			)
 import Id		( idType, mkId,
@@ -356,12 +358,24 @@ mkRecordSelId tycon field_label
     data_cons  = tyConDataCons tycon
     tyvars     = tyConTyVars tycon	-- These scope over the types in 
 					-- the FieldLabels of constructors of this type
+    tycon_theta	= tyConTheta tycon	-- The context on the data decl
+					--   eg data (Eq a, Ord b) => T a b = ...
 
     data_ty   = mkTyConApp tycon (mkTyVarTys tyvars)
     tyvar_tys = mkTyVarTys tyvars
 
+	-- Very tiresomely, the selectors are (unnecessarily!) overloaded over
+	-- just the dictionaries in the types of the constructors that contain
+	-- the relevant field.  Urgh.  
+	-- NB: this code relies on the fact that DataCons are quantified over
+	-- the identical type variables as their parent TyCon
+    dict_tys  = [mkDictTy cls tys | (cls, tys) <- tycon_theta, needed_dict (cls, tys)]
+    needed_dict pred = or [ pred `elem` (dataConTheta dc) 
+			  | (DataAlt dc, _, _) <- the_alts]
+
     selector_ty :: Type
-    selector_ty  = mkForAllTys tyvars (mkFunTy data_ty field_ty)
+    selector_ty  = mkForAllTys tyvars $ mkFunTys dict_tys $ 
+		   mkFunTy data_ty field_ty
       
     info = mkIdInfo (RecordSelId field_label)
 	   `setArityInfo`	exactArity 1
@@ -372,7 +386,7 @@ mkRecordSelId tycon field_label
     unfolding = mkTopUnfolding sel_rhs
 
 	
-    [data_id] = mkTemplateLocals [data_ty]
+    (data_id:dict_ids) = mkTemplateLocals (data_ty:dict_tys)
     alts      = map mk_maybe_alt data_cons
     the_alts  = catMaybes alts
     default_alt | all isJust alts = []	-- No default needed
@@ -381,8 +395,8 @@ mkRecordSelId tycon field_label
     sel_rhs | isNewTyCon tycon = new_sel_rhs
 	    | otherwise	       = data_sel_rhs
 
-    data_sel_rhs = mkLams tyvars $ Lam data_id $
-	 	     Case (Var data_id) data_id (the_alts ++ default_alt)
+    data_sel_rhs = mkLams tyvars $ mkLams dict_ids $ Lam data_id $
+	 	   Case (Var data_id) data_id (the_alts ++ default_alt)
 
     new_sel_rhs  = mkLams tyvars $ Lam data_id $
 		    Note (Coerce (unUsgTy field_ty) (unUsgTy data_ty)) (Var data_id)

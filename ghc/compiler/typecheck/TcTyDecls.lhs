@@ -30,7 +30,7 @@ import TcMonad
 import TcUnify		( unifyKind )
 
 import Class		( Class )
-import DataCon		( DataCon, dataConSig, mkDataCon, isNullaryDataCon,
+import DataCon		( DataCon, mkDataCon, isNullaryDataCon,
 			  dataConFieldLabels, dataConId, dataConWrapId,
 			  markedStrict, notMarkedStrict, markedUnboxed, dataConRepType
 			)
