@@ -5,7 +5,8 @@
 
 \begin{code}
 module ByteCodeLink ( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
-		      ClosureEnv, HValue, linkSomeBCOs, filterNameMap
+		      ClosureEnv, HValue, linkSomeBCOs, filterNameMap,
+		      iNTERP_STACK_CHECK_THRESH
 		   ) where
 
 #include "HsVersions.h"
@@ -188,6 +189,7 @@ mkBits findLabel st proto_insns
        doInstr st i
           = case i of
                ARGCHECK  n        -> instr2 st i_ARGCHECK n
+               STKCHECK  n        -> instr2 st i_STKCHECK n
                PUSH_L    o1       -> instr2 st i_PUSH_L o1
                PUSH_LL   o1 o2    -> instr3 st i_PUSH_LL o1 o2
                PUSH_LLL  o1 o2 o3 -> instr4 st i_PUSH_LLL o1 o2 o3
@@ -320,6 +322,7 @@ foreign label "stg_gc_d1_info"      stg_gc_d1_info :: Addr
 instrSize16s :: BCInstr -> Int
 instrSize16s instr
    = case instr of
+        STKCHECK _     -> 2
         ARGCHECK _     -> 2
         PUSH_L   _     -> 2
         PUSH_LL  _ _   -> 3
@@ -553,5 +556,8 @@ i_TESTEQ_P = (bci_TESTEQ_P :: Int)
 i_CASEFAIL = (bci_CASEFAIL :: Int)
 i_ENTER    = (bci_ENTER :: Int)
 i_RETURN   = (bci_RETURN :: Int)
+i_STKCHECK = (bci_STKCHECK :: Int)
+
+iNTERP_STACK_CHECK_THRESH = (INTERP_STACK_CHECK_THRESH :: Int)
 
 \end{code}

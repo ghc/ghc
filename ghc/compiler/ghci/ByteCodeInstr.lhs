@@ -4,7 +4,8 @@
 \section[ByteCodeInstrs]{Bytecode instruction definitions}
 
 \begin{code}
-module ByteCodeInstr ( BCInstr(..), ProtoBCO(..), nameOfProtoBCO ) where
+module ByteCodeInstr ( BCInstr(..), ProtoBCO(..), 
+		       nameOfProtoBCO, bciStackUse ) where
 
 #include "HsVersions.h"
 
@@ -43,6 +44,7 @@ type LocalLabel = Int
 data BCInstr
    -- Messing with the stack
    = ARGCHECK  Int
+   | STKCHECK  Int
    -- Push locals (existing bits of the stack)
    | PUSH_L    Int{-offset-}
    | PUSH_LL   Int Int{-2 offsets-}
@@ -92,7 +94,16 @@ data BCInstr
 		-- and return as per that.
 
 
+instance Outputable a => Outputable (ProtoBCO a) where
+   ppr (ProtoBCO name instrs origin)
+      = (text "ProtoBCO" <+> ppr name <> colon)
+        $$ nest 6 (vcat (map ppr instrs))
+        $$ case origin of
+              Left alts -> vcat (map (pprCoreAlt.deAnnAlt) alts)
+              Right rhs -> pprCoreExpr (deAnnotate rhs)
+
 instance Outputable BCInstr where
+   ppr (STKCHECK n)          = text "STKCHECK" <+> int n
    ppr (ARGCHECK n)          = text "ARGCHECK" <+> int n
    ppr (PUSH_L offset)       = text "PUSH_L  " <+> int offset
    ppr (PUSH_LL o1 o2)       = text "PUSH_LL " <+> int o1 <+> int o2
@@ -125,11 +136,39 @@ instance Outputable BCInstr where
    ppr ENTER                 = text "ENTER"
    ppr (RETURN pk)           = text "RETURN  " <+> ppr pk
 
-instance Outputable a => Outputable (ProtoBCO a) where
-   ppr (ProtoBCO name instrs origin)
-      = (text "ProtoBCO" <+> ppr name <> colon)
-        $$ nest 6 (vcat (map ppr instrs))
-        $$ case origin of
-              Left alts -> vcat (map (pprCoreAlt.deAnnAlt) alts)
-              Right rhs -> pprCoreExpr (deAnnotate rhs)
+
+-- The stack use, in words, of each bytecode insn.  These _must_ be
+-- correct, or overestimates of reality, to be safe.
+bciStackUse :: BCInstr -> Int
+bciStackUse (STKCHECK n)          = 0
+bciStackUse (ARGCHECK n)          = 0
+bciStackUse (PUSH_L offset)       = 1
+bciStackUse (PUSH_LL o1 o2)       = 2
+bciStackUse (PUSH_LLL o1 o2 o3)   = 3
+bciStackUse (PUSH_G globalish)    = 1
+bciStackUse (PUSH_AS nm pk)       = 2
+bciStackUse (PUSH_UBX lit nw)     = nw
+bciStackUse (PUSH_TAG n)          = 1
+bciStackUse (ALLOC sz)            = 1
+bciStackUse (UNPACK sz)           = sz
+bciStackUse (UPK_TAG n m k)       = n + 1{-tag-}
+bciStackUse (LABEL     lab)       = 0
+bciStackUse (TESTLT_I  i lab)     = 0
+bciStackUse (TESTEQ_I  i lab)     = 0
+bciStackUse (TESTLT_F  f lab)     = 0
+bciStackUse (TESTEQ_F  f lab)     = 0
+bciStackUse (TESTLT_D  d lab)     = 0
+bciStackUse (TESTEQ_D  d lab)     = 0
+bciStackUse (TESTLT_P  i lab)     = 0
+bciStackUse (TESTEQ_P  i lab)     = 0
+bciStackUse CASEFAIL              = 0
+bciStackUse ENTER                 = 0
+bciStackUse (RETURN pk)           = 0
+
+-- These insns actually reduce stack use, but we need the high-tide level,
+-- so can't use this info.  Not that it matters much.
+bciStackUse (SLIDE n d)           = 0
+bciStackUse (MKAP offset sz)      = 0
+bciStackUse (PACK dcon sz)        = 1 -- worst case is PACK 0 words
+
 \end{code}

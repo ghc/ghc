@@ -39,10 +39,11 @@ import ErrUtils		( showPass, dumpIfSet_dyn )
 import Unique		( mkPseudoUnique3 )
 import FastString	( FastString(..) )
 import PprType		( pprType )
-import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO )
+import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO, bciStackUse )
 import ByteCodeItbls	( ItblEnv, mkITbls )
 import ByteCodeLink	( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
-			  ClosureEnv, HValue, linkSomeBCOs, filterNameMap )
+			  ClosureEnv, HValue, linkSomeBCOs, filterNameMap,
+			  iNTERP_STACK_CHECK_THRESH )
 
 import List		( intersperse, sortBy )
 import Foreign		( Ptr(..), mallocBytes )
@@ -169,8 +170,31 @@ ppBCEnv p
 -- Create a BCO and do a spot of peephole optimisation on the insns
 -- at the same time.
 mkProtoBCO nm instrs_ordlist origin
-   = ProtoBCO nm (peep (fromOL instrs_ordlist)) origin
+   = ProtoBCO nm maybe_with_stack_check origin
      where
+        -- Overestimate the stack usage (in words) of this BCO,
+        -- and if >= iNTERP_STACK_CHECK_THRESH, add an explicit
+        -- stack check.  (The interpreter always does a stack check
+        -- for iNTERP_STACK_CHECK_THRESH words at the start of each
+        -- BCO anyway, so we only need to add an explicit on in the
+        -- (hopefully rare) cases when the (overestimated) stack use
+        -- exceeds iNTERP_STACK_CHECK_THRESH.
+        maybe_with_stack_check
+           | stack_overest >= 65535
+           = pprPanic "mkProtoBCO: stack use won't fit in 16 bits" 
+                      (int stack_overest)
+           | stack_overest >= iNTERP_STACK_CHECK_THRESH
+           = (STKCHECK stack_overest) : peep_d
+           | otherwise
+           = peep_d	-- the supposedly common case
+             
+        stack_overest = sum (map bciStackUse peep_d)
+                        + 10 {- just to be really really sure -}
+
+
+        -- Merge local pushes
+        peep_d = peep (fromOL instrs_ordlist)
+
         peep (PUSH_L off1 : PUSH_L off2 : PUSH_L off3 : rest)
            = PUSH_LLL off1 (off2-1) (off3-2) : peep rest
         peep (PUSH_L off1 : PUSH_L off2 : rest)
