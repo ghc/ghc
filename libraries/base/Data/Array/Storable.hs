@@ -49,12 +49,6 @@ import Data.Array.Base
 import Data.Array.MArray
 import Foreign hiding (newArray)
 
-#ifdef __HUGS__
-#define MAKE_ARRAY(x) makeForeignPtr (x) free
-#else
-#define MAKE_ARRAY(x) newForeignPtr (x) (free (x))
-#endif
-
 data StorableArray i e = StorableArray !i !i !(ForeignPtr e)
 
 instance HasBounds StorableArray where
@@ -63,16 +57,15 @@ instance HasBounds StorableArray where
 instance Storable e => MArray StorableArray e IO where
 
     newArray (l,u) init = do
-        a <- mallocArray size
-        sequence_ [pokeElemOff a i init | i <- [0..size-1]]
-        fp <- MAKE_ARRAY(a)
+        fp <- mallocForeignPtrArray size
+        withForeignPtr fp $ \a ->
+            sequence_ [pokeElemOff a i init | i <- [0..size-1]]
         return (StorableArray l u fp)
         where
         size = rangeSize (l,u)
 
     newArray_ (l,u) = do
-        a  <- mallocArray (rangeSize (l,u))
-        fp <- MAKE_ARRAY(a)
+        fp <- mallocForeignPtrArray (rangeSize (l,u))
         return (StorableArray l u fp)
 
     unsafeRead (StorableArray _ _ fp) i =
@@ -80,6 +73,13 @@ instance Storable e => MArray StorableArray e IO where
 
     unsafeWrite (StorableArray _ _ fp) i e =
         withForeignPtr fp $ \a -> pokeElemOff a i e
+
+-- adapted from Foreign.Marshall.Array.mallocArray
+mallocForeignPtrArray :: Storable a => Int -> IO (ForeignPtr a)
+mallocForeignPtrArray  = doMalloc undefined
+  where
+    doMalloc            :: Storable a => a -> Int -> IO (ForeignPtr a)
+    doMalloc dummy size  = mallocForeignPtrBytes (size * sizeOf dummy)
 
 withStorableArray :: StorableArray i e -> (Ptr e -> IO a) -> IO a
 withStorableArray (StorableArray _ _ fp) f = withForeignPtr fp f
