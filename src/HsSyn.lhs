@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.16 2002/11/11 09:32:57 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.17 2003/05/06 10:04:47 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -485,6 +485,9 @@ docParagraph (DocAppend (DocString s1) (DocMonospaced p))
 docParagraph (DocAppend (DocString s1)
 		(DocAppend (DocMonospaced p) (DocString s2)))
   | all isSpace s1 && all isSpace s2
+  = DocCodeBlock p
+docParagraph (DocAppend (DocMonospaced p) (DocString s2))
+  | all isSpace s2
   = DocCodeBlock p
 docParagraph p
   = DocParagraph p
