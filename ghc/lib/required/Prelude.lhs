@@ -19,7 +19,6 @@ module Prelude (
     Bounded(..), 
     Enum(..), succ, pred, 
     Show(..), ShowS, shows, show, showChar, showString, showParen,
-    Num(..), 
     Eval(..), seq, strict,
     Bool(..), (&&), (||), not, otherwise,
     Char, String, Int, Integer, Float, Double, Void,
@@ -47,7 +46,7 @@ module Prelude (
     Ratio, Rational, 
     (%), numerator, denominator, approxRational,
 
-    Num((+), (-), (*), negate, abs, signum, fromInteger),
+    Num((+), (-), (*), negate, abs, signum, fromInteger, fromInt{-glaExt-}),
     Real(toRational),
     Integral(quot, rem, div, mod, quotRem, divMod, toInteger, toInt{-partain-}),
     Fractional((/), recip, fromRational),

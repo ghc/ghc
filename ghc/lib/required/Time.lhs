@@ -13,15 +13,21 @@ its use of Coordinated Universal Time (UTC).
 
 module Time 
        (
-	CalendarTime(..),
         Month,
 	Day,
         CalendarTime(CalendarTime),
         TimeDiff(TimeDiff),
 	ClockTime(..), -- non-standard, lib. report gives this as abstract
-	getClockTime, addToClockTime, diffClockTimes,
-	toCalendarTime,	toUTCTime, toClockTime,
-        calendarTimeToString, formatCalendarTime
+
+	getClockTime, 
+	addToClockTime, 
+	diffClockTimes,
+
+	toCalendarTime,	
+	toUTCTime, 
+	toClockTime,
+        calendarTimeToString, 
+	formatCalendarTime
        ) where
 
 import PrelBase

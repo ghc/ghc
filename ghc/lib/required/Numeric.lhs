@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1997
+% (c) The AQUA Project, Glasgow University, 1997-98
 %
 \section[Numeric]{Numeric interface}
 
@@ -40,9 +40,9 @@ import PrelRead
 \end{code}
 
 %*********************************************************
-%*							*
-\subsection{Signatures}
-%*							*
+%*							 *
+\subsection[Numeric-signatures]{Signatures}
+%*							 *
 %*********************************************************
 
 Interface on offer:
@@ -103,11 +103,9 @@ showHex n r =
  showString "0x" $
  showIntAtBase 16 (toChrHex) n r
  where  
-  toChrHex d = 
-   if d < 10 then
-      chr (ord_0   + fromIntegral d)
-   else
-      chr (ord 'a' + fromIntegral (d - 10))
+  toChrHex d
+    | d < 10    = chr (ord_0   + fromIntegral d)
+    | otherwise = chr (ord 'a' + fromIntegral (d - 10))
 
 showOct :: Integral a => a -> ShowS
 showOct n r = 
@@ -116,6 +114,10 @@ showOct n r =
  where toChrOct d = chr (ord_0   + fromIntegral d)
 
 \end{code}
+
+Controlling the format and precision of floats. The code that
+implements the formatting itself is in @PrelNum@ to avoid
+mutual module deps.
 
 \begin{code}
 showEFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
@@ -127,6 +129,3 @@ showFFloat d x =  showString (formatRealFloat FFFixed d x)
 showGFloat d x =  showString (formatRealFloat FFGeneric d x)
 
 \end{code}
-      
-  
-	   
