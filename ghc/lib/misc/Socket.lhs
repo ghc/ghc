@@ -31,7 +31,7 @@ module Socket (
        ) where
 
 import BSD
-import SocketPrim hiding ( accept, socketPort )
+import SocketPrim hiding ( accept, socketPort, recvFrom, sendTo )
 import qualified SocketPrim ( accept, socketPort )
 import IO
 \end{code} 

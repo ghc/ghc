@@ -37,9 +37,8 @@ module SocketPrim (
 
     socketToHandle,	-- :: Socket -> IO Handle
 
--- Alternative read/write interface not yet implemented.
---    sendto		-- :: Socket -> String -> SockAddr -> IO Int
---    recvfrm		-- :: Socket -> Int -> SockAddr -> IO (String, Int)
+    sendTo,		-- :: Socket -> String -> SockAddr -> IO Int
+    recvFrom,		-- :: Socket -> Int -> IO (String, Int, SockAddr)
 --    sendmsg		-- :: Socket -> Message -> MsgFlags -> IO Int
 --    recvmsg		-- :: Socket -> MsgFlags -> IO Message
 
@@ -382,7 +381,7 @@ writeSocket :: Socket	-- Connected Socket
 
 writeSocket (MkSocket s family stype protocol status) xs = do
  currentStatus <- readIORef status
- if not ((currentStatus /= Connected) || (currentStatus /= Listening)) 
+ if not ((currentStatus == Connected) || (currentStatus == Listening))
    then
     fail (userError ("writeSocket: can't peform write on socket in status " ++
           show currentStatus))
@@ -392,13 +391,33 @@ writeSocket (MkSocket s family stype protocol status) xs = do
       -1 -> constructErrorAndFail "writeSocket"
       _  -> return nbytes
 
-readSocket :: Socket		-- Connected Socket
+
+sendTo :: Socket	-- Bound/Connected Socket
+       -> String	-- Data to send
+       -> SockAddr
+       -> IO Int	-- Number of Bytes sent
+
+sendTo (MkSocket s family stype protocol status) xs addr = do
+ currentStatus <- readIORef status
+ if not ((currentStatus == Connected) || (currentStatus == Listening) || (currentStatus == Bound))
+   then
+    fail (userError ("sendTo: can't peform write on socket in status " ++
+          show currentStatus))
+   else do
+    addr' <- packSockAddr addr
+    let (_,sz) = boundsOfByteArray addr'
+    nbytes <- _ccall_ sendTo__ s xs (length xs) addr' sz
+    case nbytes of
+      -1 -> constructErrorAndFail "sendTo"
+      _  -> return nbytes
+
+readSocket :: Socket		-- Connected (or bound) Socket
 	   -> Int		-- Number of Bytes to Read
 	   -> IO (String, Int)	-- (Data Read, Number of Bytes)
 
 readSocket (MkSocket s family stype protocol status) nbytes = do
  currentStatus <- readIORef status
- if not ((currentStatus /= Connected) || (currentStatus /= Listening))
+ if not ((currentStatus == Connected) || (currentStatus == Listening))
    then
     fail (userError ("readSocket: can't perform read on socket in status " ++
 	  show currentStatus))
@@ -424,6 +443,25 @@ readSocketAll s =
 	(\ _ -> return xs)
     in
     	loop ""
+
+recvFrom :: Socket -> Int -> IO (String, Int, SockAddr)
+recvFrom (MkSocket s family stype protocol status) nbytes = do
+ currentStatus <- readIORef status
+ if not ((currentStatus == Connected) || (currentStatus == Listening) || (currentStatus == Bound))
+   then
+    fail (userError ("recvFrom: can't perform read on socket in status " ++
+	  show currentStatus))
+   else do
+    ptr      <- stToIO (newCharArray (0, nbytes))
+    (ptr_addr,_) <- allocSockAddr AF_INET
+    nbytes   <- _ccall_ recvFrom__ s ptr nbytes ptr_addr
+    case nbytes of
+      -1 -> constructErrorAndFail "recvFrom"
+      n  -> do
+	    barr <- stToIO (unsafeFreezeByteArray ptr)
+	    addr <- unpackSockAddrInet ptr_addr
+            return (unpackNBytesPS (byteArrayToPS barr) n, n, addr)
+
 \end{code}
 
 The port number the given socket is currently connected to can be
