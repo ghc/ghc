@@ -12,7 +12,7 @@ import HsSyn		( TyClDecl(..), HsTupCon(..) )
 import TcMonad
 import TcMonoType	( tcIfaceType )
 import TcEnv		( TcEnv, RecTcEnv, tcExtendTyVarEnv, 
-			  tcExtendGlobalValEnv, tcSetEnv,
+			  tcExtendGlobalValEnv, tcSetEnv, tcEnvIds,
 			  tcLookupGlobal_maybe, tcLookupRecId_maybe
 			)
 
@@ -25,7 +25,7 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkId, mkVanillaId, isDataConWrapId_maybe )
+import Id		( Id, mkId, mkVanillaId, isLocalId, isDataConWrapId_maybe )
 import MkId		( mkCCallOpId )
 import IdInfo
 import DataCon		( DataCon, dataConId, dataConSig, dataConArgTys )
@@ -57,7 +57,11 @@ tcInterfaceSigs unf_env decls
   = listTc [ do_one name ty id_infos src_loc
 	   | IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc =src_loc} <- decls]
   where
-    in_scope_vars = []	-- I think this will be OK
+    in_scope_vars = filter isLocalId (tcEnvIds unf_env)
+	-- When we have hi-boot files, an unfolding might refer to
+	-- something defined in this module, so we must build a
+	-- suitable in-scope set.  This thunk will only be poked
+	-- if -dcore-lint is on.
 
     do_one name ty id_infos src_loc
       = tcAddSrcLoc src_loc 		 		$	

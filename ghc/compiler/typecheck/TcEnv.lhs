@@ -62,7 +62,9 @@ import Name		( Name, OccName, NamedThing(..),
 			)
 import Name		( NameEnv, lookupNameEnv, nameEnvElts, extendNameEnvList, emptyNameEnv )
 import OccName		( mkDFunOcc, occNameString )
-import HscTypes		( DFunId, TypeEnv, HomeSymbolTable, PackageTypeEnv )
+import HscTypes		( DFunId, TypeEnv, HomeSymbolTable, PackageTypeEnv,
+			  typeEnvTyCons, typeEnvClasses, typeEnvIds
+			)
 import Module		( Module )
 import InstEnv		( InstEnv, emptyInstEnv )
 import HscTypes		( lookupType, TyThing(..) )
@@ -156,9 +158,9 @@ initTcEnv syntax_map hst pte
 		| otherwise	   = lookupType hst pte name
 
 
-tcEnvClasses env = [cl | AClass cl <- nameEnvElts (tcGEnv env)]
-tcEnvTyCons  env = [tc | ATyCon tc <- nameEnvElts (tcGEnv env)] 
-tcEnvIds     env = [id | AnId   id <- nameEnvElts (tcGEnv env)] 
+tcEnvClasses env = typeEnvClasses (tcGEnv env)
+tcEnvTyCons  env = typeEnvTyCons  (tcGEnv env) 
+tcEnvIds     env = typeEnvIds     (tcGEnv env) 
 tcEnvTyVars  env = [tv | ATyVar tv <- nameEnvElts (tcLEnv env)]
 tcEnvTcIds   env = [id | ATcId  id <- nameEnvElts (tcLEnv env)]
 

@@ -20,7 +20,7 @@ module HscTypes (
 	TyThing(..), isTyClThing, implicitTyThingIds,
 
 	TypeEnv, lookupType, mkTypeEnv, extendTypeEnvList, 
-	typeEnvClasses, typeEnvTyCons,
+	typeEnvClasses, typeEnvTyCons, typeEnvIds,
 
 	ImportedModuleInfo, WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
@@ -248,6 +248,7 @@ instance Outputable TyThing where
 
 typeEnvClasses env = [cl | AClass cl <- nameEnvElts env]
 typeEnvTyCons  env = [tc | ATyCon tc <- nameEnvElts env] 
+typeEnvIds     env = [id | AnId id   <- nameEnvElts env] 
 
 implicitTyThingIds :: [TyThing] -> [Id]
 -- Add the implicit data cons and selectors etc 
