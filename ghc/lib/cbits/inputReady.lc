@@ -5,6 +5,8 @@
 
 \begin{code}
 
+/* select and supporting types is not */
+#define NON_POSIX_SOURCE  
 #include "rtsdefs.h"
 #include "stgio.h"
 
@@ -20,18 +22,26 @@
 #include <fcntl.h>
 #endif
 
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+
 StgInt
-inputReady(fp)
+inputReady(fp, nsecs)
 StgForeignObj fp;
+StgInt nsecs;
 {
-    int flags;
-    int c;
+    int flags, c, fd, maxfd, ready;
+    fd_set rfd;
+    struct timeval tv;
 
     if (feof((FILE *) fp))
 	return 0;
 
+    fd = fileno((FILE *)fp);
+
     /* Get the original file status flags */
-    while ((flags = fcntl(fileno((FILE *) fp), F_GETFL)) < 0) {
+    while ((flags = fcntl(fd, F_GETFL)) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -42,7 +52,7 @@ StgForeignObj fp;
 
     /* If it's not already non-blocking, make it so */
     if (!(flags & O_NONBLOCK)) {
-	while (fcntl(fileno((FILE *) fp), F_SETFL, flags | O_NONBLOCK) < 0) {
+	while (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
 	    /* still highly unlikely */
 	    if (errno != EINTR) {
 		cvtErrno();
@@ -52,12 +62,28 @@ StgForeignObj fp;
 	}
     }
     /* Now try to get a character */
+    FD_ZERO(&rfd);
+    FD_SET(fd, &rfd);
+    /* select() will consider the descriptor set in the range of 0 to (maxfd-1) */
+    maxfd = fd + 1;
+    tv.tv_usec = 0;
+    tv.tv_sec  = nsecs;
+    while ((ready = select(maxfd, &rfd, NULL, NULL, &tv)) < 0 ) {
+      if (errno != EINTR ) {
+		cvtErrno();
+		stdErrno();
+                ready = -1;
+      		break;
+      }
+   }
+   /*
     while ((c = getc((FILE *) fp)) == EOF && errno == EINTR)
 	clearerr((FILE *) fp);
+   */
 
     /* If we made it non-blocking for this, switch it back */
     if (!(flags & O_NONBLOCK)) {
-	while (fcntl(fileno((FILE *) fp), F_SETFL, flags) < 0) {
+	while (fcntl(fd, F_SETFL, flags) < 0) {
 	    /* still highly unlikely */
 	    if (errno != EINTR) {
 		cvtErrno();
@@ -66,7 +92,10 @@ StgForeignObj fp;
 	    }
 	}
     }
+    /* 1 => Input ready, 0 => time expired  (-1 error) */
+    return (ready);
 
+    /*
     if (c == EOF) {
 	if (errno == EAGAIN || feof((FILE *) fp)) {
 	    clearerr((FILE *) fp);
@@ -82,6 +111,7 @@ StgForeignObj fp;
 	return -1;
     } else
 	return 1;
+    */
 }
 
 \end{code}
