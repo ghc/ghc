@@ -457,11 +457,23 @@ dnl Remove common automounter nonsense
 dnl
 hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^//\(.\)/|\1:/|' `
 
-dnl Find 'hardtop_plat', the native format for 'hardtop' (i.e., right kind of \dnl slashes on a Win32 box, but with b-slashes being escaped).
+dnl Find 'hardtop_plat', the native format for 'hardtop' 
+dnl (i.e., right kind of \dnl slashes on a Win32 box, but with b-slashes being escaped).
 dnl
+dnl Note OSTYPE: On Cygwin we need to use 'cygpath' to convert /cygdrive/c/foo to c:/foo
+dnl		 but we must not do that if we aren't building using Cygwin (notably msys), 
+dnl		 because cygpath doesn't exist.  It seems that 'bash' sets OSTYPE to 'cygwin' 
+dnl		 or 'msys' respectively, but cygwin's 'sh' does not.  So we hackily assume
+dnl		 that if the shell hasn't set it to 'msys' then we must be in Cygwin.  Sigh.
+dnl
+dnl		 The Right Thing is probably to test $BuildPlatform instead, but we are sloppy 
+dnl		 about setting that correctly at the moment, so we just work around for now.
+dnl
+dnl		 The quotes round "$(OSTYPE)" are essential, for the Cygwin-sh case where OSTYPE
+dnl		 is not set.
 case $HostPlatform in
   i386-unknown-mingw32 | i386-unknown-cygwin32)
-        if test ${OSTYPE} != "msys" 
+        if test "${OSTYPE}" != "msys" 
           then
             # convert $hardtop to a path that mingw will understand too
             cyghardtop=${hardtop}
@@ -531,7 +543,7 @@ AC_ARG_WITH(gcc,
 [WhatGccIsCalled="$withval"
  if test "x$HostPlatform" = "xi386-unknown-mingw32"
     then
-       if test ${OSTYPE} != "msys"
+       if test "${OSTYPE}" != "msys"
          then
          # Canonicalise to <drive>:/path/to/gcc
          withval=`cygpath -w ${withval} | sed -e 's@\\\\@/@g' `
@@ -793,7 +805,7 @@ case $Catalog in
    glafp*) 
 	case $HostOS_CPP in
 	   mingw32)
-	          if test ${OSTYPE} == "msys"
+	          if test "${OSTYPE}" == "msys"
 	            then
 	              Catalog=$hardtop/$Catalog
 	            else
@@ -1418,7 +1430,7 @@ dnl ** check for ld, and whether ld has -x option
 AC_PATH_PROG(LdCmdRaw, ld)
 case $HostOS_CPP in
  mingw32) 
-        if test ${OSTYPE} == "msys"
+        if test "${OSTYPE}" == "msys"
 	   then
              LdCmd=${LdCmdRaw}
 	   else
