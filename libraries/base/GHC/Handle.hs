@@ -714,6 +714,9 @@ openFile' filepath mode binary =
  	        (c_open f (fromIntegral oflags) 0o666)
 
     openFd fd Nothing filepath mode binary truncate
+	`catchException` \e -> do c_close (fromIntegral fd); throw e
+	-- NB. don't forget to close the FD if openFd fails, otherwise
+	-- this FD leaks.
 	-- ASSERT: if we just created the file, then openFd won't fail
 	-- (so we don't need to worry about removing the newly created file
 	--  in the event of an error).
