@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.39 1998/04/30 19:47:45 sof Exp $
+# $Id: Makefile,v 1.40 1998/05/21 10:32:03 simonm Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -132,8 +132,6 @@ SRC_HC_OPTS += -recomp $(GhcHcOpts)
 #	The standard suffix rule for compiling a Haskell file
 #	adds these flags to the command line
 
-absCSyn/CStrings_HC_OPTS 	= -monly-3-regs
-
 # Was 6m with 2.10
 absCSyn/PprAbsC_HC_OPTS 	= -H10m
 
@@ -187,13 +185,12 @@ typecheck/TcHsSyn_HC_OPTS	= -H15m
 typecheck/TcExpr_HC_OPTS	= -H15m
 
 typecheck/TcEnv_HC_OPTS		= -H10m
-utils/Argv_HC_OPTS 		= -fvia-C -monly-3-regs
+utils/Argv_HC_OPTS 		= -fvia-C
 utils/SST_HC_OPTS 		= -fvia-C
-utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
-utils/FastString_HC_OPTS	= -fvia-C -monly-3-regs
+utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -funfolding-interface-threshold10
+utils/FastString_HC_OPTS	= -fvia-C
 utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts -fvia-C
-utils/Outputable_HC_OPTS	= -monly-3-regs
 utils/DirUtils_HC_OPTS 		= -fvia-C
 
 
