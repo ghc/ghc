@@ -62,7 +62,7 @@ PrelNum_HC_OPTS     += -H30m
 PrelUnsafe_HC_OPTS           += -Onot
 
 PrelBase_HC_OPTS         += -H12m
-PrelRead_HC_OPTS         += -H12m
+PrelRead_HC_OPTS         += -H13m
 PrelTup_HC_OPTS          += -H12m
 PrelArr_HC_OPTS          += -H8m
 PrelHandle_HC_OPTS       += -H12m
