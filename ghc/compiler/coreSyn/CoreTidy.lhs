@@ -14,34 +14,26 @@ module CoreTidy (
 import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
-import CoreUtils	( exprArity )
+import CoreUtils	( exprArity, exprIsBottom )
 import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars )
 import CoreLint		( showPass, endPass )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId,
-			  mkId, isLocalId, omitIfaceSigForId
+			  idCafInfo, mkId, isLocalId, omitIfaceSigForId,
+			  idFlavour, modifyIdInfo
 			) 
-import IdInfo		( IdInfo, mkIdInfo, vanillaIdInfo,
-			  IdFlavour(..), flavourInfo, ppFlavourInfo,
-			  specInfo, setSpecInfo, 
-			  cprInfo, setCprInfo, 
-			  inlinePragInfo, setInlinePragInfo, isNeverInlinePrag,
-			  strictnessInfo, setStrictnessInfo, 
-			  isBottomingStrictness,
-			  unfoldingInfo, setUnfoldingInfo, 
-			  occInfo, isLoopBreaker,
-			  workerInfo, setWorkerInfo, WorkerInfo(..),
-			  ArityInfo(..), setArityInfo
-			)
+import IdInfo		{- loads of stuff -}
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
 		  	  localiseName, mkLocalName, isGlobalName
 			)
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType, tidyType, tidyTyVar )
 import Module		( Module, moduleName )
-import HscTypes		( PersistentCompilerState( pcs_PRS ), PersistentRenamerState( prsOrig ),
+import PrimOp		( PrimOp(..), setCCallUnique )
+import HscTypes		( PersistentCompilerState( pcs_PRS ), 
+			  PersistentRenamerState( prsOrig ),
 			  OrigNameEnv( origNames ), OrigNameNameEnv
 			)
 import UniqSupply
@@ -51,6 +43,7 @@ import ErrUtils		( showPass )
 import SrcLoc		( noSrcLoc )
 import UniqFM		( mapUFM )
 import Outputable
+import FastTypes
 import List		( partition )
 import Util		( mapAccumL )
 \end{code}
@@ -285,9 +278,11 @@ tidyTopBind :: Module
 tidyTopBind mod ext_ids env (NonRec bndr rhs)
   = ((us2,orig,occ,subst) , NonRec bndr' rhs')
   where
-    tidy_env			  = (occ,subst)
-    ((us1,orig,occ,subst), bndr') = tidyTopBinder mod ext_ids tidy_env rhs' env bndr
-    (rhs',us2)			  = initUs us1 (tidyExpr tidy_env rhs)
+    ((us1,orig,occ,subst), bndr')
+	 = tidyTopBinder mod ext_ids tidy_env rhs' caf_info env bndr
+    tidy_env    = (occ,subst)
+    caf_info    = hasCafRefs (const True) rhs'
+    (rhs',us2)  = initUs us1 (tidyExpr tidy_env rhs)
 
 tidyTopBind mod ext_ids env (Rec prs)
   = (final_env, Rec prs')
@@ -298,15 +293,25 @@ tidyTopBind mod ext_ids env (Rec prs)
     do_one env (bndr,rhs) 
 	= ((us',orig,occ,subst), (bndr',rhs'))
 	where
-	((us,orig,occ,subst), bndr') = tidyTopBinder mod ext_ids final_tidy_env rhs' env bndr
-        (rhs', us')		     = initUs us (tidyExpr final_tidy_env rhs)
+	((us,orig,occ,subst), bndr')
+	   = tidyTopBinder mod ext_ids final_tidy_env rhs' caf_info env bndr
+        (rhs', us')   = initUs us (tidyExpr final_tidy_env rhs)
+
+	-- the CafInfo for a recursive group says whether *any* rhs in
+	-- the group may refer indirectly to a CAF (because then, they all do).
+    (bndrs, rhss) = unzip prs'
+    caf_info = hasCafRefss pred rhss
+    pred v = v `notElem` bndrs
+
 
 tidyTopBinder :: Module -> IdEnv Bool
-	      -> TidyEnv -> CoreExpr	-- The TidyEnv is used to tidy the IdInfo
-					-- The expr is the already-tided RHS
-					-- Both are knot-tied: don't look at them!
+	      -> TidyEnv -> CoreExpr -> CafInfo
+			-- The TidyEnv is used to tidy the IdInfo
+			-- The expr is the already-tided RHS
+			-- Both are knot-tied: don't look at them!
 	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
-tidyTopBinder mod ext_ids tidy_env rhs 
+
+tidyTopBinder mod ext_ids tidy_env rhs caf_info
 	      env@(us, orig_env2, occ_env2, subst_env2) id
 
   | omitIfaceSigForId id	-- Don't mess with constructors, 
@@ -330,7 +335,7 @@ tidyTopBinder mod ext_ids tidy_env rhs
 					       (idName id)
     ty'	       	    = tidyTopType (idType id)
     idinfo'         = tidyIdInfo us_l tidy_env
-			 is_external unfold_info arity_info id
+			 is_external unfold_info arity_info caf_info id
 
     id'	       = mkId name' ty' idinfo'
     subst_env' = extendVarEnv subst_env2 id id'
@@ -346,13 +351,14 @@ tidyTopBinder mod ext_ids tidy_env rhs
     arity_info = exprArity rhs
 
 
-tidyIdInfo us tidy_env is_external unfold_info arity_info id
+tidyIdInfo us tidy_env is_external unfold_info arity_info caf_info id
   | opt_OmitInterfacePragmas || not is_external
 	-- No IdInfo if the Id isn't external, or if we don't have -O
   = mkIdInfo new_flavour 
 	`setStrictnessInfo` strictnessInfo core_idinfo
 	`setArityInfo`	    ArityExactly arity_info
-	-- Keep strictness and arity info; it's used by the code generator
+	`setCafInfo`        caf_info
+	-- Keep strictness, arity and CAF info; it's used by the code generator
 
   | otherwise
   =  let (rules', _) = initUs us (tidyRules tidy_env (specInfo core_idinfo))
@@ -365,6 +371,7 @@ tidyIdInfo us tidy_env is_external unfold_info arity_info id
 	`setWorkerInfo`	    tidyWorker tidy_env (workerInfo core_idinfo)
 	`setSpecInfo`	    rules'
 	`setArityInfo`	    ArityExactly arity_info
+	`setCafInfo`        caf_info
 		-- this is the final IdInfo, it must agree with the
 		-- code finally generated (i.e. NO more transformations
 		-- after this!).
@@ -459,7 +466,10 @@ tidyBind env (Rec prs)
     mapUs (tidyExpr env') (map snd prs)		`thenUs` \ rhss' ->
     returnUs (env', Rec (zip bndrs' rhss'))
 
-tidyExpr env (Var v)   = returnUs (Var (tidyVarOcc env v))
+tidyExpr env (Var v)   
+  = fiddleCCall v  `thenUs` \ v ->
+    returnUs (Var (tidyVarOcc env v))
+
 tidyExpr env (Type ty) = returnUs (Type (tidyType env ty))
 tidyExpr env (Lit lit) = returnUs (Lit lit)
 
@@ -514,7 +524,7 @@ tidyVarOcc (_, var_env) v = case lookupVarEnv var_env v of
 tidyBndr :: TidyEnv -> Var -> UniqSM (TidyEnv, Var)
 tidyBndr env var
   | isTyVar var = returnUs (tidyTyVar env var)
-  | otherwise   = tidyId env var vanillaIdInfo
+  | otherwise   = tidyId env var (vanillaIdInfo `setCafInfo` NoCafRefs)
 
 tidyBndrs :: TidyEnv -> [Var] -> UniqSM (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumLUs tidyBndr env vars
@@ -525,6 +535,7 @@ tidyBndrWithRhs env (id,rhs)
    = tidyId env id idinfo
    where
 	idinfo = vanillaIdInfo `setArityInfo` ArityExactly (exprArity rhs)
+			       `setCafInfo` NoCafRefs
 			-- NB: This throws away the IdInfo of the Id, which we
 			-- no longer need.  That means we don't need to
 			-- run over it with env, nor renumber it.
@@ -544,4 +555,80 @@ tidyId env@(tidy_env, var_env) id idinfo
 	var_env'	  = extendVarEnv var_env id id'
     in
     returnUs ((tidy_env', var_env'), id')
+
+
+fiddleCCall id 
+  = case idFlavour id of
+         PrimOpId (CCallOp ccall) ->
+	    -- Make a guaranteed unique name for a dynamic ccall.
+	    getUniqueUs   	`thenUs` \ uniq ->
+	    returnUs (modifyIdInfo (`setFlavourInfo` 
+			    PrimOpId (CCallOp (setCCallUnique ccall uniq))) id)
+	 other_flavour ->
+	     returnUs id
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Figuring out CafInfo for an expression}
+%*									*
+%************************************************************************
+
+\begin{code}
+hasCafRefs  :: (Id -> Bool) -> CoreExpr -> CafInfo
+hasCafRefss :: (Id -> Bool) -> [CoreExpr] -> CafInfo
+	-- predicate returns True for a given Id if we look at this Id when
+	-- calculating the result.  Used to *avoid* looking at the CafInfo
+ 	-- field for an Id that is part of the current recursive group.
+
+hasCafRefs p expr = if isCAF expr || isFastTrue (cafRefs p expr)
+			then MayHaveCafRefs
+			else NoCafRefs
+
+hasCafRefss p exprs = if any isCAF exprs || isFastTrue (cafRefss p exprs)
+			then MayHaveCafRefs
+			else NoCafRefs
+
+cafRefs p (Var id)
+ | p id
+ = case idCafInfo id of 
+	NoCafRefs      -> fastBool False
+	MayHaveCafRefs -> fastBool True
+ | otherwise
+ = fastBool False
+
+cafRefs p (Lit l) 	     = fastBool False
+cafRefs p (App f a) 	     = cafRefs p f `fastOr` cafRefs p a
+cafRefs p (Lam x e) 	     = cafRefs p e
+cafRefs p (Let b e) 	     = cafRefss p (rhssOfBind b) `fastOr` cafRefs p e
+cafRefs p (Case e bndr alts) = cafRefs p e `fastOr` cafRefss p (rhssOfAlts alts)
+cafRefs p (Note n e) 	     = cafRefs p e
+cafRefs p (Type t) 	     = fastBool False
+
+cafRefss p [] 	  = fastBool False
+cafRefss p (e:es) = cafRefs p e `fastOr` cafRefss p es
+
+-- Decide whether a closure looks like a CAF or not.  In an effort to
+-- keep the number of CAFs (and hence the size of the SRTs) down, we
+-- would also like to look at the expression and decide whether it
+-- requires a small bounded amount of heap, so we can ignore it as a CAF.
+-- In these cases, we need to use an additional CAF list to keep track of
+-- non-collectable CAFs.
+-- 
+-- We mark real CAFs as `MayHaveCafRefs' because this information is used
+-- to decide whether a particular closure needs to be referenced in an
+-- SRT or not.
+
+isCAF :: CoreExpr -> Bool
+   -- special case for expressions which are always bottom,
+   -- such as 'error "..."'.  We don't need to record it as
+   -- a CAF, since it can only be entered once.
+isCAF e 
+  | not_function && is_bottom = False
+  | not_function && updatable = True
+  | otherwise		      = False
+  where 
+    not_function = exprArity e == 0
+    is_bottom    = exprIsBottom e
+    updatable    = True {- ToDo: check type for onceness? -}
 \end{code}

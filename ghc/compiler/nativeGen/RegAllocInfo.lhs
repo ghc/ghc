@@ -148,7 +148,7 @@ regUsage :: Instr -> RegUsage
 interesting (VirtualRegI _)  = True
 interesting (VirtualRegF _)  = True
 interesting (VirtualRegD _)  = True
-interesting (RealReg i)      = _IS_TRUE_(freeReg i)
+interesting (RealReg i)      = isFastTrue (freeReg i)
 
 #if alpha_TARGET_ARCH
 

@@ -9,7 +9,7 @@ module FastTypes (
     (+#), (-#), (*#), quotFastInt, negateFastInt,
     (==#), (<#), (<=#), (>=#), (>#),
 
-    FastBool, fastBool, _IS_TRUE_
+    FastBool, fastBool, isFastTrue, fastOr
   ) where
 
 #if defined(__GLASGOW_HASKELL__)
@@ -30,7 +30,13 @@ negateFastInt = negateInt#
 type FastBool = Int#
 fastBool True  = 1#
 fastBool False = 0#
-_IS_TRUE_ x = x ==# 1#
+isFastTrue x = x ==# 1#
+
+fastOr 1# _ = 1#
+fastOr 0# x = x
+
+fastAnd 0# x = 0#
+fastAnd 1# x = x
 
 #else {- ! __GLASGOW_HASKELL__ -}
 

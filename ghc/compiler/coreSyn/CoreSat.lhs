@@ -161,8 +161,7 @@ coreSatExprFloat :: CoreExpr -> UniqSM ([FloatingBind], CoreExpr)
 --	f (g x)	  ===>   ([v = g x], f v)
 
 coreSatExprFloat (Var v)
-  = fiddleCCall v  `thenUs` \ v ->
-    maybeSaturate v (Var v) 0 (idType v) `thenUs` \ app ->
+  = maybeSaturate v (Var v) 0 (idType v) `thenUs` \ app ->
     returnUs ([], app)
 
 coreSatExprFloat (Lit lit)
@@ -240,8 +239,7 @@ coreSatExprFloat expr@(App _ _)
 	  returnUs (App fun' arg', hd, res_ty, fs ++ floats, ss_rest)
 
     collect_args (Var v) depth
-	= fiddleCCall v   `thenUs` \ v ->
-	  returnUs (Var v, (Var v, depth), idType v, [], stricts)
+	= returnUs (Var v, (Var v, depth), idType v, [], stricts)
 	where
 	  stricts = case idStrictness v of
 			StrictnessInfo demands _ 
@@ -308,16 +306,6 @@ maybeSaturate fn expr n_args ty
     excess_arity = fn_arity - n_args
     saturate_it  = getUs 	`thenUs` \ us ->
 		   returnUs (etaExpand excess_arity us expr ty)
-
-fiddleCCall id 
-  = case idFlavour id of
-         PrimOpId (CCallOp ccall) ->
-	    -- Make a guaranteed unique name for a dynamic ccall.
-	    getUniqueUs   	`thenUs` \ uniq ->
-	    returnUs (modifyIdInfo (`setFlavourInfo` 
-			    PrimOpId (CCallOp (setCCallUnique ccall uniq))) id)
-	 other_flavour ->
-	     returnUs id
 
 -- ---------------------------------------------------------------------------
 -- Eliminate Lam as a non-rhs (STG doesn't have such a thing)

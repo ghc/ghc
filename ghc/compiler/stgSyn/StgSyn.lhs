@@ -34,8 +34,7 @@ module StgSyn (
 	pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs,
 	getArgPrimRep, pprStgAlts,
 	isLitLitArg, isDllConApp, isStgTypeArg,
-	stgArity, stgArgType,
-	collectFinalStgBinders
+	stgArity, stgArgType
 
 #ifdef DEBUG
 	, pprStgLVs
@@ -543,27 +542,6 @@ noSRT = NoSRT
 
 pprSRT (NoSRT) = ptext SLIT("_no_srt_")
 pprSRT (SRT off len) = parens (ppr off <> comma <> ppr len)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[Stg-utility-functions]{Utility functions}
-%*									*
-%************************************************************************
-
-
-For doing interfaces, we want the exported top-level Ids from the
-final pre-codegen STG code, so as to be sure we have the
-latest/greatest pragma info.
-
-\begin{code}
-collectFinalStgBinders
-	:: [StgBinding]	-- input program
-	-> [Id]
-
-collectFinalStgBinders [] = []
-collectFinalStgBinders (StgNonRec b _ : binds) = b : collectFinalStgBinders binds
-collectFinalStgBinders (StgRec bs     : binds) = map fst bs ++ collectFinalStgBinders binds
 \end{code}
 
 %************************************************************************

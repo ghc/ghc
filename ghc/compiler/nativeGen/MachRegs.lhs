@@ -812,7 +812,7 @@ allMachRegNos
 -- register allocator to attempt to map VRegs to.
 allocatableRegs :: [Reg]
 allocatableRegs
-   = let isFree i = _IS_TRUE_(freeReg i)
+   = let isFree i = isFastTrue (freeReg i)
      in  map RealReg (filter isFree allMachRegNos)
 
 -------------------------------

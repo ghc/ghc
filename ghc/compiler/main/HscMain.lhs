@@ -38,11 +38,11 @@ import Type
 import InstEnv		( emptyInstEnv )
 import Desugar
 import SimplCore
+import CoreSyn		( bindersOfBinds )
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
 import CoreSat
 import CoreToStg	( coreToStg, coreExprToStg )
-import StgSyn		( collectFinalStgBinders )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
@@ -218,24 +218,24 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -- DESUGAR, SIMPLIFY, TIDY-CORE
  	    -------------------
       	  -- We grab the the unfoldings at this point.
-	; simpl_result <- dsThenSimplThenTidy dflags pcs_tc hst this_mod 
- 					      print_unqualified is_exported tc_result
-	; let (pcs_simpl, tidy_binds, orphan_rules, foreign_stuff) = simpl_result
+	; (pcs_simpl, tidy_binds, orphan_rules, foreign_stuff)
+	      <- dsThenSimplThenTidy dflags pcs_tc hst this_mod 
+ 				print_unqualified is_exported tc_result
       	    
- 	    -------------------
- 	    -- CONVERT TO STG
- 	    -------------------
-	; (stg_binds, cost_centre_info, top_level_ids) 
-      	     <- myCoreToStg dflags this_mod tidy_binds
-
-
  	    -------------------
  	    -- BUILD THE NEW ModDetails AND ModIface
  	    -------------------
 	; let new_details = mkModDetails env_tc tidy_binds 
- 					 top_level_ids orphan_rules
+ 				(bindersOfBinds tidy_binds) orphan_rules
 	; final_iface <- mkFinalIface ghci_mode dflags location 
                                       maybe_checked_iface new_iface new_details
+
+ 	    -------------------
+ 	    -- CONVERT TO STG
+ 	    -------------------
+	; (stg_binds, cost_centre_info) 
+		<- myCoreToStg dflags this_mod tidy_binds
+
 
  	    -------------------
  	    -- COMPLETE CODE GENERATION
@@ -381,9 +381,8 @@ myCoreToStg dflags this_mod tidy_binds
 
       -- _scc_     "Stg2Stg"
       (stg_binds2, cost_centre_info) <- stg2stg dflags this_mod stg_binds
-      let final_ids = collectFinalStgBinders (map fst stg_binds2)
 
-      return (stg_binds2, cost_centre_info, final_ids)
+      return (stg_binds2, cost_centre_info)
 \end{code}
 
 
