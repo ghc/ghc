@@ -1536,10 +1536,10 @@ dupHandle other_side h_ = do
 		c_dup (fromIntegral (haFD h_))
   dupHandle_ other_side h_ new_fd
 
-dupHandleTo other_side h_ hto_ = do
+dupHandleTo other_side hto_ h_ = do
   flushBuffer h_
   new_fd <- throwErrnoIfMinus1 "dupHandleTo" $ 
-	        c_dup2 (fromIntegral (haFD hto_)) (fromIntegral (haFD h_))
+	        c_dup2 (fromIntegral (haFD h_)) (fromIntegral (haFD hto_))
   dupHandle_ other_side h_ new_fd
 
 dupHandle_ other_side h_ new_fd = do
