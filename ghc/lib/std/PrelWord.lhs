@@ -4,8 +4,6 @@
 \section[PrelWord]{Module @PrelWord@}
 
 \begin{code}
-{-# OPTIONS -monly-3-regs #-}
-
 #include "MachDeps.h"
 
 module PrelWord (

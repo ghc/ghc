@@ -4,8 +4,6 @@
 \section[PrelInt]{Module @PrelInt@}
 
 \begin{code}
-{-# OPTIONS -monly-3-regs #-}
-
 #include "MachDeps.h"
 
 module PrelInt (
