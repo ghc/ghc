@@ -848,7 +848,7 @@ jtos' n cs
   = if n < 10 then
 	chr (fromInteger (n + ord_0)) : cs
     else 
-	jtos' (n `quot` 10) (chr (fromInteger (n `rem` 10 + ord_0)) : cs)
+	jtos' (n `quot` 10) (chr (toInt (n `rem` 10) + (ord_0::Int)) : cs)
 
 showFloat x  =  showString (formatRealFloat FFGeneric Nothing x)
 
