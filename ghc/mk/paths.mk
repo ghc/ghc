@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.28 2000/12/20 10:43:17 simonmar Exp $
+# $Id: paths.mk,v 1.29 2001/03/05 10:29:00 simonmar Exp $
 #
 # ghc project specific make variables
 #
@@ -38,12 +38,6 @@ GHC_SYSMAN_DIR 		= $(GHC_RUNTIME_DIR)/parallel
 
 #-----------------------------------------------------------------------------
 # Stuff for the C-compiling phase in particular...
-
-ifeq ($(HaveGcc), YES)
-GHC_OPT_HILEV_ASM 		= $(WhatGccIsCalled)
-else
-GHC_OPT_HILEV_ASM 		= $(CC)
-endif
 
 #
 # There's no need to compute dependencies when booting from .hc files
