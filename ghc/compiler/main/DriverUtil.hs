@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.27 2001/08/16 11:06:10 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.28 2001/10/11 23:52:51 sof Exp $
 --
 -- Utils for the driver
 --
@@ -131,15 +131,15 @@ addNoDups var x = do
 type Suffix = String
 
 splitFilename :: String -> (String,Suffix)
-splitFilename f = split_longest_prefix f '.'
+splitFilename f = split_longest_prefix f (=='.')
 
 getFileSuffix :: String -> Suffix
-getFileSuffix f = drop_longest_prefix f '.'
+getFileSuffix f = drop_longest_prefix f (=='.')
 
 -- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
 splitFilename3 :: String -> (String,String,Suffix)
 splitFilename3 str
-   = let (dir, rest) = split_longest_prefix str '/'
+   = let (dir, rest) = split_longest_prefix str isPathSeparator
 	 (name, ext) = splitFilename rest
 	 real_dir | null dir  = "."
 		  | otherwise = dir
@@ -151,23 +151,29 @@ remove_suffix c s
   | otherwise = reverse pre
   where (suf,pre) = break (==c) (reverse s)
 
-drop_longest_prefix :: String -> Char -> String
-drop_longest_prefix s c = reverse suf
-  where (suf,_pre) = break (==c) (reverse s)
+drop_longest_prefix :: String -> (Char -> Bool) -> String
+drop_longest_prefix s pred = reverse suf
+  where (suf,_pre) = break pred (reverse s)
 
-take_longest_prefix :: String -> Char -> String
-take_longest_prefix s c = reverse pre
-  where (_suf,pre) = break (==c) (reverse s)
+take_longest_prefix :: String -> (Char -> Bool) -> String
+take_longest_prefix s pred = reverse pre
+  where (_suf,pre) = break pred (reverse s)
 
--- split a string at the last occurence of 'c', returning the two
--- parts of the string with the 'c' removed.  If the string contains
--- no 'c's, the entire string is returned in the second component.
-split_longest_prefix :: String -> Char -> (String,String)
-split_longest_prefix s c
+-- split a string at the last character where 'pred' is True,
+-- returning a pair of strings. The first component holds the string
+-- up (but not including) the last character for which 'pred' returned
+-- True, the second whatever comes after (but also not including the
+-- last character).
+--
+-- If 'pred' returns False for all characters in the string, the original
+-- string is returned in the second component (and the first one is just
+-- empty).
+split_longest_prefix :: String -> (Char -> Bool) -> (String,String)
+split_longest_prefix s pred
   = case pre of
 	[]      -> ([], reverse suf)
 	(_:pre) -> (reverse pre, reverse suf)
-  where (suf,pre) = break (==c) (reverse s)
+  where (suf,pre) = break pred (reverse s)
 
 newsuf :: String -> Suffix -> String
 newsuf suf s = remove_suffix '.' s ++ suf
@@ -175,12 +181,18 @@ newsuf suf s = remove_suffix '.' s ++ suf
 -- getdir strips the filename off the input string, returning the directory.
 getdir :: String -> String
 getdir s = if null dir then "." else init dir
-  where dir = take_longest_prefix s '/'
+  where dir = take_longest_prefix s isPathSeparator
 
 newdir :: String -> String -> String
-newdir dir s = dir ++ '/':drop_longest_prefix s '/'
+newdir dir s = dir ++ '/':drop_longest_prefix s isPathSeparator
 
 remove_spaces :: String -> String
 remove_spaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
-
+isPathSeparator :: Char -> Bool
+isPathSeparator ch =
+#ifdef mingw32_TARGET_OS
+  ch == '/' || ch == '\\'
+#else
+  ch == '/'
+#endif

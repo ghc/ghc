@@ -116,7 +116,7 @@ mkHomeModuleLocn mod_name
 
    -- take the *last* component of the module name (if a hierarchical name),
    -- and append it to the directory to get the .hi file name.
-   let (_,mod_str) = split_longest_prefix (moduleNameUserString mod_name) '.'
+   let (_,mod_str) = split_longest_prefix (moduleNameUserString mod_name) (=='.')
        hi_filename = mod_str ++ '.':hisuf
        hi_path | Just d <- hidir = d
 	       | otherwise       = getdir basename
