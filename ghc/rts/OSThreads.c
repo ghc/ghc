@@ -181,7 +181,7 @@ waitCondition ( Condition* pCond, Mutex* pMut )
   RELEASE_LOCK(*pMut);
   WaitForSingleObject(*pCond, INFINITE);
   /* Hmm..use WaitForMultipleObjects() ? */
-  ACQUIRE_LOCK(*pMut, INFINITE);
+  ACQUIRE_LOCK(*pMut);
   return rtsTrue;
 }
 
