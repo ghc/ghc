@@ -34,6 +34,7 @@ module Constants (
 
 	uF_SIZE,
 	sCC_UF_SIZE,
+	gRAN_UF_SIZE,  -- HWL
 	uF_RET,
 	uF_SU,
 	uF_UPDATEE,
@@ -41,6 +42,7 @@ module Constants (
 
 	sEQ_FRAME_SIZE,
 	sCC_SEQ_FRAME_SIZE,
+	gRAN_SEQ_FRAME_SIZE, -- HWL
 
 	mAX_Vanilla_REG,
 	mAX_Float_REG,
@@ -157,6 +159,9 @@ uF_SIZE	= (NOSCC_UF_SIZE::Int)
 -- Same again, with profiling
 sCC_UF_SIZE = (SCC_UF_SIZE::Int)
 
+-- Same again, with gransim
+gRAN_UF_SIZE = (GRAN_UF_SIZE::Int)
+
 -- Offsets in an update frame.  They don't change with profiling!
 uF_RET         = (UF_RET::Int)
 uF_SU          = (UF_SU::Int)
@@ -169,6 +174,7 @@ Seq frame sizes.
 \begin{code}
 sEQ_FRAME_SIZE = (NOSCC_SEQ_FRAME_SIZE::Int)
 sCC_SEQ_FRAME_SIZE = (SCC_SEQ_FRAME_SIZE::Int)
+gRAN_SEQ_FRAME_SIZE = (GRAN_SEQ_FRAME_SIZE::Int)
 \end{code}
 
 \begin{code}

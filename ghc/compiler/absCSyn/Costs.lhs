@@ -1,7 +1,9 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
-%     Hans Wolfgang Loidl
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
+% $Id: Costs.lhs,v 1.20 2000/01/13 14:33:57 hwloidl Exp $
+%
+% Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
 
 \section[Costs]{Evaluating the costs of computing some abstract C code}
@@ -28,9 +30,11 @@ The meaning of the result tuple is:
    instructions.
 \end{itemize}
 
-This function is needed in GrAnSim for parallelism.
+This function is needed in GranSim for costing pieces of abstract C.
 
-These are first suggestions for scaling the costs. But, this scaling should be done in the RTS rather than the compiler (this really should be tunable!):
+These are first suggestions for scaling the costs. But, this scaling should
+be done in the RTS rather than the compiler (this really should be
+tunable!):
 
 \begin{pseudocode}
 
@@ -82,6 +86,7 @@ instance Num CostRes where
  negate	 = mapOp negate
  abs	 = mapOp abs
  signum	 = mapOp signum
+ fromInteger _ = error "fromInteger not defined"
 
 mapOp :: (Int -> Int) -> CostRes -> CostRes
 mapOp g ( Cost (i, b, l, s, f) )  = Cost (g i, g b, g l, g s, g f)
@@ -202,7 +207,10 @@ costs absC =
 
    CSimultaneous absC	     -> costs absC
 
-   CCheck _ amodes code	     -> Cost (2, 1, 0, 0, 0)
+   CCheck _ amodes code	     -> Cost (2, 1, 0, 0, 0) -- ToDo: refine this by 
+                                                     -- looking at the first arg 
+
+   CRetDirect _ _ _ _	     -> nullCosts
 
    CMacroStmt	macro modes  -> stmtMacroCosts macro modes
 
@@ -215,18 +223,27 @@ costs absC =
   -- *** the next three [or so...] are DATA (those above are CODE) ***
   -- as they are data rather than code they all have nullCosts	       -- HWL
 
+   CCallTypedef _ _ _ _      -> nullCosts
+
    CStaticClosure _ _ _ _    -> nullCosts
+
+   CSRT _ _                  -> nullCosts
+
+   CBitmap _ _               -> nullCosts
 
    CClosureInfoAndCode _ _ _ _ -> nullCosts
 
-   CRetDirect _ _ _ _	     -> nullCosts
-
    CRetVector _ _ _ _        -> nullCosts
 
+   CClosureTbl _             -> nullCosts
+
    CCostCentreDecl _ _	     -> nullCosts
+
    CCostCentreStackDecl _    -> nullCosts
 
    CSplitMarker		     -> nullCosts
+
+   _ -> trace ("Costs.costs") nullCosts
 
 -- ---------------------------------------------------------------------------
 
@@ -242,7 +259,11 @@ addrModeCosts addr_mode side =
     CVal _ _ -> if lhs then Cost (0, 0, 0, 1, 0)
 		       else Cost (0, 0, 1, 0, 0)
 
-    CReg _   -> nullCosts	 {- loading from, storing to reg is free ! -}
+    CAddr (CIndex _ n _ ) -> Cost (1, 0, 1, 0, 0) -- does pointer arithmetic
+
+    CAddr _ -> nullCosts
+
+    CReg _  -> nullCosts	 {- loading from, storing to reg is free ! -}
 				 {- for costing CReg->Creg ops see special -}
 				 {- case in costs fct -}
 
@@ -277,6 +298,8 @@ addrModeCosts addr_mode side =
 
     CMacroExpr _ macro mode_list -> exprMacroCosts side macro mode_list
 
+    _ -> trace ("Costs.addrModeCosts") nullCosts
+
 -- ---------------------------------------------------------------------------
 
 exprMacroCosts :: Side -> CExprMacro -> [CAddrMode] -> CostRes
@@ -288,10 +311,11 @@ exprMacroCosts side macro mode_list =
   in
   arg_costs +
   case macro of
-    ENTRY_CODE -> nullCosts
-    ARG_TAG -> nullCosts -- XXX
-    GET_TAG -> nullCosts -- XXX
-    
+    ENTRY_CODE -> nullCosts -- nothing 
+    ARG_TAG -> nullCosts -- nothing
+    GET_TAG -> Cost (0, 0, 1, 0, 0)  -- indirect load
+    UPD_FRAME_UPDATEE -> Cost (0, 0, 1, 0, 0)  -- indirect load
+    _ -> trace ("Costs.exprMacroCosts") nullCosts
 
 -- ---------------------------------------------------------------------------
 
@@ -309,7 +333,9 @@ stmtMacroCosts macro modes =
     UPD_CAF		  ->  Cost (7, 0, 1, 3, 0)	 {- SMupdate.lh	 -}
     UPD_BH_UPDATABLE	  ->  Cost (3, 0, 0, 1, 0)	 {- SMupdate.lh	 -}
     UPD_BH_SINGLE_ENTRY	  ->  Cost (3, 0, 0, 1, 0)	 {- SMupdate.lh	 -}
-    PUSH_UPD_FRAME	  ->  Cost (3, 0, 0, 4, 0)	 {- SMupdate.lh	 -}
+    PUSH_UPD_FRAME	  ->  Cost (3, 0, 0, 4, 0)	 {- Updates.h	 -}
+    PUSH_SEQ_FRAME	  ->  Cost (2, 0, 0, 3, 0)	 {- StgMacros.h	 !-}
+    UPDATE_SU_FROM_UPD_FRAME -> Cost (1, 0, 1, 0, 0)     {- StgMacros.h	 !-}
     SET_TAG		  ->  nullCosts		    {- COptRegs.lh -}
     GRAN_FETCH			->  nullCosts	  {- GrAnSim bookkeeping -}
     GRAN_RESCHEDULE		->  nullCosts	  {- GrAnSim bookkeeping -}

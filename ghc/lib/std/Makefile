@@ -47,6 +47,13 @@ ifneq "$(way)" ""
 SRC_HC_OPTS += -hisuf $(way_)hi
 endif
 
+# HWL: for debugging GranSim generate .hc and .s files
+SRC_HC_OPTS += -keep-hc-files-too -keep-s-files-too
+# # HWL: why isn't that on by default !!????????????
+# ifeq "$(way)" "mg"
+# SRC_HC_OPTS += -gransim
+# endif
+
 # per-module flags
 PrelArrExtra_HC_OPTS     += -monly-2-regs
 
@@ -55,7 +62,7 @@ PrelArrExtra_HC_OPTS     += -monly-2-regs
 PrelNumExtra_HC_OPTS     += -H24m -K2m
 
 PrelPack_HC_OPTS	 += -K4m
-PrelBase_HC_OPTS         += -H12m
+PrelBase_HC_OPTS         += -H32m -K32m
 PrelRead_HC_OPTS         += -H20m
 PrelTup_HC_OPTS          += -H12m -K2m
 PrelNum_HC_OPTS		 += -H12m -K4m

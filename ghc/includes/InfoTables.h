@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.17 1999/07/16 09:41:12 panne Exp $
+ * $Id: InfoTables.h,v 1.18 2000/01/13 14:34:00 hwloidl Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -36,12 +36,15 @@ typedef struct {
    Parallelism info
    -------------------------------------------------------------------------- */
 
-#ifdef PAR
+#if 0 && (defined(PAR) || defined(GRAN))
 
-#define PAR_INFO_WORDS 0
+// CURRENTLY UNUSED
+// ToDo: use this in StgInfoTable (mutually recursive) -- HWL
+
+#define PAR_INFO_WORDS 1
 
 typedef struct {
-       /* empty */
+  StgInfoTable *rbh_infoptr;     /* infoptr to the RBH  */
 } StgParInfo;
 
 #else /* !PAR */
@@ -53,6 +56,54 @@ typedef struct {
 } StgParInfo;
 
 #endif /* PAR */
+
+/*
+   Copied from ghc-0.29; ToDo: check this code -- HWL
+
+   In the parallel system, all updatable closures have corresponding
+   revertible black holes.  When we are assembly-mangling, we guarantee
+   that the revertible black hole code precedes the normal entry code, so
+   that the RBH info table resides at a fixed offset from the normal info
+   table.  Otherwise, we add the RBH info table pointer to the end of the
+   normal info table and vice versa.
+
+   Currently has to use a !RBH_MAGIC_OFFSET setting.
+   Still todo: init of par.infoptr field in all infotables!!
+*/
+
+#if defined(PAR) || defined(GRAN)
+# define RBH_INFO_OFFSET	    (GEN_INFO_OFFSET+GEN_INFO_WORDS)
+
+# ifdef RBH_MAGIC_OFFSET
+
+#  error magic offset not yet implemented
+
+#  define RBH_INFO_WORDS    0
+#  define INCLUDE_RBH_INFO(infoptr)
+
+#  define RBH_INFOPTR(infoptr)	    (((P_)infoptr) - RBH_MAGIC_OFFSET)
+#  define REVERT_INFOPTR(infoptr)   (((P_)infoptr) + RBH_MAGIC_OFFSET)
+
+# else
+
+#  define RBH_INFO_WORDS    1
+#  define INCLUDE_RBH_INFO(info)    rbh_infoptr : &(info)
+
+#  define RBH_INFOPTR(infoptr)	    (((StgInfoTable *)(infoptr))->rbh_infoptr)
+#  define REVERT_INFOPTR(infoptr)   (((StgInfoTable *)(infoptr))->rbh_infoptr)
+
+# endif
+
+/* see ParallelRts.h */
+// EXTFUN(RBH_entry);
+//StgClosure *convertToRBH(StgClosure *closure);
+//#if defined(GRAN)
+//void convertFromRBH(StgClosure *closure);
+//#elif defined(PAR)
+//void convertToFetchMe(StgPtr closure, globalAddr *ga);
+//#endif
+
+#endif
 
 /* -----------------------------------------------------------------------------
    Debugging info
@@ -98,11 +149,27 @@ extern StgWord16 closure_flags[];
 
 #define closureFlags(c)         (closure_flags[get_itbl(c)->type])
 
-#define closure_STATIC(c)       (  closureFlags(c) & _STA)
+#define closure_HNF(c)          (  closureFlags(c) & _HNF)
+#define closure_BITMAP(c)       (  closureFlags(c) & _BTM)
+#define closure_NON_SPARK(c)    ( (closureFlags(c) & _NS))
 #define closure_SHOULD_SPARK(c) (!(closureFlags(c) & _NS))
+#define closure_STATIC(c)       (  closureFlags(c) & _STA)
+#define closure_THUNK(c)        (  closureFlags(c) & _THU)
 #define closure_MUTABLE(c)      (  closureFlags(c) & _MUT)
 #define closure_UNPOINTED(c)    (  closureFlags(c) & _UPT)
+#define closure_SRT(c)          (  closureFlags(c) & _SRT)
 
+/* same as above but for info-ptr rather than closure */
+#define ipFlags(ip)             (closure_flags[ip->type])
+
+#define ip_HNF(ip)               (  ipFlags(ip) & _HNF)
+#define ip_BITMAP(ip)       	 (  ipFlags(ip) & _BTM)
+#define ip_SHOULD_SPARK(ip) 	 (!(ipFlags(ip) & _NS))
+#define ip_STATIC(ip)       	 (  ipFlags(ip) & _STA)
+#define ip_THUNK(ip)        	 (  ipFlags(ip) & _THU)
+#define ip_MUTABLE(ip)      	 (  ipFlags(ip) & _MUT)
+#define ip_UNPOINTED(ip)    	 (  ipFlags(ip) & _UPT)
+#define ip_SRT(ip)          	 (  ipFlags(ip) & _SRT)
 
 /* -----------------------------------------------------------------------------
    Info Tables
@@ -153,8 +220,9 @@ typedef StgClosure* StgSRT[];
 
 typedef struct _StgInfoTable {
     StgSRT         *srt;	/* pointer to the SRT table */
-#ifdef PAR
-    StgParInfo	    par;
+#if defined(PAR) || defined(GRAN)
+  // StgParInfo	    par;
+    struct _StgInfoTable    *rbh_infoptr;
 #endif
 #ifdef PROFILING
   /* StgProfInfo     prof; */

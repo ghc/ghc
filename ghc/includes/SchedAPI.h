@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.8 1999/11/18 12:10:17 sewardj Exp $
+ * $Id: SchedAPI.h,v 1.9 2000/01/13 14:34:01 hwloidl Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -10,6 +10,11 @@
 
 #ifndef SCHEDAPI_H
 #define SCHEDAPI_H
+
+#if defined(GRAN)
+// Dummy def for NO_PRI if not in GranSim
+#define NO_PRI  0
+#endif
 
 /* 
  * schedule() plus the thread creation functions are not part
@@ -22,8 +27,11 @@ SchedulerStatus waitThread(StgTSO *main_thread, /*out*/StgClosure **ret);
 /* 
  * Creating threads
  */
-
+#if defined(GRAN)
+StgTSO *createThread(nat stack_size, StgInt pri);
+#else
 StgTSO *createThread(nat stack_size);
+#endif
 void scheduleThread(StgTSO *tso);
 
 static inline void pushClosure   (StgTSO *tso, StgClosure *c) {
@@ -38,7 +46,11 @@ static inline void pushRealWorld (StgTSO *tso) {
 static inline StgTSO *
 createGenThread(nat stack_size,  StgClosure *closure) {
   StgTSO *t;
+#if defined(GRAN)
+  t = createThread(stack_size, NO_PRI);
+#else
   t = createThread(stack_size);
+#endif
   pushClosure(t,closure);
   return t;
 }
@@ -46,7 +58,11 @@ createGenThread(nat stack_size,  StgClosure *closure) {
 static inline StgTSO *
 createIOThread(nat stack_size,  StgClosure *closure) {
   StgTSO *t;
+#if defined(GRAN)
+  t = createThread(stack_size, NO_PRI);
+#else
   t = createThread(stack_size);
+#endif
   pushRealWorld(t);
   pushClosure(t,closure);
   return t;
@@ -60,7 +76,11 @@ createIOThread(nat stack_size,  StgClosure *closure) {
 static inline StgTSO *
 createStrictIOThread(nat stack_size,  StgClosure *closure) {
   StgTSO *t;
+#if defined(GRAN)
+  t = createThread(stack_size, NO_PRI);
+#else
   t = createThread(stack_size);
+#endif
   pushClosure(t,closure);
   pushClosure(t,(StgClosure*)&forceIO_closure);
   return t;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.14 1999/05/21 14:37:12 sof Exp $
+ * $Id: Sanity.c,v 1.15 2000/01/13 14:34:04 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,16 +14,35 @@
  *
  * ---------------------------------------------------------------------------*/
 
+//@menu
+//* Includes::			
+//* Macros::			
+//* Stack sanity::		
+//* Heap Sanity::		
+//* TSO Sanity::		
+//* Thread Queue Sanity::	
+//* Blackhole Sanity::		
+//@end menu
+
+//@node Includes, Macros
+//@subsection Includes
+
 #include "Rts.h"
 
-#ifdef DEBUG
+#ifdef DEBUG                                                   /* whole file */
 
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "Sanity.h"
 
+//@node Macros, Stack sanity, Includes
+//@subsection Macros
+
 #define LOOKS_LIKE_PTR(r) (LOOKS_LIKE_STATIC_CLOSURE(r) || ((HEAP_ALLOCED(r) && Bdescr((P_)r)->free != (void *)-1)))
+
+//@node Stack sanity, Heap Sanity, Macros
+//@subsection Stack sanity
 
 /* -----------------------------------------------------------------------------
    Check stack sanity
@@ -42,6 +61,7 @@ static StgOffset checkLargeBitmap( StgPtr payload,
 
 void checkClosureShallow( StgClosure* p );
 
+//@cindex checkSmallBitmap
 static StgOffset 
 checkSmallBitmap( StgPtr payload, StgWord32 bitmap )
 {
@@ -56,7 +76,7 @@ checkSmallBitmap( StgPtr payload, StgWord32 bitmap )
     return i;
 }
 
-
+//@cindex checkLargeBitmap
 static StgOffset 
 checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap )
 {
@@ -75,6 +95,7 @@ checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap )
     return i;
 }
 
+//@cindex checkStackClosure
 StgOffset 
 checkStackClosure( StgClosure* c )
 {    
@@ -91,17 +112,28 @@ checkStackClosure( StgClosure* c )
     case RET_BCO: /* small bitmap (<= 32 entries) */
     case RET_SMALL:
     case RET_VEC_SMALL:
+            return 1 + checkSmallBitmap((StgPtr)c + 1,info->layout.bitmap);
+      
     case UPDATE_FRAME:
     case CATCH_FRAME:
     case STOP_FRAME:
     case SEQ_FRAME:
-	    return 1 + checkSmallBitmap((StgPtr)c + 1,info->layout.bitmap);
+#if defined(GRAN)
+            return 2 +
+#else
+            return 1 +
+#endif
+	               checkSmallBitmap((StgPtr)c + 1,info->layout.bitmap);
     case RET_BIG: /* large bitmap (> 32 entries) */
     case RET_VEC_BIG:
 	    return 1 + checkLargeBitmap((StgPtr)c + 1,info->layout.large_bitmap);
     case FUN:
     case FUN_STATIC: /* probably a slow-entry point return address: */
-	    return 1;
+#if 0 && defined(GRAN)
+            return 2;
+#else
+            return 1;
+#endif
     default:
        	    /* if none of the above, maybe it's a closure which looks a
        	     * little like an infotable
@@ -118,6 +150,7 @@ checkStackClosure( StgClosure* c )
  * chunks.
  */
  
+//@cindex checkClosureShallow
 void 
 checkClosureShallow( StgClosure* p )
 {
@@ -133,6 +166,7 @@ checkClosureShallow( StgClosure* p )
 }
 
 /* check an individual stack object */
+//@cindex checkStackObject
 StgOffset 
 checkStackObject( StgPtr sp )
 {
@@ -151,6 +185,7 @@ checkStackObject( StgPtr sp )
 }
 
 /* check sections of stack between update frames */
+//@cindex checkStackChunk
 void 
 checkStackChunk( StgPtr sp, StgPtr stack_end )
 {
@@ -160,9 +195,10 @@ checkStackChunk( StgPtr sp, StgPtr stack_end )
     while (p < stack_end) {
 	p += checkStackObject( p );
     }
-    ASSERT( p == stack_end );
+    // ASSERT( p == stack_end ); -- HWL
 }
 
+//@cindex checkStackChunk
 StgOffset 
 checkClosure( StgClosure* p )
 {
@@ -332,12 +368,16 @@ checkClosure( StgClosure* p )
     case BLOCKED_FETCH:
     case FETCH_ME:
     case EVACUATED:
-	    barf("checkClosure: unimplemented/strange closure type");
+	    barf("checkClosure: unimplemented/strange closure type %d",
+		 info->type);
     default:
-	    barf("checkClosure");
+	    barf("checkClosure (closure type %d)", info->type);
     }
 #undef LOOKS_LIKE_PTR
 }
+
+//@node Heap Sanity, TSO Sanity, Stack sanity
+//@subsection Heap Sanity
 
 /* -----------------------------------------------------------------------------
    Check Heap Sanity
@@ -348,6 +388,7 @@ checkClosure( StgClosure* p )
    all the objects in the remainder of the chain.
    -------------------------------------------------------------------------- */
 
+//@cindex checkHeap
 extern void 
 checkHeap(bdescr *bd, StgPtr start)
 {
@@ -377,6 +418,7 @@ checkHeap(bdescr *bd, StgPtr start)
     }
 }
 
+//@cindex checkChain
 extern void
 checkChain(bdescr *bd)
 {
@@ -387,6 +429,7 @@ checkChain(bdescr *bd)
 }
 
 /* check stack - making sure that update frames are linked correctly */
+//@cindex checkStack
 void 
 checkStack(StgPtr sp, StgPtr stack_end, StgUpdateFrame* su )
 {
@@ -415,6 +458,10 @@ checkStack(StgPtr sp, StgPtr stack_end, StgUpdateFrame* su )
     ASSERT(stgCast(StgPtr,su) == stack_end);
 }
 
+//@node TSO Sanity, Thread Queue Sanity, Heap Sanity
+//@subsection TSO Sanity
+
+//@cindex checkTSO
 extern void
 checkTSO(StgTSO *tso)
 {
@@ -437,6 +484,69 @@ checkTSO(StgTSO *tso)
     checkStack(sp, stack_end, su);
 }
 
+#if defined(GRAN)
+//@cindex checkTSOsSanity
+extern void  
+checkTSOsSanity(void) {
+  nat i, tsos;
+  StgTSO *tso;
+  
+  belch("Checking sanity of all runnable TSOs:");
+  
+  for (i=0, tsos=0; i<RtsFlags.GranFlags.proc; i++) {
+    for (tso=run_queue_hds[i]; tso!=END_TSO_QUEUE; tso=tso->link) {
+      fprintf(stderr, "TSO %p on PE %d ...", tso, i);
+      checkTSO(tso); 
+      fprintf(stderr, "OK, ");
+      tsos++;
+    }
+  }
+  
+  belch(" checked %d TSOs on %d PEs; ok\n", tsos, RtsFlags.GranFlags.proc);
+}
+
+//@node Thread Queue Sanity, Blackhole Sanity, TSO Sanity
+//@subsection Thread Queue Sanity
+
+// still GRAN only
+
+//@cindex checkThreadQSanity
+extern rtsBool
+checkThreadQSanity (PEs proc, rtsBool check_TSO_too) 
+{
+  StgTSO *tso, *prev;
+
+  /* the NIL value for TSOs is END_TSO_QUEUE; thus, finding NULL is an error */
+  ASSERT(run_queue_hds[proc]!=NULL);
+  ASSERT(run_queue_tls[proc]!=NULL);
+  /* if either head or tail is NIL then the other one must be NIL, too */
+  ASSERT(run_queue_hds[proc]!=END_TSO_QUEUE || run_queue_tls[proc]==END_TSO_QUEUE);
+  ASSERT(run_queue_tls[proc]!=END_TSO_QUEUE || run_queue_hds[proc]==END_TSO_QUEUE);
+  for (tso=run_queue_hds[proc], prev=END_TSO_QUEUE; 
+       tso!=END_TSO_QUEUE;
+       prev=tso, tso=tso->link) {
+    ASSERT((prev!=END_TSO_QUEUE || tso==run_queue_hds[proc]) &&
+	   (prev==END_TSO_QUEUE || prev->link==tso));
+    if (check_TSO_too)
+      checkTSO(tso);
+  }
+  ASSERT(prev==run_queue_tls[proc]);
+}
+
+//@cindex checkThreadQsSanity
+extern rtsBool
+checkThreadQsSanity (rtsBool check_TSO_too)
+{
+  PEs p;
+  
+  for (p=0; p<RtsFlags.GranFlags.proc; p++)
+    checkThreadQSanity(p, check_TSO_too);
+}
+#endif /* GRAN */
+
+//@node Blackhole Sanity, Index, Thread Queue Sanity
+//@subsection Blackhole Sanity
+
 /* -----------------------------------------------------------------------------
    Check Blackhole Sanity
 
@@ -448,7 +558,9 @@ checkTSO(StgTSO *tso)
    the update frame list.
 
    -------------------------------------------------------------------------- */
-rtsBool isBlackhole( StgTSO* tso, StgClosure* p )
+//@cindex isBlackhole
+rtsBool 
+isBlackhole( StgTSO* tso, StgClosure* p )
 {
   StgUpdateFrame* su = tso->su;
   do {
@@ -474,4 +586,26 @@ rtsBool isBlackhole( StgTSO* tso, StgClosure* p )
   } while (1);
 }
 
+//@node Index,  , Blackhole Sanity
+//@subsection Index
+
+//@index
+//* checkChain::  @cindex\s-+checkChain
+//* checkClosureShallow::  @cindex\s-+checkClosureShallow
+//* checkHeap::  @cindex\s-+checkHeap
+//* checkLargeBitmap::  @cindex\s-+checkLargeBitmap
+//* checkSmallBitmap::  @cindex\s-+checkSmallBitmap
+//* checkStack::  @cindex\s-+checkStack
+//* checkStackChunk::  @cindex\s-+checkStackChunk
+//* checkStackChunk::  @cindex\s-+checkStackChunk
+//* checkStackClosure::  @cindex\s-+checkStackClosure
+//* checkStackObject::  @cindex\s-+checkStackObject
+//* checkTSO::  @cindex\s-+checkTSO
+//* checkTSOsSanity::  @cindex\s-+checkTSOsSanity
+//* checkThreadQSanity::  @cindex\s-+checkThreadQSanity
+//* checkThreadQsSanity::  @cindex\s-+checkThreadQsSanity
+//* isBlackhole::  @cindex\s-+isBlackhole
+//@end index
+
 #endif /* DEBUG */
+

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.24 1999/12/01 14:34:39 simonmar Exp $
+ * $Id: Updates.hc,v 1.25 2000/01/13 14:34:05 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,6 +13,9 @@
 #include "HeapStackCheck.h"
 #include "Storage.h"
 #include "ProfRts.h"
+#if defined(GRAN) || defined(PAR)
+# include "FetchMe.h"
+#endif
 
 /*
   The update frame return address must be *polymorphic*, that means
@@ -244,11 +247,6 @@ EXTFUN(stg_update_PAP)
      * argument satisfaction check
      */
     Fun = R1.cl;
-
-#if defined(GRAN_COUNT)
-#error Fixme.
-      ++nPAPs;
-#endif
 
     /* Just copy the whole block of stack between the stack pointer
      * and the update frame pointer.

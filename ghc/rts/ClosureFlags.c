@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ClosureFlags.c,v 1.5 2000/01/12 12:39:20 simonmar Exp $
+ * $Id: ClosureFlags.c,v 1.6 2000/01/13 14:34:02 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -23,6 +23,7 @@ StgWord16 closure_flags[] = {
  *  to thunks.)
  */
 
+/*                             0    1    2    3    4   5   6   7 */
 /*			     HNF  BTM   NS  STA  THU MUT UPT SRT */
 				                                    
 /* INVALID_OBJECT       */ ( 0                                   ),
@@ -84,8 +85,14 @@ StgWord16 closure_flags[] = {
 /* WEAK		   	*/ (_HNF|     _NS|              _UPT     ),
 /* FOREIGN		*/ (_HNF|     _NS|              _UPT     ),
 /* STABLE_NAME	   	*/ (_HNF|     _NS|              _UPT     ),
+
 /* TSO                  */ (_HNF|     _NS|         _MUT|_UPT     ),
-/* BLOCKED_FETCH	*/ (_HNF|     _NS                        ),
-/* FETCH_ME		*/ (_HNF|     _NS                        ),
-/* EVACUATED		*/ ( 0                                   )
+/* BLOCKED_FETCH	*/ (_HNF|     _NS|         _MUT|_UPT     ),
+/* FETCH_ME		*/ (_HNF|     _NS|         _MUT|_UPT     ),
+/* FETCH_ME_BQ          */ ( 	      _NS|         _MUT|_UPT     ),
+/* RBH                  */ ( 	      _NS|         _MUT|_UPT     ),
+
+/* EVACUATED		*/ ( 0                                   ),
+
+/* N_CLOSURE_TYPES      */ ( 0                                   )
 };

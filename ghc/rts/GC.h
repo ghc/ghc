@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.h,v 1.4 1999/02/05 16:02:43 simonm Exp $
+ * $Id: GC.h,v 1.5 2000/01/13 14:34:03 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,3 +9,4 @@
 
 void threadPaused(StgTSO *);
 StgClosure *isAlive(StgClosure *p);
+void GarbageCollect(void (*get_roots)(void));

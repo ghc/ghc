@@ -29,7 +29,9 @@ import PrelShow
 import PrelAddr		( Addr, nullAddr )
 import PrelReal		( toInteger )
 import PrelPack         ( packString )
+#ifndef __PARALLEL_HASKELL__
 import PrelWeak		( addForeignFinalizer )
+#endif
 import Ix
 
 #ifdef __CONCURRENT_HASKELL__

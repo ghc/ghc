@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.38 2000/01/13 12:40:15 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.39 2000/01/13 14:34:03 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -907,7 +907,14 @@ FN_(putMVarzh_fast)
    */
   if (mvar->head != (StgTSO *)&END_TSO_QUEUE_closure) {
     ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+#if defined(GRAN)
+# error FixME
+#elif defined(PAR)
+    // ToDo: check 2nd arg (mvar) is right
+    mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
+#else
     mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
+#endif
     if (mvar->head == (StgTSO *)&END_TSO_QUEUE_closure) {
       mvar->tail = (StgTSO *)&END_TSO_QUEUE_closure;
     }

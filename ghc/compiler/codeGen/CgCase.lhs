@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.36 1999/11/01 17:10:06 simonpj Exp $
+% $Id: CgCase.lhs,v 1.37 2000/01/13 14:33:57 hwloidl Exp $
 %
 %********************************************************
 %*							*
@@ -602,9 +602,10 @@ cgAlgDefault gc_flag is_fun uniq cc_slot must_label_branch
   = 	-- We have arranged that Node points to the thing
     restoreCurrentCostCentre cc_slot `thenFC` \restore_cc ->
     getAbsC (absC restore_cc `thenC`
-             (if opt_GranMacros && emit_yield
-                then yield [node] False
-                else absC AbsCNop)                            `thenC`     
+             -- HWL: maybe need yield here
+             --(if emit_yield
+             --   then yield [node] True
+             --   else absC AbsCNop)                            `thenC`     
 	     possibleHeapCheck gc_flag is_fun [node] [] Nothing (cgExpr rhs)
 	-- Node is live, but doesn't need to point at the thing itself;
 	-- it's ok for Node to point to an indirection or FETCH_ME
@@ -633,9 +634,10 @@ cgAlgAlt gc_flag uniq cc_slot must_label_branch
   = 
     restoreCurrentCostCentre cc_slot `thenFC` \restore_cc ->
     getAbsC (absC restore_cc `thenC`
-    	     (if opt_GranMacros && emit_yield
-      		then yield [node] True		-- XXX live regs wrong
-      		else absC AbsCNop)                               `thenC`     
+             -- HWL: maybe need yield here
+    	     -- (if emit_yield
+      	     --    then yield [node] True		-- XXX live regs wrong
+      	     --    else absC AbsCNop)                               `thenC`    
     	     (case gc_flag of
 		NoGC   	    -> mapFCs bindNewToTemp args `thenFC` \_ -> nopC
     		GCMayHappen -> bindConArgs con args
@@ -667,9 +669,10 @@ cgUnboxedTupleAlt lbl cc_slot emit_yield (con,args,use_mask,rhs)
         restoreCurrentCostCentre cc_slot `thenFC` \restore_cc ->
 	absC restore_cc `thenC`
 
-  	(if opt_GranMacros && emit_yield
-  	    then yield live_regs True		-- XXX live regs wrong?
-  	    else absC AbsCNop)                         `thenC`     
+        -- HWL: maybe need yield here
+  	-- (if emit_yield
+  	--    then yield live_regs True		-- XXX live regs wrong?
+  	--    else absC AbsCNop)                         `thenC`     
   	let 
 	      -- ToDo: could maybe use Nothing here if stack_res is False
 	      -- since the heap-check can just return to the top of the 

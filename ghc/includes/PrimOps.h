@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.43 2000/01/12 15:15:17 simonmar Exp $
+ * $Id: PrimOps.h,v 1.44 2000/01/13 14:34:00 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -733,6 +733,118 @@ EF_(unblockAsyncExceptionszh_fast);
 #define myThreadIdzh(t) (t = CurrentTSO)
 
 extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
+
+/* ------------------------------------------------------------------------
+   Parallel PrimOps
+
+   A par in the Haskell code is ultimately translated to a parzh macro
+   (with a case wrapped around it to guarantee that the macro is actually 
+    executed; see compiler/prelude/PrimOps.lhs)
+   ---------------------------------------------------------------------- */
+
+#if defined(GRAN)
+// hash coding changed from 2.10 to 4.00
+#define parzh(r,node)             parZh(r,node)
+
+#define parZh(r,node)				\
+	PARZh(r,node,1,0,0,0,0,0)
+
+#define parAtzh(r,node,where,identifier,gran_info,size_info,par_info,rest) \
+	parATZh(r,node,where,identifier,gran_info,size_info,par_info,rest,1)
+
+#define parAtAbszh(r,node,proc,identifier,gran_info,size_info,par_info,rest) \
+	parATZh(r,node,proc,identifier,gran_info,size_info,par_info,rest,2)
+
+#define parAtRelzh(r,node,proc,identifier,gran_info,size_info,par_info,rest) \
+	parATZh(r,node,proc,identifier,gran_info,size_info,par_info,rest,3)
+
+#define parAtForNowzh(r,node,where,identifier,gran_info,size_info,par_info,rest)	\
+	parATZh(r,node,where,identifier,gran_info,size_info,par_info,rest,0)
+
+#define parATZh(r,node,where,identifier,gran_info,size_info,par_info,rest,local)	\
+{							\
+  rtsSparkQ result;						\
+  if (closure_SHOULD_SPARK((StgClosure*)node)) {				\
+    rtsSparkQ result;						\
+    STGCALL6(newSpark, node,identifier,gran_info,size_info,par_info,local);	\
+    if (local==2) {         /* special case for parAtAbs */   \
+      STGCALL3(GranSimSparkAtAbs, result,(I_)where,identifier);\
+    } else if (local==3) {  /* special case for parAtRel */   \
+      STGCALL3(GranSimSparkAtAbs, result,(I_)(CurrentProc+where),identifier);	\
+    } else {       \
+      STGCALL3(GranSimSparkAt, result,where,identifier);	\
+    }        \
+  }                                                     \
+}
+
+#define parLocalzh(r,node,identifier,gran_info,size_info,par_info,rest)	\
+	PARZh(r,node,rest,identifier,gran_info,size_info,par_info,1)
+
+#define parGlobalzh(r,node,identifier,gran_info,size_info,par_info,rest) \
+	PARZh(r,node,rest,identifier,gran_info,size_info,par_info,0)
+
+#define PARZh(r,node,rest,identifier,gran_info,size_info,par_info,local) \
+{                                                                        \
+  if (closure_SHOULD_SPARK((StgClosure*)node)) {                         \
+    rtsSpark *result;						         \
+    result = RET_STGCALL6(rtsSpark*, newSpark,                           \
+                          node,identifier,gran_info,size_info,par_info,local);\
+    STGCALL1(add_to_spark_queue,result); 				\
+    STGCALL2(GranSimSpark, local,(P_)node);	                        \
+  }							                \
+}
+
+#define copyablezh(r,node)				\
+  /* copyable not yet implemented!! */
+
+#define noFollowzh(r,node)				\
+  /* noFollow not yet implemented!! */
+
+#endif  /* GRAN */
+
+#if 0
+
+# if defined(GRAN)
+/* ToDo: Use a parallel ticky macro for this */
+# define COUNT_SPARK(node)     { (CurrentTSO->gran.globalsparks)++; sparksCreated++; }
+# elif defined(PAR)
+# define COUNT_SPARK(node)     { (CurrentTSO->par.globalsparks)++; sparksCreated++; }
+# endif
+
+/* 
+   Note that we must bump the required thread count NOW, rather
+   than when the thread is actually created.  
+
+   forkzh not needed any more; see ghc/rts/PrimOps.hc
+*/
+#define forkzh(r,liveness,node)				\
+{							\
+  extern  nat context_switch;                           \
+  while (pending_sparks_tl[REQUIRED_POOL] == pending_sparks_lim[REQUIRED_POOL]) \
+    DO_YIELD((liveness << 1) | 1);			\
+  if (closure_SHOULD_SPARK((StgClosure *)node)) {				\
+    *pending_sparks_tl[REQUIRED_POOL]++ = (P_)(node);	\
+  } else {                                              \
+    sparksIgnored++;                                    \
+  }							\
+  context_switch = 1;					\
+}
+
+// old version of par (previously used in GUM
+
+#define parzh(r,node)					\
+{							\
+  extern  nat context_switch;                           \
+  COUNT_SPARK(node);						\
+  if (closure_SHOULD_SPARK((StgClosure *)node) &&	\
+      pending_sparks_tl[ADVISORY_POOL] < pending_sparks_lim[ADVISORY_POOL]) {\
+    *pending_sparks_tl[ADVISORY_POOL]++ = (StgClosure *)(node);	\
+  } else {						\
+    sparksIgnored++;					\
+  }							\
+  r = context_switch = 1;					\
+}
+#endif /* 0 */
 
 #if defined(SMP) || defined(PAR)
 #define parzh(r,node)					\

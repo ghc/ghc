@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.38 1999/11/11 17:50:49 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.39 2000/01/13 14:33:58 hwloidl Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -40,7 +40,8 @@ import CgUsages		( adjustSpAndHp, setRealAndVirtualSp, getVirtSp,
 			  getSpRelOffset, getHpRelOffset
 			)
 import CLabel		( CLabel, mkClosureLabel, mkFastEntryLabel,
-			  mkRednCountsLabel, mkInfoTableLabel
+			  mkRednCountsLabel, mkInfoTableLabel,
+                          pprCLabel
 			)
 import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn, opt_DoTickyProfiling )
@@ -325,7 +326,12 @@ closureCodeBody binder_info closure_info cc all_args body
 	--
     	arg_regs = case entry_conv of
 		DirectEntry lbl arity regs -> regs
-		other 		            -> panic "closureCodeBody:arg_regs"
+		other 		           -> trace ("*** closureCodeBody:arg_regs " ++ (pprHWL entry_conv) ++ "(HWL ignored; no args passed in regs)") []
+
+        pprHWL :: EntryConvention -> String    
+        pprHWL (ViaNode) = "ViaNode"
+        pprHWL (StdEntry cl) = "StdEntry"
+        pprHWL (DirectEntry cl i l) = "DirectEntry"
 
 	num_arg_regs = length arg_regs
 	
@@ -350,7 +356,7 @@ closureCodeBody binder_info closure_info cc all_args body
 	    mapCs bindNewToStack arg_offsets	  	    `thenC`
 	    setRealAndVirtualSp sp_all_args		    `thenC`
 
-	    argSatisfactionCheck closure_info		    `thenC`
+	    argSatisfactionCheck closure_info	arg_regs	    `thenC`
 
 	    -- OK, so there are enough args.  Now we need to stuff as
 	    -- many of them in registers as the fast-entry code
@@ -516,24 +522,24 @@ relative offset of this word tells how many words of arguments
 are expected.
 
 \begin{code}
-argSatisfactionCheck :: ClosureInfo -> Code
+argSatisfactionCheck :: ClosureInfo -> [MagicId] {-GRAN-} -> Code
 
-argSatisfactionCheck closure_info
+argSatisfactionCheck closure_info arg_regs
 
   = nodeMustPointToIt (closureLFInfo closure_info)   `thenFC` \ node_points ->
 
-    let
-       emit_gran_macros = opt_GranMacros
-    in
+--      let
+--         emit_gran_macros = opt_GranMacros
+--      in
 
     -- HWL  ngo' ngoq:
     -- absC (CMacroStmt GRAN_FETCH []) 			`thenC`
     -- forceHeapCheck [] node_points (absC AbsCNop)			`thenC`
-    (if emit_gran_macros 
-      then if node_points 
-             then fetchAndReschedule  [] node_points 
-             else yield [] node_points
-      else absC AbsCNop)                       `thenC`
+    --(if opt_GranMacros
+    --  then if node_points 
+    --         then fetchAndReschedule  arg_regs node_points 
+    --         else yield arg_regs node_points
+    --  else absC AbsCNop)                       `thenC`
 
         getSpRelOffset 0 	`thenFC` \ (SpRel sp) ->
 	let
@@ -565,16 +571,13 @@ thunkWrapper closure_info lbl thunk_code
   = 	-- Stack and heap overflow checks
     nodeMustPointToIt (closureLFInfo closure_info) `thenFC` \ node_points ->
 
-    let
-       emit_gran_macros = opt_GranMacros
-    in
-	-- HWL: insert macros for GrAnSim; 2 versions depending on liveness of node
-	-- (we prefer fetchAndReschedule-style context switches to yield ones)
-    (if emit_gran_macros 
-      then if node_points 
-             then fetchAndReschedule  [] node_points 
-             else yield [] node_points
-      else absC AbsCNop)                       `thenC`
+    -- HWL: insert macros for GrAnSim; 2 versions depending on liveness of node
+    -- (we prefer fetchAndReschedule-style context switches to yield ones)
+    (if opt_GranMacros
+       then if node_points 
+              then fetchAndReschedule [] node_points 
+              else yield [] node_points
+       else absC AbsCNop)                       `thenC`
 
         -- stack and/or heap checks
     thunkChecks lbl node_points (
@@ -597,13 +600,10 @@ funWrapper :: ClosureInfo 	-- Closure whose code body this is
 funWrapper closure_info arg_regs stk_tags info_label fun_body
   = 	-- Stack overflow check
     nodeMustPointToIt (closureLFInfo closure_info)  	`thenFC` \ node_points ->
-    let
-       emit_gran_macros = opt_GranMacros
-    in
     -- HWL   chu' ngoq:
-    (if emit_gran_macros
-      then yield  arg_regs node_points
-      else absC AbsCNop)                                 `thenC`
+    (if opt_GranMacros
+       then yield arg_regs node_points
+       else absC AbsCNop)                                 `thenC`
 
         -- heap and/or stack checks
     fastEntryChecks arg_regs stk_tags info_label node_points (

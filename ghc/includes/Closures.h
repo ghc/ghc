@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.14 1999/12/01 14:34:48 simonmar Exp $
+ * $Id: Closures.h,v 1.15 2000/01/13 14:34:00 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -37,19 +37,37 @@ typedef struct {
    The parallel header
    -------------------------------------------------------------------------- */
 
-#ifdef GRAN
+#ifdef PAR
 
 typedef struct {
-  W_ procs;
-} StgGranHeader;
+  /* StgWord ga; */  /* nope! global addresses are managed via a hash table */
+} StgParHeader;
 
 #else /* !PAR */
 
 typedef struct {
   /* empty */
-} StgGranHeader;
+} StgParHeader;
 
 #endif /* PAR */
+
+/* -----------------------------------------------------------------------------
+   The GranSim header
+   -------------------------------------------------------------------------- */
+
+#if defined(GRAN)
+
+typedef struct {
+  StgWord procs; /* bitmask indicating on which PEs this closure resides */
+} StgGranHeader;
+
+#else /* !GRAN */
+
+typedef struct {
+  /* empty */
+} StgGranHeader;
+
+#endif /* GRAN */
 
 /* -----------------------------------------------------------------------------
    The ticky-ticky header
@@ -96,8 +114,11 @@ typedef struct {
 #ifdef PROFILING
 	StgProfHeader         prof;
 #endif
-#ifdef GRAN
-	StgGranHeader         par;
+#ifdef PAR
+	StgParHeader          par;
+#endif
+#if defined(GRAN)
+	StgGranHeader         gran;
 #endif
 #ifdef TICKY_TICKY
 	StgTickyHeader        ticky;
@@ -186,12 +207,6 @@ typedef struct StgCAF_ {
     StgClosure    *value;
     struct StgCAF_ *link;
 } StgCAF;
-
-typedef struct {
-    StgHeader  header;
-    struct StgTSO_ *blocking_queue;
-    StgMutClosure *mut_link;
-} StgBlockingQueue;
 
 typedef struct {
     StgHeader  header;
@@ -294,12 +309,71 @@ typedef struct {
   StgClosure*     value;
 } StgMVar;
 
-/* Parallel FETCH_ME closures */
-#ifdef PAR
-typedef struct {
+#if defined(PAR) || defined(GRAN)
+/*
+  StgBlockingQueueElement represents the types of closures that can be 
+  found on a blocking queue: StgTSO, StgRBHSave, StgBlockedFetch.
+  (StgRBHSave can only appear at the end of a blocking queue).  
+  Logically, this is a union type, but defining another struct with a common
+  layout is easier to handle in the code (same as for StgMutClosures).
+*/
+typedef struct StgBlockingQueueElement_ {
+  StgHeader                         header;
+  struct StgBlockingQueueElement_  *link;
+  StgMutClosure                    *mut_link;
+  struct StgClosure_               *payload[0];
+} StgBlockingQueueElement;
+
+typedef struct StgBlockingQueue_ {
+  StgHeader                         header;
+  struct StgBlockingQueueElement_  *blocking_queue;
+  StgMutClosure                    *mut_link;
+} StgBlockingQueue;
+
+/* this closure is hanging at the end of a blocking queue in (par setup only) */
+typedef struct StgRBHSave_ {
   StgHeader    header;
-  void        *ga;		/* type globalAddr is abstract here */
+  StgPtr       payload[0];
+} StgRBHSave;
+
+typedef struct StgRBH_ {
+  StgHeader                                header;
+  struct StgBlockingQueueElement_         *blocking_queue;
+  StgMutClosure                           *mut_link;
+} StgRBH;
+
+#else
+/* old sequential version of a blocking queue, which can only hold TSOs */
+typedef struct StgBlockingQueue_ {
+  StgHeader                 header;
+  struct StgTSO_           *blocking_queue;
+  StgMutClosure            *mut_link;
+} StgBlockingQueue;
+#endif
+
+#if defined(PAR)
+/* global indirections aka FETCH_ME closures */
+typedef struct StgFetchMe_ {
+  StgHeader              header;
+  globalAddr            *ga;		/* type globalAddr is abstract here */
+  StgMutClosure         *mut_link;
 } StgFetchMe;
+
+/* same contents as an ordinary StgBlockingQueue */
+typedef struct StgFetchMeBlockingQueue_ {
+  StgHeader                          header;
+  struct StgBlockingQueueElement_   *blocking_queue;
+  StgMutClosure                     *mut_link;
+} StgFetchMeBlockingQueue;
+
+/* entry in a blocking queue, indicating a request from a TSO on another PE */
+typedef struct StgBlockedFetch_ {
+  StgHeader                         header;
+  struct StgBlockingQueueElement_  *link;
+  StgMutClosure                    *mut_link;
+  StgClosure                       *node;
+  globalAddr                        ga;
+} StgBlockedFetch;
 #endif
 
 #endif /* CLOSURES_H */

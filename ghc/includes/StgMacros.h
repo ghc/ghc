@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.19 1999/11/22 16:44:30 sewardj Exp $
+ * $Id: StgMacros.h,v 1.20 2000/01/13 14:34:01 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -138,6 +138,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	}
        
 #define HP_CHK(headroom,ret,r,layout,tag_assts)			\
+        DO_GRAN_ALLOCATE(headroom)                              \
 	if ((Hp += headroom) > HpLim) {				\
 	    EXTFUN_RTS(stg_chk_##layout);		 	\
 	    tag_assts						\
@@ -146,6 +147,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	}
 
 #define HP_STK_CHK(stk_headroom,hp_headroom,ret,r,layout,tag_assts) \
+        DO_GRAN_ALLOCATE(hp_headroom)                              \
 	if (Sp - stk_headroom < SpLim || (Hp += hp_headroom) > HpLim) {	\
 	    EXTFUN_RTS(stg_chk_##layout);		 	\
 	    tag_assts						\
@@ -165,6 +167,10 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
    functions.  In all these cases, node points to a closure that we
    can just enter to restart the heap check (the NP stands for 'node points').
 
+   In the NP case GranSim absolutely has to check whether the current node 
+   resides on the current processor. Otherwise a FETCH event has to be
+   scheduled. All that is done in GranSimFetch. -- HWL
+
    HpLim points to the LAST WORD of valid allocation space.
    -------------------------------------------------------------------------- */
 
@@ -176,6 +182,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	}
 
 #define HP_CHK_NP(headroom,ptrs,tag_assts)			\
+        DO_GRAN_ALLOCATE(headroom)                              \
 	if ((Hp += (headroom)) > HpLim) {			\
 	    EXTFUN_RTS(stg_gc_enter_##ptrs);			\
             tag_assts						\
@@ -183,6 +190,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	}
 
 #define HP_CHK_SEQ_NP(headroom,ptrs,tag_assts)			\
+        DO_GRAN_ALLOCATE(headroom)                              \
 	if ((Hp += (headroom)) > HpLim) {			\
 	    EXTFUN_RTS(stg_gc_seq_##ptrs);			\
             tag_assts						\
@@ -190,6 +198,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	}
 
 #define HP_STK_CHK_NP(stk_headroom, hp_headroom, ptrs, tag_assts) \
+        DO_GRAN_ALLOCATE(hp_headroom)                              \
 	if ((Sp - (stk_headroom)) < SpLim || (Hp += (hp_headroom)) > HpLim) { \
 	    EXTFUN_RTS(stg_gc_enter_##ptrs);		 	\
             tag_assts						\
@@ -200,6 +209,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 /* Heap checks for branches of a primitive case / unboxed tuple return */
 
 #define GEN_HP_CHK_ALT(headroom,lbl,tag_assts)			\
+        DO_GRAN_ALLOCATE(headroom)                              \
 	if ((Hp += (headroom)) > HpLim) {			\
 	    EXTFUN_RTS(lbl);					\
             tag_assts						\
@@ -340,6 +350,25 @@ EF_(stg_gen_block);
     EF_(stg_block_##ptrs);			\
     JMP_(stg_block_##ptrs);			\
   }
+
+#if defined(PAR)
+/*
+  Similar to BLOCK_NP but separates the saving of the thread state from the
+  actual jump via an StgReturn
+*/
+
+#define SAVE_THREAD_STATE(ptrs)                  \
+  ASSERT(ptrs==1);                               \
+  Sp -= 1;                                       \
+  Sp[0] = R1.w;                                  \
+  SaveThreadState();                             
+
+#define THREAD_RETURN(ptrs)                      \
+  ASSERT(ptrs==1);                               \
+  CurrentTSO->whatNext = ThreadEnterGHC;         \
+  R1.i = ThreadBlocked;                          \
+  JMP_(StgReturn);                               
+#endif
 
 /* -----------------------------------------------------------------------------
    CCall_GC needs to push a dummy stack frame containing the contents

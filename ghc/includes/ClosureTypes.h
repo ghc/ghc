@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.11 1999/05/11 16:47:40 keithw Exp $
+ * $Id: ClosureTypes.h,v 1.12 2000/01/13 14:34:00 hwloidl Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -72,10 +72,15 @@
 #define WEAK		        56
 #define FOREIGN		        57
 #define STABLE_NAME	        58
+
 #define TSO		        59
 #define BLOCKED_FETCH	        60
 #define FETCH_ME                61
-#define EVACUATED               62
-#define N_CLOSURE_TYPES         63
+#define FETCH_ME_BQ             62
+#define RBH                     63
+
+#define EVACUATED               64
+
+#define N_CLOSURE_TYPES         65
 
 #endif CLOSURETYPES_H

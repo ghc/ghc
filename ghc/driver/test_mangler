@@ -1,6 +1,8 @@
-#! /usr/local/bin/perl
+#! /usr/bin/perl
 # a simple wrapper to test a .s-file mangler
 # reads stdin, writes stdout
+
+push(@INC,"/net/dazdak/BUILDS/gransim-4.04/i386-unknown-linux/ghc/driver");
 
 $TargetPlatform = $ARGV[0]; shift; # nice error checking, Will
 

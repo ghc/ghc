@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.2 1999/12/02 09:52:41 simonmar Exp $
+ * $Id: Exception.hc,v 1.3 2000/01/13 14:34:02 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,6 +14,9 @@
 #include "Storage.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
+#if defined(PAR)
+# include "FetchMe.h"
+#endif
 
 /* -----------------------------------------------------------------------------
    Exception Primitives
@@ -62,7 +65,16 @@ FN_(unblockAsyncExceptionszh_ret_entry)
 {
   FB_
     ASSERT(CurrentTSO->blocked_exceptions != NULL);
+#if defined(GRAN)
+# error FixME
+#elif defined(PAR)
+      // is CurrentTSO->block_info.closure always set to the node
+      // holding the blocking queue !? -- HWL
+      awakenBlockedQueue(CurrentTSO->blocked_exceptions, 
+	                 CurrentTSO->block_info.closure);
+#else
     awakenBlockedQueue(CurrentTSO->blocked_exceptions);
+#endif
     CurrentTSO->blocked_exceptions = NULL;
     Sp++;
     JMP_(ENTRY_CODE(Sp[0]));
@@ -76,7 +88,16 @@ FN_(unblockAsyncExceptionszh_fast)
     STK_CHK_GEN(2, R1_PTR, unblockAsyncExceptionszh_fast, );
 
     if (CurrentTSO->blocked_exceptions != NULL) {
+#if defined(GRAN)
+# error FixME
+#elif defined(PAR)
+      // is CurrentTSO->block_info.closure always set to the node
+      // holding the blocking queue !? -- HWL
+      awakenBlockedQueue(CurrentTSO->blocked_exceptions, 
+	                 CurrentTSO->block_info.closure);
+#else
       awakenBlockedQueue(CurrentTSO->blocked_exceptions);
+#endif
       CurrentTSO->blocked_exceptions = NULL;
       Sp--;
       Sp[0] = (W_)&blockAsyncExceptionszh_ret_info;

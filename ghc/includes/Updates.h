@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.15 1999/11/09 15:47:09 simonmar Exp $
+ * $Id: Updates.h,v 1.16 2000/01/13 14:34:01 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -91,18 +91,80 @@
    Awaken any threads waiting on this computation
    -------------------------------------------------------------------------- */
 
-extern void awakenBlockedQueue(StgTSO *q);
+#if defined(PAR) 
+
+/* 
+   In a parallel setup several types of closures, might have a blocking queue:
+     BLACKHOLE_BQ ... same as in the default concurrent setup; it will be
+                      reawakened via calling UPD_IND on that closure after
+		      having finished the computation of the graph
+     FETCH_ME_BQ  ... a global indirection (FETCH_ME) may be entered by a 
+                      local TSO, turning it into a FETCH_ME_BQ; it will be
+		      reawakened via calling processResume
+     RBH          ... a revertible black hole may be entered by another 
+                      local TSO, putting it onto its blocking queue; since
+		      RBHs only exist while the corresponding closure is in 
+		      transit, they will be reawakened via calling 
+		      convertToFetchMe (upon processing an ACK message)
+
+   In a parallel setup a blocking queue may contain 3 types of closures:
+     TSO           ... as in the default concurrent setup
+     BLOCKED_FETCH ... indicating that a TSO on another PE is waiting for
+                       the result of the current computation
+     CONSTR        ... a RBHSave closure (which contains data ripped out of
+                       the closure to make room for a blocking queue; since
+		       it only contains data we use the exisiting type of
+		       a CONSTR closure); this closure is the end of a 
+		       blocking queue for an RBH closure; it only exists in
+		       this kind of blocking queue and must be at the end
+		       of the queue
+*/		      
+extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
+#define DO_AWAKEN_BQ(bqe, node)  STGCALL2(awakenBlockedQueue, bqe, node);
 
 #define AWAKEN_BQ(info,closure)						\
-     	if (info == &BLACKHOLE_BQ_info) {				\
-	     STGCALL1(awakenBlockedQueue,				\
-		      ((StgBlockingQueue *)closure)->blocking_queue);	\
+     	if (info == &BLACKHOLE_BQ_info ||               \
+	    info == &FETCH_ME_BQ_info ||                \
+	    get_itbl(closure)->type == RBH) {		                \
+		StgBlockingQueueElement *bqe = ((StgBlockingQueue *)closure)->blocking_queue;\
+		ASSERT(bqe!=END_BQ_QUEUE);		                \
+		DO_AWAKEN_BQ(bqe, closure);     	                \
+	}
+
+#elif defined(GRAN)
+
+extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
+#define DO_AWAKEN_BQ(bq, node)  STGCALL2(awakenBlockedQueue, bq, node);
+
+/* In GranSim we don't have FETCH_ME or FETCH_ME_BQ closures, so they are
+   not checked. The rest of the code is the same as for GUM.
+*/
+#define AWAKEN_BQ(info,closure)						\
+     	if (info == &BLACKHOLE_BQ_info ||               \
+	    get_itbl(closure)->type == RBH) {		                \
+		StgBlockingQueueElement *bqe = ((StgBlockingQueue *)closure)->blocking_queue;\
+		ASSERT(bqe!=END_BQ_QUEUE);		                \
+		DO_AWAKEN_BQ(bqe, closure);     	                \
 	}
 
 
-/* -----------------------------------------------------------------------------
+#else /* !GRAN && !PAR */
+
+extern void awakenBlockedQueue(StgTSO *q);
+#define DO_AWAKEN_BQ(closure)  	\
+        STGCALL1(awakenBlockedQueue,		\
+		 ((StgBlockingQueue *)closure)->blocking_queue);
+
+#define AWAKEN_BQ(info,closure)						\
+     	if (info == &BLACKHOLE_BQ_info) {				\
+          DO_AWAKEN_BQ(closure);                                        \
+	}
+
+#endif /* GRAN || PAR */
+
+/* -------------------------------------------------------------------------
    Push an update frame on the stack.
-   -------------------------------------------------------------------------- */
+   ------------------------------------------------------------------------- */
 
 #if defined(PROFILING)
 #define PUSH_STD_CCCS(frame) frame->header.prof.ccs = CCCS

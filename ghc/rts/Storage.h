@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.13 1999/11/11 11:49:26 simonmar Exp $
+ * $Id: Storage.h,v 1.14 2000/01/13 14:34:05 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -177,6 +177,11 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
    -------------------------------------------------------------------------- */
 
 extern StgCAF* enteredCAFs;
+
+#if defined(DEBUG)
+void printMutOnceList(generation *gen);
+void printMutableList(generation *gen);
+#endif DEBUG
 
 #endif STORAGE_H
 

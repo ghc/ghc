@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.13 2000/01/13 12:40:15 simonmar Exp $
+ * $Id: Main.c,v 1.14 2000/01/13 14:34:03 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -16,21 +16,25 @@
 #include "RtsUtils.h"
 
 #ifdef DEBUG
-#include "Printer.h"   /* for printing        */
+# include "Printer.h"   /* for printing        */
 #endif
 
 #ifdef INTERPRETER
-#include "Assembler.h"
+# include "Assembler.h"
 #endif
 
 #ifdef PAR
-#include "ParInit.h"
-#include "Parallel.h"
-#include "LLC.h"
+# include "ParInit.h"
+# include "Parallel.h"
+# include "LLC.h"
+#endif
+
+#if defined(GRAN) || defined(PAR)
+# include "GranSimRts.h"
 #endif
 
 #ifdef HAVE_WINDOWS_H
-#include <windows.h>
+# include <windows.h>
 #endif
 
 
@@ -41,24 +45,65 @@
 int main(int argc, char *argv[])
 {
     int exit_status;
-
     SchedulerStatus status;
+    /* all GranSim/GUM init is done in startupHaskell; sets IAmMainThread! */
+
     startupHaskell(argc,argv);
 
-#  ifndef PAR
-    /* ToDo: want to start with a larger stack size */
-    status = rts_evalIO((StgClosure *)&mainIO_closure, NULL);
-#  else
+    /* kick off the computation by creating the main thread with a pointer
+       to mainIO_closure representing the computation of the overall program;
+       then enter the scheduler with this thread and off we go;
+      
+       the same for GranSim (we have only one instance of this code)
+
+       in a parallel setup, where we have many instances of this code
+       running on different PEs, we should do this only for the main PE
+       (IAmMainThread is set in startupHaskell) 
+    */
+
+#  if defined(PAR)
+
+#   if DEBUG
+    { /* a wait loop to allow attachment of gdb to UNIX threads */
+      nat i, j, s;
+
+      for (i=0, s=0; i<RtsFlags.ParFlags.wait; i++)
+	for (j=0; j<1000000; j++) 
+	  s += j % 65536;
+    }
+    IF_PAR_DEBUG(verbose,
+		 belch("Passed wait loop"));
+#   endif
+
     if (IAmMainThread == rtsTrue) {
-    /*Just to show we're alive */
       fprintf(stderr, "Main Thread Started ...\n");
-     
+
+      /* ToDo: Dump event for the main thread */
       status = rts_evalIO((StgClosure *)&mainIO_closure, NULL);
     } else {
-      WaitForPEOp(PP_FINISH,SysManTask);
-      exit(EXIT_SUCCESS);
+      /* Just to show we're alive */
+      IF_PAR_DEBUG(verbose,
+		   fprintf(stderr, "== [%x] Non-Main PE enters scheduler without work ...\n",
+			   mytid));
+     
+      /* all non-main threads enter the scheduler without work */
+      status = schedule( /* nothing */ );
     }
-#  endif /* PAR */
+
+#  elif defined(GRAN)
+
+    /* ToDo: Dump event for the main thread */
+    status = rts_evalIO((StgClosure *)&mainIO_closure, NULL);
+
+#  else /* !PAR && !GRAN */
+
+    /* ToDo: want to start with a larger stack size */
+    status = rts_evalIO((StgClosure *)&mainIO_closure, NULL);
+
+#  endif /* !PAR && !GRAN */
+
+    // ToDo: update for parallel execution
+    /* check the status of the entire Haskell computation */
     switch (status) {
     case Deadlock:
       prog_belch("no threads to run:  infinite loop or deadlock?");

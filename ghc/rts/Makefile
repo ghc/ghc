@@ -1,6 +1,6 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.16 1999/12/07 15:52:40 simonmar Exp $
-
+# $Id: Makefile,v 1.17 2000/01/13 14:34:03 hwloidl Exp $
+#
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
 #
@@ -21,9 +21,9 @@ include $(TOP)/mk/boilerplate.mk
 
 WAYS=$(GhcLibWays)
 
-SRCS_RTS_C  = $(wildcard *.c) $(wildcard hooks/*.c) $(filter-out gum/SysMan.c,$(wildcard gum/*.c))
+SRCS_RTS_C  = $(wildcard *.c) $(wildcard hooks/*.c) $(filter-out parallel/SysMan.c,$(wildcard parallel/*.c))
 SRCS_RTS_S  = $(wildcard *.S)
-SRCS_RTS_HC = $(wildcard *.hc)
+SRCS_RTS_HC = $(wildcard *.hc) $(wildcard parallel/*.hc)
 
 ifneq "$(way)" "dll"
 SRCS_RTS_C  := $(filter-out RtsDllMain.c, $(SRCS_RTS_C))
@@ -59,7 +59,7 @@ WARNING_OPTS += -optc-Wbad-function-cast
 #WARNING_OPTS += -optc-Wredundant-decls 
 #WARNING_OPTS += -optc-Wconversion
 
-SRC_HC_OPTS += -I../includes -I. -Igum $(WARNING_OPTS) $(GhcRtsHcOpts) -optc-DCOMPILING_RTS
+SRC_HC_OPTS += -I../includes -I. -Iparallel $(WARNING_OPTS) $(GhcRtsHcOpts) -optc-DCOMPILING_RTS
 SRC_CC_OPTS = $(GhcRtsCcOpts)
 
 ifneq "$(way)" "dll"
@@ -149,7 +149,7 @@ endif
 #
 
 ifeq "$(way)" "mp"
-all :: gum/SysMan
+all :: parallel/SysMan
 
 ifdef solaris2_TARGET_OS
 __socket_libs = -lsocket -lnsl
@@ -157,12 +157,12 @@ else
 __socket_libs =
 endif
 
-gum/SysMan : gum/SysMan.mp_o gum/LLComms.mp_o 
+parallel/SysMan : parallel/SysMan.mp_o parallel/LLComms.mp_o RtsUtils.mp_o RtsFlags.mp_o
 	$(RM) $@
-	gcc -o $@ gum/SysMan.mp_o gum/LLComms.mp_o -L$$PVM_ROOT/lib/$$PVM_ARCH -lgpvm3 -lpvm3 $(__socket_libs)
+	gcc -o $@ parallel/SysMan.mp_o parallel/LLComms.mp_o -L$$PVM_ROOT/lib/$$PVM_ARCH -lgpvm3 -lpvm3 $(__socket_libs)
 
-CLEAN_FILES  += gum/SysMan.mp_o gum/SysMan
-INSTALL_LIBEXECS += gum/SysMan
+CLEAN_FILES  += parallel/SysMan.mp_o parallel/SysMan
+INSTALL_LIBEXECS += parallel/SysMan
 endif
 
 #-----------------------------------------------------------------------------

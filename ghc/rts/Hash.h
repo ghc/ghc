@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
- * $Id: Hash.h,v 1.1 1999/01/27 12:11:26 simonm Exp $
+ * $Id: Hash.h,v 1.2 2000/01/13 14:34:03 hwloidl Exp $
  *
  * (c) The GHC Team, 1999
  *
@@ -14,3 +14,4 @@ void        insertHashTable ( HashTable *table, StgWord key, void *data );
 void *      removeHashTable ( HashTable *table, StgWord key, void *data );
 void        freeHashTable   ( HashTable *table, void (*freeDataFun)(void *) );
 HashTable * allocHashTable  ( void );
+

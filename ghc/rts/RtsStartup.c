@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.25 1999/12/20 10:34:37 simonpj Exp $
+ * $Id: RtsStartup.c,v 1.26 2000/01/13 14:34:04 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -25,7 +25,12 @@
 # include "ProfHeap.h"
 #endif
 
-#ifdef PAR
+#if defined(GRAN)
+#include "GranSimRts.h"
+#include "ParallelRts.h"
+#endif
+
+#if defined(PAR)
 #include "ParInit.h"
 #include "Parallel.h"
 #include "LLC.h"
@@ -37,6 +42,9 @@
 struct RTS_FLAGS RtsFlags;
 
 static int rts_has_started_up = 0;
+#if defined(PAR)
+static ullong startTime = 0;
+#endif
 
 void
 startupHaskell(int argc, char *argv[])
@@ -51,10 +59,6 @@ startupHaskell(int argc, char *argv[])
    else
      rts_has_started_up=1;
 
-#if defined(PAR)
-    int nPEs = 0;		    /* Number of PEs */
-#endif
-
     /* The very first thing we do is grab the start time...just in case we're
      * collecting timing statistics.
      */
@@ -62,13 +66,15 @@ startupHaskell(int argc, char *argv[])
 
 #ifdef PAR
 /*
- *The parallel system needs to be initialised and synchronised before
- *the program is run.  
+ * The parallel system needs to be initialised and synchronised before
+ * the program is run.  
  */
+    fprintf(stderr, "startupHaskell: argv[0]=%s\n", argv[0]);
     if (*argv[0] == '-') {     /* Look to see whether we're the Main Thread */
 	IAmMainThread = rtsTrue;
         argv++; argc--;			/* Strip off flag argument */
-/*	fprintf(stderr, "I am Main Thread\n"); */
+	// IF_PAR_DEBUG(verbose,
+		     fprintf(stderr, "[%x] I am Main Thread\n", mytid);
     }
     /* 
      * Grab the number of PEs out of the argument vector, and
@@ -78,7 +84,6 @@ startupHaskell(int argc, char *argv[])
     argv[1] = argv[0];
     argv++; argc--;
     initEachPEHook();                  /* HWL: hook to be execed on each PE */
-    SynchroniseSystem();
 #endif
 
     /* Set the RTS flags to default values. */
@@ -92,19 +97,26 @@ startupHaskell(int argc, char *argv[])
     prog_argc = argc;
     prog_argv = argv;
 
-#ifdef PAR
-   /* Initialise the parallel system -- before initHeap! */
-    initParallelSystem();
-   /* And start GranSim profiling if required: omitted for now
-    *if (Rtsflags.ParFlags.granSimStats)
-    *init_gr_profiling(rts_argc, rts_argv, prog_argc, prog_argv);
-    */
+#if defined(PAR)
+    /* NB: this really must be done after processing the RTS flags */
+    fprintf(stderr, "Synchronising system (%d PEs)\n", nPEs);
+    SynchroniseSystem();             // calls initParallelSystem etc
 #endif	/* PAR */
 
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
      */
     initScheduler();
+
+#if defined(GRAN)
+    /* And start GranSim profiling if required: */
+    if (RtsFlags.GranFlags.GranSimStats.Full)
+      init_gr_simulation(rts_argc, rts_argv, prog_argc, prog_argv);
+#elif defined(PAR)
+    /* And start GUM profiling if required: */
+    if (RtsFlags.ParFlags.ParStats.Full)
+      init_gr_simulation(rts_argc, rts_argv, prog_argc, prog_argv);
+#endif	/* PAR || GRAN */
 
     /* initialize the storage manager */
     initStorage();
@@ -179,12 +191,14 @@ shutdownHaskell(void)
   /* start timing the shutdown */
   stat_startExit();
 
+#if !defined(GRAN)
   /* Finalize any remaining weak pointers */
   finalizeWeakPointersNow();
+#endif
 
 #if defined(GRAN)
-  #error FixMe.
-  if (!RTSflags.GranFlags.granSimStats_suppressed)
+  /* end_gr_simulation prints global stats if requested -- HWL */
+  if (!RtsFlags.GranFlags.GranSimStats.Suppressed)
     end_gr_simulation();
 #endif
 
@@ -220,8 +234,12 @@ shutdownHaskell(void)
 #endif
 
   rts_has_started_up=0;
-}
 
+#if defined(PAR)
+  shutdownParallelSystem(0);
+#endif
+
+}
 
 /* 
  * called from STG-land to exit the program
@@ -230,7 +248,7 @@ shutdownHaskell(void)
 void  
 stg_exit(I_ n)
 {
-#ifdef PAR
+#if 0 /* def PAR */
   par_exit(n);
 #else
   exit(n);

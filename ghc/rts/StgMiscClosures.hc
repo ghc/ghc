@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.30 1999/11/30 11:43:26 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.31 2000/01/13 14:34:05 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,12 +9,17 @@
 
 #include "Rts.h"
 #include "RtsUtils.h"
+#include "RtsFlags.h"
 #include "StgMiscClosures.h"
 #include "HeapStackCheck.h"   /* for stg_gen_yield */
 #include "Storage.h"
 #include "StoragePriv.h"
 #include "ProfRts.h"
 #include "SMP.h"
+#if defined(GRAN) || defined(PAR)
+# include "GranSimRts.h"      /* for DumpRawGranEvent */
+# include "StgRun.h"	/* for StgReturn and register saving */
+#endif
 
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -24,6 +29,20 @@
  *       pop up some lovely message boxes (as well).
  */
 #define DUMP_ERRMSG(msg) STGCALL2(fprintf,stderr,msg)
+
+/*
+  Template for the entry code of non-enterable closures.
+*/
+
+#define NON_ENTERABLE_ENTRY_CODE(type)					\
+STGFUN(type##_entry)							\
+{									\
+  FB_									\
+    DUMP_ERRMSG(#type " object entered!\n");                            \
+    STGCALL1(raiseError, errorHandler);					\
+    stg_exit(EXIT_FAILURE); /* not executed */				\
+  FE_									\
+}
 
 /* -----------------------------------------------------------------------------
    Entry code for an indirection.
@@ -185,6 +204,11 @@ INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,0,2,BLACKHOLE,,EF_,0,0);
 STGFUN(BLACKHOLE_entry)
 {
   FB_
+#if defined(GRAN)
+    /* Before overwriting TSO_LINK */
+    STGCALL3(GranSimBlock,CurrentTSO,CurrentProc,(StgClosure *)R1.p /*Node*/);
+#endif
+
 #ifdef SMP
     CMPXCHG(R1.cl->header.info, &BLACKHOLE_info, &WHITEHOLE_info);
 #endif
@@ -192,15 +216,43 @@ STGFUN(BLACKHOLE_entry)
     TICK_ENT_BH();
 
     /* Put ourselves on the blocking queue for this black hole */
-    CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
+#if defined(GRAN) || defined(PAR)
+    /* in fact, only difference is the type of the end-of-queue marker! */
+    CurrentTSO->link = END_BQ_QUEUE;
+    ((StgBlockingQueue *)R1.p)->blocking_queue = (StgBlockingQueueElement *)CurrentTSO;
+#else
+    CurrentTSO->link = END_TSO_QUEUE;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
+#endif
+    /* jot down why and on what closure we are blocked */
     CurrentTSO->why_blocked = BlockedOnBlackHole;
     CurrentTSO->block_info.closure = R1.cl;
+    /* closure is mutable since something has just been added to its BQ */
     recordMutable((StgMutClosure *)R1.cl);
     /* Change the BLACKHOLE into a BLACKHOLE_BQ */
     ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
+
+#if defined(PAR)
+    /* Save the Thread State here, before calling RTS routines below! */
+    SAVE_THREAD_STATE(1);
+
+    /* if collecting stats update the execution time etc */
+    if (RtsFlags.ParFlags.ParStats.Full) {
+      /* Note that CURRENT_TIME may perform an unsafe call */
+      //rtsTime now = CURRENT_TIME; /* Now */
+      CurrentTSO->par.exectime += CURRENT_TIME - CurrentTSO->par.blockedat;
+      CurrentTSO->par.blockcount++;
+      CurrentTSO->par.blockedat = CURRENT_TIME;
+      DumpRawGranEvent(CURRENT_PROC, thisPE,
+		       GR_BLOCK, CurrentTSO, (StgClosure *)R1.p, 0);
+    }
+
+    THREAD_RETURN(1);  /* back to the scheduler */  
+#else
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
+#endif
+
   FE_
 }
 
@@ -208,6 +260,11 @@ INFO_TABLE(BLACKHOLE_BQ_info, BLACKHOLE_BQ_entry,1,1,BLACKHOLE_BQ,,EF_,0,0);
 STGFUN(BLACKHOLE_BQ_entry)
 {
   FB_
+#if defined(GRAN)
+    /* Before overwriting TSO_LINK */
+    STGCALL3(GranSimBlock,CurrentTSO,CurrentProc,(StgClosure *)R1.p /*Node*/);
+#endif
+
 #ifdef SMP
     CMPXCHG(R1.cl->header.info, &BLACKHOLE_BQ_info, &WHITEHOLE_info);
 #endif
@@ -215,42 +272,156 @@ STGFUN(BLACKHOLE_BQ_entry)
     TICK_ENT_BH();
 
     /* Put ourselves on the blocking queue for this black hole */
-    CurrentTSO->why_blocked = BlockedOnBlackHole;
-    CurrentTSO->block_info.closure = R1.cl;
     CurrentTSO->link = ((StgBlockingQueue *)R1.p)->blocking_queue;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
+    /* jot down why and on what closure we are blocked */
+    CurrentTSO->why_blocked = BlockedOnBlackHole;
+    CurrentTSO->block_info.closure = R1.cl;
 #ifdef SMP
     ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
 #endif
 
+#if defined(PAR)
+    /* Save the Thread State here, before calling RTS routines below! */
+    SAVE_THREAD_STATE(1);
+
+    /* if collecting stats update the execution time etc */
+    if (RtsFlags.ParFlags.ParStats.Full) {
+      /* Note that CURRENT_TIME may perform an unsafe call */
+      //rtsTime now = CURRENT_TIME; /* Now */
+      CurrentTSO->par.exectime += CURRENT_TIME - CurrentTSO->par.blockedat;
+      CurrentTSO->par.blockcount++;
+      CurrentTSO->par.blockedat = CURRENT_TIME;
+      DumpRawGranEvent(CURRENT_PROC, thisPE,
+		       GR_BLOCK, CurrentTSO, (StgClosure *)R1.p, 0);
+    }
+
+    THREAD_RETURN(1);  /* back to the scheduler */  
+#else
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
+#endif
   FE_
 }
+
+/*
+   Revertible black holes are needed in the parallel world, to handle
+   negative acknowledgements of messages containing updatable closures.
+   The idea is that when the original message is transmitted, the closure
+   is turned into a revertible black hole...an object which acts like a
+   black hole when local threads try to enter it, but which can be reverted
+   back to the original closure if necessary.
+
+   It's actually a lot like a blocking queue (BQ) entry, because revertible
+   black holes are initially set up with an empty blocking queue.
+*/
+
+#if defined(PAR) || defined(GRAN)
+
+INFO_TABLE(RBH_info, RBH_entry,1,1,RBH,,EF_,0,0);
+STGFUN(RBH_entry)
+{
+  FB_
+# if defined(GRAN)
+    /* mainly statistics gathering for GranSim simulation */
+    STGCALL3(GranSimBlock,CurrentTSO,CurrentProc,(StgClosure *)R1.p /*Node*/);
+# endif
+
+    /* exactly the same as a BLACKHOLE_BQ_entry -- HWL */
+    /* Put ourselves on the blocking queue for this black hole */
+    CurrentTSO->link = ((StgBlockingQueue *)R1.p)->blocking_queue;
+    ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
+    /* jot down why and on what closure we are blocked */
+    CurrentTSO->why_blocked = BlockedOnBlackHole;
+    CurrentTSO->block_info.closure = R1.cl;
+
+#if defined(PAR)
+    /* Save the Thread State here, before calling RTS routines below! */
+    SAVE_THREAD_STATE(1);
+
+    /* if collecting stats update the execution time etc */
+    if (RtsFlags.ParFlags.ParStats.Full) {
+      /* Note that CURRENT_TIME may perform an unsafe call */
+      //rtsTime now = CURRENT_TIME; /* Now */
+      CurrentTSO->par.exectime += CURRENT_TIME - CurrentTSO->par.blockedat;
+      CurrentTSO->par.blockcount++;
+      CurrentTSO->par.blockedat = CURRENT_TIME;
+      DumpRawGranEvent(CURRENT_PROC, thisPE,
+		       GR_BLOCK, CurrentTSO, (StgClosure *)R1.p, 0);
+    }
+
+    THREAD_RETURN(1);  /* back to the scheduler */  
+#else
+    /* saves thread state and leaves thread in ThreadEnterGHC state; */
+    /* stg_gen_block is too heavyweight, use a specialised one */
+    BLOCK_NP(1); 
+#endif
+
+  FE_
+}
+
+INFO_TABLE(RBH_Save_0_info, RBH_Save_0_entry,0,2,CONSTR,,EF_,0,0);
+NON_ENTERABLE_ENTRY_CODE(RBH_Save_0);
+
+INFO_TABLE(RBH_Save_1_info, RBH_Save_1_entry,1,1,CONSTR,,EF_,0,0);
+NON_ENTERABLE_ENTRY_CODE(RBH_Save_1);
+
+INFO_TABLE(RBH_Save_2_info, RBH_Save_2_entry,2,0,CONSTR,,EF_,0,0);
+NON_ENTERABLE_ENTRY_CODE(RBH_Save_2);
+#endif /* defined(PAR) || defined(GRAN) */
 
 /* identical to BLACKHOLEs except for the infotag */
 INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,,EF_,0,0);
 STGFUN(CAF_BLACKHOLE_entry)
 {
   FB_
+#if defined(GRAN)
+    /* mainly statistics gathering for GranSim simulation */
+    STGCALL3(GranSimBlock,CurrentTSO,CurrentProc,(StgClosure *)R1.p /*Node*/);
+#endif
+
 #ifdef SMP
     CMPXCHG(R1.cl->header.info, &CAF_BLACKHOLE_info, &WHITEHOLE_info);
+#endif
 
     TICK_ENT_BH();
 
     /* Put ourselves on the blocking queue for this black hole */
-    CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
+#if defined(GRAN) || defined(PAR)
+    /* in fact, only difference is the type of the end-of-queue marker! */
+    CurrentTSO->link = END_BQ_QUEUE;
+    ((StgBlockingQueue *)R1.p)->blocking_queue = (StgBlockingQueueElement *)CurrentTSO;
+#else
+    CurrentTSO->link = END_TSO_QUEUE;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
+#endif
+    /* jot down why and on what closure we are blocked */
     CurrentTSO->why_blocked = BlockedOnBlackHole;
     CurrentTSO->block_info.closure = R1.cl;
+    /* closure is mutable since something has just been added to its BQ */
     recordMutable((StgMutClosure *)R1.cl);
     /* Change the CAF_BLACKHOLE into a BLACKHOLE_BQ */
     ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
+
+#if defined(PAR)
+    /* Save the Thread State here, before calling RTS routines below! */
+    SAVE_THREAD_STATE(1);
+
+    /* if collecting stats update the execution time etc */
+    if (RtsFlags.ParFlags.ParStats.Full) {
+      /* Note that CURRENT_TIME may perform an unsafe call */
+      //rtsTime now = CURRENT_TIME; /* Now */
+      CurrentTSO->par.exectime += CURRENT_TIME - CurrentTSO->par.blockedat;
+      CurrentTSO->par.blockcount++;
+      CurrentTSO->par.blockedat = CURRENT_TIME;
+      DumpRawGranEvent(CURRENT_PROC, thisPE,
+		       GR_BLOCK, CurrentTSO, (StgClosure *)R1.p, 0);
+    }
+
+    THREAD_RETURN(1);  /* back to the scheduler */  
+#else
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
-
-#else
-    JMP_(BLACKHOLE_entry);
 #endif
 
   FE_
@@ -301,16 +472,8 @@ EF_(BCO_entry) {
 /* -----------------------------------------------------------------------------
    Some static info tables for things that don't get entered, and
    therefore don't need entry code (i.e. boxed but unpointed objects)
+   NON_ENTERABLE_ENTRY_CODE now defined at the beginning of the file
    -------------------------------------------------------------------------- */
-
-#define NON_ENTERABLE_ENTRY_CODE(type)					\
-STGFUN(type##_entry)							\
-{									\
-  FB_									\
-    DUMP_ERRMSG(#type " object entered!\n");                            \
-    STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);			\
-  FE_									\
-}
 
 INFO_TABLE(TSO_info, TSO_entry, 0,0,TSO,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(TSO);

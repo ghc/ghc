@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.11 2000/01/13 12:40:15 simonmar Exp $
+ * $Id: Rts.h,v 1.12 2000/01/13 14:34:01 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -42,17 +42,10 @@
 #define MAX_RTS_ARGS 32
 
 /* -----------------------------------------------------------------------------
-   Useful typedefs
+   Assertions and Debuggery
    -------------------------------------------------------------------------- */
 
-typedef unsigned int  nat;           /* at least 32 bits (like int) */
-typedef unsigned long lnat;          /* at least 32 bits            */
-typedef unsigned long long ullong;   /* at least 32 bits            */
-  
-typedef enum { 
-    rtsFalse = 0, 
-    rtsTrue 
-} rtsBool;
+#define IF_RTSFLAGS(c,s)  if (RtsFlags.c) { s; }
 
 /* -----------------------------------------------------------------------------
    Assertions and Debuggery

@@ -1,11 +1,30 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.68 1999/12/01 15:07:00 simonmar Exp $
+ * $Id: GC.c,v 1.69 2000/01/13 14:34:02 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
  * Generational garbage collector
  *
  * ---------------------------------------------------------------------------*/
+
+//@menu
+//* Includes::			
+//* STATIC OBJECT LIST::	
+//* Static function declarations::  
+//* Garbage Collect::		
+//* Weak Pointers::		
+//* Evacuation::		
+//* Scavenging::		
+//* Reverting CAFs::		
+//* Sanity code for CAF garbage collection::  
+//* Lazy black holing::		
+//* Stack squeezing::		
+//* Pausing a thread::		
+//* Index::			
+//@end menu
+
+//@node Includes, STATIC OBJECT LIST
+//@subsection Includes
 
 #include "Rts.h"
 #include "RtsFlags.h"
@@ -23,8 +42,20 @@
 #include "SchedAPI.h"
 #include "Weak.h"
 #include "StablePriv.h"
+#if defined(GRAN) || defined(PAR)
+# include "GranSimRts.h"
+# include "ParallelRts.h"
+# include "FetchMe.h"
+# if defined(DEBUG)
+#  include "Printer.h"
+#  include "ParallelDebug.h"
+# endif
+#endif
 
 StgCAF* enteredCAFs;
+
+//@node STATIC OBJECT LIST, Static function declarations, Includes
+//@subsection STATIC OBJECT LIST
 
 /* STATIC OBJECT LIST.
  *
@@ -96,6 +127,9 @@ bdescr *old_to_space;
 lnat new_blocks;		/* blocks allocated during this GC */
 lnat g0s0_pcnt_kept = 30;	/* percentage of g0s0 live at last minor GC */
 
+//@node Static function declarations, Garbage Collect, STATIC OBJECT LIST
+//@subsection Static function declarations
+
 /* -----------------------------------------------------------------------------
    Static function declarations
    -------------------------------------------------------------------------- */
@@ -119,6 +153,9 @@ static void         scavenge_mut_once_list  ( generation *g );
 static void         gcCAFs                  ( void );
 #endif
 
+//@node Garbage Collect, Weak Pointers, Static function declarations
+//@subsection Garbage Collect
+
 /* -----------------------------------------------------------------------------
    GarbageCollect
 
@@ -141,6 +178,7 @@ static void         gcCAFs                  ( void );
      - free from-space in each step, and set from-space = to-space.
 
    -------------------------------------------------------------------------- */
+//@cindex GarbageCollect
 
 void GarbageCollect(void (*get_roots)(void))
 {
@@ -151,6 +189,11 @@ void GarbageCollect(void (*get_roots)(void))
 
 #ifdef PROFILING
   CostCentreStack *prev_CCS;
+#endif
+
+#if defined(DEBUG) && defined(GRAN)
+  IF_DEBUG(gc, belch("@@ Starting garbage collection at %ld (%lx)\n", 
+		     Now, Now))
 #endif
 
   /* tell the stats department that we've started a GC */
@@ -176,8 +219,10 @@ void GarbageCollect(void (*get_roots)(void))
   major_gc = (N == RtsFlags.GcFlags.generations-1);
 
   /* check stack sanity *before* GC (ToDo: check all threads) */
-  /*IF_DEBUG(sanity, checkTSO(MainTSO,0)); */
-  IF_DEBUG(sanity, checkFreeListSanity());
+#if defined(GRAN)
+  // ToDo!: check sanity  IF_DEBUG(sanity, checkTSOsSanity());
+#endif
+    IF_DEBUG(sanity, checkFreeListSanity());
 
   /* Initialise the static object lists
    */
@@ -296,6 +341,8 @@ void GarbageCollect(void (*get_roots)(void))
 
     /* Do the mut-once lists first */
     for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
+      IF_PAR_DEBUG(verbose,
+		   printMutOnceList(&generations[g]));
       scavenge_mut_once_list(&generations[g]);
       evac_gen = g;
       for (st = generations[g].n_steps-1; st >= 0; st--) {
@@ -304,6 +351,8 @@ void GarbageCollect(void (*get_roots)(void))
     }
 
     for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
+      IF_PAR_DEBUG(verbose,
+		   printMutableList(&generations[g]));
       scavenge_mutable_list(&generations[g]);
       evac_gen = g;
       for (st = generations[g].n_steps-1; st >= 0; st--) {
@@ -316,6 +365,19 @@ void GarbageCollect(void (*get_roots)(void))
    */
   evac_gen = 0;
   get_roots();
+
+#if defined(PAR)
+  /* And don't forget to mark the TSO if we got here direct from
+   * Haskell! */
+  /* Not needed in a seq version?
+  if (CurrentTSO) {
+    CurrentTSO = (StgTSO *)MarkRoot((StgClosure *)CurrentTSO);
+  }
+  */
+
+  /* Mark the entries in the GALA table of the parallel system */
+  markLocalGAs(major_gc);
+#endif
 
   /* Mark the weak pointer list, and prepare to detect dead weak
    * pointers.
@@ -577,7 +639,7 @@ void GarbageCollect(void (*get_roots)(void))
       int pc_free; 
       
       adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
-      IF_DEBUG(gc, fprintf(stderr, "Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %d\n", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
+      IF_DEBUG(gc, fprintf(stderr, "@@ Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %d\n", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
       pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;
       if (pc_free < RtsFlags.GcFlags.pcFreeHeap) /* might even be < 0 */ {
 	heapOverflow();
@@ -648,6 +710,11 @@ void GarbageCollect(void (*get_roots)(void))
    */
   resetNurseries();
 
+#if defined(PAR)
+  /* Reconstruct the Global Address tables used in GUM */
+  RebuildGAtables(major_gc);
+#endif
+
   /* start any pending finalizers */
   scheduleFinalizers(old_weak_ptr_list);
   
@@ -675,6 +742,9 @@ void GarbageCollect(void (*get_roots)(void))
   stat_endGC(allocated, collected, live, copied, N);
 }
 
+//@node Weak Pointers, Evacuation, Garbage Collect
+//@subsection Weak Pointers
+
 /* -----------------------------------------------------------------------------
    Weak Pointers
 
@@ -694,6 +764,7 @@ void GarbageCollect(void (*get_roots)(void))
    probably be optimised by keeping per-generation lists of weak
    pointers, but for a few weak pointers this scheme will work.
    -------------------------------------------------------------------------- */
+//@cindex traverse_weak_ptr_list
 
 static rtsBool 
 traverse_weak_ptr_list(void)
@@ -782,6 +853,8 @@ traverse_weak_ptr_list(void)
    evacuated need to be evacuated now.
    -------------------------------------------------------------------------- */
 
+//@cindex cleanup_weak_ptr_list
+
 static void
 cleanup_weak_ptr_list ( StgWeak **list )
 {
@@ -809,6 +882,8 @@ cleanup_weak_ptr_list ( StgWeak **list )
    closure if it is alive, or NULL otherwise.
    -------------------------------------------------------------------------- */
 
+//@cindex isAlive
+
 StgClosure *
 isAlive(StgClosure *p)
 {
@@ -823,10 +898,14 @@ isAlive(StgClosure *p)
      * for static closures with an empty SRT or CONSTR_STATIC_NOCAFs.
      */
 
+#if 1 || !defined(PAR)
     /* ignore closures in generations that we're not collecting. */
+    /* In GUM we use this routine when rebuilding GA tables; for some
+       reason it has problems with the LOOKS_LIKE_STATIC macro -- HWL */
     if (LOOKS_LIKE_STATIC(p) || Bdescr((P_)p)->gen->no > N) {
       return p;
     }
+#endif
     
     switch (info->type) {
       
@@ -850,12 +929,24 @@ isAlive(StgClosure *p)
   }
 }
 
+//@cindex MarkRoot
 StgClosure *
 MarkRoot(StgClosure *root)
 {
+  //if (root != END_TSO_QUEUE)
   return evacuate(root);
 }
 
+//@cindex MarkRootHWL
+StgClosure *
+MarkRootHWL(StgClosure *root)
+{
+  StgClosure *new = evacuate(root);
+  upd_evacuee(root, new);
+  return new;
+}
+
+//@cindex addBlock
 static void addBlock(step *step)
 {
   bdescr *bd = allocBlock();
@@ -877,12 +968,16 @@ static void addBlock(step *step)
   new_blocks++;
 }
 
+//@cindex upd_evacuee
+
 static __inline__ void 
 upd_evacuee(StgClosure *p, StgClosure *dest)
 {
   p->header.info = &EVACUATED_info;
   ((StgEvacuated *)p)->evacuee = dest;
 }
+
+//@cindex copy
 
 static __inline__ StgClosure *
 copy(StgClosure *src, nat size, step *step)
@@ -925,6 +1020,8 @@ copy(StgClosure *src, nat size, step *step)
  * used to optimise evacuation of BLACKHOLEs.
  */
 
+//@cindex copyPart
+
 static __inline__ StgClosure *
 copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *step)
 {
@@ -953,6 +1050,9 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *step)
   return (StgClosure *)dest;
 }
 
+//@node Evacuation, Scavenging, Weak Pointers
+//@subsection Evacuation
+
 /* -----------------------------------------------------------------------------
    Evacuate a large object
 
@@ -963,6 +1063,8 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *step)
    Convention: bd->evacuated is /= 0 for a large object that has been
    evacuated, or 0 otherwise.
    -------------------------------------------------------------------------- */
+
+//@cindex evacuate_large
 
 static inline void
 evacuate_large(StgPtr p, rtsBool mutable)
@@ -1026,6 +1128,8 @@ evacuate_large(StgPtr p, rtsBool mutable)
    the promotion until the next GC.
    -------------------------------------------------------------------------- */
 
+//@cindex mkMutCons
+
 static StgClosure *
 mkMutCons(StgClosure *ptr, generation *gen)
 {
@@ -1075,7 +1179,7 @@ mkMutCons(StgClosure *ptr, generation *gen)
                          didn't manage to evacuate this object into evac_gen.
 
    -------------------------------------------------------------------------- */
-
+//@cindex evacuate
 
 static StgClosure *
 evacuate(StgClosure *q)
@@ -1084,6 +1188,9 @@ evacuate(StgClosure *q)
   bdescr *bd = NULL;
   step *step;
   const StgInfoTable *info;
+
+  nat size, ptrs, nonptrs, vhs;
+  char str[80];
 
 loop:
   if (HEAP_ALLOCED(q)) {
@@ -1110,7 +1217,15 @@ loop:
   ASSERT(q && (LOOKS_LIKE_GHC_INFO(GET_INFO(q))
 	       || IS_HUGS_CONSTR_INFO(GET_INFO(q))));
   info = get_itbl(q);
-
+  /*
+  if (info->type==RBH) {
+    info = REVERT_INFOPTR(info);
+    IF_DEBUG(gc,
+	     belch("@_ Trying to evacuate an RBH %p (%s); reverting to IP %p (%s)",
+		     q, info_type(q), info, info_type_by_ip(info)));
+  }
+  */
+  
   switch (info -> type) {
 
   case BCO:
@@ -1328,7 +1443,7 @@ loop:
   case CATCH_FRAME:
   case SEQ_FRAME:
     /* shouldn't see these */
-    barf("evacuate: stack frame\n");
+    barf("evacuate: stack frame at %p\n", q);
 
   case AP_UPD:
   case PAP:
@@ -1347,7 +1462,7 @@ loop:
     if (evac_gen > 0) {		/* optimisation */
       StgClosure *p = ((StgEvacuated*)q)->evacuee;
       if (Bdescr((P_)p)->gen->no < evac_gen) {
-	/*	fprintf(stderr,"evac failed!\n");*/
+	IF_DEBUG(gc, belch("@@ evacuate: evac of EVACUATED node %p failed!", p));
 	failed_to_evac = rtsTrue;
 	TICK_GC_FAILED_PROMOTION();
       }
@@ -1417,10 +1532,44 @@ loop:
       }
     }
 
+#if defined(PAR)
+  case RBH: // cf. BLACKHOLE_BQ
+    {
+      //StgInfoTable *rip = get_closure_info(q, &size, &ptrs, &nonptrs, &vhs, str);
+      to = copy(q,BLACKHOLE_sizeW(),step); 
+      //ToDo: derive size etc from reverted IP
+      //to = copy(q,size,step);
+      recordMutable((StgMutClosure *)to);
+      IF_DEBUG(gc,
+	       belch("@@ evacuate: RBH %p (%s) to %p (%s)",
+		     q, info_type(q), to, info_type(to)));
+      return to;
+    }
+
   case BLOCKED_FETCH:
+    ASSERT(sizeofW(StgBlockedFetch) >= MIN_NONUPD_SIZE);
+    to = copy(q,sizeofW(StgBlockedFetch),step);
+    IF_DEBUG(gc,
+	     belch("@@ evacuate: %p (%s) to %p (%s)",
+		   q, info_type(q), to, info_type(to)));
+    return to;
+
   case FETCH_ME:
-    fprintf(stderr,"evacuate: unimplemented/strange closure type\n");
-    return q;
+    ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
+    to = copy(q,sizeofW(StgFetchMe),step);
+    IF_DEBUG(gc,
+	     belch("@@ evacuate: %p (%s) to %p (%s)",
+		   q, info_type(q), to, info_type(to)));
+    return to;
+
+  case FETCH_ME_BQ:
+    ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
+    to = copy(q,sizeofW(StgFetchMeBlockingQueue),step);
+    IF_DEBUG(gc,
+	     belch("@@ evacuate: %p (%s) to %p (%s)",
+		   q, info_type(q), to, info_type(to)));
+    return to;
+#endif
 
   default:
     barf("evacuate: strange closure type %d", (int)(info->type));
@@ -1433,6 +1582,7 @@ loop:
    relocate_TSO is called just after a TSO has been copied from src to
    dest.  It adjusts the update frame list for the new location.
    -------------------------------------------------------------------------- */
+//@cindex relocate_TSO
 
 StgTSO *
 relocate_TSO(StgTSO *src, StgTSO *dest)
@@ -1480,6 +1630,11 @@ relocate_TSO(StgTSO *src, StgTSO *dest)
 
   return dest;
 }
+
+//@node Scavenging, Reverting CAFs, Evacuation
+//@subsection Scavenging
+
+//@cindex scavenge_srt
 
 static inline void
 scavenge_srt(const StgInfoTable *info)
@@ -1548,7 +1703,7 @@ scavengeTSO (StgTSO *tso)
    scavenging a mutable object where early promotion isn't such a good
    idea.  
    -------------------------------------------------------------------------- */
-   
+//@cindex scavenge
 
 static void
 scavenge(step *step)
@@ -1582,6 +1737,11 @@ scavenge(step *step)
 		 || IS_HUGS_CONSTR_INFO(GET_INFO((StgClosure *)p))));
 
     info = get_itbl((StgClosure *)p);
+    /*
+    if (info->type==RBH)
+      info = REVERT_INFOPTR(info);
+    */
+
     switch (info -> type) {
 
     case BCO:
@@ -1849,8 +2009,72 @@ scavenge(step *step)
 	break;
       }
 
+#if defined(PAR)
+    case RBH: // cf. BLACKHOLE_BQ
+      { 
+	// nat size, ptrs, nonptrs, vhs;
+	// char str[80];
+	// StgInfoTable *rip = get_closure_info(p, &size, &ptrs, &nonptrs, &vhs, str);
+	StgRBH *rbh = (StgRBH *)p;
+	(StgClosure *)rbh->blocking_queue = 
+	  evacuate((StgClosure *)rbh->blocking_queue);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  recordMutable((StgMutClosure *)rbh);
+	}
+	IF_DEBUG(gc,
+		 belch("@@ scavenge: RBH %p (%s) (new blocking_queue link=%p)",
+		       p, info_type(p), (StgClosure *)rbh->blocking_queue));
+	// ToDo: use size of reverted closure here!
+	p += BLACKHOLE_sizeW(); 
+	break;
+      }
+
     case BLOCKED_FETCH:
+      { 
+	StgBlockedFetch *bf = (StgBlockedFetch *)p;
+	/* follow the pointer to the node which is being demanded */
+	(StgClosure *)bf->node = 
+	  evacuate((StgClosure *)bf->node);
+	/* follow the link to the rest of the blocking queue */
+	(StgClosure *)bf->link = 
+	  evacuate((StgClosure *)bf->link);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  recordMutable((StgMutClosure *)bf);
+	}
+	IF_DEBUG(gc,
+		 belch("@@ scavenge: %p (%s); node is now %p; exciting, isn't it",
+		     bf, info_type((StgClosure *)bf), 
+		     bf->node, info_type(bf->node)));
+	p += sizeofW(StgBlockedFetch);
+	break;
+      }
+
     case FETCH_ME:
+      IF_DEBUG(gc,
+	       belch("@@ scavenge: HWL claims nothing to do for %p (%s)",
+		     p, info_type((StgClosure *)p)));
+      p += sizeofW(StgFetchMe);
+      break; // nothing to do in this case
+
+    case FETCH_ME_BQ: // cf. BLACKHOLE_BQ
+      { 
+	StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
+	(StgClosure *)fmbq->blocking_queue = 
+	  evacuate((StgClosure *)fmbq->blocking_queue);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  recordMutable((StgMutClosure *)fmbq);
+	}
+	IF_DEBUG(gc,
+		 belch("@@ scavenge: %p (%s) exciting, isn't it",
+		     p, info_type((StgClosure *)p)));
+	p += sizeofW(StgFetchMeBlockingQueue);
+	break;
+      }
+#endif
+
     case EVACUATED:
       barf("scavenge: unimplemented/strange closure type\n");
 
@@ -1879,6 +2103,8 @@ scavenge(step *step)
    because they contain old-to-new generation pointers.  Only certain
    objects can have this property.
    -------------------------------------------------------------------------- */
+//@cindex scavenge_one
+
 static rtsBool
 scavenge_one(StgClosure *p)
 {
@@ -1889,6 +2115,11 @@ scavenge_one(StgClosure *p)
 	       || IS_HUGS_CONSTR_INFO(GET_INFO(p))));
 
   info = get_itbl(p);
+
+  /* ngoq moHqu'! 
+  if (info->type==RBH)
+    info = REVERT_INFOPTR(info); // if it's an RBH, look at the orig closure
+  */
 
   switch (info -> type) {
 
@@ -1976,6 +2207,7 @@ scavenge_one(StgClosure *p)
    generations older than the one being collected) as roots.  We also
    remove non-mutable objects from the mutable list at this point.
    -------------------------------------------------------------------------- */
+//@cindex scavenge_mut_once_list
 
 static void
 scavenge_mut_once_list(generation *gen)
@@ -1997,6 +2229,10 @@ scavenge_mut_once_list(generation *gen)
 		 || IS_HUGS_CONSTR_INFO(GET_INFO(p))));
     
     info = get_itbl(p);
+    /*
+    if (info->type==RBH)
+      info = REVERT_INFOPTR(info); // if it's an RBH, look at the orig closure
+    */
     switch(info->type) {
       
     case IND_OLDGEN:
@@ -2008,7 +2244,8 @@ scavenge_mut_once_list(generation *gen)
       ((StgIndOldGen *)p)->indirectee = 
         evacuate(((StgIndOldGen *)p)->indirectee);
       
-#if 0
+#ifdef DEBUG
+      if (RtsFlags.DebugFlags.gc) 
       /* Debugging code to print out the size of the thing we just
        * promoted 
        */
@@ -2107,6 +2344,7 @@ scavenge_mut_once_list(generation *gen)
   gen->mut_once_list = new_list;
 }
 
+//@cindex scavenge_mutable_list
 
 static void
 scavenge_mutable_list(generation *gen)
@@ -2127,6 +2365,10 @@ scavenge_mutable_list(generation *gen)
 		 || IS_HUGS_CONSTR_INFO(GET_INFO(p))));
     
     info = get_itbl(p);
+    /*
+    if (info->type==RBH)
+      info = REVERT_INFOPTR(info); // if it's an RBH, look at the orig closure
+    */
     switch(info->type) {
       
     case MUT_ARR_PTRS_FROZEN:
@@ -2136,6 +2378,10 @@ scavenge_mutable_list(generation *gen)
       {
 	StgPtr end, q;
 	
+	IF_DEBUG(gc,
+		 belch("@@ scavenge_mut_list: scavenging MUT_ARR_PTRS_FROZEN %p; size: %#x ; next: %p",
+		       p, mut_arr_ptrs_sizeW((StgMutArrPtrs*)p), p->mut_link));
+
 	end = (P_)p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	evac_gen = gen->no;
 	for (q = (P_)((StgMutArrPtrs *)p)->payload; q < end; q++) {
@@ -2158,6 +2404,10 @@ scavenge_mutable_list(generation *gen)
       {
 	StgPtr end, q;
 	
+	IF_DEBUG(gc,
+		 belch("@@ scavenge_mut_list: scavenging MUT_ARR_PTRS %p; size: %#x ; next: %p",
+		       p, mut_arr_ptrs_sizeW((StgMutArrPtrs*)p), p->mut_link));
+
 	end = (P_)p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (q = (P_)((StgMutArrPtrs *)p)->payload; q < end; q++) {
 	  (StgClosure *)*q = evacuate((StgClosure *)*q);
@@ -2170,6 +2420,10 @@ scavenge_mutable_list(generation *gen)
        * it from the mutable list if possible by promoting whatever it
        * points to.
        */
+	IF_DEBUG(gc,
+		 belch("@@ scavenge_mut_list: scavenging MUT_VAR %p; var: %p ; next: %p",
+		       p, ((StgMutVar *)p)->var, p->mut_link));
+
       ASSERT(p->header.info != &MUT_CONS_info);
       ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
       p->mut_link = gen->mut_list;
@@ -2179,6 +2433,11 @@ scavenge_mutable_list(generation *gen)
     case MVAR:
       {
 	StgMVar *mvar = (StgMVar *)p;
+
+	IF_DEBUG(gc,
+		 belch("@@ scavenge_mut_list: scavenging MAVR %p; head: %p; tail: %p; value: %p ; next: %p",
+		       mvar, mvar->head, mvar->tail, mvar->value, p->mut_link));
+
 	(StgClosure *)mvar->head = evacuate((StgClosure *)mvar->head);
 	(StgClosure *)mvar->tail = evacuate((StgClosure *)mvar->tail);
 	(StgClosure *)mvar->value = evacuate((StgClosure *)mvar->value);
@@ -2205,6 +2464,11 @@ scavenge_mutable_list(generation *gen)
     case BLACKHOLE_BQ:
       { 
 	StgBlockingQueue *bh = (StgBlockingQueue *)p;
+
+	IF_DEBUG(gc,
+		 belch("@@ scavenge_mut_list: scavenging BLACKHOLE_BQ (%p); next: %p",
+		       p, p->mut_link));
+
 	(StgClosure *)bh->blocking_queue = 
 	  evacuate((StgClosure *)bh->blocking_queue);
 	p->mut_link = gen->mut_list;
@@ -2233,12 +2497,16 @@ scavenge_mutable_list(generation *gen)
       }
       continue;
 
+    // HWL: old PAR code deleted here
+
     default:
       /* shouldn't have anything else on the mutables list */
       barf("scavenge_mutable_list: strange object? %d", (int)(info->type));
     }
   }
 }
+
+//@cindex scavenge_static
 
 static void
 scavenge_static(void)
@@ -2255,7 +2523,10 @@ scavenge_static(void)
   while (p != END_OF_STATIC_LIST) {
 
     info = get_itbl(p);
-
+    /*
+    if (info->type==RBH)
+      info = REVERT_INFOPTR(info); // if it's an RBH, look at the orig closure
+    */
     /* make sure the info pointer is into text space */
     ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO(p))
 		 || IS_HUGS_CONSTR_INFO(GET_INFO(p))));
@@ -2324,6 +2595,7 @@ scavenge_static(void)
    objects pointed to by it.  We can use the same code for walking
    PAPs, since these are just sections of copied stack.
    -------------------------------------------------------------------------- */
+//@cindex scavenge_stack
 
 static void
 scavenge_stack(StgPtr p, StgPtr stack_end)
@@ -2331,6 +2603,8 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
   StgPtr q;
   const StgInfoTable* info;
   StgWord32 bitmap;
+
+  IF_DEBUG(sanity, belch("  scavenging stack between %p and %p", p, stack_end));
 
   /* 
    * Each time around this loop, we are looking at a chunk of stack
@@ -2380,8 +2654,18 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
       /* probably a slow-entry point return address: */
     case FUN:
     case FUN_STATIC:
-      p++;
+      {
+#if 0	
+	StgPtr old_p = p;
+	p++; p++; 
+	IF_DEBUG(sanity, 
+		 belch("HWL: scavenge_stack: FUN(_STATIC) adjusting p from %p to %p (instead of %p)",
+		       old_p, p, old_p+1));
+#else
+      p++; /* what if FHS!=1 !? -- HWL */
+#endif
       goto follow_srt;
+      }
 
       /* Specialised code for update frames, since they're so common.
        * We *know* the updatee points to a BLACKHOLE, CAF_BLACKHOLE,
@@ -2436,14 +2720,29 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
       }
 
       /* small bitmap (< 32 entries, or 64 on a 64-bit machine) */
-    case RET_BCO:
-    case RET_SMALL:
-    case RET_VEC_SMALL:
     case STOP_FRAME:
     case CATCH_FRAME:
     case SEQ_FRAME:
+      {
+	StgPtr old_p = p; // debugging only -- HWL
+      /* stack frames like these are ordinary closures and therefore may 
+	 contain setup-specific fixed-header words (as in GranSim!);
+	 therefore, these cases should not use p++ but &(p->payload) -- HWL */
+      IF_DEBUG(gran, IF_DEBUG(sanity, printObj(p)));
+      bitmap = info->layout.bitmap;
+
+      p = (StgPtr)&(((StgClosure *)p)->payload);
+      IF_DEBUG(sanity, 
+		 belch("HWL: scavenge_stack: (STOP|CATCH|SEQ)_FRAME adjusting p from %p to %p (instead of %p)",
+		       old_p, p, old_p+1));
+      goto small_bitmap;
+      }
+    case RET_BCO:
+    case RET_SMALL:
+    case RET_VEC_SMALL:
       bitmap = info->layout.bitmap;
       p++;
+      /* this assumes that the payload starts immediately after the info-ptr */
     small_bitmap:
       while (bitmap != 0) {
 	if ((bitmap & 1) == 0) {
@@ -2504,6 +2803,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
   objects are (repeatedly) mutable, so most of the time evac_gen will
   be zero.
   --------------------------------------------------------------------------- */
+//@cindex scavenge_large
 
 static void
 scavenge_large(step *step)
@@ -2580,6 +2880,7 @@ scavenge_large(step *step)
 
     case TSO:
 	scavengeTSO((StgTSO *)p);
+        // HWL: old PAR code deleted here
 	continue;
 
     default:
@@ -2587,6 +2888,8 @@ scavenge_large(step *step)
     }
   }
 }
+
+//@cindex zero_static_object_list
 
 static void
 zero_static_object_list(StgClosure* first_static)
@@ -2610,6 +2913,8 @@ zero_static_object_list(StgClosure* first_static)
  * It doesn't do any harm to zero all the mutable link fields on the
  * mutable list.
  */
+//@cindex zero_mutable_list
+
 static void
 zero_mutable_list( StgMutClosure *first )
 {
@@ -2621,9 +2926,13 @@ zero_mutable_list( StgMutClosure *first )
   }
 }
 
+//@node Reverting CAFs, Sanity code for CAF garbage collection, Scavenging
+//@subsection Reverting CAFs
+
 /* -----------------------------------------------------------------------------
    Reverting CAFs
    -------------------------------------------------------------------------- */
+//@cindex RevertCAFs
 
 void RevertCAFs(void)
 {
@@ -2638,6 +2947,8 @@ void RevertCAFs(void)
   }
   enteredCAFs = END_CAF_LIST;
 }
+
+//@cindex revert_dead_CAFs
 
 void revert_dead_CAFs(void)
 {
@@ -2660,6 +2971,9 @@ void revert_dead_CAFs(void)
     }
 }
 
+//@node Sanity code for CAF garbage collection, Lazy black holing, Reverting CAFs
+//@subsection Sanity code for CAF garbage collection
+
 /* -----------------------------------------------------------------------------
    Sanity code for CAF garbage collection.
 
@@ -2673,6 +2987,8 @@ void revert_dead_CAFs(void)
    -------------------------------------------------------------------------- */
 
 #ifdef DEBUG
+//@cindex gcCAFs
+
 static void
 gcCAFs(void)
 {
@@ -2710,6 +3026,9 @@ gcCAFs(void)
 }
 #endif
 
+//@node Lazy black holing, Stack squeezing, Sanity code for CAF garbage collection
+//@subsection Lazy black holing
+
 /* -----------------------------------------------------------------------------
    Lazy black holing.
 
@@ -2717,6 +3036,7 @@ gcCAFs(void)
    some work, we have to run down the stack and black-hole all the
    closures referred to by update frames.
    -------------------------------------------------------------------------- */
+//@cindex threadLazyBlackHole
 
 static void
 threadLazyBlackHole(StgTSO *tso)
@@ -2772,6 +3092,9 @@ threadLazyBlackHole(StgTSO *tso)
   }
 }
 
+//@node Stack squeezing, Pausing a thread, Lazy black holing
+//@subsection Stack squeezing
+
 /* -----------------------------------------------------------------------------
  * Stack squeezing
  *
@@ -2779,6 +3102,7 @@ threadLazyBlackHole(StgTSO *tso)
  * lazy black holing here.
  *
  * -------------------------------------------------------------------------- */
+//@cindex threadSqueezeStack
 
 static void
 threadSqueezeStack(StgTSO *tso)
@@ -2789,6 +3113,14 @@ threadSqueezeStack(StgTSO *tso)
   StgUpdateFrame *prev_frame;			/* Temporally previous */
   StgPtr bottom;
   rtsBool prev_was_update_frame;
+#if DEBUG
+  StgUpdateFrame *top_frame;
+  nat upd_frames=0, stop_frames=0, catch_frames=0, seq_frames=0,
+      bhs=0, squeezes=0;
+  void printObj( StgClosure *obj ); // from Printer.c
+
+  top_frame  = tso->su;
+#endif
   
   bottom = &(tso->stack[tso->stack_size]);
   frame  = tso->su;
@@ -2814,6 +3146,30 @@ threadSqueezeStack(StgTSO *tso)
     frame->link = next_frame;
     next_frame = frame;
     frame = prev_frame;
+#if DEBUG
+    IF_DEBUG(sanity,
+	     if (!(frame>=top_frame && frame<=bottom)) {
+	       printObj((StgClosure *)prev_frame);
+	       barf("threadSqueezeStack: current frame is rubbish %p; previous was %p\n", 
+		    frame, prev_frame);
+	     })
+    switch (get_itbl(frame)->type) {
+    case UPDATE_FRAME: upd_frames++;
+                       if (frame->updatee->header.info == &BLACKHOLE_info)
+			 bhs++;
+                       break;
+    case STOP_FRAME:  stop_frames++;
+                      break;
+    case CATCH_FRAME: catch_frames++;
+                      break;
+    case SEQ_FRAME: seq_frames++;
+                    break;
+    default:
+      barf("Found non-frame during stack squeezing at %p (prev frame was %p)\n",
+	   frame, prev_frame);
+      printObj((StgClosure *)prev_frame);
+    }
+#endif
     if (get_itbl(frame)->type == UPDATE_FRAME
 	&& frame->updatee->header.info == &BLACKHOLE_info) {
         break;
@@ -2863,8 +3219,9 @@ threadSqueezeStack(StgTSO *tso)
       StgClosure *updatee_keep   = prev_frame->updatee;
       StgClosure *updatee_bypass = frame->updatee;
       
-#if 0 /* DEBUG */
-      fprintf(stderr, "squeezing frame at %p\n", frame);
+#if DEBUG
+      IF_DEBUG(gc, fprintf(stderr, "@@ squeezing frame at %p\n", frame));
+      squeezes++;
 #endif
 
       /* Deal with blocking queues.  If both updatees have blocked
@@ -2949,9 +3306,10 @@ threadSqueezeStack(StgTSO *tso)
       else
 	next_frame_bottom = tso->sp - 1;
       
-#if 0 /* DEBUG */
-      fprintf(stderr, "sliding [%p, %p] by %ld\n", sp, next_frame_bottom,
-	      displacement);
+#if DEBUG
+      IF_DEBUG(gc,
+	       fprintf(stderr, "sliding [%p, %p] by %ld\n", sp, next_frame_bottom,
+		       displacement))
 #endif
       
       while (sp >= next_frame_bottom) {
@@ -2965,7 +3323,15 @@ threadSqueezeStack(StgTSO *tso)
 
   tso->sp += displacement;
   tso->su = prev_frame;
+#if DEBUG
+  IF_DEBUG(gc,
+	   fprintf(stderr, "@@ threadSqueezeStack: squeezed %d update-frames; found %d BHs; found %d update-, %d stop-, %d catch, %d seq-frames\n",
+		   squeezes, bhs, upd_frames, stop_frames, catch_frames, seq_frames))
+#endif
 }
+
+//@node Pausing a thread, Index, Stack squeezing
+//@subsection Pausing a thread
 
 /* -----------------------------------------------------------------------------
  * Pausing a thread
@@ -2974,6 +3340,7 @@ threadSqueezeStack(StgTSO *tso)
  * here.  We also take the opportunity to do stack squeezing if it's
  * turned on.
  * -------------------------------------------------------------------------- */
+//@cindex threadPaused
 
 void
 threadPaused(StgTSO *tso)
@@ -2983,3 +3350,83 @@ threadPaused(StgTSO *tso)
   else
     threadLazyBlackHole(tso);
 }
+
+#if DEBUG
+//@cindex printMutOnceList
+void
+printMutOnceList(generation *gen)
+{
+  const StgInfoTable *info;
+  StgMutClosure *p, *next, *new_list;
+
+  p = gen->mut_once_list;
+  new_list = END_MUT_LIST;
+  next = p->mut_link;
+
+  evac_gen = gen->no;
+  failed_to_evac = rtsFalse;
+
+  fprintf(stderr, "@@ Mut once list %p: ", gen->mut_once_list);
+  for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
+    fprintf(stderr, "%p (%s), ", 
+	    p, info_type((StgClosure *)p));
+  }
+  fputc('\n', stderr);
+}
+
+//@cindex printMutableList
+void
+printMutableList(generation *gen)
+{
+  const StgInfoTable *info;
+  StgMutClosure *p, *next;
+
+  p = gen->saved_mut_list;
+  next = p->mut_link;
+
+  evac_gen = 0;
+  failed_to_evac = rtsFalse;
+
+  fprintf(stderr, "@@ Mutable list %p: ", gen->saved_mut_list);
+  for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
+    fprintf(stderr, "%p (%s), ", 
+	    p, info_type((StgClosure *)p));
+  }
+  fputc('\n', stderr);
+}
+#endif /* DEBUG */
+
+//@node Index,  , Pausing a thread
+//@subsection Index
+
+//@index
+//* GarbageCollect::  @cindex\s-+GarbageCollect
+//* MarkRoot::  @cindex\s-+MarkRoot
+//* RevertCAFs::  @cindex\s-+RevertCAFs
+//* addBlock::  @cindex\s-+addBlock
+//* cleanup_weak_ptr_list::  @cindex\s-+cleanup_weak_ptr_list
+//* copy::  @cindex\s-+copy
+//* copyPart::  @cindex\s-+copyPart
+//* evacuate::  @cindex\s-+evacuate
+//* evacuate_large::  @cindex\s-+evacuate_large
+//* gcCAFs::  @cindex\s-+gcCAFs
+//* isAlive::  @cindex\s-+isAlive
+//* mkMutCons::  @cindex\s-+mkMutCons
+//* relocate_TSO::  @cindex\s-+relocate_TSO
+//* revert_dead_CAFs::  @cindex\s-+revert_dead_CAFs
+//* scavenge::  @cindex\s-+scavenge
+//* scavenge_large::  @cindex\s-+scavenge_large
+//* scavenge_mut_once_list::  @cindex\s-+scavenge_mut_once_list
+//* scavenge_mutable_list::  @cindex\s-+scavenge_mutable_list
+//* scavenge_one::  @cindex\s-+scavenge_one
+//* scavenge_srt::  @cindex\s-+scavenge_srt
+//* scavenge_stack::  @cindex\s-+scavenge_stack
+//* scavenge_static::  @cindex\s-+scavenge_static
+//* threadLazyBlackHole::  @cindex\s-+threadLazyBlackHole
+//* threadPaused::  @cindex\s-+threadPaused
+//* threadSqueezeStack::  @cindex\s-+threadSqueezeStack
+//* traverse_weak_ptr_list::  @cindex\s-+traverse_weak_ptr_list
+//* upd_evacuee::  @cindex\s-+upd_evacuee
+//* zero_mutable_list::  @cindex\s-+zero_mutable_list
+//* zero_static_object_list::  @cindex\s-+zero_static_object_list
+//@end index

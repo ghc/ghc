@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.21 1999/11/09 15:57:40 simonmar Exp $
+ * $Id: Stg.h,v 1.22 2000/01/13 14:34:01 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -103,6 +103,7 @@ void _stgAssert (char *, unsigned int);
 
 /* Global type definitions*/
 #include "StgTypes.h"
+#include "RtsTypes.h"
 
 /* Global constaints */
 #include "Constants.h"
@@ -115,6 +116,12 @@ void _stgAssert (char *, unsigned int);
 #include "ClosureTypes.h"
 #include "InfoTables.h"
 #include "TSO.h"
+
+/* Simulated-parallel information */
+#include "GranSim.h"
+
+/* Parallel information */
+#include "Parallel.h"
 
 /* STG/Optimised-C related stuff */
 #include "SMP.h"

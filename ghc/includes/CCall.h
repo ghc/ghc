@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CCall.h,v 1.3 1999/02/05 16:02:19 simonm Exp $
+ * $Id: CCall.h,v 1.4 2000/01/13 14:34:00 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -55,6 +55,9 @@
 #define STGCALL5(f,a,b,c,d,e) \
   CALLER_SAVE_ALL (void) f(a,b,c,d,e); CALLER_RESTORE_ALL
 
+#define STGCALL6(f,a,b,c,d,e,z) \
+  CALLER_SAVE_ALL (void) f(a,b,c,d,e,z); CALLER_RESTORE_ALL
+
 
 #define RET_STGCALL0(t,f) \
   ({ t _r; CALLER_SAVE_ALL _r = f(); CALLER_RESTORE_ALL; _r; })
@@ -73,6 +76,9 @@
 
 #define RET_STGCALL5(t,f,a,b,c,d,e) \
   ({ t _r; CALLER_SAVE_ALL _r = f(a,b,c,d,e); CALLER_RESTORE_ALL; _r; })
+
+#define RET_STGCALL6(t,f,a,b,c,d,e,z) \
+  ({ t _r; CALLER_SAVE_ALL _r = f(a,b,c,d,e,z); CALLER_RESTORE_ALL; _r; })
 
 
 /*
@@ -101,6 +107,9 @@
 #define PRIM_STGCALL5(f,a,b,c,d,e) \
   CALLER_SAVE_SYSTEM (void) f(a,b,c,d,e); CALLER_RESTORE_SYSTEM
 
+#define PRIM_STGCALL6(f,a,b,c,d,e,z) \
+  CALLER_SAVE_SYSTEM (void) f(a,b,c,d,e,z); CALLER_RESTORE_SYSTEM
+
 
 #define RET_PRIM_STGCALL0(t,f) \
   ({ t _r; CALLER_SAVE_SYSTEM _r = f(); CALLER_RESTORE_SYSTEM; _r; })
@@ -119,6 +128,9 @@
 
 #define RET_PRIM_STGCALL5(t,f,a,b,c,d,e) \
   ({ t _r; CALLER_SAVE_SYSTEM _r = f(a,b,c,d,e); CALLER_RESTORE_SYSTEM; _r; })
+
+#define RET_PRIM_STGCALL6(t,f,a,b,c,d,e,z) \
+  ({ t _r; CALLER_SAVE_SYSTEM _r = f(a,b,c,d,e,z); CALLER_RESTORE_SYSTEM; _r; })
 
 /* ToDo: ccalls that might garbage collect - do we need to return to
  * the scheduler to perform these?  Similarly, ccalls that might want

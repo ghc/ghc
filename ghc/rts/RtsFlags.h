@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.19 2000/01/12 15:15:17 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.20 2000/01/13 14:34:04 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -59,6 +59,8 @@ struct DEBUG_FLAGS {
 
   rtsBool stable      : 1; /* 256 */
   rtsBool prof        : 1; /* 512 */
+  rtsBool gran        : 1; /* 1024 */
+  rtsBool par         : 1; /* 2048 */
 };
 
 #if defined(PROFILING) || defined(PAR)
@@ -124,15 +126,46 @@ struct CONCURRENT_FLAGS {
 };
 
 #ifdef PAR
+/* currently the same as GRAN_STATS_FLAGS */
+struct PAR_STATS_FLAGS {
+  rtsBool Full;       /* Full .gr profile (rtsTrue) or only END events? */
+  // rtsBool Suppressed; /* No .gr profile at all */
+  rtsBool Binary;     /* Binary profile? (not yet implemented) */
+  rtsBool Sparks;     /* Info on sparks in profile? */
+  rtsBool Heap;       /* Info on heap allocs in profile? */ 
+  rtsBool NewLogfile; /* Use new log-file format? (not yet implemented) */
+  rtsBool Global;     /* Global statistics? (printed on shutdown; no log file) */
+};
+
+struct PAR_DEBUG_FLAGS {  
+  /* flags to control debugging output in various subsystems */
+  rtsBool verbose    : 1; /*    1 */
+  rtsBool trace      : 1; /*    2 */
+  rtsBool schedule   : 1; /*    4 */
+  rtsBool free       : 1; /*    8 */
+  rtsBool resume     : 1; /*   16 */
+  rtsBool weight     : 1; /*   32 */
+  rtsBool fetch      : 1; /*   64 */
+  rtsBool ack        : 1; /*  128 */
+  rtsBool fish       : 1; /*  256 */
+  rtsBool forward    : 1; /*  512 */
+  rtsBool pack       : 1; /* 1024 */
+};
+
+#define MAX_PAR_DEBUG_OPTION     10
+#define PAR_DEBUG_MASK(n)        ((nat)(ldexp(1,n)))
+#define MAX_PAR_DEBUG_MASK       ((nat)(ldexp(1,(MAX_PAR_DEBUG_OPTION+1))-1))
+
 struct PAR_FLAGS {
-  rtsBool parallelStats; 	/* Gather parallel statistics */
-  rtsBool granSimStats;	   /* Full .gr profile (rtsTrue) or only END events? */
-  rtsBool granSimStats_Binary;
-  
-  rtsBool outputDisabled;	/* Disable output for performance purposes */
-  
-  unsigned int packBufferSize;
-  unsigned int maxLocalSparks;
+  struct PAR_STATS_FLAGS ParStats;  /* profile and stats output */
+  struct PAR_DEBUG_FLAGS Debug;         /* debugging options */
+  rtsBool  outputDisabled;	  /* Disable output for performance purposes */
+  nat      packBufferSize;
+  nat	   maxLocalSparks;        /* spark pool size */
+  nat      maxThreads;            /* thread pool size */
+  nat      maxFishes;             /* max number of active fishes */
+  rtsTime  fishDelay;             /* delay before sending a new fish */
+  long   wait;
 };
 #endif /* PAR */
 
@@ -141,53 +174,88 @@ struct PAR_FLAGS {
   nat            nNodes;         /* number of threads to run simultaneously */
   unsigned int	 maxLocalSparks;
 };
-#endif
+#endif /* SMP */
 
 #ifdef GRAN
+struct GRAN_STATS_FLAGS {
+  rtsBool Full;       /* Full .gr profile (rtsTrue) or only END events? */
+  rtsBool Suppressed; /* No .gr profile at all */
+  rtsBool Binary;     /* Binary profile? (not yet implemented) */
+  rtsBool Sparks;     /* Info on sparks in profile? */
+  rtsBool Heap;       /* Info on heap allocs in profile? */ 
+  rtsBool NewLogfile; /* Use new log-file format? (not yet implemented) */
+  rtsBool Global;     /* Global statistics? (printed on shutdown; no log file) */
+};
+
+struct GRAN_COST_FLAGS {
+  /* Communication Cost Variables -- set in main program */
+  nat latency;              /* Latency for single packet */
+  nat additional_latency;   /* Latency for additional packets */
+  nat fetchtime;            
+  nat lunblocktime;         /* Time for local unblock */
+  nat gunblocktime;         /* Time for global unblock */
+  nat mpacktime;            /* Cost of creating a packet */     
+  nat munpacktime;	    /* Cost of receiving a packet */    
+  nat mtidytime;	    /* Cost of cleaning up after send */
+  
+  nat threadcreatetime;     /* Thread creation costs */
+  nat threadqueuetime;      /* Cost of adding a thread to the running/runnable queue */
+  nat threaddescheduletime; /* Cost of descheduling a thread */
+  nat threadscheduletime;   /* Cost of scheduling a thread */
+  nat threadcontextswitchtime;  /* Cost of context switch  */
+  
+  /* Instruction Costs */
+  nat arith_cost;        /* arithmetic instructions (+,i,< etc) */
+  nat branch_cost;       /* branch instructions */ 
+  nat load_cost;         /* load into register */
+  nat store_cost;        /* store into memory */
+  nat float_cost;        /* floating point operations */
+  
+  nat heapalloc_cost;    /* heap allocation costs */
+  
+  /* Overhead for granularity control mechanisms */
+  /* overhead per elem of spark queue */
+  nat pri_spark_overhead;
+  /* overhead per elem of thread queue */
+  nat pri_sched_overhead;
+};
+
+struct GRAN_DEBUG_FLAGS {  
+  /* flags to control debugging output in various subsystems */
+  rtsBool event_trace    : 1; /*    1 */
+  rtsBool event_stats    : 1; /*    2 */
+  rtsBool bq             : 1; /*    4 */
+  rtsBool pack           : 1; /*    8 */
+  rtsBool checkSparkQ    : 1; /*   16 */
+  rtsBool thunkStealing  : 1; /*   32 */
+  rtsBool randomSteal  	 : 1; /*   64 */
+  rtsBool findWork     	 : 1; /*  128 */
+  rtsBool unused     	 : 1; /*  256 */
+  rtsBool pri     	 : 1; /*  512 */
+  rtsBool checkLight   	 : 1; /* 1024 */
+  rtsBool sortedQ      	 : 1; /* 2048 */
+  rtsBool blockOnFetch   : 1; /* 4096 */
+  rtsBool packBuffer     : 1; /* 8192 */
+  rtsBool blockOnFetch_sanity : 1; /*  16384 */
+};
+
+#define MAX_GRAN_DEBUG_OPTION     14
+#define GRAN_DEBUG_MASK(n)        ((nat)(ldexp(1,n)))
+#define MAX_GRAN_DEBUG_MASK       ((nat)(ldexp(1,(MAX_GRAN_DEBUG_OPTION+1))-1))
+
 struct GRAN_FLAGS {
-    rtsBool granSimStats;  /* Full .gr profile (rtsTrue) or only END events? */
-    rtsBool granSimStats_suppressed; /* No .gr profile at all */
-    rtsBool granSimStats_Binary;
-    rtsBool granSimStats_Sparks;
-    rtsBool granSimStats_Heap;
-    rtsBool labelling;
-    unsigned int	    packBufferSize;
-    unsigned int	    packBufferSize_internal;
+  struct GRAN_STATS_FLAGS GranSimStats;  /* profile and stats output */
+  struct GRAN_COST_FLAGS Costs;          /* cost metric for simulation */
+  struct GRAN_DEBUG_FLAGS Debug;         /* debugging options */
 
-    int proc;                      /* number of processors */
-    int max_fishes;                /* max number of spark or thread steals */
-    TIME time_slice;              /* max time slice of one reduction thread */
+  // rtsBool labelling;
+  nat  packBufferSize;
+  nat  packBufferSize_internal;
 
-    /* Communication Cost Variables -- set in main program */
-    unsigned int gran_latency;              /* Latency for single packet */
-    unsigned int gran_additional_latency;   /* Latency for additional packets */
-    unsigned int gran_fetchtime;            
-    unsigned int gran_lunblocktime;         /* Time for local unblock */
-    unsigned int gran_gunblocktime;         /* Time for global unblock */
-    unsigned int gran_mpacktime;            /* Cost of creating a packet */     
-    unsigned int gran_munpacktime;	  /* Cost of receiving a packet */    
-    unsigned int gran_mtidytime;		  /* Cost of cleaning up after send */
-
-    unsigned int gran_threadcreatetime;     /* Thread creation costs */
-    unsigned int gran_threadqueuetime;      /* Cost of adding a thread to the running/runnable queue */
-    unsigned int gran_threaddescheduletime; /* Cost of descheduling a thread */
-    unsigned int gran_threadscheduletime;   /* Cost of scheduling a thread */
-    unsigned int gran_threadcontextswitchtime;  /* Cost of context switch  */
-
-    /* Instruction Costs */
-    unsigned int gran_arith_cost;        /* arithmetic instructions (+,i,< etc) */
-    unsigned int gran_branch_cost;       /* branch instructions */ 
-    unsigned int gran_load_cost;         /* load into register */
-    unsigned int gran_store_cost;        /* store into memory */
-    unsigned int gran_float_cost;        /* floating point operations */
-
-    unsigned int gran_heapalloc_cost;    /* heap allocation costs */
-
-    /* Overhead for granularity control mechanisms */
-    /* overhead per elem of spark queue */
-    unsigned int gran_pri_spark_overhead;
-    /* overhead per elem of thread queue */
-    unsigned int gran_pri_sched_overhead;
+  PEs proc;                     /* number of processors */
+  rtsBool Fishing;              /* Simulate GUM style fishing mechanism? */
+  nat maxFishes;                /* max number of spark or thread steals */
+  rtsTime time_slice;           /* max time slice of one reduction thread */
 
     /* GrAnSim-Light: This version puts no bound on the number of
          processors but in exchange doesn't model communication costs
@@ -198,30 +266,27 @@ struct GRAN_FLAGS {
     rtsBool Light;
 
     rtsBool DoFairSchedule ;        /* fair scheduling alg? default: unfair */
-    rtsBool DoReScheduleOnFetch ;   /* async. communication? */
+    rtsBool DoAsyncFetch;           /* async. communication? */
     rtsBool DoStealThreadsFirst;    /* prefer threads over sparks when stealing */
-    rtsBool SimplifiedFetch;        /* fast but inaccurate fetch modelling */
-    rtsBool DoAlwaysCreateThreads;  /* eager thread creation */
-    rtsBool DoGUMMFetching;         /* bulk fetching */
-    rtsBool DoThreadMigration;      /* allow to move threads */
-    int      FetchStrategy;          /* what to do when waiting for data */
-    rtsBool PreferSparksOfLocalNodes; /* prefer local over global sparks */
-    rtsBool DoPrioritySparking;     /* sparks sorted by priorities */
-    rtsBool DoPriorityScheduling;   /* threads sorted by priorities */
-    int      SparkPriority;          /* threshold for cut-off mechanism */
-    int      SparkPriority2;
-    rtsBool RandomPriorities;
-    rtsBool InversePriorities;
-    rtsBool IgnorePriorities;
-    int      ThunksToPack;           /* number of thunks in packet + 1 */ 
-    rtsBool RandomSteal;            /* steal spark/thread from random proc */
-    rtsBool NoForward;              /* no forwarding of fetch messages */
-    rtsBool PrintFetchMisses;       /* print number of fetch misses */
+  rtsBool DoAlwaysCreateThreads;  /* eager thread creation */
+  rtsBool DoBulkFetching;         /* bulk fetching */
+  rtsBool DoThreadMigration;      /* allow to move threads */
+  nat     FetchStrategy;         /* what to do when waiting for data */
+  rtsBool PreferSparksOfLocalNodes; /* prefer local over global sparks */
+  rtsBool DoPrioritySparking;     /* sparks sorted by priorities */
+  rtsBool DoPriorityScheduling;   /* threads sorted by priorities */
+  nat     SparkPriority;         /* threshold for cut-off mechanism */
+  nat     SparkPriority2;
+  rtsBool RandomPriorities;
+  rtsBool InversePriorities;
+  rtsBool IgnorePriorities;
+  nat     ThunksToPack;      /* number of thunks in packet + 1 */ 
+  rtsBool RandomSteal;        /* steal spark/thread from random proc */
+  rtsBool NoForward;        /* no forwarding of fetch messages */
 
-    unsigned int	    debug;
-    rtsBool event_trace;
-    rtsBool event_trace_all;
-   
+  // unsigned int	    debug;
+  //  rtsBool event_trace;
+  //  rtsBool event_trace_all;
 };
 #endif /* GRAN */
 

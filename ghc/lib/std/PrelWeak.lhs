@@ -7,6 +7,8 @@
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
+#ifndef __PARALLEL_HASKELL__
+
 module PrelWeak where
 
 import PrelGHC
@@ -42,5 +44,7 @@ addForeignFinalizer (ForeignObj fo) finalizer = addFinalizer fo finalizer
 instance Eq (Weak v) where
   (Weak w1) == (Weak w2) = w1 `sameWeak#` w2
 -}
+
+#endif
 
 \end{code}

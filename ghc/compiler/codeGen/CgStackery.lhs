@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.12 1999/06/24 13:04:20 simonmar Exp $
+% $Id: CgStackery.lhs,v 1.13 2000/01/13 14:33:58 hwloidl Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -25,9 +25,10 @@ import AbsCSyn
 import CgUsages		( getRealSp )
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
-import CmdLineOpts	( opt_SccProfilingOn )
+import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import Panic		( panic )
-import Constants	( uF_SIZE, sCC_UF_SIZE, sEQ_FRAME_SIZE, sCC_SEQ_FRAME_SIZE )
+import Constants	( uF_SIZE, sCC_UF_SIZE, gRAN_UF_SIZE, 
+			  sEQ_FRAME_SIZE, sCC_SEQ_FRAME_SIZE, gRAN_SEQ_FRAME_SIZE )
 
 import IOExts		( trace )
 \end{code}
@@ -224,11 +225,13 @@ getFinalStackHW fcode info_down (MkCgState absC binds usages) = state1
 \end{code}
 
 \begin{code}
-updateFrameSize | opt_SccProfilingOn = sCC_UF_SIZE
-		| otherwise          = uF_SIZE
+updateFrameSize | opt_SccProfilingOn = trace ("updateFrameSize = " ++ (show sCC_UF_SIZE)) sCC_UF_SIZE
+		| opt_GranMacros     = trace ("updateFrameSize = " ++ (show gRAN_UF_SIZE))gRAN_UF_SIZE
+		| otherwise          = trace ("updateFrameSize = " ++ (show uF_SIZE)) uF_SIZE
 
 seqFrameSize    | opt_SccProfilingOn  = sCC_SEQ_FRAME_SIZE
-	        | otherwise           = sEQ_FRAME_SIZE
+	        | opt_GranMacros      = gRAN_SEQ_FRAME_SIZE
+		| otherwise           = sEQ_FRAME_SIZE
 \end{code}			
 
 %************************************************************************

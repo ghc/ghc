@@ -122,6 +122,7 @@ macroCode PUSH_UPD_FRAME args
     	frame n = StInd PtrRep
 	    (StIndex PtrRep stgSp (StInt (toInteger (n-uF_SIZE))))
 
+        -- HWL: these values are *wrong* in a GranSim setup; ToDo: fix
 	a1 = StAssign PtrRep (frame uF_RET)     upd_frame_info
 	a3 = StAssign PtrRep (frame uF_SU)      stgSu
 	a4 = StAssign PtrRep (frame uF_UPDATEE) bhptr

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.10 1999/11/09 15:46:51 simonmar Exp $
+ * $Id: HeapStackCheck.hc,v 1.11 2000/01/13 14:34:03 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -275,6 +275,334 @@ EXTFUN(stg_gc_enter_8)
   GC_ENTER;
   FE_
 }
+
+#if defined(GRAN)
+/*
+  ToDo: merge the block and yield macros, calling something like BLOCK(N)
+        at the end;
+*/
+
+/* 
+   Should we actually ever do a yield in such a case?? -- HWL
+*/
+EXTFUN(gran_yield_0)
+{
+  FB_
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadYielding;
+  JMP_(StgReturn);
+  FE_
+}
+
+EXTFUN(gran_yield_1)
+{
+  FB_
+  Sp -= 1;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadYielding;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 2 Regs--------------------------------------------------------------------*/
+
+EXTFUN(gran_yield_2)
+{
+  FB_
+  Sp -= 2;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadYielding;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 3 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_yield_3)
+{
+  FB_
+  Sp -= 3;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadYielding;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 4 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_yield_4)
+{
+  FB_
+  Sp -= 4;
+  Sp[3] = R4.w;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadYielding;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 5 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_yield_5)
+{
+  FB_
+  Sp -= 5;
+  Sp[4] = R5.w;
+  Sp[3] = R4.w;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadYielding;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 6 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_yield_6)
+{
+  FB_
+  Sp -= 6;
+  Sp[5] = R6.w;
+  Sp[4] = R5.w;
+  Sp[3] = R4.w;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadYielding;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 7 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_yield_7)
+{
+  FB_
+  Sp -= 7;
+  Sp[6] = R7.w;
+  Sp[5] = R6.w;
+  Sp[4] = R5.w;
+  Sp[3] = R4.w;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadYielding;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 8 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_yield_8)
+{
+  FB_
+  Sp -= 8;
+  Sp[7] = R8.w;
+  Sp[6] = R7.w;
+  Sp[5] = R6.w;
+  Sp[4] = R5.w;
+  Sp[3] = R4.w;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadYielding;
+  JMP_(StgReturn);
+  FE_
+}
+
+// the same routines but with a block rather than a yield
+
+EXTFUN(gran_block_1)
+{
+  FB_
+  Sp -= 1;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadBlocked;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 2 Regs--------------------------------------------------------------------*/
+
+EXTFUN(gran_block_2)
+{
+  FB_
+  Sp -= 2;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadBlocked;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 3 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_block_3)
+{
+  FB_
+  Sp -= 3;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadBlocked;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 4 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_block_4)
+{
+  FB_
+  Sp -= 4;
+  Sp[3] = R4.w;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadBlocked;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 5 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_block_5)
+{
+  FB_
+  Sp -= 5;
+  Sp[4] = R5.w;
+  Sp[3] = R4.w;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadBlocked;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 6 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_block_6)
+{
+  FB_
+  Sp -= 6;
+  Sp[5] = R6.w;
+  Sp[4] = R5.w;
+  Sp[3] = R4.w;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadBlocked;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 7 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_block_7)
+{
+  FB_
+  Sp -= 7;
+  Sp[6] = R7.w;
+  Sp[5] = R6.w;
+  Sp[4] = R5.w;
+  Sp[3] = R4.w;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadBlocked;
+  JMP_(StgReturn);
+  FE_
+}
+
+/*- 8 Regs -------------------------------------------------------------------*/
+
+EXTFUN(gran_block_8)
+{
+  FB_
+  Sp -= 8;
+  Sp[7] = R8.w;
+  Sp[6] = R7.w;
+  Sp[5] = R6.w;
+  Sp[4] = R5.w;
+  Sp[3] = R4.w;
+  Sp[2] = R3.w;
+  Sp[1] = R2.w;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadBlocked;
+  JMP_(StgReturn);
+  FE_
+}
+
+#endif
+
+#if 0 && defined(PAR)
+
+/*
+  Similar to stg_block_1 (called via StgMacro BLOCK_NP) but separates the
+  saving of the thread state from the actual jump via an StgReturn.
+  We need this separation because we call RTS routines in blocking entry codes
+  before jumping back into the RTS (see parallel/FetchMe.hc).
+*/
+
+EXTFUN(par_block_1_no_jump)
+{
+  FB_
+  Sp -= 1;
+  Sp[0] = R1.w;
+  SaveThreadState();					
+  FE_
+}
+
+EXTFUN(par_jump)
+{
+  FB_
+  CurrentTSO->whatNext = ThreadEnterGHC;		
+  R1.i = ThreadBlocked;
+  JMP_(StgReturn);
+  FE_
+}
+
+#endif
 
 /* -----------------------------------------------------------------------------
    For a case expression on a polymorphic or function-typed object, if

@@ -1,6 +1,5 @@
-
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.18 1999/11/29 18:59:46 sewardj Exp $
+ * $Id: Printer.c,v 1.19 2000/01/13 14:34:04 hwloidl Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -17,6 +16,12 @@
 #include "RtsFlags.h"
 #include "Bytecodes.h"  /* for InstrPtr */
 #include "Disassembler.h"
+
+#include "Printer.h"
+
+// HWL: explicit fixed header size to make debugging easier
+int fixed_hs = FIXED_HS, itbl_sz = sizeofW(StgInfoTable), 
+    uf_sz=sizeofW(StgUpdateFrame), sf_sz=sizeofW(StgSeqFrame); 
 
 /* --------------------------------------------------------------------------
  * local function decls
@@ -198,6 +203,14 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n"); 
             break;
 
+#if defined(GRAN) || defined(PAR)
+    case RBH:
+      fprintf(stderr,"RBH("); 
+      printPtr((StgPtr)stgCast(StgRBH*,obj)->blocking_queue);
+      fprintf(stderr,")\n"); 
+      break;
+#endif
+
     case CONSTR:
     case CONSTR_1_0: case CONSTR_0_1:
     case CONSTR_1_1: case CONSTR_0_2: case CONSTR_2_0:
@@ -304,6 +317,13 @@ void printClosure( StgClosure *obj )
             return;
     }
 }
+
+/*
+void printGraph( StgClosure *obj )
+{
+ printClosure(obj);
+}
+*/
 
 StgPtr printStackObj( StgPtr sp )
 {
@@ -678,7 +698,7 @@ static void printZcoded( const char *raw )
 /* Causing linking trouble on Win32 plats, so I'm
    disabling this for now. 
 */
-#if defined(HAVE_BFD_H) && !defined(_WIN32)
+#if defined(HAVE_BFD_H) && !defined(_WIN32) && defined(USE_BSD)
 
 #include <bfd.h>
 

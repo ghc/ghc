@@ -687,6 +687,9 @@ sub mangle_asm {
 		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
 		}
 
+		# HWL HACK: dont die, just print a warning
+		#print stderr  "HWL: this should die! Prologue junk?: $p\n" if $p =~ /^\t[^\.]/
+		#    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 		die "Prologue junk?: $p\n" if $p =~ /^\t[^\.]/
 		    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
@@ -727,6 +730,9 @@ sub mangle_asm {
 		} else {
 		    print STDERR "$Pgm: unknown epilogue mangling? $TargetPlatform\n";
 		}
+		# HWL HACK: dont die, just print a warning
+		#print stderr "HWL: this should die! Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/
+		#    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 		die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/
 		    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 

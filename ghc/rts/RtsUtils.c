@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.12 2000/01/13 12:40:16 simonmar Exp $
+ * $Id: RtsUtils.c,v 1.13 2000/01/13 14:34:04 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -8,6 +8,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+#include "RtsTypes.h"
 #include "RtsAPI.h"
 #include "RtsFlags.h"
 #include "Hooks.h"
@@ -21,6 +22,10 @@
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
+#endif
+
+#ifdef HAVE_GETTIMEOFDAY
+#include <sys/time.h>
 #endif
 
 #include <stdarg.h>
@@ -182,7 +187,7 @@ resetGenSymZh(void) /* it's your funeral */
    Get the current time as a string.  Used in profiling reports.
    -------------------------------------------------------------------------- */
 
-#if defined(PROFILING) || defined(DEBUG)
+#if defined(PROFILING) || defined(DEBUG) || defined(PAR) || defined(GRAN)
 char *
 time_str(void)
 {
@@ -218,6 +223,44 @@ resetNonBlockingFd(int fd)
   }
 #endif
 }
+
+#if 0
+static ullong startTime = 0;
+
+/* used in a parallel setup */
+ullong
+msTime(void)
+{
+# if defined(HAVE_GETCLOCK) && !defined(alpha_TARGET_ARCH)
+    struct timespec tv;
+
+    if (getclock(TIMEOFDAY, &tv) != 0) {
+	fflush(stdout);
+	fprintf(stderr, "Clock failed\n");
+	stg_exit(EXIT_FAILURE);
+    }
+    return tv.tv_sec * LL(1000) + tv.tv_nsec / LL(1000000) - startTime;
+# elif HAVE_GETTIMEOFDAY && !defined(alpha_TARGET_ARCH)
+    struct timeval tv;
+ 
+    if (gettimeofday(&tv, NULL) != 0) {
+	fflush(stdout);
+	fprintf(stderr, "Clock failed\n");
+	stg_exit(EXIT_FAILURE);
+    }
+    return tv.tv_sec * LL(1000) + tv.tv_usec / LL(1000) - startTime;
+# else
+    time_t t;
+    if ((t = time(NULL)) == (time_t) -1) {
+	fflush(stdout);
+	fprintf(stderr, "Clock failed\n");
+	stg_exit(EXIT_FAILURE);
+    }
+    return t * LL(1000) - startTime;
+# endif
+}
+#endif
+
 
 /* -----------------------------------------------------------------------------
    Print large numbers, with punctuation.

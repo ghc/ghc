@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.15 1999/11/02 15:05:53 simonmar Exp $
+ * $Id: StgMiscClosures.h,v 1.16 2000/01/13 14:34:01 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -31,6 +31,9 @@ STGFUN(WHITEHOLE_entry);
 STGFUN(SE_BLACKHOLE_entry);
 STGFUN(SE_CAF_BLACKHOLE_entry);
 #endif
+#if defined(PAR) || defined(GRAN)
+STGFUN(RBH_entry);
+#endif
 STGFUN(BCO_entry);
 STGFUN(EVACUATED_entry);
 STGFUN(FOREIGN_entry);
@@ -50,6 +53,15 @@ STGFUN(MUT_CONS_entry);
 STGFUN(END_MUT_LIST_entry);
 STGFUN(dummy_ret_entry);
 
+/* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
+#define END_TSO_QUEUE  ((StgTSO *)(void*)&END_TSO_QUEUE_closure)
+#if defined(PAR) || defined(GRAN)
+/* this is the NIL ptr for a blocking queue */
+# define END_BQ_QUEUE  ((StgBlockingQueueElement *)(void*)&END_TSO_QUEUE_closure)
+/* this is the NIL ptr for a blocked fetch queue (as in PendingFetches in GUM) */
+# define END_BF_QUEUE  ((StgBlockedFetch *)(void*)&END_TSO_QUEUE_closure)
+#endif
+
 /* info tables */
 
 extern DLL_IMPORT_RTS const StgInfoTable IND_info;
@@ -68,6 +80,9 @@ extern DLL_IMPORT_RTS const StgInfoTable WHITEHOLE_info;
 #ifdef TICKY_TICKY
 extern DLL_IMPORT_RTS const StgInfoTable SE_BLACKHOLE_info;
 extern DLL_IMPORT_RTS const StgInfoTable SE_CAF_BLACKHOLE_info;
+#endif
+#if defined(PAR) || defined(GRAN)
+extern DLL_IMPORT_RTS const StgInfoTable RBH_info;
 #endif
 extern DLL_IMPORT_RTS const StgInfoTable BCO_info;
 extern DLL_IMPORT_RTS const StgInfoTable EVACUATED_info;

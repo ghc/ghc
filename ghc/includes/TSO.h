@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.9 1999/12/01 14:34:49 simonmar Exp $
+ * $Id: TSO.h,v 1.10 2000/01/13 14:34:01 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,30 @@
 
 #ifndef TSO_H
 #define TSO_H
+
+#if defined(GRAN) || defined(PAR)
+// magic marker for TSOs; debugging only
+#define TSO_MAGIC 4321
+
+typedef struct {
+  StgInt   pri;
+  StgInt   magic;
+  StgInt   sparkname;
+  rtsTime  startedat;
+  rtsBool  exported;
+  StgInt   basicblocks;
+  StgInt   allocs;
+  rtsTime  exectime;
+  rtsTime  fetchtime;
+  rtsTime  fetchcount;
+  rtsTime  blocktime;
+  StgInt   blockcount;
+  rtsTime  blockedat;
+  StgInt   globalsparks;
+  StgInt   localsparks;
+  rtsTime  clock;
+} StgTSOStatBuf;
+#endif
 
 #if defined(PROFILING)
 typedef struct {
@@ -20,14 +44,21 @@ typedef struct {
 #endif /* PROFILING */
 
 #if defined(PAR)
-typedef struct {
-} StgTSOParInfo;
+typedef StgTSOStatBuf StgTSOParInfo;
 #else /* !PAR */
 typedef struct {
 } StgTSOParInfo;
 #endif /* PAR */
 
-#if defined(TICKY_TICKY)
+#if defined(GRAN)
+typedef StgTSOStatBuf StgTSOGranInfo;
+#else /* !GRAN */
+typedef struct {
+} StgTSOGranInfo;
+#endif /* GRAN */
+
+
+#if defined(TICKY)
 typedef struct {
 } StgTSOTickyInfo;
 #else /* !TICKY_TICKY */
@@ -86,6 +117,9 @@ typedef enum {
   BlockedOnRead,
   BlockedOnWrite,
   BlockedOnDelay
+#if defined(PAR)
+  , BlockedOnGA    // blocked on a remote closure represented by a Global Address
+#endif
 } StgTSOBlockReason;
 
 typedef union {
@@ -93,6 +127,9 @@ typedef union {
   struct StgTSO_ *tso;
   int fd;
   unsigned int delay;
+#if defined(PAR)
+  globalAddr ga;
+#endif
 } StgTSOBlockInfo;
 
 /*
@@ -104,6 +141,7 @@ typedef union {
 typedef struct StgTSO_ {
   StgHeader          header;
   struct StgTSO_*    link;
+  /* SDM and HWL agree that it would be cool to have a list of all TSOs */
   StgMutClosure *    mut_link;	/* TSO's are mutable of course! */
   StgTSOWhatNext     whatNext;
   StgTSOBlockReason  why_blocked;
@@ -113,7 +151,7 @@ typedef struct StgTSO_ {
   StgTSOTickyInfo    ticky; 
   StgTSOProfInfo     prof;
   StgTSOParInfo      par;
-  /* GranSim Info? */
+  StgTSOGranInfo     gran;
 
   /* The thread stack... */
   StgWord    	     stack_size;     /* stack size in *words* */

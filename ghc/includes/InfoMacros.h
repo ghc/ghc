@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.8 1999/11/30 11:44:32 simonmar Exp $
+ * $Id: InfoMacros.h,v 1.9 2000/01/13 14:34:00 hwloidl Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -31,7 +31,63 @@
 #define INIT_VECTOR
 #endif
 
+/*
+  On the GRAN/PAR specific parts of the InfoTables:
+
+  In both GranSim and GUM we use revertible black holes (RBH) when putting
+  an updatable closure into a packet for communication. The entry code for
+  an RBH performs standard blocking (as with any kind of BH). The info
+  table for the RBH resides just before the one for the std info
+  table. (NB: there is one RBH ITBL for every ITBL of an updatable
+  closure.) The @rbh_infoptr@ field in the ITBL points from the std ITBL to
+  the RBH ITBL and vice versa. This is used by the RBH_INFOPTR and
+  REVERT_INFOPTR macros to turn an updatable node into an RBH and vice
+  versa. Note, that the only case where we have to revert the RBH in its
+  original form is when a packet is sent back because of garbage collection
+  on another PE. In the RTS for GdH we will use this reversion mechanism in 
+  order to deal with faults in the system. 
+  ToDo: Check that RBHs are needed for all the info tables below. From a quick
+  check of the macros generated in the libs it seems that all of them are used
+  for generating THUNKs.
+  Possible optimisation: Note that any RBH ITBL is a fixed distance away from 
+  the actual ITBL. We could inline this offset as a constant into the RTS and
+  avoid the rbh_infoptr fields altogether (Jim did that in the old RTS).
+  -- HWL
+*/
+
+
 /* function/thunk info tables --------------------------------------------- */
+
+#if defined(GRAN) || defined(PAR)
+
+#define \
+INFO_TABLE_SRT(info,				/* info-table label */	\
+	       entry,				/* entry code label */	\
+	       ptrs, nptrs,			/* closure layout info */\
+	       srt_, srt_off_, srt_len_,	/* SRT info */		\
+	       type,				/* closure type */	\
+	       info_class, entry_class,		/* C storage classes */	\
+	       prof_descr, prof_type)		/* profiling info */	\
+        entry_class(RBH_##entry);                                      \
+        entry_class(entry);                                             \
+	info_class INFO_TBL_CONST StgInfoTable info; \
+	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {		\
+		layout : { payload : {ptrs,nptrs} },			\
+		SRT_INFO(RBH,srt_,srt_off_,srt_len_),                  \
+                INCLUDE_RBH_INFO(info),			                \
+                INIT_ENTRY(RBH_##entry),                           \
+                INIT_VECTOR                                             \
+	} ; \
+        StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;            \
+	info_class INFO_TBL_CONST StgInfoTable info = {			\
+		layout : { payload : {ptrs,nptrs} },			\
+		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
+                INCLUDE_RBH_INFO(RBH_##info),			\
+                INIT_ENTRY(entry),                                      \
+                INIT_VECTOR                                             \
+	}
+
+#else
 
 #define \
 INFO_TABLE_SRT(info,				/* info-table label */	\
@@ -49,8 +105,35 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
                 INIT_VECTOR                                             \
 	}
 
+#endif
 
 /* direct-return address info tables  --------------------------------------*/
+
+#if defined(GRAN) || defined(PAR)
+
+#define									\
+INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
+		      type, info_class, entry_class,			\
+		      prof_descr, prof_type)				\
+        entry_class(RBH_##entry);                                      \
+        entry_class(entry);                                             \
+	info_class INFO_TBL_CONST StgInfoTable info; \
+	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {		\
+		layout : { bitmap : (StgWord32)bitmap_ },		\
+		SRT_INFO(RBH,srt_,srt_off_,srt_len_),			\
+                INCLUDE_RBH_INFO(info),			                \
+                INIT_ENTRY(RBH_##entry),				\
+                INIT_VECTOR						\
+	};                                                              \
+        StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;            \
+	info_class INFO_TBL_CONST StgInfoTable info = {			\
+		layout : { bitmap : (StgWord32)bitmap_ },		\
+		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
+                INCLUDE_RBH_INFO(RBH_##info),		                \
+                INIT_ENTRY(entry),					\
+                INIT_VECTOR						\
+	}
+#else
 
 #define									\
 INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
@@ -63,8 +146,35 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
                 INIT_ENTRY(entry),					\
                 INIT_VECTOR						\
 	}
+#endif
 
 /* info-table without an SRT -----------------------------------------------*/
+
+#if defined(GRAN) || defined(PAR)
+
+#define							\
+INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,	\
+	   entry_class, prof_descr, prof_type)		\
+        entry_class(RBH_##entry);                                      \
+        entry_class(entry);                                             \
+	info_class INFO_TBL_CONST StgInfoTable info; \
+	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {	\
+		layout : { payload : {ptrs,nptrs} },	\
+		STD_INFO(RBH),				\
+                INCLUDE_RBH_INFO(info),	                \
+                INIT_ENTRY(RBH_##entry),		\
+                INIT_VECTOR				\
+	};                                              \
+        StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;            \
+	info_class INFO_TBL_CONST StgInfoTable info = {	\
+		layout : { payload : {ptrs,nptrs} },	\
+		STD_INFO(type),				\
+                INCLUDE_RBH_INFO(RBH_##info),		                \
+                INIT_ENTRY(entry),			\
+                INIT_VECTOR				\
+	}
+
+#else
 
 #define							\
 INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,	\
@@ -77,7 +187,35 @@ INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,	\
                 INIT_VECTOR				\
 	}
 
+#endif
+
 /* special selector-thunk info table ---------------------------------------*/
+
+#if defined(GRAN) || defined(PAR)
+
+#define							\
+INFO_TABLE_SELECTOR(info, entry, offset, info_class,	\
+		    entry_class, prof_descr, prof_type)	\
+        entry_class(RBH_##entry);                                      \
+        entry_class(entry);                                             \
+	info_class INFO_TBL_CONST StgInfoTable info; \
+	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {	\
+		layout : { selector_offset : offset },	\
+		STD_INFO(RBH),		                \
+                INCLUDE_RBH_INFO(info),	                \
+                INIT_ENTRY(RBH_##entry),		\
+                INIT_VECTOR				\
+	};                                              \
+        StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;            \
+	info_class INFO_TBL_CONST StgInfoTable info = {	\
+		layout : { selector_offset : offset },	\
+		STD_INFO(THUNK_SELECTOR),		\
+                INCLUDE_RBH_INFO(RBH_##info),           \
+                INIT_ENTRY(entry),			\
+                INIT_VECTOR				\
+	}
+
+#else
 
 #define							\
 INFO_TABLE_SELECTOR(info, entry, offset, info_class,	\
@@ -89,6 +227,8 @@ INFO_TABLE_SELECTOR(info, entry, offset, info_class,	\
                 INIT_ENTRY(entry),			\
                 INIT_VECTOR				\
 	}
+
+#endif
 
 /* constructor info table --------------------------------------------------*/
 

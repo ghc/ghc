@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.7 1999/10/27 09:58:36 simonmar Exp $
+ * $Id: Constants.h,v 1.8 2000/01/13 14:34:00 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -18,11 +18,13 @@
    Header Sizes
 
    NOTE: keep these in line with the real definitions in Closures.h
+   HWL: checked GRAN_HDR_SIZE; ok
    -------------------------------------------------------------------------- */
 
 #define STD_HDR_SIZE   1
 #define PROF_HDR_SIZE  1
 #define GRAN_HDR_SIZE  1
+#define PAR_HDR_SIZE   0
 #define TICKY_HDR_SIZE 0
 
 #define ARR_HDR_SIZE   1
@@ -36,11 +38,13 @@
    NOTE: keep these in line with the real definitions in InfoTables.h
 
    NOTE: the PROF, and GRAN values are *wrong*  (ToDo)
+   HWL: checked GRAN_ITBL_SIZE; ok
    -------------------------------------------------------------------------- */
 
 #define STD_ITBL_SIZE   3
 #define PROF_ITBL_SIZE  1
 #define GRAN_ITBL_SIZE  1
+#define PAR_ITBL_SIZE   0
 #define TICKY_ITBL_SIZE 0
 
 /* -----------------------------------------------------------------------------
@@ -98,9 +102,13 @@
 
 /* -----------------------------------------------------------------------------
    Update Frame Layout
+   GranSim uses an additional word as bitmask in the update frame; actually,
+   not really necessary, but uses standard closure layout that way
+   NB: UF_RET etc are *wrong* in a GranSim setup; should be increased by 1 
+       if compiling for GranSim (currently not used in compiler) -- HWL
    -------------------------------------------------------------------------- */
-
 #define NOSCC_UF_SIZE 	3
+#define GRAN_UF_SIZE 	4
 #define SCC_UF_SIZE	4
 
 #define UF_RET		0
@@ -112,9 +120,11 @@
    SEQ frame size
 
    I don't think seq frames really need sccs --SDM
+   They don't need a GranSim bitmask either, but who cares anyway -- HWL
    -------------------------------------------------------------------------- */
 
 #define NOSCC_SEQ_FRAME_SIZE 2
+#define GRAN_SEQ_FRAME_SIZE  3
 #define SCC_SEQ_FRAME_SIZE   3
 
 /* -----------------------------------------------------------------------------
