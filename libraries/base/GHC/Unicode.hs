@@ -16,6 +16,7 @@
 --
 -----------------------------------------------------------------------------
 
+-- #hide
 module GHC.Unicode (
     isAscii, isLatin1, isControl,
     isAsciiUpper, isAsciiLower,
@@ -44,8 +45,14 @@ isAscii c	 	=  c <  '\x80'
 isLatin1                :: Char -> Bool
 isLatin1 c              =  c <= '\xff'
 
-isAsciiUpper, isAsciiLower :: Char -> Bool
+-- | Selects ASCII lower-case letters,
+-- i.e. characters satisfying both 'isAscii' and 'isLower'.
+isAsciiLower :: Char -> Bool
 isAsciiLower c          =  c >= 'a' && c <= 'z'
+
+-- | Selects ASCII upper-case letters,
+-- i.e. characters satisfying both 'isAscii' and 'isUpper'.
+isAsciiUpper :: Char -> Bool
 isAsciiUpper c          =  c >= 'A' && c <= 'Z'
 
 -- | Selects control characters, which are the non-printing characters of
@@ -71,15 +78,17 @@ isSpace c		=  c == ' '	||
 			   c == '\xa0'  ||
 			   iswspace (fromIntegral (ord c)) /= 0
 
--- | Selects alphabetic Unicode characters (letters) that are not lower-case.
--- (In Unicode terms, this includes letters in upper and title cases,
--- as well as modifier letters and other letters.)
+-- | Selects upper-case or title-case alphabetic Unicode characters (letters).
+-- Title case is used by a small number of letter ligatures like the
+-- single-character form of /Lj/.
 isUpper                 :: Char -> Bool
 
 -- | Selects lower-case alphabetic Unicode characters (letters).
 isLower                 :: Char -> Bool
 
--- | Selects alphabetic Unicode characters (letters).
+-- | Selects alphabetic Unicode characters (lower-case, upper-case and
+-- title-case letters, plus letters of caseless scripts and modifiers letters).
+-- This function is equivalent to 'Data.Char.isLetter'.
 isAlpha                 :: Char -> Bool
 
 -- | Selects alphabetic or numeric digit Unicode characters.
@@ -103,19 +112,18 @@ isHexDigit              :: Char -> Bool
 isHexDigit c		=  isDigit c || c >= 'A' && c <= 'F' ||
                                         c >= 'a' && c <= 'f'
 
--- | Convert a letter to the corresponding upper-case letter, leaving any
--- other character unchanged.  Any Unicode letter which has an upper-case
--- equivalent is transformed.
+-- | Convert a letter to the corresponding upper-case letter, if any.
+-- Any other character is returned unchanged.
 toUpper                 :: Char -> Char
 
--- | Convert a letter to the corresponding lower-case letter, leaving any
--- other character unchanged.  Any Unicode letter which has a lower-case
--- equivalent is transformed.
+-- | Convert a letter to the corresponding lower-case letter, if any.
+-- Any other character is returned unchanged.
 toLower                 :: Char -> Char
 
--- | Convert a letter to the corresponding title-case letter, leaving any
--- other character unchanged.  Any Unicode letter which has a lower-case
--- equivalent is transformed.
+-- | Convert a letter to the corresponding title-case or upper-case
+-- letter, if any.  (Title case differs from upper case only for a small
+-- number of ligature letters.)
+-- Any other character is returned unchanged.
 toTitle                 :: Char -> Char
 
 -- -----------------------------------------------------------------------------

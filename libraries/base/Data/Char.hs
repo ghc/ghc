@@ -23,12 +23,16 @@ module Data.Char
     -- | Unicode characters are divided into letters, numbers, marks,
     -- punctuation, symbols, separators (including spaces) and others
     -- (including control characters).
-    , isAscii, isLatin1, isControl, isSpace
-    , isLower, isUpper,  isAlpha,   isAlphaNum, isPrint
+    , isControl, isSpace
+    , isLower, isUpper, isAlpha, isAlphaNum, isPrint
     , isDigit, isOctDigit, isHexDigit
-    , isAsciiUpper, isAsciiLower
     , isLetter, isMark, isNumber, isPunctuation, isSymbol, isSeparator
 
+    -- ** Subranges
+    , isAscii, isLatin1
+    , isAsciiUpper, isAsciiLower
+
+    -- ** Unicode general categories
     , GeneralCategory(..), generalCategory
 
     -- * Case conversion
@@ -125,7 +129,7 @@ data GeneralCategory
         | NotAssigned           -- ^ Cn: Other, Not Assigned
         deriving (Eq, Ord, Enum, Read, Show, Bounded)
 
--- | Retrieves the general Unicode category of the character.
+-- | The Unicode general category of the character.
 generalCategory :: Char -> GeneralCategory
 #if defined(__GLASGOW_HASKELL__) || defined(__NHC__)
 generalCategory c = toEnum (wgencat (fromIntegral (ord c)))
@@ -136,6 +140,9 @@ generalCategory c = toEnum (primUniGenCat c)
 
 -- derived character classifiers
 
+-- | Selects alphabetic Unicode characters (lower-case, upper-case and
+-- title-case letters, plus letters of caseless scripts and modifiers letters).
+-- This function is equivalent to 'Data.Char.isAlpha'.
 isLetter :: Char -> Bool
 isLetter c = case generalCategory c of
         UppercaseLetter         -> True
@@ -145,6 +152,8 @@ isLetter c = case generalCategory c of
         OtherLetter             -> True
         _                       -> False
 
+-- | Selects Unicode mark characters, e.g. accents and the like, which
+-- combine with preceding letters.
 isMark :: Char -> Bool
 isMark c = case generalCategory c of
         NonSpacingMark          -> True
@@ -152,6 +161,8 @@ isMark c = case generalCategory c of
         EnclosingMark           -> True
         _                       -> False
 
+-- | Selects Unicode numeric characters, including digits from various
+-- scripts, Roman numerals, etc.
 isNumber :: Char -> Bool
 isNumber c = case generalCategory c of
         DecimalNumber           -> True
@@ -159,6 +170,8 @@ isNumber c = case generalCategory c of
         OtherNumber             -> True
         _                       -> False
 
+-- | Selects Unicode punctuation characters, including various kinds
+-- of connectors, brackets and quotes.
 isPunctuation :: Char -> Bool
 isPunctuation c = case generalCategory c of
         ConnectorPunctuation    -> True
@@ -170,6 +183,8 @@ isPunctuation c = case generalCategory c of
         OtherPunctuation        -> True
         _                       -> False
 
+-- | Selects Unicode symbol characters, including mathematical and
+-- currency symbols.
 isSymbol :: Char -> Bool
 isSymbol c = case generalCategory c of
         MathSymbol              -> True
@@ -178,6 +193,7 @@ isSymbol c = case generalCategory c of
         OtherSymbol             -> True
         _                       -> False
 
+-- | Selects Unicode space and separator characters.
 isSeparator :: Char -> Bool
 isSeparator c = case generalCategory c of
         Space                   -> True
