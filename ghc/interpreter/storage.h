@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.27 $
- * $Date: 2000/02/24 14:05:55 $
+ * $Revision: 1.28 $
+ * $Date: 2000/02/24 14:09:14 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -301,7 +301,6 @@ extern  Ptr             cptrOf          Args((Cell));
 #define UNBOXEDTUP   81           /* UNBOXEDTUP snd :: [Type]              */
 
 #if SIZEOF_VOID_P != SIZEOF_INT
-wuiwiuwuiwmn SIZEOF_INT cc
 #define PTRCELL      82           /* C Heap Pointer snd :: (Int,Int)       */
 #endif
 
