@@ -127,7 +127,7 @@ stmtToInstrs stmt = case stmt of
       -> returnNat (unitOL (ASCII True (_UNPK_ str)))
 
 #ifdef DEBUG
-    other -> pprPanic "stmtToInstrs" (pprStixTree other)
+    other -> pprPanic "stmtToInstrs" (pprStixStmt other)
 #endif
 
 -- Walk a Stix tree, and insert dereferences to CLabels which are marked
