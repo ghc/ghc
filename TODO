@@ -1,6 +1,8 @@
 -----------------------------------------------------------------------------
 -- bugs
 
+* Ralf Laemmel's isntance bug (email: "haddock 0.6 issue")
+
 * Pick the preferred export names as per the paper.
 
 * A module re-export should only reference the target module if the
@@ -31,6 +33,11 @@
 
 * We don't handle non-ASCII characters in doc comments.  (need to specify
   the encoding in the generated HTML too?).
+
+* There's no way to refer explicitly to either a type/class
+  constructor or data constructor When there are more than one of
+  these with the same name.  Perhaps introduce a special syntax for
+  them?  (eg. ':C' means data constructor C?)
 
 -----------------------------------------------------------------------------
 -- features
