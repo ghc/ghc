@@ -296,6 +296,7 @@ typedef struct _RtsSymbolVal {
       SymX(log)                                 \
       SymX(sqrt)                                \
       SymX(memcpy)                              \
+      SymX(stg_InstallConsoleEvent)             \
       Sym(mktime)                               \
       Sym(_imp___timezone)                      \
       Sym(_imp___tzname)                        \
