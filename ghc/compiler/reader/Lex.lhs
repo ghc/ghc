@@ -438,9 +438,9 @@ lex_keyword buf =
        Just xx -> xx : lexIface (stepOverLexeme buf')
 
 lex_decl buf =
- case expandUntilMatch buf ";;" of
+ case doDiscard False buf of -- spin until ;; is found
    buf' ->
---      _trace (show (lexemeToString buf')) $
+      {- _trace (show (lexemeToString buf')) $ -}
       case currentChar# buf' of
        '\n'# -> -- newline, no id info.
 	   ITtysig (lexIface (lexemeToBuffer (decLexeme buf'))) : 
@@ -452,7 +452,7 @@ lex_decl buf =
 	   ITtysig (lexIface (lexemeToBuffer (decLexeme buf'))) : 
 	   lexIface (stepOverLexeme buf')
        c     -> -- run all over the id info
-	 case expandUntilMatch (stepOverLexeme buf') ";;" of
+	 case doDiscard False (stepOverLexeme buf') of -- spin until ;; is found (outside a string!)
 	   buf'' -> 
 		    --_trace ((C# c):show (lexemeToString (decLexeme buf')))  $
 		    --_trace (show (lexemeToString (decLexeme buf''))) $
@@ -763,13 +763,24 @@ haskellKeywordsFM = listToUFM $
 
 -- doDiscard rips along really fast looking for a double semicolon, 
 -- indicating the end of the pragma we're skipping
-doDiscard buf =
+doDiscard inStr buf =
+-- _trace (show (C# (currentChar# buf))) $
  case currentChar# buf of
    ';'# ->
-    case lookAhead# buf 1# of
-      ';'# -> stepOnBy# buf 2#
-      _    -> doDiscard (stepOn buf)
-   _ -> doDiscard (stepOn buf)
+     if not inStr then
+       case lookAhead# buf 1# of
+        ';'# -> incLexeme (incLexeme buf)
+        _    -> doDiscard inStr (incLexeme buf)
+     else
+       doDiscard inStr (incLexeme buf)
+   '"'# ->
+       case lookAhead# buf (negateInt# 1#) of --backwards, actually
+	 '\\'# -> -- false alarm, escaped. 
+	    doDiscard inStr (incLexeme buf)
+         _ -> case inStr of -- forced to avoid build-up
+	       True  -> doDiscard False (incLexeme buf)
+               False -> doDiscard True  (incLexeme buf)
+   _ -> doDiscard inStr (incLexeme buf)
 
 \end{code}
 
