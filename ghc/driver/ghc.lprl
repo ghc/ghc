@@ -1471,8 +1471,10 @@ Now the Haskell compiler, C compiler, and assembler
 	local ($hsc_out_o_stub);
 	($ofile_s_stub_target = $ofile_c_stub_target) =~ s/\.(.*)$/\.s/;
 	($ofile_o_stub_target = $ofile_c_stub_target) =~ s/\.(.*)$/\.o/;
-	&runGcc    (0, $ofile_c_stub_target, $ofile_s_stub_target);
-        &runAs     ($ofile_o_stub_target, $ofile_s_stub_target);
+	if ($do_cc) {
+	  &runGcc    (0, $ofile_c_stub_target, $ofile_s_stub_target);
+          &runAs     ($ofile_o_stub_target, $ofile_s_stub_target);
+	}
 	#
 	# Bring the C stub protos into scope when compiling the .hc file.
 	#
