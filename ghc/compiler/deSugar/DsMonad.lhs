@@ -19,10 +19,9 @@ module DsMonad (
 	extendEnvDs, lookupEnvDs, 
 	SYN_IE(DsIdEnv),
 
-	dsShadowWarn, dsIncompleteWarn,
+	dsWarn, 
 	SYN_IE(DsWarnings),
-	DsMatchContext(..), DsMatchKind(..), pprDsWarnings,
-        DsWarnFlavour -- Nuke with 1.4
+	DsMatchContext(..), DsMatchKind(..), pprDsWarnings
 
     ) where
 
@@ -33,6 +32,7 @@ import BasicTypes       ( SYN_IE(Module) )
 import CmdLineOpts	( opt_PprUserLength )
 import CoreSyn		( SYN_IE(CoreExpr) )
 import CoreUtils	( substCoreExpr )
+import ErrUtils 	( SYN_IE(Warning) )
 import HsSyn		( OutPat )
 import Id		( mkSysLocal, mkIdWithNewUniq,
 			  lookupIdEnv, growIdEnvList, GenId, SYN_IE(IdEnv),
@@ -66,8 +66,7 @@ type DsM result =
 	-> DsWarnings
 	-> (result, DsWarnings)
 
-type DsWarnings = Bag (DsWarnFlavour, DsMatchContext)
-					-- The desugarer reports matches which are
+type DsWarnings = Bag Warning           -- The desugarer reports matches which are
 					-- completely shadowed or incomplete patterns
 
 type Group = FAST_STRING
@@ -186,13 +185,9 @@ putSrcLocDs :: SrcLoc -> DsM a -> DsM a
 putSrcLocDs new_loc expr us old_loc mod_and_grp env warns
   = expr us new_loc mod_and_grp env warns
 
-dsShadowWarn :: DsMatchContext -> DsM ()
-dsShadowWarn cxt us loc mod_and_grp env warns
-  = ((), warns `snocBag` (Shadowed, cxt))
+dsWarn :: Warning -> DsM ()
+dsWarn warn us loc mod_and_grp env warns = ((), warns `snocBag` warn)
 
-dsIncompleteWarn :: DsMatchContext -> DsM ()
-dsIncompleteWarn cxt us loc mod_and_grp env warns
-  = ((), warns `snocBag` (Incomplete, cxt))
 \end{code}
 
 \begin{code}
@@ -224,8 +219,6 @@ lookupEnvDs id us loc mod_and_grp env warns
 %************************************************************************
 
 \begin{code}
-data DsWarnFlavour = Shadowed | Incomplete deriving ()
-
 data DsMatchContext
   = DsMatchContext DsMatchKind [TypecheckedPat] SrcLoc
   | NoMatchContext
@@ -237,45 +230,11 @@ data DsMatchKind
   | LambdaMatch
   | PatBindMatch
   | DoBindMatch
+  | ListCompMatch
+  | LetMatch
   deriving ()
 
 pprDsWarnings :: PprStyle -> DsWarnings -> Doc
-pprDsWarnings sty warns
-  = vcat (map pp_warn (bagToList warns))
-  where
-    pp_warn (flavour, NoMatchContext) = sep [ptext SLIT("Warning: Some match is"), 
-					       case flavour of
-							Shadowed   -> ptext SLIT("shadowed")
-							Incomplete -> ptext SLIT("possibly incomplete")]
+pprDsWarnings sty warns = vcat [ warn sty | warn <- (bagToList warns)]
 
-    pp_warn (flavour, DsMatchContext kind pats loc)
-       = hang (hcat [ppr (PprForUser opt_PprUserLength) loc, ptext SLIT(": ")])
-	     4 (hang msg
-		     4 (pp_match kind pats))
-       where
-	msg = case flavour of
-		Shadowed   -> ptext SLIT("Warning: Pattern match(es) completely overlapped")     
-		Incomplete -> ptext SLIT("Warning: Possibly incomplete patterns")
-
-    pp_match (FunMatch fun) pats
-      = hsep [ptext SLIT("in the definition of function"), ppr sty fun]
-
-    pp_match CaseMatch pats
-      = hang (ptext SLIT("in a group of case alternatives beginning:"))
-	4 (ppr_pats pats)
-
-    pp_match PatBindMatch pats
-      = hang (ptext SLIT("in a pattern binding:"))
-	4 (ppr_pats pats)
-
-    pp_match LambdaMatch pats
-      = hang (ptext SLIT("in a lambda abstraction:"))
-	4 (ppr_pats pats)
-
-    pp_match DoBindMatch pats
-      = hang (ptext SLIT("in a `do' pattern binding:"))
-	4 (ppr_pats pats)
-
-    ppr_pats pats = pprQuote sty $ \ sty ->
-		    sep [sep (map (ppr sty) pats), ptext SLIT("-> ...")]
 \end{code}
