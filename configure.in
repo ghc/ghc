@@ -668,6 +668,10 @@ AC_CHECK_LIB(iberty, xmalloc)
 AC_CHECK_LIB(bfd,    bfd_init)
 
 dnl ** check for readline, for Hugs
+dnl termcap is obsoleted by ncurses, but for compatibility, we have to
+dnl check for both...
+AC_SEARCH_LIBS(tputs, [ncurses termcap])
+
 AC_CHECK_LIB(readline, readline,
 [
 AC_DEFINE(HAVE_LIBREADLINE,1)
@@ -676,8 +680,7 @@ HaveLibReadline=YES
 [
 AC_DEFINE(HAVE_LIBREADLINE,0)
 HaveLibReadline=NO
-],
--ltermcap)
+])
 AC_SUBST(HaveLibReadline)
 
 
