@@ -377,18 +377,26 @@ instance  Enum Int  where
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (I# x1) (I# x2) (I# y) = efdtInt x1 x2 y
 
-{-# RULES
-"eftInt"	[~1] forall x y.	eftInt x y	 = build (\ c n -> eftIntFB c n x y)
-"efdInt"	[~1] forall x1 x2.	efdInt x1 x2	 = build (\ c n -> efdIntFB c n x1 x2)
-"efdtInt"	[~1] forall x1 x2 l.	efdtInt x1 x2 l	 = build (\ c n -> efdtIntFB c n x1 x2 l)
 
+-----------------------------------------------------
+-- eftInt and eftIntFB deal with [a..b], which is the 
+-- most common form, so we take a lot of care
+-- In particular, we have rules for deforestation
+
+{-# RULES
+"eftInt"	[~1] forall x y. eftInt x y = build (\ c n -> eftIntFB c n x y)
 "eftIntList"	[1] eftIntFB  (:) [] = eftInt
-"efdIntList"	[1] efdIntFB  (:) [] = efdInt
-"efdtIntList"	[1] efdtIntFB (:) [] = efdtInt
  #-}
 
+eftInt :: Int# -> Int# -> [Int]
+-- [x1..x2]
+eftInt x y | x ># y    = []
+	   | otherwise = go x
+	       where
+		 go x = I# x : if x ==# y then [] else go (x +# 1#)
 
 {-# INLINE [0] eftIntFB #-}
+eftIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> r
 eftIntFB c n x y | x ># y    = n	
 		 | otherwise = go x
 		 where
@@ -398,66 +406,54 @@ eftIntFB c n x y | x ># y    = n
 	-- so that when eftInfFB is inlined we can inline
 	-- whatver is bound to "c"
 
-eftInt x y | x ># y    = []
-	       | otherwise = go x
-	       where
-		 go x = I# x : if x ==# y then [] else go (x +# 1#)
 
+-----------------------------------------------------
+-- efdInt and efdtInt deal with [a,b..] and [a,b..c], which are much less common
+-- so we are less elaborate.  The code is more complicated anyway, because
+-- of worries about Int overflow, so we don't both with rules and deforestation
 
--- For enumFromThenTo we give up on inlining; so we don't worry
--- about duplicating occurrences of "c"
-{-# NOINLINE [0] efdtIntFB #-}
-efdtIntFB c n x1 x2 y
-  | delta >=# 0# = if x1 ># y then n else go_up_int_fb c n x1 delta lim
-  | otherwise    = if x1 <# y then n else go_dn_int_fb c n x1 delta lim 
-  where
-    delta = x2 -# x1
-    lim   = y -# delta
+efdInt :: Int# -> Int# -> [Int]
+-- [x1,x2..maxInt]
+efdInt x1 x2 
+  | x2 >=# x1 = case maxInt of I# y -> efdtIntUp x1 x2 y
+  | otherwise = case minInt of I# y -> efdtIntDn x1 x2 y
 
+efdtInt :: Int# -> Int# -> Int# -> [Int]
+-- [x1,x2..y]
 efdtInt x1 x2 y
-  | delta >=# 0# = if x1 ># y then [] else go_up_int_list x1 delta lim
-  | otherwise    = if x1 <# y then [] else go_dn_int_list x1 delta lim
-  where
-    delta = x2 -# x1
-    lim   = y -# delta
+  | x2 >=# x1  = efdtIntUp x1 x2 y
+  | otherwise  = efdtIntDn x1 x2 y
 
-{-# NOINLINE [0] efdIntFB #-}
-efdIntFB c n x1 x2
-  | delta >=# 0# = case maxInt of I# y -> go_up_int_fb c n x1 delta (y -# delta)
-  | otherwise    = case minInt of I# y -> go_dn_int_fb c n x1 delta (y -# delta)
-  where
-    delta = x2 -# x1
+efdtIntUp :: Int# -> Int# -> Int# -> [Int]
+efdtIntUp x1 x2 y	-- Be careful about overflow!
+  | y <# x2    = if y <# x1 then [] else [I# x1]
+  | otherwise 
+  = 	-- Common case: x1 < x2 <= y
+    let 
+	delta = x2 -# x1	
+	y' = y -# delta	
+	-- NB: x1 <= y'; hence y' is representable
 
-efdInt x1 x2
-  | delta >=# 0# = case maxInt of I# y -> go_up_int_list x1 delta (y -# delta)
-  | otherwise    = case minInt of I# y -> go_dn_int_list x1 delta (y -# delta)
-  where
-    delta = x2 -# x1
+	-- Invariant: x <= y; and x+delta won't overflow
+        go_up x | x ># y'  = [I# x]
+	        | otherwise = I# x : go_up (x +# delta)
+    in 
+    I# x1 : go_up x2
+  		 	
+efdtIntDn :: Int# -> Int# -> Int# -> [Int]
+efdtIntDn x1 x2 y	-- x2 < x1
+  | y ># x2    = if y ># x1 then [] else [I# x1]
+  | otherwise 
+  = 	-- Common case: x1 > x2 >= y
+    let 
+	delta = x2 -# x1	
+	y' = y -# delta	
+	-- NB: x1 <= y'; hence y' is representable
 
--- In all of these, the (x +# delta) is guaranteed not to overflow
-
-go_up_int_fb c n x delta lim
-  = go_up x
-  where
-    go_up x | x ># lim  = I# x `c` n
-	    | otherwise = I# x `c` go_up (x +# delta)
-
-go_dn_int_fb c n x delta lim 
-  = go_dn x
-  where
-    go_dn x | x <# lim  = I# x `c` n
-	    | otherwise = I# x `c` go_dn (x +# delta)
-
-go_up_int_list x delta lim
-  = go_up x
-  where
-    go_up x | x ># lim  = [I# x]
-	    | otherwise = I# x : go_up (x +# delta)
-
-go_dn_int_list x delta lim 
-  = go_dn x
-  where
-    go_dn x | x <# lim  = [I# x]
-	    | otherwise = I# x : go_dn (x +# delta)
+	-- Invariant: x >= y; and x+delta won't overflow
+        go_dn x | x <# y'  = [I# x]
+	        | otherwise = I# x : go_dn (x +# delta)
+    in 
+    I# x1 : go_dn x2
 \end{code}
 
