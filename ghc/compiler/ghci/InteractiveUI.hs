@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.60 2001/03/28 16:51:03 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.61 2001/04/23 16:50:48 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -11,6 +11,12 @@
 module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 
 #include "HsVersions.h"
+
+#if HAVE_READLINE_4_2 == 1 || HAVE_READLINE_4 == 1
+#undef NO_READLINE
+#else
+#define NO_READLINE
+#endif
 
 import CompManager
 import CmStaticInfo
