@@ -9,10 +9,11 @@
 
 * handle scoped type variables in the parser
 
-* For a re-exported declaration, remap its original names to names that are
-  "closer" to the current module (might need to rename decls twice: once
-  for docs with import_env, and once for export with orig_env).  This is
-  the final support needed to fully "hide" modules from the output.
+* Allow fully hiding modules from the output
+
+* Add a link to the defining location of a re-exported entity
+
+* Add an index page to the HTML output
 
 * fixities
 
