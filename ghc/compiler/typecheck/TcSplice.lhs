@@ -22,7 +22,7 @@ import HsSyn		( HsBracket(..), HsExpr(..), HsSplice(..), LHsExpr, LHsDecl,
 import Convert		( convertToHsExpr, convertToHsDecls, convertToHsType )
 import RnExpr		( rnLExpr )
 import RnEnv		( lookupFixityRn, lookupSrcOcc_maybe )
-import RdrName		( RdrName, mkRdrUnqual, lookupLocalRdrEnv )
+import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, lookupLocalRdrEnv )
 import RnTypes		( rnLHsType )
 import TcExpr		( tcCheckRho, tcMonoExpr )
 import TcHsSyn		( mkHsLet, zonkTopLExpr )
@@ -465,8 +465,18 @@ lookupThName (TH.Name occ (TH.NameG th_ns mod))
 		TH.TcClsName -> tcClsName
 		TH.VarName   -> varName
 
-lookupThName th_name@(TH.Name occ TH.NameS) 
-  =  do { let rdr_name = mkRdrUnqual (OccName.mkOccFS ns occ_fs)
+lookupThName (TH.Name occ (TH.NameU uniq)) 
+  = return (mkInternalName (mk_uniq uniq) (OccName.mkOccFS bogus_ns occ_fs) noSrcLoc)
+  where
+    occ_fs = mkFastString (TH.occString occ)
+    bogus_ns = OccName.varName	-- Not yet recorded in the TH name
+				-- but only the unique matters
+
+lookupThName th_name@(TH.Name occ flavour) 	-- NameS or NameQ
+  =  do { let occ = OccName.mkOccFS ns occ_fs
+	      rdr_name = case flavour of
+			    TH.NameS   -> mkRdrUnqual occ
+			    TH.NameQ m -> mkRdrQual (mkModule (TH.modString m)) occ
 	; rdr_env <- getLocalRdrEnv
 	; case lookupLocalRdrEnv rdr_env rdr_name of
 		Just name -> return name
@@ -480,13 +490,6 @@ lookupThName th_name@(TH.Name occ TH.NameS)
     ns | isLexCon occ_fs = OccName.dataName
        | otherwise	 = OccName.varName
     occ_fs = mkFastString (TH.occString occ)
-
-lookupThName (TH.Name occ (TH.NameU uniq)) 
-  = return (mkInternalName (mk_uniq uniq) (OccName.mkOccFS bogus_ns occ_fs) noSrcLoc)
-  where
-    occ_fs = mkFastString (TH.occString occ)
-    bogus_ns = OccName.varName	-- Not yet recorded in the TH name
-				-- but only the unique matters
 
 tcLookupTh :: Name -> TcM TcTyThing
 -- This is a specialised version of TcEnv.tcLookup; specialised mainly in that

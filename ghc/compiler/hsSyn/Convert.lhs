@@ -403,8 +403,9 @@ tconName = thRdrName OccName.tcName
 thRdrName :: OccName.NameSpace -> TH.Name -> RdrName
 -- This turns a Name into a RdrName
 
-thRdrName ns (TH.Name occ (TH.NameG ns' mod)) = mkOrig (mk_mod mod) (mk_occ ns occ)
-thRdrName ns (TH.Name occ TH.NameS)           = mkDynName ns occ
+thRdrName ns (TH.Name occ TH.NameS)           = mkRdrUnqual (mk_occ ns occ)
+thRdrName ns (TH.Name occ (TH.NameQ mod))     = mkRdrQual (mk_mod mod) (mk_occ ns occ)
+thRdrName ns (TH.Name occ (TH.NameG ns' mod)) = mkOrig    (mk_mod mod) (mk_occ ns occ)
 thRdrName ns (TH.Name occ (TH.NameU uniq))    
   = mkRdrUnqual (OccName.mkOccName ns uniq_str)
   where
@@ -424,22 +425,5 @@ mk_occ ns occ = OccName.mkOccFS ns (mkFastString (TH.occString occ))
 
 mk_mod :: TH.ModName -> Module
 mk_mod mod = mkModule (TH.modString mod)
-
-mkDynName :: OccName.NameSpace -> TH.OccName -> RdrName
--- Parse the string to see if it has a "." in it
--- so we know whether to generate a qualified or unqualified name
--- It's a bit tricky because we need to parse 
---	Foo.Baz.x as Qual Foo.Baz x
--- So we parse it from back to front
-
-mkDynName ns th_occ
-  = split [] (reverse (TH.occString th_occ))
-  where
-    split occ []        = mkRdrUnqual (mk_occ occ)
-    split occ ('.':rev)	= mkRdrQual (mk_mod (reverse rev)) (mk_occ occ)
-    split occ (c:rev)   = split (c:occ) rev
-
-    mk_occ occ = OccName.mkOccFS ns (mkFastString occ)
-    mk_mod mod = mkModule mod
 \end{code}
 
