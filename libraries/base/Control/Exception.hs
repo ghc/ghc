@@ -104,7 +104,7 @@ module Control.Exception (
 	bracket,  	-- :: IO a -> (a -> IO b) -> (a -> IO c) -> IO ()
 	bracket_, 	-- :: IO a -> IO b -> IO c -> IO ()
 
-	finally, 	-- :: IO a -> IO b -> IO b
+	finally, 	-- :: IO a -> IO b -> IO a
 
   ) where
 
