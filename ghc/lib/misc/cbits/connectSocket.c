@@ -18,11 +18,14 @@ connectSocket(I_ sockfd, A_ servaddr, I_ addrlen, I_ isUnixDomain)
     int rc;
     
     while ((rc = connect((int)sockfd, (struct sockaddr *)servaddr, (int)addrlen)) < 0) {
+#if !defined(_WIN32) || defined(__CYGWIN__) || defined(__CYGWIN32__)
       if (errno == EINPROGRESS) {
 	errno = 0;
 	return FILEOBJ_BLOCKED_WRITE;
 	
-      } else if (errno != EINTR) {
+      } else
+#endif
+        if (errno != EINTR) {
 	  cvtErrno();
 	  switch (ghc_errno) {
 	  default:
@@ -33,7 +36,7 @@ connectSocket(I_ sockfd, A_ servaddr, I_ addrlen, I_ isUnixDomain)
 	      if (isUnixDomain != 0)
 	         ghc_errstr = "For a component of path prefix of path name";
 	      else
-	         ghc_errstr  = "Requested address protected, cannot bind socket";
+	         ghc_errstr = "Requested address protected, cannot bind socket";
 	      break;
 	  case GHC_EISCONN:
 	  case GHC_EADDRINUSE:
