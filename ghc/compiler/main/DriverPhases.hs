@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.23 2003/02/24 12:39:27 simonpj Exp $
+-- $Id: DriverPhases.hs,v 1.24 2003/05/21 12:46:19 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -16,7 +16,6 @@ module DriverPhases (
 
    haskellish_file, haskellish_suffix,
    haskellish_src_file, haskellish_src_suffix,
-   hsbootish_file, hsbootish_suffix,
    objish_file, objish_suffix,
    cish_file, cish_suffix,
    isExtCore_file, extcoreish_suffix,
@@ -46,7 +45,6 @@ data Phase
 	| Cpp
 	| HsPp
 	| Hsc
-	| HsBoot
 	| Cc
 	| HCc		-- Haskellised C (as opposed to vanilla C) compilation
 	| Mangle	-- assembly mangling, now done by a separate script.
@@ -67,7 +65,6 @@ startPhase "hs"    = Cpp
 startPhase "hscpp" = HsPp
 startPhase "hspp"  = Hsc
 startPhase "hcr"   = Hsc
-startPhase "hs-boot" = HsBoot
 startPhase "hc"    = HCc
 startPhase "c"     = Cc
 startPhase "cpp"   = Cc
@@ -94,7 +91,6 @@ phaseInputExt As          = "s"
 phaseInputExt SplitAs     = "split_s"   -- not really generated
 phaseInputExt Ln          = "o"
 phaseInputExt MkDependHS  = "dep"
-phaseInputExt HsBoot      = "hs-boot"
 #ifdef ILX
 phaseInputExt Ilx2Il      = "ilx"
 phaseInputExt Ilasm       = "il"
@@ -103,7 +99,6 @@ phaseInputExt Ilasm       = "il"
 haskellish_suffix     = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr", "hc", "raw_s" ])
 haskellish_src_suffix = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr"])
 cish_suffix           = (`elem` [ "c", "cpp", "C", "cc", "cxx", "s", "S" ])
-hsbootish_suffix      = (`elem` [ "hs-boot" ])
 extcoreish_suffix     = (`elem` [ "hcr" ])
 
 -- Use the appropriate suffix for the system on which 
@@ -117,10 +112,8 @@ objish_suffix     = (`elem` [ "o" ])
 haskellish_file     = haskellish_suffix     . getFileSuffix
 haskellish_src_file = haskellish_src_suffix . getFileSuffix
 cish_file           = cish_suffix           . getFileSuffix
-objish_file         = objish_suffix         . getFileSuffix
-hsbootish_file      = hsbootish_suffix      . getFileSuffix
-
 isExtCore_file      = extcoreish_suffix     . getFileSuffix
+objish_file         = objish_suffix         . getFileSuffix
 
 isSourceFile :: FilePath -> Bool
 isSourceFile   f    =
