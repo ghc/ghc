@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.32 2003/10/13 05:09:40 sof Exp $
+ * $Id: HsBase.h,v 1.33 2003/10/27 09:56:11 ross Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -681,8 +681,8 @@ INLINE int __hsposix_SIGXCPU()   { return SIGXCPU; }
 INLINE int __hsposix_SIGXFSZ()   { return SIGXFSZ; }
 
 INLINE int __hsposix_SIG_BLOCK()   { return SIG_BLOCK; }
-INLINE int __hsposix_SIG_UNBLOCK() { return SIG_SETMASK; }
-INLINE int __hsposix_SIG_SETMASK() { return SIG_UNBLOCK; }
+INLINE int __hsposix_SIG_UNBLOCK() { return SIG_UNBLOCK; }
+INLINE int __hsposix_SIG_SETMASK() { return SIG_SETMASK; }
 #endif /* mingw32_TARGET_OS */
 
 #endif /* __HSBASE_H__ */
