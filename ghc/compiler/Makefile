@@ -90,11 +90,15 @@ ifeq "$(stage)" ""
 stage=1
 endif
 
-boot ::
+.DUMMY: stage_dir
+stage_dirs :
 	$(MKDIRHIER) stage$(stage)
 	for i in $(ALL_DIRS); do \
 	    $(MKDIRHIER) stage$(stage)/$$i; \
 	done
+
+boot :: stage_dirs
+
 # On Windows, we can't use symbolic links for the -hi-boot files
 # because GHC itself is a Mingw program and does not understand
 # symbolic links.  So we have to copy the files instead of link them.
@@ -237,7 +241,7 @@ CLEAN_FILES += $(CONFIG_HS)
 
 PLATFORM_H = ghc_boot_platform.h
 
-stage1/$(PLATFORM_H) : $(FPTOOLS_TOP)/mk/config.mk Makefile
+stage1/$(PLATFORM_H) : stage_dirs $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "Creating $@..."
 	@$(RM) $@
 	@echo "#ifndef __PLATFORM_H__"  >$@
@@ -283,7 +287,7 @@ endif
 # For stage2 and above, the BUILD platform is the HOST of stage1, and
 # the HOST platform is the TARGET of stage1.  The TARGET remains the same
 # (stage1 is the cross-compiler, not stage2).
-stage2/$(PLATFORM_H) : $(FPTOOLS_TOP)/mk/config.mk Makefile
+stage2/$(PLATFORM_H) : stage_dirs $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "Creating $@..."
 	@$(RM) $@
 	@echo "#ifndef __PLATFORM_H__"  >$@
@@ -326,10 +330,12 @@ endif
 	@echo "#endif /* __PLATFORM_H__ */"          >> $@
 	@echo "Done."
 
-stage3/$(PLATFORM_H) : stage2/$(PLATFORM_H)
+stage3/$(PLATFORM_H) : stage_dirs stage2/$(PLATFORM_H)
 	$(CP) stage2/$(PLATFORM_H) stage3/$(PLATFORM_H)
 
-boot :: stage$(stage)/$(PLATFORM_H)
+STAGE_PLATFORM_H = stage$(stage)/$(PLATFORM_H)
+
+boot :: $(STAGE_PLATFORM_H)
 
 SRC_HC_OPTS += -Istage$(stage)
 
@@ -760,7 +766,7 @@ MKDEPENDHS_HC_OPTS = $(patsubst -i$(odir)/%, -i%, $(HC_OPTS))
 MKDEPENDHS=$(HC)
 
 # Must do this *after* including target.mk, because $(HS_SRCS) isn't set yet.
-depend :: $(HS_SRCS) $(C_SRCS)
+depend :: $(STAGE_PLATFORM_H) $(HS_SRCS) $(C_SRCS)
 	touch .depend-BASE
 ifneq "$(BootingFromHc)" "YES"
 	$(MKDEPENDHS) -M -optdep-f -optdep.depend-BASE $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) $(HS_SRCS)
