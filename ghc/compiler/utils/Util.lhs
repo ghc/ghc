@@ -297,7 +297,7 @@ elem__ x (y:ys)	= x==y || elem__ x ys
 notElem__ x []	   =  True
 notElem__ x (y:ys) =  x /= y && notElem__ x ys
 
-# else {- DEBUG -}
+# else /* DEBUG */
 isIn msg x ys
   = elem (_ILIT 0) x ys
   where
@@ -315,7 +315,7 @@ isn'tIn msg x ys
       | i ># _ILIT 100 = trace ("Over-long notElem in " ++ msg) $
 		         x `List.notElem` (y:ys)
       | otherwise      =  x /= y && notElem (i +# _ILIT(1)) x ys
-# endif {- DEBUG -}
+# endif /* DEBUG */
 \end{code}
 
 %************************************************************************
