@@ -722,7 +722,6 @@ product	l	= prod l 1
     prod []     a = a
     prod (x:xs) a = prod xs (a*x)
 #endif
-#endif  /* __GLASGOW_HASKELL__ */
 
 -- -----------------------------------------------------------------------------
 -- Functions on strings
@@ -769,3 +768,4 @@ unwords []		=  ""
 unwords [w]		= w
 unwords (w:ws)		= w ++ ' ' : unwords ws
 #endif
+#endif  /* __GLASGOW_HASKELL__ */
