@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/12/07 11:49:11 $
+ * $Revision: 1.13 $
+ * $Date: 2000/06/15 13:23:51 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -80,6 +80,18 @@ static InstrPtr disIntPC     ( StgBCO *bco, InstrPtr pc, char* i )
     fprintf(stderr,"%s %d %d",i,x,pc+y);
     return pc;
 }
+
+#ifdef XMLAMBDA
+static InstrPtr disInt16PC     ( StgBCO *bco, InstrPtr pc, char* i )
+{
+    StgInt  x;
+    StgWord y;
+    x = bcoInstr(bco,pc); pc += 2;
+    y = bcoInstr16(bco,pc); pc += 2;
+    fprintf(stderr,"%s %d %d",i,x,pc+y);
+    return pc;
+}
+#endif
 
 static InstrPtr disPC        ( StgBCO *bco, InstrPtr pc, char* i )
 {
@@ -266,6 +278,36 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disConstPtr(bco,pc,"CONST");
     case i_CONST_big:
             return disConstPtr16(bco,pc,"CONST_big");
+
+#ifdef XMLAMBDA
+    case i_ALLOC_ROW:
+            return disInt(bco,pc,"ALLOC_ROW");    
+    case i_ALLOC_ROW_big:
+            return disInt16(bco,pc,"ALLOC_ROW_big");    
+    case i_PACK_ROW:
+            return disInt(bco,pc,"PACK_ROW");    
+    case i_PACK_ROW_big:
+            return disInt16(bco,pc,"PACK_ROW_big");    
+
+    case i_PACK_INJ:
+            return disInt(bco,pc,"PACK_INJ");
+    case i_PACK_INJ_big:
+            return disInt16(bco,pc,"PACK_INJ_big");
+    case i_PACK_INJ_CONST:
+            return disInt(bco,pc,"PACK_INJ_CONST");
+
+    case i_UNPACK_ROW:
+            return disNone(bco,pc,"UNPACK_ROW");    
+    case i_UNPACK_INJ:
+            return disNone(bco,pc,"UNPACK_INJ");
+
+    case i_TEST_INJ:
+            return disIntPC(bco,pc,"TEST_INJ");
+    case i_TEST_INJ_big:
+            return disInt16PC(bco,pc,"TEST_INJ_big");
+    case i_TEST_INJ_CONST:
+            return disIntPC(bco,pc,"TEST_INJ_CONST");
+#endif    
 
     case i_VOID:
             return disNone(bco,pc,"VOID");

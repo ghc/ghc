@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.c,v 1.7 2000/05/22 13:09:29 simonmar Exp $
+ * $Id: Prelude.c,v 1.8 2000/06/15 13:23:52 daan Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -75,6 +75,17 @@ INFO_TABLE_CONSTR(hugs_standalone_Wzh_static_info,Hugs_CONSTR_entry,
                   0,sizeofW(StgWord),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
 INFO_TABLE_CONSTR(hugs_standalone_StablePtr_static_info,Hugs_CONSTR_entry,
                   0,sizeofW(StgStablePtr),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+
+#ifdef XMLAMBDA
+/* The Inj constructor: data Inj = forall a. Inj a Int#
+   Since this one is not present in Haskell compiled stuff, we bind it statically. 
+*/
+INFO_TABLE_CONSTR(xmlambda_Inj_con_info,Hugs_CONSTR_entry,
+                  sizeofW(StgPtr),sizeofW(StgInt),0,CONSTR,,EF_,0,0);
+
+const StgInfoTable* ind_Inj_con_info = &xmlambda_Inj_con_info;
+#endif /* XMLAMBDA */
+
 #endif
 
 

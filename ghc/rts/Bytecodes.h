@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.15 2000/04/11 20:44:19 panne Exp $
+ * $Id: Bytecodes.h,v 1.16 2000/06/15 13:23:51 daan Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -33,15 +33,27 @@
     Ins(i_ALLOC_PAP),         \
     Ins(i_ALLOC_CONSTR),      \
     Ins(i_ALLOC_CONSTR_big),  \
+    Ins(i_ALLOC_ROW),         \
+    Ins(i_ALLOC_ROW_big),     \
     Ins(i_MKAP),              \
     Ins(i_MKAP_big),          \
     Ins(i_MKPAP),             \
     Ins(i_PACK),              \
     Ins(i_PACK_big),          \
+    Ins(i_PACK_ROW),          \
+    Ins(i_PACK_ROW_big),      \
+    Ins(i_PACK_INJ),          \
+    Ins(i_PACK_INJ_big),      \
+    Ins(i_PACK_INJ_CONST),    \
     Ins(i_SLIDE),             \
     Ins(i_SLIDE_big),         \
     Ins(i_TEST),              \
+    Ins(i_TEST_INJ),          \
+    Ins(i_TEST_INJ_big),      \
+    Ins(i_TEST_INJ_CONST),    \
     Ins(i_UNPACK),            \
+    Ins(i_UNPACK_ROW),        \
+    Ins(i_UNPACK_INJ),        \
     Ins(i_VAR),               \
     Ins(i_VAR_big),           \
     Ins(i_CONST),             \
@@ -326,6 +338,12 @@ typedef enum
 
     , i_raise       
 
+#ifdef XMLAMBDA
+    /* row primitives. */
+    , i_rowInsertAt
+    , i_rowRemoveAt
+#endif
+
     /* Ref operations */
     , i_newRef
     , i_writeRef
@@ -444,7 +462,7 @@ typedef enum
 
     /* If you add a new primop to this table, check you don't
      * overflow the 256 limit.  That is MAX_Primop2 <= 255.
-     * Current value (30/10/98) = 0x42
+     * Current value (6/10/2000) = 0x44
      */
     , MAX_Primop2 = i_ccall_stdcall_IO
 } Primop2;

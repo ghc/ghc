@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.31 $
- * $Date: 2000/05/26 10:14:34 $
+ * $Revision: 1.32 $
+ * $Date: 2000/06/15 13:23:51 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -861,6 +861,40 @@ static void emit_i_ALLOC_CONSTR ( AsmBCO bco, int arg1 )
       emiti_16(bco,i_ALLOC_CONSTR_big,arg1);
 }
 
+#ifdef XMLAMBDA
+static void emit_i_ALLOC_ROW( AsmBCO bco, int n )
+{
+  ASSERT(n >= 0);
+  if (n < 256)
+      emiti_8 ( bco, i_ALLOC_ROW, n ); else
+      emiti_16( bco, i_ALLOC_ROW_big, n );
+}
+
+static void emit_i_PACK_ROW (AsmBCO bco, int var )
+{
+   ASSERT(var >= 0);
+   if (var < 256)
+      emiti_8 ( bco, i_PACK_ROW, var ); else
+      emiti_16( bco, i_PACK_ROW_big, var );
+}
+
+static void emit_i_PACK_INJ (AsmBCO bco, int var )
+{
+   ASSERT(var >= 0);
+   if (var < 256)
+      emiti_8 ( bco, i_PACK_INJ, var ); else
+      emiti_16( bco, i_PACK_INJ_big, var );
+}
+
+static void emit_i_TEST_INJ (AsmBCO bco, int var )
+{
+   ASSERT(var >= 0);
+   if (var < 256)
+      emiti_8_16 ( bco, i_TEST_INJ, var, 0 ); else
+      emiti_16_16( bco, i_TEST_INJ_big, var, 0 );
+}
+#endif
+
 /* --------------------------------------------------------------------------
  * Arg checks.
  * ------------------------------------------------------------------------*/
@@ -1414,6 +1448,12 @@ AsmPrim asmPrimOps[] = {
     , { "primIsNegativeZeroDouble",  "D",  "B",  MONAD_Id, i_PRIMOP1, i_isNegativeZeroDouble }
     , { "primIsIEEEDouble",          "",   "B",  MONAD_Id, i_PRIMOP1, i_isIEEEDouble }
 
+#ifdef XMLAMBDA
+    /* primitive row operations. */
+    , { "primRowInsertAt",           "XIa","X",  MONAD_Id, i_PRIMOP2, i_rowInsertAt }
+    , { "primRowRemoveAt",           "XI", "aX", MONAD_Id, i_PRIMOP2, i_rowRemoveAt }
+#endif
+
     /* Ref operations */
     , { "primNewRef",                "a",  "R",  MONAD_ST, i_PRIMOP2, i_newRef }
     , { "primWriteRef",              "Ra", "",   MONAD_ST, i_PRIMOP2, i_writeRef }
@@ -1823,6 +1863,104 @@ AsmInfo asmMkInfo( AsmNat tag, AsmNat ptrs )
     ASSERT( sizeW_fromITBL(info) >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
     return info;
 }
+
+#ifdef XMLAMBDA
+/* -----------------------------------------------------------------------
+ All the XMLambda primitives.
+------------------------------------------------------------------------*/
+
+/* -----------------------------------------------------------------------
+ allocation & unpacking of rows  
+------------------------------------------------------------------------*/
+AsmVar asmAllocRow   ( AsmBCO bco, AsmNat n /*number of fields*/ )
+{
+    emit_i_ALLOC_ROW(bco,n);             
+
+    incSp(bco, sizeofW(StgClosurePtr));
+    return bco->sp;
+}
+
+AsmSp asmBeginPackRow( AsmBCO bco )
+{
+    return bco->sp;
+}
+
+void asmEndPackRow( AsmBCO bco, AsmVar v, AsmSp start, AsmNat n /*#fields*/ )
+{
+    nat size = bco->sp - start;
+    ASSERT(bco->sp >= start);
+    ASSERT(start >= v);
+    /* only reason to include n is for this assertion */
+    ASSERT(n == size);
+    emit_i_PACK_ROW(bco,bco->sp - v);  
+    setSp(bco, start);
+}
+
+void asmBeginUnpackRow( AsmBCO bco )
+{
+    /* dummy to make it look prettier */
+}
+
+void asmEndUnpackRow( AsmBCO bco )
+{
+    emiti_(bco,i_UNPACK_ROW);
+}
+
+/*------------------------------------------------------------------------
+ Inj primitives.
+ The Inj constructor contains the value and its index: an unboxed int 
+ data Inj = forall a. Inj a Int# 
+ There is no "big" form for the INJ_CONST instructions. The index
+ is therefore still limited to 256 values.
+------------------------------------------------------------------------*/
+AsmVar asmInj( AsmBCO bco, AsmVar index )
+{    
+    emit_i_PACK_INJ( bco, bco->sp - index );
+
+    decSp(bco, sizeofW(StgPtr));    /* pop argument value */
+    incSp(bco, sizeofW(StgPtr));    /* push Inj result    */
+    return bco->sp;
+}
+
+AsmVar asmInjConst( AsmBCO bco, AsmIndex x )
+{
+    ASSERT( x >= 0 && x <= 255 );
+    emiti_8 (bco, i_PACK_INJ_CONST, x );
+
+    decSp(bco, sizeofW(StgPtr));   /* pop argument value */
+    incSp(bco, sizeofW(StgPtr));   /* push Inj result */
+    return bco->sp;
+}
+
+/* UNPACK_INJ only returns the value; the index should be
+   tested using the TEST_INJ instructions. */
+AsmVar asmUnInj( AsmBCO bco )
+{
+    emiti_(bco,i_UNPACK_INJ);
+    incSp(bco, sizeofW(StgPtr));  /* push the value */
+    return bco->sp;
+}
+
+AsmPc asmTestInj( AsmBCO bco, AsmVar index )
+{
+    emit_i_TEST_INJ(bco,bco->sp - index);
+    return bco->n_insns;
+}
+
+AsmPc asmTestInjConst( AsmBCO bco, AsmIndex x )
+{
+    ASSERT( x >= 0 && x <= 255 );
+    emiti_8_16 (bco, i_TEST_INJ_CONST, x, 0 );
+    return bco->n_insns;
+}
+
+AsmVar asmConstIndex( AsmBCO bco, AsmIndex x )
+{
+    ASSERT( x >= 0 && x <= 65535 );
+    asmConstInt(bco,x);
+    return bco->sp;
+}
+#endif
 
 /*-------------------------------------------------------------------------*/
 

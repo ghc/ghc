@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.26 2000/04/17 14:31:19 sewardj Exp $
+ * $Id: Printer.c,v 1.27 2000/06/15 13:23:52 daan Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -257,6 +257,23 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n");
             break;
         }
+
+#ifdef XMLAMBDA
+/* rows are mutarrays in xmlambda, maybe we should make a new type: ROW */
+    case MUT_ARR_PTRS_FROZEN:
+          {
+            StgWord i;
+            StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,obj);
+
+            fprintf(stderr,"Row<%i>(",p->ptrs);
+            for (i = 0; i < p->ptrs; ++i) {
+                if (i > 0) fprintf(stderr,", ");
+                printPtr((StgPtr)(p->payload[i]));
+            }
+            fprintf(stderr,")\n");
+            break;
+          }
+#endif  
 
     case FUN:
     case FUN_1_0: case FUN_0_1: 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.10 2000/05/23 15:31:48 sewardj Exp $
+ * $Id: Prelude.h,v 1.11 2000/06/15 13:23:52 daan Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -133,6 +133,14 @@ extern const StgInfoTable *ind_StablePtr_con_info;
 #define I64zh_con_info         ind_I64zh_con_info
 #define StablePtr_static_info  ind_StablePtr_static_info
 #define StablePtr_con_info     ind_StablePtr_con_info
+
+#ifdef XMLAMBDA
+/* The Inj constructor. Not present in combined mode or compiled code. */
+
+extern const StgInfoTable *ind_Inj_con_info;
+#define Inj_con_info           ind_Inj_con_info
+
+#endif
 
 #endif
 

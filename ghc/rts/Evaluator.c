@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.54 $
- * $Date: 2000/05/26 10:14:34 $
+ * $Revision: 1.55 $
+ * $Date: 2000/06/15 13:23:51 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -585,6 +585,29 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     xPushPtr(p);
                     Continue;
                 }
+#ifdef XMLAMBDA
+            /* allocate rows, implemented on top of Arrays */
+            Case(i_ALLOC_ROW):
+                {
+                    StgMutArrPtrs* p;
+                    int n = BCO_INSTR_8;
+                    SSS; p = stgCast(StgMutArrPtrs*,grabHpNonUpd(sizeofW(StgMutArrPtrs) + n)); LLL;
+                    SET_HDR(p,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                    p->ptrs = n;
+                    xPushPtr(p);
+                    Continue;
+                }
+            Case(i_ALLOC_ROW_big):
+                {
+                    StgMutArrPtrs* p;
+                    int n = BCO_INSTR_16;
+                    SSS; p = stgCast(StgMutArrPtrs*,grabHpNonUpd(sizeofW(StgMutArrPtrs) + n)); LLL;
+                    SET_HDR(p,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                    p->ptrs = n;
+                    xPushPtr(p);
+                    Continue;
+                }
+#endif
             Case(i_MKAP):
                 {
                     int x = BCO_INSTR_8;  /* ToDo: Word not Int! */
@@ -688,6 +711,112 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                              );
                     Continue;
                 }
+#ifdef XMLAMBDA
+            /* pack values into a row. */
+            Case(i_PACK_ROW):
+                {
+                    int offset       = BCO_INSTR_8;
+                    StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,xStackPtr(offset));
+                    StgWord        n = p->ptrs;
+                    nat i;
+
+                    for (i=0; i<n; ++i)
+                    {
+                      p->payload[i] = xPopCPtr();
+                    }
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,p));
+                             LLL;
+                            );
+                    Continue;
+                }
+            Case(i_PACK_ROW_big):
+                {
+                    int offset       = BCO_INSTR_16;
+                    StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,xStackPtr(offset));
+                    StgWord        n = p->ptrs;
+                    nat i;
+
+                    for (i=0; i<n; ++i)
+                    {
+                      p->payload[i] = xPopCPtr();
+                    }
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,p));
+                             LLL;
+                            );
+                    Continue;
+                }
+            /* pack values into an Inj */
+            Case(i_PACK_INJ):
+                {
+                    const int size  = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgInt));
+                    int offset  = BCO_INSTR_8;
+                    
+                    StgClosure* o;                    
+                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
+                    SET_HDR(o,Inj_con_info,??);
+                    
+                    payloadWord(o,sizeofW(StgPtr)) = xTaggedStackInt(offset);
+                    payloadPtr(o,0)                = xPopPtr();                                        
+                    
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,o));
+                             LLL;
+                             );
+                    xPushPtr(stgCast(StgPtr,o));
+                    Continue;
+                }
+            Case(i_PACK_INJ_big):
+                {
+                    const int size  = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgInt));
+                    int offset  = BCO_INSTR_16;
+                    
+                    StgClosure* o;                    
+                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
+                    SET_HDR(o,Inj_con_info,??);
+
+                    payloadWord(o,sizeofW(StgPtr)) = xTaggedStackInt(offset);
+                    payloadPtr(o,0)                = xPopPtr();                    
+
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,o));
+                             LLL;
+                             );
+                    xPushPtr(stgCast(StgPtr,o));
+                    Continue;
+                }
+            Case(i_PACK_INJ_CONST):
+                {
+                    const int size  = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgInt));
+                    int index  = BCO_INSTR_8;
+                    
+                    StgClosure* o;                    
+                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
+                    SET_HDR(o,Inj_con_info,??);
+
+                    payloadWord(o,sizeofW(StgPtr)) = index;
+                    payloadPtr(o,0)                = xPopPtr();                    
+
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,o));
+                             LLL;
+                             );
+                    xPushPtr(stgCast(StgPtr,o));
+                    Continue;
+                }
+
+#endif /* XMLAMBDA */
             Case(i_SLIDE):
                 {
                     int x = BCO_INSTR_8;
@@ -733,6 +862,45 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     }
                     Continue;
                 }
+#ifdef XMLAMBDA
+            /* Test Inj indices. */
+            Case(i_TEST_INJ):
+                {
+                    int  offset    = BCO_INSTR_8;
+                    StgWord jump   = BCO_INSTR_16;
+                    
+                    int index  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
+                    if (index != xTaggedStackInt(offset) )
+                    {
+                      bciPtr += jump;
+                    }
+                    Continue;
+                }
+            Case(i_TEST_INJ_big):
+                {
+                    int  offset    = BCO_INSTR_16;
+                    StgWord jump   = BCO_INSTR_16;
+                    
+                    int index  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
+                    if (index != xTaggedStackInt(offset) )
+                    {
+                      bciPtr += jump;
+                    }
+                    Continue;
+                }
+            Case(i_TEST_INJ_CONST):
+                {
+                    int  value     = BCO_INSTR_8;
+                    StgWord jump   = BCO_INSTR_16;
+                    
+                    int index  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
+                    if (index != value )
+                    {
+                      bciPtr += jump;
+                    }
+                    Continue;
+                }  
+#endif /* XMLAMBDA */
             Case(i_UNPACK):
                 {
                     StgClosure* o = stgCast(StgClosure*,xStackPtr(0));
@@ -752,6 +920,29 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     }
                     Continue;
                 }
+#ifdef XMLAMBDA
+            /* extract all fields of a row */
+            Case(i_UNPACK_ROW):
+                {
+                    StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,xStackPtr(0));
+                    int i = p->ptrs;
+                    while (--i >= 0)
+                    {
+                      xPushCPtr(p->payload[i]);
+                    }
+                    Continue;
+                }
+            /* extract the value of an INJ */
+            Case(i_UNPACK_INJ):
+                {
+                    StgClosure* con = stgCast(StgClosure*,xStackPtr(0));
+                    
+                    ASSERT(get_itbl(con) == Inj_con_info);
+                    
+                    xPushPtr(payloadPtr(con,0));                    
+                    Continue;
+                }
+#endif /* XMLAMBA */
             Case(i_VAR_big):
                 {
                     int n = BCO_INSTR_16;
@@ -1291,6 +1482,10 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
     case CONSTR_CHARLIKE:
     case CONSTR_STATIC:
     case CONSTR_NOCAF_STATIC:
+#ifdef XMLAMBDA
+/* rows are mutarrays and should be treated as constructors. */
+    case MUT_ARR_PTRS_FROZEN:
+#endif
         {
             while (1) {
                 switch (get_itbl(stgCast(StgClosure*,xSp))->type) {
@@ -1445,6 +1640,11 @@ static inline StgWord         stackWord          ( StgStackOffset i )
                               
 static inline void            setStackWord       ( StgStackOffset i, StgWord w ) 
    { gSp[i] = w; }
+
+#ifdef XMLAMBDA
+static inline void            setStackPtr        ( StgStackOffset i, StgPtr p )
+   { *(stgCast(StgPtr*, gSp+i)) = p; }
+#endif
 
 static inline void            PushTaggedRealWorld( void            ) 
    { PushTag(REALWORLD_TAG);  }
@@ -2549,6 +2749,71 @@ static void* enterBCO_primop2 ( int primop2code,
                 StgClosure* err = PopCPtr();
                 return (raiseAnError(err));
             }
+#ifdef XMLAMBDA
+/*------------------------------------------------------------------------
+  Insert and Remove primitives on Rows
+------------------------------------------------------------------------*/
+        case i_rowInsertAt:
+            {
+                nat j;
+                /* get: row, index and value */
+                StgMutArrPtrs* row = stgCast(StgMutArrPtrs*,PopPtr());
+                nat         i   = PopTaggedInt();     
+                StgClosure* x   = PopCPtr();
+                
+                /* allocate new row */
+                StgWord     n    = row->ptrs;                
+                StgMutArrPtrs* newRow 
+                    = stgCast(StgMutArrPtrs*,allocate(sizeofW(StgMutArrPtrs) + n + 1));                
+                SET_HDR(newRow,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                newRow->ptrs = n+1;
+  
+                ASSERT(i <= n);
+      
+                /* copy the fields, inserting the new value */
+                for (j = 0; j < i; j++) {
+                  newRow->payload[j] = row->payload[j];
+                }
+                newRow->payload[i] = x;
+                for (j = i+1; j <= n; j++)
+                {
+                  newRow->payload[j] = row->payload[j-1];
+                }
+
+                PushPtr(stgCast(StgPtr,newRow));
+                break; 
+            }
+
+        case i_rowRemoveAt:
+            {
+                nat j;
+                /* get row and index */
+                StgMutArrPtrs* row = stgCast(StgMutArrPtrs*,PopPtr());
+                nat         i   = PopTaggedInt(); /* or Word?? */
+                
+                /* allocate new row */
+                StgWord     n    = row->ptrs;                
+                StgMutArrPtrs* newRow 
+                    = stgCast(StgMutArrPtrs*,allocate(sizeofW(StgMutArrPtrs) + n - 1));                
+                SET_HDR(newRow,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                newRow->ptrs = n-1;
+  
+                ASSERT(i < n);
+      
+                /* copy the fields, except for the removed value. */
+                for (j = 0; j < i; j++) {
+                  newRow->payload[j] = row->payload[j];
+                }
+                for (j = i+1; j < n; j++)
+                {
+                  newRow->payload[j-1] = row->payload[j];
+                }
+
+                PushCPtr(row->payload[i]);
+                PushPtr(stgCast(StgPtr,newRow));
+                break; 
+            }
+#endif /* XMLAMBDA */
 
         case i_newRef:
             {
