@@ -347,13 +347,18 @@ def framework_fail( name ):
 # Generic command tests
 
 # A generic command test is expected to run and exit successfully.
+#
+# The expected exit code can be changed via exit_code() as normal, and
+# the expected stdout/stderr are stored in <testname>.stdout and
+# <testname>.stderr.  The output of the command can be ignored
+# altogether by using run_command_ignore_output instead of
+# run_command.
 
-def generic_command( name, way, cmd, args ):
-    result = runCmd( 'cd ' + testdir + ' && ' + cmd + ' ' + join(args,' ') );
-    if result == 0:
-        return 'pass'
-    else:
-        return 'fail'
+def run_command( name, way, cmd ):
+    return simple_run( name, cmd, '', 0 )
+
+def run_command_ignore_output( name, way, cmd ):
+    return simple_run( name, cmd, '', 1 )
 
 # -----------------------------------------------------------------------------
 # Compile-only tests
@@ -395,7 +400,7 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
     else:
         expected_stderr = ''
         expected_stderr_file = ''
-        
+
     if expected_stderr != actual_stderr:
         # print stderr_e, '\n', stderr_a
         if not outputs_differ('stderr', expected_stderr_file, actual_stderr_file):
@@ -420,7 +425,7 @@ def compile_and_run( name, way, extra_hc_opts ):
             return 'fail'
 
         # we don't check the compiler's stderr for a compile-and-run test
-        return simple_run( name )
+        return simple_run( name, './'+name, testopts.extra_run_opts, 0 )
 
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
@@ -435,7 +440,7 @@ def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
         return 'fail'
 
     # we don't check the compiler's stderr for a compile-and-run test
-    return simple_run( name )
+    return simple_run( name, './'+name, testopts.extra_run_opts, 0 )
 
 # -----------------------------------------------------------------------------
 # Build a single-module program
@@ -488,7 +493,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
 # from /dev/null.  Route output to testname.run.stdout and 
 # testname.run.stderr.  Returns the exit code of the run.
 
-def simple_run( name ):
+def simple_run( name, prog, args, ignore_output_files ):
    # figure out what to use for stdin
    if testopts.stdin != '':
        use_stdin = testopts.stdin
@@ -503,10 +508,10 @@ def simple_run( name ):
    run_stderr = add_suffix(name,'run.stderr')
 
    rm_no_fail(qualify(name,'run.stdout'))
-   rm_no_fail(qualify(name,'run_stderr,'))
+   rm_no_fail(qualify(name,'run.stderr'))
 
    cmd = 'cd ' + testdir + ' && ' \
-	  + './' + name + ' ' + testopts.extra_run_opts + ' ' \
+	  + prog + ' ' + args + ' ' \
           + ' < ' + use_stdin \
           + ' > ' + run_stdout \
           + ' 2> ' + run_stderr
@@ -522,7 +527,7 @@ def simple_run( name ):
        print 'Wrong exit code (expected', testopts.exit_code, ', actual', exit_code, ')'
        return 'fail'
 
-   if check_stdout_ok(name) and check_stderr_ok(name):
+   if ignore_output_files or (check_stdout_ok(name) and check_stderr_ok(name)):
        return 'pass'
    else:
        return 'fail'
