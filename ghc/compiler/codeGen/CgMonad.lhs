@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.24 2000/07/11 16:03:37 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.25 2000/09/04 14:07:29 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -475,7 +475,7 @@ forkEvalHelp body_eob_info env_code body_code
 stateIncUsageEval :: CgState -> CgState -> CgState
 stateIncUsageEval (MkCgState absC1 bs ((v,f,r,h1),heap_usage))
 		  (MkCgState absC2 _  ((_,_,_,h2),         _))
-     = MkCgState (absC1 `AbsCStmts` absC2)
+     = MkCgState (absC1 `mkAbsCStmts` absC2)
 		 -- The AbsC coming back should consist only of nested declarations,
 		 -- notably of the return vector!
 		 bs
