@@ -1100,15 +1100,7 @@ if test "$ac_cv_type_signal" = void; then
 fi
 
 dnl ** check for more functions
-AC_CHECK_FUNCS([ftime getclock getgrgid_r getgrnam_r getpagesize getpwnam_r getpwuid_r getpwnam getpwuid getrusage gettimeofday gmtime_r localtime_r lstat readdir_r readlink setenv setitimer siginterrupt symlink sysconf times unsetenv])
-
-dnl ** Solaris2 needs additionl flag for getpw*_r()
-case "$TargetPlatform" in
-  *-solaris2*)
-    unix_SRC_HSC2HS_OPTS="-D_POSIX_PTHREAD_SEMANTICS"
-    AC_SUBST(unix_SRC_HSC2HS_OPTS)
-  ;;
-esac
+AC_CHECK_FUNCS([ftime getclock getpagesize getrusage gettimeofday gmtime_r localtime_r lstat readdir_r readlink setenv setitimer siginterrupt symlink sysconf times unsetenv])
 
 dnl ** check whether this machine has gmp3 installed
 AC_CHECK_LIB(gmp,  __gmpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
@@ -1307,23 +1299,6 @@ else
       ])    
     AC_SUBST(HaveRtldNow)
 fi
-
-dnl ---------- usleep ----------
-dnl --- stolen from guile configure ---
-dnl --- FIXME: /usr/include/unistd.h can't be right?
-
-### On some systems usleep has no return value.  If it does have one,
-### we'd like to return it; otherwise, we'll fake it.
-AC_CACHE_CHECK([return type of usleep], cv_func_usleep_return_type,
-  [AC_EGREP_HEADER(changequote(<, >)<void[      ]+usleep>changequote([, ]),
-                   /usr/include/unistd.h,
-                   [cv_func_usleep_return_type=void],
-                   [cv_func_usleep_return_type=int])])
-case "$cv_func_usleep_return_type" in
-  "void" )
-    AC_DEFINE([USLEEP_RETURNS_VOID], [1], [Define if the system headers declare usleep to return void.])
-  ;;
-esac
 
 dnl --------------------------------------------------
 dnl * test for GTK+
