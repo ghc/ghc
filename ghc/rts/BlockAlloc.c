@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.15 2003/01/28 17:04:58 simonmar Exp $
+ * $Id: BlockAlloc.c,v 1.16 2003/02/18 05:47:53 sof Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -265,7 +265,7 @@ freeMegaGroup(bdescr *p)
 
   n = p->blocks * BLOCK_SIZE / MBLOCK_SIZE + 1;
   for (; n > 0; (W_)p += MBLOCK_SIZE, n--) {
-    initMBlock((void *)((W_)p & ~MBLOCK_MASK));
+    initMBlock(MBLOCK_ROUND_DOWN(p));
     initGroup(BLOCKS_PER_MBLOCK, p);
     freeGroup(p);
   }
