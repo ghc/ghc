@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Alloc.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Alloc.hs,v 1.3 2001/08/17 12:50:34 simonmar Exp $
 --
 -- Marshalling support: basic routines for memory allocation
 --
@@ -30,14 +30,16 @@ module Foreign.Marshal.Alloc (
 import Data.Maybe
 import Foreign.Ptr	 	( Ptr, nullPtr )
 import Foreign.C.TypesISO 	( CSize )
+import Foreign.Storable  	( Storable(sizeOf) )
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Exception 	( bracket )
-import GHC.Storable  	( Storable(sizeOf) )
+import GHC.Exception		( bracket )
 import GHC.IOBase
 import GHC.Real
+import GHC.Ptr
 import GHC.Err
 import GHC.Base
+import GHC.Prim
 #endif
 
 
@@ -75,8 +77,21 @@ alloca  = doAlloca undefined
 --   this function; in other words, in `allocaBytes n f' the allocated storage
 --   must not be used after `f' returns
 --
+#ifdef __GLASGOW_HASKELL__
+allocaBytes :: Int -> (Ptr a -> IO b) -> IO b
+allocaBytes (I# size) action = IO $ \ s ->
+     case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
+     case unsafeFreezeByteArray# mbarr# s of { (# s, barr#  #) ->
+     let addr = Ptr (byteArrayContents# barr#) in
+     case action addr    of { IO action ->
+     case action s       of { (# s, r #) ->
+     case touch# barr# s of { s ->
+     (# s, r #)
+  }}}}}
+#else
 allocaBytes      :: Int -> (Ptr a -> IO b) -> IO b
 allocaBytes size  = bracket (mallocBytes size) free
+#endif
 
 -- adjust a malloc'ed storage area to the given size
 --

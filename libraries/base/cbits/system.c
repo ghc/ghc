@@ -1,13 +1,13 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.2 2001/07/31 11:51:09 simonmar Exp $
+ * $Id: system.c,v 1.3 2001/08/17 12:50:34 simonmar Exp $
  *
  * system Runtime Support
  */
 
 /* The itimer stuff in this module is non-posix */
-#define NON_POSIX_SOURCE
+// #include "PosixSource.h"
 
 #include "HsCore.h"
 
@@ -20,32 +20,8 @@ systemCmd(HsAddr cmd)
 {
   /* -------------------- WINDOWS VERSION --------------------- */
 #if defined(mingw32_TARGET_OS)
-  STARTUPINFO sInfo;
-  PROCESS_INFORMATION pInfo;
-  DWORD retCode;
-
-  sInfo.cb              = sizeof(STARTUPINFO);
-  sInfo.lpReserved      = NULL;
-  sInfo.lpReserved2     = NULL;
-  sInfo.cbReserved2     = 0;
-  sInfo.lpDesktop       = NULL;
-  sInfo.lpTitle         = NULL;
-  sInfo.dwFlags         = 0;
-
-  if (!CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &sInfo, &pInfo))
-    /* The 'TRUE' says that the created process should share
-       handles with the current process.  This is vital to ensure
-       that error messages sent to stderr actually appear on the screen.
-       Since we are going to wait for the process to terminate anyway,
-       there is no problem with such sharing. */
-
-    return -1;
-  WaitForSingleObject(pInfo.hProcess, INFINITE);
-  if (GetExitCodeProcess(pInfo.hProcess, &retCode) == 0) return -1;
-  CloseHandle(pInfo.hProcess);
-  CloseHandle(pInfo.hThread);
-  return retCode;
-
+  if (system(cmd) < 0) return -1;
+  return 0;
 #else
   /* -------------------- UNIX VERSION --------------------- */
     int pid;

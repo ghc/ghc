@@ -1,16 +1,13 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: inputReady.c,v 1.2 2001/07/31 11:51:09 simonmar Exp $
+ * $Id: inputReady.c,v 1.3 2001/08/17 12:50:34 simonmar Exp $
  *
  * hReady Runtime Support
  */
 
-/* select and supporting types is not */
-#ifndef _AIX
-#define NON_POSIX_SOURCE  
-#endif
-
+/* select and supporting types is not Posix */
+/* #include "PosixSource.h" */
 #include "HsCore.h"
 
 /*

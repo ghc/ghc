@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Cmd.hsc,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: Cmd.hsc,v 1.2 2001/08/17 12:50:34 simonmar Exp $
 --
 -- Executing a command.
 --
@@ -46,10 +46,10 @@ import GHC.IOBase
 system :: String -> IO ExitCode
 system "" = ioException (IOError Nothing InvalidArgument "system" "null command" Nothing)
 system cmd =
-  withUnsafeCString cmd $ \s -> do
+  withCString cmd $ \s -> do
     status <- throwErrnoIfMinus1 "system" (primSystem s)
     case status of
         0  -> return ExitSuccess
         n  -> return (ExitFailure n)
 
-foreign import ccall "systemCmd" unsafe primSystem :: UnsafeCString -> IO Int
+foreign import ccall "systemCmd" unsafe primSystem :: CString -> IO Int

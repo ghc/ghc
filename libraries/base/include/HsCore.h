@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsCore.h,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+ * $Id: HsCore.h,v 1.2 2001/08/17 12:50:34 simonmar Exp $
  *
  * Definitions for package `core' which are visible in Haskell land.
  *
@@ -30,6 +30,15 @@
 #endif
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
+#endif
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
+#ifdef HAVE_DIRENT_H
+#include <dirent.h>
+#endif
+#ifdef HAVE_UTIME_H
+#include <utime.h>
 #endif
 #if defined(HAVE_GETTIMEOFDAY)
 #  ifdef HAVE_SYS_TIME_H
@@ -72,6 +81,15 @@
 #endif
 #ifdef HAVE_VFORK_H
 #include <vfork.h>
+#endif
+
+extern inline int s_isreg_wrap(m)  { return S_ISREG(m);  }
+extern inline int s_isdir_wrap(m)  { return S_ISDIR(m);  }
+extern inline int s_isfifo_wrap(m) { return S_ISFIFO(m); }
+extern inline int s_isblk_wrap(m)  { return S_ISBLK(m);  }
+extern inline int s_ischr_wrap(m)  { return S_ISCHR(m);  }
+#ifdef S_ISSOCK
+extern inline int s_issock_wrap(m) { return S_ISSOCK(m); }
 #endif
 
 #include "lockFile.h"

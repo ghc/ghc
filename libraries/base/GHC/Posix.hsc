@@ -1,14 +1,17 @@
-{-# OPTIONS -fno-implicit-prelude -optc-DNON_POSIX_SOURCE #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: Posix.hsc,v 1.2 2001/07/31 12:48:13 simonmar Exp $
+-- $Id: Posix.hsc,v 1.3 2001/08/17 12:50:34 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
--- NON_POSIX_SOURCE needed for the following features:
+-- Non-posix compliant in order to support the following features:
 --	* S_ISSOCK (no sockets in POSIX)
 
 module GHC.Posix where
+
+-- See above comment for non-Posixness reasons.
+-- #include "PosixSource.h"
 
 #include "HsCore.h"
 
@@ -28,8 +31,20 @@ import GHC.IOBase
 -- ---------------------------------------------------------------------------
 -- Types
 
-data CDir    = CDir
-type CSigset = ()
+type CDir       = ()
+type CDirent    = ()
+type CFLock     = ()
+type CGroup     = ()
+type CLconv     = ()
+type CPasswd    = ()
+type CSigaction = ()
+type CSigset    = ()
+type CStat      = ()
+type CTermios   = ()
+type CTm	= ()
+type CTms	= ()
+type CUtimbuf   = ()
+type CUtsname   = ()
 
 type CDev    = #type dev_t
 type CIno    = #type ino_t
@@ -51,8 +66,6 @@ type CTcflag = #type tcflag_t
 
 -- ---------------------------------------------------------------------------
 -- stat()-related stuff
-
-type CStat = ()
 
 fdFileSize :: Int -> IO Integer
 fdFileSize fd = 
@@ -96,23 +109,6 @@ statGetType p_stat = do
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
 			"unknown file type" Nothing
 
-foreign import "s_isreg_wrap" s_isreg :: CMode -> Bool
-#def inline int s_isreg_wrap(m) { return S_ISREG(m); }
-
-foreign import "s_isdir_wrap" s_isdir :: CMode -> Bool
-#def inline int s_isdir_wrap(m) { return S_ISDIR(m); }
-
-foreign import "s_isfifo_wrap" s_isfifo :: CMode -> Bool
-#def inline int s_isfifo_wrap(m) { return S_ISFIFO(m); }
-
-#ifndef mingw32_TARGET_OS
-foreign import "s_issock_wrap" s_issock :: CMode -> Bool
-#def inline int s_issock_wrap(m) { return S_ISSOCK(m); }
-#else
-s_issock :: CMode -> Bool
-s_issock cmode = False
-#endif
-
 -- It isn't clear whether ftruncate is POSIX or not (I've read several
 -- manpages and they seem to conflict), so we truncate using open/2.
 fileTruncate :: FilePath -> IO ()
@@ -132,8 +128,6 @@ fdIsTTY :: Int -> IO Bool
 fdIsTTY fd = c_isatty (fromIntegral fd) >>= return.toBool
 
 #ifndef mingw32_TARGET_OS
-
-type Termios = ()
 
 setEcho :: Int -> Bool -> IO ()
 setEcho fd on = do
@@ -182,7 +176,7 @@ setCooked fd cooked =
 -- wrapper which temporarily blocks SIGTTOU around the call, making it
 -- transparent.
 
-tcSetAttr :: FD -> CInt -> Ptr Termios -> IO ()
+tcSetAttr :: FD -> CInt -> Ptr CTermios -> IO ()
 tcSetAttr fd options p_tios = do
   allocaBytes (#const sizeof(sigset_t)) $ \ p_sigset -> do
   allocaBytes (#const sizeof(sigset_t)) $ \ p_old_sigset -> do
@@ -214,9 +208,9 @@ getEcho fd = return False
 
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
-		 (fcntl_read (fromIntegral fd) (#const F_GETFL))
+		 (c_fcntl_read (fromIntegral fd) (#const F_GETFL))
   throwErrnoIfMinus1Retry "setNonBlockingFD"
-	(fcntl_write (fromIntegral fd) 
+	(c_fcntl_write (fromIntegral fd) 
 	   (#const F_SETFL) (flags .|. #const O_NONBLOCK))
 #else
 
@@ -227,20 +221,6 @@ setNonBlockingFD fd = return ()
 
 -- -----------------------------------------------------------------------------
 -- foreign imports
-
-foreign import "stat" unsafe
-   c_stat :: CString -> Ptr CStat -> IO CInt
-
-foreign import "fstat" unsafe
-   c_fstat :: CInt -> Ptr CStat -> IO CInt
-
-#ifdef HAVE_LSTAT
-foreign import "lstat" unsafe
-   c_lstat :: CString -> Ptr CStat -> IO CInt
-#endif
-
-foreign import "open" unsafe
-   c_open :: CString -> CInt -> CMode -> IO CInt
 
 -- POSIX flags only:
 o_RDONLY    = (#const O_RDONLY)	   :: CInt
@@ -263,49 +243,152 @@ o_NONBLOCK  = (#const O_NONBLOCK)  :: CInt
 o_BINARY    = (#const O_BINARY)	   :: CInt
 #endif
 
-foreign import "isatty" unsafe
-   c_isatty :: CInt -> IO CInt
+foreign import ccall "access" unsafe
+   c_access :: CString -> CMode -> IO CInt
 
-foreign import "close" unsafe
+foreign import ccall "chmod" unsafe
+   c_chmod :: CString -> CMode -> IO CInt
+
+foreign import ccall "chdir" unsafe
+   c_chdir :: CString -> IO CInt
+
+foreign import ccall "chown" unsafe
+   c_chown :: CString -> CUid -> CGid -> IO CInt
+
+foreign import ccall "close" unsafe
    c_close :: CInt -> IO CInt
 
-foreign import "lseek" unsafe
+foreign import ccall "closedir" unsafe 
+   c_closedir :: Ptr CDir -> IO CInt
+
+foreign import ccall "creat" unsafe
+   c_creat :: CString -> CMode -> IO CInt
+
+foreign import ccall "dup" unsafe
+   c_dup :: CInt -> IO CInt
+
+foreign import ccall "dup2" unsafe
+   c_dup2 :: CInt -> CInt -> IO CInt
+
+foreign import ccall "fpathconf" unsafe
+   c_fpathconf :: CInt -> CInt -> IO CLong
+
+foreign import ccall "fstat" unsafe
+   c_fstat :: CInt -> Ptr CStat -> IO CInt
+
+foreign import ccall "getcwd" unsafe
+   c_getcwd   :: Ptr CChar -> CInt -> IO (Ptr CChar)
+
+foreign import ccall "isatty" unsafe
+   c_isatty :: CInt -> IO CInt
+
+foreign import ccall "link" unsafe
+   c_link :: CString -> CString -> IO CInt
+
+foreign import ccall "lseek" unsafe
    c_lseek :: CInt -> COff -> CInt -> IO COff
 
-foreign import "write" unsafe 
-   c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
+#ifdef HAVE_LSTAT
+foreign import ccall "lstat" unsafe
+   c_lstat :: CString -> Ptr CStat -> IO CInt
+#endif
 
-foreign import "read" unsafe 
+foreign import ccall "open" unsafe
+   c_open :: CString -> CInt -> CMode -> IO CInt
+
+foreign import ccall "opendir" unsafe 
+   c_opendir :: CString  -> IO (Ptr CDir)
+
+foreign import ccall "mkdir" unsafe
+#if defined(mingw32_TARGET_OS)
+   c_mkdir :: CString -> IO CInt
+#else
+   c_mkdir :: CString -> CMode -> IO CInt
+#endif
+
+foreign import ccall "mkfifo" unsafe
+   c_mkfifo :: CString -> CMode -> IO CInt
+
+foreign import ccall "pathconf" unsafe
+   c_pathconf :: CString -> CInt -> IO CLong
+
+foreign import ccall "pipe" unsafe
+   c_pipe :: Ptr CInt -> IO CInt
+
+foreign import ccall "read" unsafe 
    c_read :: CInt -> Ptr CChar -> CSize -> IO CSsize
 
+foreign import ccall "readdir" unsafe 
+   c_readdir :: Ptr CDir -> IO (Ptr CDirent)
+
+foreign import ccall "rename" unsafe
+   c_rename :: CString -> CString -> IO CInt
+		     
+foreign import ccall "rewinddir" unsafe
+   c_rewinddir :: Ptr CDir -> IO ()
+
+foreign import ccall "rmdir" unsafe
+   c_rmdir :: CString -> IO CInt
+
+foreign import ccall "stat" unsafe
+   c_stat :: CString -> Ptr CStat -> IO CInt
+
+foreign import ccall "umask" unsafe
+   c_umask :: CMode -> IO CMode
+
+foreign import ccall "utime" unsafe
+   c_utime :: CString -> Ptr CUtimbuf -> IO CMode
+
+foreign import ccall "write" unsafe 
+   c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
+
 #ifndef mingw32_TARGET_OS
-foreign import "fcntl" unsafe
-   fcntl_read  :: CInt -> CInt -> IO CInt
+foreign import ccall "fcntl" unsafe
+   c_fcntl_read  :: CInt -> CInt -> IO CInt
 
-foreign import "fcntl" unsafe
-   fcntl_write :: CInt -> CInt -> CInt -> IO CInt
+foreign import ccall "fcntl" unsafe
+   c_fcntl_write :: CInt -> CInt -> CInt -> IO CInt
 
-foreign import "fork" unsafe
-   fork :: IO CPid 
+foreign import ccall "fcntl" unsafe
+   c_fcntl_lock  :: CInt -> CInt -> Ptr CFLock -> IO CInt
 
-foreign import "sigemptyset" unsafe
+foreign import ccall "fork" unsafe
+   c_fork :: IO CPid 
+
+foreign import ccall "sigemptyset" unsafe
    c_sigemptyset :: Ptr CSigset -> IO ()
 
-foreign import "sigaddset" unsafe
+foreign import ccall "sigaddset" unsafe
    c_sigaddset :: Ptr CSigset -> CInt -> IO ()
 
-foreign import "sigprocmask" unsafe
+foreign import ccall "sigprocmask" unsafe
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO ()
 
-foreign import "tcgetattr" unsafe
-   c_tcgetattr :: CInt -> Ptr Termios -> IO CInt
+foreign import ccall "tcgetattr" unsafe
+   c_tcgetattr :: CInt -> Ptr CTermios -> IO CInt
 
-foreign import "tcsetattr" unsafe
-   c_tcsetattr :: CInt -> CInt -> Ptr Termios -> IO CInt
+foreign import ccall "tcsetattr" unsafe
+   c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
 
-foreign import "unlink" unsafe 
+foreign import ccall "uname" unsafe
+   c_uname :: Ptr CUtsname -> IO CInt
+
+foreign import ccall "unlink" unsafe
    c_unlink :: CString -> IO CInt
 
-foreign import "waitpid" unsafe
+foreign import ccall "waitpid" unsafe
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
+#endif
+
+foreign import "s_isreg_wrap"  unsafe s_isreg  :: CMode -> Bool
+foreign import "s_ischr_wrap"  unsafe s_ischr  :: CMode -> Bool
+foreign import "s_isblk_wrap"  unsafe s_isblk  :: CMode -> Bool
+foreign import "s_isdir_wrap"  unsafe s_isdir  :: CMode -> Bool
+foreign import "s_isfifo_wrap" unsafe s_isfifo :: CMode -> Bool
+
+#ifndef mingw32_TARGET_OS
+foreign import "s_issock_wrap" s_issock :: CMode -> Bool
+#else
+s_issock :: CMode -> Bool
+s_issock cmode = False
 #endif

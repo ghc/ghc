@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (only on platforms that provide POSIX regexps)
 --
--- $Id: Posix.hsc,v 1.1 2001/08/02 11:20:50 simonmar Exp $
+-- $Id: Posix.hsc,v 1.2 2001/08/17 12:50:35 simonmar Exp $
 --
 -- Interface to the POSIX regular expression library.
 -- ToDo: detect regex library with configure.
@@ -71,7 +71,7 @@ regexec :: Regex			-- pattern
 		      [String])) 	-- subexpression matches
 
 regexec (Regex regex_fptr) str = do
-  withUnsafeCString str $ \cstr -> do
+  withCString str $ \cstr -> do
     nsub <- withForeignPtr regex_fptr $ \p -> (#peek regex_t, re_nsub) p
     let nsub_int = fromIntegral (nsub :: CSize)
     allocaBytes ((1 + nsub_int) * (#const sizeof(regmatch_t))) $ \p_match -> do
@@ -151,5 +151,5 @@ foreign import "regfree" unsafe
   c_regfree :: Ptr CRegex -> IO ()
 
 foreign import "regexec" unsafe
-  c_regexec :: ForeignPtr CRegex -> UnsafeCString -> CSize
+  c_regexec :: ForeignPtr CRegex -> CString -> CSize
 	    -> Ptr CRegMatch -> CInt -> IO CInt

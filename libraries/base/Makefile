@@ -1,16 +1,12 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 2001/07/31 16:41:32 simonmar Exp $
+# $Id: Makefile,v 1.5 2001/08/17 12:50:34 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
 # -----------------------------------------------------------------------------
 
-ifeq "$(way)" ""
-SUBDIRS = cbits
-else
-SUBDIRS=
-endif
+SUBDIRS = cbits include
 
 ALL_DIRS = \
 	Control \
@@ -21,6 +17,7 @@ ALL_DIRS = \
 	Data/Array \
 	Database \
 	Debug \
+	Debug/QuickCheck \
 	FileFormat \
 	Foreign \
 	Foreign/C \
@@ -33,6 +30,8 @@ ALL_DIRS = \
 	System \
 	System/IO \
 	Text \
+	Text/PrettyPrint \
+	Text/Regex \
 	Text/Show
 
 PKG=core

@@ -1,6 +1,3 @@
-{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
--- JRS 010117: we had to say NON_POSIX_SOURCE to get the resulting .hc
--- to compile on sparc-solaris.  Blargh.
 -----------------------------------------------------------------------------
 -- 
 -- Module      :  System.Time
@@ -11,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.4 2001/07/31 13:06:09 simonmar Exp $
+-- $Id: Time.hsc,v 1.5 2001/08/17 12:50:34 simonmar Exp $
 --
 -- The standard Time library.
 --

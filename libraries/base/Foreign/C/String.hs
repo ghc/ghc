@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: String.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: String.hs,v 1.3 2001/08/17 12:50:34 simonmar Exp $
 --
 -- Utilities for primitive marshaling
 --
@@ -39,14 +39,6 @@ module Foreign.C.String (   -- representation of strings in C
   --
   castCharToCChar,   -- :: Char -> CChar
   castCCharToChar,   -- :: CChar -> Char
-
-  -- UnsafeCString: these might be more efficient than CStrings when
-  -- passing the string to an "unsafe" foreign import.  NOTE: this
-  -- feature might be removed in favour of a more general approach in
-  -- the future.
-  --
-  UnsafeCString,     -- abstract
-  withUnsafeCString, -- :: String -> (UnsafeCString -> IO a) -> IO a
 
   ) where
 
@@ -164,16 +156,3 @@ castCCharToChar ch = unsafeChr (fromIntegral (fromIntegral ch :: Word8))
 
 castCharToCChar :: Char -> CChar
 castCharToCChar ch = fromIntegral (ord ch)
-
-
--- unsafe CStrings
--- ---------------
-
-withUnsafeCString :: String -> (UnsafeCString -> IO a) -> IO a
-#if __GLASGOW_HASKELL__
-newtype UnsafeCString = UnsafeCString (ByteArray Int)
-withUnsafeCString s f = f (UnsafeCString (packString s))
-#else
-newtype UnsafeCString = UnsafeCString (Ptr CChar)
-withUnsafeCString s f = withCString s (\p -> f (UnsafeCString p))
-#endif

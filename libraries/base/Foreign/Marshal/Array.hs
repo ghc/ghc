@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Array.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Array.hs,v 1.3 2001/08/17 12:50:34 simonmar Exp $
 --
 -- Marshalling support: routines allocating, storing, and retrieving Haskell
 -- lists that are represented as arrays in the foreign language
@@ -126,11 +126,18 @@ reallocArray0 ptr size  = reallocArray ptr (size + 1)
 -- marshalling
 -- -----------
 
--- convert an array of given length into a Haskell list
+-- convert an array of given length into a Haskell list.  This version
+-- traverses the array backwards using an accumulating parameter,
+-- which uses constant stack space.  The previous version using mapM
+-- needed linear stack space.
 --
 peekArray          :: Storable a => Int -> Ptr a -> IO [a]
-peekArray size ptr  = mapM (peekElemOff ptr) [0..size-1]
-
+peekArray size ptr | size <= 0 = return []
+                 | otherwise = f (size-1) []
+  where
+    f 0 acc = do e <- peekElemOff ptr 0; return (e:acc)
+    f n acc = do e <- peekElemOff ptr n; f (n-1) (e:acc)
+  
 -- convert an array terminated by the given end marker into a Haskell list
 --
 peekArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO [a]

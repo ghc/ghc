@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Environment.hs,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: Environment.hs,v 1.2 2001/08/17 12:50:34 simonmar Exp $
 --
 -- Miscellaneous information about the system environment.
 --
@@ -37,22 +37,28 @@ import GHC.IOBase
 -- line arguments (not including the program name).
 
 getArgs :: IO [String]
-getArgs = do
-  argv <- peek prog_argv_label
-  argc <- peek prog_argc_label
-  peekArray (fromIntegral argc - 1) (advancePtr argv 1) >>= mapM peekCString
-
-foreign label "prog_argv" prog_argv_label :: Ptr (Ptr (Ptr CChar))
-foreign label "prog_argc" prog_argc_label :: Ptr CInt
+getArgs = 
+  alloca $ \ p_argc ->  
+  alloca $ \ p_argv -> do
+   getProgArgv p_argc p_argv
+   p    <- peek p_argc
+   argv <- peek p_argv
+   peekArray (p - 1) (advancePtr argv 1) >>= mapM peekCString
+   
+   
+foreign import "getProgArgv" getProgArgv :: Ptr Int -> Ptr (Ptr CString) -> IO ()
 
 -- Computation `getProgName' returns the name of the program
 -- as it was invoked.
 
 getProgName :: IO String
-getProgName = do
-  argv <- peek prog_argv_label
-  unpackProgName argv
-
+getProgName = 
+  alloca $ \ p_argc ->
+  alloca $ \ p_argv -> do
+     getProgArgv p_argc p_argv
+     argv <- peek p_argv
+     unpackProgName argv
+  
 unpackProgName	:: Ptr (Ptr CChar) -> IO String   -- argv[0]
 unpackProgName argv = do 
   s <- peekElemOff argv 0 >>= peekCString
@@ -72,7 +78,7 @@ unpackProgName argv = do
 
 getEnv :: String -> IO String
 getEnv name =
-    withUnsafeCString name $ \s -> do
+    withCString name $ \s -> do
       litstring <- c_getenv s
       if litstring /= nullPtr
 	then peekCString litstring
@@ -80,4 +86,4 @@ getEnv name =
 			  "no environment variable" (Just name))
 
 foreign import ccall "getenv" unsafe 
-   c_getenv :: UnsafeCString -> IO (Ptr CChar)
+   c_getenv :: CString -> IO (Ptr CChar)
