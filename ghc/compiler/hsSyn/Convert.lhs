@@ -21,7 +21,7 @@ import HsSyn as Hs
 		Pat(..), HsConDetails(..), HsOverLit, BangType(..),
 		placeHolderType, HsType(..), HsExplicitForAll(..),
 		HsTyVarBndr(..), HsContext,
-		mkSimpleMatch, mkHsForAllTy
+		mkSimpleMatch, mkImplicitHsForAllTy, mkExplicitHsForAllTy
 	) 
 
 import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig )
