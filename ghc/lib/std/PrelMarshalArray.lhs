@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalArray.lhs,v 1.9 2002/02/04 09:05:46 chak Exp $
+% $Id: PrelMarshalArray.lhs,v 1.10 2002/02/05 16:56:38 sewardj Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -208,7 +208,7 @@ withArray0 marker vals f  =
 -- destruct each element of an array (in reverse order)
 --
 destructArray          :: Storable a => Int -> Ptr a -> IO ()
-{-# DEPRECATED destructArray "This function is not standards complaint" #-}
+{-# DEPRECATED destructArray "This function is not standards compliant" #-}
 destructArray size ptr  =
   sequence_ [destruct (ptr `advancePtr` i)
     | i <- [size-1, size-2 .. 0]]
@@ -216,7 +216,7 @@ destructArray size ptr  =
 -- like `destructArray', but a terminator indicates where the array ends
 --
 destructArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO ()
-{-# DEPRECATED destructArray0 "This function is not standards complaint" #-}
+{-# DEPRECATED destructArray0 "This function is not standards compliant" #-}
 destructArray0 marker ptr  = do
   size <- lengthArray0 marker ptr
   sequence_ [destruct (ptr `advancePtr` i)

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStorable.lhs,v 1.11 2002/02/04 09:05:46 chak Exp $
+% $Id: PrelStorable.lhs,v 1.12 2002/02/05 16:56:39 sewardj Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -87,7 +87,7 @@ class Storable a where
    poke ptr = pokeElemOff ptr 0
 
    destruct _ = return ()
-{-# DEPRECATED destruct "This function is not standards complaint" #-}
+{-# DEPRECATED destruct "This function is not standards compliant" #-}
 \end{code}
 
 System-dependent, but rather obvious instances
