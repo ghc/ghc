@@ -223,8 +223,7 @@ processParsedTFile test_filter tfilepath initial_global_env topdefs
            then return []
            else
 
-     do { putStr "\n"   
-        ; officialMsg ("=== running tests in: " ++ tfilepath ++ " ===")
+     do { officialMsg ("=== running tests in: " ++ tfilepath ++ " ===")
 
         ; let macs      = filter isTMacroDef topdefs
         ; let incls     = filter isTInclude  topdefs -- should be []
@@ -242,7 +241,7 @@ processParsedTFile test_filter tfilepath initial_global_env topdefs
      }}
      where
         doOne global_env macro_env (TTest tname stmts)
-           = do putStr "\n\n"
+           = do putStr "\n"
                 let test_id = TestID tfilepath tname
                 officialMsg ("=== " ++ ppTestID test_id ++ " ===")
                 r <- doOneTest (("testname", tname):global_env)
@@ -552,8 +551,8 @@ evalExpr (EExists expr)
      doesFileExistEV filename			`thenEV` \ b ->
      returnEV (fromBool b)
 evalExpr (EDefined v)
-   | null v || head v /= '$'
-   = panic "evalExpr(EDefined): not a var"
+   | null v
+   = panic ("evalExpr(EDefined): not a var " ++ v)
 	-- This is a panic because the lexer+parser should have
 	-- conspired to ensure this
    | otherwise
