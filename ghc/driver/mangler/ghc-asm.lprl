@@ -531,7 +531,14 @@ sub mangle_asm {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'rodata';
 	    $chksymb[$i] = '';
-
+        } elsif ( $TargetPlatform =~ /-darwin/
+                && (/^\s*\.subsections_via_symbols/
+                  ||/^\s*\.no_dead_strip.*/) {
+            # Don't allow Apple's linker to do any dead-stripping of symbols
+            # in this file, because it will mess up info-tables in mangled
+            # code.
+            # The .no_dead_strip directives are actually put there by
+            # the gcc3 "used" attribute on entry points.
 	} elsif ( /^\s+/ ) { # most common case first -- a simple line!
 	    # duplicated from the bottom
 
@@ -540,12 +547,6 @@ sub mangle_asm {
 	} elsif ( /\.\.ng:$/ && $TargetPlatform =~ /^alpha-/ ) {
 	    # Alphas: Local labels not to be confused with new chunks
 	    $chk[$i] .= $_;
-        } elsif ( $TargetPlatform =~ /-darwin/
-                && /^\t\.subsections_via_symbols/) {
-            # Don't allow Apple's linker to do any dead-stripping of symbols
-            # in this file, because it will mess up info-tables in mangled
-            # code.
-
 	# NB: all the rest start with a non-space
 
 	} elsif ( $TargetPlatform =~ /^mips-/
