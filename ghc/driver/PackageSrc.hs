@@ -65,7 +65,7 @@ package_details installing
                             else [ ghc_src_dir cGHC_RUNTIME_DIR ],
         hs_libraries      = [ "HSrts" ],
 #ifndef mingw32_TARGET_OS
-	extra_libraries   = [],
+	extra_libraries   = [ "m" ], -- libm, that is, for ldexp()
 #else
         extra_libraries   = [ "winmm", "wsock32" ], -- winmm for the threadDelay timer, wsock32 for the linker
 #endif
