@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.34 2003/02/01 09:10:16 mthomas Exp $
+ * $Id: Signals.c,v 1.35 2003/03/25 17:15:07 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -79,14 +79,10 @@ more_handlers(I_ sig)
 	return;
 
     if (handlers == NULL)
-	handlers = (StgInt *) malloc((sig + 1) * sizeof(StgInt));
+	handlers = (StgInt *)stgMallocBytes((sig + 1) * sizeof(StgInt), "more_handlers");
     else
-	handlers = (StgInt *) realloc(handlers, (sig + 1) * sizeof(StgInt));
+	handlers = (StgInt *)stgReallocBytes(handlers, (sig + 1) * sizeof(StgInt), "more_handlers");
 
-    if (handlers == NULL) {
-	// don't fflush(stdout); WORKAROUND bug in Linux glibc
-	barf("VM exhausted (in more_handlers)");
-    }
     for(i = nHandlers; i <= sig; i++)
 	// Fill in the new slots with default actions
 	handlers[i] = STG_SIG_DFL;
@@ -397,7 +393,7 @@ shutdown_handler(int sig STG_UNUSED)
     // extreme prejudice.  So the first ^C tries to exit the program
     // cleanly, and the second one just kills it.
     if (interrupted) {
-	exit(EXIT_INTERRUPTED);
+	stg_exit(EXIT_INTERRUPTED);
     } else {
 	interruptStgRts();
     }
