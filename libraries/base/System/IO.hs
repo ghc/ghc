@@ -201,6 +201,9 @@ import IO
   , hGetContents              -- :: Handle -> IO [Char]
   , hPutChar                  -- :: Handle -> Char -> IO ()
   , hPutStr                   -- :: Handle -> [Char] -> IO ()
+  , hPutStrLn                 -- :: Handle -> [Char] -> IO ()
+  , hPrint                    -- :: Handle -> [Char] -> IO ()
+  , hReady                    -- :: Handle -> [Char] -> IO ()
   , hIsOpen, hIsClosed        -- :: Handle -> IO Bool
   , hIsReadable, hIsWritable  -- :: Handle -> IO Bool
   , hIsSeekable               -- :: Handle -> IO Bool
@@ -233,7 +236,7 @@ import System.IO.Error (
 -- -----------------------------------------------------------------------------
 -- Standard IO
 
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
 -- | Write a character to the standard output device
 -- (same as 'hPutChar' 'stdout').
 
@@ -342,8 +345,9 @@ readIO s        =  case (do { (x,t) <- reads s ;
 			[x]    -> return x
 			[]     -> ioError (userError "Prelude.readIO: no parse")
 			_      -> ioError (userError "Prelude.readIO: ambiguous parse")
-#endif  /* __HUGS__ */
+#endif  /* __GLASGOW_HASKELL__ */
 
+#ifndef __NHC__
 -- | Computation 'hReady' @hdl@ indicates whether at least one item is
 -- available for input from handle @hdl@.
 -- 
@@ -373,6 +377,7 @@ hPutStrLn hndl str = do
 
 hPrint		:: Show a => Handle -> a -> IO ()
 hPrint hdl 	=  hPutStrLn hdl . show
+#endif /* !__NHC__ */
 
 -- ---------------------------------------------------------------------------
 -- fixIO
