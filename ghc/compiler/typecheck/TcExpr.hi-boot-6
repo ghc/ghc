@@ -1,6 +1,10 @@
 __interface TcExpr 1 0 where
-__export TcExpr tcExpr ;
+__export TcExpr tcExpr tcMonoExpr ;
 1 tcExpr :: 
+	  RnHsSyn.RenamedHsExpr
+       -> TcType.TcType
+       -> TcMonad.TcM (TcHsSyn.TcExpr, Inst.LIE) ;
+1 tcMonoExpr :: 
 	  RnHsSyn.RenamedHsExpr
        -> TcType.TcType
        -> TcMonad.TcM (TcHsSyn.TcExpr, Inst.LIE) ;

@@ -10,7 +10,7 @@ module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchLambda,
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcExpr( tcExpr )
+import {-# SOURCE #-}	TcExpr( tcMonoExpr )
 
 import HsSyn		( HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			  MonoBinds(..), Stmt(..), HsMatchContext(..), HsDoContext(..),
@@ -358,7 +358,7 @@ tcStmtAndThen combine do_or_lc m_ty@(m,elt_ty) stmt@(BindStmt pat exp src_loc) t
   = tcAddSrcLoc src_loc					$
     tcAddErrCtxt (stmtCtxt do_or_lc stmt)		$
     newTyVarTy liftedTypeKind				`thenNF_Tc` \ pat_ty ->
-    tcExpr exp (m pat_ty)				`thenTc` \ (exp', exp_lie) ->
+    tcMonoExpr exp (m pat_ty)				`thenTc` \ (exp', exp_lie) ->
     tcMatchPats [pat] (mkFunTy pat_ty (m elt_ty))	(\ [pat'] _ ->
 	tcPopErrCtxt 				$
 	thing_inside 				`thenTc` \ (thing, lie) ->
@@ -395,10 +395,10 @@ tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp _ locn) t
   = tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
 	if isDoExpr do_or_lc then
 		newTyVarTy openTypeKind 	`thenNF_Tc` \ any_ty ->
-		tcExpr exp (m any_ty)		`thenNF_Tc` \ (exp', lie) ->
+		tcMonoExpr exp (m any_ty)	`thenNF_Tc` \ (exp', lie) ->
 		returnTc (ExprStmt exp' any_ty locn, lie)
 	else
-		tcExpr exp boolTy		`thenNF_Tc` \ (exp', lie) ->
+		tcMonoExpr exp boolTy		`thenNF_Tc` \ (exp', lie) ->
 		returnTc (ExprStmt exp' boolTy locn, lie)
     )						`thenTc` \ (stmt', stmt_lie) ->
 
@@ -411,9 +411,9 @@ tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp _ locn) t
 tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ResultStmt exp locn) thing_inside
   = tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
 	if isDoExpr do_or_lc then
-		tcExpr exp (m res_elt_ty)
+		tcMonoExpr exp (m res_elt_ty)
 	else
-		tcExpr exp res_elt_ty
+		tcMonoExpr exp res_elt_ty
     )						`thenTc` \ (exp', stmt_lie) ->
 
     thing_inside 				`thenTc` \ (thing, stmts_lie) ->

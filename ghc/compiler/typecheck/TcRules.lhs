@@ -18,8 +18,8 @@ import TcMType		( newTyVarTy )
 import TcType		( tyVarsOfTypes, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
-import TcExpr		( tcExpr )
-import TcEnv		( RecTcEnv, tcExtendLocalValEnv, tcLookupId )
+import TcExpr		( tcMonoExpr )
+import TcEnv		( tcExtendLocalValEnv, tcLookupId )
 import Inst		( LIE, plusLIEs, emptyLIE, instToId )
 import Id		( idName, idType, mkLocalId )
 import Outputable
@@ -67,8 +67,8 @@ tcSourceRule (HsRule name act vars lhs rhs src_loc)
 	tcExtendLocalValEnv [(idName id, id) | id <- ids]	$
 	
 		-- Now LHS and RHS
-	tcExpr lhs rule_ty					`thenTc` \ (lhs', lhs_lie) ->
-	tcExpr rhs rule_ty					`thenTc` \ (rhs', rhs_lie) ->
+	tcMonoExpr lhs rule_ty					`thenTc` \ (lhs', lhs_lie) ->
+	tcMonoExpr rhs rule_ty					`thenTc` \ (rhs', rhs_lie) ->
 	
 	returnTc (ids, lhs', rhs', lhs_lie, rhs_lie)
     )						`thenTc` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->

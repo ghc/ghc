@@ -1,8 +1,12 @@
 _interface_ TcExpr 1
 _exports_
-TcExpr tcExpr ;
+TcExpr tcExpr tcMonoExpr ;
 _declarations_
 1 tcExpr _:_ _forall_ [s] => 
+	  RnHsSyn.RenamedHsExpr
+       -> TcType.TcType
+       -> TcMonad.TcM s (TcHsSyn.TcExpr, Inst.LIE) ;;
+1 tcMonoExpr _:_ _forall_ [s] => 
 	  RnHsSyn.RenamedHsExpr
        -> TcType.TcType
        -> TcMonad.TcM s (TcHsSyn.TcExpr, Inst.LIE) ;;
