@@ -33,7 +33,7 @@ import FiniteMap	( elemFM, FiniteMap )
 import Name		( OccName(..), SYN_IE(Module) )
 import Lex		( isLexConId )
 import Outputable	( Outputable(..), PprStyle(..) )
-import PrelMods
+import PrelMods		( pRELUDE )
 import Pretty
 import SrcLoc		( mkGeneratedSrcLoc, noSrcLoc, SrcLoc )
 import Util		( nOfThem, pprError, panic )
@@ -75,14 +75,22 @@ wlkEntId = wlkQid (\occ -> if isLexConId occ
 			   else VarOcc occ)
 
 wlkQid	:: (FAST_STRING -> OccName) -> U_qid -> UgnM RdrName
+
+-- There are three kinds of qid:
+--	qualified name (noqual)		A.x
+--	unqualified name (aqual)	x
+--	special name (gid)		[], (), ->, (,,,)
+-- The special names always mean "Prelude.whatever"; that's why
+-- they are distinct.  So if you write "()", it's just as if  you
+-- had written "Prelude.()".  NB: The (qualified) prelude is always in scope,
+-- so the renamer will find it.
+
 wlkQid mk_occ_name (U_noqual name)
   = returnUgn (Unqual (mk_occ_name name))
 wlkQid mk_occ_name (U_aqual  mod name)
   = returnUgn (Qual mod (mk_occ_name name) HiFile)
-
-	-- I don't understand this one!  It is what shows up when we meet (), [], or (,,,).
 wlkQid mk_occ_name (U_gid n name)
-  = returnUgn (Unqual (mk_occ_name name))
+  = returnUgn (Qual pRELUDE (mk_occ_name name))
 
 rdTCId  pt = rdU_qid pt `thenUgn` \ qid -> wlkTCId qid
 rdVarId pt = rdU_qid pt `thenUgn` \ qid -> wlkVarId qid
