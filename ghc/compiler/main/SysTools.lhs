@@ -764,10 +764,19 @@ traceCmd phase_name cmd_line action
 
 -- -----------------------------------------------------------------------------
 -- rawSystem: run an external command
+--
+-- In GHC 6.2.1 there's a correct implementation of rawSystem in the
+-- library System.Cmd.  If we are compiling with an earlier version of
+-- GHC than this, we'd better have a copy of the correct implementation
+-- right here.
 
-#if __GLASGOW_HASKELL__ < 601
+-- If you ever alter this code, you must alter 
+--	libraries/base/System/Cmd.hs
+-- at the same time!  There are also exensive comments in System.Cmd
+-- thare are not repeated here -- go look!
 
--- This code is copied from System.Cmd on GHC 6.1.
+
+#if __GLASGOW_HASKELL__ < 621
 
 rawSystem :: FilePath -> [String] -> IO ExitCode
 
@@ -810,7 +819,6 @@ translate :: String -> String
 translate str@('"':_) = str -- already escaped.
 translate str = '"' : foldr escape "\"" str
   where escape '"'  str = '\\' : '"'  : str
-	escape '\\' str = '\\' : '\\' : str
 	escape c    str = c : str
 
 foreign import ccall "rawSystem" unsafe
