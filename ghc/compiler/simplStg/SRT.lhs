@@ -302,7 +302,7 @@ srtLet rho cont off bind body let_constr calc_cont
    let new_cont = calc_cont bind_g cont in
 
     -- now find the SRTs in the body
-   srtExpr rho cont body_off body  =: \(body, body_g, body_srt, let_off) ->
+   srtExpr rho new_cont body_off body  =: \(body, body_g, body_srt, let_off) ->
 
    let
 	-- union all the global references together
