@@ -36,7 +36,7 @@ ALL_DIRS = \
 
 PACKAGE = base
 
-SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude -\#include HsBase.h
+SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude -"\#include" HsBase.h
 SRC_HSC2HS_OPTS += -Iinclude -I$(FPTOOLS_TOP)/ghc/includes
 
 # If there is no system-supplied POSIX regex library, use our own
