@@ -87,7 +87,6 @@ import Name		( Name, isExternalName, getSrcLoc, nameOccName )
 import NameSet
 import TyCon		( tyConGenInfo )
 import BasicTypes       ( EP(..), RecFlag(..) )
-import SrcLoc		( noSrcLoc )
 import Outputable
 import HscTypes		( PersistentCompilerState(..), InteractiveContext(..),
 			  ModIface, ModDetails(..), ModGuts(..),
@@ -111,12 +110,12 @@ import RnHiFiles	( loadInterface )
 import RnEnv		( mkGlobalRdrEnv )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
+import SrcLoc		( noSrcLoc )
 import NameEnv		( delListFromNameEnv )
 import HscTypes		( GlobalRdrElt(..), GlobalRdrEnv, ImportReason(..), Provenance(..), 
 			  isLocalGRE )
 #endif
 
-import DATA_IOREF	( readIORef )
 import FastString	( mkFastString )
 import Panic		( showException )
 import List		( partition )
