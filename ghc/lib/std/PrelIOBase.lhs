@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.27 2000/07/08 18:17:40 panne Exp $
+% $Id: PrelIOBase.lhs,v 1.28 2000/09/25 12:58:39 simonpj Exp $
 % 
 % (c) The University of Glasgow, 1994-2000
 %
@@ -21,6 +21,7 @@ import {-# SOURCE #-} PrelErr ( error )
 
 import PrelST
 import PrelBase
+import PrelNum	  ( fromInteger )	-- Integer literals
 import PrelMaybe  ( Maybe(..) )
 import PrelAddr	  ( Addr(..) )
 import PrelShow

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.32 2000/06/30 13:39:36 simonmar Exp $
+% $Id: PrelNum.lhs,v 1.33 2000/09/25 12:58:39 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -319,39 +319,14 @@ instance  Ord Integer  where
 
 \begin{code}
 instance  Num Integer  where
-    (+) i1@(S# i) i2@(S# j)
-	= case addIntC# i j of { (# r, c #) ->
-	  if c ==# 0# then S# r
-	  else toBig i1 + toBig i2 }
-    (+) i1@(J# _ _) i2@(S# _)	= i1 + toBig i2
-    (+) i1@(S# _) i2@(J# _ _)	= toBig i1 + i2
-    (+) (J# s1 d1) (J# s2 d2)
-      = case plusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
-
-    (-) i1@(S# i) i2@(S# j)
-	= case subIntC# i j of { (# r, c #) ->
-	  if c ==# 0# then S# r
-	  else toBig i1 - toBig i2 }
-    (-) i1@(J# _ _) i2@(S# _)	= i1 - toBig i2
-    (-) i1@(S# _) i2@(J# _ _)	= toBig i1 - i2
-    (-) (J# s1 d1) (J# s2 d2)
-      = case minusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
-
-    (*) i1@(S# i) i2@(S# j)
-	= case mulIntC# i j of { (# r, c #) ->
-	  if c ==# 0# then S# r
-	  else toBig i1 * toBig i2 }
-    (*) i1@(J# _ _) i2@(S# _)	= i1 * toBig i2
-    (*) i1@(S# _) i2@(J# _ _)	= toBig i1 * i2
-    (*) (J# s1 d1) (J# s2 d2)
-      = case timesInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
-
-    negate (S# (-2147483648#)) = 2147483648
-    negate (S# i) = S# (negateInt# i)
-    negate (J# s d) = J# (negateInt# s) d
+    (+) = plusInteger
+    (-) = minusInteger
+    (*) = timesInteger
+    negate	   = negateInteger
+    fromInteger	x  =  x
+    fromInt (I# i) =  S# i
 
     -- ORIG: abs n = if n >= 0 then n else -n
-
     abs (S# (-2147483648#)) = 2147483648
     abs (S# i) = case abs (I# i) of I# j -> S# j
     abs n@(J# s d) = if (s >=# 0#) then n else J# (negateInt# s) d
@@ -365,9 +340,30 @@ instance  Num Integer  where
 	else if cmp ==# 0# then S# 0#
 	else			S# (negateInt# 1#)
 
-    fromInteger	x	=  x
+plusInteger i1@(S# i) i2@(S# j)  = case addIntC# i j of { (# r, c #) ->
+				   if c ==# 0# then S# r
+				   else toBig i1 + toBig i2 }
+plusInteger i1@(J# _ _) i2@(S# _) = i1 + toBig i2
+plusInteger i1@(S# _) i2@(J# _ _) = toBig i1 + i2
+plusInteger (J# s1 d1) (J# s2 d2) = case plusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
-    fromInt (I# i)	=  S# i
+minusInteger i1@(S# i) i2@(S# j)   = case subIntC# i j of { (# r, c #) ->
+				     if c ==# 0# then S# r
+				     else toBig i1 - toBig i2 }
+minusInteger i1@(J# _ _) i2@(S# _) = i1 - toBig i2
+minusInteger i1@(S# _) i2@(J# _ _) = toBig i1 - i2
+minusInteger (J# s1 d1) (J# s2 d2) = case minusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
+
+timesInteger i1@(S# i) i2@(S# j)   = case mulIntC# i j of { (# r, c #) ->
+				     if c ==# 0# then S# r
+				     else toBig i1 * toBig i2 }
+timesInteger i1@(J# _ _) i2@(S# _) = i1 * toBig i2
+timesInteger i1@(S# _) i2@(J# _ _) = toBig i1 * i2
+timesInteger (J# s1 d1) (J# s2 d2) = case timesInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
+
+negateInteger (S# (-2147483648#)) = 2147483648
+negateInteger (S# i)		  = S# (negateInt# i)
+negateInteger (J# s d)		  = J# (negateInt# s) d
 \end{code}
 
 
