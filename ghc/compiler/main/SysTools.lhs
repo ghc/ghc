@@ -245,9 +245,8 @@ initSysTools minusB_args
 	--	pick up whatever happens to be lying around in the path,
 	--	possibly including those from a cygwin install on the target,
 	--	which is exactly what we're trying to avoid.
-	; let gcc_path 	| am_installed = installed_bin ("gcc -B" ++ installed "lib/gcc-lib/" 
-                                         ++ " -I" ++ installed "include/w32api:" 
-                                                  ++ installed "include/mingw")
+	; let gcc_path 	| am_installed = installed_bin ("gcc -B" ++ installed "gcc-lib/"
+                                         ++ " -I" ++ installed "include/mingw")
 		       	| otherwise    = cGCC
 	      perl_path | am_installed = installed_bin cGHC_PERL
 		        | otherwise    = cGHC_PERL
