@@ -42,17 +42,16 @@ import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy, zapToType,
 import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
 			  isSigmaTy, mkFunTy, mkFunTys,
-			  mkTyConApp, mkClassPred, tcFunArgTy,
+			  mkTyConApp, mkClassPred, 
 			  tyVarsOfTypes, isLinearPred,
 			  liftedTypeKind, openTypeKind, 
-			  tcSplitSigmaTy, tcTyConAppTyCon,
-			  tidyOpenType
+			  tcSplitSigmaTy, tidyOpenType
 			)
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
 import Id		( Id, idType, recordSelectorFieldLabel, isRecordSelector )
 import DataCon		( DataCon, dataConFieldLabels, dataConSig, dataConStrictMarks, dataConWrapId )
 import Name		( Name )
-import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons, isClassTyCon )
+import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy )

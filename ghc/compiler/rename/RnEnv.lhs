@@ -33,8 +33,7 @@ import Name		( Name, getName, nameIsLocalOrFrom,
 			  isWiredInName, mkInternalName, mkExternalName, mkIPName, 
 			  nameSrcLoc, nameOccName, setNameSrcLoc, nameModule	)
 import NameSet
-import OccName		( OccName, tcName, isDataOcc, occNameUserString, occNameFlavour,
-			  reportIfUnused )
+import OccName		( OccName, tcName, isDataOcc, occNameFlavour, reportIfUnused )
 import Module		( Module, ModuleName, moduleName, mkHomeModule,
 			  lookupModuleEnv, lookupModuleEnvByName, extendModuleEnv_C )
 import PrelNames	( mkUnboundName, intTyConName, 
@@ -318,8 +317,9 @@ lookupInstDeclBndr cls_name rdr_name
     getGblEnv				`thenM` \ gbl_env ->
     let
 	avail_env = imp_env (tcg_imports gbl_env)
+        occ       = rdrNameOcc rdr_name
     in
-    case lookupAvailEnv avail_env cls_name of
+    case lookupAvailEnv_maybe avail_env cls_name of
 	Nothing -> 
 	    -- If the class itself isn't in scope, then cls_name will
 	    -- be unboundName, and there'll already be an error for
@@ -343,8 +343,6 @@ lookupInstDeclBndr cls_name rdr_name
 	  -- NB: qualified names are rejected by the parser
     lookupOrigName rdr_name
 
-  where
-    occ = rdrNameOcc rdr_name
 
 lookupSysBndr :: RdrName -> RnM Name
 -- Used for the 'system binders' in a data type or class declaration
@@ -770,7 +768,7 @@ bindLocalsRn doc rdr_names enclosed_scope
 
 	-- binLocalsFVRn is the same as bindLocalsRn
 	-- except that it deals with free vars
-bindLocalsFVRn doc rdr_names enclosed_scope
+bindLocalsFV doc rdr_names enclosed_scope
   = bindLocalsRn doc rdr_names		$ \ names ->
     enclosed_scope names		`thenM` \ (thing, fvs) ->
     returnM (thing, delListFromNameSet fvs names)
@@ -793,13 +791,11 @@ bindTyVarsRn doc_str tyvar_names enclosed_scope
     bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
     enclosed_scope (zipWith replaceTyVarName tyvar_names names)
 
-bindPatSigTyVars :: [RdrNameHsType]
-		 -> RnM (a, FreeVars)
-	  	 -> RnM (a, FreeVars)
+bindPatSigTyVars :: [RdrNameHsType] -> ([Name] -> RnM a) -> RnM a
   -- Find the type variables in the pattern type 
   -- signatures that must be brought into scope
 
-bindPatSigTyVars tys enclosed_scope
+bindPatSigTyVars tys thing_inside
   = getLocalRdrEnv		`thenM` \ name_env ->
     getSrcLocM			`thenM` \ loc ->
     let
@@ -814,10 +810,15 @@ bindPatSigTyVars tys enclosed_scope
 	located_tyvars = [(tv, loc) | tv <- forall_tyvars] 
 	doc_sig        = text "In a pattern type-signature"
     in
-    bindLocatedLocalsRn doc_sig located_tyvars	$ \ names ->
-    enclosed_scope 				`thenM` \ (thing, fvs) ->
-    returnM (thing, delListFromNameSet fvs names)
+    bindLocatedLocalsRn doc_sig located_tyvars thing_inside
 
+bindPatSigTyVarsFV :: [RdrNameHsType]
+		   -> RnM (a, FreeVars)
+	  	   -> RnM (a, FreeVars)
+bindPatSigTyVarsFV tys thing_inside
+  = bindPatSigTyVars tys	$ \ tvs ->
+    thing_inside		`thenM` \ (result,fvs) ->
+    returnM (result, fvs `delListFromNameSet` tvs)
 
 -------------------------------------
 checkDupOrQualNames, checkDupNames :: SDoc
@@ -896,7 +897,6 @@ mkGlobalRdrEnv this_mod unqual_imp mk_provenance avails deprecs
 				   else Just parent, 
 		      gre_prov   = mk_provenance name, 
 		      gre_deprec = lookupDeprec deprecs name}
-		      
 \end{code}
 
 \begin{code}

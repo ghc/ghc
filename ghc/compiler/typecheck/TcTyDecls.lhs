@@ -27,8 +27,7 @@ import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, allFieldLabelTag
 import MkId		( mkDataConWorkId, mkDataConWrapId, mkRecordSelId )
 import Var		( TyVar )
 import Name		( Name )
-import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc,
-			  mkGenOcc1, mkGenOcc2, setOccNameSpace )
+import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc, mkGenOcc1, mkGenOcc2 )
 import Outputable
 import TyCon		( TyCon, DataConDetails(..), visibleDataCons,
 			  tyConTyVars, tyConName )

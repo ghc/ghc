@@ -57,12 +57,12 @@ import TcType		( Type, ThetaType, TcKind, TcTyVar, TcTyVarSet,
 			)
 import qualified Type	( getTyVar_maybe )
 import Rules		( extendRuleBase )
-import Id		( idName, isLocalId, isDataConWrapId_maybe )
+import Id		( idName, isLocalId )
 import Var		( TyVar, Id, idType )
 import VarSet
 import VarEnv
 import CoreSyn		( IdCoreRule )
-import DataCon		( DataCon, dataConWrapId )
+import DataCon		( DataCon )
 import TyCon		( TyCon, DataConDetails )
 import Class		( Class, ClassOpItem )
 import Name		( Name, NamedThing(..), 
@@ -76,7 +76,6 @@ import Rules		( RuleBase )
 import BasicTypes	( EP )
 import Module		( Module )
 import InstEnv		( InstEnv, extendInstEnv )
-import Maybes		( seqMaybe )
 import SrcLoc		( SrcLoc )
 import Outputable
 import Maybe		( isJust )

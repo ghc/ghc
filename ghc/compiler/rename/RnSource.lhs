@@ -28,7 +28,7 @@ import RnBinds		( rnTopMonoBinds, rnMonoBinds, rnMethodBinds,
 			  rnMonoBindsAndThen, renameSigs, checkSigs )
 import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupSysBndr,
 			  newLocalsRn, lookupGlobalOccRn,
-			  bindLocalsFVRn, bindPatSigTyVars,
+			  bindLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
 			  bindCoreLocalRn, bindCoreLocalsRn, bindLocalNames,
 			  checkDupOrQualNames, checkDupNames, mapFvRn,
@@ -37,7 +37,7 @@ import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupSysBndr,
 			)
 import TcRnMonad
 
-import BasicTypes	( FixitySig(..) )
+import BasicTypes	( FixitySig(..), TopLevelFlag(..)  )
 import HscTypes		( ExternalPackageState(..), FixityEnv, 
 			  Deprecations(..), plusDeprecs )
 import Module		( moduleEnvElts )
@@ -75,7 +75,7 @@ Checks the @(..)@ etc constraints in the export list.
 
 
 \begin{code}
-rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name, FreeVars)
+rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name, DefUses)
 
 rnSrcDecls (HsGroup { hs_valds  = MonoBind binds sigs _,
 		      hs_tyclds = tycl_decls,
@@ -99,13 +99,21 @@ rnSrcDecls (HsGroup { hs_valds  = MonoBind binds sigs _,
 		  $ do {
 
 		-- Rename other declarations
-	(rn_val_decls, src_fvs1)     <- rnTopMonoBinds binds sigs ;
-	(rn_inst_decls, src_fvs2)    <- mapFvRn rnSrcInstDecl inst_decls ;
-	(rn_tycl_decls, src_fvs3)    <- mapFvRn rnSrcTyClDecl tycl_decls ;
-	(rn_rule_decls, src_fvs4)    <- mapFvRn rnHsRuleDecl rule_decls ;
-	(rn_foreign_decls, src_fvs5) <- mapFvRn rnHsForeignDecl foreign_decls ;
-	(rn_default_decls, src_fvs6) <- mapFvRn rnDefaultDecl default_decls ;
-	(rn_core_decls,    src_fvs7) <- mapFvRn rnCoreDecl core_decls ;
+	(rn_val_decls, bind_dus) <- rnTopMonoBinds binds sigs ;
+
+		-- You might think that we could build proper def/use information
+		-- for type and class declarations, but they can be involved
+		-- in mutual recursion across modules, and we only do the SCC
+		-- analysis for them in the type checker.
+		-- So we content ourselves with gathering uses only; that
+		-- means we'll only report a declaration as unused if it isn't
+		-- mentioned at all.  Ah well.
+	(rn_tycl_decls,    src_fvs1) <- mapFvRn rnSrcTyClDecl tycl_decls ;
+	(rn_inst_decls,    src_fvs2) <- mapFvRn rnSrcInstDecl inst_decls ;
+	(rn_rule_decls,    src_fvs3) <- mapFvRn rnHsRuleDecl rule_decls ;
+	(rn_foreign_decls, src_fvs4) <- mapFvRn rnHsForeignDecl foreign_decls ;
+	(rn_default_decls, src_fvs5) <- mapFvRn rnDefaultDecl default_decls ;
+	(rn_core_decls,    src_fvs6) <- mapFvRn rnCoreDecl core_decls ;
 	
 	let {
 	   rn_group = HsGroup { hs_valds  = rn_val_decls,
@@ -117,12 +125,14 @@ rnSrcDecls (HsGroup { hs_valds  = MonoBind binds sigs _,
 			    	hs_defds  = rn_default_decls,
 			    	hs_ruleds = rn_rule_decls,
 			    	hs_coreds = rn_core_decls } ;
-	   src_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4, 
-			      src_fvs5, src_fvs6, src_fvs7] } ;
 
-	traceRn (text "rnSrcDecls" <+> ppr (nameSetToList src_fvs)) ;
+	   other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs3, 
+				src_fvs4, src_fvs5, src_fvs6] ;
+	   src_dus = bind_dus `plusDU` usesOnly other_fvs 
+	} ;
+
 	tcg_env <- getGblEnv ;
-	return (tcg_env, rn_group, src_fvs)
+	return (tcg_env, rn_group, src_dus)
     }}}
 \end{code}
 
@@ -249,18 +259,13 @@ is just one hi-boot file (for RnSource).  rnSrcDecls is part
 of the loop too, and it must be defined in this module.
 
 \begin{code}
-rnTopBinds    :: RdrNameHsBinds -> RnM (RenamedHsBinds, FreeVars)
-rnTopBinds EmptyBinds		  = returnM (EmptyBinds, emptyFVs)
-rnTopBinds (MonoBind bind sigs _) = rnTopMonoBinds bind sigs
-  -- The parser doesn't produce other forms
-
-rnBinds    :: RdrNameHsBinds -> RnM (RenamedHsBinds, FreeVars)
+rnBinds    :: RdrNameHsBinds -> RnM (RenamedHsBinds, DefUses)
 -- This version assumes that the binders are already in scope
 -- It's used only in 'mdo'
-rnBinds EmptyBinds	       = returnM (EmptyBinds, emptyFVs)
-rnBinds (MonoBind bind sigs _) = rnMonoBinds bind sigs
+rnBinds EmptyBinds	       = returnM (EmptyBinds, emptyDUs)
+rnBinds (MonoBind bind sigs _) = rnMonoBinds NotTopLevel bind sigs
 rnBinds b@(IPBinds bind _)     = addErr (badIpBinds b)	`thenM_` 
-			         returnM (EmptyBinds, emptyFVs)
+			         returnM (EmptyBinds, emptyDUs)
 
 rnBindsAndThen	:: RdrNameHsBinds 
 		-> (RenamedHsBinds -> RnM (result, FreeVars))
@@ -378,7 +383,7 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
 	--
 	-- But the (unqualified) method names are in scope
     bindLocalNames binders (renameSigs uprags)			`thenM` \ uprags' ->
-    checkSigs okInstDclSig (mkNameSet binders) uprags'		`thenM_`
+    checkSigs (okInstDclSig (mkNameSet binders)) uprags'	`thenM_`
 
     returnM (InstDecl inst_ty mbinds' uprags' maybe_dfun_name src_loc,
 	      meth_fvs `plusFV` hsSigsFVs uprags')
@@ -404,10 +409,10 @@ rnIfaceRuleDecl (IfaceRuleOut fn rule)		-- Builtin rules come this way
     returnM (IfaceRuleOut fn' rule)
 
 rnHsRuleDecl (HsRule rule_name act vars lhs rhs src_loc)
-  = addSrcLoc src_loc				$
-    bindPatSigTyVars (collectRuleBndrSigTys vars)	$
+  = addSrcLoc src_loc					$
+    bindPatSigTyVarsFV (collectRuleBndrSigTys vars)	$
 
-    bindLocalsFVRn doc (map get_var vars)	$ \ ids ->
+    bindLocalsFV doc (map get_var vars)		$ \ ids ->
     mapFvRn rn_var (vars `zip` ids)		`thenM` \ (vars', fv_vars) ->
 
     rnExpr lhs					`thenM` \ (lhs', fv_lhs) ->
@@ -559,11 +564,8 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname,
     in
     checkDupOrQualNames sig_doc sig_rdr_names_w_locs	`thenM_` 
     mappM (rnClassOp cname' fds') op_sigs		`thenM` \ sigs' ->
-    let
-	binders = mkNameSet [ nm | (ClassOpSig nm _ _ _) <- sigs' ]
-    in
-    renameSigs non_op_sigs			`thenM` \ non_ops' ->
-    checkSigs okClsDclSig binders non_ops'	`thenM_`
+    renameSigs non_op_sigs				`thenM` \ non_ops' ->
+    checkSigs okClsDclSig  non_ops'			`thenM_`
 	-- Typechecker is responsible for checking that we only
 	-- give default-method bindings for things in this class.
 	-- The renamer *could* check this for class decls, but can't

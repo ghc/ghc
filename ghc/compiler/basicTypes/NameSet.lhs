@@ -14,7 +14,12 @@ module NameSet (
 	
 	-- Free variables
 	FreeVars, isEmptyFVs, emptyFVs, plusFVs, plusFV, 
-	mkFVs, addOneFV, unitFV, delFV, delFVs
+	mkFVs, addOneFV, unitFV, delFV, delFVs,
+
+	-- Defs and uses
+	Defs, Uses, DefUse, DefUses,
+	emptyDUs, usesOnly, mkDUs, plusDU, 
+	findUses, duDefs, duUses
     ) where
 
 #include "HsVersions.h"
@@ -104,3 +109,76 @@ delFV n s   = delFromNameSet s n
 delFVs ns s = delListFromNameSet s ns
 \end{code}
 
+
+%************************************************************************
+%*									*
+		Defs and uses
+%*									*
+%************************************************************************
+
+\begin{code}
+type Defs = NameSet
+type Uses = NameSet
+
+type DefUse  = (Maybe Defs, Uses)
+type DefUses = [DefUse]
+	-- In dependency order: earlier Defs scope over later Uses
+	-- For items (Just ds, us), the use of any member 
+	-- of the ds implies that all the us are used too
+	--
+	-- Also, us may mention ds
+	--
+	-- Nothing => Nothing defined in this group, but
+	-- 	      nevertheless all the uses are essential.
+	--	      Used for instance declarations, for example
+
+emptyDUs :: DefUses
+emptyDUs = []
+
+usesOnly :: Uses -> DefUses
+usesOnly uses = [(Nothing, uses)]
+
+mkDUs :: [(Defs,Uses)] -> DefUses
+mkDUs pairs = [(Just defs, uses) | (defs,uses) <- pairs]
+
+plusDU :: DefUses -> DefUses -> DefUses
+plusDU = (++)
+
+allUses :: DefUses -> Uses -> Uses
+-- Collect all uses, removing defs
+allUses dus uses
+  = foldr get emptyNameSet dus
+  where
+    get (Nothing,   rhs_uses) uses = rhs_uses `unionNameSets` uses
+    get (Just defs, rhs_uses) uses = (rhs_uses `unionNameSets` uses)
+				     `minusNameSet` defs
+
+findUses :: DefUses -> Uses -> Uses
+-- Given some DefUses and some Uses, 
+-- find all the uses, transitively. 
+-- The result is a superset of the input uses;
+-- and includes things defined in the input DefUses
+-- (if they are used, of course)
+findUses dus uses 
+  = foldr get uses dus
+  where
+    get (Nothing, rhs_uses) uses
+	= rhs_uses `unionNameSets` uses
+    get (Just defs, rhs_uses) uses
+	| defs `intersectsNameSet` uses
+	= rhs_uses `unionNameSets` uses
+	| otherwise	-- No def is used
+	= uses
+
+duDefs :: DefUses -> Defs
+duDefs dus = foldr get emptyNameSet dus
+  where
+    get (Nothing, u1) d2 = d2
+    get (Just d1, u1) d2 = d1 `unionNameSets` d2
+
+duUses :: DefUses -> Uses
+-- Defs are not eliminated
+duUses dus = foldr get emptyNameSet dus
+  where
+    get (d1, u1) u2 = u1 `unionNameSets` u2
+\end{code}

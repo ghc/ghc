@@ -23,7 +23,7 @@ module TcRnTypes(
 	ImportAvails(..), emptyImportAvails, plusImportAvails, 
 	plusAvail, pruneAvails,  
 	AvailEnv, emptyAvailEnv, unitAvailEnv, plusAvailEnv, 
-	mkAvailEnv, lookupAvailEnv, availEnvElts, addAvail,
+	mkAvailEnv, lookupAvailEnv, lookupAvailEnv_maybe, availEnvElts, addAvail,
 	WhereFrom(..),
 
 	-- Typechecker types
@@ -464,10 +464,11 @@ emptyUsages = emptyNameSet
 
 ImportAvails summarises what was imported from where, irrespective
 of whether the imported htings are actually used or not
-It is used 	* when porcessing the export list
+It is used 	* when processing the export list
 		* when constructing usage info for the inteface file
 		* to identify the list of directly imported modules
 			for initialisation purposes
+		* when figuring out what things are really unused
 
 \begin{code}
 data ImportAvails 
@@ -597,7 +598,13 @@ unitAvailEnv a = unitNameEnv (availName a) a
 plusAvailEnv :: AvailEnv -> AvailEnv -> AvailEnv
 plusAvailEnv = plusNameEnv_C plusAvail
 
-lookupAvailEnv = lookupNameEnv
+lookupAvailEnv_maybe :: AvailEnv -> Name -> Maybe AvailInfo
+lookupAvailEnv_maybe = lookupNameEnv
+
+lookupAvailEnv :: AvailEnv -> Name -> AvailInfo
+lookupAvailEnv env n = case lookupNameEnv env n of
+			 Just avail -> avail
+			 Nothing    -> pprPanic "lookupAvailEnv" (ppr n)
 
 availEnvElts = nameEnvElts
 

@@ -34,7 +34,7 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  isTauTy, isSigmaTy, 
 			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, 
 			  tcGetTyVar_maybe, tcGetTyVar, 
-			  mkTyConApp, mkFunTy, tyVarsOfType, mkPhiTy,
+			  mkFunTy, tyVarsOfType, mkPhiTy,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys,
 			  isHoleTyVar, isSkolemTyVar, isUserTyVar, 
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
@@ -45,17 +45,17 @@ import qualified Type	( getTyVar_maybe )
 import Inst		( newDicts, instToId, tcInstCall )
 import TcMType		( getTcTyVar, putTcTyVar, tcInstType, readHoleResult, newKindVar,
 			  newTyVarTy, newTyVarTys, newOpenTypeKind, newHoleTyVarTy, 
-			  zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV, zonkTcTyVar )
+			  zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV )
 import TcSimplify	( tcSimplifyCheck )
 import TysWiredIn	( listTyCon, parrTyCon, mkListTy, mkPArrTy, mkTupleTy )
-import TcEnv		( TcTyThing(..), tcGetGlobalTyVars, findGlobals )
+import TcEnv		( tcGetGlobalTyVars, findGlobals )
 import TyCon		( tyConArity, isTupleTyCon, tupleTyConBoxity )
 import PprType		( pprType )
-import Id		( Id, mkSysLocal, idType )
+import Id		( Id, mkSysLocal )
 import Var		( Var, varName, tyVarKind )
 import VarSet		( emptyVarSet, unitVarSet, unionVarSet, elemVarSet, varSetElems )
 import VarEnv
-import Name		( isSystemName, getSrcLoc )
+import Name		( isSystemName )
 import ErrUtils		( Message )
 import BasicTypes	( Boxity, Arity, isBoxed )
 import Util		( equalLength, notNull )

@@ -15,7 +15,7 @@ module RnHiFiles (
 
 import DriverState	( v_GhcMode, isCompManagerMode )
 import DriverUtil	( replaceFilenameSuffix )
-import CmdLineOpts	( opt_IgnoreIfacePragmas, verbosity )
+import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Parser		( parseIface )
 import HscTypes		( ModIface(..), emptyModIface,
 			  ExternalPackageState(..), noDependencies,
@@ -52,7 +52,7 @@ import Module		( Module, ModuleName, ModLocation(ml_hi_file),
 			  extendModuleEnv, lookupModuleEnvByName
 			)
 import RdrName		( RdrName, mkRdrUnqual, rdrNameOcc, nameRdrName )
-import OccName		( OccName, mkWorkerOcc, mkClassTyConOcc, mkClassDataConOcc,
+import OccName		( OccName, mkClassTyConOcc, mkClassDataConOcc,
 			  mkSuperDictSelOcc, mkGenOcc1, mkGenOcc2, 
 			  mkDataConWrapperOcc, mkDataConWorkerOcc )
 import TyCon		( DataConDetails(..) )

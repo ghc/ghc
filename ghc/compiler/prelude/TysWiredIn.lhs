@@ -97,7 +97,7 @@ import TyCon		( TyCon, AlgTyConFlavour(..), DataConDetails(..), tyConDataCons,
 			  mkTupleTyCon, mkAlgTyCon, tyConName
 			)
 
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, StrictnessMark(..) )
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys, 
 			  mkArrowKinds, liftedTypeKind, unliftedTypeKind,

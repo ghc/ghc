@@ -49,7 +49,7 @@ import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zapToType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
 		)
 import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
-		  SourceType(..), PredType, ThetaType, TyVarDetails(VanillaTv),
+		  SourceType(..), PredType, TyVarDetails(VanillaTv),
 		  tcSplitForAllTys, tcSplitForAllTys, mkTyConApp,
 		  tcSplitMethodTy, tcSplitPhiTy, mkGenTyConApp,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
@@ -61,13 +61,12 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy
 		)
 import CoreFVs	( idFreeTyVars )
-import Class	( Class )
 import DataCon	( DataCon,dataConSig )
 import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName )
 import PprType	( pprPred, pprParendType )	
-import Subst	( emptyInScopeSet, mkSubst, substTy, substTyWith, substTheta, mkTyVarSubst )
+import Subst	( substTy, substTyWith, substTheta, mkTyVarSubst )
 import Literal	( inIntRange )
 import Var	( TyVar )
 import VarEnv	( TidyEnv, emptyTidyEnv, lookupSubstEnv, SubstResult(..) )

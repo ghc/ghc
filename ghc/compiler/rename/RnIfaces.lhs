@@ -41,7 +41,6 @@ import NameSet
 import Module		( Module, isHomeModule )
 import PrelNames	( hasKey, fractionalClassKey, numClassKey, 
 			  integerTyConName, doubleTyConName )
-import FiniteMap
 import Outputable
 import Bag
 import Maybe( fromJust )

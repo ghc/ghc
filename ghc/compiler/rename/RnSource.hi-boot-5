@@ -7,9 +7,9 @@ __export RnSource rnBindsAndThen rnBinds rnSrcDecls;
 	-> TcRnTypes.RnM (b, NameSet.FreeVars) ;
 
 1 rnBinds :: RdrHsSyn.RdrNameHsBinds
-	-> TcRnTypes.RnM (RnHsSyn.RenamedHsBinds, NameSet.FreeVars) ;
+	-> TcRnTypes.RnM (RnHsSyn.RenamedHsBinds, NameSet.DefUses) ;
 
 1 rnSrcDecls :: HsDecls.HsGroup RdrName.RdrName
-	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, HsDecls.HsGroup Name.Name, NameSet.FreeVars) ;
+	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, HsDecls.HsGroup Name.Name, NameSet.DefUses) ;
 
 

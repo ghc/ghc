@@ -28,7 +28,7 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkVanillaGlobal, mkLocalId, isDataConWorkId_maybe )
+import Id		( Id, mkVanillaGlobal, mkLocalId )
 import MkId		( mkFCallId )
 import IdInfo
 import TyCon		( tyConDataCons, tyConTyVars )
@@ -40,7 +40,7 @@ import Name		( Name )
 import UniqSupply	( initUs_ )
 import Outputable	
 import Util		( zipWithEqual, dropList, equalLength )
-import HscTypes		( TyThing(..), typeEnvIds )
+import HscTypes		( typeEnvIds )
 import CmdLineOpts	( DynFlag(..) )
 \end{code}
 

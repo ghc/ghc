@@ -49,7 +49,6 @@ import DataCon		( classDataCon )
 import Class		( Class, classBigSig )
 import Var		( idName, idType )
 import NameSet		
-import Id		( setIdLocalExported )
 import MkId		( mkDictFunId, rUNTIME_ERROR_ID )
 import FunDeps		( checkInstFDs )
 import Generics		( validGenericInstanceType )

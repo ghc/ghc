@@ -16,7 +16,7 @@ import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..),
 			  isClassOpSig, isPragSig, 
 			  placeHolderType
 			)
-import BasicTypes	( RecFlag(..), StrictnessMark(..) )
+import BasicTypes	( RecFlag(..) )
 import RnHsSyn		( RenamedTyClDecl, RenamedSig,
 			  RenamedClassOpSig, RenamedMonoBinds,
 			  maybeGenericMatch
@@ -48,12 +48,11 @@ import Class		( classTyVars, classBigSig, classTyCon,
 import TyCon		( tyConGenInfo )
 import Subst		( substTyWith )
 import MkId		( mkDictSelId, mkDefaultMethodId )
-import Id		( Id, idType, idName, mkUserLocal, setIdLocalExported, setInlinePragma )
+import Id		( Id, idType, idName, mkUserLocal, setInlinePragma )
 import Name		( Name, NamedThing(..) )
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv )
 import NameSet		( emptyNameSet, unitNameSet )
-import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc, 
-			  mkSuperDictSelOcc, reportIfUnused )
+import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkSuperDictSelOcc, reportIfUnused )
 import Outputable
 import Var		( TyVar )
 import CmdLineOpts

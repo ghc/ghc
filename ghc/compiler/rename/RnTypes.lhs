@@ -21,7 +21,7 @@ import RnHsSyn	( RenamedContext, RenamedHsType, RenamedPat,
 		  parrTyCon_name, tupleTyCon_name, listTyCon_name, charTyCon_name )
 import RnEnv	( lookupOccRn, lookupBndrRn, lookupSyntaxName, lookupGlobalOccRn,
 		  newIPName, bindTyVarsRn, lookupFixityRn, mapFvRn,
-		  bindPatSigTyVars, bindLocalsFVRn, warnUnusedMatches )
+		  bindPatSigTyVarsFV, bindLocalsFV, warnUnusedMatches )
 import TcRnMonad
 
 import PrelNames( cCallishClassKeys, eqStringName, eqClassName, ordClassName, 
@@ -310,8 +310,8 @@ rnPatsAndThen :: HsMatchContext Name
 --	f x x = 1
 
 rnPatsAndThen ctxt pats thing_inside
-  = bindPatSigTyVars pat_sig_tys 	$
-    bindLocalsFVRn doc_pat bndrs	$ \ new_bndrs ->
+  = bindPatSigTyVarsFV pat_sig_tys 	$
+    bindLocalsFV doc_pat bndrs		$ \ new_bndrs ->
     rnPats pats				`thenM` \ (pats', pat_fvs) ->
     thing_inside pats'			`thenM` \ (res, res_fvs) ->
 

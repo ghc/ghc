@@ -69,7 +69,7 @@ rnMatch ctxt match@(Match pats maybe_rhs_sig grhss)
   = addSrcLoc (getMatchLoc match)	$
 
 	-- Deal with the rhs type signature
-    bindPatSigTyVars rhs_sig_tys	$ 
+    bindPatSigTyVarsFV rhs_sig_tys	$ 
     doptM Opt_GlasgowExts		`thenM` \ opt_GlasgowExts ->
     (case maybe_rhs_sig of
 	Nothing -> returnM (Nothing, emptyFVs)
@@ -84,7 +84,7 @@ rnMatch ctxt match@(Match pats maybe_rhs_sig grhss)
     rnGRHSs ctxt grhss		`thenM` \ (grhss', grhss_fvs) ->
 
     returnM (Match pats' maybe_rhs_sig' grhss', grhss_fvs `plusFV` ty_fvs)
-	-- The bindPatSigTyVars and rnPatsAndThen will remove the bound FVs
+	-- The bindPatSigTyVarsFV and rnPatsAndThen will remove the bound FVs
   where
      rhs_sig_tys =  case maybe_rhs_sig of
 			Nothing -> []
@@ -455,10 +455,10 @@ rnBracket (DecBr group)
 
     updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env gbl }) $
 
-    rnSrcDecls group	`thenM` \ (tcg_env, group', fvs) ->
+    rnSrcDecls group	`thenM` \ (tcg_env, group', dus) ->
 	-- Discard the tcg_env; it contains only extra info about fixity
 
-    returnM (DecBr group', fvs)
+    returnM (DecBr group', duUses dus `minusNameSet` duDefs dus)
 \end{code}
 
 %************************************************************************
@@ -515,7 +515,9 @@ rnNormalStmts ctxt (LetStmt binds : stmts)
     ok _	       _	     = True
 
 rnNormalStmts ctxt (ParStmt stmtss : stmts)
-  = mapFvRn (rnNormalStmts (ParStmtCtxt ctxt)) stmtss	`thenM` \ (stmtss', fv_stmtss) ->
+  = doptM Opt_GlasgowExts		`thenM` \ opt_GlasgowExts ->
+    checkM opt_GlasgowExts parStmtErr 	`thenM_`
+    mapFvRn (rnNormalStmts (ParStmtCtxt ctxt)) stmtss	`thenM` \ (stmtss', fv_stmtss) ->
     let
 	bndrss = map collectStmtsBinders stmtss'
     in
@@ -549,8 +551,6 @@ rnNormalStmts ctxt stmts = pprPanic "rnNormalStmts" (ppr stmts)
 %************************************************************************
 
 \begin{code}
-type Defs    = NameSet
-type Uses    = NameSet	-- Same as FreeVars really
 type FwdRefs = NameSet
 type Segment = (Defs,
 		Uses, 		-- May include defs
@@ -620,9 +620,9 @@ rn_mdo_stmt (BindStmt pat expr src_loc)
 	     [BindStmt pat' expr' src_loc])
 
 rn_mdo_stmt (LetStmt binds)
-  = rnBinds binds		`thenM` \ (binds', fv_binds) ->
-    returnM (mkNameSet (collectHsBinders binds'), 
-	     fv_binds, emptyNameSet, [LetStmt binds'])
+  = rnBinds binds		`thenM` \ (binds', du_binds) ->
+    returnM (duDefs du_binds, duUses du_binds, 
+	     emptyNameSet, [LetStmt binds'])
 
 rn_mdo_stmt stmt@(ParStmt _)	-- Syntactically illegal in mdo
   = pprPanic "rn_mdo_stmt" (ppr stmt)
@@ -922,6 +922,8 @@ checkTH e what 	-- Raise an error in a stage-1 compiler
 	          ptext SLIT("illegal in a stage-1 compiler"),
 	          nest 2 (ppr e)])
 #endif   
+
+parStmtErr = addErr (ptext SLIT("Illegal parallel list comprehension: use -fglagow-exts"))
 
 badIpBinds binds
   = hang (ptext SLIT("Implicit-parameter bindings illegal in a parallel list comprehension:")) 4

@@ -22,12 +22,12 @@ import TcEnv		( tcExtendTempInstEnv, newDFunName,
 			  pprInstInfoDetails, tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
-import InstEnv		( InstEnv, simpleDFunClassTyCon )
+import InstEnv		( simpleDFunClassTyCon )
 import TcMonoType	( tcHsPred )
 import TcSimplify	( tcSimplifyDeriv )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
-import RnEnv		( bindLocalsFVRn )
+import RnEnv		( bindLocalsFV )
 import TcRnMonad	( thenM, returnM, mapAndUnzipM )
 import HscTypes		( DFunId )
 
@@ -256,11 +256,11 @@ deriveOrdinaryStuff eqns
 	-- Rename to get RenamedBinds.
 	-- The only tricky bit is that the extra_binds must scope 
 	-- over the method bindings for the instances.
-	bindLocalsFVRn (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
-	rnTopMonoBinds extra_mbinds []			`thenM` \ (rn_extra_binds, fvs) ->
+	bindLocalsFV (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
+	rnTopMonoBinds extra_mbinds []			`thenM` \ (rn_extra_binds, dus) ->
 	mapAndUnzipM rn_meths method_binds_s		`thenM` \ (rn_method_binds_s, fvs_s) ->
 	returnM ((rn_method_binds_s, rn_extra_binds), 
-		  fvs `plusFV` plusFVs fvs_s)
+		  duUses dus `plusFV` plusFVs fvs_s)
     )				`thenM` \ ((rn_method_binds_s, rn_extra_binds), fvs) ->
     let
 	new_inst_infos = zipWith gen_inst_info new_dfuns rn_method_binds_s

@@ -41,7 +41,7 @@ import RdrName		( RdrName, getRdrName, mkRdrUnqual,
 import RnHsSyn		( RenamedStmt, RenamedTyClDecl, 
 			  ruleDeclFVs, instDeclFVs, tyClDeclFVs )
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedRuleDecl,
-			  zonkTopBinds, zonkTopDecls, mkHsLet,
+			  zonkTopDecls, mkHsLet,
 			  zonkTopExpr, zonkTopBndrs
 			)
 
@@ -58,7 +58,6 @@ import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, 
-			  tcExtendGlobalEnv,
 			  tcExtendInstEnv, tcExtendRules,
 			  tcLookupTyCon, tcLookupGlobal,
 			  tcLookupId 
@@ -116,7 +115,6 @@ import HscTypes		( GlobalRdrElt(..), GlobalRdrEnv, ImportReason(..), Provenance(
 			  isLocalGRE )
 #endif
 
-import Maybe		( catMaybes )
 import Panic		( showException )
 import List		( partition )
 import Util		( sortLt )
@@ -154,7 +152,7 @@ tcRnModule hsc_env pcs
 
 	traceRn (text "rn1a") ;
 		-- Rename and type check the declarations
-	(tcg_env, src_fvs) <- tcRnSrcDecls local_decls ;
+	(tcg_env, src_dus) <- tcRnSrcDecls local_decls ;
 	setGblEnv tcg_env		$ do {
 
 	traceRn (text "rn3") ;
@@ -186,8 +184,8 @@ tcRnModule hsc_env pcs
 	setGblEnv tcg_env $ do {
 
 		-- Report unused names
-	let { used_fvs = src_fvs `plusFV` export_fvs } ;
- 	reportUnusedNames tcg_env used_fvs ;
+	let { all_dus = src_dus `plusDU` usesOnly export_fvs } ;
+ 	reportUnusedNames tcg_env all_dus ;
 
 		-- Dump output and return
 	tcDump tcg_env ;
@@ -543,12 +541,12 @@ tcRnExtCore hsc_env pcs
 	-- rnSrcDecls handles fixity decls etc too, which won't occur
 	-- but that doesn't matter
    let { local_group = mkGroup local_decls } ;
-   (_, rn_local_decls, fvs) <- initRn (InterfaceMode this_mod) 
+   (_, rn_local_decls, dus) <- initRn (InterfaceMode this_mod) 
 				      (rnSrcDecls local_group) ;
    failIfErrsM ;
 
  	-- Get the supporting decls
-   rn_imp_decls <- slurpImpDecls fvs ;
+   rn_imp_decls <- slurpImpDecls (duUses dus) ;
    let { rn_decls = rn_local_decls `addImpDecls` rn_imp_decls } ;
 
 	-- Dump trace of renaming part
@@ -603,13 +601,12 @@ tcRnExtCore hsc_env pcs
 %************************************************************************
 
 \begin{code}
-tcRnSrcDecls :: [RdrNameHsDecl] -> TcM (TcGblEnv, FreeVars)
+tcRnSrcDecls :: [RdrNameHsDecl] -> TcM (TcGblEnv, DefUses)
 	-- Returns the variables free in the decls
 	-- Reason: solely to report unused imports and bindings
-
 tcRnSrcDecls decls
  = do { 	-- Do all the declarations
-	((tc_envs, fvs), lie) <- getLIE (tc_rn_src_decls decls) ;
+	((tc_envs, dus), lie) <- getLIE (tc_rn_src_decls decls) ;
 
 	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
 	     -- How could there be ambiguous ones?  They can only arise if a
@@ -636,17 +633,17 @@ tcRnSrcDecls decls
 
 	return (tcg_env { tcg_type_env = extendTypeEnvWithIds type_env bind_ids,
 			  tcg_binds = binds', tcg_rules = rules', tcg_fords = fords' }, 
-		fvs)
+		dus)
     }}
 
-tc_rn_src_decls :: [RdrNameHsDecl] -> TcM ((TcGblEnv, TcLclEnv), FreeVars)
+tc_rn_src_decls :: [RdrNameHsDecl] -> TcM ((TcGblEnv, TcLclEnv), DefUses)
 
 tc_rn_src_decls ds
  = do { let { (first_group, group_tail) = findSplice ds } ;
 		-- If ds is [] we get ([], Nothing)
 
 	-- Type check the decls up to, but not including, the first splice
-	(tc_envs@(_,tcl_env), src_fvs1) <- tcRnGroup first_group ;
+	(tc_envs@(_,tcl_env), src_dus1) <- tcRnGroup first_group ;
 
 	-- Bale out if errors; for example, error recovery when checking
 	-- the RHS of 'main' can mean that 'main' is not in the envt for 
@@ -659,7 +656,8 @@ tc_rn_src_decls ds
 	case group_tail of {
 	   Nothing -> do { 	-- Last thing: check for `main'
 			   (tcg_env, main_fvs) <- checkMain ;
-			   return ((tcg_env, tcl_env), src_fvs1 `plusFV` main_fvs)
+			   return ((tcg_env, tcl_env), 
+				    src_dus1 `plusDU` usesOnly main_fvs)
 		      } ;
 
 	-- If there's a splice, we must carry on
@@ -669,19 +667,19 @@ tc_rn_src_decls ds
 #else
 
 	-- Rename the splice expression, and get its supporting decls
-	(rn_splice_expr, fvs) <- initRn SourceMode $
-				 addSrcLoc splice_loc $
-				 rnExpr splice_expr ;
-	tcg_env <- importSupportingDecls (fvs `plusFV` templateHaskellNames) ;
+	(rn_splice_expr, splice_fvs) <- initRn SourceMode $
+				 	addSrcLoc splice_loc $
+				 	rnExpr splice_expr ;
+	tcg_env <- importSupportingDecls (splice_fvs `plusFV` templateHaskellNames) ;
 	setGblEnv tcg_env $ do {
 
 	-- Execute the splice
 	spliced_decls <- tcSpliceDecls rn_splice_expr ;
 
 	-- Glue them on the front of the remaining decls and loop
-	(tc_envs, src_fvs2) <- tc_rn_src_decls (spliced_decls ++ rest_ds) ;
+	(tc_envs, src_dus2) <- tc_rn_src_decls (spliced_decls ++ rest_ds) ;
 
-	return (tc_envs, src_fvs1 `plusFV` src_fvs2)
+	return (tcg_envs, src_dus1 `plusDU` usesOnly splice_fvs `plusDU` src_dus2)
     }
 #endif /* GHCI */
     }}}
@@ -706,24 +704,24 @@ declarations.  It expects there to be an incoming TcGblEnv in the
 monad; it augments it and returns the new TcGblEnv.
 
 \begin{code}
-tcRnGroup :: HsGroup RdrName -> TcM ((TcGblEnv, TcLclEnv), FreeVars)
+tcRnGroup :: HsGroup RdrName -> TcM ((TcGblEnv, TcLclEnv), DefUses)
 	-- Returns the variables free in the decls, for unused-binding reporting
 tcRnGroup decls
  = do {	showLIE (text "LIE at start of tcRnGroup" <+> ppr decls) ;
 
 		-- Rename the declarations
-	(tcg_env, rn_decls, src_fvs) <- rnTopSrcDecls decls ;
+	(tcg_env, rn_decls, src_dus) <- rnTopSrcDecls decls ;
 	setGblEnv tcg_env $ do {
 
 		-- Typecheck the declarations
 	tc_envs <- tcTopSrcDecls rn_decls ;
 
 	showLIE (text "LIE at end of tcRnGroup" <+> ppr decls) ;
-	return (tc_envs, src_fvs)
+	return (tc_envs, src_dus)
   }}
 
 ------------------------------------------------
-rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name, FreeVars)
+rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name, DefUses)
 rnTopSrcDecls group
  = do { 	-- Bring top level binders into scope
 	(rdr_env, imports) <- importsFromLocalDecls group ;
@@ -736,12 +734,13 @@ rnTopSrcDecls group
 	failIfErrsM ;	-- No point in continuing if (say) we have duplicate declarations
 
 		-- Rename the source decls
-	(tcg_env, rn_src_decls, src_fvs) <- initRn SourceMode (rnSrcDecls group) ;
+	(tcg_env, rn_src_decls, src_dus) <- initRn SourceMode (rnSrcDecls group) ;
 	setGblEnv tcg_env $ do {
 
 	failIfErrsM ;
 
 		-- Import consquential imports
+	let { src_fvs = duUses src_dus } ;
 	rn_imp_decls <- slurpImpDecls (src_fvs `plusFV` implicitModuleFVs src_fvs) ;
 	let { rn_decls = rn_src_decls `addImpDecls` rn_imp_decls } ;
 
@@ -749,7 +748,7 @@ rnTopSrcDecls group
 	rnDump (ppr rn_decls) ;
 	rnStats rn_imp_decls ;
 
-	return (tcg_env, rn_decls, src_fvs)
+	return (tcg_env, rn_decls, src_dus)
   }}}
 
 ------------------------------------------------

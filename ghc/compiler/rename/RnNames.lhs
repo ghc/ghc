@@ -44,8 +44,8 @@ import OccName		( varName )
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, lookupRdrEnv, rdrEnvToList,
 			  emptyRdrEnv, foldRdrEnv, rdrEnvElts, mkRdrUnqual, isQual, mkUnqual )
 import Outputable
-import Maybe		( isJust, isNothing, catMaybes, fromMaybe )
-import Maybes		( orElse, expectJust )
+import Maybe		( isJust, isNothing, catMaybes )
+import Maybes		( orElse )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull )
 import List		( partition, insert )
@@ -554,14 +554,12 @@ exports_from_avail Nothing rdr_env
 		-- keeping only things that are (a) qualified,
 		-- (b) locally defined, (c) a 'main' name
 		-- Then we look up in the entity-avail-env
-	return [ avail
+	return [ lookupAvailEnv entity_avail_env name
 	       | (rdr_name, gres) <- rdrEnvToList rdr_env,
 		 isQual rdr_name,	-- Avoid duplicates
 		 GRE { gre_name   = name, 
 		       gre_parent = Nothing,	-- Main things only
-		       gre_prov   = LocalDef } <- gres,
-		 let avail = expectJust "exportsFromAvail" 
-				 (lookupAvailEnv entity_avail_env name)
+		       gre_prov   = LocalDef } <- gres
 	       ]
     }
 
@@ -614,8 +612,7 @@ exports_from_avail (Just export_items) rdr_env
 		-- Get the AvailInfo for the parent of the specified name
 	  let
 	    parent = gre_parent gre `orElse` gre_name gre
-	    avail  = expectJust "exportsFromAvail2" 
-			(lookupAvailEnv entity_avail_env parent)
+	    avail  = lookupAvailEnv entity_avail_env parent
 	  in
 		-- Filter out the bits we want
 	  case filterAvail ie avail of {
@@ -697,28 +694,15 @@ main_RDR_Unqual = mkUnqual varName FSLIT("main")
 %*********************************************************
 
 \begin{code}
-reportUnusedNames :: TcGblEnv
-		  -> NameSet 		-- Used in this module
-		  -> TcRn m ()
-reportUnusedNames gbl_env used_names
-  = warnUnusedModules unused_imp_mods			`thenM_`
-    warnUnusedTopBinds bad_locals			`thenM_`
-    warnUnusedImports bad_imports			`thenM_`
+reportUnusedNames :: TcGblEnv -> DefUses -> TcRn m ()
+reportUnusedNames gbl_env dus
+  = warnUnusedModules unused_imp_mods	`thenM_`
+    warnUnusedTopBinds bad_locals	`thenM_`
+    warnUnusedImports bad_imports	`thenM_`
     printMinimalImports minimal_imports
   where
-    direct_import_mods :: [ModuleName]
-    direct_import_mods = map (moduleName . fst) 
-			     (moduleEnvElts (imp_mods (tcg_imports gbl_env)))
-
-    -- Now, a use of C implies a use of T,
-    -- if C was brought into scope by T(..) or T(C)
-    really_used_names :: NameSet
-    really_used_names = used_names `unionNameSets`
-		        mkNameSet [ parent
-				  | GRE{ gre_name   = name, 
-					 gre_parent = Just parent } 
-				      <- defined_names,
-				    name `elemNameSet` used_names]
+    used_names :: NameSet
+    used_names = findUses dus emptyNameSet
 
 	-- Collect the defined names from the in-scope environment
 	-- Look for the qualified ones only, else get duplicates
@@ -728,8 +712,17 @@ reportUnusedNames gbl_env used_names
 			| otherwise	  = acc
 
     defined_and_used, defined_but_not_used :: [GlobalRdrElt]
-    (defined_and_used, defined_but_not_used) = partition used defined_names
-    used gre = gre_name gre `elemNameSet` really_used_names
+    (defined_and_used, defined_but_not_used) = partition is_used defined_names
+
+    is_used gre = n `elemNameSet` used_names || any (`elemNameSet` used_names) kids
+	-- The 'kids' part is because a use of C implies a use of T,
+	-- if C was brought into scope by T(..) or T(C)
+	     where
+	       n    = gre_name gre
+	       kids = case lookupAvailEnv_maybe avail_env n of
+			Just (AvailTC n ns) -> ns
+			other	            -> []	-- Ids, class ops and datacons
+							-- (The latter two give Nothing)
     
     -- Filter out the ones that are 
     --  (a) defined in this module, and
@@ -737,7 +730,6 @@ reportUnusedNames gbl_env used_names
     -- The latter have an Internal Name, so we can filter them out easily
     bad_locals :: [GlobalRdrElt]
     bad_locals = filter is_bad defined_but_not_used
-
     is_bad :: GlobalRdrElt -> Bool
     is_bad gre = isLocalGRE gre && isExternalName (gre_name gre)
     
@@ -790,6 +782,13 @@ reportUnusedNames gbl_env used_names
     	-- Add an empty collection of imports for a module
     	-- from which we have sucked only instance decls
    
+    imports   = tcg_imports gbl_env
+    avail_env = imp_env imports
+
+    direct_import_mods :: [ModuleName]
+    direct_import_mods = map (moduleName . fst) 
+			     (moduleEnvElts (imp_mods imports))
+
     -- unused_imp_mods are the directly-imported modules 
     -- that are not mentioned in minimal_imports1
     -- [Note: not 'minimal_imports', because that includes direcly-imported

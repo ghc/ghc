@@ -25,7 +25,8 @@ import TcRnMonad
 import RnTypes		( rnHsSigType, rnHsType, rnPat )
 import RnExpr		( rnMatch, rnGRHSs, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupInstDeclBndr,
-			  lookupSigOccRn, bindPatSigTyVars, bindLocalFixities,
+			  lookupSigOccRn, bindPatSigTyVars, bindPatSigTyVarsFV,
+			  bindLocalFixities,
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
 import CmdLineOpts	( DynFlag(..) )
@@ -33,7 +34,7 @@ import Digraph		( SCC(..), stronglyConnComp )
 import Name		( Name, nameOccName, nameSrcLoc )
 import NameSet
 import RdrName		( RdrName, rdrNameOcc )
-import BasicTypes	( RecFlag(..) )
+import BasicTypes	( RecFlag(..), TopLevelFlag(..), isTopLevel )
 import List		( unzip4 )
 import Outputable
 \end{code}
@@ -150,35 +151,18 @@ contains bindings for the binders of this particular binding.
 \begin{code}
 rnTopMonoBinds :: RdrNameMonoBinds 
 	       -> [RdrNameSig]
-	       -> RnM (RenamedHsBinds, FreeVars)
+	       -> RnM (RenamedHsBinds, DefUses)
 
--- Assumes the binders of the binding are in scope already
--- Very like rnMonoBinds, but checks for missing signatures too
+-- The binders of the binding are in scope already;
+-- the top level scope resoluttion does that
 
 rnTopMonoBinds mbinds sigs
- =  bindPatSigTyVars (collectSigTysFromMonoBinds mbinds) $ 
+ =  bindPatSigTyVars (collectSigTysFromMonoBinds mbinds) $ \ _ -> 
 	-- Hmm; by analogy with Ids, this doesn't look right
+	-- Top-level bound type vars should really scope over 
+	-- everything, but we only scope them over the other bindings
 
-    renameSigs sigs			`thenM` \ siglist ->
-    rn_mono_binds siglist mbinds	`thenM` \ (binders, final_binds, bind_fvs) ->
-    checkSigs okBindSig binders siglist	`thenM_`
-
-	-- Warn about missing signatures, but not in interface mode
-	-- (This is important when renaming bindings from 'deriving' clauses.)
-    getModeRn						`thenM` \ mode ->
-    doptM Opt_WarnMissingSigs 				`thenM` \ warn_missing_sigs ->
-    (if warn_missing_sigs && not (isInterfaceMode mode) then
-	let
-	    type_sig_vars   = [n | Sig n _ _ <- siglist]
-	    un_sigd_binders = filter (not . (`elem` type_sig_vars)) 
-				     (nameSetToList binders)
-	in
-        mappM_ missingSigWarn un_sigd_binders
-     else
-	returnM ()  
-    )						`thenM_`
-
-    returnM (final_binds, bind_fvs `plusFV` hsSigsFVs siglist)
+    rnMonoBinds TopLevel mbinds sigs
 \end{code}
 
 
@@ -198,27 +182,28 @@ rnMonoBindsAndThen mbinds sigs thing_inside -- Non-empty monobinds
   =	-- Extract all the binders in this group, and extend the
 	-- current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
-    bindLocatedLocalsRn doc mbinders_w_srclocs			$ \ new_mbinders ->
-    bindPatSigTyVars (collectSigTysFromMonoBinds mbinds)	$ 
+    bindLocatedLocalsRn doc mbinders_w_srclocs			$ \ _ ->
+    bindPatSigTyVarsFV (collectSigTysFromMonoBinds mbinds)	$ 
 
 	-- Then install local fixity declarations
 	-- Notice that they scope over thing_inside too
     bindLocalFixities [sig | FixSig sig <- sigs ] 	$
 
 	-- Do the business
-    rnMonoBinds mbinds sigs		`thenM` \ (binds, bind_fvs) ->
+    rnMonoBinds NotTopLevel mbinds sigs	`thenM` \ (binds, bind_dus) ->
 
 	-- Now do the "thing inside"
     thing_inside binds 			`thenM` \ (result,result_fvs) ->
 
 	-- Final error checking
     let
-	all_fvs        = result_fvs `plusFV` bind_fvs
-	unused_binders = filter (not . (`elemNameSet` all_fvs)) new_mbinders
+	bndrs        = duDefs bind_dus
+	all_uses     = findUses bind_dus result_fvs
+	unused_bndrs = nameSetToList (bndrs `minusNameSet` all_uses)
     in
-    warnUnusedLocalBinds unused_binders		`thenM_`
+    warnUnusedLocalBinds unused_bndrs	`thenM_`
 
-    returnM (result, delListFromNameSet all_fvs new_mbinders)
+    returnM (result, all_uses `minusNameSet` bndrs)
   where
     mbinders_w_srclocs = collectLocatedMonoBinders mbinds
     doc = text "In the binding group for:"
@@ -226,63 +211,68 @@ rnMonoBindsAndThen mbinds sigs thing_inside -- Non-empty monobinds
 \end{code}
 
 
-\begin{code}
-rnMonoBinds :: RdrNameMonoBinds 
-	    -> [RdrNameSig]
-	    -> RnM (RenamedHsBinds, FreeVars)
-
--- Assumes the binders of the binding are in scope already
-
-rnMonoBinds mbinds sigs
- =  renameSigs sigs			`thenM` \ siglist ->
-    rn_mono_binds siglist mbinds	`thenM` \ (binders, final_binds, bind_fvs) ->
-    checkSigs okBindSig binders siglist	`thenM_`
-    returnM (final_binds, bind_fvs `plusFV` hsSigsFVs siglist)
-\end{code}
-
 %************************************************************************
 %*									*
 \subsubsection{		MonoBinds -- the main work is done here}
 %*									*
 %************************************************************************
 
-@rn_mono_binds@ is used by {\em both} top-level and nested bindings.
+@rnMonoBinds@ is used by {\em both} top-level and nested bindings.
 It assumes that all variables bound in this group are already in scope.
 This is done {\em either} by pass 3 (for the top-level bindings),
 {\em or} by @rnMonoBinds@ (for the nested ones).
 
 \begin{code}
-rn_mono_binds :: [RenamedSig]	        -- Signatures attached to this group
-	      -> RdrNameMonoBinds	
-	      -> RnM (NameSet,		-- Binders
-		      RenamedHsBinds, 	-- Dependency analysed
-		      FreeVars)		-- Free variables
+rnMonoBinds :: TopLevelFlag
+	    -> RdrNameMonoBinds 
+	    -> [RdrNameSig]
+	    -> RnM (RenamedHsBinds, DefUses)
 
-rn_mono_binds siglist mbinds
-  =	 -- Rename the bindings, returning a MonoBindsInfo
+-- Assumes the binders of the binding are in scope already
+
+rnMonoBinds top_lvl mbinds sigs
+ =  renameSigs sigs			`thenM` \ siglist ->
+
+  	 -- Rename the bindings, returning a MonoBindsInfo
 	 -- which is a list of indivisible vertices so far as
 	 -- the strongly-connected-components (SCC) analysis is concerned
-    flattenMonoBinds siglist mbinds		`thenM` \ mbinds_info ->
+    flattenMonoBinds siglist mbinds	`thenM` \ mbinds_info ->
 
 	 -- Do the SCC analysis
     let 
 	scc_result  = rnSCC mbinds_info
-	(binds_s, rhs_fvs_s) = unzip (map reconstructCycle scc_result)
+	(binds_s, bind_dus_s) = unzip (map reconstructCycle scc_result)
+	bind_dus    = mkDUs bind_dus_s	
 	final_binds = foldr ThenBinds EmptyBinds binds_s
-
-	-- Deal with bound and free-var calculation
-	-- Caller removes binders from free-var set
-	rhs_fvs = plusFVs rhs_fvs_s
-	bndrs   = plusFVs [defs | (defs,_,_,_) <- mbinds_info]
+	binders     = duDefs bind_dus
     in
-    returnM (bndrs, final_binds, rhs_fvs)
+
+	-- Check for duplicate or mis-placed signatures
+    checkSigs (okBindSig binders) siglist	`thenM_`
+
+	-- Warn about missing signatures, 
+	-- but only at top level, and not in interface mode
+	-- (The latter is important when renaming bindings from 'deriving' clauses.)
+    getModeRn				`thenM` \ mode ->
+    doptM Opt_WarnMissingSigs 		`thenM` \ warn_missing_sigs ->
+    (if isTopLevel top_lvl && 
+	 warn_missing_sigs && 
+	 not (isInterfaceMode mode)
+     then let
+	    type_sig_vars   = [n | Sig n _ _ <- siglist]
+	    un_sigd_binders = filter (not . (`elem` type_sig_vars)) 
+				     (nameSetToList binders)
+	  in
+          mappM_ missingSigWarn un_sigd_binders
+     else
+	returnM ()  
+    )						`thenM_`
+
+    returnM (final_binds, bind_dus `plusDU` usesOnly (hsSigsFVs siglist))
 \end{code}
 
 @flattenMonoBinds@ is ever-so-slightly magical in that it sticks
 unique ``vertex tags'' on its output; minor plumbing required.
-
-Sigh --- need to pass along the signatures for the group of bindings,
-in case any of them \fbox{\ ???\ } 
 
 \begin{code}
 flattenMonoBinds :: [RenamedSig]		-- Signatures
@@ -406,9 +396,6 @@ a function binding, and has itself been dependency-analysed and
 renamed.
 
 \begin{code}
-
-type Defs = NameSet
-type Uses = NameSet
 type FlatMonoBinds = (Defs, Uses, RenamedMonoBinds, [RenamedSig])
 			-- Signatures, if any, for this vertex
 
@@ -433,16 +420,12 @@ mkEdges nodes
 			   defs `intersectsNameSet` uses
 			 ]
 
-reconstructCycle :: SCC FlatMonoBinds -> (RenamedHsBinds, Uses)
+reconstructCycle :: SCC FlatMonoBinds -> (RenamedHsBinds, (Defs,Uses))
 reconstructCycle (AcyclicSCC (defs, uses, binds, sigs))
-  = (MonoBind binds sigs NonRecursive, uses)
+  = (MonoBind binds sigs NonRecursive, (defs, uses))
 reconstructCycle (CyclicSCC cycle)
   = (MonoBind this_gp_binds this_gp_sigs Recursive, 
-     unionManyNameSets uses_s `minusNameSet` unionManyNameSets defs_s)
-	-- The uses of the cycle are the things used in any RHS
-	-- minus the binders of the group.  Knocking them out 
-	-- right here improves the error reporting for usused
-	-- bindings; e.g. f x = f x 	-- Otherwise unused
+     (unionManyNameSets defs_s, unionManyNameSets uses_s))
   where
     (defs_s, uses_s, binds_s, sigs_s) = unzip4 cycle
     this_gp_binds = foldr1 AndMonoBinds binds_s
@@ -467,17 +450,16 @@ At the moment we don't gather free-var info from the types in
 signatures.  We'd only need this if we wanted to report unused tyvars.
 
 \begin{code}
-checkSigs :: (NameSet -> RenamedSig -> Bool)	-- OK-sig predicbate
-	  -> NameSet				-- Binders of this group
+checkSigs :: (RenamedSig -> Bool)	-- OK-sig predicbate
 	  -> [RenamedSig]
 	  -> RnM ()
-checkSigs ok_sig bndrs sigs
+checkSigs ok_sig sigs
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
-	-- Well, I can't see the check for (b)... ToDo!
+	-- Well, I can't see the check for (a)... ToDo!
   = mappM_ unknownSigErr bad_sigs
   where
-    bad_sigs = filter (not . ok_sig bndrs) sigs
+    bad_sigs = filter (not . ok_sig) sigs
 
 -- We use lookupSigOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:

@@ -277,9 +277,10 @@ okBindSig :: NameSet -> Sig Name -> Bool
 okBindSig ns (ClassOpSig _ _ _ _) = False
 okBindSig ns sig		  = sigForThisGroup ns sig
 
-okClsDclSig :: NameSet -> Sig Name -> Bool
-okClsDclSig ns (Sig _ _ _) = False
-okClsDclSig ns sig 	   = sigForThisGroup ns sig
+okClsDclSig :: Sig Name -> Bool
+okClsDclSig (Sig _ _ _)       = False
+okClsDclSig (SpecInstSig _ _) = False
+okClsDclSig sig 	      = True	-- All others OK
 
 okInstDclSig :: NameSet -> Sig Name -> Bool
 okInstDclSig ns (Sig _ _ _)	  = False

@@ -19,7 +19,7 @@ module TcMonoType ( tcHsSigType, tcHsType, tcIfaceType, tcHsTheta, tcHsPred,
 #include "HsVersions.h"
 
 import HsSyn		( HsType(..), HsTyVarBndr(..), HsTyOp(..),
-                          Sig(..), HsPred(..), pprParendHsType, HsTupCon(..), hsTyVarNames )
+                          Sig(..), HsPred(..), HsTupCon(..), hsTyVarNames )
 import RnHsSyn		( RenamedHsType, RenamedHsPred, RenamedContext, RenamedSig, extractHsTyVars )
 import TcHsSyn		( TcId )
 
@@ -31,14 +31,14 @@ import TcEnv		( tcExtendTyVarEnv, tcLookup, tcLookupGlobal,
 import TcMType		( newMutTyVar, newKindVar, zonkKindEnv, tcInstType, zonkTcType,
 			  checkValidType, UserTypeCtxt(..), pprUserTypeCtxt, newOpenTypeKind
 			)
-import TcUnify		( unifyKind, unifyOpenTypeKind, unifyFunKind )
+import TcUnify		( unifyKind, unifyFunKind )
 import TcType		( Type, Kind, SourceType(..), ThetaType, TyVarDetails(..),
 			  TcTyVar, TcKind, TcThetaType, TcTauType,
 			  mkTyVarTy, mkTyVarTys, mkFunTy, isTypeKind,
 		 	  zipFunTys, mkForAllTys, mkFunTys, tcEqType, isPredTy,
 			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
-			  liftedTypeKind, unliftedTypeKind, mkArrowKind, eqKind,
-			  mkArrowKinds, tcSplitFunTy_maybe, tcSplitForAllTys
+			  liftedTypeKind, unliftedTypeKind, eqKind,
+			  tcSplitFunTy_maybe, tcSplitForAllTys
 			)
 import qualified Type	( splitFunTys )
 import Inst		( Inst, InstOrigin(..), newMethod, instToId )
