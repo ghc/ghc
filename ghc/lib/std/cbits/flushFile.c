@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: flushFile.c,v 1.4 1999/01/15 17:54:23 sof Exp $
+ * $Id: flushFile.c,v 1.5 1999/09/19 19:26:14 sof Exp $
  *
  * hFlush Runtime Support
  */
@@ -16,7 +16,7 @@ StgForeignPtr ptr;
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc = 0;
 
-    if ( (fo->flags & FILEOBJ_FLUSH) && !FILEOBJ_BUFFER_EMPTY(fo) ) {
+    if ( (fo->flags & FILEOBJ_FLUSH) && FILEOBJ_NEEDS_FLUSHING(fo) ) {
        rc = writeBuffer(ptr,fo->bufWPtr - fo->bufRPtr);
     }
 
@@ -30,11 +30,12 @@ StgForeignPtr ptr;
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc = 0;
 
-    /* If the file object is writeable, or if its
-       RW and the last operation on it was a write,
+    /* If the file object is writeable, or if it's
+       RW *and* the last operation on it was a write,
        flush it.
     */
-    if ( (!FILEOBJ_READABLE(fo) && FILEOBJ_WRITEABLE(fo)) || (FILEOBJ_RW(fo) && FILEOBJ_JUST_WRITTEN(fo)) ) {
+    if ( (!FILEOBJ_READABLE(fo) && FILEOBJ_WRITEABLE(fo)) ||
+         (FILEOBJ_RW(fo) && FILEOBJ_JUST_WRITTEN(fo)) ) {
        rc = flushFile(ptr);
        if (rc<0) return rc;
     }
