@@ -20,8 +20,8 @@ module DsMeta( dsBracket, dsReify,
 
 import {-# SOURCE #-}	DsExpr ( dsExpr )
 
-import DsUtils    ( mkListExpr, mkStringLit, mkCoreTup,
-		    mkIntExpr, mkCharExpr )
+import MatchLit	  ( dsLit )
+import DsUtils    ( mkListExpr, mkStringLit, mkCoreTup, mkIntExpr )
 import DsMonad
 
 import qualified Language.Haskell.THSyntax as M
@@ -319,12 +319,12 @@ repE (HsVar x)            =
 	Just (Bound y)   -> repVarOrCon x (coreVar y)
 	Just (Splice e)  -> do { e' <- dsExpr e
 			       ; return (MkC e') } }
-repE (HsIPVar x)          = 
-  panic "DsMeta.repE: Can't represent implicit parameters"
-repE (HsOverLit l)        = do { a <- repOverloadedLiteral l; repLit a }
-repE (HsLit l)            = do { a <- repLiteral l;           repLit a }
-repE (HsLam m)            = repLambda m
-repE (HsApp x y)          = do {a <- repE x; b <- repE y; repApp a b}
+repE (HsIPVar x) = panic "DsMeta.repE: Can't represent implicit parameters"
+repE (HsLit l)   = do { a <- repLiteral l;           repLit a }
+repE (HsLam m)   = repLambda m
+repE (HsApp x y) = do {a <- repE x; b <- repE y; repApp a b}
+-- HsOverLit l	never happens (if it does, the catch-all will find it)
+
 repE (OpApp e1 op fix e2) =
   case op of
     HsVar op -> do { arg1 <- repE e1; 
@@ -367,8 +367,8 @@ repE (ExplicitTuple es boxed)
   | otherwise		  = panic "DsMeta.repE: Can't represent unboxed tuples"
 repE (RecordConOut _ _ _) = panic "DsMeta.repE: No record construction yet"
 repE (RecordUpdOut _ _ _ _) = panic "DsMeta.repE: No record update yet"
-repE (ExprWithTySig e ty) = 
-  panic "DsMeta.repE: No expressions with type signatures yet" 
+
+repE (ExprWithTySig e ty) = do { e1 <- repE e; t1 <- repTy ty; repSigExp e1 t1 }
 repE (ArithSeqOut _ aseq) =
   case aseq of
     From e              -> do { ds1 <- repE e; repFrom ds1 }
@@ -786,6 +786,9 @@ repComp (MkC ss) = rep2 compName [ss]
 repListExp :: Core [M.Expr] -> DsM (Core M.Expr)
 repListExp (MkC es) = rep2 listExpName [es]
 
+repSigExp :: Core M.Expr -> Core M.Type -> DsM (Core M.Expr)
+repSigExp (MkC e) (MkC t) = rep2 sigExpName [e,t]
+
 repInfixApp :: Core M.Expr -> Core String -> Core M.Expr -> DsM (Core M.Expr)
 repInfixApp (MkC x) (MkC y) (MkC z) = rep2 infixAppName [x,y,z]
 
@@ -889,13 +892,17 @@ repListTyCon = rep2 listTyConName []
 --		Literals
 
 repLiteral :: HsLit -> DsM (Core M.Lit)
-repLiteral (HsInt i)  = rep2 intLName [mkIntExpr i]
-repLiteral (HsChar c) = rep2 charLName [mkCharExpr c]
-repLiteral x = panic "trying to represent exotic literal"
-
-repOverloadedLiteral :: HsOverLit -> DsM(Core M.Lit)
-repOverloadedLiteral (HsIntegral i _)   = rep2 intLName [mkIntExpr i]
-repOverloadedLiteral (HsFractional f _) = panic "Cant do fractional literals yet"
+repLiteral lit 
+  = do { lit_expr <- dsLit lit; rep2 lit_name [lit_expr] }
+  where
+    lit_name = case lit of
+		 HsInt _    -> intLName
+		 HsChar _   -> charLName
+		 HsString _ -> stringLName
+		 HsRat _ _  -> rationalLName
+		 other 	    -> uh_oh
+    uh_oh = pprPanic "DsMeta.repLiteral: trying to represent exotic literal"
+		    (ppr lit)
 
               
 --------------- Miscellaneous -------------------
@@ -976,11 +983,12 @@ templateHaskellNames :: NameSet
 -- The names that are implicitly mentioned by ``bracket''
 -- Should stay in sync with the import list of DsMeta
 templateHaskellNames
-  = mkNameSet [ intLName,charLName, plitName, pvarName, ptupName, 
+  = mkNameSet [ intLName,charLName, stringLName, rationalLName,
+		plitName, pvarName, ptupName, 
 		pconName, ptildeName, paspatName, pwildName, 
                 varName, conName, litName, appName, infixEName, lamName,
                 tupName, doEName, compName, 
-                listExpName, condName, letEName, caseEName,
+                listExpName, sigExpName, condName, letEName, caseEName,
                 infixAppName, negName, sectionLName, sectionRName,
                 guardedName, normalName, 
 		bindStName, letStName, noBindStName, parStName,
@@ -1009,6 +1017,8 @@ mk_known_key_name space str uniq
 
 intLName       = varQual FSLIT("intL")          intLIdKey
 charLName      = varQual FSLIT("charL")         charLIdKey
+stringLName    = varQual FSLIT("stringL")       stringLIdKey
+rationalLName  = varQual FSLIT("rationalL")     rationalLIdKey
 plitName       = varQual FSLIT("plit")          plitIdKey
 pvarName       = varQual FSLIT("pvar")          pvarIdKey
 ptupName       = varQual FSLIT("ptup")          ptupIdKey
@@ -1026,6 +1036,7 @@ tupName        = varQual FSLIT("tup")           tupIdKey
 doEName        = varQual FSLIT("doE")           doEIdKey
 compName       = varQual FSLIT("comp")          compIdKey
 listExpName    = varQual FSLIT("listExp")       listExpIdKey
+sigExpName     = varQual FSLIT("sigExp")        sigExpIdKey
 condName       = varQual FSLIT("cond")          condIdKey
 letEName       = varQual FSLIT("letE")          letEIdKey
 caseEName      = varQual FSLIT("caseE")         caseEIdKey
@@ -1176,6 +1187,13 @@ listIdKey	= mkPreludeMiscIdUnique 256
 namedTyConIdKey	= mkPreludeMiscIdUnique 257
 
 constrIdKey	= mkPreludeMiscIdUnique 258
+
+stringLIdKey	= mkPreludeMiscIdUnique 259
+rationalLIdKey	= mkPreludeMiscIdUnique 260
+
+sigExpIdKey     = mkPreludeMiscIdUnique 261
+
+
 
 -- %************************************************************************
 -- %*									*

@@ -401,9 +401,11 @@ mkErrorAppDs err_id ty msg
 %************************************************************************
 
 \begin{code}
-mkCharExpr    :: Int	 -> CoreExpr	  -- Returns 	C# c :: Int
-mkIntExpr     :: Integer -> CoreExpr	  -- Returns 	I# i :: Int
-mkIntegerExpr :: Integer -> DsM CoreExpr  -- Result :: Integer
+mkCharExpr    :: Int	    -> CoreExpr	     -- Returns	C# c :: Int
+mkIntExpr     :: Integer    -> CoreExpr	     -- Returns	I# i :: Int
+mkIntegerExpr :: Integer    -> DsM CoreExpr  -- Result :: Integer
+mkStringLit   :: String     -> DsM CoreExpr  -- Result :: String
+mkStringLitFS :: FastString -> DsM CoreExpr  -- Result :: String
 
 mkIntExpr  i = mkConApp intDataCon  [mkIntLit i]
 mkCharExpr c = mkConApp charDataCon [mkLit (MachChar c)]
@@ -438,10 +440,8 @@ mkIntegerExpr i
 
 mkSmallIntegerLit i = mkConApp smallIntegerDataCon [mkIntLit i]
 
-mkStringLit   :: String       -> DsM CoreExpr
 mkStringLit str	= mkStringLitFS (mkFastString str)
 
-mkStringLitFS :: FastString  -> DsM CoreExpr
 mkStringLitFS str
   | nullFastString str
   = returnDs (mkNilExpr charTy)

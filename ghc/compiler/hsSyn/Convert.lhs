@@ -26,7 +26,7 @@ import HsSyn as Hs
 
 import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig )
 import Module   ( mkModuleName )
-import RdrHsSyn	( mkHsIntegral, mkClassDecl, mkTyData )
+import RdrHsSyn	( mkHsIntegral, mkHsFractional, mkClassDecl, mkTyData )
 import OccName
 import SrcLoc	( SrcLoc, generatedSrcLoc )
 import TyCon	( DataConDetails(..) )
@@ -173,11 +173,14 @@ cvtpair (x,y) = GRHS [BindStmt truePat (cvt x) loc0,
 		      ResultStmt (cvt y) loc0] loc0
 
 cvtOverLit :: Lit -> HsOverLit
-cvtOverLit (Int i) = mkHsIntegral (fromInt i)
+cvtOverLit (Int i)      = mkHsIntegral (fromInt i)
+cvtOverLit (Rational r) = mkHsFractional r
 -- An Int is like an an (overloaded) '3' in a Haskell source program
+-- Similarly 3.5 for fractionals
 
 cvtLit :: Lit -> HsLit
-cvtLit (Char c)	      = HsChar (ord c)
+cvtLit (Char c)	  = HsChar (ord c)
+cvtLit (String s) = HsString (mkFastString s)
 
 cvtp :: Meta.Pat -> Hs.Pat RdrName
 cvtp (Plit l)
