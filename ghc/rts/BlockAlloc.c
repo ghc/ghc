@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.7 2000/01/30 10:17:44 simonmar Exp $
+ * $Id: BlockAlloc.c,v 1.8 2001/07/23 10:47:16 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -222,7 +222,7 @@ freeGroup(bdescr *p)
 #ifdef DEBUG
   p->free = (void *)-1;  /* indicates that this block is free */
   p->step = NULL;
-  p->gen  = NULL;
+  p->gen_no = 0;
   /* fill the block group with garbage if sanity checking is on */
   IF_DEBUG(sanity,memset(p->start, 0xaa, p->blocks * BLOCK_SIZE));
 #endif

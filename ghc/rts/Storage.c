@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.39 2001/07/19 07:28:00 andy Exp $
+ * $Id: Storage.c,v 1.40 2001/07/23 10:47:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -139,6 +139,7 @@ initStorage (void)
       stp->blocks = NULL;
       stp->n_blocks = 0;
       stp->gen = &generations[g];
+      stp->gen_no = g;
       stp->hp = NULL;
       stp->hpLim = NULL;
       stp->hp_bd = NULL;
@@ -324,7 +325,7 @@ resetNurseries( void )
   for (cap = free_capabilities; cap != NULL; cap = cap->link) {
     for (bd = cap->rNursery; bd; bd = bd->link) {
       bd->free = bd->start;
-      ASSERT(bd->gen == g0);
+      ASSERT(bd->gen_no == 0);
       ASSERT(bd->step == g0s0);
       IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
     }
@@ -333,7 +334,7 @@ resetNurseries( void )
 #else
   for (bd = g0s0->blocks; bd; bd = bd->link) {
     bd->free = bd->start;
-    ASSERT(bd->gen == g0);
+    ASSERT(bd->gen_no == 0);
     ASSERT(bd->step == g0s0);
     IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
   }
@@ -353,7 +354,7 @@ allocNursery (bdescr *last_bd, nat blocks)
     bd = allocBlock();
     bd->link = last_bd;
     bd->step = g0s0;
-    bd->gen = g0;
+    bd->gen_no = 0;
     bd->evacuated = 0;
     bd->free = bd->start;
     last_bd = bd;
@@ -422,7 +423,7 @@ allocate(nat n)
     nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
     bd = allocGroup(req_blocks);
     dbl_link_onto(bd, &g0s0->large_objects);
-    bd->gen  = g0;
+    bd->gen_no  = 0;
     bd->step = g0s0;
     bd->evacuated = 0;
     bd->free = bd->start;
@@ -443,7 +444,7 @@ allocate(nat n)
     bd = allocBlock();
     bd->link = small_alloc_list;
     small_alloc_list = bd;
-    bd->gen = g0;
+    bd->gen_no = 0;
     bd->step = g0s0;
     bd->evacuated = 0;
     alloc_Hp = bd->start;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStorage.h,v 1.7 2000/04/11 16:36:53 sewardj Exp $
+ * $Id: StgStorage.h,v 1.8 2001/07/23 10:47:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -53,6 +53,7 @@ typedef struct _step {
   unsigned int n_blocks;	/* number of blocks */
   struct _step *to;		/* where collected objects from this step go */
   struct _generation *gen;	/* generation this step belongs to */
+  unsigned int gen_no;          /* generation number (cached) */
   bdescr *large_objects;	/* large objects (doubly linked) */
 
   /* temporary use during GC: */

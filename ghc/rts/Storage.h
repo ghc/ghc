@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.32 2001/05/03 16:33:27 simonmar Exp $
+ * $Id: Storage.h,v 1.33 2001/07/23 10:47:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -120,9 +120,9 @@ recordMutable(StgMutClosure *p)
 #endif
 
   bd = Bdescr((P_)p);
-  if (bd->gen->no > 0) {
-    p->mut_link = bd->gen->mut_list;
-    bd->gen->mut_list = p;
+  if (bd->gen_no > 0) {
+    p->mut_link = generations[bd->gen_no].mut_list;
+    generations[bd->gen_no].mut_list = p;
   }
 }
 
@@ -132,9 +132,9 @@ recordOldToNewPtrs(StgMutClosure *p)
   bdescr *bd;
   
   bd = Bdescr((P_)p);
-  if (bd->gen->no > 0) {
-    p->mut_link = bd->gen->mut_once_list;
-    bd->gen->mut_once_list = p;
+  if (bd->gen_no > 0) {
+    p->mut_link = generations[bd->gen_no].mut_once_list;
+    generations[bd->gen_no].mut_once_list = p;
   }
 }
 
@@ -144,7 +144,7 @@ recordOldToNewPtrs(StgMutClosure *p)
     bdescr *bd;								\
 									\
     bd = Bdescr((P_)p1);						\
-    if (bd->gen->no == 0) {						\
+    if (bd->gen_no == 0) {						\
       ((StgInd *)p1)->indirectee = p2;					\
       SET_INFO(p1,&stg_IND_info);					\
       TICK_UPD_NEW_IND();						\
@@ -152,8 +152,8 @@ recordOldToNewPtrs(StgMutClosure *p)
       ((StgIndOldGen *)p1)->indirectee = p2;				\
       if (info != &stg_BLACKHOLE_BQ_info) {				\
         ACQUIRE_LOCK(&sm_mutex);					\
-        ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;	\
-        bd->gen->mut_once_list = (StgMutClosure *)p1;			\
+        ((StgIndOldGen *)p1)->mut_link = generations[bd->gen_no].mut_once_list;	\
+        generations[bd->gen_no].mut_once_list = (StgMutClosure *)p1;			\
         RELEASE_LOCK(&sm_mutex);					\
       }									\
       SET_INFO(p1,&stg_IND_OLDGEN_info);				\
@@ -176,7 +176,7 @@ recordOldToNewPtrs(StgMutClosure *p)
 									\
     ASSERT( p1 != p2 && !closure_IND(p1) );				\
     bd = Bdescr((P_)p1);						\
-    if (bd->gen->no == 0) {						\
+    if (bd->gen_no == 0) {						\
       ((StgInd *)p1)->indirectee = p2;					\
       SET_INFO(p1,&stg_IND_info);					\
       TICK_UPD_NEW_IND();						\
@@ -193,8 +193,8 @@ recordOldToNewPtrs(StgMutClosure *p)
           }								\
         }								\
         ACQUIRE_LOCK(&sm_mutex);					\
-        ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;	\
-        bd->gen->mut_once_list = (StgMutClosure *)p1;			\
+        ((StgIndOldGen *)p1)->mut_link = generations[bd->gen_no].mut_once_list;	\
+        generations[bd->gen_no].mut_once_list = (StgMutClosure *)p1;			\
         RELEASE_LOCK(&sm_mutex);					\
       }									\
       ((StgIndOldGen *)p1)->indirectee = p2;				\
@@ -229,7 +229,7 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
 
   ASSERT( p1 != p2 && !closure_IND(p1) );
   bd = Bdescr((P_)p1);
-  if (bd->gen->no == 0) {
+  if (bd->gen_no == 0) {
     ((StgInd *)p1)->indirectee = p2;
     SET_INFO(p1,&stg_IND_PERM_info);
     TICK_UPD_NEW_PERM_IND(p1);
@@ -237,8 +237,8 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
     ((StgIndOldGen *)p1)->indirectee = p2;
     if (info != &stg_BLACKHOLE_BQ_info) {
       ACQUIRE_LOCK(&sm_mutex);
-      ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;
-      bd->gen->mut_once_list = (StgMutClosure *)p1;
+      ((StgIndOldGen *)p1)->mut_link = generations[bd->gen_no].mut_once_list;
+      generations[bd->gen_no].mut_once_list = (StgMutClosure *)p1;
       RELEASE_LOCK(&sm_mutex);
     }
     SET_INFO(p1,&stg_IND_OLDGEN_PERM_info);

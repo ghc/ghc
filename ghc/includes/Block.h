@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.7 2000/04/05 14:26:31 panne Exp $
+ * $Id: Block.h,v 1.8 2001/07/23 10:47:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -45,7 +45,7 @@ typedef struct _bdescr {
   StgPtr free;			/* first free byte of memory */
   struct _bdescr *link;		/* used for chaining blocks together */
   struct _bdescr *back;		/* used (occasionally) for doubly-linked lists*/
-  struct _generation *gen;	/* generation */
+  unsigned int gen_no;		/* generation */
   struct _step *step;		/* step */
   StgWord32 blocks;		/* no. of blocks (if grp head, 0 otherwise) */
   StgWord32 evacuated;           /* block is in to-space */

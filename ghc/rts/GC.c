@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.102 2001/04/03 16:35:12 sewardj Exp $
+ * $Id: GC.c,v 1.103 2001/07/23 10:47:16 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -301,9 +301,9 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
        */
       bd = allocBlock();
       stp = &generations[g].steps[s];
-      ASSERT(stp->gen->no == g);
+      ASSERT(stp->gen_no == g);
       ASSERT(stp->hp ? Bdescr(stp->hp)->step == stp : rtsTrue);
-      bd->gen  = &generations[g];
+      bd->gen_no = g;
       bd->step = stp;
       bd->link = NULL;
       bd->evacuated = 1;	/* it's a to-space block */
@@ -332,7 +332,7 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
       stp = &generations[g].steps[s];
       if (stp->hp_bd == NULL) {
 	bd = allocBlock();
-	bd->gen = &generations[g];
+	bd->gen_no = g;
 	bd->step = stp;
 	bd->link = NULL;
 	bd->evacuated = 0;	/* *not* a to-space block */
@@ -1014,7 +1014,7 @@ isAlive(StgClosure *p)
      */
 
     /* ignore closures in generations that we're not collecting. */
-    if (LOOKS_LIKE_STATIC(p) || Bdescr((P_)p)->gen->no > N) {
+    if (LOOKS_LIKE_STATIC(p) || Bdescr((P_)p)->gen_no > N) {
       return p;
     }
     
@@ -1081,10 +1081,10 @@ MarkRoot(StgClosure *root)
 static void addBlock(step *stp)
 {
   bdescr *bd = allocBlock();
-  bd->gen = stp->gen;
+  bd->gen_no = stp->gen_no;
   bd->step = stp;
 
-  if (stp->gen->no <= N) {
+  if (stp->gen_no <= N) {
     bd->evacuated = 1;
   } else {
     bd->evacuated = 0;
@@ -1121,7 +1121,7 @@ copy(StgClosure *src, nat size, step *stp)
    * evacuate to an older generation, adjust it here (see comment
    * by evacuate()).
    */
-  if (stp->gen->no < evac_gen) {
+  if (stp->gen_no < evac_gen) {
 #ifdef NO_EAGER_PROMOTION    
     failed_to_evac = rtsTrue;
 #else
@@ -1159,7 +1159,7 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
   P_ dest, to, from;
 
   TICK_GC_WORDS_COPIED(size_to_copy);
-  if (stp->gen->no < evac_gen) {
+  if (stp->gen_no < evac_gen) {
 #ifdef NO_EAGER_PROMOTION    
     failed_to_evac = rtsTrue;
 #else
@@ -1211,7 +1211,7 @@ evacuate_large(StgPtr p, rtsBool mutable)
     /* Don't forget to set the failed_to_evac flag if we didn't get
      * the desired destination (see comments in evacuate()).
      */
-    if (bd->gen->no < evac_gen) {
+    if (bd->gen_no < evac_gen) {
       failed_to_evac = rtsTrue;
       TICK_GC_FAILED_PROMOTION();
     }
@@ -1232,7 +1232,7 @@ evacuate_large(StgPtr p, rtsBool mutable)
   /* link it on to the evacuated large object list of the destination step
    */
   stp = bd->step->to;
-  if (stp->gen->no < evac_gen) {
+  if (stp->gen_no < evac_gen) {
 #ifdef NO_EAGER_PROMOTION    
     failed_to_evac = rtsTrue;
 #else
@@ -1241,7 +1241,7 @@ evacuate_large(StgPtr p, rtsBool mutable)
   }
 
   bd->step = stp;
-  bd->gen = stp->gen;
+  bd->gen_no = stp->gen_no;
   bd->link = stp->new_large_objects;
   stp->new_large_objects = bd;
   bd->evacuated = 1;
@@ -1323,12 +1323,12 @@ evacuate(StgClosure *q)
 loop:
   if (HEAP_ALLOCED(q)) {
     bd = Bdescr((P_)q);
-    if (bd->gen->no > N) {
+    if (bd->gen_no > N) {
       /* Can't evacuate this object, because it's in a generation
        * older than the ones we're collecting.  Let's hope that it's
        * in evac_gen or older, or we will have to make an IND_OLDGEN object.
        */
-      if (bd->gen->no < evac_gen) {
+      if (bd->gen_no < evac_gen) {
 	/* nope */
 	failed_to_evac = rtsTrue;
 	TICK_GC_FAILED_PROMOTION();
@@ -1389,9 +1389,9 @@ loop:
   case THUNK_0_2:
   case THUNK_2_0:
 #ifdef NO_PROMOTE_THUNKS
-    if (bd->gen->no == 0 && 
+    if (bd->gen_no == 0 && 
 	bd->step->no != 0 &&
-	bd->step->no == bd->gen->n_steps-1) {
+	bd->step->no == generations[bd->gen_no].n_steps-1) {
       stp = bd->step;
     }
 #endif
@@ -1460,7 +1460,7 @@ loop:
 	  if (HEAP_ALLOCED(q)) {
 	    bdescr *bd = Bdescr((P_)q);
 	    if (bd->evacuated) {
-	      if (bd->gen->no < evac_gen) {
+	      if (bd->gen_no < evac_gen) {
 		failed_to_evac = rtsTrue;
 		TICK_GC_FAILED_PROMOTION();
 	      }
@@ -1655,7 +1655,7 @@ loop:
      */
     if (evac_gen > 0) {		/* optimisation */
       StgClosure *p = ((StgEvacuated*)q)->evacuee;
-      if (Bdescr((P_)p)->gen->no < evac_gen) {
+      if (Bdescr((P_)p)->gen_no < evac_gen) {
 	IF_DEBUG(gc, belch("@@ evacuate: evac of EVACUATED node %p failed!", p));
 	failed_to_evac = rtsTrue;
 	TICK_GC_FAILED_PROMOTION();
@@ -2037,7 +2037,7 @@ scavenge(step *stp)
       }
 
     case IND_PERM:
-      if (stp->gen->no != 0) {
+      if (stp->gen_no != 0) {
 	SET_INFO(((StgClosure *)p), &stg_IND_OLDGEN_PERM_info);
       }
       /* fall through */
@@ -2858,8 +2858,8 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	} else {
 	  bdescr *bd = Bdescr((P_)frame->updatee);
 	  step *stp;
-	  if (bd->gen->no > N) { 
-	    if (bd->gen->no < evac_gen) {
+	  if (bd->gen_no > N) { 
+	    if (bd->gen_no < evac_gen) {
 	      failed_to_evac = rtsTrue;
 	    }
 	    continue;
@@ -2867,7 +2867,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 
 	  /* Don't promote blackholes */
 	  stp = bd->step;
-	  if (!(stp->gen->no == 0 && 
+	  if (!(stp->gen_no == 0 && 
 		stp->no != 0 &&
 		stp->no == stp->gen->n_steps-1)) {
 	    stp = stp->to;
