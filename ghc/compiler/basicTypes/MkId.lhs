@@ -931,7 +931,7 @@ runtimeErrorTy 		  = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlpha
 \end{code}
 
 \begin{code}
-eRROR_ID = pc_bottoming_Id errorIdKey pREL_ERR SLIT("error") errorTy
+eRROR_ID = pc_bottoming_Id errorIdKey pREL_ERR FSLIT("error") errorTy
 
 errorTy  :: Type
 errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
