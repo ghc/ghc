@@ -28,7 +28,7 @@ MKDEPENDHS = $(GHC_INPLACE)
 LIBRARY = libHS$(_way).a
 LIBOBJS = $(HS_OBJS)
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-LIBOBJS = $(filter-out PrelHugs.o,$(HS_OBJS))
+LIBOBJS = $(filter-out PrelHugs.$(way_)o,$(HS_OBJS))
 endif
 
 #-----------------------------------------------------------------------------
