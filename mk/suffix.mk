@@ -279,7 +279,7 @@ endif
 
 # TODO: Detect hhc via autoconf
 #
-# Two obstables here:
+# Two obstacles here:
 #
 # * The reason for the strange "if" below is that hhc returns 0 on error and 1
 #   on success, the opposite of what shells and make expect.
@@ -292,6 +292,7 @@ endif
 
 %.fo : %.xml
 	$(XSLTPROC) --output $@ \
+		    --stringparam draft.mode no \
 		    $(XSLTPROC_LABEL_OPTS) $(XSLTPROC_OPTS) \
 		    $(DIR_DOCBOOK_XSL)/fo/docbook.xsl $<
 
