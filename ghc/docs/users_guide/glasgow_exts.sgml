@@ -1898,8 +1898,13 @@ bindings. So this is illegal:
   f3 x = a==b where { Baz1 a b = x }
 </programlisting>
 
+Instead, use a <literal>case</literal> expression:
 
-You can only pattern-match
+<programlisting>
+  f3 x = case x of Baz1 a b -> a==b
+</programlisting>
+
+In general, you can only pattern-match
 on an existentially-quantified constructor in a <literal>case</literal> expression or
 in the patterns of a function definition.
 
