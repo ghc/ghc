@@ -87,7 +87,7 @@ HostVendor_CPP	                = @HostVendor_CPP@
 LeadingUnderscore=@LeadingUnderscore@
 
 # Pin a suffix on executables? If so, what. (cygwin32 only).
-exeext=@exeext@
+exeext=
 
 #################################################################################
 #
