@@ -24,6 +24,8 @@
 -----------------------------------------------------------------------------
 -- features
 
+* Add a search feature which just invokes Google?
+
 * Do the unlitting/CPPing from Haddock itself so we get the source file
   links right.
 
