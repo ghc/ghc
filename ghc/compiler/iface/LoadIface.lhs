@@ -126,7 +126,7 @@ loadHiBootInterface
 	    Just (mod_nm, True) -> 	-- There's a hi-boot interface below us
 		
 
-    do	{ 	-- Load it (into the PTE, and return the exported names
+    do	{ 	-- Load it (into the PTE), and return the exported names
 	  iface <- loadSrcInterface (mk_doc mod_nm) mod_nm True
 	; sequenceM [ lookupOrig mod_nm occ
 		    | (mod,avails) <- mi_exports iface, 
@@ -331,7 +331,6 @@ loadDecl ignore_prags mod (_version, decl)
 
 	-- mk_new_bndr allocates in the name cache the final canonical
 	-- name for the thing, with the correct 
-	--	* package info
 	--	* parent
 	--	* location
 	-- imported name, to fix the module correctly in the cache
