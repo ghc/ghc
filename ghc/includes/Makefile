@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.20 2002/03/02 17:49:42 sof Exp $
+# $Id: Makefile,v 1.21 2003/03/21 15:45:56 sof Exp $
 #
 
 TOP = ..
@@ -85,7 +85,7 @@ mkDerivedConstantsHdr : mkDerivedConstants.o
 DerivedConstants.h : mkDerivedConstantsHdr
 	./mkDerivedConstantsHdr >DerivedConstants.h
 
-CLEAN_FILES += mkDerivedConstantsHdr DerivedConstants.h
+CLEAN_FILES += mkDerivedConstantsHdr$(exeext) DerivedConstants.h
 
 # ---------------------------------------------------------------------------
 # Make NativeDefs.h for the NCG
@@ -100,7 +100,7 @@ mkNativeHdr : mkNativeHdr.o
 NativeDefs.h : mkNativeHdr
 	./mkNativeHdr >NativeDefs.h
 
-CLEAN_FILES += mkNativeHdr NativeDefs.h
+CLEAN_FILES += mkNativeHdr$(exeext) NativeDefs.h
 
 # ---------------------------------------------------------------------------
 # boot setup:
