@@ -34,7 +34,7 @@ module TyCon(
 	tyConTheta,
 	tyConPrimRep,
 	tyConArity,
-	isClassTyCon,
+	isClassTyCon, tyConClass_maybe,
 	getSynTyConDefn,
 
         maybeTyConSingleCon,
@@ -55,6 +55,7 @@ import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
 
 
 import Var   		( TyVar, Id )
+import Class		( Class )
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), 
 			  isBoxed, EP(..) )
 import Name		( Name, nameUnique, NamedThing(getName) )
@@ -119,7 +120,7 @@ data TyCon
 					-- e.g. the TyCon for a Class dictionary,
 					-- and TyCons with unboxed arguments
 
-	algTyConClass :: Bool		-- True if this tycon comes from a class declaration
+	algTyConClass :: Maybe Class	-- Just cl if this tycon came from a class declaration
     }
 
   | PrimTyCon {		-- Primitive types; cannot be defined in Haskell
@@ -252,7 +253,7 @@ mkAlgTyCon name kind tyvars theta argvrcs cons ncons sels flavour rec
 	dataCons		= cons, 
 	selIds			= sels,
 	noOfDataCons		= ncons,
-	algTyConClass		= False,
+	algTyConClass		= Nothing,
 	algTyConFlavour 	= flavour,
 	algTyConRec		= rec,
 	genInfo   	        = gen_info
@@ -270,7 +271,7 @@ mkClassTyCon name kind tyvars argvrcs con clas flavour
 	dataCons		= [con],
 	selIds			= [],
 	noOfDataCons		= 1,
-	algTyConClass		= True,
+	algTyConClass		= Just clas,
 	algTyConFlavour		= flavour,
 	algTyConRec		= NonRecursive,
 	genInfo   	        = Nothing
@@ -456,8 +457,12 @@ maybeTyConSingleCon tc = pprPanic "maybeTyConSingleCon: unexpected tycon " $
 
 \begin{code}
 isClassTyCon :: TyCon -> Bool
-isClassTyCon (AlgTyCon {algTyConClass = is_class_tycon}) = is_class_tycon
-isClassTyCon other_tycon			         = False
+isClassTyCon (AlgTyCon {algTyConClass = Just _}) = True
+isClassTyCon other_tycon			 = False
+
+tyConClass_maybe :: TyCon -> Maybe Class
+tyConClass_maybe (AlgTyCon {algTyConClass = maybe_clas}) = maybe_clas
+tyConClass_maybe ther_tycon				 = Nothing
 \end{code}
 
 

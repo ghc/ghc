@@ -28,7 +28,7 @@ module HscTypes (
 
 	ImportedModuleInfo, WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, DeclsMap,
-	IfaceInsts, IfaceRules, GatedDecl, IsExported,
+	IfaceInsts, IfaceRules, GatedDecl, GatedDecls, IsExported,
 	NameSupply(..), OrigNameCache, OrigIParamCache,
 	Avails, AvailEnv, GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
 	PersistentCompilerState(..),

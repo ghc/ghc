@@ -34,9 +34,13 @@ import RnHiFiles	( tryLoadInterface, loadHomeInterface,
 import RnSource		( rnTyClDecl, rnInstDecl, rnIfaceRuleDecl )
 import RnEnv
 import RnMonad
-import Id		( idType )
+import Id		( idType, idName, globalIdDetails )
+import IdInfo		( GlobalIdDetails(..) )
 import Type		( namesOfType )
-import TyCon		( isSynTyCon, getSynTyConDefn )
+import FieldLabel	( fieldLabelTyCon )
+import DataCon		( dataConTyCon )
+import TyCon		( isSynTyCon, getSynTyConDefn, tyConClass_maybe, tyConName )
+import Class		( className )
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule, isLocalName, NamedThing(..)
 			 )
@@ -50,7 +54,7 @@ import Module		( Module, ModuleEnv,
 			  elemModuleSet, extendModuleSet
 			)
 import PrelInfo		( wiredInThingEnv )
-import Maybes		( orElse )
+import Maybes		( maybeToBool )
 import FiniteMap
 import Outputable
 import Bag
@@ -312,7 +316,28 @@ recordDeclSlurp ifaces@(Ifaces { iDecls  = (decls_map, n_slurped),
     new_decls_map     = foldl delFromNameEnv decls_map (availNames avail)
     new_slurped_names = addAvailToNameSet slurped_names avail
 
-recordVSlurp ifaces name = ifaces { iVSlurp = updateVSlurp (iVSlurp ifaces) name }
+
+-- recordTypeEnvSlurp is used when we slurp something that's
+-- already in the type environment, that was not slurped in an earlier compilation.
+-- We record it in the iVSlurp set, because that's used to
+-- generate usage information
+
+recordTypeEnvSlurp ifaces ty_thing
+  = ifaces { iVSlurp = updateVSlurp (iVSlurp ifaces) (get_main_name ty_thing) }
+  where
+	-- Tiresomely, we must get the "main" name for the 
+	-- thing, because that's what VSlurp contains, and what
+	-- is recorded in the usage information
+    get_main_name (AClass cl) = className cl
+    get_main_name (ATyCon tc)
+	| Just clas <- tyConClass_maybe tc = get_main_name (AClass clas)
+        | otherwise			   = tyConName tc
+    get_main_name (AnId id)
+	= case globalIdDetails id of
+	    DataConId     dc -> get_main_name (ATyCon (dataConTyCon dc))
+	    DataConWrapId dc -> get_main_name (ATyCon (dataConTyCon dc))
+	    RecordSelId lbl  -> get_main_name (ATyCon (fieldLabelTyCon lbl))
+	    other	     -> idName id
 
 updateVSlurp (imp_mods, imp_names) main_name
   | isHomeModule mod = (imp_mods,		      addOneToNameSet imp_names main_name)
@@ -490,7 +515,11 @@ getImportedInstDecls gates
     getIfacesRn 					`thenRn` \ ifaces ->
     getTypeEnvRn					`thenRn` \ lookup ->
     let
-	(decls, new_insts) = selectGated gates lookup (iInsts ifaces)
+	available n = n `elemNameSet` gates
+		   || case lookup n of { Just (AClass c) -> True; other -> False }
+		-- See "The gating story" above for the AClass thing
+
+	(decls, new_insts) = selectGated available (iInsts ifaces)
     in
     setIfacesRn (ifaces { iInsts = new_insts })		`thenRn_`
 
@@ -514,9 +543,11 @@ getImportedRules
   = getIfacesRn 	`thenRn` \ ifaces ->
     getTypeEnvRn	`thenRn` \ lookup ->
     let
-	gates		   = iSlurp ifaces	-- Anything at all that's been slurped
-	rules		   = iRules ifaces
-	(decls, new_rules) = selectGated gates lookup rules
+		-- Slurp rules for anything that is slurped, 
+		-- either now or previously
+	gates	   	   = iSlurp ifaces	
+	available n        = n `elemNameSet` gates || maybeToBool (lookup n)
+	(decls, new_rules) = selectGated available (iRules ifaces)
     in
     if null decls then
 	returnRn []
@@ -526,9 +557,10 @@ getImportedRules
 		  text "Slurped" <+> int (length decls) <+> text "rules"])   `thenRn_`
     returnRn decls
 
-selectGated gates lookup (decl_bag, n_slurped)
-	-- Select only those decls whose gates are *all* in 'gates'
-	-- or are a class in 'lookup'
+selectGated :: (Name->Bool) -> GatedDecls d
+	    -> ([(Module,d)], GatedDecls d)
+selectGated available (decl_bag, n_slurped)
+	-- Select only those decls whose gates are *all* available
 #ifdef DEBUG
   | opt_NoPruneDecls	-- Just to try the effect of not gating at all
   = let
@@ -541,9 +573,6 @@ selectGated gates lookup (decl_bag, n_slurped)
   = case foldrBag select ([], emptyBag) decl_bag of
 	(decls, new_bag) -> (decls, (new_bag, n_slurped + length decls))
   where
-    available n = n `elemNameSet` gates 
-		|| case lookup n of { Just (AClass c) -> True; other -> False }
-
     select (reqd, decl) (yes, no)
 	| all available reqd = (decl:yes, no)
 	| otherwise	     = (yes,      (reqd,decl) `consBag` no)
@@ -576,19 +605,16 @@ importDecl name
     getTypeEnvRn 			`thenRn` \ lookup ->
     case lookup name of {
 	Just ty_thing 
-	   | name `elemNameEnv` wiredInThingEnv
-	   -> 	-- When we find a wired-in name we must load its home
+	    |	name `elemNameEnv` wiredInThingEnv
+	    ->	-- When we find a wired-in name we must load its home
 		-- module so that we find any instance decls lurking therein
 		loadHomeInterface wi_doc name	`thenRn_`
 		returnRn (InTypeEnv ty_thing)
 
-	   | otherwise
- 	   ->	-- Record that we use this thing.  We must do this
-		--  regardless of whether we need to demand-slurp it in
-		--  or we already have it in the type environment.  Why?
-		--  because the slurp information is used to generate usage
-		--  information in the interface.
-		setIfacesRn (recordVSlurp ifaces (getName ty_thing))	`thenRn_`
+	    |	otherwise
+	    ->  -- Very important: record that we've seen it
+		-- See comments with recordTypeEnvSlurp
+		setIfacesRn (recordTypeEnvSlurp ifaces ty_thing)	`thenRn_`
 		returnRn (InTypeEnv ty_thing) ;
 
 	Nothing -> 

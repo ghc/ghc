@@ -276,6 +276,12 @@ data Ifaces = Ifaces {
 	iSlurp :: NameSet,
 		-- All the names (whether "big" or "small", whether wired-in or not,
 		-- whether locally defined or not) that have been slurped in so far.
+		--
+		-- It's used for two things:
+		--	a) To record what we've already slurped, so
+		--	   we can no-op if we try to slurp it again
+		--	b) As the 'gates' for importing rules.  We import a rule
+		--	   if all its LHS free vars have been slurped
 
 	iVSlurp :: (ModuleSet, NameSet)
 		-- The Names are all the (a) non-wired-in
