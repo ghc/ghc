@@ -52,6 +52,16 @@ import Control.Exception ( handle, throwIO )
 import Foreign.C
 import Foreign
 
+#if defined(mingw32_HOST_OS)
+import Control.Monad		( when )
+import System.Directory		( doesFileExist )
+import Control.Exception 	( catchJust, ioErrors )
+import System.IO.Error		( isDoesNotExistError, doesNotExistErrorType,
+				  mkIOError )
+import System.Environment	( getEnv )
+import System.Directory.Internals ( parseSearchPath, joinFileName )
+#endif
+
 #ifdef __HUGS__
 {-# CFILES cbits/execvpe.c  #-}
 #endif
@@ -290,20 +300,49 @@ commandToProcess
   :: String
   -> IO (FilePath,String)
 commandToProcess string = do
-  sysDir <- allocaBytes 1024 (\pdir -> c_getSystemDirectory pdir 1024 >> peekCString pdir)
-  return (sysDir ++ "\\CMD.EXE", "/c " ++ string)
+  cmd <- findCommandInterpreter
+  return (cmd, "/c "++string)
 	-- We don't want to put the cmd into a single
 	-- argument, because cmd.exe will not try to split it up.  Instead,
 	-- we just tack the command on the end of the cmd.exe command line,
 	-- which partly works.  There seem to be some quoting issues, but
 	-- I don't have the energy to find+fix them right now (ToDo). --SDM
+	-- (later) Now I don't know what the above comment means.  sigh.
 
-foreign import stdcall unsafe "GetSystemDirectoryA" 
-  c_getSystemDirectory 
-        :: CString 
-        -> CInt 
-        -> IO CInt
+-- Find CMD.EXE (or COMMAND.COM on Win98).  We use the same algorithm as
+-- system() in the VC++ CRT (Vc7/crt/src/system.c in a VC++ installation).
+findCommandInterpreter :: IO FilePath
+findCommandInterpreter = do
+  -- try COMSPEC first
+  catchJust ioErrors (getEnv "COMSPEC") $ \e -> do
+    when (not (isDoesNotExistError e)) $ ioError e
 
+    -- try to find CMD.EXE or COMMAND.COM
+    osver <- c_get_osver
+    let filename | osver .&. 0x8000 /= 0 = "command.com"
+		 | otherwise             = "cmd.exe"
+    path <- getEnv "PATH"
+    let
+	-- use our own version of System.Directory.findExecutable, because
+	-- that assumes the .exe suffix.
+	search :: [FilePath] -> IO (Maybe FilePath)
+	search [] = return Nothing
+	search (d:ds) = do
+		let path = d `joinFileName` filename
+		b <- doesFileExist path
+		if b then return (Just path)
+		     else search ds
+    --
+    mb_path <- search (parseSearchPath path)
+
+    case mb_path of
+      Nothing -> ioError (mkIOError doesNotExistErrorType 
+				"findCommandInterpreter" Nothing Nothing)
+      Just cmd -> return cmd
+
+
+foreign import stdcall unsafe "__hscore_get_osver"
+  c_get_osver :: IO CUInt
 #endif
 
 -- ----------------------------------------------------------------------------

@@ -751,6 +751,10 @@ INLINE int __hscore_CSIDL_WINDOWS()  { return CSIDL_WINDOWS;  }
 INLINE int __hscore_CSIDL_PERSONAL() { return CSIDL_PERSONAL; }
 #endif
 
+#if defined(mingw32_HOST_OS)
+INLINE unsigned int __hscore_get_osver(void) { return _osver; }
+#endif
+
 /* ToDo: write a feature test that doesn't assume 'environ' to
  *    be in scope at link-time. */
 extern char** environ;
