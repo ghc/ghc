@@ -29,7 +29,7 @@ module Type (
 
 	mkSynTy, 
 
-	repType, typePrimRep, coreView,
+	repType, typePrimRep, coreView, deepCoreView,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy, dropForAlls,
@@ -56,7 +56,8 @@ module Type (
 	tidyTopType,   tidyPred,
 
 	-- Comparison
-	eqType, 
+	coreEqType, tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
+	tcEqPred, tcCmpPred, tcEqTypeX, 
 
 	-- Seq
 	seqType, seqTypes,
@@ -103,7 +104,7 @@ import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 import CmdLineOpts	( opt_DictsStrict )
 import SrcLoc		( noSrcLoc )
 import Unique		( Uniquable(..) )
-import Util		( mapAccumL, seqList, lengthIs, snocView )
+import Util		( mapAccumL, seqList, lengthIs, snocView, thenCmp, isEqual )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 import Maybe		( isJust )
@@ -131,6 +132,17 @@ coreView (NoteTy _ ty) 	   = Just ty
 coreView (PredTy p)    	   = Just (predTypeRep p)
 coreView (TyConApp tc tys) = expandNewTcApp tc tys
 coreView ty		   = Nothing
+
+deepCoreView :: Type -> Type
+-- Apply coreView recursively
+deepCoreView ty
+  | Just ty' <- coreView ty    = deepCoreView ty'
+deepCoreView (TyVarTy tv)      = TyVarTy tv
+deepCoreView (TyConApp tc tys) = TyConApp tc (map deepCoreView tys)
+deepCoreView (AppTy t1 t2)     = AppTy (deepCoreView t1) (deepCoreView t2)
+deepCoreView (FunTy t1 t2)     = FunTy (deepCoreView t1) (deepCoreView t2)
+deepCoreView (ForAllTy tv ty)  = ForAllTy tv (deepCoreView ty)
+	-- No NoteTy, no PredTy
 
 expandNewTcApp :: TyCon -> [Type] -> Maybe Type
 -- A local helper function (not exported)
@@ -835,33 +847,75 @@ seqPred (IParam n ty)  = n  `seq` seqType ty
 
 %************************************************************************
 %*									*
-\subsection{Equality on types}
+		Comparison of types
+	(We don't use instances so that we know where it happens)
 %*									*
 %************************************************************************
 
-Comparison; don't use instances so that we know where it happens.
-Look through newtypes but not usage types.
+Two flavours:
+
+* tcEqType, tcCmpType do *not* look through newtypes, PredTypes
+* coreEqType *does* look through them
 
 Note that eqType can respond 'False' for partial applications of newtypes.
 Consider
 	newtype Parser m a = MkParser (Foogle m a)
-
 Does 	
 	Monad (Parser m) `eqType` Monad (Foogle m)
-
 Well, yes, but eqType won't see that they are the same. 
 I don't think this is harmful, but it's soemthing to watch out for.
 
-\begin{code}
-eqType t1 t2 = eq_ty emptyVarEnv t1 t2
+First, the external interface
 
--- Look through Notes, PredTy, newtype applications
-eq_ty env t1 t2 | Just t1' <- coreView t1 = eq_ty env t1' t2
-eq_ty env t1 t2 | Just t2' <- coreView t2 = eq_ty env t1 t2'
+\begin{code}
+coreEqType :: Type -> Type -> Bool
+coreEqType t1 t2 = isEqual $ cmpType (deepCoreView t1) (deepCoreView t2)
+
+tcEqType :: Type -> Type -> Bool
+tcEqType t1 t2 = isEqual $ cmpType t1 t2
+
+tcEqTypes :: [Type] -> [Type] -> Bool
+tcEqTypes tys1 tys2 = isEqual $ cmpTypes tys1 tys2
+
+tcCmpType :: Type -> Type -> Ordering
+tcCmpType t1 t2 = cmpType t1 t2
+
+tcCmpTypes :: [Type] -> [Type] -> Ordering
+tcCmpTypes tys1 tys2 = cmpTypes tys1 tys2
+
+tcEqPred :: PredType -> PredType -> Bool
+tcEqPred p1 p2 = isEqual $ cmpPred p1 p2
+
+tcCmpPred :: PredType -> PredType -> Ordering
+tcCmpPred p1 p2 = cmpPred p1 p2
+
+tcEqTypeX :: RnEnv2 -> Type -> Type -> Bool
+tcEqTypeX env t1 t2 = isEqual $ cmpTypeX env t1 t2
+\end{code}
+
+Now here comes the real worker
+
+\begin{code}
+cmpType :: Type -> Type -> Ordering
+cmpType t1 t2 = cmpTypeX rn_env t1 t2
+  where
+    rn_env = mkRnEnv2 (mkInScopeSet (tyVarsOfType t1 `unionVarSet` tyVarsOfType t2))
+
+cmpTypes :: [Type] -> [Type] -> Ordering
+cmpTypes ts1 ts2 = cmpTypesX rn_env ts1 ts2
+  where
+    rn_env = mkRnEnv2 (mkInScopeSet (tyVarsOfTypes ts1 `unionVarSet` tyVarsOfTypes ts2))
+
+cmpPred :: PredType -> PredType -> Ordering
+cmpPred p1 p2 = cmpPredX rn_env p1 p2
+  where
+    rn_env = mkRnEnv2 (mkInScopeSet (tyVarsOfPred p1 `unionVarSet` tyVarsOfPred p2))
+
+cmpTypeX :: RnEnv2 -> Type -> Type -> Ordering	-- Main workhorse
 
 -- NB: we *cannot* short-cut the newtype comparison thus:
--- eq_ty env (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) 
---	| (tc1 == tc2) = (eq_tys env tys1 tys2)
+-- eqTypeX env (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) 
+--	| (tc1 == tc2) = (eqTypeXs env tys1 tys2)
 --
 -- Consider:
 --	newtype T a = MkT [a]
@@ -876,21 +930,58 @@ eq_ty env t1 t2 | Just t2' <- coreView t2 = eq_ty env t1 t2'
 -- but we can only expand saturated newtypes, so just comparing
 -- T with [] won't do. 
 
--- The rest is plain sailing
-eq_ty env (TyVarTy tv1)       (TyVarTy tv2)       = case lookupVarEnv env tv1 of
-							  Just tv1a -> tv1a == tv2
-							  Nothing   -> tv1  == tv2
-eq_ty env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   
-	| tv1 == tv2				  = eq_ty (delVarEnv env tv1)        t1 t2
-	| otherwise				  = eq_ty (extendVarEnv env tv1 tv2) t1 t2
-eq_ty env (AppTy s1 t1)       (AppTy s2 t2)       = (eq_ty env s1 s2) && (eq_ty env t1 t2)
-eq_ty env (FunTy s1 t1)       (FunTy s2 t2)       = (eq_ty env s1 s2) && (eq_ty env t1 t2)
-eq_ty env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 == tc2) && (eq_tys env tys1 tys2)
-eq_ty env t1		       t2		  = False
+cmpTypeX env (TyVarTy tv1)       (TyVarTy tv2)       = rnOccL env tv1 `compare` rnOccR env tv2
+cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX (rnBndr2 env tv1 tv2) t1 t2
+cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
+cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
+cmpTypeX env (PredTy p1)         (PredTy p2)         = cmpPredX env p1 p2
+cmpTypeX env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` cmpTypesX env tys1 tys2
+cmpTypeX env (NoteTy _ t1)	t2		     = cmpTypeX env t1 t2
+cmpTypeX env t1			(NoteTy _ t2)	     = cmpTypeX env t1 t2
 
-eq_tys env []        []        = True
-eq_tys env (t1:tys1) (t2:tys2) = (eq_ty env t1 t2) && (eq_tys env tys1 tys2)
-eq_tys env tys1      tys2      = False
+    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
+cmpTypeX env (AppTy _ _) (TyVarTy _) = GT
+    
+cmpTypeX env (FunTy _ _) (TyVarTy _) = GT
+cmpTypeX env (FunTy _ _) (AppTy _ _) = GT
+    
+cmpTypeX env (TyConApp _ _) (TyVarTy _) = GT
+cmpTypeX env (TyConApp _ _) (AppTy _ _) = GT
+cmpTypeX env (TyConApp _ _) (FunTy _ _) = GT
+    
+cmpTypeX env (ForAllTy _ _) (TyVarTy _)    = GT
+cmpTypeX env (ForAllTy _ _) (AppTy _ _)    = GT
+cmpTypeX env (ForAllTy _ _) (FunTy _ _)    = GT
+cmpTypeX env (ForAllTy _ _) (TyConApp _ _) = GT
+
+cmpTypeX env (PredTy _)   t2		= GT
+
+cmpTypeX env _ _ = LT
+
+-------------
+cmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
+cmpTypesX env []        []        = EQ
+cmpTypesX env (t1:tys1) (t2:tys2) = cmpTypeX env t1 t2 `compare` cmpTypesX env tys1 tys2
+cmpTypesX env []        tys       = LT
+cmpTypesX env ty        []        = GT
+
+-------------
+cmpPredX :: RnEnv2 -> PredType -> PredType -> Ordering
+cmpPredX env (IParam n1 ty1) (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` cmpTypeX env ty1 ty2
+	-- Compare types as well as names for implicit parameters
+	-- This comparison is used exclusively (I think) for the
+	-- finite map built in TcSimplify
+cmpPredX env (ClassP c1 tys1) (ClassP c2 tys2) = (c1 `compare` c2) `thenCmp` cmpTypesX env tys1 tys2
+cmpPredX env (IParam _ _)     (ClassP _ _)	= LT
+cmpPredX env (ClassP _ _)     (IParam _ _)     = GT
+\end{code}
+
+PredTypes are used as a FM key in TcSimplify, 
+so we take the easy path and make them an instance of Ord
+
+\begin{code}
+instance Eq  PredType where { (==)    = tcEqPred }
+instance Ord PredType where { compare = tcCmpPred }
 \end{code}
 
 

@@ -36,7 +36,7 @@ import TysWiredIn	( boolTy, trueDataConId, falseDataConId )
 import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
 import CoreUtils	( cheapEqExpr, exprIsConApp_maybe )
-import Type		( tyConAppTyCon, eqType )
+import Type		( tyConAppTyCon, coreEqType )
 import OccName		( occNameUserString)
 import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey,
 			  eqStringName, unpackCStringIdKey )
@@ -420,7 +420,7 @@ match_append_lit [Type ty1,
 		  ]
   | unpk `hasKey` unpackCStringFoldrIdKey && 
     c1 `cheapEqExpr` c2
-  = ASSERT( ty1 `eqType` ty2 )
+  = ASSERT( ty1 `coreEqType` ty2 )
     Just (Var unpk `App` Type ty1
 		   `App` Lit (MachStr (s1 `appendFS` s2))
 		   `App` c1

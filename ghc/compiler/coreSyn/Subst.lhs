@@ -6,8 +6,9 @@
 \begin{code}
 module Subst (
 	-- Substitution stuff
-	Subst, SubstResult(..),
-	emptySubst, mkSubst, substInScope, substTy,
+	IdSubstEnv, SubstResult(..),
+
+	Subst, emptySubst, mkSubst, substInScope, substTy,
 	lookupIdSubst, lookupTvSubst, isEmptySubst, 
  	extendIdSubst, extendIdSubstList, extendTvSubst, extendTvSubstList,
 	zapSubstEnv, setSubstEnv, 

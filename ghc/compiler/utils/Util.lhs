@@ -33,7 +33,7 @@ module Util (
 	takeList, dropList, splitAtList,
 
 	-- comparisons
-	eqListBy, equalLength, compareLength,
+	isEqual, eqListBy, equalLength, compareLength,
 	thenCmp, cmpList, prefixMatch, suffixMatch, maybePrefixMatch,
 
 	-- strictness
@@ -577,6 +577,17 @@ splitAtList (_:xs) (y:ys) = (y:ys', ys'')
 %************************************************************************
 
 \begin{code}
+isEqual :: Ordering -> Bool
+-- Often used in (isEqual (a `compare` b))
+isEqual GT = False
+isEqual EQ = True
+isEqual LT = False
+
+thenCmp :: Ordering -> Ordering -> Ordering
+{-# INLINE thenCmp #-}
+thenCmp EQ   any = any
+thenCmp other any = other
+
 eqListBy :: (a->a->Bool) -> [a] -> [a] -> Bool
 eqListBy eq []     []     = True
 eqListBy eq (x:xs) (y:ys) = eq x y && eqListBy eq xs ys
@@ -592,11 +603,6 @@ compareLength [] []         = EQ
 compareLength (_:xs) (_:ys) = compareLength xs ys
 compareLength [] _ys        = LT
 compareLength _xs []        = GT
-
-thenCmp :: Ordering -> Ordering -> Ordering
-{-# INLINE thenCmp #-}
-thenCmp EQ   any = any
-thenCmp other any = other
 
 cmpList :: (a -> a -> Ordering) -> [a] -> [a] -> Ordering
     -- `cmpList' uses a user-specified comparer

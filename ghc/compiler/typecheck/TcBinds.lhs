@@ -50,6 +50,7 @@ import VarSet
 import SrcLoc		( Located(..), unLoc, noLoc, getLoc )
 import Bag
 import Util		( isIn )
+import Maybes		( orElse )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNonRec, isRec, 
 			  isNotTopLevel, isAlwaysActive )
 import FiniteMap	( listToFM, lookupFM )
@@ -567,7 +568,7 @@ tcTySig sig1 (L span (Sig (L _ name) ty))
 
 	-- Try to match the context of this signature with 
 	-- that of the first signature
-	; case tcMatchPreds tvs (sig_theta sig1) theta of { 
+	; case tcMatchPreds tvs theta (sig_theta sig1) of { 
 	    Nothing   -> bale_out
 	;   Just tenv -> do
 	; case check_tvs tenv tvs of
@@ -593,15 +594,12 @@ tcTySig sig1 (L span (Sig (L _ name) ty))
     check_tvs :: TvSubstEnv -> [TcTyVar] -> Maybe [TcTyVar]
     check_tvs tenv [] = Just []
     check_tvs tenv (tv:tvs) 
-	| Just ty <- lookupVarEnv tenv tv
-	= do { tv' <- tcGetTyVar_maybe ty
+	= do { let ty = lookupVarEnv tenv tv `orElse` mkTyVarTy tv
+	     ; tv'  <- tcGetTyVar_maybe ty
 	     ; tvs' <- check_tvs tenv tvs
 	     ; if tv' `elem` tvs'
 	       then Nothing
 	       else Just (tv':tvs') }
-	| otherwise
-	= do { tvs' <- check_tvs tenv tvs
-	     ; Just (tv:tvs') }
 \end{code}
 
 \begin{code}

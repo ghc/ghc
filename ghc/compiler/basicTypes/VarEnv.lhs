@@ -23,6 +23,10 @@ module VarEnv (
 	extendInScopeSet, extendInScopeSetList, modifyInScopeSet,
 	getInScopeVars, lookupInScope, elemInScopeSet, uniqAway, 
 
+	-- RnEnv2 and its operations
+	RnEnv2, mkRnEnv2, rnBndr2, rnBndrs2, rnOccL, rnOccR, inRnEnvL, inRnEnvR,
+		rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR,
+
 	-- TidyEnvs
 	TidyEnv, emptyTidyEnv
     ) where
@@ -34,7 +38,8 @@ import Var	  ( Var, setVarUnique )
 import VarSet
 import UniqFM  
 import Unique	  ( Unique, deriveUnique, getUnique )
-import Util	  ( zipEqual )
+import Util	  ( zipEqual, foldl2 )
+import Maybes	  ( orElse, isJust )
 import CmdLineOpts	( opt_PprStyle_Debug )
 import Outputable
 import FastTypes
@@ -105,9 +110,14 @@ uniqAway :: InScopeSet -> Var -> Var
 -- in-scope set, and gives that to v.  It starts with v's current unique, of course,
 -- in the hope that it won't have to change it, and thereafter uses a combination
 -- of that and the hash-code found in the in-scope set
-uniqAway (InScope set n) var
-  | not (var `elemVarSet` set) = var				-- Nothing to do
-  | otherwise		       = try 1#
+uniqAway in_scope var
+  | var `elemInScopeSet` in_scope = uniqAway' in_scope var	-- Make a new one
+  | otherwise 			  = var				-- Nothing to do
+
+uniqAway' :: InScopeSet -> Var -> Var
+-- This one *always* makes up a new variable
+uniqAway' (InScope set n) var
+  = try 1#
   where
     orig_unique = getUnique var
     try k 
@@ -124,6 +134,110 @@ uniqAway (InScope set n) var
 	  | otherwise = setVarUnique var uniq
 	  where
 	    uniq = deriveUnique orig_unique (iBox (n *# k))
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Dual renaming
+%*									*
+%************************************************************************
+
+When we are comparing (or matching) types or terms, we are faced with 
+"going under" corresponding binders.  E.g. when comparing
+	\x. e1	~   \y. e2
+
+Basically we want to rename [x->y] or [y->x], but there are lots of 
+things we must be careful of.  In particular, x might be free in e2, or
+y in e1.  So the idea is that we come up with a fresh binder that is free
+in neither, and rename x and y respectively.  That means we must maintain
+	a) a renaming for the left-hand expression
+	b) a renaming for the right-hand expressions
+	c) an in-scope set
+
+Furthermore, when matching, we want to be able to have an 'occurs check',
+to prevent
+	\x. f   ~   \y. y
+matching with f->y.  So for each expression we want to know that set of
+locally-bound variables. That is precisely the domain of the mappings (a)
+and (b), but we must ensure that we always extend the mappings as we go in.
+
+
+\begin{code}
+data RnEnv2 
+  = RV2 { envL 	   :: VarEnv Var	-- Renaming for Left term
+	, envR 	   :: VarEnv Var	-- Renaming for Right term
+	, in_scope :: InScopeSet }	-- In scope in left or right terms
+
+-- The renamings envL and envR are *guaranteed* to contain a binding
+-- for every variable bound as we go into the term, even if it is not
+-- renamed.  That way we can ask what variables are locally bound
+-- (inRnEnvL, inRnEnvR)
+
+mkRnEnv2 :: InScopeSet -> RnEnv2
+mkRnEnv2 vars = RV2	{ envL 	   = emptyVarEnv 
+			, envR 	   = emptyVarEnv
+			, in_scope = vars }
+
+rnBndrs2 :: RnEnv2 -> [Var] -> [Var] -> RnEnv2
+-- Arg lists must be of equal length
+rnBndrs2 env bsL bsR = foldl2 rnBndr2 env bsL bsR 
+
+rnBndr2 :: RnEnv2 -> Var -> Var -> RnEnv2
+-- (rnBndr2 env bL bR) go under a binder bL in the Left term 1, 
+-- 		       and binder bR in the Right term
+-- It finds a new binder, new_b,
+-- and returns an environment mapping bL->new_b and bR->new_b resp.
+rnBndr2 (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL bR
+  = RV2 { envL 	   = extendVarEnv envL bL new_b	  -- See Note
+	, envR 	   = extendVarEnv envR bR new_b	  -- [Rebinding]
+	, in_scope = extendInScopeSet in_scope new_b }
+  where
+	-- Find a new binder not in scope in either term
+    new_b | not (bL `elemInScopeSet` in_scope) = bL
+      	  | not (bR `elemInScopeSet` in_scope) = bR
+      	  | otherwise			       = uniqAway' in_scope bL
+
+	-- Note [Rebinding]
+	-- If the new var is the same as the old one, note that
+	-- the extendVarEnv *deletes* any current renaming
+	-- E.g.	  (\x. \x. ...)	 ~  (\y. \z. ...)
+	--
+	--   Inside \x  \y	{ [x->y], [y->y],       {y} }
+	-- 	 \x  \z	  	{ [x->x], [y->y, z->x], {y,x} }
+
+rnBndrL, rnBndrR :: RnEnv2 -> Var -> (RnEnv2, Var)
+-- Used when there's a binder on one side or the other only
+-- Useful when eta-expanding
+rnBndrL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
+  = (RV2 { envL     = extendVarEnv envL bL new_b
+	 , envR     = envR
+	 , in_scope = extendInScopeSet in_scope new_b }, new_b)
+  where
+    new_b | not (bL `elemInScopeSet` in_scope) = bL
+      	  | otherwise			       = uniqAway' in_scope bL
+
+rnBndrR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
+  = (RV2 { envL     = envL
+	 , envR     = extendVarEnv envR bR new_b
+	 , in_scope = extendInScopeSet in_scope new_b }, new_b)
+  where
+    new_b | not (bR `elemInScopeSet` in_scope) = bR
+      	  | otherwise			       = uniqAway' in_scope bR
+
+rnOccL, rnOccR :: RnEnv2 -> Var -> Var
+-- Look up the renaming of an occurrence in the left or right term
+rnOccL (RV2 { envL = env }) v = lookupVarEnv env v `orElse` v
+rnOccR (RV2 { envR = env }) v = lookupVarEnv env v `orElse` v
+
+inRnEnvL, inRnEnvR :: RnEnv2 -> Var -> Bool
+-- Tells whether a variable is locally bound
+inRnEnvL (RV2 { envL = env }) v = isJust (lookupVarEnv env v)
+inRnEnvR (RV2 { envR = env }) v = isJust (lookupVarEnv env v)
+
+nukeRnEnvL, nukeRnEnvR :: RnEnv2 -> RnEnv2
+nukeRnEnvL env = env { envL = emptyVarEnv }
+nukeRnEnvR env = env { envR = emptyVarEnv }
 \end{code}
 
 
@@ -202,8 +316,8 @@ foldVarEnv	 = foldUFM
 lookupVarEnv_Directly = lookupUFM_Directly
 filterVarEnv_Directly = filterUFM_Directly
 
-zipVarEnv tyvars tys       = mkVarEnv (zipEqual "zipVarEnv" tyvars tys)
-lookupVarEnv_NF env id     = case (lookupVarEnv env id) of { Just xx -> xx }
+zipVarEnv tyvars tys   = mkVarEnv (zipEqual "zipVarEnv" tyvars tys)
+lookupVarEnv_NF env id = case (lookupVarEnv env id) of { Just xx -> xx }
 \end{code}
 
 @modifyVarEnv@: Look up a thing in the VarEnv, 

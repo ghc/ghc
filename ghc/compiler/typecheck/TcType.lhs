@@ -43,7 +43,7 @@ module TcType (
   ---------------------------------
   -- Predicates. 
   -- Again, newtypes are opaque
-  tcEqType, tcEqTypes, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred,
+  tcEqType, tcEqTypes, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred, tcEqTypeX,
   isSigmaTy, isOverloadedTy, 
   isDoubleTy, isFloatTy, isIntTy,
   isIntegerTy, isAddrTy, isBoolTy, isUnitTy,
@@ -140,6 +140,10 @@ import Type		(	-- Re-exports
 			  tidyTyVarBndr, tidyOpenTyVar,
 			  tidyOpenTyVars, 
 			  isSubKind, 
+
+			  tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
+			  tcEqPred, tcCmpPred, tcEqTypeX, 
+
 			  TvSubst(..),
 			  TvSubstEnv, emptyTvSubst,
 			  mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst,
@@ -157,7 +161,6 @@ import DataCon		( DataCon )
 import Class		( Class )
 import Var		( TyVar, Id, isTcTyVar, tcTyVarDetails )
 import ForeignCall	( Safety, playSafe, DNType(..) )
-import VarEnv
 import VarSet
 
 -- others:
@@ -169,7 +172,7 @@ import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
 import BasicTypes	( IPName(..), ipNameName )
 import SrcLoc		( SrcLoc, SrcSpan )
-import Util		( cmpList, thenCmp, snocView )
+import Util		( snocView )
 import Maybes		( maybeToBool, expectJust )
 import Outputable
 import DATA_IOREF
@@ -562,95 +565,6 @@ isInheritablePred other	     = False
 isLinearPred :: TcPredType -> Bool
 isLinearPred (IParam (Linear n) _) = True
 isLinearPred other		   = False
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Comparison}
-%*									*
-%************************************************************************
-
-Comparison, taking note of newtypes, predicates, etc,
-
-\begin{code}
-tcEqType :: Type -> Type -> Bool
-tcEqType ty1 ty2 = case ty1 `tcCmpType` ty2 of { EQ -> True; other -> False }
-
-tcEqTypes :: [Type] -> [Type] -> Bool
-tcEqTypes ty1 ty2 = case ty1 `tcCmpTypes` ty2 of { EQ -> True; other -> False }
-
-tcEqPred :: PredType -> PredType -> Bool
-tcEqPred p1 p2 = case p1 `tcCmpPred` p2 of { EQ -> True; other -> False }
-
--------------
-tcCmpType :: Type -> Type -> Ordering
-tcCmpType ty1 ty2 = cmpTy emptyVarEnv ty1 ty2
-
-tcCmpTypes tys1 tys2 = cmpTys emptyVarEnv tys1 tys2
-
-tcCmpPred p1 p2 = cmpPredTy emptyVarEnv p1 p2
--------------
-cmpTys env tys1 tys2 = cmpList (cmpTy env) tys1 tys2
-
--------------
-cmpTy :: TyVarEnv TyVar -> Type -> Type -> Ordering
-  -- The "env" maps type variables in ty1 to type variables in ty2
-  -- So when comparing for-alls.. (forall tv1 . t1) (forall tv2 . t2)
-  -- we in effect substitute tv2 for tv1 in t1 before continuing
-
-    -- Look through NoteTy
-cmpTy env (NoteTy _ ty1) ty2 = cmpTy env ty1 ty2
-cmpTy env ty1 (NoteTy _ ty2) = cmpTy env ty1 ty2
-
-    -- Deal with equal constructors
-cmpTy env (TyVarTy tv1) (TyVarTy tv2) = case lookupVarEnv env tv1 of
-					  Just tv1a -> tv1a `compare` tv2
-					  Nothing   -> tv1  `compare` tv2
-
-cmpTy env (PredTy p1) (PredTy p2) = cmpPredTy env p1 p2
-cmpTy env (AppTy f1 a1) (AppTy f2 a2) = cmpTy env f1 f2 `thenCmp` cmpTy env a1 a2
-cmpTy env (FunTy f1 a1) (FunTy f2 a2) = cmpTy env f1 f2 `thenCmp` cmpTy env a1 a2
-cmpTy env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmpTys env tys1 tys2)
-cmpTy env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTy (extendVarEnv env tv1 tv2) t1 t2
-    
-    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
-cmpTy env (AppTy _ _) (TyVarTy _) = GT
-    
-cmpTy env (FunTy _ _) (TyVarTy _) = GT
-cmpTy env (FunTy _ _) (AppTy _ _) = GT
-    
-cmpTy env (TyConApp _ _) (TyVarTy _) = GT
-cmpTy env (TyConApp _ _) (AppTy _ _) = GT
-cmpTy env (TyConApp _ _) (FunTy _ _) = GT
-    
-cmpTy env (ForAllTy _ _) (TyVarTy _)    = GT
-cmpTy env (ForAllTy _ _) (AppTy _ _)    = GT
-cmpTy env (ForAllTy _ _) (FunTy _ _)    = GT
-cmpTy env (ForAllTy _ _) (TyConApp _ _) = GT
-
-cmpTy env (PredTy _)   t2		= GT
-
-cmpTy env _ _ = LT
-\end{code}
-
-\begin{code}
-cmpPredTy :: TyVarEnv TyVar -> PredType -> PredType -> Ordering
-cmpPredTy env (IParam n1 ty1) (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` (cmpTy env ty1 ty2)
-	-- Compare types as well as names for implicit parameters
-	-- This comparison is used exclusively (I think) for the
-	-- finite map built in TcSimplify
-cmpPredTy env (IParam _ _)     (ClassP _ _)	  = LT
-cmpPredTy env (ClassP _ _)     (IParam _ _)     = GT
-cmpPredTy env (ClassP c1 tys1) (ClassP c2 tys2) = (c1 `compare` c2) `thenCmp` (cmpTys env tys1 tys2)
-\end{code}
-
-PredTypes are used as a FM key in TcSimplify, 
-so we take the easy path and make them an instance of Ord
-
-\begin{code}
-instance Eq  PredType where { (==)    = tcEqPred }
-instance Ord PredType where { compare = tcCmpPred }
 \end{code}
 
 

@@ -16,26 +16,22 @@ module Rules (
 
 import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseRule )
-import CoreFVs		( exprFreeVars, ruleRhsFreeVars )
+import CoreFVs		( exprFreeVars, exprsFreeVars, ruleRhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
-import CoreUtils	( eqExpr )
+import CoreUtils	( tcEqExprX )
 import CoreTidy		( pprTidyIdRules )
-import Subst		( Subst, SubstResult(..), extendIdSubst,
-			  getTvSubstEnv, setTvSubstEnv,
-			  emptySubst, isInScope, lookupIdSubst, lookupTvSubst,
-			  bindSubstList, unBindSubstList, substInScope
-			)
+import Subst		( IdSubstEnv, SubstResult(..) )
 import Id		( Id, idUnfolding, idSpecialisation, setIdSpecialisation ) 
-import Var		( Var, isId )
+import Var		( Var )
 import VarSet
 import VarEnv
-import TcType		( mkTyVarTy )
-import qualified Unify  ( matchTyX )
+import TcType		( TvSubstEnv )
+import Unify 		( matchTyX, MatchEnv(..) )
 import BasicTypes	( Activation, CompilerPhase, isActive )
 
 import Outputable
 import FastString
-import Maybe		( isJust, isNothing, fromMaybe )
+import Maybe		( isJust, fromMaybe )
 import Util		( sortLe )
 import Bag
 import List		( isPrefixOf )
@@ -120,27 +116,6 @@ matchRule :: (Activation -> Bool) -> InScopeSet
 --
 -- Any 'surplus' arguments in the input are simply put on the end
 -- of the output.
---
--- ASSUMPTION (A):
---	A1. No top-level variable is bound in the target
---	A2. No template variable  is bound in the target
---	A3. No lambda bound template variable is free in any subexpression of the target
---
--- To see why A1 is necessary, consider matching
---	\x->f 	   against    \f->f
--- When we meet the lambdas we substitute [f/x] in the template (a no-op),
--- and then erroneously succeed in matching f against f.
---
--- To see why A2 is needed consider matching 
---	forall a. \b->b	   against   \a->3
--- When we meet the lambdas we substitute [a/b] in the template, and then
--- erroneously succeed in matching what looks like the template variable 'a' against 3.
---
--- A3 is needed to validate the rule that says
---	(\x->E) matches F
--- if
---	(\x->E)	matches (\x->F x)
-
 
 matchRule is_active in_scope rule@(BuiltinRule name match_fn) args
   = case match_fn args of
@@ -151,251 +126,193 @@ matchRule is_active in_scope rule@(Rule rn act tpl_vars tpl_args rhs) args
   | not (is_active act)
   = Nothing
   | otherwise
-  = go tpl_args args emptySubst
-	-- We used to use the in_scope set, but I don't think that's necessary
-	-- After all, the result is going to be simplified again with that in_scope set
- where
-   tpl_var_set = mkVarSet tpl_vars
-
-   -----------------------
-	-- Do the business
-   go (tpl_arg:tpl_args) (arg:args) subst = match tpl_arg arg tpl_var_set (go tpl_args args) subst
-
-	-- Two easy ways to terminate
-   go [] []	    subst = Just (rn, app_match subst (mkLams tpl_vars rhs) tpl_vars)
-   go [] args	    subst = Just (rn, app_match subst (mkLams tpl_vars rhs) tpl_vars `mkApps` args)
-
-	-- One tiresome way to terminate: check for excess unmatched
-	-- template arguments
-   go tpl_args []   subst = Nothing	-- Failure
-
-
-   -----------------------
-   app_match subst fn vs = foldl go fn vs
-     where	
-	go fn v = case lookupVar subst v of
-		    Just e  -> fn `App` e 
-		    Nothing -> pprPanic "app_match: unbound tpl" (ppr v)
-
-lookupVar :: Subst -> Var -> Maybe CoreExpr
-lookupVar subst v
-   | isId v    = case lookupIdSubst subst v of
-		   Just (DoneEx ex) -> Just ex
-		   other 	    -> Nothing
-   | otherwise = case lookupTvSubst subst v of
-		   Just ty -> Just (Type ty)
-		   Nothing -> Nothing
-
-   -----------------------
-{-	The code below tries to match even if there are more 
-	template args than real args.
-
-	I now think this is probably a bad idea.
-	Should the template (map f xs) match (map g)?  I think not.
-	For a start, in general eta expansion wastes work.
-	SLPJ July 99
-
-      = case eta_complete tpl_args (mkVarSet leftovers) of
-	    Just leftovers' -> Just (rn, mkLams done (mkLams leftovers' rhs), 
-				     mk_result_args subst done)
-	    Nothing	    -> Nothing	-- Failure
-      where
-	(done, leftovers) = partition (\v -> isJust (lookupSubstEnv subst_env v))
-				      (map zapOccInfo tpl_vars)
-		-- Zap the occ info 
-	subst_env = substEnv subst
-   						
-   -----------------------
-   eta_complete [] vars = ASSERT( isEmptyVarSet vars )
-			  Just []
-   eta_complete (Type ty:tpl_args) vars
-	= case getTyVar_maybe ty of
-		Just tv |  tv `elemVarSet` vars
-			-> case eta_complete tpl_args (vars `delVarSet` tv) of
-				Just vars' -> Just (tv:vars')
-				Nothing    -> Nothing
-		other   -> Nothing
-
-   eta_complete (Var v:tpl_args) vars
-	| v `elemVarSet` vars
-	= case eta_complete tpl_args (vars `delVarSet` v) of
-		Just vars' -> Just (v:vars')
-		Nothing    -> Nothing
-
-   eta_complete other vars = Nothing
-
-
-zapOccInfo bndr | isTyVar bndr = bndr
-		| otherwise    = zapLamIdInfo bndr
--}
+  = case matchN in_scope tpl_vars tpl_args args of
+	Just (tpl_vals, leftovers) -> Just (rn, mkLams tpl_vars rhs `mkApps` tpl_vals `mkApps` leftovers)
+	Nothing			   -> Nothing
 \end{code}
 
 \begin{code}
-type Matcher result =  VarSet			-- Template variables
-	     	    -> (Subst -> Maybe result)	-- Continuation if success
-		    -> Subst  -> Maybe result	-- Substitution so far -> result
--- The *SubstEnv* in these Substs apply to the TEMPLATE only 
+matchN	:: InScopeSet
+	-> [Var]		-- Template tyvars
+	-> [CoreExpr]		-- Template
+	-> [CoreExpr]		-- Target; can have more elts than template
+	-> Maybe ([CoreExpr], 	-- What is substituted for each template var
+		  [CoreExpr])	-- Leftover target exprs
 
--- The *InScopeSet* in these Substs is HIJACKED,
--- 	to give the set of variables bound so far in the
---	target term.  So when matching forall a. (\x. a x) against (\y. y y)
---	while processing the body of the lambdas, the in-scope set will be {y}.
---	That lets us do the occurs-check when matching 'a' against 'y'
---
---	It starts off empty
+matchN in_scope tmpl_vars tmpl_es target_es
+  = do	{ (subst, leftover_es) <- go init_menv emptySubstEnv tmpl_es target_es
+	; return (map (lookup_tmpl subst) tmpl_vars, leftover_es) }
+  where
+    init_menv = ME { me_tmpls = mkVarSet tmpl_vars, me_env = init_rn_env }
+    init_rn_env = mkRnEnv2 (extendInScopeSetList in_scope tmpl_vars)
+		
+    go menv subst []     es 	= Just (subst, es)
+    go menv subst ts     [] 	= Nothing	-- Fail if too few actual args
+    go menv subst (t:ts) (e:es) = do { subst1 <- match menv subst t e 
+				     ; go menv subst1 ts es }
 
-match :: CoreExpr		-- Template
+    lookup_tmpl :: (TvSubstEnv, IdSubstEnv) -> Var -> CoreExpr
+    lookup_tmpl (tv_subst, id_subst) tmpl_var
+	| isTyVar tmpl_var = case lookupVarEnv tv_subst tmpl_var of
+				Just ty 	-> Type ty
+				Nothing 	-> unbound tmpl_var
+	| otherwise	   = case lookupVarEnv id_subst tmpl_var of
+				Just (DoneEx e) -> e
+				other		-> unbound tmpl_var
+ 
+    unbound var = pprPanic "Template variable unbound in rewrite rule" (ppr var)
+
+emptySubstEnv :: (TvSubstEnv, IdSubstEnv)
+emptySubstEnv = (emptyVarEnv, emptyVarEnv)
+
+
+--	At one stage I tried to match even if there are more 
+--	template args than real args.
+
+--	I now think this is probably a bad idea.
+--	Should the template (map f xs) match (map g)?  I think not.
+--	For a start, in general eta expansion wastes work.
+--	SLPJ July 99
+
+
+match :: MatchEnv
+      -> (TvSubstEnv, IdSubstEnv)
+      -> CoreExpr		-- Template
       -> CoreExpr		-- Target
-      -> Matcher result
+      -> Maybe (TvSubstEnv, IdSubstEnv)
 
-match_fail = Nothing
+-- See the notes with Unify.match, which matches types
+-- Everything is very similar for terms
 
--- ToDo: remove this debugging junk
--- match e1 e2 tpls kont subst = pprTrace "match" (ppr e1 <+> ppr e2 <+> ppr subst) $ match_ e1 e2 tpls kont subst
-match = match_
+-- Interesting examples:
+-- Consider matching
+--	\x->f 	   against    \f->f
+-- When we meet the lambdas we must remember to rename f to f' in the
+-- second expresion.  The RnEnv2 does that.
+--
+-- Consider matching 
+--	forall a. \b->b	   against   \a->3
+-- We must rename the \a.  Otherwise when we meet the lambdas we 
+-- might substitute [a/b] in the template, and then erroneously 
+-- succeed in matching what looks like the template variable 'a' against 3.
 
-match_ (Var v1) e2 tpl_vars kont subst
-  = case lookupIdSubst subst v1 of
-	Nothing	| v1 `elemVarSet` tpl_vars  	-- v1 is a template variable
-		-> if (any (`isInScope` subst) (varSetElems (exprFreeVars e2))) then
-			 match_fail		-- Occurs check failure
-						-- e.g. match forall a. (\x-> a x) against (\y. y y)
-		   else
-			 kont (extendIdSubst subst v1 (DoneEx e2))
+-- The Var case follows closely what happens in Unify.match
+match menv subst@(tv_subst, id_subst) (Var v1) e2 
+  | v1 `elemVarSet` me_tmpls menv
+  = case lookupVarEnv id_subst v1' of
+	Nothing	| any (inRnEnvR rn_env) (varSetElems (exprFreeVars e2))
+		-> Nothing	-- Occurs check failure
+		-- e.g. match forall a. (\x-> a x) against (\y. y y)
 
+		| otherwise
+		-> Just (tv_subst, extendVarEnv id_subst v1 (DoneEx e2))
 
-		| eqExpr (Var v1) e2	   -> kont subst
-			-- v1 is not a template variable, so it must be a global constant
+	Just (DoneEx e2') | tcEqExprX (nukeRnEnvL rn_env) e2' e2 
+			  -> Just subst
 
-	Just (DoneEx e2')  | eqExpr e2' e2 -> kont subst
+	other -> Nothing
 
-	other -> match_fail
-
-match_ (Lit lit1) (Lit lit2) tpl_vars kont subst
-  | lit1 == lit2
-  = kont subst
-
-match_ (App f1 a1) (App f2 a2) tpl_vars kont subst
-  = match f1 f2 tpl_vars (match a1 a2 tpl_vars kont) subst
-
-match_ (Lam x1 e1) (Lam x2 e2) tpl_vars kont subst
-  = bind [x1] [x2] (match e1 e2) tpl_vars kont subst
-
--- This rule does eta expansion
---		(\x.M)  ~  N 	iff	M  ~  N x
--- See assumption A3
-match_ (Lam x1 e1) e2 tpl_vars kont subst
-  = bind [x1] [x1] (match e1 (App e2 (mkVarArg x1))) tpl_vars kont subst
-
--- Eta expansion the other way
---	M  ~  (\y.N)	iff   \y.M y  ~  \y.N
---			iff   M	y     ~  N
--- Remembering that by (A), y can't be free in M, we get this
-match_ e1 (Lam x2 e2) tpl_vars kont subst
-  | new_id == x2	-- If the two are equal, don't bind, else we get
-			-- a substitution looking like x->x, and that sends
-			-- Unify.matchTy into a loop
-  = match (App e1 (mkVarArg new_id)) e2 tpl_vars kont subst
-  | otherwise
-  = bind [new_id] [x2] (match (App e1 (mkVarArg new_id)) e2) tpl_vars kont subst
+  | otherwise	-- v1 is not a template variable
+  = case e2 of
+	Var v2 | v1' == rnOccR rn_env v2 -> Just subst
+	other				 -> Nothing
   where
-    new_id = uniqAway (substInScope subst) x2
-	-- This uniqAway is actually needed.  Here's the example:
-	--  rule:	foldr (mapFB (:) f) [] = mapList
-	--  target:	foldr (\x. mapFB k f x) []
-	--	      where
-	--		k = \x. mapFB ... x
-	-- The first \x is ok, but when we inline k, hoping it might
-	-- match (:) we find a second \x.
-
--- gaw 2004
-match_ (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2) tpl_vars kont subst
-  = (match_ty ty1 ty2 tpl_vars $
-     match e1 e2 tpl_vars case_kont) subst
-  where
-    case_kont subst = bind [x1] [x2] (match_alts alts1 (sortLe le_alt alts2))
-				     tpl_vars kont subst
-
-match_ (Type ty1) (Type ty2) tpl_vars kont subst
-  = match_ty ty1 ty2 tpl_vars kont subst
-
-match_ (Note (Coerce to1 from1) e1) (Note (Coerce to2 from2) e2)
-      tpl_vars kont subst
-  = (match_ty to1   to2   tpl_vars $
-     match_ty from1 from2 tpl_vars $
-     match e1 e2 tpl_vars kont) subst
-
-
-{-	I don't buy this let-rule any more
-	The let rule fails on matching
-		forall f,x,xs. f (x:xs)
-	against
-		f (let y = e in (y:[]))
-	because we just get x->y, which is bogus.
-
--- This is an interesting rule: we simply ignore lets in the 
--- term being matched against!  The unfolding inside it is (by assumption)
--- already inside any occurrences of the bound variables, so we'll expand
--- them when we encounter them.  Meanwhile, we can't get false matches because
--- (also by assumption) the term being matched has no shadowing.
-match e1 (Let bind e2) tpl_vars kont subst
-  = match e1 e2 tpl_vars kont subst
--}
+    rn_env = me_env menv
+    v1'    = rnOccL rn_env v1
 
 -- Here is another important rule: if the term being matched is a
 -- variable, we expand it so long as its unfolding is a WHNF
 -- (Its occurrence information is not necessarily up to date,
 --  so we don't use it.)
-match_ e1 (Var v2) tpl_vars kont subst
+match menv subst e1 (Var v2)
   | isCheapUnfolding unfolding
-  = match e1 (unfoldingTemplate unfolding) tpl_vars kont subst
+  = match menv subst e1 (unfoldingTemplate unfolding)
   where
     unfolding = idUnfolding v2
 
+match menv subst (Lit lit1) (Lit lit2)
+  | lit1 == lit2
+  = Just subst
 
--- We can't cope with lets in the template
+match menv subst (App f1 a1) (App f2 a2)
+  = do 	{ subst' <- match menv subst f1 f2
+	; match menv subst' a1 a2 }
 
-match_ e1 e2 tpl_vars kont subst = match_fail
+match menv subst (Lam x1 e1) (Lam x2 e2)
+  = match menv' subst e1 e2
+  where
+    menv' = menv { me_env = rnBndr2 (me_env menv) x1 x2 }
 
+-- This rule does eta expansion
+--		(\x.M)  ~  N 	iff	M  ~  N x
+match menv subst (Lam x1 e1) e2
+  = match menv' subst e1 (App e2 (varToCoreExpr new_x))
+  where
+    (rn_env', new_x) = rnBndrL (me_env menv) x1
+    menv' = menv { me_env = rn_env' }
+
+-- Eta expansion the other way
+--	M  ~  (\y.N)	iff   M	y     ~  N
+match menv subst e1 (Lam x2 e2)
+  = match menv' subst (App e1 (varToCoreExpr new_x)) e2
+  where
+    (rn_env', new_x) = rnBndrR (me_env menv) x2
+    menv' = menv { me_env = rn_env' }
+
+match menv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
+  = do	{ subst1 <- match_ty menv subst ty1 ty2
+	; subst2 <- match menv subst1 e1 e2
+	; let menv' = menv { me_env = rnBndr2 (me_env menv) x2 x2 }
+	; match_alts menv' subst2 (sortLe le_alt alts1) (sortLe le_alt alts2)
+	}
+
+match menv subst (Type ty1) (Type ty2)
+  = match_ty menv subst ty1 ty2
+
+match menv subst (Note (Coerce to1 from1) e1) (Note (Coerce to2 from2) e2)
+  = do	{ subst1 <- match_ty menv subst  to1   to2
+	; subst2 <- match_ty menv subst1 from1 from2
+	; match menv subst2 e1 e2 }
+
+-- This is an interesting rule: we simply ignore lets in the 
+-- term being matched against!  The unfolding inside it is (by assumption)
+-- already inside any occurrences of the bound variables, so we'll expand
+-- them when we encounter them.
+match menv subst e1 (Let (NonRec x2 r2) e2)
+  = match menv' subst e1 e2
+  where
+    menv' = menv { me_env = fst (rnBndrR (me_env menv) x2) }
+	-- It's important to do this renaming. For example:
+	-- Matching
+	--	forall f,x,xs. f (x:xs)
+	--   against
+	--	f (let y = e in (y:[]))
+	-- We must not get success with x->y!  Instead, we 
+	-- need an occurs check.
+
+-- Everything else fails
+match menv subst e1 e2 = Nothing
 
 ------------------------------------------
-match_alts [] [] tpl_vars kont subst
-  = kont subst
-match_alts ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2) tpl_vars kont subst
+match_alts :: MatchEnv
+      -> (TvSubstEnv, IdSubstEnv)
+      -> [CoreAlt]		-- Template
+      -> [CoreAlt]		-- Target
+      -> Maybe (TvSubstEnv, IdSubstEnv)
+match_alts menv subst [] []
+  = return subst
+match_alts menv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
   | c1 == c2
-  = bind vs1 vs2 (match r1 r2) tpl_vars
-		 (match_alts alts1 alts2 tpl_vars kont)
-		 subst
-match_alts alts1 alts2 tpl_vars kont subst = match_fail
+  = do	{ subst1 <- match menv' subst r1 r2
+	; match_alts menv subst1 alts1 alts2 }
+  where
+    menv' :: MatchEnv
+    menv' = menv { me_env = rnBndrs2 (me_env menv) vs1 vs2 }
+
+match_alts menv subst alts1 alts2 
+  = Nothing
 
 le_alt (con1, _, _) (con2, _, _) = con1 <= con2
-
-----------------------------------------
-bind :: [CoreBndr]	-- Template binders
-     -> [CoreBndr]	-- Target binders
-     -> Matcher result
-     -> Matcher result
--- This makes uses of assumption (A) above.  For example,
--- this would fail:
---	Template: (\x.y)	(y is free)
---	Target  : (\y.y)	(y is bound)
--- We rename x to y in the template... but then erroneously
--- match y against y.  But this can't happen because of (A)
-bind vs1 vs2 matcher tpl_vars kont subst
-  = WARN( not (all not_in_subst vs1), bug_msg )
-    matcher tpl_vars kont' subst'
-  where
-    kont' subst'' = kont (unBindSubstList subst'' vs1 vs2)
-    subst'        = bindSubstList subst vs1 vs2
-
-	-- The unBindSubst relies on no shadowing in the template
-    not_in_subst v = isNothing (lookupVar subst v)
-    bug_msg = sep [ppr vs1, ppr vs2]
-
-----------------------------------------
-mkVarArg :: CoreBndr -> CoreArg
-mkVarArg v | isId v    = Var v
-	   | otherwise = Type (mkTyVarTy v)
 \end{code}
 
 Matching Core types: use the matcher in TcType.
@@ -405,13 +322,11 @@ we have a specialised version of a function at a newtype, say
 We only want to replace (f T) with f', not (f Int).
 
 \begin{code}
-----------------------------------------
-match_ty ty1 ty2 tpl_vars kont subst
-  = case Unify.matchTyX tpl_vars (getTvSubstEnv subst) ty1 ty2 of
-	Just tv_env' -> kont (setTvSubstEnv subst tv_env')
-	Nothing      -> match_fail
+------------------------------------------
+match_ty menv (tv_subst, id_subst) ty1 ty2
+  = do	{ tv_subst' <- Unify.matchTyX menv tv_subst ty1 ty2
+	; return (tv_subst', id_subst) }
 \end{code}
-
 
 
 %************************************************************************
@@ -583,7 +498,7 @@ ruleAppCheck_help phase fn args rules
 	| not (isActive phase act)    = text "active only in later phase"
 	| n_args < n_rule_args	      = text "too few arguments"
 	| n_mismatches == n_rule_args = text "no arguments match"
-	| n_mismatches == 0	      = text "all arguments match (considered individually), but the rule as a whole does not"
+	| n_mismatches == 0	      = text "all arguments match (considered individually), but rule as a whole does not"
 	| otherwise		      = text "arguments" <+> ppr mismatches <+> text "do not match (1-indexing)"
 	where
 	  n_rule_args  = length rule_args
@@ -591,8 +506,12 @@ ruleAppCheck_help phase fn args rules
 	  mismatches   = [i | (rule_arg, (arg,i)) <- rule_args `zip` i_args,
 			      not (isJust (match_fn rule_arg arg))]
 
-	  bndr_set 	        = mkVarSet rule_bndrs
-	  match_fn rule_arg arg = match rule_arg arg bndr_set (\s -> Just ()) emptySubst
+	  lhs_fvs = exprsFreeVars rule_args	-- Includes template tyvars
+	  match_fn rule_arg arg = match menv emptySubstEnv rule_arg arg
+		where
+		  in_scope = lhs_fvs `unionVarSet` exprFreeVars arg
+		  menv = ME { me_env   = mkRnEnv2 (mkInScopeSet in_scope)
+			    , me_tmpls = mkVarSet rule_bndrs }
 \end{code}
 
 

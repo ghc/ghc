@@ -7,7 +7,8 @@
 module Maybes (
 	module Maybe,		-- Re-export all of Maybe
 
-	MaybeErr(..),
+	MaybeErr(..),	-- Instance of Monad
+	failME,
 
 	orElse, 
 	mapCatMaybes,
@@ -16,10 +17,7 @@ module Maybes (
 	expectJust,
 	maybeToBool,
 
-	thenMaybe, seqMaybe, returnMaybe, failMaybe, 
-
-	thenMaB, returnMaB, failMaB
-
+	thenMaybe, seqMaybe, returnMaybe, failMaybe
     ) where
 
 #include "HsVersions.h"
@@ -113,20 +111,13 @@ Nothing  `orElse` y = y
 %************************************************************************
 
 \begin{code}
-data MaybeErr val err = Succeeded val | Failed err
+data MaybeErr err val = Succeeded val | Failed err
+
+instance Monad (MaybeErr err) where
+  return v = Succeeded v
+  Succeeded v >>= k = k v
+  Failed e    >>= k = Failed e
+
+failME :: err -> MaybeErr err val
+failME e = Failed e
 \end{code}
-
-\begin{code}
-thenMaB :: MaybeErr val1 err -> (val1 -> MaybeErr val2 err) -> MaybeErr val2 err
-thenMaB m k
-  = case m of
-      Succeeded v -> k v
-      Failed e	  -> Failed e
-
-returnMaB :: val -> MaybeErr val err
-returnMaB v = Succeeded v
-
-failMaB :: err -> MaybeErr val err
-failMaB e = Failed e
-\end{code}
-

@@ -26,7 +26,7 @@ import Literal		( Literal(..) )
 import Module		( moduleString )
 import Name		( getOccString, NamedThing(..) )
 import OccName		( encodeFS )
-import Type		( repType, eqType, typePrimRep )
+import Type		( repType, coreEqType, typePrimRep )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, tcSplitTyConApp_maybe, 
 			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
@@ -156,7 +156,7 @@ dsCImport :: Id
 	  -> DsM ([Binding], SDoc, SDoc)
 dsCImport id (CLabel cid) _ _ no_hdrs
  = resultWrapper (idType id) `thenDs` \ (resTy, foRhs) ->
-   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
+   ASSERT(fromJust resTy `coreEqType` addrPrimTy)    -- typechecker ensures this
     let rhs = foRhs (mkLit (MachLabel cid Nothing)) in
     returnDs ([(setImpInline no_hdrs id, rhs)], empty, empty)
 dsCImport id (CFunction target) cconv safety no_hdrs
@@ -465,7 +465,7 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      = map snd extra_cnames_and_tys ++ arg_htys
 
   -- stuff to do with the return type of the C function
-  res_hty_is_unit = res_hty `eqType` unitTy	-- Look through any newtypes
+  res_hty_is_unit = res_hty `coreEqType` unitTy	-- Look through any newtypes
 
   cResType | res_hty_is_unit = text "void"
 	   | otherwise	     = showStgType res_hty

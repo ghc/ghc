@@ -39,7 +39,7 @@ import TysWiredIn	( unboxedPairDataCon )
 import TysPrim		( realWorldStatePrimTy )
 import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
 			  keysUFM, minusUFM, ufmToList, filterUFM )
-import Type		( isUnLiftedType, eqType )
+import Type		( isUnLiftedType, coreEqType )
 import CoreLint		( showPass, endPass )
 import Util		( mapAndUnzip, mapAccumL, mapAccumR, lengthIs )
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive,
@@ -329,7 +329,7 @@ dmdAnalAlt sigs dmd (con,bndrs,rhs)
 	--	   ; print len }
 
 	io_hack_reqd = con == DataAlt unboxedPairDataCon &&
-		       idType (head bndrs) `eqType` realWorldStatePrimTy
+		       idType (head bndrs) `coreEqType` realWorldStatePrimTy
     in	
     (final_alt_ty, (con, bndrs', rhs'))
 \end{code}

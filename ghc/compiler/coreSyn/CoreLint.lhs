@@ -27,7 +27,7 @@ import PprCore
 import ErrUtils		( dumpIfSet_core, ghcExit, Message, showPass,
 			  mkLocMessage, debugTraceMsg )
 import SrcLoc		( SrcLoc, noSrcLoc, mkSrcSpan )
-import Type		( Type, tyVarsOfType, eqType,
+import Type		( Type, tyVarsOfType, coreEqType,
 			  splitFunTy_maybe, mkTyVarTys,
 			  splitForAllTy_maybe, splitTyConApp_maybe,
 			  isUnLiftedType, typeKind, 
@@ -615,7 +615,7 @@ checkTys :: Type -> Type -> Message -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
 -- annotations need only be consistent, not equal)
 -- Assumes ty1,ty2 are have alrady had the substitution applied
-checkTys ty1 ty2 msg = checkL (ty1 `eqType` ty2) msg
+checkTys ty1 ty2 msg = checkL (ty1 `coreEqType` ty2) msg
 \end{code}
 
 %************************************************************************

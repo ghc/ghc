@@ -31,7 +31,7 @@ module CoreUtils (
 	hashExpr,
 
 	-- Equality
-	cheapEqExpr, eqExpr, applyTypeToArgs, applyTypeToArg
+	cheapEqExpr, tcEqExpr, tcEqExprX, applyTypeToArgs, applyTypeToArg
     ) where
 
 #include "HsVersions.h"
@@ -40,8 +40,10 @@ module CoreUtils (
 import GLAEXTS		-- For `xori` 
 
 import CoreSyn
+import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
 import Var		( Var )
+import VarSet		( unionVarSet )
 import VarEnv
 import Name		( hashName )
 import Packages		( isDllName )
@@ -59,10 +61,10 @@ import Id		( Id, idType, globalIdDetails, idNewStrictness,
 import IdInfo		( GlobalIdDetails(..), megaSeqIdInfo )
 import NewDemand	( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
-			  splitFunTy,
+			  splitFunTy, tcEqTypeX,
 			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, splitRecNewType_maybe, 
-			  splitTyConApp_maybe, eqType, funResultTy, applyTy
+			  splitTyConApp_maybe, coreEqType, funResultTy, applyTy
 			)
 import TyCon		( tyConArity )
 -- gaw 2004
@@ -72,7 +74,7 @@ import BasicTypes	( Arity )
 import Unique		( Unique )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
-import Util             ( equalLength, lengthAtLeast )
+import Util             ( equalLength, lengthAtLeast, foldl2 )
 \end{code}
 
 
@@ -205,12 +207,12 @@ mkCoerce to_ty expr = mkCoerce2 to_ty (exprType expr) expr
 
 mkCoerce2 :: Type -> Type -> CoreExpr -> CoreExpr
 mkCoerce2 to_ty from_ty (Note (Coerce to_ty2 from_ty2) expr)
-  = ASSERT( from_ty `eqType` to_ty2 )
+  = ASSERT( from_ty `coreEqType` to_ty2 )
     mkCoerce2 to_ty from_ty2 expr
 
 mkCoerce2 to_ty from_ty expr
-  | to_ty `eqType` from_ty = expr
-  | otherwise	  	   = ASSERT( from_ty `eqType` exprType expr )
+  | to_ty `coreEqType` from_ty = expr
+  | otherwise	  	   = ASSERT( from_ty `coreEqType` exprType expr )
 			     Note (Coerce to_ty from_ty) expr
 \end{code}
 
@@ -1003,7 +1005,7 @@ cheapEqExpr :: Expr b -> Expr b -> Bool
 
 cheapEqExpr (Var v1)   (Var v2)   = v1==v2
 cheapEqExpr (Lit lit1) (Lit lit2) = lit1 == lit2
-cheapEqExpr (Type t1)  (Type t2)  = t1 `eqType` t2
+cheapEqExpr (Type t1)  (Type t2)  = t1 `coreEqType` t2
 
 cheapEqExpr (App f1 a1) (App f2 a2)
   = f1 `cheapEqExpr` f2 && a1 `cheapEqExpr` a2
@@ -1021,57 +1023,49 @@ exprIsBig other	       = True
 
 
 \begin{code}
-eqExpr :: CoreExpr -> CoreExpr -> Bool
-	-- Works ok at more general type, but only needed at CoreExpr
-	-- Used in rule matching, so when we find a type we use
-	-- eqTcType, which doesn't look through newtypes
-	-- [And it doesn't risk falling into a black hole either.]
-eqExpr e1 e2
-  = eq emptyVarEnv e1 e2
+tcEqExpr :: CoreExpr -> CoreExpr -> Bool
+-- Used in rule matching, so does *not* look through 
+-- newtypes, predicate types; hence tcEqExpr
+
+tcEqExpr e1 e2 = tcEqExprX rn_env e1 e2
   where
-  -- The "env" maps variables in e1 to variables in ty2
-  -- So when comparing lambdas etc, 
-  -- we in effect substitute v2 for v1 in e1 before continuing
-    eq env (Var v1) (Var v2) = case lookupVarEnv env v1 of
-				  Just v1' -> v1' == v2
-				  Nothing  -> v1  == v2
+    rn_env = mkRnEnv2 (mkInScopeSet (exprFreeVars e1 `unionVarSet` exprFreeVars e2))
 
-    eq env (Lit lit1)   (Lit lit2)   = lit1 == lit2
-    eq env (App f1 a1)  (App f2 a2)  = eq env f1 f2 && eq env a1 a2
-    eq env (Lam v1 e1)  (Lam v2 e2)  = eq (extendVarEnv env v1 v2) e1 e2
-    eq env (Let (NonRec v1 r1) e1)
-	   (Let (NonRec v2 r2) e2)   = eq env r1 r2 && eq (extendVarEnv env v1 v2) e1 e2
-    eq env (Let (Rec ps1) e1)
-	   (Let (Rec ps2) e2)        = equalLength ps1 ps2 &&
-				       and (zipWith eq_rhs ps1 ps2) &&
-				       eq env' e1 e2
+tcEqExprX :: RnEnv2 -> CoreExpr -> CoreExpr -> Bool
+tcEqExprX env (Var v1)	   (Var v2)	= rnOccL env v1 == rnOccR env v2
+tcEqExprX env (Lit lit1)   (Lit lit2)   = lit1 == lit2
+tcEqExprX env (App f1 a1)  (App f2 a2)  = tcEqExprX env f1 f2 && tcEqExprX env a1 a2
+tcEqExprX env (Lam v1 e1)  (Lam v2 e2)  = tcEqExprX (rnBndr2 env v1 v2) e1 e2
+tcEqExprX env (Let (NonRec v1 r1) e1)
+	      (Let (NonRec v2 r2) e2)   = tcEqExprX env r1 r2 
+				       && tcEqExprX (rnBndr2 env v1 v2) e1 e2
+tcEqExprX env (Let (Rec ps1) e1)
+	      (Let (Rec ps2) e2)        =  equalLength ps1 ps2
+				        && and (zipWith eq_rhs ps1 ps2)
+				        && tcEqExprX env' e1 e2
 				     where
-				       env' = extendVarEnvList env [(v1,v2) | ((v1,_),(v2,_)) <- zip ps1 ps2]
-				       eq_rhs (_,r1) (_,r2) = eq env' r1 r2
-    eq env (Case e1 v1 t1 a1)
-	   (Case e2 v2 t2 a2)	     = eq env e1 e2 &&
-                                       t1 `eqType` t2 &&                      
-				       equalLength a1 a2 &&
-				       and (zipWith (eq_alt env') a1 a2)
+				       env' = foldl2 rn_bndr2 env ps2 ps2
+				       rn_bndr2 env (b1,_) (b2,_) = rnBndr2 env b1 b2
+				       eq_rhs       (_,r1) (_,r2) = tcEqExprX env' r1 r2
+tcEqExprX env (Case e1 v1 t1 a1)
+	      (Case e2 v2 t2 a2)     =  tcEqExprX env e1 e2
+                                     && tcEqTypeX env t1 t2                      
+				     && equalLength a1 a2
+				     && and (zipWith (eq_alt env') a1 a2)
 				     where
-				       env' = extendVarEnv env v1 v2
+				       env' = rnBndr2 env v1 v2
 
-    eq env (Note n1 e1) (Note n2 e2) = eq_note env n1 n2 && eq env e1 e2
-    eq env (Type t1)    (Type t2)    = t1 `eqType` t2
-    eq env e1		e2	     = False
+tcEqExprX env (Note n1 e1) (Note n2 e2) = eq_note env n1 n2 && tcEqExprX env e1 e2
+tcEqExprX env (Type t1)    (Type t2)    = tcEqTypeX env t1 t2
+tcEqExprX env e1		e2	= False
 				         
-    eq_list env []	 []	  = True
-    eq_list env (e1:es1) (e2:es2) = eq env e1 e2 && eq_list env es1 es2
-    eq_list env es1      es2      = False
-    
-    eq_alt env (c1,vs1,r1) (c2,vs2,r2) = c1==c2 &&
-					 eq (extendVarEnvList env (vs1 `zip` vs2)) r1 r2
+eq_alt env (c1,vs1,r1) (c2,vs2,r2) = c1==c2 && tcEqExprX (rnBndrs2 env vs1  vs2) r1 r2
 
-    eq_note env (SCC cc1)      (SCC cc2)      = cc1 == cc2
-    eq_note env (Coerce t1 f1) (Coerce t2 f2) = t1 `eqType` t2 && f1 `eqType` f2
-    eq_note env InlineCall     InlineCall     = True
-    eq_note env (CoreNote s1)  (CoreNote s2)  = s1 == s2
-    eq_note env other1	       other2	      = False
+eq_note env (SCC cc1)      (SCC cc2)      = cc1 == cc2
+eq_note env (Coerce t1 f1) (Coerce t2 f2) = tcEqTypeX env t1 t2 && tcEqTypeX env f1 f2
+eq_note env InlineCall     InlineCall     = True
+eq_note env (CoreNote s1)  (CoreNote s2)  = s1 == s2
+eq_note env other1	       other2	  = False
 \end{code}
 
 

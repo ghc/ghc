@@ -12,7 +12,7 @@ module SpecConstr(
 
 import CoreSyn
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprType, eqExpr, mkPiTypes )
+import CoreUtils	( exprType, tcEqExpr, mkPiTypes )
 import CoreFVs 		( exprsFreeVars )
 import CoreTidy		( pprTidyIdRules )
 import WwLib		( mkWorkerArgs )
@@ -444,7 +444,7 @@ specialise env fn bndrs body (SCU {calls=calls, occs=occs})
 		  (nubBy same_call good_calls `zip` [1..])
   where
     n_bndrs  = length bndrs
-    same_call as1 as2 = and (zipWith eqExpr as1 as2)
+    same_call as1 as2 = and (zipWith tcEqExpr as1 as2)
 
 ---------------------
 good_arg :: ConstrEnv -> IdEnv ArgOcc -> (CoreBndr, CoreArg) -> Bool

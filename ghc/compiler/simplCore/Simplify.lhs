@@ -49,7 +49,7 @@ import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
 import Type		( TvSubstEnv, isUnLiftedType, seqType, tyConAppArgs, funArgTy,
-			  splitFunTy_maybe, splitFunTy, eqType, substTy,
+			  splitFunTy_maybe, splitFunTy, coreEqType, substTy,
 			  mkTyVarTys, mkTyConApp
 			)
 import VarEnv		( elemVarEnv )
@@ -846,7 +846,7 @@ simplNote env (Coerce to from) body cont
 		-- we may find 	(coerce T (coerce S (\x.e))) y
 		-- and we'd like it to simplify to e[y/x] in one round 
 		-- of simplification
-	  | t1 `eqType` k1  = cont	 	-- The coerces cancel out
+	  | t1 `coreEqType` k1  = cont	 	-- The coerces cancel out
 	  | otherwise       = CoerceIt t1 cont	-- They don't cancel, but 
 						-- the inner one is redundant
 
