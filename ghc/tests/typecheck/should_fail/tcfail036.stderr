@@ -3,14 +3,6 @@ Duplicate or overlapping instance declarations:
   tcfail036.hs:6: {Num NUM}
   tcfail036.hs:8: {Num NUM}
 
-tcfail036.hs:8:
-    No instance for `Eq NUM'
-    arising from an instance declaration at tcfail036.hs:8
-
-tcfail036.hs:8:
-    No instance for `Show NUM'
-    arising from an instance declaration at tcfail036.hs:8
-
 tcfail036.hs:9:
     Class `Num' used as a type
     When checking kinds in `Eq Num'

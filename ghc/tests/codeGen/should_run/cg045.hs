@@ -5,6 +5,7 @@ module Main (main,myseq) where
 import PrelGHC
 import PrelErr
 
+main :: IO ()
 main = seq (error "hello world!" :: Int) (return ())
 
 myseq :: a -> b -> b
