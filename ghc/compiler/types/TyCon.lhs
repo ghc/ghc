@@ -47,14 +47,13 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TypeRep ( Type, Kind, SuperKind )
+import {-# SOURCE #-} TypeRep ( Type, PredType, Kind, SuperKind )
  -- Should just be Type(Type), but this fails due to bug present up to
  -- and including 4.02 involving slurping of hi-boot files.  Bug is now fixed.
 
 import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
 
 
-import Class 		( ClassContext )
 import Var   		( TyVar, Id )
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), 
 			  isBoxed, EP(..) )
@@ -92,7 +91,7 @@ data TyCon
 	
 	tyConTyVars   :: [TyVar],
 	tyConArgVrcs  :: ArgVrcs,
-	algTyConTheta :: ClassContext,
+	algTyConTheta :: [PredType],
 
 	dataCons :: [DataCon],
 		-- Its data constructors, with fully polymorphic types
@@ -419,7 +418,7 @@ tyConPrimRep _			              = PtrRep
 \end{code}
 
 \begin{code}
-tyConTheta :: TyCon -> ClassContext
+tyConTheta :: TyCon -> [PredType]
 tyConTheta (AlgTyCon {algTyConTheta = theta}) = theta
 -- should ask about anything else
 \end{code}

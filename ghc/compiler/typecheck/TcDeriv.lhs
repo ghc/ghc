@@ -44,8 +44,8 @@ import TyCon		( tyConTyVars, tyConDataCons,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, TyCon
 			)
-import Type		( TauType, PredType(..), mkTyVarTys, mkTyConApp, 
-			  isUnLiftedType )
+import Type		( TauType, ThetaType, PredType, mkTyVarTys, mkTyConApp, 
+			  isUnLiftedType, mkClassPred )
 import Var		( TyVar )
 import PrelNames
 import Util		( zipWithEqual, sortLt )
@@ -143,9 +143,7 @@ type DerivEqn = (Name, Class, TyCon, [TyVar], DerivRhs)
 		-- The Name is the name for the DFun we'll build
 		-- The tyvars bind all the variables in the RHS
 
-type DerivRhs = [(Class, [TauType])]	-- Same as a ThetaType!
-		--[PredType]   -- ... | Class Class [Type==TauType]
-
+type DerivRhs  = ThetaType
 type DerivSoln = DerivRhs
 \end{code}
 
@@ -316,7 +314,7 @@ makeDerivEqns tycl_decls
 	    offensive_class = clas_key `elem` needsDataDeclCtxtClassKeys
     
 	    mk_constraints data_con
-	       = [ (clas, [arg_ty])
+	       = [ mkClassPred clas [arg_ty]
 		 | arg_ty <- dataConArgTys data_con tyvar_tys,
 		   not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
 		 ]
@@ -436,10 +434,9 @@ add_solns dflags inst_env_in eqns solns
 	-- They'll appear later, when we do the top-level extendInstEnvs
 
       mk_deriv_dfun (dfun_name, clas, tycon, tyvars, _) theta
-        = mkDictFunId dfun_name clas tyvars [mkTyConApp tycon (mkTyVarTys tyvars)] 
-		      (map pair2PredType theta)
-
-      pair2PredType (clas, tautypes) = Class clas tautypes
+        = mkDictFunId dfun_name clas tyvars 
+		      [mkTyConApp tycon (mkTyVarTys tyvars)] 
+		      theta
 \end{code}
 
 %************************************************************************

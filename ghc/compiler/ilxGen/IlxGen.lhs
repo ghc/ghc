@@ -17,7 +17,7 @@ import TyCon	( TyCon,  tyConPrimRep, isUnboxedTupleTyCon, tyConDataCons,
 		)
 import Class	( Class,  classTyCon )
 import Type	( liftedTypeKind, openTypeKind, unliftedTypeKind,
-		  isUnLiftedType, isTyVarTy, mkTyVarTy, 
+		  isUnLiftedType, isTyVarTy, mkTyVarTy, predRepTy,
 		  splitForAllTys, splitFunTys, applyTy, applyTys
 		)
 import TypeRep	( Type(..) )
@@ -92,11 +92,11 @@ importsBinds :: [StgBinding] -> ImportsInfo
 importsBinds binds = unionImpInfos (map importsBind binds)
 
 importsBind :: StgBinding -> ImportsInfo
-importsBind (StgNonRec b rhs) = importsRhs rhs  `unionImpInfo` importsVar b
-importsBind (StgRec pairs) = unionImpInfos (map (\(b,rhs) -> importsRhs rhs `unionImpInfo` importsVar b) pairs)
+importsBind (StgNonRec _ b rhs) = importsRhs rhs  `unionImpInfo` importsVar b
+importsBind (StgRec _ pairs)    = unionImpInfos (map (\(b,rhs) -> importsRhs rhs `unionImpInfo` importsVar b) pairs)
 
 importsRhs (StgRhsCon _ con args) = importsDataCon con   `unionImpInfo` importsStgArgs args
-importsRhs (StgRhsClosure _ _ srt _ upd args body) = importsExpr body `unionImpInfo` importsVars args
+importsRhs (StgRhsClosure _ _ _ upd args body) = importsExpr body `unionImpInfo` importsVars args
 
 importsExpr :: StgExpr -> ImportsInfo
 importsExpr (StgLit l)	 = emptyImpInfo
@@ -237,8 +237,8 @@ pprIlxDataCon env dcon =
 \begin{code}
 
 ilxBindClosures :: IlxEnv -> StgBinding -> SDoc
-ilxBindClosures env (StgNonRec b rhs) = ilxRhsClosures env (b,rhs)
-ilxBindClosures env (StgRec pairs)  
+ilxBindClosures env (StgNonRec _ b rhs) = ilxRhsClosures env (b,rhs)
+ilxBindClosures env (StgRec _ pairs)  
   = vcat (map (ilxRhsClosures new_env) pairs)
   where
      new_env = extendIlxEnvWithBinds env pairs
@@ -247,7 +247,7 @@ ilxBindClosures env (StgRec pairs)
 ilxRhsClosures env (bndr, StgRhsCon _ _ _)
   = empty
 
-ilxRhsClosures env (bndr, StgRhsClosure _ _ _ fvs upd args rhs)
+ilxRhsClosures env (bndr, StgRhsClosure _ _ fvs upd args rhs)
   = vcat [ilxExprClosures next_env rhs,
 
 	 empty $$ line,
@@ -375,8 +375,8 @@ ilxCCallArgLocals env arg@(StgVarArg v) | pinCCallArg v =
    [(LocalSDoc (idType v, ilxEnvQualifyByExact env (ppr v) <> text "pin", True), Nothing)]
 ilxCCallArgLocals _ _ | otherwise = []
 
-ilxBindLocals env (StgNonRec b rhs) = [(LocalId b,Just (env, rhs))]
-ilxBindLocals env (StgRec pairs)  = map (\(x,y) -> (LocalId x,Just (env, y))) pairs
+ilxBindLocals env (StgNonRec _ b rhs) = [(LocalId b,Just (env, rhs))]
+ilxBindLocals env (StgRec _ pairs)    = map (\(x,y) -> (LocalId x,Just (env, y))) pairs
 
 ilxAltsLocals env (StgAlgAlts  _ alts deflt) = ilxDefltLocals env deflt ++ concat (ilxMapPlaceAlts ilxAlgAltLocals env alts)
 ilxAltsLocals env (StgPrimAlts _ alts deflt) = ilxDefltLocals env deflt ++ concat (ilxMapPlaceAlts ilxPrimAltLocals env alts)
@@ -481,10 +481,10 @@ ilxExpr eenv@(IlxEEnv env _) (StgPrimApp primop args ret_ty) sequel
 --BEGIN TEMPORARY
 -- The following are versions of a peephole optimizations for "let t = \[] t2[fvs] in t"
 -- I think would be subsumed by a general treatmenet of let-no-rec bindings??
-ilxExpr eenv@(IlxEEnv env _) (StgLet (StgNonRec bndr (StgRhsClosure _ _ _ fvs upd [] rhs)) (StgApp fun [])) sequel 
+ilxExpr eenv@(IlxEEnv env _) (StgLet (StgNonRec _ bndr (StgRhsClosure _ _ fvs upd [] rhs)) (StgApp fun [])) sequel 
               | (bndr == fun && null (ilxExprLocals env rhs)) -- TO DO???
   = ilxExpr eenv rhs sequel
-ilxExpr eenv@(IlxEEnv env _) (StgLetNoEscape _ _ (StgNonRec bndr (StgRhsClosure _ _ _ fvs upd [] rhs)) (StgApp fun [])) sequel 
+ilxExpr eenv@(IlxEEnv env _) (StgLetNoEscape _ _ (StgNonRec _ bndr (StgRhsClosure _ _ fvs upd [] rhs)) (StgApp fun [])) sequel 
               | (bndr == fun && null (ilxExprLocals env rhs)) -- TO DO???
   = ilxExpr eenv rhs sequel
 --END TEMPORARY
@@ -697,8 +697,8 @@ ilxFunApp env fun args tail_call
   where
     known_clo =
       case lookupIlxBindEnv env fun of
-	  Just (place, StgRhsClosure  _ _ _ _ Updatable _ _) ->  Nothing 
-	  Just (place, StgRhsClosure  _ _ _ fvs _ args _)  -> Just (place,fun,args,fvs)
+	  Just (place, StgRhsClosure  _ _ _ Updatable _ _) ->  Nothing 
+	  Just (place, StgRhsClosure  _ _ fvs _ args _)  -> Just (place,fun,args,fvs)
 	  _ ->  trace (show fun ++ " --> " ++ show (arityLowerBound (idArityInfo fun)))  Nothing 
 
 -- Push as many arguments as ILX allows us to in one go.
@@ -848,7 +848,7 @@ ilxRhs env rec (bndr, StgRhsCon _ con args)
 	   text "stloc" <+> pprId bndr
           ]
 
-ilxRhs env rec (bndr, StgRhsClosure _ _ _ fvs upd args rhs)
+ilxRhs env rec (bndr, StgRhsClosure _ _ fvs upd args rhs)
   = 	-- Assume .closure v<any A>(int64,!A) { 
 	--		.apply <any B> (int32) (B) { ... }
 	--	   }
@@ -872,7 +872,7 @@ ilxFixupRec env rec (bndr, _) | isVoidIlxRepId bndr = ilxComment (text "no recur
 ilxFixupRec env rec (bndr, StgRhsCon _ con args)
   = text "// no recursive fixup"
 
-ilxFixupRec env rec (bndr, StgRhsClosure _ _ _ fvs upd args rhs)
+ilxFixupRec env rec (bndr, StgRhsClosure _ _ fvs upd args rhs)
      = vcat [vcat (map fixFv rec)]
   where
     fixFv recid = if elem recid fvs then 
@@ -889,11 +889,11 @@ ilxFixupRec env rec (bndr, StgRhsClosure _ _ _ fvs upd args rhs)
 -- Code for a top-level binding in a module
 ilxPairs binds = concat (map ilxPairs1 binds)
 
-ilxPairs1 (StgNonRec bndr rhs) = [(bndr,rhs)]
-ilxPairs1 (StgRec pairs) = pairs
+ilxPairs1 (StgNonRec _ bndr rhs) = [(bndr,rhs)]
+ilxPairs1 (StgRec _ pairs)       = pairs
 
-ilxRecIds1 (StgNonRec bndr rhs) = []
-ilxRecIds1 (StgRec pairs) = map fst pairs
+ilxRecIds1 (StgNonRec _ bndr rhs) = []
+ilxRecIds1 (StgRec _ pairs)       = map fst pairs
 
 ---------------------------------------------
 -- Code for a top-level binding in a module
@@ -921,7 +921,7 @@ isArg m _ = False
 
 
 ilxTopBind :: Module -> IlxEnv -> [(Id,StgRhs)] -> SDoc
---ilxTopBind mod env (StgNonRec bndr rhs) = 
+--ilxTopBind mod env (StgNonRec _ bndr rhs) = 
 --ilxTopRhs env (bndr,rhs)
 ilxTopBind mod env pairs       = 
    vcat [text ".class" <+> pprId mod,
@@ -940,7 +940,7 @@ ilxTopBind mod env pairs       =
 --ilxTopRhs mod env (bndr, _) | isVoidIlxRepId bndr 
 --  = empty
 
-ilxTopRhs mod env (bndr, StgRhsClosure _ _ _ fvs upd args rhs)
+ilxTopRhs mod env (bndr, StgRhsClosure _ _ fvs upd args rhs)
   = vcat [vcat (map (pushId env) free_vs),
          (if null free_non_ilx_tvs then empty else (ilxComment (text "ignored some higher order type arguments in application - code will be non verifiable...."))),
 	  text "newclo" <+> pprIlxBoxedTyConApp env (ilxEnvQualifyByModule env (ppr bndr)) (map mkTyVarTy free_ilx_tvs),
@@ -960,7 +960,7 @@ ilxTopRhs mod env (bndr, StgRhsCon _ data_con args)
 pprFieldRef env (mod,ty,id) 
   =  pprIlxTypeL env ty <+> moduleReference env mod <+> pprId mod <> text "::" <> pprId id
 
-ilxTopRhsStorage mod env (bndr, StgRhsClosure _ _ _ _ _ _ _) 
+ilxTopRhsStorage mod env (bndr, StgRhsClosure _ _ _ _ _ _) 
   =   text ".field public static " <+> pprIlxTypeL env bndTy <+> pprId bndr
   where
     bndTy = idIlxRepType bndr
@@ -1091,6 +1091,7 @@ deepIlxRepType (TyConApp tc tys)
 deepIlxRepType (AppTy f x)  = AppTy (deepIlxRepType f) (deepIlxRepType x)
 deepIlxRepType (ForAllTy b ty) = ForAllTy b (deepIlxRepType ty)
 deepIlxRepType (NoteTy   _ ty) = deepIlxRepType ty
+deepIlxRepType (PredTy p)      = deepIlxRepType (predRepTy p)
 deepIlxRepType ty@(TyVarTy tv) = ty
 
 idIlxRepType id = deepIlxRepType (idType id)

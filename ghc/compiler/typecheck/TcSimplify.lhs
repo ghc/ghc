@@ -9,6 +9,7 @@
 module TcSimplify (
 	tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyCheck, 
 	tcSimplifyToDicts, tcSimplifyIPs, tcSimplifyTop, 
+
 	tcSimplifyThetas, tcSimplifyCheckThetas,
 	bindInstsOfLocalFuns
     ) where
@@ -22,14 +23,14 @@ import TcHsSyn		( TcExpr, TcId,
 
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
-			  tyVarsOfInst, predsOfInsts, 
+			  tyVarsOfInst, predsOfInsts, predsOfInst,
 			  isDict, isClassDict, 
 			  isStdClassTyVarDict, isMethodFor,
 			  instToId, tyVarsOfInsts,
 			  instBindingRequired, instCanBeGeneralised,
 			  newDictsFromOld, instMentionsIPs,
-			  getDictClassTys, getIPs, isTyVarDict,
-			  instLoc, pprInst, zonkInst, tidyInst, tidyInsts,
+			  getDictClassTys, isTyVarDict,
+			  instLoc, pprInst, zonkInst, tidyInsts,
 			  Inst, LIE, pprInsts, pprInstsInFull,
 			  mkLIE, lieToList 
 			)
@@ -41,22 +42,23 @@ import TcUnify		( unifyTauTy )
 import Id		( idType )
 import Name		( Name )
 import NameSet		( mkNameSet )
-import Class		( Class, classBigSig )
+import Class		( classBigSig )
 import FunDeps		( oclose, grow, improve )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
 
-import Type		( Type, ClassContext,
-			  mkTyVarTy, getTyVar, 
-			  isTyVarTy, splitSigmaTy, tyVarsOfTypes
+import Type		( Type, ThetaType, PredType, mkClassPred,
+			  mkTyVarTy, getTyVar, isTyVarClassPred,
+			  splitSigmaTy, tyVarsOfPred,
+			  getClassPredTys_maybe, isClassPred, isIPPred,
+			  inheritablePred
 			)
-import Subst		( mkTopTyVarSubst, substClasses, substTy )
-import PprType		( pprClassPred )
+import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import TysWiredIn	( unitTy )
 import VarSet
 import FiniteMap
 import Outputable
 import ListSetOps	( equivClasses )
-import Util		( zipEqual, mapAccumL )
+import Util		( zipEqual )
 import List		( partition )
 import CmdLineOpts
 \end{code}
@@ -453,7 +455,7 @@ with (Max Z (S x) y)!
 \begin{code}
 isFree qtvs inst
   =  not (tyVarsOfInst inst `intersectsVarSet` qtvs)	-- Constrains no quantified vars
-  && null (getIPs inst)					-- And no implicit parameter involved
+  && all inheritablePred (predsOfInst inst)		-- And no implicit parameter involved
 							-- (see "Notes on implicit parameters")
 \end{code}
 
@@ -1129,7 +1131,7 @@ add_scs avails dict
   where
     (clas, tys) = getDictClassTys dict
     (tyvars, sc_theta, sc_sels, _) = classBigSig clas
-    sc_theta' = substClasses (mkTopTyVarSubst tyvars tys) sc_theta
+    sc_theta' = substTheta (mkTopTyVarSubst tyvars tys) sc_theta
 
     add_sc avails (sc_dict, sc_sel)	-- Add it, and its superclasses
       = case lookupFM avails sc_dict of
@@ -1278,10 +1280,10 @@ disambigGroup dicts
       try_default (default_ty : default_tys)
 	= tryTc_ (try_default default_tys) $	-- If default_ty fails, we try
 						-- default_tys instead
-	  tcSimplifyCheckThetas [] thetas	`thenTc` \ _ ->
+	  tcSimplifyCheckThetas [] theta	`thenTc` \ _ ->
 	  returnTc default_ty
         where
-	  thetas = classes `zip` repeat [default_ty]
+	  theta = [mkClassPred clas [default_ty] | clas <- classes]
     in
 	-- See if any default works, and if so bind the type variable to it
 	-- If not, add an AmbigErr
@@ -1364,8 +1366,8 @@ a,b,c are type variables.  This is required for the context of
 instance declarations.
 
 \begin{code}
-tcSimplifyThetas :: ClassContext		-- Wanted
-	       	 -> TcM ClassContext		-- Needed
+tcSimplifyThetas :: ThetaType		-- Wanted
+	       	 -> TcM ThetaType		-- Needed
 
 tcSimplifyThetas wanteds
   = doptsTc Opt_GlasgowExts 		`thenNF_Tc` \ glaExts ->
@@ -1376,10 +1378,10 @@ tcSimplifyThetas wanteds
 	-- we expect an instance here
 	-- For Haskell 98, check that all the constraints are of the form C a,
 	-- where a is a type variable
-    	bad_guys | glaExts   = [ct | ct@(clas,tys) <- irreds, 
-				     isEmptyVarSet (tyVarsOfTypes tys)]
-		 | otherwise = [ct | ct@(clas,tys) <- irreds, 
-				     not (all isTyVarTy tys)]
+    	bad_guys | glaExts   = [pred | pred <- irreds, 
+				       isEmptyVarSet (tyVarsOfPred pred)]
+		 | otherwise = [pred | pred <- irreds, 
+				       not (isTyVarClassPred pred)]
     in
     if null bad_guys then
 	returnTc irreds
@@ -1393,8 +1395,8 @@ used with \tr{default} declarations.  We are only interested in
 whether it worked or not.
 
 \begin{code}
-tcSimplifyCheckThetas :: ClassContext	-- Given
-		      -> ClassContext	-- Wanted
+tcSimplifyCheckThetas :: ThetaType	-- Given
+		      -> ThetaType	-- Wanted
 		      -> TcM ()
 
 tcSimplifyCheckThetas givens wanteds
@@ -1408,23 +1410,23 @@ tcSimplifyCheckThetas givens wanteds
 
 
 \begin{code}
-type AvailsSimple = FiniteMap (Class,[Type]) Bool
+type AvailsSimple = FiniteMap PredType Bool
 		    -- True  => irreducible 
 		    -- False => given, or can be derived from a given or from an irreducible
 
-reduceSimple :: ClassContext			-- Given
-	     -> ClassContext			-- Wanted
-	     -> NF_TcM ClassContext		-- Irreducible
+reduceSimple :: ThetaType			-- Given
+	     -> ThetaType			-- Wanted
+	     -> NF_TcM ThetaType		-- Irreducible
 
 reduceSimple givens wanteds
   = reduce_simple (0,[]) givens_fm wanteds	`thenNF_Tc` \ givens_fm' ->
-    returnNF_Tc [ct | (ct,True) <- fmToList givens_fm']
+    returnNF_Tc [pred | (pred,True) <- fmToList givens_fm']
   where
     givens_fm     = foldl addNonIrred emptyFM givens
 
-reduce_simple :: (Int,ClassContext)		-- Stack
+reduce_simple :: (Int,ThetaType)		-- Stack
 	      -> AvailsSimple
-	      -> ClassContext
+	      -> ThetaType
 	      -> NF_TcM AvailsSimple
 
 reduce_simple (n,stack) avails wanteds
@@ -1434,32 +1436,36 @@ reduce_simple (n,stack) avails wanteds
     go avails (w:ws) = reduce_simple_help (n+1,w:stack) avails w	`thenNF_Tc` \ avails' ->
 		       go avails' ws
 
-reduce_simple_help stack givens wanted@(clas,tys)
+reduce_simple_help stack givens wanted
   | wanted `elemFM` givens
   = returnNF_Tc givens
 
-  | otherwise
+  | Just (clas, tys) <- getClassPredTys_maybe wanted
   = lookupSimpleInst clas tys	`thenNF_Tc` \ maybe_theta ->
-
     case maybe_theta of
       Nothing ->    returnNF_Tc (addSimpleIrred givens wanted)
       Just theta -> reduce_simple stack (addNonIrred givens wanted) theta
 
-addSimpleIrred :: AvailsSimple -> (Class,[Type]) -> AvailsSimple
-addSimpleIrred givens ct@(clas,tys)
-  = addSCs (addToFM givens ct True) ct
+  | otherwise
+  = returnNF_Tc (addSimpleIrred givens wanted)
 
-addNonIrred :: AvailsSimple -> (Class,[Type]) -> AvailsSimple
-addNonIrred givens ct@(clas,tys)
-  = addSCs (addToFM givens ct False) ct
+addSimpleIrred :: AvailsSimple -> PredType -> AvailsSimple
+addSimpleIrred givens pred
+  = addSCs (addToFM givens pred True) pred
 
-addSCs givens ct@(clas,tys)
- = foldl add givens sc_theta
+addNonIrred :: AvailsSimple -> PredType -> AvailsSimple
+addNonIrred givens pred
+  = addSCs (addToFM givens pred False) pred
+
+addSCs givens pred
+  | not (isClassPred pred) = givens
+  | otherwise		   = foldl add givens sc_theta
  where
+   Just (clas,tys) = getClassPredTys_maybe pred
    (tyvars, sc_theta_tmpl, _, _) = classBigSig clas
-   sc_theta = substClasses (mkTopTyVarSubst tyvars tys) sc_theta_tmpl
+   sc_theta = substTheta (mkTopTyVarSubst tyvars tys) sc_theta_tmpl
 
-   add givens ct@(clas, tys)
+   add givens ct
      = case lookupFM givens ct of
        Nothing    -> -- Add it and its superclasses
 		     addSCs (addToFM givens ct False) ct
@@ -1488,8 +1494,8 @@ addTopAmbigErrs dicts
   = mapNF_Tc complain tidy_dicts
   where
     fixed_tvs = oclose (predsOfInsts tidy_dicts) emptyVarSet
-    (tidy_env, tidy_dicts) = tidyInsts emptyTidyEnv dicts
-    complain d | not (null (getIPs d))		      = addTopIPErr tidy_env d
+    (tidy_env, tidy_dicts) = tidyInsts dicts
+    complain d | any isIPPred (predsOfInst d)	      = addTopIPErr tidy_env d
 	       | not (isTyVarDict d) ||
 	         tyVarsOfInst d `subVarSet` fixed_tvs = addTopInstanceErr tidy_env d
 	       | otherwise			      = addAmbigErr tidy_env d
@@ -1508,7 +1514,7 @@ addTopInstanceErr tidy_env tidy_dict
 addAmbigErrs dicts
   = mapNF_Tc (addAmbigErr tidy_env) tidy_dicts
   where
-    (tidy_env, tidy_dicts) = tidyInsts emptyTidyEnv dicts
+    (tidy_env, tidy_dicts) = tidyInsts dicts
 
 addAmbigErr tidy_env tidy_dict
   = addInstErrTcM (instLoc tidy_dict)
@@ -1526,7 +1532,7 @@ warnDefault dicts default_ty
 
   where
 	-- Tidy them first
-    (_, tidy_dicts) = mapAccumL tidyInst emptyTidyEnv dicts
+    (_, tidy_dicts) = tidyInsts dicts
 
 	-- Group the dictionaries by source location
     groups      = equivClasses cmp tidy_dicts
@@ -1575,7 +1581,7 @@ addNoInstanceErr what_doc givens dict
 	     | otherwise
 	     = ptext SLIT("Or add an instance declaration for") <+> quotes (pprInst tidy_dict)
     
-    	(tidy_env, tidy_dict:tidy_givens) = tidyInsts emptyTidyEnv (dict:givens)
+    	(tidy_env, tidy_dict:tidy_givens) = tidyInsts (dict:givens)
     
 	    -- Checks for the ambiguous case when we have overlapping instances
     	ambig_overlap | isClassDict dict
@@ -1589,8 +1595,8 @@ addNoInstanceErr what_doc givens dict
     addInstErrTcM (instLoc dict) (tidy_env, doc)
 
 -- Used for the ...Thetas variants; all top level
-addNoInstErr (c,ts)
-  = addErrTc (ptext SLIT("No instance for") <+> quotes (pprClassPred c ts))
+addNoInstErr pred
+  = addErrTc (ptext SLIT("No instance for") <+> quotes (ppr pred))
 
 reduceDepthErr n stack
   = vcat [ptext SLIT("Context reduction stack overflow; size =") <+> int n,

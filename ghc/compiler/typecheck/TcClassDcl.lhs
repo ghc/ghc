@@ -31,7 +31,7 @@ import TcEnv		( RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
-import TcMonoType	( tcHsRecType, tcRecClassContext, checkSigTyVars, checkAmbiguity, sigCtxt, mkTcSig )
+import TcMonoType	( tcHsRecType, tcRecTheta, checkSigTyVars, checkAmbiguity, sigCtxt, mkTcSig )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import TcType		( TcType, TcTyVar, tcInstTyVars )
 import TcMonad
@@ -47,7 +47,7 @@ import Name		( Name, NamedThing(..) )
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv, nameEnvElts )
 import NameSet		( emptyNameSet )
 import Outputable
-import Type		( Type, ClassContext, mkTyVarTys, mkDictTys, mkClassPred,
+import Type		( Type, ThetaType, mkTyVarTys, mkPredTys, mkClassPred,
 			  splitTyConApp_maybe, isTyVarTy
 			)
 import Var		( TyVar )
@@ -148,7 +148,7 @@ tcClassDecl1 is_rec rec_env
 	-- MAKE THE CLASS DETAILS
     let
 	(op_tys, op_items) = unzip sig_stuff
-        sc_tys		   = mkDictTys sc_theta
+        sc_tys		   = mkPredTys sc_theta
 	dict_component_tys = sc_tys ++ op_tys
 
         dict_con = mkDataCon datacon_name
@@ -219,23 +219,20 @@ checkGenericClassIsUnary clas dm_env
 tcSuperClasses :: RecFlag -> Bool -> Class
 	       -> RenamedContext 	-- class context
 	       -> [Name]		-- Names for superclass selectors
-	       -> TcM (ClassContext,	-- the superclass context
-		         [Id])  	-- superclass selector Ids
+	       -> TcM (ThetaType,	-- the superclass context
+		       [Id])		-- superclass selector Ids
 
 tcSuperClasses is_rec gla_exts clas context sc_sel_names
-  = 	-- Check the context.
+  = ASSERT( length context == length sc_sel_names )
+	-- Check the context.
 	-- The renamer has already checked that the context mentions
 	-- only the type variable of the class decl.
 
 	-- For std Haskell check that the context constrains only tyvars
-    (if gla_exts then
-	returnTc ()
-     else
-	mapTc_ check_constraint context
-    )						`thenTc_`
+    mapTc_ check_constraint context			`thenTc_`
 
 	-- Context is already kind-checked
-    tcRecClassContext is_rec context		`thenTc` \ sc_theta ->
+    tcRecTheta is_rec context		`thenTc` \ sc_theta ->
     let
        sc_sel_ids = [mkDictSelId sc_name clas | sc_name <- sc_sel_names]
     in
@@ -243,8 +240,10 @@ tcSuperClasses is_rec gla_exts clas context sc_sel_names
     returnTc (sc_theta, sc_sel_ids)
 
   where
-    check_constraint sc@(HsPClass c tys) 
-	= checkTc (all is_tyvar tys) (superClassErr clas sc)
+    check_constraint sc = checkTc (ok sc) (superClassErr clas sc)
+    ok (HsClassP c tys) | gla_exts  = True
+			| otherwise = all is_tyvar tys 
+    ok (HsIParam _ _)  = False		-- Never legal
 
     is_tyvar (HsTyVar _) = True
     is_tyvar other	 = False

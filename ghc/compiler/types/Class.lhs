@@ -5,7 +5,7 @@
 
 \begin{code}
 module Class (
-	Class, ClassOpItem, ClassPred, ClassContext, FunDep,
+	Class, ClassOpItem, FunDep,
 	DefMeth (..),
 
 	mkClass, classTyVars, classArity,
@@ -16,7 +16,7 @@ module Class (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon	( TyCon )
-import {-# SOURCE #-} TypeRep	( Type )
+import {-# SOURCE #-} TypeRep	( PredType )
 
 import Var		( Id, TyVar )
 import Name		( NamedThing(..), Name )
@@ -42,7 +42,7 @@ data Class
 	classTyVars  :: [TyVar],		-- The class type variables
 	classFunDeps :: [FunDep TyVar],		-- The functional dependencies
 
-	classSCTheta :: [(Class,[Type])],	-- Immediate superclasses, and the
+	classSCTheta :: [PredType],		-- Immediate superclasses, and the
 	classSCSels  :: [Id],			-- corresponding selector functions to
 						-- extract them from a dictionary of this
 						-- class
@@ -51,9 +51,6 @@ data Class
 
 	classTyCon :: TyCon		-- The data type constructor for dictionaries
   }					-- of this class
-
-type ClassPred 	  = (Class, [Type])
-type ClassContext = [ClassPred]
 
 type FunDep a	  = ([a],[a])	--  e.g. class C a b c |  a b -> c, a c -> b  where ...
 				--  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
@@ -73,7 +70,7 @@ The @mkClass@ function fills in the indirect superclasses.
 \begin{code}
 mkClass :: Name -> [TyVar]
 	-> [([TyVar], [TyVar])]
-	-> [(Class,[Type])] -> [Id]
+	-> [PredType] -> [Id]
 	-> [ClassOpItem]
 	-> TyCon
 	-> Class

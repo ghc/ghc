@@ -28,7 +28,7 @@ module Subst (
 
 	-- Type stuff
 	mkTyVarSubst, mkTopTyVarSubst, 
-	substTy, substClasses, substTheta,
+	substTy, substTheta,
 
 	-- Expression stuff
 	substExpr, substIdInfo
@@ -43,7 +43,7 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			)
 import CoreFVs		( exprFreeVars )
 import TypeRep		( Type(..), TyNote(..) )  -- friend
-import Type		( ThetaType, PredType(..), ClassContext,
+import Type		( ThetaType, PredType(..), 
 			  tyVarsOfType, tyVarsOfTypes, mkAppTy, mkUTy, isUTy
 			)
 import VarSet
@@ -392,19 +392,14 @@ substTy :: Subst -> Type  -> Type
 substTy subst ty | isEmptySubst subst = ty
 	         | otherwise	      = subst_ty subst ty
 
-substClasses :: TyVarSubst -> ClassContext -> ClassContext
-substClasses subst theta
-  | isEmptySubst subst = theta
-  | otherwise	       = [(clas, map (subst_ty subst) tys) | (clas, tys) <- theta]
-
 substTheta :: TyVarSubst -> ThetaType -> ThetaType
 substTheta subst theta
   | isEmptySubst subst = theta
   | otherwise	       = map (substPred subst) theta
 
 substPred :: TyVarSubst -> PredType -> PredType
-substPred subst (Class clas tys) = Class clas (map (subst_ty subst) tys)
-substPred subst (IParam n ty)    = IParam n (subst_ty subst ty)
+substPred subst (ClassP clas tys) = ClassP clas (map (subst_ty subst) tys)
+substPred subst (IParam n ty)     = IParam n (subst_ty subst ty)
 
 subst_ty subst ty
    = go ty

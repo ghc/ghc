@@ -108,7 +108,7 @@ oclose preds fixed_tvs
 	-- In our example, tv_fds will be [ ({x,y}, {z}), ({x,p},{q}) ]
 	-- Meaning "knowing x,y fixes z, knowing x,p fixes q"
     tv_fds  = [ (tyVarsOfTypes xs, tyVarsOfTypes ys)
-	      | Class cls tys <- preds,		-- Ignore implicit params
+	      | ClassP cls tys <- preds,		-- Ignore implicit params
 		let (cls_tvs, cls_fds) = classTvsFds cls,
 		fd <- cls_fds,
 		let (xs,ys) = instFD fd cls_tvs tys
@@ -210,11 +210,11 @@ checkGroup inst_env (IParam _ ty : ips)
   = 	-- For implicit parameters, all the types must match
     [(emptyVarSet, ty, ty') | IParam _ ty' <- ips, ty /= ty']
 
-checkGroup inst_env clss@(Class cls tys : _)
+checkGroup inst_env clss@(ClassP cls tys : _)
   = 	-- For classes life is more complicated  
    	-- Suppose the class is like
 	--	classs C as | (l1 -> r1), (l2 -> r2), ... where ...
-	-- Then FOR EACH PAIR (Class c tys1, Class c tys2) in the list clss
+	-- Then FOR EACH PAIR (ClassP c tys1, ClassP c tys2) in the list clss
 	-- we check whether
 	--	U l1[tys1/as] = U l2[tys2/as]
 	--  (where U is a unifier)
@@ -235,8 +235,8 @@ checkGroup inst_env clss@(Class cls tys : _)
     pairwise_eqns :: [Equation]
     pairwise_eqns	-- This group comes from pairwise comparison
       = [ eqn | fd <- cls_fds,
-	      	Class _ tys1 : rest <- tails clss,
-	      	Class _ tys2	<- rest,
+	      	ClassP _ tys1 : rest <- tails clss,
+	      	ClassP _ tys2	<- rest,
 	      	eqn <- checkClsFD emptyVarSet fd cls_tvs tys1 tys2
 	]
 
@@ -244,7 +244,7 @@ checkGroup inst_env clss@(Class cls tys : _)
     instance_eqns	-- This group comes from comparing with instance decls
       = [ eqn | fd <- cls_fds,
 	    	(qtvs, tys1, _) <- cls_inst_env,
-	    	Class _ tys2    <- clss,
+	    	ClassP _ tys2    <- clss,
 	    	eqn <- checkClsFD qtvs fd cls_tvs tys1 tys2
 	]
 

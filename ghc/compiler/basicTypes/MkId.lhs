@@ -38,7 +38,7 @@ import TysWiredIn	( charTy, mkListTy )
 import PrelNames	( pREL_ERR, pREL_GHC )
 import PrelRules	( primOpRule )
 import Rules		( addRule )
-import Type		( Type, ThetaType, mkDictTy, mkDictTys, mkTyConApp, mkTyVarTys,
+import Type		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp, mkTyVarTys,
 			  mkFunTys, mkFunTy, mkSigmaTy, splitSigmaTy, 
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
 			  splitFunTys, splitForAllTys, mkPredTy
@@ -256,8 +256,8 @@ mkDataConWrapId data_con
     (tyvars, theta, ex_tyvars, ex_theta, orig_arg_tys, tycon) = dataConSig data_con
     all_tyvars   = tyvars ++ ex_tyvars
 
-    dict_tys     = mkDictTys theta
-    ex_dict_tys  = mkDictTys ex_theta
+    dict_tys     = mkPredTys theta
+    ex_dict_tys  = mkPredTys ex_theta
     all_arg_tys  = dict_tys ++ ex_dict_tys ++ orig_arg_tys
     result_ty    = mkTyConApp tycon (mkTyVarTys tyvars)
 
@@ -360,8 +360,8 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 
     tycon_theta	= tyConTheta tycon	-- The context on the data decl
 					--   eg data (Eq a, Ord b) => T a b = ...
-    dict_tys  = [mkDictTy cls tys | (cls, tys) <- tycon_theta, 
-				    needed_dict (cls, tys)]
+    dict_tys  = [mkPredTy pred | pred <- tycon_theta, 
+				 needed_dict pred]
     needed_dict pred = or [ pred `elem` (dataConTheta dc) 
 			  | (DataAlt dc, _, _) <- the_alts]
     n_dict_tys = length dict_tys
@@ -632,9 +632,6 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
   = mkVanillaGlobal dfun_name dfun_ty noCafNoTyGenIdInfo
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
-    info     = noCafNoTyGenIdInfo
-             -- Type is wired-in (see comment at TcClassDcl.tcClassSig),
-             -- so do not generalise it
 
 {-  1 dec 99: disable the Mark Jones optimisation for the sake
     of compatibility with Hugs.

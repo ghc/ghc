@@ -17,7 +17,7 @@ import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyCheckThetas )
 
 import TysWiredIn	( integerTy, doubleTy )
-import Type             ( Type )
+import Type             ( Type, mkClassPred )
 import PrelNames	( numClassName )
 import Outputable
 import HscTypes		( TyThing(..) )
@@ -57,7 +57,7 @@ tc_defaults [DefaultDecl mono_tys locn]
     	tcAddErrCtxt defaultDeclCtxt		$
     	tcSimplifyCheckThetas
  		    [{- Nothing given -}]
- 		    [ (num_class, [ty]) | ty <- tau_tys ]	`thenTc_`
+ 		    [ mkClassPred num_class [ty] | ty <- tau_tys ]	`thenTc_`
     
     	returnTc tau_tys
 

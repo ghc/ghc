@@ -130,9 +130,9 @@ checkContext t
 checkPred :: RdrNameHsType -> [RdrNameHsType] 
 	-> P (HsPred RdrName)
 checkPred (HsTyVar t) args@(_:_) | not (isRdrTyVar t) 
-  	= returnP (HsPClass t args)
+  	= returnP (HsClassP t args)
 checkPred (HsAppTy l r) args = checkPred l (r:args)
-checkPred (HsPredTy (HsPIParam n ty)) [] = returnP (HsPIParam n ty)
+checkPred (HsPredTy (HsIParam n ty)) [] = returnP (HsIParam n ty)
 checkPred _ _ = parseError "Illegal class assertion"
 
 checkDictTy :: RdrNameHsType -> [RdrNameHsType] -> P RdrNameHsType

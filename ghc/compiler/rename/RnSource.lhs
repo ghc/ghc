@@ -651,19 +651,19 @@ rnContext doc ctxt
 			   (naughtyCCallContextErr pred')	`thenRn_`
 		   returnRn pred'
 
-    bad_pred (HsPClass clas _) = getUnique clas `elem` cCallishClassKeys
+    bad_pred (HsClassP clas _) = getUnique clas `elem` cCallishClassKeys
     bad_pred other	       = False
 
 
-rnPred doc (HsPClass clas tys)
+rnPred doc (HsClassP clas tys)
   = lookupOccRn clas		`thenRn` \ clas_name ->
     rnHsTypes doc tys		`thenRn` \ tys' ->
-    returnRn (HsPClass clas_name tys')
+    returnRn (HsClassP clas_name tys')
 
-rnPred doc (HsPIParam n ty)
+rnPred doc (HsIParam n ty)
   = newIPName n			`thenRn` \ name ->
     rnHsType doc ty		`thenRn` \ ty' ->
-    returnRn (HsPIParam name ty')
+    returnRn (HsIParam name ty')
 \end{code}
 
 \begin{code}
@@ -893,7 +893,7 @@ dupClassAssertWarn ctxt (assertion : dups)
 	       ptext SLIT("in the context:")],
 	 nest 4 (pprHsContext ctxt <+> ptext SLIT("..."))]
 
-naughtyCCallContextErr (HsPClass clas _)
+naughtyCCallContextErr (HsClassP clas _)
   = sep [ptext SLIT("Can't use class") <+> quotes (ppr clas), 
 	 ptext SLIT("in a context")]
 \end{code}

@@ -149,8 +149,8 @@ extractHsCtxtRdrTyVars ty = filter isRdrTyVar (extractHsCtxtRdrNames ty)
 
 extract_ctxt ctxt acc = foldr extract_pred acc ctxt
 
-extract_pred (HsPClass cls tys) acc	= foldr extract_ty (cls : acc) tys
-extract_pred (HsPIParam n ty) acc	= extract_ty ty acc
+extract_pred (HsClassP cls tys) acc	= foldr extract_ty (cls : acc) tys
+extract_pred (HsIParam n ty) acc	= extract_ty ty acc
 
 extract_tys tys = foldr extract_ty [] tys
 

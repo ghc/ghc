@@ -9,15 +9,15 @@ module Inst (
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 
 	Inst, 
-	pprInst, pprInsts, pprInstsInFull, tidyInst, tidyInsts,
+	pprInst, pprInsts, pprInstsInFull, tidyInsts,
 
-	newDictsFromOld, newDicts, newClassDicts,
+	newDictsFromOld, newDicts, 
 	newMethod, newMethodWithGivenTy, newOverloadedLit,
 	newIPDict, tcInstId,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, instLoc, getDictClassTys,
 	getIPs,
-	predsOfInsts,
+	predsOfInsts, predsOfInst,
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
@@ -25,7 +25,7 @@ module Inst (
 	isTyVarDict, isStdClassTyVarDict, isMethodFor, 
 	instBindingRequired, instCanBeGeneralised,
 
-	zonkInst, zonkInsts, 
+	zonkInst, zonkInsts,
 	instToId, 
 
 	InstOrigin(..), InstLoc, pprInstLoc
@@ -41,27 +41,29 @@ import TcHsSyn	( TcExpr, TcId,
 import TcMonad
 import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupSyntaxId )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
-import TcType	( TcThetaType, TcClassContext,
+import TcType	( TcThetaType,
 		  TcType, TcTauType, TcTyVarSet,
-		  zonkTcType, zonkTcTypes, 
+		  zonkTcType, zonkTcTypes, zonkTcPredType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType
 		)
 import CoreFVs	( idFreeTyVars )
 import Class	( Class )
 import Id	( Id, idType, mkUserLocal, mkSysLocal, mkLocalId )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
-import Name	( mkDictOcc, mkMethodOcc, getOccName, mkLocalName )
+import Name	( mkMethodOcc, getOccName )
 import NameSet	( NameSet )
 import PprType	( pprPred )	
-import Type	( Type, PredType(..), 
+import Type	( Type, PredType(..), ThetaType,
 		  isTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  splitForAllTys, splitSigmaTy, funArgTy,
-		  splitMethodTy, splitRhoTy, classesOfPreds,
-		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
-		  tidyOpenType, tidyOpenTypes, predMentionsIPs
+		  splitMethodTy, splitRhoTy,
+		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
+		  predMentionsIPs, isClassPred, isTyVarClassPred, 
+		  getClassPredTys, getClassPredTys_maybe, mkPredName,
+		  tidyType, tidyTypes, tidyFreeTyVars
 		)
 import Subst	( emptyInScopeSet, mkSubst, 
-		  substTy, substClasses, mkTyVarSubst, mkTopTyVarSubst
+		  substTy, substTheta, mkTyVarSubst, mkTopTyVarSubst
 		)
 import Literal	( inIntRange )
 import VarEnv	( TidyEnv, lookupSubstEnv, SubstResult(..) )
@@ -72,7 +74,7 @@ import TysWiredIn ( isIntTy,
 		    isIntegerTy
 		  ) 
 import PrelNames( fromIntegerName, fromRationalName )
-import Util	( thenCmp, zipWithEqual, mapAccumL )
+import Util	( thenCmp, zipWithEqual )
 import Bag
 import Outputable
 \end{code}
@@ -202,7 +204,7 @@ instLoc (Dict _ _         loc) = loc
 instLoc (Method _ _ _ _ _ loc) = loc
 instLoc (LitInst _ _ _    loc) = loc
 
-getDictClassTys (Dict _ (Class clas tys) _) = (clas, tys)
+getDictClassTys (Dict _ pred _) = getClassPredTys pred
 
 predsOfInsts :: [Inst] -> [PredType]
 predsOfInsts insts = concatMap predsOfInst insts
@@ -238,8 +240,12 @@ isDict (Dict _ _ _) = True
 isDict other	    = False
 
 isClassDict :: Inst -> Bool
-isClassDict (Dict _ (Class _ _) _) = True
-isClassDict other		   = False
+isClassDict (Dict _ pred _) = isClassPred pred
+isClassDict other	    = False
+
+isTyVarDict :: Inst -> Bool
+isTyVarDict (Dict _ pred _) = isTyVarClassPred pred
+isTyVarDict other	    = False
 
 isMethod :: Inst -> Bool
 isMethod (Method _ _ _ _ _ _) = True
@@ -256,14 +262,9 @@ instMentionsIPs (Dict _ pred _)          ip_names = pred `predMentionsIPs` ip_na
 instMentionsIPs (Method _ _ _ theta _ _) ip_names = any (`predMentionsIPs` ip_names) theta
 instMentionsIPs other			 ip_names = False
 
-isTyVarDict :: Inst -> Bool
-isTyVarDict (Dict _ (Class _ tys) _) = all isTyVarTy tys
-isTyVarDict other		     = False
-
-isStdClassTyVarDict (Dict _ (Class clas [ty]) _)
-  = isStandardClass clas && isTyVarTy ty
-isStdClassTyVarDict other
-  = False
+isStdClassTyVarDict (Dict _ pred _) = case getClassPredTys_maybe pred of
+					Just (clas, [ty]) -> isStandardClass clas && isTyVarTy ty
+					other		  -> False
 \end{code}
 
 Two predicates which deal with the case where class constraints don't
@@ -273,13 +274,13 @@ must be witnessed by an actual binding; the second tells whether an
 
 \begin{code}
 instBindingRequired :: Inst -> Bool
-instBindingRequired (Dict _ (Class clas _) _) = not (isNoDictClass clas)
-instBindingRequired (Dict _ (IParam _ _) _)   = False
-instBindingRequired other		      = True
+instBindingRequired (Dict _ (ClassP clas _) _) = not (isNoDictClass clas)
+instBindingRequired (Dict _ (IParam _ _) _)    = False
+instBindingRequired other		       = True
 
 instCanBeGeneralised :: Inst -> Bool
-instCanBeGeneralised (Dict _ (Class clas _) _) = not (isCcallishClass clas)
-instCanBeGeneralised other		       = True
+instCanBeGeneralised (Dict _ (ClassP clas _) _) = not (isCcallishClass clas)
+instCanBeGeneralised other		        = True
 \end{code}
 
 
@@ -297,13 +298,8 @@ newDicts orig theta
   = tcGetInstLoc orig		`thenNF_Tc` \ loc ->
     newDictsAtLoc loc theta
 
-newClassDicts :: InstOrigin
-	      -> TcClassContext
-	      -> NF_TcM [Inst]
-newClassDicts orig theta = newDicts orig (map (uncurry Class) theta)
-
-newDictsFromOld :: Inst -> TcClassContext -> NF_TcM [Inst]
-newDictsFromOld (Dict _ _ loc) theta = newDictsAtLoc loc (map (uncurry Class) theta)
+newDictsFromOld :: Inst -> TcThetaType -> NF_TcM [Inst]
+newDictsFromOld (Dict _ _ loc) theta = newDictsAtLoc loc theta
 
 -- Local function, similar to newDicts, 
 -- but with slightly different interface
@@ -314,10 +310,7 @@ newDictsAtLoc inst_loc@(_,loc,_) theta
   = tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
     returnNF_Tc (zipWithEqual "newDictsAtLoc" mk_dict new_uniqs theta)
   where
-    mk_dict uniq pred = Dict (mkLocalId (mk_dict_name uniq pred) (mkPredTy pred)) pred inst_loc
-
-    mk_dict_name uniq (Class cls tys)  = mkLocalName uniq (mkDictOcc (getOccName cls)) loc
-    mk_dict_name uniq (IParam name ty) = name
+    mk_dict uniq pred = Dict (mkLocalId (mkPredName uniq loc pred) (mkPredTy pred)) pred inst_loc
 
 newIPDict orig name ty
   = tcGetInstLoc orig			`thenNF_Tc` \ inst_loc ->
@@ -470,17 +463,9 @@ but doesn't do the same for any of the Ids in an Inst.  There's no
 need, and it's a lot of extra work.
 
 \begin{code}
-zonkPred :: TcPredType -> NF_TcM TcPredType
-zonkPred (Class clas tys)
-  = zonkTcTypes tys			`thenNF_Tc` \ new_tys ->
-    returnNF_Tc (Class clas new_tys)
-zonkPred (IParam n ty)
-  = zonkTcType ty			`thenNF_Tc` \ new_ty ->
-    returnNF_Tc (IParam n new_ty)
-
 zonkInst :: Inst -> NF_TcM Inst
 zonkInst (Dict id pred loc)
-  = zonkPred pred			`thenNF_Tc` \ new_pred ->
+  = zonkTcPredType pred			`thenNF_Tc` \ new_pred ->
     returnNF_Tc (Dict id new_pred loc)
 
 zonkInst (Method m id tys theta tau loc) 
@@ -528,36 +513,20 @@ pprInst m@(Method u id tys theta tau loc)
 	  show_uniq u,
 	  ppr (instToId m) -}]
 
-tidyPred :: TidyEnv -> TcPredType -> (TidyEnv, TcPredType)
-tidyPred env (Class clas tys)
-  = (env', Class clas tys')
-  where
-    (env', tys') = tidyOpenTypes env tys
-tidyPred env (IParam n ty)
-  = (env', IParam n ty')
-  where
-    (env', ty') = tidyOpenType env ty
-
-tidyInst :: TidyEnv -> Inst -> (TidyEnv, Inst)
-tidyInst env (LitInst u lit ty loc)
-  = (env', LitInst u lit ty' loc)
-  where
-    (env', ty') = tidyOpenType env ty
-
-tidyInst env (Dict u pred loc)
-  = (env', Dict u pred' loc)
-  where
-    (env', pred') = tidyPred env pred
-
-tidyInst env (Method u id tys theta tau loc)
-  = (env', Method u id tys' theta tau loc)
-		-- Leave theta, tau alone cos we don't print them
-  where
-    (env', tys') = tidyOpenTypes env tys
-
-tidyInsts env insts = mapAccumL tidyInst env insts
-
 show_uniq u = ifPprDebug (text "{-" <> ppr u <> text "-}")
+
+tidyInst :: TidyEnv -> Inst -> Inst
+tidyInst env (LitInst u lit ty loc) 	     = LitInst u lit (tidyType env ty) loc
+tidyInst env (Dict u pred loc)     	     = Dict u (tidyPred env pred) loc
+tidyInst env (Method u id tys theta tau loc) = Method u id (tidyTypes env tys) theta tau loc
+
+tidyInsts :: [Inst] -> (TidyEnv, [Inst])
+-- This function doesn't assume that the tyvars are in scope
+-- so it works like tidyOpenType, returning a TidyEnv
+tidyInsts insts 
+  = (env, map (tidyInst env) insts)
+  where
+    env = tidyFreeTyVars emptyTidyEnv (tyVarsOfInsts insts)
 \end{code}
 
 
@@ -578,7 +547,7 @@ lookupInst :: Inst
 
 -- Dictionaries
 
-lookupInst dict@(Dict _ (Class clas tys) loc)
+lookupInst dict@(Dict _ (ClassP clas tys) loc)
   = tcGetInstEnv		`thenNF_Tc` \ inst_env ->
     case lookupInstEnv inst_env clas tys of
 
@@ -667,16 +636,15 @@ ambiguous dictionaries.
 \begin{code}
 lookupSimpleInst :: Class
 		 -> [Type]				-- Look up (c,t)
-	         -> NF_TcM (Maybe [(Class,[Type])])	-- Here are the needed (c,t)s
+	         -> NF_TcM (Maybe ThetaType)	-- Here are the needed (c,t)s
 
 lookupSimpleInst clas tys
   = tcGetInstEnv		`thenNF_Tc` \ inst_env -> 
     case lookupInstEnv inst_env clas tys of
       FoundInst tenv dfun
-	-> returnNF_Tc (Just (substClasses (mkSubst emptyInScopeSet tenv) theta'))
+	-> returnNF_Tc (Just (substTheta (mkSubst emptyInScopeSet tenv) theta))
         where
 	   (_, theta, _) = splitSigmaTy (idType dfun)
-	   theta'	 = classesOfPreds theta
 
       other  -> returnNF_Tc Nothing
 \end{code}

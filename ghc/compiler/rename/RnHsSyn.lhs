@@ -97,9 +97,9 @@ extractHsCtxtTyNames ctxt = foldr (unionNameSets . extractHsPredTyNames) emptyNa
 
 -- You don't import or export implicit parameters,
 -- so don't mention the IP names
-extractHsPredTyNames (HsPClass cls tys)
+extractHsPredTyNames (HsClassP cls tys)
   = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
-extractHsPredTyNames (HsPIParam n ty)
+extractHsPredTyNames (HsIParam n ty)
   = extractHsTyNames ty
 \end{code}
 

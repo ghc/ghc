@@ -27,7 +27,7 @@ module HsTypes (
 #include "HsVersions.h"
 
 import Class		( FunDep )
-import Type		( Type, Kind, PredType(..), ClassContext,
+import Type		( Type, Kind, ThetaType, PredType(..), 
 			  splitSigmaTy, liftedTypeKind
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
@@ -52,8 +52,8 @@ This is the syntax for types as seen in type signatures.
 \begin{code}
 type HsContext name = [HsPred name]
 
-data HsPred name = HsPClass name [HsType name]
-		 | HsPIParam name (HsType name)
+data HsPred name = HsClassP name [HsType name]
+		 | HsIParam name (HsType name)
 
 data HsType name
   = HsForAllTy	(Maybe [HsTyVarBndr name])	-- Nothing for implicitly quantified signatures
@@ -123,8 +123,8 @@ mkHsForAllTy mtvs1     [] (HsForAllTy mtvs2 ctxt ty) = mkHsForAllTy (mtvs1 `plus
 						       (Just tvs1) `plus` (Just tvs2) = Just (tvs1 ++ tvs2)
 mkHsForAllTy tvs ctxt ty = HsForAllTy tvs ctxt ty
 
-mkHsDictTy cls tys = HsPredTy (HsPClass cls tys)
-mkHsIParamTy v ty  = HsPredTy (HsPIParam v ty)
+mkHsDictTy cls tys = HsPredTy (HsClassP cls tys)
+mkHsIParamTy v ty  = HsPredTy (HsIParam v ty)
 
 data HsTyVarBndr name
   = UserTyVar name
@@ -162,8 +162,8 @@ instance (Outputable name) => Outputable (HsTyVarBndr name) where
     ppr (IfaceTyVar name kind) = pprHsTyVarBndr name kind
 
 instance Outputable name => Outputable (HsPred name) where
-    ppr (HsPClass clas tys) = ppr clas <+> hsep (map pprParendHsType tys)
-    ppr (HsPIParam n ty)    = hsep [char '?' <> ppr n, text "::", ppr ty]
+    ppr (HsClassP clas tys) = ppr clas <+> hsep (map pprParendHsType tys)
+    ppr (HsIParam n ty)    = hsep [char '?' <> ppr n, text "::", ppr ty]
 
 pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
 pprHsTyVarBndr name kind | kind == liftedTypeKind = ppr name
@@ -324,11 +324,11 @@ toHsType (UsageTy u ty) = HsUsageTy (toHsType u) (toHsType ty)
                           -- **! consider dropping usMany annotations ToDo KSW 2000-10
 
 
-toHsPred (Class cls tys) = HsPClass (getName cls) (map toHsType tys)
-toHsPred (IParam n ty)	 = HsPIParam (getName n)  (toHsType ty)
+toHsPred (ClassP cls tys) = HsClassP (getName cls) (map toHsType tys)
+toHsPred (IParam n ty)	  = HsIParam (getName n)  (toHsType ty)
 
-toHsContext :: ClassContext -> HsContext Name
-toHsContext cxt = [HsPClass (getName cls) (map toHsType tys) | (cls,tys) <- cxt]
+toHsContext :: ThetaType -> HsContext Name
+toHsContext theta = map toHsPred theta
 
 toHsFDs :: [FunDep TyVar] -> [FunDep Name]
 toHsFDs fds = [(map getName ns, map getName ms) | (ns,ms) <- fds]
@@ -438,9 +438,9 @@ eq_hsType env ty1 ty2 = False
 eq_hsContext env a b = eqListBy (eq_hsPred env) a b
 
 -------------------
-eq_hsPred env (HsPClass c1 tys1) (HsPClass c2 tys2)
+eq_hsPred env (HsClassP c1 tys1) (HsClassP c2 tys2)
   = c1 == c2 &&  eq_hsTypes env tys1 tys2
-eq_hsPred env (HsPIParam n1 ty1) (HsPIParam n2 ty2)
+eq_hsPred env (HsIParam n1 ty1) (HsIParam n2 ty2)
   = n1 == n2 && eq_hsType env ty1 ty2
 eq_hsPred env _ _ = False
 

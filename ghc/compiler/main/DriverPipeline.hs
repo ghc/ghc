@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.53 2001/03/06 15:00:25 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.54 2001/03/13 14:58:26 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -884,7 +884,7 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
 		    HscC           -> newTempName (phaseInputExt HCc)
         	    HscJava        -> newTempName "java" -- ToDo
 #ifdef ILX
-		    HscILX         -> newTempName (phaseInputExt Ilx)
+		    HscILX         -> newTempName "ilx"	-- ToDo
 #endif
 		    HscInterpreted -> return (error "no output file")
 

@@ -20,7 +20,7 @@ import BasicTypes	( RecFlag(..) )
 import Inst		( InstOrigin(..), 
 			  LIE, mkLIE, emptyLIE, unitLIE, plusLIE, plusLIEs,
 			  newOverloadedLit, newMethod, newIPDict,
-			  newDicts, newClassDicts,
+			  newDicts, 
 			  instToId, tcInstId
 			)
 import TcBinds		( tcBindsAndThen )
@@ -44,14 +44,14 @@ import DataCon		( dataConFieldLabels, dataConSig,
 import Name		( Name )
 import Type		( mkFunTy, mkAppTy, mkTyConTy,
 			  splitFunTy_maybe, splitFunTys,
-			  mkTyConApp, splitSigmaTy, 
+			  mkTyConApp, splitSigmaTy, mkClassPred,
 			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
 			  isSigmaTy, splitAlgTyConApp, splitAlgTyConApp_maybe,
 			  liftedTypeKind, openTypeKind, mkArrowKind,
 			  tidyOpenType
 			)
 import TyCon		( TyCon, tyConTyVars )
-import Subst		( mkTopTyVarSubst, substClasses, substTy )
+import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( elemVarSet )
 import TysWiredIn	( boolTy, mkListTy, listTyCon )
 import TcUnify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy )
@@ -268,8 +268,8 @@ tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
     tcLookupTyCon ioTyConName		`thenNF_Tc` \ ioTyCon ->
     let
 	new_arg_dict (arg, arg_ty)
-	  = newClassDicts (CCallOrigin (_UNPK_ lbl) (Just arg))
-			  [(cCallableClass, [arg_ty])]	`thenNF_Tc` \ arg_dicts ->
+	  = newDicts (CCallOrigin (_UNPK_ lbl) (Just arg))
+		     [mkClassPred cCallableClass [arg_ty]]	`thenNF_Tc` \ arg_dicts ->
 	    returnNF_Tc arg_dicts	-- Actually a singleton bag
 
 	result_origin = CCallOrigin (_UNPK_ lbl) Nothing {- Not an arg -}
@@ -295,7 +295,7 @@ tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
 	-- Construct the extra insts, which encode the
 	-- constraints on the argument and result types.
     mapNF_Tc new_arg_dict (zipEqual "tcMonoExpr:CCall" args arg_tys)	`thenNF_Tc` \ ccarg_dicts_s ->
-    newClassDicts result_origin [(cReturnableClass, [result_ty])]	`thenNF_Tc` \ ccres_dict ->
+    newDicts result_origin [mkClassPred cReturnableClass [result_ty]]	`thenNF_Tc` \ ccres_dict ->
     returnTc (HsCCall lbl args' may_gc is_asm io_result_ty,
 	      mkLIE (ccres_dict ++ concat ccarg_dicts_s) `plusLIE` args_lie)
 \end{code}
@@ -532,9 +532,9 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     let
 	(tyvars, theta, _, _, _, _) = dataConSig (head data_cons)
 	inst_env = mkTopTyVarSubst tyvars result_inst_tys
-	theta'   = substClasses inst_env theta
+	theta'   = substTheta inst_env theta
     in
-    newClassDicts RecordUpdOrigin theta'	`thenNF_Tc` \ dicts ->
+    newDicts RecordUpdOrigin theta'	`thenNF_Tc` \ dicts ->
 
 	-- Phew!
     returnTc (RecordUpdOut record_expr' result_record_ty (map instToId dicts) rbinds', 
@@ -925,8 +925,8 @@ Overloaded literals.
 tcLit :: HsLit -> TcType -> TcM (TcExpr, LIE)
 tcLit (HsLitLit s _) res_ty
   = tcLookupClass cCallableClassName			`thenNF_Tc` \ cCallableClass ->
-    newClassDicts (LitLitOrigin (_UNPK_ s))
-	          [(cCallableClass,[res_ty])]		`thenNF_Tc` \ dicts ->
+    newDicts (LitLitOrigin (_UNPK_ s))
+	     [mkClassPred cCallableClass [res_ty]]	`thenNF_Tc` \ dicts ->
     returnTc (HsLit (HsLitLit s res_ty), mkLIE dicts)
 
 tcLit lit res_ty 

@@ -2,7 +2,7 @@
 module TcMonad(
 	TcType, 
 	TcTauType, TcPredType, TcThetaType, TcRhoType,
-	TcTyVar, TcTyVarSet, TcClassContext,
+	TcTyVar, TcTyVarSet,
 	TcKind,
 
 	TcM, NF_TcM, TcDown, TcEnv, 
@@ -55,7 +55,7 @@ import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, War
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
-import Class		( Class, ClassContext )
+import Class		( Class )
 import Name		( Name )
 import Var		( Id, TyVar, newMutTyVar, newSigTyVar, readMutTyVar, writeMutTyVar )
 import VarEnv		( TidyEnv, emptyTidyEnv )
@@ -94,7 +94,6 @@ type TcType = Type 		-- A TcType can have mutable type variables
 	-- a cannot occur inside a MutTyVar in T; that is,
 	-- T is "flattened" before quantifying over a
 
-type TcClassContext = ClassContext
 type TcPredType     = PredType
 type TcThetaType    = ThetaType
 type TcRhoType      = RhoType

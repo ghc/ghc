@@ -63,9 +63,9 @@ pprKind       = pprType
 pprParendKind = pprParendType
 
 pprPred :: PredType -> SDoc
-pprPred (Class clas tys) = pprClassPred clas tys
-pprPred (IParam n ty)    = hsep [ptext SLIT("?") <> ppr n,
-				 ptext SLIT("::"), ppr ty]
+pprPred (ClassP clas tys) = pprClassPred clas tys
+pprPred (IParam n ty)     = hsep [ptext SLIT("?") <> ppr n,
+				  ptext SLIT("::"), ppr ty]
 
 pprClassPred :: Class -> [Type] -> SDoc
 pprClassPred clas tys = ppr clas <+> hsep (map pprParendType tys)

@@ -16,7 +16,7 @@ import HsSyn		( TyClDecl(..), ConDecl(..), ConDetails(..), BangType(..),
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
 import BasicTypes	( NewOrData(..), RecFlag, isRec )
 
-import TcMonoType	( tcHsRecType, tcHsTyVars, tcRecClassContext,
+import TcMonoType	( tcHsRecType, tcHsTyVars, tcRecTheta,
 			  kcHsContext, kcHsSigType, kcHsLiftedSigType
 			)
 import TcEnv		( tcExtendTyVarEnv, 
@@ -25,7 +25,6 @@ import TcEnv		( tcExtendTyVarEnv,
 			)
 import TcMonad
 
-import Class		( ClassContext )
 import DataCon		( DataCon, mkDataCon, dataConFieldLabels,  markedStrict, 
 		 	  notMarkedStrict, markedUnboxed, dataConRepType
 			)
@@ -35,9 +34,9 @@ import Var		( TyVar )
 import Name		( Name, NamedThing(..) )
 import Outputable
 import TyCon		( TyCon, isNewTyCon, tyConTyVars )
-import Type		( tyVarsOfTypes, splitFunTy, applyTys,
+import Type		( tyVarsOfTypes, tyVarsOfPred, splitFunTy, applyTys,
 			  mkTyConApp, mkTyVarTys, mkForAllTys, 
-			  splitAlgTyConApp_maybe, Type
+			  splitAlgTyConApp_maybe, Type, ThetaType
 			)
 import TysWiredIn	( unitTy )
 import VarSet		( intersectVarSet, isEmptyVarSet )
@@ -80,7 +79,7 @@ tcTyDecl1 is_rec unf_env (TyData {tcdND = new_or_data, tcdCtxt = context,
     tcExtendTyVarEnv tyvars				$
 
 	-- Typecheck the pieces
-    tcRecClassContext is_rec context					`thenTc` \ ctxt ->
+    tcRecTheta is_rec context						`thenTc` \ ctxt ->
     mapTc (tcConDecl is_rec new_or_data tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
     tcRecordSelectors is_rec unf_env tycon data_cons			`thenTc` \ sel_ids -> 
     returnTc (tycon_name, DataTyDetails ctxt data_cons sel_ids)
@@ -127,12 +126,12 @@ kcConDetails new_or_data ex_ctxt details
 	    -- going to remove the constructor while coercing it to a lifted type.
 
 
-tcConDecl :: RecFlag -> NewOrData -> TyCon -> [TyVar] -> ClassContext -> RenamedConDecl -> TcM DataCon
+tcConDecl :: RecFlag -> NewOrData -> TyCon -> [TyVar] -> ThetaType -> RenamedConDecl -> TcM DataCon
 
 tcConDecl is_rec new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
   = tcAddSrcLoc src_loc							$
     tcHsTyVars ex_tvs (kcConDetails new_or_data ex_ctxt details)	$ \ ex_tyvars ->
-    tcRecClassContext is_rec ex_ctxt					`thenTc` \ ex_theta ->
+    tcRecTheta is_rec ex_ctxt						`thenTc` \ ex_theta ->
     case details of
 	VanillaCon btys    -> tc_datacon ex_tyvars ex_theta btys
 	InfixCon bty1 bty2 -> tc_datacon ex_tyvars ex_theta [bty1,bty2]
@@ -182,8 +181,8 @@ thinContext arg_tys ctxt
   = filter in_arg_tys ctxt
   where
       arg_tyvars = tyVarsOfTypes arg_tys
-      in_arg_tys (clas,tys) = not $ isEmptyVarSet $ 
-			      tyVarsOfTypes tys `intersectVarSet` arg_tyvars
+      in_arg_tys pred = not $ isEmptyVarSet $ 
+			tyVarsOfPred pred `intersectVarSet` arg_tyvars
 
 getBangStrictness (Banged   _) = markedStrict
 getBangStrictness (Unbanged _) = notMarkedStrict

@@ -111,7 +111,7 @@ import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTys, 
 			  mkArrowKinds, liftedTypeKind, unliftedTypeKind,
 			  splitTyConApp_maybe, repType,
-			  TauType, ClassContext )
+			  TauType, ThetaType )
 import Unique		( incrUnique, mkTupleTyConUnique, mkTupleDataConUnique )
 import PrelNames
 import CmdLineOpts
@@ -197,7 +197,7 @@ mk_tc_gen_info mod tc_uniq tc_name tycon
 	name1	    = mkWiredInName  mod occ_name1 fn1_key
 	name2	    = mkWiredInName  mod occ_name2 fn2_key
 
-pcDataCon :: Name -> [TyVar] -> ClassContext -> [TauType] -> TyCon -> DataCon
+pcDataCon :: Name -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> DataCon
 -- The unique is the first of two free uniques;
 -- the first is used for the datacon itself and the worker;
 -- the second is used for the wrapper.

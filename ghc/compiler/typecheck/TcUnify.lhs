@@ -164,7 +164,7 @@ uTys ps_ty1 ty1 ps_ty2 (TyVarTy tyvar2) = uVar True  tyvar2 ps_ty1 ty1
 	-- Predicates
 uTys _ (PredTy (IParam n1 t1)) _ (PredTy (IParam n2 t2))
   | n1 == n2 = uTys t1 t1 t2 t2
-uTys _ (PredTy (Class c1 tys1)) _ (PredTy (Class c2 tys2))
+uTys _ (PredTy (ClassP c1 tys1)) _ (PredTy (ClassP c2 tys2))
   | c1 == c2 = unifyTauTyLists tys1 tys2
 
 	-- Functions; just check the two parts

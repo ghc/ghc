@@ -163,7 +163,7 @@ Here the "Eq a" and "?x :: Int -> Int" and "r\l" are all called *predicates*
 Predicates are represented inside GHC by PredType:
 
 \begin{code}
-data PredType  = Class  Class [Type]
+data PredType  = ClassP  Class [Type]
 	       | IParam Name  Type
 \end{code}
 

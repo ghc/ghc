@@ -25,7 +25,7 @@ import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad       
 import TcType		( tcInstType )
 import Inst		( InstOrigin(..),
-			  newDicts, newClassDicts, instToId,
+			  newDicts, instToId,
 			  LIE, mkLIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
 import TcEnv		( TcEnv, tcExtendGlobalValEnv, 
@@ -60,9 +60,9 @@ import Type		( splitDFunTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy,
 			  splitForAllTys,
 			  tyVarsOfTypes, mkClassPred, mkTyVarTy,
-			  getClassTys_maybe
+			  isTyVarClassPred, inheritablePred
 			)
-import Subst		( mkTopTyVarSubst, substClasses )
+import Subst		( mkTopTyVarSubst, substTheta )
 import VarSet		( varSetElems )
 import TysWiredIn	( genericTyCons, isFFIArgumentTy, isFFIImportResultTy )
 import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
@@ -527,7 +527,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
 	sel_names = [idName sel_id | (sel_id, _) <- op_items]
 
         -- Instantiate the super-class context with inst_tys
-	sc_theta' = substClasses (mkTopTyVarSubst class_tyvars inst_tys') sc_theta
+	sc_theta' = substTheta (mkTopTyVarSubst class_tyvars inst_tys') sc_theta
 
 	-- Find any definitions in monobinds that aren't from the class
 	bad_bndrs = collectMonoBinders monobinds `minusList` sel_names
@@ -541,9 +541,9 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
     mapTc (addErrTc . badMethodErr clas) bad_bndrs		`thenNF_Tc_`
 
 	 -- Create dictionary Ids from the specified instance contexts.
-    newClassDicts origin sc_theta'		`thenNF_Tc` \ sc_dicts ->
-    newDicts origin dfun_theta'			`thenNF_Tc` \ dfun_arg_dicts ->
-    newClassDicts origin [(clas,inst_tys')]	`thenNF_Tc` \ [this_dict] ->
+    newDicts origin sc_theta'			 `thenNF_Tc` \ sc_dicts ->
+    newDicts origin dfun_theta'			 `thenNF_Tc` \ dfun_arg_dicts ->
+    newDicts origin [mkClassPred clas inst_tys'] `thenNF_Tc` \ [this_dict] ->
 
     tcExtendTyVarEnvForMeths inst_tyvars inst_tyvars' (
  	tcExtendGlobalValEnv dm_ids (
@@ -668,15 +668,16 @@ checkInstValidity dflags theta clas inst_tys
 	   [err | pred <- theta, err <- checkInstConstraint dflags pred]
 
 checkInstConstraint dflags pred
-  |  dopt Opt_AllowUndecidableInstances dflags
-  =  []
+	-- Checks whether a predicate is legal in the
+	-- context of an instance declaration
+  | ok 	       = []
+  | otherwise  = [instConstraintErr pred]
+  where
+    ok = inheritablePred pred &&
+	 (isTyVarClassPred pred || arbitrary_preds_ok)
 
-  |  Just (clas,tys) <- getClassTys_maybe pred,
-     all isTyVarTy tys
-  =  []
+    arbitrary_preds_ok = dopt Opt_AllowUndecidableInstances dflags
 
-  |  otherwise
-  =  [instConstraintErr pred]
 
 checkInstHead dflags theta clas inst_taus
   |	-- CCALL CHECK

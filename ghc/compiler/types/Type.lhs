@@ -42,10 +42,6 @@ module Type (
         isUTy, uaUTy, unUTy, liftUTy, mkUTyM,
         isUsageKind, isUsage, isUTyVar,
 
-	-- Predicates and the like
-	mkDictTy, mkDictTys, mkPredTy, splitPredTy_maybe, predTyUnique,
-	splitDictTy, splitDictTy_maybe, isDictTy, predRepTy, splitDFunTy,
-
 	mkSynTy, deNoteType, 
 
 	repType, splitRepFunTys, splitNewType_maybe, typePrimRep,
@@ -53,9 +49,15 @@ module Type (
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, hoistForAllTys, isForAllTy,
 
-	TauType, RhoType, SigmaType, PredType(..), ThetaType,
-	ClassPred, ClassContext, mkClassPred,
-	getClassTys_maybe, predMentionsIPs, classesOfPreds,
+	-- Predicates and the like
+	PredType(..), getClassPredTys_maybe, getClassPredTys, 
+	isClassPred, isTyVarClassPred,
+	mkDictTy, mkPredTy, mkPredTys, splitPredTy_maybe, predTyUnique,
+	splitDictTy, splitDictTy_maybe, isDictTy, predRepTy, splitDFunTy,
+	mkClassPred, predMentionsIPs, inheritablePred, isIPPred, mkPredName,
+
+	-- Tau, Rho, Sigma
+	TauType, RhoType, SigmaType, ThetaType,
 	isTauTy, mkRhoTy, splitRhoTy, splitMethodTy,
 	mkSigmaTy, isSigmaTy, splitSigmaTy,
 	getDFunTyKey,
@@ -70,8 +72,8 @@ module Type (
 	-- Tidying up for printing
 	tidyType,     tidyTypes,
 	tidyOpenType, tidyOpenTypes,
-	tidyTyVar,    tidyTyVars,
-	tidyTopType,
+	tidyTyVar,    tidyTyVars, tidyFreeTyVars,
+	tidyTopType,  tidyPred,
 
 	-- Seq
 	seqType, seqTypes
@@ -96,9 +98,10 @@ import Var	( Var, TyVar, tyVarKind, tyVarName, setTyVarName )
 import VarEnv
 import VarSet
 
-import Name	( NamedThing(..), OccName, mkLocalName, tidyOccName )
+import OccName	( mkDictOcc )
+import Name	( Name, NamedThing(..), OccName, mkLocalName, tidyOccName )
 import NameSet
-import Class	( classTyCon, Class, ClassPred, ClassContext )
+import Class	( classTyCon, Class )
 import TyCon	( TyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isDataTyCon, isNewTyCon, newTyConRep,
@@ -109,7 +112,7 @@ import TyCon	( TyCon,
 
 -- others
 import Maybes		( maybeToBool )
-import SrcLoc		( noSrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc )
 import PrimRep		( PrimRep(..) )
 import Unique		( Unique, Uniquable(..) )
 import Util		( mapAccumL, seqList, thenCmp )
@@ -417,8 +420,8 @@ deNoteType (ForAllTy tv ty)	= ForAllTy tv (deNoteType ty)
 deNoteType (UsageTy u ty)	= UsageTy u (deNoteType ty)
 
 deNotePred :: PredType -> PredType
-deNotePred (Class c tys) = Class c (map deNoteType tys)
-deNotePred (IParam n ty) = IParam n (deNoteType ty)
+deNotePred (ClassP c tys) = ClassP c (map deNoteType tys)
+deNotePred (IParam n ty)  = IParam n (deNoteType ty)
 \end{code}
 
 Notes on type synonyms
@@ -667,10 +670,7 @@ isUTyVar v
 
 %************************************************************************
 %*									*
-\subsection{Stuff to do with the source-language types}
-
-PredType and ThetaType are used in types for expressions and bindings.
-ClassPred and ClassContext are used in class and instance declarations.
+\subsection{Predicates}
 %*									*
 %************************************************************************
 
@@ -679,27 +679,59 @@ tell from the type constructor whether it's a dictionary or not.
 
 \begin{code}
 mkClassPred clas tys = UASSERT2( not (any isUTy tys), ppr clas <+> fsep (map pprType tys) )
-                       Class clas tys
+                       ClassP clas tys
+
+isClassPred (ClassP clas tys) = True
+isClassPred other	      = False
+
+isIPPred (IParam _ _) = True
+isIPPred other	      = False
+
+isTyVarClassPred (ClassP clas tys) = all isTyVarTy tys
+isTyVarClassPred other		   = False
+
+getClassPredTys_maybe :: PredType -> Maybe (Class, [Type])
+getClassPredTys_maybe (ClassP clas tys) = Just (clas, tys)
+getClassPredTys_maybe _		        = Nothing
+
+getClassPredTys :: PredType -> (Class, [Type])
+getClassPredTys (ClassP clas tys) = (clas, tys)
+
+inheritablePred :: PredType -> Bool
+-- Can be inherited by a context.  For example, consider
+--	f x = let g y = (?v, y+x)
+--	      in (g 3 with ?v = 8, 
+--		  g 4 with ?v = 9)
+-- The point is that g's type must be quantifed over ?v:
+--	g :: (?v :: a) => a -> a
+-- but it doesn't need to be quantified over the Num a dictionary
+-- which can be free in g's rhs, and shared by both calls to g
+inheritablePred (ClassP _ _) = True
+inheritablePred other	     = False
+
+predMentionsIPs :: PredType -> NameSet -> Bool
+predMentionsIPs (IParam n _) ns = n `elemNameSet` ns
+predMentionsIPs other	     ns = False
 
 mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = UASSERT2( not (any isUTy tys), ppr clas <+> fsep (map pprType tys) )
-                    mkPredTy (Class clas tys)
-
-mkDictTys :: ClassContext -> [Type]
-mkDictTys cxt = [mkDictTy cls tys | (cls,tys) <- cxt]
+                    mkPredTy (ClassP clas tys)
 
 mkPredTy :: PredType -> Type
 mkPredTy pred = PredTy pred
 
+mkPredTys :: ThetaType -> [Type]
+mkPredTys preds = map PredTy preds
+
 predTyUnique :: PredType -> Unique
-predTyUnique (IParam n _)     = getUnique n
-predTyUnique (Class clas tys) = getUnique clas
+predTyUnique (IParam n _)      = getUnique n
+predTyUnique (ClassP clas tys) = getUnique clas
 
 predRepTy :: PredType -> Type
 -- Convert a predicate to its "representation type";
 -- the type of evidence for that predicate, which is actually passed at runtime
-predRepTy (Class clas tys) = TyConApp (classTyCon clas) tys
-predRepTy (IParam n ty)    = ty
+predRepTy (ClassP clas tys) = TyConApp (classTyCon clas) tys
+predRepTy (IParam n ty)     = ty
 
 isPredTy :: Type -> Bool
 isPredTy (NoteTy _ ty) = isPredTy ty
@@ -708,10 +740,10 @@ isPredTy (UsageTy _ ty)= isPredTy ty
 isPredTy _	       = False
 
 isDictTy :: Type -> Bool
-isDictTy (NoteTy _ ty)	      = isDictTy ty
-isDictTy (PredTy (Class _ _)) = True
-isDictTy (UsageTy _ ty)       = isDictTy ty
-isDictTy other		      = False
+isDictTy (NoteTy _ ty)	       = isDictTy ty
+isDictTy (PredTy (ClassP _ _)) = True
+isDictTy (UsageTy _ ty)        = isDictTy ty
+isDictTy other		       = False
 
 splitPredTy_maybe :: Type -> Maybe PredType
 splitPredTy_maybe (NoteTy _ ty) = splitPredTy_maybe ty
@@ -721,12 +753,12 @@ splitPredTy_maybe other	        = Nothing
 
 splitDictTy :: Type -> (Class, [Type])
 splitDictTy (NoteTy _ ty) = splitDictTy ty
-splitDictTy (PredTy (Class clas tys)) = (clas, tys)
+splitDictTy (PredTy (ClassP clas tys)) = (clas, tys)
 
 splitDictTy_maybe :: Type -> Maybe (Class, [Type])
-splitDictTy_maybe (NoteTy _ ty) = Just (splitDictTy ty)
-splitDictTy_maybe (PredTy (Class clas tys)) = Just (clas, tys)
-splitDictTy_maybe other			    = Nothing
+splitDictTy_maybe (NoteTy _ ty)		     = splitDictTy_maybe ty
+splitDictTy_maybe (PredTy (ClassP clas tys)) = Just (clas, tys)
+splitDictTy_maybe other			     = Nothing
 
 splitDFunTy :: Type -> ([TyVar], [PredType], Class, [Type])
 -- Split the type of a dictionary function
@@ -735,17 +767,16 @@ splitDFunTy ty
     case splitDictTy tau of { (clas, tys) ->
     (tvs, theta, clas, tys) }}
 
-getClassTys_maybe :: PredType -> Maybe ClassPred
-getClassTys_maybe (Class clas tys) = Just (clas, tys)
-getClassTys_maybe _		   = Nothing
-
-predMentionsIPs :: PredType -> NameSet -> Bool
-predMentionsIPs (IParam n _) ns = n `elemNameSet` ns
-predMentionsIPs other	     ns = False
-
-classesOfPreds :: ThetaType -> ClassContext
-classesOfPreds theta = [(clas,tys) | Class clas tys <- theta]
+mkPredName :: Unique -> SrcLoc -> PredType -> Name
+mkPredName uniq loc (ClassP cls tys) = mkLocalName uniq (mkDictOcc (getOccName cls)) loc
+mkPredName uniq loc (IParam name ty) = name
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Tau, sigma and rho}
+%*									*
+%************************************************************************
 
 @isTauTy@ tests for nested for-alls.
 
@@ -891,8 +922,8 @@ tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
 
 tyVarsOfPred :: PredType -> TyVarSet
-tyVarsOfPred (Class clas tys) = tyVarsOfTypes tys
-tyVarsOfPred (IParam n ty)    = tyVarsOfType ty
+tyVarsOfPred (ClassP clas tys) = tyVarsOfTypes tys
+tyVarsOfPred (IParam n ty)     = tyVarsOfType ty
 
 tyVarsOfTheta :: ThetaType -> TyVarSet
 tyVarsOfTheta = foldr (unionVarSet . tyVarsOfPred) emptyVarSet
@@ -975,7 +1006,15 @@ tidyTyVar env@(tidy_env, subst) tyvar
   where
     name = tyVarName tyvar
 
+tidyTyVars :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
 tidyTyVars env tyvars = mapAccumL tidyTyVar env tyvars
+
+tidyFreeTyVars :: TidyEnv -> TyVarSet -> TidyEnv
+-- Add the free tyvars to the env in tidy form,
+-- so that we can tidy the type they are free in
+tidyFreeTyVars env tyvars = foldl add env (varSetElems tyvars)
+			  where
+			    add env tv = fst (tidyTyVar env tv)
 
 tidyType :: TidyEnv -> Type -> Type
 tidyType env@(tidy_env, subst) ty
@@ -987,7 +1026,7 @@ tidyType env@(tidy_env, subst) ty
     go (TyConApp tycon tys) = let args = map go tys
 			      in args `seqList` TyConApp tycon args
     go (NoteTy note ty)     = (NoteTy SAPPLY (go_note note)) SAPPLY (go ty)
-    go (PredTy p)	    = PredTy (go_pred p)
+    go (PredTy p)	    = PredTy (tidyPred env p)
     go (AppTy fun arg)	    = (AppTy SAPPLY (go fun)) SAPPLY (go arg)
     go (FunTy fun arg)	    = (FunTy SAPPLY (go fun)) SAPPLY (go arg)
     go (ForAllTy tv ty)	    = ForAllTy tvp SAPPLY (tidyType envp ty)
@@ -998,10 +1037,11 @@ tidyType env@(tidy_env, subst) ty
     go_note (SynNote ty)        = SynNote SAPPLY (go ty)
     go_note note@(FTVNote ftvs) = note	-- No need to tidy the free tyvars
 
-    go_pred (Class c tys) = Class c (tidyTypes env tys)
-    go_pred (IParam n ty) = IParam n (go ty)
-
 tidyTypes env tys = map (tidyType env) tys
+
+tidyPred :: TidyEnv -> PredType -> PredType
+tidyPred env (ClassP clas tys) = ClassP clas (tidyTypes env tys)
+tidyPred env (IParam n ty)     = IParam n (tidyType env ty)
 \end{code}
 
 
@@ -1013,8 +1053,7 @@ tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
 tidyOpenType env ty
   = (env', tidyType env' ty)
   where
-    env'         = foldl go env (varSetElems (tyVarsOfType ty))
-    go env tyvar = fst (tidyTyVar env tyvar)
+    env' = tidyFreeTyVars env (tyVarsOfType ty)
 
 tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
 tidyOpenTypes env tys = mapAccumL tidyOpenType env tys
@@ -1098,8 +1137,8 @@ seqNote (SynNote ty)  = seqType ty
 seqNote (FTVNote set) = sizeUniqSet set `seq` ()
 
 seqPred :: PredType -> ()
-seqPred (Class c tys) = c `seq` seqTypes tys
-seqPred (IParam n ty) = n `seq` seqType ty
+seqPred (ClassP c tys) = c `seq` seqTypes tys
+seqPred (IParam n ty)  = n `seq` seqType ty
 \end{code}
 
 
@@ -1180,7 +1219,7 @@ cmpPred env (IParam n1 ty1)   (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` (cmp
 	-- Compare types as well as names for implicit parameters
 	-- This comparison is used exclusively (I think) for the
 	-- finite map built in TcSimplify
-cmpPred env (Class c1 tys1) (Class c2 tys2) = (c1 `compare` c2) `thenCmp` (cmpTys env tys1 tys2)
-cmpPred env (IParam _ _)    (Class _ _)     = LT
-cmpPred env (Class _ _)     (IParam _ _)    = GT
+cmpPred env (ClassP c1 tys1) (ClassP c2 tys2) = (c1 `compare` c2) `thenCmp` (cmpTys env tys1 tys2)
+cmpPred env (IParam _ _)     (ClassP _ _)     = LT
+cmpPred env (ClassP _ _)     (IParam _ _)     = GT
 \end{code}

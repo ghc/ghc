@@ -28,9 +28,9 @@ module DataCon (
 import {-# SOURCE #-} Subst( substTy, mkTyVarSubst )
 
 import CmdLineOpts	( opt_DictsStrict )
-import Type		( Type, TauType, ClassContext,
+import Type		( Type, TauType, ThetaType,
 			  mkForAllTys, mkFunTys, mkTyConApp,
-			  mkTyVarTys, mkDictTys,
+			  mkTyVarTys, mkPredTys, getClassPredTys_maybe,
 			  splitTyConApp_maybe
 			)
 import TyCon		( TyCon, tyConDataCons, tyConDataConsIfAvailable, isDataTyCon, isProductTyCon,
@@ -106,10 +106,10 @@ data DataCon
 					-- These are ALWAYS THE SAME AS THE TYVARS
 					-- FOR THE PARENT TyCon.  We occasionally rely on
 					-- this just to avoid redundant instantiation
-	dcTheta  ::  ClassContext,
+	dcTheta  ::  ThetaType,
 
 	dcExTyVars :: [TyVar], 		-- Ditto for the context of the constructor,
-	dcExTheta  :: ClassContext,	-- the existentially quantified stuff
+	dcExTheta  :: ThetaType,	-- the existentially quantified stuff
 					
 	dcOrigArgTys :: [Type],		-- Original argument types
 					-- (before unboxing and flattening of
@@ -233,8 +233,8 @@ instance Show DataCon where
 \begin{code}
 mkDataCon :: Name
 	  -> [StrictnessMark] -> [FieldLabel]
-	  -> [TyVar] -> ClassContext
-	  -> [TyVar] -> ClassContext
+	  -> [TyVar] -> ThetaType
+	  -> [TyVar] -> ThetaType
 	  -> [TauType] -> TyCon
 	  -> Id -> Id
 	  -> DataCon
@@ -260,7 +260,7 @@ mkDataCon name arg_stricts fields
 
     (real_arg_stricts, strict_arg_tyss)
 	= unzip (zipWith (unbox_strict_arg_ty tycon) arg_stricts orig_arg_tys)
-    rep_arg_tys = mkDictTys ex_theta ++ concat strict_arg_tyss
+    rep_arg_tys = mkPredTys ex_theta ++ concat strict_arg_tyss
 	
     ex_dict_stricts = map mk_dict_strict_mark ex_theta
 	-- Add a strictness flag for the existential dictionary arguments
@@ -274,9 +274,9 @@ mkDataCon name arg_stricts fields
 
     result_ty = mkTyConApp tycon (mkTyVarTys tyvars)
 
-mk_dict_strict_mark (clas,tys)
-  | opt_DictsStrict &&
-	-- Don't mark newtype things as strict!
+mk_dict_strict_mark pred
+  | opt_DictsStrict,	-- Don't mark newtype things as strict!
+    Just (clas,_) <- getClassPredTys_maybe pred,
     isDataTyCon (classTyCon clas) = MarkedStrict
   | otherwise			  = NotMarkedStrict
 \end{code}
@@ -334,8 +334,8 @@ dataConRepStrictness dc
     go (NotMarkedStrict     : ss) = wwLazy   : go ss
     go (MarkedUnboxed con _ : ss) = go (dcRealStricts con ++ ss)
 
-dataConSig :: DataCon -> ([TyVar], ClassContext,
-			  [TyVar], ClassContext,
+dataConSig :: DataCon -> ([TyVar], ThetaType,
+			  [TyVar], ThetaType,
 			  [TauType], TyCon)
 
 dataConSig (MkData {dcTyVars = tyvars, dcTheta = theta,
@@ -355,7 +355,7 @@ dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars}) inst_tys
  = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) arg_tys
 
-dataConTheta :: DataCon -> ClassContext
+dataConTheta :: DataCon -> ThetaType
 dataConTheta dc = dcTheta dc
 
 -- And the same deal for the original arg tys:

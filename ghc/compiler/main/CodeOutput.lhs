@@ -35,6 +35,7 @@ import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
 import TmpFiles		( newTempName )
 
 import IO		( IOMode(..), hClose, openFile, Handle )
+import IO		( hPutStr, stderr) 	-- Debugging
 \end{code}
 
 
@@ -81,7 +82,8 @@ codeOutput dflags mod_name tycons core_binds stg_binds
 
 doOutput :: String -> (Handle -> IO ()) -> IO ()
 doOutput filenm io_action
-  = (do	handle <- openFile filenm WriteMode
+  = (do	hPutStr stderr ("Writing to" ++ filenm)
+	handle <- openFile filenm WriteMode
 	io_action handle
 	hClose handle)
     `catch` (\err -> pprPanic "Failed to open or write code output file" 

@@ -6,7 +6,7 @@
 \begin{code}
 module TcMonoType ( tcHsType, tcHsRecType, tcIfaceType,
 		    tcHsSigType, tcHsLiftedSigType, 
-		    tcRecClassContext, checkAmbiguity,
+		    tcRecTheta, checkAmbiguity,
 
 			-- Kind checking
 		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
@@ -46,7 +46,7 @@ import Type		( Type, Kind, PredType(..), ThetaType, SigmaType, TauType,
 			  mkArrowKinds, getTyVar_maybe, getTyVar, splitFunTy_maybe,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
 			  tyVarsOfType, tyVarsOfPred, mkForAllTys,
-			  classesOfPreds, isUnboxedTupleType, isForAllTy
+			  isUnboxedTupleType, isForAllTy, isIPPred
 			)
 import PprType		( pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
@@ -57,7 +57,7 @@ import VarEnv
 import VarSet
 import ErrUtils		( Message )
 import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind )
-import Class		( ClassContext, classArity, classTyCon )
+import Class		( classArity, classTyCon )
 import Name		( Name )
 import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
 import BasicTypes	( Boxity(..), RecFlag(..), isRec )
@@ -241,11 +241,11 @@ kcAppKind fun_kind arg_kind
 kcHsContext ctxt = mapTc_ kcHsPred ctxt
 
 kcHsPred :: RenamedHsPred -> TcM ()
-kcHsPred pred@(HsPIParam name ty)
+kcHsPred pred@(HsIParam name ty)
   = tcAddErrCtxt (appKindCtxt (ppr pred))	$
     kcLiftedType ty
 
-kcHsPred pred@(HsPClass cls tys)
+kcHsPred pred@(HsClassP cls tys)
   = tcAddErrCtxt (appKindCtxt (ppr pred))	$
     kcClass cls					`thenTc` \ kind ->
     mapTc kcHsType tys				`thenTc` \ arg_kinds ->
@@ -397,7 +397,7 @@ tc_type wimp_out full_ty@(HsForAllTy (Just tv_names) ctxt ty)
 	kind_check = kcHsContext ctxt `thenTc_` kcHsType ty
     in
     tcHsTyVars tv_names kind_check			$ \ tyvars ->
-    tc_context wimp_out ctxt				`thenTc` \ theta ->
+    tcRecTheta wimp_out ctxt				`thenTc` \ theta ->
 
 	-- Context behaves like a function type
 	-- This matters.  Return-unboxed-tuple analysis can
@@ -492,22 +492,17 @@ tc_fun_type name arg_tys
 Contexts
 ~~~~~~~~
 \begin{code}
-tcRecClassContext :: RecFlag -> RenamedContext -> TcM ClassContext
+tcRecTheta :: RecFlag -> RenamedContext -> TcM ThetaType
 	-- Used when we are expecting a ClassContext (i.e. no implicit params)
-tcRecClassContext wimp_out context
-  = tc_context wimp_out context 	`thenTc` \ theta ->
-    returnTc (classesOfPreds theta)
+tcRecTheta wimp_out context = mapTc (tc_pred wimp_out) context
 
-tc_context :: RecFlag -> RenamedContext -> TcM ThetaType
-tc_context wimp_out context = mapTc (tc_pred wimp_out) context
-
-tc_pred wimp_out assn@(HsPClass class_name tys)
+tc_pred wimp_out assn@(HsClassP class_name tys)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
     tc_arg_types wimp_out tys			`thenTc` \ arg_tys ->
     tcLookupGlobal class_name			`thenTc` \ thing ->
     case thing of
 	AClass clas -> checkTc (arity == n_tys) err	`thenTc_`
-		       returnTc (Class clas arg_tys)
+		       returnTc (ClassP clas arg_tys)
 	    where
 		arity = classArity clas
 		n_tys = length tys
@@ -515,7 +510,7 @@ tc_pred wimp_out assn@(HsPClass class_name tys)
 
 	other -> failWithTc (wrongThingErr "class" (AGlobal thing) class_name)
 
-tc_pred wimp_out assn@(HsPIParam name ty)
+tc_pred wimp_out assn@(HsIParam name ty)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
     tc_arg_type wimp_out ty			`thenTc` \ arg_ty ->
     returnTc (IParam name arg_ty)
@@ -574,14 +569,12 @@ checkAmbiguity wimp_out is_source_polytype forall_tyvars theta tau
 		        not (ct_var `elemVarSet` extended_tau_vars)
     is_free ct_var    = not (ct_var `elem` forall_tyvars)
     
-    check_pred pred = checkTc (not any_ambig)              (ambigErr pred sigma_ty) `thenTc_`
-	    	      checkTc (is_ip pred || not all_free) (freeErr  pred sigma_ty)
+    check_pred pred = checkTc (not any_ambig)                 (ambigErr pred sigma_ty) `thenTc_`
+	    	      checkTc (isIPPred pred || not all_free) (freeErr  pred sigma_ty)
              where 
 	    	ct_vars	  = varSetElems (tyVarsOfPred pred)
 	    	all_free  = all is_free ct_vars
 	    	any_ambig = is_source_polytype && any is_ambig ct_vars
-		is_ip (IParam _ _) = True
-		is_ip _            = False
 \end{code}
 
 %************************************************************************

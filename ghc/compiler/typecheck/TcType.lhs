@@ -13,7 +13,7 @@ module TcType (
   newTyVarTys,		-- Int -> Kind -> NF_TcM [TcType]
 
   -----------------------------------------
-  TcType, TcTauType, TcThetaType, TcRhoType, TcClassContext,
+  TcType, TcTauType, TcThetaType, TcRhoType,
 
 	-- Find the type to which a type variable is bound
   tcPutTyVar,		-- :: TcTyVar -> TcType -> NF_TcM TcType
@@ -33,6 +33,7 @@ module TcType (
   --------------------------------
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkTcSigTyVars,
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
+  zonkTcPredType,
 
   zonkTcTypeToType, zonkTcTyVarToTyVar, zonkKindEnv
 
@@ -313,9 +314,9 @@ zonkTcThetaType :: TcThetaType -> NF_TcM TcThetaType
 zonkTcThetaType theta = mapNF_Tc zonkTcPredType theta
 
 zonkTcPredType :: TcPredType -> NF_TcM TcPredType
-zonkTcPredType (Class c ts) =
+zonkTcPredType (ClassP c ts) =
     zonkTcTypes ts	`thenNF_Tc` \ new_ts ->
-    returnNF_Tc (Class c new_ts)
+    returnNF_Tc (ClassP c new_ts)
 zonkTcPredType (IParam n t) =
     zonkTcType t	`thenNF_Tc` \ new_t ->
     returnNF_Tc (IParam n new_t)
@@ -446,8 +447,8 @@ zonkType unbound_var_fn ty
 			     go ty			`thenNF_Tc` \ ty' ->
 			     returnNF_Tc (ForAllTy tyvar' ty')
 
-    go_pred (Class c tys) = mapNF_Tc go tys	`thenNF_Tc` \ tys' ->
-			    returnNF_Tc	(Class c tys')
+    go_pred (ClassP c tys) = mapNF_Tc go tys	`thenNF_Tc` \ tys' ->
+			     returnNF_Tc (ClassP c tys')
     go_pred (IParam n ty) = go ty		`thenNF_Tc` \ ty' ->
 			    returnNF_Tc (IParam n ty')
 

@@ -524,8 +524,8 @@ context_list1	: class					{ [$1] }
 		| class ',' context_list1 		{ $1 : $3 }
 
 class		:: { HsPred RdrName }
-class		:  qcls_name atypes			{ (HsPClass $1 $2) }
-		|  ipvar_name '::' type			{ (HsPIParam $1 $3) }
+class		:  qcls_name atypes			{ (HsClassP $1 $2) }
+		|  ipvar_name '::' type			{ (HsIParam $1 $3) }
 
 types0		:: { [RdrNameHsType] 			{- Zero or more -}  }	
 types0		:  {- empty -}				{ [ ] }

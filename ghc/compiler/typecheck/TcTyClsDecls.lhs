@@ -412,7 +412,7 @@ tyClDeclFTVs d = foldNameSet add [] (tyClDeclFVs d)
 
 mkClassEdges :: RenamedTyClDecl -> Maybe (RenamedTyClDecl, Name, [Name])
 
-mkClassEdges decl@(ClassDecl {tcdCtxt = ctxt, tcdName = name}) = Just (decl, name, [c | HsPClass c _ <- ctxt])
+mkClassEdges decl@(ClassDecl {tcdCtxt = ctxt, tcdName = name}) = Just (decl, name, [c | HsClassP c _ <- ctxt])
 mkClassEdges other_decl				   	       = Nothing
 
 mkEdges :: RenamedTyClDecl -> (RenamedTyClDecl, Name, [Name])

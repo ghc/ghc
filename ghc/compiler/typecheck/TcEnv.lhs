@@ -48,13 +48,13 @@ import Id		( idName, mkSpecPragmaId, mkUserLocal, isDataConWrapId_maybe )
 import IdInfo		( vanillaIdInfo )
 import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
 import VarSet
-import Type		( Type,
+import Type		( Type, ThetaType, 
 			  tyVarsOfTypes, splitDFunTy,
 			  getDFunTyKey, tyConAppTyCon
 			)
 import DataCon		( DataCon )
 import TyCon		( TyCon )
-import Class		( Class, ClassOpItem, ClassContext )
+import Class		( Class, ClassOpItem )
 import Name		( Name, OccName, NamedThing(..), 
 			  nameOccName, getSrcLoc, mkLocalName, isLocalName,
 			  nameIsLocalOrFrom
@@ -173,8 +173,8 @@ getTcGEnv (TcEnv { tcGEnv = genv }) = genv
 -- This data type is used to help tie the knot
 -- when type checking type and class declarations
 data TyThingDetails = SynTyDetails Type
-		    | DataTyDetails ClassContext [DataCon] [Id]
-		    | ClassDetails ClassContext [Id] [ClassOpItem] DataCon
+		    | DataTyDetails ThetaType [DataCon] [Id]
+		    | ClassDetails ThetaType [Id] [ClassOpItem] DataCon
 \end{code}
 
 

@@ -15,7 +15,7 @@ import TcHsSyn		( TcPat, TcId )
 import TcMonad
 import Inst		( InstOrigin(..),
 			  emptyLIE, plusLIE, LIE, mkLIE, unitLIE, instToId,
-			  newMethod, newOverloadedLit, newDicts, newClassDicts
+			  newMethod, newOverloadedLit, newDicts
 			)
 import Id		( mkLocalId )
 import Name		( Name )
@@ -30,7 +30,7 @@ import DataCon		( dataConSig, dataConFieldLabels,
 			  dataConSourceArity
 			)
 import Type		( isTauTy, mkTyConApp, mkClassPred, liftedTypeKind )
-import Subst		( substTy, substClasses )
+import Subst		( substTy, substTheta )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
@@ -372,14 +372,14 @@ tcConstructor pat con_name pat_ty
     in
     tcInstTyVars (ex_tvs ++ tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
     let
-	ex_theta' = substClasses tenv ex_theta
+	ex_theta' = substTheta tenv ex_theta
 	arg_tys'  = map (substTy tenv) arg_tys
 
 	n_ex_tvs  = length ex_tvs
 	ex_tvs'   = take n_ex_tvs all_tvs'
 	result_ty = mkTyConApp tycon (drop n_ex_tvs ty_args')
     in
-    newClassDicts (PatOrigin pat) ex_theta'	`thenNF_Tc` \ dicts ->
+    newDicts (PatOrigin pat) ex_theta'	`thenNF_Tc` \ dicts ->
 
 	-- Check overall type matches
     unifyTauTy pat_ty result_ty		`thenTc_`
