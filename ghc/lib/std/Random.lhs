@@ -39,7 +39,6 @@ import PrelReal		( toInt )
 import PrelFloat	( float2Double, double2Float )
 import Time		( getClockTime, ClockTime(..) )
 #else
-import Prelude
 import privileged Prelude
 			( IORef
 			, newIORef
