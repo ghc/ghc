@@ -1112,7 +1112,19 @@ loadObj( char *path )
 #endif
 
    n = ROUND_UP(oc->fileSize, pagesize);
-   oc->image = mmap(map_addr, n, PROT_EXEC|PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
+
+   /* Link objects into the lower 2Gb on x86_64.  GHC assumes the
+    * small memory model on this architecture (see gcc docs,
+    * -mcmodel=small).
+    */
+#ifdef x86_64_HOST_ARCH
+#define EXTRA_MAP_FLAGS MAP_32BIT
+#else
+#define EXTRA_MAP_FLAGS 0
+#endif
+
+   oc->image = mmap(map_addr, n, PROT_EXEC|PROT_READ|PROT_WRITE, 
+		    MAP_PRIVATE|EXTRA_MAP_FLAGS, fd, 0);
    if (oc->image == MAP_FAILED)
       barf("loadObj: can't map `%s'", path);
 
@@ -2532,6 +2544,9 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       case EM_IA_64: IF_DEBUG(linker,debugBelch( "ia64" )); break;
 #endif
       case EM_PPC:   IF_DEBUG(linker,debugBelch( "powerpc32" )); break;
+#ifdef EM_X86_64
+      case EM_X86_64: IF_DEBUG(linker,debugBelch( "x86_64" )); break;
+#endif
       default:       IF_DEBUG(linker,debugBelch( "unknown" ));
                      errorBelch("%s: unknown architecture", oc->fileName);
                      return 0;
@@ -2945,7 +2960,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                           target_shndx, symtab_shndx ));
 
    for (j = 0; j < nent; j++) {
-#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(ia64_HOST_ARCH) || defined(powerpc_HOST_ARCH)
+#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(ia64_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
       /* This #ifdef only serves to avoid unused-var warnings. */
       Elf_Addr  offset = rtab[j].r_offset;
       Elf_Addr  P      = targ + offset;
@@ -3121,6 +3136,23 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                                           | (delta & 0x3fffffc);
             break;
 #        endif
+
+      case R_X86_64_64:
+	  *(Elf64_Xword *)P = value;
+	  break;
+
+      case R_X86_64_PC32:
+	  *(Elf64_Word *)P = (Elf64_Word) (value - P);
+	  break;
+
+      case R_X86_64_32:
+	  *(Elf64_Word *)P = (Elf64_Word)value;
+	  break;
+
+      case R_X86_64_32S:
+	  *(Elf64_Sword *)P = (Elf64_Sword)value;
+	  break;
+
          default:
             errorBelch("%s: unhandled ELF relocation(RelA) type %d\n",
 		  oc->fileName, ELF_R_TYPE(info));
