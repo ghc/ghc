@@ -177,7 +177,7 @@
       <para>The <literal>ghc-pkg</literal> tool allows packages to be
       added or removed from a package configuration file.  By default,
       the system-wide configuration file is used, but alternatively
-      packages can be added or removed from a user-specified
+      packages can be added, updated or removed from a user-specified
       configuration file using the <option>&ndash;&ndash;config-file</option>
       option.  An empty package configuration file consists of the
       string <quote><literal>[]</literal></quote>.</para>
@@ -310,9 +310,9 @@
 <screen>
   Package {
      name            = "mypkg",
-     import_dirs     = ["/usr/local/lib/imports/mypkg"],
+     import_dirs     = ["${installdir}/imports/mypkg"],
      source_dirs     = [],
-     library_dirs    = ["/usr/local/lib"],
+     library_dirs    = ["${installdir}"],
      hs_libraries    = ["HSmypkg" ],
      extra_libraries = ["HSmypkg_cbits"],
      include_dirs    = [],
@@ -517,6 +517,27 @@
 	  </listitem>
 	</varlistentry>
       </variablelist>
+      
+      <para>
+      The <literal>ghc-pkg</literal> tool performs expansion of
+      environment variables occurring in input package specifications.
+      So, if the <literal>mypkg</literal> was added to the package
+      database as follows:
+      </para>
+<screen>
+  $ installdir=/usr/local/lib ghc-pkg -a < mypkg.pkg
+</screen>
+      
+      <para>
+      The occurrence of <literal>${installdir}</literal> is replaced
+      with <literal>/usr/local/lib</literal> in the package data that
+      is added for <literal>mypkg</literal>.
+      </para>
+      
+      <para>
+      This feature enables the distribution of package specification
+      files that can be easily configured when installing.
+      </para>
 
       <para>For examples of more package specifications, take a look
       at the <literal>package.conf</literal> in your GHC
