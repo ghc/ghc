@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.52 2000/06/30 09:34:09 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.53 2000/07/11 10:47:06 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -352,30 +352,57 @@ rm -fr conftest*
 
 dnl Test for version of installed ghc.  Uses $GHC.  Largely pinched from c2hs.
 dnl
+dnl
+dnl FPTOOLS_GHC_VERSION
+dnl FPTOOLS_GHC_VERSION(version)
+dnl FPTOOLS_GHC_VERSION(major, minor [, patchlevel])
+dnl
+dnl Test for version of installed ghc.  Uses $GHC.
+dnl
 AC_DEFUN(FPTOOLS_GHC_VERSION,
-[ AC_CACHE_CHECK([version of ghc], fptools_cv_ghc_version, [
-    fptools_cv_ghc_version=`$GHC --version 2>&1 | sed -e 's/.*\([[0-9]]\)\.\([[0-9]]*\)\([[.-]]\([[0-9]]*\)\)\?.*/\1.\2.\4/'`
-  ])
-  ghc_maj_vers=`echo $fptools_cv_ghc_version | sed -e 's/^\([[0-9]]\).*/\1/'`
-  ghc_min_vers=`echo $fptools_cv_ghc_version | sed -e 's/^[[0-9]]\.\([[0-9]]*\).*/\1/'`
-  ghc_patch_level=`echo $fptools_cv_ghc_version | sed -e 's/^[[0-9]]\.[[0-9]]*\.\([[0-9]]*\)/\1/'`
+[define([FPTOOLS_CV_GHC_VERSION], [fptools_cv_ghc_version])dnl
+AC_CACHE_CHECK([version of ghc], FPTOOLS_CV_GHC_VERSION, [dnl
+${GHC-ghc} --version > conftestghc 2>&1
+  cat conftestghc >&AC_FD_CC
+dnl `Useless Use Of cat' award...
+changequote(<<, >>)dnl
+  FPTOOLS_CV_GHC_VERSION=`cat conftestghc | sed -n -e 's/.* version \([0-9.]\+\(, patchlevel [0-9]\+\)\?\)/\1/;t PL;b;:PL s/, patchlevel */./;p'`
+changequote([, ])dnl
+  rm -fr conftest*
+  if test "[$]FPTOOLS_CV_GHC_VERSION" = ""
+  then
+    FPTOOLS_CV_GHC_VERSION='unknown'
+  fi])
+changequote(<<, >>)dnl
+FPTOOLS_CV_GHC_VERSION<<_major>>=`echo <<$>>FPTOOLS_CV_GHC_VERSION | sed -e 's/^\([0-9]\).*/\1/'`
+FPTOOLS_CV_GHC_VERSION<<_minor>>=`echo <<$>>FPTOOLS_CV_GHC_VERSION | sed -e 's/^[0-9]\.\([0-9]*\).*/\1/'`
+FPTOOLS_CV_GHC_VERSION<<_pl>>=`echo <<$>>FPTOOLS_CV_GHC_VERSION | sed -n -e 's/^[0-9]\.[0-9]*\.\([0-9]*\)/\1/p'`
+changequote([, ])dnl
+if test "[$]FPTOOLS_CV_GHC_VERSION[_pl]" = ""
+then
+  FPTOOLS_CV_GHC_VERSION[_all]="[$]FPTOOLS_CV_GHC_VERSION[_major].[$]FPTOOLS_CV_GHC_VERSION[_minor]"
+  FPTOOLS_CV_GHC_VERSION[_pl]="0"
+else
+  FPTOOLS_CV_GHC_VERSION[_all]="[$]FPTOOLS_CV_GHC_VERSION[_major].[$]FPTOOLS_CV_GHC_VERSION[_minor].[$]FPTOOLS_CV_GHC_VERSION[_pl]"
+fi
+ifelse($#, [1], [dnl
+[$1]="[$]FPTOOLS_CV_GHC_VERSION[_all]"
+], $#, [2], [dnl
+[$1]="[$]FPTOOLS_CV_GHC_VERSION[_major]"
+[$2]="[$]FPTOOLS_CV_GHC_VERSION[_minor]"
+], $#, [3], [dnl
+[$1]="[$]FPTOOLS_CV_GHC_VERSION[_major]"
+[$2]="[$]FPTOOLS_CV_GHC_VERSION[_minor]"
+[$3]="[$]FPTOOLS_CV_GHC_VERSION[_pl]"
+], $#, [4], [dnl
+[$1]="[$]FPTOOLS_CV_GHC_VERSION[_all]"
+[$2]="[$]FPTOOLS_CV_GHC_VERSION[_major]"
+[$3]="[$]FPTOOLS_CV_GHC_VERSION[_minor]"
+[$4]="[$]FPTOOLS_CV_GHC_VERSION[_pl]"
+], [AC_MSG_ERROR([wrong number of arguments to $0])])dnl
+undefine(FPTOOLS_CV_GHC_VERSION)dnl
+])dnl
 
-  if test "$ghc_patch_level" = ""; then 
-	GhcVersion=$ghc_maj_vers.$ghc_min_vers
-	ghc_patch_level="0"
-  else
-	GhcVersion=$ghc_maj_vers.$ghc_min_vers.$ghc_patch_level
-  fi
-
-  GhcMajVersion=$ghc_maj_vers
-  GhcMinVersion=$ghc_min_vers
-  GhcPatchLevel=$ghc_patch_level
-
-  AC_SUBST(GhcVersion)
-  AC_SUBST(GhcMajVersion)
-  AC_SUBST(GhcMinVersion)
-  AC_SUBST(GhcPatchLevel)
-])
 
 dnl ** figure out the alignment restriction of a type
 dnl    (required SIZEOF test but AC_CHECK_SIZEOF doesn't call PROVIDE

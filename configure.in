@@ -326,7 +326,11 @@ if test "$GHC" = ""; then
   AC_PATH_PROG(GHC,ghc)
 fi
 if test "$GHC" != ""; then
-  FPTOOLS_GHC_VERSION
+  FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
+  AC_SUBST(GhcVersion)dnl
+  AC_SUBST(GhcMajVersion)dnl
+  AC_SUBST(GhcMinVersion)dnl
+  AC_SUBST(GhcPatchLevel)dnl
 fi
 
 AC_PATH_PROGS(NHC,nhc nhc98)
