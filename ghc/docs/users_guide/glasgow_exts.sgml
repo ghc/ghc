@@ -3011,14 +3011,14 @@ The following are good producers:
  <function>++</function>
 </para>
 </listitem>
-<listitem>
 
+<listitem>
 <para>
  <function>map</function>
 </para>
 </listitem>
-<listitem>
 
+<listitem>
 <para>
  <function>filter</function>
 </para>
@@ -3068,8 +3068,14 @@ The following are good consumers:
  <function>++</function> (on its first argument)
 </para>
 </listitem>
-<listitem>
 
+<listitem>
+<para>
+ <function>foldr</function>
+</para>
+</listitem>
+
+<listitem>
 <para>
  <function>map</function>
 </para>
