@@ -24,7 +24,7 @@ import RnEnv	( lookupOccRn, lookupBndrRn, lookupSyntaxName, lookupGlobalOccRn,
 		  bindPatSigTyVarsFV, bindLocalsFV, warnUnusedMatches )
 import TcRnMonad
 
-import PrelNames( cCallishClassKeys, eqStringName, eqClassName, ordClassName, 
+import PrelNames( cCallishClassKeys, eqStringName, eqClassName, integralClassName, 
 		  negateName, minusName, lengthPName, indexPName, plusIntegerName, fromIntegerName,
 		  timesIntegerName, ratioDataConName, fromRationalName, cCallableClassName )
 import Constants	( mAX_TUPLE_SIZE )
@@ -373,7 +373,8 @@ rnPat (NPlusKPatIn name lit _)
     lookupBndrRn name			`thenM` \ name' ->
     lookupSyntaxName minusName		`thenM` \ (minus, fvs2) ->
     returnM (NPlusKPatIn name' lit' minus, 
-	      fvs1 `plusFV` fvs2 `addOneFV` ordClassName)
+	      fvs1 `plusFV` fvs2 `addOneFV` integralClassName)
+	-- The Report says that n+k patterns must be in Integral
 
 rnPat (LazyPat pat)
   = rnPat pat		`thenM` \ (pat', fvs) ->

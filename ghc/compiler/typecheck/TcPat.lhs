@@ -35,7 +35,8 @@ import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TysWiredIn	( stringTy )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( DataCon, dataConFieldLabels, dataConSourceArity )
-import PrelNames	( eqStringName, eqName, geName, negateName, minusName, cCallableClassName )
+import PrelNames	( eqStringName, eqName, geName, negateName, minusName, 
+			  integralClassName, cCallableClassName )
 import BasicTypes	( isBoxed )
 import Bag
 import Outputable
@@ -308,6 +309,12 @@ tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus_name) pat_ty
 	-- The '-' part is re-mappable syntax
     tcSyntaxName origin pat_ty' minusName minus_name	`thenM` \ (minus_expr, _) ->
 
+	-- The Report says that n+k patterns must be in Integral
+	-- We may not want this when using re-mappable syntax, though (ToDo?)
+    tcLookupClass integralClassName 			`thenM` \ icls ->
+    newDicts origin [mkClassPred icls [pat_ty']]	`thenM` \ dicts ->
+    extendLIEs dicts					`thenM_`
+    
     returnM (NPlusKPatOut bndr_id i 
 			   (SectionR (HsVar ge) over_lit_expr)
 			   (SectionR minus_expr over_lit_expr),
