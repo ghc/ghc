@@ -1,0 +1,10 @@
+* export some missing operations from ST/LazyST
+* remove wired-in runST from the compiler, move runST from STBase to Unsafe
+  and give it a type signature.
+* fix cut-n-paste-o in PosixUtils.lhs.
+* better code for checking for overlapping(incomplete?) patterns.
+* -fwarn-simple-patterns for pattern-bindings that could fail.
+* win32 green-card stubs imported.
+* fix 'make carries on after errors' problem /again/.
+* driver fixed to be perl4 compatible again.
+* obscure happy bug fixed.
