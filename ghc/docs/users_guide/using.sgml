@@ -1192,24 +1192,6 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-O2-for-C</option>:</term>
-	  <indexterm><primary>-O2-for-C option</primary></indexterm>
-	  <indexterm><primary>gcc, invoking with -O2</primary></indexterm>
-	  <listitem>
-	    <para>Says to run GCC with <option>-O2</option>, which may
-            be worth a few percent in execution speed.  Don't forget
-            <option>-fvia-C</option>, lest you use the native-code
-            generator and bypass GCC altogether!</para>
-
-	    <para><emphasis>Note: some versions of gcc are known to
-	    have code generation bugs with <option>-O2</option>.  Use
-	    this option at your own risk!  But we'd be keen to here
-	    any reports of whether (a) it works or (b) it improves
-	    performance at all.</emphasis></para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
 	  <term><option>-Ofile &lt;file&gt;</option>:</term>
 	  <indexterm><primary>-Ofile &lt;file&gt; option</primary></indexterm>
 	  <indexterm><primary>optimising, customised</primary></indexterm>
