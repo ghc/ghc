@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.26 $
- * $Date: 2000/03/07 07:27:11 $
+ * $Revision: 1.27 $
+ * $Date: 2000/03/07 09:34:43 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1963,6 +1963,7 @@ Inst in; {                              /* member functions for instance in*/
     /* Invent a GHC-compatible name for the instance decl */
     {
        char buf[FILENAME_MAX+1];
+       char buf2[10];
        Int           i, j;
        String        str;
        Cell          qq      = inst(in).head;
@@ -1989,7 +1990,9 @@ Inst in; {                              /* member functions for instance in*/
           switch (whatIs(qq)) {
              case TYCON:  str = textToStr(tycon(qq).text); break;
              case TUPLE:  str = textToStr(ghcTupleText(qq)); break;
-             case OFFSET: sprintf(&str,"%d",offsetOf(qq)); break;
+             case OFFSET: sprintf(buf2,"%d",offsetOf(qq)); 
+                          str = buf2;
+                          break;
              default: internal("typeInstDefn: making GHC name"); break;
           }
           for (j = 0; i<FILENAME_MAX && str[j]!='\0'; i++, j++) {
