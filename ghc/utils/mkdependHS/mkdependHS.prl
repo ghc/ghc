@@ -389,8 +389,7 @@ sub slurp_file_for_imports {
     
     local ($open_cmd);
     if ($Cpp_flag_set) {
-#       $open_cmd = "${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |";
-       &run_something("${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines - 2>&1 > ${file_to_read}.i", $orig_src_file, 'cpp');
+       &run_something("${SED} -e '/^# *include/{p;s/^# *include/!include/;}' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines - 2>&1 > ${file_to_read}.i", $orig_src_file, 'cpp');
        $read_from_file="${file_to_read}.i";
        $cleanup=1;
     } else {
