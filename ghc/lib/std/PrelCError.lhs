@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCError.lhs,v 1.6 2001/01/27 07:46:27 qrczak Exp $
+% $Id: PrelCError.lhs,v 1.7 2001/03/16 21:47:41 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -97,6 +97,7 @@ import Monad        (liftM)
 import PrelStorable
 import PrelMarshalError
 import PrelCTypes
+import PrelCString
 import PrelIOBase
 import PrelPtr
 import PrelNum
@@ -106,31 +107,11 @@ import PrelBase
 #else
 import Ptr          (Ptr, nullPtr)
 import CTypes       (CInt)
+import CString      (peekCString)
 import MarshalError (void)
 
 import IO           (IOError, Handle, ioError)
 #endif
-
--- system dependent re-definitions
--- -------------------------------
-
--- we bring GHC's `IOErrorType' in scope in other compilers to simplify the
--- routine `errnoToIOError' below
---
-#if !__GLASGOW_HASKELL__
-data IOErrorType
-  = AlreadyExists        | HardwareFault
-  | IllegalOperation     | InappropriateType
-  | Interrupted          | InvalidArgument
-  | NoSuchThing          | OtherError
-  | PermissionDenied     | ProtocolError
-  | ResourceBusy         | ResourceExhausted
-  | ResourceVanished     | SystemError
-  | TimeExpired          | UnsatisfiedConstraints
-  | UnsupportedOperation
-  | EOF
-#endif
-
 
 -- "errno" type
 -- ------------
@@ -383,219 +364,115 @@ throwErrnoIfNullRetry  = throwErrnoIfRetry (== nullPtr)
 -- and an optional filename into a matching IO error
 --
 errnoToIOError :: String -> Errno -> Maybe Handle -> Maybe String -> IOError
-errnoToIOError loc errno@(Errno no) maybeHdl maybeName =
+errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
+    str <- strerror errno >>= peekCString
 #if __GLASGOW_HASKELL__
-  IOException (IOError maybeHdl errType loc str maybeName)
+    return (IOException (IOError maybeHdl errType loc str maybeName))
+    where
+    errType
+        | errno == eOK             = OtherError
+        | errno == e2BIG           = ResourceExhausted
+        | errno == eACCES          = PermissionDenied
+        | errno == eADDRINUSE      = ResourceBusy
+        | errno == eADDRNOTAVAIL   = UnsupportedOperation
+        | errno == eADV            = OtherError
+        | errno == eAFNOSUPPORT    = UnsupportedOperation
+        | errno == eAGAIN          = ResourceExhausted
+        | errno == eALREADY        = AlreadyExists
+        | errno == eBADF           = OtherError
+        | errno == eBADMSG         = InappropriateType
+        | errno == eBADRPC         = OtherError
+        | errno == eBUSY           = ResourceBusy
+        | errno == eCHILD          = NoSuchThing
+        | errno == eCOMM           = ResourceVanished
+        | errno == eCONNABORTED    = OtherError
+        | errno == eCONNREFUSED    = NoSuchThing
+        | errno == eCONNRESET      = ResourceVanished
+        | errno == eDEADLK         = ResourceBusy
+        | errno == eDESTADDRREQ    = InvalidArgument
+        | errno == eDIRTY          = UnsatisfiedConstraints
+        | errno == eDOM            = InvalidArgument
+        | errno == eDQUOT          = PermissionDenied
+        | errno == eEXIST          = AlreadyExists
+        | errno == eFAULT          = OtherError
+        | errno == eFBIG           = PermissionDenied
+        | errno == eFTYPE          = InappropriateType
+        | errno == eHOSTDOWN       = NoSuchThing
+        | errno == eHOSTUNREACH    = NoSuchThing
+        | errno == eIDRM           = ResourceVanished
+        | errno == eILSEQ          = InvalidArgument
+        | errno == eINPROGRESS     = AlreadyExists
+        | errno == eINTR           = Interrupted
+        | errno == eINVAL          = InvalidArgument
+        | errno == eIO             = HardwareFault
+        | errno == eISCONN         = AlreadyExists
+        | errno == eISDIR          = InappropriateType
+        | errno == eLOOP           = InvalidArgument
+        | errno == eMFILE          = ResourceExhausted
+        | errno == eMLINK          = ResourceExhausted
+        | errno == eMSGSIZE        = ResourceExhausted
+        | errno == eMULTIHOP       = UnsupportedOperation
+        | errno == eNAMETOOLONG    = InvalidArgument
+        | errno == eNETDOWN        = ResourceVanished
+        | errno == eNETRESET       = ResourceVanished
+        | errno == eNETUNREACH     = NoSuchThing
+        | errno == eNFILE          = ResourceExhausted
+        | errno == eNOBUFS         = ResourceExhausted
+        | errno == eNODATA         = NoSuchThing
+        | errno == eNODEV          = NoSuchThing
+        | errno == eNOENT          = NoSuchThing
+        | errno == eNOEXEC         = InvalidArgument
+        | errno == eNOLCK          = ResourceExhausted
+        | errno == eNOLINK         = ResourceVanished
+        | errno == eNOMEM          = ResourceExhausted
+        | errno == eNOMSG          = NoSuchThing
+        | errno == eNONET          = NoSuchThing
+        | errno == eNOPROTOOPT     = UnsupportedOperation
+        | errno == eNOSPC          = ResourceExhausted
+        | errno == eNOSR           = ResourceExhausted
+        | errno == eNOSTR          = InvalidArgument
+        | errno == eNOSYS          = UnsupportedOperation
+        | errno == eNOTBLK         = InvalidArgument
+        | errno == eNOTCONN        = InvalidArgument
+        | errno == eNOTDIR         = InappropriateType
+        | errno == eNOTEMPTY       = UnsatisfiedConstraints
+        | errno == eNOTSOCK        = InvalidArgument
+        | errno == eNOTTY          = IllegalOperation
+        | errno == eNXIO           = NoSuchThing
+        | errno == eOPNOTSUPP      = UnsupportedOperation
+        | errno == ePERM           = PermissionDenied
+        | errno == ePFNOSUPPORT    = UnsupportedOperation
+        | errno == ePIPE           = ResourceVanished
+        | errno == ePROCLIM        = PermissionDenied
+        | errno == ePROCUNAVAIL    = UnsupportedOperation
+        | errno == ePROGMISMATCH   = ProtocolError
+        | errno == ePROGUNAVAIL    = UnsupportedOperation
+        | errno == ePROTO          = ProtocolError
+        | errno == ePROTONOSUPPORT = ProtocolError
+        | errno == ePROTOTYPE      = ProtocolError
+        | errno == eRANGE          = UnsupportedOperation
+        | errno == eREMCHG         = ResourceVanished
+        | errno == eREMOTE         = IllegalOperation
+        | errno == eROFS           = PermissionDenied
+        | errno == eRPCMISMATCH    = ProtocolError
+        | errno == eRREMOTE        = IllegalOperation
+        | errno == eSHUTDOWN       = IllegalOperation
+        | errno == eSOCKTNOSUPPORT = UnsupportedOperation
+        | errno == eSPIPE          = UnsupportedOperation
+        | errno == eSRCH           = NoSuchThing
+        | errno == eSRMNT          = UnsatisfiedConstraints
+        | errno == eSTALE          = ResourceVanished
+        | errno == eTIME           = TimeExpired
+        | errno == eTIMEDOUT       = TimeExpired
+        | errno == eTOOMANYREFS    = ResourceExhausted
+        | errno == eTXTBSY         = ResourceBusy
+        | errno == eUSERS          = ResourceExhausted
+        | errno == eWOULDBLOCK     = OtherError
+        | errno == eXDEV           = UnsupportedOperation
+        | otherwise                = OtherError
 #else
-  userError (loc ++ ": " ++ str ++ maybe "" (": "++) maybeName)
+    return (userError (loc ++ ": " ++ str ++ maybe "" (": "++) maybeName))
 #endif
-  where
-    (errType, str)
-      | errno == eOK              = (OtherError,
-				     "no error")
-      | errno == e2BIG            = (ResourceExhausted,
-				     "argument list too long")
-      | errno == eACCES		  = (PermissionDenied,
-				     "inadequate access permission")
-      | errno == eADDRINUSE	  = (ResourceBusy,
-				     "address already in use")
-      | errno == eADDRNOTAVAIL	  = (UnsupportedOperation,
-				     "address not available")
-      | errno == eADV		  = (OtherError,
-				     "RFS advertise error")
-      | errno == eAFNOSUPPORT	  = (UnsupportedOperation,
-				     "address family not supported by " ++
-				     "protocol family")
-				     -- no multiline strings with cpp
-      | errno == eAGAIN		  = (ResourceExhausted,
-				     "insufficient resources")
-      | errno == eALREADY	  = (AlreadyExists,
-				     "operation already in progress")
-      | errno == eBADF		  = (OtherError,
-				     "internal error (EBADF)")
-      | errno == eBADMSG	  = (InappropriateType,
-				     "next message has wrong type")
-      | errno == eBADRPC	  = (OtherError,
-				     "invalid RPC request or response")
-      | errno == eBUSY		  = (ResourceBusy,
-				     "device busy")
-      | errno == eCHILD		  = (NoSuchThing,
-				     "no child processes")
-      | errno == eCOMM		  = (ResourceVanished,
-				     "no virtual circuit could be found")
-      | errno == eCONNABORTED	  = (OtherError,
-				     "aborted connection")
-      | errno == eCONNREFUSED	  = (NoSuchThing,
-				     "no listener on remote host")
-      | errno == eCONNRESET	  = (ResourceVanished,
-				     "connection reset by peer")
-      | errno == eDEADLK	  = (ResourceBusy,
-				     "resource deadlock avoided")
-      | errno == eDESTADDRREQ	  = (InvalidArgument,
-				     "destination address required")
-      | errno == eDIRTY		  = (UnsatisfiedConstraints,
-				     "file system dirty")
-      | errno == eDOM		  = (InvalidArgument,
-				     "argument too large")
-      | errno == eDQUOT		  = (PermissionDenied,
-				     "quota exceeded")
-      | errno == eEXIST		  = (AlreadyExists,
-				     "file already exists")
-      | errno == eFAULT		  = (OtherError,
-				     "internal error (EFAULT)")
-      | errno == eFBIG		  = (PermissionDenied,
-				     "file too large")
-      | errno == eFTYPE		  = (InappropriateType,
-				     "inappropriate NFS file type or format")
-      | errno == eHOSTDOWN	  = (NoSuchThing,
-				     "destination host down")
-      | errno == eHOSTUNREACH	  = (NoSuchThing,
-				     "remote host is unreachable")
-      | errno == eIDRM		  = (ResourceVanished,
-				     "IPC identifier removed")
-      | errno == eILSEQ		  = (InvalidArgument,
-				     "invalid wide character")
-      | errno == eINPROGRESS	  = (AlreadyExists,
-				     "operation now in progress")
-      | errno == eINTR		  = (Interrupted,
-				     "interrupted system call")
-      | errno == eINVAL		  = (InvalidArgument,
-				     "invalid argument")
-      | errno == eIO		  = (HardwareFault,
-				     "unknown I/O fault")
-      | errno == eISCONN	  = (AlreadyExists,
-				     "socket is already connected")
-      | errno == eISDIR		  = (InappropriateType,
-				     "file is a directory")
-      | errno == eLOOP		  = (InvalidArgument,
-				     "too many symbolic links")
-      | errno == eMFILE		  = (ResourceExhausted,
-				     "process file table full")
-      | errno == eMLINK		  = (ResourceExhausted,
-				     "too many links")
-      | errno == eMSGSIZE	  = (ResourceExhausted,
-				     "message too long")
-      | errno == eMULTIHOP	  = (UnsupportedOperation,
-				     "multi-hop RFS request")
-      | errno == eNAMETOOLONG	  = (InvalidArgument,
-				     "filename too long")
-      | errno == eNETDOWN	  = (ResourceVanished,
-				     "network is down")
-      | errno == eNETRESET	  = (ResourceVanished,
-				     "remote host rebooted; connection lost")
-      | errno == eNETUNREACH	  = (NoSuchThing,
-				     "remote network is unreachable")
-      | errno == eNFILE		  = (ResourceExhausted,
-				     "system file table full")
-      | errno == eNOBUFS	  = (ResourceExhausted,
-				     "no buffer space available")
-      | errno == eNODATA	  = (NoSuchThing,
-				     "no message on the stream head read " ++
-				     "queue")
-				     -- no multiline strings with cpp
-      | errno == eNODEV		  = (NoSuchThing,
-				     "no such device")
-      | errno == eNOENT		  = (NoSuchThing,
-				     "no such file or directory")
-      | errno == eNOEXEC	  = (InvalidArgument,
-				     "not an executable file")
-      | errno == eNOLCK		  = (ResourceExhausted,
-				     "no file locks available")
-      | errno == eNOLINK	  = (ResourceVanished,
-				     "RFS link has been severed")
-      | errno == eNOMEM		  = (ResourceExhausted,
-				     "not enough virtual memory")
-      | errno == eNOMSG		  = (NoSuchThing,
-				     "no message of desired type")
-      | errno == eNONET		  = (NoSuchThing,
-				     "host is not on a network")
-      | errno == eNOPROTOOPT	  = (UnsupportedOperation,
-				     "operation not supported by protocol")
-      | errno == eNOSPC		  = (ResourceExhausted,
-				     "no space left on device")
-      | errno == eNOSR		  = (ResourceExhausted,
-				     "out of stream resources")
-      | errno == eNOSTR		  = (InvalidArgument,
-				     "not a stream device")
-      | errno == eNOSYS		  = (UnsupportedOperation,
-				     "function not implemented")
-      | errno == eNOTBLK	  = (InvalidArgument,
-				     "not a block device")
-      | errno == eNOTCONN	  = (InvalidArgument,
-				     "socket is not connected")
-      | errno == eNOTDIR	  = (InappropriateType,
-				     "not a directory")
-      | errno == eNOTEMPTY	  = (UnsatisfiedConstraints,
-				     "directory not empty")
-      | errno == eNOTSOCK	  = (InvalidArgument,
-				     "not a socket")
-      | errno == eNOTTY		  = (IllegalOperation,
-				     "inappropriate ioctl for device")
-      | errno == eNXIO		  = (NoSuchThing,
-				     "no such device or address")
-      | errno == eOPNOTSUPP	  = (UnsupportedOperation,
-				     "operation not supported on socket")
-      | errno == ePERM		  = (PermissionDenied,
-				     "privileged operation")
-      | errno == ePFNOSUPPORT	  = (UnsupportedOperation,
-				     "protocol family not supported")
-      | errno == ePIPE		  = (ResourceVanished,
-				     "broken pipe")
-      | errno == ePROCLIM	  = (PermissionDenied,
-				     "too many processes")
-      | errno == ePROCUNAVAIL	  = (UnsupportedOperation,
-				     "unimplemented RPC procedure")
-      | errno == ePROGMISMATCH	  = (ProtocolError,
-				     "unsupported RPC program version")
-      | errno == ePROGUNAVAIL	  = (UnsupportedOperation,
-				     "RPC program unavailable")
-      | errno == ePROTO		  = (ProtocolError,
-				     "error in streams protocol")
-      | errno == ePROTONOSUPPORT  = (ProtocolError,
-				     "protocol not supported")
-      | errno == ePROTOTYPE	  = (ProtocolError,
-				     "wrong protocol for socket")
-      | errno == eRANGE		  = (UnsupportedOperation,
-				     "result too large")
-      | errno == eREMCHG	  = (ResourceVanished,
-				     "remote address changed")
-      | errno == eREMOTE	  = (IllegalOperation,
-				     "too many levels of remote in path")
-      | errno == eROFS		  = (PermissionDenied,
-				     "read-only file system")
-      | errno == eRPCMISMATCH	  = (ProtocolError,
-				     "RPC version is wrong")
-      | errno == eRREMOTE	  = (IllegalOperation,
-				     "object is remote")
-      | errno == eSHUTDOWN        = (IllegalOperation,
-				     "can't send after socket shutdown")
-      | errno == eSOCKTNOSUPPORT  = (UnsupportedOperation,
-				     "socket type not supported")
-      | errno == eSPIPE		  = (UnsupportedOperation,
-				     "can't seek on a pipe")
-      | errno == eSRCH		  = (NoSuchThing,
-				     "no such process")
-      | errno == eSRMNT		  = (UnsatisfiedConstraints,
-				     "RFS resources still mounted by " ++
-				     "remote host(s)")
-				     -- no multiline strings with cpp
-      | errno == eSTALE		  = (ResourceVanished,
-				     "stale NFS file handle")
-      | errno == eTIME		  = (TimeExpired,
-				     "timer expired")
-      | errno == eTIMEDOUT	  = (TimeExpired,
-				     "connection timed out")
-      | errno == eTOOMANYREFS	  = (ResourceExhausted,
-				     "too many references; can't splice")
-      | errno == eTXTBSY	  = (ResourceBusy,
-				     "text file in-use")
-      | errno == eUSERS		  = (ResourceExhausted,
-				     "quota table full")
-      | errno == eWOULDBLOCK	  = (OtherError,
-				     "operation would block")
-      | errno == eXDEV		  = (UnsupportedOperation,
-				     "can't make a cross-device link")
-      | otherwise                 = (OtherError, 
-				     "unexpected error (error code: " 
-				     ++ show no ++")")
+
+foreign import unsafe strerror :: Errno -> IO (Ptr CChar)
 \end{code}
