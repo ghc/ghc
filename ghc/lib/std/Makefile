@@ -57,43 +57,6 @@ ifneq "$(way)" ""
 SRC_HC_OPTS += -hisuf $(way_)hi
 endif
 
-# Far too much heap is needed to compile PrelNumExtra with -O at the
-# moment, but there you go..
-<<<<<<< Makefile
-# PrelNumExtra_HC_OPTS     += -H24m -K2m
-# 
-# PrelPack_HC_OPTS	 += -K4m
-# PrelBase_HC_OPTS         += -H12m
-# PrelRead_HC_OPTS         += -H20m
-# PrelTup_HC_OPTS          += -H12m -K2m
-# PrelNum_HC_OPTS		 += -H12m -K4m
-# PrelArr_HC_OPTS          += -H8m
-# PrelHandle_HC_OPTS       += -H20m
-# Time_HC_OPTS             += -H24m -K2m
-# Complex_HC_OPTS          += -H10m
-# IO_HC_OPTS	         += -H12m
-# List_HC_OPTS             += -H8m
-# Directory_HC_OPTS        += -H8m
-=======
-PrelNumExtra_HC_OPTS     += +RTS -H24m -K2m -RTS
->>>>>>> 1.50
-
-<<<<<<< Makefile
-=======
-PrelPack_HC_OPTS	 += +RTS -K4m -RTS
-PrelBase_HC_OPTS         += +RTS -H12m -RTS
-PrelRead_HC_OPTS         += +RTS -H20m -RTS
-PrelTup_HC_OPTS          += +RTS -H12m -K2m -RTS
-PrelNum_HC_OPTS		 += +RTS -H12m -K4m -RTS
-PrelArr_HC_OPTS          += +RTS -H8m -RTS
-PrelHandle_HC_OPTS       += +RTS -H20m -RTS
-Time_HC_OPTS             += +RTS -H24m -K2m -RTS
-Complex_HC_OPTS          += +RTS -H10m -RTS
-IO_HC_OPTS	         += +RTS -H12m -RTS
-List_HC_OPTS             += +RTS -H8m -RTS
-Directory_HC_OPTS        += +RTS -H8m -RTS
-
->>>>>>> 1.50
 #-----------------------------------------------------------------------------
 # 	Dependency generation
 
