@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.38 2003/09/21 13:22:03 igloo Exp $
+ * $Id: Signals.c,v 1.39 2003/10/20 17:15:29 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -295,7 +295,7 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
 	}
 	return STG_SIG_ERR;
     }
-    
+
     if (previous_spi == STG_SIG_DFL || previous_spi == STG_SIG_IGN
 	|| previous_spi == STG_SIG_ERR) {
 	return previous_spi;

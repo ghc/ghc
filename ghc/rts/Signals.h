@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.h,v 1.11 2003/04/01 15:05:22 sof Exp $
+ * $Id: Signals.h,v 1.12 2003/10/20 17:15:29 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -30,9 +30,12 @@ extern void initDefaultHandlers(void);
 
 extern void handleSignalsInThisThread(void);
 
-#else
+#elif defined(mingw32_TARGET_OS)
+#define RTS_USER_SIGNALS 1
+#include "win32/ConsoleHandler.h"
 
+#else /* PAR */
 #define signals_pending() (rtsFalse)
 #define handleSignalsInThisThread() /* nothing */
 
-#endif /* !PAR && !mingw32_TARGET_OS */
+#endif /* PAR */

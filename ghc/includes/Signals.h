@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.h,v 1.2 2002/12/05 14:20:55 stolz Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -16,7 +15,11 @@
 #define STG_SIG_HAN  (-4)
 #define STG_SIG_RST  (-5)
 
+#if !defined(mingw32_TARGET_OS)
+extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
+#else
 extern int stg_sig_install (int, int, StgStablePtr *, void *);
+#endif
 
 #endif // SIGNALS_H
 
