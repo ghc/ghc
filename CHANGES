@@ -1,3 +1,40 @@
+Changes in version 0.6:
+
+  * Implicit parameters, zip comprehensions and 'mdo' are now
+    supported by the parser.
+
+  * Some lexical bugs were fixed, mainly concerning literal paragraphs
+    next to non-literal paragraphs.
+
+  * New options:  --gen-index, --use-index, --gen-contents and --use-contents,
+    for generting a combined index and contents for several libraries
+    from the appropriate .haddock files.
+
+  * There is now one index rather than separate Function/Constructor and
+    Type/Class indices.  Where a name refers to several entities, these
+    are listed separately in the index.
+
+  * New option: -v, elicits more verbose warnings.  Some warnings are
+    now turned off by default; Haddock should be a little less noisy
+    in general.
+
+  * Markup for definition lists has been added.  See the documentation 
+    for details.
+
+  * New option: --package for setting the package name.  The package
+    is listed alongside each module name in the combined contents.
+
+  * Entities which are re-exported from another package now at least
+    leave a hyperlink in the generated HTML, rather than nothing at all.
+
+  * Some fixes for bugs which caused incorrect hyperlinks in the
+    generated HTML.  In particular, instances should now be linked
+    correctly.
+
+  * Some aesthetic improvements to the generated HTML.
+
+-----------------------------------------------------------------------------
+
 Changes in version 0.5:
 
   * Compiles with recent versions of GHC.
