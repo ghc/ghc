@@ -15,7 +15,8 @@ module Inst (
 	newDictsFromOld, newDicts, cloneDict, 
 	newOverloadedLit, newIPDict, 
 	newMethod, newMethodFromName, newMethodWithGivenTy, 
-	tcInstClassOp, tcInstCall, tcInstDataCon, tcSyntaxName,
+	tcInstClassOp, tcInstCall, tcInstDataCon, 
+	tcSyntaxName, tcStdSyntaxName,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
 	ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst, fdPredsOfInsts,
@@ -653,8 +654,7 @@ tcSyntaxName :: InstOrigin
 
 tcSyntaxName orig ty (std_nm, HsVar user_nm)
   | std_nm == user_nm
-  = newMethodFromName orig ty std_nm	`thenM` \ id ->
-    returnM (std_nm, HsVar id)
+  = tcStdSyntaxName orig ty std_nm
 
 tcSyntaxName orig ty (std_nm, user_nm_expr)
   = tcLookupId std_nm		`thenM` \ std_id ->
@@ -668,6 +668,15 @@ tcSyntaxName orig ty (std_nm, user_nm_expr)
     addErrCtxtM (syntaxNameCtxt user_nm_expr orig tau1)	$
     tcCheckSigma user_nm_expr tau1			`thenM` \ expr ->
     returnM (std_nm, expr)
+
+tcStdSyntaxName :: InstOrigin
+	        -> TcType		-- Type to instantiate it at
+	        -> Name			-- Standard name
+	        -> TcM (Name, TcExpr)	-- (Standard name, suitable expression)
+
+tcStdSyntaxName orig ty std_nm
+  = newMethodFromName orig ty std_nm	`thenM` \ id ->
+    returnM (std_nm, HsVar id)
 
 syntaxNameCtxt name orig ty tidy_env
   = getInstLoc orig		`thenM` \ inst_loc ->

@@ -32,8 +32,8 @@ import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsExpr(..),
 import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameStmt, RdrNameHsExpr,
 			  emptyGroup, mkGroup, findSplice, addImpDecls, main_RDR_Unqual )
 
-import PrelNames	( iNTERACTIVE, ioTyConName, printName,
-			  returnIOName, bindIOName, failIOName, thenIOName, runIOName, 
+import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames,
+			  returnIOName, runIOName, 
 			  dollarMainName, itName, mAIN_Name, unsafeCoerceName
 			)
 import MkId		( unsafeCoerceId )
@@ -55,7 +55,7 @@ import TcType		( Type, liftedTypeKind,
 			  mkForAllTys, mkFunTys, mkTyConApp, tcSplitForAllTys
 			)
 import TcMatches	( tcStmtsAndThen, TcStmtCtxt(..) )
-import Inst		( showLIE )
+import Inst		( showLIE, tcStdSyntaxName )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
@@ -402,7 +402,9 @@ tc_stmts stmts
 			     (ExplicitList placeHolderType (map mk_item names)) ;
 	    mk_item name = HsApp (HsVar unsafeCoerceName) (HsVar name) ;
 
-	    all_stmts = stmts ++ [ret_stmt]
+	    all_stmts = stmts ++ [ret_stmt] ;
+
+	    io_ty = mkTyConApp ioTyCon []
 	 } ;
 
 	-- OK, we're ready to typecheck the stmts
@@ -427,8 +429,7 @@ tc_stmts stmts
 	const_binds <- tcSimplifyTop lie ;
 
 	-- Build result expression and zonk it
-	io_ids <- mappM mk_rebound
-			[returnIOName, failIOName, bindIOName, thenIOName] ;
+	io_ids <- mappM (tcStdSyntaxName DoOrigin io_ty) monadNames ;
 	let { expr = mkHsLet const_binds $
 		     HsDo DoExpr tc_stmts io_ids
 		 	  (mkTyConApp ioTyCon [ret_ty]) noSrcLoc } ;
@@ -439,8 +440,6 @@ tc_stmts stmts
 	}
   where
     combine stmt (ids, stmts) = (ids, stmt:stmts)
-    mk_rebound n = do { id <- tcLookupId n; return (n, HsVar id) }
-	-- A bit hackoid
 \end{code}
 
 
