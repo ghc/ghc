@@ -530,13 +530,12 @@ on...</para>
 <Para>
 Getting the Glasgow Haskell Compiler (GHC) to run on Windows platforms can
 be a bit of a trying experience. It should be much easier now than in the
-past, since all the software required to build and use GHC is included in
+past, since all the software required to use GHC is included in
 the InstallShield.
 </Para>
 
 <Para>
-An installation of GHC requires about 70M of disk space (which can be
-reduced by choosing a &ldquo;compact&rdquo; installation).
+An installation of GHC requires about 70M of disk space.
 To run GHC comfortably, your machine should have at least
 64M of memory.
 </Para>
@@ -545,18 +544,15 @@ To run GHC comfortably, your machine should have at least
 <Sect2><Title>Installing GHC</Title>
 
 <Para>
-Download the latest GHC distribution (ghc-4.08 InstallShield installer, 19M)
+Download the latest GHC distribution (ghc-5.02 InstallShield installer, 24M)
 from <ULink
 URL="http://www.haskell.org/ghc/download.html">haskell.org</ULink>
 It is packaged up using an installer that should be familiar-looking to
-Windows users. The 4.08 InstallShield package comes with some Cygwin
-binaries, which unfortunately won't work with another Cygwin installation on
-the same machine, unless it uses exactly the same version of the Cygwin DLL
-(1.3.1 in this InstallShield).
+Windows users.
 </Para>
 
 <Para>
-Note: The Cygwin support for long file names containing
+Note: GHC's support for file names containing
 spaces is not 100%, so make sure that you install ghc in a directory
 that has no embedded spaces (i.e., resist the temptation to put it
 in <Filename>/Program Files/</Filename>!)
@@ -565,10 +561,8 @@ in <Filename>/Program Files/</Filename>!)
 <Para>
 When the installer has completed, make sure you add the location of the
 ghc <Filename>bin/</Filename> directory to your path (e.g.
-<Filename>/ghc/ghc-4.08/bin</Filename>).
+<Filename>C:/ghc/ghc-5.02/bin</Filename>).
 You need to do this in order to bring the various GHC binaries into scope.
-Also, if the directory <Filename>C:/TEMP</Filename> doesn't already exist,
-you should create it.
 </Para>
 
 <Para>
@@ -630,7 +624,7 @@ work with symlinks.
 
 <Question>
 <Para>
-I'm getting &ldquo;permission denied&rdquo; messages from <Command>rm</Command> or
+I'm getting &ldquo;permission denied&rdquo; messages from the <Command>rm</Command> or
 <Command>mv</Command>.
 </Para>
 </Question>
@@ -643,21 +637,6 @@ problem, but sometimes its cause is more mysterious, and logging off and back
 on or rebooting may be the quickest cure.
 </Para>
 </Answer>
-
-</QandAEntry>
-
-<QandAEntry>
-
-<Question>
-<Para>
-I get errors when trying to build GHC 4.08 with GHC 4.05.
-</Para>
-</Question>
-
-<Answer> <Para> This seems to work better if you don't use
-<Option>-O</Option> in <Constant>GhcHcOpts</Constant>. It's a bug in 4.05,
-unfortunately. Anyway, better to install 4.08 binaries and use those.
-</Para> </Answer>
 
 </QandAEntry>
 
