@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.15 1999/11/02 17:04:28 simonmar Exp $
+ * $Id: StgMacros.h,v 1.16 1999/11/05 12:28:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -412,6 +412,7 @@ EDI_(stg_gen_chk_info);
    Misc
    -------------------------------------------------------------------------- */
 
+
 /* set the tag register (if we have one) */
 #define SET_TAG(t)  /* nothing */
 
@@ -660,7 +661,7 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable seq_frame_info;
    we have one).
    -------------------------------------------------------------------------- */
 
-#ifndef NO_REGS
+#ifdef IN_STG_CODE
 
 static __inline__ void
 SaveThreadState(void)
@@ -702,7 +703,11 @@ LoadThreadState (void)
 # endif
 }
 
-#endif /* NO_REGS */
+#endif
+
+/* -----------------------------------------------------------------------------
+   Support for _ccall_GC_ and _casm_GC.
+   -------------------------------------------------------------------------- */
 
 /* 
  * Suspending/resuming threads for doing external C-calls (_ccall_GC).
@@ -710,6 +715,20 @@ LoadThreadState (void)
  */
 StgInt        suspendThread ( StgRegTable *cap );
 StgRegTable * resumeThread  ( StgInt );
+
+#define SUSPEND_THREAD(token)			\
+   SaveThreadState();				\
+   token = suspendThread(BaseReg);
+
+#ifdef SMP
+#define RESUME_THREAD(token)  			\
+   BaseReg = resumeThread(token);		\
+   LoadThreadState();
+#else
+#define RESUME_THREAD(token)			\
+   (void)resumeThread(token);			\
+   LoadThreadState();
+#endif
 
 #endif /* STGMACROS_H */
 

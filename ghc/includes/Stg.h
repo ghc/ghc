@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.18 1999/11/02 15:05:52 simonmar Exp $
+ * $Id: Stg.h,v 1.19 1999/11/05 12:28:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,9 +22,11 @@
  * be in vanilla C.
  */
 #ifdef NOT_IN_STG_CODE
-#define NO_REGS			/* don't define fixed registers */
+# ifndef NO_REGS
+#  define NO_REGS			/* don't define fixed registers */
+# endif
 #else
-#define IN_STG_CODE
+# define IN_STG_CODE
 #endif
 
 /* Configuration */
