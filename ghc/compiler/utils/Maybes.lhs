@@ -37,21 +37,8 @@ module Maybes (
 #endif
     ) where
 
-#if defined(COMPILING_GHC)
-
 CHK_Ubiq()			-- debugging consistency check
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER( SpecLoop )	-- Specialisation
-#else
-import {-# SOURCE #-} Name
-#endif
-
 import Unique  (Unique)		-- only for specialising
-
-#else
-import Maybe -- renamer will tell us if there are any conflicts
-#endif
 \end{code}
 
 
