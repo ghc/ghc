@@ -52,7 +52,7 @@ import Pretty		( ($$), vcat, hsep, hcat,
 		          ptext, text, char, hang, Doc )
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
-			  tyConTheta, maybeTyConSingleCon,
+			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, isAlgTyCon, TyCon
 			)
 import Type		( GenType(..), SYN_IE(TauType), mkTyVarTys, applyTyCon,
@@ -678,17 +678,18 @@ gen_taggery_Names inst_infos
     (tycons_of_interest, _) = removeDups cmp all_tycons
     
     do_con2tag acc_Names tycon
-      = if (we_are_deriving eqClassKey tycon
+      | isDataTyCon tycon &&
+        (we_are_deriving eqClassKey tycon
 	    && any isNullaryDataCon (tyConDataCons tycon))
-	|| (we_are_deriving ordClassKey  tycon
+	 || (we_are_deriving ordClassKey  tycon
 	    && not (maybeToBool (maybeTyConSingleCon tycon)))
-	|| (we_are_deriving enumClassKey tycon)
-	|| (we_are_deriving ixClassKey   tycon)
-	then
-	  returnTc ((con2tag_RDR tycon, tycon, GenCon2Tag)
+	 || (we_are_deriving enumClassKey tycon)
+	 || (we_are_deriving ixClassKey   tycon)
+	
+      = returnTc ((con2tag_RDR tycon, tycon, GenCon2Tag)
 		   : acc_Names)
-	else
-	  returnTc acc_Names
+      | otherwise
+      = returnTc acc_Names
 
     do_tag2con acc_Names tycon
       = if (we_are_deriving enumClassKey tycon)
