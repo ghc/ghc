@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.16 2001/07/24 05:04:58 ken Exp $
+ * $Id: InfoMacros.h,v 1.17 2001/09/17 22:46:59 ken Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -618,7 +618,8 @@ typedef vec_info_8 StgPolyInfoTable;
   static const StgSRT lbl = {
 
 #define BITMAP(lbl,size,contents) \
-  static const StgLargeBitmap lbl = { size, { contents } };
+  static const StgLargeBitmap lbl = { \
+      (size*4+SIZEOF_VOID_P-1)/SIZEOF_VOID_P, { contents } };
 
 #if SIZEOF_VOID_P == 8
 #define BITMAP_SWITCH64(small, large)	small
