@@ -8,7 +8,10 @@ checked in incrementally.
 
 The full documentation for CVS is online, in info format (use 'info
 cvs' or run emacs and type C-h i).  A good source of tips is the CVS
-FAQ, in /local/doc/gnu/CVS.FAQ.
+FAQ, in /local/doc/gnu/CVS.FAQ.  Bradley C. Kuszmaul provides a "to
+the point" introduction to CVS at
+
+	http://arch.cs.yale.edu:8080/~bradley/cvs-instructions
 
 This note is supposed to be a set of guidelines for how to use CVS at
 Glasgow, and will probably evolve in time.  The main thing to remember
