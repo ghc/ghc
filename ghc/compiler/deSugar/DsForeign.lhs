@@ -22,7 +22,9 @@ import CallConv
 import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
 import DataCon		( DataCon, dataConWrapId )
-import Id		( Id, idType, idName, mkWildId, mkVanillaId, mkSysLocal )
+import Id		( Id, idType, idName, mkWildId, mkVanillaId, mkSysLocal,
+			  setInlinePragma )
+import IdInfo		( neverInlinePrag )
 import MkId		( mkWorkerId )
 import Literal		( Literal(..) )
 import Module		( Module, moduleUserString )
@@ -298,24 +300,17 @@ of some fixed type behind an externally callable interface (i.e.,
 as a C function pointer). Useful for callbacks and stuff.
 
 \begin{verbatim}
-foreign export stdcall f :: (Addr -> Int -> IO Int) -> IO Addr
+foreign export dynamic f :: (Addr -> Int -> IO Int) -> IO Addr
 
--- Haskell-visible constructor, which is generated from the
--- above:
+-- Haskell-visible constructor, which is generated from the above:
+-- SUP: No check for NULL from createAdjustor anymore???
 
 f :: (Addr -> Int -> IO Int) -> IO Addr
-f cback = IO ( \ s1# ->
-  case makeStablePtr# cback s1# of { StateAndStablePtr# s2# sp# ->
-  case _ccall_ "mkAdjustor" sp# ``f_helper'' s2# of
-    StateAndAddr# s3# a# ->
-    case addr2Int# a# of
-      0# -> IOfail s# err
-      _  -> 
-	 let
-	  a :: Addr
-	  a = A# a#
-	 in
-         IOok s3# a)
+f cback =
+   bindIO (makeStablePtr cback)
+          (\StablePtr sp# -> IO (\s1# ->
+              case _ccall_ createAdjustor cconv sp# ``f_helper'' s1# of
+                 (# s2#, a# #) -> (# s2#, A# a# #)))
 
 foreign export "f_helper" f_helper :: StablePtr (Addr -> Int -> IO Int) -> Addr -> Int -> IO Int
 -- `special' foreign export that invokes the closure pointed to by the
@@ -379,7 +374,9 @@ dsFExportDynamic i ty mod_name ext_name cconv =
 		  mkLams [cback] $
 		  stbl_app ccall_io_adj addrTy
      in
-     returnDs (NonRec i io_app, fe, h_code, c_code)
+	-- Never inline the f.e.d. function, because the litlit might not be in scope
+	-- in other modules.
+     returnDs (NonRec (i `setInlinePragma` neverInlinePrag) io_app, fe, h_code, c_code)
 
  where
   (tvs,sans_foralls)		   = splitForAllTys ty
