@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.47 2005/01/11 15:22:04 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.48 2005/01/11 15:59:39 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -64,14 +64,22 @@ getOptionsFromSource file
                               return (words opts ++ rest)
 		       | otherwise -> return []
 
+-- detect {-# OPTIONS_GHC ... #-}.  For the time being, we accept OPTIONS
+-- instead of OPTIONS_GHC, but that is deprecated.
 matchOptions s
-  | Just s1 <- maybePrefixMatch "{-#" s, -- -}
-    Just s2 <- maybePrefixMatch "OPTIONS" (remove_spaces s1),
-    not (is_ident (head s2)),
-    Just s3 <- maybePrefixMatch "}-#" (reverse s2)
-  = Just (reverse s3)
+  | Just s1 <- maybePrefixMatch "{-#" s -- -} 
+  = matchOptions1 (remove_spaces s1)
   | otherwise
   = Nothing
+ where
+  matchOptions1 s
+    | Just s2 <- maybePrefixMatch "OPTIONS_GHC" s   = matchOptions2 s2
+    | Just s2 <- maybePrefixMatch "OPTIONS" s	    = matchOptions2 s2
+    | otherwise					    = Nothing
+  matchOptions2 s
+    | not (is_ident (head s)),
+      Just s3 <- maybePrefixMatch "}-#" (reverse s) = Just (reverse s3)
+    | otherwise					    = Nothing
 
 -----------------------------------------------------------------------------
 -- A version of getDirectoryContents that is non-fatal if the
