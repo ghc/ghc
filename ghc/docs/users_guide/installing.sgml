@@ -703,20 +703,21 @@ the implementation.
 <para> GHC is installed in two directory trees:</para>
 <variablelist>
 <varlistentry>
-<term>Binary directory</term>
-<listitem> <para> known as <Filename>$(bindir)</Filename>, holds executables that 
-the user is expected to invoke.  Notably,
-<Filename>ghc</Filename> and <Filename>ghci</FileName>.  On Unix, this directory
-is typically something like <Filename>/usr/local/bin</Filename>.  On Windows,
-however, this directory is always <Filename>$(libdir)/bin</Filename>.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
 <term>Library directory,</term>
 <listitem> <para> known as <Filename>$(libdir)</Filename>, holds all the 
 support files needed to run GHC.  On Unix, this 
 directory is usually something like <Filename>/usr/lib/ghc/ghc-5.02</Filename>. </para>
+</listitem>
+</varlistentry>
+<varlistentry>
+<term>Binary directory</term>
+<listitem> <para> known as <Filename>$(bindir)</Filename>, holds executables that 
+the user is expected to invoke.
+Notably, it contains
+<Filename>ghc</Filename> and <Filename>ghci</FileName>.  On Unix, this directory
+can be anywhere, but is typically something like <Filename>/usr/local/bin</Filename>.  On Windows,
+however, this directory <emphasis>must be</emphasis> <Filename>$(libdir)/bin</Filename>.
+</para>
 </listitem>
 </varlistentry>
 </variablelist>
@@ -740,14 +741,41 @@ one wins.]
 <para> On Windows (but not Unix), if no <option>-B</option> flag is given, GHC uses a system
 call to find the directory in which the running GHC executable lives, and derives 
 <Filename>$(libdir)</Filename> from that. [Unix lacks such a system call.]
+That is why <Filename>$(bindir)</Filename> must be <Filename>$(libdir)/bin</Filename>.
 </para>
 </listitem>
 </itemizedlist>
 
-<sect2> <title>Layout of the library directory</title>
+<sect2> <title>The binary directory</title>
 
-<para>The layout of the library directory is almost identical on
-Windows and Unix, as follows: layout:</para>
+<para>The binary directory, <Filename>$(bindir)</Filename> contains user-visible
+executables, notably <filename>ghc</filename> and <filename>ghci</filename>.
+You should add it to your <literal>$PATH</literal>
+</para>
+
+<para>On Unix, the user-invokable <filename>ghc</filename> invokes <filename>$(libdir)/ghc-<replaceable>version</replaceable></filename>,
+passing a suitable <option>-B</option> flag to tell <filename>ghc-<replaceable>version</replaceable></filename> where
+<Filename>$(libdir)</Filename> is.
+Similarly <filename>ghci</filename>, except the extra flag <literal>--interactive</literal> is passed.
+</para>
+
+<para>On Win32, the user-invokable <filename>ghc</filename> binary 
+is the Real Thing (no intervening
+shell scripts or <filename>.bat</filename> files). 
+Reason: we sometimes invoke GHC with very long command lines,
+and <filename>cmd.exe</filename> (which executes <filename>.bat</filename> files)
+truncates them.  Similarly <filename>ghci</filename> is a C wrapper program that invokes <filename>ghc --interactive</filename>
+(passing on all other arguments), not a <filename>.bat</filename> file.
+</para>
+
+
+</sect2>
+
+<sect2> <title>The library directory</title>
+
+<para>The layout of the library directory, <filename>$(libdir)</filename> is almost identical on
+Windows and Unix, as follows.  Differences between Windows and Unix
+are noted thus <literal>[Win32 only]</literal> and are commented below.</para>
 
 <programlisting>
   $(libdir)/
@@ -756,7 +784,7 @@ Windows and Unix, as follows: layout:</para>
     
     bin/                   [Win32 only]  User-visible binaries
          ghc.exe
-         ghci.bat
+         ghci.exe
 
     unlit                  Remove literate markup
     
@@ -805,24 +833,8 @@ Windows and Unix, as follows: layout:</para>
     HSlang.o                  not grok .a files yet)
 </programlisting>
 
-<para>Note that:</para>
+<para>Note that:
 <itemizedlist>
-<listitem>
-<para>On Win32, the <filename>$(libdir)/bin</filename> directory contains user-visible binaries; 
-add it to your <filename>PATH</filename>.  The <filename>ghci</filename> executable is a <filename>.bat</filename>
-file which invokes <filename>ghc</filename>.   </para>
-
-<para>The GHC executable is the Real Thing (no intervening
-shell scripts or <filename>.bat</filename> files).  
-Reason: we sometimes invoke GHC with very long command lines,
-and <filename>cmd.exe</filename> (which executes <filename>.bat</filename> files)
-truncates them.  [We assume people won't invoke ghci with very long
-command lines.]</para>
-
-<para>On Unix, the user-invokable <filename>ghc</filename> invokes <filename>$(libdir)/ghc-<replaceable>version</replaceable></filename>,
-passing a suitable <option>-B</option> flag. 
-</para>
-</listitem>
 
 	<listitem>
 	  <para><filename>$(libdir)</filename> also contains support
@@ -859,6 +871,7 @@ with the Win32 distribution of GHC. </para>
           with GHC, rather than assume some installed one.  </para>
 	</listitem>
 </itemizedlist>
+</para>
 
 </sect2>
 
