@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.16 2000/11/27 11:58:55 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.17 2000/11/27 12:10:01 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -220,7 +220,7 @@ loadModule' path = do
 			modules = mods,
 			current_module = case mods of 
 					   [] -> defaultCurrentModule
-					   xs -> last xs,
+					   xs -> head xs,
 			target = Just path
 		   }
   setGHCiState new_state
