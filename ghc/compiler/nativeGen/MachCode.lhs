@@ -862,8 +862,9 @@ getRegister (StMachOp mop [x]) -- unary MachOps
       MO_NatS_to_Dbl -> coerceInt2FP DoubleRep x
 
       -- Conversions which are a nop on x86
-      MO_NatS_to_32U  -> conversionNop WordRep   x
       MO_32U_to_NatS  -> conversionNop IntRep    x
+      MO_32S_to_NatS  -> conversionNop IntRep    x
+      MO_NatS_to_32U  -> conversionNop WordRep   x
       MO_32U_to_NatU  -> conversionNop WordRep   x
 
       MO_NatU_to_NatS -> conversionNop IntRep    x
@@ -1258,6 +1259,7 @@ getRegister (StMachOp mop [x]) -- unary PrimOps
 
       -- Conversions which are a nop on sparc
       MO_32U_to_NatS   -> conversionNop IntRep   x
+      MO_32S_to_NatS  -> conversionNop IntRep   x
       MO_NatS_to_32U   -> conversionNop WordRep  x
       MO_32U_to_NatU   -> conversionNop WordRep  x
 
