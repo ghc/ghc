@@ -1232,7 +1232,7 @@ deleteFindMax t
   - A lower [delta] leads to a more 'perfectly' balanced tree.
   - A higher [delta] performs less rebalancing.
 
-  - Balancing is automaic for random data and a balancing
+  - Balancing is automatic for random data and a balancing
     scheme is only necessary to avoid pathological worst cases.
     Almost any choice will do, and in practice, a rather large
     [delta] may perform better than smaller one.
