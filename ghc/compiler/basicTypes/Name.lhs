@@ -201,22 +201,6 @@ mkCCallName :: Unique -> EncodedString -> Name
 mkCCallName uniq str =  Name { n_uniq = uniq, n_sort = Local, 
 			       n_occ = mkCCallOcc str, n_loc = noSrcLoc }
 
-mkTopName :: Unique -> Module -> FAST_STRING -> Name
-	-- Make a top-level name; make it Global if top-level
-	-- things should be externally visible; Local otherwise
-	-- This chap is only used *after* the tidyCore phase
-	-- Notably, it is used during STG lambda lifting
-	--
-	-- We have to make sure that the name is globally unique
-	-- and we don't have tidyCore to help us. So we append
-	-- the unique.  Hack!  Hack!
-	-- (Used only by the STG lambda lifter.)
-mkTopName uniq mod fs
-  = Name { n_uniq = uniq, 
-	   n_sort = mk_top_sort mod,
-	   n_occ  = mkVarOcc (_PK_ ((_UNPK_ fs) ++ show uniq)),
-	   n_loc = noSrcLoc }
-
 mkIPName :: Unique -> OccName -> Name
 mkIPName uniq occ
   = Name { n_uniq = uniq,
@@ -314,12 +298,32 @@ tidyTopName mod env
 
     localise     = (env', name')
     (env', occ') = tidyOccName env occ
-    name' | all_toplev_ids_visible  = name { n_occ = occ', n_sort = Global mod }
-	  | otherwise		    = name { n_occ = occ' }
+    name'        = name { n_occ = occ', n_sort = mkLocalTopSort mod }
 
-all_toplev_ids_visible = 
-	not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
-	opt_EnsureSplittableC            -- Splitting requires visiblilty
+mkTopName :: Unique -> Module -> FAST_STRING -> Name
+	-- Make a top-level name; make it Global if top-level
+	-- things should be externally visible; Local otherwise
+	-- This chap is only used *after* the tidyCore phase
+	-- Notably, it is used during STG lambda lifting
+	--
+	-- We have to make sure that the name is globally unique
+	-- and we don't have tidyCore to help us. So we append
+	-- the unique.  Hack!  Hack!
+	-- (Used only by the STG lambda lifter.)
+mkTopName uniq mod fs
+  = Name { n_uniq = uniq, 
+	   n_sort = mkLocalTopSort mod,
+	   n_occ  = mkVarOcc (_PK_ ((_UNPK_ fs) ++ show uniq)),
+	   n_loc = noSrcLoc }
+
+mkLocalTopSort :: Module -> NameSort
+mkLocalTopSort mod
+  | all_toplev_ids_visible = Global mod
+  | otherwise		   = Local
+
+all_toplev_ids_visible
+  = not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
+    opt_EnsureSplittableC            -- Splitting requires visiblilty
 \end{code}
 
 
