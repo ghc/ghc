@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.42 2003/05/23 10:12:28 ross Exp $
+# $Id: Makefile,v 1.43 2003/05/30 09:19:39 simonpj Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -98,7 +98,6 @@ endif # OBJECT_FILEFORMAT = PEi
 # Doc building with Haddock
 
 EXCLUDED_HADDOCK_SRCS = \
-	Data/Generics.hs \
 	GHC/PrimopWrappers.hs \
 	GHC/PArr.hs
 

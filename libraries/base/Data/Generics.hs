@@ -51,7 +51,9 @@ module Data.Generics (
 import Prelude	-- So that 'make depend' works
 
 #ifdef __GLASGOW_HASKELL__
+#ifndef __HADDOCK__
 import GHC.Base ( (:*:)(..), (:+:)(..), Unit(..) )
+#endif
 #endif
 
 import Data.Dynamic
