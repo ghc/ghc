@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: readFile.c,v 1.10 2000/01/18 12:42:12 simonmar Exp $
+ * $Id: readFile.c,v 1.11 2000/03/10 15:23:40 simonmar Exp $
  *
  * hGetContents Runtime Support
  */
@@ -105,8 +105,19 @@ readBlock(StgForeignPtr ptr)
 }
 
 /* Filling up a (block-buffered) buffer of length len */
+
+/* readChunk(FileObjet *, void *, int)
+ * returns:
+ *  -1                             error
+ *  -2                             object closed
+ *  FILEOBJ_BLOCKED_CONN_WRITE     blocking while flushing
+ *                                 buffer of connected handle.
+ *  FILEOBJ_BLOCKED_READ           didn't read anything; would block
+ *  n, where n > 0                 read n bytes into buffer.
+ */
+
 StgInt
-readChunk(StgForeignPtr ptr, StgAddr buf, StgInt len)
+readChunk(StgForeignPtr ptr, StgAddr buf, StgInt off, StgInt len)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int count=0,rc=0, total_count;
@@ -159,7 +170,7 @@ readChunk(StgForeignPtr ptr, StgAddr buf, StgInt len)
        return count;
 
     len -= count;
-    p = buf;
+    p = buf+off;
     p += count;
     total_count = count;
 
@@ -172,28 +183,28 @@ readChunk(StgForeignPtr ptr, StgAddr buf, StgInt len)
 #else
 	         read(fd, p, len))) <= 0 ) {
 #endif
-	if ( count == 0 ) { /* EOF */
-	    break;
+        /* EOF */
+	if ( count == 0 ) {
+            FILEOBJ_SET_EOF(fo);
+            return total_count;
+
+        /* Blocking */
 	} else if ( count == -1 && errno == EAGAIN) {
-	    /* ToDo: partial/blocked reads??????  Looks like we don't recover
-	     * from this properly.
-	     */
 	    errno = 0;
-	    return FILEOBJ_BLOCKED_READ;
+            if (total_count > 0) 
+               return total_count; /* partial read */
+	    else
+	       return FILEOBJ_BLOCKED_READ;
+
+        /* Error */
 	} else if ( count == -1 && errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();
 	    return -1;
-	}
-        total_count += count;
-	len -= count;
-	p += count;
+        }
     }
 
     total_count += count;
-    /* ToDo: might point beyond the end of the buffer??? */
-    fo->bufWPtr = total_count;
-    fo->bufRPtr = 0;
     return total_count;
 }
 

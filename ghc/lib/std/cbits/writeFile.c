@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: writeFile.c,v 1.12 1999/12/08 15:47:08 simonmar Exp $
+ * $Id: writeFile.c,v 1.13 2000/03/10 15:23:40 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -82,15 +82,21 @@ writeBuffer(StgForeignPtr ptr, StgInt bytes)
 }
 
 
+/* ToDo: there's currently no way for writeBuf to return both a
+ * partial write and an indication that the write blocked.  It needs
+ * two calls: one to get the partial result, and the next one to block.
+ * This matches Unix write/2, but is rather a waste.
+ */
+
 StgInt
-writeBuf(StgForeignPtr ptr, StgAddr buf, StgInt len)
+writeBuf(StgForeignPtr ptr, StgAddr buf, StgInt off, StgInt len)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    int count;
+    int count, total_count;
     int rc = 0;
-    char *pBuf = (char *) buf;
+    char *pBuf = (char *) buf+off;
 
-    if (len == 0 )
+    if (len == 0)
 	return 0;
 
     /* First of all, check if we do need to flush the buffer .. */
@@ -100,10 +106,10 @@ writeBuf(StgForeignPtr ptr, StgAddr buf, StgInt len)
     if ( fo->buf != NULL  		     &&   /* buffered and */
          (fo->bufWPtr + len < (fo->bufSize))      /* there's room */
        ) {
-       /* Block copying is likely to be cheaper than, flush, followed by write */
-       memcpy(((char*)fo->buf + fo->bufWPtr), buf, len);
+       /* Block copying is likely to be cheaper than flush, followed by write */
+       memcpy(((char*)fo->buf + fo->bufWPtr), pBuf, len);
        fo->bufWPtr += len;
-       return 0;
+       return len;
     }
     /* If we do overflow, flush current contents of the buffer and
        directly output the chunk.
@@ -120,6 +126,8 @@ writeBuf(StgForeignPtr ptr, StgAddr buf, StgInt len)
        }
     }
 
+    total_count = 0;
+
     while ((count = 
                (
 #ifdef USE_WINSOCK
@@ -132,10 +140,14 @@ writeBuf(StgForeignPtr ptr, StgAddr buf, StgInt len)
         if ( count >= 0 ) {
             len -= count;
 	    pBuf += count;
+            total_count += count;
 	    continue;
 	} else if ( errno == EAGAIN ) {
 	    errno = 0;
-	    return FILEOBJ_BLOCKED_WRITE;
+            if (total_count > 0)
+                return total_count; /* partial write */
+ 	    else
+		return FILEOBJ_BLOCKED_WRITE;
 	} else if ( errno != EINTR ) {
 	    cvtErrno();
 	    stdErrno();
@@ -143,11 +155,12 @@ writeBuf(StgForeignPtr ptr, StgAddr buf, StgInt len)
 	}
     }
 
-    return 0;
+    total_count += count;
+    return total_count;
 }
 
 StgInt
-writeBufBA(StgForeignPtr ptr, StgByteArray buf, StgInt len)
+writeBufBA(StgForeignPtr ptr, StgByteArray buf, StgInt off, StgInt len)
 { 
-    return (writeBuf(ptr,(StgAddr)buf, len)); 
+    return (writeBuf(ptr,(StgAddr)buf, off, len)); 
 }

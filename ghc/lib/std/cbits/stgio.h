@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.16 1999/12/08 15:47:08 simonmar Exp $
+ * $Id: stgio.h,v 1.17 2000/03/10 15:23:40 simonmar Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -161,7 +161,7 @@ StgInt  get_prog_argc(void);
 
 /* readFile.c */
 StgInt	readBlock (StgForeignPtr);
-StgInt	readChunk (StgForeignPtr,StgAddr,StgInt);
+StgInt	readChunk (StgForeignPtr,StgAddr,StgInt,StgInt);
 StgInt	readLine  (StgForeignPtr);
 StgInt	readChar  (StgForeignPtr);
 
@@ -230,8 +230,8 @@ StgInt toClockSec (StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgBy
 /* writeError.c */
 void    writeErrString__ (StgAddr, StgByteArray, StgInt);
 /* writeFile.c */
-StgInt	writeBuf  (StgForeignPtr, StgAddr, StgInt);
-StgInt	writeBufBA  (StgForeignPtr, StgByteArray, StgInt);
+StgInt	writeBuf  (StgForeignPtr, StgAddr, StgInt, StgInt);
+StgInt	writeBufBA  (StgForeignPtr, StgByteArray, StgInt, StgInt);
 StgInt	writeFileObject (StgForeignPtr, StgInt);
 StgInt	writeBuffer (StgForeignPtr, StgInt);
 
