@@ -66,6 +66,7 @@ module Util (
 
     ) where
 
+#include "../includes/config.h"
 #include "HsVersions.h"
 
 import List		( zipWith4 )
