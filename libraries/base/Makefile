@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.36 2002/07/02 13:13:36 simonmar Exp $
+# $Id: Makefile,v 1.37 2002/07/29 09:57:17 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -16,18 +16,12 @@ ALL_DIRS = \
 	Data \
 	Data/Array \
 	Data/STRef \
-	Database \
 	Debug \
 	Debug/QuickCheck \
-	FileFormat \
 	Foreign \
 	Foreign/C \
 	Foreign/Marshal \
 	GHC \
-	Hugs \
-	Language \
-	Network \
-	NHC \
 	System \
 	System/Console \
 	System/Mem \
