@@ -26,6 +26,7 @@ import TcRnMonad
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
 import TcExpr		( tcCheckSigma )			
 
+import ForeignCall	( CCallConv(..) )
 import ErrUtils		( Message )
 import Id		( Id, mkLocalId, mkExportedLocalId )
 #if alpha_TARGET_ARCH
@@ -130,6 +131,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv _ _ _ CWrapper)
    	-- as ft -> IO Addr is accepted, too.  The use of the latter two forms
    	-- is DEPRECATED, though.
     checkCg checkCOrAsmOrInterp `thenM_`
+    checkCConv cconv 		`thenM_`
     (case arg_tys of
 	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys		     `thenM_`
 		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty    `thenM_`
@@ -140,9 +142,10 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv _ _ _ CWrapper)
         other -> addErrTc (illegalForeignTyErr empty sig_ty)	)            `thenM_`
     return idecl
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ _ (CFunction target))
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ _ (CFunction target))
   | isDynamicTarget target	-- Foreign import dynamic
   = checkCg checkCOrAsmOrInterp		`thenM_`
+    checkCConv cconv 			`thenM_`
     case arg_tys of		-- The first arg must be Ptr, FunPtr, or Addr
       []     		-> 
       	check False (illegalForeignTyErr empty sig_ty) `thenM_`
@@ -156,6 +159,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ _ (CFunction targe
 	return idecl
   | otherwise 		-- Normal foreign import
   = checkCg (checkCOrAsmOrDotNetOrInterp)			`thenM_`
+    checkCConv cconv 						`thenM_`
     checkCTarget target						`thenM_`
     getDOpts							`thenM` \ dflags ->
     checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenM_`
@@ -321,6 +325,18 @@ checkCg check
 	 Just err -> addErrTc (text "Illegal foreign declaration:" <+> err)
 \end{code} 
 			   
+Calling conventions
+
+\begin{code}
+checkCConv :: CCallConv -> TcM ()
+checkCConv CCallConv  = return ()
+#if i386_TARGET_ARCH
+checkCConv StdCallConv = return ()
+#else
+checkCConv StdCallConv = addErrTc (text "calling convention not supported on this architecture: stdcall")
+#endif
+\end{code}
+
 Warnings
 
 \begin{code}
