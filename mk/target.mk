@@ -801,10 +801,13 @@ ifneq "$(INSTALL_SGML_DOC)" ""
 ifneq "$(SGMLDocWays)" ""
 install-docs:: $(foreach i,$(SGMLDocWays),$(INSTALL_SGML_DOC).$i)
 	@$(INSTALL_DIR) $(datadir)	
-	for i in $(SGMLDocWays); do \
+	@for i in $(SGMLDocWays); do \
 		if [ $$i = "html" ]; then \
-			$(CP) -r $(INSTALL_SGML_DOC) $(datadir); \
+			$(INSTALL_DIR) $(datadir)/html; \
+			echo $(CP) -r $(INSTALL_SGML_DOC) $(datadir)/html; \
+			$(CP) -r $(INSTALL_SGML_DOC) $(datadir)/html; \
 		else \
+			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_SGML_DOC).$$i $(datadir); \
 			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_SGML_DOC).$$i $(datadir); \
 		fi \
 	done
