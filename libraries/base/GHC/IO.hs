@@ -563,7 +563,7 @@ commitBuffer
 
 commitBuffer hdl raw sz@(I# _) count@(I# _) flush release = do
   wantWritableHandle "commitAndReleaseBuffer" hdl $
-     commitBuffer' hdl raw sz count flush release
+     commitBuffer' raw sz count flush release
 
 -- Explicitly lambda-lift this function to subvert GHC's full laziness
 -- optimisations, which otherwise tends to float out subexpressions
@@ -576,7 +576,7 @@ commitBuffer hdl raw sz@(I# _) count@(I# _) flush release = do
 --
 -- This hack is a fairly big win for hPutStr performance.  --SDM 18/9/2001
 --
-commitBuffer' hdl raw sz@(I# _) count@(I# _) flush release
+commitBuffer' raw sz@(I# _) count@(I# _) flush release
   handle_@Handle__{ haFD=fd, haBuffer=ref, haBuffers=spare_buf_ref } = do
 
 #ifdef DEBUG_DUMP
