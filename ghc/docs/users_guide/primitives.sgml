@@ -2,11 +2,11 @@
 
 <sect1 id="primitives">
   <title>Unboxed types and primitive operations</title>
-  <indexterm><primary>PrelGHC module</primary></indexterm>
+  <indexterm><primary>GHC.Prim module</primary></indexterm>
 
   <para>This chapter defines all the types which are primitive in
   Glasgow Haskell, and the operations provided for them. You bring
-  them into scope by importing module <literal>PrelGHC</literal>.</para>
+  them into scope by importing module <literal>GHC.Prim</literal>.</para>
 
   <para>Note: while you really can use this stuff to write fast code,
   we generally find it a lot less painful, and more satisfying in the
@@ -93,7 +93,7 @@ counterpart&mdash;we saw a threefold speedup on one example.
 </title>
 
 <para>
-Unboxed tuples aren't really exported by <literal>PrelGHC</literal>,
+Unboxed tuples aren't really exported by <literal>GHC.Prim</literal>,
 they're available by default with <option>-fglasgow-exts</option>.  An
 unboxed tuple looks like this:
 </para>
