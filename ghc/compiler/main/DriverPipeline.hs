@@ -651,6 +651,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 					ms_hspp_buf  = hspp_buf,
 					ms_location  = location4,
 					ms_hs_date   = src_timestamp,
+					ms_obj_date  = Nothing,
 					ms_imps	     = unused_field,
 					ms_srcimps   = unused_field }
 
