@@ -887,8 +887,6 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
                  StaticTarget target
                     -> ioToBc (lookupStaticPtr target) `thenBc` \res ->
                        returnBc (True, res)
-                 CasmTarget _
-                    -> pprPanic "ByteCodeGen.generateCCall: casm" (ppr ccall_spec)
      in
          get_target_info	`thenBc` \ (is_static, static_target_addr) ->
      let
