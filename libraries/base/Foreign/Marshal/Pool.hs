@@ -5,7 +5,7 @@
 -- Copyright   :  (c) Sven Panne 2003
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
--- Maintainer  :  sven_panne@yahoo.com
+-- Maintainer  :  sven.panne@aedion.de
 -- Stability   :  provisional
 -- Portability :  portable
 --
