@@ -1,8 +1,8 @@
  
 tcfail080.hs:11:
     Ambiguous type variable(s)
-    `aqR'
-	in the constraint `Collection aqR aqU'
+    `ar9'
+	in the constraint `Collection ar9 arc'
 	arising from use of `singleton' at tcfail080.hs:11
 
 

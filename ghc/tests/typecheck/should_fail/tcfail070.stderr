@@ -1,8 +1,8 @@
  
 tcfail070.hs:13:
-    Couldn't match the kind * against * -> kaAl
+    Couldn't match the kind * against * -> kaAD
     Expected: *
-    Found:    * -> kaAl
+    Found:    * -> kaAD
     In the type `[Int] Bool'
     In the type declaration for `State'
 

@@ -1,8 +1,8 @@
  
 tcfail014.hs:5:
-    Occurs check: cannot construct the infinite type: aN3 = aN3 -> aN5
-    Expected: aN3
-    Inferred: aN3 -> aN5
+    Occurs check: cannot construct the infinite type: aND = aND -> aNF
+    Expected: aND
+    Inferred: aND -> aNF
     In the first argument of `z', namely `z'
     In an equation for function `h': h z = z z
 

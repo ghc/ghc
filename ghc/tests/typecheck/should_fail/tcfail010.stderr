@@ -1,8 +1,8 @@
  
 tcfail010.hs:3:
     Ambiguous type variable(s)
-    `aME'
-	in the constraint `Num [aME]'
+    `aNe'
+	in the constraint `Num [aNe]'
 	arising from the literal `2' at tcfail010.hs:3
 
 

@@ -1,8 +1,8 @@
  
 tcfail013.hs:4:
-    Couldn't match the type `[aMB]' against `Bool'
+    Couldn't match the type `[aNb]' against `Bool'
     Expected: Bool
-    Inferred: [aMB]
+    Inferred: [aNb]
     In an equation for function `f': f True = 2
 
 

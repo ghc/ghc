@@ -1,8 +1,8 @@
  
 tcfail005.hs:3:
-    Couldn't match the type `[a11U]' against `(a11Y, a120)'
-    Expected: [a11U]
-    Inferred: (a11Y, a120)
+    Couldn't match the type `[a12u]' against `(a12y, a12A)'
+    Expected: [a12u]
+    Inferred: (a12y, a12A)
     In a pattern binding: (h : i) = (1, ('a'))
 
 

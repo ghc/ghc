@@ -1,7 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1 302
-_instance_modules_
-IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _exports_
 ShouldSucceed B(:B :B op2) C(:C :C op1);
 _instances_

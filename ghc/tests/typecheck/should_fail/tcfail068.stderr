@@ -1,8 +1,8 @@
  
 tcfail068.hs:45:
     A type signature is more polymorphic than the inferred type
-	Can't for-all the type variable(s) `a1jl'
-	in the type `ST a1jl a1jh'
+	Can't for-all the type variable(s) `a1jV'
+	in the type `ST a1jV a1jR'
     In the first argument of `runST', namely `(itrapstate' i k s)'
     In an equation for function `itrapstate':
 	itrapstate ((i, k), (j, l)) f c d s arr
@@ -25,8 +25,8 @@ tcfail068.hs:45:
  
 tcfail068.hs:32:
     A type signature is more polymorphic than the inferred type
-	Can't for-all the type variable(s) `a1m6'
-	in the type `ST a1m6 a1m2'
+	Can't for-all the type variable(s) `a1mG'
+	in the type `ST a1mG a1mC'
     In the first argument of `runST', namely `(itrap' i k)'
     In an equation for function `itrap':
 	itrap ((i, k), (j, l)) f arr
@@ -48,8 +48,8 @@ tcfail068.hs:32:
  
 tcfail068.hs:21:
     A type signature is more polymorphic than the inferred type
-	Can't for-all the type variable(s) `a1mB'
-	in the type `ST a1mB a1mr'
+	Can't for-all the type variable(s) `a1nb'
+	in the type `ST a1nb a1n1'
     In the first argument of `runST', namely
 	`((readArray arr i)
 	  >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
@@ -60,8 +60,8 @@ tcfail068.hs:21:
  
 tcfail068.hs:14:
     A type signature is more polymorphic than the inferred type
-	Can't for-all the type variable(s) `a1nB'
-	in the type `ST a1nB a1nx'
+	Can't for-all the type variable(s) `a1ob'
+	in the type `ST a1ob a1o7'
     In the first argument of `runST', namely
 	`(newArray ((1, (1)), (n)) x)'
     In an equation for function `itgen':

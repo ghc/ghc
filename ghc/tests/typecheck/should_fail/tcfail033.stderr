@@ -1,8 +1,8 @@
  
 tcfail033.hs:4:
-    Occurs check: cannot construct the infinite type: aM8 = (aM8, aMb)
-    Expected: aMc (aM8, aMb)
-    Inferred: aMc aM8
+    Occurs check: cannot construct the infinite type: aMq = (aMq, aMt)
+    Expected: aMu (aMq, aMt)
+    Inferred: aMu aMq
     In a pattern binding: buglet = [x | (x, y) <- buglet]
 
 

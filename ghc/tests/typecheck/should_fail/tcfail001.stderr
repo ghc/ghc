@@ -4,9 +4,9 @@ tcfail001.hs:9: Warning:
 
  
 tcfail001.hs:9:
-    Couldn't match the type `[a]' against `aqd -> aqe'
+    Couldn't match the type `[a]' against `aqv -> aqw'
     Expected: [a]
-    Inferred: aqd -> aqe
+    Inferred: aqv -> aqw
     In an equation for function `op': op [] = []
     In the definition for method `op'
 

@@ -1,11 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1 302
-_instance_modules_
-IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
-_usages_
-PrelBase 1 :: $dEq0 1 $dEq1 1 $dEqBool0 1 $dEqChar0 1 $dEqInt0 1 $dEqOrdering0 1 $dEval0 1 $dEval1 1 $dEval2 1 $dEvalBool0 1 $dEvalChar0 1 $dEvalDouble0 1 $dEvalInt0 1 $dEvalInteger0 1 $dEvalOrdering0 1 $dMonad0 1 $dNumInt0 1 $dOrd0 1 $dOrd1 1 $dOrdBool0 1 $dOrdChar0 1 $dOrdInt0 1 $dOrdOrdering0 1 $dShow0 1 $dShow1 1 $dShow2 1 $dShowBool0 1 $dShowChar0 1 $dShowInt0 1 $dShowOrdering0 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $m>> 1 $mcompare 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 && 1 . 1 not 1 showList__ 1 showParen 1 showSpace 1 showString 1 Eq 1 Eval 1 Monad 1 Num 1 Ord 1 Ordering 1 Show 1 ShowS 1 String 1;
-PrelNum 1 :: $dEqDouble0 1 $dEqInteger0 1 $dNumDouble0 1 $dNumInteger0 1 $dOrdDouble0 1 $dOrdInteger0 1 $dShowDouble0 1 $dShowInteger0 1;
-PrelTup 1 :: $dEq0 1 $dEval0 1 $dOrd0 1 $dShow3 1;
 _exports_
 ShouldSucceed bindState foo unState unitState St State(State) TS(TS vs);
 _instances_

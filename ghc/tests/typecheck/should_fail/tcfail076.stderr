@@ -1,8 +1,8 @@
  
 tcfail076.hs:20:
     A type signature is more polymorphic than the inferred type
-	Can't for-all the type variable(s) `aNv'
-	in the type `(aNr -> aNp aNv) -> aNp aNv'
+	Can't for-all the type variable(s) `aO3'
+	in the type `(aNZ -> aNX aO3) -> aNX aO3'
     In the first argument of `KContT', namely `(\ cont' -> cont a)'
     In the first argument of `f', namely
 	`(\ a -> KContT (\ cont' -> cont a))'

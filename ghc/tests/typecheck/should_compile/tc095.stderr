@@ -1,16 +1,6 @@
 
 NOTE: Simplifier still going after 4 iterations; bailing out.
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1 302
-_instance_modules_
-IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
-_usages_
-PrelBase 1 :: $dEnum0 1 $dEnumBool0 1 $dEnumChar0 1 $dEnumInt0 1 $dEnumOrdering0 1 $dEq0 1 $dEq1 1 $dEqBool0 1 $dEqChar0 1 $dEqInt0 1 $dEqOrdering0 1 $dEval0 1 $dEval1 1 $dEval2 1 $dEvalBool0 1 $dEvalChar0 1 $dEvalDouble0 1 $dEvalInt0 1 $dEvalInteger0 1 $dEvalOrdering0 1 $dFunctor0 1 $dNumInt0 1 $dOrd0 1 $dOrd1 1 $dOrdBool0 1 $dOrdChar0 1 $dOrdInt0 1 $dOrdOrdering0 1 $dShow0 1 $dShow1 1 $dShow2 1 $dShowBool0 1 $dShowChar0 1 $dShowInt0 1 $dShowOrdering0 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 . 1 showList__ 1 showParen 1 showSpace 1 showString 1 Enum 1 Eq 1 Eval 1 Functor 1 Num 1 Ord 1 Ordering 1 Show 1 ShowS 1 String 1;
-PrelIO 1 :: print 1;
-PrelIOBase 1 :: $dEvalIO0 1 $dFunctorIO0 1 $dShowIO0 1 IO 1;
-PrelList 1 :: drop 1;
-PrelNum 1 :: $dEnumDouble0 1 $dEnumInteger0 1 $dEnumRatio0 1 $dEqDouble0 1 $dEqInteger0 1 $dEqRatio0 1 $dEvalRatio0 1 $dFractionalDouble0 1 $dFractionalRatio0 1 $dIntegralInt0 1 $dIntegralInteger0 1 $dNumDouble0 1 $dNumInteger0 1 $dNumRatio0 1 $dOrdDouble0 1 $dOrdInteger0 1 $dOrdRatio0 1 $dRealDouble0 1 $dRealInt0 1 $dRealInteger0 1 $dRealRatio0 1 $dShowDouble0 1 $dShowInteger0 1 $dShowRatio0 1 $mdiv 1 $mdivMod 1 $mmod 1 $mquot 1 $mrecip 1 $mrem 1 Fractional 1 Integral 1 Ratio 1 Rational 1 Real 1;
-PrelTup 1 :: $dEq0 1 $dEval0 1 $dOrd0 1 $dShow3 1;
 _exports_
 ShouldSucceed action_0 action_1 action_2 action_3 action_4 action_5 action_6 happyAccept happyError happyFail happyGoto happyMonadReduce happyNewToken happyParse happyReduce happyReduce_1 happyReduce_2 happyReduce_3 happyReturn happyShift happySpecReduce_0 happySpecReduce_1 happySpecReduce_2 happySpecReduce_3 happyThen main myparser notHappyAtAll HappyAbsSyn(HappyTerminal HappyErrorToken HappyAbsSyn1 HappyAbsSyn2 HappyAbsSyn3) HappyState(HappyState) Token(TokenInt TokenVar TokenEq);
 _instances_

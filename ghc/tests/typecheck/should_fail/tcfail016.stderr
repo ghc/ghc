@@ -1,8 +1,8 @@
  
 tcfail016.hs:9:
-    Couldn't match the type `AnnExpr a12c' against `Expr a125'
-    Expected: Expr a12c
-    Inferred: AnnExpr a12c
+    Couldn't match the type `AnnExpr a12M' against `Expr a12F'
+    Expected: Expr a12M
+    Inferred: AnnExpr a12M
     In the first argument of `g', namely `e1'
     In the first argument of `++', namely `(g e1)'
 

@@ -1,8 +1,8 @@
  
 tcfail004.hs:3:
-    Couldn't match the type `(a12F, a12I)' against `(a12K, a12M, a12O)'
-    Expected: (a12E, a12H)
-    Inferred: (a12K, a12M, a12O)
+    Couldn't match the type `(a13f, a13i)' against `(a13k, a13m, a13o)'
+    Expected: (a13e, a13h)
+    Inferred: (a13k, a13m, a13o)
     In a pattern binding: (f, g) = (1, 2, 3)
 
 

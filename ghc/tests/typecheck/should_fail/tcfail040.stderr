@@ -1,8 +1,8 @@
  
 tcfail040.hs:19:
     Ambiguous type variable(s)
-    `aMu'
-	in the constraint `ORD aMu'
+    `aN4'
+	in the constraint `ORD aN4'
 	arising from use of `<<' at tcfail040.hs:19
 
 

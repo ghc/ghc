@@ -1,8 +1,8 @@
  
 tcfail012.hs:3:
-    Couldn't match the type `Bool' against `[apz]'
+    Couldn't match the type `Bool' against `[apR]'
     Expected: Bool
-    Inferred: [apz]
+    Inferred: [apR]
     In a pattern binding: True = []
 
 

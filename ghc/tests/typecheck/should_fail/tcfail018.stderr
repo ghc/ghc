@@ -1,8 +1,8 @@
  
 tcfail018.hs:5:
     Ambiguous type variable(s)
-    `aMx'
-	in the constraint `Num [aMx]'
+    `aN7'
+	in the constraint `Num [aN7]'
 	arising from the literal `1' at tcfail018.hs:5
 
 

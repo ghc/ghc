@@ -1,9 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1 302
-_instance_modules_
-IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
-_usages_
-PrelBase 1 :: $dEval0 1 $dEval2 1 $dEvalBool0 1 $dEvalDouble0 1 $dEvalInt0 1 Eval 1;
 _exports_
 ShouldSucceed F Twine(Twine2) Twist(Twist2);
 _instances_

@@ -1,13 +1,11 @@
-module Main where
-
 --!!! space leak from overloading !!!
+module Main where
 
 -- This program develops a space leak if sfoldl isn't compiled with some
 -- care.  See comment about polymorphic recursion in TcMonoBinds.lhs
 
 import System(getArgs)
-import IOBase
-import STBase
+import PrelIOBase
 
 sfoldl :: Eval a => (a -> Int -> a) -> a -> [Int] -> a
 sfoldl f z [] = z

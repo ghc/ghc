@@ -2,7 +2,7 @@
 tcfail071.hs:8:
     Type signature doesn't match inferred type
 	Signature: c -> c
-	Inferred : (aMF -> [aMD] -> [aMD]) -> aMF -> [aMD] -> [aMD]
+	Inferred : (aNf -> [aNd] -> [aNd]) -> aNf -> [aNd] -> [aNd]
     When checking the type signature for `g'
 
 

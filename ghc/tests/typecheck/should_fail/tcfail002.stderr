@@ -1,8 +1,8 @@
  
 tcfail002.hs:4:
-    Occurs check: cannot construct the infinite type: apP = [apP]
-    Expected: apP
-    Inferred: [apP]
+    Occurs check: cannot construct the infinite type: aq7 = [aq7]
+    Expected: aq7
+    Inferred: [aq7]
     In an equation for function `c': c z = z
 
 

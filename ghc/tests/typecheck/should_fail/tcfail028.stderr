@@ -1,8 +1,8 @@
  
 tcfail028.hs:4:
-    Couldn't match the kind ** against kaPo -> *
+    Couldn't match the kind ** against kaPY -> *
     Expected: **
-    Found:    kaPo -> *
+    Found:    kaPY -> *
     In the type `A a'
     In the data declaration for `A'
 

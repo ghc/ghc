@@ -1,8 +1,8 @@
  
 tcfail069.hs:20:
-    Couldn't match the type `[aEL]' against `(aEP, aER)'
-    Expected: [aEL]
-    Inferred: (aEP, aER)
+    Couldn't match the type `[aF3]' against `(aF7, aF9)'
+    Expected: [aF3]
+    Inferred: (aF7, aF9)
     In the scrutinee of a case expression: (list1, (list2))
     In the case expression: case (list1, (list2)) of [] -> error "foo"
 
