@@ -36,12 +36,12 @@ import {-# SOURCE #-} Match ( matchSimply )
 import HsSyn
 import TcHsSyn		( TypecheckedPat, hsPatType )
 import CoreSyn
-
+import Constants	( mAX_TUPLE_SIZE )
 import DsMonad
 
 import CoreUtils	( exprType, mkIfThenElse, mkCoerce )
 import MkId		( iRREFUT_PAT_ERROR_ID, mkReboxingAlt, mkNewTypeBody )
-import Id		( idType, Id, mkWildId )
+import Id		( idType, Id, mkWildId, mkTemplateLocals )
 import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, dataConSourceArity )
@@ -49,7 +49,7 @@ import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp )
 import TcType		( tcTyConAppTyCon, isIntTy, isFloatTy, isDoubleTy )
 import TysPrim		( intPrimTy )
 import TysWiredIn	( nilDataCon, consDataCon, 
-                          tupleCon,
+                          tupleCon, mkTupleTy,
 			  unitDataConId, unitTy,
                           charTy, charDataCon, 
                           intTy, intDataCon, smallIntegerDataCon, 
@@ -63,7 +63,7 @@ import PrelNames	( unpackCStringName, unpackCStringUtf8Name,
 			  lengthPName, indexPName )
 import Outputable
 import UnicodeUtil      ( intsToUtf8, stringToUtf8 )
-import Util             ( isSingleton, notNull )
+import Util             ( isSingleton, notNull, zipEqual )
 import FastString
 \end{code}
 
@@ -567,27 +567,46 @@ mkSelectorBinds pat val_expr
 \end{code}
 
 
-@mkTupleExpr@ builds a tuple; the inverse to @mkTupleSelector@.  If it
-has only one element, it is the identity function.
+%************************************************************************
+%*									*
+		Tuples
+%*									*
+%************************************************************************
+
+@mkTupleExpr@ builds a tuple; the inverse to @mkTupleSelector@.  
+
+* If it has only one element, it is the identity function.
+
+* If there are more elements than a big tuple can have, it nests 
+  the tuples.  
+
+Nesting policy.  Better a 2-tuple of 10-tuples (3 objects) than
+a 10-tuple of 2-tuples (11 objects).  So we want the leaves to be big.
 
 \begin{code}
 mkTupleExpr :: [Id] -> CoreExpr
+mkTupleExpr ids 
+  = mk_tuple_expr (chunkify (map Var ids))
+  where
+    mk_tuple_expr :: [[CoreExpr]] -> CoreExpr
+	-- Each sub-list is short enough to fit in a tuple
+    mk_tuple_expr [exprs] = mkCoreTup exprs
+    mk_tuple_expr exprs_s = mk_tuple_expr (chunkify (map mkCoreTup exprs_s))
+ 
 
-{- This code has been replaced by mkCoreTup below
-mkTupleExpr []	 = Var unitDataConId
-mkTupleExpr [id] = Var id
-mkTupleExpr ids	 = mkConApp (tupleCon Boxed (length ids))
-			    (map (Type . idType) ids ++ [ Var i | i <-ids])
--}
+chunkify :: [a] -> [[a]]
+-- The sub-lists of the result all have length <= mAX_TUPLE_SIZE
+chunkify xs
+  | n_xs <= mAX_TUPLE_SIZE = [xs]
+  | otherwise		   = split xs
+  where
+	-- n_chunks_m1 = numbe of chunks - 1
+    n_xs        = length xs
+    n_chunks_m1 = n_xs `div` mAX_TUPLE_SIZE
+    chunk_size  = n_xs `div` n_chunks_m1
 
-mkTupleExpr ids = mkCoreTup(map Var ids)			    
-			    
-mkCoreTup :: [CoreExpr] -> CoreExpr			    
-mkCoreTup []   = Var unitDataConId
-mkCoreTup [c]  = c
-mkCoreTup cs  = mkConApp (tupleCon Boxed (length cs))
-			 (map (Type . exprType) cs ++ cs)
-			    
+    split [] = []
+    split xs = take chunk_size xs : split (drop chunk_size xs)
 \end{code}
 
 
@@ -600,6 +619,19 @@ are in scope.
 If there is just one id in the ``tuple'', then the selector is
 just the identity.
 
+If it's big, it does nesting
+	mkTupleSelector [a,b,c,d] b v e
+	  = case e of v { 
+		(p,q) -> case p of p {
+			   (a,b) -> b }}
+We use 'tpl' vars for the p,q, since shadowing does not matter.
+
+In fact, it's more convenient to generate it innermost first, getting
+
+	case (case e of v 
+		(p,q) -> p) of p
+	  (a,b) -> b
+
 \begin{code}
 mkTupleSelector :: [Id]		-- The tuple args
 		-> Id		-- The selected one
@@ -607,13 +639,17 @@ mkTupleSelector :: [Id]		-- The tuple args
 		-> CoreExpr	-- Scrutinee
 		-> CoreExpr
 
-mkTupleSelector [var] should_be_the_same_var scrut_var scrut
-  = ASSERT(var == should_be_the_same_var)
-    scrut
-
 mkTupleSelector vars the_var scrut_var scrut
-  = ASSERT( notNull vars )
-    Case scrut scrut_var [(DataAlt (tupleCon Boxed (length vars)), vars, Var the_var)]
+  = mk_tup_sel (chunkify vars) the_var
+  where
+    mk_tup_sel [vars] the_var = mkCoreSel vars the_var scrut_var scrut
+    mk_tup_sel vars_s the_var = mkCoreSel group the_var tpl_v $
+				mk_tup_sel (chunkify tpl_vs) tpl_v
+	where
+	  tpl_tys = [mkTupleTy Boxed (length gp) (map idType gp) | gp <- vars_s]
+	  tpl_vs  = mkTemplateLocals tpl_tys
+	  [(tpl_v, group)] = [(tpl,gp) | (tpl,gp) <- zipEqual "mkTupleSelector" tpl_vs vars_s,
+					 the_var `elem` gp ]
 \end{code}
 
 
@@ -635,7 +671,30 @@ mkConsExpr ty hd tl = mkConApp consDataCon [Type ty, hd, tl]
 
 mkListExpr :: Type -> [CoreExpr] -> CoreExpr
 mkListExpr ty xs = foldr (mkConsExpr ty) (mkNilExpr ty) xs
+			    
+mkCoreTup :: [CoreExpr] -> CoreExpr			    
+-- Builds exactly the specified tuple.
+-- No fancy business for big tuples
+mkCoreTup []  = Var unitDataConId
+mkCoreTup [c] = c
+mkCoreTup cs  = mkConApp (tupleCon Boxed (length cs))
+			 (map (Type . exprType) cs ++ cs)
 
+mkCoreSel :: [Id]	-- The tuple args
+	  -> Id		-- The selected one
+	  -> Id		-- A variable of the same type as the scrutinee
+	  -> CoreExpr	-- Scrutinee
+	  -> CoreExpr
+-- mkCoreSel [x,y,z] x v e
+-- ===>  case e of v { (x,y,z) -> x
+mkCoreSel [var] should_be_the_same_var scrut_var scrut
+  = ASSERT(var == should_be_the_same_var)
+    scrut
+
+mkCoreSel vars the_var scrut_var scrut
+  = ASSERT( notNull vars )
+    Case scrut scrut_var 
+	 [(DataAlt (tupleCon Boxed (length vars)), vars, Var the_var)]
 \end{code}
 
 

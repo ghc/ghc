@@ -229,7 +229,9 @@ mkZipBind elt_tys
     mapDs newSysLocalDs  list_tys	`thenDs` \ as's ->
     newSysLocalDs zip_fn_ty		`thenDs` \ zip_fn ->
     let 
-	inner_rhs = mkConsExpr ret_elt_ty (mkTupleExpr as') (mkVarApps (Var zip_fn) as's)
+	inner_rhs = mkConsExpr ret_elt_ty 
+			(mkCoreTup (map Var as'))
+			(mkVarApps (Var zip_fn) as's)
 	zip_body  = foldr mk_case inner_rhs (zip3 ass as' as's)
     in
     returnDs (zip_fn, mkLams ass zip_body)
@@ -348,7 +350,7 @@ dsPArrComp qs _  =
   dsLookupGlobalId replicatePName			  `thenDs` \repP ->
   let unitArray = mkApps (Var repP) [Type unitTy, 
 				     mkIntExpr 1, 
-				     mkTupleExpr []]
+				     mkCoreTup []]
   in
   dePArrComp qs (TuplePat [] Boxed) unitArray
 
@@ -412,9 +414,10 @@ dePArrComp (LetStmt ds : qs) pa cea =
       ty'cea = parrElemType cea
   in
   newSysLocalDs ty'cea					  `thenDs` \v       ->
-  dsLet ds (mkTupleExpr xs)				  `thenDs` \clet    ->
+  dsLet ds (mkCoreTup (map Var xs))			  `thenDs` \clet    ->
   newSysLocalDs (exprType clet)				  `thenDs` \let'v   ->
-  let projBody = mkDsLet (NonRec let'v clet) $ mkTupleExpr [v, let'v]
+  let projBody = mkDsLet (NonRec let'v clet) $ 
+		 mkCoreTup [Var v, Var let'v]
       errTy    = exprType projBody
       errMsg   = "DsListComp.dePArrComp: internal error!"
   in
