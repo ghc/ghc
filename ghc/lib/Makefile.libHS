@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile.libHS,v 1.5 1997/01/07 01:17:38 simonpj Exp $
+# $Id: Makefile.libHS,v 1.6 1997/01/07 13:20:35 simonm Exp $
 
 TOP = ../..
 include $(TOP)/ghc/mk/ghc.mk
@@ -24,13 +24,6 @@ include $(TOP)/mk/rules.mk
 GHC_OPTS = \
   -recomp -cpp -fglasgow-exts -fvia-C \
   $(HcMaxHeapFlag) $(EXTRA_HC_OPTS)
-
-SRCS = $(wildcard ghc/*.lhs required/*.lhs glaExts/*.lhs concurrent/*.lhs)
-ifeq ($(suffix), norm)
-OBJS = $(SRCS:.lhs=.o)
-else
-OBJS = $(SRCS:.lhs=.$(suffix)_o)
-endif
 
 #-----------------------------------------------------------------------------
 # Rules for building various types of objects from HS files
@@ -61,27 +54,16 @@ endif
 # build the library itself...
 
 ifeq ($(suffix), norm)
-LIB = libHS.a	 		# this one is special
+ARCHIVE = libHS.a	 		# this one is special
 else
-LIB = libHS_$(suffix).a
+ARCHIVE = libHS_$(suffix).a
 endif
 
-$(LIB) : $(OBJS)
-	@$(RM) $@
-	$(AR) $@ $^
+SRCS 	= $(wildcard prelude/*.hs required/*.hs concurrent/*.hs)
+LIBOBJS = $(SRCS:.hs=.$(suffix)_o)
+DESTDIR = $(INSTLIBDIR_GHC)
 
-all :: $(LIB)
-
-clean ::
-	$(RM) $(LIB)
-	$(RM) $(OBJS)
-
-install :: $(LIB)
-	$(INSTALL) $(INSTLIBFLAGS) $(LIB) $(INSTLIBDIR_GHC)
-	$(RANLIB) $(INSTLIBDIR_GHC)/$(LIB)
-
-veryclean ::
-	$(RM) */*.hc */*.hi
+include $(TOP)/mk/lib.mk
 
 #-----------------------------------------------------------------------------
 # per-module flags
