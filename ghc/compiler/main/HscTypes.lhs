@@ -168,10 +168,11 @@ data ModIface
 
 	mi_boot	    :: !IsBootInterface,    -- read from an hi-boot file?
 
-        mi_usages   :: ![ImportVersion Name],	
+        mi_usages   :: [ImportVersion Name],	
 		-- Usages; kept sorted so that it's easy to decide
 		-- whether to write a new iface file (changing usages
 		-- doesn't affect the version of this module)
+		-- NOT STRICT!  we read this field lazilly from the interface file
 
         mi_exports  :: ![ExportItem],
 		-- What it exports Kept sorted by (mod,occ), to make
@@ -182,7 +183,8 @@ data ModIface
 		-- interface from a file.
 
         mi_fixities :: !FixityEnv,	    -- Fixities
-	mi_deprecs  :: !Deprecations,	    -- Deprecations
+	mi_deprecs  :: Deprecations,	    -- Deprecations
+		-- NOT STRICT!  we read this field lazilly from the interface file
 
 	mi_decls    :: IfaceDecls	    -- The RnDecls form of ModDetails
 		-- NOT STRICT!  we fill this field with _|_ sometimes
@@ -524,7 +526,7 @@ collectFixities env decls
 
 %************************************************************************
 %*									*
-\subsection{ModIface}
+\subsection{WhatsImported}
 %*									*
 %************************************************************************
 
