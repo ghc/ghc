@@ -48,7 +48,7 @@ import MachOp		( MachRep(..), wordRep, MachOp(..),  MachHint(..),
 			  mo_wordULt, machRepByteWidth )
 import ForeignCall	( CCallConv(..) )
 import Literal		( Literal(..) )
-import CLabel		( CLabel, mkAsmTempLabel )
+import CLabel		( CLabel, mkStringLitLabel )
 import Digraph		( SCC(..), stronglyConnComp )
 import ListSetOps	( assocDefault )
 import Util		( filterOut, sortLe )
@@ -302,7 +302,7 @@ mkStringCLit :: String -> FCode CmmLit
 -- and return its label
 mkStringCLit str 
   = do 	{ uniq <- newUnique
-	; let lbl = mkAsmTempLabel uniq
+	; let lbl = mkStringLitLabel uniq
 	; emitData ReadOnlyData [CmmDataLabel lbl, CmmString str]
 	; return (CmmLabel lbl) }
 

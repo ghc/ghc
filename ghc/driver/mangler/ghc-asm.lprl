@@ -494,8 +494,8 @@ sub mangle_asm {
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
 
-	# Labels beginning "_c": these are literal strings.
-	} elsif ( /^${T_US}_c.*$/ ) {
+	# Labels ending "_str": these are literal strings.
+	} elsif ( /^${T_US}([A-Za-z0-9_]+)_str${T_POST_LBL}$/ ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'rodata';
 	    $chksymb[$i] = '';

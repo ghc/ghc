@@ -28,6 +28,7 @@ module CLabel (
 	mkAltLabel,
 	mkDefaultLabel,
 	mkBitmapLabel,
+	mkStringLitLabel,
 
 	mkClosureTblLabel,
 
@@ -134,6 +135,9 @@ data CLabel
 	CaseLabelInfo
 
   | AsmTempLabel 
+	{-# UNPACK #-} !Unique
+
+  | StringLitLabel
 	{-# UNPACK #-} !Unique
 
   | ModuleInitLabel 
@@ -249,6 +253,7 @@ mkReturnInfoLabel uniq		= CaseLabel uniq CaseReturnInfo
 mkAltLabel      uniq tag	= CaseLabel uniq (CaseAlt tag)
 mkDefaultLabel  uniq 		= CaseLabel uniq CaseDefault
 
+mkStringLitLabel		= StringLitLabel
 mkAsmTempLabel 			= AsmTempLabel
 
 mkModuleInitLabel		= ModuleInitLabel
@@ -351,6 +356,7 @@ needsCDecl (PlainModuleInitLabel _)	= True
 needsCDecl ModuleRegdLabel		= False
 
 needsCDecl (CaseLabel _ _)		= False
+needsCDecl (StringLitLabel _)		= False
 needsCDecl (AsmTempLabel _)		= False
 needsCDecl (RtsLabel _)			= False
 needsCDecl (ForeignLabel _ _ _)		= False
@@ -372,6 +378,7 @@ isAsmTemp _ 	    	   = False
 
 externallyVisibleCLabel :: CLabel -> Bool -- not C "static"
 externallyVisibleCLabel (CaseLabel _ _)	   = False
+externallyVisibleCLabel (StringLitLabel _) = False
 externallyVisibleCLabel (AsmTempLabel _)   = False
 externallyVisibleCLabel (ModuleInitLabel _ _)= True
 externallyVisibleCLabel (PlainModuleInitLabel _)= True
@@ -535,6 +542,9 @@ pprAsmCLbl (ForeignLabel fs (Just sz) _)
    = ftext fs <> char '@' <> int sz
 pprAsmCLbl lbl
    = pprCLbl lbl
+
+pprCLbl (StringLitLabel u)
+  = pprUnique u <> ptext SLIT("_str")
 
 pprCLbl (CaseLabel u CaseReturnPt)
   = hcat [pprUnique u, ptext SLIT("_ret")]
