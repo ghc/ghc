@@ -4,7 +4,14 @@ import Socket
 import Concurrent
 import IO
 
-main = do
+-- NOTE: this test depends on non-blocking I/O support,
+-- which win32 doesn't support. Rather than having the
+-- test program block, we fail to initialise WinSock
+-- (via withSocketsDo) here so that the test will fall over
+-- (and repeatedly remind us to implement Win32 support
+-- for non-blocking I/O !)
+
+main = {- withSocketsDo $ -} do
    forkIO server
    yield
    h <- connectTo "localhost" (PortNumber 22222)

@@ -1,4 +1,4 @@
--- $Id: net002.hs,v 1.2 2002/07/19 15:32:39 sof Exp $
+-- $Id: net002.hs,v 1.3 2002/07/23 17:11:52 sof Exp $
 -- http://www.bagley.org/~doug/shootout/
 -- Haskell echo/client server
 -- written by Brian Gregor
@@ -7,6 +7,13 @@
     
 -- !!! exposed a bug in 5.02.2's network library, accept wasn't setting the
 -- socket it returned to non-blocking mode.
+
+-- NOTE: this test depends on non-blocking I/O support,
+-- which win32 doesn't support. Rather than having the
+-- test program block, we fail to initialise WinSock
+-- (via withSocketsDo) here so that the test will fall over
+-- (and repeatedly remind us to implement Win32 support
+-- for non-blocking I/O !)
 
 module Main where
 
@@ -91,7 +98,7 @@ echo_client n = do
                 putStr "Client read nil\n"
                 return []
 
-main = do 
+main = {- withSocketsDo $ -} do 
     ~[n] <- getArgs
     -- server & client semaphores
     -- get the server socket
