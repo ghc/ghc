@@ -584,6 +584,7 @@ checkValidType ctxt ty
 	ubx_tup | not gla_exts = UT_NotOk
 		| otherwise    = case ctxt of
 				   TySynCtxt _ -> UT_Ok
+				   ExprSigCtxt -> UT_Ok
 				   other       -> UT_NotOk
 		-- Unboxed tuples ok in function results,
 		-- but for type synonyms we allow them even at
