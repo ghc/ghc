@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.89 2002/01/26 18:04:48 rje Exp $
+ * $Id: PrimOps.hc,v 1.90 2002/01/29 14:41:52 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -814,7 +814,7 @@ FN_(cmpIntegerzh_fast)
   MP_INT arg1, arg2;
   I_ r;
   FB_
-  MAYBE_GC(R2_PTR | R4_PTR, cmpIntegerIntzh_fast);
+  MAYBE_GC(R2_PTR | R4_PTR, cmpIntegerzh_fast);
   arg1._mp_size	= R1.i;
   arg1._mp_alloc= ((StgArrWords *)R2.p)->words;
   arg1._mp_d	= (mp_limb_t *) (BYTE_ARR_CTS(R2.p));
