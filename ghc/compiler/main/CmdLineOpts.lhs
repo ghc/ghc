@@ -293,6 +293,8 @@ data DynFlag
    | Opt_PArr			       -- syntactic support for parallel arrays
    | Opt_With			       -- deprecated keyword for implicit parms
    | Opt_Arrows			       -- Arrow-notation syntax
+   | Opt_TH
+   | Opt_ImplicitParams
    | Opt_Generics
    | Opt_NoImplicitPrelude 
 

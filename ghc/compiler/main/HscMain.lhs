@@ -38,8 +38,7 @@ import HsSyn
 import RdrName		( nameRdrName )
 import StringBuffer	( hGetStringBuffer )
 import Parser
-import Lexer		( P(..), ParseResult(..), ExtFlags(..), 
-			  mkPState, showPFailed )
+import Lexer		( P(..), ParseResult(..), mkPState, showPFailed )
 import SrcLoc		( mkSrcLoc )
 import TcRnDriver	( checkOldIface, tcRnModule, tcRnExtCore, tcRnIface )
 import RnEnv		( extendOrigNameCache )
@@ -388,10 +387,9 @@ myParseModule dflags src_filename
       _scc_  "Parser" do
       buf <- hGetStringBuffer src_filename
 
-      let exts = mkExtFlags dflags
-	  loc  = mkSrcLoc (mkFastString src_filename) 1 0
+      let loc  = mkSrcLoc (mkFastString src_filename) 1 0
 
-      case unP parseModule (mkPState buf loc exts) of {
+      case unP parseModule (mkPState buf loc dflags) of {
 
 	PFailed l1 l2 err -> do { hPutStrLn stderr (showPFailed l1 l2 err);
                             	  return Nothing };
@@ -510,10 +508,9 @@ hscParseStmt dflags str
 
       buf <- stringToStringBuffer str
 
-      let exts = mkExtFlags dflags 
-	  loc  = mkSrcLoc FSLIT("<interactive>") 1 0
+      let loc  = mkSrcLoc FSLIT("<interactive>") 1 0
 
-      case unP parseStmt (mkPState buf loc exts) of {
+      case unP parseStmt (mkPState buf loc dflags) of {
 
 	PFailed l1 l2 err -> do { hPutStrLn stderr (showPFailed l1 l2 err);	
                                   return Nothing };
@@ -566,10 +563,8 @@ hscThing hsc_env pcs0 ic str
 myParseIdentifier dflags str
   = do buf <- stringToStringBuffer str
  
-       let exts = mkExtFlags dflags
-	   loc  = mkSrcLoc FSLIT("<interactive>") 1 0
-
-       case unP parseIdentifier (mkPState buf loc exts) of
+       let loc  = mkSrcLoc FSLIT("<interactive>") 1 0
+       case unP parseIdentifier (mkPState buf loc dflags) of
 
 	  PFailed l1 l2 err -> do { hPutStrLn stderr (showPFailed l1 l2 err);
                                     return Nothing }
@@ -670,11 +665,4 @@ initExternalPackageState
 
 initOrigNames :: OrigNameCache
 initOrigNames = foldl extendOrigNameCache emptyModuleEnv knownKeyNames 
-
-mkExtFlags dflags
-  = ExtFlags { glasgowExtsEF = dopt Opt_GlasgowExts dflags,
-	       ffiEF	     = dopt Opt_FFI	 dflags,
-	       withEF	     = dopt Opt_With	 dflags,
-	       arrowsEF	     = dopt Opt_Arrows	 dflags,
-	       parrEF	     = dopt Opt_PArr	 dflags}
 \end{code}

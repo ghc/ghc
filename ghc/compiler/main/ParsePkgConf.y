@@ -5,6 +5,7 @@ module ParsePkgConf( loadPackageConfig ) where
 
 import Packages  ( PackageConfig(..), defaultPackageConfig )
 import Lexer
+import CmdLineOpts
 import FastString
 import StringBuffer
 import SrcLoc
@@ -96,12 +97,7 @@ loadPackageConfig :: FilePath -> IO [PackageConfig]
 loadPackageConfig conf_filename = do
    buf <- hGetStringBuffer conf_filename
    let loc  = mkSrcLoc (mkFastString conf_filename) 1 0
-       exts = ExtFlags {glasgowExtsEF = False,
-		        ffiEF	      = False,
-		        arrowsEF      = False,
-			withEF	      = False,
-			parrEF	      = False}
-   case unP parse (mkPState buf loc exts) of
+   case unP parse (mkPState buf loc defaultDynFlags) of
 	PFailed l1 l2 err -> do
             throwDyn (InstallationError (showPFailed l1 l2 err))
 

@@ -640,12 +640,13 @@ readIface :: Module -> String -> IsBootInterface -> TcRn m (Either Exception Par
 	-- Just x  <=> successfully found and parsed 
 
 readIface mod file_path is_hi_boot_file
-  = ioToTcRn (tryMost (read_iface mod file_path is_hi_boot_file))
+  = do dflags <- getDOpts
+       ioToTcRn (tryMost (read_iface mod dflags file_path is_hi_boot_file))
 
-read_iface mod file_path is_hi_boot_file
+read_iface mod dflags file_path is_hi_boot_file
  | is_hi_boot_file		-- Read ascii
  = do { buffer <- hGetStringBuffer file_path ;
-        case unP parseIface (mkPState buffer loc exts) of
+        case unP parseIface (mkPState buffer loc dflags) of
 	  POk _ iface | wanted_mod_name == actual_mod_name
 		      -> return iface
 		      | otherwise
@@ -664,11 +665,6 @@ read_iface mod file_path is_hi_boot_file
  = readBinIface file_path
 
  where
-    exts = ExtFlags {glasgowExtsEF = True,
-		     ffiEF	   = True,
-		     arrowsEF	   = True,
-		     withEF	   = True,
-		     parrEF	   = True}
     loc  = mkSrcLoc (mkFastString file_path) 1 0
 \end{code}
 

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.123 2003/09/04 11:08:47 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.124 2003/09/10 16:44:05 simonmar Exp $
 --
 -- Driver flags
 --
@@ -424,6 +424,9 @@ dynamic_flags = [
   ,  ( "fvia-C",	NoArg (setLang HscC) )
   ,  ( "filx",		NoArg (setLang HscILX) )
 
+  ,  ( "fglasgow-exts",    NoArg (mapM_ setDynFlag   glasgowExtsFlags) )
+  ,  ( "fno-glasgow-exts", NoArg (mapM_ unSetDynFlag glasgowExtsFlags) )
+
 	-- "active negatives"
   ,  ( "fno-implicit-prelude",  NoArg (setDynFlag Opt_NoImplicitPrelude) )
   ,  ( "fno-monomorphism-restriction",	
@@ -451,17 +454,20 @@ fFlags = [
   ( "warn-unused-imports",       	Opt_WarnUnusedImports ),
   ( "warn-unused-matches",       	Opt_WarnUnusedMatches ),
   ( "warn-deprecations",         	Opt_WarnDeprecations ),
-  ( "glasgow-exts", 		 	Opt_GlasgowExts ),
   ( "fi",				Opt_FFI ),  -- support `-ffi'...
   ( "ffi",				Opt_FFI ),  -- ...and also `-fffi'
   ( "with",				Opt_With ), -- with keyword
   ( "arrows",				Opt_Arrows ), -- arrow syntax
   ( "parr",				Opt_PArr ),
+  ( "th",				Opt_TH ),
+  ( "implicit-params",			Opt_ImplicitParams ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),
   ( "allow-incoherent-instances", 	Opt_AllowIncoherentInstances ),
   ( "generics",  			Opt_Generics )
   ]
+
+glasgowExtsFlags = [ Opt_GlasgowExts, Opt_FFI, Opt_TH, Opt_ImplicitParams ]
 
 isFFlag f = f `elem` (map fst fFlags)
 getFFlag f = fromJust (lookup f fFlags)

@@ -22,7 +22,7 @@
 
 {
 module Lexer (
-   Token(..), Token__(..), lexer, ExtFlags(..), mkPState, showPFailed,
+   Token(..), Token__(..), lexer, mkPState, showPFailed,
    P(..), ParseResult(..), setSrcLocFor, getSrcLoc, 
    failMsgP, failLocMsgP, srcParseFail,
    popContext, pushCurrentContext,
@@ -38,6 +38,7 @@ import FastString
 import FastTypes
 import SrcLoc
 import UniqFM
+import CmdLineOpts
 import Ctype
 import Util		( maybePrefixMatch )
 
@@ -185,27 +186,40 @@ $white_no_nl+ 				;
 
 -- "special" symbols
 
-<glaexts> {
-  "(#"					{ token IToubxparen }
-  "#)"					{ token ITcubxparen }
+<0,glaexts> {
+  "[:" / { ifExtension parrEnabled }	{ token ITopabrack }
+  ":]" / { ifExtension parrEnabled }	{ token ITcpabrack }
+}
   
-  "[:"					{ token ITopabrack }
-  ":]"					{ token ITcpabrack }
-  
-  "{|"					{ token ITocurlybar }
-  "|}"					{ token ITccurlybar }
-  
-  "[|"					{ token ITopenExpQuote }
-  "[e|"					{ token ITopenExpQuote }
-  "[p|"					{ token ITopenPatQuote }
-  "[d|"					{ layout_token ITopenDecQuote }
-  "[t|"					{ token ITopenTypQuote }
-  "|]"					{ token ITcloseQuote }
+<0,glaexts> {
+  "[|"	    / { ifExtension thEnabled }	{ token ITopenExpQuote }
+  "[e|"	    / { ifExtension thEnabled }	{ token ITopenExpQuote }
+  "[p|"	    / { ifExtension thEnabled }	{ token ITopenPatQuote }
+  "[d|"	    / { ifExtension thEnabled }	{ layout_token ITopenDecQuote }
+  "[t|"	    / { ifExtension thEnabled }	{ token ITopenTypQuote }
+  "|]"	    / { ifExtension thEnabled }	{ token ITcloseQuote }
+  \$ @varid / { ifExtension thEnabled }	{ skip_one_varid ITidEscape }
+  "$("	    / { ifExtension thEnabled }	{ token ITparenEscape }
 }
 
 <0,glaexts> {
-  "(|" / { \b _ _ _ -> arrowsEnabled b} { special IToparenbar }
-  "|)" / { \b _ _ _ -> arrowsEnabled b} { special ITcparenbar }
+  "(|" / { ifExtension arrowsEnabled }  { special IToparenbar }
+  "|)" / { ifExtension arrowsEnabled }  { special ITcparenbar }
+}
+
+<0,glaexts> {
+  \? @varid / { ifExtension ipEnabled }	{ skip_one_varid ITdupipvarid }
+  \% @varid / { ifExtension ipEnabled } { skip_one_varid ITsplitipvarid }
+}
+
+<glaexts> {
+  "(#"					{ token IToubxparen }
+  "#)"					{ token ITcubxparen }
+  "{|"					{ token ITocurlybar }
+  "|}"					{ token ITccurlybar }
+}
+
+<0,glaexts> {
   \(					{ special IToparen }
   \)					{ special ITcparen }
   \[					{ special ITobrack }
@@ -216,13 +230,6 @@ $white_no_nl+ 				;
  				
   \{					{ open_brace }
   \}					{ close_brace }
-}
-
-<glaexts> {
-  \? @varid			{ skip_one_varid ITdupipvarid }
-  \% @varid			{ skip_one_varid ITsplitipvarid }
-  \$ @varid			{ skip_one_varid ITidEscape }
-  "$("				{ token ITparenEscape }
 }
 
 <0,glaexts> {
@@ -591,6 +598,8 @@ pop_and :: Action -> Action
 pop_and act loc end buf len = do popLexState; act loc end buf len
 
 notFollowedBy char _ _ _ (_,buf) = atEnd buf || currentChar buf /= char
+
+ifExtension pred bits _ _ _ = pred bits
 
 {-
   nested comments require traversing by hand, they can't be parsed
@@ -1198,6 +1207,8 @@ ffiBit	   = 1
 parrBit	   = 2
 withBit	   = 3
 arrowsBit  = 4
+thBit	   = 5
+ipBit      = 6
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 glaExtsEnabled flags = testBit flags glaExtsBit
@@ -1205,23 +1216,13 @@ ffiEnabled     flags = testBit flags ffiBit
 withEnabled    flags = testBit flags withBit
 parrEnabled    flags = testBit flags parrBit
 arrowsEnabled  flags = testBit flags arrowsBit
-
--- convenient record-based bitmap for the interface to the rest of the world
---
--- NB: `glasgowExtsEF' implies `ffiEF' (see `mkPState' below)
---
-data ExtFlags = ExtFlags {
-		  glasgowExtsEF :: Bool,
-		  ffiEF		:: Bool,
-		  withEF	:: Bool,
-		  parrEF	:: Bool,
-		  arrowsEF	:: Bool
-		}
+thEnabled      flags = testBit flags thBit
+ipEnabled      flags = testBit flags ipBit
 
 -- create a parse state
 --
-mkPState :: StringBuffer -> SrcLoc -> ExtFlags -> PState
-mkPState buf loc exts  = 
+mkPState :: StringBuffer -> SrcLoc -> DynFlags -> PState
+mkPState buf loc flags  = 
   PState {
       buffer	 = buf,
       last_loc   = loc,
@@ -1233,12 +1234,13 @@ mkPState buf loc exts  =
 	-- we begin in the layout state if toplev_layout is set
     }
     where
-      bitmap =     glaExtsBit `setBitIf` glasgowExtsEF     exts
-	       .|. ffiBit     `setBitIf` (ffiEF	           exts
-					  || glasgowExtsEF exts)
-	       .|. withBit    `setBitIf` withEF		   exts
-	       .|. parrBit    `setBitIf` parrEF		   exts
-	       .|. arrowsBit  `setBitIf` arrowsEF	   exts
+      bitmap =     glaExtsBit `setBitIf` dopt Opt_GlasgowExts flags
+	       .|. ffiBit     `setBitIf` dopt Opt_FFI         flags
+	       .|. withBit    `setBitIf` dopt Opt_With	      flags
+	       .|. parrBit    `setBitIf` dopt Opt_PArr        flags
+	       .|. arrowsBit  `setBitIf` dopt Opt_Arrows      flags
+	       .|. thBit      `setBitIf` dopt Opt_TH          flags
+	       .|. ipBit      `setBitIf` dopt Opt_ImplicitParams flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
