@@ -65,6 +65,9 @@ you will screw up the layout where they are used in case expressions!
 # if bsdi_TARGET_OS
 #  include "../../includes/i386-unknown-bsdi.h"
 # endif
+# if cygwin32_TARGET_OS
+#  include "../../includes/i386-unknown-cygwin32.h"
+# endif
 # if solaris2_TARGET_OS
 #  include "../../includes/i386-unknown-solaris2.h"
 # endif
