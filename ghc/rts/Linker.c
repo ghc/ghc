@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.95 2002/06/12 22:29:43 wolfgang Exp $
+ * $Id: Linker.c,v 1.96 2002/06/15 19:38:11 wolfgang Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -276,34 +276,6 @@ typedef struct _RtsSymbolVal {
       Sym(__umoddi3)
 #endif
 
-#ifdef darwin_TARGET_OS
-#define RTS_DARWIN_ONLY_SYMBOLS                 \
-      Sym(__divdi3)                             \
-      Sym(__udivdi3)                            \
-      Sym(__moddi3)                             \
-      Sym(__umoddi3)							\
-	  Sym(__ashldi3)							\
-	  Sym(__ashrdi3)							\
-	  Sym(__lshrdi3)							\
-	  SymX(stg_gc_enter_2)						\
-	  SymX(stg_gc_enter_3)						\
-	  SymX(stg_gc_enter_4)						\
-	  SymX(stg_gc_enter_5)						\
-	  SymX(stg_gc_enter_6)						\
-	  SymX(stg_gc_enter_7)						\
-	  SymX(stg_gc_enter_8)						\
-	  SymX(stg_chk_2)							\
-	  SymX(stg_chk_3)							\
-	  SymX(stg_chk_4)							\
-	  SymX(stg_chk_5)							\
-	  SymX(stg_chk_6)							\
-	  SymX(stg_chk_7)							\
-	  SymX(stg_chk_8)							\
-
-#else
-#define RTS_DARWIN_ONLY_SYMBOLS
-#endif
-
 #ifndef SMP
 # define MAIN_CAP_SYM SymX(MainCapability)
 #else
@@ -528,6 +500,15 @@ typedef struct _RtsSymbolVal {
 /* force these symbols to be present */
 #define RTS_EXTRA_SYMBOLS			\
       Sym(__divsf3)
+#elif defined(powerpc_TARGET_ARCH)
+#define RTS_EXTRA_SYMBOLS						\
+      Sym(__divdi3)                             \
+      Sym(__udivdi3)                            \
+      Sym(__moddi3)                             \
+      Sym(__umoddi3)							\
+	  Sym(__ashldi3)							\
+	  Sym(__ashrdi3)							\
+	  Sym(__lshrdi3)
 #else
 #define RTS_EXTRA_SYMBOLS /* nothing */
 #endif
@@ -541,7 +522,6 @@ RTS_EXTRA_SYMBOLS
 RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
 RTS_CYGWIN_ONLY_SYMBOLS
-RTS_DARWIN_ONLY_SYMBOLS
 #undef Sym
 #undef SymX
 
@@ -562,7 +542,6 @@ static RtsSymbolVal rtsSyms[] = {
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
       RTS_CYGWIN_ONLY_SYMBOLS
-	  RTS_DARWIN_ONLY_SYMBOLS
       { 0, 0 } /* sentinel */
 };
 
