@@ -5,6 +5,8 @@ import System
 import Char
 import Array
 
+--import IOExts(trace)
+
 type Label = String
 type Code  = [String]
 
@@ -14,6 +16,8 @@ pzipWith f _      _      = error "pzipWith: unbalanced list"
 
 main 
    = getArgs >>= \args ->
+     --return ["/home/v-julsew/SOLARIS/NCG/fpt/ghc/tests/codeGen/should_run/cg001.s"]
+     --                                                                     >>= \args ->
      if   length args /= 1
      then putStr ("\ndiff_gcc_nat:\n" ++
                   "   usage: create   File.s-gcc   and   File.s-nat\n" ++
@@ -32,6 +36,9 @@ main
 
         let split_nat0 = breakOn is_split_line (lines f_nat)
             split_nat  = filter (not.null.getLabels) split_nat0
+
+            split_markers_present
+               = any is_split_line (lines f_nat)
 
             labels_nat = map getLabels split_nat
             labels_cls = map (map breakLabel) labels_nat
@@ -77,7 +84,14 @@ main
                  ++ ["#endif"
                     ]
 
-        putStr (unlines final)
+        if split_markers_present
+         then putStr (unlines final)
+         else putStr ("\ndiff_gcc_nat:\n"
+                      ++ "   fatal error: NCG output doesn't contain any\n"
+                      ++ "   ___ncg_debug_marker marks.  Can't continue!\n"
+                      ++ "   To fix: enable these markers in\n" 
+                      ++ "   fptools/ghc/compiler/nativeGen/AsmCodeGen.lhs,\n"
+                      ++ "   recompile the compiler, and regenerate the assembly.\n\n")
 
 
 pp_ok_sync :: (Label, [LabelKind], [String], [String])
@@ -133,7 +147,23 @@ find_corresponding :: Label                      -- root
                    -> Maybe ([String],[String])  -- (found text, gcc leftovers)
 
 find_corresponding root kinds gcc_lines
-   = case kinds of
+ = -- Enable the following trace in order to debug pattern matching problems.
+   --trace (
+   --   case result of 
+   --      Nothing -> show (root,kinds) ++ "\nNothing\n\n"
+   --      Just (found,uu)
+   --         -> show (root, kinds) ++ "\n" ++ unlines found ++ "\n\n"
+   --) 
+   result
+    where
+
+     arr = listArray (1, length gcc_lines) gcc_lines
+     pfxMatch ss t
+         = let clean_t = filter (not.isSpace) t
+           in  any (`isPrefixOf` clean_t) ss 
+
+     result
+      = case kinds of
 
         [Vtbl]
            -> let lbl_i = find_label arr (reconstruct_label root Vtbl)
@@ -144,7 +174,8 @@ find_corresponding root kinds gcc_lines
         [Closure]
            -> let lbl_i = find_label arr (reconstruct_label root Closure)
                   fst_i = search_back arr lbl_i (pfxMatch [".data"])
-                  lst_i = search_fwds arr (lbl_i+1) (not . pfxMatch [".long"])
+                  lst_i = search_fwds arr (lbl_i+1) 
+                             (not . pfxMatch [".long",".uaword",".uahalf"])
               in
                   splice arr fst_i (lst_i-1)
 
@@ -188,15 +219,17 @@ find_corresponding root kinds gcc_lines
 
         [Srt]
            -> let lbl_i = find_label arr (reconstruct_label root Srt)
-                  fst_i = search_back arr lbl_i (pfxMatch [".text"])
-                  lst_i = search_fwds arr (lbl_i+1) (not . pfxMatch [".long"])
+                  fst_i = search_back arr lbl_i (pfxMatch [".text",".data"])
+                  lst_i = search_fwds arr (lbl_i+1)
+                             (not . pfxMatch [".long",".uaword",".uahalf"])
               in
                   splice arr fst_i (lst_i-1)
 
         [CTbl]
            -> let lbl_i = find_label arr (reconstruct_label root CTbl)
                   fst_i = search_back arr lbl_i (pfxMatch [".text"])
-                  lst_i = search_fwds arr (lbl_i+1) (not . pfxMatch [".long"])
+                  lst_i = search_fwds arr (lbl_i+1)
+                             (not . pfxMatch [".long",".uaword",".uahalf"])
               in
                   splice arr fst_i (lst_i-1)
 
@@ -209,11 +242,6 @@ find_corresponding root kinds gcc_lines
         other 
            -> error ("find_corresponding: " ++ show kinds)
 
-     where
-        arr = listArray (1, length gcc_lines) gcc_lines
-        pfxMatch ss t
-           = let clean_t = filter (not.isSpace) t
-             in  any (`isPrefixOf` clean_t) ss 
 
 search_back :: Array Int String -> Int -> (String -> Bool) -> Int
 search_back code start_ix pred
@@ -232,10 +260,11 @@ search_fwds code start_ix pred
 
 find_label :: Array Int String -> Label -> Int
 find_label code lbl
-   = case [idx | (idx, lbl2) <- assocs code, lbl == lbl2] of
+   = --trace (unlines (map show (assocs code))) (
+     case [idx | (idx, lbl2) <- assocs code, lbl == lbl2] of
         [idx] -> idx
-        other -> error ("find_label: " ++ lbl)
-
+        other -> error ("find_label `" ++ lbl ++ "'\n")
+     --)
 
 reconstruct_label :: Label -> LabelKind -> Label
 reconstruct_label root Init
@@ -330,7 +359,7 @@ reconstruct number nat_code gcc_code
 comment str x = str ++ x
 
 -----------------------------------------------------
-split_marker = "___stg_split_marker"
+split_marker = "___ncg_debug_marker"
 
 is_split_line s
    = let m = split_marker

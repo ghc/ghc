@@ -97,11 +97,10 @@ nativeCodeGen absC us
 
 #        if NCG_DEBUG
          my_trace m x = trace m x
-         my_vcat sds = vcat (intersperse 
-				(char ' ' 
-                                 $$ ptext SLIT("# __debug_NCG_split_marker")
-                                 $$ char ' ') 
-                                 sds)
+         my_vcat sds = vcat (intersperse (char ' ' 
+                                          $$ ptext SLIT("# ___ncg_debug_marker")
+                                          $$ char ' ') 
+                                          sds)
 #        else
          my_vcat sds = vcat sds
          my_trace m x = x
