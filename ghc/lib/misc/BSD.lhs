@@ -9,6 +9,8 @@ functionality that is only provided by BSD-style APIs.
 \begin{code}       
 {-# OPTIONS -#include "cbits/ghcSockets.h" #-}
 
+#include "config.h"
+
 module BSD (
        
     HostName,
@@ -19,10 +21,13 @@ module BSD (
     getServiceByName,	    -- :: ServiceName -> ProtocolName -> IO ServiceEntry
     getServiceByPort,       -- :: PortNumber  -> ProtocolName -> IO ServiceEntry
     getServicePortNumber,   -- :: ServiceName -> IO PortNumber
+
+#ifndef cygwin32_TARGET_OS
     getServiceEntry,	    -- :: IO ServiceEntry
     setServiceEntry,	    -- :: Bool -> IO ()
     endServiceEntry,	    -- :: IO ()
     getServiceEntries,	    -- :: Bool -> IO [ServiceEntry]
+#endif
 
     ProtocolName,
     ProtocolNumber,
@@ -31,10 +36,12 @@ module BSD (
     getProtocolByNumber,    -- :: ProtocolNumber -> IO ProtcolEntry
     getProtocolNumber,	    -- :: ProtocolName   -> ProtocolNumber
 
+#ifndef cygwin32_TARGET_OS
     setProtocolEntry,	    -- :: Bool -> IO ()
     getProtocolEntry,	    -- :: IO ProtocolEntry
     endProtocolEntry,	    -- :: IO ()
     getProtocolEntries,	    -- :: Bool -> IO [ProtocolEntry]
+#endif
 
     PortNumber,
     mkPortNumber,	    -- :: Int -> PortNumber
@@ -44,22 +51,25 @@ module BSD (
     getHostByAddr,	    -- :: HostAddress -> Family -> IO HostEntry
     hostAddress,	    -- :: HostEntry -> HostAddress
 
+#ifndef cygwin32_TARGET_OS
     setHostEntry,	    -- :: Bool -> IO ()
     getHostEntry,	    -- :: IO HostEntry
     endHostEntry,	    -- :: IO ()
     getHostEntries,	    -- :: Bool -> IO [HostEntry]
+#endif
 
     NetworkName,
     NetworkAddr,
     NetworkEntry(..),
+#ifndef cygwin32_TARGET_OS
     getNetworkByName,	    -- :: NetworkName -> IO NetworkEntry
     getNetworkByAddr,       -- :: NetworkAddr -> Family -> IO NetworkEntry
     setNetworkEntry,	    -- :: Bool -> IO ()
     getNetworkEntry,	    -- :: IO NetworkEntry
     endNetworkEntry,	    -- :: IO ()
     getNetworkEntries       -- :: Bool -> IO [NetworkEntry]
-    
-) where
+#endif
+    ) where
 
 
 import GlaExts
@@ -159,6 +169,7 @@ getServicePortNumber name = do
     (ServiceEntry _ _ port _) <- getServiceByName name "tcp"
     return port
 
+#ifndef cygwin32_TARGET_OS
 getServiceEntry	:: IO ServiceEntry
 getServiceEntry = do
     ptr <- _ccall_ getservent
@@ -177,7 +188,7 @@ getServiceEntries :: Bool -> IO [ServiceEntry]
 getServiceEntries stayOpen = do
   setServiceEntry stayOpen
   getEntries (getServiceEntry) (endServiceEntry)
-
+#endif
 \end{code}
 
 The following relate directly to the corresponding \tr{UNIX} {C} calls for
@@ -194,10 +205,12 @@ getProtocolByName   :: ProtocolName   -> IO ProtocolEntry
 getProtocolByNumber :: ProtocolNumber -> IO ProtocolEntry
 getProtocolNumber   :: ProtocolName   -> IO ProtocolNumber
 
+#ifndef cygwin32_TARGET_OS
 setProtocolEntry    :: Bool -> IO ()	-- Keep DB Open ?
 getProtocolEntry    :: IO ProtocolEntry	-- Next Protocol Entry from DB
 endProtocolEntry    :: IO ()
 getProtocolEntries  :: Bool -> IO [ProtocolEntry]
+#endif
 \end{code}
 
 \begin{code}
@@ -220,6 +233,7 @@ getProtocolNumber proto = do
  (ProtocolEntry _ _ num) <- getProtocolByName proto
  return num
 
+#ifndef cygwin32_TARGET_OS
 --getProtocolEntry :: IO ProtocolEntry	-- Next Protocol Entry from DB
 getProtocolEntry = do
  ptr <- _ccall_ getprotoent
@@ -238,6 +252,7 @@ endProtocolEntry = _ccall_ endprotoent
 getProtocolEntries stayOpen = do
   setProtocolEntry stayOpen
   getEntries (getProtocolEntry) (endProtocolEntry)
+#endif
 
 \end{code}
 
@@ -260,6 +275,7 @@ getHostByAddr family addr = do
     then fail (IOError Nothing NoSuchThing "no such host entry")
     else unpackHostEntry ptr
 
+#ifndef cygwin32_TARGET_OS
 getHostEntry :: IO HostEntry
 getHostEntry = do
  ptr <- _ccall_ gethostent
@@ -278,7 +294,7 @@ getHostEntries :: Bool -> IO [HostEntry]
 getHostEntries stayOpen = do
   setHostEntry stayOpen
   getEntries (getHostEntry) (endHostEntry)
-
+#endif
 \end{code}
 
 %***************************************************************************
@@ -303,7 +319,7 @@ data NetworkEntry =
      networkFamily	:: Family,	   -- type
      networkAddress	:: NetworkAddr
    }
-
+#ifndef cygwin32_TARGET_OS
 getNetworkByName :: NetworkName -> IO NetworkEntry
 getNetworkByName name = do
  ptr <- _ccall_ getnetbyname name
@@ -336,6 +352,7 @@ getNetworkEntries :: Bool -> IO [NetworkEntry]
 getNetworkEntries stayOpen = do
   setNetworkEntry stayOpen
   getEntries (getNetworkEntry) (endNetworkEntry)
+#endif
 
 \end{code}
 
