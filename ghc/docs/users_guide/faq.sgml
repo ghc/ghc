@@ -45,6 +45,34 @@
     </varlistentry>
     
     <varlistentry>
+      <term>Do I have to recompile all my code if I upgrade
+      GHC?</term>
+      <listitem>
+	<para>Yes.  There are two reasons for this:</para>
+	<itemizedlist>
+	  <listitem>
+	    <para>GHC does a lot of cross-module optimisation, so
+	    compiled code will include parts of the libraries it was
+	    compiled against (including the Prelude), so will be
+	    deeply tied to the actual version of those libraries it
+	    was compiled against.  When you upgrade GHC, the libraries
+	    may change; even if the external interface of the
+	    libraries doesn't change, sometimes internal details may
+	    change because GHC optimised the code in the library
+	    differently.</para>
+	  </listitem>
+	  <listitem>
+	    <para>We sometimes change the ABI (application binary
+	    interface) between versions of GHC.  Code compiled with
+	    one version of GHC is not necessarily compatible with code
+	    compiled by a different version, even if you arrange to
+	    keep the same libraries.</para>
+	  </listitem>
+	</itemizedlist>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
       <term>Why doesn't GHC use shared libraries?</term>
       <listitem>
 	<para>The subject of shared libraries has come up several
