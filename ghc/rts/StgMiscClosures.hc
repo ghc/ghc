@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.61 2001/01/29 17:23:41 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.62 2001/01/31 10:12:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -313,7 +313,7 @@ STGFUN(stg_IND_PERM_entry)
 #  ifdef PROFILING
 #    error Profiling and ticky-ticky do not mix at present!
 #  endif  /* PROFILING */
-    SET_INFO((StgInd*)R1.p,&IND_info);
+    SET_INFO((StgInd*)R1.p,&stg_IND_info);
 #endif /* TICKY_TICKY */
 
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
@@ -359,7 +359,7 @@ STGFUN(stg_IND_OLDGEN_PERM_entry)
 #  ifdef PROFILING
 #    error Profiling and ticky-ticky do not mix at present!
 #  endif  /* PROFILING */
-    SET_INFO((StgInd*)R1.p,&IND_OLDGEN_info);
+    SET_INFO((StgInd*)R1.p,&stg_IND_OLDGEN_info);
 #endif /* TICKY_TICKY */
 
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
