@@ -17,12 +17,12 @@ import Linker
 
 import CmStaticInfo	( PCI )
 import CmFind		( Path, PkgName )
-import InterpSyn	( UnlinkedIBind, HValue )
+import InterpSyn	( UnlinkedIBind, HValue, binder )
 import Module		( Module )
 import Outputable	( SDoc )
 import FiniteMap	( FiniteMap, emptyFM )
 import RdrName		( RdrName )
-import Digraph		( SCC )
+import Digraph		( SCC(..) )
 import Addr		( Addr )
 import Outputable
 import Panic		( panic )
@@ -49,6 +49,13 @@ data Unlinked
    | DotDLL Path
    | Trees [UnlinkedIBind]	-- bunch of interpretable bindings
 
+instance Outputable Unlinked where
+   ppr (DotO path)   = text "DotO" <+> text path
+   ppr (DotA path)   = text "DotA" <+> text path
+   ppr (DotDLL path) = text "DotDLL" <+> text path
+   ppr (Trees binds) = text "Trees" <+> ppr (map binder binds)
+
+
 isObject (DotO _) = True
 isObject (DotA _) = True
 isObject (DotDLL _) = True
@@ -61,6 +68,10 @@ data Linkable
    = LM {-should be:Module-} String{- == ModName-} [Unlinked]
    | LP PkgName
 
+instance Outputable Linkable where
+   ppr (LM mod_nm unlinkeds) = text "LinkableM" <+> text mod_nm <+> ppr unlinkeds
+   ppr (LP package_nm)       = text "LinkableP" <+> text package_nm
+
 emptyPLS :: IO PLS
 emptyPLS = return (MkPLS { closure_env = emptyFM, 
                            itbl_env    = emptyFM })
@@ -70,7 +81,18 @@ emptyPLS = return (MkPLS { closure_env = emptyFM,
 link :: PCI -> [SCC Linkable] -> PLS -> IO LinkResult
 
 #ifndef GHCI_NOTYET
-link = panic "CmLink.link: not implemented"
+--link = panic "CmLink.link: not implemented"
+link pci groups pls1
+   = do putStrLn "Hello from the Linker!"
+        putStrLn (showSDoc (vcat (map ppLinkableSCC groups)))
+        putStrLn "Bye-bye from the Linker!"
+        return (LinkOK pls1)
+
+ppLinkableSCC :: SCC Linkable -> SDoc
+ppLinkableSCC (CyclicSCC xs) = ppr xs
+ppLinkableSCC (AcyclicSCC x) = ppr [x]
+
+
 #else
 link pci [] pls = return (LinkOK pls)
 link pci (group:groups) pls = do

@@ -46,16 +46,39 @@ import BSD
 import IOExts		( unsafePerformIO )
 import NativeInfo       ( os, arch )
 #endif
-import StgInterp	( runStgI )
 #ifdef GHCI
+import StgInterp	( runStgI )
+import CmStaticInfo	( Package(..) )  -- ToDo: maybe zap this?
+import CompManager
+import System		( getArgs ) -- tmp debugging hack; to be rm'd
 import Linker		( linkPrelude )
 #endif
 \end{code}
 
 \begin{code}
+#ifdef GHCI
+fptools = "/home/v-julsew/GHCI/fpt"
+main = stderr `seq` ghci_main
+
+ghci_main :: IO ()
+ghci_main
+   = do putStr "GHCI main\n"
+        args <- getArgs
+        if length args /= 2
+         then 
+          do putStrLn "usage: ghci <path> ModuleName"
+         else
+          do pci_txt <- readFile (fptools ++ "/ghc/driver/package.conf.inplace")
+             let raw_package_info = read pci_txt :: [Package]
+             cmstate <- emptyCmState (args!!0) raw_package_info
+             junk <- cmLoadModule cmstate (args!!1)
+             return ()
+
+#else
 main = stderr `seq`	-- Bug fix.  Sigh
  --  _scc_ "main" 
  doIt classifyOpts
+#endif
 \end{code}
 
 \begin{code}
@@ -90,7 +113,7 @@ doIt (core_cmds, stg_cmds)
 	 hPutStr stderr "\n")					>>
 
 #ifdef GHCI
-    linkPrelude >>
+--    linkPrelude >>
 #endif
 
 	--------------------------  Reader  ----------------
@@ -224,7 +247,7 @@ doIt (core_cmds, stg_cmds)
 	--------------------------  Final report -------------------------------
     reportCompile mod_name (showSDoc (ppSourceStats True rdr_module)) >>
 
-#endif
+#endif /* GHCI */
 
 
     ghcExit 0

@@ -14,27 +14,31 @@ where
 import IO		( hPutStr, stderr )
 import List		( maximumBy )
 import Maybe		( catMaybes )
-import Char		( isUpper )
-import List		( nub )
 import Time		( ClockTime )
-import Directory	( doesFileExist, getModificationTime,
-                          getDirectoryContents) 
+import Directory	( doesFileExist, getModificationTime )
+import Outputable
 
 import Module		( Module )
-import CmStaticInfo	( PCI, Package(..) )
+import CmStaticInfo	( PCI(..), Package(..), Path, ModName, PkgName )
 \end{code}
 
 \begin{code}
-type Path    = String
-type ModName = String
-type PkgName = String
-
 data ModLocation 
    = SourceOnly ModName Path        -- .hs
    | ObjectCode ModName Path Path   -- .o, .hi
    | InPackage  ModName PkgName
    | NotFound
-     deriving Show
+
+instance Outputable ModLocation where
+   ppr (SourceOnly nm path_hs) 
+      = hsep [text "SourceOnly", text (show nm), text (show path_hs)]
+   ppr (ObjectCode nm path_o path_hi)
+      = hsep [text "ObjectCode", text (show nm), 
+                                 text (show path_o), text (show path_hi)]
+   ppr (InPackage nm pkgname)
+      = hsep [text "InPackage", text (show nm), text (show pkgname)]
+
+
 
 type Finder = ModName -> IO ModLocation
 
@@ -49,7 +53,7 @@ mkFinder :: [(ModName,PkgName,Path)] -> [Path] -> Finder
 mkFinder pkg_ifaces home_dirs modnm
    = do found <- mkFinderX pkg_ifaces home_dirs modnm
         putStrLn ("FINDER: request  = " ++ modnm ++ "\n" ++
-                  "FINDER: response = " ++ show found)
+                  "FINDER: response = " ++ showSDoc (ppr found))
         return found
 
 
@@ -117,35 +121,9 @@ homeModuleExists modname path
 
 
 
-newFinder :: PCI -> IO Finder
-newFinder pci
-   -- PCI is a list of packages and their names
-   = do 
-        -- the list of directories where package interfaces are
-        let p_i_dirs :: [(PkgName,Path)]
-            p_i_dirs = concatMap nm_and_paths pci
-
-        -- interface names in each directory
-        ifacess <- mapM ifaces_in_dir p_i_dirs
-        let ifaces :: [(ModName,PkgName,Path)] 
-            ifaces = concat ifacess
-
-        -- ToDo: allow a range of home package directories
-        return (mkFinder ifaces ["."])
-     where
-        nm_and_paths :: Package -> [(PkgName,Path)]
-        nm_and_paths package 
-           = [(name package, path) | path <- nub (import_dirs package)]
-
-        ifaces_in_dir :: (PkgName,Path) -> IO [(ModName,PkgName,Path)]
-        ifaces_in_dir (pkgname,path)
-           = getDirectoryContents path >>= \ entries ->
-             return [(zap_hi if_nm, pkgname, path) 
-                    | if_nm <- entries, looks_like_iface_name if_nm]
-        looks_like_iface_name e
-           = not (null e) && isUpper (head e) 
-                          && take 3 (reverse e) == "ih."
-        zap_hi 
-           = reverse . drop 3 . reverse
+newFinder :: String{-temp debugging hack-}
+          -> PCI -> IO Finder
+newFinder path pci
+   = return (mkFinder (module_table pci) [path])
 
 \end{code}

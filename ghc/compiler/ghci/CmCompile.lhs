@@ -16,11 +16,10 @@ where
 
 #include "HsVersions.h"
 
-import CmLink		( Linkable )
+import CmLink		( Linkable(..) )
 import Outputable	( SDoc )
 import CmFind		( Finder )
-import CmSummarise	( ModSummary )
-import CmStaticInfo	( SI )
+import CmSummarise	( ModSummary, name_of_summary )
 import FiniteMap	( FiniteMap, emptyFM )
 
 import Module		( Module )
@@ -38,17 +37,24 @@ import RdrHsSyn		( RdrNameDeprecation, RdrNameRuleDecl, RdrNameFixitySig,
 
 \end{code}
 \begin{code}
-cmCompile :: SI               -- obvious
-          -> Finder           -- to find modules
+cmCompile :: Finder           -- to find modules
           -> ModSummary       -- summary, including source
           -> Maybe ModIFace   -- old interface, if available
           -> HST              -- for home module ModDetails
           -> PCS              -- IN: persistent compiler state
           -> IO CompResult
 
-cmCompile flags finder summary old_iface hst pcs
-   = return (error "cmCompile:unimp")
-
+cmCompile finder summary old_iface hst pcs
+   = do putStrLn ("cmCompile: compiling " ++ name_of_summary summary)
+        return (CompOK (error "cmCompile:modDetails")
+                       (Just (error "cmCompile:modIFace", 
+                              --error "cmCompile:Linkable"
+                              --LM (name_of_summary summary) [] 
+                              LM (name_of_summary summary) []
+                              ))
+                       pcs
+                       []
+               )
 
 data CompResult
    = CompOK   ModDetails  -- new details (HST additions)
@@ -59,7 +65,8 @@ data CompResult
               [SDoc]   -- warnings
 
    | CompErrs PCS      -- updated PCS
-              [SDoc]   -- warnings and errors
+              [SDoc]   -- errors
+              [SDoc]   -- warnings
 
 emptyPCS :: IO PCS
 emptyPCS = return (MkPCS emptyPIT emptyPST emptyHoldingPen)
