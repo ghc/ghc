@@ -1,5 +1,6 @@
 _interface_ CLabel 1
 _exports_
-CLabel CLabel;
+CLabel CLabel mkReturnPtLabel;
 _declarations_
 1 data CLabel;
+1 mkReturnPtLabel _:_ Unique.Unique -> CLabel ;;
