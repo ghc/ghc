@@ -1,6 +1,4 @@
 -- !!! printing Floats; was a bug in hbc (reported by andy)
 --
 
-import Int( Num(fromInt) )
-
-main = print ((fromInt 42) :: Float)
+main = print ((fromIntegral (42 :: Int)) :: Float)
