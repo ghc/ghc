@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.21 2005/01/28 12:55:51 simonmar Exp $
+ * $Id: MachRegs.h,v 1.22 2005/02/09 15:59:35 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -457,7 +457,7 @@
 #define REG_R7    	r20
 #define REG_R8    	r21
 
-#ifdef darwin_REGS
+#if darwin_REGS
 
 #define REG_F1		f14
 #define REG_F2		f15
