@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.14 2000/10/27 14:36:36 simonmar Exp $
+-- $Id: Main.hs,v 1.15 2000/10/31 11:13:29 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -164,10 +164,7 @@ main =
 
 	-- find the build tag, and re-process the build-specific options
    more_opts <- findBuildTag
-   left_over <- processArgs static_flags more_opts []
-   if not (null left_over) 
-	then throwDyn (OtherError "non-static flag in way-specific options")
-	else do
+   way_non_static <- processArgs static_flags more_opts []
 
 	-- give the static flags to hsc
    static_opts <- buildStaticHscOpts
@@ -197,10 +194,11 @@ main =
 		  flags = [] }
 
 	-- the rest of the arguments are "dynamic"
-   srcs <- processArgs dynamic_flags (non_static ++ warn_opts) []
+   srcs <- processArgs dynamic_flags (way_non_static ++ 
+					non_static ++ warn_opts) []
 	-- save the "initial DynFlags" away
-   dyn_flags <- readIORef v_DynFlags
-   writeIORef v_InitDynFlags dyn_flags
+   init_dyn_flags <- readIORef v_DynFlags
+   writeIORef v_InitDynFlags init_dyn_flags
 
     	-- complain about any unknown flags
    mapM unknownFlagErr [ f | ('-':f) <- srcs ]
@@ -242,8 +240,9 @@ main =
    saved_driver_state <- readIORef v_Driver_state
 
    let compileFile (src, phases) = do
-	  r <- runPipeline phases src (mode==DoLink) True
 	  writeIORef v_Driver_state saved_driver_state
+	  writeIORef v_DynFlags init_dyn_flags
+	  r <- runPipeline phases src (mode==DoLink) True
 	  return r
 
    o_files <- mapM compileFile src_pipelines
