@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.10 2002/03/19 10:59:01 simonmar Exp $
+-- $Id: Time.hsc,v 1.11 2002/03/26 21:07:06 sof Exp $
 --
 -- The standard Time library.
 --
@@ -317,7 +317,8 @@ gmtoff x    = (#peek struct tm,tm_gmtoff) x
 #   define tzname _tzname
 #  endif
 #  ifndef mingw32_TARGET_OS
-foreign import ccall "&tzname" :: Ptr (Ptr CChar)
+foreign import ccall unsafe "&tzname" tzname :: Ptr (Ptr CChar)
+foreign import ccall unsafe "timezone" timezone :: Ptr CLong
 #  else
 foreign import ccall unsafe "__hscore_timezone" timezone :: Ptr CLong
 foreign import ccall unsafe "__hscore_tzname"   tzname :: Ptr (Ptr CChar)
@@ -331,7 +332,7 @@ zone x = do
 # endif /* ! HAVE_TZNAME */
 
 -- Get the offset in secs from UTC, if (struct tm) doesn't supply it. */
-#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
+#if defined(mingw32_TARGET_OS)
 #define timezone _timezone
 #endif
 
