@@ -27,7 +27,7 @@ module OccName (
 	foldOccSet, isEmptyOccSet, intersectOccSet, intersectsOccSet,
 
 	mkOccName, mkOccFS, mkSysOcc, mkSysOccFS, mkFCallOcc, mkKindOccFS,
-	mkVarOcc, mkVarOccEncoded,
+	mkVarOcc, mkVarOccEncoded, mkTyVarOcc,
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
 	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
@@ -240,6 +240,9 @@ mkOccName ns s = mkSysOcc ns (encode s)
 
 mkVarOcc :: UserFS -> OccName
 mkVarOcc fs = mkSysOccFS varName (encodeFS fs)
+
+mkTyVarOcc :: UserFS -> OccName
+mkTyVarOcc fs = mkSysOccFS tvName (encodeFS fs)
 
 mkVarOccEncoded :: EncodedFS -> OccName
 mkVarOccEncoded fs = mkSysOccFS varName fs

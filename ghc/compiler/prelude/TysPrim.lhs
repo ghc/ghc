@@ -47,7 +47,7 @@ module TysPrim(
 
 import Var		( TyVar, mkTyVar )
 import Name		( Name, BuiltInSyntax(..), mkInternalName, mkWiredInName )
-import OccName		( mkVarOcc, mkOccFS, tcName )
+import OccName		( mkOccFS, tcName, mkTyVarOcc )
 import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon,
 			  PrimRep(..) )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
@@ -147,7 +147,7 @@ alphaTyVars is a list of type variables for use in templates:
 \begin{code}
 tyVarList :: Kind -> [TyVar]
 tyVarList kind = [ mkTyVar (mkInternalName (mkAlphaTyVarUnique u) 
-				(mkVarOcc (mkFastString name))
+				(mkTyVarOcc (mkFastString name))
 			 	noSrcLoc) kind
 	         | u <- [2..],
 		   let name | c <= 'z'  = [c]
