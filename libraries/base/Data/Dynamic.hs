@@ -370,3 +370,8 @@ INSTANCE_TYPEABLE0(Word64,word64Tc,"Word64")
 INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 INSTANCE_TYPEABLE0(Dynamic,dynamicTc,"Dynamic")
+
+#ifndef __NHC__
+#include "Dynamic.h"
+INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
+#endif

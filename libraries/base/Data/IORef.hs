@@ -66,6 +66,7 @@ mkWeakIORef r@(IORef (STRef r#)) f = IO $ \s ->
 modifyIORef :: IORef a -> (a -> a) -> IO ()
 modifyIORef ref f = writeIORef ref . f =<< readIORef ref
 
+
 -- |Atomically modifies the contents of an 'IORef'.
 --
 -- This function is useful for using 'IORef' in a safe way in a multithreaded
@@ -79,14 +80,10 @@ modifyIORef ref f = writeIORef ref . f =<< readIORef ref
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
 #if defined(__GLASGOW_HASKELL__)
 atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
+
 #elif defined(__HUGS__)
 atomicModifyIORef = plainModifyIORef	-- Hugs has no preemption
   where plainModifyIORef r f = do
 		a <- readIORef r
 		case f a of (a',b) -> writeIORef r a' >> return b
-#endif
-
-#ifndef __NHC__
-#include "Dynamic.h"
-INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
 #endif
