@@ -386,6 +386,49 @@ regUsage instr = case instr of
     regRI  _	= []
 
 #endif {- sparc_TARGET_ARCH -}
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#if powerpc_TARGET_ARCH
+
+regUsage instr = case instr of
+    LD    sz reg addr  	-> usage (regAddr addr, [reg])
+    ST    sz reg addr  	-> usage (reg : regAddr addr, [])
+    STU    sz reg addr  -> usage (reg : regAddr addr, [])
+    LIS   reg imm	-> usage ([], [reg])
+    LI    reg imm	-> usage ([], [reg])
+    MR	  reg1 reg2     -> usage ([reg2], [reg1])
+    CMP   sz reg ri	-> usage (reg : regRI ri,[])
+    CMPL  sz reg ri	-> usage (reg : regRI ri,[])
+    MTCTR reg		-> usage ([reg],[])
+    ADD	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    SUBF  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    MULLW reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    DIVW  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
+    DIVWU reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
+    AND	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    OR	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    XOR	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    SLW	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    SRW	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    SRAW  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    NEG	  reg1 reg2	-> usage ([reg2], [reg1])
+    NOT	  reg1 reg2	-> usage ([reg2], [reg1])
+    BL    imm params	-> usage (params, callClobberedRegs)
+    BCTRL params	-> usage (params, callClobberedRegs)
+    FADD  sz r1 r2 r3   -> usage ([r2,r3], [r1])
+    FSUB  sz r1 r2 r3   -> usage ([r2,r3], [r1])
+    FMUL  sz r1 r2 r3   -> usage ([r2,r3], [r1])
+    FDIV  sz r1 r2 r3   -> usage ([r2,r3], [r1])
+    FCMP  r1 r2		-> usage ([r1,r2], [])
+    _ 	    	    	-> noUsage
+  where
+    usage (src, dst) = RU (regSetFromList (filter interesting src))
+    	    	    	  (regSetFromList (filter interesting dst))
+    regAddr (AddrRegReg r1 r2) = [r1, r2]
+    regAddr (AddrRegImm r1 _)  = [r1]
+
+    regRI (RIReg r) = [r]
+    regRI  _	= []
+#endif {- powerpc_TARGET_ARCH -}
 \end{code}
 
 
@@ -462,6 +505,10 @@ findReservedRegs instrs
                              [i1,i2,f1], [i1,f1,f2], [i1,i2,f1,f2] ]
     in
         possibilities
+#endif
+#if powerpc_TARGET_ARCH
+  = [[NCG_SpillTmp_I1, NCG_SpillTmp_I2, 
+      NCG_SpillTmp_D1, NCG_SpillTmp_D2]]
 #endif
 \end{code}
 
@@ -552,6 +599,16 @@ insnFuture insn
     boring -> Next
 
 #endif {- sparc_TARGET_ARCH -}
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#if powerpc_TARGET_ARCH
+    BCC ALWAYS clbl | isAsmTemp clbl -> Branch clbl
+		    | otherwise -> NoFuture
+    BCC _ clbl 	    | isAsmTemp clbl -> NextOrBranch clbl
+    BCC _ _ -> panic "insnFuture: conditional jump to non-local label"
+    
+    BCTR -> NoFuture
+    boring	-> Next
+#endif {- powerpc_TARGET_ARCH -}
 \end{code}
 
 %************************************************************************
@@ -757,6 +814,47 @@ patchRegs instr env = case instr of
     fixRI other	= other
 
 #endif {- sparc_TARGET_ARCH -}
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#if powerpc_TARGET_ARCH
+
+patchRegs instr env = case instr of
+    LD    sz reg addr   -> LD sz (env reg) (fixAddr addr)
+    ST    sz reg addr   -> ST sz (env reg) (fixAddr addr)
+    STU    sz reg addr  -> STU sz (env reg) (fixAddr addr)
+    LIS   reg imm	-> LIS (env reg) imm
+    LI    reg imm	-> LI (env reg) imm
+    MR	  reg1 reg2     -> MR (env reg1) (env reg2)
+    CMP	  sz reg ri	-> CMP sz (env reg) (fixRI ri)
+    CMPL  sz reg ri	-> CMPL sz (env reg) (fixRI ri)
+    BCC	  cond lbl	-> BCC cond lbl
+    MTCTR reg		-> MTCTR (env reg)
+    BCTR		-> BCTR
+    ADD	  reg1 reg2 ri	-> ADD (env reg1) (env reg2) (fixRI ri)
+    SUBF  reg1 reg2 ri	-> SUBF (env reg1) (env reg2) (fixRI ri)
+    MULLW reg1 reg2 ri	-> MULLW (env reg1) (env reg2) (fixRI ri)
+    DIVW  reg1 reg2 reg3-> DIVW (env reg1) (env reg2) (env reg3)
+    DIVWU reg1 reg2 reg3-> DIVWU (env reg1) (env reg2) (env reg3)
+    AND	  reg1 reg2 ri	-> AND (env reg1) (env reg2) (fixRI ri)
+    OR 	  reg1 reg2 ri	-> OR  (env reg1) (env reg2) (fixRI ri)
+    XOR	  reg1 reg2 ri	-> XOR (env reg1) (env reg2) (fixRI ri)
+    SLW	  reg1 reg2 ri	-> SLW (env reg1) (env reg2) (fixRI ri)
+    SRW	  reg1 reg2 ri	-> SRW (env reg1) (env reg2) (fixRI ri)
+    SRAW  reg1 reg2 ri	-> SRAW (env reg1) (env reg2) (fixRI ri)
+    NEG	  reg1 reg2	-> NEG (env reg1) (env reg2)
+    NOT	  reg1 reg2	-> NOT (env reg1) (env reg2)
+    FADD  sz r1 r2 r3   -> FADD sz (env r1) (env r2) (env r3)
+    FSUB  sz r1 r2 r3   -> FSUB sz (env r1) (env r2) (env r3)
+    FMUL  sz r1 r2 r3   -> FMUL sz (env r1) (env r2) (env r3)
+    FDIV  sz r1 r2 r3   -> FDIV sz (env r1) (env r2) (env r3)
+    FCMP  r1 r2		-> FCMP (env r1) (env r2)
+    _ -> instr
+  where
+    fixAddr (AddrRegReg r1 r2) = AddrRegReg (env r1) (env r2)
+    fixAddr (AddrRegImm r1 i)  = AddrRegImm (env r1) i
+
+    fixRI (RIReg r) = RIReg (env r)
+    fixRI other	= other
+#endif {- powerpc_TARGET_ARCH -}
 \end{code}
 
 %************************************************************************
@@ -773,7 +871,7 @@ location.  Leave 8 words (ie, 64 bytes for a 64-bit arch) of slop.
 
 \begin{code}
 spillSlotSize :: Int
-spillSlotSize = IF_ARCH_alpha( 8, IF_ARCH_sparc( 8, IF_ARCH_i386( 12, )))
+spillSlotSize = IF_ARCH_alpha( 8, IF_ARCH_sparc( 8, IF_ARCH_i386( 12, IF_ARCH_powerpc( 8, ))))
 
 maxSpillSlots :: Int
 maxSpillSlots = ((rESERVED_C_STACK_BYTES - 64) `div` spillSlotSize) - 1
@@ -820,7 +918,13 @@ spillReg vreg_to_slot_map delta dyn vreg
                                     RcFloat   -> F
                                     RcDouble  -> DF
                         in ST sz dyn (fpRel (- off_w))
-        ,)))
+        ,IF_ARCH_powerpc(
+			let sz = case regClass vreg of
+                                    RcInteger -> W
+                                    RcFloat   -> F
+                                    RcDouble  -> DF
+			in ST sz dyn (AddrRegImm sp (ImmInt (off-delta)))
+	,))))
 
    
 loadReg vreg_to_slot_map delta vreg dyn
@@ -842,5 +946,11 @@ loadReg vreg_to_slot_map delta vreg dyn
                                    RcFloat   -> F
                                    RcDouble  -> DF
                         in LD sz (fpRel (- off_w)) dyn
-        ,)))
+        ,IF_ARCH_powerpc(
+			let sz = case regClass vreg of
+                                    RcInteger -> W
+                                    RcFloat   -> F
+                                    RcDouble  -> DF
+			in LD sz dyn (AddrRegImm sp (ImmInt (off-delta)))
+	,))))
 \end{code}

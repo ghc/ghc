@@ -65,6 +65,11 @@ you will screw up the layout where they are used in case expressions!
 # define BYTES_PER_WORD_STR "4"
 #endif
 
+#if powerpc_TARGET_ARCH
+# define BYTES_PER_WORD 4
+# define BYTES_PER_WORD_STR "4"
+#endif
+
 ---------------------------------------------
 
 #if alpha_TARGET_ARCH
@@ -140,6 +145,18 @@ you will screw up the layout where they are used in case expressions!
 # define IF_OS_solaris2(x,y) x
 #else
 # define IF_OS_solaris2(x,y) y
+#endif
+---------------------------------------------
+#if powerpc_TARGET_ARCH
+# define IF_ARCH_powerpc(x,y) x
+#else
+# define IF_ARCH_powerpc(x,y) y
+#endif
+-- - - - - - - - - - - - - - - - - - - - - - 
+#if darwin_TARGET_OS
+# define IF_OS_darwin(x,y) x
+#else
+# define IF_OS_darwin(x,y) y
 #endif
 ---------------------------------------------
 #endif

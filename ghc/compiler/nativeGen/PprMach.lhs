@@ -176,6 +176,45 @@ pprReg IF_ARCH_i386(s,) r
 	_  -> SLIT("very naughty sparc register")
       })
 #endif
+#if powerpc_TARGET_ARCH
+    ppr_reg_no :: Int -> Doc
+    ppr_reg_no i = ptext
+      (case i of {
+	 0 -> SLIT("r0");   1 -> SLIT("r1");
+	 2 -> SLIT("r2");   3 -> SLIT("r3");
+	 4 -> SLIT("r4");   5 -> SLIT("r5");
+	 6 -> SLIT("r6");   7 -> SLIT("r7");
+	 8 -> SLIT("r8");   9 -> SLIT("r9");
+	10 -> SLIT("r10");  11 -> SLIT("r11");
+	12 -> SLIT("r12");  13 -> SLIT("r13");
+	14 -> SLIT("r14");  15 -> SLIT("r15");
+	16 -> SLIT("r16");  17 -> SLIT("r17");
+	18 -> SLIT("r18");  19 -> SLIT("r19");
+	20 -> SLIT("r20");  21 -> SLIT("r21");
+	22 -> SLIT("r22");  23 -> SLIT("r23");
+	24 -> SLIT("r24");  25 -> SLIT("r25");
+	26 -> SLIT("r26");  27 -> SLIT("r27");
+	28 -> SLIT("r28");  29 -> SLIT("r29");
+	30 -> SLIT("r30");  31 -> SLIT("r31");
+	32 -> SLIT("f0");  33 -> SLIT("f1");
+	34 -> SLIT("f2");  35 -> SLIT("f3");
+	36 -> SLIT("f4");  37 -> SLIT("f5");
+	38 -> SLIT("f6");  39 -> SLIT("f7");
+	40 -> SLIT("f8");  41 -> SLIT("f9");
+	42 -> SLIT("f10"); 43 -> SLIT("f11");
+	44 -> SLIT("f12"); 45 -> SLIT("f13");
+	46 -> SLIT("f14"); 47 -> SLIT("f15");
+	48 -> SLIT("f16"); 49 -> SLIT("f17");
+	50 -> SLIT("f18"); 51 -> SLIT("f19");
+	52 -> SLIT("f20"); 53 -> SLIT("f21");
+	54 -> SLIT("f22"); 55 -> SLIT("f23");
+	56 -> SLIT("f24"); 57 -> SLIT("f25");
+	58 -> SLIT("f26"); 59 -> SLIT("f27");
+	60 -> SLIT("f28"); 61 -> SLIT("f29");
+	62 -> SLIT("f30"); 63 -> SLIT("f31");
+	_  -> SLIT("very naughty powerpc register")
+      })
+#endif
 \end{code}
 
 %************************************************************************
@@ -231,6 +270,15 @@ pprStSize x = ptext (case x of
 	F   -> SLIT("")
 	DF  -> SLIT("d")
 #endif
+#if powerpc_TARGET_ARCH
+	B   -> SLIT("b")
+	Bu  -> SLIT("b")
+        H   -> SLIT("h")
+        Hu  -> SLIT("h")
+	W   -> SLIT("w")
+	F   -> SLIT("fs")
+	DF  -> SLIT("fd")
+#endif
     )
 \end{code}
 
@@ -274,6 +322,14 @@ pprCond c = ptext (case c of {
 	NEG	-> SLIT("neg");	POS   -> SLIT("pos");
 	VC	-> SLIT("vc");	VS    -> SLIT("vs")
 #endif
+#if powerpc_TARGET_ARCH
+	ALWAYS  -> SLIT("");
+	EQQ	-> SLIT("eq");	NE    -> SLIT("ne");
+	LTT     -> SLIT("lt");  GE    -> SLIT("ge");
+	GTT     -> SLIT("gt");  LE    -> SLIT("le");
+	LU      -> SLIT("lt");  GEU   -> SLIT("ge");
+	GU      -> SLIT("gt");  LEU   -> SLIT("le");
+#endif
     })
 \end{code}
 
@@ -308,6 +364,22 @@ pprImm (HI i)
   = hcat [ pp_hi, pprImm i, rparen ]
   where
     pp_hi = text "%hi("
+#endif
+#if powerpc_TARGET_ARCH
+pprImm (LO i)
+  = hcat [ pp_lo, pprImm i, rparen ]
+  where
+    pp_lo = text "lo16("
+
+pprImm (HI i)
+  = hcat [ pp_hi, pprImm i, rparen ]
+  where
+    pp_hi = text "hi16("
+
+pprImm (HA i)
+  = hcat [ pp_ha, pprImm i, rparen ]
+  where
+    pp_ha = text "ha16("
 #endif
 \end{code}
 
@@ -375,12 +447,22 @@ pprAddr (AddrRegImm r1 (ImmInt i))
 pprAddr (AddrRegImm r1 (ImmInteger i))
   | i == 0 = pprReg r1
   | not (fits13Bits i) = largeOffsetError i
+-------------------
+
   | otherwise  = hcat [ pprReg r1, pp_sign, integer i ]
   where
     pp_sign = if i > 0 then char '+' else empty
 
 pprAddr (AddrRegImm r1 imm)
   = hcat [ pprReg r1, char '+', pprImm imm ]
+#endif
+#if powerpc_TARGET_ARCH
+pprAddr (AddrRegReg r1 r2)
+  = error "PprMach.pprAddr (AddrRegReg) unimplemented"
+
+pprAddr (AddrRegImm r1 (ImmInt i)) = hcat [ int i, char '(', pprReg r1, char ')' ]
+pprAddr (AddrRegImm r1 (ImmInteger i)) = hcat [ integer i, char '(', pprReg r1, char ')' ]
+pprAddr (AddrRegImm r1 imm) = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 #endif
 \end{code}
 
@@ -398,7 +480,8 @@ pprInstr (COMMENT s)
    =  IF_ARCH_alpha( ((<>) (ptext SLIT("\t# ")) (ftext s))
      ,IF_ARCH_sparc( ((<>) (ptext SLIT("! "))   (ftext s))
      ,IF_ARCH_i386( ((<>) (ptext SLIT("# "))   (ftext s))
-     ,)))
+     ,IF_ARCH_powerpc( ((<>) (ptext SLIT("; ")) (ftext s))
+     ,))))
 
 pprInstr (DELTA d)
    = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
@@ -407,21 +490,24 @@ pprInstr (SEGMENT TextSegment)
     =  IF_ARCH_alpha(ptext SLIT("\t.text\n\t.align 3") {-word boundary-}
       ,IF_ARCH_sparc(ptext SLIT(".text\n\t.align 4") {-word boundary-}
       ,IF_ARCH_i386((text ".text\n\t.align 4,0x90") {-needs per-OS variation!-}
-      ,)))
+      ,IF_ARCH_powerpc(ptext SLIT(".text\n.align 2")
+      ,))))
 
 pprInstr (SEGMENT DataSegment)
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".data\n\t.align 4")
-	,)))
+        ,IF_ARCH_powerpc(SLIT(".data\n.align 2")
+	,))))
 
 pprInstr (SEGMENT RoDataSegment)
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 4")
-	,)))
+        ,IF_ARCH_powerpc(SLIT(".const_data\n.align 2")
+	,))))
 
 pprInstr (LABEL clab)
   = let
@@ -435,7 +521,8 @@ pprInstr (LABEL clab)
 			 IF_ARCH_alpha(SLIT("\t.globl\t")
 		        ,IF_ARCH_i386(SLIT(".globl ")
 			,IF_ARCH_sparc(SLIT(".global\t")
-			,)))
+		        ,IF_ARCH_powerpc(SLIT(".globl ")
+			,))))
 			, pp_lab, char '\n'],
 	pp_lab,
 	char ':'
@@ -477,6 +564,19 @@ pprInstr (DATA s xs)
 #if i386_TARGET_ARCH
 	ppr_item B  x = [ptext SLIT("\t.byte\t") <> pprImm x]
 	ppr_item L  x = [ptext SLIT("\t.long\t") <> pprImm x]
+	ppr_item F  (ImmFloat r)
+           = let bs = floatToBytes (fromRational r)
+             in  map (\b -> ptext SLIT("\t.byte\t") <> pprImm (ImmInt b)) bs
+    	ppr_item DF (ImmDouble r)
+           = let bs = doubleToBytes (fromRational r)
+             in  map (\b -> ptext SLIT("\t.byte\t") <> pprImm (ImmInt b)) bs
+#endif
+#if powerpc_TARGET_ARCH
+	ppr_item B  x = [ptext SLIT("\t.byte\t") <> pprImm x]
+	ppr_item Bu  x = [ptext SLIT("\t.byte\t") <> pprImm x]
+	ppr_item H  x = [ptext SLIT("\t.byte\t") <> pprImm x]
+	ppr_item Hu  x = [ptext SLIT("\t.byte\t") <> pprImm x]
+	ppr_item W  x = [ptext SLIT("\t.long\t") <> pprImm x]
 	ppr_item F  (ImmFloat r)
            = let bs = floatToBytes (fromRational r)
              in  map (\b -> ptext SLIT("\t.byte\t") <> pprImm (ImmInt b)) bs
@@ -1734,6 +1834,212 @@ pp_comma_a	  = text ",a"
 #endif {-sparc_TARGET_ARCH-}
 \end{code}
 
+%************************************************************************
+%*									*
+\subsubsection{@pprInstr@ for PowerPC}
+%*									*
+%************************************************************************
+
+\begin{code}
+#if powerpc_TARGET_ARCH
+pprInstr (LD sz reg addr) = hcat [
+	char '\t',
+	ptext SLIT("l"),
+	ptext (case sz of
+	    B   -> SLIT("ba")
+	    Bu  -> SLIT("bz")
+	    H   -> SLIT("ha")
+	    Hu  -> SLIT("hz")
+	    W   -> SLIT("wz")
+	    F   -> SLIT("fs")
+	    DF  -> SLIT("fd")),
+	char '\t',
+	pprReg reg,
+	ptext SLIT(", "),
+	pprAddr addr
+    ]
+pprInstr (ST sz reg addr) = hcat [
+	char '\t',
+	ptext SLIT("st"),
+	pprSize sz,
+	char '\t',
+	pprReg reg,
+	ptext SLIT(", "),
+	pprAddr addr
+    ]
+pprInstr (STU sz reg addr) = hcat [
+	char '\t',
+	ptext SLIT("st"),
+	pprSize sz,
+	ptext SLIT("u\t"),
+	pprReg reg,
+	ptext SLIT(", "),
+	pprAddr addr
+    ]
+pprInstr (LIS reg imm) = hcat [
+	char '\t',
+	ptext SLIT("lis"),
+	char '\t',
+	pprReg reg,
+	ptext SLIT(", "),
+	pprImm imm
+    ]
+pprInstr (LI reg imm) = hcat [
+	char '\t',
+	ptext SLIT("li"),
+	char '\t',
+	pprReg reg,
+	ptext SLIT(", "),
+	pprImm imm
+    ]
+pprInstr (MR reg1 reg2) = hcat [
+	char '\t',
+	case regClass reg1 of
+	    RcInteger -> ptext SLIT("mr")
+	    _ -> ptext SLIT("fmr"),
+	char '\t',
+	pprReg reg1,
+	ptext SLIT(", "),
+	pprReg reg2
+    ]
+pprInstr (CMP sz reg ri) = hcat [
+	char '\t',
+	op,
+	char '\t',
+	pprReg reg,
+	ptext SLIT(", "),
+	pprRI ri
+    ]
+    where
+	op = hcat [
+		ptext SLIT("cmp"),
+		pprSize sz,
+		case ri of
+		    RIReg _ -> empty
+		    RIImm _ -> char 'i'
+	    ]
+pprInstr (CMPL sz reg ri) = hcat [
+	char '\t',
+	op,
+	char '\t',
+	pprReg reg,
+	ptext SLIT(", "),
+	pprRI ri
+    ]
+    where
+	op = hcat [
+		ptext SLIT("cmpl"),
+		pprSize sz,
+		case ri of
+		    RIReg _ -> empty
+		    RIImm _ -> char 'i'
+	    ]
+pprInstr (BCC cond lbl) = hcat [
+	char '\t',
+	ptext SLIT("b"),
+	pprCond cond,
+	char '\t',
+	pprCLabel_asm lbl
+    ]
+
+pprInstr (MTCTR reg) = hcat [
+	char '\t',
+	ptext SLIT("mtctr"),
+	char '\t',
+	pprReg reg
+    ]
+pprInstr (BCTR) = hcat [
+	char '\t',
+	ptext SLIT("bctr")
+    ]
+pprInstr (BL imm _) = hcat [
+	char '\t',
+	ptext SLIT("bl"),
+	char '\t',
+	pprImm imm
+    ]
+pprInstr (BCTRL _) = hcat [
+	char '\t',
+	ptext SLIT("bctrl")
+    ]
+pprInstr (ADD reg1 reg2 ri) = pprLogic SLIT("add") reg1 reg2 ri
+pprInstr (SUBF reg1 reg2 ri) = pprLogic SLIT("subf") reg1 reg2 ri
+pprInstr (MULLW reg1 reg2 ri@(RIReg _)) = pprLogic SLIT("mullw") reg1 reg2 ri
+pprInstr (MULLW reg1 reg2 ri@(RIImm _)) = pprLogic SLIT("mull") reg1 reg2 ri
+pprInstr (DIVW reg1 reg2 reg3) = pprLogic SLIT("divw") reg1 reg2 (RIReg reg3)
+pprInstr (DIVWU reg1 reg2 reg3) = pprLogic SLIT("divwu") reg1 reg2 (RIReg reg3)
+pprInstr (AND reg1 reg2 ri) = pprLogic SLIT("and") reg1 reg2 ri
+pprInstr (OR reg1 reg2 ri) = pprLogic SLIT("or") reg1 reg2 ri
+pprInstr (XOR reg1 reg2 ri) = pprLogic SLIT("xor") reg1 reg2 ri
+pprInstr (SLW reg1 reg2 ri) = pprLogic SLIT("slw") reg1 reg2 ri
+pprInstr (SRW reg1 reg2 ri) = pprLogic SLIT("srw") reg1 reg2 ri
+pprInstr (SRAW reg1 reg2 ri) = pprLogic SLIT("sraw") reg1 reg2 ri
+pprInstr (NEG reg1 reg2) = pprUnary SLIT("neg") reg1 reg2
+pprInstr (NOT reg1 reg2) = pprUnary SLIT("not") reg1 reg2
+
+pprInstr (FADD sz reg1 reg2 reg3) = pprBinaryF SLIT("fadd") sz reg1 reg2 reg3
+pprInstr (FSUB sz reg1 reg2 reg3) = pprBinaryF SLIT("fsub") sz reg1 reg2 reg3
+pprInstr (FMUL sz reg1 reg2 reg3) = pprBinaryF SLIT("fmul") sz reg1 reg2 reg3
+pprInstr (FDIV sz reg1 reg2 reg3) = pprBinaryF SLIT("fdiv") sz reg1 reg2 reg3
+
+pprInstr (FCMP reg1 reg2) = hcat [
+	char '\t',
+	ptext SLIT("fcmpu\tcr0, "),
+	    -- Note: we're using fcmpu, not fcmpo
+	    -- The difference is with fcmpo, compare with NaN is an invalid operation.
+	    -- We don't handle invalid fp ops, so we don't care
+	pprReg reg1,
+	ptext SLIT(", "),
+	pprReg reg2
+    ]
+
+pprInstr _ = ptext SLIT("something")
+
+pprLogic op reg1 reg2 ri = hcat [
+	char '\t',
+	ptext op,
+	case ri of
+	    RIReg _ -> empty
+	    RIImm _ -> char 'i',
+	char '\t',
+	pprReg reg1,
+	ptext SLIT(", "),
+	pprReg reg2,
+	ptext SLIT(", "),
+	pprRI ri
+    ]
+    
+pprUnary op reg1 reg2 = hcat [
+	char '\t',
+	ptext op,
+	char '\t',
+	pprReg reg1,
+	ptext SLIT(", "),
+	pprReg reg2
+    ]
+    
+pprBinaryF op sz reg1 reg2 reg3 = hcat [
+	char '\t',
+	ptext op,
+	pprFSize sz,
+	char '\t',
+	pprReg reg1,
+	ptext SLIT(", "),
+	pprReg reg2,
+	ptext SLIT(", "),
+	pprReg reg3
+    ]
+    
+pprRI :: RI -> Doc
+pprRI (RIReg r) = pprReg r
+pprRI (RIImm r) = pprImm r
+
+pprFSize DF = empty
+pprFSize F = char 's'
+
+#endif {-powerpc_TARGET_ARCH-}
+\end{code}
+
 \begin{code}
 #if __GLASGOW_HASKELL__ >= 504
 newFloatArray :: (Int,Int) -> ST s (STUArray s Int Float)
@@ -1765,6 +2071,8 @@ castFloatToCharArray :: MutableByteArray s t -> ST s (MutableByteArray s t)
 castFloatToCharArray = return
 
 castDoubleToCharArray :: MutableByteArray s t -> ST s (MutableByteArray s t)
+
+
 castDoubleToCharArray = return
 
 #endif

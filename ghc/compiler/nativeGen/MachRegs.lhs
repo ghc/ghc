@@ -50,6 +50,13 @@ module MachRegs (
 	, fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f26, f27
 	
 #endif
+#if powerpc_TARGET_ARCH
+	, allFPArgRegs
+	, fits16Bits
+	, sp
+	, r3, r4, r27, r28
+	, f1, f20, f21
+#endif
     ) where
 
 #include "HsVersions.h"
@@ -83,7 +90,11 @@ data Imm
   IF_ARCH_sparc(
   | LO Imm		    -- Possible restrictions...
   | HI Imm
-  ,)
+  ,IF_ARCH_powerpc(
+  | LO Imm
+  | HI Imm
+  | HA Imm	-- high halfword adjusted
+  ,))
 strImmLit s = ImmLit (text s)
 \end{code}
 
@@ -107,6 +118,11 @@ type Displacement = Imm
 #endif
 
 #if sparc_TARGET_ARCH
+  = AddrRegReg	Reg Reg
+  | AddrRegImm	Reg Imm
+#endif
+
+#if powerpc_TARGET_ARCH
   = AddrRegReg	Reg Reg
   | AddrRegImm	Reg Imm
 #endif
@@ -143,6 +159,23 @@ addrOffset addr off
       _ -> Nothing
 
 #endif {-sparc-}
+#if powerpc_TARGET_ARCH
+      AddrRegImm r (ImmInt n)
+       | fits16Bits n2 -> Just (AddrRegImm r (ImmInt n2))
+       | otherwise     -> Nothing
+       where n2 = n + off
+
+      AddrRegImm r (ImmInteger n)
+       | fits16Bits n2 -> Just (AddrRegImm r (ImmInt (fromInteger n2)))
+       | otherwise     -> Nothing
+       where n2 = n + toInteger off
+
+      AddrRegReg r (RealReg 0)
+       | fits16Bits off -> Just (AddrRegImm r (ImmInt off))
+       | otherwise     -> Nothing
+       
+      _ -> Nothing
+#endif {-powerpc-}
 
 -----------------
 #if alpha_TARGET_ARCH
@@ -165,6 +198,11 @@ largeOffsetError i
            "\nworkaround: use -fvia-C on this module.\n")
 
 #endif {-sparc-}
+
+#if powerpc_TARGET_ARCH
+fits16Bits :: Integral a => a -> Bool
+fits16Bits x = x >= -32768 && x < 32768
+#endif
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -503,6 +541,38 @@ f1  = RealReg (fReg 1)
 #endif
 \end{code}
 
+The PowerPC has 64 registers of interest; 32 integer registers and 32 floating
+point registers.
+\begin{code}
+#if powerpc_TARGET_ARCH
+fReg :: Int -> Int
+fReg x = (32 + x)
+
+regClass (VirtualRegI u) = RcInteger
+regClass (VirtualRegF u) = RcFloat
+regClass (VirtualRegD u) = RcDouble
+regClass (RealReg i) | i < 32                = RcInteger 
+		     | otherwise	     = RcDouble
+                  --   | i < nCG_FirstFloatReg = RcDouble
+                  --   | otherwise             = RcFloat
+
+showReg :: Int -> String
+showReg n
+    | n >= 0 && n <= 31	  = "%r" ++ show n
+    | n >= 32 && n <= 63  = "%f" ++ show (n - 32)
+    | otherwise           = "%unknown_powerpc_real_reg_" ++ show n
+
+sp = RealReg 1
+r3 = RealReg 3
+r4 = RealReg 4
+r27 = RealReg 27
+r28 = RealReg 28
+f1 = RealReg $ fReg 1
+f20 = RealReg $ fReg 20
+f21 = RealReg $ fReg 21
+#endif
+\end{code}
+
 Redefine the literals used for machine-registers with non-numeric
 names in the header files.  Gag me with a spoon, eh?
 \begin{code}
@@ -622,7 +692,73 @@ names in the header files.  Gag me with a spoon, eh?
 #define f29 61
 #define f30 62
 #define f31 63
+#endif
 
+#if powerpc_TARGET_ARCH
+#define r0 0
+#define r1 1
+#define r2 2
+#define r3 3
+#define r4 4
+#define r5 5
+#define r6 6
+#define r7 7
+#define r8 8
+#define r9 9
+#define r10 10
+#define r11 11
+#define r12 12
+#define r13 13
+#define r14 14
+#define r15 15
+#define r16 16
+#define r17 17
+#define r18 18
+#define r19 19
+#define r20 20
+#define r21 21
+#define r22 22
+#define r23 23
+#define r24 24
+#define r25 25
+#define r26 26
+#define r27 27
+#define r28 28
+#define r29 29
+#define r30 30
+#define r31 31
+#define f0  32
+#define f1  33
+#define f2  34
+#define f3  35
+#define f4  36
+#define f5  37
+#define f6  38
+#define f7  39
+#define f8  40
+#define f9  41
+#define f10 42
+#define f11 43
+#define f12 44
+#define f13 45
+#define f14 46
+#define f15 47
+#define f16 48
+#define f17 49
+#define f18 50
+#define f19 51
+#define f20 52
+#define f21 53
+#define f22 54
+#define f23 55
+#define f24 56
+#define f25 57
+#define f26 58
+#define f27 59
+#define f28 60
+#define f29 61
+#define f30 62
+#define f31 63
 #endif
 \end{code}
 
@@ -832,7 +968,8 @@ allMachRegNos
      IF_ARCH_sparc( ([0..31]
                      ++ [f0,f2 .. nCG_FirstFloatReg-1]
                      ++ [nCG_FirstFloatReg .. f31]),
-                   )))
+     IF_ARCH_powerpc([0..63],
+                   ))))
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
@@ -865,6 +1002,9 @@ callClobberedRegs
           [gReg i | i <- [1..7]] ++
           [fReg i | i <- [0..31]] )
 #endif {- sparc_TARGET_ARCH -}
+#if powerpc_TARGET_ARCH
+    map RealReg ([0..12] ++ map fReg [0..13])
+#endif {- powerpc_TARGET_ARCH -}
 
 -------------------------------
 -- argRegs is the set of regs which are read for an n-argument call to C.
@@ -899,6 +1039,19 @@ argRegs 6 = map (RealReg . oReg) [0,1,2,3,4,5]
 argRegs _ = panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
 #endif {- sparc_TARGET_ARCH -}
 
+#if powerpc_TARGET_ARCH
+argRegs 0 = []
+argRegs 1 = map RealReg [3]
+argRegs 2 = map RealReg [3,4]
+argRegs 3 = map RealReg [3..5]
+argRegs 4 = map RealReg [3..6]
+argRegs 5 = map RealReg [3..7]
+argRegs 6 = map RealReg [3..8]
+argRegs 7 = map RealReg [3..9]
+argRegs 8 = map RealReg [3..10]
+argRegs _ = panic "MachRegs.argRegs(powerpc): don't know about >8 arguments!"
+#endif {- powerpc_TARGET_ARCH -}
+
 -------------------------------
 -- all of the arg regs ??
 #if alpha_TARGET_ARCH
@@ -915,6 +1068,13 @@ allArgRegs = map RealReg [oReg i | i <- [0..5]]
 allArgRegs :: [Reg]
 allArgRegs = panic "MachRegs.allArgRegs(x86): should not be used!"
 #endif
+
+#if powerpc_TARGET_ARCH
+allArgRegs :: [Reg]
+allArgRegs = map RealReg [3..10]
+allFPArgRegs :: [Reg]
+allFPArgRegs = map (RealReg . fReg) [1..13]
+#endif {- powerpc_TARGET_ARCH -}
 \end{code}
 
 \begin{code}
@@ -944,6 +1104,15 @@ freeReg o6 = fastBool False  --	%o6 is our stack pointer.
 freeReg o7 = fastBool False  --	%o7 holds ret addrs (???)
 freeReg f0 = fastBool False  --  %f0/%f1 are the C fp return registers.
 freeReg f1 = fastBool False
+#endif
+
+#if powerpc_TARGET_ARCH
+freeReg 0 = fastBool False -- Hack: r0 can't be used in all insns, but it's actually free
+freeReg 1 = fastBool False -- The Stack Pointer
+#if !darwin_TARGET_OS
+ -- most non-darwin powerpc OSes use r2 as a TOC pointer or something like that
+freeReg 2 = fastBool False
+#endif
 #endif
 
 #ifdef REG_Base

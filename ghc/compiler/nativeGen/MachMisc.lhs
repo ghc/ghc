@@ -33,6 +33,10 @@ module MachMisc (
 #if sparc_TARGET_ARCH
 	RI(..), riZero, fpRelEA, moveSp, fPair
 #endif
+#if powerpc_TARGET_ARCH
+	, RI(..)
+	, condUnsigned, condToSigned
+#endif
     ) where
 
 #include "HsVersions.h"
@@ -90,7 +94,7 @@ where do we start putting the rest of them?
 \begin{code}
 eXTRA_STK_ARGS_HERE :: Int
 eXTRA_STK_ARGS_HERE
-  = IF_ARCH_alpha(0, IF_ARCH_i386(23{-6x4bytes-}, IF_ARCH_sparc(23,???)))
+  = IF_ARCH_alpha(0, IF_ARCH_i386(23{-6x4bytes-}, IF_ARCH_sparc(23, IF_ARCH_powerpc(24,???))))
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -235,6 +239,19 @@ data Cond
   | VC
   | VS
 #endif
+#if powerpc_TARGET_ARCH
+  = ALWAYS
+  | EQQ
+  | GE
+  | GEU
+  | GTT
+  | GU
+  | LE
+  | LEU
+  | LTT
+  | LU
+  | NE
+#endif
     deriving Eq  -- to make an assertion work
 \end{code}
 
@@ -264,7 +281,7 @@ data Size
     | DF    -- IEEE single-precision floating pt
     | F80   -- Intel 80-bit internal FP format; only used for spilling
 #endif
-#if sparc_TARGET_ARCH
+#if sparc_TARGET_ARCH || powerpc_TARGET_ARCH
     = B     -- byte (signed)
     | Bu    -- byte (unsigned)
     | H     -- halfword (signed, 2 bytes)
@@ -276,28 +293,28 @@ data Size
 
 primRepToSize :: PrimRep -> Size
 
-primRepToSize PtrRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize CodePtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize DataPtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize RetRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize CostCentreRep = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize CharRep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize PtrRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
+primRepToSize CodePtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
+primRepToSize DataPtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
+primRepToSize RetRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
+primRepToSize CostCentreRep = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
+primRepToSize CharRep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
 
-primRepToSize Int8Rep	    = IF_ARCH_alpha(B,  IF_ARCH_i386(B,  IF_ARCH_sparc(B,  )))
-primRepToSize Int16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(W,  IF_ARCH_sparc(H,  )))
+primRepToSize Int8Rep	    = IF_ARCH_alpha(B,  IF_ARCH_i386(B,  IF_ARCH_sparc(B,  IF_ARCH_powerpc(B,  ))))
+primRepToSize Int16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(W,  IF_ARCH_sparc(H,  IF_ARCH_powerpc(H,  ))))
     where err = primRepToSize_fail "Int16Rep"
-primRepToSize Int32Rep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize Word8Rep	    = IF_ARCH_alpha(Bu, IF_ARCH_i386(Bu, IF_ARCH_sparc(Bu, )))
-primRepToSize Word16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(Wu, IF_ARCH_sparc(Hu, )))
+primRepToSize Int32Rep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
+primRepToSize Word8Rep	    = IF_ARCH_alpha(Bu, IF_ARCH_i386(Bu, IF_ARCH_sparc(Bu, IF_ARCH_powerpc(Bu, ))))
+primRepToSize Word16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(Wu, IF_ARCH_sparc(Hu, IF_ARCH_powerpc(Hu, ))))
     where err = primRepToSize_fail "Word16Rep"
-primRepToSize Word32Rep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(Lu, IF_ARCH_sparc(W,  )))
+primRepToSize Word32Rep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(Lu, IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
 
-primRepToSize IntRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize WordRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize AddrRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize FloatRep	    = IF_ARCH_alpha(TF, IF_ARCH_i386(F,  IF_ARCH_sparc(F,  )))
-primRepToSize DoubleRep	    = IF_ARCH_alpha(TF, IF_ARCH_i386(DF, IF_ARCH_sparc(DF, )))
-primRepToSize StablePtrRep  = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize IntRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
+primRepToSize WordRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
+primRepToSize AddrRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
+primRepToSize FloatRep	    = IF_ARCH_alpha(TF, IF_ARCH_i386(F,  IF_ARCH_sparc(F,  IF_ARCH_powerpc(F,  ))))
+primRepToSize DoubleRep	    = IF_ARCH_alpha(TF, IF_ARCH_i386(DF, IF_ARCH_sparc(DF, IF_ARCH_powerpc(DF, ))))
+primRepToSize StablePtrRep  = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  IF_ARCH_powerpc(W,  ))))
 
 primRepToSize Word64Rep     = primRepToSize_fail "Word64Rep"
 primRepToSize Int64Rep      = primRepToSize_fail "Int64Rep"
@@ -700,3 +717,67 @@ fPair (RealReg n) | n >= 32 && n `mod` 2 == 0  = RealReg (n+1)
 fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 #endif {- sparc_TARGET_ARCH -}
 \end{code}
+
+\begin{code}
+#ifdef powerpc_TARGET_ARCH
+-- data Instr continues...
+
+-- Loads and stores.
+
+	      | LD	Size Reg MachRegsAddr -- size, dst, src
+	      | ST	Size Reg MachRegsAddr -- size, src, dst 
+	      | STU	Size Reg MachRegsAddr -- size, src, dst 
+	      | LIS	Reg Imm -- dst, src
+	      | LI	Reg Imm -- dst, src
+	      | MR	Reg Reg -- dst, src -- also for fmr
+	      
+	      | CMP     Size Reg RI --- size, src1, src2
+	      | CMPL    Size Reg RI --- size, src1, src2
+	      
+	      | BCC     Cond CLabel
+	      | MTCTR	Reg
+	      | BCTR
+	      | BL	Imm [Reg]	-- with list of argument regs
+	      | BCTRL	[Reg]
+	      
+	      | ADD     Reg Reg RI -- dst, src1, src2    
+	      | SUBF    Reg Reg RI -- dst, src1, src2    
+	      | MULLW	Reg Reg RI
+	      | DIVW	Reg Reg Reg
+	      | DIVWU	Reg Reg Reg
+	      
+	      | AND	Reg Reg RI -- dst, src1, src2
+	      | OR	Reg Reg RI -- dst, src1, src2
+	      | XOR	Reg Reg RI -- dst, src1, src2
+	      
+	      | NEG	Reg Reg
+	      | NOT	Reg Reg
+	      
+	      | SLW	Reg Reg RI
+	      | SRW	Reg Reg RI
+	      | SRAW	Reg Reg RI
+	      
+	      | FADD	Size Reg Reg Reg
+	      | FSUB	Size Reg Reg Reg
+	      | FMUL	Size Reg Reg Reg
+	      | FDIV	Size Reg Reg Reg
+	      
+	      | FCMP	Reg Reg
+	      
+data RI = RIReg Reg
+	| RIImm Imm
+
+condUnsigned GU = True
+condUnsigned LU = True
+condUnsigned GEU = True
+condUnsigned LEU = True
+condUnsigned _ = False
+
+condToSigned GU = GTT
+condToSigned LU = LTT
+condToSigned GEU = GE
+condToSigned LEU = LE
+condToSigned x = x
+#endif {- powerpc_TARGET_ARCH -}
+\end{code}
+
