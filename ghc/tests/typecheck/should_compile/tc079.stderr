@@ -1,18 +1,18 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
+_interface_ ShouldSucceed 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-PrelBase 1 :: $d12 1 $d13 1 $d20 1 $d21 1 $d26 1 $d28 1 $d39 1 $d41 1 $d6 1 $d7 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mmax 1 $mmin 1 && 1 Eq 1 Ord 1 Ordering 1;
-PrelNum 1 :: $d17 1 $d18 1;
+PrelBase 1 :: $dEq0 1 $dEq1 1 $dEqBool0 1 $dEqInt0 1 $dEqOrdering0 1 $dOrd0 1 $dOrd1 1 $dOrdBool0 1 $dOrdInt0 1 $dOrdOrdering0 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mmax 1 $mmin 1 && 1 Eq 1 Ord 1 Ordering 1;
+PrelNum 1 :: $dEqDouble0 1 $dOrdDouble0 1;
 _exports_
-ShouldSucceed Foo(:Foo :Foo op1 op2);
+ShouldSucceed Foo(:Foo :Foo op2 op1);
 _instances_
-instance _forall_ [a] {Foo a} => {Foo [a]} = $d1;
-instance {Foo PrelBase.Int} = $d2;
+instance _forall_ [a] {Foo a} => {Foo [a]} = $dFoo0;
+instance {Foo PrelBase.Int} = $dFooInt0;
 _declarations_
-1 $d1 _:_ _forall_ [a] {Foo a} => {Foo [a]} ;;
-1 $d2 _:_ {Foo PrelBase.Int} ;;
+1 $dFoo0 _:_ _forall_ [a] {Foo a} => {Foo [a]} ;;
+1 $dFooInt0 _:_ {Foo PrelBase.Int} ;;
 1 $mop1 _:_ _forall_ [a] {Foo a} => a -> PrelBase.Bool ;;
 1 $mop2 _:_ _forall_ [a] {Foo a} => _forall_ [b] {PrelBase.Ord b} => a -> b -> b -> b ;;
-1 class Foo a where {op1 = :: a -> PrelBase.Bool; op2 = :: _forall_ [b] {PrelBase.Ord b} => a -> b -> b -> b} ;
+1 class Foo a where {op2 = :: _forall_ [b] {PrelBase.Ord b} => a -> b -> b -> b; op1 = :: a -> PrelBase.Bool} ;

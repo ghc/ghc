@@ -1,13 +1,13 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
+_interface_ ShouldSucceed 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _exports_
 ShouldSucceed Eq2(:Eq2 :Eq2 deq);
 _instances_
-instance {Eq2 PrelBase.Int} = $d1;
-instance _forall_ [a] {Eq2 a} => {Eq2 [a]} = $d2;
+instance _forall_ [a] {Eq2 a} => {Eq2 [a]} = $dEq20;
+instance {Eq2 PrelBase.Int} = $dEq2Int0;
 _declarations_
-1 $d1 _:_ {Eq2 PrelBase.Int} ;;
-1 $d2 _:_ _forall_ [a] {Eq2 a} => {Eq2 [a]} ;;
+1 $dEq20 _:_ _forall_ [a] {Eq2 a} => {Eq2 [a]} ;;
+1 $dEq2Int0 _:_ {Eq2 PrelBase.Int} ;;
 1 class Eq2 a where {deq :: a -> a -> PrelBase.Bool} ;

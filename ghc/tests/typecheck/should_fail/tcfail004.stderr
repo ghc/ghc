@@ -1,9 +1,9 @@
  
 tcfail004.hs:3:
-    Couldn't match the type `(aWn, aWp, aWr)' against `(aWi, aWl)'
-	Expected: (aWn, aWp, aWr)
-	Inferred: (aWh, aWk)
-	In a pattern binding: (f, g) = (1, 2, 3)
+    Couldn't match the type `(a12F, a12I)' against `(a12K, a12M, a12O)'
+    Expected: (a12E, a12H)
+    Inferred: (a12K, a12M, a12O)
+    In a pattern binding: (f, g) = (1, 2, 3)
 
 
 Compilation had errors

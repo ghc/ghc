@@ -8,11 +8,6 @@ rnfail012.hs:2:
     Conflicting definitions for `:A'
 	Defined at rnfail012.hs:9
 	Defined at rnfail012.hs:3
- 
-rnfail012.hs:2:
-    Conflicting definitions for `:A'
-	Defined at rnfail012.hs:9
-	Defined at rnfail012.hs:3
 
 
 Compilation had errors

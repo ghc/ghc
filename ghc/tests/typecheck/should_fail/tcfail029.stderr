@@ -1,7 +1,7 @@
  
 tcfail029.hs:6:
-    No instance for: `Ord Foo'
-	arising from use of `>', at tcfail029.hs:6
+    No instance for `Ord Foo'
+	(arising from use of `>' at tcfail029.hs:6)
 
 
 Compilation had errors

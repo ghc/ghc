@@ -1,11 +1,15 @@
  
 tcfail072.hs:23:
-    Cannot resolve the ambiguous context (Ord aGd)
-	`Ord aGd' arising from use of `g', at tcfail072.hs:23
+    Ambiguous type variable(s)
+    `aMK'
+	in the constraint `Ord aMK'
+	arising from use of `g' at tcfail072.hs:23
  
 tcfail072.hs:23:
-    Cannot resolve the ambiguous context (Ord aGg)
-	`Ord aGg' arising from use of `g', at tcfail072.hs:23
+    Ambiguous type variable(s)
+    `aMN'
+	in the constraint `Ord aMN'
+	arising from use of `g' at tcfail072.hs:23
 
 
 Compilation had errors

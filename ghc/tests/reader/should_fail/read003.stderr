@@ -14,16 +14,16 @@ module Read003 where
  
 read003.hs:8:
     Occurs check: cannot construct the infinite type:
-	    aIK = (aIK, aIN, aIQ)
-	Expected: aIK
-	Inferred: (aIK, [aIY], aIQ)
-	In a pattern binding:
-	    ~(a, b, c)
-		| nullity b = a
-		| nullity c = a
-		| otherwise = a
-		where
-		    nullity = null
+	    aMm = (aMm, aMp, aMs)
+    Expected: (aMm, [aMA], aMs)
+    Inferred: aMm
+    In a pattern binding:
+	~(a, b, c)
+	    | nullity b = a
+	    | nullity c = a
+	    | otherwise = a
+	    where
+		nullity = null
 
 
 Compilation had errors

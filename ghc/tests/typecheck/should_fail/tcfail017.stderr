@@ -1,9 +1,11 @@
  
 tcfail017.hs:11:
-    No instance for: `C [a]'
-	arising from an instance declaration, at tcfail017.hs:11
-	Available context: (C [a])
-	From the superclasses of the instance declaration
+    Could not deduce `C [a]'
+	(arising from an instance declaration at tcfail017.hs:11)
+	from the context (B a)
+    Probable cause: missing `C [a]' in instance declaration context
+		    or missing instance declaration for `C [a]'
+    When checking the superclasses of an instance declaration
 
 
 Compilation had errors

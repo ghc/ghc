@@ -1,8 +1,8 @@
  
 tcfail058.hs:6:
     Type constructor used as a class: PrelArr.Array
-	In the context `(PrelArr.Array a)'
-	In the type `_forall_ [a b] (PrelArr.Array a) => a -> b'
+    In the context `(PrelArr.Array a)'
+    In the type `_forall_ [a b] (PrelArr.Array a) => a -> b'
 
 
 Compilation had errors

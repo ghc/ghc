@@ -1,9 +1,11 @@
  
 tcfail020.hs:11:
-    No instance for: `A [a]'
-	arising from an instance declaration, at tcfail020.hs:11
-	Available context: (A [a])
-	From the superclasses of the instance declaration
+    Could not deduce `A [a]'
+	(arising from an instance declaration at tcfail020.hs:11)
+	from the context (A a)
+    Probable cause: missing `A [a]' in instance declaration context
+		    or missing instance declaration for `A [a]'
+    When checking the superclasses of an instance declaration
 
 
 Compilation had errors

@@ -1,9 +1,9 @@
  
 tcfail012.hs:3:
-    Couldn't match the type `[amk]' against `Bool'
-	Expected: [amk]
-	Inferred: Bool
-	In a pattern binding: True = []
+    Couldn't match the type `Bool' against `[apz]'
+    Expected: Bool
+    Inferred: [apz]
+    In a pattern binding: True = []
 
 
 Compilation had errors

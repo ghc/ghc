@@ -1,10 +1,10 @@
  
 tcfail070.hs:13:
-    Couldn't match the kind * against * -> kawG
-	Expected: *
-	Found:    * -> kawG
-	In the type `[Int] Bool'
-	In the type declaration for `State'
+    Couldn't match the kind * against * -> kaAl
+    Expected: *
+    Found:    * -> kaAl
+    In the type `[Int] Bool'
+    In the type declaration for `State'
 
 
 Compilation had errors

@@ -1,18 +1,18 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
+_interface_ ShouldSucceed 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-PrelBase 1 :: $d1 1 $d10 1 $d13 1 $d15 1 $d2 1 $d21 1 $d26 1 $d27 1 $d29 1 $d3 1 $d30 1 $d31 1 $d33 1 $d34 1 $d36 1 $d38 1 $d4 1 $d42 1 $d7 1 $d8 1 $m- 1 $m/= 1 $mfromInt 1 $mshowList 1 otherwise 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
-PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+PrelBase 1 :: $dEq0 1 $dEq1 1 $dEqBool0 1 $dEqChar0 1 $dEqInt0 1 $dEval0 1 $dEval1 1 $dEval2 1 $dEvalBool0 1 $dEvalChar0 1 $dEvalDouble0 1 $dEvalInt0 1 $dEvalInteger0 1 $dNumInt0 1 $dShow0 1 $dShow1 1 $dShow2 1 $dShowBool0 1 $dShowChar0 1 $dShowInt0 1 $m- 1 $m/= 1 $mfromInt 1 $mshowList 1 otherwise 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $dEqDouble0 1 $dEqInteger0 1 $dNumDouble0 1 $dNumInteger0 1 $dShowDouble0 1 $dShowInteger0 1;
 _exports_
 ShouldSucceed f Eq'(:Eq' :Eq' doubleeq) Ord'(:Ord' :Ord' lt);
 _instances_
-instance {Ord' PrelBase.Int} = $d1;
-instance {Eq' PrelBase.Int} = $d2;
+instance {Eq' PrelBase.Int} = $dEq'Int0;
+instance {Ord' PrelBase.Int} = $dOrd'Int0;
 _declarations_
-1 $d1 _:_ {Ord' PrelBase.Int} ;;
-1 $d2 _:_ {Eq' PrelBase.Int} ;;
+1 $dEq'Int0 _:_ {Eq' PrelBase.Int} ;;
+1 $dOrd'Int0 _:_ {Ord' PrelBase.Int} ;;
 1 class Eq' a where {doubleeq :: a -> a -> PrelBase.Bool} ;
 1 class {Eq' a} => Ord' a where {lt :: a -> a -> PrelBase.Bool} ;
 1 f _:_ _forall_ [a b] {Ord' b, PrelBase.Num b} => b -> a -> PrelBase.Bool ;;

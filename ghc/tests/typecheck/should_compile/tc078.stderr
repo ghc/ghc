@@ -4,20 +4,20 @@ tc078.hs:7: Warning:
     in an instance declaration for `Eq'
 
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldFail 1
+_interface_ ShouldFail 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-PrelBase 1 :: $d12 1 $d13 1 $d2 1 $d26 1 $d28 1 $d29 1 $d31 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d6 1 $d7 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mmax 1 $mmin 1 Eq 1 Eval 1 Ord 1 Ordering 1;
-PrelNum 1 :: $d17 1 $d18 1;
+PrelBase 1 :: $dEq0 1 $dEqBool0 1 $dEqInt0 1 $dEqOrdering0 1 $dEval0 1 $dEval2 1 $dEvalBool0 1 $dEvalDouble0 1 $dEvalInt0 1 $dEvalOrdering0 1 $dOrd0 1 $dOrdBool0 1 $dOrdInt0 1 $dOrdOrdering0 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mmax 1 $mmin 1 Eq 1 Eval 1 Ord 1 Ordering 1;
+PrelNum 1 :: $dEqDouble0 1 $dOrdDouble0 1;
 _exports_
 ShouldFail Bar(MkBar);
 _instances_
-instance _forall_ [a] {PrelBase.Ord a} => {PrelBase.Ord (Bar a)} = $d1;
-instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} = $d2;
-instance _forall_ [a] => {PrelBase.Eval (Bar a)} = $d3;
+instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} = $dEqBar0;
+instance _forall_ [a] => {PrelBase.Eval (Bar a)} = $dEvalBar0;
+instance _forall_ [a] {PrelBase.Ord a} => {PrelBase.Ord (Bar a)} = $dOrdBar0;
 _declarations_
-1 $d1 _:_ _forall_ [a] {PrelBase.Ord a, PrelBase.Eq (Bar a)} => {PrelBase.Ord (Bar a)} ;;
-1 $d2 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} ;;
-1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (Bar a)} ;;
+1 $dEqBar0 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} ;;
+1 $dEvalBar0 _:_ _forall_ [a] => {PrelBase.Eval (Bar a)} ;;
+1 $dOrdBar0 _:_ _forall_ [a] {PrelBase.Ord a, PrelBase.Eq (Bar a)} => {PrelBase.Ord (Bar a)} ;;
 1 data Bar a = MkBar PrelBase.Int a ;

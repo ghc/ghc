@@ -1,15 +1,19 @@
  
 tcfail019.hs:19:
-    No instance for: `B [a]'
-	arising from an instance declaration, at tcfail019.hs:19
-	Available context: (B [a], C [a])
-	From the superclasses of the instance declaration
+    Could not deduce `C [a]'
+	(arising from an instance declaration at tcfail019.hs:19)
+	from the context ()
+    Probable cause: missing `C [a]' in instance declaration context
+		    or missing instance declaration for `C [a]'
+    When checking the superclasses of an instance declaration
  
 tcfail019.hs:19:
-    No instance for: `C [a]'
-	arising from an instance declaration, at tcfail019.hs:19
-	Available context: (B [a], C [a])
-	From the superclasses of the instance declaration
+    Could not deduce `B [a]'
+	(arising from an instance declaration at tcfail019.hs:19)
+	from the context ()
+    Probable cause: missing `B [a]' in instance declaration context
+		    or missing instance declaration for `B [a]'
+    When checking the superclasses of an instance declaration
 
 
 Compilation had errors

@@ -1,5 +1,5 @@
  
-tcfail077.hs:8: Class `Foo' does not have a method `op2'
+tcfail077.hs:8: Value not in scope: `op2'
 
 
 Compilation had errors

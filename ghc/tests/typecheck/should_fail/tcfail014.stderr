@@ -1,10 +1,10 @@
  
 tcfail014.hs:5:
-    Occurs check: cannot construct the infinite type: aGA = aGA -> aGC
-	Expected: aGA -> aGC
-	Inferred: aGA
-	In the first argument of `z', namely `z'
-	In an equation for function `h': h z = z z
+    Occurs check: cannot construct the infinite type: aN3 = aN3 -> aN5
+    Expected: aN3
+    Inferred: aN3 -> aN5
+    In the first argument of `z', namely `z'
+    In an equation for function `h': h z = z z
 
 
 Compilation had errors

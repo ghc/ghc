@@ -1,21 +1,21 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
+_interface_ ShouldSucceed 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-PrelBase 1 :: $d13 1 $d2 1 $d26 1 $d29 1 $d31 1 $d33 1 $d38 1 $d7 1 $m/= 1 not 1 Eq 1 Eval 1;
-PrelNum 1 :: $d18 1;
+PrelBase 1 :: $dEq0 1 $dEqBool0 1 $dEqInt0 1 $dEval0 1 $dEval2 1 $dEvalBool0 1 $dEvalDouble0 1 $dEvalInt0 1 $m/= 1 not 1 Eq 1 Eval 1;
+PrelNum 1 :: $dEqDouble0 1;
 _exports_
 ShouldSucceed B(X Y) T(D C);
 _instances_
-instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (B a)} = $d1;
-instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} = $d2;
-instance _forall_ [a] => {PrelBase.Eval (B a)} = $d3;
-instance _forall_ [a] => {PrelBase.Eval (T a)} = $d4;
+instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (B a)} = $dEqB0;
+instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} = $dEqT0;
+instance _forall_ [a] => {PrelBase.Eval (B a)} = $dEvalB0;
+instance _forall_ [a] => {PrelBase.Eval (T a)} = $dEvalT0;
 _declarations_
-1 $d1 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (B a)} ;;
-1 $d2 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} ;;
-1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (B a)} ;;
-1 $d4 _:_ _forall_ [a] => {PrelBase.Eval (T a)} ;;
+1 $dEqB0 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (B a)} ;;
+1 $dEqT0 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} ;;
+1 $dEvalB0 _:_ _forall_ [a] => {PrelBase.Eval (B a)} ;;
+1 $dEvalT0 _:_ _forall_ [a] => {PrelBase.Eval (T a)} ;;
 1 data B b = X |  Y b ;
 1 data T a = D (B a) |  C ;

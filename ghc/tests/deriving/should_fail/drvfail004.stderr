@@ -1,9 +1,11 @@
  
 drvfail004.hs:5:
-    No instance for: `Eq (Foo a b)'
-	arising from an instance declaration, at drvfail004.hs:5
-	Available context: (Eq (Foo a b))
-	From the superclasses of the instance declaration
+    Could not deduce `Eq (Foo a b)'
+	(arising from an instance declaration at drvfail004.hs:5)
+	from the context (Ord a, Ord b)
+    Probable cause: missing `Eq (Foo a b)' in instance declaration context
+		    or missing instance declaration for `Eq (Foo a b)'
+    When checking the superclasses of an instance declaration
 
 
 Compilation had errors

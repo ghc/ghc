@@ -1,9 +1,9 @@
  
 tcfail002.hs:4:
-    Occurs check: cannot construct the infinite type: amA = [amA]
-	Expected: [amA]
-	Inferred: amA
-	In an equation for function `c': c z = z
+    Occurs check: cannot construct the infinite type: apP = [apP]
+    Expected: apP
+    Inferred: [apP]
+    In an equation for function `c': c z = z
 
 
 Compilation had errors

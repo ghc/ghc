@@ -4,11 +4,11 @@ tcfail001.hs:9: Warning:
 
  
 tcfail001.hs:9:
-    Couldn't match the type `an0 -> an1' against `[a]'
-	Expected: an0 -> an1
-	Inferred: [a]
-	In an equation for function `op': op [] = []
-	In the definition for method `op'
+    Couldn't match the type `[a]' against `aqd -> aqe'
+    Expected: [a]
+    Inferred: aqd -> aqe
+    In an equation for function `op': op [] = []
+    In the definition for method `op'
 
 
 Compilation had errors

@@ -4,18 +4,18 @@ tcfail023.hs:1:
 	for `A B' at tcfail023.hs:14 and tcfail023.hs:11
  
 tcfail023.hs:14:
-    Couldn't match the type `Bool' against `B'
-	Expected: Bool
-	Inferred: B
-	In an equation for function `op': op C = True
-	In the definition for method `op'
+    Couldn't match the type `B' against `Bool'
+    Expected: B
+    Inferred: Bool
+    In an equation for function `op': op C = True
+    In the definition for method `op'
  
 tcfail023.hs:11:
-    Couldn't match the type `Bool' against `B'
-	Expected: Bool
-	Inferred: B
-	In an equation for function `op': op C = True
-	In the definition for method `op'
+    Couldn't match the type `B' against `Bool'
+    Expected: B
+    Inferred: Bool
+    In an equation for function `op': op C = True
+    In the definition for method `op'
 
 
 Compilation had errors

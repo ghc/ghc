@@ -1,15 +1,15 @@
  
-PrelForeign.hi:23:
+PrelForeign.hi:19:
     Constructors for `ForeignObj' not visible when checking `PrelGHC.CCallable' instance
 	(Try either importing ForeignObj non-abstractly or compile using -fno-prune-tydecls ..)
  
 cc002.hs:18:
-    No instance for: `PrelGHC.CCallable ForeignObj'
-	arising from an argument in the _ccall_ to `c', namely `x', at cc002.hs:18
+    No instance for `PrelGHC.CCallable ForeignObj'
+	(arising from an argument in the _ccall_ to `c', namely `x' at cc002.hs:18)
  
 cc002.hs:10:
-    No instance for: `PrelGHC.CReturnable ForeignObj'
-	arising from the result of the _ccall_ to a, at cc002.hs:10
+    No instance for `PrelGHC.CReturnable ForeignObj'
+	(arising from the result of the _ccall_ to `a' at cc002.hs:10)
 
 
 Compilation had errors

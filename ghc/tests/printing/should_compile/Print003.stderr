@@ -1,22 +1,22 @@
 
 ==================== Typechecked ====================
+Word.bitLsh{-r3A-} =
+    _/\_ a_tr3y -> \ x1_B1 ->
+	case x1_B1 of { Word.:Bits{-r3C-} x2_B2 x3_B3  -> x2_B2;}
 Word.bitRsh{-r3z-} =
-    _/\_ a_tr3x -> \ tpl_B1 ->
-	case tpl_B1 of { Word.:Bits{-r3B-} tpl_B2 tpl_B3  -> tpl_B2;}
-Word.bitLsh{-r3y-} =
-    _/\_ a_tr3x -> \ tpl_B1 ->
-	case tpl_B1 of { Word.:Bits{-r3B-} tpl_B2 tpl_B3  -> tpl_B3;}
-AbsBinds [a_tan2] [d.Bits_an1] []
+    _/\_ a_tr3y -> \ x1_B1 ->
+	case x1_B1 of { Word.:Bits{-r3C-} x2_B2 x3_B3  -> x3_B3;}
+AbsBinds [a_taqh] [d.Bits_aqg] []
 
 
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ Word 1
+_interface_ Word 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _exports_
-Word Bits(:Bits :Bits bitRsh bitLsh);
+Word Bits(:Bits :Bits bitLsh bitRsh);
 _fixities_
 infixl 8 bitLsh;
 infixl 8 bitRsh;
 _declarations_
-1 class Bits a where {bitRsh :: a -> PrelBase.Int -> a; bitLsh :: a -> PrelBase.Int -> a} ;
+1 class Bits a where {bitLsh :: a -> PrelBase.Int -> a; bitRsh :: a -> PrelBase.Int -> a} ;

@@ -1,9 +1,9 @@
  
 tcfail009.hs:3:
     Couldn't match the type `Int' against `Integer'
-	Expected: Integer
-	Inferred: Int
-	In an expression with a type signature: 2 :: Integer
+    Expected: Integer
+    Inferred: Int
+    In an expression with a type signature: 2 :: Integer
 
 
 Compilation had errors

@@ -2,8 +2,8 @@
 tcfail071.hs:8:
     Type signature doesn't match inferred type
 	Signature: c -> c
-	Inferred : (aG1 -> [aG6] -> [aG6]) -> aG1 -> [aG6] -> [aG6]
-	When checking the type signature for `g'
+	Inferred : (aMF -> [aMD] -> [aMD]) -> aMF -> [aMD] -> [aMD]
+    When checking the type signature for `g'
 
 
 Compilation had errors

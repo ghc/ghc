@@ -1,7 +1,7 @@
 
 NOTE: Simplifier still going after 4 iterations; bailing out.
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
+_interface_ ShouldSucceed 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
@@ -9,8 +9,8 @@ PrelBase 1 :: id 1;
 _exports_
 ShouldSucceed f Normal(:Normal :Normal normal);
 _instances_
-instance _forall_ [a b] => {Normal (a -> b)} = $d1;
+instance _forall_ [a b] => {Normal (a -> b)} = $dNormal0;
 _declarations_
-1 $d1 _:_ _forall_ [a b] => {Normal (a -> b)} ;;
+1 $dNormal0 _:_ _forall_ [a b] => {Normal (a -> b)} ;;
 1 class Normal a where {normal :: a -> PrelBase.Bool} ;
 1 f _:_ _forall_ [a] => a -> PrelBase.Bool ;;

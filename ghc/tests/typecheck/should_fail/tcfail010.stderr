@@ -1,7 +1,9 @@
  
 tcfail010.hs:3:
-    Cannot resolve the ambiguous context (Num [aGb])
-	`Num [aGb]' arising from the literal `2', at tcfail010.hs:3
+    Ambiguous type variable(s)
+    `aME'
+	in the constraint `Num [aME]'
+	arising from the literal `2' at tcfail010.hs:3
 
 
 Compilation had errors

@@ -10,8 +10,8 @@ tcfail044.hs:5:
 	 where T is not a synonym, and a,b,c are distinct type variables)
  
 tcfail044.hs:20:
-    No instance for: `Num (Float -> Float)'
-	arising from use of `+', at tcfail044.hs:20
+    No instance for `Num (Float -> Float)'
+	(arising from use of `+' at tcfail044.hs:20)
 
 
 Compilation had errors

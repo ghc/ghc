@@ -1,9 +1,9 @@
  
 tcfail005.hs:3:
-    Couldn't match the type `(aVB, aVD)' against `[aVx]'
-	Expected: (aVB, aVD)
-	Inferred: [aVx]
-	In a pattern binding: (h : i) = (1, ('a'))
+    Couldn't match the type `[a11U]' against `(a11Y, a120)'
+    Expected: [a11U]
+    Inferred: (a11Y, a120)
+    In a pattern binding: (h : i) = (1, ('a'))
 
 
 Compilation had errors

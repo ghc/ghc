@@ -8,13 +8,13 @@ SUBDIRS = \
 	deSugar \
 	deriving \
 	numeric \
-	printing \
 	reader \
 	rename \
 	simplCore \
 	stranal \
 	typecheck 
 
+#	printing \
 #	io \
 #	programs
 

@@ -1,30 +1,34 @@
  
 tcfail067.hs:65: Warning:
-    No explicit method nor default method for `abs'
+    No explicit method nor default method for `signum'
     in an instance declaration for `Num'
  
 tcfail067.hs:65: Warning:
-    No explicit method nor default method for `signum'
+    No explicit method nor default method for `abs'
     in an instance declaration for `Num'
 
  
 tcfail067.hs:76:
-    No instance for: `Ord a'
-	arising from use of `SubRange', at tcfail067.hs:76
-	Available context: (Num a)
-	When checking the type signature(s) for `numSubRangeBinOp'
- 
-tcfail067.hs:61:
-    No instance for: `Ord a'
-	arising from use of `numSubRangeNegate', at tcfail067.hs:61
-	Available context: (Eq (SubRange a), Show (SubRange a), Eval (SubRange a))
-	From the superclasses of the instance declaration
+    Could not deduce `Ord a'
+	(arising from use of `SubRange' at tcfail067.hs:76)
+	from the context (Num a, numSubRangeBinOp at a)
+    Probable cause: missing `Ord a' in type signature for `numSubRangeBinOp'
+    When checking the type signature(s) for `numSubRangeBinOp'
  
 tcfail067.hs:65:
-    No instance for: `Show (SubRange a)'
-	arising from an instance declaration, at tcfail067.hs:65
-	Available context: (Eq (SubRange a), Show (SubRange a), Eval (SubRange a))
-	From the superclasses of the instance declaration
+    Could not deduce `Ord a'
+	(arising from use of `SubRange' at tcfail067.hs:65)
+	from the context (Num (SubRange a), Num a, Eq (SubRange a), Show (SubRange a), Eval (SubRange a), Eq (SubRange a), Show (SubRange a), Eval (SubRange a), fromInt at SubRange a, fromInteger at SubRange a, signum at SubRange a, abs at SubRange a, negate at SubRange a, * at SubRange a, - at SubRange a, + at SubRange a)
+    Probable cause: missing `Ord a' in instance declaration context
+    When checking the methods of an instance declaration
+ 
+tcfail067.hs:65:
+    Could not deduce `Show (SubRange a)'
+	(arising from an instance declaration at tcfail067.hs:65)
+	from the context (Num a)
+    Probable cause: missing `Show (SubRange a)' in instance declaration context
+		    or missing instance declaration for `Show (SubRange a)'
+    When checking the superclasses of an instance declaration
 
 
 Compilation had errors

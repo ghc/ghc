@@ -1,14 +1,14 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
+_interface_ ShouldSucceed 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-PrelBase 1 :: $d2 1 $d29 1 $d31 1 $d33 1 $d38 1 $m>> 1 Eval 1 Monad 1 MonadZero 1;
+PrelBase 1 :: $dEval0 1 $dEval2 1 $dEvalBool0 1 $dEvalDouble0 1 $dEvalInt0 1 $m>> 1 Eval 1 Monad 1 MonadZero 1;
 _exports_
 ShouldSucceed f Pair(MkPair);
 _instances_
-instance _forall_ [a b] => {PrelBase.Eval (Pair a b)} = $d1;
+instance _forall_ [a b] => {PrelBase.Eval (Pair a b)} = $dEvalPair0;
 _declarations_
-1 $d1 _:_ _forall_ [a b] => {PrelBase.Eval (Pair a b)} ;;
+1 $dEvalPair0 _:_ _forall_ [a b] => {PrelBase.Eval (Pair a b)} ;;
 1 data Pair a b = MkPair a b ;
 1 f _:_ _forall_ [a b c :: (* -> *)] {PrelBase.Monad c} => c (Pair a b) -> c b ;;

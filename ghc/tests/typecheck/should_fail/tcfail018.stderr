@@ -1,7 +1,9 @@
  
 tcfail018.hs:5:
-    Cannot resolve the ambiguous context (Num [aG4])
-	`Num [aG4]' arising from the literal `1', at tcfail018.hs:5
+    Ambiguous type variable(s)
+    `aMx'
+	in the constraint `Num [aMx]'
+	arising from the literal `1' at tcfail018.hs:5
 
 
 Compilation had errors

@@ -1,16 +1,16 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
+_interface_ ShouldSucceed 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-PrelBase 1 :: $d12 1 $d13 1 $d2 1 $d20 1 $d21 1 $d26 1 $d28 1 $d29 1 $d31 1 $d33 1 $d36 1 $d37 1 $d38 1 $d39 1 $d41 1 $d6 1 $d7 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mmax 1 $mmin 1 Eq 1 Eval 1 Ord 1 Ordering 1;
-PrelNum 1 :: $d17 1 $d18 1;
+PrelBase 1 :: $dEq0 1 $dEq1 1 $dEqBool0 1 $dEqInt0 1 $dEqOrdering0 1 $dEval0 1 $dEval1 1 $dEval2 1 $dEvalBool0 1 $dEvalDouble0 1 $dEvalInt0 1 $dEvalOrdering0 1 $dOrd0 1 $dOrd1 1 $dOrdBool0 1 $dOrdInt0 1 $dOrdOrdering0 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mmax 1 $mmin 1 Eq 1 Eval 1 Ord 1 Ordering 1;
+PrelNum 1 :: $dEqDouble0 1 $dOrdDouble0 1;
 _exports_
 ShouldSucceed e0 e1 e2 q Empty(Empty);
 _instances_
-instance _forall_ [a :: (* -> *)] => {PrelBase.Eval (Empty a)} = $d1;
+instance _forall_ [a :: (* -> *)] => {PrelBase.Eval (Empty a)} = $dEvalEmpty0;
 _declarations_
-1 $d1 _:_ _forall_ [a :: (* -> *)] => {PrelBase.Eval (Empty a)} ;;
+1 $dEvalEmpty0 _:_ _forall_ [a :: (* -> *)] => {PrelBase.Eval (Empty a)} ;;
 1 data Empty q :: (* -> *) = Empty (_forall_ [a] {PrelBase.Ord a} => q a) ;
 1 e0 _:_ Empty PrelBase.[] ;;
 1 e1 _:_ Empty PrelBase.[] ;;

@@ -1,72 +1,82 @@
 
 ==================== Typechecked ====================
 Print001.BarNil{-r8-} =
-    _/\_ a_tr51 -> Print001.BarNil{-r8-} {_@_ a_tr51}
+    _/\_ a_tr58 -> Print001.BarNil{-r8-} {_@_ a_tr58}
 Print001.BarCon{-r7-} =
-    _/\_ a_tr51 -> \ tpl_B1 tpl_B2 ->
-	Print001.BarCon{-r7-} {_@_ a_tr51 tpl_B1 tpl_B2}
-Print001.MkFoo{-r57-} =
-    _/\_ d_tr53 e_tr54 f_tr55 -> \ tpl_B1 tpl_B2 tpl_B3 ->
-	Print001.MkFoo{-r57-} {_@_ d_tr53
-			       _@_ e_tr54
-			       _@_ f_tr55
-			       tpl_B1
-			       tpl_B2
-			       tpl_B3}
+    _/\_ a_tr58 -> \ x1_B1
+		     x2_B2 ->
+	Print001.BarCon{-r7-} {_@_ a_tr58 x1_B1 x2_B2}
+Print001.MkFoo{-r50-} =
+    _/\_ d_tr5a
+	 e_tr5b
+	 f_tr5c -> \ x1_B1
+		     x2_B2
+		     x3_B3 ->
+	Print001.MkFoo{-r50-} {_@_ d_tr5a
+			       _@_ e_tr5b
+			       _@_ f_tr5c
+			       x1_B1
+			       x2_B2
+			       x3_B3}
 AbsBinds
-[a_ta12D, b_ta12F]
+[a_ta19e, b_ta19g]
 []
-[([a_ta12D, b_ta12F], Print001.g{-r4S-}, g_a13Q)]
-    g_a13Q x_r4Z = lit_a13S
+[([a_ta19e, b_ta19g], Print001.g{-r4W-}, g_a1aD)]
+    g_a1aD x_r56 = lit_a1aF
 AbsBinds
-[a_ta12R, b_ta12T, c_ta12V]
-[d.Eq_a130, d.Ord_a131, d.Ix_a132]
-[([a_ta12R, b_ta12T, c_ta12V], Print001.f2{-r4R-}, f2_a13Z)]
-    f2_a13Z x_r4X = x_r4X
+[a_ta19y, b_ta19A, c_ta19C]
+[d.Eq_a19H, d.Ord_a19I, d.Ix_a19J]
+[([a_ta19y, b_ta19A, c_ta19C], Print001.f2{-r4X-}, f2_a1aM)]
+    f2_a1aM x_r54 = x_r54
 AbsBinds
-[a_ta13b, b_ta13d, c_ta13f]
-[d.Eq_a13k]
-[([a_ta13b, b_ta13d, c_ta13f], Print001.f{-r4Q-}, f_a140)]
-    f_a140 x_r4V = x_r4V
+[a_ta19Y, b_ta1a0, c_ta1a2]
+[d.Eq_a1a7]
+[([a_ta19Y, b_ta1a0, c_ta1a2], Print001.f{-r4Y-}, f_a1aN)]
+    f_a1aN x_r52 = x_r52
 AbsBinds
-[a13o, a13q, a13s]
+[a1ab, a1ad, a1af]
 []
-[([a13o, a13q, a13s], Print001.mkFoo{-r4T-}, mkFoo_a141)]
-    mkFoo_a141 = Print001.MkFoo{-r57-} [a13o, a13q, a13s]
+[([a1ab, a1ad, a1af], Print001.mkFoo{-r4Z-}, mkFoo_a1aO)]
+    mkFoo_a1aO = Print001.MkFoo{-r50-} [a1ab, a1ad, a1af]
 AbsBinds
-[a_ta13M]
+[a_ta1az]
 []
-[([a_ta13M], Print001.$d1{-r13Y-}, d.Eval_a13A)]
-    d.Eval_a13A = PrelBase.:Eval{-rR-} (Print001.Bar{-r56-} a_ta13M)
+[([a_ta1az], Print001.$dEvalBar0{-r1aL-}, d.Eval_a1an)]
+    d.Eval_a1an =
+	PrelErr.error{-87-}
+	    {PrelBase.Eval{-24-} (Print001.Bar{-r5d-} a_ta1az)} "Compiler error: bad dictionary Eval"
 AbsBinds
-[d_ta13N, e_ta13P, f_ta13O]
+[d_ta1aA, e_ta1aC, f_ta1aB]
 []
-[([d_ta13N, e_ta13P, f_ta13O], Print001.$d2{-r13X-}, d.Eval_a13I)]
-    d.Eval_a13I =
-	PrelBase.:Eval{-rR-} (Print001.Foo{-r58-} d_ta13N e_ta13P f_ta13O)
-lit_a13S = fromRational_a13R 2.0
-fromRational_a13R =
-    PrelNum.fromRational{-8U-} PrelBase.Float{-3c-} d.Fractional_a13L
-d.Fractional_a13L = PrelNum.$d23{-rF0-}
+[([d_ta1aA, e_ta1aC, f_ta1aB],
+  Print001.$dEvalFoo0{-r1aK-},
+  d.Eval_a1av)]
+    d.Eval_a1av =
+	PrelErr.error{-87-}
+	    {PrelBase.Eval{-24-} (Print001.Foo{-r5e-} d_ta1aA e_ta1aC f_ta1aB)} "Compiler error: bad dictionary Eval"
+lit_a1aF = fromRational_a1aE 2.0
+fromRational_a1aE =
+    PrelNum.fromRational{-8S-} PrelBase.Float{-3c-} d.Fractional_a1ay
+d.Fractional_a1ay = PrelNum.$dFractionalFloat0{-rGQ-}
 
 
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ Print001 1
+_interface_ Print001 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-Ix 1 :: $d3 1 $d4 1 $d5 1 $d6 1 $d7 1 $d8 1 $d9 1 Ix 1;
-PrelBase 1 :: $d1 1 $d10 1 $d11 1 $d12 1 $d13 1 $d15 1 $d2 1 $d20 1 $d21 1 $d24 1 $d25 1 $d26 1 $d27 1 $d28 1 $d29 1 $d3 1 $d30 1 $d31 1 $d32 1 $d33 1 $d34 1 $d36 1 $d37 1 $d38 1 $d39 1 $d4 1 $d40 1 $d41 1 $d42 1 $d43 1 $d5 1 $d6 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 Enum 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 String 1;
-PrelNum 1 :: $d1 1 $d10 1 $d14 1 $d15 1 $d16 1 $d17 1 $d18 1 $d19 1 $d2 1 $d23 1 $d24 1 $d25 1 $d26 1 $d27 1 $d28 1 $d29 1 $d30 1 $d31 1 $d32 1 $d33 1 $d34 1 $d35 1 $d36 1 $d37 1 $d38 1 $d39 1 $d4 1 $d5 1 $d6 1 $d7 1 $d8 1 $d9 1 $mdiv 1 $mdivMod 1 $mmod 1 $mquot 1 $mrecip 1 $mrem 1 Fractional 1 Integral 1 Ratio 1 Rational 1 Real 1;
-PrelTup 1 :: $d10 1 $d13 1 $d14 1 $d3 1 $d4 1 $d49 1 $d50 1 $d9 1;
+Ix 1 :: $dIx2 1 $dIx3 1 $dIx4 1 $dIxBool0 1 $dIxChar0 1 $dIxInt0 1 $dIxOrdering0 1 Ix 1;
+PrelBase 1 :: $dEnum0 1 $dEnumBool0 1 $dEnumChar0 1 $dEnumInt0 1 $dEnumOrdering0 1 $dEq0 1 $dEq1 1 $dEqBool0 1 $dEqChar0 1 $dEqInt0 1 $dEqOrdering0 1 $dEval0 1 $dEval1 1 $dEval2 1 $dEvalBool0 1 $dEvalChar0 1 $dEvalDouble0 1 $dEvalFloat0 1 $dEvalInt0 1 $dEvalInteger0 1 $dEvalOrdering0 1 $dNumInt0 1 $dOrd0 1 $dOrd1 1 $dOrdBool0 1 $dOrdChar0 1 $dOrdInt0 1 $dOrdOrdering0 1 $dShow0 1 $dShow1 1 $dShow2 1 $dShowBool0 1 $dShowChar0 1 $dShowInt0 1 $dShowOrdering0 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 Enum 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 String 1;
+PrelNum 1 :: $dEnumDouble0 1 $dEnumFloat0 1 $dEnumInteger0 1 $dEnumRatio0 1 $dEqDouble0 1 $dEqFloat0 1 $dEqInteger0 1 $dEqRatio0 1 $dEvalRatio0 1 $dFractionalDouble0 1 $dFractionalFloat0 1 $dFractionalRatio0 1 $dIntegralInt0 1 $dIntegralInteger0 1 $dIxInteger0 1 $dNumDouble0 1 $dNumFloat0 1 $dNumInteger0 1 $dNumRatio0 1 $dOrdDouble0 1 $dOrdFloat0 1 $dOrdInteger0 1 $dOrdRatio0 1 $dRealDouble0 1 $dRealFloat0 1 $dRealInt0 1 $dRealInteger0 1 $dRealRatio0 1 $dShowDouble0 1 $dShowFloat0 1 $dShowInteger0 1 $dShowRatio0 1 $mdiv 1 $mdivMod 1 $mmod 1 $mquot 1 $mrecip 1 $mrem 1 Fractional 1 Integral 1 Ratio 1 Rational 1 Real 1;
+PrelTup 1 :: $dEq0 1 $dEq1 1 $dEval0 1 $dEval1 1 $dOrd0 1 $dOrd1 1 $dShow2 1 $dShow3 1;
 _exports_
 Print001 f f2 g mkFoo Bar(BarNil BarCon) Foo(MkFoo);
 _instances_
-instance _forall_ [a] => {PrelBase.Eval (Bar a)} = $d1;
-instance _forall_ [a b c] => {PrelBase.Eval (Foo a b c)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (Bar a)} = $dEvalBar0;
+instance _forall_ [a b c] => {PrelBase.Eval (Foo a b c)} = $dEvalFoo0;
 _declarations_
-1 $d1 _:_ _forall_ [a] => {PrelBase.Eval (Bar a)} ;;
-1 $d2 _:_ _forall_ [a b c] => {PrelBase.Eval (Foo a b c)} ;;
+1 $dEvalBar0 _:_ _forall_ [a] => {PrelBase.Eval (Bar a)} ;;
+1 $dEvalFoo0 _:_ _forall_ [a b c] => {PrelBase.Eval (Foo a b c)} ;;
 1 data Bar a = BarNil |  BarCon (Foo a a a) (Bar a) ;
 1 data Foo d e f = MkFoo [((d -> PrelBase.Int) -> d) -> e] (d -> e, e -> e) PrelBase.() ;
 1 f _:_ _forall_ [a b c] {PrelBase.Eq a} => (a -> b -> c) -> a -> b -> c ;;

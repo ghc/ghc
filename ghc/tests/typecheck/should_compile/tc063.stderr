@@ -1,19 +1,19 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
+_interface_ ShouldSucceed 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-PrelBase 1 :: $d2 1 $d29 1 $d31 1 $d33 1 $d38 1 Eval 1;
+PrelBase 1 :: $dEval0 1 $dEval2 1 $dEvalBool0 1 $dEvalDouble0 1 $dEvalInt0 1 Eval 1;
 _exports_
 ShouldSucceed g Reps(:Reps :Reps f) X(Tag);
 _instances_
-instance {Reps PrelBase.Bool} = $d1;
-instance _forall_ [a] => {Reps (X a)} = $d2;
-instance _forall_ [a] => {PrelBase.Eval (X a)} = $d3;
+instance _forall_ [a] => {PrelBase.Eval (X a)} = $dEvalX0;
+instance {Reps PrelBase.Bool} = $dRepsBool0;
+instance _forall_ [a] => {Reps (X a)} = $dRepsX0;
 _declarations_
-1 $d1 _:_ {Reps PrelBase.Bool} ;;
-1 $d2 _:_ _forall_ [a] => {Reps (X a)} ;;
-1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (X a)} ;;
+1 $dEvalX0 _:_ _forall_ [a] => {PrelBase.Eval (X a)} ;;
+1 $dRepsBool0 _:_ {Reps PrelBase.Bool} ;;
+1 $dRepsX0 _:_ _forall_ [a] => {Reps (X a)} ;;
 1 class Reps r where {f :: r -> r -> r} ;
 1 data X a = Tag a ;
 1 g _:_ _forall_ [a] {Reps a} => a -> a ;;

@@ -1,18 +1,5 @@
  
-rnfail008.hs:18: Warning:
-    No explicit method nor default method for `op1'
-    in an instance declaration for `K'
- 
-rnfail008.hs:18: Warning:
-    No explicit method nor default method for `op2'
-    in an instance declaration for `K'
- 
-rnfail008.hs:14: Warning:
-    No explicit method nor default method for `op2'
-    in an instance declaration for `K'
-
- 
-rnfail008.hs:18: Class `K' does not have a method `op3'
+rnfail008.hs:18: Value not in scope: `op3'
 
 
 Compilation had errors

@@ -1,13 +1,13 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
+_interface_ ShouldSucceed 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-PrelBase 1 :: $d2 1 $d29 1 $d31 1 $d33 1 $d38 1 Eval 1;
+PrelBase 1 :: $dEval0 1 $dEval2 1 $dEvalBool0 1 $dEvalDouble0 1 $dEvalInt0 1 Eval 1;
 _exports_
 ShouldSucceed Rec(Node);
 _instances_
-instance {PrelBase.Eval Rec} = $d1;
+instance {PrelBase.Eval Rec} = $dEvalRec0;
 _declarations_
-1 $d1 _:_ {PrelBase.Eval Rec} ;;
+1 $dEvalRec0 _:_ {PrelBase.Eval Rec} ;;
 1 data Rec = Node PrelBase.Int Rec ;

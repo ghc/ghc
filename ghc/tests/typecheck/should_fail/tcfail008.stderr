@@ -1,11 +1,15 @@
  
 tcfail008.hs:3:
-    Cannot resolve the ambiguous context (Num [aG1])
-	`Num [aG1]' arising from the literal `2', at tcfail008.hs:3
+    Ambiguous type variable(s)
+    `aMu'
+	in the constraint `Num [aMu]'
+	arising from the literal `2' at tcfail008.hs:3
  
 tcfail008.hs:3:
-    Cannot resolve the ambiguous context (Num aG1)
-	`Num aG1' arising from the literal `1', at tcfail008.hs:3
+    Ambiguous type variable(s)
+    `aMu'
+	in the constraint `Num aMu'
+	arising from the literal `1' at tcfail008.hs:3
 
 
 Compilation had errors

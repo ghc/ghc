@@ -1,10 +1,10 @@
  
 tcfail016.hs:9:
-    Couldn't match the type `Expr aVI' against `AnnExpr aVO'
-	Expected: AnnExpr aVO
-	Inferred: Expr aVO
-	In the first argument of `g', namely `e1'
-	In the first argument of `++', namely `(g e1)'
+    Couldn't match the type `AnnExpr a12c' against `Expr a125'
+    Expected: Expr a12c
+    Inferred: AnnExpr a12c
+    In the first argument of `g', namely `e1'
+    In the first argument of `++', namely `(g e1)'
 
 
 Compilation had errors

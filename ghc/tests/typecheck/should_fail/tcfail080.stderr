@@ -1,7 +1,9 @@
  
-tcfail080.hs:7:
-    Too many parameters for class `Collection'
-    In the class declaration for `Collection'
+tcfail080.hs:11:
+    Ambiguous type variable(s)
+    `aqR'
+	in the constraint `Collection aqR aqU'
+	arising from use of `singleton' at tcfail080.hs:11
 
 
 Compilation had errors

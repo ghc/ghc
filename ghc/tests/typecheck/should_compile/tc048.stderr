@@ -1,20 +1,20 @@
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
+_interface_ ShouldSucceed 1 302
 _instance_modules_
 IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-PrelBase 1 :: $d2 1 $d29 1 $d31 1 $d33 1 $d36 1 $d38 1 Eval 1;
-PrelTup 1 :: $d13 1;
+PrelBase 1 :: $dEval0 1 $dEval1 1 $dEval2 1 $dEvalBool0 1 $dEvalDouble0 1 $dEvalInt0 1 Eval 1;
+PrelTup 1 :: $dEval0 1;
 _exports_
 ShouldSucceed mAp ranAFE ranOAL sNd AFE(MkAFE) FG(MkFG) OL(MkOL);
 _instances_
-instance _forall_ [a b c] => {PrelBase.Eval (AFE a b c)} = $d1;
-instance _forall_ [a b] => {PrelBase.Eval (FG a b)} = $d2;
-instance _forall_ [a] => {PrelBase.Eval (OL a)} = $d3;
+instance _forall_ [a b c] => {PrelBase.Eval (AFE a b c)} = $dEvalAFE0;
+instance _forall_ [a b] => {PrelBase.Eval (FG a b)} = $dEvalFG0;
+instance _forall_ [a] => {PrelBase.Eval (OL a)} = $dEvalOL0;
 _declarations_
-1 $d1 _:_ _forall_ [a b c] => {PrelBase.Eval (AFE a b c)} ;;
-1 $d2 _:_ _forall_ [a b] => {PrelBase.Eval (FG a b)} ;;
-1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (OL a)} ;;
+1 $dEvalAFE0 _:_ _forall_ [a b c] => {PrelBase.Eval (AFE a b c)} ;;
+1 $dEvalFG0 _:_ _forall_ [a b] => {PrelBase.Eval (FG a b)} ;;
+1 $dEvalOL0 _:_ _forall_ [a] => {PrelBase.Eval (OL a)} ;;
 1 data AFE n a b = MkAFE (OL (n, FG a b)) ;
 1 data FG a b = MkFG (OL (a, b)) ;
 1 data OL a = MkOL [a] ;

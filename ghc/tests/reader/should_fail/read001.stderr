@@ -13,8 +13,8 @@ infix 6 fixn
 infixl 7 +#
 infixr 8 fixr
 {- rec -}
-bindwith :: _forall_ [] (OrdClass a, OrdClass b) => a -> b -> b
 g :: _forall_ [] (Num a, Eq b) => Foo a -> [b] -> (a, a, a) -> b
+bindwith :: _forall_ [] (OrdClass a, OrdClass b) => a -> b -> b
 fixn x y = x
 fixl x y = x
 fixr x y = x
@@ -80,7 +80,7 @@ instance _forall_ [] (Eq a) => EqClass (EqTree a) where
     []
     eqc x = 'a'
 class (Ord a) => OrdClass a where {
-    orda :: a -> Char; ordb :: a -> Char; ordc :: a -> Char;
+    ordc :: a -> Char; ordb :: a -> Char; orda :: a -> Char;
     }
 class (Eq a) => EqClass a where {
     eqc :: a -> Char;

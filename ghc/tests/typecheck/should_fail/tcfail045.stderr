@@ -4,8 +4,8 @@ tcfail045.hs:10:
 	class CCallable type Socket
  
 tcfail045.hs:13:
-    No instance for: `CCallable Socket'
-	arising from an argument in the _ccall_ to `foo', namely `x', at tcfail045.hs:13
+    No instance for `CCallable Socket'
+	(arising from an argument in the _ccall_ to `foo', namely `x' at tcfail045.hs:13)
 
 
 Compilation had errors

@@ -1,10 +1,10 @@
  
 tcfail028.hs:4:
-    Couldn't match the kind ** against kaIT -> *
-	Expected: **
-	Found:    kaIT -> *
-	In the type `A a'
-	In the data declaration for `A'
+    Couldn't match the kind ** against kaPo -> *
+    Expected: **
+    Found:    kaPo -> *
+    In the type `A a'
+    In the data declaration for `A'
 
 
 Compilation had errors
