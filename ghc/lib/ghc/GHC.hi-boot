@@ -74,6 +74,8 @@ GHC
   neWord#
   ltWord#
   leWord#
+  quotWord#
+  remWord#
   and#
   or#
   not#
