@@ -1838,7 +1838,7 @@ So this program is legal:
   f :: Baz -> String
   f (Baz1 p q) | p == q    = "Yes"
                | otherwise = "No"
-  f (Baz1 v fn)            = show (fn v)
+  f (Baz2 v fn)            = show (fn v)
 </programlisting>
 
 </para>
