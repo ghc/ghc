@@ -727,7 +727,7 @@ warnUnusedModules mods
   | otherwise 		      = mapRn_ (addWarnRn . unused_mod) mods
   where
     unused_mod m = ptext SLIT("Module") <+> quotes (pprModuleName m) <+> 
-		   ptext SLIT("is imported, but nothing from it is used")
+		   text "is imported, but nothing from it is used"
 
 warnUnusedLocalBinds, warnUnusedImports, warnUnusedMatches :: [Name] -> RnM d ()
 warnUnusedImports names
