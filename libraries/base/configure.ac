@@ -22,6 +22,8 @@ AC_CHECK_HEADERS([wctype.h], [AC_CHECK_FUNCS(iswspace)])
 
 AC_CHECK_FUNCS([ftime gmtime_r localtime_r lstat readdir_r])
 
+AC_CHECK_FUNCS([_chsize ftruncate])
+
 # map standard C types and ISO types to Haskell types
 FPTOOLS_CHECK_HTYPE(char)
 FPTOOLS_CHECK_HTYPE(signed char)

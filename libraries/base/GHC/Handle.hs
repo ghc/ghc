@@ -35,7 +35,7 @@ module GHC.Handle (
 
   stdin, stdout, stderr,
   IOMode(..), openFile, openBinaryFile, openFd, fdToHandle,
-  hFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
+  hFileSize, hSetFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
   hFlush, hDuplicate, hDuplicateTo,
 
   hClose, hClose_help,
@@ -1009,7 +1009,7 @@ hClose_handle_ handle_ = do
   		   })
 
 -----------------------------------------------------------------------------
--- Detecting the size of a file
+-- Detecting and changing the size of a file
 
 -- | For a handle @hdl@ which attached to a physical file,
 -- 'hFileSize' @hdl@ returns the size of that file in 8-bit bytes.
@@ -1026,6 +1026,20 @@ hFileSize handle =
 		 then return r
 		 else ioException (IOError Nothing InappropriateType "hFileSize"
 				   "not a regular file" Nothing)
+
+
+-- | 'hSetFileSize' @hdl@ @size@ truncates the physical file with handle @hdl@ to @size@ bytes.
+
+hSetFileSize :: Handle -> Integer -> IO ()
+hSetFileSize handle size =
+    withHandle_ "hSetFileSize" handle $ \ handle_ -> do
+    case haType handle_ of 
+      ClosedHandle 		-> ioe_closedHandle
+      SemiClosedHandle 		-> ioe_closedHandle
+      _ -> do flushWriteBufferOnly handle_
+	      throwErrnoIf (/=0) "hSetFileSize" 
+	         (c_ftruncate (fromIntegral (haFD handle_)) (fromIntegral size))
+	      return ()
 
 -- ---------------------------------------------------------------------------
 -- Detecting the End of Input

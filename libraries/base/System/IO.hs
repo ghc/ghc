@@ -57,9 +57,12 @@ module System.IO (
 
     -- * Operations on handles
 
-    -- ** Determining the size of a file
+    -- ** Determining and changing the size of a file
 
     hFileSize,		       -- :: Handle -> IO Integer
+#ifdef __GLASGOW_HASKELL__
+    hSetFileSize,              -- :: Handle -> Integer -> IO ()
+#endif
 
     -- ** Detecting the end of input
 

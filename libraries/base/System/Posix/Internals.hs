@@ -376,6 +376,9 @@ foreign import ccall unsafe "HsBase.h umask"
 foreign import ccall unsafe "HsBase.h write" 
    c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
 
+foreign import ccall unsafe "HsBase.h __hscore_ftruncate"
+   c_ftruncate :: CInt -> COff -> IO CInt
+
 foreign import ccall unsafe "HsBase.h unlink"
    c_unlink :: CString -> IO CInt
 

@@ -397,6 +397,18 @@ __hscore_seek_end( void )
   return SEEK_END;
 }
 
+INLINE int
+__hscore_ftruncate( int fd, off_t where )
+{
+#if defined(HAVE_FTRUNCATE)
+  return ftruncate(fd,where);
+#elif defined(HAVE__CHSIZE)
+  return _chsize(fd,where);
+#else
+#error at least ftruncate or _chsize functions are required to build
+#endif
+}
+
 INLINE HsInt
 __hscore_setmode( HsInt fd, HsBool toBin )
 {
