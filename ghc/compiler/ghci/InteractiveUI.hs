@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.18 2000/11/27 12:52:36 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.19 2000/11/28 12:58:02 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -131,7 +131,7 @@ uiLoop = do
   	  runCommand l
 	  uiLoop  
 
-exitGHCi = io $ do putStrLn "Leaving GHCi."; exitWith ExitSuccess
+exitGHCi = io $ do putStrLn "Leaving GHCi." 
 
 -- Top level exception handler, just prints out the exception 
 -- and carries on.
