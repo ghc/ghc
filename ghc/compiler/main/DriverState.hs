@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.69 2002/02/13 15:45:25 simonmar Exp $
+-- $Id: DriverState.hs,v 1.70 2002/02/16 18:15:14 sof Exp $
 --
 -- Settings for the driver
 --
@@ -508,10 +508,10 @@ getPackageLibraries = do
        = libs
 #      else
        = if   "HSbase1" `elem` libs && "HSbase2" `elem` libs
-         then "HSbase" : filter ((/= "HSbase").(take 5)) libs
+         then "HSbase" : filter (not.(isPrefixOf "HSbase")) libs
          else
          if   "HSwin321" `elem` libs && "HSwin322" `elem` libs
-         then "HSwin32" : filter ((/= "HSwin32").(take 7)) libs
+         then "HSwin32" : filter (not.(isPrefixOf "HSwin32")) libs
          else 
          libs
 #      endif
