@@ -172,6 +172,11 @@ coreSatExprFloat (Let bind body)
     coreSatExprFloat body		`thenUs` \ (floats, new_body) ->
     returnUs (new_bind:floats, new_body)
 
+coreSatExprFloat (Note n@(SCC _) expr)
+  = coreSatAnExpr expr			`thenUs` \ expr ->
+    deLam expr				`thenUs` \ expr ->
+    returnUs ([], Note n expr)
+
 coreSatExprFloat (Note other_note expr)
   = coreSatExprFloat expr		`thenUs` \ (floats, expr) ->
     returnUs (floats, Note other_note expr)
