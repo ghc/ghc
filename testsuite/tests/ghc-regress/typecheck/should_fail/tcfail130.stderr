@@ -1,0 +1,6 @@
+
+tcfail130.hs:10:0:
+    Implicit parameters escape from the monomorphic top-level binding(s) of `foo':
+      ?x::Int arising from use of `woggle' at tcfail130.hs:10:6-11
+    Probably fix: add type signatures for the top-level binding(s)
+    When generalising the type(s) for `foo'

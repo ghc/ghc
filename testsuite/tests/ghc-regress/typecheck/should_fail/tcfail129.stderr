@@ -1,0 +1,12 @@
+
+tcfail129.hs:12:7:
+    Type synonym `Foo' should have 1 argument, but has been given 0
+    In an expression type signature: Bar Foo
+    In the expression: undefined :: Bar Foo
+    In the definition of `blah': blah = undefined :: Bar Foo
+
+tcfail129.hs:17:8:
+    Type synonym `Foo1' should have 1 argument, but has been given 0
+    In an expression type signature: Bar1 Foo1
+    In the expression: undefined :: Bar1 Foo1
+    In the definition of `blah1': blah1 = undefined :: Bar1 Foo1
