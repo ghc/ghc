@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.39 2001/07/19 07:28:00 andy Exp $
+ * $Id: RtsFlags.c,v 1.40 2001/07/23 10:42:37 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -417,7 +417,7 @@ usage_text[] = {
 "    -hd{des,des...} closures with specified closure descriptions",
 "    -hy{typ,typ...} closures with specified type descriptions",
 "",
-"  -i<sec>         how often to sample heap",
+"  -i<msec>       Time between heap samples (msec, default: 20)",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
 # endif
