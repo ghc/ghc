@@ -14,8 +14,10 @@ you will screw up the layout where they are used in case expressions!
 
 #ifdef DEBUG
 #define ASSERT(e) if (not (e)) then (assertPanic __FILE__ __LINE__) else
+#define ASSERT2(e,msg) if (not (e)) then (assertPprPanic __FILE__ __LINE__ (msg)) else
 #else
 #define ASSERT(e)
+#define ASSERT2(e,msg)
 #endif
 
 #if __STDC__
