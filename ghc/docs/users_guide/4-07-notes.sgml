@@ -1,0 +1,201 @@
+<sect1 id="release-4-07">
+  <title>Release notes for version 4.07 (May 2000)</title>
+
+  <sect2>
+    <title>User-visible compiler changes</title>
+
+    <itemizedlist>
+      <listitem>
+	<para>New profiling subsystem, based on cost-centre stacks.
+	See <xref linkend="profiling">.</para>
+      </listitem>
+
+      <listitem>
+	<para>The x86 native code generator has been reworked
+	considerably, and now works reliably.  Using the NCG rather
+	than compiling via C reduces compilation times by roughly a
+	half while having minimal effect on the run-time of the
+	compiled program (about 2-4% slower, worse for floating-point
+	intensive programs).</para>
+
+	<para>Add the <option>-fasm-x86</option> flag to GHC's command
+	line to enable it.</para>
+      </listitem>
+
+      <listitem>
+	<para>Implicit parameters.</para>
+      </listitem>
+
+      <listitem>
+	<para>Functional dependencies.</para>
+      </listitem>
+
+      <listitem>
+	<para>New <literal>DEPRECATED</literal> pragma for marking
+	outdated interfaces as deprecated.</para>
+      </listitem>
+
+      <listitem>
+	<para>New flag: <option>-fdump-minimal-imports</option>, which
+	dumps a file <literal>M.imports</literal> that contains the
+	(allegedly) minimal bunch of imports needed by the current
+	module.</para>
+      </listitem>
+
+      <listitem>
+	<para>New &ldquo;package&rdquo; system for libraries.  See
+	<xref linkend="packages"> for the details.</para>
+      </listitem>
+
+      <listitem>
+	<para>The long-standing bug that caused some programs which
+	used <link linkend="trace"><literal>trace</literal></link> to
+	exit with a deadlock error has been fixed.</para>
+      </listitem>
+
+      <listitem>
+	<para>Trying to put into a full <link
+	linkend="sec-MVars"><literal>MVar</literal></link> will now
+	raise a <link
+	linkend="PutFullMVar"><literal>PutFullMVar</literal></link>
+	exception.</para>
+      </listitem>
+
+      <listitem>
+	<para>If a thread is about to be garbage collected, because it
+	is waiting on an <literal>MVar</literal> that no other thread
+	has access to, then it will now be sent the <link
+	linkend="BlockedOnDeadMVar"><literal>BlockedOnDeadMVar</literal></link>
+	exception.</para>
+      </listitem>
+
+      <listitem>
+	<para>A thread that is found to be blocked against itself
+	(i.e. is black holed) is now sent a
+	<literal>NonTermination</literal> exception.</para>
+      </listitem>
+
+      <listitem>
+	<para>Operations which may <emphasis>block</emphasis>, such as
+	<literal>takeMVar</literal>, <literal>raiseInThread</literal>,
+	and several I/O operations, may now receive asynchronous
+	exceptions even in the scope of a
+	<literal>blockAsyncExceptions</literal>.  These are called
+	<firstterm>interruptible</firstterm> operations.  See <xref
+	linkend="interruptible-operations"> for more details.</para>
+      </listitem>
+
+      <listitem>
+	<para>Result type signatures now work.</para>
+      </listitem>
+
+      <listitem>
+	<para>A truckload of bugfixes.</para>
+      </listitem>
+      
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>User-visible library changes</title>
+
+    <itemizedlist>
+      <listitem>
+	<para>FFI.</para>
+      </listitem>
+
+      <listitem>
+	<para>HaXml, a library for parsing and generating XML, has
+	been added to the <literal>text</literal> package (<xref
+	linkend="sec-haxml">).</para>
+      </listitem>
+
+      <listitem>
+	<para>The <literal>QuickCheck</literal> library for performing
+	functional testing has been added to the
+	<literal>util</literal> package.</para>
+      </listitem>
+
+      <listitem>
+	<para>Two new experimental interfaces to arrays:
+	<literal>IArray</literal> for immutable arrays (<xref
+	linkend="sec-iarray">), and <literal>MArray</literal> for
+	mutable arrays (<xref linkend="sec-marray">).</para> 
+
+	<para>Comments on these interfaces are welcome; eventually
+	we'd like them to replace <literal>ByteArray</literal>,
+	<literal>STArray</literal> and
+	<literal>IOArray</literal>.</para>
+      </listitem>
+
+      <listitem>
+	<para>New function: <link
+	linkend="tryTakeMVar"><literal>tryTakeMVar</literal></link>.</para>
+      </listitem>
+
+      <listitem>
+	<para><literal>MutableArray</literal> has gone away, use
+	<literal>STArray</literal> (see <xref linkend="sec-ST">)
+	instead.</para>
+      </listitem>
+
+      <listitem>
+	<para><literal>hPutBuf</literal>,
+	<literal>hPutBufBA</literal>, <literal>hGetBuf</literal>, and
+	<literal>hGetBufBA</literal>, have been renamed to
+	<literal>hPutBufFull</literal>,
+	<literal>hPutBufBAFull</literal>,
+	<literal>hGetBufFull</literal>, and
+	<literal>hGetBufBAFull</literal>.  Functions with the old
+	names still exist, but have slightly different semantics.  See
+	<xref linkend="sec-bulk-transfers"> for more details.</para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Internal changes</title>
+
+    <itemizedlist>
+      <listitem>
+	<para><literal>Con</literal> is gone; the
+	<literal>CoreExpr</literal> type is simpler.</para>
+      </listitem>
+
+      <listitem>
+	<para><literal>NoRepLits</literal> have gone.</para>
+      </listitem>
+
+      <listitem>
+	<para>Better usage info in interface files, which means less
+	recompilation.</para>
+      </listitem>
+
+      <listitem>
+	<para>CCall primop is tidied up.</para>
+      </listitem>
+
+      <listitem>
+	<para>Constant folding now done by Rules.</para>
+      </listitem>
+
+      <listitem>
+	<para>Lots of hackery in the simplifier.</para>
+      </listitem>
+
+      <listitem>
+	<para>Improvements in CPR and strictness analysis.</para>
+      </listitem>
+  
+    </itemizedlist>
+
+  </sect2>
+
+</sect1>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter" "sect1") ***
+     ;;; End: ***
+ -->

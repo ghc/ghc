@@ -1,6 +1,6 @@
 <!ENTITY license        SYSTEM "license.sgml">
 <!ENTITY intro          SYSTEM "intro.sgml" >
-<!ENTITY relnotes       SYSTEM "4-06-notes.sgml" >
+<!ENTITY relnotes       SYSTEM "4-07-notes.sgml" >
 <!ENTITY installing     SYSTEM "installing.sgml" >
 <!ENTITY using          SYSTEM "using.sgml" >
 <!ENTITY runtime        SYSTEM "runtime_control.sgml" >
