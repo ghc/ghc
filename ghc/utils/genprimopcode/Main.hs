@@ -14,7 +14,7 @@ import Maybe ( catMaybes )
 
 main = getArgs >>= \args ->
        if length args /= 1 || head args `notElem` known_args
-       then error ("usage: genprimopcode command < primops.txt > ...\n"
+       then error ("usage: genprimopcode command < primops.i > ...\n"
                    ++ "   where command is one of\n"
                    ++ unlines (map ("            "++) known_args)
                   )

@@ -67,10 +67,9 @@ SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 #-----------------------------------------------------------------------------
 # 	Rules
 
-PrelPrimopWrappers.hs: ../../compiler/prelude/primops.txt
-	rm -f PrelPrimopWrappers.hs
-	../../utils/genprimopcode/genprimopcode  --make-haskell-wrappers \
-		< ../../compiler/prelude/primops.txt > PrelPrimopWrappers.hs
+PrelPrimopWrappers.hs: ../../compiler/prelude/primops.i
+	rm -f $@
+	../../utils/genprimopcode/genprimopcode --make-haskell-wrappers < $< > $@
 
 PrelGHC.$(way_)hi	: PrelGHC.hi-boot
 	cp $< $@

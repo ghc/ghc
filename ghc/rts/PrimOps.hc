@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.81 2001/07/23 17:28:33 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.82 2001/07/26 03:08:39 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -595,7 +595,7 @@ FN_(word64ToIntegerzh_fast)
 }
 
 
-#endif /* HAVE_LONG_LONG */
+#endif /* SUPPORT_LONG_LONGS */
 
 /* ToDo: this is shockingly inefficient */
 

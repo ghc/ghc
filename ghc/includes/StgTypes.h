@@ -1,10 +1,10 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.16 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: StgTypes.h,v 1.17 2001/07/26 03:08:39 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
  * Various C datatypes used in the run-time system.  This is the
- * lowest-level include file (after config.h).
+ * lowest-level include file, after config.h and Derived.h.
  *
  * This module should define types *only*, all beginning with "Stg".
  *
@@ -36,6 +36,8 @@
 #ifndef STGTYPES_H
 #define STGTYPES_H
 
+#include "Derived.h"
+
 /*
  * First, platform-dependent definitions of size-specific integers.
  * Assume for now that the int type is 32 bits.
@@ -55,15 +57,6 @@ typedef signed   int             StgInt32;
 typedef unsigned int             StgWord32;
 #else
 #error GHC untested on this architecture: sizeof(unsigned int) != 4
-#endif
-
-/* This #define controls whether we need to support long longs on a particular
- * platform. 
- *
- * ToDo: find a proper home for (derived) configuration information like this.
- */
-#if HAVE_LONG_LONG && SIZEOF_VOID_P < 8
-#define SUPPORT_LONG_LONGS
 #endif
 
 #ifdef SUPPORT_LONG_LONGS
