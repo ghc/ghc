@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.43 2001/01/03 11:13:43 simonmar Exp $
+-- $Id: Main.hs,v 1.44 2001/01/03 11:48:06 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -33,7 +33,7 @@ import DriverFlags
 import DriverMkDepend
 import DriverUtil
 import Panic
-import DriverPhases	( Phase(..) )
+import DriverPhases	( Phase(..), haskellish_file )
 import CmdLineOpts	( HscLang(..), DynFlags(..), v_Static_hsc_opts )
 import TmpFiles
 import Finder		( initFinder )
@@ -74,9 +74,7 @@ import Maybe
 -- Win32 support: proper signal handling
 -- make sure OPTIONS in .hs file propogate to .hc file if -C or -keep-hc-file-too
 -- reading the package configuration file is too slow
--- -H, -K, -Rghc-timing
--- hi-diffs
--- -ddump-all doesn't do anything
+-- -K<size>
 
 -----------------------------------------------------------------------------
 -- Differences vs. old driver:
@@ -274,7 +272,8 @@ main =
 	  let (basename, suffix) = splitFilename src
 
 	  -- just preprocess
-	  pp <- if mode == StopBefore Hsc then return src else do
+	  pp <- if not (haskellish_file src) || mode == StopBefore Hsc
+			then return src else do
 		phases <- genPipeline (StopBefore Hsc) stop_flag
 			    False{-not persistent-} defaultHscLang src
 	  	pipeLoop phases src False{-no linking-} False{-no -o flag-}
