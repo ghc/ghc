@@ -11,7 +11,7 @@ import TcRnTypes	-- Re-export all
 import IOEnv		-- Re-export all
 
 import HsSyn		( MonoBinds(..) )
-import HscTypes		( HscEnv(..), 
+import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
 			  TyThing, Dependencies(..),
 			  ExternalPackageState(..), HomePackageTable,
 			  ModDetails(..), HomeModInfo(..), 
@@ -744,15 +744,38 @@ initIfaceExtCore thing_inside
 	  }
 	; setEnvs (if_env, if_lenv) thing_inside }
 
-initIfaceIO :: HscEnv -> Dependencies -> IfG a -> IO a
-initIfaceIO hsc_env deps do_this
+initIfaceCheck :: HscEnv -> IfG a -> IO a
+-- Used when checking the up-to-date-ness of the old Iface
+-- Initialise the environment with no useful info at all
+initIfaceCheck hsc_env do_this
+ = do	{ let { gbl_env = IfGblEnv { if_is_boot   = emptyModuleEnv,
+				     if_rec_types = Nothing } ;
+	   }
+	; initTcRnIf 'i' hsc_env gbl_env () do_this
+    }
+
+initIfaceTc :: HscEnv -> ModIface -> IfG a -> IO a
+-- Used when type-checking checking an up-to-date interface file
+-- No type envt from the current module, but we do know the module dependencies
+initIfaceTc hsc_env iface do_this
+ = do	{ let { gbl_env = IfGblEnv { if_is_boot   = mkModDeps (dep_mods (mi_deps iface)),
+				     if_rec_types = Nothing } ;
+	   }
+	; initTcRnIf 'i' hsc_env gbl_env () do_this
+    }
+
+initIfaceRules :: HscEnv -> ModGuts -> IfG a -> IO a
+-- Used when sucking in new Rules in SimplCore
+-- We have available the type envt of the module being compiled, and we must use it
+initIfaceRules hsc_env guts do_this
  = do	{ let {
-	     is_boot = mkModDeps (dep_mods deps)
+	     is_boot = mkModDeps (dep_mods (mg_deps guts))
 			-- Urgh!  But we do somehow need to get the info
 			-- on whether (for this particular compilation) we should
 			-- import a hi-boot file or not.
+	   ; type_info = (mg_module guts, return (mg_types guts))
 	   ; gbl_env = IfGblEnv { if_is_boot   = is_boot,
-				  if_rec_types = Nothing } ;
+				  if_rec_types = Just type_info } ;
 	   }
 
 	-- Run the thing; any exceptions just bubble out from here

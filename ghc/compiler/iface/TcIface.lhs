@@ -27,7 +27,7 @@ import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName )
 import HscTypes		( ExternalPackageState(..), PackageInstEnv, PackageRuleBase,
 			  HscEnv, TyThing(..), implicitTyThings, typeEnvIds,
-			  ModIface(..), ModDetails(..), InstPool, Dependencies(..),
+			  ModIface(..), ModDetails(..), InstPool, ModGuts,
 			  TypeEnv, mkTypeEnv, extendTypeEnvList, lookupTypeEnv,
 			  DeclPool, RulePool, Pool(..), Gated, addRuleToPool )
 import InstEnv		( extendInstEnv )
@@ -492,19 +492,21 @@ are in the type environment.  However, remember that typechecking a Rule may
 (as a side effect) augment the type envt, and so we may need to iterate the process.
 
 \begin{code}
-loadImportedRules :: HscEnv -> Dependencies -> IO PackageRuleBase
-loadImportedRules hsc_env deps
-  = initIfaceIO hsc_env deps $ do 
+loadImportedRules :: HscEnv -> ModGuts -> IO PackageRuleBase
+loadImportedRules hsc_env guts
+  = initIfaceRules hsc_env guts $ do 
 	{ -- Get new rules
 	  if_rules <- updateEps (\ eps ->
 		let { (new_pool, if_rules) = selectRules (eps_rules eps) (eps_PTE eps) }
 		in (eps { eps_rules = new_pool }, if_rules) )
 
+	; traceIf (ptext SLIT("Importing rules:") <+> vcat (map ppr if_rules))
+
 	; let tc_rule (mod, rule) = initIfaceLcl mod (tcIfaceRule rule)
 	; core_rules <- mapM tc_rule if_rules
 
 	-- Debug print
-	; traceIf (ptext SLIT("Importing rules:") <+> pprIdRules core_rules)
+	; traceIf (ptext SLIT("Imported rules:") <+> pprIdRules core_rules)
 	
 	-- Update the rule base and return it
 	; updateEps (\ eps -> 

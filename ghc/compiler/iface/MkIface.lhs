@@ -185,7 +185,7 @@ import TcRnMonad
 import TcRnTypes	( ImportAvails(..), mkModDeps )
 import HscTypes		( ModIface(..), 
 			  ModGuts(..), ModGuts, IfaceExport,
-			  GhciMode(..), noDependencies,
+			  GhciMode(..), 
 			  HscEnv(..), hscEPS,
 			  Dependencies(..), FixItem(..), 
 			  isImplicitTyThing, 
@@ -741,7 +741,7 @@ checkOldIface hsc_env mod iface_path source_unchanged maybe_iface
   = do	{ showPass (hsc_dflags hsc_env) 
 	           ("Checking old interface for " ++ moduleUserString mod) ;
 
-	; initIfaceIO hsc_env noDependencies {- wrong? -} $
+	; initIfaceCheck hsc_env $
 	  check_old_iface mod iface_path source_unchanged maybe_iface
      }
 

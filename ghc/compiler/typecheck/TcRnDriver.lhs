@@ -213,7 +213,7 @@ tcRnIface :: HscEnv
 	  -> ModIface 	-- Get the decls from here
 	  -> IO ModDetails
 tcRnIface hsc_env iface
-  = initIfaceIO hsc_env (mi_deps iface) (typecheckIface iface)
+  = initIfaceTc hsc_env iface (typecheckIface iface)
 \end{code}
 
 

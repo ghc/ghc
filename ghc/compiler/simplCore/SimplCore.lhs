@@ -22,12 +22,12 @@ import HscTypes		( HscEnv(..), GhciMode(..),
 			)
 import CSE		( cseProgram )
 import Rules		( RuleBase, emptyRuleBase, ruleBaseIds, 
-			  extendRuleBaseList, pprRuleBase, 
+			  extendRuleBaseList, pprRuleBase, getLocalRules,
 			  ruleCheckProgram )
 import Module		( moduleEnvElts )
 import Name		( Name, isExternalName )
 import NameSet		( elemNameSet )
-import PprCore		( pprCoreBindings, pprCoreExpr )
+import PprCore		( pprCoreBindings, pprCoreExpr, pprIdRules )
 import OccurAnal	( occurAnalyseBinds, occurAnalyseGlobalExpr )
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
@@ -37,7 +37,7 @@ import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import CoreLint		( endPass )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( idName, setIdLocalExported )
+import Id		( idName, idIsFrom, setIdLocalExported )
 import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
@@ -222,32 +222,23 @@ prepareRules :: HscEnv
 		    [IdCoreRule])	-- Orphan rules defined in this module
 
 prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
-	     (ModGuts { mg_binds = binds, mg_rules = local_rules,
-			mg_deps = deps })
+	     guts@(ModGuts { mg_binds = binds, mg_rules = local_rules, mg_module = this_mod })
 	     us 
-  = do	{ pkg_rule_base <- loadImportedRules hsc_env deps
+  = do	{ pkg_rule_base <- loadImportedRules hsc_env guts
 
 	; let env	       = emptySimplEnv SimplGently [] local_ids 
 	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)
 
-	; let (local_rules, orphan_rules) = partition ((`elemVarSet` local_ids) . fst) better_rules
-		-- We use (`elemVarSet` local_ids) rather than isLocalId because
-		-- isLocalId isn't true of class methods.
-		-- If we miss any rules for Ids defined here, then we end up
-		-- giving the local decl a new Unique (because the in-scope-set is the
-		-- same as the rule-id set), and now the binding for the class method 
-		-- doesn't have the same Unique as the one in the Class and the tc-env
-		--	Example:	class Foo a where
-		--			  op :: a -> a
-		--			{-# RULES "op" op x = x #-}
-	      local_rule_base = extendRuleBaseList emptyRuleBase local_rules
-	      local_rule_ids  = ruleBaseIds local_rule_base	-- Local Ids with rules attached
+	      imp_rule_base  = foldl add_rules pkg_rule_base (moduleEnvElts hpt)
+	      full_rule_base = extendRuleBaseList imp_rule_base better_rules
 
-	      imp_rule_base   = foldl add_rules pkg_rule_base (moduleEnvElts hpt)
-	      final_rule_base = extendRuleBaseList imp_rule_base orphan_rules
+	      (local_rule_ids, final_rule_base) = getLocalRules this_mod full_rule_base
+		-- NB: the imported rules may include rules for Ids in this module
+		      
+	      orphan_rules = filter (not . idIsFrom this_mod . fst) better_rules
 
 	; dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
-		(vcat [text "Local rules", pprRuleBase local_rule_base,
+		(vcat [text "Local rules", pprIdRules better_rules,
 		       text "",
 		       text "Imported rules", pprRuleBase final_rule_base])
 
