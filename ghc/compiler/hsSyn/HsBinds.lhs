@@ -50,7 +50,10 @@ instance OutputableBndr id => Outputable (HsBindGroup id) where
   ppr (HsBindGroup binds sigs is_rec)
      = vcat [ppr_isrec,
      	     vcat (map ppr sigs),
-	     pprLHsBinds binds
+	     vcat (map ppr (bagToList binds))
+		-- *not* pprLHsBinds because we don't want braces; 'let' and
+		-- 'where' include a list of HsBindGroups and we don't want
+		-- several groups of bindings each with braces around.
        ]
      where
        ppr_isrec = getPprStyle $ \ sty -> 
