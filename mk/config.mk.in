@@ -436,13 +436,8 @@ ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 DEFAULT_TMPDIR		= C:/TEMP
 endif
 
-# FPTOOLS_TOP: the top of the fptools hierarchy, absolute path.
-
-ifeq "$(findstring $(TARGETPLATFORM), i386-unknown-cygwin32 i386-unknown-mingw32)" ""
-FPTOOLS_TOP_ABS		= @hardtop@
-else
-FPTOOLS_TOP_ABS		= $(subst \,/,$(shell cygpath -w @hardtop@))
-endif
+# FPTOOLS_TOP: the top of the fptools hierarchy, absolute path. (platform-specific format).
+FPTOOLS_TOP_ABS		= @hardtop_plat@
 # Keep the Unix-style path to use with Unix tools (e.g. in ghc-inplace script)
 FPTOOLS_TOP_ABS_UNIX    = @hardtop@
 
@@ -833,7 +828,7 @@ HAPPY_VERSION		= @HappyVersion@
 #
 # Options to pass to Happy when we're going to compile the output with GHC
 #
-GHC_HAPPY_OPTS		= $(shell if ( test `echo $(HAPPY_VERSION) | sed -e "s/\(.*\)\..*/\1/g"` "-gt" "1" || test `echo $(HAPPY_VERSION) | sed -e "s/.*\.\(.*\)/\1/g"` "-ge" "9" ); then echo -agc; else echo -g; fi)
+GHC_HAPPY_OPTS		= @HappyOpts@
 
 #
 # Stuff from fptools/literate
