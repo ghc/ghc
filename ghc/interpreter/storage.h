@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.28 $
- * $Date: 2000/02/24 14:09:14 $
+ * $Revision: 1.29 $
+ * $Date: 2000/02/25 10:53:54 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -140,6 +140,10 @@ extern  Cell         whatIs    Args((Cell));
  * and string text etc.
  * ------------------------------------------------------------------------*/
 
+#if !defined(SIZEOF_VOID_P) || !defined(SIZEOF_INT)
+#error SIZEOF_VOID_P or SIZEOF_INT is not defined
+#endif
+
 #define TAGMIN       1            /* Box and constructor cell tag values   */
 #define BCSTAG       30           /* Box=TAGMIN..BCSTAG-1                  */
 #define isTag(c)     (TAGMIN<=(c) && (c)<SPECMIN) /* Tag cell values       */
@@ -157,14 +161,14 @@ extern  Cell         whatIs    Args((Cell));
 #define ADDPAT       11           /* (_+k) pattern discr:     snd :: Int   */
 #define FLOATCELL    15           /* Floating Pt literal:     snd :: Text  */
 #define BIGCELL      16           /* Integer literal:         snd :: Text  */
-#if PTR_ON_HEAP
 #define PTRCELL      17           /* C Heap Pointer           snd :: Ptr   */
+#define CPTRCELL     21           /* Native code pointer      snd :: Ptr   */
+
 #if IPARAM
 #define IPCELL       19		  /* Imp Param Cell:	      snd :: Text  */
 #define IPVAR	     20		  /* ?x:		      snd :: Text  */
 #endif
-#define CPTRCELL     21           /* Native code pointer      snd :: Ptr   */
-#endif
+
 #if TREX
 #define EXTCOPY      22           /* Copy of an Ext:          snd :: Text  */
 #endif
@@ -214,14 +218,12 @@ extern  Text            textOf       Args((Cell));
 #define stringToBignum(s) pair(BIGCELL,findText(s))
 #define bignumToString(b) textToStr(snd(b))
 
-#if PTR_ON_HEAP
 #define isPtr(c)        (isPair(c) && fst(c)==PTRCELL)
 extern  Cell            mkPtr           Args((Ptr));
 extern  Ptr             ptrOf           Args((Cell));
 #define isCPtr(c)       (isPair(c) && fst(c)==CPTRCELL)
 extern  Cell            mkCPtr          Args((Ptr));
 extern  Ptr             cptrOf          Args((Cell));
-#endif
 
 /* --------------------------------------------------------------------------
  * Constructor cell tags are used as the fst element of a pair to indicate

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.45 $
- * $Date: 2000/02/24 17:26:12 $
+ * $Revision: 1.46 $
+ * $Date: 2000/02/25 10:53:54 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2445,7 +2445,9 @@ Int n; {
 }
 
 #if SIZEOF_VOID_P == SIZEOF_INT
+
 typedef union {Int i; Ptr p;} IntOrPtr;
+
 Cell mkPtr(p)
 Ptr p;
 {
@@ -2462,6 +2464,7 @@ Cell c;
     x.i = snd(c);
     return x.p;
 }
+
 Cell mkCPtr(p)
 Ptr p;
 {
@@ -2478,8 +2481,11 @@ Cell c;
     x.i = snd(c);
     return x.p;
 }
+
 #elif SIZEOF_VOID_P == 2*SIZEOF_INT
+
 typedef union {struct {Int i1; Int i2;} i; Ptr p;} IntOrPtr;
+
 Cell mkPtr(p)
 Ptr p;
 {
@@ -2497,22 +2503,31 @@ Cell c;
     x.i.i2 = intOf(snd(snd(c)));
     return x.p;
 }
-#else
-#warning "type Addr not supported on this architecture - don't use it"
-Cell mkPtr(p)
+
+Cell mkCPtr(p)
 Ptr p;
 {
-    ERRMSG(0) "mkPtr: type Addr not supported on this architecture"
-    EEND;
+    IntOrPtr x;
+    x.p = p;
+    return pair(CPTRCELL,pair(mkInt(x.i.i1),mkInt(x.i.i2)));
 }
 
-Ptr ptrOf(c)
+Ptr cptrOf(c)
 Cell c;
 {
-    ERRMSG(0) "ptrOf: type Addr not supported on this architecture"
-    EEND;
+    IntOrPtr x;
+    assert(fst(c) == CPTRCELL);
+    x.i.i1 = intOf(fst(snd(c)));
+    x.i.i2 = intOf(snd(snd(c)));
+    return x.p;
 }
+
+#else
+
+#error "Can't implement mkPtr/ptrOf on this architecture."
+
 #endif
+
 
 String stringNegate( s )
 String s;

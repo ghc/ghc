@@ -1,20 +1,14 @@
-/* ../options.h.  Generated automatically by configure.  */
+
 /* --------------------------------------------------------------------------
  * Configuration options
- *
- * Most configuration options are arguments to the configure script
- * (try running "configure --help").  The following options are either
- * experimental or require changes to "Prelude.hs", the standard libraries
- * and demos and therefore cannot be modified using the configure script.
- * Most users should leave them alone!
  *
  * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
  * All rights reserved. See NOTICE for details and conditions of use etc...
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.16 $
- * $Date: 2000/01/06 11:57:11 $
+ * $Revision: 1.17 $
+ * $Date: 2000/02/25 10:53:53 $
  * ------------------------------------------------------------------------*/
 
 
@@ -157,12 +151,6 @@
  * to be extended dynamically at run-time to avoid exhausted space errors.
  */
 #define DYN_TABLES SMALL_HUGS
-
-/* Define this to include support for storing pointers in the heap.
- * This is required by the code generator (which has to store 
- * pointers to AsmObjects).
- */
-#define PTR_ON_HEAP 1
 
 /* Should quantifiers be displayed in error messages.
  * Warning: not consistently used.
