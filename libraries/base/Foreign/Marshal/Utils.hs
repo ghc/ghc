@@ -18,8 +18,7 @@ module Foreign.Marshal.Utils (
 
   -- ** Combined allocation and marshalling
   --
-  withObject,    -- :: Storable a => a -> (Ptr a -> IO b) -> IO b
-  {- FIXME: should be `with' -}
+  with,          -- :: Storable a => a -> (Ptr a -> IO b) -> IO b
   new,           -- :: Storable a => a -> IO (Ptr a)
 
   -- ** Marshalling of Boolean values (non-zero corresponds to 'True')
@@ -41,10 +40,14 @@ module Foreign.Marshal.Utils (
   withMany,      -- :: (a -> (b -> res) -> res) -> [a] -> ([b] -> res) -> res
 
   -- ** Haskellish interface to memcpy and memmove
-
   -- | (argument order: destination, source)
+  --
   copyBytes,     -- :: Ptr a -> Ptr a -> Int -> IO ()
-  moveBytes      -- :: Ptr a -> Ptr a -> Int -> IO ()
+  moveBytes,     -- :: Ptr a -> Ptr a -> Int -> IO ()
+
+  -- ** DEPRECATED FUNCTIONS (don\'t use; they may disappear at any time)
+  --
+  withObject     -- :: Storable a => a -> (Ptr a -> IO b) -> IO b
 ) where
 
 import Data.Maybe
@@ -76,13 +79,18 @@ new val  =
 --
 -- * see the life time constraints imposed by 'alloca'
 --
-{- FIXME: should be called `with' -}
-withObject       :: Storable a => a -> (Ptr a -> IO b) -> IO b
-withObject val f  =
+with       :: Storable a => a -> (Ptr a -> IO b) -> IO b
+with val f  =
   alloca $ \ptr -> do
     poke ptr val
     res <- f ptr
     return res
+
+-- old DEPRECATED name (don't use; may disappear at any time)
+--
+withObject :: Storable a => a -> (Ptr a -> IO b) -> IO b
+{-# DEPRECATED withObject "use `with' instead" #-}
+withObject  = with
 
 
 -- marshalling of Boolean values (non-zero corresponds to 'True')

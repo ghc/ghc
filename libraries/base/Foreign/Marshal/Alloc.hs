@@ -21,7 +21,8 @@ module Foreign.Marshal.Alloc (
   alloca,       -- :: Storable a =>        (Ptr a -> IO b) -> IO b
   allocaBytes,  -- ::               Int -> (Ptr a -> IO b) -> IO b
 
-  reallocBytes, -- :: Ptr a -> Int -> IO (Ptr a)
+  realloc,      -- :: Storable b => Ptr a        -> IO (Ptr b)
+  reallocBytes, -- ::		    Ptr a -> Int -> IO (Ptr a)
 
   free          -- :: Ptr a -> IO ()
 ) where
@@ -93,6 +94,18 @@ allocaBytes      :: Int -> (Ptr a -> IO b) -> IO b
 allocaBytes size  = bracket (mallocBytes size) free
 #endif
 
+-- |Adjust a malloc\'ed storage area to the given size of the required type
+-- (corresponds to C\'s @realloc()@).
+--
+realloc :: Storable b => Ptr a -> IO (Ptr b)
+realloc  = doRealloc undefined
+  where
+    doRealloc           :: Storable b => b -> Ptr a -> IO (Ptr b)
+    doRealloc dummy ptr  = let
+			     size = fromIntegral (sizeOf dummy)
+			   in
+			   failWhenNULL "realloc" (_realloc ptr size)
+
 -- |Adjust a malloc\'ed storage area to the given size (equivalent to
 -- C\'s @realloc()@).
 --
@@ -128,5 +141,5 @@ failWhenNULL name f = do
 -- basic C routines needed for memory allocation
 --
 foreign import ccall unsafe "malloc"  _malloc  ::          CSize -> IO (Ptr a)
-foreign import ccall unsafe "realloc" _realloc :: Ptr a -> CSize -> IO (Ptr a)
+foreign import ccall unsafe "realloc" _realloc :: Ptr a -> CSize -> IO (Ptr b)
 foreign import ccall unsafe "free"    _free    :: Ptr a -> IO ()
