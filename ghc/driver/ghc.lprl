@@ -2834,6 +2834,7 @@ arg: while($_ = $Args[0]) {
     /^-optP(.*)$/   && do { push(@HsCpp_flags,      $1); next arg; };
     /^-optCrts(.*)$/&& do { push(@HsC_rts_flags,    $1); next arg; };
     /^-optC(.*)$/   && do { push(@HsC_flags,        $1); next arg; };
+    /^-optp(.*)$/   && do { push(@HsP_flags,        $1); next arg; };
     /^-optcpp(.*)$/ && do { push(@Cpp_define,       $1); $Only_preprocess_hc = ($1 eq "-E"); next arg; };
     /^-optc(.*)$/   && do { push(@CcBoth_flags,     $1); next arg; };
     /^-opta(.*)$/   && do { push(@As_flags,         $1); next arg; };
