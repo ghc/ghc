@@ -1,6 +1,6 @@
 _interface_ FunDeps 1
 _exports_
-instantiateFdClassTys oclose pprFundeps ;
+FunDeps instantiateFdClassTys oclose pprFundeps;
 _declarations_
 1 instantiateFdClassTys _:_ _forall_ [b] => Class.Class -> [b] -> [([b], [b])] ;;
 1 oclose _:_ _forall_ [a] => {Unique.Uniquable a} -> [([a], [a])] -> UniqFM.UniqFM a -> UniqFM.UniqFM a ;;
