@@ -2009,8 +2009,8 @@ sub prepareWin32DllLink ()
          }
          push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/Main.dll_o"
 			                  : "$TopPwd/$CURRENT_DIR/$GHC_RUNTIME_DIR/Main.dll_o") if $linking_main;
-         push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/PrelMain.o"
-			                  : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/PrelMain.o") if $linking_main;
+         push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/PrelMain.dll_o"
+			                  : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/std/PrelMain.dll_o") if $linking_main;
        }
        push(@Ld_flags,  "-mno-cygwin");
     }
