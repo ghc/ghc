@@ -321,7 +321,7 @@ sameVal (AbsProd vals1) (AbsProd vals2) = and (zipWithEqual "sameVal" sameVal va
 sameVal (AbsProd _)	AbsTop 		= False
 sameVal (AbsProd _)	AbsBot 		= False
 
-sameVal (AbsApproxFun str1 v1) (AbsApproxFun str2 v2) = str1 == str2 && sameVal v1 v1
+sameVal (AbsApproxFun str1 v1) (AbsApproxFun str2 v2) = str1 == str2 && sameVal v1 v2
 sameVal (AbsApproxFun _ _)     AbsTop		      = False
 sameVal (AbsApproxFun _ _)     AbsBot 		      = False
 
