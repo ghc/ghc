@@ -1027,19 +1027,29 @@ addFree (avails, frees) free
     avail | instBindingRequired free = BoundTo (instToId free)
 	  | otherwise		     = NoRhs
 
+addWanted :: RedState -> Inst -> TcExpr -> [Inst] -> NF_TcM RedState
+addWanted state@(avails, frees) wanted rhs_expr wanteds
+-- Do *not* add superclasses as well.  Here's an example of why not
+-- 	class Eq a => Foo a b 
+--	instance Eq a => Foo [a] a
+-- If we are reducing
+--	(Foo [t] t)
+-- we'll first deduce that it holds (via the instance decl).  We  
+-- must not then overwrite the Eq t constraint with a superclass selection!
+-- 	ToDo: this isn't entirely unsatisfactory, because
+--	      we may also lose some entirely-legitimate sharing this way
+
+  = ASSERT( not (isAvailable state wanted) )
+    returnNF_Tc (addToFM avails wanted avail, frees)
+  where 
+    avail | instBindingRequired wanted = Rhs rhs_expr wanteds
+	  | otherwise		       = ASSERT( null wanteds ) NoRhs
+
 addGiven :: RedState -> Inst -> NF_TcM RedState
 addGiven state given = add_avail state given (BoundTo (instToId given))
 
 addIrred :: RedState -> Inst -> NF_TcM RedState
 addIrred state irred = add_avail state irred Irred
-
-addWanted :: RedState -> Inst -> TcExpr -> [Inst] -> NF_TcM RedState
-addWanted state wanted rhs_expr wanteds
-  = ASSERT( not (isAvailable state wanted) )
-    add_avail state wanted avail
-  where 
-    avail | instBindingRequired wanted = Rhs rhs_expr wanteds
-	  | otherwise		       = ASSERT( null wanteds ) NoRhs
 
 add_avail :: RedState -> Inst -> Avail -> NF_TcM RedState
 add_avail (avails, frees) wanted avail
