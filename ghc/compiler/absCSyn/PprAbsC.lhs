@@ -838,7 +838,7 @@ pprCCall call@(CCall op_str is_asm may_gc cconv) args results vol_regs
 		if null non_void_results
 		  then empty
 		  else text "%r = ",
-		lparen, parens fun_name, lparen,
+		lparen, fun_name, lparen,
 		  hcat (punctuate comma ccall_fun_args),
 		text "));"
 	])
