@@ -7,8 +7,7 @@
 module ParseUtil (
 	  parseError		-- String -> Pa
 	, cbot			-- a
-	, splitForConApp        -- RdrNameHsType -> [RdrNameBangType]
-				--     -> P (RdrName, [RdrNameBangType])
+	, mkVanillaCon, mkRecCon,
 
 	, mkRecConstrOrUpdate	-- HsExp -> [HsFieldUpdate] -> P HsExp
 	, groupBindings
@@ -36,7 +35,7 @@ import RdrHsSyn		( mkNPlusKPatIn, unitTyCon_RDR,
 			  RdrBinding(..),
 			  RdrNameHsType, RdrNameBangType, RdrNameContext,
 			  RdrNameHsTyVar, RdrNamePat, RdrNameHsExpr, RdrNameGRHSs,
-			  RdrNameHsRecordBinds, RdrNameMonoBinds
+			  RdrNameHsRecordBinds, RdrNameMonoBinds, RdrNameConDetails
 			)
 import RdrName
 import CallConv
@@ -57,40 +56,37 @@ parseError s =
 cbot = panic "CCall:result_ty"
 
 -----------------------------------------------------------------------------
--- splitForConApp
+-- mkVanillaCon
 
 -- When parsing data declarations, we sometimes inadvertently parse
 -- a constructor application as a type (eg. in data T a b = C a b `D` E a b)
 -- This function splits up the type application, adds any pending
 -- arguments, and converts the type constructor back into a data constructor.
 
-splitForConApp :: RdrNameHsType -> [RdrNameBangType]
-	-> P (RdrName, [RdrNameBangType])
+mkVanillaCon :: RdrNameHsType -> [RdrNameBangType] -> P (RdrName, RdrNameConDetails)
 
-splitForConApp  t ts = split t ts
+mkVanillaCon ty tys
+ = split ty tys
  where
-	split (HsAppTy t u) ts = split t (Unbanged u : ts)
-{-	split (HsOpTy t1 t ty2) ts = 
-		-- check that we've got a type constructor at the head
-	   if occNameSpace t_occ /= tcClsName
-		then parseError 
-			(showSDoc (text "not a constructor: (type pattern)`" <> 
-					ppr t <> char '\''))
-		else returnP (con, ts)
-	   where t_occ = rdrNameOcc t
-		 con   = setRdrNameOcc t (setOccNameSpace t_occ dataName)
--}
-	split (HsTyVar t)   ts  = 
-		-- check that we've got a type constructor at the head
-	   if occNameSpace t_occ /= tcClsName
-		then parseError 
-			(showSDoc (text "not a constructor: `" <> 
-					ppr t <> char '\''))
-		else returnP (con, ts)
-	   where t_occ = rdrNameOcc t
-		 con   = setRdrNameOcc t (setOccNameSpace t_occ dataName)
+   split (HsAppTy t u)  ts = split t (Unbanged u : ts)
+   split (HsTyVar tc)   ts = tyConToDataCon tc	`thenP` \ data_con ->
+			     returnP (data_con, VanillaCon ts)
+   split _		 _ = parseError "Illegal data/newtype declaration"
 
-	split _ _ = parseError "Illegal data/newtype declaration"
+mkRecCon :: RdrName -> [([RdrName],RdrNameBangType)] -> P (RdrName, RdrNameConDetails)
+mkRecCon con fields
+  = tyConToDataCon con	`thenP` \ data_con ->
+    returnP (data_con, RecCon fields)
+
+tyConToDataCon :: RdrName -> P RdrName
+tyConToDataCon tc
+  | occNameSpace tc_occ == tcClsName
+  = returnP (setRdrNameOcc tc (setOccNameSpace tc_occ dataName))
+  | otherwise
+  = parseError (showSDoc (text "not a constructor:" <+> quotes (ppr tc)))
+  where 
+    tc_occ   = rdrNameOcc tc
+
 
 ----------------------------------------------------------------------------
 -- Various Syntactic Checks

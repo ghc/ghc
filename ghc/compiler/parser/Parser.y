@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.37 2000/10/03 08:43:02 simonpj Exp $
+$Id: Parser.y,v 1.38 2000/10/05 15:42:30 simonpj Exp $
 
 Haskell grammar.
 
@@ -570,6 +570,11 @@ varids0	:: { [RdrName] }
 -----------------------------------------------------------------------------
 -- Datatype declarations
 
+newconstr :: { RdrNameConDecl }
+	: srcloc conid atype	{ mkConDecl $2 [] [] (VanillaCon [Unbanged $3]) $1 }
+	| srcloc conid '{' var '::' type '}'
+				{ mkConDecl $2 [] [] (RecCon [([$4], Unbanged $6)]) $1 }
+
 constrs :: { [RdrNameConDecl] }
 	: constrs '|' constr		{ $3 : $1 }
 	| constr			{ [$1] }
@@ -588,27 +593,14 @@ context :: { RdrNameContext }
 	: btype '=>'			{% checkContext $1 }
 
 constr_stuff :: { (RdrName, RdrNameConDetails) }
-	: scontype   		 	{ (fst $1, VanillaCon (snd $1)) }
+	: btype				{% mkVanillaCon $1 []		    }
+	| btype '!' atype satypes	{% mkVanillaCon $1 (Banged $3 : $4) }
+	| gtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 }
 	| sbtype conop sbtype		{ ($2, InfixCon $1 $3) }
-	| con '{' fielddecls '}' 	{ ($1, RecCon (reverse $3)) }
 
-newconstr :: { RdrNameConDecl }
-	: srcloc conid atype	{ mkConDecl $2 [] [] (VanillaCon [Unbanged $3]) $1 }
-	| srcloc conid '{' var '::' type '}'
-				{ mkConDecl $2 [] [] (RecCon [([$4], Unbanged $6)]) $1 }
-
-scontype :: { (RdrName, [RdrNameBangType]) }
-	: btype				{% splitForConApp $1 [] }
-	| scontype1			{ $1 }
-
-scontype1 :: { (RdrName, [RdrNameBangType]) }
-	: btype '!' atype		{% splitForConApp $1 [Banged $3] }
-	| scontype1 satype		{ (fst $1, snd $1 ++ [$2] ) }
-        | '(' consym ')' 		{ ($2,[]) }
-
-satype :: { RdrNameBangType }
-	: atype				{ Unbanged $1 }
-	| '!' atype			{ Banged   $2 }
+satypes	:: { [RdrNameBangType] }
+	: atype satypes			{ Unbanged $1 : $2 }
+	| '!' atype satypes		{ Banged   $2 : $3 }
 
 sbtype :: { RdrNameBangType }
 	: btype				{ Unbanged $1 }
@@ -885,6 +877,7 @@ dbind	: ipvar '=' exp			{ ($1, $3) }
 
 gtycon 	:: { RdrName }
 	: qtycon			{ $1 }
+ 	| '(' qtyconop ')'		{ $2 }
 	| '(' ')'			{ unitTyCon_RDR }
 	| '(' '->' ')'			{ funTyCon_RDR }
 	| '[' ']'			{ listTyCon_RDR }
@@ -910,10 +903,6 @@ qvar 	:: { RdrName }
 
 ipvar	:: { RdrName }
 	: IPVARID		{ (mkSrcUnqual ipName (tailFS $1)) }
-
-con	:: { RdrName }
-	: conid			{ $1 }
-	| '(' consym ')'        { $2 }
 
 qcon	:: { RdrName }
 	: qconid		{ $1 }
@@ -1077,6 +1066,10 @@ tyconop	:: { RdrName }
 qtycon :: { RdrName }
 	: tycon			{ $1 }
 	| QCONID		{ mkSrcQual tcClsName $1 }
+
+qtyconop :: { RdrName }
+ 	  : tyconop		{ $1 }
+	  | QCONSYM		{ mkSrcQual tcClsName $1 }
 
 qtycls 	:: { RdrName }
 	: qtycon		{ $1 }
