@@ -766,6 +766,7 @@ do_bol loc end _str _len = do
 -- certain keywords put us in the "layout" state, where we might
 -- add an opening curly brace.
 maybe_layout ITdo	= pushLexState layout_do
+maybe_layout ITmdo	= pushLexState layout_do
 maybe_layout ITof	= pushLexState layout
 maybe_layout ITlet	= pushLexState layout
 maybe_layout ITwhere	= pushLexState layout
