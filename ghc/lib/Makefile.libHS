@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile.libHS,v 1.7 1997/01/18 10:04:27 simonpj Exp $
+# $Id: Makefile.libHS,v 1.8 1997/01/21 22:56:20 sof Exp $
 
 TOP = ../..
 include $(TOP)/ghc/mk/ghc.mk
@@ -21,7 +21,7 @@ include $(TOP)/mk/rules.mk
 # (Hence the use of $(GHC), rather than $(HC).)
 # The driver will give warnings if -split-objs, but that's cool...
 
-GHC_OPTS = \
+GHCFLAGS = \
   -recomp -cpp -fglasgow-exts -fvia-C \
   $(HcMaxHeapFlag) $(EXTRA_HC_OPTS)
 
@@ -59,12 +59,13 @@ else
 ARCHIVE = libHS_$(suffix).a
 endif
 
-SRCS 	= $(wildcard ghc/*.lhs glaExts/*.lhs required/*.lhs concurrent/*.lhs)
+SRCS 	= $(wildcard required/*.lhs ghc/*.lhs glaExts/*.lhs concurrent/*.lhs)
 ifeq ($(suffix), norm)
 LIBOBJS = $(SRCS:.lhs=.o)
 else
 LIBOBJS = $(SRCS:.lhs=.$(suffix)_o)
 endif
+
 DESTDIR = $(INSTLIBDIR_GHC)
 
 include $(TOP)/mk/lib.mk
@@ -79,42 +80,44 @@ ghc/PackedString_flags	 = '-\#include"cbits/stgio.h"' -monly-3-regs
 required/Directory_flags = '-\#include"cbits/stgio.h"' -monly-3-regs
 required/System_flags 	 = '-\#include"cbits/stgio.h"'
 
+#ghc/ArrBase_flags	= '-fno-implicit-prelude'
+#ghc/IOBase_flags	= '-fno-implicit-prelude'
+#ghc/IOHandle_flags	= '-fno-implicit-prelude'
+#ghc/PrelBase_flags	= '-fno-implicit-prelude'
+#ghc/PrelIO_flags	= '-fno-implicit-prelude'
+#ghc/PrelList_flags	= '-fno-implicit-prelude'
+#ghc/PrelNum_flags	= '-fno-implicit-prelude'
+#ghc/PrelRead_flags	= '-fno-implicit-prelude'
+#ghc/PrelTup_flags	= '-fno-implicit-prelude'
+#ghc/STBase_flags	= '-fno-implicit-prelude'
+#glaExts/Foreign_flags	= '-fno-implicit-prelude'
+#glaExts/PackedString_flags	= '-fno-implicit-prelude'
+#glaExts/ST_flags	= '-fno-implicit-prelude'
+#required/Array_flags	= '-fno-implicit-prelude'
+#required/Char_flags	= '-fno-implicit-prelude'
+#required/IO_flags	= '-fno-implicit-prelude'
+#required/Ix_flags	= '-fno-implicit-prelude'
+#required/Maybe_flags	= '-fno-implicit-prelude'
+#required/Monad_flags	= '-fno-implicit-prelude'
+#required/Ratio_flags	= '-fno-implicit-prelude'
+
 concurrent/Merge_flags = -iconcurrent
 concurrent/Parallel_flags = -fglasgow-exts
 concurrent/Concurrent_flags = -iconcurrent
 
-ghc/ArrBase_flags	= '-fno-implicit-prelude'
-ghc/IOBase_flags	= '-fno-implicit-prelude'
-ghc/IOHandle_flags	= '-fno-implicit-prelude'
-ghc/PrelBase_flags	= '-fno-implicit-prelude'
-ghc/PrelIO_flags	= '-fno-implicit-prelude'
-ghc/PrelList_flags	= '-fno-implicit-prelude'
-ghc/PrelNum_flags	= '-fno-implicit-prelude'
-ghc/PrelRead_flags	= '-fno-implicit-prelude'
-ghc/PrelTup_flags	= '-fno-implicit-prelude'
-ghc/STBase_flags	= '-fno-implicit-prelude'
-glaExts/Foreign_flags	= '-fno-implicit-prelude'
-glaExts/PackedString_flags	= '-fno-implicit-prelude'
-glaExts/ST_flags	= '-fno-implicit-prelude'
-required/Array_flags	= '-fno-implicit-prelude'
-required/Char_flags	= '-fno-implicit-prelude'
-required/IO_flags	= '-fno-implicit-prelude'
-required/Ix_flags	= '-fno-implicit-prelude'
-required/Maybe_flags	= '-fno-implicit-prelude'
-required/Monad_flags	= '-fno-implicit-prelude'
-required/Ratio_flags	= '-fno-implicit-prelude'
-
-
 #-----------------------------------------------------------------------------
 # Depend and install stuff
 
+# temp soln until ghcconfig.mk leaves 1.2 behind.
+MKDEPENDHS = $(LIB_GHC) -M
+
 MKDEPENDHS_OPTS += -I$(GHC_INCLUDES)
 MKDEPENDHS_OPTS += -irequired:ghc:hbc:glaExts:concurrent
-MKDEPENDHS_OPTS += $(foreach way,$(WAY_SUFFIXES),-s .$(way))
+MKDEPENDHS_OPTS += $(foreach way,$(filter-out norm, $(WAY_SUFFIXES)),-optdep-s -optdep$(way))
 
 # Todo: make this a generic include of hsdepend.mk or something.
 depend :: $(SRCS)
-	$(MKDEPENDHS) $(MKDEPENDHSFLAGS) -- $(GHCFLAGS) -- -f .depend $(SRCS)
+	$(MKDEPENDHS) $(MKDEPENDHSFLAGS) -optdep-f -optdep.depend $(GHCFLAGS) $(SRCS)
 
 # Copy the crucial IOBase hi file over
 hiboot ::
