@@ -25,3 +25,4 @@ test "ffi005"   { skip when True
 test "ffi006"   { vtr("-fglasgow-exts", "", "") }
 test "ffi007"   { vtr("-fglasgow-exts", "", "") }
 test "ffi008"   { vtr("-fglasgow-exts", "", "1") }
+test "ffi009"   { vtr("-fglasgow-exts", "", "") }
