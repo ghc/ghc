@@ -53,6 +53,8 @@
 ALL_SRCS    = $(wildcard $(patsubst ./%, %,  \
 		   $(patsubst %,%/*.hs,   . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.lhs,  . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.hs-boot,  . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.lhs-boot, . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.y,    . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.ly,   . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.x,    . $(ALL_DIRS)) \
@@ -75,6 +77,9 @@ ALL_SRCS    = $(wildcard $(patsubst ./%, %,  \
 
 PRE_HS_SRCS  = $(filter %.hs,  $(PRE_SRCS))
 PRE_LHS_SRCS = $(filter %.lhs, $(PRE_SRCS))
+
+PRE_HS_BOOT_SRCS = $(filter %.hs-boot,  $(PRE_SRCS)) \
+		   $(filter %.lhs-boot, $(PRE_SRCS))
 
 GC_SRCS       = $(filter %.gc,  $(PRE_SRCS))
 HSC_SRCS      = $(filter %.hsc, $(PRE_SRCS))
@@ -140,6 +145,12 @@ SRCS        = $(filter-out $(CLOSED_EXCLUDED_SRCS), \
 HS_SRCS	    = $(filter %.lhs %.hs, $(sort $(SRCS) $(BOOT_SRCS)))
 HS_OBJS     = $(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
+
+HI_BOOTS    = $(patsubst %.hs-boot, %.$(way_)hi-boot, \
+	      $(patsubst %.lhs-boot, %.$(way_)hi-boot, $(PRE_HS_BOOT_SRCS)))
+
+O_BOOTS     = $(patsubst %.hs-boot, %.$(way_)o-boot, \
+	      $(patsubst %.lhs-boot, %.$(way_)o-boot, $(PRE_HS_BOOT_SRCS)))
 
 GC_C_OBJS   = $(addsuffix _stub_ffi.$(way_)o,$(basename $(filter %.gc,$(SRCS))))
 HSC_C_OBJS  = $(addsuffix _hsc.$(way_)o,$(basename $(filter %.hsc,$(SRCS))))
@@ -226,7 +237,8 @@ CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
 		      $(PROG) $(LIBRARY) a.out \
 		      $(DERIVED_HSC_SRCS) \
 		      $(DERIVED_GC_SRCS) \
-		      $(patsubst %,%/*.$(way_)hi, . $(ALL_DIRS))
+		      $(patsubst %,%/*.$(way_)hi, . $(ALL_DIRS)) \
+		      $(HI_BOOTS) $(O_BOOTS)
 
 # we delete *all* the .hi files we can find, rather than just
 # $(HS_IFACES), because stale interfaces left around by modules which
