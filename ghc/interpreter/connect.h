@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.11 $
- * $Date: 1999/10/16 02:17:30 $
+ * $Revision: 1.12 $
+ * $Date: 1999/10/20 02:15:59 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -156,6 +156,7 @@ extern Bool  preludeLoaded;             /* TRUE => prelude has been loaded */
 extern Bool  gcMessages;                /* TRUE => print GC messages       */
 extern Bool  literateScripts;           /* TRUE => default lit scripts     */
 extern Bool  literateErrors;            /* TRUE => report errs in lit scrs */
+extern Bool  showInstRes;               /* TRUE => show instance resolution */
 extern Bool  optimise;                  /* TRUE => simplify STG            */
 
 extern Int   cutoff;                    /* Constraint Cutoff depth         */
@@ -326,8 +327,26 @@ extern Bool  broken;                    /* indicates interrupt received    */
 #  define ctrlbrk(bh) 
 #  define allowBreak()  kbhit()
 #else /* !HUGS_FOR_WINDOWS */
-#  define ctrlbrk(bh)   signal(SIGINT,bh); signal(SIGBREAK,bh)
-#  define allowBreak()  if (broken) { broken=FALSE; sigRaise(breakHandler); }
+# if HAVE_SIGPROCMASK
+#  include <signal.h>
+#  define ctrlbrk(bh)	{ sigset_t mask; \
+			  signal(SIGINT,bh); \
+			  sigemptyset(&mask); \
+			  sigaddset(&mask, SIGINT); \
+			  sigprocmask(SIG_UNBLOCK, &mask, NULL); \
+			}
+# else
+#  define ctrlbrk(bh)	signal(SIGINT,bh)
+# endif
+#if SYMANTEC_C
+extern int time_release;
+extern int allow_break_count;
+# define allowBreak()	if (time_release !=0 && \
+			    (++allow_break_count % time_release) == 0) \
+			    ProcessEvent();
+#else
+# define allowBreak()  if (broken) { broken=FALSE; sigRaise(breakHandler); }
+#endif
 #endif /* !HUGS_FOR_WINDOWS */
 
 /*---------------------------------------------------------------------------

@@ -10,9 +10,12 @@
  * included in the distribution.
  *
  * $RCSfile: prelude.h,v $
- * $Revision: 1.5 $
- * $Date: 1999/10/15 21:40:54 $
+ * $Revision: 1.6 $
+ * $Date: 1999/10/20 02:16:04 $
  * ------------------------------------------------------------------------*/
+
+#define NON_POSIX_SOURCE
+/* AJG: machdep.h needs this, for S_IREAD and S_IFREG in cygwin? */
 
 #include "config.h"
 #include "options.h"
@@ -335,5 +338,16 @@ extern Void   hugsPutc              Args((int, FILE*));
 #define Putc                 putc
 
 #endif
+
+/*-------------------------------------------------------------------------*/
+/* AJG: This needs moved to a more appropreate location
+ *
+ *   TREX	    to include support for Typed Rows and EXtensions.
+ *   IPARAM	    to include support for Implicit Parameters.
+ *   MULTI_INST	    to include support for Multi-Instance Resolution.
+ */
+#define TREX		0
+#define IPARAM		0
+#define MULTI_INST	0
 
 /*-------------------------------------------------------------------------*/

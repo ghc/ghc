@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/10/19 23:51:58 $
+ * $Revision: 1.13 $
+ * $Date: 1999/10/20 02:16:05 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -349,7 +349,7 @@ Cell id; {
         }
         default : internal("findQualTycon2");
     }
-    return 0; /* NOTREACHED */
+    return NIL; /* NOTREACHED */
 }
 
 Tycon addPrimTycon(t,kind,ar,what,defn) /* add new primitive type constr   */
@@ -713,6 +713,7 @@ Text t; {
     cclass(classHw).arity     = 0;
     cclass(classHw).kinds     = NIL;
     cclass(classHw).head      = NIL;
+    cclass(classHw).fds       = NIL;
     cclass(classHw).dcon      = NIL;
     cclass(classHw).supers    = NIL;
     cclass(classHw).dsels     = NIL;
@@ -957,7 +958,7 @@ Cell c; {
         case CONIDCELL : return findModule(textOf(c));
         default        : internal("findModid");
     }
-    assert(0); return 0; /* NOTREACHED */
+    return NIL;/*NOTUSED*/
 }
 
 static local Module findQualifier(t)    /* locate Module in import list   */
@@ -1427,11 +1428,14 @@ Cell c; {                               /* cells reachable from given root */
         }
     }
 
+    /* STACK_CHECK: Avoid stack overflows during recursive marking. */
     if (isGenPair(fst(c))) {
+	STACK_CHECK
         fst(c) = markCell(fst(c));
         markSnd(c);
     }
     else if (isNull(fst(c)) || fst(c)>=BCSTAG) {
+	STACK_CHECK
         markSnd(c);
     }
 
@@ -1757,6 +1761,14 @@ Int  depth; {
         case CONOPCELL:
                 Printf("{id %s}",textToStr(textOf(c)));
                 break;
+#if IPARAM
+	  case IPCELL :
+	      Printf("{ip %s}",textToStr(textOf(c)));
+	      break;
+	  case IPVAR :
+	      Printf("?%s",textToStr(textOf(c)));
+	      break;
+#endif
         case QUALIDENT:
                 Printf("{qid %s.%s}",textToStr(qmodOf(c)),textToStr(qtextOf(c)));
                 break;
@@ -2428,6 +2440,7 @@ Int what; {
                        for (i=CLASSMIN; i<classHw; ++i) {
                            mark(cclass(i).head);
                            mark(cclass(i).kinds);
+			   mark(cclass(i).fds);
                            mark(cclass(i).dsels);
                            mark(cclass(i).supers);
                            mark(cclass(i).members);

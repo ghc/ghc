@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: preds.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/10/19 15:11:31 $
+ * $Revision: 1.8 $
+ * $Date: 1999/10/20 02:16:04 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -18,6 +18,11 @@
  * ------------------------------------------------------------------------*/
 
 static Cell   local assumeEvid        Args((Cell,Int));
+#if IPARAM
+static Cell   local findIPEvid	      Args((Text));
+static Void   local removeIPEvid      Args((Text));
+static Void   local matchupIPs	      Args((List,List));
+#endif
 static List   local makePredAss       Args((List,Int));
 static List   local copyPreds         Args((List));
 static Void   local qualify           Args((List,Cell));
@@ -30,6 +35,10 @@ static Cell   local scFind            Args((Cell,Cell,Int,Cell,Int,Int));
 static Cell   local scEntail          Args((List,Cell,Int,Int));
 static Cell   local entail            Args((List,Cell,Int,Int));
 static Cell   local inEntail          Args((List,Cell,Int,Int));
+#if MULTI_INST
+static Cell   local inEntails	      Args((List,Cell,Int,Int));
+static Bool   local instCompare	      Args((Inst, Inst));
+#endif
 #if TREX
 static Cell   local lacksNorm         Args((Type,Int,Cell));
 #endif
@@ -45,6 +54,7 @@ static Void   local normPreds         Args((Int));
 static Bool   local resolveDefs       Args((List));
 static Bool   local resolveVar        Args((Int));
 static Class  local classConstraining Args((Int,Cell,Int));
+static Bool   local instComp_         Args((Inst,Inst));
 
 /* --------------------------------------------------------------------------
  * Predicate assignments:
@@ -66,6 +76,33 @@ Int  o; {
     preds   = cons(triple(pi,mkInt(o),nd),preds);
     return nd;
 }
+
+#if IPARAM
+static Cell local findIPEvid(t)
+Text t; {
+    List ps = preds;
+    for (; nonNull(ps); ps=tl(ps)) {
+	Cell p = hd(ps);	
+	if (ipMatch(fst3(p), t))
+	    return p;
+    }
+    return NIL;
+}
+
+static Void local removeIPEvid(t)
+Text t; {
+    List ps = preds;
+    List *prev = &preds;
+    for (; nonNull(ps); ps = tl(ps))
+	if (ipMatch(fst3(hd(ps)), t)) {
+	    *prev = tl(ps);
+	    return;
+	} else {
+	    prev = &tl(ps);
+	}
+}
+#endif
+
 
 static List local makePredAss(qs,o)     /* Make list of predicate assumps. */
 List qs;                                /* from qs (offset o), w/ new dict */
@@ -174,7 +211,7 @@ Cell ev; {
  *
  * ------------------------------------------------------------------------*/
 
-Int cutoff = 60;                        /* Used to limit depth of recursion*/
+Int cutoff = 64;                        /* Used to limit depth of recursion*/
 
 static Void local cutoffExceeded(pi,o,pi1,o1,ps)
 Cell pi, pi1;                           /* Display error msg when cutoff   */
@@ -208,9 +245,13 @@ Int  d; {
     Class h1 = getHead(pi1);
     Class h  = getHead(pi);
 
-    if (h==h1 && samePred(pi1,o1,pi,o))
+    /* the h==h1 test is just an optimization, and I'm not
+       sure it will work with IPs, so I'm being conservative
+       and commenting it out */
+    if (/* h==h1 && */ samePred(pi1,o1,pi,o))
         return e;
 
+    /* the cclass.level test is also an optimization */
     if (isClass(h1) && (!isClass(h) || cclass(h).level<cclass(h1).level)) {
         Int  beta  = newKindedVars(cclass(h1).kinds);
         List scs   = cclass(h1).supers;
@@ -244,6 +285,37 @@ Int  d; {
     }
     return NIL;
 }
+
+#if IPARAM
+static Cell local ipEntail(ps,ip,o)	/* Find evidence for (ip,o) from ps*/
+List ps;
+Cell ip;
+Int  o; {
+    Class h  = getHead(ip);
+    int i;
+    for (; nonNull(ps); ps=tl(ps)) {
+	Cell pr1 = hd(ps);
+	Cell pi1 = fst3(pr1);
+	Int o1 = intOf(snd3(pr1));
+	Class h1 = getHead(pi1);
+	if (isIP(h1)) {
+	    if (textOf(h1) == textOf(h)) {
+		if (unify(arg(pi1),o1,arg(ip),o)) {
+		    return thd3(pr1);
+		} else {
+		    ERRMSG(0) "Mismatching uses of implicit parameter\n" ETHEN
+		    ERRPRED(copyPred(pi1,o1));
+		    ERRTEXT      "\n" ETHEN
+		    ERRPRED(copyPred(ip,o));
+		    ERRTEXT      "\n"
+		    EEND;
+		}
+	    }
+	}
+    }
+    return NIL;
+}
+#endif
 
 /* --------------------------------------------------------------------------
  * Now we reach the main entailment routine:
@@ -299,7 +371,13 @@ Cell pi;                                /* tautology, and construction     */
 Int  o;
 Int  d; {
     Cell ev = scEntail(ps,pi,o,d);
-    return nonNull(ev) ? ev : inEntail(ps,pi,o,d);
+    return nonNull(ev) ? ev :
+#if MULTI_INST
+                              multiInstRes ? inEntails(ps,pi,o,d) :
+                                             inEntail(ps,pi,o,d);
+#else
+                              inEntail(ps,pi,o,d);
+#endif
 }
 
 static Cell local inEntail(ps,pi,o,d)   /* Calc evidence for (pi,o) from ps*/
@@ -355,6 +433,160 @@ Int  d; {
     }
 #endif
 }
+
+#if MULTI_INST
+static Cell local inEntails(ps,pi,o,d)	/* Calc evidence for (pi,o) from ps*/
+List ps;				/* using a top-level instance	   */
+Cell pi;				/* entailment			   */
+Int  o;
+Int  d; {
+    int i;
+    int k = 0;
+    Cell ins;				/* Class predicates		   */
+    Inst in, in_;
+    Cell pi_;
+    Cell e_;
+
+#if TREX
+    if (isAp(pi) && isExt(fun(pi))) {	/* Lacks predicates		   */
+	Cell e  = fun(pi);
+	Cell l;
+	l  = lacksNorm(arg(pi),o,e);
+	if (isNull(l) || isInt(l))
+	    return l;
+	else {
+	    List qs = ps;
+	    for (; nonNull(qs); qs=tl(qs)) {
+		Cell qi = fst3(hd(qs));
+		if (isAp(qi) && fun(qi)==e) {
+		    Cell lq = lacksNorm(arg(qi),intOf(snd3(hd(qs))),e);
+		    if (isAp(lq) && intOf(fst(l))==intOf(fst(lq))) {
+			Int f = intOf(snd(l)) - intOf(snd(lq));
+			return (f==0) ? thd3(hd(qs)) : ap2(nameAddEv,
+							   mkInt(f),
+							   thd3(hd(qs)));
+		    }
+		}
+	    }
+	    return NIL;
+	}
+    }
+    else {
+#endif
+    if (d++ >= cutoff)
+	cutoffExceeded(pi,o,NIL,0,ps);
+
+#if EXPLAIN_INSTANCE_RESOLUTION
+    if (showInstRes) {
+	pi_ = copyPred(pi, o);
+	for (i = 0; i < d; i++)
+	  fputc(' ', stdout);
+	fputs("inEntails: ", stdout);
+	printPred(stdout, pi_);
+	fputc('\n', stdout);
+    }
+#endif
+
+    ins = findInstsFor(pi,o);
+    for (; nonNull(ins); ins=tl(ins)) {
+        in = snd(hd(ins));
+	if (nonNull(in)) {
+	    Int  beta = fst(hd(ins));
+	    Cell e    = inst(in).builder;
+	    Cell es   = inst(in).specifics;
+	    Cell es_  = es;
+
+#if EXPLAIN_INSTANCE_RESOLUTION
+	    if (showInstRes) {
+		for (i = 0; i < d; i++)
+		  fputc(' ', stdout);
+		fputs("try ", stdout);
+		printContext(stdout, es);
+		fputs(" => ", stdout);
+		printPred(stdout, inst(in).head);
+		fputc('\n', stdout);
+	    }
+#endif
+
+	    for (; nonNull(es); es=tl(es)) {
+		Cell ev = entail(ps,hd(es),beta,d);
+		if (nonNull(ev))
+		    e = ap(e,ev);
+		else {
+		    e = NIL;
+		    break;
+		}
+	    }
+#if EXPLAIN_INSTANCE_RESOLUTION
+	    if (showInstRes)
+		for (i = 0; i < d; i++)
+		  fputc(' ', stdout);
+#endif
+	    if (nonNull(e)) {
+#if EXPLAIN_INSTANCE_RESOLUTION
+		if (showInstRes)
+		    fprintf(stdout, "Sat\n");
+#endif
+		if (k > 0) {
+		    if (instCompare (in_, in)) {
+		        ERRMSG(0) "Multiple satisfiable instances for "
+			ETHEN
+			ERRPRED(copyPred(pi, o));
+			ERRTEXT "\nin_ " ETHEN ERRPRED(inst(in_).head);
+			ERRTEXT "\nin  " ETHEN ERRPRED(inst(in).head);
+			ERRTEXT "\n"
+			EEND;
+		    }
+		}
+		if (k++ == 0) {
+		    e_ = e;
+		    in_ = in;
+		}
+		continue;
+	    } else {
+#if EXPLAIN_INSTANCE_RESOLUTION
+		if (showInstRes)
+		    fprintf(stdout, "not Sat\n");
+#endif
+		continue;
+	    }
+	}
+#if EXPLAIN_INSTANCE_RESOLUTION
+	if (showInstRes) {
+	    for (i = 0; i < d; i++)
+	      fputc(' ', stdout);
+	    fprintf(stdout, "not Sat.\n");
+	}
+#endif
+    }
+    if (k > 0)
+	return e_;
+#if EXPLAIN_INSTANCE_RESOLUTION
+    if (showInstRes) {
+	for (i = 0; i < d; i++)
+	  fputc(' ', stdout);
+	fprintf(stdout, "all not Sat.\n");
+    }
+#endif
+    return NIL;
+#if TREX
+    }
+#endif
+}
+
+static Bool local instComp_(ia,ib)	/* See if ia is an instance of ib  */
+Inst ia, ib;{
+    Int alpha = newKindedVars(inst(ia).kinds);
+    Int beta  = newKindedVars(inst(ib).kinds);
+    return matchPred(inst(ia).head,alpha,inst(ib).head,beta);
+}
+
+static Bool local instCompare (ia, ib)
+Inst ia, ib;
+{
+    return instComp_(ia, ib) && instComp_(ib, ia);
+}
+#endif
 
 Cell provePred(ks,ps,pi)                /* Find evidence for predicate pi  */
 Kinds ks;                               /* assuming ps.  If ps is null,    */
@@ -499,9 +731,11 @@ List sps; {                             /* preds that contain no generics. */
     for (preds=scSimplify(preds); nonNull(preds); ) {
         Cell pi = hd(preds);
         Cell nx = tl(preds);
-        if (anyGenerics(fst3(pi),intOf(snd3(pi)))) {    /* Retain predicate*/
-            tl(preds) = qs;
-            qs        = preds;
+	if (anyGenerics(fst3(pi),intOf(snd3(pi)))
+	    || !isAp(fst3(pi))
+	    || isIP(fun(fst3(pi)))) {
+	    tl(preds) = qs;				/* Retain predicate*/
+  	    qs	      = preds;
         }
         else {                                          /* Defer predicate */
             tl(preds) = sps;
@@ -524,10 +758,10 @@ List sps; {                             /* context ps.  sps = savePreds.   */
         Cell ev = entail(ps,pi,o,0);
         preds   = tl(preds);
 
-        if (nonNull(ev))                /* Discharge if ps ||- (pi,o)      */
+	if (nonNull(ev)) {		/* Discharge if ps ||- (pi,o)	   */
             overEvid(thd3(hd(p)),ev);
-        else if (!anyGenerics(pi,o)) {  /* Defer if no generics            */
-            tl(p) = sps;
+	} else if (!isAp(pi) || isIP(fun(pi)) || !anyGenerics(pi,o)) {
+	    tl(p) = sps;		/* Defer if no generics		   */
             sps   = p;
         }
         else {                          /* Try to split generics and fixed */
@@ -554,7 +788,15 @@ static Void local reducePreds() {       /* Context reduce predicates: uggh!*/
         Cell p  = preds;
         Cell pi = fst3(hd(p));
         Int  o  = intOf(snd3(hd(p)));
-        Inst in = findInstFor(pi,o);
+	Inst in = NIL;
+#if MULTI_INST
+	List ins = NIL;
+	if (multiInstRes) {
+	    ins = findInstsFor(pi,o);
+	    in = nonNull(ins) && isNull(tl(ins)) ? hd(ins) : NIL;
+	} else
+#endif
+	in = findInstFor(pi,o);
         preds   = tl(preds);
         if (nonNull(in)) {
             List qs = inst(in).specifics;

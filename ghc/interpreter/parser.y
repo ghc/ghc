@@ -5,14 +5,15 @@
  * Expect 6 shift/reduce conflicts when passing this grammar through yacc,
  * but don't worry; they should all be resolved in an appropriate manner.
  *
- * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
- * Haskell Group 1994-99, and is distributed as Open Source software
- * under the Artistic License; see the file "Artistic" that is included
- * in the distribution for details.
+ * The Hugs 98 system is Copyright (c) Mark P Jones, Alastair Reid, the
+ * Yale Haskell Group, and the Oregon Graduate Institute of Science and
+ * Technology, 1994-1999, All rights reserved.  It is distributed as
+ * free software under the license in the file "License", which is
+ * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/16 02:17:29 $
+ * $Revision: 1.11 $
+ * $Date: 1999/10/20 02:16:02 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -46,6 +47,9 @@ static Cell   local checkTyLhs   Args((Cell));
 #if !TREX
 static Void   local noTREX       Args((String));
 #endif
+#if !IPARAM
+static Void   local noIP	 Args((String));
+#endif
 
 /* For the purposes of reasonably portable garbage collection, it is
  * necessary to simulate the YACC stack on the Hugs stack to keep
@@ -78,11 +82,14 @@ static Void   local noTREX       Args((String));
 %token THEN       ELSE       WHERE      LET        IN
 %token INFIXN     INFIXL     INFIXR     FOREIGN    TNEWTYPE
 %token DEFAULT    DERIVING   DO         TCLASS     TINSTANCE
+/*#if IPARAM*/
+%token WITH DLET
+/*#endif*/
 %token REPEAT     ALL        NUMLIT     CHARLIT    STRINGLIT
 %token VAROP      VARID      CONOP      CONID
 %token QVAROP     QVARID     QCONOP     QCONID
 /*#if TREX*/
-%token RECSELID
+%token RECSELID	  IPVARID
 /*#endif*/
 %token COCO       '='        UPTO       '@'        '\\'
 %token '|'        '-'        FROM       ARROW      '~'
@@ -96,6 +103,7 @@ static Void   local noTREX       Args((String));
 /*- Top level script/module structure -------------------------------------*/
 
 start     : EXPR exp wherePart          {inputExpr = letrec($3,$2); sp-=2;}
+ 	  | CONTEXT context		{inputContext = $2;	    sp-=1;}
           | SCRIPT topModule            {valDefns  = $2;            sp-=1;}
           | INTERFACE iface             {sp-=1;}
           | error                       {syntaxError("input");}
@@ -641,7 +649,7 @@ unsafe_flag: /* empty */         {$$ = gc0(NIL);}
 
 /*- Class declarations: ---------------------------------------------------*/
 
-topDecl   : TCLASS crule wherePart      {classDefn(intOf($1),$2,$3,NIL); sp-=3;}
+topDecl	  : TCLASS crule fds wherePart	{classDefn(intOf($1),$2,$4,$3); sp-=4;}
           | TINSTANCE irule wherePart   {instDefn(intOf($1),$2,$3);  sp-=3;}
           | DEFAULT '(' dtypes ')'      {defaultDefn(intOf($1),$3);  sp-=4;}
           | TCLASS error                {syntaxError("class declaration");}
@@ -661,9 +669,27 @@ dtypes1   : dtypes1 ',' type            {$$ = gc3(cons($3,$1));}
           | type                        {$$ = gc1(cons($1,NIL));}
           ;
 
-/*- Type expressions: -----------------------------------------------------*/
-
-topType   : context IMPLIES topType1    {$$ = gc3(qualify($1,$3));}
+fds	  : /* empty */			{$$ = gc0(NIL);}
+	  | '|' fds1			{h98DoesntSupport(row,"dependent parameters");
+					 $$ = gc2(rev($2));}
+	  ;
+fds1	  : fds1 ',' fd			{$$ = gc3(cons($3,$1));}
+	  | fd				{$$ = gc1(cons($1,NIL));}
+	  | 
+	  ;
+fd	  : varids0 ARROW varids0	{$$ = gc3(pair(rev($1),rev($3)));}
+	  ;
+varids0   : /* empty */			{$$ = gc0(NIL);}
+	  | varids0 varid		{$$ = gc2(cons($2,$1));}
+	  ;
+  
+  /*- Type expressions: -----------------------------------------------------*/
+  
+topType	  : ALL varids '.' topType0	{$$ = gc4(ap(POLYTYPE,
+						     pair(rev($2),$4)));}
+	  | topType0			{$$ = $1;}
+ 	  ;
+topType0  : context IMPLIES topType1	{$$ = gc3(qualify($1,$3));}
           | topType1                    {$$ = $1;}
           ;
 topType1  : bpolyType ARROW topType1    {$$ = gc3(fn($1,$3));}
@@ -673,11 +699,12 @@ topType1  : bpolyType ARROW topType1    {$$ = gc3(fn($1,$3));}
           ;
 polyType  : ALL varids '.' sigType      {$$ = gc4(ap(POLYTYPE,
                                                      pair(rev($2),$4)));}
+	  | context IMPLIES type	{$$ = gc3(qualify($1,$3));}
           | bpolyType                   {$$ = $1;}
           ;
 bpolyType : '(' polyType ')'            {$$ = gc3($2);}
           ;
-varids    : varids ',' varid            {$$ = gc3(cons($3,$1));}
+varids	  : varids varid		{$$ = gc2(cons($2,$1));}
           | varid                       {$$ = gc1(singleton($1));}
           ;
 sigType   : context IMPLIES type        {$$ = gc3(qualify($1,$3));}
@@ -698,6 +725,13 @@ lacks     : varid '\\' varid            {
                                          noTREX("a type context");
 #endif
                                         }
+          | IPVARID COCO type		{
+#if IPARAM
+					 $$ = gc3(pair(mkIParam($1),$3));
+#else
+					 noIP("a type context");
+#endif
+					}
           ;
 lacks1    : btypes2 ',' lacks           {$$ = gc3(cons($3,$1));}
           | lacks1  ',' btype2          {$$ = gc3(cons($3,$1));}
@@ -735,7 +769,6 @@ atype1    : varid                       {$$ = $1;}
           | '(' tupCommas ')'           {$$ = gc3($2);}
           | '(' btypes2 ')'             {$$ = gc3(buildTuple($2));}
           | '(' typeTuple ')'           {$$ = gc3(buildTuple($2));}
-/*#if TREX*/
           | '(' tfields ')'             {
 #if TREX
                                          $$ = gc3(revOnto($2,typeNoRow));
@@ -743,11 +776,17 @@ atype1    : varid                       {$$ = $1;}
                                          noTREX("a type");
 #endif
                                         }
-          | '(' tfields '|' type ')'    {$$ = gc5(revOnto($2,$4));}
-/*#endif*/
+	  | '(' tfields '|' type ')'	{
+#if TREX
+					 $$ = gc5(revOnto($2,$4));
+#else
+					 noTREX("a type");
+#endif
+					}
           | '[' type ']'                {$$ = gc3(ap(typeList,$2));}
           | '[' ']'                     {$$ = gc2(typeList);}
-          | '_'                         {$$ = gc1(inventVar());}
+	  | '_'				{h98DoesntSupport(row,"anonymous type variables");
+					 $$ = gc1(inventVar());}
           ;
 btypes2   : btypes2 ',' btype2          {$$ = gc3(cons($3,$1));}
           | btype2  ',' btype2          {$$ = gc3(cons($3,cons($1,NIL)));}
@@ -761,7 +800,8 @@ typeTuple : type1     ',' type          {$$ = gc3(cons($3,cons($1,NIL)));}
 tfields   : tfields ',' tfield          {$$ = gc3(cons($3,$1));}
           | tfield                      {$$ = gc1(singleton($1));}
           ;
-tfield    : varid COCO type             {$$ = gc3(ap(mkExt(textOf($1)),$3));}
+tfield	  : varid COCO type		{h98DoesntSupport(row,"extensible records");
+					 $$ = gc3(ap(mkExt(textOf($1)),$3));}
           ;
 /*#endif*/
 
@@ -853,6 +893,7 @@ pat0_vI   : pat10_vI                    {$$ = $1;}
           | infixPat                    {$$ = gc1(ap(INFIX,$1));}
           ;
 infixPat  : '-' pat10                   {$$ = gc2(ap(NEG,only($2)));}
+	  | '-' error			{syntaxError("pattern");}
           | var qconop pat10            {$$ = gc3(ap(ap($2,only($1)),$3));}
           | var qconop '-' pat10        {$$ = gc4(ap(NEG,ap2($2,only($1),$4)));}
           | NUMLIT qconop pat10         {$$ = gc3(ap(ap($2,only($1)),$3));}
@@ -932,6 +973,13 @@ exp       : exp_err                     {$$ = $1;}
           | error                       {syntaxError("expression");}
           ;
 exp_err   : exp0a COCO sigType          {$$ = gc3(ap(ESIGN,pair($1,$3)));}
+	  | exp0a WITH dbinds		{
+#if IPARAM
+					 $$ = gc3(ap(WITHEXP,pair($1,$3)));
+#else
+					 noIP("an expression");
+#endif
+					}
           | exp0                        {$$ = $1;}
           ;
 exp0      : exp0a                       {$$ = $1;}
@@ -966,6 +1014,13 @@ exp10b    : '\\' pats ARROW exp         {$$ = gc4(ap(LAMBDA,
                                                           pair($3,$4))));}
           | LET decls IN exp            {$$ = gc4(letrec($2,$4));}
           | IF exp THEN exp ELSE exp    {$$ = gc6(ap(COND,triple($2,$4,$6)));}
+	  | DLET dbinds IN exp		{
+#if IPARAM
+					 $$ = gc4(ap(WITHEXP,pair($4,$2)));
+#else
+					 noIP("an expression");
+#endif
+					}
           ;
 pats      : pats apat                   {$$ = gc2(cons($2,$1));}
           | apat                        {$$ = gc1(cons($1,NIL));}
@@ -976,6 +1031,7 @@ appExp    : appExp aexp                 {$$ = gc2(ap($1,$2));}
 aexp      : qvar                        {$$ = $1;}
           | qvar '@' aexp               {$$ = gc3(ap(ASPAT,pair($1,$3)));}
           | '~' aexp                    {$$ = gc2(ap(LAZYPAT,$2));}
+	  | IPVARID			{$$ = $1;}
           | '_'                         {$$ = gc1(WILDCARD);}
           | gcon                        {$$ = $1;}
           | qcon '{' fbinds '}'         {$$ = gc4(ap(CONFLDS,pair($1,$3)));}
@@ -1056,6 +1112,18 @@ fbinds1   : fbinds1 ',' fbind           {$$ = gc3(cons($3,$1));}
 fbind     : var                         {$$ = $1;}
           | qvar '=' exp                {$$ = gc3(pair($1,$3));}
           ;
+
+dbinds	  : '{' dbs0 end		{$$ = gc3($2);}
+	  | '{' dbs1 end		{$$ = gc3($2);}
+	  ;
+dbs0	  : /* empty */			{$$ = gc0(NIL);}
+	  | dbs0 ';'			{$$ = gc2($1);}
+	  | dbs1 ';'			{$$ = gc2($1);}
+	  ;
+dbs1	  : dbs0 dbind			{$$ = gc2(cons($2,$1));}
+	  ;
+dbind	  : IPVARID '=' exp		{$$ = gc3(pair($1,$3));}
+	  ;
 
 /*- List Expressions: -------------------------------------------------------*/
 
@@ -1245,7 +1313,15 @@ static String local unexpected() {     /* find name for unexpected token   */
         case DEFAULT   : keyword("default");
         case IMPORT    : keyword("import");
         case TMODULE   : keyword("module");
+	  /* AJG: Hugs98/Classic use the keyword forall
+	          rather than __forall.
+		  Agree on one or the other
+	  */
         case ALL       : keyword("__forall");
+#if IPARAM
+	case DLET      : keyword("dlet");
+	case WITH      : keyword("with");
+#endif
 #undef keyword
 
         case ARROW     : return "`->'";
@@ -1257,12 +1333,12 @@ static String local unexpected() {     /* find name for unexpected token   */
         case '@'       : return "`@'";
         case '('       : return "`('";
         case ')'       : return "`)'";
-        case '{'       : return "`{'";
-        case '}'       : return "`}'";
+	case '{'       : return "`{', possibly due to bad layout";
+	case '}'       : return "`}', possibly due to bad layout";
         case '_'       : return "`_'";
         case '|'       : return "`|'";
         case '.'       : return "`.'";
-        case ';'       : return "`;'";
+	case ';'       : return "`;', possibly due to bad layout";
         case UPTO      : return "`..'";
         case '['       : return "`['";
         case ']'       : return "`]'";
@@ -1274,6 +1350,11 @@ static String local unexpected() {     /* find name for unexpected token   */
         case RECSELID  : sprintf(buffer,"selector \"#%s\"",
                                  textToStr(extText(snd(yylval))));
                          return buffer;
+#endif
+#if IPARAM
+	case IPVARID   : sprintf(buffer,"implicit parameter \"?%s\"",
+				 textToStr(textOf(yylval)));
+			 return buffer;
 #endif
         case VAROP     :
         case VARID     :
@@ -1339,7 +1420,11 @@ Cell c; {                               /* constraint                      */
     if (isExt(cn) && argCount==1)
         return c;
 #endif
-    if (!isQCon(cn) || argCount==0)
+#if IPARAM
+    if (isIP(cn))
+	return c;
+#endif
+    if (!isQCon(cn) /*|| argCount==0*/)
         syntaxError("class expression");
     return c;
 }
@@ -1355,26 +1440,33 @@ List dqs; {                             /* to an (expr,quals) pair         */
     return dqs;
 }
 
-static Cell local checkTyLhs(c)         /* check that lhs is of the form   */
-Cell c; {                               /* T a1 ... a                      */
+static Cell local checkTyLhs(c)		/* check that lhs is of the form   */
+Cell c; {				/* T a1 ... a			   */
     Cell tlhs = c;
-    while (isAp(tlhs) && whatIs(arg(tlhs))==VARIDCELL)
-        tlhs = fun(tlhs);
-    switch (whatIs(tlhs)) {
-        case CONIDCELL  : return c;
-
-        default :
-            ERRMSG(row) "Illegal left hand side in datatype definition"
-            EEND;
+    while (isAp(tlhs) && whatIs(arg(tlhs))==VARIDCELL) {
+	tlhs = fun(tlhs);
     }
-    return 0; /* NOTREACHED */
+    if (whatIs(tlhs)!=CONIDCELL) {
+	ERRMSG(row) "Illegal left hand side in datatype definition"
+	EEND;
+    }
+    return c;
 }
+
 
 #if !TREX
 static Void local noTREX(where)
 String where; {
     ERRMSG(row) "Attempt to use TREX records while parsing %s.\n", where ETHEN
     ERRTEXT     "(TREX is disabled in this build of Hugs)"
+    EEND;
+}
+#endif
+#if !IPARAM
+static Void local noIP(where)
+String where; {
+    ERRMSG(row) "Attempt to use Implicit Parameters while parsing %s.\n", where ETHEN
+    ERRTEXT     "(Implicit Parameters are disabled in this build of Hugs)"
     EEND;
 }
 #endif

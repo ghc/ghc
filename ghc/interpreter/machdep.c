@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/10/15 21:40:52 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/20 02:16:01 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -100,6 +100,9 @@ extern unsigned _stklen = 8000;         /* Allocate an 8k stack segment    */
 #ifdef HAVE_UNIX_H
 #include <unix.h>
 #endif
+#if SYMANTEC_C
+int allow_break_count = 0;
+#endif
 
 /* --------------------------------------------------------------------------
  * Prototypes for registry reading
@@ -113,7 +116,7 @@ extern unsigned _stklen = 8000;         /* Allocate an 8k stack segment    */
 #endif
 
 #define HugsRoot ("SOFTWARE\\Haskell\\Hugs\\" HUGS_VERSION "\\")
-#define ProjectRoot ("SOFTWARE\\Haskell\\Hugs\\Projects\\")
+#define ProjectRoot ("SOFTWARE\\Haskell\\Projects\\")
 
 static Bool   local createKey      Args((HKEY, String, PHKEY, REGSAM));
 static Bool   local queryValue     Args((HKEY, String, String, LPDWORD, LPBYTE, DWORD));
@@ -306,7 +309,7 @@ static String local hugsdir() {     /* directory containing lib/Prelude.hs */
 }
 
 #if HSCRIPT    
-static String local hscriptDir() {  /* directory containing ?? what Daan?  */
+static String local hscriptDir() {  /* Directory containing hscript.dll	   */
     static char dir[FILENAME_MAX+1] = "";
     if (dir[0] == '\0') { /* not initialised yet */
         String s = readRegString(HKEY_LOCAL_MACHINE,HScriptRoot,"InstallDir","");
@@ -1064,7 +1067,54 @@ Int readTerminalChar() {                /* read character from terminal    */
     if (terminalEchoReqd) {
         return getchar();
     } else {
-        Int c = getch();
+#if IS_WIN32 && !HUGS_FOR_WINDOWS && !__BORLANDC__
+	/* When reading a character from the console/terminal, we want
+	 * to operate in 'raw' mode (to use old UNIX tty parlance) and have
+ 	 * it return when a character is available and _not_ wait until
+ 	 * the next time the user hits carriage return. On Windows platforms,
+ 	 * this _can_ be done by reading directly from the console, using
+	 * getch().  However, this doesn't sit well with programming
+	 * environments such as Emacs which allow you to create sub-processes
+	 * running Hugs, and then communicate with the running interpreter
+	 * through its standard input and output handles. If you use getch()
+	 * in that setting, you end up trying to read the (unused) console
+	 * of the editor itself, through which not a lot of characters is
+	 * bound to come out, since the editor communicates input to Hugs
+	 * via the standard input handle.
+ 	 *
+ 	 * To avoid this rather unfortunate situation, we use the Win32
+	 * console API and re-jig the input properties of the standard
+	 * input handle before trying to read a character using stdio's
+	 * getchar().
+ 	 * 
+ 	 * The 'cost' of this solution is that it is Win32 specific and
+	 * won't work with Windows 3.1 + it is kind of ugly and verbose
+	 * to have to futz around with the console properties on a
+	 * per-char basis. Both of these disadvantages aren't in my
+	 * opinion fatal.
+ 	 *
+ 	 * -- sof 5/99
+ 	 */
+        Int c;
+ 	DWORD mo;
+ 	HANDLE hIn;
+ 
+ 	/* I don't quite understand why, but if the FILE*'s underlying file
+	   descriptor is in text mode, we seem to lose the first carriage
+	   return.
+ 	 */
+ 	setmode(fileno(stdin), _O_BINARY);
+ 	hIn = GetStdHandle(STD_INPUT_HANDLE);
+ 	GetConsoleMode(hIn, &mo);
+ 	SetConsoleMode(hIn, mo & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT));
+ 	c = getc(stdin);
+ 
+ 	/* Same as it ever was - revert back state of stdin. */
+ 	SetConsoleMode(hIn, mo);
+ 	setmode(fileno(stdin), _O_TEXT);
+#else
+	Int c = getch();
+#endif
         return c=='\r' ? '\n' : c;      /* slight paranoia about CR-LF    */
     }
 }
@@ -1121,8 +1171,21 @@ static sigHandler(panic) {              /* exit in a panic, on receipt of  */
 }
 #endif /* !DONT_PANIC */
 
+#if IS_WIN32
+BOOL WINAPI consoleHandler(DWORD dwCtrlType) {
+    switch (dwCtrlType) {		/* Allows Hugs to be terminated    */
+	case CTRL_CLOSE_EVENT :		/* from the window's close menu.   */
+	    ExitProcess(0);
+    }
+    return FALSE;
+}
+#endif
+ 
 static Void local installHandlers() { /* Install handlers for all fatal    */ 
                                       /* signals except SIGINT and SIGBREAK*/
+#if IS_WIN32
+    SetConsoleCtrlHandler(consoleHandler,TRUE);
+#endif
 #if !DONT_PANIC && !DOS
 # ifdef SIGABRT
     signal(SIGABRT,panic);
@@ -1173,7 +1236,7 @@ String nm; {                            /* or just line may be zero        */
         String ec = editorCmd;
         String rd = NULL;               /* Set to nonnull to redo ...      */
 
-        for (; n>0 && *he && *he!=' '; n--)
+	for (; n>0 && *he && *he!=' ' && *he!='%'; n--)
             *ec++ = *he++;              /* Copy editor name to buffer      */
                                         /* assuming filename ends at space */
 

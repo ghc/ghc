@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/10/15 21:41:05 $
+ * $Revision: 1.8 $
+ * $Date: 1999/10/20 02:15:59 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -78,11 +78,17 @@ String symbol; {
 #else /* eg FreeBSD doesn't have RTLD_LAZY */
     ObjectFile instance = dlopen(dll,1);
 #endif
+    void *sym;
+
     if (NULL == instance) {
-        ERRMSG(0) "Error %s while importing DLL \"%s\"", dlerror(), dll
+	ERRMSG(0) "Error while importing DLL \"%s\":\n%s\n", dll, dlerror()
         EEND;
     }
-    return dlsym(instance,symbol);
+    if (sym = dlsym(instance,symbol))
+        return sym;
+
+    ERRMSG(0) "Error loading sym:\n%s\n", dlerror()
+    EEND;
 }
 
 #elif HAVE_DL_H /* eg HPUX */

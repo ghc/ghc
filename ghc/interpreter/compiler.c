@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/15 21:41:03 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/20 02:15:58 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -136,7 +136,9 @@ Cell e; {
         case STRCELL    :
         case BIGCELL    :
         case CHARCELL   : return e;
-
+#if IPARAM
+	case IPVAR	: return nameId;
+#endif
         case FINLIST    : mapOver(translate,snd(e));
                           return mkConsList(snd(e));
 
@@ -215,7 +217,15 @@ static List local transBinds(bs)        /* Translate list of bindings:     */
 List bs; {                              /* eliminating pattern matching on */
     List newBinds = NIL;                /* lhs of bindings.                */
     for (; nonNull(bs); bs=tl(bs)) {
+#if IPARAM
+	Cell v = fst(hd(bs));
+	while (isAp(v) && fst(v) == nameInd)
+	    v = arg(v);
+	fst(hd(bs)) = v;
+	if (isVar(v)) {
+#else
         if (isVar(fst(hd(bs)))) {
+#endif
             mapProc(transAlt,snd(hd(bs)));
             newBinds = cons(hd(bs),newBinds);
         }

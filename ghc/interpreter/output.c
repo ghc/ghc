@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/10/16 02:17:28 $
+ * $Revision: 1.8 $
+ * $Date: 1999/10/20 02:16:02 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -147,6 +147,18 @@ Cell e; {
         case CONIDCELL  :
         case CONOPCELL  : unlexVar(textOf(e));
                           break;
+
+#if IPARAM
+	case IPVAR	: putChr('?');
+			  unlexVar(textOf(e));
+			  break;
+
+	case WITHEXP	: OPEN(d>WHERE_PREC);
+			  putStr("dlet {...} in ");
+			  put(WHERE_PREC+1,fst(snd(e)));
+			  CLOSE(d>WHERE_PREC);
+			  break;
+#endif
 
 #if TREX
         case RECSEL     : putChr('#');
@@ -622,9 +634,12 @@ List qs;
 Int  fr; {
     Int len = length(ps) + length(qs);
     Int c   = len;
-    if (len!=1) {
-        putChr('(');
-    }
+#if IPARAM
+    Bool useParens = len!=1 || isIP(fun(hd(ps)));
+#else
+    Bool useParens = len!=1;
+#endif
+    if (useParens)
     for (; nonNull(ps); ps=tl(ps)) {
         putPred(hd(ps),fr);
         if (--c > 0) {
@@ -637,9 +652,8 @@ Int  fr; {
             putStr(", ");
         }
     }
-    if (len!=1) {
+    if (useParens)
         putChr(')');
-    }
 }
 
 static Void local putPred(pi,fr)        /* Output predicate                */
@@ -654,6 +668,15 @@ Int  fr; {
             return;
         }
 #endif
+#if IPARAM
+	if (whatIs(fun(pi)) == IPCELL) {
+	    putChr('?');
+	    putPred(fun(pi),fr);
+	    putStr(" :: ");
+	    putType(arg(pi),NEVER,fr);
+	    return;
+	}
+#endif
         putPred(fun(pi),fr);
         putChr(' ');
         putType(arg(pi),ALWAYS,fr);
@@ -662,6 +685,10 @@ Int  fr; {
         putStr(textToStr(cclass(pi).text));
     else if (isCon(pi))
         putStr(textToStr(textOf(pi)));
+#if IPARAM
+    else if (whatIs(pi) == IPCELL)
+        unlexVar(textOf(pi));
+#endif
     else
         putStr("<unknownPredicate>");
 }
@@ -688,7 +715,7 @@ Int  fr; {
                              for (; isAp(ks); ks=tl(ks)) {
                                  putTyVar(fr++);
                                  if (isAp(tl(ks)))
-                                     putChr(',');
+                                     putChr(' ');
                              }
                              putStr(". ");
                              putType(monotypeOf(t),NEVER,fr);
@@ -747,12 +774,14 @@ Int  fr; {
                                     CLOSE(prec>=ARROW_PREC);
                                     return;
                                 }
+#if 0
                                 else if (argCount==1) {
                                     putChr('(');
                                     putType(arg(t),ARROW_PREC,fr);
                                     putStr("->)");
                                     return;
                                 }
+#endif
                             }
                             else if (isTuple(typeHead)) {
                                 if (argCount==tupleOf(typeHead)) {
@@ -770,7 +799,7 @@ Int  fr; {
                                         putStr(punc);
                                         punc = ", ";
                                         putStr(textToStr(extText(typeHead)));
-                                        putStr("::");
+                                        putStr(" :: ");
                                         putType(extField(t),NEVER,fr);
                                         t        = extRow(t);
                                         typeHead = getHead(t);

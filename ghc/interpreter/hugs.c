@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/10/19 23:51:57 $
+ * $Revision: 1.15 $
+ * $Date: 1999/10/20 02:15:59 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -1422,8 +1422,6 @@ static Void local showtype() {         /* print type of expression (if any)*/
 static Void local browseit(mod,t)
 Module mod; 
 String t; {
-#if 0
-  /* AJG: DISABLED FOR NOW */
     if (nonNull(mod)) {
 	Cell cs;
 	Printf("module %s where\n",textToStr(module(mod).text));
@@ -1444,9 +1442,6 @@ String t; {
 		    } else if (isSfun(nm)) {
 			Printf("  -- selector function");
 		    }
-		    if (name(nm).primDef) {
-			Printf("   -- primitive");
-		    }
 		    Printf("\n");
 		}
 	    }
@@ -1456,7 +1451,6 @@ String t; {
 	Printf("Unknown module %s\n",t);
       }
     }
-#endif
 }
 
 static Void local browse() {            /* browse modules                  */
@@ -1715,8 +1709,7 @@ Text t; {
             Printf(" => ");
         }
         printPred(stdout,cclass(cl).head);
-#if 0
-	/* AJG: commented out for now */
+
 	if (nonNull(cclass(cl).fds)) {
 	    List   fds = cclass(cl).fds;
 	    String pre = " | ";
@@ -1726,7 +1719,7 @@ Text t; {
 		pre = ", ";
 	    }
 	}
-#endif
+
         if (nonNull(cclass(cl).members)) {
             List ms = cclass(cl).members;
             Printf(" where");
