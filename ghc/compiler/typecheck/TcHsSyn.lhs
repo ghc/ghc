@@ -415,10 +415,11 @@ zonkExpr te (ExplicitTuple exprs)
   = mapNF_Tc (zonkExpr te) exprs  `thenNF_Tc` \ new_exprs ->
     returnNF_Tc (ExplicitTuple new_exprs)
 
-zonkExpr te (RecordCon con rbinds)
-  = zonkExpr te con		`thenNF_Tc` \ new_con ->
+zonkExpr te (RecordConOut con_id con_expr rbinds)
+  = zonkIdOcc con_id		`thenNF_Tc` \ new_con_id ->
+    zonkExpr te con_expr		`thenNF_Tc` \ new_con_expr ->
     zonkRbinds te rbinds	`thenNF_Tc` \ new_rbinds ->
-    returnNF_Tc (RecordCon new_con new_rbinds)
+    returnNF_Tc (RecordConOut new_con_id new_con_expr new_rbinds)
 
 zonkExpr te (RecordUpd _ _) = panic "zonkExpr te:RecordUpd"
 
