@@ -112,7 +112,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\.text\n\t\.align 3\n";
     $T_HDR_vector   = "\.text\n\t\.align 3\n";
     $T_HDR_direct   = "\.text\n\t\.align 3\n";
-    $T_create_word  = "\t.quad";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^hppa/ ) {
@@ -139,7 +138,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
     $T_HDR_vector   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
     $T_HDR_direct   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
-    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|nextstep3|cygwin32|mingw32)$/ ) {
@@ -169,7 +167,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
     $T_HDR_vector   = "\.text\n\t\.align 2\n"; # NB: requires padding
     $T_HDR_direct   = "\.text\n\t\.align 2,0x90\n";
-    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|freebsd|netbsd|openbsd)$/ ) {
@@ -205,7 +202,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
     $T_HDR_vector   = "\.text\n\t\.align 4\n"; # NB: requires padding
     $T_HDR_direct   = "\.text\n\t\.align 4\n";
-    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^ia64-.*-linux$/ ) {
@@ -232,7 +228,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\.text\n\t\.align 16\n";
     $T_HDR_vector   = "\.text\n\t\.align 8\n";
     $T_HDR_direct   = "\.text\n\t\.align 8\n";
-    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^m68k-.*-sunos4/ ) {
@@ -259,7 +254,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\.text\n\t\.even\n";
     $T_HDR_vector   = "\.text\n\t\.even\n";
     $T_HDR_direct   = "\.text\n\t\.even\n";
-    $T_create_word  = "\t.long";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^mips-.*/ ) {
@@ -286,7 +280,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
     $T_HDR_direct   = "\t\.text\n\t\.align 2\n";
-    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ ) {
@@ -314,7 +307,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
     $T_HDR_direct   = "\t\.text\n\t\.align 2\n";
-    $T_create_word  = "\t.long";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^sparc-.*-(solaris2|openbsd)/ ) {
@@ -341,7 +333,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\.text\n\t\.align 4\n";
     $T_HDR_vector   = "\.text\n\t\.align 4\n";
     $T_HDR_direct   = "\.text\n\t\.align 4\n";
-    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^sparc-.*-sunos4/ ) {
@@ -368,7 +359,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\.text\n\t\.align 4\n";
     $T_HDR_vector   = "\.text\n\t\.align 4\n";
     $T_HDR_direct   = "\.text\n\t\.align 4\n";
-    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^sparc-.*-linux/ ) {
@@ -395,7 +385,6 @@ sub init_TARGET_STUFF {
     $T_HDR_entry    = "\.text\n\t\.align 4\n";
     $T_HDR_vector   = "\.text\n\t\.align 4\n";
     $T_HDR_direct   = "\.text\n\t\.align 4\n";
-    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } else {
