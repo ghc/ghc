@@ -29,7 +29,7 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs,
 			  opt_AutoSccsOnExportedToplevs, opt_AutoSccsOnDicts
 		        )
 import CostCentre	( CostCentre, mkAutoCC, IsCafCC(..) )
-import Id		( idType, idName, isUserExportedId, Id )
+import Id		( idType, idName, isUserExportedId, isSpecPragmaId, Id )
 import NameSet
 import VarEnv
 import VarSet
@@ -70,7 +70,17 @@ dsMonoBinds _ (VarMonoBind var expr) rest
 	-- we only need do this here
     addDictScc var core_expr	`thenDs` \ core_expr' ->
 
-    returnDs ((var, core_expr') : rest)
+    let
+	-- Gross hack to prevent inlining into SpecPragmaId rhss
+	-- Consider	fromIntegral = fromInteger . toInteger
+	--		spec1 = fromIntegral Int Float
+	-- Even though fromIntegral is small we don't want to inline
+	-- it inside spec1, so that we collect the specialised call
+	-- Solution: make spec1 an INLINE thing.  
+   	core_expr'' = mkInline (isSpecPragmaId var) core_expr'
+    in  
+
+    returnDs ((var, core_expr'') : rest)
 
 dsMonoBinds auto_scc (FunMonoBind fun _ matches locn) rest
   = putSrcLocDs locn	$

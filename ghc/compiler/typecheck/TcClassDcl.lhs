@@ -14,7 +14,7 @@ import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
 			  InPat(..), HsBinds(..), GRHSs(..),
 			  HsExpr(..), HsLit(..), HsType(..), pprClassAssertion,
 			  unguardedRHS, andMonoBinds, andMonoBindList, getTyVarName,
-			  isClassDecl, isClassOpSig, collectMonoBinders
+			  isClassDecl, isClassOpSig, isPragSig, collectMonoBinders
 			)
 import HsPragmas	( ClassPragmas(..) )
 import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..) )
@@ -352,7 +352,7 @@ tcClassDecl2 (ClassDecl context class_name
 		    ]
     in
 	-- Generate bindings for the default methods
-    tcDefaultMethodBinds clas default_binds		`thenTc` \ (const_insts, meth_binds) ->
+    tcDefaultMethodBinds clas default_binds class_sigs		`thenTc` \ (const_insts, meth_binds) ->
 
     returnTc (const_insts,
 	      meth_binds `AndMonoBinds` andMonoBindList sel_binds)
@@ -423,9 +423,10 @@ dfun.Foo.List
 tcDefaultMethodBinds
 	:: Class
 	-> RenamedMonoBinds
+	-> [RenamedSig]
 	-> TcM s (LIE, TcMonoBinds)
 
-tcDefaultMethodBinds clas default_binds
+tcDefaultMethodBinds clas default_binds sigs
   = 	-- Check that the default bindings come from this class
     checkFromThisClass clas op_sel_ids default_binds	`thenNF_Tc_`
 
@@ -434,6 +435,7 @@ tcDefaultMethodBinds clas default_binds
 
     returnTc (plusLIEs const_lies, andMonoBindList defm_binds)
   where
+    prags = filter isPragSig sigs
 
     (tyvars, sc_theta, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
 
@@ -463,7 +465,7 @@ tcDefaultMethodBinds clas default_binds
 	in
 	tcExtendTyVarEnvForMeths tyvars clas_tyvars (
 	    tcMethodBind clas origin clas_tyvars inst_tys theta
-		         default_binds [{-no prags-}] False
+		         default_binds prags False
 		         sel_id_w_dm	
         )					`thenTc` \ (defm_bind, insts_needed, (_, local_dm_id)) ->
     
