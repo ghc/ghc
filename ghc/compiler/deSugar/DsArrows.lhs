@@ -234,7 +234,7 @@ matchVarStack env_id (stack_id:stack_ids) body
 \begin{code}
 mkHsTupleExpr :: [TypecheckedHsExpr] -> TypecheckedHsExpr
 mkHsTupleExpr [e] = e
-mkHsTupleExpr es = ExplicitTuple es Unboxed
+mkHsTupleExpr es = ExplicitTuple es Boxed
 
 mkHsPairExpr :: TypecheckedHsExpr -> TypecheckedHsExpr -> TypecheckedHsExpr
 mkHsPairExpr e1 e2 = mkHsTupleExpr [e1, e2]
@@ -417,6 +417,74 @@ dsCmd ids local_vars env_ids stack res_ty
 dsCmd ids local_vars env_ids stack res_ty (HsPar cmd)
   = dsCmd ids local_vars env_ids stack res_ty cmd
 
+--	A, xs |- e :: Bool
+--	A | xs1 |- c1 :: [ts] t
+--	A | xs2 |- c2 :: [ts] t
+--	----------------------------------------
+--	A | xs |- if e then c1 else c2 :: [ts] t
+--
+--		---> arr (\ ((xs)*ts) ->
+--			if e then Left ((xs1)*ts) else Right ((xs2)*ts)) >>>
+--		     c1 ||| c2
+
+dsCmd ids local_vars env_ids stack res_ty (HsIf cond then_cmd else_cmd _loc)
+  = dsExpr cond			`thenDs` \ core_cond ->
+    dsfixCmd ids local_vars stack res_ty then_cmd
+				`thenDs` \ (core_then, fvs_then, then_ids) ->
+    dsfixCmd ids local_vars stack res_ty else_cmd
+				`thenDs` \ (core_else, fvs_else, else_ids) ->
+    mapDs newSysLocalDs stack		`thenDs` \ stack_ids ->
+    dsLookupTyCon eitherTyConName	`thenDs` \ either_con ->
+    dsLookupDataCon leftDataConName	`thenDs` \ left_con ->
+    dsLookupDataCon rightDataConName	`thenDs` \ right_con ->
+    let
+	left_expr ty1 ty2 e = mkConApp left_con [Type ty1, Type ty2, e]
+	right_expr ty1 ty2 e = mkConApp right_con [Type ty1, Type ty2, e]
+
+	in_ty = envStackType env_ids stack
+	then_ty = envStackType then_ids stack
+	else_ty = envStackType else_ids stack
+	sum_ty = mkTyConApp either_con [then_ty, else_ty]
+	fvs_cond = exprFreeVars core_cond `intersectVarSet` local_vars
+    in
+    matchEnvStack env_ids stack_ids
+	(mkIfThenElse core_cond
+	    (left_expr then_ty else_ty (buildEnvStack then_ids stack_ids))
+	    (right_expr then_ty else_ty (buildEnvStack else_ids stack_ids)))
+					`thenDs` \ core_if ->
+    returnDs(do_map_arrow ids in_ty sum_ty res_ty
+		core_if
+		(do_choice ids then_ty else_ty res_ty core_then core_else),
+	fvs_cond `unionVarSet` fvs_then `unionVarSet` fvs_else)
+\end{code}
+
+Case commands are treated in much the same way as if commands
+(see above) except that there are more alternatives.  For example
+
+	case e of { p1 -> c1; p2 -> c2; p3 -> c3 }
+
+is translated to
+
+	arr (\ ((xs)*ts) -> case e of
+		p1 -> (Left (Left (xs1)*ts))
+		p2 -> Left ((Right (xs2)*ts))
+		p3 -> Right ((xs3)*ts)) >>>
+	(c1 ||| c2) ||| c3
+
+The idea is to extract the commands from the case, build a balanced tree
+of choices, and replace the commands with expressions that build tagged
+tuples, obtaining a case expression that can be desugared normally.
+To build all this, we use quadruples decribing segments of the list of
+case bodies, containing the following fields:
+1. an IdSet containing the environment variables free in the case bodies
+2. a list of expressions of the form (Left|Right)* ((xs)*ts), to be put
+   into the case replacing the commands
+3. a sum type that is the common type of these expressions, and also the
+   input type of the arrow
+4. a CoreExpr for an arrow built by combining the translated command
+   bodies with |||.
+
+\begin{code}
 dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches src_loc)
   = dsExpr exp				`thenDs` \ core_exp ->
     mapDs newSysLocalDs stack		`thenDs` \ stack_ids ->
@@ -454,56 +522,21 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches src_loc)
 		map (right_expr in_ty1 in_ty2) builds2,
 	     mkTyConApp either_con [in_ty1, in_ty2],
 	     do_choice ids in_ty1 in_ty2 res_ty core_exp1 core_exp2)
-	(fvs, leaves', sum_ty, core_choices) = foldb merge_branches branches
+	(fvs_alts, leaves', sum_ty, core_choices)
+	  = foldb merge_branches branches
 
 	-- Replace the commands in the case with these tagged tuples,
 	-- yielding a TypecheckedHsExpr we can feed to dsExpr.
 
 	(_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
 	in_ty = envStackType env_ids stack
+	fvs_exp = exprFreeVars core_exp `intersectVarSet` local_vars
     in
-    dsExpr (HsCase exp matches' src_loc) `thenDs` \ core_matches ->
+    dsExpr (HsCase exp matches' src_loc) `thenDs` \ core_body ->
+    matchEnvStack env_ids stack_ids core_body
+					`thenDs` \ core_matches ->
     returnDs(do_map_arrow ids in_ty sum_ty res_ty core_matches core_choices,
-	exprFreeVars core_exp `unionVarSet` fvs)
-
---	A, xs |- e :: Bool
---	A | xs1 |- c1 :: [ts] t
---	A | xs2 |- c2 :: [ts] t
---	----------------------------------------
---	A | xs |- if e then c1 else c2 :: [ts] t
---
---		---> arr (\ ((xs)*ts) ->
---			if e then Left ((xs1)*ts) else Right ((xs2)*ts)) >>>
---		     c1 ||| c2
-
-dsCmd ids local_vars env_ids stack res_ty (HsIf cond then_cmd else_cmd _loc)
-  = dsExpr cond			`thenDs` \ core_cond ->
-    dsfixCmd ids local_vars stack res_ty then_cmd
-				`thenDs` \ (core_then, fvs_then, then_ids) ->
-    dsfixCmd ids local_vars stack res_ty else_cmd
-				`thenDs` \ (core_else, fvs_else, else_ids) ->
-    mapDs newSysLocalDs stack		`thenDs` \ stack_ids ->
-    dsLookupTyCon eitherTyConName	`thenDs` \ either_con ->
-    dsLookupDataCon leftDataConName	`thenDs` \ left_con ->
-    dsLookupDataCon rightDataConName	`thenDs` \ right_con ->
-    let
-	left_expr ty1 ty2 e = mkConApp left_con [Type ty1, Type ty2, e]
-	right_expr ty1 ty2 e = mkConApp right_con [Type ty1, Type ty2, e]
-
-	in_ty = envStackType env_ids stack
-	then_ty = envStackType then_ids stack
-	else_ty = envStackType else_ids stack
-	sum_ty = mkTyConApp either_con [then_ty, else_ty]
-    in
-    matchEnvStack env_ids stack_ids
-	(mkIfThenElse core_cond
-	    (left_expr then_ty else_ty (buildEnvStack then_ids stack_ids))
-	    (right_expr then_ty else_ty (buildEnvStack else_ids stack_ids)))
-					`thenDs` \ core_if ->
-    returnDs(do_map_arrow ids in_ty sum_ty res_ty
-		core_if
-		(do_choice ids then_ty else_ty res_ty core_then core_else),
-	exprFreeVars core_cond `unionVarSet` fvs_then `unionVarSet` fvs_else)
+	fvs_exp `unionVarSet` fvs_alts)
 
 --	A | ys |- c :: [ts] t
 --	----------------------------------
@@ -956,9 +989,9 @@ matchSimplys (exp:exps) ctxt (pat:pats) result_expr fail_expr
     matchSimply exp ctxt pat match_code fail_expr
 \end{code}
 
-\begin{code}
+List of leaf expressions, with set of variables bound in each
 
--- list of leaf expressions, with set of variables bound in each
+\begin{code}
 leavesMatch :: TypecheckedMatch -> [(TypecheckedHsExpr, IdSet)]
 leavesMatch (Match pats _ (GRHSs grhss binds _ty))
   = let
@@ -968,9 +1001,11 @@ leavesMatch (Match pats _ (GRHSs grhss binds _ty))
     [(expr, mkVarSet (collectStmtsBinders stmts) `unionVarSet` defined_vars) |
 	GRHS stmts _locn <- grhss,
 	let ResultStmt expr _ = last stmts]
+\end{code}
 
--- Replace the leaf commands in a match
+Replace the leaf commands in a match
 
+\begin{code}
 replaceLeavesMatch
 	:: Type			-- new result type
 	-> [TypecheckedHsExpr]	-- replacement leaf expressions of that type
@@ -990,7 +1025,6 @@ replaceLeavesGRHS
 	    TypecheckedGRHS)	-- updated GRHS
 replaceLeavesGRHS (leaf:leaves) (GRHS stmts srcloc)
   = (leaves, GRHS (init stmts ++ [ResultStmt leaf srcloc]) srcloc)
-
 \end{code}
 
 Balanced fold of a non-empty list.
