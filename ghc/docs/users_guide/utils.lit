@@ -81,6 +81,7 @@ Here are the @mkdependHS@-specific options (not between @--@'s):
 \begin{description}
 \item[@-v@]	Be verbose.
 \item[@-v -v@]	Be very verbose.
+\item[@-w@]	Turn off warnings about interface file shadowing.
 \item[@-f blah@]
 	Use @blah@ as the makefile, rather than @makefile@
 	or @Makefile@.  If @blah@ doesn't exist, @mkdependHS@ creates it.
@@ -117,6 +118,12 @@ Here are the @mkdependHS@-specific options (not between @--@'s):
                 Regard @<file>@ as not "stable"; i.e., generate dependencies
                 on it (if any). This option is normally used in conjunction 
                 with the @--exclude-directory@ option.
+\item[@--include-prelude@]
+		Regard prelude libraries as unstable, i.e., generate dependencies
+		on the prelude modules used (including \tr{Prelude}).
+		This option is normally only used by the various system libraries. If
+		a \tr{-syslib} option is used, dependencies will also be
+		generated on the library's interfaces. 
 \end{description}
 
 
