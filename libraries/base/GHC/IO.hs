@@ -103,9 +103,7 @@ hGetChar handle =
     NoBuffering -> do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
-	r <- throwErrnoIfMinus1RetryMayBlock "hGetChar"
-	        (read_off_ba (fromIntegral fd) (haIsStream handle_) raw 0 1)
-	        (threadWaitRead fd)
+	r <- readRawBuffer "hGetChar" (fromIntegral fd) (haIsStream handle_) raw 0 1
 	if r == 0
 	   then ioe_EOF
 	   else do (c,_) <- readCharFromBuffer raw 0
@@ -288,9 +286,7 @@ lazyRead' h handle_ = do
      NoBuffering      -> do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
-	r <- throwErrnoIfMinus1RetryMayBlock "lazyRead"
-	        (read_off_ba (fromIntegral fd) (haIsStream handle_) raw 0 1)
-	        (threadWaitRead fd)
+	r <- readRawBuffer "lazyRead" (fromIntegral fd) (haIsStream handle_) raw 0 1
 	if r == 0
 	   then do handle_ <- hClose_help handle_ 
 		   return (handle_, "")
@@ -346,11 +342,9 @@ hPutChar handle c =
 	LineBuffering    -> hPutcBuffered handle_ True  c
 	BlockBuffering _ -> hPutcBuffered handle_ False c
 	NoBuffering      ->
-		withObject (castCharToCChar c) $ \buf ->
-		throwErrnoIfMinus1RetryMayBlock_ "hPutChar"
-		   (write_off (fromIntegral fd) (haIsStream handle_) buf 0 1)
-		   (threadWaitWrite fd)
-
+		withObject (castCharToCChar c) $ \buf -> do
+  		  writeRawBufferPtr "hPutChar" (fromIntegral fd) (haIsStream handle_) buf 0 1
+		  return ()
 
 hPutcBuffered handle_ is_line c = do
   let ref = haBuffer handle_
@@ -633,18 +627,17 @@ hPutBuf handle ptr count
 	    else do flushed_buf <- flushWriteBuffer fd is_stream old_buf
 		    writeIORef ref flushed_buf
 		    -- ToDo: should just memcpy instead of writing if possible
-		    writeChunk fd ptr count
+		    writeChunk fd is_stream (castPtr ptr) count
 
-writeChunk :: FD -> Ptr a -> Int -> IO ()
-writeChunk fd ptr bytes = loop 0 bytes 
+writeChunk :: FD -> Bool -> Ptr CChar -> Int -> IO ()
+writeChunk fd is_stream ptr bytes = loop 0 bytes 
  where
   loop :: Int -> Int -> IO ()
   loop _   bytes | bytes <= 0 = return ()
   loop off bytes = do
     r <- fromIntegral `liftM`
-	   throwErrnoIfMinus1RetryMayBlock "writeChunk"
-	    (c_write (fromIntegral fd) (ptr `plusPtr` off) (fromIntegral bytes))
-	    (threadWaitWrite fd)
+    	   writeRawBufferPtr "writeChunk" (fromIntegral fd) is_stream ptr
+	   		     off (fromIntegral bytes)
     -- write can't return 0
     loop (off + r) (bytes - r)
 
@@ -657,10 +650,10 @@ hGetBuf handle ptr count
   | count <  0 = illegalBufferSize handle "hGetBuf" count
   | otherwise = 
       wantReadableHandle "hGetBuf" handle $ 
-	\ handle_@Handle__{ haFD=fd, haBuffer=ref } -> do
+	\ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
 	buf@Buffer{ bufBuf=raw, bufWPtr=w, bufRPtr=r } <- readIORef ref
 	if bufferEmpty buf
-	   then readChunk fd ptr count
+	   then readChunk fd is_stream ptr count
 	   else do 
 		let avail = w - r
 		copied <- if (count >= avail)
@@ -675,20 +668,19 @@ hGetBuf handle ptr count
 
 		let remaining = count - copied
 		if remaining > 0 
-		   then do rest <- readChunk fd (ptr `plusPtr` copied) remaining
+		   then do rest <- readChunk fd is_stream (ptr `plusPtr` copied) remaining
 			   return (rest + copied)
 		   else return count
 		
-readChunk :: FD -> Ptr a -> Int -> IO Int
-readChunk fd ptr bytes = loop 0 bytes 
+readChunk :: FD -> Bool -> Ptr a -> Int -> IO Int
+readChunk fd is_stream ptr bytes = loop 0 bytes 
  where
   loop :: Int -> Int -> IO Int
   loop off bytes | bytes <= 0 = return off
   loop off bytes = do
     r <- fromIntegral `liftM`
-	   throwErrnoIfMinus1RetryMayBlock "readChunk"
-	    (c_read (fromIntegral fd) (ptr `plusPtr` off) (fromIntegral bytes))
-	    (threadWaitRead fd)
+           readRawBufferPtr "readChunk" (fromIntegral fd) is_stream 
+	   		    (castPtr ptr) off (fromIntegral bytes)
     if r == 0
 	then return off
 	else loop (off + r) (bytes - r)

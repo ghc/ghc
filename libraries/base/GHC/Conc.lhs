@@ -14,6 +14,7 @@
 -- 
 -----------------------------------------------------------------------------
 
+#include "config.h"
 module GHC.Conc
 	( ThreadId(..)
 
@@ -44,7 +45,14 @@ module GHC.Conc
 	, isEmptyMVar	-- :: MVar a -> IO Bool
 	, addMVarFinalizer -- :: MVar a -> IO () -> IO ()
 
-    ) where
+#ifdef mingw32_TARGET_OS
+	, asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
+	, asyncWrite    -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
+
+	, asyncReadBA   -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
+	, asyncWriteBA  -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
+#endif
+        ) where
 
 import Data.Maybe
 
@@ -54,6 +62,7 @@ import GHC.Num		( fromInteger, negate )
 import GHC.Base		( Int(..) )
 import GHC.Exception    ( Exception(..), AsyncException(..) )
 import GHC.Pack		( packCString# )
+import GHC.Ptr          ( Ptr(..), plusPtr )
 
 infixr 0 `par`, `pseq`
 \end{code}
@@ -310,4 +319,34 @@ threadWaitWrite :: Int -> IO ()
 threadDelay     (I# ms) = IO $ \s -> case delay# ms s     of s -> (# s, () #)
 threadWaitRead  (I# fd) = IO $ \s -> case waitRead# fd s  of s -> (# s, () #)
 threadWaitWrite (I# fd) = IO $ \s -> case waitWrite# fd s of s -> (# s, () #)
+
+#ifdef mingw32_TARGET_OS
+
+-- Note: threadDelay, threadWaitRead and threadWaitWrite aren't really functional
+-- on Win32, but left in there because lib code (still) uses them (the manner
+-- in which they're used doesn't cause problems on a Win32 platform though.)
+
+asyncRead :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
+asyncRead  (I# fd) (I# isSock) (I# len) (Ptr buf) = 
+  IO $ \s -> case asyncRead# fd isSock len buf s  of 
+  	       (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
+
+asyncWrite :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
+asyncWrite  (I# fd) (I# isSock) (I# len) (Ptr buf) = 
+  IO $ \s -> case asyncWrite# fd isSock len buf s  of 
+  	       (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
+
+-- to aid the use of these primops by the IO Handle implementation,
+-- provide the following convenience funs:
+
+-- this better be a pinned byte array!
+asyncReadBA :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int,Int)
+asyncReadBA fd isSock len off bufB = 
+  asyncRead fd isSock len ((Ptr (byteArrayContents# (unsafeCoerce# bufB))) `plusPtr` off)
+  
+asyncWriteBA :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int,Int)
+asyncWriteBA fd isSock len off bufB = 
+  asyncWrite fd isSock len ((Ptr (byteArrayContents# (unsafeCoerce# bufB))) `plusPtr` off)
+
+#endif
 \end{code}

@@ -462,10 +462,8 @@ readChunk fd is_stream ptr init_off bytes = loop init_off bytes
   loop :: Int -> Int -> IO Int
   loop off bytes | bytes <= 0 = return (off - init_off)
   loop off bytes = do
-    r' <- throwErrnoIfMinus1RetryMayBlock "readChunk"
-	    (read_off_ba (fromIntegral fd) is_stream ptr 
-		(fromIntegral off) (fromIntegral bytes))
-	    (threadWaitRead fd)
+    r' <- readRawBuffer "readChunk" (fromIntegral fd) is_stream ptr
+    				    (fromIntegral off) (fromIntegral bytes)
     let r = fromIntegral r'
     if r == 0
 	then return (off - init_off)
