@@ -7,7 +7,7 @@
 --	PrelBase, and other Prelude files that precede PrelNum
 ---------------------------------------------------------------------------
  
-__interface PrelNum 1 where
+__interface "std" PrelNum 1 where
 __export PrelNum Integer addr2Integer ;
 
 1 data Integer ;
