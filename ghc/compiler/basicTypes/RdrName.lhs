@@ -50,9 +50,7 @@ import OccName	( NameSpace, varName,
 import Module   ( ModuleName, mkModuleNameFS	)
 import Name	( Name, NamedThing(getName), nameModuleName, nameParent_maybe,
 		  nameOccName, isExternalName, nameSrcLoc )
-import Maybes	( seqMaybe )
 import SrcLoc	( isGoodSrcLoc, SrcSpan )
-import BasicTypes( DeprecTxt )
 import Outputable
 import Util	( thenCmp )
 \end{code}
@@ -312,8 +310,7 @@ globalRdrEnvElts env = foldOccEnv (++) [] env
 
 data GlobalRdrElt 
   = GRE { gre_name   :: Name,
-	  gre_prov   :: Provenance,	-- Why it's in scope
-	  gre_deprec :: Maybe DeprecTxt	-- Whether this name is deprecated
+	  gre_prov   :: Provenance	-- Why it's in scope
     }
 
 instance Outputable GlobalRdrElt where
@@ -391,11 +388,8 @@ insertGRE new_g (old_g : old_gs)
 plusGRE :: GlobalRdrElt -> GlobalRdrElt -> GlobalRdrElt
 -- Used when the gre_name fields match
 plusGRE g1 g2
-  = GRE { gre_name   = gre_name g1,
-	  gre_prov   = gre_prov g1 `plusProv` gre_prov g2,
-	  gre_deprec = gre_deprec g1 `seqMaybe` gre_deprec g2 }
-	-- Could the deprecs be different?  If we re-export
-	-- something deprecated, is it propagated?  I forget.
+  = GRE { gre_name = gre_name g1,
+	  gre_prov = gre_prov g1 `plusProv` gre_prov g2 }
 \end{code}
 
 

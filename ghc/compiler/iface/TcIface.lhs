@@ -20,8 +20,7 @@ import IfaceEnv		( lookupIfaceTop, newGlobalBinder, lookupOrig,
 			  newIfaceName, newIfaceNames )
 import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass )
 import TcRnMonad
-import Type		( Kind, openTypeKind, liftedTypeKind, 
-			  unliftedTypeKind, mkArrowKind, splitTyConApp, 
+import Type		( liftedTypeKind, splitTyConApp, 
 			  mkTyVarTys, mkGenTyConApp, mkTyVarTys, ThetaType, pprClassPred )
 import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName )
