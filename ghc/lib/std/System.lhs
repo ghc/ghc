@@ -217,7 +217,7 @@ fromExitCode (ExitFailure n) = n
 -- see comment in Prelude.hs near primRunIO_hugs_toplevel
 exitWith :: ExitCode -> IO a
 exitWith c
-   = do cleanup_action <- readIORef prelExitWithAction
+   = do cleanup_action <- readIORef prelCleanupAfterRunAction
         case cleanup_action of
            Just xx -> xx
            Nothing -> return ()
