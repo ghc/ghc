@@ -49,7 +49,7 @@ import GHC.Err
 import GHC.IOBase
 import GHC.Base
 #elif defined(__HUGS__)
-import HugsStorable
+import Hugs.Storable
 #endif
 
 {- |
