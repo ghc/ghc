@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.8 2001/03/27 14:10:34 simonmar Exp $
+-- $Id: Main.hs,v 1.9 2001/04/07 22:30:01 qrczak Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -146,7 +146,7 @@ writeNewConfig :: String -> [PackageConfig] -> IO ()
 writeNewConfig conf_file details = do
   hPutStr stdout "Writing new package config file... "
   h <- openFile conf_file WriteMode
-  hPutStr h (dumpPackages details )
+  hPutStrLn h (dumpPackages details)
   hClose h
   hPutStrLn stdout "done."
 
