@@ -53,7 +53,8 @@ import Module		( Module, ModuleEnv,
 			  extendModuleEnv_C, foldModuleEnv, lookupModuleEnv,
 			  elemModuleSet, extendModuleSet
 			)
-import PrelInfo		( wiredInThingEnv )
+import PrelInfo		( wiredInThingEnv, hasKey, fractionalClassKey, numClassKey, 
+			  integerTyConName, doubleTyConName )
 import Maybes		( maybeToBool )
 import FiniteMap
 import Outputable
@@ -271,6 +272,15 @@ slurpSourceRefs source_fvs
 	-- and the instance decls 
 
 	-- The outer loop is needed because consider
+	--	instance Foo a => Baz (Maybe a) where ...
+	-- It may be that Baz and Maybe are used in the source module,
+	-- but not Foo; so we need to chase Foo too.
+	--
+	-- We also need to follow superclass refs.  In particular, 'chasing Foo' must
+	-- include actually getting in Foo's class decl
+	--	class Wib a => Foo a where ..
+	-- so that its superclasses are discovered.  The point is that Wib is a gate too.
+	-- We do this for tycons too, so that we look through type synonyms.
 
     go_outer decls fvs all_gates []	
 	= returnRn (decls, fvs)
@@ -284,6 +294,7 @@ slurpSourceRefs source_fvs
 			       (nameSetToList (gates2 `minusNameSet` all_gates))
 		-- Knock out the all_gates because even if we don't slurp any new
 		-- decls we can get some apparently-new gates from wired-in names
+		-- and we get an infinite loop
 
     go_inner (decls, fvs, gates) wanted_name
 	= importDecl wanted_name 		`thenRn` \ import_result ->
@@ -481,11 +492,11 @@ getGates source_fvs decl
 get_gates is_used (IfaceSig {tcdType = ty}) = extractHsTyNames ty
 
 get_gates is_used (ClassDecl { tcdCtxt = ctxt, tcdName = cls, tcdTyVars = tvs, tcdSigs = sigs})
-  = (delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
-		        (hsTyVarNames tvs)
-     `addOneToNameSet` cls)
-    `plusFV` implicitGates cls
+  = (super_cls_and_sigs `addOneToNameSet` cls) `unionNameSets` 
+    implicitClassGates cls
   where
+    super_cls_and_sigs = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
+		        		    (hsTyVarNames tvs)
     get (ClassOpSig n _ ty _) 
 	| is_used n = extractHsTyNames ty
 	| otherwise = emptyFVs
@@ -522,6 +533,22 @@ get_gates is_used (TyData {tcdCtxt = ctxt, tcdName = tycon, tcdTyVars = tvs, tcd
 		     | otherwise      = emptyFVs
 
     get_bang bty = extractHsTyNames (getBangType bty)
+
+implicitClassGates :: Name -> FreeVars
+implicitClassGates cls
+	-- If we load class Num, add Integer to the free gates
+	-- This takes account of the fact that Integer might be needed for
+	-- defaulting, but we don't want to load Integer (and all its baggage)
+	-- if there's no numeric stuff needed.
+	-- Similarly for class Fractional and Double
+	--
+	-- NB: adding T to the gates will force T to be loaded
+	--
+	-- NB: If we load (say) Floating, we'll end up loading Fractional too,
+	--     since Fractional is a superclass of Floating
+  | cls `hasKey` numClassKey	    = unitFV integerTyConName
+  | cls `hasKey` fractionalClassKey = unitFV doubleTyConName
+  | otherwise			    = emptyFVs
 \end{code}
 
 @getWiredInGates@ is just like @getGates@, but it sees a previously-loaded
@@ -539,8 +566,11 @@ getWiredInGates :: TyThing -> FreeVars
 -- mentioned in other modules, and hence are in the type environment
 
 getWiredInGates (AnId the_id) = namesOfType (idType the_id)
-getWiredInGates (AClass cl)   = emptyFVs	-- The superclasses must also be previously
-						-- loaded, and hence are automatically gates
+getWiredInGates (AClass cl)   = implicitClassGates (getName cl)
+	-- The superclasses must also be previously
+	-- loaded, and hence are automatically gates
+	-- All previously-loaded classes are automatically gates
+	-- See "The gating story" above
 getWiredInGates (ATyCon tc)
   | isSynTyCon tc = delListFromNameSet (namesOfType ty) (map getName tyvars)
   | otherwise	  = unitFV (getName tc)
@@ -568,8 +598,9 @@ getImportedInstDecls gates
     getIfacesRn 					`thenRn` \ ifaces ->
     getTypeEnvRn					`thenRn` \ lookup ->
     let
-	available n = n `elemNameSet` gates
-		   || case lookup n of { Just (AClass c) -> True; other -> False }
+	available n
+	  | n `elemNameSet` gates = True
+	  | otherwise		  = case lookup n of { Just (AClass c) -> True; other -> False }
 		-- See "The gating story" above for the AClass thing
 
 	(decls, new_insts) = selectGated available (iInsts ifaces)

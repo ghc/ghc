@@ -12,6 +12,7 @@ import {-# SOURCE #-} RnHiFiles
 
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
+import RnHsSyn		( RenamedTyClDecl )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
 			  mkRdrUnqual, mkRdrQual, lookupRdrEnv, foldRdrEnv
 			)
@@ -408,21 +409,6 @@ ubiquitousNames
 	-- Add occurrences for very frequently used types.
 	--  	 (e.g. we don't want to be bothered with making funTyCon a
 	--	  free var at every function application!)
-\end{code}
-
-\begin{code}
-implicitGates :: Name -> FreeVars	
--- If we load class Num, add Integer to the gates
--- This takes account of the fact that Integer might be needed for
--- defaulting, but we don't want to load Integer (and all its baggage)
--- if there's no numeric stuff needed.
--- Similarly for class Fractional and Double
---
--- NB: If we load (say) Floating, we'll end up loading Fractional too,
---     since Fractional is a superclass of Floating
-implicitGates cls | cls `hasKey` numClassKey	    = unitFV integerTyConName
-		  | cls `hasKey` fractionalClassKey = unitFV doubleTyConName
-		  | otherwise			    = emptyFVs
 \end{code}
 
 \begin{code}
