@@ -21,7 +21,10 @@ EXTDATA_RO(PrelBase_IZh_static_info);
 
 #define INTLIKE_HDR(n)	    SET_STATIC_FIXED_HDR(__INTLIKE_CLOSURE(n),PrelBase_IZh_static_info,CC_DONTZuCARE), (W_) n
 
-const W_ CHARLIKE_closures[] = {
+#ifndef aix_TARGET_OS /* AIX gives link errors with consts in this file (RO assembler section) */
+const 
+#endif
+      W_ CHARLIKE_closures[] = {
     CHARLIKE_HDR(0),
     CHARLIKE_HDR(1),
     CHARLIKE_HDR(2),
@@ -280,7 +283,11 @@ const W_ CHARLIKE_closures[] = {
     CHARLIKE_HDR(255)
 };
 
-static const W_ INTLIKE_closures_def[] = {
+static 
+#ifndef aix_TARGET_OS /* AIX gives link errors with consts in this file (RO assembler section) */
+       const 
+#endif
+             W_ INTLIKE_closures_def[] = {
     INTLIKE_HDR(-16),	/* MIN_INTLIKE == -16 */
     INTLIKE_HDR(-15),
     INTLIKE_HDR(-14),
