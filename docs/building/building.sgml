@@ -1270,6 +1270,10 @@ $ cvs checkout nofib/spectral
           CVS sources, it is <emphasis>not</emphasis> needed if you
           just intend to build a standard source distribution.</para>
 
+	  <para>Version 2.52 or later of autoconf is required.
+	  NB. vesrion 2.13 will no longer work, as of GHC version
+	  6.1.</para>
+
 	  <para>Autoconf builds the <command>configure</command>
           script from <filename>configure.in</filename> and
           <filename>aclocal.m4</filename>.  If you modify either of
