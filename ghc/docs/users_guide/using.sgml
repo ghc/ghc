@@ -405,7 +405,7 @@ olleh
     <sect2 id="options-order">
       <title>Batch compiler mode</title>
       
-      <para>In this mode, GHC will compile one or more source files
+      <para>In <emphasis>batch mode</emphasis>, GHC will compile one or more source files
       given on the command line.</para>
       
       <para>The first phase to run is determined by each input-file
