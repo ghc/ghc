@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: IO.lhs,v 1.42 2001/06/01 13:06:01 sewardj Exp $
+% $Id: IO.lhs,v 1.43 2001/06/07 10:44:47 sewardj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -29,7 +29,6 @@ module IO (
 
     hSetBuffering,	       -- :: Handle -> BufferMode -> IO ()
     hGetBuffering,	       -- :: Handle -> IO BufferMode
-    hSetBinaryMode,	       -- :: Handle -> Bool -> IO ()
     hFlush,		       -- :: Handle -> IO ()
     hGetPosn,		       -- :: Handle -> IO HandlePosn
     hSetPosn,		       -- :: Handle -> HandlePosn -> IO ()

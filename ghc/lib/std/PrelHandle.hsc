@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.8 2001/06/01 13:06:01 sewardj Exp $
+-- $Id: PrelHandle.hsc,v 1.9 2001/06/07 10:44:47 sewardj Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -80,6 +80,15 @@ import PrelConc
 -- specify?
 dEFAULT_OPEN_IN_BINARY_MODE :: Bool
 dEFAULT_OPEN_IN_BINARY_MODE = False
+
+-- Is seeking on text-mode handles allowed, or not?
+tEXT_MODE_SEEK_ALLOWED :: Bool
+#if defined(mingw32_TARGET_OS)
+tEXT_MODE_SEEK_ALLOWED = False
+#else
+tEXT_MODE_SEEK_ALLOWED = True
+#endif
+
 
 -- ---------------------------------------------------------------------------
 -- Creating a new handle
@@ -249,8 +258,8 @@ checkSeekableHandle act handle_ =
       ClosedHandle 	-> ioe_closedHandle
       SemiClosedHandle	-> ioe_closedHandle
       AppendHandle      -> ioe_notSeekable
-      _                 | haIsBin handle_ -> act handle_
-                        | otherwise       -> ioe_notSeekable_notBin
+      _  | haIsBin handle_ || tEXT_MODE_SEEK_ALLOWED -> act handle_
+         | otherwise                                 -> ioe_notSeekable_notBin
 
 -- -----------------------------------------------------------------------------
 -- Handy IOErrors
@@ -275,7 +284,8 @@ ioe_notSeekable = ioException
 	"handle is not seekable" Nothing)
 ioe_notSeekable_notBin = ioException 
    (IOError Nothing IllegalOperation ""
-	"seek operations are only allowed on binary-mode handles" Nothing)
+	"seek operations on text-mode handles are not allowed on this platform" 
+        Nothing)
 
 ioe_bufsiz :: Int -> IO a
 ioe_bufsiz n = ioException 
@@ -1111,7 +1121,8 @@ hIsSeekable handle =
       SemiClosedHandle 	   -> ioe_closedHandle
       AppendHandle 	   -> return False
       _                    -> do t <- fdType (haFD handle_)
-	 			 return (t == RegularFile && haIsBin handle_)
+	 			 return (t == RegularFile
+                                         && (haIsBin handle_ || tEXT_MODE_SEEK_ALLOWED))
 
 -- -----------------------------------------------------------------------------
 -- Changing echo status
