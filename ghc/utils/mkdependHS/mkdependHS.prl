@@ -77,7 +77,6 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
 $TopPwd	           = "${TOP_PWD}";
 $InstLibDirGhc     = "${libdir}";
 $InstLibExecDirGhc = "${libexecdir}";
-$InstHsLibDirGhc   = "${libdir}/hslibs";
 $InstDataDirGhc    = "${datadir}";
 
 $Unlit = ($INSTALLING) ? "${InstLibExecDirGhc}/unlit" 
