@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.94 2002/01/04 16:02:04 simonmar Exp $
+-- $Id: Main.hs,v 1.95 2002/03/04 14:40:54 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -42,11 +42,11 @@ import DriverFlags	( buildStaticHscOpts,
 			  dynamic_flags, processArgs, static_flags)
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
-import DriverPhases	( Phase(HsPp, Hsc, HCc), haskellish_src_file, objish_file )
+import DriverPhases	( Phase(HsPp, Hsc), haskellish_src_file, objish_file )
 
 import DriverUtil	( add, handle, handleDyn, later, splitFilename,
 			  unknownFlagErr, getFileSuffix )
-import CmdLineOpts	( dynFlag, defaultDynFlags, restoreDynFlags,
+import CmdLineOpts	( dynFlag, restoreDynFlags,
 			  saveDynFlags, setDynFlags, getDynFlags, dynFlag,
 			  DynFlags(..), HscLang(..), v_Static_hsc_opts
 			)
