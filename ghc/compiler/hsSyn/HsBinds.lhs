@@ -164,8 +164,8 @@ So the desugarer tries to do a better job:
 					(fm,gm) -> fm
 	..ditto for gp..
 
-	p = /\ [a,b] -> \ [d1,d2] -> letrec DBINDS and BIND 
-				      in (fm,gm)
+	tp = /\ [a,b] -> \ [d1,d2] -> letrec DBINDS and BIND 
+				       in (fm,gm)
 
 \begin{code}
 -- We keep the invariant that a MonoBinds is only empty 
