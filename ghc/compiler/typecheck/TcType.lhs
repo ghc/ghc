@@ -127,7 +127,7 @@ import Type		(	-- Re-exports
 			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy,
 			  mkPredTys, isUnLiftedType,
 			  isUnboxedTupleType, isPrimitiveType,
-			  splitNewType_maybe, splitTyConApp_maybe,
+			  splitTyConApp_maybe,
 			  tidyTopType, tidyType, tidyPred, tidyTypes,
 			  tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
 			  tidyTyVarBndr, tidyOpenTyVar,
@@ -853,7 +853,7 @@ isFFILabelTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc =
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 	-- Look through newtypes
 	-- Non-recursive ones are transparent to splitTyConApp,
-	-- but recursive ones aren't; hence the splitNewType_maybe
+	-- but recursive ones aren't
 checkRepTyCon check_tc ty 
   | Just (tc,_) <- splitTyConApp_maybe (repType ty) = check_tc tc
   | otherwise				  	    = False
