@@ -11,8 +11,6 @@ module CompManager (
 
     cmUnload,	  -- :: CmState -> IO CmState
 
-    cmTypeOfName, -- :: CmState -> Name -> IO (Maybe String)
-
     cmSetContext, -- :: CmState -> String -> IO CmState
 
     cmGetContext, -- :: CmState -> IO String
