@@ -430,7 +430,7 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
 
   | otherwise		-- Add updated version numbers
   = --pprTrace "completeIface" (ppr (dcl_tycl old_decls))
-    (final_iface, Just pp_tc_diffs)
+    (final_iface, Just pp_diffs)
 	
   where
     final_iface = new_iface { mi_version = new_version }
@@ -451,8 +451,12 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
     old_vers_decls = vers_decls old_version
     (no_tc_change,  pp_tc_diffs,  tc_vers) = diffDecls old_vers_decls old_fixities new_fixities
 						       (dcl_tycl old_decls) (dcl_tycl new_decls)
-
-
+    pp_diffs = vcat [pp_tc_diffs,
+		     pp_change no_export_change "Export list",
+		     pp_change no_rule_change   "Rules",
+		     pp_change no_usage_change  "Usages"]
+    pp_change True  what = empty
+    pp_change False what = text what <+> ptext SLIT("changed")
 
 diffDecls :: NameEnv Version				-- Old version map
 	  -> NameEnv Fixity -> NameEnv Fixity		-- Old and new fixities
