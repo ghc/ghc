@@ -23,11 +23,11 @@ import DataCon		( splitProductType_maybe )
 import DataCon		( dataConSourceArity )
 import Type		( isUnLiftedType )
 #endif
-import MachOp		( machRepByteWidth )
+import MachOp		( machRepByteWidth, MachRep(..) )
 import SMRep		( argMachRep, primRepToCgRep )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkSysLocal, setInlinePragma )
-import Literal		( Literal(..) )
+import Literal		( Literal(..), mkStringLit )
 import Module		( moduleString )
 import Name		( getOccString, NamedThing(..) )
 import OccName		( encodeFS )
@@ -389,11 +389,20 @@ dsFExportDynamic id cconv
       adj_args      = [ mkIntLitInt (ccallConvToInt cconv)
 		      , Var stbl_value
 		      , mkLit (MachLabel fe_nm mb_sz_args)
+                      , mkLit (mkStringLit arg_type_info)
 		      ]
         -- name of external entry point providing these services.
 	-- (probably in the RTS.) 
       adjustor	 = FSLIT("createAdjustor")
       
+      arg_type_info = drop 2 $ map (repCharCode.argMachRep
+                                   .primRepToCgRep.typePrimRep)
+                                   stub_args
+      repCharCode F32 = 'f'
+      repCharCode F64 = 'd'
+      repCharCode I64 = 'l'
+      repCharCode _   = 'i'
+
 	-- Determine the number of bytes of arguments to the stub function,
 	-- so that we can attach the '@N' suffix to its label if it is a
 	-- stdcall on Windows.

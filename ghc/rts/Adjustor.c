@@ -134,33 +134,52 @@ stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
 }
 #endif
 
-#if defined(powerpc64_TARGET_ARCH)
-// We don't need to generate dynamic code on powerpc64-[linux|AIX],
-// but we do need a piece of (static) inline assembly code:
+#if defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
+#if !(defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS))
 
-static void
-adjustorCodeWrittenInAsm()
-{
-	__asm__ volatile (
-		"adjustorCode:\n\t"
-		"mr 10,8\n\t"
-		"mr 9,7\n\t"
-		"mr 8,6\n\t"
-		"mr 7,5\n\t"
-		"mr 6,4\n\t"
-		"mr 5,3\n\t"
-		"mr 3,11\n\t"
-		"ld 0,0(2)\n\t"
-		"ld 11,16(2)\n\t"
-		"mtctr 0\n\t"
-		"ld 2,8(2)\n\t"
-		"bctr"
-		: : );
-}
+/* !!! !!! WARNING: !!! !!!
+ * This structure is accessed from AdjustorAsm.s
+ * Any changes here have to be mirrored in the offsets there.
+ */
+
+typedef struct AdjustorStub {
+#if defined(powerpc_TARGET_ARCH) && defined(darwin_TARGET_OS)
+    unsigned        lis;
+    unsigned        ori;
+    unsigned        lwz;
+    unsigned        mtctr;
+    unsigned        bctr;
+    StgFunPtr       code;
+#elif defined(powerpc64_TARGET_ARCH) && defined(darwin_TARGET_OS)
+        /* powerpc64-darwin: just guessing that it won't use fundescs. */
+    unsigned        lis;
+    unsigned        ori;
+    unsigned        rldimi;
+    unsigned        oris;
+    unsigned        ori2;
+    unsigned        lwz;
+    unsigned        mtctr;
+    unsigned        bctr;
+    StgFunPtr       code;
+#else
+        /* fundesc-based ABIs */
+#define         FUNDESCS
+    StgFunPtr       code;
+    struct AdjustorStub
+                    *toc;
+    void            *env;
+#endif
+    StgStablePtr    hptr;
+    StgFunPtr       wptr;
+    StgInt          negative_framesize;
+    StgInt          extrawords_plus_one;
+} AdjustorStub;
+
+#endif
 #endif
 
 void*
-createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
+createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr, char *typeString)
 {
   void *adjustor = NULL;
 
@@ -364,9 +383,9 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 	/* Ensure that instruction cache is consistent with our new code */
 	__asm__ volatile("call_pal %0" : : "i" (PAL_imb));
     }
-#elif defined(powerpc_TARGET_ARCH)
+#elif defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS)
 /*
-	For PowerPC, the following code is used:
+	For PowerPC Linux, the following code is used:
 
 	mr r10,r8
 	mr r9,r7
@@ -429,27 +448,102 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 			__asm__ volatile ("sync\n\tisync");
 		}
 	}
-#elif defined(powerpc64_TARGET_ARCH)
-	// This is for powerpc64 linux and powerpc64 AIX.
-	// It probably won't apply to powerpc64-darwin.
-	
-	{
-		typedef struct {
-			StgFunPtr		code;
-			void*			toc;
-			void*			env;
-		} FunDesc;
+
+#elif defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
+        
+#define OP_LO(op,lo)  ((((unsigned)(op)) << 16) | (((unsigned)(lo)) & 0xFFFF))
+#define OP_HI(op,hi)  ((((unsigned)(op)) << 16) | (((unsigned)(hi)) >> 16))
+        {
+            AdjustorStub *adjustorStub;
+            int sz = 0, extra_sz, total_sz;
+
+                  // from AdjustorAsm.s
+                  // not declared as a function so that AIX-style
+                  // fundescs can never get in the way.
+            extern void *adjustorCode;
+            
+#ifdef FUNDESCS
+            adjustorStub = stgMallocBytes(sizeof(AdjustorStub), "createAdjustor");
+#else
+            adjustorStub = mallocBytesRWX(sizeof(AdjustorStub));
+#endif
+            adjustor = adjustorStub;
 		
-		FunDesc *desc = malloc(sizeof(FunDesc));
-		extern void *adjustorCode;
-		
-		desc->code = (void*) &adjustorCode;
-		desc->toc = (void*) wptr;
-		desc->env = (void*) hptr;
-		
-		adjustor = (void*) desc;
-	}
-	break;
+	    adjustorStub->code = (void*) &adjustorCode;
+
+#ifdef FUNDESCS
+                // function descriptors are a cool idea.
+                // We don't need to generate any code at runtime.
+            adjustorStub->toc = adjustorStub;
+#else
+
+                // no function descriptors :-(
+                // We need to do things "by hand".
+#if defined(powerpc_TARGET_ARCH)
+                // lis  r2, hi(adjustorStub)
+            adjustorStub->lis = OP_HI(0x3c40, adjustorStub);
+                // ori  r2, r2, lo(adjustorStub)
+            adjustorStub->ori = OP_LO(0x6042, adjustorStub);
+                // lwz r0, code(r2)
+            adjustorStub->lwz = OP_LO(0x8002, (char*)(&adjustorStub->code)
+                                            - (char*)adjustorStub);
+                // mtctr r0
+            adjustorStub->mtctr = 0x7c0903a6;
+                // bctr
+            adjustorStub->bctr = 0x4e800420;
+#else
+            barf("adjustor creation not supported on this platform");
+#endif
+
+            // Flush the Instruction cache:
+            {
+                int n = sizeof(AdjustorStub)/sizeof(unsigned);
+                unsigned *p = (unsigned*)adjustor;
+                while(n--)
+                {
+                    __asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0"
+                                        : : "r" (p));
+                    p++;
+                }
+                __asm__ volatile ("sync\n\tisync");
+            }
+#endif
+
+            printf("createAdjustor: %s\n", typeString);
+            while(*typeString)
+            {
+                char t = *typeString++;
+
+                switch(t)
+                {
+#if defined(powerpc64_TARGET_ARCH)
+                    case 'd': sz += 1; break;
+                    case 'l': sz += 1; break;
+#else
+                    case 'd': sz += 2; break;
+                    case 'l': sz += 2; break;
+#endif
+                    case 'f': sz += 1; break;
+                    case 'i': sz += 1; break;
+                }
+            }
+            extra_sz = sz - 8;
+            if(extra_sz < 0)
+                extra_sz = 0;
+            total_sz = (6 /* linkage area */
+                      + 8 /* minimum parameter area */
+                      + 2 /* two extra arguments */
+                      + extra_sz)*sizeof(StgWord);
+           
+                // align to 16 bytes.
+                // AIX only requires 8 bytes, but who cares?
+            total_sz = (total_sz+15) & ~0xF;
+           
+            adjustorStub->hptr = hptr;
+            adjustorStub->wptr = wptr;
+            adjustorStub->negative_framesize = -total_sz;
+            adjustorStub->extrawords_plus_one = extra_sz + 1;
+        }
 
 #elif defined(ia64_TARGET_ARCH)
 /*
@@ -577,12 +671,19 @@ freeHaskellFunctionPtr(void* ptr)
 
  /* Free the stable pointer first..*/
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
-#elif defined(powerpc_TARGET_ARCH)
+#elif defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS)
  if ( *(StgWord*)ptr != 0x7d0a4378 ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 4*12)));
+#elif defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
+ extern void* adjustorCode;
+ if ( ((AdjustorStub*)ptr)->code != (StgFunPtr) &adjustorCode ) {
+   errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   return;
+ }
+ freeStablePtr(((AdjustorStub*)ptr)->hptr);
 #elif defined(ia64_TARGET_ARCH)
  IA64FunDesc *fdesc = (IA64FunDesc *)ptr;
  StgWord64 *code = (StgWord64 *)(fdesc+1);

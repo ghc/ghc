@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsExternal.h,v 1.6 2004/10/15 07:48:29 simonmar Exp $
+ * $Id: RtsExternal.h,v 1.7 2005/01/10 18:44:40 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2004
  *
@@ -59,7 +59,8 @@ extern StgInt        suspendThread ( StgRegTable * );
 extern StgRegTable * resumeThread  ( StgInt );
 
 /* Creating and destroying an adjustor thunk */
-extern void*  createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
+extern void*  createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr,
+                             char *typeString);
 extern void   freeHaskellFunctionPtr(void* ptr);
 
 /* -----------------------------------------------------------------------------
