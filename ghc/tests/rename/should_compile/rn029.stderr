@@ -1,0 +1,13 @@
+
+rn029.hs:6:
+    Ambiguous occurrence `sort'
+    It could refer to either `sort', defined at rn029.hs:7
+		          or `List.sort', imported from List at rn029.hs:4
+
+rn029.hs:10:
+    Ambiguous occurrence `reverse'
+    It could refer to either `reverse', defined at rn029.hs:11
+		          or `List.reverse', imported from List at rn029.hs:4
+
+Compilation had errors
+
