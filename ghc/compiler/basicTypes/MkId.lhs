@@ -453,6 +453,11 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
     (class_tyvars, sc_theta, _, _) = classBigSig clas
     sc_theta' = substTheta (mkTopTyVarSubst class_tyvars inst_tys) sc_theta
 
+    dfun_theta = inst_decl_theta
+
+{-  1 dec 99: disable the Mark Jones optimisation for the sake
+    of compatibility with Hugs.
+
     dfun_theta = case inst_decl_theta of
 		   []    -> []	-- If inst_decl_theta is empty, then we don't
 				-- want to have any dict arguments, so that we can
@@ -472,7 +477,7 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
 				--   class Foo a => Baz a b where ...
 				--   instance Wob b => Baz T b where..
 				-- Now sc_theta' has Foo T
-
+-}
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 
     not_const (clas, tys) = not (isEmptyVarSet (tyVarsOfTypes tys))
