@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.44 2001/08/08 10:50:37 simonmar Exp $
+ * $Id: Storage.c,v 1.45 2001/08/08 11:27:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -59,7 +59,7 @@ static void *stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
 static void  stgDeallocForGMP (void *ptr, size_t size);
 
 void
-initStorage (void)
+initStorage( void )
 {
   nat g, s;
   step *stp;
@@ -82,7 +82,8 @@ initStorage (void)
   }
 #endif
 
-  if (RtsFlags.GcFlags.heapSizeSuggestion > 
+  if (RtsFlags.GcFlags.maxHeapSize != 0 &&
+      RtsFlags.GcFlags.heapSizeSuggestion > 
       RtsFlags.GcFlags.maxHeapSize) {
     RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
   }
