@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.94 2002/02/13 11:51:40 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.95 2002/02/13 19:42:38 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1001,13 +1001,18 @@ Test.
 </Article>
 EOF
 fptools_cv_sgml_catalog=no
-for fptools_catalog in $4; do
-  ac_try="$2 -t rtf -d $3#print -c $fptools_catalog conftest.sgml"
-  if AC_TRY_EVAL(ac_try); then
-    fptools_cv_sgml_catalog=[$]fptools_catalog
-    break
-  fi
-done
+if test -z "$SGML_CATALOG_FILES" ; then
+ for fptools_catalog in $4; do
+   ac_try="$2 -t rtf -d $3#print -c $fptools_catalog conftest.sgml"
+   if AC_TRY_EVAL(ac_try); then
+     fptools_cv_sgml_catalog=[$]fptools_catalog
+     break
+   fi
+ done
+else
+# If the env var SGML_CATALOG_FILES is defined, assume things are cool.
+  fptools_cv_sgml_catalog="yes"
+fi
 ])
 rm -rf conftest*
 if test $fptools_cv_sgml_catalog != "no"; then

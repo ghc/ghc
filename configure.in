@@ -617,6 +617,9 @@ if test -z "$Catalog"; then
   AC_MSG_RESULT([Warning: You will not be able to build the documentation.])
 fi
 case $Catalog in
+   yes) # assume it is provided by other means (e.g., SGML_CATALOG_FILES env var).
+        Catalog=
+   	;;
    glafp*) 
 	case $HostOS_CPP in
 	   mingw32)
