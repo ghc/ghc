@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.8 2000/01/13 12:40:15 simonmar Exp $
+ * $Id: Itimer.c,v 1.9 2000/02/28 10:57:44 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -64,7 +64,7 @@ handle_tick(int unused STG_UNUSED)
   total_ticks++;
 
 #ifdef PROFILING
-  if (do_prof_ticks = rtsTrue) {
+  if (do_prof_ticks == rtsTrue) {
     CCS_TICK(CCCS);
   }
 #endif
