@@ -10,6 +10,10 @@ module Addr
 	, module Word
 	, module Int
 	, module Addr 
+	
+        -- (non-standard) coercions
+	, addrToInt		-- :: Addr -> Int  
+	, intToAddr		-- :: Int  -> Addr
 	    
 	) where
 
@@ -32,6 +36,16 @@ import Int	( indexInt8OffAddr,  indexInt16OffAddr
 		, writeInt32OffAddr, writeInt64OffAddr
 		)
 
+\end{code}
+
+Coercing between machine ints and words
+
+\begin{code}
+addrToInt :: Addr -> Int
+addrToInt (A# a#) = I# (addr2Int# a#)
+
+intToAddr :: Int -> Addr
+intToAddr (I# i#) = A# (int2Addr# i#)
 \end{code}
 
 Indexing immutable memory:
