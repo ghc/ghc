@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * $Id: mkDerivedConstants.c,v 1.1 2001/10/03 13:57:42 simonmar Exp $
+ * $Id: mkDerivedConstants.c,v 1.2 2002/01/29 16:49:42 simonmar Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
@@ -31,7 +31,6 @@ main(int argc, char *argv[])
     printf("#define STD_ITBL_SIZE   %d\n", sizeofW(StgInfoTable));
     printf("#define PROF_ITBL_SIZE  %d\n", sizeofW(StgProfInfo));
     printf("#define GRAN_ITBL_SIZE  %d\n", 0);
-    printf("#define PAR_ITBL_SIZE   %d\n", sizeofW(StgParInfo));
     printf("#define TICKY_ITBL_SIZE %d\n", sizeofW(StgTickyInfo));
 
     printf("#define STD_UF_SIZE   %d\n", sizeofW(StgUpdateFrame));
