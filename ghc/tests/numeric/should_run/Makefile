@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 1998/04/17 15:59:29 simonm Exp $
+# $Id: Makefile,v 1.3 1998/07/08 10:36:54 simonm Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -9,5 +9,7 @@ HC_OPTS += -dcore-lint
 
 arith011_HC_OPTS = -fglasgow-exts
 arith012_HC_OPTS = -fglasgow-exts
+
+SRC_MKDEPENDHS_OPTS += -fglasgow-exts
 
 include $(TOP)/mk/target.mk
