@@ -298,8 +298,8 @@ HsLibsFor	= ghc
 # hslibs for GHC also uses the following variables (defined above):
 #   GhcLibWays, GhcLibHcOpts, GhcLibToolsHcOpts, DLLized, StripLibraries
 
-# Haskell compiler options for tools in hslibs
-GhcLibToolsHcOpts=-O
+# Haskell compiler options for tools in fptools
+FptoolsHcOpts=-O
 
 # Build the Haskell Readline bindings?
 #

@@ -312,6 +312,9 @@ endif
 SRC_HC_OPTS += $(patsubst %, -package %, $(PACKAGE_DEPS))
 ifneq "$(PACKAGE)" ""
 SRC_HC_OPTS += -package-name $(PACKAGE)
+else
+# No library, we are actually building the tools
+SRC_HC_OPTS += $(FptoolsHcOpts)
 endif
 
 #----------------------------------------
