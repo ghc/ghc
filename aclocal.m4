@@ -171,72 +171,56 @@ done
 ])# FP_CHECK_CONSTS
 
 
-dnl ** check for leading underscores in symbol names
-dnl 
-dnl Test for determining whether symbol names have a leading
-dnl underscore.
-dnl 
-dnl We assume that they _haven't_ if anything goes wrong.
-dnl
-dnl Some nlist implementations seem to try to be compatible by ignoring
-dnl a leading underscore sometimes (eg. FreeBSD).  We therefore have
-dnl to work around this by checking for *no* leading underscore first.
-dnl Sigh.  --SDM
-dnl
-dnl Similarly on OpenBSD, but this test doesn't help. -- dons
-dnl
-AC_DEFUN(FPTOOLS_UNDERSCORE,
-[AC_CHECK_LIB(elf, nlist, LIBS="-lelf $LIBS")dnl
-AC_CACHE_CHECK([leading underscore in symbol names], fptools_cv_lead_uscore,
-
-dnl
-dnl Hack!: nlist() under Digital UNIX insist on there being an _,
-dnl but symbol table listings shows none. What is going on here?!?
-dnl
-dnl Another hack: cygwin doesn't come with nlist.h , so we hardwire
-dnl the underscoredness of that "platform"
-changequote(<<, >>)dnl
-<<
+# FP_LEADING_UNDERSCORE
+# ---------------------
+# Test for determining whether symbol names have a leading underscore. We assume
+# that they _haven't_ if anything goes wrong. Sets the output variable
+# LeadingUnderscore to YES or NO and defines LEADING_UNDERSCORE correspondingly.
+#
+# Some nlist implementations seem to try to be compatible by ignoring a leading
+# underscore sometimes (eg. FreeBSD). We therefore have to work around this by
+# checking for *no* leading underscore first. Sigh.  --SDM
+#
+# Similarly on OpenBSD, but this test doesn't help. -- dons
+AC_DEFUN([FP_LEADING_UNDERSCORE],
+[AC_CHECK_LIB([elf], [nlist], [LIBS="-lelf $LIBS"])
+AC_CACHE_CHECK([leading underscore in symbol names], [fptools_cv_leading_underscore], [
+# Hack!: nlist() under Digital UNIX insist on there being an _,
+# but symbol table listings shows none. What is going on here?!?
+#
+# Another hack: cygwin doesn't come with nlist.h , so we hardwire
+# the underscoredness of that "platform"
 case $HostPlatform in
 *openbsd*) # x86 openbsd is ELF from 3.4 >, meaning no leading uscore
-    case $build in
-        i386-*2\.[[0-9]] | i386-*3\.[[0-3]] ) fptools_cv_lead_uscore='yes' ;;
-        *)      fptools_cv_lead_uscore='no' ;;
-    esac ;;
-alpha-dec-osf*) fptools_cv_lead_uscore='no';;
-*cygwin32) fptools_cv_lead_uscore='yes';;
-*mingw32) fptools_cv_lead_uscore='yes';;
-*) >>
-changequote([, ])dnl
-AC_TRY_RUN([#ifdef HAVE_NLIST_H
+  case $build in
+    i386-*2\.@<:@0-9@:>@ | i386-*3\.@<:@0-3@:>@ ) fptools_cv_leading_underscore=yes ;;
+    *) fptools_cv_leading_underscore=no ;;
+  esac ;;
+alpha-dec-osf*) fptools_cv_leading_underscore=no;;
+*cygwin32) fptools_cv_leading_underscore=yes;;
+*mingw32) fptools_cv_leading_underscore=yes;;
+*) AC_TRY_RUN([#ifdef HAVE_NLIST_H
 #include <nlist.h>
-changequote(<<, >>)dnl
-<<
 struct nlist xYzzY1[] = {{"xYzzY1", 0},{0}};
 struct nlist xYzzY2[] = {{"_xYzzY2", 0},{0}};
 #endif
 
-main(argc, argv)
-int argc;
-char **argv;
+int main()
 {
 #ifdef HAVE_NLIST_H
     if(nlist(argv[0], xYzzY1) == 0 && xYzzY1[0].n_value != 0)
         exit(1);
     if(nlist(argv[0], xYzzY2) == 0 && xYzzY2[0].n_value != 0)
-        exit(0);>>
-changequote([, ])dnl
+        exit(0);
 #endif
     exit(1);
-}], fptools_cv_lead_uscore=yes, fptools_cv_lead_uscore=no, fptools_cv_lead_uscore=NO)
+}], [fptools_cv_leading_underscore=yes], [fptools_cv_leading_underscore=no], [fptools_cv_leading_underscore=no])
 ;;
-esac);
-LeadingUnderscore=`echo $fptools_cv_lead_uscore | sed 'y/yesno/YESNO/'`
-AC_SUBST(LeadingUnderscore)
-case $LeadingUnderscore in
-YES) AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.]);;
-esac
-])
+esac]);
+AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])
+if test x"$fptools_cv_leading_underscore" = xyes; then
+   AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.])
+fi])# FP_LEADING_UNDERSCORE
 
 
 # FP_COMPARE_VERSIONS(VERSION1, TEST, VERSION2, [ACTION-IF-TRUE], [ACTION-IF-FALSE])

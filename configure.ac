@@ -1424,7 +1424,7 @@ dnl ** are we big endian?
 AC_C_BIGENDIAN
 
 dnl ** check for leading underscores in symbol names
-FPTOOLS_UNDERSCORE
+FP_LEADING_UNDERSCORE
 
 dnl ** check for ld, and whether ld has -x option
 AC_PATH_PROG(LdCmdRaw, ld)
