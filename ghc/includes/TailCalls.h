@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.7 2001/02/14 10:33:05 simonmar Exp $
+ * $Id: TailCalls.h,v 1.8 2002/03/26 10:30:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,13 +22,13 @@
 
 #else
 
+extern void __DISCARD__(void);
+
 /* -----------------------------------------------------------------------------
    Tail calling on x86
    -------------------------------------------------------------------------- */
 
 #if i386_TARGET_ARCH
-
-extern void __DISCARD__(void);
 
 /* Note about discard: possibly there to fool GCC into clearing up
    before we do the jump eg. if there are some arguments left on the C
@@ -152,6 +152,30 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
 #endif /* hppa1_1_hp_hpux_TARGET */
 
 /* -----------------------------------------------------------------------------
+   Tail calling on PowerPC
+   -------------------------------------------------------------------------- */
+
+#ifdef powerpc_TARGET_ARCH
+
+#define JMP_(cont)			\
+    { 					\
+      void *target;			\
+      target = (void *)(cont);    	\
+      goto *target; 	    	    	\
+    }
+
+/*
+	I would _love_ to use the following instead,
+	but GCC fails to generate code for it if it is called for a casted
+	data pointer - which is exactly what we are going to do...
+
+	#define JMP_(cont)	((F_) (cont))()
+*/
+
+
+#endif /* sparc_TARGET_ARCH */
+
+/* -----------------------------------------------------------------------------
   FUNBEGIN and FUNEND.
 
   These are markers indicating the start and end of Real Code in a
@@ -168,6 +192,7 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
  *  it just doesn't choose to do it at the moment.
  *  -= chak
  */
+ 
 #ifndef FB_
 #define FB_    __asm__ volatile ("--- BEGIN ---"); __DISCARD__ ();
 #endif
