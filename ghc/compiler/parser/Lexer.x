@@ -159,7 +159,9 @@ $white_no_nl+ 				;
 --    {-# LINE <line> "<file>" #-}
 <line_prag2> $digit+			{ set_line line_prag2a }
 <line_prag2a> \" [$graphic \ ]* \"	{ set_file line_prag2b }
-<line_prag2b> "#-}"			{ pop }
+<line_prag2b> "#-}"|"-}"		{ pop }
+   -- NOTE: accept -} at the end of a LINE pragma, for compatibility
+   -- with older versions of GHC which generated these.
 
 <0,glaexts> {
   "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
