@@ -8,7 +8,7 @@
 # unpacked).  All options are passed through to ./configure (especially
 # useful with --prefix).
 
-configopts="$*"
+configopts="$*"         # e.g., --enable-hc-boot-unregisterised
 
 # check for GNU make
 #

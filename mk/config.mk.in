@@ -100,6 +100,10 @@ exeext=@exeext@
 # BootingFromHc - build GHC and the libraries from .hc files?
 BootingFromHc = @BootingFromHc@
 
+# BootingFromUnregisterisedHc - treat .hc files as containing unregisterised
+# rather than registerised code, i.e., disable the mangler?
+BootingFromUnregisterisedHc = @BootingFromUnregisterisedHc@
+
 # build the libs first if we're bootstrapping from .hc files
 ifeq "$(BootingFromHc)" "YES"
 AllProjects = glafp-utils hslibs ghc green-card happy hdirect hood nofib

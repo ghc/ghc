@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.11 2001/05/25 10:53:59 simonmar Exp $
+# $Id: bootstrap.mk,v 1.12 2001/07/23 22:33:53 ken Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -118,6 +118,17 @@ endif
 # -----------------------------------------------------------------------------
 # suffix rules for building a .o from a .hc file.
 
+ifeq "$(BootingFromUnregisterisedHc)" "YES"
+
+# without mangling
+
+%.o : %.hc
+	$(CC) -x c $< -o $@ -c -O $(HC_BOOT_CC_OPTS) -I.  `echo $(patsubst -monly-%-regs, -DSTOLEN_X86_REGS=%, $(filter -monly-%-regs, $($*_HC_OPTS))) | sed 's/^$$/-DSTOLEN_X86_REGS=4/'`
+
+else
+
+# with mangling
+
 %.raw_s : %.hc
 	$(CC) -x c $< -o $@ -S -O $(HC_BOOT_CC_OPTS) -I.  `echo $(patsubst -monly-%-regs, -DSTOLEN_X86_REGS=%, $(filter -monly-%-regs, $($*_HC_OPTS))) | sed 's/^$$/-DSTOLEN_X86_REGS=4/'`
 
@@ -126,3 +137,5 @@ endif
 
 %.o : %.s
 	$(CC) -c -o $@ $<
+
+endif
