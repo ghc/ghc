@@ -101,7 +101,9 @@ module CmdLineOpts (
 	opt_WarnIncompletePatterns, opt_WarnOverlappedPatterns,
 	opt_PruneTyDecls, opt_PruneInstDecls,
 	opt_D_show_unused_imports,
-	opt_D_show_rn_stats
+	opt_D_show_rn_stats,
+	
+	all_toplev_ids_visible
     ) where
 
 IMPORT_1_3(Array(array, (//)))
@@ -361,6 +363,21 @@ opt_D_show_rn_stats		= lookUp SLIT("-dshow-rn-stats")
 
 -- opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"
 \end{code}
+
+
+\begin{code}
+all_toplev_ids_visible :: Bool
+all_toplev_ids_visible = 
+  not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
+  opt_EnsureSplittableC        ||  -- Splitting requires visiblilty
+  opt_AutoSccsOnAllToplevs	   -- ditto for profiling 
+				   -- (ToDo: fix up the auto-annotation
+				   -- pass in the desugarer to avoid having
+				   -- to do this)
+
+\end{code}
+
+
 
 \begin{code}
 classifyOpts :: ([CoreToDo],	-- Core-to-Core processing spec
