@@ -712,9 +712,6 @@ runSomething phase_name pgm args
  = traceCmd phase_name (concat (intersperse " " (pgm:quoteargs))) $
    do
 #ifndef mingw32_HOST_OS
-          installHandler sigCHLD Ignore Nothing
-          -- avoid strange interaction with waitpid():
-          installHandler sigCONT Ignore Nothing
           mpid <- forkProcess
           exit_code <- case mpid of
             Nothing -> do -- Child
@@ -723,7 +720,7 @@ runSomething phase_name pgm args
 	      -- NOT REACHED
               return ExitSuccess
             Just child -> do -- Parent
-              Just (Exited res) <- getProcessStatus True True child
+              Just (Exited res) <- getProcessStatus True False child
               return res
 #else
           exit_code <- rawSystem cmd_line
