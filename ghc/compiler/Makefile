@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.119 2000/12/18 12:43:04 sewardj Exp $
+# $Id: Makefile,v 1.120 2000/12/19 12:27:09 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -9,7 +9,7 @@ include $(TOP)/mk/boilerplate.mk
 WAYS=$(GhcCompilerWays)
 
 # -----------------------------------------------------------------------------
-#		Set HS_PROG, LIBRARY
+#		Set HS_PROG
 
 # Note: there have been reports of people running up against the ARG_MAX limit
 # when linking ghc with all its constituent object files. The likely source of 
@@ -28,8 +28,8 @@ LINK = ghc
 # -----------------------------------------------------------------------------
 # Create compiler configuration
 
-CURRENT_DIR=ghc/compiler
-CONFIG_HS = main/Config.hs
+CURRENT_DIR	= ghc/compiler
+CONFIG_HS 	= main/Config.hs
 boot :: $(CONFIG_HS)
 
 $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
@@ -76,13 +76,6 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 CLEAN_FILES += $(CONFIG_HS)
 
 # -----------------------------------------------------------------------------
-#		Compilation history for Patrick
-
-# Make the sources first, because that's what the compilation history needs
-$(HS_PROG) :: $(HS_SRCS)
-
-
-# -----------------------------------------------------------------------------
 # 		Set SRCS, HCS, OBJS
 #
 # First figure out DIRS, the source sub-directories
@@ -113,19 +106,23 @@ DIRS += ghci
 endif
 endif
 
-HS_SRCS = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
+HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
+HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs, $(HS_SRCS))
+
+ifneq "$(GhcWithHscBuiltViaC)" "YES"
+HS_SRCS += rename/ParseIface.hs parser/Parser.hs
+endif
 
 HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 
-# ParseIface.hs ain't part of HS_SRCS when this is on..
 ifeq "$(GhcWithHscBuiltViaC)" "YES"
-HCS      += rename/ParseIface.hc parser/Parser.hc
+HCS	+= rename/ParseIface.hc parser/Parser.hc
 endif
 
 HS_OBJS  = \
   $(patsubst %.hc, %.o, $(HCS)) \
-  parser/hschooks.o
-
+  parser/hschooks.o \
+  parser/hs_ctype.o
 
 DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
 
@@ -140,10 +137,6 @@ C_SRCS += parser/hschooks.c
 # 
 SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 
-# stuff you get for free in a source distribution
-# 
-# SRC_DIST_FILES += rename/ParseIface.hs rename/Parser.hs
-
 # -----------------------------------------------------------------------------
 # 		Haskell compilations
 
@@ -156,6 +149,11 @@ HC=$(GHC)
 else
 HC=$(GHC_INPLACE)
 endif
+
+#
+# Use GHC for compiling C bits
+#
+CC = $(HC)
 
 # magic from GNU make manual to convert a list of values
 # into a colon-separated list
@@ -210,7 +208,7 @@ prelude/PrelRules_HC_OPTS	= -fvia-C
 
 rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
 
-parser/Parser_HC_OPTS 		+= -Onot -H80m -fno-warn-incomplete-patterns
+parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
@@ -339,30 +337,12 @@ primop-primop-info.hs-incl: prelude/primops.txt
 # ----------------------------------------------------------------------------
 #		Parsers/lexers
 
-parser/hschooks.o : parser/hschooks.c
-	@$(RM) $@
-	$(HC) -c -o $@ $(HC_OPTS) parser/hschooks.c
-
-
-# Interface-file parser uses Happy
 SRC_HAPPY_OPTS += +RTS -K2m -H16m -RTS  $(GHC_HAPPY_OPTS)
-
-rename/ParseIface.hs : rename/ParseIface.y
-	@$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
-	$(HAPPY) $(HAPPY_OPTS) rename/ParseIface.y
-	@chmod 444 rename/ParseIface.hs
-
-parser/Parser.hs : parser/Parser.y
-	@$(RM) parser/Parser.hs parser/ParseIface.hinfo
-	$(HAPPY) $(HAPPY_OPTS) parser/Parser.y
-	@chmod 444 parser/Parser.hs
 
 #-----------------------------------------------------------------------------
 # 		Linking
 
 SRC_LD_OPTS += -no-link-chk 
-# REMOVED SLPJ
-# -ldl
 
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
 ifeq "$(GhcReportCompiles)" "YES"
@@ -422,16 +402,6 @@ install ::
 INSTALL_PROGS += $(HS_PROG)
 
 #-----------------------------------------------------------------------------
-# 		depend
-
-#
-# Before doing `make depend', need to build all derived Haskell source files
-#
-ifneq "$(GhcWithHscBuiltViaC)" "YES"
-depend :: rename/ParseIface.hs parser/Parser.hs
-endif
-
-#-----------------------------------------------------------------------------
 # 		clean
 
 CLEAN_FILES += $(wildcard */*.$(way_)o */*.$(way_)hi)
@@ -443,16 +413,6 @@ MAINTAINER_CLEAN_FILES += $(wildcard */*.hc) \
 	parser/Parser.hs rename/ParseIface.hs
 
 #-----------------------------------------------------------------------------
-# 		TAGS setup
-
-SRC_HSTAGS_OPTS += -fglasgow-exts -cpp
-TAGS_HS_SRCS=$(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs))
-TAGS_C_SRCS=$(strip $(foreach f,$(foreach dir,$(DIRS),$(wildcard $(dir)/*.c)),$(shell if [ -w $(f) ]; then echo $(f); else echo ''; fi)))
-
-#-----------------------------------------------------------------------------
 # 		Include target-rule boilerplate
 
 include $(TOP)/mk/target.mk
-
-parser/%.o : parser/%.c
-
