@@ -43,7 +43,7 @@ import AbsCUtils	( magicIdPrimRep )
 import CLabel           ( CLabel, isAsmTemp )
 import Literal		( mkMachInt, Literal(..) )
 import MachRegs		( stgReg, callerSaves, RegLoc(..),
-			  Imm(..), Reg, 
+			  Imm(..), Reg(..), 
 			  MachRegsAddr(..)
 #                         if sparc_TARGET_ARCH
                           ,fp, sp
