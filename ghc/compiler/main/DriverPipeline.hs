@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.45 2001/01/03 11:13:43 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.46 2001/01/03 14:28:26 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -147,12 +147,16 @@ genPipeline todo stop_flag persistent_output lang filename
    ----------- -----  ----   ---   --   --  -  -  -
     (_basename, suffix) = splitFilename filename
 
-    start_phase = startPhase suffix
+    start = startPhase suffix
+
+      -- special case for mkdependHS: .hspp files go through MkDependHS
+    start_phase | todo == DoMkDependHS && start == Hsc  = MkDependHS
+	        | otherwise = start
 
     haskellish = haskellish_suffix suffix
     cish = cish_suffix suffix
 
-   -- for a .hc file we need to force lang to HscC
+       -- for a .hc file we need to force lang to HscC
     real_lang | start_phase == HCc  = HscC
 	      | otherwise           = lang
 
