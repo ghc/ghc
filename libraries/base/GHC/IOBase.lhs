@@ -181,19 +181,29 @@ help of 'unsafePerformIO'.  So be careful!
 unsafePerformIO	:: IO a -> a
 unsafePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
 
+-- Why do we NOINLINE unsafePerformIO?  See the comment with
+-- GHC.ST.runST.  Essentially the issue is that the IO computation
+-- inside unsafePerformIO must be atomic: it must either all run, or
+-- not at all.  If we let the compiler see the application of the IO
+-- to realWorld#, it might float out part of the IO.
+
 {-|
 'unsafeInterleaveIO' allows 'IO' computation to be deferred lazily.
 When passed a value of type @IO a@, the 'IO' will only be performed
 when the value of the @a@ is demanded.  This is used to implement lazy
 file reading, see 'System.IO.hGetContents'.
 -}
-{-# NOINLINE unsafeInterleaveIO #-}
+{-# INLINE unsafeInterleaveIO #-}
 unsafeInterleaveIO :: IO a -> IO a
 unsafeInterleaveIO (IO m)
   = IO ( \ s -> let
 		   r = case m s of (# _, res #) -> res
 		in
 		(# s, r #))
+
+-- We believe that INLINE on unsafeInterleaveIO is safe, because the
+-- state from this IO thread is passed explicitly to the interleaved
+-- IO, so it cannot be floated out and shared.
 
 -- ---------------------------------------------------------------------------
 -- Handle type
