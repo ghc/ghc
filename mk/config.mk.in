@@ -249,7 +249,12 @@ else
 ifeq "$(strip $(way))" "mr"
 GhcLibHcOpts= -O
 else
+ifeq "$(GhcWithHscBuiltViaC)" "NO"
 GhcLibHcOpts= -O -split-objs -odir $*
+else
+#NB: .hc files need to distributed in *unsplit* form.
+GhcLibHcOpts= -O
+endif
 endif
 endif
 
