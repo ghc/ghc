@@ -6,7 +6,7 @@
 
 module HaddockHtml ( 
 	ppHtml, copyHtmlBits, 
-	ppHtmlIndex, ppHtmlContents, foo
+	ppHtmlIndex, ppHtmlContents
   ) where
 
 import Prelude hiding (div)
@@ -15,51 +15,39 @@ import HaddockTypes
 import HaddockUtil
 import HaddockModuleTree
 import HaddockHH
+import HaddockHH2
 import HsSyn
 
 import IO
-import Maybe	( fromJust, isJust )
+import Maybe	( fromJust, isJust, fromMaybe )
 import List 	( sortBy )
 import Char	( isUpper, toUpper, isAlpha, ord )
 import Monad	( when, unless )
 
 #if __GLASGOW_HASKELL__ < 503
 import FiniteMap
-import URI	( escapeString, unreserved )
 #else
 import Data.FiniteMap
-import Network.URI ( escapeString, unreserved )
 #endif
 
 import Html
 import qualified Html
 
-foo = 42
-
--- -----------------------------------------------------------------------------
--- Files we need to copy from our $libdir
-
-cssFile, jsFile, iconFile :: String
-cssFile  = "haddock.css"
-jsFile   = "haddock.js"
-iconFile = "haskell_icon.gif"
-plusFile = "plus.jpg"
-minusFile = "minus.jpg"
-
 -- -----------------------------------------------------------------------------
 -- Generating HTML documentation
 
 ppHtml	:: String
+	-> Maybe String				-- package
 	-> Maybe String
 	-> [(Module, Interface)]
 	-> FilePath			-- destination directory
 	-> Maybe Doc			-- prologue text, maybe
-	-> Bool				-- do MS Help stuff
+	-> Maybe String		-- the Html Help format (--html-help)
 	-> Maybe String			-- the contents URL (--use-contents)
 	-> Maybe String			-- the index URL (--use-index)
 	-> IO ()
 
-ppHtml doctitle source_url ifaces odir prologue do_ms_help 
+ppHtml doctitle package source_url ifaces odir prologue maybe_html_help_format
 	maybe_contents_url maybe_index_url =  do
   let
 	visible_ifaces = filter visible ifaces
@@ -74,10 +62,20 @@ ppHtml doctitle source_url ifaces odir prologue do_ms_help
   when (not (isJust maybe_index_url)) $ 
     ppHtmlIndex odir doctitle maybe_contents_url visible_ifaces
 
-  -- Generate index and contents page for MS help if requested
-  when do_ms_help $ do
-    ppHHContents odir (map fst visible_ifaces)
-    ppHHIndex odir visible_ifaces
+  -- Generate index and contents page for Html Help if requested
+  case maybe_html_help_format of
+    Nothing       -> return ()
+    Just "mshelp" -> do
+		ppHHContents odir visible_ifaces
+		ppHHIndex    odir visible_ifaces
+    Just "mshelp2" -> do
+		let pkg_name = fromMaybe "pkg" package
+		ppHH2Contents   odir pkg_name visible_ifaces
+		ppHH2Index      odir pkg_name visible_ifaces
+		ppHH2Files      odir pkg_name visible_ifaces
+		ppHH2Collection odir pkg_name visible_ifaces
+    Just format -> do
+		fail ("The "++format++" format is not implemented")
 
   mapM_ (ppHtmlModule odir doctitle source_url 
 	   maybe_contents_url maybe_index_url) visible_ifaces
@@ -348,7 +346,7 @@ ppHtmlIndex odir doctitle maybe_contents_url ifaces = do
   ppAnnot (HsVarName n)
        | isUpper c || c == ':'  = toHtml "Data Constructor"
        | otherwise		= toHtml "Function"
-      where c = head (ppHsIdentifier n)
+      where c = head (hsIdentifierStr n)
 
   indexLinks nm entries = 
      tda [ theclass "indexlinks" ] << 
@@ -418,7 +416,7 @@ ifaceToHtml _ iface
 	-- if the documentation doesn't begin with a section header, then
 	-- add one ("Documentation").
 	maybe_doc_hdr
-	    = case exports of
+	    = case exports of		   
 		   [] -> Html.emptyTable
 		   ExportGroup _ _ _ : _ -> Html.emptyTable
 		   _ -> tda [ theclass "section1" ] << toHtml "Documentation"
@@ -439,7 +437,7 @@ ppModuleContents exports
     | lev <= n  = ( [], items )
     | otherwise = ( html:secs, rest2 )
     where
-	html = (dterm << linkedAnchor "" id0 << docToHtml doc)
+	html = (dterm << linkedAnchor id0 << docToHtml doc)
 		 +++ mk_subsections ssecs
 	(ssecs, rest1) = process lev rest
 	(secs,  rest2) = process n   rest1
@@ -595,6 +593,7 @@ ppHsDataDecl summary instances is_newty
 			   aboves (map (declBox.ppInstHead) instances)
 		        )
  		   )
+
 ppHsDataDecl _ _ _ _ d =
     error $ "HaddockHtml.ppHsDataDecl: unexpected decl " ++ show d
 
@@ -763,7 +762,7 @@ ppHsClassDecl summary instances orig_c
 			)
 
 	inst_id = collapseId nm
-	instances_bit
+ 	instances_bit
 	   | null instances = Html.emptyTable
 	   | otherwise 
 	   =  s8 </> inst_hdr inst_id </>
@@ -771,7 +770,7 @@ ppHsClassDecl summary instances orig_c
 		   collapsed inst_id (
 		      spacedTable1 << (
 			aboves (map (declBox.ppInstHead) instances)
-		   ))
+		  ))
 
 ppHsClassDecl _ _ _ d =
     error $ "HaddockHtml.ppHsClassDecl: unexpected decl: " ++ show d
@@ -902,23 +901,10 @@ isSpecial _                                      = False
 ppHsName :: HsName -> Html
 ppHsName nm = toHtml (hsNameStr nm)
 
-hsAnchorNameStr :: HsName -> String
-hsAnchorNameStr (HsTyClsName id0) = "t:" ++ ppHsIdentifier id0
-hsAnchorNameStr (HsVarName id0)   = "v:" ++ ppHsIdentifier id0
-
-hsNameStr :: HsName -> String
-hsNameStr (HsTyClsName id0) = ppHsIdentifier id0
-hsNameStr (HsVarName id0)   = ppHsIdentifier id0
-
-ppHsIdentifier :: HsIdentifier -> String
-ppHsIdentifier (HsIdent str)   =  str
-ppHsIdentifier (HsSymbol str)  =  str
-ppHsIdentifier (HsSpecial str) =  str
-
 ppHsBinder :: Bool -> HsName -> Html
 -- The Bool indicates whether we are generating the summary, in which case
 -- the binder will be a link to the full definition.
-ppHsBinder True nm = linkedAnchor "" (hsAnchorNameStr nm) << ppHsBinder' nm
+ppHsBinder True nm = linkedAnchor (hsAnchorNameStr nm) << ppHsBinder' nm
 ppHsBinder False nm = linkTarget nm +++ bold << ppHsBinder' nm
 
 ppHsBinder' :: HsName -> Html
@@ -931,11 +917,11 @@ ppHsBindIdent (HsSymbol str)  =  parens (toHtml str)
 ppHsBindIdent (HsSpecial str) =  toHtml str
 
 linkId :: Module -> Maybe HsName -> Html -> Html
-linkId (Module mdl) mbStr = linkedAnchor (moduleHtmlFile fp mdl) frag
-  where frag = case mbStr of
-                  Nothing  -> ""
-                  Just str -> hsAnchorNameStr str
-        fp   = case lookupFM html_xrefs (Module mdl) of
+linkId (Module mdl) mbName = anchor ! [href hr]
+  where hr = case mbName of
+                  Nothing   -> moduleHtmlFile fp mdl
+                  Just name -> nameHtmlRef fp mdl name
+        fp = case lookupFM html_xrefs (Module mdl) of
 		  Nothing  -> ""
 		  Just fp0 -> fp0
 
@@ -1108,14 +1094,6 @@ s15 = tda [ theclass "s15" ] << noHtml
 namedAnchor :: String -> Html -> Html
 namedAnchor n = anchor ! [name (escapeStr n)]
 
-linkedAnchor :: String -> String -> Html -> Html
-linkedAnchor ref frag = anchor ! [href hr]
-   where hr | null frag = ref
-            | otherwise = ref ++ '#': escapeStr frag
-
-escapeStr :: String -> String
-escapeStr = flip escapeString unreserved
-
 --
 -- A section of HTML which is collapsible via a +/- button.
 --
@@ -1130,4 +1108,10 @@ collapsed id html =
 -- A quote is a valid part of a Haskell identifier, but it would interfere with
 -- the ECMA script string delimiter used in collapsebutton above.
 collapseId :: HsName -> String
-collapseId nm = "i:" ++ escapeString (hsNameStr nm) (/= '\'')
+collapseId nm = "i:" ++ escapeStr (hsNameStr nm)
+
+linkedAnchor :: String -> Html -> Html
+linkedAnchor frag = anchor ! [href hr]
+   where hr | null frag = ""
+            | otherwise = '#': escapeStr frag
+

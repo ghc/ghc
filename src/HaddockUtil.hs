@@ -15,10 +15,11 @@ module HaddockUtil (
   -- * Filename utilities
   basename, dirname, splitFilename3, 
   isPathSeparator, pathSeparator,
-  moduleHtmlFile,
+  moduleHtmlFile, nameHtmlRef,
+  cssFile, iconFile, jsFile, plusFile, minusFile,
 
   -- * Miscellaneous utilities
-  getProgramName, bye, die, dieMsg, mapSnd, mapMaybeM,
+  getProgramName, bye, die, dieMsg, mapSnd, mapMaybeM, escapeStr,
 
   -- * HTML cross reference mapping
   html_xrefs_ref, html_xrefs,
@@ -37,11 +38,13 @@ import Monad
 import RegexString
 import FiniteMap
 import IOExts
+import URI	( escapeString, unreserved )
 #else
 import Text.Regex
 import Data.FiniteMap
 import Data.IORef
 import System.IO.Unsafe	 ( unsafePerformIO )
+import Network.URI ( escapeString, unreserved )
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -271,6 +274,19 @@ moduleHtmlFile :: FilePath -> String -> FilePath
 moduleHtmlFile "" mod0  = mod0 ++ ".html" -- ToDo: Z-encode filename?
 moduleHtmlFile dir mod0 = dir ++ pathSeparator : mod0 ++ ".html"
 
+nameHtmlRef :: FilePath -> String -> HsName -> String	
+nameHtmlRef fp mdl str = moduleHtmlFile fp mdl ++ '#':escapeStr (hsAnchorNameStr str)
+
+-- -----------------------------------------------------------------------------
+-- Files we need to copy from our $libdir
+
+cssFile, iconFile, jsFile, plusFile,minusFile :: String
+cssFile   = "haddock.css"
+iconFile  = "haskell_icon.gif"
+jsFile    = "haddock.js"
+plusFile  = "plus.jpg"
+minusFile = "minus.jpg"
+
 -----------------------------------------------------------------------------
 -- misc.
 
@@ -296,6 +312,9 @@ mapSnd f ((x,y):xs) = (x,f y) : mapSnd f xs
 mapMaybeM :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
 mapMaybeM _ Nothing = return Nothing
 mapMaybeM f (Just a) = f a >>= return . Just
+
+escapeStr :: String -> String
+escapeStr str = escapeString str unreserved
 
 -----------------------------------------------------------------------------
 -- HTML cross references

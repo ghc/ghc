@@ -51,12 +51,6 @@ import Regex
 import PackedString
 #endif
 
-#if defined(mingw32_HOST_OS)
-import Foreign.Marshal.Array
-import Foreign
-import Foreign.C
-#endif
-
 -----------------------------------------------------------------------------
 -- Top-level stuff
 main :: IO ()
@@ -79,8 +73,8 @@ data Flag
   | Flag_Heading String
   | Flag_Package String
   | Flag_Html
+  | Flag_HtmlHelp String
   | Flag_Lib String
-  | Flag_MSHtmlHelp
   | Flag_NoImplicitPrelude
   | Flag_OutputDir FilePath
   | Flag_Prologue FilePath
@@ -110,8 +104,8 @@ options =
 --	"output in docbook (SGML)",
     Option ['h']  ["html"]     (NoArg Flag_Html)
 	"output in HTML",
-    Option ['m']  ["ms-help"]    (NoArg Flag_MSHtmlHelp)
-	"produce Microsoft HTML Help files (with -h)",
+    Option []  ["html-help"]    (ReqArg Flag_HtmlHelp "format")
+	"produce index and table of contents in mshelp, mshelp2 or devhelp format (with -h)",
     Option ['s']  ["source"]   (ReqArg Flag_SourceURL "URL") 
 	"base URL for links to source code",
     Option ['c']  ["css"]         (ReqArg Flag_CSS "FILE") 
@@ -261,8 +255,11 @@ run flags files = do
 			     | (mdl, i) <-  these_mod_ifaces ])
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml title source_url these_mod_ifaces odir
-	prologue (Flag_MSHtmlHelp `elem` flags) 
+    let hhformat = case [hhformat | Flag_HtmlHelp hhformat <- flags] of
+		[]      -> Nothing
+		formats -> Just (last formats)
+    ppHtml title package source_url these_mod_ifaces odir
+		prologue hhformat
 		maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
 
@@ -439,7 +436,6 @@ mkInterface no_implicit_prelude verbose mod_map filename package
   -- make the "export items", which will be converted into docs later
   orig_export_list <- mkExportItems mod_map mdl exported_names decl_map sub_map
 			 		final_decls opts orig_exports
-					
 
   let
      -- prune the export list to just those declarations that have
@@ -529,8 +525,8 @@ derivedInstances mdl decl = case decl of
      isVar (HsTyVar _) = True
      isVar _ = False
      extra_constraint
-	| null complex_tvars = []
-	| otherwise = [(unknownConstraint,complex_tvars)]
+ 	| null complex_tvars = []
+ 	| otherwise = [(unknownConstraint,complex_tvars)]
      lhs
 	| n == tuple_tycon_name (length tvs - 1) =
 	   HsTyTuple True (map HsTyVar tvs)
@@ -843,7 +839,7 @@ getReExports :: Module
    -> FiniteMap HsQName HsQName
    -> FiniteMap HsName HsQName
 getReExports mdl exported exported_visible import_env
-  = listToFM (concat invisible_names)
+  = listToFM (concat invisible_names)  
   where
    invisible_names = [ get_name n | n <- exported, 
 				       n `notElem` exported_visible ]

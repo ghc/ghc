@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.19 2003/11/06 12:39:47 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.20 2004/07/27 22:58:24 krasimir Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -30,6 +30,8 @@ module HsSyn (
     unit_tycon_qname, fun_tycon_qname, list_tycon_qname, tuple_tycon_qname,
     unit_tycon, fun_tycon, list_tycon, tuple_tycon,
 
+    hsIdentifierStr, hsAnchorNameStr, hsNameStr, 
+	
     GenDoc(..), Doc, DocMarkup(..),
     markup, mapIdent, idMarkup,
     docAppend, docParagraph,
@@ -385,6 +387,19 @@ list_tycon	      = HsTyCon list_tycon_qname
 
 tuple_tycon :: Int -> HsType
 tuple_tycon i	      = HsTyCon (tuple_tycon_qname i)
+
+hsIdentifierStr :: HsIdentifier -> String
+hsIdentifierStr (HsIdent str)   =  str
+hsIdentifierStr (HsSymbol str)  =  str
+hsIdentifierStr (HsSpecial str) =  str
+
+hsAnchorNameStr :: HsName -> String
+hsAnchorNameStr (HsTyClsName id0) = "t:" ++ hsIdentifierStr id0
+hsAnchorNameStr (HsVarName id0)   = "v:" ++ hsIdentifierStr id0
+
+hsNameStr :: HsName -> String
+hsNameStr (HsTyClsName id0) = hsIdentifierStr id0
+hsNameStr (HsVarName id0)   = hsIdentifierStr id0
 
 -- -----------------------------------------------------------------------------
 -- Doc strings and formatting

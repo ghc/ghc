@@ -18,9 +18,9 @@ contentsHHFile, indexHHFile :: String
 contentsHHFile = "index.hhc"
 indexHHFile = "index.hhk"
 
-ppHHContents :: FilePath -> [Module] -> IO ()
-ppHHContents odir mods = do
-  let tree = mkModuleTree (zip mods (repeat Nothing)) --TODO: packages
+ppHHContents :: FilePath -> [(Module,Interface)] -> IO ()
+ppHHContents odir ifaces = do
+  let tree = mkModuleTree (map (\(mod,_) -> (mod,Nothing)) ifaces) --TODO: packages
       html =
       	text "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML//EN\">" $$
 	text "<HTML>" $$
@@ -83,21 +83,18 @@ ppHHIndex odir ifaces = do
 	text "</BODY><HTML>"
   writeFile (odir ++ pathSeparator:indexHHFile) (render html)
   where	
-	index :: [(HsName, Module)]
-	index = fmToList full_index
+	index :: [(HsName, [Module])]
+	index = fmToList (foldr getIfaceIndex emptyFM ifaces)
 
-	iface_indices = map getIfaceIndex ifaces
-	full_index = foldr1 plusFM iface_indices
-
-	getIfaceIndex (mdl,iface) = listToFM
-	    [ (name, mdl) | (name, Qual mdl' _) <- fmToList (iface_env iface), mdl == mdl']
+	getIfaceIndex (mdl,iface) fm =
+		addListToFM_C (++) fm [(name, [mdl]) | (name, Qual mdl' _) <- fmToList (iface_env iface), mdl == mdl']
 	
 	ppList [] = empty
-	ppList ((name,Module mdl):mdls)  =
+	ppList ((name,(Module mdl:_)):mdls)  =
 		text "<LI>" <> nest 4
 				(text "<OBJECT type=\"text/sitemap\">" $$
 				 text "<PARAM name=\"Name\" value=\"" <> text (show name) <> text "\">" $$
-				 text "<PARAM name=\"Local\" value=\"" <> text (moduleHtmlFile "" mdl) <> char '#' <> text (show name) <> text "\">" $$
+				 text "<PARAM name=\"Local\" value=\"" <> text (nameHtmlRef "" mdl name) <> text "\">" $$
 				 text "</OBJECT>") $+$
 		text "</LI>" $$
 		ppList mdls
