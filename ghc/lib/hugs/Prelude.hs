@@ -106,6 +106,9 @@ module Prelude (
     , MVar, newEmptyMVar, newMVar, putMVar, takeMVar, readMVar, swapMVar
     , ThreadId, forkIO
     ,trace
+
+    , Ref, newRef, readRef, writeRef
+
     -- Arrrggghhh!!! Help! Help! Help!
     -- What?!  Prelude.hs doesn't even _define_ most of these things!
     ,primCompAux,PrimArray,primRunST,primNewArray,primWriteArray
@@ -1889,6 +1892,13 @@ data PrimByteArray
 data Ref                  s a -- mutable variables
 data PrimMutableArray     s a -- mutable arrays with Int indices
 data PrimMutableByteArray s
+
+newRef   :: a -> ST s (Ref s a)
+newRef    = primNewRef
+readRef  :: Ref s a -> ST s a
+readRef   = primReadRef
+writeRef :: Ref s a -> a -> ST s ()
+writeRef  = primWriteRef
 
 
 ------------------------------------------------------------------------------
