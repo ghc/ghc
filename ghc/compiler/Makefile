@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.185 2001/08/15 12:23:56 rrt Exp $
+# $Id: Makefile,v 1.186 2001/08/15 14:02:54 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -148,7 +148,7 @@ HS_SRCS += $(CONFIG_HS)
 
 ifneq "$(ghc_502_at_least)" "YES"
 C_SRCS += main/rawSystem.c
-HS_SRCS += main/SystemExts.lhs
+HS_SRCS := $(filter-out main/SystemExts.lhs,$(HS_SRCS)) main/SystemExts.lhs
 SRC_CC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 SRC_MKDEPENDC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 HS_OBJS += main/rawSystem.o
