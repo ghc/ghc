@@ -410,6 +410,8 @@ discardWarnings :: TcRn a -> TcRn a
 -- With -dppr-debug, the effects is switched off, so you can still see
 -- what warnings derived code would give
 discardWarnings thing_inside
+  | opt_PprStyle_Debug = thing_inside
+  | otherwise
   = do	{ errs_var <- newMutVar emptyMessages
 	; result <- setErrsVar errs_var thing_inside
 	; (_warns, errs) <- readMutVar errs_var
