@@ -5,9 +5,11 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.14 $
- * $Date: 2000/10/09 11:20:16 $
+ * $Revision: 1.15 $
+ * $Date: 2000/12/19 16:48:35 $
  * ---------------------------------------------------------------------------*/
+
+#if 0
 
 #include "Rts.h"
 
@@ -18,10 +20,76 @@
 #include "Assembler.h"
 #include "Printer.h"
 #include "Disassembler.h"
+#include "Interpreter.h"
 
 /* --------------------------------------------------------------------------
  * Disassembler
  * ------------------------------------------------------------------------*/
+
+static int disInstr ( StgBCO *bco, int pc )
+{
+   StgArrWords* instr_arr = bco->instrs;
+   UShort*      instrs    = (UShort*)(&instr_arr->payload[0]);
+
+   switch (instrs[pc++]) {
+      case i_ARGCHECK: 
+         fprintf(stderr, "ARGCHECK %d\n", instrs[pc] );
+         pc += 1; break;
+      case i_PUSH_L: 
+         fprintf(stderr, "PUSH_L   %d\n", instrs[pc] );
+         pc += 1; break;
+      case i_PUSH_LL:
+         fprintf(stderr, "PUSH_LL  %d %d\n", instrs[pc], instrs[pc+1] ); 
+         pc += 2; break;
+      case i_PUSH_LLL:
+         fprintf(stderr, "PUSH_LLL %d %d %d\n", instrs[pc], instrs[pc+1], 
+                                                            instrs[pc+2] ); 
+         pc += 3; break;
+      case i_PUSH_G:
+         fprintf(stderr, "PUSH_G   " ); printPtr( ptrs[instrs[pc]] ); 
+         pc += 1; break;
+      case i_PUSH_AS:
+         fprintf(stderr, "PUSH_AS  " ); printPtr( ptrs[instrs[pc]] );
+         fprintf(stderr, " 0x%x", literals[instrs[pc+1]] );
+         pc += 2; break;
+      case i_PUSH_UBX:
+         fprintf(stderr, "PUSH_UBX ");
+         for (i = 0; i < instrs[pc+1]; i++) 
+            fprintf(stderr, "0x%x ", literals[i + instrs[pc]] );
+         fprintf(stderr, "\n");
+         pc += 2; break;
+      case i_PUSH_TAG:
+         fprintf(stderr, "PUSH_TAG %d\n", instrs[pc] );
+         pc += 1; break;
+      case i_SLIDE: 
+         fprintf(stderr, "SLIDE    %d down by %d\n", instrs[pc], instrs[pc+1] );
+         pc += 2; break;
+      case i_ALLOC:
+         fprintf(stderr, "ALLOC    %d words\n", instrs[pc] );
+         pc += 1; break;
+      case i_MKAP:
+         fprintf(stderr, "MKAP     %d words, %d stkoff\n", instrs[pc+1], 
+                                                           instrs[pc] );
+         pc += 2; break;
+      case i_UNPACK:
+         fprintf(stderr, "UNPACK   %d\n", instrs[pc] );
+         pc += 1; break;
+      case i_UPK_TAG:
+         fprintf(stderr, "UPK_TAG  %d words, %d conoff, %d stkoff\n",
+                         instrs[pc], instrs[pc+1], instrs[pc+2] );
+         pc += 3; break;
+      case i_PACK:
+         fprintf(stderr, "PACK     %d words with itbl ", instrs[pc+1] );
+         printPtr( itbls[instrs[pc]] );
+         pc += 2; break;
+      
+      case i_TESTLT_I:
+         
+pc = disLitN ( bco, pc ); break;
+   case i_TESTEQ_I: pc = disLitNInt ( bco, pc );
+   }
+}
+
 
 static InstrPtr disNone         ( StgBCO *bco, InstrPtr pc, char* i );
 static InstrPtr disInt          ( StgBCO *bco, InstrPtr pc, char* i );
@@ -519,3 +587,4 @@ void  disassemble( StgBCO *bco, char* prefix )
 }
 
 #endif /* INTERPRETER */
+#endif 0

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.64 2000/12/19 12:34:01 sewardj Exp $
+ * $Id: PrimOps.hc,v 1.65 2000/12/19 16:48:35 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1032,10 +1032,10 @@ FN_(newBCOzh_fast)
   bco = (StgBCO *) (Hp + 1 - sizeofW(StgBCO));
   SET_HDR(bco, &stg_BCO_info, CCCS);
 
-  bco->instrs     = R1.cl;
-  bco->literals   = R2.cl;
-  bco->ptrs       = R3.cl;
-  bco->itbls      = R4.cl;
+  bco->instrs     = (StgArrWords*)R1.cl;
+  bco->literals   = (StgArrWords*)R2.cl;
+  bco->ptrs       = (StgMutArrPtrs*)R3.cl;
+  bco->itbls      = (StgArrWords*)R4.cl;
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(bco);

@@ -7,8 +7,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.3 $
- * $Date: 2000/12/14 15:19:48 $
+ * $Revision: 1.4 $
+ * $Date: 2000/12/19 16:48:35 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -46,6 +46,7 @@
 #endif /* 0 */
 
 #include <stdio.h>
+
 int /*StgThreadReturnCode*/ interpretBCO ( void* /* Capability* */ cap )
 {
    fprintf(stderr, "Greetings, earthlings.  I am not yet implemented.  Bye!\n");
