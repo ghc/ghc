@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.22 2002/02/26 19:18:00 sof Exp $
+ * $Id: HeapStackCheck.hc,v 1.23 2002/02/28 08:53:13 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -634,7 +634,7 @@ EXTFUN(stg_gc_seq_1)
    cases are covered below.
    -------------------------------------------------------------------------- */
 
-/*-- No regsiters live (probably a void return) ----------------------------- */
+/*-- No registers live (probably a void return) ----------------------------- */
 
 /* If we change the policy for thread startup to *not* remove the
  * return address from the stack, we can get rid of this little
