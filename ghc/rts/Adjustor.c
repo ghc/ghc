@@ -55,6 +55,10 @@ Haskell side.
 typedef unsigned long my_uintptr_t;
 #endif
 
+#if defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS)
+#include <string.h>
+#endif
+
 /* Heavily arch-specific, I'm afraid.. */
 
 /*
@@ -132,6 +136,15 @@ stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
   /* and return a ptr to the goods inside the array */
   return(BYTE_ARR_CTS(arr));
 }
+#endif
+
+#if defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS)
+__asm__("obscure_ccall_ret_code:\n\t"
+        "lwz 1,0(1)\n\t"
+        "lwz 0,4(1)\n\t"
+        "mtlr 0\n\t"
+        "blr");
+extern void obscure_ccall_ret_code(void);
 #endif
 
 #if defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
@@ -384,70 +397,213 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 	__asm__ volatile("call_pal %0" : : "i" (PAL_imb));
     }
 #elif defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS)
-/*
-	For PowerPC Linux, the following code is used:
 
-	mr r10,r8
-	mr r9,r7
-	mr r8,r6
-	mr r7,r5
-	mr r6,r4
-	mr r5,r3
-	lis r0,0xDEAD ;hi(wptr)
-	lis r3,0xDEAF ;hi(hptr)
-	ori r0,r0,0xBEEF ; lo(wptr)
-	ori r3,r3,0xFACE ; lo(hptr)
-	mtctr r0
-	bctr
+#define OP_LO(op,lo)  ((((unsigned)(op)) << 16) | (((unsigned)(lo)) & 0xFFFF))
+#define OP_HI(op,hi)  ((((unsigned)(op)) << 16) | (((unsigned)(hi)) >> 16))
+    {
+        /* The PowerPC Linux (32-bit) calling convention is annoyingly complex.
+           We need to calculate all the details of the stack frame layout,
+           taking into account the types of all the arguments, and then
+           generate code on the fly. */
+    
+        int src_gpr = 3, dst_gpr = 5;
+        int fpr = 3;
+        int src_offset = 0, dst_offset = 0;
+        int n = strlen(typeString),i;
+        int src_locs[n], dst_locs[n];
+        int frameSize;
+        unsigned *code;
+      
+            /* Step 1:
+               Calculate where the arguments should go.
+               src_locs[] will contain the locations of the arguments in the
+               original stack frame passed to the adjustor.
+               dst_locs[] will contain the locations of the arguments after the
+               adjustor runs, on entry to the wrapper proc pointed to by wptr.
 
-	The arguments (passed in registers r3 - r10) are shuffled along by two to
-	make room for hptr and a dummy argument. As r9 and r10 are overwritten by
-	this code, it only works for up to 6 arguments (when floating point arguments
-	are involved, this may be more or less, depending on the exact situation).
-*/
-	adjustor = mallocBytesRWX(4*13);
-	{
-		unsigned long *const adj_code = (unsigned long *)adjustor;
+               This algorithm is based on the one described on page 3-19 of the
+               System V ABI PowerPC Processor Supplement.
+            */
+        for(i=0;typeString[i];i++)
+        {
+            char t = typeString[i];
+            if((t == 'f' || t == 'd') && fpr <= 8)
+                src_locs[i] = dst_locs[i] = -32-(fpr++);
+            else
+            {
+                if(t == 'l' && src_gpr <= 9)
+                {
+                    if((src_gpr & 1) == 0)
+                        src_gpr++;
+                    src_locs[i] = -src_gpr;
+                    src_gpr += 2;
+                }
+                else if(t == 'i' && src_gpr <= 10)
+                {
+                    src_locs[i] = -(src_gpr++);
+                }
+                else
+                {
+                    if(t == 'l' || t == 'd')
+                    {
+                        if(src_offset % 8)
+                            src_offset += 4;
+                    }
+                    src_locs[i] = src_offset;
+                    src_offset += (t == 'l' || t == 'd') ? 8 : 4;
+                }
 
-		// make room for extra arguments
-		adj_code[0] = 0x7d0a4378;	//mr r10,r8
-		adj_code[1] = 0x7ce93b78;	//mr r9,r7
-		adj_code[2] = 0x7cc83378;	//mr r8,r6
-		adj_code[3] = 0x7ca72b78;	//mr r7,r5
-		adj_code[4] = 0x7c862378;	//mr r6,r4
-		adj_code[5] = 0x7c651b78;	//mr r5,r3
-		
-		adj_code[6] = 0x3c000000;	//lis r0,hi(wptr)
-		adj_code[6] |= ((unsigned long)wptr) >> 16;
-		
-		adj_code[7] = 0x3c600000;	//lis r3,hi(hptr)
-		adj_code[7] |= ((unsigned long)hptr) >> 16;
-		
-		adj_code[8] = 0x60000000;	//ori r0,r0,lo(wptr)
-		adj_code[8] |= ((unsigned long)wptr) & 0xFFFF; 
-		
-		adj_code[9] = 0x60630000;	//ori r3,r3,lo(hptr)
-		adj_code[9] |= ((unsigned long)hptr) & 0xFFFF;
-		
-		adj_code[10] = 0x7c0903a6;	//mtctr r0
-		adj_code[11] = 0x4e800420;	//bctr
-		adj_code[12] = (unsigned long)hptr;
-		
-		// Flush the Instruction cache:
-		//	MakeDataExecutable(adjustor,4*13);
-			/* This would require us to link with CoreServices.framework */
-		{		/* this should do the same: */
-			int n = 13;
-			unsigned long *p = adj_code;
-			while(n--)
-			{
-				__asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0"
-						    : : "r" (p));
-				p++;
-			}
-			__asm__ volatile ("sync\n\tisync");
-		}
-	}
+                if(t == 'l' && dst_gpr <= 9)
+                {
+                    if((dst_gpr & 1) == 0)
+                        dst_gpr++;
+                    dst_locs[i] = -dst_gpr;
+                    dst_gpr += 2;
+                }
+                else if(t == 'i' && dst_gpr <= 10)
+                {
+                    dst_locs[i] = -(dst_gpr++);
+                }
+                else
+                {
+                    if(t == 'l' || t == 'd')
+                    {
+                        if(dst_offset % 8)
+                            dst_offset += 4;
+                    }
+                    dst_locs[i] = dst_offset;
+                    dst_offset += (t == 'l' || t == 'd') ? 8 : 4;
+                }
+            }
+        }
+
+        frameSize = dst_offset + 8;
+        frameSize = (frameSize+15) & ~0xF;
+
+            /* Step 2:
+               Build the adjustor.
+            */
+                    // allocate space for at most 4 insns per parameter
+                    // plus 14 more instructions.
+        adjustor = mallocBytesRWX(4 * (4*n + 14));
+        code = (unsigned*)adjustor;
+        
+        *code++ = 0x48000008; // b *+8
+            // * Put the hptr in a place where freeHaskellFunctionPtr
+            //   can get at it.
+        *code++ = (unsigned) hptr;
+
+            // * save the link register
+        *code++ = 0x7c0802a6; // mflr r0;
+        *code++ = 0x90010004; // stw r0, 4(r1);
+            // * and build a new stack frame
+        *code++ = OP_LO(0x9421, -frameSize); // stwu r1, -frameSize(r1)
+
+            // * now generate instructions to copy arguments
+            //   from the old stack frame into the new stack frame.
+        for(i=n-1;i>=0;i--)
+        {
+            if(src_locs[i] < -32)
+                ASSERT(dst_locs[i] == src_locs[i]);
+            else if(src_locs[i] < 0)
+            {
+                // source in GPR.
+                ASSERT(typeString[i] != 'f' && typeString[i] != 'd');
+                if(dst_locs[i] < 0)
+                {
+                    ASSERT(dst_locs[i] > -32);
+                        // dst is in GPR, too.
+
+                    if(typeString[i] == 'l')
+                    {
+                            // mr dst+1, src+1
+                        *code++ = 0x7c000378
+                                | ((-dst_locs[i]+1) << 16)
+                                | ((-src_locs[i]+1) << 11)
+                                | ((-src_locs[i]+1) << 21);
+                    }
+                    // mr dst, src
+                    *code++ = 0x7c000378
+                            | ((-dst_locs[i]) << 16)
+                            | ((-src_locs[i]) << 11)
+                            | ((-src_locs[i]) << 21);
+                }
+                else
+                {
+                    if(typeString[i] == 'l')
+                    {
+                            // stw src+1, dst_offset+4(r1)
+                        *code++ = 0x90010000
+                                | ((-src_locs[i]+1) << 21)
+                                | (dst_locs[i] + 4);
+                    }
+                    
+                        // stw src, dst_offset(r1)
+                    *code++ = 0x90010000
+                            | ((-src_locs[i]) << 21)
+                            | (dst_locs[i] + 8);
+                }
+            }
+            else
+            {
+                ASSERT(dst_locs[i] >= 0);
+                ASSERT(typeString[i] != 'f' && typeString[i] != 'd');
+
+                if(typeString[i] == 'l')
+                {
+                    // lwz r0, src_offset(r1)
+                        *code++ = 0x80010000
+                                | (src_locs[i] + frameSize + 8 + 4);
+                    // stw r0, dst_offset(r1)
+                        *code++ = 0x90010000
+                                | (dst_locs[i] + 8 + 4);
+                    }
+                // lwz r0, src_offset(r1)
+                    *code++ = 0x80010000
+                            | (src_locs[i] + frameSize + 8);
+                // stw r0, dst_offset(r1)
+                    *code++ = 0x90010000
+                            | (dst_locs[i] + 8);
+           }
+        }
+
+            // * hptr will be the new first argument.
+            // lis r3, hi(hptr)
+        *code++ = OP_HI(0x3c60, hptr);
+            // ori r3,r3,lo(hptr)
+        *code++ = OP_LO(0x6063, hptr);
+
+            // * we need to return to a piece of code
+            //   which will tear down the stack frame.
+            // lis r11,hi(obscure_ccall_ret_code)
+        *code++ = OP_HI(0x3d60, obscure_ccall_ret_code);
+            // ori r11,r11,lo(obscure_ccall_ret_code)
+        *code++ = OP_LO(0x616b, obscure_ccall_ret_code);
+            // mtlr r11
+        *code++ = 0x7d6803a6;
+
+            // * jump to wptr
+            // lis r11,hi(wptr)
+        *code++ = OP_HI(0x3d60, wptr);
+            // ori r11,r11,lo(wptr)
+        *code++ = OP_LO(0x616b, wptr);
+            // mtctr r11
+        *code++ = 0x7d6903a6;
+            // bctr
+        *code++ = 0x4e800420;
+
+        // Flush the Instruction cache:
+        {
+            unsigned *p = adjustor;
+            while(p < code)
+            {
+                __asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0"
+                                 : : "r" (p));
+                p++;
+            }
+            __asm__ volatile ("sync\n\tisync");
+        }
+    }
 
 #elif defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
         
@@ -672,11 +828,11 @@ freeHaskellFunctionPtr(void* ptr)
  /* Free the stable pointer first..*/
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
 #elif defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS)
- if ( *(StgWord*)ptr != 0x7d0a4378 ) {
+ if ( *(StgWord*)ptr != 0x48000008 ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
- freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 4*12)));
+ freeStablePtr(((StgStablePtr*)ptr)[1]);
 #elif defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
  extern void* adjustorCode;
  if ( ((AdjustorStub*)ptr)->code != (StgFunPtr) &adjustorCode ) {
