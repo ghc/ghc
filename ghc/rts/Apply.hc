@@ -64,8 +64,13 @@ stg_ap_0_ret(void)
    the stack check fails, we can just push the PAP on the stack and
    return to the scheduler.
 
-   On entry: R1 points to the PAP.  The rest of the function's arguments
-   (*all* of 'em) are on the stack, starting at Sp[0].
+   On entry: R1 points to the PAP.  The rest of the function's
+   arguments (apart from those that are already in the PAP) are on the
+   stack, starting at Sp[0].  R2 contains an info table which
+   describes these arguments, which is used in the event that the
+   stack check in the entry code below fails.  The info table is
+   currently one of the stg_ap_*_ret family, as this code is always
+   entered from those functions.
 
    The idea is to copy the chunk of stack from the PAP object onto the
    stack / into registers, and enter the function.
@@ -88,13 +93,14 @@ STGFUN(stg_PAP_entry)
   // We have a hand-rolled stack check fragment here, because none of
   // the canned ones suit this situation.
   if ((Sp - Words) < SpLim) {
-      // there is a return address on the stack in the event of a
+      // there is a return address in R2 in the event of a
       // stack check failure.  The various stg_apply functions arrange
       // this before calling stg_PAP_entry.
+      Sp--; 
+      Sp[0] = R2.w;
       JMP_(stg_gc_unpt_r1);
   }
-  // Sp is already pointing one word below the arguments...
-  Sp -= Words-1;
+  Sp -= Words;
 
   // profiling
   TICK_ENT_PAP(pap);

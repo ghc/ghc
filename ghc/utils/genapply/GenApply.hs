@@ -141,7 +141,7 @@ mkApplyRetName args
 mkApplyInfoName args
   = text "stg_ap_" <> text (map showArg args) <> text "_info"
 
-genMkPAP macro jump is_pap args all_args_size fun_info_label
+genMkPAP macro jump stack_apply is_pap args all_args_size fun_info_label
   =  smaller_arity_cases
   $$ exact_arity_case
   $$ larger_arity_case
@@ -161,8 +161,8 @@ genMkPAP macro jump is_pap args all_args_size fun_info_label
         =  text "if (arity == " <> int arity <> text ") {" $$
 	   let
 	     (reg_doc, sp')
-		| is_pap    = (empty, 1)
-		| otherwise = loadRegArgs 1 these_args
+		| stack_apply = (empty, 1)
+		| otherwise   = loadRegArgs 1 these_args
 	   in
            nest 4 (vcat [
 	     reg_doc,
@@ -174,7 +174,7 @@ genMkPAP macro jump is_pap args all_args_size fun_info_label
 		-- return address in the even that stg_PAP_entry fails its
 		-- heap check.  See stg_PAP_entry in Apply.hc for details.
 	     if is_pap 
-		then text "Sp--; Sp[0] = (W_)&" <> mkApplyInfoName these_args <> semi
+		then text "R2.w = (W_)&" <> mkApplyInfoName these_args <> semi
 		else empty,
 	     text "JMP_" <> parens (text jump) <> semi
 	    ]) $$
@@ -197,14 +197,14 @@ genMkPAP macro jump is_pap args all_args_size fun_info_label
 	= text "if (arity == " <> int n_args <> text ") {" $$
 	  let
 	     (reg_doc, sp')
-		| is_pap    = (empty, 0)
-		| otherwise = loadRegArgs 1 args
+		| stack_apply = (empty, 1)
+		| otherwise   = loadRegArgs 1 args
 	  in
 	  nest 4 (vcat [
 	    reg_doc,
 	    text "Sp += " <> int sp' <> semi,
 	    if is_pap 
-		then text "Sp[0] = (W_)&" <> fun_info_label <> semi
+		then text "R2.w = (W_)&" <> fun_info_label <> semi
 		else empty,
 	    text "JMP_" <> parens (text jump) <> semi
 	  ])
@@ -246,7 +246,6 @@ genApply args =
       text "F_ " <> fun_ret_label <> text "( void )\n{",
       nest 4 (vcat [
        text "StgInfoTable *info;",
-       text "F_ target;",
        text "nat arity;",
 
 --    if fast == 1:
@@ -312,8 +311,10 @@ genApply args =
 	text "case BCO:",
 	nest 4 (vcat [
 	  text "arity = BCO_ARITY((StgBCO *)R1.p);",
-	  text "target = (F_)&stg_BCO_entry;",
-	  text "goto apply_pap;"
+	  text "ASSERT(arity > 0);",
+	  genMkPAP "BUILD_PAP" "stg_BCO_entry" 
+		True{-stack apply-} False{-not a PAP-}
+		args all_args_size fun_info_label
 	 ]),
 
 --    if fast == 1:
@@ -329,7 +330,8 @@ genApply args =
 	nest 4 (vcat [
 	  text "arity = itbl_to_fun_itbl(info)->arity;",
 	  text "ASSERT(arity > 0);",
-          genMkPAP "BUILD_PAP" "GET_ENTRY(R1.cl)" False{-not PAP-}
+          genMkPAP "BUILD_PAP" "GET_ENTRY(R1.cl)" 
+		False{-reg apply-} False{-not a PAP-}
 		args all_args_size fun_info_label
 	 ]),
 
@@ -340,10 +342,9 @@ genApply args =
 	text "case PAP:",
 	nest 4 (vcat [
  	  text "arity = ((StgPAP *)R1.p)->arity;",
-	  text "target = (F_)&stg_PAP_entry;",
-	  text "apply_pap:",
 	  text "ASSERT(arity > 0);",
-	  genMkPAP "NEW_PAP" "target" True{-is PAP-}
+	  genMkPAP "NEW_PAP" "stg_PAP_entry" 
+		True{-stack apply-} True{-is a PAP-}
 		args all_args_size fun_info_label
 	 ]),
 
