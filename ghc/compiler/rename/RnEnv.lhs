@@ -529,11 +529,11 @@ conflictsFM bad fm1 fm2
 conflictFM :: Ord a 
 	   => (b->b->Bool)
 	   -> FiniteMap a b -> a -> b
-	   -> [(a,(b,b))]
+	   -> Maybe (a,(b,b))
 conflictFM bad fm key elt
   = case lookupFM fm key of
-	Just elt' | bad elt elt' -> [(key,(elt,elt'))]
-	other			 -> []
+	Just elt' | bad elt elt' -> Just (key,(elt,elt'))
+	other			 -> Nothing
 \end{code}
 
 
