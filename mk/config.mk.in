@@ -242,24 +242,10 @@ endif
 # 	-O is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
 
-#
-# Splitting profiled code produces awfully large archives under ELF, so
-# we turn it off here.
-#
-# ToDo: track down the source of this.
-#
-ifeq "$(strip $(way))" "p"
-GhcLibHcOpts= -O
-else 
-ifeq "$(strip $(way))" "mr"
-GhcLibHcOpts= -O
-else
 ifeq "$(GhcWithHscBuiltViaC)" "YES"
 GhcLibHcOpts=-O
 else
 GhcLibHcOpts=-O -split-objs -odir $*
-endif
-endif
 endif
 
 # Build the Haskell Readline bindings?
