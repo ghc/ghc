@@ -72,7 +72,13 @@ include $(TOP)/mk/package.mk
 # Compiler produced files that are targets of the source's imports.
 MKDEPENDHS_OBJ_SUFFICES=o
 
-depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS)
+ifneq "$(STAMP_PKG_CONF)" ""
+PKGCONF_DEP = $(STAMP_PKG_CONF)
+else
+PKGCONF_DEP =
+endif
+
+depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS) $(STAMP_PKG_CONF)
 	@$(RM) .depend
 	@touch .depend
 ifneq "$(DOC_SRCS)" ""
