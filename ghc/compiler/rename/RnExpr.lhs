@@ -26,6 +26,7 @@ import RnHsSyn
 import RnMonad
 import RnEnv
 import CmdLineOpts	( opt_GlasgowExts )
+import BasicTypes	( Fixity(..), FixityDirection(..) )
 import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, ccallableClass_RDR,
 			  creturnableClass_RDR, monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
 			  ratioDataCon_RDR, negate_RDR
@@ -43,7 +44,6 @@ import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
 			  SYN_IE(UniqSet)
 			)
-import PprStyle		( PprStyle(..) )
 import Util		( Ord3(..), removeDups, panic, pprPanic, assertPanic )
 import Outputable
 
@@ -138,7 +138,7 @@ rnPat (RecPatIn con rpats)
 ************************************************************************
 
 \begin{code}
---rnMatch :: RdrNameMatch -> RnMS s (RenamedMatch, FreeVars)
+rnMatch :: RdrNameMatch -> RnMS s (RenamedMatch, FreeVars)
 
 rnMatch (PatMatch pat match)
   = bindLocalsRn "pattern" binders	$ \ new_binders ->
@@ -160,7 +160,7 @@ rnMatch (GRHSMatch grhss_and_binds)
 %************************************************************************
 
 \begin{code}
---rnGRHSsAndBinds :: RdrNameGRHSsAndBinds -> RnMS s (RenamedGRHSsAndBinds, FreeVars)
+rnGRHSsAndBinds :: RdrNameGRHSsAndBinds -> RnMS s (RenamedGRHSsAndBinds, FreeVars)
 
 rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
   = rnBinds binds		$ \ binds' ->
@@ -209,7 +209,7 @@ rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
 %************************************************************************
 
 \begin{code}
---rnExprs :: [RdrNameHsExpr] -> RnMS s ([RenamedHsExpr], FreeVars)
+rnExprs :: [RdrNameHsExpr] -> RnMS s ([RenamedHsExpr], FreeVars)
 rnExprs ls =
  rnExprs' ls [] `thenRn` \  (exprs, fvExprs) ->
  returnRn (exprs, unionManyNameSets fvExprs)
@@ -255,12 +255,15 @@ rnExpr (OpApp e1 op@(HsVar op_name) _ e2)
     rnExpr e2				`thenRn` \ (e2', fv_e2) ->
     rnExpr op				`thenRn` \ (op', fv_op) ->
 
-	-- Deal wth fixity
+	-- Deal with fixity
+	-- When renaming code synthesised from "deriving" declarations
+	-- we're in Interface mode, and we should ignore fixity; assume
+	-- that the deriving code generator got the association correct
     lookupFixity op_name		`thenRn` \ fixity ->
     getModeRn				`thenRn` \ mode -> 
     (case mode of
-	SourceMode    -> mkOpAppRn e1' op' fixity e2'
-	InterfaceMode -> returnRn (OpApp e1' op' fixity e2')
+	SourceMode      -> mkOpAppRn e1' op' fixity e2'
+	InterfaceMode _ -> returnRn (OpApp e1' op' fixity e2')
     )					`thenRn` \ final_e -> 
 
     returnRn (final_e,
@@ -269,8 +272,7 @@ rnExpr (OpApp e1 op@(HsVar op_name) _ e2)
 rnExpr (NegApp e n)
   = rnExpr e				`thenRn` \ (e', fv_e) ->
     lookupImplicitOccRn negate_RDR	`thenRn` \ neg ->
-    getModeRn				`thenRn` \ mode -> 
-    mkNegAppRn mode e' (HsVar neg)	`thenRn` \ final_e ->
+    mkNegAppRn e' (HsVar neg)		`thenRn` \ final_e ->
     returnRn (final_e, fv_e)
 
 rnExpr (HsPar e)
@@ -537,8 +539,12 @@ right_op_ok fix1 other
   = True
 
 -- Parser initially makes negation bind more tightly than any other operator
-mkNegAppRn mode neg_arg neg_op
-  = ASSERT( not_op_app mode neg_arg )
+mkNegAppRn neg_arg neg_op
+  = 
+#ifdef DEBUG
+    getModeRn			`thenRn` \ mode ->
+    ASSERT( not_op_app mode neg_arg )
+#endif
     returnRn (NegApp neg_arg neg_op)
 
 not_op_app SourceMode (OpApp _ _ _ _) = False
