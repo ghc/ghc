@@ -9,7 +9,25 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
------------------------------------------------------------------------------
+-- The 'Monad' library defines the 'MonadPlus' class, and provides some useful operations on monads.
+--
+-- The functions in this library use the following naming conventions: 
+--
+-- * A postfix `M' always stands for a function in the Kleisli category:
+-- @m@ is added to function results (modulo currying) and nowhere else. So, for example, 
+-- 
+-- >  filter  ::              (a ->   Bool) -> [a] ->   [a]
+-- >  filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
+-- 
+-- * A postfix `_' changes the result type from @(m a)@ to @(m ())@. Thus (in the "Prelude"): 
+-- 
+-- >  sequence  :: Monad m => [m a] -> m [a] 
+-- >  sequence_ :: Monad m => [m a] -> m () 
+-- 
+-- * A prefix `m' generalises an existing function to a monadic form. Thus, for example: 
+-- 
+-- >  sum  :: Num a       => [a]   -> a
+-- >  msum :: MonadPlus m => [m a] -> m a
 
 module Control.Monad
     ( MonadPlus (   -- class context: Monad
@@ -84,7 +102,7 @@ mapM_ f as      =  sequence_ (map f as)
 #endif  /* __HUGS__ */
 
 -- -----------------------------------------------------------------------------
--- Monadic classes: MonadPlus
+-- |The MonadPlus class definition
 
 class Monad m => MonadPlus m where
    mzero :: m a
@@ -125,18 +143,62 @@ msum        =  foldr mplus mzero
 -- -----------------------------------------------------------------------------
 -- Other monad functions
 
+-- | The 'join' function is the conventional monad join operator. It is used to
+-- remove one level of monadic structure, projecting its bound argument into the
+-- outer level.
 join              :: (Monad m) => m (m a) -> m a
 join x            =  x >>= id
 
+-- | The 'mapAndUnzipM' function maps its first argument over a list, returning
+-- the result as a pair of lists. This function is mainly used with complicated
+-- data structures or a state- transforming monad.
 mapAndUnzipM      :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
 mapAndUnzipM f xs =  sequence (map f xs) >>= return . unzip
 
+-- | The 'zipWithM' function generalises zipWith to arbitrary monads.
 zipWithM          :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
 zipWithM f xs ys  =  sequence (zipWith f xs ys)
 
+-- | 'zipWithM_' is the extension of 'zipWithM' which ignores the final result.
 zipWithM_         :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
 zipWithM_ f xs ys =  sequence_ (zipWith f xs ys)
 
+{- | The 'foldM' function is analogous to 'foldl', except that its result is
+encapsulated in a monad. Note that 'foldM' works from left-to-right over
+the list arguments. This could be an issue where '(>>)' and the `folded
+function' are not commutative.
+
+
+>	foldM f a1 [x1, x2, ..., xm ]
+==  
+>	do
+>	  a2 <- f a1 x1
+>	  a3 <- f a2 x2
+>	  ...
+>	  f am xm
+
+If right-to-left evaluation is required, the input list should be reversed.
+
+The when and unless functions provide conditional execution of monadic expressions. For example, 
+
+>	when debug (putStr "Debugging\n")
+
+will output the string @Debugging\\n@ if the Boolean value @debug@ is @True@, and otherwise do nothing.
+
+The monadic lifting operators promote a function to a monad. The function arguments are scanned left to right. For example, 
+
+>	liftM2 (+) [0,1] [0,2] = [0,2,1,3]
+>	liftM2 (+) (Just 1) Nothing = Nothing
+
+In many situations, the 'liftM' operations can be replaced by uses of 'ap', which promotes function application. 
+
+>	return f `ap` x1 `ap` ... `ap` xn
+
+is equivalent to 
+
+>	liftMn f x1 x2 ... xn
+
+-}
 foldM             :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
 foldM _ a []      =  return a
 foldM f a (x:xs)  =  f a x >>= \fax -> foldM f fax xs
