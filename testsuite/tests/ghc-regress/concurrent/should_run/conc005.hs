@@ -1,6 +1,6 @@
 module Main where
 
-import Concurrent
+import Control.Concurrent
 
 -- same as conc004, but using the ChannelVar abstraction
 

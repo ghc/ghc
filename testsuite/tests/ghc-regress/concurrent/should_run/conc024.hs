@@ -1,7 +1,7 @@
 module Main where
 
-import Exception
-import Concurrent
+import Control.Exception
+import Control.Concurrent
 import Prelude hiding (catch)
 
 -- illustrates the BlockOnDeadMVar exception

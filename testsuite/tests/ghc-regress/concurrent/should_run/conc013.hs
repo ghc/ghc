@@ -2,7 +2,7 @@ module Main where
 
 -- !!! test Eq and Ord instances over thread Ids.
 
-import Concurrent
+import Control.Concurrent
 
 main = do
   tso1 <- forkIO (return ())

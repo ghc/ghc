@@ -1,6 +1,6 @@
 module Main where
 
-import Concurrent
+import Control.Concurrent
 
 -- This test hopefully exercises the black hole code.  The main thread
 -- forks off another thread and starts on a large computation.  

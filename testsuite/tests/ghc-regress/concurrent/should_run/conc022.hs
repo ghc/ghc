@@ -1,7 +1,7 @@
 -- !!! test tryTakeMVar
 
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 import IO
 
 import GHC.Exts		( fork# )

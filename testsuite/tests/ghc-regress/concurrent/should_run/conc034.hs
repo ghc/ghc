@@ -1,5 +1,5 @@
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 -- !!! Try to get two threads into a knot depending on each other.
 

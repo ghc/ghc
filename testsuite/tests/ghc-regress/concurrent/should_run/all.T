@@ -8,7 +8,7 @@ include ($confdir ++ "/../vanilla-test.T")
 
 def myvtr ( $args_c, $args_r, $ret_res )
 {
-   vtr ( " -package concurrent -package lang -fglasgow-exts " ++ $args_c,
+   vtr ( " -fglasgow-exts " ++ $args_c,
          $args_r, $ret_res )
 }
 

@@ -2,8 +2,8 @@
 
 module Main where
 
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 import IOExts
 
 choose :: a -> a -> IO a

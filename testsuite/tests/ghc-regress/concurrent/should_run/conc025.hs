@@ -3,8 +3,8 @@
 
 module Main where
 
-import Exception
-import Chan
+import Control.Exception
+import Control.Concurrent.Chan
 
 main = do
 	  chan <- newChan

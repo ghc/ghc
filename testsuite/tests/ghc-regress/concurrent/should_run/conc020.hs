@@ -1,5 +1,5 @@
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 main = do
   m <- newEmptyMVar

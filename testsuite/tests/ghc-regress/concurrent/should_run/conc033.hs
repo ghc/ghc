@@ -1,5 +1,5 @@
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 -- !!! test that deadlock is raised as an exception properly
 main = do

@@ -1,4 +1,4 @@
-import Concurrent
+import Control.Concurrent
 import Exception
 import IOExts
 import Weak

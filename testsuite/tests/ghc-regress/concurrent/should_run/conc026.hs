@@ -1,6 +1,6 @@
 -- test for blocking putMVar
 
-import Concurrent
+import Control.Concurrent
 
 main = do
   m <- newMVar ()

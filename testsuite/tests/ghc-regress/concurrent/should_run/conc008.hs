@@ -2,8 +2,8 @@
 
 module Main where
 
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 -- Send ourselves a KillThread signal, catch it and recover.
 

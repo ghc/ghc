@@ -1,7 +1,7 @@
 module Main where
 
-import Concurrent
-import qualified Exception as E
+import Control.Concurrent
+import qualified Control.Exception as E
 
 trapHandler :: MVar Int -> IO ()
 trapHandler inVar =

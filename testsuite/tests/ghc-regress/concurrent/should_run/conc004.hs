@@ -3,7 +3,7 @@ module Main where
 -- Test thread creation.
 -- (from: Einar Wolfgang Karlsen <ewk@Informatik.Uni-Bremen.DE>)
 
-import Concurrent
+import Control.Concurrent
 
 main :: IO ()
 main = do

@@ -2,8 +2,8 @@
 
 module Main where
 
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 -- Raise an exception in another thread.  We need a lot of synchronisation here:
 

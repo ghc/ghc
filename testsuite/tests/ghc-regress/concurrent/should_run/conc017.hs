@@ -1,5 +1,5 @@
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 -- check that async exceptions are restored to their previous
 -- state after an exception is raised and handled.

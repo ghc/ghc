@@ -1,6 +1,6 @@
 -- test tryPutMVar
 
-import Concurrent
+import Control.Concurrent
 
 main = do
   m <- newMVar ()

@@ -1,6 +1,6 @@
 module Main where
 
-import Concurrent
+import Control.Concurrent
 
 main = do
   c <- newChan

@@ -1,6 +1,6 @@
 module Main where
 
-import Concurrent
+import Control.Concurrent
 
 -- simple handshaking using two MVars, 
 -- must context switch twice for each character.

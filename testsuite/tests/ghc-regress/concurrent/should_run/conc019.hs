@@ -1,6 +1,6 @@
 import IO
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 main = do
   forkIO (Exception.catch (do { m <- newEmptyMVar; takeMVar m })

@@ -5,8 +5,8 @@
 -- for all the threads to finish.
 
 import Random
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 n = 5000  -- no. of threads
 m = 3000  -- maximum delay

@@ -1,5 +1,5 @@
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 -- check that we can still kill a thread that is blocked on
 -- delivering an exception to us.

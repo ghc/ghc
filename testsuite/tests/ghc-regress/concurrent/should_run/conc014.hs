@@ -1,5 +1,5 @@
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 -- Test blocking of async exceptions in an exception handler.
 -- The exception raised in the main thread should not be delivered

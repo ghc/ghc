@@ -2,7 +2,7 @@
 -- !!! GHC 5.00.  It involves multiple blocking takes & puts on the
 -- !!! same MVar.
 
-import Concurrent
+import Control.Concurrent
 import IOExts
 
 awk True  True  z     = 1

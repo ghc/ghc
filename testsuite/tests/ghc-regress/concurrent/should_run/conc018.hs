@@ -1,5 +1,5 @@
-import Concurrent
-import Exception
+import Control.Concurrent
+import Control.Exception
 
 -- test that putMVar blocks on a full MVar rather than raising an
 -- exception.
