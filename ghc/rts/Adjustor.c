@@ -88,34 +88,8 @@ execPage (void* addr, pageMode mode)
 #endif
 }
 
-
-static unsigned char __obscure_ccall_ret_code [] = 
 #if defined(i386_TARGET_ARCH)
-/* Now here's something obscure for you:
-
-   When generating an adjustor thunk that uses the C calling
-   convention, we have to make sure that the thunk kicks off
-   the process of jumping into Haskell with a tail jump. Why?
-   Because as a result of jumping in into Haskell we may end
-   up freeing the very adjustor thunk we came from using
-   freeHaskellFunctionPtr(). Hence, we better not return to
-   the adjustor code on our way  out, since it could by then
-   point to junk.
-
-   The fix is readily at hand, just include the opcodes
-   for the C stack fixup code that we need to perform when
-   returning in some static piece of memory and arrange
-   to return to it before tail jumping from the adjustor thunk.
-
-   For this to work we make the assumption that bytes in .data
-   are considered executable.
-*/
-  { 0x83, 0xc4, 0x04 /* addl $0x4, %esp */
-  , 0xc3             /* ret */
-  };
-#else
-/* No such mind-twisters on non-Intel platforms */
-  { };
+static unsigned char *obscure_ccall_ret_code;
 #endif
 
 #if defined(alpha_TARGET_ARCH)
@@ -208,7 +182,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
   <00>: 68 ef be ad de     pushl  $0xdeadbeef  	   # constant is large enough to
         			   	           # hold a StgStablePtr
   <05>:	b8 fa ef ff 00	   movl   $0x00ffeffa, %eax # load up wptr
-  <0a>: 68 ef be ad de     pushl  $__obscure_ccall_ret_code # push the return address
+  <0a>: 68 ef be ad de     pushl  $obscure_ccall_ret_code # push the return address
   <0f>: ff e0              jmp    *%eax            # jump to wptr
 
     The ccall'ing version is a tad different, passing in the return
@@ -216,7 +190,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
     via the stable pointer.) (The auto-generated C stub is in on this
     game, don't worry :-)
 
-    See the comment next to __obscure_ccall_ret_code why we need to
+    See the comment next to obscure_ccall_ret_code why we need to
     perform a tail jump instead of a call, followed by some C stack
     fixup.
 
@@ -234,8 +208,8 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 	adj_code[0x05] = (unsigned char)0xb8;  /* movl  $wptr, %eax */
 	*((StgFunPtr*)(adj_code + 0x06)) = (StgFunPtr)wptr;
 
-	adj_code[0x0a] = (unsigned char)0x68;  /* pushl __obscure_ccall_ret_code */
-	*((StgFunPtr*)(adj_code + 0x0b)) = (StgFunPtr)__obscure_ccall_ret_code;
+	adj_code[0x0a] = (unsigned char)0x68;  /* pushl obscure_ccall_ret_code */
+	*((StgFunPtr*)(adj_code + 0x0b)) = (StgFunPtr)obscure_ccall_ret_code;
 
 	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
 	adj_code[0x10] = (unsigned char)0xe0; 
@@ -587,5 +561,33 @@ freeHaskellFunctionPtr(void* ptr)
 rtsBool
 initAdjustor(void)
 {
-    return execPage(__obscure_ccall_ret_code, pageExecuteRead);
+#if defined(i386_TARGET_ARCH)
+  /* Now here's something obscure for you:
+
+  When generating an adjustor thunk that uses the C calling
+  convention, we have to make sure that the thunk kicks off
+  the process of jumping into Haskell with a tail jump. Why?
+  Because as a result of jumping in into Haskell we may end
+  up freeing the very adjustor thunk we came from using
+  freeHaskellFunctionPtr(). Hence, we better not return to
+  the adjustor code on our way  out, since it could by then
+  point to junk.
+
+  The fix is readily at hand, just include the opcodes
+  for the C stack fixup code that we need to perform when
+  returning in some static piece of memory and arrange
+  to return to it before tail jumping from the adjustor thunk.
+  */
+
+  obscure_ccall_ret_code = stgMallocBytes(4, "initAdjustor");
+
+  obscure_ccall_ret_code[0x00] = (unsigned char)0x83;  /* addl $0x4, %esp */
+  obscure_ccall_ret_code[0x01] = (unsigned char)0xc4;
+  obscure_ccall_ret_code[0x02] = (unsigned char)0x04;
+
+  obscure_ccall_ret_code[0x03] = (unsigned char)0xc3;  /* ret */
+
+  execPage(obscure_ccall_ret_code, pageExecuteRead);
+#endif
+  return rtsTrue;
 }
