@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.163 2001/06/25 17:28:30 sof Exp $
+# $Id: Makefile,v 1.164 2001/06/25 21:08:01 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -96,12 +96,15 @@ SRC_HC_OPTS += -DILX
 endif
 
 #
-# Canonicalize the GHC version number - assume it is has the form x.yy.[z].
+# Canonicalize the GHC version number - assume it is has the form x.yy.[z] or 
+# x.yy[.date] where date = yyyymmdd
 #
-# [First sed substitution gets rid of the '.' - second appends a '0' if the
-#  'z' portion is missing]
+# [First sed substitution gets rid of the '.', second gets rid of the date portion,
+#  third appends a '0' if the z portion is missing]
 #
-CANON_HC_VERSION=$(shell echo "$(GhcVersion)" | sed -e 's/\.//g;s/^\(...\)$$/\10/g')
+CANON_HC_VERSION=$(shell echo "$(GhcVersion)" | sed -e 's/\.//g;s/^\(...\)........$$/\1/g;s/^\(...\)$$/\10/g')
+
+# 20010625
 
 ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
