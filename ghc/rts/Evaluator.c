@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.16 $
- * $Date: 1999/05/11 16:47:50 $
+ * $Revision: 1.17 $
+ * $Date: 1999/07/06 16:40:24 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -473,7 +473,11 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             );
 #endif
 
-    if (++eCount == 0) {
+    if (
+#ifdef DEBUG
+        1 ||
+#endif
+             ++eCount == 0) {
        if (context_switch) {
           xPushCPtr(obj); /* code to restart with */
           RETURN(ThreadYielding);
@@ -532,7 +536,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             fprintf(stderr,"Sp = %p\tSu = %p\tpc = %d\t", xSp, xSu, PC);
                     SSS;
                     disInstr(bco,PC);
-                    { int i;
+                    if (0) { int i;
                     fprintf(stderr,"\n");
                       for (i = 8; i >= 0; i--) 
                          fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(Sp+i)));
@@ -813,6 +817,11 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                     ASSERT(  itbl->type == CONSTR
                           || itbl->type == CONSTR_STATIC
                           || itbl->type == CONSTR_NOCAF_STATIC
+                          || itbl->type == CONSTR_1_0
+                          || itbl->type == CONSTR_0_1
+                          || itbl->type == CONSTR_2_0
+                          || itbl->type == CONSTR_1_1
+                          || itbl->type == CONSTR_0_2
                           );
                     while (--i>=0) {
                         xPushCPtr(payloadCPtr(o,i));
@@ -1341,6 +1350,11 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             goto enterLoop;
         }
     case CONSTR:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_2_0:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
     case CONSTR_INTLIKE:
     case CONSTR_CHARLIKE:
     case CONSTR_STATIC:
@@ -1400,15 +1414,11 @@ StgThreadReturnCode enter( StgClosure* obj0 )
         }
     default:
         {
-            SSS;
-            fprintf(stderr, "enterCountI = %d\n", enterCountI);
-            fprintf(stderr, "panic: enter: entered unknown closure\n"); 
-            printObj(obj);
-            fprintf(stderr, "what it points at is\n");
-            printObj( ((StgEvacuated*)obj) ->evacuee);
-            LLL;
-            exit(1);
-            /* formerly ... */
+            //SSS;
+            //fprintf(stderr, "enterCountI = %d\n", enterCountI);
+            //fprintf(stderr, "entering unknown closure -- yielding to sched\n"); 
+            //printObj(obj);
+            //LLL;
             CurrentTSO->whatNext = ThreadEnterGHC;
             xPushCPtr(obj); /* code to restart with */
             RETURN(ThreadYielding);

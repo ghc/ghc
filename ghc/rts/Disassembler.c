@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/04/27 10:07:19 $
+ * $Revision: 1.7 $
+ * $Date: 1999/07/06 16:40:24 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -120,14 +120,14 @@ static InstrPtr disConstPtr16 ( StgBCO *bco, InstrPtr pc, char* i )
 static InstrPtr disConstInt  ( StgBCO *bco, InstrPtr pc, char* i )
 {
     StgInt x = bcoConstInt(bco,bcoInstr(bco,pc++));
-    fprintf(stderr,"%s %d",i,x);
+    fprintf(stderr,"%s %d (0x%x)",i,x,x);
     return pc;
 }
 
 static InstrPtr disConstInt16 ( StgBCO *bco, InstrPtr pc, char* i )
 {
     StgInt x = bcoConstInt(bco,bcoInstr16(bco,pc)); pc += 2;
-    fprintf(stderr,"%s %d",i,x);
+    fprintf(stderr,"%s %d (0x%x)",i,x,x);
     return pc;
 }
 

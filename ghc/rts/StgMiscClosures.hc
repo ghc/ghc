@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.25 1999/06/08 10:26:39 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.26 1999/07/06 16:40:27 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -501,10 +501,8 @@ SET_STATIC_HDR(forceIO_closure,forceIO_info,CCS_DONTZuCARE,,EI_)
 
 STGFUN(Hugs_CONSTR_entry)
 {
-    Sp -= 1;
-    ((StgPtr*)Sp)[0] = R1.p;
-    /* vectored: JMP_(RET_VEC(((StgPtr*)Sp)[1],constrTag(?))); */
-    JMP_(ENTRY_CODE(((StgPtr*)Sp)[1]));
+    /* R1 points at the constructor */
+    JMP_(ENTRY_CODE(((StgPtr*)Sp)[0]));
 }
 
 #define RET_BCO_ENTRY_TEMPLATE(label) 	\

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/04/27 10:07:15 $
+ * $Revision: 1.9 $
+ * $Date: 1999/07/06 16:40:22 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -1553,6 +1553,16 @@ AsmVar asmClosure( AsmBCO bco, AsmObject p )
     bco->sp += sizeofW(StgPtr);
     return bco->sp;
 }
+
+AsmVar asmGHCClosure( AsmBCO bco, AsmObject p )
+{
+    // A complete hack.  Pushes the address as a tagged int
+    // and then uses SLIDE to get rid of the tag.  Appalling.
+    asmConstInt(bco, (AsmInt)p);
+    emit_i_SLIDE(bco,0,1); bco->sp -= 1;
+    return bco->sp;
+}
+
 
 /* --------------------------------------------------------------------------
  * Building InfoTables

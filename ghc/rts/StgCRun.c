@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.5 1999/03/11 11:21:47 simonm Exp $
+ * $Id: StgCRun.c,v 1.6 1999/07/06 16:40:27 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -38,6 +38,8 @@
 
 static jmp_buf jmp_environment;
 
+#if 0
+
 extern StgThreadReturnCode StgRun(StgFunPtr f)
 {
     jmp_buf save_buf;
@@ -45,7 +47,7 @@ extern StgThreadReturnCode StgRun(StgFunPtr f)
     memcpy((void *) jmp_environment, (void *) save_buf, sizeof(jmp_buf));
     if (setjmp(jmp_environment) == 0) {
 	while ( 1 ) {
-	    IF_DEBUG(evaluator,
+            IF_DEBUG(evaluator,
 		     fprintf(stderr,"Jumping to ");
 		     printPtr((P_)f);
 		     fprintf(stderr,"\n");
@@ -63,6 +65,46 @@ EXTFUN(StgReturn)
 {
     longjmp(jmp_environment, 1);
 }
+
+#else
+
+extern StgThreadReturnCode StgRun(StgFunPtr f)
+{
+    char* nm;
+    while ( f ) {
+
+#if 0
+      //IF_DEBUG(evaluator,
+                fprintf(stderr,"Jumping to ");
+                nm = nameOfObjSym ( f );
+                if (nm)
+                   fprintf(stderr, "%s (%p)", nm, f); else
+                   printPtr((P_)f);
+                fprintf(stderr,"\n");
+		//         );
+if (0&& MainRegTable.rSp) {
+   int i;
+   StgWord* p = MainRegTable.rSp;
+fprintf(stderr, "SP = %p\n", p);
+   p += (8-1);
+   for (i = 0; i < 8; i++, p--)
+      fprintf (stderr, "-- %p: %p\n", p, *p );
+}    
+#endif    
+
+       f = (StgFunPtr) (f)();
+    }
+
+    return (StgThreadReturnCode)R1.i;
+}
+
+EXTFUN(StgReturn)
+{
+   return 0;
+}
+#endif
+
+
 
 #else /* !USE_MINIINTERPRETER */
 
