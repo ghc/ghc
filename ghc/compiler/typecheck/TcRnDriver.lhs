@@ -69,7 +69,8 @@ import HscTypes		( ModGuts(..), HscEnv(..),
 			  emptyFixityEnv
 			)
 #ifdef GHCI
-import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), LStmt, LHsExpr,
+import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), 
+			  LStmt, LHsExpr, LHsType,
 			  collectStmtsBinders, mkSimpleMatch, placeHolderType,
 			  nlLetStmt, nlExprStmt, nlBindStmt, nlResultStmt, nlVarPat )
 import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
