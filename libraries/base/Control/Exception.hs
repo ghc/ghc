@@ -260,7 +260,7 @@ tryJust p a = do
 -- Dynamic exceptions
 
 -- $dynamic
--- Because the 'Exception' datatype is not extensible, there is an
+--  #DynamicExceptions# Because the 'Exception' datatype is not extensible, there is an
 -- interface for throwing and catching exceptions of type 'Dynamic'
 -- (see "Data.Dynamic") which allows exception values of any type in
 -- the 'Typeable' class to be thrown and caught.
@@ -393,7 +393,7 @@ bracket_ before after thing = bracket before (const after) (const thing)
 
 {- $async
 
-Asynchronous exceptions are so-called because they arise due to
+ #AsynchronousExceptions# Asynchronous exceptions are so-called because they arise due to
 external influences, and can be raised at any point during execution.
 'StackOverflow' and 'HeapOverflow' are two examples of
 system-generated asynchronous exceptions.

@@ -445,7 +445,7 @@ showHandle p h duplex =
 -- |The type of exceptions.  Every kind of system-generated exception
 -- has a constructor in the 'Exception' type, and values of other
 -- types may be injected into 'Exception' by coercing them to
--- 'Dynamic' (see the section on Dynamic Exceptions).
+-- 'Dynamic' (see the section on Dynamic Exceptions: "Control.Exception\#DynamicExceptions").
 --
 -- For backwards compatibility with Haskell 98, 'IOError' is a type synonym
 -- for 'Exception'.
@@ -464,7 +464,7 @@ data Exception
 	-- fails.  The 'String' argument contains the
 	-- location of the assertion in the source program.
   | AsyncException	AsyncException
-	-- ^Asynchronous exceptions (see section on Asynchronous Exceptions).
+	-- ^Asynchronous exceptions (see section on Asynchronous Exceptions: "Control.Exception\#AsynchronousExceptions").
   | BlockedOnDeadMVar
 	-- ^The current thread was executing a call to
 	-- 'takeMVar' that could never return, because there are no other
@@ -474,7 +474,7 @@ data Exception
 	-- deadlocked.  The 'Deadlock' exception is
 	-- raised in the main thread only (see also: "Control.Concurrent").
   | DynException	Dynamic
-	-- ^Dynamically typed exceptions (see section on Dynamic Exceptions).
+	-- ^Dynamically typed exceptions (see section on Dynamic Exceptions: "Control.Exception\#DynamicExceptions").
   | ErrorCall		String
 	-- ^The 'ErrorCall' exception is thrown by 'error'.  The 'String'
 	-- argument of 'ErrorCall' is the string passed to 'error' when it was
