@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.34 $
- * $Date: 2000/01/11 17:09:38 $
+ * $Revision: 1.35 $
+ * $Date: 2000/01/12 10:30:09 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -523,7 +523,7 @@ Int what; {
            linkPreludeCM();
            linkPreludeNames();
            name(nameNil).stgVar
-              = mkCPtr(lookupOTabName(modulePrelBase, "PrelBase_ZMZN_closure"));
+              = mkCPtr(lookupOTabName(modulePrelBase, "PrelBase_ZMZN_static_closure"));
            name(nameCons).stgVar 
               = mkCPtr(lookupOTabName(modulePrelBase, "PrelBase_ZC_closure"));
 #endif
@@ -564,6 +564,10 @@ Int what; {
                typeArrow = addPrimTycon(findText("(->)"),
                                         pair(STAR,pair(STAR,STAR)),
                                         2,DATATYPE,NIL);
+
+               pFun(nameInd, "_indirect");
+               name(nameInd).number = DFUNNAME;
+
            } else {
 
                modulePrelude = newModule(textPrelude);
