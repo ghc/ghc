@@ -483,6 +483,7 @@ collectArgs expr
      --   This doesn't look right (i.e., Plain Wrong),
      --   collectArgs should return the the function and
      --   not the whole expr.      -- Laszlo 8/98
+
 \end{code}
 
 
