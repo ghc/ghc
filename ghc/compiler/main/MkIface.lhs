@@ -14,13 +14,15 @@ import HsSyn
 import HsCore		( HsIdInfo(..), UfExpr(..), toUfExpr, toUfBndr )
 import HsTypes		( toHsTyVars )
 import BasicTypes	( Fixity(..), NewOrData(..),
-			  Version, bumpVersion, isLoopBreaker
+			  Version, initialVersion, bumpVersion, isLoopBreaker
 			)
 import RnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import TcHsSyn		( TypecheckedRuleDecl )
 import HscTypes		( VersionInfo(..), IfaceDecls(..), ModIface(..), ModDetails(..),
-			  TyThing(..), DFunId, TypeEnv, isTyClThing
+			  TyThing(..), DFunId, TypeEnv, isTyClThing, Avails,
+			  WhatsImported(..), GenAvailInfo(..), RdrAvailInfo,
+			  ImportVersion
 			)
 
 import CmdLineOpts
@@ -42,6 +44,7 @@ import Name		( isLocallyDefined, getName,
 			  plusNameEnv, lookupNameEnv, emptyNameEnv, mkNameEnv,
 			  extendNameEnv, lookupNameEnv_NF, nameEnvElts
 			)
+import OccName		( pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize
 			)
@@ -50,8 +53,10 @@ import FieldLabel	( fieldLabelType )
 import Type		( splitSigmaTy, tidyTopType, deNoteType )
 import SrcLoc		( noSrcLoc )
 import Outputable
+import Module		( ModuleName, moduleName )
 
 import List		( partition )
+import IO		( IOMode(..), openFile, hClose )
 \end{code}
 
 
@@ -597,8 +602,8 @@ diffDecls old_vers old_fixities new_fixities old new
 %************************************************************************
 
 \begin{code}
-writeIface :: Finder -> ModIface -> IO ()
-writeIface finder mod_iface
+--writeIface :: Finder -> ModIface -> IO ()
+writeIface {-finder-} mod_iface
   = do	{ let filename = error "... find the right file..."
 	; if_hdl <- openFile filename WriteMode
 	; printForIface if_hdl (pprIface mod_iface)
@@ -614,7 +619,7 @@ pprIface iface
 		<+> int opt_HiVersion
 		<+> ptext SLIT("where")
 
-	, pprExports (mi_exports iface)
+	, pprExport (mi_exports iface)
 	, vcat (map pprUsage (mi_usages iface))
 
 	, pprIfaceDecls (vers_decls version_info) 
@@ -624,7 +629,7 @@ pprIface iface
 	, pprDeprecs (mi_deprecs iface)
 	]
   where
-    version_info = mi_version mod_iface
+    version_info = mi_version iface
     exp_vers     = vers_exports version_info
     rule_vers	 = vers_rules version_info
 
@@ -640,12 +645,12 @@ When printing export lists, we print like this:
 \begin{code}
 pprExport :: (ModuleName, Avails) -> SDoc
 pprExport (mod, items)
- = hsep [ ptext SLIT("__export "), ppr mod, hsep (map upp_avail items) ] <> semi
+ = hsep [ ptext SLIT("__export "), ppr mod, hsep (map pp_avail items) ] <> semi
   where
     pp_avail :: RdrAvailInfo -> SDoc
     pp_avail (Avail name)      = pprOccName name
     pp_avail (AvailTC name []) = empty
-    pp_avail (AvailTC name ns) = hcat [pprOccName name, bang, upp_export ns']
+    pp_avail (AvailTC name ns) = hcat [pprOccName name, bang, pp_export ns']
 				where
 				  bang | name `elem` ns = empty
 				       | otherwise	= char '|'
@@ -659,7 +664,7 @@ pprExport (mod, items)
 \begin{code}
 pprUsage :: ImportVersion Name -> SDoc
 pprUsage (m, has_orphans, is_boot, whats_imported)
-  = hsep [ptext SLIT("import"), pprModuleName m, 
+  = hsep [ptext SLIT("import"), ppr (moduleName m), 
 	  pp_orphan, pp_boot,
 	  pp_versions whats_imported
     ] <> semi
@@ -696,8 +701,8 @@ pprIfaceDecls version_map fixity_map decls
 		   Just v  -> int v
 
 	-- Print fixities relevant to the decl
-    ppr_fixes d = vcat (map ppr_fix (fixities d))
-    fixities d  = [ ppr fix <+> ppr n <> semi
+    ppr_fixes d = vcat (map ppr_fix d)
+    ppr_fix d   = [ ppr fix <+> ppr n <> semi
 		  | n <- tyClDeclNames d, 
 		    [Just fix] <- lookupNameEnv fixity_map n
 		  ]

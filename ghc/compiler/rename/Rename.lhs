@@ -4,7 +4,7 @@
 \section[Rename]{Renaming and dependency analysis passes}
 
 \begin{code}
-module Rename ( renameModule, closeIfaceDecls ) where
+module Rename ( renameModule, closeIfaceDecls, checkOldIface ) where
 
 #include "HsVersions.h"
 

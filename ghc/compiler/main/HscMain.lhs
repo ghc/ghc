@@ -8,7 +8,8 @@ module HscMain ( hscMain ) where
 
 #include "HsVersions.h"
 
-import IO		( hPutStr, stderr )
+import Monad		( when )
+import IO		( hPutStr, hClose, stderr, openFile, IOMode(..) )
 import HsSyn
 
 import RdrHsSyn		( RdrNameHsModule )
@@ -18,11 +19,11 @@ import Parser		( parse )
 import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
 
-import Rename		( renameModule )
+import Rename		( renameModule, checkOldIface )
 
 import PrelInfo		( wiredInThings )
 import PrelRules	( builtinRules )
-import MkIface		( writeIface )
+import MkIface		( completeIface, mkModDetailsFromIface )
 import TcModule		( TcResults(..), typecheckModule )
 import Desugar		( deSugar )
 import SimplCore	( core2core )
@@ -35,15 +36,29 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
-import Module		( ModuleName, moduleNameUserString )
+import Module		( ModuleName, moduleNameUserString, 
+			  moduleUserString, moduleName )
 import CmdLineOpts
 import ErrUtils		( ghcExit, doIfSet, dumpIfSet )
 import UniqSupply	( mkSplitUniqSupply )
 
+import Bag		( emptyBag )
 import Outputable
 import Char		( isSpace )
-import StgInterp	( runStgI )
+import StgInterp	( stgToInterpSyn )
 import HscStats		( ppSourceStats )
+import HscTypes		( ModDetails, ModIface, PersistentCompilerState(..),
+			  PersistentRenamerState(..), WhatsImported(..),
+			  HomeSymbolTable, PackageSymbolTable, ImportVersion, 
+			  GenAvailInfo(..), RdrAvailInfo, OrigNameEnv(..),
+			  PackageRuleBase )
+import RnMonad		( ExportItem, ParsedIface(..) )
+import CmSummarise	( ModSummary )
+import InterpSyn	( UnlinkedIBind )
+import StgInterp	( ItblEnv )
+import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
+import OccName		( OccName, pprOccName )
+import Name		( Name, nameModule )
 \end{code}
 
 
@@ -69,7 +84,7 @@ data HscResult
 hscMain
   :: DynFlags	
   -> ModSummary       -- summary, including source filename
-  -> Maybe ModIFace   -- old interface, if available
+  -> Maybe ModIface   -- old interface, if available
   -> String	      -- file in which to put the output (.s, .hc, .java etc.)
   -> HomeSymbolTable		-- for home module ModDetails
   -> PersistentCompilerState    -- IN: persistent compiler state
@@ -90,7 +105,7 @@ hscMain dflags core_cmds stg_cmds summary maybe_old_iface
       let no_old_iface = not (isJust maybe_checked_iface)
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
-
+      ;
       return (what_next dflags core_cmds stg_cmds summary hit hst 
                         pcs2 maybe_checked_iface)
       }}
@@ -99,13 +114,13 @@ hscMain dflags core_cmds stg_cmds summary maybe_old_iface
 hscNoRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
  = do {
       -- we definitely expect to have the old interface available
-      old_iface = case maybe_old_iface of 
-                     Just old_if -> old_if
-                     Nothing -> panic "hscNoRecomp:old_iface"
-
+      let old_iface = case maybe_old_iface of 
+                         Just old_if -> old_if
+                         Nothing -> panic "hscNoRecomp:old_iface"
+      ;
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
-         <- closeIfaceDecls dflags finder hit hst pcs old_iface
+         <- closeIfaceDecls dflags finder hit hst pcs old_iface ;
       if closure_errs then 
          return (HscFail cl_pcs) 
       else do {
@@ -124,10 +139,10 @@ hscNoRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
           local_classes = tc_classes tc_result
           local_insts   = tc_insts tc_result
           local_rules   = tc_rules tc_result
-
+      ;
       -- create a new details from the closed, typechecked, old iface
       let new_details = mkModDetailsFromIface env_tc local_insts local_rules
-
+      ;
       return (HscOK final_details
 		    Nothing -- tells CM to use old iface and linkables
 		    Nothing Nothing -- foreign export stuff
@@ -139,8 +154,8 @@ hscNoRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
 hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
  = do {
       -- what target are we shooting for?
-      let toInterp = dopt_HscLang dflags == HscInterpreted;
-
+      let toInterp = dopt_HscLang dflags == HscInterpreted
+      ;
       -- PARSE
       maybe_parsed <- myParseModule dflags summary;
       case maybe_parsed of {
@@ -167,29 +182,29 @@ hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
           local_tycons  = tc_tycons tc_result
           local_classes = tc_classes tc_result
           local_insts   = tc_insts tc_result
-
+      ;
       -- DESUGAR, SIMPLIFY, TIDY-CORE
       -- We grab the the unfoldings at this point.
       (tidy_binds, orphan_rules, foreign_stuff)
          <- dsThenSimplThenTidy dflags mod tc_result ds_uniqs
-
+      ;
       -- CONVERT TO STG
       (stg_binds, cost_centre_info, top_level_ids) 
          <- myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
-
+      ;
       -- cook up a new ModDetails now we (finally) have all the bits
       let new_details = mkModDetails tc_env local_insts tidy_binds 
 			             top_level_ids orphan_rules
-
+      ;
       -- and possibly create a new ModIface
       let maybe_final_iface = completeIface maybe_old_iface new_iface new_details 
-
+      ;
       -- do the rest of code generation/emission
       (maybe_ibinds, maybe_stub_h_filename, maybe_stub_c_filename) 
          <- restOfCodeGeneration toInterp
                                  this_mod imported_modules cost_centre_info 
                                  fe_binders tc_env stg_binds
-
+      ;
       -- and the answer is ...
       return (HscOK new_details maybe_final_iface 
 		    maybe_stub_h_filename maybe_stub_c_filename
@@ -203,10 +218,11 @@ myParseModule dflags summary
       -- _scc_     "Parser"
 
       let src_filename -- name of the preprocessed source file
-         = case ms_ppsource summary of
-              Just (filename, fingerprint) -> filename
-              Nothing -> pprPanic "myParseModule:summary is not of a source module"
-                                  (ppr summary)
+            = case ms_ppsource summary of
+                 Just (filename, fingerprint) -> filename
+                 Nothing -> pprPanic 
+                               "myParseModule:summary is not of a source module"
+                               (ppr summary)
 
       buf <- hGetStringBuffer True{-expand tabs-} src_filename
 
@@ -217,8 +233,8 @@ myParseModule dflags summary
 	 		     context = [], glasgow_exts = glaexts,
 			     loc = mkSrcLoc src_filename 1 } of {
 
-	PFailed err -> do hPutStrLn stderr (showSDoc err)
-                          return Nothing
+	PFailed err -> do { hPutStrLn stderr (showSDoc err);
+                            return Nothing };
 	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) ->
 
       dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_module)
@@ -226,6 +242,7 @@ myParseModule dflags summary
 			   (ppSourceStats False rdr_module)
 
       return (Just rdr_module)
+      }
 
 
 restOfCodeGeneration toInterp this_mod imported_modules cost_centre_info 
@@ -295,34 +312,6 @@ myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
 
 #if 0
 -- BEGIN old stuff
-	--------------------------  Reader  ----------------
-    show_pass "Parser"	>>
-    _scc_     "Parser"
-
-    let src_filename -- name of the preprocessed source file
-       = case ms_ppsource summary of
-            Just (filename, fingerprint) -> filename
-            Nothing -> pprPanic "hscMain:summary is not of a source module"
-                                (ppr summary)
-
-    buf <- hGetStringBuffer True{-expand tabs-} src_filename
-
-    let glaexts | dopt Opt_GlasgowExts dflags = 1#
-		| otherwise 		      = 0#
-
-    case parse buf PState{ bol = 0#, atbol = 1#,
-		           context = [], glasgow_exts = glaexts,
-		           loc = mkSrcLoc src_filename 1 } of {
-
-	PFailed err -> return (HscErrs pcs (unitBag err) emptyBag)
-
-	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) ->
-
-    dumpIfSet (dopt_D_dump_parsed flags) "Parser" (ppr rdr_module) >>
-
-    dumpIfSet (dopt_D_source_stats flags) "Source Statistics"
-	(ppSourceStats False rdr_module)	 	>>
-
     -- UniqueSupplies for later use (these are the only lower case uniques)
     mkSplitUniqSupply 'd'	>>= \ ds_uniqs 	-> -- desugarer
     mkSplitUniqSupply 'r'	>>= \ ru_uniqs 	-> -- rules
@@ -330,87 +319,6 @@ myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
     mkSplitUniqSupply 'g'	>>= \ st_uniqs  -> -- stg-to-stg passes
     mkSplitUniqSupply 'n'	>>= \ ncg_uniqs -> -- native-code generator
 
-	--------------------------  Rename  ----------------
-    show_pass "Renamer" 			>>
-    _scc_     "Renamer"
-
-    renameModule dflags finder pcs hst rdr_module	
-						>>= \ (pcs_rn, maybe_rn_stuff) ->
-    case maybe_rn_stuff of {
-	Nothing -> 	-- Hurrah!  Renamer reckons that there's no need to
-			-- go any further
-			reportCompile mod_name "Compilation NOT required!" >>
-			return ();
-	
-	Just (this_mod, rn_mod, 
-	      old_iface, new_iface,
-	      rn_name_supply, fixity_env,
-	      imported_modules) ->
-			-- Oh well, we've got to recompile for real
-
-
-	--------------------------  Typechecking ----------------
-    show_pass "TypeCheck" 				>>
-    _scc_     "TypeCheck"
-    typecheckModule dflags mod pcs hst hit pit rn_mod
-    --                tc_uniqs rn_name_supply
-    --		    fixity_env rn_mod	        
-						>>= \ maybe_tc_stuff ->
-    case maybe_tc_stuff of {
-	Nothing -> ghcExit 1;	-- Type checker failed
-
-	Just (tc_results@(TcResults {tc_tycons  = local_tycons, 
-		   	 	     tc_classes = local_classes, 
-		   	 	     tc_insts   = inst_info })) ->
-
-
-	--------------------------  Desugaring ----------------
-    _scc_     "DeSugar"
-    deSugar this_mod ds_uniqs tc_results	>>= \ (desugared, rules, h_code, c_code, fe_binders) ->
-
-
-	--------------------------  Main Core-language transformations ----------------
-    _scc_     "Core2Core"
-    core2core core_cmds desugared rules		>>= \ (simplified, orphan_rules) ->
-
-	-- Do the final tidy-up
-    tidyCorePgm this_mod
-		simplified orphan_rules		>>= \ (tidy_binds, tidy_orphan_rules) -> 
-
-	-- Run the occurrence analyser one last time, so that
-	-- dead binders get dead-binder info.  This is exploited by
-	-- code generators to avoid spitting out redundant bindings.
-	-- The occurrence-zapping in Simplify.simplCaseBinder means
-	-- that the Simplifier nukes useful dead-var stuff especially
-	-- in case patterns.
-    let occ_anal_tidy_binds = occurAnalyseBinds tidy_binds in
-
-    coreBindsSize occ_anal_tidy_binds `seq`
---	TEMP: the above call zaps some space usage allocated by the
---	simplifier, which for reasons I don't understand, persists
---	thoroughout code generation
-
-
-
-	--------------------------  Convert to STG code -------------------------------
-    show_pass "Core2Stg" 			>>
-    _scc_     "Core2Stg"
-    let
-	stg_binds   = topCoreBindsToStg c2s_uniqs occ_anal_tidy_binds
-    in
-
-	--------------------------  Simplify STG code -------------------------------
-    show_pass "Stg2Stg" 			 >>
-    _scc_     "Stg2Stg"
-    stg2stg stg_cmds this_mod st_uniqs stg_binds >>= \ (stg_binds2, cost_centre_info) ->
-
-#ifdef GHCI
-    runStgI local_tycons local_classes 
-                         (map fst stg_binds2)    >>= \ i_result ->
-    putStr ("\nANSWER = " ++ show i_result ++ "\n\n")
-    >>
-
-#else
 	--------------------------  Interface file -------------------------------
 	-- Dump instance decls and type signatures into the interface file
     _scc_     "Interface"
@@ -444,9 +352,6 @@ myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
 	--------------------------  Final report -------------------------------
     reportCompile mod_name (showSDoc (ppSourceStats True rdr_module)) >>
 
-#endif
-
-
     ghcExit 0
     } }
   where
@@ -471,21 +376,14 @@ myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
 \begin{code}
 initPersistentCompilerState :: IO PersistentCompilerState
 initPersistentCompilerState 
-<<<<<<< HscMain.lhs
   = do prs <- initPersistentRenamerState
        return (
         PCS { pcs_PST   = initPackageDetails,
 	      pcs_insts = emptyInstEnv,
 	      pcs_rules = emptyRuleEnv,
-	      pcs_PRS   = initPersistentRenamerState 
+	      pcs_PRS   = prs
             }
         )
-=======
-  = PCS { pcs_PST   = initPackageDetails,
-	  pcs_insts = emptyInstEnv,
-	  pcs_rules = initRules,
-	  pcs_PRS   = initPersistentRenamerState }
->>>>>>> 1.12
 
 initPackageDetails :: PackageSymbolTable
 initPackageDetails = extendTypeEnv emptyModuleEnv wiredInThings
@@ -494,7 +392,7 @@ initPersistentRenamerState :: IO PersistentRenamerState
   = do ns <- mkSplitUniqSupply 'r'
        return (
         PRS { prsOrig  = Orig { origNames  = initOrigNames,
-			       origIParam = emptyFM },
+			        origIParam = emptyFM },
 	      prsDecls = emptyNameEnv,
 	      prsInsts = emptyBag,
 	      prsRules = emptyBag,
@@ -509,7 +407,7 @@ initOrigNames = grab knownKeyNames `plusFM` grab (map getName wiredInThings)
 		add env name = addToFM env (moduleName (nameModule name), nameOccName name) name
 
 
-initRules :: RuleEnv
+initRules :: PackageRuleBase
 initRules = foldl add emptyVarEnv builtinRules
 	  where
 	    add env (name,rule) = extendNameEnv_C add1 env name [rule]
@@ -560,6 +458,7 @@ writeIface this_mod old_iface new_iface
     full_new_iface = completeIface new_iface local_tycons local_classes
 				   	     inst_info final_ids tidy_binds
 					     tidy_orphan_rules
+    isNothing = not . isJust
 \end{code}
 
 
@@ -624,7 +523,7 @@ pprExport (mod, items)
 \begin{code}
 pprUsage :: ImportVersion OccName -> SDoc
 pprUsage (m, has_orphans, is_boot, whats_imported)
-  = hsep [ptext SLIT("import"), pprModuleName m, 
+  = hsep [ptext SLIT("import"), ppr (moduleName m), 
 	  pp_orphan, pp_boot,
 	  upp_import_versions whats_imported
     ] <> semi
