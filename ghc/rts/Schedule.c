@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.166 2003/04/01 15:05:15 sof Exp $
+ * $Id: Schedule.c,v 1.167 2003/04/02 00:28:59 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2619,7 +2619,7 @@ performGCWithRoots(void (*get_roots)(evac_fn))
 static StgTSO *
 threadStackOverflow(StgTSO *tso)
 {
-  nat new_stack_size, new_tso_size, diff, stack_words;
+  nat new_stack_size, new_tso_size, stack_words;
   StgPtr new_sp;
   StgTSO *dest;
 
@@ -2660,8 +2660,7 @@ threadStackOverflow(StgTSO *tso)
   memcpy(new_sp, tso->sp, stack_words * sizeof(W_));
 
   /* relocate the stack pointers... */
-  diff = (P_)new_sp - (P_)tso->sp; /* In *words* */
-  dest->sp    = new_sp;
+  dest->sp         = new_sp;
   dest->stack_size = new_stack_size;
 	
   /* Mark the old TSO as relocated.  We have to check for relocated
