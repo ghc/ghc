@@ -88,6 +88,7 @@ Package {
          , "-u", "_GHCziFloat_Fzh_con_info"
          , "-u", "_GHCziFloat_Dzh_con_info"
          , "-u", "_GHCziPtr_Ptr_con_info"
+         , "-u", "_GHCziPtr_FunPtr_con_info"
          , "-u", "_GHCziStable_StablePtr_con_info"
          , "-u", "_GHCziBase_False_closure"
          , "-u", "_GHCziBase_True_closure"
