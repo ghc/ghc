@@ -889,9 +889,35 @@ resets the &ldquo;import directories&rdquo; list back to nothing.
 <Para>
 <IndexTerm><Primary>-fno-implicit-prelude option</Primary></IndexTerm>
 GHC normally imports <Filename>Prelude.hi</Filename> files for you.  If you'd rather it
-didn't, then give it a <Option>-fno-implicit-prelude</Option> option.  You are
-unlikely to get very far without a Prelude, but, hey, it's a free
-country.
+didn't, then give it a <Option>-fno-implicit-prelude</Option> option.  
+The idea is that you can then import a Prelude of your own.  (But don't call it <Literal>Prelude</Literal>;
+the Haskell module namespace is flat, and you must not conflict with any Prelude module.)
+</Para>
+<Para>
+Even though you have not imported the Prelude, all the built-in syntax still refers to 
+the built-in Haskell Prelude types and values, as specified by the Haskell Report.  
+For example, the type <Literal>[Int]</Literal>
+still means <Literal>Prelude.[] Int</Literal>; tuples continue to refer to the standard Prelude
+tuples; the translation for list comprehensions continues to use <Literal>Prelude.map</Literal> etc.
+</Para>
+<Para> With one group of exceptions!  You may want to define your own numeric class hierarchy.
+It completely defeats that purpose if the literal "1" means "<Literal>Prelude.fromInteger 1</Literal>",
+which is what the Haskell Report specifies.  So the <Option>-fno-implicit-prelude</Option> flag causes
+the following pieces of built-in syntax to refer to whatever is in scope, not the Prelude versions:
+<ItemizedList>
+<ListItem> 
+Integer and fractional literals mean "<Literal>fromInteger 1</Literal>" and "<Literal>fromRational 3.2</Literal>",
+not the Prelude-qualified versions; both in expressions and in patterns.
+</ListItem>
+<ListItem>
+Negation (e.g. "<Literal>- (f x)</Literal>") means "<Literal>negate (f x)</Literal>" (not <Literal>Prelude.negate</Literal>).
+</ListItem>
+<ListItem>
+In an n+k pattern, the standard Prelude <Literal>OrdK/Literal> class is used for comparison, but the 
+necessary subtraction uses 
+whatever "<Literal>(-)</Literal>" is in scope (not "<Literal>Prelude.(-)</Literal>").
+</ListItem>
+</ItemizedList>
 </Para>
 </ListItem>
 </VarListEntry>
