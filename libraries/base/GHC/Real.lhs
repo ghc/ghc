@@ -262,7 +262,8 @@ instance  (Integral a)  => Show (Ratio a)  where
     {-# SPECIALIZE instance Show Rational #-}
     showsPrec p (x:%y)	=  showParen (p > ratioPrec) $
 			   showsPrec ratioPrec1 x . 
-			   showString " % " . 
+			   showString "%" . 	-- H98 report has spaces round the %
+						-- but we removed them [May 04]
 			   showsPrec ratioPrec1 y
 
 instance  (Integral a)	=> Enum (Ratio a)  where
