@@ -1941,7 +1941,25 @@ sub runHsc {
     }
 
     local($to_do);
-    $to_do = "$HsC @HsP_flags ,$hscpp_hsc $dump @HsC_flags $CoreLint $StgLint $Verbose $output +RTS @HsC_rts_flags";
+    # Win32 only: If the command processor used by system()
+    # exec()s the application as an ordinary Win32 executable,
+    # we're in trouble here, since the command line is likely
+    # to be > 255 chars long. To work around this situation,
+    # $HsC also understands `at-files',  i.e., `@file' on the
+    # command line will cause $HsC to add the contents of `file'
+    # to the command line.
+    #
+    #  [ Note: support for `at-files' is not compiled in by default ]
+    $cmd_line_opts_via_at_file=0;
+    if ($cmd_line_opts_via_at_file) {
+      local($to_do_opts) = "$Tmp_prefix.opts";
+      open(OPTS, "> $Tmp_prefix.opts") || &tidy_up_and_die(1,"Can't open $Tmp_prefix.opts\n");
+      print OPTS "$dump @HsC_flags $CoreLint $StgLint $Verbose";
+      close(OPTS);
+      $to_do = "$HsC @HsP_flags ,$hscpp_hsc \@$Tmp_prefix.opts $output +RTS @HsC_rts_flags";
+    } else {
+      $to_do = "$HsC @HsP_flags ,$hscpp_hsc $dump @HsC_flags $CoreLint $StgLint $Verbose $output +RTS @HsC_rts_flags";
+    }
     &run_something($to_do, 'Haskell compiler');
 
     # finish business w/ nofibbish time/bytes-alloc stats
@@ -2056,7 +2074,6 @@ EOINCL
     # heave in the consistency info
     print TMP "static char ghc_cc_ID[] = \"\@(#)cc $ifile\t$Cc_major_version.$Cc_minor_version,$Cc_consist_options\";\n";
 
-    # and #include the real source
     print TMP "#include \"$hsc_out\"\n";
     close(TMP) || &tidy_up_and_die(1,"Failed writing to $cc_help\n");
 
@@ -2248,7 +2265,6 @@ sub run_something {
         if ($Using_dump_file) {
 	    print STDERR "Compilation Errors dumped in $Specific_dump_file\n";
 	}
-
 	&tidy_up_and_die($return_val, '');
     }
     $Using_dump_file = 0;
@@ -2448,8 +2464,7 @@ sub add_syslib {
 
     push(@SysLibrary, "-lHS$syslib");
     push(@SysLibrary, "-lHS${syslib}_cbits")
-          unless $syslib eq 'contrib' || $syslib eq 'exts' || $syslib eq 'concurrent';
-	  #HACK! they have no cbits
+          unless $syslib =~ /^(contrib|exts|conc|win32)$/; #HACK! have no cbits
 }
 \end{code}
 
@@ -2798,7 +2813,7 @@ arg: while($_ = $Args[0]) {
 
     /^-syslib(.*)/  && do { local($syslib) = &grab_arg_arg(*Args,'-syslib',$1);
 			    print STDERR "$Pgm: no such system library (-syslib): $syslib\n",
-			      $Status++ unless $syslib =~ /^(exts|misc|posix)$/;
+			      $Status++ unless $syslib =~ /^(exts|misc|posix|win32)$/;
 
 			    #
 			    # The posix library is a `special' in that it relies on
@@ -2811,9 +2826,13 @@ arg: while($_ = $Args[0]) {
 			    if ( $syslib eq 'posix' ) {
 				&add_syslib('misc');
 			    } elsif ( $syslib eq 'misc' && 
-				      $TargetName =~ /-solaris2$/ ) {
+				      $TargetPlatform =~ /-solaris2$/ ) {
 				# needed for Berkeley socket/nwork stuff.
 				push(@SysLibrary, '-lnsl');
+			    } elsif ( $syslib eq 'win32' && 
+				      $TargetPlatform =~ /-cygwin32$/ ) {
+				# need to get at UI/Graphics functionality.
+				push(@SysLibrary, '-luser32 -lgdi32');
 			    }
 			    next arg; };
 
