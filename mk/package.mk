@@ -1,12 +1,14 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.34 2004/01/09 12:43:37 simonmar Exp $
+# $Id: package.mk,v 1.35 2004/01/23 13:37:40 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
+ifeq "$(STANDALONE_PACKAGE)" ""
 ifeq "$(ProjectNameShort)" "ghc"
 STANDALONE_PACKAGE = NO
 else
 STANDALONE_PACKAGE = YES
+endif
 endif
 
 # -----------------------------------------------------------------------------
@@ -20,16 +22,13 @@ else
 PKGCONF_CPP_EXTRA_OPTS =
 endif
 
-ifeq "$(STANDALONE_PACKAGE)" "NO"
 package.conf.inplace   : package.conf.in
-	$(CPP) $(RAWCPP_FLAGS) $(PKGCONF_CPP_EXTRA_OPTS) -x c $(PACKAGE_CPP_OPTS) $< \
-		| sed 's/^#.*$$//g' >$@
+	$(CPP) $(RAWCPP_FLAGS) -P $(PKGCONF_CPP_EXTRA_OPTS) -x c $(PACKAGE_CPP_OPTS) $< | \
+	sed -e 's/""//g' -e 's/, ]/ ]/g' >$@
 
 package.conf.installed : package.conf.in
-	$(CPP) $(RAWCPP_FLAGS) $(PKGCONF_CPP_EXTRA_OPTS) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< \
-		| sed 's/^#.*$$//g' >$@
-
-endif
+	$(CPP) $(RAWCPP_FLAGS) -P $(PKGCONF_CPP_EXTRA_OPTS) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< | \
+	sed -e 's/""//g' -e 's/, ]/ ]/g' >$@
 
 # we could be more accurate here and add a dependency on
 # ghc/driver/package.conf, but that doesn't work too well because of
@@ -64,15 +63,18 @@ PACKAGE_CPP_OPTS += -DPACKAGE=\"${PACKAGE}\"
 PACKAGE_CPP_OPTS += -DPACKAGE_DEPS='$(patsubst %,"%"$(comma),$(PACKAGE_DEPS))'
 PACKAGE_CPP_OPTS += -DLIBRARY=\"HS$(PACKAGE)\"
 PACKAGE_CPP_OPTS += -DLIBDIR=\"$(libdir)\"
+PACKAGE_CPP_OPTS += -DFPTOOLS_TOP_ABS=\"${FPTOOLS_TOP_ABS}\"
 
 # Let the package configuration file refer to $(libdir) as
 # ${pkglibdir}.  Note we can't use ${libdir} because ghc-pkg already
 # redefines it to point to GHC's libdir (bug or feature?).
 #
-install :: package.conf.in
-	$(CPP) $(RAWCPP_FLAGS) $(PKGCONF_CPP_EXTRA_OPTS) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< \
-	| sed -e 's/^#.*$$//g' -e 's/""//g' -e 's/, ]/ ]/g' \
-	| $(GHC_PKG) --force --update-package
+install :: package.conf.installed
+	$(GHC_PKG) --force --update-package <package.conf.installed
+
+# Invoke this rule by hand in order to use the package in-place
+install-inplace-pkg : package.conf.inplace
+	$(GHC_PKG) --force --update-package <package.conf.inplace
 
 endif # $(STANDALONE_PACKAGE)
 
