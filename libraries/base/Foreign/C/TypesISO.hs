@@ -41,6 +41,7 @@ import GHC.Read
 import GHC.Num
 #endif
 
+#include "Dynamic.h"
 #include "CTypes.h"
 
 INTEGRAL_TYPE(CPtrdiff,tyConCPtrdiff,"CPtrdiff",HTYPE_PTRDIFF_T)
@@ -71,10 +72,3 @@ data CJmpBuf = CJmpBuf
 -- C99 types which are still missing include:
 -- intptr_t, uintptr_t, intmax_t, uintmax_t, wint_t, wctrans_t, wctype_t
 
-#include "Dynamic.h"
-INSTANCE_TYPEABLE0(CPtrdiff,cPtrdiffTc,"CPtrdiff")
-INSTANCE_TYPEABLE0(CSize,cSizeTc,"CSize")
-INSTANCE_TYPEABLE0(CWchar,cWcharTc,"CWchar")
-INSTANCE_TYPEABLE0(CSigAtomic,cSigAtomicTc,"CSigAtomic")
-INSTANCE_TYPEABLE0(CClock,cClockTc,"CClock")
-INSTANCE_TYPEABLE0(CTime,cTimeTc,"CTime")

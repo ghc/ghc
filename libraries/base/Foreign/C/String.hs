@@ -52,6 +52,8 @@ import GHC.Real
 import GHC.Num
 import GHC.IOBase
 import GHC.Base
+#else
+#define unsafeChr chr
 #endif
 
 -----------------------------------------------------------------------------

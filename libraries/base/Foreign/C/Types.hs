@@ -18,7 +18,10 @@ module Foreign.C.Types
 	  -- Typeable, Storable, Bounded, Real, Integral, Bits
 	  CChar(..),  CSChar(..),  CUChar(..)
 	, CShort(..), CUShort(..), CInt(..),   CUInt(..)
-	, CLong(..),  CULong(..),  CLLong(..), CULLong(..)
+	, CLong(..),  CULong(..)
+#ifndef __HUGS__
+        , CLLong(..), CULLong(..)
+#endif
 
 	  -- Floating types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable, Real, Fractional, Floating, RealFrac,
@@ -41,6 +44,7 @@ import GHC.Read
 import GHC.Num
 #endif
 
+#include "Dynamic.h"
 #include "CTypes.h"
 
 INTEGRAL_TYPE(CChar,tyConCChar,"CChar",HTYPE_CHAR)
@@ -56,8 +60,10 @@ INTEGRAL_TYPE(CUInt,tyConCUInt,"CUInt",HTYPE_UNSIGNED_INT)
 INTEGRAL_TYPE(CLong,tyConCLong,"CLong",HTYPE_LONG)
 INTEGRAL_TYPE(CULong,tyConCULong,"CULong",HTYPE_UNSIGNED_LONG)
 
+#ifndef __HUGS__
 INTEGRAL_TYPE(CLLong,tyConCLLong,"CLLong",HTYPE_LONG_LONG)
 INTEGRAL_TYPE(CULLong,tyConCULLong,"CULLong",HTYPE_UNSIGNED_LONG_LONG)
+#endif
 
 {-# RULES
 "fromIntegral/a->CChar"   fromIntegral = \x -> CChar   (fromIntegral x)
@@ -90,24 +96,3 @@ FLOATING_TYPE(CDouble,tyConCDouble,"CDouble",HTYPE_DOUBLE)
 -- HACK: Currently no long double in the FFI, so we simply re-use double
 FLOATING_TYPE(CLDouble,tyConCLDouble,"CLDouble",HTYPE_DOUBLE)
 
-
-#include "Dynamic.h"
-INSTANCE_TYPEABLE0(CChar,cCharTc,"CChar")
-INSTANCE_TYPEABLE0(CSChar,cSCharTc,"CSChar")
-INSTANCE_TYPEABLE0(CUChar,cUCharTc,"CUChar")
-
-INSTANCE_TYPEABLE0(CShort,cShortTc,"CShort")
-INSTANCE_TYPEABLE0(CUShort,cUShortTc,"CUShort")
-
-INSTANCE_TYPEABLE0(CInt,cIntTc,"CInt")
-INSTANCE_TYPEABLE0(CUInt,cUIntTc,"CUInt")
-
-INSTANCE_TYPEABLE0(CLong,cLongTc,"CLong")
-INSTANCE_TYPEABLE0(CULong,cULongTc,"CULong")
-
-INSTANCE_TYPEABLE0(CLLong,cLLongTc,"CLLong")
-INSTANCE_TYPEABLE0(CULLong,cULLongTc,"CULLong")
-
-INSTANCE_TYPEABLE0(CFloat,cFloatTc,"CFloat")
-INSTANCE_TYPEABLE0(CDouble,cDoubleTc,"CDouble")
-INSTANCE_TYPEABLE0(CLDouble,cLDoubleTc,"CLDouble")

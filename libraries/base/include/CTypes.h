@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.2 2001/12/21 15:07:26 simonmar Exp $
+ * $Id: CTypes.h,v 1.3 2002/08/03 19:32:17 reid Exp $
  *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
@@ -21,7 +21,7 @@ INSTANCE_NUM(T) ; \
 INSTANCE_READ(T) ; \
 INSTANCE_SHOW(T) ; \
 INSTANCE_ENUM(T) ; \
-INSTANCE_TYPEABLE(T,C,S) ;
+INSTANCE_TYPEABLE0(T,C,S) ;
 
 #define INTEGRAL_TYPE(T,C,S,B) \
 NUMERIC_TYPE(T,C,S,B) ; \
@@ -37,6 +37,10 @@ INSTANCE_FRACTIONAL(T) ; \
 INSTANCE_FLOATING(T) ; \
 INSTANCE_REALFRAC(T) ; \
 INSTANCE_REALFLOAT(T)
+
+#ifndef __GLASGOW_HASKELL__
+#define fakeMap map
+#endif
 
 #define INSTANCE_READ(T) \
 instance Read T where { \
@@ -55,12 +59,6 @@ instance Num T where { \
    abs     (T i) = T (abs    i) ; \
    signum  (T i) = T (signum i) ; \
    fromInteger x = T (fromInteger x) }
-
-#define INSTANCE_TYPEABLE(T,C,S) \
-C :: TyCon ; \
-C = mkTyCon S ; \
-instance Typeable T where { \
-  typeOf _ = mkAppTy C [] }
 
 #define INSTANCE_BOUNDED(T) \
 instance Bounded T where { \
