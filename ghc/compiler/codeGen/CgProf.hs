@@ -24,6 +24,8 @@ module CgProf (
   ) where
 
 #include "HsVersions.h"
+#include "MachDeps.h"
+ -- For WORD_SIZE_IN_BITS only.
 #include "../includes/Constants.h"
 	-- For LDV_CREATE_MASK, LDV_STATE_USE
 	-- which are StgWords
@@ -312,18 +314,13 @@ emitCostCentreStackDecl
 emitCostCentreStackDecl ccs 
   | Just cc <- maybeSingletonCCS ccs = do
   { let
-     lits = [ zero,
-	      mkCCostCentre cc,
-	      zero,   -- struct _CostCentreStack *prevStack;
-	      zero,   -- struct _IndexTable *indexTable;
-	      zero64, -- StgWord64  scc_count;      
-	      zero,   -- StgWord    selected;       
-	      zero,   -- StgWord    time_ticks;     
-	      zero64, -- StgWord64  mem_alloc;      
-	      zero64, -- StgWord64  inherited_alloc;
-	      zero,   -- StgWord    inherited_ticks;
-	      zero    -- CostCentre *root;
-	   ]
+	-- Note: to avoid making any assumptions about how the
+	-- C compiler (that compiles the RTS, in particular) does
+	-- layouts of structs containing long-longs, simply
+	-- pad out the struct with zero words until we hit the
+	-- size of the overall struct (which we get via DerivedConstants.h)
+	--
+     lits = zero : mkCCostCentre cc : replicate (sizeof_ccs_words - 2) zero
   ; emitDataLits (mkCCSLabel ccs) lits
   }
   | otherwise = pprPanic "emitCostCentreStackDecl" (ppr ccs)
@@ -331,6 +328,13 @@ emitCostCentreStackDecl ccs
 zero = mkIntCLit 0
 zero64 = CmmInt 0 I64
 
+sizeof_ccs_words :: Int
+sizeof_ccs_words 
+    -- round up to the next word.
+  | ms == 0   = ws
+  | otherwise = ws + 1
+  where
+   (ws,ms) = SIZEOF_CostCentreStack `divMod` wORD_SIZE
 
 -- ---------------------------------------------------------------------------
 -- Registering CCs and CCSs
