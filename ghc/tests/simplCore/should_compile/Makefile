@@ -2,7 +2,7 @@ TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_compile.mk
 
-SRC_HC_OPTS += -noC -dcore-lint
+SRC_HC_OPTS += -noC -dcore-lint -package concurrent
 
 include $(TOP)/mk/target.mk
 
