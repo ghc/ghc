@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.192 2001/10/12 14:27:28 rrt Exp $
+# $Id: Makefile,v 1.193 2001/10/19 10:02:50 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -283,7 +283,7 @@ utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
 
 # ByteCodeItbls uses primops that the NCG doesn't support yet.
 ghci/ByteCodeItbls_HC_OPTS	= -fvia-C
-ghci/ByteCodeLink_HC_OPTS	= -fvia-C
+ghci/ByteCodeLink_HC_OPTS	= -fvia-C -monly-3-regs
 
 # CSE interacts badly with top-level IORefs (reportedly in DriverState and
 # DriverMkDepend), causing some of them to be commoned up.  We have a fix for

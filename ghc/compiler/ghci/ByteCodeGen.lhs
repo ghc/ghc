@@ -48,9 +48,9 @@ import Constants	( wORD_SIZE )
 import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO, bciStackUse )
 import ByteCodeItbls	( ItblEnv, mkITbls )
 import ByteCodeLink	( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
-			  ClosureEnv, HValue, filterNameMap,
+			  ClosureEnv, HValue, filterNameMap, linkFail,
 			  iNTERP_STACK_CHECK_THRESH )
-import ByteCodeFFI	( taggedSizeW, untaggedSizeW, mkMarshalCode )
+import ByteCodeFFI	( taggedSizeW, untaggedSizeW, mkMarshalCode, moan64 )
 import Linker		( lookupSymbol )
 
 import List		( intersperse, sortBy, zip4 )
@@ -765,16 +765,14 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
                  DynamicTarget
                     -> returnBc (False, panic "ByteCodeGen.generateCCall(dyn)")
                  StaticTarget target
-                    -> ioToBc (lookupSymbol (_UNPK_ target)) `thenBc` \res ->
+                    -> let sym_to_find = _UNPK_ target in
+                       ioToBc (lookupSymbol sym_to_find) `thenBc` \res ->
                        case res of
                            Just aa -> case aa of Ptr a# -> returnBc (True, A# a#)
-                           Nothing -> returnBc invalid
+                           Nothing -> ioToBc (linkFail "ByteCodeGen.generateCCall" 
+                                                       sym_to_find)
                  CasmTarget _
-                    -> returnBc invalid
-                 where
-                    invalid = pprPanic ("ByteCodeGen.generateCCall: unfindable " 
-                                        ++ "symbol or otherwise invalid target")
-                                       (ppr ccall_spec)
+                    -> pprPanic "ByteCodeGen.generateCCall: casm" (ppr ccall_spec)
      in
          get_target_info	`thenBc` \ (is_static, static_target_addr) ->
      let
@@ -840,10 +838,11 @@ mkDummyLiteral pr
    = case pr of
         CharRep   -> MachChar 0
         IntRep    -> MachInt 0
+        WordRep   -> MachWord 0
         DoubleRep -> MachDouble 0
         FloatRep  -> MachFloat 0
         AddrRep   | taggedSizeW AddrRep == taggedSizeW WordRep -> MachWord 0
-        _         -> pprPanic "mkDummyLiteral" (ppr pr)
+        _         -> moan64 "mkDummyLiteral" (ppr pr)
 
 
 -- Convert (eg) 
@@ -980,7 +979,7 @@ mkUnpackCode vars d p
            | npr `elem` [IntRep, WordRep, FloatRep, DoubleRep, CharRep, AddrRep]
            = approved
            | otherwise
-           = pprPanic "ByteCodeGen.mkUnpackCode" (ppr npr)
+           = moan64 "ByteCodeGen.mkUnpackCode" (ppr npr)
              where
                 approved = UPK_TAG usizeW (off_h-usizeW) off_s   `consOL` theRest
                 theRest  = do_nptrs (off_h-usizeW) (off_s + tsizeW) nprs

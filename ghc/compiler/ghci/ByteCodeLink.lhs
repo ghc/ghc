@@ -9,7 +9,7 @@
 
 module ByteCodeLink ( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
 		      ClosureEnv, HValue, filterNameMap,
-		      linkIModules, linkIExpr,
+		      linkIModules, linkIExpr, linkFail,
 		      iNTERP_STACK_CHECK_THRESH
 		   ) where
 
@@ -37,6 +37,7 @@ import Monad		( when, foldM )
 import ST		( runST )
 import IArray		( array )
 import MArray		( castSTUArray, 
+			  newInt64Array, writeInt64Array,
 			  newFloatArray, writeFloatArray,
 			  newDoubleArray, writeDoubleArray,
 			  newIntArray, writeIntArray,
@@ -51,9 +52,12 @@ import PrelBase		( Int(..) )
 import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
 			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
 import IOExts		( fixIO )
+import Exception        ( throwDyn )
+import Panic            ( GhcException(..) )
 import PrelArr		( Array(..) )
 import ArrayBase	( UArray(..) )
 import PrelIOBase	( IO(..) )
+import Int		( Int64 )
 
 \end{code}
 
@@ -319,6 +323,11 @@ mkBits findLabel st proto_insns
                st_l1 <- addListToSS st_l0 ws
                return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
+       int64 (st_i0,st_l0,st_p0,st_I0) i
+          = do let ws = mkLitI64 i
+               st_l1 <- addListToSS st_l0 ws
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
+
        addr (st_i0,st_l0,st_p0,st_I0) a
           = do let ws = mkLitA a
                st_l1 <- addListToSS st_l0 ws
@@ -332,12 +341,14 @@ mkBits findLabel st proto_insns
           = do st_I1 <- addToSS st_I0 (getName dcon)
                return (sizeSS st_I0, (st_i0,st_l0,st_p0,st_I1))
 
-       literal st (MachWord w)   = int st (fromIntegral w)
-       literal st (MachInt j)    = int st (fromIntegral j)
-       literal st (MachFloat r)  = float st (fromRational r)
-       literal st (MachDouble r) = double st (fromRational r)
-       literal st (MachChar c)   = int st c
-       literal st other          = pprPanic "ByteCodeLink.literal" (ppr other)
+       literal st (MachWord w)    = int st (fromIntegral w)
+       literal st (MachInt j)     = int st (fromIntegral j)
+       literal st (MachFloat r)   = float st (fromRational r)
+       literal st (MachDouble r)  = double st (fromRational r)
+       literal st (MachChar c)    = int st c
+       literal st (MachInt64 ii)  = int64 st (fromIntegral ii)
+       literal st (MachWord64 ii) = int64 st (fromIntegral ii)
+       literal st other           = pprPanic "ByteCodeLink.literal" (ppr other)
 
        ctoi_itbl st pk
           = addr st ret_itbl_addr
@@ -361,6 +372,7 @@ mkBits findLabel st proto_insns
                   = case pk of
                        CharRep   -> stg_gc_unbx_r1_ret_info
                        IntRep    -> stg_gc_unbx_r1_ret_info
+                       WordRep   -> stg_gc_unbx_r1_ret_info
                        AddrRep   -> stg_gc_unbx_r1_ret_info
                        FloatRep  -> stg_gc_f1_ret_info
                        DoubleRep -> stg_gc_d1_ret_info
@@ -415,10 +427,11 @@ instrSize16s instr
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the
 -- bit pattern is correct for the host's word size and endianness.
-mkLitI :: Int    -> [Word]
-mkLitF :: Float  -> [Word]
-mkLitD :: Double -> [Word]
-mkLitA :: Addr   -> [Word]
+mkLitI   :: Int    -> [Word]
+mkLitF   :: Float  -> [Word]
+mkLitD   :: Double -> [Word]
+mkLitA   :: Addr   -> [Word]
+mkLitI64 :: Int64  -> [Word]
 
 mkLitF f
    = runST (do
@@ -443,6 +456,25 @@ mkLitD d
    = runST (do
         arr <- newDoubleArray ((0::Int),0)
         writeDoubleArray arr 0 d
+        d_arr <- castSTUArray arr
+        w0 <- readWordArray d_arr 0
+        return [w0]
+     )
+
+mkLitI64 ii
+   | wORD_SIZE == 4
+   = runST (do
+        arr <- newInt64Array ((0::Int),1)
+        writeInt64Array arr 0 ii
+        d_arr <- castSTUArray arr
+        w0 <- readWordArray d_arr 0
+        w1 <- readWordArray d_arr 1
+        return [w0,w1]
+     )
+   | wORD_SIZE == 8
+   = runST (do
+        arr <- newInt64Array ((0::Int),0)
+        writeInt64Array arr 0 ii
         d_arr <- castSTUArray arr
         w0 <- readWordArray d_arr 0
         return [w0]
@@ -536,20 +568,22 @@ newBCO a b c d
 
 lookupCE :: ClosureEnv -> Either Name PrimOp -> IO HValue
 lookupCE ce (Right primop)
-   = do m <- lookupSymbol (primopToCLabel primop "closure")
+   = do let sym_to_find = primopToCLabel primop "closure"
+        m <- lookupSymbol sym_to_find
         case m of
            Just (Ptr addr) -> case addrToHValue# addr of
                                  (# hval #) -> return hval
-           Nothing -> pprPanic "ByteCodeLink.lookupCE(primop)" (ppr primop)
+           Nothing -> linkFail "ByteCodeLink.lookupCE(primop)" sym_to_find
 lookupCE ce (Left nm)
    = case lookupFM ce nm of
         Just aa -> return aa
         Nothing 
-           -> do m <- lookupSymbol (nameToCLabel nm "closure")
+           -> do let sym_to_find = nameToCLabel nm "closure"
+                 m <- lookupSymbol sym_to_find
                  case m of
                     Just (Ptr addr) -> case addrToHValue# addr of
                                           (# hval #) -> return hval
-                    Nothing        -> pprPanic "ByteCodeLink.lookupCE" (ppr nm)
+                    Nothing         -> linkFail "ByteCodeLink.lookupCE" sym_to_find
 
 lookupIE :: ItblEnv -> Name -> IO (Ptr a)
 lookupIE ie con_nm 
@@ -557,15 +591,32 @@ lookupIE ie con_nm
         Just (Ptr a) -> return (Ptr a)
         Nothing
            -> do -- try looking up in the object files.
-                 m <- lookupSymbol (nameToCLabel con_nm "con_info")
+                 let sym_to_find1 = nameToCLabel con_nm "con_info"
+                 m <- lookupSymbol sym_to_find1
                  case m of
                     Just addr -> return addr
                     Nothing 
                        -> do -- perhaps a nullary constructor?
-                             n <- lookupSymbol (nameToCLabel con_nm "static_info")
+                             let sym_to_find2 = nameToCLabel con_nm "static_info"
+                             n <- lookupSymbol sym_to_find2
                              case n of
                                 Just addr -> return addr
-                                Nothing -> pprPanic "ByteCodeLink.lookupIE" (ppr con_nm)
+                                Nothing   -> linkFail "ByteCodeLink.lookupIE" 
+                                                (sym_to_find1 ++ " or " ++ sym_to_find2)
+
+linkFail :: String -> String -> IO a
+linkFail who what
+   = throwDyn (ProgramError (
+        "\nDuring interactive linking, GHCi couldn't find the following symbol:\n" ++
+        "   " ++ what ++ "\n" ++
+        "This may be due to you not asking GHCi to load extra object files,\n" ++
+        "archives or DLLs needed by your current session.  Restart GHCi, specifying\n" ++
+        "the missing library using the -L/path/to/object/dir and -lmissinglibname\n" ++
+        "flags, or simply by naming the relevant files on the GHCi command line.\n" ++
+        "Alternatively, this link failure might indicate a bug in GHCi.\n" ++
+        "If you suspect the latter, please send a bug report to:\n" ++
+        "   glasgow-haskell-bugs@haskell.org\n"
+     ))
 
 -- HACKS!!!  ToDo: cleaner
 nameToCLabel :: Name -> String{-suffix-} -> String

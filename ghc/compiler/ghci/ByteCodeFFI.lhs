@@ -4,7 +4,7 @@
 \section[ByteCodeGen]{Generate machine-code sequences for foreign import}
 
 \begin{code}
-module ByteCodeFFI ( taggedSizeW, untaggedSizeW, mkMarshalCode ) where
+module ByteCodeFFI ( taggedSizeW, untaggedSizeW, mkMarshalCode, moan64 ) where
 
 #include "HsVersions.h"
 
@@ -19,7 +19,8 @@ import Bits		( Bits(..), shiftR, shiftL )
 import Word		( Word8, Word32 )
 import Addr		( Addr(..), writeWord8OffAddr )
 import Foreign		( Ptr(..), mallocBytes )
-import IOExts		( trace )
+import IOExts		( trace, unsafePerformIO )
+import IO		( hPutStrLn, stderr )
 
 \end{code}
 
@@ -66,6 +67,21 @@ sendBytesToMallocville bytes
 %************************************************************************
 
 \begin{code}
+
+moan64 :: String -> SDoc -> a
+moan64 msg pp_rep
+   = unsafePerformIO (
+        hPutStrLn stderr (
+        "\nGHCi's bytecode generation machinery can't handle 64-bit\n" ++
+        "code properly yet.  You can work around this for the time being\n" ++
+        "by compiling this module and all those it imports to object code,\n" ++
+        "and re-starting your GHCi session.  The panic below contains information,\n" ++
+        "intended for the GHC implementors, about the exact place where GHC gave up.\n"
+        )
+     )
+     `seq`
+     pprPanic msg pp_rep
+
 
 -- For sparc_TARGET_ARCH, i386_TARGET_ARCH, etc.
 #include "nativeGen/NCG.h"
@@ -141,6 +157,8 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
             = [0x81, 0xC4] ++ lit32 lit
          movl_eax_offesimem offB	-- movl   %eax, offB(%esi)
             = [0x89, 0x86] ++ lit32 offB
+         movl_edx_offesimem offB	-- movl   %edx, offB(%esi)
+            = [0x89, 0x96] ++ lit32 offB
          ret				-- ret
             = [0xC3]
          fstpl_offesimem offB		-- fstpl   offB(%esi)
@@ -256,16 +274,23 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
         or
            fstps       4(%esi)
      -}
-     ++ case r_rep of
-           CharRep   -> movl_eax_offesimem 4
-           IntRep    -> movl_eax_offesimem 4
-           WordRep   -> movl_eax_offesimem 4
-           AddrRep   -> movl_eax_offesimem 4
-           DoubleRep -> fstpl_offesimem 4
-           FloatRep  -> fstps_offesimem 4
+     ++ let i32 = movl_eax_offesimem 4
+            i64 = movl_eax_offesimem 4 ++ movl_edx_offesimem 8
+            f32 = fstps_offesimem 4
+            f64 = fstpl_offesimem 4
+        in
+        case r_rep of
+           CharRep   -> i32
+           IntRep    -> i32
+           WordRep   -> i32
+           AddrRep   -> i32
+           DoubleRep -> f64  
+           FloatRep  -> f32
+           -- Word64Rep -> i64
+           -- Int64Rep  -> i64
            VoidRep   -> []
-           other     -> pprPanic "ByteCodeFFI.mkMarshalCode_wrk(x86)" 
-                                 (ppr r_rep)
+           other     -> moan64 "ByteCodeFFI.mkMarshalCode_wrk(x86)" 
+                               (ppr r_rep)
 
      {- Restore all the pushed regs and go home.
 
@@ -463,8 +488,8 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
                DoubleRep -> f64
                FloatRep  -> f32
                VoidRep   -> []
-               other     -> pprPanic "ByteCodeFFI.mkMarshalCode_wrk(sparc)" 
-                                     (ppr r_rep)
+               other     -> moan64 "ByteCodeFFI.mkMarshalCode_wrk(sparc)" 
+                                   (ppr r_rep)
 
      ++ [mkRET,
          mkRESTORE_TRIVIAL]  -- this is in the delay slot of the RET
