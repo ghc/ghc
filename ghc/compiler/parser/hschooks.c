@@ -6,51 +6,37 @@ in instead of the defaults.
 
 #include <string.h>
 
-#if __GLASGOW_HASKELL__ >= 400
-#include "../rts/Rts.h"
-#else
-#include "rtsdefs.h"
-#endif
-
-#if __GLASGOW_HASKELL__ >= 505
-#include "../rts/Rts.h"
+/* For GHC 4.08, we are relying on the fact that RtsFlags has
+ * compatibile layout with the current version, because we're
+ * #including the current version of RtsFlags.h below.  4.08 didn't
+ * ship with its own RtsFlags.h, unfortunately.   For later GHC
+ * versions, we #include the correct RtsFlags.h.
+ */
+#if __GLASGOW_HASKELL__ < 502
+#include "../includes/Rts.h"
 #include "../includes/RtsFlags.h"
 #else
 #include "Rts.h"
 #include "RtsFlags.h"
 #endif
 
-#if __GLASGOW_HASKELL__ >= 502
-#include "RtsFlags.h"
-#endif
-
-#if __GLASGOW_HASKELL__ >= 408
 #include "HsFFI.h"
-#endif
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 
-#if __GLASGOW_HASKELL__ >= 504
-
-char *ghc_rts_opts = "-H8m -K8m";
-
-#else
-
 void
 defaultsHook (void)
 {
-#if __GLASGOW_HASKELL__ >= 408
     RtsFlags.GcFlags.heapSizeSuggestion = 6*1024*1024 / BLOCK_SIZE;
     RtsFlags.GcFlags.maxStkSize         = 8*1024*1024 / sizeof(W_);
-#endif
 #if __GLASGOW_HASKELL__ >= 411
+    /* GHC < 4.11 didn't have these */
     RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
     RtsFlags.GcFlags.statsFile = stderr;
 #endif
 }
-#endif
 
 void
 enableTimingStats( void )	/* called from the driver */
@@ -64,13 +50,11 @@ enableTimingStats( void )	/* called from the driver */
 void
 setHeapSize( HsInt size )
 {
-#if __GLASGOW_HASKELL__ >= 408
     RtsFlags.GcFlags.heapSizeSuggestion = size / BLOCK_SIZE;
     if (RtsFlags.GcFlags.maxHeapSize != 0 &&
 	RtsFlags.GcFlags.heapSizeSuggestion > RtsFlags.GcFlags.maxHeapSize) {
 	RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
     }
-#endif
 }
 
 void

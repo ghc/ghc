@@ -294,7 +294,11 @@ HS_OBJS	 += $(C_OBJS)
 # Big Fudge to get around inherent problem that Makefile setup
 # has got with 'mkdependC'.
 # 
-SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(GHC_INCLUDE_DIR)
+SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
+
+# XXX not really correct, hschooks.c actually gets include files like
+# RtsFlags.c from the installed GHC, but we can't tell mkdependC about that.
+SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
 # -----------------------------------------------------------------------------
 # 		Haskell compilations
@@ -328,7 +332,7 @@ SRC_HC_OPTS += -package concurrent -package util
 endif
 endif
 
-SRC_CC_OPTS += -Iparser -I. -I$(GHC_INCLUDE_DIR) -O
+SRC_CC_OPTS += -Iparser -I. -O
 SRC_HC_OPTS += -recomp $(GhcHcOpts) $(GhcStage$(stage)HcOpts)
 SRC_HC_OPTS += -H16M
 
