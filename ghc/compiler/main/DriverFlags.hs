@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.74 2001/10/08 13:24:53 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.75 2001/10/10 17:17:44 ken Exp $
 --
 -- Driver flags
 --
@@ -487,7 +487,7 @@ buildStaticHscOpts = do
 
 machdepCCOpts 
    | prefixMatch "alpha"   cTARGETPLATFORM  
-	= return ( ["-static", "-w"], ["-mieee"] )
+	= return ( ["-static", "-w", "-mieee"], [] )
 	-- For now, to suppress the gcc warning "call-clobbered
 	-- register used for global register variable", we simply
 	-- disable all warnings altogether using the -w flag. Oh well.
