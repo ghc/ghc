@@ -181,17 +181,25 @@ registerCode :: Register -> Reg -> InstrBlock
 registerCode (Fixed _ _ code) reg = code
 registerCode (Any _ code) reg = code reg
 
+registerCodeF (Fixed _ _ code) = code
+registerCodeF (Any _ _)        = pprPanic "registerCodeF" empty
+
 registerName :: Register -> Reg -> Reg
 registerName (Fixed _ reg _) _ = reg
-registerName (Any   _ _)   reg = reg
+registerName (Any _ _)   reg   = reg
+
+registerNameF (Fixed _ reg _) = reg
+registerNameF (Any _ _)       = pprPanic "registerNameF" empty
 
 registerRep :: Register -> PrimRep
 registerRep (Fixed pk _ _) = pk
 registerRep (Any   pk _) = pk
 
-isFixed :: Register -> Bool
+isFixed, isFloat :: Register -> Bool
 isFixed (Fixed _ _ _) = True
 isFixed (Any _ _)     = False
+
+isFloat = not . isFixed
 \end{code}
 
 Generate code to get a subtree into a @Register@:
@@ -612,7 +620,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       IntSubOp  -> sub_code  L x y
       IntQuotOp -> quot_code L x y True{-division-}
       IntRemOp  -> quot_code L x y False{-remainder-}
-      IntMulOp  -> trivialCode (IMUL L) x y {-True-}
+      IntMulOp  -> let op = IMUL L in trivialCode op (Just op) x y
 
       FloatAddOp -> trivialFCode  FloatRep  GADD x y
       FloatSubOp -> trivialFCode  FloatRep  GSUB x y
@@ -624,9 +632,9 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       DoubleMulOp -> trivialFCode DoubleRep GMUL x y
       DoubleDivOp -> trivialFCode DoubleRep GDIV x y
 
-      AndOp -> trivialCode (AND L) x y {-True-}
-      OrOp  -> trivialCode (OR L)  x y {-True-}
-      XorOp -> trivialCode (XOR L) x y {-True-}
+      AndOp -> let op = AND L in trivialCode op (Just op) x y
+      OrOp  -> let op = OR  L in trivialCode op (Just op) x y
+      XorOp -> let op = XOR L in trivialCode op (Just op) x y
 
 	{- Shift ops on x86s have constraints on their source, it
 	   either has to be Imm, CL or 1
@@ -659,19 +667,19 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       -- Code is the same as the first eq. for trivialCode -- sigh.
     shift_code instr x y{-amount-}
       | maybeToBool imm
-      = getRegister x		`thenUs` \ register ->
-	let op_imm = OpImm imm__2
-	    code__2 dst = 
-		let code  = registerCode  register dst
-                    src   = registerName  register dst
-	        in
-		code .
-		if isFixed register && src /= dst
-		then mkSeqInstrs [MOV L (OpReg src) (OpReg dst),
-                                  instr imm__2  (OpReg dst)]
-                else mkSeqInstr (instr imm__2 (OpReg src)) 
-	in
-        returnUs (Any IntRep code__2)
+      = getRegister x	                   `thenUs` \ regx ->
+        let mkcode dst
+              = if   isFloat regx
+                then registerCode regx dst   `bind` \ code_x ->
+                     code_x .
+                     mkSeqInstr (instr imm__2 (OpReg dst))
+                else registerCodeF regx      `bind` \ code_x ->
+                     registerNameF regx      `bind` \ r_x ->
+                     code_x .
+                     mkSeqInstr (MOV L (OpReg r_x) (OpReg dst)) .
+                     mkSeqInstr (instr imm__2 (OpReg dst))
+        in
+        returnUs (Any IntRep mkcode)        
       where
        imm = maybeImm y
        imm__2 = case imm of Just x -> x
@@ -700,8 +708,10 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
                     r_dst    = OpReg dst
                     r_tmp    = OpReg tmp
                 in
-                    code_val .
                     code_amt .
+                    mkSeqInstr (MOV L (OpReg src_amt) r_tmp) .
+                    code_val .
+                    mkSeqInstr (MOV L (OpReg src_val) r_dst) .
                     mkSeqInstrs [
                        COMMENT (_PK_ "begin shift sequence"),
                        MOV L (OpReg src_val) r_dst,
@@ -789,7 +799,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	in
 	returnUs (Any IntRep code__2)
 
-    sub_code sz x y = trivialCode (SUB sz) x y {-False-}
+    sub_code sz x y = trivialCode (SUB sz) Nothing x y
 
     --------------------
     quot_code
@@ -803,6 +813,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
     -- edx:eax / reg -> eax (remainder in edx) Currently we chose to
     -- put y in memory (if it is not there already)
 
+    -- quot_code needs further checking in the Rules-of-the-Game(x86) audit
     quot_code sz x (StInd pk mem) is_division
       = getRegister x		`thenUs` \ register1 ->
 	getNewRegNCG IntRep	`thenUs` \ tmp1 ->
@@ -1380,6 +1391,7 @@ condFltCode = panic "MachCode.condFltCode: not on Alphas"
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
+-- some condIntCode clauses look pretty dodgy to me
 condIntCode cond (StInd _ x) y
   | maybeToBool imm
   = getAmode x			`thenUs` \ amode ->
@@ -1401,7 +1413,7 @@ condIntCode cond x (StInt 0)
 	code1 = registerCode register1 tmp1 asmVoid
 	src1  = registerName register1 tmp1
 	code__2 = asmParThen [code1] .
-    	    	mkSeqInstr (TEST L (OpReg src1) (OpReg src1))
+    	    	  mkSeqInstr (TEST L (OpReg src1) (OpReg src1))
     in
     returnUs (CondCode False cond code__2)
 
@@ -1413,7 +1425,7 @@ condIntCode cond x y
 	code1 = registerCode register1 tmp1 asmVoid
 	src1  = registerName register1 tmp1
 	code__2 = asmParThen [code1] .
-    	    	mkSeqInstr (CMP L (OpImm imm__2) (OpReg src1))
+                  mkSeqInstr (CMP L (OpImm imm__2) (OpReg src1))
     in
     returnUs (CondCode False cond code__2)
   where
@@ -1617,6 +1629,7 @@ assignIntCode pk dst src
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
+-- looks dodgy to me
 assignIntCode pk dd@(StInd _ dst) src
   = getAmode dst		`thenUs` \ amode ->
     get_op_RI src		`thenUs` \ (codesrc, opsrc) ->
@@ -2620,7 +2633,8 @@ have handled the constant-folding.
 \begin{code}
 trivialCode
     :: IF_ARCH_alpha((Reg -> RI -> Reg -> Instr)
-      ,IF_ARCH_i386 ((Operand -> Operand -> Instr)
+      ,IF_ARCH_i386 ((Operand -> Operand -> Instr) 
+                     -> Maybe (Operand -> Operand -> Instr)
       ,IF_ARCH_sparc((Reg -> RI -> Reg -> Instr)
       ,)))
     -> StixTree -> StixTree -- the two arguments
@@ -2723,40 +2737,128 @@ trivialUFCode _ instr x
 #endif {- alpha_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
+\end{code}
+The Rules of the Game are:
 
-trivialCode instr x y
-  | maybeToBool imm
-  = getRegister x		`thenUs` \ register1 ->
-    let
-    	code__2 dst = let code1 = registerCode register1 dst
-    	                  src1  = registerName register1 dst
-		      in code1 .
-			 if   isFixed register1 && src1 /= dst
-			 then mkSeqInstrs [MOV L (OpReg src1) (OpReg dst),
-					   instr (OpImm imm__2) (OpReg dst)]
-			 else mkSeqInstrs [instr (OpImm imm__2) (OpReg src1)]
-    in
-    returnUs (Any IntRep code__2)
-  where
-    imm = maybeImm y
-    imm__2 = case imm of Just x -> x
+* You cannot assume anything about the destination register dst;
+  it may be anything, includind a fixed reg.
 
-trivialCode instr x y
-  = getRegister x		`thenUs` \ register1 ->
-    getRegister y		`thenUs` \ register2 ->
-    getNewRegNCG IntRep		`thenUs` \ tmp2 ->
-    let
-    	code2 = registerCode register2 tmp2 --asmVoid
-    	src2  = registerName register2 tmp2
-    	code__2 dst = let code1 = registerCode register1 dst --asmVoid
-    	                  src1  = registerName register1 dst
-		      in code2 . code1 .  --asmParThen [code1, code2] .
-			 if   isFixed register1 && src1 /= dst
-			 then mkSeqInstrs [MOV L (OpReg src1) (OpReg dst),
-					   instr (OpReg src2)  (OpReg dst)]
-			 else mkSeqInstr (instr (OpReg src2) (OpReg src1))
+* You may compute a value into a fixed reg, but you may not 
+  subsequently change the contents of that fixed reg.  If you
+  want to do so, first copy the value either to a temporary
+  or into dst.  You are free to modify dst even if it happens
+  to be a fixed reg -- that's not your problem.
+
+* You cannot assume that a fixed reg will stay live over an
+  arbitrary computation.  The same applies to the dst reg.
+
+* Temporary regs obtained from getNewRegNCG are distinct from
+  all other regs, and stay live over arbitrary computations.
+
+\begin{code}
+
+infixr 3 `bind`
+x `bind` f = f x
+
+trivialCode instr maybe_revinstr a b
+
+  | is_imm_b
+  = getRegister a                         `thenUs` \ rega ->
+    let mkcode dst
+          = if   isFloat rega 
+            then registerCode rega dst      `bind` \ code_a ->
+                 code_a . 
+                 mkSeqInstr (instr (OpImm imm_b) (OpReg dst))
+            else registerCodeF rega         `bind` \ code_a ->
+                 registerNameF rega         `bind` \ r_a ->
+                 code_a .
+                 mkSeqInstr (MOV L (OpReg r_a) (OpReg dst)) .
+                 mkSeqInstr (instr (OpImm imm_b) (OpReg dst))
     in
-    returnUs (Any IntRep code__2)
+    returnUs (Any IntRep mkcode)
+              
+  | is_imm_a
+  = getRegister b                         `thenUs` \ regb ->
+    getNewRegNCG IntRep                   `thenUs` \ tmp ->
+    let revinstr_avail = maybeToBool maybe_revinstr
+        revinstr       = case maybe_revinstr of Just ri -> ri
+        mkcode dst
+          | revinstr_avail
+          = if   isFloat regb
+            then registerCode regb dst      `bind` \ code_b ->
+                 code_b .
+                 mkSeqInstr (revinstr (OpImm imm_a) (OpReg dst))
+            else registerCodeF regb         `bind` \ code_b ->
+                 registerNameF regb         `bind` \ r_b ->
+                 code_b .
+                 mkSeqInstr (MOV L (OpReg r_b) (OpReg dst)) .
+                 mkSeqInstr (revinstr (OpImm imm_a) (OpReg dst))
+          
+          | otherwise
+          = if   isFloat regb
+            then registerCode regb tmp      `bind` \ code_b ->
+                 code_b .
+                 mkSeqInstr (MOV L (OpImm imm_a) (OpReg dst)) .
+                 mkSeqInstr (instr (OpReg tmp) (OpReg dst))
+            else registerCodeF regb         `bind` \ code_b ->
+                 registerNameF regb         `bind` \ r_b ->
+                 code_b .
+                 mkSeqInstr (MOV L (OpReg r_b) (OpReg tmp)) .
+                 mkSeqInstr (MOV L (OpImm imm_a) (OpReg dst)) .
+                 mkSeqInstr (instr (OpReg tmp) (OpReg dst))
+    in
+    returnUs (Any IntRep mkcode)
+
+  | otherwise
+  = getRegister a                         `thenUs` \ rega ->
+    getRegister b                         `thenUs` \ regb ->
+    getNewRegNCG IntRep                   `thenUs` \ tmp ->
+    let mkcode dst
+          = case (isFloat rega, isFloat regb) of
+              (True, True) 
+                 -> registerCode regb tmp   `bind` \ code_b ->
+                    registerCode rega dst   `bind` \ code_a ->
+                    code_b . 
+                    code_a .
+                    mkSeqInstr (instr (OpReg tmp) (OpReg dst))
+              (True, False)
+                 -> registerCode  rega tmp  `bind` \ code_a ->
+                    registerCodeF regb      `bind` \ code_b ->
+                    registerNameF regb      `bind` \ r_b ->
+                    code_a . 
+                    code_b . 
+                    mkSeqInstr (instr (OpReg r_b) (OpReg tmp)) .
+                    mkSeqInstr (MOV L (OpReg tmp) (OpReg dst))
+              (False, True)
+                 -> registerCode  regb tmp  `bind` \ code_b ->
+                    registerCodeF rega      `bind` \ code_a ->
+                    registerNameF rega      `bind` \ r_a ->
+                    code_b .
+                    code_a .
+                    mkSeqInstr (MOV L (OpReg r_a) (OpReg dst)) .
+                    mkSeqInstr (instr (OpReg tmp) (OpReg dst))
+              (False, False)
+                 -> registerCodeF  rega     `bind` \ code_a ->
+                    registerNameF  rega     `bind` \ r_a ->
+                    registerCodeF  regb     `bind` \ code_b ->
+                    registerNameF  regb     `bind` \ r_b ->
+                    code_a .
+                    mkSeqInstr (MOV L (OpReg r_a) (OpReg tmp)) .
+                    code_b .
+                    mkSeqInstr (instr (OpReg r_b) (OpReg tmp)) .
+                    mkSeqInstr (MOV L (OpReg tmp) (OpReg dst))
+    in
+    returnUs (Any IntRep mkcode)
+
+    where
+       maybe_imm_a = maybeImm a
+       is_imm_a    = maybeToBool maybe_imm_a
+       imm_a       = case maybe_imm_a of Just imm -> imm
+
+       maybe_imm_b = maybeImm b
+       is_imm_b    = maybeToBool maybe_imm_b
+       imm_b       = case maybe_imm_b of Just imm -> imm
+
 
 -----------
 trivialUCode instr x

@@ -1,6 +1,6 @@
 
-Known bugs in nativeGen, 000124 (JRS)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Known bugs/issues in nativeGen, 000202 (JRS)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 All these bugs are for x86; I don't know about sparc/alpha.
 
@@ -9,8 +9,26 @@ All these bugs are for x86; I don't know about sparc/alpha.
    pretty dubious.  I think I have it fixed for big and little
    endian 32-bit, but it won't work at all on a 64 bit platform.
 
--- nofib/spectral/cvh_unboxing exposes some kind of spilling bug
-   (I think), since there are many references to registers %M229
-   etc, which I believe are dynamic registers which didn't get assigned
-   to real ones.
+-- Most of the x86 insn selector code in MachCode.lhs needs to
+   be checked against the Rules of the Game recorded in that file.
+   I think there are a lot of subtle violations.
+
+-- When selecting spill regs, don't use %eax if there is a CALL insn
+   (perhaps excluding calls to newCAF, since it doesn't return a
+    result).
+
+-- Keep track of the stack offset so that correct spill code can
+   be generated even if %esp moves.  At the moment %esp doesn't
+   move, so the problem doesn't exist, but there is a different
+   problem: ccalls put args in memory below %esp and only move
+   %esp immediately prior to the call.  This is dangerous because
+   (1) writing below %esp can cause a segmentation fault (as deemed
+   by the OS), and (2) if a signal should be handled on that stack
+   during argument construction, the args will get silently trashed.
+
+-- nofib/real/hidden gets slightly different FP answers from the
+   via-C route; possibly due to exp/log not being done in-line.
+
+-- Possibly implement GLDZ and GLD1 as analogues of FLDZ and FLD1
+   (x86), to reduce number of constants emitted in f-p code.
 

@@ -19,7 +19,7 @@ import PprMach
 import AbsCStixGen	( genCodeAbstractC )
 import AbsCSyn		( AbstractC, MagicId )
 import AsmRegAlloc	( runRegAllocate )
-import OrdList		( OrdList )
+import OrdList		( OrdList, flattenOrdList )
 import PrimOp		( commutableOp, PrimOp(..) )
 import RegAllocInfo	( mkMRegsState, MRegsState, findReservedRegs )
 import Stix		( StixTree(..), StixReg(..), 
@@ -104,12 +104,19 @@ codeGen stixFinal
 
         static_instrss :: [[Instr]]
 	static_instrss = map fp_kludge (scheduleMachCode dynamic_codes)
-        docs           = map (vcat . map pprInstr) static_instrss       
+        docs           = map (vcat . map pprInstr) static_instrss
+
+        -- for debugging only
+        docs_prealloc  = map (vcat . map pprInstr . flattenOrdList) 
+                             dynamic_codes
+        text_prealloc  = vcat (intersperse (char ' ' $$ char ' ') docs_prealloc)
     in
+    -- trace (showSDoc text_prealloc) (
     returnUs (vcat (intersperse (char ' ' 
                                  $$ text "# ___stg_split_marker" 
                                  $$ char ' ') 
                     docs))
+    -- )
 \end{code}
 
 Top level code generator for a chunk of stix code:
