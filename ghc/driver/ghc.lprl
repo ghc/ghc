@@ -284,6 +284,7 @@ warnings that you get all the time are
 	-fwarn-missing-fields
 	-fwarn-deprecations
 	-fwarn-duplicate-exports
+	-fwarn-hi-shadowing
 
 these are turned off by -Wnot.
 
@@ -292,6 +293,7 @@ these are turned off by -Wnot.
 		     '-fwarn-missing-methods',
 		     '-fwarn-missing-fields',
 		     '-fwarn-deprecations',
+		     '-fwarn-hi-shadowing',
 		     '-fwarn-duplicate-exports');
 @MinusWOpts    	  = (@StandardWarnings, 
 		     '-fwarn-unused-binds',
