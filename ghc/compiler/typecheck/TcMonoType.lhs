@@ -644,6 +644,9 @@ hoistForAllTys :: Type -> Type
 -- e.g.  T -> forall a. a        ==>   forall a. T -> a
 --	 T -> (?x::Int) -> Int   ==>   (?x::Int) -> T -> Int
 --
+-- Also: eliminate duplicate constraints.  These can show up
+-- when hoisting constraints, notably implicit parameters.
+--
 -- We want to 'look through' type synonyms when doing this
 -- so it's better done on the Type than the HsType
 

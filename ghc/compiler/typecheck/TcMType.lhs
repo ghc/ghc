@@ -936,6 +936,10 @@ check_valid_theta ctxt []
 check_valid_theta ctxt theta
   = getDOptsTc					`thenNF_Tc` \ dflags ->
     warnTc (notNull dups) (dupPredWarn dups)	`thenNF_Tc_`
+	-- Actually, in instance decls and type signatures, 
+	-- duplicate constraints are eliminated by TcMonoType.hoistForAllTys,
+	-- so this error can only fire for the context of a class or
+	-- data type decl.
     mapTc_ (check_source_ty dflags ctxt) theta
   where
     (_,dups) = removeDups tcCmpPred theta
