@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.23 $
- * $Date: 2000/03/17 14:37:21 $
+ * $Revision: 1.24 $
+ * $Date: 2000/03/20 04:26:24 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -1399,19 +1399,21 @@ AsmPrim asmPrimOps[] = {
 #endif
 #ifdef PROVIDE_CONCURRENT
     /* Concurrency operations */
-    , { "primFork",                  "a", "T",   MONAD_IO, i_PRIMOP2, i_fork }
+    , { "primForkIO",                "a", "T",   MONAD_IO, i_PRIMOP2, i_forkIO }
     , { "primKillThread",            "T", "",    MONAD_IO, i_PRIMOP2, i_killThread }
-    , { "primDelay",                 "I", "",    MONAD_IO, i_PRIMOP2, i_delay }
+    , { "primRaiseInThread",         "TE", "",   MONAD_IO, i_PRIMOP2, i_raiseInThread }
+
     , { "primWaitRead",              "I", "",    MONAD_IO, i_PRIMOP2, i_waitRead }
     , { "primWaitWrite",             "I", "",    MONAD_IO, i_PRIMOP2, i_waitWrite }
+    , { "primYield",                 "", "",     MONAD_IO, i_PRIMOP2, i_yield }    , { "primDelay",                 "I", "",    MONAD_IO, i_PRIMOP2, i_delay }
+    , { "primGetThreadId",           "",   "T",  MONAD_IO, i_PRIMOP2, i_getThreadId }
+    , { "primCmpThreadIds",          "TT", "I",  MONAD_Id, i_PRIMOP2, i_cmpThreadIds }
 #endif
-    , { "primNewEmptyMVar",         "",  "r",   MONAD_IO, i_PRIMOP2, i_newMVar }
+    , { "primNewEmptyMVar",          "",  "r",   MONAD_IO, i_PRIMOP2, i_newMVar }
       /* primTakeMVar is handwritten bytecode */
     , { "primPutMVar",               "ra", "",   MONAD_IO, i_PRIMOP2, i_putMVar } 
     , { "primSameMVar",              "rr", "B",  MONAD_Id, i_PRIMOP2, i_sameMVar }
-    , { "primGetThreadId",           "",   "T",  MONAD_IO, i_PRIMOP2, i_getThreadId }
-    , { "primCmpThreadIds",          "TT", "I",  MONAD_Id, i_PRIMOP2, i_cmpThreadIds }
-    , { "primForkIO",                 "a", "T",  MONAD_IO, i_PRIMOP2, i_forkIO }
+
   
     /* Ccall is polyadic - so it's excluded from this table */
 
@@ -1427,6 +1429,16 @@ AsmPrim ccall_stdcall_Id
 AsmPrim ccall_stdcall_IO 
    = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_stdcall_IO };
 
+#ifdef DEBUG
+void checkBytecodeCount( void ) {
+  if (MAX_Primop1 >= 255) {
+    printf("Too many Primop1 bytecodes (%d)\n",MAX_Primop1);
+  }
+  if (MAX_Primop2 >= 255) {
+    printf("Too many Primop2 bytecodes (%d)\n",MAX_Primop2);
+  }
+}
+#endif
 
 AsmPrim* asmFindPrim( char* s )
 {

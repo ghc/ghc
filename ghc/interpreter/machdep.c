@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.20 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.21 $
+ * $Date: 2000/03/20 04:26:23 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -251,7 +251,7 @@ static Void   local searchChr     ( Int );
 static Void   local searchStr     ( String );
 static Bool   local tryEndings    ( String );
 
-#if DOS_FILENAMES
+#if (DOS_FILENAMES || __CYGWIN32__) 
 # define SLASH                   '\\'
 # define isSLASH(c)              ((c)=='\\' || (c)=='/')
 # define PATHSEP                 ';'
@@ -690,7 +690,7 @@ Bool findFilesForModule (
    strcat(augdPath, "lib");
    strcat(augdPath, PATHSEP_STR);
 
-   /* fprintf ( stderr, "augdpath = `%s'\n", augdPath ); */
+   /*   fprintf ( stderr, "augdpath = `%s'\n", augdPath ); */
 
    peEnd = augdPath-1;
    while (1) {

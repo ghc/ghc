@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.30 $
- * $Date: 2000/03/15 23:27:16 $
+ * $Revision: 1.31 $
+ * $Date: 2000/03/20 04:26:23 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -1025,4 +1025,7 @@ extern Bool  sameType		( Type,Int,Type,Int );
 extern Bool  matchType		( Type,Int,Type,Int );
 extern Bool  typeMatches        ( Type,Type );
 
+#ifdef DEBUG
+extern Void  checkBytecodeCount  ( Void );
+#endif
 /*-------------------------------------------------------------------------*/

@@ -2049,9 +2049,10 @@ swapMVar mvar new =
     putMVar mvar new    >>
     return old
 
+isEmptyMVar var = error "isEmptyMVar is not (yet) implemented in Hugs"
+
 instance Eq (MVar a) where
     m1 == m2 = primSameMVar m1 m2
-
 
 data ThreadId
 
@@ -2080,6 +2081,11 @@ forkIO computation
 
 trace_quiet s x
    = (unsafePerformIO (putStr (s ++ "\n"))) `seq` x
+
+
+-- Foreign ------------------------------------------------------------------
+
+data ForeignObj
 
 -- showFloat ------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.7 2000/03/08 22:05:43 andy Exp $ 
+# $Id: Makefile,v 1.8 2000/03/20 04:26:23 andy Exp $ 
 # -------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -52,12 +52,17 @@ UTIL_LIBS = QuickCheck.hs QuickCheckBatch.hs QuickCheckPoly.hs \
 	Regex.lhs RegexString.lhs Observe.lhs Memo.lhs Readline.lhs \
 	Select.lhs 
 
+CONC_LIBS = Channel.lhs ChannelVar.lhs Concurrent.lhs Merge.lhs \
+	Parallel.lhs SampleVar.lhs Semaphore.lhs Strategies.lhs
+
+
 LIBS =  $(PRELUDE) \
         $(STD_LIBS) \
 	$(DATA_LIBS) \
 	$(LANG_LIBS) \
 	$(TEXT_LIBS) \
-	$(UTIL_LIBS)
+	$(CONC_LIBS) \
+	$(UTIL_LIBS) 
 
 all :: $(LIBS)
 

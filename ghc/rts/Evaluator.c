@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.42 $
- * $Date: 2000/03/17 14:37:21 $
+ * $Revision: 1.43 $
+ * $Date: 2000/03/20 04:26:24 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -41,8 +41,10 @@
 #include <ieee754.h> /* These are for primops */
 #endif
 
-/* Allegedly useful macro */
+
+/* Allegedly useful macro, taken from ClosureMacros.h */
 #define payloadWord( c, i )   (*stgCast(StgWord*,      ((c)->payload+(i))))
+#define payloadPtr( c, i )    (*stgCast(StgPtr*,       ((c)->payload+(i))))
 
 /* An incredibly useful abbreviation.
  * Interestingly, there are some uses of END_TSO_QUEUE_closure that
@@ -102,6 +104,7 @@ void cp_init ( void )
    for (i = 0; i < M_CPTAB; i++)
       cpTab[i].who = CP_NIL;
 }
+
 
 
 void cp_enter ( StgBCO* b )
@@ -255,6 +258,12 @@ void setRtsFlags( int x )
 }
 
 
+typedef struct { 
+  StgTSOBlockReason reason;
+  unsigned int delay;
+} HugsBlock;
+
+
 /* --------------------------------------------------------------------------
  * Entering-objects and bytecode interpreter part of evaluator
  * ------------------------------------------------------------------------*/
@@ -284,7 +293,7 @@ void setRtsFlags( int x )
 /* Forward decls ... */
 static        void* enterBCO_primop1 ( int );
 static        void* enterBCO_primop2 ( int , int* /*StgThreadReturnCode* */, 
-                                       StgBCO**, Capability* );
+                                       StgBCO**, Capability*, HugsBlock * );
 static inline void PopUpdateFrame ( StgClosure* obj );
 static inline void PopCatchFrame  ( void );
 static inline void PopSeqFrame    ( void );
@@ -453,6 +462,10 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
     register StgClosure*      obj;    /* object currently under evaluation */
              char             eCount; /* enter counter, for context switching */
 
+
+   HugsBlock hugsBlock = { NotBlocked, 0 };
+
+
 #ifdef DEBUG
     StgPtr tSp; StgUpdateFrame* tSu; StgPtr tSpLim;
 #endif
@@ -504,8 +517,30 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
 #endif
        ) {
        if (context_switch) {
-          xPushCPtr(obj); /* code to restart with */
-          RETURN(ThreadYielding);
+	 switch(hugsBlock.reason) {
+	 case NotBlocked: {
+	   xPushCPtr(obj); /* code to restart with */
+	   RETURN(ThreadYielding);
+	 }
+	 case BlockedOnDelay: /* fall through */
+	 case BlockedOnRead:  /* fall through */
+	 case BlockedOnWrite: {
+	   ASSERT(cap->rCurrentTSO->why_blocked == NotBlocked);
+	   cap->rCurrentTSO->why_blocked = BlockedOnDelay;
+	   ACQUIRE_LOCK(&sched_mutex);
+	   
+	   cap->rCurrentTSO->block_info.delay 
+	     = hugsBlock.delay + ticks_since_select;
+	   APPEND_TO_BLOCKED_QUEUE(cap->rCurrentTSO);
+	   
+	   RELEASE_LOCK(&sched_mutex);
+	   
+	   xPushCPtr(obj); /* code to restart with */
+	   RETURN(ThreadBlocked);
+	 }
+	 default:
+	   barf("Unknown context switch reasoning");
+	 }
        }
     }
 
@@ -1186,7 +1221,8 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     pc_saved = PC; 
                     bco_tmp  = bco;
                     SSS;
-                    p        = enterBCO_primop2 ( i, &trc, &bco_tmp, cap ); 
+                    p        = enterBCO_primop2 ( i, &trc, &bco_tmp, cap, 
+						  &hugsBlock ); 
                     LLL;
                     bco      = bco_tmp;
                     bciPtr   = &(bcoInstr(bco,pc_saved));
@@ -1195,8 +1231,9 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                           /* we want to enter p */
                           obj = p; goto enterLoop;
                        } else {
-                          /* trc is the the StgThreadReturnCode for this thread */
-                          RETURN((StgThreadReturnCode)trc);
+                          /* trc is the the StgThreadReturnCode for 
+			   * this thread */
+			 RETURN((StgThreadReturnCode)trc);
                        };
                     }
                     Continue;
@@ -2645,11 +2682,14 @@ static void* enterBCO_primop1 ( int primop1code )
       return the address of it and leave *return2 unchanged.
    To return a StgThreadReturnCode to the scheduler,
       set *return2 to it and return a non-NULL value.
+   To cause a context switch, set context_switch (its a global),
+   and optionally set hugsBlock to your rational.
 */
 static void* enterBCO_primop2 ( int primop2code, 
                                 int* /*StgThreadReturnCode* */ return2,
                                 StgBCO** bco,
-                                Capability* cap )
+                                Capability* cap,
+				HugsBlock *hugsBlock )
 {
         if (combined) {
 	   /* A small concession: we need to allow ccalls, 
@@ -3016,6 +3056,83 @@ static void* enterBCO_primop2 ( int primop2code,
                 PushTaggedBool(x==y);
                 break;
             }
+#ifdef PROVIDE_CONCURRENT
+        case i_forkIO:
+            {
+                StgClosure* closure;
+                StgTSO*     tso;
+                StgWord     tid;
+                closure = PopCPtr();
+                tso     = createGenThread (RtsFlags.GcFlags.initialStkSize,closure);
+                tid     = tso->id;
+                scheduleThread(tso);
+                context_switch = 1;
+		/* Later: Change to use tso as the ThreadId */
+                PushTaggedWord(tid);
+                break;
+            }
+
+        case i_killThread:
+            {
+                StgWord n = PopTaggedWord();
+		StgTSO* tso = 0;
+		StgTSO *t;
+
+		// Map from ThreadId to Thread Structure */
+		for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
+		  if (n == t->id)
+		    tso = t;
+		}
+		if (tso == 0) {
+		  // Already dead
+		  break;
+		}
+
+		while (tso->what_next == ThreadRelocated) {
+		  tso = tso->link;
+		}
+
+                deleteThread(tso);
+                if (tso == cap->rCurrentTSO) { /* suicide */
+                    *return2 = ThreadFinished;
+                    return (void*)(1+(NULL));
+                }
+                break;
+            }
+        case i_raiseInThread:
+	  ASSERT(0); /* not (yet) supported */
+        case i_delay:
+	  {
+	    StgInt  n = PopTaggedInt();
+	    context_switch = 1;
+	    hugsBlock->reason = BlockedOnDelay;
+	    hugsBlock->delay = n;
+	    break;
+	  }
+        case i_waitRead:
+	  {
+	    StgInt  n = PopTaggedInt();
+	    context_switch = 1;
+	    hugsBlock->reason = BlockedOnRead;
+	    hugsBlock->delay = n;
+	    break;
+	  }
+        case i_waitWrite:
+	  {
+	    StgInt  n = PopTaggedInt();
+	    context_switch = 1;
+	    hugsBlock->reason = BlockedOnWrite;
+	    hugsBlock->delay = n;
+	    break;
+	  }
+	case i_yield:
+	  {
+	    /* The definition of yield include an enter right after
+	     * the primYield, at which time context_switch is tested.
+	     */
+	    context_switch = 1;
+	    break;
+	  }
         case i_getThreadId:
             {
                 StgWord tid = cap->rCurrentTSO->id;
@@ -3031,38 +3148,6 @@ static void* enterBCO_primop2 ( int primop2code,
                 else PushTaggedInt(0);
                 break;
             }
-        case i_forkIO:
-            {
-                StgClosure* closure;
-                StgTSO*     tso;
-                StgWord     tid;
-                closure = PopCPtr();
-                tso     = createGenThread (RtsFlags.GcFlags.initialStkSize,closure);
-                tid     = tso->id;
-                scheduleThread(tso);
-                context_switch = 1;
-                PushTaggedWord(tid);
-                break;
-            }
-
-#ifdef PROVIDE_CONCURRENT
-        case i_killThread:
-            {
-                StgTSO* tso = stgCast(StgTSO*,PopPtr());
-                deleteThread(tso);
-                if (tso == cap->rCurrentTSO) { /* suicide */
-                    *return2 = ThreadFinished;
-                    return (void*)(1+(NULL));
-                }
-                break;
-            }
-
-        case i_delay:
-        case i_waitRead:
-        case i_waitWrite:
-                /* As PrimOps.h says: Hmm, I'll think about these later. */
-                ASSERT(0);
-                break;
 #endif /* PROVIDE_CONCURRENT */
 
         case i_ccall_ccall_Id:

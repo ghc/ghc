@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.22 $
- * $Date: 2000/03/10 18:28:26 $
+ * $Revision: 1.23 $
+ * $Date: 2000/03/20 04:26:24 $
  * ------------------------------------------------------------------------*/
 
 
@@ -158,15 +158,13 @@
  * without attention.  However, standard Haskell 98 is supported 
  * is supported without needing them.
  */
-#undef  PROVIDE_STABLE
-#undef  PROVIDE_FOREIGN
 #undef  PROVIDE_WEAK
-#undef  PROVIDE_CONCURRENT
-#undef  PROVIDE_PTREQUALITY
-#undef  PROVIDE_COERCE
 
-#define  PROVIDE_COERCE     1
+#define PROVIDE_STABLE      1
+#define PROVIDE_FOREIGN     1
+#define PROVIDE_COERCE      1
 #define PROVIDE_PTREQUALITY 1
+#define PROVIDE_CONCURRENT  1
 
 /* Enable a crude profiler which counts BCO entries, bytes allocated
    and bytecode insns executed on a per-fn basis.  Used for assessing

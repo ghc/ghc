@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.44 $
- * $Date: 2000/03/15 23:27:16 $
+ * $Revision: 1.45 $
+ * $Date: 2000/03/20 04:26:23 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -227,6 +227,10 @@ char *argv[]; {
 #endif
 
     CStackBase = &argc;                 /* Save stack base for use in gc   */
+
+#ifdef DEBUG
+    checkBytecodeCount();		/* check for too many bytecodes    */
+#endif
 
     /* If first arg is +Q or -Q, be entirely silent, and automatically run
        main after loading scripts.  Useful for running the nofib suite.    */
