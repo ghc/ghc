@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.25 2000/02/14 11:15:09 sewardj Exp $                      #
+# $Id: Makefile,v 1.26 2000/02/24 13:58:56 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -49,7 +49,8 @@ hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
       ../rts/Evaluator.o ../rts/ForeignCall.o ../rts/GC.o ../rts/Printer.o \
       ../rts/StgCRun.o ../rts/PrimOps.o
 	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) \
-		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) -lgmp -lm
+		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) \
+		 ../rts/gmp/libgmp.a -lm
 
 foobar:
 	rm -f ../rts/libHSrts.a  ../rts/libHSrts_u.a
