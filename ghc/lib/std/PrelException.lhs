@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.20 2000/06/09 13:49:35 simonmar Exp $
+% $Id: PrelException.lhs,v 1.21 2000/06/18 21:12:31 panne Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -64,6 +64,7 @@ data AsyncException
 data ArrayException
   = IndexOutOfBounds  	String		-- out-of-range array access
   | UndefinedElement	String		-- evaluating an undefined element
+  deriving (Eq, Ord)
 
 stackOverflow, heapOverflow :: Exception -- for the RTS
 stackOverflow = AsyncException StackOverflow
