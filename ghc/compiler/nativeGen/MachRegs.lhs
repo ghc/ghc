@@ -668,22 +668,22 @@ callerSaves (VanillaReg _ ILIT(7))	= True
 callerSaves (VanillaReg _ ILIT(8))	= True
 #endif
 #ifdef CALLER_SAVES_F1
-callerSaves (FloatReg ILIT(1))		= True
+callerSaves (FloatReg 1#)		= True
 #endif
 #ifdef CALLER_SAVES_F2
-callerSaves (FloatReg ILIT(2))		= True
+callerSaves (FloatReg 2#)		= True
 #endif
 #ifdef CALLER_SAVES_F3
-callerSaves (FloatReg ILIT(3))		= True
+callerSaves (FloatReg 3#)		= True
 #endif
 #ifdef CALLER_SAVES_F4
-callerSaves (FloatReg ILIT(4))		= True
+callerSaves (FloatReg 4#)		= True
 #endif
 #ifdef CALLER_SAVES_D1
-callerSaves (DoubleReg ILIT(1))		= True
+callerSaves (DoubleReg 1#)		= True
 #endif
 #ifdef CALLER_SAVES_D2
-callerSaves (DoubleReg ILIT(2))		= True
+callerSaves (DoubleReg 2#)		= True
 #endif
 #ifdef CALLER_SAVES_L1
 callerSaves (LongReg _ ILIT(1))		= True
@@ -722,49 +722,49 @@ magicIdRegMaybe BaseReg			= Just (RealReg REG_Base)
 magicIdRegMaybe (VanillaReg _ 1#) 	= Just (RealReg REG_R1)
 #endif 
 #ifdef REG_R2 
-magicIdRegMaybe (VanillaReg _ ILIT(2)) 	= Just (RealReg REG_R2)
+magicIdRegMaybe (VanillaReg _ 2#) 	= Just (RealReg REG_R2)
 #endif 
 #ifdef REG_R3 
-magicIdRegMaybe (VanillaReg _ ILIT(3)) 	= Just (RealReg REG_R3)
+magicIdRegMaybe (VanillaReg _ 3#) 	= Just (RealReg REG_R3)
 #endif 
 #ifdef REG_R4 
-magicIdRegMaybe (VanillaReg _ ILIT(4)) 	= Just (RealReg REG_R4)
+magicIdRegMaybe (VanillaReg _ 4#) 	= Just (RealReg REG_R4)
 #endif 
 #ifdef REG_R5 
-magicIdRegMaybe (VanillaReg _ ILIT(5)) 	= Just (RealReg REG_R5)
+magicIdRegMaybe (VanillaReg _ 5#) 	= Just (RealReg REG_R5)
 #endif 
 #ifdef REG_R6 
-magicIdRegMaybe (VanillaReg _ ILIT(6)) 	= Just (RealReg REG_R6)
+magicIdRegMaybe (VanillaReg _ 6#) 	= Just (RealReg REG_R6)
 #endif 
 #ifdef REG_R7 
-magicIdRegMaybe (VanillaReg _ ILIT(7)) 	= Just (RealReg REG_R7)
+magicIdRegMaybe (VanillaReg _ 7#) 	= Just (RealReg REG_R7)
 #endif 
 #ifdef REG_R8 
-magicIdRegMaybe (VanillaReg _ ILIT(8)) 	= Just (RealReg REG_R8)
+magicIdRegMaybe (VanillaReg _ 8#) 	= Just (RealReg REG_R8)
 #endif
 #ifdef REG_R9 
-magicIdRegMaybe (VanillaReg _ ILIT(9)) 	= Just (RealReg REG_R9)
+magicIdRegMaybe (VanillaReg _ 9#) 	= Just (RealReg REG_R9)
 #endif
 #ifdef REG_R10 
-magicIdRegMaybe (VanillaReg _ ILIT(10))	= Just (RealReg REG_R10)
+magicIdRegMaybe (VanillaReg _ 10#)	= Just (RealReg REG_R10)
 #endif
 #ifdef REG_F1
-magicIdRegMaybe (FloatReg ILIT(1))	= Just (RealReg REG_F1)
+magicIdRegMaybe (FloatReg 1#)	= Just (RealReg REG_F1)
 #endif				 	
 #ifdef REG_F2			 	
-magicIdRegMaybe (FloatReg ILIT(2))	= Just (RealReg REG_F2)
+magicIdRegMaybe (FloatReg 2#)	= Just (RealReg REG_F2)
 #endif				 	
 #ifdef REG_F3			 	
-magicIdRegMaybe (FloatReg ILIT(3))	= Just (RealReg REG_F3)
+magicIdRegMaybe (FloatReg 3#)	= Just (RealReg REG_F3)
 #endif				 	
 #ifdef REG_F4			 	
-magicIdRegMaybe (FloatReg ILIT(4))	= Just (RealReg REG_F4)
+magicIdRegMaybe (FloatReg 4#)	= Just (RealReg REG_F4)
 #endif				 	
 #ifdef REG_D1			 	
-magicIdRegMaybe (DoubleReg ILIT(1))	= Just (RealReg REG_D1)
+magicIdRegMaybe (DoubleReg 1#)	= Just (RealReg REG_D1)
 #endif				 	
 #ifdef REG_D2			 	
-magicIdRegMaybe (DoubleReg ILIT(2))	= Just (RealReg REG_D2)
+magicIdRegMaybe (DoubleReg 2#)	= Just (RealReg REG_D2)
 #endif
 #ifdef REG_Sp	    
 magicIdRegMaybe Sp		   	= Just (RealReg REG_Sp)

@@ -918,8 +918,6 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       FloatNegOp     -> trivialUFCode FloatRep (FNEG F) x
       DoubleNegOp    -> trivialUFCode DoubleRep (FNEG DF) x
 
-      DoubleNegOp -> trivialUFCode DoubleRep (FNEG DF) x
-
       Double2FloatOp -> trivialUFCode FloatRep  (FxTOy DF F) x
       Float2DoubleOp -> trivialUFCode DoubleRep (FxTOy F DF) x
 

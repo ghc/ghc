@@ -1,5 +1,9 @@
+{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
+-- JRS 010117: we had to say NON_POSIX_SOURCE to get the resulting .hc
+-- to compile on sparc-solaris.  Blargh.
+
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.5 2001/01/14 15:36:04 simonmar Exp $
+-- $Id: Time.hsc,v 1.6 2001/01/17 16:46:02 sewardj Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -333,9 +337,11 @@ normalizeTimeDiff td =
 -- But that's crap, so we do it The BSD Way if we can: namely use the
 -- tm_zone and tm_gmtoff fields of struct tm, if they're available.
 
+zone   :: Ptr CTm -> IO (Ptr CChar)
+gmtoff :: Ptr CTm -> IO CLong
 #if HAVE_TM_ZONE
-zone x      = (#peek struct tm,tm_zone) x   :: IO (Ptr CChar)
-gmtoff x    = (#peek struct tm,tm_gmtoff) x :: IO CLong
+zone x      = (#peek struct tm,tm_zone) x
+gmtoff x    = (#peek struct tm,tm_gmtoff) x
 
 #else /* ! HAVE_TM_ZONE */
 # if HAVE_TZNAME || _WIN32
@@ -347,7 +353,7 @@ foreign label tzname :: Ptr (Ptr CChar)
 #  endif
 zone x = do 
   dst <- (#peek struct tm,tm_isdst) x
-  if dst then peekArray tzname 1 else peekArray tzname 0
+  if dst then peekElemOff tzname 1 else peekElemOff tzname 0
 # else /* ! HAVE_TZNAME */
 -- We're in trouble. If you should end up here, please report this as a bug.
 #  error Dont know how to get at timezone name on your OS.
@@ -371,7 +377,7 @@ gmtoff x = do
 gmtoff x = do 
   dst <- (#peek struct tm,tm_isdst) x
   tz  <- peek timezone
-  if dst then return (fromIngtegral tz - 3600) else return tz
+  if dst then return (fromIntegral tz - 3600) else return tz
 # endif /* ! HAVE_ALTZONE */
 #endif  /* ! HAVE_TM_ZONE */
 
