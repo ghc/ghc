@@ -150,7 +150,9 @@ loadInterface doc_str mod_name from
     in
     foldlRn (loadDecl mod)	     (iDecls ifaces) rd_decls 		`thenRn` \ new_decls ->
     foldlRn (loadInstDecl mod)	     (iInsts ifaces) (pi_insts iface)	`thenRn` \ new_insts ->
-    foldlRn (loadRule mod)	     (iRules ifaces) (pi_rules iface)	`thenRn` \ new_rules -> 
+    (if (opt_IgnoreIfacePragmas) 
+	then returnRn emptyBag
+	else foldlRn (loadRule mod)  (iRules ifaces) (pi_rules iface))	`thenRn` \ new_rules -> 
     foldlRn (loadFixDecl mod_name)   (iFixes ifaces) rd_decls  		`thenRn` \ new_fixities ->
     mapRn   (loadExport this_mod_nm) (pi_exports iface)			`thenRn` \ avails_s ->
     let
@@ -421,7 +423,7 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
     case lookupNameEnv decls name of
 
 	Nothing       -> 	-- We used it before, but it ain't there now
-			  putDocRn (sep [ptext SLIT("No longer exported:"), ppr name])
+			  traceRn (sep [ptext SLIT("No longer exported:"), ppr name])
 			  `thenRn_` returnRn False
 
 	Just (new_vers,_,_,_) 	-- It's there, but is it up to date?
@@ -431,7 +433,7 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
 
 		| otherwise
 			-- Out of date, so bale out
-		-> putDocRn (sep [ptext SLIT("Out of date:"), ppr name])  `thenRn_`
+		-> traceRn (sep [ptext SLIT("Out of date:"), ppr name])  `thenRn_`
 		   returnRn False
 \end{code}
 
@@ -577,7 +579,9 @@ ppr_brief_inst_decl (mod, InstD (InstDecl inst_ty _ _ _ _))
 	other		   -> ppr inst_ty
 
 getImportedRules :: RnMG [(Module,RdrNameHsDecl)]
-getImportedRules
+getImportedRules 
+  | opt_IgnoreIfacePragmas = returnRn []
+  | otherwise
   = getIfacesRn 	`thenRn` \ ifaces ->
     let
 	gates		   = iSlurp ifaces	-- Anything at all that's been slurped
