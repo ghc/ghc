@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCError.lhs,v 1.5 2001/01/26 17:51:54 rrt Exp $
+% $Id: PrelCError.lhs,v 1.6 2001/01/27 07:46:27 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -7,7 +7,7 @@
 C-specific Marshalling support: Handling of C "errno" error codes
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude -#include "cbits/errno.h" #-}
+{-# OPTIONS -fno-implicit-prelude -#include "cbits/ghc_errno.h" #-}
 
 -- this is were we get the CCONST_XXX definitions from that configure
 -- calculated for us
