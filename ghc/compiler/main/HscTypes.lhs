@@ -32,8 +32,7 @@ module HscTypes (
 	extendTypeEnvList, extendTypeEnvWithIds,
 	typeEnvElts, typeEnvClasses, typeEnvTyCons, typeEnvIds,
 
-	ImportedModuleInfo, WhetherHasOrphans, ImportVersion, WhatsImported(..),
-	IsBootInterface, DeclsMap,
+	WhetherHasOrphans, IsBootInterface, DeclsMap, Usage(..), Dependencies, 
 	IfaceInsts, IfaceRules, GatedDecl, GatedDecls, GateFn, 
 	NameCache(..), OrigNameCache, OrigIParamCache,
 	Avails, availsToNameSet, availName, availNames,
@@ -83,14 +82,15 @@ import Class		( Class, classSelIds )
 import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataCons_maybe )
 import Type		( TyThing(..), isTyClThing )
 import DataCon		( dataConWorkId, dataConWrapId )
-import Packages		( PackageName, preludePackage )
+import Packages		( PackageName, basePackage )
 import CmdLineOpts	( DynFlags )
 
 import BasicTypes	( Version, initialVersion, IPName,
 			  Fixity, FixitySig(..), defaultFixity )
 
-import HsSyn		( DeprecTxt, TyClDecl, InstDecl, RuleDecl, 
-			  tyClDeclName, ifaceRuleDeclName, tyClDeclNames )
+import HsSyn		( DeprecTxt, TyClDecl, InstDecl, RuleDecl,
+			  tyClDeclName, ifaceRuleDeclName, tyClDeclNames,
+			  instDeclDFun )
 import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
 import CoreSyn		( IdCoreRule )
@@ -193,15 +193,20 @@ data ModIface
    = ModIface {
         mi_module   :: !Module,
 	mi_package  :: !PackageName,	    -- Which package the module comes from
-        mi_version  :: !VersionInfo,	    -- Module version number
+        mi_version  :: !VersionInfo,	    -- Version info for everything in this module
         mi_orphan   :: !WhetherHasOrphans,  -- Whether this module has orphans
 	mi_boot	    :: !IsBootInterface,    -- Read from an hi-boot file?
 
-        mi_usages   :: [ImportVersion Name],
+	mi_deps	    :: Dependencies,
+		-- This is consulted for directly-imported modules, but
+		-- not for anything else
+
+        mi_usages   :: [Usage Name],
 		-- Usages; kept sorted so that it's easy to decide
 		-- whether to write a new iface file (changing usages
 		-- doesn't affect the version of this module)
 		-- NOT STRICT!  we read this field lazily from the interface file
+		-- It is *only* consulted by the recompilation checker
 
         mi_exports  :: ![ExportItem],
 		-- What it exports Kept sorted by (mod,occ), to make
@@ -229,8 +234,6 @@ data ModDetails
         md_rules    :: ![IdCoreRule]	-- Domain may include Ids from other modules
      }
 
-
-
 -- A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module
 -- being compiled right now.  Once it is compiled, a ModIface and 
@@ -239,10 +242,11 @@ data ModDetails
 data ModGuts
   = ModGuts {
         mg_module   :: !Module,
-	mg_exports  :: !Avails,			-- What it exports
-	mg_usages   :: ![ImportVersion Name],	-- What it imports, directly or otherwise
-						-- ...exactly as in ModIface
-	mg_dir_imps :: ![Module],		-- Directly imported modules
+	mg_exports  :: !Avails,		-- What it exports
+	mg_deps	    :: !Dependencies,	-- What is below it, directly or otherwise
+	mg_dir_imps :: ![Module],	-- Directly-imported modules; used to
+					--	generate initialisation code
+	mg_usages   :: ![Usage Name],	-- Version info for what it needed
 
         mg_rdr_env  :: !GlobalRdrEnv,	-- Top-level lexical environment
 	mg_fix_env  :: !FixityEnv,	-- Fixity env, for things declared in this module
@@ -306,22 +310,25 @@ data IfaceDecls = IfaceDecls { dcl_tycl  :: [RenamedTyClDecl],	-- Sorted
 			       dcl_insts :: [RenamedInstDecl] }	-- Unsorted
 
 mkIfaceDecls :: [RenamedTyClDecl] -> [RenamedRuleDecl] -> [RenamedInstDecl] -> IfaceDecls
+-- Sort to put them in canonical order for version comparison
 mkIfaceDecls tycls rules insts
   = IfaceDecls { dcl_tycl  = sortLt lt_tycl tycls,
 		 dcl_rules = sortLt lt_rule rules,
-		 dcl_insts = insts }
+		 dcl_insts = sortLt lt_inst insts }
   where
     d1 `lt_tycl` d2 = tyClDeclName      d1 < tyClDeclName      d2
     r1 `lt_rule` r2 = ifaceRuleDeclName r1 < ifaceRuleDeclName r2
+    i1 `lt_inst` i2 = instDeclDFun      i1 < instDeclDFun      i2
 \end{code}
 
 \begin{code}
 emptyModIface :: Module -> ModIface
 emptyModIface mod
   = ModIface { mi_module   = mod,
-	       mi_package  = preludePackage, -- XXX fully bogus
+	       mi_package  = basePackage, -- XXX fully bogus
 	       mi_version  = initialVersionInfo,
 	       mi_usages   = [],
+	       mi_deps     = ([], []),
 	       mi_orphan   = False,
 	       mi_boot	   = False,
 	       mi_exports  = [],
@@ -353,7 +360,8 @@ data ParsedIface
       pi_pkg       :: PackageName,
       pi_vers	   :: Version,		 		-- Module version number
       pi_orphan    :: WhetherHasOrphans,		-- Whether this module has orphans
-      pi_usages	   :: [ImportVersion OccName],		-- Usages
+      pi_deps      :: Dependencies,			-- What it depends on
+      pi_usages	   :: [Usage OccName],			-- Usages
       pi_exports   :: (Version, [RdrExportItem]),	-- Exports
       pi_decls	   :: [(Version, TyClDecl RdrName)],	-- Local definitions
       pi_fixity	   :: [FixitySig RdrName],		-- Local fixity declarations,
@@ -604,33 +612,30 @@ type WhetherHasOrphans   = Bool
 	--	* a transformation rule in a module other than the one defining
 	--		the function in the head of the rule.
 
-type IsBootInterface     = Bool
+type IsBootInterface = Bool
 
-type ImportVersion name  = (ModuleName, WhetherHasOrphans, IsBootInterface, WhatsImported name)
+-- Dependency info about modules and packages below this one
+-- in the import hierarchy.  See TcRnTypes.ImportAvails for details.
+--
+-- Invariant: the dependencies of a module M never includes M
+type Dependencies
+  = ([(ModuleName, WhetherHasOrphans, IsBootInterface)], [PackageName])
 
-data WhatsImported name  = NothingAtAll			-- The module is below us in the
-							-- hierarchy, but we import nothing
-							-- Used for orphan modules, so they appear
-							-- in the usage list
-
-			 | Everything Version		-- Used for modules from other packages;
-							-- we record only the module's version number
-
-			 | Specifically 
-				Version			-- Module version
-				(Maybe Version)		-- Export-list version, if we depend on it
-				[(name,Version)]	-- List guaranteed non-empty
-				Version			-- Rules version
-
-			 deriving( Eq )
-	-- 'Specifically' doesn't let you say "I imported f but none of the rules in
+data Usage name 
+  = Usage { usg_name     :: ModuleName,		-- Name of the module
+	    usg_mod      :: Version,		-- Module version
+	    usg_exports  :: Maybe Version,	-- Export-list version, if we depend on it
+	    usg_entities :: [(name,Version)],	-- Sorted by occurrence name
+	    usg_rules    :: Version 		-- Rules version
+    }	    deriving( Eq )
+	-- This type doesn't let you say "I imported f but none of the rules in
 	-- the module". If you use anything in the module you get its rule version
 	-- So if the rules change, you'll recompile, even if you don't use them.
 	-- This is easy to implement, and it's safer: you might not have used the rules last
 	-- time round, but if someone has added a new rule you might need it this time
 
 	-- The export list field is (Just v) if we depend on the export list:
-	--	we imported the module without saying exactly what we imported
+	--	i.e. we imported the module without saying exactly what we imported
 	-- We need to recompile if the module exports changes, because we might
 	-- now have a name clash in the importing module.
 \end{code}
@@ -673,11 +678,6 @@ data ExternalPackageState
 		--	* Its exports
 		--	* Fixities
 		--	* Deprecations
-
-	eps_imp_mods :: !ImportedModuleInfo,
-		-- Modules that we know something about, because they are mentioned
-		-- in interface files, BUT which we have not loaded yet.  
-		-- No module is both in here and in the PIT
 
 	eps_PTE :: !PackageTypeEnv,		-- Domain = external-package modules
 
@@ -730,20 +730,14 @@ data NameCache
 		-- Ensures that one implicit parameter name gets one unique
    }
 
-type OrigNameCache   = FiniteMap (ModuleName,OccName) Name
+type OrigNameCache = ModuleEnv (Module, OccNameCache)
+ 	-- Maps a module *name* to a Module, 
+	-- plus the OccNameEnv fot that module
+type OccNameCache = FiniteMap OccName Name
+	-- Maps the OccName to a Name
+	-- A FiniteMap because OccNames have a Namespace/Faststring pair
+
 type OrigIParamCache = FiniteMap (IPName RdrName) (IPName Name)
-\end{code}
-
-@ImportedModuleInfo@ contains info ONLY about modules that have not yet 
-been loaded into the iPIT.  These modules are mentioned in interfaces we've
-already read, so we know a tiny bit about them, but we havn't yet looked
-at the interface file for the module itself.  It needs to persist across 
-invocations of the renamer, at least from Rename.checkOldIface to Rename.renameSource.
-And there's no harm in it persisting across multiple compilations.
-
-\begin{code}
-type ImportedModuleInfo 
-    = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface)
 \end{code}
 
 A DeclsMap contains a binding for each Name in the declaration

@@ -7,7 +7,7 @@
 \begin{code}
 module MkIface ( 
 	showIface, mkIface, mkUsageInfo,
-	pprIface, pprUsage, pprUsages, pprExports,
+	pprIface, 
 	ifaceTyThing,
   ) where
 
@@ -22,17 +22,18 @@ import BasicTypes	( NewOrData(..), Activation(..), FixitySig(..),
 			)
 import NewDemand	( isTopSig )
 import TcRnMonad
+import TcRnTypes	( ImportAvails(..) )
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import HscTypes		( VersionInfo(..), ModIface(..), HomeModInfo(..),
 			  ModGuts(..), ModGuts, 
 			  GhciMode(..), HscEnv(..),
 			  FixityEnv, lookupFixity, collectFixities,
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  TyThing(..), DFunId, 
+			  TyThing(..), DFunId, Dependencies,
 			  Avails, AvailInfo, GenAvailInfo(..), availName, 
 			  ExternalPackageState(..),
-			  WhatsImported(..), ParsedIface(..),
-			  ImportVersion, Deprecations(..), initialVersionInfo,
+			  ParsedIface(..), Usage(..),
+			  Deprecations(..), initialVersionInfo,
 			  lookupVersion
 			)
 
@@ -59,7 +60,7 @@ import SrcLoc		( noSrcLoc )
 import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
 			  ModLocation(..), mkSysModuleNameFS,
 			  ModuleEnv, emptyModuleEnv, foldModuleEnv, lookupModuleEnv,
-			  extendModuleEnv_C, elemModuleSet, moduleEnvElts
+			  extendModuleEnv_C, elemModuleSet, moduleEnvElts, elemModuleEnv
 			)
 import Outputable
 import Util		( sortLt, dropList, seqList )
@@ -70,7 +71,8 @@ import FiniteMap
 import FastString
 
 import Monad		( when )
-import Maybe		( catMaybes, isJust )
+import Maybe		( catMaybes, isJust, isNothing )
+import Maybes		( orElse )
 import IO		( putStrLn )
 \end{code}
 
@@ -87,6 +89,7 @@ showIface filename = do
    parsed_iface <- Binary.getBinFileWithDict filename
    let ParsedIface{
       pi_mod=pi_mod, pi_pkg=pi_pkg, pi_vers=pi_vers,
+      pi_deps=pi_deps,
       pi_orphan=pi_orphan, pi_usages=pi_usages,
       pi_exports=pi_exports, pi_decls=pi_decls,
       pi_fixity=pi_fixity, pi_insts=pi_insts,
@@ -98,6 +101,7 @@ showIface filename = do
 	   <+> ptext SLIT("where"),
 	-- no instance Outputable (WhatsImported):
 	pprExports id (snd pi_exports),
+	pprDeps pi_deps,
 	pprUsages  id pi_usages,
 	hsep (map ppr_fix pi_fixity) <> semi,
 	vcat (map ppr_inst pi_insts),
@@ -131,6 +135,7 @@ mkIface :: HscEnv
 mkIface hsc_env location maybe_old_iface 
 	impl@ModGuts{ mg_module = this_mod,
 		      mg_usages = usages,
+		      mg_deps   = deps,
 		      mg_exports = exports,
 		      mg_rdr_env = rdr_env,
 		      mg_fix_env = fix_env,
@@ -144,6 +149,7 @@ mkIface hsc_env location maybe_old_iface
 	        iface_w_decls = ModIface { mi_module   = this_mod,
 					   mi_package  = opt_InPackage,
 					   mi_version  = initialVersionInfo,
+					   mi_deps     = deps,
 					   mi_usages   = usages,
 					   mi_exports  = my_exports,
 					   mi_decls    = new_decls,
@@ -465,118 +471,77 @@ compiled with -O.  I think this is the case.]
 
 \begin{code}
 mkUsageInfo :: HscEnv -> ExternalPackageState
-	    -> ImportAvails -> Usages 
-	    -> [ImportVersion Name]
+	    -> ImportAvails -> EntityUsage
+	    -> [Usage Name]
 
 mkUsageInfo hsc_env eps
-	    (ImportAvails { imp_mods = dir_imp_mods })
-	    (Usages { usg_ext  = pkg_mods, 
-		      usg_home = home_names })
-  = let
-	hpt = hsc_HPT hsc_env
-	pit = eps_PIT eps
-
-	import_all_mods = [moduleName m | (m,True) <- moduleEnvElts dir_imp_mods]
-
-	-- mv_map groups together all the things imported and used
-	-- from a particular module in this package
-	-- We use a finite map because we want the domain
-	mv_map :: ModuleEnv [Name]
-	mv_map  = foldNameSet add_mv emptyModuleEnv home_names
-        add_mv name mv_map = extendModuleEnv_C add_item mv_map mod [name]
-			   where
-			     mod = nameModule name
-			     add_item names _ = name:names
-
-	-- In our usage list we record
-	--
-	--	a) Specifically: Detailed version info for imports
-	--         from modules in this package Gotten from iVSlurp plus
-	--         import_all_mods
-	--
-	--	b) Everything: Just the module version for imports
-	--         from modules in other packages Gotten from iVSlurp plus
-	--         import_all_mods
-	--
-	--	c) NothingAtAll: The name only of modules, Baz, in
-	--	   this package that are 'below' us, but which we didn't need
-	--	   at all (this is needed only to decide whether to open Baz.hi
-	--	   or Baz.hi-boot higher up the tree).  This happens when a
-	--	   module, Foo, that we explicitly imported has 'import Baz' in
-	--	   its interface file, recording that Baz is below Foo in the
-	--	   module dependency hierarchy.  We want to propagate this
-	--	   info.  These modules are in a combination of HIT/PIT and
-	--	   iImpModInfo
-	--
-	--	d) NothingAtAll: The name only of all orphan modules
-	--	   we know of (this is needed so that anyone who imports us can
-	--	   find the orphan modules) These modules are in a combination
-	--	   of HIT/PIT and iImpModInfo
-
-	import_info0 = foldModuleEnv mk_imp_info 	      []	   pit
-	import_info1 = foldModuleEnv (mk_imp_info . hm_iface) import_info0 hpt
-	import_info  = not_even_opened_imports ++ import_info1
-
-		-- Recall that iImpModInfo describes modules that have
-		-- been mentioned in the import lists of interfaces we
-		-- have seen mentioned, but which we have not even opened when
-		-- compiling this module
-	not_even_opened_imports =
-	  [ (mod_name, orphans, is_boot, NothingAtAll) 
-	  | (mod_name, (orphans, is_boot)) <- fmToList (eps_imp_mods eps)]
-
-	
-	mk_imp_info :: ModIface -> [ImportVersion Name] -> [ImportVersion Name]
-	mk_imp_info iface so_far
-
-	  | Just ns <- lookupModuleEnv mv_map mod 	-- Case (a)
-	  = go_for_it (Specifically mod_vers maybe_export_vers 
-				    (mk_import_items ns) rules_vers)
-
-	  | mod `elemModuleSet` pkg_mods		-- Case (b)
-	  = go_for_it (Everything mod_vers)
-
-	  | import_all_mod				-- Case (a) and (b); the import-all part
-	  = if is_home_pkg_mod then
-		go_for_it (Specifically mod_vers (Just export_vers) [] rules_vers)
-		-- Since the module isn't in the mv_map, presumably we
-		-- didn't actually import anything at all from it
-	    else
-		go_for_it (Everything mod_vers)
-		
-	  | is_home_pkg_mod || has_orphans		-- Case (c) or (d)
-	  = go_for_it NothingAtAll
-
-	  | otherwise = so_far
-	  where
-	    go_for_it exports = (mod_name, has_orphans, mi_boot iface, exports) : so_far
-
-	    mod		    = mi_module iface
-	    mod_name	    = moduleName mod
-	    is_home_pkg_mod = isHomeModule mod
-	    version_info    = mi_version iface
-	    version_env     = vers_decls   version_info
-	    mod_vers	    = vers_module  version_info
-	    rules_vers	    = vers_rules   version_info
-	    export_vers	    = vers_exports version_info
-	    import_all_mod  = mod_name `elem` import_all_mods
-	    has_orphans	    = mi_orphan iface
-	    
-		-- The sort is to put them into canonical order
-	    mk_import_items ns = [(n,v) | n <- sortLt lt_occ ns, 
-	    		                  let v = lookupVersion version_env n
-		                 ]
-			 where
-			   lt_occ n1 n2 = nameOccName n1 < nameOccName n2
-
-	    maybe_export_vers | import_all_mod = Just (vers_exports version_info)
-			      | otherwise      = Nothing
-    in
-
-    -- seq the list of ImportVersions returned: occasionally these
+	    (ImportAvails { imp_mods = dir_imp_mods,
+			    dep_mods = dep_mods })
+	    used_names
+  = -- seq the list of Usages returned: occasionally these
     -- don't get evaluated for a while and we can end up hanging on to
     -- the entire collection of Ifaces.
-    import_info `seqList` import_info
+    usages `seqList` usages
+  where
+    usages = catMaybes (map mkUsage (moduleEnvElts hpt))
+    hpt    = hsc_HPT hsc_env
+    
+    import_all mod = case lookupModuleEnv dir_imp_mods mod of
+    			Just (_,imp_all) -> imp_all
+    			Nothing		 -> False
+    
+	-- Find out whether this module is an
+    is_orphan_mod mod = case lookupModuleEnv dep_mods mod of
+			     Just (_, orph, _) -> orph
+			     Nothing	       -> False
+    
+    -- ent_map groups together all the things imported and used
+    -- from a particular module in this package
+    ent_map :: ModuleEnv [Name]
+    ent_map  = foldNameSet add_mv emptyModuleEnv used_names
+    add_mv name mv_map = extendModuleEnv_C add_item mv_map mod [name]
+    		   where
+    		     mod = nameModule name
+    		     add_item names _ = name:names
+    
+    -- We want to create a Usage for a home module if 
+    --	a) we used something from; has something in used_names
+    --	b) we imported all of it, even if we used nothing from it
+    --		(need to recompile if its export list changes: export_vers)
+    --	c) is a home-package orphan module (need to recompile if its
+    --	 	instance decls change: rules_vers)
+    mkUsage :: HomeModInfo -> Maybe (Usage Name)
+    mkUsage mod_info
+      |  null used_names
+      && not all_imported
+      && not orphan_mod
+      = Nothing
+    
+      | otherwise	
+      = Just (Usage { usg_name     = moduleName mod,
+    	  	      usg_mod      = mod_vers,
+    		      usg_exports  = export_vers,
+    		      usg_entities = ent_vers,
+    		      usg_rules    = rules_vers })
+      where
+        iface 	     = hm_iface mod_info
+        mod   	     = mi_module iface
+        version_info = mi_version iface
+	orphan_mod   = mod `elemModuleEnv` dep_mods && mi_orphan iface
+			-- Only bother if the module is below 
+			-- us in the import graph
+        version_env  = vers_decls   version_info
+        mod_vers     = vers_module  version_info
+        rules_vers   = vers_rules   version_info
+        all_imported = import_all mod 
+        export_vers | all_imported = Just (vers_exports version_info)
+    		    | otherwise    = Nothing
+    
+    	-- The sort is to put them into canonical order
+        used_names = lookupModuleEnv ent_map mod `orElse` []
+        ent_vers = [(n, lookupVersion version_env n) 
+    	           | n <- sortLt lt_occ used_names ]
+        lt_occ n1 n2 = nameOccName n1 < nameOccName n2
 \end{code}
 
 \begin{code}
@@ -669,6 +634,7 @@ addVersionInfo (Just old_iface@(ModIface { mi_version  = old_version,
 
     no_export_change = mi_exports old_iface == mi_exports new_iface		-- Kept sorted
     no_rule_change   = dcl_rules old_decls  == dcl_rules  new_decls		-- Ditto
+		     && dcl_insts old_decls == dcl_insts  new_decls
     no_deprec_change = old_deprecs	    == new_deprecs
 
 	-- Fill in the version number on the new declarations by looking at the old declarations.
@@ -747,6 +713,7 @@ pprIface iface
 		<+> ptext SLIT("where")
 
 	, pprExports nameOccName (mi_exports iface)
+	, pprDeps    (mi_deps iface)
 	, pprUsages  nameOccName (mi_usages iface)
 
 	, pprFixities (mi_fixities iface) (dcl_tycl decls)
@@ -793,30 +760,36 @@ pprOcc n = pprOccName (nameOccName n)
 
 
 \begin{code}
-pprUsages :: (a -> OccName) -> [ImportVersion a] -> SDoc
+pprUsages :: (a -> OccName) -> [Usage a] -> SDoc
 pprUsages getOcc usages = vcat (map (pprUsage getOcc) usages)
 
-pprUsage :: (a -> OccName) -> ImportVersion a -> SDoc
-pprUsage getOcc (m, has_orphans, is_boot, whats_imported)
-  = hsep [ptext SLIT("import"), ppr m, 
-	  pp_orphan, pp_boot,
-	  pp_versions whats_imported
+pprUsage :: (a -> OccName) -> Usage a -> SDoc
+pprUsage getOcc usage
+  = hsep [ptext SLIT("import"), ppr (usg_name usage), 
+	  int (usg_mod usage), 
+	  pp_export_version (usg_exports usage),
+	  int (usg_rules usage),
+	  pp_versions (usg_entities usage)
     ] <> semi
   where
-    pp_orphan | has_orphans = char '!'
-	      | otherwise   = empty
-    pp_boot   | is_boot     = char '@'
-              | otherwise   = empty
-
-	-- Importing the whole module is indicated by an empty list
-    pp_versions NothingAtAll   		    = empty
-    pp_versions (Everything v) 		    = dcolon <+> int v
-    pp_versions (Specifically vm ve nvs vr) = 
-	dcolon <+> int vm <+> pp_export_version ve <+> int vr 
-	<+> hsep [ ppr (getOcc n) <+> int v | (n,v) <- nvs ]
+    pp_versions nvs = hsep [ ppr (getOcc n) <+> int v | (n,v) <- nvs ]
 
     pp_export_version Nothing  = empty
     pp_export_version (Just v) = int v
+
+
+pprDeps :: Dependencies -> SDoc
+pprDeps (mods, pkgs)
+  = vcat [ptext SLIT("module dependencies:") <+> fsep (map ppr_mod mods),
+	  ptext SLIT("package dependencies:") <+> fsep (map ppr pkgs)]
+  where
+    ppr_mod (mod_name, orph, boot)
+      = ppr mod_name <+> ppr_orphan orph <+> ppr_boot boot
+   
+    ppr_orphan True  = char '!'
+    ppr_orphan False = empty
+    ppr_boot   True  = char '@'
+    ppr_boot   False = empty
 \end{code}
 
 \begin{code}

@@ -15,7 +15,7 @@ import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), ExternalPackageState(..),
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
 import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr )
-import TcRnTypes	( TcGblEnv(..), ImportAvails(imp_mods) )
+import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
 import MkIface		( mkUsageInfo )
 import Id		( Id )
 import CoreSyn
@@ -89,9 +89,11 @@ deSugar hsc_env pcs
 		  (printDump (ppr_ds_rules ds_rules))
 
 	; let 
+	     deps = (moduleEnvElts (dep_mods imports), dep_pkgs imports)
 	     mod_guts = ModGuts {	
 		mg_module   = mod,
 		mg_exports  = exports,
+		mg_deps	    = deps,
 		mg_usages   = mkUsageInfo hsc_env eps imports usages,
 		mg_dir_imps = [m | (m,_) <- moduleEnvElts (imp_mods imports)],
 	        mg_rdr_env  = rdr_env,

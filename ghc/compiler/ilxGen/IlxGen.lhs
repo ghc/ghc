@@ -31,7 +31,7 @@ import Name		( nameModule, nameOccName, isExternalName, isInternalName, NamedThi
 import Subst   		( substTyWith )
 
 import Module		( Module, PackageName, ModuleName, moduleName, 
-                          modulePackage, preludePackage,
+                          modulePackage, basePackage,
 			  isHomeModule, isVanillaModule,
                           pprModuleName, mkHomeModule, mkModuleName
 			)
@@ -168,7 +168,7 @@ importsName env n
 
 
 importsPrelude | inPrelude = addModuleImpInfo (mkModuleName "PrelGHC")
-	       | otherwise = addPackageImpInfo preludePackage
+	       | otherwise = addPackageImpInfo basePackage
 
 
 importsType :: IlxEnv -> Type -> ImportsInfo -> ImportsInfo
@@ -1465,7 +1465,7 @@ nameReference env n
 -- gets things working for the scenario "standard library linked as one
 -- assembly with multiple modules + a one module program running on top of this"
 -- Same applies to all other mentions of Vailla modules in this file
-  | isVanillaModule (nameModule n)  && not inPrelude =  preludePackageReference
+  | isVanillaModule (nameModule n)  && not inPrelude =  basePackageReference
   | isVanillaModule (nameModule n)  && inPrelude =   moduleNameReference (moduleName (nameModule n))
 -- end hack
   | otherwise = packageReference (modulePackage (nameModule n))
@@ -1477,13 +1477,13 @@ moduleReference env m
   | ilxEnvModule env   == m = text ""
   | isHomeModule m = moduleNameReference (moduleName m)
   -- See hack above
-  | isVanillaModule m && not inPrelude =  preludePackageReference
+  | isVanillaModule m && not inPrelude =  basePackageReference
   | isVanillaModule m && inPrelude =  moduleNameReference (moduleName m)
   -- end hack
   | otherwise  =  packageReference (modulePackage m)
 
-preludePackageReference = packageReference preludePackage
-inPrelude = preludePackage == opt_InPackage
+basePackageReference = packageReference basePackage
+inPrelude = basePackage == opt_InPackage
 
 ------------------------------------------------
 -- This code is copied from absCSyn/CString.lhs,
@@ -1693,13 +1693,13 @@ prelGHCReference :: IlxTyFrag
 prelGHCReference env =
    if ilxEnvModule env == mkHomeModule (mkModuleName "PrelGHC") then empty
    else if inPrelude then moduleNameReference (mkModuleName "PrelGHC")
-   else preludePackageReference
+   else basePackageReference
 
 prelBaseReference :: IlxTyFrag
 prelBaseReference env =
    if ilxEnvModule env == mkHomeModule (mkModuleName "PrelBase") then empty
    else if inPrelude then moduleNameReference (mkModuleName "PrelBase")
-   else preludePackageReference
+   else basePackageReference
 
 repThread = ilxType "class [mscorlib]System.Threading.Thread /* ThreadId# */ "
 repByteArray = ilxType "unsigned int8[] /* ByteArr# */ "

@@ -56,9 +56,8 @@ module Module
     , moduleString		-- :: Module -> EncodedString
     , moduleUserString		-- :: Module -> UserString
 
-    , mkVanillaModule	        -- :: ModuleName -> Module
-    , isVanillaModule		-- :: Module -> Bool
-    , mkPrelModule		-- :: UserString -> Module
+    , mkBasePkgModule		-- :: UserString -> Module
+    , mkThPkgModule		-- :: UserString -> Module
     , mkHomeModule		-- :: ModuleName -> Module
     , isHomeModule		-- :: Module -> Bool
     , mkPackageModule		-- :: ModuleName -> Module
@@ -84,7 +83,7 @@ module Module
 #include "HsVersions.h"
 import OccName
 import Outputable
-import Packages		( PackageName, preludePackage )
+import Packages		( PackageName, basePackage, thPackage )
 import CmdLineOpts	( opt_InPackage )
 import FastString	( FastString )
 import Unique		( Uniquable(..) )
@@ -118,24 +117,13 @@ renamer href here.)
 \begin{code}
 data Module = Module ModuleName !PackageInfo
 
-instance Binary Module where
-   put_ bh (Module m p) = put_ bh m
-   get bh = do m <- get bh; return (Module m DunnoYet)
-
 data PackageInfo
   = ThisPackage				-- A module from the same package 
 					-- as the one being compiled
   | AnotherPackage			-- A module from a different package
 
-  | DunnoYet	-- This is used when we don't yet know
-		-- Main case: we've come across Foo.x in an interface file
-		-- but we havn't yet opened Foo.hi.  We need a Name for Foo.x
-		-- Later on (in RnEnv.newTopBinder) we'll update the cache
-		-- to have the right PackageName
-
 packageInfoPackage :: PackageInfo -> PackageName
 packageInfoPackage ThisPackage        = opt_InPackage
-packageInfoPackage DunnoYet	      = FSLIT("<?>")
 packageInfoPackage AnotherPackage     = FSLIT("<pkg>")
 
 instance Outputable PackageInfo where
@@ -274,13 +262,21 @@ pprModule (Module mod p) = getPprStyle $ \ sty ->
 
 
 \begin{code}
-mkPrelModule :: ModuleName -> Module
-mkPrelModule mod_nm
+mkBasePkgModule :: ModuleName -> Module
+mkBasePkgModule mod_nm
   = Module mod_nm pack_info
   where
     pack_info
-      | opt_InPackage == preludePackage = ThisPackage
-      | otherwise			= AnotherPackage
+      | opt_InPackage == basePackage = ThisPackage
+      | otherwise		     = AnotherPackage
+
+mkThPkgModule :: ModuleName -> Module
+mkThPkgModule mod_nm
+  = Module mod_nm pack_info
+  where
+    pack_info
+      | opt_InPackage == thPackage = ThisPackage
+      | otherwise		   = AnotherPackage
 
 mkHomeModule :: ModuleName -> Module
 mkHomeModule mod_nm = Module mod_nm ThisPackage
@@ -291,16 +287,6 @@ isHomeModule _                       = False
 
 mkPackageModule :: ModuleName -> Module
 mkPackageModule mod_nm = Module mod_nm AnotherPackage
-
--- Used temporarily when we first come across Foo.x in an interface
--- file, but before we've opened Foo.hi.
--- (Until we've opened Foo.hi we don't know what the Package is.)
-mkVanillaModule :: ModuleName -> Module
-mkVanillaModule name = Module name DunnoYet
-
-isVanillaModule :: Module -> Bool
-isVanillaModule (Module nm DunnoYet) = True
-isVanillaModule _                       = False
 
 moduleString :: Module -> EncodedString
 moduleString (Module (ModuleName fs) _) = unpackFS fs

@@ -34,7 +34,7 @@ module Name (
 #include "HsVersions.h"
 
 import OccName		-- All of it
-import Module		( Module, ModuleName, moduleName, mkVanillaModule, isHomeModule )
+import Module		( Module, ModuleName, moduleName, isHomeModule )
 import CmdLineOpts	( opt_Static )
 import SrcLoc		( noSrcLoc, isWiredInLoc, wiredInSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), getKey, pprUnique )
@@ -177,11 +177,11 @@ mkInternalName uniq occ loc = Name { n_uniq = uniq, n_sort = Internal, n_occ = o
 
 mkExternalName :: Unique -> Module -> OccName -> SrcLoc -> Name
 mkExternalName uniq mod occ loc = Name { n_uniq = uniq, n_sort = External mod,
-				       n_occ = occ, n_loc = loc }
+				         n_occ = occ, n_loc = loc }
 
-mkKnownKeyExternalName :: ModuleName -> OccName -> Unique -> Name
+mkKnownKeyExternalName :: Module -> OccName -> Unique -> Name
 mkKnownKeyExternalName mod occ uniq
-  = mkExternalName uniq (mkVanillaModule mod) occ noSrcLoc
+  = mkExternalName uniq mod occ noSrcLoc
 
 mkWiredInName :: Module -> OccName -> Unique -> Name
 mkWiredInName mod occ uniq = mkExternalName uniq mod occ wiredInSrcLoc

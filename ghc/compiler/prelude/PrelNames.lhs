@@ -4,8 +4,7 @@
 \section[PrelNames]{Definitions of prelude modules and names}
 
 
-The strings identify built-in prelude modules.  They are
-defined here so as to avod 
+Nota Bene: all Names defined in here should come from the base package
 
 * ModuleNames for prelude modules, 
 	e.g.	pREL_BASE_Name :: ModuleName
@@ -62,17 +61,10 @@ module PrelNames (
 
 #include "HsVersions.h"
 
-import Module	  ( ModuleName, mkPrelModule, mkHomeModule, mkModuleName,mkVanillaModule )
-import OccName	  ( UserFS, dataName, tcName, clsName, 
+import Module	  ( ModuleName, mkBasePkgModule, mkHomeModule, mkModuleName )
+import OccName	  ( UserFS, dataName, tcName, clsName, varName,
 		    mkKindOccFS, mkOccFS
 		  )
-
--- to avoid clashes with Meta.var we must make a local alias for OccName.varName
--- we do this by removing varName from the import of OccName above, making
--- a qualified instance of OccName and using OccNameAlias.varName where varName
--- ws previously used in this file.
-import qualified OccName as OccNameAlias 
-
 		  
 import RdrName	  ( RdrName, nameRdrName, mkOrig, rdrNameOcc )
 import Unique	  ( Unique, Uniquable(..), hasKey,
@@ -100,7 +92,7 @@ import FastString
 This *local* name is used by the interactive stuff
 
 \begin{code}
-itName uniq = mkInternalName uniq (mkOccFS OccNameAlias.varName FSLIT("it")) noSrcLoc
+itName uniq = mkInternalName uniq (mkOccFS varName FSLIT("it")) noSrcLoc
 \end{code}
 
 \begin{code}
@@ -285,18 +277,18 @@ aDDR_Name	  = mkModuleName "Addr"
 
 gLA_EXTS_Name   = mkModuleName "GHC.Exts"
 
-gHC_PRIM     	= mkPrelModule gHC_PRIM_Name
-pREL_BASE    	= mkPrelModule pREL_BASE_Name
-pREL_ADDR    	= mkPrelModule pREL_ADDR_Name
-pREL_PTR    	= mkPrelModule pREL_PTR_Name
-pREL_STABLE  	= mkPrelModule pREL_STABLE_Name
-pREL_IO_BASE 	= mkPrelModule pREL_IO_BASE_Name
-pREL_PACK    	= mkPrelModule pREL_PACK_Name
-pREL_ERR     	= mkPrelModule pREL_ERR_Name
-pREL_NUM     	= mkPrelModule pREL_NUM_Name
-pREL_REAL    	= mkPrelModule pREL_REAL_Name
-pREL_FLOAT   	= mkPrelModule pREL_FLOAT_Name
-pRELUDE		= mkPrelModule pRELUDE_Name
+gHC_PRIM     	= mkBasePkgModule gHC_PRIM_Name
+pREL_BASE    	= mkBasePkgModule pREL_BASE_Name
+pREL_ADDR    	= mkBasePkgModule pREL_ADDR_Name
+pREL_PTR    	= mkBasePkgModule pREL_PTR_Name
+pREL_STABLE  	= mkBasePkgModule pREL_STABLE_Name
+pREL_IO_BASE 	= mkBasePkgModule pREL_IO_BASE_Name
+pREL_PACK    	= mkBasePkgModule pREL_PACK_Name
+pREL_ERR     	= mkBasePkgModule pREL_ERR_Name
+pREL_NUM     	= mkBasePkgModule pREL_NUM_Name
+pREL_REAL    	= mkBasePkgModule pREL_REAL_Name
+pREL_FLOAT   	= mkBasePkgModule pREL_FLOAT_Name
+pRELUDE		= mkBasePkgModule pRELUDE_Name
 
 
 iNTERACTIVE     = mkHomeModule (mkModuleName "$Interactive")
@@ -708,24 +700,24 @@ mfixName	   = varQual mONAD_FIX_Name FSLIT("mfix") mfixIdKey
 All these are original names; hence mkOrig
 
 \begin{code}
-varQual  = mk_known_key_name OccNameAlias.varName	-- Note use of local alias vName
+varQual  = mk_known_key_name varName
 dataQual = mk_known_key_name dataName
 tcQual   = mk_known_key_name tcName
 clsQual  = mk_known_key_name clsName
 
-wVarQual  = mk_wired_in_name OccNameAlias.varName	-- The wired-in analogues
+wVarQual  = mk_wired_in_name varName	-- The wired-in analogues
 wDataQual = mk_wired_in_name dataName		
 wTcQual   = mk_wired_in_name tcName
 
-varQual_RDR  mod str = mkOrig mod (mkOccFS OccNameAlias.varName str)   -- note use of local alias vName
+varQual_RDR  mod str = mkOrig mod (mkOccFS varName str)   -- note use of local alias vName
 tcQual_RDR   mod str = mkOrig mod (mkOccFS tcName str)
 clsQual_RDR  mod str = mkOrig mod (mkOccFS clsName str)
 dataQual_RDR mod str = mkOrig mod (mkOccFS dataName str)
 
 mk_known_key_name space mod str uniq 
-  = mkKnownKeyExternalName mod (mkOccFS space str) uniq 
+  = mkKnownKeyExternalName (mkBasePkgModule mod) (mkOccFS space str) uniq 
 mk_wired_in_name space mod str uniq 
-  = mkWiredInName (mkVanillaModule mod) (mkOccFS space str) uniq
+  = mkWiredInName (mkBasePkgModule mod) (mkOccFS space str) uniq
 
 kindQual str uq = mkInternalName uq (mkKindOccFS tcName str) noSrcLoc
 	-- Kinds are not z-encoded in interface file, hence mkKindOccFS

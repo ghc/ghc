@@ -29,6 +29,7 @@ import BasicTypes	( isNeverActive )
 import Name		( getOccName, nameOccName, mkInternalName, mkExternalName, 
 		  	  localiseName, isExternalName, nameSrcLoc
 			)
+import RnEnv		( lookupOrigNameCache, newExternalName )
 import NameEnv		( filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType )
@@ -541,7 +542,7 @@ tidyTopName mod ns occ_env external name
 	-- Similarly, we must make sure it has a system-wide Unique, because
 	-- the byte-code generator builds a system-wide Name->BCO symbol table
 
-  | local  && external = case lookupFM ns_names key of
+  | local  && external = case lookupOrigNameCache ns_names mod occ' of
 			   Just orig -> (ns,	      occ_env', orig)
 			   Nothing   -> (ns_w_global, occ_env', new_external_name)
 	-- If we want to externalise a currently-local name, check
@@ -554,20 +555,17 @@ tidyTopName mod ns occ_env external name
     global	     = isExternalName name
     local	     = not global
     internal	     = not external
-
-    (occ_env', occ') = tidyOccName occ_env (nameOccName name)
-    key		     = (moduleName mod, occ')
-    ns_names	     = nsNames ns
-    ns_uniqs	     = nsUniqs ns
-    (us1, us2)	     = splitUniqSupply ns_uniqs
-    uniq	     = uniqFromSupply us1
     loc		     = nameSrcLoc name
 
-    new_local_name     = mkInternalName  uniq     occ' loc
-    new_external_name  = mkExternalName uniq mod occ' loc  
+    (occ_env', occ') = tidyOccName occ_env (nameOccName name)
 
+    ns_names	     = nsNames ns
+    (us1, us2)	     = splitUniqSupply (nsUniqs ns)
+    uniq	     = uniqFromSupply us1
+    new_local_name   = mkInternalName uniq occ' loc
     ns_w_local	     = ns { nsUniqs = us2 }
-    ns_w_global	     = ns { nsUniqs = us2, nsNames = addToFM ns_names key new_external_name }
+
+    (ns_w_global, new_external_name) = newExternalName ns mod occ' loc
 
 
 ------------  Worker  --------------

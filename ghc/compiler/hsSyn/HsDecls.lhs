@@ -18,7 +18,7 @@ module HsDecls (
 	tyClDeclName, tyClDeclNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, 
 	isTypeOrClassDecl, countTyClDecls,
-	isSourceInstDecl, ifaceRuleDeclName,
+	isSourceInstDecl, instDeclDFun, ifaceRuleDeclName,
 	conDetailsTys,
 	collectRuleBndrSigTys, isSrcRule
     ) where
@@ -649,6 +649,9 @@ data InstDecl name
 
 isSourceInstDecl :: InstDecl name -> Bool
 isSourceInstDecl (InstDecl _ _ _ maybe_dfun _) = isNothing maybe_dfun
+
+instDeclDFun :: InstDecl name -> Maybe name
+instDeclDFun (InstDecl _ _ _ df _) = df	-- A Maybe, but that's ok
 \end{code}
 
 \begin{code}

@@ -12,7 +12,7 @@ module Packages (
 
 	PackageName,		-- Instance of Outputable
 	mkPackageName, packageNameString,
-	preludePackage, rtsPackage, haskell98Package,	-- :: PackageName
+	basePackage, rtsPackage, haskell98Package, thPackage,	-- :: PackageName
 
 	PackageConfigMap, emptyPkgMap, extendPkgMap, lookupPkg
     )
@@ -60,10 +60,11 @@ mkPackageName = mkFastString
 packageNameString :: PackageName -> String
 packageNameString = unpackFS
 
-rtsPackage, preludePackage, haskell98Package :: PackageName
-preludePackage   = FSLIT("base")
+rtsPackage, basePackage, haskell98Package, thPackage :: PackageName
+basePackage      = FSLIT("base")
 rtsPackage 	 = FSLIT("rts")
 haskell98Package = FSLIT("haskell98")
+thPackage        = FSLIT("haskell-src")	-- Template Haskell libraries in here
 
 packageDependents :: PackageConfig -> [PackageName]
 -- Impedence matcher, because PackageConfig has Strings 

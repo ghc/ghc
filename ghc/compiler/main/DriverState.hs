@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.83 2002/10/17 14:26:18 simonmar Exp $
+-- $Id: DriverState.hs,v 1.84 2002/10/24 14:17:49 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -18,7 +18,7 @@ import Packages		( PackageConfig(..), PackageConfigMap,
 			  PackageName, mkPackageName, packageNameString,
 			  packageDependents,
 			  mungePackagePaths, emptyPkgMap, extendPkgMap, lookupPkg,
-			  preludePackage, rtsPackage, haskell98Package  )
+			  basePackage, rtsPackage, haskell98Package  )
 import CmdLineOpts
 import DriverPhases
 import DriverUtil
@@ -489,7 +489,7 @@ getPackages :: IO [PackageName]
 getPackages = readIORef v_Packages
 
 initPackageList = [haskell98Package,
-		   preludePackage,
+		   basePackage,
 		   rtsPackage]
 
 addPackage :: String -> IO ()

@@ -6,7 +6,7 @@
 \begin{code}
 module RnNames (
 	rnImports, importsFromLocalDecls, exportsFromAvail,
-	reportUnusedNames 
+	reportUnusedNames, mkModDeps
     ) where
 
 #include "HsVersions.h"
@@ -25,16 +25,17 @@ import TcRnMonad
 
 import FiniteMap
 import PrelNames	( pRELUDE_Name, mAIN_Name, isBuiltInSyntaxName )
-import Module		( Module, ModuleName, moduleName, 
-			  moduleNameUserString, 
-			  unitModuleEnvByName, lookupModuleEnvByName,
-			  moduleEnvElts )
+import Module		( Module, ModuleName, ModuleEnv, moduleName, 
+			  moduleNameUserString, isHomeModule,
+			  emptyModuleEnv, unitModuleEnvByName, unitModuleEnv, 
+			  lookupModuleEnvByName, extendModuleEnvByName, moduleEnvElts )
 import Name		( Name, nameSrcLoc, nameOccName, nameModule, isExternalName )
 import NameSet
 import NameEnv
 import OccName		( OccName, dataName, isTcOcc )
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
-			  GenAvailInfo(..), AvailInfo, Avails, IsBootInterface,
+			  GenAvailInfo(..), AvailInfo, Avails, 
+			  IsBootInterface, WhetherHasOrphans,
 			  availName, availNames, availsToNameSet, 
 			  Deprecations(..), ModIface(..), 
 		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE
@@ -45,7 +46,7 @@ import Outputable
 import Maybes		( maybeToBool, catMaybes )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull )
-import List		( partition )
+import List		( partition, insert )
 import IO		( openFile, IOMode(..) )
 \end{code}
 
@@ -73,7 +74,7 @@ rnImports imports
 	  (source, ordinary) = partition is_source_import all_imports
 	  is_source_import (ImportDecl _ is_boot _ _ _ _) = is_boot
 
-	  get_imports = importsFromImportDecl (moduleName this_mod)
+	  get_imports = importsFromImportDecl this_mod
 	in
 	mappM get_imports ordinary	`thenM` \ stuff1 ->
 	mappM get_imports source	`thenM` \ stuff2 ->
@@ -115,15 +116,15 @@ preludeImportDecl loc
 \end{code}
 	
 \begin{code}
-importsFromImportDecl :: ModuleName
+importsFromImportDecl :: Module
 		      -> RdrNameImportDecl
 		      -> TcRn m (GlobalRdrEnv, ImportAvails)
 
-importsFromImportDecl this_mod_name 
-	(ImportDecl imp_mod_name is_boot qual_only as_mod import_spec iloc)
+importsFromImportDecl this_mod
+	(ImportDecl imp_mod_name is_boot qual_only as_mod imp_spec iloc)
   = addSrcLoc iloc $
     let
-	doc     = ppr imp_mod_name <+> ptext SLIT("is directly imported")
+	doc = ppr imp_mod_name <+> ptext SLIT("is directly imported")
     in
 
 	-- If there's an error in loadInterface, (e.g. interface
@@ -135,15 +136,16 @@ importsFromImportDecl this_mod_name
 	Right iface ->    
 
     let
-	imp_mod		 = mi_module iface
+	imp_mod	     	 = mi_module iface
 	avails_by_module = mi_exports iface
-	deprecs		 = mi_deprecs iface
-	dir_imp 	 = unitModuleEnvByName imp_mod_name (imp_mod, import_all import_spec)
+	deprecs	     	 = mi_deprecs iface
+	is_orph		 = mi_orphan iface 
 
 	avails :: Avails
 	avails = [ avail | (mod_name, avails) <- avails_by_module,
 			   mod_name /= this_mod_name,
 			   avail <- avails ]
+	this_mod_name = moduleName this_mod
 	-- If the module exports anything defined in this module, just ignore it.
 	-- Reason: otherwise it looks as if there are two local definition sites
 	-- for the thing, and an error gets reported.  Easiest thing is just to
@@ -162,6 +164,63 @@ importsFromImportDecl this_mod_name
 	-- then you'll get a 'B does not export AType' message.  Oh well.
 
     in
+	-- Filter the imports according to the import list
+    filterImports imp_mod is_boot imp_spec avails    `thenM` \ (filtered_avails, explicits) ->
+
+    let
+	(sub_dep_mods, sub_dep_pkgs) = mi_deps iface
+
+	-- Compute new transitive dependencies: take the ones in 
+	-- the interface and add 
+	(dependent_mods, dependent_pkgs) 
+	   | isHomeModule imp_mod 
+	   = 	-- Imported module is from the home package
+		-- Take its dependent modules and
+		--	(a) remove this_mod (might be there as a hi-boot)
+		--	(b) add imp_mod itself
+		-- Take its dependent packages unchanged
+	     ((imp_mod_name, is_orph, is_boot) : filter not_self sub_dep_mods, 
+	      sub_dep_pkgs)
+	   | otherwise	
+ 	   = 	-- Imported module is from another package
+		-- Take only the orphan modules from its dependent modules
+		--	(sigh!  it would be better to dump them entirely)
+		-- Add the package imp_mod comes from to the dependent packages
+		-- from imp_mod
+	     (filter sub_is_orph sub_dep_mods, 
+	      insert (mi_package iface) sub_dep_pkgs)
+
+	not_self    (m, _, _)    = m /= this_mod_name
+	sub_is_orph (_, orph, _) = orph
+
+	import_all = case imp_spec of
+			(Just (False, _)) -> False	-- Imports are spec'd explicitly
+			other	   	  -> True	-- Everything is imported, 
+							-- (or almost everything [hiding])
+
+	qual_mod_name = case as_mod of
+			  Nothing  	    -> imp_mod_name
+			  Just another_name -> another_name
+
+	-- unqual_avails is the Avails that are visible in *unqualified* form
+	-- We need to know this so we know what to export when we see
+	--	module M ( module P ) where ...
+	-- Then we must export whatever came from P unqualified.
+	avail_env = mkAvailEnv filtered_avails
+        unqual_avails | qual_only = emptyAvailEnv	-- Qualified import
+		      | otherwise = avail_env		-- Unqualified import
+
+	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
+	gbl_env      = mkGlobalRdrEnv qual_mod_name (not qual_only) 
+				      mk_prov filtered_avails deprecs
+	imports      = ImportAvails { 
+			imp_unqual = unitModuleEnvByName qual_mod_name unqual_avails,
+			imp_env    = avail_env,
+			imp_mods   = unitModuleEnv imp_mod (imp_mod, import_all),
+			dep_mods   = mkModDeps dependent_mods,
+			dep_pkgs   = dependent_pkgs }
+
+    in
 	-- Complain if we import a deprecated module
     ifOptM Opt_WarnDeprecations	(
        case deprecs of	
@@ -169,24 +228,14 @@ importsFromImportDecl this_mod_name
 	  other	        -> returnM ()
     )							`thenM_`
 
-	-- Filter the imports according to the import list
-    filterImports imp_mod_name is_boot import_spec avails	`thenM` \ (filtered_avails, explicits) ->
-
-    let
-	unqual_imp = not qual_only	-- Maybe want unqualified names
-	qual_mod   = case as_mod of
-			Nothing  	  -> imp_mod_name
-			Just another_name -> another_name
-
-	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
-	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp mk_prov filtered_avails deprecs
-	imports      = mkImportAvails qual_mod unqual_imp filtered_avails
-    in
-    returnM (gbl_env, imports { imp_mods = dir_imp})
+    returnM (gbl_env, imports)
     }
 
-import_all (Just (False, _)) = False	-- Imports are spec'd explicitly
-import_all other	     = True	-- Everything is imported
+mkModDeps :: [(ModuleName, WhetherHasOrphans, IsBootInterface)]
+	  -> ModuleEnv (ModuleName, WhetherHasOrphans, IsBootInterface)
+mkModDeps deps = foldl add emptyModuleEnv deps
+	       where
+		 add env elt@(m,_,_) = extendModuleEnvByName env m elt
 \end{code}
 
 
@@ -226,9 +275,9 @@ importsFromLocalDecls group
     doptM Opt_NoImplicitPrelude 		`thenM` \ implicit_prelude ->
     let
 	mod_name   = moduleName this_mod
-	unqual_imp = True	-- Want unqualified names
 	mk_prov n  = LocalDef	-- Provenance is local
 
+	unqual_imp = True	-- Want unqualified names in scope
 	gbl_env = mkGlobalRdrEnv mod_name unqual_imp mk_prov avails NoDeprecs
 	    -- NoDeprecs: don't complain about locally defined names
 	    -- For a start, we may be exporting a deprecated thing
@@ -255,13 +304,19 @@ importsFromLocalDecls group
 	    -- but that stops them being Exact, so they get looked up.  Sigh.
 	    -- It doesn't matter because it only affects the Data.Tuple really.
 	    -- The important thing is to trim down the exports.
-	imports = mkImportAvails mod_name unqual_imp avails'
+
  	avails' | implicit_prelude = filter not_built_in_syntax avails
 		| otherwise	   = avails
 	not_built_in_syntax a = not (all isBuiltInSyntaxName (availNames a))
 		-- Only filter it if all the names of the avail are built-in
 		-- In particular, lists have (:) which is not built in syntax
 		-- so we don't filter it out.
+
+	avail_env = mkAvailEnv avails'
+	imports   = emptyImportAvails {
+			imp_unqual = unitModuleEnv this_mod avail_env,
+			imp_env    = avail_env
+		    }
     in
     returnM (gbl_env, imports)
 \end{code}
@@ -314,7 +369,7 @@ getLocalDeclBinders mod (HsGroup {hs_valds = val_decls,
 available, and filters it through the import spec (if any).
 
 \begin{code}
-filterImports :: ModuleName			-- The module being imported
+filterImports :: Module				-- The module being imported
 	      -> IsBootInterface		-- Tells whether it's a {-# SOURCE #-} import
 	      -> Maybe (Bool, [RdrNameIE])	-- Import spec; True => hiding
 	      -> [AvailInfo]			-- What's available

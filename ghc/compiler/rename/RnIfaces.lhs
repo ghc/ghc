@@ -23,6 +23,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl,
 			  tyClDeclFVs, ruleDeclFVs, impDeclFVs
 			)
 import RnHiFiles	( loadInterface, loadHomeInterface, loadOrphanModules )
+import RnNames		( mkModDeps )
 import RnSource		( rnTyClDecl, rnInstDecl, rnIfaceRuleDecl )
 import TcEnv		( getInGlobalScope, tcLookupGlobal_maybe )
 import TcRnMonad
@@ -37,7 +38,7 @@ import Name		( Name {-instance NamedThing-}, isWiredInName, isInternalName, name
 			 )
 import NameEnv 		( delFromNameEnv, lookupNameEnv )
 import NameSet
-import Module		( Module, isHomeModule, extendModuleSet )
+import Module		( Module, isHomeModule, extendModuleSet, moduleEnvElts )
 import PrelNames	( hasKey, fractionalClassKey, numClassKey, 
 			  integerTyConName, doubleTyConName )
 import FiniteMap
@@ -206,8 +207,8 @@ recordUsage :: Name -> TcRn m ()
 recordUsage name = updUsages (upd_usg name)
 
 upd_usg name usages
-  | isHomeModule mod = usages { usg_home = addOneToNameSet (usg_home usages) name }
-  | otherwise        = usages { usg_ext  = extendModuleSet (usg_ext usages)  mod }
+  | isHomeModule mod = addOneToNameSet usages name
+  | otherwise        = usages
   where
     mod = nameModule name
 \end{code}
@@ -491,12 +492,13 @@ getImportedInstDecls :: NameSet -> TcRn m ([(Module,RdrNameInstDecl)], NameSet)
 getImportedInstDecls gates
   =    	-- First, load any orphan-instance modules that aren't aready loaded
 	-- Orphan-instance modules are recorded in the module dependecnies
-    getEps 					`thenM` \ eps ->
+    getImports			`thenM` \ imports ->
+    getEps 			`thenM` \ eps ->
     let
 	old_gates = eps_inst_gates eps
 	new_gates = gates `minusNameSet` old_gates
 	all_gates = new_gates `unionNameSets` old_gates
-	orphan_mods = [mod | (mod, (True, _)) <- fmToList (eps_imp_mods eps)]
+	orphan_mods = [mod | (mod, True, _) <- moduleEnvElts (dep_mods imports)]
     in
     loadOrphanModules orphan_mods			`thenM_` 
 
@@ -593,10 +595,21 @@ checkVersions source_unchanged iface
   = returnM outOfDate
   | otherwise
   = traceHiDiffs (text "Considering whether compilation is required for" <+> 
-			ppr (mi_module iface) <> colon)	`thenM_`
+		  ppr (mi_module iface) <> colon)	`thenM_`
 
 	-- Source code unchanged and no errors yet... carry on 
-    checkList [checkModUsage u | u <- mi_usages iface]
+	-- First put the dependent-module info in the envt, just temporarily,
+	-- so that when we look for interfaces we look for the right one.
+	-- It's just temporary because either the usage check will succeed 
+	-- (in which case we are done with this module) or it'll fail (in which
+	-- case we'll compile the module from scratch anyhow).
+    updGblEnv (\ gbl -> gbl { tcg_imports = mod_deps }) (
+	checkList [checkModUsage u | u <- mi_usages iface]
+    )
+
+  where
+	-- This is a bit of a hack really
+    mod_deps = emptyImportAvails { dep_mods = mkModDeps (fst (mi_deps iface)) }
 
 checkList :: [TcRn m RecompileRequired] -> TcRn m RecompileRequired
 checkList []		 = returnM upToDate
@@ -608,30 +621,22 @@ checkList (check:checks) = check	`thenM` \ recompile ->
 \end{code}
 	
 \begin{code}
-checkModUsage :: ImportVersion Name -> TcRn m RecompileRequired
+checkModUsage :: Usage Name -> TcRn m RecompileRequired
 -- Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
 
-checkModUsage (mod_name, _, _, NothingAtAll)
-	-- If CurrentModule.hi contains 
-	--	import Foo :: ;
-	-- then that simply records that Foo lies below CurrentModule in the
-	-- hierarchy, but CurrentModule doesn't depend in any way on Foo.
-	-- In this case we don't even want to open Foo's interface.
-  = up_to_date (ptext SLIT("Nothing used from:") <+> ppr mod_name)
-
-checkModUsage (mod_name, _, is_boot, whats_imported)
+checkModUsage (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
+		       usg_rules = old_rule_vers,
+		       usg_exports = maybe_old_export_vers, 
+		       usg_entities = old_decl_vers })
   = 	-- Load the imported interface is possible
-	-- We use tryLoadInterface, because failure is not an error
-	-- (might just be that the old .hi file for this module is out of date)
     let
     	doc_str = sep [ptext SLIT("need version info for"), ppr mod_name]
-    	from    = ImportForUsage is_boot
     in
     traceHiDiffs (text "Checking usages for module" <+> ppr mod_name) `thenM_`
 
-    tryM (loadInterface doc_str mod_name from)	`thenM` \ mb_iface ->
+    tryM (loadInterface doc_str mod_name ImportBySystem)	`thenM` \ mb_iface ->
 
     case mb_iface of {
 	Left exn ->  (out_of_date (sep [ptext SLIT("Can't find version number for module"), 
@@ -648,16 +653,6 @@ checkModUsage (mod_name, _, is_boot, whats_imported)
 	new_export_vers = vers_exports new_vers
 	new_rule_vers   = vers_rules   new_vers
     in
-    case whats_imported of {	-- NothingAtAll dealt with earlier
-
-      Everything old_mod_vers -> checkModuleVersion old_mod_vers new_mod_vers	`thenM` \ recompile ->
-				 if recompile then
-					out_of_date (ptext SLIT("...and I needed the whole module"))
-				 else
-					returnM upToDate ;
-
-      Specifically old_mod_vers maybe_old_export_vers old_decl_vers old_rule_vers ->
-
 	-- CHECK MODULE
     checkModuleVersion old_mod_vers new_mod_vers	`thenM` \ recompile ->
     if not recompile then
@@ -684,7 +679,7 @@ checkModUsage (mod_name, _, is_boot, whats_imported)
     else
 	up_to_date (ptext SLIT("  Great!  The bits I use are up to date"))
 
-    }}
+    }
 
 ------------------------
 checkModuleVersion old_mod_vers new_mod_vers

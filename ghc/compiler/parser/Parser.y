@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.111 2002/10/23 14:30:01 simonpj Exp $
+$Id: Parser.y,v 1.112 2002/10/24 14:17:50 simonpj Exp $
 
 Haskell grammar.
 
@@ -295,6 +295,7 @@ iface   :: { ParsedIface }
 			pi_vers    = 1, 		-- Module version
 			pi_orphan  = False,
 			pi_exports = (1,[($2,mkIfaceExports $4)]),
+			pi_deps    = ([],[]),
 			pi_usages  = [],
 			pi_fixity  = [],
 			pi_insts   = [],

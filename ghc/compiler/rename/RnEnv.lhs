@@ -23,18 +23,19 @@ import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  ImportReason(..), GlobalRdrEnv, GlobalRdrElt(..), 
 			  GenAvailInfo(..), AvailInfo, Avails, 
-			  ModIface(..), NameCache(..),
+			  ModIface(..), NameCache(..), OrigNameCache,
 			  Deprecations(..), lookupDeprec, isLocalGRE,
 			  extendLocalRdrEnv, availName, availNames,
 			  lookupFixity
 			)
 import TcRnMonad
 import Name		( Name, getName, getSrcLoc, nameIsLocalOrFrom, isWiredInName,
-			  mkInternalName, mkExternalName, mkIPName, 
+			  mkInternalName, mkExternalName, mkIPName, nameSrcLoc,
 			  nameOccName, setNameModuleAndLoc, nameModule	)
 import NameSet
 import OccName		( OccName, tcName, isDataOcc, occNameUserString, occNameFlavour )
-import Module		( Module, ModuleName, moduleName, mkVanillaModule )
+import Module		( Module, ModuleName, moduleName, mkHomeModule,
+			  lookupModuleEnv, lookupModuleEnvByName, extendModuleEnv_C )
 import PrelNames	( mkUnboundName, intTyConName, 
 			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
@@ -45,9 +46,10 @@ import PrelNames	( mkUnboundName, intTyConName,
 import DsMeta		( templateHaskellNames, qTyConName )
 #endif
 import TysWiredIn	( unitTyCon )	-- A little odd
+import Finder		( findModule )
 import FiniteMap
 import UniqSupply
-import SrcLoc		( SrcLoc, noSrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc, importedSrcLoc )
 import Outputable
 import ListSetOps	( removeDups, equivClasses )
 import BasicTypes	( mapIPName, FixitySig(..) )
@@ -76,89 +78,82 @@ newTopBinder mod rdr_name loc
   = returnM name
 
   | otherwise
+  = newGlobalName mod (rdrNameOcc rdr_name) loc
+
+newGlobalName :: Module -> OccName -> SrcLoc -> TcRn m Name
+newGlobalName mod occ loc
   = 	-- First check the cache
     getNameCache		`thenM` \ name_supply -> 
-    let 
-	occ = rdrNameOcc rdr_name
-	key = (moduleName mod, occ)
-	cache = nsNames name_supply
-    in
-    case lookupFM cache key of
+    case lookupOrigNameCache (nsNames name_supply) mod occ of
 
-	-- A hit in the cache!  We are at the binding site of the name, and
-	-- this is the moment when we know all about 
-	--	a) the Name's host Module (in particular, which
-	-- 	   package it comes from)
-	--	b) its defining SrcLoc
-	-- So we update this info
+	-- A hit in the cache!  We are at the binding site of the name.
+	-- This is the moment when we know the defining SrcLoc
+	-- of the Name.  However, since we must have encountered an 
+	-- occurrence before the binding site, this must be an 
+	-- implicitly-imported name and we can't give a useful SrcLoc to
+	-- it.  So we just leave it alone.
+	--
+	-- IMPORTANT: don't mess with wired-in names.  
+	-- Their wired-in-ness is in the SrcLoc
 
-	Just name 
-	  | isWiredInName name -> returnM name
-		-- Don't mess with wired-in names.  Apart from anything
-		-- else, their wired-in-ness is in the SrcLoca
-	  | otherwise 
-	  -> let 
-		new_name  = setNameModuleAndLoc name mod loc
-		new_cache = addToFM cache key new_name
-	     in
-	     setNameCache (name_supply {nsNames = new_cache})	`thenM_`
-	     returnM new_name
+	Just name -> returnM name
 		     
 	-- Miss in the cache!
 	-- Build a completely new Name, and put it in the cache
-	-- Even for locally-defined names we use implicitImportProvenance; 
-	-- updateProvenances will set it to rights
-	Nothing -> addNewName name_supply key mod occ loc
-
-newGlobalName :: ModuleName -> OccName -> TcRn m Name
-  -- Used for *occurrences*.  We make a place-holder Name, really just
-  -- to agree on its unique, which gets overwritten when we read in
-  -- the binding occurence later (newTopBinder)
-  -- The place-holder Name doesn't have the right SrcLoc, and its
-  -- Module won't have the right Package either.
-  --
-  -- (We have to pass a ModuleName, not a Module, because we may be
-  -- simply looking at an occurrence M.x in an interface file.)
-  --
-  -- This means that a renamed program may have incorrect info
-  -- on implicitly-imported occurrences, but the correct info on the 
-  -- *binding* declaration. It's the type checker that propagates the 
-  -- correct information to all the occurrences.
-  -- Since implicitly-imported names never occur in error messages,
-  -- it doesn't matter that we get the correct info in place till later,
-  -- (but since it affects DLL-ery it does matter that we get it right
-  --  in the end).
-newGlobalName mod_name occ
-  = getNameCache		`thenM` \ name_supply ->
-    let
-	key = (mod_name, occ)
-	cache = nsNames name_supply
-    in
-    case lookupFM cache key of
-	Just name -> -- traceRn (text "newGlobalName: hit" <+> ppr name) `thenM_`
-		     returnM name
-
-	Nothing   -> -- traceRn (text "newGlobalName: new" <+> ppr name)  `thenM_`
-		     addNewName name_supply key (mkVanillaModule mod_name) occ noSrcLoc
+	Nothing -> addNewName name_supply mod occ loc
 
 -- Look up a "system name" in the name cache.
 -- This is done by the type checker... 
--- For *source* declarations, this will put the thing into the name cache
--- For *interface* declarations, RnHiFiles.getSysBinders will already have
--- put it into the cache.
 lookupSysName :: Name			-- Base name
 	      -> (OccName -> OccName) 	-- Occurrence name modifier
 	      -> TcRn m Name		-- System name
 lookupSysName base_name mk_sys_occ
+  = newGlobalName (nameModule base_name)
+		  (mk_sys_occ (nameOccName base_name))
+		  (nameSrcLoc base_name)    
+
+
+newGlobalNameFromRdrName rdr_name		-- Qualified original name
+ = newGlobalName2 (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
+
+newGlobalName2 :: ModuleName -> OccName -> TcRn m Name
+  -- This one starts with a ModuleName, not a Module, because 
+  -- we may be simply looking at an occurrence M.x in an interface file.
+  --
+  -- Used for *occurrences*.  Even if we get a miss in the
+  -- original-name cache, we make a new External Name.
+  -- We get its Module either from the OrigNameCache, or (if this
+  -- is the first Name from that module) from the Finder
+  --
+  -- In the case of a miss, we have to make up the SrcLoc, but that's
+  -- OK: it must be an implicitly-imported Name, and that never occurs
+  -- in an error message.
+
+newGlobalName2 mod_name occ
   = getNameCache		`thenM` \ name_supply ->
     let
-	mod = nameModule base_name
-	occ = mk_sys_occ (nameOccName base_name)
-	key = (moduleName mod, occ)
+	new_name mod = addNewName name_supply mod occ importedSrcLoc
     in
-    case lookupFM (nsNames name_supply) key of
-	Just name -> returnM name
-	Nothing   -> addNewName name_supply key mod occ noSrcLoc
+    case lookupModuleEnvByName (nsNames name_supply) mod_name of
+      Just (mod, occ_env) -> 	
+	-- There are some names from this module already
+	-- Next, look up in the OccNameEnv
+	case lookupFM occ_env occ of
+	     Just name -> returnM name
+	     Nothing   -> new_name mod
+
+      Nothing   -> 	-- No names from this module yet
+	ioToTcRn (findModule mod_name)		`thenM` \ mb_loc ->
+	case mb_loc of
+	    Just (mod, _) -> new_name mod
+	    Nothing       -> addErr (noModule mod_name)	`thenM_`
+				-- Things have really gone wrong at this point,
+				-- so having the wrong package info in the 
+				-- Module is the least of our worries.
+			     new_name (mkHomeModule mod_name)
+  where
+    noModule mod_name = ptext SLIT("Can't find interface for module") <+> ppr mod_name
+
 
 newIPName rdr_name_ip
   = getNameCache		`thenM` \ name_supply ->
@@ -179,20 +174,42 @@ newIPName rdr_name_ip
     where 
 	key = rdr_name_ip	-- Ensures that ?x and %x get distinct Names
 
-addNewName :: NameCache -> (ModuleName,OccName) 
-	   -> Module -> OccName -> SrcLoc -> TcRn m Name
--- Internal function: extend the name cache, dump it back into
--- 		      the monad, and return the new name
--- (internal, hence the rather redundant interface)
-addNewName name_supply key mod occ loc
+-- A local helper function
+addNewName name_supply mod occ loc
   = setNameCache new_name_supply 	`thenM_`
     returnM name
   where
-     (us', us1) = splitUniqSupply (nsUniqs name_supply)
-     uniq   	= uniqFromSupply us1
-     name       = mkExternalName uniq mod occ loc
-     new_cache  = addToFM (nsNames name_supply) key name
+    (new_name_supply, name) = newExternalName name_supply mod occ loc
+
+
+newExternalName :: NameCache -> Module -> OccName -> SrcLoc 
+		  -> (NameCache,Name)
+-- Allocate a new unique, manufacture a new External Name,
+-- put it in the cache, and return the two
+newExternalName name_supply mod occ loc
+  = (new_name_supply, name)
+  where
+     (us', us1)      = splitUniqSupply (nsUniqs name_supply)
+     uniq   	     = uniqFromSupply us1
+     name            = mkExternalName uniq mod occ loc
+     new_cache       = extend_name_cache (nsNames name_supply) mod occ name
      new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
+
+lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
+lookupOrigNameCache nc mod occ
+  = case lookupModuleEnv nc mod of
+	Nothing 	  -> Nothing
+	Just (_, occ_env) -> lookupFM occ_env occ
+
+extendOrigNameCache :: OrigNameCache -> Name -> OrigNameCache
+extendOrigNameCache nc name 
+  = extend_name_cache nc (nameModule name) (nameOccName name) name
+
+extend_name_cache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
+extend_name_cache nc mod occ name
+  = extendModuleEnv_C combine nc mod (mod, unitFM occ name)
+  where
+    combine (mod, occ_env) _ = (mod, addToFM occ_env occ name)
 \end{code}
 
 %*********************************************************
@@ -416,8 +433,7 @@ lookupSrcName_maybe rdr_name
   = returnM (Just name)
 
   | isOrig rdr_name			-- An original name
-  = newGlobalName (rdrNameModule rdr_name) 
-		  (rdrNameOcc rdr_name)	`thenM` \ name ->
+  = newGlobalNameFromRdrName rdr_name	`thenM` \ name ->
     returnM (Just name)
 
   | otherwise
@@ -443,7 +459,7 @@ lookupIfaceName :: Module -> RdrName -> TcRn m Name
 	-- unqualified names for locally-defined things, such as
 	-- constructors of a data type.
 lookupIfaceName mod rdr_name
-  | isUnqual rdr_name = newGlobalName (moduleName mod) (rdrNameOcc rdr_name)
+  | isUnqual rdr_name = newGlobalName mod (rdrNameOcc rdr_name) importedSrcLoc
   | otherwise	      = lookupOrigName rdr_name
 
 lookupOrigName :: RdrName -> TcRn m Name
@@ -456,7 +472,7 @@ lookupOrigName rdr_name
 
   | otherwise	-- Usually Orig, but can be a Qual when 
 		-- we are reading a .hi-boot file
-  = newGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
+  = newGlobalNameFromRdrName rdr_name
 
 
 dataTcOccs :: RdrName -> [RdrName]

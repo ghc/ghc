@@ -40,6 +40,7 @@ import Parser
 import Lex		( ParseResult(..), ExtFlags(..), mkPState )
 import SrcLoc		( mkSrcLoc )
 import TcRnDriver	( checkOldIface, tcRnModule, tcRnExtCore, tcRnIface )
+import RnEnv		( extendOrigNameCache )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings, knownKeyNames )
 import PrelRules	( builtinRules )
@@ -57,7 +58,7 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
-import Module		( ModuleName, moduleName )
+import Module		( ModuleName, moduleName, emptyModuleEnv )
 import CmdLineOpts
 import DriverPhases     ( isExtCore_file )
 import ErrUtils		( dumpIfSet_dyn, showPass, printError )
@@ -692,7 +693,6 @@ initExternalPackageState
       eps_insts      = (emptyBag, 0),
       eps_inst_gates = emptyNameSet,
       eps_rules      = foldr add_rule (emptyBag, 0) builtinRules,
-      eps_imp_mods   = emptyFM,
 
       eps_PIT       = emptyPackageIfaceTable,
       eps_PTE       = wiredInThingEnv,
@@ -708,11 +708,11 @@ initExternalPackageState
 	   rdr_name   = nameRdrName name
 	   gate_fn vis_fn = vis_fn name	-- Load the rule whenever name is visible
 
-initOrigNames :: FiniteMap (ModuleName,OccName) Name
+initOrigNames :: OrigNameCache
 initOrigNames 
-   = grab knownKeyNames `plusFM` grab (map getName wiredInThings)
-     where
-        grab names = foldl add emptyFM names
-        add env name 
-           = addToFM env (moduleName (nameModule name), nameOccName name) name
+   = insert knownKeyNames $
+     insert (map getName wiredInThings) $
+     emptyModuleEnv
+  where
+     insert names env = foldl extendOrigNameCache env names
 \end{code}

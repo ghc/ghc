@@ -19,10 +19,11 @@ module TcRnTypes(
 
 	-- Ranamer types
 	RnMode(..), isInterfaceMode, isCmdLineMode,
-	Usages(..), emptyUsages, ErrCtxt,
-	ImportAvails(..), emptyImportAvails, plusImportAvails, mkImportAvails,
+	EntityUsage, emptyUsages, ErrCtxt,
+	ImportAvails(..), emptyImportAvails, plusImportAvails, 
 	plusAvail, pruneAvails,  
-	AvailEnv, emptyAvailEnv, unitAvailEnv, plusAvailEnv, lookupAvailEnv, availEnvElts, addAvail,
+	AvailEnv, emptyAvailEnv, unitAvailEnv, plusAvailEnv, 
+	mkAvailEnv, lookupAvailEnv, availEnvElts, addAvail,
 	WhereFrom(..),
 
 	-- Typechecker types
@@ -48,7 +49,8 @@ import RnHsSyn		( RenamedHsExpr, RenamedPat, RenamedArithSeqInfo )
 import HscTypes		( GhciMode, ExternalPackageState, HomePackageTable, NameCache,
 			  GlobalRdrEnv, LocalRdrEnv, FixityEnv, TypeEnv, TyThing, 
 			  Avails, GenAvailInfo(..), AvailInfo, availName,
-			  IsBootInterface, Deprecations )
+			  IsBootInterface, Deprecations, WhetherHasOrphans )
+import Packages		( PackageName )
 import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, TcPredType, TcKind,
 			  tcCmpPred, tcCmpType, tcCmpTypes )
 import InstEnv		( DFunId, InstEnv )
@@ -258,9 +260,8 @@ data TopEnv	-- Built once at top level then does not change
 data TcGblEnv
   = TcGblEnv {
 	tcg_mod    :: Module,		-- Module being compiled
-	tcg_usages :: TcRef Usages,	-- What version of what entities 
-					-- have been used from other modules
-					-- (whether home or ext-package modules)
+	tcg_usages :: TcRef EntityUsage,  -- What version of what entities 
+					  -- have been used from other home-pkg modules
 	tcg_rdr_env :: GlobalRdrEnv,	-- Top level envt; used during renaming
 	tcg_fix_env :: FixityEnv,	-- Ditto
 	tcg_default :: [Type],		-- Types used for defaulting
@@ -416,34 +417,27 @@ isCmdLineMode _ = False
 
 %************************************************************************
 %*									*
-			Usages
+			EntityUsage
 %*									*
 %************************************************************************
 
-Usages tells what things are actually need in order to compile this
-module.  It is used 
-	* for generating the usages field of the ModIface
-	* for reporting unused things in scope
+EntityUsage tells what things are actually need in order to compile this
+module.  It is used for generating the usage-version field of the ModIface.
+
+Note that we do not record version info for entities from 
+other (non-home) packages.  If the package changes, GHC doesn't help.
 
 \begin{code}
-data Usages
-  = Usages {
-	usg_ext :: ModuleSet,
-		-- The non-home-package modules from which we have
-		-- slurped at least one name.
+type EntityUsage = NameSet
+	-- The Names are all the (a) home-package
+	--			 (b) "big" (i.e. no data cons, class ops)
+	--	   		 (c) non-locally-defined
+	--			 (d) non-wired-in
+	-- names that have been slurped in so far.
+	-- This is used to generate the "usage" information for this module.
 
-	usg_home :: NameSet
-		-- The Names are all the (a) home-package
-		--			 (b) "big" (i.e. no data cons, class ops)
-		--	   		 (c) non-locally-defined
-		--			 (d) non-wired-in
-		-- names that have been slurped in so far.
-		-- This is used to generate the "usage" information for this module.
-    }
-
-emptyUsages :: Usages
-emptyUsages = Usages { usg_ext = emptyModuleSet,
-		       usg_home = emptyNameSet }
+emptyUsages :: EntityUsage
+emptyUsages = emptyNameSet
 \end{code}
 
 
@@ -477,7 +471,7 @@ data ImportAvails
 		-- combine stuff coming from different (unqualified) 
 		-- imports of the same module
 
-	imp_mods :: ModuleEnv (Module, Bool)
+	imp_mods :: ModuleEnv (Module, Bool),
 		-- Domain is all directly-imported modules
 		-- Bool is True if there was an unrestricted import
 		--	(i.e. not a selective list)
@@ -488,45 +482,48 @@ data ImportAvails
 		--       the interface file; if we import everything we
 		--       need to recompile if the module version changes
 		--   (b) to specify what child modules to initialise
+
+	dep_mods :: ModuleEnv (ModuleName, WhetherHasOrphans, IsBootInterface),
+		-- For a given import or set of imports, 
+		-- there's an entry here for
+		-- (a) modules below the one being compiled, in the current package
+		-- (b) orphan modules below the one being compiled, regardless of package
+		--
+		-- It doesn't matter whether any of these dependencies are actually
+		-- *used* when compiling the module; they are listed if they are below
+		-- it at all.  For example, suppose M imports A which imports X.  Then
+		-- compiling M might not need to consult X.hi, but X is still listed
+		-- in M's dependencies.
+
+	dep_pkgs :: [PackageName]
+		-- Packages needed by the module being compiled, whether
+		-- directly, or via other modules in this package, or via
+		-- modules imported from other packages.
       }
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_env    = emptyAvailEnv, 
 				   imp_unqual = emptyModuleEnv, 
-				   imp_mods   = emptyModuleEnv }
+				   imp_mods   = emptyModuleEnv,
+				   dep_mods   = emptyModuleEnv,
+				   dep_pkgs   = [] }
 
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
-  (ImportAvails { imp_env = env1, imp_unqual = unqual1, imp_mods = mods1 })
-  (ImportAvails { imp_env = env2, imp_unqual = unqual2, imp_mods = mods2 })
+  (ImportAvails { imp_env = env1, imp_unqual = unqual1, imp_mods = mods1,
+		  dep_mods = dmods1, dep_pkgs = dpkgs1 })
+  (ImportAvails { imp_env = env2, imp_unqual = unqual2, imp_mods = mods2,
+		  dep_mods = dmods2, dep_pkgs = dpkgs2 })
   = ImportAvails { imp_env    = env1 `plusAvailEnv` env2, 
 		   imp_unqual = plusModuleEnv_C plusAvailEnv unqual1 unqual2, 
-		   imp_mods   = mods1 `plusModuleEnv` mods2 }
-
-mkImportAvails :: ModuleName -> Bool
-	       -> [AvailInfo] -> ImportAvails
-mkImportAvails mod_name unqual_imp avails 
-  = ImportAvails { imp_unqual = mod_avail_env, 
-		   imp_env    = entity_avail_env,
-		   imp_mods   = emptyModuleEnv }-- Stays empty for module being compiled;
-						-- gets updated for imported modules
+		   imp_mods   = mods1  `plusModuleEnv` mods2,	
+		   dep_mods   = plusModuleEnv_C plus_mod_dep dmods1 dmods2,	
+		   dep_pkgs   = nub (dpkgs1 ++ dpkgs2)	 }
   where
-    mod_avail_env = unitModuleEnvByName mod_name unqual_avails 
-
-	-- unqual_avails is the Avails that are visible in *unqualified* form
-	-- We need to know this so we know what to export when we see
-	--	module M ( module P ) where ...
-	-- Then we must export whatever came from P unqualified.
-
-    unqual_avails | not unqual_imp = emptyAvailEnv	-- Qualified import
-		  | otherwise      = entity_avail_env	-- Unqualified import
-
-    entity_avail_env = foldl insert emptyAvailEnv avails
-    insert env avail = extendNameEnv_C plusAvail env (availName avail) avail
-	-- 'avails' may have several items with the same availName
-	-- E.g  import Ix( Ix(..), index )
-	-- will give Ix(Ix,index,range) and Ix(index)
-	-- We want to combine these
+    plus_mod_dep (m1, orphan1, boot1) (m2, orphan2, boot2) 
+	= ASSERT( m1 == m2 && orphan1 == orphan2 )
+	  (m1, orphan1, boot1 && boot2)
+	-- If either side can "see" a non-hi-boot interface, use that
 \end{code}
 
 %************************************************************************
@@ -581,6 +578,13 @@ availEnvElts = nameEnvElts
 
 addAvail :: AvailEnv -> AvailInfo -> AvailEnv
 addAvail avails avail = extendNameEnv_C plusAvail avails (availName avail) avail
+
+mkAvailEnv :: [AvailInfo] -> AvailEnv
+	-- 'avails' may have several items with the same availName
+	-- E.g  import Ix( Ix(..), index )
+	-- will give Ix(Ix,index,range) and Ix(index)
+	-- We want to combine these; addAvail does that
+mkAvailEnv avails = foldl addAvail emptyAvailEnv avails
 \end{code}
 
 %************************************************************************
@@ -598,9 +602,7 @@ data WhereFrom
   | ImportForUsage IsBootInterface	-- Import when chasing usage info from an interaface file
 					-- 	Failure in this case is not an error
 
-  | ImportBySystem			-- Non user import.  Use eps_mod_info to decide whether
-					-- the module this module depends on, or is a system-ish module; 
-					-- M.hi-boot otherwise
+  | ImportBySystem			-- Non user import.
 
 instance Outputable WhereFrom where
   ppr (ImportByUser is_boot) | is_boot     = ptext SLIT("{- SOURCE -}")

@@ -19,9 +19,9 @@ import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Parser		( parseIface )
 import HscTypes		( ModIface(..), emptyModIface,
 			  ExternalPackageState(..), 
-			  VersionInfo(..), ImportedModuleInfo,
-			  lookupIfaceByModName, RdrExportItem, WhatsImported(..),
-			  ImportVersion, WhetherHasOrphans, IsBootInterface,
+			  VersionInfo(..), Usage(..),
+			  lookupIfaceByModName, RdrExportItem, 
+			  WhetherHasOrphans, IsBootInterface,
 			  DeclsMap, GatedDecl, IfaceInsts, IfaceRules, mkIfaceDecls,
 			  AvailInfo, GenAvailInfo(..), ParsedIface(..), IfaceDeprecs,
 			  Avails, availNames, availName, Deprecations(..)
@@ -46,10 +46,10 @@ import NameEnv
 import NameSet
 import Id		( idName )
 import MkId		( seqId )
-import Packages		( preludePackage )
+import Packages		( basePackage )
 import Module		( Module, ModuleName, ModLocation(ml_hi_file),
-			  moduleName, isHomeModule, mkVanillaModule,
-			  extendModuleEnv
+			  moduleName, isHomeModule, mkPackageModule,
+			  extendModuleEnv, lookupModuleEnvByName
 			)
 import RdrName		( RdrName, mkRdrUnqual, rdrNameOcc, nameRdrName )
 import OccName		( OccName, mkWorkerOcc, mkClassTyConOcc, mkClassDataConOcc,
@@ -116,12 +116,11 @@ loadInterface :: SDoc -> ModuleName -> WhereFrom -> TcRn m ModIface
   -- But it's OK to fail; perhaps the module has changed, and that interface 
   -- is no longer used.
   
-  -- tryLoadInterface guarantees to return with eps_mod_info m --> (..., True)
-  -- (If the load fails, we plug in a vanilla placeholder)
 loadInterface doc_str mod_name from
- = getHpt	`thenM` \ hpt ->
-   getModule	`thenM` \ this_mod ->
-   getEps 	`thenM` \ eps@(EPS { eps_PIT = pit }) ->
+ = getHpt		`thenM` \ hpt ->
+   getModule		`thenM` \ this_mod ->
+   getImports		`thenM` \ import_avails ->
+   getEps 		`thenM` \ eps@(EPS { eps_PIT = pit }) ->
 
 	-- CHECK WHETHER WE HAVE IT ALREADY
    case lookupIfaceByModName hpt pit mod_name of {
@@ -136,16 +135,18 @@ loadInterface doc_str mod_name from
 			-- before we got to real imports.  
 	other	    -> 
 
+   traceRn (vcat [text "loadInterface" <+> brackets doc_str,
+		  ppr (dep_mods import_avails)])	`thenM_`
    let
-	mod_map  = eps_imp_mods eps
-	mod_info = lookupFM mod_map mod_name
+	mod_map  = dep_mods import_avails
+	mod_info = lookupModuleEnvByName mod_map mod_name
 
 	hi_boot_file 
 	  = case (from, mod_info) of
-		(ImportByUser   is_boot, _)  	    -> is_boot
-		(ImportForUsage is_boot, _)	    -> is_boot
-		(ImportBySystem, Just (_, is_boot)) -> is_boot
-		(ImportBySystem, Nothing)	    -> False
+		(ImportByUser   is_boot, _)  	       -> is_boot
+		(ImportForUsage is_boot, _)	       -> is_boot
+		(ImportBySystem, Just (_, _, is_boot)) -> is_boot
+		(ImportBySystem, Nothing)	       -> False
 			-- We're importing a module we know absolutely
 			-- nothing about, so we assume it's from
 			-- another package, where we aren't doing 
@@ -153,8 +154,8 @@ loadInterface doc_str mod_name from
 
 	redundant_source_import 
 	  = case (from, mod_info) of 
-		(ImportByUser True, Just (_,False)) -> True
-		other			            -> False
+		(ImportByUser True, Just (_, _, False)) -> True
+		other			                -> False
    in
 
 	-- Issue a warning for a redundant {- SOURCE -} import
@@ -181,7 +182,7 @@ loadInterface doc_str mod_name from
 	  |  otherwise  
 	  -> let  	-- Not found, so add an empty export env to 
 			-- the EPS map so that we don't look again
-		fake_mod   = mkVanillaModule mod_name
+		fake_mod   = mkPackageModule mod_name
 		fake_iface = emptyModIface fake_mod
 		new_eps    = eps { eps_PIT = extendModuleEnv pit fake_mod fake_iface }
 	     in
@@ -226,21 +227,6 @@ loadInterface doc_str mod_name from
 				vers_rules = rule_vers,
 				vers_decls = decls_vers }
 
-	-- Add to mod_map info about the things the imported module 
-	-- depends on, extracted from its usage info
-	-- No point for system imports, for reasons that escape me...
-	usages   = pi_usages iface
-	mod_map1 = case from of
-			ImportBySystem -> mod_map
-			other 	       -> addModDeps mod is_loaded usages mod_map
-	-- Delete the module itself, which is now in the PIT
-	mod_map2 = delFromFM mod_map1 mod_name
-
-	-- mod_deps is a pruned version of usages that records only what 
-	-- module imported, but nothing about versions.
-	-- This info is used when demand-linking the dependencies
-	mod_deps = [ (mod,orph,boot,NothingAtAll) | (mod,orph,boot,_) <- usages]
-
  	this_mod_name = moduleName this_mod
 	is_loaded m   =  m == this_mod_name 
 		      || maybeToBool (lookupIfaceByModName hpt pit m)
@@ -257,8 +243,8 @@ loadInterface doc_str mod_name from
 			       mi_orphan = has_orphans, mi_boot = hi_boot_file,
 			       mi_exports = avails, 
 			       mi_fixities = fix_env, mi_deprecs = deprec_env,
-			       mi_usages   = mod_deps,	-- Used for demand-loading,
-							-- not for version info
+			       mi_deps     = pi_deps iface,
+			       mi_usages   = panic "No mi_usages in PIT",
 			       mi_decls    = panic "No mi_decls in PIT",
 			       mi_globals  = Nothing
 		    }
@@ -266,45 +252,11 @@ loadInterface doc_str mod_name from
 	new_eps = eps { eps_PIT	     = new_pit,
 			eps_decls    = new_decls,
 			eps_insts    = new_insts,
-			eps_rules    = new_rules,
-			eps_imp_mods = mod_map2  }
+			eps_rules    = new_rules }
     in
     setEps new_eps		`thenM_`
     returnM mod_iface
     }}
-
------------------------------------------------------
---	Adding module dependencies from the 
---	import decls in the interface file
------------------------------------------------------
-
-addModDeps :: Module 
-	   -> (ModuleName -> Bool)	-- True for modules that are already loaded
-	   -> [ImportVersion a] 
-	   -> ImportedModuleInfo -> ImportedModuleInfo
--- (addModDeps M ivs deps)
--- We are importing module M, and M.hi contains 'import' decls given by ivs
-addModDeps mod is_loaded new_deps mod_deps
-  = foldr add mod_deps filtered_new_deps
-  where
-	-- Don't record dependencies when importing a module from another package
-	-- Except for its descendents which contain orphans,
-	-- and in that case, forget about the boot indicator
-    filtered_new_deps :: [(ModuleName, (WhetherHasOrphans, IsBootInterface))]
-    filtered_new_deps
-	| isHomeModule mod  = [ (imp_mod, (has_orphans, is_boot))
-			      | (imp_mod, has_orphans, is_boot, _) <- new_deps,
-				not (is_loaded imp_mod)
-			      ]			      
-	| otherwise	    = [ (imp_mod, (True, False))
-			      | (imp_mod, has_orphans, _, _) <- new_deps,
-				not (is_loaded imp_mod) && has_orphans
-			      ]
-    add (imp_mod, dep) deps = addToFM_C combine deps imp_mod dep
-
-    combine old@(old_has_orphans, old_is_boot) new@(new_has_orphans, new_is_boot)
-	| old_is_boot = new	-- Record the best is_boot info
-	| otherwise   = old
 
 -----------------------------------------------------
 --	Loading the export list
@@ -322,11 +274,11 @@ loadExport (mod, entities)
     returnM (mod, avails)
   where
     load_entity mod (Avail occ)
-      =	newGlobalName mod occ	`thenM` \ name ->
+      =	newGlobalName2 mod occ	`thenM` \ name ->
 	returnM (Avail name)
     load_entity mod (AvailTC occ occs)
-      =	newGlobalName mod occ	      	`thenM` \ name ->
-        mappM (newGlobalName mod) occs	`thenM` \ names ->
+      =	newGlobalName2 mod occ	      	`thenM` \ name ->
+        mappM (newGlobalName2 mod) occs	`thenM` \ names ->
         returnM (AvailTC name names)
 
 
@@ -550,7 +502,7 @@ loadOldIface iface
 	decls = mkIfaceDecls new_decls new_rules new_insts
 
  	mod_iface = ModIface { mi_module = mod, mi_package = pi_pkg iface,
-			       mi_version = version,
+			       mi_version = version, mi_deps = pi_deps iface,
 			       mi_exports = avails, mi_usages = usages,
 			       mi_boot = False, mi_orphan = pi_orphan iface, 
 			       mi_fixities = fix_env, mi_deprecs = deprec_env,
@@ -586,17 +538,13 @@ loadHomeInsts :: [RdrNameInstDecl]
 loadHomeInsts insts = mappM rnInstDecl insts
 
 ------------------
-loadHomeUsage :: ImportVersion OccName
-	      -> TcRn m (ImportVersion Name)
-loadHomeUsage (mod_name, orphans, is_boot, whats_imported)
-  = rn_imps whats_imported	`thenM` \ whats_imported' ->
-    returnM (mod_name, orphans, is_boot, whats_imported')
+loadHomeUsage :: Usage OccName -> TcRn m (Usage Name)
+loadHomeUsage usage
+  = mappM rn_imp (usg_entities usage)	`thenM` \ entities' ->
+    returnM (usage { usg_entities = entities' })
   where
-    rn_imps NothingAtAll	   	  = returnM NothingAtAll
-    rn_imps (Everything v)		  = returnM (Everything v)
-    rn_imps (Specifically mv ev items rv) = mappM rn_imp items 	`thenM` \ items' ->
-					    returnM (Specifically mv ev items' rv)
-    rn_imp (occ,vers) = newGlobalName mod_name occ	`thenM` \ name ->
+    mod_name = usg_name usage 
+    rn_imp (occ,vers) = newGlobalName2 mod_name occ	`thenM` \ name ->
 			returnM (name,vers)
 \end{code}
 
@@ -736,7 +684,8 @@ read_iface mod file_path is_hi_boot_file
 ghcPrimIface :: ParsedIface
 ghcPrimIface = ParsedIface {
       pi_mod	 = gHC_PRIM_Name,
-      pi_pkg     = preludePackage,
+      pi_pkg     = basePackage,
+      pi_deps    = ([],[]),
       pi_vers    = 1,
       pi_orphan  = False,
       pi_usages  = [],

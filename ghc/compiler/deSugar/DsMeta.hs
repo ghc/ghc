@@ -42,10 +42,16 @@ import HsSyn  	  ( Pat(..), HsExpr(..), Stmt(..), HsLit(..), HsOverLit(..),
 		    toHsType
 		  )
 
-import PrelNames  ( mETA_META_Name, varQual, tcQual )
+import PrelNames  ( mETA_META_Name )
 import MkIface	  ( ifaceTyThing )
 import Name       ( Name, nameOccName, nameModule )
 import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
+-- To avoid clashes with DsMeta.varName we must make a local alias for OccName.varName
+-- we do this by removing varName from the import of OccName above, making
+-- a qualified instance of OccName and using OccNameAlias.varName where varName
+-- ws previously used in this file.
+import qualified OccName( varName, tcName )
+
 import Module	  ( moduleUserString )
 import Id         ( Id, idType )
 import NameEnv
@@ -963,90 +969,99 @@ templateHaskellNames
 		decTyConName, typTyConName ]
 
 
+varQual  = mk_known_key_name OccName.varName
+tcQual   = mk_known_key_name OccName.tcName
 
-intLName       = varQual mETA_META_Name FSLIT("intL")          intLIdKey
-charLName      = varQual mETA_META_Name FSLIT("charL")         charLIdKey
-plitName       = varQual mETA_META_Name FSLIT("plit")          plitIdKey
-pvarName       = varQual mETA_META_Name FSLIT("pvar")          pvarIdKey
-ptupName       = varQual mETA_META_Name FSLIT("ptup")          ptupIdKey
-pconName       = varQual mETA_META_Name FSLIT("pcon")          pconIdKey
-ptildeName     = varQual mETA_META_Name FSLIT("ptilde")        ptildeIdKey
-paspatName     = varQual mETA_META_Name FSLIT("paspat")        paspatIdKey
-pwildName      = varQual mETA_META_Name FSLIT("pwild")         pwildIdKey
-varName        = varQual mETA_META_Name FSLIT("var")           varIdKey
-conName        = varQual mETA_META_Name FSLIT("con")           conIdKey
-litName        = varQual mETA_META_Name FSLIT("lit")           litIdKey
-appName        = varQual mETA_META_Name FSLIT("app")           appIdKey
-infixEName     = varQual mETA_META_Name FSLIT("infixE")        infixEIdKey
-lamName        = varQual mETA_META_Name FSLIT("lam")           lamIdKey
-tupName        = varQual mETA_META_Name FSLIT("tup")           tupIdKey
-doEName        = varQual mETA_META_Name FSLIT("doE")           doEIdKey
-compName       = varQual mETA_META_Name FSLIT("comp")          compIdKey
-listExpName    = varQual mETA_META_Name FSLIT("listExp")       listExpIdKey
-condName       = varQual mETA_META_Name FSLIT("cond")          condIdKey
-letEName       = varQual mETA_META_Name FSLIT("letE")          letEIdKey
-caseEName      = varQual mETA_META_Name FSLIT("caseE")         caseEIdKey
-infixAppName   = varQual mETA_META_Name FSLIT("infixApp")      infixAppIdKey
-sectionLName   = varQual mETA_META_Name FSLIT("sectionL")      sectionLIdKey
-sectionRName   = varQual mETA_META_Name FSLIT("sectionR")      sectionRIdKey
-guardedName    = varQual mETA_META_Name FSLIT("guarded")       guardedIdKey
-normalName     = varQual mETA_META_Name FSLIT("normal")        normalIdKey
-bindStName     = varQual mETA_META_Name FSLIT("bindSt")        bindStIdKey
-letStName      = varQual mETA_META_Name FSLIT("letSt")         letStIdKey
-noBindStName   = varQual mETA_META_Name FSLIT("noBindSt")      noBindStIdKey
-parStName      = varQual mETA_META_Name FSLIT("parSt")         parStIdKey
-fromName       = varQual mETA_META_Name FSLIT("from")          fromIdKey
-fromThenName   = varQual mETA_META_Name FSLIT("fromThen")      fromThenIdKey
-fromToName     = varQual mETA_META_Name FSLIT("fromTo")        fromToIdKey
-fromThenToName = varQual mETA_META_Name FSLIT("fromThenTo")    fromThenToIdKey
-liftName       = varQual mETA_META_Name FSLIT("lift")          liftIdKey
-gensymName     = varQual mETA_META_Name FSLIT("gensym")        gensymIdKey
-returnQName    = varQual mETA_META_Name FSLIT("returnQ")       returnQIdKey
-bindQName      = varQual mETA_META_Name FSLIT("bindQ")         bindQIdKey
+thModule :: Module
+-- NB: the THSyntax module comes from the "haskell-src" package
+thModule = mkThPkgModule mETA_META_Name
+
+mk_known_key_name space mod str uniq 
+  = mkKnownKeyExternalName thModule (mkOccFS space str) uniq 
+
+intLName       = varQual FSLIT("intL")          intLIdKey
+charLName      = varQual FSLIT("charL")         charLIdKey
+plitName       = varQual FSLIT("plit")          plitIdKey
+pvarName       = varQual FSLIT("pvar")          pvarIdKey
+ptupName       = varQual FSLIT("ptup")          ptupIdKey
+pconName       = varQual FSLIT("pcon")          pconIdKey
+ptildeName     = varQual FSLIT("ptilde")        ptildeIdKey
+paspatName     = varQual FSLIT("paspat")        paspatIdKey
+pwildName      = varQual FSLIT("pwild")         pwildIdKey
+varName        = varQual FSLIT("var")           varIdKey
+conName        = varQual FSLIT("con")           conIdKey
+litName        = varQual FSLIT("lit")           litIdKey
+appName        = varQual FSLIT("app")           appIdKey
+infixEName     = varQual FSLIT("infixE")        infixEIdKey
+lamName        = varQual FSLIT("lam")           lamIdKey
+tupName        = varQual FSLIT("tup")           tupIdKey
+doEName        = varQual FSLIT("doE")           doEIdKey
+compName       = varQual FSLIT("comp")          compIdKey
+listExpName    = varQual FSLIT("listExp")       listExpIdKey
+condName       = varQual FSLIT("cond")          condIdKey
+letEName       = varQual FSLIT("letE")          letEIdKey
+caseEName      = varQual FSLIT("caseE")         caseEIdKey
+infixAppName   = varQual FSLIT("infixApp")      infixAppIdKey
+sectionLName   = varQual FSLIT("sectionL")      sectionLIdKey
+sectionRName   = varQual FSLIT("sectionR")      sectionRIdKey
+guardedName    = varQual FSLIT("guarded")       guardedIdKey
+normalName     = varQual FSLIT("normal")        normalIdKey
+bindStName     = varQual FSLIT("bindSt")        bindStIdKey
+letStName      = varQual FSLIT("letSt")         letStIdKey
+noBindStName   = varQual FSLIT("noBindSt")      noBindStIdKey
+parStName      = varQual FSLIT("parSt")         parStIdKey
+fromName       = varQual FSLIT("from")          fromIdKey
+fromThenName   = varQual FSLIT("fromThen")      fromThenIdKey
+fromToName     = varQual FSLIT("fromTo")        fromToIdKey
+fromThenToName = varQual FSLIT("fromThenTo")    fromThenToIdKey
+liftName       = varQual FSLIT("lift")          liftIdKey
+gensymName     = varQual FSLIT("gensym")        gensymIdKey
+returnQName    = varQual FSLIT("returnQ")       returnQIdKey
+bindQName      = varQual FSLIT("bindQ")         bindQIdKey
 
 -- type Mat = ...
-matchName      = varQual mETA_META_Name FSLIT("match")         matchIdKey
-
--- type Cls = ...
-clauseName     = varQual mETA_META_Name FSLIT("clause")        clauseIdKey
-
--- data Dec = ...
-funName        = varQual mETA_META_Name FSLIT("fun")           funIdKey
-valName        = varQual mETA_META_Name FSLIT("val")           valIdKey
-dataDName      = varQual mETA_META_Name FSLIT("dataD")         dataDIdKey
-classDName     = varQual mETA_META_Name FSLIT("classD")        classDIdKey
-instName       = varQual mETA_META_Name FSLIT("inst")          instIdKey
-protoName      = varQual mETA_META_Name FSLIT("proto")         protoIdKey
-
--- data Typ = ...
-tvarName       = varQual mETA_META_Name FSLIT("tvar")          tvarIdKey
-tconName       = varQual mETA_META_Name FSLIT("tcon")          tconIdKey
-tappName       = varQual mETA_META_Name FSLIT("tapp")          tappIdKey
-
--- data Tag = ...
-arrowTyConName = varQual mETA_META_Name FSLIT("arrowTyCon")   arrowIdKey
-tupleTyConName = varQual mETA_META_Name FSLIT("tupleTyCon")   tupleIdKey
-listTyConName  = varQual mETA_META_Name FSLIT("listTyCon")    listIdKey
-namedTyConName = varQual mETA_META_Name FSLIT("namedTyCon")   namedTyConIdKey
-
--- data Con = ...
-constrName     = varQual mETA_META_Name FSLIT("constr")        constrIdKey
-
-exprTyConName  = tcQual  mETA_META_Name FSLIT("Expr")  	       exprTyConKey
-declTyConName  = tcQual  mETA_META_Name FSLIT("Decl")  	       declTyConKey
-pattTyConName  = tcQual  mETA_META_Name FSLIT("Patt")  	       pattTyConKey
-mtchTyConName  = tcQual  mETA_META_Name FSLIT("Mtch")  	       mtchTyConKey
-clseTyConName  = tcQual  mETA_META_Name FSLIT("Clse")  	       clseTyConKey
-stmtTyConName  = tcQual  mETA_META_Name FSLIT("Stmt") 	       stmtTyConKey
-consTyConName  = tcQual  mETA_META_Name FSLIT("Cons")  	       consTyConKey
-typeTyConName  = tcQual  mETA_META_Name FSLIT("Type")  	       typeTyConKey
-
-qTyConName     = tcQual  mETA_META_Name FSLIT("Q")  	       qTyConKey
-expTyConName   = tcQual  mETA_META_Name FSLIT("Exp")  	       expTyConKey
-decTyConName   = tcQual  mETA_META_Name FSLIT("Dec")  	       decTyConKey
-typTyConName   = tcQual  mETA_META_Name FSLIT("Typ")  	       typTyConKey
-matTyConName   = tcQual  mETA_META_Name FSLIT("Mat")  	       matTyConKey
-clsTyConName   = tcQual  mETA_META_Name FSLIT("Cls")  	       clsTyConKey
+matchName      = varQual FSLIT("match")         matchIdKey
+			 
+-- type Cls = ...	 
+clauseName     = varQual FSLIT("clause")        clauseIdKey
+			 
+-- data Dec = ...	 
+funName        = varQual FSLIT("fun")           funIdKey
+valName        = varQual FSLIT("val")           valIdKey
+dataDName      = varQual FSLIT("dataD")         dataDIdKey
+classDName     = varQual FSLIT("classD")        classDIdKey
+instName       = varQual FSLIT("inst")          instIdKey
+protoName      = varQual FSLIT("proto")         protoIdKey
+			 
+-- data Typ = ...	 
+tvarName       = varQual FSLIT("tvar")          tvarIdKey
+tconName       = varQual FSLIT("tcon")          tconIdKey
+tappName       = varQual FSLIT("tapp")          tappIdKey
+			 
+-- data Tag = ...	 
+arrowTyConName = varQual FSLIT("arrowTyCon")   arrowIdKey
+tupleTyConName = varQual FSLIT("tupleTyCon")   tupleIdKey
+listTyConName  = varQual FSLIT("listTyCon")    listIdKey
+namedTyConName = varQual FSLIT("namedTyCon")   namedTyConIdKey
+			 
+-- data Con = ...	 
+constrName     = varQual FSLIT("constr")        constrIdKey
+			 
+exprTyConName  = tcQual  FSLIT("Expr")  	       exprTyConKey
+declTyConName  = tcQual  FSLIT("Decl")  	       declTyConKey
+pattTyConName  = tcQual  FSLIT("Patt")  	       pattTyConKey
+mtchTyConName  = tcQual  FSLIT("Mtch")  	       mtchTyConKey
+clseTyConName  = tcQual  FSLIT("Clse")  	       clseTyConKey
+stmtTyConName  = tcQual  FSLIT("Stmt") 	       stmtTyConKey
+consTyConName  = tcQual  FSLIT("Cons")  	       consTyConKey
+typeTyConName  = tcQual  FSLIT("Type")  	       typeTyConKey
+			 
+qTyConName     = tcQual  FSLIT("Q")  	       qTyConKey
+expTyConName   = tcQual  FSLIT("Exp")  	       expTyConKey
+decTyConName   = tcQual  FSLIT("Dec")  	       decTyConKey
+typTyConName   = tcQual  FSLIT("Typ")  	       typTyConKey
+matTyConName   = tcQual  FSLIT("Mat")  	       matTyConKey
+clsTyConName   = tcQual  FSLIT("Cls")  	       clsTyConKey
 
 --	TyConUniques available: 100-119
 -- 	Check in PrelNames if you want to change this

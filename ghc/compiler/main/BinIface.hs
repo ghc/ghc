@@ -269,12 +269,13 @@ instance Binary ModIface where
   put_ bh iface =  do
 	build_tag <- readIORef v_Build_tag
 	put_ bh (show opt_HiVersion ++ build_tag)
-	p <- put_ bh (mi_module iface)
+	p <- put_ bh (moduleName (mi_module iface))
 	put_ bh (mi_package iface)
 	put_ bh (vers_module (mi_version iface))
 	put_ bh (mi_orphan iface)
 	-- no: mi_boot
-	lazyPut bh (map importVersionNameToOccName (mi_usages iface))
+	lazyPut bh (mi_deps iface)
+	lazyPut bh (map usageToOccName (mi_usages iface))
 	put_ bh (vers_exports (mi_version iface),
 		 map exportItemToRdrExportItem (mi_exports iface))
 	put_ bh (declsToVersionedDecls (dcl_tycl (mi_decls iface))
@@ -309,14 +310,9 @@ deprecsToIfaceDeprecs (DeprecSome env) = Just (Right (nameEnvElts env))
 {-! for WhatsImported derive: Binary !-}
 
 -- For binary interfaces we need to convert the ImportVersion Names to OccNames
-importVersionNameToOccName :: ImportVersion Name -> ImportVersion OccName
-importVersionNameToOccName (mod, orphans, boot, what)
-  = (mod, orphans, boot, fiddle_with what)
-  where fiddle_with NothingAtAll = NothingAtAll
-	fiddle_with (Everything v) = Everything v
- 	fiddle_with (Specifically v ev ns rv) = Specifically v ev ns' rv
-	  where ns' = [ (nameOccName n, v) | (n,v) <- ns ]
-
+usageToOccName :: Usage Name -> Usage OccName
+usageToOccName usg
+  = usg { usg_entities = [ (nameOccName n, v) | (n,v) <- usg_entities usg ] }
 
 exportItemToRdrExportItem (mn, avails) 
   = (mn, map availInfoToRdrAvailInfo avails)
@@ -370,6 +366,7 @@ instance Binary ParsedIface where
 	pkg_name    <- get bh
 	module_ver  <- get bh
 	orphan      <- get bh
+	deps	    <- lazyGet bh
 	usages	    <- {-# SCC "bin_usages" #-} lazyGet bh
 	exports	    <- {-# SCC "bin_exports" #-} get bh
         tycl_decls  <- {-# SCC "bin_tycldecls" #-} get bh
@@ -382,6 +379,7 @@ instance Binary ParsedIface where
 		 pi_pkg = pkg_name,
 		 pi_vers = module_ver,
 		 pi_orphan = orphan,
+		 pi_deps = deps,
 		 pi_usages = usages,
 		 pi_exports = exports,
 		 pi_decls = tycl_decls,
@@ -412,29 +410,23 @@ instance (Binary name) => Binary (GenAvailInfo name) where
 		      ac <- get bh
 		      return (AvailTC ab ac)
 
-instance (Binary name) => Binary (WhatsImported name) where
-    put_ bh NothingAtAll = do
-	    putByte bh 0
-    put_ bh (Everything aa) = do
-	    putByte bh 1
-	    put_ bh aa
-    put_ bh (Specifically ab ac ad ae) = do
-	    putByte bh 2
-	    put_ bh ab
-	    put_ bh ac
-	    put_ bh ad
-	    put_ bh ae
+instance (Binary name) => Binary (Usage name) where
+    put_ bh usg	= do 
+	put_ bh (usg_name     usg)
+	put_ bh (usg_mod      usg)
+	put_ bh (usg_exports  usg)
+	put_ bh (usg_entities usg)
+	put_ bh (usg_rules    usg)
+
     get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do return NothingAtAll
-	      1 -> do aa <- get bh
-		      return (Everything aa)
-	      _ -> do ab <- get bh
-		      ac <- get bh
-		      ad <- get bh
-		      ae <- get bh
-		      return (Specifically ab ac ad ae)
+	nm    <- get bh
+	mod   <- get bh
+	exps  <- get bh
+	ents  <- get bh
+	rules <- get bh
+	return (Usage {	usg_name = nm, usg_mod = mod,
+			usg_exports = exps, usg_entities = ents,
+			usg_rules = rules })
 
 instance Binary Activation where
     put_ bh NeverActive = do

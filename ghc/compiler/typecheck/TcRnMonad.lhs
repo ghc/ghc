@@ -14,7 +14,7 @@ import HscTypes		( HscEnv(..), PersistentCompilerState(..),
 			  GlobalRdrEnv, LocalRdrEnv, NameCache, FixityEnv,
 			  GhciMode, lookupType, unQualInScope )
 import TcRnTypes
-import Module		( Module, moduleName, foldModuleEnv )
+import Module		( Module, moduleName, unitModuleEnv, foldModuleEnv )
 import Name		( Name, isInternalName )
 import Type		( Type )
 import NameEnv		( extendNameEnvList )
@@ -177,12 +177,11 @@ initTc  (HscEnv { hsc_mode   = ghci_mode,
   where
     eps = pcs_EPS pcs
 
-    init_imports = mkImportAvails (moduleName mod) True []
+    init_imports = emptyImportAvails { imp_unqual = unitModuleEnv mod emptyAvailEnv }
 	-- Initialise tcg_imports with an empty set of bindings for
 	-- this module, so that if we see 'module M' in the export
 	-- list, and there are no bindings in M, we don't bleat 
 	-- "unknown module M".
-
 
 defaultDefaultTys :: [Type]
 defaultDefaultTys = [integerTy, doubleTy]
@@ -283,6 +282,9 @@ getModule = do { env <- getGblEnv; return (tcg_mod env) }
 getGlobalRdrEnv :: TcRn m GlobalRdrEnv
 getGlobalRdrEnv = do { env <- getGblEnv; return (tcg_rdr_env env) }
 
+getImports :: TcRn m ImportAvails
+getImports = do { env <- getGblEnv; return (tcg_imports env) }
+
 getFixityEnv :: TcRn m FixityEnv
 getFixityEnv = do { env <- getGblEnv; return (tcg_fix_env env) }
 
@@ -296,13 +298,13 @@ getDefaultTys = do { env <- getGblEnv; return (tcg_default env) }
 \end{code}
 
 \begin{code}
-getUsageVar :: TcRn m (TcRef Usages)
+getUsageVar :: TcRn m (TcRef EntityUsage)
 getUsageVar = do { env <- getGblEnv; return (tcg_usages env) }
 
-getUsages :: TcRn m Usages
+getUsages :: TcRn m EntityUsage
 getUsages = do { usg_var <- getUsageVar; readMutVar usg_var }
 
-updUsages :: (Usages -> Usages) -> TcRn m () 
+updUsages :: (EntityUsage -> EntityUsage) -> TcRn m () 
 updUsages upd = do { usg_var <- getUsageVar ;
 		     usg <- readMutVar usg_var ;
 		     writeMutVar usg_var (upd usg) }

@@ -88,7 +88,7 @@ import ErrUtils		( mkDumpDoc, showPass )
 import Id		( Id, mkLocalId, isLocalId, idName, idType, idUnfolding, setIdLocalExported )
 import IdInfo		( GlobalIdDetails(..) )
 import Var		( Var, setGlobalIdDetails )
-import Module           ( Module, moduleName, moduleUserString )
+import Module           ( Module, moduleName, moduleUserString, moduleEnvElts )
 import Name		( Name, isExternalName, getSrcLoc, nameOccName )
 import NameEnv		( delListFromNameEnv )
 import NameSet
@@ -147,7 +147,7 @@ tcRnModule hsc_env pcs
 	updGblEnv ( \ gbl -> gbl { tcg_rdr_env = rdr_env,
 				   tcg_imports = tcg_imports gbl `plusImportAvails` imports }) 
 		     $ do {
-	traceRn (text "rn1") ;
+	traceRn (text "rn1" <+> ppr (dep_mods imports)) ;
 		-- Fail if there are any errors so far
 		-- The error printing (if needed) takes advantage 
 		-- of the tcg_env we have now set
@@ -172,7 +172,6 @@ tcRnModule hsc_env pcs
 	updGblEnv (\gbl -> gbl { tcg_deprecs = tcg_deprecs gbl `plusDeprecs` mod_deprecs })
 		  $ do {
 
-	traceRn (text "Rn4:" <+> ppr (imp_unqual (tcg_imports tcg_env))) ;
 		-- Process the export list
 	export_avails <- exportsFromAvail exports ;
 	updGblEnv (\gbl -> gbl { tcg_exports = export_avails })
@@ -557,6 +556,7 @@ tcRnExtCore hsc_env pcs
 	mod_guts = ModGuts {	mg_module   = this_mod,
 				mg_usages   = [],	-- ToDo: compute usage
 				mg_dir_imps = [],	-- ??
+				mg_deps     = ([],[]),	-- ??
 				mg_exports  = my_exports,
 				mg_types    = final_type_env,
 				mg_insts    = tcg_insts tcg_env,
@@ -1166,11 +1166,14 @@ tcCoreDump mod_guts
 pprTcGblEnv :: TcGblEnv -> SDoc
 pprTcGblEnv (TcGblEnv { tcg_type_env = type_env, 
 		        tcg_insts    = dfun_ids, 
-		        tcg_rules    = rules })
+		        tcg_rules    = rules,
+			tcg_imports  = imports })
   = vcat [ ppr_types dfun_ids type_env
 	 , ppr_insts dfun_ids
 	 , vcat (map ppr rules)
-	 , ppr_gen_tycons (typeEnvTyCons type_env)]
+	 , ppr_gen_tycons (typeEnvTyCons type_env)
+	 , ppr (moduleEnvElts (dep_mods imports))
+	 , ppr (dep_pkgs imports)]
 
 pprModGuts :: ModGuts -> SDoc
 pprModGuts (ModGuts { mg_types = type_env,

@@ -87,7 +87,7 @@ import TysPrim
 
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
-import Module		( mkPrelModule )
+import Module		( mkBasePkgModule )
 import Name		( Name, nameUnique, nameOccName, 
 			  nameModule, mkWiredInName )
 import OccName		( mkOccFS, tcName, dataName, mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
@@ -255,7 +255,7 @@ mk_tuple boxity arity = (tycon, tuple_con)
 	name      = mkWiredInName mod (mkOccFS dataName name_str) dc_uniq
  	tc_uniq   = mkTupleTyConUnique   boxity arity
 	dc_uniq   = mkTupleDataConUnique boxity arity
-	mod	  = mkPrelModule mod_name
+	mod	  = mkBasePkgModule mod_name
 	gen_info  = mk_tc_gen_info mod tc_uniq tc_name tycon
 
 unitTyCon     = tupleTyCon Boxed 0
@@ -611,7 +611,7 @@ mkPArrFakeCon arity  = pcDataCon name [tyvar] [] tyvarTys parrTyCon
         nameStr   = mkFastString ("MkPArr" ++ show arity)
 	name      = mkWiredInName mod (mkOccFS dataName nameStr) uniq
 	uniq      = mkPArrDataConUnique arity
-	mod	  = mkPrelModule pREL_PARR_Name
+	mod	  = mkBasePkgModule pREL_PARR_Name
 
 -- checks whether a data constructor is a fake constructor for parallel arrays
 --
