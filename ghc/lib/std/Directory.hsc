@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.13 2001/07/13 11:48:52 rrt Exp $
+-- $Id: Directory.hsc,v 1.14 2001/08/10 13:48:06 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -123,7 +123,7 @@ The path refers to an existing non-directory object.
 
 createDirectory :: FilePath -> IO ()
 createDirectory path = do
-    withUnsafeCString path $ \s -> do
+    withCString path $ \s -> do
       throwErrnoIfMinus1Retry_ "createDirectory" $
 #if defined(mingw32_TARGET_OS)
         mkdir s
@@ -169,7 +169,7 @@ The operand refers to an existing non-directory object.
 
 removeDirectory :: FilePath -> IO ()
 removeDirectory path = do
-    withUnsafeCString path $ \s ->
+    withCString path $ \s ->
        throwErrnoIfMinus1Retry_ "removeDirectory" (rmdir s)
 
 {-
@@ -204,7 +204,7 @@ The operand refers to an existing directory.
 
 removeFile :: FilePath -> IO ()
 removeFile path = do
-    withUnsafeCString path $ \s ->
+    withCString path $ \s ->
       throwErrnoIfMinus1Retry_ "removeFile" (unlink s)
 
 {-
@@ -256,8 +256,8 @@ renameDirectory opath npath =
 			    ("not a directory") (Just opath))
 	else do
 
-   withUnsafeCString opath $ \s1 ->
-     withUnsafeCString npath $ \s2 ->
+   withCString opath $ \s1 ->
+     withCString npath $ \s2 ->
         throwErrnoIfMinus1Retry_ "renameDirectory" (rename s1 s2)
 
 {-
@@ -307,8 +307,8 @@ renameFile opath npath =
 			   "is a directory" (Just opath))
 	else do
 
-    withUnsafeCString opath $ \s1 ->
-      withUnsafeCString npath $ \s2 ->
+    withCString opath $ \s1 ->
+      withCString npath $ \s2 ->
          throwErrnoIfMinus1Retry_ "renameFile" (rename s1 s2)
 
 {-
@@ -340,7 +340,7 @@ The path refers to an existing non-directory object.
 
 getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do
-   p <- withUnsafeCString path $ \s ->
+   p <- withCString path $ \s ->
 	  throwErrnoIfNullRetry "getDirectoryContents" (opendir s)
    loop p
   where
@@ -439,7 +439,7 @@ The path refers to an existing non-directory object.
 
 setCurrentDirectory :: FilePath -> IO ()
 setCurrentDirectory path = do
-    withUnsafeCString path $ \s -> 
+    withCString path $ \s -> 
        throwErrnoIfMinus1Retry_ "setCurrentDirectory" (chdir s)
 	-- ToDo: add path to error
 
@@ -469,7 +469,7 @@ getModificationTime name =
 
 getPermissions :: FilePath -> IO Permissions
 getPermissions name = do
-  withUnsafeCString name $ \s -> do
+  withCString name $ \s -> do
   read  <- access s (#const R_OK)
   write <- access s (#const W_OK)
   exec  <- access s (#const X_OK)
@@ -494,13 +494,13 @@ setPermissions name (Permissions r w e s) = do
 
      mode  = read `unionCMode` (write `unionCMode` exec)
 
-    withUnsafeCString name $ \s ->
+    withCString name $ \s ->
       throwErrnoIfMinus1_ "setPermissions" $ chmod s mode
 
 withFileStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
 withFileStatus name f = do
     allocaBytes (#const sizeof(struct stat)) $ \p ->
-      withUnsafeCString name $ \s -> do
+      withCString name $ \s -> do
         throwErrnoIfMinus1Retry_ "withFileStatus" (stat s p)
 	f p
 
@@ -531,26 +531,24 @@ emptyCMode     = 0
 unionCMode     :: CMode -> CMode -> CMode
 unionCMode     = (+)
 
-type UCString = UnsafeCString
-
 #if defined(mingw32_TARGET_OS)
-foreign import ccall unsafe mkdir    :: UCString -> IO CInt
+foreign import ccall unsafe mkdir    :: CString -> IO CInt
 #else
-foreign import ccall unsafe mkdir    :: UCString -> CInt -> IO CInt
+foreign import ccall unsafe mkdir    :: CString -> CInt -> IO CInt
 #endif
 
-foreign import ccall unsafe chmod    :: UCString -> CMode -> IO CInt
-foreign import ccall unsafe access   :: UCString -> CMode -> IO CInt
-foreign import ccall unsafe rmdir    :: UCString -> IO CInt
-foreign import ccall unsafe chdir    :: UCString -> IO CInt
+foreign import ccall unsafe chmod    :: CString -> CMode -> IO CInt
+foreign import ccall unsafe access   :: CString -> CMode -> IO CInt
+foreign import ccall unsafe rmdir    :: CString -> IO CInt
+foreign import ccall unsafe chdir    :: CString -> IO CInt
 foreign import ccall unsafe getcwd   :: Ptr CChar -> CInt -> IO (Ptr CChar)
-foreign import ccall unsafe unlink   :: UCString -> IO CInt
-foreign import ccall unsafe rename   :: UCString -> UCString -> IO CInt
+foreign import ccall unsafe unlink   :: CString -> IO CInt
+foreign import ccall unsafe rename   :: CString -> CString -> IO CInt
 		     
-foreign import ccall unsafe opendir  :: UCString  -> IO (Ptr CDir)
+foreign import ccall unsafe opendir  :: CString  -> IO (Ptr CDir)
 foreign import ccall unsafe readdir  :: Ptr CDir -> IO (Ptr CDirent)
 foreign import ccall unsafe closedir :: Ptr CDir -> IO CInt
 
-foreign import ccall unsafe stat     :: UCString -> Ptr CStat -> IO CInt
+foreign import ccall unsafe stat     :: CString -> Ptr CStat -> IO CInt
 
 type CDirent = ()

@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: System.lhs,v 1.31 2001/05/22 15:06:47 simonmar Exp $
+-- $Id: System.lhs,v 1.32 2001/08/10 13:48:06 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -58,14 +58,14 @@ getProgName = do
 
 getEnv :: String -> IO String
 getEnv name =
-    withUnsafeCString name $ \s -> do
+    withCString name $ \s -> do
       litstring <- _getenv s
       if litstring /= nullPtr
 	then peekCString litstring
         else ioException (IOError Nothing NoSuchThing "getEnv"
 			  "no environment variable" (Just name))
 
-foreign import ccall "getenv" unsafe _getenv :: UnsafeCString -> IO (Ptr CChar)
+foreign import ccall "getenv" unsafe _getenv :: CString -> IO (Ptr CChar)
 
 -- ---------------------------------------------------------------------------
 -- system
@@ -84,13 +84,13 @@ foreign import ccall "getenv" unsafe _getenv :: UnsafeCString -> IO (Ptr CChar)
 system :: String -> IO ExitCode
 system "" = ioException (IOError Nothing InvalidArgument "system" "null command" Nothing)
 system cmd =
-  withUnsafeCString cmd $ \s -> do
+  withCString cmd $ \s -> do
     status <- throwErrnoIfMinus1 "system" (primSystem s)
     case status of
         0  -> return ExitSuccess
         n  -> return (ExitFailure n)
 
-foreign import ccall "systemCmd" unsafe primSystem :: UnsafeCString -> IO Int
+foreign import ccall "systemCmd" unsafe primSystem :: CString -> IO Int
 
 -- ---------------------------------------------------------------------------
 -- exitWith

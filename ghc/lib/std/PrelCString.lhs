@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCString.lhs,v 1.4 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelCString.lhs,v 1.5 2001/08/10 13:48:06 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -124,17 +124,4 @@ castCCharToChar ch = unsafeChr (fromIntegral (fromIntegral ch :: Word8))
 
 castCharToCChar :: Char -> CChar
 castCharToCChar ch = fromIntegral (ord ch)
-
-
--- unsafe CStrings
--- ---------------
-
-withUnsafeCString :: String -> (UnsafeCString -> IO a) -> IO a
-#if __GLASGOW_HASKELL__
-newtype UnsafeCString = UnsafeCString (ByteArray Int)
-withUnsafeCString s f = f (UnsafeCString (packString s))
-#else
-newtype UnsafeCString = UnsafeCString (Ptr CChar)
-withUnsafeCString s f = withCString s (\p -> f (UnsafeCString p))
-#endif
 \end{code}
