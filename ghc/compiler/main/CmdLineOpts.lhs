@@ -28,6 +28,8 @@ module CmdLineOpts (
 	opt_PprStyle_Debug,
 
 	dopt,
+	dopt_set,
+	dopt_unset,
 
 	-- other dynamic flags
 	dopt_CoreToDo,
@@ -346,6 +348,12 @@ dopt_StgToDo = stgToDo
 
 dopt_OutName :: DynFlags -> String
 dopt_OutName = hscOutName
+
+dopt_set :: DynFlags -> DynFlag -> DynFlags
+dopt_set dfs f = dfs{ flags = f : flags dfs }
+
+dopt_unset :: DynFlags -> DynFlag -> DynFlags
+dopt_unset dfs f = dfs{ flags = filter (/= f) (flags dfs) }
 
 data HscLang
   = HscC

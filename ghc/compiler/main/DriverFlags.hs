@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.49 2001/03/15 15:53:28 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.50 2001/03/27 16:55:03 simonmar Exp $
 --
 -- Driver flags
 --
@@ -318,8 +318,8 @@ getDynFlags = readIORef v_DynFlags
 dynFlag :: (DynFlags -> a) -> IO a
 dynFlag f = do dflags <- readIORef v_DynFlags; return (f dflags)
 
-setDynFlag f   = updDynFlags (\dfs -> dfs{ flags = f : flags dfs })
-unSetDynFlag f = updDynFlags (\dfs -> dfs{ flags = filter (/= f) (flags dfs) })
+setDynFlag f   = updDynFlags (\dfs -> dopt_set dfs f)
+unSetDynFlag f = updDynFlags (\dfs -> dopt_unset dfs f)
 
 addOpt_L     a = updDynFlags (\s -> s{opt_L =  a : opt_L s})
 addOpt_P     a = updDynFlags (\s -> s{opt_P =  a : opt_P s})

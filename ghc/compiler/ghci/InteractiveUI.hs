@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.57 2001/03/25 13:29:54 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.58 2001/03/27 16:55:03 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -22,6 +22,7 @@ import Linker
 import Util
 import Name		( Name )
 import Outputable
+import CmdLineOpts	( DynFlag(..), dopt_unset )
 import Panic		( GhcException(..) )
 import Config
 
@@ -254,7 +255,8 @@ runStmt stmt
  | otherwise
  = do st <- getGHCiState
       dflags <- io (getDynFlags)
-      (new_cmstate, names) <- io (cmRunStmt (cmstate st) dflags stmt)
+      let dflags' = dopt_unset dflags Opt_WarnUnusedBinds
+      (new_cmstate, names) <- io (cmRunStmt (cmstate st) dflags' stmt)
       setGHCiState st{cmstate = new_cmstate}
       return (Just names)
 
