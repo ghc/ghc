@@ -46,7 +46,7 @@ package_details installing =
                             then [ clibdir ]
                             else [ ghc_src_dir cGHC_RUNTIME_DIR ],
         hs_libraries      = [ "HSrts" ],
-	extra_libraries   = [ "" ],
+	extra_libraries   = [],
         include_dirs   = if installing
                             then [ clibdir ++ "/includes" ]
                             else [ ghc_src_dir cGHC_INCLUDE_DIR ],
