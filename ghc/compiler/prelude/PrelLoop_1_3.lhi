@@ -1,9 +1,0 @@
-\begin{code}
-interface PrelLoop_1_3 1
-__exports__
-Name mkWiredInName (..)
-Type mkSigmaTy (..)
-Type mkFunTys (..)
-Type mkFunTy (..)
-IdUtils primOpNameInfo (..)
-\end{code}

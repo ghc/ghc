@@ -1,7 +1,0 @@
-\begin{code}
-interface RnLoop_1_3 1
-__exports__
-RnBinds  rnBinds (..)
-RnBinds  FreeVars
-RnSource rnPolyType (..)
-\end{code}

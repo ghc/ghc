@@ -1,6 +1,0 @@
-\begin{code}
-interface CgLoop2_1_3 1
-__exports__
-CgExpr cgExpr (..)
-CgExpr getPrimOpArgAmodes (..)
-\end{code}

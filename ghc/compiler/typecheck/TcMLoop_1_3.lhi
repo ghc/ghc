@@ -1,7 +1,0 @@
-\begin{code}
-interface TcMLoop_1_3 1
-__exports__
-TcEnv TcEnv
-TcEnv initEnv (..)
-TcType TcMaybe
-\end{code}

@@ -1,5 +1,0 @@
-\begin{code}
-interface TcLoop_1_3 1
-__exports__
-TcGRHSs tcGRHSsAndBinds (..)
-\end{code}

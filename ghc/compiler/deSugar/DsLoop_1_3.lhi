@@ -1,8 +1,0 @@
-\begin{code}
-interface DsLoop_1_3 1
-__exports__
-Match match (..)
-Match matchSimply (..)
-DsBinds	dsBinds (..)
-DsExpr	dsExpr (..)
-\end{code}
