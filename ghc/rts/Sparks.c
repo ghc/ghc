@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Sparks.c,v 1.4 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Sparks.c,v 1.5 2002/01/24 02:06:49 sof Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -36,7 +36,7 @@
 # endif
 #include "Sparks.h"
 
-#if defined(SMP) || defined(PAR)
+#if /*defined(SMP) ||*/ defined(PAR)
 
 //@node GUM code, GranSim code, Includes, Spark Management Routines
 //@subsection GUM code

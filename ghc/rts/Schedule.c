@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.111 2002/01/22 13:54:22 simonmar Exp $
+ * $Id: Schedule.c,v 1.112 2002/01/24 02:06:48 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -306,7 +306,7 @@ char *threadReturnCode_strs[] = {
 };
 #endif
 
-#ifdef PAR
+#if defined(PAR)
 StgTSO * createSparkThread(rtsSpark spark);
 StgTSO * activateSpark (rtsSpark spark);  
 #endif
@@ -494,8 +494,11 @@ schedule( void )
     /* Top up the run queue from our spark pool.  We try to make the
      * number of threads in the run queue equal to the number of
      * free capabilities.
+     *
+     * Disable spark support in SMP for now, non-essential & requires
+     * a little bit of work to make it compile cleanly. -- sof 1/02.
      */
-#if defined(SMP)
+#if 0 /* defined(SMP) */
     {
       nat n = n_free_capabilities;
       StgTSO *tso = run_queue_hd;
@@ -2256,7 +2259,7 @@ GetRoots(evac_fn evac)
       evac((StgClosure **)&suspended_ccalling_threads);
   }
 
-#if defined(SMP) || defined(PAR) || defined(GRAN)
+#if defined(PAR) || defined(GRAN)
   markSparkQueue(evac);
 #endif
 }

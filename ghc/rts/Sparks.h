@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sparks.h,v 1.3 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: Sparks.h,v 1.4 2002/01/24 02:06:49 sof Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -25,14 +25,15 @@ void      markSparkQueue(void);
 
 #elif defined(PAR) || defined(SMP)
 
+StgClosure  *findSpark( rtsBool );
 rtsBool      initSparkPools( void );
 void         markSparkQueue( void );
-StgClosure  *findSpark( rtsBool );
+#if defined(PAR)
 StgTSO      *activateSpark (rtsSpark spark) ;
 rtsBool      add_to_spark_queue( StgClosure *closure, StgSparkPool *pool );
 void         markSparkQueue( void );
 nat          spark_queue_len( StgSparkPool *pool );
 void         disposeSpark( StgClosure *spark );
-
+#endif
 
 #endif
