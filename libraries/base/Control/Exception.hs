@@ -139,7 +139,7 @@ INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
 #ifdef __HUGS__
 -- This is as close as Hugs gets to providing throw
 throw :: Exception -> IO a
-throw = ioError
+throw = throwIO
 #endif
 
 -----------------------------------------------------------------------------
