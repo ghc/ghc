@@ -158,7 +158,14 @@ $SIG{'QUIT'} = 'quit_upon_signal';
 			   : "$TopPwd/${CURRENT_DIR}" );
 
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
-    $Tmp_prefix = ($ENV{'TMPDIR'} . "/ghc$$");
+    # Try to find a $Tmp_prefix which isn't being used...
+    $tmp = $$;
+    do {
+      $Tmp_prefix = ($ENV{'TMPDIR'} . "/ghc$tmp");
+      $tmp++;
+    } while ( -e "$Tmp_prefix.hc" ||
+	      -e "$Tmp_Prefix.s"  || 
+	      -e "$Tmp_Prefix.hi" );
 } else {
     print STDERR "TMPDIR has not been set to anything useful!\n" if (${TMPDIR} eq '');
     $Tmp_prefix ="${TMPDIR}/ghc$$"; # TMPDIR set via Makefile when booting..
