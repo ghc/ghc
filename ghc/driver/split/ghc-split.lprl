@@ -30,7 +30,7 @@ sub split_asm_file {
 
     &collectExports_hppa() if $TargetPlatform =~ /^hppa/;
     &collectExports_mips() if $TargetPlatform =~ /^mips/;
-    &collectDyldStuff_powerpc() if $TargetPlatform =~ /^powerpc-apple/;
+    &collectDyldStuff_powerpc_darwin() if $TargetPlatform =~ /^powerpc-apple-darwin/;
 
     $octr = 0;	# output file counter
     $* = 1; 	# multi-line matches are OK
@@ -107,7 +107,7 @@ sub collectExports_mips { # Note: MIPS only
     seek(TMPI, 0, 0);
 }
 
-sub collectDyldStuff_powerpc { # Note: Darwin/PowerPC only
+sub collectDyldStuff_powerpc_darwin {
     local($chunk_label,$label,$cur_section,$section,$chunk,$alignment,$cur_alignment);
     
     %DyldChunks = (); # NB: global table
@@ -212,7 +212,10 @@ sub process_asm_block {
     return(&process_asm_block_alpha($str)) if $TargetPlatform =~ /^alpha-/;
     return(&process_asm_block_hppa($str))  if $TargetPlatform =~ /^hppa/;
     return(&process_asm_block_mips($str))   if $TargetPlatform =~ /^mips-/;
-    return(&process_asm_block_powerpc($str))   if $TargetPlatform =~ /^powerpc-apple-/;
+    return(&process_asm_block_powerpc_darwin($str))
+                            if $TargetPlatform =~ /^powerpc-apple-darwin/;
+    return(&process_asm_block_powerpc_linux($str))
+                            if $TargetPlatform =~ /^powerpc-[^-]+-linux/;
 
     # otherwise...
     &tidy_up_and_die(1,"$Pgm: no process_asm_block for $TargetPlatform\n");
@@ -477,7 +480,7 @@ sub process_asm_block_mips {
 \end{code}
 
 \begin{code}
-sub process_asm_block_powerpc {
+sub process_asm_block_powerpc_darwin {
     local($str) = @_;
     local($dyld_stuff) = '';
 
@@ -516,7 +519,38 @@ sub process_asm_block_powerpc {
 
     $str .= "\n" . $dyld_stuff;
 
-    print STDERR "### STRIPPED BLOCK (powerpc):\n$str" if $Dump_asm_splitting_info;
+    print STDERR "### STRIPPED BLOCK (powerpc darwin):\n$str" if $Dump_asm_splitting_info;
+
+    $str;
+}
+\end{code}
+
+\begin{code}
+sub process_asm_block_powerpc_linux {
+    local($str) = @_;
+
+    # strip the marker
+    $str =~ s/__stg_split_marker.*\n//;
+
+    # remove/record any literal constants defined here
+    while ( $str =~ s/^(\s+.section\s+\.rodata\n\s+\.align.*\n(\.LC\d+):\n(\s\.(byte|short|long|quad|2byte|4byte|8byte|fill|space|ascii|string).*\n)+)// ) {
+	local($label) = $2;
+	local($body)  = $1;
+
+	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
+	    if $LocalConstant{$label};
+
+	$LocalConstant{$label} = $body;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+	if ( $str =~ /[\s,]$k\b/ ) {
+	    $str = $LocalConstant{$k} . $str;
+	}
+    }
+    
+    print STDERR "### STRIPPED BLOCK (powerpc linux):\n$str" if $Dump_asm_splitting_info;
 
     $str;
 }
