@@ -456,19 +456,19 @@
 	  <row>
 	    <entry><option>-W</option></entry>
 	    <entry>enable normal warnings</entry>
-	    <entry>static</entry>
+	    <entry>dynamic</entry>
 	    <entry><option>-w</option></entry>
 	  </row>
 	  <row>
 	    <entry><option>-w</option></entry>
 	    <entry>disable all warnings</entry>
-	    <entry>static</entry>
+	    <entry>dynamic</entry>
 	    <entry>-</entry>
 	  </row>
 	  <row>
 	    <entry><option>-Wall</option></entry>
 	    <entry>enable all warnings</entry>
-	    <entry>static</entry>
+	    <entry>dynamic</entry>
 	    <entry><option>-w</option></entry>
 	  </row>
 

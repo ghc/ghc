@@ -2,7 +2,7 @@
 <!ENTITY flags          SYSTEM "flags.sgml">
 <!ENTITY license        SYSTEM "license.sgml">
 <!ENTITY intro          SYSTEM "intro.sgml" >
-<!ENTITY relnotes       SYSTEM "4-08-notes.sgml" >
+<!ENTITY relnotes       SYSTEM "5-00-notes.sgml" >
 <!ENTITY installing     SYSTEM "installing.sgml" >
 <!ENTITY using          SYSTEM "using.sgml" >
 <!ENTITY runtime        SYSTEM "runtime_control.sgml" >

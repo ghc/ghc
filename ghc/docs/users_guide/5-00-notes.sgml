@@ -1,0 +1,54 @@
+<sect1 id="release-5-00">
+  <title>Release notes for version 5.00 (February 2001)</title>
+
+  <sect2>
+    <title>User-visible compiler changes</title>
+    <itemizedlist>
+      <listitem>
+	<para>GHCi added</para>
+      </listitem>
+      <listitem>
+	<para><option>--make</option> flag added</para>
+      </listitem>
+      <listitem>
+	<para>dynamic vs. static options</para>
+      </listitem>
+      <listitem>
+	<para>NCG support for Sparc</para>
+      </listitem>
+      <listitem>
+	<para><command>hsc2hs</command> added</para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>User-visible library changes</title>
+    <itemizedlist>
+      <listitem>
+	<para>FFI libraries enhanced, lots of deprecations.</para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Internal changes</title>
+    <itemizedlist>
+      <listitem>
+	<para>The old perl driver has been removed and replaced by a
+	driver in the compiler proper.</para>
+      </listitem>
+      <listitem>
+	<para>Several libraries rewritten to use the FFI.</para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+</sect1>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter" "sect1") ***
+     ;;; End: ***
+ -->

@@ -1,4 +1,4 @@
-<chapter>
+<chapter id="ghci">
   <title>Using GHCi</title>
   
   <para>ToDo</para>

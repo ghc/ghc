@@ -1,4 +1,4 @@
-<chapter>
+<chapter id="using-ghc">
   <title>Using GHC</title>
 
   <indexterm><primary>GHC, using</primary></indexterm>
