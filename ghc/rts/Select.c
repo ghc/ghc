@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.10 2000/03/20 09:42:50 andy Exp $
+ * $Id: Select.c,v 1.11 2000/03/23 12:02:38 simonmar Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -52,6 +52,7 @@ awaitEvent(rtsBool wait)
     int numFound;
     nat min, delta;
     int maxfd = -1;
+    rtsBool select_succeeded = rtsTrue;
    
     struct timeval tv;
 #ifndef linux_TARGET_OS
@@ -165,6 +166,8 @@ awaitEvent(rtsBool wait)
 	if (signals_pending()) {
 	  RELEASE_LOCK(&sched_mutex);
 	  start_signal_handlers();
+	  /* Don't wake up any other threads that were waiting on I/O */
+	  select_succeeded = rtsFalse;
 	  break;
 	}
 
@@ -173,6 +176,7 @@ awaitEvent(rtsBool wait)
 	 */
 	if (run_queue_hd != END_TSO_QUEUE) {
 	  RELEASE_LOCK(&sched_mutex);
+	  select_succeeded = rtsFalse;
 	  break;
 	}
 	
@@ -209,16 +213,15 @@ awaitEvent(rtsBool wait)
 	next = tso->link;
 	switch (tso->why_blocked) {
 	case BlockedOnRead:
-	  ready = FD_ISSET(tso->block_info.fd, &rfd);
+	  ready = select_succeeded && FD_ISSET(tso->block_info.fd, &rfd);
 	  break;
 	
 	case BlockedOnWrite:
-	  ready = FD_ISSET(tso->block_info.fd, &wfd);
+	  ready = select_succeeded && FD_ISSET(tso->block_info.fd, &wfd);
 	  break;
 	
 	case BlockedOnDelay:
 	  {
-	    int candidate; /* signed int is intentional */
 #if defined(HAVE_SETITIMER)
 	    if (tso->block_info.delay > delta) {
 	      tso->block_info.delay -= delta;
@@ -228,6 +231,7 @@ awaitEvent(rtsBool wait)
 	      ready = 1;
 	    }
 #else
+	    int candidate; /* signed int is intentional */
 	    candidate = tso->block_info.target - getourtimeofday();
 	    if (candidate < 0) {
 	      candidate = 0;
