@@ -229,26 +229,28 @@ tags:
     </sect2>
     <sect2><title>Input syntax</title>
 
-      <para>All special processing is triggered by the
-      <literal>#</literal> character placed outside Haskell comments
-      and string literals. To output a literal <literal>#</literal>,
-      write it twice: <literal>##</literal>.</para>
+      <para>All special processing is triggered by
+      the <literal>#</literal> operator. To output
+      a literal <literal>#</literal>, write it twice:
+      <literal>##</literal>. Inside string literals and comments
+      <literal>#</literal> characters are not processed.</para>
 
-      <para>Otherwise <literal>#</literal> is followed by optional
-      spaces and tabs, an alphanumeric key that describes the
-      kind of processing, and its arguments. Arguments look
-      like C expressions separated by commas and extend up to the
-      nearest unmatched <literal>)</literal>, <literal>]</literal>,
-      or <literal>}</literal>, or to the end of line outside any
-      <literal>() [] {} '' "" /* */</literal>. Any character may be
-      preceded by a backslash and will not be treated specially.</para>
+      <para>A <literal>#</literal> is followed by optional
+      spaces and tabs, an alphanumeric keyword that describes
+      the kind of processing, and its arguments. Arguments look
+      like C expressions separated by commas (they are not
+      written inside parens).  They extend up to the nearest
+      unmatched <literal>)</literal>, <literal>]</literal> or
+      <literal>}</literal>, or to the end of line if it occurs outside
+      any <literal>() [] {} '' "" /**/</literal> and is not preceded
+      by a backslash. Backslash-newline pairs are stripped.</para>
 
       <para>In addition <literal>#{stuff}</literal> is equivalent
       to <literal>#stuff</literal> except that it's self-delimited
       and thus needs not to be placed at the end of line or in some
       brackets.</para>
 
-      <para>Meanings of specific keys:</para>
+      <para>Meanings of specific keywords:</para>
 
       <variablelist>
 
