@@ -8,23 +8,26 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- The PackedString type, and associated operations.
---
--- Original GHC implementation by Bryan O\'Sullivan, 
--- rewritten to use UArray by Simon Marlow.
+-- An efficient implementation of strings.
 --
 -----------------------------------------------------------------------------
 
+-- Original GHC implementation by Bryan O\'Sullivan, 
+-- rewritten to use UArray by Simon Marlow.
+
 module Data.PackedString (
+	-- * The @PackedString@ type
         PackedString,      -- abstract, instances: Eq, Ord, Show, Typeable
 
-         -- Creating the beasts
-	packString,  -- :: [Char] -> PackedString
-	unpackPS,    -- :: PackedString -> [Char]
+         -- * Converting to and from @PackedString@s
+	packString,  -- :: String -> PackedString
+	unpackPS,    -- :: PackedString -> String
 
+	-- * I\/O with @PackedString@s	
 	hPutPS,      -- :: Handle -> PackedString -> IO ()
 	hGetPS,      -- :: Handle -> Int -> IO PackedString
 
+	-- * List-like manipulation functions
 	nilPS,       -- :: PackedString
 	consPS,      -- :: Char -> PackedString -> PackedString
 	headPS,      -- :: PackedString -> Char
@@ -71,6 +74,8 @@ import System.IO
 -- -----------------------------------------------------------------------------
 -- PackedString type declaration
 
+-- | A space-efficient representation of a 'String', which supports various
+-- efficient operations.  A 'PackedString' contains full Unicode 'Char's.
 newtype PackedString = PS (UArray Int Char)
 
 instance Eq PackedString where
@@ -96,7 +101,8 @@ nilPS = PS (array (0,-1) [])
 consPS :: Char -> PackedString -> PackedString
 consPS c cs = packString (c : (unpackPS cs)) -- ToDo:better
 
-packString :: [Char] -> PackedString
+-- | Convert a 'String' into a 'PackedString'
+packString :: String -> PackedString
 packString str = packNChars (length str) str
 
 packNChars :: Int -> [Char] -> PackedString
@@ -105,7 +111,8 @@ packNChars len str = PS (array (0,len-1) (zip [0..] str))
 -- -----------------------------------------------------------------------------
 -- Destructor functions (taking PackedStrings apart)
 
-unpackPS :: PackedString -> [Char]
+-- | Convert a 'PackedString' into a 'String'
+unpackPS :: PackedString -> String
 unpackPS (PS ps) = elems ps
 
 -- -----------------------------------------------------------------------------
@@ -253,6 +260,11 @@ substrPS (PS ps) begin end = packString [ ps ! i | i <- [begin..end] ]
 -- -----------------------------------------------------------------------------
 -- hPutPS
 
+-- | Outputs a 'PackedString' to the specified 'Handle'.  
+--
+-- NOTE: the representation of the 'PackedString' in the file is assumed to
+-- be in the ISO-8859-1 encoding.  In other words, only the least signficant
+-- byte is taken from each character in the 'PackedString'.
 hPutPS :: Handle -> PackedString -> IO ()
 hPutPS h (PS ps) = do
   let l = lengthPS (PS ps)
@@ -263,6 +275,12 @@ hPutPS h (PS ps) = do
 -- -----------------------------------------------------------------------------
 -- hGetPS
 
+-- | Read a 'PackedString' directly from the specified 'Handle'.  This
+-- is far more efficient than reading the characters into a 'String'
+-- and then using 'packString'.  
+--
+-- NOTE: as with 'hPutPS', the string representation in the file is 
+-- assumed to be ISO-8859-1.
 hGetPS :: Handle -> Int -> IO PackedString
 hGetPS h i = do
   arr <- newArray_ (0, i-1)
