@@ -28,6 +28,10 @@ IMP_Ubiq(){-uitous-}
 
 import Pretty
 import Util		( panic )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable 
+#endif
+
 \end{code}
 
 The @BinderInfo@ describes how a variable is used in a given scope.
@@ -253,20 +257,20 @@ getBinderInfoArity (OneOcc _ _ _ _ i) = i
 
 \begin{code}
 instance Outputable BinderInfo where
-  ppr sty DeadCode     = ppPStr SLIT("Dead")
-  ppr sty (ManyOcc ar) = ppBesides [ ppPStr SLIT("Many-"), ppInt ar ]
+  ppr sty DeadCode     = ptext SLIT("Dead")
+  ppr sty (ManyOcc ar) = hcat [ ptext SLIT("Many-"), int ar ]
   ppr sty (OneOcc posn dup_danger in_scc n_alts ar)
-    = ppBesides [ ppPStr SLIT("One-"), pp_posn posn, ppChar '-', pp_danger dup_danger,
-		  ppChar '-', pp_scc in_scc,  ppChar '-', ppInt n_alts,
-		  ppChar '-', ppInt ar ]
+    = hcat [ ptext SLIT("One-"), pp_posn posn, char '-', pp_danger dup_danger,
+		  char '-', pp_scc in_scc,  char '-', int n_alts,
+		  char '-', int ar ]
     where
-      pp_posn FunOcc = ppPStr SLIT("fun")
-      pp_posn ArgOcc = ppPStr SLIT("arg")
+      pp_posn FunOcc = ptext SLIT("fun")
+      pp_posn ArgOcc = ptext SLIT("arg")
 
-      pp_danger DupDanger   = ppPStr SLIT("*dup*")
-      pp_danger NoDupDanger = ppPStr SLIT("nodup")
+      pp_danger DupDanger   = ptext SLIT("*dup*")
+      pp_danger NoDupDanger = ptext SLIT("nodup")
 
-      pp_scc InsideSCC	  = ppPStr SLIT("*SCC*")
-      pp_scc NotInsideSCC = ppPStr SLIT("noscc")
+      pp_scc InsideSCC	  = ptext SLIT("*SCC*")
+      pp_scc NotInsideSCC = ptext SLIT("noscc")
 \end{code}
 
