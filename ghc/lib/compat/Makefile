@@ -22,7 +22,6 @@ ifeq "$(ghc_603_plus)" "YES"
 # These modules are all provided in GHC 6.3+
 EXCLUDED_SRCS += \
 	System/FilePath.hs \
-	Distribution/Compat/Error.hs \
 	Distribution/Compat/ReadP.hs \
 	Distribution/Extension.hs \
 	Distribution/GetOpt.hs \
@@ -36,7 +35,6 @@ endif
 
 # Some explicit dependencies
 System/FilePath.$(way_)o : $(FPTOOLS_TOP)/libraries/base/System/FilePath.hs
-Distribution/Compat/Error.$(way_)o : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compat/Error.hs
 Distribution/Compat/ReadP.$(way_) : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compat/ReadP.hs
 Distribution/Extension.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Extension.hs
 Distribution/GetOpt.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/GetOpt.hs

@@ -9,7 +9,6 @@
 
 -- TODO:
 --	- validate modules
---	- expose/hide
 --	- expanding of variables in new-style package conf
 --	- version manipulation (checking whether old version exists,
 --	  hiding old version?)
@@ -19,7 +18,7 @@ module Main (main) where
 import Version	( version, targetOS, targetARCH )
 import Distribution.InstalledPackageInfo
 import Distribution.Compat.ReadP
-import Distribution.ParseUtils	( showError )
+import Distribution.ParseUtils	( showError, ParseResult(..) )
 import Distribution.Package
 import Distribution.Version
 import Compat.Directory 	( getAppUserDataDirectory, createDirectoryIfMissing )
@@ -338,8 +337,8 @@ parsePackageInfo
 	-> IO InstalledPackageInfo
 parsePackageInfo str defines force =
   case parseInstalledPackageInfo str of
-    Right ok -> return ok
-    Left err -> die (showError err)
+    ParseOk ok -> return ok
+    ParseFailed err -> die (showError err)
 
 -- Used for converting versionless package names to new
 -- PackageIdentifiers.  "Version [] []" is special: it means "no
