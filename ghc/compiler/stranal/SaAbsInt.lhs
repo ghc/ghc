@@ -34,8 +34,6 @@ import TyCon		( tyConUnique )
 import PrelInfo		( numericTyKeys )
 import Util		( isIn, nOfThem, zipWithEqual )
 import Outputable	
-
-returnsRealWorld x = False -- ToDo: panic "SaAbsInt.returnsRealWorld (ToDo)"
 \end{code}
 
 %************************************************************************
@@ -848,10 +846,14 @@ fixpoint anal ids rhss env
   where
     initial_val id
       = case anal of	-- The (unsafe) starting point
-	  StrAnal -> if (returnsRealWorld (idType id))
-		     then AbsTop -- this is a massively horrible hack (SLPJ 95/05)
-		     else AbsBot
 	  AbsAnal -> AbsTop
+	  StrAnal -> AbsBot
+		-- At one stage for StrAnal we said:
+		--   if (returnsRealWorld (idType id))
+		--   then AbsTop -- this is a massively horrible hack (SLPJ 95/05)
+		-- but no one has the foggiest idea what this hack did,
+		-- and returnsRealWorld was a stub that always returned False
+		-- So this comment is all that is left of the hack!
 
     initial_vals = [ initial_val id | id <- ids ]
 
