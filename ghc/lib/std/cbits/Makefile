@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.32 2001/08/17 00:17:55 sof Exp $
+# $Id: Makefile,v 1.33 2001/08/17 10:10:15 rrt Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -12,7 +12,7 @@ ifeq "$(ILXized)" "YES"
 DLLized = YES
 C_SRCS += $(FPTOOLS_TOP)/ghc/rts/StgPrimFloat.c
 else
-C_SRCS := $(filter-out ilxstubs.c,$(C_SRCS))
+EXCLUDED_SRCS += ilxstubs.c
 endif
 
 # -----------------------------------------------------------------------------
