@@ -536,7 +536,9 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
 				     mi_fixities = new_fixities })
 
   | no_output_change && no_usage_change
-  = (old_iface, Nothing)
+  = (new_iface, Nothing)
+	-- don't return the old iface because it may not have an
+	-- mi_globals field set to anything reasonable.
 
   | otherwise		-- Add updated version numbers
   = (final_iface, Just pp_tc_diffs)
