@@ -160,13 +160,14 @@ mkJumpToAddr a
 -- B8 ZZ YY XX WW FF E0
 mkJumpToAddr a
    = let w32 = fromIntegral (addrToInt a)
+         insnBytes :: [Word8]
          insnBytes
-            = take 16 (
+            = map fromIntegral (take 16 (
                  [0xB8, byte 0 w32, byte 1 w32, 
                         byte 2 w32, byte 3 w32, 
                   0xFF, 0xE0]
                  ++ let nops = 0x90 : nops in nops
-              )
+              ))
      in
          insnBytes
 #endif
