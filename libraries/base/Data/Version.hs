@@ -104,7 +104,7 @@ data Version =
 
 #if __GLASGOW_HASKELL__ < 602
 versionTc :: TyCon
-versionTc = mkTyCon "()"
+versionTc = mkTyCon "Version"
 
 instance Typeable Version where
   typeOf _ = mkAppTy versionTc []

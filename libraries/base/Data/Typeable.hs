@@ -487,7 +487,7 @@ instance Typeable6 (,,,,,) where
   typeOf6 tu = mkTyConApp tup6Tc []
 
 tup7Tc :: TyCon
-tup7Tc = mkTyCon ",,,,,"
+tup7Tc = mkTyCon ",,,,,,"
 
 instance Typeable7 (,,,,,,) where
   typeOf7 tu = mkTyConApp tup7Tc []
