@@ -10,7 +10,7 @@ module RnNames (
 
 #include "HsVersions.h"
 
-import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports, opt_SourceUnchanged )
+import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports )
 
 import HsSyn	( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
 		  collectTopBinders
@@ -191,7 +191,7 @@ checkEarlyExit mod_name
 		    returnRn (outOfDate, Nothing)
 
 	Right iface
-	  | not opt_SourceUnchanged
+	  | panic "checkEarlyExit: ???: not opt_SourceUnchanged"
 	  -> 	-- Source code changed
 	     traceRn (nest 4 (text "source file changed or recompilation check turned off"))	`thenRn_` 
 	     returnRn (False, Just iface)

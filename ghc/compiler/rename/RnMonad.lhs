@@ -48,11 +48,9 @@ import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  decode, mkLocalName, mkUnboundName, mkKnownKeyGlobal,
 			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, extendNameEnvList
 			)
-import Module		( Module, ModuleName, ModuleHiMap, SearchPath, WhereFrom,
-			  mkModuleHiMaps, moduleName, mkSearchPath
-			)
+import Module		( Module, ModuleName, WhereFrom, moduleName )
 import NameSet		
-import CmdLineOpts	( opt_D_dump_rn_trace, opt_HiMap )
+import CmdLineOpts	( DynFlags, dopt_D_dump_rn_trace )
 import PrelInfo		( wiredInNames, knownKeyRdrNames )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique )
@@ -60,6 +58,7 @@ import FiniteMap	( FiniteMap, emptyFM, listToFM, plusFM )
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
+import CmFind		( Finder )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -78,8 +77,9 @@ ioToRnM io rn_down g_down = (io >>= \ ok -> return (Right ok))
 			    (\ err -> return (Left err))
 	    
 traceRn :: SDoc -> RnM d ()
-traceRn msg | opt_D_dump_rn_trace = putDocRn msg
-	    | otherwise		  = returnRn ()
+traceRn msg
+   = doptsRn dopt_D_dump_rn_trace `thenRn` \b ->
+     if b then putDocRn msg else returnRn ()
 
 putDocRn :: SDoc -> RnM d ()
 putDocRn msg = ioToRnM (printErrs msg)	`thenRn_`
@@ -109,14 +109,14 @@ data RnDown
 	rn_loc     :: SrcLoc,			-- Current locn
 
 	rn_finder  :: Finder,
-	rn_flags   :: DynFlags,
+	rn_dflags  :: DynFlags,
 	rn_gst     :: GlobalSymbolTable,	-- Both home modules and packages,
 						-- at the moment we started compiling 
 						-- this module
 
 	rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
 	rn_ns      :: IORef NameSupply,
-	rn_ifaces  :: IORef Ifaces,
+	rn_ifaces  :: IORef Ifaces
     }
 
 	-- For renaming source code
@@ -209,7 +209,7 @@ data WhatsImported name  = NothingAtAll				-- The module is below us in the
 					[(name,Version)]	-- List guaranteed non-empty
 			 deriving( Eq )
 	-- 'Specifically' doesn't let you say "I imported f but none of the fixities in
-	-- the module. If you use anything in the module you get its fixity and rule version
+	-- the module". If you use anything in the module you get its fixity and rule version
 	-- So if the fixities or rules change, you'll recompile, even if you don't use either.
 	-- This is easy to implement, and it's safer: you might not have used the rules last
 	-- time round, but if someone has added a new rule you might need it this time
@@ -235,6 +235,8 @@ data ParsedIface
 
 type RdrNamePragma = ()				-- Fudge for now
 -------------------
+
+\end{code}
 
 %************************************************************************
 %*									*
@@ -275,7 +277,6 @@ data Ifaces = Ifaces {
 						-- See comments with RnIfaces.lookupFixity
 		iDeprecs :: DeprecationEnv,
 
-
 	-- EPHEMERAL FIELDS
 	-- These fields persist during the compilation of a single module only
 
@@ -283,7 +284,7 @@ data Ifaces = Ifaces {
 		-- All the names (whether "big" or "small", whether wired-in or not,
 		-- whether locally defined or not) that have been slurped in so far.
 
-		iVSlurp :: [(Name,Version)],
+		iVSlurp :: [(Name,Version)]
 		-- All the (a) non-wired-in (b) "big" (c) non-locally-defined 
 		-- names that have been slurped in so far, with their versions.
 		-- This is used to generate the "usage" information for this module.
@@ -326,10 +327,8 @@ type ImportedModuleInfo
 initRn :: DynFlags -> Finder -> GlobalSymbolTable
        -> PersistentRenamerState
        -> Module -> SrcLoc
-       -> RnMG r
-       -> IO (r, Bag ErrMsg, Bag WarnMsg)
 
-initRn flags finder gst prs mod loc do_rn = do
+initRn dflags finder gst prs mod loc do_rn = do
   himaps    <- mkModuleHiMaps dirs
   names_var <- newIORef (prsNS pcs)
   errs_var  <- newIORef (emptyBag,emptyBag)
@@ -339,7 +338,7 @@ initRn flags finder gst prs mod loc do_rn = do
 			   rn_loc = loc, 
 
 			   rn_finder = finder,
-			   rn_flags  = flags,
+			   rn_dflags = dflags,
 			   rn_gst    = gst,
 				
 			   rn_ns     = names_var, 
@@ -407,23 +406,24 @@ The @NameSupply@ includes a @UniqueSupply@, so if you call it more than
 once you must either split it, or install a fresh unique supply.
 
 \begin{code}
-renameSourceCode :: Module
-		 -> NameSupply
+renameSourceCode :: DynFlags 
+		 -> Module
+		 -> RnNameSupply
 	         -> RnMS r
 	         -> r
 
-renameSourceCode mod name_supply m
+renameSourceCode dflags mod name_supply m
   = unsafePerformIO (
 	-- It's not really unsafe!  When renaming source code we
 	-- only do any I/O if we need to read in a fixity declaration;
 	-- and that doesn't happen in pragmas etc
 
-        mkModuleHiMaps (mkSearchPath opt_HiMap) >>= \ himaps ->
 	newIORef name_supply		>>= \ names_var ->
 	newIORef (emptyBag,emptyBag)	>>= \ errs_var ->
     	let
-	    rn_down = RnDown { rn_loc = mkGeneratedSrcLoc, rn_ns = names_var,
-			       rn_errs = errs_var, rn_hi_maps = himaps,
+	    rn_down = RnDown { rn_dflags = dflags,
+			       rn_loc = mkGeneratedSrcLoc, rn_ns = names_var,
+			       rn_errs = errs_var, 
 			       rn_mod = mod, 
 			       rn_ifaces = panic "rnameSourceCode: rn_ifaces"  -- Not required
 			     }
@@ -570,6 +570,10 @@ checkErrsRn :: RnM d Bool		-- True <=> no errors so far
 checkErrsRn (RnDown {rn_errs = errs_var}) l_down
   = readIORef  errs_var  				 	>>=  \ (warns,errs) ->
     return (isEmptyBag errs)
+
+doptsRn :: (DynFlags -> Bool) -> RnM d Bool
+doptsRn dopt (RnDown { rn_dflags = dflags}) l_down
+   = return (dopt dflags)
 \end{code}
 
 
@@ -694,9 +698,4 @@ getIfacesRn (RnDown {rn_ifaces = iface_var}) _
 setIfacesRn :: Ifaces -> RnM d ()
 setIfacesRn ifaces (RnDown {rn_ifaces = iface_var}) _
   = writeIORef iface_var ifaces
-
-getHiMaps :: RnM d (SearchPath, ModuleHiMap, ModuleHiMap)
-getHiMaps (RnDown {rn_hi_maps = himaps}) _ 
-  = return himaps
-\end{code}
 \end{code}

@@ -46,7 +46,7 @@ import Bag		( bagToList )
 import List		( partition, nub )
 import Outputable
 import SrcLoc		( SrcLoc )
-import CmdLineOpts	( opt_GlasgowExts, opt_WarnUnusedMatches )	-- Warn of unused for-all'd tyvars
+import CmdLineOpts	( opt_WarnUnusedMatches, dopt_GlasgowExts )	-- Warn of unused for-all'd tyvars
 import Unique		( Uniquable(..) )
 import ErrUtils		( Message )
 import CStrings		( isCLabelString )
@@ -155,17 +155,18 @@ rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivin
 
 rnDecl (TyClD (TySynonym name tyvars ty src_loc))
   = pushSrcLocRn src_loc $
+    doptsRn dopt_GlasgowExts			`thenRn` \ glaExts ->
     lookupTopBndrRn name			`thenRn` \ name' ->
     bindTyVarsFVRn syn_doc tyvars 		$ \ tyvars' ->
-    rnHsType syn_doc (unquantify ty)		`thenRn` \ (ty', ty_fvs) ->
+    rnHsType syn_doc (unquantify glaExts ty)	`thenRn` \ (ty', ty_fvs) ->
     returnRn (TyClD (TySynonym name' tyvars' ty' src_loc), ty_fvs)
   where
     syn_doc = text "the declaration for type synonym" <+> quotes (ppr name)
 
 	-- For H98 we do *not* universally quantify on the RHS of a synonym
 	-- Silently discard context... but the tyvars in the rest won't be in scope
-    unquantify (HsForAllTy Nothing ctxt ty) | not opt_GlasgowExts = ty
-    unquantify ty				   	          = ty
+    unquantify glaExts (HsForAllTy Nothing ctxt ty) | glaExts = ty
+    unquantify glaExys ty			     	      = ty
 
 rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
                names src_loc))

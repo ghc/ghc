@@ -26,7 +26,7 @@ import RnHsSyn
 import RnMonad
 import RnEnv
 import RnIfaces		( lookupFixityRn )
-import CmdLineOpts	( opt_GlasgowExts, opt_IgnoreAsserts )
+import CmdLineOpts	( dopt_GlasgowExts, opt_IgnoreAsserts )
 import Literal		( inIntRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
 import PrelNames	( hasKey, assertIdKey,
@@ -67,14 +67,15 @@ rnPat (VarPatIn name)
     returnRn (VarPatIn vname, emptyFVs)
 
 rnPat (SigPatIn pat ty)
-  | opt_GlasgowExts
-  = rnPat pat		`thenRn` \ (pat', fvs1) ->
-    rnHsType doc ty	`thenRn` \ (ty',  fvs2) ->
-    returnRn (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
+  = doptsRn dopt_GlasgowExts `thenRn` \ opt_GlasgowExts ->
+    
+    if opt_GlasgowExts
+    then rnPat pat		`thenRn` \ (pat', fvs1) ->
+         rnHsType doc ty	`thenRn` \ (ty',  fvs2) ->
+         returnRn (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
 
-  | otherwise
-  = addErrRn (patSigErr ty)	`thenRn_`
-    rnPat pat
+    else addErrRn (patSigErr ty)	`thenRn_`
+         rnPat pat
   where
     doc = text "a pattern type-signature"
     
@@ -183,6 +184,7 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
 
     mapFvRn rnPat pats			`thenRn` \ (pats', pat_fvs) ->
     rnGRHSs grhss			`thenRn` \ (grhss', grhss_fvs) ->
+    doptsRn dopt_GlasgowExts		`thenRn` \ opt_GlasgowExts ->
     (case maybe_rhs_sig of
 	Nothing -> returnRn (Nothing, emptyFVs)
 	Just ty | opt_GlasgowExts -> rnHsType doc_sig ty	`thenRn` \ (ty', ty_fvs) ->
@@ -218,7 +220,8 @@ rnGRHSs (GRHSs grhss binds maybe_ty)
     returnRn (GRHSs grhss' binds' Nothing, fvGRHSs)
 
 rnGRHS (GRHS guarded locn)
-  = pushSrcLocRn locn $		    
+  = doptsRn dopt_GlasgowExts		`thenRn` \ opt_GlasgowExts ->
+    pushSrcLocRn locn $		    
     (if not (opt_GlasgowExts || is_standard_guard guarded) then
 		addWarnRn (nonStdGuardErr guarded)
      else

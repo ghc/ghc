@@ -15,7 +15,7 @@ import RnHsSyn		( RenamedHsModule, RenamedHsDecl,
 			  extractHsTyNames, extractHsCtxtTyNames
 			)
 
-import CmdLineOpts	( opt_HiMap, opt_D_dump_rn_trace, opt_D_dump_minimal_imports,
+import CmdLineOpts	( dopt_D_dump_rn_trace, dopt_D_dump_minimal_imports,
 			  opt_D_dump_rn, opt_D_dump_rn_stats, opt_WarnDeprecations,
 			  opt_WarnUnusedBinds
 		        )
