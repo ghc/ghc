@@ -72,7 +72,8 @@ test "tcfail076" { vtcf("") }
 test "tcfail077" { vtcf("") }
 test "tcfail078" { vtcf("") }
 test "tcfail079" { vtcf("") }
-test "tcfail080" { $expect = "fail" vtcf("-fglasgow-exts -package lang") }
+test "tcfail080" { $expect = "fail" 
+                   vtcf("-fglasgow-exts -package lang") }
 test "tcfail082" { vtcf("") }
 test "tcfail083" { vtcf("") }
 test "tcfail084" { vtcf("") }
@@ -89,4 +90,8 @@ test "tcfail094" { vtcf("") }
 test "tcfail095" { vtcf("") }
 test "tcfail096" { vtcf("") }
 test "tcfail097" { vtcf("") }
-test "tcfail098" { vtcf("") }
+
+-- The compiler should reject tc098, but it doesn't.  Hence
+-- this is an expected failure.
+test "tcfail098" { $expect = "fail" 
+                   vtcf("") }
