@@ -3,7 +3,9 @@
 import PrelGHC( Float# )
 import PrelFloat
 
-main = putStr (shows (selectee1 + selectee2) "\n")
+-- This test is a little bit numerically unstable, so compare only a small prefix.
+-- Otherwise you get slightly different results with and without optimization.
+main = putStrLn (take 6 (shows (selectee1 + selectee2) ""))
 
 data Tfo = Tfo Float# Float# Float# Float# Float# Float# Float# Float# Float# Float# Float# Float#
 
