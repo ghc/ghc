@@ -3823,17 +3823,6 @@ GhcStage2HcOpts = -O -fvia-C -keep-hc-files
 	    </listitem>
 
 	    <listitem>
-	      <para>Copy
-	      <filename><replaceable>T</replaceable>/ghc/includes/config.h</filename>
-	      to
-	      <filename><replaceable>H</replaceable>/ghc/includes</filename>.
-	      Note that we are building on the host machine, using the
-	      target machine's <literal>config.h</literal> file.  This
-	      is so that the intermediate C files generated here will
-	      be suitable for compiling on the target system.</para>
-	    </listitem>
-
-	    <listitem>
 	      <para>Edit
 	      <filename><replaceable>H</replaceable>/mk/config.mk</filename>:</para>
 	      <itemizedlist>
@@ -3849,16 +3838,30 @@ GhcStage2HcOpts = -O -fvia-C -keep-hc-files
 	    </listitem>
 	    
 	    <listitem>
+	      <para>Copy
+	      <filename><replaceable>T</replaceable>/ghc/includes/config.h</filename>
+	      to
+	      <filename><replaceable>H</replaceable>/ghc/includes</filename>.
+	      Note that we are building on the host machine, using the
+	      target machine's <literal>config.h</literal> file.  This
+	      is so that the intermediate C files generated here will
+	      be suitable for compiling on the target system.</para>
+
+	    </listitem>
+
+	      <listitem>
+		<para>Touch <literal>config.h</literal>, just to make
+		sure it doesn't get replaced during the build:</para>
+<screen>
+$ touch <replaceable>H</replaceable>/ghc/includes/config.h</screen>
+	      </listitem>
+
+	    <listitem>
+		<para>Now build the compiler:</para>
 <screen>
 $ cd <replaceable>H</replaceable>/glafp-utils && make boot && make
-</screen>
-	    </listitem>
-	    
-	    <listitem>
-<screen>
 $ cd <replaceable>H</replaceable>/ghc && make boot && make
 </screen>
-
 	      <para>Don't worry if the build falls over in the RTS, we
               don't need the RTS yet.</para>
 	    </listitem>
