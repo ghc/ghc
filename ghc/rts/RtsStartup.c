@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.18 1999/08/25 16:11:50 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.19 1999/09/13 11:02:08 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -123,7 +123,9 @@ startupHaskell(int argc, char *argv[])
     initStats();
 
     /* Initialise the user signal handler set */
+#if !defined(mingw32_TARGET_OS) && !defined(PAR)
     initUserSignals();
+#endif
  
     /* When the RTS and Prelude live in separate DLLs,
        we need to patch up the char- and int-like tables
