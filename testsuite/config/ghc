@@ -21,7 +21,6 @@ if (ghc_with_profiling == 1):
 	config.run_ways.append('prof')
 
 if (ghc_with_interpreter == 1):
-	config.compile_ways.append('ghci')
 	config.run_ways.append('ghci')
 
 config.way_flags = { 'normal' : [],
