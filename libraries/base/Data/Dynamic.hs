@@ -270,11 +270,6 @@ applyTy _ _     		= Nothing
 --
 -- >  mkTyCon "a" == mkTyCon "a"
 --
--- NOTE: GHC\'s implementation is quite hacky, and the above equation
--- does not necessarily hold.  For defining your own instances of
--- 'Typeable', try to ensure that only one call to 'mkTyCon' exists
--- for each type constructor (put it at the top level, and annotate the
--- corresponding definition with a @NOINLINE@ pragma).
 mkTyCon :: String	-- ^ the name of the type constructor (should be unique
 			-- in the program, so it might be wise to use the
 			-- fully qualified name).
