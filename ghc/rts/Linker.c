@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.18 2001/02/06 14:44:53 simonmar Exp $
+ * $Id: Linker.c,v 1.19 2001/02/09 12:39:53 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -1143,6 +1143,10 @@ ocResolve_PEi386 ( ObjectCode* oc, int verb )
 #define FALSE 0
 #define TRUE  1
 
+#if defined(solaris2_TARGET_OS)
+#  define ELF_TARGET_SPARC  /* Used inside <elf.h> */
+#endif
+
 #include <elf.h>
 
 static char *
@@ -1236,9 +1240,9 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 
    for (i = 0; i < ehdr->e_shnum; i++) {
       IF_DEBUG(linker,fprintf(stderr, "%2d:  ", i ));
-      IF_DEBUG(linker,fprintf(stderr, "type=%2d  ", shdr[i].sh_type ));
-      IF_DEBUG(linker,fprintf(stderr, "size=%4d  ", shdr[i].sh_size ));
-      IF_DEBUG(linker,fprintf(stderr, "offs=%4d  ", shdr[i].sh_offset ));
+      IF_DEBUG(linker,fprintf(stderr, "type=%2d  ", (int)shdr[i].sh_type ));
+      IF_DEBUG(linker,fprintf(stderr, "size=%4d  ", (int)shdr[i].sh_size ));
+      IF_DEBUG(linker,fprintf(stderr, "offs=%4d  ", (int)shdr[i].sh_offset ));
       IF_DEBUG(linker,fprintf(stderr, "  (%p .. %p)  ",
                ehdrC + shdr[i].sh_offset, 
 		      ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1));
@@ -1374,8 +1378,8 @@ ocGetNames_ELF ( ObjectCode* oc )
       oc->symbols = malloc(nent * sizeof(SymbolVal));
       oc->n_symbols = nent;
       for (j = 0; j < nent; j++) {
-         if ( ( ELF32_ST_BIND(stab[j].st_info)==STB_GLOBAL /* ||
-	        ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL */
+         if ( ( ELF32_ST_BIND(stab[j].st_info)==STB_GLOBAL
+	        /* || ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL */
               )
 	      /* and not an undefined symbol */
 	      && stab[j].st_shndx != SHN_UNDEF
@@ -1398,8 +1402,17 @@ ocGetNames_ELF ( ObjectCode* oc )
 	    insertStrHashTable(symhash, nm, &(oc->symbols[j]));
          }
 	 else {
-	     IF_DEBUG(linker,belch( "skipping `%s'", strtab +
-			     stab[j].st_name ));
+	     IF_DEBUG(linker,belch( "skipping `%s'", 
+                                    strtab + stab[j].st_name ));
+	     /*
+	     fprintf(stderr, 
+		     "skipping   bind = %d,  type = %d,  shndx = %d   `%s'\n",
+		     (int)ELF32_ST_BIND(stab[j].st_info), 
+                     (int)ELF32_ST_TYPE(stab[j].st_info), 
+                     (int)stab[j].st_shndx,
+                     strtab + stab[j].st_name
+                    );
+	     */
 	     oc->symbols[j].lbl  = NULL;
 	     oc->symbols[j].addr = NULL;
 	 }
@@ -1410,16 +1423,184 @@ ocGetNames_ELF ( ObjectCode* oc )
 }
 
 
+/* Do ELF relocations which lack an explicit addend.  All x86-linux
+   relocations appear to be of this form. */
+static int do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
+                                      Elf32_Shdr* shdr, int shnum, 
+                                      Elf32_Sym*  stab, char* strtab )
+{
+   int j;
+   char *symbol;
+   Elf32_Word* targ;
+   Elf32_Rel*  rtab = (Elf32_Rel*) (ehdrC + shdr[shnum].sh_offset);
+   int         nent = shdr[shnum].sh_size / sizeof(Elf32_Rel);
+   int target_shndx = shdr[shnum].sh_info;
+   int symtab_shndx = shdr[shnum].sh_link;
+   stab  = (Elf32_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
+   targ  = (Elf32_Word*)(ehdrC + shdr[ target_shndx ].sh_offset);
+   IF_DEBUG(linker,belch( "relocations for section %d using symtab %d",
+                          target_shndx, symtab_shndx ));
+   for (j = 0; j < nent; j++) {
+      Elf32_Addr offset = rtab[j].r_offset;
+      Elf32_Word info   = rtab[j].r_info;
+
+      Elf32_Addr  P  = ((Elf32_Addr)targ) + offset;
+      Elf32_Word* pP = (Elf32_Word*)P;
+      Elf32_Addr  A  = *pP;
+      Elf32_Addr  S;
+
+      IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p)   ", 
+                             j, (void*)offset, (void*)info ));
+      if (!info) {
+         IF_DEBUG(linker,belch( " ZERO" ));
+         S = 0;
+      } else {
+         /* First see if it is a nameless local symbol. */
+         if (stab[ ELF32_R_SYM(info)].st_name == 0) {
+            symbol = "(noname)";
+            S = (Elf32_Addr)
+                (ehdrC + shdr[stab[ELF32_R_SYM(info)].st_shndx ].sh_offset
+                       + stab[ELF32_R_SYM(info)].st_value);
+         } else {
+            /* No?  Should be in the symbol table then. */
+            symbol = strtab+stab[ ELF32_R_SYM(info)].st_name;
+            (void *)S = lookupSymbol( symbol );
+         }
+         if (!S) {
+            barf("ocResolve_ELF: %s: unknown symbol `%s'", 
+                 oc->fileName, symbol);
+         }
+         IF_DEBUG(linker,belch( "`%s' resolves to %p", symbol, (void*)S ));
+      }
+      IF_DEBUG(linker,fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n",
+                                        (void*)P, (void*)S, (void*)A )); 
+      switch (ELF32_R_TYPE(info)) {
+#        if defined(linux_TARGET_OS)
+         case R_386_32:   *pP = S + A;     break;
+         case R_386_PC32: *pP = S + A - P; break;
+#        endif
+         default: 
+            fprintf(stderr, "unhandled ELF relocation(Rel) type %d\n",
+                            ELF32_R_TYPE(info));
+            barf("do_Elf32_Rel_relocations: unhandled ELF relocation type");
+            return 0;
+      }
+
+   }
+   return 1;
+}
+
+
+/* Do ELF relocations for which explicit addends are supplied.
+   sparc-solaris relocations appear to be of this form. */
+static int do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
+                                       Elf32_Shdr* shdr, int shnum, 
+                                       Elf32_Sym*  stab, char* strtab )
+{
+   int j;
+   char *symbol;
+   Elf32_Word* targ;
+   Elf32_Rela* rtab = (Elf32_Rela*) (ehdrC + shdr[shnum].sh_offset);
+   int         nent = shdr[shnum].sh_size / sizeof(Elf32_Rela);
+   int target_shndx = shdr[shnum].sh_info;
+   int symtab_shndx = shdr[shnum].sh_link;
+   stab  = (Elf32_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
+   targ  = (Elf32_Word*)(ehdrC + shdr[ target_shndx ].sh_offset);
+   IF_DEBUG(linker,belch( "relocations for section %d using symtab %d",
+                          target_shndx, symtab_shndx ));
+   for (j = 0; j < nent; j++) {
+      Elf32_Addr  offset = rtab[j].r_offset;
+      Elf32_Word  info   = rtab[j].r_info;
+      Elf32_Sword addend = rtab[j].r_addend;
+
+      Elf32_Addr  P  = ((Elf32_Addr)targ) + offset;
+      Elf32_Word* pP = (Elf32_Word*)P;
+      Elf32_Addr  A  = addend;
+      Elf32_Addr  S;
+      Elf32_Word  w1, w2;
+
+      IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p %6p)   ", 
+                             j, (void*)offset, (void*)info, 
+                                (void*)addend ));
+      if (!info) {
+         IF_DEBUG(linker,belch( " ZERO" ));
+         S = 0;
+      } else {
+         /* First see if it is a nameless local symbol. */
+         if (stab[ ELF32_R_SYM(info)].st_name == 0) {
+            symbol = "(noname)";
+            S = (Elf32_Addr)
+                (ehdrC + shdr[stab[ELF32_R_SYM(info)].st_shndx ].sh_offset
+                       + stab[ELF32_R_SYM(info)].st_value);
+         } else {
+            /* No?  Should be in the symbol table then. */
+            symbol = strtab+stab[ ELF32_R_SYM(info)].st_name;
+            (void *)S = lookupSymbol( symbol );
+         }
+         if (!S) {
+	   barf("ocResolve_ELF: %s: unknown symbol `%s'", 
+                   oc->fileName, symbol);
+	   /* 
+	   S = 0x11223344;
+	   fprintf ( stderr, "S %p A %p S+A %p S+A-P %p\n",S,A,S+A,S+A-P);
+	   */
+         }
+         IF_DEBUG(linker,belch( "`%s' resolves to %p", symbol, (void*)S ));
+      }
+      IF_DEBUG(linker,fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n",
+                                        (void*)P, (void*)S, (void*)A )); 
+      switch (ELF32_R_TYPE(info)) {
+#        if defined(solaris2_TARGET_OS)
+         case R_SPARC_WDISP30: 
+            w1 = *pP & 0xC0000000;
+            w2 = (Elf32_Word)((S + A - P) >> 2);
+            ASSERT((w2 & 0xC0000000) == 0);
+            w1 |= w2;
+            *pP = w1;
+            break;
+         case R_SPARC_HI22:
+            w1 = *pP & 0xFFC00000;
+            w2 = (Elf32_Word)((S + A) >> 10);
+            ASSERT((w2 & 0xFFC00000) == 0);
+            w1 |= w2;
+            *pP = w1;
+            break;
+         case R_SPARC_LO10:
+            w1 = *pP & ~0x3FF;
+            w2 = (Elf32_Word)((S + A) & 0x3FF);
+            ASSERT((w2 & ~0x3FF) == 0);
+            w1 |= w2;
+            *pP = w1;
+            break;
+         case R_SPARC_32:
+            w2 = (Elf32_Word)(S + A);
+            *pP = w2;
+            break;
+         case R_SPARC_NONE: belch("R_SPARC_NONE");
+            break;
+
+#        endif
+         default: 
+            fprintf(stderr, "unhandled ELF relocation(RelA) type %d\n",
+                            ELF32_R_TYPE(info));
+            barf("do_Elf32_Rela_relocations: unhandled ELF relocation type");
+            return 0;
+      }
+
+   }
+   return 1;
+}
+
+
 static int
 ocResolve_ELF ( ObjectCode* oc )
 {
-   char *strtab, *symbol;
-   int   i, j;
+   char *strtab;
+   int   shnum, ok;
    Elf32_Sym*  stab = NULL;
    char*       ehdrC = (char*)(oc->image);
    Elf32_Ehdr* ehdr = (Elf32_Ehdr*) ehdrC;
    Elf32_Shdr* shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
-   Elf32_Word* targ;
 
    /* first find "the" symbol table */
    stab = (Elf32_Sym*) findElfSection ( ehdrC, SHT_SYMTAB );
@@ -1432,66 +1613,18 @@ ocResolve_ELF ( ObjectCode* oc )
       return 0; 
    }
 
-   for (i = 0; i < ehdr->e_shnum; i++) {
-      if (shdr[i].sh_type == SHT_REL ) {
-         Elf32_Rel*  rtab = (Elf32_Rel*) (ehdrC + shdr[i].sh_offset);
-         int         nent = shdr[i].sh_size / sizeof(Elf32_Rel);
-         int target_shndx = shdr[i].sh_info;
-         int symtab_shndx = shdr[i].sh_link;
-         stab  = (Elf32_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
-         targ  = (Elf32_Word*)(ehdrC + shdr[ target_shndx ].sh_offset);
-	 IF_DEBUG(linker,belch( "relocations for section %d using symtab %d",
-			 target_shndx, symtab_shndx ));
-         for (j = 0; j < nent; j++) {
-            Elf32_Addr offset = rtab[j].r_offset;
-            Elf32_Word info   = rtab[j].r_info;
-
-            Elf32_Addr  P = ((Elf32_Addr)targ) + offset;
-            Elf32_Word* pP = (Elf32_Word*)P;
-            Elf32_Addr  A = *pP;
-            Elf32_Addr  S;
-
-            IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p)   ", 
-                                j, (void*)offset, (void*)info ));
-            if (!info) {
-               IF_DEBUG(linker,belch( " ZERO" ));
-               S = 0;
-            } else {
-               /* First see if it is a nameless local symbol. */
-               if (stab[ ELF32_R_SYM(info)].st_name == 0) {
-		   symbol = "(noname)";
-		   S = (Elf32_Addr)(ehdrC
-				    + shdr[stab[ELF32_R_SYM(info)].st_shndx ].sh_offset
-				    + stab[ELF32_R_SYM(info)].st_value
-		       );
-               } else {
-		   /* No?  Should be in the symbol table then. */
-		   symbol = strtab+stab[ ELF32_R_SYM(info)].st_name;
-		   (void *)S = lookupSymbol( symbol );
-               }
-               if (!S) {
-		   barf("ocResolve_ELF: %s: unknown symbol `%s'",
-			oc->fileName, symbol);
-               }
-               IF_DEBUG(linker,belch( "`%s' resolves to %p", symbol, (void*)S ));
-	    }
-            IF_DEBUG(linker,fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n", (void*)P, (void*)S, (void*)A )); 
-            switch (ELF32_R_TYPE(info)) {
-               case R_386_32:   *pP = S + A;     break;
-               case R_386_PC32: *pP = S + A - P; break;
-               default: fprintf(stderr, 
-                                "unhandled ELF relocation type %d",
-                                ELF32_R_TYPE(info));
-                        belch("ocResolve_ELF: unhandled ELF relocation type");
-                        return 0;
-	    }
-
-         }
+   /* Process the relocation sections. */
+   for (shnum = 0; shnum < ehdr->e_shnum; shnum++) {
+      if (shdr[shnum].sh_type == SHT_REL ) {
+         ok = do_Elf32_Rel_relocations ( oc, ehdrC, shdr, 
+                                         shnum, stab, strtab );
+         if (!ok) return ok;
       }
       else
-      if (shdr[i].sh_type == SHT_RELA) {
-         belch("ocResolve_ELF: RelA style reloc table -- not yet done");
-         return 0;
+      if (shdr[shnum].sh_type == SHT_RELA) {
+         ok = do_Elf32_Rela_relocations ( oc, ehdrC, shdr, 
+                                          shnum, stab, strtab );
+         if (!ok) return ok;
       }
    }
 
