@@ -741,8 +741,13 @@ dist-post::
 dist-manifest ::
 	cd $(SRC_DIST_DIR); find . \( -type l -o -type f \) -exec ls -lLG {} \; | sed -e 's/\.\///' > /tmp/MANIFEST ; mv /tmp/MANIFEST MANIFEST
 
-dist-package::
+dist-package:: dist-package-tar-gz
+
+dist-package-tar-gz ::
 	cd $(SRC_DIST_DIR); cd ..; $(TAR) chzf $(SRC_DIST_NAME).tar.gz $(SRC_DIST_NAME)
+
+dist-package-zip ::
+	cd $(SRC_DIST_DIR); cd ..; $(ZIP) -r $(SRC_DIST_NAME).zip $(SRC_DIST_NAME)
 
 #
 # binary-dist creates a binary bundle, set BIN_DIST_NAME

@@ -600,6 +600,7 @@ REAL_SHELL=$(SHELL)
 SIZE			= size
 STRIP			= strip
 TAR			= @TarCmd@
+ZIP			= zip
 
 #
 # Under cygwin32, we have to deal with .exe suffixes
