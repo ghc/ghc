@@ -126,7 +126,7 @@ nullFastString (UnicodeStr _ []) = True
 nullFastString (UnicodeStr _ (_:_)) = False
 
 unpackFS :: FastString -> String
-unpackFS (FastString _ l# ba#) = unpackCStringBA (BA ba#) (I# l#)
+unpackFS (FastString _ l# ba#) = unpackNBytesBA (BA ba#) (I# l#)
 unpackFS (UnicodeStr _ s) = map chr s
 
 unpackIntFS :: FastString -> [Int]

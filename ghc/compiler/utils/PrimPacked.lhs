@@ -14,7 +14,7 @@ module PrimPacked (
 	Ptr(..), nullPtr, writeCharOffPtr, plusAddr#,
 	BA(..), MBA(..),
 	packString, 	   -- :: String -> (Int, BA)
-	unpackCStringBA,   -- :: BA -> Int -> [Char]
+	unpackNBytesBA,    -- :: BA -> Int -> [Char]
         strLength,	   -- :: Ptr CChar -> Int
         copyPrefixStr,	   -- :: Addr# -> Int -> BA
         copySubStr,	   -- :: Addr# -> Int -> Int -> BA
@@ -91,7 +91,7 @@ packString str = (l, arr)
   l@(I# length#) = length str
 
   arr = runST (do
-    ch_array <- new_ps_array (length# +# 1#)
+    ch_array <- new_ps_array length#
       -- fill in packed string from "str"
     fill_in ch_array 0# str
       -- freeze the puppy:
@@ -100,9 +100,7 @@ packString str = (l, arr)
 
   fill_in :: MBA s -> Int# -> [Char] -> ST s ()
   fill_in arr_in# idx [] =
-   write_ps_array arr_in# idx (chr# 0#) >>
    return ()
-
   fill_in arr_in# idx (C# c : cs) =
    write_ps_array arr_in# idx c	 >>
    fill_in arr_in# (idx +# 1#) cs
@@ -111,21 +109,18 @@ packString str = (l, arr)
 Unpacking a string
 
 \begin{code}
-unpackCStringBA :: BA -> Int -> [Char]
-unpackCStringBA (BA bytes) (I# len)
+unpackNBytesBA :: BA -> Int -> [Char]
+unpackNBytesBA (BA bytes) (I# len)
  = unpack 0#
  where
     unpack nh
-      | nh >=# len         || 
-        ch `eqChar#` '\0'#    = []
-      | otherwise	      = C# ch : unpack (nh +# 1#)
+      | nh >=# len  = []
+      | otherwise   = C# ch : unpack (nh +# 1#)
       where
 	ch = indexCharArray# bytes nh
 \end{code}
 
-Copying a char string prefix into a byte array,
-{\em assuming} the prefix does not contain any
-NULs.
+Copying a char string prefix into a byte array.
 
 \begin{code}
 copyPrefixStr :: Addr# -> Int -> BA
@@ -133,9 +128,8 @@ copyPrefixStr a# len@(I# length#) = copy' length#
  where
    copy' length# = runST (do
      {- allocate an array that will hold the string
-       (not forgetting the NUL at the end)
      -}
-     ch_array <- new_ps_array (length# +# 1#)
+     ch_array <- new_ps_array length#
      {- Revert back to Haskell-only solution for the moment.
      	_ccall_ memcpy ch_array (A# a) len        >>=  \ () ->
      	write_ps_array ch_array length# (chr# 0#) >>
@@ -149,8 +143,7 @@ copyPrefixStr a# len@(I# length#) = copy' length#
    fill_in :: MBA s -> Int# -> ST s ()
    fill_in arr_in# idx
       | idx ==# length#
-      = write_ps_array arr_in# idx (chr# 0#) >>
-	return ()
+      = return ()
       | otherwise
       = case (indexCharOffAddr# a# idx) of { ch ->
 	write_ps_array arr_in# idx ch >>
@@ -169,10 +162,8 @@ copySubStrBA :: BA -> Int -> Int -> BA
 copySubStrBA (BA barr#) (I# start#) len@(I# length#) = ba
  where
   ba = runST (do
-    {- allocate an array that will hold the string
-      (not forgetting the NUL at the end)
-    -}
-    ch_array <- new_ps_array (length# +# 1#)
+     -- allocate an array that will hold the string
+    ch_array <- new_ps_array length#
      -- fill in packed string from "addr"
     fill_in ch_array 0#
      -- freeze the puppy:
@@ -182,8 +173,7 @@ copySubStrBA (BA barr#) (I# start#) len@(I# length#) = ba
   fill_in :: MBA s -> Int# -> ST s ()
   fill_in arr_in# idx
       | idx ==# length#
-      = write_ps_array arr_in# idx (chr# 0#) >>
-	return ()
+      = return ()
       | otherwise
       = case (indexCharArray# barr# (start# +# idx)) of { ch ->
 	write_ps_array arr_in# idx ch >>

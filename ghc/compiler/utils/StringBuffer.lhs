@@ -504,10 +504,9 @@ lexemeToString (StringBuffer fo len# start_pos# current#) =
  if start_pos# ==# current# then
     ""
  else
-    unpackCStringBA
-	(copySubStr fo (I# start_pos#) (I# (current# -# start_pos#)))
-	(I# len#)
-    
+    let len = I# (current# -# start_pos#) in
+    unpackNBytesBA (copySubStr fo (I# start_pos#) len) len
+
 lexemeToFastString :: StringBuffer -> FastString
 lexemeToFastString (StringBuffer fo l# start_pos# current#) =
  if start_pos# ==# current# then
