@@ -78,7 +78,7 @@ real_libdir      = $(libdir)/$(package)-$(version)
 real_datadir     = $(datadir)/$(package)-$(version)
 
 package     = ghc
-version     = 2.03
+version     = 2.07
 PERL        = @PerlCmd@
 RM          = rm -f
 MV          = mv
@@ -101,7 +101,7 @@ VERSION_SYMLINKS_FOR=ghc
 # local setup/install information prepended.
 #
 PACKAGE_SCRIPTS=ghc stat2resid hstags mkdependHS
-PACKAGE_LIBSCRIPTS=hscpp
+PACKAGE_LIB_SCRIPTS=hscpp
 
 # Binaries to install
 PACKAGE_BINS=$(PACKAGE_SCRIPTS) hp2ps
