@@ -371,7 +371,7 @@ x = nfib 25
     <para>To run <command>ghcprof</command>, you need
     <productname>daVinci</productname> installed, which can be
     obtained from <ulink
-    url="http://www.tzi.de/~davinci/"><citetitle>The Graph
+    url="http://www.informatik.uni-bremen.de/daVinci/"><citetitle>The Graph
     Visualisation Tool daVinci</citetitle></ulink>.  Install one of
     the binary
     distributions<footnote><para><productname>daVinci</productname> is
