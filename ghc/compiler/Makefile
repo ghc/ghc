@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.138 2001/02/13 09:35:45 simonmar Exp $
+# $Id: Makefile,v 1.139 2001/02/14 11:54:33 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -247,7 +247,7 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
             primop-usage.hs-incl  \
             primop-primop-info.hs-incl
 
-prelude/PrimOp.lhs: $(PRIMOP_BITS)
+prelude/PrimOp.lhs prelude/PrimOp.o: $(PRIMOP_BITS)
 
 depend :: $(PRIMOP_BITS)
 
