@@ -501,8 +501,6 @@ getRegister leaf
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
-getRegister (StReg (StixTemp u pk)) = returnUs (Fixed pk (UnmappedReg u pk) id)
-
 getRegister (StDouble 0.0)
   = let
     	code dst = mkSeqInstrs [FLDZ]
@@ -3160,8 +3158,7 @@ coerceFP2Int x
     	src  = registerName register tmp
     	pk   = registerRep register
 
-    	code__2 dst = let
-		      in code . mkSeqInstrs [
+    	code__2 dst = code . mkSeqInstrs [
     	                        FRNDINT,
     	                        FIST L (AddrBaseIndex (Just ebx) Nothing (ImmInt OFFSET_R1)),
     	                        MOV L (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt OFFSET_R1))) (OpReg dst)]
