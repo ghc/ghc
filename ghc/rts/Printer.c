@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.46 2001/08/21 10:12:02 sewardj Exp $
+ * $Id: Printer.c,v 1.47 2001/10/02 15:27:15 sewardj Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -462,7 +462,7 @@ void printStackChunk( StgPtr sp, StgPtr spBottom )
 	      printPtr((P_)*sp);
 	      fprintf(stderr,"\n");
 	    } else {
-	      fprintf(stderr,"Word# %ld\n", *sp++);
+	      fprintf(stderr,"Word# %ld\n", *sp);
 	    }	      
 	    sp++;
 	    bitmap = bitmap >> 1;
