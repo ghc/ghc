@@ -1,7 +1,24 @@
-# $Id: aclocal.m4,v 1.18 1998/02/12 22:25:13 sof Exp $
+# $Id: aclocal.m4,v 1.19 1998/03/03 04:45:07 reid Exp $
 #
 # Extra autoconf macros for the Glasgow fptools
 #
+
+#
+# Are we running under the GNU libc?  Need -D_GNU_SOURCE to get 
+# caddr_t and such.
+#
+AC_DEFUN(AC_GNU_LIBC,
+[AC_CACHE_CHECK([GNU libc], ac_cv_gnu_libc,
+[AC_EGREP_CPP(yes,
+[#include <features.h>
+#ifdef __GLIBC__
+yes
+#endif
+], ac_cv_gnu_libc=yes, ac_cv_gnu_libc=no)])
+if test "$ac_cv_gnu_libc" = yes; then
+  AC_DEFINE(_GNU_SOURCE)
+fi
+])
 
 #
 # Has timezone the type time_t or long (HP-UX 10.20 apparently

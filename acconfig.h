@@ -1,0 +1,72 @@
+/* acconfig.h
+
+   Descriptive text for the C preprocessor macros that
+   the fptools configuration script can define.
+   The current version may not use all of them; autoheader copies the ones
+   your configure.in uses into your configuration header file templates.
+
+   The entries are in sort -df order: alphabetical, case insensitive,
+   ignoring punctuation (such as underscores).  Although this order
+   can split up related entries, it makes it easier to check whether
+   a given entry is in the file.
+
+   Leave the following blank line there!!  Autoheader needs it.  */
+
+
+/* The following definitions will only work on Linux.
+   I (ADR) make no apology for this because we SHOULD NOT
+   be using system based tests and I want to get this puppy running
+   tonight.  I'm forced to define these values here because the
+   current system contains 2 (two) config.h files - both of
+   which are needed.  Will someone at Glasgow please fix this mess. */
+#define HostPlatform_TYPE   i386_unknown_linux
+#define TargetPlatform_TYPE i386_unknown_linux
+#define BuildPlatform_TYPE  i386_unknown_linux
+
+#define i386_unknown_linux_HOST		1
+#define i386_unknown_linux_TARGET	1
+#define i386_unknown_linux_BUILD  	1
+
+#define i386_HOST_ARCH	1
+#define i386_TARGET_ARCH	1
+#define i386_BUILD_ARCH  	1
+
+#define linux_HOST_OS		1
+#define linux_TARGET_OS		1
+#define linux_BUILD_OS 		1
+
+#define unknown_HOST_VENDOR	1
+#define unknown_TARGET_VENDOR  1
+#define unknown_BUILD_VENDOR 	1
+
+@TOP@
+
+/* Define if we're have GNU libc. */
+#undef _GNU_SOURCE
+
+/* Define if time.h or sys/time.h define the altzone variable */
+#undef HAVE_ALTZONE
+
+/* Define to the type of the timezone variable (usually long or time_t) */
+#undef TYPE_TIMEZONE
+
+/* Define to unsigned int if <sys/types.h> doesn't define */
+#undef uint
+
+/* Define to unsigned long int if <sys/types.h> doesn't define */
+#undef ulong
+
+/* Define to unsigned long long int if <sys/types.h> doesn't define */
+#undef ullong
+
+
+/* Leave that blank line there!!  Autoheader needs it.
+   If you're adding to this file, keep in mind:
+   The entries are in sort -df order: alphabetical, case insensitive,
+   ignoring punctuation (such as underscores).  */
+
+
+/* autoheader doesn't grok AC_CHECK_LIB_NOWARN so we have to add them
+   manually.  */
+
+@BOTTOM@
