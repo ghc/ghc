@@ -31,4 +31,16 @@ SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=Distribution.Version \
 	-optdep--exclude-module=System.Directory.Internals
 
+all :: runhaskell
+
+runhaskell : $(HS_PROG)
+	$(CP) $< runhaskell
+
+# Only install runhaskell if there isn't already one installed
+ifneq "$(findstring install, $(MAKECMDGOALS))" ""
+ifeq "$(wildcard $(bindir)/runhaskell)" ""
+INSTALL_PROGS += runhaskell
+endif
+endif
+
 include $(TOP)/mk/target.mk
