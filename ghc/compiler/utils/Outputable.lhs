@@ -54,7 +54,7 @@ module Outputable (
 import {-# SOURCE #-} 	Module( Module )
 import {-# SOURCE #-} 	OccName( OccName )
 
-import CmdLineOpts	( opt_PprStyle_Debug, opt_PprUserLength )
+import StaticFlags	( opt_PprStyle_Debug, opt_PprUserLength )
 import PackageConfig	( PackageId, packageIdString )
 import FastString
 import qualified Pretty

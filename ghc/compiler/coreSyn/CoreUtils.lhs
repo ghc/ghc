@@ -47,7 +47,7 @@ import VarSet		( unionVarSet )
 import VarEnv
 import Name		( hashName )
 import Packages		( isDllName )
-import CmdLineOpts	( DynFlags )
+import DynFlags	( DynFlags )
 import Literal		( hashLiteral, literalType, litIsDupable, 
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys,

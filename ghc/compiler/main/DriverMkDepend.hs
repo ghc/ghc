@@ -1,9 +1,8 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.42 2005/02/22 16:29:42 simonpj Exp $
 --
--- GHC Driver
+-- Makefile Dependency Generation
 --
--- (c) Simon Marlow 2000
+-- (c) The University of Glasgow 2005
 --
 -----------------------------------------------------------------------------
 
@@ -14,20 +13,21 @@ module DriverMkDepend (
 #include "HsVersions.h"
 
 import CompManager	( cmDownsweep, cmTopSort, cyclicModuleErr )
-import CmdLineOpts	( DynFlags( verbosity ) )
-import DriverState      ( getStaticOpts, v_Opt_dep )
-import DriverUtil	( escapeSpaces, splitFilename, add )
-import DriverFlags	( processArgs, OptKind(..) )
-import HscTypes		( IsBootInterface, ModSummary(..), msObjFilePath, msHsFilePath )
+import DynFlags		( DynFlags( verbosity, opt_dep ), getOpts )
+import Util		( escapeSpaces, splitFilename )
+import HscTypes		( IsBootInterface, ModSummary(..), msObjFilePath,
+			   msHsFilePath )
 import Packages		( PackageIdH(..) )
 import SysTools		( newTempName )
 import qualified SysTools
-import Module		( Module, ModLocation(..), mkModule, moduleUserString, addBootSuffix_maybe )
+import Module		( Module, ModLocation(..), mkModule, moduleUserString,
+			  addBootSuffix_maybe )
 import Digraph		( SCC(..) )
 import Finder		( findModule, FindResult(..) )
-import Util             ( global )
+import Util             ( global, consIORef )
 import Outputable
 import Panic
+import CmdLineParser
 
 import DATA_IOREF	( IORef, readIORef, writeIORef )
 import EXCEPTION
@@ -50,7 +50,7 @@ import Panic		( catchJust, ioErrors )
 doMkDependHS :: DynFlags -> [FilePath] -> IO ()
 doMkDependHS dflags srcs
   = do	{ 	-- Initialisation
-	  files <- beginMkDependHS
+	  files <- beginMkDependHS dflags
 
 		-- Do the downsweep to find all the modules
 	; excl_mods <- readIORef v_Dep_exclude_mods
@@ -87,12 +87,12 @@ data MkDepFiles
 	    mkd_tmp_file  :: FilePath,		-- Name of the temporary file
 	    mkd_tmp_hdl   :: Handle }		-- Handle of the open temporary file
 
-beginMkDependHS :: IO MkDepFiles
+beginMkDependHS :: DynFlags -> IO MkDepFiles
 	
-beginMkDependHS = do
+beginMkDependHS dflags = do
   	-- slurp in the mkdependHS-style options
-  flags <- getStaticOpts v_Opt_dep
-  _ <- processArgs dep_opts flags []
+  let flags = getOpts dflags opt_dep
+  _ <- processArgs dep_opts flags
 
      	-- open a new temp file in which to stuff the dependency info
      	-- as we go along.
@@ -319,11 +319,11 @@ depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
 -- for compatibility with the old mkDependHS, we accept options of the form
 -- -optdep-f -optdep.depend, etc.
 dep_opts = 
-   [ (  "s", 			SepArg (add v_Dep_suffixes) )
+   [ (  "s", 			SepArg (consIORef v_Dep_suffixes) )
    , (  "f", 			SepArg (writeIORef v_Dep_makefile) )
    , (  "w", 			NoArg (writeIORef v_Dep_warnings False) )
    , (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_pkg_deps True) )
    , (  "-include-pkg-deps",  	NoArg (writeIORef v_Dep_include_pkg_deps True) )
-   , (  "-exclude-module=",     Prefix (add v_Dep_exclude_mods . mkModule) )
-   , (  "x",                    Prefix (add v_Dep_exclude_mods . mkModule) )
+   , (  "-exclude-module=",     Prefix (consIORef v_Dep_exclude_mods . mkModule) )
+   , (  "x",                    Prefix (consIORef v_Dep_exclude_mods . mkModule) )
    ]

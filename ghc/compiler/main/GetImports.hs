@@ -19,7 +19,7 @@ import PrelNames        ( gHC_PRIM )
 import StringBuffer	( StringBuffer, hGetStringBuffer )
 import SrcLoc		( Located(..), mkSrcLoc, unLoc )
 import FastString	( mkFastString )
-import CmdLineOpts	( DynFlags )
+import DynFlags	( DynFlags )
 import ErrUtils
 import Pretty
 import Panic

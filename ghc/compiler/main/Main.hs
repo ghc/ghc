@@ -1,11 +1,9 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
-
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.148 2005/02/10 15:26:23 simonmar Exp $
 --
 -- GHC Driver program
 --
--- (c) The University of Glasgow 2002
+-- (c) The University of Glasgow 2005
 --
 -----------------------------------------------------------------------------
 
@@ -18,40 +16,30 @@ import InteractiveUI	( ghciWelcomeMsg, interactiveUI )
 #endif
 
 
-import DriverState	( isInteractiveMode )
+import MkIface		( showIface )
 import CompManager	( cmInit, cmLoadModules, cmDepAnal )
-import HscTypes		( GhciMode(..) )
-import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
-import SysTools		( initSysTools, cleanTempFiles, normalisePath )
-import Packages		( dumpPackages, initPackages, haskell98PackageId, PackageIdH(..) )
-import DriverPipeline	( staticLink, doMkDLL, compileFile )
-import DriverState	( isLinkMode, 
-			  isCompManagerMode, isInterpretiveMode, 
-			  buildStgToDo, findBuildTag, unregFlags, 
-			  v_GhcMode, GhcMode(..),
-			  v_Keep_tmp_files, v_Ld_inputs, v_Ways, 
-			  v_Output_file, v_Output_hi, v_GhcLink,
-			  verifyOutputFiles, GhcLink(..)
-			)
-import DriverFlags
+import Config
+import SysTools
+import Packages		( dumpPackages, initPackages, haskell98PackageId,
+			  PackageIdH(..) )
+import DriverPipeline	( runPipeline, staticLink, doMkDLL )
 
 import DriverMkDepend	( doMkDependHS )
-import DriverPhases	( Phase, isStopLn, isSourceFilename )
+import DriverPhases	( Phase(..), isStopLn, isSourceFilename, anyHsc )
 
-import DriverUtil	( add, handle, handleDyn, later, unknownFlagsErr )
-import CmdLineOpts	( DynFlags(..), HscTarget(..), v_Static_hsc_opts,
-			  defaultDynFlags )
+import DynFlags
+import StaticFlags	( parseStaticFlags, staticFlags, v_Ld_inputs )
+import CmdLineParser
 import BasicTypes	( failed )
-import Outputable
 import Util
-import Panic		( GhcException(..), panic, installSignalHandlers )
+import Panic
 
-import DATA_IOREF	( readIORef, writeIORef )
+-- Standard Haskell libraries
 import EXCEPTION	( throwDyn, Exception(..), 
 			  AsyncException(StackOverflow) )
 
--- Standard Haskell libraries
 import IO
+import Directory	( doesFileExist, doesDirectoryExist )
 import System		( getArgs, exitWith, ExitCode(..) )
 import Monad
 import List
@@ -60,27 +48,19 @@ import Maybe
 -----------------------------------------------------------------------------
 -- ToDo:
 
--- new mkdependHS doesn't support all the options that the old one did (-X et al.)
 -- time commands when run with -v
--- split marker
--- java generation
 -- user ways
 -- Win32 support: proper signal handling
--- make sure OPTIONS in .hs file propogate to .hc file if -C or -keep-hc-file-too
 -- reading the package configuration file is too slow
 -- -K<size>
-
------------------------------------------------------------------------------
--- Differences vs. old driver:
-
--- No more "Enter your Haskell program, end with ^D (on a line of its own):"
--- consistency checking removed (may do this properly later)
--- no -Ofile
 
 -----------------------------------------------------------------------------
 -- Main loop
 
 main =
+  ---------------------------------------
+  -- exception handlers
+
   -- top-level exception handler: any unrecognised exception is a compiler bug.
   handle (\exception -> do
   	   hFlush stdout
@@ -105,76 +85,65 @@ main =
 
    installSignalHandlers
 
-   argv <- getArgs
-   let (minusB_args, argv') = partition (prefixMatch "-B") argv
-   top_dir <- initSysTools minusB_args
+   ----------------------------------------
+   -- command-line parsing
+   argv0 <- getArgs
 
-	-- Process all the other arguments, and get the source files
-   non_static <- processStaticFlags argv'
-   mode <- readIORef v_GhcMode
+   -- 1. we grab the -B option if there is one
+   let (minusB_args, argv1) = partition (prefixMatch "-B") argv0
+   dflags0 <- initSysTools minusB_args defaultDynFlags
 
-	-- -O and --interactive are not a good combination
-	-- ditto with any kind of way selection
-   orig_ways <- readIORef v_Ways
-   when (notNull orig_ways && isInterpretiveMode mode) $
-      do throwDyn (UsageError 
-                   "--interactive can't be used with -prof, -ticky, -unreg or -smp.")
+   -- 2. Parse the "mode" flags (--make, --interactive etc.)
+   (cli_mode, argv2) <- parseModeFlags argv1
 
-	-- Find the build tag, and re-process the build-specific options.
-	-- Also add in flags for unregisterised compilation, if 
-	-- GhcUnregisterised=YES.
-   way_opts <- findBuildTag
-   let unreg_opts | cGhcUnregisterised == "YES" = unregFlags
-		  | otherwise = []
-   extra_non_static <- processStaticFlags (unreg_opts ++ way_opts)
+   -- 3. Parse the static flags
+   argv3 <- parseStaticFlags argv2
 
-	-- Give the static flags to hsc
-   static_opts <- buildStaticHscOpts
-   writeIORef v_Static_hsc_opts static_opts
+   -- 4. Parse the dynamic flags
+   dflags1 <- initDynFlags dflags0
 
-   -- build the default DynFlags (these may be adjusted on a per
-   -- module basis by OPTIONS pragmas and settings in the interpreter).
-
-   stg_todo  <- buildStgToDo
-
-   -- set the "global" HscTarget.  The HscTarget can be further adjusted on a module
-   -- by module basis, using only the -fvia-C and -fasm flags.  If the global
-   -- HscTarget is not HscC or HscAsm, -fvia-C and -fasm have no effect.
-   let dflags0 = defaultDynFlags
-   let lang = case mode of 
+   -- set the default HscTarget.  The HscTarget can be further
+   -- adjusted on a module by module basis, using only the -fvia-C and
+   -- -fasm flags.  If the default HscTarget is not HscC or HscAsm,
+   -- -fvia-C and -fasm have no effect.
+   let lang = case cli_mode of 
 		 DoInteractive  -> HscInterpreted
 		 DoEval _	-> HscInterpreted
-		 _other		-> hscTarget dflags0
+		 _other		-> hscTarget dflags1
 
-   let dflags1 = dflags0{ stgToDo  = stg_todo,
+   let mode = case cli_mode of
+		DoInteractive	-> Interactive
+		DoEval _	-> Interactive
+		DoMake		-> BatchCompile
+		DoMkDependHS	-> MkDepend
+		_		-> OneShot
+
+   let dflags2 = dflags1{ ghcMode = mode,
                   	  hscTarget  = lang,
 			  -- leave out hscOutName for now
 	                  hscOutName = panic "Main.main:hscOutName not set",
-		  	  verbosity = case mode of
+		  	  verbosity = case cli_mode of
 				 	 DoEval _ -> 0
 				 	 _other   -> 1
 			}
 
 	-- The rest of the arguments are "dynamic"
 	-- Leftover ones are presumably files
-   (dflags2, fileish_args) <- processDynamicFlags 
-				(extra_non_static ++ non_static) dflags1
+   (dflags3, fileish_args) <- parseDynamicFlags dflags2 argv3
 
 	-- make sure we clean up after ourselves
-   later (do  forget_it <- readIORef v_Keep_tmp_files
-	      unless forget_it $ do
-	      cleanTempFiles dflags2
-     ) $ do
+   later (unless (dopt Opt_KeepTmpFiles dflags3) $ 
+	    cleanTempFiles dflags3) $ do
 	-- exceptions will be blocked while we clean the temporary files,
 	-- so there shouldn't be any difficulty if we receive further
 	-- signals.
 
 	-- Display banner
-   showBanner mode dflags2
+   showBanner cli_mode dflags3
 
 	-- Read the package config(s), and process the package-related
 	-- command-line flags
-   dflags <- initPackages dflags2
+   dflags <- initPackages dflags3
 
    let
     {-
@@ -206,75 +175,247 @@ main =
 
     -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on 
     --       the command-line.
-   mapM_ (add v_Ld_inputs) (reverse objs)
+   mapM_ (consIORef v_Ld_inputs) (reverse objs)
 
 	---------------- Display configuration -----------
    when (verbosity dflags >= 4) $
 	dumpPackages dflags
 
-   when (verbosity dflags >= 3) $
-	hPutStrLn stderr ("Hsc static flags: " ++ unwords static_opts)
+   when (verbosity dflags >= 3) $ do
+	hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
 
 	---------------- Final sanity checking -----------
-   checkOptions mode srcs objs
+   checkOptions cli_mode dflags srcs objs
 
 	---------------- Do the business -----------
+   case cli_mode of
+	ShowUsage       -> showGhcUsage cli_mode
+	PrintLibdir     -> do d <- getTopDir; putStrLn d
+	ShowVersion     -> showVersion
+        ShowNumVersion  -> putStrLn cProjectVersion
+        ShowInterface f -> showIface f
+	DoMake 	        -> doMake dflags srcs
+	DoMkDependHS    -> doMkDependHS dflags srcs 
+	StopBefore p    -> oneShot dflags p srcs
+	DoInteractive   -> interactiveUI dflags srcs Nothing
+	DoEval expr     -> interactiveUI dflags srcs (Just expr)
 
-   case mode of
-	DoMake 	       -> doMake dflags srcs
-	DoMkDependHS   -> doMkDependHS dflags srcs 
-	StopBefore p   -> do { o_files <- compileFiles mode dflags srcs 
-			     ; doLink dflags p o_files }
+   exitWith ExitSuccess
+
 #ifndef GHCI
-	DoInteractive -> noInteractiveError
-	DoEval _      -> noInteractiveError
-     where
-       noInteractiveError = throwDyn (CmdLineError "not built for interactive use")
-#else
-	DoInteractive -> interactiveUI dflags srcs Nothing
-	DoEval expr   -> interactiveUI dflags srcs (Just expr)
+interactiveUI _ _ _ = 
+  throwDyn (CmdLineError "not built for interactive use")
 #endif
+
 
 -- -----------------------------------------------------------------------------
 -- Option sanity checks
 
-checkOptions :: GhcMode -> [String] -> [String] -> IO ()
+checkOptions :: CmdLineMode -> DynFlags -> [String] -> [String] -> IO ()
      -- Final sanity checking before kicking off a compilation (pipeline).
-checkOptions mode srcs objs = do
+checkOptions cli_mode dflags srcs objs = do
      -- Complain about any unknown flags
    let unknown_opts = [ f | f@('-':_) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
+	-- -prof and --interactive are not a good combination
+   when (notNull (wayNames dflags)  && isInterpretiveMode cli_mode) $
+      do throwDyn (UsageError 
+                   "--interactive can't be used with -prof, -ticky, -unreg or -smp.")
 	-- -ohi sanity check
-   ohi <- readIORef v_Output_hi
-   if (isJust ohi && 
-      (isCompManagerMode mode || srcs `lengthExceeds` 1))
+   if (isJust (outputHi dflags) && 
+      (isCompManagerMode cli_mode || srcs `lengthExceeds` 1))
 	then throwDyn (UsageError "-ohi can only be used when compiling a single source file")
 	else do
 
 	-- -o sanity checking
-   o_file <- readIORef v_Output_file
-   if (srcs `lengthExceeds` 1 && isJust o_file && not (isLinkMode mode))
+   if (srcs `lengthExceeds` 1 && isJust (outputFile dflags)
+	 && not (isLinkMode cli_mode))
 	then throwDyn (UsageError "can't apply -o to multiple source files")
 	else do
 
 	-- Check that there are some input files
 	-- (except in the interactive case)
-   if null srcs && null objs && not (isInterpretiveMode mode)
+   if null srcs && null objs && not (isInterpretiveMode cli_mode)
 	then throwDyn (UsageError "no input files")
 	else do
 
      -- Verify that output files point somewhere sensible.
-   verifyOutputFiles
+   verifyOutputFiles dflags
+
+
+-- Compiler output options
+
+-- called to verify that the output files & directories
+-- point somewhere valid. 
+--
+-- The assumption is that the directory portion of these output
+-- options will have to exist by the time 'verifyOutputFiles'
+-- is invoked.
+-- 
+verifyOutputFiles :: DynFlags -> IO ()
+verifyOutputFiles dflags = do
+  let odir = outputDir dflags
+  when (isJust odir) $ do
+     let dir = fromJust odir
+     flg <- doesDirectoryExist dir
+     when (not flg) (nonExistentDir "-odir" dir)
+  let ofile = outputFile dflags
+  when (isJust ofile) $ do
+     let fn = fromJust ofile
+     flg <- doesDirNameExist fn
+     when (not flg) (nonExistentDir "-o" fn)
+  let ohi = outputHi dflags
+  when (isJust ohi) $ do
+     let hi = fromJust ohi
+     flg <- doesDirNameExist hi
+     when (not flg) (nonExistentDir "-ohi" hi)
+ where
+   nonExistentDir flg dir = 
+     throwDyn (CmdLineError ("error: directory portion of " ++ 
+                             show dir ++ " does not exist (used with " ++ 
+			     show flg ++ " option.)"))
+
+-----------------------------------------------------------------------------
+-- GHC modes of operation
+
+data CmdLineMode
+  = ShowUsage			-- ghc -?
+  | PrintLibdir			-- ghc --print-libdir
+  | ShowVersion			-- ghc -V/--version
+  | ShowNumVersion		-- ghc --numeric-version
+  | ShowInterface String	-- ghc --show-iface
+  | DoMkDependHS		-- ghc -M
+  | StopBefore Phase		-- ghc -E | -C | -S
+				-- StopBefore StopLn is the default
+  | DoMake			-- ghc --make
+  | DoInteractive		-- ghc --interactive
+  | DoEval String		-- ghc -e
+  deriving (Show)
+
+isInteractiveMode, isInterpretiveMode     :: CmdLineMode -> Bool
+isLinkMode, isCompManagerMode :: CmdLineMode -> Bool
+
+isInteractiveMode DoInteractive = True
+isInteractiveMode _		= False
+
+-- isInterpretiveMode: byte-code compiler involved
+isInterpretiveMode DoInteractive = True
+isInterpretiveMode (DoEval _)    = True
+isInterpretiveMode _             = False
+
+-- True if we are going to attempt to link in this mode.
+-- (we might not actually link, depending on the GhcLink flag)
+isLinkMode (StopBefore StopLn) = True
+isLinkMode DoMake	       = True
+isLinkMode _   		       = False
+
+isCompManagerMode DoMake        = True
+isCompManagerMode DoInteractive = True
+isCompManagerMode (DoEval _)    = True
+isCompManagerMode _             = False
+
+
+-- -----------------------------------------------------------------------------
+-- Parsing the mode flag
+
+parseModeFlags :: [String] -> IO (CmdLineMode, [String])
+parseModeFlags args = do
+  let ((leftover, errs), (mode, _, flags)) = 
+	 runCmdLine (processArgs mode_flags args) (StopBefore StopLn, "", []) 
+  when (not (null errs)) $ do
+    throwDyn (UsageError (unlines errs))
+  return (mode, flags ++ leftover)
+
+type ModeM a = CmdLineP (CmdLineMode, String, [String]) a
+  -- mode flags sometimes give rise to new DynFlags (eg. -C, see below)
+  -- so we collect the new ones and return them.
+
+mode_flags :: [(String, OptKind (CmdLineP (CmdLineMode, String, [String])))]
+mode_flags =
+  [  ------- help / version ----------------------------------------------
+     ( "?"    		 , PassFlag (setMode ShowUsage))
+  ,  ( "-help"	 	 , PassFlag (setMode ShowUsage))
+  ,  ( "-print-libdir"   , PassFlag (setMode PrintLibdir))
+  ,  ( "V"	 	 , PassFlag (setMode ShowVersion))
+  ,  ( "-version"	 , PassFlag (setMode ShowVersion))
+  ,  ( "-numeric-version", PassFlag (setMode ShowNumVersion))
+
+      ------- interfaces ----------------------------------------------------
+  ,  ( "-show-iface"     , HasArg (\f -> setMode (ShowInterface f)
+					  "--show-iface"))
+
+      ------- primary modes ------------------------------------------------
+  ,  ( "M"		, PassFlag (setMode DoMkDependHS))
+  ,  ( "E"		, PassFlag (setMode (StopBefore anyHsc)))
+  ,  ( "C"		, PassFlag (\f -> do setMode (StopBefore HCc) f
+					     addFlag "-fvia-C"))
+  ,  ( "S"		, PassFlag (setMode (StopBefore As)))
+  ,  ( "-make"		, PassFlag (setMode DoMake))
+  ,  ( "-interactive"	, PassFlag (setMode DoInteractive))
+  ,  ( "e"              , HasArg   (\s -> setMode (DoEval s) "-e"))
+
+	-- -fno-code says to stop after Hsc but don't generate any code.
+  ,  ( "fno-code"	, PassFlag (\f -> do setMode (StopBefore HCc) f
+					     addFlag "-fno-code"
+					     addFlag "-no-recomp"))
+  ]
+
+setMode :: CmdLineMode -> String -> ModeM ()
+setMode m flag = do
+  (old_mode, old_flag, flags) <- getCmdLineState
+  when (notNull old_flag && flag /= old_flag) $
+      throwDyn (UsageError 
+          ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
+  putCmdLineState (m, flag, flags)
+
+addFlag :: String -> ModeM ()
+addFlag s = do
+  (m, f, flags) <- getCmdLineState
+  putCmdLineState (m, f, s:flags)
+
 
 -- -----------------------------------------------------------------------------
 -- Compile files in one-shot mode.
 
-compileFiles :: GhcMode
+oneShot :: DynFlags -> Phase -> [String] -> IO ()
+oneShot dflags stop_phase srcs = do
+	o_files <- compileFiles stop_phase dflags srcs 
+	doLink dflags stop_phase o_files
+
+compileFiles :: Phase
 	     -> DynFlags
 	     -> [String]	-- Source files
 	     -> IO [String]	-- Object files
-compileFiles mode dflags srcs = mapM (compileFile mode dflags) srcs
+compileFiles stop_phase dflags srcs 
+  = mapM (compileFile stop_phase dflags) srcs
+
+compileFile :: Phase -> DynFlags -> FilePath -> IO FilePath
+compileFile stop_phase dflags src = do
+   exists <- doesFileExist src
+   when (not exists) $ 
+   	throwDyn (CmdLineError ("does not exist: " ++ src))
+   
+   let
+	split    = dopt Opt_SplitObjs dflags
+	o_file   = outputFile dflags
+	ghc_link = ghcLink dflags	-- Set by -c or -no-link
+
+	-- When linking, the -o argument refers to the linker's output.	
+	-- otherwise, we use it as the name for the pipeline's output.
+        maybe_o_file
+	 | StopLn <- stop_phase, not (isNoLink ghc_link) = Nothing
+		-- -o foo applies to linker
+	 | otherwise = o_file
+		-- -o foo applies to the file we are compiling now
+
+        stop_phase' = case stop_phase of 
+			As | split -> SplitAs
+			other      -> stop_phase
+
+   (_, out_file) <- runPipeline stop_phase' dflags
+			 True maybe_o_file src Nothing{-no ModLocation-}
+   return out_file
 
 
 doLink :: DynFlags -> Phase -> [FilePath] -> IO ()
@@ -283,12 +424,10 @@ doLink dflags stop_phase o_files
   = return ()		-- We stopped before the linking phase
 
   | otherwise
-  = do 	{ ghc_link <- readIORef v_GhcLink
-	; case ghc_link of
-	    NoLink     -> return ()
-	    StaticLink -> staticLink dflags o_files link_pkgs
-	    MkDLL      -> doMkDLL dflags o_files link_pkgs
-	}
+  = case ghcLink dflags of
+	NoLink     -> return ()
+	StaticLink -> staticLink dflags o_files link_pkgs
+	MkDLL      -> doMkDLL dflags o_files link_pkgs
   where
    -- Always link in the haskell98 package for static linking.  Other
    -- packages have to be specified via the -package flag.
@@ -303,17 +442,18 @@ doLink dflags stop_phase o_files
 doMake :: DynFlags -> [String] -> IO ()
 doMake dflags []    = throwDyn (UsageError "no input files")
 doMake dflags srcs  = do 
-    state  <- cmInit Batch dflags
+    state  <- cmInit dflags
     graph  <- cmDepAnal state srcs
     (_, ok_flag, _) <- cmLoadModules state graph
     when (failed ok_flag) (exitWith (ExitFailure 1))
     return ()
 
+
 -- ---------------------------------------------------------------------------
 -- Various banners and verbosity output.
 
-showBanner :: GhcMode -> DynFlags -> IO ()
-showBanner mode dflags = do
+showBanner :: CmdLineMode -> DynFlags -> IO ()
+showBanner cli_mode dflags = do
    let verb = verbosity dflags
 	-- Show the GHCi banner
 #  ifdef GHCI
@@ -322,8 +462,32 @@ showBanner mode dflags = do
 #  endif
 
 	-- Display details of the configuration in verbose mode
-   when (not (isInteractiveMode mode) && verb >= 2) $
+   when (not (isInteractiveMode cli_mode) && verb >= 2) $
 	do hPutStr stderr "Glasgow Haskell Compiler, Version "
  	   hPutStr stderr cProjectVersion
 	   hPutStr stderr ", for Haskell 98, compiled by GHC version "
 	   hPutStrLn stderr cBooterVersion
+
+showVersion :: IO ()
+showVersion = do
+  putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
+  exitWith ExitSuccess
+
+showGhcUsage cli_mode = do 
+  (ghc_usage_path,ghci_usage_path) <- getUsageMsgPaths
+  let usage_path 
+	| DoInteractive <- cli_mode = ghci_usage_path
+	| otherwise		    = ghc_usage_path
+  usage <- readFile usage_path
+  dump usage
+  exitWith ExitSuccess
+  where
+     dump ""	      = return ()
+     dump ('$':'$':s) = hPutStr stderr progName >> dump s
+     dump (c:s)	      = hPutChar stderr c >> dump s
+
+-- -----------------------------------------------------------------------------
+-- Util
+
+unknownFlagsErr :: [String] -> a
+unknownFlagsErr fs = throwDyn (UsageError ("unrecognised flags: " ++ unwords fs))

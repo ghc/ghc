@@ -99,7 +99,8 @@ module CLabel (
 
 #include "HsVersions.h"
 
-import CmdLineOpts      ( DynFlags, opt_Static, opt_DoTickyProfiling )
+import DynFlags		( DynFlags )
+import StaticFlags	( opt_Static, opt_DoTickyProfiling )
 import Packages		( isHomeModule, isDllName )
 import DataCon		( ConTag )
 import Module		( moduleFS, Module )

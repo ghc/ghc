@@ -37,7 +37,7 @@ import Pretty
 import FastString
 import qualified Outputable
 
-import CmdLineOpts      ( opt_PIC, opt_Static )
+import StaticFlags      ( opt_PIC, opt_Static )
 
 #if __GLASGOW_HASKELL__ >= 504
 import Data.Array.ST

@@ -20,7 +20,7 @@ module SaAbsInt (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
+import StaticFlags	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
 import CoreUnfold	( maybeUnfoldingTemplate )
 import Id		( Id, idType, idUnfolding, isDataConWorkId_maybe,

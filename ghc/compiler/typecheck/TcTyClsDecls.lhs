@@ -54,7 +54,8 @@ import List		( partition )
 import SrcLoc		( Located(..), unLoc, getLoc )
 import ListSetOps	( equivClasses )
 import Digraph		( SCC(..) )
-import CmdLineOpts	( DynFlag( Opt_GlasgowExts, Opt_Generics, Opt_UnboxStrictFields ) )
+import DynFlags		( DynFlag( Opt_GlasgowExts, Opt_Generics, 
+					Opt_UnboxStrictFields ) )
 \end{code}
 
 

@@ -29,7 +29,8 @@ module SCCfinal ( stgMassageForProfiling ) where
 
 import StgSyn
 
-import CmdLineOpts	( DynFlags, opt_AutoSccsOnIndividualCafs )
+import DynFlags		( DynFlags )
+import StaticFlags	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
 import Id		( Id )
 import Module		( Module )

@@ -22,7 +22,7 @@ module FlattenInfo (
   namesNeededForFlattening
 ) where
 
-import CmdLineOpts (opt_Flatten)
+import StaticFlags (opt_Flatten)
 import NameSet     (FreeVars, emptyFVs, mkFVs)
 import PrelNames   (fstName, andName, orName, lengthPName, replicatePName,
 		    mapPName, bpermutePName, bpermuteDftPName, indexOfPName)

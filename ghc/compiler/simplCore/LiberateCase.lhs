@@ -8,7 +8,8 @@ module LiberateCase ( liberateCase ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), opt_LiberateCaseThreshold )
+import DynFlags		( DynFlags, DynFlag(..) )
+import StaticFlags	( opt_LiberateCaseThreshold )
 import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreUnfold	( couldBeSmallEnoughToInline )

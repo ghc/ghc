@@ -17,8 +17,8 @@ module LoadIface (
 import {-# SOURCE #-}	TcIface( tcIfaceDecl )
 
 import Packages		( PackageState(..), PackageIdH(..), isHomePackage )
-import DriverState	( v_GhcMode, isCompManagerMode )
-import CmdLineOpts	( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ) )
+import DynFlags		( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ),
+			  isOneShot )
 import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
 			  IfaceConDecls(..), IfaceInst(..), IfaceRule(..),
 			  IfaceExpr(..), IfaceTyCon(..), IfaceIdInfo(..), 
@@ -607,8 +607,7 @@ findHiFile dflags explicit mod_name hi_boot_file
 	-- This helps in the case where you are sitting in eg. ghc/lib/std
 	-- and start up GHCi - it won't complain that all the modules it tries
 	-- to load are found in the home location.
-	ghci_mode <- readIORef v_GhcMode ;
-	let { home_allowed = not (isCompManagerMode ghci_mode) } ;
+	let { home_allowed = isOneShot (ghcMode dflags) } ;
 	maybe_found <-	if home_allowed 
 			then findModule        dflags mod_name explicit
 			else findPackageModule dflags mod_name explicit;

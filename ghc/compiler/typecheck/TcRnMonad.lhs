@@ -15,7 +15,7 @@ import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
 			  TyThing, TypeEnv, emptyTypeEnv, HscSource(..), isHsBoot,
 			  ExternalPackageState(..), HomePackageTable,
 			  Deprecs(..), FixityEnv, FixItem, 
-			  GhciMode, lookupType, unQualInScope )
+			  lookupType, unQualInScope )
 import Module		( Module, unitModuleEnv )
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, 	
 			  LocalRdrEnv, emptyLocalRdrEnv )
@@ -37,7 +37,8 @@ import Bag		( emptyBag )
 import Outputable
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, uniqFromSupply, splitUniqSupply )
 import Unique		( Unique )
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_PprStyle_Debug, dopt_set )
+import DynFlags		( DynFlags(..), DynFlag(..), dopt, dopt_set, GhcMode )
+import StaticFlags	( opt_PprStyle_Debug )
 import Bag		( snocBag, unionBags )
 import Panic		( showException )
  
@@ -238,8 +239,8 @@ ifOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()	-- Do it flag is tru
 ifOptM flag thing_inside = do { b <- doptM flag; 
 				if b then thing_inside else return () }
 
-getGhciMode :: TcRnIf gbl lcl GhciMode
-getGhciMode = do { env <- getTopEnv; return (hsc_mode env) }
+getGhciMode :: TcRnIf gbl lcl GhcMode
+getGhciMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 \end{code}
 
 \begin{code}

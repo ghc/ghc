@@ -24,11 +24,9 @@ import Module
 import UniqFM		( filterUFM )
 import HscTypes		( Linkable(..), Unlinked(..) )
 import Packages
-import DriverState
-import DriverUtil
 import FastString
 import Util
-import CmdLineOpts	( DynFlags(..) )
+import DynFlags		( DynFlags(..), isOneShot, GhcMode(..) )
 import Outputable
 
 import DATA_IOREF	( IORef, writeIORef, readIORef )
@@ -50,7 +48,7 @@ type BaseName = String	-- Basename of file
 -- The Finder provides a thin filesystem abstraction to the rest of
 -- the compiler.  For a given module, it can tell you where the
 -- source, interface, and object files for that module live.
--- 
+
 -- It does *not* know which particular package a module lives in.  Use
 -- Packages.moduleToPackageConfig for that.
 
@@ -174,26 +172,23 @@ findModule' dflags name = do
 findHomeModule' :: DynFlags -> Module -> IO LocalFindResult
 findHomeModule' dflags mod = do
    let home_path = importPaths dflags
-   hisuf     <- readIORef v_Hi_suf
-   mode      <- readIORef v_GhcMode
+       hisuf = hiSuf dflags
 
    let
      source_exts = 
-      [ ("hs",   mkHomeModLocationSearched mod "hs")
-      , ("lhs",  mkHomeModLocationSearched mod "lhs")
+      [ ("hs",   mkHomeModLocationSearched dflags mod "hs")
+      , ("lhs",  mkHomeModLocationSearched dflags  mod "lhs")
       ]
      
-     hi_exts = [ (hisuf,  	 	mkHiOnlyModLocation hisuf)
-	       , (addBootSuffix hisuf,	mkHiOnlyModLocation hisuf)
+     hi_exts = [ (hisuf,  	 	mkHiOnlyModLocation dflags hisuf)
+	       , (addBootSuffix hisuf,	mkHiOnlyModLocation dflags hisuf)
 	       ]
      
      	-- In compilation manager modes, we look for source files in the home
      	-- package because we can compile these automatically.  In one-shot
      	-- compilation mode we look for .hi and .hi-boot files only.
-     exts
-         | DoMkDependHS <- mode   = source_exts
-         | isCompManagerMode mode = source_exts
-	 | otherwise {-one-shot-} = hi_exts
+     exts | isOneShot (ghcMode dflags) = hi_exts
+          | otherwise      	       = source_exts
 
    searchPathExts home_path mod exts
    	
@@ -201,31 +196,31 @@ findPackageModule' :: DynFlags -> Module -> IO LocalFindResult
 findPackageModule' dflags mod 
   = case moduleToPackageConfig dflags mod of
     	Nothing       -> return (Failed [])
-	Just pkg_info -> findPackageIface mod pkg_info
+	Just pkg_info -> findPackageIface dflags mod pkg_info
 
-findPackageIface :: Module -> (PackageConfig,Bool) -> IO LocalFindResult
-findPackageIface mod pkg_info@(pkg_conf, _) = do
-  mode <- readIORef v_GhcMode
-  tag  <- readIORef v_Build_tag
+findPackageIface :: DynFlags -> Module -> (PackageConfig,Bool) -> IO LocalFindResult
+findPackageIface dflags mod pkg_info@(pkg_conf, _) = do
   let
+     tag = buildTag dflags
+
 	   -- hi-suffix for packages depends on the build tag.
      package_hisuf | null tag  = "hi"
 		   | otherwise = tag ++ "_hi"
      hi_exts =
         [ (package_hisuf, 
-	    mkPackageModLocation pkg_info package_hisuf) ]
+	    mkPackageModLocation dflags pkg_info package_hisuf) ]
 
      source_exts = 
-       [ ("hs",   mkPackageModLocation pkg_info package_hisuf)
-       , ("lhs",  mkPackageModLocation pkg_info package_hisuf)
+       [ ("hs",   mkPackageModLocation dflags pkg_info package_hisuf)
+       , ("lhs",  mkPackageModLocation dflags pkg_info package_hisuf)
        ]
 
      -- mkdependHS needs to look for source files in packages too, so
      -- that we can make dependencies between package before they have
      -- been built.
      exts 
-      | DoMkDependHS <- mode = hi_exts ++ source_exts
-      | otherwise 	     = hi_exts
+      | MkDepend <- ghcMode dflags = hi_exts ++ source_exts
+      | otherwise	 	   = hi_exts
       -- we never look for a .hi-boot file in an external package;
       -- .hi-boot files only make sense for the home package.
 
@@ -275,21 +270,22 @@ searchPathExts paths mod exts
 	then do { res <- mk_result; return (Succeeded res) }
 	else search rest
 
-mkHomeModLocationSearched :: Module -> FileExt
+mkHomeModLocationSearched :: DynFlags -> Module -> FileExt
 		          -> FilePath -> BaseName -> IO FinderCacheEntry
-mkHomeModLocationSearched mod suff path basename = do
-   loc <- mkHomeModLocation2 mod (path ++ '/':basename) suff
+mkHomeModLocationSearched dflags mod suff path basename = do
+   loc <- mkHomeModLocation2 dflags mod (path ++ '/':basename) suff
    return (loc, Nothing)
 
-mkHiOnlyModLocation :: FileExt -> FilePath -> BaseName -> IO FinderCacheEntry
-mkHiOnlyModLocation hisuf path basename = do
-  loc <- hiOnlyModLocation path basename hisuf
+mkHiOnlyModLocation :: DynFlags -> FileExt -> FilePath -> BaseName
+		    -> IO FinderCacheEntry
+mkHiOnlyModLocation dflags hisuf path basename = do
+  loc <- hiOnlyModLocation dflags path basename hisuf
   return (loc, Nothing)
 
-mkPackageModLocation :: (PackageConfig, Bool) -> FileExt
+mkPackageModLocation :: DynFlags -> (PackageConfig, Bool) -> FileExt
 		     -> FilePath -> BaseName -> IO FinderCacheEntry
-mkPackageModLocation pkg_info hisuf path basename = do
-  loc <- hiOnlyModLocation path basename hisuf
+mkPackageModLocation dflags pkg_info hisuf path basename = do
+  loc <- hiOnlyModLocation dflags path basename hisuf
   return (loc, Just pkg_info)
 
 -- -----------------------------------------------------------------------------
@@ -325,29 +321,30 @@ mkPackageModLocation pkg_info hisuf path basename = do
 -- ext
 --	The filename extension of the source file (usually "hs" or "lhs").
 
-mkHomeModLocation :: Module -> FilePath -> IO ModLocation
-mkHomeModLocation mod src_filename = do
+mkHomeModLocation :: DynFlags -> Module -> FilePath -> IO ModLocation
+mkHomeModLocation dflags mod src_filename = do
    let (basename,extension) = splitFilename src_filename
-   mkHomeModLocation2 mod basename extension
+   mkHomeModLocation2 dflags mod basename extension
 
-mkHomeModLocation2 :: Module	
+mkHomeModLocation2 :: DynFlags
+		   -> Module	
 		   -> FilePath 	-- Of source module, without suffix
 		   -> String 	-- Suffix
 		   -> IO ModLocation
-mkHomeModLocation2 mod src_basename ext = do
+mkHomeModLocation2 dflags mod src_basename ext = do
    let mod_basename = dots_to_slashes (moduleUserString mod)
 
-   obj_fn <- mkObjPath src_basename mod_basename
-   hi_fn  <- mkHiPath  src_basename mod_basename
+   obj_fn <- mkObjPath dflags src_basename mod_basename
+   hi_fn  <- mkHiPath  dflags src_basename mod_basename
 
    return (ModLocation{ ml_hs_file   = Just (src_basename ++ '.':ext),
 			ml_hi_file   = hi_fn,
 			ml_obj_file  = obj_fn })
 
-hiOnlyModLocation :: FilePath -> String -> Suffix -> IO ModLocation
-hiOnlyModLocation path basename hisuf 
+hiOnlyModLocation :: DynFlags -> FilePath -> String -> Suffix -> IO ModLocation
+hiOnlyModLocation dflags path basename hisuf 
  = do let full_basename = path++'/':basename
-      obj_fn <- mkObjPath full_basename basename
+      obj_fn <- mkObjPath dflags full_basename basename
       return ModLocation{    ml_hs_file   = Nothing,
  	        	     ml_hi_file   = full_basename ++ '.':hisuf,
 		 		-- Remove the .hi-boot suffix from
@@ -360,30 +357,34 @@ hiOnlyModLocation path basename hisuf
 -- | Constructs the filename of a .o file for a given source file.
 -- Does /not/ check whether the .o file exists
 mkObjPath
-  :: FilePath		-- the filename of the source file, minus the extension
+  :: DynFlags
+  -> FilePath		-- the filename of the source file, minus the extension
   -> String		-- the module name with dots replaced by slashes
   -> IO FilePath
-mkObjPath basename mod_basename
-  = do  odir   <- readIORef v_Output_dir
-	osuf   <- readIORef v_Object_suf
-
-	let obj_basename | Just dir <- odir = dir ++ '/':mod_basename
-	   	         | otherwise        = basename
+mkObjPath dflags basename mod_basename
+  = do  let
+		odir = outputDir dflags
+		osuf = objectSuf dflags
+	
+		obj_basename | Just dir <- odir = dir ++ '/':mod_basename
+			     | otherwise        = basename
 
         return (obj_basename ++ '.':osuf)
 
 -- | Constructs the filename of a .hi file for a given source file.
 -- Does /not/ check whether the .hi file exists
 mkHiPath
-  :: FilePath		-- the filename of the source file, minus the extension
+  :: DynFlags
+  -> FilePath		-- the filename of the source file, minus the extension
   -> String		-- the module name with dots replaced by slashes
   -> IO FilePath
-mkHiPath basename mod_basename
-  = do  hidir   <- readIORef v_Hi_dir
-	hisuf   <- readIORef v_Hi_suf
+mkHiPath dflags basename mod_basename
+  = do  let
+		hidir = hiDir dflags
+		hisuf = hiSuf dflags
 
-	let hi_basename | Just dir <- hidir = dir ++ '/':mod_basename
-	   	        | otherwise         = basename
+		hi_basename | Just dir <- hidir = dir ++ '/':mod_basename
+			    | otherwise         = basename
 
         return (hi_basename ++ '.':hisuf)
 

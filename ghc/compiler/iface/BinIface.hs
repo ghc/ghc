@@ -17,8 +17,7 @@ import VarEnv
 import Packages		( PackageIdH(..) )
 import Class		( DefMeth(..) )
 import CostCentre
-import DriverState	( v_Build_tag )
-import CmdLineOpts	( opt_HiVersion )
+import StaticFlags	( opt_HiVersion, v_Build_tag )
 import Kind		( Kind(..) )
 import Panic
 import Binary

@@ -19,8 +19,6 @@ module CodeGen ( codeGen ) where
 
 #include "HsVersions.h"
 
-import DriverState	( v_Build_tag, v_MainModIs )
-
 -- Kludge (??) so that CgExpr is reached via at least one non-SOURCE
 -- import.  Before, that wasn't the case, and CM therefore didn't 
 -- bother to compile it.
@@ -41,8 +39,8 @@ import MachOp		( wordRep, MachHint(..) )
 
 import StgSyn
 import PrelNames	( gHC_PRIM, rOOT_MAIN, mAIN, pREL_TOP_HANDLER )
-import CmdLineOpts	( DynFlags, DynFlag(..), opt_EnsureSplittableC,
-			  opt_SccProfilingOn )
+import DynFlags		( DynFlags(..), DynFlag(..) )
+import StaticFlags	( opt_SplitObjs, opt_SccProfilingOn )
 
 import HscTypes		( ForeignStubs(..), TypeEnv, typeEnvTyCons )
 import CostCentre       ( CollectedCCs )
@@ -75,8 +73,8 @@ codeGen dflags this_mod type_env foreign_stubs imported_mods
 	cost_centre_info stg_binds
   = do	
   { showPass dflags "CodeGen"
-  ; way <- readIORef v_Build_tag
-  ; mb_main_mod <- readIORef v_MainModIs
+  ; let way = buildTag dflags
+        mb_main_mod = mainModIs dflags
 
   ; let     tycons	= typeEnvTyCons type_env
 	    data_tycons = filter isDataTyCon tycons
@@ -346,7 +344,7 @@ which refers to this name).
 \begin{code}
 maybeExternaliseId :: Id -> FCode Id
 maybeExternaliseId id
-  | opt_EnsureSplittableC, 	-- Externalise the name for -split-objs
+  | opt_SplitObjs, 	-- Externalise the name for -split-objs
     isInternalName name = do { mod <- moduleName
 			     ; returnFC (setIdName id (externalise mod)) }
   | otherwise		= returnFC id

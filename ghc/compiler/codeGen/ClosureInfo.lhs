@@ -63,7 +63,8 @@ import CLabel
 
 import Constants	( mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject )
 import Packages		( isDllName )
-import CmdLineOpts	( DynFlags, opt_SccProfilingOn, opt_OmitBlackHoling,
+import DynFlags		( DynFlags )
+import StaticFlags	( opt_SccProfilingOn, opt_OmitBlackHoling,
 			  opt_Parallel, opt_DoTickyProfiling,
 			  opt_SMP )
 import Id		( Id, idType, idArity, idName )

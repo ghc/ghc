@@ -6,7 +6,6 @@
 \begin{code}
 module HscTypes ( 
 	HscEnv(..), hscEPS,
-	GhciMode(..), isOneShot,
 
 	ModDetails(..),	
 	ModGuts(..), ModImports(..), ForeignStubs(..),
@@ -85,7 +84,7 @@ import Class		( Class, classSelIds, classTyCon )
 import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
 import Packages		( PackageIdH, PackageId )
-import CmdLineOpts	( DynFlags )
+import DynFlags		( DynFlags(..), isOneShot )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString )
 import BasicTypes	( Version, initialVersion, IPName, 
 			  Fixity, defaultFixity, DeprecTxt )
@@ -116,8 +115,7 @@ The HscEnv gives the environment in which to compile a chunk of code.
 
 \begin{code}
 data HscEnv 
-  = HscEnv { hsc_mode   :: GhciMode,
-	     hsc_dflags :: DynFlags,
+  = HscEnv { hsc_dflags :: DynFlags,
 
 	     hsc_HPT    :: HomePackageTable,
 		-- The home package table describes already-compiled
@@ -144,20 +142,6 @@ data HscEnv
 
 hscEPS :: HscEnv -> IO ExternalPackageState
 hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
-\end{code}
-
-The GhciMode is self-explanatory:
-
-\begin{code}
-data GhciMode = Batch 		-- ghc --make Main
-	      | Interactive	-- ghc --interactive
-	      | OneShot		-- ghc Foo.hs
-	      | IDE		-- Visual Studio etc
-	      deriving Eq
-
-isOneShot :: GhciMode -> Bool
-isOneShot OneShot = True
-isOneShot _other  = False
 \end{code}
 
 \begin{code}
@@ -208,7 +192,7 @@ hptRules :: HscEnv -> [(Module, IsBootInterface)] -> [IdCoreRule]
 -- Get rules from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
 hptRules hsc_env deps
-  | isOneShot (hsc_mode hsc_env) = []
+  | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
   | otherwise
   = let 
 	hpt = hsc_HPT hsc_env

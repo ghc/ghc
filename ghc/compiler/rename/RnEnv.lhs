@@ -60,7 +60,7 @@ import Outputable
 import Util		( sortLe )
 import ListSetOps	( removeDups )
 import List		( nubBy )
-import CmdLineOpts
+import DynFlags
 \end{code}
 
 %*********************************************************

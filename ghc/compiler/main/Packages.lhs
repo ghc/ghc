@@ -37,10 +37,10 @@ where
 #include "HsVersions.h"
 
 import PackageConfig	
-import DriverState	( v_Build_tag, v_RTS_Build_tag, v_Static )
 import SysTools		( getTopDir, getPackageConfigPath )
 import ParsePkgConf	( loadPackageConfig )
-import CmdLineOpts	( DynFlags(..), PackageFlag(..), opt_Static )
+import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..) )
+import StaticFlags	( opt_Static )
 import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )
 import Module		( Module, mkModule )
@@ -207,7 +207,7 @@ readPackageConfigs dflags = do
 			++ '-':cProjectVersion ++ "/package.conf"
    --
    exists <- doesFileExist pkgconf
-   pkg_map2 <- if (readUserPkgConf dflags && exists)
+   pkg_map2 <- if (dopt Opt_ReadUserPackageConf dflags && exists)
 		  then readPackageConfig dflags pkg_map1 pkgconf
 		  else return pkg_map1
 
@@ -433,11 +433,10 @@ getPackageLibraryPath dflags pkgs = do
 getPackageLinkOpts :: DynFlags -> [PackageId] -> IO [String]
 getPackageLinkOpts dflags pkgs = do
   ps <- getExplicitPackagesAnd dflags pkgs
-  tag <- readIORef v_Build_tag
-  rts_tag <- readIORef v_RTS_Build_tag
-  static <- readIORef v_Static
+  let tag = buildTag dflags
+      rts_tag = rtsBuildTag dflags
   let 
-	imp        = if static then "" else "_dyn"
+	imp        = if opt_Static then "" else "_dyn"
       	libs p     = map ((++imp) . addSuffix) (hACK (hsLibraries p)) ++ extraLibraries p
 	all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
 

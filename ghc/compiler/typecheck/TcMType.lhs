@@ -80,7 +80,7 @@ import FunDeps		( grow )
 import Name		( Name, setNameUnique, mkSysTvName )
 import VarSet
 import VarEnv
-import CmdLineOpts	( dopt, DynFlag(..) )
+import DynFlags	( dopt, DynFlag(..) )
 import UniqSupply	( uniqsFromSupply )
 import Util		( nOfThem, isSingleton, equalLength, notNull )
 import ListSetOps	( removeDups )

@@ -41,7 +41,7 @@ import VarSet		( VarSet, varSetElems )
 import TysPrim		( arrayPrimTyCon, mutableArrayPrimTyCon,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon
 			)
-import CmdLineOpts	( DynFlags, DynFlag(..) )
+import DynFlags	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
 import Unique		( mkPseudoUniqueE )
 import FastString	( FastString(..), unpackFS )

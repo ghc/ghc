@@ -16,9 +16,8 @@ import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
 import SRT		( computeSRTs )
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt, 
-			  StgToDo(..), dopt_StgToDo
-			)
+import DynFlags		( DynFlags(..), DynFlag(..), dopt, StgToDo(..),
+			  getStgToDo )
 import Id		( Id )
 import Module		( Module )
 import ErrUtils		( doIfSet_dyn, dumpIfSet_dyn, showPass )
@@ -44,8 +43,7 @@ stg2stg dflags module_name binds
 
 		-- Do the main business!
 	; (processed_binds, _, cost_centres) 
-		<- foldl_mn do_stg_pass (binds', us', ccs)
-			    (dopt_StgToDo dflags)
+		<- foldl_mn do_stg_pass (binds', us', ccs) (getStgToDo dflags)
 
 	; let srt_binds = computeSRTs processed_binds
 

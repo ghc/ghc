@@ -31,7 +31,7 @@ import SrcLoc		( Located(..), unLoc, getLoc, noLoc, combineSrcSpans,
 			  SrcSpan, combineLocs, srcLocFile, 
 			  mkSrcLoc, mkSrcSpan )
 import Module
-import CmdLineOpts	( opt_SccProfilingOn )
+import StaticFlags	( opt_SccProfilingOn )
 import Type		( Kind, mkArrowKind, liftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  Activation(..) )

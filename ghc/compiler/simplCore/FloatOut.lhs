@@ -13,7 +13,7 @@ module FloatOut ( floatOutwards ) where
 import CoreSyn
 import CoreUtils	( mkSCC, exprIsValue, exprIsTrivial )
 
-import CmdLineOpts	( DynFlags, DynFlag(..), FloatOutSwitches(..) )
+import DynFlags	( DynFlags, DynFlag(..), FloatOutSwitches(..) )
 import ErrUtils		( dumpIfSet_dyn )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id, idType )

@@ -53,7 +53,7 @@ import CLabel		( CLabel, mkRtsDataLabel, mkRednCountsLabel )
 
 import Name		( isInternalName )
 import Id		( Id, idType )
-import CmdLineOpts	( opt_DoTickyProfiling )
+import StaticFlags	( opt_DoTickyProfiling )
 import BasicTypes	( Arity )
 import FastString	( FastString, mkFastString, LitString )	
 import Constants	-- Lots of field offsets

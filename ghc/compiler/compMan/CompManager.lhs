@@ -10,7 +10,7 @@ module CompManager (
 
     CmState, 		-- Abstract
 
-    cmInit, 	   -- :: GhciMode -> IO CmState
+    cmInit, 	   -- :: GhcMode -> IO CmState
 
     cmDepAnal,	   -- :: CmState -> [FilePath] -> IO ModuleGraph
     cmDownsweep,   
@@ -58,19 +58,18 @@ where
 import Packages		( isHomePackage )
 import DriverPipeline	( CompResult(..), preprocess, compile, link )
 import HscMain		( newHscEnv )
-import DriverState	( v_Output_file, v_NoHsMain, v_MainModIs )
 import DriverPhases	( HscSource(..), hscSourceString, isHaskellSrcFilename )
 import Finder		( findModule, findLinkable, addHomeModuleToFinder,
 			  flushFinderCache, mkHomeModLocation, FindResult(..), cantFindError )
-import HscTypes		( ModSummary(..), HomeModInfo(..), ModIface(..), msHsFilePath,
-			  HscEnv(..), GhciMode(..), isBootSummary,
+import HscTypes		( ModSummary(..), HomeModInfo(..), ModIface(..),
+			  msHsFilePath, HscEnv(..), isBootSummary,
 			  InteractiveContext(..), emptyInteractiveContext, 
-			  HomePackageTable, emptyHomePackageTable, IsBootInterface,
-			  Linkable(..), isObjectLinkable )
-import Module		( Module, mkModule, delModuleEnv, delModuleEnvList, mkModuleEnv,
-			  lookupModuleEnv, moduleEnvElts, extendModuleEnv, filterModuleEnv,
-			  moduleUserString, addBootSuffixLocn, 
-			  ModLocation(..) )
+			  HomePackageTable, emptyHomePackageTable,
+			  IsBootInterface, Linkable(..), isObjectLinkable )
+import Module		( Module, mkModule, delModuleEnv, delModuleEnvList,
+			  mkModuleEnv, lookupModuleEnv, moduleEnvElts,
+			  extendModuleEnv, filterModuleEnv, moduleUserString,
+			  addBootSuffixLocn, ModLocation(..) )
 import GetImports	( getImports )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
 import ErrUtils		( showPass )
@@ -80,11 +79,9 @@ import StringBuffer	( hGetStringBuffer )
 import Util
 import Outputable
 import Panic
-import CmdLineOpts	( DynFlags(..) )
+import DynFlags		( DynFlags(..), DynFlag(..), GhcMode(..), dopt )
 import Maybes		( expectJust, orElse, mapCatMaybes )
 import FiniteMap
-
-import DATA_IOREF	( readIORef )
 
 #ifdef GHCI
 import Finder 		( findPackageModule )
@@ -102,7 +99,7 @@ import Linker		( HValue, unload, extendLinkEnv )
 import GHC.Exts		( unsafeCoerce# )
 import Foreign
 import Control.Exception as Exception ( Exception, try )
-import CmdLineOpts	( DynFlag(..), dopt_unset, dopt )
+import DynFlags	( DynFlag(..), dopt_unset, dopt )
 #endif
 
 import EXCEPTION	( throwDyn )
@@ -183,9 +180,9 @@ cmGetPrintUnqual cmstate = icPrintUnqual (cm_ic cmstate)
 cmHPT		 cmstate = hsc_HPT (cm_hsc cmstate)
 #endif
 
-cmInit :: GhciMode -> DynFlags -> IO CmState
-cmInit ghci_mode dflags
-   = do { hsc_env <- newHscEnv ghci_mode dflags
+cmInit :: DynFlags -> IO CmState
+cmInit dflags
+   = do { hsc_env <- newHscEnv dflags
 	; return (CmState { cm_hsc = hsc_env,
 			    cm_mg  = emptyMG, 
 			    cm_ic  = emptyInteractiveContext })}
@@ -499,8 +496,8 @@ cmUnload state@CmState{ cm_hsc = hsc_env }
       return (discardCMInfo state)
 
 cm_unload hsc_env stable_linkables	-- Unload everthing *except* 'stable_linkables'
-  = case hsc_mode hsc_env of
-	Batch -> return ()
+  = case ghcMode (hsc_dflags hsc_env) of
+	BatchCompile -> return ()
 #ifdef GHCI
 	Interactive -> Linker.unload (hsc_dflags hsc_env) stable_linkables
 #else
@@ -523,7 +520,7 @@ cm_unload hsc_env stable_linkables	-- Unload everthing *except* 'stable_linkable
 cmDepAnal :: CmState -> [FilePath] -> IO ModuleGraph
 cmDepAnal cmstate rootnames
   = do showPass dflags "Chasing dependencies"
-       when (verbosity dflags >= 1 && gmode == Batch) $
+       when (verbosity dflags >= 1 && gmode == BatchCompile) $
            hPutStrLn stderr (showSDoc (hcat [
 	     text "Chasing modules from: ",
 	     hcat (punctuate comma (map text rootnames))]))
@@ -531,7 +528,7 @@ cmDepAnal cmstate rootnames
   where
     hsc_env = cm_hsc cmstate
     dflags  = hsc_dflags hsc_env
-    gmode   = hsc_mode hsc_env
+    gmode   = ghcMode (hsc_dflags hsc_env)
 
 -----------------------------------------------------------------------------
 -- The real business of the compilation manager: given a system state and
@@ -548,7 +545,7 @@ cmLoadModules cmstate1 mg2unsorted
    = do -- version 1's are the original, before downsweep
 	let hsc_env   = cm_hsc cmstate1
         let hpt1      = hsc_HPT hsc_env
-        let ghci_mode = hsc_mode   hsc_env -- this never changes
+        let ghci_mode = ghcMode (hsc_dflags hsc_env) -- this never changes
         let dflags    = hsc_dflags hsc_env -- this never changes
         let verb      = verbosity dflags
 
@@ -676,16 +673,15 @@ cmLoadModules cmstate1 mg2unsorted
 	      -- Clean up after ourselves
 	      cleanTempFilesExcept dflags (ppFilesFromSummaries modsDone)
 
-
 	      -- Issue a warning for the confusing case where the user
 	      -- said '-o foo' but we're not going to do any linking.
 	      -- We attempt linking if either (a) one of the modules is
 	      -- called Main, or (b) the user said -no-hs-main, indicating
 	      -- that main() is going to come from somewhere else.
 	      --
-	      ofile       <- readIORef v_Output_file
-	      no_hs_main  <- readIORef v_NoHsMain
-	      mb_main_mod <- readIORef v_MainModIs
+	      let ofile = outputFile dflags
+	      let no_hs_main = dopt Opt_NoHsMain dflags
+	      let mb_main_mod = mainModIs dflags
 	      let 
 	 	main_mod = mb_main_mod `orElse` "Main"
 		a_root_is_Main 
@@ -693,7 +689,7 @@ cmLoadModules cmstate1 mg2unsorted
                     	  mg2unsorted
 		do_linking = a_root_is_Main || no_hs_main
 
-	      when (ghci_mode == Batch && isJust ofile && not do_linking
+	      when (ghci_mode == BatchCompile && isJust ofile && not do_linking
 		     && verb > 0) $
 	         hPutStrLn stderr ("Warning: output was redirected with -o, " ++
 				   "but no output will be generated\n" ++
@@ -778,7 +774,7 @@ ppFilesFromSummaries summaries = [ fn | Just fn <- map ms_hspp_file summaries ]
 -- ToDo: this pass could be merged with the preUpsweep.
 
 getValidLinkables
-	:: GhciMode
+	:: GhcMode
 	-> [Linkable]		-- old linkables
 	-> [Module]		-- all home modules
 	-> [SCC ModSummary]	-- all modules in the program, dependency order
@@ -801,7 +797,7 @@ getValidLinkables mode old_linkables all_home_mods module_graph
 
 
 getValidLinkablesSCC
-	:: GhciMode
+	:: GhcMode
 	-> [Linkable]		-- old linkables
 	-> [Module]		-- all home modules
 	-> [(Linkable,Bool)]
@@ -823,7 +819,7 @@ getValidLinkablesSCC mode old_linkables all_home_mods new_linkables scc0
 			    Nothing -> False
 			    Just l  -> isObjectLinkable l
 
-          objects_allowed = mode == Batch || all has_object scc_allhomeimps
+          objects_allowed = mode == BatchCompile || all has_object scc_allhomeimps
      in do
 
      new_linkables'
@@ -1256,7 +1252,7 @@ summariseFile dflags file
         (srcimps,the_imps,mod) <- getImports dflags' buf hspp_fn
 
 	-- Make a ModLocation for this file
-	location <- mkHomeModLocation mod file
+	location <- mkHomeModLocation dflags mod file
 
 	-- Tell the Finder cache where it is, so that subsequent calls
 	-- to findModule will find it, even if it's not on any search path

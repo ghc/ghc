@@ -68,7 +68,8 @@ import ListSetOps	( equivClasses )
 import Util		( zipEqual, isSingleton )
 import List		( partition )
 import SrcLoc		( Located(..) )
-import CmdLineOpts
+import DynFlags		( DynFlag(..) )
+import StaticFlags
 \end{code}
 
 

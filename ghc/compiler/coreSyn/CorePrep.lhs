@@ -35,7 +35,7 @@ import UniqSupply
 import Maybes
 import OrdList
 import ErrUtils
-import CmdLineOpts
+import DynFlags
 import Util       ( listLengthCmp )
 import Outputable
 \end{code}

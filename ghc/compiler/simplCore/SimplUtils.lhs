@@ -23,9 +23,11 @@ module SimplUtils (
 #include "HsVersions.h"
 
 import SimplEnv
-import CmdLineOpts	( SimplifierSwitch(..), SimplifierMode(..), opt_UF_UpdateInPlace,
-			  opt_SimplNoPreInlining, opt_RulesOff,
+import DynFlags		( SimplifierSwitch(..), SimplifierMode(..),
 			  DynFlag(..), dopt )
+import StaticFlags	( opt_UF_UpdateInPlace, opt_SimplNoPreInlining,
+			  opt_RulesOff )
+			  
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,

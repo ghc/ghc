@@ -13,7 +13,8 @@ module DmdAnal ( dmdAnalPgm, dmdAnalTopRhs,
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), opt_MaxWorkerArgs )
+import DynFlags		( DynFlags, DynFlag(..) )
+import StaticFlags	( opt_MaxWorkerArgs )
 import NewDemand	-- All of it
 import CoreSyn
 import PprCore	

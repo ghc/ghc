@@ -30,13 +30,11 @@ module CoreUnfold (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_UF_CreationThreshold,
-			  opt_UF_UseThreshold,
-			  opt_UF_FunAppDiscount,
-		  	  opt_UF_KeenessFactor,
+import StaticFlags	( opt_UF_CreationThreshold, opt_UF_UseThreshold,
+			  opt_UF_FunAppDiscount, opt_UF_KeenessFactor,
 			  opt_UF_DearOp,
-			  DynFlags, DynFlag(..), dopt
 			)
+import DynFlags		( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseGlobalExpr )

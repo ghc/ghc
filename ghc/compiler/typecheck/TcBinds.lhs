@@ -11,7 +11,7 @@ module TcBinds ( tcBindsAndThen, tcTopBinds, tcHsBootSigs, tcMonoBinds, tcSpecSi
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcCheckSigma, tcCheckRho )
 
-import CmdLineOpts	( DynFlag(Opt_MonomorphismRestriction) )
+import DynFlags		( DynFlag(Opt_MonomorphismRestriction) )
 import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, Sig(..),
 			  LSig, Match(..), HsBindGroup(..), IPBind(..), 
 			  HsType(..), HsExplicitForAll(..), hsLTyVarNames, isVanillaLSig,

@@ -57,7 +57,8 @@ import PrelNames	( enumFromName, enumFromThenName,
 			  enumFromToPName, enumFromThenToPName
 			)
 import ListSetOps	( minusList )
-import CmdLineOpts
+import DynFlags
+import StaticFlags	( opt_NoMethodSharing )
 import HscTypes		( TyThing(..) )
 import SrcLoc		( Located(..), unLoc, getLoc )
 import Util

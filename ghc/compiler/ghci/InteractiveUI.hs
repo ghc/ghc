@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.193 2005/03/08 09:47:43 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.194 2005/03/18 13:38:31 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -21,22 +21,20 @@ import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..),
 		   	  pprIfaceDeclHead, pprParendIfaceType,
 			  pprIfaceForAllPart, pprIfaceType )
 import FunDeps		( pprFundeps )
-import DriverFlags
-import DriverState
-import DriverUtil	( remove_spaces )
+import Util		( removeSpaces )
 import Linker		( showLinkerState, linkPackages )
 import Util
 import Name		( Name, NamedThing(..) )
 import OccName		( OccName, parenSymOcc, occNameUserString )
 import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..) )
 import Outputable
-import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt )
+import DynFlags	( DynFlags(..), DynFlag(..), dopt )
 import Panic 		hiding ( showException )
 import Config
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
 
 #ifndef mingw32_HOST_OS
-import DriverUtil( handle )
+import Util		( handle )
 import System.Posix
 #if __GLASGOW_HASKELL__ > 504
 	hiding (getEnv)

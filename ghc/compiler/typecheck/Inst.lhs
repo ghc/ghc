@@ -88,7 +88,7 @@ import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rational
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
 import SrcLoc	( mkSrcSpan, noLoc, unLoc, Located(..) )
-import CmdLineOpts( DynFlags )
+import DynFlags( DynFlags )
 import Maybes	( isJust )
 import Outputable
 \end{code}

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.34 2005/01/31 16:59:37 simonpj Exp $
+-- $Id: DriverPhases.hs,v 1.35 2005/03/18 13:39:05 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -9,7 +9,7 @@
 
 module DriverPhases (
    HscSource(..), isHsBoot, hscSourceString,
-   HscTarget(..), Phase(..),
+   Phase(..),
    happensBefore, eqPhase, anyHsc, isStopLn,
    startPhase,		-- :: String -> Phase
    phaseInputExt, 	-- :: Phase -> String
@@ -24,7 +24,7 @@ module DriverPhases (
    isSourceFilename         -- :: FilePath -> Bool
  ) where
 
-import DriverUtil
+import Util		( getFileSuffix )
 import Panic		( panic )
 
 -----------------------------------------------------------------------------
@@ -57,15 +57,6 @@ isHsBoot :: HscSource -> Bool
 isHsBoot HsBootFile = True
 isHsBoot other      = False
 
-data HscTarget
-  = HscC
-  | HscAsm
-  | HscJava
-  | HscILX
-  | HscInterpreted
-  | HscNothing
-  deriving (Eq, Show)
-
 data Phase 
 	= Unlit HscSource
 	| Cpp   HscSource
@@ -79,15 +70,10 @@ data Phase
 	| As
 	| CmmCpp	-- pre-process Cmm source
 	| Cmm		-- parse & compile Cmm code
-#ifdef ILX
-        | Ilx2Il
-	| Ilasm
-#endif
 
 	-- The final phase is a pseudo-phase that tells the pipeline to stop.
 	-- There is no runPhase case for it.
 	| StopLn	-- Stop, but linking will follow, so generate .o file
-
   deriving (Show)
 
 anyHsc :: Phase

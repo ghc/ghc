@@ -29,7 +29,7 @@ import TyCon		( TyCon )
 import Outputable
 import UniqFM		( UniqFM, lookupUFM, emptyUFM, addToUFM_C, eltsUFM )
 import Id		( idType )
-import CmdLineOpts
+import DynFlags
 import Util             ( notNull )
 import Maybe		( isJust )
 \end{code}

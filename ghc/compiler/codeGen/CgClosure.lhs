@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.66 2004/12/08 14:32:29 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.67 2005/03/18 13:37:40 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -42,7 +42,7 @@ import CmmUtils		( CmmStmts, mkStmts, oneStmt, plusStmts, noStmts,
 			  mkLblExpr )
 import CLabel
 import StgSyn
-import CmdLineOpts	( opt_DoTickyProfiling )
+import StaticFlags	( opt_DoTickyProfiling )
 import CostCentre	
 import Id		( Id, idName, idType )
 import Name		( Name )

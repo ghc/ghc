@@ -61,7 +61,7 @@ import qualified Type		( substTy, substTyVarBndr )
 import Type             ( Type, TvSubst(..), TvSubstEnv, composeTvSubst,
 			  isUnLiftedType, seqType, tyVarsOfType )
 import BasicTypes	( OccInfo(..), isFragileOcc )
-import CmdLineOpts	( SimplifierMode(..) )
+import DynFlags	( SimplifierMode(..) )
 import Outputable
 \end{code}
 

@@ -30,11 +30,12 @@ module Util (
 	mapAccumL, mapAccumR, mapAccumB, 
 	foldl2, count,
 	
-	takeList, dropList, splitAtList,
+	takeList, dropList, splitAtList, split,
 
 	-- comparisons
 	isEqual, eqListBy, equalLength, compareLength,
 	thenCmp, cmpList, prefixMatch, suffixMatch, maybePrefixMatch,
+	removeSpaces,
 
 	-- strictness
 	foldl', seqList,
@@ -42,7 +43,7 @@ module Util (
 	-- pairs
 	unzipWith,
 
-	global,
+	global, consIORef,
 
 	-- module names
 	looksLikeModuleName,
@@ -51,6 +52,21 @@ module Util (
 
 	-- Floating point stuff
 	readRational,
+
+	-- IO-ish utilities
+	createDirectoryHierarchy,
+	doesDirNameExist,
+
+	later, handleDyn, handle,
+
+	-- Filename utils
+	Suffix,
+	splitFilename, getFileSuffix, splitFilenameDir,
+	splitFilename3, removeSuffix, 
+	dropLongestPrefix, takeLongestPrefix, splitLongestPrefix,
+	replaceFilenameSuffix, directoryOf, filenameOf,
+	replaceFilenameDirectory,
+	escapeSpaces, isPathSeparator,
     ) where
 
 #include "HsVersions.h"
@@ -58,11 +74,12 @@ module Util (
 import Panic		( panic, trace )
 import FastTypes
 
-#if __GLASGOW_HASKELL__ <= 408
-import EXCEPTION	( catchIO, justIoErrors, raiseInThread )
-#endif
+import EXCEPTION	( Exception(..), finally, throwDyn, catchDyn, throw )
+import qualified EXCEPTION as Exception
+import DYNAMIC		( Typeable )
 import DATA_IOREF	( IORef, newIORef )
 import UNSAFE_IO	( unsafePerformIO )
+import DATA_IOREF	( readIORef, writeIORef )
 
 import qualified List	( elem, notElem )
 
@@ -70,6 +87,9 @@ import qualified List	( elem, notElem )
 import List		( zipWith4 )
 #endif
 
+import Monad		( when )
+import IO		( catch )
+import Directory	( doesDirectoryExist, createDirectory )
 import Char		( isUpper, isAlphaNum, isSpace, ord, isDigit )
 import Ratio		( (%) )
 
@@ -571,6 +591,11 @@ splitAtList (_:xs) (y:ys) = (y:ys', ys'')
     where
       (ys', ys'') = splitAtList xs ys
 
+split :: Char -> String -> [String]
+split c s = case rest of
+		[]     -> [chunk] 
+		_:rest -> chunk : split c rest
+  where (chunk, rest) = break (==c) s
 \end{code}
 
 
@@ -634,6 +659,9 @@ maybePrefixMatch (p:pat) (r:rest)
 
 suffixMatch :: Eq a => [a] -> [a] -> Bool
 suffixMatch pat str = prefixMatch (reverse pat) (reverse str)
+
+removeSpaces :: String -> String
+removeSpaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 \end{code}
 
 %************************************************************************
@@ -683,6 +711,13 @@ Global variables:
 \begin{code}
 global :: a -> IORef a
 global a = unsafePerformIO (newIORef a)
+\end{code}
+
+\begin{code}
+consIORef :: IORef [a] -> a -> IO ()
+consIORef var x = do
+  xs <- readIORef var
+  writeIORef var (x:xs)
 \end{code}
 
 Module names:
@@ -768,4 +803,124 @@ readRational top_s
 	  [x] -> x
 	  []  -> error ("readRational: no parse:"        ++ top_s)
 	  _   -> error ("readRational: ambiguous parse:" ++ top_s)
+
+
+-----------------------------------------------------------------------------
+-- Create a hierarchy of directories
+
+createDirectoryHierarchy :: FilePath -> IO ()
+createDirectoryHierarchy dir = do
+  b <- doesDirectoryExist dir
+  when (not b) $ do
+	createDirectoryHierarchy (directoryOf dir)
+	createDirectory dir
+
+-----------------------------------------------------------------------------
+-- Verify that the 'dirname' portion of a FilePath exists.
+-- 
+doesDirNameExist :: FilePath -> IO Bool
+doesDirNameExist fpath = doesDirectoryExist (directoryOf fpath)
+
+-- -----------------------------------------------------------------------------
+-- Exception utils
+
+later = flip finally
+
+handleDyn :: Typeable ex => (ex -> IO a) -> IO a -> IO a
+handleDyn = flip catchDyn
+
+handle :: (Exception -> IO a) -> IO a -> IO a
+#if __GLASGOW_HASKELL__ < 501
+handle = flip Exception.catchAllIO
+#else
+handle h f = f `Exception.catch` \e -> case e of
+    ExitException _ -> throw e
+    _               -> h e
+#endif
+
+-- --------------------------------------------------------------
+-- Filename manipulation
+		
+type Suffix = String
+
+splitFilename :: String -> (String,Suffix)
+splitFilename f = splitLongestPrefix f (=='.')
+
+getFileSuffix :: String -> Suffix
+getFileSuffix f = dropLongestPrefix f (=='.')
+
+-- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy.ext")
+splitFilenameDir :: String -> (String,String)
+splitFilenameDir str
+  = let (dir, rest) = splitLongestPrefix str isPathSeparator
+  	real_dir | null dir  = "."
+		 | otherwise = dir
+    in  (real_dir, rest)
+
+-- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
+splitFilename3 :: String -> (String,String,Suffix)
+splitFilename3 str
+   = let (dir, rest) = splitLongestPrefix str isPathSeparator
+	 (name, ext) = splitFilename rest
+	 real_dir | null dir  = "."
+		  | otherwise = dir
+     in  (real_dir, name, ext)
+
+removeSuffix :: Char -> String -> Suffix
+removeSuffix c s
+  | null pre  = s
+  | otherwise = reverse pre
+  where (suf,pre) = break (==c) (reverse s)
+
+dropLongestPrefix :: String -> (Char -> Bool) -> String
+dropLongestPrefix s pred = reverse suf
+  where (suf,_pre) = break pred (reverse s)
+
+takeLongestPrefix :: String -> (Char -> Bool) -> String
+takeLongestPrefix s pred = reverse pre
+  where (_suf,pre) = break pred (reverse s)
+
+-- split a string at the last character where 'pred' is True,
+-- returning a pair of strings. The first component holds the string
+-- up (but not including) the last character for which 'pred' returned
+-- True, the second whatever comes after (but also not including the
+-- last character).
+--
+-- If 'pred' returns False for all characters in the string, the original
+-- string is returned in the second component (and the first one is just
+-- empty).
+splitLongestPrefix :: String -> (Char -> Bool) -> (String,String)
+splitLongestPrefix s pred
+  = case pre of
+	[]      -> ([], reverse suf)
+	(_:pre) -> (reverse pre, reverse suf)
+  where (suf,pre) = break pred (reverse s)
+
+replaceFilenameSuffix :: FilePath -> Suffix -> FilePath
+replaceFilenameSuffix s suf = removeSuffix '.' s ++ suf
+
+-- directoryOf strips the filename off the input string, returning
+-- the directory.
+directoryOf :: FilePath -> String
+directoryOf = fst . splitFilenameDir
+
+-- filenameOf strips the directory off the input string, returning
+-- the filename.
+filenameOf :: FilePath -> String
+filenameOf = snd . splitFilenameDir
+
+replaceFilenameDirectory :: FilePath -> String -> FilePath
+replaceFilenameDirectory s dir
+ = dir ++ '/':dropLongestPrefix s isPathSeparator
+
+escapeSpaces :: String -> String
+escapeSpaces = foldr (\c s -> if isSpace c then '\\':c:s else c:s) ""
+
+isPathSeparator :: Char -> Bool
+isPathSeparator ch =
+#ifdef mingw32_TARGET_OS
+  ch == '/' || ch == '\\'
+#else
+  ch == '/'
+#endif
 \end{code}

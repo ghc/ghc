@@ -46,7 +46,7 @@ import ForeignCall	( CExportSpec(..), CCallTarget(..),
 			  CLabelString, isCLabelString,
 			  isDynamicTarget, withDNTypes, DNKind(..), DNCallSpec(..) ) 
 import PrelNames	( hasKey, ioTyConKey )
-import CmdLineOpts	( dopt_HscTarget, HscTarget(..) )
+import DynFlags		( DynFlags(..), HscTarget(..) )
 import Outputable
 import SrcLoc		( Located(..), srcSpanStart )
 import Bag		( consBag )
@@ -315,11 +315,11 @@ checkCOrAsmOrDotNetOrInterp other
 
 checkCg check
  = getDOpts		`thenM` \ dflags ->
-   let hscTarget = dopt_HscTarget dflags in
-   case hscTarget of
+   let target = hscTarget dflags in
+   case target of
      HscNothing -> returnM ()
      otherwise  ->
-       case check hscTarget of
+       case check target of
 	 Nothing  -> returnM ()
 	 Just err -> addErrTc (text "Illegal foreign declaration:" <+> err)
 \end{code} 

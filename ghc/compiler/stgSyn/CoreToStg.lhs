@@ -32,7 +32,8 @@ import Maybes		( maybeToBool )
 import Name		( getOccName, isExternalName, nameOccName )
 import OccName		( occNameUserString, occNameFS )
 import BasicTypes       ( Arity )
-import CmdLineOpts	( DynFlags, opt_RuntimeTypes )
+import DynFlags		( DynFlags )
+import StaticFlags	( opt_RuntimeTypes )
 import Outputable
 
 infixr 9 `thenLne`

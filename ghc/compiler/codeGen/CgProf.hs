@@ -47,7 +47,7 @@ import Module		( moduleUserString )
 import Id		( Id )
 import CostCentre
 import StgSyn		( GenStgExpr(..), StgExpr )
-import CmdLineOpts	( opt_SccProfilingOn )
+import StaticFlags	( opt_SccProfilingOn )
 import FastString	( FastString, mkFastString, LitString )	
 import Constants	-- Lots of field offsets
 import Outputable

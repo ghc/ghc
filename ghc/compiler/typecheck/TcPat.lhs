@@ -36,7 +36,7 @@ import TcHsType		( UserTypeCtxt(..), TcSigInfo( sig_tau ), TcSigFun, tcHsPatSigT
 import TysWiredIn	( stringTy, parrTyCon, tupleTyCon )
 import Unify		( MaybeErr(..), gadtRefineTys, BindFlag(..) )
 import Type		( substTys, substTheta )
-import CmdLineOpts	( opt_IrrefutableTuples )
+import StaticFlags	( opt_IrrefutableTuples )
 import TyCon		( TyCon )
 import DataCon		( DataCon, dataConTyCon, isVanillaDataCon, dataConInstOrigArgTys,
 			  dataConFieldLabels, dataConSourceArity, dataConSig )

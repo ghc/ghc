@@ -58,7 +58,7 @@ import TyCon		( TyCon, tyConFamilySize )
 import Bitmap		( Bitmap, mAX_SMALL_BITMAP_SIZE, 
 			  mkBitmap, intsToReverseBitmap )
 import Util		( isn'tIn, sortLe )
-import CmdLineOpts	( opt_Unregisterised )
+import StaticFlags	( opt_Unregisterised )
 import FastString	( LitString )
 import Outputable
 import DATA_BITS

@@ -32,7 +32,8 @@ import Literal
 import Name
 import Outputable
 import ForeignCall
-import CmdLineOpts
+import DynFlags	( DynFlags(..) )
+import StaticFlags	( opt_EmitExternalCore )
 import Maybes	( mapCatMaybes )
 import IO
 import FastString

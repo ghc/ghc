@@ -29,7 +29,7 @@ import Unique		( hasKey )
 import BasicTypes	( RecFlag(..), isNonRec, Activation(..) )
 import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
-import CmdLineOpts
+import DynFlags
 import WwLib
 import Util		( lengthIs, notNull )
 import Outputable

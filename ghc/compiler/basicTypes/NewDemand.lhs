@@ -24,7 +24,7 @@ module NewDemand(
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_CprOff )
+import StaticFlags	( opt_CprOff )
 import BasicTypes	( Arity )
 import VarEnv		( VarEnv, emptyVarEnv, isEmptyVarEnv )
 import UniqFM		( ufmToList )

@@ -37,7 +37,8 @@ import Literal		( mkMachInt )
 import Unique
 import UniqFM
 import SrcLoc
-import CmdLineOpts	( DynFlags, DynFlag(..), opt_SccProfilingOn )
+import DynFlags		( DynFlags, DynFlag(..) )
+import StaticFlags	( opt_SccProfilingOn )
 import ErrUtils		( printError, dumpIfSet_dyn, showPass )
 import StringBuffer	( hGetStringBuffer )
 import FastString

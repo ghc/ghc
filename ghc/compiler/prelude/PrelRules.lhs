@@ -44,7 +44,7 @@ import Maybes		( orElse )
 import Name		( Name )
 import Outputable
 import FastString
-import CmdLineOpts      ( opt_SimplExcessPrecision )
+import StaticFlags      ( opt_SimplExcessPrecision )
 
 import DATA_BITS	( Bits(..) )
 #if __GLASGOW_HASKELL__ >= 500

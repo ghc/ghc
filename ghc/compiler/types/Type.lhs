@@ -101,7 +101,7 @@ import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		)
 
 -- others
-import CmdLineOpts	( opt_DictsStrict )
+import StaticFlags	( opt_DictsStrict )
 import SrcLoc		( noSrcLoc )
 import Unique		( Uniquable(..) )
 import Util		( mapAccumL, seqList, lengthIs, snocView, thenCmp, isEqual )

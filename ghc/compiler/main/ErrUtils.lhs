@@ -34,7 +34,8 @@ import Util		( sortLe, global )
 import Outputable
 import qualified Pretty
 import SrcLoc		( srcSpanStart )
-import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt, opt_ErrorSpans )
+import DynFlags		( DynFlags(..), DynFlag(..), dopt )
+import StaticFlags	( opt_ErrorSpans )
 import System		( ExitCode(..), exitWith )
 import DATA_IOREF
 import IO		( hPutStrLn, stderr )

@@ -8,10 +8,9 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
+import DynFlags		( CoreToDo(..), SimplifierSwitch(..),
 			  SimplifierMode(..), DynFlags, DynFlag(..), dopt,
-			  dopt_CoreToDo, buildCoreToDo
-			)
+			  getCoreToDo )
 import CoreSyn
 import TcIface		( loadImportedRules )
 import HscTypes		( HscEnv(..), ModGuts(..), ExternalPackageState(..),
@@ -71,9 +70,7 @@ core2core :: HscEnv
 core2core hsc_env guts
   = do
         let dflags = hsc_dflags hsc_env
-	    core_todos
-		| Just todo <- dopt_CoreToDo dflags  =  todo
-		| otherwise			     =  buildCoreToDo dflags
+	    core_todos = getCoreToDo dflags
 
 	us <- mkSplitUniqSupply 's'
 	let (cp_us, ru_us) = splitUniqSupply us

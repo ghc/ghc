@@ -11,7 +11,7 @@ module TcDeriv ( tcDeriving ) where
 #include "HsVersions.h"
 
 import HsSyn
-import CmdLineOpts	( DynFlag(..) )
+import DynFlags	( DynFlag(..) )
 
 import Generics		( mkTyConGenericBinds )
 import TcRnMonad

@@ -52,7 +52,7 @@ import CLabel		( CLabel, mkStringLitLabel )
 import Digraph		( SCC(..), stronglyConnComp )
 import ListSetOps	( assocDefault )
 import Util		( filterOut, sortLe )
-import CmdLineOpts	( DynFlags(..), HscTarget(..) )
+import DynFlags	( DynFlags(..), HscTarget(..) )
 import FastString	( LitString, FastString, unpackFS )
 import Outputable
 

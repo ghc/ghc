@@ -52,7 +52,7 @@ import UniqSupply	( UniqSupply, uniqsFromSupply )
 import Name		( Name, nameOccName )
 import NameEnv
 import OccName          ( occNameFS )
-import CmdLineOpts	( DynFlags )
+import DynFlags	( DynFlags )
 import ErrUtils		( WarnMsg, mkWarnMsg )
 import Bag		( mapBag )
 

@@ -24,7 +24,8 @@ import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import CoreUtils	( exprType, mkInlineMe, mkSCC )
 
-import CmdLineOpts	( opt_AutoSccsOnAllToplevs, opt_AutoSccsOnExportedToplevs )
+import StaticFlags	( opt_AutoSccsOnAllToplevs,
+			  opt_AutoSccsOnExportedToplevs )
 import CostCentre	( mkAutoCC, IsCafCC(..) )
 import Id		( idType, idName, isExportedId, isSpecPragmaId, Id )
 import NameSet

@@ -41,7 +41,7 @@ import OccName		( mkVarOcc )
 import BasicTypes	( IPName, Boxity, tupleParens )
 import PrelNames	( unboundKey )
 import SrcLoc		( noSrcLoc, Located(..), unLoc, noSrcSpan )
-import CmdLineOpts	( opt_PprStyle_Debug )
+import StaticFlags	( opt_PprStyle_Debug )
 import Outputable
 \end{code}
 

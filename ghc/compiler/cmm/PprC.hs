@@ -37,7 +37,7 @@ import UniqFM		( eltsUFM )
 import FastString
 import Outputable
 import Constants
-import CmdLineOpts	( opt_EnsureSplittableC )
+import StaticFlags	( opt_SplitObjs )
 
 -- The rest
 import Data.List        ( intersperse, groupBy )
@@ -67,8 +67,8 @@ writeCs handle cmms = printForUser handle alwaysQualify (pprCs cmms)
  			-- ToDo: should be printForC
 
 split_marker
-  | opt_EnsureSplittableC = ptext SLIT("__STG_SPLIT_MARKER")
-  | otherwise             = empty
+  | opt_SplitObjs = ptext SLIT("__STG_SPLIT_MARKER")
+  | otherwise     = empty
 
 -- --------------------------------------------------------------------------
 -- Now do some real work

@@ -8,7 +8,7 @@ module Match ( match, matchWrapper, matchSimply, matchSinglePat ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), dopt )
+import DynFlags	( DynFlag(..), dopt )
 import HsSyn		
 import TcHsSyn		( hsPatType )
 import Check            ( check, ExhaustivePat )

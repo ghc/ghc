@@ -8,7 +8,7 @@ module Simplify ( simplTopBinds, simplExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( dopt, DynFlag(Opt_D_dump_inlinings),
+import DynFlags	( dopt, DynFlag(Opt_D_dump_inlinings),
 			  SimplifierSwitch(..)
 			)
 import SimplMonad

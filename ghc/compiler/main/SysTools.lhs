@@ -11,22 +11,6 @@ module SysTools (
 	-- Initialisation
 	initSysTools,
 
-	setPgmL,		-- String -> IO ()
-	setPgmP,
-	setPgmF,
-	setPgmc,
-	setPgmm,
-	setPgms,
-	setPgma,
-	setPgml,
-	setPgmDLL,
-#ifdef ILX
-	setPgmI,
-	setPgmi,
-#endif
-				-- Command-line override
-	setDryRun,
-
 	getTopDir,		-- IO String	-- The value of $topdir
 	getPackageConfigPath,	-- IO String	-- Where package.conf is
         getUsageMsgPaths,       -- IO (String,String)
@@ -37,10 +21,6 @@ module SysTools (
 	runMangle, runSplit,	 -- [Option] -> IO ()
 	runAs, runLink,		 -- [Option] -> IO ()
 	runMkDLL,
-#ifdef ILX
-        runIlx2il, runIlasm,     -- [String] -> IO ()
-#endif
-
 
 	touch,			-- String -> String -> IO ()
 	copy,			-- String -> String -> String -> IO ()
@@ -64,13 +44,12 @@ module SysTools (
 
 #include "HsVersions.h"
 
-import DriverUtil
 import DriverPhases     ( isHaskellUserSrcFilename )
 import Config
 import Outputable
 import Panic		( GhcException(..) )
-import Util		( global, notNull )
-import CmdLineOpts	( DynFlags(..) )
+import Util		( Suffix, global, notNull, consIORef )
+import DynFlags		( DynFlags(..), DynFlag(..), dopt, Option(..) )
 
 import EXCEPTION	( throwDyn )
 import DATA_IOREF	( IORef, readIORef, writeIORef )
@@ -184,20 +163,6 @@ All these pathnames are maintained IN THE NATIVE FORMAT OF THE HOST MACHINE.
 (See remarks under pathnames below)
 
 \begin{code}
-GLOBAL_VAR(v_Pgm_L,   	error "pgm_L",   String)	-- unlit
-GLOBAL_VAR(v_Pgm_P,   	error "pgm_P",   (String,[Option]))	-- cpp
-GLOBAL_VAR(v_Pgm_F,   	error "pgm_F",   String)	-- pp
-GLOBAL_VAR(v_Pgm_c,   	error "pgm_c",   (String,[Option])) -- gcc
-GLOBAL_VAR(v_Pgm_m,   	error "pgm_m",   (String,[Option])) -- asm code mangler
-GLOBAL_VAR(v_Pgm_s,   	error "pgm_s",   (String,[Option])) -- asm code splitter
-GLOBAL_VAR(v_Pgm_a,   	error "pgm_a",   (String,[Option])) -- as
-#ifdef ILX
-GLOBAL_VAR(v_Pgm_I,     error "pgm_I",   String)        -- ilx2il
-GLOBAL_VAR(v_Pgm_i,     error "pgm_i",   String)        -- ilasm
-#endif
-GLOBAL_VAR(v_Pgm_l,   	error "pgm_l",   (String,[Option])) -- ld
-GLOBAL_VAR(v_Pgm_MkDLL, error "pgm_dll", (String,[Option])) -- mkdll
-
 GLOBAL_VAR(v_Pgm_T,    error "pgm_T",    String)	-- touch
 GLOBAL_VAR(v_Pgm_CP,   error "pgm_CP", 	 String)	-- cp
 
@@ -224,13 +189,14 @@ getTopDir	     = readIORef v_TopDir
 \begin{code}
 initSysTools :: [String]	-- Command-line arguments starting "-B"
 
-	     -> IO ()		-- Set all the mutable variables above, holding 
+	     -> DynFlags
+	     -> IO DynFlags	-- Set all the mutable variables above, holding 
 				--	(a) the system programs
 				--	(b) the package-config file
 				--	(c) the GHC usage message
 
 
-initSysTools minusB_args
+initSysTools minusB_args dflags
   = do  { (am_installed, top_dir) <- findTopDir minusB_args
 	; writeIORef v_TopDir top_dir
 		-- top_dir
@@ -386,12 +352,6 @@ initSysTools minusB_args
 	; let	(as_prog,as_args)  = (gcc_prog,gcc_args)
 		(ld_prog,ld_args)  = (gcc_prog,gcc_args)
 
-#ifdef ILX
-       -- ilx2il and ilasm are specified in Config.hs
-       ; let    ilx2il_path = cILX2IL
-		ilasm_path  = cILASM
-#endif
-				       
 	-- Initialise the global vars
 	; writeIORef v_Path_package_config pkgconfig_path
 	; writeIORef v_Path_usages 	   (ghc_usage_msg_path,
@@ -401,55 +361,25 @@ initSysTools minusB_args
 		-- Hans: this isn't right in general, but you can 
 		-- elaborate it in the same way as the others
 
-	; writeIORef v_Pgm_L   	 	   unlit_path
-	; writeIORef v_Pgm_P   	 	   cpp_path
-	; writeIORef v_Pgm_F               ""
-	; writeIORef v_Pgm_c   	 	   (gcc_prog,gcc_args)
-	; writeIORef v_Pgm_m   	 	   (mangle_prog,mangle_args)
-	; writeIORef v_Pgm_s   	 	   (split_prog,split_args)
-	; writeIORef v_Pgm_a   	 	   (as_prog,as_args)
-#ifdef ILX
-	; writeIORef v_Pgm_I               ilx2il_path
-	; writeIORef v_Pgm_i               ilasm_path
-#endif
-	; writeIORef v_Pgm_l   	 	   (ld_prog,ld_args)
-	; writeIORef v_Pgm_MkDLL 	   (mkdll_prog,mkdll_args)
 	; writeIORef v_Pgm_T   	 	   touch_path
 	; writeIORef v_Pgm_CP  	 	   cp_path
 
-	; return ()
+	; return dflags{
+			pgm_L	= unlit_path,
+			pgm_P	= cpp_path,
+			pgm_F	= "",
+			pgm_c	= (gcc_prog,gcc_args),
+			pgm_m	= (mangle_prog,mangle_args),
+			pgm_s   = (split_prog,split_args),
+			pgm_a   = (as_prog,as_args),
+			pgm_l	= (ld_prog,ld_args),
+			pgm_dll = (mkdll_prog,mkdll_args) }
 	}
 
 #if defined(mingw32_HOST_OS)
 foreign import stdcall unsafe "GetTempPathA" getTempPath :: Int -> CString -> IO Int32
 #endif
 \end{code}
-
-The various setPgm functions are called when a command-line option
-like
-
-	-pgmLld
-
-is used to override a particular program with a new one
-
-\begin{code}
-setPgmL = writeIORef v_Pgm_L
--- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
--- Config.hs should really use Option.
-setPgmP arg = let (pgm:args) = words arg in writeIORef v_Pgm_P (pgm,map Option args)
-setPgmF = writeIORef v_Pgm_F
-setPgmc prog = writeIORef v_Pgm_c (prog,[])
-setPgmm prog = writeIORef v_Pgm_m (prog,[])
-setPgms prog = writeIORef v_Pgm_s (prog,[])
-setPgma prog = writeIORef v_Pgm_a (prog,[])
-setPgml prog = writeIORef v_Pgm_l (prog,[])
-setPgmDLL prog = writeIORef v_Pgm_MkDLL (prog,[])
-#ifdef ILX
-setPgmI = writeIORef v_Pgm_I
-setPgmi = writeIORef v_Pgm_i
-#endif
-\end{code}
-
 
 \begin{code}
 -- Find TopDir
@@ -499,33 +429,6 @@ findTopDir minusbs
 
 %************************************************************************
 %*									*
-\subsection{Command-line options}
-n%*									*
-%************************************************************************
-
-When invoking external tools as part of the compilation pipeline, we
-pass these a sequence of options on the command-line. Rather than
-just using a list of Strings, we use a type that allows us to distinguish
-between filepaths and 'other stuff'. [The reason being, of course, that
-this type gives us a handle on transforming filenames, and filenames only,
-to whatever format they're expected to be on a particular platform.]
-
-\begin{code}
-data Option
- = FileOption -- an entry that _contains_ filename(s) / filepaths.
-              String  -- a non-filepath prefix that shouldn't be transformed (e.g., "/out=" 
- 	      String  -- the filepath/filename portion
- | Option     String
- 
-showOpt (FileOption pre f) = pre ++ platformPath f
-showOpt (Option "") = ""
-showOpt (Option s)  = s
-
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Running an external program}
 %*									*
 %************************************************************************
@@ -534,59 +437,47 @@ showOpt (Option s)  = s
 \begin{code}
 runUnlit :: DynFlags -> [Option] -> IO ()
 runUnlit dflags args = do 
-  p <- readIORef v_Pgm_L
+  let p = pgm_L dflags
   runSomething dflags "Literate pre-processor" p args
 
 runCpp :: DynFlags -> [Option] -> IO ()
 runCpp dflags args =   do 
-  (p,baseArgs) <- readIORef v_Pgm_P
-  runSomething dflags "C pre-processor" p (baseArgs ++ args)
+  let (p,args0) = pgm_P dflags
+  runSomething dflags "C pre-processor" p (args0 ++ args)
 
 runPp :: DynFlags -> [Option] -> IO ()
 runPp dflags args =   do 
-  p <- readIORef v_Pgm_F
+  let p = pgm_F dflags
   runSomething dflags "Haskell pre-processor" p args
 
 runCc :: DynFlags -> [Option] -> IO ()
 runCc dflags args =   do 
-  (p,args0) <- readIORef v_Pgm_c
+  let (p,args0) = pgm_c dflags
   runSomething dflags "C Compiler" p (args0++args)
 
 runMangle :: DynFlags -> [Option] -> IO ()
 runMangle dflags args = do 
-  (p,args0) <- readIORef v_Pgm_m
+  let (p,args0) = pgm_m dflags
   runSomething dflags "Mangler" p (args0++args)
 
 runSplit :: DynFlags -> [Option] -> IO ()
 runSplit dflags args = do 
-  (p,args0) <- readIORef v_Pgm_s
+  let (p,args0) = pgm_s dflags
   runSomething dflags "Splitter" p (args0++args)
 
 runAs :: DynFlags -> [Option] -> IO ()
 runAs dflags args = do 
-  (p,args0) <- readIORef v_Pgm_a
+  let (p,args0) = pgm_a dflags
   runSomething dflags "Assembler" p (args0++args)
 
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = do 
-  (p,args0) <- readIORef v_Pgm_l
+  let (p,args0) = pgm_l dflags
   runSomething dflags "Linker" p (args0++args)
-
-#ifdef ILX
-runIlx2il :: DynFlags -> [Option] -> IO ()
-runIlx2il dflags args = do 
-  p <- readIORef v_Pgm_I
-  runSomething dflags "Ilx2Il" p args
-
-runIlasm :: DynFlags -> [Option] -> IO ()
-runIlasm dflags args = do 
-  p <- readIORef v_Pgm_i
-  runSomething dflags "Ilasm" p args
-#endif
 
 runMkDLL :: DynFlags -> [Option] -> IO ()
 runMkDLL dflags args = do
-  (p,args0) <- readIORef v_Pgm_MkDLL
+  let (p,args0) = pgm_dll dflags
   runSomething dflags "Make DLL" p (args0++args)
 
 touch :: DynFlags -> String -> String -> IO ()
@@ -603,6 +494,7 @@ copy dflags purpose from to = do
 	    	      -- ToDo: speed up via slurping.
   hPutStr h ls
   hClose h
+
 \end{code}
 
 \begin{code}
@@ -687,12 +579,12 @@ newTempName extn
       = do let filename = tmp_dir ++ "/ghc" ++ show x ++ '.':extn
   	   b  <- doesFileExist filename
 	   if b then findTempName tmp_dir (x+1)
-		else do add v_FilesToClean filename -- clean it up later
+		else do consIORef v_FilesToClean filename -- clean it up later
 		        return filename
 
 addFilesToClean :: [FilePath] -> IO ()
 -- May include wildcards [used by DriverPipeline.run_phase SplitMangle]
-addFilesToClean files = mapM_ (add v_FilesToClean) files
+addFilesToClean files = mapM_ (consIORef v_FilesToClean) files
 
 removeTmpFiles :: DynFlags -> [FilePath] -> IO ()
 removeTmpFiles dflags fs
@@ -723,20 +615,6 @@ removeTmpFiles dflags fs
 		      hPutStrLn stderr ("Warning: deleting non-existent " ++ f)
 		)
 
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Running a program}
-%*									*
-%************************************************************************
-
-\begin{code}
-GLOBAL_VAR(v_Dry_run, False, Bool)
-
-setDryRun :: IO () 
-setDryRun = writeIORef v_Dry_run True
 
 -----------------------------------------------------------------------------
 -- Running an external program
@@ -766,6 +644,10 @@ runSomething dflags phase_name pgm args = do
      ExitFailure _other ->
 	throwDyn (PhaseFailed phase_name exit_code)
 
+showOpt (FileOption pre f) = pre ++ platformPath f
+showOpt (Option "") = ""
+showOpt (Option s)  = s
+
 traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
 -- b) don't do it at all if dry-run is set
@@ -776,8 +658,7 @@ traceCmd dflags phase_name cmd_line action
 	; hFlush stderr
 	
 	   -- Test for -n flag
-	; n <- readIORef v_Dry_run
-	; unless n $ do {
+	; unless (dopt Opt_DryRun dflags) $ do {
 
 	   -- And run it!
 	; action `IO.catch` handle_exn verb

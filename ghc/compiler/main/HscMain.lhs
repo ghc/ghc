@@ -69,7 +69,7 @@ import CodeGen		( codeGen )
 import CmmParse		( parseCmmFile )
 import CodeOutput	( codeOutput )
 
-import CmdLineOpts
+import DynFlags
 import DriverPhases     ( HscSource(..) )
 import ErrUtils
 import UniqSupply	( mkSplitUniqSupply )
@@ -99,13 +99,12 @@ import DATA_IOREF	( newIORef, readIORef )
 %************************************************************************
 
 \begin{code}
-newHscEnv :: GhciMode -> DynFlags -> IO HscEnv
-newHscEnv ghci_mode dflags
+newHscEnv :: DynFlags -> IO HscEnv
+newHscEnv dflags
   = do 	{ eps_var <- newIORef initExternalPackageState
 	; us      <- mkSplitUniqSupply 'r'
 	; nc_var  <- newIORef (initNameCache us knownKeyNames)
-	; return (HscEnv { hsc_mode   = ghci_mode,
-			   hsc_dflags = dflags,
+	; return (HscEnv { hsc_dflags = dflags,
 			   hsc_HPT    = emptyHomePackageTable,
 			   hsc_EPS    = eps_var,
 			   hsc_NC     = nc_var } ) }
@@ -183,7 +182,7 @@ hscMain hsc_env msg_act mod_summary
 -- hscNoRecomp definitely expects to have the old interface available
 hscNoRecomp hsc_env msg_act mod_summary 
 	    have_object (Just old_iface)
- | isOneShot (hsc_mode hsc_env)
+ | isOneShot (ghcMode (hsc_dflags hsc_env))
  = do {
       compilationProgressMsg (hsc_dflags hsc_env) $
 	"compilation IS NOT required";
@@ -241,9 +240,9 @@ hscFileFrontEnd hsc_env msg_act mod_summary = do {
  	    -------------------
  	    -- DISPLAY PROGRESS MESSAGE
  	    -------------------
-	  let one_shot  = isOneShot (hsc_mode hsc_env)
+	  let one_shot  = isOneShot (ghcMode (hsc_dflags hsc_env))
       	; let dflags    = hsc_dflags hsc_env
-	; let toInterp  = dopt_HscTarget dflags == HscInterpreted
+	; let toInterp  = hscTarget dflags == HscInterpreted
       	; when (not one_shot) $
 		 compilationProgressMsg dflags $
 		 ("Compiling " ++ showModMsg (not toInterp) mod_summary)
@@ -316,7 +315,7 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
   = do 	{ 	-- OMITTED: 
 		-- ; seqList imported_modules (return ())
 
-	  let one_shot  = isOneShot (hsc_mode hsc_env)
+	  let one_shot  = isOneShot (ghcMode (hsc_dflags hsc_env))
 	      dflags    = hsc_dflags hsc_env
 
  	    -------------------
@@ -464,7 +463,7 @@ hscCodeGen dflags
   prepd_binds <- _scc_ "CorePrep"
 		 corePrepPgm dflags core_binds type_env;
 
-  case dopt_HscTarget dflags of
+  case hscTarget dflags of
       HscNothing -> return (False, False, Nothing)
 
       HscInterpreted ->

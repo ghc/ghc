@@ -30,7 +30,7 @@ import RnEnv		( bindLocatedLocalsRn, lookupLocatedBndrRn,
 			  bindLocalFixities, bindSigTyVarsFV, 
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
-import CmdLineOpts	( DynFlag(..) )
+import DynFlags	( DynFlag(..) )
 import Digraph		( SCC(..), stronglyConnComp )
 import Name		( Name, nameOccName, nameSrcLoc )
 import NameSet

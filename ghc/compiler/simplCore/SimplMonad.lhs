@@ -32,9 +32,8 @@ import Type             ( Type )
 import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			  UniqSupply
 			)
-import CmdLineOpts	( SimplifierSwitch(..), DynFlags, DynFlag(..), dopt, 
-			  opt_PprStyle_Debug, opt_HistorySize, 
-			)
+import DynFlags		( SimplifierSwitch(..), DynFlags, DynFlag(..), dopt )
+import StaticFlags	( opt_PprStyle_Debug, opt_HistorySize )
 import OccName		( EncodedFS )
 import Unique		( Unique )
 import Maybes		( expectJust )

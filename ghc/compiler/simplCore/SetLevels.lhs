@@ -55,7 +55,7 @@ module SetLevels (
 
 import CoreSyn
 
-import CmdLineOpts	( FloatOutSwitches(..) )
+import DynFlags	( FloatOutSwitches(..) )
 import CoreUtils	( exprType, exprIsTrivial, exprIsCheap, mkPiTypes )
 import CoreFVs		-- all of it
 import CoreSubst	( Subst, emptySubst, extendInScope, extendIdSubst,

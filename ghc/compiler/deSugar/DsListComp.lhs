@@ -18,7 +18,8 @@ import CoreSyn
 import DsMonad		-- the monadery used in the desugarer
 import DsUtils
 
-import CmdLineOpts	( DynFlag(..), dopt, opt_RulesOff )
+import DynFlags		( DynFlag(..), dopt )
+import StaticFlags	( opt_RulesOff )
 import CoreUtils	( exprType, mkIfThenElse )
 import Id		( idType )
 import Var              ( Id )

@@ -28,12 +28,8 @@ import ByteCodeItbls	( ItblEnv )
 import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
-import DriverState	( v_Library_paths, v_Opt_l, v_Ld_inputs, getStaticOpts )
 import DriverPhases	( isObjectFilename, isDynLibFilename )
-import DriverUtil	( getFileSuffix )
-#ifdef darwin_TARGET_OS
-import DriverState	( v_Cmdline_frameworks, v_Framework_paths )
-#endif
+import Util		( getFileSuffix )
 import Finder		( findModule, findLinkable, FindResult(..) )
 import HscTypes
 import Name		( Name, nameModule, isExternalName, isWiredInName )
@@ -41,7 +37,7 @@ import NameEnv
 import NameSet		( nameSetToList )
 import Module
 import ListSetOps	( minusList )
-import CmdLineOpts	( DynFlags(..) )
+import DynFlags	( DynFlags(..) )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
 import Panic            ( GhcException(..) )

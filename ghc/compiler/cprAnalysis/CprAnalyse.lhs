@@ -11,7 +11,7 @@ module CprAnalyse ( cprAnalyse ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..) )
+import DynFlags	( DynFlags, DynFlag(..) )
 import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreUtils	( exprIsValue )

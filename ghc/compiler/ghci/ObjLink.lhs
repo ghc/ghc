@@ -25,7 +25,6 @@ import Monad            ( when )
 import Foreign.C
 import Foreign		( Ptr, nullPtr )
 import Panic		( panic )
-import DriverUtil       ( prefixUnderscore )
 import BasicTypes	( SuccessFlag, successIf )
 import Outputable
 
@@ -41,6 +40,11 @@ lookupSymbol str_in = do
      if addr == nullPtr
 	then return Nothing
 	else return (Just addr)
+
+prefixUnderscore :: String -> String
+prefixUnderscore
+ | cLeadingUnderscore == "YES" = ('_':)
+ | otherwise                   = id
 
 loadDLL :: String -> IO (Maybe String)
 -- Nothing      => success

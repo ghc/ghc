@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.72 2004/11/26 16:19:59 simonmar Exp $
+% $Id: CgCase.lhs,v 1.73 2005/03/18 13:37:38 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -48,7 +48,7 @@ import CmmUtils		( CmmStmts, noStmts, oneStmt, plusStmts )
 import Cmm
 import MachOp		( wordRep )
 import ClosureInfo	( mkLFArgument )
-import CmdLineOpts	( opt_SccProfilingOn )
+import StaticFlags	( opt_SccProfilingOn )
 import Id		( Id, idName, isDeadBinder, idType )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), playSafe )
 import VarSet		( varSetElems )

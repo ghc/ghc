@@ -62,7 +62,7 @@ import ErrUtils		( Message )
 import Maybes		( MaybeErr(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( zipWithEqual, dropList, equalLength )
-import CmdLineOpts	( DynFlag(..) )
+import DynFlags	( DynFlag(..) )
 \end{code}
 
 This module takes

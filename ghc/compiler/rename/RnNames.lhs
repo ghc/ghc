@@ -12,7 +12,7 @@ module RnNames (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..) )
+import DynFlags		( DynFlag(..), GhcMode(..) )
 import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..), HsBindGroup(..), 
 			  Sig(..), collectGroupBinders, tyClDeclNames 
@@ -33,7 +33,7 @@ import NameSet
 import NameEnv
 import OccName		( srcDataName, isTcOcc, occNameFlavour, OccEnv, 
 			  mkOccEnv, lookupOccEnv, emptyOccEnv, extendOccEnv )
-import HscTypes		( GenAvailInfo(..), AvailInfo, GhciMode(..),
+import HscTypes		( GenAvailInfo(..), AvailInfo,
 			  IfaceExport, HomePackageTable, PackageIfaceTable, 
 			  availNames, unQualInScope, 
 			  Deprecs(..), ModIface(..), Dependencies(..), 

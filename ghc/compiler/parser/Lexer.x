@@ -38,7 +38,7 @@ import FastString
 import FastTypes
 import SrcLoc
 import UniqFM
-import CmdLineOpts
+import DynFlags
 import Ctype
 import Util		( maybePrefixMatch, readRational )
 

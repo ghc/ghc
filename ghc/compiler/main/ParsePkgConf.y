@@ -5,7 +5,7 @@ module ParsePkgConf( loadPackageConfig ) where
 
 import PackageConfig
 import Lexer
-import CmdLineOpts
+import DynFlags
 import FastString
 import StringBuffer
 import ErrUtils  ( mkLocMessage )

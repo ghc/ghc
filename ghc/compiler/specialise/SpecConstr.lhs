@@ -28,7 +28,7 @@ import Name		( nameOccName, nameSrcLoc )
 import Rules		( addIdSpecialisations )
 import OccName		( mkSpecOcc )
 import ErrUtils		( dumpIfSet_dyn )
-import CmdLineOpts	( DynFlags, DynFlag(..) )
+import DynFlags	( DynFlags, DynFlag(..) )
 import BasicTypes	( Activation(..) )
 import Outputable
 

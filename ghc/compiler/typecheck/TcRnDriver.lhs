@@ -22,10 +22,10 @@ import IO
 import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 #endif
 
-import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
+import DynFlags		( DynFlag(..), DynFlags(..), dopt, GhcMode(..) )
+import StaticFlags	( opt_PprStyle_Debug )
 import Packages		( moduleToPackageConfig, mkPackageId, package,
 			  isHomeModule )
-import DriverState	( v_MainModIs, v_MainFunIs )
 import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl, SpliceDecl(..), HsBind(..),
 			  nlHsApp, nlHsVar, pprLHsBinds )
 import RdrHsSyn		( findSplice )
@@ -69,7 +69,7 @@ import TyCon		( tyConHasGenerics, isSynTyCon, getSynTyConDefn, tyConKind )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
 import DriverPhases	( HscSource(..), isHsBoot )
 import HscTypes		( ModGuts(..), HscEnv(..), ExternalPackageState(..),
-			  GhciMode(..), IsBootInterface, noDependencies, 
+			  IsBootInterface, noDependencies, 
 			  Deprecs( NoDeprecs ), plusDeprecs,
 			  ForeignStubs(NoStubs), TyThing(..), 
 			  TypeEnv, lookupTypeEnv, hptInstances, lookupType,
@@ -699,13 +699,11 @@ tcTopSrcDecls boot_names
 checkMain 
   = do { ghci_mode <- getGhciMode ;
 	 tcg_env   <- getGblEnv ;
-
-	 mb_main_mod <- readMutVar v_MainModIs ;
-	 mb_main_fn  <- readMutVar v_MainFunIs ;
-	 let { main_mod = case mb_main_mod of {
+	 dflags    <- getDOpts ;
+	 let { main_mod = case mainModIs dflags of {
 				Just mod -> mkModule mod ;
 				Nothing  -> mAIN } ;
-	       main_fn  = case mb_main_fn of {
+	       main_fn  = case mainFunIs dflags of {
 				Just fn -> mkRdrUnqual (mkVarOcc (mkFastString fn)) ;
 				Nothing -> main_RDR_Unqual } } ;
 	

@@ -112,7 +112,7 @@ import Maybes		( orElse )
 import SrcLoc		( SrcLoc )
 import Outputable
 import Unique		( Unique, mkBuiltinUnique )
-import CmdLineOpts	( opt_NoStateHack )
+import StaticFlags	( opt_NoStateHack )
 
 -- infixl so you can say (id `set` a `set` b)
 infixl 	1 `setIdUnfolding`,

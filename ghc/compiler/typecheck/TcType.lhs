@@ -164,7 +164,7 @@ import ForeignCall	( Safety, playSafe, DNType(..) )
 import VarSet
 
 -- others:
-import CmdLineOpts	( DynFlags, DynFlag( Opt_GlasgowExts ), dopt )
+import DynFlags		( DynFlags, DynFlag( Opt_GlasgowExts ), dopt )
 import Name		( Name, NamedThing(..), mkInternalName, getSrcLoc )
 import NameSet
 import VarEnv		( TidyEnv )

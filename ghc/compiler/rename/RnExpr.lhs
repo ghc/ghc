@@ -32,7 +32,7 @@ import RnNames		( importsFromLocalDecls )
 import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
 			  dupFieldErr, precParseErr, sectionPrecErr, patSigErr,
 			  checkTupSize )
-import CmdLineOpts	( DynFlag(..) )
+import DynFlags	( DynFlag(..) )
 import BasicTypes	( Fixity(..), FixityDirection(..), negateFixity, compareFixity )
 import PrelNames	( hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,

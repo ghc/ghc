@@ -40,7 +40,7 @@ import NameSet
 import NameEnv
 import Outputable
 import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
-import CmdLineOpts	( DynFlag(..) )
+import DynFlags	( DynFlag(..) )
 import Maybes		( seqMaybe )
 import Maybe            ( catMaybes, isNothing )
 \end{code}

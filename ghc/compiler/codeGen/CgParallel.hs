@@ -12,7 +12,7 @@ import CgMonad
 import CgCallConv	( mkRegLiveness )
 import Id		( Id )
 import Cmm		( CmmLit, GlobalReg(..), node, CmmExpr )
-import CmdLineOpts	( opt_GranMacros )
+import StaticFlags	( opt_GranMacros )
 import Outputable
 
 staticParHdr :: [CmmLit]

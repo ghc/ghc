@@ -63,11 +63,11 @@ import FlattenMonad (Flatten, runFlatten, mkBind, extendContext, packContext,
 		     mk'indexOfP,mk'eq,mk'neq) 
 
 -- GHC
-import CmdLineOpts  (opt_Flatten)
+import StaticFlags  (opt_Flatten)
 import Panic        (panic)
 import ErrUtils     (dumpIfSet_dyn)
 import UniqSupply   (mkSplitUniqSupply)
-import CmdLineOpts  (DynFlag(..))
+import DynFlags  (DynFlag(..))
 import Literal      (Literal, literalType)
 import Var	    (Var(..), idType, isTyVar)
 import Id	    (setIdType)

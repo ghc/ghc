@@ -49,7 +49,7 @@ module CoreSyn (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_RuntimeTypes )
+import StaticFlags	( opt_RuntimeTypes )
 import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId )
 import Type		( Type, mkTyVarTy, seqType )

@@ -187,8 +187,7 @@ import TcRnTypes	( mkModDeps )
 import TcType		( isFFITy )
 import HscTypes		( ModIface(..), TyThing(..), 
 			  ModGuts(..), ModGuts, IfaceExport,
-			  GhciMode(..), HscEnv(..), hscEPS,
-			  Dependencies(..), FixItem(..), 
+			  HscEnv(..), hscEPS, Dependencies(..), FixItem(..), 
 			  ModSummary(..), msHiFilePath, 
 			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,
 			  typeEnvElts, 
@@ -200,7 +199,8 @@ import HscTypes		( ModIface(..), TyThing(..),
 			)
 
 
-import CmdLineOpts
+import DynFlags		( GhcMode(..), DynFlags(..), DynFlag(..), dopt )
+import StaticFlags	( opt_HiVersion )
 import Name		( Name, nameModule, nameOccName, nameParent,
 			  isExternalName, nameParent_maybe, isWiredInName,
 			  NamedThing(..) )
@@ -221,7 +221,7 @@ import Module		( Module, moduleFS,
 			  extendModuleEnv_C
 			)
 import Outputable
-import DriverUtil	( createDirectoryHierarchy, directoryOf )
+import Util		( createDirectoryHierarchy, directoryOf )
 import Util		( sortLe, seqList )
 import Binary		( getBinFileWithDict )
 import BinIface		( writeBinIface, v_IgnoreHiWay )
@@ -346,7 +346,7 @@ mkIface hsc_env location maybe_old_iface
      i1 `le_inst` i2 = ifDFun     i1 <= ifDFun     i2
 
      dflags    	  = hsc_dflags hsc_env
-     ghci_mode 	  = hsc_mode hsc_env
+     ghci_mode 	  = ghcMode (hsc_dflags hsc_env)
      omit_prags   = dopt Opt_OmitInterfacePragmas dflags
      hi_file_path = ml_hi_file location
 

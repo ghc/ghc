@@ -38,7 +38,8 @@ import Type		( Type, tyVarsOfType, coreEqType,
 			  getTvSubstEnv, getTvInScope )
 import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), Boxity(..), isNonRec )
-import CmdLineOpts
+import StaticFlags	( opt_PprStyle_Debug )
+import DynFlags		( DynFlags, DynFlag(..), dopt )
 import Outputable
 
 #ifdef DEBUG

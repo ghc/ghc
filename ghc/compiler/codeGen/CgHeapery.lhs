@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.43 2005/02/10 13:01:53 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.44 2005/03/18 13:37:42 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -53,7 +53,7 @@ import TyCon		( tyConPrimRep )
 import CostCentre	( CostCentreStack )
 import Util		( mapAccumL, filterOut )
 import Constants	( wORD_SIZE )
-import CmdLineOpts	( DynFlags )
+import DynFlags	( DynFlags )
 import Outputable
 
 import GLAEXTS

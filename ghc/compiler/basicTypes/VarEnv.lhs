@@ -41,7 +41,7 @@ import UniqFM
 import Unique	  ( Unique, deriveUnique, getUnique )
 import Util	  ( zipEqual, foldl2 )
 import Maybes	  ( orElse, isJust )
-import CmdLineOpts	( opt_PprStyle_Debug )
+import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastTypes
 \end{code}

@@ -10,7 +10,7 @@ module CSE (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), DynFlags )
+import DynFlags	( DynFlag(..), DynFlags )
 import Id		( Id, idType, idWorkerInfo )
 import IdInfo		( workerExists )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr, exprIsCheap )

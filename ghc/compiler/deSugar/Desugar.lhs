@@ -8,9 +8,10 @@ module Desugar ( deSugar, deSugarExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), DynFlags(..), dopt, opt_SccProfilingOn )
+import DynFlags		( DynFlag(..), DynFlags(..), dopt, GhcMode(..) )
+import StaticFlags	( opt_SccProfilingOn )
 import DriverPhases	( isHsBoot )
-import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), GhciMode(..),
+import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), 
 			  Dependencies(..), TypeEnv, IsBootInterface )
 import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
 			  HsBindGroup(..), LRuleDecl, HsBind(..) )
@@ -167,7 +168,7 @@ deSugar hsc_env
 
   where
     dflags       = hsc_dflags hsc_env
-    ghci_mode    = hsc_mode hsc_env
+    ghci_mode    = ghcMode (hsc_dflags hsc_env)
     auto_scc | opt_SccProfilingOn = TopLevel
 	     | otherwise          = NoSccs
 

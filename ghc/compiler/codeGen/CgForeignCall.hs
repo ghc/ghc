@@ -32,7 +32,7 @@ import MachOp
 import SMRep
 import ForeignCall
 import Constants
-import CmdLineOpts	( opt_SccProfilingOn )
+import StaticFlags	( opt_SccProfilingOn )
 import Outputable
 
 import Monad		( when )

@@ -61,7 +61,7 @@ import MachRegs
 import MachInstrs
 import NCGMonad         ( NatM, getNewRegNat, getNewLabelNat )
 
-import CmdLineOpts      ( opt_PIC, opt_Static )
+import StaticFlags	( opt_PIC, opt_Static )
 
 import Pretty
 import qualified Outputable

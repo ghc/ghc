@@ -65,7 +65,8 @@ import TyCon            ( TyCon )
 import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
 import Unique		( Unique )
 import Bitmap
-import CmdLineOpts	( DynFlags, opt_SccProfilingOn )
+import DynFlags		( DynFlags )
+import StaticFlags	( opt_SccProfilingOn )
 \end{code}
 
 %************************************************************************

@@ -50,7 +50,7 @@ import TysPrim  ( foreignObjPrimTyCon, weakPrimTyCon, byteArrayPrimTyCon, mutabl
 -- versions of compiled Haskell code.  We add a ".O" to all assembly and module 
 -- names when this is set (because that's clue that -O was set).  
 -- One day this will be configured by the command line.
-import CmdLineOpts	( opt_InPackage, opt_SimplDoEtaReduction )
+import DynFlags	( opt_InPackage, opt_SimplDoEtaReduction )
 
 import Util		( lengthIs, equalLength )
 

@@ -27,11 +27,11 @@ import Distribution.Package	( showPackageId )
 import PprC		( writeCs )
 import CmmLint		( cmmLint )
 import Packages
-import DriverUtil	( filenameOf )
+import Util		( filenameOf )
 import FastString	( unpackFS )
 import Cmm		( Cmm )
 import HscTypes
-import CmdLineOpts
+import DynFlags
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Pretty		( Mode(..), printDoc )
@@ -77,9 +77,9 @@ codeOutput dflags this_mod foreign_stubs deps flat_abstractC
 		}
 
 	; showPass dflags "CodeOutput"
-	; let filenm = dopt_OutName dflags 
+	; let filenm = hscOutName dflags 
 	; stubs_exist <- outputForeignStubs dflags foreign_stubs
-	; case dopt_HscTarget dflags of {
+	; case hscTarget dflags of {
              HscInterpreted -> return ();
              HscAsm         -> outputAsm dflags filenm flat_abstractC;
              HscC           -> outputC dflags filenm flat_abstractC stubs_exist

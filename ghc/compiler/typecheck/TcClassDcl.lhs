@@ -52,7 +52,7 @@ import OccName		( reportIfUnused, mkDefaultMethodOcc )
 import RdrName		( RdrName, mkDerivedRdrName )
 import Outputable
 import PrelNames	( genericTyConNames )
-import CmdLineOpts
+import DynFlags
 import UnicodeUtil	( stringToUtf8 )
 import ErrUtils		( dumpIfSet_dyn )
 import Util		( count, lengthIs, isSingleton, lengthExceeds )

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.43 2004/12/08 14:32:31 simonpj Exp $
+% $Id: CgMonad.lhs,v 1.44 2005/03/18 13:37:44 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -61,7 +61,7 @@ module CgMonad (
 
 import {-# SOURCE #-} CgBindery ( CgBindings, nukeVolatileBinds )
 
-import CmdLineOpts	( DynFlags )
+import DynFlags	( DynFlags )
 import Cmm
 import CmmUtils		( CmmStmts, isNopStmt )
 import CLabel

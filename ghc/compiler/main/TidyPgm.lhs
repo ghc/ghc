@@ -8,7 +8,7 @@ module TidyPgm( tidyCorePgm, tidyCoreExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
+import DynFlags	( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding )
 import CoreFVs		( ruleLhsFreeIds, exprSomeFreeVars )

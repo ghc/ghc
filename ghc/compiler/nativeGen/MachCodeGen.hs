@@ -29,7 +29,7 @@ import MachOp
 import CLabel
 
 -- The rest:
-import CmdLineOpts	( opt_PIC )
+import StaticFlags	( opt_PIC )
 import ForeignCall	( CCallConv(..) )
 import OrdList
 import Pretty

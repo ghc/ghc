@@ -11,7 +11,7 @@ module RnTypes ( rnHsType, rnLHsType, rnLHsTypes, rnContext,
 		 precParseErr, sectionPrecErr, dupFieldErr, patSigErr, checkTupSize
   ) where
 
-import CmdLineOpts	( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts) )
+import DynFlags		( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts) )
 
 import HsSyn
 import RdrHsSyn		( extractHsRhoRdrTyVars )
