@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.43 2003/03/20 15:43:31 simonmar Exp $
+ * $Id: MBlock.c,v 1.44 2003/03/26 02:12:38 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -153,16 +153,25 @@ gen_map_mblocks (int size)
     
     // unmap the slop bits around the chunk we allocated
     slop = (W_)ret & MBLOCK_MASK;
-	
+    
     if (munmap(ret, MBLOCK_SIZE - slop) == -1) {
-	barf("gen_map_mblocks: munmap failed");
+      barf("gen_map_mblocks: munmap failed");
     }
     if (slop > 0 && munmap(ret+size-slop, slop) == -1) {
-	barf("gen_map_mblocks: munmap failed");
+      barf("gen_map_mblocks: munmap failed");
     }
-    
+
     // ToDo: if we happened to get an aligned block, then don't
-    // unmap the excess, just use it.
+    // unmap the excess, just use it. For this to work, you
+    // need to keep in mind the following:
+    //     * Calling my_mmap() with an 'addr' arg pointing to
+    //       already my_mmap()ed space is OK and won't fail.
+    //     * If my_mmap() can't satisfy the request at the
+    //       given 'next_request' address in getMBlocks(), that
+    //       you unmap the extra mblock mmap()ed here (or simply
+    //       satisfy yourself that the slop introduced isn't worth
+    //       salvaging.)
+    // 
 
     // next time, try after the block we just got.
     ret += MBLOCK_SIZE - slop;
