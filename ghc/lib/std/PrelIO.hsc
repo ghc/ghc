@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hsc,v 1.9 2001/08/05 00:24:10 ken Exp $
+-- $Id: PrelIO.hsc,v 1.10 2001/08/17 11:08:01 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -18,7 +18,6 @@ module PrelIO where
 
 #include "HsStd.h"
 #include "PrelHandle_hsc.h"
-#include <string.h>
 
 import PrelBase
 
