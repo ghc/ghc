@@ -285,7 +285,6 @@ tcMatchPats pats tys body_ty thing_inside
   = do	{ (pats', ex_tvs, res) <- tcPats LamPat pats tys thing_inside 
 	; tcCheckExistentialPat pats' ex_tvs tys body_ty
 	; returnM (pats', res) }
-  where
 
 tcCheckExistentialPat :: [LPat TcId]		-- Patterns (just for error message)
 		      -> [TcTyVar]		-- Existentially quantified tyvars bound by pattern
