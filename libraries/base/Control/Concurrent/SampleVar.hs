@@ -21,7 +21,8 @@ module Control.Concurrent.SampleVar
          newSampleVar,      -- :: a -> IO (SampleVar a)
 	 emptySampleVar,    -- :: SampleVar a -> IO ()
 	 readSampleVar,	    -- :: SampleVar a -> IO a
-	 writeSampleVar	    -- :: SampleVar a -> a -> IO ()
+	 writeSampleVar,    -- :: SampleVar a -> a -> IO ()
+	 isEmptySampleVar,  -- :: SampleVar a -> IO Bool
 
        ) where
 
@@ -68,7 +69,8 @@ newSampleVar a = do
 emptySampleVar :: SampleVar a -> IO ()
 emptySampleVar v = do
    (readers, var) <- takeMVar v
-   if readers >= 0 then
+   if readers > 0 then do
+     takeMVar var
      putMVar v (0,var)
     else
      putMVar v (readers,var)
@@ -100,3 +102,16 @@ writeSampleVar svar v = do
      _ -> 
        putMVar val v >> 
        putMVar svar (min 1 (readers+1), val)
+
+-- | Returns 'True' if the 'SampleVar' is currently empty.
+--
+-- Note that this function is only useful if you know that no other
+-- threads can be modifying the state of the 'SampleVar', because
+-- otherwise the state of the 'SampleVar' may have changed by the time
+-- you see the result of 'isEmptySampleVar'.
+--
+isEmptySampleVar :: SampleVar a -> IO Bool
+isEmptySampleVar svar = do
+   (readers,val) <- readMVar svar
+   return (readers == 0)
+
