@@ -30,3 +30,4 @@ cabal01: setup
 	ls install
 	./setup sdist
 	ls dist
+	$(GHC_PKG) unregister --user test
