@@ -42,9 +42,7 @@ module TysPrim(
 	word32PrimTyCon,	word32PrimTy,
 
 	int64PrimTyCon,		int64PrimTy,
-	word64PrimTyCon,	word64PrimTy,
-
-	primRepTyCon
+	word64PrimTyCon,	word64PrimTy
   ) where
 
 #include "HsVersions.h"
@@ -370,32 +368,4 @@ to the thread id internally.
 \begin{code}
 threadIdPrimTy    = mkTyConTy threadIdPrimTyCon
 threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName ThreadIdRep
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[TysPrim-PrimRep]{Making types from PrimReps}
-%*									*
-%************************************************************************
-
-Each of the primitive types from this module is equivalent to a
-PrimRep (see PrimRep.lhs).  The following function returns the
-primitive TyCon for a given PrimRep.
-
-\begin{code}
-primRepTyCon CharRep       = charPrimTyCon
-primRepTyCon Int8Rep       = charPrimTyCon
-primRepTyCon IntRep        = intPrimTyCon
-primRepTyCon WordRep       = wordPrimTyCon
-primRepTyCon Int32Rep      = int32PrimTyCon
-primRepTyCon Int64Rep      = int64PrimTyCon
-primRepTyCon Word32Rep     = word32PrimTyCon
-primRepTyCon Word64Rep     = word64PrimTyCon
-primRepTyCon AddrRep       = addrPrimTyCon
-primRepTyCon FloatRep      = floatPrimTyCon
-primRepTyCon DoubleRep     = doublePrimTyCon
-primRepTyCon StablePtrRep  = stablePtrPrimTyCon
-primRepTyCon ForeignObjRep = foreignObjPrimTyCon
-primRepTyCon WeakPtrRep    = weakPrimTyCon
-primRepTyCon other         = pprPanic "primRepTyCon" (ppr other)
 \end{code}
