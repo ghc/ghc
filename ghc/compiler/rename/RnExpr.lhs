@@ -162,7 +162,9 @@ rnExpr (HsVar v)
   = lookupOccRn v	`thenM` \ name ->
     if name `hasKey` assertIdKey && not opt_IgnoreAsserts then
 	-- We expand it to (GHC.Err.assertError location_string)
-        mkAssertErrorExpr
+        mkAssertErrorExpr	`thenM` \ (e, fvs) ->
+	returnM (e, fvs `addOneFV` name)
+		-- Keep 'assert' as a free var, to ensure it's not reported as unused!
     else
         -- The normal case.  Even if the Id was 'assert', if we are 
 	-- ignoring assertions we leave it as GHC.Base.assert; 
