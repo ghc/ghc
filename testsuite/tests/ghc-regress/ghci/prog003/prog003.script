@@ -8,7 +8,7 @@
 -- sensibly.
 
 -- clean up
-:! rm *.o *.hi
+:! rm -f *.o *.hi
 :! cp D1.hs D.hs
 
 :load A
