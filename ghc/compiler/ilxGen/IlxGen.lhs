@@ -111,7 +111,7 @@ importsExpr :: IlxEnv -> StgExpr -> ImportsInfo -> ImportsInfo
 importsExpr env (StgLit _) = importsNone
 importsExpr env (StgApp f args) = importsVar env f.importsStgArgs env args
 importsExpr env (StgConApp con args) = importsDataCon env con.importsStgArgs env args
-importsExpr env (StgOpApp (StgFCallOp (CCall (CCallSpec (StaticTarget c) cc _ _)) _) args rty)
+importsExpr env (StgOpApp (StgFCallOp (CCall (CCallSpec (StaticTarget c) cc _)) _) args rty)
   = addCCallInfo (c,cc, map stgArgType tm_args, rty) . importsStgArgs env args
   where 
     (ty_args,tm_args) = splitTyArgs1 args 
@@ -394,7 +394,7 @@ ilxExprLocals env (StgCase scrut _ _ bndr _ alts)
      = ilxExprLocals (ilxPlaceStgCaseScrut env) scrut ++ 
        (if isDeadBinder bndr then [] else [(LocalId bndr,Nothing)]) ++ 
        ilxAltsLocals env alts
-ilxExprLocals env (StgOpApp (StgFCallOp (CCall (CCallSpec (StaticTarget _) _ _ _)) _) args _) 
+ilxExprLocals env (StgOpApp (StgFCallOp fcall _) args _) 
      = concat (ilxMapPlaceArgs 0 ilxCCallArgLocals env args)
 ilxExprLocals _ _  = []
 
@@ -731,14 +731,30 @@ ilxFunApp env fun args tail_call
 	--
     vcat [pushId env fun,ilxFunAppArgs env 0 (idIlxRepType fun) args tail_call known_clo]
   where
+    known_clo :: KnownClosure
     known_clo =
       case lookupIlxBindEnv env fun of
-	  Just (_, StgRhsClosure  _ _ _ Updatable _ _) ->  Nothing 
+	  Just (_, StgRhsClosure  _ _ _ Updatable _ _)   -> Nothing 
 	  Just (place, StgRhsClosure  _ _ fvs _ args _)  -> Just (place,fun,args,fvs)
 	  _ ->  trace (show fun ++ " --> " ++ show (arityLowerBound (idArityInfo fun)))  Nothing 
 
--- Push as many arguments as ILX allows us to in one go.
+type KnownClosure = Maybe (Place	-- Of the binding site of the function
+			   , Id		-- The function
+			   , [Var]	-- Binders
+			   , [Var])	-- Free vars of the closure
+
+-- Push as many arguments as ILX allows us to in one go, and call the function
 -- Recurse until we're done.
+-- The function is already on the stack
+ilxFunAppArgs :: IlxEnv
+	      -> Int		-- Number of args already pushed (zero is a special case;
+				--	otherwise used only for place generation)
+	      -> Type		-- Type of the function
+	      -> [StgArg]	-- The arguments
+	      -> Bool		-- True <=> tail call please
+	      -> KnownClosure	-- Information about the function we're calling
+	      -> SDoc
+
 ilxFunAppArgs env num_sofar funty args tail_call known_clo
  =   vcat [vcat (ilxMapPlaceArgs num_sofar pushArgWithVoids env now_args),
 	   call_instr <+> (if num_sofar == 0 then text "() /* first step in every Haskell app. is to a thunk */ " else empty)
@@ -1118,6 +1134,7 @@ deepIlxRepType ty@(TyConApp tc tys)
 		-- only be applied to *types* (of kind *)
 	 Nothing     -> 
            -- collapse UnboxedTupleTyCon down when it contains VoidRep types.
+	   -- e.g. 	(# State#, Int#, Int# #)  ===>   (# Int#, Int# #)
             if isUnboxedTupleTyCon tc then 
                let tys' = map deepIlxRepType (filter (not. isVoidIlxRepType) tys) in 
                case tys' of
@@ -1549,20 +1566,23 @@ ilxConApp env data_con args
    rep_ty_args = map deepIlxRepType ty_args
    (ty_args,tm_args) = if isAlgTyCon tycon then splitTyArgs (tyConTyVars tycon) args  else splitTyArgs1 args
 
--- split some type arguments off, throwing away the higher kinded ones for the moment
--- base the higher-kinded checks off a corresponding list of formals
+-- Split some type arguments off, throwing away the higher kinded ones for the moment.
+-- Base the higher-kinded checks off a corresponding list of formals.
+splitTyArgs :: [Var] 		-- Formals
+	    -> [StgArg]		-- Actuals
+	    -> ([StgArg], [StgArg])
 splitTyArgs (htv:ttv) (StgTypeArg h:t) 
    | isIlxTyVar htv = ((h:l), r) 
    | otherwise = trace "splitTyArgs: threw away higher kinded type arg" (l, r) 
    where (l,r) = splitTyArgs ttv t 
 splitTyArgs _ l = ([],l)
  
--- split some type arguments off, where none should be higher kinded
-splitTyArgs1 (StgTypeArg h:t) 
-   = ((h:l), r) 
-   where (l,r) = splitTyArgs1 t 
-splitTyArgs1 l = ([],l)
- 
+-- Split some type arguments off, where none should be higher kinded
+splitTyArgs1 :: [StgArg] -> ([StgArg], [StgArg])
+splitTyArgs1 args = span is_type_arg args
+		  where
+		    is_type_arg (StgTypeArg _) = True
+		    is_type_arg other	       = False
 
 ilxConRef env data_con
     = pprId data_con <> pprValArgTys ilxTypeL env' (map deepIlxRepType (filter (not . isVoidIlxRepType) arg_tys))
@@ -2262,7 +2282,7 @@ warn_op  warning f args = trace ("WARNING! IlxGen cannot translate primop " ++ w
 -- We eliminate voids in and around an IL C Call.  
 -- We also do some type-directed translation for pinning Haskell-managed blobs
 -- of data as we throw them across the boundary.
-ilxFCall env (CCall (CCallSpec (StaticTarget c) cconv gc casm)) args ret_ty
+ilxFCall env (CCall (CCallSpec (StaticTarget c) cconv gc)) args ret_ty
  = ilxComment (text "C call <+> pprCLabelString c") <+> 
 	vcat [vcat (ilxMapPlaceArgs 0 pushCArg env args),
               text "call" <+> retdoc <+> pprCLabelString c  <+> pprTypeArgs ilxTypeR env ty_args
@@ -2272,6 +2292,19 @@ ilxFCall env (CCall (CCallSpec (StaticTarget c) cconv gc casm)) args ret_ty
 	   | otherwis		     = ilxTypeR env (deepIlxRepType ret_ty)
     (ty_args,tm_args) = splitTyArgs1 args 
 
+ilxFCall env (CCall (DotNetCallSpec call_instr)) args ret_ty
+  = ilxComment (text "IL call") <+> 
+    vcat [vcat (ilxMapPlaceArgs 0 pushILArg env tm_args), 
+	  text call_instr
+		-- In due course we'll need to pass the type arguments
+		-- and to do that we'll need to have more than just a string
+		-- for call_instr
+    ]
+  where
+    (ty_args,tm_args) = splitTyArgs1 args 
+
+pushILArg env arg | isUnliftedType (stgArgType arg) = pushArg env arg
+		  | otherwise			    = pushArg env arg <+> error "call ilxFunAppArgs"
 
 hasTyCon (TyConApp tc _) tc2 = tc == tc2
 hasTyCon _  _ = False
