@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.58 2000/11/13 14:40:37 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.59 2000/11/16 12:49:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -981,17 +981,12 @@ FN_(putMVarzh_fast)
     if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
       mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
     }
-
-    /* unlocks the MVar in the SMP case */
-    SET_INFO(mvar,&stg_FULL_MVAR_info);
-
-    /* yield, to give the newly woken thread a chance to take the MVar */
-    JMP_(stg_yield_noregs);
   }
 
   /* unlocks the MVar in the SMP case */
   SET_INFO(mvar,&stg_FULL_MVAR_info);
 
+  /* ToDo: yield here for better communication performance? */
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
