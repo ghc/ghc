@@ -40,7 +40,7 @@ import DataCon		( DataCon, dataConTyCon, isVanillaDataCon, dataConInstOrigArgTys
 import PrelNames	( eqStringName, eqName, geName, negateName, minusName, 
 			  integralClassName )
 import BasicTypes	( isBoxed )
-import SrcLoc		( Located(..), noLoc, unLoc )
+import SrcLoc		( Located(..), SrcSpan, noLoc, unLoc, getLoc )
 import ErrUtils		( Message )
 import Outputable
 import FastString
@@ -283,7 +283,7 @@ tc_pat ctxt pat_in@(ConPatIn (L con_span con_name) arg_pats) pat_ty thing_inside
   = do	{ data_con <- tcLookupDataCon con_name
 	; let tycon = dataConTyCon data_con
 	; ty_args <- zapToTyConApp tycon pat_ty
-	; (pat', tvs, res) <- tcConPat ctxt data_con tycon ty_args arg_pats thing_inside
+	; (pat', tvs, res) <- tcConPat ctxt con_span data_con tycon ty_args arg_pats thing_inside
 	; return (pat', tvs, res) }
 
 
@@ -361,16 +361,16 @@ tc_pat ctxt pat@(NPlusKPatIn (L nm_loc name) lit@(HsIntegral i _) minus_name) pa
 %************************************************************************
 
 \begin{code}
-tcConPat :: PatCtxt -> DataCon -> TyCon -> [TcTauType] 
+tcConPat :: PatCtxt -> SrcSpan -> DataCon -> TyCon -> [TcTauType] 
 	 -> HsConDetails Name (LPat Name) -> TcM a
 	 -> TcM (Pat TcId, [TcTyVar], a)
-tcConPat ctxt data_con tycon ty_args arg_pats thing_inside
+tcConPat ctxt span data_con tycon ty_args arg_pats thing_inside
   | isVanillaDataCon data_con
   = do	{ let arg_tys = dataConInstOrigArgTys data_con ty_args
 	; tcInstStupidTheta data_con ty_args
 	; traceTc (text "tcConPat" <+> vcat [ppr data_con, ppr ty_args, ppr arg_tys])
 	; (arg_pats', tvs, res) <- tcConArgs ctxt data_con arg_pats arg_tys thing_inside
-	; return (ConPatOut data_con [] [] emptyLHsBinds 
+	; return (ConPatOut (L span data_con) [] [] emptyLHsBinds 
 			    arg_pats' (mkTyConApp tycon ty_args),
 		  tvs, res) }
 
@@ -400,7 +400,7 @@ tcConPat ctxt data_con tycon ty_args arg_pats thing_inside
 
 	; dict_binds <- tcSimplifyCheck doc tvs' dicts lie_req
 
-	; return (ConPatOut data_con 
+	; return (ConPatOut (L span data_con)
 			    tvs' (map instToId dicts) dict_binds
 			    arg_pats' (mkTyConApp tycon ty_args),
 		  tvs' ++ inner_tvs, res) } }

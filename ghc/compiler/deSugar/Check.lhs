@@ -357,7 +357,7 @@ is transformed in:
 remove_first_column :: Pat Id                -- Constructor 
                     -> [(EqnNo, EquationInfo)] 
                     -> [(EqnNo, EquationInfo)]
-remove_first_column (ConPatOut con _ _ _ (PrefixCon con_pats) _) qs
+remove_first_column (ConPatOut (L _ con) _ _ _ (PrefixCon con_pats) _) qs
   = ASSERT2( okGroup qs, pprGroup qs ) 
     [(n, shift_var eqn) | q@(n, eqn) <- qs, is_var_con con (firstPatN q)]
   where
@@ -383,7 +383,7 @@ make_row_vars_for_constructor (_, EqnInfo { eqn_pats = pats})
   = takeList (tail pats) (repeat nlWildPat)
 
 compare_cons :: Pat Id -> Pat Id -> Bool
-compare_cons (ConPatOut id1 _ _ _ _ _) (ConPatOut id2 _ _ _ _ _) = id1 == id2  
+compare_cons (ConPatOut (L _ id1) _ _ _ _ _) (ConPatOut (L _ id2) _ _ _ _ _) = id1 == id2  
 
 remove_dups :: [Pat Id] -> [Pat Id]
 remove_dups []     = []
@@ -423,7 +423,7 @@ get_unused_cons used_cons = unused_cons
        (ConPatOut _ _ _ _ _ ty) = head used_cons
        ty_con 		      = tcTyConAppTyCon ty		-- Newtype observable
        all_cons        	      = tyConDataCons ty_con
-       used_cons_as_id 	      = map (\ (ConPatOut d _ _ _ _ _) -> d) used_cons
+       used_cons_as_id 	      = map (\ (ConPatOut (L _ d) _ _ _ _ _) -> d) used_cons
        unused_cons     	      = uniqSetToList
 		 (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
 
@@ -471,7 +471,7 @@ is_var _           = False
 
 is_var_con :: DataCon -> Pat Id -> Bool
 is_var_con con (WildPat _)                          = True
-is_var_con con (ConPatOut id _ _ _ _ _) | id == con = True
+is_var_con con (ConPatOut (L _ id) _ _ _ _ _) | id == con = True
 is_var_con con _                                    = False
 
 is_var_lit :: HsLit -> Pat Id -> Bool
@@ -534,12 +534,12 @@ make_list p (ListPat ps ty) = ListPat (p:ps) ty
 make_list _ _               = panic "Check.make_list: Invalid argument"
 
 make_con :: Pat Id -> ExhaustivePat -> ExhaustivePat           
-make_con (ConPatOut id _ _ _ _ _) (lp:lq:ps, constraints) 
+make_con (ConPatOut (L _ id) _ _ _ _ _) (lp:lq:ps, constraints) 
      | return_list id q = (noLoc (make_list lp q) : ps, constraints)
      | isInfixCon id    = (nlInfixConPat (getName id) lp lq : ps, constraints) 
    where q  = unLoc lq	
 
-make_con (ConPatOut id _ _ _ (PrefixCon pats) _) (ps, constraints) 
+make_con (ConPatOut (L _ id) _ _ _ (PrefixCon pats) _) (ps, constraints) 
       | isTupleTyCon tc  = (noLoc (TuplePat pats_con (tupleTyConBoxity tc)) : rest_pats, constraints) 
       | isPArrFakeCon id = (noLoc (PArrPat pats_con placeHolderType)        : rest_pats, constraints) 
       | otherwise        = (nlConPat name pats_con      : rest_pats, constraints)
@@ -584,8 +584,8 @@ simplify_pat (LazyPat p)      = unLoc (simplify_lpat p)
 simplify_pat (AsPat id p)     = unLoc (simplify_lpat p)
 simplify_pat (SigPatOut p _)  = unLoc (simplify_lpat p)	-- I'm not sure this is right
 
-simplify_pat (ConPatOut id tvs dicts binds ps ty) 
-  = ConPatOut id tvs dicts binds (simplify_con id ps) ty
+simplify_pat (ConPatOut (L loc id) tvs dicts binds ps ty) 
+  = ConPatOut (L loc id) tvs dicts binds (simplify_con id ps) ty
 
 simplify_pat (ListPat ps ty) = 
   unLoc $ foldr (\ x y -> mkPrefixConPat consDataCon [x,y] list_ty)
@@ -632,7 +632,7 @@ simplify_pat (DictPat dicts methods)
        num_of_d_and_ms	 = length dicts + length methods
        dict_and_method_pats = map VarPat (dicts ++ methods)
 
-mk_simple_con_pat con args ty = ConPatOut con [] [] emptyLHsBinds args ty
+mk_simple_con_pat con args ty = ConPatOut (noLoc con) [] [] emptyLHsBinds args ty
 
 -----------------
 simplify_con con (PrefixCon ps)   = PrefixCon (map simplify_lpat ps)

@@ -67,7 +67,7 @@ data Pat id
   | ConPatIn	(Located id)
 		(HsConDetails id (LPat id))
 
-  | ConPatOut	DataCon 
+  | ConPatOut	(Located DataCon)
 		[TyVar]			-- Existentially bound type variables
 		[id]			-- Ditto dictionaries
 		(DictBinds id)		-- Bindings involving those dictionaries
@@ -214,7 +214,7 @@ pabrackets p  = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 \begin{code}
 mkPrefixConPat :: DataCon -> [OutPat id] -> Type -> OutPat id
 -- Make a vanilla Prefix constructor pattern
-mkPrefixConPat dc pats ty = noLoc $ ConPatOut dc [] [] emptyLHsBinds (PrefixCon pats) ty
+mkPrefixConPat dc pats ty = noLoc $ ConPatOut (noLoc dc) [] [] emptyLHsBinds (PrefixCon pats) ty
 
 mkNilPat :: Type -> OutPat id
 mkNilPat ty = mkPrefixConPat nilDataCon [] ty

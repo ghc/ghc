@@ -6,7 +6,7 @@
 
 \begin{code}
 module HscMain ( 
-	HscResult(..), HscCheckResult(..) , 
+	HscResult(..),
 	hscMain, newHscEnv, hscCmmFile, hscBufferFrontEnd
 #ifdef GHCI
 	, hscStmt, hscTcExpr, hscKcType
@@ -132,7 +132,9 @@ data HscResult
    = HscFail
 
    -- In IDE mode: we just do the static/dynamic checks
-   | HscChecked HscCheckResult
+   | HscChecked
+	(Located (HsModule RdrName))	-- parse tree
+	(Maybe TcGblEnv)		-- typechecker output, if succeeded
 
    -- Concluded that it wasn't necessary
    | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
@@ -146,13 +148,6 @@ data HscResult
 	         Bool  		 	-- stub_c exists
 	         (Maybe CompiledByteCode)
 
-
--- The result when we're just checking (in an IDE editor, for example)
-data HscCheckResult
-    = HscParsed  (Located (HsModule RdrName))
-		-- renaming/typechecking failed, here's the parse tree
-    | HscTypechecked TcGblEnv
-		-- renaming/typechecking succeeded
 
 -- What to do when we have compiler error or warning messages
 type MessageAction = Messages -> IO ()
@@ -389,9 +384,9 @@ hscBufferTypecheck hsc_env rdr_module msg_act = do
 					tcRnModule hsc_env rdr_module
 	msg_act tc_msgs
 	case maybe_tc_result of
-	    Nothing  -> return (HscChecked (HscParsed rdr_module))
+	    Nothing  -> return (HscChecked rdr_module Nothing)
+	    Just r   -> return (HscChecked rdr_module (Just r))
 				-- space leak on rdr_module!
-	    Just r -> return (HscChecked (HscTypechecked r))
 
 
 hscFrontEnd hsc_env msg_act rdr_module  = do {

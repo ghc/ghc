@@ -430,8 +430,8 @@ tidy1 v (LazyPat pat) rhs
 
 -- re-express <con-something> as (ConPat ...) [directly]
 
-tidy1 v (ConPatOut con ex_tvs dicts binds ps pat_ty) rhs
-  = returnDs (ConPatOut con ex_tvs dicts binds tidy_ps pat_ty, rhs)
+tidy1 v (ConPatOut (L loc con) ex_tvs dicts binds ps pat_ty) rhs
+  = returnDs (ConPatOut (L loc con) ex_tvs dicts binds tidy_ps pat_ty, rhs)
   where
     tidy_ps = PrefixCon (tidy_con con pat_ty ps)
 

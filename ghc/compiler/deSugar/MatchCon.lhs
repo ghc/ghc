@@ -22,7 +22,7 @@ import DsUtils
 import Id		( Id )
 import Type             ( Type )
 import ListSetOps	( equivClassesByUniq )
-import SrcLoc		( unLoc )
+import SrcLoc		( unLoc, Located(..) )
 import Unique		( Uniquable(..) )
 import Outputable
 \end{code}
@@ -87,7 +87,7 @@ matchConFamily (var:vars) ty eqns_info
 	-- Sort into equivalence classes by the unique on the constructor
 	-- All the EqnInfos should start with a ConPat
 	eqn_groups = equivClassesByUniq get_uniq eqns_info
-	get_uniq (EqnInfo { eqn_pats = ConPatOut data_con _ _ _ _ _ : _}) = getUnique data_con
+	get_uniq (EqnInfo { eqn_pats = ConPatOut (L _ data_con) _ _ _ _ _ : _}) = getUnique data_con
     in
 	-- Now make a case alternative out of each group
     mappM (match_con vars ty) eqn_groups	`thenDs` \ alts ->
@@ -118,7 +118,7 @@ match_con vars ty eqns
 	; return (data_con, tvs1 ++ dicts1 ++ arg_vars, match_result') }
   where
     pats@(pat1 : other_pats) = map firstPat eqns
-    ConPatOut data_con tvs1 dicts1 _ (PrefixCon arg_pats1) pat_ty = pat1
+    ConPatOut (L _ data_con) tvs1 dicts1 _ (PrefixCon arg_pats1) pat_ty = pat1
 
     ds_binds bind = do { prs <- dsHsNestedBinds bind; return (Rec prs) }
 

@@ -477,7 +477,7 @@ dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty rbinds)
 				out_inst_tys)
 			  val_args
 	    in
-	    returnDs (mkSimpleMatch [noLoc $ ConPatOut con [] [] emptyLHsBinds 
+	    returnDs (mkSimpleMatch [noLoc $ ConPatOut (noLoc con) [] [] emptyLHsBinds 
 						       (PrefixCon (map nlVarPat arg_ids)) record_in_ty]
 				    rhs)
     in
