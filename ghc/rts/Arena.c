@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
-   $Id: Arena.c,v 1.2 2002/07/17 09:21:49 simonmar Exp $ 
+   $Id: Arena.c,v 1.3 2002/07/26 09:35:46 simonmar Exp $ 
    (c) The University of Glasgow 2001
 
    Arena allocation.  Arenas provide fast memory allocation at the
@@ -23,8 +23,6 @@
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "Arena.h"
-
-#include <stdlib.h>
 
 // Each arena struct is allocated using malloc().
 struct _Arena {
@@ -62,8 +60,12 @@ arenaAlloc( Arena *arena, size_t size )
     nat req_blocks;
     bdescr *bd;
 
-    // round up to word size...
-    size_w = (size + sizeof(W_) - 1) / sizeof(W_);
+// The minimum alignment of an allocated block.
+#define MIN_ALIGN 8
+
+    // size of allocated block in words, rounded up to the nearest 
+    // alignment chunk.
+    size_w = ((size + MIN_ALIGN - 1) / MIN_ALIGN) * (MIN_ALIGN/sizeof(W_));
 
     if ( arena->free + size_w < arena->lim ) {
 	// enough room in the current block...
