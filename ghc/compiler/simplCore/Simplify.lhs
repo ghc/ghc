@@ -1467,17 +1467,21 @@ simplAlts env zap_occ_info handled_cons case_bndr' alts cont'
 	-- We really must record that b is already evaluated so that we don't
 	-- go and re-evaluate it when constructing the result.
 
-    add_evals (DataAlt dc) vs = cat_evals vs (dataConRepStrictness dc)
+    add_evals (DataAlt dc) vs = cat_evals dc vs (dataConRepStrictness dc)
     add_evals other_con    vs = vs
 
-    cat_evals [] [] = []
-    cat_evals (v:vs) (str:strs)
-	| isTyVar v          = v	: cat_evals vs (str:strs)
-	| isMarkedStrict str = evald_v  : cat_evals vs strs
-	| otherwise          = zapped_v : cat_evals vs strs
+    cat_evals dc vs strs
+	= go vs strs
 	where
-	  zapped_v = zap_occ_info v
-	  evald_v  = zapped_v `setIdUnfolding` mkOtherCon []
+	  go [] [] = []
+	  go (v:vs) (str:strs)
+	    | isTyVar v          = v	    : go vs (str:strs)
+	    | isMarkedStrict str = evald_v  : go vs strs
+	    | otherwise          = zapped_v : go vs strs
+	    where
+	      zapped_v = zap_occ_info v
+	      evald_v  = zapped_v `setIdUnfolding` mkOtherCon []
+	  go _ _ = pprPanic "cat_evals" (ppr dc $$ ppr vs $$ ppr strs)
 \end{code}
 
 
