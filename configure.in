@@ -570,6 +570,12 @@ AC_PATH_PROG(LxCmd,lx)
 AC_SUBST(LxCmd)
 #
 #
+dnl ** check for installed green-card binary
+#
+AC_PATH_PROG(GreencardCmd,green-card)
+AC_SUBST(GreencardCmd)
+#
+#
 dnl ** check for full ANSI header (.h) files
 #
 AC_HEADER_STDC
