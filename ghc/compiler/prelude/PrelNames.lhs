@@ -637,7 +637,7 @@ prec_RDR	   = varQual_RDR  rEAD_PREC_Name FSLIT("prec")
 -- Module Lex
 symbol_RDR	   = dataQual_RDR  lEX_Name FSLIT("Symbol")
 ident_RDR	   = dataQual_RDR  lEX_Name FSLIT("Ident")
-single_RDR	   = dataQual_RDR  lEX_Name FSLIT("Single")
+punc_RDR	   = dataQual_RDR  lEX_Name FSLIT("Punc")
 
 times_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("*")
 plus_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("+")

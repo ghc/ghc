@@ -62,7 +62,7 @@ import Util		( mapAccumL, zipEqual, zipWithEqual, isSingleton,
 			  zipWith3Equal, nOfThem )
 import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool )
-import Char		( ord )
+import Char		( ord, isAlpha )
 import Constants
 import List		( partition, intersperse )
 import FastString
@@ -759,11 +759,11 @@ instance Read T where
       +++
       prec appPrec (
 	do Ident "T1" <- Lex.lex
-	   Single '{' <- Lex.lex
+	   Punc '{' <- Lex.lex
 	   Ident "f1" <- Lex.lex
-	   Single '=' <- Lex.lex
+	   Punc '=' <- Lex.lex
 	   x	      <- ReadP.reset Read.readPrec
-	   Single '}' <- Lex.lex
+	   Punc '}' <- Lex.lex
 	   return (T1 { f1 = x }))
       +++
       prec appPrec (
@@ -802,7 +802,7 @@ gen_Read_binds get_fixity tycon
     read_nullary_cons 
       = case nullary_cons of
     	    []    -> []
-    	    [con] -> [HsDo DoExpr [BindStmt (ident_pat (data_con_str con)) lex loc,
+    	    [con] -> [HsDo DoExpr [bindLex (ident_pat (data_con_str con)),
     		      result_stmt con []] loc]
             _     -> [HsApp (HsVar choose_RDR) 
     		   	    (ExplicitList placeHolderType (map mk_pair nullary_cons))]
@@ -819,21 +819,21 @@ gen_Read_binds get_fixity tycon
      	      | otherwise	  = prefix_stmts
      
        	prefix_stmts		-- T a b c
-       	  = [BindStmt (ident_pat (data_con_str data_con)) lex loc]
+       	  = [bindLex (ident_pat (data_con_str data_con))]
        	    ++ map read_arg as_needed
        	    ++ [result_stmt data_con as_needed]
      	 
        	infix_stmts 		-- a %% b
        	  = [read_arg a1, 
-   	     BindStmt (symbol_pat (data_con_str data_con)) lex loc,
+   	     bindLex (symbol_pat (data_con_str data_con)),
      	     read_arg a2,
      	     result_stmt data_con [a1,a2]]
      
        	lbl_stmts		-- T { f1 = a, f2 = b }
-       	  = [BindStmt (ident_pat (data_con_str data_con)) lex loc,
-       	     read_punc '{']
-       	    ++ concat (intersperse [read_punc ','] field_stmts)
-       	    ++ [read_punc '}', result_stmt data_con as_needed]
+       	  = [bindLex (ident_pat (data_con_str data_con)),
+       	     read_punc "{"]
+       	    ++ concat (intersperse [read_punc ","] field_stmts)
+       	    ++ [read_punc "}", result_stmt data_con as_needed]
      
        	field_stmts  = zipWithEqual "lbl_stmts" read_field labels as_needed
      
@@ -841,36 +841,46 @@ gen_Read_binds get_fixity tycon
        	nullary_con  = con_arity == 0
        	labels       = dataConFieldLabels data_con
        	lab_fields   = length labels
-       	dc_nm	= getName data_con
+       	dc_nm	     = getName data_con
        	is_infix     = isDataSymOcc (getOccName dc_nm)
        	as_needed    = take con_arity as_RDRs
        	(a1:a2:_)    = as_needed
-     
-       	prec | not is_infix  = appPrecedence
-             | otherwise     = getPrecedence get_fixity dc_nm
+       	prec 	     = getPrec is_infix get_fixity dc_nm
 
     ------------------------------------------------------------------------
     --		Helpers
     ------------------------------------------------------------------------
     mk_alt e1 e2     = genOpApp e1 alt_RDR e2
+    bindLex pat	     = BindStmt pat (HsVar lexP_RDR) loc
     result_stmt c as = ResultStmt (HsApp (HsVar returnM_RDR) (con_app c as)) loc
     con_app c as     = mkHsVarApps (qual_orig_name c) as
     
-    lex          = HsVar lexP_RDR
-    single_pat c = ConPatIn single_RDR [LitPatIn (mkHsChar c)]	  -- Single 'x'
+    punc_pat s   = ConPatIn punc_RDR [LitPatIn (mkHsString s)]	  -- Punc 'c'
     ident_pat s  = ConPatIn ident_RDR [LitPatIn s]		  -- Ident "foo"
     symbol_pat s = ConPatIn symbol_RDR [LitPatIn s]		  -- Symbol ">>"
     
-    lbl_str :: FieldLabel -> HsLit
-    lbl_str      lbl = mkHsString (occNameUserString (getOccName (fieldLabelName lbl)))
     data_con_str con = mkHsString (occNameUserString (getOccName con))
     
-    read_punc c = BindStmt (single_pat c) lex loc
+    read_punc c = bindLex (punc_pat c)
     read_arg a  = BindStmt (VarPatIn a) (mkHsVarApps step_RDR [readPrec_RDR]) loc
     
-    read_field lbl a = [BindStmt (ident_pat (lbl_str lbl)) lex loc,
-    		        read_punc '=',
+    read_field lbl a = read_lbl lbl ++
+    		       [read_punc "=",
     		        BindStmt (VarPatIn a) (mkHsVarApps reset_RDR [readPrec_RDR]) loc]
+
+	-- When reading field labels we might encounter
+	-- 	a = 3
+	-- or	(#) = 4
+	-- Note the parens!
+    read_lbl lbl | isAlpha (head lbl_str) 
+		 = [bindLex (ident_pat lbl_lit)]
+		 | otherwise
+		 = [read_punc "(", 
+		    bindLex (symbol_pat lbl_lit),
+		    read_punc ")"]
+		 where	
+		   lbl_str = occNameUserString (getOccName (fieldLabelName lbl)) 
+		   lbl_lit = mkHsString lbl_str
 \end{code}
 
 
@@ -896,114 +906,69 @@ gen_Show_binds get_fixity tycon
 	pats_etc data_con
 	  | nullary_con =  -- skip the showParen junk...
 	     ASSERT(null bs_needed)
-	     ([wildPat, con_pat], show_con)
+	     ([wildPat, con_pat], mk_showString_app con_str)
 	  | otherwise   =
 	     ([a_Pat, con_pat],
-		  showParen_Expr (HsPar (genOpApp a_Expr ge_RDR (HsLit (HsInt paren_prec_limit))))
+		  showParen_Expr (HsPar (genOpApp a_Expr ge_RDR (HsLit (HsInt con_prec))))
 				 (HsPar (nested_compose_Expr show_thingies)))
 	    where
-	     data_con_RDR = qual_orig_name data_con
-	     con_arity    = dataConSourceArity data_con
-	     bs_needed    = take con_arity bs_RDRs
-	     con_pat      = ConPatIn data_con_RDR (map VarPatIn bs_needed)
-	     nullary_con  = con_arity == 0
-             labels       = dataConFieldLabels data_con
-	     lab_fields   = length labels
+	     data_con_RDR  = qual_orig_name data_con
+	     con_arity     = dataConSourceArity data_con
+	     bs_needed     = take con_arity bs_RDRs
+	     con_pat       = ConPatIn data_con_RDR (map VarPatIn bs_needed)
+	     nullary_con   = con_arity == 0
+             labels        = dataConFieldLabels data_con
+	     lab_fields    = length labels
+	     record_syntax = lab_fields > 0
 
 	     dc_nm	    = getName data_con
 	     dc_occ_nm	    = getOccName data_con
-             dc_occ_nm_str  = occNameUserString dc_occ_nm
+             con_str        = occNameUserString dc_occ_nm
 
-	     is_infix     = isDataSymOcc dc_occ_nm
-
-
-	     show_con
-	       | is_infix  = mk_showString_app (' ':dc_occ_nm_str)
-	       | otherwise = mk_showString_app (dc_occ_nm_str ++ space_ocurly_maybe)
-		 where
-	          space_ocurly_maybe
-                    | nullary_con     = ""
-		    | lab_fields == 0 = " "
-		    | otherwise       = "{"
-		 
-
-	     show_all con fs@(x:xs)
-		| is_infix  = x:con:xs
-		| otherwise = 
-		  let
-                    ccurly_maybe 
-                      | lab_fields > 0  = [mk_showString_app "}"]
-                      | otherwise       = []
-		  in
-		  con:fs ++ ccurly_maybe
-
-	     show_thingies = show_all show_con real_show_thingies_with_labs
+	     show_thingies 
+		| is_infix     	= [show_arg1, mk_showString_app (" " ++ con_str ++ " "), show_arg2]
+		| record_syntax = mk_showString_app (con_str ++ " {") : 
+				  show_record_args ++ [mk_showString_app "}"]
+		| otherwise	= mk_showString_app (con_str ++ " ") : show_prefix_args
                 
 	     show_label l = mk_showString_app (the_name ++ "=")
 		 where
 		   occ_nm   = getOccName (fieldLabelName l)
-		    -- legal, but rare.
-		   is_op    = isSymOcc occ_nm
+		   nm       = occNameUserString occ_nm
+
+		   is_op    = isSymOcc occ_nm	    -- Legal, but rare.
 		   the_name 
 		     | is_op     = '(':nm ++ ")"
 		     | otherwise = nm
 
-		   nm       = occNameUserString occ_nm
-		
+             show_args = [ mkHsApps showsPrec_RDR [HsLit (HsInt arg_prec), HsVar b]
+			 | b <- bs_needed ]
+	     (show_arg1:show_arg2:_) = show_args
+	     show_prefix_args = intersperse (HsVar showSpace_RDR) show_args
 
-             mk_showString_app str = HsApp (HsVar showString_RDR)
-					   (HsLit (mkHsString str))
 
-             prec_cons = getLRPrecs is_infix get_fixity dc_nm
-
-             real_show_thingies
-		| is_infix  = 
-		     [ mkHsApps showsPrec_RDR [HsLit (HsInt p), HsVar b]
-		     | (p,b) <- zip prec_cons bs_needed ]
-		| otherwise =
-		     [ mkHsApps showsPrec_RDR [mkHsIntLit 10, HsVar b]
-		     | b <- bs_needed ]
-
-             real_show_thingies_with_labs
-		| lab_fields == 0 = intersperse (HsVar showSpace_RDR) real_show_thingies
-		| otherwise       = --Assumption: no of fields == no of labelled fields 
-				     --            (and in same order)
-		    concat $
-		    intersperse ([mk_showString_app ","]) $ -- Using SLIT()s containing ,s spells trouble.
-		    zipWithEqual "gen_Show_binds"
-				 (\ a b -> [a,b])
-				 (map show_label labels) 
-				 real_show_thingies
+		--  Assumption for record syntax: no of fields == no of labelled fields 
+		--            (and in same order)
+	     show_record_args = concat $
+				intersperse [mk_showString_app ", "] $
+				[ [show_label lbl, arg] 
+				| (lbl,arg) <- zipEqual "gen_Show_binds" 
+							labels show_args ]
 			       
-	      {-
-	        c.f. Figure 16 and 17 in Haskell 1.1 report
-	      -}  
-	     paren_prec_limit
-		| not is_infix = appPrecedence + 1
-		| otherwise    = getPrecedence get_fixity dc_nm + 1
+		-- Fixity stuff
+	     is_infix = isDataSymOcc dc_occ_nm
+             con_prec = 1 + getPrec is_infix get_fixity dc_nm
+	     arg_prec | record_syntax = 0	-- Record fields don't need parens
+		      | otherwise     = con_prec	
 
+mk_showString_app str = HsApp (HsVar showString_RDR) (HsLit (mkHsString str))
 \end{code}
 
 \begin{code}
-getLRPrecs :: Bool -> FixityEnv -> Name -> [Integer]
-getLRPrecs is_infix get_fixity nm = [lp, rp]
-    where
-     {-
-	Figuring out the fixities of the arguments to a constructor,
-	cf. Figures 16-18 in Haskell 1.1 report.
-     -}
-     (con_left_assoc, con_right_assoc) = isLRAssoc get_fixity nm
-     paren_con_prec = getPrecedence get_fixity nm
-
-     lp
-      | not is_infix   = appPrecedence + 1
-      | con_left_assoc = paren_con_prec
-      | otherwise      = paren_con_prec + 1
-		  
-     rp
-      | not is_infix    = appPrecedence + 1
-      | con_right_assoc = paren_con_prec
-      | otherwise       = paren_con_prec + 1
+getPrec :: Bool -> FixityEnv -> Name -> Integer
+getPrec is_infix get_fixity nm 
+  | not is_infix   = appPrecedence
+  | otherwise      = getPrecedence get_fixity nm
 		  
 appPrecedence :: Integer
 appPrecedence = fromIntegral maxPrecedence
