@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * $Id: mkNativeHdr.c,v 1.3 2000/01/25 18:09:52 sewardj Exp $
+ * $Id: mkNativeHdr.c,v 1.4 2000/05/15 14:44:42 simonmar Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
@@ -33,13 +33,19 @@
 #define OFFSET_SpLim OFFSET(RegTable, RegTable.rSpLim)
 #define OFFSET_Hp    OFFSET(RegTable, RegTable.rHp)
 #define OFFSET_HpLim OFFSET(RegTable, RegTable.rHpLim)
+#define OFFSET_CurrentTSO OFFSET(RegTable, RegTable.rCurrentTSO)
+#define OFFSET_CurrentNursery OFFSET(RegTable, RegTable.rCurrentNursery)
 
 #define TSO_SP       OFFSET(tso, tso.sp)
 #define TSO_SPLIM    OFFSET(tso, tso.splim)
 #define TSO_SU       OFFSET(tso, tso.su)
 
+#define BDESCR_START OFFSET(bd, bd.start)
+#define BDESCR_FREE  OFFSET(bd, bd.free)
+
 StgRegTable RegTable;
 StgTSO tso;
+bdescr bd;
 
 int
 main()
@@ -72,6 +78,8 @@ main()
     printf("#define OFFSET_SpLim %d\n", OFFSET_SpLim);
     printf("#define OFFSET_Hp %d\n", OFFSET_Hp);
     printf("#define OFFSET_HpLim %d\n", OFFSET_HpLim);
+    printf("#define OFFSET_CurrentTSO %d\n", OFFSET_CurrentTSO);
+    printf("#define OFFSET_CurrentNursery %d\n", OFFSET_CurrentNursery);
 
     printf("\n-- Storage Manager offsets for the Native Code Generator\n");
 
@@ -80,6 +88,11 @@ main()
     printf("#define TSO_SP %d\n", TSO_SP);
     printf("#define TSO_SU %d\n", TSO_SU);
     printf("#define TSO_SPLIM %d\n", TSO_SPLIM);
+
+    printf("\n-- Block descriptor offsets for the Native Code Generator\n");
+
+    printf("#define BDESCR_START %d\n", BDESCR_START);
+    printf("#define BDESCR_FREE %d\n", BDESCR_FREE);
 
     printf("\n-- FILE size for the Native Code Generator\n");
 
