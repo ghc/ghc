@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.32 2002/06/13 23:26:55 sof Exp $
+# $Id: Makefile,v 1.33 2002/06/20 16:12:58 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -105,23 +105,7 @@ EXCLUDED_HADDOCK_SRCS = \
 	Data/Generics.hs \
 	GHC/PArr.hs
 
-HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS))))
-
-HADDOCK = $(FPTOOLS_TOP)/haddock/src/haddock-inplace
-
-# Urgh, hack needed to ensure that the value of HS_SRCS is computed in time for
-# the docs rule below.
-PRE_SRCS := $(ALL_SRCS)
-
-.PHONY: docs
-haddock-docs : $(HS_PPS)
-	$(HADDOCK) -t "Haskell Core Libraries" -h -s "." $(HS_PPS)
-
-%.raw-hs : %.lhs
-	$(GHC_INPLACE) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
-
-%.raw-hs : %.hs
-	$(GHC_INPLACE) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+SRC_HADDOCK_OPTS += -t "Haskell Core Libraries"
 
 # -----------------------------------------------------------------------------
 
