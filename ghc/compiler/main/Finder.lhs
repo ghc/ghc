@@ -85,7 +85,8 @@ maybeHomeModule mod_name = do
 	   home_imports <- readIORef v_Import_paths
 	   let extendFM fm path = do
 		   contents <- getDirectoryContents' path
-		   return (addListToFM fm (zip contents (repeat path)))
+                   let clean_contents = filter isUsefulFile contents
+		   return (addListToFM fm (zip clean_contents (repeat path)))
 	   home_map <- foldM extendFM emptyFM home_imports
 	   writeIORef v_HomeDirCache (Just home_map)
 	   return home_map
@@ -136,7 +137,8 @@ newPkgCache pkgs = do
     		pkg_name = _PK_ (name pkg)
     	    let addDir fm dir = do
     		    contents <- getDirectoryContents' dir
-    		    return (addListToFM fm (zip contents 
+		    let clean_contents = filter isUsefulFile contents
+    		    return (addListToFM fm (zip clean_contents 
     					       (repeat (pkg_name,dir))))
     	    foldM addDir fm dirs
     
@@ -168,6 +170,10 @@ maybePackageModule mod_name = do
 				obj_file = "error:_package_module;_no_object"
 			   }
 		   ))
+
+isUsefulFile fn
+   = let suffix = (reverse . takeWhile (/= '.') . reverse) fn
+     in  suffix `elem` ["hi", "hs", "lhs", "hi-boot", "hi-boot-5"]
 
 getDirectoryContents' d
    = IO.catch (getDirectoryContents d)
