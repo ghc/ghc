@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.49 1999/01/14 16:59:51 sof Exp $
+# $Id: Makefile,v 1.50 1999/01/19 13:49:29 simonm Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -164,7 +164,7 @@ main/Main_HC_OPTS 		+= -syslib misc -DREPORT_TO_MOTHERLODE
 endif
 endif
 
-main/CmdLineOpts_HC_OPTS 	= -fvia-C
+main/CmdLineOpts_HC_OPTS 	= -fvia-C -K3m
 nativeGen/PprMach_HC_OPTS 	= -K2m
 nativeGen/MachMisc_HC_OPTS 	= -K2m -fvia-C
 nativeGen/MachCode_HC_OPTS 	= -H10m
