@@ -676,12 +676,12 @@ gen_taggery_Names inst_infos
     
     do_con2tag acc_Names tycon
       | isDataTyCon tycon &&
-        (we_are_deriving eqClassKey tycon
+        ((we_are_deriving eqClassKey tycon
 	    && any isNullaryDataCon (tyConDataCons tycon))
 	 || (we_are_deriving ordClassKey  tycon
 	    && not (maybeToBool (maybeTyConSingleCon tycon)))
 	 || (we_are_deriving enumClassKey tycon)
-	 || (we_are_deriving ixClassKey   tycon)
+	 || (we_are_deriving ixClassKey   tycon))
 	
       = returnTc ((con2tag_RDR tycon, tycon, GenCon2Tag)
 		   : acc_Names)
@@ -689,14 +689,14 @@ gen_taggery_Names inst_infos
       = returnTc acc_Names
 
     do_tag2con acc_Names tycon
-      = if (we_are_deriving enumClassKey tycon)
-	|| (we_are_deriving ixClassKey   tycon)
-	then
-	  returnTc ( (tag2con_RDR tycon, tycon, GenTag2Con)
-		   : (maxtag_RDR  tycon, tycon, GenMaxTag)
-		   : acc_Names)
-	else
-	  returnTc acc_Names
+      | isDataTyCon tycon &&
+         (we_are_deriving enumClassKey tycon ||
+	  we_are_deriving ixClassKey   tycon)
+      = returnTc ( (tag2con_RDR tycon, tycon, GenTag2Con)
+		 : (maxtag_RDR  tycon, tycon, GenMaxTag)
+		 : acc_Names)
+      | otherwise
+      = returnTc acc_Names
 
     we_are_deriving clas_key tycon
       = is_in_eqns clas_key tycon all_CTs
