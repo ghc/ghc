@@ -180,7 +180,7 @@ plusFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
 			   -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
 
 -- | @(minusFM a1 a2)@ deletes from @a1@ any mappings which are bound in @a2@
-minusFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
+minusFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt1 -> FiniteMap key elt2 -> FiniteMap key elt1
 
 -- | @(intersectFM a1 a2)@ returns a new 'FiniteMap' containing
 -- mappings from @a1@ for which @a2@ also has a mapping with the same
