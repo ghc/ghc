@@ -357,7 +357,10 @@ SRC_HC_POST_OPTS += \
 endif # SplitObjs
 endif # StripLibraries
 
-$(LIBRARY) : $(STUBOBJS) $(LIBOBJS)
+# Note: $(STUBOBJS) isn't depended on here, but included when building the lib.
+#       (i.e., the assumption is that $(STUBOBJS) are created as a side-effect
+#       of building $(LIBOBJS)).
+$(LIBRARY) : $(LIBOBJS)
 	$(BUILD_LIB)
 endif # LIBRARY = ""
 
