@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.29 $
- * $Date: 2000/01/05 13:53:37 $
+ * $Revision: 1.30 $
+ * $Date: 2000/01/05 15:57:41 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -488,7 +488,9 @@ Text t; {
 
 Tycon addTycon(tc)  /* Insert Tycon in tycon table - if no clash is caused */
 Tycon tc; {
-    Tycon oldtc = findTycon(tycon(tc).text);
+    Tycon oldtc; 
+    assert(whatIs(tc)==TYCON || whatIs(tc)==TUPLE);
+    oldtc = findTycon(tycon(tc).text);
     if (isNull(oldtc)) {
         hashTycon(tc);
         module(currentModule).tycons=cons(tc,module(currentModule).tycons);
@@ -499,7 +501,10 @@ Tycon tc; {
 
 static Void local hashTycon(tc)         /* Insert Tycon into hash table    */
 Tycon tc; {
-   assert(isTycon(tc) || isTuple(tc));
+  if (!(isTycon(tc) || isTuple(tc))) {
+    printf("\nbad stuff: " ); print(tc,10); printf("\n");
+      assert(isTycon(tc) || isTuple(tc));
+  }
    if (1) {
      Text  t = tycon(tc).text;
      Int   h = tHash(t);
@@ -668,7 +673,9 @@ Text t; {
 
 Name addName(nm)                        /* Insert Name in name table - if  */
 Name nm; {                              /* no clash is caused              */
-    Name oldnm = findName(name(nm).text);
+    Name oldnm; 
+    assert(whatIs(nm)==NAME);
+    oldnm = findName(name(nm).text);
     if (isNull(oldnm)) {
         hashName(nm);
         module(currentModule).names=cons(nm,module(currentModule).names);
@@ -1047,7 +1054,9 @@ Text t; {
 
 Class addClass(c)                       /* Insert Class in class list      */
 Class c; {                              /*  - if no clash caused           */
-    Class oldc = findClass(cclass(c).text);
+    Class oldc; 
+    assert(whatIs(c)==CLASS);
+    oldc = findClass(cclass(c).text);
     if (isNull(oldc)) {
         classes=cons(c,classes);
         module(currentModule).classes=cons(c,module(currentModule).classes);

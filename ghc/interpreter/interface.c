@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.15 $
- * $Date: 2000/01/05 13:53:36 $
+ * $Revision: 1.16 $
+ * $Date: 2000/01/05 15:57:40 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1092,6 +1092,7 @@ Void finishGHCModule ( Cell root )
                if (isNull(c)) goto notfound;
                fprintf(stderr, "   var %s\n", textToStr(textOf(ex)) );
                module(mod).exports = cons(c, module(mod).exports);
+               addName(c);
                break;
 
             case CONIDCELL: /* non data tycon */
@@ -1100,6 +1101,7 @@ Void finishGHCModule ( Cell root )
                if (isNull(c)) goto notfound;
                fprintf(stderr, "   type %s\n", textToStr(textOf(ex)) );
                module(mod).exports = cons(c, module(mod).exports);
+               addTycon(c);
                break;
 
             case ZTUP2: /* data T = C1 ... Cn  or class C where f1 ... fn */
@@ -1119,10 +1121,12 @@ Void finishGHCModule ( Cell root )
                      original (defining) module.
 		  */
                   if (abstract) {
-                     module(mod).exports = cons ( ex, module(mod).exports );
+                     module(mod).exports = cons(c, module(mod).exports);
+                     addTycon(c);
                      fprintf ( stderr, "(abstract) ");
 		  } else {
                      module(mod).exports = cons(pair(c,DOTDOT), module(mod).exports);
+                     addTycon(c);
                      for (; nonNull(subents); subents = tl(subents)) {
                         Cell ent2 = hd(subents);
                         assert(isCon(ent2) || isVar(ent2)); 
@@ -1132,6 +1136,7 @@ Void finishGHCModule ( Cell root )
                         fprintf(stderr, "%s ", textToStr(name(c).text));
                         assert(nonNull(c));
                         module(mod).exports = cons(c, module(mod).exports);
+                        addName(c);
                      }
                   }
                   fprintf(stderr, "}\n" );
@@ -1141,6 +1146,7 @@ Void finishGHCModule ( Cell root )
                   if (isNull(c)) goto notfound;
                   fprintf(stderr, "   class %s { ", textToStr(textOf(ex)) );
                   module(mod).exports = cons(pair(c,DOTDOT), module(mod).exports);
+                  addClass(c);
                   for (; nonNull(subents); subents = tl(subents)) {
                      Cell ent2 = hd(subents);
                      assert(isVar(ent2));
@@ -1149,6 +1155,7 @@ Void finishGHCModule ( Cell root )
                      fprintf(stderr, "%s ", textToStr(name(c).text));
                      if (isNull(c)) goto notfound;
                      module(mod).exports = cons(c, module(mod).exports);
+                     addName(c);
                   }
                   fprintf(stderr, "}\n" );
                }
@@ -1169,6 +1176,7 @@ Void finishGHCModule ( Cell root )
       }
    }
 
+#if 0
    if (preludeLoaded) {
       /* do the implicit 'import Prelude' thing */
       List pxs = module(modulePrelude).exports;
@@ -1195,6 +1203,7 @@ Void finishGHCModule ( Cell root )
          }
       }
    }
+#endif
 
    /* Last, but by no means least ... */
    if (!ocResolve(module(mod).object,0||VERBOSE))
