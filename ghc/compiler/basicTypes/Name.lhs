@@ -130,7 +130,7 @@ mkKnownKeyGlobal rdr_name uniq
 
 mkSysLocalName :: Unique -> UserFS -> Name
 mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = Local, 
-				n_occ = mkSrcVarOcc fs, n_prov = systemProvenance }
+				n_occ = mkVarOcc fs, n_prov = systemProvenance }
 
 mkCCallName :: Unique -> EncodedString -> Name
 	-- The encoded string completely describes the ccall
@@ -150,7 +150,7 @@ mkTopName :: Unique -> Module -> FAST_STRING -> Name
 mkTopName uniq mod fs
   = Name { n_uniq = uniq, 
 	   n_sort = mk_top_sort mod,
-	   n_occ  = mkSrcVarOcc (_PK_ ((_UNPK_ fs) ++ show uniq)),
+	   n_occ  = mkVarOcc (_PK_ ((_UNPK_ fs) ++ show uniq)),
 	   n_prov = LocalDef noSrcLoc NotExported }
 
 mkIPName :: Unique -> OccName -> Name

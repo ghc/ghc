@@ -60,7 +60,7 @@ import Name		( mkDerivedName, mkWiredInIdName, mkLocalName,
 			  mkWorkerOcc, mkSuperDictSelOcc, mkCCallName,
 			  Name, NamedThing(..),
 			)
-import OccName		( mkSrcVarOcc )
+import OccName		( mkVarOcc )
 import PrimOp		( PrimOp(DataToTagOp, CCallOp), 
 			  primOpSig, mkPrimOpIdName,
 			  CCall, pprCCallOp
@@ -783,7 +783,7 @@ pAR_ERROR_ID
 pcMiscPrelId :: Unique{-IdKey-} -> Module -> FAST_STRING -> Type -> IdInfo -> Id
 pcMiscPrelId key mod str ty info
   = let
-	name = mkWiredInIdName key mod (mkSrcVarOcc str) imp
+	name = mkWiredInIdName key mod (mkVarOcc str) imp
 	imp  = mkId name ty info -- the usual case...
     in
     imp

@@ -32,7 +32,7 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList
 			)
 import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
-import RdrName		( RdrName, mkSrcUnqual )
+import RdrName		( RdrName, mkUnqual )
 import RnMonad		( FixityEnv, lookupFixity )
 import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
 			, maxPrecedence
@@ -1355,7 +1355,7 @@ genOpApp e1 op e2 = mkHsOpApp e1 op e2
 
 \begin{code}
 qual_orig_name n = nameRdrName (getName n)
-varUnqual n      = mkSrcUnqual varName n
+varUnqual n      = mkUnqual varName n
 
 zz_a_RDR	= varUnqual SLIT("_a")
 a_RDR		= varUnqual SLIT("a")

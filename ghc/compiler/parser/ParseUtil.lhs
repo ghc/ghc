@@ -335,5 +335,5 @@ groupBindings binds = group Nothing binds
 		RdrValBinding b@(FunMonoBind _ _ _ _) -> group (Just b) binds
 		other -> bind `RdrAndBindings` group Nothing binds
 
-plus_RDR = mkSrcUnqual varName SLIT("+")
+plus_RDR = mkUnqual varName SLIT("+")
 \end{code}

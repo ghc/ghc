@@ -93,7 +93,7 @@ import TysPrim
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( Module, mkPrelModule )
 import Name		( mkWiredInTyConName, mkWiredInIdName, nameOccName )
-import OccName		( mkSrcOccFS, tcName, dataName, mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
+import OccName		( mkOccFS, tcName, dataName, mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
 import RdrName		( RdrName, mkPreludeQual, rdrNameOcc, rdrNameModule )
 import DataCon		( DataCon, StrictnessMark(..),  mkDataCon, dataConId )
 import Var		( TyVar, tyVarKind )
@@ -236,7 +236,7 @@ mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
 mk_tuple boxity arity = (tycon, tuple_con)
   where
 	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con boxity gen_info 
-	tc_name = mkWiredInTyConName tc_uniq mod (mkSrcOccFS tcName name_str) tycon
+	tc_name = mkWiredInTyConName tc_uniq mod (mkOccFS tcName name_str) tycon
     	tc_kind = mkArrowKinds (map tyVarKind tyvars) res_kind
 	res_kind | isBoxed boxity = boxedTypeKind
 		 | otherwise	  = unboxedTypeKind

@@ -19,7 +19,7 @@ import DsUtils		( EquationInfo(..), MatchResult(..), EqnSet, CanItFail(..),
 import Id		( idType )
 import DataCon		( DataCon, dataConTyCon, dataConArgTys,
 			  dataConSourceArity, dataConFieldLabels )
-import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, mkSrcVarOcc )
+import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, mkVarOcc )
 import Type		( splitAlgTyConApp, mkTyVarTys, splitTyConApp_maybe )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           mkListTy, mkTupleTy, tupleCon
@@ -373,7 +373,7 @@ make_row_vars used_lits (EqnInfo _ _ pats _ ) =
   where new_var = hash_x
 
 hash_x = mkLocalName unboundKey {- doesn't matter much -}
-		     (mkSrcVarOcc SLIT("#x"))
+		     (mkVarOcc SLIT("#x"))
 		     noSrcLoc
 
 make_row_vars_for_constructor :: EquationInfo -> [WarningPat]

@@ -82,7 +82,7 @@ import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
                       	)
 import PrelNames	( pRELUDE_Name, mkTupNameStr )
 import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc,
-			  mkSrcUnqual, mkPreludeQual
+			  mkUnqual, mkPreludeQual
 			)
 import HsPragmas	
 import List		( nub )
@@ -336,7 +336,7 @@ tupleTyCon_RDR arity    = prelQual tcName   (snd (mkTupNameStr Boxed arity))
 ubxTupleCon_RDR arity   = prelQual dataName (snd (mkTupNameStr Unboxed arity))
 ubxTupleTyCon_RDR arity = prelQual tcName   (snd (mkTupNameStr Unboxed arity))
 
-prelQual ns occ | opt_NoImplicitPrelude = mkSrcUnqual   ns occ
+prelQual ns occ | opt_NoImplicitPrelude = mkUnqual   ns occ
 		| otherwise		= mkPreludeQual ns pRELUDE_Name occ
 \end{code}
 

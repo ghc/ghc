@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.40 2000/10/06 09:31:45 simonpj Exp $
+$Id: Parser.y,v 1.41 2000/10/12 11:47:26 sewardj Exp $
 
 Haskell grammar.
 
@@ -903,7 +903,7 @@ qvar 	:: { RdrName }
 -- *after* we see the close paren.
 
 ipvar	:: { RdrName }
-	: IPVARID		{ (mkSrcUnqual ipName (tailFS $1)) }
+	: IPVARID		{ (mkUnqual ipName (tailFS $1)) }
 
 qcon	:: { RdrName }
 	: qconid		{ $1 }
@@ -949,21 +949,21 @@ qopm	:: { RdrNameHsExpr }   -- used in sections
 
 qvarid :: { RdrName }
 	: varid			{ $1 }
-	| QVARID		{ mkSrcQual varName $1 }
+	| QVARID		{ mkQual varName $1 }
 
 varid :: { RdrName }
 	: varid_no_unsafe 	{ $1 }
-	| 'unsafe'		{ mkSrcUnqual varName SLIT("unsafe") }
+	| 'unsafe'		{ mkUnqual varName SLIT("unsafe") }
 
 varid_no_unsafe :: { RdrName }
-	: VARID			{ mkSrcUnqual varName $1 }
-	| special_id		{ mkSrcUnqual varName $1 }
-	| 'forall'		{ mkSrcUnqual varName SLIT("forall") }
+	: VARID			{ mkUnqual varName $1 }
+	| special_id		{ mkUnqual varName $1 }
+	| 'forall'		{ mkUnqual varName SLIT("forall") }
 
 tyvar 	:: { RdrName }
-	: VARID			{ mkSrcUnqual tvName $1 }
-	| special_id		{ mkSrcUnqual tvName $1 }
-	| 'unsafe' 		{ mkSrcUnqual tvName SLIT("unsafe") }
+	: VARID			{ mkUnqual tvName $1 }
+	| special_id		{ mkUnqual tvName $1 }
+	| 'unsafe' 		{ mkUnqual tvName SLIT("unsafe") }
 
 -- These special_ids are treated as keywords in various places, 
 -- but as ordinary ids elsewhere.   A special_id collects all thsee
@@ -984,20 +984,20 @@ special_id
 
 qconid :: { RdrName }
 	: conid			{ $1 }
-	| QCONID		{ mkSrcQual dataName $1 }
+	| QCONID		{ mkQual dataName $1 }
 
 conid 	:: { RdrName }
-	: CONID			{ mkSrcUnqual dataName $1 }
+	: CONID			{ mkUnqual dataName $1 }
 
 -----------------------------------------------------------------------------
 -- ConSyms
 
 qconsym :: { RdrName }
 	: consym		{ $1 }
-	| QCONSYM		{ mkSrcQual dataName $1 }
+	| QCONSYM		{ mkQual dataName $1 }
 
 consym :: { RdrName }
-	: CONSYM		{ mkSrcUnqual dataName $1 }
+	: CONSYM		{ mkUnqual dataName $1 }
 
 -----------------------------------------------------------------------------
 -- VarSyms
@@ -1011,15 +1011,15 @@ qvarsym_no_minus :: { RdrName }
 	| qvarsym1		{ $1 }
 
 qvarsym1 :: { RdrName }
-qvarsym1 : QVARSYM		{ mkSrcQual varName $1 }
+qvarsym1 : QVARSYM		{ mkQual varName $1 }
 
 varsym :: { RdrName }
 	: varsym_no_minus 	{ $1 }
-	| '-'			{ mkSrcUnqual varName SLIT("-") }
+	| '-'			{ mkUnqual varName SLIT("-") }
 
 varsym_no_minus :: { RdrName } -- varsym not including '-'
-	: VARSYM		{ mkSrcUnqual varName $1 }
-	| special_sym		{ mkSrcUnqual varName $1 }
+	: VARSYM		{ mkUnqual varName $1 }
+	| special_sym		{ mkUnqual varName $1 }
 
 
 -- See comments with special_id
@@ -1059,18 +1059,18 @@ modid 	:: { ModuleName }
 	: CONID			{ mkSrcModuleFS $1 }
 
 tycon 	:: { RdrName }
-	: CONID			{ mkSrcUnqual tcClsName $1 }
+	: CONID			{ mkUnqual tcClsName $1 }
 
 tyconop	:: { RdrName }
-	: CONSYM		{ mkSrcUnqual tcClsName $1 }
+	: CONSYM		{ mkUnqual tcClsName $1 }
 
 qtycon :: { RdrName }
 	: tycon			{ $1 }
-	| QCONID		{ mkSrcQual tcClsName $1 }
+	| QCONID		{ mkQual tcClsName $1 }
 
 qtyconop :: { RdrName }
  	  : tyconop		{ $1 }
-	  | QCONSYM		{ mkSrcQual tcClsName $1 }
+	  | QCONSYM		{ mkQual tcClsName $1 }
 
 qtycls 	:: { RdrName }
 	: qtycon		{ $1 }

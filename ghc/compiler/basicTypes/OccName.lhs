@@ -14,7 +14,7 @@ module OccName (
 	OccName, 	-- Abstract, instance of Outputable
 	pprOccName, 
 
-	mkSrcOccFS, mkSysOcc, mkSysOccFS, mkCCallOcc, mkSrcVarOcc, mkKindOccFS,
+	mkOccFS, mkSysOcc, mkSysOccFS, mkCCallOcc, mkVarOcc, mkKindOccFS,
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
 	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
@@ -188,11 +188,11 @@ mkKindOccFS occ_sp fs = OccName occ_sp fs
 *Source-code* things are encoded.
 
 \begin{code}
-mkSrcOccFS :: NameSpace -> UserFS -> OccName
-mkSrcOccFS occ_sp fs = mkSysOccFS occ_sp (encodeFS fs)
+mkOccFS :: NameSpace -> UserFS -> OccName
+mkOccFS occ_sp fs = mkSysOccFS occ_sp (encodeFS fs)
 
-mkSrcVarOcc :: UserFS -> OccName
-mkSrcVarOcc fs = mkSysOccFS varName (encodeFS fs)
+mkVarOcc :: UserFS -> OccName
+mkVarOcc fs = mkSysOccFS varName (encodeFS fs)
 \end{code}
 
 

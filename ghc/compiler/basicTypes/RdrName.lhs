@@ -10,7 +10,7 @@ module RdrName (
 
 	-- Construction
 	mkRdrUnqual, mkRdrQual,
-	mkSrcUnqual, mkSrcQual, 
+	mkUnqual, mkQual, 
 	mkSysUnqual, mkSysQual,
 	mkPreludeQual, qualifyRdrName, mkRdrNameWkr,
 	dummyRdrVarName, dummyRdrTcName,
@@ -33,7 +33,7 @@ module RdrName (
 import OccName	( NameSpace, tcName,
 		  OccName, UserFS,
 		  mkSysOccFS,
-		  mkSrcOccFS, mkSrcVarOcc,
+		  mkOccFS, mkVarOcc,
 		  isDataOcc, isTvOcc, mkWorkerOcc
 		)
 import Module   ( ModuleName,
@@ -86,11 +86,11 @@ mkRdrQual mod occ = RdrName (Qual mod) occ
 
 	-- These two are used when parsing source files
 	-- They do encode the module and occurrence names
-mkSrcUnqual :: NameSpace -> FAST_STRING -> RdrName
-mkSrcUnqual sp n = RdrName Unqual (mkSrcOccFS sp n)
+mkUnqual :: NameSpace -> FAST_STRING -> RdrName
+mkUnqual sp n = RdrName Unqual (mkOccFS sp n)
 
-mkSrcQual :: NameSpace -> (UserFS, UserFS) -> RdrName
-mkSrcQual sp (m, n) = RdrName (Qual (mkModuleNameFS m)) (mkSrcOccFS sp n)
+mkQual :: NameSpace -> (UserFS, UserFS) -> RdrName
+mkQual sp (m, n) = RdrName (Qual (mkModuleNameFS m)) (mkOccFS sp n)
 
 	-- These two are used when parsing interface files
 	-- They do not encode the module and occurrence name
@@ -101,7 +101,7 @@ mkSysQual :: NameSpace -> (FAST_STRING, FAST_STRING) -> RdrName
 mkSysQual sp (m,n) = RdrName (Qual (mkSysModuleNameFS m)) (mkSysOccFS sp n)
 
 mkPreludeQual :: NameSpace -> ModuleName -> FAST_STRING -> RdrName
-mkPreludeQual sp mod n = RdrName (Qual mod) (mkSrcOccFS sp n)
+mkPreludeQual sp mod n = RdrName (Qual mod) (mkOccFS sp n)
 
 qualifyRdrName :: ModuleName -> RdrName -> RdrName
 	-- Sets the module name of a RdrName, even if it has one already
@@ -117,8 +117,8 @@ mkRdrNameWkr (RdrName qual occ) = RdrName qual (mkWorkerOcc occ)
 	-- the renamer.  We can't just put "error..." because
 	-- we sometimes want to print out stuff after reading but
 	-- before renaming
-dummyRdrVarName = RdrName Unqual (mkSrcVarOcc SLIT("V-DUMMY"))
-dummyRdrTcName  = RdrName Unqual (mkSrcOccFS tcName SLIT("TC-DUMMY"))
+dummyRdrVarName = RdrName Unqual (mkVarOcc SLIT("V-DUMMY"))
+dummyRdrTcName  = RdrName Unqual (mkOccFS tcName SLIT("TC-DUMMY"))
 \end{code}
 
 

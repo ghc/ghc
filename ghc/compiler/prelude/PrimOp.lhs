@@ -34,7 +34,7 @@ import Var		( TyVar, Id )
 import CallConv		( CallConv, pprCallConv )
 import Name		( Name, mkWiredInIdName )
 import RdrName		( RdrName, mkRdrQual )
-import OccName		( OccName, pprOccName, mkSrcVarOcc )
+import OccName		( OccName, pprOccName, mkVarOcc )
 import TyCon		( TyCon, tyConArity )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, mkTyVarTys,
 			  mkTyConApp, typePrimRep,
@@ -134,10 +134,10 @@ data PrimOpInfo
 		[Type] 
 		Type 
 
-mkDyadic str  ty = Dyadic  (mkSrcVarOcc str) ty
-mkMonadic str ty = Monadic (mkSrcVarOcc str) ty
-mkCompare str ty = Compare (mkSrcVarOcc str) ty
-mkGenPrimOp str tvs tys ty = GenPrimOp (mkSrcVarOcc str) tvs tys ty
+mkDyadic str  ty = Dyadic  (mkVarOcc str) ty
+mkMonadic str ty = Monadic (mkVarOcc str) ty
+mkCompare str ty = Compare (mkVarOcc str) ty
+mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOcc str) tvs tys ty
 \end{code}
 
 %************************************************************************
