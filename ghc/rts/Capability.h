@@ -28,24 +28,26 @@
 extern Capability MainCapability;
 #endif
 
+
 extern void initCapabilities(void);
 extern void grabCapability(Capability** cap);
 extern void releaseCapability(Capability* cap);
 
 #if defined(RTS_SUPPORTS_THREADS)
-extern nat rts_n_free_capabilities;  /* total number of available capabilities */
+/* total number of available capabilities */
+extern nat rts_n_free_capabilities;  
 
-static inline nat getFreeCapabilities()
+static inline nat getFreeCapabilities (void)
 {
   return rts_n_free_capabilities;
 }
 
-static inline rtsBool noCapabilities()
+static inline rtsBool noCapabilities (void)
 {
   return (rts_n_free_capabilities == 0);
 }
 
-static inline rtsBool allFreeCapabilities()
+static inline rtsBool allFreeCapabilities (void)
 {
 # if defined(SMP)
   return (rts_n_free_capabilities == RtsFlags.ParFlags.nNodes);

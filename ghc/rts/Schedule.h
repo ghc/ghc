@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.27 2002/02/12 15:39:49 sof Exp $
+ * $Id: Schedule.h,v 1.28 2002/02/13 08:48:07 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -131,16 +131,6 @@ extern rtsBool interrupted;
 /* In Select.c */
 extern nat timestamp;
 
-/* Free capability list.
- * Locks required: sched_mutex.
- */
-#ifdef SMP
-extern Capability *free_capabilities;
-extern nat n_free_capabilities;
-#else
-extern Capability MainCapability;
-#endif
-
 /* Thread queues.
  * Locks required  : sched_mutex
  *
@@ -157,12 +147,30 @@ extern  StgTSO *sleeping_queue;
 extern  StgTSO *all_threads;
 
 #if defined(RTS_SUPPORTS_THREADS)
+/* Schedule.c has detailed info on what these do */
 extern Mutex       sched_mutex;
 extern Condition   thread_ready_cond;
-# if defined(SMP)
-extern Condition   gc_pending_cond;
-# endif
+extern Condition   returning_worker_cond;
+extern nat         rts_n_waiting_workers;
+extern nat         rts_n_waiting_tasks;
 #endif
+
+
+/* Sigh, RTS-internal versions of waitThread(), scheduleThread(), and
+   rts_evalIO() for the use by main() only. ToDo: better. */
+extern SchedulerStatus waitThread_(StgTSO *tso,
+				   /*out*/StgClosure **ret
+#if defined(THREADED_RTS)
+				   , rtsBool blockWaiting
+#endif
+				   );
+extern void scheduleThread_(StgTSO *tso
+#if defined(THREADED_RTS)
+			   , rtsBool createTask
+#endif
+			    );
+extern SchedulerStatus rts_mainEvalIO(HaskellObj p, /*out*/HaskellObj *ret);
+
 
 /* Called by shutdown_handler(). */
 void interruptStgRts ( void );
@@ -250,7 +258,7 @@ void print_bqe (StgBlockingQueueElement *bqe);
  */
 #if defined(RTS_SUPPORTS_THREADS)
 #define THREAD_RUNNABLE()			\
-  if ( !noCapabilities() ) {		        \
+  if ( !noCapabilities() ) {	                \
      signalCondition(&thread_ready_cond);	\
   }						\
   context_switch = 1;

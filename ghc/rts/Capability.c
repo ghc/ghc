@@ -19,6 +19,7 @@
  * --------------------------------------------------------------------------*/
 #include "PosixSource.h"
 #include "Rts.h"
+#include "Schedule.h"
 #include "RtsUtils.h"
 #include "Capability.h"
 
@@ -51,6 +52,7 @@ initCapabilities()
   initCapabilities_(RtsFlags.ParFlags.nNodes);
 #else
   initCapability(&MainCapability);
+  rts_n_free_capabilities = 1;
 #endif
 
   return;
@@ -75,14 +77,38 @@ void grabCapability(Capability** cap)
 #endif
 }
 
-void releaseCapability(Capability* cap)
+/*
+ * Letting go of a capability
+ *
+ * Locks required: sched_mutex
+ */
+void releaseCapability(Capability* cap
+#if !defined(SMP)
+		       STG_UNUSED
+#endif
+)
 {
 #if defined(SMP)
   cap->link = free_capabilities;
   free_capabilities = cap;
   rts_n_free_capabilities++;
-#endif
+#else
   rts_n_free_capabilities = 1;
+#endif
+
+#if defined(RTS_SUPPORTS_THREADS)
+  /* Check to see whether a worker thread can be given
+     the go-ahead to return the result of an external call..*/
+  if (rts_n_waiting_workers > 0) {
+    /* The worker is responsible for grabbing the capability and
+     * decrementing the rts_n_returning_workers count
+     */
+    signalCondition(&returning_worker_cond);
+  } else if ( !EMPTY_RUN_QUEUE() ) {
+    /* Signal that work is available */
+    signalCondition(&thread_ready_cond);
+  }
+#endif
   return;
 }
 

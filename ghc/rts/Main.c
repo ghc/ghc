@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.33 2002/02/05 15:42:04 simonpj Exp $
+ * $Id: Main.c,v 1.34 2002/02/13 08:48:06 sof Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 		   fprintf(stderr, "==== [%x] Main Thread Started ...\n", mytid));
 
       /* ToDo: Dump event for the main thread */
-      status = rts_evalIO((HaskellObj)mainIO_closure, NULL);
+      status = rts_mainEvalIO((HaskellObj)mainIO_closure, NULL);
     } else {
       /* Just to show we're alive */
       IF_PAR_DEBUG(verbose,
@@ -98,12 +98,12 @@ int main(int argc, char *argv[])
 #  elif defined(GRAN)
 
     /* ToDo: Dump event for the main thread */
-    status = rts_evalIO(mainIO_closure, NULL);
+    status = rts_mainEvalIO(mainIO_closure, NULL);
 
 #  else /* !PAR && !GRAN */
 
     /* ToDo: want to start with a larger stack size */
-    status = rts_evalIO((HaskellObj)mainIO_closure, NULL);
+    status = rts_mainEvalIO((HaskellObj)mainIO_closure, NULL);
 
 #  endif /* !PAR && !GRAN */
 
