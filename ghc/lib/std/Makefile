@@ -97,6 +97,8 @@ all :: PrelMain.dll_o DllVersionInfo.o
 
 endif
 
+CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
+
 #
 # Building PrelMain.dll_o is, unfortunately, somewhat tricky
 # with the current DLL setup. PrelMain.dll_o should refer to
