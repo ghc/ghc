@@ -1,11 +1,10 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.3 2000/10/23 11:08:22 simonmar Exp $
+# $Id: Makefile,v 1.4 2000/12/30 20:42:03 panne Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
 HS_PROG        = genprimopcode
-INSTALL_PROGS += $(HS_PROG)
 SRC_HC_OPTS   += -syslib text
 
 # genprimopcode is needed to boot in ghc/compiler...
