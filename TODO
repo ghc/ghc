@@ -1,3 +1,13 @@
+* doc strings for: function arguments
+
+* more compact rendering for datatypes, like
+	data T = -- comment for T
+	   A	 -- comment for A
+	 | B     -- comment for B
+
+* instances: list relevant instances in the documentation for classes and
+  datatypes.
+
 * A module re-export should only reference the target module if the
   target module is imported without hiding any of its exports (otherwise
   we should inline just the exported bits).
@@ -29,9 +39,6 @@
 
 * pay attention to import specs!
 
-* instances: list relevant instances in the documentation for classes and
-  datatypes.
-
 * include file revision info in module headers
 
 * Add a link to the defining location of a re-exported entity
@@ -40,8 +47,6 @@
 
 * we don't deal with records properly - exporting record selectors etc.
 
-* doc strings for: function arguments
-
 * remove the s/r conflicts I added to the grammar
 
 * check handling of special types ([], (), (,) etc.)
@@ -49,3 +54,8 @@
 * Horizontal lines?
 
 * clean up the layout: don't use table cellspacing, use CSS instead
+
+* implicit parameter support in the parser.
+
+* Allow a qualified name in a doc string to point to the entity even if it
+  isn't in scope.
