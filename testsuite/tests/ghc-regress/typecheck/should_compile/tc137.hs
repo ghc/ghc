@@ -13,6 +13,7 @@ Reported by Armin Groesslinger
 -}
 
 module ShouldCompile
+where
 
 data X a = X a
 
