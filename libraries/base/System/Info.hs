@@ -18,7 +18,9 @@ module System.Info
        os,		    -- :: String
        arch,		    -- :: String
        compilerName,	    -- :: String
+#ifdef __GLASGOW_HASKELL__
        compilerVersion	    -- :: Version
+#endif
    ) where
 
 import Prelude
@@ -50,8 +52,8 @@ compilerName = "hugs"
 #error Unknown compiler name
 #endif
 
-compilerVersion :: Version
 #ifdef __GLASGOW_HASKELL__
+compilerVersion :: Version
 compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
   where (maj,min) = __GLASGOW_HASKELL__ `divMod` 100
 #endif
