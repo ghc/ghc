@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: OutOfHeap.c,v 1.4 2002/07/17 09:21:51 simonmar Exp $
+ * $Id: OutOfHeap.c,v 1.5 2003/10/31 16:22:11 sof Exp $
  *
  * User-overridable RTS hooks.
  *
@@ -14,7 +14,7 @@ OutOfHeapHook (lnat request_size, lnat heap_size) /* both sizes in bytes */
   /*    fprintf(stderr, "Heap exhausted;\nwhile trying to allocate %lu bytes in a %lu-byte heap;\nuse `+RTS -H<size>' to increase the total heap size.\n", */
 
   (void)request_size;   /* keep gcc -Wall happy */
-  fprintf(stderr, "Heap exhausted;\nCurrent maximum heap size is %lu bytes;\nuse `+RTS -M<size>' to increase it.\n",
-	  heap_size);
+  fprintf(stderr, "Heap exhausted;\nCurrent maximum heap size is %lu bytes (%lu Mb);\nuse `+RTS -M<size>' to increase it.\n",
+	  heap_size, heap_size / (1024*1024));
 }
 
