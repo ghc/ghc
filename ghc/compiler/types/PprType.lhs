@@ -182,7 +182,7 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
 ppr_ty env ctxt_prec (FunTy ty1 ty2)
   = maybeParen ctxt_prec fUN_PREC (sep (ppr_ty env fUN_PREC ty1 : pp_rest ty2))
   -- we don't want to lose usage annotations or synonyms,
-  -- so we can't use splitFunTys here.
+  -- so we mustn't use splitFunTys here.
   where
     pp_rest (FunTy ty1 ty2) = pp_codom ty1 : pp_rest ty2
     pp_rest ty              = [pp_codom ty]
