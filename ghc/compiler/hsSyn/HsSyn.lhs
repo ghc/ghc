@@ -73,13 +73,10 @@ instance (Outputable name, Outputable pat)
     ppr (HsModule name iface_version exports imports
 		      decls deprec src_loc)
       = vcat [
-	    case deprec of
-	      Nothing -> empty
-	      Just dt -> hsep [ptext SLIT("{-# DEPRECATED"), ppr dt, ptext SLIT("#-}")],
 	    case exports of
-	      Nothing -> hsep [ptext SLIT("module"), pprModuleName name, ptext SLIT("where")]
+	      Nothing -> pp_header (ptext SLIT("where"))
 	      Just es -> vcat [
-			    hsep [ptext SLIT("module"), pprModuleName name, lparen],
+			    pp_header lparen,
 			    nest 8 (fsep (punctuate comma (map ppr es))),
 			    nest 4 (ptext SLIT(") where"))
 			  ],
@@ -87,6 +84,16 @@ instance (Outputable name, Outputable pat)
 	    pp_nonnull decls
 	]
       where
+	pp_header rest = case deprec of
+           Nothing -> pp_modname <+> rest
+           Just dt -> vcat [
+                         pp_modname,
+                         hsep [ptext SLIT("{-# DEPRECATED"), doubleQuotes (ppr dt), ptext SLIT("#-}")],
+                         rest
+                       ]
+
+	pp_modname = ptext SLIT("module") <+> pprModuleName name
+
 	pp_nonnull [] = empty
 	pp_nonnull xs = vcat (map ppr xs)
 

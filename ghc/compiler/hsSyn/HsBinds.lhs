@@ -329,7 +329,7 @@ ppr_sig (SpecInstSig ty _)
 ppr_sig (FixSig fix_sig) = ppr fix_sig
 
 ppr_sig (DeprecSig n txt)
-      = hsep [text "{-# DEPRECATED", ppr n, ppr txt, text "#-}"]
+      = hsep [text "{-# DEPRECATED", ppr n, doubleQuotes(ppr txt), text "#-}"]
 
 ppr_phase Nothing = empty
 ppr_phase (Just n) = int n
