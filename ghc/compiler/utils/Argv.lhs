@@ -26,9 +26,9 @@ unpackArgv argv argc = unpack 1
   where
     unpack :: Int -> [FAST_STRING]
     unpack n
-      = if (n >= argc)
-	then ([] :: [FAST_STRING])
-	else case (indexAddrOffAddr argv n) of { item ->
-	     mkFastCharString item : unpack (n + 1)
-	     }
+      | n >= argc = []
+      | otherwise =
+	 case (indexAddrOffAddr argv n) of 
+	   item -> mkFastCharString item : unpack (n + 1)
+
 \end{code}
