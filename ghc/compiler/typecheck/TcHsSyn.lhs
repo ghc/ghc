@@ -27,6 +27,11 @@ module TcHsSyn (
 	mkHsTyLam, mkHsDictLam, mkHsLet,
 	hsLitType, hsPatType, 
 
+	-- Coercions
+	Coercion, ExprCoFn, PatCoFn, 
+	(<$>), (<.>), mkCoercion, 
+	idCoercion, isIdCoercion,
+
 	-- re-exported from TcMonad
 	TcId, TcIdSet,
 
@@ -65,6 +70,7 @@ import VarSet
 import VarEnv
 import BasicTypes ( RecFlag(..), Boxity(..), IPName(..), ipNameName, mapIPName )
 import Maybes	  ( orElse )
+import Maybe  	  ( isNothing )
 import Unique	  ( Uniquable(..) )
 import SrcLoc	  ( noSrcLoc )
 import Bag
@@ -182,12 +188,37 @@ hsLitType (HsDoublePrim d) = doublePrimTy
 hsLitType (HsLitLit _ ty)  = ty
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Coercion functions}
+%*									*
+%************************************************************************
+
 \begin{code}
--- zonkId is used *during* typechecking just to zonk the Id's type
-zonkId :: TcId -> TcM TcId
-zonkId id
-  = zonkTcType (idType id) `thenM` \ ty' ->
-    returnM (setIdType id ty')
+type Coercion a = Maybe (a -> a)
+	-- Nothing => identity fn
+
+type ExprCoFn = Coercion TypecheckedHsExpr
+type PatCoFn  = Coercion TcPat
+
+(<.>) :: Coercion a -> Coercion a -> Coercion a	-- Composition
+Nothing <.> Nothing = Nothing
+Nothing <.> Just f  = Just f
+Just f  <.> Nothing = Just f
+Just f1 <.> Just f2 = Just (f1 . f2)
+
+(<$>) :: Coercion a -> a -> a
+Just f  <$> e = f e
+Nothing <$> e = e
+
+mkCoercion :: (a -> a) -> Coercion a
+mkCoercion f = Just f
+
+idCoercion :: Coercion a
+idCoercion = Nothing
+
+isIdCoercion :: Coercion a -> Bool
+isIdCoercion = isNothing
 \end{code}
 
 
@@ -197,7 +228,16 @@ zonkId id
 %*									*
 %************************************************************************
 
-This zonking pass runs over the bindings
+\begin{code}
+-- zonkId is used *during* typechecking just to zonk the Id's type
+zonkId :: TcId -> TcM TcId
+zonkId id
+  = zonkTcType (idType id) `thenM` \ ty' ->
+    returnM (setIdType id ty')
+\end{code}
+
+The rest of the zonking is done *after* typechecking.
+The main zonking pass runs over the bindings
 
  a) to convert TcTyVars to TyVars etc, dereferencing any bindings etc
  b) convert unbound TcTyVar to Void

@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchLambda, 
-		   tcDoStmts, tcStmtsAndThen, tcGRHSs 
+		   tcDoStmts, tcStmtsAndThen, tcGRHSs, tcThingWithSig
        ) where
 
 #include "HsVersions.h"
@@ -21,20 +21,22 @@ import HsSyn		( HsExpr(..), HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, 
 			  RenamedPat, RenamedMatchContext )
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TcHsBinds, 
-			  TcMonoBinds, TcPat, TcStmt )
+			  TcMonoBinds, TcPat, TcStmt, ExprCoFn,
+			  isIdCoercion, (<$>), (<.>) )
 
 import TcRnMonad
 import TcMonoType	( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
-import Inst		( tcSyntaxName )
+import Inst		( tcSyntaxName, tcInstCall )
 import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendLocalValEnv, tcExtendLocalValEnv2 )
 import TcPat		( tcPat, tcMonoPatBndr )
 import TcMType		( newTyVarTy, newTyVarTys, zonkTcType, zapToType )
-import TcType		( TcType, TcTyVar, tyVarsOfType, tidyOpenTypes, tidyOpenType,
+import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType,
+			  tyVarsOfType, tidyOpenTypes, tidyOpenType, isSigmaTy,
 			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind, 
 			  mkArrowKind, mkAppTy )
 import TcBinds		( tcBindsAndThen )
 import TcUnify		( unifyPArrTy,subFunTy, unifyListTy, unifyTauTy,
-			  checkSigTyVarsWrt, tcSubExp, isIdCoercion, (<$>) )
+			  checkSigTyVarsWrt, tcSubExp, tcGen )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import Name		( Name )
 import PrelNames	( monadNames, mfixName )
@@ -63,13 +65,12 @@ is used in error messages.  It checks that all the equations have the
 same number of arguments before using @tcMatches@ to do the work.
 
 \begin{code}
-tcMatchesFun :: [(Name,Id)]	-- Bindings for the variables bound in this group
-	     -> Name
+tcMatchesFun :: Name
 	     -> TcType 		-- Expected type
 	     -> [RenamedMatch]
 	     -> TcM [TcMatch]
 
-tcMatchesFun xve fun_name expected_ty matches@(first_match:_)
+tcMatchesFun fun_name expected_ty matches@(first_match:_)
   =	 -- Check that they all have the same no of arguments
 	 -- Set the location to that of the first equation, so that
 	 -- any inter-equation error messages get some vaguely
@@ -86,7 +87,7 @@ tcMatchesFun xve fun_name expected_ty matches@(first_match:_)
 	-- may show up as something wrong with the (non-existent) type signature
 
 	-- No need to zonk expected_ty, because subFunTy does that on the fly
-    tcMatches xve (FunRhs fun_name) matches expected_ty
+    tcMatches (FunRhs fun_name) matches expected_ty
 \end{code}
 
 @tcMatchesCase@ doesn't do the argument-count check because the
@@ -100,22 +101,21 @@ tcMatchesCase :: [RenamedMatch]		-- The case alternatives
 
 tcMatchesCase matches expr_ty
   = newTyVarTy openTypeKind 					`thenM` \ scrut_ty ->
-    tcMatches [] CaseAlt matches (mkFunTy scrut_ty expr_ty)	`thenM` \ matches' ->
+    tcMatches CaseAlt matches (mkFunTy scrut_ty expr_ty)	`thenM` \ matches' ->
     returnM (scrut_ty, matches')
 
 tcMatchLambda :: RenamedMatch -> TcType -> TcM TcMatch
-tcMatchLambda match res_ty = tcMatch [] LambdaExpr match res_ty
+tcMatchLambda match res_ty = tcMatch LambdaExpr match res_ty
 \end{code}
 
 
 \begin{code}
-tcMatches :: [(Name,Id)]
-	  -> RenamedMatchContext 
+tcMatches :: RenamedMatchContext 
 	  -> [RenamedMatch]
 	  -> TcType
 	  -> TcM [TcMatch]
 
-tcMatches xve ctxt matches expected_ty
+tcMatches ctxt matches expected_ty
   = 	-- If there is more than one branch, and expected_ty is a 'hole',
 	-- all branches must be types, not type schemes, otherwise the
 	-- in which we check them would affect the result.
@@ -126,7 +126,7 @@ tcMatches xve ctxt matches expected_ty
 
     mappM (tc_match expected_ty') matches
   where
-    tc_match expected_ty match = tcMatch xve ctxt match expected_ty
+    tc_match expected_ty match = tcMatch ctxt match expected_ty
 \end{code}
 
 
@@ -137,8 +137,7 @@ tcMatches xve ctxt matches expected_ty
 %************************************************************************
 
 \begin{code}
-tcMatch :: [(Name,Id)]
-	-> RenamedMatchContext
+tcMatch :: RenamedMatchContext
 	-> RenamedMatch
 	-> TcType 	-- Expected result-type of the Match.
 			-- Early unification with this guy gives better error messages
@@ -147,7 +146,7 @@ tcMatch :: [(Name,Id)]
 			-- where there are n patterns.
 	-> TcM TcMatch
 
-tcMatch xve1 ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
+tcMatch ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
   = addSrcLoc (getMatchLoc match)		$	-- At one stage I removed this;
     addErrCtxt (matchCtxt ctxt match)		$	-- I'm not sure why, so I put it back
     tcMatchPats pats expected_ty tc_grhss	`thenM` \ (pats', grhss', ex_binds) ->
@@ -155,17 +154,14 @@ tcMatch xve1 ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
 
   where
     tc_grhss rhs_ty 
-	= tcExtendLocalValEnv2 xve1 			$
-
-		-- Deal with the result signature
+	= 	-- Deal with the result signature
 	  case maybe_rhs_sig of
 	    Nothing ->  tcGRHSs ctxt grhss rhs_ty
 
 	    Just sig ->	 tcAddScopedTyVars [sig]	$
 				-- Bring into scope the type variables in the signature
-			 tcHsSigType ResSigCtxt sig	`thenM` \ sig_ty ->
-			 tcGRHSs ctxt grhss sig_ty	`thenM` \ grhss' ->
-			 tcSubExp rhs_ty sig_ty		`thenM` \ co_fn  ->
+			 tcHsSigType ResSigCtxt sig				`thenM` \ sig_ty ->
+			 tcThingWithSig sig_ty (tcGRHSs ctxt grhss) rhs_ty	`thenM` \ (co_fn, grhss') ->
 			 returnM (lift_grhss co_fn rhs_ty grhss')
 
 -- lift_grhss pushes the coercion down to the right hand sides,
@@ -173,7 +169,7 @@ tcMatch xve1 ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
 lift_grhss co_fn rhs_ty grhss 
   | isIdCoercion co_fn = grhss
 lift_grhss co_fn rhs_ty (GRHSs grhss binds ty)
-  = GRHSs (map lift_grhs grhss) binds rhs_ty	-- Change the type, since we
+  = GRHSs (map lift_grhs grhss) binds rhs_ty	-- Change the type, since the coercion does
   where
     lift_grhs (GRHS stmts loc) = GRHS (map lift_stmt stmts) loc
 	      
@@ -203,6 +199,31 @@ tcGRHSs ctxt (GRHSs grhss binds _) expected_ty
 	= addSrcLoc locn			$
 	  tcStmts (PatGuard ctxt) m_ty guarded	`thenM` \ guarded' ->
 	  returnM (GRHS guarded' locn)
+\end{code}
+
+
+\begin{code}
+tcThingWithSig :: TcSigmaType 		-- Type signature
+	       -> (TcRhoType -> TcM r) 	-- How to type check the thing inside
+	       -> TcRhoType 		-- Overall expected result type
+	       -> TcM (ExprCoFn, r)
+-- Used for expressions with a type signature, and for result type signatures
+
+tcThingWithSig sig_ty thing_inside res_ty
+  | not (isSigmaTy sig_ty)
+  = thing_inside sig_ty		`thenM` \ result ->
+    tcSubExp res_ty sig_ty	`thenM` \ co_fn ->
+    returnM (co_fn, result)
+
+  | otherwise 	-- The signature has some outer foralls
+  =	-- Must instantiate the outer for-alls of sig_tc_ty
+	-- else we risk instantiating a ? res_ty to a forall-type
+	-- which breaks the invariant that tcMonoExpr only returns phi-types
+    tcGen sig_ty emptyVarSet thing_inside	`thenM` \ (gen_fn, result) ->
+    tcInstCall SignatureOrigin sig_ty		`thenM` \ (inst_fn, inst_sig_ty) ->
+    tcSubExp res_ty inst_sig_ty			`thenM` \ co_fn ->
+    returnM (co_fn <.> inst_fn <.> gen_fn,  result)
+	-- Note that we generalise, then instantiate. Ah well.
 \end{code}
 
 

@@ -5,9 +5,7 @@ tcGRHSs ::  HsExpr.HsMatchContext Name.Name
 	      -> TcType.TcType
 	      -> TcRnTypes.TcM TcHsSyn.TcGRHSs
 
-tcMatchesFun :: 
-		[(Name.Name,Var.Id)]
-	     ->	Name.Name
+tcMatchesFun :: Name.Name
 	     -> TcType.TcType
 	     -> [RnHsSyn.RenamedMatch]
 	     -> TcRnTypes.TcM [TcHsSyn.TcMatch]

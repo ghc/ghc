@@ -12,7 +12,9 @@ module TcPat ( tcPat, tcMonoPatBndr, tcSubPat,
 
 import HsSyn		( Pat(..), HsConDetails(..), HsLit(..), HsOverLit(..), HsExpr(..) )
 import RnHsSyn		( RenamedPat )
-import TcHsSyn		( TcPat, TcId, hsLitType )
+import TcHsSyn		( TcPat, TcId, hsLitType,
+			  mkCoercion, idCoercion, isIdCoercion,
+			  (<$>), PatCoFn )
 
 import TcRnMonad
 import Inst		( InstOrigin(..),
@@ -27,9 +29,7 @@ import TcMType 		( newTyVarTy, zapToType, arityErr )
 import TcType		( TcType, TcTyVar, TcSigmaType, 
 			  mkClassPred, liftedTypeKind )
 import TcUnify		( tcSubOff, TcHoleType, 
-			  unifyTauTy, unifyListTy, unifyPArrTy, unifyTupleTy,  
-			  mkCoercion, idCoercion, isIdCoercion,
-			  (<$>), PatCoFn )
+			  unifyTauTy, unifyListTy, unifyPArrTy, unifyTupleTy )  
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 
 import TysWiredIn	( stringTy )

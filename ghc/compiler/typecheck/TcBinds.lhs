@@ -255,8 +255,9 @@ tcBindWithSigs top_lvl mbind sigs is_rec
     )						$
 
 	-- TYPECHECK THE BINDINGS
-    getLIE (tcMonoBinds mbind tc_ty_sigs is_rec)	`thenM` \ ((mbind', binder_names, mono_ids), lie_req) ->
+    getLIE (tcMonoBinds mbind tc_ty_sigs is_rec)	`thenM` \ ((mbind', bndr_names_w_ids), lie_req) ->
     let
+	(binder_names, mono_ids) = unzip (bagToList bndr_names_w_ids)
 	tau_tvs = foldr (unionVarSet . tyVarsOfType . idType) emptyVarSet mono_ids
     in
 
@@ -620,91 +621,86 @@ The signatures have been dealt with already.
 
 \begin{code}
 tcMonoBinds :: RenamedMonoBinds 
-	    -> [TcSigInfo]
-	    -> RecFlag
+	    -> [TcSigInfo] -> RecFlag
 	    -> TcM (TcMonoBinds, 
-		      [Name],		-- Bound names
-		      [TcId])		-- Corresponding monomorphic bound things
+		    Bag (Name,		-- Bound names
+		  	 TcId))		-- Corresponding monomorphic bound things
 
 tcMonoBinds mbinds tc_ty_sigs is_rec
-  = tc_mb_pats mbinds		`thenM` \ (complete_it, tvs, ids, lie_avail) ->
-    let
-	id_list 	  = bagToList ids
-	(names, mono_ids) = unzip id_list
-
-		-- This last defn is the key one:
-		-- extend the val envt with bindings for the 
-		-- things bound in this group, overriding the monomorphic
-		-- ids with the polymorphic ones from the pattern
-	extra_val_env = case is_rec of
-			  Recursive    -> map mk_bind id_list
-			  NonRecursive -> []
-    in
-	-- Don't know how to deal with pattern-bound existentials yet
-    checkTc (isEmptyBag tvs && null lie_avail) 
-	    (existentialExplode mbinds)			`thenM_` 
-
-	-- *Before* checking the RHSs, but *after* checking *all* the patterns,
-	-- extend the envt with bindings for all the bound ids;
-	--   and *then* override with the polymorphic Ids from the signatures
-	-- That is the whole point of the "complete_it" stuff.
-	--
-	-- There's a further wrinkle: we have to delay extending the environment
-	-- until after we've dealt with any pattern-bound signature type variables
-	-- Consider  f (x::a) = ...f...
-	-- We're going to check that a isn't unified with anything in the envt, 
-	-- so f itself had better not be!  So we pass the envt binding f into
-	-- complete_it, which extends the actual envt in TcMatches.tcMatch, after
-	-- dealing with the signature tyvars
-
-    complete_it extra_val_env				`thenM` \ mbinds' ->
-
-    returnM (mbinds', names, mono_ids)
+   	-- Three stages: 
+	-- 1. Check the patterns, building up an environment binding
+	--    the variables in this group (in the recursive case)
+	-- 2. Extend the environment
+	-- 3. Check the RHSs
+  = tc_mb_pats mbinds		`thenM` \ (complete_it, xve) ->
+    tcExtendLocalValEnv2 (bagToList xve) complete_it
   where
-
-    mk_bind (name, mono_id) = case maybeSig tc_ty_sigs name of
-				Nothing  -> (name, mono_id)
-				Just sig -> (idName poly_id, poly_id)
-					 where
-					    poly_id = tcSigPolyId sig
-
-    tc_mb_pats EmptyMonoBinds
-      = returnM (\ xve -> returnM EmptyMonoBinds, emptyBag, emptyBag, [])
+    tc_mb_pats EmptyMonoBinds 
+      = returnM (returnM (EmptyMonoBinds, emptyBag), emptyBag)
 
     tc_mb_pats (AndMonoBinds mb1 mb2)
-      = tc_mb_pats mb1		`thenM` \ (complete_it1, tvs1, ids1, lie_avail1) ->
-        tc_mb_pats mb2		`thenM` \ (complete_it2, tvs2, ids2, lie_avail2) ->
+      = tc_mb_pats mb1		`thenM` \ (complete_it1, xve1) ->
+        tc_mb_pats mb2		`thenM` \ (complete_it2, xve2) ->
 	let
-	   complete_it xve = complete_it1 xve	`thenM` \ mb1' ->
-			     complete_it2 xve	`thenM` \ mb2' ->
-			     returnM (AndMonoBinds mb1' mb2')
+	   complete_it = complete_it1 	`thenM` \ (mb1', bs1) ->
+			 complete_it2 	`thenM` \ (mb2', bs2) ->
+			 returnM (AndMonoBinds mb1' mb2', bs1 `unionBags` bs2)
 	in
-	returnM (complete_it,
-		  tvs1 `unionBags` tvs2,
-		  ids1 `unionBags` ids2,
-		  lie_avail1 ++ lie_avail2)
+	returnM (complete_it, xve1 `unionBags` xve2)
 
     tc_mb_pats (FunMonoBind name inf matches locn)
-      = (case maybeSig tc_ty_sigs name of
-	    Just sig -> returnM (tcSigMonoId sig)
-	    Nothing  -> newLocalName name	`thenM` \ bndr_name ->
-		        newTyVarTy openTypeKind	`thenM` \ bndr_ty -> 
-			-- NB: not a 'hole' tyvar; since there is no type 
-			-- signature, we revert to ordinary H-M typechecking
-			-- which means the variable gets an inferred tau-type
-		        returnM (mkLocalId bndr_name bndr_ty)
-	)					`thenM` \ bndr_id ->
-	let
-	   bndr_ty	   = idType bndr_id
-	   complete_it xve = addSrcLoc locn				$
-			     tcMatchesFun xve name bndr_ty matches	`thenM` \ matches' ->
-			     returnM (FunMonoBind bndr_id inf matches' locn)
-	in
-	returnM (complete_it, emptyBag, unitBag (name, bndr_id), [])
+		-- Three cases:
+		--	a) Type sig supplied
+		--	b) No type sig and recursive
+		--	c) No type sig and non-recursive
 
+      | Just sig <- maybeSig tc_ty_sigs name 
+      = let	-- (a) There is a type signature
+		-- Use it for the environment extension, and check
+		-- the RHS has the appropriate type (with outer for-alls stripped off)
+	   mono_id = tcSigMonoId sig
+	   mono_ty = idType mono_id
+	   complete_it = addSrcLoc locn				$
+			 tcMatchesFun name mono_ty matches	`thenM` \ matches' ->
+			 returnM (FunMonoBind mono_id inf matches' locn, 
+				  unitBag (name, mono_id))
+	in
+	returnM (complete_it, if isRec is_rec then unitBag (name,tcSigPolyId sig) 
+					      else emptyBag)
+
+      | isRec is_rec
+      =		-- (b) No type signature, and recursive
+      		-- So we must use an ordinary H-M type variable
+		-- which means the variable gets an inferred tau-type
+	newLocalName name		`thenM` \ mono_name ->
+	newTyVarTy openTypeKind		`thenM` \ mono_ty ->
+	let
+	   mono_id     = mkLocalId mono_name mono_ty
+	   complete_it = addSrcLoc locn				$
+			 tcMatchesFun name mono_ty matches	`thenM` \ matches' ->
+			 returnM (FunMonoBind mono_id inf matches' locn, 
+				  unitBag (name, mono_id))
+	in
+	returnM (complete_it, unitBag (name, mono_id))
+
+      | otherwise	-- (c) No type signature, and non-recursive
+      =	let		-- So we can use a 'hole' type to infer a higher-rank type
+	   complete_it 
+		= addSrcLoc locn			$
+		  newHoleTyVarTy 			`thenM` \ fun_ty -> 
+		  tcMatchesFun name fun_ty matches	`thenM` \ matches' ->
+		  readHoleResult fun_ty			`thenM` \ fun_ty' ->
+	  	  newLocalName name			`thenM` \ mono_name ->
+		  let
+		     mono_id = mkLocalId mono_name fun_ty'
+		  in
+		  returnM (FunMonoBind mono_id inf matches' locn, 
+			   unitBag (name, mono_id))
+	in
+	returnM (complete_it, emptyBag)
+	
     tc_mb_pats bind@(PatMonoBind pat grhss locn)
       = addSrcLoc locn	 	$
-	newHoleTyVarTy 			`thenM` \ pat_ty -> 
 
 		-- 	Now typecheck the pattern
 		-- We do now support binding fresh (not-already-in-scope) scoped 
@@ -714,16 +710,21 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		-- The type variables are brought into scope in tc_binds_and_then,
 		-- so we don't have to do anything here.
 
-	tcPat tc_pat_bndr pat pat_ty		`thenM` \ (pat', tvs, ids, lie_avail) ->
-	readHoleResult pat_ty			`thenM` \ pat_ty' ->
+	newHoleTyVarTy 			`thenM` \ pat_ty -> 
+	tcPat tc_pat_bndr pat pat_ty	`thenM` \ (pat', tvs, ids, lie_avail) ->
+	readHoleResult pat_ty		`thenM` \ pat_ty' ->
+
+	-- Don't know how to deal with pattern-bound existentials yet
+        checkTc (isEmptyBag tvs && null lie_avail) 
+	        (existentialExplode bind)	`thenM_` 
+
 	let
-	   complete_it xve = addSrcLoc locn		 		$
-			     addErrCtxt (patMonoBindsCtxt bind)	$
-			     tcExtendLocalValEnv2 xve			$
-			     tcGRHSs PatBindRhs grhss pat_ty'		`thenM` \ grhss' ->
-			     returnM (PatMonoBind pat' grhss' locn)
+	   complete_it = addSrcLoc locn		 		$
+			 addErrCtxt (patMonoBindsCtxt bind)	$
+			 tcGRHSs PatBindRhs grhss pat_ty'	`thenM` \ grhss' ->
+			 returnM (PatMonoBind pat' grhss' locn, ids)
 	in
-	returnM (complete_it, tvs, ids, lie_avail)
+	returnM (complete_it, if isRec is_rec then ids else emptyBag)
 
 	-- tc_pat_bndr is used when dealing with a LHS binder in a pattern.
 	-- If there was a type sig for that Id, we want to make it much
@@ -735,9 +736,8 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 	
     tc_pat_bndr name pat_ty
 	= case maybeSig tc_ty_sigs name of
-	    Nothing
-		-> newLocalName name	`thenM` \ bndr_name ->
-		   tcMonoPatBndr bndr_name pat_ty
+	    Nothing  -> newLocalName name			`thenM` \ bndr_name ->
+		        tcMonoPatBndr bndr_name pat_ty
 
 	    Just sig -> addSrcLoc (getSrcLoc name)		$
 			tcSubPat (idType mono_id) pat_ty	`thenM` \ co_fn ->

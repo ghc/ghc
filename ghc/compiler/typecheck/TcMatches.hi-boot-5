@@ -5,8 +5,7 @@ __export TcMatches tcGRHSs tcMatchesFun;
 	      -> TcType.TcType
 	      -> TcRnTypes.TcM TcHsSyn.TcGRHSs ;
 1 tcMatchesFun :: 
-		[(Name.Name,Var.Id)]
-	     ->	Name.Name
+		Name.Name
 	     -> TcType.TcType
 	     -> [RnHsSyn.RenamedMatch]
 	     -> TcRnTypes.TcM [TcHsSyn.TcMatch] ;

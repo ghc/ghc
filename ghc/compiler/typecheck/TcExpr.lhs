@@ -19,11 +19,10 @@ import qualified DsMeta
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), recBindFields )
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
-import TcHsSyn		( TcExpr, TcRecordBinds, hsLitType, mkHsDictApp, mkHsTyApp, mkHsLet )
+import TcHsSyn		( TcExpr, TcRecordBinds, hsLitType, mkHsDictApp, mkHsTyApp, mkHsLet, (<$>) )
 import TcRnMonad
-import TcUnify		( tcSubExp, tcGen, (<$>),
-			  unifyTauTy, unifyFunTy, unifyListTy, unifyPArrTy,
-			  unifyTupleTy )
+import TcUnify		( tcSubExp, tcGen,
+			  unifyTauTy, unifyFunTy, unifyListTy, unifyPArrTy, unifyTupleTy )
 import BasicTypes	( isMarkedStrict )
 import Inst		( InstOrigin(..), 
 			  newOverloadedLit, newMethodFromName, newIPDict,
@@ -34,7 +33,7 @@ import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookupClass, tcLookupGlobal_maybe, tcLookupIdLvl,
 			  tcLookupTyCon, tcLookupDataCon, tcLookupId
 			)
-import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts )
+import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcThingWithSig )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon )
 import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy, zapToType,
@@ -136,17 +135,10 @@ tcMonoExpr (HsIPVar ip) res_ty
 
 \begin{code}
 tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
- = addErrCtxt (exprSigCtxt in_expr)	$
-   tcHsSigType ExprSigCtxt poly_ty	`thenM` \ sig_tc_ty ->
-   tcExpr expr sig_tc_ty		`thenM` \ expr' ->
-
-	-- Must instantiate the outer for-alls of sig_tc_ty
-	-- else we risk instantiating a ? res_ty to a forall-type
-	-- which breaks the invariant that tcMonoExpr only returns phi-types
-   tcInstCall SignatureOrigin sig_tc_ty	`thenM` \ (inst_fn, inst_sig_ty) ->
-   tcSubExp res_ty inst_sig_ty		`thenM` \ co_fn ->
-
-   returnM (co_fn <$> inst_fn expr')
+ = addErrCtxt (exprSigCtxt in_expr)			$
+   tcHsSigType ExprSigCtxt poly_ty			`thenM` \ sig_tc_ty ->
+   tcThingWithSig sig_tc_ty (tcMonoExpr expr) res_ty	`thenM` \ (co_fn, expr') ->
+   returnM (co_fn <$> expr')
 
 tcMonoExpr (HsType ty) res_ty
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
@@ -832,7 +824,7 @@ tcId name	-- Look up the Id and instantiate its type
     loop fun fun_ty 
 	| isSigmaTy fun_ty
 	= tcInstCall orig fun_ty	`thenM` \ (inst_fn, tau) ->
-	  loop (inst_fn fun) tau
+	  loop (inst_fn <$> fun) tau
 
 	| otherwise
 	= returnM (fun, fun_ty)

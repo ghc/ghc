@@ -12,12 +12,7 @@ module TcUnify (
 	-- Various unifications
   unifyTauTy, unifyTauTyList, unifyTauTyLists, 
   unifyFunTy, unifyListTy, unifyPArrTy, unifyTupleTy,
-  unifyKind, unifyKinds, unifyOpenTypeKind, unifyFunKind,
-
-	-- Coercions
-  Coercion, ExprCoFn, PatCoFn, 
-  (<$>), (<.>), mkCoercion, 
-  idCoercion, isIdCoercion
+  unifyKind, unifyKinds, unifyOpenTypeKind, unifyFunKind
 
   ) where
 
@@ -25,7 +20,8 @@ module TcUnify (
 
 
 import HsSyn		( HsExpr(..) )
-import TcHsSyn		( TypecheckedHsExpr, TcPat, mkHsLet )
+import TcHsSyn		( TypecheckedHsExpr, TcPat, mkHsLet,
+			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
 import TypeRep		( Type(..), SourceType(..), TyNote(..), openKindCon )
 
 import TcRnMonad         -- TcType, amongst others
@@ -181,7 +177,7 @@ tc_sub exp_sty expected_ty act_sty actual_ty
   | isSigmaTy actual_ty
   = tcInstCall Rank2Origin actual_ty		`thenM` \ (inst_fn, body_ty) ->
     tc_sub exp_sty expected_ty body_ty body_ty	`thenM` \ co_fn ->
-    returnM (co_fn <.> mkCoercion inst_fn)
+    returnM (co_fn <.> inst_fn)
 
 -----------------------------------
 -- Function case
@@ -350,39 +346,6 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 \end{code}    
 
     
-
-%************************************************************************
-%*									*
-\subsection{Coercion functions}
-%*									*
-%************************************************************************
-
-\begin{code}
-type Coercion a = Maybe (a -> a)
-	-- Nothing => identity fn
-
-type ExprCoFn = Coercion TypecheckedHsExpr
-type PatCoFn  = Coercion TcPat
-
-(<.>) :: Coercion a -> Coercion a -> Coercion a	-- Composition
-Nothing <.> Nothing = Nothing
-Nothing <.> Just f  = Just f
-Just f  <.> Nothing = Just f
-Just f1 <.> Just f2 = Just (f1 . f2)
-
-(<$>) :: Coercion a -> a -> a
-Just f  <$> e = f e
-Nothing <$> e = e
-
-mkCoercion :: (a -> a) -> Coercion a
-mkCoercion f = Just f
-
-idCoercion :: Coercion a
-idCoercion = Nothing
-
-isIdCoercion :: Coercion a -> Bool
-isIdCoercion = isNothing
-\end{code}
 
 %************************************************************************
 %*									*

@@ -40,7 +40,8 @@ import {-# SOURCE #-}	TcExpr( tcExpr )
 
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..) )
 import TcHsSyn	( TcExpr, TcId, TcIdSet, TypecheckedHsExpr,
-		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
+		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId,
+		  mkCoercion, ExprCoFn
 		)
 import TcRnMonad
 import TcEnv	( tcGetInstEnv, tcLookupId, tcLookupTyCon, checkWellStaged, topIdLvl )
@@ -256,7 +257,7 @@ newIPDict orig ip_name ty
 
 
 \begin{code}
-tcInstCall :: InstOrigin  -> TcType -> TcM (TypecheckedHsExpr -> TypecheckedHsExpr, TcType)
+tcInstCall :: InstOrigin  -> TcType -> TcM (ExprCoFn, TcType)
 tcInstCall orig fun_ty	-- fun_ty is usually a sigma-type
   = tcInstType VanillaTv fun_ty	`thenM` \ (tyvars, theta, tau) ->
     newDicts orig theta		`thenM` \ dicts ->
@@ -264,7 +265,7 @@ tcInstCall orig fun_ty	-- fun_ty is usually a sigma-type
     let
 	inst_fn e = mkHsDictApp (mkHsTyApp e (mkTyVarTys tyvars)) (map instToId dicts)
     in
-    returnM (inst_fn, tau)
+    returnM (mkCoercion inst_fn, tau)
 
 tcInstDataCon :: InstOrigin -> DataCon
 	      -> TcM ([TcType],	-- Types to instantiate at

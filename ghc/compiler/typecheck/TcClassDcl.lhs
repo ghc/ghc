@@ -457,7 +457,7 @@ tcMethodBind xtve inst_tyvars inst_theta avail_insts prags
      tcExtendTyVarEnv2 xtve (
 	addErrCtxt (methodCtxt sel_id)		$
 	getLIE (tcMonoBinds meth_bind [meth_sig] NonRecursive)
-     )						`thenM` \ ((meth_bind, _, _), meth_lie) ->
+     )						`thenM` \ ((meth_bind, _), meth_lie) ->
 
 	-- Now do context reduction.   We simplify wrt both the local tyvars
 	-- and the ones of the class/instance decl, so that there is

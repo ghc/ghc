@@ -8,8 +8,7 @@ _declarations_
 	      -> TcType.TcType
 	      -> TcMonad.TcM s (TcHsSyn.TcGRHSs, TcMonad.LIE) ;;
 3 tcMatchesFun _:_ _forall_ [s] => 
-		[(Name.Name,Var.Id)]
-	     ->	Name.Name
+		Name.Name
 	     -> TcType.TcType
 	     -> [RnHsSyn.RenamedMatch]
 	     -> TcMonad.TcM s ([TcHsSyn.TcMatch], TcMonad.LIE) ;;
