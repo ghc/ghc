@@ -97,7 +97,6 @@ import GHC.IOBase (Exception(..), IOException(..), IOErrorType(..))
 -- regular imports
 -- ---------------
 
-import System.IO.Unsafe( unsafePerformIO )
 import Foreign.Storable
 import Foreign.Ptr
 import Foreign.C.Types
@@ -112,6 +111,7 @@ import GHC.Num
 import GHC.Base
 #else
 import System.IO		( IOError, Handle, ioError )
+import System.IO.Unsafe		( unsafePerformIO )
 #endif
 
 -- "errno" type
