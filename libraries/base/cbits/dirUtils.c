@@ -34,7 +34,7 @@ __hscore_readdir( HsAddr dirPtr, HsAddr pDirEnt )
   if (pDirE == NULL) {
     return -1;
   }
-  if (nm_max == -1) {
+  if (nm_max == (unsigned int)-1) {
 #ifdef NAME_MAX
     nm_max = NAME_MAX + 1;
 #else
