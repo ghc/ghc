@@ -11,7 +11,7 @@ module RnEnv where		-- Export everything
 import {-# SOURCE #-} RnHiFiles
 
 import HsSyn
-import RdrHsSyn		( RdrNameIE )
+import RdrHsSyn		( RdrNameIE, RdrNameHsType, extractHsTyRdrTyVars )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
 			  mkRdrUnqual, mkRdrQual, lookupRdrEnv, foldRdrEnv, rdrEnvToList,
 			  unqualifyRdrName
@@ -607,15 +607,28 @@ bindTyVarsFV2Rn doc_str rdr_names enclosed_scope
     enclosed_scope names tyvars		`thenRn` \ (thing, fvs) ->
     returnRn (thing, delListFromNameSet fvs names)
 
-bindNakedTyVarsFVRn :: SDoc -> [RdrName]
-	            -> ([Name] -> RnMS (a, FreeVars))
-		    -> RnMS (a, FreeVars)
-bindNakedTyVarsFVRn doc_str tyvar_names enclosed_scope
-  = getSrcLocRn					`thenRn` \ loc ->
+bindPatSigTyVars :: [RdrNameHsType]
+		 -> ([Name] -> RnMS (a, FreeVars))
+	  	 -> RnMS (a, FreeVars)
+  -- Find the type variables in the pattern type 
+  -- signatures that must be brought into scope
+
+bindPatSigTyVars tys enclosed_scope
+  = getLocalNameEnv			`thenRn` \ name_env ->
+    getSrcLocRn				`thenRn` \ loc ->
     let
-	located_tyvars = [(tv, loc) | tv <- tyvar_names] 
+	forall_tyvars  = nub [ tv | ty <- tys,
+				    tv <- extractHsTyRdrTyVars ty, 
+				    not (tv `elemFM` name_env)
+			 ]
+		-- The 'nub' is important.  For example:
+		--	f (x :: t) (y :: t) = ....
+		-- We don't want to complain about binding t twice!
+
+	located_tyvars = [(tv, loc) | tv <- forall_tyvars] 
+	doc_sig        = text "In a pattern type-signature"
     in
-    bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
+    bindLocatedLocalsRn doc_sig located_tyvars	$ \ names ->
     enclosed_scope names			`thenRn` \ (thing, fvs) ->
     returnRn (thing, delListFromNameSet fvs names)
 

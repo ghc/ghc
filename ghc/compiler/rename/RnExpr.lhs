@@ -199,21 +199,8 @@ rnMatch ctxt match@(Match _ pats maybe_rhs_sig grhss)
     
     returnRn (Match sig_tyvars pats' maybe_rhs_sig' grhss', all_fvs)
 	-- The bindLocals and bindTyVars will remove the bound FVs
-
-
-bindPatSigTyVars :: [RdrNameHsType]
-		 -> ([Name] -> RnMS (a, FreeVars))
-	  	 -> RnMS (a, FreeVars)
-  -- Find the type variables in the pattern type 
-  -- signatures that must be brought into scope
-bindPatSigTyVars tys thing_inside
-  = getLocalNameEnv			`thenRn` \ name_env ->
-    let
-	forall_tyvars  = [ tv | ty <- tys, tv <- extractHsTyRdrTyVars ty, not (tv `elemFM` name_env)]
-	doc_sig        = text "In a pattern type-signature"
-    in
-    bindNakedTyVarsFVRn doc_sig forall_tyvars thing_inside
 \end{code}
+
 
 %************************************************************************
 %*									*
