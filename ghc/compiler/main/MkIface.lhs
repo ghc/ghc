@@ -34,7 +34,7 @@ import HscTypes		( VersionInfo(..), ModIface(..), HomeModInfo(..),
 			  ExternalPackageState(..),
 			  ParsedIface(..), Usage(..),
 			  Deprecations(..), initialVersionInfo,
-			  lookupVersion
+			  lookupVersion, lookupIfaceByModName
 			)
 
 import CmdLineOpts
@@ -58,7 +58,7 @@ import FieldLabel	( fieldLabelType )
 import TcType		( tcSplitSigmaTy, tidyTopType, deNoteType, tyClsNamesOfDFunHead )
 import SrcLoc		( noSrcLoc )
 import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
-			  ModLocation(..), mkSysModuleNameFS,
+			  ModLocation(..), mkSysModuleNameFS, 
 			  ModuleEnv, emptyModuleEnv, foldModuleEnv, lookupModuleEnv,
 			  extendModuleEnv_C, elemModuleSet, moduleEnvElts, elemModuleEnv
 			)
@@ -483,17 +483,15 @@ mkUsageInfo hsc_env eps
     -- the entire collection of Ifaces.
     usages `seqList` usages
   where
-    usages = catMaybes (map mkUsage (moduleEnvElts hpt))
-    hpt    = hsc_HPT hsc_env
+    usages = catMaybes [ mkUsage mod_name 
+		       | (mod_name,_,_) <- moduleEnvElts dep_mods]
+
+    hpt = hsc_HPT hsc_env
+    pit = eps_PIT eps
     
     import_all mod = case lookupModuleEnv dir_imp_mods mod of
     			Just (_,imp_all) -> imp_all
     			Nothing		 -> False
-    
-	-- Find out whether this module is an
-    is_orphan_mod mod = case lookupModuleEnv dep_mods mod of
-			     Just (_, orph, _) -> orph
-			     Nothing	       -> False
     
     -- ent_map groups together all the things imported and used
     -- from a particular module in this package
@@ -510,12 +508,14 @@ mkUsageInfo hsc_env eps
     --		(need to recompile if its export list changes: export_vers)
     --	c) is a home-package orphan module (need to recompile if its
     --	 	instance decls change: rules_vers)
-    mkUsage :: HomeModInfo -> Maybe (Usage Name)
-    mkUsage mod_info
-      |  null used_names
-      && not all_imported
-      && not orphan_mod
-      = Nothing
+    mkUsage :: ModuleName -> Maybe (Usage Name)
+    mkUsage mod_name
+      |  isNothing maybe_iface	-- We can't depend on it if we didn't
+      || not (isHomeModule mod)	-- even open the interface!
+      || (null used_names
+	  && not all_imported
+	  && not orphan_mod)
+      = Nothing			-- Record no usage info
     
       | otherwise	
       = Just (Usage { usg_name     = moduleName mod,
@@ -524,12 +524,14 @@ mkUsageInfo hsc_env eps
     		      usg_entities = ent_vers,
     		      usg_rules    = rules_vers })
       where
-        iface 	     = hm_iface mod_info
+	maybe_iface  = lookupIfaceByModName hpt pit mod_name
+		-- In one-shot mode, the interfaces for home-package 
+		-- modules accumulate in the PIT not HPT.  Sigh.
+
+        Just iface   = maybe_iface
         mod   	     = mi_module iface
         version_info = mi_version iface
-	orphan_mod   = mod `elemModuleEnv` dep_mods && mi_orphan iface
-			-- Only bother if the module is below 
-			-- us in the import graph
+	orphan_mod   = mi_orphan iface
         version_env  = vers_decls   version_info
         mod_vers     = vers_module  version_info
         rules_vers   = vers_rules   version_info
