@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.9 1999/08/25 16:11:51 simonmar Exp $
+ * $Id: RtsUtils.c,v 1.10 1999/11/09 10:46:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -17,6 +17,10 @@
 
 #ifdef HAVE_TIME_H
 #include <time.h>
+#endif
+
+#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
 #endif
 
 #include <stdarg.h>
@@ -182,6 +186,26 @@ time_str(void)
     return nowstr;
 }
 #endif
+
+/* -----------------------------------------------------------------------------
+ * Reset a file handle to blocking mode.  We do this for the standard
+ * file descriptors before exiting, because the shell doesn't always
+ * clean up for us.
+ * -------------------------------------------------------------------------- */
+
+void
+resetNonBlockingFd(int fd)
+{
+  long fd_flags;
+
+#if !defined(_WIN32) || defined(__CYGWIN__) || defined(__CYGWIN32__)
+  /* clear the non-blocking flag on this file descriptor */
+  fd_flags = fcntl(fd, F_GETFL);
+  if (fd_flags & O_NONBLOCK) {
+    fcntl(fd, F_SETFL, fd_flags & ~O_NONBLOCK);
+  }
+#endif
+}
 
 /* -----------------------------------------------------------------------------
    Print large numbers, with punctuation.

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.7 1999/10/29 13:52:30 sof Exp $
+# $Id: Makefile,v 1.8 1999/11/09 10:46:27 simonmar Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -16,7 +16,7 @@ C_SRCS= $(wildcard *.c)
 
 C_OBJS  = $(C_SRCS:.c=.$(way_)o)
 LIBOBJS = $(C_OBJS)
-SRC_CC_OPTS += -O -I$(GHC_INCLUDE_DIR) $(GhcLibCcOpts)
+SRC_CC_OPTS += -O -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) $(GhcLibCcOpts)
 
 ifneq "$(way)" "dll"
 SRC_CC_OPTS += -static

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.23 1999/11/02 17:19:15 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.24 1999/11/09 10:46:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -192,6 +192,11 @@ shutdownHaskell(void)
   /* stop the ticker */
   initialize_virtual_timer(0);
   
+  /* reset the standard file descriptors to blocking mode */
+  resetNonBlockingFd(0);
+  resetNonBlockingFd(1);
+  resetNonBlockingFd(2);
+
   /* stop timing the shutdown, we're about to print stats */
   stat_endExit();
 

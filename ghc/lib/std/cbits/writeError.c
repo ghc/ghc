@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
  *
- * $Id: writeError.c,v 1.3 1999/11/05 15:22:59 simonmar Exp $
+ * $Id: writeError.c,v 1.4 1999/11/09 10:46:27 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -17,6 +17,7 @@ implementation in one or two places.)
 */
 
 #include "Rts.h"
+#include "RtsUtils.h"
 #include "stgio.h"
 
 #ifdef HAVE_FCNTL_H
@@ -32,13 +33,8 @@ StgInt len;
   int count = 0;
   char* p  = (char*)msg;
   char  nl = '\n';
-  long fd_flags;
 
-#if !defined(_WIN32) || defined(__CYGWIN__) || defined(__CYGWIN32__)
-    /* clear the non-blocking flag on this file descriptor */
-    fd_flags = fcntl(2, F_GETFL);
-    fcntl(2, F_SETFL, fd_flags & ~O_NONBLOCK);
-#endif
+  resetNonBlockingFd(2);
 
   /* Print error msg header */
   if (msg_hdr) {

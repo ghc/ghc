@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.4 1999/03/17 13:19:23 simonm Exp $
+ * $Id: RtsUtils.h,v 1.5 1999/11/09 10:46:25 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -21,6 +21,8 @@ extern void raiseError( StgStablePtr handler );
 
 extern void stackOverflow(void);
 extern void heapOverflow(void);
+
+void resetNonBlockingFd(int fd);
 
 extern nat stg_strlen(char *str);
 
