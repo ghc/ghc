@@ -411,29 +411,30 @@ filterImports :: ModIface
 	-- Complains if import spec mentions things that the module doesn't export
         -- Warns/informs if import spec contains duplicates.
 			
+mkGenericRdrEnv imp_spec avails
+  = mkGlobalRdrEnv [ GRE { gre_name = name, gre_prov = Imported [imp_spec] False }
+		   | avail <- avails, name <- availNames avail ]
+
 filterImports iface imp_spec Nothing total_avails
   = returnM (mkAvailEnv total_avails, 
-	     mkGlobalRdrEnv [ GRE { gre_name = name, gre_prov = Imported [imp_spec] False }
-			    | avail <- total_avails, name <- availNames avail ])
+	     mkGenericRdrEnv imp_spec total_avails)
 
 filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
   = mapAndUnzipM (addLocM get_item) import_items 	`thenM` \ (avails_s, gres) ->
     let
 	avails = concat avails_s
-	rdr_env | not want_hiding 
-		= foldr plusGlobalRdrEnv emptyGlobalRdrEnv gres
-		| otherwise	-- Hiding; qualified-only import of hidden things
-		= mkGlobalRdrEnv [ GRE { gre_name = name, 
-					 gre_prov = Imported [mk_imp_spec name] False }
-				 | avail <- total_avails, name <- availNames avail ]
-	hidden = availsToNameSet avails
-	mk_imp_spec n 
-	  | n `elemNameSet` hidden = imp_spec { is_qual = True }
-	  | otherwise		   = imp_spec
     in
-    returnM (mkAvailEnv avails, rdr_env)
- 	-- Hiding still imports everything qualified, so 'avails' is not 
-	-- conditional on hiding.  But the rdrenv is modified to 
+    if not want_hiding then
+      return (mkAvailEnv avails,
+	      foldr plusGlobalRdrEnv emptyGlobalRdrEnv gres)
+    else
+      let
+	hidden = availsToNameSet avails
+	keep n = not (n `elemNameSet` hidden)
+	pruned_avails = pruneAvails keep total_avails
+      in
+      return (mkAvailEnv pruned_avails,
+	      mkGenericRdrEnv imp_spec pruned_avails)
 
   where
     import_fm :: OccEnv AvailInfo
