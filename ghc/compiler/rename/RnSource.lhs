@@ -362,7 +362,7 @@ rnDecl (DefD (DefaultDecl tys src_loc))
 \begin{code}
 rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
   = pushSrcLocRn src_loc $
-    lookupBndrRn name		        `thenRn` \ name' ->
+    lookupOccRn name		        `thenRn` \ name' ->
     let 
 	fvs1 = case imp_exp of
 		FoImport _ | not isDyn	-> emptyFVs
@@ -370,6 +370,7 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
 		FoExport   | isDyn	-> mkNameSet [makeStablePtr_NAME,
 						      deRefStablePtr_NAME,
 						      bindIO_NAME]
+			   | otherwise  -> mkNameSet [name']
 		_ -> emptyFVs
     in
     rnHsSigType fo_decl_msg ty		        `thenRn` \ (ty', fvs2) ->

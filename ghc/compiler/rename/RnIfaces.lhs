@@ -22,6 +22,7 @@ module RnIfaces (
 import CmdLineOpts	( opt_NoPruneDecls, opt_IgnoreIfacePragmas )
 import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..), 
 			  HsType(..), ConDecl(..), IE(..), ConDetails(..), Sig(..),
+			  ForeignDecl(..), ForKind(..), isDynamic,
 			  FixitySig(..), RuleDecl(..),
 			  isClassOpSig
 			)
@@ -30,7 +31,7 @@ import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameTyClDecl, RdrNameRuleD
 			  extractHsTyRdrNames
 			)
 import RnEnv		( mkImportedGlobalName, newImportedBinder, mkImportedGlobalFromRdrName,
-			  lookupOccRn,
+			  lookupOccRn, lookupImplicitOccRn,
 			  pprAvail,
 			  availName, availNames, addAvailToNameSet,
 			  FreeVars, emptyFVs
@@ -787,10 +788,24 @@ getDeclBinders new_name (SigD (IfaceSig var ty prags src_loc))
     returnRn (Just (Avail var_name))
 
 getDeclBinders new_name (FixD _)  = returnRn Nothing
-getDeclBinders new_name (ForD _)  = returnRn Nothing
+
+    -- foreign declarations
+getDeclBinders new_name (ForD (ForeignDecl nm kind _ dyn _ loc))
+  | binds_haskell_name kind dyn
+  = new_name nm loc		    `thenRn` \ name ->
+    returnRn (Just (Avail name))
+
+  | otherwise -- a foreign export
+  = lookupImplicitOccRn nm `thenRn_` 
+    returnRn Nothing
+
 getDeclBinders new_name (DefD _)  = returnRn Nothing
 getDeclBinders new_name (InstD _) = returnRn Nothing
 getDeclBinders new_name (RuleD _) = returnRn Nothing
+
+binds_haskell_name (FoImport _) _   = True
+binds_haskell_name FoLabel      _   = True
+binds_haskell_name FoExport  ext_nm = isDynamic ext_nm
 
 ----------------
 getConFieldNames new_name (ConDecl con _ _ (RecCon fielddecls) src_loc : rest)

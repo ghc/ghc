@@ -306,15 +306,6 @@ getLocalDeclBinders new_name (ValD binds)
     do_one (rdr_name, loc) = new_name rdr_name loc	`thenRn` \ name ->
 			     returnRn (Avail name)
 
-    -- foreign declarations
-getLocalDeclBinders new_name (ForD (ForeignDecl nm kind _ dyn _ loc))
-  | binds_haskell_name kind dyn
-  = new_name nm loc		    `thenRn` \ name ->
-    returnRn [Avail name]
-
-  | otherwise
-  = returnRn []
-
 getLocalDeclBinders new_name decl
   = getDeclBinders new_name decl	`thenRn` \ maybe_avail ->
     case maybe_avail of
@@ -325,10 +316,6 @@ getLocalDeclBinders new_name decl
 	-- The getDeclSysBinders is just to get the names of superclass selectors
 	-- etc, into the cache
     new_sys_name rdr_name loc = newImplicitBinder (rdrNameOcc rdr_name) loc
-
-binds_haskell_name (FoImport _) _   = True
-binds_haskell_name FoLabel      _   = True
-binds_haskell_name FoExport  ext_nm = isDynamic ext_nm
 
 fixitiesFromLocalDecls :: GlobalRdrEnv -> [RdrNameHsDecl] -> RnMG FixityEnv
 fixitiesFromLocalDecls gbl_env decls
