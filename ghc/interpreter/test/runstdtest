@@ -1,0 +1,257 @@
+#!/usr/bin/perl
+#! /usr/local/bin/perl
+#
+# Given:
+#	* a program to run (1st arg)
+# 	* some "command-line opts" ( -O<opt1> -O<opt2> ... )
+#	    [default: anything on the cmd line this script doesn't recognise ]
+#	  the first opt not starting w/ "-" is taken to be an input
+#	  file and (if it exists) is grepped for "what's going on here"
+#	  comments (^--!!!).
+#	* a file to feed to stdin ( -i<file> ) [default: $dev_null ]
+#	* a "time" command to use (-t <cmd>).
+#       * a "start" line (-s <line>) - all preceeding lines of output 
+#       *   are ignored (from stdout).
+#       * a "start" pattern (-f <regexp>) - all preceeding lines of output 
+#       *   are deleted (from stdout).
+#       * an "end" pattern (-l <regexp>) - all later lines of output 
+#       *   are deleted (from stdout).
+#
+#	* alternatively, a "-script <script>" argument says: run the
+#   	  named Bourne-shell script to do the test.  It's passed the
+#	  pgm-to-run as the one-and-only arg.
+#
+# Run the program with those options and that input, and check:
+# if we get...
+# 
+# 	* an expected exit status ( -x <val> ) [ default 0 ]
+# 	* expected output on stdout ( -o1 <file> ) [ default $dev_null ]
+#		( we'll accept one of several...)
+# 	* expected output on stderr ( -o2 <file> ) [ default $dev_null ]
+#		( we'll accept one of several...)
+#
+#	(if the expected-output files' names end in .Z, then
+#	 they are uncompressed before doing the comparison)
+# 
+# (This is supposed to be a "prettier" replacement for runstdtest.)
+#
+
+die "$0 requires perl 5.0 or higher" unless $] >= 5.0;
+
+($Pgm = $0) =~ s|.*/||;
+
+$tmpdir   = &fromEnv('TMPDIR',"/tmp");
+$shell    = "/bin/sh";
+$cmp      = "diff -q";
+$diff     = &fromEnv('CONTEXT_DIFF',"diff -c1");
+$dev_null = &fromEnv('DEV_NULL',"/dev/null");
+
+$Verbose = 0;
+$Status = 0;
+@PgmArgs = ();
+$PgmExitStatus = 0;
+$PgmStdinFile  = $dev_null;
+$DefaultStdoutFile = "${tmpdir}/no_stdout$$"; # can't use $dev_null (e.g. Alphas)
+$DefaultStderrFile = "${tmpdir}/no_stderr$$";
+@PgmStdoutFile = ();
+@PgmStderrFile = ();
+$PgmStartLine = 0;
+$PgmStartPat = '.';
+$PgmEndPat   = 'WILLNAEMATCH';  # hack!
+$AltScript = '';
+$TimeCmd = '';
+
+die "$Pgm: program to run not given as first argument\n" if $#ARGV < 0;
+$ToRun = $ARGV[0]; shift(@ARGV);
+# avoid picking up same-named thing from somewhere else on $PATH...
+$ToRun = "./$ToRun" if $ToRun !~ /^\//;
+
+arg: while ($_ = $ARGV[0]) {
+    shift(@ARGV);
+    
+    /^-v$/	&& do { $Verbose = 1; next arg; };
+    /^-O(.*)/	&& do { push(@PgmArgs, &grab_arg_arg('-O',$1)); next arg; };
+    /^-i(.*)/	&& do { $PgmStdinFile = &grab_arg_arg('-i',$1);
+			$Status++,
+			print STDERR "$Pgm: bogus -i input file: $PgmStdinFile\n"
+			    if ! -f $PgmStdinFile;
+			next arg; };
+    /^-x(.*)/	&& do { $PgmExitStatus = &grab_arg_arg('-x',$1);
+			$Status++ ,
+			print STDERR "$Pgm: bogus -x expected exit status: $PgmExitStatus\n"
+			    if $PgmExitStatus !~ /^\d+$/;
+			next arg; };
+    /^-s(.*)/	&& do { $PgmStartLine = &grab_arg_arg('-x',$1);
+			$Status++ ,
+			print STDERR "$Pgm: bogus -s start line: $PgmStartLine\n"
+			    if $PgmStartLine !~ /^\d+$/;
+			next arg; };
+    /^-f(.*)/	&& do { $PgmStartPat = &grab_arg_arg('-f',$1);
+			next arg; };
+    /^-l(.*)/	&& do { $PgmEndPat = &grab_arg_arg('-l',$1);
+			next arg; };
+    /^-o1(.*)/	&& do { $out_file = &grab_arg_arg('-o1',$1);
+			$Status++ ,
+			print STDERR "$Pgm: bogus -o1 expected-output file: $out_file\n"
+			    if ! -f $out_file;
+			push(@PgmStdoutFile, $out_file);
+			next arg; };
+    /^-o2(.*)/	&& do { $out_file = &grab_arg_arg('-o2',$1);
+			$Status++,
+			print STDERR "$Pgm: bogus -o2 expected-stderr file: $out_file\n"
+			    if ! -f $out_file;
+			push(@PgmStderrFile, $out_file);
+			next arg; };
+    /^-script(.*)/ && do { $AltScript = &grab_arg_arg('-script',$1);
+			next arg; };
+    /^-t(.*)/	&& do { $TimeCmd = &grab_arg_arg('-t', $1); next arg; };
+
+    # anything else is taken to be a pgm arg
+    push(@PgmArgs, $_);
+}
+exit 1 if $Status;
+
+# add on defaults if none specified
+@PgmStdoutFile = ( $DefaultStdoutFile ) if $#PgmStdoutFile < 0;
+@PgmStderrFile = ( $DefaultStderrFile ) if $#PgmStderrFile < 0;
+
+# tidy up the pgm args:
+# (1) look for the "first input file"
+#     and grep it for "interesting" comments (--!!! )
+# (2) quote any args w/ whitespace in them.
+$grep_done = 0;
+foreach $a ( @PgmArgs ) {
+    if (! $grep_done && $a !~ /^-/ && -f $a) {
+	 unless (open(ARG, $a)) {
+	     print STDERR "Can't open $a: $!\n";
+	     exit 1;
+	 }
+	 while (<ARG>) {
+	     print if /^--!!!/;
+	 }
+	 close(ARG);
+	 $grep_done = 1;
+    }
+    if ($a =~ /\s/ || $a =~ /'/) {
+	$a =~ s/'/\\'/g;    # backslash the quotes;
+	$a =~ s/"/\\"/g;    # backslash the quotes;
+	$a = "\"$a\"";	    # quote the arg
+    }
+}
+
+if ($AltScript ne '') {
+    local($to_do);
+    $to_do = `cat $AltScript`;
+    # glue in pgm to run...
+    $* = 1;
+    $to_do =~ s/^\$1 /$ToRun /;
+    &run_something($to_do);
+    exit 0;
+#    exec "$AltScript $ToRun";
+#    print STDERR "Failed to exec!!! $AltScript $ToRun\n";
+#    exit 1;
+}
+
+# OK, so we're gonna do the normal thing...
+
+$Script = <<EOSCRIPT;
+CONTEXT_DIFF='/usr/bin/diff -C 1'
+export CONTEXT_DIFF
+DEV_NULL='/dev/null'
+export DEV_NULL
+myexit=0
+diffsShown=0
+/bin/rm -f $DefaultStdoutFile $DefaultStderrFile
+cat $dev_null > $DefaultStdoutFile
+cat $dev_null > $DefaultStderrFile
+$TimeCmd ${shell} -c \'$ToRun @PgmArgs < $PgmStdinFile 1> ${tmpdir}/runtest$$.1 2> ${tmpdir}/runtest$$.2\'
+progexit=\$?
+if [ \$progexit -ne $PgmExitStatus ]; then
+    echo $ToRun @PgmArgs \\< $PgmStdinFile
+    echo expected exit status $PgmExitStatus not seen \\; got \$progexit
+    myexit=1
+else
+    # Pipe that filters out stuff we don't want to check
+    tail +$PgmStartLine ${tmpdir}/runtest$$.1 | test/after "$PgmStartPat" | test/before "$PgmEndPat" >${tmpdir}/runtest$$.3
+
+    for out_file in @PgmStdoutFile ; do
+	$diff \$out_file ${tmpdir}/runtest$$.3 > ${tmpdir}/diffs$$
+	if [ \$? -ne 0 ]; then
+	    echo $ToRun @PgmArgs \\< $PgmStdinFile
+	    echo expected stdout not matched by reality
+            cat ${tmpdir}/diffs$$
+            myexit=1
+	fi
+        /bin/rm -f ${tmpdir}/diffs$$
+    done
+fi
+for out_file in @PgmStderrFile ; do
+    $diff \$out_file ${tmpdir}/runtest$$.2 > ${tmpdir}/diffs$$
+    if [ \$? -ne 0 ]; then
+        echo $ToRun @PgmArgs \\< $PgmStdinFile
+        echo expected stderr not matched by reality
+        cat ${tmpdir}/diffs$$
+        myexit=1
+    fi
+    /bin/rm -f ${tmpdir}/diffs$$
+done
+/bin/rm -f core $DefaultStdoutFile $DefaultStderrFile ${tmpdir}/runtest$$.1 ${tmpdir}/runtest$$.3 ${tmpdir}/runtest$$.2
+exit \$myexit
+EOSCRIPT
+
+&run_something($Script);
+# print $Script if $Verbose;
+# open(SH, "| ${shell}") || die "Can't open shell pipe\n";
+# print SH $Script;
+# close(SH);
+
+exit 0;
+
+sub fromEnv {
+    local($varname,$default) = @_;
+    local($val) = $ENV{$varname};
+    $val = $default if $val eq "";
+    return $val;
+}
+
+sub grab_arg_arg {
+    local($option, $rest_of_arg) = @_;
+    
+    if ($rest_of_arg) {
+	return($rest_of_arg);
+    } elsif ($#ARGV >= 0) {
+	local($temp) = $ARGV[0]; shift(@ARGV); 
+	return($temp);
+    } else {
+	print STDERR "$Pgm: no argument following $option option\n";
+	$Status++;
+    }
+}
+
+sub run_something {
+    local($str_to_do) = @_;
+
+    print STDERR "$str_to_do\n" if $Verbose;
+
+    local($return_val) = 0;
+
+    # On Windows NT, we have to build a file before we can interpret it.
+    local($scriptfile) = "./script$$";
+    open(FOO,">$scriptfile") || die "Can't create script $scriptfile";
+    print FOO $str_to_do;
+    close FOO;
+
+    system("sh $scriptfile");
+    $return_val = $?;
+    system("rm $scriptfile");
+
+    if ($return_val != 0) {
+#ToDo: this return-value mangling is wrong
+#	local($die_msg) = "$Pgm: execution of the $tidy_name had trouble";
+#	$die_msg .= " (program not found)" if $return_val == 255;
+#	$die_msg .= " ($!)" if $Verbose && $! != 0;
+#	$die_msg .= "\n";
+
+	exit (($return_val == 0) ? 0 : 1);
+    }
+}

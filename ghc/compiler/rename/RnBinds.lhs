@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[RnBinds]{Renaming and dependency analysis of bindings}
 
@@ -28,19 +28,14 @@ import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupOccRn, lookupGlobalOccRn,
 			  isUnboundName, warnUnusedBinds
 			)
-import CmdLineOpts	( opt_SigsRequired )
+import CmdLineOpts	( opt_WarnMissingSigs )
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( OccName(..), Provenance, 
-			  Name, isExportedName,
-			  NameSet, emptyNameSet, mkNameSet, unionNameSets, 
-		 	  minusNameSet, unionManyNameSets, elemNameSet, unitNameSet, nameSetToList
-			)
+import Name		( OccName(..), Name, isExportedName )
+import NameSet
 import BasicTypes	( RecFlag(..), TopLevelFlag(..) )
 import Util		( thenCmp, removeDups, panic, panic#, assertPanic )
-import UniqSet		( UniqSet )
 import ListSetOps	( minusList )
 import Bag		( bagToList )
-import UniqFM		( UniqFM )
 import Outputable
 \end{code}
 
@@ -460,7 +455,7 @@ renameSigs top_lev inst_decl binders sigs
 	not_this_group  = sigsForMe (not . (`elemNameSet` binders)) goodies
 	spec_inst_sigs  = [s | s@(SpecInstSig _ _) <- goodies]
 	type_sig_vars	= [n | Sig n _ _ <- goodies]
-	sigs_required   = case top_lev of {TopLevel -> opt_SigsRequired; NotTopLevel -> False}
+	sigs_required   = case top_lev of {TopLevel -> opt_WarnMissingSigs; NotTopLevel -> False}
 	un_sigd_binders | sigs_required = nameSetToList binders `minusList` type_sig_vars
 			| otherwise	= []
     in
@@ -471,7 +466,7 @@ renameSigs top_lev inst_decl binders sigs
      else
 	returnRn []
     )							`thenRn_`
-    mapRn (addErrRn.missingSigErr) un_sigd_binders	`thenRn_`
+    mapRn (addWarnRn.missingSigWarn) un_sigd_binders	`thenRn_`
 
     returnRn sigs' -- bad ones and all:
 		   -- we need bindings of *some* sort for every name
@@ -565,8 +560,8 @@ sig_doc (InlineSig  _     loc) 	    = (SLIT("INLINE pragma"),loc)
 sig_doc (NoInlineSig  _   loc) 	    = (SLIT("NOINLINE pragma"),loc)
 sig_doc (SpecInstSig _ loc)	    = (SLIT("SPECIALISE instance pragma"),loc)
 
-missingSigErr var
-  = sep [ptext SLIT("Definition but no type signature for"), quotes (ppr var)]
+missingSigWarn var
+  = sep [ptext SLIT("definition but no type signature for"), quotes (ppr var)]
 
 methodBindErr mbind
  =  hang (ptext SLIT("Can't handle multiple methods defined by one pattern binding"))

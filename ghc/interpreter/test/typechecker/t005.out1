@@ -1,0 +1,4 @@
+ERROR "test/typechecker/t005.hs" (line 19): Unresolved top-level overloading
+*** Binding             : popIndentList
+*** Outstanding context : Monad b
+

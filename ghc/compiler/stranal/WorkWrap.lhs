@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
 
@@ -13,16 +13,19 @@ import CoreUnfold	( Unfolding, certainlySmallEnoughToInline, calcUnfoldingGuidan
 import CmdLineOpts	( opt_UnfoldingCreationThreshold )
 
 import CoreUtils	( coreExprType )
+import Const		( Con(..) )
+import DataCon		( DataCon )
 import MkId		( mkWorkerId )
-import Id		( getInlinePragma, getIdStrictness,
-			  addIdStrictness, addInlinePragma, idWantsToBeINLINEd,
-			  IdSet, emptyIdSet, addOneToIdSet, unionIdSets,
-			  GenId, Id
+import Id		( Id, getIdStrictness,
+			  setIdStrictness, setInlinePragma, idWantsToBeINLINEd,
 			)
+import VarSet
 import Type		( splitAlgTyConApp_maybe )
-import IdInfo		( noIdInfo, mkStrictnessInfo, setStrictnessInfo, StrictnessInfo(..) )
+import IdInfo		( mkStrictnessInfo, StrictnessInfo(..),
+			  InlinePragInfo(..) )
 import SaLib
-import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM )
+import UniqSupply	( UniqSupply, initUs, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
+import UniqSet
 import WwLib
 import Outputable
 \end{code}
@@ -40,16 +43,17 @@ info for exported values).
 \end{enumerate}
 
 \begin{code}
-workersAndWrappers :: [CoreBinding] -> UniqSM [CoreBinding]
+workersAndWrappers :: UniqSupply -> [CoreBind] -> [CoreBind]
 
-workersAndWrappers top_binds
-  = mapUs (wwBind True{-top-level-}) top_binds `thenUs` \ top_binds2 ->
+workersAndWrappers us top_binds
+  = initUs us $
+    mapUs (wwBind True{-top-level-}) top_binds `thenUs` \ top_binds2 ->
     let
 	top_binds3 = map make_top_binding top_binds2
     in
     returnUs (concat top_binds3)
   where
-    make_top_binding :: WwBinding -> [CoreBinding]
+    make_top_binding :: WwBinding -> [CoreBind]
 
     make_top_binding (WwLet binds) = binds
 \end{code}
@@ -65,14 +69,14 @@ turn.  Non-recursive case first, then recursive...
 
 \begin{code}
 wwBind	:: Bool			-- True <=> top-level binding
-	-> CoreBinding
+	-> CoreBind
 	-> UniqSM WwBinding	-- returns a WwBinding intermediate form;
 				-- the caller will convert to Expr/Binding,
 				-- as appropriate.
 
 wwBind top_level (NonRec binder rhs)
-  = wwExpr rhs			`thenUs` \ new_rhs ->
-    tryWW binder new_rhs 	`thenUs` \ new_pairs ->
+  = wwExpr rhs						`thenUs` \ new_rhs ->
+    tryWW True {- non-recursive -} binder new_rhs 	`thenUs` \ new_pairs ->
     returnUs (WwLet [NonRec b e | (b,e) <- new_pairs])
       -- Generated bindings must be non-recursive
       -- because the original binding was.
@@ -84,7 +88,7 @@ wwBind top_level (Rec pairs)
     returnUs (WwLet [Rec (concat new_pairs)])
   where
     do_one (binder, rhs) = wwExpr rhs 	`thenUs` \ new_rhs ->
-			   tryWW binder new_rhs
+			   tryWW False {- recursive -} binder new_rhs
 \end{code}
 
 @wwExpr@ basically just walks the tree, looking for appropriate
@@ -96,10 +100,12 @@ matching by looking for strict arguments of the correct type.
 \begin{code}
 wwExpr :: CoreExpr -> UniqSM CoreExpr
 
+wwExpr e@(Type _)   = returnUs e
 wwExpr e@(Var _)    = returnUs e
-wwExpr e@(Lit _)    = returnUs e
-wwExpr e@(Con  _ _) = returnUs e
-wwExpr e@(Prim _ _) = returnUs e
+
+wwExpr e@(Con con args)
+ = mapUs wwExpr args	`thenUs` \ args' ->
+   returnUs (Con con args')
 
 wwExpr (Lam binder expr)
   = wwExpr expr			`thenUs` \ new_expr ->
@@ -107,7 +113,8 @@ wwExpr (Lam binder expr)
 
 wwExpr (App f a)
   = wwExpr f			`thenUs` \ new_f ->
-    returnUs (App new_f a)
+    wwExpr a			`thenUs` \ new_a ->
+    returnUs (App new_f new_a)
 
 wwExpr (Note note expr)
   = wwExpr expr			`thenUs` \ new_expr ->
@@ -118,38 +125,17 @@ wwExpr (Let bind expr)
     wwExpr expr				`thenUs` \ new_expr ->
     returnUs (mash_ww_bind intermediate_bind new_expr)
   where
-    mash_ww_bind (WwLet  binds)   body = mkCoLetsNoUnboxed binds body
+    mash_ww_bind (WwLet  binds)   body = mkLets binds body
     mash_ww_bind (WwCase case_fn) body = case_fn body
 
-wwExpr (Case expr alts)
+wwExpr (Case expr binder alts)
   = wwExpr expr				`thenUs` \ new_expr ->
-    ww_alts alts			`thenUs` \ new_alts ->
-    returnUs (Case new_expr new_alts)
+    mapUs ww_alt alts			`thenUs` \ new_alts ->
+    returnUs (Case new_expr binder new_alts)
   where
-    ww_alts (AlgAlts alts deflt)
-      = mapUs ww_alg_alt alts		`thenUs` \ new_alts ->
-	ww_deflt deflt			`thenUs` \ new_deflt ->
-	returnUs (AlgAlts new_alts new_deflt)
-
-    ww_alts (PrimAlts alts deflt)
-      = mapUs ww_prim_alt alts		`thenUs` \ new_alts ->
-	ww_deflt deflt			`thenUs` \ new_deflt ->
-	returnUs (PrimAlts new_alts new_deflt)
-
-    ww_alg_alt (con, binders, rhs)
+    ww_alt (con, binders, rhs)
       =	wwExpr rhs			`thenUs` \ new_rhs ->
 	returnUs (con, binders, new_rhs)
-
-    ww_prim_alt (lit, rhs)
-      = wwExpr rhs			`thenUs` \ new_rhs ->
-	returnUs (lit, new_rhs)
-
-    ww_deflt NoDefault
-      = returnUs NoDefault
-
-    ww_deflt (BindDefault binder rhs)
-      = wwExpr rhs			`thenUs` \ new_rhs ->
-	returnUs (BindDefault binder new_rhs)
 \end{code}
 
 %************************************************************************
@@ -171,7 +157,8 @@ reason), then we don't w-w it.
 The only reason this is monadised is for the unique supply.
 
 \begin{code}
-tryWW	:: Id				-- The fn binder
+tryWW	:: Bool				-- True <=> a non-recursive binding
+	-> Id				-- The fn binder
 	-> CoreExpr			-- The bound rhs; its innards
 					--   are already ww'd
 	-> UniqSM [(Id, CoreExpr)]	-- either *one* or *two* pairs;
@@ -179,10 +166,10 @@ tryWW	:: Id				-- The fn binder
 					-- the orig "wrapper" lives on);
 					-- if two, then a worker and a
 					-- wrapper.
-tryWW fn_id rhs
+tryWW non_rec fn_id rhs
   |  idWantsToBeINLINEd fn_id 
-  || (certainlySmallEnoughToInline fn_id $
-      calcUnfoldingGuidance opt_UnfoldingCreationThreshold rhs
+  || (non_rec &&	-- Don't split if its non-recursive and small
+      certainlySmallEnoughToInline fn_id unfold_guidance
      )
 	    -- No point in worker/wrappering something that is going to be
 	    -- INLINEd wholesale anyway.  If the strictness analyser is run
@@ -195,20 +182,20 @@ tryWW fn_id rhs
 
   | otherwise		-- Do w/w split
   = let
-	(tyvars, wrap_args, body) = collectBinders rhs
+	(tyvars, wrap_args, body) = collectTyAndValBinders rhs
     in
     mkWwBodies tyvars wrap_args 
 	       (coreExprType body)
 	       revised_wrap_args_info		`thenUs` \ (wrap_fn, work_fn, work_demands) ->
-    getUnique					`thenUs` \ work_uniq ->
+    getUniqueUs					`thenUs` \ work_uniq ->
     let
 	work_rhs  = work_fn body
-	work_id   = mkWorkerId work_uniq fn_id (coreExprType work_rhs) work_info
-	work_info = mkStrictnessInfo work_demands False `setStrictnessInfo` noIdInfo
+	work_id   = mkWorkerId work_uniq fn_id (coreExprType work_rhs) `setIdStrictness`
+		    mkStrictnessInfo work_demands False
 
 	wrap_rhs = wrap_fn work_id
-	wrap_id  = addInlinePragma (fn_id `addIdStrictness`
-				    mkStrictnessInfo revised_wrap_args_info True)
+	wrap_id  = fn_id `setIdStrictness` mkStrictnessInfo revised_wrap_args_info True
+			 `setInlinePragma` IWantToBeINLINEd
 		-- Add info to the wrapper:
 		--	(a) we want to inline it everywhere
 		-- 	(b) we want to pin on its revised stricteness info
@@ -226,15 +213,18 @@ tryWW fn_id rhs
 			StrictnessInfo args_info _ -> args_info
     revised_wrap_args_info = setUnpackStrategy wrap_args_info
 
+    unfold_guidance = calcUnfoldingGuidance opt_UnfoldingCreationThreshold rhs
+
 -- This rather (nay! extremely!) crude function looks at a wrapper function, and
 -- snaffles out (a) the worker Id and (b) constructors needed to 
 -- make the wrapper.
 -- These are needed when we write an interface file.
+getWorkerIdAndCons :: Id -> CoreExpr -> (Id, UniqSet DataCon)
 getWorkerIdAndCons wrap_id wrapper_fn
   = (get_work_id wrapper_fn, get_cons wrapper_fn)
   where
     get_work_id (Lam _ body)			 = get_work_id body
-    get_work_id (Case _ (AlgAlts [(_,_,rhs)] _)) = get_work_id rhs
+    get_work_id (Case _ _ [(_,_,rhs)])		 = get_work_id rhs
     get_work_id (Note _ body)			 = get_work_id body
     get_work_id (Let _ body)			 = get_work_id body
     get_work_id (App fn _)   			 = get_work_id fn
@@ -243,20 +233,20 @@ getWorkerIdAndCons wrap_id wrapper_fn
 
 
     get_cons (Lam _ body)			= get_cons body
-    get_cons (Let (NonRec _ rhs) body)		= get_cons rhs `unionIdSets` get_cons body
+    get_cons (Let (NonRec _ rhs) body)		= get_cons rhs `unionUniqSets` get_cons body
 
-    get_cons (Case e (AlgAlts [(con,_,rhs)] _)) = (get_cons e `unionIdSets` get_cons rhs)
-						  `addOneToIdSet` con
+    get_cons (Case e _ [(DataCon dc,_,rhs)]) 	= (get_cons e `unionUniqSets` get_cons rhs)
+						  `addOneToUniqSet` dc
 
 	-- Coercions don't mention the construtor now,
 	-- but we must still put the constructor in the interface
 	-- file so that the RHS of the newtype decl is imported
     get_cons (Note (Coerce to_ty from_ty) body)
-	= get_cons body `addOneToIdSet` con
+	= get_cons body `addOneToUniqSet` con
 	where
 	  con = case splitAlgTyConApp_maybe from_ty of
 			Just (_, _, [con]) -> con
 			other		   -> pprPanic "getWorkerIdAndCons" (ppr to_ty)
 
-    get_cons other = emptyIdSet
+    get_cons other = emptyUniqSet
 \end{code}

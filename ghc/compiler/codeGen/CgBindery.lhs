@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[CgBindery]{Utility functions related to doing @CgBindings@}
 
@@ -8,20 +8,22 @@ module CgBindery (
 	CgBindings, CgIdInfo(..){-dubiously concrete-},
 	StableLoc, VolatileLoc,
 
-	maybeAStkLoc, maybeBStkLoc,
+	maybeStkLoc,
 
 	stableAmodeIdInfo, heapIdInfo, newTempAmodeAndIdInfo,
 	letNoEscapeIdInfo, idInfoToAmode,
 
 	nukeVolatileBinds,
+	nukeDeadBindings,
 
-	bindNewToAStack, bindNewToBStack,
+	bindNewToStack,  rebindToStack,
 	bindNewToNode, bindNewToReg, bindArgsToRegs,
 	bindNewToTemp, bindNewPrimToAmode,
 	getArgAmode, getArgAmodes,
 	getCAddrModeAndInfo, getCAddrMode,
 	getCAddrModeIfVolatile, getVolatileRegs,
-	rebindToAStack, rebindToBStack
+
+	buildLivenessMask, buildContLivenessMask
     ) where
 
 #include "HsVersions.h"
@@ -29,28 +31,29 @@ module CgBindery (
 import AbsCSyn
 import CgMonad
 
-import CgUsages		( getHpRelOffset, getSpARelOffset, getSpBRelOffset )
-import CLabel		( mkStaticClosureLabel, mkClosureLabel )
-import ClosureInfo	( mkLFImported, mkConLFInfo, mkLFArgument, LambdaFormInfo )
-import HeapOffs		( VirtualHeapOffset,
-			  VirtualSpAOffset, VirtualSpBOffset
-			)
-import Id		( idPrimRep,
-			  mkIdEnv, rngIdEnv, IdEnv,
-			  idSetToList,
-			  Id
-			)
-import Literal		( Literal )
-import Maybes		( catMaybes )
-import Name		( isLocallyDefined, isWiredInName,
-			  Name{-instance NamedThing-}, NamedThing(..) )
+import CgUsages		( getHpRelOffset, getSpRelOffset, getRealSp )
+import CgStackery	( freeStackSlots, addFreeSlots )
+import CLabel		( mkStaticClosureLabel, mkClosureLabel,
+			  mkBitmapLabel )
+import ClosureInfo	( mkLFImported, mkLFArgument, LambdaFormInfo )
+import BitSet		( mkBS, emptyBS )
+import PrimRep		( isFollowableRep, getPrimRepSize )
+import DataCon		( DataCon, dataConName )
+import Id		( Id, idPrimRep, idType )
+import Type		( typePrimRep )
+import VarEnv
+import VarSet		( varSetElems )
+import Const		( Con(..), Literal )
+import Maybes		( catMaybes, maybeToBool )
+import Name		( isLocallyDefined, isWiredInName, NamedThing(..) )
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
 #endif
-import PrimRep          ( PrimRep )
+import PrimRep          ( PrimRep(..) )
 import StgSyn		( StgArg, StgLiveVars, GenStgArg(..) )
 import Unique           ( Unique, Uniquable(..) )
-import Util		( zipWithEqual, panic )
+import UniqSet		( elementOfUniqSet )
+import Util		( zipWithEqual, panic, sortLt )
 import Outputable
 \end{code}
 
@@ -97,18 +100,14 @@ the @CgBindings@ environment in @CgBindery@.
 \begin{code}
 data StableLoc
   = NoStableLoc
-  | VirAStkLoc		VirtualSpAOffset
-  | VirBStkLoc		VirtualSpBOffset
+  | VirStkLoc		VirtualSpOffset
   | LitLoc		Literal
   | StableAmodeLoc	CAddrMode
 
 -- these are so StableLoc can be abstract:
 
-maybeAStkLoc (VirAStkLoc offset) = Just offset
-maybeAStkLoc _			 = Nothing
-
-maybeBStkLoc (VirBStkLoc offset) = Just offset
-maybeBStkLoc _			 = Nothing
+maybeStkLoc (VirStkLoc offset) = Just offset
+maybeStkLoc _		       = Nothing
 \end{code}
 
 %************************************************************************
@@ -122,15 +121,15 @@ stableAmodeIdInfo i amode lf_info = MkCgIdInfo i NoVolatileLoc (StableAmodeLoc a
 heapIdInfo i offset       lf_info = MkCgIdInfo i (VirHpLoc offset) NoStableLoc lf_info
 tempIdInfo i uniq         lf_info = MkCgIdInfo i (TempVarLoc uniq) NoStableLoc lf_info
 
-letNoEscapeIdInfo i spa spb lf_info
-  = MkCgIdInfo i NoVolatileLoc (StableAmodeLoc (CJoinPoint spa spb)) lf_info
+letNoEscapeIdInfo i sp lf_info
+  = MkCgIdInfo i NoVolatileLoc (StableAmodeLoc (CJoinPoint sp)) lf_info
 
 newTempAmodeAndIdInfo :: Id -> LambdaFormInfo -> (CAddrMode, CgIdInfo)
 
 newTempAmodeAndIdInfo name lf_info
   = (temp_amode, temp_idinfo)
   where
-    uniq       	= uniqueOf name
+    uniq       	= getUnique name
     temp_amode	= CTemp uniq (idPrimRep name)
     temp_idinfo = tempIdInfo name uniq lf_info
 
@@ -146,7 +145,7 @@ idInfoPiecesToAmode kind NoVolatileLoc (LitLoc lit)           = returnFC (CLit l
 idInfoPiecesToAmode kind NoVolatileLoc (StableAmodeLoc amode) = returnFC amode
 
 idInfoPiecesToAmode kind (VirNodeLoc nd_off) stable_loc
-  = returnFC (CVal (NodeRel nd_off) kind)
+  = returnFC (CVal (nodeRel nd_off) kind)
     -- Virtual offsets from Node increase into the closures,
     -- and so do Node-relative offsets (which we want in the CVal),
     -- so there is no mucking about to do to the offset.
@@ -155,13 +154,9 @@ idInfoPiecesToAmode kind (VirHpLoc hp_off) stable_loc
   = getHpRelOffset hp_off `thenFC` \ rel_hp ->
     returnFC (CAddr rel_hp)
 
-idInfoPiecesToAmode kind NoVolatileLoc (VirAStkLoc i)
-  = getSpARelOffset i `thenFC` \ rel_spA ->
-    returnFC (CVal rel_spA kind)
-
-idInfoPiecesToAmode kind NoVolatileLoc (VirBStkLoc i)
-  = getSpBRelOffset i `thenFC` \ rel_spB ->
-    returnFC (CVal rel_spB kind)
+idInfoPiecesToAmode kind NoVolatileLoc (VirStkLoc i)
+  = getSpRelOffset i `thenFC` \ rel_sp ->
+    returnFC (CVal rel_sp kind)
 
 #ifdef DEBUG
 idInfoPiecesToAmode kind NoVolatileLoc NoStableLoc = panic "idInfoPiecesToAmode: no loc"
@@ -180,7 +175,7 @@ we don't leave any (NoVolatile, NoStable) binds around...
 \begin{code}
 nukeVolatileBinds :: CgBindings -> CgBindings
 nukeVolatileBinds binds
-  = mkIdEnv (foldr keep_if_stable [] (rngIdEnv binds))
+  = mkVarEnv (foldr keep_if_stable [] (rngVarEnv binds))
   where
     keep_if_stable (MkCgIdInfo i _ NoStableLoc entry_info) acc = acc
     keep_if_stable (MkCgIdInfo i _ stable_loc  entry_info) acc
@@ -219,7 +214,7 @@ getCAddrModeAndInfo id
     returnFC (amode, lf_info)
   where
     name = getName id
-    global_amode = CLbl (mkClosureLabel id) kind
+    global_amode = CLbl (mkClosureLabel name) kind
     kind = idPrimRep id
 
 getCAddrMode :: Id -> FCode CAddrMode
@@ -253,7 +248,7 @@ forget the volatile one.
 getVolatileRegs :: StgLiveVars -> FCode [MagicId]
 
 getVolatileRegs vars
-  = mapFCs snaffle_it (idSetToList vars) `thenFC` \ stuff ->
+  = mapFCs snaffle_it (varSetElems vars) `thenFC` \ stuff ->
     returnFC (catMaybes stuff)
   where
     snaffle_it var
@@ -296,7 +291,9 @@ getArgAmodes (atom:atoms)
 
 getArgAmode :: StgArg -> FCode CAddrMode
 
-getArgAmode (StgConArg var)
+getArgAmode (StgVarArg var) = getCAddrMode var		-- The common case
+
+getArgAmode (StgConArg (DataCon con))
      {- Why does this case differ from StgVarArg?
 	Because the program might look like this:
 		data Foo a = Empty | Baz a
@@ -328,11 +325,10 @@ getArgAmode (StgConArg var)
 	is really
 		App f (StgCon Empty [])
      -}
-  = returnFC (CLbl (mkStaticClosureLabel var) (idPrimRep var))
+  = returnFC (CLbl (mkStaticClosureLabel (dataConName con)) PtrRep)
 
-getArgAmode (StgVarArg var) = getCAddrMode var		-- The common case
 
-getArgAmode (StgLitArg lit) = returnFC (CLit lit)
+getArgAmode (StgConArg (Literal lit)) = returnFC (CLit lit)
 \end{code}
 
 %************************************************************************
@@ -342,18 +338,11 @@ getArgAmode (StgLitArg lit) = returnFC (CLit lit)
 %************************************************************************
 
 \begin{code}
-bindNewToAStack :: (Id, VirtualSpAOffset) -> Code
-bindNewToAStack (name, offset)
+bindNewToStack :: (Id, VirtualSpOffset) -> Code
+bindNewToStack (name, offset)
   = addBindC name info
   where
-    info = MkCgIdInfo name NoVolatileLoc (VirAStkLoc offset) mkLFArgument
-
-bindNewToBStack :: (Id, VirtualSpBOffset) -> Code
-bindNewToBStack (name, offset)
-  = addBindC name info
-  where
-    info = MkCgIdInfo name NoVolatileLoc (VirBStkLoc offset) (panic "bindNewToBStack")
-	   -- B-stack things shouldn't need lambda-form info!
+    info = MkCgIdInfo name NoVolatileLoc (VirStkLoc offset) mkLFArgument
 
 bindNewToNode :: Id -> VirtualHeapOffset -> LambdaFormInfo -> Code
 bindNewToNode name offset lf_info
@@ -392,26 +381,17 @@ bindArgsToRegs args regs
     arg `bind` reg = bindNewToReg arg reg mkLFArgument
 \end{code}
 
-@bindNewPrimToAmode@ works only for certain addressing modes, because
-those are the only ones we've needed so far!
+@bindNewPrimToAmode@ works only for certain addressing modes.  Making
+this work for stack offsets is non-trivial (virt vs. real stack offset
+difficulties).
 
 \begin{code}
 bindNewPrimToAmode :: Id -> CAddrMode -> Code
-bindNewPrimToAmode name (CReg reg) = bindNewToReg name reg (panic "bindNewPrimToAmode")
-						-- was: mkLFArgument
-						-- LFinfo is irrelevant for primitives
+bindNewPrimToAmode name (CReg reg) 
+  = bindNewToReg name reg (panic "bindNewPrimToAmode")
+
 bindNewPrimToAmode name (CTemp uniq kind)
   = addBindC name (tempIdInfo name uniq (panic "bindNewPrimToAmode"))
-	-- LFinfo is irrelevant for primitives
-
-bindNewPrimToAmode name (CLit lit) = bindNewToLit name lit
-
-bindNewPrimToAmode name (CVal (SpBRel _ offset) _)
-  = bindNewToBStack (name, offset)
-
-bindNewPrimToAmode name (CVal (NodeRel offset) _)
-  = bindNewToNode name offset (panic "bindNewPrimToAmode node")
-  -- See comment on idInfoPiecesToAmode for VirNodeLoc
 
 #ifdef DEBUG
 bindNewPrimToAmode name amode
@@ -420,18 +400,197 @@ bindNewPrimToAmode name amode
 \end{code}
 
 \begin{code}
-rebindToAStack :: Id -> VirtualSpAOffset -> Code
-rebindToAStack name offset
+rebindToStack :: Id -> VirtualSpOffset -> Code
+rebindToStack name offset
   = modifyBindC name replace_stable_fn
   where
     replace_stable_fn (MkCgIdInfo i vol stab einfo)
-      = MkCgIdInfo i vol (VirAStkLoc offset) einfo
-
-rebindToBStack :: Id -> VirtualSpBOffset -> Code
-rebindToBStack name offset
-  = modifyBindC name replace_stable_fn
-  where
-    replace_stable_fn (MkCgIdInfo i vol stab einfo)
-      = MkCgIdInfo i vol (VirBStkLoc offset) einfo
+      = MkCgIdInfo i vol (VirStkLoc offset) einfo
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection[CgBindery-liveness]{Build a liveness mask for the current stack}
+%*									*
+%************************************************************************
+
+ToDo: remove the dependency on 32-bit words.
+
+There are two ways to build a liveness mask, and both appear to have
+problems.
+
+  1) Find all the pointer words by searching through the binding list.
+     Invert this to find the non-pointer words and build the bitmap.
+
+  2) Find all the non-pointer words by search through the binding list.
+     Merge this with the list of currently free slots.  Build the
+     bitmap.
+
+Method (1) conflicts with update frames - these contain pointers but
+have no bindings in the environment.  We could bind the updatee to its
+location in the update frame at the point when the update frame is
+pushed, but this binding would be dropped by the first case expression
+(nukeDeadBindings).
+
+Method (2) causes problems because we must make sure that every
+non-pointer word on the stack is either a free stack slot or has a
+binding in the environment.  Things like cost centres break this (but
+only for case-of-case expressions - because that's when there's a cost
+centre on the stack from the outer case and we need to generate a
+bitmap for the inner case's continuation).
+
+This method also works "by accident" for update frames: since all
+unaccounted for slots on the stack are assumed to be pointers, and an
+update frame always occurs at virtual Sp offsets 0-3 (i.e. the bottom
+of the stack frame), the bitmap will simply end at the start of the
+update frame.
+
+We use method (2) at the moment.
+
+\begin{code}
+buildLivenessMask 
+	:: Unique		-- unique for for large bitmap label
+	-> VirtualSpOffset	-- offset from which the bitmap should start
+	-> FCode Liveness	-- mask for free/unlifted slots
+
+buildLivenessMask uniq sp info_down
+	state@(MkCgState abs_c binds ((vsp, free, _, _), heap_usage))
+  = ASSERT(all (>=0) rel_slots) 
+    livenessToAbsC uniq liveness_mask info_down state 
+  where
+	-- find all unboxed stack-resident ids
+	unboxed_slots = 		   
+	  [ (ofs, getPrimRepSize rep) | 
+		     (MkCgIdInfo id _ (VirStkLoc ofs) _) <- rngVarEnv binds,
+	        let rep = idPrimRep id,
+		not (isFollowableRep rep)
+	  ]
+
+	-- flatten this list into a list of unboxed stack slots
+	flatten_slots = foldr (\(ofs,size) r -> [ofs-size+1 .. ofs] ++ r) []
+			   unboxed_slots
+
+	-- merge in the free slots
+	all_slots = addFreeSlots flatten_slots free ++ 
+		    if vsp < sp then [vsp+1 .. sp] else []
+
+        -- recalibrate the list to be sp-relative
+	rel_slots = reverse (map (sp-) all_slots)
+
+	-- build the bitmap
+	liveness_mask = listToLivenessMask rel_slots
+
+{- ALTERNATE version that doesn't work because update frames aren't
+   recorded in the environment.
+
+	-- find all boxed stack-resident ids
+	boxed_slots = 		   
+	  [ ofs | (MkCgIdInfo id _ (VirStkLoc ofs) _) <- rngVarEnv binds,
+	        isFollowableRep (idPrimRep id)
+	  ]
+	all_slots = [1..vsp]
+
+	-- invert to get unboxed slots
+	unboxed_slots = filter (`notElem` boxed_slots) all_slots
+-}
+
+listToLivenessMask :: [Int] -> LivenessMask
+listToLivenessMask []    = []
+listToLivenessMask slots = 
+   mkBS this : listToLivenessMask (map (\x -> x-32) rest)
+   where (this,rest) = span (<32) slots
+
+livenessToAbsC :: Unique -> LivenessMask -> FCode Liveness
+livenessToAbsC uniq []    = returnFC (LvSmall emptyBS)
+livenessToAbsC uniq [one] = returnFC (LvSmall one)
+livenessToAbsC uniq many  = 
+  	absC (CBitmap lbl many) `thenC`
+  	returnFC (LvLarge lbl)
+  where lbl = mkBitmapLabel uniq
+\end{code}
+
+In a continuation, we want a liveness mask that starts from just after
+the return address, which is on the stack at realSp.
+
+\begin{code}
+buildContLivenessMask
+	:: Unique
+	-> FCode Liveness
+buildContLivenessMask uniq
+  = getRealSp  `thenFC` \ realSp ->
+    buildLivenessMask uniq (realSp-1)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[CgMonad-deadslots]{Finding dead stack slots}
+%*									*
+%************************************************************************
+
+nukeDeadBindings does the following:
+
+      -	Removes all bindings from the environment other than those
+	for variables in the argument to nukeDeadBindings.
+      -	Collects any stack slots so freed, and returns them to the  stack free
+	list.
+      -	Moves the virtual stack pointer to point to the topmost used
+	stack locations.
+
+You can have multi-word slots on the stack (where a Double# used to
+be, for instance); if dead, such a slot will be reported as *several*
+offsets (one per word).
+
+Probably *naughty* to look inside monad...
+
+\begin{code}
+nukeDeadBindings :: StgLiveVars  -- All the *live* variables
+		 -> Code
+
+nukeDeadBindings live_vars info_down (MkCgState abs_c binds usage)
+  = freeStackSlots extra_free info_down (MkCgState abs_c (mkVarEnv bs') usage)
+  where
+    (dead_stk_slots, bs')
+      = dead_slots live_vars
+		   [] []
+		   [ (i, b) | b@(MkCgIdInfo i _ _ _) <- rngVarEnv binds ]
+
+    extra_free = sortLt (<) dead_stk_slots
+\end{code}
+
+Several boring auxiliary functions to do the dirty work.
+
+\begin{code}
+dead_slots :: StgLiveVars
+	   -> [(Id,CgIdInfo)]
+	   -> [VirtualSpOffset]
+	   -> [(Id,CgIdInfo)]
+	   -> ([VirtualSpOffset], [(Id,CgIdInfo)])
+
+-- dead_slots carries accumulating parameters for
+--	filtered bindings, dead slots
+dead_slots live_vars fbs ds []
+  = (ds, reverse fbs) -- Finished; rm the dups, if any
+
+dead_slots live_vars fbs ds ((v,i):bs)
+  | v `elementOfUniqSet` live_vars
+    = dead_slots live_vars ((v,i):fbs) ds bs
+	  -- Live, so don't record it in dead slots
+	  -- Instead keep it in the filtered bindings
+
+  | otherwise
+    = case i of
+	MkCgIdInfo _ _ stable_loc _
+	 | is_stk_loc ->
+	   dead_slots live_vars fbs ([offset-size+1 .. offset] ++ ds) bs
+ 	 where
+ 	  maybe_stk_loc = maybeStkLoc stable_loc
+ 	  is_stk_loc	= maybeToBool maybe_stk_loc
+ 	  (Just offset) = maybe_stk_loc
+
+	_ -> dead_slots live_vars fbs ds bs
+  where
+
+    size :: Int
+    size = (getPrimRepSize . typePrimRep . idType) v
+
+\end{code}

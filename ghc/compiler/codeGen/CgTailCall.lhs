@@ -1,5 +1,7 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+%
+% $Id: CgTailCall.lhs,v 1.16 1998/12/02 13:17:52 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -10,11 +12,16 @@
 \begin{code}
 module CgTailCall (
 	cgTailCall,
-	performReturn,
+	performReturn, performPrimReturn,
 	mkStaticAlgReturnCode, mkDynamicAlgReturnCode,
+	mkUnboxedTupleReturnCode, returnUnboxedTuple,
 	mkPrimReturnCode,
 
-	tailCallBusiness
+	tailCallFun,
+	tailCallPrimOp,
+	doTailCall,
+
+	pushReturnAddress
     ) where
 
 #include "HsVersions.h"
@@ -24,28 +31,28 @@ import AbsCSyn
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
 import CgBindery	( getArgAmodes, getCAddrMode, getCAddrModeAndInfo )
-import CgRetConv	( dataReturnConvPrim, dataReturnConvAlg,
+import CgRetConv	( dataReturnConvPrim,
 			  ctrlReturnConvAlg, CtrlReturnConvention(..),
-			  DataReturnConvention(..)
+			  assignAllRegs, assignRegs
 			)
-import CgStackery	( adjustRealSps, mkStkAmodes )
-import CgUsages		( getSpARelOffset )
-import CLabel		( mkStdUpdCodePtrVecLabel, mkConUpdCodePtrVecLabel, CLabel )
+import CgStackery	( adjustRealSp, mkTaggedStkAmodes, adjustStackHW )
+import CgUsages		( getSpRelOffset )
+import CgUpdate		( pushSeqFrame )
+import CLabel		( mkUpdEntryLabel, mkRtsPrimOpLabel )
 import ClosureInfo	( nodeMustPointToIt,
 			  getEntryConvention, EntryConvention(..),
 			  LambdaFormInfo
 			)
 import CmdLineOpts	( opt_DoSemiTagging )
-import HeapOffs		( zeroOff, VirtualSpAOffset )
-import Id		( idType, dataConTyCon, dataConTag,
-			  fIRST_TAG, Id
-			)
-import Literal		( mkMachInt )
+import Id		( Id, idType, idName )
+import DataCon		( DataCon, dataConTyCon, dataConTag, fIRST_TAG )
+import Const		( mkMachInt )
 import Maybes		( assocMaybe )
 import PrimRep		( PrimRep(..) )
-import StgSyn		( StgArg, GenStgArg(..), StgLiveVars )
-import Type		( isUnpointedType )
+import StgSyn		( StgArg, GenStgArg(..) )
+import Type		( isUnLiftedType )
 import TyCon            ( TyCon )
+import PrimOp		( PrimOp )
 import Util		( zipWithEqual, panic, assertPanic )
 \end{code}
 
@@ -56,7 +63,7 @@ import Util		( zipWithEqual, panic, assertPanic )
 %************************************************************************
 
 \begin{code}
-cgTailCall :: StgArg -> [StgArg] -> StgLiveVars -> Code
+cgTailCall :: Id -> [StgArg] -> Code
 \end{code}
 
 Here's the code we generate for a tail call.  (NB there may be no
@@ -79,34 +86,20 @@ Things to be careful about:
 \item	Adjust the stack high water mark appropriately.
 \end{itemize}
 
-\begin{code}
-cgTailCall (StgConArg con) args live_vars
-  = panic "cgTailCall StgConArg"	-- Only occur in argument positions
-\end{code}
-
-Literals are similar to constructors; they return by putting
-themselves in an appropriate register and returning to the address on
-top of the B stack.
-
-\begin{code}
-cgTailCall (StgLitArg lit) [] live_vars
-  = performPrimReturn (CLit lit) live_vars
-\end{code}
-
 Treat unboxed locals exactly like literals (above) except use the addr
 mode for the local instead of (CLit lit) in the assignment.
 
 Case for unboxed @Ids@ first:
 \begin{code}
-cgTailCall atom@(StgVarArg fun) [] live_vars
-  | isUnpointedType (idType fun)
-  = getCAddrMode fun `thenFC` \ amode ->
-    performPrimReturn amode live_vars
+cgTailCall fun []
+  | isUnLiftedType (idType fun)
+  = getCAddrMode fun		`thenFC` \ amode ->
+    performPrimReturn amode
 \end{code}
 
 The general case (@fun@ is boxed):
 \begin{code}
-cgTailCall (StgVarArg fun) args live_vars = performTailCall fun args live_vars
+cgTailCall fun args = performTailCall fun args
 \end{code}
 
 %************************************************************************
@@ -115,31 +108,11 @@ cgTailCall (StgVarArg fun) args live_vars = performTailCall fun args live_vars
 %*									*
 %************************************************************************
 
-ADR-HACK
-
-  A quick bit of hacking to try to solve my void#-leaking blues...
-
-  I think I'm getting bitten by this stuff because code like
-
-  \begin{pseudocode}
-	  case ds.s12 :: IoWorld of {
-	      -- lvs: [ds.s12]; rhs lvs: []; uniq: c0
-	    IoWorld ds.s13# -> ds.s13#;
-	  } :: Universe#
-  \end{pseudocode}
-
-  causes me to try to allocate a register to return the result in.  The
-  hope is that the following will avoid such problems (and that Will
-  will do this in a cleaner way when he hits the same problem).
-
-KCAH-RDA
-
 \begin{code}
 performPrimReturn :: CAddrMode	-- The thing to return
-		  -> StgLiveVars
 		  -> Code
 
-performPrimReturn amode live_vars
+performPrimReturn amode
   = let
 	kind = getAmodeRep amode
 	ret_reg = dataReturnConvPrim kind
@@ -148,29 +121,27 @@ performPrimReturn amode live_vars
 	  VoidRep -> AbsCNop
 	  kind -> (CAssign (CReg ret_reg) amode)
     in
-    performReturn assign_possibly mkPrimReturnCode live_vars
+    performReturn assign_possibly mkPrimReturnCode
 
 mkPrimReturnCode :: Sequel -> Code
-mkPrimReturnCode (UpdateCode _)	= panic "mkPrimReturnCode: Upd"
+mkPrimReturnCode UpdateCode	= panic "mkPrimReturnCode: Upd"
 mkPrimReturnCode sequel		= sequelToAmode sequel	`thenFC` \ dest_amode ->
 				  absC (CReturn dest_amode DirectReturn)
 				  -- Direct, no vectoring
 
--- All constructor arguments in registers; Node and InfoPtr are set.
+-- Constructor is built on the heap; Node is set.
 -- All that remains is
 --	(a) to set TagReg, if necessary
---	(b) to set InfoPtr to the info ptr, if necessary
 --	(c) to do the right sort of jump.
 
-mkStaticAlgReturnCode :: Id		-- The constructor
-		      -> Maybe CLabel	-- The info ptr, if it isn't already set
+mkStaticAlgReturnCode :: DataCon	-- The constructor
 		      -> Sequel		-- where to return to
 		      -> Code
 
-mkStaticAlgReturnCode con maybe_info_lbl sequel
+mkStaticAlgReturnCode con sequel
   =	-- Generate profiling code if necessary
     (case return_convention of
-	VectoredReturn sz -> profCtrC SLIT("VEC_RETURN") [mkIntCLit sz]
+	VectoredReturn sz -> profCtrC SLIT("TICK_VEC_RETURN") [mkIntCLit sz]
 	other		  -> nopC
     )					`thenC`
 
@@ -189,31 +160,26 @@ mkStaticAlgReturnCode con maybe_info_lbl sequel
 
 	-- Generate the right jump or return
     (case sequel of
-	UpdateCode _ ->	-- Ha!	We know the constructor,
-			-- so we can go direct to the correct
-			-- update code for that constructor
-
-				-- Set the info pointer, and jump
-			set_info_ptr		`thenC`
-    			absC (CJump (CLbl update_label CodePtrRep))
+	UpdateCode ->	-- Ha!  We can go direct to the update code,
+			-- (making sure to jump to the *correct* update
+			--  code.)
+    			absC (CReturn (CLbl mkUpdEntryLabel CodePtrRep)
+				      return_info)
 
 	CaseAlts _ (Just (alts, _)) ->	-- Ho! We know the constructor so
 					-- we can go right to the alternative
 
-			-- No need to set info ptr when returning to a
-			-- known join point. After all, the code at
-			-- the destination knows what constructor it
-			-- is going to handle.
+		case assocMaybe alts tag of
+		   Just (alt_absC, join_lbl) -> 
+			absC (CJump (CLbl join_lbl CodePtrRep))
+		   Nothing -> panic "mkStaticAlgReturnCode: default"
+				-- The Nothing case should never happen; 
+				-- it's the subject of a wad of special-case 
+				-- code in cgReturnCon
 
-			case assocMaybe alts tag of
-			   Just (alt_absC, join_lbl) -> absC (CJump (CLbl join_lbl CodePtrRep))
-			   Nothing		     -> panic "mkStaticAlgReturnCode: default"
-				-- The Nothing case should never happen; it's the subject
-				-- of a wad of special-case code in cgReturnCon
+	-- can't be a SeqFrame, because we're returning a constructor
 
-	other ->	-- OnStack, or (CaseAlts) ret_amode Nothing)
-			-- Set the info pointer, and jump
-		    set_info_ptr		`thenC`
+	other ->	-- OnStack, or (CaseAlts ret_amode Nothing)
 		    sequelToAmode sequel	`thenFC` \ ret_amode ->
 		    absC (CReturn ret_amode return_info)
     )
@@ -225,19 +191,28 @@ mkStaticAlgReturnCode con maybe_info_lbl sequel
     zero_indexed_tag  = tag - fIRST_TAG	      -- Adjust tag to be zero-indexed
 					      -- cf AbsCUtils.mkAlgAltsCSwitch
 
-    update_label
-      = case (dataReturnConvAlg con) of
-	  ReturnInHeap   -> mkStdUpdCodePtrVecLabel tycon tag
-	  ReturnInRegs _ -> mkConUpdCodePtrVecLabel tycon tag
+    return_info = 
+       case return_convention of
+		UnvectoredReturn _ -> DirectReturn
+		VectoredReturn _   -> StaticVectoredReturn zero_indexed_tag
 
-    return_info = case return_convention of
-			UnvectoredReturn _ -> DirectReturn
-			VectoredReturn _   -> StaticVectoredReturn zero_indexed_tag
+mkUnboxedTupleReturnCode :: Sequel -> Code
+mkUnboxedTupleReturnCode sequel
+    = case sequel of
+	-- can't update with an unboxed tuple!
+	UpdateCode -> panic "mkUnboxedTupleReturnCode"
 
-    set_info_ptr = case maybe_info_lbl of
-			Nothing	      -> nopC
-			Just info_lbl -> absC (CAssign (CReg infoptr) (CLbl info_lbl DataPtrRep))
+	CaseAlts _ (Just ([(_,(alt_absC,join_lbl))], _)) ->
+			absC (CJump (CLbl join_lbl CodePtrRep))
 
+	-- can't be a SeqFrame
+
+	other ->	-- OnStack, or (CaseAlts ret_amode something)
+		    sequelToAmode sequel	`thenFC` \ ret_amode ->
+		    absC (CReturn ret_amode DirectReturn)
+
+-- This function is used by PrimOps that return enumerated types (i.e.
+-- all the comparison operators).
 
 mkDynamicAlgReturnCode :: TyCon -> CAddrMode -> Sequel -> Code
 
@@ -245,7 +220,7 @@ mkDynamicAlgReturnCode tycon dyn_tag sequel
   = case ctrlReturnConvAlg tycon of
 	VectoredReturn sz ->
 
-		profCtrC SLIT("VEC_RETURN") [mkIntCLit sz] `thenC`
+		profCtrC SLIT("TICK_VEC_RETURN") [mkIntCLit sz] `thenC`
 		sequelToAmode sequel		`thenFC` \ ret_addr ->
 		absC (CReturn ret_addr (DynamicVectoredReturn dyn_tag))
 
@@ -272,59 +247,105 @@ performReturn :: AbstractC	    -- Simultaneous assignments to perform
 	      -> (Sequel -> Code)   -- The code to execute to actually do
 				    -- the return, given an addressing mode
 				    -- for the return address
-	      -> StgLiveVars
 	      -> Code
 
-performReturn sim_assts finish_code live_vars
-  = getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_spa args_spb sequel) ->
+-- this is just a special case of doTailCall, later.
+performReturn sim_assts finish_code
+  = getEndOfBlockInfo	`thenFC` \ eob@(EndOfBlockInfo args_sp sequel) ->
 
 	-- Do the simultaneous assignments,
-    doSimAssts args_spa live_vars sim_assts	`thenC`
+    doSimAssts sim_assts	 	`thenC`
 
-	-- Adjust stack pointers
-    adjustRealSps args_spa args_spb	`thenC`
+	-- push a return address if necessary
+	-- (after the assignments above, in case we clobber a live
+	--  stack location)
+    pushReturnAddress eob		`thenC`
+
+	-- Adjust stack pointer
+    adjustRealSp args_sp		`thenC`
 
 	-- Do the return
     finish_code sequel		-- "sequel" is `robust' in that it doesn't
 				-- depend on stk-ptr values
 \end{code}
 
+Returning unboxed tuples.  This is mainly to support _ccall_GC_, where
+we want to do things in a slightly different order to normal:
+
+		- push return address
+		- adjust stack pointer
+		- r = call(args...)
+		- assign regs for unboxed tuple (usually just R1 = r)
+		- return to continuation
+
+The return address (i.e. stack frame) must be on the stack before
+doing the call in case the call ends up in the garbage collector.
+
+Sadly, the information about the continuation is lost after we push it
+(in order to avoid pushing it again), so we end up doing a needless
+indirect jump (ToDo).
+
 \begin{code}
-performTailCall :: Id			-- Function
+returnUnboxedTuple :: [CAddrMode] -> Code -> Code
+returnUnboxedTuple amodes before_jump
+  = getEndOfBlockInfo	`thenFC` \ eob@(EndOfBlockInfo args_sp sequel) ->
+
+	-- push a return address if necessary
+    pushReturnAddress eob		`thenC`
+    setEndOfBlockInfo (EndOfBlockInfo args_sp (OnStack args_sp)) (
+
+	-- Adjust stack pointer
+    adjustRealSp args_sp		`thenC`
+
+    before_jump				`thenC`
+
+    let (ret_regs, leftovers) = assignRegs [] (map getAmodeRep amodes)
+    in
+
+    doTailCall amodes ret_regs
+		mkUnboxedTupleReturnCode
+		(length leftovers)  {- fast args arity -}
+		AbsCNop {-no pending assigments-}
+		Nothing {-not a let-no-escape-}
+		False   {-node doesn't point-}
+     )
+\end{code}
+
+\begin{code}
+performTailCall :: Id		-- Function
 		-> [StgArg]	-- Args
-		-> StgLiveVars
 		-> Code
 
-performTailCall fun args live_vars
+performTailCall fun args
   =	-- Get all the info we have about the function and args and go on to
 	-- the business end
     getCAddrModeAndInfo fun	`thenFC` \ (fun_amode, lf_info) ->
     getArgAmodes args		`thenFC` \ arg_amodes ->
 
-    tailCallBusiness
+    tailCallFun
 		fun fun_amode lf_info arg_amodes
-		live_vars AbsCNop {- No pending assignments -}
+		AbsCNop {- No pending assignments -}
 
 
-tailCallBusiness :: Id -> CAddrMode	-- Function and its amode
+-- generating code for a tail call to a function (or closure)
+
+tailCallFun :: Id -> CAddrMode	-- Function and its amode
 		 -> LambdaFormInfo	-- Info about the function
 		 -> [CAddrMode]		-- Arguments
-		 -> StgLiveVars	-- Live in continuation
 
 		 -> AbstractC		-- Pending simultaneous assignments
-					-- *** GUARANTEED to contain only stack assignments.
-					--     In ptic, we don't need to look in here to
-					--     discover all live regs
+					-- *** GUARANTEED to contain only stack 
+					-- assignments.
+
+					-- In ptic, we don't need to look in 
+					-- here to discover all live regs
 
 		 -> Code
 
-tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
+tailCallFun fun fun_amode lf_info arg_amodes pending_assts
   = nodeMustPointToIt lf_info			`thenFC` \ node_points ->
-    getEntryConvention fun lf_info
+    getEntryConvention (idName fun) lf_info
 	(map getAmodeRep arg_amodes)		`thenFC` \ entry_conv ->
-
-    getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_spa args_spb sequel) ->
-
     let
 	node_asst
 	  = if node_points then
@@ -332,85 +353,110 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 	    else
 		AbsCNop
 
-	(arg_regs, finish_code)
+	(arg_regs, finish_code, arity)
 	  = case entry_conv of
-	      ViaNode			  ->
+	      ViaNode ->
 		([],
-		     mkAbstractCs [
-			CCallProfCtrMacro SLIT("ENT_VIA_NODE") [],
-			CJump (CMacroExpr CodePtrRep ENTRY_CODE [(CMacroExpr DataPtrRep INFO_PTR [CReg node])])
-		     ])
-	      StdEntry lbl Nothing	  -> ([], CJump (CLbl lbl CodePtrRep))
-	      StdEntry lbl (Just itbl)	  -> ([], CAssign (CReg infoptr) (CLbl itbl DataPtrRep)
-						     `mkAbsCStmts`
-						  CJump (CLbl lbl CodePtrRep))
+		     profCtrC SLIT("TICK_ENT_VIA_NODE") [] `thenC`
+		     absC (CJump (CMacroExpr CodePtrRep ENTRY_CODE 
+			        [CVal (nodeRel 0) DataPtrRep]))
+		     , 0)
+	      StdEntry lbl -> ([], absC (CJump (CLbl lbl CodePtrRep)), 0)
 	      DirectEntry lbl arity regs  ->
-		(regs,	 CJump (CLbl lbl CodePtrRep))
+		(regs,	 absC (CJump (CLbl lbl CodePtrRep)), 
+	         arity - length regs)
 
+	-- set up for a let-no-escape if necessary
+	join_sp = case fun_amode of
+			CJoinPoint sp -> Just sp
+			other         -> Nothing
+    in
+    doTailCall arg_amodes arg_regs (const finish_code) arity
+		(mkAbstractCs [node_asst,pending_assts]) join_sp node_points
+
+
+-- this generic tail call code is used for both function calls and returns.
+
+doTailCall 
+	:: [CAddrMode] 			-- args to pass to function
+	-> [MagicId]			-- registers to use
+	-> (Sequel->Code)		-- code to perform jump
+	-> Int				-- number of "fast" stack arguments
+	-> AbstractC			-- pending assignments
+	-> Maybe VirtualSpOffset	-- sp offset to trim stack to
+	-> Bool				-- node points to the closure to enter
+	-> Code
+
+doTailCall arg_amodes arg_regs finish_code arity pending_assts
+		maybe_join_sp node_points
+  = getEndOfBlockInfo	`thenFC` \ eob@(EndOfBlockInfo args_sp sequel) ->
+
+    let
 	no_of_args = length arg_amodes
 
 	(reg_arg_amodes, stk_arg_amodes) = splitAt (length arg_regs) arg_amodes
-	    -- We get some stk_arg_amodes if (a) no regs, or (b) args beyond arity
+	    -- We get some stk_arg_amodes if (a) no regs, or 
+	    --				     (b) args beyond arity
 
 	reg_arg_assts
-	  = mkAbstractCs (zipWithEqual "assign_to_reg2" assign_to_reg arg_regs reg_arg_amodes)
+	  = mkAbstractCs (zipWithEqual "assign_to_reg2" 
+				assign_to_reg arg_regs reg_arg_amodes)
 
 	assign_to_reg reg_id amode = CAssign (CReg reg_id) amode
-    in
-    case fun_amode of
-      CJoinPoint join_spa join_spb ->  -- Ha!  A let-no-escape thingy
 
-	  ASSERT(not (args_spa > join_spa) || (args_spb > join_spb))
+	join_sp = case maybe_join_sp of
+			Just sp -> ASSERT(not (args_sp > sp)) sp
 	      -- If ASSERTion fails: Oops: the join point has *lower*
 	      -- stack ptrs than the continuation Note that we take
-	      -- the SpB point without the return address here.	 The
+	      -- the Sp point without the return address here.	 The
 	      -- return address is put on by the let-no-escapey thing
 	      -- when it finishes.
+			Nothing -> args_sp
 
-	  mkStkAmodes join_spa join_spb stk_arg_amodes
-		      `thenFC` \ (final_spa, final_spb, stk_arg_assts) ->
+	(fast_stk_amodes, tagged_stk_amodes) = 
+		splitAt arity stk_arg_amodes
+    in
+	-- We can omit tags on the arguments passed to the fast entry point, 
+	-- but we have to be careful to fill in the tags on any *extra*
+	-- arguments we're about to push on the stack.
 
+	mkTaggedStkAmodes join_sp tagged_stk_amodes `thenFC`
+			    \ (fast_sp, tagged_arg_assts, tag_assts) ->
+
+	mkTaggedStkAmodes fast_sp fast_stk_amodes `thenFC`
+			    \ (final_sp, fast_arg_assts, _) ->
+
+	-- adjust the high-water mark if necessary
+	adjustStackHW final_sp	`thenC`
+
+		-- The stack space for the pushed return addess, 
+		-- with any args pushed on top, is recorded in final_sp.
+	
 		-- Do the simultaneous assignments,
-	  doSimAssts join_spa live_vars
-		(mkAbstractCs [pending_assts, reg_arg_assts, stk_arg_assts])
-			`thenC`
+	doSimAssts (mkAbstractCs [pending_assts,
+			          reg_arg_assts, 
+				  fast_arg_assts, 
+				  tagged_arg_assts,
+			          tag_assts])	`thenC`
+	
+		-- push a return address if necessary
+		-- (after the assignments above, in case we clobber a live
+		--  stack location)
+	pushReturnAddress eob		`thenC`
 
-		-- Adjust stack ptrs
-	  adjustRealSps final_spa final_spb	`thenC`
-
-		-- Jump to join point
-	  absC finish_code
-
-      _ -> -- else: not a let-no-escape (the common case)
-
-		-- Make instruction to save return address
-	    loadRetAddrIntoRetReg sequel	`thenFC` \ ret_asst ->
-
-	    mkStkAmodes args_spa args_spb stk_arg_amodes
-						`thenFC`
-			    \ (final_spa, final_spb, stk_arg_assts) ->
-
-		-- The B-stack space for the pushed return addess, with any args pushed
-		-- on top, is recorded in final_spb.
-
-		-- Do the simultaneous assignments,
-	    doSimAssts args_spa live_vars
-		(mkAbstractCs [pending_assts, node_asst, ret_asst,
-			       reg_arg_assts, stk_arg_assts])
-						`thenC`
-
-		-- Final adjustment of stack pointers
-	    adjustRealSps final_spa final_spb	`thenC`
-
+		-- Final adjustment of stack pointer
+	adjustRealSp final_sp		`thenC`
+	
 		-- Now decide about semi-tagging
-	    let
+	let
 		semi_tagging_on = opt_DoSemiTagging
-	    in
-	    case (semi_tagging_on, arg_amodes, node_points, sequel) of
+	in
+	case (semi_tagging_on, arg_amodes, node_points, sequel) of
 
 	--
 	-- *************** The semi-tagging case ***************
 	--
+	{- XXX leave this out for now.
 	      (	  True,		   [],		True,	     CaseAlts _ (Just (st_alts, maybe_deflt_join_details))) ->
 
 		-- Whoppee!  Semi-tagging rules OK!
@@ -466,23 +512,35 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 					 (semi_tagged_alts)
 					 (join_details_to_code details))
 		])
+		-}
 
 	--
 	-- *************** The non-semi-tagging case ***************
 	--
-	      other -> absC finish_code
+	      other -> finish_code sequel
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection[tailCallPrimOp]{@tailCallPrimOp@}
+%*									*
+%************************************************************************
+
 \begin{code}
-loadRetAddrIntoRetReg :: Sequel -> FCode AbstractC
-
-loadRetAddrIntoRetReg InRetReg
-  = returnFC AbsCNop  -- Return address already there
-
-loadRetAddrIntoRetReg sequel
-  = sequelToAmode sequel      `thenFC` \ amode ->
-    returnFC (CAssign (CReg RetReg) amode)
-
+tailCallPrimOp :: PrimOp -> [StgArg] -> Code
+tailCallPrimOp op args =
+    -- we're going to perform a normal-looking tail call, 
+    -- except that *all* the arguments will be in registers.
+    getArgAmodes args		`thenFC` \ arg_amodes ->
+    let (arg_regs, leftovers) = assignAllRegs [] (map getAmodeRep arg_amodes)
+    in
+    ASSERT(null leftovers) -- no stack-resident args
+    doTailCall arg_amodes arg_regs 
+	(const (absC (CJump (CLbl (mkRtsPrimOpLabel op) CodePtrRep))))
+	0       {- arity shouldn't matter, all args in regs -}
+	AbsCNop {- no pending assignments -}
+	Nothing {- not a let-no-escape -}
+	False   {- node doesn't point -}
 \end{code}
 
 %************************************************************************
@@ -495,35 +553,39 @@ loadRetAddrIntoRetReg sequel
 They are separate because we sometimes do some jiggery-pokery in between.
 
 \begin{code}
-doSimAssts :: VirtualSpAOffset	-- tail_spa: SpA as seen by continuation
-	   -> StgLiveVars	-- Live in continuation
-	   -> AbstractC
-	   -> Code
+doSimAssts :: AbstractC -> Code
 
-doSimAssts tail_spa live_vars sim_assts
-  =	-- Do the simultaneous assignments
-    absC (CSimultaneous sim_assts)	`thenC`
+doSimAssts sim_assts
+  = absC (CSimultaneous sim_assts)
+\end{code}
 
-	-- Stub any unstubbed slots; the only live variables are indicated in
-	-- the end-of-block info in the monad
-    nukeDeadBindings live_vars		`thenC`
-    getUnstubbedAStackSlots tail_spa	`thenFC` \ a_slots ->
-	-- Passing in tail_spa here should actually be redundant, because
-	-- the stack should be trimmed (by nukeDeadBindings) to
-	-- exactly the tail_spa position anyhow.
+%************************************************************************
+%*									*
+\subsection[retAddr]{@Return Addresses@}
+%*									*
+%************************************************************************
 
-	-- Emit code to stub dead regs; this only generates actual
-	-- machine instructions in in the DEBUG version
-	-- *** NOT DONE YET ***
+We always push the return address just before performing a tail call
+or return.  The reason we leave it until then is because the stack
+slot that the return address is to go into might contain something
+useful.
 
-    (if (null a_slots)
-     then nopC
-     else profCtrC SLIT("A_STK_STUB") [mkIntCLit (length a_slots)]	`thenC`
-	  mapCs stub_A_slot a_slots
-    )
-  where
-    stub_A_slot :: VirtualSpAOffset -> Code
-    stub_A_slot offset = getSpARelOffset offset		`thenFC` \ spa_rel ->
-			 absC (CAssign	(CVal spa_rel PtrRep)
-					(CReg StkStubReg))
+If the end of block info is CaseAlts, then we're in the scrutinee of a
+case expression and the return address is still to be pushed.
+
+There are cases where it doesn't look necessary to push the return
+address: for example, just before doing a return to a known
+continuation.  However, the continuation will expect to find the
+return address on the stack in case it needs to do a heap check.
+
+\begin{code}
+pushReturnAddress :: EndOfBlockInfo -> Code
+pushReturnAddress (EndOfBlockInfo args_sp sequel@(CaseAlts amode _)) =
+    getSpRelOffset args_sp			 `thenFC` \ sp_rel ->
+    absC (CAssign (CVal sp_rel RetRep) amode)
+pushReturnAddress (EndOfBlockInfo args_sp sequel@(SeqFrame amode _)) =
+    pushSeqFrame args_sp			 `thenFC` \ ret_sp ->
+    getSpRelOffset ret_sp			 `thenFC` \ sp_rel ->
+    absC (CAssign (CVal sp_rel RetRep) amode)
+pushReturnAddress _ = nopC
 \end{code}

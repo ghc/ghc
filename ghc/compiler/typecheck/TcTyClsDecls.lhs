@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[TcTyClsDecls]{Typecheck type and class declarations}
 
@@ -16,21 +16,21 @@ import HsSyn		( HsDecl(..), TyDecl(..), ClassDecl(..),
 			  Sig(..),
 			  hsDeclName
 			)
-import RnHsSyn		( RenamedTyDecl, RenamedClassDecl, RenamedHsDecl )
-import TcHsSyn		( TcHsBinds )
-import BasicTypes	( RecFlag(..) )
+import RnHsSyn		( RenamedHsDecl )
+import RnEnv		( listTyCon_name, tupleTyCon_name ) -- ToDo: move these
+import BasicTypes	( RecFlag(..), Arity )
 
 import TcMonad
 import Inst		( InstanceMapper )
 import TcClassDcl	( tcClassDecl1 )
 import TcEnv		( TcIdOcc(..), GlobalValueEnv, tcExtendTyConEnv, tcExtendClassEnv )
-import TcKind		( TcKind, newKindVar, newKindVars, tcDefaultKind, kindToTcKind )
-import TcTyDecls	( tcTyDecl, mkDataBinds )
+import TcType		( TcKind, newKindVar, newKindVars, kindToTcKind )
+import TcTyDecls	( tcTyDecl )
 import TcMonoType	( tcTyVarScope )
 
 import TyCon		( tyConKind, tyConArity, isSynTyCon )
 import Class		( Class, classBigSig )
-import TyVar		( tyVarKind )
+import Var		( tyVarKind )
 import Bag	
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( Name, NamedThing(..), getSrcLoc, isTvOcc, nameOccName )
@@ -40,7 +40,7 @@ import UniqSet		( UniqSet, emptyUniqSet,
 			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
 import SrcLoc		( SrcLoc )
-import TyCon		( TyCon, Arity )
+import TyCon		( TyCon )
 import Unique		( Unique, Uniquable(..) )
 import Util		( panic{-, pprTrace-} )
 
@@ -157,38 +157,29 @@ Dependency analysis
 \begin{code}
 sortByDependency :: [RenamedHsDecl] -> TcM s [SCC RenamedHsDecl]
 sortByDependency decls
-  = let		-- CHECK FOR SYNONYM CYCLES
+  = let		-- CHECK FOR CLASS CYCLES
+	cls_sccs   = stronglyConnComp (mapMaybe mk_cls_edges decls)
+	cls_cycles = [ decls | CyclicSCC decls <- cls_sccs]
+    in
+    checkTc (null cls_cycles) (classCycleErr cls_cycles)	`thenTc_`
+
+    let		-- CHECK FOR SYNONYM CYCLES
 	syn_sccs   = stronglyConnComp (filter is_syn_decl edges)
 	syn_cycles = [ decls | CyclicSCC decls <- syn_sccs]
 
     in
     checkTc (null syn_cycles) (typeCycleErr syn_cycles)		`thenTc_`
 
-    let		-- CHECK FOR CLASS CYCLES
-	cls_sccs   = stronglyConnComp (filter is_cls_decl edges)
-	cls_cycles = [ decls | CyclicSCC decls <- cls_sccs]
-
-    in
-    checkTc (null cls_cycles) (classCycleErr cls_cycles)	`thenTc_`
-
-		-- DO THE MAIN DEPENDENCY ANALYSIS
+    	-- DO THE MAIN DEPENDENCY ANALYSIS
     let
-	decl_sccs  = stronglyConnComp (filter is_ty_cls_decl edges)
+	decl_sccs  = stronglyConnComp edges
     in
     returnTc decl_sccs
-
   where
     edges = mapMaybe mk_edges decls
     
-bag_acyclic (AcyclicSCC scc) = unitBag scc
-bag_acyclic (CyclicSCC sccs) = listToBag sccs
-
 is_syn_decl (TyD (TySynonym _ _ _ _), _, _) = True
 is_syn_decl _		                    = False
-
-is_ty_cls_decl (TyD _, _, _) = True
-is_ty_cls_decl (ClD _, _, _) = True
-is_ty_cls_decl other         = False
 
 is_cls_decl (ClD _, _, _) = True
 is_cls_decl other         = False
@@ -197,16 +188,30 @@ is_cls_decl other         = False
 Edges in Type/Class decls
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
+-- mk_cls_edges looks only at the context of class decls
+-- Its used when we are figuring out if there's a cycle in the
+-- superclass hierarchy
+
+mk_cls_edges :: RenamedHsDecl -> Maybe (RenamedHsDecl, Unique, [Unique])
+
+mk_cls_edges decl@(ClD (ClassDecl ctxt name _ _ _ _ _ _ _))
+  = Just (decl, getUnique name, map (getUnique . fst) ctxt)
+mk_cls_edges other_decl
+  = Nothing
+
+
+mk_edges :: RenamedHsDecl -> Maybe (RenamedHsDecl, Unique, [Unique])
+
 mk_edges decl@(TyD (TyData _ ctxt name _ condecls derivs _ _))
-  = Just (decl, uniqueOf name, uniqSetToList (get_ctxt ctxt `unionUniqSets` 
+  = Just (decl, getUnique name, uniqSetToList (get_ctxt ctxt `unionUniqSets` 
 					 get_cons condecls `unionUniqSets` 
 					 get_deriv derivs))
 
 mk_edges decl@(TyD (TySynonym name _ rhs _))
-  = Just (decl, uniqueOf name, uniqSetToList (get_ty rhs))
+  = Just (decl, getUnique name, uniqSetToList (get_ty rhs))
 
 mk_edges decl@(ClD (ClassDecl ctxt name _ sigs _ _ _ _ _))
-  = Just (decl, uniqueOf name, uniqSetToList (get_ctxt ctxt `unionUniqSets`
+  = Just (decl, getUnique name, uniqSetToList (get_ctxt ctxt `unionUniqSets`
 				         get_sigs sigs))
 
 mk_edges other_decl = Nothing
@@ -218,7 +223,7 @@ get_deriv (Just clss) = unionManyUniqSets (map set_name clss)
 
 get_cons cons = unionManyUniqSets (map get_con cons)
 
-get_con (ConDecl _ ctxt details _) 
+get_con (ConDecl _ _ ctxt details _) 
   = get_ctxt ctxt `unionUniqSets` get_con_details details
 
 get_con_details (VanillaCon btys)    = unionManyUniqSets (map get_bty btys)
@@ -235,10 +240,10 @@ get_ty (MonoTyApp ty1 ty2)
   = unionUniqSets (get_ty ty1) (get_ty ty2)
 get_ty (MonoFunTy ty1 ty2)	
   = unionUniqSets (get_ty ty1) (get_ty ty2)
-get_ty (MonoListTy tc ty)
-  = set_name tc `unionUniqSets` get_ty ty
-get_ty (MonoTupleTy tc tys)
-  = set_name tc `unionUniqSets` get_tys tys
+get_ty (MonoListTy ty)
+  = set_name listTyCon_name `unionUniqSets` get_ty ty
+get_ty (MonoTupleTy tys boxed)
+  = set_name (tupleTyCon_name boxed (length tys)) `unionUniqSets` get_tys tys
 get_ty (HsForAllTy _ ctxt mty)
   = get_ctxt ctxt `unionUniqSets` get_ty mty
 get_ty other = panic "TcTyClsDecls:get_ty"
@@ -252,7 +257,7 @@ get_sigs sigs
     get_sig (ClassOpSig _ _ ty _) = get_ty ty
     get_sig other = panic "TcTyClsDecls:get_sig"
 
-set_name name = unitUniqSet (uniqueOf name)
+set_name name = unitUniqSet (getUnique name)
 
 set_to_bag set = listToBag (uniqSetToList set)
 \end{code}
@@ -261,11 +266,15 @@ set_to_bag set = listToBag (uniqSetToList set)
 get_binders
 ~~~~~~~~~~~
 Extract *binding* names from type and class decls.  Type variables are
-bound in type, data, newtype and class declarations and the polytypes
-in the class op sigs.
+bound in type, data, newtype and class declarations, 
+	*and* the polytypes in the class op sigs.
+	*and* the existentially quantified contexts in datacon decls
 
 Why do we need to grab all these type variables at once, including
 those locally-quantified type variables in class op signatures?
+
+	[Incidentally, this only works because the names are all unique by now.]
+
 Because we can only commit to the final kind of a type variable when
 we've completed the mutually recursive group. For example:
 
@@ -295,13 +304,18 @@ get_binders decls = (bagToList tyvars, bagToList tycons, bagToList classes)
     union3 (a1,a2,a3) (b1,b2,b3)
       = (a1 `unionBags` b1, a2 `unionBags` b2, a3 `unionBags` b3)
 
-get_binders1 (TyD (TyData _ _ name tyvars _ _ _ _))
- = (listToBag tyvars, unitBag (name,Nothing), emptyBag)
 get_binders1 (TyD (TySynonym name tyvars _ _))
  = (listToBag tyvars, unitBag (name, Just (length tyvars)), emptyBag)
+get_binders1 (TyD (TyData _ _ name tyvars condecls _ _ _))
+ = (listToBag tyvars `unionBags` cons_tvs condecls,
+    unitBag (name,Nothing), emptyBag)
 get_binders1 (ClD (ClassDecl _ name tyvars sigs _ _ _ _ _))
  = (listToBag tyvars `unionBags` sigs_tvs sigs,
     emptyBag, unitBag (name, length tyvars))
+
+cons_tvs condecls = unionManyBags (map con_tvs condecls)
+  where
+    con_tvs (ConDecl _ tvs _ _ _) = listToBag tvs
 
 sigs_tvs sigs = unionManyBags (map sig_tvs sigs)
   where 

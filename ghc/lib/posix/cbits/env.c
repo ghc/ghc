@@ -1,21 +1,18 @@
 /*
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1995-1996
-%
-\subsection[env.lc]{Environment Handling for LibPosix}
+ * (c) The GRASP/AQUA Project, Glasgow University, 1995-1996
+ * 
+ * \subsection[env.lc]{Environment Handling for LibPosix}
+ * 
+ * Many useful environment functions are not necessarily provided by libc.
+ * To get around this problem, we introduce our own.  The first time that
+ * you modify your environment, we copy the environment wholesale into
+ * malloc'ed locations, so that subsequent modifications can do proper
+ * memory management.  The $environ$ variable is updated with a pointer
+ * to the current environment so that the normal $getenv$ and $exec*$ functions
+ * should continue to work properly.
+ */
 
-Many useful environment functions are not necessarily provided by libc.
-To get around this problem, we introduce our own.  The first time that
-you modify your environment, we copy the environment wholesale into
-malloc'ed locations, so that subsequent modifications can do proper
-memory management.  The $environ$ variable is updated with a pointer
-to the current environment so that the normal $getenv$ and $exec*$ functions
-should continue to work properly.
-
-\begin{code}
-*/
-
-#include "rtsdefs.h"
+#include "Rts.h"
 #include "libposix.h"
 
 /* Switch this on once we've moved the environment to the malloc arena */

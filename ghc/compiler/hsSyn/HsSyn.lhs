@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section{Haskell abstract syntax definition}
 
@@ -35,7 +35,7 @@ import HsDecls		( HsDecl(..), TyDecl(..), InstDecl(..), ClassDecl(..),
 			  DefaultDecl(..), ForeignDecl(..), ForKind(..),
 			  ExtName(..), isDynamic,  FixityDecl(..), 
 			  ConDecl(..), ConDetails(..), BangType(..),
-			  IfaceSig(..), HsIdInfo,  SpecDataSig(..), 
+			  IfaceSig(..),  SpecDataSig(..), 
 			  hsDeclName
 			)
 import HsExpr
@@ -44,13 +44,10 @@ import HsBasic
 import HsMatches
 import HsPat
 import HsTypes
-import HsPragmas	( ClassPragmas, ClassOpPragmas,
-			  DataPragmas, GenPragmas, InstancePragmas )
 import HsCore
 import BasicTypes	( Fixity, Version, NewOrData, IfaceFlavour, Module )
 
 -- others:
-import FiniteMap	( FiniteMap )
 import Outputable
 import SrcLoc		( SrcLoc )
 import Bag

@@ -1,16 +1,47 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[PrelInfo]{The @PrelInfo@ interface to the compiler's prelude knowledge}
 
 \begin{code}
 module PrelInfo (
-	-- finite maps for built-in things (for the renamer and typechecker):
-	builtinNames, derivingOccurrences,
-	BuiltinNames,
+	builtinNames, 	-- Names of things whose *unique* must be known, but 
+			-- that is all. If something is in here, you know that
+			-- if it's used at all then it's Name will be just as
+			-- it is here, unique and all.  Includes all the 
+			-- wiredd-in names.
+
+	thinAirIdNames,	-- Names of non-wired-in Ids that may be used out of
+	setThinAirIds,	-- thin air in any compilation. If they are not wired in
+	thinAirModules,	-- we must be sure to import them from some Prelude 
+			-- interface file even if they are not overtly 
+			-- mentioned.  Subset of builtinNames.
+	noRepIntegerIds,
+	noRepStrIds,
+
+	derivingOccurrences, 	-- For a given class C, this tells what other 
+				-- things are needed as a result of a 
+				-- deriving(C) clause
+
+
+	-- Here are the thin-air Ids themselves
+	int2IntegerId, addr2IntegerId,
+	integerMinusOneId, integerZeroId, integerPlusOneId, integerPlusTwoId,
+	packStringForCId, unpackCStringId, unpackCString2Id,
+	unpackCStringAppendId, unpackCStringFoldrId,
+	foldrId,
+
+	-- Random other things
+	main_NAME, ioTyCon_NAME,
+	deRefStablePtr_NAME, makeStablePtr_NAME,
+	bindIO_NAME,
 
 	maybeCharLikeCon, maybeIntLikeCon,
+	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, 
+	isNoDictClass, isNumericClass, isStandardClass, isCcallishClass, 
+	isCreturnableClass, numericTyKeys,
 
+	-- RdrNames for lots of things, mainly used in derivings
 	eq_RDR, ne_RDR, le_RDR, lt_RDR, ge_RDR, gt_RDR, max_RDR, min_RDR, 
 	compare_RDR, minBound_RDR, maxBound_RDR, enumFrom_RDR, enumFromTo_RDR,
 	enumFromThen_RDR, enumFromThenTo_RDR, fromEnum_RDR, toEnum_RDR, 
@@ -27,23 +58,20 @@ module PrelInfo (
 
 	numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 	ccallableClass_RDR, creturnableClass_RDR,
-	monadZeroClass_RDR, enumClass_RDR, evalClass_RDR, ordClass_RDR,
-	ioDataCon_RDR, ioOkDataCon_RDR,
+	monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
+	ioDataCon_RDR
 
-	main_NAME, allClass_NAME, ioTyCon_NAME, ioOkDataCon_NAME,
-
-	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, isNoDictClass,
-	isNumericClass, isStandardClass, isCcallishClass, isCreturnableClass
     ) where
 
 #include "HsVersions.h"
 
-import IdUtils ( primOpName )
 
 -- friends:
 import PrelMods		-- Prelude module names
 import PrelVals		-- VALUES
+import MkId		( mkPrimitiveId )
 import PrimOp		( PrimOp(..), allThePrimOps )
+import DataCon		( DataCon )
 import PrimRep		( PrimRep(..) )
 import TysPrim		-- TYPES
 import TysWiredIn
@@ -51,17 +79,19 @@ import TysWiredIn
 -- others:
 import RdrHsSyn		( RdrName(..), varQual, tcQual, qual )
 import BasicTypes	( IfaceFlavour )
-import Id		( GenId, Id )
+import Var		( varUnique, Id )
 import Name		( Name, OccName(..), Provenance(..),
 			  getName, mkGlobalName, modAndOcc
 			)
 import Class		( Class, classKey )
-import TyCon		( tyConDataCons, mkFunTyCon, TyCon )
-import Type
+import TyCon		( tyConDataCons, TyCon )
+import Type		( funTyCon )
 import Bag
 import Unique		-- *Key stuff
-import UniqFM		( UniqFM, listToUFM ) 
-import Util		( isIn )
+import UniqFM		( UniqFM, listToUFM, lookupWithDefaultUFM ) 
+import Util		( isIn, panic )
+
+import IOExts
 \end{code}
 
 %************************************************************************
@@ -74,35 +104,39 @@ We have two ``builtin name funs,'' one to look up @TyCons@ and
 @Classes@, the other to look up values.
 
 \begin{code}
-type BuiltinNames = Bag Name
-
-builtinNames :: BuiltinNames
+builtinNames :: Bag Name
 builtinNames
-  = 	-- Wired in TyCons
-    unionManyBags (map getTyConNames wired_in_tycons)	`unionBags`
+  = unionManyBags
+	[	-- Wired in TyCons
+	  unionManyBags (map getTyConNames wired_in_tycons)
 
-	-- Wired in Ids
-    listToBag (map getName wired_in_ids)		`unionBags`
+		-- Wired in Ids
+	, listToBag (map getName wired_in_ids)
 
-	-- PrimOps
-    listToBag (map (getName.primOpName) allThePrimOps)	`unionBags`
+		-- PrimOps
+	, listToBag (map (getName . mkPrimitiveId) allThePrimOps)
 
-	-- Other names with magic keys
-    listToBag knownKeyNames
+ 		-- Thin-air ids
+	, listToBag thinAirIdNames
+
+		-- Other names with magic keys
+	, listToBag knownKeyNames
+	]
 \end{code}
 
 
 \begin{code}
 getTyConNames :: TyCon -> Bag Name
 getTyConNames tycon
-    =  getName tycon `consBag` listToBag (map getName (tyConDataCons tycon))
+    = getName tycon `consBag` 
+      listToBag (map getName (tyConDataCons tycon))
 	-- Synonyms return empty list of constructors
 \end{code}
-
 
 We let a lot of "non-standard" values be visible, so that we can make
 sense of them in interface pragmas. It's cool, though they all have
 "non-standard" names, so they won't get past the parser in user code.
+
 
 %************************************************************************
 %*									*
@@ -110,11 +144,11 @@ sense of them in interface pragmas. It's cool, though they all have
 %*									*
 %************************************************************************
 
-
 \begin{code}
-wired_in_tycons = [mkFunTyCon] ++
+wired_in_tycons = [funTyCon] ++
 		  prim_tycons ++
 		  tuple_tycons ++
+		  unboxed_tuple_tycons ++
 		  data_tycons
 
 prim_tycons
@@ -127,53 +161,35 @@ prim_tycons
     , intPrimTyCon
     , int64PrimTyCon
     , foreignObjPrimTyCon
+    , weakPrimTyCon
     , mutableArrayPrimTyCon
     , mutableByteArrayPrimTyCon
-    , synchVarPrimTyCon
+    , mVarPrimTyCon
+    , mutVarPrimTyCon
     , realWorldTyCon
     , stablePtrPrimTyCon
     , statePrimTyCon
+    , threadIdPrimTyCon
     , wordPrimTyCon
     , word64PrimTyCon
     ]
 
 tuple_tycons = unitTyCon : [tupleTyCon i | i <- [2..37] ]
-
+unboxed_tuple_tycons = [unboxedTupleTyCon i | i <- [1..37] ]
 
 data_tycons
-  = [ listTyCon
-    , addrTyCon
+  = [ addrTyCon
     , boolTyCon
     , charTyCon
     , doubleTyCon
     , floatTyCon
-    , foreignObjTyCon
     , intTyCon
     , int8TyCon
     , int16TyCon
     , int32TyCon
     , int64TyCon
     , integerTyCon
-    , liftTyCon
-    , return2GMPsTyCon
-    , returnIntAndGMPTyCon
-    , stTyCon
-    , stRetTyCon
-    , stablePtrTyCon
-    , stateAndAddrPrimTyCon
-    , stateAndArrayPrimTyCon
-    , stateAndByteArrayPrimTyCon
-    , stateAndCharPrimTyCon
-    , stateAndDoublePrimTyCon
-    , stateAndFloatPrimTyCon
-    , stateAndForeignObjPrimTyCon
-    , stateAndIntPrimTyCon
-    , stateAndMutableArrayPrimTyCon
-    , stateAndMutableByteArrayPrimTyCon
-    , stateAndPtrPrimTyCon
-    , stateAndStablePtrPrimTyCon
-    , stateAndSynchVarPrimTyCon
-    , stateAndWordPrimTyCon
+    , listTyCon
     , voidTyCon
     , wordTyCon
     , word8TyCon
@@ -183,56 +199,123 @@ data_tycons
     ]
 \end{code}
 
+
 %************************************************************************
 %*									*
 \subsection{Wired in Ids}
 %*									*
 %************************************************************************
 
-The WiredIn Ids ...
-ToDo: Some of these should be moved to id_keys_infos!
-
 \begin{code}
 wired_in_ids
-  = [ aBSENT_ERROR_ID
-    , augmentId
-    , buildId
+  = [ 	-- These error-y things are wired in because we don't yet have
+	-- a way to express in an inteface file that the result type variable
+	-- is 'open'; that is can be unified with an unboxed type
+      aBSENT_ERROR_ID
     , eRROR_ID
-    , foldlId
-    , foldrId
     , iRREFUT_PAT_ERROR_ID
-    , integerMinusOneId
-    , integerPlusOneId
-    , integerPlusTwoId
-    , integerZeroId
     , nON_EXHAUSTIVE_GUARDS_ERROR_ID
     , nO_METHOD_BINDING_ERROR_ID
     , pAR_ERROR_ID
     , pAT_ERROR_ID
-    , packStringForCId
     , rEC_CON_ERROR_ID
     , rEC_UPD_ERROR_ID
-    , realWorldPrimId
---    , tRACE_ID
-    , unpackCString2Id
-    , unpackCStringAppendId
-    , unpackCStringFoldrId
-    , unpackCStringId
-    , unsafeCoerceId
-    , voidId
 
---  , copyableId
---  , forkId
---  , noFollowId
---    , parAtAbsId
---    , parAtForNowId
---    , parAtId
---    , parAtRelId
---    , parGlobalId
---    , parId
---    , parLocalId
---    , seqId
+	-- These two can't be defined in Haskell
+    , realWorldPrimId
+    , unsafeCoerceId
     ]
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Thin air entities}
+%*									*
+%************************************************************************
+
+These are Ids that we need to reference in various parts of the
+system, and we'd like to pull them out of thin air rather than pass
+them around.  We'd also like to have all the IdInfo available for each
+one: i.e. everything that gets pulled out of the interface file.
+
+The solution is to generate this map of global Ids after the
+typechecker, and assign it to a global variable.  Any subsequent
+pass may refer to the map to pull Ids out.  Any invalid
+(i.e. pre-typechecker) access to the map will result in a panic.
+
+\begin{code}
+thinAirIdNames 
+  = map mkKnownKeyGlobal
+    [
+	-- Needed for converting literals to Integers (used in tidyCoreExpr)
+      (varQual (pREL_BASE, SLIT("int2Integer")),  int2IntegerIdKey)	
+    , (varQual (pREL_BASE, SLIT("addr2Integer")), addr2IntegerIdKey)
+
+	-- OK, this is Will's idea: we should have magic values for Integers 0,
+	-- +1, +2, and -1 (go ahead, fire me):
+    , (varQual (pREL_BASE, SLIT("integer_0")),  integerZeroIdKey)    
+    , (varQual (pREL_BASE, SLIT("integer_1")),  integerPlusOneIdKey) 
+    , (varQual (pREL_BASE, SLIT("integer_2")),  integerPlusTwoIdKey) 
+    , (varQual (pREL_BASE, SLIT("integer_m1")), integerMinusOneIdKey)
+
+
+	-- String literals
+    , (varQual (pREL_PACK, SLIT("packCString#")),   packCStringIdKey)
+    , (varQual (pREL_PACK, SLIT("unpackCString#")), unpackCStringIdKey)
+    , (varQual (pREL_PACK, SLIT("unpackNBytes#")),  unpackCString2IdKey)
+    , (varQual (pREL_PACK, SLIT("unpackAppendCString#")), unpackCStringAppendIdKey)
+    , (varQual (pREL_PACK, SLIT("unpackFoldrCString#")),  unpackCStringFoldrIdKey)
+
+	-- Folds; introduced by desugaring list comprehensions
+    , (varQual (pREL_BASE, SLIT("foldr")), foldrIdKey)
+    ]
+
+thinAirModules = [pREL_PACK]	-- See notes with RnIfaces.findAndReadIface
+
+noRepIntegerIds = [integerZeroId, integerPlusOneId, integerPlusTwoId, integerMinusOneId,
+		   int2IntegerId, addr2IntegerId]
+
+noRepStrIds = [unpackCString2Id, unpackCStringId]
+
+int2IntegerId  = lookupThinAirId int2IntegerIdKey
+addr2IntegerId = lookupThinAirId addr2IntegerIdKey
+
+integerMinusOneId = lookupThinAirId integerMinusOneIdKey
+integerZeroId     = lookupThinAirId integerZeroIdKey
+integerPlusOneId  = lookupThinAirId integerPlusOneIdKey
+integerPlusTwoId  = lookupThinAirId integerPlusTwoIdKey
+
+packStringForCId = lookupThinAirId packCStringIdKey
+unpackCStringId  = lookupThinAirId unpackCStringIdKey
+unpackCString2Id = lookupThinAirId unpackCString2IdKey 
+unpackCStringAppendId = lookupThinAirId unpackCStringAppendIdKey 
+unpackCStringFoldrId  = lookupThinAirId unpackCStringFoldrIdKey 
+
+foldrId = lookupThinAirId foldrIdKey
+\end{code}
+
+
+\begin{code}
+\end{code}
+
+\begin{code}
+thinAirIdMapRef :: IORef (UniqFM Id)
+thinAirIdMapRef = unsafePerformIO (newIORef (panic "thinAirIdMap: still empty"))
+
+setThinAirIds :: [Id] -> IO ()
+setThinAirIds thin_air_ids
+  = writeIORef thinAirIdMapRef the_map
+  where
+    the_map = listToUFM [(varUnique id, id) | id <- thin_air_ids]
+
+thinAirIdMap :: UniqFM Id
+thinAirIdMap = unsafePerformIO (readIORef thinAirIdMapRef)
+  -- Read it just once, the first time someone tugs on thinAirIdMap
+
+lookupThinAirId :: Unique -> Id
+lookupThinAirId uniq = lookupWithDefaultUFM thinAirIdMap
+			(panic "lookupThinAirId: no mapping") uniq 
 \end{code}
 
 
@@ -249,32 +332,35 @@ mkKnownKeyGlobal :: (RdrName, Unique) -> Name
 mkKnownKeyGlobal (Qual mod occ hif, uniq)
   = mkGlobalName uniq mod occ NoProvenance
 
-allClass_NAME    = mkKnownKeyGlobal (allClass_RDR,   allClassKey)
-ioTyCon_NAME	 = mkKnownKeyGlobal (ioTyCon_RDR,    ioTyConKey)
-ioOkDataCon_NAME = mkKnownKeyGlobal (ioOkDataCon_RDR, ioOkDataConKey)
-main_NAME	 = mkKnownKeyGlobal (main_RDR,	     mainKey)
+ioTyCon_NAME	  = mkKnownKeyGlobal (ioTyCon_RDR,       ioTyConKey)
+main_NAME	  = mkKnownKeyGlobal (main_RDR,	         mainKey)
+
+ -- Operations needed when compiling FFI decls
+bindIO_NAME	    = mkKnownKeyGlobal (bindIO_RDR,	    bindIOIdKey)
+deRefStablePtr_NAME = mkKnownKeyGlobal (deRefStablePtr_RDR, deRefStablePtrIdKey)
+makeStablePtr_NAME  = mkKnownKeyGlobal (makeStablePtr_RDR,  makeStablePtrIdKey)
 
 knownKeyNames :: [Name]
 knownKeyNames
-  = [main_NAME, allClass_NAME, ioTyCon_NAME, ioOkDataCon_NAME]
+  = [main_NAME, ioTyCon_NAME]
     ++
     map mkKnownKeyGlobal
     [
 	-- Type constructors (synonyms especially)
-      (orderingTyCon_RDR,  orderingTyConKey)
-    , (rationalTyCon_RDR,  rationalTyConKey)
-    , (ratioDataCon_RDR,   ratioDataConKey)
-    , (ratioTyCon_RDR,     ratioTyConKey)
-    , (byteArrayTyCon_RDR, byteArrayTyConKey)
+      (orderingTyCon_RDR,  	orderingTyConKey)
+    , (rationalTyCon_RDR,  	rationalTyConKey)
+    , (ratioDataCon_RDR,   	ratioDataConKey)
+    , (ratioTyCon_RDR,     	ratioTyConKey)
+    , (byteArrayTyCon_RDR, 	byteArrayTyConKey)
     , (mutableByteArrayTyCon_RDR, mutableByteArrayTyConKey)
-
+    , (foreignObjTyCon_RDR, 	foreignObjTyConKey)
+    , (stablePtrTyCon_RDR, 	stablePtrTyConKey)
 
 	--  Classes.  *Must* include:
 	--  	classes that are grabbed by key (e.g., eqClassKey)
 	--  	classes in "Class.standardClassKeys" (quite a few)
     , (eqClass_RDR,		eqClassKey)		-- mentioned, derivable
     , (ordClass_RDR,		ordClassKey)		-- derivable
-    , (evalClass_RDR,		evalClassKey)		-- mentioned
     , (boundedClass_RDR, 	boundedClassKey)	-- derivable
     , (numClass_RDR, 		numClassKey)		-- mentioned, numeric
     , (enumClass_RDR,		enumClassKey)		-- derivable
@@ -310,6 +396,18 @@ knownKeyNames
     , (returnM_RDR,		returnMClassOpKey)
     , (zeroM_RDR,		zeroClassOpKey)
     , (fromRational_RDR,	fromRationalClassOpKey)
+    
+    , (deRefStablePtr_RDR,	deRefStablePtrIdKey)
+    , (makeStablePtr_RDR,	makeStablePtrIdKey)
+    , (bindIO_RDR,		bindIOIdKey)
+
+    , (map_RDR,			mapIdKey)
+    , (append_RDR,		appendIdKey)
+
+	-- List operations
+    , (concat_RDR,		concatIdKey)
+    , (filter_RDR,		filterIdKey)
+    , (zip_RDR,			zipIdKey)
 
 	-- Others
     , (otherwiseId_RDR,		otherwiseIdKey)
@@ -320,9 +418,9 @@ knownKeyNames
 ToDo: make it do the ``like'' part properly (as in 0.26 and before).
 
 \begin{code}
-maybeCharLikeCon, maybeIntLikeCon :: Id -> Bool
-maybeCharLikeCon con = uniqueOf con == charDataConKey
-maybeIntLikeCon  con = uniqueOf con == intDataConKey
+maybeCharLikeCon, maybeIntLikeCon :: DataCon -> Bool
+maybeCharLikeCon con = getUnique con == charDataConKey
+maybeIntLikeCon  con = getUnique con == intDataConKey
 \end{code}
 
 %************************************************************************
@@ -336,12 +434,16 @@ These RdrNames are not really "built in", but some parts of the compiler
 to write them all down in one place.
 
 \begin{code}
-prelude_primop op = qual (modAndOcc (primOpName op))
+prelude_primop op = qual (modAndOcc (mkPrimitiveId op))
+
+main_RDR		= varQual (mAIN,     SLIT("main"))
+otherwiseId_RDR 	= varQual (pREL_BASE, SLIT("otherwise"))
 
 intTyCon_RDR		= qual (modAndOcc intTyCon)
-ioTyCon_RDR		= tcQual (pREL_IO_BASE,   SLIT("IO"))
-ioDataCon_RDR  	   	= varQual (pREL_IO_BASE,   SLIT("IO"))
-ioOkDataCon_RDR		= varQual (pREL_IO_BASE,   SLIT("IOok"))
+ioTyCon_RDR		= tcQual  (pREL_IO_BASE, SLIT("IO"))
+ioDataCon_RDR  	   	= varQual (pREL_IO_BASE, SLIT("IO"))
+bindIO_RDR	        = varQual (pREL_IO_BASE, SLIT("bindIO"))
+
 orderingTyCon_RDR	= tcQual (pREL_BASE, SLIT("Ordering"))
 rationalTyCon_RDR	= tcQual (pREL_NUM,  SLIT("Rational"))
 ratioTyCon_RDR		= tcQual (pREL_NUM,  SLIT("Ratio"))
@@ -350,10 +452,13 @@ ratioDataCon_RDR	= varQual (pREL_NUM, SLIT(":%"))
 byteArrayTyCon_RDR		= tcQual (pREL_ARR,  SLIT("ByteArray"))
 mutableByteArrayTyCon_RDR	= tcQual (pREL_ARR,  SLIT("MutableByteArray"))
 
-allClass_RDR		= tcQual (pREL_GHC,  SLIT("All"))
+foreignObjTyCon_RDR	= tcQual (pREL_IO_BASE, SLIT("ForeignObj"))
+stablePtrTyCon_RDR	= tcQual (pREL_FOREIGN, SLIT("StablePtr"))
+deRefStablePtr_RDR      = varQual (pREL_FOREIGN, SLIT("deRefStablePtr"))
+makeStablePtr_RDR       = varQual (pREL_FOREIGN, SLIT("makeStablePtr"))
+
 eqClass_RDR		= tcQual (pREL_BASE, SLIT("Eq"))
 ordClass_RDR		= tcQual (pREL_BASE, SLIT("Ord"))
-evalClass_RDR 		= tcQual (pREL_BASE, SLIT("Eval"))
 boundedClass_RDR	= tcQual (pREL_BASE, SLIT("Bounded"))
 numClass_RDR		= tcQual (pREL_BASE, SLIT("Num"))
 enumClass_RDR 		= tcQual (pREL_BASE, SLIT("Enum"))
@@ -383,11 +488,11 @@ enumFromTo_RDR	   = varQual (pREL_BASE, SLIT("enumFromTo"))
 enumFromThen_RDR   = varQual (pREL_BASE, SLIT("enumFromThen"))
 enumFromThenTo_RDR = varQual (pREL_BASE, SLIT("enumFromThenTo"))
 
-thenM_RDR	   = varQual (pREL_BASE, SLIT(">>="))
-returnM_RDR	   = varQual (pREL_BASE, SLIT("return"))
-zeroM_RDR	   = varQual (pREL_BASE, SLIT("zero"))
-fromRational_RDR   = varQual (pREL_NUM,  SLIT("fromRational"))
+thenM_RDR	   = varQual (pREL_BASE,    SLIT(">>="))
+returnM_RDR	   = varQual (pREL_BASE,    SLIT("return"))
+zeroM_RDR	   = varQual (pREL_BASE,    SLIT("zero"))
 
+fromRational_RDR   = varQual (pREL_NUM,     SLIT("fromRational"))
 negate_RDR	   = varQual (pREL_BASE, SLIT("negate"))
 eq_RDR		   = varQual (pREL_BASE, SLIT("=="))
 ne_RDR		   = varQual (pREL_BASE, SLIT("/="))
@@ -410,6 +515,9 @@ not_RDR		   = varQual (pREL_BASE,  SLIT("not"))
 compose_RDR	   = varQual (pREL_BASE, SLIT("."))
 append_RDR	   = varQual (pREL_BASE, SLIT("++"))
 map_RDR		   = varQual (pREL_BASE, SLIT("map"))
+concat_RDR	   = varQual (mONAD,     SLIT("concat"))
+filter_RDR	   = varQual (mONAD,     SLIT("filter"))
+zip_RDR		   = varQual (pREL_LIST, SLIT("zip"))
 
 showList___RDR     = varQual (pREL_BASE,  SLIT("showList__"))
 showsPrec_RDR	   = varQual (pREL_BASE, SLIT("showsPrec"))
@@ -434,7 +542,7 @@ mkInt_RDR	   = varQual (pREL_BASE, SLIT("I#"))
 
 error_RDR	   = varQual (pREL_ERR, SLIT("error"))
 assert_RDR         = varQual (pREL_GHC, SLIT("assert"))
-assertErr_RDR       = varQual (pREL_ERR, SLIT("assertError"))
+assertErr_RDR      = varQual (pREL_ERR, SLIT("assertError"))
 
 eqH_Char_RDR	= prelude_primop CharEqOp
 ltH_Char_RDR	= prelude_primop CharLtOp
@@ -451,10 +559,6 @@ ltH_Int_RDR	= prelude_primop IntLtOp
 geH_RDR		= prelude_primop IntGeOp
 leH_RDR		= prelude_primop IntLeOp
 minusH_RDR	= prelude_primop IntSubOp
-
-main_RDR	= varQual (mAIN,     SLIT("main"))
-
-otherwiseId_RDR = varQual (pREL_BASE, SLIT("otherwise"))
 \end{code}
 
 %************************************************************************
@@ -487,7 +591,6 @@ deriving_occ_info
 				-- EQ (from Ordering) is needed to force in the constructors
 				-- as well as the type constructor.
     , (enumClassKey, 	[intTyCon_RDR, map_RDR])
-    , (evalClassKey,	[intTyCon_RDR])
     , (boundedClassKey,	[intTyCon_RDR])
     , (showClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, compose_RDR, showString_RDR, 
 			 showParen_RDR, showSpace_RDR, showList___RDR])
@@ -522,26 +625,46 @@ isCreturnableClass clas = classKey clas == cReturnableClassKey
 isNoDictClass      clas = classKey clas `is_elem` noDictClassKeys
 is_elem = isIn "is_X_Class"
 
-numericClassKeys
-  = [ numClassKey
-    , realClassKey
-    , integralClassKey
-    , fractionalClassKey
-    , floatingClassKey
-    , realFracClassKey
-    , realFloatClassKey
-    ]
+numericClassKeys =
+	[ numClassKey
+    	, realClassKey
+    	, integralClassKey
+    	, fractionalClassKey
+    	, floatingClassKey
+    	, realFracClassKey
+    	, realFloatClassKey
+    	]
 
-needsDataDeclCtxtClassKeys -- see comments in TcDeriv
-  = [ readClassKey
-    ]
+	-- the strictness analyser needs to know about numeric types
+	-- (see SaAbsInt.lhs)
+numericTyKeys = 
+	[ addrTyConKey
+	, wordTyConKey
+	, intTyConKey
+	, integerTyConKey
+	, doubleTyConKey
+	, floatTyConKey
+	]
 
-cCallishClassKeys = [ cCallableClassKey, cReturnableClassKey ]
+needsDataDeclCtxtClassKeys = -- see comments in TcDeriv
+  	[ readClassKey
+    	]
+
+cCallishClassKeys = 
+	[ cCallableClassKey
+	, cReturnableClassKey
+	]
 
 	-- Renamer always imports these data decls replete with constructors
 	-- so that desugarer can always see the constructor.  Ugh!
-cCallishTyKeys = [ addrTyConKey, wordTyConKey, byteArrayTyConKey, 
-		   mutableByteArrayTyConKey, foreignObjTyConKey ]
+cCallishTyKeys = 
+	[ addrTyConKey
+	, wordTyConKey
+	, byteArrayTyConKey
+	, mutableByteArrayTyConKey
+	, foreignObjTyConKey
+	, stablePtrTyConKey
+	]
 
 standardClassKeys
   = derivableClassKeys ++ numericClassKeys ++ cCallishClassKeys
@@ -556,10 +679,4 @@ standardClassKeys
 noDictClassKeys 	-- These classes are used only for type annotations;
 			-- they are not implemented by dictionaries, ever.
   = cCallishClassKeys
-	-- I used to think that class Eval belonged in here, but
-	-- we really want functions with type (Eval a => ...) and that
-	-- means that we really want to pass a placeholder for an Eval
-	-- dictionary.  The unit tuple is what we'll get if we leave things
-	-- alone, and that'll do for now.  Could arrange to drop that parameter
-	-- in the end.
 \end{code}

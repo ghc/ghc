@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.9 1998/08/11 21:40:34 sof Exp $
+# $Id: Makefile,v 1.10 1998/12/02 13:26:38 simonm Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -54,9 +54,10 @@ endif
 #
 # Specific flags
 #
-BSD_HC_OPTS        += -optc-DNON_POSIX_SOURCE
-Socket_HC_OPTS     += -I../std/cbits -syslib posix -optc-DNON_POSIX_SOURCE
-SocketPrim_HC_OPTS += -I../std/cbits -H10m -optc-DNON_POSIX_SOURCE
+BSD_HC_OPTS          += -I../std/cbits -optc-DNON_POSIX_SOURCE
+Socket_HC_OPTS       += -I../std/cbits -optc-DNON_POSIX_SOURCE
+SocketPrim_HC_OPTS   += -I../std/cbits -H10m -optc-DNON_POSIX_SOURCE
+PackedString_HC_OPTS += -H12m
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation

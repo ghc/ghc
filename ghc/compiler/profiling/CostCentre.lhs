@@ -1,41 +1,98 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[CostCentre]{The @CostCentre@ data type}
 
 \begin{code}
 module CostCentre (
 	CostCentre, CcKind, IsDupdCC{-ToDo:rm-}, IsCafCC(..),
-	noCostCentre, subsumedCosts,
-	useCurrentCostCentre,
-	noCostCentreAttached, costsAreSubsumed, isCurrentCostCentre,
-	currentOrSubsumedCosts,
-	preludeCafsCostCentre, preludeDictsCostCentre,
-	overheadCostCentre, dontCareCostCentre,
+	CostCentreStack,
+	noCCS, subsumedCCS, currentCCS, overheadCCS, dontCareCCS,
+	noCostCentre, noCCAttached,
+	noCCSAttached, isCurrentCCS,  isSubsumedCCS, currentOrSubsumedCCS,
 
 	mkUserCC, mkAutoCC, mkDictCC, mkAllCafsCC, mkAllDictsCC,
-	cafifyCC, dupifyCC,
-	isCafCC, isDictCC, isDupdCC,
+	mkSingletonCCS, cafifyCC, dupifyCC,
+	isCafCC, isDictCC, isDupdCC, isEmptyCC, isCafCCS,
 	isSccCountCostCentre,
 	sccAbleCostCentre,
 	ccFromThisModule,
 	ccMentionsId,
 
-	uppCostCentre, uppCostCentreDecl, showCostCentre, -- printing
+	pprCostCentreDecl, pprCostCentreStackDecl,
 
 	cmpCostCentre	-- used for removing dups in a list
     ) where
 
 #include "HsVersions.h"
 
-import Id		( externallyVisibleId, GenId, Id )
+import Var		( externallyVisibleId, GenId, Id )
 import CStrings		( identToC, stringToC )
-import Name		( OccName, getOccString, moduleString )
+import Name		( getOccString )
 import Outputable	
-import Util	        ( panic, panic#, assertPanic, thenCmp )
-
+import BasicTypes	( moduleString )
+import Util	        ( panic, assertPanic, thenCmp )
 \end{code}
 
+A Cost Centre Stack is something that can be attached to a closure.
+This is either:
+	
+	- the current cost centre stack (CCCS)
+	- a pre-defined cost centre stack (there are several
+	  pre-defined CCSs, see below).
+
+\begin{code}
+data CostCentreStack
+  = NoCCS
+
+  | CurrentCCS		-- Pinned on a let(rec)-bound 
+			-- thunk/function/constructor, this says that the 
+			-- cost centre to be attached to the object, when it 
+			-- is allocated, is whatever is in the 
+			-- current-cost-centre-stack register.
+
+  | SubsumedCCS		-- Cost centre stack for top-level subsumed functions
+			-- (CAFs get an AllCafsCC).
+			-- Its execution costs get subsumed into the caller.
+			-- This guy is *only* ever pinned on static closures,
+			-- and is *never* the cost centre for an SCC construct.
+
+  | OverheadCCS		-- We charge costs due to the profiling-system
+  			-- doing its work to "overhead".
+			--
+			-- Objects whose CCS is "Overhead"
+			-- have their *allocation* charged to "overhead",
+			-- but have the current CCS put into the object
+			-- itself.
+
+			-- For example, if we transform "f g" to "let
+			-- g' = g in f g'" (so that something about
+			-- profiling works better...), then we charge
+			-- the *allocation* of g' to OverheadCCS, but
+			-- we put the cost-centre of the call to f
+			-- (i.e., current CCS) into the g' object.  When
+			-- g' is entered, the CCS of the call
+			-- to f will be set.
+
+  | DontCareCCS		-- We need a CCS to stick in static closures
+			-- (for data), but we *don't* expect them to
+			-- accumulate any costs.  But we still need
+			-- the placeholder.  This CCS is it.
+
+  | SingletonCCS CostCentre
+			-- This is primarily for CAF cost centres, which
+			-- are attached to top-level thunks right at the
+			-- end of STG processing, before code generation.
+			-- Hence, a CAF cost centre never appears as the
+			-- argument of an _scc_.
+			-- Also, we generate these singleton CCSs statically
+			-- as part of code generation.
+
+  deriving (Eq, Ord)	-- needed for Ord on CLabel
+\end{code}
+
+A Cost Centre is the argument of an _scc_ expression.
+ 
 \begin{code}
 data CostCentre
   = NoCostCentre	-- Having this constructor avoids having
@@ -46,19 +103,6 @@ data CostCentre
 		FAST_STRING   -- "Group" that this CC is in.
 		IsDupdCC -- see below
 		IsCafCC	 -- see below
-
-  | CurrentCC		-- Pinned on a let(rec)-bound thunk/function/constructor,
-			-- this says that the cost centre to be attached to
-			-- the object, when it is allocated, is whatever is in the
-			-- current-cost-centre register.
-			-- This guy is *never* the cost centre for an SCC construct,
-			-- and is only used for *local* (non-top-level) definitions.
-
-  | SubsumedCosts	-- Cost centre for top-level subsumed functions
-			-- (CAFs get an AllCafsCC).
-			-- Its execution costs get subsumed into the caller.
-			-- This guy is *only* ever pinned on static closures,
-			-- and is *never* the cost centre for an SCC construct.
 
   | AllCafsCC	FAST_STRING	-- Ditto for CAFs.
 		FAST_STRING  -- We record module and group names.
@@ -73,38 +117,6 @@ data CostCentre
 			-- per-individual-DICT cost attribution.
 		IsDupdCC -- see below
 
-  | OverheadCC		-- We charge costs due to the profiling-system
-  			-- doing its work to "overhead".
-			--
-			-- Objects whose cost-centre is "Overhead"
-			-- have their *allocation* charged to "overhead",
-			-- but have the current CC put into the object
-			-- itself.
-			--
-			-- For example, if we transform "f g" to "let
-			-- g' = g in f g'" (so that something about
-			-- profiling works better...), then we charge
-			-- the *allocation* of g' to OverheadCC, but
-			-- we put the cost-centre of the call to f
-			-- (i.e., current CC) into the g' object.  When
-			-- g' is entered, the cost-centre of the call
-			-- to f will be set.
-
-  | PreludeCafsCC	-- In compiling the prelude, we do sometimes
-  | PreludeDictsCC	-- need a CC to blame; i.e., when there's a CAF,
-			-- or other costs that really shouldn't be
-			-- subsumed/blamed-on-the-caller.  These costs
-			-- should be *small*.  We treat PreludeCafsCC
-			-- as if it were shorthand for
-			-- (AllCafsCC <PreludeSomething> _).  Analogously
-			-- for PreludeDictsCC...
-	IsDupdCC	-- see below/above
-
-  | DontCareCC		-- We need a cost-centre to stick in static closures
-			-- (for data), but we *don't* expect them to
-			-- accumulate any costs.  But we still need
-			-- the placeholder.  This CC is it.
-
 data CcKind
   = UserCC  FAST_STRING	-- Supplied by user: String is the cc name
   | AutoCC  Id		-- CC -auto-magically inserted for that Id
@@ -115,6 +127,11 @@ data IsDupdCC
   | ADupdCC		-- it is ADupdCC doesn't make it a different
 			-- CC, just that it a sub-expression which has
 			-- been moved ("dupd") into a different scope.
+			--
+			-- The point about a dupd SCC is that we don't
+			-- count entries to it, because it's not the
+			-- "original" one.
+			--
 			-- In the papers, it's called "SCCsub",
 			--  i.e. SCCsub CC == SCC ADupdCC,
 			-- but we are trying to avoid confusion between
@@ -134,28 +151,45 @@ being moved across module boundaries.
 SIMON: Maybe later...
 
 \begin{code}
-noCostCentre  = NoCostCentre
-subsumedCosts = SubsumedCosts
-useCurrentCostCentre = CurrentCC
-overheadCostCentre = OverheadCC
-preludeCafsCostCentre = PreludeCafsCC
-dontCareCostCentre = DontCareCC
-preludeDictsCostCentre is_dupd
-  = PreludeDictsCC (if is_dupd then ADupdCC else AnOriginalCC)
 
-noCostCentreAttached NoCostCentre  = True
-noCostCentreAttached _		   = False
+noCCS 			= NoCCS
+subsumedCCS 		= SubsumedCCS
+currentCCS	 	= CurrentCCS
+overheadCCS	 	= OverheadCCS
+dontCareCCS	 	= DontCareCCS
 
-isCurrentCostCentre CurrentCC = True
-isCurrentCostCentre _	      = False
+noCostCentre  		= NoCostCentre
+\end{code}
 
-costsAreSubsumed SubsumedCosts	= True
-costsAreSubsumed _		= False
+Predicates on Cost-Centre Stacks
 
-currentOrSubsumedCosts SubsumedCosts	= True
-currentOrSubsumedCosts CurrentCC	= True
-currentOrSubsumedCosts _		= False
+\begin{code}
+noCCSAttached NoCCS			= True
+noCCSAttached _				= False
 
+noCCAttached NoCostCentre		= True
+noCCAttached _				= False
+
+isCurrentCCS CurrentCCS			= True
+isCurrentCCS _	      			= False
+
+isSubsumedCCS SubsumedCCS 		= True
+isSubsumedCCS _		     		= False
+
+isCafCCS (SingletonCCS cc)		= isCafCC cc
+isCafCCS _				= False
+
+isDictCCS (SingletonCCS cc)		= isDictCC cc
+isDictCCS _				= False
+
+currentOrSubsumedCCS SubsumedCCS	= True
+currentOrSubsumedCCS CurrentCCS		= True
+currentOrSubsumedCCS _			= False
+\end{code}
+
+Building cost centres
+
+\begin{code}
 mkUserCC :: FAST_STRING -> FAST_STRING -> FAST_STRING -> CostCentre
 
 mkUserCC cc_name module_name group_name
@@ -176,38 +210,39 @@ mkAllCafsCC  m g   = AllCafsCC  m g
 mkAllDictsCC m g is_dupd
   = AllDictsCC m g (if is_dupd then ADupdCC else AnOriginalCC)
 
+mkSingletonCCS :: CostCentre -> CostCentreStack
+mkSingletonCCS cc = SingletonCCS cc
+
 cafifyCC, dupifyCC  :: CostCentre -> CostCentre
 
 cafifyCC cc@(AllDictsCC _ _ _) = cc -- ToDo ???
-cafifyCC cc@(PreludeDictsCC _) = cc --    ditto
 cafifyCC (NormalCC kind m g is_dupd is_caf)
   = ASSERT(not_a_calf_already is_caf)
     NormalCC kind m g is_dupd IsCafCC
   where
     not_a_calf_already IsCafCC = False
     not_a_calf_already _       = True
-cafifyCC cc = panic ("cafifyCC"++(showCostCentre False cc))
+cafifyCC cc = pprPanic "cafifyCC" (ppr cc)
 
 dupifyCC (AllDictsCC m g _) = AllDictsCC m g ADupdCC
-dupifyCC (PreludeDictsCC _) = PreludeDictsCC ADupdCC
 dupifyCC (NormalCC kind m g is_dupd is_caf)
   = NormalCC kind m g ADupdCC is_caf
-dupifyCC cc = panic ("dupifyCC"++(showCostCentre False cc))
+dupifyCC cc = pprPanic "dupifyCC" (ppr cc)
 
-isCafCC, isDictCC, isDupdCC :: CostCentre -> Bool
+isEmptyCC, isCafCC, isDictCC, isDupdCC :: CostCentre -> Bool
+
+isEmptyCC (NoCostCentre)		= True
+isEmptyCC _				= False
 
 isCafCC (AllCafsCC _ _)		   = True
-isCafCC PreludeCafsCC		   = True
 isCafCC (NormalCC _ _ _ _ IsCafCC) = True
 isCafCC _		           = False
 
 isDictCC (AllDictsCC _ _ _)		= True
-isDictCC (PreludeDictsCC _)		= True
 isDictCC (NormalCC (DictCC _) _ _ _ _)  = True
 isDictCC _				= False
 
 isDupdCC (AllDictsCC _ _ ADupdCC)   = True
-isDupdCC (PreludeDictsCC ADupdCC)   = True
 isDupdCC (NormalCC _ _ _ ADupdCC _) = True
 isDupdCC _		            = False
 
@@ -216,11 +251,7 @@ isSccCountCostCentre :: CostCentre -> Bool
 
 #if DEBUG
 isSccCountCostCentre NoCostCentre  = panic "isSccCount:NoCostCentre"
-isSccCountCostCentre SubsumedCosts = panic "isSccCount:SubsumedCosts"
-isSccCountCostCentre CurrentCC	   = panic "isSccCount:CurrentCC"
-isSccCountCostCentre DontCareCC    = panic "isSccCount:DontCareCC"
 #endif
-isSccCountCostCentre OverheadCC       = False
 isSccCountCostCentre cc | isCafCC cc  = False
                         | isDupdCC cc = False
 			| isDictCC cc = True
@@ -231,11 +262,7 @@ sccAbleCostCentre :: CostCentre -> Bool
 
 #if DEBUG
 sccAbleCostCentre NoCostCentre  = panic "sccAbleCC:NoCostCentre"
-sccAbleCostCentre SubsumedCosts = panic "sccAbleCC:SubsumedCosts"
-sccAbleCostCentre CurrentCC	= panic "sccAbleCC:CurrentCC"
-sccAbleCostCentre DontCareCC	= panic "sccAbleCC:DontCareCC"
 #endif
-sccAbleCostCentre OverheadCC	  = False
 sccAbleCostCentre cc | isCafCC cc = False
 		     | otherwise  = True
 
@@ -244,11 +271,6 @@ ccFromThisModule :: CostCentre -> FAST_STRING{-module name-} -> Bool
 ccFromThisModule (NormalCC _ m _ _ _) mod_name = m == mod_name
 ccFromThisModule (AllCafsCC  m _)     mod_name = m == mod_name
 ccFromThisModule (AllDictsCC m _ _)   mod_name = m == mod_name
-ccFromThisModule PreludeCafsCC	      _	       = False
-ccFromThisModule (PreludeDictsCC _)   _	       = False
-ccFromThisModule OverheadCC	      _	       = False
-ccFromThisModule DontCareCC	      _	       = False
-  -- shouldn't ask about any others!
 \end{code}
 
 \begin{code}
@@ -260,14 +282,16 @@ ccMentionsId other			    = Nothing
 \end{code}
 
 \begin{code}
+instance Eq CostCentre where
+	c1 == c2 = case c1 `cmpCostCentre` c2 of { EQ -> True; _ -> False }
+
+instance Ord CostCentre where
+	compare = cmpCostCentre
+
 cmpCostCentre :: CostCentre -> CostCentre -> Ordering
 
 cmpCostCentre (AllCafsCC  m1 _)   (AllCafsCC  m2 _)   = m1 `compare` m2
 cmpCostCentre (AllDictsCC m1 _ _) (AllDictsCC m2 _ _) = m1 `compare` m2
-cmpCostCentre PreludeCafsCC    	  PreludeCafsCC	      = EQ
-cmpCostCentre (PreludeDictsCC _)  (PreludeDictsCC _)  = EQ
-cmpCostCentre OverheadCC       	  OverheadCC	      = EQ
-cmpCostCentre DontCareCC       	  DontCareCC	      = EQ
 
 cmpCostCentre (NormalCC k1 m1 _ _ c1) (NormalCC k2 m2 _ _ c2)
     -- first key is module name, then we use "kinds" (which include
@@ -284,16 +308,6 @@ cmpCostCentre other_1 other_2
     tag_CC (NormalCC _ _ _ _ _) = (ILIT(1) :: FAST_INT)
     tag_CC (AllCafsCC  _ _)   	= ILIT(2)
     tag_CC (AllDictsCC _ _ _) 	= ILIT(3)
-    tag_CC PreludeCafsCC      	= ILIT(4)
-    tag_CC (PreludeDictsCC _) 	= ILIT(5)
-    tag_CC OverheadCC	      	= ILIT(6)
-    tag_CC DontCareCC	      	= ILIT(7)
-
-    -- some BUG avoidance here...
-    tag_CC NoCostCentre  = panic# "tag_CC:NoCostCentre"
-    tag_CC SubsumedCosts = panic# "tag_CC:SubsumedCosts"
-    tag_CC CurrentCC	 = panic# "tag_CC:SubsumedCosts"
-
 
 cmp_kind (UserCC n1) (UserCC n2) = n1 `compare` n2
 cmp_kind (AutoCC i1) (AutoCC i2) = i1 `compare` i2
@@ -315,192 +329,141 @@ cmp_caf IsCafCC    IsCafCC     = EQ
 cmp_caf IsCafCC    IsNotCafCC  = GT
 \end{code}
 
+-----------------------------------------------------------------------------
+Printing Cost Centre Stacks.
+
+There are two ways to print a CCS:
+
+	- for debugging output (i.e. -ddump-whatever),
+	- as a C label
+
 \begin{code}
-showCostCentre    :: Bool -> CostCentre -> String
-uppCostCentre	  :: Bool -> CostCentre -> SDoc
-uppCostCentreDecl :: Bool -> CostCentre -> SDoc
+instance Outputable CostCentreStack where
+  ppr ccs = case ccs of
+		NoCCS		-> ptext SLIT("NO_CCS")
+		CurrentCCS	-> ptext SLIT("CCCS")
+		OverheadCCS	-> ptext SLIT("CCS_OVERHEAD")
+		DontCareCCS	-> ptext SLIT("CCS_DONTZuCARE")
+		SubsumedCCS	-> ptext SLIT("CCS_SUBSUMED")
+		SingletonCCS cc -> 
+			getPprStyle $ \sty ->
+			if (codeStyle sty) 
+			    then ptext SLIT("CCS_") <> 
+				 identToC (_PK_ (costCentreStr cc))
+			    else ptext SLIT("CCS.") <> text (costCentreStr cc)
 
-{- 	PprUnfolding is gone now
-showCostCentre PprUnfolding print_as_string cc
-  = ASSERT(not print_as_string) -- we never "print as string w/ Unfolding"
-    ASSERT(not (noCostCentreAttached cc))
-    ASSERT(not (currentOrSubsumedCosts cc))
-    uppShow 80 (upp_cc_uf cc)
--}
+pprCostCentreStackDecl :: CostCentreStack -> SDoc
 
-showCostCentre print_as_string cc
-  = showSDoc (uppCostCentre print_as_string cc)
-
-uppCostCentre print_as_string NoCostCentre
-  | print_as_string	= text "\"NO_CC\""
-  | otherwise		= ptext SLIT("NO_CC")
-
-uppCostCentre print_as_string SubsumedCosts
-  | print_as_string 	= text "\"SUBSUMED\""
-  | otherwise		= ptext SLIT("CC_SUBSUMED")
-
-uppCostCentre print_as_string CurrentCC
-  | print_as_string 	= text "\"CURRENT_CC\""
-  | otherwise		= ptext SLIT("CCC")
-
-uppCostCentre print_as_string OverheadCC
-  | print_as_string	= text "\"OVERHEAD\""
-  | otherwise		= ptext SLIT("CC_OVERHEAD")
-
-uppCostCentre print_as_string cc
-  = getPprStyle $ \ sty ->
-    let
-	prefix_CC	   = ptext SLIT("CC_")
-	basic_thing        = do_cc sty cc
-	basic_thing_string = stringToC basic_thing
+pprCostCentreStackDecl ccs@(SingletonCCS cc)
+  = let
+       (mod_name, grp_name, is_subsumed, externally_visible) = get_cc_info cc
     in
-    if print_as_string then
-    	hcat [char '"', text basic_thing_string, char '"']
+    hcat [ ptext SLIT("CCS_DECLARE"), char '(',
+    	   ppr ccs,	 	comma,	-- better be codeStyle
+    	   ppCostCentreLbl cc, 	comma,
+    	   ptext is_subsumed, 	comma,
+    	   if externally_visible
+       		then empty 
+       		else ptext SLIT("static"),
+    	   text ");"
+	 ]
 
-    else if (friendly_sty sty) then
-	text basic_thing
-    else
-	hcat [prefix_CC, identToC (_PK_ basic_thing)]
-  where
-    friendly_sty sty = userStyle sty || debugStyle sty    -- i.e. probably for human consumption
-
-    do_cc sty DontCareCC	  = "DONT_CARE"
-    do_cc sty (AllCafsCC  m _)   = if print_as_string
-				    then "CAFs_in_..."
-				    else "CAFs." ++ _UNPK_ m
-    do_cc sty (AllDictsCC m _ d) = do_dupd sty d (
-			            if print_as_string
-				    then "DICTs_in_..."
-				    else "DICTs." ++ _UNPK_ m)
-    do_cc sty PreludeCafsCC	  = if print_as_string
-				    then "CAFs_in_..."
-				    else "CAFs"
-    do_cc sty (PreludeDictsCC d) = do_dupd sty d (
-				    if print_as_string
-				    then "DICTs_in_..."
-				    else "DICTs")
-
-    do_cc sty (NormalCC kind mod_name grp_name is_dupd is_caf)
-      = let
-            basic_kind  = do_kind kind
-	    module_kind = do_caf is_caf (moduleString mod_name ++ '/':
-					       basic_kind)
-            grp_str     = [] 
-            {- TODO: re-instate this once interface file lexer
-	       handles groups.
-              grp_str     = 
-                 if (_NULL_ grp_name) then 
-	            [] 
-		 else 
-		    '/' : (_UNPK_ grp_name)
-	    -}
-            full_kind   = do_caf is_caf
-	                         (moduleString mod_name  ++ 
-			          grp_str ++ ('/' : basic_kind))
-	in
-        if (friendly_sty sty) then
-	   do_dupd sty is_dupd full_kind
-	else if codeStyle sty && print_as_string then
-	        {-
-	         drop the module name when printing
-	         out SCC label in CC declaration
-	        -}
-	        basic_kind
-	     else
-                module_kind
-      where
-	do_caf IsCafCC ls = "CAF:" ++ ls
-	do_caf _       ls = ls
-
-    	do_kind (UserCC name) = _UNPK_ name
-	do_kind (AutoCC id)   = do_id id ++ (if (debugStyle sty) then "/AUTO" else "")
-	do_kind (DictCC id)   = do_id id ++ (if (debugStyle sty) then "/DICT" else "")
-
-        {-
-	 do_id is only applied in a (not print_as_string) context for local ids,
-	 hence using the occurrence name is enough.
-	-}
-	do_id :: Id -> String
-	do_id id = getOccString id
-
-    ---------------
-    do_dupd sty ADupdCC str = if (debugStyle sty) then str ++ "/DUPD" else str
-    do_dupd _   _       str = str
+pprCostCentreStackDecl ccs 
+  = pprPanic "pprCostCentreStackDecl: " (ppr ccs)
 \end{code}
 
-Printing unfoldings is sufficiently weird that we do it separately.
-This should only apply to CostCentres that can be ``set to'' (cf
-@sccAbleCostCentre@).  That excludes CAFs and 
-`overhead'---which are added at the very end---but includes dictionaries.
-Dict \tr{_scc_}s may cross module boundaries to show ``scope'' info;
-even if we won't ultimately do a \tr{SET_CCC} from it.
+-----------------------------------------------------------------------------
+Printing Cost Centres.
+
+There are several different ways in which we might want to print a
+cost centre:
+
+	- the name of the cost centre, for profiling output (a C string)
+	- the label, i.e. C label for cost centre in .hc file.
+	- the debugging name, for output in -ddump things
+	- the interface name, for printing in _scc_ exprs in iface files.
+
+The last 3 are derived from costCentreStr below.  The first is given
+by costCentreName.
+
 \begin{code}
-{- UNUSED
-upp_cc_uf (PreludeDictsCC d)
-  = hsep [ptext SLIT("_PRELUDE_DICTS_CC_"), upp_dupd d]
-upp_cc_uf (AllDictsCC m g d)
-  = hsep [ptext SLIT("_ALL_DICTS_CC_"), 
-            char '"',ptext m,char '"',
-            char '"',ptext g,char '"',
-            upp_dupd d]
+instance Outputable CostCentre where
+  ppr cc = getPprStyle $ \ sty ->
+	   if codeStyle sty
+		then ppCostCentreLbl cc
+		else
+	   if ifaceStyle sty
+		then ppCostCentreIface cc
+		else text (costCentreStr cc)
 
-upp_cc_uf cc@(NormalCC cc_kind m g is_dupd is_caf)
-  = ASSERT(sccAbleCostCentre cc)
-    hsep [pp_kind cc_kind, 
-            char '"', ptext m, char '"', 
-            char '"', ptext g, char '"',
-	    upp_dupd is_dupd, pp_caf is_caf]
-  where
-    pp_kind (UserCC name) = hcat [ptext SLIT("_USER_CC_ "), char '"', ptext name, char '"']
-    pp_kind (AutoCC id)   = (<>) (ptext SLIT("_AUTO_CC_ ")) (show_id id)
-    pp_kind (DictCC id)	  = (<>) (ptext SLIT("_DICT_CC_ ")) (show_id id)
+ppCostCentreLbl cc   = ptext SLIT("CC_") <> identToC (_PK_ (costCentreStr cc))
+ppCostCentreIface cc = doubleQuotes (text (costCentreStr cc))
+ppCostCentreName cc  = doubleQuotes (text (stringToC (costCentreName cc)))
 
-    show_id id = pprIdInUnfolding {-no_in_scopes-} id
+costCentreStr (NoCostCentre)		= "NO_CC"
+costCentreStr (AllCafsCC m _) 		= "CAFs."  ++ _UNPK_ m
+costCentreStr (AllDictsCC m _ d) 	= "DICTs." ++ _UNPK_ m
+costCentreStr (NormalCC kind mod_name grp_name is_dupd is_caf)
+  =  case is_caf of { IsCafCC -> "CAF:";   _ -> "" }
+  ++ moduleString mod_name
+  ++ case kind of { UserCC name -> _UNPK_ name;
+		    AutoCC id   -> getOccString id ++ "/AUTO";
+		    DictCC id   -> getOccString id ++ "/DICT"
+		  }
+  -- ToDo: group name
+  ++ case is_dupd of { ADupdCC -> "/DUPD";   _ -> "" }
 
-    pp_caf IsCafCC    = ptext SLIT("_CAF_CC_")
-    pp_caf IsNotCafCC = ptext SLIT("_N_")
-
-#ifdef DEBUG
-upp_cc_uf other = panic ("upp_cc_uf:"++(showCostCentre True other))
-#endif
-
-pprIdInUnfolding = panic "Whoops"
-
-upp_dupd AnOriginalCC = ptext SLIT("_N_")
-upp_dupd ADupdCC      = ptext SLIT("_D_")
--}
+-- This is the name to go in the cost centre declaration
+costCentreName (NoCostCentre)		= "NO_CC"
+costCentreName (AllCafsCC _ _)		= "CAFs_in_..."
+costCentreName (AllDictsCC _ _ _)	= "DICTs_in_..."
+costCentreName (NormalCC kind mod_name grp_name is_dupd is_caf)
+  =  case is_caf of { IsCafCC -> "CAF:";   _ -> "" }
+  ++ case kind of { UserCC name -> _UNPK_ name;
+		    AutoCC id   -> getOccString id;
+		    DictCC id   -> getOccString id
+		  }
 \end{code}
 
+Cost Centre Declarations
+
 \begin{code}
-uppCostCentreDecl is_local cc
 #ifdef DEBUG
-  | noCostCentreAttached cc || currentOrSubsumedCosts cc
-  = panic "uppCostCentreDecl: no cost centre!"
-  | otherwise
+pprCostCentreDecl is_local (NoCostCentre)
+  = panic "pprCostCentreDecl: no cost centre!"
 #endif
+pprCostCentreDecl is_local cc
   = if is_local then
 	hcat [
 	    ptext SLIT("CC_DECLARE"),char '(',
-	    upp_ident, comma,
-	    uppCostCentre True {-as String!-} cc, comma,
-	    pp_str mod_name, comma,
-	    pp_str grp_name, comma,
-	    text is_subsumed, comma,
-	    if externally_visible {- || all_toplev_ids_visible -}
-			-- all_toplev stuff removed SLPJ Sept 97;
-			-- not sure this is right.
+	    cc_ident, 		  comma,
+	    ppCostCentreName cc,  comma,
+	    pp_str mod_name,      comma,
+	    pp_str grp_name,      comma,
+	    ptext is_subsumed,    comma,
+	    if externally_visible
 	       then empty 
 	       else ptext SLIT("static"),
 	    text ");"]
     else
-	hcat [ ptext SLIT("CC_EXTERN"),char '(', upp_ident, text ");" ]
+	hcat [ ptext SLIT("CC_EXTERN"),char '(', cc_ident, text ");" ]
   where
-    upp_ident = uppCostCentre False{-as identifier!-} cc
+    cc_ident = ppCostCentreLbl cc
 
     pp_str s  = doubleQuotes (ptext s)
 
     (mod_name, grp_name, is_subsumed, externally_visible)
-      = case cc of
+      = get_cc_info cc
+
+
+get_cc_info :: CostCentre -> 
+	(FAST_STRING,			-- module name
+	 FAST_STRING,			-- group name
+	 FAST_STRING,			-- subsumed value
+	 Bool)				-- externally visible
+	  
+get_cc_info cc
+  = case cc of
 	  AllCafsCC m g -> (m, g, cc_IS_CAF, True)
 
 	  AllDictsCC m g _ -> (m, g, cc_IS_DICT, True)
@@ -512,9 +475,9 @@ uppCostCentreDecl is_local cc
 	    -> (m, g, do_caf is_caf,
 		case x of { UserCC _ -> True; AutoCC i -> externallyVisibleId i})
       where
-	cc_IS_CAF      = "CC_IS_CAF"
-	cc_IS_DICT     = "CC_IS_DICT"
-	cc_IS_BORING   = "CC_IS_BORING"
+	cc_IS_CAF      = SLIT("CC_IS_CAF")
+	cc_IS_DICT     = SLIT("CC_IS_DICT")
+	cc_IS_BORING   = SLIT("CC_IS_BORING")
 
 	do_caf IsCafCC	     = cc_IS_CAF
 	do_caf IsNotCafCC    = cc_IS_BORING

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[Argv]{@Argv@: direct (non-standard) access to command-line arguments}
 

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1997
+% (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
 %
 \section{Basic ops on packed representations}
 
@@ -43,9 +43,11 @@ import PrelForeign   ( ForeignObj(..) )
 import ArrBase  	( StateAndMutableByteArray#(..), 
 			  StateAndByteArray#(..) )
 import STBase
-#else
+#elif __GLASGOW_HASKELL__ < 400
 import PrelArr  	( StateAndMutableByteArray#(..), 
 			  StateAndByteArray#(..) )
+import PrelST
+#else
 import PrelST
 #endif
 
@@ -176,19 +178,33 @@ write_ps_array	:: MutableByteArray s Int -> Int# -> Char# -> ST s ()
 freeze_ps_array :: MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
 new_ps_array size = ST $ \ s ->
+#if __GLASGOW_HASKELL__ < 400
     case (newCharArray# size s)	  of { StateAndMutableByteArray# s2# barr# ->
     STret s2# (MutableByteArray bot barr#) }
+#else
+    case (newCharArray# size s)	  of { (# s2#, barr# #) ->
+    (# s2#, MutableByteArray bot barr# #) }
+#endif
   where
     bot = error "new_ps_array"
 
 write_ps_array (MutableByteArray _ barr#) n ch = ST $ \ s# ->
     case writeCharArray# barr# n ch s#	of { s2#   ->
+#if __GLASGOW_HASKELL__ < 400
     STret s2# () }
+#else
+    (# s2#, () #) }
+#endif
 
 -- same as unsafeFreezeByteArray
 freeze_ps_array (MutableByteArray _ arr#) len# = ST $ \ s# ->
+#if __GLASGOW_HASKELL__ < 400
     case unsafeFreezeByteArray# arr# s# of { StateAndByteArray# s2# frozen# ->
     STret s2# (ByteArray (0,I# len#) frozen#) }
+#else
+    case unsafeFreezeByteArray# arr# s# of { (# s2#, frozen# #) ->
+    (# s2#, ByteArray (0,I# len#) frozen# #) }
+#endif
 \end{code}
 
 

@@ -1,41 +1,47 @@
-This is version 3.02 of the Glorious Glasgow Haskell compilation
-system (GHC).  GHC 3.02 is a compiler for Haskell 1.4.
+This is version 4.01 of the Glorious Glasgow Haskell compilation
+system (GHC).  GHC 4.01 is a compiler for Haskell 1.4.
 
 Haskell is "the" standard lazy functional programming language.
 Haskell 1.4 is the current version of the language, released in 
 April 1997.  The language definition is on the Web at
 http://www.haskell.org/report/index.html.
 
+More information on GHC can be found on its web page
+
+	http://www.dcs.gla.ac.uk/fp/software/ghc
+
 GHC documentation of interest:
 
-* docs/installing.{dvi,info,html}: How to configure, build, and
+* docs/installing.{dvi,html}: How to configure, build, and
   install the system.
 
   The document, as with many others, is in TeX-produced DVI format
-  (.dvi suffix), or GNU Info format (.info); the latter is close to
-  plain ASCII, if that's what you want.
+  (.dvi suffix), or HTML.
 
-* ghc/docs/users_guide/user.{dvi,info,html}: How to use GHC; e.g., what
+* ghc/docs/users_guide/user.{dvi,html}: How to use GHC; e.g., what
   options are available, how to cope with common problems, how to use
   the profiling facilities, etc.
 
+* ghc/docs/libraries/libs.{dvi,html}: Several libraries that are
+  provided by both GHC and Hugs.
+
 We welcome your comments and suggestions about this software!  Please
 do not suffer or grumble in silence.  The "bug reports" section of the
-User's Guide (docs/users_guide/user.{dvi,info,html}) says what we
-would like to know when you report a problem.
+User's Guide says what we would like to know when you report a
+problem.
 
-Current AQUA team (all @dcs.gla.ac.uk):
+Current GHC team:
 
-    Sigbjorn Finne	(sof)	    [hired hand]
-    Hans Wolfgang Loidl (hwloidl)   [PhD student]
-    Simon Marlow	(simonm)    [hired hand]
+    Simon Peyton Jones	( simonpj@microsoft.com)    [our Fearless Leader]
+    Sigbjorn Finne	(v-sfinne@microsoft.com)    [hired hand]
+    Simon Marlow	(t-simonm@microsoft.com)    [hired hand]
+
+Past contributors and/or continuing advisors (all @dcs.gla.ac.uk):
+
     Thomas Nordin       (nordin)    [@cse.ogi.edu; Green Card Hero]
-    Simon Peyton Jones	(simonpj)   [our Fearless Leader]
+    Hans Wolfgang Loidl (hwloidl)   [PhD student]
     Patrick Sansom	(sansom)    [hired hand, Bidirectional Analyses]
     Phil Trinder	(trinder)   [hired hand, Parade]
-
-Past contributors and/or continuing advisors:
-
     Andy Gill		(andy)	    [PhD student; at HP]
     Cordy Hall		(cvh) 	    [GRASP]
     Kevin Hammond	(kh)	    [GRASP; at St. Andrews]
@@ -48,6 +54,8 @@ Past contributors and/or continuing advisors:
     Andr\'e Santos	(andre)	    [PhD student; back in Brazil]
     David N Turner	(dnt)	    [Linear Types; at An-Teallach]
     Phil Wadler		(wadler)    [GRASP; at Lucent]
+
+And many others who've contributed bits of code / bug reports in the past.
 
 Cool people who've let us use their machines:
 
@@ -65,14 +73,13 @@ Simon's projects' acronyms:
     GRASP ('90-'92): Graph reduction applications support project
     AQUA  ('93-   ): Declarative systems architecture: a quantitative approach
 
-GHC WWW page: http://www.dcs.gla.ac.uk/fp/software/ghc/
-
 E-mail contacts:
     glasgow-haskell-bugs@dcs.gla.ac.uk	    (bug reports mailing list)
     glasgow-haskell-users@dcs.gla.ac.uk	    (users' mailing list)
 
 Send mail to majordomo@dcs.gla.ac.uk with 'help' in the body of the
-message for information on joining either of these mailing lists.
+message for information on joining/leaving either of these mailing
+lists.
 
 Anonymous FTP site: ftp://ftp.dcs.gla.ac.uk:pub/haskell/glasgow.
 Mostly mirrored by ftp.cs.chalmers.se and haskell.org (same

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[SimplStg]{Driver for simplifying @STG@ programs}
 
@@ -11,18 +11,21 @@ module SimplStg ( stg2stg ) where
 import StgSyn
 
 import LambdaLift	( liftProgram )
-import CostCentre       ( CostCentre )
+import CostCentre       ( CostCentre, CostCentreStack )
 import SCCfinal		( stgMassageForProfiling )
 import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
 import StgVarInfo	( setStgVarInfo )
 import UpdAnal		( updateAnalyse )
+import SRT		( computeSRTs )
 
-import CmdLineOpts	( opt_SccGroup, --Not used:opt_EnsureSplittableC,
+import CmdLineOpts	( opt_SccGroup,
 			  opt_StgDoLetNoEscapes, opt_D_verbose_stg2stg,
 			  opt_DoStgLinting,
 			  StgToDo(..)
 			)
+import Id		( Id )
+import VarEnv
 import ErrUtils		( doIfSet )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 import Util		( panic, assertPanic, trace )
@@ -36,9 +39,10 @@ stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
 	-> UniqSupply		-- a name supply
 	-> [StgBinding]		-- input...
 	-> IO
-	    ([StgBinding],	-- output program...
-	     ([CostCentre],	-- local cost-centres that need to be decl'd
-	      [CostCentre]))	-- "extern" cost-centres
+	    ([(StgBinding,[Id])],  -- output program...
+	     ([CostCentre],	   -- local cost-centres that need to be decl'd
+	      [CostCentre],	   -- "extern" cost-centres
+	      [CostCentreStack]))  -- pre-defined "singleton" cost centre stacks
 
 stg2stg stg_todos module_name us binds
   = case (splitUniqSupply us)	of { (us4now, us4later) ->
@@ -49,23 +53,10 @@ stg2stg stg_todos module_name us binds
 		    vcat (map ppr (setStgVarInfo False binds)))) >>
 
 	-- Do the main business!
-    foldl_mn do_stg_pass (binds, us4now, ([],[])) stg_todos
+    foldl_mn do_stg_pass (binds, us4now, ([],[],[])) stg_todos
 		>>= \ (processed_binds, _, cost_centres) ->
 
 	-- 	Do essential wind-up
-
-{- Nuked for now	SLPJ Dec 96
-
-	-- Essential wind-up: part (a), saturate RHSs
-	-- This must occur *after* elimIndirections, because elimIndirections
-	-- can change things' arities.  Consider:
-	--	x_local = f x
-	--	x_global = \a -> x_local a
-	-- Then elimIndirections will change the program to
-	--	x_global = f x
-	-- and lo and behold x_global's arity has changed!
-    case (satStgRhs processed_binds us4later) of { saturated_binds ->
--}
 
 	-- Essential wind-up: part (b), do setStgVarInfo. It has to
 	-- happen regardless, because the code generator uses its
@@ -78,24 +69,23 @@ stg2stg stg_todos module_name us binds
 	-- correct, which is done by satStgRhs.
 	--
 
-    return (setStgVarInfo do_let_no_escapes processed_binds, cost_centres)
+    let
+	annotated_binds = setStgVarInfo do_let_no_escapes processed_binds
+	srt_binds       = computeSRTs annotated_binds
+    in
+
+    return (srt_binds, cost_centres)
    }
   where
     do_let_no_escapes  = opt_StgDoLetNoEscapes
     do_verbose_stg2stg = opt_D_verbose_stg2stg
 
-{-
-    (do_unlocalising, unlocal_tag) 
-     = case opt_EnsureSplittableC of
-         Just tag -> (True, _PK_ tag)
-         Nothing  -> (False, panic "tag")
--}
     grp_name  = case (opt_SccGroup) of
 		  Just xx -> _PK_ xx
 		  Nothing -> module_name -- default: module name
 
     -------------
-    stg_linter = if False --LATER: opt_DoStgLinting (ToDo)
+    stg_linter = if opt_DoStgLinting
 		 then lintStgBindings
 		 else ( \ whodunnit binds -> binds )
 
@@ -108,7 +98,6 @@ stg2stg stg_todos module_name us binds
 	  StgDoStaticArgs ->  panic "STG static argument transformation deleted"
 
 	  StgDoUpdateAnalysis ->
-	     ASSERT(null (fst ccs) && null (snd ccs))
 	     _scc_ "StgUpdAnal"
 		-- NB We have to do setStgVarInfo first!  (There's one
 		-- place free-var info is used) But no let-no-escapes,
@@ -138,7 +127,7 @@ stg2stg stg_todos module_name us binds
     end_pass us2 what ccs binds2
       = -- report verbosely, if required
 	(if do_verbose_stg2stg then
-	    hPutStr stderr (showSDoc
+	    hPutStr stderr (show
 	      (text ("*** "++what++":") $$ vcat (map ppr binds2)
 	    ))
 	 else return ()) >>

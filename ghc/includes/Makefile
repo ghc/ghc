@@ -1,49 +1,22 @@
-#
-# ghc/includes
+# -----------------------------------------------------------------------------
+# $Id: Makefile,v 1.11 1998/12/02 13:21:15 simonm Exp $
 #
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
 #
-# Just to make sure, no ways stuff in here, please.
+# All header files
 #
-override WAYS=
-
-# De-litted header files
-LH_FILES=$(wildcard *.lh)
-
-DELIT_H_FILES = $(patsubst %.lh, %.h, $(LH_FILES))
+H_FILES = $(wildcard *.h)
 
 #
 # Header file built from the configure script's findings
 #
 H_CONFIG = config.h
 
+all :: $(H_CONFIG) NativeDefs.h
 
-# Everything else
-H_FILES = stgdefs.h rtsdefs.h StgDirections.h StgMachDeps.h error.h \
-  ieee-flpt.h gmp.h LLC.h HLC.h
-
-MKDEPENDC_SRCS=mkNativeHdr.c
-
-ALL_FILES = $(DELIT_H_FILES) $(H_FILES)
-ifeq ($(GhcWithNativeCodeGen),YES)
-ALL_FILES += $(TARGETPLATFORM).h
-endif
-
-
-#
-# In main/Signals we need to distinguish between irix5 and irix6,
-# so we suitably mangle HostOS_FULL to get at the major version.
-# (A hack, for sure - ToDo: consider systematically adding more
-# fine-grained OS info to this Makefile/configure soup )
-
-ifeq "$(HostOS_CPP)" "irix"
-IRIX_MAJOR = $(shell echo $(HostOS_Full) | sed 's/\(irix[^.]*\).*$$/\1/' )
-endif
-
-#
 # The fptools configure script creates the configuration header file 
 # and puts it in fptools/mk/config.h. We copy it down to here, prepending
 # some make variables specifying cpp platform variables.
@@ -82,25 +55,21 @@ endif
 	@cat $(FPTOOLS_TOP)/mk/$@ >> $@
 	@echo "Done."
 
-$(TARGETPLATFORM).h : mkNativeHdr
-	$(RM) $@
-	./mkNativeHdr > $@ || ( rm $@ && exit 1 )
+# ---------------------------------------------------------------------------
+# Make NativeDefs.h for the NCG
 
-#
-# Building mkNativeHdr using the Haskell compiler
-# to do it (ghc really).
-#
-mkNativeHdr : $(HLIT) $(HFILES) mkNativeHdr.c
-	$(CC) -o mkNativeHdr mkNativeHdr.c
+C_PROG = mkNativeHdr
+C_SRCS = mkNativeHdr.c
 
-all :: $(H_CONFIG) $(ALL_FILES)
+NativeDefs.h : mkNativeHdr
+	./mkNativeHdr >NativeDefs.h
 
-#
+CLEAN_FILES += NativeDefs.h
+
+# ---------------------------------------------------------------------------
 # boot setup:
 #
-# When building the dependencies in runtime/ , lib/ we need to get
-# at the de-litted versions of includes/, hence we arrange the
-# `depend' target to depend on `all'.
+# Need config.h to make dependencies in the runtime system source.
 #
 boot :: all
 
@@ -114,16 +83,12 @@ boot :: all
 # it gives (perhaps) a cleaner binary dist structure..might change.
 #
 override datadir:=$(libdir)/includes
-INSTALL_DATAS += $(DELIT_H_FILES) $(H_FILES) $(TARGETPLATFORM).h $(H_CONFIG)
+INSTALL_DATAS += $(H_FILES) $(H_CONFIG)
 
 #
 # `make clean' settings:
 #
-CLEAN_FILES += $(DELIT_H_FILES) $(H_CONFIG) mkNativeHdr.o mkNativeHdr
-
-ifeq ($(GhcWithNativeCodeGen),YES)
-CLEAN_FILES += $(TARGETPLATFORM).h
-endif
+CLEAN_FILES += $(H_CONFIG)
 
 #
 # Finally, slurp in the standard targets.

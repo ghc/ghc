@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRAP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[PrelBase]{Module @PrelBase@}
 
@@ -7,11 +7,13 @@
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-module PrelBase(
+module PrelBase
+	(
 	module PrelBase,
 	module PrelGHC		-- Re-export PrelGHC, to avoid lots of people 
 				-- having to import it explicitly
-  ) where
+  ) 
+	where
 
 import {-# SOURCE #-} PrelErr ( error )
 import PrelGHC
@@ -31,7 +33,17 @@ infixr 0  $
 
 \begin{code}
 {-
+data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
+			  -- to avoid weird names like con2tag_[]#
+instance Functor [] where
+    map f []             =  []
+    map f (x:xs)         =  f x : [] -- map f xs
+
+class  Functor f  where
+    map         :: (a -> b) -> f a -> f b
+
 class Eval a
+
 data Bool = False | True
 data Int = I# Int#
 data Double	= D# Double#
@@ -39,13 +51,11 @@ data  ()  =  ()  --easier to do explicitly: deriving (Eq, Ord, Enum, Show, Bound
 		 -- (avoids weird-named functions, e.g., con2tag_()#
 
 data  Maybe a  =  Nothing | Just a	
-data Ordering = LT | EQ | GT	 deriving( Eq )
+data Ordering = LT | EQ | GT deriving( Eq, Ord )
 
 type  String = [Char]
 
 data Char = C# Char#	
-data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
-			  -- to avoid weird names like con2tag_[]#
 
 
 -------------- Stage 2 -----------------------
@@ -163,6 +173,8 @@ class  (Eq a) => Ord a  where
 class  Bounded a  where
     minBound, maxBound :: a
 
+-- Leave this in for now; to make it easier to silently
+-- discard Evals from Haskell 1.4 contexts
 class Eval a
 \end{code}
 
@@ -210,7 +222,7 @@ class  Enum a	where
     enumFromThenTo n n' m
                         =  map toEnum [fromEnum n, fromEnum n' .. fromEnum m]
 
-class  (Eq a, Show a, Eval a) => Num a  where
+class  (Eq a, Show a) => Num a  where
     (+), (-), (*)	:: a -> a -> a
     negate		:: a -> a
     abs, signum		:: a -> a
@@ -218,7 +230,8 @@ class  (Eq a, Show a, Eval a) => Num a  where
     fromInt		:: Int -> a -- partain: Glasgow extension
 
     x - y		=  x + negate y
-    fromInt (I# i#)	= fromInteger (int2Integer# i#)
+    fromInt (I# i#)	= fromInteger (case int2Integer# i# of 
+					  (# a, s, d #) -> J# a s d)
 					-- Go via the standard class-op if the
 					-- non-standard one ain't provided
 \end{code}
@@ -656,16 +669,18 @@ instance  Show Int  where
 %*							*
 %*********************************************************
 
-Just the type declarations.  If we don't actually use any @Integers@ we'd
-rather not link the @Integer@ module at all; and the default-decl stuff
-in the renamer tends to slurp in @Double@ regardless.
-
 \begin{code}
 data Float	= F# Float#
 data Double	= D# Double#
 data Integer	= J# Int# Int# ByteArray#
-\end{code}
 
+instance  Eq Integer  where
+    (J# a1 s1 d1) == (J# a2 s2 d2)
+      = (cmpInteger# a1 s1 d1 a2 s2 d2) ==# 0#
+
+    (J# a1 s1 d1) /= (J# a2 s2 d2)
+      = (cmpInteger# a1 s1 d1 a2 s2 d2) /=# 0#
+\end{code}
 
 %*********************************************************
 %*							*
@@ -674,11 +689,6 @@ data Integer	= J# Int# Int# ByteArray#
 %*********************************************************
 
 \begin{code}
--- The current implementation of seq# cannot handle function types,
--- so we leave this instance out rather than make false promises.
---
--- instance Eval (a -> b) 
-
 instance  Show (a -> b)  where
     showsPrec p f  =  showString "<<function>>"
     showList ls	   = showList__ (showsPrec 0) ls
@@ -849,4 +859,20 @@ eqInt	(I# x) (I# y) = x ==# y
 neInt	(I# x) (I# y) = x /=# y
 ltInt	(I# x) (I# y) = x <# y
 leInt	(I# x) (I# y) = x <=# y
+\end{code}
+
+Convenient boxed Integer PrimOps.  These are 'thin-air' Ids, so
+it's nice to have them in PrelBase.
+
+\begin{code}
+{-# INLINE int2Integer #-}
+{-# INLINE addr2Integer #-}
+int2Integer  i = case int2Integer#  i of (# a, s, d #) -> J# a s d
+addr2Integer s = case addr2Integer# s of (# a, s, d #) -> J# a s d
+
+integer_0, integer_1, integer_2, integer_m1 :: Integer
+integer_0  = int2Integer 0#
+integer_1  = int2Integer 1#
+integer_2  = int2Integer 2#
+integer_m1 = int2Integer (negateInt# 1#)
 \end{code}

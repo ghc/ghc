@@ -1,41 +1,140 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1996
+% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 \section[SimplMonad]{The simplifier Monad}
 
 \begin{code}
 module SimplMonad (
-	SmplM,
+	InId, InBind, InExpr, InAlt, InArg, InType, InBinder,
+	OutId, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBinder,
+
+	-- The continuation type
+	SimplCont(..), DupFlag(..), contIsDupable,
+
+	-- The monad
+	SimplM,
 	initSmpl, returnSmpl, thenSmpl, thenSmpl_,
 	mapSmpl, mapAndUnzipSmpl, mapAccumLSmpl,
 
         -- Unique supply
         getUniqueSmpl, getUniquesSmpl,
+	newId, newIds,
 
 	-- Counting
-	SimplCount{-abstract-}, TickType(..), tick, tickN, tickUnfold,
-	simplCount, detailedSimplCount,
-	zeroSimplCount, showSimplCount, combineSimplCounts
+	SimplCount, TickType(..), TickCounts,
+	tick, tickUnfold,
+	getSimplCount, zeroSimplCount, pprSimplCount, 
+	plusSimplCount, isZeroSimplCount,
+
+	-- Switch checker
+	SwitchChecker, getSwitchChecker, getSimplIntSwitch,
+
+	-- Cost centres
+	getEnclosingCC, setEnclosingCC,
+
+	-- Environments
+	InScopeEnv, SubstEnv,
+	getInScope, setInScope, extendInScope, extendInScopes, modifyInScope,
+	emptySubstEnv, getSubstEnv, setSubstEnv, zapSubstEnv,
+	extendIdSubst, extendTySubst,
+	getTyEnv, getValEnv,
+	getSimplBinderStuff, setSimplBinderStuff,
+	switchOffInlining
     ) where
 
 #include "HsVersions.h"
 
-import MkId		( mkSysLocal )
-import Id		( mkIdWithNewUniq, Id )
-import SimplEnv
-import SrcLoc		( noSrcLoc )
-import TyVar		( TyVar )
-import Type             ( Type )
-import UniqSupply	( getUnique, getUniques, splitUniqSupply,
+import Id		( Id, mkSysLocal, idMustBeINLINEd )
+import IdInfo		( InlinePragInfo(..) )
+import CoreSyn
+import CoreUtils	( IdSubst, SubstCoreExpr )
+import CostCentre	( CostCentreStack, subsumedCCS )
+import Var		( TyVar )
+import VarEnv
+import VarSet
+import Type             ( Type, TyVarSubst )
+import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			  UniqSupply
 			)
+import CmdLineOpts	( SimplifierSwitch(..), SwitchResult(..), intSwitchSet )
 import Unique		( Unique )
-import Util		( zipWithEqual, Eager, appEager )
+import Maybes		( expectJust )
+import Util		( zipWithEqual )
 import Outputable
-import Ix
 
 infixr 9  `thenSmpl`, `thenSmpl_`
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[Simplify-types]{Type declarations}
+%*									*
+%************************************************************************
+
+\begin{code}
+type InBinder  = CoreBndr
+type InId      = Id			-- Not yet cloned
+type InType    = Type			-- Ditto
+type InBind    = CoreBind
+type InExpr    = CoreExpr
+type InAlt     = CoreAlt
+type InArg     = CoreArg
+
+type OutBinder  = CoreBndr
+type OutId	= Id			-- Cloned
+type OutType	= Type			-- Cloned
+type OutBind	= CoreBind
+type OutExpr	= CoreExpr
+type OutAlt	= CoreAlt
+type OutArg	= CoreArg
+
+type SwitchChecker = SimplifierSwitch -> SwitchResult
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The continuation data type}
+%*									*
+%************************************************************************
+
+\begin{code}
+data SimplCont
+  = Stop
+
+  | CoerceIt DupFlag
+	     InType SubstEnv
+	     SimplCont
+
+  | ApplyTo  DupFlag 
+	     InExpr SubstEnv		-- The argument, as yet unsimplified, 
+	     SimplCont			-- and its subst-env
+
+  | Select   DupFlag 
+	     InId [InAlt] SubstEnv	-- The case binder, alts, and subst-env
+	     SimplCont
+
+instance Outputable SimplCont where
+  ppr Stop        		     = ptext SLIT("Stop")
+  ppr (ApplyTo dup arg se cont)      = (ptext SLIT("ApplyTo") <+> ppr dup <+> ppr arg) $$ ppr cont
+  ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
+				       (nest 4 (ppr alts)) $$ ppr cont
+  ppr (CoerceIt dup ty se cont)	     = (ptext SLIT("CoerceIt") <+> ppr dup <+> ppr ty) $$ ppr cont
+
+data DupFlag = OkToDup | NoDup
+
+instance Outputable DupFlag where
+  ppr OkToDup = ptext SLIT("ok")
+  ppr NoDup   = ptext SLIT("nodup")
+
+contIsDupable :: SimplCont -> Bool
+contIsDupable Stop        		= True
+contIsDupable (ApplyTo OkToDup _ _ _)   = True
+contIsDupable (Select  OkToDup _ _ _ _) = True
+contIsDupable (CoerceIt OkToDup _ _ _)  = True
+contIsDupable other			= False
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -47,41 +146,54 @@ For the simplifier monad, we want to {\em thread} a unique supply and a counter.
 (Command-line switches move around through the explicitly-passed SimplEnv.)
 
 \begin{code}
-type SmplM result
-  = UniqSupply
-  -> SimplCount    -- things being threaded
-  -> (result, SimplCount)
+type SimplM result		-- We thread the unique supply because
+  =  SimplEnv			-- constantly splitting it is rather expensive
+  -> UniqSupply
+  -> SimplCount 
+  -> (result, UniqSupply, SimplCount)
+
+data SimplEnv
+  = SimplEnv {
+	seChkr     :: SwitchChecker,
+	seCC       :: CostCentreStack,	-- The enclosing CCS (when profiling)
+	seSubst    :: SubstEnv,		-- The current substitution
+	seInScope  :: InScopeEnv	-- Says what's in scope and gives info about it
+    }
 \end{code}
 
 \begin{code}
-initSmpl :: UniqSupply -- no init count; set to 0
-	  -> SmplM a
-	  -> (a, SimplCount)
+initSmpl :: SwitchChecker
+	 -> UniqSupply		-- No init count; set to 0
+	 -> SimplM a
+	 -> (a, SimplCount)
 
-initSmpl us m = m us zeroSimplCount
+initSmpl chkr us m = case m (emptySimplEnv chkr) us zeroSimplCount of 
+			(result, _, count) -> (result, count)
+
 
 {-# INLINE thenSmpl #-}
 {-# INLINE thenSmpl_ #-}
 {-# INLINE returnSmpl #-}
 
-returnSmpl :: a -> SmplM a
-returnSmpl e us sc = (e, sc)
+returnSmpl :: a -> SimplM a
+returnSmpl e env us sc = (e, us, sc)
 
-thenSmpl  :: SmplM a -> (a -> SmplM b) -> SmplM b
-thenSmpl_ :: SmplM a -> SmplM b -> SmplM b
+thenSmpl  :: SimplM a -> (a -> SimplM b) -> SimplM b
+thenSmpl_ :: SimplM a -> SimplM b -> SimplM b
 
-thenSmpl m k us sc0
-  = case splitUniqSupply us of { (s1, s2) ->
-    case (m s1 sc0)	    of { (m_result, sc1) ->
-    k m_result s2 sc1 }}
+thenSmpl m k env us0 sc0
+  = case (m env us0 sc0) of 
+	(m_result, us1, sc1) -> k m_result env us1 sc1
 
-thenSmpl_ m k us sc0
-  = case splitUniqSupply us of { (s1, s2) ->
-    case (m s1 sc0) 	    of { (_, sc1) ->
-    k s2 sc1 }}
+thenSmpl_ m k env us0 sc0
+  = case (m env us0 sc0) of 
+	(_, us1, sc1) -> k env us1 sc1
+\end{code}
 
-mapSmpl	    	:: (a -> SmplM b) -> [a] -> SmplM [b]
-mapAndUnzipSmpl :: (a -> SmplM (b, c)) -> [a] -> SmplM ([b],[c])
+
+\begin{code}
+mapSmpl	    	:: (a -> SimplM b) -> [a] -> SimplM [b]
+mapAndUnzipSmpl :: (a -> SimplM (b, c)) -> [a] -> SimplM ([b],[c])
 
 mapSmpl f [] = returnSmpl []
 mapSmpl f (x:xs)
@@ -99,12 +211,23 @@ mapAccumLSmpl f acc []     = returnSmpl (acc, [])
 mapAccumLSmpl f acc (x:xs) = f acc x	`thenSmpl` \ (acc', x') ->
 			     mapAccumLSmpl f acc' xs	`thenSmpl` \ (acc'', xs') ->
 			     returnSmpl (acc'', x':xs')
+\end{code}
 
-getUniqueSmpl :: SmplM Unique
-getUniqueSmpl us sc = (getUnique us, sc)
 
-getUniquesSmpl :: Int -> SmplM [Unique]
-getUniquesSmpl n us sc = (getUniques n us, sc)
+%************************************************************************
+%*									*
+\subsection{The unique supply}
+%*									*
+%************************************************************************
+
+\begin{code}
+getUniqueSmpl :: SimplM Unique
+getUniqueSmpl env us sc = case splitUniqSupply us of
+				(us1, us2) -> (uniqFromSupply us1, us2, sc)
+
+getUniquesSmpl :: Int -> SimplM [Unique]
+getUniquesSmpl n env us sc = case splitUniqSupply us of
+				(us1, us2) -> (uniqsFromSupply n us1, us2, sc)
 \end{code}
 
 
@@ -114,6 +237,17 @@ getUniquesSmpl n us sc = (getUniques n us, sc)
 %*									*
 %************************************************************************
 
+\begin{code}
+doTickSmpl :: (SimplCount -> SimplCount) -> SimplM ()
+doTickSmpl f env us sc = sc' `seq` ((), us, sc')
+		       where
+			 sc' = f sc
+
+getSimplCount :: SimplM SimplCount
+getSimplCount env us sc = (sc, us, sc)
+\end{code}
+
+
 The assoc list isn't particularly costly, because we only use
 the number of ticks in ``real life.''
 
@@ -122,222 +256,340 @@ a mutable array through @SimplM@.
 
 \begin{code}
 data SimplCount
-  = SimplCount	FAST_INT	    -- number of ticks
-		[(TickType, Int)]   -- assoc list of all diff kinds of ticks
-		UnfoldingHistory
+  = SimplCount	!TickCounts
+		!UnfoldingHistory
+
+type TickCounts = [(TickType, Int)]	-- Assoc list of all diff kinds of ticks
+					-- Kept in increasing order of TickType
+					-- Zeros not present
 
 type UnfoldingHistory = (Int,		-- N
-		         [(Id,Int)], 	-- Last N unfoldings
-		         [(Id,Int)])	-- The MaxUnfoldHistory unfoldings before that
+		         [Id],	 	-- Last N unfoldings
+		         [Id])		-- The MaxUnfoldHistory unfoldings before that
 
 data TickType
-  = UnfoldingDone    | MagicUnfold	| ConReused
-  | CaseFloatFromLet | CaseOfCase
-  | LetFloatFromLet  | LetFloatFromCase
-  | KnownBranch	     | Let2Case
-  | CaseMerge	     | CaseElim
+  = PreInlineUnconditionally
+  | PostInlineUnconditionally
+  | UnfoldingDone    
+  | MagicUnfold
+  | CaseOfCase
+  | LetFloatFromLet
+  | KnownBranch	     
+  | Let2Case 	
+  | Case2Let
+  | CaseMerge	     
+  | CaseElim
   | CaseIdentity
-  | AtomicRhs	-- Rhs of a let-expression was an atom
   | EtaExpansion
   | CaseOfError
-  | TyBetaReduction
   | BetaReduction
   | SpecialisationDone
-  {- BEGIN F/B ENTRIES -}
-  -- the 8 rules
-  | FoldrBuild	     	-- foldr f z (build g) ==>
-  | FoldrAugment	-- foldr f z (augment g z) ==>
-  | Foldr_Nil		-- foldr f z [] ==>
-  | Foldr_List		-- foldr f z (x:...) ==>
+  | FillInCaseDefault
+  | LeavesExamined
+  deriving (Eq, Ord, Show)
 
-  | FoldlBuild	        -- foldl f z (build g) ==>
-  | FoldlAugment	-- foldl f z (augment g z) ==>
-  | Foldl_Nil		-- foldl f z [] ==>
-  | Foldl_List		-- foldl f z (x:...) ==>
-
-  | Foldr_Cons_Nil	-- foldr (:) [] => id
-  | Foldr_Cons		-- foldr (:) => flip (++)
-
-  | Str_FoldrStr	-- foldr f z "hello" => unpackFoldrPS__ f z "hello"
-  | Str_UnpackCons	-- unpackFoldrPS# (:) z "hello" => unpackAppendPS__ z "hello"
-  | Str_UnpackNil	-- unpackAppendPS__ [] "hello" => "hello"
-  {- END F/B ENTRIES -}
-  deriving (Eq, Ord, Ix)
-
-instance Text TickType where
-    showsPrec p UnfoldingDone	= showString "UnfoldingDone    "
-    showsPrec p MagicUnfold	= showString "MagicUnfold      "
-    showsPrec p ConReused	= showString "ConReused        "
-    showsPrec p CaseFloatFromLet= showString "CaseFloatFromLet "
-    showsPrec p CaseOfCase	= showString "CaseOfCase       "
-    showsPrec p LetFloatFromLet	= showString "LetFloatFromLet  "
-    showsPrec p LetFloatFromCase= showString "LetFloatFromCase "
-    showsPrec p KnownBranch	= showString "KnownBranch      "
-    showsPrec p Let2Case	= showString "Let2Case         "
-    showsPrec p CaseMerge	= showString "CaseMerge        "
-    showsPrec p CaseElim	= showString "CaseElim         "
-    showsPrec p CaseIdentity	= showString "CaseIdentity     "
-    showsPrec p AtomicRhs	= showString "AtomicRhs        "
-    showsPrec p EtaExpansion	= showString "EtaExpansion     "
-    showsPrec p CaseOfError	= showString "CaseOfError      "
-    showsPrec p TyBetaReduction	= showString "TyBetaReduction  "
-    showsPrec p BetaReduction	= showString "BetaReduction    "
-    showsPrec p SpecialisationDone 
-				= showString "Specialisation   "
-
-	-- Foldr/Build Stuff:
-    showsPrec p FoldrBuild	= showString "FoldrBuild       "
-    showsPrec p FoldrAugment	= showString "FoldrAugment     "
-    showsPrec p Foldr_Nil	= showString "Foldr_Nil        "
-    showsPrec p Foldr_List	= showString "Foldr_List       "
-
-    showsPrec p FoldlBuild	= showString "FoldlBuild       "
-    showsPrec p FoldlAugment	= showString "FoldlAugment     "
-    showsPrec p Foldl_Nil	= showString "Foldl_Nil        "
-    showsPrec p Foldl_List	= showString "Foldl_List       "
-
-    showsPrec p Foldr_Cons_Nil	= showString "Foldr_Cons_Nil   "
-    showsPrec p Foldr_Cons	= showString "Foldr_Cons       "
-
-    showsPrec p Str_FoldrStr	= showString "Str_FoldrStr     "
-    showsPrec p Str_UnpackCons  = showString "Str_UnpackCons   "
-    showsPrec p Str_UnpackNil   = showString "Str_UnpackNil    "
-
-showSimplCount :: SimplCount -> String
-
-showSimplCount (SimplCount _ stuff (_, unf1, unf2))
-  = shw stuff ++ "\nMost recent unfoldings: " ++ showSDoc (ppr (reverse unf2 ++ reverse unf1))
+pprSimplCount :: SimplCount -> SDoc
+pprSimplCount (SimplCount stuff (_, unf1, unf2))
+  = vcat (map ppr_item stuff) 
+    $$ (text "Most recent unfoldings (most recent at top):" 
+	$$ nest 4 (vcat (map ppr (unf1 ++ unf2))))
   where
-    shw []	    = ""
-    shw ((t,n):tns) | n /= 0	= show t ++ ('\t' : show n) ++ ('\n' : shw tns)
-		    | otherwise = shw tns
+    ppr_item (t,n) = text (show t) <+> char '\t' <+> ppr n
 
 zeroSimplCount :: SimplCount
-zeroSimplCount
-  = SimplCount ILIT(0) stuff (0, [], [])
-  where
-    stuff =
-      [ (UnfoldingDone, 0),
-	(MagicUnfold, 0),
-	(ConReused, 0),
-	(CaseFloatFromLet, 0),
-	(CaseOfCase, 0),
-	(LetFloatFromLet, 0),
-	(LetFloatFromCase, 0),
-	(KnownBranch, 0),
-	(Let2Case, 0),
-	(CaseMerge, 0),
-	(CaseElim, 0),
-	(CaseIdentity, 0),
-	(AtomicRhs, 0),
-	(EtaExpansion, 0),
-	(CaseOfError, 0),
-	(TyBetaReduction,0),
-	(BetaReduction,0),
-	(SpecialisationDone,0),
-	-- Foldr/Build Stuff:
-	(FoldrBuild, 0),
-	(FoldrAugment, 0),
-	(Foldr_Nil, 0),
-	(Foldr_List, 0),
-	(FoldlBuild, 0),
-	(FoldlAugment, 0),
-	(Foldl_Nil, 0),
-	(Foldl_List, 0),
-	(Foldr_Cons_Nil, 0),
-	(Foldr_Cons, 0),
+zeroSimplCount = SimplCount [] (0, [], [])
 
-	(Str_FoldrStr, 0),
-	(Str_UnpackCons, 0),
-	(Str_UnpackNil, 0) ]
---
---= array (con2tag_TickType UnfoldingDone, con2tag_TickType FoldrInline)
---        [ i := 0 | i <- indices zeroSimplCount ]
+isZeroSimplCount :: SimplCount -> Bool
+isZeroSimplCount (SimplCount []                   _) = True
+isZeroSimplCount (SimplCount [(LeavesExamined,_)] _) = True
+isZeroSimplCount other				     = False
+
+-- incTick is careful to be pretty strict, so we don't
+-- get a huge buildup of thunks
+incTick :: TickType -> FAST_INT -> TickCounts -> TickCounts
+incTick tick_type n []
+  = [(tick_type, IBOX(n))]
+
+incTick tick_type n (x@(ttype, I# cnt#) : xs)
+  = case tick_type `compare` ttype of
+	LT -> 	-- Insert here
+		(tick_type, IBOX(n)) : x : xs
+
+	EQ -> 	-- Increment
+		case cnt# +# n of
+		   incd -> (ttype, IBOX(incd)) : xs
+
+	GT -> 	-- Move on
+		rest `seq` x : rest
+	   where
+		rest = incTick tick_type n xs
+
+-- Second argument is more recent stuff
+plusSimplCount :: SimplCount -> SimplCount -> SimplCount
+plusSimplCount (SimplCount tc1 uh1) (SimplCount tc2 uh2)
+  = SimplCount (plusTickCounts tc1 tc2) (plusUnfolds uh1 uh2)
+
+plusTickCounts :: TickCounts -> TickCounts -> TickCounts
+plusTickCounts ts1 [] = ts1
+plusTickCounts [] ts2 = ts2
+plusTickCounts ((tt1,n1) : ts1) ((tt2,n2) : ts2) 
+  = case tt1 `compare` tt2 of
+	LT -> (tt1,n1)    : plusTickCounts ts1              ((tt2,n2) : ts2)
+	EQ -> (tt1,n1+n2) : plusTickCounts ts1              ts2
+	GT -> (tt2,n2)    : plusTickCounts ((tt1,n1) : ts1) ts2
+
+-- Second argument is the more recent stuff
+plusUnfolds uh1          (0, h2, t2)  = uh1			-- Nothing recent
+plusUnfolds (n1, h1, t1) (n2, h2, []) = (n2, h2, (h1++t1))	-- Small amount recent
+plusUnfolds (n1, h1, t1) uh2          = uh2			-- Decent batch recent
 \end{code}
 
-Counting-related monad functions:
-\begin{code}
-tick :: TickType -> SmplM ()
 
-tick tick_type us (SimplCount n stuff unf)
-  = -- pprTrace "Tick: " (text (show tick_type)) $
-#ifdef OMIT_SIMPL_COUNTS
-    ((), SimplCount (n _ADD_ ILIT(1) stuff unf))		    stuff -- don't change anything
-#else
-    new_stuff `seqL`
-    ((), SimplCount (n _ADD_ ILIT(1)) new_stuff unf)
+Counting-related monad functions:
+
+\begin{code}
+tick :: TickType -> SimplM ()
+
+tick tick_type
+  = doTickSmpl f
   where
-    new_stuff = inc_tick tick_type ILIT(1) stuff
-#endif
+    f (SimplCount stuff unf) = SimplCount (incTick tick_type ILIT(1) stuff) unf
 
 maxUnfoldHistory :: Int
 maxUnfoldHistory = 20
 
-tickUnfold :: Id -> SmplM ()
-tickUnfold id us (SimplCount n stuff (n_unf, unf1, unf2))
-  = -- pprTrace "Unfolding: " (ppr id) $
-    new_stuff `seqL`
-    new_unf   `seqTriple`
-    ((), SimplCount (n _ADD_ ILIT(1)) new_stuff new_unf)
+tickUnfold :: Id -> SimplM ()
+tickUnfold id 
+  = doTickSmpl f
+  where 
+    f (SimplCount stuff (n_unf, unf1, unf2))
+      | n_unf >= maxUnfoldHistory = SimplCount new_stuff (1, [id], unf1)
+      | otherwise 		  = SimplCount new_stuff (n_unf+1, id:unf1, unf2)
+      where
+	new_stuff = incTick UnfoldingDone ILIT(1) stuff
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection{Command-line switches}
+%*									*
+%************************************************************************
+
+\begin{code}
+getSwitchChecker :: SimplM SwitchChecker
+getSwitchChecker env us sc = (seChkr env, us, sc)
+
+getSimplIntSwitch :: SwitchChecker -> (Int-> SimplifierSwitch) -> Int
+getSimplIntSwitch chkr switch
+  = expectJust "getSimplIntSwitch" (intSwitchSet chkr switch)
+\end{code}
+
+
+@switchOffInlining@ is used to prepare the environment for simplifying
+the RHS of an Id that's marked with an INLINE pragma.  It is going to
+be inlined wherever they are used, and then all the inlining will take
+effect.  Meanwhile, there isn't much point in doing anything to the
+as-yet-un-INLINEd rhs.  Furthremore, it's very important to switch off
+inlining!  because
+	(a) not doing so will inline a worker straight back into its wrapper!
+
+and 	(b) Consider the following example 
+	     	let f = \pq -> BIG
+	     	in
+	     	let g = \y -> f y y
+		    {-# INLINE g #-}
+	     	in ...g...g...g...g...g...
+
+	Now, if that's the ONLY occurrence of f, it will be inlined inside g,
+	and thence copied multiple times when g is inlined.
+
+	Andy disagrees! Example:
+		all xs = foldr (&&) True xs
+		any p = all . map p  {-# INLINE any #-}
+	
+	Problem: any won't get deforested, and so if it's exported and
+	the importer doesn't use the inlining, (eg passes it as an arg)
+	then we won't get deforestation at all.
+	We havn't solved this problem yet!
+
+We prepare the envt by simply modifying the in_scope_env, which has all the
+unfolding info. At one point we did it by modifying the chkr so that
+it said "EssentialUnfoldingsOnly", but that prevented legitmate, and
+important, simplifications happening in the body of the RHS.
+
+6/98 update: 
+
+We *don't* prevent inlining from happening for identifiers
+that are marked as IMustBeINLINEd. An example of where
+doing this is crucial is:
+  
+   class Bar a => Foo a where
+     ...g....
+   {-# INLINE f #-}
+   f :: Foo a => a -> b
+   f x = ....Foo_sc1...
+   
+If `f' needs to peer inside Foo's superclass, Bar, it refers
+to the appropriate super class selector, which is marked as
+must-inlineable. We don't generate any code for a superclass
+selector, so failing to inline it in the RHS of `f' will
+leave a reference to a non-existent id, with bad consequences.
+
+ALSO NOTE that we do all this by modifing the inline-pragma,
+not by zapping the unfolding.  The latter may still be useful for
+knowing when something is evaluated.
+
+June 98 update: I've gone back to dealing with this by adding
+the EssentialUnfoldingsOnly switch.  That doesn't stop essential
+unfoldings, nor inlineUnconditionally stuff; and the thing's going
+to be inlined at every call site anyway.  Running over the whole
+environment seems like wild overkill.
+
+\begin{code}
+switchOffInlining :: SimplM a -> SimplM a
+switchOffInlining m env@(SimplEnv { seChkr = sw_chkr }) us sc
+  = m (env { seChkr = new_chkr  }) us sc
   where
-     new_stuff = inc_tick UnfoldingDone ILIT(1) stuff
-
-     new_unf | n_unf >= maxUnfoldHistory = (1, [unf_item], unf1)
-	     | otherwise 		 = (n_unf+1, unf_item:unf1, unf2)
-	     
-     unf_item = (id, IBOX(n))
+    new_chkr EssentialUnfoldingsOnly = SwBool True
+    new_chkr other		     = sw_chkr other
+\end{code}
 
 
-    -- force list to avoid getting a chain of @inc_tick@ applications
-    -- building up on the heap. (Only true when not dumping stats).
-seqL []    y = y
-seqL (_:_) y = y
+%************************************************************************
+%*									*
+\subsubsection{The ``enclosing cost-centre''}
+%*									*
+%************************************************************************
 
-seqTriple (_,_,_) y = y
+\begin{code}
+getEnclosingCC :: SimplM CostCentreStack
+getEnclosingCC env us sc = (seCC env, us, sc)
 
-tickN :: TickType -> Int -> SmplM ()
-
-tickN tick_type 0 us counts 
-  = ((), counts)
-tickN tick_type IBOX(increment) us (SimplCount n stuff unf)
-  = -- pprTrace "Tick: " (text (show tick_type)) $
-#ifdef OMIT_SIMPL_COUNTS
-    ((), SimplCount (n _ADD_ increment) stuff) -- don't change anything
-#else
-    new_stuff	`seqL`
-    ((), SimplCount (n _ADD_ increment) new_stuff unf)
-  where   
-    new_stuff = inc_tick tick_type increment stuff
+setEnclosingCC :: CostCentreStack -> SimplM a -> SimplM a
+setEnclosingCC cc m env us sc = m (env { seCC = cc }) us sc
+\end{code}
 
 
-inc_tick tick_type n [] = panic "couldn't inc_tick!"
+%************************************************************************
+%*									*
+\subsubsection{The @SimplEnv@ type}
+%*									*
+%************************************************************************
 
-inc_tick tick_type n (x@(ttype, I# cnt#) : xs)
-  | ttype == tick_type = case cnt# +# n of
-		              incd -> (ttype,IBOX(incd)) : xs
+\begin{code}
+type SubstEnv = (TyVarSubst, IdSubst)
+	-- The range of these substitutions is OutType and OutExpr resp
+	-- 
+	-- The substitution is idempotent
+	-- It *must* be applied; things in its domain simply aren't
+	-- bound in the result.
+	--
+	-- The substitution usually maps an Id to its clone,
+	-- but if the orig defn is a let-binding, and
+	-- the RHS of the let simplifies to an atom,
+	-- we just add the binding to the substitution and elide the let.
 
-  | otherwise	       = case inc_tick tick_type n xs of { [] -> [x]; ls -> x:ls }
+type InScopeEnv = IdOrTyVarSet
+	-- Domain includes *all* in-scope TyVars and Ids
+	--
+	-- The elements of the set may have better IdInfo than the
+	-- occurrences of in-scope Ids, and (more important) they will
+	-- have a correctly-substituted type.  So we use a lookup in this
+	-- set to replace occurrences
+
+-- INVARIANT:	If t is in the in-scope set, it certainly won't be
+-- 		in the domain of the SubstEnv, and vice versa
+\end{code}
+
+
+\begin{code}
+emptySubstEnv :: SubstEnv
+emptySubstEnv = (emptyVarEnv, emptyVarEnv)
+
+emptySimplEnv :: SwitchChecker -> SimplEnv
+
+emptySimplEnv sw_chkr
+  = SimplEnv { seChkr = sw_chkr, seCC = subsumedCCS,
+	       seSubst   = emptySubstEnv,
+	       seInScope = emptyVarSet }
+
+	-- The top level "enclosing CC" is "SUBSUMED".
+
+getTyEnv :: SimplM (TyVarSubst, InScopeEnv)
+getTyEnv (SimplEnv {seSubst = (ty_subst,_), seInScope = in_scope}) us sc
+  = ((ty_subst, in_scope), us, sc)
+
+getValEnv :: SimplM (IdSubst, InScopeEnv)
+getValEnv (SimplEnv {seSubst = (_, id_subst), seInScope = in_scope}) us sc
+  = ((id_subst, in_scope), us, sc)
+
+getInScope :: SimplM InScopeEnv
+getInScope env us sc = (seInScope env, us, sc)
+
+setInScope :: InScopeEnv -> SimplM a -> SimplM a
+setInScope in_scope m env us sc = m (env {seInScope = in_scope}) us sc
+
+extendInScope :: CoreBndr -> SimplM a -> SimplM a
+extendInScope v m env@(SimplEnv {seInScope = in_scope}) us sc
+  = m (env {seInScope = extendVarSet in_scope v}) us sc
+
+extendInScopes :: [CoreBndr] -> SimplM a -> SimplM a
+extendInScopes vs m env@(SimplEnv {seInScope = in_scope}) us sc
+  = m (env {seInScope = foldl extendVarSet in_scope vs}) us sc
+
+modifyInScope :: CoreBndr -> SimplM a -> SimplM a
+modifyInScope v m env us sc 
+#ifdef DEBUG
+  | not (v `elemVarSet` seInScope env )
+  = pprTrace "modifyInScope: not in scope:" (ppr v)
+    m env us sc
 #endif
+  | otherwise
+  = extendInScope v m env us sc
 
-simplCount :: SmplM Int
-simplCount us sc@(SimplCount n _ _) = (IBOX(n), sc)
+getSubstEnv :: SimplM SubstEnv
+getSubstEnv env us sc = (seSubst env, us, sc)
 
-detailedSimplCount :: SmplM SimplCount
-detailedSimplCount us sc = (sc, sc)
+setSubstEnv :: SubstEnv -> SimplM a -> SimplM a
+setSubstEnv subst_env m env us sc = m (env {seSubst = subst_env}) us sc
 
-combineSimplCounts :: SimplCount -> SimplCount -> SimplCount
+extendIdSubst :: Id -> SubstCoreExpr -> SimplM a -> SimplM a
+extendIdSubst id expr m env@(SimplEnv {seSubst = (ty_subst, id_subst)}) us sc
+  = m (env { seSubst = (ty_subst, extendVarEnv id_subst id expr) }) us sc
 
-#ifdef OMIT_SIMPL_COUNTS
-combineSimplCounts (SimplCount n1 stuff1 unf1) (SimplCount n2 stuff2 unf2)
-  = SimplCount (n1 _ADD_ n2)
-	       stuff2 -- just pick one
-	       unf2
-#else
-combineSimplCounts (SimplCount n1 stuff1 unf1) (SimplCount n2 stuff2 unf2)
-  = new_stuff `seqL`
-    SimplCount (n1 _ADD_ n2) new_stuff unf2	-- Just pick the second for unfold history
-  where
-    new_stuff = zipWithEqual "combineSimplCounts" (\ (t1,c1) (t2,c2) -> (t1,c1+c2)) stuff1 stuff2
-#endif
+extendTySubst :: TyVar -> OutType -> SimplM a -> SimplM a
+extendTySubst tv ty m env@(SimplEnv {seSubst = (ty_subst, id_subst)}) us sc
+  = m (env { seSubst = (extendVarEnv ty_subst tv ty, id_subst) }) us sc
+
+zapSubstEnv :: SimplM a -> SimplM a
+zapSubstEnv m env us sc = m (env {seSubst = emptySubstEnv}) us sc
+
+getSimplBinderStuff :: SimplM (TyVarSubst, IdSubst, InScopeEnv, UniqSupply)
+getSimplBinderStuff (SimplEnv {seSubst = (ty_subst, id_subst), seInScope = in_scope}) us sc
+  = ((ty_subst, id_subst, in_scope, us), us, sc)
+
+setSimplBinderStuff :: (TyVarSubst, IdSubst, InScopeEnv, UniqSupply)
+		    -> SimplM a -> SimplM a
+setSimplBinderStuff (ty_subst, id_subst, in_scope, us) m env _ sc
+  = m (env {seSubst = (ty_subst, id_subst), seInScope = in_scope}) us sc
+\end{code}
+
+
+\begin{code}
+newId :: Type -> (Id -> SimplM a) -> SimplM a
+	-- Extends the in-scope-env too
+newId ty m env@(SimplEnv {seInScope = in_scope}) us sc
+  =  case splitUniqSupply us of
+	(us1, us2) -> m v (env {seInScope = extendVarSet in_scope v}) us2 sc
+		   where
+		      v = mkSysLocal (uniqFromSupply us1) ty
+
+newIds :: [Type] -> ([Id] -> SimplM a) -> SimplM a
+newIds tys m env@(SimplEnv {seInScope = in_scope}) us sc
+  =  case splitUniqSupply us of
+	(us1, us2) -> m vs (env {seInScope = foldl extendVarSet in_scope vs}) us2 sc
+		   where
+		      vs = zipWithEqual "newIds" mkSysLocal (uniqsFromSupply (length tys) us1) tys
 \end{code}
 

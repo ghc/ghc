@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <limits.h>
 
 #ifdef HAVE_STDLIB_H
 # include <stdlib.h>
@@ -47,44 +48,44 @@
 #endif
 
 /* acceptSocket.lc */
-StgInt	acceptSocket PROTO((StgInt, StgAddr, StgAddr));
+StgInt	acceptSocket (StgInt, StgAddr, StgAddr);
 
 /* bindSocket.lc */
-StgInt	bindSocket PROTO((StgInt, StgAddr, StgInt, StgInt));
+StgInt	bindSocket (StgInt, StgAddr, StgInt, StgInt);
 
 /* connectSocket.lc */
-StgInt	connectSocket PROTO((StgInt, StgAddr, StgInt, StgInt));
+StgInt	connectSocket (StgInt, StgAddr, StgInt, StgInt);
 
 /* createSocket.lc */
-StgInt	createSocket PROTO((StgInt, StgInt, StgInt));
+StgInt	createSocket (StgInt, StgInt, StgInt);
 
 /* getSockName.lc */
-StgInt	getSockName PROTO((StgInt, StgAddr, StgAddr));
+StgInt	getSockName (StgInt, StgAddr, StgAddr);
 
 /* getPeerName.lc */
-StgInt	getPeerName PROTO((StgInt, StgAddr, StgAddr));
+StgInt	getPeerName (StgInt, StgAddr, StgAddr);
 
 /* listenSocket.lc */
-StgInt	listenSocket PROTO((StgInt, StgInt));
+StgInt	listenSocket (StgInt, StgInt);
 
 /* shutdownSocket.lc */
-StgInt	shutdownSocket PROTO((StgInt, StgInt));
+StgInt	shutdownSocket (StgInt, StgInt);
 
 /* readDescriptor.lc */
-StgInt	readDescriptor PROTO((StgInt, StgAddr, StgInt));
+StgInt	readDescriptor (StgInt, StgAddr, StgInt);
 
 /* recvFrom.c */
-StgInt	recvFrom__ PROTO((StgInt, StgAddr, StgInt, StgAddr));
+StgInt	recvFrom__ (StgInt, StgAddr, StgInt, StgAddr);
 
 /* sendTo.c */
-StgInt	sendTo__ PROTO((StgInt, StgAddr, StgInt, StgAddr, StgInt));
+StgInt	sendTo__ (StgInt, StgAddr, StgInt, StgAddr, StgInt);
 
 /* socketOpt.c */
-StgInt	getSocketOption__ PROTO((StgInt, StgInt));
-StgInt	setSocketOption__ PROTO((StgInt, StgInt, StgInt));
+StgInt	getSocketOption__ (StgInt, StgInt);
+StgInt	setSocketOption__ (StgInt, StgInt, StgInt);
 
 /* writeDescriptor.lc */
-StgInt	writeDescriptor PROTO((StgInt, StgAddr, StgInt));
+StgInt	writeDescriptor (StgInt, StgAddr, StgInt);
 
 
 #endif /* !GHC_SOCKETS_H */

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
 
@@ -8,44 +8,39 @@ module Specialise ( specProgram ) where
 
 #include "HsVersions.h"
 
-import MkId		( mkUserLocal )
-import Id		( Id, DictVar, idType, mkTemplateLocals,
-
-			  getIdSpecialisation, setIdSpecialisation, isSpecPragmaId,
-
-			  IdSet, mkIdSet, addOneToIdSet, intersectIdSets, isEmptyIdSet, 
-			         emptyIdSet, unionIdSets, minusIdSet, unitIdSet, elementOfIdSet,
-
-			  IdEnv, mkIdEnv, lookupIdEnv, addOneToIdEnv, delOneFromIdEnv
+import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_spec )
+import Id		( Id, idType, mkTemplateLocals, mkUserLocal,
+			  getIdSpecialisation, setIdSpecialisation, 
+			  isSpecPragmaId,
 			)
+import VarSet
+import VarEnv
 
-import Type		( Type, mkTyVarTy, splitSigmaTy, instantiateTy, isDictTy,
-			  tyVarsOfType, tyVarsOfTypes, applyTys, mkForAllTys
+import Type		( Type, TyVarSubst, mkTyVarTy, splitSigmaTy, substTy, 
+			  fullSubstTy, tyVarsOfType, tyVarsOfTypes,
+			  mkForAllTys, boxedTypeKind
 			)
-import TyCon		( TyCon )
-import TyVar		( TyVar, mkTyVar, mkSysTyVar,
-			  TyVarSet, mkTyVarSet, isEmptyTyVarSet, intersectTyVarSets,
-			   	    elementOfTyVarSet, unionTyVarSets, emptyTyVarSet,
-				    minusTyVarSet,
-			  TyVarEnv, mkTyVarEnv, delFromTyVarEnv
-			)
-import Kind		( mkBoxedTypeKind )
+import Var		( TyVar, mkSysTyVar, setVarUnique )
+import VarSet
+import VarEnv
 import CoreSyn
-import FreeVars		( exprFreeVars, exprFreeTyVars )
+import CoreUtils	( IdSubst, SubstCoreExpr(..), exprFreeVars,
+			  substExpr, substId, substIds, coreExprType
+			)
+import CoreLint		( beginPass, endPass )
 import PprCore		()	-- Instances 
-import Name		( NamedThing(..), getSrcLoc, mkSysLocalName, isLocallyDefined )
-import SrcLoc		( noSrcLoc )
-import SpecEnv		( addToSpecEnv, lookupSpecEnv, specEnvValues )
+import SpecEnv		( addToSpecEnv )
 
 import UniqSupply	( UniqSupply,
-			  UniqSM, initUs, thenUs, returnUs, getUnique, mapUs
+			  UniqSM, initUs, thenUs, thenUs_, returnUs, getUniqueUs, 
+			  getUs, setUs, uniqFromSupply, splitUniqSupply, mapUs
 			)
-import Unique		( mkAlphaTyVarUnique )
+import Name		( NamedThing(getOccName) )
 import FiniteMap
-import Maybes		( MaybeErr(..), maybeToBool, catMaybes )
+import Maybes		( MaybeErr(..), catMaybes )
 import Bag
 import List		( partition )
-import Util		( zipEqual )
+import Util		( zipEqual, mapAccumL )
 import Outputable
 
 
@@ -99,12 +94,6 @@ applications could only arise as a result of transformation, and even
 then I think it's unlikely.  In any case, we simply don't accumulate such
 partial applications.)
 
-There's a choice of whether to collect details of all *polymorphic* functions
-or simply all *overloaded* ones.  How to sort this out?
-  Pass in a predicate on the function to say if it is "interesting"?
-  This is dependent on the user flags: SpecialiseOverloaded
-				       SpecialiseUnboxed
-				       SpecialiseAll
 
 STEP 2: EQUIVALENCES
 
@@ -585,11 +574,16 @@ Hence, the invariant is this:
 %************************************************************************
 
 \begin{code}
-specProgram :: UniqSupply -> [CoreBinding] -> [CoreBinding]
+specProgram :: UniqSupply -> [CoreBind] -> IO [CoreBind]
 specProgram us binds
-  = initSM us (go binds 	`thenSM` \ (binds', uds') ->
-	       returnSM (dumpAllDictBinds uds' binds')
-	      )
+  = do
+	beginPass "Specialise"
+
+	let binds' = initSM us (go binds 	`thenSM` \ (binds', uds') ->
+			        returnSM (dumpAllDictBinds uds' binds'))
+
+	endPass "Specialise" (opt_D_dump_spec || opt_D_verbose_core2core) binds'
+
   where
     go []	    = returnSM ([], emptyUDs)
     go (bind:binds) = go binds 		`thenSM` \ (binds', uds) ->
@@ -607,10 +601,12 @@ specProgram us binds
 specExpr :: CoreExpr -> SpecM (CoreExpr, UsageDetails)
 
 ---------------- First the easy cases --------------------
+specExpr e@(Type _)   = returnSM (e, emptyUDs)
 specExpr e@(Var _)    = returnSM (e, emptyUDs)
-specExpr e@(Lit _)    = returnSM (e, emptyUDs)
-specExpr e@(Con _ _)  = returnSM (e, emptyUDs)
-specExpr e@(Prim _ _) = returnSM (e, emptyUDs)
+
+specExpr e@(Con con args)
+  = mapAndCombineSM specExpr args	`thenSM` \ (args', uds) ->
+    returnSM (Con con args', uds)
 
 specExpr (Note note body)
   = specExpr body 	`thenSM` \ (body', uds) ->
@@ -618,13 +614,15 @@ specExpr (Note note body)
 
 
 ---------------- Applications might generate a call instance --------------------
-specExpr e@(App fun arg)
-  = go fun [arg]
+specExpr expr@(App fun arg)
+  = go expr []
   where
-    go (App fun arg) args = go fun (arg:args)
-    go (Var f)       args = returnSM (e, mkCallUDs f args)
-    go other	     args = specExpr other	`thenSM` \ (e', uds) ->
-			    returnSM (foldl App e' args, uds)
+    go (App fun arg) args = specExpr arg	`thenSM` \ (arg', uds_arg) ->
+			    go fun (arg':args)	`thenSM` \ (fun', uds_app) ->
+			    returnSM (App fun' arg', uds_arg `plusUDs` uds_app)
+
+    go (Var f)       args = returnSM (Var f, mkCallUDs f args)
+    go other	     args = specExpr other
 
 ---------------- Lambda/case require dumping of usage details --------------------
 specExpr e@(Lam _ _)
@@ -632,48 +630,27 @@ specExpr e@(Lam _ _)
     let
 	(filtered_uds, body'') = dumpUDs bndrs uds body'
     in
-    returnSM (foldr Lam body'' bndrs, filtered_uds)
+    returnSM (mkLams bndrs body'', filtered_uds)
   where
     (bndrs, body) = go [] e
 
 	-- More efficient to collect a group of binders together all at once
+	-- and we don't want to split a lambda group with dumped bindings
     go bndrs (Lam bndr e) = go (bndr:bndrs) e
     go bndrs e            = (reverse bndrs, e)
 
 
-specExpr (Case scrut alts)
-  = specExpr scrut	`thenSM` \ (scrut', uds_scrut) ->
-    spec_alts alts	`thenSM` \ (alts', uds_alts) ->
-    returnSM (Case scrut' alts', uds_scrut `plusUDs` uds_alts)
+specExpr (Case scrut case_bndr alts)
+  = specExpr scrut			`thenSM` \ (scrut', uds_scrut) ->
+    mapAndCombineSM spec_alt alts	`thenSM` \ (alts', uds_alts) ->
+    returnSM (Case scrut' case_bndr alts', uds_scrut `plusUDs` uds_alts)
   where
-    spec_alts (AlgAlts alts deflt)
-	= mapAndCombineSM spec_alg_alt alts	`thenSM` \ (alts', uds1) ->
-	  spec_deflt deflt			`thenSM` \ (deflt', uds2) ->
-	  returnSM (AlgAlts alts' deflt', uds1 `plusUDs` uds2)
-
-    spec_alts (PrimAlts alts deflt)
-	= mapAndCombineSM spec_prim_alt alts	`thenSM` \ (alts', uds1) ->
-	  spec_deflt deflt			`thenSM` \ (deflt', uds2) ->
-	  returnSM (PrimAlts alts' deflt', uds1 `plusUDs` uds2)
-
-    spec_alg_alt (con, args, rhs)
+    spec_alt (con, args, rhs)
 	= specExpr rhs		`thenSM` \ (rhs', uds) ->
 	  let
-	     (uds', rhs'') = dumpUDs (map ValBinder args) uds rhs'
+	     (uds', rhs'') = dumpUDs args uds rhs'
 	  in
 	  returnSM ((con, args, rhs''), uds')
-
-    spec_prim_alt (lit, rhs)
-	= specExpr rhs		`thenSM` \ (rhs', uds) ->
-	  returnSM ((lit, rhs'), uds)
-
-    spec_deflt NoDefault = returnSM (NoDefault, emptyUDs)
-    spec_deflt (BindDefault arg rhs)
-	= specExpr rhs		`thenSM` \ (rhs', uds) ->
-	  let
-	     (uds', rhs'') = dumpUDs [ValBinder arg] uds rhs'
-	  in
-	  returnSM (BindDefault arg rhs'', uds')
 
 ---------------- Finally, let is the interesting case --------------------
 specExpr (Let bind body)
@@ -694,69 +671,84 @@ specExpr (Let bind body)
 %************************************************************************
 
 \begin{code}
-specBind :: CoreBinding
+specBind :: CoreBind
 	 -> UsageDetails		-- Info on how the scope of the binding
-	 -> SpecM ([CoreBinding],	-- New bindings
+	 -> SpecM ([CoreBind],		-- New bindings
 		   UsageDetails)	-- And info to pass upstream
 
-specBind (NonRec bndr rhs) body_uds
-  | isDictTy (idType bndr)
-  =	-- It's a dictionary binding
-	-- Pick it up and float it outwards.
-    specExpr rhs				`thenSM` \ (rhs', rhs_uds) ->
-    let
-	all_uds = rhs_uds `plusUDs` addDictBind body_uds bndr rhs'
-    in
-    returnSM ([], all_uds)
-
-  | isSpecPragmaId bndr
+specBind bind@(NonRec bndr rhs) body_uds
+  | isSpecPragmaId bndr		-- Aha!  A spec-pragma Id.  Collect UDs from
+				-- its RHS and discard it!
   = specExpr rhs				`thenSM` \ (rhs', rhs_uds) ->
     returnSM ([], rhs_uds `plusUDs` body_uds)
 
-  | otherwise
-  =   -- Deal with the RHS, specialising it according
-      -- to the calls found in the body
-    specDefn (calls body_uds) (bndr,rhs)	`thenSM` \ ((bndr',rhs'), spec_defns, spec_uds) ->
+
+specBind bind body_uds
+  = specBindItself bind (calls body_uds)	`thenSM` \ (bind', bind_uds) ->
     let
-	(all_uds, (dict_binds, dump_calls)) 
-		= splitUDs [ValBinder bndr]
-			   (body_uds `plusUDs` spec_uds)
+	bndrs   = bindersOf bind
+	all_uds = zapCalls bndrs (body_uds `plusUDs` bind_uds)
 			-- It's important that the `plusUDs` is this way round,
 			-- because body_uds may bind dictionaries that are
 			-- used in the calls passed to specDefn.  So the
-			-- dictionary bindings in spec_uds may mention 
+			-- dictionary bindings in bind_uds may mention 
 			-- dictionaries bound in body_uds.
+    in
+    case splitUDs bndrs all_uds of
 
-        -- If we make specialisations then we Rec the whole lot together
-        -- If not, leave it as a NonRec
+	(_, ([],[]))  	-- This binding doesn't bind anything needed
+			-- in the UDs, so put the binding here
+			-- This is the case for most non-dict bindings, except
+			-- for the few that are mentioned in a dict binding
+			-- that is floating upwards in body_uds
+		-> returnSM ([bind'], all_uds)
+
+	(float_uds, (dict_binds, calls)) 	-- This binding is needed in the UDs, so float it out
+		-> returnSM ([], float_uds `plusUDs` mkBigUD bind' dict_binds calls)
+   
+
+-- A truly gruesome function
+mkBigUD bind@(NonRec _ _) dbs calls
+  = 	-- Common case: non-recursive and no specialisations
+	-- (if there were any specialistions it would have been made recursive)
+    MkUD { dict_binds = listToBag (mkDB bind : dbs),
+	   calls = listToCallDetails calls }
+
+mkBigUD bind dbs calls
+  = 	-- General case
+    MkUD { dict_binds = unitBag (mkDB (Rec (bind_prs bind ++ dbsToPairs dbs))),
+			-- Make a huge Rec
+	   calls = listToCallDetails calls }
+  where
+    bind_prs (NonRec b r) = [(b,r)]
+    bind_prs (Rec prs)    = prs
+
+    dbsToPairs []             = []
+    dbsToPairs ((bind,_):dbs) = bind_prs bind ++ dbsToPairs dbs
+
+-- specBindItself deals with the RHS, specialising it according
+-- to the calls found in the body (if any)
+specBindItself (NonRec bndr rhs) call_info
+  = specDefn call_info (bndr,rhs)	`thenSM` \ ((bndr',rhs'), spec_defns, spec_uds) ->
+    let
         new_bind | null spec_defns = NonRec bndr' rhs'
                  | otherwise       = Rec ((bndr',rhs'):spec_defns)
+		-- bndr' mentions the spec_defns in its SpecEnv
+		-- Not sure why we couln't just put the spec_defns first
     in
-    returnSM ( new_bind : mkDictBinds dict_binds, all_uds )
+    returnSM (new_bind, spec_uds)
 
-specBind (Rec pairs) body_uds
-  = mapSM (specDefn (calls body_uds)) pairs	`thenSM` \ stuff ->
+specBindItself (Rec pairs) call_info
+  = mapSM (specDefn call_info) pairs	`thenSM` \ stuff ->
     let
 	(pairs', spec_defns_s, spec_uds_s) = unzip3 stuff
 	spec_defns = concat spec_defns_s
 	spec_uds   = plusUDList spec_uds_s
-
-	(all_uds, (dict_binds, dump_calls)) 
-		= splitUDs (map (ValBinder . fst) pairs)
-			   (body_uds `plusUDs` spec_uds)
-			-- See notes for non-rec case
-
-        new_bind = Rec (spec_defns ++ 
-			pairs'     ++ 
-			[(d,r) | (d,r,_,_) <- dict_binds])
-		-- We need to Rec together the dict_binds too, because they
-		-- can be recursive; this happens when an overloaded function
-		-- is used as a method in an instance declaration.
-		-- (The particular program that showed this up was
-		--  docon/source/auxil/DInteger.hs)
+        new_bind   = Rec (spec_defns ++ pairs')
     in
-    returnSM (	[new_bind], all_uds )
+    returnSM (new_bind, spec_uds)
     
+
 specDefn :: CallDetails			-- Info on how it is used in its scope
 	 -> (Id, CoreExpr)		-- The thing being bound and its un-processed RHS
 	 -> SpecM ((Id, CoreExpr),	-- The thing and its processed RHS
@@ -782,7 +774,7 @@ specDefn calls (fn, rhs)
 	(spec_defns, spec_uds, spec_env_stuff) = unzip3 stuff
 
 	fn'  = addIdSpecialisations fn spec_env_stuff
-	rhs' = foldr Lam (mkDictLets dict_binds body') rhs_bndrs 
+	rhs' = mkLams rhs_bndrs (mkDictLets dict_binds body')
     in
     returnSM ((fn',rhs'), 
 	      spec_defns, 
@@ -798,10 +790,10 @@ specDefn calls (fn, rhs)
     n_tyvars		 = length tyvars
     n_dicts		 = length theta
 
-    (rhs_tyvars, rhs_ids, rhs_body) = collectBinders rhs
+    (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs
     rhs_dicts = take n_dicts rhs_ids
-    rhs_bndrs = map TyBinder rhs_tyvars ++ map ValBinder rhs_dicts
-    body      = mkValLam (drop n_dicts rhs_ids) rhs_body
+    rhs_bndrs = rhs_tyvars ++ rhs_dicts
+    body      = mkLams (drop n_dicts rhs_ids) rhs_body
 		-- Glue back on the non-dict lambdas
 
     calls_for_me = case lookupFM calls fn of
@@ -812,11 +804,11 @@ specDefn calls (fn, rhs)
 	-- Specialise to one particular call pattern
     spec_call :: ProtoUsageDetails          -- From the original body, captured by
 					    -- the dictionary lambdas
-              -> ([Maybe Type], [DictVar])  -- Call instance
+              -> ([Maybe Type], ([DictExpr], IdOrTyVarSet))  -- Call instance
               -> SpecM ((Id,CoreExpr),    	  -- Specialised definition
 	                UsageDetails,             -- Usage details from specialised body
                 	([TyVar], [Type], CoreExpr))       -- Info for the Id's SpecEnv
-    spec_call bound_uds (call_ts, call_ds)
+    spec_call bound_uds (call_ts, (call_ds, _))
       = ASSERT( length call_ts == n_tyvars && length call_ds == n_dicts )
 		-- Calls are only recorded for properly-saturated applications
 	
@@ -834,10 +826,10 @@ specDefn calls (fn, rhs)
         let
 	   (maybe_spec_tyvars, spec_tys) = unzip stuff
            spec_tyvars = catMaybes maybe_spec_tyvars
-	   spec_rhs    = mkTyLam spec_tyvars $
-                         mkGenApp rhs (map TyArg spec_tys ++ map VarArg call_ds)
-  	   spec_id_ty  = mkForAllTys spec_tyvars (instantiateTy ty_env tau)
-	   ty_env      = mkTyVarEnv (zipEqual "spec_call" tyvars spec_tys)
+	   spec_rhs    = mkLams spec_tyvars $
+                         mkApps rhs (map Type spec_tys ++ call_ds)
+  	   spec_id_ty  = mkForAllTys spec_tyvars (substTy ty_env tau)
+	   ty_env      = zipVarEnv tyvars spec_tys
 	in
 
 	newIdSM fn spec_id_ty		`thenSM` \ spec_f ->
@@ -853,9 +845,9 @@ specDefn calls (fn, rhs)
 		-- In fact we use the standard template locals, so that the
 		-- they don't need to be "tidied" before putting in interface files
 	let
-	   arg_ds	 = mkTemplateLocals (map idType call_ds)
-	   spec_env_rhs  = mkValLam arg_ds $
-			   mkTyApp (Var spec_f) $
+	   arg_ds	 = mkTemplateLocals (map coreExprType call_ds)
+	   spec_env_rhs  = mkLams arg_ds $
+			   mkTyApps (Var spec_f) $
 			   map mkTyVarTy spec_tyvars
            spec_env_info = (spec_tyvars, spec_tys, spec_env_rhs)
         in
@@ -863,10 +855,10 @@ specDefn calls (fn, rhs)
 		-- Specialise the UDs from f's RHS
 	let
 		-- Only the overloaded tyvars should be free in the uds
-	   ty_env   = [ (rhs_tyvar,ty) 
-		      | (rhs_tyvar, Just ty) <- zipEqual "specUDs1" rhs_tyvars call_ts
-		      ]
-	   dict_env = zipEqual "specUDs2" rhs_dicts call_ds
+	   ty_env   = mkVarEnv [ (rhs_tyvar, ty) 
+			       | (rhs_tyvar, Just ty) <- zipEqual "specUDs1" rhs_tyvars call_ts
+			       ]
+	   dict_env = zipVarEnv rhs_dicts (map Done call_ds)
 	in
         specUDs ty_env dict_env bound_uds			`thenSM` \ spec_uds ->
 
@@ -897,36 +889,53 @@ data UsageDetails
 	calls     :: !CallDetails
     }
 
-type DictBind = (DictVar, CoreExpr, TyVarSet, FreeDicts)
-			-- The FreeDicts are the free dictionaries (only)
-			-- of the RHS of the dictionary bindings
-			-- Similarly the TyVarSet
+type DictBind = (CoreBind, IdOrTyVarSet)
+	-- The set is the free vars of the binding
+	-- both tyvars and dicts
+
+type DictExpr = CoreExpr
 
 emptyUDs = MkUD { dict_binds = emptyBag, calls = emptyFM }
 
 type ProtoUsageDetails = ([DictBind],
-			  [(Id, [Maybe Type], [DictVar])]
+			  [(Id, [Maybe Type], ([DictExpr], IdOrTyVarSet))]
 			 )
 
 ------------------------------------------------------------			
 type CallDetails  = FiniteMap Id CallInfo
-type CallInfo     = FiniteMap [Maybe Type]	-- Nothing => unconstrained type argument
-		              [DictVar]		-- Dict args
+type CallInfo     = FiniteMap [Maybe Type]		-- Nothing => unconstrained type argument
+		              ([DictExpr], IdSet)	-- Dict args and the free dicts
+							-- free dicts does *not* include the main id itself
 	-- The finite maps eliminate duplicates
 	-- The list of types and dictionaries is guaranteed to
 	-- match the type of f
+
+unionCalls :: CallDetails -> CallDetails -> CallDetails
+unionCalls c1 c2 = plusFM_C plusFM c1 c2
+
+singleCall (id, tys, dicts) 
+  = unitFM id (unitFM tys (dicts, dict_fvs))
+  where
+    dict_fvs = foldr (unionVarSet . exprFreeVars) emptyVarSet dicts
+	-- The type args (tys) are guaranteed to be part of the dictionary
+	-- types, because they are just the constrained types,
+	-- and the dictionary is therefore sure to be bound
+	-- inside the binding for any type variables free in the type;
+	-- hence it's safe to neglect tyvars free in tys when making
+	-- the free-var set for this call
+	--
+	-- We don't include the 'id' itself.
+
+listToCallDetails calls
+  = foldr (unionCalls . mk_call) emptyFM calls
+  where
+    mk_call (id, tys, dicts_w_fvs) = unitFM id (unitFM tys dicts_w_fvs)
+	-- NB: the free vars of the call are provided
 
 callDetailsToList calls = [ (id,tys,dicts)
 			  | (id,fm) <- fmToList calls,
 		            (tys,dicts) <- fmToList fm
 			  ]
-
-listToCallDetails calls  = foldr (unionCalls . singleCall) emptyFM calls
-
-unionCalls :: CallDetails -> CallDetails -> CallDetails
-unionCalls c1 c2 = plusFM_C plusFM c1 c2
-
-singleCall (id, tys, dicts) = unitFM id (unitFM tys dicts)
 
 mkCallUDs f args 
   | null theta
@@ -936,18 +945,18 @@ mkCallUDs f args
 
   | otherwise
   = MkUD {dict_binds = emptyBag, 
-	  calls = singleCall (f, spec_tys, dicts)
+	  calls      = singleCall (f, spec_tys, dicts)
     }
   where
     (tyvars, theta, tau) = splitSigmaTy (idType f)
-    constrained_tyvars   = foldr (unionTyVarSets . tyVarsOfTypes . snd) emptyTyVarSet theta 
+    constrained_tyvars   = foldr (unionVarSet . tyVarsOfTypes . snd) emptyVarSet theta 
     n_tyvars		 = length tyvars
     n_dicts		 = length theta
 
-    spec_tys = [mk_spec_ty tv ty | (tv, TyArg ty) <- tyvars `zip` args]
-    dicts    = [d | (_, VarArg d) <- theta `zip` (drop n_tyvars args)]
+    spec_tys = [mk_spec_ty tv ty | (tv, Type ty) <- tyvars `zip` args]
+    dicts    = [dict_expr | (_, dict_expr) <- theta `zip` (drop n_tyvars args)]
     
-    mk_spec_ty tyvar ty | tyvar `elementOfTyVarSet` constrained_tyvars
+    mk_spec_ty tyvar ty | tyvar `elemVarSet` constrained_tyvars
 			= Just ty
 			| otherwise
 			= Nothing
@@ -963,27 +972,32 @@ plusUDs (MkUD {dict_binds = db1, calls = calls1})
 
 plusUDList = foldr plusUDs emptyUDs
 
-mkDB dict rhs = (dict, rhs, db_ftvs, db_fvs)
-	      where
-		db_ftvs	= exprFreeTyVars rhs
-		db_fvs  = exprFreeVars isLocallyDefined rhs
+-- zapCalls deletes calls to ids from uds
+zapCalls ids uds = uds {calls = delListFromFM (calls uds) ids}
 
-addDictBind uds dict rhs = uds { dict_binds = mkDB dict rhs `consBag` dict_binds uds }
+mkDB bind = (bind, bind_fvs bind)
+
+bind_fvs (NonRec bndr rhs) = exprFreeVars rhs
+bind_fvs (Rec prs)	   = foldl delVarSet rhs_fvs (map fst prs)
+			   where
+			     rhs_fvs = foldr (unionVarSet . exprFreeVars . snd) emptyVarSet prs
+
+addDictBind uds bind = uds { dict_binds = mkDB bind `consBag` dict_binds uds }
 
 dumpAllDictBinds (MkUD {dict_binds = dbs}) binds
   = foldrBag add binds dbs
   where
-    add (dict,rhs,_,_) binds = NonRec dict rhs : binds
+    add (bind,_) binds = bind : binds
 
-mkDictBinds :: [DictBind] -> [CoreBinding]
-mkDictBinds = map (\(d,r,_,_) -> NonRec d r)
+mkDictBinds :: [DictBind] -> [CoreBind]
+mkDictBinds = map fst
 
 mkDictLets :: [DictBind] -> CoreExpr -> CoreExpr
 mkDictLets dbs body = foldr mk body dbs
 		    where
-		      mk (d,r,_,_) e = Let (NonRec d r) e 
+		      mk (bind,_) e = Let bind e 
 
-dumpUDs :: [CoreBinder]
+dumpUDs :: [CoreBndr]
 	-> UsageDetails -> CoreExpr
 	-> (UsageDetails, CoreExpr)
 dumpUDs bndrs uds body
@@ -991,7 +1005,7 @@ dumpUDs bndrs uds body
   where
     (free_uds, (dict_binds, _)) = splitUDs bndrs uds
 
-splitUDs :: [CoreBinder]
+splitUDs :: [CoreBndr]
 	 -> UsageDetails
 	 -> (UsageDetails,		-- These don't mention the binders
 	     ProtoUsageDetails)		-- These do
@@ -1011,73 +1025,65 @@ splitUDs bndrs uds@(MkUD {dict_binds = orig_dbs,
 	)
 
   where
-    tyvar_set    = mkTyVarSet [tv | TyBinder tv <- bndrs]
-    id_set       = mkIdSet    [id | ValBinder id <- bndrs]
+    bndr_set = mkVarSet bndrs
 
     (free_dbs, dump_dbs, dump_idset) 
-	  = foldlBag dump_db (emptyBag, emptyBag, id_set) orig_dbs
+	  = foldlBag dump_db (emptyBag, emptyBag, bndr_set) orig_dbs
 		-- Important that it's foldl not foldr;
 		-- we're accumulating the set of dumped ids in dump_set
 
 	-- Filter out any calls that mention things that are being dumped
-	-- Don't need to worry about the tyvars because the dicts will
-	-- spot the captured ones; any fully polymorphic arguments will
-	-- be Nothings in the call details
-    orig_call_list = callDetailsToList orig_calls
-    (dump_calls, free_calls) = partition captured orig_call_list
-    captured (id,tys,dicts)  = any (`elementOfIdSet` dump_idset) (id:dicts)
+    orig_call_list	     	   = callDetailsToList orig_calls
+    (dump_calls, free_calls) 	   = partition captured orig_call_list
+    captured (id,tys,(dicts, fvs)) =  fvs `intersectsVarSet` dump_idset
+				   || id `elemVarSet` dump_idset
 
-    dump_db (free_dbs, dump_dbs, dump_idset) db@(dict, rhs, ftvs, fvs)
-	|  isEmptyIdSet    (dump_idset `intersectIdSets`    fvs)
-	&& isEmptyTyVarSet (tyvar_set  `intersectTyVarSets` ftvs)
-	= (free_dbs `snocBag` db, dump_dbs, dump_idset)
-
-	| otherwise	-- Dump it
+    dump_db (free_dbs, dump_dbs, dump_idset) db@(bind, fvs)
+	| dump_idset `intersectsVarSet` fvs	-- Dump it
 	= (free_dbs, dump_dbs `snocBag` db,
-	   dump_idset `addOneToIdSet` dict)
+	   dump_idset `unionVarSet` mkVarSet (bindersOf bind))
+
+	| otherwise	-- Don't dump it
+	= (free_dbs `snocBag` db, dump_dbs, dump_idset)
 \end{code}
 
 Given a type and value substitution, specUDs creates a specialised copy of
 the given UDs
 
 \begin{code}
-specUDs :: [(TyVar,Type)] -> [(DictVar,DictVar)] -> ProtoUsageDetails -> SpecM UsageDetails
-specUDs tv_env_list dict_env_list (dbs, calls)
-  = specDBs dict_env_list dbs		`thenSM` \ (dict_env_list', dbs') ->
+specUDs :: TyVarSubst -> IdSubst -> ProtoUsageDetails -> SpecM UsageDetails
+specUDs tv_env dict_env (dbs, calls)
+  = getUniqSupplySM			`thenSM` \ us ->
     let
-	dict_env = mkIdEnv dict_env_list'
+	((us', dict_env'), dbs') = mapAccumL specDB (us, dict_env) dbs
     in
-    returnSM (MkUD { dict_binds = dbs',
-	  	     calls      = listToCallDetails (map (inst_call dict_env) calls)
+    setUniqSupplySM us'			`thenSM_`
+    returnSM (MkUD { dict_binds = listToBag dbs',
+	  	     calls      = foldr (unionCalls . singleCall . inst_call dict_env') 
+					emptyFM calls
     })
   where
-    bound_tyvars = mkTyVarSet (map fst tv_env_list)
-    tv_env   = mkTyVarEnv tv_env_list	-- Doesn't change
+    inst_call dict_env (id, tys, (dicts,fvs)) = (id, map (inst_maybe_ty fvs) tys, 
+				                     map (substExpr tv_env dict_env fvs) dicts)
 
-    inst_call dict_env (id, tys, dicts) = (id, map inst_maybe_ty tys, 
-				               map (lookupId dict_env) dicts)
+    inst_maybe_ty fvs Nothing   = Nothing
+    inst_maybe_ty fvs (Just ty) = Just (fullSubstTy tv_env fvs ty)
 
-    inst_maybe_ty Nothing   = Nothing
-    inst_maybe_ty (Just ty) = Just (instantiateTy tv_env ty)
+    specDB (us, dict_env) (NonRec bndr rhs, fvs)
+	= ((us', dict_env'), mkDB (NonRec bndr' (substExpr tv_env dict_env fvs rhs)))
+	where
+	  (dict_env', _, us', bndr') = substId clone_fn tv_env dict_env fvs us bndr
+		-- Fudge the in_scope set a bit by using the free vars of
+		-- the binding, and ignoring the one that comes back
 
-    specDBs dict_env []
-	= returnSM (dict_env, emptyBag)
-    specDBs dict_env ((dict, rhs, ftvs, fvs) : dbs)
-	= newIdSM dict (instantiateTy tv_env (idType dict))	`thenSM` \ dict' ->
-	  let
-	    rhs'      = foldl App (foldr Lam rhs (t_bndrs ++ d_bndrs)) (t_args ++ d_args)
-	    (t_bndrs, t_args) = unzip [(TyBinder tv, TyArg ty)  | (tv,ty) <- tv_env_list,
-								   tv `elementOfTyVarSet` ftvs]
-	    (d_bndrs, d_args) = unzip [(ValBinder d, VarArg d') | (d,d')  <- dict_env,
-								   d `elementOfIdSet` fvs]
-	    dict_env' = (dict,dict') : dict_env
-	    ftvs' = tyVarsOfTypes [ty | TyArg ty <- t_args] `unionTyVarSets`
-		    (ftvs `minusTyVarSet` bound_tyvars)
-	    fvs'  = mkIdSet [d | VarArg d <- d_args] `unionIdSets`
-		    (fvs `minusIdSet` mkIdSet [d | ValBinder d <- d_bndrs])
-	  in
-	  specDBs dict_env' dbs		`thenSM` \ (dict_env'', dbs') ->
-	  returnSM ( dict_env'', (dict', rhs', ftvs', fvs') `consBag` dbs' )
+    specDB (us, dict_env) (Rec prs, fvs)
+	= ((us', dict_env'), mkDB (Rec (bndrs' `zip` rhss')))
+	where
+	  (dict_env', _, us', bndrs') = substIds clone_fn tv_env dict_env fvs us (map fst prs)
+	  rhss' = [substExpr tv_env dict_env' fvs rhs | (_, rhs) <- prs]
+
+    clone_fn _ us id = case splitUniqSupply us of
+			  (us1, us2) -> Just (us1, setVarUnique id (uniqFromSupply us2))
 \end{code}
 
 %************************************************************************
@@ -1088,7 +1094,7 @@ specUDs tv_env_list dict_env_list (dbs, calls)
 
 \begin{code}
 lookupId:: IdEnv Id -> Id -> Id
-lookupId env id = case lookupIdEnv env id of
+lookupId env id = case lookupVarEnv env id of
 			Nothing  -> id
 			Just id' -> id'
 
@@ -1110,8 +1116,11 @@ addIdSpecialisations id spec_stuff
 type SpecM a = UniqSM a
 
 thenSM    = thenUs
+thenSM_    = thenUs_
 returnSM  = returnUs
-getUniqSM = getUnique
+getUniqSM = getUniqueUs
+getUniqSupplySM = getUs
+setUniqSupplySM = setUs
 mapSM     = mapUs
 initSM	  = initUs
 
@@ -1121,16 +1130,15 @@ mapAndCombineSM f (x:xs) = f x	`thenSM` \ (y, uds1) ->
 			   returnSM (y:ys, uds1 `plusUDs` uds2)
 
 newIdSM old_id new_ty
-  = getUnique		`thenSM` \ uniq ->
+  = getUniqSM		`thenSM` \ uniq ->
     returnSM (mkUserLocal (getOccName old_id) 
 			  uniq
 			  new_ty
-			  (getSrcLoc old_id)
     )
 
 newTyVarSM
-  = getUnique		`thenSM` \ uniq ->
-    returnSM (mkSysTyVar uniq mkBoxedTypeKind)
+  = getUniqSM		`thenSM` \ uniq ->
+    returnSM (mkSysTyVar uniq boxedTypeKind)
 \end{code}
 
 

@@ -1,0 +1,1 @@
+ERROR "test/static/s084.hs" (line 3): No top level binding of "x" for restricted synonym "T"

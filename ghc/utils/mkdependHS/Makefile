@@ -9,8 +9,7 @@ SCRIPT_PROG=mkdependHS
 SCRIPT_OBJS=mkdependHS.prl
 SCRIPT_SUBST_VARS= \
  TOP_PWD \
- INSTALLING \
- ProjectVersionInt
+ INSTALLING
 
 INTERP=perl
 

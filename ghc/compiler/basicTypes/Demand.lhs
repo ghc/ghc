@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Demand]{@Demand@: the amount of demand on a value}
 
@@ -8,16 +8,15 @@ module Demand(
 	Demand(..),
 
 	wwLazy, wwStrict, wwUnpackData, wwUnpackNew, wwPrim, wwEnum, 
-	isStrict,
+	isStrict, isLazy, 
 
-	showDemands
+	pprDemands
      ) where
 
 #include "HsVersions.h"
 
 import BasicTypes	( NewOrData(..) )
 import Outputable
-import Util		( panic )
 \end{code}
 
 
@@ -75,13 +74,20 @@ wwEnum	    = WwEnum
 
 \begin{code}
 isStrict :: Demand -> Bool
-
-isStrict WwStrict	= True
-isStrict (WwUnpack DataType _ _) = True
 isStrict (WwUnpack NewType _ ds) = isStrict (head ds)
-isStrict WwPrim		= True
-isStrict WwEnum		= True
-isStrict _		= False
+isStrict (WwUnpack other _ _)    = True
+isStrict WwStrict = True
+isStrict WwEnum	  = True
+isStrict WwPrim	  = False	-- NB: we treat only lifted types as strict.
+				-- Why is this important?  Mostly it doesn't matter
+				-- but it saves a test for lifted-ness in SimplUtils.etaCoreExpr
+isStrict _	  = False
+\end{code}
+
+\begin{code}
+isLazy :: Demand -> Bool
+isLazy (WwLazy False) = True	-- NB "Absent" args do *not* count!
+isLazy _	      = False	-- (as they imply a worker)
 \end{code}
 
 
@@ -92,24 +98,19 @@ isStrict _		= False
 %************************************************************************
 
 \begin{code}
-showDemands :: [Demand] -> String
-showDemands wrap_args = show_demands wrap_args ""
-
-
 #ifdef REALLY_HASKELL_1_3
 
 instance Read Demand where
     readList str = read_em [] str
+
 instance Show Demand where
-    showsPrec prec wrap rest = show_demand wrap rest
-    showList wrap_args rest  = show_demands wrap_args rest
+    showsPrec p d = showsPrecSDoc p (ppr d)
 
 #else
 
 instance Text Demand where
-    readList str = read_em [] str
-    showList wrap_args rest = show_demands wrap_args rest
-
+    readList str  = read_em [] str
+    showsPrec p d = showsPrecSDoc p (ppr d)
 #endif
 
 read_em acc ('L' : xs)	= read_em (WwLazy   False : acc) xs
@@ -127,17 +128,17 @@ read_em acc rest	= [(reverse acc, rest)]
 do_unpack new_or_data wrapper_unpacks acc xs
 	  = case (read_em [] xs) of
 	      [(stuff, rest)] -> read_em (WwUnpack new_or_data wrapper_unpacks stuff : acc) rest
-	      _ -> panic ("Demand.do_unpack:"++show acc++"::"++xs)
+	      _ -> pprPanic "Demand.do_unpack:" (ppr acc <+> text ("::"++xs))
 
-show_demands wrap_args rest
-  = foldr show_demand rest wrap_args
 
-show_demand (WwLazy False)  	  rest = 'L' : rest
-show_demand (WwLazy True)   	  rest = 'A' : rest
-show_demand WwStrict	      	  rest = 'S' : rest
-show_demand WwPrim	      	  rest = 'P' : rest
-show_demand WwEnum	      	  rest = 'E' : rest
-show_demand (WwUnpack nd wu args) rest = ch:'(':showList args (')' : rest)
+pprDemands demands = hcat (map pprDemand demands)
+
+pprDemand (WwLazy False)  	 = char 'L'
+pprDemand (WwLazy True)   	 = char 'A'
+pprDemand WwStrict	      	 = char 'S'
+pprDemand WwPrim	      	 = char 'P'
+pprDemand WwEnum	      	 = char 'E'
+pprDemand (WwUnpack nd wu args)  = char ch <> parens (pprDemands args)
 				      where
 					ch = case nd of
 						DataType | wu        -> 'U'
@@ -146,5 +147,6 @@ show_demand (WwUnpack nd wu args) rest = ch:'(':showList args (')' : rest)
 							 | otherwise -> 'n'
 
 instance Outputable Demand where
-    ppr si = text (showList [si] "")
+    ppr (WwLazy False) = empty
+    ppr other_demand   = ptext SLIT("__D") <+> pprDemand other_demand
 \end{code}

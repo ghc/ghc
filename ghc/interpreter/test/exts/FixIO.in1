@@ -1,0 +1,6 @@
+look env "f"
+look env "g"
+look env2 "f"
+look env2 "g"
+main
+main2

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Name]{@Name@: to transmit name info from renamer to typechecker}
 
@@ -9,11 +9,15 @@ module Name (
 	Module,
 	pprModule, moduleString,
 
+	-- The basic form of names
+	isLexCon, isLexVar, isLexId, isLexSym,
+	isLexConId, isLexConSym, isLexVarId, isLexVarSym,
+	mkTupNameStr, mkUbxTupNameStr, isLowerISO, isUpperISO,
+
 	-- The OccName type
-	OccName(..),
+	OccName(..), varOcc, 
 	pprOccName, occNameString, occNameFlavour, 
 	isTvOcc, isTCOcc, isVarOcc, prefixOccName,
-	uniqToOccName,
 
 	-- The Name type
 	Name,					-- Abstract
@@ -27,19 +31,18 @@ module Name (
 
 	nameUnique, changeUnique, setNameProvenance, getNameProvenance,
 	setNameVisibility, mkNameVisible,
-	nameOccName, nameString, nameModule,
+	nameOccName, nameModule,
 
 	isExportedName,	nameSrcLoc,
 	isLocallyDefinedName,
 
-	isLocalName, 
+	isSysLocalName, isLocalName, isGlobalName, isExternallyVisibleName,
 
         pprNameProvenance,
 
-	-- Sets of Names
-	NameSet,
-	emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
-	minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet, isEmptyNameSet,
+	-- Special Names
+	dictNamePrefix, mkSuperDictSelName, mkWorkerName,
+	mkDefaultMethodName, mkClassTyConStr, mkClassDataConStr,
 
 	-- Misc
 	Provenance(..), pprProvenance,
@@ -54,23 +57,95 @@ module Name (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Id    ( Id )
+import {-# SOURCE #-} Var   ( Id )
 import {-# SOURCE #-} TyCon ( TyCon )
 
 import CStrings		( identToC )
-import CmdLineOpts	( opt_PprStyle_All, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
+import PrelMods		( pREL_BASE, pREL_TUP, pREL_GHC )
+import CmdLineOpts	( opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 import BasicTypes	( Module, IfaceFlavour(..), moduleString, pprModule )
 
-import Lex		( isLexConId )
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
-import Unique		( pprUnique, showUnique, Unique, Uniquable(..) )
-import UniqSet		( UniqSet,
-			     emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, 
-			     isEmptyUniqSet, unionManyUniqSets, minusUniqSet, mkUniqSet, 
-			     elementOfUniqSet, addListToUniqSet, addOneToUniqSet
-			)
-import UniqFM		( UniqFM )
+import Unique		( pprUnique, Unique, Uniquable(..) )
 import Outputable
+import Char		( isUpper, isLower, ord )
+import Util		( nOfThem )
+import GlaExts
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Lexical categories}
+%*									*
+%************************************************************************
+
+These functions test strings to see if they fit the lexical categories
+defined in the Haskell report.
+
+\begin{code}
+isLexCon, isLexVar, isLexId, isLexSym, isLexConId, isLexConSym,
+ isLexVarId, isLexVarSym  :: FAST_STRING -> Bool
+
+isLexCon cs = isLexConId  cs || isLexConSym cs
+isLexVar cs = isLexVarId  cs || isLexVarSym cs
+
+isLexId  cs = isLexConId  cs || isLexVarId  cs
+isLexSym cs = isLexConSym cs || isLexVarSym cs
+
+-------------
+
+isLexConId cs
+  | _NULL_ cs	     = False
+  | cs == SLIT("[]") = True
+  | c  == '('	     = True	-- (), (,), (,,), ...
+  | otherwise	     = isUpper c || isUpperISO c
+  where					
+    c = _HEAD_ cs
+
+isLexVarId cs
+  | _NULL_ cs	 = False
+  | otherwise    = isLower c || isLowerISO c
+  where
+    c = _HEAD_ cs
+
+isLexConSym cs
+  | _NULL_ cs	= False
+  | otherwise	= c  == ':'
+	       || cs == SLIT("->")
+  where
+    c = _HEAD_ cs
+
+isLexVarSym cs
+  | _NULL_ cs = False
+  | otherwise = isSymbolASCII c
+	     || isSymbolISO c
+  where
+    c = _HEAD_ cs
+
+-------------
+isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
+isSymbolISO   c = ord c `elem` (0xd7 : 0xf7 : [0xa1 .. 0xbf])
+isUpperISO    (C# c#) = c# `geChar#` '\xc0'# && c# `leChar#` '\xde'# && c# `neChar#` '\xd7'#
+--0xc0 <= oc && oc <= 0xde && oc /= 0xd7 where oc = ord c
+isLowerISO    (C# c#) = c# `geChar#` '\xdf'# && c# `leChar#` '\xff'# && c# `neChar#` '\xf7'#
+--0xdf <= oc && oc <= 0xff && oc /= 0xf7 where oc = ord c
+\end{code}
+
+\begin{code}
+mkTupNameStr 0 = (pREL_BASE, SLIT("()"))
+mkTupNameStr 1 = panic "Name.mkTupNameStr: 1 ???"
+mkTupNameStr 2 = (pREL_TUP, _PK_ "(,)")   -- not strictly necessary
+mkTupNameStr 3 = (pREL_TUP, _PK_ "(,,)")  -- ditto
+mkTupNameStr 4 = (pREL_TUP, _PK_ "(,,,)") -- ditto
+mkTupNameStr n = (pREL_TUP, _PK_ ("(" ++ nOfThem (n-1) ',' ++ ")"))
+
+mkUbxTupNameStr 0 = panic "Name.mkUbxTupNameStr: 0 ???"
+mkUbxTupNameStr 1 = (pREL_GHC, _PK_ "(# #)") -- 1 and 0 both make sense!!!
+mkUbxTupNameStr 2 = (pREL_GHC, _PK_ "(#,#)")
+mkUbxTupNameStr 3 = (pREL_GHC, _PK_ "(#,,#)")
+mkUbxTupNameStr 4 = (pREL_GHC, _PK_ "(#,,,#)")
+mkUbxTupNameStr n = (pREL_GHC, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
 \end{code}
 
 
@@ -91,10 +166,18 @@ pprOccName n = getPprStyle $ \ sty ->
 	       then identToC (occNameString n)
 	       else ptext (occNameString n)
 
+varOcc :: FAST_STRING -> OccName
+varOcc = VarOcc
+
 occNameString :: OccName -> FAST_STRING
 occNameString (VarOcc s)  = s
 occNameString (TvOcc s)   = s
 occNameString (TCOcc s)   = s
+
+mapOccName :: (FAST_STRING -> FAST_STRING) -> OccName -> OccName
+mapOccName f (VarOcc s) = VarOcc (f s)
+mapOccName f (TvOcc s)  = TvOcc  (f s)
+mapOccName f (TCOcc s)  = TCOcc  (f s)
 
 prefixOccName :: FAST_STRING -> OccName -> OccName
 prefixOccName prefix (VarOcc s) = VarOcc (prefix _APPEND_ s)
@@ -155,8 +238,7 @@ instance Outputable OccName where
 \begin{code}
 data Name
   = Local    Unique
-             OccName
-             SrcLoc
+	     (Maybe OccName)	-- For ones that started life with a user name
 
   | Global   Unique
 	     Module		-- The defining module
@@ -179,15 +261,15 @@ data Provenance
 
   | NonLocalDef  		-- Defined non-locally
 	SrcLoc			-- Defined non-locally; src-loc gives defn site
-	IfaceFlavour		-- Whether the defn site is an .hi-boot file or not
+	IfaceFlavour		-- Whether the defn site is an .hi-boot file
 	PrintUnqualified
 
   | WiredInTyCon TyCon			-- There's a wired-in version
   | WiredInId    Id			-- ...ditto...
 
-type PrintUnqualified = Bool		-- True <=> the unqualified name of this thing is
-					-- in scope in this module, so print it unqualified
-					-- in error messages
+type PrintUnqualified = Bool	-- True <=> the unqualified name of this thing is
+				-- in scope in this module, so print it 
+				-- unqualified in error messages
 \end{code}
 
 Something is "Exported" if it may be mentioned by another module without
@@ -196,7 +278,10 @@ never be dropped as dead code, even if they aren't used in this module.
 Furthermore, being Exported means that we can't see all call sites of the thing.
 
 Exported things include:
-	- explicitly exported Ids, including data constructors, class method selectors
+
+	- explicitly exported Ids, including data constructors, 
+	  class method selectors
+
 	- dfuns from instance decls
 
 Being Exported is *not* the same as finally appearing in the .o file's 
@@ -209,14 +294,14 @@ data ExportFlag = Exported  | NotExported
 \end{code}
 
 \begin{code}
-mkLocalName    :: Unique -> OccName -> SrcLoc -> Name
-mkLocalName = Local
+mkLocalName    :: Unique -> OccName -> Name
+mkLocalName uniq occ = Local uniq (Just occ)
 
 mkGlobalName :: Unique -> Module -> OccName -> Provenance -> Name
 mkGlobalName = Global
 
-mkSysLocalName :: Unique -> FAST_STRING -> SrcLoc -> Name
-mkSysLocalName uniq str loc = Local uniq (VarOcc str) loc
+mkSysLocalName :: Unique -> Name
+mkSysLocalName uniq = Local uniq Nothing
 
 mkWiredInIdName :: Unique -> Module -> FAST_STRING -> Id -> Name
 mkWiredInIdName uniq mod occ id 
@@ -227,35 +312,36 @@ mkWiredInTyConName uniq mod occ tycon
   = Global uniq mod (TCOcc occ) (WiredInTyCon tycon)
 
 
-mkCompoundName :: (FAST_STRING -> FAST_STRING)	-- Occurrence-name modifier
-	       -> Unique			-- New unique
-	       -> Name				-- Base name (must be a Global)
+mkCompoundName :: (OccName -> OccName)
+	       -> Unique		-- New unique
+	       -> Name			-- Base name
 	       -> Name		-- Result is always a value name
 
-mkCompoundName str_fn uniq (Global _ mod occ prov)
-  = Global uniq mod new_occ prov
-  where    
-    new_occ = VarOcc (str_fn (occNameString occ))		-- Always a VarOcc
+mkCompoundName f uniq (Global _ mod occ prov)
+  = Global uniq mod (f occ) prov
 
-mkCompoundName str_fn uniq (Local _ occ loc)
-  = Local uniq (VarOcc (str_fn (occNameString occ))) loc
+mkCompoundName f uniq (Local _ (Just occ))
+  = Local uniq (Just (f occ))
 
+mkCompoundName f uniq (Local _ Nothing)
+  = Local uniq Nothing
 
 setNameProvenance :: Name -> Provenance -> Name	
-	-- setNameProvenance used to only change the provenance of Implicit-provenance things,
-	-- but that gives bad error messages for names defined twice in the same
-	-- module, so I changed it to set the provenance of *any* global (SLPJ Jun 97)
+	-- setNameProvenance used to only change the provenance of 
+	-- Implicit-provenance things, but that gives bad error messages 
+	-- for names defined twice in the same module, so I changed it to 
+	-- set the provenance of *any* global (SLPJ Jun 97)
 setNameProvenance (Global uniq mod occ _) prov = Global uniq mod occ prov
 setNameProvenance other_name 		  prov = other_name
 
 getNameProvenance :: Name -> Provenance
 getNameProvenance (Global uniq mod occ prov) = prov
-getNameProvenance (Local uniq occ locn)      = LocalDef locn NotExported
+getNameProvenance (Local uniq occ)           = LocalDef noSrcLoc NotExported
 
 -- When we renumber/rename things, we need to be
 -- able to change a Name's Unique to match the cached
 -- one in the thing it's the name of.  If you know what I mean.
-changeUnique (Local      _ n l)  u = Local u n l
+changeUnique (Local      _ n )          u = Local u n
 changeUnique (Global   _ mod occ  prov) u = Global u mod occ prov
 \end{code}
 
@@ -300,37 +386,37 @@ are exported.  But also:
 \begin{code}
 setNameVisibility :: Maybe Module -> Unique -> Name -> Name
 
-setNameVisibility maybe_mod occ_uniq name@(Global uniq mod occ (LocalDef loc NotExported))
+setNameVisibility maybe_mod uniq name@(Global _ mod occ (LocalDef loc NotExported))
   | not all_toplev_ids_visible || not_top_level maybe_mod
-  = Local uniq (uniqToOccName occ_uniq) loc	-- Localise Global name
+  = Local uniq Nothing				-- Localise Global name
 
-setNameVisibility maybe_mod occ_uniq name@(Global _ _ _ _)
+setNameVisibility maybe_mod uniq name@(Global _ _ _ _)
   = name					-- Otherwise don't fiddle with Global
 
-setNameVisibility (Just mod) occ_uniq (Local uniq occ loc)
+setNameVisibility (Just mod) uniq (Local _ _)
   | all_toplev_ids_visible
   = Global uniq mod	 			-- Globalise Local name
-	   (uniqToOccName occ_uniq)
-	   (LocalDef loc NotExported)
+	   (uniqToOccName uniq)
+	   (LocalDef noSrcLoc NotExported)
 
-setNameVisibility maybe_mod occ_uniq (Local uniq occ loc)
-  = Local uniq (uniqToOccName occ_uniq) loc	-- New OccName for Local
+setNameVisibility maybe_mod uniq (Local _ _)
+  = Local uniq Nothing 			-- New unique for Local; zap its occ
 
 -- make the Name globally visible regardless.
 mkNameVisible :: Module -> Unique -> Name -> Name
 mkNameVisible mod occ_uniq nm@(Global _ _ _ _) = nm
-mkNameVisible mod occ_uniq nm@(Local uniq occ loc)
- = Global uniq mod (uniqToOccName occ_uniq) (LocalDef loc Exported)
+mkNameVisible mod occ_uniq nm@(Local uniq occ)
+ = Global uniq mod (uniqToOccName occ_uniq) (LocalDef noSrcLoc Exported)
 
-
-uniqToOccName uniq = VarOcc (_PK_ ('$':showUnique uniq))
-	-- The "$" is to make sure that this OccName is distinct from all user-defined ones
+uniqToOccName uniq = VarOcc (_PK_ ('_':show uniq))
+	-- The "_" is to make sure that this OccName is distinct from all user-defined ones
 
 not_top_level (Just m) = False
 not_top_level Nothing  = True
 
-all_toplev_ids_visible = not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
-			 opt_EnsureSplittableC            -- Splitting requires visiblilty
+all_toplev_ids_visible = 
+	not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
+	opt_EnsureSplittableC            -- Splitting requires visiblilty
 \end{code}
 
 %************************************************************************
@@ -344,39 +430,38 @@ nameUnique		:: Name -> Unique
 nameModAndOcc		:: Name -> (Module, OccName)	-- Globals only
 nameOccName		:: Name -> OccName 
 nameModule		:: Name -> Module
-nameString		:: Name -> FAST_STRING		-- A.b form
 nameSrcLoc		:: Name -> SrcLoc
 isLocallyDefinedName	:: Name -> Bool
 isExportedName		:: Name -> Bool
 isWiredInName		:: Name -> Bool
 isLocalName		:: Name -> Bool
+isGlobalName		:: Name -> Bool
+isExternallyVisibleName :: Name -> Bool
 
 
 
-nameUnique (Local  u _ _)   = u
+nameUnique (Local  u _)     = u
 nameUnique (Global u _ _ _) = u
 
-nameOccName (Local _ occ _)    = occ
-nameOccName (Global _ _ occ _) = occ
+nameOccName (Local _ (Just occ)) = occ
+nameOccName (Local uniq Nothing) = pprPanic "nameOccName" (ppr uniq)
+nameOccName (Global _ _ occ _)   = occ
 
 nameModule (Global _ mod occ _) = mod
 
 nameModAndOcc (Global _ mod occ _) = (mod,occ)
 
-nameString (Local _ occ _)      = occNameString occ
-nameString (Global _ mod occ _) = mod _APPEND_ SLIT(".") _APPEND_ occNameString occ
-
 isExportedName (Global _ _ _ (LocalDef _ Exported)) = True
 isExportedName other				    = False
 
-nameSrcLoc (Local _ _ loc)     = loc
+nameSrcLoc (Local _ _)   			= noSrcLoc
 nameSrcLoc (Global _ _ _ (LocalDef loc _))      = loc
 nameSrcLoc (Global _ _ _ (NonLocalDef loc _ _)) = loc
 nameSrcLoc (Global _ _ _ (WiredInTyCon _))      = mkBuiltinSrcLoc
 nameSrcLoc (Global _ _ _ (WiredInId _))         = mkBuiltinSrcLoc
 nameSrcLoc other			        = noSrcLoc
   
-isLocallyDefinedName (Local  _ _ _)	     	   = True
+isLocallyDefinedName (Local  _ _)	     	   = True
 isLocallyDefinedName (Global _ _ _ (LocalDef _ _)) = True
 isLocallyDefinedName other		           = False
 
@@ -397,8 +482,19 @@ maybeWiredInTyConName (Global _ _ _ (WiredInTyCon tc)) = Just tc
 maybeWiredInTyConName other			       = Nothing
 
 
-isLocalName (Local _ _ _) = True
-isLocalName _ 		  = False
+isLocalName (Local _ _) = True
+isLocalName _ 		= False
+
+isSysLocalName (Local _ Nothing) = True
+isSysLocalName other		 = False
+
+isGlobalName (Global _ _ _ _) = True
+isGlobalName other	      = False
+
+-- Global names are by definition those that are visible
+-- outside the module, *as seen by the linker*.  Externally visible
+-- does not mean visible at the source level (that's isExported).
+isExternallyVisibleName name = isGlobalName name
 \end{code}
 
 
@@ -411,8 +507,8 @@ isLocalName _ 		  = False
 \begin{code}
 cmpName n1 n2 = c n1 n2
   where
-    c (Local  u1 _ _)   (Local  u2 _ _)   = compare u1 u2
-    c (Local   _ _ _)	  _		  = LT
+    c (Local  u1 _)   (Local  u2 _)       = compare u1 u2
+    c (Local   _ _)	  _		  = LT
     c (Global u1 _ _ _) (Global u2 _ _ _) = compare u1 u2
     c (Global  _ _ _ _)   _		  = GT
 \end{code}
@@ -430,13 +526,109 @@ instance Ord Name where
     compare a b = cmpName a b
 
 instance Uniquable Name where
-    uniqueOf = nameUnique
+    getUnique = nameUnique
 
 instance NamedThing Name where
     getName n = n
 \end{code}
 
 
+%************************************************************************
+%*									*
+\subsection[Special-Names]{Special Kinds of names}
+%*									*
+%************************************************************************
+
+Here's our convention for splitting up the object file name space:
+
+	_d...		dictionary identifiers
+	_g...		externally visible (non-user visible) names
+
+	_m...		default methods
+	_n...		default methods (encoded symbols, eg. <= becomes _nle)
+
+	_p...		superclass selectors
+
+	_w...		workers
+	_v...		workers (encoded symbols)
+
+	_x...		local variables
+
+	_u...		user-defined names that previously began with '_'
+
+	_[A-Z]...	compiler-generated tycons/datacons (namely dictionary
+			constructors)
+
+	__....		keywords (__export, __letrec etc.)
+
+This knowledge is encoded in the following functions.
+
+\begin{code}
+dictNamePrefix :: FAST_STRING
+dictNamePrefix	= SLIT("_d")
+
+mkSuperDictSelName :: Int -> OccName -> OccName
+mkSuperDictSelName index = prefixOccName (_PK_ ("_p" ++ show index ++ "_"))
+
+mkWorkerName :: OccName -> OccName
+mkWorkerName nm
+  | isLexSym nm_str = 
+	prefixOccName SLIT("_v") (mapOccName trName nm)
+  | otherwise 		     = 
+	prefixOccName SLIT("_w") nm
+  where nm_str = occNameString nm
+
+mkDefaultMethodName :: OccName -> OccName
+mkDefaultMethodName nm
+  | isLexSym nm_str = 
+	prefixOccName SLIT("_n") (mapOccName trName nm)
+  | otherwise 		     = 
+	prefixOccName SLIT("_m") nm
+  where nm_str = occNameString nm
+
+-- not used yet:
+--mkRecordSelectorName     :: Name -> Name
+--mkMethodSelectorName     :: Name -> Name
+
+mkClassTyConStr, mkClassDataConStr :: FAST_STRING -> FAST_STRING
+
+mkClassTyConStr   s = SLIT("_") _APPEND_ s
+mkClassDataConStr s = SLIT("_") _APPEND_ s
+
+-- translate a string such that it can occur as *part* of an identifer.  This
+-- is used when we prefix identifiers to create new names, for example the
+-- name of a default method.
+
+trName :: FAST_STRING -> FAST_STRING
+trName nm = _PK_ (foldr tran "" (_UNPK_ nm))
+ where 
+    tran c cs = case trChar c of
+		   '\0' -> '_' : show (ord c) ++ cs
+		   c'   -> c' : cs
+    trChar '&'  = 'a'
+    trChar '|'  = 'b'
+    trChar ':'  = 'c'
+    trChar '/'  = 'd'
+    trChar '='  = 'e'
+    trChar '>'  = 'g'
+    trChar '#'  = 'h'
+    trChar '@'  = 'i'
+    trChar '<'  = 'l'
+    trChar '-'  = 'm'
+    trChar '!'  = 'n'
+    trChar '+'  = 'p'
+    trChar '\'' = 'q'
+    trChar '$'  = 'r'
+    trChar '?'  = 's'
+    trChar '*'  = 't'
+    trChar '_'  = 'u'
+    trChar '.'  = 'v'
+    trChar '\\' = 'w'
+    trChar '%'  = 'x'
+    trChar '~'  = 'y'
+    trChar '^'  = 'z'
+    trChar _    = '\0'
+\end{code}
 
 %************************************************************************
 %*									*
@@ -452,11 +644,16 @@ instance Outputable Name where
 pprName name
   = getPprStyle $ \ sty ->
     let
-       ppr (Local u n _) 
-         |  userStyle sty 
-	 || ifaceStyle sty = ptext (occNameString n)
-         |  codeStyle sty  = pprUnique u
-         |  otherwise      = hcat [ptext (occNameString n), ptext SLIT("_"), pprUnique u]
+       -- when printing local names for interface files, prepend the '_'
+       -- to avoid clashes with user-defined names.  In fact, these names
+       -- will always begin with 'g' for top-level ids and 'x' otherwise,
+       -- because these are the unique supplies going into the tidy phase.
+       ppr (Local u n) | codeStyle sty   = pprUnique u
+		       | ifaceStyle sty  = char '_' <> pprUnique u
+
+       ppr (Local u Nothing)	= pprUnique u
+       ppr (Local u (Just occ))	| userStyle sty = ptext (occNameString occ)
+				| otherwise	= ptext (occNameString occ) <> char '_' <> pprUnique u
    
        ppr name@(Global u m n prov)
 	 | codeStyle sty
@@ -466,12 +663,14 @@ pprName name
 	 = hcat [pp_mod_dot, ptext (occNameString n), pp_debug sty name]
 	 where
 	   pp_mod_dot 
-		= case prov of		-- Omit home module qualifier if its in scope 
-			   LocalDef _ _           -> pp_qual dot (user_sty || iface_sty)
-			   NonLocalDef _ hif omit -> pp_qual (pp_hif hif) (omit && user_sty)
-			   WiredInTyCon _	  -> pp_qual dot user_sty -- Hack: omit qualifers on wired in things
-			   WiredInId _ 		  -> pp_qual dot user_sty -- in user style only
-			   NoProvenance		  -> pp_qual dot False
+	     = case prov of   -- Omit home module qualifier if in scope 
+		   LocalDef _ _          -> pp_qual dot (user_sty || iface_sty)
+		   NonLocalDef _ hif omit -> pp_qual (pp_hif hif) (omit && user_sty)
+				 -- Hack: omit qualifers on wired in things
+				 -- in user style only
+		   WiredInTyCon _ 	-> pp_qual dot user_sty
+		   WiredInId _		-> pp_qual dot user_sty
+		   NoProvenance	    	-> pp_qual dot False
    
 	   pp_qual sep omit_qual
 	    | omit_qual  = empty
@@ -491,8 +690,8 @@ pp_debug sty (Global uniq m n prov)
   | debugStyle sty = hcat [text "{-", pprUnique uniq, prov_p, text "-}"]
   | otherwise	   = empty
 	           where
-		     prov_p | opt_PprStyle_All = comma <> pp_prov prov
-			    | otherwise	       = empty
+		     prov_p | opt_PprStyle_NoPrags = empty
+			    | otherwise		   = comma <> pp_prov prov
 
 pp_prov (LocalDef _ Exported)    = char 'x'
 pp_prov (LocalDef _ NotExported) = char 'l'
@@ -503,7 +702,7 @@ pp_prov NoProvenance     	 = char '?'
 
 -- pprNameProvenance is used in error messages to say where a name came from
 pprNameProvenance :: Name -> SDoc
-pprNameProvenance (Local _ _ loc)     = pprProvenance (LocalDef loc NotExported)
+pprNameProvenance (Local _ _)         = pprProvenance (LocalDef noSrcLoc NotExported)
 pprNameProvenance (Global _ _ _ prov) = pprProvenance prov
 
 pprProvenance :: Provenance -> SDoc
@@ -513,41 +712,6 @@ pprProvenance (WiredInTyCon tc)     = ptext SLIT("Wired-in tycon")
 pprProvenance (WiredInId id)        = ptext SLIT("Wired-in id")
 pprProvenance NoProvenance	    = ptext SLIT("No provenance")
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[Sets of names}
-%*									*
-%************************************************************************
-
-\begin{code}
-type NameSet = UniqSet Name
-emptyNameSet	  :: NameSet
-unitNameSet	  :: Name -> NameSet
-addListToNameSet  :: NameSet -> [Name] -> NameSet
-addOneToNameSet   :: NameSet -> Name -> NameSet
-mkNameSet         :: [Name] -> NameSet
-unionNameSets	  :: NameSet -> NameSet -> NameSet
-unionManyNameSets :: [NameSet] -> NameSet
-minusNameSet 	  :: NameSet -> NameSet -> NameSet
-elemNameSet	  :: Name -> NameSet -> Bool
-nameSetToList	  :: NameSet -> [Name]
-isEmptyNameSet	  :: NameSet -> Bool
-
-isEmptyNameSet    = isEmptyUniqSet
-emptyNameSet	  = emptyUniqSet
-unitNameSet	  = unitUniqSet
-mkNameSet         = mkUniqSet
-addListToNameSet  = addListToUniqSet
-addOneToNameSet	  = addOneToUniqSet
-unionNameSets     = unionUniqSets
-unionManyNameSets = unionManyUniqSets
-minusNameSet	  = minusUniqSet
-elemNameSet       = elementOfUniqSet
-nameSetToList     = uniqSetToList
-\end{code}
-
 
 
 %************************************************************************

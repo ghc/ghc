@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[StrictAnal]{``Simple'' Mycroft-style strictness analyser}
 
@@ -11,21 +11,19 @@ module StrictAnal ( saWwTopBinds ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_dump_stranal, opt_D_simplifier_stats
-			)
+import CmdLineOpts	( opt_D_dump_stranal, opt_D_simplifier_stats,  opt_D_verbose_core2core )
 import CoreSyn
-import Id		( idType, addIdStrictness,
-			  getIdDemandInfo, addIdDemandInfo,
+import Id		( idType, setIdStrictness,
+			  getIdDemandInfo, setIdDemandInfo,
 			  Id
 			)
-import IdInfo		( mkStrictnessInfo, mkBottomStrictnessInfo,
-			  mkDemandInfo, willBeDemanded, DemandInfo
-			)
-import PprCore		( pprCoreBinding )
+import IdInfo		( mkStrictnessInfo, mkBottomStrictnessInfo )
+import CoreLint		( beginPass, endPass )
+import ErrUtils		( dumpIfSet )
 import SaAbsInt
 import SaLib
+import Demand		( isStrict )
 import WorkWrap		-- "back-end" of strictness analyser
-import Unique		( Unique{-instance Eq -} )
 import UniqSupply       ( UniqSupply )
 import Util		( zipWith4Equal )
 import Outputable
@@ -79,49 +77,28 @@ Alas and alack.
 
 \begin{code}
 saWwTopBinds :: UniqSupply
-	     -> [CoreBinding]
-	     -> [CoreBinding]
+	     -> [CoreBind]
+	     -> IO [CoreBind]
 
 saWwTopBinds us binds
-  = let
+  = do {
+	beginPass "Strictness analysis";
 
-	-- mark each binder with its strictness
+	-- Mark each binder with its strictness
 #ifndef OMIT_STRANAL_STATS
-	(binds_w_strictness, sa_stats)
-	  = saTopBinds binds nullSaStats
+	let { (binds_w_strictness, sa_stats) = saTopBinds binds nullSaStats };
+	dumpIfSet opt_D_simplifier_stats "Strictness analysis statistics"
+		  (pp_stats sa_stats);
 #else
-	binds_w_strictness
-	  = saTopBindsBinds binds
+	let { binds_w_strictness = saTopBindsBinds binds };
 #endif
-    in
-    -- possibly show what we decided about strictness...
-    (if opt_D_dump_stranal
-     then pprTrace "Strictness:\n" (vcat (
-	   map (pprCoreBinding)  binds_w_strictness))
-     else id
-    )
-    -- possibly show how many things we marked as demanded...
-    ((if opt_D_simplifier_stats
-#ifndef OMIT_STRANAL_STATS
-     then pp_stats sa_stats
-#else
-     then id
-#endif
-     else id
-    )
-	-- create worker/wrappers, and mark binders with their
-	-- "strictness info" [which encodes their
-	-- worker/wrapper-ness]
-    (workersAndWrappers binds_w_strictness us))
-#ifndef OMIT_STRANAL_STATS
-  where
-    pp_stats (SaStats tlam dlam tc dc tlet dlet)
-      = pprTrace "Binders marked demanded: "
-	(hcat [ptext SLIT("Lambda vars: "), int IBOX(dlam), char '/', int IBOX(tlam),
-		    ptext SLIT("; Case vars: "), int IBOX(dc),   char '/', int IBOX(tc),
-		    ptext SLIT("; Let vars: "),  int IBOX(dlet), char '/', int IBOX(tlet)
-	])
-#endif
+
+	-- Create worker/wrappers, and mark binders with their
+	-- "strictness info" [which encodes their worker/wrapper-ness]
+	let { binds' = workersAndWrappers us binds_w_strictness };
+
+	endPass "Strictness analysis" (opt_D_dump_stranal || opt_D_verbose_core2core) binds'
+    }
 \end{code}
 
 %************************************************************************
@@ -146,7 +123,7 @@ environment which maps @Id@s to their abstract values (i.e., an
 @AbsValEnv@ maps an @Id@ to its @AbsVal@).
 
 \begin{code}
-saTopBinds :: [CoreBinding] -> SaM [CoreBinding] -- not exported
+saTopBinds :: [CoreBind] -> SaM [CoreBind] -- not exported
 
 saTopBinds binds
   = let
@@ -168,8 +145,8 @@ be used; we can't turn top-level @let@s into @case@s.
 
 \begin{code}
 saTopBind :: StrictEnv -> AbsenceEnv
-	  -> CoreBinding
-	  -> SaM (StrictEnv, AbsenceEnv, CoreBinding)
+	  -> CoreBind
+	  -> SaM (StrictEnv, AbsenceEnv, CoreBind)
 
 saTopBind str_env abs_env (NonRec binder rhs)
   = saExpr str_env abs_env rhs 	`thenSa` \ new_rhs ->
@@ -226,53 +203,41 @@ environment.
 saExpr :: StrictEnv -> AbsenceEnv -> CoreExpr -> SaM CoreExpr
 
 saExpr _ _ e@(Var _)	= returnSa e
-saExpr _ _ e@(Lit _)	= returnSa e
 saExpr _ _ e@(Con  _ _)	= returnSa e
-saExpr _ _ e@(Prim _ _)	= returnSa e
+saExpr _ _ e@(Type _)	= returnSa e
 
-saExpr str_env abs_env (Lam (ValBinder arg) body)
-  = saExpr str_env abs_env body	`thenSa` \ new_body ->
-    let
-	new_arg = addDemandInfoToId str_env abs_env body arg
-    in
-    tickLambda new_arg	`thenSa_` -- stats
-    returnSa (Lam (ValBinder new_arg) new_body)
-
-saExpr str_env abs_env (Lam other_binder expr)
-  = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
-    returnSa (Lam other_binder new_expr)
+saExpr str_env abs_env (Lam bndr body)
+  =	-- Don't bother to set the demand-info on a lambda binder
+	-- We do that only for let(rec)-bound functions
+    saExpr str_env abs_env body	`thenSa` \ new_body ->
+    returnSa (Lam bndr new_body)
 
 saExpr str_env abs_env (App fun arg)
   = saExpr str_env abs_env fun	`thenSa` \ new_fun ->
-    returnSa (App new_fun arg)
+    saExpr str_env abs_env arg	`thenSa` \ new_arg ->
+    returnSa (App new_fun new_arg)
 
 saExpr str_env abs_env (Note note expr)
   = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
     returnSa (Note note new_expr)
 
-saExpr str_env abs_env (Case expr (AlgAlts alts deflt))
-  = saExpr    str_env abs_env expr  `thenSa` \ new_expr  ->
-    saDefault str_env abs_env deflt `thenSa` \ new_deflt ->
-    mapSa sa_alt alts		    `thenSa` \ new_alts  ->
-    returnSa (Case new_expr (AlgAlts new_alts new_deflt))
+saExpr str_env abs_env (Case expr case_bndr alts)
+  = saExpr str_env abs_env expr		`thenSa` \ new_expr  ->
+    mapSa sa_alt alts			`thenSa` \ new_alts  ->
+    let
+	new_case_bndr = addDemandInfoToCaseBndr str_env abs_env alts case_bndr
+    in
+    returnSa (Case new_expr new_case_bndr new_alts)
   where
     sa_alt (con, binders, rhs)
       = saExpr str_env abs_env rhs  `thenSa` \ new_rhs ->
 	let
-	    new_binders = addDemandInfoToIds str_env abs_env rhs binders
+	    new_binders = map add_demand_info binders
+	    add_demand_info bndr | isTyVar bndr = bndr
+			  	 | otherwise	= addDemandInfoToId str_env abs_env rhs bndr
 	in
 	tickCases new_binders	    `thenSa_` -- stats
 	returnSa (con, new_binders, new_rhs)
-
-saExpr str_env abs_env (Case expr (PrimAlts alts deflt))
-  = saExpr    str_env abs_env expr  `thenSa` \ new_expr  ->
-    saDefault str_env abs_env deflt `thenSa` \ new_deflt ->
-    mapSa sa_alt alts		    `thenSa` \ new_alts  ->
-    returnSa (Case new_expr (PrimAlts new_alts new_deflt))
-  where
-    sa_alt (lit, rhs)
-      = saExpr str_env abs_env rhs `thenSa` \ new_rhs ->
-	returnSa (lit, new_rhs)
 
 saExpr str_env abs_env (Let (NonRec binder rhs) body)
   =	-- Analyse the RHS in the environment at hand
@@ -329,25 +294,9 @@ saExpr str_env abs_env (Let (Rec pairs) body)
 	improved_binders = zipWith4Equal "saExpr" addStrictnessInfoToId
 				         str_vals abs_vals binders rhss
 
-	whiter_than_white_binders = launder improved_binders
-
-      	new_pairs   = whiter_than_white_binders `zip` new_rhss
+      	new_pairs   = improved_binders `zip` new_rhss
     in
     returnSa (Let (Rec new_pairs) new_body)
-  where
-    launder me = {-still-} me
-\end{code}
-
-\begin{code}
-saDefault str_env abs_env NoDefault = returnSa NoDefault
-
-saDefault str_env abs_env (BindDefault bdr rhs)
-  = saExpr str_env abs_env rhs	`thenSa` \ new_rhs ->
-    let
-	new_bdr = addDemandInfoToId str_env abs_env rhs bdr
-    in
-    tickCases [new_bdr]		`thenSa_` -- stats
-    returnSa (BindDefault new_bdr new_rhs)
 \end{code}
 
 
@@ -379,12 +328,12 @@ addStrictnessInfoToId
 addStrictnessInfoToId str_val abs_val binder body
 
   | isBot str_val
-  = binder `addIdStrictness` mkBottomStrictnessInfo
+  = binder `setIdStrictness` mkBottomStrictnessInfo
 
   | otherwise
-  = case (collectBinders body) of
+  = case (collectTyAndValBinders body) of
 	(_, [], rhs) 	        -> binder
-	(_, lambda_bounds, rhs) -> binder `addIdStrictness` 
+	(_, lambda_bounds, rhs) -> binder `setIdStrictness` 
 				      mkStrictnessInfo strictness False
 		where
 		    tys        = map idType lambda_bounds
@@ -398,7 +347,10 @@ addDemandInfoToId :: StrictEnv -> AbsenceEnv
 		  -> Id			-- Id augmented with Demand info
 
 addDemandInfoToId str_env abs_env expr binder
-  = binder `addIdDemandInfo` (mkDemandInfo (findDemand str_env abs_env expr binder))
+  = binder `setIdDemandInfo` (findDemand str_env abs_env expr binder)
+
+addDemandInfoToCaseBndr str_env abs_env alts binder
+  = binder `setIdDemandInfo` (findDemandAlts str_env abs_env alts binder)
 
 addDemandInfoToIds :: StrictEnv -> AbsenceEnv -> CoreExpr -> [Id] -> [Id]
 
@@ -430,7 +382,7 @@ returnSa      :: a -> SaM a
 {-# INLINE returnSa #-}
 
 tickLambda :: Id   -> SaM ()
-tickCases  :: [Id] -> SaM ()
+tickCases  :: [CoreBndr] -> SaM ()
 tickLet    :: Id   -> SaM ()
 
 #ifndef OMIT_STRANAL_STATS
@@ -459,10 +411,18 @@ tickLet var (SaStats tlam dlam tc dc tlet dlet)
     ((), SaStats tlam dlam tc dc (tlet _ADD_ tot) (dlet _ADD_ demanded)) }
 
 tick_demanded var (tot, demanded)
+  | isTyVar var = (tot, demanded)
+  | otherwise
   = (tot + 1,
-     if (willBeDemanded (getIdDemandInfo var))
+     if (isStrict (getIdDemandInfo var))
      then demanded + 1
      else demanded)
+
+pp_stats (SaStats tlam dlam tc dc tlet dlet)
+      = hcat [ptext SLIT("Lambda vars: "), int IBOX(dlam), char '/', int IBOX(tlam),
+		    ptext SLIT("; Case vars: "), int IBOX(dc),   char '/', int IBOX(tc),
+		    ptext SLIT("; Let vars: "),  int IBOX(dlet), char '/', int IBOX(tlet)
+	]
 
 #else {-OMIT_STRANAL_STATS-}
 -- identity monad

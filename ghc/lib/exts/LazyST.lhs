@@ -61,7 +61,7 @@ instance Monad (ST s) where
            k_a new_s
 
 {-# NOINLINE runST #-}
-runST :: (All s => ST s a) -> a
+runST :: (forall s. ST s a) -> a
 runST st = case st of ST st -> let (r,_) = st (PrelST.S# realWorld#) in r
 \end{code}
 
@@ -112,9 +112,9 @@ freezeSTArray (STArray arr) = strictToLazyST (freezeArray arr)
 unsafeFreezeSTArray (STArray arr) = strictToLazyST (unsafeFreezeArray arr)
 
 strictToLazyST :: PrelST.ST s a -> ST s a
-strictToLazyST (PrelST.ST m) = ST $ \s ->
+strictToLazyST m = ST $ \s ->
         let 
-  	   pr = case s of { PrelST.S# s# -> m s# }
+  	   pr = case s of { PrelST.S# s# -> PrelST.liftST m s# }
 	   r  = case pr of { PrelST.STret s2# r -> r }
 	   s' = case pr of { PrelST.STret s2# r -> PrelST.S# s2# }
 	in
@@ -122,7 +122,7 @@ strictToLazyST (PrelST.ST m) = ST $ \s ->
 
 lazyToStrictST :: ST s a -> PrelST.ST s a
 lazyToStrictST (ST m) = PrelST.ST $ \s ->
-        case (m (PrelST.S# s)) of (a, PrelST.S# s') -> PrelST.STret s' a
+        case (m (PrelST.S# s)) of (a, PrelST.S# s') -> (# s', a #)
 
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST = strictToLazyST . ST.unsafeInterleaveST . lazyToStrictST

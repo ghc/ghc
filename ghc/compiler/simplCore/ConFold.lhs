@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[ConFold]{Constant Folder}
 
@@ -8,18 +8,15 @@ ToDo:
    (i1 + i2) only if it results	in a valid Float.
 
 \begin{code}
-module ConFold	( completePrim ) where
+module ConFold	( cleverMkPrimApp ) where
 
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUnfold	( Unfolding )
-import Id		( idType )
-import Literal		( mkMachInt, mkMachWord, Literal(..) )
+import Id		( getIdUnfolding )
+import Const		( mkMachInt, mkMachWord, Literal(..), Con(..) )
 import PrimOp		( PrimOp(..) )
-import SimplEnv
 import SimplMonad
-import SimplUtils	( newId )
 import TysWiredIn	( trueDataCon, falseDataCon )
 
 import Char		( ord, chr )
@@ -27,9 +24,7 @@ import Outputable
 \end{code}
 
 \begin{code}
-completePrim :: SimplEnv
-	     -> PrimOp -> [OutArg]
-	     -> SmplM OutExpr
+cleverMkPrimApp :: PrimOp -> [CoreArg] -> CoreExpr
 \end{code}
 
 In the parallel world, we use _seq_ to control the order in which
@@ -86,69 +81,63 @@ NB: If we ever do case-floating, we have an extra worry:
 
 The second case must never be floated outside of the first!
 
-\begin{code}
-completePrim env SeqOp [TyArg ty, LitArg lit]
-  = returnSmpl (Lit (mkMachInt 1))
+\begin{code}p
+cleverMkPrimApp SeqOp [Type ty, Con (Literal lit) _]
+  = Con (Literal (mkMachInt 1)) []
 
-completePrim env op@SeqOp args@[TyArg ty, VarArg var]
-  | isEvaluated (lookupUnfolding env var) = returnSmpl (Lit (mkMachInt 1))  -- var is eval'd
-  | otherwise				= returnSmpl (Prim op args)	  -- var not eval'd
+cleverMkPrimApp SeqOp args@[Type ty, Var var]
+  | isEvaluated (getIdUnfolding var) = Con (Literal (mkMachInt 1)) [])	-- var is eval'd
+  | otherwise			     = Con (PrimOp op) args		-- var not eval'd
 \end{code}
 
 \begin{code}
-completePrim env op args
+cleverMkPrimApp op args
   = case args of
-     [LitArg (MachChar char_lit)]      -> oneCharLit   op char_lit
-     [LitArg (MachInt int_lit signed)] -> (if signed then oneIntLit else oneWordLit)
+     [Con (Literal (MachChar char_lit))      _] -> oneCharLit   op char_lit
+     [Con (Literal (MachInt int_lit signed)) _] -> (if signed then oneIntLit else oneWordLit)
 							  op int_lit
-     [LitArg (MachFloat float_lit)]    -> oneFloatLit  op float_lit
-     [LitArg (MachDouble double_lit)]  -> oneDoubleLit op double_lit
-     [LitArg other_lit]		       -> oneLit       op other_lit
+     [Con (Literal (MachFloat float_lit))   _]  -> oneFloatLit  op float_lit
+     [Con (Literal (MachDouble double_lit)) _]  -> oneDoubleLit op double_lit
+     [Con (Literal other_lit)               _]  -> oneLit       op other_lit
 
-     [LitArg (MachChar char_lit1),
-      LitArg (MachChar char_lit2)]     -> twoCharLits op char_lit1 char_lit2
+     [Con (Literal (MachChar char_lit1)) _,
+      Con (Literal (MachChar char_lit2)) _]     -> twoCharLits op char_lit1 char_lit2
 
-     [LitArg (MachInt int_lit1 True),  -- both *signed* literals
-      LitArg (MachInt int_lit2 True)]  -> twoIntLits op int_lit1 int_lit2
+     [Con (Literal (MachInt int_lit1 True)) _,  -- both *signed* literals
+      Con (Literal (MachInt int_lit2 True)) _]  -> twoIntLits op int_lit1 int_lit2
 
-     [LitArg (MachInt int_lit1 False), -- both *unsigned* literals
-      LitArg (MachInt int_lit2 False)] -> twoWordLits op int_lit1 int_lit2
+     [Con (Literal (MachInt int_lit1 False)) _, -- both *unsigned* literals
+      Con (Literal (MachInt int_lit2 False)) _] -> twoWordLits op int_lit1 int_lit2
 
-     [LitArg (MachInt int_lit1 False), -- unsigned+signed (shift ops)
-      LitArg (MachInt int_lit2 True)]  -> oneWordOneIntLit op int_lit1 int_lit2
+     [Con (Literal (MachInt int_lit1 False)) _, -- unsigned+signed (shift ops)
+      Con (Literal (MachInt int_lit2 True))  _] -> oneWordOneIntLit op int_lit1 int_lit2
 
-     [LitArg (MachFloat float_lit1),
-      LitArg (MachFloat float_lit2)]   -> twoFloatLits op float_lit1 float_lit2
+     [Con (Literal (MachFloat float_lit1)) _,
+      Con (Literal (MachFloat float_lit2)) _]   -> twoFloatLits op float_lit1 float_lit2
 
-     [LitArg (MachDouble double_lit1),
-      LitArg (MachDouble double_lit2)] -> twoDoubleLits op double_lit1 double_lit2
+     [Con (Literal (MachDouble double_lit1)) _,
+      Con (Literal (MachDouble double_lit2)) _] -> twoDoubleLits op double_lit1 double_lit2
 
-     [LitArg lit, VarArg var]	       -> litVar op lit var
-     [VarArg var, LitArg lit]	       -> litVar op lit var
+     [Con (Literal lit) _, Var var]	        -> litVar op lit var
+     [Var var, Con (Literal lit) _]	        -> litVar op lit var
 
-     other			       -> give_up
+     other			       		-> give_up
   where
-    give_up = returnSmpl (Prim op args)
+    give_up = Con (PrimOp op) args
 
-    return_char c   = returnSmpl (Lit (MachChar   c))
-    return_int i    = returnSmpl (Lit (mkMachInt  i))
-    return_word i   = returnSmpl (Lit (mkMachWord i))
-    return_float f  = returnSmpl (Lit (MachFloat  f))
-    return_double d = returnSmpl (Lit (MachDouble d))
-    return_lit lit  = returnSmpl (Lit lit)
+    return_char c   = Con (Literal (MachChar   c)) []
+    return_int i    = Con (Literal (mkMachInt  i)) []
+    return_word i   = Con (Literal (mkMachWord i)) []
+    return_float f  = Con (Literal (MachFloat  f)) []
+    return_double d = Con (Literal (MachDouble d)) []
+    return_lit lit  = Con (Literal lit) []
 
-    return_bool True  = returnSmpl trueVal
-    return_bool False = returnSmpl falseVal
+    return_bool True  = trueVal
+    return_bool False = falseVal
 
     return_prim_case var lit val_if_eq val_if_neq
-      = newId (idType var)	`thenSmpl` \ unused_binder ->
-	let
-	    result
-	      =	Case (Var var)
-		  (PrimAlts [(lit,val_if_eq)]
-		  (BindDefault unused_binder val_if_neq))
-	in
-	returnSmpl result
+      = Case (Var var) var [(Literal lit, [], val_if_eq),
+			    (DEFAULT,     [], val_if_neq)]
 
 	---------   Ints --------------
     oneIntLit IntNegOp     i = return_int (-i)
@@ -267,17 +256,17 @@ completePrim env op args
     litVar other_op lit var = give_up
 
 
-    checkRange :: Integer -> SmplM OutExpr
+    checkRange :: Integer -> CoreExpr
     checkRange val
      | (val > fromInt maxInt) || (val < fromInt minInt)  = 
 	-- Better tell the user that we've overflowed...
        pprTrace "Warning:" (text "Integer overflow in expression: " <> 
-	                   ppr ((Prim op args)::CoreExpr)) $
+	                   ppr ((mkPrimApp op args)::CoreExpr)) $
 	-- ..not that it stops us from actually folding!
 	-- ToDo: a SrcLoc would be nice.
        return_int val
      | otherwise = return_int val
 
-trueVal  = Con trueDataCon  []
-falseVal = Con falseDataCon []
+trueVal  = Con (DataCon trueDataCon)  []
+falseVal = Con (DataCon falseDataCon) []
 \end{code}

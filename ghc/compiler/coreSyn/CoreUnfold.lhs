@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[CoreUnfold]{Core-syntax unfoldings}
 
@@ -16,13 +16,11 @@ find, unsurprisingly, a Core expression.
 module CoreUnfold (
 	Unfolding(..), UnfoldingGuidance(..), -- types
 
-	FormSummary(..), mkFormSummary, whnfOrBottom, exprSmallEnoughToDup, 
-	exprIsTrivial,
-
 	noUnfolding, mkMagicUnfolding, mkUnfolding, getUnfoldingTemplate,
+	isEvaldUnfolding, hasUnfolding,
 
 	smallEnoughToInline, couldBeSmallEnoughToInline, 
-	certainlySmallEnoughToInline, inlineUnconditionally, okToInline,
+	certainlySmallEnoughToInline, 
 	okToUnfoldInHiFile,
 
 	calcUnfoldingGuidance
@@ -42,25 +40,19 @@ import Constants	( uNFOLDING_CHEAP_OP_COST,
 			  uNFOLDING_DEAR_OP_COST,
 			  uNFOLDING_NOREP_LIT_COST
 			)
-import BinderInfo	( BinderInfo, isOneSameSCCFunOcc, isDeadOcc,
-			  isInlinableOcc, isOneSafeFunOcc
-			)
 import CoreSyn
-import Literal		( Literal )
-import CoreUtils	( unTagBinders )
 import OccurAnal	( occurAnalyseGlobalExpr )
-import CoreUtils	( coreExprType )
-import Id		( Id, idType, getIdArity,  isBottomingId, isDataCon,
-			  idWantsToBeINLINEd, idMustBeINLINEd, idMustNotBeINLINEd,
-			  IdSet )
-import PrimOp		( fragilePrimOp, primOpCanTriggerGC, PrimOp(..) )
+import CoreUtils	( coreExprType, exprIsTrivial, mkFormSummary, 
+			  FormSummary(..) )
+import Id		( Id, idType, isId )
+import Const		( Con(..), isLitLitLit )
+import PrimOp		( PrimOp(..), primOpOutOfLine )
 import IdInfo		( ArityInfo(..), InlinePragInfo(..) )
-import Name		( isExported )
-import Literal		( isNoRepLit, isLitLitLit )
 import TyCon		( tyConFamilySize )
 import Type		( splitAlgTyConApp_maybe )
+import Const		( isNoRepLit )
 import Unique           ( Unique )
-import Util		( isIn, panic, assertPanic )
+import Util		( isIn, panic )
 import Outputable
 \end{code}
 
@@ -74,13 +66,19 @@ import Outputable
 data Unfolding
   = NoUnfolding
 
-  | OtherLit [Literal]		-- It ain't one of these
-  | OtherCon [Id]		-- It ain't one of these
+  | OtherCon [Con]		-- It ain't one of these
+				-- (OtherCon xs) also indicates that something has been evaluated
+				-- and hence there's no point in re-evaluating it.
+				-- OtherCon [] is used even for non-data-type values
+				-- to indicated evaluated-ness.  Notably:
+				--	data C = C !(Int -> Int)
+				-- 	case x of { C f -> ... }
+				-- Here, f gets an OtherCon [] unfolding.
 
   | CoreUnfolding			-- An unfolding with redundant cached information
 		FormSummary		-- Tells whether the template is a WHNF or bottom
 		UnfoldingGuidance	-- Tells about the *size* of the template.
-		SimplifiableCoreExpr	-- Template
+		CoreExpr		-- Template; binder-info is correct
 
   | MagicUnfolding
 	Unique				-- Unique of the Id whose magic unfolding this is
@@ -95,20 +93,24 @@ mkUnfolding expr
      -- strictness mangling (depends on there being no CSE)
      ufg = calcUnfoldingGuidance opt_UnfoldingCreationThreshold expr
      occ = occurAnalyseGlobalExpr expr
-     cuf = CoreUnfolding (mkFormSummary expr) ufg occ
-					  
-     cont = case occ of { Var _ -> cuf; _ -> cuf }
     in
-    case ufg of { UnfoldAlways -> cont; _ -> cont }
+    CoreUnfolding (mkFormSummary expr) ufg occ
 
 mkMagicUnfolding :: Unique -> Unfolding
 mkMagicUnfolding tag  = MagicUnfolding tag (mkMagicUnfoldingFun tag)
 
 getUnfoldingTemplate :: Unfolding -> CoreExpr
-getUnfoldingTemplate (CoreUnfolding _ _ expr)
-  = unTagBinders expr
+getUnfoldingTemplate (CoreUnfolding _ _ expr) = expr
 getUnfoldingTemplate other = panic "getUnfoldingTemplate"
 
+isEvaldUnfolding :: Unfolding -> Bool
+isEvaldUnfolding (OtherCon _)		          = True
+isEvaldUnfolding (CoreUnfolding ValueForm _ expr) = True
+isEvaldUnfolding other			          = False
+
+hasUnfolding :: Unfolding -> Bool
+hasUnfolding NoUnfolding = False
+hasUnfolding other 	 = True
 
 data UnfoldingGuidance
   = UnfoldNever
@@ -147,89 +149,6 @@ instance Outputable UnfoldingGuidance where
 
 %************************************************************************
 %*									*
-\subsection{Figuring out things about expressions}
-%*									*
-%************************************************************************
-
-\begin{code}
-data FormSummary
-  = VarForm		-- Expression is a variable (or scc var, etc)
-  | ValueForm		-- Expression is a value: i.e. a value-lambda,constructor, or literal
-  | BottomForm		-- Expression is guaranteed to be bottom. We're more gung
-			-- ho about inlining such things, because it can't waste work
-  | OtherForm		-- Anything else
-
-instance Outputable FormSummary where
-   ppr VarForm    = ptext SLIT("Var")
-   ppr ValueForm  = ptext SLIT("Value")
-   ppr BottomForm = ptext SLIT("Bot")
-   ppr OtherForm  = ptext SLIT("Other")
-
-mkFormSummary ::GenCoreExpr bndr Id flexi -> FormSummary
-
-mkFormSummary expr
-  = go (0::Int) expr		-- The "n" is the number of (value) arguments so far
-  where
-    go n (Lit _)	= ASSERT(n==0) ValueForm
-    go n (Con _ _)      = ASSERT(n==0) ValueForm
-    go n (Prim _ _)	= OtherForm
-    go n (Note _ e)     = go n e
-
-    go n (Let (NonRec b r) e) | exprIsTrivial r = go n e	-- let f = f' alpha in (f,g) 
-								-- should be treated as a value
-    go n (Let _ e)      = OtherForm
-    go n (Case _ _)     = OtherForm
-
-    go 0 (Lam (ValBinder x) e) = ValueForm	-- NB: \x.bottom /= bottom!
-    go n (Lam (ValBinder x) e) = go (n-1) e	-- Applied lambda
-    go n (Lam other_binder e)  = go n e
-
-    go n (App fun arg) | isValArg arg = go (n+1) fun
-    go n (App fun other_arg)          = go n fun
-
-    go n (Var f) | isBottomingId f = BottomForm
-		 | isDataCon f	   = ValueForm		-- Can happen inside imported unfoldings
-    go 0 (Var f)		   = VarForm
-    go n (Var f)		   = case getIdArity f of
-					  ArityExactly a | n < a -> ValueForm
-					  ArityAtLeast a | n < a -> ValueForm
-					  other			 -> OtherForm
-
-whnfOrBottom :: FormSummary -> Bool
-whnfOrBottom VarForm    = True
-whnfOrBottom ValueForm  = True
-whnfOrBottom BottomForm = True
-whnfOrBottom OtherForm  = False
-\end{code}
-
-@exprIsTrivial@ is true of expressions we are unconditionally happy to duplicate;
-simple variables and constants, and type applications.
-
-\begin{code}
-exprIsTrivial (Var v) 		= True
-exprIsTrivial (Lit lit)         = not (isNoRepLit lit)
-exprIsTrivial (App e (TyArg _)) = exprIsTrivial e
-exprIsTrivial (Note _ e)        = exprIsTrivial e
-exprIsTrivial other		= False
-\end{code}
-
-\begin{code}
-exprSmallEnoughToDup (Con _ _)      = True	-- Could check # of args
-exprSmallEnoughToDup (Prim op _)    = not (fragilePrimOp op) -- Could check # of args
-exprSmallEnoughToDup (Lit lit)      = not (isNoRepLit lit)
-exprSmallEnoughToDup (Note _ e)     = exprSmallEnoughToDup e
-exprSmallEnoughToDup expr
-  = case (collectArgs expr) of { (fun, _, vargs) ->
-    case fun of
-      Var v | length vargs <= 4 -> True
-      _				-> False
-    }
-
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection[calcUnfoldingGuidance]{Calculate ``unfolding guidance'' for an expression}
 %*									*
 %************************************************************************
@@ -240,7 +159,15 @@ calcUnfoldingGuidance
 	-> CoreExpr    		-- expression to look at
 	-> UnfoldingGuidance
 calcUnfoldingGuidance bOMB_OUT_SIZE expr
-  = case collectBinders expr of { (ty_binders, val_binders, body) ->
+  | exprIsTrivial expr		-- Often trivial expressions are never bound
+				-- to an expression, but it can happen.  For
+				-- example, the Id for a nullary constructor has
+				-- a trivial expression as its unfolding, and
+				-- we want to make sure that we always unfold it.
+  = UnfoldAlways
+ 
+  | otherwise
+  = case collectTyAndValBinders expr of { (ty_binders, val_binders, body) ->
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
 
       TooBig -> UnfoldNever
@@ -253,16 +180,20 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 			(I# size)
 			(I# scrut_discount)
 	where        
-	    discount_for b
-	         | is_data && b `is_elem` cased_args = tyConFamilySize tycon
-		 | otherwise = 0
+	    discount_for b 
+		| num_cases == 0 = 0
+		| otherwise
+		= if is_data 
+			then tyConFamilySize tycon * num_cases
+			else num_cases -- prim cases are pretty cheap
+	  
 		 where
 		   (is_data, tycon)
 		     = case (splitAlgTyConApp_maybe (idType b)) of
 			  Nothing       -> (False, panic "discount")
 			  Just (tc,_,_) -> (True,  tc)
-
-	    is_elem = isIn "calcUnfoldingGuidance" }
+		   num_cases = length (filter (==b) cased_args)
+	}
 \end{code}
 
 \begin{code}
@@ -275,96 +206,55 @@ sizeExpr :: Int 	    -- Bomb out if it gets bigger than this
 sizeExpr (I# bOMB_OUT_SIZE) args expr
   = size_up expr
   where
-    size_up (Var v)        	       = sizeZero
-    size_up (Lit lit) | isNoRepLit lit = sizeN uNFOLDING_NOREP_LIT_COST
-		      | otherwise      = sizeZero
+    size_up (Type t)	   = sizeZero		-- Types cost nothing
+    size_up (Note _ body)  = size_up body	-- Notes cost nothing
+    size_up (Var v)        = sizeOne
+    size_up (App fun arg)  = size_up fun `addSize` size_up arg
 
-    size_up (Note _ body)  = size_up body		-- Notes cost nothing
+    size_up (Con con args) = foldr (addSize . size_up) 
+				   (size_up_con con (valArgCount args))
+				   args
 
-    size_up (App fun arg)  = size_up fun `addSize` size_up_arg arg
-				-- NB Zero cost for for type applications;
-				-- others cost 1 or more
+    size_up (Lam b e) | isId b    = size_up e `addSizeN` 1
+		      | otherwise = size_up e
 
-    size_up (Con con args) = conSizeN (numValArgs args)
-			     -- We don't count 1 for the constructor because we're
-			     -- quite keen to get constructors into the open
-			     
-    size_up (Prim op args) = sizeN op_cost -- NB: no charge for PrimOp args
+    size_up (Let (NonRec binder rhs) body)
+      = nukeScrutDiscount (size_up rhs)		`addSize`
+	size_up body				`addSizeN`
+	1	-- For the allocation
+
+    size_up (Let (Rec pairs) body)
+      = nukeScrutDiscount rhs_size		`addSize`
+	size_up body				`addSizeN`
+	length pairs		-- For the allocation
       where
-	op_cost = if primOpCanTriggerGC op
+	rhs_size = foldr (addSize . size_up . snd) sizeZero pairs
+
+    size_up (Case scrut _ alts)
+      = nukeScrutDiscount (size_up scrut)		`addSize`
+	arg_discount scrut				`addSize`
+	foldr (addSize . size_up_alt) sizeZero alts	`addSizeN`
+	case (splitAlgTyConApp_maybe (coreExprType scrut)) of
+	      	Nothing       -> 1
+	      	Just (tc,_,_) -> tyConFamilySize tc
+
+    ------------ 
+    size_up_alt (con, bndrs, rhs) = size_up rhs
+	    -- Don't charge for args, so that wrappers look cheap
+
+    ------------
+    size_up_con (Literal lit) nv | isNoRepLit lit = sizeN uNFOLDING_NOREP_LIT_COST
+			         | otherwise      = sizeOne
+
+    size_up_con (DataCon dc) n_val_args = conSizeN n_val_args
+			     
+    size_up_con (PrimOp op) nv = sizeN op_cost
+      where
+	op_cost = if primOpOutOfLine op
 		  then uNFOLDING_DEAR_OP_COST
 			-- these *tend* to be more expensive;
 			-- number chosen to avoid unfolding (HACK)
 		  else uNFOLDING_CHEAP_OP_COST
-
-    size_up expr@(Lam _ _)
-      = let
-	    (tyvars, args, body) = collectBinders expr
-	in
-	size_up body `addSizeN` length args
-
-    size_up (Let (NonRec binder rhs) body)
-      = nukeScrutDiscount (size_up rhs)
-		`addSize`
-	size_up body
-		`addSizeN`
-	1	-- For the allocation
-
-    size_up (Let (Rec pairs) body)
-      = nukeScrutDiscount (foldr addSize sizeZero [size_up rhs | (_,rhs) <- pairs])
-		`addSize`
-	size_up body
-		`addSizeN`
-	length pairs	-- For the allocation
-
-    size_up (Case scrut alts)
-      = nukeScrutDiscount (size_up scrut)
-		`addSize`
-	arg_discount scrut
-		`addSize`
-	size_up_alts (coreExprType scrut) alts
-	    -- We charge for the "case" itself in "size_up_alts"
-
-    ------------
-	-- In an application we charge	0 for type application
-	-- 				1 for most anything else
-	--				N for norep_lits
-    size_up_arg (LitArg lit) | isNoRepLit lit = sizeN uNFOLDING_NOREP_LIT_COST
-    size_up_arg (TyArg _)		      = sizeZero
-    size_up_arg other			      = sizeOne
-
-    ------------
-    size_up_alts scrut_ty (AlgAlts alts deflt)
-      = (foldr (addSize . size_alg_alt) (size_up_deflt deflt) alts)
-	`addSizeN`
-	alt_cost
-      where
-	size_alg_alt (con,args,rhs) = size_up rhs
-	    -- Don't charge for args, so that wrappers look cheap
-
-	-- NB: we charge N for an alg. "case", where N is
-	-- the number of constructors in the thing being eval'd.
-	-- (You'll eventually get a "discount" of N if you
-	-- think the "case" is likely to go away.)
-	-- It's important to charge for alternatives.  If you don't then you
-	-- get size 1 for things like:
-	--		case x of { A -> 1#; B -> 2#; ... lots }
-
-	alt_cost :: Int
-	alt_cost
-	  = case (splitAlgTyConApp_maybe scrut_ty) of
-	      Nothing       -> 1
-	      Just (tc,_,_) -> tyConFamilySize tc
-
-    size_up_alts _ (PrimAlts alts deflt)
-      = foldr (addSize . size_prim_alt) (size_up_deflt deflt) alts
-	    -- *no charge* for a primitive "case"!
-      where
-	size_prim_alt (lit,rhs) = size_up rhs
-
-    ------------
-    size_up_deflt NoDefault		   = sizeZero
-    size_up_deflt (BindDefault binder rhs) = size_up rhs
 
     ------------
 	-- We want to record if we're case'ing an argument
@@ -411,7 +301,8 @@ data ExprSize = TooBig
 sizeZero     	= SizeIs 0# [] 0#
 sizeOne      	= SizeIs 1# [] 0#
 sizeN (I# n) 	= SizeIs n  [] 0#
-conSizeN (I# n) = SizeIs n  [] n
+conSizeN (I# n) = SizeIs 0# [] n   -- We don't count 1 for the constructor because we're
+				   -- quite keen to get constructors into the open
 scrutArg v	= SizeIs 0# [v] 0#
 
 nukeScrutDiscount (SizeIs n vs d) = SizeIs n vs 0#
@@ -462,7 +353,6 @@ smallEnoughToInline id arg_is_evald_s result_is_scruted
   = if enough_args n_vals_wanted arg_is_evald_s &&
        size - discount <= opt_UnfoldingUseThreshold
     then
-       -- pprTrace "small enough" (ppr id <+> int size <+> int discount) 
        True
     else
        False
@@ -473,10 +363,17 @@ smallEnoughToInline id arg_is_evald_s result_is_scruted
 
 	-- We multiple the raw discounts (args_discount and result_discount)
 	-- ty opt_UnfoldingKeenessFactor because the former have to do with
-	-- *size* whereas the discounts imply that there's some extra *efficiency*
-	-- to be gained (e.g. beta reductions, case reductions) by inlining.
+	-- *size* whereas the discounts imply that there's some extra 
+	-- *efficiency* to be gained (e.g. beta reductions, case reductions) 
+	-- by inlining.
+
+	-- we also discount 1 for each argument passed, because these will
+	-- reduce with the lambdas in the function (we count 1 for a lambda
+ 	-- in size_up).
+
     discount :: Int
-    discount = round (
+    discount = length (take n_vals_wanted arg_is_evald_s) +
+	       round (
 		      opt_UnfoldingKeenessFactor * 
 		      fromInt (args_discount + result_discount)
 		     )
@@ -502,55 +399,6 @@ certainlySmallEnoughToInline :: Id -> UnfoldingGuidance -> Bool
 certainlySmallEnoughToInline id guidance = smallEnoughToInline id (repeat False) False guidance
 \end{code}
 
-Predicates
-~~~~~~~~~~
-
-@inlineUnconditionally@ decides whether a let-bound thing can
-*definitely* be inlined at each of its call sites.  If so, then
-we can drop the binding right away.  But remember, you have to be 
-certain that every use can be inlined.  So, notably, any ArgOccs 
-rule this out.  Since ManyOcc doesn't record FunOcc/ArgOcc 
-
-\begin{code}
-inlineUnconditionally :: (Id,BinderInfo) -> Bool
-
-inlineUnconditionally (id, occ_info)
-  |  idMustNotBeINLINEd id 
-  || isExported id
-  =  False
-
-  |  isOneSameSCCFunOcc occ_info
-  && idWantsToBeINLINEd id = True
-
-  |  isOneSafeFunOcc occ_info
-  =  True
-
-  |  otherwise
-  = False
-\end{code}
-
-okToInline is used at call sites, so it is a bit more generous
-
-\begin{code}
-okToInline :: Id		-- The Id
-	   -> Bool		-- The thing is WHNF or bottom; 
-	   -> Bool		-- It's small enough to duplicate the code
-	   -> BinderInfo
-	   -> Bool		-- True <=> inline it
-
-okToInline id _ _ _		-- Check the Id first
-  | idWantsToBeINLINEd id = True
-  | idMustNotBeINLINEd id = False
-
-okToInline id whnf small binder_info 
-#ifdef DEBUG
-  | isDeadOcc binder_info
-  = pprTrace "okToInline: dead" (ppr id) False
-  | otherwise
-#endif
-  = isInlinableOcc whnf small binder_info
-\end{code}
-
 @okToUnfoldInHifile@ is used when emitting unfolding info into an interface
 file to determine whether an unfolding candidate really should be unfolded.
 The predicate is needed to prevent @_casm_@s (+ lit-lits) from being emitted
@@ -567,34 +415,18 @@ okToUnfoldInHiFile :: CoreExpr -> Bool
 okToUnfoldInHiFile e = opt_UnfoldCasms || go e
  where
     -- Race over an expression looking for CCalls..
-    go (Var _)   = True
-    go (Lit lit) = not (isLitLitLit lit)
-    go (Note _ body)  = go body
-    go (App fun arg)  = go fun
-    go (Con con args) = True
-    go (Prim op args) = okToUnfoldPrimOp op
-    go (Lam _ body) = go body
-    go (Let (NonRec binder rhs) body) = go rhs && go body
-    go (Let (Rec pairs) body) = and (map go (body:rhses))
-      where
-        rhses = [ rhs | (_, rhs) <- pairs ]
-    go (Case scrut alts) = and (map go (scrut:rhses))
-      where
-        rhses = getAltRhs alts
-
-        getAltRhs (PrimAlts alts deflt) =
-	    let ls = map snd alts  in
-	    case deflt of
-	      NoDefault -> ls
-	      BindDefault _ rhs -> rhs:ls
-        getAltRhs (AlgAlts alts deflt) =
-	    let ls = map (\ (_,_,r) -> r) alts  in
-	    case deflt of
-	      NoDefault -> ls
-	      BindDefault _ rhs -> rhs:ls
+    go (Var _)                = True
+    go (Con (Literal lit) _)  = not (isLitLitLit lit)
+    go (Con (PrimOp op) args) = okToUnfoldPrimOp op && all go args
+    go (Con con args)         = True -- con args are always atomic
+    go (App fun arg)          = go fun && go arg
+    go (Lam _ body)           = go body
+    go (Let binds body)       = and (map go (body :rhssOfBind binds))
+    go (Case scrut bndr alts) = and (map go (scrut:rhssOfAlts alts))
+    go (Note _ body)          = go body
+    go (Type _)		      = True
 
     -- ok to unfold a PrimOp as long as it's not a _casm_
-    okToUnfoldPrimOp (CCallOp _ is_casm _ _ _ _) = not is_casm
-    okToUnfoldPrimOp _                           = True
-     
+    okToUnfoldPrimOp (CCallOp _ is_casm _ _) = not is_casm
+    okToUnfoldPrimOp _                       = True
 \end{code}

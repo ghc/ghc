@@ -1,0 +1,1 @@
+ERROR "test/static/s004.hs" (line 5): Binding for qualified variable "A.f" not allowed

@@ -11,13 +11,21 @@ The standard Haskell 1.3 library for working with
 
 module Maybe
    (
-    Maybe(..),
-    isJust, fromJust, 
-    fromMaybe, 
-    listToMaybe, maybeToList,
-    catMaybes, 
-    mapMaybe, 
-    unfoldr
+    Maybe(..),		-- non-standard
+			-- instance of: Eq, Ord, Show, Read,
+			--		Functor, Monad, MonadZero, MonadPlus
+
+    maybe,		-- :: b -> (a -> b) -> Maybe a -> b
+
+    isJust,		-- :: Maybe a -> Bool
+    fromJust,		-- :: Maybe a -> a
+    fromMaybe,		-- :: a -> Maybe a -> a
+    listToMaybe,        -- :: [a] -> Maybe a
+    maybeToList,	-- :: Maybe a -> [a]
+    catMaybes,		-- :: [Maybe a] -> [a]
+    mapMaybe,		-- :: (a -> Maybe b) -> [a] -> [b]
+    unfoldr		-- :: (a -> Maybe (b,a)) -> a -> (a,[b])
+
    ) where
 
 import PrelErr	( error )
@@ -54,8 +62,10 @@ listToMaybe           :: [a] -> Maybe a
 listToMaybe []        =  Nothing
 listToMaybe (a:_)     =  Just a
  
+{- OLD, NOT EXPORTED:
 findMaybe              :: (a -> Bool) -> [a] -> Maybe a
 findMaybe p            =  listToMaybe . filter p
+-}
 
 catMaybes              :: [Maybe a] -> [a]
 catMaybes ls = [x | Just x <- ls]
@@ -68,27 +78,18 @@ mapMaybe f (x:xs) =
   Nothing -> rs
   Just r  -> r:rs
 
---OLD: mapMaybe f             =  catMaybes . map f
--- new version is potentially more space efficient
-
--- Not exported
+{- OLD, NOT EXPORTED:
 joinMaybe         :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a 
 joinMaybe f m1 m2 =
  case m1 of
   Nothing -> m2
   Just v1 -> case m2 of {Nothing -> m1; Just v2 -> Just (f v1 v2)}
-
-{- OLD: Note: stricter than the above.
-joinMaybe _ Nothing  Nothing  = Nothing
-joinMaybe _ (Just g) Nothing  = Just g
-joinMaybe _ Nothing  (Just g) = Just g
-joinMaybe f (Just g) (Just h) = Just (f g h)
 -}
 
 \end{code}
 
 \begin{verbatim}
-  unfoldr f' (foldr f z xs) == (xs,z)
+  unfoldr f' (foldr f z xs) == (z,xs)
 
  if the following holds:
 
@@ -97,9 +98,9 @@ joinMaybe f (Just g) (Just h) = Just (f g h)
 \end{verbatim}
 
 \begin{code}
-unfoldr       :: (a -> Maybe (b, a)) -> a -> ([b],a)
+unfoldr       :: (a -> Maybe (b, a)) -> a -> (a,[b])
 unfoldr f x   =
   case f x of
-  Just (y,x') -> let (ys,x'') = unfoldr f x' in (y:ys,x'')
-  Nothing     -> ([],x)
+   Just (y,x') -> let (x'',ys) = unfoldr f x' in (x'',y:ys)
+   Nothing     -> (x,[])
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1998
 %
 \section[StdIdInfo]{Standard unfoldings}
 
@@ -13,60 +13,62 @@ have a standard form, namely:
 
 \begin{code}
 module MkId (
-	mkImportedId,
-	mkUserId,
-	mkUserLocal, mkSysLocal, 
-	mkSpecPragmaId,
+	mkSpecPragmaId,	mkWorkerId,
 
-	mkDataCon, mkTupleCon,
+	mkDictFunId, mkDefaultMethodId,
+	mkMethodSelId, mkSuperDictSelId, 
 
-	mkDictFunId,
-	mkMethodSelId, mkSuperDictSelId, mkDefaultMethodId,
-
+	mkDataConId,
 	mkRecordSelId,
-
-	mkPrimitiveId, 
-	mkWorkerId
-
+	mkPrimitiveId
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} CoreUnfold ( mkUnfolding )
 
-import Type
-import CoreSyn
-import Literal
-import TysWiredIn	( tupleCon )
-import Name		( mkLocalName, mkSysLocalName, mkCompoundName, 
-			  occNameString, Name, OccName, NamedThing(..)
+import TysWiredIn	( boolTy )
+import Type		( Type, ThetaType,
+			  mkDictTy, mkTyConApp, mkTyVarTys, mkFunTys, mkFunTy, mkSigmaTy,
+			  isUnLiftedType, substFlexiTheta,
+			  splitSigmaTy, splitFunTy_maybe, splitAlgTyConApp,
+			  splitFunTys, splitForAllTys
 			)
-import Id		( idType, fIRST_TAG,
-			  mkTemplateLocals, mkId, mkVanillaId,
-			  dataConStrictMarks, dataConFieldLabels, dataConArgTys,
-			  recordSelectorFieldLabel, dataConSig,
-			  StrictnessMark(..),
-			  Id, IdDetails(..), GenId
+import TyCon		( TyCon, isNewTyCon, tyConDataCons, isDataTyCon )
+import Class		( Class, classBigSig, classTyCon )
+import Var		( Id, TyVar, VarDetails(..), mkId )
+import VarEnv		( zipVarEnv )
+import Const		( Con(..) )
+import Name		( mkCompoundName, mkWiredInIdName, 
+			  mkWorkerName, mkSuperDictSelName,
+			  Name, NamedThing(..),
+			)
+import PrimOp		( PrimOp, primOpType, primOpStr, primOpUniq )
+import DataCon		( DataCon, dataConStrictMarks, dataConFieldLabels, 
+			  dataConArgTys, dataConSig
+			)
+import Id		( idType,
+			  mkUserLocal, mkVanillaId, mkTemplateLocals,
+			  setInlinePragma
 			)
 import IdInfo		( noIdInfo,
 			  exactArity, setUnfoldingInfo, 
 			  setArityInfo, setInlinePragInfo,
 			  InlinePragInfo(..), IdInfo
 			)
-import Class		( Class, classBigSig, classTyCon )
 import FieldLabel	( FieldLabel, FieldLabelTag, mkFieldLabel, fieldLabelName, 
 			  firstFieldLabelTag, allFieldLabelTags
 			)
-import TyVar		( TyVar )
-import TyCon		( TyCon, isNewTyCon, tyConDataCons, isDataTyCon )
+import CoreSyn
 import PrelVals		( rEC_SEL_ERROR_ID )
+import PrelMods		( pREL_GHC )
 import Maybes
-import SrcLoc		( SrcLoc )
-import BasicTypes	( Arity )
+import BasicTypes	( Arity, StrictnessMark(..) )
 import Unique		( Unique )
 import Maybe            ( isJust )
 import Outputable
 import Util		( assoc )
+import List		( nub )
 \end{code}		
 
 
@@ -77,40 +79,15 @@ import Util		( assoc )
 %************************************************************************
 
 \begin{code}
-mkImportedId :: Name -> ty -> IdInfo -> GenId ty
-mkImportedId name ty info = mkId name ty (VanillaId True) info
-
--- SysLocal: for an Id being created by the compiler out of thin air...
--- UserLocal: an Id with a name the user might recognize...
-mkSysLocal  :: FAST_STRING -> Unique -> (GenType flexi) -> SrcLoc -> GenId (GenType flexi)
-mkUserLocal :: OccName     -> Unique -> (GenType flexi) -> SrcLoc -> GenId (GenType flexi)
-
-mkSysLocal str uniq ty loc
-  = mkVanillaId (mkSysLocalName uniq str loc) ty noIdInfo
-
-mkUserLocal occ uniq ty loc
-  = mkVanillaId (mkLocalName uniq occ loc) ty noIdInfo
-
-mkSpecPragmaId occ uniq ty loc
-  = mkId (mkLocalName uniq occ loc) ty SpecPragmaId noIdInfo
-
-mkUserId :: Name -> GenType flexi -> GenId (GenType flexi)
-mkUserId name ty
-  = mkVanillaId name ty noIdInfo
+mkSpecPragmaId occ uniq ty
+  = mkUserLocal occ uniq ty `setInlinePragma` IAmASpecPragmaId
 
 mkDefaultMethodId dm_name rec_c ty
-  = mkVanillaId dm_name ty noIdInfo
+  = mkVanillaId dm_name ty
 
-mkDictFunId dfun_name full_ty clas itys
-  = mkVanillaId dfun_name full_ty noIdInfo
-
-mkWorkerId uniq unwrkr ty info
-  = mkVanillaId name ty info
-  where
-    name    	    = mkCompoundName name_fn uniq (getName unwrkr)
-    name_fn wkr_str = SLIT("$w") _APPEND_ wkr_str
+mkWorkerId uniq unwrkr ty
+  = mkVanillaId (mkCompoundName mkWorkerName uniq (getName unwrkr)) ty
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -119,34 +96,17 @@ mkWorkerId uniq unwrkr ty info
 %************************************************************************
 
 \begin{code}
-mkDataCon :: Name
-	  -> [StrictnessMark] -> [FieldLabel]
-	  -> [TyVar] -> ThetaType
-	  -> [TyVar] -> ThetaType
-	  -> [TauType] -> TyCon
-	  -> Id
-  -- can get the tag and all the pieces of the type from the Type
-
-mkDataCon name stricts fields tvs ctxt con_tvs con_ctxt args_tys tycon
-  = ASSERT(length stricts == length args_tys)
-    data_con
+mkDataConId :: DataCon -> Id
+mkDataConId data_con
+  = mkId (getName data_con)
+	 id_ty
+	 (ConstantId (DataCon data_con))
+	 (dataConInfo data_con)
   where
-    -- NB: data_con self-recursion; should be OK as tags are not
-    -- looked at until late in the game.
-    data_con = mkId name data_con_ty details (dataConInfo data_con)
-    details  = AlgConId data_con_tag stricts fields tvs ctxt con_tvs con_ctxt args_tys tycon
-
-    data_con_tag    = assoc "mkDataCon" (data_con_family `zip` [fIRST_TAG..]) data_con
-    data_con_family = tyConDataCons tycon
-    data_con_ty     = mkSigmaTy (tvs++con_tvs) (ctxt++con_ctxt)
-				(mkFunTys args_tys (mkTyConApp tycon (mkTyVarTys tvs)))
-
-
-mkTupleCon :: Arity -> Name -> Type -> Id
-mkTupleCon arity name ty 
-  = con_id
-  where
-    con_id = mkId name ty (TupleConId arity) (dataConInfo con_id)
+    (tyvars, theta, ex_tyvars, ex_theta, arg_tys, tycon) = dataConSig data_con
+    id_ty = mkSigmaTy (tyvars ++ ex_tyvars) 
+	              (theta ++ ex_theta)
+	              (mkFunTys arg_tys (mkTyConApp tycon (mkTyVarTys tyvars)))
 \end{code}
 
 We're going to build a constructor that looks like:
@@ -174,30 +134,29 @@ Notice that
   to be here.
 
 \begin{code}
-dataConInfo :: Id -> IdInfo
+dataConInfo :: DataCon -> IdInfo
 
-dataConInfo con_id
+dataConInfo data_con
   = setInlinePragInfo IMustBeINLINEd $
-	    	-- Always inline constructors; we don't create a binding for them
-		-- (well, at least not for dict constructors, since they are 
-		--  always applied)
+	    	-- Always inline constructors; we won't create a binding for them
     setArityInfo (exactArity (length locals)) $
     setUnfoldingInfo unfolding $
     noIdInfo
   where
         unfolding = mkUnfolding con_rhs
 
-	(tyvars, theta, con_tyvars, con_theta, arg_tys, tycon) = dataConSig con_id
+	(tyvars, theta, ex_tyvars, ex_theta, arg_tys, tycon) = dataConSig data_con
+	all_tyvars   = tyvars ++ ex_tyvars
 
 	dict_tys     = [mkDictTy clas tys | (clas,tys) <- theta]
-	con_dict_tys = [mkDictTy clas tys | (clas,tys) <- con_theta]
+	ex_dict_tys  = [mkDictTy clas tys | (clas,tys) <- ex_theta]
 	n_dicts	     = length dict_tys
 	result_ty    = mkTyConApp tycon (mkTyVarTys tyvars)
 
-	locals        = mkTemplateLocals (dict_tys ++ con_dict_tys ++ arg_tys)
+	locals        = mkTemplateLocals (dict_tys ++ ex_dict_tys ++ arg_tys)
 	data_args     = drop n_dicts locals
 	(data_arg1:_) = data_args		-- Used for newtype only
-	strict_marks  = dataConStrictMarks con_id
+	strict_marks  = dataConStrictMarks data_con
 	strict_args   = [arg | (arg,MarkedStrict) <- data_args `zip` strict_marks]
 		-- NB: we can't call mkTemplateLocals twice, because it
 		-- always starts from the same unique.
@@ -206,16 +165,15 @@ dataConInfo con_id
 		= ASSERT( length arg_tys == 1)
 		  Note (Coerce result_ty (head arg_tys)) (Var data_arg1)
  		| otherwise
-		= Con con_id (map TyArg (mkTyVarTys tyvars) ++ map VarArg data_args)
+		= mkConApp data_con (map Type (mkTyVarTys all_tyvars) ++ map Var data_args)
 
-	con_rhs = mkTyLam tyvars $
-		  mkValLam locals $
+	con_rhs = mkLams all_tyvars $ mkLams locals $
 		  foldr mk_case con_app strict_args
 
-	mk_case arg body | isUnpointedType (idType arg)
+	mk_case arg body | isUnLiftedType (idType arg)
 			 = body			-- "!" on unboxed arg does nothing
 			 | otherwise
-			 = Case (Var arg) (AlgAlts [] (BindDefault arg body))
+			 = Case (Var arg) arg [(DEFAULT,[],body)]
 				-- This case shadows "arg" but that's fine
 \end{code}
 
@@ -261,29 +219,24 @@ mkRecordSelId field_label selector_ty
     [data_id] = mkTemplateLocals [data_ty]
     alts      = map mk_maybe_alt data_cons
     the_alts  = catMaybes alts
+    default_alt | all isJust alts = []	-- No default needed
+		| otherwise	  = [(DEFAULT, [], error_expr)]
 
-    sel_rhs   = mkTyLam tyvars $
-		mkValLam [data_id] $
-		Case (Var data_id) 
-		         -- if any of the constructors don't have the label, ...
-		     (if any (not . isJust) alts then
-		           AlgAlts the_alts(BindDefault data_id error_expr)
-		      else
-			   AlgAlts the_alts NoDefault)
+    sel_rhs   = mkLams tyvars $ Lam data_id $
+		Case (Var data_id) data_id (the_alts ++ default_alt)
 
     mk_maybe_alt data_con 
 	  = case maybe_the_arg_id of
 		Nothing		-> Nothing
-		Just the_arg_id -> Just (data_con, arg_ids, Var the_arg_id)
+		Just the_arg_id -> Just (DataCon data_con, arg_ids, Var the_arg_id)
 	  where
 	    arg_ids 	     = mkTemplateLocals (dataConArgTys data_con tyvar_tys)
 				    -- The first one will shadow data_id, but who cares
 	    field_lbls	     = dataConFieldLabels data_con
 	    maybe_the_arg_id = assocMaybe (field_lbls `zip` arg_ids) field_label
 
-    error_expr = mkApp (Var rEC_SEL_ERROR_ID) [rhs_ty] [LitArg msg_lit]
+    error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type rhs_ty, mkStringLit full_msg]
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
-    msg_lit    = NoRepStr (_PK_ full_msg)
 \end{code}
 
 
@@ -304,8 +257,7 @@ mkSuperDictSelId :: Unique -> Class -> FieldLabelTag -> Type -> Id
 mkSuperDictSelId uniq clas index ty
   = mkDictSelId name clas ty
   where
-    name    = mkCompoundName name_fn uniq (getName clas)
-    name_fn clas_str = clas_str _APPEND_ SLIT("_sc") _APPEND_ (_PK_ (show index))
+    name   = mkCompoundName (mkSuperDictSelName index) uniq (getName clas)
 
 	-- For method selectors the clean thing to do is
 	-- to give the method selector the same name as the class op itself.
@@ -343,11 +295,11 @@ mkDictSelId name clas ty
     dict_ty    = mkDictTy clas tyvar_tys
     (dict_id:arg_ids) = mkTemplateLocals (dict_ty : arg_tys)
 
-    rhs | isNewTyCon tycon = mkLam tyvars [dict_id] $
+    rhs | isNewTyCon tycon = mkLams tyvars $ Lam dict_id $
 			     Note (Coerce (head arg_tys) dict_ty) (Var dict_id)
-	| otherwise	   = mkLam tyvars [dict_id] $
-			     Case (Var dict_id) $
-			     AlgAlts [(data_con, arg_ids, Var the_arg_id)] NoDefault
+	| otherwise	   = mkLams tyvars $ Lam dict_id $
+			     Case (Var dict_id) dict_id
+			     	  [(DataCon data_con, arg_ids, Var the_arg_id)]
 \end{code}
 
 
@@ -359,10 +311,16 @@ mkDictSelId name clas ty
 
 
 \begin{code}
-mkPrimitiveId name ty prim_op 
-  = mkId name ty (PrimitiveId prim_op) info
+mkPrimitiveId :: PrimOp -> Id
+mkPrimitiveId prim_op 
+  = id
   where
-
+    occ_name = primOpStr  prim_op
+    key	     = primOpUniq prim_op
+    ty	     = primOpType prim_op
+    name    = mkWiredInIdName key pREL_GHC occ_name id
+    id      = mkId name ty (ConstantId (PrimOp prim_op)) info
+		
     info = setUnfoldingInfo unfolding $
 	   setInlinePragInfo IMustBeINLINEd $
 		-- The pragma @IMustBeINLINEd@ says that this Id absolutely 
@@ -376,21 +334,54 @@ mkPrimitiveId name ty prim_op
     (arg_tys, _)  = splitFunTys tau
 
     args = mkTemplateLocals arg_tys
-    rhs =  mkLam tyvars args $
-	   Prim prim_op
-		([TyArg (mkTyVarTy tv) | tv <- tyvars] ++ 
-		 [VarArg v | v <- args])
+    rhs =  mkLams tyvars $ mkLams args $
+	   mkPrimApp prim_op (map Type (mkTyVarTys tyvars) ++ map Var args)
+\end{code}
+
+\end{code}
+
+\begin{code}
+dyadic_fun_ty  ty = mkFunTys [ty, ty] ty
+monadic_fun_ty ty = ty `mkFunTy` ty
+compare_fun_ty ty = mkFunTys [ty, ty] boolTy
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Catch-all}
+\subsection{DictFuns}
 %*									*
 %************************************************************************
 
 \begin{code}
-addStandardIdInfo id
-  = pprTrace "addStandardIdInfo missing:" (ppr id) id
-\end{code}
+mkDictFunId :: Name		-- Name to use for the dict fun;
+	    -> Class 
+	    -> [TyVar]
+	    -> [Type]
+	    -> ThetaType
+	    -> Id
 
+mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
+  = mkVanillaId dfun_name dfun_ty
+  where
+    (class_tyvars, sc_theta, _, _, _) = classBigSig clas
+    sc_theta' = substFlexiTheta (zipVarEnv class_tyvars inst_tys) sc_theta
+			-- Doesn't really need to be flexi
+
+    dfun_theta = case inst_decl_theta of
+		   []    -> []	-- If inst_decl_theta is empty, then we don't
+				-- want to have any dict arguments, so that we can
+				-- expose the constant methods.
+
+		   other -> nub (inst_decl_theta ++ sc_theta')
+				-- Otherwise we pass the superclass dictionaries to
+				-- the dictionary function; the Mark Jones optimisation.
+				--
+				-- NOTE the "nub".  I got caught by this one:
+				--   class Monad m => MonadT t m where ...
+				--   instance Monad m => MonadT (EnvT env) m where ...
+				-- Here, the inst_decl_theta has (Monad m); but so
+				-- does the sc_theta'!
+
+    dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
+\end{code}

@@ -1,0 +1,3 @@
+--!!! Illegal constraints on member funs
+module M where
+class C a where f :: Eq a => a

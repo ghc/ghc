@@ -1,24 +1,24 @@
- A Haskell port of GNU's getopt library
- 
- Sven Panne <Sven.Panne@informatik.uni-muenchen.de> Oct. 1996; last change: Jul. 1998
+A Haskell port of GNU's getopt library 
 
- Two rather obscure features are missing: The Bash 2.0 non-option hack (if you don't
- already know it, you probably don't want to hear about it...) and the recognition of
- long options with a single dash (e.g. '-help' is recognised as '--help', as long as
- there is no short option 'h').
+Sven Panne <Sven.Panne@informatik.uni-muenchen.de> Oct. 1996 (small
+changes Dec. 1997)
 
- Other differences between GNU's getopt and this implementation:
-    * To enforce a coherent description of options and arguments, there are explanation
-      fields in the option/argument descriptor.
-    * Error messages are now more informative, but no longer POSIX compliant... :-(
- 
- And a final Haskell advertisement: The GNU C implementation uses well over 1100 lines,
- we need only 199 here, including a 46 line example! :-)
+Two rather obscure features are missing: The Bash 2.0 non-option hack
+(if you don't already know it, you probably don't want to hear about
+it...) and the recognition of long options with a single dash
+(e.g. '-help' is recognised as '--help', as long as there is no short
+option 'h').
+
+Other differences between GNU's getopt and this implementation: * To
+enforce a coherent description of options and arguments, there are
+explanation fields in the option/argument descriptor.  * Error
+messages are now more informative, but no longer POSIX
+compliant... :-( And a final Haskell advertisement: The GNU C
+implementation uses well over 1100 lines, we need only 195 here,
+including a 46 line example! :-)
 
 \begin{code}
-module GetOpt (
-   ArgOrder(..), OptDescr(..), ArgDescr(..), usageInfo, getOpt
-   ) where
+module GetOpt (ArgOrder(..), OptDescr(..), ArgDescr(..), usageInfo, getOpt) where
 
 import List(isPrefixOf)
 
@@ -58,8 +58,8 @@ fmtOpt :: OptDescr a -> (String,String,String)
 fmtOpt (Option sos los ad descr) = (sepBy ", " (map (fmtShort ad) sos),
                                     sepBy ", " (map (fmtLong  ad) los),
                                     descr)
-   where sepBy _   []     = ""
-         sepBy _   [x]    = x
+   where sepBy sep []     = ""
+         sepBy sep [x]    = x
          sepBy sep (x:xs) = x ++ sep ++ sepBy sep xs
 
 fmtShort :: ArgDescr a -> Char -> String
@@ -76,8 +76,8 @@ getOpt :: ArgOrder a                   -- non-option handling
        -> [OptDescr a]                 -- option descriptors
        -> [String]                     -- the commandline arguments
        -> ([a],[String],[String])      -- (options,non-options,error messages)
-getOpt _        _        []   =  ([],[],[])
-getOpt ordering optDescr args = procNextOpt opt ordering
+getOpt _        _        []         =  ([],[],[])
+getOpt ordering optDescr (arg:args) = procNextOpt opt ordering
    where procNextOpt (Opt o)    _                 = (o:os,xs,es)
          procNextOpt (NonOpt x) RequireOrder      = ([],x:rest,[])
          procNextOpt (NonOpt x) Permute           = (os,x:xs,es)
@@ -87,16 +87,15 @@ getOpt ordering optDescr args = procNextOpt opt ordering
          procNextOpt EndOfOpts  (ReturnInOrder f) = (map f rest,[],[])
          procNextOpt (OptErr e) _                 = (os,xs,e:es)
 
-         (opt,rest) = getNext args optDescr
+         (opt,rest) = getNext arg args optDescr
          (os,xs,es) = getOpt ordering optDescr rest
 
 -- take a look at the next cmd line arg and decide what to do with it
-getNext :: [String] -> [OptDescr a] -> (OptKind a,[String])
-getNext (('-':'-':[]):rest) _        = (EndOfOpts,rest)
-getNext (('-':'-':xs):rest) optDescr = longOpt xs rest optDescr
-getNext (('-':x:xs)  :rest) optDescr = shortOpt x xs rest optDescr
-getNext (a           :rest) _        = (NonOpt a,rest)
-getNext []                  _        = error "getNext: impossible"
+getNext :: String -> [String] -> [OptDescr a] -> (OptKind a,[String])
+getNext ('-':'-':[]) rest _        = (EndOfOpts,rest)
+getNext ('-':'-':xs) rest optDescr = longOpt xs rest optDescr
+getNext ('-': x :xs) rest optDescr = shortOpt x xs rest optDescr
+getNext a            rest _        = (NonOpt a,rest)
 
 -- handle long option
 longOpt :: String -> [String] -> [OptDescr a] -> (OptKind a,[String])
@@ -106,16 +105,15 @@ longOpt xs rest optDescr = long ads arg rest
          ads       = [ ad | Option _ _ ad _ <- options ]
          optStr    = ("--"++opt)
 
-         long (_:_:_)      _        rest1     = (errAmbig options optStr,rest1)
-         long [NoArg  a  ] []       rest1     = (Opt a,rest1)
-         long [NoArg  _  ] ('=':_)  rest1     = (errNoArg optStr,rest1)
-         long [ReqArg _ d] []       []        = (errReq d optStr,[])
-         long [ReqArg f _] []       (r:rest1) = (Opt (f r),rest1)
-         long [ReqArg f _] ('=':ys) rest1     = (Opt (f ys),rest1)
-         long [OptArg f _] []       rest1     = (Opt (f Nothing),rest1)
-         long [OptArg f _] ('=':ys) rest1     = (Opt (f (Just ys)),rest1)
-         long [_]          (_  :_)  _         = error "long: impossible"
-         long []           _        rest1     = (errUnrec optStr,rest1)
+         long (_:_:_)      _        rest     = (errAmbig options optStr,rest)
+         long [NoArg  a  ] []       rest     = (Opt a,rest)
+         long [NoArg  a  ] ('=':xs) rest     = (errNoArg optStr,rest)
+         long [ReqArg f d] []       []       = (errReq d optStr,[])
+         long [ReqArg f _] []       (r:rest) = (Opt (f r),rest)
+         long [ReqArg f _] ('=':xs) rest     = (Opt (f xs),rest)
+         long [OptArg f _] []       rest     = (Opt (f Nothing),rest)
+         long [OptArg f _] ('=':xs) rest     = (Opt (f (Just xs)),rest)
+         long _            _        rest     = (errUnrec optStr,rest)
 
 -- handle short option
 shortOpt :: Char -> String -> [String] -> [OptDescr a] -> (OptKind a,[String])
@@ -124,16 +122,16 @@ shortOpt x xs rest optDescr = short ads xs rest
         ads     = [ ad | Option _ _ ad _ <- options ]
         optStr  = '-':[x]
 
-        short (_:_:_)        _  rest1     = (errAmbig options optStr,rest1)
-        short (NoArg  a  :_) [] rest1     = (Opt a,rest1)
-        short (NoArg  a  :_) ys rest1     = (Opt a,('-':ys):rest1)
-        short (ReqArg _ d:_) [] []        = (errReq d optStr,[])
-        short (ReqArg f _:_) [] (r:rest1) = (Opt (f r),rest1)
-        short (ReqArg f _:_) ys rest1     = (Opt (f ys),rest1)
-        short (OptArg f _:_) [] rest1     = (Opt (f Nothing),rest1)
-        short (OptArg f _:_) ys rest1     = (Opt (f (Just ys)),rest1)
-        short []             [] rest1     = (errUnrec optStr,rest1)
-        short []             ys rest1     = (errUnrec optStr,('-':ys):rest1)
+        short (_:_:_)        _  rest     = (errAmbig options optStr,rest)
+        short (NoArg  a  :_) [] rest     = (Opt a,rest)
+        short (NoArg  a  :_) xs rest     = (Opt a,('-':xs):rest)
+        short (ReqArg f d:_) [] []       = (errReq d optStr,[])
+        short (ReqArg f _:_) [] (r:rest) = (Opt (f r),rest)
+        short (ReqArg f _:_) xs rest     = (Opt (f xs),rest)
+        short (OptArg f _:_) [] rest     = (Opt (f Nothing),rest)
+        short (OptArg f _:_) xs rest     = (Opt (f (Just xs)),rest)
+        short []             [] rest     = (errUnrec optStr,rest)
+        short []             xs rest     = (errUnrec optStr,('-':xs):rest)
 
 -- miscellaneous error formatting
 
@@ -149,7 +147,6 @@ errUnrec optStr = OptErr ("unrecognized option `" ++ optStr ++ "'\n")
 
 errNoArg :: String -> OptKind a
 errNoArg optStr = OptErr ("option `" ++ optStr ++ "' doesn't allow an argument\n")
-\end{code}
 
 {-
 -----------------------------------------------------------------------------------------
@@ -196,3 +193,4 @@ test order cmdline = case getOpt order options cmdline of
 --          -n USER   --name=USER           only dump USER's files
 -----------------------------------------------------------------------------------------
 -}
+\end{code}

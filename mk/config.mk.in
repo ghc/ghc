@@ -193,10 +193,8 @@ GhcWithNativeCodeGen=$(shell if (test x$(findstring $(HostArch_CPP),i386 alpha s
 # Building various ways?
 # (right now, empty if not).
 BuildingParallel=$(subst mp,YES,$(filter mp,$(WAYS)))
-BuildingConcurrent=$(subst mc,YES,$(filter mc,$(WAYS)))
 BuildingProfiling=$(subst p,YES,$(filter p,$(WAYS)))
 BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
-BuildingProfilingConcurrent=$(subst mr,YES,$(filter mr,$(WAYS)))
 
 #---------------------------------------------------------------
 #
@@ -225,6 +223,14 @@ else
 GhcLibHcOpts=-O -split-objs -odir $*
 endif
 
+# Option flags to pass to GHC when it's compiling RTS modules
+# This is a good way to set things like -optc-g and -optc-DDEBUG for the RTS.
+# GhcRtsHcOpts is used when compiling .hc files.
+# GhcRtsCcOpts is used when compiling .c  files.
+
+GhcRtsHcOpts=
+GhcRtsCcOpts=
+
 # Build the Haskell Readline bindings?
 #
 GhcLibsWithReadline=NO
@@ -246,7 +252,7 @@ StripLibraries=NO
 # Include compiler support for letting the compiler (optionally) report
 # your compilation to a central server for generation of fun stats.
 #
-GhcReportCompiles=NO
+GhcReportCompiles=YES
 
 #################################################################################
 #
@@ -486,7 +492,7 @@ endif
 endif
 
 #-----------------------------------------------------------------------------
-# GMP Library
+# GMP Library (version 2.0.x or above)
 #
 HaveLibGmp	= @HaveLibGmp@
 LibGmp		= @LibGmp@
@@ -673,20 +679,21 @@ HSTAGS			= $(HSTAGS_PREFIX)hstags
 #
 # The ways currently defined.
 #
-ALL_WAYS=p t u mc mr mt mp mg 1s 2s du a b c d e f g h i j k l m n o A B
+ALL_WAYS=p t u mp mg a b c d e f g h i j k l m n o A B
 
 #
-# The following ways currently have treated specially, p u t mc mt my mp mg 1s 2d du,
+# The following ways currently have treated specially, p u t mg,
 # as the driver script treats these guys specially and needs to carefully be told
 # about the options for these. Hence, we hide the required command line options
 # for these in the ghc/driver, as this is the only place they are needed.
 # 
 # If you want to add to these default options, fill in the variables below:
-# 
+
+# Way 'p':
 WAY_p_NAME=profiling
 WAY_p_HC_OPTS= -prof
 
-# Way t:
+# Way 't':
 WAY_t_NAME=ticky-ticky profiling
 WAY_t_HC_OPTS= -ticky
 
@@ -694,39 +701,13 @@ WAY_t_HC_OPTS= -ticky
 WAY_u_NAME=unregisterized (using portable C only)
 WAY_u_HC_OPTS=
 
-# Way `mc': concurrent
-WAY_mc_NAME=concurrent
-WAY_mc_HC_OPTS=-concurrent
-
-# Way `mr': 
-WAY_mr_NAME=profiled concurrent
-WAY_mr_HC_OPTS=-prof -concurrent
-
-# Way `mt': 
-WAY_mt_NAME=ticky-ticky concurrent
-WAY_mt_HC_OPTS=-ticky -concurrent
-
 # Way `mp': 
 WAY_mp_NAME=parallel
 WAY_mp_HC_OPTS=-parallel
 
-#
 # Way `mg': 
-#
 WAY_mg_NAME=GranSim
 WAY_mg_HC_OPTS=-gransim
-
-#
-# Ways for different garbage collectors
-#
-WAY_2s_NAME=2-space GC
-WAY_2s_HC_OPTS=-2s
-
-WAY_1s_NAME=1-space GC
-WAY_1s_HC_OPTS=-1s
-
-WAY_du_NAME=dual-mode GC
-WAY_du_HC_OPTS=-du
 
 #
 # Add user-way configurations here:

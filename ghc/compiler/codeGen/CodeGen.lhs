@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[CodeGen]{@CodeGen@: main module of the code generator}
 
@@ -22,9 +22,9 @@ module CodeGen ( codeGen ) where
 import StgSyn
 import CgMonad
 import AbsCSyn
+import CLabel		( CLabel, mkSRTLabel, mkClosureLabel )
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
-import Bag		( foldBag )
 import CgBindery	( CgIdInfo )
 import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
@@ -33,41 +33,44 @@ import ClosureInfo	( mkClosureLFInfo )
 import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC, 
 					      opt_SccGroup
 			)
-import CostCentre       ( CostCentre )
+import CostCentre       ( CostCentre, CostCentreStack )
 import CStrings		( modnameToC )
 import FiniteMap	( FiniteMap )
-import Id               ( Id )
-import Maybes		( maybeToBool )
+import Id               ( Id, idName )
 import Name             ( Module )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Type             ( Type )
 import TyCon            ( TyCon )
-import Util		( panic, assertPanic )
+import BasicTypes	( TopLevelFlag(..) )
+import Util
 \end{code}
 
 \begin{code}
 codeGen :: FAST_STRING		-- module name
 	-> ([CostCentre],	-- local cost-centres needing declaring/registering
-	    [CostCentre])	-- "extern" cost-centres needing declaring
+	    [CostCentre],	-- "extern" cost-centres needing declaring
+	    [CostCentreStack])  -- pre-defined "singleton" cost centre stacks
 	-> [Module]		-- import names
 	-> [TyCon]		-- tycons with data constructors to convert
 	-> FiniteMap TyCon [(Bool, [Maybe Type])]
 				-- tycon specialisation info
-	-> [StgBinding]	-- bindings to convert
+	-> [(StgBinding,[Id])]	-- bindings to convert, with SRTs
 	-> AbstractC		-- output
 
-codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg_pgm
+codeGen mod_name (local_CCs, extern_CCs, singleton_CCSs) 
+	import_names gen_tycons tycon_specs stg_pgm
   = let
-	doing_profiling   = opt_SccProfilingOn
-	maybe_split       = if opt_EnsureSplittableC then CSplitMarker else AbsCNop
+	maybe_split       = if opt_EnsureSplittableC 
+				then CSplitMarker 
+				else AbsCNop
 	cinfo             = MkCompInfo mod_name
     in
-    if not doing_profiling then
-	mkAbstractCs [
+    let 
+	module_code = mkAbstractCs [
 	    genStaticConBits cinfo gen_tycons tycon_specs,
 	    initC cinfo (cgTopBindings maybe_split stg_pgm) ]
 
-    else -- yes, cost-centre profiling:
+	 -- Cost-centre profiling:
 	 -- Besides the usual stuff, we must produce:
 	 --
     	 -- * Declarations for the cost-centres defined in this module;
@@ -78,12 +81,17 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
 	 -- into the code-generator, as are the imported-modules' names.)
 	 --
 	 --
-	mkAbstractCs [
-		mkAbstractCs [mkAbstractCs (map (CCostCentreDecl True)  local_CCs),
-				   mkAbstractCs (map (CCostCentreDecl False) extern_CCs),
-				   mkCcRegister local_CCs import_names],
-		genStaticConBits cinfo gen_tycons tycon_specs,
-		initC cinfo (cgTopBindings maybe_split stg_pgm) ]
+	cost_centre_stuff 
+		| not opt_SccProfilingOn = AbsCNop
+		| otherwise = mkAbstractCs (
+		    map (CCostCentreDecl True)   local_CCs ++
+		    map (CCostCentreDecl False)  extern_CCs ++
+		    map CCostCentreStackDecl     singleton_CCSs ++
+		    mkCcRegister local_CCs singleton_CCSs import_names
+		   )
+   in
+   mkAbstractCs [ cost_centre_stuff, module_code ]
+
   where
     -----------------
     grp_name  = case opt_SccGroup of
@@ -91,15 +99,18 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
 		  Nothing -> mod_name	-- default: module name
 
     -----------------
-    mkCcRegister ccs import_names
+    mkCcRegister ccs cc_stacks import_names
       = let
 	    register_ccs     = mkAbstractCs (map mk_register ccs)
 	    register_imports
 	      = foldr (mkAbsCStmts . mk_import_register) AbsCNop import_names
+	    register_cc_stacks = mkAbstractCs (map mk_register_ccs cc_stacks)
 	in
-	mkAbstractCs [
-	    CCallProfCCMacro SLIT("START_REGISTER_CCS") [CLitLit (modnameToC (SLIT("_reg") _APPEND_ mod_name)) AddrRep],
+	[
+	    CCallProfCCMacro SLIT("START_REGISTER_CCS") 
+	       [ CLitLit (modnameToC (SLIT("_reg") _APPEND_ mod_name)) AddrRep],
 	    register_ccs,
+	    register_cc_stacks,
 	    register_imports,
 	    CCallProfCCMacro SLIT("END_REGISTER_CCS") []
 	]
@@ -107,8 +118,12 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
 	mk_register cc
 	  = CCallProfCCMacro SLIT("REGISTER_CC") [mkCCostCentre cc]
 
+	mk_register_ccs ccs
+	  = CCallProfCCMacro SLIT("REGISTER_CCS") [mkCCostCentreStack ccs]
+
 	mk_import_register import_name
-	  = CCallProfCCMacro SLIT("REGISTER_IMPORT") [CLitLit (modnameToC (SLIT("_reg") _APPEND_ import_name)) AddrRep]
+	  = CCallProfCCMacro SLIT("REGISTER_IMPORT") 
+	      [CLitLit (modnameToC (SLIT("_reg") _APPEND_ import_name)) AddrRep]
 \end{code}
 
 %************************************************************************
@@ -128,23 +143,37 @@ style, with the increasing static environment being plumbed as a state
 variable.
 
 \begin{code}
-cgTopBindings :: AbstractC -> [StgBinding] -> Code
+cgTopBindings :: AbstractC -> [(StgBinding,[Id])] -> Code
 
 cgTopBindings split bindings = mapCs (cgTopBinding split) bindings
 
-cgTopBinding :: AbstractC -> StgBinding -> Code
+cgTopBinding :: AbstractC -> (StgBinding,[Id]) -> Code
 
-cgTopBinding split (StgNonRec name rhs)
-  = absC split		`thenC`
-    cgTopRhs name rhs	`thenFC` \ (name, info) ->
+cgTopBinding split ((StgNonRec name rhs), srt)
+  = absC split		  	`thenC`
+    absC (mkSRT srt_label srt) 	`thenC`
+    setSRTLabel srt_label (
+    cgTopRhs name rhs	  	`thenFC` \ (name, info) ->
     addBindC name info
+    )
+  where
+    srt_label = mkSRTLabel (idName name)
 
-cgTopBinding split (StgRec pairs)
-  = absC split		`thenC`
+cgTopBinding split ((StgRec pairs@((name,rhs):_)), srt)
+  = absC split		  	`thenC`
+    absC (mkSRT srt_label srt) 	`thenC`
+    setSRTLabel srt_label (
     fixC (\ new_binds -> addBindsC new_binds	`thenC`
 			 mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs
-    )			`thenFC` \ new_binds ->
+    )			  `thenFC` \ new_binds ->
     addBindsC new_binds
+    )
+  where
+    srt_label = mkSRTLabel (idName name)
+
+mkSRT :: CLabel -> [Id] -> AbstractC
+mkSRT lbl []  = AbsCNop
+mkSRT lbl ids = CSRT lbl (map (mkClosureLabel . idName) ids)
 
 -- Urgh!  I tried moving the forkStatics call from the rhss of cgTopRhs
 -- to enclose the listFCs in cgTopBinding, but that tickled the
@@ -153,14 +182,14 @@ cgTopBinding split (StgRec pairs)
 cgTopRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- the Id is passed along for setting up a binding...
 
-cgTopRhs name (StgRhsCon cc con args)
-  = forkStatics (cgTopRhsCon name con args (all zero_size args))
+cgTopRhs bndr (StgRhsCon cc con args)
+  = forkStatics (cgTopRhsCon bndr con args (all zero_size args))
   where
     zero_size atom = getPrimRepSize (getArgPrimRep atom) == 0
 
-cgTopRhs name (StgRhsClosure cc bi fvs upd_flag args body)
+cgTopRhs bndr (StgRhsClosure cc bi srt fvs upd_flag args body)
   = ASSERT(null fvs) -- There should be no free variables
-    forkStatics (cgTopRhsClosure name cc bi args body lf_info)
+    forkStatics (cgTopRhsClosure bndr cc bi srt args body lf_info)
   where
-    lf_info = mkClosureLFInfo True{-top level-} [{-no fvs-}] upd_flag args
+    lf_info = mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args
 \end{code}

@@ -1,0 +1,1 @@
+ERROR "test/static/s028.hs" (line 2): Repeated definition for constructor function "K"

@@ -1,25 +1,23 @@
-
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TyCon]{The @TyCon@ datatype}
 
 \begin{code}
 module TyCon(
-	TyCon,
+	TyCon, KindCon, Boxity(..),
 
-	Arity, NewOrData(..),
+	isFunTyCon, isUnLiftedTyCon, isBoxedTyCon, isProductTyCon,
+	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
+	isEnumerationTyCon, isTupleTyCon, isUnboxedTupleTyCon,
 
-	isFunTyCon, isPrimTyCon, isBoxedTyCon, isProductTyCon,
-	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, 
-	isEnumerationTyCon, isTupleTyCon, 
-
-	mkDataTyCon,
+	mkAlgTyCon,
 	mkFunTyCon,
 	mkPrimTyCon,
-	mkSpecTyCon,
 	mkTupleTyCon,
-
 	mkSynTyCon,
+	mkKindCon,
+	superKindCon,
 
 	tyConKind,
 	tyConUnique,
@@ -33,272 +31,302 @@ module TyCon(
 	tyConClass_maybe,
 	getSynTyConDefn,
 
-        maybeTyConSingleCon
+        maybeTyConSingleCon,
+
+	matchesTyCon
 ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Type  ( Type )
-import {-# SOURCE #-} Class ( Class )
-import {-# SOURCE #-} Id    ( Id, isNullaryDataCon )
-import {-# SOURCE #-} TysWiredIn ( tupleCon )
+import {-# SOURCE #-} Type  ( Type, Kind )
+import {-# SOURCE #-} DataCon ( DataCon )
 
-
+import Class 		( Class )
+import Var   		( TyVar )
 import BasicTypes	( Arity, NewOrData(..), RecFlag(..) )
-import TyVar		( GenTyVar, alphaTyVars, alphaTyVar, betaTyVar, TyVar )
-import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkUnboxedTypeKind,
-			  mkArrowKind, resultKind, argKind
-			)
 import Maybes
-import Name		( Name, nameUnique, mkWiredInTyConName, NamedThing(getName) )
-import Unique		( Unique, funTyConKey, Uniquable(..) )
+import Name		( Name, nameUnique, NamedThing(getName) )
+import Unique		( Unique, Uniquable(..), superKindConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import PrelMods		( pREL_GHC )
-import Util		( panic )
+import Outputable
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{The data type}
+%*									*
+%************************************************************************
+
 \begin{code}
+type KindCon = TyCon
+
 data TyCon
-  = FunTyCon		-- Kind = Type -> Type -> Type
+  = FunTyCon {
+	tyConUnique :: Unique,
+	tyConName   :: Name,
+	tyConKind   :: Kind,
+	tyConArity  :: Arity
+    }
 
-  | DataTyCon	Unique
-		Name
-		Kind
-		[TyVar]
-		[(Class,[Type])]	-- Its context
-		[Id{-DataCon-}]	-- Its data constructors, with fully polymorphic types
-				-- 	This list can be empty, when we import a data type abstractly,
-				-- 	either (a) the interface is hand-written and doesn't give
-				--		   the constructors, or
-				--	       (b) in a quest for fast compilation we don't import 
-				--		   the constructors
-		[Class]		-- Classes which have derived instances
-		(Maybe Class)	-- Nothing for ordinary types; Just c for the type constructor
-				-- for dictionaries of class c.
-		NewOrData
-		RecFlag		-- Tells whether the data type is part of 
-				-- a mutually-recursive group or not
 
-  | TupleTyCon	Unique		-- cached
-		Name		-- again, we could do without this, but
-				-- it makes life somewhat easier
-		Arity	-- just a special case of DataTyCon
-			-- Kind = BoxedTypeKind
-			--      -> ... (n times) ...
-			--	-> BoxedTypeKind
-			--      -> BoxedTypeKind
+  | AlgTyCon {		-- Tuples, data type, and newtype decls.
+			-- All lifted, all boxed
+	tyConUnique :: Unique,
+	tyConName   :: Name,
+	tyConKind   :: Kind,
+	tyConArity  :: Arity,
+	
+	tyConTyVars   	:: [TyVar],
+	dataTyConTheta  :: [(Class,[Type])],
 
-  | PrimTyCon		-- Primitive types; cannot be defined in Haskell
-	Unique		-- Always unpointed; hence never represented by a closure
-	Name		-- Often represented by a bit-pattern for the thing
-	Kind		-- itself (eg Int#), but sometimes by a pointer to
-	Arity		-- the thing.
-	PrimRep
+	dataCons :: [DataCon],
+		-- Its data constructors, with fully polymorphic types
+		-- 	This list can be empty, when we import a data type abstractly,
+		-- 	either (a) the interface is hand-written and doesn't give
+		--		   the constructors, or
+		--	       (b) in a quest for fast compilation we don't import 
+		--		   the constructors
 
-  | SpecTyCon		-- A specialised TyCon; eg (Arr# Int#), or (List Int#)
-	TyCon
-	[Maybe Type]	-- Specialising types
+	dataTyConDerivings   :: [Class],	-- Classes which have derived instances
 
-	-- 	OLD STUFF ABOUT Array types.  Use SpecTyCon instead
-	-- ([PrimRep] -> PrimRep) -- a heap-allocated object (eg ArrInt#).
-	-- The primitive types Arr# and StablePtr# have
-	-- parameters (hence arity /= 0); but the rest don't.
-	-- Only arrays use the list in a non-trivial way.
-	-- Length of that list must == arity.
+	dataTyConClass_maybe :: (Maybe Class),	-- Nothing for ordinary types; 
+						-- Just c for the type constructor
+						-- for dictionaries of class c.
+	algTyConFlavour :: NewOrData,
+	algTyConRec     :: RecFlag		-- Tells whether the data type is part of 
+						-- a mutually-recursive group or not
+    }
 
-  | SynTyCon
-	Unique
-	Name
-	Kind
-	Arity
-	[TyVar]		-- Argument type variables
-	Type		-- Right-hand side, mentioning these type vars.
-			-- Acts as a template for the expansion when
-			-- the tycon is applied to some types.
+  | PrimTyCon {		-- Primitive types; cannot be defined in Haskell
+			-- NB: All of these guys are *unlifted*, but not all are *unboxed*
+	tyConUnique  :: Unique,
+	tyConName    :: Name,
+	tyConKind    :: Kind,
+	tyConArity   :: Arity,
+	primTyConRep :: PrimRep
+    }
+
+  | TupleTyCon {
+
+	tyConUnique :: Unique,
+	tyConName   :: Name,
+	tyConKind   :: Kind,
+	tyConArity  :: Arity,
+	tyConBoxed  :: Bool,
+	tyConTyVars :: [TyVar],
+	dataCon     :: DataCon
+    }
+
+  | SynTyCon {
+	tyConUnique :: Unique,
+	tyConName   :: Name,
+	tyConKind   :: Kind,
+	tyConArity  :: Arity,
+
+	tyConTyVars :: [TyVar],		-- Bound tyvars
+	synTyConDefn :: Type		-- Right-hand side, mentioning these type vars.
+					-- Acts as a template for the expansion when
+					-- the tycon is applied to some types.
+    }
+
+  | KindCon {		-- Type constructor at the kind level
+	tyConUnique :: Unique,
+	tyConName   :: Name,
+	tyConKind   :: Kind,
+	tyConArity  :: Arity,
+	
+	kindConBoxity :: Boxity
+    }
+
+  | SuperKindCon	{		-- The type of kind variables,
+	tyConUnique :: Unique 		-- sometimes written as a box
+    }
+
+data Boxity = Boxed | Unboxed | Open
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{TyCon Construction}
+%*									*
+%************************************************************************
+
+Note: the TyCon constructors all take a Kind as one argument, even though
+they could, in principle, work out their Kind from their other arguments.
+But to do so they need functions from Types, and that makes a nasty
+module mutual-recursion.  And they aren't called from many places.
+So we compromise, and move their Kind calculation to the call site.
+
+\begin{code}
+superKindCon = SuperKindCon superKindConKey
+
+mkKindCon name kind boxity 
+  = KindCon { 
+	tyConUnique = nameUnique name,
+	tyConName = name,
+	tyConArity = 0,
+	tyConKind = kind,
+	kindConBoxity = boxity
+     }
+
+mkFunTyCon name kind 
+  = FunTyCon { 
+	tyConUnique = nameUnique name,
+	tyConName   = name,
+	tyConKind   = kind,
+	tyConArity  = 2
+    }
+			    
+mkAlgTyCon name kind tyvars theta cons derivs maybe_clas flavour rec
+  = AlgTyCon {	
+	tyConName = name,
+	tyConUnique = nameUnique name,
+	tyConKind = kind,
+	tyConArity = length tyvars,
+	tyConTyVars = tyvars,
+	dataTyConTheta = theta,
+	dataCons = cons,
+	dataTyConDerivings = derivs,
+	dataTyConClass_maybe = maybe_clas,
+	algTyConFlavour = flavour,
+	algTyConRec = rec
+    }
+
+mkTupleTyCon name kind arity tyvars con boxed
+  = TupleTyCon {
+	tyConUnique = nameUnique name,
+	tyConName = name,
+	tyConKind = kind,
+	tyConArity = arity,
+	tyConBoxed = boxed,
+	tyConTyVars = tyvars,
+	dataCon = con
+    }
+
+mkPrimTyCon name kind arity rep 
+  = PrimTyCon {
+	tyConName = name,
+	tyConUnique = nameUnique name,
+	tyConKind = kind,
+	tyConArity = arity,
+	primTyConRep = rep
+    }
+
+mkSynTyCon name kind arity tyvars rhs 
+  = SynTyCon {	
+	tyConName = name,
+	tyConUnique = nameUnique name,
+	tyConKind = kind,
+	tyConArity = arity,
+	tyConTyVars = tyvars,
+	synTyConDefn = rhs
+    }
 \end{code}
 
 \begin{code}
-mkFunTyCon     = FunTyCon
-mkFunTyConName = mkWiredInTyConName funTyConKey pREL_GHC SLIT("->") FunTyCon
+isFunTyCon (FunTyCon {}) = True
+isFunTyCon _             = False
 
-mkSpecTyCon  = SpecTyCon
-mkTupleTyCon = TupleTyCon
+isPrimTyCon (PrimTyCon {}) = True
+isPrimTyCon _              = False
 
-mkDataTyCon name = DataTyCon (nameUnique name) name
+isUnLiftedTyCon (PrimTyCon {}) = True
+isUnLiftedTyCon (TupleTyCon { tyConBoxed = False }) = True
+isUnLiftedTyCon _              = False
 
-mkPrimTyCon name arity rep 
-  = PrimTyCon (nameUnique name) name (mk_kind arity) arity rep
-  where
-    mk_kind 0 | isFollowableRep rep = mkBoxedTypeKind	-- Represented by a GC-ish ptr
-	      | otherwise	    = mkUnboxedTypeKind	-- Represented by a non-ptr
-    mk_kind n = mkTypeKind `mkArrowKind` mk_kind (n-1)
-
-mkSynTyCon  name = SynTyCon  (nameUnique name) name
-
-isFunTyCon FunTyCon = True
-isFunTyCon _ = False
-
-isPrimTyCon (PrimTyCon _ _ _ _ _) = True
-isPrimTyCon _ = False
-
--- At present there are no unboxed non-primitive types, so
--- isBoxedTyCon is just the negation of isPrimTyCon.
-isBoxedTyCon = not . isPrimTyCon
+-- isBoxedTyCon should not be applied to SynTyCon, nor KindCon
+isBoxedTyCon (AlgTyCon {}) = True
+isBoxedTyCon (FunTyCon {}) = True
+isBoxedTyCon (TupleTyCon {tyConBoxed = boxed}) = boxed
+isBoxedTyCon (PrimTyCon {primTyConRep = rep}) = isFollowableRep rep
 
 -- isAlgTyCon returns True for both @data@ and @newtype@
-isAlgTyCon (DataTyCon _ _ _ _ _ _ _ _ _ _) = True
-isAlgTyCon (TupleTyCon _ _ _)	           = True
-isAlgTyCon other 		           = False
+isAlgTyCon (AlgTyCon {})   = True
+isAlgTyCon (TupleTyCon {}) = True
+isAlgTyCon other 	   = False
 
 -- isDataTyCon returns False for @newtype@.
-isDataTyCon (DataTyCon _ _ _ _ _ _ _ _ DataType _) = True
-isDataTyCon (TupleTyCon _ _ _) 		           = True
-isDataTyCon other 			           = False
+isDataTyCon (AlgTyCon {algTyConFlavour = new_or_data})  = case new_or_data of
+								NewType -> False
+								other	-> True
+isDataTyCon (TupleTyCon {}) = True	-- is an unboxed tuple a datatype?
+isDataTyCon other = False
 
-isNewTyCon (DataTyCon _ _ _ _ _ _ _ _ NewType _) = True 
-isNewTyCon other			         = False
+isNewTyCon (AlgTyCon {algTyConFlavour = NewType}) = True 
+isNewTyCon other			          = False
 
 -- A "product" tycon is non-recursive and has one constructor,
 -- whether DataType or NewType
-isProductTyCon (TupleTyCon _ _ _)			    = True
-isProductTyCon (DataTyCon _ _ _ _ _ [c] _ _ _ NonRecursive) = True
-isProductTyCon other					    = False
+isProductTyCon (AlgTyCon {dataCons = [c], algTyConRec = NonRecursive}) = True
+isProductTyCon (TupleTyCon {}) = True
+isProductTyCon other = False
 
-isSynTyCon (SynTyCon _ _ _ _ _ _) = True
-isSynTyCon _			  = False
+isSynTyCon (SynTyCon {}) = True
+isSynTyCon _		 = False
 
-isEnumerationTyCon (TupleTyCon _ _ arity)
-  = arity == 0
-isEnumerationTyCon (DataTyCon _ _ _ _ _ data_cons _ _ DataType _)
-  = not (null data_cons) && all isNullaryDataCon data_cons
-isEnumerationTyCon other = False
+isEnumerationTyCon (AlgTyCon {algTyConFlavour = EnumType}) = True
+isEnumerationTyCon other				   = False
 
-isTupleTyCon (TupleTyCon _ _ arity) = arity >= 2    -- treat "0-tuple" specially
-isTupleTyCon (SpecTyCon tc tys)     = isTupleTyCon tc
-isTupleTyCon other		    = False
+-- The unit tycon isn't classed as a tuple tycon
+isTupleTyCon (TupleTyCon {tyConArity = arity, tyConBoxed = True}) = arity >= 2
+isTupleTyCon other = False
+
+isUnboxedTupleTyCon (TupleTyCon {tyConBoxed = False}) = True
+isUnboxedTupleTyCon other = False
 \end{code}
 
 \begin{code}
--- Special cases to avoid reconstructing lots of kinds
-kind1 = mkBoxedTypeKind `mkArrowKind` mkBoxedTypeKind
-kind2 = mkBoxedTypeKind `mkArrowKind` kind1
-
-tyConKind :: TyCon -> Kind
-tyConKind FunTyCon 			     = kind2
-tyConKind (DataTyCon _ _ kind _ _ _ _ _ _ _) = kind
-tyConKind (PrimTyCon _ _ kind _ _)	     = kind
-tyConKind (SynTyCon _ _ k _ _ _)	     = k
-
-tyConKind (TupleTyCon _ _ n)
-  = mkArrow n
-   where
-    mkArrow 0 = mkBoxedTypeKind
-    mkArrow 1 = kind1
-    mkArrow 2 = kind2
-    mkArrow n = mkBoxedTypeKind `mkArrowKind` mkArrow (n-1)
-
-tyConKind (SpecTyCon tc tys)
-  = spec (tyConKind tc) tys
-   where
-    spec kind []	      = kind
-    spec kind (Just _  : tys) = spec (resultKind kind) tys
-    spec kind (Nothing : tys) =
-      argKind kind `mkArrowKind` spec (resultKind kind) tys
-\end{code}
-
-\begin{code}
-tyConUnique :: TyCon -> Unique
-tyConUnique FunTyCon			       = funTyConKey
-tyConUnique (DataTyCon uniq _ _ _ _ _ _ _ _ _) = uniq
-tyConUnique (TupleTyCon uniq _ _)	       = uniq
-tyConUnique (PrimTyCon uniq _ _ _ _) 	       = uniq
-tyConUnique (SynTyCon uniq _ _ _ _ _)          = uniq
-tyConUnique (SpecTyCon _ _ )		       = panic "tyConUnique:SpecTyCon"
-
-tyConArity :: TyCon -> Arity 
-tyConArity FunTyCon			        = 2
-tyConArity (DataTyCon _ _ _ tyvars _ _ _ _ _ _) = length tyvars
-tyConArity (TupleTyCon _ _ arity)	      	= arity
-tyConArity (PrimTyCon _ _ _ arity _)	      	= arity 
-tyConArity (SynTyCon _ _ _ arity _ _)	      	= arity
-tyConArity (SpecTyCon _ _ )		      	= panic "tyConArity:SpecTyCon"
-\end{code}
-
-\begin{code}
-tyConTyVars :: TyCon -> [TyVar]
-tyConTyVars FunTyCon			      = [alphaTyVar,betaTyVar]
-tyConTyVars (DataTyCon _ _ _ tvs _ _ _ _ _ _) = tvs
-tyConTyVars (TupleTyCon _ _ arity)	      = take arity alphaTyVars
-tyConTyVars (SynTyCon _ _ _ _ tvs _)          = tvs
-#ifdef DEBUG
-tyConTyVars (PrimTyCon _ _ _ _ _)     	  = panic "tyConTyVars:PrimTyCon"
-tyConTyVars (SpecTyCon _ _ ) 	     	  = panic "tyConTyVars:SpecTyCon"
-#endif
-\end{code}
-
-\begin{code}
-tyConDataCons :: TyCon -> [Id]
-tyConFamilySize  :: TyCon -> Int
-
-tyConDataCons (DataTyCon _ _ _ _ _ data_cons _ _ _ _) = data_cons
-tyConDataCons (TupleTyCon _ _ a)		      = [tupleCon a]
-tyConDataCons other				      = []
+tyConDataCons :: TyCon -> [DataCon]
+tyConDataCons (AlgTyCon {dataCons = cons}) = cons
+tyConDataCons (TupleTyCon {dataCon = con}) = [con]
+tyConDataCons other			   = []
 	-- You may think this last equation should fail,
 	-- but it's quite convenient to return no constructors for
 	-- a synonym; see for example the call in TcTyClsDecls.
 
-tyConFamilySize (DataTyCon _ _ _ _ _ data_cons _ _ _ _) = length data_cons
-tyConFamilySize (TupleTyCon _ _ _)		        = 1
+tyConFamilySize  :: TyCon -> Int
+tyConFamilySize (AlgTyCon {dataCons = cons}) = length cons
+tyConFamilySize (TupleTyCon {}) = 1
 #ifdef DEBUG
---tyConFamilySize other = pprPanic "tyConFamilySize:" (pprTyCon other)
+tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 #endif
 
 tyConPrimRep :: TyCon -> PrimRep
-tyConPrimRep (PrimTyCon _ __  _ rep) = rep
-tyConPrimRep _			     = PtrRep
+tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep
+tyConPrimRep _			              = PtrRep
 \end{code}
 
 \begin{code}
 tyConDerivings :: TyCon -> [Class]
-tyConDerivings (DataTyCon _ _ _ _ _ _ derivs _ _ _) = derivs
-tyConDerivings other				    = []
+tyConDerivings (AlgTyCon {dataTyConDerivings = derivs}) = derivs
+tyConDerivings other				        = []
 \end{code}
 
 \begin{code}
 tyConTheta :: TyCon -> [(Class, [Type])]
-tyConTheta (DataTyCon _ _ _ _ theta _ _ _ _ _) = theta
-tyConTheta (TupleTyCon _ _ _)		       = []
+tyConTheta (AlgTyCon {dataTyConTheta = theta}) = theta
 -- should ask about anything else
 \end{code}
 
 \begin{code}
 getSynTyConDefn :: TyCon -> ([TyVar], Type)
-getSynTyConDefn (SynTyCon _ _ _ _ tyvars ty) = (tyvars,ty)
+getSynTyConDefn (SynTyCon {tyConTyVars = tyvars, synTyConDefn = ty}) = (tyvars,ty)
 \end{code}
 
 \begin{code}
-maybeTyConSingleCon :: TyCon -> Maybe Id
-
-maybeTyConSingleCon (TupleTyCon _ _ arity)            = Just (tupleCon arity)
-maybeTyConSingleCon (DataTyCon _ _ _ _ _ [c] _ _ _ _) = Just c
-maybeTyConSingleCon (DataTyCon _ _ _ _ _ _   _ _ _ _) = Nothing
-maybeTyConSingleCon (PrimTyCon _ _ _ _ _)             = Nothing
-maybeTyConSingleCon (SpecTyCon tc tys)                = panic "maybeTyConSingleCon:SpecTyCon"
-						  -- requires DataCons of TyCon
+maybeTyConSingleCon :: TyCon -> Maybe DataCon
+maybeTyConSingleCon (AlgTyCon {dataCons = [c]})  = Just c
+maybeTyConSingleCon (AlgTyCon {})	         = Nothing
+maybeTyConSingleCon (TupleTyCon {dataCon = con}) = Just con
+maybeTyConSingleCon (PrimTyCon {})               = Nothing
 \end{code}
 
 \begin{code}
 tyConClass_maybe :: TyCon -> Maybe Class
-tyConClass_maybe (DataTyCon _ _ _ _ _ _ _ maybe_cls _ _) = maybe_cls
-tyConClass_maybe other_tycon			         = Nothing
+tyConClass_maybe (AlgTyCon {dataTyConClass_maybe = maybe_cls}) = maybe_cls
+tyConClass_maybe other_tycon			               = Nothing
 \end{code}
 
-@derivedFor@ reports if we have an {\em obviously}-derived instance
-for the given class/tycon.  Of course, you might be deriving something
-because it a superclass of some other obviously-derived class --- this
-function doesn't deal with that.
-
-ToDo: what about derivings for specialised tycons !!!
 
 %************************************************************************
 %*									*
@@ -321,25 +349,49 @@ instance Ord TyCon where
     a <	 b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
     a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
     a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
-    compare a b = uniqueOf a `compare` uniqueOf b
+    compare a b = getUnique a `compare` getUnique b
 
 instance Uniquable TyCon where
-    uniqueOf tc = tyConUnique tc
+    getUnique tc = tyConUnique tc
+
+instance Outputable TyCon where
+    ppr tc  = ppr (getName tc)
+
+instance NamedThing TyCon where
+    getName = tyConName
 \end{code}
 
-\begin{code}
-instance NamedThing TyCon where
-    getName (DataTyCon _ n _ _ _ _ _ _ _ _) = n
-    getName (PrimTyCon _ n _ _ _)	    = n
-    getName (SpecTyCon tc _)		    = getName tc
-    getName (SynTyCon _ n _ _ _ _)	    = n
-    getName FunTyCon			    = mkFunTyConName
-    getName (TupleTyCon _ n _)		    = n
 
-{- LATER:
-    getName (SpecTyCon tc tys) = let (OrigName m n) = origName "????" tc in
-       			     (m, n _APPEND_ specMaybeTysSuffix tys)
-    getName	other_tc           = moduleNamePair (expectJust "tycon1" (getName other_tc))
-    getName other			     = Nothing
--}
+%************************************************************************
+%*									*
+\subsection{Kind constructors}
+%*									*
+%************************************************************************
+
+@matchesTyCon tc1 tc2@ checks whether an appliation
+(tc1 t1..tn) matches (tc2 t1..tn).  By "matches" we basically mean "equals",
+except that at the kind level tc2 might have more boxity info that tc1.
+
+E.g. It's ok to bind a type variable
+	tv :: k2
+to a type
+	t  :: k1
+
+\begin{code}
+matchesTyCon :: TyCon	-- Expected (e.g. arg type of function)
+	     -> TyCon	-- Inferred (e.g. type of actual arg to function)
+	     -> Bool
+
+matchesTyCon (KindCon {kindConBoxity = k1}) (KindCon {kindConBoxity = k2})
+  = k2 `has_more` k1
+  where
+	-- "has_more" means has more boxity info
+    Boxed   `has_more` Open	= True
+    Boxed   `has_more` Boxed    = True
+    Unboxed `has_more` Open 	= True
+    Unboxed `has_more` Unboxed  = True
+    Open    `has_more` Open     = True
+    k1	    `has_more` k2	= False
+
+matchesTyCon tc1 tc2 = tyConUnique tc1 == tyConUnique tc2
 \end{code}

@@ -43,10 +43,7 @@ instance  Ix Char  where
     range (c,c')	=  [c..c']
     index b@(c,c') ci
 	| inRange b ci	=  fromEnum ci - fromEnum c
-	| otherwise	=  error (showString "Ix{Char}.index: Index " .
-				  showParen True (showsPrec 0 ci) .
-				  showString " out of range " $
-				  showParen True (showsPrec 0 b) "")
+	| otherwise	=  indexCharError ci b
     inRange (c,c') ci	=  fromEnum c <= i && i <= fromEnum c'
 			   where i = fromEnum ci
 
@@ -54,11 +51,27 @@ instance  Ix Int  where
     range (m,n)		=  [m..n]
     index b@(m,n) i
 	| inRange b i	=  i - m
-	| otherwise	=  error (showString "Ix{Int}.index: Index " .
-				  showParen True (showsPrec 0 i) .
-                                  showString " out of range " $
-				  showParen True (showsPrec 0 b) "")
+	| otherwise	=  indexIntError i b
     inRange (m,n) i	=  m <= i && i <= n
+
+-- abstract these errors from the relevant index functions so that
+-- the guts of the function will be small enough to inline.
+
+{-# NOINLINE indexCharError #-}
+indexCharError :: Char -> (Char,Char) -> a
+indexCharError ci b 
+  = error (showString "Ix{Char}.index: Index " .
+	   showParen True (showsPrec 0 ci) .
+	   showString " out of range " $
+ 	   showParen True (showsPrec 0 b) "")
+
+{-# NOINLINE indexIntError #-}
+indexIntError :: Int -> (Int,Int) -> a
+indexIntError i b
+  = error (showString "Ix{Int}.index: Index " .
+   	   showParen True (showsPrec 0 i) .
+           showString " out of range " $
+	   showParen True (showsPrec 0 b) "")
 
 -- Integer instance is in PrelNum
 
@@ -85,15 +98,15 @@ instance Ix () where
 
 ----------------------------------------------------------------------
 instance (Ix a, Ix b) => Ix (a, b) where -- as derived
-    {-# INLINE range #-}
+    {- INLINE range #-}
     range ((l1,l2),(u1,u2)) =
       [ (i1,i2) | i1 <- range (l1,u1), i2 <- range (l2,u2) ]
 
-    {-# INLINE index #-}
+    {- INLINE index #-}
     index ((l1,l2),(u1,u2)) (i1,i2) =
       index (l1,u1) i1 * rangeSize (l2,u2) + index (l2,u2) i2
 
-    {-# INLINE inRange #-}
+    {- INLINE inRange #-}
     inRange ((l1,l2),(u1,u2)) (i1,i2) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2
 
@@ -160,6 +173,7 @@ The @rangeSize@ operator returns the number of elements
 in the range for an @Ix@ pair:
 
 \begin{code}
+{-# SPECIALISE rangeSize :: (Int,Int) -> Int #-}
 rangeSize :: (Ix a) => (a,a) -> Int
 rangeSize b@(l,h)
  | l > h     = 0

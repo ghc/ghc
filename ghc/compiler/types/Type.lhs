@@ -1,12 +1,19 @@
 \begin{code}
 module Type (
-	GenType(..), Type, 
+	GenType(..), TyNote(..), 		-- Representation visible to friends
+	Type, GenKind, Kind,
+	TyVarSubst, GenTyVarSubst,
+
+	funTyCon, boxedKindCon, unboxedKindCon, openKindCon,
+
+	boxedTypeKind, unboxedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds,
+	hasMoreBoxityInfo, superKind,
 
 	mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, isTyVarTy,
 
-	mkAppTy, mkAppTys, splitAppTy, splitAppTys,
+	mkAppTy, mkAppTys, splitAppTy, splitAppTys, splitAppTy_maybe,
 
-	mkFunTy, mkFunTys, splitFunTy_maybe, splitFunTys,
+	mkFunTy, mkFunTys, splitFunTy_maybe, splitFunTys, funResultTy,
 
 	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
 	splitAlgTyConApp_maybe, splitAlgTyConApp,
@@ -16,52 +23,108 @@ module Type (
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy,
+	mkPiType,
 
 	TauType, RhoType, SigmaType, ThetaType,
 	isTauTy,
 	mkRhoTy, splitRhoTy,
 	mkSigmaTy, splitSigmaTy,
 
-	isUnpointedType, isUnboxedType, typePrimRep,
-
-	matchTy, matchTys, 
+	isUnLiftedType, isUnboxedType, isUnboxedTupleType, isAlgType,
+	typePrimRep,
 
 	tyVarsOfType, tyVarsOfTypes, namesOfType, typeKind,
+	addFreeTyVars,
 
-	instantiateTy, instantiateTauTy, instantiateThetaTy, applyToTyVars,
+	substTy, fullSubstTy, substTyVar,
+	substFlexiTy, substFlexiTheta,
 
 	showTypeCategory
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Id	( Id )
+import {-# SOURCE #-}	DataCon( DataCon )
 
 -- friends:
+import Var	( Id, TyVar, GenTyVar, IdOrTyVar,
+		  removeTyVarFlexi, 
+		  tyVarKind, isId, idType
+		)
+import VarEnv
+import VarSet
+
+import Name	( NamedThing(..), Provenance(..), ExportFlag(..),
+		  mkWiredInTyConName, mkGlobalName, varOcc
+		)
+import NameSet
 import Class	( classTyCon, Class )
-import Kind	( mkBoxedTypeKind, resultKind, Kind )
-import TyCon	( mkFunTyCon, isFunTyCon, isEnumerationTyCon, isTupleTyCon, maybeTyConSingleCon,
+import TyCon	( TyCon, Boxity(..),
+		  mkFunTyCon, mkKindCon, superKindCon,
+		  matchesTyCon, isUnboxedTupleTyCon, isUnLiftedTyCon,
+		  isFunTyCon, isEnumerationTyCon, 
+		  isTupleTyCon, maybeTyConSingleCon,
 		  isPrimTyCon, isAlgTyCon, isSynTyCon, tyConArity,
 		  tyConKind, tyConDataCons, getSynTyConDefn, 
-		  tyConPrimRep, tyConClass_maybe, TyCon )
-import TyVar	( GenTyVarSet, TyVarEnv, GenTyVar, TyVar,
-		  tyVarKind, tyVarFlexi, emptyTyVarSet, unionTyVarSets, minusTyVarSet,
-		  unitTyVarSet, lookupTyVarEnv, delFromTyVarEnv, zipTyVarEnv, mkTyVarEnv,
-		  emptyTyVarEnv, isEmptyTyVarEnv, addToTyVarEnv )
-import Name	( NamedThing(..), 
-		  NameSet, 
-		    unionNameSets, emptyNameSet, unitNameSet, minusNameSet
+		  tyConPrimRep, tyConClass_maybe
 		)
 
 -- others
-import BasicTypes ( Unused )
-import Maybes	( maybeToBool, assocMaybe )
-import PrimRep	( PrimRep(..) )
-import Unique	-- quite a few *Keys
-import Util	( thenCmp, panic, assertPanic )
+import BasicTypes 	( Unused )
+import SrcLoc		( mkBuiltinSrcLoc )
+import PrelMods		( pREL_GHC )
+import Maybes		( maybeToBool )
+import PrimRep		( PrimRep(..), isFollowableRep )
+import Unique		-- quite a few *Keys
+import Util		( thenCmp )
+import Outputable
+
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Type Classifications}
+%*									*
+%************************************************************************
 
+A type is
+
+	*unboxed*	iff its representation is other than a pointer
+			Unboxed types cannot instantiate a type variable
+			Unboxed types are always unlifted.
+
+	*lifted*	A type is lifted iff it has bottom as an element.
+			Closures always have lifted types:  i.e. any
+			let-bound identifier in Core must have a lifted
+			type.  Operationally, a lifted object is one that
+			can be entered.
+			(NOTE: previously "pointed").			
+
+	*algebraic*	A type with one or more constructors.  An algebraic
+			type is one that can be deconstructed with a case
+			expression.  *NOT* the same as lifted types, 
+			because we also include unboxed tuples in this
+			classification.
+
+	*primitive*	iff it is a built-in type that can't be expressed
+			in Haskell.
+
+Currently, all primitive types are unlifted, but that's not necessarily
+the case.  (E.g. Int could be primitive.)
+
+Some primitive types are unboxed, such as Int#, whereas some are boxed
+but unlifted (such as ByteArray#).  The only primitive types that we
+classify as algebraic are the unboxed tuples.
+
+examples of type classifications:
+
+Type		primitive	boxed		lifted		algebraic    
+-----------------------------------------------------------------------------
+Int#,		Yes		No		No		No
+ByteArray#	Yes		Yes		No		No
+(# a, b #)	Yes		No		No		Yes
+(  a, b  )	No		Yes		Yes		Yes
+[a]		No		Yes		Yes		Yes
 
 %************************************************************************
 %*									*
@@ -72,6 +135,12 @@ import Util	( thenCmp, panic, assertPanic )
 
 \begin{code}
 type Type  = GenType Unused	-- Used after typechecker
+
+type GenKind flexi = GenType flexi
+type Kind  = Type
+
+type TyVarSubst 	 = TyVarEnv Type
+type GenTyVarSubst flexi = TyVarEnv (GenType flexi) 
 
 data GenType flexi			-- Parameterised over the "flexi" part of a type variable
   = TyVarTy (GenTyVar flexi)
@@ -89,13 +158,91 @@ data GenType flexi			-- Parameterised over the "flexi" part of a type variable
 	(GenType flexi)
 	(GenType flexi)
 
-  | SynTy 			-- Saturated application of a type synonym
-	(GenType flexi)		-- The unexpanded version; always a TyConTy
+  | NoteTy 			-- Saturated application of a type synonym
+	(TyNote flexi)
 	(GenType flexi)		-- The expanded version
 
   | ForAllTy
 	(GenTyVar flexi)
 	(GenType flexi)		-- TypeKind
+
+data TyNote flexi
+  = SynNote (GenType flexi)	-- The unexpanded version of the type synonym; always a TyConApp
+  | FTVNote (GenTyVarSet flexi)	-- The free type variables of the noted expression
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Wired-in type constructors
+%*									*
+%************************************************************************
+
+We define a few wired-in type constructors here to avoid module knots
+
+\begin{code}
+funTyConName = mkWiredInTyConName funTyConKey pREL_GHC SLIT("->") funTyCon
+funTyCon = mkFunTyCon funTyConName (mkArrowKinds [boxedTypeKind, boxedTypeKind] boxedTypeKind)
+\end{code}
+
+\begin{code}
+mk_kind_name key str = mkGlobalName key pREL_GHC (varOcc str)
+				  (LocalDef mkBuiltinSrcLoc NotExported)
+	-- mk_kind_name is a bit of a hack
+	-- The LocalDef means that we print the name without
+	-- a qualifier, which is what we want for these kinds.
+
+boxedKindConName = mk_kind_name boxedKindConKey SLIT("*")
+boxedKindCon     = mkKindCon boxedKindConName superKind Boxed
+
+unboxedKindConName = mk_kind_name unboxedKindConKey SLIT("*#")
+unboxedKindCon     = mkKindCon unboxedKindConName superKind Unboxed
+
+openKindConName = mk_kind_name openKindConKey SLIT("*?")
+openKindCon     = mkKindCon openKindConName superKind Open
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Kinds}
+%*									*
+%************************************************************************
+
+\begin{code}
+superKind :: GenKind flexi	-- Box, the type of all kinds
+superKind = TyConApp superKindCon []
+
+boxedTypeKind, unboxedTypeKind, openTypeKind :: GenKind flexi
+boxedTypeKind   = TyConApp boxedKindCon   []
+unboxedTypeKind = TyConApp unboxedKindCon []
+openTypeKind	= TyConApp openKindCon    []
+
+mkArrowKind :: GenKind flexi -> GenKind flexi -> GenKind flexi
+mkArrowKind = FunTy
+
+mkArrowKinds :: [GenKind flexi] -> GenKind flexi -> GenKind flexi
+mkArrowKinds arg_kinds result_kind = foldr FunTy result_kind arg_kinds
+\end{code}
+
+\begin{code}
+hasMoreBoxityInfo :: GenKind flexi -> GenKind flexi -> Bool
+
+(NoteTy _ k1) `hasMoreBoxityInfo` k2 = k1 `hasMoreBoxityInfo` k2
+k1 `hasMoreBoxityInfo` (NoteTy _ k2) = k1 `hasMoreBoxityInfo` k2
+
+(TyConApp kc1 ts1) `hasMoreBoxityInfo` (TyConApp kc2 ts2) 
+  = ASSERT( null ts1 && null ts2 )
+    kc2 `matchesTyCon` kc1	-- NB the reversal of arguments
+
+kind1@(FunTy _ _) `hasMoreBoxityInfo` kind2@(FunTy _ _)
+  = ASSERT( kind1 == kind2 )
+    True
+	-- The two kinds can be arrow kinds; for example when unifying
+	-- (m1 Int) and (m2 Int) we end up unifying m1 and m2, which should
+	-- have the same kind.
+
+-- Other cases are impossible
 \end{code}
 
 
@@ -118,18 +265,18 @@ mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
 getTyVar :: String -> GenType flexi -> GenTyVar flexi
 getTyVar msg (TyVarTy tv) = tv
-getTyVar msg (SynTy _ t)  = getTyVar msg t
+getTyVar msg (NoteTy _ t) = getTyVar msg t
 getTyVar msg other	  = panic ("getTyVar: " ++ msg)
 
 getTyVar_maybe :: GenType flexi -> Maybe (GenTyVar flexi)
 getTyVar_maybe (TyVarTy tv) = Just tv
-getTyVar_maybe (SynTy _ t)  = getTyVar_maybe t
+getTyVar_maybe (NoteTy _ t) = getTyVar_maybe t
 getTyVar_maybe other	    = Nothing
 
 isTyVarTy :: GenType flexi -> Bool
-isTyVarTy (TyVarTy tv) = True
-isTyVarTy (SynTy _ ty) = isTyVarTy ty
-isTyVarTy other        = False
+isTyVarTy (TyVarTy tv)  = True
+isTyVarTy (NoteTy _ ty) = isTyVarTy ty
+isTyVarTy other         = False
 \end{code}
 
 
@@ -143,7 +290,7 @@ invariant: use it.
 \begin{code}
 mkAppTy orig_ty1 orig_ty2 = mk_app orig_ty1
   where
-    mk_app (SynTy _ ty1)     = mk_app ty1
+    mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ [orig_ty2])
     mk_app ty1		     = AppTy orig_ty1 orig_ty2
 
@@ -156,27 +303,34 @@ mkAppTys orig_ty1 []	    = orig_ty1
 	--   the Rational part.
 mkAppTys orig_ty1 orig_tys2 = mk_app orig_ty1
   where
-    mk_app (SynTy _ ty1)     = mk_app ty1
+    mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
     mk_app ty1		     = foldl AppTy orig_ty1 orig_tys2
 
-splitAppTy :: GenType flexi -> (GenType flexi, GenType flexi)
-splitAppTy (FunTy ty1 ty2)   = (TyConApp mkFunTyCon [ty1], ty2)
-splitAppTy (AppTy ty1 ty2)   = (ty1, ty2)
-splitAppTy (SynTy _ ty)      = splitAppTy ty
-splitAppTy (TyConApp tc tys) = split tys []
+splitAppTy_maybe :: GenType flexi -> Maybe (GenType flexi, GenType flexi)
+splitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
+splitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
+splitAppTy_maybe (NoteTy _ ty)     = splitAppTy_maybe ty
+splitAppTy_maybe (TyConApp tc [])  = Nothing
+splitAppTy_maybe (TyConApp tc tys) = split tys []
 			    where
-			       split [ty2]    acc = (TyConApp tc (reverse acc), ty2)
+			       split [ty2]    acc = Just (TyConApp tc (reverse acc), ty2)
 			       split (ty:tys) acc = split tys (ty:acc)
-splitAppTy other	     = panic "splitAppTy"
+
+splitAppTy_maybe other	     	  = Nothing
+
+splitAppTy :: GenType flexi -> (GenType flexi, GenType flexi)
+splitAppTy ty = case splitAppTy_maybe ty of
+			Just pr -> pr
+			Nothing -> panic "splitAppTy"
 
 splitAppTys :: GenType flexi -> (GenType flexi, [GenType flexi])
 splitAppTys ty = split ty ty []
   where
     split orig_ty (AppTy ty arg)        args = split ty ty (arg:args)
-    split orig_ty (SynTy _ ty)          args = split orig_ty ty args
+    split orig_ty (NoteTy _ ty)         args = split orig_ty ty args
     split orig_ty (FunTy ty1 ty2)       args = ASSERT( null args )
-					       (TyConApp mkFunTyCon [], [ty1,ty2])
+					       (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty (TyConApp tc tc_args) args = (TyConApp tc [], tc_args ++ args)
     split orig_ty ty		        args = (orig_ty, args)
 \end{code}
@@ -195,7 +349,7 @@ mkFunTys tys ty = foldr FunTy ty tys
 
 splitFunTy_maybe :: GenType flexi -> Maybe (GenType flexi, GenType flexi)
 splitFunTy_maybe (FunTy arg res) = Just (arg, res)
-splitFunTy_maybe (SynTy _ ty)    = splitFunTy_maybe ty
+splitFunTy_maybe (NoteTy _ ty)   = splitFunTy_maybe ty
 splitFunTy_maybe other	         = Nothing
 
 
@@ -203,8 +357,13 @@ splitFunTys :: GenType flexi -> ([GenType flexi], GenType flexi)
 splitFunTys ty = split [] ty ty
   where
     split args orig_ty (FunTy arg res) = split (arg:args) res res
-    split args orig_ty (SynTy _ ty)    = split args orig_ty ty
+    split args orig_ty (NoteTy _ ty)   = split args orig_ty ty
     split args orig_ty ty              = (reverse args, orig_ty)
+
+funResultTy :: GenType flexi -> GenType flexi
+funResultTy (FunTy arg res) = res
+funResultTy (NoteTy _ ty)   = funResultTy ty
+funResultTy ty		    = ty
 \end{code}
 
 
@@ -234,8 +393,8 @@ mkTyConTy tycon = ASSERT( not (isSynTyCon tycon) )
 
 splitTyConApp_maybe :: GenType flexi -> Maybe (TyCon, [GenType flexi])
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
-splitTyConApp_maybe (FunTy arg res)   = Just (mkFunTyCon, [arg,res])
-splitTyConApp_maybe (SynTy _ ty)      = splitTyConApp_maybe ty
+splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
+splitTyConApp_maybe (NoteTy _ ty)     = splitTyConApp_maybe ty
 splitTyConApp_maybe other	      = Nothing
 
 -- splitAlgTyConApp_maybe looks for 
@@ -243,18 +402,18 @@ splitTyConApp_maybe other	      = Nothing
 -- "Algebraic" => newtype, data type, or dictionary (not function types)
 -- We return the constructors too.
 
-splitAlgTyConApp_maybe :: GenType flexi -> Maybe (TyCon, [GenType flexi], [Id])
+splitAlgTyConApp_maybe :: GenType flexi -> Maybe (TyCon, [GenType flexi], [DataCon])
 splitAlgTyConApp_maybe (TyConApp tc tys) 
   | isAlgTyCon tc &&
-    tyConArity tc == length tys   = Just (tc, tys, tyConDataCons tc)
-splitAlgTyConApp_maybe (SynTy _ ty) = splitAlgTyConApp_maybe ty
-splitAlgTyConApp_maybe other	  = Nothing
+    tyConArity tc == length tys      = Just (tc, tys, tyConDataCons tc)
+splitAlgTyConApp_maybe (NoteTy _ ty) = splitAlgTyConApp_maybe ty
+splitAlgTyConApp_maybe other	     = Nothing
 
-splitAlgTyConApp :: GenType flexi -> (TyCon, [GenType flexi], [Id])
+splitAlgTyConApp :: GenType flexi -> (TyCon, [GenType flexi], [DataCon])
 	-- Here the "algebraic" property is an *assertion*
 splitAlgTyConApp (TyConApp tc tys) = ASSERT( isAlgTyCon tc && tyConArity tc == length tys )
 	      			     (tc, tys, tyConDataCons tc)
-splitAlgTyConApp (SynTy _ ty)      = splitAlgTyConApp ty
+splitAlgTyConApp (NoteTy _ ty)     = splitAlgTyConApp ty
 \end{code}
 
 "Dictionary" types are just ordinary data types, but you can
@@ -272,7 +431,7 @@ splitDictTy_maybe (TyConApp tc tys)
      maybe_class = tyConClass_maybe tc
      Just clas   = maybe_class
 
-splitDictTy_maybe (SynTy _ ty) 	= splitDictTy_maybe ty
+splitDictTy_maybe (NoteTy _ ty)	= splitDictTy_maybe ty
 splitDictTy_maybe other		= Nothing
 
 isDictTy :: GenType flexi -> Bool
@@ -281,8 +440,8 @@ isDictTy (TyConApp tc tys)
   |  maybeToBool (tyConClass_maybe tc)
   && tyConArity tc == length tys
   = True
-isDictTy (SynTy _ ty) 		= isDictTy ty
-isDictTy other			= False
+isDictTy (NoteTy _ ty)	= isDictTy ty
+isDictTy other		= False
 \end{code}
 
 
@@ -293,13 +452,14 @@ isDictTy other			= False
 \begin{code}
 mkSynTy syn_tycon tys
   = ASSERT(isSynTyCon syn_tycon)
-    SynTy (TyConApp syn_tycon tys)
-	  (instantiateTauTy (zipTyVarEnv tyvars tys) body)
+    NoteTy (SynNote (TyConApp syn_tycon tys))
+	   (substFlexiTy (zipVarEnv tyvars tys) body)
+		-- The "flexi" is needed so we can get a TcType from a synonym
   where
     (tyvars, body) = getSynTyConDefn syn_tycon
 
-isSynTy (SynTy _ _) = True
-isSynTy other       = False
+isSynTy (NoteTy (SynNote _) _) = True
+isSynTy other                  = False
 \end{code}
 
 Notes on type synonyms
@@ -330,12 +490,12 @@ mkForAllTys :: [GenTyVar flexi] -> GenType flexi -> GenType flexi
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 splitForAllTy_maybe :: GenType flexi -> Maybe (GenTyVar flexi, GenType flexi)
-splitForAllTy_maybe (SynTy _ ty)        = splitForAllTy_maybe ty
+splitForAllTy_maybe (NoteTy _ ty)       = splitForAllTy_maybe ty
 splitForAllTy_maybe (ForAllTy tyvar ty) = Just(tyvar, ty)
 splitForAllTy_maybe _		        = Nothing
 
 isForAllTy :: GenType flexi -> Bool
-isForAllTy (SynTy _ ty)        = isForAllTy ty
+isForAllTy (NoteTy _ ty)       = isForAllTy ty
 isForAllTy (ForAllTy tyvar ty) = True
 isForAllTy _		     = False
 
@@ -343,23 +503,31 @@ splitForAllTys :: GenType flexi -> ([GenTyVar flexi], GenType flexi)
 splitForAllTys ty = split ty ty []
    where
      split orig_ty (ForAllTy tv ty) tvs = split ty ty (tv:tvs)
-     split orig_ty (SynTy _ ty)     tvs = split orig_ty ty tvs
+     split orig_ty (NoteTy _ ty)    tvs = split orig_ty ty tvs
      split orig_ty t	            tvs = (reverse tvs, orig_ty)
 \end{code}
 
+@mkPiType@ makes a (->) type or a forall type, depending on whether
+it is given a type variable or a term variable.
+
+\begin{code}
+mkPiType :: IdOrTyVar -> Type -> Type	-- The more polymorphic version doesn't work...
+mkPiType v ty | isId v    = mkFunTy (idType v) ty
+	      | otherwise = ForAllTy v ty
+\end{code}
 
 \begin{code}
 applyTy :: GenType flexi -> GenType flexi -> GenType flexi
-applyTy (SynTy _ fun)    arg = applyTy fun arg
-applyTy (ForAllTy tv ty) arg = instantiateTy (mkTyVarEnv [(tv,arg)]) ty
+applyTy (NoteTy _ fun)   arg = applyTy fun arg
+applyTy (ForAllTy tv ty) arg = substTy (mkVarEnv [(tv,arg)]) ty
 applyTy other		 arg = panic "applyTy"
 
 applyTys :: GenType flexi -> [GenType flexi] -> GenType flexi
 applyTys fun_ty arg_tys
  = go [] fun_ty arg_tys
  where
-   go env ty               []         = instantiateTy (mkTyVarEnv env) ty
-   go env (SynTy _ fun)    args       = go env fun args
+   go env ty               []         = substTy (mkVarEnv env) ty
+   go env (NoteTy _ fun)   args       = go env fun args
    go env (ForAllTy tv ty) (arg:args) = go ((tv,arg):env) ty args
    go env other            args       = panic "applyTys"
 \end{code}
@@ -386,7 +554,7 @@ isTauTy (TyVarTy v)      = True
 isTauTy (TyConApp _ tys) = all isTauTy tys
 isTauTy (AppTy a b)    	 = isTauTy a && isTauTy b
 isTauTy (FunTy a b)  	 = isTauTy a && isTauTy b
-isTauTy (SynTy _ ty)   	 = isTauTy ty
+isTauTy (NoteTy _ ty)  	 = isTauTy ty
 isTauTy other	       	 = False
 \end{code}
 
@@ -400,7 +568,7 @@ splitRhoTy ty = split ty ty []
   split orig_ty (FunTy arg res) ts = case splitDictTy_maybe arg of
 					Just pair -> split res res (pair:ts)
 					Nothing   -> (reverse ts, orig_ty)
-  split orig_ty (SynTy _ ty) ts    = split orig_ty ty ts
+  split orig_ty (NoteTy _ ty) ts   = split orig_ty ty ts
   split orig_ty ty ts		   = (reverse ts, orig_ty)
 \end{code}
 
@@ -428,14 +596,19 @@ splitSigmaTy ty =
 		Finding the kind of a type
 		~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
+-- typeKind is only ever used on Types, never Kinds
+-- If it were used on Kinds, the typeKind of FunTy would not be boxedTypeKind;
+-- yet at the type level functions are boxed even if neither argument nor
+-- result are boxed.   This seems pretty fishy to me.
+
 typeKind :: GenType flexi -> Kind
 
 typeKind (TyVarTy tyvar) 	= tyVarKind tyvar
-typeKind (TyConApp tycon tys)	= foldr (\_ k -> resultKind k) (tyConKind tycon) tys
-typeKind (SynTy _ ty)		= typeKind ty
-typeKind (FunTy fun arg)	= mkBoxedTypeKind
-typeKind (AppTy fun arg)	= resultKind (typeKind fun)
-typeKind (ForAllTy _ _)		= mkBoxedTypeKind
+typeKind (TyConApp tycon tys)	= foldr (\_ k -> funResultTy k) (tyConKind tycon) tys
+typeKind (NoteTy _ ty)		= typeKind ty
+typeKind (FunTy fun arg)	= boxedTypeKind
+typeKind (AppTy fun arg)	= funResultTy (typeKind fun)
+typeKind (ForAllTy _ _)		= boxedTypeKind
 \end{code}
 
 
@@ -445,22 +618,29 @@ typeKind (ForAllTy _ _)		= mkBoxedTypeKind
 \begin{code}
 tyVarsOfType :: GenType flexi -> GenTyVarSet flexi
 
-tyVarsOfType (TyVarTy tv)		= unitTyVarSet tv
+tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
-tyVarsOfType (SynTy ty1 ty2)		= tyVarsOfType ty1
-tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionTyVarSets` tyVarsOfType res
-tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionTyVarSets` tyVarsOfType arg
-tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusTyVarSet` unitTyVarSet tyvar
+tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
+tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty1
+tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
+tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
+tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusVarSet` unitVarSet tyvar
 
 tyVarsOfTypes :: [GenType flexi] -> GenTyVarSet flexi
-tyVarsOfTypes tys = foldr (unionTyVarSets.tyVarsOfType) emptyTyVarSet tys
+tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
+
+-- Add a Note with the free tyvars to the top of the type
+addFreeTyVars :: GenType flexi -> GenType flexi
+addFreeTyVars ty@(NoteTy (FTVNote _) _) = ty
+addFreeTyVars ty			= NoteTy (FTVNote (tyVarsOfType ty)) ty
 
 -- Find the free names of a type, including the type constructors and classes it mentions
 namesOfType :: GenType flexi -> NameSet
 namesOfType (TyVarTy tv)		= unitNameSet (getName tv)
 namesOfType (TyConApp tycon tys)	= unitNameSet (getName tycon) `unionNameSets`
 					  namesOfTypes tys
-namesOfType (SynTy ty1 ty2)		= namesOfType ty1
+namesOfType (NoteTy (SynNote ty1) ty2)	= namesOfType ty1
+namesOfType (NoteTy other_note    ty2)	= namesOfType ty2
 namesOfType (FunTy arg res)		= namesOfType arg `unionNameSets` namesOfType res
 namesOfType (AppTy fun arg)		= namesOfType fun `unionNameSets` namesOfType arg
 namesOfType (ForAllTy tyvar ty)		= namesOfType ty `minusNameSet` unitNameSet (getName tyvar)
@@ -475,193 +655,128 @@ namesOfTypes tys = foldr (unionNameSets . namesOfType) emptyNameSet tys
 %*									*
 %************************************************************************
 
+@substTy@ applies a substitution to a type.  It deals correctly with name capture.
+
 \begin{code}
-instantiateTy	 :: TyVarEnv (GenType flexi)  -> GenType flexi  -> GenType flexi
-instantiateTauTy :: TyVarEnv (GenType flexi2) -> GenType flexi1 -> GenType flexi2
+substTy :: GenTyVarSubst flexi -> GenType flexi -> GenType flexi
+substTy tenv ty = subst_ty tenv tset ty
+	         where
+		    tset = foldVarEnv (unionVarSet . tyVarsOfType) emptyVarSet tenv
+				-- If ty doesn't have any for-alls, then this thunk
+				-- will never be evaluated
+\end{code}
 
+@fullSubstTy@ is like @substTy@ except that it needs to be given a set
+of in-scope type variables.  In exchange it's a bit more efficient, at least
+if you happen to have that set lying around.
 
--- instantiateTy applies a type environment to a type.
--- It can handle shadowing; for example:
---	f = /\ t1 t2 -> \ d ->
---	   letrec f' = /\ t1 -> \x -> ...(f' t1 x')...
---         in f' t1
--- Here, when we clone t1 to t1', say, we'll come across shadowing
--- when applying the clone environment to the type of f'.
---
--- As a sanity check, we should also check that name capture 
--- doesn't occur, but that means keeping track of the free variables of the
--- range of the TyVarEnv, which I don't do just yet.
+\begin{code}
+fullSubstTy :: GenTyVarSubst flexi	  	-- Substitution to apply
+            -> GenTyVarSet flexi		-- Superset of the free tyvars of
+						-- the range of the tyvar env
+            -> GenType flexi  -> GenType flexi
+-- ASSUMPTION: The substitution is idempotent.
+-- Equivalently: No tyvar is both in scope, and in the domain of the substitution.
+fullSubstTy tenv tset ty | isEmptyVarEnv tenv = ty
+		         | otherwise	      = subst_ty tenv tset ty
 
-instantiateTy tenv ty
-  | isEmptyTyVarEnv tenv
-  = ty
-
-  | otherwise
-  = go tenv ty
+-- subst_ty does the business
+subst_ty tenv tset ty
+   = go ty
   where
-    go tenv ty@(TyVarTy tv)   = case (lookupTyVarEnv tenv tv) of
-				      Nothing -> ty
-				      Just ty -> ty
-    go tenv (TyConApp tc tys) = TyConApp tc (map (go tenv) tys)
-    go tenv (SynTy ty1 ty2)   = SynTy (go tenv ty1) (go tenv ty2)
-    go tenv (FunTy arg res)   = FunTy (go tenv arg) (go tenv res)
-    go tenv (AppTy fun arg)   = mkAppTy (go tenv fun) (go tenv arg)
-    go tenv (ForAllTy tv ty)  = ForAllTy tv (go tenv' ty)
-			      where
-				tenv' = case lookupTyVarEnv tenv tv of
-					    Nothing -> tenv
-					    Just _  -> delFromTyVarEnv tenv tv
+    go (TyConApp tc tys)	   = TyConApp tc (map go tys)
+    go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote (go ty1)) (go ty2)
+    go (NoteTy (FTVNote _) ty2)    = go ty2		-- Discard the free tyvar note
+    go (FunTy arg res)   	   = FunTy (go arg) (go res)
+    go (AppTy fun arg)   	   = mkAppTy (go fun) (go arg)
+    go ty@(TyVarTy tv)   	   = case (lookupVarEnv tenv tv) of
+	       			      Nothing  -> ty
+       				      Just ty' -> ty'
+    go (ForAllTy tv ty)		   = case substTyVar tenv tset tv of
+					(tenv', tset', tv') -> ForAllTy tv' (subst_ty tenv' tset' ty)
 
--- instantiateTauTy works only (a) on types with no ForAlls,
--- 	and when	       (b) all the type variables are being instantiated
--- In return it is more polymorphic than instantiateTy
+substTyVar ::  GenTyVarSubst flexi -> GenTyVarSet flexi -> GenTyVar flexi
+	   -> (GenTyVarSubst flexi,   GenTyVarSet flexi,   GenTyVar flexi)
 
-instantiateTauTy tenv ty = applyToTyVars lookup ty
-                         where
-                           lookup tv = case lookupTyVarEnv tenv tv of
-                                          Just ty -> ty  -- Must succeed
+substTyVar tenv tset tv
+  | not (tv `elemVarSet` tset)	-- No need to clone
+				-- But must delete from substitution
+  = (tenv `delVarEnv` tv, tset `extendVarSet` tv, tv)
 
-
-instantiateThetaTy :: TyVarEnv Type -> ThetaType -> ThetaType
-instantiateThetaTy tenv theta
- = [(clas, map (instantiateTauTy tenv) tys) | (clas, tys) <- theta]
-
-applyToTyVars :: (GenTyVar flexi1 -> GenType flexi2)
-              -> GenType flexi1
-              -> GenType flexi2
-applyToTyVars f ty = go ty
+  | otherwise	-- The forall's variable is in scope so
+		-- we'd better rename it away from the in-scope variables
+		-- Extending the substitution to do this renaming also
+		-- has the (correct) effect of discarding any existing
+		-- substitution for that variable
+  = (extendVarEnv tenv tv (TyVarTy tv'), tset `extendVarSet` tv', tv')
   where
-    go (TyVarTy tv)      = f tv
-    go (TyConApp tc tys) = TyConApp tc (map go tys)
-    go (SynTy ty1 ty2)	 = SynTy (go ty1) (go ty2)
-    go (FunTy arg res)	 = FunTy (go arg) (go res)
-    go (AppTy fun arg)	 = mkAppTy (go fun) (go arg)
-    go (ForAllTy tv ty)  = panic "instantiateTauTy"
+     tv' = uniqAway tset tv
+\end{code}
+
+
+@substFlexiTy@ applies a substitution to a (GenType flexi1) returning
+a (GenType flexi2).  Note that we convert from one flexi status to another.
+
+Two assumptions, for (substFlexiTy env ty)
+	(a) the substitution, env, must cover all free tyvars of the type, ty
+	(b) the free vars of the range of the substitution must be
+		different than any of the forall'd variables in the type, ty
+
+The latter assumption is reasonable because, after all, ty has a different
+type to the range of the substitution.
+
+\begin{code}
+substFlexiTy :: GenTyVarSubst flexi2 -> GenType flexi1 -> GenType flexi2
+substFlexiTy env ty = go ty
+  where
+    go (TyVarTy tv)      	  = case lookupVarEnv env tv of
+					Just ty -> ty
+                                        Nothing -> pprPanic "substFlexiTy" (ppr tv)
+    go (TyConApp tc tys) 	  = TyConApp tc (map go tys)
+    go (NoteTy (SynNote ty1) ty2) = NoteTy (SynNote (go ty1)) (go ty2)
+    go (NoteTy (FTVNote _)   ty2) = go ty2	-- Discard free tyvar note
+    go (FunTy arg res)	          = FunTy (go arg) (go res)
+    go (AppTy fun arg)	 	  = mkAppTy (go fun) (go arg)
+    go (ForAllTy tv ty)  	  = ForAllTy tv' (substFlexiTy env' ty)
+				  where
+				    tv' = removeTyVarFlexi tv
+				    env' = extendVarEnv env tv (TyVarTy tv')
+
+substFlexiTheta :: GenTyVarSubst flexi2 -> [(Class, [GenType flexi1])]
+					-> [(Class, [GenType flexi2])]
+substFlexiTheta env theta = [(clas, map (substFlexiTy env) tys) | (clas,tys) <- theta]
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Boxedness and pointedness}
+\subsection{Boxedness and liftedness}
 %*									*
 %************************************************************************
 
-A type is
-	*unboxed*	iff its representation is other than a pointer
-			Unboxed types cannot instantiate a type variable
-			Unboxed types are always unpointed.
-
-	*unpointed*	iff it can't be a thunk, and cannot have value bottom
-			An unpointed type may or may not be unboxed.
-				(E.g. Array# is unpointed, but boxed.)
-			An unpointed type *can* instantiate a type variable,
-			provided it is boxed.
-
-	*primitive*	iff it is a built-in type that can't be expressed
-				in Haskell
-
-Currently, all primitive types are unpointed, but that's not necessarily
-the case.  (E.g. Int could be primitive.)
-
 \begin{code}
-isUnboxedType :: Type -> Bool
-isUnboxedType ty = case typePrimRep ty of
-			PtrRep -> False
-			other  -> True
+isUnboxedType :: GenType flexi -> Bool
+isUnboxedType ty = not (isFollowableRep (typePrimRep ty))
 
--- Danger!  Currently the unpointed types are precisely
--- the primitive ones, but that might not always be the case
-isUnpointedType :: Type -> Bool
-isUnpointedType ty = case splitTyConApp_maybe ty of
-			   Just (tc, ty_args) -> isPrimTyCon tc
+isUnLiftedType :: GenType flexi -> Bool
+isUnLiftedType ty = case splitTyConApp_maybe ty of
+			   Just (tc, ty_args) -> isUnLiftedTyCon tc
 			   other	      -> False
 
-typePrimRep :: Type -> PrimRep
+isUnboxedTupleType :: GenType flexi -> Bool
+isUnboxedTupleType ty = case splitTyConApp_maybe ty of
+			   Just (tc, ty_args) -> isUnboxedTupleTyCon tc
+			   other	      -> False
+
+isAlgType :: GenType flexi -> Bool
+isAlgType ty = case splitTyConApp_maybe ty of
+			Just (tc, ty_args) -> isAlgTyCon tc
+			other		   -> False
+
+typePrimRep :: GenType flexi -> PrimRep
 typePrimRep ty = case splitTyConApp_maybe ty of
 		   Just (tc, ty_args) -> tyConPrimRep tc
 		   other	      -> PtrRep
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Matching on types}
-%*									*
-%************************************************************************
-
-Matching is a {\em unidirectional} process, matching a type against a
-template (which is just a type with type variables in it).  The
-matcher assumes that there are no repeated type variables in the
-template, so that it simply returns a mapping of type variables to
-types.  It also fails on nested foralls.
-
-@matchTys@ matches corresponding elements of a list of templates and
-types.
-
-\begin{code}
-matchTy :: GenType Bool 			-- Template
-	-> GenType flexi			-- Proposed instance of template
-	-> Maybe (TyVarEnv (GenType flexi))	-- Matching substitution
-					
-
-matchTys :: [GenType Bool]			-- Templates
-	 -> [GenType flexi]			-- Proposed instance of template
-	 -> Maybe (TyVarEnv (GenType flexi),	-- Matching substitution
-		   [GenType flexi])		-- Left over instance types
-
-matchTy  ty1  ty2  = match      ty1  ty2  (\s  -> Just s)  emptyTyVarEnv
-matchTys tys1 tys2 = match_list tys1 tys2 (\pr -> Just pr) emptyTyVarEnv
-\end{code}
-
-@match@ is the main function.
-
-\begin{code}
-match :: GenType Bool -> GenType flexi		        -- Current match pair
-      -> (TyVarEnv (GenType flexi) -> Maybe result)	-- Continuation
-      -> TyVarEnv (GenType flexi)			-- Current substitution
-      -> Maybe result
-
--- When matching against a type variable, see if the variable
--- has already been bound.  If so, check that what it's bound to
--- is the same as ty; if not, bind it and carry on.
-
-match (TyVarTy v) ty k = \s -> if tyVarFlexi v then
-                                     -- v is a template variable
-                                     case lookupTyVarEnv s v of
-				       Nothing  -> k (addToTyVarEnv s v ty)
-				       Just ty' | ty' == ty -> k s      -- Succeeds
-					        | otherwise -> Nothing  -- Fails
-                               else
-                                     -- v is not a template variable; ty had better match
-                                     -- Can't use (==) because types differ
-                                     case ty of
-                                       TyVarTy v' | uniqueOf v == uniqueOf v'
-                                                  -> k s       -- Success
-                                       other      -> Nothing   -- Failure
-
-match (FunTy arg1 res1)   (FunTy arg2 res2)   k = match arg1 arg2 (match res1 res2 k)
-match (AppTy fun1 arg1)   (AppTy fun2 arg2)   k = match fun1 fun2 (match arg1 arg2 k)
-match (TyConApp tc1 tys1) (TyConApp tc2 tys2) k | tc1 == tc2
-					        = match_list tys1 tys2 ( \(s,tys2') ->
-						  if null tys2' then 
-							k s	-- Succeed
-						  else
-							Nothing	-- Fail	
-						  )
-
-	-- With type synonyms, we have to be careful for the exact
-	-- same reasons as in the unifier.  Please see the
-	-- considerable commentary there before changing anything
-	-- here! (WDP 95/05)
-match (SynTy _ ty1) ty2           k = match ty1 ty2 k
-match ty1	    (SynTy _ ty2) k = match ty1 ty2 k
-
--- Catch-all fails
-match _ _ _ = \s -> Nothing
-
-match_list []         tys2       k = \s -> k (s, tys2)
-match_list (ty1:tys1) []         k = \s -> Nothing	-- Not enough arg tys => failure
-match_list (ty1:tys1) (ty2:tys2) k = match ty1 ty2 (match_list tys1 tys2 k)
 \end{code}
 
 %************************************************************************
@@ -682,25 +797,25 @@ instance Ord (GenType flexi) where
 
 cmpTy :: GenType flexi -> GenType flexi -> Ordering
 cmpTy ty1 ty2
-  = cmp emptyTyVarEnv ty1 ty2
+  = cmp emptyVarEnv ty1 ty2
   where
   -- The "env" maps type variables in ty1 to type variables in ty2
   -- So when comparing for-alls.. (forall tv1 . t1) (forall tv2 . t2)
   -- we in effect substitute tv2 for tv1 in t1 before continuing
-    lookup env tv1 = case lookupTyVarEnv env tv1 of
+    lookup env tv1 = case lookupVarEnv env tv1 of
 			  Just tv2 -> tv2
 			  Nothing  -> tv1
 
-    -- Get rid of SynTy
-    cmp env (SynTy _ ty1) ty2 = cmp env ty1 ty2
-    cmp env ty1 (SynTy _ ty2) = cmp env ty1 ty2
+    -- Get rid of NoteTy
+    cmp env (NoteTy _ ty1) ty2 = cmp env ty1 ty2
+    cmp env ty1 (NoteTy _ ty2) = cmp env ty1 ty2
     
     -- Deal with equal constructors
     cmp env (TyVarTy tv1) (TyVarTy tv2) = lookup env tv1 `compare` tv2
     cmp env (AppTy f1 a1) (AppTy f2 a2) = cmp env f1 f2 `thenCmp` cmp env a1 a2
     cmp env (FunTy f1 a1) (FunTy f2 a2) = cmp env f1 f2 `thenCmp` cmp env a1 a2
     cmp env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmps env tys1 tys2)
-    cmp env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmp (addToTyVarEnv env tv1 tv2) t1 t2
+    cmp env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmp (extendVarEnv env tv1 tv2) t1 t2
     
     -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy
     cmp env (AppTy _ _) (TyVarTy _) = GT
@@ -763,7 +878,7 @@ showTypeCategory ty
 		   else '.'
 
 	Just (tycon, _) ->
-          let utc = uniqueOf tycon in
+          let utc = getUnique tycon in
 	  if	  utc == charDataConKey    then 'C'
 	  else if utc == intDataConKey     then 'I'
 	  else if utc == floatDataConKey   then 'F'

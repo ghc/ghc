@@ -25,7 +25,7 @@ you will screw up the layout where they are used in case expressions!
 
 #define FAST_REG_NO FAST_INT
 
-#include "../../includes/config.h"
+#include "../includes/config.h"
 
 #if 0
 {-testing only-}
@@ -49,57 +49,22 @@ you will screw up the layout where they are used in case expressions!
 -- HACK: go for the max
 #endif
 
-#include "../../includes/MachRegs.h"
+#include "../includes/MachRegs.h"
+#include "../includes/NativeDefs.h"
 
 #if alpha_TARGET_ARCH
 # define BYTES_PER_WORD 8
 # define BYTES_PER_WORD_STR "8"
-
-# if osf1_TARGET_OS
-#  include "../../includes/alpha-dec-osf1.h"
-# endif
-# if osf3_TARGET_OS
-#  include "../../includes/alpha-dec-osf3.h"
-# endif
 #endif
 
 #if i386_TARGET_ARCH
 # define BYTES_PER_WORD 4
 # define BYTES_PER_WORD_STR "4"
-
-# if linuxaout_TARGET_OS
-#  include "../../includes/i386-unknown-linuxaout.h"
-# endif
-# if linux_TARGET_OS
-#  include "../../includes/i386-unknown-linux.h"
-# endif
-# if freebsd_TARGET_OS
-#  include "../../includes/i386-unknown-freebsd.h"
-# endif
-# if netbsd_TARGET_OS
-#  include "../../includes/i386-unknown-netbsd.h"
-# endif
-# if bsdi_TARGET_OS
-#  include "../../includes/i386-unknown-bsdi.h"
-# endif
-# if cygwin32_TARGET_OS
-#  include "../../includes/i386-unknown-cygwin32.h"
-# endif
-# if solaris2_TARGET_OS
-#  include "../../includes/i386-unknown-solaris2.h"
-# endif
 #endif
 
 #if sparc_TARGET_ARCH
 # define BYTES_PER_WORD 4
 # define BYTES_PER_WORD_STR "4"
-
-# if sunos4_TARGET_OS
-#  include "../../includes/sparc-sun-sunos4.h"
-# endif
-# if solaris2_TARGET_OS
-#  include "../../includes/sparc-sun-solaris2.h"
-# endif
 #endif
 
 ---------------------------------------------

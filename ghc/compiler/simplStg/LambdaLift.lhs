@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[LambdaLift]{A STG-code lambda lifter}
 
@@ -11,18 +11,15 @@ module LambdaLift ( liftProgram ) where
 import StgSyn
 
 import Bag		( Bag, emptyBag, unionBags, unitBag, snocBag, bagToList )
-import MkId		( mkSysLocal )
-import Id		( idType, addIdArity, 
-			  mkIdSet, unitIdSet, minusIdSet, setIdVisibility,
-			  unionManyIdSets, idSetToList, IdSet,
-			  nullIdEnv, growIdEnvList, lookupIdEnv, IdEnv,
-			  Id
+import Id		( mkSysLocal, idType, setIdArity, 
+			  setIdVisibility, Id
 			)
-import IdInfo		( ArityInfo, exactArity )
+import VarSet
+import VarEnv
+import IdInfo		( exactArity )
 import Name             ( Module )
-import SrcLoc		( noSrcLoc )
 import Type		( splitForAllTys, mkForAllTys, mkFunTys, Type )
-import UniqSupply	( getUnique, splitUniqSupply, UniqSupply )
+import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
 import Util		( zipEqual, panic, assertPanic )
 \end{code}
 
@@ -147,23 +144,20 @@ liftExpr :: StgExpr
 	 -> LiftM (StgExpr, LiftInfo)
 
 
-liftExpr expr@(StgCon con args lvs) = returnLM (expr, emptyLiftInfo)
-liftExpr expr@(StgPrim op args lvs) = returnLM (expr, emptyLiftInfo)
+liftExpr expr@(StgCon con args _) = returnLM (expr, emptyLiftInfo)
 
-liftExpr expr@(StgApp (StgLitArg lit) args lvs) = returnLM (expr, emptyLiftInfo)
-liftExpr expr@(StgApp (StgConArg con) args lvs) = returnLM (expr, emptyLiftInfo)
-liftExpr expr@(StgApp (StgVarArg v)  args lvs)
+liftExpr expr@(StgApp v args)
   = lookUp v		`thenLM` \ ~(sc, sc_args) ->	-- NB the ~.  We don't want to
 							-- poke these bindings too early!
-    returnLM (StgApp (StgVarArg sc) (map StgVarArg sc_args ++ args) lvs,
+    returnLM (StgApp sc (map StgVarArg sc_args ++ args),
 	      emptyLiftInfo)
 	-- The lvs field is probably wrong, but we reconstruct it
 	-- anyway following lambda lifting
 
-liftExpr (StgCase scrut lv1 lv2 uniq alts)
+liftExpr (StgCase scrut lv1 lv2 bndr srt alts)
   = liftExpr scrut	`thenLM` \ (scrut', scrut_info) ->
     lift_alts alts	`thenLM` \ (alts', alts_info) ->
-    returnLM (StgCase scrut' lv1 lv2 uniq alts', scrut_info `unionLiftInfo` alts_info)
+    returnLM (StgCase scrut' lv1 lv2 bndr srt alts', scrut_info `unionLiftInfo` alts_info)
   where
     lift_alts (StgAlgAlts ty alg_alts deflt)
 	= mapAndUnzipLM lift_alg_alt alg_alts	`thenLM` \ (alg_alts', alt_infos) ->
@@ -184,9 +178,9 @@ liftExpr (StgCase scrut lv1 lv2 uniq alts)
 	  returnLM ((lit, rhs'), rhs_info)
 
     lift_deflt StgNoDefault = returnLM (StgNoDefault, emptyLiftInfo)
-    lift_deflt (StgBindDefault var used rhs)
+    lift_deflt (StgBindDefault rhs)
       	= liftExpr rhs	`thenLM` \ (rhs', rhs_info) ->
-	  returnLM (StgBindDefault var used rhs', rhs_info)
+	  returnLM (StgBindDefault rhs', rhs_info)
 \end{code}
 
 Now the interesting cases.  Let no escape isn't lifted.  We turn it
@@ -258,9 +252,9 @@ liftExpr (StgLet (StgRec pairs) body)
       let
 	-- Find the free vars of all the rhss,
 	-- excluding the binders themselves.
-	rhs_free_vars = unionManyIdSets (map rhsFreeVars rhss)
-			`minusIdSet`
-			mkIdSet binders
+	rhs_free_vars = unionVarSets (map rhsFreeVars rhss)
+			`minusVarSet`
+			mkVarSet binders
 
 	rhs_info      = unionLiftInfos rhs_infos
       in
@@ -280,9 +274,9 @@ liftExpr (StgLet (StgRec pairs) body)
 \end{code}
 
 \begin{code}
-liftExpr (StgSCC ty cc expr)
+liftExpr (StgSCC cc expr)
   = liftExpr expr `thenLM` \ (expr2, expr_info) ->
-    returnLM (StgSCC ty cc expr2, expr_info)
+    returnLM (StgSCC cc expr2, expr_info)
 \end{code}
 
 A binding is liftable if it's a *function* (args not null) and never
@@ -291,7 +285,7 @@ occurs in an argument position.
 \begin{code}
 isLiftable :: StgRhs -> Bool
 
-isLiftable (StgRhsClosure _ (StgBinderInfo arg_occ _ _ _ unapplied_occ) fvs _ args _)
+isLiftable (StgRhsClosure _ (StgBinderInfo arg_occ _ _ _ unapplied_occ) _ fvs _ args _)
 
   -- Experimental evidence suggests we should lift only if we will be
   -- abstracting up to 4 fvs.
@@ -331,7 +325,7 @@ static arguments, if we change things there we should change things
 here).
 -}
 
-isLiftableRec (StgRhsClosure _ (StgBinderInfo arg_occ _ _ _ unapplied_occ) fvs _ args _)
+isLiftableRec (StgRhsClosure _ (StgBinderInfo arg_occ _ _ _ unapplied_occ) _ fvs _ args _)
   = if not (null args	|| 	-- Not a function
 	 unapplied_occ	|| 	-- Has an occ with no args at all
 	 arg_occ	|| 	-- Occurs in arg position
@@ -342,7 +336,7 @@ isLiftableRec (StgRhsClosure _ (StgBinderInfo arg_occ _ _ _ unapplied_occ) fvs _
 isLiftableRec other_rhs = False
 
 rhsFreeVars :: StgRhs -> IdSet
-rhsFreeVars (StgRhsClosure _ _ fvs _ _ _) = mkIdSet fvs
+rhsFreeVars (StgRhsClosure _ _ _ fvs _ _ _) = mkVarSet fvs
 rhsFreeVars other 			  = panic "rhsFreeVars"
 \end{code}
 
@@ -356,9 +350,9 @@ dontLiftRhs :: StgRhs -> LiftM (StgRhs, LiftInfo)
 
 dontLiftRhs rhs@(StgRhsCon cc v args) = returnLM (rhs, emptyLiftInfo)
 
-dontLiftRhs (StgRhsClosure cc bi fvs upd args body)
+dontLiftRhs (StgRhsClosure cc bi srt fvs upd args body)
   = liftExpr body	`thenLM` \ (body', body_info) ->
-    returnLM (StgRhsClosure cc bi fvs upd args body', body_info)
+    returnLM (StgRhsClosure cc bi srt fvs upd args body', body_info)
 \end{code}
 
 \begin{code}
@@ -368,14 +362,14 @@ mkScPieces :: IdSet 		-- Extra args for the supercombinator
 						-- the set is its free vars
 		     (Id,StgRhs))	-- Binding for supercombinator
 
-mkScPieces extra_arg_set (id, StgRhsClosure cc bi _ upd args body)
+mkScPieces extra_arg_set (id, StgRhsClosure cc bi srt _ upd args body)
   = ASSERT( n_args > 0 )
 	-- Construct the rhs of the supercombinator, and its Id
     newSupercombinator sc_ty arity  `thenLM` \ sc_id ->
     returnLM ((sc_id, extra_args), (sc_id, sc_rhs))
   where
     n_args     = length args
-    extra_args = idSetToList extra_arg_set
+    extra_args = varSetElems extra_arg_set
     arity      = n_args + length extra_args
 
 	-- Construct the supercombinator type
@@ -384,7 +378,7 @@ mkScPieces extra_arg_set (id, StgRhsClosure cc bi _ upd args body)
     (tyvars, rest)      = splitForAllTys type_of_original_id
     sc_ty 	        = mkForAllTys tyvars (mkFunTys extra_arg_tys rest)
 
-    sc_rhs = StgRhsClosure cc bi [] upd (extra_args ++ args) body
+    sc_rhs = StgRhsClosure cc bi srt [] upd (extra_args ++ args) body
 \end{code}
 
 
@@ -412,7 +406,7 @@ type LiftFlags = Maybe Int	-- No of fvs reqd to float recursive
 
 
 runLM :: Module -> LiftFlags -> UniqSupply -> LiftM a -> a
-runLM mod flags us m = m mod flags us nullIdEnv
+runLM mod flags us m = m mod flags us emptyVarEnv
 
 thenLM :: LiftM a -> (a -> LiftM b) -> LiftM b
 thenLM m k mod ci us idenv
@@ -447,15 +441,15 @@ newSupercombinator :: Type
 		   -> LiftM Id
 
 newSupercombinator ty arity mod ci us idenv
-  = setIdVisibility (Just mod) uniq (mkSysLocal SLIT("sc") uniq ty noSrcLoc)
-    `addIdArity` exactArity arity
-	-- ToDo: rm the addIdArity?  Just let subsequent stg-saturation pass do it?
+  = setIdVisibility (Just mod) uniq (mkSysLocal uniq ty)
+    `setIdArity` exactArity arity
+	-- ToDo: rm the setIdArity?  Just let subsequent stg-saturation pass do it?
   where
-    uniq = getUnique us
+    uniq = uniqFromSupply us
 
 lookUp :: Id -> LiftM (Id,[Id])
 lookUp v mod ci us idenv
-  = case (lookupIdEnv idenv v) of
+  = case (lookupVarEnv idenv v) of
       Just result -> result
       Nothing     -> (v, [])
 
@@ -463,7 +457,7 @@ addScInlines :: [Id] -> [(Id,[Id])] -> LiftM a -> LiftM a
 addScInlines ids values m mod ci us idenv
   = m mod ci us idenv'
   where
-    idenv' = growIdEnvList idenv (ids `zip_lazy` values)
+    idenv' = extendVarEnvList idenv (ids `zip_lazy` values)
 
     -- zip_lazy zips two things together but matches lazily on the
     -- second argument.  This is important, because the ids are know here,
@@ -492,13 +486,13 @@ addScInlines ids values m mod ci us idenv
 getFinalFreeVars :: IdSet -> LiftM IdSet
 
 getFinalFreeVars free_vars mod ci us idenv
-  = unionManyIdSets (map munge_it (idSetToList free_vars))
+  = unionVarSets (map munge_it (varSetElems free_vars))
   where
     munge_it :: Id -> IdSet	-- Takes a free var and maps it to the "real"
 				-- free var
-    munge_it id = case (lookupIdEnv idenv id) of
-		    Just (_, args) -> mkIdSet args
-		    Nothing	   -> unitIdSet id
+    munge_it id = case (lookupVarEnv idenv id) of
+		    Just (_, args) -> mkVarSet args
+		    Nothing	   -> unitVarSet id
 \end{code}
 
 
@@ -548,7 +542,7 @@ co_rec_ify binds = StgRec (concat (map f binds))
 getScBinds :: LiftInfo -> [StgBinding]
 getScBinds binds = bagToList binds
 
-looksLikeSATRhs [(f,StgRhsClosure _ _ _ _ ls _)] (StgApp (StgVarArg f') args _)
+looksLikeSATRhs [(f,StgRhsClosure _ _ _ _ _ ls _)] (StgApp f' args)
   = (f == f') && (length args == length ls)
 looksLikeSATRhs _ _ = False
 \end{code}

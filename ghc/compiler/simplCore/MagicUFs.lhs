@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[MagicUFs]{Magic unfoldings that the simplifier knows about}
 
@@ -13,10 +13,8 @@ module MagicUFs (
 
 #include "HsVersions.h"
 
-import Id		( addInlinePragma )
 import CoreSyn
-import SimplEnv		( SimplEnv )
-import SimplMonad	( SmplM, SimplCount )
+import SimplMonad	( SimplM, SimplCont )
 import Type		( mkFunTys )
 import TysWiredIn	( mkListTy )
 import Unique		( Unique{-instances-} )
@@ -31,11 +29,7 @@ import Util		( assoc, zipWith3Equal, nOfThem, panic )
 
 \begin{code}
 data MagicUnfoldingFun
-  = MUF ( SimplEnv              -- state of play in simplifier...
-				-- (note: we can get simplifier switches
-				-- from the SimplEnv)
-	-> [CoreArg]       -- arguments
-	-> Maybe (SmplM CoreExpr))
+  = MUF ( SimplCont -> Maybe (SimplM CoreExpr))
 				-- Just result, or Nothing
 \end{code}
 
@@ -49,16 +43,15 @@ mkMagicUnfoldingFun tag
 magic_UFs_table = panic "MagicUFs.magic_UFs_table:ToDo"
 \end{code}
 
-Give us an MUF and stuff to apply it to, and we'll give you back the
-answer.
+Give us an MUF and stuff to apply it to, and we'll give you back the answer.
+
 \begin{code}
 applyMagicUnfoldingFun
 	:: MagicUnfoldingFun
-	-> SimplEnv
-	-> [CoreArg]
-	-> Maybe (SmplM CoreExpr)
+	-> SimplCont
+	-> Maybe (SimplM CoreExpr)
 
-applyMagicUnfoldingFun (MUF fun) env args = fun env args
+applyMagicUnfoldingFun (MUF fun) cont = fun cont
 \end{code}
 
 %************************************************************************
@@ -92,7 +85,7 @@ magic_UFs_table
 
 build_fun :: SimplEnv
 	  -> [CoreArg]
-	  -> Maybe (SmplM CoreExpr)
+	  -> Maybe (SimplM CoreExpr)
 build_fun env [TypeArg ty,ValArg (VarArg e)]
   | switchIsSet env SimplDoInlineFoldrBuild
   = Just result
@@ -115,7 +108,7 @@ build_fun env _ = ASSERT (not (switchIsSet env SimplDoInlineFoldrBuild))
 \begin{code}
 augment_fun :: SimplEnv
 	  -> [CoreArg]
-	  -> Maybe (SmplM CoreExpr)
+	  -> Maybe (SimplM CoreExpr)
 
 augment_fun env [TypeArg ty,ValArg (VarArg e),ValArg nil]
  | switchIsSet env SimplDoInlineFoldrBuild
@@ -138,7 +131,7 @@ Now foldr, the way we consume lists.
 \begin{code}
 foldr_fun :: SimplEnv
 	  -> [CoreArg]
-	  -> Maybe (SmplM CoreExpr)
+	  -> Maybe (SimplM CoreExpr)
 
 foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:rest_args)
   | do_fb_red && isConsFun env arg_k && isNilForm env arg_z

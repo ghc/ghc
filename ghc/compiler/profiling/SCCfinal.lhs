@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[SCCfinal]{Modify and collect code generation for final STG program}
 
@@ -31,11 +31,9 @@ import StgSyn
 
 import CmdLineOpts	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
-import MkId		(  mkSysLocal )
-import Id		( idType, emptyIdSet, Id )
-import SrcLoc		( noSrcLoc )
-import Type		( splitSigmaTy, splitFunTy_maybe )
-import UniqSupply	( getUnique, splitUniqSupply, UniqSupply )
+import Const		( Con(..) )
+import Id		( Id, mkSysLocal )
+import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
 import Unique           ( Unique )
 import Util		( removeDups, assertPanic, trace )
 import Outputable	
@@ -45,7 +43,8 @@ infixr 9 `thenMM`, `thenMM_`
 
 \begin{code}
 type CollectedCCs = ([CostCentre],	-- locally defined ones
-		     [CostCentre])	-- ones needing "extern" decls
+		     [CostCentre],	-- ones needing "extern" decls
+		     [CostCentreStack]) -- singleton stacks (for CAFs)
 
 stgMassageForProfiling
 	:: FAST_STRING -> FAST_STRING	-- module name, group name
@@ -55,23 +54,26 @@ stgMassageForProfiling
 
 stgMassageForProfiling mod_name grp_name us stg_binds
   = let
-	((local_ccs, extern_ccs),
+	((local_ccs, extern_ccs, cc_stacks),
 	 stg_binds2)
 	  = initMM mod_name us (mapMM do_top_binding stg_binds)
 
-	fixed_ccs
-	  = if do_auto_sccs_on_cafs
-	    then [] -- don't need "all CAFs" CC (for Prelude, we use PreludeCC)
-	    else [all_cafs_cc]
+	(fixed_ccs, fixed_cc_stacks)
+	  = if opt_AutoSccsOnIndividualCafs
+	    then ([],[])  -- don't need "all CAFs" CC 
+			  -- (for Prelude, we use PreludeCC)
+	    else ([all_cafs_cc], [all_cafs_ccs])
 
 	local_ccs_no_dups  = fst (removeDups cmpCostCentre local_ccs)
 	extern_ccs_no_dups = fst (removeDups cmpCostCentre extern_ccs)
     in
-    ((fixed_ccs ++ local_ccs_no_dups, extern_ccs_no_dups), stg_binds2)
+    ((fixed_ccs ++ local_ccs_no_dups, 
+      extern_ccs_no_dups, 
+      fixed_cc_stacks ++ cc_stacks), stg_binds2)
   where
-    do_auto_sccs_on_cafs  = opt_AutoSccsOnIndividualCafs  -- only use!
 
-    all_cafs_cc = mkAllCafsCC mod_name grp_name
+    all_cafs_cc  = mkAllCafsCC mod_name grp_name
+    all_cafs_ccs = mkSingletonCCS all_cafs_cc
 
     ----------
     do_top_binding :: StgBinding -> MassageM StgBinding
@@ -91,90 +93,87 @@ stgMassageForProfiling mod_name grp_name us stg_binds
     ----------
     do_top_rhs :: Id -> StgRhs -> MassageM StgRhs
 
-    do_top_rhs binder (StgRhsClosure _ bi fv u [] (StgSCC ty cc (StgCon con args lvs)))
+    do_top_rhs binder (StgRhsClosure _ bi srt fv u [] (StgSCC cc (StgCon (DataCon con) args _)))
       | not (isSccCountCostCentre cc)
 	-- Trivial _scc_ around nothing but static data
 	-- Eliminate _scc_ ... and turn into StgRhsCon
-      = returnMM (StgRhsCon dontCareCostCentre con args)
+      = returnMM (StgRhsCon dontCareCCS con args)
 
-    do_top_rhs binder (StgRhsClosure no_cc bi fv u [] (StgSCC ty cc expr))
-      | (noCostCentreAttached no_cc || currentOrSubsumedCosts no_cc)
+{- Can't do this one with cost-centre stacks:  --SDM
+    do_top_rhs binder (StgRhsClosure no_cc bi srt fv u [] (StgSCC ty cc expr))
+      | (noCCSAttached no_cc || currentOrSubsumedCCS no_cc)
         && not (isSccCountCostCentre cc)
 	-- Top level CAF without a cost centre attached
 	-- Attach and collect cc of trivial _scc_ in body
       = collectCC cc					`thenMM_`
 	set_prevailing_cc cc (do_expr expr)		`thenMM`  \ expr' ->
-        returnMM (StgRhsClosure cc bi fv u [] expr')
+        returnMM (StgRhsClosure cc bi srt fv u [] expr')
+-}
 
-    do_top_rhs binder (StgRhsClosure no_cc bi fv u [] body)
-      | noCostCentreAttached no_cc || currentOrSubsumedCosts no_cc
+    do_top_rhs binder (StgRhsClosure no_cc bi srt fv u [] body)
+      | noCCSAttached no_cc || currentOrSubsumedCCS no_cc
 	-- Top level CAF without a cost centre attached
 	-- Attach CAF cc (collect if individual CAF ccs)
-      = let
-	    (collect, caf_cc)
-	      = if do_auto_sccs_on_cafs then
-		   (True, mkAutoCC binder mod_name grp_name IsCafCC)
-		else
-		   (False, all_cafs_cc)
-	in
-	(if collect then collectCC caf_cc else nopMM)	`thenMM_`
-	set_prevailing_cc caf_cc (do_expr body)		`thenMM`  \ body' ->
-        returnMM (StgRhsClosure caf_cc bi fv u [] body')
+      = (if opt_AutoSccsOnIndividualCafs 
+		then let cc = mkAutoCC binder mod_name grp_name IsCafCC
+			 ccs = mkSingletonCCS cc
+		     in
+		     collectCC  cc  `thenMM_`
+		     collectCCS ccs `thenMM_`
+		     returnMM ccs
+		else 
+		     returnMM all_cafs_ccs)		`thenMM`  \ caf_ccs ->
+	set_prevailing_cc caf_ccs (do_expr body)	`thenMM`  \ body' ->
+        returnMM (StgRhsClosure caf_ccs bi srt fv u [] body')
 
-    do_top_rhs binder (StgRhsClosure cc bi fv u [] body)
+    do_top_rhs binder (StgRhsClosure cc bi srt fv u [] body)
 	-- Top level CAF with cost centre attached
 	-- Should this be a CAF cc ??? Does this ever occur ???
-      = trace ("SCCfinal: CAF with cc: " ++ showCostCentre False cc) $
-	collectCC cc					`thenMM_`
-        set_prevailing_cc cc (do_expr body)		`thenMM` \ body' ->
-	returnMM (StgRhsClosure cc bi fv u [] body')
+      = pprPanic "SCCfinal: CAF with cc:" (ppr cc)
 
-    do_top_rhs binder (StgRhsClosure _ bi fv u args (StgSCC ty cc expr))
+{- can't do this with cost-centre stacks:  --SDM
+    do_top_rhs binder (StgRhsClosure _ bi srt fv u args (StgSCC cc expr))
       | not (isSccCountCostCentre cc)
 	-- Top level function with trivial _scc_ in body
 	-- Attach and collect cc of trivial _scc_
       = collectCC cc					`thenMM_`
 	set_prevailing_cc cc (do_expr expr)		`thenMM` \ expr' ->
-	returnMM (StgRhsClosure cc bi fv u args expr')
+	returnMM (StgRhsClosure cc bi srt fv u args expr')
+-}
 
-    do_top_rhs binder (StgRhsClosure cc bi fv u args body)
+    do_top_rhs binder (StgRhsClosure no_ccs bi srt fv u args body)
 	-- Top level function, probably subsumed
-      = let
-	    (cc_closure, cc_body)
-	      = if noCostCentreAttached cc
-		then (subsumedCosts, useCurrentCostCentre)
-		else (cc, cc)
-        in
-	set_prevailing_cc cc_body (do_expr body)	`thenMM` \ body' ->
-	returnMM (StgRhsClosure cc_closure bi fv u args body')
+      | noCCSAttached no_ccs
+      = set_prevailing_cc currentCCS (do_expr body)	`thenMM` \ body' ->
+	returnMM (StgRhsClosure subsumedCCS bi srt fv u args body')
 
-    do_top_rhs binder (StgRhsCon cc con args)
+      | otherwise
+      = pprPanic "SCCfinal: CAF with cc:" (ppr no_ccs)
+
+    do_top_rhs binder (StgRhsCon ccs con args)
 	-- Top-level (static) data is not counted in heap
-	-- profiles; nor do we set CCC from it; so we
+	-- profiles; nor do we set CCCS from it; so we
 	-- just slam in dontCareCostCentre
-      = returnMM (StgRhsCon dontCareCostCentre con args)
+      = returnMM (StgRhsCon dontCareCCS con args)
 
     ------
     do_expr :: StgExpr -> MassageM StgExpr
 
-    do_expr (StgApp fn args lvs)
-      = boxHigherOrderArgs (StgApp fn) args lvs
+    do_expr (StgApp fn args)
+      = boxHigherOrderArgs (StgApp fn) args
 
-    do_expr (StgCon con args lvs)
-      = boxHigherOrderArgs (StgCon con) args lvs
+    do_expr (StgCon con args res_ty)
+      = boxHigherOrderArgs (\args -> StgCon con args res_ty) args
 
-    do_expr (StgPrim op args lvs)
-      = boxHigherOrderArgs (StgPrim op) args lvs
+    do_expr (StgSCC cc expr)	-- Ha, we found a cost centre!
+      = collectCC cc					`thenMM_`
+	set_prevailing_cc currentCCS (do_expr expr)	`thenMM`  \ expr' ->
+	returnMM (StgSCC cc expr')
 
-    do_expr (StgSCC ty cc expr)	-- Ha, we found a cost centre!
-      = collectCC cc				`thenMM_`
-	set_prevailing_cc cc (do_expr expr)	`thenMM`  \ expr' ->
-	returnMM (StgSCC ty cc expr')
-
-    do_expr (StgCase expr fv1 fv2 uniq alts)
+    do_expr (StgCase expr fv1 fv2 bndr srt alts)
       = do_expr expr		`thenMM` \ expr' ->
 	do_alts alts		`thenMM` \ alts' ->
-	returnMM (StgCase expr' fv1 fv2 uniq alts')
+	returnMM (StgCase expr' fv1 fv2 bndr srt alts')
       where
 	do_alts (StgAlgAlts ty alts def) 
 	  = mapMM do_alt alts 	`thenMM` \ alts' ->
@@ -195,9 +194,9 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 		returnMM (l,e')
 
 	do_deflt StgNoDefault = returnMM StgNoDefault
-	do_deflt (StgBindDefault b is_used e) 
+	do_deflt (StgBindDefault e) 
 	  = do_expr e			`thenMM` \ e' ->
-	    returnMM (StgBindDefault b is_used e')
+	    returnMM (StgBindDefault e')
 
     do_expr (StgLet b e)
       = do_binding b		 	`thenMM` \ b' ->
@@ -228,21 +227,25 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 	-- We play much the same game as we did in do_top_rhs above;
 	-- but we don't have to worry about cafs etc.
 
-    do_rhs (StgRhsClosure _ bi fv u [] (StgSCC ty cc (StgCon con args lvs)))
+{-
+    do_rhs (StgRhsClosure closure_cc bi srt fv u [] (StgSCC ty cc (StgCon (DataCon con) args _)))
       | not (isSccCountCostCentre cc)
       = collectCC cc `thenMM_`
 	returnMM (StgRhsCon cc con args)
+-}
 
-    do_rhs (StgRhsClosure _ bi fv u args (StgSCC ty cc expr))
+{-
+    do_rhs (StgRhsClosure _ bi srt fv u args (StgSCC ty cc expr))
       | not (isSccCountCostCentre cc)
       = collectCC cc 				`thenMM_`
 	set_prevailing_cc cc (do_expr expr)	`thenMM` \ expr' ->
-	returnMM (StgRhsClosure cc bi fv u args expr')
+	returnMM (StgRhsClosure cc bi srt fv u args expr')
+-}
 
-    do_rhs (StgRhsClosure cc bi fv u args body)
+    do_rhs (StgRhsClosure cc bi srt fv u args body)
       = set_prevailing_cc_maybe cc 		$ \ cc' ->
 	set_lambda_cc (do_expr body)		`thenMM` \ body' ->
-	returnMM (StgRhsClosure cc' bi fv u args body')
+	returnMM (StgRhsClosure cc' bi srt fv u args body')
 
     do_rhs (StgRhsCon cc con args)
       = set_prevailing_cc_maybe cc 		$ \ cc' ->
@@ -260,16 +263,13 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 
 \begin{code}
 boxHigherOrderArgs
-    :: ([StgArg] -> StgLiveVars -> StgExpr)
+    :: ([StgArg] -> StgExpr)
 			-- An application lacking its arguments and live-var info
     -> [StgArg]		-- arguments which we might box
-    -> StgLiveVars	-- live var info, which we do *not* try
-			-- to maintain/update (setStgVarInfo will
-			-- do that)
     -> MassageM StgExpr
 
-boxHigherOrderArgs almost_expr args live_vars
-  = returnMM (almost_expr args live_vars)
+boxHigherOrderArgs almost_expr args
+  = returnMM (almost_expr args)
 
 {- No boxing for now ... should be moved to desugarer and preserved ... 
 
@@ -295,7 +295,7 @@ boxHigherOrderArgs almost_expr args live_vars
 	    -- make a trivial let-binding for the top-level function
 	    getUniqueMM		`thenMM` \ uniq ->
 	    let
-		new_var = mkSysLocal SLIT("ho") uniq var_type noSrcLoc
+		new_var = mkSysLocal uniq var_type
 	    in
 	    returnMM ( (new_var, old_var) : bindings, StgVarAtom new_var )
 	else
@@ -306,8 +306,8 @@ boxHigherOrderArgs almost_expr args live_vars
 
     mk_stg_let cc (new_var, old_var) body
       = let
-	    rhs_body    = StgApp (StgVarAtom old_var) [{-args-}] bOGUS_LVs
-	    rhs_closure = StgRhsClosure cc stgArgOcc [{-fvs-}] ReEntrant [{-args-}] rhs_body
+	    rhs_body    = StgApp (StgVarAtom old_var) [{-args-}]
+	    rhs_closure = StgRhsClosure cc stgArgOcc NoSRT [{-fvs-}] ReEntrant [{-args-}] rhs_body
         in
 	StgLet (StgNonRec new_var rhs_closure) body
       where
@@ -324,7 +324,7 @@ boxHigherOrderArgs almost_expr args live_vars
 \begin{code}
 type MassageM result
   =  FAST_STRING	-- module name
-  -> CostCentre		-- prevailing CostCentre
+  -> CostCentreStack	-- prevailing CostCentre
 			-- if none, subsumedCosts at top-level
 			-- useCurrentCostCentre at nested levels
   -> UniqSupply
@@ -338,7 +338,7 @@ initMM :: FAST_STRING	-- module name, which we may consult
        -> MassageM a
        -> (CollectedCCs, a)
 
-initMM mod_name init_us m = m mod_name noCostCentre init_us ([],[])
+initMM mod_name init_us m = m mod_name noCCS init_us ([],[],[])
 
 thenMM  :: MassageM a -> (a -> MassageM b) -> MassageM b
 thenMM_ :: MassageM a -> (MassageM b) -> MassageM b
@@ -376,21 +376,23 @@ mapAccumMM f b (m:ms)
     returnMM (b3, r:rs)
 
 getUniqueMM :: MassageM Unique
-getUniqueMM mod scope_cc us ccs = (ccs, getUnique us)
+getUniqueMM mod scope_cc us ccs = (ccs, uniqFromSupply us)
 \end{code}
 
+I'm not sure about all this prevailing CC stuff  --SDM
+
 \begin{code}
-set_prevailing_cc :: CostCentre -> MassageM a -> MassageM a
+set_prevailing_cc :: CostCentreStack -> MassageM a -> MassageM a
 set_prevailing_cc cc_to_set_to action mod scope_cc us ccs
     	-- set unconditionally
   = action mod cc_to_set_to us ccs
 
-set_prevailing_cc_maybe :: CostCentre -> (CostCentre -> MassageM a) -> MassageM a
+set_prevailing_cc_maybe :: CostCentreStack -> (CostCentreStack -> MassageM a) -> MassageM a
 set_prevailing_cc_maybe cc_to_try action mod scope_cc us ccs
     	-- set only if a real cost centre
   = let
 	cc_to_use
-	  = if noCostCentreAttached cc_to_try || currentOrSubsumedCosts cc_to_try
+	  = if noCCSAttached cc_to_try
 	    then scope_cc    -- carry on as before
 	    else cc_to_try   -- use new cost centre
     in
@@ -398,18 +400,20 @@ set_prevailing_cc_maybe cc_to_try action mod scope_cc us ccs
 
 set_lambda_cc :: MassageM a -> MassageM a
 set_lambda_cc action mod scope_cc us ccs
-	-- used when moving inside a lambda;
-  	-- if we were chugging along as "caf/dict" we change to "ccc"
+	-- used when moving inside a lambda; 
+ 	-- if we were chugging along as "caf/dict" we change to "ccc"
   = let
-	cc_to_use
+	cc_to_use = currentCCS
+	{-
 	  = if isCafCC scope_cc || isDictCC scope_cc
 	    then useCurrentCostCentre
 	    else scope_cc
+	-}
     in
     action mod cc_to_use us ccs
 
 
-get_prevailing_cc :: MassageM CostCentre
+get_prevailing_cc :: MassageM CostCentreStack
 get_prevailing_cc mod scope_cc us ccs = (ccs, scope_cc)
 
 \end{code}
@@ -417,11 +421,16 @@ get_prevailing_cc mod scope_cc us ccs = (ccs, scope_cc)
 \begin{code}
 collectCC :: CostCentre -> MassageM ()
 
-collectCC cc mod_name scope_cc us (local_ccs, extern_ccs)
-  = ASSERT(not (noCostCentreAttached cc))
-    ASSERT(not (currentOrSubsumedCosts cc))
+collectCC cc mod_name scope_cc us (local_ccs, extern_ccs, ccss)
+  = ASSERT(not (noCCAttached cc))
     if (cc `ccFromThisModule` mod_name) then
-	((cc : local_ccs, extern_ccs), ())
+	((cc : local_ccs, extern_ccs, ccss), ())
     else -- must declare it "extern"
-	((local_ccs, cc : extern_ccs), ())
+	((local_ccs, cc : extern_ccs, ccss), ())
+
+collectCCS :: CostCentreStack -> MassageM ()
+
+collectCCS ccs mod_name scope_cc us (local_ccs, extern_ccs, ccss)
+  = ASSERT(not (noCCSAttached ccs))
+    ((local_ccs, extern_ccs, ccs : ccss), ())
 \end{code}

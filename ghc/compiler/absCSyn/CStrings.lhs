@@ -122,11 +122,11 @@ identToC ps
     char_to_c '+'  = ptext SLIT("Zp")
     char_to_c '\'' = ptext SLIT("Zq")
     char_to_c '*'  = ptext SLIT("Zt")
-    char_to_c '_'  = ptext SLIT("Zu")
+    char_to_c '_'  = ptext SLIT("_")
 
     char_to_c c    = if isAlphanum c
 		     then char c
-		     else (<>) (char 'Z') (int (ord c))
+		     else char 'Z' <> int (ord c)
 \end{code}
 
 For \tr{modnameToC}, we really only have to worry about \tr{'}s (quote

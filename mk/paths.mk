@@ -101,6 +101,7 @@ SRCS=$(wildcard *.lhs *.hs *.c *.lc *.prl *.lprl *.lit *.verb)
 
 HS_SRCS=$(filter %.lhs %.hs %.hc,$(SRCS) $(BOOT_SRCS))
 HS_OBJS=$(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
+HS_HCS=$(addsuffix .$(way_)hc,$(basename $(HS_SRCS)))
 HS_IFACES=$(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 
 C_SRCS=$(filter %.lc %.c,$(SRCS))
@@ -156,9 +157,10 @@ TAGS_C_SRCS=$(C_SRCS)
 #
 #
 MOSTLY_CLEAN_FILES     += $(HS_OBJS) $(C_OBJS)
-CLEAN_FILES            += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(PROG) $(LIBRARY) \
-			  $(HS_IFACES) \
-			  a.out core
+CLEAN_FILES            += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(PROG) \
+			  $(LIBRARY) $(HS_IFACES) $(HS_HCS) \
+			  a.out
+
 MAINTAINER_CLEAN_FILES += .depend $(BOOT_SRCS)
 
 #

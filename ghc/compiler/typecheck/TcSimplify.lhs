@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcSimplify]{TcSimplify}
 
@@ -123,7 +123,8 @@ module TcSimplify (
 
 #include "HsVersions.h"
 
-import HsSyn		( MonoBinds(..), HsExpr(..), andMonoBinds )
+import CmdLineOpts	( opt_MaxContextReductionDepth )
+import HsSyn		( MonoBinds(..), HsExpr(..), andMonoBinds, andMonoBindList )
 import TcHsSyn		( TcExpr, TcIdOcc(..), TcIdBndr, 
 			  TcMonoBinds, TcDictBinds
 			)
@@ -135,32 +136,31 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  instToId, instBindingRequired, instCanBeGeneralised,
 			  newDictFromOld,
 			  instLoc, getDictClassTys,
-			  pprInst, zonkInst,
-			  Inst, LIE, pprInsts, pprInstsInFull, mkLIE, 
-			  InstOrigin, pprOrigin
+			  pprInst, zonkInst, tidyInst, tidyInsts,
+			  Inst, LIE, pprInsts, pprInstsInFull, mkLIE, emptyLIE, 
+			  plusLIE, pprOrigin
 			)
 import TcEnv		( TcIdOcc(..), tcGetGlobalTyVars )
-import TcType		( TcType, TcTyVarSet, TcMaybe, tcInstType, tcInstTheta )
-import Unify		( unifyTauTy )
-import Id		( mkIdSet )
+import TcType		( TcType, TcTyVarSet, typeToTcType )
+import TcUnify		( unifyTauTy )
+import Id		( idType )
+import VarSet		( mkVarSet )
 
-import Bag		( Bag, bagToList, snocBag )
+import Bag		( bagToList )
 import Class		( Class, ClassInstEnv, classBigSig, classInstEnv )
 import PrelInfo		( isNumericClass, isCreturnableClass )
 
-import Maybes		( maybeToBool )
 import Type		( Type, ThetaType, TauType, mkTyVarTy, getTyVar,
-			  isTyVarTy, instantiateThetaTy
+			  isTyVarTy, substFlexiTheta, splitSigmaTy,
+			  tyVarsOfTypes
 			)
 import PprType		( pprConstraint )
 import TysWiredIn	( unitTy )
-import TyVar		( intersectTyVarSets, unionManyTyVarSets, minusTyVarSet,
-			  isEmptyTyVarSet, tyVarSetToList, unionTyVarSets,
-			  zipTyVarEnv, emptyTyVarEnv
-			)
+import VarSet
+import VarEnv		( zipVarEnv )
 import FiniteMap
 import BasicTypes	( TopLevelFlag(..) )
-import Unique		( Unique )
+import CmdLineOpts	( opt_GlasgowExts )
 import Outputable
 import Util
 import List		( partition )
@@ -192,6 +192,10 @@ tcSimplify
 		  LIE s)			-- Remaining wanteds; no dups
 
 tcSimplify str top_lvl local_tvs wanted_lie
+  | isEmptyVarSet local_tvs
+  = returnTc (wanted_lie, EmptyMonoBinds, emptyLIE)
+
+  | otherwise
   = reduceContext str try_me [] wanteds		`thenTc` \ (binds, frees, irreds) ->
 
 	-- Check for non-generalisable insts
@@ -208,14 +212,14 @@ tcSimplify str top_lvl local_tvs wanted_lie
 	-- But we can get stuck with 
 	--	C a b
 	-- where "a" is one of the local_tvs, but "b" is unconstrained.
-	-- Then we must yell about the ambiguous b.
+	-- Then we must yell about the ambiguous b
 	-- But we must only do so if "b" really is unconstrained; so
 	-- we must grab the global tyvars to answer that question
     tcGetGlobalTyVars				`thenNF_Tc` \ global_tvs ->
     let
-	avail_tvs	    = local_tvs `unionTyVarSets` global_tvs
-	(irreds', bad_guys) = partition (isEmptyTyVarSet . ambig_tv_fn) irreds
-	ambig_tv_fn dict    = tyVarsOfInst dict `minusTyVarSet` avail_tvs
+	avail_tvs	    = local_tvs `unionVarSet` global_tvs
+	(irreds', bad_guys) = partition (isEmptyVarSet . ambig_tv_fn) irreds
+	ambig_tv_fn dict    = tyVarsOfInst dict `minusVarSet` avail_tvs
     in
     addAmbigErrs ambig_tv_fn bad_guys	`thenNF_Tc_`
 
@@ -227,7 +231,7 @@ tcSimplify str top_lvl local_tvs wanted_lie
 
     try_me inst 
       -- Does not constrain a local tyvar
-      | isEmptyTyVarSet (tyVarsOfInst inst `intersectTyVarSets` local_tvs)
+      | isEmptyVarSet (tyVarsOfInst inst `intersectVarSet` local_tvs)
       = -- if is_top_level then
 	--   FreeIfTautological		  -- Special case for inference on 
 	--				  -- top-level defns
@@ -255,6 +259,12 @@ tcSimplifyAndCheck
 		   TcDictBinds s)	-- Bindings
 
 tcSimplifyAndCheck str local_tvs given_lie wanted_lie
+  | isEmptyVarSet local_tvs
+	-- This can happen quite legitimately; for example in
+	-- 	instance Num Int where ...
+  = returnTc (wanted_lie, EmptyMonoBinds)
+
+  | otherwise
   = reduceContext str try_me givens wanteds	`thenTc` \ (binds, frees, irreds) ->
 
 	-- Complain about any irreducible ones
@@ -268,7 +278,7 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
 
     try_me inst 
       -- Does not constrain a local tyvar
-      | isEmptyTyVarSet (tyVarsOfInst inst `intersectTyVarSets` local_tvs)
+      | isEmptyVarSet (tyVarsOfInst inst `intersectVarSet` local_tvs)
       = Free
 
       -- When checking against a given signature we always reduce
@@ -409,7 +419,7 @@ reduceContext str try_me givens wanteds
     foldlNF_Tc addGiven emptyFM givens		`thenNF_Tc` \ avails ->
 
         -- Do the real work
-    reduce try_me wanteds (avails, [], [])	`thenTc` \ (avails, frees, irreds) ->
+    reduceList (0,[]) try_me wanteds (avails, [], [])	`thenTc` \ (avails, frees, irreds) ->
 
 	-- Extract the bindings from avails
     let
@@ -429,15 +439,14 @@ reduceContext str try_me givens wanteds
 	     | otherwise     = binds
     in
 {-
-    pprTrace ("reduceContext1") (vcat [
+    pprTrace ("reduceContext end") (vcat [
 	     text "----------------------",
 	     str,
 	     text "given" <+> ppr givens,
 	     text "wanted" <+> ppr wanteds,
 	     text "----", 
 	     text "avails" <+> pprAvails avails,
-	     text "free" <+> ppr frees,		
-	     text "irreds" <+> ppr irreds,		
+	     text "irreds" <+> ppr irreds,
 	     text "----------------------"
 	     ]) $
 -}
@@ -447,10 +456,11 @@ reduceContext str try_me givens wanteds
 The main context-reduction function is @reduce@.  Here's its game plan.
 
 \begin{code}
-reduce :: (Inst s -> WhatToDo)
-       -> [Inst s]
-       -> RedState s
-       -> TcM s (RedState s)
+reduceList :: (Int,[Inst s])
+       	   -> (Inst s -> WhatToDo)
+       	   -> [Inst s]
+       	   -> RedState s
+       	   -> TcM s (RedState s)
 \end{code}
 
 @reduce@ is passed
@@ -462,19 +472,34 @@ reduce :: (Inst s -> WhatToDo)
      wanteds:	The list of insts to reduce
      state:	An accumulating parameter of type RedState 
 		that contains the state of the algorithm
-
+ 
   It returns a RedState.
 
 
 \begin{code}
-    -- Base case: we're done!
-reduce try_me [] state = returnTc state
+reduceList (n,stack) try_me wanteds state
+  | n > opt_MaxContextReductionDepth
+  = failWithTc (reduceDepthErr n stack)
 
-reduce try_me (wanted:wanteds) state@(avails, frees, irreds)
+  | otherwise
+  =
+#ifdef DEBUG
+   (if n > 4 then
+	pprTrace "Jeepers! ReduceContext:" (reduceDepthMsg n stack)
+    else (\x->x))
+#endif
+    go wanteds state
+  where
+    go []     state = returnTc state
+    go (w:ws) state = reduce (n+1, w:stack) try_me w state	`thenTc` \ state' ->
+		      go ws state'
+
+    -- Base case: we're done!
+reduce stack try_me wanted state@(avails, frees, irreds)
 
     -- It's the same as an existing inst, or a superclass thereof
   | wanted `elemFM` avails
-  = reduce try_me wanteds (activate avails wanted, frees, irreds)
+  = returnTc (activate avails wanted, frees, irreds)
 
     -- It should be reduced
   | case try_me_result of { ReduceMe _ -> True; _ -> False }
@@ -508,10 +533,8 @@ reduce try_me (wanted:wanteds) state@(avails, frees, irreds)
 	   returnTc (avails', frees, wanted:irreds))
 
 	  -- If tautology succeeds, just add to frees
-	  (reduce try_me_taut [wanted] (avails, [], [])		`thenTc_`
+	  (reduce stack try_me_taut wanted (avails, [], [])		`thenTc_`
 	   returnTc (avails, wanted:frees, irreds))
-								`thenTc` \ state' ->
-    reduce try_me wanteds state'
 
 
     -- It's irreducible (or at least should not be reduced)
@@ -525,14 +548,18 @@ reduce try_me (wanted:wanteds) state@(avails, frees, irreds)
 
   where
 	-- The three main actions
-    add_to_frees  = reduce try_me wanteds (avails, wanted:frees, irreds)
+    add_to_frees  = let 
+			avails' = addFree avails wanted
+			-- Add the thing to the avails set so any identical Insts
+			-- will be commoned up with it right here
+		    in
+		    returnTc (avails', wanted:frees, irreds)
 
     add_to_irreds = addGiven avails wanted		`thenNF_Tc` \ avails' ->
-		    reduce try_me wanteds (avails',  frees, wanted:irreds)
+		    returnTc (avails',  frees, wanted:irreds)
 
     use_instance wanteds' rhs = addWanted avails wanted rhs	`thenNF_Tc` \ avails' ->
-		       		reduce try_me (wanteds' ++ wanteds) (avails', frees, irreds)
-
+			  	reduceList stack try_me wanteds' (avails', frees, irreds)
 
     try_me_result	        = try_me wanted
     ReduceMe no_instance_action = try_me_result
@@ -586,10 +613,18 @@ addWanted avails wanted rhs_expr
     rhs | instBindingRequired wanted = Rhs rhs_expr False	-- Not superclass selection
 	| otherwise		     = NoRhs
 
+addFree :: Avails s -> Inst s -> (Avails s)
+	-- When an Inst is tossed upstairs as 'free' we nevertheless add it
+	-- to avails, so that any other equal Insts will be commoned up right
+	-- here rather than also being tossed upstairs. 
+addFree avails free
+  | isDict free = addToFM avails free (Avail (instToId free) NoRhs [])
+  | otherwise   = avails
+
 addGiven :: Avails s -> Inst s -> NF_TcM s (Avails s)
 addGiven avails given
   =	 -- ASSERT( not (given `elemFM` avails) )
-	 -- This assertion isn' necessarily true.  It's permitted
+	 -- This assertion isn't necessarily true.  It's permitted
 	 -- to given a redundant context in a type signature (eg (Ord a, Eq a) => ...)
 	 -- and when typechecking instance decls we generate redundant "givens" too.
     addAvail avails given avail
@@ -608,13 +643,12 @@ addSuperClasses avails dict
   = returnNF_Tc avails
 
   | otherwise	-- It is a dictionary
-  = tcInstTheta env sc_theta		`thenNF_Tc` \ sc_theta' ->
-    foldlNF_Tc add_sc avails (zipEqual "addSuperClasses" sc_theta' sc_sels)
+  = foldlNF_Tc add_sc avails (zipEqual "addSuperClasses" sc_theta' sc_sels)
   where
     (clas, tys) = getDictClassTys dict
     
     (tyvars, sc_theta, sc_sels, _, _) = classBigSig clas
-    env       = zipTyVarEnv tyvars tys
+    sc_theta' = substFlexiTheta (zipVarEnv tyvars tys) sc_theta
 
     add_sc avails ((super_clas, super_tys), sc_sel)
       = newDictFromOld dict super_clas super_tys	`thenNF_Tc` \ super_dict ->
@@ -674,7 +708,11 @@ tcSimplifyThetas inst_mapper wanteds
   = reduceSimple inst_mapper [] wanteds		`thenNF_Tc` \ irreds ->
     let
 	-- Check that the returned dictionaries are of the form (C a b c)
-	bad_guys = [ct | ct@(clas,tys) <- irreds, not (all isTyVarTy tys)]
+    	bad_guys | opt_GlasgowExts = [ct | ct@(clas,tys) <- irreds, 
+					   isEmptyVarSet (tyVarsOfTypes tys)]
+		 | otherwise       = [ct | ct@(clas,tys) <- irreds, 
+					   not (all isTyVarTy tys)]
+ 
     in
     if null bad_guys then
 	returnTc irreds
@@ -713,30 +751,34 @@ reduceSimple :: (Class -> ClassInstEnv)
 	     -> NF_TcM s ThetaType	-- Irreducible
 
 reduceSimple inst_mapper givens wanteds
-  = reduce_simple inst_mapper givens_fm wanteds	`thenNF_Tc` \ givens_fm' ->
+  = reduce_simple (0,[]) inst_mapper givens_fm wanteds	`thenNF_Tc` \ givens_fm' ->
     returnNF_Tc [ct | (ct,True) <- fmToList givens_fm']
   where
     givens_fm     = foldl addNonIrred emptyFM givens
 
-reduce_simple :: (Class -> ClassInstEnv) 
+reduce_simple :: (Int,ThetaType)		-- Stack
+	      -> (Class -> ClassInstEnv) 
 	      -> AvailsSimple
 	      -> ThetaType
 	      -> NF_TcM s AvailsSimple
 
-reduce_simple inst_mapper givens [] 
-  =	     -- Finished, so pull out the needed ones
-    returnNF_Tc givens
+reduce_simple (n,stack) inst_mapper avails wanteds
+  = go avails wanteds
+  where
+    go avails []     = returnNF_Tc avails
+    go avails (w:ws) = reduce_simple_help (n+1,w:stack) inst_mapper avails w	`thenNF_Tc` \ avails' ->
+		       go avails' ws
 
-reduce_simple inst_mapper givens (wanted@(clas,tys) : wanteds)
+reduce_simple_help stack inst_mapper givens wanted@(clas,tys)
   | wanted `elemFM` givens
-  = reduce_simple inst_mapper givens wanteds
+  = returnNF_Tc givens
 
   | otherwise
   = lookupSimpleInst (inst_mapper clas) clas tys	`thenNF_Tc` \ maybe_theta ->
 
     case maybe_theta of
-      Nothing ->    reduce_simple inst_mapper (addIrred    givens wanted) wanteds
-      Just theta -> reduce_simple inst_mapper (addNonIrred givens wanted) (theta ++ wanteds)
+      Nothing ->    returnNF_Tc (addIrred givens wanted)
+      Just theta -> reduce_simple stack inst_mapper (addNonIrred givens wanted) theta
 
 addIrred :: AvailsSimple -> (Class, [TauType]) -> AvailsSimple
 addIrred givens ct
@@ -750,7 +792,7 @@ addSCs givens ct@(clas,tys)
  = foldl add givens sc_theta
  where
    (tyvars, sc_theta_tmpl, _, _, _) = classBigSig clas
-   sc_theta = instantiateThetaTy (zipTyVarEnv tyvars tys) sc_theta_tmpl
+   sc_theta = substFlexiTheta (zipVarEnv tyvars tys) sc_theta_tmpl
 
    add givens ct = case lookupFM givens ct of
 			   Nothing    -> -- Add it and its superclasses
@@ -793,16 +835,30 @@ For each method @Inst@ in the @init_lie@ that mentions one of the
 bindInstsOfLocalFuns ::	LIE s -> [TcIdBndr s] -> TcM s (LIE s, TcMonoBinds s)
 
 bindInstsOfLocalFuns init_lie local_ids
+  | null overloaded_ids || null lie_for_here
+	-- Common case
+  = returnTc (init_lie, EmptyMonoBinds)
+
+  | otherwise
   = reduceContext (text "bindInsts" <+> ppr local_ids)
-		  try_me [] (bagToList init_lie)	`thenTc` \ (binds, frees, irreds) ->
+		  try_me [] lie_for_here	`thenTc` \ (binds, frees, irreds) ->
     ASSERT( null irreds )
-    returnTc (mkLIE frees, binds)
+    returnTc (mkLIE frees `plusLIE` mkLIE lie_not_for_here, binds)
   where
-    local_id_set = mkIdSet local_ids	-- There can occasionally be a lot of them
-					-- so it's worth building a set, so that 
-					-- lookup (in isMethodFor) is faster
-    try_me inst | isMethodFor local_id_set inst = ReduceMe AddToIrreds
-		| otherwise		        = Free
+    overloaded_ids = filter is_overloaded local_ids
+    is_overloaded id = case splitSigmaTy (idType id) of
+			  (_, theta, _) -> not (null theta)
+
+    overloaded_set = mkVarSet overloaded_ids	-- There can occasionally be a lot of them
+						-- so it's worth building a set, so that 
+						-- lookup (in isMethodFor) is faster
+
+	-- No sense in repeatedly zonking lots of 
+	-- constant constraints so filter them out here
+    (lie_for_here, lie_not_for_here) = partition (isMethodFor overloaded_set)
+					 	 (bagToList init_lie)
+    try_me inst | isMethodFor overloaded_set inst = ReduceMe AddToIrreds
+		| otherwise		          = Free
 \end{code}
 
 
@@ -865,8 +921,8 @@ tcSimplifyTop wanted_lie
 		-- Have a try at disambiguation 
 		-- if the type variable isn't bound
 		-- up with one of the non-standard classes
-	worth_a_try group@(d:_) = isEmptyTyVarSet (tyVarsOfInst d `intersectTyVarSets` non_std_tyvars)
-	non_std_tyvars		= unionManyTyVarSets (map tyVarsOfInst non_stds)
+	worth_a_try group@(d:_) = isEmptyVarSet (tyVarsOfInst d `intersectVarSet` non_std_tyvars)
+	non_std_tyvars		= unionVarSets (map tyVarsOfInst non_stds)
 
 		-- Collect together all the bad guys
 	bad_guys = non_stds ++ concat std_bads
@@ -878,14 +934,14 @@ tcSimplifyTop wanted_lie
 	-- And complain about the ones that don't
     mapNF_Tc complain bad_guys		`thenNF_Tc_`
 
-    returnTc (binds1 `AndMonoBinds` andMonoBinds binds_ambig)
+    returnTc (binds1 `andMonoBinds` andMonoBindList binds_ambig)
   where
     wanteds	= bagToList wanted_lie
     try_me inst	= ReduceMe AddToIrreds
 
     d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
 
-    complain d | isEmptyTyVarSet (tyVarsOfInst d) = addTopInstanceErr d
+    complain d | isEmptyVarSet (tyVarsOfInst d) = addTopInstanceErr d
 	       | otherwise			  = addAmbigErr tyVarsOfInst d
 
 get_tv d   = case getDictClassTys d of
@@ -939,7 +995,9 @@ disambigGroup dicts
     try_default default_tys		 	`thenTc` \ chosen_default_ty ->
 
 	-- Bind the type variable and reduce the context, for real this time
-    tcInstType emptyTyVarEnv chosen_default_ty		`thenNF_Tc` \ chosen_default_tc_ty ->	-- Tiresome!
+    let
+	chosen_default_tc_ty = typeToTcType chosen_default_ty	-- Tiresome!
+    in
     unifyTauTy chosen_default_tc_ty (mkTyVarTy tyvar)	`thenTc_`
     reduceContext (text "disambig" <+> ppr dicts)
 		  try_me [] dicts	`thenTc` \ (binds, frees, ambigs) ->
@@ -981,35 +1039,49 @@ addAmbigErrs ambig_tv_fn dicts = mapNF_Tc (addAmbigErr ambig_tv_fn) dicts
 
 addAmbigErr ambig_tv_fn dict
   = tcAddSrcLoc (instLoc dict) $
-    addErrTc (sep [text "Ambiguous type variable(s)",
-		   hsep (punctuate comma (map (quotes . ppr) ambig_tvs)),
-		   nest 4 (text "in the constraint" <+> quotes (pprInst dict)),
+    addErrTcM (tidy_env,
+	       sep [text "Ambiguous type variable(s)" <+>
+			hsep (punctuate comma (map (quotes . ppr) ambig_tvs)),
+		   nest 4 (text "in the constraint" <+> quotes (pprInst tidy_dict)),
 	 	   nest 4 (pprOrigin dict)])
   where
-    ambig_tvs = tyVarSetToList (ambig_tv_fn dict)
+    ambig_tvs = varSetElems (ambig_tv_fn tidy_dict)
+    (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 -- Used for top-level irreducibles
 addTopInstanceErr dict
   = tcAddSrcLoc (instLoc dict)		       $
-    addErrTc (sep [ptext SLIT("No instance for") <+> quotes (pprInst dict),
-		   nest 4 $ parens $ pprOrigin dict])
+    addErrTcM (tidy_env, 
+	       sep [ptext SLIT("No instance for") <+> quotes (pprInst tidy_dict),
+		   nest 4 $ pprOrigin dict])
+  where
+    (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 addNoInstanceErr str givens dict
   = tcAddSrcLoc (instLoc dict) $
-    addErrTc (sep [sep [ptext SLIT("Could not deduce") <+> quotes (pprInst dict),
+    addErrTcM (tidy_env, 
+	       sep [sep [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
 		        nest 4 $ parens $ pprOrigin dict],
-		   nest 4 $ ptext SLIT("from the context") <+> pprInsts givens]
+		   nest 4 $ ptext SLIT("from the context") <+> pprInsts tidy_givens]
 	      $$
 	      ptext SLIT("Probable cause:") <+> 
-	      vcat [ptext SLIT("missing") <+> quotes (pprInst dict) <+> ptext SLIT("in") <+> str,
+	      vcat [ptext SLIT("missing") <+> quotes (pprInst tidy_dict) <+> ptext SLIT("in") <+> str,
 		    if all_tyvars then empty else
-		    ptext SLIT("or missing instance declaration for") <+> quotes (pprInst dict)]
+		    ptext SLIT("or missing instance declaration for") <+> quotes (pprInst tidy_dict)]
     )
   where
     all_tyvars = all isTyVarTy tys
     (_, tys)   = getDictClassTys dict
+    (tidy_env, tidy_dict:tidy_givens) = tidyInsts emptyTidyEnv (dict:givens)
 
 -- Used for the ...Thetas variants; all top level
 addNoInstErr (c,ts)
   = addErrTc (ptext SLIT("No instance for") <+> quotes (pprConstraint c ts))
+
+reduceDepthErr n stack
+  = vcat [ptext SLIT("Context reduction stack overflow; size =") <+> int n,
+	  ptext SLIT("Use -fcontext-stack20 to increase stack size to (e.g.) 20"),
+	  nest 4 (pprInstsInFull stack)]
+
+reduceDepthMsg n stack = nest 4 (pprInstsInFull stack)
 \end{code}

@@ -1,0 +1,57 @@
+/* 
+ * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
+ *
+ * $Id: filePosn.c,v 1.3 1998/12/02 13:27:27 simonm Exp $
+ *
+ * hGetPosn and hSetPosn Runtime Support
+ */
+
+#include "Rts.h"
+#include "stgio.h"
+
+StgInt
+getFilePosn(ptr)
+StgForeignPtr ptr;
+{
+    IOFileObject* fo = (IOFileObject*)ptr;
+    StgInt posn;
+   
+    while ( (posn = lseek(fo->fd, 0, SEEK_CUR)) == -1) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+    if (fo->flags & FILEOBJ_WRITE)  {
+       posn += fo->bufWPtr;
+    } else if (fo->flags & FILEOBJ_READ) {
+       posn -= (fo->bufWPtr - fo->bufRPtr);
+    }
+    return posn;
+}
+
+/* The following is only called with a position that we've already visited 
+   (this is ensured by making the Haskell file posn. type abstract.)
+*/
+StgInt
+setFilePosn(ptr, posn)
+StgForeignPtr ptr;
+StgInt posn;
+{
+    IOFileObject* fo = (IOFileObject*)ptr;
+    int rc;
+
+    rc = flushBuffer(ptr);
+    if (rc < 0) return rc;
+
+    while (lseek(fo->fd, posn, SEEK_SET) == -1) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+    FILEOBJ_CLEAR_EOF(fo);
+    return 0;
+}

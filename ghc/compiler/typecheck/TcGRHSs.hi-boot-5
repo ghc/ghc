@@ -1,0 +1,7 @@
+__interface TcGRHSs 2 0 where
+__export TcGRHSs tcGRHSsAndBinds;
+2 tcGRHSsAndBinds :: __forall [_s] => 
+		RnHsSyn.RenamedGRHSsAndBinds
+		-> TcMonad.TcType _s
+		-> HsExpr.StmtCtxt
+		-> TcMonad.TcM _s (TcHsSyn.TcGRHSsAndBinds _s, Inst.LIE _s) ;

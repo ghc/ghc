@@ -8,6 +8,8 @@ This mimics some code that comes with HBC.
 -}
 
 \begin{code}
+{-# OPTIONS -#include "cbits/ByteOps.h" #-}
+
 module ByteOps (
 	longToBytes,
 	intToBytes,

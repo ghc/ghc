@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[DsUtils]{Utilities for desugaring}
 
@@ -10,49 +10,41 @@ module DsUtils (
 	CanItFail(..), EquationInfo(..), MatchResult(..),
         EqnNo, EqnSet,
 
-	combineGRHSMatchResults,
-	combineMatchResults,
-	dsExprToAtomGivenTy, DsCoreArg,
-	mkCoAlgCaseMatchResult,
-	mkAppDs, mkConDs, mkPrimDs, mkErrorAppDs,
-	mkCoLetsMatchResult,
-	mkCoPrimCaseMatchResult,
-	mkFailurePair,
-	mkGuardedMatchResult,
-	mkSelectorBinds,
-	mkTupleExpr,
-	mkTupleSelector,
-	selectMatchVars,
-	showForErr
+	cantFailMatchResult, extractMatchResult,
+	combineMatchResults, 
+	adjustMatchResult, adjustMatchResultDs,
+	mkCoLetsMatchResult, mkGuardedMatchResult, 
+	mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult,
+
+	mkErrorAppDs,
+
+	mkSelectorBinds, mkTupleExpr, mkTupleSelector,
+
+	selectMatchVar
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} Match ( matchSimply )
 
-import HsSyn		( OutPat(..), Stmt, DoOrListComp )
+import HsSyn		( OutPat(..) )
 import TcHsSyn		( TypecheckedPat )
 import DsHsSyn		( outPatType, collectTypedPatBinders )
 import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( coreExprType, mkCoreIfThenElse )
-import PrelVals		( iRREFUT_PAT_ERROR_ID, voidId )
-import Id		( idType, dataConArgTys, 
-			  DataCon, Id, GenId )
-import Literal		( Literal(..) )
-import PrimOp           ( PrimOp )
+import CoreUtils	( coreExprType )
+import PrelVals		( iRREFUT_PAT_ERROR_ID )
+import Id		( idType, Id, mkWildId )
+import Const		( Literal(..), Con(..) )
 import TyCon		( isNewTyCon, tyConDataCons )
-import Type		( mkRhoTy, mkFunTy,
-			  isUnpointedType, mkTyConApp, splitAlgTyConApp,
+import DataCon		( DataCon )
+import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp,
 			  Type
 			)
-import BasicTypes	( Unused )
-import TysPrim		( voidTy )
-import TysWiredIn	( unitDataCon, tupleCon, stringTy )
-import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet )
-import Unique		( Unique )
+import TysWiredIn	( unitDataCon, tupleCon, stringTy, unitTy, unitDataCon )
+import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
 import Outputable
 \end{code}
 
@@ -69,15 +61,11 @@ hand, which should indeed be bound to the pattern as a whole, then use it;
 otherwise, make one up.
 
 \begin{code}
-selectMatchVars :: [TypecheckedPat] -> DsM [Id]
-selectMatchVars pats
-  = mapDs var_from_pat_maybe pats
-  where
-    var_from_pat_maybe (VarPat var)	= returnDs var
-    var_from_pat_maybe (AsPat var pat)	= returnDs var
-    var_from_pat_maybe (LazyPat pat)	= var_from_pat_maybe pat
-    var_from_pat_maybe other_pat
-      = newSysLocalDs (outPatType other_pat) -- OK, better make up one...
+selectMatchVar :: TypecheckedPat -> DsM Id
+selectMatchVar (VarPat var)    = returnDs var
+selectMatchVar (AsPat var pat) = returnDs var
+selectMatchVar (LazyPat pat)   = selectMatchVar pat
+selectMatchVar other_pat       = newSysLocalDs (outPatType other_pat) -- OK, better make up one...
 \end{code}
 
 
@@ -98,22 +86,23 @@ type EqnSet  = UniqSet EqnNo
 
 data EquationInfo
   = EqnInfo
-	EqnNo               -- The number of the equation
+	EqnNo		-- The number of the equation
+
 	DsMatchContext	-- The context info is used when producing warnings
 			-- about shadowed patterns.  It's the context
 			-- of the *first* thing matched in this group.
 			-- Should perhaps be a list of them all!
-	[TypecheckedPat]    -- the patterns for an eqn
+
+	[TypecheckedPat]    -- The patterns for an eqn
+
       	MatchResult	    -- Encapsulates the guards and bindings
 \end{code}
 
 \begin{code}
 data MatchResult
   = MatchResult
-	CanItFail
-	Type		-- Type of argument expression
-
-	(CoreExpr -> CoreExpr)
+	CanItFail	-- Tells whether the failure expression is used
+	(CoreExpr -> DsM CoreExpr)
 			-- Takes a expression to plug in at the
 			-- failure point(s). The expression should
 			-- be duplicatable!
@@ -122,177 +111,121 @@ data CanItFail = CanFail | CantFail
 
 orFail CantFail CantFail = CantFail
 orFail _        _	 = CanFail
+\end{code}
+
+Functions on MatchResults
+
+\begin{code}
+cantFailMatchResult :: CoreExpr -> MatchResult
+cantFailMatchResult expr = MatchResult CantFail (\ ignore -> returnDs expr)
+
+extractMatchResult :: MatchResult -> CoreExpr -> DsM CoreExpr
+extractMatchResult (MatchResult CantFail match_fn) fail_expr
+  = match_fn (error "It can't fail!")
+
+extractMatchResult (MatchResult CanFail match_fn) fail_expr
+  = mkFailurePair fail_expr	 	`thenDs` \ (fail_bind, if_it_fails) ->
+    match_fn if_it_fails		`thenDs` \ body ->
+    returnDs (Let fail_bind body)
 
 
-mkCoLetsMatchResult :: [CoreBinding] -> MatchResult -> MatchResult
-mkCoLetsMatchResult binds (MatchResult can_it_fail ty body_fn)
-  = MatchResult can_it_fail ty (\body -> mkCoLetsAny binds (body_fn body))
+combineMatchResults :: MatchResult -> MatchResult -> MatchResult
+combineMatchResults (MatchResult CanFail      body_fn1)
+		    (MatchResult can_it_fail2 body_fn2)
+  = MatchResult can_it_fail2 body_fn
+  where
+    body_fn fail = body_fn2 fail			`thenDs` \ body2 ->
+		   mkFailurePair body2	 		`thenDs` \ (fail_bind, duplicatable_expr) ->
+		   body_fn1 duplicatable_expr		`thenDs` \ body1 ->
+		   returnDs (Let fail_bind body1)
 
-mkGuardedMatchResult :: CoreExpr -> MatchResult -> DsM MatchResult
-mkGuardedMatchResult pred_expr (MatchResult can_it_fail ty body_fn)
-  = returnDs (MatchResult CanFail
-			  ty
-			  (\fail -> mkCoreIfThenElse pred_expr (body_fn fail) fail)
-    )
+combineMatchResults match_result1@(MatchResult CantFail body_fn1) match_result2
+  = match_result1
+
+
+adjustMatchResult :: (CoreExpr -> CoreExpr) -> MatchResult -> MatchResult
+adjustMatchResult encl_fn (MatchResult can_it_fail body_fn)
+  = MatchResult can_it_fail (\fail -> body_fn fail	`thenDs` \ body ->
+				      returnDs (encl_fn body))
+
+adjustMatchResultDs :: (CoreExpr -> DsM CoreExpr) -> MatchResult -> MatchResult
+adjustMatchResultDs encl_fn (MatchResult can_it_fail body_fn)
+  = MatchResult can_it_fail (\fail -> body_fn fail	`thenDs` \ body ->
+				      encl_fn body)
+
+
+mkCoLetsMatchResult :: [CoreBind] -> MatchResult -> MatchResult
+mkCoLetsMatchResult binds match_result
+  = adjustMatchResult (mkLets binds) match_result
+
+
+mkGuardedMatchResult :: CoreExpr -> MatchResult -> MatchResult
+mkGuardedMatchResult pred_expr (MatchResult can_it_fail body_fn)
+  = MatchResult CanFail (\fail -> body_fn fail	`thenDs` \ body ->
+				  returnDs (mkIfThenElse pred_expr body fail))
 
 mkCoPrimCaseMatchResult :: Id				-- Scrutinee
-		    -> [(Literal, MatchResult)]	-- Alternatives
-		    -> DsM MatchResult
-mkCoPrimCaseMatchResult var alts
-  = newSysLocalDs (idType var)	`thenDs` \ wild ->
-    returnDs (MatchResult CanFail
-			  ty1
-			  (mk_case alts wild))
+		    -> [(Literal, MatchResult)]		-- Alternatives
+		    -> MatchResult
+mkCoPrimCaseMatchResult var match_alts
+  = MatchResult CanFail mk_case
   where
-    ((_,MatchResult _ ty1 _) : _) = alts
+    mk_case fail
+      = mapDs (mk_alt fail) match_alts		`thenDs` \ alts ->
+	returnDs (Case (Var var) var (alts ++ [(DEFAULT, [], fail)]))
 
-    mk_case alts wild fail_expr
-      = Case (Var var) (PrimAlts final_alts (BindDefault wild fail_expr))
-      where
-	final_alts = [ (lit, body_fn fail_expr)
-		     | (lit, MatchResult _ _ body_fn) <- alts
-		     ]
+    mk_alt fail (lit, MatchResult _ body_fn) = body_fn fail	`thenDs` \ body ->
+					       returnDs (Literal lit, [], body)
 
 
-mkCoAlgCaseMatchResult :: Id				-- Scrutinee
-		    -> [(DataCon, [Id], MatchResult)]	-- Alternatives
-		    -> DsM MatchResult
+mkCoAlgCaseMatchResult :: Id					-- Scrutinee
+		    -> [(DataCon, [CoreBndr], MatchResult)]	-- Alternatives
+		    -> MatchResult
 
-mkCoAlgCaseMatchResult var alts
-  | isNewTyCon tycon		-- newtype case; use a let
+mkCoAlgCaseMatchResult var match_alts
+  | isNewTyCon tycon		-- Newtype case; use a let
   = ASSERT( newtype_sanity )
-    returnDs (mkCoLetsMatchResult [coercion_bind] match_result)
+    mkCoLetsMatchResult [coercion_bind] match_result
 
-  | otherwise			-- datatype case  
-  =	    -- Find all the constructors in the type which aren't
-	    -- explicitly mentioned in the alternatives:
-    case un_mentioned_constructors of
-	[] ->	-- All constructors mentioned, so no default needed
-		returnDs (MatchResult can_any_alt_fail
-			  	      ty1
-				      (mk_case alts (\ignore -> NoDefault)))
-
-	[con] ->     -- Just one constructor missing, so add a case for it
-		     -- We need to build new locals for the args of the constructor,
-		     -- and figuring out their types is somewhat tiresome.
-		let
-			arg_tys = dataConArgTys con tycon_arg_tys
-		in
-		newSysLocalsDs arg_tys	`thenDs` \ arg_ids ->
-
-		     -- Now we are ready to construct the new alternative
-		let
-			new_alt = (con, arg_ids, MatchResult CanFail ty1 id)
-		in
-		returnDs (MatchResult CanFail
-			  	      ty1
-				      (mk_case (new_alt:alts) (\ignore -> NoDefault)))
-
-	other ->      -- Many constructors missing, so use a default case
-		newSysLocalDs scrut_ty		`thenDs` \ wild ->
-		returnDs (MatchResult CanFail
-			  	      ty1
-				      (mk_case alts (\fail_expr -> BindDefault wild fail_expr)))
+  | otherwise			-- Datatype case; use a case
+  = MatchResult fail_flag mk_case
   where
 	-- Common stuff
     scrut_ty = idType var
     (tycon, tycon_arg_tys, _) = splitAlgTyConApp scrut_ty
 
 	-- Stuff for newtype
-    (con_id, arg_ids, match_result) = head alts
+    (con_id, arg_ids, match_result) = head match_alts
     arg_id 	   		    = head arg_ids
     coercion_bind		    = NonRec arg_id (Note (Coerce (idType arg_id) scrut_ty) (Var var))
-    newtype_sanity		    = null (tail alts) && null (tail arg_ids)
+    newtype_sanity		    = null (tail match_alts) && null (tail arg_ids)
 
 	-- Stuff for data types
     data_cons = tyConDataCons tycon
 
+    match_results             = [match_result | (_,_,match_result) <- match_alts]
+
+    fail_flag | exhaustive_case
+	      = foldr1 orFail [can_it_fail | MatchResult can_it_fail _ <- match_results]
+	      | otherwise
+	      = CanFail
+
+    wild_var = mkWildId (idType var)
+    mk_case fail = mapDs (mk_alt fail) match_alts	`thenDs` \ alts ->
+		   returnDs (Case (Var var) wild_var (alts ++ mk_default fail))
+
+    mk_alt fail (con, args, MatchResult _ body_fn)
+	= body_fn fail		`thenDs` \ body ->
+	  returnDs (DataCon con, args, body)
+
+    mk_default fail | exhaustive_case = []
+		    | otherwise       = [(DEFAULT, [], fail)]
+
     un_mentioned_constructors
-      = uniqSetToList (mkUniqSet data_cons `minusUniqSet` mkUniqSet [ con | (con, _, _) <- alts] )
-
-    match_results = [match_result | (_,_,match_result) <- alts]
-    (MatchResult _ ty1 _ : _) = match_results
-    can_any_alt_fail = foldr1 orFail [can_it_fail | MatchResult can_it_fail _ _ <- match_results]
-
-    mk_case alts deflt_fn fail_expr
-      = Case (Var var) (AlgAlts final_alts (deflt_fn fail_expr))
-      where
-	final_alts = [ (con, args, body_fn fail_expr)
-		     | (con, args, MatchResult _ _ body_fn) <- alts
-		     ]
+        = mkUniqSet data_cons `minusUniqSet` mkUniqSet [ con | (con, _, _) <- match_alts]
+    exhaustive_case = isEmptyUniqSet un_mentioned_constructors
 
 
-combineMatchResults :: MatchResult -> MatchResult -> DsM MatchResult
-combineMatchResults (MatchResult CanFail      ty1 body_fn1)
-		    (MatchResult can_it_fail2 ty2 body_fn2)
-  = mkFailurePair ty1		`thenDs` \ (bind_fn, duplicatable_expr) ->
-    let
-	new_body_fn1 = \body1 -> Let (bind_fn body1) (body_fn1 duplicatable_expr)
-	new_body_fn2 = \body2 -> new_body_fn1 (body_fn2 body2)
-    in
-    returnDs (MatchResult can_it_fail2 ty1 new_body_fn2)
-
-combineMatchResults match_result1@(MatchResult CantFail ty body_fn1)
-				  match_result2
-  = returnDs match_result1
-
-
--- The difference in combineGRHSMatchResults is that there is no
--- need to let-bind to avoid code duplication
-combineGRHSMatchResults :: MatchResult -> MatchResult -> DsM MatchResult
-combineGRHSMatchResults (MatchResult CanFail     ty1 body_fn1)
-			(MatchResult can_it_fail ty2 body_fn2)
-  = returnDs (MatchResult can_it_fail ty1 (\ body -> body_fn1 (body_fn2 body)))
-
-combineGRHSMatchResults match_result1 match_result2
-  = 	-- Delegate to avoid duplication of code
-    combineMatchResults match_result1 match_result2
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[dsExprToAtom]{Take an expression and produce an atom}
-%*									*
-%************************************************************************
-
-\begin{code}
-dsArgToAtom :: DsCoreArg		    -- The argument expression
-	     -> (CoreArg -> DsM CoreExpr)   -- Something taking the argument *atom*,
-					    -- and delivering an expression E
-	     -> DsM CoreExpr		    -- Either E or let x=arg-expr in E
-
-dsArgToAtom (TyArg    t) continue_with = continue_with (TyArg    t)
-dsArgToAtom (LitArg   l) continue_with = continue_with (LitArg   l)
-dsArgToAtom (VarArg arg) continue_with = dsExprToAtomGivenTy arg (coreExprType arg) continue_with
-
-dsExprToAtomGivenTy
-	 :: CoreExpr		    	-- The argument expression
-	 -> Type			-- Type of the argument
-	 -> (CoreArg -> DsM CoreExpr)   -- Something taking the argument *atom*,
-					-- and delivering an expression E
-	 -> DsM CoreExpr		-- Either E or let x=arg-expr in E
-
-dsExprToAtomGivenTy (Var v)  arg_ty continue_with = continue_with (VarArg v)
-dsExprToAtomGivenTy (Lit v)  arg_ty continue_with = continue_with (LitArg v)
-dsExprToAtomGivenTy arg_expr arg_ty continue_with
-  = newSysLocalDs arg_ty		`thenDs` \ arg_id ->
-    continue_with (VarArg arg_id)	`thenDs` \ body   ->
-    returnDs (
-	if isUnpointedType arg_ty
-	then Case arg_expr (PrimAlts [] (BindDefault arg_id body))
-	else Let (NonRec arg_id arg_expr) body
-    )
-
-dsArgsToAtoms :: [DsCoreArg]
-	       -> ([CoreArg] -> DsM CoreExpr)
-	       -> DsM CoreExpr
-
-dsArgsToAtoms [] continue_with = continue_with []
-
-dsArgsToAtoms (arg:args) continue_with
-  = dsArgToAtom   arg 	$ \ arg_atom  ->
-    dsArgsToAtoms args $ \ arg_atoms ->
-    continue_with (arg_atom:arg_atoms)
 \end{code}
 
 %************************************************************************
@@ -302,29 +235,6 @@ dsArgsToAtoms (arg:args) continue_with
 %************************************************************************
 
 \begin{code}
-type DsCoreArg = GenCoreArg CoreExpr{-NB!-} Unused
-
-mkAppDs  :: CoreExpr -> [DsCoreArg] -> DsM CoreExpr
-mkConDs  :: Id       -> [DsCoreArg] -> DsM CoreExpr
-mkPrimDs :: PrimOp   -> [DsCoreArg] -> DsM CoreExpr
-
-mkAppDs fun args
-  = dsArgsToAtoms args $ \ atoms ->
-    returnDs (mkGenApp fun atoms)
-
-mkConDs con args
-  = dsArgsToAtoms args $ \ atoms ->
-    returnDs (Con con atoms)
-
-mkPrimDs op args
-  = dsArgsToAtoms args $ \ atoms ->
-    returnDs (Prim op  atoms)
-\end{code}
-
-\begin{code}
-showForErr :: Outputable a => a -> String		-- Boring but useful
-showForErr thing = showSDoc (ppr thing)
-
 mkErrorAppDs :: Id 		-- The error function
 	     -> Type		-- Type to which it should be applied
 	     -> String		-- The error message string to pass
@@ -334,9 +244,8 @@ mkErrorAppDs err_id ty msg
   = getSrcLocDs			`thenDs` \ src_loc ->
     let
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
-	msg_lit  = NoRepStr (_PK_ full_msg)
     in
-    returnDs (mkApp (Var err_id) [ty] [LitArg msg_lit])
+    returnDs (mkApps (Var err_id) [Type ty, mkStringLit full_msg])
 \end{code}
 
 %************************************************************************
@@ -379,20 +288,19 @@ mkSelectorBinds pat val_expr
     getSrcLocDs					`thenDs` \ src_loc ->
     let
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", ppr pat])
-	msg_lit  = NoRepStr (_PK_ full_msg)
     in
     mapDs (mk_bind val_var msg_var) binders	`thenDs` \ binds ->
     returnDs ( (val_var, val_expr) : 
-	       (msg_var, Lit msg_lit) :
+	       (msg_var, mkStringLit full_msg) :
 	       binds )
 
 
   | otherwise
   = mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (showSDoc (ppr pat))	`thenDs` \ error_expr ->
-    matchSimply val_expr LetMatch pat tuple_ty local_tuple error_expr	`thenDs` \ tuple_expr ->
-    newSysLocalDs tuple_ty						`thenDs` \ tuple_var ->
+    matchSimply val_expr LetMatch pat local_tuple error_expr	`thenDs` \ tuple_expr ->
+    newSysLocalDs tuple_ty					`thenDs` \ tuple_var ->
     let
-	mk_tup_bind binder = (binder, mkTupleSelector binders binder (Var tuple_var))
+	mk_tup_bind binder = (binder, mkTupleSelector binders binder tuple_var (Var tuple_var))
     in
     returnDs ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
   where
@@ -404,18 +312,17 @@ mkSelectorBinds pat val_expr
     -- (mk_bind sv bv) generates
     --		bv = case sv of { pat -> bv; other -> error-msg }
     -- Remember, pat binds bv
-      = matchSimply (Var scrut_var) LetMatch pat binder_ty 
+      = matchSimply (Var scrut_var) LetMatch pat
 		    (Var bndr_var) error_expr			`thenDs` \ rhs_expr ->
         returnDs (bndr_var, rhs_expr)
       where
         binder_ty = idType bndr_var
-        error_expr = mkApp (Var iRREFUT_PAT_ERROR_ID) [binder_ty] [VarArg msg_var]
+        error_expr = mkApps (Var iRREFUT_PAT_ERROR_ID) [Type binder_ty, Var msg_var]
 
-    is_simple_pat (TuplePat ps)        = all is_triv_pat ps
-    is_simple_pat (ConPat _ _ ps)      = all is_triv_pat ps
+    is_simple_pat (TuplePat ps True{-boxed-}) = all is_triv_pat ps
+    is_simple_pat (ConPat _ _ _ _ ps)  = all is_triv_pat ps
     is_simple_pat (VarPat _)	       = True
-    is_simple_pat (ConOpPat p1 _ p2 _) = is_triv_pat p1 && is_triv_pat p2
-    is_simple_pat (RecPat _ _ ps)      = and [is_triv_pat p | (_,p,_) <- ps]
+    is_simple_pat (RecPat _ _ _ _ ps)  = and [is_triv_pat p | (_,p,_) <- ps]
     is_simple_pat other		       = False
 
     is_triv_pat (VarPat v)  = True
@@ -430,11 +337,10 @@ has only one element, it is the identity function.
 \begin{code}
 mkTupleExpr :: [Id] -> CoreExpr
 
-mkTupleExpr []	 = Con unitDataCon []
+mkTupleExpr []	 = mkConApp unitDataCon []
 mkTupleExpr [id] = Var id
-mkTupleExpr ids	 = mkCon (tupleCon (length ids))
-			 (map idType ids)
-			 [ VarArg i | i <- ids ]
+mkTupleExpr ids	 = mkConApp (tupleCon (length ids))
+			    (map (Type . idType) ids ++ [ Var i | i <- ids ])
 \end{code}
 
 
@@ -450,16 +356,17 @@ just the identity.
 \begin{code}
 mkTupleSelector :: [Id]			-- The tuple args
 		-> Id			-- The selected one
+		-> Id			-- A variable of the same type as the scrutinee
 		-> CoreExpr		-- Scrutinee
 		-> CoreExpr
 
-mkTupleSelector [var] should_be_the_same_var scrut
+mkTupleSelector [var] should_be_the_same_var scrut_var scrut
   = ASSERT(var == should_be_the_same_var)
     scrut
 
-mkTupleSelector vars the_var scrut
+mkTupleSelector vars the_var scrut_var scrut
   = ASSERT( not (null vars) )
-    Case scrut (AlgAlts [(tupleCon (length vars), vars, Var the_var)] NoDefault)
+    Case scrut scrut_var [(DataCon (tupleCon (length vars)), vars, Var the_var)]
 \end{code}
 
 
@@ -518,23 +425,23 @@ for the primitive case:
 Now fail.33 is a function, so it can be let-bound.
 
 \begin{code}
-mkFailurePair :: Type		-- Result type of the whole case expression
-	      -> DsM (CoreExpr -> CoreBinding,
-				-- Binds the newly-created fail variable
+mkFailurePair :: CoreExpr	-- Result type of the whole case expression
+	      -> DsM (CoreBind,	-- Binds the newly-created fail variable
 				-- to either the expression or \ _ -> expression
 		      CoreExpr)	-- Either the fail variable, or fail variable
 				-- applied to unit tuple
-mkFailurePair ty
-  | isUnpointedType ty
-  = newFailLocalDs (voidTy `mkFunTy` ty)	`thenDs` \ fail_fun_var ->
-    newSysLocalDs voidTy			`thenDs` \ fail_fun_arg ->
-    returnDs (\ body ->
-		NonRec fail_fun_var (Lam (ValBinder fail_fun_arg) body),
-	      App (Var fail_fun_var) (VarArg voidId))
+mkFailurePair expr
+  | isUnLiftedType ty
+  = newFailLocalDs (unitTy `mkFunTy` ty)	`thenDs` \ fail_fun_var ->
+    newSysLocalDs unitTy			`thenDs` \ fail_fun_arg ->
+    returnDs (NonRec fail_fun_var (Lam fail_fun_arg expr),
+	      App (Var fail_fun_var) (mkConApp unitDataCon []))
 
   | otherwise
   = newFailLocalDs ty 		`thenDs` \ fail_var ->
-    returnDs (\ body -> NonRec fail_var body, Var fail_var)
+    returnDs (NonRec fail_var expr, Var fail_var)
+  where
+    ty = coreExprType expr
 \end{code}
 
 

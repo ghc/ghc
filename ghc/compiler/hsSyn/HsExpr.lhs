@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[HsExpr]{Abstract Haskell syntax: expressions}
 
@@ -17,12 +17,12 @@ import BasicTypes	( Fixity(..), FixityDirection(..) )
 import HsTypes		( HsType )
 
 -- others:
-import Name		( NamedThing )
-import Id		( Id )
+import Name		( Name, NamedThing(..), isLexSym, occNameString )
 import Outputable	
 import PprType		( pprType, pprParendType )
 import Type		( GenType )
-import TyVar		( GenTyVar )
+import Var		( GenTyVar, Id )
+import DataCon		( DataCon )
 import SrcLoc		( SrcLoc )
 \end{code}
 
@@ -79,11 +79,11 @@ data HsExpr flexi id pat
   | HsLet	(HsBinds flexi id pat)	-- let(rec)
 		(HsExpr  flexi id pat)
 
-  | HsDo	DoOrListComp
+  | HsDo	StmtCtxt
 		[Stmt flexi id pat]	-- "do":one or more stmts
 		SrcLoc
 
-  | HsDoOut	DoOrListComp
+  | HsDoOut	StmtCtxt
 		[Stmt   flexi id pat]	-- "do":one or more stmts
 		id				-- id for return
 		id				-- id for >>=
@@ -102,16 +102,20 @@ data HsExpr flexi id pat
 				-- NB: Unit is ExplicitTuple []
 				-- for tuples, we can get the types
 				-- direct from the components
+		Bool		-- boxed?
 
-  | HsCon Id			-- TRANSLATION; a saturated constructor application
+  | HsCon DataCon		-- TRANSLATION; a saturated constructor application
 	  [GenType flexi]
 	  [HsExpr flexi id pat]
 
 	-- Record construction
   | RecordCon	id				-- The constructor
-		(HsExpr flexi id pat)		-- Always (HsVar id) until type checker,
-						-- but the latter adds its type args too
 		(HsRecordBinds flexi id pat)
+
+  | RecordConOut DataCon
+		(HsExpr flexi id pat)		-- Data con Id applied to type args
+		(HsRecordBinds flexi id pat)
+
 
 	-- Record update
   | RecordUpd	(HsExpr flexi id pat)
@@ -190,6 +194,7 @@ pprExpr :: (NamedThing id, Outputable id, Outputable pat)
         => HsExpr flexi id pat -> SDoc
 
 pprExpr e = pprDeeper (ppr_expr e)
+pprBinds b = pprDeeper (ppr b)
 
 ppr_expr (HsVar v) = ppr v
 
@@ -218,13 +223,15 @@ ppr_expr (OpApp e1 op fixity e2)
       = hang (pprExpr op) 4 (sep [pp_e1, pp_e2])
 
     pp_infixly v
-      = sep [pp_e1, hsep [ppr v, pp_e2]]
+      = sep [pp_e1, hsep [pp_v, pp_e2]]
+      where
+        pp_v | isLexSym (occNameString (getOccName v)) = ppr v
+	     | otherwise			       = char '`' <> ppr v <> char '`'
 
 ppr_expr (NegApp e _)
-  = (<>) (char '-') (pprParendExpr e)
+  = char '-' <+> pprParendExpr e
 
-ppr_expr (HsPar e)
-  = parens (ppr_expr e)
+ppr_expr (HsPar e) = parens (ppr_expr e)
 
 ppr_expr (SectionL expr op)
   = case op of
@@ -261,11 +268,11 @@ ppr_expr (HsIf e1 e2 e3 _)
 
 -- special case: let ... in let ...
 ppr_expr (HsLet binds expr@(HsLet _ _))
-  = sep [hang (ptext SLIT("let")) 2 (hsep [ppr binds, ptext SLIT("in")]),
+  = sep [hang (ptext SLIT("let")) 2 (hsep [pprBinds binds, ptext SLIT("in")]),
 	 pprExpr expr]
 
 ppr_expr (HsLet binds expr)
-  = sep [hang (ptext SLIT("let")) 2 (ppr binds),
+  = sep [hang (ptext SLIT("let")) 2 (pprBinds binds),
 	 hang (ptext SLIT("in"))  2 (ppr expr)]
 
 ppr_expr (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp stmts
@@ -277,14 +284,19 @@ ppr_expr (ExplicitListOut ty exprs)
   = hcat [ brackets (fsep (punctuate comma (map ppr_expr exprs))),
 	   ifNotPprForUser ((<>) space (parens (pprType ty))) ]
 
-ppr_expr (ExplicitTuple exprs)
+ppr_expr (ExplicitTuple exprs True)
   = parens (sep (punctuate comma (map ppr_expr exprs)))
+
+ppr_expr (ExplicitTuple exprs False)
+  = ptext SLIT("(#") <> sep (punctuate comma (map ppr_expr exprs)) <> ptext SLIT("#)")
 
 ppr_expr (HsCon con_id tys args)
   = ppr con_id <+> sep (map pprParendType tys ++
 		        map pprParendExpr args)
 
-ppr_expr (RecordCon con_id con rbinds)
+ppr_expr (RecordCon con_id rbinds)
+  = pp_rbinds (ppr con_id) rbinds
+ppr_expr (RecordConOut data_con con rbinds)
   = pp_rbinds (ppr con) rbinds
 
 ppr_expr (RecordUpd aexp rbinds)
@@ -350,7 +362,7 @@ pprParendExpr expr
       HsVar _		    -> pp_as_was
       ExplicitList _	    -> pp_as_was
       ExplicitListOut _ _   -> pp_as_was
-      ExplicitTuple _	    -> pp_as_was
+      ExplicitTuple _ _	    -> pp_as_was
       HsPar _		    -> pp_as_was
 
       _			    -> parens pp_as_was
@@ -386,8 +398,14 @@ pp_rbinds thing rbinds
 %************************************************************************
 
 \begin{code}
-data DoOrListComp = DoStmt | ListComp | Guard
-
+data StmtCtxt	-- Context of a Stmt
+  = DoStmt		-- Do Statment
+  | ListComp		-- List comprehension
+  | CaseAlt		-- Guard on a case alternative
+  | PatBindRhs		-- Guard on a pattern binding
+  | FunRhs Name		-- Guard on a function defn for f
+  | LambdaBody		-- Body of a lambda abstraction
+		
 pprDo DoStmt stmts
   = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))
 pprDo ListComp stmts
@@ -410,7 +428,7 @@ data Stmt flexi id pat
   | GuardStmt	(HsExpr  flexi id pat)		-- List comps only
 		SrcLoc
 
-  | ExprStmt	(HsExpr  flexi id pat)		-- Do stmts only
+  | ExprStmt	(HsExpr  flexi id pat)		-- Do stmts; and guarded things at the end
 		SrcLoc
 
   | ReturnStmt	(HsExpr  flexi id pat)		-- List comps only, at the end
@@ -424,7 +442,7 @@ instance (NamedThing id, Outputable id, Outputable pat) =>
 pprStmt (BindStmt pat expr _)
  = hsep [ppr pat, ptext SLIT("<-"), ppr expr]
 pprStmt (LetStmt binds)
- = hsep [ptext SLIT("let"), ppr binds]
+ = hsep [ptext SLIT("let"), pprBinds binds]
 pprStmt (ExprStmt expr _)
  = ppr expr
 pprStmt (GuardStmt expr _)

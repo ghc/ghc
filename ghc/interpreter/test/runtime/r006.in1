@@ -1,0 +1,17 @@
+map succ [1..10]
+
+filter odd [1..10]
+
+takeWhile (<5) [1..10]
+dropWhile (<5) [1..10]
+span  (<5) [1..10]
+break (<5) [1..10]
+span  (>5) [1..10]
+break (>5) [1..10]
+
+length [1..10]
+[1..10] !! 5
+
+take 5 [1..10]
+drop 5 [1..10]
+splitAt 5 [1..10]

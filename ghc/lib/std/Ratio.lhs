@@ -14,6 +14,7 @@ module	Ratio (
   ) where
 
 import PrelNum
+import PrelNumExtra
 \end{code}
 
 

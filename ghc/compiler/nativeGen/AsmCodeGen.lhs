@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1996
+% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 
 \begin{code}
@@ -19,11 +19,15 @@ import AbsCSyn		( AbstractC, MagicId )
 import AsmRegAlloc	( runRegAllocate )
 import OrdList		( OrdList )
 import PrimOp		( commutableOp, PrimOp(..) )
-import PrimRep		( PrimRep{-instance Eq-} )
 import RegAllocInfo	( mkMRegsState, MRegsState )
-import Stix		( StixTree(..), StixReg(..), CodeSegment )
-import UniqSupply	( returnUs, thenUs, mapUs, UniqSM, UniqSupply )
+import Stix		( StixTree(..), StixReg(..) )
+import PrimRep		( isFloatingRep )
+import UniqSupply	( returnUs, thenUs, mapUs, initUs, UniqSM, UniqSupply )
+import UniqFM		( UniqFM, emptyUFM, addToUFM, lookupUFM )
 import Outputable	
+
+import GlaExts (trace) --tmp
+#include "nativeGen/NCG.h"
 \end{code}
 
 The 96/03 native-code generator has machine-independent and
@@ -75,17 +79,25 @@ So, here we go:
 \begin{code}
 writeRealAsm :: Handle -> AbstractC -> UniqSupply -> IO ()
 writeRealAsm handle absC us
-  = _scc_ "writeRealAsm" (printForAsm handle (runNCG absC us))
+  = -- _scc_ "writeRealAsm" 
+    printForAsm handle (initUs us (runNCG absC))
 
 dumpRealAsm :: AbstractC -> UniqSupply -> SDoc
-dumpRealAsm = runNCG
+dumpRealAsm absC us = initUs us (runNCG absC)
 
 runNCG absC
   = genCodeAbstractC absC	`thenUs` \ treelists ->
     let
 	stix = map (map genericOpt) treelists
     in
+#if i386_TARGET_ARCH
+    let
+	stix' = map floatFix stix
+    in
+    codeGen stix'
+#else
     codeGen stix
+#endif
 \end{code}
 
 @codeGen@ is the top-level code-generation function:
@@ -281,4 +293,65 @@ Anything else is just too hard.
 
 \begin{code}
 primOpt op args = StPrim op args
+\end{code}
+
+-----------------------------------------------------------------------------
+Fix up floating point operations for x86.
+
+The problem is that the code generator can't handle the weird register
+naming scheme for floating point registers on the x86, so we have to
+deal with memory-resident floating point values wherever possible.
+
+We therefore can't stand references to floating-point kinded temporary
+variables, and try to translate them into memory addresses wherever
+possible.
+
+\begin{code}
+floatFix :: [StixTree] -> [StixTree]
+floatFix trees = fltFix emptyUFM trees
+
+fltFix 	:: UniqFM StixTree	-- mapping tmp vars to memory locations
+      	-> [StixTree]
+	-> [StixTree]
+fltFix locs [] = []
+
+-- The case we're interested in: loading a temporary from a memory
+-- address.  Eliminate the instruction and replace all future references
+-- to the temporary with the memory address.
+fltFix locs ((StAssign rep (StReg (StixTemp uq _)) loc) : trees)
+  | isFloatingRep rep  = trace "found one" $ fltFix (addToUFM locs uq loc) trees
+
+fltFix locs ((StAssign rep src dst) : trees)
+  = StAssign rep (fltFix1 locs src) (fltFix1 locs dst) : fltFix locs trees
+  
+fltFix locs (tree : trees)
+  = fltFix1 locs tree : fltFix locs trees
+
+
+fltFix1 :: UniqFM StixTree -> StixTree -> StixTree
+fltFix1 locs r@(StReg (StixTemp uq rep))
+  | isFloatingRep rep = case lookupUFM locs uq of
+			 	Nothing -> panic "fltFix1"
+				Just tree -> trace "substed" $ tree
+
+fltFix1 locs (StIndex rep l r) =
+  StIndex rep (fltFix1 locs l) (fltFix1 locs r)
+
+fltFix1 locs (StInd rep tree) =
+  StInd rep (fltFix1 locs tree)
+
+fltFix1 locs (StAssign rep dst src) = panic "fltFix1: StAssign"
+
+fltFix1 locs (StJump tree) = StJump (fltFix1 locs tree)
+
+fltFix1 locs (StCondJump label tree) =
+  StCondJump label (fltFix1 locs tree)
+
+fltFix1 locs (StPrim op trees) = 
+  StPrim op (map (fltFix1 locs) trees)
+
+fltFix1 locs (StCall f conv rep trees) =
+  StCall f conv rep (map (fltFix1 locs) trees)
+ 
+fltFix1 locs tree = tree
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[DsHsSyn]{Haskell abstract syntax---added things for desugarer}
 
@@ -8,14 +8,13 @@ module DsHsSyn where
 
 #include "HsVersions.h"
 
-import HsSyn		( OutPat(..), MonoBinds(..),
-			  HsExpr, GRHSsAndBinds, Match, HsLit )
+import HsSyn		( OutPat(..), MonoBinds(..) )
 import TcHsSyn		( TypecheckedPat,
 			  TypecheckedMonoBinds )
 
 import Id		( idType, Id )
 import Type             ( Type )
-import TysWiredIn	( mkListTy, mkTupleTy, unitTy )
+import TysWiredIn	( mkListTy, mkTupleTy, mkUnboxedTupleTy, unitTy )
 import Util		( panic )
 \end{code}
 
@@ -28,11 +27,11 @@ outPatType (WildPat ty)		= ty
 outPatType (VarPat var)		= idType var
 outPatType (LazyPat pat)	= outPatType pat
 outPatType (AsPat var pat)	= idType var
-outPatType (ConPat _ ty _)	= ty
-outPatType (ConOpPat _ _ _ ty)	= ty
+outPatType (ConPat _ ty _ _ _)	= ty
 outPatType (ListPat ty _)	= mkListTy ty
-outPatType (TuplePat pats)	= mkTupleTy (length pats) (map outPatType pats)
-outPatType (RecPat _ ty _)      = ty
+outPatType (TuplePat pats True)	= mkTupleTy (length pats) (map outPatType pats)
+outPatType (TuplePat pats False)= mkUnboxedTupleTy (length pats) (map outPatType pats)
+outPatType (RecPat _ ty _ _ _)  = ty
 outPatType (LitPat lit ty)	= ty
 outPatType (NPat lit ty _)	= ty
 outPatType (NPlusKPat _ _ ty _ _) = ty
@@ -64,14 +63,14 @@ collectTypedMonoBinders (AbsBinds _ _ exports _)
   = [global | (_, global, local) <- exports]
 
 collectTypedPatBinders :: TypecheckedPat -> [Id]
-collectTypedPatBinders (VarPat var)	    = [var]
-collectTypedPatBinders (LazyPat pat)	    = collectTypedPatBinders pat
-collectTypedPatBinders (AsPat a pat)	    = a : collectTypedPatBinders pat
-collectTypedPatBinders (ConPat _ _ pats)    = concat (map collectTypedPatBinders pats)
-collectTypedPatBinders (ConOpPat p1 _ p2 _) = collectTypedPatBinders p1 ++ collectTypedPatBinders p2
-collectTypedPatBinders (ListPat t pats)     = concat (map collectTypedPatBinders pats)
-collectTypedPatBinders (TuplePat pats)	    = concat (map collectTypedPatBinders pats)
-collectTypedPatBinders (RecPat _ _ fields)  = concat (map (\ (f,pat,_) -> collectTypedPatBinders pat) fields)
-collectTypedPatBinders (DictPat ds ms)	    = ds ++ ms
-collectTypedPatBinders any_other_pat	    = [ {-no binders-} ]
+collectTypedPatBinders (VarPat var)	     = [var]
+collectTypedPatBinders (LazyPat pat)	     = collectTypedPatBinders pat
+collectTypedPatBinders (AsPat a pat)	     = a : collectTypedPatBinders pat
+collectTypedPatBinders (ConPat _ _ _ _ pats) = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (ListPat t pats)      = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (TuplePat pats _)     = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (RecPat _ _ _ _ fields) = concat (map (\ (f,pat,_) -> collectTypedPatBinders pat)
+							fields)
+collectTypedPatBinders (DictPat ds ms)	     = ds ++ ms
+collectTypedPatBinders any_other_pat	     = [ {-no binders-} ]
 \end{code}

@@ -1,0 +1,1 @@
+ERROR "test/static/s059.hs" (line 4): Cannot derive instances of class "C"

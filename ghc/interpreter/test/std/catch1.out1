@@ -1,0 +1,9 @@
+Left {HugsObject ...}
+Right 1
+2
+1
+{error "bar"}
+abcdefg
+<error>bcdefg
+abc<error>
+<error>bc<error>

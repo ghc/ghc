@@ -128,6 +128,7 @@ BOOLEAN pat_check=TRUE;
 %token	OCURLY		CCURLY		VCCURLY	
 %token  COMMA		SEMI		OBRACK		CBRACK
 %token	WILDCARD	BQUOTE		OPAREN		CPAREN
+%token  OUNBOXPAREN     CUNBOXPAREN
 
 
 /**********************************************************************
@@ -161,6 +162,8 @@ BOOLEAN pat_check=TRUE;
 
 %token  SCC
 %token	CCALL		CCALL_GC	CASM		CASM_GC
+
+%token	DOT		FORALL
 %token  EXPORT          UNSAFE          STDCALL		C_CALL   LABEL
 %token  PASCAL		FASTCALL	FOREIGN         DYNAMIC
 
@@ -228,8 +231,8 @@ BOOLEAN pat_check=TRUE;
 		dorest stmts stmt
 		rbinds rbinds1 rpats rpats1 list_exps list_rest
 		qvarsk qvars_list
-		constrs constr1 fields 
-		types atypes batypes
+		constrs constr1 fields conargatypes
+		tautypes atypes
 		types_and_maybe_ids
   		pats simple_context simple_context_list 
 		export_list enames
@@ -238,14 +241,15 @@ BOOLEAN pat_check=TRUE;
 		maybefixes fixes fix ops
 		dtyclses dtycls_list
   		gdrhs gdpat valrhs
-  		lampats	cexps gd
+  		lampats	cexps gd texps
+		tyvars1 constr_context forall
 
 %type <umaybe>  maybeexports impspec deriving 
 		ext_name
 
 %type <uliteral> lit_constant
 
-%type <utree>	exp oexp dexp kexp fexp aexp rbind texps
+%type <utree>	exp oexp dexp kexp fexp aexp rbind
 		expL oexpL kexpL expLno oexpLno dexpLno kexpLno
 		vallhs funlhs qual leftexp
  		pat cpat bpat apat apatc conpat rpat
@@ -256,7 +260,8 @@ BOOLEAN pat_check=TRUE;
 		VARID CONID VARSYM CONSYM 
   		var con varop conop op
 		vark varid varsym varsym_nominus
-	        tycon modid ccallid
+	        tycon modid ccallid tyvar
+		varid_noforall
 
 %type <uqid>	QVARID QCONID QVARSYM QCONSYM 
 		qvarid qconid qvarsym qconsym
@@ -272,9 +277,12 @@ BOOLEAN pat_check=TRUE;
 
 %type <upbinding> valrhs1 altrest
 
-%type <uttype>    ctype sigtype sigarrowtype type atype bigatype btype
-		  bbtype batype bxtype wierd_atype
-		  simple_con_app simple_con_app1 tyvar contype inst_type
+%type <uttype>    polytype
+		  conargatype conapptype
+		  tautype
+		  apptype
+		  atype polyatype
+		  simple_con_app simple_con_app1 inst_type
 
 %type <uconstr>	  constr constr_after_context field
 
@@ -489,7 +497,7 @@ topdecl	:  typed				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  decl 				{ $$ = $1; }
 	;
 
-typed	:  typekey simple_con_app EQUAL type		{ $$ = mknbind($2,$4,startlineno); }
+typed	:  typekey simple_con_app EQUAL tautype		{ $$ = mknbind($2,$4,startlineno); }
 	;
 
 
@@ -509,11 +517,11 @@ deriving: /* empty */				{ $$ = mknothing(); }
         | DERIVING dtyclses                     { $$ = mkjust($2); }
 	;
 
-classd	:  classkey btype DARROW simple_con_app1 cbody
+classd	:  classkey apptype DARROW simple_con_app1 cbody
 		/* Context can now be more than simple_context */
 		{ $$ = mkcbind(type2context($2),$4,$5,startlineno); }
-	|  classkey btype cbody
-		/* We have to say btype rather than simple_con_app1, else
+	|  classkey apptype cbody
+		/* We have to say apptype rather than simple_con_app1, else
 		   we get reduce/reduce errs */
 		{ check_class_decl_head($2);
 		  $$ = mkcbind(Lnil,$2,$3,startlineno); }
@@ -527,10 +535,11 @@ cbody	:  /* empty */				{ $$ = mknullbind(); }
 instd	:  instkey inst_type rinst		{ $$ = mkibind($2,$3,startlineno); }
 	;
 
-/* Compare ctype */
-inst_type : type DARROW type			{ is_context_format( $3, 0 );   /* Check the instance head */
-						  $$ = mkcontext(type2context($1),$3); }
-	  | btype				{ is_context_format( $1, 0 );   /* Check the instance head */
+/* Compare polytype */
+/* [July 98: first production was tautype DARROW tautype, but I can't see why.] */
+inst_type : apptype DARROW apptype		{ is_context_format( $3, 0 );   /* Check the instance head */
+						  $$ = mkforall(Lnil,type2context($1),$3); }
+	  | apptype				{ is_context_format( $1, 0 );   /* Check the instance head */
 						  $$ = $1; }
 	  ;
 
@@ -540,15 +549,15 @@ rinst	:  /* empty */			  			{ $$ = mknullbind(); }
 	|  WHERE vocurly instdefs vccurly 			{ $$ = $3; }
 	;
 
-defaultd:  defaultkey OPAREN types CPAREN       { $$ = mkdbind($3,startlineno); }
+defaultd:  defaultkey OPAREN tautypes CPAREN       { $$ = mkdbind($3,startlineno); }
 	|  defaultkey OPAREN CPAREN		{ $$ = mkdbind(Lnil,startlineno); }
 	;
 
 /* FFI primitive declarations - GHC/Hugs specific */
-foreignd:  foreignkey IMPORT callconv ext_name unsafe_flag qvarid DCOLON sigtype { $$ = mkfobind($6,$8,$4,$5,$3,FOREIGN_IMPORT,startlineno); }
-        |  foreignkey EXPORT callconv ext_name qvarid DCOLON sigtype             { $$ = mkfobind($5,$7,$4,0,$3,FOREIGN_EXPORT,startlineno); }
+foreignd:  foreignkey IMPORT callconv ext_name unsafe_flag qvarid DCOLON tautype { $$ = mkfobind($6,$8,$4,$5,$3,FOREIGN_IMPORT,startlineno); }
+        |  foreignkey EXPORT callconv ext_name qvarid DCOLON tautype             { $$ = mkfobind($5,$7,$4,0,$3,FOREIGN_EXPORT,startlineno); }
 	;
-        |  foreignkey LABEL ext_name qvarid DCOLON sigtype                       { $$ = mkfobind($4,$6,$3,0,-1,FOREIGN_LABEL,startlineno); }
+        |  foreignkey LABEL ext_name qvarid DCOLON tautype                       { $$ = mkfobind($4,$6,$3,0,-1,FOREIGN_LABEL,startlineno); }
 	;
 
 callconv: STDCALL 	{ $$ = CALLCONV_STDCALL;  }
@@ -588,7 +597,7 @@ decls	: decl
     to real mischief (ugly, but likely to work).
 */
 
-decl	: qvarsk DCOLON sigtype
+decl	: qvarsk DCOLON polytype
 		{ $$ = mksbind($1,$3,startlineno);
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
 		}
@@ -656,8 +665,8 @@ types_and_maybe_ids :
 	;
 
 type_and_maybe_id :
-	   type					{ $$ = mkvspec_ty_and_id($1,mknothing()); }
-	|  type EQUAL qvark			{ $$ = mkvspec_ty_and_id($1,mkjust($3)); }
+	   tautype				{ $$ = mkvspec_ty_and_id($1,mknothing()); }
+	|  tautype EQUAL qvark			{ $$ = mkvspec_ty_and_id($1,mkjust($3)); }
 
 
 /**********************************************************************
@@ -668,68 +677,75 @@ type_and_maybe_id :
 *                                                                     *
 **********************************************************************/
 
-/*  "DCOLON context => type" vs "DCOLON type" is a problem,
+/*  "DCOLON context => tautype" vs "DCOLON tautype" is a problem,
     because you can't distinguish between
 
 	foo :: (Baz a, Baz a)
 	bar :: (Baz a, Baz a) => [a] -> [a] -> [a]
 
-    with one token of lookahead.  The HACK is to have "DCOLON ttype"
-    [tuple type] in the first case, then check that it has the right
+    with one token of lookahead.  The HACK is to have "DCOLON apptype"
+    in the first case, then check that it has the right
     form C a, or (C1 a, C2 b, ... Cn z) and convert it into a
     context.  Blaach!
 */
 
-/* A sigtype is a rank 2 type; it can have for-alls as function args:
-  	f :: All a => (All b => ...) -> Int
-*/
-sigtype	: btype DARROW sigarrowtype		{ $$ = mkcontext(type2context($1),$3); }
-	| sigarrowtype 
+/* --------------------------- */
+
+polyatype : atype
+          ;
+
+polytype : FORALL tyvars1 DOT
+                  apptype DARROW tautype	{ $$ = mkforall($2,   type2context($4), $6); }
+         | FORALL tyvars1 DOT tautype           { $$ = mkforall($2,   Lnil,             $4); }
+         |        apptype DARROW tautype	{ $$ = mkforall(Lnil, type2context($1), $3); }
+         | tautype
+	 ;
+
+/* --------------------------- */
+/* tautype is just a monomorphic type.
+   But it may have nested for-alls if we're in a rank-2 type */
+
+tautype :  apptype RARROW tautype		{ $$ = mktfun($1,$3); }
+	|  apptype				{ $$ = $1; }
 	;
 
-sigarrowtype : bigatype RARROW sigarrowtype	{ $$ = mktfun($1,$3); }
-	     | btype RARROW sigarrowtype	{ $$ = mktfun($1,$3); }
-	     | btype
-	     ;
+tautypes :  tautype				{ $$ = lsing($1); }
+	 |  tautypes COMMA tautype		{ $$ = lapp($1,$3); }
+	 ;
 
-/* A "big" atype can be a forall-type in brackets.  */
-bigatype: OPAREN btype DARROW type CPAREN	{ $$ = mkcontext(type2context($2),$4); }
-	;
+/* --------------------------- */
+/* apptype: type application */
 
-	/* 1 S/R conflict at DARROW -> shift */
-ctype   : btype DARROW type			{ $$ = mkcontext(type2context($1),$3); }
-	| type
-	;
-
-	/* 1 S/R conflict at RARROW -> shift */
-type	:  btype RARROW type			{ $$ = mktfun($1,$3); }
-	|  btype				{ $$ = $1; }
-	;
-
-btype	:  btype atype				{ $$ = mktapp($1,$2); }
+apptype	:  apptype atype			{ $$ = mktapp($1,$2); }
 	|  atype				{ $$ = $1; }
 	;
 
-atype  	:  gtycon				{ $$ = mktname($1); }
-	|  tyvar				{ $$ = $1; }
-	|  OPAREN type COMMA types CPAREN	{ $$ = mkttuple(mklcons($2,$4)); }
-	|  OBRACK type CBRACK			{ $$ = mktllist($2); }
-	|  OPAREN type CPAREN			{ $$ = $2; }
-        ;
+/* --------------------------- */
+/* atype: an atomic or bracketed type: T, x, [ty], tuple ty */
 
+atypes :  atype				        { $$ = lsing($1); }
+	  |  atype atypes		        { $$ = mklcons($1,$2); }
+	  ;
+
+atype   :  gtycon				{ $$ = mktname($1); }
+	|  tyvar				{ $$ = mknamedtvar($1); }
+
+	|  OPAREN tautype COMMA
+		  tautypes CPAREN		{ $$ = mkttuple(mklcons($2,$4)); }
+
+	|  OUNBOXPAREN tautype COMMA 
+		       tautypes CUNBOXPAREN	{ $$ = mktutuple(mklcons($2,$4)); }
+
+	|  OBRACK tautype CBRACK		{ $$ = mktllist($2); }
+        |  OPAREN polytype CPAREN		{ $$ = $2; }
+	;
+
+/* --------------------------- */
 gtycon	:  qtycon
 	|  OPAREN RARROW CPAREN			{ $$ = creategid(ARROWGID); }
 	|  OBRACK CBRACK			{ $$ = creategid(NILGID); }         
 	|  OPAREN CPAREN			{ $$ = creategid(UNITGID); }         
 	|  OPAREN commas CPAREN 		{ $$ = creategid($2); }
-	;
-
-atypes	:  atype				{ $$ = lsing($1); }
-	|  atypes atype				{ $$ = lapp($1,$2); }
-	;
-
-types	:  type					{ $$ = lsing($1); }
-	|  types COMMA type			{ $$ = lapp($1,$3); }
 	;
 
 commas	: COMMA					{ $$ = 1; }
@@ -750,8 +766,8 @@ simple_con_app: gtycon                          { $$ = mktname($1); }
         |  simple_con_app1                      { $$ = $1; }
 	;
    
-simple_con_app1:  gtycon tyvar			{ $$ = mktapp(mktname($1),$2); }
-	|  simple_con_app tyvar			{ $$ = mktapp($1, $2); } 
+simple_con_app1:  gtycon tyvar			{ $$ = mktapp(mktname($1),mknamedtvar($2)); }
+	|  simple_con_app tyvar			{ $$ = mktapp($1, mknamedtvar($2)); } 
 	;
 
 simple_context	:  OPAREN simple_context_list CPAREN		{ $$ = $2; }
@@ -766,8 +782,17 @@ constrs	:  constr				{ $$ = lsing($1); }
 	|  constrs VBAR constr			{ $$ = lapp($1,$3); }
 	;
 
-constr	:  constr_after_context
-	|  btype DARROW constr_after_context	{ $$ = mkconstrcxt ( type2context($1), $3 ); }
+constr	:  forall constr_context DARROW constr_after_context	{ $$ = mkconstrex ( $1, $2, $4 ); }
+        |  forall constr_after_context	                        { $$ = mkconstrex ( $1, Lnil, $2 ); }
+	;
+
+forall :                                                { $$ = Lnil }
+       | FORALL tyvars1 DOT                             { $$ = $2; }
+       ;
+
+constr_context
+	: conapptype conargatype 	{ $$ = type2context( mktapp($1,$2) ); }
+   	| conargatype 			{ $$ = type2context( $1 ); }
 	;
 
 constr_after_context :
@@ -785,15 +810,15 @@ constr_after_context :
 	*/
 
 /* Con !Int (Tree a) */
-	   contype				{ qid tyc; list tys;
+	   conapptype				{ qid tyc; list tys;
 						  splittyconapp($1, &tyc, &tys);
 					          $$ = mkconstrpre(tyc,tys,hsplineno); }
 
-/* !Int `Con` Tree a */
-	|  bbtype qconop bbtype			{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
-
 /* (::) (Tree a) Int */
-	|  OPAREN qconsym CPAREN batypes	{ $$ = mkconstrpre($2,$4,hsplineno); }
+	|  OPAREN qconsym CPAREN conargatypes	{ $$ = mkconstrpre($2,$4,hsplineno); }
+
+/* !Int `Con` Tree a */
+	|  conargatype qconop conargatype	{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
 
 /* Con { op1 :: Int } */
 	| qtycon OCURLY fields CCURLY		{ $$ = mkconstrrec($1,$3,hsplineno); }
@@ -802,49 +827,27 @@ constr_after_context :
 		/* 1 S/R conflict on OCURLY -> shift */
 
 
-/* contype has to reduce to a btype unless there are !'s, so that
-   we don't get reduce/reduce conflicts with the second production of constr.
-   But as soon as we see a ! we must switch to using bxtype. */
+conapptype : gtycon				{ $$ = mktname($1); }
+	   | conapptype conargatype		{ $$ = mktapp($1, $2); }
+	   ;
 
-contype : btype					{ $$ = $1; }
-	| bxtype				{ $$ = $1; }
-	;
-
-/* S !Int Bool; at least one ! */
-bxtype	: btype wierd_atype			{ $$ = mktapp($1, $2); }
-	| bxtype batype				{ $$ = mktapp($1, $2); }
-	;
-
-bbtype	:  btype				{ $$ = $1; }
-	|  wierd_atype				{ $$ = $1; }
-	;
-
-batype	:  atype				{ $$ = $1; }
-	|  wierd_atype				{ $$ = $1; }
-	;
-
-/* A wierd atype is one that isn't a regular atype;
-   it starts with a "!", or with a forall. */
-wierd_atype : BANG bigatype			{ $$ = mktbang( $2 ); }
-	    | BANG atype			{ $$ = mktbang( $2 ); }
-	    | bigatype 
+conargatype : polyatype				{ $$ = $1; }
+	    | BANG polyatype			{ $$ = mktbang( $2 ); }
 	    ;
 
-batypes	:  					{ $$ = Lnil; }
-	|  batypes batype			{ $$ = lapp($1,$2); }
-	;
-
+conargatypes :  				{ $$ = Lnil; }
+	  |  conargatype conargatypes		{ $$ = mklcons($1,$2); }
+	  ;
 
 fields	: field					{ $$ = lsing($1); }
 	| fields COMMA field			{ $$ = lapp($1,$3); }
 	;
 
-field	:  qvars_list DCOLON ctype		{ $$ = mkfield($1,$3); }
-	|  qvars_list DCOLON BANG atype		{ $$ = mkfield($1,mktbang($4)); }
- 	|  qvars_list DCOLON BANG bigatype	{ $$ = mkfield($1,mktbang($4)); }
+field	:  qvars_list DCOLON polytype		{ $$ = mkfield($1,$3); }
+ 	|  qvars_list DCOLON BANG polyatype	{ $$ = mkfield($1,mktbang($4)); }
 	; 
 
-constr1 :  gtycon atype				{ $$ = lsing(mkconstrnew($1,$2,hsplineno)); }
+constr1 :  gtycon conargatype			{ $$ = lsing(mkconstrnew($1,$2,hsplineno)); }
 	;
 
 
@@ -989,7 +992,7 @@ gd	:  VBAR quals				{ $$ = $2; }
 *                                                                     *
 **********************************************************************/
 
-exp	:  oexp DCOLON ctype			{ $$ = mkrestr($1,$3); }
+exp	:  oexp DCOLON polytype			{ $$ = mkrestr($1,$3); }
 	|  oexp
 	;
 
@@ -1014,7 +1017,7 @@ dexp	:  MINUS kexp				{ $$ = mknegate($2); }
   We need to factor out a leading let expression so we can set
   pat_check=FALSE when parsing (non let) expressions inside stmts and quals
 */
-expLno 	: oexpLno DCOLON ctype			{ $$ = mkrestr($1,$3); }
+expLno 	: oexpLno DCOLON polytype		{ $$ = mkrestr($1,$3); }
 	| oexpLno
 	;
 oexpLno	:  oexpLno qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
@@ -1024,7 +1027,7 @@ dexpLno	:  MINUS kexp				{ $$ = mknegate($2); }
 	|  kexpLno
 	;
 
-expL 	:  oexpL DCOLON ctype			{ $$ = mkrestr($1,$3); }
+expL 	:  oexpL DCOLON polytype		{ $$ = mkrestr($1,$3); }
 	|  oexpL
 	;
 oexpL	:  oexpL qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
@@ -1111,10 +1114,10 @@ aexp	:  qvar					{ $$ = mkident($1); }
 	|  OPAREN exp CPAREN			{ $$ = mkpar($2); }	    /* mkpar: stop infix parsing at ()'s */
 	|  qcon OCURLY rbinds CCURLY		{ $$ = mkrecord($1,$3); }   /* 1 S/R conflict on OCURLY -> shift */
 	|  OBRACK list_exps CBRACK		{ $$ = mkllist($2); }
-	|  OPAREN exp COMMA texps CPAREN	{ if (ttree($4) == tuple)
-			     			     $$ = mktuple(mklcons($2, gtuplelist((struct Stuple *) $4)));
-						  else
-						     $$ = mktuple(ldub($2, $4)); }
+	|  OPAREN exp COMMA texps CPAREN	{ $$ = mktuple(mklcons($2,$4)); }
+        /* unboxed tuples */
+	|  OUNBOXPAREN exp COMMA texps CUNBOXPAREN 
+						{ $$ = mkutuple(mklcons($2,$4)); }
 
 	/* only in expressions ... */
 	|  aexp OCURLY rbinds1 CCURLY		{ $$ = mkrupdate($1,$3); }
@@ -1155,17 +1158,10 @@ rbinds1	:  rbind				{ $$ = lsing($1); }
 
 rbind  	:  qvar					{ $$ = mkrbind($1,mknothing()); }
 	|  qvar EQUAL exp			{ $$ = mkrbind($1,mkjust($3)); }
-	;
+;	
 
-texps	:  exp	{ $$ = mkpar($1); }	/* mkpar: so we don't flatten last element in tuple */
-	|  exp COMMA texps
-		{ if (ttree($3) == tuple)
-		    $$ = mktuple(mklcons($1, gtuplelist((struct Stuple *) $3)));
-		  else if (ttree($3) == par)
-		    $$ = mktuple(ldub($1, gpare((struct Spar *) $3)));
-		  else
-		    hsperror("hsparser:texps: panic");
-		}
+texps	:  exp					{ $$ = lsing($1); }
+	|  exp COMMA texps			{ $$ = mklcons($1, $3) }
 	/* right recursion? WDP */
 	;
 
@@ -1326,6 +1322,7 @@ apatc	:  qvar		 			{ $$ = mkident($1); }
 	|  WILDCARD				{ $$ = mkwildp(); }
 	|  OPAREN pat CPAREN			{ $$ = mkpar($2); }
 	|  OPAREN pat COMMA pats CPAREN 	{ $$ = mktuple(mklcons($2,$4)); }
+	|  OUNBOXPAREN pat COMMA pats CUNBOXPAREN { $$ = mkutuple(mklcons($2,$4)); }
 	|  OBRACK pats CBRACK			{ $$ = mkllist($2); }
 	|  LAZY apat				{ $$ = mklazyp($2); }
 	;
@@ -1387,6 +1384,8 @@ apatck	:  qvark		 		{ $$ = mkident($1); }
 	|  WILDCARD				{ $$ = mkwildp(); setstartlineno(); }
 	|  oparenkey pat CPAREN			{ $$ = mkpar($2); }
 	|  oparenkey pat COMMA pats CPAREN 	{ $$ = mktuple(mklcons($2,$4)); }
+	|  ounboxparenkey pat COMMA pats CUNBOXPAREN
+						{ $$ = mkutuple(mklcons($2,$4)); }
 	|  obrackkey pats CBRACK		{ $$ = mkllist($2); }
 	|  lazykey apat				{ $$ = mklazyp($2); }
 	;
@@ -1485,6 +1484,9 @@ modulekey:  MODULE	{ setstartlineno();
 
 oparenkey:  OPAREN	{ setstartlineno(); }
 	;
+
+ounboxparenkey: OUNBOXPAREN { setstartlineno(); }
+        ;
 
 obrackkey:  OBRACK	{ setstartlineno(); }
 	;
@@ -1585,32 +1587,46 @@ varsym	:  varsym_nominus
 varsym_nominus : VARSYM
 	|  PLUS				{ $$ = install_literal("+"); }
 	|  BANG				{ $$ = install_literal("!"); }	
+	|  DOT			        { $$ = install_literal("."); }
 	;
 
 /* AS HIDING QUALIFIED are valid varids */
-varid   :  VARID
+varid   :  varid_noforall
+        |  FORALL                       { $$ = install_literal("forall"); }
+	;
+
+varid_noforall
+	:  VARID
 	|  AS				{ $$ = install_literal("as"); }
 	|  HIDING			{ $$ = install_literal("hiding"); }
 	|  QUALIFIED			{ $$ = install_literal("qualified"); }
+/* The rest of these guys are used by the FFI decls, a ghc (and hugs) extension. */
+	|  EXPORT			{ $$ = install_literal("export"); }
+	|  UNSAFE			{ $$ = install_literal("unsafe"); }
+	|  DYNAMIC			{ $$ = install_literal("dynamic"); }
+	|  LABEL			{ $$ = install_literal("label"); }
+	|  C_CALL			{ $$ = install_literal("ccall"); }
+	|  STDCALL			{ $$ = install_literal("stdcall"); }
+	|  PASCAL			{ $$ = install_literal("pascal"); }
 	;
-
 
 ccallid	:  VARID
 	|  CONID
 	;
 
-tyvar	:  varid			{ $$ = mknamedtvar(mknoqual($1)); }
-	;
 tycon	:  CONID
 	;
 modid	:  CONID
 	;
 
-/*
-tyvar_list: tyvar			{ $$ = lsing($1); }
-	|  tyvar_list COMMA tyvar 	{ $$ = lapp($1,$3); }
+/* ---------------------------------------------- */
+tyvar	:  varid_noforall		{ $$ = $1; }
 	;
-*/
+
+/* tyvars1: At least one tyvar */
+tyvars1 : tyvar				{ $$ = lsing($1); }
+	| tyvar tyvars1  		{ $$ = mklcons($1,$2); }
+	;
 
 /**********************************************************************
 *                                                                     *

@@ -123,7 +123,7 @@ one-line string containing the requested info.
 %************************************************************************
 
 The basic task of the @ghc@ driver is to run each input file
-through the right phases (parsing, linking, etc.).
+through the right phases (compiling, linking, etc.).
 
 The first phase to run is determined by the input-file suffix, and the
 last phase is determined by a flag.  If no relevant flag is present,
@@ -228,9 +228,9 @@ If you would like to look at the assembler output, toss in a
 <nidx>standard error, saving</nidx>
 
 Sometimes, you may cause GHC to be rather chatty on standard error;
-with @-dshow-rn-trace@, for example.  You can instruct GHC to
-<em>append</em> this output to a particular log file with a @-odump
-<blah>@<nidx>-odump &lt;blah&gt; option</nidx> option.
+with @-v@, for example.  You can instruct GHC to <em>append</em> this
+output to a particular log file with a @-odump <blah>@<nidx>-odump
+&lt;blah&gt; option</nidx> option.
 
 <sect2> Redirecting temporary files
 <label id="temp-files">
@@ -265,7 +265,7 @@ GHC has a number of options that select which types of non-fatal error
 messages, otherwise known as warnings, can be generated during
 compilation.  By default, you get a standard set of warnings which are
 generally likely to indicate bugs in your program.  These are:
-@-fwarn-overlapping-patterns@, @-fwarn-duplicate-exports@, and
+@-fwarn-overlpapping-patterns@, @-fwarn-duplicate-exports@, and
 @-fwarn-missing-methods@.  The following flags are simple ways to
 select standard ``packages'' of warnings:
 
@@ -313,32 +313,19 @@ into hard-to-find bugs, e.g., in the inadvertent cyclic definition
 Consequently, this option does <em>not</em> allow cyclic recursive
 definitions.
 
-<tag>@-fwarn-hi-shadowing@:</tag> 
-<nidx>-fwarn-hi-shadowing option</nidx>
-<nidx>interface files, shadowing</nidx>
-
-Warns you about shadowing of interface files along the supplied import path.
-For instance, assuming you invoke @ghc@ with the import path
-@-iutils:src@ and @Utils.hi@ exist in both the @utils@ and @src@
-directories, @-fwarn-hi-shadowing@ will warn you that @utils/Utils.hi@
-shadows @src/Utils.hi@.
-
 <tag>@-fwarn-overlapping-patterns@:</tag>
 <nidx>-fwarn-overlapping-patterns option</nidx>
 <nidx>overlapping patterns, warning</nidx>
 <nidx>patterns, overlapping</nidx>
 
-By default, the compiler will warn you if a set of patterns are either
-incomplete (i.e., you're only matching on a subset of an algebraic
-data type's constructors), or overlapping, i.e.,
+By default, the compiler will warn you if a set of patterns are
+overlapping, i.e.,
 
 <tscreen><verb>
 f :: String -> Int
 f []     = 0
 f (_:xs) = 1
 f "2"    = 2
-
-g [] = 2
 </verb></tscreen>
 
 where the last pattern match in @f@ won't ever be reached, as the
@@ -350,9 +337,18 @@ is a programmer mistake/error, so this option is enabled by default.
 <nidx>incomplete patterns, warning</nidx>
 <nidx>patterns, incomplete</nidx>
 
-Similarly for incomplete patterns, the function @g@ will fail when
-applied to non-empty lists, so the compiler will emit a warning about
-this when this option is enabled.
+Similarly for incomplete patterns, the function @g@ below will fail
+when applied to non-empty lists, so the compiler will emit a warning
+about this when @-fwarn-incomplete-patterns@ is enabled.
+
+<tscreen><verb>
+g [] = 2
+</verb></tscreen>
+
+This option isn't enabled be default because it can be a bit noisy,
+and it doesn't always indicate a bug in the program.  However, it's
+generally considered good practice to cover all the cases in your
+functions.
 
 <tag>@-fwarn-missing-methods@:</tag>
 <nidx>-fwarn-missing-methods option</nidx>
@@ -401,11 +397,15 @@ mention of it in the export list.
 
 This option is on by default.
 
-</descrip>
+<tag>@-fwarn-missing-signatures@:</tag>
+<nidx>-fwarn-missing-signatures option</nidx>
+<nidx>type signatures, missing</nidx>
 
-If you would like GHC to check that every top-level value has a type
-signature, use the @-fsignatures-required@
-option.<nidx>-fsignatures-required option</nidx>
+If you would like GHC to check that every top-level function/value has
+a type signature, use the @-fwarn-missing-signatures@ option.  This
+option is off by default.
+
+</descrip>
 
 If you're feeling really paranoid, the @-dcore-lint@
 option<nidx>-dcore-lint option</nidx> is a good choice.  It turns on
@@ -433,7 +433,9 @@ This section describes how GHC supports separate compilation.
 
 When GHC compiles a source file @F@ which contains a module @A@, say,
 it generates an object @F.o@, <em>and</em> a companion <em>interface
-file</em> @A.hi@.  
+file</em> @A.hi@.  The interface file is not intended for human
+consumption, as you'll see if you take a look at one.  It's merely
+there to help the compiler compile other modules in the same program.
 
 NOTE: Having the name of the interface file follow the module name and
 not the file name, means that working with tools such as @make(1)@
@@ -682,22 +684,19 @@ a rule to do so; one of the preceding suffix rules does the job
 nicely.
 
 Putting inter-dependencies of the form @Foo.o : Bar.hi@ into your
-@Makefile@ by hand is rather error-prone.  @ghc@ offers you a helping
-hand with it's @-M@ option. To automatically generate
-inter-dependencies, add the following to your @Makefile@:
+@Makefile@ by hand is rather error-prone.  Don't worry---never fear,
+@mkdependHS@ is here! (and is distributed as part of GHC) Add the
+following to your @Makefile@:
 
 <tscreen><verb>
 depend :
-        $(HC) -M $(HC_OPTS) $(SRCS)
+        mkdependHS -- $(HC_OPTS) -- $(SRCS)
 </verb></tscreen>
 
 Now, before you start compiling, and any time you change the @imports@
 in your program, do @make depend@ before you do @make cool_pgm@.
-@ghc -M@ will then append the needed dependencies to your @Makefile@.
-
-The dependencies are actually generated by another utility,
-@mkdependHS@, which @ghc -M@ just calls upon. @mkdependHS@ is
-distributed with GHC and is documented in Section <ref name="Makefile
+@mkdependHS@ will append the needed dependencies to your @Makefile@.
+@mkdependHS@ is fully describe in Section <ref name="Makefile
 dependencies in Haskell: using mkdependHS" id="mkdependHS">.
 
 A few caveats about this simple scheme:
@@ -769,15 +768,15 @@ example, it doesn't need to contain declarations for <em/everything/
 that module @A@ exports, only the things required by the module that
 imports @A@ recursively.
 
-For the example at hand, the boot interface file for A would like the
-following:
+For the example at hand, the boot interface file for A would look like
+the following:
 
 <tscreen><verb>
-_interface_ A 1
-_exports_
-A(A);
-_declarations_
+__interface A 1 where
+__exports A A f;
+__import PrelBase Int;
 1 newtype A = A PrelBase.Int ;
+1 f :: A -> A ;
 </verb></tscreen>
 
 The syntax is essentially the same as a normal @.hi@ file
@@ -798,7 +797,7 @@ the way it is.
 
 <bf>Note:</bf> This is all a temporary solution, a version of the
 compiler that handles mutually recursive properly without the manual
-construction of interface file, is in the works.
+construction of interface files, is in the works.
 
 %************************************************************************
 %*                                                                      *
@@ -916,8 +915,9 @@ analyser [because it is sometimes slow]),
 @-fno-specialise@<nidx>-fno-specialise option</nidx> (automatic
 specialisation of overloaded functions [because it makes your code
 bigger]) [US spelling also accepted], and
-@-fno-update-analyser@<nidx>-fno-update-analyser option</nidx>
-(update analyser, because it sometimes takes a <em>long</em> time).
+@-fno-update-analysis@<nidx>-fno-update-analysis option</nidx> (update
+analyser, because it sometimes takes a <em>long</em> time).  This one
+is only enabled with -O2 anyway.
 
 Should you wish to turn individual flags <em>on</em>, you are advised
 to use the @-Ofile@ option, described above.  Because the order in
@@ -938,50 +938,52 @@ bit of speed by compiling via C.  If you use @_ccall_gc_@s or
 
 The lower-case incantation, @-fvia-c@, is synonymous.
 
-<tag>@-funfolding-creation-threshold<n>@:</tag>
-<nidx>-funfolding-creation-threshold option</nidx>
+Compiling via C will probably be slower (in compilation time) than
+using GHC's native code generator.
+
+<tag>@-funfolding-interface-threshold<n>@:</tag>
+<nidx>-funfolding-interface-threshold option</nidx>
 <nidx>inlining, controlling</nidx>
 <nidx>unfolding, controlling</nidx>
 (Default: 30) By raising or lowering this number, you can raise or
 lower the amount of pragmatic junk that gets spewed into interface
 files.  (An unfolding has a ``size'' that reflects the cost in terms
 of ``code bloat'' of expanding that unfolding in another module.  A
-bigger Core expression would be assigned a bigger cost.)
+bigger function would be assigned a bigger cost.)
+
+<tag>@-funfolding-creation-threshold<n>@:</tag>
+<nidx>-funfolding-creation-threshold option</nidx>
+<nidx>inlining, controlling</nidx>
+<nidx>unfolding, controlling</nidx>
+(Default: 30) This option is similar to
+@-funfolding-interface-threshold@, except that it governs unfoldings
+within a single module.  Increasing this figure is more likely to
+result in longer compile times than faster code.  The next option is
+more useful:
 
 <tag>@-funfolding-use-threshold<n>@:</tag>
 <nidx>-funfolding-use-threshold option</nidx>
 <nidx>inlining, controlling</nidx>
 <nidx>unfolding, controlling</nidx>
-(Default: 3) By raising or lowering this number, you can make the
-compiler more or less keen to expand unfoldings.
+(Default: 8) This is the magic cut-off figure for unfolding: below
+this size, a function definition will be unfolded at the call-site,
+any bigger and it won't.  The size computed for a function depends on
+two things: the actual size of the expression minus any discounts that
+apply (see @-funfolding-con-discount@).
 
-OK, folks, these magic numbers `30' and `3' are mildly arbitrary; they
-are of the ``seem to be OK'' variety.  The `3' is the more critical
-one; it's what determines how eager GHC is about expanding unfoldings.
+<tag>@-funfolding-con-discount<n>@:</tag>
+<nidx>-funfolding-con-discount option</nidx>
+<nidx>inlining, controlling</nidx>
+<nidx>unfolding, controlling</nidx>
+(Default: 2) If the compiler decides that it can eliminate some
+computation by performing an unfolding, then this is a discount factor
+that it applies to the funciton size before deciding whether to unfold
+it or not.
 
-% <tag>@-funfolding-override-threshold<n>@:</tag>
-% (Default: 8) [Pretty obscure]
-W hen deciding what unfoldings from a module should be made available
-% to the rest of the world (via this module's interface), the compiler
-% normally likes ``small'' expressions.
-
-% For example, if it sees @foo = bar@, it will decide that the very
-% small expression @bar@ is a great unfolding for @foo@.  But if
-% @bar@ turns out to be @(True,False,True)@, we would probably
-% prefer <em>that</em> for the unfolding for @foo@.
-
-% Should we ``override'' the initial small unfolding from @foo=bar@
-% with the bigger-but-better one?  Yes, if the bigger one's ``size'' is
-% still under the ``override threshold.''  You can use this flag to
-% adjust this threshold (why, I'm not sure).
-
-% <tag>@-fliberated-case-threshold<n>@:</tag>
-% (Default: 12) [Vastly obscure: NOT IMPLEMENTED YET]
-% ``Case liberation'' lifts evaluation out of recursive functions; it
-% does this by duplicating code.  Done without constraint, you can get
-% serious code bloat; so we only do it if the ``size'' of the duplicated
-% code is smaller than some ``threshold.''  This flag can fiddle that
-% threshold.
+OK, folks, these magic numbers `30', `8', and '2' are mildly
+arbitrary; they are of the ``seem to be OK'' variety.  The `8' is the
+more critical one; it's what determines how eager GHC is about
+expanding unfoldings.
 
 <tag>@-fsemi-tagging@:</tag>
 This option (which <em>does not work</em> with the native-code generator)
@@ -1065,8 +1067,9 @@ compilation, you really shouldn't need it.
 <tag>@-D<foo>@:</tag>
 <nidx>-D&lt;name&gt; option</nidx>
 Define macro @<foo>@ in the usual way.  NB: does <em>not</em> affect
-@-D@ macros passed to the C~compiler when compiling via C!  For
-those, use the @-optc-Dfoo@ hack...
+@-D@ macros passed to the C~compiler when compiling via C!  For those,
+use the @-optc-Dfoo@ hack... (see Section <ref name="Forcing options
+to a particular phase." id="forcing-options-through">).
 
 <tag>@-U<foo>@:</tag>
 <nidx>-U&lt;name&gt; option</nidx>
@@ -1082,20 +1085,17 @@ The @ghc@ driver pre-defines several macros:
 <descrip>
 <tag>@__HASKELL1__@:</tag>
 <nidx>__HASKELL1__ macro</nidx>
-If defined to $n$, that means GHC supports the
-Haskell language defined in the Haskell report version $1.n$.
+If defined to <em/n/, that means GHC supports the
+Haskell language defined in the Haskell report version <em/1.n/.
 Currently 4.
 
-NB: This macro is set both when pre-processing Haskell source and
-when pre-processing generated C (@.hc@) files.
+NB. This macro is <em/only/ set when pre-processing Haskell source
+(ie. @.hs@ or @.lhs@ files).
 
 <tag>@__GLASGOW_HASKELL__@:</tag>
 <nidx>__GLASGOW_HASKELL__ macro</nidx>
-For version $n$ of the GHC system, this will be @#define@d to
-$100 \times n$.  So, for version~3.00, it is 300.
-
-This macro is <em>only</em> set when pre-processing Haskell source.
-(<em>Not</em> when pre-processing generated C.)
+For version <em/n/ of the GHC system, this will be @#define@d to
+<em/100n/.  So, for version 4.00, it is 400.
 
 With any luck, @__GLASGOW_HASKELL__@ will be undefined in all other
 implementations that support C-style pre-processing.
@@ -1103,11 +1103,15 @@ implementations that support C-style pre-processing.
 (For reference: the comparable symbols for other systems are:
 @__HUGS__@ for Hugs and @__HBC__@ for Chalmers.)
 
+NB. This macro is set when pre-processing both Haskell source and C
+source, including the C source generated from a Haskell module
+(ie. @.hs@, @.lhs@, @.c@ and @.hc@ files).
+
 <tag>@__CONCURRENT_HASKELL__@:</tag>
 <nidx>__CONCURRENT_HASKELL__ macro</nidx>
-Only defined when @-concurrent@ is in use!
 This symbol is defined when pre-processing Haskell (input) and
-pre-processing C (GHC output).
+pre-processing C (GHC output).  Since GHC from verion 4.00 now
+supports concurrent haskell by default, this symbol is always defined.
 
 <tag>@__PARALLEL_HASKELL__@:</tag>
 <nidx>__PARALLEL_HASKELL__ macro</nidx>
@@ -1120,8 +1124,8 @@ pre-processor with the @-opt@ flags (see
 Section <ref name="Forcing options to a particular phase." id="forcing-options-through">).
 
 A small word of warning: @-cpp@ is not friendly to ``string
-gaps''.<nidx>-cpp vs string gaps</nidx><nidx>string gaps vs -cpp</nidx>.  In
-other words, strings such as the following:
+gaps''.<nidx>-cpp vs string gaps</nidx><nidx>string gaps vs
+-cpp</nidx>.  In other words, strings such as the following:
 
 <tscreen><verb>
 	strmod = "\
@@ -1252,13 +1256,18 @@ check with @-no-link-chk@.  You can turn it (back) on with
 %*                                                                      *
 %************************************************************************
 
-To compile a program as Concurrent Haskell, use the @-concurrent@
-option,<nidx>-concurrent option</nidx> both when compiling <em>and
-linking</em>.  You will probably need the @-fglasgow-exts@ option, too.
+GHC (as of version 4.00) supports Concurrent Haskell by default,
+without requiring a special option or libraries compiled in a certain
+way.  To get access to the support libraries for Concurrent Haskell
+(ie. @Concurrent@ and friends), use the @-syslib concurrent@ option.
 
 Three RTS options are provided for modifying the behaviour of the
 threaded runtime system.  See the descriptions of @-C[<us>]@, @-q@,
-and @-t<num>@ in Section <ref name="RTS options for Concurrent/Parallel Haskell" id="parallel-rts-opts">.
+and @-t<num>@ in Section <ref name="RTS options for
+Concurrent/Parallel Haskell" id="parallel-rts-opts">.
+
+Concurrent Haskell is described in more detail in Section <ref
+name="Concurrent and Parallel Haskell" id="concurrent-and-parallel">.
 
 %************************************************************************
 %*                                                                      *
@@ -1270,34 +1279,10 @@ and @-t<num>@ in Section <ref name="RTS options for Concurrent/Parallel Haskell"
 %*                                                                      *
 %************************************************************************
 
-The main thread in a Concurrent Haskell program is given its own
-private stack space, but all other threads are given stack space from
-the heap.  Stack space for the main thread can be
-adjusted as usual with the @-K@ RTS
-option,<nidx>-K RTS option (concurrent, parallel)</nidx> but if this
-private stack space is exhausted, the main thread will switch to stack
-segments in the heap, just like any other thread.  Thus, problems
-which would normally result in stack overflow in ``sequential Haskell''
-can be expected to result in heap overflow when using threads.
-
-The concurrent runtime system uses black holes as synchronisation
-points for subexpressions which are shared among multiple threads.  In
-``sequential Haskell'', a black hole indicates a cyclic data
-dependency, which is a fatal error.  However, in concurrent execution, a
-black hole may simply indicate that the desired expression is being
-evaluated by another thread.  Therefore, when a thread encounters a
-black hole, it simply blocks and waits for the black hole to be
-updated.  Cyclic data dependencies will result in deadlock, and the
-program will fail to terminate.
-
-Because the concurrent runtime system uses black holes as
-synchronisation points, it is not possible to disable black-holing
-with the @-N@ RTS option.<nidx>-N RTS option</nidx> Therefore, the use
-of signal handlers (including timeouts) with the concurrent runtime
-system can lead to problems if a thread attempts to enter a black hole
-that was created by an abandoned computation.  The use of signal
-handlers in conjunction with threads is strongly discouraged.
-
+The previous implementation of Concurrent Haskell in GHC had problems
+with using signals handlers in concurrent programs.  The current
+system, however, provides thread-safe signal handling (see Section
+<ref name="Signal Handling" id="signals">).
 
 %************************************************************************
 %*                                                                      *
@@ -1442,24 +1427,29 @@ capable of 10 millisecond granularity, so the default setting may be
 the finest granularity possible, short of a context switch at every
 heap allocation.
 
+[NOTE: this option currently has no effect (version 4.00).  Context
+switches happen when the current heap block is full, i.e. every 4k of
+allocation].
+
 <tag>@-q[v]@:</tag>
 <nidx>-q RTS option</nidx>
-Produce a quasi-parallel profile of thread activity, in the file
-@<program>.qp@.  In the style of @hbcpp@, this profile records
-the movement of threads between the green (runnable) and red (blocked)
-queues.  If you specify the verbose suboption (@-qv@), the green
-queue is split into green (for the currently running thread only) and
-amber (for other runnable threads).  We do not recommend that you use
-the verbose suboption if you are planning to use the @hbcpp@
-profiling tools or if you are context switching at every heap check
-(with @-C@).
+(PARALLEL ONLY) Produce a quasi-parallel profile of thread activity,
+in the file @<program>.qp@.  In the style of @hbcpp@, this profile
+records the movement of threads between the green (runnable) and red
+(blocked) queues.  If you specify the verbose suboption (@-qv@), the
+green queue is split into green (for the currently running thread
+only) and amber (for other runnable threads).  We do not recommend
+that you use the verbose suboption if you are planning to use the
+@hbcpp@ profiling tools or if you are context switching at every heap
+check (with @-C@).
 
 <tag>@-t<num>@:</tag>
 <nidx>-t&lt;num&gt; RTS option</nidx>
-Limit the number of concurrent threads per processor to @<num>@.
-The default is 32.  Each thread requires slightly over 1K <em>words</em>
-in the heap for thread state and stack objects.  (For 32-bit machines,
-this translates to 4K bytes, and for 64-bit machines, 8K bytes.)
+(PARALLEL ONLY) Limit the number of concurrent threads per processor
+to @<num>@.  The default is 32.  Each thread requires slightly over 1K
+<em>words</em> in the heap for thread state and stack objects.  (For
+32-bit machines, this translates to 4K bytes, and for 64-bit machines,
+8K bytes.)
 
 <tag>@-d@:</tag>
 <nidx>-d RTS option (parallel)</nidx>
@@ -1482,16 +1472,3 @@ to @<num>@. The default is 1024 words. A larger number may be
 appropriate if your machine has a high communication cost relative to
 computation speed.
 </descrip>
-
-%************************************************************************
-%*                                                                      *
-<sect2>Potential problems with Parallel Haskell
-<label id="parallel-problems">
-<p>
-<nidx>Parallel Haskell---problems</nidx> 
-<nidx>problems, Parallel Haskell</nidx> 
-%*                                                                      *
-%************************************************************************
-
-The ``Potential problems'' for Concurrent Haskell also apply for
-Parallel Haskell.  Please see Section <ref name="Potential problems with Concurrent Haskell" id="concurrent-problems">.

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[MachCode]{Generating machine code}
 
@@ -24,7 +24,7 @@ import CLabel		( isAsmTemp, CLabel )
 import Maybes		( maybeToBool, expectJust )
 import OrdList		-- quite a bit of it
 import PrimRep		( isFloatingRep, PrimRep(..) )
-import PrimOp		( PrimOp(..), showPrimOp )
+import PrimOp		( PrimOp(..) )
 import CallConv		( cCallConv )
 import Stix		( getUniqLabelNCG, StixTree(..),
 			  StixReg(..), CodeSegment(..)
@@ -33,6 +33,7 @@ import UniqSupply	( returnUs, thenUs, mapUs, mapAndUnzipUs,
 			  mapAccumLUs, UniqSM
 			)
 import Outputable
+import GlaExts (trace) --tmp
 \end{code}
 
 Code extractor for an entire stix tree---stix statement level.
@@ -78,6 +79,9 @@ stmt2Instrs stmt = case stmt of
 	    returnUs (mkSeqInstrs [LABEL lbl,
 				   ASCII True (_UNPK_ s)],
 				   ImmCLbl lbl)
+	-- the linker can handle simple arithmetic...
+	getData (StIndex rep (StCLbl lbl) (StInt off)) =
+		returnUs (id, ImmIndex lbl (fromInteger (off * sizeOf rep)))
 \end{code}
 
 %************************************************************************
@@ -157,6 +161,9 @@ maybeImm :: StixTree -> Maybe Imm
 maybeImm (StLitLbl s) = Just (ImmLab s)
 maybeImm (StLitLit s) = Just (strImmLit (cvtLitLit (_UNPK_ s)))
 maybeImm (StCLbl   l) = Just (ImmCLbl l)
+
+maybeImm (StIndex rep (StCLbl l) (StInt off)) = 
+	Just (ImmIndex l (fromInteger (off * sizeOf rep)))
 
 maybeImm (StInt i)
   | i >= toInteger minInt && i <= toInteger maxInt
@@ -1004,7 +1011,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 	      DoubleSinhOp  -> (False, SLIT("sinh"))
 	      DoubleCoshOp  -> (False, SLIT("cosh"))
 	      DoubleTanhOp  -> (False, SLIT("tanh"))
-	      _             -> panic ("Monadic PrimOp not handled: " ++ showPrimOp primop)
+	      _             -> panic ("Monadic PrimOp not handled: " ++ show primop)
 
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
@@ -1840,7 +1847,8 @@ assignFltCode pk (StInd _ dst) src
     returnUs code__2
 
 assignFltCode pk dst src
-  = getRegister dst	    	    	    `thenUs` \ register1 ->
+  = trace "assignFltCode: dodgy floating point instruction" $
+    getRegister dst	    	    	    `thenUs` \ register1 ->
     getRegister src	    	    	    `thenUs` \ register2 ->
     --getNewRegNCG (registerRep register2)
     --	    	        	    `thenUs` \ tmp ->

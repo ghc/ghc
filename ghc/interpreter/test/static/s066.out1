@@ -1,0 +1,1 @@
+ERROR "test/static/s066.hs" (line 3): Constructor function "Left" needs 1 args in pattern

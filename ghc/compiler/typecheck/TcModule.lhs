@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcModule]{Typechecking a whole module}
 
@@ -26,7 +26,9 @@ import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
 import TcEnv		( TcIdOcc(..), tcExtendGlobalValEnv, tcExtendTyConEnv,
 			  getEnv_TyCons, getEnv_Classes, tcLookupLocalValue,
-			  tcLookupTyCon, initEnv, tcSetGlobalValEnv )
+			  lookupGlobalByKey, tcSetGlobalValEnv,
+			  tcLookupTyCon, initEnv, GlobalValueEnv
+			)
 import TcExpr		( tcId )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
@@ -35,30 +37,34 @@ import TcInstUtil	( buildInstanceEnvs, classDataCon, InstInfo )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls1 )
 import TcTyDecls	( mkDataBinds )
-import TcType		( TcType, tcInstType )
-import TcKind		( TcKind, kindToTcKind )
+import TcType		( TcType, typeToTcType,
+			  TcKind, kindToTcKind
+			)
 
 import RnMonad		( RnNameSupply )
 import Bag		( isEmptyBag )
-import ErrUtils		( WarnMsg, ErrMsg, 
+import ErrUtils		( ErrMsg, 
 			  pprBagOfErrors, dumpIfSet
 			)
-import Id		( idType, GenId )
-import Name		( Name, isLocallyDefined, pprModule, NamedThing(..) )
+import Id		( Id, idType )
+import Name		( Name, nameUnique, isLocallyDefined, pprModule, NamedThing(..) )
 import TyCon		( TyCon, tyConKind )
+import DataCon		( dataConId )
 import Class		( Class, classSelIds, classTyCon )
 import Type		( mkTyConApp, Type )
-import TyVar		( emptyTyVarEnv )
 import TysWiredIn	( unitTy )
 import PrelMods		( mAIN )
-import PrelInfo		( main_NAME, ioTyCon_NAME )
-import Unify		( unifyTauTy )
+import PrelInfo		( main_NAME, ioTyCon_NAME,
+			  thinAirIdNames, setThinAirIds
+			)
+import TcUnify		( unifyTauTy )
 import Unique		( Unique  )
 import UniqSupply       ( UniqSupply )
 import Util
 import Bag		( Bag, isEmptyBag )
-import FiniteMap	( FiniteMap )
 import Outputable
+
+import IOExts
 \end{code}
 
 Outside-world interface:
@@ -68,9 +74,12 @@ Outside-world interface:
 type TcResults
   = (TypecheckedMonoBinds,
      [TyCon], [Class],
-     Bag InstInfo,	       -- Instance declaration information
+     Bag InstInfo,		-- Instance declaration information
      [TypecheckedForeignDecl], -- foreign import & exports.
-     TcDDumpDeriv)
+     TcDDumpDeriv,
+     GlobalValueEnv,
+     [Id]			-- The thin-air Ids
+     )
 
 type TcDDumpDeriv = SDoc
 
@@ -91,13 +100,19 @@ typecheckModule us rn_name_supply mod
 
     dumpIfSet opt_D_dump_tc "Typechecked"
 	(case maybe_result of
-	    Just (binds, _, _, _, ds, _) -> ppr binds $$ ppr ds
-	    Nothing 		         -> text "Typecheck failed")  	>>
+	    Just (binds, _, _, _, _, _, _, _) -> ppr binds
+	    Nothing 		              -> text "Typecheck failed")   >>
 
     dumpIfSet opt_D_dump_deriv "Derived instances"
 	(case maybe_result of
-	    Just (_, _, _, _, _, dump_deriv) -> dump_deriv
-	    Nothing 		             -> empty)  	>>
+	    Just (_, _, _, _, _, dump_deriv, _, _) -> dump_deriv
+	    Nothing 		                   -> empty)		    >>
+
+    -- write the thin-air Id map
+    (case maybe_result of
+	Just (_, _, _, _, _, _, _, thin_air_ids) -> setThinAirIds thin_air_ids
+	Nothing 		                 -> return ()
+    ) 									>>
 
     return (if isEmptyBag errs then 
 		maybe_result 
@@ -182,7 +197,7 @@ tcModule rn_name_supply
 	-- the classes, and the global value environment with the
 	-- corresponding data cons.
 	--  They are mentioned in types in interface files.
-    	tcExtendGlobalValEnv (map classDataCon classes)		$
+    	tcExtendGlobalValEnv (map (dataConId . classDataCon) classes)		$
         tcExtendTyConEnv [ (getName tycon, (kindToTcKind (tyConKind tycon), Nothing, tycon))
 		         | clas <- classes,
 			   let tycon = classTyCon clas
@@ -203,11 +218,13 @@ tcModule rn_name_supply
 
 	-- Value declarations next.
 	-- We also typecheck any extra binds that came out of the "deriving" process
-        -- trace "tcBinds:"			$
+--      trace "tc6"			$
     	tcTopBindsAndThen
 	    (\ is_rec binds1 (binds2, thing) -> (binds1 `AndMonoBinds` binds2, thing))
 	    (get_val_decls decls `ThenBinds` deriv_binds)
 	    (	tcGetEnv		`thenNF_Tc` \ env ->
+--		tcGetUnique	`thenNF_Tc` \ uniq ->
+--		pprTrace "tc7" (ppr uniq) $
 		returnTc ((EmptyMonoBinds, env), emptyLIE)
 	    )				`thenTc` \ ((val_binds, final_env), lie_valdecls) ->
 	tcSetEnv final_env $
@@ -217,7 +234,7 @@ tcModule rn_name_supply
 
 		-- Second pass over class and instance declarations,
 		-- to compile the bindings themselves.
-	-- trace "tc8" $
+--	pprTrace "tc8" emtpy $
 	tcInstDecls2  inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
 	tcClassDecls2 decls		`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
 
@@ -230,7 +247,6 @@ tcModule rn_name_supply
 	     -- restriction, and no subsequent decl instantiates its
 	     -- type.  (Usually, ambiguous type variables are resolved
 	     -- during the generalisation step.)
-	-- trace "tc9" $
 	let
 	    lie_alldecls = lie_valdecls  `plusLIE`
 			   lie_instdecls `plusLIE`
@@ -254,9 +270,16 @@ tcModule rn_name_supply
 	tcSetGlobalValEnv really_final_env $
 	zonkForeignExports foe_decls	`thenNF_Tc` \ foe_decls' ->
 
+	let
+	   thin_air_ids = map (lookupGlobalByKey really_final_env . nameUnique) thinAirIdNames
+		-- When looking up the thin-air names we must use
+		-- a global env that includes the zonked locally-defined Ids too
+		-- Hence using really_final_env
+	in
 	returnTc (really_final_env, 
-		  (all_binds',local_tycons, local_classes,
-		   inst_info, foi_decls ++ foe_decls', ddump_deriv))
+		  (all_binds', local_tycons, local_classes, inst_info,
+		   foi_decls ++ foe_decls',
+		   ddump_deriv, really_final_env, thin_air_ids))
 
     -- End of outer fix loop
     ) `thenTc` \ (final_env, stuff) ->
@@ -281,14 +304,13 @@ tcCheckMainSig mod_name
 
 	-- Check that it has the right type (or a more general one)
     let 
-	expected_ty = mkTyConApp ioTyCon [unitTy]
+	expected_tau = typeToTcType (mkTyConApp ioTyCon [unitTy])
     in
-    tcInstType emptyTyVarEnv expected_ty	`thenNF_Tc` \ expected_tau ->
     tcId main_NAME				`thenNF_Tc` \ (_, lie, main_tau) ->
     tcSetErrCtxt mainTyCheckCtxt $
     unifyTauTy expected_tau
 	       main_tau			`thenTc_`
-    checkTc (isEmptyBag lie) (mainTyMisMatch expected_ty (idType main_id))
+    checkTc (isEmptyBag lie) (mainTyMisMatch expected_tau (idType main_id))
     }
 
 
@@ -299,7 +321,7 @@ noMainErr
   = hsep [ptext SLIT("Module"), quotes (pprModule mAIN), 
 	  ptext SLIT("must include a definition for"), quotes (ppr main_NAME)]
 
-mainTyMisMatch :: Type -> TcType s -> ErrMsg
+mainTyMisMatch :: TcType s -> TcType s -> ErrMsg
 mainTyMisMatch expected actual
   = hang (hsep [ppr main_NAME, ptext SLIT("has the wrong type")])
 	 4 (vcat [

@@ -27,7 +27,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
 import TcMonad
 import TcEnv		( tcLookupClassByKey, newLocalId, tcLookupGlobalValue )
-import TcType		( tcInstTcType, tcInstSigType, tcSplitRhoTy, zonkTcTypeToType )
+import TcType		( tcInstTcType, typeToTcType, tcSplitRhoTy, zonkTcTypeToType )
 import TcMonoType	( tcHsType )
 import TcHsSyn		( TcMonoBinds, maybeBoxedPrimType, TypecheckedForeignDecl, TcIdOcc(..),
 			  TcForeignExportDecl )
@@ -36,26 +36,21 @@ import Inst		( emptyLIE, LIE, plusLIE )
 import CoreSyn
 
 import ErrUtils		( Message )
-import Id		( Id, idName )
+import Id		( Id, idName, mkUserId )
 import Name		( nameOccName )
-import MkId		( mkUserId )
-import Type		( isUnpointedType
-		        , splitFunTys
+import Type		( splitFunTys
 			, splitTyConApp_maybe
 			, splitForAllTys
 			, splitRhoTy
 			, isForAllTy
 			, mkForAllTys
 			)
-import TyVar		( emptyTyVarEnv )
-
 
 import TysWiredIn	( isFFIArgumentTy, isFFIResultTy, 
 			  isFFIExternalTy, isAddrTy
 			)
 import Type             ( Type )
 import Unique
-import Unify		( unifyTauTy )
 import Outputable
 import Util
 import CmdLineOpts	( opt_GlasgowExts )
@@ -145,9 +140,9 @@ tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
 
-   tcHsType hs_ty		    `thenTc`	\ sig_ty ->
-   tcInstSigType sig_ty	    	    `thenNF_Tc` \ sig_tc_ty ->
-   tcPolyExpr (HsVar nm) sig_tc_ty  `thenTc`    \ (rhs, lie, _, _, _) ->
+   tcHsType hs_ty		       `thenTc`	\ sig_ty ->
+   let sig_tc_ty = typeToTcType sig_ty in
+   tcPolyExpr (HsVar nm) sig_tc_ty     `thenTc`    \ (rhs, lie, _, _, _) ->
 
    let
       -- drop the foralls before inspecting the structure
@@ -213,17 +208,17 @@ checkForeignArg :: (Type -> Bool) -> Type -> TcM s ()
 checkForeignArg pred ty = check (pred ty) (illegalForeignTyErr True{-Arg-} ty)
 
 -- Check that the type has the form 
---    (IO t) and that t satisfies the given predicate.
+--    (IO t) or (t) , and that t satisfies the given predicate.
 --
 checkForeignRes :: (Type -> Bool) -> Type -> TcM s ()
 checkForeignRes pred_res_ty ty =
  case (splitTyConApp_maybe ty) of
     Just (io, [res_ty]) 
-        | (uniqueOf io) == ioTyConKey &&
-          pred_res_ty res_ty 
+        | (getUnique io) == ioTyConKey && pred_res_ty res_ty 
 	-> returnTc ()
-    _   | pred_res_ty ty -> returnTc ()
-        | otherwise      -> check False (illegalForeignTyErr False{-Res-} ty)
+    _   
+        | pred_res_ty ty -> returnTc ()
+	| otherwise      -> check False (illegalForeignTyErr False{-Res-} ty)
 
 \end{code}
 
@@ -231,15 +226,15 @@ Warnings
 
 \begin{code}
 illegalForeignTyErr isArg ty
-  = hang (hsep [ptext SLIT("Unacceptable"), arg_or_res, ptext SLIT("type in foreign declaration")])
-	 4 (hsep [ ptext SLIT("type:"),  ppr ty])
+  = hang (hsep [ptext SLIT("Unacceptable"), arg_or_res, ptext SLIT("type in foreign declaration:")])
+	 4 (hsep [ppr ty])
   where
    arg_or_res
     | isArg     = ptext SLIT("argument")
     | otherwise = ptext SLIT("result")
 
 foreignDeclCtxt fo = 
- hang (ptext SLIT("When checking a foreign declaration:"))
+ hang (ptext SLIT("When checking declaration:"))
   4   (ppr fo)
 
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[RnEnv]{Environment manipulation for the renamer monad}
 
@@ -17,16 +17,17 @@ import RdrHsSyn		( RdrName(..), RdrNameIE,
 import HsTypes		( getTyVarName, replaceTyVarName )
 import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..) )
 import RnMonad
-import ErrUtils         ( ErrMsg )
 import Name		( Name, OccName(..), Provenance(..), ExportFlag(..), NamedThing(..),
 			  occNameFlavour, getSrcLoc, occNameString,
-			  NameSet, emptyNameSet, addListToNameSet, nameSetToList,
-			  mkLocalName, mkGlobalName, modAndOcc,
-			  nameOccName, setNameProvenance, isVarOcc, getNameProvenance,
-			  pprOccName, isLocalName
+			  mkLocalName, mkGlobalName, 
+			  nameOccName, setNameProvenance, isVarOcc, 
+			  getNameProvenance, pprOccName, isLocalName,
+			  dictNamePrefix
 			)
+import NameSet
 import TyCon		( TyCon )
-import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
+import TysWiredIn	( tupleTyCon, unboxedTupleTyCon, 
+			  listTyCon, charTyCon )
 import FiniteMap
 import Unique		( Unique, Uniquable(..), unboundKey )
 import UniqFM           ( listToUFM, plusUFM_C )
@@ -79,7 +80,7 @@ newImportedGlobalName mod occ hif
 			-- Build a new original name, and put it in the cache
 		   let
 			(us', us1) = splitUniqSupply us
-			uniq   	   = getUnique us1
+			uniq   	   = uniqFromSupply us1
 			name       = mkGlobalName uniq mod occ prov
 			new_cache  = addToFM cache key name
 		   in
@@ -125,7 +126,7 @@ newLocallyDefinedGlobalName mod occ rec_exp_fn loc
 	Nothing -> let
 			provenance = LocalDef loc (rec_exp_fn new_name)
 			(us', us1) = splitUniqSupply us
-			uniq   	   = getUnique us1
+			uniq   	   = uniqFromSupply us1
 			new_name   = mkGlobalName uniq mod occ provenance
 			new_cache  = addToFM cache key new_name
 		   in
@@ -145,7 +146,8 @@ newDfunName cl_nm tycon_nm Nothing src_loc		-- Local instance decls have a "Noth
   = getModuleRn		`thenRn` \ mod_name ->
     newInstUniq name	`thenRn` \ inst_uniq ->
     let
-     dfun_occ = VarOcc (_PK_ ("$d" ++ (_UNPK_ name) ++ show inst_uniq))
+     dfun_occ = VarOcc (dictNamePrefix _APPEND_ 
+			name _APPEND_ _PK_(show inst_uniq))
     in
     newLocallyDefinedGlobalName mod_name dfun_occ 
 				(\_ -> Exported) src_loc
@@ -153,7 +155,7 @@ newDfunName cl_nm tycon_nm Nothing src_loc		-- Local instance decls have a "Noth
        {-
 	     Dictionary names have the following form
 
-	       $d<class><tycon><n>    
+	       _d<class><tycon><n>    
 
 	     where "n" is a positive number, and "tycon" is the
 	     name of the type constructor for which a "class"
@@ -165,8 +167,11 @@ newDfunName cl_nm tycon_nm Nothing src_loc		-- Local instance decls have a "Noth
 	      declaration be added to a module.)
       -}
      -- We're dropping the modids on purpose.
-     tycon_nm_str    = occNameString tycon_nm
-     cl_nm_str       = occNameString cl_nm
+     tycon_nm_str    = _PK_(map trHash (_UNPK_(occNameString tycon_nm)))
+     cl_nm_str       = _PK_(map trHash (_UNPK_(occNameString cl_nm)))
+
+     trHash '#'      = '_'
+     trHash c	     = c
 
       -- give up on any type constructor that starts with a
       -- non-alphanumeric char (e.g., [] (,*)
@@ -181,8 +186,8 @@ newLocalNames rdr_names
     let
 	n	   = length rdr_names
 	(us', us1) = splitUniqSupply us
-	uniqs	   = getUniques n us1
-	locals	   = [ mkLocalName uniq (rdrNameOcc rdr_name) loc
+	uniqs	   = uniqsFromSupply n us1
+	locals	   = [ mkLocalName uniq (rdrNameOcc rdr_name)
 		     | ((rdr_name,loc), uniq) <- rdr_names `zip` uniqs
 		     ]
     in
@@ -192,10 +197,10 @@ newLocalNames rdr_names
 -- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
 -- during compiler debugging.
 mkUnboundName :: RdrName -> Name
-mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name) noSrcLoc
+mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name)
 
 isUnboundName :: Name -> Bool
-isUnboundName name = uniqueOf name == unboundKey
+isUnboundName name = getUnique name == unboundKey
 \end{code}
 
 \begin{code}
@@ -402,12 +407,11 @@ addImplicitOccRn name = addOccurrenceName name
 addImplicitOccsRn :: [Name] -> RnMS s ()
 addImplicitOccsRn names = addOccurrenceNames names
 
-listType_RDR	= qual (modAndOcc listType_name)
-tupleType_RDR n	= qual (modAndOcc (tupleType_name n))
+charTyCon_name    = getName charTyCon
+listTyCon_name    = getName listTyCon
 
-charType_name    = getName charTyCon
-listType_name    = getName listTyCon
-tupleType_name n = getName (tupleTyCon n)
+tupleTyCon_name True  n = getName (tupleTyCon n)
+tupleTyCon_name False n = getName (unboxedTupleTyCon n)
 \end{code}
 
 \begin{code}

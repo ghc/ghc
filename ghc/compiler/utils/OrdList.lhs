@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1996
+% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 
 This is useful, general stuff for the Native Code Generator.

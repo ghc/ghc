@@ -1,5 +1,7 @@
-%
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% -----------------------------------------------------------------------------
+% $Id: PrelIOBase.lhs,v 1.6 1998/12/02 13:27:03 simonm Exp $
+% 
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 
 \section[PrelIOBase]{Module @PrelIOBase@}
@@ -9,18 +11,39 @@ concretely; the @IO@ module itself exports abstractly.
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
-#include "error.h"
+#include "cbits/error.h"
 
+#ifndef __HUGS__ /* Hugs just includes this in PreludeBuiltin so no header needed */
 module PrelIOBase where
 
 import {-# SOURCE #-} PrelErr ( error )
+
+import PrelST
 import PrelBase
-import PrelST	  ( ST(..), STret(..), StateAndPtr#(..) )
+import {-# SOURCE #-} PrelException ( fail )
+import PrelST	  ( ST(..), STret(..) )
 import PrelMaybe  ( Maybe(..) )
 import PrelAddr	  ( Addr(..), nullAddr )
 import PrelPack   ( unpackCString )
 import PrelArr	  ( MutableVar, readVar )
+#endif
 
+#ifdef __HUGS__
+#define cat2(x,y)  x/**/y
+#define CCALL(fun) cat2(prim_,fun)
+#define __CONCURRENT_HASKELL__
+#define stToIO id
+#define unpackCString primUnpackString
+#else
+#define CCALL(fun) _ccall_ fun
+#define ref_freeStdFileObject (``&freeStdFileObject''::Addr)
+#endif
+
+#ifndef __PARALLEL_HASKELL__
+#define FILE_OBJECT	    ForeignObj
+#else
+#define FILE_OBJECT	    Addr
+#endif
 \end{code}
 
 %*********************************************************
@@ -29,19 +52,15 @@ import PrelArr	  ( MutableVar, readVar )
 %*							*
 %*********************************************************
 
-IO is no longer built on top of PrimIO (which used to be a specialised
-version of the ST monad), instead it is now has its own type.  This is
-purely for efficiency purposes, since we get to remove several levels
-of lifting in the type of the monad.
+The IO Monad is just an instance of the ST monad, where the state is
+the real world.  We use the exception mechanism (in PrelException) to
+implement IO exceptions.
 
 \begin{code}
-newtype IO a = IO (State# RealWorld -> IOResult a)
+#ifndef __HUGS__
+newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
 
-{-# INLINE unIO #-}
 unIO (IO a) = a
-
-data IOResult a = IOok   (State# RealWorld) a
-		| IOfail (State# RealWorld) IOError
 
 instance  Functor IO where
    map f x = x >>= (return . f)
@@ -51,40 +70,24 @@ instance  Monad IO  where
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
     m >> k      =  m >>= \ _ -> k
-    return x	= IO $ \ s -> IOok s x
+    return x	= IO $ \ s -> (# s, x #)
 
-    (IO m) >>= k =
-        IO $ \s ->
-	case m s of
-	    IOfail new_s err -> IOfail new_s err
-	    IOok   new_s a   -> unIO (k a) new_s
+    m >>= k     = bindIO m k
 
-fixIO :: (a -> IO a) -> IO a
     -- not required but worth having around
+fixIO 		:: (a -> IO a) -> IO a
+fixIO m         = stToIO (fixST (ioToST . m))
 
-fixIO k = IO $ \ s ->
-    let
-	(IO k_loop) = k loop
-	result      = k_loop s
-	IOok _ loop = result
-    in
-    result
+liftIO :: IO a -> State# RealWorld -> STret RealWorld a
+liftIO (IO m) = \s -> case m s of (# s', r #) -> STret s' r
 
-fail            :: IOError -> IO a 
-fail err	=  IO $ \ s -> IOfail s err
+bindIO :: IO a -> (a -> IO b) -> IO b
+bindIO (IO m) k = IO ( \ s ->
+  case m s of 
+    (# new_s, a #) -> unIO (k a) new_s
+  )
 
-userError       :: String  -> IOError
-userError str	=  IOError Nothing (UserError Nothing) "" str
-
-catch           :: IO a    -> (IOError -> IO a) -> IO a 
-catch (IO m) k  = IO $ \ s ->
-  case m s of
-    IOok   new_s a -> IOok new_s a
-    IOfail new_s e -> unIO (k e) new_s
-
-instance  Show (IO a)  where
-    showsPrec p f  = showString "<<IO action>>"
-    showList	   = showList__ (showsPrec 0)
+#endif
 \end{code}
 
 %*********************************************************
@@ -94,14 +97,53 @@ instance  Show (IO a)  where
 %*********************************************************
 
 \begin{code}
-stToIO	   :: ST RealWorld a -> IO a
-stToIO (ST m) = IO $ \ s -> case (m s) of STret new_s r -> IOok new_s r
+#ifdef __HUGS__
+/* Hugs doesn't distinguish these types so no coercion required) */
+#else
+stToIO	      :: ST RealWorld a -> IO a
+stToIO (ST m) = (IO m)
 
-ioToST	   :: IO a -> ST RealWorld a
-ioToST (IO io) = ST $ \ s ->
-    case (io s) of
-      IOok   new_s a -> STret new_s a
-      IOfail new_s e -> error ("I/O Error (ioToST): " ++ showsPrec 0 e "\n")
+ioToST	      :: IO a -> ST RealWorld a
+ioToST (IO m) = (ST m)
+#endif
+\end{code}
+
+%*********************************************************
+%*							 *
+\subsection{Utility functions}
+%*							 *
+%*********************************************************
+
+I'm not sure why this little function is here...
+
+\begin{code}
+--fputs :: Addr{-FILE*-} -> String -> IO Bool
+
+userError       :: String  -> IOError
+userError str	=  IOError Nothing (UserError Nothing) "" str
+
+{-
+fputs stream (c : cs)
+  = CCALL(filePutc) stream c >>
+    fputs stream cs
+-}
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Unsafe @IO@ operations}
+%*							*
+%*********************************************************
+
+\begin{code}
+#ifndef __HUGS__
+{-# NOINLINE unsafePerformIO #-}
+unsafePerformIO	:: IO a -> a
+unsafePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
+
+unsafeInterleaveIO :: IO a -> IO a
+unsafeInterleaveIO = stToIO . unsafeInterleaveST . ioToST
+#endif
 \end{code}
 
 %*********************************************************
@@ -195,6 +237,12 @@ isUserError _		                  = False
 Showing @IOError@s
 
 \begin{code}
+#ifdef __HUGS__
+-- For now we give a fairly uninformative error message which just happens to
+-- be like the ones that Hugs used to give.
+instance Show IOError where
+    showsPrec p (IOError hdl iot loc s) = showString s . showChar '\n'
+#else
 instance Show IOError where
     showsPrec p (IOError hdl iot loc s) =
       showsPrec p iot .
@@ -212,7 +260,7 @@ instance Show IOError where
         Nothing -> id
 	Just h  -> showString "Handle: " . showsPrec p h
 
-
+#endif
 \end{code}
 
 The @String@ part of an @IOError@ is platform-dependent.  However, to
@@ -254,35 +302,35 @@ constructError call_site = constructErrorMsg call_site Nothing
 
 constructErrorMsg	      :: String -> Maybe String -> IO IOError
 constructErrorMsg call_site reason =
- _ccall_ getErrType__            >>= \ (I# errtype#) ->
- _ccall_ getErrStr__             >>= \ str ->
+ CCALL(getErrType__)            >>= \ errtype ->
+ CCALL(getErrStr__)             >>= \ str ->
  let
   iot =
-   case errtype# of
-     ERR_ALREADYEXISTS#	         -> AlreadyExists
-     ERR_HARDWAREFAULT#	         -> HardwareFault
-     ERR_ILLEGALOPERATION#	 -> IllegalOperation
-     ERR_INAPPROPRIATETYPE#	 -> InappropriateType
-     ERR_INTERRUPTED#	         -> Interrupted
-     ERR_INVALIDARGUMENT#	 -> InvalidArgument
-     ERR_NOSUCHTHING#	         -> NoSuchThing
-     ERR_OTHERERROR#		 -> OtherError
-     ERR_PERMISSIONDENIED#	 -> PermissionDenied
-     ERR_PROTOCOLERROR#	         -> ProtocolError
-     ERR_RESOURCEBUSY#	         -> ResourceBusy
-     ERR_RESOURCEEXHAUSTED#	 -> ResourceExhausted
-     ERR_RESOURCEVANISHED#	 -> ResourceVanished
-     ERR_SYSTEMERROR#	         -> SystemError
-     ERR_TIMEEXPIRED#	         -> TimeExpired
-     ERR_UNSATISFIEDCONSTRAINTS# -> UnsatisfiedConstraints
-     ERR_UNSUPPORTEDOPERATION#   -> UnsupportedOperation
-     ERR_EOF#		         -> EOF
+   case errtype of
+     ERR_ALREADYEXISTS	         -> AlreadyExists
+     ERR_HARDWAREFAULT	         -> HardwareFault
+     ERR_ILLEGALOPERATION	 -> IllegalOperation
+     ERR_INAPPROPRIATETYPE	 -> InappropriateType
+     ERR_INTERRUPTED	         -> Interrupted
+     ERR_INVALIDARGUMENT	 -> InvalidArgument
+     ERR_NOSUCHTHING	         -> NoSuchThing
+     ERR_OTHERERROR		 -> OtherError
+     ERR_PERMISSIONDENIED	 -> PermissionDenied
+     ERR_PROTOCOLERROR	         -> ProtocolError
+     ERR_RESOURCEBUSY	         -> ResourceBusy
+     ERR_RESOURCEEXHAUSTED	 -> ResourceExhausted
+     ERR_RESOURCEVANISHED	 -> ResourceVanished
+     ERR_SYSTEMERROR	         -> SystemError
+     ERR_TIMEEXPIRED	         -> TimeExpired
+     ERR_UNSATISFIEDCONSTRAINTS -> UnsatisfiedConstraints
+     ERR_UNSUPPORTEDOPERATION   -> UnsupportedOperation
+     ERR_EOF		         -> EOF
      _			         -> OtherError
 
   msg = 
    unpackCString str ++
    (case iot of
-     OtherError -> "(error code: " ++ show (I# errtype#) ++ ")"
+     OtherError -> "(error code: " ++ show errtype ++ ")"
      _ -> "") ++
    (case reason of
       Nothing -> ""
@@ -310,6 +358,7 @@ a handles reside in @IOHandle@.
 
 \begin{code}
 
+#ifndef __HUGS__
 {-
  Sigh, the MVar ops in ConcBase depend on IO, the IO
  representation here depend on MVars for handles (when
@@ -317,7 +366,7 @@ a handles reside in @IOHandle@.
  the definition of MVars go here:
 
 -}
-data MVar a = MVar (SynchVar# RealWorld a)
+data MVar a = MVar (MVar# RealWorld a)
 
 {-
   Double sigh - ForeignObj is needed here too to break a cycle.
@@ -325,25 +374,12 @@ data MVar a = MVar (SynchVar# RealWorld a)
 data ForeignObj = ForeignObj ForeignObj#   -- another one
 instance CCallable ForeignObj
 instance CCallable ForeignObj#
-
-makeForeignObj  :: Addr        -> Addr       -> IO ForeignObj
-makeForeignObj (A# obj) (A# finaliser) = IO ( \ s# ->
-    case makeForeignObj# obj finaliser s# of
-      StateAndForeignObj# s1# fo# -> IOok s1# (ForeignObj fo#))
-
-data StateAndForeignObj# s  = StateAndForeignObj# (State# s) ForeignObj#
-
+#endif /* ndef __HUGS__ */
 
 #if defined(__CONCURRENT_HASKELL__)
 newtype Handle = Handle (MVar Handle__)
 #else
 newtype Handle = Handle (MutableVar RealWorld Handle__)
-#endif
-
-#ifndef __PARALLEL_HASKELL__
-#define FILE_OBJECT	    ForeignObj
-#else
-#define FILE_OBJECT	    Addr
 #endif
 
 {-
@@ -359,15 +395,6 @@ newtype Handle = Handle (MutableVar RealWorld Handle__)
 
 Note: when a Handle is garbage collected, we want to flush its buffer
 and close the OS file handle, so as to free up a (precious) resource.
-
-This means that the finaliser for the handle needs to have access to
-the buffer and the OS file handle. The current implementation of foreign
-objects requires that the finaliser is implemented in C, so to
-arrange for this to happen, openFile() returns a pointer to a structure
-big enough to hold the OS file handle and a pointer to the buffer.
-This pointer is then wrapped up inside a ForeignObj, and finalised
-as desired.
-
 -}
 data Handle__
   = Handle__ {
@@ -380,7 +407,6 @@ data Handle__
 {-
   Internally, we classify handles as being one
   of the following:
-
 -}
 data Handle__Type
  = ErrorHandle  IOError
@@ -410,12 +436,16 @@ instance Show Handle where
   showsPrec p (Handle h) = 
     let
 #if defined(__CONCURRENT_HASKELL__)
+#ifdef __HUGS__
+     hdl_ = unsafePerformIO (primTakeMVar h)
+#else
      -- (Big) SIGH: unfolded defn of takeMVar to avoid
      -- an (oh-so) unfortunate module loop with PrelConc.
      hdl_ = unsafePerformIO (IO $ \ s# ->
 	     case h               of { MVar h# ->
-	     case takeMVar# h# s# of { StateAndPtr# s2# r -> 
-		    IOok s2# r }})
+	     case takeMVar# h# s# of { (# s2# , r #) -> 
+		    (# s2#, r #) }})
+#endif
 #else
      hdl_ = unsafePerformIO (stToIO (readVar h))
 #endif
@@ -442,37 +472,7 @@ instance Show Handle where
 	BlockBuffering Nothing  -> showString "block " . showParen True (showsPrec p def)
       where
        def :: Int 
-       def = unsafePerformIO (_ccall_ getBufSize fo)
-
-
-{-
- nullFile__ is only used for closed handles, plugging it in as
- a null file object reference.
--}
-nullFile__ :: FILE_OBJECT
-nullFile__ = 
-#ifndef __PARALLEL_HASKELL__
-    unsafePerformIO (makeForeignObj nullAddr nullAddr{-i.e., don't finalise-})
-#else
-    nullAddr
-#endif
-
-
-mkClosedHandle__ :: Handle__
-mkClosedHandle__ = 
-  Handle__ 
-	   nullFile__
-	   ClosedHandle 
-	   NoBuffering
-	   "closed file"
-
-mkErrorHandle__ :: IOError -> Handle__
-mkErrorHandle__ ioe =
-  Handle__
-           nullFile__ 
-	   (ErrorHandle ioe)
-	   NoBuffering
-	   "error handle"
+       def = unsafePerformIO (CCALL(getBufSize) fo)
 
 mkBuffer__ :: FILE_OBJECT -> Int -> IO ()
 mkBuffer__ fo sz_in_bytes = do
@@ -480,11 +480,11 @@ mkBuffer__ fo sz_in_bytes = do
   case sz_in_bytes of
     0 -> return nullAddr  -- this has the effect of overwriting the pointer to the old buffer.
     _ -> do
-     chunk <- _ccall_ allocMemory__ sz_in_bytes
+     chunk <- CCALL(allocMemory__) sz_in_bytes
      if chunk == nullAddr
       then fail (IOError Nothing ResourceExhausted "mkBuffer__" "not enough virtual memory")
       else return chunk
- _ccall_ setBuf fo chunk sz_in_bytes
+ CCALL(setBuf) fo chunk sz_in_bytes
 
 \end{code}
 
@@ -537,29 +537,5 @@ data BufferMode
  = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
    deriving (Eq, Ord, Show)
    {- Read instance defined in IO. -}
-
-\end{code}
-
-%*********************************************************
-%*							*
-\subsection{Unsafe @IO@ operations}
-%*							*
-%*********************************************************
-
-\begin{code}
-{-# NOINLINE unsafePerformIO #-}
-unsafePerformIO	:: IO a -> a
-unsafePerformIO (IO m)
-  = case m realWorld# of
-      IOok _ r   -> r
-      IOfail _ e -> error ("unsafePerformIO: I/O error: " ++ show e ++ "\n")
-
-{-# NOINLINE unsafeInterleaveIO #-}
-unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO (IO m) = IO ( \ s ->
-	let
-	    IOok _ r = m s
-	in
-	IOok s r)
 
 \end{code}

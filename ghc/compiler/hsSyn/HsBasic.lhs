@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[HsLit]{Abstract syntax: source-language literals}
 
@@ -56,15 +56,16 @@ negLiteral (HsFrac f) = HsFrac (-f)
 
 \begin{code}
 instance Outputable HsLit where
+	-- Use "show" because it puts in appropriate escapes
     ppr (HsChar c)	 = text (show c)
-    ppr (HsCharPrim c)	 = (<>) (text (show c)) (char '#')
-    ppr (HsString s)	 = text (show s)
-    ppr (HsStringPrim s) = (<>) (text (show s)) (char '#')
+    ppr (HsCharPrim c)	 = text (show c) <> char '#'
+    ppr (HsStringPrim s) = pprFSAsString s <> char '#'
+    ppr (HsString s)	 = pprFSAsString s
     ppr (HsInt i)	 = integer i
     ppr (HsFrac f)	 = rational f
-    ppr (HsFloatPrim f)	 = (<>) (rational f) (char '#')
-    ppr (HsDoublePrim d) = (<>) (rational d) (text "##")
-    ppr (HsIntPrim i)	 = (<>) (integer i) (char '#')
+    ppr (HsFloatPrim f)	 = rational f <> char '#'
+    ppr (HsDoublePrim d) = rational d <> text "##"
+    ppr (HsIntPrim i)	 = integer i  <> char '#'
     ppr (HsLitLit s)	 = hcat [text "``", ptext s, text "''"]
 \end{code}
 

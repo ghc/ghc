@@ -68,57 +68,22 @@ import PrelBase
 import PrelList
 import PrelRead
 import PrelNum
+import PrelNumExtra
 import PrelTup
 import PrelMaybe
 import PrelEither
 import PrelBounded
+import PrelConc
 import Monad
 import Maybe
-import PrelErr   ( error, seqError )
-import IO  ( IO, FilePath, IOError,
-	     fail, userError, catch,
-	     putChar, putStr, putStrLn, print,
-	     getChar, getLine, getContents, interact,
-	     readFile, writeFile, appendFile, readIO, readLn
-	   )
-
-{- Declared elsewhere:
-PrelBase: infixr 9 .
-PrelNum:  infixr 8 ^, ^^, **
-PrelBase: infixl *
-PrelNum:  infixl 7 /, %, `quot`, `rem`, `div`, `mod`
-PrelBase: infixl 6 +, -
-PrelBase: infixr 5 :, ++
-PrelBase: infix  4 ==, /=, <. <=, >=, >
-PrelBase: infixr 3 &&
-PrelBase: infixr 2 ||
-PrelBase: infixl >>, >>=
-PrelBase: infixr $
--}
-infixr 0 `seq`
-
+import PrelErr   ( error )
+import IO
 
 -- These can't conveniently be defined in PrelBase because they use numbers,
 -- or I/O, so here's a convenient place to do them.
 
-strict      :: Eval a => (a -> b) -> a -> b
+strict      :: (a -> b) -> a -> b
 strict f x  = x `seq` f x
-
-
--- "seq" is defined a bit wierdly (see below)
---
--- The reason for the strange "0# -> parError" case is that
--- it fools the compiler into thinking that seq is non-strict in
--- its second argument (even if it inlines seq at the call site).
--- If it thinks seq is strict in "y", then it often evaluates
--- "y" before "x", which is totally wrong.  
---
--- Just before converting from Core to STG there's a bit of magic
--- that recognises the seq# and eliminates the duff case.
-
-{-# INLINE seq  #-}
-seq :: Eval a => a -> b -> b
-seq  x y = case (seq#  x) of { 0# -> seqError; _ -> y }
 
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which undefined 

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcInstDecls]{Typechecking instance declarations}
 
@@ -12,17 +12,12 @@ module TcInstDcls (
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), InstDecl(..),
-			  HsBinds(..), MonoBinds(..), GRHSsAndBinds(..), GRHS(..),
+			  HsBinds(..), MonoBinds(..), GRHSsAndBinds(..),
 			  HsExpr(..), InPat(..), HsLit(..), Sig(..),
-			  unguardedRHS,
-			  collectMonoBinders, andMonoBinds
+			  collectMonoBinders, andMonoBindList
 			)
-import HsBinds		( sigsForMe )
-import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds,
-			  RenamedInstDecl, RenamedHsExpr,
-			  RenamedSig, RenamedHsDecl
-			)
-import TcHsSyn		( TcMonoBinds, TcIdOcc(..), TcIdBndr, 
+import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl )
+import TcHsSyn		( TcMonoBinds, TcIdOcc(..),
 			  maybeBoxedPrimType, tcIdType
 			)
 
@@ -33,37 +28,36 @@ import RnMonad		( RnNameSupply )
 import Inst		( Inst, InstOrigin(..),
 			  newDicts, LIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( GlobalValueEnv, tcExtendGlobalValEnv, tcAddImportedIdInfo )
-import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, classDataCon )
-import TcKind		( TcKind, unifyKind )
+import TcEnv		( GlobalValueEnv, tcExtendGlobalValEnv, tcAddImportedIdInfo, tcInstId )
+import TcInstUtil	( InstInfo(..), classDataCon )
 import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( TcType, TcTyVar, TcTyVarSet, 
-			  zonkSigTyVar, tcInstSigType, tcInstTheta
-			)
+import TcType		( TcTyVar, zonkTcTyVarBndr )
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			  foldBag, bagToList, Bag
 			)
-import CmdLineOpts	( opt_GlasgowExts )
+import CmdLineOpts	( opt_GlasgowExts, opt_AllowUndecidableInstances )
 import Class		( classBigSig, Class )
-import Id		( isNullaryDataCon, dataConArgTys, replaceIdInfo, idName, idType, Id )
-import Maybes 		( maybeToBool, seqMaybe, catMaybes, expectJust )
-import Name		( nameOccName, mkLocalName,
-			  isLocallyDefined, Module,
+import Var		( setIdInfo, idName, Id, TyVar )
+import DataCon		( isNullaryDataCon, dataConArgTys, dataConId )
+import Maybes 		( maybeToBool, catMaybes, expectJust )
+import MkId		( mkDictFunId )
+import Name		( nameOccName, isLocallyDefined, Module,
 			  NamedThing(..)
 			)
 import PrelVals		( eRROR_ID )
-import PprType		( pprParendType,  pprConstraint )
-import SrcLoc		( SrcLoc, noSrcLoc )
+import PprType		( pprConstraint )
+import SrcLoc		( SrcLoc )
 import TyCon		( isSynTyCon, isDataTyCon, tyConDerivings )
-import Type		( Type, ThetaType, isUnpointedType,
-			  splitSigmaTy, isTyVarTy, mkSigmaTy,
+import Type		( Type, isUnLiftedType, mkTyVarTys,
+			  splitSigmaTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy_maybe,
-			  splitAlgTyConApp_maybe, splitRhoTy,
-			  tyVarsOfTypes, mkTyVarTys,
+			  splitAlgTyConApp_maybe,
+			  tyVarsOfTypes, substFlexiTheta
 			)
-import TyVar		( zipTyVarEnv, mkTyVarSet, tyVarSetToList, TyVar )
+import VarEnv		( zipVarEnv )
+import VarSet		( mkVarSet, varSetElems )
 import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( stringTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, Uniquable(..) )
@@ -193,13 +187,13 @@ tcInstDecl1 unf_env mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src
 
 	-- Make the dfun id and constant-method ids
     let
-	(dfun_id, dfun_theta) = mkInstanceRelatedIds dfun_name
-				         clas tyvars inst_tys theta
+	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
+
 	-- Add info from interface file
 	final_dfun_id = tcAddImportedIdInfo unf_env dfun_id
     in
     returnTc (unitBag (InstInfo clas tyvars inst_tys theta	
-				dfun_theta final_dfun_id
+				final_dfun_id
 			     	binds src_loc uprags))
 \end{code}
 
@@ -294,7 +288,7 @@ First comes the easy case of a non-local instance decl.
 tcInstDecl2 :: InstInfo -> NF_TcM s (LIE s, TcMonoBinds s)
 
 tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
-		      inst_decl_theta dfun_theta
+		      inst_decl_theta
 		      dfun_id monobinds
 		      locn uprags)
   | not (isLocallyDefined dfun_id)
@@ -317,26 +311,23 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     tcAddSrcLoc locn					   $
 
 	-- Instantiate the instance decl with tc-style type variables
-    tcInstSigType (idType dfun_id)	`thenNF_Tc` \ dfun_ty' ->
+    tcInstId dfun_id		`thenNF_Tc` \ (inst_tyvars', dfun_theta', dict_ty') ->
     let
-	(inst_tyvars', 
-	 dfun_theta', dict_ty') = splitSigmaTy dfun_ty'
-
 	(clas, inst_tys')	= expectJust "tcInstDecl2" (splitDictTy_maybe dict_ty')
+
+	origin			= InstanceDeclOrigin
 
         (class_tyvars,
 	 sc_theta, sc_sel_ids,
 	 op_sel_ids, defm_ids)  = classBigSig clas
 
-	origin			= InstanceDeclOrigin
-    in
 	-- Instantiate the theta found in the original instance decl
-    tcInstTheta (zipTyVarEnv inst_tyvars (mkTyVarTys inst_tyvars'))
-		inst_decl_theta					`thenNF_Tc` \ inst_decl_theta' ->
+	inst_decl_theta' = substFlexiTheta (zipVarEnv inst_tyvars (mkTyVarTys inst_tyvars'))
+					   inst_decl_theta
 
-         -- Instantiate the super-class context with the instance types
-    tcInstTheta (zipTyVarEnv class_tyvars inst_tys') sc_theta	`thenNF_Tc` \ sc_theta' ->
-
+         -- Instantiate the super-class context with inst_tys
+	sc_theta' = substFlexiTheta (zipVarEnv class_tyvars inst_tys') sc_theta
+    in
 	 -- Create dictionary Ids from the specified instance contexts.
     newDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
     newDicts origin dfun_theta'		`thenNF_Tc` \ (dfun_arg_dicts,  dfun_arg_dicts_ids)  ->
@@ -370,10 +361,13 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     )					`thenTc` \ (prag_info_fn, prag_binds, prag_lie) ->
 
 	-- Check the overloading constraints of the methods and superclasses
-    mapNF_Tc zonkSigTyVar inst_tyvars' 	`thenNF_Tc` \ zonked_inst_tyvars ->
 
+	-- tcMethodBind has checked that the class_tyvars havn't
+	-- been unified with each other or another type, but we must
+	-- still zonk them
+    mapNF_Tc zonkTcTyVarBndr inst_tyvars' 	`thenNF_Tc` \ zonked_inst_tyvars ->
     let
-        inst_tyvars_set = mkTyVarSet zonked_inst_tyvars
+        inst_tyvars_set = mkVarSet zonked_inst_tyvars
 
 	(meth_lies, meth_ids) = unzip meth_lies_w_ids
 
@@ -405,7 +399,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		 inst_tyvars_set		-- Local tyvars
 		 inst_decl_dicts		-- The instance dictionaries available
 		 sc_dicts			-- The superclass dicationaries reqd
-    )					`thenTc_`
+    )					`thenTc` \ _ -> 
     						-- Ignore the result; we're only doing
 						-- this to make sure it can be done.
 
@@ -439,7 +433,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		  (HsLitOut (HsString msg) stringTy)
 
 	  | otherwise	-- The common case
-	  = foldl HsApp (TyApp (HsVar (RealId dict_constr)) inst_tys')
+	  = foldl HsApp (TyApp (HsVar (RealId (dataConId dict_constr))) inst_tys')
 			       (map HsVar (sc_dict_ids ++ meth_ids))
 		-- We don't produce a binding for the dict_constr; instead we
 		-- rely on the simplifier to unfold this saturated application
@@ -452,9 +446,9 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 	    msg = _PK_ ("Compiler error: bad dictionary " ++ showSDoc (ppr clas))
 
 	dict_bind    = VarMonoBind this_dict_id dict_rhs
-	method_binds = andMonoBinds method_binds_s
+	method_binds = andMonoBindList method_binds_s
 
-	final_dfun_id = replaceIdInfo dfun_id (prag_info_fn (idName dfun_id))
+	final_dfun_id = setIdInfo dfun_id (prag_info_fn (idName dfun_id))
 				-- Pretty truesome
 	main_bind
 	  = AbsBinds
@@ -488,8 +482,9 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 
 \begin{code}
 scrutiniseInstanceConstraint (clas, tys)
-  | all isTyVarTy tys = returnNF_Tc ()
-  | otherwise	      = addErrTc (instConstraintErr clas tys)
+  |  all isTyVarTy tys 
+  || opt_AllowUndecidableInstances = returnNF_Tc ()
+  | otherwise	      	           = addErrTc (instConstraintErr clas tys)
 
 scrutiniseInstanceHead clas inst_taus
   |	-- CCALL CHECK (a).... urgh!
@@ -499,15 +494,15 @@ scrutiniseInstanceHead clas inst_taus
 	--  
         -- We flag this separately to give a more precise error msg.
         --
-     (uniqueOf clas == cCallableClassKey || uniqueOf clas == cReturnableClassKey)
+     (getUnique clas == cCallableClassKey || getUnique clas == cReturnableClassKey)
   && is_alg_tycon_app && not constructors_visible
   = addErrTc (invisibleDataConPrimCCallErr clas first_inst_tau)
 
   |	-- CCALL CHECK (b) 
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
-    (uniqueOf clas == cCallableClassKey   && not (ccallable_type   first_inst_tau)) ||
-    (uniqueOf clas == cReturnableClassKey && not (creturnable_type first_inst_tau))
+    (getUnique clas == cCallableClassKey   && not (ccallable_type   first_inst_tau)) ||
+    (getUnique clas == cReturnableClassKey && not (creturnable_type first_inst_tau))
   = addErrTc (nonBoxedPrimCCallErr clas first_inst_tau)
 
   	-- DERIVING CHECK
@@ -517,13 +512,23 @@ scrutiniseInstanceHead clas inst_taus
   = addErrTc (derivingWhenInstanceExistsErr clas first_inst_tau)
 	   -- Kind check will have ensured inst_taus is of length 1
 
+	-- Allow anything for AllowUndecidableInstances
+  | opt_AllowUndecidableInstances
+  = returnNF_Tc ()
+
+	-- If GlasgowExts then check at least one isn't a type variable
+  | opt_GlasgowExts 
+  = if all isTyVarTy inst_taus then
+	addErrTc (instTypeErr clas inst_taus (text "There must be at least one non-type-variable in the instance head"))
+    else
+	returnNF_Tc ()
+
 	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
-  |  not opt_GlasgowExts
-  && not (length inst_taus == 1 &&
+  |  not (length inst_taus == 1 &&
 	  maybeToBool maybe_tycon_app &&	-- Yes, there's a type constuctor
           not (isSynTyCon tycon) &&		-- ...but not a synonym
           all isTyVarTy arg_tys && 		-- Applied to type variables
-	  length (tyVarSetToList (tyVarsOfTypes arg_tys)) == length arg_tys
+	  length (varSetElems (tyVarsOfTypes arg_tys)) == length arg_tys
 		 -- This last condition checks that all the type variables are distinct
      )
   = addErrTc (instTypeErr clas inst_taus
@@ -553,7 +558,7 @@ scrutiniseInstanceHead clas inst_taus
 -- These conditions come directly from what the DsCCall is capable of.
 -- Totally grotesque.  Green card should solve this.
 
-ccallable_type   ty = isUnpointedType ty ||				-- Allow CCallable Int# etc
+ccallable_type   ty = isUnLiftedType ty ||				-- Allow CCallable Int# etc
                       maybeToBool (maybeBoxedPrimType ty) ||	-- Ditto Int etc
 		      ty == stringTy ||
 		      byte_arr_thing

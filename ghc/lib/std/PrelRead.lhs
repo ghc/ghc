@@ -13,6 +13,7 @@ module PrelRead where
 
 import {-# SOURCE #-} PrelErr ( error )
 import PrelNum
+import PrelNumExtra
 import PrelList
 import PrelTup
 import PrelMaybe
@@ -21,8 +22,8 @@ import PrelBase
 import Monad
 
 -- needed for readIO.
-import PrelIOBase ( IO, fail, userError )
-
+import PrelIOBase ( IO, userError )
+import PrelException ( fail )
 \end{code}
 
 %*********************************************************

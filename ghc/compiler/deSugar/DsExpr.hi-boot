@@ -1,5 +1,6 @@
 _interface_ DsExpr 1
 _exports_
-DsExpr dsExpr;
+DsExpr dsExpr dsLet;
 _declarations_
 1 dsExpr _:_ TcHsSyn.TypecheckedHsExpr -> DsMonad.DsM CoreSyn.CoreExpr ;;
+1 dsLet  _:_ TcHsSyn.TypecheckedHsBinds -> CoreSyn.CoreExpr -> DsMonad.DsM CoreSyn.CoreExpr ;;

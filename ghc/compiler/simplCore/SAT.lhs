@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 %************************************************************************
 %*									*
@@ -53,10 +53,16 @@ import Util
 \end{code}
 
 \begin{code}
-doStaticArgs :: [CoreBinding] -> UniqSupply -> [CoreBinding]
+doStaticArgs :: [CoreBind] -> UniqSupply -> [CoreBind]
 
 doStaticArgs binds
-  = initSAT (mapSAT sat_bind binds)
+  = do {
+	beginPass "Static argument";
+	let { binds' = initSAT (mapSAT sat_bind binds) };
+	endPass "Static argument" 
+		False		-- No specific flag for dumping SAT
+		binds'
+    }
   where
     sat_bind (NonRec binder expr)
       = emptyEnvSAT  `thenSAT_`

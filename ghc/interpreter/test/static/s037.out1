@@ -1,0 +1,1 @@
+ERROR "test/static/s037.hs": Import of class "Eq" clashes with type constructor in module "Prelude"

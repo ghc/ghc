@@ -1,0 +1,5 @@
+ERROR "test/static/s052.hs" (line 4): Cannot build superclass instance
+*** Instance            : Ord T
+*** Context supplied    : ()
+*** Required superclass : Eq T
+

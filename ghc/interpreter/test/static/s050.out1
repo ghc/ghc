@@ -1,0 +1,5 @@
+ERROR "test/static/s050.hs" (line 5): Overlapping instances for class "Eq"
+*** This instance   : Eq T
+*** Overlaps with   : Eq T
+*** Common instance : Eq T
+

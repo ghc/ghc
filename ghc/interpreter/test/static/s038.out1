@@ -1,0 +1,1 @@
+ERROR "test/static/s038.hs": Import of type constructor "Int" clashes with class in module "PreludeBuiltin"

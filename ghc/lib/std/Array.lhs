@@ -17,7 +17,7 @@ module  Array (
 
 import Ix
 import PrelList
-import PrelRead
+--import PrelRead
 import PrelArr		-- Most of the hard work is done here
 import PrelBase
 
@@ -90,10 +90,12 @@ instance  (Ix a, Show a, Show b) => Show (Array a b)  where
 		    shows (assocs a)                  )
     showList = showList__ (showsPrec 0)
 
+{-
 instance  (Ix a, Read a, Read b) => Read (Array a b)  where
     readsPrec p = readParen (p > 9)
 	   (\r -> [(array b as, u) | ("array",s) <- lex r,
 				     (b,t)       <- reads s,
 				     (as,u)      <- reads t   ])
     readList = readList__ (readsPrec 0)
+-}
 \end{code}

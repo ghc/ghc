@@ -1,0 +1,1 @@
+ERROR "test/static/s025.hs" (line 3): Repeated definition of class "C"

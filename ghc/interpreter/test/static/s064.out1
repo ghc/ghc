@@ -1,0 +1,2 @@
+ERROR "test/static/s064.hs" (line 4): Multiple default declarations are not permitted ina single script file.
+

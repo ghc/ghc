@@ -1,0 +1,5 @@
+ERROR "test/typechecker/t002.hs" (line 2): Inferred type is not general enough
+*** Expression    : x
+*** Expected type : a
+*** Inferred type : Char
+

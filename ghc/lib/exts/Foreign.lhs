@@ -8,8 +8,9 @@
 module Foreign 
        ( 
 	 ForeignObj       -- abstract, instance of: Eq
-       , makeForeignObj   -- :: Addr{-obj-} -> Addr{-finaliser-} -> IO ForeignObj
+       , makeForeignObj   -- :: Addr{-obj-} -> IO ForeignObj
        , writeForeignObj  -- :: ForeignObj  -> Addr{-new obj-}   -> IO ()
+       , addForeignFinaliser -- :: ForeignObj -> IO () -> IO ()
        , foreignObjToAddr -- :: ForeignObj  -> IO Addr
            -- the coercion from a foreign obj. to an addr. is unsafe,
 	   -- and should not be used unless absolutely necessary.
@@ -18,49 +19,6 @@ module Foreign
        , makeStablePtr   -- :: a -> IO (StablePtr a)
        , deRefStablePtr  -- :: StablePtr a -> IO a
        , freeStablePtr   -- :: StablePtr a -> IO ()
-
-       , indexCharOffForeignObj
-       , indexAddrOffForeignObj
-       , indexIntOffForeignObj
-       , indexFloatOffForeignObj
-       , indexDoubleOffForeignObj
-       , readCharOffForeignObj
-       , readAddrOffForeignObj
-       , readIntOffForeignObj
-       , readFloatOffForeignObj
-       , readDoubleOffForeignObj
-       , writeCharOffForeignObj
-       , writeAddrOffForeignObj
-       , writeIntOffForeignObj
-       , writeFloatOffForeignObj
-       , writeDoubleOffForeignObj
-        
-       , indexWord8OffForeignObj
-       , indexWord16OffForeignObj
-       , indexWord32OffForeignObj
-       , indexWord64OffForeignObj
-       , readWord8OffForeignObj
-       , readWord16OffForeignObj
-       , readWord32OffForeignObj
-       , readWord64OffForeignObj
-       , writeWord8OffForeignObj
-       , writeWord16OffForeignObj
-       , writeWord32OffForeignObj
-       , writeWord64OffForeignObj
-
-       , indexInt8OffForeignObj
-       , indexInt16OffForeignObj
-       , indexInt32OffForeignObj
-       , indexInt64OffForeignObj
-       , readInt8OffForeignObj
-       , readInt16OffForeignObj
-       , readInt32OffForeignObj
-       , readInt64OffForeignObj
-       , writeInt8OffForeignObj
-       , writeInt16OffForeignObj
-       , writeInt32OffForeignObj
-       , writeInt64OffForeignObj
-
        ) where
 
 import PrelForeign
@@ -69,8 +27,8 @@ import PrelGHC     ( indexCharOffForeignObj#, indexIntOffForeignObj#,
 		     indexAddrOffForeignObj#, indexFloatOffForeignObj#, 
 		     indexDoubleOffForeignObj#
 		   )
-import PrelAddr    ( Addr(..) )
-import PrelCCall   ( Word(..) )
+import PrelAddr    ( Addr(..), Word(..) )
+import PrelWeak    ( addForeignFinaliser )
 import Word 
    ( 
      indexWord8OffForeignObj
@@ -102,7 +60,7 @@ import Int
    , writeInt32OffForeignObj
    , writeInt64OffForeignObj
    )
-import PrelIOBase ( IO(..), IOResult(..) )
+import PrelIOBase ( IO(..) )
 \end{code}
 
 \begin{code}

@@ -8,11 +8,12 @@
 %************************************************************************
 
 If you still have a problem after consulting this section, then you
-may have found a <em>bug</em>---please report it!  See
-Section <ref name="How to report a bug in the GHC system" id="bug-reports"> for a list of things we'd like to know about
-your bug.  If in doubt, send a report---we love mail from irate users :-!
+may have found a <em>bug</em>---please report it!  See Section <ref
+name="How to report a bug in the GHC system" id="bug-reports"> for a
+list of things we'd like to know about your bug.  If in doubt, send a
+report---we love mail from irate users :-!
 
-(Section <ref name="Haskell 1.4 vs. Glasgow Haskell 3.00: language
+(Section <ref name="Haskell 1.4 vs. Glasgow Haskell 4.00: language
 non-compliance" id="vs-Haskell-defn">, which describes Glasgow
 Haskell's shortcomings vs.~the Haskell language definition, may also
 be of interest.)
@@ -42,6 +43,10 @@ can vary by platform (e.g., on a 64-bit machine).
 Just say @make all EXTRA_HC_OPTS=-H<a reasonable number>@ and see
 how you get along.
 
+Note that this is less likely to happen if you are compiling with GHC
+4.00 or later, since the introduction of the dynamically expanding
+heap.
+
 %-------------------------------------------------------------------
 <tag>``The compiler died with a pattern-matching error.''</tag>
 This is a bug just as surely as a ``panic.'' Please report it.
@@ -70,7 +75,7 @@ it.
 <tag>``What about this warning from the C compiler?''</tag>
 
 For example: ``...warning: `Foo' declared `static' but never defined.''
-Unsightly, but not a problem.
+Unsightly, but shouldn't be a problem.
 
 %-------------------------------------------------------------------
 <tag>Sensitivity to @.hi@ interface files:</tag>
@@ -91,15 +96,14 @@ Unlikely :-) A useful be-more-paranoid option to give to GHC is
 @-dcore-lint@<nidx>-dcore-lint option</nidx>; this causes a ``lint''
 pass to check for errors (notably type errors) after each Core-to-Core
 transformation pass.  We run with @-dcore-lint@ on all the time; it
-costs about 5\% in compile time.  (Or maybe 25\%; who knows?)
+costs about 5\% in compile time.
 
 %-------------------------------------------------------------------
 <tag>``Why did I get a link error?''</tag>
 
 If the linker complains about not finding @_<something>_fast@, then
-your interface files haven't settled---keep on compiling!  (In
-particular, this error means that arity information, which you can see
-in any @.hi@ file, has changed.)
+something is inconsistent: you probably didn't compile modules in the
+proper dependency order.
 
 %-------------------------------------------------------------------
 <tag>``What's a `consistency error'?''</tag>
@@ -142,11 +146,13 @@ stingier" id="sooner-faster-quicker">).
 %-----------------------------------------------------------------------
 <tag>``Help! My program crashed!''</tag>
 (e.g., a `segmentation fault' or `core dumped')
+<nidx>segmentation fault</nidx>
 
-If your program has no @_ccall_@s/@_casm_@s in it, then a crash is always
-a BUG in the GHC system, except in one case: If your program is made
-of several modules, each module must have been compiled with a stable
-group of interface (@.hi@) files.
+If your program has no @_ccall_@s/@_casm_@s in it, then a crash is
+always a BUG in the GHC system, except in one case: If your program is
+made of several modules, each module must have been compiled after any
+modules on which it depends (unless you use @.hi-boot@ files, in which
+case these <em/must/ be correct with respect to the module source). 
 
 For example, if an interface is lying about the type of an imported
 value then GHC may well generate duff code for the importing module.
@@ -185,11 +191,6 @@ bets are off, because you can trash the heap, the stack, or whatever.
 If you are interested in hard-core debugging of a crashing
 GHC-compiled program, please see Section <ref name="Hard-core
 debugging of GHC-compiled programs" id="hard-core-debug">.
-
-% (If you have an ``unregisterised'' arity-checking
-% (@-O0 -darity-checks@) around [as we sometimes do at Glasgow], then you
-% might recompile with @-darity-checks@<nidx>-darity-checks option</nidx>,
-% which will definitely detect arity-compatibility errors.)
 
 %-------------------------------------------------------------------
 <tag>``My program entered an `absent' argument.''</tag>

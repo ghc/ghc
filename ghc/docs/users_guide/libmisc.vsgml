@@ -247,7 +247,7 @@ accumulating any errors that occur.
 %************************************************************************
 
 You need to @import PackedString@ and heave in your
-@-syslib misc@ to use @PackedString@s.
+@-syslib ghc@ to use @PackedString@s.
 
 The basic type and functions available are:
 <tscreen><verb>
@@ -512,7 +512,7 @@ unzipWith   :: (a -> b -> c) -> [(a, b)] -> [c]
 %*                                                                      *
 %************************************************************************
 
-The GHC system library (@-syslib misc@) also provides interfaces to
+The GHC system library (@-syslib ghc@) also provides interfaces to
 several useful C libraries, mostly from the GNU project.
 
 %************************************************************************
@@ -532,7 +532,7 @@ Readline library.  As such, you will need to look at the GNU
 documentation (and have a @libreadline.a@ file around somewhere...)
 
 You'll need to link any Readlining program with @-lreadline -ltermcap@,
-besides the usual @-syslib misc@.
+besides the usual @-syslib ghc@ (and @-fhaskell-1.3@).
 
 The main function you'll use is:
 <tscreen><verb>

@@ -1,5 +1,7 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+%
+% $Id: CgMonad.lhs,v 1.15 1998/12/02 13:17:50 simonm Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -23,19 +25,13 @@ module CgMonad (
 	EndOfBlockInfo(..),
 	setEndOfBlockInfo, getEndOfBlockInfo,
 
-	AStackUsage, BStackUsage, HeapUsage,
-	StubFlag,
-	isStubbed,
+	setSRTLabel, getSRTLabel,
 
-	nukeDeadBindings, getUnstubbedAStackSlots,
+	StackUsage, HeapUsage,
 
---	addFreeASlots,	-- no need to export it
-	addFreeBSlots,	-- ToDo: Belong elsewhere
-
-	noBlackHolingFlag,
 	profCtrC,
 
-	costCentresC, costCentresFlag, moduleName,
+	costCentresC, moduleName,
 
 	Sequel(..), -- ToDo: unabstract?
 	sequelToAmode,
@@ -47,34 +43,18 @@ module CgMonad (
 
 #include "HsVersions.h"
 
-import	List	( nub )
-
-import {-# SOURCE #-} CgBindery ( CgIdInfo(..), CgBindings, maybeAStkLoc, maybeBStkLoc, nukeVolatileBinds )
-import {-# SOURCE #-} CgUsages
+import {-# SOURCE #-} CgBindery ( CgIdInfo(..), CgBindings, maybeStkLoc, nukeVolatileBinds )
+import {-# SOURCE #-} CgUsages  ( getSpRelOffset )
 
 import AbsCSyn
 import AbsCUtils	( mkAbsCStmts )
-import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling,
-			  opt_OmitBlackHoling
-			)
-import HeapOffs		( maxOff,
-			  VirtualSpAOffset, VirtualSpBOffset,
-			  HeapOffset
-			)
-import CLabel           ( CLabel )
-import Id		( idType,
-			  nullIdEnv, mkIdEnv, addOneToIdEnv,
-			  modifyIdEnv, lookupIdEnv, rngIdEnv, IdEnv,
-			  ConTag, GenId{-instance Outputable-},
-			  Id
-			)
-import Literal          ( Literal )
-import Maybes		( maybeToBool )
+import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling )
+import CLabel           ( CLabel, mkUpdEntryLabel )
+import DataCon		( ConTag )
+import Id		( Id )
+import VarEnv
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import StgSyn		( StgLiveVars )
-import Type		( typePrimRep )
-import UniqSet		( elementOfUniqSet )
-import Util		( sortLt )
 import Outputable
 
 infixr 9 `thenC`	-- Right-associative!
@@ -99,6 +79,8 @@ data CgInfoDownwards	-- information only passed *downwards* by the monad
 
      CgBindings		-- [Id -> info] : static environment
 
+     CLabel		-- label of the current SRT
+
      EndOfBlockInfo	-- Info for stuff to do at end of basic block:
 
 
@@ -121,35 +103,15 @@ alternative.
 \begin{code}
 data EndOfBlockInfo
   = EndOfBlockInfo
-	VirtualSpAOffset  -- Args SpA: trim the A stack to this point at a
+	VirtualSpOffset   -- Args Sp: trim the stack to this point at a
 			  -- return; push arguments starting just
 			  -- above this point on a tail call.
 			  
-			  -- This is therefore the A-stk ptr as seen
+			  -- This is therefore the stk ptr as seen
 			  -- by a case alternative.
-			  
-			  -- Args SpA is used when we want to stub any
-			  -- currently-unstubbed dead A-stack (ptr)
-			  -- slots; we want to know what SpA in the
-			  -- continuation is so that we don't stub any
-			  -- slots which are off the top of the
-			  -- continuation's stack!
-			  
-	VirtualSpBOffset  -- Args SpB: Very similar to Args SpA.
-			  -- Two main differences:
-			  --  1. If Sequel isn't OnStack, then Args SpB points
-			  -- 	 just below the slot in which the return address
-			  --	 should be put.  In effect, the Sequel
-			  --	 is a pending argument.  If it is
-			  --	 OnStack, Args SpB
-    	    	    	  --     points to the top word of the return
-			  --	 address.
-			  --
-			  --  2. It ain't used for stubbing because there are
-			  --	 no ptrs on B stk.
 	Sequel
 
-initEobInfo = EndOfBlockInfo 0 0 InRetReg
+initEobInfo = EndOfBlockInfo 0 (OnStack 0)
 \end{code}
 
 Any addressing modes inside @Sequel@ must be ``robust,'' in the sense
@@ -158,20 +120,21 @@ block.
 
 \begin{code}
 data Sequel
-  = InRetReg              -- The continuation is in RetReg
-
-  | OnStack VirtualSpBOffset
-			  -- Continuation is on the stack, at the
+  = OnStack 
+	VirtualSpOffset   -- Continuation is on the stack, at the
 			  -- specified location
 
-  | UpdateCode CAddrMode  -- May be standard update code, or might be
-			  -- the data-type-specific one.
+  | UpdateCode
 
   | CaseAlts
 	  CAddrMode   -- Jump to this; if the continuation is for a vectored
 		      -- case this might be the label of a return
 		      -- vector Guaranteed to be a non-volatile
 		      -- addressing mode (I think)
+	  SemiTaggingStuff
+
+  | SeqFrame			-- like CaseAlts but push a seq frame too.
+	  CAddrMode
 	  SemiTaggingStuff
 
 type SemiTaggingStuff
@@ -196,83 +159,65 @@ type JoinDetails
 -- DIRE WARNING.
 -- The OnStack case of sequelToAmode delivers an Amode which is only
 -- valid just before the final control transfer, because it assumes
--- that SpB is pointing to the top word of the return address.  This
+-- that Sp is pointing to the top word of the return address.  This
 -- seems unclean but there you go.
 
 sequelToAmode :: Sequel -> FCode CAddrMode
 
-sequelToAmode (OnStack virt_spb_offset)
-  = getSpBRelOffset virt_spb_offset `thenFC` \ spb_rel ->
-    returnFC (CVal spb_rel RetRep)
+sequelToAmode (OnStack virt_sp_offset)
+  = getSpRelOffset virt_sp_offset `thenFC` \ sp_rel ->
+    returnFC (CVal sp_rel RetRep)
 
-sequelToAmode InRetReg		 = returnFC (CReg RetReg)
---Andy/Simon's patch:
---WAS: sequelToAmode (UpdateCode amode) = returnFC amode
-sequelToAmode (UpdateCode amode) = returnFC (CReg StdUpdRetVecReg)
+sequelToAmode UpdateCode = returnFC (CLbl mkUpdEntryLabel CodePtrRep)
 sequelToAmode (CaseAlts amode _) = returnFC amode
-\end{code}
+sequelToAmode (SeqFrame _ _) = panic "sequelToAmode: SeqFrame"
 
-See the NOTES about the details of stack/heap usage tracking.
-
-\begin{code}
 type CgStksAndHeapUsage		-- stacks and heap usage information
-  = (AStackUsage,		-- A-stack usage
-     BStackUsage,		-- B-stack usage
-     HeapUsage)
+  = (StackUsage, HeapUsage)
 
-type AStackUsage =
-	(Int,			-- virtSpA: Virtual offset of topmost allocated slot
-	 [(Int,StubFlag)],	-- freeA:   List of free slots, in increasing order
-	 Int,			-- realSpA: Virtual offset of real stack pointer
-	 Int)			-- hwSpA:   Highest value ever taken by virtSp
-
-data StubFlag = Stubbed | NotStubbed
-
-isStubbed Stubbed    = True  -- so the type can be abstract
-isStubbed NotStubbed = False
-
-type BStackUsage =
-	(Int,		-- virtSpB: Virtual offset of topmost allocated slot
-	 [Int],		-- freeB:   List of free slots, in increasing order
-	 Int,		-- realSpB: Virtual offset of real stack pointer
-	 Int)		-- hwSpB:   Highest value ever taken by virtSp
+type StackUsage =
+	(Int,		   -- virtSp: Virtual offset of topmost allocated slot
+	 [Int],            -- free:   List of free slots, in increasing order
+	 Int,		   -- realSp: Virtual offset of real stack pointer
+	 Int)		   -- hwSp:   Highest value ever taken by virtSp
 
 type HeapUsage =
-	(HeapOffset,	-- virtHp: Virtual offset of highest-numbered allocated word
+	(HeapOffset,	-- virtHp: Virtual offset of highest-allocated word
 	 HeapOffset)	-- realHp: Virtual offset of real heap ptr
 \end{code}
+
 NB: absolutely every one of the above Ints is really
 a VirtualOffset of some description (the code generator
-works entirely in terms of VirtualOffsets; see NOTES).
+works entirely in terms of VirtualOffsets).
 
 Initialisation.
 
 \begin{code}
-initialStateC = MkCgState AbsCNop nullIdEnv initUsage
+initialStateC = MkCgState AbsCNop emptyVarEnv initUsage
 
 initUsage :: CgStksAndHeapUsage
-initUsage  = ((0,[],0,0), (0,[],0,0), (initVirtHp, initRealHp))
+initUsage  = ((0,[],0,0), (initVirtHp, initRealHp))
 initVirtHp = panic "Uninitialised virtual Hp"
 initRealHp = panic "Uninitialised real Hp"
 \end{code}
 
-@envInitForAlternatives@ initialises the environment for a case alternative,
+"envInitForAlternatives" initialises the environment for a case alternative,
 assuming that the alternative is entered after an evaluation.
 This involves:
-\begin{itemize}
-\item
-zapping any volatile bindings, which aren't valid.
-\item
-zapping the heap usage.	 It should be restored by a heap check.
-\item
-setting the virtual AND real stack pointer fields to the given virtual stack offsets.
-this doesn't represent any {\em code}; it is a prediction of where the
-real stack pointer will be when we come back from the case analysis.
-\item
-BUT LEAVING the rest of the stack-usage info because it is all valid.
-In particular, we leave the tail stack pointers unchanged, becuase the
-alternative has to de-allocate the original @case@ expression's stack.
-\end{itemize}
+
+   - zapping any volatile bindings, which aren't valid.
+   
+   - zapping the heap usage. It should be restored by a heap check.
+   
+   - setting the virtual AND real stack pointer fields to the given
+   virtual stack offsets.  this doesn't represent any {\em code}; it is a
+   prediction of where the real stack pointer will be when we come back
+   from the case analysis.
+   
+   - BUT LEAVING the rest of the stack-usage info because it is all
+   valid.  In particular, we leave the tail stack pointers unchanged,
+   becuase the alternative has to de-allocate the original @case@
+   expression's stack.  \end{itemize}
 
 @stateIncUsage@$~e_1~e_2$ incorporates in $e_1$ the stack and heap high water
 marks found in $e_2$.
@@ -280,13 +225,12 @@ marks found in $e_2$.
 \begin{code}
 stateIncUsage :: CgState -> CgState -> CgState
 
-stateIncUsage (MkCgState abs_c bs ((vA,fA,rA,hA1),(vB,fB,rB,hB1),(vH1,rH1)))
-	      (MkCgState _     _  (( _, _, _,hA2),( _, _, _,hB2),(vH2, _)))
+stateIncUsage (MkCgState abs_c bs ((v,f,r,h1),(vH1,rH1)))
+	      (MkCgState _     _  ((_,_,_,h2),(vH2, _)))
      = MkCgState abs_c
 		 bs
-		 ((vA,fA,rA,hA1 `max` hA2),
-		  (vB,fB,rB,hB1 `max` hB2),
-		  (vH1 `maxOff` vH2, rH1))
+		 ((v,f,r,h1 `max` h2),
+		  (vH1 `max` vH2, rH1))
 \end{code}
 
 %************************************************************************
@@ -309,7 +253,11 @@ The Abstract~C is not in the environment so as to improve strictness.
 initC :: CompilationInfo -> Code -> AbstractC
 
 initC cg_info code
-  = case (code (MkCgInfoDown cg_info (error "initC: statics") initEobInfo)
+  = case (code (MkCgInfoDown 
+			cg_info 
+			(error "initC: statics")
+			(error "initC: srt")
+			initEobInfo)
 	       initialStateC) of
       MkCgState abc _ _ -> abc
 
@@ -408,34 +356,34 @@ bindings and usage information is otherwise unchanged.
 forkClosureBody :: Code -> Code
 
 forkClosureBody code
-	(MkCgInfoDown cg_info statics _)
+	(MkCgInfoDown cg_info statics srt _)
 	(MkCgState absC_in binds un_usage)
   = MkCgState (AbsCStmts absC_in absC_fork) binds un_usage
   where
     fork_state		    = code body_info_down initialStateC
     MkCgState absC_fork _ _ = fork_state
-    body_info_down = MkCgInfoDown cg_info statics initEobInfo
+    body_info_down = MkCgInfoDown cg_info statics srt initEobInfo
 
 forkStatics :: FCode a -> FCode a
 
-forkStatics fcode (MkCgInfoDown cg_info _ _)
+forkStatics fcode (MkCgInfoDown cg_info _ srt _)
 		  (MkCgState absC_in statics un_usage)
   = (result, MkCgState (AbsCStmts absC_in absC_fork) statics un_usage)
   where
   (result, state) = fcode rhs_info_down initialStateC
   MkCgState absC_fork _ _ = state	-- Don't merge these this line with the one
 					-- above or it becomes too strict!
-  rhs_info_down = MkCgInfoDown cg_info statics initEobInfo
+  rhs_info_down = MkCgInfoDown cg_info statics srt initEobInfo
 
 forkAbsC :: Code -> FCode AbstractC
 forkAbsC code info_down (MkCgState absC1 bs usage)
   = (absC2, new_state)
   where
-    MkCgState absC2 _ ((_, _, _,hA2),(_, _, _,hB2), _) =
+    MkCgState absC2 _ ((_, _, _,h2), _) =
 	code info_down (MkCgState AbsCNop bs usage)
-    ((vA, fA, rA, hA1), (vB, fB, rB, hB1), heap_usage) = usage
+    ((v, f, r, h1), heap_usage) = usage
 
-    new_usage = ((vA, fA, rA, hA1 `max` hA2), (vB, fB, rB, hB1 `max` hB2), heap_usage)
+    new_usage = ((v, f, r, h1 `max` h2), heap_usage)
     new_state = MkCgState absC1 bs new_usage
 \end{code}
 
@@ -446,55 +394,32 @@ that
 	- the worst stack high-water mark is incorporated
 	- the virtual Hp is moved on to the worst virtual Hp for the branches
 
-The "extra branches" arise from handling the default case:
-
-	case f x of
-	  C1 a b -> e1
-	  z     -> e2
-
-Here we in effect expand to
-
-	case f x of
-	  C1 a b -> e1
-	  C2 c -> let z = C2 c in JUMP(default)
-	  C3 d e f -> let z = C2 d e f in JUMP(default)
-
-	  default: e2
-
-The stuff for C2 and C3 are the extra branches.  They are
-handled differently by forkAlts, because their
-heap usage is joined onto that for the default case.
-
 \begin{code}
-forkAlts :: [FCode a] -> [FCode a] -> FCode b -> FCode ([a],b)
+forkAlts :: [FCode a] -> FCode b -> FCode ([a],b)
 
-forkAlts branch_fcodes extra_branch_fcodes deflt_fcode info_down in_state
- = ((extra_branch_results ++ branch_results , deflt_result), out_state)
+forkAlts branch_fcodes deflt_fcode info_down in_state
+ = ((branch_results , deflt_result), out_state)
   where
     compile fc = fc info_down in_state
 
-    (branch_results,       branch_out_states)       = unzip (map compile branch_fcodes)
-    (extra_branch_results, extra_branch_out_states) = unzip (map compile extra_branch_fcodes)
+    (branch_results, branch_out_states) = unzip (map compile branch_fcodes)
 
-	-- The "in_state" for the default branch is got by worst-casing the
-	-- heap usages etc from the "extra_branches"
-    default_in_state		    = foldl stateIncUsage in_state extra_branch_out_states
-    (deflt_result, deflt_out_state) = deflt_fcode info_down default_in_state
+    (deflt_result, deflt_out_state) = deflt_fcode info_down in_state
 
-    out_state = foldl stateIncUsage default_in_state (deflt_out_state:branch_out_states)
+    out_state = foldl stateIncUsage in_state (deflt_out_state:branch_out_states)
 		-- NB foldl.  in_state is the *left* argument to stateIncUsage
 \end{code}
 
 @forkEval@ takes two blocks of code.
-\begin{itemize}
-\item The first meddles with the environment to set it up as expected by
-	the alternatives of a @case@ which does an eval (or gc-possible primop).
-\item The second block is the code for the alternatives.
-	(plus info for semi-tagging purposes)
-\end{itemize}
-@forkEval@ picks up the virtual stack pointers and stubbed stack slots
-as set up by the first block, and returns a suitable @EndOfBlockInfo@ for
-the caller to use, together with whatever value is returned by the second block.
+
+   -  The first meddles with the environment to set it up as expected by
+      the alternatives of a @case@ which does an eval (or gc-possible primop).
+   -  The second block is the code for the alternatives.
+      (plus info for semi-tagging purposes)
+
+@forkEval@ picks up the virtual stack pointer and returns a suitable
+@EndOfBlockInfo@ for the caller to use, together with whatever value
+is returned by the second block.
 
 It uses @initEnvForAlternatives@ to initialise the environment, and
 @stateIncUsageAlt@ to incorporate usage; the latter ignores the heap
@@ -507,51 +432,41 @@ forkEval :: EndOfBlockInfo              -- For the body
 	 -> FCode EndOfBlockInfo	-- The new end of block info
 
 forkEval body_eob_info env_code body_code
-  = forkEvalHelp body_eob_info env_code body_code `thenFC` \ (vA, vB, sequel) ->
-    returnFC (EndOfBlockInfo vA vB sequel)
+  = forkEvalHelp body_eob_info env_code body_code `thenFC` \ (v, sequel) ->
+    returnFC (EndOfBlockInfo v sequel)
 
 forkEvalHelp :: EndOfBlockInfo  -- For the body
     	     -> Code		-- Code to set environment
 	     -> FCode a		-- The code to do after the eval
-	     -> FCode (Int,	-- SpA
-		       Int,	-- SpB
+	     -> FCode (Int,	-- Sp
 		       a)	-- Result of the FCode
 
 forkEvalHelp body_eob_info env_code body_code
-	 info_down@(MkCgInfoDown cg_info statics _) state
-  = ((vA,vB,value_returned), state `stateIncUsageEval` state_at_end_return)
+	 info_down@(MkCgInfoDown cg_info statics srt _) state
+  = ((v,value_returned), state `stateIncUsageEval` state_at_end_return)
   where
-    info_down_for_body = MkCgInfoDown cg_info statics body_eob_info
+    info_down_for_body = MkCgInfoDown cg_info statics srt body_eob_info
 
-    (MkCgState _ binds ((vA,fA,_,_), (vB,fB,_,_), _)) = env_code info_down_for_body state
-	-- These vA and fA things are now set up as the body code expects them
+    (MkCgState _ binds ((v,f,_,_), _)) = env_code info_down_for_body state
+	-- These v and f things are now set up as the body code expects them
 
-    state_at_end_return :: CgState
-
-    (value_returned, state_at_end_return) = body_code info_down_for_body state_for_body
-
-    state_for_body :: CgState
+    (value_returned, state_at_end_return) 
+	= body_code info_down_for_body state_for_body
 
     state_for_body = MkCgState AbsCNop
 	 		     (nukeVolatileBinds binds)
-			     ((vA,stubbed_fA,vA,vA),	-- Set real and hwms
-			      (vB,fB,vB,vB),		-- to virtual ones
+			     ((v,f,v,v),
 			      (initVirtHp, initRealHp))
-
-    stubbed_fA = [ (offset, Stubbed) | (offset,_) <- fA ]
-	-- In the branch, all free locations will have been stubbed
 
 
 stateIncUsageEval :: CgState -> CgState -> CgState
-stateIncUsageEval (MkCgState absC1 bs ((vA,fA,rA,hA1),(vB,fB,rB,hB1),heap_usage))
-		  (MkCgState absC2 _  (( _, _, _,hA2),( _, _, _,hB2),	     _))
+stateIncUsageEval (MkCgState absC1 bs ((v,f,r,h1),heap_usage))
+		  (MkCgState absC2 _  ((_,_,_,h2),         _))
      = MkCgState (absC1 `AbsCStmts` absC2)
 		 -- The AbsC coming back should consist only of nested declarations,
 		 -- notably of the return vector!
 		 bs
-		 ((vA,fA,rA,hA1 `max` hA2),
-		  (vB,fB,rB,hB1 `max` hB2),
-		  heap_usage)
+		 ((v,f,r,h1 `max` h2), heap_usage)
 	-- We don't max the heap high-watermark because stateIncUsageEval is
 	-- used only in forkEval, which in turn is only used for blocks of code
 	-- which do their own heap-check.
@@ -596,8 +511,7 @@ profCtrC macro args _ state@(MkCgState absC binds usage)
 {- Try to avoid adding too many special compilation strategies here.
    It's better to modify the header files as necessary for particular
    targets, so that we can get away with as few variants of .hc files
-   as possible.  'ForConcurrent' is somewhat special anyway, as it
-   changes entry conventions pretty significantly.
+   as possible.
 -}
 \end{code}
 
@@ -613,32 +527,36 @@ getAbsC :: Code -> FCode AbstractC
 getAbsC code info_down (MkCgState absC binds usage)
   = (absC2, MkCgState absC binds2 usage2)
   where
-    (MkCgState absC2 binds2 usage2) = code info_down (MkCgState AbsCNop binds usage)
-\end{code}
-
-\begin{code}
-noBlackHolingFlag, costCentresFlag :: FCode Bool
-
-noBlackHolingFlag _ state = (opt_OmitBlackHoling, state)
-costCentresFlag	  _ state = (opt_SccProfilingOn, state)
+    (MkCgState absC2 binds2 usage2) 
+	= code info_down (MkCgState AbsCNop binds usage)
 \end{code}
 
 \begin{code}
 
 moduleName :: FCode FAST_STRING
-moduleName (MkCgInfoDown (MkCompInfo mod_name) _ _) state
+moduleName (MkCgInfoDown (MkCompInfo mod_name) _ _ _) state
   = (mod_name, state)
 
 \end{code}
 
 \begin{code}
 setEndOfBlockInfo :: EndOfBlockInfo -> Code -> Code
-setEndOfBlockInfo eob_info code	(MkCgInfoDown c_info statics _) state
-  = code (MkCgInfoDown c_info statics eob_info) state
+setEndOfBlockInfo eob_info code	(MkCgInfoDown c_info statics srt _) state
+  = code (MkCgInfoDown c_info statics srt eob_info) state
 
 getEndOfBlockInfo :: FCode EndOfBlockInfo
-getEndOfBlockInfo (MkCgInfoDown c_info statics eob_info) state
+getEndOfBlockInfo (MkCgInfoDown c_info statics _ eob_info) state
   = (eob_info, state)
+\end{code}
+
+\begin{code}
+getSRTLabel :: FCode CLabel
+getSRTLabel (MkCgInfoDown _ _ srt _) state
+  = (srt, state)
+
+setSRTLabel :: CLabel -> Code -> Code
+setSRTLabel srt code (MkCgInfoDown c_info statics _ eob_info) state
+  = code (MkCgInfoDown c_info statics srt eob_info) state
 \end{code}
 
 %************************************************************************
@@ -648,199 +566,48 @@ getEndOfBlockInfo (MkCgInfoDown c_info statics eob_info) state
 %************************************************************************
 
 There are three basic routines, for adding (@addBindC@), modifying
-(@modifyBindC@) and looking up (@lookupBindC@) bindings.  Each routine
-is just a wrapper for its lower-level @Bind@ routine (drop the \tr{C}
-on the end of each function name).
+(@modifyBindC@) and looking up (@lookupBindC@) bindings.
 
 A @Id@ is bound to a @(VolatileLoc, StableLoc)@ triple.
 The name should not already be bound. (nice ASSERT, eh?)
+
 \begin{code}
 addBindC :: Id -> CgIdInfo -> Code
 addBindC name stuff_to_bind info_down (MkCgState absC binds usage)
-  = MkCgState absC (addOneToIdEnv binds name stuff_to_bind) usage
-\end{code}
+  = MkCgState absC (extendVarEnv binds name stuff_to_bind) usage
 
-\begin{code}
 addBindsC :: [(Id, CgIdInfo)] -> Code
 addBindsC new_bindings info_down (MkCgState absC binds usage)
   = MkCgState absC new_binds usage
   where
-    new_binds = foldl (\ binds (name,info) -> addOneToIdEnv binds name info)
+    new_binds = foldl (\ binds (name,info) -> extendVarEnv binds name info)
 		      binds
 		      new_bindings
-\end{code}
 
-\begin{code}
 modifyBindC :: Id -> (CgIdInfo -> CgIdInfo) -> Code
 modifyBindC name mangle_fn info_down (MkCgState absC binds usage)
-  = MkCgState absC (modifyIdEnv mangle_fn binds name) usage
-\end{code}
+  = MkCgState absC (modifyVarEnv mangle_fn binds name) usage
 
-Lookup is expected to find a binding for the @Id@.
-\begin{code}
 lookupBindC :: Id -> FCode CgIdInfo
-lookupBindC name info_down@(MkCgInfoDown _ static_binds _)
+lookupBindC name info_down@(MkCgInfoDown _ static_binds srt _)
 		 state@(MkCgState absC local_binds usage)
   = (val, state)
   where
-    val = case (lookupIdEnv local_binds name) of
+    val = case (lookupVarEnv local_binds name) of
 	    Nothing	-> try_static
 	    Just this	-> this
 
-    try_static = case (lookupIdEnv static_binds name) of
-		   Just this -> this
-		   Nothing
-		     -> pprPanic "lookupBindC:no info!\n"
-			(vcat [
-			    hsep [ptext SLIT("for:"), ppr name],
-			    ptext SLIT("(probably: data dependencies broken by an optimisation pass)"),
-			    ptext SLIT("static binds for:"),
-			    vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngIdEnv static_binds ],
-			    ptext SLIT("local binds for:"),
-			    vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngIdEnv local_binds ]
-			 ])
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[CgMonad-deadslots]{Finding dead stack slots}
-%*									*
-%************************************************************************
-
-@nukeDeadBindings@ does the following:
-\begin{itemize}
-\item	Removes all bindings from the environment other than those
-	for variables in the argument to @nukeDeadBindings@.
-\item	Collects any stack slots so freed, and returns them to the appropriate
-	stack free list.
-\item	Moves the virtual stack pointers to point to the topmost used
-	stack locations.
-\end{itemize}
-
-Find dead slots on the stacks *and* remove bindings for dead variables
-from the bindings.
-
-You can have multi-word slots on the B stack; if dead, such a slot
-will be reported as {\em several} offsets (one per word).
-
-NOT YET: It returns empty lists if the -fno-stack-stubbing flag is
-set, so that no stack-stubbing will take place.
-
-Probably *naughty* to look inside monad...
-
-\begin{code}
-nukeDeadBindings :: StgLiveVars  -- All the *live* variables
-		 -> Code
-nukeDeadBindings
-	live_vars
-	info_down
-	state@(MkCgState abs_c binds ((vsp_a, free_a, real_a, hw_a),
-				      (vsp_b, free_b, real_b, hw_b),
-				      heap_usage))
-  = MkCgState abs_c (mkIdEnv bs') new_usage
-  where
-    new_usage = ((new_vsp_a, new_free_a, real_a, hw_a),
-		 (new_vsp_b, new_free_b, real_b, hw_b),
-		 heap_usage)
-
-    (dead_a_slots, dead_b_slots, bs')
-      = dead_slots live_vars
-		   [] [] []
-		   [ (i, b) | b@(MkCgIdInfo i _ _ _) <- rngIdEnv binds ]
-
-    extra_free_a = (sortLt (<)  dead_a_slots) `zip` (repeat NotStubbed)
-    extra_free_b = sortLt (<) dead_b_slots
-
-    (new_vsp_a, new_free_a) = trim fst vsp_a (addFreeASlots free_a extra_free_a)
-    (new_vsp_b, new_free_b) = trim id  vsp_b (addFreeBSlots free_b extra_free_b)
-
-getUnstubbedAStackSlots
-	:: VirtualSpAOffset		-- Ignore slots bigger than this
-	-> FCode [VirtualSpAOffset]	-- Return the list of slots found
-
-getUnstubbedAStackSlots tail_spa
-	info_down state@(MkCgState _ _ ((_, free_a, _, _), _, _))
-  = ([ slot | (slot, NotStubbed) <- free_a, slot <= tail_spa ], state)
-\end{code}
-
-Several boring auxiliary functions to do the dirty work.
-
-\begin{code}
-dead_slots :: StgLiveVars
-	   -> [(Id,CgIdInfo)] -> [VirtualSpAOffset] -> [VirtualSpBOffset]
-	   -> [(Id,CgIdInfo)]
-	   -> ([VirtualSpAOffset], [VirtualSpBOffset], [(Id,CgIdInfo)])
-
--- dead_slots carries accumulating parameters for
---	filtered bindings, dead a and b slots
-dead_slots live_vars fbs das dbs []
-  = (nub das, nub dbs, reverse fbs) -- Finished; rm the dups, if any
-
-dead_slots live_vars fbs das dbs ((v,i):bs)
-  | v `elementOfUniqSet` live_vars
-    = dead_slots live_vars ((v,i):fbs) das dbs bs
-	  -- Live, so don't record it in dead slots
-	  -- Instead keep it in the filtered bindings
-
-  | otherwise
-    = case i of
-	MkCgIdInfo _ _ stable_loc _
-	 | is_Astk_loc ->
-	   dead_slots live_vars fbs (offsetA : das) dbs bs
-
-	 | is_Bstk_loc ->
-	   dead_slots live_vars fbs das ([offsetB .. (offsetB + size - 1)] ++ dbs) bs
-	 where
-	   maybe_Astk_loc = maybeAStkLoc stable_loc
-	   is_Astk_loc	  = maybeToBool maybe_Astk_loc
-	   (Just offsetA) = maybe_Astk_loc
-
-	   maybe_Bstk_loc = maybeBStkLoc stable_loc
-	   is_Bstk_loc	  = maybeToBool maybe_Bstk_loc
-	   (Just offsetB) = maybe_Bstk_loc
-
-	_ -> dead_slots live_vars fbs das dbs bs
-  where
-    size :: Int
-    size = (getPrimRepSize . typePrimRep . idType) v
-
--- addFreeSlots expects *both* args to be in increasing order
-addFreeASlots :: [(Int,StubFlag)] -> [(Int,StubFlag)] -> [(Int,StubFlag)]
-addFreeASlots = addFreeSlots fst
-
-addFreeBSlots :: [Int] -> [Int] -> [Int]
-addFreeBSlots = addFreeSlots id
-
-addFreeSlots :: (slot -> Int{-offset-}) -> [slot] -> [slot] -> [slot]
-
-addFreeSlots get_offset cs [] = cs
-addFreeSlots get_offset [] ns = ns
-addFreeSlots get_offset (c:cs) (n:ns)
- = if off_c < off_n then
-	(c : addFreeSlots get_offset cs (n:ns))
-   else if off_c > off_n then
-	(n : addFreeSlots get_offset (c:cs) ns)
-   else
-	panic ("addFreeSlots: equal slots: ")-- ++ show (c:cs) ++ show (n:ns))
- where
-  off_c = get_offset c
-  off_n = get_offset n
-
-trim :: (slot -> Int{-offset-}) -> Int{-offset-} -> [slot] -> (Int{-offset-}, [slot])
-
-trim get_offset current_sp free_slots
-  = try current_sp (reverse free_slots)
-  where
-    try csp [] = (csp, [])
-    try csp (slot:slots)
-      = if csp < slot_off then
-	    try csp slots		-- Free slot off top of stk; ignore
-
-	else if csp == slot_off then
-    	    try (csp-1) slots		-- Free slot at top of stk; trim
-
-	else
-	    (csp, reverse (slot:slots))	-- Otherwise gap; give up
-      where
-	slot_off = get_offset slot
+    try_static = 
+      case (lookupVarEnv static_binds name) of
+	Just this -> this
+	Nothing
+	  -> pprPanic "lookupBindC:no info!\n"
+	     (vcat [
+		hsep [ptext SLIT("for:"), ppr name],
+		ptext SLIT("(probably: data dependencies broken by an optimisation pass)"),
+		ptext SLIT("static binds for:"),
+		vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngVarEnv static_binds ],
+		ptext SLIT("local binds for:"),
+		vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngVarEnv local_binds ]
+	      ])
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1996
+% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 \section[MachMisc]{Description of various machine-specific things}
 
@@ -8,16 +8,11 @@
 
 module MachMisc (
 
-	fixedHdrSizeInWords, varHdrSizeInWords,
-	charLikeSize, intLikeSize, mutHS, dataHS, fixedHS, foHS,
 	sizeOf, primRepToSize,
 
 	eXTRA_STK_ARGS_HERE,
 
 	volatileSaves, volatileRestores,
-
-	storageMgrInfo, smCAFlist, smOldLim, smOldMutables,
-	smStablePtrTable,
 
 	targetMaxDouble, targetMaxInt, targetMinDouble, targetMinInt,
 
@@ -41,22 +36,19 @@ module MachMisc (
     ) where
 
 #include "HsVersions.h"
+--#include "config.h"
 
 import AbsCSyn		( MagicId(..) ) 
 import AbsCUtils	( magicIdPrimRep )
 import CLabel           ( CLabel )
-import CmdLineOpts	( opt_SccProfilingOn )
-import Literal		( mkMachInt, Literal(..) )
+import Const		( mkMachInt, Literal(..) )
 import MachRegs		( stgReg, callerSaves, RegLoc(..),
 			  Imm(..), Reg(..), 
 			  MachRegsAddr(..)
 			)
-import OrdList		( OrdList )
 import PrimRep		( PrimRep(..) )
-import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
-import Stix		( StixTree(..), StixReg(..), sStLitLbl,
-			  CodeSegment
-			)
+import SMRep		( SMRep(..) )
+import Stix		( StixTree(..), StixReg(..), CodeSegment )
 import Util		( panic )
 import Char		( isDigit )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
@@ -65,18 +57,11 @@ import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
 \begin{code}
 underscorePrefix :: Bool   -- leading underscore on assembler labels?
 
-underscorePrefix
-  = IF_ARCH_alpha(False
-    ,{-else-} IF_ARCH_i386(
-	IF_OS_linuxaout(True
-	, IF_OS_freebsd(True
-	, IF_OS_cygwin32(True
-	, IF_OS_bsdi(True
-	, {-otherwise-} False)))
-        )
-     ,{-else-}IF_ARCH_sparc(
-	IF_OS_sunos4(True, {-otherwise-} False)
-     ,)))
+#ifdef LEADING_UNDERSCORE
+underscorePrefix = True
+#else
+underscorePrefix = False
+#endif
 
 ---------------------------
 fmtAsmLbl :: String -> String  -- for formatting labels
@@ -142,72 +127,6 @@ eXTRA_STK_ARGS_HERE
   = IF_ARCH_alpha(0, IF_ARCH_i386(23{-6x4bytes-}, IF_ARCH_sparc(23,???)))
 \end{code}
 
-% ----------------------------------------------------------------
-
-@fixedHdrSizeInWords@ and @varHdrSizeInWords@: these are not dependent
-on target architecture.
-\begin{code}
-fixedHdrSizeInWords :: Int
-
-fixedHdrSizeInWords
-  = 1{-info ptr-} + profFHS + parFHS + tickyFHS
-    -- obviously, we aren't taking non-sequential too seriously yet
-  where
-    profFHS  = if opt_SccProfilingOn then 1 else 0
-    parFHS   = {-if PAR or GRAN then 1 else-} 0
-    tickyFHS = {-if ticky ... then 1 else-} 0
-
-varHdrSizeInWords :: SMRep -> Int{-in words-}
-
-varHdrSizeInWords sm
-  = case sm of
-    StaticRep _ _	   -> 0
-    SpecialisedRep _ _ _ _ -> 0
-    GenericRep _ _ _	   -> 0
-    BigTupleRep _	   -> 1
-    MuTupleRep _	   -> 2 {- (1 + GC_MUT_RESERVED_WORDS) -}
-    DataRep _		   -> 1
-    DynamicRep		   -> 2
-    BlackHoleRep	   -> 0
-    PhantomRep		   -> panic "MachMisc.varHdrSizeInWords:phantom"
-\end{code}
-
-% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-Static closure sizes:
-\begin{code}
-charLikeSize, intLikeSize :: Int
-
-charLikeSize = blahLikeSize CharLikeRep
-intLikeSize  = blahLikeSize IntLikeRep
-
-blahLikeSize blah
-  = fromInteger (sizeOf PtrRep)
-  * (fixedHdrSizeInWords + varHdrSizeInWords blahLikeRep + 1)
-  where
-    blahLikeRep = SpecialisedRep blah 0 1 SMNormalForm
-
---------
-mutHS, dataHS, fixedHS, foHS :: StixTree
-
-mutHS   = blah_hs (MuTupleRep 0)
-dataHS  = blah_hs (DataRep 0)
-fixedHS = StInt (toInteger fixedHdrSizeInWords)
-
-{- Semi-hack: to avoid introducing ForeignObjRep,
-   we hard-code the VHS for ForeignObj here.
--}
-foHS   
-  = StInt (toInteger words)
-  where
-    words = fixedHdrSizeInWords + 1{-FOREIGN_VHS-}
-
-blah_hs blah
-  = StInt (toInteger words)
-  where
-    words = fixedHdrSizeInWords + varHdrSizeInWords blah
-\end{code}
-
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 Size of a @PrimRep@, in bytes.
@@ -234,8 +153,8 @@ constants.
 \begin{code}
 volatileSaves, volatileRestores :: [MagicId] -> [StixTree]
 
-save_cands    = [BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg]
-restore_cands = save_cands ++ [StkStubReg,StdUpdRetVecReg]
+save_cands    = [BaseReg,Sp,Su,SpLim,Hp,HpLim]
+restore_cands = save_cands
 
 volatileSaves vols
   = map save ((filter callerSaves) (save_cands ++ vols))
@@ -266,23 +185,8 @@ ToDo: Fix!(JSM)
 \begin{code}
 targetMinDouble = MachDouble (-1.7976931348623157e+308)
 targetMaxDouble = MachDouble (1.7976931348623157e+308)
-targetMinInt = mkMachInt (-2147483647)
+targetMinInt = mkMachInt (-2147483648)
 targetMaxInt = mkMachInt 2147483647
-\end{code}
-
-% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-Storage manager nonsense.  Note that the indices are dependent on
-the definition of the smInfo structure in SMinterface.lh
-
-\begin{code}
-storageMgrInfo, smCAFlist, smOldMutables, smOldLim :: StixTree
-
-storageMgrInfo   = sStLitLbl SLIT("StorageMgrInfo")
-smCAFlist        = StInd PtrRep (StIndex PtrRep storageMgrInfo (StInt SM_CAFLIST))
-smOldMutables    = StInd PtrRep (StIndex PtrRep storageMgrInfo (StInt SM_OLDMUTABLES))
-smOldLim         = StInd PtrRep (StIndex PtrRep storageMgrInfo (StInt SM_OLDLIM))
-smStablePtrTable = StInd PtrRep (StIndex PtrRep storageMgrInfo (StInt SM_STABLEPOINTERTABLE))
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -413,8 +317,9 @@ primRepToSize FloatRep	    = IF_ARCH_alpha( TF, IF_ARCH_i386( F, IF_ARCH_sparc( 
 primRepToSize DoubleRep	    = IF_ARCH_alpha( TF, IF_ARCH_i386( DF,IF_ARCH_sparc( DF,)))
 primRepToSize ArrayRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize ByteArrayRep  = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
+primRepToSize WeakPtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
+primRepToSize ForeignObjRep  = IF_ARCH_alpha( Q, IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize StablePtrRep  = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize ForeignObjRep  = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 \end{code}
 
 %************************************************************************

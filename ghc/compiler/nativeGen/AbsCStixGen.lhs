@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1996
+% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 
 \begin{code}
@@ -16,22 +16,25 @@ import MachMisc
 import AbsCUtils	( getAmodeRep, mixedTypeLocn,
 			  nonemptyAbsC, mkAbsCStmts, mkAbsCStmtList
 			)
+import SMRep		( fixedItblSize, 
+			  rET_SMALL, rET_BIG, 
+			  rET_VEC_SMALL, rET_VEC_BIG 
+			)
 import Constants   	( mIN_UPD_SIZE )
-import CLabel           ( CLabel )
+import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd
 			)
-import HeapOffs		( hpRelToInt )
-import Literal		( Literal(..) )
+import Const		( Literal(..) )
 import Maybes	    	( maybeToBool )
-import OrdList		( OrdList )
 import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
 import PrimRep	    	( isFloatingRep, PrimRep(..) )
-import StixInfo	    	( genCodeInfoTable )
-import StixMacro	( macroCode )
+import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable )
+import StixMacro	( macroCode, checkCode )
 import StixPrim		( primCode, amodeToStix, amodeToStix' )
-import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM )
+import UniqSupply	( returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import Util		( naturalMergeSortLe, panic )
+import BitSet 		( intBS )
 
 #ifdef REALLY_HASKELL_1_3
 ord = fromEnum :: Char -> Int
@@ -56,7 +59,6 @@ genCodeAbstractC absC
  volrestores = volatileRestores
  p2stix      = primCode
  macro_code  = macroCode
- hp_rel	     = hpRelToInt
  -- real code follows... ---------
 \end{code}
 
@@ -78,13 +80,23 @@ Here we handle top-level things, like @CCodeBlock@s and
   = genCodeStaticClosure stmt			`thenUs` \ code ->
     returnUs (StSegment DataSegment : StLabel label : code [])
 
- gentopcode stmt@(CRetUnVector _ _) = returnUs []
-
- gentopcode stmt@(CFlatRetVector label _)
+ gentopcode stmt@(CRetVector label _ _ _)
   = genCodeVecTbl stmt				`thenUs` \ code ->
     returnUs (StSegment TextSegment : code [StLabel label])
 
- gentopcode stmt@(CClosureInfoAndCode cl_info slow Nothing _ _ _)
+ gentopcode stmt@(CRetDirect uniq absC srt liveness)
+  = gencode absC				       `thenUs` \ code ->
+    genBitmapInfoTable liveness srt closure_type False `thenUs` \ itbl ->
+    returnUs (StSegment TextSegment : 
+              itbl (StLabel lbl_info : StLabel lbl_ret : code []))
+  where 
+	lbl_info = mkReturnInfoLabel uniq
+	lbl_ret  = mkReturnPtLabel uniq
+ 	closure_type = case liveness of
+			 LvSmall _ -> rET_SMALL
+			 LvLarge _ -> rET_BIG
+
+ gentopcode stmt@(CClosureInfoAndCode cl_info slow Nothing _ _)
 
   | slow_is_empty
   = genCodeInfoTable stmt		`thenUs` \ itbl ->
@@ -99,7 +111,7 @@ Here we handle top-level things, like @CCodeBlock@s and
     slow_is_empty = not (maybeToBool (nonemptyAbsC slow))
     slow_lbl = entryLabelFromCI cl_info
 
- gentopcode stmt@(CClosureInfoAndCode cl_info slow (Just fast) _ _ _) =
+ gentopcode stmt@(CClosureInfoAndCode cl_info slow (Just fast) _ _) =
  -- ToDo: what if this is empty? ------------------------^^^^
     genCodeInfoTable stmt		`thenUs` \ itbl ->
     gencode slow			`thenUs` \ slow_code ->
@@ -111,13 +123,24 @@ Here we handle top-level things, like @CCodeBlock@s and
     slow_lbl = entryLabelFromCI cl_info
     fast_lbl = fastLabelFromCI cl_info
 
+ gentopcode stmt@(CSRT lbl closures)
+  = returnUs [ StSegment TextSegment 
+	     , StLabel lbl 
+	     , StData DataPtrRep (map StCLbl closures)
+	     ]
+
+ gentopcode stmt@(CBitmap lbl mask)
+  = returnUs [ StSegment TextSegment 
+	     , StLabel lbl 
+	     , StData WordRep (StInt (toInteger (length mask)) : 
+				map  (StInt . toInteger . intBS) mask)
+	     ]
+
  gentopcode absC
   = gencode absC				`thenUs` \ code ->
     returnUs (StSegment TextSegment : code [])
 
 \end{code}
-
-Vector tables are trivial!
 
 \begin{code}
  {-
@@ -125,14 +148,16 @@ Vector tables are trivial!
     :: AbstractC
     -> UniqSM StixTreeList
  -}
- genCodeVecTbl (CFlatRetVector label amodes)
-  = returnUs (\xs -> vectbl : xs)
+ genCodeVecTbl (CRetVector label amodes srt liveness)
+  = genBitmapInfoTable liveness srt closure_type True `thenUs` \itbl ->
+    returnUs (\xs -> vectbl : itbl xs)
   where
     vectbl = StData PtrRep (reverse (map a2stix amodes))
+    closure_type = case liveness of
+		    LvSmall _ -> rET_VEC_SMALL
+		    LvLarge _ -> rET_VEC_BIG
 
 \end{code}
-
-Static closures are not so hard either.
 
 \begin{code}
  {-
@@ -146,10 +171,12 @@ Static closures are not so hard either.
     table = StData PtrRep (StCLbl info_lbl : body)
     info_lbl = infoTableLabelFromCI cl_info
 
+    -- always at least one padding word: this is the static link field
+    -- for the garbage collector.
     body = if closureUpdReqd cl_info then
-    	    	take (max mIN_UPD_SIZE (length amodes')) (amodes' ++ zeros)
+    	    	take (1 + max mIN_UPD_SIZE (length amodes')) (amodes' ++ zeros)
     	   else
-    	    	amodes'
+    	    	amodes' ++ [StInt 0]
 
     zeros = StInt 0 : zeros
 
@@ -208,12 +235,22 @@ addresses, etc.)
 
 \begin{code}
 
- gencode (CInitHdr cl_info reg_rel _ _)
+ gencode (CInitHdr cl_info reg_rel _)
   = let
 	lhs = a2stix (CVal reg_rel PtrRep)
     	lbl = infoTableLabelFromCI cl_info
     in
 	returnUs (\xs -> StAssign PtrRep lhs (StCLbl lbl) : xs)
+
+\end{code}
+
+Heap/Stack Checks.
+
+\begin{code}
+
+ gencode (CCheck macro args assts)
+  = gencode assts `thenUs` \assts_stix ->
+    checkCode macro args assts_stix
 
 \end{code}
 
@@ -242,6 +279,10 @@ Unconditional jumps, including the special ``enter closure'' operation.
 Note that the new entry convention requires that we load the InfoPtr (R2)
 with the address of the info table before jumping to the entry code for Node.
 
+For a vectored return, we must subtract the size of the info table to
+get at the return vector.  This depends on the size of the info table,
+which varies depending on whether we're profiling etc.
+
 \begin{code}
 
  gencode (CJump dest)
@@ -257,13 +298,14 @@ with the address of the info table before jumping to the entry code for Node.
   = returnUs (\xs -> StJump dest : xs)
   where
     dest = StInd PtrRep (StIndex PtrRep (a2stix table)
-    	    	    	    	    	  (StInt (toInteger (-n-1))))
+    	    	      	    	  (StInt (toInteger (-n-fixedItblSize-1))))
 
  gencode (CReturn table (DynamicVectoredReturn am))
   = returnUs (\xs -> StJump dest : xs)
   where
     dest = StInd PtrRep (StIndex PtrRep (a2stix table) dyn_off)
-    dyn_off = StPrim IntSubOp [StPrim IntNegOp [a2stix am], StInt 1]
+    dyn_off = StPrim IntSubOp [StPrim IntNegOp [a2stix am], 
+			       StInt (toInteger (fixedItblSize+1))]
 
 \end{code}
 
@@ -271,7 +313,7 @@ Now the PrimOps, some of which may need caller-saves register wrappers.
 
 \begin{code}
 
- gencode (COpStmt results op args liveness_mask vols)
+ gencode (COpStmt results op args vols)
   -- ToDo (ADR?): use that liveness mask
   | primOpNeedsWrapper op
   = let
@@ -325,7 +367,7 @@ Now the if statement.  Almost *all* flow of control are of this form.
       other | simple_discrim -> mkSimpleSwitches discrim alts deflt
 
 	-- Otherwise, we need to do a bit of work.
-      other ->  getUnique		      	  `thenUs` \ u ->
+      other ->  getUniqueUs		      	  `thenUs` \ u ->
 		gencode (AbsCStmts
 		(CAssign (CTemp u pk) discrim)
 		(CSwitch (CTemp u pk) alts deflt))
@@ -360,9 +402,10 @@ Finally, all of the disgusting AbstractC macros.
 
 \end{code}
 
-Here, we generate a jump table if there are more than four (integer) alternatives and
-the jump table occupancy is greater than 50%.  Otherwise, we generate a binary
-comparison tree.  (Perhaps this could be tuned.)
+Here, we generate a jump table if there are more than four (integer)
+alternatives and the jump table occupancy is greater than 50%.
+Otherwise, we generate a binary comparison tree.  (Perhaps this could
+be tuned.)
 
 \begin{code}
 

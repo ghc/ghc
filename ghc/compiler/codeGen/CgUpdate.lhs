@@ -1,18 +1,20 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[CgUpdate]{Manipulating update frames}
 
 \begin{code}
-module CgUpdate ( pushUpdateFrame ) where
+module CgUpdate ( pushUpdateFrame, reserveSeqFrame, pushSeqFrame ) where
 
 #include "HsVersions.h"
 
 import CgMonad
 import AbsCSyn
 
-import Constants	( sTD_UF_SIZE, sCC_STD_UF_SIZE )
+import Constants	( uF_SIZE, sCC_UF_SIZE, sEQ_FRAME_SIZE )
+import PrimRep		( PrimRep(..) )
 import CgStackery	( allocUpdateFrame )
+import CgUsages		( getSpRelOffset )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Util		( assertPanic )
 \end{code}
@@ -33,46 +35,49 @@ are guaranteed to be nicely aligned with the top of stack.
 to reflect the frame pushed.
 
 \begin{code}
-pushUpdateFrame :: CAddrMode -> CAddrMode -> Code -> Code
+pushUpdateFrame :: CAddrMode -> Code -> Code
 
-pushUpdateFrame updatee vector code
+pushUpdateFrame updatee code
   = let
-	profiling_on = opt_SccProfilingOn
-
 	-- frame_size *includes* the return address
-	frame_size = if profiling_on
-		     then sCC_STD_UF_SIZE
-		     else sTD_UF_SIZE
+	frame_size = if opt_SccProfilingOn
+		     then sCC_UF_SIZE
+		     else uF_SIZE
     in
     getEndOfBlockInfo 	    	    	`thenFC` \ eob_info ->
-    ASSERT(case eob_info of { EndOfBlockInfo _ _ InRetReg -> True; _ -> False})
-    allocUpdateFrame frame_size vector (\ _ ->
+    ASSERT(case eob_info of { EndOfBlockInfo _ (OnStack _) -> True; 
+			      _ -> False})
+    allocUpdateFrame frame_size (
 
 		-- Emit the push macro
-	    absC (CMacroStmt PUSH_STD_UPD_FRAME [
+	    absC (CMacroStmt PUSH_UPD_FRAME [
 			updatee,
-			int_CLit0, 	-- Known to be zero because we have just
-			int_CLit0	-- entered a thunk
+			int_CLit0 	-- Known to be zero because we have just
 	    ])
 	    `thenC` code
     )
 
 int_CLit0 = mkIntCLit 0 -- out here to avoid pushUpdateFrame CAF (sigh)
 
-{- ---------------------
-    What actually happens is something like this; but it got macro-ised
+\end{code}
 
-  = pushOnBStack (CReg CurCostCentre)			`thenFC` \ _ ->
-    pushOnBStack (CReg SuA)				`thenFC` \ _ ->
-    pushOnBStack (CReg SuB)				`thenFC` \ _ ->
-    pushOnBStack updatee				`thenFC` \ _ ->
-    pushOnBStack (CLabel sTD_UPD_RET_VEC_LABEL CodePtrRep) `thenFC` \ _ ->
+We push a SEQ frame just before evaluating the scrutinee of a case, if
+the scrutinee has a polymorphic or function type.  The SEQ frame acts
+as a barrier in case the scrutinee evaluates to a partial application.
 
-	-- MAKE SuA, SuB POINT TO TOP OF A,B STACKS
-	-- Remember, SpB hasn't yet been incremented to account for the
-	-- 4-word update frame which has been pushed.
-	-- This code seems crude, but effective...
-    absC (AbsCStmts (CAssign (CReg SuA) (CReg SpA))
-		    (CAssign (CReg SuB) (CAddr (SpBRel 0 4))))
--------------------------- -}
+reserveSeqFrame takes the EndOfBlockInfo for the case expression and
+updates the sequel to a SeqFrame, reserving room for the frame at
+args_sp.  When the scrutinee comes around to pushing a return address,
+it will also push the SEQ frame, using pushSeqFrame.
+
+\begin{code}
+reserveSeqFrame :: EndOfBlockInfo -> EndOfBlockInfo
+reserveSeqFrame (EndOfBlockInfo args_sp (CaseAlts amode stuff)) 
+  = EndOfBlockInfo (args_sp + sEQ_FRAME_SIZE) (SeqFrame amode stuff)
+
+pushSeqFrame :: VirtualSpOffset -> FCode VirtualSpOffset
+pushSeqFrame args_sp
+  = getSpRelOffset args_sp  `thenFC` \ sp_rel ->
+    absC (CMacroStmt PUSH_SEQ_FRAME [CAddr sp_rel]) `thenC`
+    returnFC (args_sp - sEQ_FRAME_SIZE)
 \end{code}

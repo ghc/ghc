@@ -1,0 +1,1 @@
+ERROR "test/static/s051.hs" (line 4): Type signature decls not permitted in instance decl

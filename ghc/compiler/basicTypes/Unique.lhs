@@ -1,4 +1,6 @@
-
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+%
 
 @Uniques@ are used to distinguish entities in the compiler (@Ids@,
 @Classes@, etc.) from each other.  Thus, @Uniques@ are the basic
@@ -17,13 +19,14 @@ module Unique (
 	Unique, Uniquable(..),
 	u2i,				-- hack: used in UniqFM
 
-	pprUnique, pprUnique10, showUnique,
+	pprUnique, pprUnique10,
 
 	mkUnique,			-- Used in UniqSupply
 	mkUniqueGrimily,		-- Used in UniqSupply only!
+	getKey,				-- Used in Var only!
 
 	incrUnique,			-- Used for renumbering
-	initTyVarUnique, mkTyVarUnique,
+	initTyVarUnique,
 	initTidyUniques,
 
 	-- now all the built-in Uniques (and functions to make them)
@@ -31,7 +34,9 @@ module Unique (
 	mkAlphaTyVarUnique,
 	mkPrimOpIdUnique,
 	mkTupleDataConUnique,
+	mkUbxTupleDataConUnique,
 	mkTupleTyConUnique,
+	mkUbxTupleTyConUnique,
 
 	getBuiltinUniques, mkBuiltinUnique,
 	mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
@@ -40,14 +45,13 @@ module Unique (
 	addrDataConKey,
 	addrPrimTyConKey,
 	addrTyConKey,
-	andandIdKey,
 	appendIdKey,
 	arrayPrimTyConKey,
 	assertIdKey,
 	augmentIdKey,
 	boolTyConKey,
 	boundedClassKey,
-	buildDataConKey,
+	boxedKindConKey,
 	buildIdKey,
 	byteArrayPrimTyConKey,
 	cCallableClassKey,
@@ -55,8 +59,7 @@ module Unique (
 	charDataConKey,
 	charPrimTyConKey,
 	charTyConKey,
-	coerceIdKey,
-	composeIdKey,
+	concatIdKey,
 	consDataConKey,
 	doubleDataConKey,
 	doublePrimTyConKey,
@@ -68,10 +71,9 @@ module Unique (
 	enumFromToClassOpKey,
 	eqClassKey,
 	eqClassOpKey,
-	eqDataConKey,
 	errorIdKey,
-	evalClassKey,
 	falseDataConKey,
+	filterIdKey,
 	floatDataConKey,
 	floatPrimTyConKey,
 	floatTyConKey,
@@ -81,7 +83,7 @@ module Unique (
 	foreignObjDataConKey,
 	foreignObjPrimTyConKey,
 	foreignObjTyConKey,
-	forkIdKey,
+	weakPrimTyConKey,
 	fractionalClassKey,
 	fromEnumClassOpKey,
 	fromIntClassOpKey,
@@ -90,8 +92,6 @@ module Unique (
 	funTyConKey,
 	functorClassKey,
 	geClassOpKey,
-	gtDataConKey,
-	inlineIdKey,
 	intDataConKey,
 	intPrimTyConKey,
 	intTyConKey,
@@ -108,28 +108,28 @@ module Unique (
 	integerMinusOneIdKey,
 	integerPlusOneIdKey,
 	integerPlusTwoIdKey,
+	int2IntegerIdKey,
+	addr2IntegerIdKey,
 	integerTyConKey,
 	integerZeroIdKey,
 	integralClassKey,
 	irrefutPatErrorIdKey,
 	ixClassKey,
-	lexIdKey,
-	liftDataConKey,
-	liftTyConKey,
 	listTyConKey,
-	ltDataConKey,
 	mainKey,
+	mapIdKey,
 	minusClassOpKey,
 	monadClassKey,
 	monadPlusClassKey,
 	monadZeroClassKey,
 	mutableArrayPrimTyConKey,
 	mutableByteArrayPrimTyConKey,
+	mutVarPrimTyConKey,
 	nilDataConKey,
 	noMethodBindingErrorIdKey,
 	nonExhaustiveGuardsErrorIdKey,
-	notIdKey,
 	numClassKey,
+	openKindConKey,
 	ordClassKey,
 	orderingTyConKey,
 	otherwiseIdKey,
@@ -141,7 +141,6 @@ module Unique (
 	ratioTyConKey,
 	rationalTyConKey,
 	readClassKey,
-	readParenIdKey,
 	realClassKey,
 	realFloatClassKey,
 	realFracClassKey,
@@ -150,73 +149,29 @@ module Unique (
 	recConErrorIdKey,
 	recSelErrIdKey,
 	recUpdErrorIdKey,
-	return2GMPsDataConKey,
-	return2GMPsTyConKey,
-	returnIntAndGMPDataConKey,
-	returnIntAndGMPTyConKey,
 	returnMClassOpKey,
-	seqIdKey,
 	showClassKey,
-	showParenIdKey,
-	showSpaceIdKey,
-	showStringIdKey,
-	stTyConKey,
-	stDataConKey,
 	ioTyConKey,
 	ioDataConKey,
-	ioResultTyConKey,
-	ioOkDataConKey,
-	ioFailDataConKey,
 	stablePtrDataConKey,
 	stablePtrPrimTyConKey,
 	stablePtrTyConKey,
-	stateAndAddrPrimDataConKey,
-	stateAndAddrPrimTyConKey,
-	stateAndArrayPrimDataConKey,
-	stateAndArrayPrimTyConKey,
-	stateAndByteArrayPrimDataConKey,
-	stateAndByteArrayPrimTyConKey,
-	stateAndCharPrimDataConKey,
-	stateAndCharPrimTyConKey,
-	stateAndDoublePrimDataConKey,
-	stateAndDoublePrimTyConKey,
-	stateAndFloatPrimDataConKey,
-	stateAndFloatPrimTyConKey,
-	stateAndForeignObjPrimDataConKey,
-	stateAndForeignObjPrimTyConKey,
-	stateAndIntPrimDataConKey,
-	stateAndIntPrimTyConKey,
-	stateAndInt64PrimDataConKey,
-	stateAndInt64PrimTyConKey,
-	stateAndMutableArrayPrimDataConKey,
-	stateAndMutableArrayPrimTyConKey,
-	stateAndMutableByteArrayPrimDataConKey,
-	stateAndMutableByteArrayPrimTyConKey,
-	stateAndPtrPrimDataConKey,
-	stateAndPtrPrimTyConKey,
-	stateAndStablePtrPrimDataConKey,
-	stateAndStablePtrPrimTyConKey,
-	stateAndSynchVarPrimDataConKey,
-	stateAndSynchVarPrimTyConKey,
-	stateAndWordPrimDataConKey,
-	stateAndWordPrimTyConKey,
-	stateAndWord64PrimDataConKey,
-	stateAndWord64PrimTyConKey,
 	stateDataConKey,
-	stRetDataConKey,
-	statePrimTyConKey,
 	stateTyConKey,
-	stRetTyConKey,
-	synchVarPrimTyConKey,
+
+	statePrimTyConKey,
+	superKindConKey,
+	mVarPrimTyConKey,
 	thenMClassOpKey,
+	threadIdPrimTyConKey,
 	toEnumClassOpKey,
 	traceIdKey,
 	trueDataConKey,
+	unboxedKindConKey,
 	unpackCString2IdKey,
 	unpackCStringAppendIdKey,
 	unpackCStringFoldrIdKey,
 	unpackCStringIdKey,
-	ureadListIdKey,
 	unsafeCoerceIdKey,
 	ushowListIdKey,
 	voidIdKey,
@@ -233,19 +188,14 @@ module Unique (
 	word64DataConKey,
 	word64PrimTyConKey,
 	word64TyConKey,
-	zeroClassOpKey
-	, copyableIdKey
-	, noFollowIdKey
-	, parAtAbsIdKey
-	, parAtForNowIdKey
-	, parAtIdKey
-	, parAtRelIdKey
-	, parGlobalIdKey
-	, parLocalIdKey
-	, unboundKey
-	, byteArrayTyConKey
-	, mutableByteArrayTyConKey
-	, allClassKey
+	zeroClassOpKey,
+	zipIdKey,
+	bindIOIdKey,
+	deRefStablePtrIdKey,
+	makeStablePtrIdKey,
+	unboundKey,
+	byteArrayTyConKey,
+	mutableByteArrayTyConKey
     ) where
 
 #include "HsVersions.h"
@@ -286,12 +236,17 @@ unpkUnique	:: Unique -> (Char, Int)	-- The reverse
 
 mkUniqueGrimily :: Int# -> Unique		-- A trap-door for UniqSupply
 
+getKey		:: Unique -> Int#		-- for Var
+
 incrUnique	:: Unique -> Unique
 \end{code}
 
 
 \begin{code}
 mkUniqueGrimily x = MkUnique x
+
+{-# INLINE getKey #-}
+getKey (MkUnique x) = x
 
 incrUnique (MkUnique i) = MkUnique (i +# 1#)
 
@@ -326,13 +281,13 @@ unpkUnique (MkUnique u)
 
 \begin{code}
 class Uniquable a where
-    uniqueOf :: a -> Unique
+    getUnique :: a -> Unique
 
 instance Uniquable FastString where
- uniqueOf fs = mkUniqueGrimily (uniqueOfFS fs)
+ getUnique fs = mkUniqueGrimily (uniqueOfFS fs)
 
 instance Uniquable Int where
- uniqueOf (I# i#) = mkUniqueGrimily i#
+ getUnique (I# i#) = mkUniqueGrimily i#
 \end{code}
 
 
@@ -367,7 +322,7 @@ instance Ord Unique where
 
 -----------------
 instance Uniquable Unique where
-    uniqueOf u = u
+    getUnique u = u
 \end{code}
 
 We do sometimes make strings with @Uniques@ in them:
@@ -388,14 +343,11 @@ finish_ppr 't' u pp_u | u < 26
     char (chr (ord 'a' + u))
 finish_ppr tag u pp_u = char tag <> pp_u
 
-showUnique :: Unique -> String
-showUnique uniq = showSDoc (pprUnique uniq)
-
 instance Outputable Unique where
     ppr u = pprUnique u
 
-instance Text Unique where
-    showsPrec p uniq rest = showUnique uniq
+instance Show Unique where
+    showsPrec p uniq = showsPrecSDoc p (pprUnique uniq)
 \end{code}
 
 %************************************************************************
@@ -459,29 +411,28 @@ Allocation of unique supply characters:
 	B:   builtin
 	C-E: pseudo uniques	(used in native-code generator)
 	_:   unifiable tyvars   (above)
-	1-8: prelude things below
+	0-9: prelude things below
 
 \begin{code}
-mkAlphaTyVarUnique i		= mkUnique '1' i
+mkAlphaTyVarUnique i            = mkUnique '1' i
 
 mkPreludeClassUnique i		= mkUnique '2' i
 mkPreludeTyConUnique i		= mkUnique '3' i
 mkTupleTyConUnique a		= mkUnique '4' a
+mkUbxTupleTyConUnique a		= mkUnique '5' a
 
-mkPreludeDataConUnique i	= mkUnique '5' i 	-- must be alphabetic
-mkTupleDataConUnique a		= mkUnique '6' a	-- ditto (*may* be used in C labels)
+mkPreludeDataConUnique i	= mkUnique '6' i -- must be alphabetic
+mkTupleDataConUnique a		= mkUnique '7' a -- ditto (*may* be used in C labels)
+mkUbxTupleDataConUnique a	= mkUnique '8' a
 
-mkPrimOpIdUnique op		= mkUnique '7' op
-mkPreludeMiscIdUnique i		= mkUnique '8' i
+mkPrimOpIdUnique op		= mkUnique '9' op
+mkPreludeMiscIdUnique i		= mkUnique '0' i
 
 -- The "tyvar uniques" print specially nicely: a, b, c, etc.
 -- See pprUnique for details
 
 initTyVarUnique :: Unique
 initTyVarUnique = mkUnique 't' 0
-
-mkTyVarUnique :: Int -> Unique
-mkTyVarUnique n = mkUnique 't' n
 
 initTidyUniques :: (Unique, Unique)	-- Global and local
 initTidyUniques = (mkUnique 'g' 0, mkUnique 'x' 0)
@@ -490,7 +441,7 @@ mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
  mkBuiltinUnique :: Int -> Unique
 
 mkBuiltinUnique i = mkUnique 'B' i
-mkPseudoUnique1 i = mkUnique 'C' i -- used for uniqueOf on Regs
+mkPseudoUnique1 i = mkUnique 'C' i -- used for getUnique on Regs
 mkPseudoUnique2 i = mkUnique 'D' i -- ditto
 mkPseudoUnique3 i = mkUnique 'E' i -- ditto
 
@@ -508,7 +459,6 @@ getBuiltinUniques n = map (mkUnique 'B') [1 .. n]
 boundedClassKey		= mkPreludeClassUnique 1 
 enumClassKey		= mkPreludeClassUnique 2 
 eqClassKey		= mkPreludeClassUnique 3 
-evalClassKey		= mkPreludeClassUnique 4 
 floatingClassKey	= mkPreludeClassUnique 5 
 fractionalClassKey	= mkPreludeClassUnique 6 
 integralClassKey	= mkPreludeClassUnique 7 
@@ -528,7 +478,6 @@ cCallableClassKey	= mkPreludeClassUnique 19
 cReturnableClassKey	= mkPreludeClassUnique 20
 
 ixClassKey		= mkPreludeClassUnique 21
-allClassKey		= mkPreludeClassUnique 22	-- Pseudo class used for universal quantification
 \end{code}
 
 %************************************************************************
@@ -558,53 +507,39 @@ int32TyConKey				= mkPreludeTyConUnique 18
 int64PrimTyConKey			= mkPreludeTyConUnique 19
 int64TyConKey				= mkPreludeTyConUnique 20
 integerTyConKey				= mkPreludeTyConUnique 21
-liftTyConKey				= mkPreludeTyConUnique 22
-listTyConKey				= mkPreludeTyConUnique 23
-foreignObjPrimTyConKey			= mkPreludeTyConUnique 24
-foreignObjTyConKey			= mkPreludeTyConUnique 25
+listTyConKey				= mkPreludeTyConUnique 22
+foreignObjPrimTyConKey			= mkPreludeTyConUnique 23
+foreignObjTyConKey			= mkPreludeTyConUnique 24
+weakPrimTyConKey			= mkPreludeTyConUnique 25
 mutableArrayPrimTyConKey		= mkPreludeTyConUnique 26
 mutableByteArrayPrimTyConKey		= mkPreludeTyConUnique 27
 orderingTyConKey			= mkPreludeTyConUnique 28
-synchVarPrimTyConKey		    	= mkPreludeTyConUnique 29
+mVarPrimTyConKey		    	= mkPreludeTyConUnique 29
 ratioTyConKey				= mkPreludeTyConUnique 30
 rationalTyConKey			= mkPreludeTyConUnique 31
 realWorldTyConKey			= mkPreludeTyConUnique 32
-return2GMPsTyConKey			= mkPreludeTyConUnique 33
-returnIntAndGMPTyConKey			= mkPreludeTyConUnique 34
-stablePtrPrimTyConKey			= mkPreludeTyConUnique 35
-stablePtrTyConKey			= mkPreludeTyConUnique 36
-stateAndAddrPrimTyConKey		= mkPreludeTyConUnique 37
-stateAndArrayPrimTyConKey		= mkPreludeTyConUnique 38
-stateAndByteArrayPrimTyConKey		= mkPreludeTyConUnique 39
-stateAndCharPrimTyConKey		= mkPreludeTyConUnique 40
-stateAndDoublePrimTyConKey		= mkPreludeTyConUnique 41
-stateAndFloatPrimTyConKey		= mkPreludeTyConUnique 42
-stateAndIntPrimTyConKey			= mkPreludeTyConUnique 43
-stateAndInt64PrimTyConKey		= mkPreludeTyConUnique 44
-stateAndForeignObjPrimTyConKey		= mkPreludeTyConUnique 45
-stateAndMutableArrayPrimTyConKey	= mkPreludeTyConUnique 46
-stateAndMutableByteArrayPrimTyConKey	= mkPreludeTyConUnique 47
-stateAndSynchVarPrimTyConKey	    	= mkPreludeTyConUnique 48
-stateAndPtrPrimTyConKey			= mkPreludeTyConUnique 49
-stateAndStablePtrPrimTyConKey		= mkPreludeTyConUnique 50
-stateAndWordPrimTyConKey		= mkPreludeTyConUnique 51
-stateAndWord64PrimTyConKey		= mkPreludeTyConUnique 52
-statePrimTyConKey			= mkPreludeTyConUnique 53
-stateTyConKey				= mkPreludeTyConUnique 54
-mutableByteArrayTyConKey		= mkPreludeTyConUnique 55
-stTyConKey				= mkPreludeTyConUnique 56
-stRetTyConKey				= mkPreludeTyConUnique 57
-ioTyConKey				= mkPreludeTyConUnique 58
-ioResultTyConKey			= mkPreludeTyConUnique 59
-byteArrayTyConKey			= mkPreludeTyConUnique 60
-wordPrimTyConKey			= mkPreludeTyConUnique 61
-wordTyConKey				= mkPreludeTyConUnique 62
-word8TyConKey				= mkPreludeTyConUnique 63
-word16TyConKey				= mkPreludeTyConUnique 64
-word32TyConKey				= mkPreludeTyConUnique 65
-word64PrimTyConKey			= mkPreludeTyConUnique 66
-word64TyConKey				= mkPreludeTyConUnique 67
-voidTyConKey				= mkPreludeTyConUnique 68
+stablePtrPrimTyConKey			= mkPreludeTyConUnique 33
+stablePtrTyConKey			= mkPreludeTyConUnique 34
+stateTyConKey			        = mkPreludeTyConUnique 50
+statePrimTyConKey			= mkPreludeTyConUnique 51
+mutableByteArrayTyConKey		= mkPreludeTyConUnique 52
+mutVarPrimTyConKey			= mkPreludeTyConUnique 53
+ioTyConKey				= mkPreludeTyConUnique 55
+byteArrayTyConKey			= mkPreludeTyConUnique 56
+wordPrimTyConKey			= mkPreludeTyConUnique 57
+wordTyConKey				= mkPreludeTyConUnique 58
+word8TyConKey				= mkPreludeTyConUnique 59
+word16TyConKey				= mkPreludeTyConUnique 60
+word32TyConKey				= mkPreludeTyConUnique 61
+word64PrimTyConKey			= mkPreludeTyConUnique 62
+word64TyConKey				= mkPreludeTyConUnique 63
+voidTyConKey				= mkPreludeTyConUnique 64
+boxedKindConKey				= mkPreludeTyConUnique 65
+unboxedKindConKey			= mkPreludeTyConUnique 66
+openKindConKey				= mkPreludeTyConUnique 67
+superKindConKey				= mkPreludeTyConUnique 68
+threadIdPrimTyConKey			= mkPreludeTyConUnique 69
+
 \end{code}
 
 %************************************************************************
@@ -615,56 +550,30 @@ voidTyConKey				= mkPreludeTyConUnique 68
 
 \begin{code}
 addrDataConKey				= mkPreludeDataConUnique  1
-buildDataConKey				= mkPreludeDataConUnique  2
-charDataConKey				= mkPreludeDataConUnique  4
-consDataConKey				= mkPreludeDataConUnique  5
-doubleDataConKey			= mkPreludeDataConUnique  6
-eqDataConKey				= mkPreludeDataConUnique  7
-falseDataConKey				= mkPreludeDataConUnique  8
-floatDataConKey				= mkPreludeDataConUnique  9
-gtDataConKey				= mkPreludeDataConUnique 10
-intDataConKey				= mkPreludeDataConUnique 11
-int8DataConKey				= mkPreludeDataConUnique 12
-int16DataConKey				= mkPreludeDataConUnique 13
-int32DataConKey				= mkPreludeDataConUnique 14
-int64DataConKey				= mkPreludeDataConUnique 15
-integerDataConKey			= mkPreludeDataConUnique 16
-liftDataConKey				= mkPreludeDataConUnique 17
-ltDataConKey				= mkPreludeDataConUnique 18
-foreignObjDataConKey			= mkPreludeDataConUnique 19
-nilDataConKey				= mkPreludeDataConUnique 20
-ratioDataConKey				= mkPreludeDataConUnique 21
-return2GMPsDataConKey			= mkPreludeDataConUnique 22
-returnIntAndGMPDataConKey		= mkPreludeDataConUnique 23
-stablePtrDataConKey			= mkPreludeDataConUnique 24
-stateAndAddrPrimDataConKey		= mkPreludeDataConUnique 25
-stateAndArrayPrimDataConKey		= mkPreludeDataConUnique 26
-stateAndByteArrayPrimDataConKey		= mkPreludeDataConUnique 27
-stateAndCharPrimDataConKey		= mkPreludeDataConUnique 28
-stateAndDoublePrimDataConKey		= mkPreludeDataConUnique 29
-stateAndFloatPrimDataConKey		= mkPreludeDataConUnique 30
-stateAndIntPrimDataConKey		= mkPreludeDataConUnique 31
-stateAndInt64PrimDataConKey		= mkPreludeDataConUnique 32
-stateAndForeignObjPrimDataConKey	= mkPreludeDataConUnique 33
-stateAndMutableArrayPrimDataConKey	= mkPreludeDataConUnique 34
-stateAndMutableByteArrayPrimDataConKey	= mkPreludeDataConUnique 35
-stateAndSynchVarPrimDataConKey	    	= mkPreludeDataConUnique 36
-stateAndPtrPrimDataConKey		= mkPreludeDataConUnique 37
-stateAndStablePtrPrimDataConKey		= mkPreludeDataConUnique 38
-stateAndWordPrimDataConKey		= mkPreludeDataConUnique 39
-stateAndWord64PrimDataConKey		= mkPreludeDataConUnique 40
-stateDataConKey				= mkPreludeDataConUnique 41
-trueDataConKey				= mkPreludeDataConUnique 42
-wordDataConKey				= mkPreludeDataConUnique 43
-word8DataConKey				= mkPreludeDataConUnique 44
-word16DataConKey			= mkPreludeDataConUnique 45
-word32DataConKey			= mkPreludeDataConUnique 46
-word64DataConKey			= mkPreludeDataConUnique 47
-stDataConKey				= mkPreludeDataConUnique 48
-stRetDataConKey				= mkPreludeDataConUnique 49
-ioDataConKey				= mkPreludeDataConUnique 50
-ioOkDataConKey				= mkPreludeDataConUnique 51
-ioFailDataConKey			= mkPreludeDataConUnique 52
+charDataConKey				= mkPreludeDataConUnique  2
+consDataConKey				= mkPreludeDataConUnique  3
+doubleDataConKey			= mkPreludeDataConUnique  4
+falseDataConKey				= mkPreludeDataConUnique  5
+floatDataConKey				= mkPreludeDataConUnique  6
+intDataConKey				= mkPreludeDataConUnique  7
+int8DataConKey				= mkPreludeDataConUnique  8
+int16DataConKey				= mkPreludeDataConUnique  9
+int32DataConKey				= mkPreludeDataConUnique 10
+int64DataConKey				= mkPreludeDataConUnique 11
+integerDataConKey			= mkPreludeDataConUnique 12
+foreignObjDataConKey			= mkPreludeDataConUnique 13
+nilDataConKey				= mkPreludeDataConUnique 14
+ratioDataConKey				= mkPreludeDataConUnique 15
+stablePtrDataConKey			= mkPreludeDataConUnique 16
+stateDataConKey				= mkPreludeDataConUnique 33
+trueDataConKey				= mkPreludeDataConUnique 34
+wordDataConKey				= mkPreludeDataConUnique 35
+word8DataConKey				= mkPreludeDataConUnique 36
+word16DataConKey			= mkPreludeDataConUnique 37
+word32DataConKey			= mkPreludeDataConUnique 38
+word64DataConKey			= mkPreludeDataConUnique 39
+stDataConKey				= mkPreludeDataConUnique 40
+ioDataConKey				= mkPreludeDataConUnique 42
 \end{code}
 
 %************************************************************************
@@ -675,85 +584,74 @@ ioFailDataConKey			= mkPreludeDataConUnique 52
 
 \begin{code}
 absentErrorIdKey	      = mkPreludeMiscIdUnique  1
-andandIdKey		      = mkPreludeMiscIdUnique  2
-appendIdKey 		      = mkPreludeMiscIdUnique  3
-augmentIdKey		      = mkPreludeMiscIdUnique  4
-buildIdKey		      = mkPreludeMiscIdUnique  5
-composeIdKey		      = mkPreludeMiscIdUnique  6
-errorIdKey		      = mkPreludeMiscIdUnique  7
-foldlIdKey		      = mkPreludeMiscIdUnique  8
-foldrIdKey		      = mkPreludeMiscIdUnique  9
-forkIdKey   	    	      = mkPreludeMiscIdUnique 10
-recSelErrIdKey		      = mkPreludeMiscIdUnique 11
-integerMinusOneIdKey	      = mkPreludeMiscIdUnique 12
-integerPlusOneIdKey	      = mkPreludeMiscIdUnique 13
-integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 14
-integerZeroIdKey	      = mkPreludeMiscIdUnique 15
-irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 16
-lexIdKey		      = mkPreludeMiscIdUnique 17
-noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 20
-nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 21
-notIdKey		      = mkPreludeMiscIdUnique 22
-packCStringIdKey	      = mkPreludeMiscIdUnique 23
-parErrorIdKey		      = mkPreludeMiscIdUnique 24
-parIdKey		      = mkPreludeMiscIdUnique 25
-patErrorIdKey		      = mkPreludeMiscIdUnique 26
-readParenIdKey		      = mkPreludeMiscIdUnique 27
-realWorldPrimIdKey	      = mkPreludeMiscIdUnique 28
-recConErrorIdKey	      = mkPreludeMiscIdUnique 29
-recUpdErrorIdKey	      = mkPreludeMiscIdUnique 30
-seqIdKey		      = mkPreludeMiscIdUnique 31
-showParenIdKey		      = mkPreludeMiscIdUnique 32
-showSpaceIdKey		      = mkPreludeMiscIdUnique 33
-showStringIdKey		      = mkPreludeMiscIdUnique 34
-traceIdKey		      = mkPreludeMiscIdUnique 35
-unpackCString2IdKey	      = mkPreludeMiscIdUnique 36
-unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 37
-unpackCStringFoldrIdKey	      = mkPreludeMiscIdUnique 38
-unpackCStringIdKey	      = mkPreludeMiscIdUnique 39
-unsafeCoerceIdKey	      = mkPreludeMiscIdUnique 40
-voidIdKey		      = mkPreludeMiscIdUnique 41
-ushowListIdKey		      = mkPreludeMiscIdUnique 42
-ureadListIdKey		      = mkPreludeMiscIdUnique 43
-
-copyableIdKey		= mkPreludeMiscIdUnique 44
-noFollowIdKey		= mkPreludeMiscIdUnique 45
-parAtAbsIdKey		= mkPreludeMiscIdUnique 46
-parAtForNowIdKey	= mkPreludeMiscIdUnique 47
-parAtIdKey		= mkPreludeMiscIdUnique 48
-parAtRelIdKey		= mkPreludeMiscIdUnique 49
-parGlobalIdKey		= mkPreludeMiscIdUnique 50
-parLocalIdKey		= mkPreludeMiscIdUnique 51
+appendIdKey 		      = mkPreludeMiscIdUnique  2
+augmentIdKey		      = mkPreludeMiscIdUnique  3
+buildIdKey		      = mkPreludeMiscIdUnique  4
+errorIdKey		      = mkPreludeMiscIdUnique  5
+foldlIdKey		      = mkPreludeMiscIdUnique  6
+foldrIdKey		      = mkPreludeMiscIdUnique  7
+recSelErrIdKey		      = mkPreludeMiscIdUnique  8
+integerMinusOneIdKey	      = mkPreludeMiscIdUnique  9
+integerPlusOneIdKey	      = mkPreludeMiscIdUnique 10
+integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 11
+integerZeroIdKey	      = mkPreludeMiscIdUnique 12
+int2IntegerIdKey	      = mkPreludeMiscIdUnique 13
+addr2IntegerIdKey	      = mkPreludeMiscIdUnique 14
+irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 15
+lexIdKey		      = mkPreludeMiscIdUnique 16
+noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 17
+nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 18
+packCStringIdKey	      = mkPreludeMiscIdUnique 19
+parErrorIdKey		      = mkPreludeMiscIdUnique 20
+parIdKey		      = mkPreludeMiscIdUnique 21
+patErrorIdKey		      = mkPreludeMiscIdUnique 22
+realWorldPrimIdKey	      = mkPreludeMiscIdUnique 23
+recConErrorIdKey	      = mkPreludeMiscIdUnique 24
+recUpdErrorIdKey	      = mkPreludeMiscIdUnique 25
+traceIdKey		      = mkPreludeMiscIdUnique 26
+unpackCString2IdKey	      = mkPreludeMiscIdUnique 27
+unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 28
+unpackCStringFoldrIdKey	      = mkPreludeMiscIdUnique 29
+unpackCStringIdKey	      = mkPreludeMiscIdUnique 30
+voidIdKey		      = mkPreludeMiscIdUnique 31
+ushowListIdKey		      = mkPreludeMiscIdUnique 32
+unsafeCoerceIdKey	      = mkPreludeMiscIdUnique 33
+concatIdKey		      = mkPreludeMiscIdUnique 34
+filterIdKey		      = mkPreludeMiscIdUnique 35
+zipIdKey		      = mkPreludeMiscIdUnique 36
+bindIOIdKey		      = mkPreludeMiscIdUnique 37
+deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 38
+makeStablePtrIdKey	      = mkPreludeMiscIdUnique 39
 \end{code}
 
-Certain class operations from Prelude classes.  They get
-their own uniques so we can look them up easily when we want
-to conjure them up during type checking.        
-\begin{code}					  
-fromIntClassOpKey	= mkPreludeMiscIdUnique 52
-fromIntegerClassOpKey	= mkPreludeMiscIdUnique 53
-minusClassOpKey		= mkPreludeMiscIdUnique 54
-fromRationalClassOpKey	= mkPreludeMiscIdUnique 55
-enumFromClassOpKey	= mkPreludeMiscIdUnique 56
-enumFromThenClassOpKey	= mkPreludeMiscIdUnique 57
-enumFromToClassOpKey	= mkPreludeMiscIdUnique 58
-enumFromThenToClassOpKey= mkPreludeMiscIdUnique 59
-eqClassOpKey		= mkPreludeMiscIdUnique 50
-geClassOpKey		= mkPreludeMiscIdUnique 61
-zeroClassOpKey		= mkPreludeMiscIdUnique 62
-thenMClassOpKey		= mkPreludeMiscIdUnique 63 -- (>>=)
-unboundKey		= mkPreludeMiscIdUnique 64	-- Just a place holder for unbound
-							-- variables produced by the renamer
-fromEnumClassOpKey	= mkPreludeMiscIdUnique 65
+Certain class operations from Prelude classes.  They get their own
+uniques so we can look them up easily when we want to conjure them up
+during type checking.
 
-mainKey			= mkPreludeMiscIdUnique 66
-returnMClassOpKey	= mkPreludeMiscIdUnique 67
-otherwiseIdKey		= mkPreludeMiscIdUnique 68
-toEnumClassOpKey	= mkPreludeMiscIdUnique 69
+\begin{code}					  
+fromIntClassOpKey	      = mkPreludeMiscIdUnique 101
+fromIntegerClassOpKey	      = mkPreludeMiscIdUnique 102
+minusClassOpKey		      = mkPreludeMiscIdUnique 103
+fromRationalClassOpKey	      = mkPreludeMiscIdUnique 104
+enumFromClassOpKey	      = mkPreludeMiscIdUnique 105
+enumFromThenClassOpKey	      = mkPreludeMiscIdUnique 106
+enumFromToClassOpKey	      = mkPreludeMiscIdUnique 107
+enumFromThenToClassOpKey      = mkPreludeMiscIdUnique 108
+eqClassOpKey		      = mkPreludeMiscIdUnique 109
+geClassOpKey		      = mkPreludeMiscIdUnique 110
+zeroClassOpKey		      = mkPreludeMiscIdUnique 112
+thenMClassOpKey		      = mkPreludeMiscIdUnique 113 -- (>>=)
+	-- Just a place holder for  unbound variables  produced by the renamer:
+unboundKey		      = mkPreludeMiscIdUnique 114 
+fromEnumClassOpKey	      = mkPreludeMiscIdUnique 115
+			      
+mainKey			      = mkPreludeMiscIdUnique 116
+returnMClassOpKey	      = mkPreludeMiscIdUnique 117
+otherwiseIdKey		      = mkPreludeMiscIdUnique 118
+toEnumClassOpKey	      = mkPreludeMiscIdUnique 119
+mapIdKey		      = mkPreludeMiscIdUnique 120
 \end{code}
 
 \begin{code}
-inlineIdKey		= mkPreludeMiscIdUnique 70
-coerceIdKey		= mkPreludeMiscIdUnique 71
-assertIdKey		= mkPreludeMiscIdUnique 72
+assertIdKey		      = mkPreludeMiscIdUnique 121
 \end{code}

@@ -1,0 +1,53 @@
+<sect> <idx/Int/
+<label id="sec:Int">
+<p>
+
+This library provides signed integers of various sizes.  The types
+supported are as follows:
+
+<tabular ca="ll">
+type    | number of bits @ 
+<!-- <hline>  -->
+Int8    | 8  @
+Int16   | 16 @
+Int32   | 32 @
+Int64   | 64 @
+<!-- <hline>  -->
+</tabular>
+
+For each type <it/I/ above, we provide the following instances.
+
+<tscreen><verb>
+data I            -- Signed Ints
+iToInt            :: I -> Int  -- not provided for Int64
+intToi            :: Int -> I  -- not provided for Int64
+instance Eq       I
+instance Ord      I
+instance Show     I
+instance Read     I
+instance Bounded  I
+instance Num      I
+instance Real     I
+instance Integral I
+instance Enum     I
+instance Ix       I
+instance Bits     I
+</verb></tscreen>
+Plus
+<tscreen><verb>
+int8ToInt  :: Int8  -> Int
+intToInt8  :: Int   -> Int8
+int16ToInt :: Int16 -> Int
+intToInt16 :: Int   -> Int16
+int32ToInt :: Int32 -> Int
+intToInt32 :: Int   -> Int32
+</verb></tscreen>
+
+<itemize>
+<item>
+Hugs does not provide <tt/Int64/ at the moment.
+
+<item>
+ToDo: complete the set of coercion functions.
+
+</itemize>

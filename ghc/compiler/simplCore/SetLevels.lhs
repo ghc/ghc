@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section{SetLevels}
 
@@ -20,34 +20,23 @@ module SetLevels (
 
 #include "HsVersions.h"
 
-import AnnCoreSyn
 import CoreSyn
 
-import CoreUtils	( coreExprType, idSpecVars )
-import CoreUnfold	( FormSummary, whnfOrBottom, mkFormSummary )
+import CoreUtils	( coreExprType, exprIsTrivial, idFreeVars, exprIsBottom
+			)
 import FreeVars		-- all of it
-import MkId		( mkSysLocal )
-import Id		( idType,
-			  nullIdEnv, addOneToIdEnv, growIdEnvList,
-			  unionManyIdSets, unionIdSets, minusIdSet, mkIdSet,
-			  idSetToList, Id,
-			  lookupIdEnv, IdEnv
-			)
-import SrcLoc		( noSrcLoc )
-import Type		( isUnpointedType, mkTyVarTys, mkForAllTys, tyVarsOfTypes, Type )
-import TyVar		( emptyTyVarEnv, addToTyVarEnv,
-			  growTyVarEnvList, lookupTyVarEnv,
-			  tyVarSetToList, 
-			  TyVarEnv, TyVar,
-			  unionManyTyVarSets, unionTyVarSets
-			)
-import UniqSupply	( thenUs, returnUs, mapUs, mapAndUnzipUs,
-			  mapAndUnzip3Us, getUnique, UniqSM,
-			  UniqSupply
-			)
-import BasicTypes	( Unused )
-import Maybes	        ( maybeToBool )
-import Util		( mapAccumL, zipWithEqual, zipEqual, panic, assertPanic )
+import Id		( Id, idType, mkUserLocal )
+import Name		( varOcc )
+import Var		( IdOrTyVar )
+import VarEnv
+import VarSet
+import Type		( isUnLiftedType, mkTyVarTys, mkForAllTys, Type )
+import VarSet
+import VarEnv
+import UniqSupply	( initUs, thenUs, returnUs, mapUs, mapAndUnzipUs, getUniqueUs,
+			  mapAndUnzip3Us, UniqSM, UniqSupply )
+import Maybes		( maybeToBool )
+import Util		( zipWithEqual, zipEqual, panic, assertPanic )
 import Outputable
 
 isLeakFreeType x y = False -- safe option; ToDo
@@ -61,17 +50,19 @@ isLeakFreeType x y = False -- safe option; ToDo
 
 \begin{code}
 data Level
-  = Top		-- Means *really* the top level.
+  = Top		-- Means *really* the top level; short for (Level 0 0).
   | Level   Int	-- Level number of enclosing lambdas
 	    Int	-- Number of big-lambda and/or case expressions between
 		-- here and the nearest enclosing lambda
 \end{code}
 
 The {\em level number} on a (type-)lambda-bound variable is the
-nesting depth of the (type-)lambda which binds it.  On an expression,
-it's the maximum level number of its free (type-)variables.  On a
-let(rec)-bound variable, it's the level of its RHS.  On a case-bound
-variable, it's the number of enclosing lambdas.
+nesting depth of the (type-)lambda which binds it.  The outermost lambda
+has level 1, so (Level 0 0) means that the variable is bound outside any lambda.
+
+On an expression, it's the maximum level number of its free
+(type-)variables.  On a let(rec)-bound variable, it's the level of its
+RHS.  On a case-bound variable, it's the number of enclosing lambdas.
 
 Top-level variables: level~0.  Those bound on the RHS of a top-level
 definition but ``before'' a lambda; e.g., the \tr{x} in (levels shown
@@ -92,12 +83,9 @@ sub-expression so that it will indeed float. This context level starts
 at @Level 0 0@; it is never @Top@.
 
 \begin{code}
-type LevelledExpr  = GenCoreExpr    (Id, Level) Id Unused
-type LevelledArg   = GenCoreArg			Id Unused
-type LevelledBind  = GenCoreBinding (Id, Level) Id Unused
-
-type LevelEnvs = (IdEnv    Level, -- bind Ids to levels
-		  TyVarEnv Level) -- bind type variables to levels
+type LevelledExpr  = TaggedExpr Level
+type LevelledArg   = TaggedArg	Level
+type LevelledBind  = TaggedBind Level
 
 tOP_LEVEL = Top
 
@@ -137,13 +125,31 @@ isTopMajLvl :: Level -> Bool -- Tells if it's the top *lambda* level
 isTopMajLvl Top		  = True
 isTopMajLvl (Level maj _) = maj == 0
 
-unTopify :: Level -> Level
-unTopify Top = Level 0 0
-unTopify lvl = lvl
-
 instance Outputable Level where
   ppr Top	      = ptext SLIT("<Top>")
   ppr (Level maj min) = hcat [ char '<', int maj, char ',', int min, char '>' ]
+\end{code}
+
+\begin{code}
+type LevelEnv = VarEnv Level
+
+varLevel :: LevelEnv -> IdOrTyVar -> Level
+varLevel env v
+  = case lookupVarEnv env v of
+      Just level -> level
+      Nothing    -> tOP_LEVEL
+
+maxIdLvl :: LevelEnv -> IdOrTyVar -> Level -> Level
+maxIdLvl env var lvl | isTyVar var = lvl
+		     | otherwise   = case lookupVarEnv env var of
+					Just lvl' -> maxLvl lvl' lvl
+					Nothing   -> lvl 
+
+maxTyVarLvl :: LevelEnv -> IdOrTyVar -> Level -> Level
+maxTyVarLvl env var lvl | isId var  = lvl
+		        | otherwise = case lookupVarEnv env var of
+					Just lvl' -> maxLvl lvl' lvl
+					Nothing   -> lvl 
 \end{code}
 
 %************************************************************************
@@ -153,32 +159,32 @@ instance Outputable Level where
 %************************************************************************
 
 \begin{code}
-setLevels :: [CoreBinding]
+setLevels :: [CoreBind]
 	  -> UniqSupply
 	  -> [LevelledBind]
 
 setLevels binds us
-  = do_them binds us
+  = initLvl us (do_them binds)
   where
     -- "do_them"'s main business is to thread the monad along
     -- It gives each top binding the same empty envt, because
     -- things unbound in the envt have level number zero implicitly
-    do_them :: [CoreBinding] -> LvlM [LevelledBind]
+    do_them :: [CoreBind] -> LvlM [LevelledBind]
 
     do_them [] = returnLvl []
     do_them (b:bs)
       = lvlTopBind b	`thenLvl` \ (lvld_bind, _) ->
-	do_them bs	 `thenLvl` \ lvld_binds ->
+	do_them bs	`thenLvl` \ lvld_binds ->
     	returnLvl (lvld_bind ++ lvld_binds)
 
-initial_envs = (nullIdEnv, emptyTyVarEnv)
+initialEnv = emptyVarEnv
 
 lvlTopBind (NonRec binder rhs)
-  = lvlBind (Level 0 0) initial_envs (AnnNonRec binder (freeVars rhs))
+  = lvlBind Top initialEnv (AnnNonRec binder (freeVars rhs))
 					-- Rhs can have no free vars!
 
 lvlTopBind (Rec pairs)
-  = lvlBind (Level 0 0) initial_envs (AnnRec [(b,freeVars rhs) | (b,rhs) <- pairs])
+  = lvlBind Top initialEnv (AnnRec [(b,freeVars rhs) | (b,rhs) <- pairs])
 \end{code}
 
 %************************************************************************
@@ -190,32 +196,28 @@ lvlTopBind (Rec pairs)
 The binding stuff works for top level too.
 
 \begin{code}
-type CoreBindingWithFVs = AnnCoreBinding Id Id Unused FVInfo
-
 lvlBind :: Level
-	-> LevelEnvs
-	-> CoreBindingWithFVs
-	-> LvlM ([LevelledBind], LevelEnvs)
+	-> LevelEnv
+	-> CoreBindWithFVs
+	-> LvlM ([LevelledBind], LevelEnv)
 
-lvlBind ctxt_lvl envs@(venv, tenv) (AnnNonRec name rhs)
-  = setFloatLevel (Just name) {- Already let-bound -}
-	ctxt_lvl envs rhs ty 	`thenLvl` \ (final_lvl, rhs') ->
+lvlBind ctxt_lvl env (AnnNonRec name rhs)
+  = setFloatLevel (Just name) ctxt_lvl env rhs ty 	`thenLvl` \ (final_lvl, rhs') ->
     let
-	new_envs = (addOneToIdEnv venv name final_lvl, tenv)
+	new_env = extendVarEnv env name final_lvl
     in
-    returnLvl ([NonRec (name, final_lvl) rhs'], new_envs)
+    returnLvl ([NonRec (name, final_lvl) rhs'], new_env)
   where
     ty = idType name
 
 
-lvlBind ctxt_lvl envs@(venv, tenv) (AnnRec pairs)
-  = decideRecFloatLevel ctxt_lvl envs binders rhss
-				`thenLvl` \ (final_lvl, extra_binds, rhss') ->
+lvlBind ctxt_lvl env (AnnRec pairs)
+  = decideRecFloatLevel ctxt_lvl env binders rhss	`thenLvl` \ (final_lvl, extra_binds, rhss') ->
     let
 	binders_w_lvls = binders `zip` repeat final_lvl
-	new_envs       = (growIdEnvList venv binders_w_lvls, tenv)
+	new_env        = extendVarEnvList env binders_w_lvls
     in
-    returnLvl (extra_binds ++ [Rec (zipEqual "lvlBind" binders_w_lvls rhss')], new_envs)
+    returnLvl (extra_binds ++ [Rec (zipEqual "lvlBind" binders_w_lvls rhss')], new_env)
   where
     (binders,rhss) = unzip pairs
 \end{code}
@@ -228,7 +230,7 @@ lvlBind ctxt_lvl envs@(venv, tenv) (AnnRec pairs)
 
 \begin{code}
 lvlExpr :: Level		-- ctxt_lvl: Level of enclosing expression
-	-> LevelEnvs		-- Level of in-scope names/tyvars
+	-> LevelEnv		-- Level of in-scope names/tyvars
 	-> CoreExprWithFVs	-- input expression
 	-> LvlM LevelledExpr	-- Result expression
 \end{code}
@@ -251,17 +253,20 @@ don't want @lvlExpr@ to turn the scrutinee of the @case@ into an MFE
 If there were another lambda in @r@'s rhs, it would get level-2 as well.
 
 \begin{code}
-lvlExpr _ _ (_, AnnVar v)     	 = returnLvl (Var v)
-lvlExpr _ _ (_, AnnLit l) 	 = returnLvl (Lit l)
-lvlExpr _ _ (_, AnnCon con args) = returnLvl (Con con args)
-lvlExpr _ _ (_, AnnPrim op args) = returnLvl (Prim op args)
+lvlExpr _ _ (_, AnnType ty) = returnLvl (Type ty)
+lvlExpr _ _ (_, AnnVar v)   = returnLvl (Var v)
 
-lvlExpr ctxt_lvl envs@(venv, tenv) (_, AnnApp fun arg)
-  = lvlExpr ctxt_lvl envs fun		`thenLvl` \ fun' ->
-    returnLvl (App fun' arg)
+lvlExpr ctxt_lvl env (_, AnnCon con args)
+  = mapLvl (lvlExpr ctxt_lvl env) args	`thenLvl` \ args' ->
+    returnLvl (Con con args')
 
-lvlExpr ctxt_lvl envs (_, AnnNote note expr)
-  = lvlExpr ctxt_lvl envs expr 		`thenLvl` \ expr' ->
+lvlExpr ctxt_lvl env (_, AnnApp fun arg)
+  = lvlExpr ctxt_lvl env fun		`thenLvl` \ fun' ->
+    lvlMFE  ctxt_lvl env arg		`thenLvl` \ arg' ->
+    returnLvl (App fun' arg')
+
+lvlExpr ctxt_lvl env (_, AnnNote note expr)
+  = lvlExpr ctxt_lvl env expr 		`thenLvl` \ expr' ->
     returnLvl (Note note expr')
 
 -- We don't split adjacent lambdas.  That is, given
@@ -271,68 +276,45 @@ lvlExpr ctxt_lvl envs (_, AnnNote note expr)
 -- Why not?  Because partial applications are fairly rare, and splitting
 -- lambdas makes them more expensive.
 
-lvlExpr ctxt_lvl envs@(venv, tenv) (_, AnnLam (ValBinder arg) rhs)
-  = lvlMFE incd_lvl (new_venv, tenv) body `thenLvl` \ body' ->
-    returnLvl (foldr (Lam . ValBinder) body' lvld_args)
+lvlExpr ctxt_lvl env (_, AnnLam bndr rhs)
+  = lvlMFE incd_lvl new_env body	`thenLvl` \ body' ->
+    returnLvl (mkLams lvld_bndrs body')
   where
-    incd_lvl     = incMajorLvl ctxt_lvl
-    (args, body) = annCollectValBinders rhs
-    lvld_args    = [(a,incd_lvl) | a <- (arg:args)]
-    new_venv     = growIdEnvList venv lvld_args
+    bndr_is_id    = isId bndr
+    bndr_is_tyvar = isTyVar bndr
+    (bndrs, body) = go rhs
 
--- We don't need to play such tricks for type lambdas, because
--- they don't get annotated
+    incd_lvl   | bndr_is_id = incMajorLvl ctxt_lvl
+	       | otherwise  = incMinorLvl ctxt_lvl
+    lvld_bndrs = [(b,incd_lvl) | b <- (bndr:bndrs)]
+    new_env    = extendVarEnvList env lvld_bndrs
 
-lvlExpr ctxt_lvl (venv, tenv) (_, AnnLam (TyBinder tyvar) body)
-  = lvlExpr incd_lvl (venv, new_tenv) body	`thenLvl` \ body' ->
-    returnLvl (Lam (TyBinder tyvar) body')
+    go (_, AnnLam bndr rhs) |  bndr_is_id && isId bndr 
+			    || bndr_is_tyvar && isTyVar bndr
+			    =  case go rhs of { (bndrs, body) -> (bndr:bndrs, body) }
+    go body		    = ([], body)
+
+lvlExpr ctxt_lvl env (_, AnnLet bind body)
+  = lvlBind ctxt_lvl env bind		`thenLvl` \ (binds', new_env) ->
+    lvlExpr ctxt_lvl new_env body	`thenLvl` \ body' ->
+    returnLvl (mkLets binds' body')
+
+lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr alts)
+  = lvlMFE ctxt_lvl env expr	`thenLvl` \ expr' ->
+    mapLvl lvl_alt alts		`thenLvl` \ alts' ->
+    returnLvl (Case expr' (case_bndr, incd_lvl) alts')
   where
-    incd_lvl = incMinorLvl ctxt_lvl
-    new_tenv = addToTyVarEnv tenv tyvar incd_lvl
-
-lvlExpr ctxt_lvl envs (_, AnnLet bind body)
-  = lvlBind ctxt_lvl envs bind		`thenLvl` \ (binds', new_envs) ->
-    lvlExpr ctxt_lvl new_envs body	`thenLvl` \ body' ->
-    returnLvl (foldr Let body' binds') -- mkCoLet* requires Core...
-
-lvlExpr ctxt_lvl envs@(venv, tenv) (_, AnnCase expr alts)
-  = lvlMFE ctxt_lvl envs expr	`thenLvl` \ expr' ->
-    lvl_alts alts		`thenLvl` \ alts' ->
-    returnLvl (Case expr' alts')
-    where
       expr_type = coreExprType (deAnnotate expr)
       incd_lvl  = incMinorLvl ctxt_lvl
+      alts_env  = extendVarEnv env case_bndr incd_lvl
 
-      lvl_alts (AnnAlgAlts alts deflt)
-	= mapLvl lvl_alt alts	`thenLvl` \ alts' ->
-	  lvl_deflt deflt	`thenLvl` \ deflt' ->
-	  returnLvl (AlgAlts alts' deflt')
-	where
-	  lvl_alt (con, bs, e)
-	    = let
-		  bs'  = [ (b, incd_lvl) | b <- bs ]
-		  new_envs = (growIdEnvList venv bs', tenv)
-	      in
-	      lvlMFE incd_lvl new_envs e	`thenLvl` \ e' ->
-	      returnLvl (con, bs', e')
-
-      lvl_alts (AnnPrimAlts alts deflt)
-	= mapLvl lvl_alt alts	`thenLvl` \ alts' ->
-	  lvl_deflt deflt	`thenLvl` \ deflt' ->
-	  returnLvl (PrimAlts alts' deflt')
-	where
-	  lvl_alt (lit, e)
-	    = lvlMFE incd_lvl envs e `thenLvl` \ e' ->
-	      returnLvl (lit, e')
-
-      lvl_deflt AnnNoDefault = returnLvl NoDefault
-
-      lvl_deflt (AnnBindDefault b expr)
-	= let
-	      new_envs = (addOneToIdEnv venv b incd_lvl, tenv)
-	  in
-	  lvlMFE incd_lvl new_envs expr `thenLvl` \ expr' ->
-	  returnLvl (BindDefault (b, incd_lvl) expr')
+      lvl_alt (con, bs, rhs)
+        = let
+		bs'  = [ (b, incd_lvl) | b <- bs ]
+		new_env = extendVarEnvList alts_env bs'
+          in
+	  lvlMFE incd_lvl new_env rhs	`thenLvl` \ rhs' ->
+	  returnLvl (con, bs', rhs')
 \end{code}
 
 @lvlMFE@ is just like @lvlExpr@, except that it might let-bind
@@ -340,17 +322,20 @@ the expression, so that it can itself be floated.
 
 \begin{code}
 lvlMFE ::  Level		-- Level of innermost enclosing lambda/tylam
-	-> LevelEnvs		-- Level of in-scope names/tyvars
+	-> LevelEnv		-- Level of in-scope names/tyvars
 	-> CoreExprWithFVs	-- input expression
 	-> LvlM LevelledExpr	-- Result expression
 
-lvlMFE ctxt_lvl envs@(venv,_) ann_expr
-  | isUnpointedType ty	-- Can't let-bind it
-  = lvlExpr ctxt_lvl envs ann_expr
+lvlMFE ctxt_lvl env (_, AnnType ty)
+  = returnLvl (Type ty)
+
+lvlMFE ctxt_lvl env ann_expr
+  | isUnLiftedType ty		-- Can't let-bind it
+  = lvlExpr ctxt_lvl env ann_expr
 
   | otherwise		-- Not primitive type so could be let-bound
   = setFloatLevel Nothing {- Not already let-bound -}
-	ctxt_lvl envs ann_expr ty	`thenLvl` \ (final_lvl, expr') ->
+	ctxt_lvl env ann_expr ty	`thenLvl` \ (final_lvl, expr') ->
     returnLvl expr'
   where
     ty = coreExprType (deAnnotate ann_expr)
@@ -393,18 +378,15 @@ Let Bound?
 setFloatLevel :: Maybe Id		-- Just id <=> the expression is already let-bound to id
 					-- Nothing <=> it's a possible MFE
 	      -> Level 			-- of context
-	      -> LevelEnvs
+	      -> LevelEnv
 
 	      -> CoreExprWithFVs	-- Original rhs
-	      -> Type 		-- Type of rhs
+	      -> Type 			-- Type of rhs
 
 	      -> LvlM (Level, 		-- Level to attribute to this let-binding
 		       LevelledExpr)	-- Final rhs
 
-setFloatLevel maybe_let_bound ctxt_lvl envs@(venv, tenv)
-	      expr@(FVInfo fvs tfvs might_leak, _) ty
--- Invariant: ctxt_lvl is never = Top
--- Beautiful ASSERT, dudes (WDP 95/04)...
+setFloatLevel maybe_let_bound ctxt_lvl env expr@(expr_fvs, _) ty
 
 -- Now deal with (by not floating) trivial non-let-bound expressions
 -- which just aren't worth let-binding in order to float.  We always
@@ -421,21 +403,29 @@ setFloatLevel maybe_let_bound ctxt_lvl envs@(venv, tenv)
 -- for top level.
 
   | not alreadyLetBound
-    && (manifestly_whnf || not will_float_past_lambda)
-  =   -- Pin whnf non-let-bound expressions,
+    && (expr_is_trivial || expr_is_bottom || not will_float_past_lambda)
+  =   -- Pin trivial non-let-bound expressions,
       -- or ones which aren't going anywhere useful
-    lvlExpr ctxt_lvl envs expr        `thenLvl` \ expr' ->
+    lvlExpr ctxt_lvl env expr		`thenLvl` \ expr' ->
     returnLvl (ctxt_lvl, expr')
+
+{- SDM 7/98
+The above case used to read (whnf_or_bottom || not will_float_past_lambda).  
+It was changed because we really do want to float out constructors if possible:
+this can save a great deal of needless allocation inside a loop.  On the other
+hand, there's no point floating out nullary constructors and literals, hence
+the expr_is_trivial condition.
+-}
 
   | alreadyLetBound && not worth_type_abstraction
   =   -- Process the expression with a new ctxt_lvl, obtained from
       -- the free vars of the expression itself
-    lvlExpr (unTopify expr_lvl) envs expr `thenLvl` \ expr' ->
-    returnLvl (maybe_unTopify expr_lvl, expr')
+    lvlExpr expr_lvl env expr		`thenLvl` \ expr' ->
+    returnLvl (expr_lvl, expr')
 
   | otherwise -- This will create a let anyway, even if there is no
 	      -- type variable to abstract, so we try to abstract anyway
-  = abstractWrtTyVars offending_tyvars ty envs lvl_after_ty_abstr expr
+  = abstractWrtTyVars offending_tyvars ty env lvl_after_ty_abstr expr
 					      `thenLvl` \ final_expr ->
     returnLvl (expr_lvl, final_expr)
       -- OLD LIE: The body of the let, just a type application, isn't worth floating
@@ -444,71 +434,30 @@ setFloatLevel maybe_let_bound ctxt_lvl envs@(venv, tenv)
       -- something non-trivial which depends on it.
   where
     alreadyLetBound = maybeToBool maybe_let_bound
-        
-    
 
-    real_fvs = case maybe_let_bound of
-		Nothing -> fvs		-- Just the expr fvs
-		Just id -> fvs `unionIdSets` mkIdSet (idSpecVars id)
-					-- Tiresome!  Add the specVars
+    fvs 	       = case maybe_let_bound of
+				Nothing -> expr_fvs
+				Just id -> expr_fvs `unionVarSet` idFreeVars id
 
-    fv_list = idSetToList    real_fvs
-    tv_list = tyVarSetToList tfvs
-    expr_lvl = ids_only_lvl `maxLvl` tyvars_only_lvl
-    ids_only_lvl    = foldr (maxLvl . idLevel venv)    tOP_LEVEL fv_list
-    tyvars_only_lvl = foldr (maxLvl . tyvarLevel tenv) tOP_LEVEL tv_list
+    ids_only_lvl       = foldVarSet (maxIdLvl    env) tOP_LEVEL fvs
+    tyvars_only_lvl    = foldVarSet (maxTyVarLvl env) tOP_LEVEL fvs
+    expr_lvl           = ids_only_lvl `maxLvl` tyvars_only_lvl
     lvl_after_ty_abstr = ids_only_lvl --`maxLvl` non_offending_tyvars_lvl
 
-    will_float_past_lambda = 	-- Will escape lambda if let-bound
-			    ids_only_lvl `ltMajLvl` ctxt_lvl
+ 	-- Will escape lambda if let-bound
+    will_float_past_lambda = ids_only_lvl `ltMajLvl` ctxt_lvl
+			    
+	 -- Will escape (more) lambda(s)/type lambda(s) if type abstracted
+    worth_type_abstraction =  (ids_only_lvl `ltLvl` tyvars_only_lvl)
+			   && not expr_is_trivial	 -- Avoids abstracting trivial type applications
 
-    worth_type_abstraction = -- Will escape (more) lambda(s)/type lambda(s)
-			     -- if type abstracted
-      (ids_only_lvl `ltLvl` tyvars_only_lvl)
-      && not (is_trivial de_ann_expr) -- avoids abstracting trivial type applications
+    offending_tyvars = filter offending_tv (varSetElems fvs)
+    offending_tv var | isId var  = False
+		     | otherwise = ids_only_lvl `ltLvl` varLevel env var
 
-    de_ann_expr = deAnnotate expr
-
-    is_trivial (App e a)
-      | notValArg a	= is_trivial e
-    is_trivial (Var _)  = True
-    is_trivial _        = False
-
-    offending_tyvars = filter offending tv_list
-    --non_offending_tyvars = filter (not . offending) tv_list
-    --non_offending_tyvars_lvl = foldr (maxLvl . tyvarLevel tenv) tOP_LEVEL non_offending_tyvars
-
-    offending tyvar = ids_only_lvl `ltLvl` tyvarLevel tenv tyvar
-
-    manifestly_whnf = whnfOrBottom (mkFormSummary de_ann_expr)
-
-    maybe_unTopify Top | not (canFloatToTop (ty, expr)) = Level 0 0
-    maybe_unTopify lvl                                  = lvl
-	{- ToDo [Andre]: the line above (maybe) should be Level 1 0,
-	-- so that the let will not go past the *last* lambda if it can
-	-- generate a space leak. If it is already in major level 0
-	-- It won't do any harm to give it a Level 1 0.
-	-- we should do the same test not only for things with level Top,
-	-- but also for anything that gets a major level 0.
-	   the problem is that
-	   f = \a -> let x = [1..1000]
-		     in zip a x
-	   ==>
-	   f = let x = [1..1000]
-	       in \a -> zip a x
-	   is just as bad as floating x to the top level.
-	   Notice it would be OK in cases like
-	   f = \a -> let x = [1..1000]
-			 y = length x
-		     in a + y
-	   ==>
-	   f = let x = [1..1000]
-		   y = length x
-	       in \a -> a + y
-	   as x will be gc'd after y is updated.
-	   [We did not hit any problems with the above (Level 0 0) code
-	    in nofib benchmark]
-	-}
+    expr_is_trivial = exprIsTrivial de_ann_expr
+    expr_is_bottom  = exprIsBottom  de_ann_expr
+    de_ann_expr     = deAnnotate expr
 \end{code}
 
 Abstract wrt tyvars, by making it just as if we had seen
@@ -521,13 +470,13 @@ has no free type variables. Of course, if E has no free type
 variables, then we just return E.
 
 \begin{code}
-abstractWrtTyVars offending_tyvars ty (venv,tenv) lvl expr
-  = lvlExpr incd_lvl new_envs expr	`thenLvl` \ expr' ->
+abstractWrtTyVars offending_tyvars ty env lvl expr
+  = lvlExpr incd_lvl new_env expr	`thenLvl` \ expr' ->
     newLvlVar poly_ty			`thenLvl` \ poly_var ->
     let
-       poly_var_rhs     = mkTyLam offending_tyvars expr'
+       poly_var_rhs     = mkLams tyvar_lvls expr'
        poly_var_binding = NonRec (poly_var, lvl) poly_var_rhs
-       poly_var_app     = mkTyApp (Var poly_var) (mkTyVarTys offending_tyvars)
+       poly_var_app     = mkTyApps (Var poly_var) (mkTyVarTys offending_tyvars)
        final_expr       = Let poly_var_binding poly_var_app -- mkCoLet* requires Core
     in
     returnLvl final_expr
@@ -535,13 +484,9 @@ abstractWrtTyVars offending_tyvars ty (venv,tenv) lvl expr
     poly_ty = mkForAllTys offending_tyvars ty
 
 	-- These defns are just like those in the TyLam case of lvlExpr
-    (incd_lvl, tyvar_lvls) = mapAccumL next (unTopify lvl) offending_tyvars
-
-    next lvl tyvar = (lvl1, (tyvar,lvl1))
-		     where lvl1 = incMinorLvl lvl
-
-    new_tenv = growTyVarEnvList tenv tyvar_lvls
-    new_envs = (venv, new_tenv)
+    incd_lvl   = incMinorLvl lvl
+    tyvar_lvls = [(tv,incd_lvl) | tv <- offending_tyvars]
+    new_env    = extendVarEnvList env tyvar_lvls
 \end{code}
 
 Recursive definitions.  We want to transform
@@ -581,56 +526,31 @@ but differ in their level numbers; here the ab are the newly-introduced
 type lambdas.
 
 \begin{code}
-decideRecFloatLevel ctxt_lvl envs@(venv, tenv) ids rhss
-  | isTopMajLvl ids_only_lvl   &&		-- Destination = top
-    not (all canFloatToTop (zipEqual "decideRec" tys rhss)) -- Some can't float to top
-  = 	-- Pin it here
-    let
-	ids_w_lvls = ids `zip` repeat ctxt_lvl
-	new_envs   = (growIdEnvList venv ids_w_lvls, tenv)
-    in
-    mapLvl (lvlExpr ctxt_lvl new_envs) rhss	`thenLvl` \ rhss' ->
-    returnLvl (ctxt_lvl, [], rhss')
-
-{- OMITTED; see comments above near isWorthFloatingExpr
-
-  | not (any (isWorthFloating True . deAnnotate) rhss)
-  =  	-- Pin it here
-    mapLvl (lvlExpr ctxt_lvl envs) rhss	`thenLvl` \ rhss' ->
-    returnLvl (ctxt_lvl, [], rhss')
-
--}
-
+decideRecFloatLevel ctxt_lvl env ids rhss
   | ids_only_lvl `ltLvl` tyvars_only_lvl
   = 	-- Abstract wrt tyvars;
 	-- offending_tyvars is definitely non-empty
 	-- (I love the ASSERT to check this...  WDP 95/02)
     let
-	-- These defns are just like those in the TyLam case of lvlExpr
-       (incd_lvl, tyvar_lvls) = mapAccumL next (unTopify ids_only_lvl) offending_tyvars
-
-       next lvl tyvar = (lvl1, (tyvar,lvl1))
-		     where lvl1 = incMinorLvl lvl
-
-       ids_w_incd_lvl = [(id,incd_lvl) | id <- ids]
-       new_tenv	      = growTyVarEnvList tenv tyvar_lvls
-       new_venv	      = growIdEnvList    venv ids_w_incd_lvl
-       new_envs	      = (new_venv, new_tenv)
+       incd_lvl     = incMinorLvl ids_only_lvl
+       tyvars_w_lvl = [(var,incd_lvl) | var <- offending_tyvars]
+       ids_w_lvl    = [(var,incd_lvl) | var <- ids]
+       new_env	    = extendVarEnvList env (tyvars_w_lvl ++ ids_w_lvl)
     in
-    mapLvl (lvlExpr incd_lvl new_envs) rhss	`thenLvl` \ rhss' ->
+    mapLvl (lvlExpr incd_lvl new_env) rhss	`thenLvl` \ rhss' ->
     mapLvl newLvlVar poly_tys			`thenLvl` \ poly_vars ->
     let
 	ids_w_poly_vars = zipEqual "decideRec2" ids poly_vars
 
 		-- The "d_rhss" are the right-hand sides of "D" and "D'"
 		-- in the documentation above
-	d_rhss = [ mkTyApp (Var poly_var) offending_tyvar_tys | poly_var <- poly_vars]
+	d_rhss = [ mkTyApps (Var poly_var) offending_tyvar_tys | poly_var <- poly_vars]
 
 		-- "local_binds" are "D'" in the documentation above
-	local_binds = zipWithEqual "SetLevels" NonRec ids_w_incd_lvl d_rhss
+	local_binds = zipWithEqual "SetLevels" NonRec ids_w_lvl d_rhss
 
-	poly_var_rhss = [ mkTyLam offending_tyvars (foldr Let rhs' local_binds)
-			| rhs' <- rhss'	-- mkCoLet* requires Core...
+	poly_var_rhss = [ mkLams tyvars_w_lvl (mkLets local_binds rhs')
+			| rhs' <- rhss'
 			]
 
 	poly_binds  = zipEqual "poly_binds" [(poly_var, ids_only_lvl) | poly_var <- poly_vars] 
@@ -645,116 +565,28 @@ decideRecFloatLevel ctxt_lvl envs@(venv, tenv) ids rhss
   =	-- Let it float freely
     let
 	ids_w_lvls = ids `zip` repeat expr_lvl
-	new_envs   = (growIdEnvList venv ids_w_lvls, tenv)
+	new_env   = extendVarEnvList env ids_w_lvls
     in
-    mapLvl (lvlExpr (unTopify expr_lvl) new_envs) rhss	`thenLvl` \ rhss' ->
+    mapLvl (lvlExpr expr_lvl new_env) rhss	`thenLvl` \ rhss' ->
     returnLvl (expr_lvl, [], rhss')
 
   where
-    tys  = map idType ids
+	-- Finding the free vars of the binding group is annoying
+    bind_fvs	    = (unionVarSets (map fst rhss) `unionVarSet` unionVarSets (map idFreeVars ids))
+		      `minusVarSet`
+		      mkVarSet ids
 
-    fvs  = (unionManyIdSets [freeVarsOf   rhs | rhs <- rhss] `unionIdSets`
-	    mkIdSet (concat (map idSpecVars ids)))
-	   `minusIdSet` mkIdSet ids
-
-    tfvs = unionManyTyVarSets [freeTyVarsOf rhs | rhs <- rhss]
-	   `unionTyVarSets`
-	   tyVarsOfTypes tys
-	-- Why the "tyVarsOfTypes" part?  Consider this:
-	--	/\a -> letrec x::a = x in E
-	-- Now, there are no explicit free type variables in the RHS of x,
-	-- but nevertheless "a" is free in its definition.  So we add in
-	-- the free tyvars of the types of the binders.
-	-- This actually happened in the defn of errorIO in IOBase.lhs:
-	-- 	errorIO (ST io) = case (errorIO# io) of
-	--	    		    _ -> bottom
-	--			  where
-	--			    bottom = bottom -- Never evaluated
-	-- I don't think this can every happen for non-recursive bindings.
-
-    fv_list = idSetToList fvs
-    tv_list = tyVarSetToList tfvs
-
-    ids_only_lvl    = foldr (maxLvl . idLevel venv)    tOP_LEVEL fv_list
-    tyvars_only_lvl = foldr (maxLvl . tyvarLevel tenv) tOP_LEVEL tv_list
+    ids_only_lvl    = foldVarSet (maxIdLvl    env) tOP_LEVEL bind_fvs
+    tyvars_only_lvl = foldVarSet (maxTyVarLvl env) tOP_LEVEL bind_fvs
     expr_lvl 	    = ids_only_lvl `maxLvl` tyvars_only_lvl
 
-    offending_tyvars
-	| ids_only_lvl `ltLvl` tyvars_only_lvl = filter offending tv_list
-	| otherwise 			       = []
-
+    offending_tyvars = filter offending_tv (varSetElems bind_fvs)
+    offending_tv var | isId var  = False
+		     | otherwise = ids_only_lvl `ltLvl` varLevel env var
     offending_tyvar_tys = mkTyVarTys offending_tyvars
-    poly_tys = map (mkForAllTys offending_tyvars) tys
 
-    offending tyvar = ids_only_lvl `ltLvl` tyvarLevel tenv tyvar
-\end{code}
-
-
-\begin{code}
-{- ******** OMITTED NOW
-
-isWorthFloating :: Bool		-- True <=> already let-bound
-		-> CoreExpr	-- The expression
-		-> Bool
-
-isWorthFloating alreadyLetBound expr
-
-  | alreadyLetBound = isWorthFloatingExpr expr
-
-  | otherwise       = 	-- No point in adding a fresh let-binding for a WHNF, because
-			-- floating it isn't beneficial enough.
-		      isWorthFloatingExpr expr &&
-		      not (whnfOrBottom expr)
-********** -}
-
-isWorthFloatingExpr :: CoreExpr -> Bool
-
-isWorthFloatingExpr (Var v)	= False
-isWorthFloatingExpr (Lit lit)	= False
-isWorthFloatingExpr (App e arg)
-  | notValArg arg		= isWorthFloatingExpr e
-isWorthFloatingExpr (Con con as)
-  | all notValArg as		= False	-- Just a type application
-isWorthFloatingExpr _		= True
-
-canFloatToTop :: (Type, CoreExprWithFVs) -> Bool
-
-canFloatToTop (ty, (FVInfo _ _ (LeakFree _), expr)) = True
-canFloatToTop (ty, (FVInfo _ _ MightLeak,    expr)) = isLeakFreeType [] ty
-
-valSuggestsLeakFree expr = whnfOrBottom expr
-\end{code}
-
-
-
-%************************************************************************
-%*									*
-\subsection{Help functions}
-%*									*
-%************************************************************************
-
-\begin{code}
-idLevel :: IdEnv Level -> Id -> Level
-idLevel venv v
-  = case lookupIdEnv venv v of
-      Just level -> level
-      Nothing    -> tOP_LEVEL
-
-tyvarLevel :: TyVarEnv Level -> TyVar -> Level
-tyvarLevel tenv tyvar
-  = case lookupTyVarEnv tenv tyvar of
-      Just level -> level
-      Nothing    -> tOP_LEVEL
-\end{code}
-
-\begin{code}
-annCollectValBinders (_, (AnnLam (ValBinder arg) rhs))
-  = (arg:args, body) 
-  where
-    (args, body) = annCollectValBinders rhs
-
-annCollectValBinders body
-  = ([], body)
+    tys  		= map idType ids
+    poly_tys		= map (mkForAllTys offending_tyvars) tys
 \end{code}
 
 %************************************************************************
@@ -766,6 +598,7 @@ annCollectValBinders body
 \begin{code}
 type LvlM result = UniqSM result
 
+initLvl		= initUs
 thenLvl		= thenUs
 returnLvl	= returnUs
 mapLvl		= mapUs
@@ -778,7 +611,6 @@ applications, to give them a fighting chance of being floated.
 
 \begin{code}
 newLvlVar :: Type -> LvlM Id
-
-newLvlVar ty us
-  = mkSysLocal SLIT("lvl") (getUnique us) ty noSrcLoc
+newLvlVar ty = getUniqueUs	`thenLvl` \ uniq ->
+	       returnUs (mkUserLocal (varOcc SLIT("lvl")) uniq ty)
 \end{code}

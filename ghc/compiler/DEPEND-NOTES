@@ -1,0 +1,106 @@
+ToDo
+~~~~
+* Test effect of eta-expanding past (case x of ..)
+
+* Bottom strictness isn't right.  Should be (eg) SSX, not just X.
+
+* Enumeration types in worker/wrapper for strictness analysis
+
+* Use (!) types in data cons to unbox.
+
+* Check constant folding
+
+* .hi file isn't updated if the only change is to the exports.
+  For example, UgenAll.lhs re-exports all of U_binding.hs; when a data type
+  decl in the latter changes, the .hi file for the former isn't updated.
+  I think this happens when a module exports another mdodule thus:
+
+	module UgenAll( module U_binding, ... ) where
+
+* This should be reported as an error:
+	data T k = MkT (k Int#)
+
+* Bogus report of overlapped pattern for
+	f (R {field = [c]}) = 1
+  	f (R {})	      = 2
+  This shows up for TyCon.maybeTyConSingleCon
+
+*  > module Main( main ) where
+
+   > f :: String -> Int
+   > f "=<" = 0
+   > f "="  = 0
+   
+   > g :: [Char] -> Int
+   > g ['=','<'] = 0
+   > g ['=']     = 0
+   
+   > main = return ()
+   
+   For ``f'' the following is reported.
+   
+   tmp.lhs:4: 
+    Pattern match(es) are overlapped in the definition of function `f'
+            "=" = ...
+
+   There are no complaints for definition for ``g''.
+
+* Without -O I don't think we need change the module version
+  if the usages change; I forget why it changes even with -O
+
+* Record selectors for existential type; no good!  What to do?
+  Record update doesn't make sense either.
+
+  Need to be careful when figuring out strictness, and when generating
+  worker-wrapper split.
+
+  Also when deriving.
+
+* Consructor re-use via CSE
+
+		Notes on module dependencies
+		~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Name/Var/Type group is a bit complicated. Here's the deal
+
+	Name, PrimRep, FieldLabel (uses Type.Type)
+then
+	Var (uses Const.Con, IdInfo.IdInfo, Type.GenType, Type.Kind)
+then
+	VarEnv, VarSet
+then
+	Class (uses TyCon.TyCon, Type.Type, SpecEnv.SpecEnv)
+then
+	TyCon (uses Type.Type, Type.Kind, DataCon.DataCon)
+then
+	Type (uses [DataCon.DataCon])
+then
+	DataCon, TysPrim, Unify, SpecEnv, PprType
+then
+	IdInfo, TysWiredIn (uses DataCon.mkDataCon, [MkId.mkDataConId])
+then
+	PrimOp (uses PprType, TysWiredIn)
+then
+	Const (needs PrimOp, [TysWiredIn.stringTy])
+then
+	Id (needs Const.Con(..)), CoreSyn
+then
+	CoreUtils, OccurAnal
+then
+	CoreUnfold (uses OccurAnal)
+then
+	MkId (uses CoreUnfold)
+	
+
+PrimOp uses TysWiredIn
+
+
+Add
+~~~
+basicTypes/DataCon.lhs
+basicTypes/DataCon.hi-boot
+
+Remove
+~~~~~~
+specialise/SpecUtils.lhs
+basicTypes/IdUtils.lhs

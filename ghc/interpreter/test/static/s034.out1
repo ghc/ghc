@@ -1,0 +1,1 @@
+ERROR "test/static/s034.hs": Transparent export of restricted type synonym "T" in export list of module "M"

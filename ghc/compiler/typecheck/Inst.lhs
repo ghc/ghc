@@ -1,14 +1,15 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Inst]{The @Inst@ type: dictionaries or method instances}
 
 \begin{code}
 module Inst (
-	LIE, emptyLIE, unitLIE, plusLIE, consLIE, zonkLIE, plusLIEs, mkLIE,
-	pprInsts, pprInstsInFull,
+	LIE, emptyLIE, unitLIE, plusLIE, consLIE, zonkLIE,
+	plusLIEs, mkLIE, isEmptyLIE,
 
-	Inst, OverloadedLit(..), pprInst,
+	Inst, OverloadedLit(..),
+	pprInst, pprInsts, pprInstsInFull, tidyInst, tidyInsts,
 
         InstanceMapper,
 
@@ -22,55 +23,57 @@ module Inst (
 	isDict, isTyVarDict, isStdClassTyVarDict, isMethodFor,
 	instBindingRequired, instCanBeGeneralised,
 
-	zonkInst, instToId,
+	zonkInst, instToId, instToIdBndr,
 
 	InstOrigin(..), pprOrigin
     ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts ( opt_AllowOverlappingInstances )
-import HsSyn	( HsLit(..), HsExpr(..), MonoBinds )
-import RnHsSyn	( RenamedArithSeqInfo, RenamedHsExpr )
+import HsSyn	( HsLit(..), HsExpr(..) )
+import RnHsSyn	( RenamedArithSeqInfo, RenamedHsExpr, RenamedPat )
 import TcHsSyn	( TcExpr, TcIdOcc(..), TcIdBndr, 
 		  mkHsTyApp, mkHsDictApp, tcIdTyVars, zonkTcId
 		)
 import TcMonad
-import TcEnv	( tcLookupGlobalValueByKey, tcLookupTyConByKey )
+import TcEnv	( TcIdSet, tcLookupGlobalValueByKey, tcLookupTyConByKey,
+		  tidyType, tidyTypes
+		)
 import TcType	( TcThetaType,
-		  TcType, TcTauType, TcMaybe, TcTyVarSet,
-		  tcInstType, zonkTcType, zonkTcTypes, tcSplitForAllTy,
+		  TcType, TcTauType, TcTyVarSet,
+		  zonkTcType, zonkTcTypes, 
 		  zonkTcThetaType
 		)
-import Bag	( emptyBag, unitBag, unionBags, unionManyBags,
-		  listToBag, consBag, Bag )
+import Bag
 import Class	( classInstEnv,
 		  Class, ClassInstEnv 
 		)
-import MkId	( mkUserLocal, mkSysLocal )
-import Id	( Id, idType, mkId,
-		  GenIdSet, elementOfIdSet
-		)
+import Id	( Id, idType, mkUserLocal, mkSysLocal )
+import VarSet	( elemVarSet )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( OccName(..), Name, occNameString, getOccName )
-import PprType	( TyCon, pprConstraint )	
+import PprType	( pprConstraint )	
 import SpecEnv	( SpecEnv, lookupSpecEnv )
 import SrcLoc	( SrcLoc )
-import Type	( Type, ThetaType, instantiateTy, instantiateThetaTy,
+import Type	( Type, ThetaType, substTy,
 		  isTyVarTy, mkDictTy, splitForAllTys, splitSigmaTy,
 		  splitRhoTy, tyVarsOfType, tyVarsOfTypes,
-		  mkSynTy
+		  mkSynTy, substFlexiTy, substFlexiTheta
 		)
-import TyVar	( zipTyVarEnv, lookupTyVarEnv, unionTyVarSets )
+import TyCon	( TyCon )
+import VarEnv	( zipVarEnv, lookupVarEnv )
+import VarSet	( unionVarSet )
 import TysPrim	  ( intPrimTy, floatPrimTy, doublePrimTy )
-import TysWiredIn ( intDataCon, integerTy, isIntTy, isIntegerTy, inIntRange,
-		    floatDataCon, isFloatTy, 
-		    doubleDataCon, isDoubleTy )
+import TysWiredIn ( intDataCon, isIntTy, inIntRange,
+		    floatDataCon, isFloatTy,
+		    doubleDataCon, isDoubleTy,
+		    integerTy, isIntegerTy
+		  ) 
 import Unique	( fromRationalClassOpKey, rationalTyConKey,
 		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
 		)
-import Maybes	( MaybeErr, expectJust )
-import Util	( thenCmp, zipWithEqual )
+import Maybes	( expectJust )
+import Util	( thenCmp, zipWithEqual, mapAccumL )
 import Outputable
 \end{code}
 
@@ -83,6 +86,7 @@ import Outputable
 \begin{code}
 type LIE s = Bag (Inst s)
 
+isEmptyLIE	  = isEmptyBag
 emptyLIE          = emptyBag
 unitLIE inst 	  = unitBag inst
 mkLIE insts	  = listToBag insts
@@ -218,7 +222,7 @@ getDictClassTys (Dict u clas tys _ _) = (clas, tys)
 
 tyVarsOfInst :: Inst s -> TcTyVarSet s
 tyVarsOfInst (Dict _ _ tys _ _)        = tyVarsOfTypes  tys
-tyVarsOfInst (Method _ id tys _ _ _ _) = tyVarsOfTypes tys `unionTyVarSets` tcIdTyVars id
+tyVarsOfInst (Method _ id tys _ _ _ _) = tyVarsOfTypes tys `unionVarSet` tcIdTyVars id
 					 -- The id might not be a RealId; in the case of
 					 -- locally-overloaded class methods, for example
 tyVarsOfInst (LitInst _ _ ty _ _)     = tyVarsOfType  ty
@@ -231,9 +235,9 @@ isDict :: Inst s -> Bool
 isDict (Dict _ _ _ _ _) = True
 isDict other	        = False
 
-isMethodFor :: GenIdSet (TcType s) -> Inst s -> Bool
+isMethodFor :: TcIdSet s -> Inst s -> Bool
 isMethodFor ids (Method uniq (TcId id) tys _ _ orig loc) 
-  = id `elementOfIdSet` ids
+  = id `elemVarSet` ids
 isMethodFor ids inst 
   = False
 
@@ -300,19 +304,22 @@ newMethod :: InstOrigin s
 newMethod orig id tys
   =   	-- Get the Id type and instantiate it at the specified types
     (case id of
-       RealId id -> let (tyvars, rho) = splitForAllTys (idType id)
+       RealId id -> let 
+			(tyvars, rho) = splitForAllTys (idType id)
 		    in
 		    ASSERT( length tyvars == length tys)
-		    tcInstType (zipTyVarEnv tyvars tys) rho
+		    returnNF_Tc (substFlexiTy (zipVarEnv tyvars tys) rho)
 
-       TcId   id -> tcSplitForAllTy (idType id) 	`thenNF_Tc` \ (tyvars, rho) -> 
-		    returnNF_Tc (instantiateTy (zipTyVarEnv tyvars tys) rho)
+       TcId   id -> let
+			(tyvars, rho) = splitForAllTys (idType id)
+		    in
+		    returnNF_Tc (substTy (zipVarEnv tyvars tys) rho)
     )						`thenNF_Tc` \ rho_ty ->
     let
 	(theta, tau) = splitRhoTy rho_ty
     in
-	 -- Our friend does the rest
-    newMethodWithGivenTy orig id tys theta tau
+    newMethodWithGivenTy orig id tys theta tau	`thenNF_Tc` \ meth_inst ->
+    returnNF_Tc (unitLIE meth_inst, instToId meth_inst)
 
 
 newMethodWithGivenTy orig id tys theta tau
@@ -321,7 +328,7 @@ newMethodWithGivenTy orig id tys theta tau
     let
 	meth_inst = Method new_uniq id tys theta tau orig loc
     in
-    returnNF_Tc (unitLIE meth_inst, instToId meth_inst)
+    returnNF_Tc meth_inst
 
 newMethodAtLoc :: InstOrigin s -> SrcLoc
 	       -> Id -> [TcType s]
@@ -329,14 +336,13 @@ newMethodAtLoc :: InstOrigin s -> SrcLoc
 newMethodAtLoc orig loc real_id tys	-- Local function, similar to newMethod but with 
 					-- slightly different interface
   =   	-- Get the Id type and instantiate it at the specified types
-    let
-	 (tyvars,rho) = splitForAllTys (idType real_id)
-    in
-    tcInstType (zipTyVarEnv tyvars tys) rho	`thenNF_Tc` \ rho_ty ->
     tcGetUnique					`thenNF_Tc` \ new_uniq ->
     let
-	(theta, tau) = splitRhoTy rho_ty
-	meth_inst    = Method new_uniq (RealId real_id) tys theta tau orig loc
+	(tyvars,rho) = splitForAllTys (idType real_id)
+	rho_ty	      = ASSERT( length tyvars == length tys )
+			substFlexiTy (zipVarEnv tyvars tys) rho
+	(theta, tau)  = splitRhoTy rho_ty
+	meth_inst     = Method new_uniq (RealId real_id) tys theta tau orig loc
     in
     returnNF_Tc (meth_inst, instToId meth_inst)
 \end{code}
@@ -361,8 +367,8 @@ newOverloadedLit orig (OverloadedIntegral i) ty
   where
     intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
     integer_lit    = HsLitOut (HsInt i) integerTy
-    int_lit        = HsApp (HsVar (RealId intDataCon)) intprim_lit
- 
+    int_lit        = HsCon intDataCon [] [intprim_lit]
+
 newOverloadedLit orig lit ty		-- The general case
   = tcGetSrcLoc			`thenNF_Tc` \ loc ->
     tcGetUnique			`thenNF_Tc` \ new_uniq ->
@@ -375,16 +381,19 @@ newOverloadedLit orig lit ty		-- The general case
 
 \begin{code}
 instToId :: Inst s -> TcIdOcc s
-instToId (Dict u clas ty orig loc)
-  = TcId (mkUserLocal occ u (mkDictTy clas ty) loc)
+instToId inst = TcId (instToIdBndr inst)
+
+instToIdBndr :: Inst s -> TcIdBndr s
+instToIdBndr (Dict u clas ty orig loc)
+  = mkUserLocal occ u (mkDictTy clas ty)
   where
     occ = VarOcc (SLIT("d.") _APPEND_ (occNameString (getOccName clas)))
 
-instToId (Method u id tys theta tau orig loc)
-  = TcId (mkUserLocal (getOccName id) u tau loc)
+instToIdBndr (Method u id tys theta tau orig loc)
+  = mkUserLocal (getOccName id) u tau
     
-instToId (LitInst u list ty orig loc)
-  = TcId (mkSysLocal SLIT("lit") u ty loc)
+instToIdBndr (LitInst u list ty orig loc)
+  = mkSysLocal u ty
 \end{code}
 
 
@@ -435,8 +444,27 @@ pprInst (Dict u clas tys orig loc) = pprConstraint clas tys <+> show_uniq u
 
 pprInst (Method u id tys _ _ orig loc)
   = hsep [ppr id, ptext SLIT("at"), 
-	  interppSP tys,
+	  brackets (interppSP tys),
 	  show_uniq u]
+
+tidyInst :: TidyTypeEnv s -> Inst s -> (TidyTypeEnv s, Inst s)
+tidyInst env (LitInst u lit ty orig loc)
+  = (env', LitInst u lit ty' orig loc)
+  where
+    (env', ty') = tidyType env ty
+
+tidyInst env (Dict u clas tys orig loc)
+  = (env', Dict u clas tys' orig loc)
+  where
+    (env', tys') = tidyTypes env tys
+
+tidyInst env (Method u id tys theta tau orig loc)
+  = (env', Method u id tys' theta tau orig loc)
+		-- Leave theta, tau alone cos we don't print them
+  where
+    (env', tys') = tidyTypes env tys
+    
+tidyInsts env insts = mapAccumL tidyInst env insts
 
 show_uniq u = ifPprDebug (text "{-" <> ppr u <> text "-}")
 \end{code}
@@ -472,6 +500,7 @@ data LookupInstResult s
   = NoInstance
   | SimpleInst (TcExpr s)		-- Just a variable, type application, or literal
   | GenInst    [Inst s] (TcExpr s)	-- The expression and its needed insts
+
 lookupInst :: Inst s 
 	   -> NF_TcM s (LookupInstResult s)
 
@@ -483,13 +512,11 @@ lookupInst dict@(Dict _ clas tys orig loc)
       Just (tenv, dfun_id)
 	-> let
 		(tyvars, rho) = splitForAllTys (idType dfun_id)
-		ty_args	      = map (expectJust "Inst" . lookupTyVarEnv tenv) tyvars
+		ty_args	      = map (expectJust "Inst" . lookupVarEnv tenv) tyvars
 				-- tenv should bind all the tyvars
-	   in
-	   tcInstType tenv rho		`thenNF_Tc` \ dfun_rho ->
-	   let
-		(theta, tau) = splitRhoTy dfun_rho
-		ty_app       = mkHsTyApp (HsVar (RealId dfun_id)) ty_args
+		dfun_rho      = substFlexiTy tenv rho
+		(theta, tau)  = splitRhoTy dfun_rho
+		ty_app        = mkHsTyApp (HsVar (RealId dfun_id)) ty_args
 	   in
 	   if null theta then
 		returnNF_Tc (SimpleInst ty_app)
@@ -531,7 +558,7 @@ lookupInst inst@(LitInst u (OverloadedIntegral i) ty orig loc)
     in_int_range   = inIntRange i
     intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
     integer_lit    = HsLitOut (HsInt i) integerTy
-    int_lit        = HsApp (HsVar (RealId intDataCon)) intprim_lit
+    int_lit        = HsCon intDataCon [] [intprim_lit]
 
 -- similar idea for overloaded floating point literals: if the literal is
 -- *definitely* a float or a double, generate the real thing here.
@@ -555,9 +582,9 @@ lookupInst inst@(LitInst u (OverloadedFractional f) ty orig loc)
 
   where
     floatprim_lit  = HsLitOut (HsFloatPrim f) floatPrimTy
-    float_lit      = HsApp (HsVar (RealId floatDataCon)) floatprim_lit
+    float_lit      = HsCon floatDataCon [] [floatprim_lit]
     doubleprim_lit = HsLitOut (HsDoublePrim f) doublePrimTy
-    double_lit     = HsApp (HsVar (RealId doubleDataCon)) doubleprim_lit
+    double_lit     = HsCon doubleDataCon [] [doubleprim_lit]
 
 \end{code}
 
@@ -577,7 +604,7 @@ lookupSimpleInst class_inst_env clas tys
       Nothing	 -> returnNF_Tc Nothing
 
       Just (tenv, dfun)
-	-> returnNF_Tc (Just (instantiateThetaTy tenv theta))
+	-> returnNF_Tc (Just (substFlexiTheta tenv theta))
         where
 	   (_, theta, _) = splitSigmaTy (idType dfun)
 \end{code}
@@ -606,6 +633,8 @@ data InstOrigin s
   | InstanceDeclOrigin		-- Typechecking an instance decl
 
   | LiteralOrigin	HsLit	-- Occurrence of a literal
+
+  | PatOrigin RenamedPat
 
   | ArithSeqOrigin	RenamedArithSeqInfo -- [x..], [x..y] etc
 
@@ -657,6 +686,8 @@ pprOrigin inst
 	= hsep [ptext SLIT("use of"), quotes (ppr id)]
     pp_orig (LiteralOrigin lit)
 	= hsep [ptext SLIT("the literal"), quotes (ppr lit)]
+    pp_orig (PatOrigin pat)
+	= hsep [ptext SLIT("the pattern"), quotes (ppr pat)]
     pp_orig (InstanceDeclOrigin)
 	=  ptext SLIT("an instance declaration")
     pp_orig (ArithSeqOrigin seq)

@@ -1,5 +1,0 @@
-_interface_ Literal 1
-_exports_
-Literal Literal;
-_declarations_
-1 data Literal;

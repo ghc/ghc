@@ -1,0 +1,79 @@
+<sect> <idx/ST/ 
+<label id="sec:ST">
+<p>
+
+This library provides support for <em/strict/ state threads, as
+described in the PLDI '94 paper by John Launchbury and Simon Peyton
+Jones <cite id="LazyStateThreads">.  In addition to the monad <tt/ST/,
+it also provides mutable variables <tt/STRef/ and mutable arrays
+<tt/STArray/.
+
+<tscreen><verb>
+module ST( module ST, module Monad ) where
+import Monad
+
+data ST s a        -- abstract type
+runST              :: forall a. (forall s. ST s a) -> a
+fixST              :: (a -> ST s a) -> ST s a
+unsafeInterleaveST :: ST s a -> ST s a
+instance Functor (ST s)
+instance Monad   (ST s)
+
+data STRef s a     -- mutable variables in state thread s
+                   -- containing values of type a.
+newSTRef           :: a -> ST s (STRef s a)
+readSTRef          :: STRef s a -> ST s a
+writeSTRef         :: STRef s a -> a -> ST s ()
+instance Eq (STRef s a)
+
+data STArray s ix elt -- mutable arrays in state thread s
+                      -- indexed by values of type ix
+                      -- containing values of type a.
+newSTArray          :: Ix ix => (ix,ix) -> elt -> ST s (STArray s ix elt)
+boundsSTArray       :: Ix ix => STArray s ix elt -> (ix, ix)
+readSTArray         :: Ix ix => STArray s ix elt -> ix -> ST s elt
+writeSTArray        :: Ix ix => STArray s ix elt -> ix -> elt -> ST s ()
+thawSTArray         :: Ix ix => Array ix elt -> ST s (STArray s ix elt)
+freezeSTArray       :: Ix ix => STArray s ix elt -> ST s (Array ix elt)
+unsafeFreezeSTArray :: Ix ix => STArray s ix elt -> ST s (Array ix elt)  
+instance Eq (STArray s ix elt)
+</verb></tscreen>
+
+Notes:
+<itemize>
+
+<item> 
+GHC also supports ByteArrays --- these aren't supported by Hugs yet.
+
+<item> 
+The operations <tt/freezeSTArray/ and <tt/thawSTArray/ convert mutable
+arrays to and from immutable arrays.  Semantically, they are identical
+to copying the array and they are usually implemented that way.  The
+operation <tt/unsafeFreezeSTArray/ is a faster version of
+<tt/freezeSTArray/ which omits the copying step.  It's a safe substitute for
+<tt/freezeSTArray/ if you don't modify the mutable array after freezing it.
+
+<item>
+In the current version of Hugs, the <tt/<idx/runST// operation,
+used to specify encapsulation, is implemented as a language construct,
+and <tt/runST/ is treated as a keyword.  We plan to change this to match
+GHC soon.
+
+<!-- 
+  <item>
+     Note that it is possible to install Hugs 1.4 without support for lazy
+     state threads, and hence the primitives described here may not be
+     available in all implementations.  Also, in contrast with the
+     implementation of lazy state threads in previous releases of Hugs and
+     Gofer, there is no direct relationship between the
+     <tt/<idx/ST monad// and the <tt/<idx/IO monad//.
+  -->
+
+<item>
+Hugs provides <tt/thenLazyST/ and <tt/thenStrictST/ so that you can
+import <tt/LazyST/ (say) and still use the strict instance in those
+places where it matters.  GHC implements LazyST and ST using different
+types, so this isn't possible.
+</item>
+
+</itemize>

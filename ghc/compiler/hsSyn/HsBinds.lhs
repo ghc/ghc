@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[HsBinds]{Abstract syntax: top-level bindings and signatures}
 
@@ -19,14 +19,13 @@ import CoreSyn		( CoreExpr )
 import PprCore		()	   -- Instances for Outputable
 
 --others:
-import Id		( Id, GenId )
+import Id		( Id )
 import Name		( OccName, NamedThing(..) )
 import BasicTypes	( RecFlag(..) )
 import Outputable	
 import Bag
 import SrcLoc		( SrcLoc )
-import Type		( GenType )
-import TyVar		( GenTyVar )
+import Var		( GenTyVar )
 \end{code}
 
 %************************************************************************
@@ -157,8 +156,13 @@ nullMonoBinds EmptyMonoBinds	     = True
 nullMonoBinds (AndMonoBinds bs1 bs2) = nullMonoBinds bs1 && nullMonoBinds bs2
 nullMonoBinds other_monobind	     = False
 
-andMonoBinds :: [MonoBinds flexi id pat] -> MonoBinds flexi id pat
-andMonoBinds binds = foldr AndMonoBinds EmptyMonoBinds binds
+andMonoBinds :: MonoBinds flexi id pat -> MonoBinds flexi id pat -> MonoBinds flexi id pat
+andMonoBinds EmptyMonoBinds mb = mb
+andMonoBinds mb EmptyMonoBinds = mb
+andMonoBinds mb1 mb2 = AndMonoBinds mb1 mb2
+
+andMonoBindList :: [MonoBinds flexi id pat] -> MonoBinds flexi id pat
+andMonoBindList binds = foldr AndMonoBinds EmptyMonoBinds binds
 \end{code}
 
 \begin{code}

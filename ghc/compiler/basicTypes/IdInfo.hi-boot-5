@@ -1,0 +1,3 @@
+__interface IdInfo 1 0 where
+__export IdInfo IdInfo ;
+1 data IdInfo ;

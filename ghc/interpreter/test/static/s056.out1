@@ -1,0 +1,1 @@
+ERROR "test/static/s056.hs" (line 3): Unknown class "Foo" in derived instance

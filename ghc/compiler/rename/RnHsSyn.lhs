@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[RnHsSyn]{Specialisations of the @HsSyn@ syntax for the renamer}
 
@@ -8,15 +8,14 @@ module RnHsSyn where
 
 #include "HsVersions.h"
 
+import RnEnv		( listTyCon_name, tupleTyCon_name )
+
 import HsSyn
 import HsPragmas	( InstancePragmas, GenPragmas, DataPragmas, ClassPragmas, ClassOpPragmas )
 
-import Id		( GenId, Id )
-import BasicTypes	( Unused, NewOrData, IfaceFlavour )
+import BasicTypes	( Unused )
 import Name		( Name )
-import Name		( NameSet, unitNameSet, mkNameSet, minusNameSet, unionNameSets, emptyNameSet )
-import TyVar		( GenTyVar )
-import Unique		( Unique )
+import NameSet
 import Util
 import Outputable
 \end{code}
@@ -69,8 +68,10 @@ extractHsTyNames ty
   = get ty
   where
     get (MonoTyApp ty1 ty2)      = get ty1 `unionNameSets` get ty2
-    get (MonoListTy tc ty)       = unitNameSet tc `unionNameSets` get ty
-    get (MonoTupleTy tc tys)     = unitNameSet tc `unionNameSets` extractHsTyNames_s tys
+    get (MonoListTy ty)          = unitNameSet listTyCon_name 
+				   `unionNameSets` get ty
+    get (MonoTupleTy tys boxed)  = unitNameSet (tupleTyCon_name boxed (length tys)) 
+				   `unionNameSets` extractHsTyNames_s tys
     get (MonoFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (MonoDictTy cls tys)     = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
     get (MonoTyVar tv)	         = unitNameSet tv

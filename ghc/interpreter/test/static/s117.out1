@@ -1,0 +1,1 @@
+ERROR "test/static/s117.hs" (line 5): Attempt to redefine variable "x"

@@ -1,22 +1,19 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[DsExpr]{Matching expressions (Exprs)}
 
 \begin{code}
-module DsExpr ( dsExpr ) where
+module DsExpr ( dsExpr, dsLet ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsBinds (dsBinds )
 
 import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
-			  Stmt(..), DoOrListComp(..), Match(..), HsBinds, HsType, Fixity,
-			  GRHSsAndBinds
+			  Stmt(..), StmtCtxt(..), Match(..), HsBinds(..), MonoBinds(..), 
 			)
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
-			  TypecheckedRecordBinds, TypecheckedPat,
 			  TypecheckedStmt,
 			  maybeBoxedPrimType
 
@@ -24,41 +21,91 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
 import CoreSyn
 
 import DsMonad
+import DsBinds		( dsMonoBinds )
+import DsGRHSs		( dsGuarded )
 import DsCCall		( dsCCall )
 import DsListComp	( dsListComp )
-import DsUtils		( mkAppDs, mkConDs, dsExprToAtomGivenTy,
-			  mkErrorAppDs, showForErr, DsCoreArg
-			)
-import Match		( matchWrapper )
+import DsUtils		( mkErrorAppDs )
+import Match		( matchWrapper, matchSimply )
 
-import CoreUtils	( coreExprType, mkCoreIfThenElse )
+import CoreUtils	( coreExprType )
 import CostCentre	( mkUserCC )
 import FieldLabel	( FieldLabel )
-import Id		( dataConTyCon, dataConArgTys, dataConFieldLabels,
-			  recordSelectorFieldLabel, Id
-			)
-import Literal		( mkMachInt, Literal(..) )
-import Name		( Name{--O only-} )
-import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID )
+import Id		( Id, idType, recordSelectorFieldLabel )
+import Const		( Con(..) )
+import DataCon		( DataCon, dataConId, dataConTyCon, dataConArgTys, dataConFieldLabels )
+import Const		( mkMachInt, Literal(..) )
+import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import TyCon		( isNewTyCon )
-import Type		( splitFunTys, typePrimRep, mkTyConApp,
+import DataCon		( isExistentialDataCon )
+import Type		( splitFunTys, mkTyConApp,
 			  splitAlgTyConApp, splitTyConApp_maybe,
-			  splitAppTy, Type
+			  splitAppTy, isUnLiftedType, Type
 			)
-import TysWiredIn	( tupleCon, nilDataCon, consDataCon, listTyCon, mkListTy,
-			  charDataCon, charTy
+import TysWiredIn	( tupleCon, unboxedTupleCon,
+			  consDataCon, listTyCon, mkListTy,
+			  charDataCon, charTy, stringTy
 			)
-import TyVar		( GenTyVar{-instance Eq-} )
+import BasicTypes	( RecFlag(..) )
 import Maybes		( maybeToBool )
-import Util		( zipEqual )
+import Util		( zipEqual, zipWithEqual )
 import Outputable
-
-mk_nil_con ty = mkCon nilDataCon [ty] []  -- micro utility...
 \end{code}
 
-The funny business to do with variables is that we look them up in the
-Id-to-Id and Id-to-Id maps that the monadery is carrying
-around; if we get hits, we use the value accordingly.
+
+%************************************************************************
+%*									*
+\subsection{dsLet}
+%*									*
+%************************************************************************
+
+@dsLet@ is a match-result transformer, taking the MatchResult for the body
+and transforming it into one for the let-bindings enclosing the body.
+
+This may seem a bit odd, but (source) let bindings can contain unboxed
+binds like
+
+	C x# = e
+
+This must be transformed to a case expression and, if the type has
+more than one constructor, may fail.
+
+\begin{code}
+dsLet :: TypecheckedHsBinds -> CoreExpr -> DsM CoreExpr
+
+dsLet EmptyBinds body
+  = returnDs body
+
+dsLet (ThenBinds b1 b2) body
+  = dsLet b2 body 	`thenDs` \ body' ->
+    dsLet b1 body'
+  
+-- Special case for bindings which bind unlifted variables
+dsLet (MonoBind (AbsBinds [] [] binder_triples bind) sigs is_rec) body
+  | or [isUnLiftedType (idType g) | (_, g, l) <- binder_triples]
+  = ASSERT (case is_rec of {NonRecursive -> True; other -> False})
+    putSrcLocDs loc							$
+    dsGuarded grhss							`thenDs` \ rhs ->
+    let
+	body' = foldr bind body binder_triples
+	bind (tyvars, g, l) body = ASSERT( null tyvars )
+				   bindNonRec g (Var l) body
+    in
+    mkErrorAppDs iRREFUT_PAT_ERROR_ID result_ty (showSDoc (ppr pat))	`thenDs` \ error_expr ->
+    matchSimply rhs PatBindMatch pat body' error_expr
+  where
+    PatMonoBind pat grhss loc = bind
+    result_ty		      = coreExprType body
+
+-- Ordinary case for bindings
+dsLet (MonoBind binds sigs is_rec) body
+  = dsMonoBinds False binds []  `thenDs` \ prs ->
+    case is_rec of
+      Recursive    -> returnDs (Let (Rec prs) body)
+      NonRecursive -> returnDs (foldr mk_let body prs)
+  where
+    mk_let (bndr,rhs) body = Let (NonRec bndr rhs) body
+\end{code}
 
 %************************************************************************
 %*									*
@@ -69,7 +116,7 @@ around; if we get hits, we use the value accordingly.
 \begin{code}
 dsExpr :: TypecheckedHsExpr -> DsM CoreExpr
 
-dsExpr e@(HsVar var) = dsId var
+dsExpr e@(HsVar var) = returnDs (Var var)
 \end{code}
 
 %************************************************************************
@@ -96,14 +143,16 @@ See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 \begin{code}
 dsExpr (HsLitOut (HsString s) _)
   | _NULL_ s
-  = returnDs (mk_nil_con charTy)
+  = returnDs (mkNilExpr charTy)
 
   | _LENGTH_ s == 1
   = let
-	the_char = mkCon charDataCon [] [LitArg (MachChar (_HEAD_ s))]
-	the_nil  = mk_nil_con charTy
+	the_char = mkConApp charDataCon [mkLit (MachChar (_HEAD_ s))]
+	the_nil  = mkNilExpr charTy
+	the_cons = mkConApp consDataCon [Type charTy, the_char, the_nil]
     in
-    mkConDs consDataCon [TyArg charTy, VarArg the_char, VarArg the_nil]
+    returnDs the_cons
+
 
 -- "_" => build (\ c n -> c 'c' n)	-- LATER
 
@@ -132,61 +181,59 @@ dsExpr (HsLitOut (HsString str) _)
 -- the Core-to-STG pass will wrap it in an application of "unpackCStringId".
 
 dsExpr (HsLitOut (HsString str) _)
-  = returnDs (Lit (NoRepStr str))
+  = returnDs (mkLit (NoRepStr str stringTy))
 
-dsExpr (HsLitOut (HsLitLit s) ty)
-  = returnDs ( mkCon data_con [] [LitArg (MachLitLit s kind)] )
+dsExpr (HsLitOut (HsLitLit str) ty)
+  = returnDs ( mkConApp data_con [mkLit (MachLitLit str prim_ty)] )
   where
-    (data_con, kind)
+    (data_con, prim_ty)
       = case (maybeBoxedPrimType ty) of
-	  Just (boxing_data_con, prim_ty)
-	    -> (boxing_data_con, typePrimRep prim_ty)
+	  Just (boxing_data_con, prim_ty) -> (boxing_data_con, prim_ty)
 	  Nothing
 	    -> pprPanic "ERROR: ``literal-literal'' not a single-constructor type: "
-			(hcat [ptext s, text "; type: ", ppr ty])
+			(hcat [ptext str, text "; type: ", ppr ty])
 
 dsExpr (HsLitOut (HsInt i) ty)
-  = returnDs (Lit (NoRepInteger i ty))
+  = returnDs (mkLit (NoRepInteger i ty))
 
 dsExpr (HsLitOut (HsFrac r) ty)
-  = returnDs (Lit (NoRepRational r ty))
+  = returnDs (mkLit (NoRepRational r ty))
 
 -- others where we know what to do:
 
 dsExpr (HsLitOut (HsIntPrim i) _)
-  | i >= toInteger minInt && i <= toInteger maxInt 
-  = returnDs (Lit (mkMachInt (fromInteger i)))
-  | otherwise 
+  | (i >= toInteger minInt && i <= toInteger maxInt) 
+  = returnDs (mkLit (mkMachInt i))
+  | otherwise
   = error ("ERROR: Int constant " ++ show i ++ out_of_range_msg)
 
 dsExpr (HsLitOut (HsFloatPrim f) _)
-  = returnDs (Lit (MachFloat f))
+  = returnDs (mkLit (MachFloat f))
     -- ToDo: range checking needed!
 
 dsExpr (HsLitOut (HsDoublePrim d) _)
-  = returnDs (Lit (MachDouble d))
+  = returnDs (mkLit (MachDouble d))
     -- ToDo: range checking needed!
 
 dsExpr (HsLitOut (HsChar c) _)
-  = returnDs ( mkCon charDataCon [] [LitArg (MachChar c)] )
+  = returnDs ( mkConApp charDataCon [mkLit (MachChar c)] )
 
 dsExpr (HsLitOut (HsCharPrim c) _)
-  = returnDs (Lit (MachChar c))
+  = returnDs (mkLit (MachChar c))
 
 dsExpr (HsLitOut (HsStringPrim s) _)
-  = returnDs (Lit (MachStr s))
+  = returnDs (mkLit (MachStr s))
 
 -- end of literals magic. --
 
 dsExpr expr@(HsLam a_Match)
   = matchWrapper LambdaMatch [a_Match] "lambda"	`thenDs` \ (binders, matching_code) ->
-    returnDs ( mkValLam binders matching_code )
+    returnDs (mkLams binders matching_code)
 
 dsExpr expr@(HsApp fun arg)      
   = dsExpr fun		`thenDs` \ core_fun ->
     dsExpr arg		`thenDs` \ core_arg ->
-    dsExprToAtomGivenTy core_arg (coreExprType core_arg)	$ \ atom_arg ->
-    returnDs (core_fun `App` atom_arg)
+    returnDs (core_fun `App` core_arg)
 
 \end{code}
 
@@ -220,9 +267,7 @@ dsExpr (OpApp e1 op _ e2)
     in
     dsExpr e1				`thenDs` \ x_core ->
     dsExpr e2				`thenDs` \ y_core ->
-    dsExprToAtomGivenTy x_core x_ty	$ \ x_atom ->
-    dsExprToAtomGivenTy y_core y_ty	$ \ y_atom ->
-    returnDs (core_op `App` x_atom `App` y_atom)
+    returnDs (mkApps core_op [x_core, y_core])
     
 dsExpr (SectionL expr op)
   = dsExpr op						`thenDs` \ core_op ->
@@ -231,10 +276,11 @@ dsExpr (SectionL expr op)
 	(x_ty:y_ty:_, _) = splitFunTys (coreExprType core_op)
     in
     dsExpr expr				`thenDs` \ x_core ->
-    dsExprToAtomGivenTy x_core x_ty	$ \ x_atom ->
-
+    newSysLocalDs x_ty			`thenDs` \ x_id ->
     newSysLocalDs y_ty			`thenDs` \ y_id ->
-    returnDs (mkValLam [y_id] (core_op `App` x_atom `App` VarArg y_id)) 
+
+    returnDs (bindNonRec x_id x_core $
+	      Lam y_id (mkApps core_op [Var x_id, Var y_id]))
 
 -- dsExpr (SectionR op expr)	-- \ x -> op x expr
 dsExpr (SectionR op expr)
@@ -243,11 +289,12 @@ dsExpr (SectionR op expr)
     let
 	(x_ty:y_ty:_, _) = splitFunTys (coreExprType core_op)
     in
-    dsExpr expr				`thenDs` \ y_expr ->
-    dsExprToAtomGivenTy y_expr y_ty	$ \ y_atom ->
-
+    dsExpr expr				`thenDs` \ y_core ->
     newSysLocalDs x_ty			`thenDs` \ x_id ->
-    returnDs (mkValLam [x_id] (core_op `App` VarArg x_id `App` y_atom))
+    newSysLocalDs y_ty			`thenDs` \ y_id ->
+
+    returnDs (bindNonRec y_id y_core $
+	      Lam x_id (mkApps core_op [Var x_id, Var y_id]))
 
 dsExpr (CCall label args may_gc is_asm result_ty)
   = mapDs dsExpr args		`thenDs` \ core_args ->
@@ -259,17 +306,29 @@ dsExpr (HsSCC cc expr)
     getModuleAndGroupDs		`thenDs` \ (mod_name, group_name) ->
     returnDs (Note (SCC (mkUserCC cc mod_name group_name)) core_expr)
 
-dsExpr expr@(HsCase discrim matches src_loc)
+-- special case to handle unboxed tuple patterns
+
+dsExpr (HsCase discrim matches@[PatMatch (TuplePat ps boxed) (GRHSMatch rhs)]
+		src_loc)
+ | all var_pat ps 
+ =  putSrcLocDs src_loc $
+    dsExpr discrim				`thenDs` \ core_discrim ->
+    matchWrapper CaseMatch matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
+    case matching_code of
+	Case (Var x) bndr alts | x == discrim_var -> 
+		returnDs (Case core_discrim bndr alts)
+	_ -> panic ("dsExpr: tuple pattern:\n" ++ showSDoc (ppr matching_code))
+
+dsExpr (HsCase discrim matches src_loc)
   = putSrcLocDs src_loc $
     dsExpr discrim				`thenDs` \ core_discrim ->
     matchWrapper CaseMatch matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
-    returnDs ( mkCoLetAny (NonRec discrim_var core_discrim) matching_code )
+    returnDs (bindNonRec discrim_var core_discrim matching_code)
 
-dsExpr (HsLet binds expr)
-  = dsBinds False binds     `thenDs` \ core_binds ->
-    dsExpr expr		    `thenDs` \ core_expr ->
-    returnDs ( mkCoLetsAny core_binds core_expr )
-
+dsExpr (HsLet binds body)
+  = dsExpr body		`thenDs` \ body' ->
+    dsLet binds body'
+    
 dsExpr (HsDoOut do_or_lc stmts return_id then_id zero_id result_ty src_loc)
   | maybeToBool maybe_list_comp
   =	-- Special case for list comprehensions
@@ -297,7 +356,7 @@ dsExpr (HsIf guard_expr then_expr else_expr src_loc)
     dsExpr guard_expr	`thenDs` \ core_guard ->
     dsExpr then_expr	`thenDs` \ core_then ->
     dsExpr else_expr	`thenDs` \ core_else ->
-    returnDs (mkCoreIfThenElse core_guard core_then core_else)
+    returnDs (mkIfThenElse core_guard core_then core_else)
 \end{code}
 
 
@@ -306,11 +365,11 @@ Type lambda and application
 \begin{code}
 dsExpr (TyLam tyvars expr)
   = dsExpr expr `thenDs` \ core_expr ->
-    returnDs (mkTyLam tyvars core_expr)
+    returnDs (mkLams tyvars core_expr)
 
 dsExpr (TyApp expr tys)
   = dsExpr expr		`thenDs` \ core_expr ->
-    returnDs (mkTyApp core_expr tys)
+    returnDs (mkTyApps core_expr tys)
 \end{code}
 
 
@@ -322,20 +381,17 @@ dsExpr (ExplicitListOut ty xs)
   where
     list_ty   = mkListTy ty
 
-	-- xs can ocasaionlly be huge, so don't try to take
-	-- coreExprType of core_xs, as dsArgToAtom does
-	-- (that gives a quadratic algorithm)
-    go []     = returnDs (mk_nil_con ty)
+    go []     = returnDs (mkNilExpr ty)
     go (x:xs) = dsExpr x				`thenDs` \ core_x ->
-		dsExprToAtomGivenTy core_x ty		$ \ arg_x ->
 		go xs					`thenDs` \ core_xs ->
-		dsExprToAtomGivenTy core_xs list_ty	$ \ arg_xs ->
-		returnDs (Con consDataCon [TyArg ty, arg_x, arg_xs])
+		returnDs (mkConApp consDataCon [Type ty, core_x, core_xs])
 
-dsExpr (ExplicitTuple expr_list)
+dsExpr (ExplicitTuple expr_list boxed)
   = mapDs dsExpr expr_list	  `thenDs` \ core_exprs  ->
-    mkConDs (tupleCon (length expr_list))
-	    (map (TyArg . coreExprType) core_exprs ++ map VarArg core_exprs)
+    returnDs (mkConApp ((if boxed 
+			    then tupleCon 
+			    else unboxedTupleCon) (length expr_list))
+	    	(map (Type . coreExprType) core_exprs ++ core_exprs))
 
 dsExpr (HsCon con_id [ty] [arg])
   | isNewTyCon tycon
@@ -347,31 +403,31 @@ dsExpr (HsCon con_id [ty] [arg])
 
 dsExpr (HsCon con_id tys args)
   = mapDs dsExpr args	 	  `thenDs` \ args2  ->
-    mkConDs con_id (map TyArg tys ++ map VarArg args2)
+    returnDs (mkConApp con_id (map Type tys ++ args2))
 
 dsExpr (ArithSeqOut expr (From from))
   = dsExpr expr		  `thenDs` \ expr2 ->
     dsExpr from		  `thenDs` \ from2 ->
-    mkAppDs expr2 [VarArg from2]
+    returnDs (App expr2 from2)
 
 dsExpr (ArithSeqOut expr (FromTo from two))
   = dsExpr expr		  `thenDs` \ expr2 ->
     dsExpr from		  `thenDs` \ from2 ->
     dsExpr two		  `thenDs` \ two2 ->
-    mkAppDs expr2 [VarArg from2, VarArg two2]
+    returnDs (mkApps expr2 [from2, two2])
 
 dsExpr (ArithSeqOut expr (FromThen from thn))
   = dsExpr expr		  `thenDs` \ expr2 ->
     dsExpr from		  `thenDs` \ from2 ->
     dsExpr thn		  `thenDs` \ thn2 ->
-    mkAppDs expr2 [VarArg from2, VarArg thn2]
+    returnDs (mkApps expr2 [from2, thn2])
 
 dsExpr (ArithSeqOut expr (FromThenTo from thn two))
   = dsExpr expr		  `thenDs` \ expr2 ->
     dsExpr from		  `thenDs` \ from2 ->
     dsExpr thn		  `thenDs` \ thn2 ->
     dsExpr two		  `thenDs` \ two2 ->
-    mkAppDs expr2 [VarArg from2, VarArg thn2, VarArg two2]
+    returnDs (mkApps expr2 [from2, thn2, two2])
 \end{code}
 
 Record construction and update
@@ -392,7 +448,7 @@ before printing it as
 
 
 \begin{code}
-dsExpr (RecordCon con_id con_expr rbinds)
+dsExpr (RecordConOut data_con con_expr rbinds)
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
 	(arg_tys, _) = splitFunTys (coreExprType con_expr')
@@ -402,10 +458,10 @@ dsExpr (RecordCon con_id con_expr rbinds)
 			lbl == recordSelectorFieldLabel sel_id] of
 	      (rhs:rhss) -> ASSERT( null rhss )
 		 	    dsExpr rhs
-	      []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showForErr lbl)
+	      []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showSDoc (ppr lbl))
     in
-    mapDs mk_arg (zipEqual "dsExpr:RecordCon" arg_tys (dataConFieldLabels con_id)) `thenDs` \ con_args ->
-    mkAppDs con_expr' (map VarArg con_args)
+    mapDs mk_arg (zipEqual "dsExpr:RecordCon" arg_tys (dataConFieldLabels data_con)) `thenDs` \ con_args ->
+    returnDs (mkApps con_expr' con_args)
 \end{code}
 
 Record update is a little harder. Suppose we have the decl:
@@ -431,11 +487,17 @@ dictionaries.
 
 \begin{code}
 dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
-  = dsExpr record_expr	 `thenDs` \ record_expr' ->
+  = dsExpr record_expr	 	`thenDs` \ record_expr' ->
 
 	-- Desugar the rbinds, and generate let-bindings if
 	-- necessary so that we don't lose sharing
-    dsRbinds rbinds		$ \ rbinds' ->
+
+    let
+	ds_rbind (sel_id, rhs, pun_flag)
+	  = dsExpr rhs		 		`thenDs` \ rhs' ->
+	    returnDs (recordSelectorFieldLabel sel_id, rhs')
+    in
+    mapDs ds_rbind rbinds			`thenDs` \ rbinds' ->
     let
 	record_in_ty		   = coreExprType record_expr'
 	(tycon, in_inst_tys, cons) = splitAlgTyConApp record_in_ty
@@ -443,37 +505,39 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 	cons_to_upd  	 	   = filter has_all_fields cons
 
 	-- initial_args are passed to every constructor
-	initial_args		= map TyArg out_inst_tys ++ map VarArg dicts
+	initial_args		= map Type out_inst_tys ++ map Var dicts
 		
-	mk_val_arg (field, arg_id) 
-	  = case [arg | (f, arg) <- rbinds',
-			field == recordSelectorFieldLabel f] of
-	      (arg:args) -> ASSERT(null args)
-			    arg
-	      []	 -> VarArg arg_id
+	mk_val_arg field old_arg_id 
+	  = case [rhs | (f, rhs) <- rbinds', field == f] of
+	      (rhs:rest) -> ASSERT(null rest) rhs
+	      []	 -> Var old_arg_id
 
 	mk_alt con
 	  = newSysLocalsDs (dataConArgTys con in_inst_tys)	`thenDs` \ arg_ids ->
 	    let 
-		val_args = map mk_val_arg (zipEqual "dsExpr:RecordUpd" (dataConFieldLabels con) arg_ids)
+		val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
+					(dataConFieldLabels con) arg_ids
+		rhs = mkApps (mkApps (Var (dataConId con)) initial_args) val_args
 	    in
-	    returnDs (con, arg_ids, mkGenApp (mkGenApp (Var con) initial_args) val_args)
+	    returnDs (DataCon con, arg_ids, rhs)
 
 	mk_default
 	  | length cons_to_upd == length cons 
-	  = returnDs NoDefault
+	  = returnDs []
 	  | otherwise			    
-	  = newSysLocalDs record_in_ty				`thenDs` \ deflt_id ->
-	    mkErrorAppDs rEC_UPD_ERROR_ID record_out_ty ""	`thenDs` \ err ->
-	    returnDs (BindDefault deflt_id err)
+	  = mkErrorAppDs rEC_UPD_ERROR_ID record_out_ty ""	`thenDs` \ err ->
+	    returnDs [(DEFAULT, [], err)]
     in
+	-- Record stuff doesn't work for existentials
+    ASSERT( all (not . isExistentialDataCon) cons )
+
+    newSysLocalDs record_in_ty	`thenDs` \ case_bndr ->
     mapDs mk_alt cons_to_upd	`thenDs` \ alts ->
     mk_default			`thenDs` \ deflt ->
 
-    returnDs (Case record_expr' (AlgAlts alts deflt))
-
+    returnDs (Case record_expr' case_bndr (alts ++ deflt))
   where
-    has_all_fields :: Id -> Bool
+    has_all_fields :: DataCon -> Bool
     has_all_fields con_id 
       = all ok rbinds
       where
@@ -489,14 +553,13 @@ complicated; reminiscent of fully-applied constructors.
 \begin{code}
 dsExpr (DictLam dictvars expr)
   = dsExpr expr `thenDs` \ core_expr ->
-    returnDs (mkValLam dictvars core_expr)
+    returnDs (mkLams dictvars core_expr)
 
 ------------------
 
 dsExpr (DictApp expr dicts)	-- becomes a curried application
-  = mapDs lookupEnvDs dicts	`thenDs` \ core_dicts ->
-    dsExpr expr			`thenDs` \ core_expr ->
-    returnDs (foldl (\f d -> f `App` (VarArg d)) core_expr core_dicts)
+  = dsExpr expr			`thenDs` \ core_expr ->
+    returnDs (foldl (\f d -> f `App` (Var d)) core_expr dicts)
 \end{code}
 
 \begin{code}
@@ -514,35 +577,12 @@ out_of_range_msg			   -- ditto
   = " out of range: [" ++ show minInt ++ ", " ++ show maxInt ++ "]\n"
 \end{code}
 
-
 %--------------------------------------------------------------------
 
-\begin{code}
-dsId v
-  = lookupEnvDs v	`thenDs` \ v' ->
-    returnDs (Var v')
-\end{code}
-
-\begin{code}
-dsRbinds :: TypecheckedRecordBinds		-- The field bindings supplied
-	 -> ([(Id, CoreArg)] -> DsM CoreExpr)	-- A continuation taking the field
-	  					-- bindings with atomic rhss
-	 -> DsM CoreExpr			-- The result of the continuation,
-						-- wrapped in suitable Lets
-
-dsRbinds [] continue_with 
-  = continue_with []
-
-dsRbinds ((sel_id, rhs, pun_flag) : rbinds) continue_with
-  = dsExpr rhs		 				`thenDs` \ rhs' ->
-    dsExprToAtomGivenTy rhs' (coreExprType rhs')	$ \ rhs_atom ->
-    dsRbinds rbinds					$ \ rbinds' ->
-    continue_with ((sel_id, rhs_atom) : rbinds')
-\end{code}	
-
 Basically does the translation given in the Haskell~1.3 report:
+
 \begin{code}
-dsDo	:: DoOrListComp
+dsDo	:: StmtCtxt
 	-> [TypecheckedStmt]
 	-> Id		-- id for: return m
 	-> Id		-- id for: (>>=) m
@@ -551,21 +591,17 @@ dsDo	:: DoOrListComp
 	-> DsM CoreExpr
 
 dsDo do_or_lc stmts return_id then_id zero_id result_ty
-  = dsId return_id	`thenDs` \ return_ds -> 
-    dsId then_id	`thenDs` \ then_ds -> 
-    dsId zero_id	`thenDs` \ zero_ds -> 
-    let
+  = let
 	(_, b_ty) = splitAppTy result_ty	-- result_ty must be of the form (m b)
 	
 	go [ReturnStmt expr] 
 	  = dsExpr expr			`thenDs` \ expr2 ->
-	    mkAppDs return_ds [TyArg b_ty, VarArg expr2]
+	    returnDs (mkApps (Var return_id) [Type b_ty, expr2])
     
 	go (GuardStmt expr locn : stmts)
 	  = do_expr expr locn			`thenDs` \ expr2 ->
 	    go stmts				`thenDs` \ rest ->
-	    mkAppDs zero_ds [TyArg b_ty]	`thenDs` \ zero_expr ->
-	    returnDs (mkCoreIfThenElse expr2 rest zero_expr)
+	    returnDs (mkIfThenElse expr2 rest (App (Var zero_id) (Type b_ty)))
     
 	go (ExprStmt expr locn : stmts)
 	  = do_expr expr locn		`thenDs` \ expr2 ->
@@ -577,14 +613,13 @@ dsDo do_or_lc stmts return_id then_id zero_id result_ty
 	    else
 		go stmts     		`thenDs` \ rest  ->
 		newSysLocalDs a_ty		`thenDs` \ ignored_result_id ->
-		mkAppDs then_ds [TyArg a_ty, TyArg b_ty, VarArg expr2, 
-				   VarArg (mkValLam [ignored_result_id] rest)]
+		returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2, 
+					        Lam ignored_result_id rest])
     
 	go (LetStmt binds : stmts )
-	  = dsBinds False binds   `thenDs` \ binds2 ->
-	    go stmts 		  `thenDs` \ rest   ->
-	    returnDs (mkCoLetsAny binds2 rest)
-    
+	  = go stmts 		`thenDs` \ rest   ->
+	    dsLet binds	rest
+	    
 	go (BindStmt pat expr locn : stmts)
 	  = putSrcLocDs locn $
 	    dsExpr expr 	   `thenDs` \ expr2 ->
@@ -593,18 +628,15 @@ dsDo do_or_lc stmts return_id then_id zero_id result_ty
 		zero_expr  = TyApp (HsVar zero_id) [b_ty]
 		main_match = PatMatch pat (SimpleMatch (
 			     HsDoOut do_or_lc stmts return_id then_id zero_id result_ty locn))
-
 		the_matches
-		  | failureFreePat pat = [main_match]
-		  | otherwise	       = 
-			[ main_match
-		        , PatMatch (WildPat a_ty) (SimpleMatch zero_expr)
-			]
+		  = if failureFreePat pat
+		    then [main_match]
+		    else [main_match, PatMatch (WildPat a_ty) (SimpleMatch zero_expr)]
 	    in
 	    matchWrapper DoBindMatch the_matches match_msg
 				`thenDs` \ (binders, matching_code) ->
-	    mkAppDs then_ds [TyArg a_ty, TyArg b_ty,
-			     VarArg expr2, VarArg (mkValLam binders matching_code)]
+	    returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2,
+				            mkLams binders matching_code])
     in
     go stmts
 
@@ -615,3 +647,10 @@ dsDo do_or_lc stmts return_id then_id zero_id result_ty
 			DoStmt   -> "`do' statement"
 			ListComp -> "comprehension"
 \end{code}
+
+\begin{code}
+var_pat (WildPat _) = True
+var_pat (VarPat _) = True
+var_pat _ = False
+\end{code}
+

@@ -1,0 +1,5 @@
+Hugs:Hugs:Reading file "DictHW.hs":
+ERROR "DictHW.hs" (line 4): Int is not an instance of class "Fractional"
+Hugs:Hugs:Reading file "DictHW.hs":
+Hugs:"(1, 1, 1)"
+Hugs:[Leaving Hugs]

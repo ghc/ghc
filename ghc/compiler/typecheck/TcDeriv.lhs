@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcDeriv]{Deriving}
 
@@ -16,26 +16,26 @@ import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
 
 import TcMonad
 import Inst		( InstanceMapper )
-import TcEnv		( getEnv_TyCons, tcLookupClassByKey )
-import TcKind		( TcKind )
+import TcEnv		( getEnv_TyCons )
 import TcGenDeriv	-- Deriv stuff
-import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
+import TcInstUtil	( InstInfo(..), buildInstanceEnvs )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( newDfunName, bindLocatedLocalsRn )
-import RnMonad		( RnM, RnDown, SDown, RnNameSupply, 
+import RnMonad		( RnNameSupply, 
 			  renameSourceCode, thenRn, mapRn, returnRn )
 
 import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
 import ErrUtils		( ErrMsg )
 import MkId		( mkDictFunId )
-import Id		( dataConArgTys, isNullaryDataCon )
+import Id		( mkVanillaId )
+import DataCon		( dataConArgTys, isNullaryDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
-import Name		( isLocallyDefined, getSrcLoc, Provenance, 
-			  Name{--O only-}, Module, NamedThing(..),
+import Name		( isLocallyDefined, getSrcLoc,
+			  Name, Module, NamedThing(..),
 			  OccName, nameOccName
 			)
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
@@ -47,8 +47,8 @@ import Type		( GenType(..), TauType, mkTyVarTys, mkTyConApp,
 			  mkSigmaTy, mkDictTy, isUnboxedType,
 			  splitAlgTyConApp
 			)
-import TysPrim		( voidTy )
-import TyVar		( GenTyVar, TyVar )
+import TysWiredIn	( voidTy )
+import Var		( TyVar )
 import Unique		-- Keys stuff
 import Bag		( bagToList )
 import Util		( zipWithEqual, sortLt, removeDups,  assoc, thenCmp )
@@ -252,7 +252,7 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
     ddump_deriving inst_infos extra_binds
       = vcat ((map pp_info inst_infos) ++ [ppr extra_binds])
       where
-	pp_info (InstInfo clas tvs [ty] inst_decl_theta _ _ mbinds _ _)
+	pp_info (InstInfo clas tvs [ty] inst_decl_theta _ mbinds _ _)
 	  = ($$) (ppr (mkSigmaTy tvs inst_decl_theta (mkDictTy clas [ty])))
 		    (ppr mbinds)
 \end{code}
@@ -287,37 +287,23 @@ makeDerivEqns
     let
 	local_data_tycons = filter (\tc -> isLocallyDefined tc && isAlgTyCon tc)
 				   (getEnv_TyCons env)
-    in
-    if null local_data_tycons then
-	-- Bale out now; evalClass may not be loaded if there aren't any
-	returnTc []
-    else
-    tcLookupClassByKey evalClassKey `thenNF_Tc` \ eval_clas ->
-    let
-	think_about_deriving = need_deriving eval_clas local_data_tycons
+
+	think_about_deriving = need_deriving local_data_tycons
 	(derive_these, _)    = removeDups cmp_deriv think_about_deriving
 	eqns		     = map mk_eqn derive_these
     in
+    if null local_data_tycons then
+	returnTc []	-- Bale out now
+    else
     mapTc chk_out think_about_deriving `thenTc_`
     returnTc eqns
   where
     ------------------------------------------------------------------
-    need_deriving :: Class -> [TyCon] -> [(Class, TyCon)]
+    need_deriving :: [TyCon] -> [(Class, TyCon)]
 	-- find the tycons that have `deriving' clauses;
-	-- we handle the "every datatype in Eval" by
-	-- doing a dummy "deriving" for it.
 
-    need_deriving eval_clas tycons_to_consider
-      = foldr ( \ tycon acc ->
-		   let
-			acc_plus = if isLocallyDefined tycon
-				   then (eval_clas, tycon) : acc
-				   else acc
-		   in
-		   case (tyConDerivings tycon) of
-		     [] -> acc_plus
-		     cs -> [ (clas,tycon) | clas <- cs ] ++ acc_plus
-	      )
+    need_deriving tycons_to_consider
+      = foldr (\ tycon acc -> [(clas,tycon) | clas <- tyConDerivings tycon] ++ acc)
 	      []
 	      tycons_to_consider
 
@@ -360,14 +346,12 @@ makeDerivEqns
 	-- to make the rest of the equation
 
     mk_eqn (clas, tycon)
-      = (clas, tycon, tyvars, if_not_Eval constraints)
+      = (clas, tycon, tyvars, constraints)
       where
 	clas_key  = classKey clas
 	tyvars    = tyConTyVars tycon	-- ToDo: Do we need new tyvars ???
 	tyvar_tys = mkTyVarTys tyvars
 	data_cons = tyConDataCons tycon
-
-	if_not_Eval cs = if clas_key == evalClassKey then [] else cs
 
 	constraints = extra_constraints ++ concat (map mk_constraints data_cons)
 
@@ -482,18 +466,13 @@ add_solns inst_infos_in eqns solns
     mk_deriv_inst_info (clas, tycon, tyvars, _) theta
       = InstInfo clas tyvars [mkTyConApp tycon (mkTyVarTys tyvars)]
 		 theta
-		 (my_panic "dfun_theta")
-
 		 dummy_dfun_id
-
 		 (my_panic "binds") (getSrcLoc tycon)
 		 (my_panic "upragmas")
       where
 	dummy_dfun_id
-	  = mkDictFunId (getName tycon) dummy_dfun_ty bottom bottom
+	  = mkVanillaId (getName tycon) dummy_dfun_ty
 		-- The name is getSrcLoc'd in an error message 
-	  where
-	    bottom = panic "dummy_dfun_id"
 
 	dummy_dfun_ty = mkSigmaTy tyvars theta voidTy
 		-- All we need from the dfun is its "theta" part, used during
@@ -577,7 +556,7 @@ the renamer.  What a great hack!
 -- (paired with class name, as we need that when generating dict
 --  names.)
 gen_bind :: InstInfo -> ({-class-}OccName, {-tyCon-}OccName, RdrNameMonoBinds)
-gen_bind (InstInfo clas _ [ty] _ _ _ _ _ _)
+gen_bind (InstInfo clas _ [ty] _ _ _ _ _)
   | not from_here 
   = (clas_nm, tycon_nm, EmptyMonoBinds)
   | otherwise
@@ -586,7 +565,6 @@ gen_bind (InstInfo clas _ [ty] _ _ _ _ _ _)
 	   [(eqClassKey,      gen_Eq_binds)
 	   ,(ordClassKey,     gen_Ord_binds)
 	   ,(enumClassKey,    gen_Enum_binds)
-	   ,(evalClassKey,    gen_Eval_binds)
 	   ,(boundedClassKey, gen_Bounded_binds)
 	   ,(showClassKey,    gen_Show_binds)
 	   ,(readClassKey,    gen_Read_binds)
@@ -606,18 +584,15 @@ gen_inst_info :: Module					-- Module name
 	      -> InstInfo				-- the gen'd (filled-in) "instance decl"
 
 gen_inst_info modname
-    (InstInfo clas tyvars tys@(ty:_) inst_decl_theta _ _ _ locn _, (dfun_name, meth_binds))
+    (InstInfo clas tyvars tys@(ty:_) inst_decl_theta _ _ locn _, (dfun_name, meth_binds))
   =
 	-- Generate the various instance-related Ids
     InstInfo clas tyvars tys inst_decl_theta
-	       dfun_theta dfun_id
+	       dfun_id
 	       meth_binds
 	       locn []
   where
-   (dfun_id, dfun_theta) = mkInstanceRelatedIds
-					dfun_name
-					clas tyvars tys
-					inst_decl_theta
+   dfun_id = mkDictFunId dfun_name clas tyvars tys inst_decl_theta
 
    from_here = isLocallyDefined tycon
    (tycon,_,_) = splitAlgTyConApp ty
@@ -667,7 +642,7 @@ gen_taggery_Names inst_infos
     foldlTc do_con2tag []           tycons_of_interest `thenTc` \ names_so_far ->
     foldlTc do_tag2con names_so_far tycons_of_interest
   where
-    all_CTs = [ (c, get_tycon ty) | (InstInfo c _ [ty] _ _ _ _ _ _) <- inst_infos ]
+    all_CTs = [ (c, get_tycon ty) | (InstInfo c _ [ty] _ _ _ _ _) <- inst_infos ]
 		    
     get_tycon ty = case splitAlgTyConApp ty of { (tc, _, _) -> tc }
 

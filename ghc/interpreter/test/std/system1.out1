@@ -1,0 +1,9 @@
+Reading file "System.lhs":
+Reading file "test/std/system1.hs":
+Type :? for help
+Hugs:ExitSuccess
+Hugs:ExitFailure 1
+Hugs:ExitFailure 2
+Hugs:[]
+Hugs:"Hugs"
+Hugs:getEnv "SHELL" returns known shell

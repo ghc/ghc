@@ -23,7 +23,7 @@ endif
 #
 
 LIBRARY = libHS$(_way).a
-HS_SRCS	= $(wildcard *.lhs)
+HS_SRCS = $(wildcard *.lhs)
 HS_OBJS = $(HS_SRCS:.lhs=.$(way_)o)
 LIBOBJS = $(HS_OBJS)
 HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) PrelGHC.$(way_)hi
@@ -47,20 +47,21 @@ SRC_HC_OPTS += -hisuf $(way_)hi
 endif
 
 # per-module flags
-PrelArr_HC_OPTS     += -monly-2-regs
-Directory_HC_OPTS   += -monly-3-regs 
-Time_HC_OPTS        += -monly-3-regs -H16m
+PrelArrExtra_HC_OPTS     += -monly-2-regs
+Directory_HC_OPTS   	 += -monly-3-regs 
+Time_HC_OPTS        	 += -monly-3-regs
 
-# Far too much heap is needed to compile PrelNum with -O at the
+# Far too much heap is needed to compile PrelNumExtra with -O at the
 # moment, but there you go..
-PrelNum_HC_OPTS     += -H30m
+PrelNumExtra_HC_OPTS     += -H30m -K2m
 
-PrelBase_HC_OPTS         += -H12m
-PrelRead_HC_OPTS         += -H13m
+PrelBase_HC_OPTS         += -H10m
+PrelRead_HC_OPTS         += -H16m
 PrelTup_HC_OPTS          += -H12m
+PrelNum_HC_OPTS		 += -H12m
 PrelArr_HC_OPTS          += -H8m
-PrelHandle_HC_OPTS       += -H12m
-Time_HC_OPTS             += -H8m
+PrelHandle_HC_OPTS       += -H14m
+Time_HC_OPTS             += -H18m
 Complex_HC_OPTS          += -H10m
 IO_HC_OPTS	         += -H12m
 PrelMain_HC_OPTS	 += -fno-prune-tydecls # avoids an apparent bug; ToDo
@@ -96,8 +97,3 @@ INSTALL_LIBS  += $(LIBRARY)
 INSTALL_DATAS += $(HS_IFACES)
 
 include $(TOP)/mk/target.mk
-
-glaExts/PackedString_HC_OPTS += -monly-3-regs
-concurrent/Parallel_HC_OPTS  += -fglasgow-exts
-glaExts/Int_HC_OPTS          += -H8m
-glaExts/Word_HC_OPTS         += -H8m

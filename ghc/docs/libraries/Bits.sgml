@@ -1,0 +1,59 @@
+<sect> <idx/Bits/
+<label id="sec:Bits">
+<p>
+
+This library defines bitwise operations for signed and unsigned ints.
+
+<tscreen><verb>
+module Bits where
+infixl 8 `shift`, `rotate`
+infixl 7 .&.
+infixl 6 `xor`
+infixl 5 .|.
+
+class Bits a where
+  (.&.), (.|.), xor :: a -> a -> a
+  complement        :: a -> a
+  shift             :: a -> Int -> a
+  rotate            :: a -> Int -> a
+  bit               :: Int -> a        
+  setBit            :: a -> Int -> a   
+  clearBit          :: a -> Int -> a   
+  complementBit     :: a -> Int -> a   
+  testBit           :: a -> Int -> Bool
+  bitSize           :: a -> Int
+  isSigned          :: a -> Bool
+
+shiftL, shiftR   :: Bits a => a -> Int -> a
+rotateL, rotateR :: Bits a => a -> Int -> a
+shiftL  a i = shift  a i
+shiftR  a i = shift  a (-i)
+rotateL a i = rotate a i
+rotateR a i = rotate a (-i)
+</verb></tscreen>
+
+Notes:
+<itemize>
+<item>
+  <tt/bitSize/ and <tt/isSigned/ are like <tt/floatRadix/ and
+  <tt/floatDigits/ -- they return parameters of the <em/type/ of their
+  argument rather than of the particular argument they are applied to.
+  <tt/bitSize/ returns the number of bits in the type; and
+  <tt/isSigned/ returns whether the type is signed or not.
+<item>
+  <tt/shift/ performs sign extension on signed number types.
+  That is, right shifts fill the top bits with 1 if the number is negative
+  and with 0 otherwise.
+<item>
+  Bits are numbered from 0 with bit 0 being the least significant bit.
+<item>
+  <tt/shift x i/ and <tt/rotate x i/ shift to the left if <tt/i/ is
+  positive and to the right otherwise.  
+<!--
+  <item>
+    <tt/rotate/ is well defined only if bitSize returns a number.
+    (Maybe we should impose a Bounded constraint on it?)
+  -->
+<item>
+  <tt/bit i/ is the value with the i'th bit set.
+</itemize>

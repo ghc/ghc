@@ -1,7 +1,19 @@
+/* 
+ * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
+ *
+ * $Id: timezone.h,v 1.3 1998/12/02 13:28:01 simonm Exp $
+ *
+ * Time-zone support header
+ */
+
 #ifndef TIMEZONE_H
 #define TIMEZONE_H
 
 #define _OSF_SOURCE
+
+#if HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
 
 #if linux_TARGET_OS
 /* Sigh, RedHat 5 has the TM_ZONE stuff, but only when _BSD_SOURCE is
@@ -34,10 +46,9 @@
 #else /* ! HAVE_TM_ZONE */
 # if HAVE_TZNAME || cygwin32_TARGET_OS
 #if cygwin32_TARGET_OS
-extern char *tzname;
-#else
-extern char *tzname[2];
+#define tzname _tzname
 #endif
+extern char *tzname[2];
 #  define ZONE(x)	 (((struct tm *)x)->tm_isdst ? tzname[1] : tzname[0])
 #  define SETZONE(x,z)
 # else /* ! HAVE_TZNAME */

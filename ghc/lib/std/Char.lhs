@@ -27,7 +27,7 @@ module Char
 
 import PrelBase
 import PrelRead (readLitChar)
-import PrelErr   ( error )
+import {-# SOURCE #-} PrelErr   ( error )
 
 \end{code}
 

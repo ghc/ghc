@@ -1,0 +1,1 @@
+ERROR "test/static/s009.hs": Explicit constructor list given for type synonym "T" in export list of module "M"

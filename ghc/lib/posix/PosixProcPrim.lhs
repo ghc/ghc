@@ -358,9 +358,7 @@ fullSignalSet = unsafePerformPrimIO $ do
 addSignal :: Signal -> SignalSet -> SignalSet
 addSignal int oldset = unsafePerformPrimIO $ do
     bytes <- allocChars sigSetSize
-    _casm_ ``*(sigset_t *)%0 = *(sigset_t *)%1;
-	     (void) sigaddset((sigset_t *)%0, %2);''
-	bytes oldset int
+    _ccall_ stg_sigaddset bytes oldset int
     freeze bytes
 
 inSignalSet :: Signal -> SignalSet -> Bool
@@ -371,9 +369,7 @@ inSignalSet int sigset = unsafePerformPrimIO $ do
 deleteSignal :: Signal -> SignalSet -> SignalSet
 deleteSignal int oldset = unsafePerformPrimIO $ do
     bytes <- allocChars sigSetSize
-    _casm_ ``*(sigset_t *)%0 = *(sigset_t *)%1;
-	     (void) sigdelset((sigset_t *)%0, %2);''
-           bytes oldset int
+    _ccall_ stg_sigdelset bytes oldset int
     freeze bytes
 
 installHandler :: Signal

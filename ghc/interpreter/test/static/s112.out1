@@ -1,0 +1,2 @@
+ERROR "test/static/s112.hs" (line 5): Constructor "T1" does not have selected fields in T1{y = b, z = c}
+

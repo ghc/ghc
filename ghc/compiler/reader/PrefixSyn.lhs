@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[PrefixSyn]{``Prefix-form'' syntax}
 
@@ -23,9 +23,7 @@ module PrefixSyn (
 
 import HsSyn
 import RdrHsSyn
-import BasicTypes	( IfaceFlavour )
 import Util		( panic )
-import SrcLoc           ( SrcLoc )
 import Char		( isDigit, ord )
 
 

@@ -1,0 +1,49 @@
+Hugs:"abcd"
+Hugs:[]
+Hugs:"abcd\NULefgh\NUL"
+Hugs:"abc" ++ {error "def"}
+Hugs:"abc" ++ [{error "def"}, 'h', 'i', 'j']
+Hugs:"abc" ++ {error "foo"}
+Hugs:"abc" ++ [{error "foo"}]
+Hugs:"\"" ++ {error "foo"}
+Hugs:"abcd"
+Hugs:{error "foo"}
+Hugs:{error (error "foo")}
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:()
+Hugs:{error "foo"}
+Hugs:10
+Hugs:-10
+Hugs:{error "foo"}
+Hugs:{error "foo"}
+Hugs:10
+Hugs:10
+Hugs:10.0
+Hugs:-10.0
+Hugs:10.0
+Hugs:-10.0
+Hugs:'a'
+Hugs:'\NUL'
+Hugs:'\DEL'
+Hugs:[]
+Hugs:[1]
+Hugs:True
+Hugs:False
+Hugs:('a','b')
+Hugs:('a','b','c')
+Hugs:(1,{error "foo"},3)
+Hugs:R 1
+Hugs:L 'a'
+Hugs:J True
+Hugs:N
+Hugs:[Leaving Hugs]

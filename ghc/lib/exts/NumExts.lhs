@@ -6,26 +6,50 @@
 
 \begin{code}
 module NumExts
+
        (
          doubleToFloat   -- :: Double -> Float
        , floatToDouble   -- :: Double -> Float
        , showHex         -- :: Integral a => a -> ShowS
        , showOct         -- :: Integral a => a -> ShowS
-       , showIntAtBase   -- :: Integral a => a -> (a -> Char) -> a -> ShowS
        ) where
 
 import Char (ord, chr)
+#ifdef __HUGS__
+import PreludeBuiltin
+ord_0 = ord '0'
+#else
 import PrelBase (ord_0)
 import GlaExts
+#endif
 \end{code}
 
 \begin{code}
 doubleToFloat :: Double -> Float
-doubleToFloat (D# d#) = F# (double2Float# d#)
-
 floatToDouble :: Float -> Double
-floatToDouble (F# f#) = D# (float2Double# f#)
 
+#ifdef __HUGS__
+doubleToFloat = primDoubleToFloat
+floatToDouble = primFloatToDouble
+#else
+doubleToFloat (D# d#) = F# (double2Float# d#)
+floatToDouble (F# f#) = D# (float2Double# f#)
+#endif
+
+#ifdef __HUGS__
+showIntAtBase :: Integral a => a -> (a -> Char) -> a -> ShowS
+showIntAtBase base toChr n r
+  | n < 0  = error ("NumExts.showIntAtBase: applied to negative number " ++ show n)
+  | otherwise = 
+    case quotRem n base of { (n', d) ->
+    let c = toChr d in
+    seq c $ -- stricter than necessary
+    let
+	r' = c : r
+    in
+    if n' == 0 then r' else showIntAtBase base toChr n' r'
+    }
+#else
 showIntAtBase :: Integral a => a -> (a -> Char) -> a -> ShowS
 showIntAtBase base toChr n r
   | n < 0  = error ("NumExts.showIntAtBase: applied to negative number " ++ show n)
@@ -37,6 +61,7 @@ showIntAtBase base toChr n r
     in
     if n' == 0 then r' else showIntAtBase base toChr n' r'
     }}
+#endif
 
 showHex :: Integral a => a -> ShowS
 showHex n r = 

@@ -1,17 +1,16 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[DsCCall]{Desugaring \tr{_ccall_}s and \tr{_casm_}s}
 
 \begin{code}
 module DsCCall 
-	( 
-	   dsCCall 
-	,  getIoOkDataCon
-	,  unboxArg
-	,  boxResult
+	( dsCCall
+	, unboxArg
+	, boxResult
 	,  wrapUnboxedValue
-	,  can'tSeeDataConsPanic
+	, can'tSeeDataConsPanic
+	
 	) where
 
 #include "HsVersions.h"
@@ -23,21 +22,21 @@ import DsUtils
 
 import TcHsSyn		( maybeBoxedPrimType )
 import CoreUtils	( coreExprType )
-import Id		( Id, dataConArgTys, idType )
+import Id		( Id, mkWildId )
+import Const		( Con(..) )
 import Maybes		( maybeToBool )
-import PrelVals		( packStringForCId )
+import PrelInfo		( packStringForCId )
 import PrimOp		( PrimOp(..) )
+import DataCon		( DataCon, dataConId, dataConArgTys )
 import CallConv
-import Type		( isUnpointedType, splitAlgTyConApp_maybe, 
-			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
-			  Type
+import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
+			  splitTyConApp_maybe, Type
 			)
-import TyCon		( tyConDataCons )
 import TysPrim		( byteArrayPrimTy, realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
-import TysWiredIn	( getStatePairingConInfo,
-			  unitDataCon, stringTy,
-			  realWorldStateTy, stateDataCon
+import TysWiredIn	( unitDataCon, stringTy,
+			  mkUnboxedTupleTy, unboxedPairDataCon,
+			  mkUnboxedTupleTy, unboxedTupleCon
 			)
 import Outputable
 \end{code}
@@ -85,27 +84,26 @@ dsCCall :: FAST_STRING	-- C routine to invoke
 	-> Type		-- Type of the result (a boxed-prim IO type)
 	-> DsM CoreExpr
 
-dsCCall label args may_gc is_asm io_result_ty
+dsCCall label args may_gc is_asm result_ty
   = newSysLocalDs realWorldStatePrimTy	`thenDs` \ old_s ->
 
     mapAndUnzipDs unboxArg args	`thenDs` \ (unboxed_args, arg_wrappers) ->
-    let
-	 final_args = Var old_s : unboxed_args
-	 (ioOkDataCon, _, result_ty) = getIoOkDataCon io_result_ty
-    in
-
-    boxResult ioOkDataCon result_ty `thenDs` \ (final_result_ty, res_wrapper) ->
+    boxResult result_ty		`thenDs` \ (final_result_ty, res_wrapper) ->
 
     let
+	val_args   = Var old_s : unboxed_args
+	final_args = Type inst_ty : val_args
+
+	-- A CCallOp has type (forall a. a), so we must instantiate
+	-- it at the full type, including the state argument
+	inst_ty = mkFunTys (map coreExprType val_args) final_result_ty
+
 	the_ccall_op = CCallOp (Left label) is_asm may_gc cCallConv
-			       (map coreExprType final_args)
-			       final_result_ty
-    in
-    mkPrimDs the_ccall_op (map VarArg final_args) `thenDs` \ the_prim_app ->
-    let
+ 	the_prim_app = mkPrimApp the_ccall_op final_args
+
 	the_body = foldr ($) (res_wrapper the_prim_app) arg_wrappers
     in
-    returnDs (Lam (ValBinder old_s) the_body)
+    returnDs (Lam old_s the_body)
 \end{code}
 
 \begin{code}
@@ -125,17 +123,16 @@ unboxArg arg
   --  which generates the boiler-plate box-unbox code for you, i.e., it may help
   --  us nuke this very module :-)
   --
-  | isUnpointedType arg_ty
+  | isUnLiftedType arg_ty
   = returnDs (arg, \body -> body)
 
   -- Strings
   | arg_ty == stringTy
+  -- ToDo (ADR): - allow synonyms of Strings too?
   = newSysLocalDs byteArrayPrimTy		`thenDs` \ prim_arg ->
-    mkAppDs (Var packStringForCId) [VarArg arg]	`thenDs` \ pack_appn ->
     returnDs (Var prim_arg,
-	      \body -> Case pack_appn (PrimAlts []
-						    (BindDefault prim_arg body))
-    )
+	      \body -> Case (App (Var packStringForCId) arg) 
+			    prim_arg [(DEFAULT,[],body)])
 
   | null data_cons
     -- oops: we can't see the data constructors!!!
@@ -148,18 +145,18 @@ unboxArg arg
     (arg2_tycon ==  byteArrayPrimTyCon ||
      arg2_tycon ==  mutableByteArrayPrimTyCon)
     -- and, of course, it is an instance of CCallable
-  = newSysLocalsDs data_con_arg_tys		`thenDs` \ vars@[ixs_var, arr_cts_var] ->
+  = newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
+    newSysLocalsDs data_con_arg_tys	`thenDs` \ vars@[ixs_var, arr_cts_var] ->
     returnDs (Var arr_cts_var,
-	      \ body -> Case arg (AlgAlts [(the_data_con,vars,body)]
-					      NoDefault)
+	      \ body -> Case arg case_bndr [(DataCon the_data_con,vars,body)]
     )
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
   | maybeToBool maybe_boxed_prim_arg_ty
-  = newSysLocalDs the_prim_arg_ty		`thenDs` \ prim_arg ->
+  = newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
+    newSysLocalDs the_prim_arg_ty	`thenDs` \ prim_arg ->
     returnDs (Var prim_arg,
-	      \ body -> Case arg (AlgAlts [(box_data_con,[prim_arg],body)]
-					      NoDefault)
+	      \ body -> Case arg case_bndr [(DataCon box_data_con,[prim_arg],body)]
     )
 
   | otherwise
@@ -185,38 +182,19 @@ unboxArg arg
 can'tSeeDataConsPanic thing ty
   = pprPanic "ERROR: Can't see the data constructor(s) for _ccall_/_casm_/foreign declaration"
 	     (hcat [text thing, text "; type: ", ppr ty, text "(try compiling with -fno-prune-tydecls ..)\n"])
+
 \end{code}
 
 
 \begin{code}
-boxResult :: Id				-- IOok constructor
-	  -> Type			-- Type of desired result
+boxResult :: Type			-- Type of desired result
 	  -> DsM (Type,			-- Type of the result of the ccall itself
 		  CoreExpr -> CoreExpr)	-- Wrapper for the ccall
 					-- to box the result
-boxResult ioOkDataCon result_ty
+boxResult result_ty
   | null data_cons
   -- oops! can't see the data constructors
   = can'tSeeDataConsPanic "result" result_ty
-
-  -- Data types with a single constructor, which has a single, primitive-typed arg
-  | (maybeToBool maybe_data_type) &&				-- Data type
-    (null other_data_cons) &&					-- Just one constr
-    not (null data_con_arg_tys) && null other_args_tys	&& 	-- Just one arg
-    isUnpointedType the_prim_result_ty				-- of primitive type
-  =
-    newSysLocalDs realWorldStatePrimTy		`thenDs` \ prim_state_id ->
-    wrapUnboxedValue result_ty			`thenDs` \ (state_and_prim_datacon,
-							    state_and_prim_ty, prim_result_id, the_result) ->
-    mkConDs ioOkDataCon
-	    [TyArg result_ty, VarArg (Var prim_state_id), VarArg the_result]
-							`thenDs` \ the_pair ->
-    let
-	the_alt = (state_and_prim_datacon, [prim_state_id, prim_result_id], the_pair)
-    in
-    returnDs (state_and_prim_ty,
-	      \prim_app -> Case prim_app (AlgAlts [the_alt] NoDefault)
-    )
 
   -- Data types with a single nullary constructor
   | (maybeToBool maybe_data_type) &&				-- Data type
@@ -224,16 +202,42 @@ boxResult ioOkDataCon result_ty
     (null data_con_arg_tys)
   =
     newSysLocalDs realWorldStatePrimTy		`thenDs` \ prim_state_id ->
-
+{-
+    wrapUnboxedValue result_ty			`thenDs` \ (state_and_prim_datacon,
+							    state_and_prim_ty, prim_result_id, the_result) ->
     mkConDs ioOkDataCon
-	    [TyArg result_ty, VarArg (Var prim_state_id), VarArg (Var unitDataCon)]
-						`thenDs` \ the_pair ->
+	    [TyArg result_ty, VarArg (Var prim_state_id), VarArg the_result]
+							`thenDs` \ the_pair ->
+-}
+    let
+	the_pair = mkConApp unboxedPairDataCon
+			    [Type realWorldStatePrimTy, Type result_ty, 
+			     Var prim_state_id, 
+			     Con (DataCon unitDataCon) []]
+	the_alt  = (DataCon (unboxedTupleCon 1), [prim_state_id], the_pair)
+	scrut_ty = mkUnboxedTupleTy 1 [realWorldStatePrimTy]
+    in
+    returnDs (scrut_ty, \prim_app -> Case prim_app (mkWildId scrut_ty) [the_alt]
+    )
+
+  -- Data types with a single constructor, which has a single, primitive-typed arg
+  | (maybeToBool maybe_data_type) &&				-- Data type
+    (null other_data_cons) &&					-- Just one constr
+    not (null data_con_arg_tys) && null other_args_tys	&& 	-- Just one arg
+    isUnLiftedType the_prim_result_ty				-- of primitive type
+  =
+    newSysLocalDs realWorldStatePrimTy		`thenDs` \ prim_state_id ->
+    newSysLocalDs the_prim_result_ty 		`thenDs` \ prim_result_id ->
+    newSysLocalDs ccall_res_type 		`thenDs` \ case_bndr ->
 
     let
-	the_alt  = (stateDataCon, [prim_state_id], the_pair)
+	the_result = mkConApp the_data_con (map Type tycon_arg_tys ++ [Var prim_result_id])
+	the_pair   = mkConApp unboxedPairDataCon
+				[Type realWorldStatePrimTy, Type result_ty, 
+				 Var prim_state_id, the_result]
+	the_alt    = (DataCon unboxedPairDataCon, [prim_state_id, prim_result_id], the_pair)
     in
-    returnDs (realWorldStateTy,
-	      \prim_app -> Case prim_app (AlgAlts [the_alt] NoDefault)
+    returnDs (ccall_res_type, \prim_app -> Case prim_app case_bndr [the_alt]
     )
 
   | otherwise
@@ -242,14 +246,14 @@ boxResult ioOkDataCon result_ty
     maybe_data_type 			   = splitAlgTyConApp_maybe result_ty
     Just (tycon, tycon_arg_tys, data_cons) = maybe_data_type
     (the_data_con : other_data_cons)       = data_cons
+    ccall_res_type = mkUnboxedTupleTy 2 
+			[realWorldStatePrimTy, the_prim_result_ty]
 
     data_con_arg_tys		           = dataConArgTys the_data_con tycon_arg_tys
     (the_prim_result_ty : other_args_tys)  = data_con_arg_tys
 
---    (state_and_prim_datacon, state_and_prim_ty) = getStatePairingConInfo the_prim_result_ty
-
 -- wrap up an unboxed value.
-wrapUnboxedValue :: Type -> DsM (Id, Type, Id, CoreExpr)
+wrapUnboxedValue :: Type -> DsM (Type, Id, CoreExpr)
 wrapUnboxedValue ty
   | null data_cons
       -- oops! can't see the data constructors
@@ -258,68 +262,33 @@ wrapUnboxedValue ty
   | (maybeToBool maybe_data_type) &&				-- Data type
     (null other_data_cons) &&					-- Just one constr
     not (null data_con_arg_tys) && null other_args_tys	&& 	-- Just one arg
-    isUnpointedType the_prim_result_ty				-- of primitive type
+    isUnLiftedType the_prim_result_ty				-- of primitive type
   =
     newSysLocalDs the_prim_result_ty 		         `thenDs` \ prim_result_id ->
-    mkConDs the_data_con (map TyArg tycon_arg_tys ++ 
-                          [VarArg (Var prim_result_id)]) `thenDs` \ the_result ->
-    returnDs (state_and_prim_datacon, state_and_prim_ty, prim_result_id, the_result)
+    let
+	the_result = mkConApp the_data_con (map Type tycon_arg_tys ++ [Var prim_result_id])
+    in
+    returnDs (ccall_res_type, prim_result_id, the_result)
 
   -- Data types with a single nullary constructor
   | (maybeToBool maybe_data_type) &&				-- Data type
     (null other_data_cons) &&					-- Just one constr
     (null data_con_arg_tys)
   =
-    let unit = unitDataCon in
-    returnDs (stateDataCon, realWorldStateTy, unit, Var unit)
+    let unit = dataConId unitDataCon
+	scrut_ty = mkUnboxedTupleTy 1 [realWorldStatePrimTy]
+    in
+    returnDs (scrut_ty, unit, mkConApp unitDataCon [])
   | otherwise
   = pprPanic "boxResult: " (ppr ty)
  where
    maybe_data_type			  = splitAlgTyConApp_maybe ty
    Just (tycon, tycon_arg_tys, data_cons) = maybe_data_type
    (the_data_con : other_data_cons)       = data_cons
+   ccall_res_type = mkUnboxedTupleTy 2 
+			[realWorldStatePrimTy, the_prim_result_ty]
 
    data_con_arg_tys		          = dataConArgTys the_data_con tycon_arg_tys
    (the_prim_result_ty : other_args_tys)  = data_con_arg_tys
-   (state_and_prim_datacon, state_and_prim_ty) = getStatePairingConInfo the_prim_result_ty
 
 \end{code}
-
-This grimy bit of code is for digging out the IOok constructor from an
-application of the the IO type.  The constructor is needed for
-wrapping the result of a _ccall_.  The alternative is to wire-in IO,
-which brings a whole heap of junk with it.
-
-If the representation of IO changes, this will probably have to be
-brought in line with the new definition.
-
-newtype IO a = IO (State# RealWorld -> IOResult a)
-
-the constructor IO has type (State# RealWorld -> IOResult a) -> IO a
-
-\begin{code}
-getIoOkDataCon :: Type 		 -- IO t
-	       -> (Id, Id, Type) -- Returns (IOok, IO, t)
-
-getIoOkDataCon io_ty
-  = let 
-  	Just (ioTyCon, [t]) 	        = splitTyConApp_maybe io_ty
-  	[ioDataCon]    			= tyConDataCons ioTyCon
-	ioDataConTy			= idType ioDataCon
-	(_, ioDataConTy')               = splitForAllTys ioDataConTy
-	([arg_ty], _) 		        = splitFunTys ioDataConTy'
-	(_, io_result_ty)		= splitFunTys arg_ty
-	Just (io_result_tycon, _)	= splitTyConApp_maybe io_result_ty
-	[ioOkDataCon,ioFailDataCon]     = tyConDataCons io_result_tycon
-    in
-    (ioOkDataCon, ioDataCon, t)
-\end{code}
-
-Another way to do it, more sensitive:
-
-     case ioDataConTy of
-	ForAll _ (FunTy (FunTy _ (AppTy (TyConTy ioResultTyCon _) _)) _) ->
-		let [ioOkDataCon,ioFailDataCon] = tyConDataCons ioResultTyCon
-		in
-		(ioOkDataCon, result_ty)
-	_ -> pprPanic "getIoOkDataCon: " (ppr PprDebug ioDataConTy)

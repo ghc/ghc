@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[MkIface]{Print an interface for a module}
 
@@ -17,8 +17,8 @@ import IO		( Handle, hPutStr, openFile,
 
 import HsSyn
 import RdrHsSyn		( RdrName(..) )
-import RnHsSyn		( RenamedHsModule )
 import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..),
+  			  StrictnessMark(..), 
 			  pprModule
 			)
 import RnMonad
@@ -28,26 +28,25 @@ import TcInstUtil	( InstInfo(..) )
 import WorkWrap		( getWorkerIdAndCons )
 
 import CmdLineOpts
-import Id		( idType, dataConRawArgTys, dataConFieldLabels, 
-			  idInfo, omitIfaceSigForId,
-			  dataConStrictMarks, StrictnessMark(..), 
-			  IdSet, idSetToList, unionIdSets, unitIdSet, minusIdSet, 
-			  isEmptyIdSet, elementOfIdSet, emptyIdSet, mkIdSet,
-			  pprId, getIdSpecialisation,
-			  Id
+import Id		( Id, idType, idInfo, omitIfaceSigForId,
+			  getIdSpecialisation
 			)
+import Var		( isId )
+import VarSet
+import DataCon		( dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, InlinePragInfo(..), inlinePragInfo,
-			  arityInfo, ppArityInfo, strictnessInfo, ppStrictnessInfo, 
+			  arityInfo, ppArityInfo, 
+			  strictnessInfo, ppStrictnessInfo, 
+			  cafInfo, ppCafInfo,
 			  bottomIsGuaranteed, workerExists, 
 			)
-import CoreSyn		( CoreExpr, CoreBinding, GenCoreExpr, GenCoreBinding(..) )
-import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), Unfolding,
-			  okToUnfoldInHiFile
-			)
-import FreeVars		( exprFreeVars )
-import Name		( isLocallyDefined, isWiredInName, modAndOcc, nameModule, pprOccName,
-			  OccName, occNameString, nameOccName, nameString, isExported,
-			  Name {-instance NamedThing-}, Provenance, NamedThing(..)
+import CoreSyn		( CoreExpr, CoreBind, Bind(..) )
+import CoreUtils	( exprSomeFreeVars )
+import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), 
+			  Unfolding, okToUnfoldInHiFile )
+import Name		( isLocallyDefined, isWiredInName, modAndOcc, nameModule,
+			  OccName, occNameString, isExported,
+			  Name, NamedThing(..)
 			)
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons
@@ -56,18 +55,18 @@ import Class		( Class, classBigSig )
 import SpecEnv		( specEnvToList )
 import FieldLabel	( fieldLabelName, fieldLabelType )
 import Type		( mkSigmaTy, splitSigmaTy, mkDictTy,
-			  mkTyVarTys, Type, ThetaType
+			  Type, ThetaType
 		        )
 
-import PprEnv		-- not sure how much...
 import PprType
 import PprCore		( pprIfaceUnfolding )
 
 import Bag		( bagToList, isEmptyBag )
 import Maybes		( catMaybes, maybeToBool )
-import FiniteMap	( emptyFM, addToFM, addToFM_C, lookupFM, fmToList, eltsFM, FiniteMap )
-import UniqFM		( UniqFM, lookupUFM, listToUFM )
-import Util		( sortLt, zipWithEqual, zipWith3Equal, mapAccumL )
+import FiniteMap	( emptyFM, addToFM, addToFM_C, fmToList, FiniteMap )
+import UniqFM		( lookupUFM, listToUFM )
+import UniqSet		( uniqSetToList )
+import Util		( sortLt, mapAccumL )
 import Outputable
 \end{code}
 
@@ -92,7 +91,7 @@ ifaceDecls :: Maybe Handle
 	   -> [TyCon] -> [Class]
 	   -> Bag InstInfo 
 	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
-	   -> [CoreBinding]	-- In dependency order, later depend on earlier
+	   -> [CoreBind]	-- In dependency order, later depend on earlier
 	   -> IO ()
 
 endIface    :: Maybe Handle -> IO ()
@@ -104,7 +103,8 @@ startIface mod
       Nothing -> return Nothing -- not producing any .hi file
       Just fn -> do
 	if_hdl <- openFile fn WriteMode
-	hPutStrLn if_hdl ("_interface_ "++ _UNPK_ mod ++ ' ':show (opt_HiVersion :: Int))
+	hPutStr if_hdl ("__interface "++ _UNPK_ mod ++ ' ':show (opt_HiVersion :: Int))
+	hPutStrLn if_hdl " where"
 	return (Just if_hdl)
 
 endIface Nothing	= return ()
@@ -116,11 +116,11 @@ endIface (Just if_hdl)	= hPutStr if_hdl "\n" >> hClose if_hdl
 ifaceMain Nothing iface_stuff = return ()
 ifaceMain (Just if_hdl)
 	  (import_usages, ExportEnv avails fixities, instance_modules)
-  =
-    ifaceInstanceModules	if_hdl instance_modules		>>
-    ifaceUsages			if_hdl import_usages		>>
-    ifaceExports		if_hdl avails			>>
-    ifaceFixities		if_hdl fixities			>>
+  = do
+    ifaceImports		if_hdl import_usages
+    ifaceInstanceModules	if_hdl instance_modules
+    ifaceExports		if_hdl avails
+    ifaceFixities		if_hdl fixities
     return ()
 
 ifaceDecls Nothing tycons classes inst_info final_ids simplified = return ()
@@ -131,9 +131,8 @@ ifaceDecls (Just hdl)
   | null_decls = return ()		 
 	--  You could have a module with just (re-)exports/instances in it
   | otherwise
-  = ifaceInstances hdl inst_infos		>>= \ needed_ids ->
-    hPutStr hdl "_declarations_\n"		>>
-    ifaceClasses hdl classes			>>
+  = ifaceClasses hdl classes			>>
+    ifaceInstances hdl inst_infos		>>= \ needed_ids ->
     ifaceTyCons hdl tycons			>>
     ifaceBinds hdl needed_ids final_ids binds	>>
     return ()
@@ -145,12 +144,12 @@ ifaceDecls (Just hdl)
 \end{code}
 
 \begin{code}
-ifaceUsages if_hdl import_usages
-  = hPutStr if_hdl "_usages_\n"   >>
-    hPutCol if_hdl upp_uses (sortLt lt_imp_vers import_usages)
+ifaceImports if_hdl import_usages
+  = hPutCol if_hdl upp_uses (sortLt lt_imp_vers import_usages)
   where
     upp_uses (m, hif, mv, whats_imported)
-      = hsep [pprModule m, pp_hif hif, int mv, ptext SLIT("::"),
+      = ptext SLIT("import ") <>
+	hsep [pprModule m, pp_hif hif, int mv, ptext SLIT("::"),
 	      upp_import_versions whats_imported
 	] <> semi
 
@@ -163,14 +162,16 @@ ifaceUsages if_hdl import_usages
 
 ifaceInstanceModules if_hdl [] = return ()
 ifaceInstanceModules if_hdl imods
-  = hPutStr if_hdl "_instance_modules_\n" >>
-    printForIface if_hdl (hsep (map ptext (sortLt (<) imods))) >>
+  = let sorted = sortLt (<) imods
+	lines = map (\m -> ptext SLIT("__instimport ") <> ptext m <>
+			   ptext SLIT(" ;")) sorted
+    in 
+    printForIface if_hdl (vcat lines) >>
     hPutStr if_hdl "\n"
 
 ifaceExports if_hdl [] = return ()
 ifaceExports if_hdl avails
-  = hPutStr if_hdl "_exports_\n"			>>
-    hPutCol if_hdl do_one_module (fmToList export_fm)
+  = hPutCol if_hdl do_one_module (fmToList export_fm)
   where
 	-- Sort them into groups by module
     export_fm :: FiniteMap Module [AvailInfo]
@@ -184,7 +185,8 @@ ifaceExports if_hdl avails
 	-- Print one module's worth of stuff
     do_one_module :: (Module, [AvailInfo]) -> SDoc
     do_one_module (mod_name, avails@(avail1:_))
-	= hsep [pp_hif (ifaceFlavour (availName avail1)), 
+	= ptext SLIT("__export ") <>
+	  hsep [pp_hif (ifaceFlavour (availName avail1)), 
 		pprModule mod_name,
 		hsep (map upp_avail (sortLt lt_avail avails))
 	  ] <> semi
@@ -195,8 +197,7 @@ pp_hif HiBootFile = char '!'
 
 ifaceFixities if_hdl [] = return ()
 ifaceFixities if_hdl fixities 
-  = hPutStr if_hdl "_fixities_\n"		>>
-    hPutCol if_hdl upp_fixity fixities
+  = hPutCol if_hdl upp_fixity fixities
 \end{code}			 
 
 %************************************************************************
@@ -209,24 +210,23 @@ ifaceFixities if_hdl fixities
 \begin{code}			 
 ifaceInstances :: Handle -> Bag InstInfo -> IO IdSet		-- The IdSet is the needed dfuns
 ifaceInstances if_hdl inst_infos
-  | null togo_insts = return emptyIdSet		 
-  | otherwise 	    = hPutStr if_hdl "_instances_\n" >>
-		      hPutCol if_hdl pp_inst (sortLt lt_inst togo_insts) >>
+  | null togo_insts = return emptyVarSet		 
+  | otherwise 	    = hPutCol if_hdl pp_inst (sortLt lt_inst togo_insts) >>
 		      return needed_ids
   where				 
     togo_insts	= filter is_togo_inst (bagToList inst_infos)
-    needed_ids  = mkIdSet [dfun_id | InstInfo _ _ _ _ _ dfun_id _ _ _ <- togo_insts]
-    is_togo_inst (InstInfo _ _ _ _ _ dfun_id _ _ _) = isLocallyDefined dfun_id
+    needed_ids  = mkVarSet [dfun_id | InstInfo _ _ _ _ dfun_id _ _ _ <- togo_insts]
+    is_togo_inst (InstInfo _ _ _ _ dfun_id _ _ _) = isLocallyDefined dfun_id
 				 
     -------			 
-    lt_inst (InstInfo _ _ _ _ _ dfun_id1 _ _ _)
-	    (InstInfo _ _ _ _ _ dfun_id2 _ _ _)
+    lt_inst (InstInfo _ _ _ _ dfun_id1 _ _ _)
+	    (InstInfo _ _ _ _ dfun_id2 _ _ _)
       = getOccName dfun_id1 < getOccName dfun_id2
 	-- The dfuns are assigned names df1, df2, etc, in order of original textual
 	-- occurrence, and this makes as good a sort order as any
 
     -------			 
-    pp_inst (InstInfo clas tvs tys theta _ dfun_id _ _ _)
+    pp_inst (InstInfo clas tvs tys theta dfun_id _ _ _)
       = let			 
 	    forall_ty     = mkSigmaTy tvs theta (mkDictTy clas tys)
 	    renumbered_ty = nmbrGlobalType forall_ty
@@ -255,27 +255,34 @@ ifaceId :: (Id -> IdInfo)		-- This function "knows" the extra info added
 	    -> Maybe (SDoc, IdSet)	-- The emitted stuff, plus a possibly-augmented set of needed Ids
 
 ifaceId get_idinfo needed_ids is_rec id rhs
-  | not (id `elementOfIdSet` needed_ids ||		-- Needed [no id in needed_ids has omitIfaceSigForId]
+  | not (id `elemVarSet` needed_ids ||		-- Needed [no id in needed_ids has omitIfaceSigForId]
 	 (isExported id && not (omitIfaceSigForId id)))	-- or exported and not to be omitted
   = Nothing 		-- Well, that was easy!
 
 ifaceId get_idinfo needed_ids is_rec id rhs
-  = Just (hsep [sig_pretty, pp_double_semi, prag_pretty], new_needed_ids)
+  = Just (hsep [sig_pretty, prag_pretty, char ';'], new_needed_ids)
   where
-    pp_double_semi = ptext SLIT(";;")
     idinfo         = get_idinfo id
     inline_pragma  = inlinePragInfo idinfo
 
     ty_pretty  = pprType (nmbrGlobalType (idType id))
-    sig_pretty = hcat [ppr (getOccName id), ptext SLIT(" _:_ "), ty_pretty]
+    sig_pretty = hcat [ppr (getOccName id), ptext SLIT(" :: "), ty_pretty]
 
     prag_pretty 
      | opt_OmitInterfacePragmas = empty
-     | otherwise		= hsep [arity_pretty, strict_pretty, unfold_pretty, 
-					spec_pretty, pp_double_semi]
+     | otherwise		= hsep [ptext SLIT("{-##"),
+					arity_pretty, 
+					caf_pretty,
+					strict_pretty, 
+					unfold_pretty, 
+					spec_pretty,
+					ptext SLIT("##-}")]
 
     ------------  Arity  --------------
     arity_pretty  = ppArityInfo (arityInfo idinfo)
+
+    ------------ Caf Info --------------
+    caf_pretty = ppCafInfo (cafInfo idinfo)
 
     ------------  Strictness  --------------
     strict_info   = strictnessInfo idinfo
@@ -283,45 +290,43 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     strict_pretty = ppStrictnessInfo strict_info <+> wrkr_pretty
 
     wrkr_pretty | not has_worker = empty
-		| null con_list  = pprId work_id
-		| otherwise      = pprId work_id <+> 
-				   braces (hsep (map (pprId) con_list))
+		| null con_list  = ppr work_id
+		| otherwise      = ppr work_id <+> 
+				   braces (hsep (map ppr con_list))
 
     (work_id, wrapper_cons) = getWorkerIdAndCons id rhs
-    con_list 		   = idSetToList wrapper_cons
+    con_list 		    = uniqSetToList wrapper_cons
 
     ------------  Unfolding  --------------
-    unfold_pretty | show_unfold = hsep [ptext unfold_herald, pprIfaceUnfolding rhs]
+    unfold_pretty | show_unfold = unfold_herald <+> pprIfaceUnfolding rhs
 		  | otherwise   = empty
 
-    unfold_herald = case inline_pragma of
-			IMustBeINLINEd   -> SLIT("_U_")
-			IWantToBeINLINEd -> SLIT("_U_")
-			other		 -> SLIT("_u_")
-
     show_unfold = not implicit_unfolding &&	-- Not unnecessary
-		  unfolding_is_ok		-- Not dangerous
+		  unfolding_needed		-- Not dangerous
+
+    unfolding_needed =  case inline_pragma of
+			      IMustBeINLINEd    -> definitely_ok_to_unfold
+			      IWantToBeINLINEd  -> definitely_ok_to_unfold
+			      NoInlinePragInfo  -> rhs_is_small
+			      other	        -> False
 
     implicit_unfolding = has_worker ||
 			 bottomIsGuaranteed strict_info
 
-    unfolding_is_ok
-	= case inline_pragma of
-	    IMustBeINLINEd       -> definitely_ok_to_unfold
-	    IWantToBeINLINEd     -> definitely_ok_to_unfold
-	    IDontWantToBeINLINEd -> False
-	    IMustNotBeINLINEd    -> False
-	    NoPragmaInfo         -> case guidance of
-					UnfoldNever -> False	-- Too big
-					other       -> definitely_ok_to_unfold
+    unfold_herald = case inline_pragma of
+			NoInlinePragInfo -> ptext SLIT("__u")
+			other		 -> ppr inline_pragma
+
+    rhs_is_small = case calcUnfoldingGuidance opt_InterfaceUnfoldThreshold rhs of
+			UnfoldNever -> False	-- Too big
+			other	    ->  definitely_ok_to_unfold -- Small enough
 
     definitely_ok_to_unfold =  okToUnfoldInHiFile rhs
-    guidance = calcUnfoldingGuidance opt_InterfaceUnfoldThreshold rhs
 
     ------------  Specialisations --------------
     spec_list = specEnvToList (getIdSpecialisation id)
     spec_pretty = hsep (map pp_spec spec_list)
-    pp_spec (tyvars, tys, rhs) = hsep [ptext SLIT("_P_"),
+    pp_spec (tyvars, tys, rhs) = hsep [ptext SLIT("__P"),
 				       if null tyvars then ptext SLIT("[ ]")
 						      else brackets (interppSP tyvars),
 					-- The lexer interprets "[]" as a CONID.  Sigh.
@@ -331,28 +336,28 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 				 ]
     
     ------------  Extra free Ids  --------------
-    new_needed_ids = (needed_ids `minusIdSet` unitIdSet id)	`unionIdSets` 
+    new_needed_ids = (needed_ids `minusVarSet` unitVarSet id)	`unionVarSet` 
 		     extra_ids
 
-    extra_ids | opt_OmitInterfacePragmas = emptyIdSet
-	      | otherwise		 = worker_ids	`unionIdSets`
-					   unfold_ids	`unionIdSets`
+    extra_ids | opt_OmitInterfacePragmas = emptyVarSet
+	      | otherwise		 = worker_ids	`unionVarSet`
+					   unfold_ids	`unionVarSet`
 					   spec_ids
 
-    worker_ids | has_worker = unitIdSet work_id
-	       | otherwise  = emptyIdSet
+    worker_ids | has_worker = unitVarSet work_id
+	       | otherwise  = emptyVarSet
 
-    spec_ids = foldr add emptyIdSet spec_list
+    spec_ids = foldr add emptyVarSet spec_list
 	     where
-	       add (_, _, rhs) = unionIdSets (find_fvs rhs)
+	       add (_, _, rhs) = unionVarSet (find_fvs rhs)
 
     unfold_ids | show_unfold = find_fvs rhs
-	       | otherwise   = emptyIdSet
+	       | otherwise   = emptyVarSet
 
     find_fvs expr = free_vars
 		  where
-		    free_vars = exprFreeVars interesting expr
-		    interesting id = isLocallyDefined id &&
+		    free_vars = exprSomeFreeVars interesting expr
+		    interesting id = isId id && isLocallyDefined id &&
 				     not (omitIfaceSigForId id)
 \end{code}
 
@@ -360,7 +365,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 ifaceBinds :: Handle
 	   -> IdSet		-- These Ids are needed already
 	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
-	   -> [CoreBinding]	-- In dependency order, later depend on earlier
+	   -> [CoreBind]	-- In dependency order, later depend on earlier
 	   -> IO ()
 
 ifaceBinds hdl needed_ids final_ids binds
@@ -375,9 +380,9 @@ ifaceBinds hdl needed_ids final_ids binds
 
     pretties = go needed_ids (reverse binds)	-- Reverse so that later things will 
 						-- provoke earlier ones to be emitted
-    go needed [] = if not (isEmptyIdSet needed) then
+    go needed [] = if not (isEmptyVarSet needed) then
 			pprTrace "ifaceBinds: free vars:" 
-				  (sep (map ppr (idSetToList needed))) $
+				  (sep (map ppr (varSetElems needed))) $
 			[]
 		   else
 			[]
@@ -394,7 +399,7 @@ ifaceBinds hdl needed_ids final_ids binds
 	= pretties ++ go needed'' binds
 	where
 	  (needed', pretties) = go_rec needed pairs
-	  needed'' = needed' `minusIdSet` mkIdSet (map fst pairs)
+	  needed'' = needed' `minusVarSet` mkVarSet (map fst pairs)
 		-- Later ones may spuriously cause earlier ones to be "needed" again
 
     go_rec :: IdSet -> [(Id,CoreExpr)] -> (IdSet, [SDoc])
@@ -459,21 +464,30 @@ ifaceTyCon tycon
     keyword | isNewTyCon tycon = SLIT("newtype")
 	    | otherwise	       = SLIT("data")
 
+    tyvars = tyConTyVars tycon
+
     ppr_con data_con 
 	| null field_labels
-	= hsep [ ppr name,
+	= ASSERT( tycon == tycon1 && tyvars == tyvars1 )
+	  hsep [  ppr_ex ex_tyvars ex_theta,
+		  ppr name,
 		  hsep (map ppr_arg_ty (strict_marks `zip` arg_tys))
 	        ]
 
 	| otherwise
-	= hsep [ ppr name,
+	= hsep [  ppr_ex ex_tyvars ex_theta,
+		  ppr name,
 		  braces $ hsep $ punctuate comma (map ppr_field (strict_marks `zip` field_labels))
 	 	]
           where
+	   (tyvars1, theta1, ex_tyvars, ex_theta, arg_tys, tycon1) = dataConSig data_con
            field_labels   = dataConFieldLabels data_con
-	   arg_tys        = dataConRawArgTys   data_con
            strict_marks   = dataConStrictMarks data_con
 	   name           = getName            data_con
+
+    ppr_ex [] ex_theta = ASSERT( null ex_theta ) empty
+    ppr_ex ex_tvs ex_theta = ptext SLIT("__forall") <+> brackets (pprTyVarBndrs ex_tvs)
+			     <+> pprIfaceTheta ex_theta <+> ptext SLIT("=>")
 
     ppr_arg_ty (strict_mark, ty) = ppr_strict_mark strict_mark <> pprParendType ty
 
@@ -519,13 +533,11 @@ ifaceClass clas
 	  (sel_tyvars, _, op_ty) = splitSigmaTy (idType sel_id)
 
 ppr_decl_context :: ThetaType -> SDoc
-ppr_decl_context [] = empty
-ppr_decl_context theta
-  = braces (hsep (punctuate comma (map (ppr_dict) theta)))
-    <> 
-    ptext SLIT(" =>")
-  where
-    ppr_dict (clas,tys) = ppr clas <+> hsep (map pprParendType tys)
+ppr_decl_context []    = empty
+ppr_decl_context theta = pprIfaceTheta theta <+> ptext SLIT(" =>")
+
+pprIfaceTheta :: ThetaType -> SDoc	-- Use braces rather than parens in interface files
+pprIfaceTheta theta =  braces (hsep (punctuate comma [pprConstraint c tys | (c,tys) <- theta]))
 \end{code}
 
 %************************************************************************
@@ -550,7 +562,7 @@ upp_avail (AvailTC name ns) = hcat [upp_occname (getOccName name), bang, upp_exp
 			      ns' = filter (/= name) ns
 
 upp_export []    = empty
-upp_export names = parens (hsep (map (upp_occname . getOccName) names)) 
+upp_export names = braces (hsep (map (upp_occname . getOccName) names)) 
 
 upp_fixity (occ, fixity) = hcat [ppr fixity, space, upp_occname occ, semi]
 

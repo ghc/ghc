@@ -1,51 +1,67 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[CoreUtils]{Utility functions on @Core@ syntax}
 
 \begin{code}
 module CoreUtils (
-	coreExprType, coreAltsType, coreExprCc,
+	IdSubst, SubstCoreExpr(..),
 
-	mkCoreIfThenElse,
-	argToExpr,
-	unTagBinders, unTagBindersAlts,
-	
-	maybeErrorApp,
-	nonErrorRHSs,
-	squashableDictishCcExpr,
-	idSpecVars
+	coreExprType, exprFreeVars, exprSomeFreeVars,
+
+	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsWHNF, exprIsCheap,
+	FormSummary(..), mkFormSummary, whnfOrBottom,
+	cheapEqExpr,
+
+	substExpr, substId, substIds,
+	idSpecVars, idFreeVars,
+
+	squashableDictishCcExpr
     ) where
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} CoreUnfold	( noUnfolding, hasUnfolding )
+
 import CoreSyn
+import PprCore		()	-- Instances only
+import Var		( IdOrTyVar, isId, isTyVar )
+import VarSet
+import VarEnv
+import Name		( isLocallyDefined )
+import Const		( Con(..), isWHNFCon, conIsTrivial, conIsCheap )
+import Id		( Id, idType, setIdType, idUnique, isBottomingId, 
+			  getIdArity, idFreeTyVars,
+			  getIdSpecialisation, setIdSpecialisation,
+			  getInlinePragma, setInlinePragma,
+			  getIdUnfolding, setIdUnfolding
+			)
+import IdInfo		( arityLowerBound, InlinePragInfo(..) )
+import SpecEnv		( emptySpecEnv, specEnvToList, isEmptySpecEnv )
+import CostCentre	( isDictCC, CostCentre )
+import Const		( Con, conType )
+import Type		( Type, TyVarSubst, mkFunTy, mkForAllTy,
+			  splitFunTy_maybe, applyTys, tyVarsOfType, tyVarsOfTypes,
+			  fullSubstTy, substTyVar )
+import Unique		( buildIdKey, augmentIdKey )
+import Util		( zipWithEqual, mapAccumL )
+import Outputable
+import TysPrim		( alphaTy )	-- Debgging only
+\end{code}
 
-import CostCentre	( isDictCC, CostCentre, noCostCentre )
-import MkId		( mkSysLocal )
-import Id		( idType, isBottomingId, getIdSpecialisation,
-			  dataConRepType,
-			  Id
-			)
-import Literal		( literalType, Literal(..) )
-import Maybes		( catMaybes, maybeToBool )
-import PprCore
-import PrimOp		( primOpType, PrimOp(..) )
-import SpecEnv	        ( specEnvValues )
-import SrcLoc		( noSrcLoc )
-import Type		( mkFunTy, mkForAllTy, mkTyVarTy,
-			  splitFunTy_maybe, applyTys, isUnpointedType,
-			  splitSigmaTy, splitFunTys,
-			  Type
-			)
-import TysWiredIn	( trueDataCon, falseDataCon )
-import BasicTypes	( Unused )
-import UniqSupply	( returnUs, thenUs,
-			  mapAndUnzipUs, getUnique,
-			  UniqSM
-			)
-import Outputable	( assertPanic, pprPanic, ppr, vcat, panic )
 
+%************************************************************************
+%*									*
+\subsection{Substitutions}
+%*									*
+%************************************************************************
+
+\begin{code}
+type IdSubst = IdEnv SubstCoreExpr		-- Maps Ids to SubstCoreExpr
+
+data SubstCoreExpr
+  = Done    CoreExpr			-- No more substitution needed
+  | SubstMe CoreExpr TyVarSubst IdSubst	-- A suspended substitution
 \end{code}
 
 %************************************************************************
@@ -57,352 +73,367 @@ import Outputable	( assertPanic, pprPanic, ppr, vcat, panic )
 \begin{code}
 coreExprType :: CoreExpr -> Type
 
-coreExprType (Var var) = idType   var
-coreExprType (Lit lit) = literalType lit
-
-coreExprType (Let _ body)	= coreExprType body
-coreExprType (Case _ alts)	= coreAltsType alts
+coreExprType (Var var)		      = idType var
+coreExprType (Let _ body)	      = coreExprType body
+coreExprType (Case _ _ ((_,_,rhs):_)) = coreExprType rhs
 
 coreExprType (Note (Coerce ty _) e) = ty
 coreExprType (Note other_note e)    = coreExprType e
 
--- a Con is a fully-saturated application of a data constructor
--- a Prim is <ditto> of a PrimOp
+coreExprType e@(Con con args) = applyTypeToArgs e (conType con) args
 
-coreExprType (Con con args) = 
---			      pprTrace "appTyArgs" (hsep [ppr con, semi, 
---						 	   ppr con_ty, semi,
---							   ppr args]) $
-    			      applyTypeToArgs con_ty args
-			    where
-				con_ty = dataConRepType con
+coreExprType (Lam binder expr)
+  | isId binder    = idType binder `mkFunTy` coreExprType expr
+  | isTyVar binder = mkForAllTy binder (coreExprType expr)
 
-coreExprType (Prim op args) = applyTypeToArgs (primOpType op) args
+coreExprType e@(App _ _)
+  = case collectArgs e of
+	(fun, args) -> applyTypeToArgs e (coreExprType fun) args
 
-coreExprType (Lam (ValBinder binder) expr)
-  = idType binder `mkFunTy` coreExprType expr
-
-coreExprType (Lam (TyBinder tyvar) expr)
-  = mkForAllTy tyvar (coreExprType expr)
-
-coreExprType (App expr (TyArg ty))
-  = 	-- Gather type args; more efficient to instantiate the type all at once
-    go expr [ty]
-  where
-    go (App expr (TyArg ty)) tys = go expr (ty:tys)
-    go expr		     tys = applyTys (coreExprType expr) tys
-
-coreExprType (App expr val_arg)
-  = ASSERT(isValArg val_arg)
-    let
-	fun_ty = coreExprType expr
-    in
-    case (splitFunTy_maybe fun_ty) of
-	  Just (_, result_ty) -> result_ty
-#ifdef DEBUG
-	  Nothing -> pprPanic "coreExprType:\n"
-	  		(vcat [ppr fun_ty,  ppr (App expr val_arg)])
-#endif
+coreExprType other = pprTrace "coreExprType" (ppr other) alphaTy
 \end{code}
 
 \begin{code}
-coreAltsType :: CoreCaseAlts -> Type
+-- The "e" argument is just for debugging
 
-coreAltsType (AlgAlts [] deflt)         = default_ty deflt
-coreAltsType (AlgAlts ((_,_,rhs1):_) _) = coreExprType rhs1
+applyTypeToArgs e op_ty [] = op_ty
 
-coreAltsType (PrimAlts [] deflt)       = default_ty deflt
-coreAltsType (PrimAlts ((_,rhs1):_) _) = coreExprType rhs1
-
-default_ty NoDefault           = panic "coreExprType:Case:default_ty"
-default_ty (BindDefault _ rhs) = coreExprType rhs
-\end{code}
-
-\begin{code}
-applyTypeToArgs op_ty (TyArg ty : args)
+applyTypeToArgs e op_ty (Type ty : args)
   =	-- Accumulate type arguments so we can instantiate all at once
-    applyTypeToArgs (applyTys op_ty tys) rest_args
+    applyTypeToArgs e (applyTys op_ty tys) rest_args
   where
-    (tys, rest_args)         = go [ty] args
-    go tys (TyArg ty : args) = go (ty:tys) args
-    go tys rest_args	     = (reverse tys, rest_args)
+    (tys, rest_args)        = go [ty] args
+    go tys (Type ty : args) = go (ty:tys) args
+    go tys rest_args	    = (reverse tys, rest_args)
 
-applyTypeToArgs op_ty (val_or_lit_arg:args)
+applyTypeToArgs e op_ty (other_arg : args)
   = case (splitFunTy_maybe op_ty) of
-	Just (_, res_ty) -> applyTypeToArgs res_ty args
-
-applyTypeToArgs op_ty [] = op_ty
+	Just (_, res_ty) -> applyTypeToArgs e res_ty args
+	Nothing -> pprPanic "applyTypeToArgs" (ppr e)
 \end{code}
 
-coreExprCc gets the cost centre enclosing an expression, if any.
-It looks inside lambdas because (scc "foo" \x.e) = \x.scc "foo" e
-
-\begin{code}
-coreExprCc :: GenCoreExpr val_bdr val_occ flexi -> CostCentre
-coreExprCc (Note (SCC cc) e)   = cc
-coreExprCc (Note other_note e) = coreExprCc e
-coreExprCc (Lam _ e)           = coreExprCc e
-coreExprCc other               = noCostCentre
-\end{code}
 
 %************************************************************************
 %*									*
-\subsection{Routines to manufacture bits of @CoreExpr@}
+\subsection{Figuring out things about expressions}
 %*									*
 %************************************************************************
 
 \begin{code}
-mkCoreIfThenElse (Var bool) then_expr else_expr
-    | bool == trueDataCon   = then_expr
-    | bool == falseDataCon  = else_expr
+data FormSummary
+  = VarForm		-- Expression is a variable (or scc var, etc)
+  | ValueForm		-- Expression is a value: i.e. a value-lambda,constructor, or literal
+  | BottomForm		-- Expression is guaranteed to be bottom. We're more gung
+			-- ho about inlining such things, because it can't waste work
+  | OtherForm		-- Anything else
 
-mkCoreIfThenElse guard then_expr else_expr
-  = Case guard
-      (AlgAlts [ (trueDataCon,  [], then_expr),
-		 (falseDataCon, [], else_expr) ]
-       NoDefault )
+instance Outputable FormSummary where
+   ppr VarForm    = ptext SLIT("Var")
+   ppr ValueForm  = ptext SLIT("Value")
+   ppr BottomForm = ptext SLIT("Bot")
+   ppr OtherForm  = ptext SLIT("Other")
+
+whnfOrBottom :: FormSummary -> Bool
+whnfOrBottom VarForm    = True
+whnfOrBottom ValueForm  = True
+whnfOrBottom BottomForm = True
+whnfOrBottom OtherForm  = False
 \end{code}
 
-For making @Apps@ and @Lets@, we must take appropriate evasive
-action if the thing being bound has unboxed type.  @mkCoApp@ requires
-a name supply to do its work.
-
-@mkCoApps@, @mkCoCon@ and @mkCoPrim@ also handle the
-arguments-must-be-atoms constraint.
-
 \begin{code}
-data CoreArgOrExpr
-  = AnArg   CoreArg
-  | AnExpr  CoreExpr
-
-mkCoApps :: CoreExpr -> [CoreArgOrExpr] -> UniqSM CoreExpr
-mkCoCon  :: Id       -> [CoreArgOrExpr] -> UniqSM CoreExpr
-mkCoPrim :: PrimOp   -> [CoreArgOrExpr] -> UniqSM CoreExpr
-
-mkCoApps fun args = co_thing (mkGenApp fun) args
-mkCoCon  con args = co_thing (Con  con)     args
-mkCoPrim  op args = co_thing (Prim op)      args 
-
-co_thing :: ([CoreArg] -> CoreExpr)
-	 -> [CoreArgOrExpr]
-	 -> UniqSM CoreExpr
-
-co_thing thing arg_exprs
-  = mapAndUnzipUs expr_to_arg arg_exprs `thenUs` \ (args, maybe_binds) ->
-    returnUs (mkCoLetsUnboxedToCase (catMaybes maybe_binds) (thing args))
+mkFormSummary :: CoreExpr -> FormSummary
+mkFormSummary expr
+  = go (0::Int) expr	-- The "n" is the number of *value* arguments so far
   where
-    expr_to_arg :: CoreArgOrExpr
-		-> UniqSM (CoreArg, Maybe CoreBinding)
+    go n (Con con _) | isWHNFCon con = ValueForm
+		     | otherwise     = OtherForm
 
-    expr_to_arg (AnArg  arg)     = returnUs (arg,      Nothing)
-    expr_to_arg (AnExpr (Var v)) = returnUs (VarArg v, Nothing)
-    expr_to_arg (AnExpr (Lit l)) = returnUs (LitArg l, Nothing)
-    expr_to_arg (AnExpr other_expr)
-      = let
-	    e_ty = coreExprType other_expr
-	in
-	getUnique `thenUs` \ uniq ->
-	let
-	    new_var  = mkSysLocal SLIT("a") uniq e_ty noSrcLoc
-	in
-	returnUs (VarArg new_var, Just (NonRec new_var other_expr))
+    go n (Note _ e)         = go n e
+
+    go n (Let (NonRec b r) e) | exprIsTrivial r = go n e	-- let f = f' alpha in (f,g) 
+								-- should be treated as a value
+    go n (Let _ e)    = OtherForm
+    go n (Case _ _ _) = OtherForm
+
+    go 0 (Lam x e) | isId x    = ValueForm	-- NB: \x.bottom /= bottom!
+    		   | otherwise = go 0 e
+    go n (Lam x e) | isId x    = go (n-1) e	-- Applied lambda
+		   | otherwise = go n e
+
+    go n (App fun (Type _)) = go n fun		-- Ignore type args
+    go n (App fun arg)      = go (n+1) fun
+
+    go n (Var f) | isBottomingId f = BottomForm
+    go 0 (Var f)		   = VarForm
+    go n (Var f) | n < arityLowerBound (getIdArity f) = ValueForm
+		 | otherwise			      = OtherForm
 \end{code}
 
-\begin{code}
-argToExpr ::
-  GenCoreArg val_occ flexi -> GenCoreExpr val_bdr val_occ flexi
+@exprIsTrivial@	is true of expressions we are unconditionally 
+		happy to duplicate; simple variables and constants,
+		and type applications.
 
-argToExpr (VarArg v)   = Var v
-argToExpr (LitArg lit) = Lit lit
+@exprIsDupable@	is true of expressions that can be duplicated at a modest
+		cost in space, but without duplicating any work.
+
+
+@exprIsBottom@	is true of expressions that are guaranteed to diverge
+
+
+\begin{code}
+exprIsTrivial (Type _)	     = True
+exprIsTrivial (Var v) 	     = True
+exprIsTrivial (App e arg)    = isTypeArg arg && exprIsTrivial e
+exprIsTrivial (Note _ e)     = exprIsTrivial e
+exprIsTrivial (Con con args) = conIsTrivial con && all isTypeArg args
+exprIsTrivial (Lam b body)   | isTyVar b = exprIsTrivial body
+exprIsTrivial other	     = False
 \end{code}
 
-All the following functions operate on binders, perform a uniform
-transformation on them; ie. the function @(\ x -> (x,False))@
-annotates all binders with False.
 
 \begin{code}
-unTagBinders :: GenCoreExpr (Id,tag) bdee flexi -> GenCoreExpr Id bdee flexi
-unTagBinders expr = bop_expr fst expr
+exprIsDupable (Type _)	     = True
+exprIsDupable (Con con args) = conIsCheap con && 
+			       all exprIsDupable args &&
+			       valArgCount args <= dupAppSize
 
-unTagBindersAlts :: GenCoreCaseAlts (Id,tag) bdee flexi -> GenCoreCaseAlts Id bdee flexi
-unTagBindersAlts alts = bop_alts fst alts
+exprIsDupable (Note _ e)     = exprIsDupable e
+exprIsDupable expr	     = case collectArgs expr of  
+				  (Var v, args) -> n_val_args == 0 ||
+						   (n_val_args < fun_arity &&
+						    all exprIsDupable args &&
+						    n_val_args <= dupAppSize)
+						where
+						   n_val_args = valArgCount args
+						   fun_arity = arityLowerBound (getIdArity v)
+									
+				  _	        -> False
+
+dupAppSize :: Int
+dupAppSize = 4		-- Size of application we are prepared to duplicate
 \end{code}
 
+@exprIsCheap@ looks at a Core expression and returns \tr{True} if
+it is obviously in weak head normal form, or is cheap to get to WHNF.
+[Note that that's not the same as exprIsDupable; an expression might be
+big, and hence not dupable, but still cheap.]
+By ``cheap'' we mean a computation we're willing to push inside a lambda 
+in order to bring a couple of lambdas together.  That might mean it gets
+evaluated more than once, instead of being shared.  The main examples of things
+which aren't WHNF but are ``cheap'' are:
+
+  * 	case e of
+	  pi -> ei
+
+	where e, and all the ei are cheap; and
+
+  *	let x = e
+	in b
+
+	where e and b are cheap; and
+
+  *	op x1 ... xn
+
+	where op is a cheap primitive operator
+
 \begin{code}
-bop_expr  :: (a -> b) -> GenCoreExpr a bdee flexi -> GenCoreExpr b bdee flexi
+exprIsCheap :: CoreExpr -> Bool
+exprIsCheap (Type _)        	= True
+exprIsCheap (Var _)         	= True
+exprIsCheap (Con con args)  	= conIsCheap con && all exprIsCheap args
+exprIsCheap (Note _ e)      	= exprIsCheap e
+exprIsCheap (Lam x e)       	= if isId x then True else exprIsCheap e
+exprIsCheap (Let bind body) 	= all exprIsCheap (rhssOfBind bind) && exprIsCheap body
+exprIsCheap (Case scrut _ alts) = exprIsCheap scrut && 
+				  all (\(_,_,rhs) -> exprIsCheap rhs) alts
 
-bop_expr f (Var b)	     = Var b
-bop_expr f (Lit lit)	     = Lit lit
-bop_expr f (Con con args)    = Con con args
-bop_expr f (Prim op args)    = Prim op args
-bop_expr f (Lam binder expr) = Lam  (bop_binder f binder) (bop_expr f expr)
-bop_expr f (App expr arg)    = App  (bop_expr f expr) arg
-bop_expr f (Note note expr)  = Note note (bop_expr f expr)
-bop_expr f (Let bind expr)   = Let  (bop_bind f bind) (bop_expr f expr)
-bop_expr f (Case expr alts)  = Case (bop_expr f expr) (bop_alts f alts)
+exprIsCheap other_expr   -- look for manifest partial application
+  = case collectArgs other_expr of
 
-bop_binder f (ValBinder   v) = ValBinder (f v)
-bop_binder f (TyBinder    t) = TyBinder    t
+      (Var f, _) | isBottomingId f -> True	-- Application of a function which
+					-- always gives bottom; we treat this as
+					-- a WHNF, because it certainly doesn't
+					-- need to be shared!
 
-bop_bind f (NonRec b e)	= NonRec (f b) (bop_expr f e)
-bop_bind f (Rec pairs)	= Rec [(f b, bop_expr f e) | (b, e) <- pairs]
+      (Var f, args) ->
+		let
+		    num_val_args = valArgCount args
+		in
+		num_val_args == 0 ||	-- Just a type application of
+					-- a variable (f t1 t2 t3)
+					-- counts as WHNF
+		num_val_args < arityLowerBound (getIdArity f)
 
-bop_alts f (AlgAlts alts deflt)
-  = AlgAlts  [ (con, [f b | b <- binders], bop_expr f e)
-	     | (con, binders, e) <- alts ]
-	     (bop_deflt f deflt)
-
-bop_alts f (PrimAlts alts deflt)
-  = PrimAlts [ (lit, bop_expr f e) | (lit, e) <- alts ]
-    	     (bop_deflt f deflt)
-
-bop_deflt f (NoDefault)		 = NoDefault
-bop_deflt f (BindDefault b expr) = BindDefault (f b) (bop_expr f expr)
+      _ -> False
 \end{code}
 
-OLD (but left here because of the nice example): @singleAlt@ checks
-whether a bunch of case alternatives is actually just one alternative.
-It specifically {\em ignores} alternatives which consist of just a
-call to @error@, because they won't result in any code duplication.
-
-Example:
-\begin{verbatim}
-	case (case <something> of
-		True  -> <rhs>
-		False -> error "Foo") of
-	<alts>
-
-===>
-
-	case <something> of
-	   True ->  case <rhs> of
-		    <alts>
-	   False -> case error "Foo" of
-		    <alts>
-
-===>
-
-	case <something> of
-	   True ->  case <rhs> of
-		    <alts>
-	   False -> error "Foo"
-\end{verbatim}
-Notice that the \tr{<alts>} don't get duplicated.
 
 \begin{code}
-nonErrorRHSs :: GenCoreCaseAlts a Id Unused -> [GenCoreExpr a Id Unused]
-
-nonErrorRHSs alts
-  = filter not_error_app (find_rhss alts)
-  where
-    find_rhss (AlgAlts  as deflt) = [rhs | (_,_,rhs) <- as] ++ deflt_rhs deflt
-    find_rhss (PrimAlts as deflt) = [rhs | (_,rhs)   <- as] ++ deflt_rhs deflt
-
-    deflt_rhs NoDefault           = []
-    deflt_rhs (BindDefault _ rhs) = [rhs]
-
-    not_error_app rhs
-      = case (maybeErrorApp rhs Nothing) of
-	  Just _  -> False
-	  Nothing -> True
+exprIsBottom :: CoreExpr -> Bool	-- True => definitely bottom
+exprIsBottom (Note _ e)   = exprIsBottom e
+exprIsBottom (Let _ e)    = exprIsBottom e
+exprIsBottom (Case e _ _) = exprIsBottom e	-- Just chek the scrut
+exprIsBottom (Con _ _)    = False
+exprIsBottom (App e _)    = exprIsBottom e
+exprIsBottom (Var v)      = isBottomingId v
+exprIsBottom (Lam _ _)	  = False
 \end{code}
 
-maybeErrorApp checks whether an expression is of the form
+exprIsWHNF reports True for head normal forms.  Note that does not necessarily
+mean *normal* forms; constructors might have non-trivial argument expressions, for
+example.  We use a let binding for WHNFs, rather than a case binding, even if it's
+used strictly.  We try to expose WHNFs by floating lets out of the RHS of lets.
 
-	error ty args
-
-If so, it returns
-
-	Just (error ty' args)
-
-where ty' is supplied as an argument to maybeErrorApp.
-
-Here's where it is useful:
-
-		case (error ty "Foo" e1 e2) of <alts>
- ===>
-		error ty' "Foo"
-
-where ty' is the type of any of the alternatives.  You might think
-this never occurs, but see the comments on the definition of
-@singleAlt@.
-
-Note: we *avoid* the case where ty' might end up as a primitive type:
-this is very uncool (totally wrong).
-
-NOTICE: in the example above we threw away e1 and e2, but not the
-string "Foo".  How did we know to do that?
-
-Answer: for now anyway, we only handle the case of a function whose
-type is of form
-
-	bottomingFn :: forall a. t1 -> ... -> tn -> a
-	    	    	      ^---------------------^ NB!
-
-Furthermore, we only count a bottomingApp if the function is applied
-to more than n args.  If so, we transform:
-
-	bottomingFn ty e1 ... en en+1 ... em
-to
-	bottomingFn ty' e1 ... en
-
-That is, we discard en+1 .. em
+We treat applications of buildId and augmentId as honorary WHNFs, because we
+want them to get exposed
 
 \begin{code}
-maybeErrorApp
-	:: GenCoreExpr a Id Unused	-- Expr to look at
-	-> Maybe Type			-- Just ty => a result type *already cloned*;
-					-- Nothing => don't know result ty; we
-					-- *pretend* that the result ty won't be
-					-- primitive -- somebody later must
-					-- ensure this.
-	-> Maybe (GenCoreExpr b Id Unused)
+exprIsWHNF :: CoreExpr -> Bool	-- True => Variable, value-lambda, constructor, PAP
+exprIsWHNF (Type ty)	      = True	-- Types are honorary WHNFs; we don't mind
+					-- copying them
+exprIsWHNF (Var v)    	      = True
+exprIsWHNF (Lam b e)  	      = isId b || exprIsWHNF e
+exprIsWHNF (Note _ e) 	      = exprIsWHNF e
+exprIsWHNF (Let _ e)          = False
+exprIsWHNF (Case _ _ _)       = False
+exprIsWHNF (Con con _)        = isWHNFCon con 
+exprIsWHNF e@(App _ _)        = case collectArgs e of  
+				  (Var v, args) -> n_val_args == 0 || 
+						   fun_arity > n_val_args ||
+						   v_uniq == buildIdKey ||
+						   v_uniq == augmentIdKey
+						where
+						   n_val_args = valArgCount args
+						   fun_arity  = arityLowerBound (getIdArity v)
+						   v_uniq     = idUnique v
 
-maybeErrorApp expr result_ty_maybe
-  = case (collectArgs expr) of
-      (Var fun, [ty], other_args)
-	| isBottomingId fun
-	&& maybeToBool result_ty_maybe -- we *know* the result type
-				       -- (otherwise: live a fairy-tale existence...)
-	&& not (isUnpointedType result_ty) ->
-
-	case (splitSigmaTy (idType fun)) of
-	  ([tyvar], [], tau_ty) ->
-	      case (splitFunTys tau_ty) of { (arg_tys, res_ty) ->
-	      let
-		  n_args_to_keep = length arg_tys
-		  args_to_keep   = take n_args_to_keep other_args
-	      in
-	      if  (res_ty == mkTyVarTy tyvar)
-	       && n_args_to_keep <= length other_args
-	      then
-		    -- Phew!  We're in business
-		  Just (mkGenApp (Var fun) (TyArg result_ty : args_to_keep))
-	      else
-		  Nothing
-	      }
-
-	  other -> Nothing  -- Function type wrong shape
-      other -> Nothing
-  where
-    Just result_ty = result_ty_maybe
+				  _	        -> False
 \end{code}
 
-\begin{code}
-squashableDictishCcExpr :: CostCentre -> GenCoreExpr a b c -> Bool
+I don't like this function but I'n not confidnt enough to change it.
 
+\begin{code}
+squashableDictishCcExpr :: CostCentre -> Expr b f -> Bool
 squashableDictishCcExpr cc expr
-  = if not (isDictCC cc) then
-	False -- that was easy...
-    else
-	squashable expr -- note: quite like the "atomic_rhs" stuff in simplifier
+  | isDictCC cc = False		-- that was easy...
+  | otherwise   = squashable expr
   where
     squashable (Var _)      = True
     squashable (Con  _ _)   = True -- I think so... WDP 94/09
-    squashable (Prim _ _)   = True -- ditto
     squashable (App f a)
-      | notValArg a	    = squashable f
+      | isTypeArg a	    = squashable f
     squashable other	    = False
+\end{code}
+
+
+@cheapEqExpr@ is a cheap equality test which bales out fast!
+	True  => definitely equal
+	False => may or may not be equal
+
+\begin{code}
+cheapEqExpr :: Expr b f -> Expr b f -> Bool
+
+cheapEqExpr (Var v1) (Var v2) = v1==v2
+cheapEqExpr (Con con1 args1) (Con con2 args2)
+  = con1 == con2 && 
+    and (zipWithEqual "cheapEqExpr" cheapEqExpr args1 args2)
+
+cheapEqExpr (App f1 a1) (App f2 a2)
+  = f1 `cheapEqExpr` f2 && a1 `cheapEqExpr` a2
+
+cheapEqExpr (Type t1) (Type t2) = t1 == t2
+
+cheapEqExpr _ _ = False
+\end{code}
+
+
+%************************************************************************
+%*									*
+\section{Finding the free variables of an expression}
+%*									*
+%************************************************************************
+
+This function simply finds the free variables of an expression.
+So far as type variables are concerned, it only finds tyvars that are
+
+	* free in type arguments, 
+	* free in the type of a binder,
+
+but not those that are free in the type of variable occurrence.
+
+\begin{code}
+exprFreeVars :: CoreExpr -> IdOrTyVarSet	-- Find all locally-defined free Ids or tyvars
+exprFreeVars = exprSomeFreeVars isLocallyDefined
+
+exprSomeFreeVars :: InterestingVarFun 	-- Says which Vars are interesting
+		-> CoreExpr
+		-> IdOrTyVarSet
+exprSomeFreeVars fv_cand e = expr_fvs e fv_cand emptyVarSet
+
+type InterestingVarFun = IdOrTyVar -> Bool	-- True <=> interesting
+\end{code}
+
+
+\begin{code}
+type FV = InterestingVarFun 
+	  -> IdOrTyVarSet	-- In scope
+	  -> IdOrTyVarSet	-- Free vars
+
+union :: FV -> FV -> FV
+union fv1 fv2 fv_cand in_scope = fv1 fv_cand in_scope `unionVarSet` fv2 fv_cand in_scope
+
+noVars :: FV
+noVars fv_cand in_scope = emptyVarSet
+
+oneVar :: IdOrTyVar -> FV
+oneVar var fv_cand in_scope
+  | keep_it fv_cand in_scope var = unitVarSet var
+  | otherwise			 = emptyVarSet
+
+someVars :: IdOrTyVarSet -> FV
+someVars vars fv_cand in_scope
+  = filterVarSet (keep_it fv_cand in_scope) vars
+
+keep_it fv_cand in_scope var
+  | var `elemVarSet` in_scope = False
+  | fv_cand var		      = True
+  | otherwise		      = False
+
+
+addBndr :: CoreBndr -> FV -> FV
+addBndr bndr fv fv_cand in_scope
+  | isId bndr = inside_fvs `unionVarSet` someVars (idFreeVars bndr) fv_cand in_scope
+  | otherwise = inside_fvs
+  where
+    inside_fvs = fv fv_cand (in_scope `extendVarSet` bndr) 
+
+addBndrs :: [CoreBndr] -> FV -> FV
+addBndrs bndrs fv = foldr addBndr fv bndrs
+\end{code}
+
+
+\begin{code}
+expr_fvs :: CoreExpr -> FV
+
+expr_fvs (Type ty) 	 = someVars (tyVarsOfType ty)
+expr_fvs (Var var) 	 = oneVar var
+expr_fvs (Con con args)  = foldr (union . expr_fvs) noVars args
+expr_fvs (Note _ expr)   = expr_fvs expr
+expr_fvs (App fun arg)   = expr_fvs fun `union` expr_fvs arg
+expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
+
+expr_fvs (Case scrut bndr alts)
+  = expr_fvs scrut `union` addBndr bndr (foldr (union. alt_fvs) noVars alts)
+  where
+    alt_fvs (con, bndrs, rhs) = addBndrs bndrs (expr_fvs rhs)
+
+expr_fvs (Let (NonRec bndr rhs) body)
+  = expr_fvs rhs `union` addBndr bndr (expr_fvs body)
+
+expr_fvs (Let (Rec pairs) body)
+  = addBndrs bndrs (foldr (union . expr_fvs) (expr_fvs body) rhss)
+  where
+    (bndrs,rhss) = unzip pairs
 \end{code}
 
 
@@ -412,14 +443,213 @@ This is used by the occurrence analyser and free-var finder;
 we regard an Id's specialisations as free in the Id's definition.
 
 \begin{code}
-idSpecVars :: Id -> [Id]
+idSpecVars :: Id -> IdOrTyVarSet
 idSpecVars id 
-  = map get_spec (specEnvValues (getIdSpecialisation id))
+  = foldr (unionVarSet . spec_item_fvs)
+	  emptyVarSet 
+	  (specEnvToList (getIdSpecialisation id))
   where
-    -- get_spec is another cheapo function like dictRhsFVs
-    -- It knows what these specialisation temlates look like,
-    -- and just goes for the jugular
-    get_spec (App f _) = get_spec f
-    get_spec (Lam _ b) = get_spec b
-    get_spec (Var v)   = v
+    spec_item_fvs (tyvars, tys, rhs) = foldl delVarSet
+					     (tyVarsOfTypes tys `unionVarSet` exprFreeVars rhs)
+					     tyvars
+
+idFreeVars :: Id -> IdOrTyVarSet
+idFreeVars id = idSpecVars id `unionVarSet` idFreeTyVars id
 \end{code}
+
+
+%************************************************************************
+%*									*
+\section{Substitution}
+%*									*
+%************************************************************************
+
+This expression substituter deals correctly with name capture, much
+like Type.substTy.
+
+BUT NOTE that substExpr silently discards the
+	unfolding, and
+	spec env
+IdInfo attached to any binders in the expression.  It's quite
+tricky to do them 'right' in the case of mutually recursive bindings,
+and so far has proved unnecessary.
+
+\begin{code}
+substExpr :: TyVarSubst -> IdSubst	-- Substitution
+	  -> IdOrTyVarSet		-- Superset of in-scope
+	  -> CoreExpr
+	  -> CoreExpr
+
+substExpr te ve in_scope expr = subst_expr (te, ve, in_scope) expr
+
+subst_expr env@(te, ve, in_scope) expr
+  = go expr
+  where
+    go (Var v) = case lookupVarEnv ve v of
+			Just (Done e')
+				-> e'
+
+			Just (SubstMe e' te' ve')
+				-> subst_expr (te', ve', in_scope) e'
+
+			Nothing -> case lookupVarSet in_scope v of
+					Just v' -> Var v'
+					Nothing -> Var v
+			-- NB: we look up in the in_scope set because the variable
+			-- there may have more info. In particular, when substExpr
+			-- is called from the simplifier, the type inside the *occurrences*
+			-- of a variable may not be right; we should replace it with the
+			-- binder, from the in_scope set.
+
+    go (Type ty)      = Type (go_ty ty)
+    go (Con con args) = Con con (map go args)
+    go (App fun arg)  = App (go fun) (go arg)
+    go (Note note e)  = Note (go_note note) (go e)
+
+    go (Lam bndr body) = Lam bndr' (subst_expr env' body)
+		       where
+			 (env', bndr') = go_bndr env bndr
+
+    go (Let (NonRec bndr rhs) body) = Let (NonRec bndr' (go rhs)) (subst_expr env' body)
+				    where
+				      (env', bndr') = go_bndr env bndr
+
+    go (Let (Rec pairs) body) = Let (Rec pairs') (subst_expr env' body)
+			      where
+				(ve', in_scope', _, bndrs') 
+				   = substIds clone_fn te ve in_scope undefined (map fst pairs)
+				env'    = (te, ve', in_scope')
+				pairs'	= bndrs' `zip` rhss'
+				rhss'	= map (subst_expr env' . snd) pairs
+
+    go (Case scrut bndr alts) = Case (go scrut) bndr' (map (go_alt env') alts)
+			      where
+				(env', bndr') = go_bndr env bndr
+
+    go_alt env (con, bndrs, rhs) = (con, bndrs', subst_expr env' rhs)
+				 where
+				   (env', bndrs') = mapAccumL go_bndr env bndrs
+
+    go_note (Coerce ty1 ty2) = Coerce (go_ty ty1) (go_ty ty2)
+    go_note note	     = note
+
+    go_ty ty = fullSubstTy te in_scope ty
+
+    go_bndr (te, ve, in_scope) bndr
+	| isTyVar bndr
+	= case substTyVar te in_scope bndr of
+		(te', in_scope', bndr') -> ((te', ve, in_scope'), bndr')
+
+	| otherwise
+	= case substId clone_fn te ve in_scope undefined bndr of
+		(ve', in_scope', _, bndr') -> ((te, ve', in_scope'), bndr')
+
+
+    clone_fn in_scope _ bndr
+		| bndr `elemVarSet` in_scope = Just (uniqAway in_scope bndr, undefined)
+		| otherwise		     = Nothing
+				
+\end{code}
+
+Substituting in binders is a rather tricky part of the whole compiler.
+
+\begin{code}
+substIds :: (IdOrTyVarSet -> us -> Id -> Maybe (us, Id))	-- Cloner
+	 -> TyVarSubst -> IdSubst -> IdOrTyVarSet	-- Usual stuff
+	 -> us						-- Unique supply
+	 -> [Id]
+	 -> (IdSubst, IdOrTyVarSet, 			-- New id_subst, in_scope
+	     us, 					-- New unique supply
+	     [Id])
+
+substIds clone_fn ty_subst id_subst in_scope us []
+  = (id_subst, in_scope, us, [])
+
+substIds clone_fn ty_subst id_subst in_scope us (id:ids)
+  = case (substId clone_fn ty_subst id_subst in_scope us id) of {
+	(id_subst', in_scope', us', id') -> 
+
+    case (substIds clone_fn ty_subst id_subst' in_scope' us' ids) of {
+	(id_subst'', in_scope'', us'', ids') -> 
+
+    (id_subst'', in_scope'', us'', id':ids')
+    }}
+
+
+substId :: (IdOrTyVarSet -> us -> Id -> Maybe (us, Id))	-- Cloner
+	-> TyVarSubst -> IdSubst -> IdOrTyVarSet	-- Usual stuff
+	-> us						-- Unique supply
+	-> Id
+	-> (IdSubst, IdOrTyVarSet, 			-- New id_subst, in_scope
+	    us, 					-- New unique supply
+	    Id)
+
+-- Returns an Id with empty unfolding and spec-env. 
+-- It's up to the caller to sort these out.
+
+substId clone_fn 
+	ty_subst id_subst in_scope
+	us id
+  | old_id_will_do
+		-- No need to clone, but we *must* zap any current substitution
+		-- for the variable.  For example:
+		--	(\x.e) with id_subst = [x |-> e']
+		-- Here we must simply zap the substitution for x
+  = (delVarEnv id_subst id, extendVarSet in_scope id, us, id)
+
+  | otherwise
+  = (extendVarEnv id_subst id (Done (Var new_id)), 
+     extendVarSet in_scope new_id,
+     new_us,
+     new_id)
+  where
+    id_ty	   = idType id
+    old_id_will_do = old1 && old2 && old3 && {-old4 && -}not cloned 
+
+       -- id1 has its type zapped
+    (id1,old1) |  isEmptyVarEnv ty_subst
+	       || isEmptyVarSet (tyVarsOfType id_ty) = (id, True)
+ 	       | otherwise 			     = (setIdType id ty', False)
+
+    ty' = fullSubstTy ty_subst in_scope id_ty
+
+	-- id2 has its SpecEnv zapped
+	-- It's filled in later by 
+    (id2,old2) | isEmptySpecEnv spec_env = (id1, True)
+	       | otherwise  	         = (setIdSpecialisation id1 emptySpecEnv, False)
+    spec_env  = getIdSpecialisation id
+
+	-- id3 has its Unfolding zapped
+	-- This is very important; occasionally a let-bound binder is used
+	-- as a binder in some lambda, in which case its unfolding is utterly
+	-- bogus.  Also the unfolding uses old binders so if we left it we'd
+	-- have to substitute it. Much better simply to give the Id a new
+	-- unfolding each time, which is what the simplifier does.
+    (id3,old3) | hasUnfolding (getIdUnfolding id) = (id2 `setIdUnfolding` noUnfolding, False)
+	       | otherwise			  = (id2, True)
+
+	-- new_id is cloned if necessary
+    (new_us, new_id, cloned) = case clone_fn in_scope us id3 of
+				  Nothing         -> (us,  id3, False)
+				  Just (us', id') -> (us', id', True)
+
+        -- new_id_bndr has its Inline info neutered.  We must forget about whether it
+        -- was marked safe-to-inline, because that isn't necessarily true in
+        -- the simplified expression.  We do this for the *binder* which will
+	-- be used at the binding site, but we *dont* do it for new_id, which
+	-- is put into the in_scope env.  Why not?  Because the in_scope env
+	-- carries down the occurrence information to usage sites! 
+	--
+	-- Net result: post-simplification, occurrences may have over-optimistic
+	-- occurrence info, but binders won't.
+{-    (new_id_bndr, old4)
+	= case getInlinePragma id of
+		ICanSafelyBeINLINEd _ _ -> (setInlinePragma new_id NoInlinePragInfo, False)
+		other		        -> (new_id, True)
+-}
+\end{code}
+
+
+
+
+

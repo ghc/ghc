@@ -1,0 +1,7 @@
+__interface HsMatches 1 0 where
+__export HsMatches Match GRHSsAndBinds pprMatch pprMatches pprGRHSsAndBinds ;
+1 data Match a b c ;
+1 data GRHSsAndBinds a b c ;
+1 pprGRHSsAndBinds :: __forall [_i _p _f] {Name.NamedThing _i, Outputable.Outputable _i, Outputable.Outputable _p} => PrelBase.Bool -> HsMatches.GRHSsAndBinds _f _i _p -> Outputable.SDoc ;
+1 pprMatch :: __forall [_i _p _f] {Name.NamedThing _i, Outputable.Outputable _i, Outputable.Outputable _p} => PrelBase.Bool -> HsMatches.Match _f _i _p -> Outputable.SDoc ;
+1 pprMatches :: __forall [_i _p _f] {Name.NamedThing _i, Outputable.Outputable _i, Outputable.Outputable _p} => (PrelBase.Bool, Outputable.SDoc) -> [HsMatches.Match _f _i _p] -> Outputable.SDoc ;

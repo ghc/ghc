@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcGenDeriv]{Generating derived instance declarations}
 
@@ -12,7 +12,6 @@ This is where we do all the grimy bindings' generation.
 module TcGenDeriv (
 	gen_Bounded_binds,
 	gen_Enum_binds,
-	gen_Eval_binds,
 	gen_Eq_binds,
 	gen_Ix_binds,
 	gen_Ord_binds,
@@ -27,9 +26,9 @@ module TcGenDeriv (
 
 #include "HsVersions.h"
 
-import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..), GRHS(..), 
+import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			  Match(..), GRHSsAndBinds(..), Stmt(..), HsLit(..),
-			  HsBinds(..), DoOrListComp(..),
+			  HsBinds(..), StmtCtxt(..),
 			  unguardedRHS
 			)
 import RdrHsSyn		( RdrName(..), varUnqual, mkOpApp,
@@ -37,25 +36,26 @@ import RdrHsSyn		( RdrName(..), varUnqual, mkOpApp,
 			)
 import BasicTypes	( IfaceFlavour(..), RecFlag(..) )
 import FieldLabel       ( fieldLabelName )
-import Id		( GenId, isNullaryDataCon, dataConTag,
+import DataCon		( isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
-			  isDataCon, DataCon, ConTag,
-			  dataConFieldLabels, Id )
-import Maybes		( maybeToBool )
+			  DataCon, ConTag,
+			  dataConFieldLabels )
 import Name		( getOccString, getOccName, getSrcLoc, occNameString, 
 			  modAndOcc, OccName, Name )
 
 import PrimOp		( PrimOp(..) )
 import PrelInfo		-- Lots of RdrNames
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
-import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon, maybeTyConSingleCon )
-import Type		( isUnpointedType, isUnboxedType, Type )
+import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
+			  maybeTyConSingleCon
+			)
+import Type		( isUnLiftedType, isUnboxedType, Type )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
 			)
 import Util		( mapAccumL, zipEqual, zipWithEqual,
 			  zipWith3Equal, nOfThem, panic, assertPanic )
-
+import Maybes		( maybeToBool )
 import List		( partition, intersperse )
 \end{code}
 
@@ -472,16 +472,6 @@ gen_Enum_binds tycon
 
 %************************************************************************
 %*									*
-\subsubsection{Generating @Eval@ instance declarations}
-%*									*
-%************************************************************************
-
-\begin{code}
-gen_Eval_binds tycon = EmptyMonoBinds
-\end{code}
-
-%************************************************************************
-%*									*
 \subsubsection{Generating @Bounded@ instance declarations}
 %*									*
 %************************************************************************
@@ -589,7 +579,8 @@ gen_Ix_binds tycon
     	    	enum_index `AndMonoBinds` enum_inRange
 
     enum_range
-      = mk_easy_FunMonoBind tycon_loc range_RDR [TuplePatIn [a_Pat, b_Pat]] [] $
+      = mk_easy_FunMonoBind tycon_loc range_RDR 
+		[TuplePatIn [a_Pat, b_Pat] True{-boxed-}] [] $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
 	  untag_Expr tycon [(b_RDR, bh_RDR)] $
 	  HsApp (mk_easy_App map_RDR [tag2con_RDR tycon]) $
@@ -598,7 +589,9 @@ gen_Ix_binds tycon
 			(mk_easy_App mkInt_RDR [bh_RDR]))
 
     enum_index
-      = mk_easy_FunMonoBind tycon_loc index_RDR [AsPatIn c_RDR (TuplePatIn [a_Pat, b_Pat]), d_Pat] [] (
+      = mk_easy_FunMonoBind tycon_loc index_RDR 
+		[AsPatIn c_RDR (TuplePatIn [a_Pat, b_Pat] True{-boxed-}), 
+				d_Pat] [] (
 	HsIf (HsPar (mk_easy_App inRange_RDR [c_RDR, d_RDR])) (
 	   untag_Expr tycon [(a_RDR, ah_RDR)] (
 	   untag_Expr tycon [(d_RDR, dh_RDR)] (
@@ -617,7 +610,8 @@ gen_Ix_binds tycon
 	tycon_loc)
 
     enum_inRange
-      = mk_easy_FunMonoBind tycon_loc inRange_RDR [TuplePatIn [a_Pat, b_Pat], c_Pat] [] (
+      = mk_easy_FunMonoBind tycon_loc inRange_RDR 
+	  [TuplePatIn [a_Pat, b_Pat] True{-boxed-}, c_Pat] [] (
 	  untag_Expr tycon [(a_RDR, ah_RDR)] (
 	  untag_Expr tycon [(b_RDR, bh_RDR)] (
 	  untag_Expr tycon [(c_RDR, ch_RDR)] (
@@ -636,7 +630,7 @@ gen_Ix_binds tycon
     data_con
       =	case maybeTyConSingleCon tycon of -- just checking...
 	  Nothing -> panic "get_Ix_binds"
-	  Just dc -> if (any isUnpointedType (dataConRawArgTys dc)) then
+	  Just dc -> if (any isUnLiftedType (dataConRawArgTys dc)) then
 			 error ("ERROR: Can't derive Ix for a single-constructor type with primitive argument types: "++tycon_str)
 		     else
 			 dc
@@ -653,7 +647,8 @@ gen_Ix_binds tycon
 
     --------------------------------------------------------------
     single_con_range
-      = mk_easy_FunMonoBind tycon_loc range_RDR [TuplePatIn [con_pat as_needed, con_pat bs_needed]] [] $
+      = mk_easy_FunMonoBind tycon_loc range_RDR 
+	  [TuplePatIn [con_pat as_needed, con_pat bs_needed] True{-boxed-}] [] $
 	HsDo ListComp stmts tycon_loc
       where
 	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
@@ -661,37 +656,47 @@ gen_Ix_binds tycon
 		[ReturnStmt con_expr]
 
 	mk_qual a b c = BindStmt (VarPatIn c)
-				 (HsApp (HsVar range_RDR) (ExplicitTuple [HsVar a, HsVar b]))
+				 (HsApp (HsVar range_RDR) 
+					(ExplicitTuple [HsVar a, HsVar b] True))
 				 tycon_loc
 
     ----------------
     single_con_index
-      = mk_easy_FunMonoBind tycon_loc index_RDR [TuplePatIn [con_pat as_needed, con_pat bs_needed], con_pat cs_needed] [range_size] (
+      = mk_easy_FunMonoBind tycon_loc index_RDR 
+		[TuplePatIn [con_pat as_needed, con_pat bs_needed] True, 
+		 con_pat cs_needed] [range_size] (
 	foldl mk_index (HsLit (HsInt 0)) (zip3 as_needed bs_needed cs_needed))
       where
 	mk_index multiply_by (l, u, i)
 	  = genOpApp (
-		(HsApp (HsApp (HsVar index_RDR) (ExplicitTuple [HsVar l, HsVar u])) (HsVar i))
+	       (HsApp (HsApp (HsVar index_RDR) 
+		      (ExplicitTuple [HsVar l, HsVar u] True)) (HsVar i))
 	   ) plus_RDR (
 		genOpApp (
-		    (HsApp (HsVar rangeSize_RDR) (ExplicitTuple [HsVar l, HsVar u]))
+		    (HsApp (HsVar rangeSize_RDR) 
+			   (ExplicitTuple [HsVar l, HsVar u] True))
 		) times_RDR multiply_by
 	   )
 
 	range_size
-	  = mk_easy_FunMonoBind tycon_loc rangeSize_RDR [TuplePatIn [a_Pat, b_Pat]] [] (
+	  = mk_easy_FunMonoBind tycon_loc rangeSize_RDR 
+			[TuplePatIn [a_Pat, b_Pat] True] [] (
 		genOpApp (
-		    (HsApp (HsApp (HsVar index_RDR) (ExplicitTuple [a_Expr, b_Expr])) b_Expr)
+		    (HsApp (HsApp (HsVar index_RDR) 
+			   (ExplicitTuple [a_Expr, b_Expr] True)) b_Expr)
 		) plus_RDR (HsLit (HsInt 1)))
 
     ------------------
     single_con_inRange
       = mk_easy_FunMonoBind tycon_loc inRange_RDR 
-			   [TuplePatIn [con_pat as_needed, con_pat bs_needed], con_pat cs_needed]
+		[TuplePatIn [con_pat as_needed, con_pat bs_needed] True, 
+		 con_pat cs_needed]
 			   [] (
 	  foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed))
       where
-    	in_range a b c = HsApp (HsApp (HsVar inRange_RDR) (ExplicitTuple [HsVar a, HsVar b])) (HsVar c)
+    	in_range a b c = HsApp (HsApp (HsVar inRange_RDR) 
+				      (ExplicitTuple [HsVar a, HsVar b] True)) 
+			       (HsVar c)
 \end{code}
 
 %************************************************************************
@@ -739,13 +744,14 @@ gen_Read_binds tycon
 				       -- (label, '=' and field)*n, (n-1)*',' + '{' + '}'
 		con_qual
                   = BindStmt
-		          (TuplePatIn [LitPatIn (HsString data_con_str), d_Pat])
+		          (TuplePatIn [LitPatIn (HsString data_con_str), 
+				       d_Pat] True)
 		          (HsApp (HsVar lex_RDR) c_Expr)
 		          tycon_loc
 
 		str_qual str res draw_from
                   = BindStmt
-		       (TuplePatIn [LitPatIn (HsString str), VarPatIn res])
+		       (TuplePatIn [LitPatIn (HsString str), VarPatIn res] True)
 		       (HsApp (HsVar lex_RDR) draw_from)
 		       tycon_loc
   
@@ -785,13 +791,13 @@ gen_Read_binds tycon
 
 		mk_read_qual con_field res draw_from =
 		  BindStmt
-		   (TuplePatIn [VarPatIn con_field, VarPatIn res])
+		   (TuplePatIn [VarPatIn con_field, VarPatIn res] True)
 		   (HsApp (HsApp (HsVar readsPrec_RDR) (HsLit (HsInt 10))) draw_from)
 		   tycon_loc
 
 		result_expr = ExplicitTuple [con_expr, if null bs_needed 
 						       then d_Expr 
-						       else HsVar (last bs_needed)]
+						       else HsVar (last bs_needed)] True
 
 		stmts = con_qual:field_quals ++ [ReturnStmt result_expr]
 		
@@ -928,8 +934,7 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
     mk_stuff :: DataCon -> ([RdrNamePat], RdrNameHsExpr)
 
     mk_stuff var
-      = ASSERT(isDataCon var)
-	([pat], HsLit (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG))))
+      = ([pat], HsLit (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG))))
       where
 	pat    = ConPatIn var_RDR (nOfThem (argFieldCount var) WildPatIn)
 	var_RDR = qual_orig_name var
@@ -939,10 +944,7 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
 							     [([WildPatIn], impossible_Expr)])
   where
     mk_stuff :: DataCon -> ([RdrNamePat], RdrNameHsExpr)
-
-    mk_stuff var
-      = ASSERT(isDataCon var)
-	([lit_pat], HsVar var_RDR)
+    mk_stuff var = ([lit_pat], HsVar var_RDR)
       where
 	lit_pat = ConPatIn mkInt_RDR [LitPatIn (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG)))]
 	var_RDR  = qual_orig_name var
@@ -1106,7 +1108,7 @@ eq_Expr ty a b
 \end{code}
 
 \begin{code}
-argFieldCount :: Id -> Int	-- Works on data and newtype constructors
+argFieldCount :: DataCon -> Int	-- Works on data and newtype constructors
 argFieldCount con = length (dataConRawArgTys con)
 \end{code}
 

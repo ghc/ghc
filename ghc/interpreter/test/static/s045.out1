@@ -1,0 +1,1 @@
+ERROR "test/static/s045.hs" (line 3): Illegal constraints on class variable "a" in type of member function "f"

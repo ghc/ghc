@@ -34,6 +34,7 @@ import PrelBase
 import PrelMaybe
 import PrelArr
 import PrelNum
+import PrelNumExtra
 import PrelRead
 import PrelErr ( error )
 

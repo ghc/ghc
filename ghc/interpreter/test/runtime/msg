@@ -1,0 +1,28 @@
+----------------------------------------------------------------
+-- Testing runtime system.
+-- This group of checks will produce 12-16 lines of output of the form
+-- 
+-- --!!! <description of feature being tested>
+-- 
+-- It may also produce output that looks like this:
+-- 
+--   ./hugs +q -pHugs:  test/???.hs < test/???.input
+--   expected stdout not matched by reality
+--   *** test/???.output  Fri Jul 11 13:25:27 1997
+--   --- /tmp/runtest3584.3  Fri Jul 11 15:55:13 1997
+--   ***************
+--   *** 1,3 ****
+--     ...
+--   | Hugs:\"[0.0, 0.304693, 0.643501, 1.5708]\"
+--     ...
+--   --- 1,3 ----
+--     ...
+--   | Hugs:\"[0.0, 0.30469323452, 0.643503234321, 1.5708234234]\"
+--     ...
+-- 
+-- This is harmless and reflects variations in the accuracy of floating
+-- point representation, calculations and printing.
+-- 
+-- You should report a problem if any other output is generated or if
+-- the size of the floating point errors seem excessively large.
+----------------------------------------------------------------

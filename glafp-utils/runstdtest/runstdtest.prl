@@ -119,7 +119,7 @@ arg: while ($_ = $ARGV[0]) {
 
 foreach $out_file ( @PgmStdoutFile ) {
     if ( ! -f $out_file && !$SaveStdout ) {
-    	    print STDERR "$Pgm: warning: expected-stderr file missing: $out_file\n";
+    	    print STDERR "$Pgm: warning: expected-stdout file missing: $out_file\n";
 	    pop(@PgmStdoutFile);
     }
 }

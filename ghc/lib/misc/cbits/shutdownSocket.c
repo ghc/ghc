@@ -8,8 +8,9 @@
 #endif
 
 #define NON_POSIX_SOURCE
-#include "rtsdefs.h"
+#include "Rts.h"
 #include "ghcSockets.h"
+#include "stgio.h"
 
 StgInt
 shutdownSocket(I_ sockfd, I_ how)
@@ -19,7 +20,23 @@ shutdownSocket(I_ sockfd, I_ how)
     while ((rc = shutdown((int) sockfd, (int) how)) < 0) {
       if (errno != EINTR) {
 	  cvtErrno();
-	  stdErrno();
+	  switch (ghc_errno) {
+	  default:
+	      stdErrno();
+	      break;
+	  case GHC_EBADF:
+       	      ghc_errtype = ERR_INVALIDARGUMENT;
+              ghc_errstr  = "Not a valid write descriptor";
+	      break;
+	  case GHC_ENOTCONN:
+	      ghc_errtype = ERR_INVALIDARGUMENT;
+	      ghc_errstr  = "Socket not connected";
+	      break;
+	  case GHC_ENOTSOCK:
+	      ghc_errtype = ERR_INVALIDARGUMENT;
+	      ghc_errstr  = "Descriptor is not a socket";
+	      break;
+	  }
 	  return -1;
       }
     }

@@ -1,0 +1,6 @@
+Reading file "List.hs":
+Reading file "test/std/list1.hs":
+Type :? for help
+Hugs:[0,1,2,3,4]
+Hugs:[0,1,2,3,4]
+Hugs:[0,1,4]

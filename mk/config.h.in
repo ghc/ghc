@@ -18,21 +18,12 @@
 /* Define if using alloca.c.  */
 #undef C_ALLOCA
 
-/* Define if text section appear before data section in exec. */
-#undef CODE_BEFORE_DATA
-
 /* Define to empty if the keyword does not work.  */
 #undef const
 
 /* Define to one of _getb67, GETB67, getb67 for Cray-2 and Cray-YMP systems.
    This function is required for alloca.c support on those systems.  */
 #undef CRAY_STACKSEG_END
-
-/* Define to decl that terminates data section. */
-#undef DATA_SECTION_END_MARKER_DECL
-
-/* Define to section that terminates data section. */
-#undef DATA_SECTION_END_MARKER
 
 /* Define if you have alloca, as a function or macro.  */
 #undef HAVE_ALLOCA
@@ -87,8 +78,23 @@
 /* Define to alignment constraint on unsigned int - whichever is the greater */
 #undef ALIGNMENT_UNSIGNED_INT
 
+/* Define if code lives before data in memory */
+#undef CODE_BEFORE_DATA
+
+/* Define as the symbol which marks the end of the data section */
+#undef DATA_SECTION_END_MARKER
+
+/* Define as the decl which terminates the data section */
+#undef DATA_SECTION_END_MARKER_DECL
+
 /* Define if time.h or sys/time.h define the altzone variable */
 #undef HAVE_ALTZONE
+
+/* Define if you have /bin/sh */
+#define HAVE_BIN_SH 0
+
+/* Define if you have the GetModuleFileName function.  */
+#define HAVE_GETMODULEFILENAME 0
 
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
@@ -96,11 +102,28 @@
 /* Define if fcntl.h defines O_BINARY */
 #undef HAVE_O_BINARY
 
+/* Define if compiler supports prototypes. */
+#define HAVE_PROTOTYPES 0
+
+/* Define if you have the WinExec function.  */
+#define HAVE_WINEXEC 0
+
 /* Define if C Symbols have a leading underscore added by the compiler */
 #undef LEADING_UNDERSCORE
 
+/* Define as the symbol which marks the end of the text section */
+#undef TEXT_SECTION_END_MARKER
+
+/* Define to decl that terminates text section. */
+#undef TEXT_SECTION_END_MARKER_DECL
+
 /* Define to the type of the timezone variable (usually long or time_t) */
 #undef TYPE_TIMEZONE
+
+/* Define if signal handlers have type void (*)(int)
+ * (Otherwise, they're assumed to have type int (*)(void).)
+ */
+#define VOID_INT_SIGNALS 0
 
 /* The number of bytes in a double.  */
 #undef SIZEOF_DOUBLE
@@ -117,8 +140,44 @@
 /* The number of bytes in a void *.  */
 #undef SIZEOF_VOID_P
 
+/* Define if you have the PBHSetVolSync function.  */
+#undef HAVE_PBHSETVOLSYNC
+
+/* Define if you have the _fullpath function.  */
+#undef HAVE__FULLPATH
+
+/* Define if you have the _pclose function.  */
+#undef HAVE__PCLOSE
+
+/* Define if you have the _popen function.  */
+#undef HAVE__POPEN
+
+/* Define if you have the _snprintf function.  */
+#undef HAVE__SNPRINTF
+
+/* Define if you have the _stricmp function.  */
+#undef HAVE__STRICMP
+
+/* Define if you have the _vsnprintf function.  */
+#undef HAVE__VSNPRINTF
+
 /* Define if you have the access function.  */
 #undef HAVE_ACCESS
+
+/* Define if you have the farcalloc function.  */
+#undef HAVE_FARCALLOC
+
+/* Define if you have the fgetpos function.  */
+#undef HAVE_FGETPOS
+
+/* Define if you have the fseek function.  */
+#undef HAVE_FSEEK
+
+/* Define if you have the fsetpos function.  */
+#undef HAVE_FSETPOS
+
+/* Define if you have the ftell function.  */
+#undef HAVE_FTELL
 
 /* Define if you have the ftime function.  */
 #undef HAVE_FTIME
@@ -135,17 +194,50 @@
 /* Define if you have the gettimeofday function.  */
 #undef HAVE_GETTIMEOFDAY
 
+/* Define if you have the macsystem function.  */
+#undef HAVE_MACSYSTEM
+
 /* Define if you have the mktime function.  */
 #undef HAVE_MKTIME
 
 /* Define if you have the mprotect function.  */
 #undef HAVE_MPROTECT
 
+/* Define if you have the pclose function.  */
+#undef HAVE_PCLOSE
+
+/* Define if you have the popen function.  */
+#undef HAVE_POPEN
+
+/* Define if you have the readlink function.  */
+#undef HAVE_READLINK
+
+/* Define if you have the realpath function.  */
+#undef HAVE_REALPATH
+
 /* Define if you have the setitimer function.  */
 #undef HAVE_SETITIMER
 
+/* Define if you have the snprintf function.  */
+#undef HAVE_SNPRINTF
+
 /* Define if you have the stat function.  */
 #undef HAVE_STAT
+
+/* Define if you have the strcasecmp function.  */
+#undef HAVE_STRCASECMP
+
+/* Define if you have the strcmp function.  */
+#undef HAVE_STRCMP
+
+/* Define if you have the strcmpi function.  */
+#undef HAVE_STRCMPI
+
+/* Define if you have the stricmp function.  */
+#undef HAVE_STRICMP
+
+/* Define if you have the symlink function.  */
+#undef HAVE_SYMLINK
 
 /* Define if you have the sysconf function.  */
 #undef HAVE_SYSCONF
@@ -159,20 +251,65 @@
 /* Define if you have the vadvise function.  */
 #undef HAVE_VADVISE
 
+/* Define if you have the valloc function.  */
+#undef HAVE_VALLOC
+
 /* Define if you have the vfork function.  */
 #undef HAVE_VFORK
+
+/* Define if you have the vsnprintf function.  */
+#undef HAVE_VSNPRINTF
+
+/* Define if you have the <Files.h> header file.  */
+#undef HAVE_FILES_H
+
+/* Define if you have the <assert.h> header file.  */
+#undef HAVE_ASSERT_H
 
 /* Define if you have the <bfd.h> header file.  */
 #undef HAVE_BFD_H
 
+/* Define if you have the <conio.h> header file.  */
+#undef HAVE_CONIO_H
+
+/* Define if you have the <console.h> header file.  */
+#undef HAVE_CONSOLE_H
+
+/* Define if you have the <ctype.h> header file.  */
+#undef HAVE_CTYPE_H
+
 /* Define if you have the <dirent.h> header file.  */
 #undef HAVE_DIRENT_H
+
+/* Define if you have the <dl.h> header file.  */
+#undef HAVE_DL_H
+
+/* Define if you have the <dlfcn.h> header file.  */
+#undef HAVE_DLFCN_H
+
+/* Define if you have the <dos.h> header file.  */
+#undef HAVE_DOS_H
+
+/* Define if you have the <errno.h> header file.  */
+#undef HAVE_ERRNO_H
 
 /* Define if you have the <fcntl.h> header file.  */
 #undef HAVE_FCNTL_H
 
+/* Define if you have the <float.h> header file.  */
+#undef HAVE_FLOAT_H
+
+/* Define if you have the <ftw.h> header file.  */
+#undef HAVE_FTW_H
+
 /* Define if you have the <grp.h> header file.  */
 #undef HAVE_GRP_H
+
+/* Define if you have the <ieee754.h> header file.  */
+#undef HAVE_IEEE754_H
+
+/* Define if you have the <io.h> header file.  */
+#undef HAVE_IO_H
 
 /* Define if you have the <malloc.h> header file.  */
 #undef HAVE_MALLOC_H
@@ -186,14 +323,17 @@
 /* Define if you have the <nlist.h> header file.  */
 #undef HAVE_NLIST_H
 
+/* Define if you have the <pascal.h> header file.  */
+#undef HAVE_PASCAL_H
+
 /* Define if you have the <pwd.h> header file.  */
 #undef HAVE_PWD_H
 
 /* Define if you have the <readline/readline.h> header file.  */
 #undef HAVE_READLINE_READLINE_H
 
-/* Define if you have the readlink function.  */
-#undef HAVE_READLINK
+/* Define if you have the <sgtty.h> header file.  */
+#undef HAVE_SGTTY_H
 
 /* Define if you have the <siginfo.h> header file.  */
 #undef HAVE_SIGINFO_H
@@ -201,20 +341,29 @@
 /* Define if you have the <signal.h> header file.  */
 #undef HAVE_SIGNAL_H
 
+/* Define if you have the <stat.h> header file.  */
+#undef HAVE_STAT_H
+
+/* Define if you have the <std.h> header file.  */
+#undef HAVE_STD_H
+
+/* Define if you have the <stdarg.h> header file.  */
+#undef HAVE_STDARG_H
+
 /* Define if you have the <stdlib.h> header file.  */
 #undef HAVE_STDLIB_H
 
 /* Define if you have the <string.h> header file.  */
 #undef HAVE_STRING_H
 
-/* Define if you have the symlink function.  */
-#undef HAVE_SYMLINK
-
 /* Define if you have the <sys/fault.h> header file.  */
 #undef HAVE_SYS_FAULT_H
 
 /* Define if you have the <sys/file.h> header file.  */
 #undef HAVE_SYS_FILE_H
+
+/* Define if you have the <sys/ioctl.h> header file.  */
+#undef HAVE_SYS_IOCTL_H
 
 /* Define if you have the <sys/mman.h> header file.  */
 #undef HAVE_SYS_MMAN_H
@@ -264,6 +413,9 @@
 /* Define if you have the <sys/wait.h> header file.  */
 #undef HAVE_SYS_WAIT_H
 
+/* Define if you have the <termio.h> header file.  */
+#undef HAVE_TERMIO_H
+
 /* Define if you have the <termios.h> header file.  */
 #undef HAVE_TERMIOS_H
 
@@ -279,18 +431,17 @@
 /* Define if you have the <utime.h> header file.  */
 #undef HAVE_UTIME_H
 
+/* Define if you have the <values.h> header file.  */
+#undef HAVE_VALUES_H
+
 /* Define if you have the <vfork.h> header file.  */
 #undef HAVE_VFORK_H
+
+/* Define if you have the <windows.h> header file.  */
+#undef HAVE_WINDOWS_H
 
 /* Define if you have the bfd library (-lbfd).  */
 #undef HAVE_LIBBFD
 
 /* Define if you have the iberty library (-liberty).  */
 #undef HAVE_LIBIBERTY
-
-/* Define to decl that terminates text section. */
-#undef TEXT_SECTION_END_MARKER_DECL
-
-/* Define to symbol that terminates text section. */
-#undef TEXT_SECTION_END_MARKER
-

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 1997/03/24 08:39:19 sof Exp $
+# $Id: Makefile,v 1.8 1998/12/02 13:17:13 simonm Exp $
 #
 
 TOP=.
@@ -21,9 +21,9 @@ include $(TOP)/mk/boilerplate.mk
 # we descend into compiler/ and lib/
 #
 ifeq "$(GhcWithHscBuiltViaC)" "NO"
-SUBDIRS = utils driver includes runtime docs compiler lib
+SUBDIRS = utils driver includes rts docs compiler lib
 else
-SUBDIRS = utils driver includes runtime docs lib compiler
+SUBDIRS = utils driver includes rts docs lib compiler
 endif
 
 # Easier to copy

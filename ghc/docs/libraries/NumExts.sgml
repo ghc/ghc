@@ -1,0 +1,31 @@
+<sect> <idx/NumExts/
+<label id="sec:NumExts">
+<p>
+
+The <tt/NumExts/ interface collect together various numeric
+operations that have proven to be commonly useful 
+
+<tscreen> <verb>
+-- Going between Doubles and Floats:
+doubleToFloat :: Double -> Float
+floatToDouble :: Float  -> Double
+
+showHex       :: Integral a => a -> ShowS
+showOct       :: Integral a => a -> ShowS
+</verb> </tscreen>
+
+Notes: 
+<itemize>
+<item>
+    If <tt/doubleToFloat/ is applied to a <tt/Double/ that is within
+    the representable range for <tt/Float/, the result may be the next
+    higher or lower representable <tt/Float/ value. If the <tt/Double/
+    is out of range, the result is undefined.
+<item>
+    No loss of precision occurs in the other direction with
+    <tt/floatToDouble/, the floating value remains unchanged.
+<item>
+    <tt/showOct/ and <tt/showHex/ will prefix <tt/0o/ and <tt/0x/
+    respectively. Like <tt/Numeric.showInt/, these show functions
+    work on positive numbers only.
+</itemize>

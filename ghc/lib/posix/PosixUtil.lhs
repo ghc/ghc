@@ -8,7 +8,6 @@ module PosixUtil where
 
 import GlaExts
 import PrelIOBase  -- IOError representation
-
 \end{code}
 
 First, all of the major Posix data types, to avoid any recursive dependencies

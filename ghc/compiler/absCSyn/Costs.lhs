@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1994-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
 %     Hans Wolfgang Loidl
 %
 % ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
 import Util		( trace )
 
 -- --------------------------------------------------------------------------
-newtype CostRes = Cost (Int, Int, Int, Int, Int)
+data CostRes = Cost (Int, Int, Int, Int, Int)
 	       deriving (Text)
 
 nullCosts    = Cost (0, 0, 0, 0, 0) :: CostRes
@@ -168,7 +168,7 @@ costs absC =
 
    CCodeBlock _ absC	      -> costs absC
 
-   CInitHdr cl_info reg_rel cost_centre inplace_upd -> initHdrCosts
+   CInitHdr cl_info reg_rel cost_centre -> initHdrCosts
 
 			{- This is more fancy but superflous: The addr modes
 			   are fixed and so the costs are const!
@@ -183,7 +183,7 @@ costs absC =
 			   For costing the args of this macro
 			   see PprAbsC.lhs where args are inserted -}
 
-   COpStmt modes_res primOp modes_args _ _ ->
+   COpStmt modes_res primOp modes_args _ ->
 	{-
 	   let
 		n = length modes_res
@@ -202,6 +202,8 @@ costs absC =
 
    CSimultaneous absC	     -> costs absC
 
+   CCheck _ amodes code	     -> Cost (2, 1, 0, 0, 0)
+
    CMacroStmt	macro modes  -> stmtMacroCosts macro modes
 
    CCallProfCtrMacro   _ _   -> nullCosts
@@ -215,17 +217,14 @@ costs absC =
 
    CStaticClosure _ _ _ _    -> nullCosts
 
-   CClosureInfoAndCode _ _ _ _ _ _ -> nullCosts
+   CClosureInfoAndCode _ _ _ _ _ -> nullCosts
 
-   CRetVector _ _ _	     -> nullCosts
+   CRetDirect _ _ _ _	     -> nullCosts
 
-   CRetUnVector _ _	     -> nullCosts
-
-   CFlatRetVector _ _	     -> nullCosts
+   CRetVector _ _ _ _        -> nullCosts
 
    CCostCentreDecl _ _	     -> nullCosts
-
-   CClosureUpdInfo _	     -> nullCosts
+   CCostCentreStackDecl _    -> nullCosts
 
    CSplitMarker		     -> nullCosts
 
@@ -265,10 +264,6 @@ addrModeCosts addr_mode side =
 		  -- Rhs: typically: sethi %hi(lbl),%tmp_reg
 		  --		     or	   %tmp_reg,%lo(lbl),%target_reg
 
-    CUnVecLbl _ _ -> if lhs then Cost (0, 0, 0, 1, 0)
-			    else Cost (2, 0, 0, 0, 0)
-		     -- same as CLbl
-
     --	Check the following 3 (checked form CLit on)
 
     CCharLike mode -> if lhs then Cost (0, 0, 0, 1, 0)
@@ -287,20 +282,10 @@ addrModeCosts addr_mode side =
 			     else Cost (1, 0, 0, 0, 0)
 		      -- same es CLit
 
-    COffset _	   -> if lhs then nullCosts
-			     else Cost (1, 0, 0, 0, 0)
-		      -- same es CLit
-
-    CCode absC	   -> costs absC
-
-    CLabelledCode _ absC  ->  costs absC
-
-    CJoinPoint _ _	  -> if lhs then Cost (0, 0, 0, 1, 0)
+    CJoinPoint _	  -> if lhs then Cost (0, 0, 0, 1, 0)
 				    else Cost (0, 0, 1, 0, 0)
 
     CMacroExpr _ macro mode_list -> exprMacroCosts side macro mode_list
-
-    CCostCentre _ _ -> nullCosts
 
 -- ---------------------------------------------------------------------------
 
@@ -313,14 +298,10 @@ exprMacroCosts side macro mode_list =
   in
   arg_costs +
   case macro of
-    INFO_PTR   -> if side == Lhs then Cost (0, 0, 0, 1, 0)
-				 else Cost (0, 0, 1, 0, 0)
     ENTRY_CODE -> nullCosts
-    INFO_TAG   -> if side == Lhs then Cost (0, 0, 0, 1, 0)
-				 else Cost (0, 0, 1, 0, 0)
-    EVAL_TAG   -> if side == Lhs then Cost (1, 0, 0, 1, 0)
-				 else Cost (1, 0, 1, 0, 0)
-		  -- costs of INFO_TAG + (1,0,0,0,0)
+    ARG_TAG -> nullCosts -- XXX
+    GET_TAG -> nullCosts -- XXX
+    
 
 -- ---------------------------------------------------------------------------
 
@@ -332,36 +313,13 @@ stmtMacroCosts macro modes =
 			[addrModeCosts mode Rhs | mode <- modes]
   in
   case macro of
-    ARGS_CHK_A_LOAD_NODE  ->  Cost (2, 1, 0, 0, 0)	 {- StgMacros.lh  -}
+    ARGS_CHK_LOAD_NODE  ->  Cost (2, 1, 0, 0, 0)	 {- StgMacros.lh  -}
 		-- p=probability of PAP (instead of AP): + p*(3,1,0,0,0)
-    ARGS_CHK_A		  ->  Cost (2, 1, 0, 0, 0)	 {- StgMacros.lh  -}
-		-- p=probability of PAP (instead of AP): + p*(0,1,0,0,0)
-    ARGS_CHK_B_LOAD_NODE  ->  Cost (2, 1, 0, 0, 0)	 {- StgMacros.lh  -}
-    ARGS_CHK_B		  ->  Cost (2, 1, 0, 0, 0)	 {- StgMacros.lh  -}
-    HEAP_CHK		  ->  Cost (2, 1, 0, 0, 0)	 {- StgMacros.lh  -}
-    -- STK_CHK		     ->	 (2, 1, 0, 0, 0)       {- StgMacros.lh	-}
-    STK_CHK		  ->  Cost (0, 0, 0, 0, 0)	 {- StgMacros.lh  -}
+    ARGS_CHK		  ->  Cost (2, 1, 0, 0, 0)	 {- StgMacros.lh  -}
     UPD_CAF		  ->  Cost (7, 0, 1, 3, 0)	 {- SMupdate.lh	 -}
-    UPD_IND		  ->  Cost (8, 2, 2, 0, 0)	 {- SMupdate.lh
-				updatee in old-gen: Cost (4, 1, 1, 0, 0)
-				updatee in new-gen: Cost (4, 1, 1, 0, 0)
-				NB: we include costs fo checking if there is
-				    a BQ, but we omit costs for awakening BQ
-				    (these probably differ between old-gen and
-				    new gen) -}
-    UPD_INPLACE_NOPTRS	  ->  Cost (13, 3, 3, 2, 0)	  {- SMupdate.lh
-				common for both:    Cost (4, 1, 1, 0, 0)
-				updatee in old-gen: Cost (14, 3, 2, 4, 0)
-				updatee in new-gen: Cost (4, 1, 1, 0, 0)   -}
-    UPD_INPLACE_PTRS	  ->  Cost (13, 3, 3, 2, 0)	  {- SMupdate.lh
-				common for both:    Cost (4, 1, 1, 0, 0)
-				updatee in old-gen: Cost (14, 3, 2, 4, 0)
-				updatee in new-gen: Cost (4, 1, 1, 0, 0)   -}
-
     UPD_BH_UPDATABLE	  ->  Cost (3, 0, 0, 1, 0)	 {- SMupdate.lh	 -}
     UPD_BH_SINGLE_ENTRY	  ->  Cost (3, 0, 0, 1, 0)	 {- SMupdate.lh	 -}
-    PUSH_STD_UPD_FRAME	  ->  Cost (3, 0, 0, 4, 0)	 {- SMupdate.lh	 -}
-    POP_STD_UPD_FRAME	  ->  Cost (1, 0, 3, 0, 0)	 {- SMupdate.lh	 -}
+    PUSH_UPD_FRAME	  ->  Cost (3, 0, 0, 4, 0)	 {- SMupdate.lh	 -}
     SET_TAG		  ->  nullCosts		    {- COptRegs.lh -}
     GRAN_FETCH			->  nullCosts	  {- GrAnSim bookkeeping -}
     GRAN_RESCHEDULE		->  nullCosts	  {- GrAnSim bookkeeping -}
@@ -416,7 +374,7 @@ primOpCosts :: PrimOp -> CostRes
 
 -- Special cases
 
-primOpCosts (CCallOp _ _ _ _ _ _) = SAVE_COSTS + RESTORE_COSTS  	
+primOpCosts (CCallOp _ _ _ _) = SAVE_COSTS + RESTORE_COSTS  	
 	                          -- don't guess costs of ccall proper
                                   -- for exact costing use a GRAN_EXEC
                                   -- in the C code

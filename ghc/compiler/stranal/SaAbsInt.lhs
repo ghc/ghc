@@ -1,12 +1,12 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[SaAbsInt]{Abstract interpreter for strictness analysis}
 
 \begin{code}
 module SaAbsInt (
 	findStrictness,
-	findDemand,
+	findDemand, findDemandAlts,
 	absEval,
 	widen,
 	fixpoint,
@@ -17,27 +17,21 @@ module SaAbsInt (
 
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
-import CoreUnfold	( Unfolding(..), FormSummary )
-import CoreUtils	( unTagBinders )
-import Id		( idType, getIdStrictness, getIdUnfolding,
-			  dataConTyCon, dataConArgTys, Id
-			)
+import CoreUnfold	( Unfolding(..) )
+import Id		( Id, idType, getIdStrictness, getIdUnfolding )
+import Const		( Con(..) )
+import DataCon		( dataConTyCon, dataConArgTys )
 import IdInfo		( StrictnessInfo(..) )
-import Demand		( Demand(..), wwPrim, wwStrict, wwEnum, wwUnpackData, wwUnpackNew )
-import MagicUFs		( MagicUnfoldingFun )
-import Maybes		( maybeToBool )
-import PrimOp		( PrimOp(..) )
+import Demand		( Demand(..), wwPrim, wwStrict, wwEnum, wwUnpackData, 
+			  wwUnpackNew )
 import SaLib
-import TyCon		( isProductTyCon, isEnumerationTyCon, isNewTyCon, 
-			  TyCon{-instance Eq-}
-			)
+import TyCon		( isProductTyCon, isEnumerationTyCon, isNewTyCon )
 import BasicTypes	( NewOrData(..) )
 import Type		( splitAlgTyConApp_maybe, 
-		          isUnpointedType, Type )
-import TysWiredIn	( intTyCon, integerTyCon, doubleTyCon,
-			  floatTyCon, wordTyCon, addrTyCon
-			)
-import Util		( isIn, isn'tIn, nOfThem, zipWithEqual, trace )
+		          isUnLiftedType, Type )
+import TyCon		( tyConUnique )
+import PrelInfo		( numericTyKeys )
+import Util		( isIn, nOfThem, zipWithEqual )
 import Outputable	
 
 returnsRealWorld x = False -- ToDo: panic "SaAbsInt.returnsRealWorld (ToDo)"
@@ -121,67 +115,6 @@ glb AbsTop	 v2	      = v2
 glb v1           AbsTop	      = v1
 
 glb _            _            = AbsBot 		-- Be pessimistic
-
-
-
-combineCaseValues
-	:: AnalysisKind
-	-> AbsVal	-- Value of scrutinee
-	-> [AbsVal]	-- Value of branches (at least one)
-	-> AbsVal	-- Result
-
--- For strictness analysis, see if the scrutinee is bottom; if so
--- return bottom; otherwise, the lub of the branches.
-
-combineCaseValues StrAnal AbsBot	  branches = AbsBot
-combineCaseValues StrAnal other_scrutinee branches
-	-- Scrutinee can only be AbsBot, AbsProd or AbsTop
-  = ASSERT(ok_scrutinee)
-    foldr1 lub branches
-  where
-    ok_scrutinee
-      = case other_scrutinee of {
-	  AbsTop    -> True; 	-- i.e., cool
-	  AbsProd _ -> True; 	-- ditto
-	  _ 	    -> False 	-- party over
-	}
-
--- For absence analysis, check if the scrutinee is all poison (isBot)
--- If so, return poison (AbsBot); otherwise, any nested poison will come
--- out from looking at the branches, so just glb together the branches
--- to get the worst one.
-
-combineCaseValues AbsAnal AbsBot          branches = AbsBot
-combineCaseValues AbsAnal other_scrutinee branches
-	-- Scrutinee can only be AbsBot, AbsProd or AbsTop
-  = ASSERT(ok_scrutinee)
-    let
-	result = foldr1 glb branches
-
-	tracer = if at_least_one_AbsFun && at_least_one_AbsTop
-		    && no_AbsBots then
-		    pprTrace "combineCase:" (ppr branches)
-		 else
-		    id
-    in
---    tracer (
-    result
---    )
-  where
-    ok_scrutinee
-      = case other_scrutinee of {
-	  AbsTop    -> True; 	-- i.e., cool
-	  AbsProd _ -> True; 	-- ditto
-	  _ 	    -> False 	-- party over
-	}
-
-    at_least_one_AbsFun = foldr ((||) . is_AbsFun) False branches
-    at_least_one_AbsTop = foldr ((||) . is_AbsTop) False branches
-    no_AbsBots = foldr ((&&) . is_not_AbsBot) True branches
-
-    is_AbsFun x = case x of { AbsFun _ _ _ -> True; _ -> False }
-    is_AbsTop x = case x of { AbsTop -> True; _ -> False }
-    is_not_AbsBot x = case x of { AbsBot -> False; _ -> True }
 \end{code}
 
 @isBot@ returns True if its argument is (a representation of) bottom.  The
@@ -193,11 +126,9 @@ Used only in strictness analysis:
 \begin{code}
 isBot :: AbsVal -> Bool
 
-isBot AbsBot		    = True
-isBot (AbsFun arg body env) = isBot (absEval StrAnal body env)
-			       -- Don't bother to extend the envt because
-			       -- unbound variables default to AbsTop anyway
-isBot other	 	    = False
+isBot AbsBot = True
+isBot other  = False	-- Functions aren't bottom any more
+
 \end{code}
 
 Used only in absence analysis:
@@ -207,12 +138,8 @@ anyBot :: AbsVal -> Bool
 anyBot AbsBot 		      = True	-- poisoned!
 anyBot AbsTop 		      = False
 anyBot (AbsProd vals) 	      = any anyBot vals
-anyBot (AbsFun arg body env)  = anyBot (absEval AbsAnal body env)
-anyBot (AbsApproxFun _ _)     = False
-
-    -- AbsApproxFun can only arise in absence analysis from the Demand
-    -- info of an imported value; whatever it is we're looking for is
-    -- certainly not present over in the imported value.
+anyBot (AbsFun bndr body env) = anyBot (absEval AbsAnal body (addOneToAbsValEnv env bndr AbsTop))
+anyBot (AbsApproxFun _ val)   = anyBot val
 \end{code}
 
 @widen@ takes an @AbsVal@, $val$, and returns and @AbsVal@ which is
@@ -222,11 +149,24 @@ it, so it can be compared for equality by @sameVal@.
 \begin{code}
 widen :: AnalysisKind -> AbsVal -> AbsVal
 
-widen StrAnal (AbsFun arg body env)
-  = AbsApproxFun (findDemandStrOnly env body arg)
-		 (widen StrAnal abs_body)
+-- Widening is complicated by the fact that funtions are lifted
+widen StrAnal the_fn@(AbsFun bndr body env)
+  = case widened_body of
+	AbsApproxFun ds val -> AbsApproxFun (d : ds) val
+			    where
+			       d = findRecDemand str_fn abs_fn bndr_ty
+			       str_fn val = foldl (absApply StrAnal) the_fn 
+						  (val : [AbsTop | d <- ds])
+
+	other		    -> AbsApproxFun [d] widened_body
+			    where
+			       d = findRecDemand str_fn abs_fn bndr_ty
+			       str_fn val = absApply StrAnal the_fn val
   where
-    abs_body = absEval StrAnal body env
+    bndr_ty      = idType bndr
+    widened_body = widen StrAnal (absApply StrAnal the_fn AbsTop)
+    abs_fn val   = AbsBot	-- Always says poison; so it looks as if
+				-- nothing is absent; safe
 
 {-	OLD comment... 
 	This stuff is now instead handled neatly by the fact that AbsApproxFun 
@@ -254,17 +194,30 @@ widen StrAnal (AbsProd vals) = AbsProd (map (widen StrAnal) vals)
 widen StrAnal other_val	     = other_val
 
 
-widen AbsAnal (AbsFun arg body env)
-  | anyBot abs_body = AbsBot
+widen AbsAnal the_fn@(AbsFun bndr body env)
+  | anyBot widened_body = AbsBot
 	-- In the absence-analysis case it's *essential* to check
 	-- that the function has no poison in its body.  If it does,
 	-- anywhere, then the whole function is poisonous.
 
   | otherwise
-  = AbsApproxFun (findDemandAbsOnly env body arg)
-		 (widen AbsAnal abs_body)
+  = case widened_body of
+	AbsApproxFun ds val -> AbsApproxFun (d : ds) val
+			    where
+			       d = findRecDemand str_fn abs_fn bndr_ty
+			       abs_fn val = foldl (absApply AbsAnal) the_fn 
+						  (val : [AbsTop | d <- ds])
+
+	other		    -> AbsApproxFun [d] widened_body
+			    where
+			       d = findRecDemand str_fn abs_fn bndr_ty
+			       abs_fn val = absApply AbsAnal the_fn val
   where
-    abs_body = absEval AbsAnal body env
+    bndr_ty      = idType bndr
+    widened_body = widen AbsAnal (absApply AbsAnal the_fn AbsTop)
+    str_fn val   = AbsBot	-- Always says non-termination;
+				-- that'll make findRecDemand peer into the
+				-- structure of the value.
 
 widen AbsAnal (AbsProd vals) = AbsProd (map (widen AbsAnal) vals)
 
@@ -346,15 +299,15 @@ evalStrictness (WwUnpack DataType _ demand_info) val
       AbsTop	   -> False
       AbsBot	   -> True
       AbsProd vals -> or (zipWithEqual "evalStrictness" evalStrictness demand_info vals)
-      _	    	   -> trace "evalStrictness?" False
+      _	    	   -> pprTrace "evalStrictness?" empty False
 
 evalStrictness WwPrim val
   = case val of
       AbsTop -> False
+      AbsBot -> True	-- Can happen: consider f (g x), where g is a 
+			-- recursive function returning an Int# that diverges
 
-      other  ->   -- A primitive value should be defined, never bottom;
-		  -- hence this paranoia check
-		pprPanic "evalStrictness: WwPrim:" (ppr other)
+      other  -> pprPanic "evalStrictness: WwPrim:" (ppr other)
 \end{code}
 
 For absence analysis, we're interested in whether "poison" in the
@@ -396,9 +349,7 @@ evalAbsence other val = anyBot val
 				-- error's arg
 
 absId anal var env
-  = let
-     result =
-      case (lookupAbsValEnv env var, getIdStrictness var, getIdUnfolding var) of
+  = case (lookupAbsValEnv env var, getIdStrictness var, getIdUnfolding var) of
 
 	(Just abs_val, _, _) ->
 			abs_val	-- Bound in the environment
@@ -407,7 +358,7 @@ absId anal var env
 			-- We have an unfolding for the expr
 			-- Assume the unfolding has no free variables since it
 			-- came from inside the Id
-			absEval anal (unTagBinders unfolding) env
+			absEval anal unfolding env
 		-- Notice here that we only look in the unfolding if we don't
 		-- have strictness info (an unusual situation).
 		-- We could have chosen to look in the unfolding if it exists,
@@ -432,79 +383,51 @@ absId anal var env
 			-- Includes MagicUnfolding, NoUnfolding
 			-- Try the strictness info
 			absValFromStrictness anal strictness_info
-    in
-    -- pprTrace "absId:" (hcat [ppr var, ptext SLIT("=:"), pp_anal anal, text SLIT(":="),ppr result]) $
-    result
-  where
-    pp_anal StrAnal = ptext SLIT("STR")
-    pp_anal AbsAnal = ptext SLIT("ABS")
-
-absEvalAtom anal (VarArg v) env = absId anal v env
-absEvalAtom anal (LitArg _) env = AbsTop
 \end{code}
 
 \begin{code}
 absEval :: AnalysisKind -> CoreExpr -> AbsValEnv -> AbsVal
 
+absEval anal (Type ty) env = AbsTop
 absEval anal (Var var) env = absId anal var env
-
-absEval anal (Lit _) env = AbsTop
-    -- What if an unboxed literal?  That's OK: it terminates, so its
-    -- abstract value is AbsTop.
-
-    -- For absence analysis, a literal certainly isn't the "poison" variable
 \end{code}
 
-Discussion about \tr{error} (following/quoting Lennart): Any expression
-\tr{error e} is regarded as bottom (with HBC, with the
-\tr{-ffail-strict} flag, on with \tr{-O}).
+Discussion about error (following/quoting Lennart): Any expression
+'error e' is regarded as bottom (with HBC, with the -ffail-strict
+flag, on with -O).
 
 Regarding it as bottom gives much better strictness properties for
 some functions.	 E.g.
-\begin{verbatim}
+
 	f [x] y = x+y
 	f (x:xs) y = f xs (x+y)
 i.e.
 	f [] _ = error "no match"
 	f [x] y = x+y
 	f (x:xs) y = f xs (x+y)
-\end{verbatim}
-is strict in \tr{y}, which you really want.  But, it may lead to
+
+is strict in y, which you really want.  But, it may lead to
 transformations that turn a call to \tr{error} into non-termination.
 (The odds of this happening aren't good.)
-
 
 Things are a little different for absence analysis, because we want
 to make sure that any poison (?????)
 
 \begin{code}
-absEval StrAnal (Prim SeqOp [TyArg _, e]) env
-  = ASSERT(isValArg e)
-    if isBot (absEvalAtom StrAnal e env) then AbsBot else AbsTop
-	-- This is a special case to ensure that seq# is strict in its argument.
-	-- The comments below (for most normal PrimOps) do not apply.
+absEval anal (Con (Literal _) args) env
+  = 	-- Literals terminate (strictness) and are not poison (absence)
+    AbsTop
 
-absEval StrAnal (Prim op es) env = AbsTop
-	-- The arguments are all of unboxed type, so they will already
-	-- have been eval'd.  If the boxed version was bottom, we'll
-	-- already have returned bottom.
-
-    	-- Actually, I believe we are saying that either (1) the
-	-- primOp uses unboxed args and they've been eval'ed, so
-	-- there's no need to force strictness here, _or_ the primOp
-	-- uses boxed args and we don't know whether or not it's
-    	-- strict, so we assume laziness. (JSM)
-
-absEval AbsAnal (Prim op as) env
-  = if any anyBot [absEvalAtom AbsAnal a env | a <- as, isValArg a]
+absEval anal (Con (PrimOp _) args) env
+  = 	-- PrimOps evaluate all their arguments
+    if any anyBot [absEval anal arg env | arg <- args]
     then AbsBot
     else AbsTop
-	-- For absence analysis, we want to see if the poison shows up...
 
-absEval anal (Con con as) env
+absEval anal (Con (DataCon con) args) env
   | isProductTyCon (dataConTyCon con)
-  = --pprTrace "absEval.Con" (cat[ text "con: ", (ppr con), text "args: ", interppSP as]) $
-    AbsProd [absEvalAtom anal a env | a <- as, isValArg a]
+  = 	-- Products; filter out type arguments
+    AbsProd [absEval anal a env | a <- args, isValArg a]
 
   | otherwise	-- Not single-constructor
   = case anal of
@@ -513,55 +436,45 @@ absEval anal (Con con as) env
 	AbsAnal -> 	-- In the absence case we need to be more
 			-- careful: look to see if there's any
 			-- poison in the components
-		   if any anyBot [absEvalAtom AbsAnal a env | a <- as, isValArg a]
+		   if any anyBot [absEval AbsAnal arg env | arg <- args]
 		   then AbsBot
 		   else AbsTop
 \end{code}
 
 \begin{code}
-absEval anal (Lam (ValBinder binder) body) env
-  = AbsFun binder body env
-absEval anal (Lam other_binder expr) env
-  = absEval  anal expr env
-absEval anal (App f a) env | isValArg a
-  = absApply anal (absEval anal f env) (absEvalAtom anal a env)
-absEval anal (App expr _) env
-  = absEval anal expr env
+absEval anal (Lam bndr body) env
+  | isTyVar bndr = absEval anal body env	-- Type lambda
+  | otherwise    = AbsFun bndr body env		-- Value lambda
+
+absEval anal (App expr (Type ty)) env
+  = absEval anal expr env			-- Type appplication
+absEval anal (App f val_arg) env
+  = absApply anal (absEval anal f env) 		-- Value applicationn
+		  (absEval anal val_arg env)
 \end{code}
 
-For primitive cases, just GLB the branches, then LUB with the expr part.
-
 \begin{code}
-absEval anal (Case expr (PrimAlts alts deflt)) env
+absEval anal expr@(Case scrut case_bndr alts) env
   = let
-	expr_val    = absEval anal expr env
-	abs_alts    = [ absEval anal rhs env | (_, rhs) <- alts ]
-			-- PrimAlts don't bind anything, so no need
-			-- to extend the environment
+	scrut_val  = absEval anal scrut env
+	alts_env   = addOneToAbsValEnv env case_bndr scrut_val
+    in
+    case (scrut_val, alts) of
+	(AbsBot, _) -> AbsBot
 
-	abs_deflt   = absEvalDefault anal expr_val deflt env
-    in
-	combineCaseValues anal expr_val
-			       (abs_deflt ++ abs_alts)
+	(AbsProd arg_vals, [(con, bndrs, rhs)])
+		| con /= DEFAULT ->
+		-- The scrutinee is a product value, so it must be of a single-constr
+		-- type; so the constructor in this alternative must be the right one
+		-- so we can go ahead and bind the constructor args to the components
+		-- of the product value.
+	    ASSERT(length arg_vals == length val_bndrs)
+	    absEval anal rhs rhs_env
+	  where
+	    val_bndrs = filter isId bndrs
+	    rhs_env   = growAbsValEnvList alts_env (val_bndrs `zip` arg_vals)
 
-absEval anal (Case expr (AlgAlts alts deflt)) env
-  = let
-	expr_val  = absEval anal expr env
-	abs_alts  = [ absEvalAlgAlt anal expr_val alt env | alt <- alts ]
-	abs_deflt = absEvalDefault anal expr_val deflt env
-    in
-    let
-	result =
-	  combineCaseValues anal expr_val
-				(abs_deflt ++ abs_alts)
-    in
-{-
-    (case anal of
-	StrAnal -> id
-	_ -> pprTrace "absCase:ABS:" (($$) (hsep [ppr expr, ppr result, ppr expr_val, ppr abs_deflt, ppr abs_alts]) (ppr (keysFM env `zip` eltsFM env)))
-    )
--}
-    result
+	other -> absEvalAlts anal alts alts_env
 \end{code}
 
 For @Lets@ we widen the value we get.  This is nothing to
@@ -609,48 +522,17 @@ absEval anal (Note note expr) env = absEval anal expr env
 \end{code}
 
 \begin{code}
-absEvalAlgAlt :: AnalysisKind -> AbsVal -> (Id,[Id],CoreExpr) -> AbsValEnv -> AbsVal
-
-absEvalAlgAlt anal (AbsProd arg_vals) (con, args, rhs) env
-  =	-- The scrutinee is a product value, so it must be of a single-constr
-	-- type; so the constructor in this alternative must be the right one
-	-- so we can go ahead and bind the constructor args to the components
-	-- of the product value.
-    ASSERT(length arg_vals == length args)
-    let
-	 new_env = growAbsValEnvList env (args `zip` arg_vals)
-    in
-    absEval anal rhs new_env
-
-absEvalAlgAlt anal other_scrutinee (con, args, rhs) env
-  = 	-- Scrutinised value is Top or Bot (it can't be a function!)
-	-- So just evaluate the rhs with all constr args bound to Top.
-	-- (If the scrutinee is Top we'll never evaluated this function
-	-- call anyway!)
-    ASSERT(ok_scrutinee)
-    absEval anal rhs rhs_env
+absEvalAlts :: AnalysisKind -> [CoreAlt] -> AbsValEnv -> AbsVal
+absEvalAlts anal alts env
+  = combine anal (map go alts)
   where
-    rhs_env = growAbsValEnvList env (args `zip` repeat AbsTop)
-		-- We must extend the environment, because
-		-- there might be shadowing
+    combine StrAnal = foldr1 lub	-- Diverge only if all diverge
+    combine AbsAnal = foldr1 glb	-- Find any poison
 
-    ok_scrutinee
-      = case other_scrutinee of {
-	  AbsTop -> True;   -- i.e., OK
-	  AbsBot -> True;   -- ditto
-	  _ 	 -> False   -- party over
-	}
-
-
-absEvalDefault :: AnalysisKind
-	       -> AbsVal		-- Value of scrutinee
-	       -> CoreCaseDefault
-	       -> AbsValEnv
-	       -> [AbsVal]		-- Empty or singleton
-
-absEvalDefault anal scrut_val NoDefault env = []
-absEvalDefault anal scrut_val (BindDefault binder expr) env
-  = [absEval anal expr (addOneToAbsValEnv env binder scrut_val)]
+    go (con, bndrs, rhs)
+      = absEval anal rhs rhs_env
+      where
+	rhs_env = growAbsValEnvList env (filter isId bndrs `zip` repeat AbsTop)
 \end{code}
 
 %************************************************************************
@@ -686,15 +568,20 @@ absApply anal (AbsFun binder body env) arg
 \end{code}
 
 \begin{code}
-absApply StrAnal (AbsApproxFun demand val) arg
-  = if evalStrictness demand arg
-    then AbsBot
-    else val
+absApply StrAnal (AbsApproxFun (d:ds) val) arg
+  = case ds of 
+	[]    -> val'
+	other -> AbsApproxFun ds val'	-- Result is non-bot if there are still args
+  where
+    val' | evalStrictness d arg = AbsBot
+	 | otherwise		= val
 
-absApply AbsAnal (AbsApproxFun demand val) arg
-  = if evalAbsence demand arg
-    then AbsBot
-    else val
+absApply AbsAnal (AbsApproxFun (d:ds) val) arg
+  = if evalAbsence d arg
+    then AbsBot		-- Poison in arg means poison in the application
+    else case ds of
+		[]    -> val
+		other -> AbsApproxFun ds val
 
 #ifdef DEBUG
 absApply anal f@(AbsProd _)       arg = pprPanic ("absApply: Duff function: AbsProd." ++ show anal) ((ppr f) <+> (ppr arg))
@@ -731,44 +618,36 @@ findStrictness :: [Type]	-- Types of args in which strictness is wanted
 	       -> AbsVal	-- Abstract absence value of function
 	       -> [Demand]	-- Resulting strictness annotation
 
-findStrictness [] str_val abs_val = []
+findStrictness tys str_val abs_val
+  = map find_str tys_w_index
+  where
+    tys_w_index = tys `zip` [1..]
 
-findStrictness (ty:tys) str_val abs_val
-  = let
-	demand 	     = findRecDemand str_fn abs_fn ty
-	str_fn val   = absApply StrAnal str_val val
-	abs_fn val   = absApply AbsAnal abs_val val
+    find_str (ty,n) = findRecDemand str_fn abs_fn ty
+		    where
+		      str_fn val = foldl (absApply StrAnal) str_val 
+					 (map (mk_arg val n) tys_w_index)
 
-	demands = findStrictness tys
-			(absApply StrAnal str_val AbsTop)
-			(absApply AbsAnal abs_val AbsTop)
-    in
-    demand : demands
+		      abs_fn val = foldl (absApply AbsAnal) abs_val 
+					 (map (mk_arg val n) tys_w_index)
+
+    mk_arg val n (_,m) | m==n      = val
+		       | otherwise = AbsTop
 \end{code}
 
 
 \begin{code}
-findDemandStrOnly str_env expr binder 	-- Only strictness environment available
-  = findRecDemand str_fn abs_fn (idType binder)
-  where
-    str_fn val = absEval StrAnal expr (addOneToAbsValEnv str_env binder val)
-    abs_fn val = AbsBot		-- Always says poison; so it looks as if
-				-- nothing is absent; safe
-
-findDemandAbsOnly abs_env expr binder 	-- Only absence environment available
-  = findRecDemand str_fn abs_fn (idType binder)
-  where
-    str_fn val = AbsBot		-- Always says non-termination;
-				-- that'll make findRecDemand peer into the
-				-- structure of the value.
-    abs_fn val = absEval AbsAnal expr (addOneToAbsValEnv abs_env binder val)
-
-
 findDemand str_env abs_env expr binder
   = findRecDemand str_fn abs_fn (idType binder)
   where
     str_fn val = absEval StrAnal expr (addOneToAbsValEnv str_env binder val)
     abs_fn val = absEval AbsAnal expr (addOneToAbsValEnv abs_env binder val)
+
+findDemandAlts str_env abs_env alts binder
+  = findRecDemand str_fn abs_fn (idType binder)
+  where
+    str_fn val = absEvalAlts StrAnal alts (addOneToAbsValEnv str_env binder val)
+    abs_fn val = absEvalAlts AbsAnal alts (addOneToAbsValEnv abs_env binder val)
 \end{code}
 
 @findRecDemand@ is where we finally convert strictness/absence info
@@ -810,7 +689,7 @@ findRecDemand :: (AbsVal -> AbsVal) -- The strictness function
 	      -> Demand
 
 findRecDemand str_fn abs_fn ty
-  = if isUnpointedType ty then -- It's a primitive type!
+  = if isUnLiftedType ty then -- It's a primitive type!
        wwPrim
 
     else if not (anyBot (abs_fn AbsBot)) then -- It's absent
@@ -840,10 +719,7 @@ findRecDemand str_fn abs_fn ty
 		let
 		    demand = findRecDemand str_fn abs_fn (head cmpnt_tys)
 		in
-		case demand of		-- No point in unpacking unless there is more to see inside
-		  WwUnpack _ _ _ -> wwUnpackNew demand
-		  other	         -> wwStrict 
-
+		wwUnpackNew demand
 	   else				-- A data type!
 	   let
 	      compt_strict_infos
@@ -876,10 +752,7 @@ findRecDemand str_fn abs_fn ty
       = case (splitAlgTyConApp_maybe ty) of -- NB: duplicates stuff done above
 	  Nothing -> False
 	  Just (tycon, _, _)
-	    | tycon `is_elem`
-	      [intTyCon, integerTyCon,
-	       doubleTyCon, floatTyCon,
-	       wordTyCon, addrTyCon]
+	    | tyConUnique tycon `is_elem` numericTyKeys
 	    -> True
 	  _{-something else-} -> False
       where

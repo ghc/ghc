@@ -1,0 +1,7573 @@
+Reading file "Int.hs":
+Reading file "Bits.lhs":
+Reading file "Int.hs":
+Reading file "Word.hs":
+Reading file "test/exts/intTest.hs":
+Type :? for help
+Hugs:--------------------------------
+--Testing Int8
+--------------------------------
+testBounded
+(127,-128,-127)
+(126,127,-128)
+testEnum
+[0,1,2,3,4,5,6,7,8,9]
+[0,2,4,6,8,10,12,14,16,18]
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+[0,2,4,6,8,10,12,14,16,18,20]
+testReadShow
+[-3,-2,-1,0,1,2,3]
+[-3,-2,-1,0,1,2,3]
+testEq
+-3 == -3 = True
+-3 == -2 = False
+-3 == -1 = False
+-3 == 0 = False
+-3 == 1 = False
+-3 == 2 = False
+-3 == 3 = False
+ 
+-2 == -3 = False
+-2 == -2 = True
+-2 == -1 = False
+-2 == 0 = False
+-2 == 1 = False
+-2 == 2 = False
+-2 == 3 = False
+ 
+-1 == -3 = False
+-1 == -2 = False
+-1 == -1 = True
+-1 == 0 = False
+-1 == 1 = False
+-1 == 2 = False
+-1 == 3 = False
+ 
+0 == -3 = False
+0 == -2 = False
+0 == -1 = False
+0 == 0 = True
+0 == 1 = False
+0 == 2 = False
+0 == 3 = False
+ 
+1 == -3 = False
+1 == -2 = False
+1 == -1 = False
+1 == 0 = False
+1 == 1 = True
+1 == 2 = False
+1 == 3 = False
+ 
+2 == -3 = False
+2 == -2 = False
+2 == -1 = False
+2 == 0 = False
+2 == 1 = False
+2 == 2 = True
+2 == 3 = False
+ 
+3 == -3 = False
+3 == -2 = False
+3 == -1 = False
+3 == 0 = False
+3 == 1 = False
+3 == 2 = False
+3 == 3 = True
+ 
+#
+-3 /= -3 = False
+-3 /= -2 = True
+-3 /= -1 = True
+-3 /= 0 = True
+-3 /= 1 = True
+-3 /= 2 = True
+-3 /= 3 = True
+ 
+-2 /= -3 = True
+-2 /= -2 = False
+-2 /= -1 = True
+-2 /= 0 = True
+-2 /= 1 = True
+-2 /= 2 = True
+-2 /= 3 = True
+ 
+-1 /= -3 = True
+-1 /= -2 = True
+-1 /= -1 = False
+-1 /= 0 = True
+-1 /= 1 = True
+-1 /= 2 = True
+-1 /= 3 = True
+ 
+0 /= -3 = True
+0 /= -2 = True
+0 /= -1 = True
+0 /= 0 = False
+0 /= 1 = True
+0 /= 2 = True
+0 /= 3 = True
+ 
+1 /= -3 = True
+1 /= -2 = True
+1 /= -1 = True
+1 /= 0 = True
+1 /= 1 = False
+1 /= 2 = True
+1 /= 3 = True
+ 
+2 /= -3 = True
+2 /= -2 = True
+2 /= -1 = True
+2 /= 0 = True
+2 /= 1 = True
+2 /= 2 = False
+2 /= 3 = True
+ 
+3 /= -3 = True
+3 /= -2 = True
+3 /= -1 = True
+3 /= 0 = True
+3 /= 1 = True
+3 /= 2 = True
+3 /= 3 = False
+ 
+#
+testOrd
+-3 <= -3 = True
+-3 <= -2 = True
+-3 <= -1 = True
+-3 <= 0 = True
+-3 <= 1 = True
+-3 <= 2 = True
+-3 <= 3 = True
+ 
+-2 <= -3 = False
+-2 <= -2 = True
+-2 <= -1 = True
+-2 <= 0 = True
+-2 <= 1 = True
+-2 <= 2 = True
+-2 <= 3 = True
+ 
+-1 <= -3 = False
+-1 <= -2 = False
+-1 <= -1 = True
+-1 <= 0 = True
+-1 <= 1 = True
+-1 <= 2 = True
+-1 <= 3 = True
+ 
+0 <= -3 = False
+0 <= -2 = False
+0 <= -1 = False
+0 <= 0 = True
+0 <= 1 = True
+0 <= 2 = True
+0 <= 3 = True
+ 
+1 <= -3 = False
+1 <= -2 = False
+1 <= -1 = False
+1 <= 0 = False
+1 <= 1 = True
+1 <= 2 = True
+1 <= 3 = True
+ 
+2 <= -3 = False
+2 <= -2 = False
+2 <= -1 = False
+2 <= 0 = False
+2 <= 1 = False
+2 <= 2 = True
+2 <= 3 = True
+ 
+3 <= -3 = False
+3 <= -2 = False
+3 <= -1 = False
+3 <= 0 = False
+3 <= 1 = False
+3 <= 2 = False
+3 <= 3 = True
+ 
+#
+-3 <  -3 = False
+-3 <  -2 = True
+-3 <  -1 = True
+-3 <  0 = True
+-3 <  1 = True
+-3 <  2 = True
+-3 <  3 = True
+ 
+-2 <  -3 = False
+-2 <  -2 = False
+-2 <  -1 = True
+-2 <  0 = True
+-2 <  1 = True
+-2 <  2 = True
+-2 <  3 = True
+ 
+-1 <  -3 = False
+-1 <  -2 = False
+-1 <  -1 = False
+-1 <  0 = True
+-1 <  1 = True
+-1 <  2 = True
+-1 <  3 = True
+ 
+0 <  -3 = False
+0 <  -2 = False
+0 <  -1 = False
+0 <  0 = False
+0 <  1 = True
+0 <  2 = True
+0 <  3 = True
+ 
+1 <  -3 = False
+1 <  -2 = False
+1 <  -1 = False
+1 <  0 = False
+1 <  1 = False
+1 <  2 = True
+1 <  3 = True
+ 
+2 <  -3 = False
+2 <  -2 = False
+2 <  -1 = False
+2 <  0 = False
+2 <  1 = False
+2 <  2 = False
+2 <  3 = True
+ 
+3 <  -3 = False
+3 <  -2 = False
+3 <  -1 = False
+3 <  0 = False
+3 <  1 = False
+3 <  2 = False
+3 <  3 = False
+ 
+#
+-3 >  -3 = False
+-3 >  -2 = False
+-3 >  -1 = False
+-3 >  0 = False
+-3 >  1 = False
+-3 >  2 = False
+-3 >  3 = False
+ 
+-2 >  -3 = True
+-2 >  -2 = False
+-2 >  -1 = False
+-2 >  0 = False
+-2 >  1 = False
+-2 >  2 = False
+-2 >  3 = False
+ 
+-1 >  -3 = True
+-1 >  -2 = True
+-1 >  -1 = False
+-1 >  0 = False
+-1 >  1 = False
+-1 >  2 = False
+-1 >  3 = False
+ 
+0 >  -3 = True
+0 >  -2 = True
+0 >  -1 = True
+0 >  0 = False
+0 >  1 = False
+0 >  2 = False
+0 >  3 = False
+ 
+1 >  -3 = True
+1 >  -2 = True
+1 >  -1 = True
+1 >  0 = True
+1 >  1 = False
+1 >  2 = False
+1 >  3 = False
+ 
+2 >  -3 = True
+2 >  -2 = True
+2 >  -1 = True
+2 >  0 = True
+2 >  1 = True
+2 >  2 = False
+2 >  3 = False
+ 
+3 >  -3 = True
+3 >  -2 = True
+3 >  -1 = True
+3 >  0 = True
+3 >  1 = True
+3 >  2 = True
+3 >  3 = False
+ 
+#
+-3 >= -3 = True
+-3 >= -2 = False
+-3 >= -1 = False
+-3 >= 0 = False
+-3 >= 1 = False
+-3 >= 2 = False
+-3 >= 3 = False
+ 
+-2 >= -3 = True
+-2 >= -2 = True
+-2 >= -1 = False
+-2 >= 0 = False
+-2 >= 1 = False
+-2 >= 2 = False
+-2 >= 3 = False
+ 
+-1 >= -3 = True
+-1 >= -2 = True
+-1 >= -1 = True
+-1 >= 0 = False
+-1 >= 1 = False
+-1 >= 2 = False
+-1 >= 3 = False
+ 
+0 >= -3 = True
+0 >= -2 = True
+0 >= -1 = True
+0 >= 0 = True
+0 >= 1 = False
+0 >= 2 = False
+0 >= 3 = False
+ 
+1 >= -3 = True
+1 >= -2 = True
+1 >= -1 = True
+1 >= 0 = True
+1 >= 1 = True
+1 >= 2 = False
+1 >= 3 = False
+ 
+2 >= -3 = True
+2 >= -2 = True
+2 >= -1 = True
+2 >= 0 = True
+2 >= 1 = True
+2 >= 2 = True
+2 >= 3 = False
+ 
+3 >= -3 = True
+3 >= -2 = True
+3 >= -1 = True
+3 >= 0 = True
+3 >= 1 = True
+3 >= 2 = True
+3 >= 3 = True
+ 
+#
+-3 `compare` -3 = EQ
+-3 `compare` -2 = LT
+-3 `compare` -1 = LT
+-3 `compare` 0 = LT
+-3 `compare` 1 = LT
+-3 `compare` 2 = LT
+-3 `compare` 3 = LT
+ 
+-2 `compare` -3 = GT
+-2 `compare` -2 = EQ
+-2 `compare` -1 = LT
+-2 `compare` 0 = LT
+-2 `compare` 1 = LT
+-2 `compare` 2 = LT
+-2 `compare` 3 = LT
+ 
+-1 `compare` -3 = GT
+-1 `compare` -2 = GT
+-1 `compare` -1 = EQ
+-1 `compare` 0 = LT
+-1 `compare` 1 = LT
+-1 `compare` 2 = LT
+-1 `compare` 3 = LT
+ 
+0 `compare` -3 = GT
+0 `compare` -2 = GT
+0 `compare` -1 = GT
+0 `compare` 0 = EQ
+0 `compare` 1 = LT
+0 `compare` 2 = LT
+0 `compare` 3 = LT
+ 
+1 `compare` -3 = GT
+1 `compare` -2 = GT
+1 `compare` -1 = GT
+1 `compare` 0 = GT
+1 `compare` 1 = EQ
+1 `compare` 2 = LT
+1 `compare` 3 = LT
+ 
+2 `compare` -3 = GT
+2 `compare` -2 = GT
+2 `compare` -1 = GT
+2 `compare` 0 = GT
+2 `compare` 1 = GT
+2 `compare` 2 = EQ
+2 `compare` 3 = LT
+ 
+3 `compare` -3 = GT
+3 `compare` -2 = GT
+3 `compare` -1 = GT
+3 `compare` 0 = GT
+3 `compare` 1 = GT
+3 `compare` 2 = GT
+3 `compare` 3 = EQ
+ 
+#
+testNum
+-3 + -3 = -6
+-3 + -2 = -5
+-3 + -1 = -4
+-3 + 0 = -3
+-3 + 1 = -2
+-3 + 2 = -1
+-3 + 3 = 0
+ 
+-2 + -3 = -5
+-2 + -2 = -4
+-2 + -1 = -3
+-2 + 0 = -2
+-2 + 1 = -1
+-2 + 2 = 0
+-2 + 3 = 1
+ 
+-1 + -3 = -4
+-1 + -2 = -3
+-1 + -1 = -2
+-1 + 0 = -1
+-1 + 1 = 0
+-1 + 2 = 1
+-1 + 3 = 2
+ 
+0 + -3 = -3
+0 + -2 = -2
+0 + -1 = -1
+0 + 0 = 0
+0 + 1 = 1
+0 + 2 = 2
+0 + 3 = 3
+ 
+1 + -3 = -2
+1 + -2 = -1
+1 + -1 = 0
+1 + 0 = 1
+1 + 1 = 2
+1 + 2 = 3
+1 + 3 = 4
+ 
+2 + -3 = -1
+2 + -2 = 0
+2 + -1 = 1
+2 + 0 = 2
+2 + 1 = 3
+2 + 2 = 4
+2 + 3 = 5
+ 
+3 + -3 = 0
+3 + -2 = 1
+3 + -1 = 2
+3 + 0 = 3
+3 + 1 = 4
+3 + 2 = 5
+3 + 3 = 6
+ 
+#
+-3 - -3 = 0
+-3 - -2 = -1
+-3 - -1 = -2
+-3 - 0 = -3
+-3 - 1 = -4
+-3 - 2 = -5
+-3 - 3 = -6
+ 
+-2 - -3 = 1
+-2 - -2 = 0
+-2 - -1 = -1
+-2 - 0 = -2
+-2 - 1 = -3
+-2 - 2 = -4
+-2 - 3 = -5
+ 
+-1 - -3 = 2
+-1 - -2 = 1
+-1 - -1 = 0
+-1 - 0 = -1
+-1 - 1 = -2
+-1 - 2 = -3
+-1 - 3 = -4
+ 
+0 - -3 = 3
+0 - -2 = 2
+0 - -1 = 1
+0 - 0 = 0
+0 - 1 = -1
+0 - 2 = -2
+0 - 3 = -3
+ 
+1 - -3 = 4
+1 - -2 = 3
+1 - -1 = 2
+1 - 0 = 1
+1 - 1 = 0
+1 - 2 = -1
+1 - 3 = -2
+ 
+2 - -3 = 5
+2 - -2 = 4
+2 - -1 = 3
+2 - 0 = 2
+2 - 1 = 1
+2 - 2 = 0
+2 - 3 = -1
+ 
+3 - -3 = 6
+3 - -2 = 5
+3 - -1 = 4
+3 - 0 = 3
+3 - 1 = 2
+3 - 2 = 1
+3 - 3 = 0
+ 
+#
+-3 * -3 = 9
+-3 * -2 = 6
+-3 * -1 = 3
+-3 * 0 = 0
+-3 * 1 = -3
+-3 * 2 = -6
+-3 * 3 = -9
+ 
+-2 * -3 = 6
+-2 * -2 = 4
+-2 * -1 = 2
+-2 * 0 = 0
+-2 * 1 = -2
+-2 * 2 = -4
+-2 * 3 = -6
+ 
+-1 * -3 = 3
+-1 * -2 = 2
+-1 * -1 = 1
+-1 * 0 = 0
+-1 * 1 = -1
+-1 * 2 = -2
+-1 * 3 = -3
+ 
+0 * -3 = 0
+0 * -2 = 0
+0 * -1 = 0
+0 * 0 = 0
+0 * 1 = 0
+0 * 2 = 0
+0 * 3 = 0
+ 
+1 * -3 = -3
+1 * -2 = -2
+1 * -1 = -1
+1 * 0 = 0
+1 * 1 = 1
+1 * 2 = 2
+1 * 3 = 3
+ 
+2 * -3 = -6
+2 * -2 = -4
+2 * -1 = -2
+2 * 0 = 0
+2 * 1 = 2
+2 * 2 = 4
+2 * 3 = 6
+ 
+3 * -3 = -9
+3 * -2 = -6
+3 * -1 = -3
+3 * 0 = 0
+3 * 1 = 3
+3 * 2 = 6
+3 * 3 = 9
+ 
+#
+negate -3 = 3
+negate -2 = 2
+negate -1 = 1
+negate 0 = 0
+negate 1 = -1
+negate 2 = -2
+negate 3 = -3
+#
+testReal
+toRational -3 = -3 % 1
+toRational -2 = -2 % 1
+toRational -1 = -1 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
+#
+testIntegral
+-3 `divMod`  -3 = (1,0)
+-3 `divMod`  -2 = (1,-1)
+-3 `divMod`  -1 = (3,0)
+-3 `divMod`  1 = (-3,0)
+-3 `divMod`  2 = (-2,1)
+-3 `divMod`  3 = (-1,0)
+ 
+-2 `divMod`  -3 = (0,-2)
+-2 `divMod`  -2 = (1,0)
+-2 `divMod`  -1 = (2,0)
+-2 `divMod`  1 = (-2,0)
+-2 `divMod`  2 = (-1,0)
+-2 `divMod`  3 = (-1,1)
+ 
+-1 `divMod`  -3 = (0,-1)
+-1 `divMod`  -2 = (0,-1)
+-1 `divMod`  -1 = (1,0)
+-1 `divMod`  1 = (-1,0)
+-1 `divMod`  2 = (-1,1)
+-1 `divMod`  3 = (-1,2)
+ 
+0 `divMod`  -3 = (0,0)
+0 `divMod`  -2 = (0,0)
+0 `divMod`  -1 = (0,0)
+0 `divMod`  1 = (0,0)
+0 `divMod`  2 = (0,0)
+0 `divMod`  3 = (0,0)
+ 
+1 `divMod`  -3 = (-1,-2)
+1 `divMod`  -2 = (-1,-1)
+1 `divMod`  -1 = (-1,0)
+1 `divMod`  1 = (1,0)
+1 `divMod`  2 = (0,1)
+1 `divMod`  3 = (0,1)
+ 
+2 `divMod`  -3 = (-1,-1)
+2 `divMod`  -2 = (-1,0)
+2 `divMod`  -1 = (-2,0)
+2 `divMod`  1 = (2,0)
+2 `divMod`  2 = (1,0)
+2 `divMod`  3 = (0,2)
+ 
+3 `divMod`  -3 = (-1,0)
+3 `divMod`  -2 = (-2,-1)
+3 `divMod`  -1 = (-3,0)
+3 `divMod`  1 = (3,0)
+3 `divMod`  2 = (1,1)
+3 `divMod`  3 = (1,0)
+ 
+#
+-3 `div`     -3 = 1
+-3 `div`     -2 = 1
+-3 `div`     -1 = 3
+-3 `div`     1 = -3
+-3 `div`     2 = -2
+-3 `div`     3 = -1
+ 
+-2 `div`     -3 = 0
+-2 `div`     -2 = 1
+-2 `div`     -1 = 2
+-2 `div`     1 = -2
+-2 `div`     2 = -1
+-2 `div`     3 = -1
+ 
+-1 `div`     -3 = 0
+-1 `div`     -2 = 0
+-1 `div`     -1 = 1
+-1 `div`     1 = -1
+-1 `div`     2 = -1
+-1 `div`     3 = -1
+ 
+0 `div`     -3 = 0
+0 `div`     -2 = 0
+0 `div`     -1 = 0
+0 `div`     1 = 0
+0 `div`     2 = 0
+0 `div`     3 = 0
+ 
+1 `div`     -3 = -1
+1 `div`     -2 = -1
+1 `div`     -1 = -1
+1 `div`     1 = 1
+1 `div`     2 = 0
+1 `div`     3 = 0
+ 
+2 `div`     -3 = -1
+2 `div`     -2 = -1
+2 `div`     -1 = -2
+2 `div`     1 = 2
+2 `div`     2 = 1
+2 `div`     3 = 0
+ 
+3 `div`     -3 = -1
+3 `div`     -2 = -2
+3 `div`     -1 = -3
+3 `div`     1 = 3
+3 `div`     2 = 1
+3 `div`     3 = 1
+ 
+#
+-3 `mod`     -3 = 0
+-3 `mod`     -2 = -1
+-3 `mod`     -1 = 0
+-3 `mod`     1 = 0
+-3 `mod`     2 = 1
+-3 `mod`     3 = 0
+ 
+-2 `mod`     -3 = -2
+-2 `mod`     -2 = 0
+-2 `mod`     -1 = 0
+-2 `mod`     1 = 0
+-2 `mod`     2 = 0
+-2 `mod`     3 = 1
+ 
+-1 `mod`     -3 = -1
+-1 `mod`     -2 = -1
+-1 `mod`     -1 = 0
+-1 `mod`     1 = 0
+-1 `mod`     2 = 1
+-1 `mod`     3 = 2
+ 
+0 `mod`     -3 = 0
+0 `mod`     -2 = 0
+0 `mod`     -1 = 0
+0 `mod`     1 = 0
+0 `mod`     2 = 0
+0 `mod`     3 = 0
+ 
+1 `mod`     -3 = -2
+1 `mod`     -2 = -1
+1 `mod`     -1 = 0
+1 `mod`     1 = 0
+1 `mod`     2 = 1
+1 `mod`     3 = 1
+ 
+2 `mod`     -3 = -1
+2 `mod`     -2 = 0
+2 `mod`     -1 = 0
+2 `mod`     1 = 0
+2 `mod`     2 = 0
+2 `mod`     3 = 2
+ 
+3 `mod`     -3 = 0
+3 `mod`     -2 = -1
+3 `mod`     -1 = 0
+3 `mod`     1 = 0
+3 `mod`     2 = 1
+3 `mod`     3 = 0
+ 
+#
+-3 `quotRem` -3 = (1,0)
+-3 `quotRem` -2 = (1,-1)
+-3 `quotRem` -1 = (3,0)
+-3 `quotRem` 1 = (-3,0)
+-3 `quotRem` 2 = (-1,-1)
+-3 `quotRem` 3 = (-1,0)
+ 
+-2 `quotRem` -3 = (0,-2)
+-2 `quotRem` -2 = (1,0)
+-2 `quotRem` -1 = (2,0)
+-2 `quotRem` 1 = (-2,0)
+-2 `quotRem` 2 = (-1,0)
+-2 `quotRem` 3 = (0,-2)
+ 
+-1 `quotRem` -3 = (0,-1)
+-1 `quotRem` -2 = (0,-1)
+-1 `quotRem` -1 = (1,0)
+-1 `quotRem` 1 = (-1,0)
+-1 `quotRem` 2 = (0,-1)
+-1 `quotRem` 3 = (0,-1)
+ 
+0 `quotRem` -3 = (0,0)
+0 `quotRem` -2 = (0,0)
+0 `quotRem` -1 = (0,0)
+0 `quotRem` 1 = (0,0)
+0 `quotRem` 2 = (0,0)
+0 `quotRem` 3 = (0,0)
+ 
+1 `quotRem` -3 = (0,1)
+1 `quotRem` -2 = (0,1)
+1 `quotRem` -1 = (-1,0)
+1 `quotRem` 1 = (1,0)
+1 `quotRem` 2 = (0,1)
+1 `quotRem` 3 = (0,1)
+ 
+2 `quotRem` -3 = (0,2)
+2 `quotRem` -2 = (-1,0)
+2 `quotRem` -1 = (-2,0)
+2 `quotRem` 1 = (2,0)
+2 `quotRem` 2 = (1,0)
+2 `quotRem` 3 = (0,2)
+ 
+3 `quotRem` -3 = (-1,0)
+3 `quotRem` -2 = (-1,1)
+3 `quotRem` -1 = (-3,0)
+3 `quotRem` 1 = (3,0)
+3 `quotRem` 2 = (1,1)
+3 `quotRem` 3 = (1,0)
+ 
+#
+-3 `quot`    -3 = 1
+-3 `quot`    -2 = 1
+-3 `quot`    -1 = 3
+-3 `quot`    1 = -3
+-3 `quot`    2 = -1
+-3 `quot`    3 = -1
+ 
+-2 `quot`    -3 = 0
+-2 `quot`    -2 = 1
+-2 `quot`    -1 = 2
+-2 `quot`    1 = -2
+-2 `quot`    2 = -1
+-2 `quot`    3 = 0
+ 
+-1 `quot`    -3 = 0
+-1 `quot`    -2 = 0
+-1 `quot`    -1 = 1
+-1 `quot`    1 = -1
+-1 `quot`    2 = 0
+-1 `quot`    3 = 0
+ 
+0 `quot`    -3 = 0
+0 `quot`    -2 = 0
+0 `quot`    -1 = 0
+0 `quot`    1 = 0
+0 `quot`    2 = 0
+0 `quot`    3 = 0
+ 
+1 `quot`    -3 = 0
+1 `quot`    -2 = 0
+1 `quot`    -1 = -1
+1 `quot`    1 = 1
+1 `quot`    2 = 0
+1 `quot`    3 = 0
+ 
+2 `quot`    -3 = 0
+2 `quot`    -2 = -1
+2 `quot`    -1 = -2
+2 `quot`    1 = 2
+2 `quot`    2 = 1
+2 `quot`    3 = 0
+ 
+3 `quot`    -3 = -1
+3 `quot`    -2 = -1
+3 `quot`    -1 = -3
+3 `quot`    1 = 3
+3 `quot`    2 = 1
+3 `quot`    3 = 1
+ 
+#
+-3 `rem`     -3 = 0
+-3 `rem`     -2 = -1
+-3 `rem`     -1 = 0
+-3 `rem`     1 = 0
+-3 `rem`     2 = -1
+-3 `rem`     3 = 0
+ 
+-2 `rem`     -3 = -2
+-2 `rem`     -2 = 0
+-2 `rem`     -1 = 0
+-2 `rem`     1 = 0
+-2 `rem`     2 = 0
+-2 `rem`     3 = -2
+ 
+-1 `rem`     -3 = -1
+-1 `rem`     -2 = -1
+-1 `rem`     -1 = 0
+-1 `rem`     1 = 0
+-1 `rem`     2 = -1
+-1 `rem`     3 = -1
+ 
+0 `rem`     -3 = 0
+0 `rem`     -2 = 0
+0 `rem`     -1 = 0
+0 `rem`     1 = 0
+0 `rem`     2 = 0
+0 `rem`     3 = 0
+ 
+1 `rem`     -3 = 1
+1 `rem`     -2 = 1
+1 `rem`     -1 = 0
+1 `rem`     1 = 0
+1 `rem`     2 = 1
+1 `rem`     3 = 1
+ 
+2 `rem`     -3 = 2
+2 `rem`     -2 = 0
+2 `rem`     -1 = 0
+2 `rem`     1 = 0
+2 `rem`     2 = 0
+2 `rem`     3 = 2
+ 
+3 `rem`     -3 = 0
+3 `rem`     -2 = 1
+3 `rem`     -1 = 0
+3 `rem`     1 = 0
+3 `rem`     2 = 1
+3 `rem`     3 = 0
+ 
+#
+testBits
+-3 .&.   -3 = -3
+-3 .&.   -2 = -4
+-3 .&.   -1 = -3
+-3 .&.   1 = 1
+-3 .&.   2 = 0
+-3 .&.   3 = 1
+ 
+-2 .&.   -3 = -4
+-2 .&.   -2 = -2
+-2 .&.   -1 = -2
+-2 .&.   1 = 0
+-2 .&.   2 = 2
+-2 .&.   3 = 2
+ 
+-1 .&.   -3 = -3
+-1 .&.   -2 = -2
+-1 .&.   -1 = -1
+-1 .&.   1 = 1
+-1 .&.   2 = 2
+-1 .&.   3 = 3
+ 
+0 .&.   -3 = 0
+0 .&.   -2 = 0
+0 .&.   -1 = 0
+0 .&.   1 = 0
+0 .&.   2 = 0
+0 .&.   3 = 0
+ 
+1 .&.   -3 = 1
+1 .&.   -2 = 0
+1 .&.   -1 = 1
+1 .&.   1 = 1
+1 .&.   2 = 0
+1 .&.   3 = 1
+ 
+2 .&.   -3 = 0
+2 .&.   -2 = 2
+2 .&.   -1 = 2
+2 .&.   1 = 0
+2 .&.   2 = 2
+2 .&.   3 = 2
+ 
+3 .&.   -3 = 1
+3 .&.   -2 = 2
+3 .&.   -1 = 3
+3 .&.   1 = 1
+3 .&.   2 = 2
+3 .&.   3 = 3
+ 
+#
+-3 .|.   -3 = -3
+-3 .|.   -2 = -1
+-3 .|.   -1 = -1
+-3 .|.   1 = -3
+-3 .|.   2 = -1
+-3 .|.   3 = -1
+ 
+-2 .|.   -3 = -1
+-2 .|.   -2 = -2
+-2 .|.   -1 = -1
+-2 .|.   1 = -1
+-2 .|.   2 = -2
+-2 .|.   3 = -1
+ 
+-1 .|.   -3 = -1
+-1 .|.   -2 = -1
+-1 .|.   -1 = -1
+-1 .|.   1 = -1
+-1 .|.   2 = -1
+-1 .|.   3 = -1
+ 
+0 .|.   -3 = -3
+0 .|.   -2 = -2
+0 .|.   -1 = -1
+0 .|.   1 = 1
+0 .|.   2 = 2
+0 .|.   3 = 3
+ 
+1 .|.   -3 = -3
+1 .|.   -2 = -1
+1 .|.   -1 = -1
+1 .|.   1 = 1
+1 .|.   2 = 3
+1 .|.   3 = 3
+ 
+2 .|.   -3 = -1
+2 .|.   -2 = -2
+2 .|.   -1 = -1
+2 .|.   1 = 3
+2 .|.   2 = 2
+2 .|.   3 = 3
+ 
+3 .|.   -3 = -1
+3 .|.   -2 = -1
+3 .|.   -1 = -1
+3 .|.   1 = 3
+3 .|.   2 = 3
+3 .|.   3 = 3
+ 
+#
+-3 `xor` -3 = 0
+-3 `xor` -2 = 3
+-3 `xor` -1 = 2
+-3 `xor` 1 = -4
+-3 `xor` 2 = -1
+-3 `xor` 3 = -2
+ 
+-2 `xor` -3 = 3
+-2 `xor` -2 = 0
+-2 `xor` -1 = 1
+-2 `xor` 1 = -1
+-2 `xor` 2 = -4
+-2 `xor` 3 = -3
+ 
+-1 `xor` -3 = 2
+-1 `xor` -2 = 1
+-1 `xor` -1 = 0
+-1 `xor` 1 = -2
+-1 `xor` 2 = -3
+-1 `xor` 3 = -4
+ 
+0 `xor` -3 = -3
+0 `xor` -2 = -2
+0 `xor` -1 = -1
+0 `xor` 1 = 1
+0 `xor` 2 = 2
+0 `xor` 3 = 3
+ 
+1 `xor` -3 = -4
+1 `xor` -2 = -1
+1 `xor` -1 = -2
+1 `xor` 1 = 0
+1 `xor` 2 = 3
+1 `xor` 3 = 2
+ 
+2 `xor` -3 = -1
+2 `xor` -2 = -4
+2 `xor` -1 = -3
+2 `xor` 1 = 3
+2 `xor` 2 = 0
+2 `xor` 3 = 1
+ 
+3 `xor` -3 = -2
+3 `xor` -2 = -3
+3 `xor` -1 = -4
+3 `xor` 1 = 2
+3 `xor` 2 = 1
+3 `xor` 3 = 0
+ 
+#
+complement -3 = 2
+complement -2 = 1
+complement -1 = 0
+complement 0 = -1
+complement 1 = -2
+complement 2 = -3
+complement 3 = -4
+#
+-3 `shift` 0 = -3
+-3 `shift` 1 = -6
+-3 `shift` 2 = -12
+-3 `shift` 3 = -24
+ 
+-2 `shift` 0 = -2
+-2 `shift` 1 = -4
+-2 `shift` 2 = -8
+-2 `shift` 3 = -16
+ 
+-1 `shift` 0 = -1
+-1 `shift` 1 = -2
+-1 `shift` 2 = -4
+-1 `shift` 3 = -8
+ 
+0 `shift` 0 = 0
+0 `shift` 1 = 0
+0 `shift` 2 = 0
+0 `shift` 3 = 0
+ 
+1 `shift` 0 = 1
+1 `shift` 1 = 2
+1 `shift` 2 = 4
+1 `shift` 3 = 8
+ 
+2 `shift` 0 = 2
+2 `shift` 1 = 4
+2 `shift` 2 = 8
+2 `shift` 3 = 16
+ 
+3 `shift` 0 = 3
+3 `shift` 1 = 6
+3 `shift` 2 = 12
+3 `shift` 3 = 24
+ 
+#
+-3 `setBit` 0 = -3
+-3 `setBit` 1 = -1
+-3 `setBit` 2 = -3
+-3 `setBit` 3 = -3
+ 
+-2 `setBit` 0 = -1
+-2 `setBit` 1 = -2
+-2 `setBit` 2 = -2
+-2 `setBit` 3 = -2
+ 
+-1 `setBit` 0 = -1
+-1 `setBit` 1 = -1
+-1 `setBit` 2 = -1
+-1 `setBit` 3 = -1
+ 
+0 `setBit` 0 = 1
+0 `setBit` 1 = 2
+0 `setBit` 2 = 4
+0 `setBit` 3 = 8
+ 
+1 `setBit` 0 = 1
+1 `setBit` 1 = 3
+1 `setBit` 2 = 5
+1 `setBit` 3 = 9
+ 
+2 `setBit` 0 = 3
+2 `setBit` 1 = 2
+2 `setBit` 2 = 6
+2 `setBit` 3 = 10
+ 
+3 `setBit` 0 = 3
+3 `setBit` 1 = 3
+3 `setBit` 2 = 7
+3 `setBit` 3 = 11
+ 
+#
+-3 `clearBit` 0 = -4
+-3 `clearBit` 1 = -3
+-3 `clearBit` 2 = -7
+-3 `clearBit` 3 = -11
+ 
+-2 `clearBit` 0 = -2
+-2 `clearBit` 1 = -4
+-2 `clearBit` 2 = -6
+-2 `clearBit` 3 = -10
+ 
+-1 `clearBit` 0 = -2
+-1 `clearBit` 1 = -3
+-1 `clearBit` 2 = -5
+-1 `clearBit` 3 = -9
+ 
+0 `clearBit` 0 = 0
+0 `clearBit` 1 = 0
+0 `clearBit` 2 = 0
+0 `clearBit` 3 = 0
+ 
+1 `clearBit` 0 = 0
+1 `clearBit` 1 = 1
+1 `clearBit` 2 = 1
+1 `clearBit` 3 = 1
+ 
+2 `clearBit` 0 = 2
+2 `clearBit` 1 = 0
+2 `clearBit` 2 = 2
+2 `clearBit` 3 = 2
+ 
+3 `clearBit` 0 = 2
+3 `clearBit` 1 = 1
+3 `clearBit` 2 = 3
+3 `clearBit` 3 = 3
+ 
+#
+-3 `complementBit` 0 = -4
+-3 `complementBit` 1 = -1
+-3 `complementBit` 2 = -7
+-3 `complementBit` 3 = -11
+ 
+-2 `complementBit` 0 = -1
+-2 `complementBit` 1 = -4
+-2 `complementBit` 2 = -6
+-2 `complementBit` 3 = -10
+ 
+-1 `complementBit` 0 = -2
+-1 `complementBit` 1 = -3
+-1 `complementBit` 2 = -5
+-1 `complementBit` 3 = -9
+ 
+0 `complementBit` 0 = 1
+0 `complementBit` 1 = 2
+0 `complementBit` 2 = 4
+0 `complementBit` 3 = 8
+ 
+1 `complementBit` 0 = 0
+1 `complementBit` 1 = 3
+1 `complementBit` 2 = 5
+1 `complementBit` 3 = 9
+ 
+2 `complementBit` 0 = 3
+2 `complementBit` 1 = 0
+2 `complementBit` 2 = 6
+2 `complementBit` 3 = 10
+ 
+3 `complementBit` 0 = 2
+3 `complementBit` 1 = 1
+3 `complementBit` 2 = 7
+3 `complementBit` 3 = 11
+ 
+#
+-3 `testBit` 0 = True
+-3 `testBit` 1 = False
+-3 `testBit` 2 = True
+-3 `testBit` 3 = True
+ 
+-2 `testBit` 0 = False
+-2 `testBit` 1 = True
+-2 `testBit` 2 = True
+-2 `testBit` 3 = True
+ 
+-1 `testBit` 0 = True
+-1 `testBit` 1 = True
+-1 `testBit` 2 = True
+-1 `testBit` 3 = True
+ 
+0 `testBit` 0 = False
+0 `testBit` 1 = False
+0 `testBit` 2 = False
+0 `testBit` 3 = False
+ 
+1 `testBit` 0 = True
+1 `testBit` 1 = False
+1 `testBit` 2 = False
+1 `testBit` 3 = False
+ 
+2 `testBit` 0 = False
+2 `testBit` 1 = True
+2 `testBit` 2 = False
+2 `testBit` 3 = False
+ 
+3 `testBit` 0 = True
+3 `testBit` 1 = True
+3 `testBit` 2 = False
+3 `testBit` 3 = False
+ 
+#
+bitSize -3 = 8
+bitSize -2 = 8
+bitSize -1 = 8
+bitSize 0 = 8
+bitSize 1 = 8
+bitSize 2 = 8
+bitSize 3 = 8
+#
+isSigned -3 = True
+isSigned -2 = True
+isSigned -1 = True
+isSigned 0 = True
+isSigned 1 = True
+isSigned 2 = True
+isSigned 3 = True
+#
+--------------------------------
+--------------------------------
+--Testing Int16
+--------------------------------
+testBounded
+(32767,-32768,-32767)
+(32766,32767,-32768)
+testEnum
+[0,1,2,3,4,5,6,7,8,9]
+[0,2,4,6,8,10,12,14,16,18]
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+[0,2,4,6,8,10,12,14,16,18,20]
+testReadShow
+[-3,-2,-1,0,1,2,3]
+[-3,-2,-1,0,1,2,3]
+testEq
+-3 == -3 = True
+-3 == -2 = False
+-3 == -1 = False
+-3 == 0 = False
+-3 == 1 = False
+-3 == 2 = False
+-3 == 3 = False
+ 
+-2 == -3 = False
+-2 == -2 = True
+-2 == -1 = False
+-2 == 0 = False
+-2 == 1 = False
+-2 == 2 = False
+-2 == 3 = False
+ 
+-1 == -3 = False
+-1 == -2 = False
+-1 == -1 = True
+-1 == 0 = False
+-1 == 1 = False
+-1 == 2 = False
+-1 == 3 = False
+ 
+0 == -3 = False
+0 == -2 = False
+0 == -1 = False
+0 == 0 = True
+0 == 1 = False
+0 == 2 = False
+0 == 3 = False
+ 
+1 == -3 = False
+1 == -2 = False
+1 == -1 = False
+1 == 0 = False
+1 == 1 = True
+1 == 2 = False
+1 == 3 = False
+ 
+2 == -3 = False
+2 == -2 = False
+2 == -1 = False
+2 == 0 = False
+2 == 1 = False
+2 == 2 = True
+2 == 3 = False
+ 
+3 == -3 = False
+3 == -2 = False
+3 == -1 = False
+3 == 0 = False
+3 == 1 = False
+3 == 2 = False
+3 == 3 = True
+ 
+#
+-3 /= -3 = False
+-3 /= -2 = True
+-3 /= -1 = True
+-3 /= 0 = True
+-3 /= 1 = True
+-3 /= 2 = True
+-3 /= 3 = True
+ 
+-2 /= -3 = True
+-2 /= -2 = False
+-2 /= -1 = True
+-2 /= 0 = True
+-2 /= 1 = True
+-2 /= 2 = True
+-2 /= 3 = True
+ 
+-1 /= -3 = True
+-1 /= -2 = True
+-1 /= -1 = False
+-1 /= 0 = True
+-1 /= 1 = True
+-1 /= 2 = True
+-1 /= 3 = True
+ 
+0 /= -3 = True
+0 /= -2 = True
+0 /= -1 = True
+0 /= 0 = False
+0 /= 1 = True
+0 /= 2 = True
+0 /= 3 = True
+ 
+1 /= -3 = True
+1 /= -2 = True
+1 /= -1 = True
+1 /= 0 = True
+1 /= 1 = False
+1 /= 2 = True
+1 /= 3 = True
+ 
+2 /= -3 = True
+2 /= -2 = True
+2 /= -1 = True
+2 /= 0 = True
+2 /= 1 = True
+2 /= 2 = False
+2 /= 3 = True
+ 
+3 /= -3 = True
+3 /= -2 = True
+3 /= -1 = True
+3 /= 0 = True
+3 /= 1 = True
+3 /= 2 = True
+3 /= 3 = False
+ 
+#
+testOrd
+-3 <= -3 = True
+-3 <= -2 = True
+-3 <= -1 = True
+-3 <= 0 = True
+-3 <= 1 = True
+-3 <= 2 = True
+-3 <= 3 = True
+ 
+-2 <= -3 = False
+-2 <= -2 = True
+-2 <= -1 = True
+-2 <= 0 = True
+-2 <= 1 = True
+-2 <= 2 = True
+-2 <= 3 = True
+ 
+-1 <= -3 = False
+-1 <= -2 = False
+-1 <= -1 = True
+-1 <= 0 = True
+-1 <= 1 = True
+-1 <= 2 = True
+-1 <= 3 = True
+ 
+0 <= -3 = False
+0 <= -2 = False
+0 <= -1 = False
+0 <= 0 = True
+0 <= 1 = True
+0 <= 2 = True
+0 <= 3 = True
+ 
+1 <= -3 = False
+1 <= -2 = False
+1 <= -1 = False
+1 <= 0 = False
+1 <= 1 = True
+1 <= 2 = True
+1 <= 3 = True
+ 
+2 <= -3 = False
+2 <= -2 = False
+2 <= -1 = False
+2 <= 0 = False
+2 <= 1 = False
+2 <= 2 = True
+2 <= 3 = True
+ 
+3 <= -3 = False
+3 <= -2 = False
+3 <= -1 = False
+3 <= 0 = False
+3 <= 1 = False
+3 <= 2 = False
+3 <= 3 = True
+ 
+#
+-3 <  -3 = False
+-3 <  -2 = True
+-3 <  -1 = True
+-3 <  0 = True
+-3 <  1 = True
+-3 <  2 = True
+-3 <  3 = True
+ 
+-2 <  -3 = False
+-2 <  -2 = False
+-2 <  -1 = True
+-2 <  0 = True
+-2 <  1 = True
+-2 <  2 = True
+-2 <  3 = True
+ 
+-1 <  -3 = False
+-1 <  -2 = False
+-1 <  -1 = False
+-1 <  0 = True
+-1 <  1 = True
+-1 <  2 = True
+-1 <  3 = True
+ 
+0 <  -3 = False
+0 <  -2 = False
+0 <  -1 = False
+0 <  0 = False
+0 <  1 = True
+0 <  2 = True
+0 <  3 = True
+ 
+1 <  -3 = False
+1 <  -2 = False
+1 <  -1 = False
+1 <  0 = False
+1 <  1 = False
+1 <  2 = True
+1 <  3 = True
+ 
+2 <  -3 = False
+2 <  -2 = False
+2 <  -1 = False
+2 <  0 = False
+2 <  1 = False
+2 <  2 = False
+2 <  3 = True
+ 
+3 <  -3 = False
+3 <  -2 = False
+3 <  -1 = False
+3 <  0 = False
+3 <  1 = False
+3 <  2 = False
+3 <  3 = False
+ 
+#
+-3 >  -3 = False
+-3 >  -2 = False
+-3 >  -1 = False
+-3 >  0 = False
+-3 >  1 = False
+-3 >  2 = False
+-3 >  3 = False
+ 
+-2 >  -3 = True
+-2 >  -2 = False
+-2 >  -1 = False
+-2 >  0 = False
+-2 >  1 = False
+-2 >  2 = False
+-2 >  3 = False
+ 
+-1 >  -3 = True
+-1 >  -2 = True
+-1 >  -1 = False
+-1 >  0 = False
+-1 >  1 = False
+-1 >  2 = False
+-1 >  3 = False
+ 
+0 >  -3 = True
+0 >  -2 = True
+0 >  -1 = True
+0 >  0 = False
+0 >  1 = False
+0 >  2 = False
+0 >  3 = False
+ 
+1 >  -3 = True
+1 >  -2 = True
+1 >  -1 = True
+1 >  0 = True
+1 >  1 = False
+1 >  2 = False
+1 >  3 = False
+ 
+2 >  -3 = True
+2 >  -2 = True
+2 >  -1 = True
+2 >  0 = True
+2 >  1 = True
+2 >  2 = False
+2 >  3 = False
+ 
+3 >  -3 = True
+3 >  -2 = True
+3 >  -1 = True
+3 >  0 = True
+3 >  1 = True
+3 >  2 = True
+3 >  3 = False
+ 
+#
+-3 >= -3 = True
+-3 >= -2 = False
+-3 >= -1 = False
+-3 >= 0 = False
+-3 >= 1 = False
+-3 >= 2 = False
+-3 >= 3 = False
+ 
+-2 >= -3 = True
+-2 >= -2 = True
+-2 >= -1 = False
+-2 >= 0 = False
+-2 >= 1 = False
+-2 >= 2 = False
+-2 >= 3 = False
+ 
+-1 >= -3 = True
+-1 >= -2 = True
+-1 >= -1 = True
+-1 >= 0 = False
+-1 >= 1 = False
+-1 >= 2 = False
+-1 >= 3 = False
+ 
+0 >= -3 = True
+0 >= -2 = True
+0 >= -1 = True
+0 >= 0 = True
+0 >= 1 = False
+0 >= 2 = False
+0 >= 3 = False
+ 
+1 >= -3 = True
+1 >= -2 = True
+1 >= -1 = True
+1 >= 0 = True
+1 >= 1 = True
+1 >= 2 = False
+1 >= 3 = False
+ 
+2 >= -3 = True
+2 >= -2 = True
+2 >= -1 = True
+2 >= 0 = True
+2 >= 1 = True
+2 >= 2 = True
+2 >= 3 = False
+ 
+3 >= -3 = True
+3 >= -2 = True
+3 >= -1 = True
+3 >= 0 = True
+3 >= 1 = True
+3 >= 2 = True
+3 >= 3 = True
+ 
+#
+-3 `compare` -3 = EQ
+-3 `compare` -2 = LT
+-3 `compare` -1 = LT
+-3 `compare` 0 = LT
+-3 `compare` 1 = LT
+-3 `compare` 2 = LT
+-3 `compare` 3 = LT
+ 
+-2 `compare` -3 = GT
+-2 `compare` -2 = EQ
+-2 `compare` -1 = LT
+-2 `compare` 0 = LT
+-2 `compare` 1 = LT
+-2 `compare` 2 = LT
+-2 `compare` 3 = LT
+ 
+-1 `compare` -3 = GT
+-1 `compare` -2 = GT
+-1 `compare` -1 = EQ
+-1 `compare` 0 = LT
+-1 `compare` 1 = LT
+-1 `compare` 2 = LT
+-1 `compare` 3 = LT
+ 
+0 `compare` -3 = GT
+0 `compare` -2 = GT
+0 `compare` -1 = GT
+0 `compare` 0 = EQ
+0 `compare` 1 = LT
+0 `compare` 2 = LT
+0 `compare` 3 = LT
+ 
+1 `compare` -3 = GT
+1 `compare` -2 = GT
+1 `compare` -1 = GT
+1 `compare` 0 = GT
+1 `compare` 1 = EQ
+1 `compare` 2 = LT
+1 `compare` 3 = LT
+ 
+2 `compare` -3 = GT
+2 `compare` -2 = GT
+2 `compare` -1 = GT
+2 `compare` 0 = GT
+2 `compare` 1 = GT
+2 `compare` 2 = EQ
+2 `compare` 3 = LT
+ 
+3 `compare` -3 = GT
+3 `compare` -2 = GT
+3 `compare` -1 = GT
+3 `compare` 0 = GT
+3 `compare` 1 = GT
+3 `compare` 2 = GT
+3 `compare` 3 = EQ
+ 
+#
+testNum
+-3 + -3 = -6
+-3 + -2 = -5
+-3 + -1 = -4
+-3 + 0 = -3
+-3 + 1 = -2
+-3 + 2 = -1
+-3 + 3 = 0
+ 
+-2 + -3 = -5
+-2 + -2 = -4
+-2 + -1 = -3
+-2 + 0 = -2
+-2 + 1 = -1
+-2 + 2 = 0
+-2 + 3 = 1
+ 
+-1 + -3 = -4
+-1 + -2 = -3
+-1 + -1 = -2
+-1 + 0 = -1
+-1 + 1 = 0
+-1 + 2 = 1
+-1 + 3 = 2
+ 
+0 + -3 = -3
+0 + -2 = -2
+0 + -1 = -1
+0 + 0 = 0
+0 + 1 = 1
+0 + 2 = 2
+0 + 3 = 3
+ 
+1 + -3 = -2
+1 + -2 = -1
+1 + -1 = 0
+1 + 0 = 1
+1 + 1 = 2
+1 + 2 = 3
+1 + 3 = 4
+ 
+2 + -3 = -1
+2 + -2 = 0
+2 + -1 = 1
+2 + 0 = 2
+2 + 1 = 3
+2 + 2 = 4
+2 + 3 = 5
+ 
+3 + -3 = 0
+3 + -2 = 1
+3 + -1 = 2
+3 + 0 = 3
+3 + 1 = 4
+3 + 2 = 5
+3 + 3 = 6
+ 
+#
+-3 - -3 = 0
+-3 - -2 = -1
+-3 - -1 = -2
+-3 - 0 = -3
+-3 - 1 = -4
+-3 - 2 = -5
+-3 - 3 = -6
+ 
+-2 - -3 = 1
+-2 - -2 = 0
+-2 - -1 = -1
+-2 - 0 = -2
+-2 - 1 = -3
+-2 - 2 = -4
+-2 - 3 = -5
+ 
+-1 - -3 = 2
+-1 - -2 = 1
+-1 - -1 = 0
+-1 - 0 = -1
+-1 - 1 = -2
+-1 - 2 = -3
+-1 - 3 = -4
+ 
+0 - -3 = 3
+0 - -2 = 2
+0 - -1 = 1
+0 - 0 = 0
+0 - 1 = -1
+0 - 2 = -2
+0 - 3 = -3
+ 
+1 - -3 = 4
+1 - -2 = 3
+1 - -1 = 2
+1 - 0 = 1
+1 - 1 = 0
+1 - 2 = -1
+1 - 3 = -2
+ 
+2 - -3 = 5
+2 - -2 = 4
+2 - -1 = 3
+2 - 0 = 2
+2 - 1 = 1
+2 - 2 = 0
+2 - 3 = -1
+ 
+3 - -3 = 6
+3 - -2 = 5
+3 - -1 = 4
+3 - 0 = 3
+3 - 1 = 2
+3 - 2 = 1
+3 - 3 = 0
+ 
+#
+-3 * -3 = 9
+-3 * -2 = 6
+-3 * -1 = 3
+-3 * 0 = 0
+-3 * 1 = -3
+-3 * 2 = -6
+-3 * 3 = -9
+ 
+-2 * -3 = 6
+-2 * -2 = 4
+-2 * -1 = 2
+-2 * 0 = 0
+-2 * 1 = -2
+-2 * 2 = -4
+-2 * 3 = -6
+ 
+-1 * -3 = 3
+-1 * -2 = 2
+-1 * -1 = 1
+-1 * 0 = 0
+-1 * 1 = -1
+-1 * 2 = -2
+-1 * 3 = -3
+ 
+0 * -3 = 0
+0 * -2 = 0
+0 * -1 = 0
+0 * 0 = 0
+0 * 1 = 0
+0 * 2 = 0
+0 * 3 = 0
+ 
+1 * -3 = -3
+1 * -2 = -2
+1 * -1 = -1
+1 * 0 = 0
+1 * 1 = 1
+1 * 2 = 2
+1 * 3 = 3
+ 
+2 * -3 = -6
+2 * -2 = -4
+2 * -1 = -2
+2 * 0 = 0
+2 * 1 = 2
+2 * 2 = 4
+2 * 3 = 6
+ 
+3 * -3 = -9
+3 * -2 = -6
+3 * -1 = -3
+3 * 0 = 0
+3 * 1 = 3
+3 * 2 = 6
+3 * 3 = 9
+ 
+#
+negate -3 = 3
+negate -2 = 2
+negate -1 = 1
+negate 0 = 0
+negate 1 = -1
+negate 2 = -2
+negate 3 = -3
+#
+testReal
+toRational -3 = -3 % 1
+toRational -2 = -2 % 1
+toRational -1 = -1 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
+#
+testIntegral
+-3 `divMod`  -3 = (1,0)
+-3 `divMod`  -2 = (1,-1)
+-3 `divMod`  -1 = (3,0)
+-3 `divMod`  1 = (-3,0)
+-3 `divMod`  2 = (-2,1)
+-3 `divMod`  3 = (-1,0)
+ 
+-2 `divMod`  -3 = (0,-2)
+-2 `divMod`  -2 = (1,0)
+-2 `divMod`  -1 = (2,0)
+-2 `divMod`  1 = (-2,0)
+-2 `divMod`  2 = (-1,0)
+-2 `divMod`  3 = (-1,1)
+ 
+-1 `divMod`  -3 = (0,-1)
+-1 `divMod`  -2 = (0,-1)
+-1 `divMod`  -1 = (1,0)
+-1 `divMod`  1 = (-1,0)
+-1 `divMod`  2 = (-1,1)
+-1 `divMod`  3 = (-1,2)
+ 
+0 `divMod`  -3 = (0,0)
+0 `divMod`  -2 = (0,0)
+0 `divMod`  -1 = (0,0)
+0 `divMod`  1 = (0,0)
+0 `divMod`  2 = (0,0)
+0 `divMod`  3 = (0,0)
+ 
+1 `divMod`  -3 = (-1,-2)
+1 `divMod`  -2 = (-1,-1)
+1 `divMod`  -1 = (-1,0)
+1 `divMod`  1 = (1,0)
+1 `divMod`  2 = (0,1)
+1 `divMod`  3 = (0,1)
+ 
+2 `divMod`  -3 = (-1,-1)
+2 `divMod`  -2 = (-1,0)
+2 `divMod`  -1 = (-2,0)
+2 `divMod`  1 = (2,0)
+2 `divMod`  2 = (1,0)
+2 `divMod`  3 = (0,2)
+ 
+3 `divMod`  -3 = (-1,0)
+3 `divMod`  -2 = (-2,-1)
+3 `divMod`  -1 = (-3,0)
+3 `divMod`  1 = (3,0)
+3 `divMod`  2 = (1,1)
+3 `divMod`  3 = (1,0)
+ 
+#
+-3 `div`     -3 = 1
+-3 `div`     -2 = 1
+-3 `div`     -1 = 3
+-3 `div`     1 = -3
+-3 `div`     2 = -2
+-3 `div`     3 = -1
+ 
+-2 `div`     -3 = 0
+-2 `div`     -2 = 1
+-2 `div`     -1 = 2
+-2 `div`     1 = -2
+-2 `div`     2 = -1
+-2 `div`     3 = -1
+ 
+-1 `div`     -3 = 0
+-1 `div`     -2 = 0
+-1 `div`     -1 = 1
+-1 `div`     1 = -1
+-1 `div`     2 = -1
+-1 `div`     3 = -1
+ 
+0 `div`     -3 = 0
+0 `div`     -2 = 0
+0 `div`     -1 = 0
+0 `div`     1 = 0
+0 `div`     2 = 0
+0 `div`     3 = 0
+ 
+1 `div`     -3 = -1
+1 `div`     -2 = -1
+1 `div`     -1 = -1
+1 `div`     1 = 1
+1 `div`     2 = 0
+1 `div`     3 = 0
+ 
+2 `div`     -3 = -1
+2 `div`     -2 = -1
+2 `div`     -1 = -2
+2 `div`     1 = 2
+2 `div`     2 = 1
+2 `div`     3 = 0
+ 
+3 `div`     -3 = -1
+3 `div`     -2 = -2
+3 `div`     -1 = -3
+3 `div`     1 = 3
+3 `div`     2 = 1
+3 `div`     3 = 1
+ 
+#
+-3 `mod`     -3 = 0
+-3 `mod`     -2 = -1
+-3 `mod`     -1 = 0
+-3 `mod`     1 = 0
+-3 `mod`     2 = 1
+-3 `mod`     3 = 0
+ 
+-2 `mod`     -3 = -2
+-2 `mod`     -2 = 0
+-2 `mod`     -1 = 0
+-2 `mod`     1 = 0
+-2 `mod`     2 = 0
+-2 `mod`     3 = 1
+ 
+-1 `mod`     -3 = -1
+-1 `mod`     -2 = -1
+-1 `mod`     -1 = 0
+-1 `mod`     1 = 0
+-1 `mod`     2 = 1
+-1 `mod`     3 = 2
+ 
+0 `mod`     -3 = 0
+0 `mod`     -2 = 0
+0 `mod`     -1 = 0
+0 `mod`     1 = 0
+0 `mod`     2 = 0
+0 `mod`     3 = 0
+ 
+1 `mod`     -3 = -2
+1 `mod`     -2 = -1
+1 `mod`     -1 = 0
+1 `mod`     1 = 0
+1 `mod`     2 = 1
+1 `mod`     3 = 1
+ 
+2 `mod`     -3 = -1
+2 `mod`     -2 = 0
+2 `mod`     -1 = 0
+2 `mod`     1 = 0
+2 `mod`     2 = 0
+2 `mod`     3 = 2
+ 
+3 `mod`     -3 = 0
+3 `mod`     -2 = -1
+3 `mod`     -1 = 0
+3 `mod`     1 = 0
+3 `mod`     2 = 1
+3 `mod`     3 = 0
+ 
+#
+-3 `quotRem` -3 = (1,0)
+-3 `quotRem` -2 = (1,-1)
+-3 `quotRem` -1 = (3,0)
+-3 `quotRem` 1 = (-3,0)
+-3 `quotRem` 2 = (-1,-1)
+-3 `quotRem` 3 = (-1,0)
+ 
+-2 `quotRem` -3 = (0,-2)
+-2 `quotRem` -2 = (1,0)
+-2 `quotRem` -1 = (2,0)
+-2 `quotRem` 1 = (-2,0)
+-2 `quotRem` 2 = (-1,0)
+-2 `quotRem` 3 = (0,-2)
+ 
+-1 `quotRem` -3 = (0,-1)
+-1 `quotRem` -2 = (0,-1)
+-1 `quotRem` -1 = (1,0)
+-1 `quotRem` 1 = (-1,0)
+-1 `quotRem` 2 = (0,-1)
+-1 `quotRem` 3 = (0,-1)
+ 
+0 `quotRem` -3 = (0,0)
+0 `quotRem` -2 = (0,0)
+0 `quotRem` -1 = (0,0)
+0 `quotRem` 1 = (0,0)
+0 `quotRem` 2 = (0,0)
+0 `quotRem` 3 = (0,0)
+ 
+1 `quotRem` -3 = (0,1)
+1 `quotRem` -2 = (0,1)
+1 `quotRem` -1 = (-1,0)
+1 `quotRem` 1 = (1,0)
+1 `quotRem` 2 = (0,1)
+1 `quotRem` 3 = (0,1)
+ 
+2 `quotRem` -3 = (0,2)
+2 `quotRem` -2 = (-1,0)
+2 `quotRem` -1 = (-2,0)
+2 `quotRem` 1 = (2,0)
+2 `quotRem` 2 = (1,0)
+2 `quotRem` 3 = (0,2)
+ 
+3 `quotRem` -3 = (-1,0)
+3 `quotRem` -2 = (-1,1)
+3 `quotRem` -1 = (-3,0)
+3 `quotRem` 1 = (3,0)
+3 `quotRem` 2 = (1,1)
+3 `quotRem` 3 = (1,0)
+ 
+#
+-3 `quot`    -3 = 1
+-3 `quot`    -2 = 1
+-3 `quot`    -1 = 3
+-3 `quot`    1 = -3
+-3 `quot`    2 = -1
+-3 `quot`    3 = -1
+ 
+-2 `quot`    -3 = 0
+-2 `quot`    -2 = 1
+-2 `quot`    -1 = 2
+-2 `quot`    1 = -2
+-2 `quot`    2 = -1
+-2 `quot`    3 = 0
+ 
+-1 `quot`    -3 = 0
+-1 `quot`    -2 = 0
+-1 `quot`    -1 = 1
+-1 `quot`    1 = -1
+-1 `quot`    2 = 0
+-1 `quot`    3 = 0
+ 
+0 `quot`    -3 = 0
+0 `quot`    -2 = 0
+0 `quot`    -1 = 0
+0 `quot`    1 = 0
+0 `quot`    2 = 0
+0 `quot`    3 = 0
+ 
+1 `quot`    -3 = 0
+1 `quot`    -2 = 0
+1 `quot`    -1 = -1
+1 `quot`    1 = 1
+1 `quot`    2 = 0
+1 `quot`    3 = 0
+ 
+2 `quot`    -3 = 0
+2 `quot`    -2 = -1
+2 `quot`    -1 = -2
+2 `quot`    1 = 2
+2 `quot`    2 = 1
+2 `quot`    3 = 0
+ 
+3 `quot`    -3 = -1
+3 `quot`    -2 = -1
+3 `quot`    -1 = -3
+3 `quot`    1 = 3
+3 `quot`    2 = 1
+3 `quot`    3 = 1
+ 
+#
+-3 `rem`     -3 = 0
+-3 `rem`     -2 = -1
+-3 `rem`     -1 = 0
+-3 `rem`     1 = 0
+-3 `rem`     2 = -1
+-3 `rem`     3 = 0
+ 
+-2 `rem`     -3 = -2
+-2 `rem`     -2 = 0
+-2 `rem`     -1 = 0
+-2 `rem`     1 = 0
+-2 `rem`     2 = 0
+-2 `rem`     3 = -2
+ 
+-1 `rem`     -3 = -1
+-1 `rem`     -2 = -1
+-1 `rem`     -1 = 0
+-1 `rem`     1 = 0
+-1 `rem`     2 = -1
+-1 `rem`     3 = -1
+ 
+0 `rem`     -3 = 0
+0 `rem`     -2 = 0
+0 `rem`     -1 = 0
+0 `rem`     1 = 0
+0 `rem`     2 = 0
+0 `rem`     3 = 0
+ 
+1 `rem`     -3 = 1
+1 `rem`     -2 = 1
+1 `rem`     -1 = 0
+1 `rem`     1 = 0
+1 `rem`     2 = 1
+1 `rem`     3 = 1
+ 
+2 `rem`     -3 = 2
+2 `rem`     -2 = 0
+2 `rem`     -1 = 0
+2 `rem`     1 = 0
+2 `rem`     2 = 0
+2 `rem`     3 = 2
+ 
+3 `rem`     -3 = 0
+3 `rem`     -2 = 1
+3 `rem`     -1 = 0
+3 `rem`     1 = 0
+3 `rem`     2 = 1
+3 `rem`     3 = 0
+ 
+#
+testBits
+-3 .&.   -3 = -3
+-3 .&.   -2 = -4
+-3 .&.   -1 = -3
+-3 .&.   1 = 1
+-3 .&.   2 = 0
+-3 .&.   3 = 1
+ 
+-2 .&.   -3 = -4
+-2 .&.   -2 = -2
+-2 .&.   -1 = -2
+-2 .&.   1 = 0
+-2 .&.   2 = 2
+-2 .&.   3 = 2
+ 
+-1 .&.   -3 = -3
+-1 .&.   -2 = -2
+-1 .&.   -1 = -1
+-1 .&.   1 = 1
+-1 .&.   2 = 2
+-1 .&.   3 = 3
+ 
+0 .&.   -3 = 0
+0 .&.   -2 = 0
+0 .&.   -1 = 0
+0 .&.   1 = 0
+0 .&.   2 = 0
+0 .&.   3 = 0
+ 
+1 .&.   -3 = 1
+1 .&.   -2 = 0
+1 .&.   -1 = 1
+1 .&.   1 = 1
+1 .&.   2 = 0
+1 .&.   3 = 1
+ 
+2 .&.   -3 = 0
+2 .&.   -2 = 2
+2 .&.   -1 = 2
+2 .&.   1 = 0
+2 .&.   2 = 2
+2 .&.   3 = 2
+ 
+3 .&.   -3 = 1
+3 .&.   -2 = 2
+3 .&.   -1 = 3
+3 .&.   1 = 1
+3 .&.   2 = 2
+3 .&.   3 = 3
+ 
+#
+-3 .|.   -3 = -3
+-3 .|.   -2 = -1
+-3 .|.   -1 = -1
+-3 .|.   1 = -3
+-3 .|.   2 = -1
+-3 .|.   3 = -1
+ 
+-2 .|.   -3 = -1
+-2 .|.   -2 = -2
+-2 .|.   -1 = -1
+-2 .|.   1 = -1
+-2 .|.   2 = -2
+-2 .|.   3 = -1
+ 
+-1 .|.   -3 = -1
+-1 .|.   -2 = -1
+-1 .|.   -1 = -1
+-1 .|.   1 = -1
+-1 .|.   2 = -1
+-1 .|.   3 = -1
+ 
+0 .|.   -3 = -3
+0 .|.   -2 = -2
+0 .|.   -1 = -1
+0 .|.   1 = 1
+0 .|.   2 = 2
+0 .|.   3 = 3
+ 
+1 .|.   -3 = -3
+1 .|.   -2 = -1
+1 .|.   -1 = -1
+1 .|.   1 = 1
+1 .|.   2 = 3
+1 .|.   3 = 3
+ 
+2 .|.   -3 = -1
+2 .|.   -2 = -2
+2 .|.   -1 = -1
+2 .|.   1 = 3
+2 .|.   2 = 2
+2 .|.   3 = 3
+ 
+3 .|.   -3 = -1
+3 .|.   -2 = -1
+3 .|.   -1 = -1
+3 .|.   1 = 3
+3 .|.   2 = 3
+3 .|.   3 = 3
+ 
+#
+-3 `xor` -3 = 0
+-3 `xor` -2 = 3
+-3 `xor` -1 = 2
+-3 `xor` 1 = -4
+-3 `xor` 2 = -1
+-3 `xor` 3 = -2
+ 
+-2 `xor` -3 = 3
+-2 `xor` -2 = 0
+-2 `xor` -1 = 1
+-2 `xor` 1 = -1
+-2 `xor` 2 = -4
+-2 `xor` 3 = -3
+ 
+-1 `xor` -3 = 2
+-1 `xor` -2 = 1
+-1 `xor` -1 = 0
+-1 `xor` 1 = -2
+-1 `xor` 2 = -3
+-1 `xor` 3 = -4
+ 
+0 `xor` -3 = -3
+0 `xor` -2 = -2
+0 `xor` -1 = -1
+0 `xor` 1 = 1
+0 `xor` 2 = 2
+0 `xor` 3 = 3
+ 
+1 `xor` -3 = -4
+1 `xor` -2 = -1
+1 `xor` -1 = -2
+1 `xor` 1 = 0
+1 `xor` 2 = 3
+1 `xor` 3 = 2
+ 
+2 `xor` -3 = -1
+2 `xor` -2 = -4
+2 `xor` -1 = -3
+2 `xor` 1 = 3
+2 `xor` 2 = 0
+2 `xor` 3 = 1
+ 
+3 `xor` -3 = -2
+3 `xor` -2 = -3
+3 `xor` -1 = -4
+3 `xor` 1 = 2
+3 `xor` 2 = 1
+3 `xor` 3 = 0
+ 
+#
+complement -3 = 2
+complement -2 = 1
+complement -1 = 0
+complement 0 = -1
+complement 1 = -2
+complement 2 = -3
+complement 3 = -4
+#
+-3 `shift` 0 = -3
+-3 `shift` 1 = -6
+-3 `shift` 2 = -12
+-3 `shift` 3 = -24
+ 
+-2 `shift` 0 = -2
+-2 `shift` 1 = -4
+-2 `shift` 2 = -8
+-2 `shift` 3 = -16
+ 
+-1 `shift` 0 = -1
+-1 `shift` 1 = -2
+-1 `shift` 2 = -4
+-1 `shift` 3 = -8
+ 
+0 `shift` 0 = 0
+0 `shift` 1 = 0
+0 `shift` 2 = 0
+0 `shift` 3 = 0
+ 
+1 `shift` 0 = 1
+1 `shift` 1 = 2
+1 `shift` 2 = 4
+1 `shift` 3 = 8
+ 
+2 `shift` 0 = 2
+2 `shift` 1 = 4
+2 `shift` 2 = 8
+2 `shift` 3 = 16
+ 
+3 `shift` 0 = 3
+3 `shift` 1 = 6
+3 `shift` 2 = 12
+3 `shift` 3 = 24
+ 
+#
+-3 `setBit` 0 = -3
+-3 `setBit` 1 = -1
+-3 `setBit` 2 = -3
+-3 `setBit` 3 = -3
+ 
+-2 `setBit` 0 = -1
+-2 `setBit` 1 = -2
+-2 `setBit` 2 = -2
+-2 `setBit` 3 = -2
+ 
+-1 `setBit` 0 = -1
+-1 `setBit` 1 = -1
+-1 `setBit` 2 = -1
+-1 `setBit` 3 = -1
+ 
+0 `setBit` 0 = 1
+0 `setBit` 1 = 2
+0 `setBit` 2 = 4
+0 `setBit` 3 = 8
+ 
+1 `setBit` 0 = 1
+1 `setBit` 1 = 3
+1 `setBit` 2 = 5
+1 `setBit` 3 = 9
+ 
+2 `setBit` 0 = 3
+2 `setBit` 1 = 2
+2 `setBit` 2 = 6
+2 `setBit` 3 = 10
+ 
+3 `setBit` 0 = 3
+3 `setBit` 1 = 3
+3 `setBit` 2 = 7
+3 `setBit` 3 = 11
+ 
+#
+-3 `clearBit` 0 = -4
+-3 `clearBit` 1 = -3
+-3 `clearBit` 2 = -7
+-3 `clearBit` 3 = -11
+ 
+-2 `clearBit` 0 = -2
+-2 `clearBit` 1 = -4
+-2 `clearBit` 2 = -6
+-2 `clearBit` 3 = -10
+ 
+-1 `clearBit` 0 = -2
+-1 `clearBit` 1 = -3
+-1 `clearBit` 2 = -5
+-1 `clearBit` 3 = -9
+ 
+0 `clearBit` 0 = 0
+0 `clearBit` 1 = 0
+0 `clearBit` 2 = 0
+0 `clearBit` 3 = 0
+ 
+1 `clearBit` 0 = 0
+1 `clearBit` 1 = 1
+1 `clearBit` 2 = 1
+1 `clearBit` 3 = 1
+ 
+2 `clearBit` 0 = 2
+2 `clearBit` 1 = 0
+2 `clearBit` 2 = 2
+2 `clearBit` 3 = 2
+ 
+3 `clearBit` 0 = 2
+3 `clearBit` 1 = 1
+3 `clearBit` 2 = 3
+3 `clearBit` 3 = 3
+ 
+#
+-3 `complementBit` 0 = -4
+-3 `complementBit` 1 = -1
+-3 `complementBit` 2 = -7
+-3 `complementBit` 3 = -11
+ 
+-2 `complementBit` 0 = -1
+-2 `complementBit` 1 = -4
+-2 `complementBit` 2 = -6
+-2 `complementBit` 3 = -10
+ 
+-1 `complementBit` 0 = -2
+-1 `complementBit` 1 = -3
+-1 `complementBit` 2 = -5
+-1 `complementBit` 3 = -9
+ 
+0 `complementBit` 0 = 1
+0 `complementBit` 1 = 2
+0 `complementBit` 2 = 4
+0 `complementBit` 3 = 8
+ 
+1 `complementBit` 0 = 0
+1 `complementBit` 1 = 3
+1 `complementBit` 2 = 5
+1 `complementBit` 3 = 9
+ 
+2 `complementBit` 0 = 3
+2 `complementBit` 1 = 0
+2 `complementBit` 2 = 6
+2 `complementBit` 3 = 10
+ 
+3 `complementBit` 0 = 2
+3 `complementBit` 1 = 1
+3 `complementBit` 2 = 7
+3 `complementBit` 3 = 11
+ 
+#
+-3 `testBit` 0 = True
+-3 `testBit` 1 = False
+-3 `testBit` 2 = True
+-3 `testBit` 3 = True
+ 
+-2 `testBit` 0 = False
+-2 `testBit` 1 = True
+-2 `testBit` 2 = True
+-2 `testBit` 3 = True
+ 
+-1 `testBit` 0 = True
+-1 `testBit` 1 = True
+-1 `testBit` 2 = True
+-1 `testBit` 3 = True
+ 
+0 `testBit` 0 = False
+0 `testBit` 1 = False
+0 `testBit` 2 = False
+0 `testBit` 3 = False
+ 
+1 `testBit` 0 = True
+1 `testBit` 1 = False
+1 `testBit` 2 = False
+1 `testBit` 3 = False
+ 
+2 `testBit` 0 = False
+2 `testBit` 1 = True
+2 `testBit` 2 = False
+2 `testBit` 3 = False
+ 
+3 `testBit` 0 = True
+3 `testBit` 1 = True
+3 `testBit` 2 = False
+3 `testBit` 3 = False
+ 
+#
+bitSize -3 = 16
+bitSize -2 = 16
+bitSize -1 = 16
+bitSize 0 = 16
+bitSize 1 = 16
+bitSize 2 = 16
+bitSize 3 = 16
+#
+isSigned -3 = True
+isSigned -2 = True
+isSigned -1 = True
+isSigned 0 = True
+isSigned 1 = True
+isSigned 2 = True
+isSigned 3 = True
+#
+--------------------------------
+--------------------------------
+--Testing Int32
+--------------------------------
+testBounded
+(2147483647,-2147483648,-2147483647)
+(2147483646,2147483647,-2147483648)
+testEnum
+[0,1,2,3,4,5,6,7,8,9]
+[0,2,4,6,8,10,12,14,16,18]
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+[0,2,4,6,8,10,12,14,16,18,20]
+testReadShow
+[-3,-2,-1,0,1,2,3]
+[-3,-2,-1,0,1,2,3]
+testEq
+-3 == -3 = True
+-3 == -2 = False
+-3 == -1 = False
+-3 == 0 = False
+-3 == 1 = False
+-3 == 2 = False
+-3 == 3 = False
+ 
+-2 == -3 = False
+-2 == -2 = True
+-2 == -1 = False
+-2 == 0 = False
+-2 == 1 = False
+-2 == 2 = False
+-2 == 3 = False
+ 
+-1 == -3 = False
+-1 == -2 = False
+-1 == -1 = True
+-1 == 0 = False
+-1 == 1 = False
+-1 == 2 = False
+-1 == 3 = False
+ 
+0 == -3 = False
+0 == -2 = False
+0 == -1 = False
+0 == 0 = True
+0 == 1 = False
+0 == 2 = False
+0 == 3 = False
+ 
+1 == -3 = False
+1 == -2 = False
+1 == -1 = False
+1 == 0 = False
+1 == 1 = True
+1 == 2 = False
+1 == 3 = False
+ 
+2 == -3 = False
+2 == -2 = False
+2 == -1 = False
+2 == 0 = False
+2 == 1 = False
+2 == 2 = True
+2 == 3 = False
+ 
+3 == -3 = False
+3 == -2 = False
+3 == -1 = False
+3 == 0 = False
+3 == 1 = False
+3 == 2 = False
+3 == 3 = True
+ 
+#
+-3 /= -3 = False
+-3 /= -2 = True
+-3 /= -1 = True
+-3 /= 0 = True
+-3 /= 1 = True
+-3 /= 2 = True
+-3 /= 3 = True
+ 
+-2 /= -3 = True
+-2 /= -2 = False
+-2 /= -1 = True
+-2 /= 0 = True
+-2 /= 1 = True
+-2 /= 2 = True
+-2 /= 3 = True
+ 
+-1 /= -3 = True
+-1 /= -2 = True
+-1 /= -1 = False
+-1 /= 0 = True
+-1 /= 1 = True
+-1 /= 2 = True
+-1 /= 3 = True
+ 
+0 /= -3 = True
+0 /= -2 = True
+0 /= -1 = True
+0 /= 0 = False
+0 /= 1 = True
+0 /= 2 = True
+0 /= 3 = True
+ 
+1 /= -3 = True
+1 /= -2 = True
+1 /= -1 = True
+1 /= 0 = True
+1 /= 1 = False
+1 /= 2 = True
+1 /= 3 = True
+ 
+2 /= -3 = True
+2 /= -2 = True
+2 /= -1 = True
+2 /= 0 = True
+2 /= 1 = True
+2 /= 2 = False
+2 /= 3 = True
+ 
+3 /= -3 = True
+3 /= -2 = True
+3 /= -1 = True
+3 /= 0 = True
+3 /= 1 = True
+3 /= 2 = True
+3 /= 3 = False
+ 
+#
+testOrd
+-3 <= -3 = True
+-3 <= -2 = True
+-3 <= -1 = True
+-3 <= 0 = True
+-3 <= 1 = True
+-3 <= 2 = True
+-3 <= 3 = True
+ 
+-2 <= -3 = False
+-2 <= -2 = True
+-2 <= -1 = True
+-2 <= 0 = True
+-2 <= 1 = True
+-2 <= 2 = True
+-2 <= 3 = True
+ 
+-1 <= -3 = False
+-1 <= -2 = False
+-1 <= -1 = True
+-1 <= 0 = True
+-1 <= 1 = True
+-1 <= 2 = True
+-1 <= 3 = True
+ 
+0 <= -3 = False
+0 <= -2 = False
+0 <= -1 = False
+0 <= 0 = True
+0 <= 1 = True
+0 <= 2 = True
+0 <= 3 = True
+ 
+1 <= -3 = False
+1 <= -2 = False
+1 <= -1 = False
+1 <= 0 = False
+1 <= 1 = True
+1 <= 2 = True
+1 <= 3 = True
+ 
+2 <= -3 = False
+2 <= -2 = False
+2 <= -1 = False
+2 <= 0 = False
+2 <= 1 = False
+2 <= 2 = True
+2 <= 3 = True
+ 
+3 <= -3 = False
+3 <= -2 = False
+3 <= -1 = False
+3 <= 0 = False
+3 <= 1 = False
+3 <= 2 = False
+3 <= 3 = True
+ 
+#
+-3 <  -3 = False
+-3 <  -2 = True
+-3 <  -1 = True
+-3 <  0 = True
+-3 <  1 = True
+-3 <  2 = True
+-3 <  3 = True
+ 
+-2 <  -3 = False
+-2 <  -2 = False
+-2 <  -1 = True
+-2 <  0 = True
+-2 <  1 = True
+-2 <  2 = True
+-2 <  3 = True
+ 
+-1 <  -3 = False
+-1 <  -2 = False
+-1 <  -1 = False
+-1 <  0 = True
+-1 <  1 = True
+-1 <  2 = True
+-1 <  3 = True
+ 
+0 <  -3 = False
+0 <  -2 = False
+0 <  -1 = False
+0 <  0 = False
+0 <  1 = True
+0 <  2 = True
+0 <  3 = True
+ 
+1 <  -3 = False
+1 <  -2 = False
+1 <  -1 = False
+1 <  0 = False
+1 <  1 = False
+1 <  2 = True
+1 <  3 = True
+ 
+2 <  -3 = False
+2 <  -2 = False
+2 <  -1 = False
+2 <  0 = False
+2 <  1 = False
+2 <  2 = False
+2 <  3 = True
+ 
+3 <  -3 = False
+3 <  -2 = False
+3 <  -1 = False
+3 <  0 = False
+3 <  1 = False
+3 <  2 = False
+3 <  3 = False
+ 
+#
+-3 >  -3 = False
+-3 >  -2 = False
+-3 >  -1 = False
+-3 >  0 = False
+-3 >  1 = False
+-3 >  2 = False
+-3 >  3 = False
+ 
+-2 >  -3 = True
+-2 >  -2 = False
+-2 >  -1 = False
+-2 >  0 = False
+-2 >  1 = False
+-2 >  2 = False
+-2 >  3 = False
+ 
+-1 >  -3 = True
+-1 >  -2 = True
+-1 >  -1 = False
+-1 >  0 = False
+-1 >  1 = False
+-1 >  2 = False
+-1 >  3 = False
+ 
+0 >  -3 = True
+0 >  -2 = True
+0 >  -1 = True
+0 >  0 = False
+0 >  1 = False
+0 >  2 = False
+0 >  3 = False
+ 
+1 >  -3 = True
+1 >  -2 = True
+1 >  -1 = True
+1 >  0 = True
+1 >  1 = False
+1 >  2 = False
+1 >  3 = False
+ 
+2 >  -3 = True
+2 >  -2 = True
+2 >  -1 = True
+2 >  0 = True
+2 >  1 = True
+2 >  2 = False
+2 >  3 = False
+ 
+3 >  -3 = True
+3 >  -2 = True
+3 >  -1 = True
+3 >  0 = True
+3 >  1 = True
+3 >  2 = True
+3 >  3 = False
+ 
+#
+-3 >= -3 = True
+-3 >= -2 = False
+-3 >= -1 = False
+-3 >= 0 = False
+-3 >= 1 = False
+-3 >= 2 = False
+-3 >= 3 = False
+ 
+-2 >= -3 = True
+-2 >= -2 = True
+-2 >= -1 = False
+-2 >= 0 = False
+-2 >= 1 = False
+-2 >= 2 = False
+-2 >= 3 = False
+ 
+-1 >= -3 = True
+-1 >= -2 = True
+-1 >= -1 = True
+-1 >= 0 = False
+-1 >= 1 = False
+-1 >= 2 = False
+-1 >= 3 = False
+ 
+0 >= -3 = True
+0 >= -2 = True
+0 >= -1 = True
+0 >= 0 = True
+0 >= 1 = False
+0 >= 2 = False
+0 >= 3 = False
+ 
+1 >= -3 = True
+1 >= -2 = True
+1 >= -1 = True
+1 >= 0 = True
+1 >= 1 = True
+1 >= 2 = False
+1 >= 3 = False
+ 
+2 >= -3 = True
+2 >= -2 = True
+2 >= -1 = True
+2 >= 0 = True
+2 >= 1 = True
+2 >= 2 = True
+2 >= 3 = False
+ 
+3 >= -3 = True
+3 >= -2 = True
+3 >= -1 = True
+3 >= 0 = True
+3 >= 1 = True
+3 >= 2 = True
+3 >= 3 = True
+ 
+#
+-3 `compare` -3 = EQ
+-3 `compare` -2 = LT
+-3 `compare` -1 = LT
+-3 `compare` 0 = LT
+-3 `compare` 1 = LT
+-3 `compare` 2 = LT
+-3 `compare` 3 = LT
+ 
+-2 `compare` -3 = GT
+-2 `compare` -2 = EQ
+-2 `compare` -1 = LT
+-2 `compare` 0 = LT
+-2 `compare` 1 = LT
+-2 `compare` 2 = LT
+-2 `compare` 3 = LT
+ 
+-1 `compare` -3 = GT
+-1 `compare` -2 = GT
+-1 `compare` -1 = EQ
+-1 `compare` 0 = LT
+-1 `compare` 1 = LT
+-1 `compare` 2 = LT
+-1 `compare` 3 = LT
+ 
+0 `compare` -3 = GT
+0 `compare` -2 = GT
+0 `compare` -1 = GT
+0 `compare` 0 = EQ
+0 `compare` 1 = LT
+0 `compare` 2 = LT
+0 `compare` 3 = LT
+ 
+1 `compare` -3 = GT
+1 `compare` -2 = GT
+1 `compare` -1 = GT
+1 `compare` 0 = GT
+1 `compare` 1 = EQ
+1 `compare` 2 = LT
+1 `compare` 3 = LT
+ 
+2 `compare` -3 = GT
+2 `compare` -2 = GT
+2 `compare` -1 = GT
+2 `compare` 0 = GT
+2 `compare` 1 = GT
+2 `compare` 2 = EQ
+2 `compare` 3 = LT
+ 
+3 `compare` -3 = GT
+3 `compare` -2 = GT
+3 `compare` -1 = GT
+3 `compare` 0 = GT
+3 `compare` 1 = GT
+3 `compare` 2 = GT
+3 `compare` 3 = EQ
+ 
+#
+testNum
+-3 + -3 = -6
+-3 + -2 = -5
+-3 + -1 = -4
+-3 + 0 = -3
+-3 + 1 = -2
+-3 + 2 = -1
+-3 + 3 = 0
+ 
+-2 + -3 = -5
+-2 + -2 = -4
+-2 + -1 = -3
+-2 + 0 = -2
+-2 + 1 = -1
+-2 + 2 = 0
+-2 + 3 = 1
+ 
+-1 + -3 = -4
+-1 + -2 = -3
+-1 + -1 = -2
+-1 + 0 = -1
+-1 + 1 = 0
+-1 + 2 = 1
+-1 + 3 = 2
+ 
+0 + -3 = -3
+0 + -2 = -2
+0 + -1 = -1
+0 + 0 = 0
+0 + 1 = 1
+0 + 2 = 2
+0 + 3 = 3
+ 
+1 + -3 = -2
+1 + -2 = -1
+1 + -1 = 0
+1 + 0 = 1
+1 + 1 = 2
+1 + 2 = 3
+1 + 3 = 4
+ 
+2 + -3 = -1
+2 + -2 = 0
+2 + -1 = 1
+2 + 0 = 2
+2 + 1 = 3
+2 + 2 = 4
+2 + 3 = 5
+ 
+3 + -3 = 0
+3 + -2 = 1
+3 + -1 = 2
+3 + 0 = 3
+3 + 1 = 4
+3 + 2 = 5
+3 + 3 = 6
+ 
+#
+-3 - -3 = 0
+-3 - -2 = -1
+-3 - -1 = -2
+-3 - 0 = -3
+-3 - 1 = -4
+-3 - 2 = -5
+-3 - 3 = -6
+ 
+-2 - -3 = 1
+-2 - -2 = 0
+-2 - -1 = -1
+-2 - 0 = -2
+-2 - 1 = -3
+-2 - 2 = -4
+-2 - 3 = -5
+ 
+-1 - -3 = 2
+-1 - -2 = 1
+-1 - -1 = 0
+-1 - 0 = -1
+-1 - 1 = -2
+-1 - 2 = -3
+-1 - 3 = -4
+ 
+0 - -3 = 3
+0 - -2 = 2
+0 - -1 = 1
+0 - 0 = 0
+0 - 1 = -1
+0 - 2 = -2
+0 - 3 = -3
+ 
+1 - -3 = 4
+1 - -2 = 3
+1 - -1 = 2
+1 - 0 = 1
+1 - 1 = 0
+1 - 2 = -1
+1 - 3 = -2
+ 
+2 - -3 = 5
+2 - -2 = 4
+2 - -1 = 3
+2 - 0 = 2
+2 - 1 = 1
+2 - 2 = 0
+2 - 3 = -1
+ 
+3 - -3 = 6
+3 - -2 = 5
+3 - -1 = 4
+3 - 0 = 3
+3 - 1 = 2
+3 - 2 = 1
+3 - 3 = 0
+ 
+#
+-3 * -3 = 9
+-3 * -2 = 6
+-3 * -1 = 3
+-3 * 0 = 0
+-3 * 1 = -3
+-3 * 2 = -6
+-3 * 3 = -9
+ 
+-2 * -3 = 6
+-2 * -2 = 4
+-2 * -1 = 2
+-2 * 0 = 0
+-2 * 1 = -2
+-2 * 2 = -4
+-2 * 3 = -6
+ 
+-1 * -3 = 3
+-1 * -2 = 2
+-1 * -1 = 1
+-1 * 0 = 0
+-1 * 1 = -1
+-1 * 2 = -2
+-1 * 3 = -3
+ 
+0 * -3 = 0
+0 * -2 = 0
+0 * -1 = 0
+0 * 0 = 0
+0 * 1 = 0
+0 * 2 = 0
+0 * 3 = 0
+ 
+1 * -3 = -3
+1 * -2 = -2
+1 * -1 = -1
+1 * 0 = 0
+1 * 1 = 1
+1 * 2 = 2
+1 * 3 = 3
+ 
+2 * -3 = -6
+2 * -2 = -4
+2 * -1 = -2
+2 * 0 = 0
+2 * 1 = 2
+2 * 2 = 4
+2 * 3 = 6
+ 
+3 * -3 = -9
+3 * -2 = -6
+3 * -1 = -3
+3 * 0 = 0
+3 * 1 = 3
+3 * 2 = 6
+3 * 3 = 9
+ 
+#
+negate -3 = 3
+negate -2 = 2
+negate -1 = 1
+negate 0 = 0
+negate 1 = -1
+negate 2 = -2
+negate 3 = -3
+#
+testReal
+toRational -3 = -3 % 1
+toRational -2 = -2 % 1
+toRational -1 = -1 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
+#
+testIntegral
+-3 `divMod`  -3 = (1,0)
+-3 `divMod`  -2 = (1,-1)
+-3 `divMod`  -1 = (3,0)
+-3 `divMod`  1 = (-3,0)
+-3 `divMod`  2 = (-2,1)
+-3 `divMod`  3 = (-1,0)
+ 
+-2 `divMod`  -3 = (0,-2)
+-2 `divMod`  -2 = (1,0)
+-2 `divMod`  -1 = (2,0)
+-2 `divMod`  1 = (-2,0)
+-2 `divMod`  2 = (-1,0)
+-2 `divMod`  3 = (-1,1)
+ 
+-1 `divMod`  -3 = (0,-1)
+-1 `divMod`  -2 = (0,-1)
+-1 `divMod`  -1 = (1,0)
+-1 `divMod`  1 = (-1,0)
+-1 `divMod`  2 = (-1,1)
+-1 `divMod`  3 = (-1,2)
+ 
+0 `divMod`  -3 = (0,0)
+0 `divMod`  -2 = (0,0)
+0 `divMod`  -1 = (0,0)
+0 `divMod`  1 = (0,0)
+0 `divMod`  2 = (0,0)
+0 `divMod`  3 = (0,0)
+ 
+1 `divMod`  -3 = (-1,-2)
+1 `divMod`  -2 = (-1,-1)
+1 `divMod`  -1 = (-1,0)
+1 `divMod`  1 = (1,0)
+1 `divMod`  2 = (0,1)
+1 `divMod`  3 = (0,1)
+ 
+2 `divMod`  -3 = (-1,-1)
+2 `divMod`  -2 = (-1,0)
+2 `divMod`  -1 = (-2,0)
+2 `divMod`  1 = (2,0)
+2 `divMod`  2 = (1,0)
+2 `divMod`  3 = (0,2)
+ 
+3 `divMod`  -3 = (-1,0)
+3 `divMod`  -2 = (-2,-1)
+3 `divMod`  -1 = (-3,0)
+3 `divMod`  1 = (3,0)
+3 `divMod`  2 = (1,1)
+3 `divMod`  3 = (1,0)
+ 
+#
+-3 `div`     -3 = 1
+-3 `div`     -2 = 1
+-3 `div`     -1 = 3
+-3 `div`     1 = -3
+-3 `div`     2 = -2
+-3 `div`     3 = -1
+ 
+-2 `div`     -3 = 0
+-2 `div`     -2 = 1
+-2 `div`     -1 = 2
+-2 `div`     1 = -2
+-2 `div`     2 = -1
+-2 `div`     3 = -1
+ 
+-1 `div`     -3 = 0
+-1 `div`     -2 = 0
+-1 `div`     -1 = 1
+-1 `div`     1 = -1
+-1 `div`     2 = -1
+-1 `div`     3 = -1
+ 
+0 `div`     -3 = 0
+0 `div`     -2 = 0
+0 `div`     -1 = 0
+0 `div`     1 = 0
+0 `div`     2 = 0
+0 `div`     3 = 0
+ 
+1 `div`     -3 = -1
+1 `div`     -2 = -1
+1 `div`     -1 = -1
+1 `div`     1 = 1
+1 `div`     2 = 0
+1 `div`     3 = 0
+ 
+2 `div`     -3 = -1
+2 `div`     -2 = -1
+2 `div`     -1 = -2
+2 `div`     1 = 2
+2 `div`     2 = 1
+2 `div`     3 = 0
+ 
+3 `div`     -3 = -1
+3 `div`     -2 = -2
+3 `div`     -1 = -3
+3 `div`     1 = 3
+3 `div`     2 = 1
+3 `div`     3 = 1
+ 
+#
+-3 `mod`     -3 = 0
+-3 `mod`     -2 = -1
+-3 `mod`     -1 = 0
+-3 `mod`     1 = 0
+-3 `mod`     2 = 1
+-3 `mod`     3 = 0
+ 
+-2 `mod`     -3 = -2
+-2 `mod`     -2 = 0
+-2 `mod`     -1 = 0
+-2 `mod`     1 = 0
+-2 `mod`     2 = 0
+-2 `mod`     3 = 1
+ 
+-1 `mod`     -3 = -1
+-1 `mod`     -2 = -1
+-1 `mod`     -1 = 0
+-1 `mod`     1 = 0
+-1 `mod`     2 = 1
+-1 `mod`     3 = 2
+ 
+0 `mod`     -3 = 0
+0 `mod`     -2 = 0
+0 `mod`     -1 = 0
+0 `mod`     1 = 0
+0 `mod`     2 = 0
+0 `mod`     3 = 0
+ 
+1 `mod`     -3 = -2
+1 `mod`     -2 = -1
+1 `mod`     -1 = 0
+1 `mod`     1 = 0
+1 `mod`     2 = 1
+1 `mod`     3 = 1
+ 
+2 `mod`     -3 = -1
+2 `mod`     -2 = 0
+2 `mod`     -1 = 0
+2 `mod`     1 = 0
+2 `mod`     2 = 0
+2 `mod`     3 = 2
+ 
+3 `mod`     -3 = 0
+3 `mod`     -2 = -1
+3 `mod`     -1 = 0
+3 `mod`     1 = 0
+3 `mod`     2 = 1
+3 `mod`     3 = 0
+ 
+#
+-3 `quotRem` -3 = (1,0)
+-3 `quotRem` -2 = (1,-1)
+-3 `quotRem` -1 = (3,0)
+-3 `quotRem` 1 = (-3,0)
+-3 `quotRem` 2 = (-1,-1)
+-3 `quotRem` 3 = (-1,0)
+ 
+-2 `quotRem` -3 = (0,-2)
+-2 `quotRem` -2 = (1,0)
+-2 `quotRem` -1 = (2,0)
+-2 `quotRem` 1 = (-2,0)
+-2 `quotRem` 2 = (-1,0)
+-2 `quotRem` 3 = (0,-2)
+ 
+-1 `quotRem` -3 = (0,-1)
+-1 `quotRem` -2 = (0,-1)
+-1 `quotRem` -1 = (1,0)
+-1 `quotRem` 1 = (-1,0)
+-1 `quotRem` 2 = (0,-1)
+-1 `quotRem` 3 = (0,-1)
+ 
+0 `quotRem` -3 = (0,0)
+0 `quotRem` -2 = (0,0)
+0 `quotRem` -1 = (0,0)
+0 `quotRem` 1 = (0,0)
+0 `quotRem` 2 = (0,0)
+0 `quotRem` 3 = (0,0)
+ 
+1 `quotRem` -3 = (0,1)
+1 `quotRem` -2 = (0,1)
+1 `quotRem` -1 = (-1,0)
+1 `quotRem` 1 = (1,0)
+1 `quotRem` 2 = (0,1)
+1 `quotRem` 3 = (0,1)
+ 
+2 `quotRem` -3 = (0,2)
+2 `quotRem` -2 = (-1,0)
+2 `quotRem` -1 = (-2,0)
+2 `quotRem` 1 = (2,0)
+2 `quotRem` 2 = (1,0)
+2 `quotRem` 3 = (0,2)
+ 
+3 `quotRem` -3 = (-1,0)
+3 `quotRem` -2 = (-1,1)
+3 `quotRem` -1 = (-3,0)
+3 `quotRem` 1 = (3,0)
+3 `quotRem` 2 = (1,1)
+3 `quotRem` 3 = (1,0)
+ 
+#
+-3 `quot`    -3 = 1
+-3 `quot`    -2 = 1
+-3 `quot`    -1 = 3
+-3 `quot`    1 = -3
+-3 `quot`    2 = -1
+-3 `quot`    3 = -1
+ 
+-2 `quot`    -3 = 0
+-2 `quot`    -2 = 1
+-2 `quot`    -1 = 2
+-2 `quot`    1 = -2
+-2 `quot`    2 = -1
+-2 `quot`    3 = 0
+ 
+-1 `quot`    -3 = 0
+-1 `quot`    -2 = 0
+-1 `quot`    -1 = 1
+-1 `quot`    1 = -1
+-1 `quot`    2 = 0
+-1 `quot`    3 = 0
+ 
+0 `quot`    -3 = 0
+0 `quot`    -2 = 0
+0 `quot`    -1 = 0
+0 `quot`    1 = 0
+0 `quot`    2 = 0
+0 `quot`    3 = 0
+ 
+1 `quot`    -3 = 0
+1 `quot`    -2 = 0
+1 `quot`    -1 = -1
+1 `quot`    1 = 1
+1 `quot`    2 = 0
+1 `quot`    3 = 0
+ 
+2 `quot`    -3 = 0
+2 `quot`    -2 = -1
+2 `quot`    -1 = -2
+2 `quot`    1 = 2
+2 `quot`    2 = 1
+2 `quot`    3 = 0
+ 
+3 `quot`    -3 = -1
+3 `quot`    -2 = -1
+3 `quot`    -1 = -3
+3 `quot`    1 = 3
+3 `quot`    2 = 1
+3 `quot`    3 = 1
+ 
+#
+-3 `rem`     -3 = 0
+-3 `rem`     -2 = -1
+-3 `rem`     -1 = 0
+-3 `rem`     1 = 0
+-3 `rem`     2 = -1
+-3 `rem`     3 = 0
+ 
+-2 `rem`     -3 = -2
+-2 `rem`     -2 = 0
+-2 `rem`     -1 = 0
+-2 `rem`     1 = 0
+-2 `rem`     2 = 0
+-2 `rem`     3 = -2
+ 
+-1 `rem`     -3 = -1
+-1 `rem`     -2 = -1
+-1 `rem`     -1 = 0
+-1 `rem`     1 = 0
+-1 `rem`     2 = -1
+-1 `rem`     3 = -1
+ 
+0 `rem`     -3 = 0
+0 `rem`     -2 = 0
+0 `rem`     -1 = 0
+0 `rem`     1 = 0
+0 `rem`     2 = 0
+0 `rem`     3 = 0
+ 
+1 `rem`     -3 = 1
+1 `rem`     -2 = 1
+1 `rem`     -1 = 0
+1 `rem`     1 = 0
+1 `rem`     2 = 1
+1 `rem`     3 = 1
+ 
+2 `rem`     -3 = 2
+2 `rem`     -2 = 0
+2 `rem`     -1 = 0
+2 `rem`     1 = 0
+2 `rem`     2 = 0
+2 `rem`     3 = 2
+ 
+3 `rem`     -3 = 0
+3 `rem`     -2 = 1
+3 `rem`     -1 = 0
+3 `rem`     1 = 0
+3 `rem`     2 = 1
+3 `rem`     3 = 0
+ 
+#
+testBits
+-3 .&.   -3 = -3
+-3 .&.   -2 = -4
+-3 .&.   -1 = -3
+-3 .&.   1 = 1
+-3 .&.   2 = 0
+-3 .&.   3 = 1
+ 
+-2 .&.   -3 = -4
+-2 .&.   -2 = -2
+-2 .&.   -1 = -2
+-2 .&.   1 = 0
+-2 .&.   2 = 2
+-2 .&.   3 = 2
+ 
+-1 .&.   -3 = -3
+-1 .&.   -2 = -2
+-1 .&.   -1 = -1
+-1 .&.   1 = 1
+-1 .&.   2 = 2
+-1 .&.   3 = 3
+ 
+0 .&.   -3 = 0
+0 .&.   -2 = 0
+0 .&.   -1 = 0
+0 .&.   1 = 0
+0 .&.   2 = 0
+0 .&.   3 = 0
+ 
+1 .&.   -3 = 1
+1 .&.   -2 = 0
+1 .&.   -1 = 1
+1 .&.   1 = 1
+1 .&.   2 = 0
+1 .&.   3 = 1
+ 
+2 .&.   -3 = 0
+2 .&.   -2 = 2
+2 .&.   -1 = 2
+2 .&.   1 = 0
+2 .&.   2 = 2
+2 .&.   3 = 2
+ 
+3 .&.   -3 = 1
+3 .&.   -2 = 2
+3 .&.   -1 = 3
+3 .&.   1 = 1
+3 .&.   2 = 2
+3 .&.   3 = 3
+ 
+#
+-3 .|.   -3 = -3
+-3 .|.   -2 = -1
+-3 .|.   -1 = -1
+-3 .|.   1 = -3
+-3 .|.   2 = -1
+-3 .|.   3 = -1
+ 
+-2 .|.   -3 = -1
+-2 .|.   -2 = -2
+-2 .|.   -1 = -1
+-2 .|.   1 = -1
+-2 .|.   2 = -2
+-2 .|.   3 = -1
+ 
+-1 .|.   -3 = -1
+-1 .|.   -2 = -1
+-1 .|.   -1 = -1
+-1 .|.   1 = -1
+-1 .|.   2 = -1
+-1 .|.   3 = -1
+ 
+0 .|.   -3 = -3
+0 .|.   -2 = -2
+0 .|.   -1 = -1
+0 .|.   1 = 1
+0 .|.   2 = 2
+0 .|.   3 = 3
+ 
+1 .|.   -3 = -3
+1 .|.   -2 = -1
+1 .|.   -1 = -1
+1 .|.   1 = 1
+1 .|.   2 = 3
+1 .|.   3 = 3
+ 
+2 .|.   -3 = -1
+2 .|.   -2 = -2
+2 .|.   -1 = -1
+2 .|.   1 = 3
+2 .|.   2 = 2
+2 .|.   3 = 3
+ 
+3 .|.   -3 = -1
+3 .|.   -2 = -1
+3 .|.   -1 = -1
+3 .|.   1 = 3
+3 .|.   2 = 3
+3 .|.   3 = 3
+ 
+#
+-3 `xor` -3 = 0
+-3 `xor` -2 = 3
+-3 `xor` -1 = 2
+-3 `xor` 1 = -4
+-3 `xor` 2 = -1
+-3 `xor` 3 = -2
+ 
+-2 `xor` -3 = 3
+-2 `xor` -2 = 0
+-2 `xor` -1 = 1
+-2 `xor` 1 = -1
+-2 `xor` 2 = -4
+-2 `xor` 3 = -3
+ 
+-1 `xor` -3 = 2
+-1 `xor` -2 = 1
+-1 `xor` -1 = 0
+-1 `xor` 1 = -2
+-1 `xor` 2 = -3
+-1 `xor` 3 = -4
+ 
+0 `xor` -3 = -3
+0 `xor` -2 = -2
+0 `xor` -1 = -1
+0 `xor` 1 = 1
+0 `xor` 2 = 2
+0 `xor` 3 = 3
+ 
+1 `xor` -3 = -4
+1 `xor` -2 = -1
+1 `xor` -1 = -2
+1 `xor` 1 = 0
+1 `xor` 2 = 3
+1 `xor` 3 = 2
+ 
+2 `xor` -3 = -1
+2 `xor` -2 = -4
+2 `xor` -1 = -3
+2 `xor` 1 = 3
+2 `xor` 2 = 0
+2 `xor` 3 = 1
+ 
+3 `xor` -3 = -2
+3 `xor` -2 = -3
+3 `xor` -1 = -4
+3 `xor` 1 = 2
+3 `xor` 2 = 1
+3 `xor` 3 = 0
+ 
+#
+complement -3 = 2
+complement -2 = 1
+complement -1 = 0
+complement 0 = -1
+complement 1 = -2
+complement 2 = -3
+complement 3 = -4
+#
+-3 `shift` 0 = -3
+-3 `shift` 1 = -6
+-3 `shift` 2 = -12
+-3 `shift` 3 = -24
+ 
+-2 `shift` 0 = -2
+-2 `shift` 1 = -4
+-2 `shift` 2 = -8
+-2 `shift` 3 = -16
+ 
+-1 `shift` 0 = -1
+-1 `shift` 1 = -2
+-1 `shift` 2 = -4
+-1 `shift` 3 = -8
+ 
+0 `shift` 0 = 0
+0 `shift` 1 = 0
+0 `shift` 2 = 0
+0 `shift` 3 = 0
+ 
+1 `shift` 0 = 1
+1 `shift` 1 = 2
+1 `shift` 2 = 4
+1 `shift` 3 = 8
+ 
+2 `shift` 0 = 2
+2 `shift` 1 = 4
+2 `shift` 2 = 8
+2 `shift` 3 = 16
+ 
+3 `shift` 0 = 3
+3 `shift` 1 = 6
+3 `shift` 2 = 12
+3 `shift` 3 = 24
+ 
+#
+-3 `setBit` 0 = -3
+-3 `setBit` 1 = -1
+-3 `setBit` 2 = -3
+-3 `setBit` 3 = -3
+ 
+-2 `setBit` 0 = -1
+-2 `setBit` 1 = -2
+-2 `setBit` 2 = -2
+-2 `setBit` 3 = -2
+ 
+-1 `setBit` 0 = -1
+-1 `setBit` 1 = -1
+-1 `setBit` 2 = -1
+-1 `setBit` 3 = -1
+ 
+0 `setBit` 0 = 1
+0 `setBit` 1 = 2
+0 `setBit` 2 = 4
+0 `setBit` 3 = 8
+ 
+1 `setBit` 0 = 1
+1 `setBit` 1 = 3
+1 `setBit` 2 = 5
+1 `setBit` 3 = 9
+ 
+2 `setBit` 0 = 3
+2 `setBit` 1 = 2
+2 `setBit` 2 = 6
+2 `setBit` 3 = 10
+ 
+3 `setBit` 0 = 3
+3 `setBit` 1 = 3
+3 `setBit` 2 = 7
+3 `setBit` 3 = 11
+ 
+#
+-3 `clearBit` 0 = -4
+-3 `clearBit` 1 = -3
+-3 `clearBit` 2 = -7
+-3 `clearBit` 3 = -11
+ 
+-2 `clearBit` 0 = -2
+-2 `clearBit` 1 = -4
+-2 `clearBit` 2 = -6
+-2 `clearBit` 3 = -10
+ 
+-1 `clearBit` 0 = -2
+-1 `clearBit` 1 = -3
+-1 `clearBit` 2 = -5
+-1 `clearBit` 3 = -9
+ 
+0 `clearBit` 0 = 0
+0 `clearBit` 1 = 0
+0 `clearBit` 2 = 0
+0 `clearBit` 3 = 0
+ 
+1 `clearBit` 0 = 0
+1 `clearBit` 1 = 1
+1 `clearBit` 2 = 1
+1 `clearBit` 3 = 1
+ 
+2 `clearBit` 0 = 2
+2 `clearBit` 1 = 0
+2 `clearBit` 2 = 2
+2 `clearBit` 3 = 2
+ 
+3 `clearBit` 0 = 2
+3 `clearBit` 1 = 1
+3 `clearBit` 2 = 3
+3 `clearBit` 3 = 3
+ 
+#
+-3 `complementBit` 0 = -4
+-3 `complementBit` 1 = -1
+-3 `complementBit` 2 = -7
+-3 `complementBit` 3 = -11
+ 
+-2 `complementBit` 0 = -1
+-2 `complementBit` 1 = -4
+-2 `complementBit` 2 = -6
+-2 `complementBit` 3 = -10
+ 
+-1 `complementBit` 0 = -2
+-1 `complementBit` 1 = -3
+-1 `complementBit` 2 = -5
+-1 `complementBit` 3 = -9
+ 
+0 `complementBit` 0 = 1
+0 `complementBit` 1 = 2
+0 `complementBit` 2 = 4
+0 `complementBit` 3 = 8
+ 
+1 `complementBit` 0 = 0
+1 `complementBit` 1 = 3
+1 `complementBit` 2 = 5
+1 `complementBit` 3 = 9
+ 
+2 `complementBit` 0 = 3
+2 `complementBit` 1 = 0
+2 `complementBit` 2 = 6
+2 `complementBit` 3 = 10
+ 
+3 `complementBit` 0 = 2
+3 `complementBit` 1 = 1
+3 `complementBit` 2 = 7
+3 `complementBit` 3 = 11
+ 
+#
+-3 `testBit` 0 = True
+-3 `testBit` 1 = False
+-3 `testBit` 2 = True
+-3 `testBit` 3 = True
+ 
+-2 `testBit` 0 = False
+-2 `testBit` 1 = True
+-2 `testBit` 2 = True
+-2 `testBit` 3 = True
+ 
+-1 `testBit` 0 = True
+-1 `testBit` 1 = True
+-1 `testBit` 2 = True
+-1 `testBit` 3 = True
+ 
+0 `testBit` 0 = False
+0 `testBit` 1 = False
+0 `testBit` 2 = False
+0 `testBit` 3 = False
+ 
+1 `testBit` 0 = True
+1 `testBit` 1 = False
+1 `testBit` 2 = False
+1 `testBit` 3 = False
+ 
+2 `testBit` 0 = False
+2 `testBit` 1 = True
+2 `testBit` 2 = False
+2 `testBit` 3 = False
+ 
+3 `testBit` 0 = True
+3 `testBit` 1 = True
+3 `testBit` 2 = False
+3 `testBit` 3 = False
+ 
+#
+bitSize -3 = 32
+bitSize -2 = 32
+bitSize -1 = 32
+bitSize 0 = 32
+bitSize 1 = 32
+bitSize 2 = 32
+bitSize 3 = 32
+#
+isSigned -3 = True
+isSigned -2 = True
+isSigned -1 = True
+isSigned 0 = True
+isSigned 1 = True
+isSigned 2 = True
+isSigned 3 = True
+#
+--------------------------------
+--------------------------------
+--Testing Word8
+--------------------------------
+testBounded
+(255,0,1)
+(254,255,0)
+testEnum
+[0,1,2,3,4,5,6,7,8,9]
+[0,2,4,6,8,10,12,14,16,18]
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+[0,2,4,6,8,10,12,14,16,18,20]
+testReadShow
+[253,254,255,0,1,2,3]
+[253,254,255,0,1,2,3]
+testEq
+253 == 253 = True
+253 == 254 = False
+253 == 255 = False
+253 == 0 = False
+253 == 1 = False
+253 == 2 = False
+253 == 3 = False
+ 
+254 == 253 = False
+254 == 254 = True
+254 == 255 = False
+254 == 0 = False
+254 == 1 = False
+254 == 2 = False
+254 == 3 = False
+ 
+255 == 253 = False
+255 == 254 = False
+255 == 255 = True
+255 == 0 = False
+255 == 1 = False
+255 == 2 = False
+255 == 3 = False
+ 
+0 == 253 = False
+0 == 254 = False
+0 == 255 = False
+0 == 0 = True
+0 == 1 = False
+0 == 2 = False
+0 == 3 = False
+ 
+1 == 253 = False
+1 == 254 = False
+1 == 255 = False
+1 == 0 = False
+1 == 1 = True
+1 == 2 = False
+1 == 3 = False
+ 
+2 == 253 = False
+2 == 254 = False
+2 == 255 = False
+2 == 0 = False
+2 == 1 = False
+2 == 2 = True
+2 == 3 = False
+ 
+3 == 253 = False
+3 == 254 = False
+3 == 255 = False
+3 == 0 = False
+3 == 1 = False
+3 == 2 = False
+3 == 3 = True
+ 
+#
+253 /= 253 = False
+253 /= 254 = True
+253 /= 255 = True
+253 /= 0 = True
+253 /= 1 = True
+253 /= 2 = True
+253 /= 3 = True
+ 
+254 /= 253 = True
+254 /= 254 = False
+254 /= 255 = True
+254 /= 0 = True
+254 /= 1 = True
+254 /= 2 = True
+254 /= 3 = True
+ 
+255 /= 253 = True
+255 /= 254 = True
+255 /= 255 = False
+255 /= 0 = True
+255 /= 1 = True
+255 /= 2 = True
+255 /= 3 = True
+ 
+0 /= 253 = True
+0 /= 254 = True
+0 /= 255 = True
+0 /= 0 = False
+0 /= 1 = True
+0 /= 2 = True
+0 /= 3 = True
+ 
+1 /= 253 = True
+1 /= 254 = True
+1 /= 255 = True
+1 /= 0 = True
+1 /= 1 = False
+1 /= 2 = True
+1 /= 3 = True
+ 
+2 /= 253 = True
+2 /= 254 = True
+2 /= 255 = True
+2 /= 0 = True
+2 /= 1 = True
+2 /= 2 = False
+2 /= 3 = True
+ 
+3 /= 253 = True
+3 /= 254 = True
+3 /= 255 = True
+3 /= 0 = True
+3 /= 1 = True
+3 /= 2 = True
+3 /= 3 = False
+ 
+#
+testOrd
+253 <= 253 = True
+253 <= 254 = True
+253 <= 255 = True
+253 <= 0 = False
+253 <= 1 = False
+253 <= 2 = False
+253 <= 3 = False
+ 
+254 <= 253 = False
+254 <= 254 = True
+254 <= 255 = True
+254 <= 0 = False
+254 <= 1 = False
+254 <= 2 = False
+254 <= 3 = False
+ 
+255 <= 253 = False
+255 <= 254 = False
+255 <= 255 = True
+255 <= 0 = False
+255 <= 1 = False
+255 <= 2 = False
+255 <= 3 = False
+ 
+0 <= 253 = True
+0 <= 254 = True
+0 <= 255 = True
+0 <= 0 = True
+0 <= 1 = True
+0 <= 2 = True
+0 <= 3 = True
+ 
+1 <= 253 = True
+1 <= 254 = True
+1 <= 255 = True
+1 <= 0 = False
+1 <= 1 = True
+1 <= 2 = True
+1 <= 3 = True
+ 
+2 <= 253 = True
+2 <= 254 = True
+2 <= 255 = True
+2 <= 0 = False
+2 <= 1 = False
+2 <= 2 = True
+2 <= 3 = True
+ 
+3 <= 253 = True
+3 <= 254 = True
+3 <= 255 = True
+3 <= 0 = False
+3 <= 1 = False
+3 <= 2 = False
+3 <= 3 = True
+ 
+#
+253 <  253 = False
+253 <  254 = True
+253 <  255 = True
+253 <  0 = False
+253 <  1 = False
+253 <  2 = False
+253 <  3 = False
+ 
+254 <  253 = False
+254 <  254 = False
+254 <  255 = True
+254 <  0 = False
+254 <  1 = False
+254 <  2 = False
+254 <  3 = False
+ 
+255 <  253 = False
+255 <  254 = False
+255 <  255 = False
+255 <  0 = False
+255 <  1 = False
+255 <  2 = False
+255 <  3 = False
+ 
+0 <  253 = True
+0 <  254 = True
+0 <  255 = True
+0 <  0 = False
+0 <  1 = True
+0 <  2 = True
+0 <  3 = True
+ 
+1 <  253 = True
+1 <  254 = True
+1 <  255 = True
+1 <  0 = False
+1 <  1 = False
+1 <  2 = True
+1 <  3 = True
+ 
+2 <  253 = True
+2 <  254 = True
+2 <  255 = True
+2 <  0 = False
+2 <  1 = False
+2 <  2 = False
+2 <  3 = True
+ 
+3 <  253 = True
+3 <  254 = True
+3 <  255 = True
+3 <  0 = False
+3 <  1 = False
+3 <  2 = False
+3 <  3 = False
+ 
+#
+253 >  253 = False
+253 >  254 = False
+253 >  255 = False
+253 >  0 = True
+253 >  1 = True
+253 >  2 = True
+253 >  3 = True
+ 
+254 >  253 = True
+254 >  254 = False
+254 >  255 = False
+254 >  0 = True
+254 >  1 = True
+254 >  2 = True
+254 >  3 = True
+ 
+255 >  253 = True
+255 >  254 = True
+255 >  255 = False
+255 >  0 = True
+255 >  1 = True
+255 >  2 = True
+255 >  3 = True
+ 
+0 >  253 = False
+0 >  254 = False
+0 >  255 = False
+0 >  0 = False
+0 >  1 = False
+0 >  2 = False
+0 >  3 = False
+ 
+1 >  253 = False
+1 >  254 = False
+1 >  255 = False
+1 >  0 = True
+1 >  1 = False
+1 >  2 = False
+1 >  3 = False
+ 
+2 >  253 = False
+2 >  254 = False
+2 >  255 = False
+2 >  0 = True
+2 >  1 = True
+2 >  2 = False
+2 >  3 = False
+ 
+3 >  253 = False
+3 >  254 = False
+3 >  255 = False
+3 >  0 = True
+3 >  1 = True
+3 >  2 = True
+3 >  3 = False
+ 
+#
+253 >= 253 = True
+253 >= 254 = False
+253 >= 255 = False
+253 >= 0 = True
+253 >= 1 = True
+253 >= 2 = True
+253 >= 3 = True
+ 
+254 >= 253 = True
+254 >= 254 = True
+254 >= 255 = False
+254 >= 0 = True
+254 >= 1 = True
+254 >= 2 = True
+254 >= 3 = True
+ 
+255 >= 253 = True
+255 >= 254 = True
+255 >= 255 = True
+255 >= 0 = True
+255 >= 1 = True
+255 >= 2 = True
+255 >= 3 = True
+ 
+0 >= 253 = False
+0 >= 254 = False
+0 >= 255 = False
+0 >= 0 = True
+0 >= 1 = False
+0 >= 2 = False
+0 >= 3 = False
+ 
+1 >= 253 = False
+1 >= 254 = False
+1 >= 255 = False
+1 >= 0 = True
+1 >= 1 = True
+1 >= 2 = False
+1 >= 3 = False
+ 
+2 >= 253 = False
+2 >= 254 = False
+2 >= 255 = False
+2 >= 0 = True
+2 >= 1 = True
+2 >= 2 = True
+2 >= 3 = False
+ 
+3 >= 253 = False
+3 >= 254 = False
+3 >= 255 = False
+3 >= 0 = True
+3 >= 1 = True
+3 >= 2 = True
+3 >= 3 = True
+ 
+#
+253 `compare` 253 = EQ
+253 `compare` 254 = LT
+253 `compare` 255 = LT
+253 `compare` 0 = GT
+253 `compare` 1 = GT
+253 `compare` 2 = GT
+253 `compare` 3 = GT
+ 
+254 `compare` 253 = GT
+254 `compare` 254 = EQ
+254 `compare` 255 = LT
+254 `compare` 0 = GT
+254 `compare` 1 = GT
+254 `compare` 2 = GT
+254 `compare` 3 = GT
+ 
+255 `compare` 253 = GT
+255 `compare` 254 = GT
+255 `compare` 255 = EQ
+255 `compare` 0 = GT
+255 `compare` 1 = GT
+255 `compare` 2 = GT
+255 `compare` 3 = GT
+ 
+0 `compare` 253 = LT
+0 `compare` 254 = LT
+0 `compare` 255 = LT
+0 `compare` 0 = EQ
+0 `compare` 1 = LT
+0 `compare` 2 = LT
+0 `compare` 3 = LT
+ 
+1 `compare` 253 = LT
+1 `compare` 254 = LT
+1 `compare` 255 = LT
+1 `compare` 0 = GT
+1 `compare` 1 = EQ
+1 `compare` 2 = LT
+1 `compare` 3 = LT
+ 
+2 `compare` 253 = LT
+2 `compare` 254 = LT
+2 `compare` 255 = LT
+2 `compare` 0 = GT
+2 `compare` 1 = GT
+2 `compare` 2 = EQ
+2 `compare` 3 = LT
+ 
+3 `compare` 253 = LT
+3 `compare` 254 = LT
+3 `compare` 255 = LT
+3 `compare` 0 = GT
+3 `compare` 1 = GT
+3 `compare` 2 = GT
+3 `compare` 3 = EQ
+ 
+#
+testNum
+253 + 253 = 250
+253 + 254 = 251
+253 + 255 = 252
+253 + 0 = 253
+253 + 1 = 254
+253 + 2 = 255
+253 + 3 = 0
+ 
+254 + 253 = 251
+254 + 254 = 252
+254 + 255 = 253
+254 + 0 = 254
+254 + 1 = 255
+254 + 2 = 0
+254 + 3 = 1
+ 
+255 + 253 = 252
+255 + 254 = 253
+255 + 255 = 254
+255 + 0 = 255
+255 + 1 = 0
+255 + 2 = 1
+255 + 3 = 2
+ 
+0 + 253 = 253
+0 + 254 = 254
+0 + 255 = 255
+0 + 0 = 0
+0 + 1 = 1
+0 + 2 = 2
+0 + 3 = 3
+ 
+1 + 253 = 254
+1 + 254 = 255
+1 + 255 = 0
+1 + 0 = 1
+1 + 1 = 2
+1 + 2 = 3
+1 + 3 = 4
+ 
+2 + 253 = 255
+2 + 254 = 0
+2 + 255 = 1
+2 + 0 = 2
+2 + 1 = 3
+2 + 2 = 4
+2 + 3 = 5
+ 
+3 + 253 = 0
+3 + 254 = 1
+3 + 255 = 2
+3 + 0 = 3
+3 + 1 = 4
+3 + 2 = 5
+3 + 3 = 6
+ 
+#
+253 - 253 = 0
+253 - 254 = 255
+253 - 255 = 254
+253 - 0 = 253
+253 - 1 = 252
+253 - 2 = 251
+253 - 3 = 250
+ 
+254 - 253 = 1
+254 - 254 = 0
+254 - 255 = 255
+254 - 0 = 254
+254 - 1 = 253
+254 - 2 = 252
+254 - 3 = 251
+ 
+255 - 253 = 2
+255 - 254 = 1
+255 - 255 = 0
+255 - 0 = 255
+255 - 1 = 254
+255 - 2 = 253
+255 - 3 = 252
+ 
+0 - 253 = 3
+0 - 254 = 2
+0 - 255 = 1
+0 - 0 = 0
+0 - 1 = 255
+0 - 2 = 254
+0 - 3 = 253
+ 
+1 - 253 = 4
+1 - 254 = 3
+1 - 255 = 2
+1 - 0 = 1
+1 - 1 = 0
+1 - 2 = 255
+1 - 3 = 254
+ 
+2 - 253 = 5
+2 - 254 = 4
+2 - 255 = 3
+2 - 0 = 2
+2 - 1 = 1
+2 - 2 = 0
+2 - 3 = 255
+ 
+3 - 253 = 6
+3 - 254 = 5
+3 - 255 = 4
+3 - 0 = 3
+3 - 1 = 2
+3 - 2 = 1
+3 - 3 = 0
+ 
+#
+253 * 253 = 9
+253 * 254 = 6
+253 * 255 = 3
+253 * 0 = 0
+253 * 1 = 253
+253 * 2 = 250
+253 * 3 = 247
+ 
+254 * 253 = 6
+254 * 254 = 4
+254 * 255 = 2
+254 * 0 = 0
+254 * 1 = 254
+254 * 2 = 252
+254 * 3 = 250
+ 
+255 * 253 = 3
+255 * 254 = 2
+255 * 255 = 1
+255 * 0 = 0
+255 * 1 = 255
+255 * 2 = 254
+255 * 3 = 253
+ 
+0 * 253 = 0
+0 * 254 = 0
+0 * 255 = 0
+0 * 0 = 0
+0 * 1 = 0
+0 * 2 = 0
+0 * 3 = 0
+ 
+1 * 253 = 253
+1 * 254 = 254
+1 * 255 = 255
+1 * 0 = 0
+1 * 1 = 1
+1 * 2 = 2
+1 * 3 = 3
+ 
+2 * 253 = 250
+2 * 254 = 252
+2 * 255 = 254
+2 * 0 = 0
+2 * 1 = 2
+2 * 2 = 4
+2 * 3 = 6
+ 
+3 * 253 = 247
+3 * 254 = 250
+3 * 255 = 253
+3 * 0 = 0
+3 * 1 = 3
+3 * 2 = 6
+3 * 3 = 9
+ 
+#
+negate 253 = 3
+negate 254 = 2
+negate 255 = 1
+negate 0 = 0
+negate 1 = 255
+negate 2 = 254
+negate 3 = 253
+#
+testReal
+toRational 253 = 253 % 1
+toRational 254 = 254 % 1
+toRational 255 = 255 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
+#
+testIntegral
+253 `divMod`  253 = (1,0)
+253 `divMod`  254 = (0,253)
+253 `divMod`  255 = (0,253)
+253 `divMod`  1 = (253,0)
+253 `divMod`  2 = (126,1)
+253 `divMod`  3 = (84,1)
+ 
+254 `divMod`  253 = (1,1)
+254 `divMod`  254 = (1,0)
+254 `divMod`  255 = (0,254)
+254 `divMod`  1 = (254,0)
+254 `divMod`  2 = (127,0)
+254 `divMod`  3 = (84,2)
+ 
+255 `divMod`  253 = (1,2)
+255 `divMod`  254 = (1,1)
+255 `divMod`  255 = (1,0)
+255 `divMod`  1 = (255,0)
+255 `divMod`  2 = (127,1)
+255 `divMod`  3 = (85,0)
+ 
+0 `divMod`  253 = (0,0)
+0 `divMod`  254 = (0,0)
+0 `divMod`  255 = (0,0)
+0 `divMod`  1 = (0,0)
+0 `divMod`  2 = (0,0)
+0 `divMod`  3 = (0,0)
+ 
+1 `divMod`  253 = (0,1)
+1 `divMod`  254 = (0,1)
+1 `divMod`  255 = (0,1)
+1 `divMod`  1 = (1,0)
+1 `divMod`  2 = (0,1)
+1 `divMod`  3 = (0,1)
+ 
+2 `divMod`  253 = (0,2)
+2 `divMod`  254 = (0,2)
+2 `divMod`  255 = (0,2)
+2 `divMod`  1 = (2,0)
+2 `divMod`  2 = (1,0)
+2 `divMod`  3 = (0,2)
+ 
+3 `divMod`  253 = (0,3)
+3 `divMod`  254 = (0,3)
+3 `divMod`  255 = (0,3)
+3 `divMod`  1 = (3,0)
+3 `divMod`  2 = (1,1)
+3 `divMod`  3 = (1,0)
+ 
+#
+253 `div`     253 = 1
+253 `div`     254 = 0
+253 `div`     255 = 0
+253 `div`     1 = 253
+253 `div`     2 = 126
+253 `div`     3 = 84
+ 
+254 `div`     253 = 1
+254 `div`     254 = 1
+254 `div`     255 = 0
+254 `div`     1 = 254
+254 `div`     2 = 127
+254 `div`     3 = 84
+ 
+255 `div`     253 = 1
+255 `div`     254 = 1
+255 `div`     255 = 1
+255 `div`     1 = 255
+255 `div`     2 = 127
+255 `div`     3 = 85
+ 
+0 `div`     253 = 0
+0 `div`     254 = 0
+0 `div`     255 = 0
+0 `div`     1 = 0
+0 `div`     2 = 0
+0 `div`     3 = 0
+ 
+1 `div`     253 = 0
+1 `div`     254 = 0
+1 `div`     255 = 0
+1 `div`     1 = 1
+1 `div`     2 = 0
+1 `div`     3 = 0
+ 
+2 `div`     253 = 0
+2 `div`     254 = 0
+2 `div`     255 = 0
+2 `div`     1 = 2
+2 `div`     2 = 1
+2 `div`     3 = 0
+ 
+3 `div`     253 = 0
+3 `div`     254 = 0
+3 `div`     255 = 0
+3 `div`     1 = 3
+3 `div`     2 = 1
+3 `div`     3 = 1
+ 
+#
+253 `mod`     253 = 0
+253 `mod`     254 = 253
+253 `mod`     255 = 253
+253 `mod`     1 = 0
+253 `mod`     2 = 1
+253 `mod`     3 = 1
+ 
+254 `mod`     253 = 1
+254 `mod`     254 = 0
+254 `mod`     255 = 254
+254 `mod`     1 = 0
+254 `mod`     2 = 0
+254 `mod`     3 = 2
+ 
+255 `mod`     253 = 2
+255 `mod`     254 = 1
+255 `mod`     255 = 0
+255 `mod`     1 = 0
+255 `mod`     2 = 1
+255 `mod`     3 = 0
+ 
+0 `mod`     253 = 0
+0 `mod`     254 = 0
+0 `mod`     255 = 0
+0 `mod`     1 = 0
+0 `mod`     2 = 0
+0 `mod`     3 = 0
+ 
+1 `mod`     253 = 1
+1 `mod`     254 = 1
+1 `mod`     255 = 1
+1 `mod`     1 = 0
+1 `mod`     2 = 1
+1 `mod`     3 = 1
+ 
+2 `mod`     253 = 2
+2 `mod`     254 = 2
+2 `mod`     255 = 2
+2 `mod`     1 = 0
+2 `mod`     2 = 0
+2 `mod`     3 = 2
+ 
+3 `mod`     253 = 3
+3 `mod`     254 = 3
+3 `mod`     255 = 3
+3 `mod`     1 = 0
+3 `mod`     2 = 1
+3 `mod`     3 = 0
+ 
+#
+253 `quotRem` 253 = (1,0)
+253 `quotRem` 254 = (0,253)
+253 `quotRem` 255 = (0,253)
+253 `quotRem` 1 = (253,0)
+253 `quotRem` 2 = (126,1)
+253 `quotRem` 3 = (84,1)
+ 
+254 `quotRem` 253 = (1,1)
+254 `quotRem` 254 = (1,0)
+254 `quotRem` 255 = (0,254)
+254 `quotRem` 1 = (254,0)
+254 `quotRem` 2 = (127,0)
+254 `quotRem` 3 = (84,2)
+ 
+255 `quotRem` 253 = (1,2)
+255 `quotRem` 254 = (1,1)
+255 `quotRem` 255 = (1,0)
+255 `quotRem` 1 = (255,0)
+255 `quotRem` 2 = (127,1)
+255 `quotRem` 3 = (85,0)
+ 
+0 `quotRem` 253 = (0,0)
+0 `quotRem` 254 = (0,0)
+0 `quotRem` 255 = (0,0)
+0 `quotRem` 1 = (0,0)
+0 `quotRem` 2 = (0,0)
+0 `quotRem` 3 = (0,0)
+ 
+1 `quotRem` 253 = (0,1)
+1 `quotRem` 254 = (0,1)
+1 `quotRem` 255 = (0,1)
+1 `quotRem` 1 = (1,0)
+1 `quotRem` 2 = (0,1)
+1 `quotRem` 3 = (0,1)
+ 
+2 `quotRem` 253 = (0,2)
+2 `quotRem` 254 = (0,2)
+2 `quotRem` 255 = (0,2)
+2 `quotRem` 1 = (2,0)
+2 `quotRem` 2 = (1,0)
+2 `quotRem` 3 = (0,2)
+ 
+3 `quotRem` 253 = (0,3)
+3 `quotRem` 254 = (0,3)
+3 `quotRem` 255 = (0,3)
+3 `quotRem` 1 = (3,0)
+3 `quotRem` 2 = (1,1)
+3 `quotRem` 3 = (1,0)
+ 
+#
+253 `quot`    253 = 1
+253 `quot`    254 = 0
+253 `quot`    255 = 0
+253 `quot`    1 = 253
+253 `quot`    2 = 126
+253 `quot`    3 = 84
+ 
+254 `quot`    253 = 1
+254 `quot`    254 = 1
+254 `quot`    255 = 0
+254 `quot`    1 = 254
+254 `quot`    2 = 127
+254 `quot`    3 = 84
+ 
+255 `quot`    253 = 1
+255 `quot`    254 = 1
+255 `quot`    255 = 1
+255 `quot`    1 = 255
+255 `quot`    2 = 127
+255 `quot`    3 = 85
+ 
+0 `quot`    253 = 0
+0 `quot`    254 = 0
+0 `quot`    255 = 0
+0 `quot`    1 = 0
+0 `quot`    2 = 0
+0 `quot`    3 = 0
+ 
+1 `quot`    253 = 0
+1 `quot`    254 = 0
+1 `quot`    255 = 0
+1 `quot`    1 = 1
+1 `quot`    2 = 0
+1 `quot`    3 = 0
+ 
+2 `quot`    253 = 0
+2 `quot`    254 = 0
+2 `quot`    255 = 0
+2 `quot`    1 = 2
+2 `quot`    2 = 1
+2 `quot`    3 = 0
+ 
+3 `quot`    253 = 0
+3 `quot`    254 = 0
+3 `quot`    255 = 0
+3 `quot`    1 = 3
+3 `quot`    2 = 1
+3 `quot`    3 = 1
+ 
+#
+253 `rem`     253 = 0
+253 `rem`     254 = 253
+253 `rem`     255 = 253
+253 `rem`     1 = 0
+253 `rem`     2 = 1
+253 `rem`     3 = 1
+ 
+254 `rem`     253 = 1
+254 `rem`     254 = 0
+254 `rem`     255 = 254
+254 `rem`     1 = 0
+254 `rem`     2 = 0
+254 `rem`     3 = 2
+ 
+255 `rem`     253 = 2
+255 `rem`     254 = 1
+255 `rem`     255 = 0
+255 `rem`     1 = 0
+255 `rem`     2 = 1
+255 `rem`     3 = 0
+ 
+0 `rem`     253 = 0
+0 `rem`     254 = 0
+0 `rem`     255 = 0
+0 `rem`     1 = 0
+0 `rem`     2 = 0
+0 `rem`     3 = 0
+ 
+1 `rem`     253 = 1
+1 `rem`     254 = 1
+1 `rem`     255 = 1
+1 `rem`     1 = 0
+1 `rem`     2 = 1
+1 `rem`     3 = 1
+ 
+2 `rem`     253 = 2
+2 `rem`     254 = 2
+2 `rem`     255 = 2
+2 `rem`     1 = 0
+2 `rem`     2 = 0
+2 `rem`     3 = 2
+ 
+3 `rem`     253 = 3
+3 `rem`     254 = 3
+3 `rem`     255 = 3
+3 `rem`     1 = 0
+3 `rem`     2 = 1
+3 `rem`     3 = 0
+ 
+#
+testBits
+253 .&.   253 = 253
+253 .&.   254 = 252
+253 .&.   255 = 253
+253 .&.   1 = 1
+253 .&.   2 = 0
+253 .&.   3 = 1
+ 
+254 .&.   253 = 252
+254 .&.   254 = 254
+254 .&.   255 = 254
+254 .&.   1 = 0
+254 .&.   2 = 2
+254 .&.   3 = 2
+ 
+255 .&.   253 = 253
+255 .&.   254 = 254
+255 .&.   255 = 255
+255 .&.   1 = 1
+255 .&.   2 = 2
+255 .&.   3 = 3
+ 
+0 .&.   253 = 0
+0 .&.   254 = 0
+0 .&.   255 = 0
+0 .&.   1 = 0
+0 .&.   2 = 0
+0 .&.   3 = 0
+ 
+1 .&.   253 = 1
+1 .&.   254 = 0
+1 .&.   255 = 1
+1 .&.   1 = 1
+1 .&.   2 = 0
+1 .&.   3 = 1
+ 
+2 .&.   253 = 0
+2 .&.   254 = 2
+2 .&.   255 = 2
+2 .&.   1 = 0
+2 .&.   2 = 2
+2 .&.   3 = 2
+ 
+3 .&.   253 = 1
+3 .&.   254 = 2
+3 .&.   255 = 3
+3 .&.   1 = 1
+3 .&.   2 = 2
+3 .&.   3 = 3
+ 
+#
+253 .|.   253 = 253
+253 .|.   254 = 255
+253 .|.   255 = 255
+253 .|.   1 = 253
+253 .|.   2 = 255
+253 .|.   3 = 255
+ 
+254 .|.   253 = 255
+254 .|.   254 = 254
+254 .|.   255 = 255
+254 .|.   1 = 255
+254 .|.   2 = 254
+254 .|.   3 = 255
+ 
+255 .|.   253 = 255
+255 .|.   254 = 255
+255 .|.   255 = 255
+255 .|.   1 = 255
+255 .|.   2 = 255
+255 .|.   3 = 255
+ 
+0 .|.   253 = 253
+0 .|.   254 = 254
+0 .|.   255 = 255
+0 .|.   1 = 1
+0 .|.   2 = 2
+0 .|.   3 = 3
+ 
+1 .|.   253 = 253
+1 .|.   254 = 255
+1 .|.   255 = 255
+1 .|.   1 = 1
+1 .|.   2 = 3
+1 .|.   3 = 3
+ 
+2 .|.   253 = 255
+2 .|.   254 = 254
+2 .|.   255 = 255
+2 .|.   1 = 3
+2 .|.   2 = 2
+2 .|.   3 = 3
+ 
+3 .|.   253 = 255
+3 .|.   254 = 255
+3 .|.   255 = 255
+3 .|.   1 = 3
+3 .|.   2 = 3
+3 .|.   3 = 3
+ 
+#
+253 `xor` 253 = 0
+253 `xor` 254 = 3
+253 `xor` 255 = 2
+253 `xor` 1 = 252
+253 `xor` 2 = 255
+253 `xor` 3 = 254
+ 
+254 `xor` 253 = 3
+254 `xor` 254 = 0
+254 `xor` 255 = 1
+254 `xor` 1 = 255
+254 `xor` 2 = 252
+254 `xor` 3 = 253
+ 
+255 `xor` 253 = 2
+255 `xor` 254 = 1
+255 `xor` 255 = 0
+255 `xor` 1 = 254
+255 `xor` 2 = 253
+255 `xor` 3 = 252
+ 
+0 `xor` 253 = 253
+0 `xor` 254 = 254
+0 `xor` 255 = 255
+0 `xor` 1 = 1
+0 `xor` 2 = 2
+0 `xor` 3 = 3
+ 
+1 `xor` 253 = 252
+1 `xor` 254 = 255
+1 `xor` 255 = 254
+1 `xor` 1 = 0
+1 `xor` 2 = 3
+1 `xor` 3 = 2
+ 
+2 `xor` 253 = 255
+2 `xor` 254 = 252
+2 `xor` 255 = 253
+2 `xor` 1 = 3
+2 `xor` 2 = 0
+2 `xor` 3 = 1
+ 
+3 `xor` 253 = 254
+3 `xor` 254 = 253
+3 `xor` 255 = 252
+3 `xor` 1 = 2
+3 `xor` 2 = 1
+3 `xor` 3 = 0
+ 
+#
+complement 253 = 2
+complement 254 = 1
+complement 255 = 0
+complement 0 = 255
+complement 1 = 254
+complement 2 = 253
+complement 3 = 252
+#
+253 `shift` 0 = 253
+253 `shift` 1 = 250
+253 `shift` 2 = 244
+253 `shift` 3 = 232
+ 
+254 `shift` 0 = 254
+254 `shift` 1 = 252
+254 `shift` 2 = 248
+254 `shift` 3 = 240
+ 
+255 `shift` 0 = 255
+255 `shift` 1 = 254
+255 `shift` 2 = 252
+255 `shift` 3 = 248
+ 
+0 `shift` 0 = 0
+0 `shift` 1 = 0
+0 `shift` 2 = 0
+0 `shift` 3 = 0
+ 
+1 `shift` 0 = 1
+1 `shift` 1 = 2
+1 `shift` 2 = 4
+1 `shift` 3 = 8
+ 
+2 `shift` 0 = 2
+2 `shift` 1 = 4
+2 `shift` 2 = 8
+2 `shift` 3 = 16
+ 
+3 `shift` 0 = 3
+3 `shift` 1 = 6
+3 `shift` 2 = 12
+3 `shift` 3 = 24
+ 
+#
+253 `setBit` 0 = 253
+253 `setBit` 1 = 255
+253 `setBit` 2 = 253
+253 `setBit` 3 = 253
+ 
+254 `setBit` 0 = 255
+254 `setBit` 1 = 254
+254 `setBit` 2 = 254
+254 `setBit` 3 = 254
+ 
+255 `setBit` 0 = 255
+255 `setBit` 1 = 255
+255 `setBit` 2 = 255
+255 `setBit` 3 = 255
+ 
+0 `setBit` 0 = 1
+0 `setBit` 1 = 2
+0 `setBit` 2 = 4
+0 `setBit` 3 = 8
+ 
+1 `setBit` 0 = 1
+1 `setBit` 1 = 3
+1 `setBit` 2 = 5
+1 `setBit` 3 = 9
+ 
+2 `setBit` 0 = 3
+2 `setBit` 1 = 2
+2 `setBit` 2 = 6
+2 `setBit` 3 = 10
+ 
+3 `setBit` 0 = 3
+3 `setBit` 1 = 3
+3 `setBit` 2 = 7
+3 `setBit` 3 = 11
+ 
+#
+253 `clearBit` 0 = 252
+253 `clearBit` 1 = 253
+253 `clearBit` 2 = 249
+253 `clearBit` 3 = 245
+ 
+254 `clearBit` 0 = 254
+254 `clearBit` 1 = 252
+254 `clearBit` 2 = 250
+254 `clearBit` 3 = 246
+ 
+255 `clearBit` 0 = 254
+255 `clearBit` 1 = 253
+255 `clearBit` 2 = 251
+255 `clearBit` 3 = 247
+ 
+0 `clearBit` 0 = 0
+0 `clearBit` 1 = 0
+0 `clearBit` 2 = 0
+0 `clearBit` 3 = 0
+ 
+1 `clearBit` 0 = 0
+1 `clearBit` 1 = 1
+1 `clearBit` 2 = 1
+1 `clearBit` 3 = 1
+ 
+2 `clearBit` 0 = 2
+2 `clearBit` 1 = 0
+2 `clearBit` 2 = 2
+2 `clearBit` 3 = 2
+ 
+3 `clearBit` 0 = 2
+3 `clearBit` 1 = 1
+3 `clearBit` 2 = 3
+3 `clearBit` 3 = 3
+ 
+#
+253 `complementBit` 0 = 252
+253 `complementBit` 1 = 255
+253 `complementBit` 2 = 249
+253 `complementBit` 3 = 245
+ 
+254 `complementBit` 0 = 255
+254 `complementBit` 1 = 252
+254 `complementBit` 2 = 250
+254 `complementBit` 3 = 246
+ 
+255 `complementBit` 0 = 254
+255 `complementBit` 1 = 253
+255 `complementBit` 2 = 251
+255 `complementBit` 3 = 247
+ 
+0 `complementBit` 0 = 1
+0 `complementBit` 1 = 2
+0 `complementBit` 2 = 4
+0 `complementBit` 3 = 8
+ 
+1 `complementBit` 0 = 0
+1 `complementBit` 1 = 3
+1 `complementBit` 2 = 5
+1 `complementBit` 3 = 9
+ 
+2 `complementBit` 0 = 3
+2 `complementBit` 1 = 0
+2 `complementBit` 2 = 6
+2 `complementBit` 3 = 10
+ 
+3 `complementBit` 0 = 2
+3 `complementBit` 1 = 1
+3 `complementBit` 2 = 7
+3 `complementBit` 3 = 11
+ 
+#
+253 `testBit` 0 = True
+253 `testBit` 1 = False
+253 `testBit` 2 = True
+253 `testBit` 3 = True
+ 
+254 `testBit` 0 = False
+254 `testBit` 1 = True
+254 `testBit` 2 = True
+254 `testBit` 3 = True
+ 
+255 `testBit` 0 = True
+255 `testBit` 1 = True
+255 `testBit` 2 = True
+255 `testBit` 3 = True
+ 
+0 `testBit` 0 = False
+0 `testBit` 1 = False
+0 `testBit` 2 = False
+0 `testBit` 3 = False
+ 
+1 `testBit` 0 = True
+1 `testBit` 1 = False
+1 `testBit` 2 = False
+1 `testBit` 3 = False
+ 
+2 `testBit` 0 = False
+2 `testBit` 1 = True
+2 `testBit` 2 = False
+2 `testBit` 3 = False
+ 
+3 `testBit` 0 = True
+3 `testBit` 1 = True
+3 `testBit` 2 = False
+3 `testBit` 3 = False
+ 
+#
+bitSize 253 = 8
+bitSize 254 = 8
+bitSize 255 = 8
+bitSize 0 = 8
+bitSize 1 = 8
+bitSize 2 = 8
+bitSize 3 = 8
+#
+isSigned 253 = False
+isSigned 254 = False
+isSigned 255 = False
+isSigned 0 = False
+isSigned 1 = False
+isSigned 2 = False
+isSigned 3 = False
+#
+--------------------------------
+--------------------------------
+--Testing Word16
+--------------------------------
+testBounded
+(65535,0,1)
+(65534,65535,0)
+testEnum
+[0,1,2,3,4,5,6,7,8,9]
+[0,2,4,6,8,10,12,14,16,18]
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+[0,2,4,6,8,10,12,14,16,18,20]
+testReadShow
+[65533,65534,65535,0,1,2,3]
+[65533,65534,65535,0,1,2,3]
+testEq
+65533 == 65533 = True
+65533 == 65534 = False
+65533 == 65535 = False
+65533 == 0 = False
+65533 == 1 = False
+65533 == 2 = False
+65533 == 3 = False
+ 
+65534 == 65533 = False
+65534 == 65534 = True
+65534 == 65535 = False
+65534 == 0 = False
+65534 == 1 = False
+65534 == 2 = False
+65534 == 3 = False
+ 
+65535 == 65533 = False
+65535 == 65534 = False
+65535 == 65535 = True
+65535 == 0 = False
+65535 == 1 = False
+65535 == 2 = False
+65535 == 3 = False
+ 
+0 == 65533 = False
+0 == 65534 = False
+0 == 65535 = False
+0 == 0 = True
+0 == 1 = False
+0 == 2 = False
+0 == 3 = False
+ 
+1 == 65533 = False
+1 == 65534 = False
+1 == 65535 = False
+1 == 0 = False
+1 == 1 = True
+1 == 2 = False
+1 == 3 = False
+ 
+2 == 65533 = False
+2 == 65534 = False
+2 == 65535 = False
+2 == 0 = False
+2 == 1 = False
+2 == 2 = True
+2 == 3 = False
+ 
+3 == 65533 = False
+3 == 65534 = False
+3 == 65535 = False
+3 == 0 = False
+3 == 1 = False
+3 == 2 = False
+3 == 3 = True
+ 
+#
+65533 /= 65533 = False
+65533 /= 65534 = True
+65533 /= 65535 = True
+65533 /= 0 = True
+65533 /= 1 = True
+65533 /= 2 = True
+65533 /= 3 = True
+ 
+65534 /= 65533 = True
+65534 /= 65534 = False
+65534 /= 65535 = True
+65534 /= 0 = True
+65534 /= 1 = True
+65534 /= 2 = True
+65534 /= 3 = True
+ 
+65535 /= 65533 = True
+65535 /= 65534 = True
+65535 /= 65535 = False
+65535 /= 0 = True
+65535 /= 1 = True
+65535 /= 2 = True
+65535 /= 3 = True
+ 
+0 /= 65533 = True
+0 /= 65534 = True
+0 /= 65535 = True
+0 /= 0 = False
+0 /= 1 = True
+0 /= 2 = True
+0 /= 3 = True
+ 
+1 /= 65533 = True
+1 /= 65534 = True
+1 /= 65535 = True
+1 /= 0 = True
+1 /= 1 = False
+1 /= 2 = True
+1 /= 3 = True
+ 
+2 /= 65533 = True
+2 /= 65534 = True
+2 /= 65535 = True
+2 /= 0 = True
+2 /= 1 = True
+2 /= 2 = False
+2 /= 3 = True
+ 
+3 /= 65533 = True
+3 /= 65534 = True
+3 /= 65535 = True
+3 /= 0 = True
+3 /= 1 = True
+3 /= 2 = True
+3 /= 3 = False
+ 
+#
+testOrd
+65533 <= 65533 = True
+65533 <= 65534 = True
+65533 <= 65535 = True
+65533 <= 0 = False
+65533 <= 1 = False
+65533 <= 2 = False
+65533 <= 3 = False
+ 
+65534 <= 65533 = False
+65534 <= 65534 = True
+65534 <= 65535 = True
+65534 <= 0 = False
+65534 <= 1 = False
+65534 <= 2 = False
+65534 <= 3 = False
+ 
+65535 <= 65533 = False
+65535 <= 65534 = False
+65535 <= 65535 = True
+65535 <= 0 = False
+65535 <= 1 = False
+65535 <= 2 = False
+65535 <= 3 = False
+ 
+0 <= 65533 = True
+0 <= 65534 = True
+0 <= 65535 = True
+0 <= 0 = True
+0 <= 1 = True
+0 <= 2 = True
+0 <= 3 = True
+ 
+1 <= 65533 = True
+1 <= 65534 = True
+1 <= 65535 = True
+1 <= 0 = False
+1 <= 1 = True
+1 <= 2 = True
+1 <= 3 = True
+ 
+2 <= 65533 = True
+2 <= 65534 = True
+2 <= 65535 = True
+2 <= 0 = False
+2 <= 1 = False
+2 <= 2 = True
+2 <= 3 = True
+ 
+3 <= 65533 = True
+3 <= 65534 = True
+3 <= 65535 = True
+3 <= 0 = False
+3 <= 1 = False
+3 <= 2 = False
+3 <= 3 = True
+ 
+#
+65533 <  65533 = False
+65533 <  65534 = True
+65533 <  65535 = True
+65533 <  0 = False
+65533 <  1 = False
+65533 <  2 = False
+65533 <  3 = False
+ 
+65534 <  65533 = False
+65534 <  65534 = False
+65534 <  65535 = True
+65534 <  0 = False
+65534 <  1 = False
+65534 <  2 = False
+65534 <  3 = False
+ 
+65535 <  65533 = False
+65535 <  65534 = False
+65535 <  65535 = False
+65535 <  0 = False
+65535 <  1 = False
+65535 <  2 = False
+65535 <  3 = False
+ 
+0 <  65533 = True
+0 <  65534 = True
+0 <  65535 = True
+0 <  0 = False
+0 <  1 = True
+0 <  2 = True
+0 <  3 = True
+ 
+1 <  65533 = True
+1 <  65534 = True
+1 <  65535 = True
+1 <  0 = False
+1 <  1 = False
+1 <  2 = True
+1 <  3 = True
+ 
+2 <  65533 = True
+2 <  65534 = True
+2 <  65535 = True
+2 <  0 = False
+2 <  1 = False
+2 <  2 = False
+2 <  3 = True
+ 
+3 <  65533 = True
+3 <  65534 = True
+3 <  65535 = True
+3 <  0 = False
+3 <  1 = False
+3 <  2 = False
+3 <  3 = False
+ 
+#
+65533 >  65533 = False
+65533 >  65534 = False
+65533 >  65535 = False
+65533 >  0 = True
+65533 >  1 = True
+65533 >  2 = True
+65533 >  3 = True
+ 
+65534 >  65533 = True
+65534 >  65534 = False
+65534 >  65535 = False
+65534 >  0 = True
+65534 >  1 = True
+65534 >  2 = True
+65534 >  3 = True
+ 
+65535 >  65533 = True
+65535 >  65534 = True
+65535 >  65535 = False
+65535 >  0 = True
+65535 >  1 = True
+65535 >  2 = True
+65535 >  3 = True
+ 
+0 >  65533 = False
+0 >  65534 = False
+0 >  65535 = False
+0 >  0 = False
+0 >  1 = False
+0 >  2 = False
+0 >  3 = False
+ 
+1 >  65533 = False
+1 >  65534 = False
+1 >  65535 = False
+1 >  0 = True
+1 >  1 = False
+1 >  2 = False
+1 >  3 = False
+ 
+2 >  65533 = False
+2 >  65534 = False
+2 >  65535 = False
+2 >  0 = True
+2 >  1 = True
+2 >  2 = False
+2 >  3 = False
+ 
+3 >  65533 = False
+3 >  65534 = False
+3 >  65535 = False
+3 >  0 = True
+3 >  1 = True
+3 >  2 = True
+3 >  3 = False
+ 
+#
+65533 >= 65533 = True
+65533 >= 65534 = False
+65533 >= 65535 = False
+65533 >= 0 = True
+65533 >= 1 = True
+65533 >= 2 = True
+65533 >= 3 = True
+ 
+65534 >= 65533 = True
+65534 >= 65534 = True
+65534 >= 65535 = False
+65534 >= 0 = True
+65534 >= 1 = True
+65534 >= 2 = True
+65534 >= 3 = True
+ 
+65535 >= 65533 = True
+65535 >= 65534 = True
+65535 >= 65535 = True
+65535 >= 0 = True
+65535 >= 1 = True
+65535 >= 2 = True
+65535 >= 3 = True
+ 
+0 >= 65533 = False
+0 >= 65534 = False
+0 >= 65535 = False
+0 >= 0 = True
+0 >= 1 = False
+0 >= 2 = False
+0 >= 3 = False
+ 
+1 >= 65533 = False
+1 >= 65534 = False
+1 >= 65535 = False
+1 >= 0 = True
+1 >= 1 = True
+1 >= 2 = False
+1 >= 3 = False
+ 
+2 >= 65533 = False
+2 >= 65534 = False
+2 >= 65535 = False
+2 >= 0 = True
+2 >= 1 = True
+2 >= 2 = True
+2 >= 3 = False
+ 
+3 >= 65533 = False
+3 >= 65534 = False
+3 >= 65535 = False
+3 >= 0 = True
+3 >= 1 = True
+3 >= 2 = True
+3 >= 3 = True
+ 
+#
+65533 `compare` 65533 = EQ
+65533 `compare` 65534 = LT
+65533 `compare` 65535 = LT
+65533 `compare` 0 = GT
+65533 `compare` 1 = GT
+65533 `compare` 2 = GT
+65533 `compare` 3 = GT
+ 
+65534 `compare` 65533 = GT
+65534 `compare` 65534 = EQ
+65534 `compare` 65535 = LT
+65534 `compare` 0 = GT
+65534 `compare` 1 = GT
+65534 `compare` 2 = GT
+65534 `compare` 3 = GT
+ 
+65535 `compare` 65533 = GT
+65535 `compare` 65534 = GT
+65535 `compare` 65535 = EQ
+65535 `compare` 0 = GT
+65535 `compare` 1 = GT
+65535 `compare` 2 = GT
+65535 `compare` 3 = GT
+ 
+0 `compare` 65533 = LT
+0 `compare` 65534 = LT
+0 `compare` 65535 = LT
+0 `compare` 0 = EQ
+0 `compare` 1 = LT
+0 `compare` 2 = LT
+0 `compare` 3 = LT
+ 
+1 `compare` 65533 = LT
+1 `compare` 65534 = LT
+1 `compare` 65535 = LT
+1 `compare` 0 = GT
+1 `compare` 1 = EQ
+1 `compare` 2 = LT
+1 `compare` 3 = LT
+ 
+2 `compare` 65533 = LT
+2 `compare` 65534 = LT
+2 `compare` 65535 = LT
+2 `compare` 0 = GT
+2 `compare` 1 = GT
+2 `compare` 2 = EQ
+2 `compare` 3 = LT
+ 
+3 `compare` 65533 = LT
+3 `compare` 65534 = LT
+3 `compare` 65535 = LT
+3 `compare` 0 = GT
+3 `compare` 1 = GT
+3 `compare` 2 = GT
+3 `compare` 3 = EQ
+ 
+#
+testNum
+65533 + 65533 = 65530
+65533 + 65534 = 65531
+65533 + 65535 = 65532
+65533 + 0 = 65533
+65533 + 1 = 65534
+65533 + 2 = 65535
+65533 + 3 = 0
+ 
+65534 + 65533 = 65531
+65534 + 65534 = 65532
+65534 + 65535 = 65533
+65534 + 0 = 65534
+65534 + 1 = 65535
+65534 + 2 = 0
+65534 + 3 = 1
+ 
+65535 + 65533 = 65532
+65535 + 65534 = 65533
+65535 + 65535 = 65534
+65535 + 0 = 65535
+65535 + 1 = 0
+65535 + 2 = 1
+65535 + 3 = 2
+ 
+0 + 65533 = 65533
+0 + 65534 = 65534
+0 + 65535 = 65535
+0 + 0 = 0
+0 + 1 = 1
+0 + 2 = 2
+0 + 3 = 3
+ 
+1 + 65533 = 65534
+1 + 65534 = 65535
+1 + 65535 = 0
+1 + 0 = 1
+1 + 1 = 2
+1 + 2 = 3
+1 + 3 = 4
+ 
+2 + 65533 = 65535
+2 + 65534 = 0
+2 + 65535 = 1
+2 + 0 = 2
+2 + 1 = 3
+2 + 2 = 4
+2 + 3 = 5
+ 
+3 + 65533 = 0
+3 + 65534 = 1
+3 + 65535 = 2
+3 + 0 = 3
+3 + 1 = 4
+3 + 2 = 5
+3 + 3 = 6
+ 
+#
+65533 - 65533 = 0
+65533 - 65534 = 65535
+65533 - 65535 = 65534
+65533 - 0 = 65533
+65533 - 1 = 65532
+65533 - 2 = 65531
+65533 - 3 = 65530
+ 
+65534 - 65533 = 1
+65534 - 65534 = 0
+65534 - 65535 = 65535
+65534 - 0 = 65534
+65534 - 1 = 65533
+65534 - 2 = 65532
+65534 - 3 = 65531
+ 
+65535 - 65533 = 2
+65535 - 65534 = 1
+65535 - 65535 = 0
+65535 - 0 = 65535
+65535 - 1 = 65534
+65535 - 2 = 65533
+65535 - 3 = 65532
+ 
+0 - 65533 = 3
+0 - 65534 = 2
+0 - 65535 = 1
+0 - 0 = 0
+0 - 1 = 65535
+0 - 2 = 65534
+0 - 3 = 65533
+ 
+1 - 65533 = 4
+1 - 65534 = 3
+1 - 65535 = 2
+1 - 0 = 1
+1 - 1 = 0
+1 - 2 = 65535
+1 - 3 = 65534
+ 
+2 - 65533 = 5
+2 - 65534 = 4
+2 - 65535 = 3
+2 - 0 = 2
+2 - 1 = 1
+2 - 2 = 0
+2 - 3 = 65535
+ 
+3 - 65533 = 6
+3 - 65534 = 5
+3 - 65535 = 4
+3 - 0 = 3
+3 - 1 = 2
+3 - 2 = 1
+3 - 3 = 0
+ 
+#
+65533 * 65533 = 9
+65533 * 65534 = 6
+65533 * 65535 = 3
+65533 * 0 = 0
+65533 * 1 = 65533
+65533 * 2 = 65530
+65533 * 3 = 65527
+ 
+65534 * 65533 = 6
+65534 * 65534 = 4
+65534 * 65535 = 2
+65534 * 0 = 0
+65534 * 1 = 65534
+65534 * 2 = 65532
+65534 * 3 = 65530
+ 
+65535 * 65533 = 3
+65535 * 65534 = 2
+65535 * 65535 = 1
+65535 * 0 = 0
+65535 * 1 = 65535
+65535 * 2 = 65534
+65535 * 3 = 65533
+ 
+0 * 65533 = 0
+0 * 65534 = 0
+0 * 65535 = 0
+0 * 0 = 0
+0 * 1 = 0
+0 * 2 = 0
+0 * 3 = 0
+ 
+1 * 65533 = 65533
+1 * 65534 = 65534
+1 * 65535 = 65535
+1 * 0 = 0
+1 * 1 = 1
+1 * 2 = 2
+1 * 3 = 3
+ 
+2 * 65533 = 65530
+2 * 65534 = 65532
+2 * 65535 = 65534
+2 * 0 = 0
+2 * 1 = 2
+2 * 2 = 4
+2 * 3 = 6
+ 
+3 * 65533 = 65527
+3 * 65534 = 65530
+3 * 65535 = 65533
+3 * 0 = 0
+3 * 1 = 3
+3 * 2 = 6
+3 * 3 = 9
+ 
+#
+negate 65533 = 3
+negate 65534 = 2
+negate 65535 = 1
+negate 0 = 0
+negate 1 = 65535
+negate 2 = 65534
+negate 3 = 65533
+#
+testReal
+toRational 65533 = 65533 % 1
+toRational 65534 = 65534 % 1
+toRational 65535 = 65535 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
+#
+testIntegral
+65533 `divMod`  65533 = (1,0)
+65533 `divMod`  65534 = (0,65533)
+65533 `divMod`  65535 = (0,65533)
+65533 `divMod`  1 = (65533,0)
+65533 `divMod`  2 = (32766,1)
+65533 `divMod`  3 = (21844,1)
+ 
+65534 `divMod`  65533 = (1,1)
+65534 `divMod`  65534 = (1,0)
+65534 `divMod`  65535 = (0,65534)
+65534 `divMod`  1 = (65534,0)
+65534 `divMod`  2 = (32767,0)
+65534 `divMod`  3 = (21844,2)
+ 
+65535 `divMod`  65533 = (1,2)
+65535 `divMod`  65534 = (1,1)
+65535 `divMod`  65535 = (1,0)
+65535 `divMod`  1 = (65535,0)
+65535 `divMod`  2 = (32767,1)
+65535 `divMod`  3 = (21845,0)
+ 
+0 `divMod`  65533 = (0,0)
+0 `divMod`  65534 = (0,0)
+0 `divMod`  65535 = (0,0)
+0 `divMod`  1 = (0,0)
+0 `divMod`  2 = (0,0)
+0 `divMod`  3 = (0,0)
+ 
+1 `divMod`  65533 = (0,1)
+1 `divMod`  65534 = (0,1)
+1 `divMod`  65535 = (0,1)
+1 `divMod`  1 = (1,0)
+1 `divMod`  2 = (0,1)
+1 `divMod`  3 = (0,1)
+ 
+2 `divMod`  65533 = (0,2)
+2 `divMod`  65534 = (0,2)
+2 `divMod`  65535 = (0,2)
+2 `divMod`  1 = (2,0)
+2 `divMod`  2 = (1,0)
+2 `divMod`  3 = (0,2)
+ 
+3 `divMod`  65533 = (0,3)
+3 `divMod`  65534 = (0,3)
+3 `divMod`  65535 = (0,3)
+3 `divMod`  1 = (3,0)
+3 `divMod`  2 = (1,1)
+3 `divMod`  3 = (1,0)
+ 
+#
+65533 `div`     65533 = 1
+65533 `div`     65534 = 0
+65533 `div`     65535 = 0
+65533 `div`     1 = 65533
+65533 `div`     2 = 32766
+65533 `div`     3 = 21844
+ 
+65534 `div`     65533 = 1
+65534 `div`     65534 = 1
+65534 `div`     65535 = 0
+65534 `div`     1 = 65534
+65534 `div`     2 = 32767
+65534 `div`     3 = 21844
+ 
+65535 `div`     65533 = 1
+65535 `div`     65534 = 1
+65535 `div`     65535 = 1
+65535 `div`     1 = 65535
+65535 `div`     2 = 32767
+65535 `div`     3 = 21845
+ 
+0 `div`     65533 = 0
+0 `div`     65534 = 0
+0 `div`     65535 = 0
+0 `div`     1 = 0
+0 `div`     2 = 0
+0 `div`     3 = 0
+ 
+1 `div`     65533 = 0
+1 `div`     65534 = 0
+1 `div`     65535 = 0
+1 `div`     1 = 1
+1 `div`     2 = 0
+1 `div`     3 = 0
+ 
+2 `div`     65533 = 0
+2 `div`     65534 = 0
+2 `div`     65535 = 0
+2 `div`     1 = 2
+2 `div`     2 = 1
+2 `div`     3 = 0
+ 
+3 `div`     65533 = 0
+3 `div`     65534 = 0
+3 `div`     65535 = 0
+3 `div`     1 = 3
+3 `div`     2 = 1
+3 `div`     3 = 1
+ 
+#
+65533 `mod`     65533 = 0
+65533 `mod`     65534 = 65533
+65533 `mod`     65535 = 65533
+65533 `mod`     1 = 0
+65533 `mod`     2 = 1
+65533 `mod`     3 = 1
+ 
+65534 `mod`     65533 = 1
+65534 `mod`     65534 = 0
+65534 `mod`     65535 = 65534
+65534 `mod`     1 = 0
+65534 `mod`     2 = 0
+65534 `mod`     3 = 2
+ 
+65535 `mod`     65533 = 2
+65535 `mod`     65534 = 1
+65535 `mod`     65535 = 0
+65535 `mod`     1 = 0
+65535 `mod`     2 = 1
+65535 `mod`     3 = 0
+ 
+0 `mod`     65533 = 0
+0 `mod`     65534 = 0
+0 `mod`     65535 = 0
+0 `mod`     1 = 0
+0 `mod`     2 = 0
+0 `mod`     3 = 0
+ 
+1 `mod`     65533 = 1
+1 `mod`     65534 = 1
+1 `mod`     65535 = 1
+1 `mod`     1 = 0
+1 `mod`     2 = 1
+1 `mod`     3 = 1
+ 
+2 `mod`     65533 = 2
+2 `mod`     65534 = 2
+2 `mod`     65535 = 2
+2 `mod`     1 = 0
+2 `mod`     2 = 0
+2 `mod`     3 = 2
+ 
+3 `mod`     65533 = 3
+3 `mod`     65534 = 3
+3 `mod`     65535 = 3
+3 `mod`     1 = 0
+3 `mod`     2 = 1
+3 `mod`     3 = 0
+ 
+#
+65533 `quotRem` 65533 = (1,0)
+65533 `quotRem` 65534 = (0,65533)
+65533 `quotRem` 65535 = (0,65533)
+65533 `quotRem` 1 = (65533,0)
+65533 `quotRem` 2 = (32766,1)
+65533 `quotRem` 3 = (21844,1)
+ 
+65534 `quotRem` 65533 = (1,1)
+65534 `quotRem` 65534 = (1,0)
+65534 `quotRem` 65535 = (0,65534)
+65534 `quotRem` 1 = (65534,0)
+65534 `quotRem` 2 = (32767,0)
+65534 `quotRem` 3 = (21844,2)
+ 
+65535 `quotRem` 65533 = (1,2)
+65535 `quotRem` 65534 = (1,1)
+65535 `quotRem` 65535 = (1,0)
+65535 `quotRem` 1 = (65535,0)
+65535 `quotRem` 2 = (32767,1)
+65535 `quotRem` 3 = (21845,0)
+ 
+0 `quotRem` 65533 = (0,0)
+0 `quotRem` 65534 = (0,0)
+0 `quotRem` 65535 = (0,0)
+0 `quotRem` 1 = (0,0)
+0 `quotRem` 2 = (0,0)
+0 `quotRem` 3 = (0,0)
+ 
+1 `quotRem` 65533 = (0,1)
+1 `quotRem` 65534 = (0,1)
+1 `quotRem` 65535 = (0,1)
+1 `quotRem` 1 = (1,0)
+1 `quotRem` 2 = (0,1)
+1 `quotRem` 3 = (0,1)
+ 
+2 `quotRem` 65533 = (0,2)
+2 `quotRem` 65534 = (0,2)
+2 `quotRem` 65535 = (0,2)
+2 `quotRem` 1 = (2,0)
+2 `quotRem` 2 = (1,0)
+2 `quotRem` 3 = (0,2)
+ 
+3 `quotRem` 65533 = (0,3)
+3 `quotRem` 65534 = (0,3)
+3 `quotRem` 65535 = (0,3)
+3 `quotRem` 1 = (3,0)
+3 `quotRem` 2 = (1,1)
+3 `quotRem` 3 = (1,0)
+ 
+#
+65533 `quot`    65533 = 1
+65533 `quot`    65534 = 0
+65533 `quot`    65535 = 0
+65533 `quot`    1 = 65533
+65533 `quot`    2 = 32766
+65533 `quot`    3 = 21844
+ 
+65534 `quot`    65533 = 1
+65534 `quot`    65534 = 1
+65534 `quot`    65535 = 0
+65534 `quot`    1 = 65534
+65534 `quot`    2 = 32767
+65534 `quot`    3 = 21844
+ 
+65535 `quot`    65533 = 1
+65535 `quot`    65534 = 1
+65535 `quot`    65535 = 1
+65535 `quot`    1 = 65535
+65535 `quot`    2 = 32767
+65535 `quot`    3 = 21845
+ 
+0 `quot`    65533 = 0
+0 `quot`    65534 = 0
+0 `quot`    65535 = 0
+0 `quot`    1 = 0
+0 `quot`    2 = 0
+0 `quot`    3 = 0
+ 
+1 `quot`    65533 = 0
+1 `quot`    65534 = 0
+1 `quot`    65535 = 0
+1 `quot`    1 = 1
+1 `quot`    2 = 0
+1 `quot`    3 = 0
+ 
+2 `quot`    65533 = 0
+2 `quot`    65534 = 0
+2 `quot`    65535 = 0
+2 `quot`    1 = 2
+2 `quot`    2 = 1
+2 `quot`    3 = 0
+ 
+3 `quot`    65533 = 0
+3 `quot`    65534 = 0
+3 `quot`    65535 = 0
+3 `quot`    1 = 3
+3 `quot`    2 = 1
+3 `quot`    3 = 1
+ 
+#
+65533 `rem`     65533 = 0
+65533 `rem`     65534 = 65533
+65533 `rem`     65535 = 65533
+65533 `rem`     1 = 0
+65533 `rem`     2 = 1
+65533 `rem`     3 = 1
+ 
+65534 `rem`     65533 = 1
+65534 `rem`     65534 = 0
+65534 `rem`     65535 = 65534
+65534 `rem`     1 = 0
+65534 `rem`     2 = 0
+65534 `rem`     3 = 2
+ 
+65535 `rem`     65533 = 2
+65535 `rem`     65534 = 1
+65535 `rem`     65535 = 0
+65535 `rem`     1 = 0
+65535 `rem`     2 = 1
+65535 `rem`     3 = 0
+ 
+0 `rem`     65533 = 0
+0 `rem`     65534 = 0
+0 `rem`     65535 = 0
+0 `rem`     1 = 0
+0 `rem`     2 = 0
+0 `rem`     3 = 0
+ 
+1 `rem`     65533 = 1
+1 `rem`     65534 = 1
+1 `rem`     65535 = 1
+1 `rem`     1 = 0
+1 `rem`     2 = 1
+1 `rem`     3 = 1
+ 
+2 `rem`     65533 = 2
+2 `rem`     65534 = 2
+2 `rem`     65535 = 2
+2 `rem`     1 = 0
+2 `rem`     2 = 0
+2 `rem`     3 = 2
+ 
+3 `rem`     65533 = 3
+3 `rem`     65534 = 3
+3 `rem`     65535 = 3
+3 `rem`     1 = 0
+3 `rem`     2 = 1
+3 `rem`     3 = 0
+ 
+#
+testBits
+65533 .&.   65533 = 65533
+65533 .&.   65534 = 65532
+65533 .&.   65535 = 65533
+65533 .&.   1 = 1
+65533 .&.   2 = 0
+65533 .&.   3 = 1
+ 
+65534 .&.   65533 = 65532
+65534 .&.   65534 = 65534
+65534 .&.   65535 = 65534
+65534 .&.   1 = 0
+65534 .&.   2 = 2
+65534 .&.   3 = 2
+ 
+65535 .&.   65533 = 65533
+65535 .&.   65534 = 65534
+65535 .&.   65535 = 65535
+65535 .&.   1 = 1
+65535 .&.   2 = 2
+65535 .&.   3 = 3
+ 
+0 .&.   65533 = 0
+0 .&.   65534 = 0
+0 .&.   65535 = 0
+0 .&.   1 = 0
+0 .&.   2 = 0
+0 .&.   3 = 0
+ 
+1 .&.   65533 = 1
+1 .&.   65534 = 0
+1 .&.   65535 = 1
+1 .&.   1 = 1
+1 .&.   2 = 0
+1 .&.   3 = 1
+ 
+2 .&.   65533 = 0
+2 .&.   65534 = 2
+2 .&.   65535 = 2
+2 .&.   1 = 0
+2 .&.   2 = 2
+2 .&.   3 = 2
+ 
+3 .&.   65533 = 1
+3 .&.   65534 = 2
+3 .&.   65535 = 3
+3 .&.   1 = 1
+3 .&.   2 = 2
+3 .&.   3 = 3
+ 
+#
+65533 .|.   65533 = 65533
+65533 .|.   65534 = 65535
+65533 .|.   65535 = 65535
+65533 .|.   1 = 65533
+65533 .|.   2 = 65535
+65533 .|.   3 = 65535
+ 
+65534 .|.   65533 = 65535
+65534 .|.   65534 = 65534
+65534 .|.   65535 = 65535
+65534 .|.   1 = 65535
+65534 .|.   2 = 65534
+65534 .|.   3 = 65535
+ 
+65535 .|.   65533 = 65535
+65535 .|.   65534 = 65535
+65535 .|.   65535 = 65535
+65535 .|.   1 = 65535
+65535 .|.   2 = 65535
+65535 .|.   3 = 65535
+ 
+0 .|.   65533 = 65533
+0 .|.   65534 = 65534
+0 .|.   65535 = 65535
+0 .|.   1 = 1
+0 .|.   2 = 2
+0 .|.   3 = 3
+ 
+1 .|.   65533 = 65533
+1 .|.   65534 = 65535
+1 .|.   65535 = 65535
+1 .|.   1 = 1
+1 .|.   2 = 3
+1 .|.   3 = 3
+ 
+2 .|.   65533 = 65535
+2 .|.   65534 = 65534
+2 .|.   65535 = 65535
+2 .|.   1 = 3
+2 .|.   2 = 2
+2 .|.   3 = 3
+ 
+3 .|.   65533 = 65535
+3 .|.   65534 = 65535
+3 .|.   65535 = 65535
+3 .|.   1 = 3
+3 .|.   2 = 3
+3 .|.   3 = 3
+ 
+#
+65533 `xor` 65533 = 0
+65533 `xor` 65534 = 3
+65533 `xor` 65535 = 2
+65533 `xor` 1 = 65532
+65533 `xor` 2 = 65535
+65533 `xor` 3 = 65534
+ 
+65534 `xor` 65533 = 3
+65534 `xor` 65534 = 0
+65534 `xor` 65535 = 1
+65534 `xor` 1 = 65535
+65534 `xor` 2 = 65532
+65534 `xor` 3 = 65533
+ 
+65535 `xor` 65533 = 2
+65535 `xor` 65534 = 1
+65535 `xor` 65535 = 0
+65535 `xor` 1 = 65534
+65535 `xor` 2 = 65533
+65535 `xor` 3 = 65532
+ 
+0 `xor` 65533 = 65533
+0 `xor` 65534 = 65534
+0 `xor` 65535 = 65535
+0 `xor` 1 = 1
+0 `xor` 2 = 2
+0 `xor` 3 = 3
+ 
+1 `xor` 65533 = 65532
+1 `xor` 65534 = 65535
+1 `xor` 65535 = 65534
+1 `xor` 1 = 0
+1 `xor` 2 = 3
+1 `xor` 3 = 2
+ 
+2 `xor` 65533 = 65535
+2 `xor` 65534 = 65532
+2 `xor` 65535 = 65533
+2 `xor` 1 = 3
+2 `xor` 2 = 0
+2 `xor` 3 = 1
+ 
+3 `xor` 65533 = 65534
+3 `xor` 65534 = 65533
+3 `xor` 65535 = 65532
+3 `xor` 1 = 2
+3 `xor` 2 = 1
+3 `xor` 3 = 0
+ 
+#
+complement 65533 = 2
+complement 65534 = 1
+complement 65535 = 0
+complement 0 = 65535
+complement 1 = 65534
+complement 2 = 65533
+complement 3 = 65532
+#
+65533 `shift` 0 = 65533
+65533 `shift` 1 = 65530
+65533 `shift` 2 = 65524
+65533 `shift` 3 = 65512
+ 
+65534 `shift` 0 = 65534
+65534 `shift` 1 = 65532
+65534 `shift` 2 = 65528
+65534 `shift` 3 = 65520
+ 
+65535 `shift` 0 = 65535
+65535 `shift` 1 = 65534
+65535 `shift` 2 = 65532
+65535 `shift` 3 = 65528
+ 
+0 `shift` 0 = 0
+0 `shift` 1 = 0
+0 `shift` 2 = 0
+0 `shift` 3 = 0
+ 
+1 `shift` 0 = 1
+1 `shift` 1 = 2
+1 `shift` 2 = 4
+1 `shift` 3 = 8
+ 
+2 `shift` 0 = 2
+2 `shift` 1 = 4
+2 `shift` 2 = 8
+2 `shift` 3 = 16
+ 
+3 `shift` 0 = 3
+3 `shift` 1 = 6
+3 `shift` 2 = 12
+3 `shift` 3 = 24
+ 
+#
+65533 `setBit` 0 = 65533
+65533 `setBit` 1 = 65535
+65533 `setBit` 2 = 65533
+65533 `setBit` 3 = 65533
+ 
+65534 `setBit` 0 = 65535
+65534 `setBit` 1 = 65534
+65534 `setBit` 2 = 65534
+65534 `setBit` 3 = 65534
+ 
+65535 `setBit` 0 = 65535
+65535 `setBit` 1 = 65535
+65535 `setBit` 2 = 65535
+65535 `setBit` 3 = 65535
+ 
+0 `setBit` 0 = 1
+0 `setBit` 1 = 2
+0 `setBit` 2 = 4
+0 `setBit` 3 = 8
+ 
+1 `setBit` 0 = 1
+1 `setBit` 1 = 3
+1 `setBit` 2 = 5
+1 `setBit` 3 = 9
+ 
+2 `setBit` 0 = 3
+2 `setBit` 1 = 2
+2 `setBit` 2 = 6
+2 `setBit` 3 = 10
+ 
+3 `setBit` 0 = 3
+3 `setBit` 1 = 3
+3 `setBit` 2 = 7
+3 `setBit` 3 = 11
+ 
+#
+65533 `clearBit` 0 = 65532
+65533 `clearBit` 1 = 65533
+65533 `clearBit` 2 = 65529
+65533 `clearBit` 3 = 65525
+ 
+65534 `clearBit` 0 = 65534
+65534 `clearBit` 1 = 65532
+65534 `clearBit` 2 = 65530
+65534 `clearBit` 3 = 65526
+ 
+65535 `clearBit` 0 = 65534
+65535 `clearBit` 1 = 65533
+65535 `clearBit` 2 = 65531
+65535 `clearBit` 3 = 65527
+ 
+0 `clearBit` 0 = 0
+0 `clearBit` 1 = 0
+0 `clearBit` 2 = 0
+0 `clearBit` 3 = 0
+ 
+1 `clearBit` 0 = 0
+1 `clearBit` 1 = 1
+1 `clearBit` 2 = 1
+1 `clearBit` 3 = 1
+ 
+2 `clearBit` 0 = 2
+2 `clearBit` 1 = 0
+2 `clearBit` 2 = 2
+2 `clearBit` 3 = 2
+ 
+3 `clearBit` 0 = 2
+3 `clearBit` 1 = 1
+3 `clearBit` 2 = 3
+3 `clearBit` 3 = 3
+ 
+#
+65533 `complementBit` 0 = 65532
+65533 `complementBit` 1 = 65535
+65533 `complementBit` 2 = 65529
+65533 `complementBit` 3 = 65525
+ 
+65534 `complementBit` 0 = 65535
+65534 `complementBit` 1 = 65532
+65534 `complementBit` 2 = 65530
+65534 `complementBit` 3 = 65526
+ 
+65535 `complementBit` 0 = 65534
+65535 `complementBit` 1 = 65533
+65535 `complementBit` 2 = 65531
+65535 `complementBit` 3 = 65527
+ 
+0 `complementBit` 0 = 1
+0 `complementBit` 1 = 2
+0 `complementBit` 2 = 4
+0 `complementBit` 3 = 8
+ 
+1 `complementBit` 0 = 0
+1 `complementBit` 1 = 3
+1 `complementBit` 2 = 5
+1 `complementBit` 3 = 9
+ 
+2 `complementBit` 0 = 3
+2 `complementBit` 1 = 0
+2 `complementBit` 2 = 6
+2 `complementBit` 3 = 10
+ 
+3 `complementBit` 0 = 2
+3 `complementBit` 1 = 1
+3 `complementBit` 2 = 7
+3 `complementBit` 3 = 11
+ 
+#
+65533 `testBit` 0 = True
+65533 `testBit` 1 = False
+65533 `testBit` 2 = True
+65533 `testBit` 3 = True
+ 
+65534 `testBit` 0 = False
+65534 `testBit` 1 = True
+65534 `testBit` 2 = True
+65534 `testBit` 3 = True
+ 
+65535 `testBit` 0 = True
+65535 `testBit` 1 = True
+65535 `testBit` 2 = True
+65535 `testBit` 3 = True
+ 
+0 `testBit` 0 = False
+0 `testBit` 1 = False
+0 `testBit` 2 = False
+0 `testBit` 3 = False
+ 
+1 `testBit` 0 = True
+1 `testBit` 1 = False
+1 `testBit` 2 = False
+1 `testBit` 3 = False
+ 
+2 `testBit` 0 = False
+2 `testBit` 1 = True
+2 `testBit` 2 = False
+2 `testBit` 3 = False
+ 
+3 `testBit` 0 = True
+3 `testBit` 1 = True
+3 `testBit` 2 = False
+3 `testBit` 3 = False
+ 
+#
+bitSize 65533 = 16
+bitSize 65534 = 16
+bitSize 65535 = 16
+bitSize 0 = 16
+bitSize 1 = 16
+bitSize 2 = 16
+bitSize 3 = 16
+#
+isSigned 65533 = False
+isSigned 65534 = False
+isSigned 65535 = False
+isSigned 0 = False
+isSigned 1 = False
+isSigned 2 = False
+isSigned 3 = False
+#
+--------------------------------
+--------------------------------
+--Testing Word32
+--------------------------------
+testBounded
+(4294967295,0,1)
+(4294967294,4294967295,0)
+testEnum
+[0,1,2,3,4,5,6,7,8,9]
+[0,2,4,6,8,10,12,14,16,18]
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+[0,2,4,6,8,10,12,14,16,18,20]
+testReadShow
+[4294967293,4294967294,4294967295,0,1,2,3]
+[4294967293,4294967294,4294967295,0,1,2,3]
+testEq
+4294967293 == 4294967293 = True
+4294967293 == 4294967294 = False
+4294967293 == 4294967295 = False
+4294967293 == 0 = False
+4294967293 == 1 = False
+4294967293 == 2 = False
+4294967293 == 3 = False
+ 
+4294967294 == 4294967293 = False
+4294967294 == 4294967294 = True
+4294967294 == 4294967295 = False
+4294967294 == 0 = False
+4294967294 == 1 = False
+4294967294 == 2 = False
+4294967294 == 3 = False
+ 
+4294967295 == 4294967293 = False
+4294967295 == 4294967294 = False
+4294967295 == 4294967295 = True
+4294967295 == 0 = False
+4294967295 == 1 = False
+4294967295 == 2 = False
+4294967295 == 3 = False
+ 
+0 == 4294967293 = False
+0 == 4294967294 = False
+0 == 4294967295 = False
+0 == 0 = True
+0 == 1 = False
+0 == 2 = False
+0 == 3 = False
+ 
+1 == 4294967293 = False
+1 == 4294967294 = False
+1 == 4294967295 = False
+1 == 0 = False
+1 == 1 = True
+1 == 2 = False
+1 == 3 = False
+ 
+2 == 4294967293 = False
+2 == 4294967294 = False
+2 == 4294967295 = False
+2 == 0 = False
+2 == 1 = False
+2 == 2 = True
+2 == 3 = False
+ 
+3 == 4294967293 = False
+3 == 4294967294 = False
+3 == 4294967295 = False
+3 == 0 = False
+3 == 1 = False
+3 == 2 = False
+3 == 3 = True
+ 
+#
+4294967293 /= 4294967293 = False
+4294967293 /= 4294967294 = True
+4294967293 /= 4294967295 = True
+4294967293 /= 0 = True
+4294967293 /= 1 = True
+4294967293 /= 2 = True
+4294967293 /= 3 = True
+ 
+4294967294 /= 4294967293 = True
+4294967294 /= 4294967294 = False
+4294967294 /= 4294967295 = True
+4294967294 /= 0 = True
+4294967294 /= 1 = True
+4294967294 /= 2 = True
+4294967294 /= 3 = True
+ 
+4294967295 /= 4294967293 = True
+4294967295 /= 4294967294 = True
+4294967295 /= 4294967295 = False
+4294967295 /= 0 = True
+4294967295 /= 1 = True
+4294967295 /= 2 = True
+4294967295 /= 3 = True
+ 
+0 /= 4294967293 = True
+0 /= 4294967294 = True
+0 /= 4294967295 = True
+0 /= 0 = False
+0 /= 1 = True
+0 /= 2 = True
+0 /= 3 = True
+ 
+1 /= 4294967293 = True
+1 /= 4294967294 = True
+1 /= 4294967295 = True
+1 /= 0 = True
+1 /= 1 = False
+1 /= 2 = True
+1 /= 3 = True
+ 
+2 /= 4294967293 = True
+2 /= 4294967294 = True
+2 /= 4294967295 = True
+2 /= 0 = True
+2 /= 1 = True
+2 /= 2 = False
+2 /= 3 = True
+ 
+3 /= 4294967293 = True
+3 /= 4294967294 = True
+3 /= 4294967295 = True
+3 /= 0 = True
+3 /= 1 = True
+3 /= 2 = True
+3 /= 3 = False
+ 
+#
+testOrd
+4294967293 <= 4294967293 = True
+4294967293 <= 4294967294 = True
+4294967293 <= 4294967295 = True
+4294967293 <= 0 = False
+4294967293 <= 1 = False
+4294967293 <= 2 = False
+4294967293 <= 3 = False
+ 
+4294967294 <= 4294967293 = False
+4294967294 <= 4294967294 = True
+4294967294 <= 4294967295 = True
+4294967294 <= 0 = False
+4294967294 <= 1 = False
+4294967294 <= 2 = False
+4294967294 <= 3 = False
+ 
+4294967295 <= 4294967293 = False
+4294967295 <= 4294967294 = False
+4294967295 <= 4294967295 = True
+4294967295 <= 0 = False
+4294967295 <= 1 = False
+4294967295 <= 2 = False
+4294967295 <= 3 = False
+ 
+0 <= 4294967293 = True
+0 <= 4294967294 = True
+0 <= 4294967295 = True
+0 <= 0 = True
+0 <= 1 = True
+0 <= 2 = True
+0 <= 3 = True
+ 
+1 <= 4294967293 = True
+1 <= 4294967294 = True
+1 <= 4294967295 = True
+1 <= 0 = False
+1 <= 1 = True
+1 <= 2 = True
+1 <= 3 = True
+ 
+2 <= 4294967293 = True
+2 <= 4294967294 = True
+2 <= 4294967295 = True
+2 <= 0 = False
+2 <= 1 = False
+2 <= 2 = True
+2 <= 3 = True
+ 
+3 <= 4294967293 = True
+3 <= 4294967294 = True
+3 <= 4294967295 = True
+3 <= 0 = False
+3 <= 1 = False
+3 <= 2 = False
+3 <= 3 = True
+ 
+#
+4294967293 <  4294967293 = False
+4294967293 <  4294967294 = True
+4294967293 <  4294967295 = True
+4294967293 <  0 = False
+4294967293 <  1 = False
+4294967293 <  2 = False
+4294967293 <  3 = False
+ 
+4294967294 <  4294967293 = False
+4294967294 <  4294967294 = False
+4294967294 <  4294967295 = True
+4294967294 <  0 = False
+4294967294 <  1 = False
+4294967294 <  2 = False
+4294967294 <  3 = False
+ 
+4294967295 <  4294967293 = False
+4294967295 <  4294967294 = False
+4294967295 <  4294967295 = False
+4294967295 <  0 = False
+4294967295 <  1 = False
+4294967295 <  2 = False
+4294967295 <  3 = False
+ 
+0 <  4294967293 = True
+0 <  4294967294 = True
+0 <  4294967295 = True
+0 <  0 = False
+0 <  1 = True
+0 <  2 = True
+0 <  3 = True
+ 
+1 <  4294967293 = True
+1 <  4294967294 = True
+1 <  4294967295 = True
+1 <  0 = False
+1 <  1 = False
+1 <  2 = True
+1 <  3 = True
+ 
+2 <  4294967293 = True
+2 <  4294967294 = True
+2 <  4294967295 = True
+2 <  0 = False
+2 <  1 = False
+2 <  2 = False
+2 <  3 = True
+ 
+3 <  4294967293 = True
+3 <  4294967294 = True
+3 <  4294967295 = True
+3 <  0 = False
+3 <  1 = False
+3 <  2 = False
+3 <  3 = False
+ 
+#
+4294967293 >  4294967293 = False
+4294967293 >  4294967294 = False
+4294967293 >  4294967295 = False
+4294967293 >  0 = True
+4294967293 >  1 = True
+4294967293 >  2 = True
+4294967293 >  3 = True
+ 
+4294967294 >  4294967293 = True
+4294967294 >  4294967294 = False
+4294967294 >  4294967295 = False
+4294967294 >  0 = True
+4294967294 >  1 = True
+4294967294 >  2 = True
+4294967294 >  3 = True
+ 
+4294967295 >  4294967293 = True
+4294967295 >  4294967294 = True
+4294967295 >  4294967295 = False
+4294967295 >  0 = True
+4294967295 >  1 = True
+4294967295 >  2 = True
+4294967295 >  3 = True
+ 
+0 >  4294967293 = False
+0 >  4294967294 = False
+0 >  4294967295 = False
+0 >  0 = False
+0 >  1 = False
+0 >  2 = False
+0 >  3 = False
+ 
+1 >  4294967293 = False
+1 >  4294967294 = False
+1 >  4294967295 = False
+1 >  0 = True
+1 >  1 = False
+1 >  2 = False
+1 >  3 = False
+ 
+2 >  4294967293 = False
+2 >  4294967294 = False
+2 >  4294967295 = False
+2 >  0 = True
+2 >  1 = True
+2 >  2 = False
+2 >  3 = False
+ 
+3 >  4294967293 = False
+3 >  4294967294 = False
+3 >  4294967295 = False
+3 >  0 = True
+3 >  1 = True
+3 >  2 = True
+3 >  3 = False
+ 
+#
+4294967293 >= 4294967293 = True
+4294967293 >= 4294967294 = False
+4294967293 >= 4294967295 = False
+4294967293 >= 0 = True
+4294967293 >= 1 = True
+4294967293 >= 2 = True
+4294967293 >= 3 = True
+ 
+4294967294 >= 4294967293 = True
+4294967294 >= 4294967294 = True
+4294967294 >= 4294967295 = False
+4294967294 >= 0 = True
+4294967294 >= 1 = True
+4294967294 >= 2 = True
+4294967294 >= 3 = True
+ 
+4294967295 >= 4294967293 = True
+4294967295 >= 4294967294 = True
+4294967295 >= 4294967295 = True
+4294967295 >= 0 = True
+4294967295 >= 1 = True
+4294967295 >= 2 = True
+4294967295 >= 3 = True
+ 
+0 >= 4294967293 = False
+0 >= 4294967294 = False
+0 >= 4294967295 = False
+0 >= 0 = True
+0 >= 1 = False
+0 >= 2 = False
+0 >= 3 = False
+ 
+1 >= 4294967293 = False
+1 >= 4294967294 = False
+1 >= 4294967295 = False
+1 >= 0 = True
+1 >= 1 = True
+1 >= 2 = False
+1 >= 3 = False
+ 
+2 >= 4294967293 = False
+2 >= 4294967294 = False
+2 >= 4294967295 = False
+2 >= 0 = True
+2 >= 1 = True
+2 >= 2 = True
+2 >= 3 = False
+ 
+3 >= 4294967293 = False
+3 >= 4294967294 = False
+3 >= 4294967295 = False
+3 >= 0 = True
+3 >= 1 = True
+3 >= 2 = True
+3 >= 3 = True
+ 
+#
+4294967293 `compare` 4294967293 = EQ
+4294967293 `compare` 4294967294 = LT
+4294967293 `compare` 4294967295 = LT
+4294967293 `compare` 0 = GT
+4294967293 `compare` 1 = GT
+4294967293 `compare` 2 = GT
+4294967293 `compare` 3 = GT
+ 
+4294967294 `compare` 4294967293 = GT
+4294967294 `compare` 4294967294 = EQ
+4294967294 `compare` 4294967295 = LT
+4294967294 `compare` 0 = GT
+4294967294 `compare` 1 = GT
+4294967294 `compare` 2 = GT
+4294967294 `compare` 3 = GT
+ 
+4294967295 `compare` 4294967293 = GT
+4294967295 `compare` 4294967294 = GT
+4294967295 `compare` 4294967295 = EQ
+4294967295 `compare` 0 = GT
+4294967295 `compare` 1 = GT
+4294967295 `compare` 2 = GT
+4294967295 `compare` 3 = GT
+ 
+0 `compare` 4294967293 = LT
+0 `compare` 4294967294 = LT
+0 `compare` 4294967295 = LT
+0 `compare` 0 = EQ
+0 `compare` 1 = LT
+0 `compare` 2 = LT
+0 `compare` 3 = LT
+ 
+1 `compare` 4294967293 = LT
+1 `compare` 4294967294 = LT
+1 `compare` 4294967295 = LT
+1 `compare` 0 = GT
+1 `compare` 1 = EQ
+1 `compare` 2 = LT
+1 `compare` 3 = LT
+ 
+2 `compare` 4294967293 = LT
+2 `compare` 4294967294 = LT
+2 `compare` 4294967295 = LT
+2 `compare` 0 = GT
+2 `compare` 1 = GT
+2 `compare` 2 = EQ
+2 `compare` 3 = LT
+ 
+3 `compare` 4294967293 = LT
+3 `compare` 4294967294 = LT
+3 `compare` 4294967295 = LT
+3 `compare` 0 = GT
+3 `compare` 1 = GT
+3 `compare` 2 = GT
+3 `compare` 3 = EQ
+ 
+#
+testNum
+4294967293 + 4294967293 = 4294967290
+4294967293 + 4294967294 = 4294967291
+4294967293 + 4294967295 = 4294967292
+4294967293 + 0 = 4294967293
+4294967293 + 1 = 4294967294
+4294967293 + 2 = 4294967295
+4294967293 + 3 = 0
+ 
+4294967294 + 4294967293 = 4294967291
+4294967294 + 4294967294 = 4294967292
+4294967294 + 4294967295 = 4294967293
+4294967294 + 0 = 4294967294
+4294967294 + 1 = 4294967295
+4294967294 + 2 = 0
+4294967294 + 3 = 1
+ 
+4294967295 + 4294967293 = 4294967292
+4294967295 + 4294967294 = 4294967293
+4294967295 + 4294967295 = 4294967294
+4294967295 + 0 = 4294967295
+4294967295 + 1 = 0
+4294967295 + 2 = 1
+4294967295 + 3 = 2
+ 
+0 + 4294967293 = 4294967293
+0 + 4294967294 = 4294967294
+0 + 4294967295 = 4294967295
+0 + 0 = 0
+0 + 1 = 1
+0 + 2 = 2
+0 + 3 = 3
+ 
+1 + 4294967293 = 4294967294
+1 + 4294967294 = 4294967295
+1 + 4294967295 = 0
+1 + 0 = 1
+1 + 1 = 2
+1 + 2 = 3
+1 + 3 = 4
+ 
+2 + 4294967293 = 4294967295
+2 + 4294967294 = 0
+2 + 4294967295 = 1
+2 + 0 = 2
+2 + 1 = 3
+2 + 2 = 4
+2 + 3 = 5
+ 
+3 + 4294967293 = 0
+3 + 4294967294 = 1
+3 + 4294967295 = 2
+3 + 0 = 3
+3 + 1 = 4
+3 + 2 = 5
+3 + 3 = 6
+ 
+#
+4294967293 - 4294967293 = 0
+4294967293 - 4294967294 = 4294967295
+4294967293 - 4294967295 = 4294967294
+4294967293 - 0 = 4294967293
+4294967293 - 1 = 4294967292
+4294967293 - 2 = 4294967291
+4294967293 - 3 = 4294967290
+ 
+4294967294 - 4294967293 = 1
+4294967294 - 4294967294 = 0
+4294967294 - 4294967295 = 4294967295
+4294967294 - 0 = 4294967294
+4294967294 - 1 = 4294967293
+4294967294 - 2 = 4294967292
+4294967294 - 3 = 4294967291
+ 
+4294967295 - 4294967293 = 2
+4294967295 - 4294967294 = 1
+4294967295 - 4294967295 = 0
+4294967295 - 0 = 4294967295
+4294967295 - 1 = 4294967294
+4294967295 - 2 = 4294967293
+4294967295 - 3 = 4294967292
+ 
+0 - 4294967293 = 3
+0 - 4294967294 = 2
+0 - 4294967295 = 1
+0 - 0 = 0
+0 - 1 = 4294967295
+0 - 2 = 4294967294
+0 - 3 = 4294967293
+ 
+1 - 4294967293 = 4
+1 - 4294967294 = 3
+1 - 4294967295 = 2
+1 - 0 = 1
+1 - 1 = 0
+1 - 2 = 4294967295
+1 - 3 = 4294967294
+ 
+2 - 4294967293 = 5
+2 - 4294967294 = 4
+2 - 4294967295 = 3
+2 - 0 = 2
+2 - 1 = 1
+2 - 2 = 0
+2 - 3 = 4294967295
+ 
+3 - 4294967293 = 6
+3 - 4294967294 = 5
+3 - 4294967295 = 4
+3 - 0 = 3
+3 - 1 = 2
+3 - 2 = 1
+3 - 3 = 0
+ 
+#
+4294967293 * 4294967293 = 9
+4294967293 * 4294967294 = 6
+4294967293 * 4294967295 = 3
+4294967293 * 0 = 0
+4294967293 * 1 = 4294967293
+4294967293 * 2 = 4294967290
+4294967293 * 3 = 4294967287
+ 
+4294967294 * 4294967293 = 6
+4294967294 * 4294967294 = 4
+4294967294 * 4294967295 = 2
+4294967294 * 0 = 0
+4294967294 * 1 = 4294967294
+4294967294 * 2 = 4294967292
+4294967294 * 3 = 4294967290
+ 
+4294967295 * 4294967293 = 3
+4294967295 * 4294967294 = 2
+4294967295 * 4294967295 = 1
+4294967295 * 0 = 0
+4294967295 * 1 = 4294967295
+4294967295 * 2 = 4294967294
+4294967295 * 3 = 4294967293
+ 
+0 * 4294967293 = 0
+0 * 4294967294 = 0
+0 * 4294967295 = 0
+0 * 0 = 0
+0 * 1 = 0
+0 * 2 = 0
+0 * 3 = 0
+ 
+1 * 4294967293 = 4294967293
+1 * 4294967294 = 4294967294
+1 * 4294967295 = 4294967295
+1 * 0 = 0
+1 * 1 = 1
+1 * 2 = 2
+1 * 3 = 3
+ 
+2 * 4294967293 = 4294967290
+2 * 4294967294 = 4294967292
+2 * 4294967295 = 4294967294
+2 * 0 = 0
+2 * 1 = 2
+2 * 2 = 4
+2 * 3 = 6
+ 
+3 * 4294967293 = 4294967287
+3 * 4294967294 = 4294967290
+3 * 4294967295 = 4294967293
+3 * 0 = 0
+3 * 1 = 3
+3 * 2 = 6
+3 * 3 = 9
+ 
+#
+negate 4294967293 = 3
+negate 4294967294 = 2
+negate 4294967295 = 1
+negate 0 = 0
+negate 1 = 4294967295
+negate 2 = 4294967294
+negate 3 = 4294967293
+#
+testReal
+toRational 4294967293 = 4294967293 % 1
+toRational 4294967294 = 4294967294 % 1
+toRational 4294967295 = 4294967295 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
+#
+testIntegral
+4294967293 `divMod`  4294967293 = (1,0)
+4294967293 `divMod`  4294967294 = (0,4294967293)
+4294967293 `divMod`  4294967295 = (0,4294967293)
+4294967293 `divMod`  1 = (4294967293,0)
+4294967293 `divMod`  2 = (2147483646,1)
+4294967293 `divMod`  3 = (1431655764,1)
+ 
+4294967294 `divMod`  4294967293 = (1,1)
+4294967294 `divMod`  4294967294 = (1,0)
+4294967294 `divMod`  4294967295 = (0,4294967294)
+4294967294 `divMod`  1 = (4294967294,0)
+4294967294 `divMod`  2 = (2147483647,0)
+4294967294 `divMod`  3 = (1431655764,2)
+ 
+4294967295 `divMod`  4294967293 = (1,2)
+4294967295 `divMod`  4294967294 = (1,1)
+4294967295 `divMod`  4294967295 = (1,0)
+4294967295 `divMod`  1 = (4294967295,0)
+4294967295 `divMod`  2 = (2147483647,1)
+4294967295 `divMod`  3 = (1431655765,0)
+ 
+0 `divMod`  4294967293 = (0,0)
+0 `divMod`  4294967294 = (0,0)
+0 `divMod`  4294967295 = (0,0)
+0 `divMod`  1 = (0,0)
+0 `divMod`  2 = (0,0)
+0 `divMod`  3 = (0,0)
+ 
+1 `divMod`  4294967293 = (0,1)
+1 `divMod`  4294967294 = (0,1)
+1 `divMod`  4294967295 = (0,1)
+1 `divMod`  1 = (1,0)
+1 `divMod`  2 = (0,1)
+1 `divMod`  3 = (0,1)
+ 
+2 `divMod`  4294967293 = (0,2)
+2 `divMod`  4294967294 = (0,2)
+2 `divMod`  4294967295 = (0,2)
+2 `divMod`  1 = (2,0)
+2 `divMod`  2 = (1,0)
+2 `divMod`  3 = (0,2)
+ 
+3 `divMod`  4294967293 = (0,3)
+3 `divMod`  4294967294 = (0,3)
+3 `divMod`  4294967295 = (0,3)
+3 `divMod`  1 = (3,0)
+3 `divMod`  2 = (1,1)
+3 `divMod`  3 = (1,0)
+ 
+#
+4294967293 `div`     4294967293 = 1
+4294967293 `div`     4294967294 = 0
+4294967293 `div`     4294967295 = 0
+4294967293 `div`     1 = 4294967293
+4294967293 `div`     2 = 2147483646
+4294967293 `div`     3 = 1431655764
+ 
+4294967294 `div`     4294967293 = 1
+4294967294 `div`     4294967294 = 1
+4294967294 `div`     4294967295 = 0
+4294967294 `div`     1 = 4294967294
+4294967294 `div`     2 = 2147483647
+4294967294 `div`     3 = 1431655764
+ 
+4294967295 `div`     4294967293 = 1
+4294967295 `div`     4294967294 = 1
+4294967295 `div`     4294967295 = 1
+4294967295 `div`     1 = 4294967295
+4294967295 `div`     2 = 2147483647
+4294967295 `div`     3 = 1431655765
+ 
+0 `div`     4294967293 = 0
+0 `div`     4294967294 = 0
+0 `div`     4294967295 = 0
+0 `div`     1 = 0
+0 `div`     2 = 0
+0 `div`     3 = 0
+ 
+1 `div`     4294967293 = 0
+1 `div`     4294967294 = 0
+1 `div`     4294967295 = 0
+1 `div`     1 = 1
+1 `div`     2 = 0
+1 `div`     3 = 0
+ 
+2 `div`     4294967293 = 0
+2 `div`     4294967294 = 0
+2 `div`     4294967295 = 0
+2 `div`     1 = 2
+2 `div`     2 = 1
+2 `div`     3 = 0
+ 
+3 `div`     4294967293 = 0
+3 `div`     4294967294 = 0
+3 `div`     4294967295 = 0
+3 `div`     1 = 3
+3 `div`     2 = 1
+3 `div`     3 = 1
+ 
+#
+4294967293 `mod`     4294967293 = 0
+4294967293 `mod`     4294967294 = 4294967293
+4294967293 `mod`     4294967295 = 4294967293
+4294967293 `mod`     1 = 0
+4294967293 `mod`     2 = 1
+4294967293 `mod`     3 = 1
+ 
+4294967294 `mod`     4294967293 = 1
+4294967294 `mod`     4294967294 = 0
+4294967294 `mod`     4294967295 = 4294967294
+4294967294 `mod`     1 = 0
+4294967294 `mod`     2 = 0
+4294967294 `mod`     3 = 2
+ 
+4294967295 `mod`     4294967293 = 2
+4294967295 `mod`     4294967294 = 1
+4294967295 `mod`     4294967295 = 0
+4294967295 `mod`     1 = 0
+4294967295 `mod`     2 = 1
+4294967295 `mod`     3 = 0
+ 
+0 `mod`     4294967293 = 0
+0 `mod`     4294967294 = 0
+0 `mod`     4294967295 = 0
+0 `mod`     1 = 0
+0 `mod`     2 = 0
+0 `mod`     3 = 0
+ 
+1 `mod`     4294967293 = 1
+1 `mod`     4294967294 = 1
+1 `mod`     4294967295 = 1
+1 `mod`     1 = 0
+1 `mod`     2 = 1
+1 `mod`     3 = 1
+ 
+2 `mod`     4294967293 = 2
+2 `mod`     4294967294 = 2
+2 `mod`     4294967295 = 2
+2 `mod`     1 = 0
+2 `mod`     2 = 0
+2 `mod`     3 = 2
+ 
+3 `mod`     4294967293 = 3
+3 `mod`     4294967294 = 3
+3 `mod`     4294967295 = 3
+3 `mod`     1 = 0
+3 `mod`     2 = 1
+3 `mod`     3 = 0
+ 
+#
+4294967293 `quotRem` 4294967293 = (1,0)
+4294967293 `quotRem` 4294967294 = (0,4294967293)
+4294967293 `quotRem` 4294967295 = (0,4294967293)
+4294967293 `quotRem` 1 = (4294967293,0)
+4294967293 `quotRem` 2 = (2147483646,1)
+4294967293 `quotRem` 3 = (1431655764,1)
+ 
+4294967294 `quotRem` 4294967293 = (1,1)
+4294967294 `quotRem` 4294967294 = (1,0)
+4294967294 `quotRem` 4294967295 = (0,4294967294)
+4294967294 `quotRem` 1 = (4294967294,0)
+4294967294 `quotRem` 2 = (2147483647,0)
+4294967294 `quotRem` 3 = (1431655764,2)
+ 
+4294967295 `quotRem` 4294967293 = (1,2)
+4294967295 `quotRem` 4294967294 = (1,1)
+4294967295 `quotRem` 4294967295 = (1,0)
+4294967295 `quotRem` 1 = (4294967295,0)
+4294967295 `quotRem` 2 = (2147483647,1)
+4294967295 `quotRem` 3 = (1431655765,0)
+ 
+0 `quotRem` 4294967293 = (0,0)
+0 `quotRem` 4294967294 = (0,0)
+0 `quotRem` 4294967295 = (0,0)
+0 `quotRem` 1 = (0,0)
+0 `quotRem` 2 = (0,0)
+0 `quotRem` 3 = (0,0)
+ 
+1 `quotRem` 4294967293 = (0,1)
+1 `quotRem` 4294967294 = (0,1)
+1 `quotRem` 4294967295 = (0,1)
+1 `quotRem` 1 = (1,0)
+1 `quotRem` 2 = (0,1)
+1 `quotRem` 3 = (0,1)
+ 
+2 `quotRem` 4294967293 = (0,2)
+2 `quotRem` 4294967294 = (0,2)
+2 `quotRem` 4294967295 = (0,2)
+2 `quotRem` 1 = (2,0)
+2 `quotRem` 2 = (1,0)
+2 `quotRem` 3 = (0,2)
+ 
+3 `quotRem` 4294967293 = (0,3)
+3 `quotRem` 4294967294 = (0,3)
+3 `quotRem` 4294967295 = (0,3)
+3 `quotRem` 1 = (3,0)
+3 `quotRem` 2 = (1,1)
+3 `quotRem` 3 = (1,0)
+ 
+#
+4294967293 `quot`    4294967293 = 1
+4294967293 `quot`    4294967294 = 0
+4294967293 `quot`    4294967295 = 0
+4294967293 `quot`    1 = 4294967293
+4294967293 `quot`    2 = 2147483646
+4294967293 `quot`    3 = 1431655764
+ 
+4294967294 `quot`    4294967293 = 1
+4294967294 `quot`    4294967294 = 1
+4294967294 `quot`    4294967295 = 0
+4294967294 `quot`    1 = 4294967294
+4294967294 `quot`    2 = 2147483647
+4294967294 `quot`    3 = 1431655764
+ 
+4294967295 `quot`    4294967293 = 1
+4294967295 `quot`    4294967294 = 1
+4294967295 `quot`    4294967295 = 1
+4294967295 `quot`    1 = 4294967295
+4294967295 `quot`    2 = 2147483647
+4294967295 `quot`    3 = 1431655765
+ 
+0 `quot`    4294967293 = 0
+0 `quot`    4294967294 = 0
+0 `quot`    4294967295 = 0
+0 `quot`    1 = 0
+0 `quot`    2 = 0
+0 `quot`    3 = 0
+ 
+1 `quot`    4294967293 = 0
+1 `quot`    4294967294 = 0
+1 `quot`    4294967295 = 0
+1 `quot`    1 = 1
+1 `quot`    2 = 0
+1 `quot`    3 = 0
+ 
+2 `quot`    4294967293 = 0
+2 `quot`    4294967294 = 0
+2 `quot`    4294967295 = 0
+2 `quot`    1 = 2
+2 `quot`    2 = 1
+2 `quot`    3 = 0
+ 
+3 `quot`    4294967293 = 0
+3 `quot`    4294967294 = 0
+3 `quot`    4294967295 = 0
+3 `quot`    1 = 3
+3 `quot`    2 = 1
+3 `quot`    3 = 1
+ 
+#
+4294967293 `rem`     4294967293 = 0
+4294967293 `rem`     4294967294 = 4294967293
+4294967293 `rem`     4294967295 = 4294967293
+4294967293 `rem`     1 = 0
+4294967293 `rem`     2 = 1
+4294967293 `rem`     3 = 1
+ 
+4294967294 `rem`     4294967293 = 1
+4294967294 `rem`     4294967294 = 0
+4294967294 `rem`     4294967295 = 4294967294
+4294967294 `rem`     1 = 0
+4294967294 `rem`     2 = 0
+4294967294 `rem`     3 = 2
+ 
+4294967295 `rem`     4294967293 = 2
+4294967295 `rem`     4294967294 = 1
+4294967295 `rem`     4294967295 = 0
+4294967295 `rem`     1 = 0
+4294967295 `rem`     2 = 1
+4294967295 `rem`     3 = 0
+ 
+0 `rem`     4294967293 = 0
+0 `rem`     4294967294 = 0
+0 `rem`     4294967295 = 0
+0 `rem`     1 = 0
+0 `rem`     2 = 0
+0 `rem`     3 = 0
+ 
+1 `rem`     4294967293 = 1
+1 `rem`     4294967294 = 1
+1 `rem`     4294967295 = 1
+1 `rem`     1 = 0
+1 `rem`     2 = 1
+1 `rem`     3 = 1
+ 
+2 `rem`     4294967293 = 2
+2 `rem`     4294967294 = 2
+2 `rem`     4294967295 = 2
+2 `rem`     1 = 0
+2 `rem`     2 = 0
+2 `rem`     3 = 2
+ 
+3 `rem`     4294967293 = 3
+3 `rem`     4294967294 = 3
+3 `rem`     4294967295 = 3
+3 `rem`     1 = 0
+3 `rem`     2 = 1
+3 `rem`     3 = 0
+ 
+#
+testBits
+4294967293 .&.   4294967293 = 4294967293
+4294967293 .&.   4294967294 = 4294967292
+4294967293 .&.   4294967295 = 4294967293
+4294967293 .&.   1 = 1
+4294967293 .&.   2 = 0
+4294967293 .&.   3 = 1
+ 
+4294967294 .&.   4294967293 = 4294967292
+4294967294 .&.   4294967294 = 4294967294
+4294967294 .&.   4294967295 = 4294967294
+4294967294 .&.   1 = 0
+4294967294 .&.   2 = 2
+4294967294 .&.   3 = 2
+ 
+4294967295 .&.   4294967293 = 4294967293
+4294967295 .&.   4294967294 = 4294967294
+4294967295 .&.   4294967295 = 4294967295
+4294967295 .&.   1 = 1
+4294967295 .&.   2 = 2
+4294967295 .&.   3 = 3
+ 
+0 .&.   4294967293 = 0
+0 .&.   4294967294 = 0
+0 .&.   4294967295 = 0
+0 .&.   1 = 0
+0 .&.   2 = 0
+0 .&.   3 = 0
+ 
+1 .&.   4294967293 = 1
+1 .&.   4294967294 = 0
+1 .&.   4294967295 = 1
+1 .&.   1 = 1
+1 .&.   2 = 0
+1 .&.   3 = 1
+ 
+2 .&.   4294967293 = 0
+2 .&.   4294967294 = 2
+2 .&.   4294967295 = 2
+2 .&.   1 = 0
+2 .&.   2 = 2
+2 .&.   3 = 2
+ 
+3 .&.   4294967293 = 1
+3 .&.   4294967294 = 2
+3 .&.   4294967295 = 3
+3 .&.   1 = 1
+3 .&.   2 = 2
+3 .&.   3 = 3
+ 
+#
+4294967293 .|.   4294967293 = 4294967293
+4294967293 .|.   4294967294 = 4294967295
+4294967293 .|.   4294967295 = 4294967295
+4294967293 .|.   1 = 4294967293
+4294967293 .|.   2 = 4294967295
+4294967293 .|.   3 = 4294967295
+ 
+4294967294 .|.   4294967293 = 4294967295
+4294967294 .|.   4294967294 = 4294967294
+4294967294 .|.   4294967295 = 4294967295
+4294967294 .|.   1 = 4294967295
+4294967294 .|.   2 = 4294967294
+4294967294 .|.   3 = 4294967295
+ 
+4294967295 .|.   4294967293 = 4294967295
+4294967295 .|.   4294967294 = 4294967295
+4294967295 .|.   4294967295 = 4294967295
+4294967295 .|.   1 = 4294967295
+4294967295 .|.   2 = 4294967295
+4294967295 .|.   3 = 4294967295
+ 
+0 .|.   4294967293 = 4294967293
+0 .|.   4294967294 = 4294967294
+0 .|.   4294967295 = 4294967295
+0 .|.   1 = 1
+0 .|.   2 = 2
+0 .|.   3 = 3
+ 
+1 .|.   4294967293 = 4294967293
+1 .|.   4294967294 = 4294967295
+1 .|.   4294967295 = 4294967295
+1 .|.   1 = 1
+1 .|.   2 = 3
+1 .|.   3 = 3
+ 
+2 .|.   4294967293 = 4294967295
+2 .|.   4294967294 = 4294967294
+2 .|.   4294967295 = 4294967295
+2 .|.   1 = 3
+2 .|.   2 = 2
+2 .|.   3 = 3
+ 
+3 .|.   4294967293 = 4294967295
+3 .|.   4294967294 = 4294967295
+3 .|.   4294967295 = 4294967295
+3 .|.   1 = 3
+3 .|.   2 = 3
+3 .|.   3 = 3
+ 
+#
+4294967293 `xor` 4294967293 = 0
+4294967293 `xor` 4294967294 = 3
+4294967293 `xor` 4294967295 = 2
+4294967293 `xor` 1 = 4294967292
+4294967293 `xor` 2 = 4294967295
+4294967293 `xor` 3 = 4294967294
+ 
+4294967294 `xor` 4294967293 = 3
+4294967294 `xor` 4294967294 = 0
+4294967294 `xor` 4294967295 = 1
+4294967294 `xor` 1 = 4294967295
+4294967294 `xor` 2 = 4294967292
+4294967294 `xor` 3 = 4294967293
+ 
+4294967295 `xor` 4294967293 = 2
+4294967295 `xor` 4294967294 = 1
+4294967295 `xor` 4294967295 = 0
+4294967295 `xor` 1 = 4294967294
+4294967295 `xor` 2 = 4294967293
+4294967295 `xor` 3 = 4294967292
+ 
+0 `xor` 4294967293 = 4294967293
+0 `xor` 4294967294 = 4294967294
+0 `xor` 4294967295 = 4294967295
+0 `xor` 1 = 1
+0 `xor` 2 = 2
+0 `xor` 3 = 3
+ 
+1 `xor` 4294967293 = 4294967292
+1 `xor` 4294967294 = 4294967295
+1 `xor` 4294967295 = 4294967294
+1 `xor` 1 = 0
+1 `xor` 2 = 3
+1 `xor` 3 = 2
+ 
+2 `xor` 4294967293 = 4294967295
+2 `xor` 4294967294 = 4294967292
+2 `xor` 4294967295 = 4294967293
+2 `xor` 1 = 3
+2 `xor` 2 = 0
+2 `xor` 3 = 1
+ 
+3 `xor` 4294967293 = 4294967294
+3 `xor` 4294967294 = 4294967293
+3 `xor` 4294967295 = 4294967292
+3 `xor` 1 = 2
+3 `xor` 2 = 1
+3 `xor` 3 = 0
+ 
+#
+complement 4294967293 = 2
+complement 4294967294 = 1
+complement 4294967295 = 0
+complement 0 = 4294967295
+complement 1 = 4294967294
+complement 2 = 4294967293
+complement 3 = 4294967292
+#
+4294967293 `shift` 0 = 4294967293
+4294967293 `shift` 1 = 4294967290
+4294967293 `shift` 2 = 4294967284
+4294967293 `shift` 3 = 4294967272
+ 
+4294967294 `shift` 0 = 4294967294
+4294967294 `shift` 1 = 4294967292
+4294967294 `shift` 2 = 4294967288
+4294967294 `shift` 3 = 4294967280
+ 
+4294967295 `shift` 0 = 4294967295
+4294967295 `shift` 1 = 4294967294
+4294967295 `shift` 2 = 4294967292
+4294967295 `shift` 3 = 4294967288
+ 
+0 `shift` 0 = 0
+0 `shift` 1 = 0
+0 `shift` 2 = 0
+0 `shift` 3 = 0
+ 
+1 `shift` 0 = 1
+1 `shift` 1 = 2
+1 `shift` 2 = 4
+1 `shift` 3 = 8
+ 
+2 `shift` 0 = 2
+2 `shift` 1 = 4
+2 `shift` 2 = 8
+2 `shift` 3 = 16
+ 
+3 `shift` 0 = 3
+3 `shift` 1 = 6
+3 `shift` 2 = 12
+3 `shift` 3 = 24
+ 
+#
+4294967293 `setBit` 0 = 4294967293
+4294967293 `setBit` 1 = 4294967295
+4294967293 `setBit` 2 = 4294967293
+4294967293 `setBit` 3 = 4294967293
+ 
+4294967294 `setBit` 0 = 4294967295
+4294967294 `setBit` 1 = 4294967294
+4294967294 `setBit` 2 = 4294967294
+4294967294 `setBit` 3 = 4294967294
+ 
+4294967295 `setBit` 0 = 4294967295
+4294967295 `setBit` 1 = 4294967295
+4294967295 `setBit` 2 = 4294967295
+4294967295 `setBit` 3 = 4294967295
+ 
+0 `setBit` 0 = 1
+0 `setBit` 1 = 2
+0 `setBit` 2 = 4
+0 `setBit` 3 = 8
+ 
+1 `setBit` 0 = 1
+1 `setBit` 1 = 3
+1 `setBit` 2 = 5
+1 `setBit` 3 = 9
+ 
+2 `setBit` 0 = 3
+2 `setBit` 1 = 2
+2 `setBit` 2 = 6
+2 `setBit` 3 = 10
+ 
+3 `setBit` 0 = 3
+3 `setBit` 1 = 3
+3 `setBit` 2 = 7
+3 `setBit` 3 = 11
+ 
+#
+4294967293 `clearBit` 0 = 4294967292
+4294967293 `clearBit` 1 = 4294967293
+4294967293 `clearBit` 2 = 4294967289
+4294967293 `clearBit` 3 = 4294967285
+ 
+4294967294 `clearBit` 0 = 4294967294
+4294967294 `clearBit` 1 = 4294967292
+4294967294 `clearBit` 2 = 4294967290
+4294967294 `clearBit` 3 = 4294967286
+ 
+4294967295 `clearBit` 0 = 4294967294
+4294967295 `clearBit` 1 = 4294967293
+4294967295 `clearBit` 2 = 4294967291
+4294967295 `clearBit` 3 = 4294967287
+ 
+0 `clearBit` 0 = 0
+0 `clearBit` 1 = 0
+0 `clearBit` 2 = 0
+0 `clearBit` 3 = 0
+ 
+1 `clearBit` 0 = 0
+1 `clearBit` 1 = 1
+1 `clearBit` 2 = 1
+1 `clearBit` 3 = 1
+ 
+2 `clearBit` 0 = 2
+2 `clearBit` 1 = 0
+2 `clearBit` 2 = 2
+2 `clearBit` 3 = 2
+ 
+3 `clearBit` 0 = 2
+3 `clearBit` 1 = 1
+3 `clearBit` 2 = 3
+3 `clearBit` 3 = 3
+ 
+#
+4294967293 `complementBit` 0 = 4294967292
+4294967293 `complementBit` 1 = 4294967295
+4294967293 `complementBit` 2 = 4294967289
+4294967293 `complementBit` 3 = 4294967285
+ 
+4294967294 `complementBit` 0 = 4294967295
+4294967294 `complementBit` 1 = 4294967292
+4294967294 `complementBit` 2 = 4294967290
+4294967294 `complementBit` 3 = 4294967286
+ 
+4294967295 `complementBit` 0 = 4294967294
+4294967295 `complementBit` 1 = 4294967293
+4294967295 `complementBit` 2 = 4294967291
+4294967295 `complementBit` 3 = 4294967287
+ 
+0 `complementBit` 0 = 1
+0 `complementBit` 1 = 2
+0 `complementBit` 2 = 4
+0 `complementBit` 3 = 8
+ 
+1 `complementBit` 0 = 0
+1 `complementBit` 1 = 3
+1 `complementBit` 2 = 5
+1 `complementBit` 3 = 9
+ 
+2 `complementBit` 0 = 3
+2 `complementBit` 1 = 0
+2 `complementBit` 2 = 6
+2 `complementBit` 3 = 10
+ 
+3 `complementBit` 0 = 2
+3 `complementBit` 1 = 1
+3 `complementBit` 2 = 7
+3 `complementBit` 3 = 11
+ 
+#
+4294967293 `testBit` 0 = True
+4294967293 `testBit` 1 = False
+4294967293 `testBit` 2 = True
+4294967293 `testBit` 3 = True
+ 
+4294967294 `testBit` 0 = False
+4294967294 `testBit` 1 = True
+4294967294 `testBit` 2 = True
+4294967294 `testBit` 3 = True
+ 
+4294967295 `testBit` 0 = True
+4294967295 `testBit` 1 = True
+4294967295 `testBit` 2 = True
+4294967295 `testBit` 3 = True
+ 
+0 `testBit` 0 = False
+0 `testBit` 1 = False
+0 `testBit` 2 = False
+0 `testBit` 3 = False
+ 
+1 `testBit` 0 = True
+1 `testBit` 1 = False
+1 `testBit` 2 = False
+1 `testBit` 3 = False
+ 
+2 `testBit` 0 = False
+2 `testBit` 1 = True
+2 `testBit` 2 = False
+2 `testBit` 3 = False
+ 
+3 `testBit` 0 = True
+3 `testBit` 1 = True
+3 `testBit` 2 = False
+3 `testBit` 3 = False
+ 
+#
+bitSize 4294967293 = 32
+bitSize 4294967294 = 32
+bitSize 4294967295 = 32
+bitSize 0 = 32
+bitSize 1 = 32
+bitSize 2 = 32
+bitSize 3 = 32
+#
+isSigned 4294967293 = False
+isSigned 4294967294 = False
+isSigned 4294967295 = False
+isSigned 0 = False
+isSigned 1 = False
+isSigned 2 = False
+isSigned 3 = False
+#
+--------------------------------
+

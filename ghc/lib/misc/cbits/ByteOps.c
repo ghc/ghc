@@ -19,14 +19,14 @@ returns the number of bytes taken.
 \begin{code}
 #endif /* 0 */
 
-#include "rtsdefs.h"
+#include "Rts.h"
 #include "ByteOps.h"
 
 #if __STDC__
     /* need the ANSI arg decl, so "short" and "float" args dont get promoted */
 #define X2BYTES(type)				\
 I_						\
-CAT2(type,2bytes__)(type in, unsigned char *arr)\
+type##2bytes(type in, unsigned char *arr)	\
 { 						\
     union {					\
 	type i;					\
@@ -44,9 +44,7 @@ CAT2(type,2bytes__)(type in, unsigned char *arr)\
 #else /* not STDC */
 #define X2BYTES(type)				\
 I_						\
-CAT2(type,2bytes__)(in, arr)			\
-  type in;					\
-  unsigned char *arr;				\
+type##2bytes(type in, unsigned char *arr)	\
 { 						\
     union {					\
 	type i;					\
@@ -70,7 +68,7 @@ X2BYTES(double)
     
 #define BYTES2X(ctype,htype)			\
 I_						\
-CAT3(bytes2,ctype,__)(P_ in, htype *out)	\
+bytes2##ctype##__(P_ in, htype *out)		\
 {						\
     union {					\
 	ctype i;				\
@@ -87,29 +85,9 @@ CAT3(bytes2,ctype,__)(P_ in, htype *out)	\
     return(sizeof (ctype));			\
 }
     
-static STG_INLINE
-void
-assign_flt(W_ p_dest[], StgFloat src)
-{ 
-    float_thing y;
-    y.f = src;
-    *p_dest = y.fu;
-}
-
-
-static STG_INLINE
-void
-assign_dbl(W_ p_dest[], StgDouble src)
-{
-    double_thing y;
-    y.d = src;
-    p_dest[0] = y.du.dhi;
-    p_dest[1] = y.du.dlo;
-}
-
 #define BYTES2FX(ctype,htype,assign_fx)		\
 I_						\
-CAT3(bytes2,ctype,__)(P_ in, htype *out)	\
+bytes2##ctype##__(P_ in, htype *out)		\
 {						\
     union {					\
 	ctype i;				\
@@ -121,7 +99,7 @@ CAT3(bytes2,ctype,__)(P_ in, htype *out)	\
     for (k = 0; k < sizeof(ctype); k++)		\
 	u.cs[k] = arr[k];			\
 						\
-    assign_fx(out, (htype) u.i);		\
+    assign_fx((P_)out, (htype) u.i);		\
 						\
     return(sizeof (ctype));			\
 }
@@ -130,5 +108,5 @@ BYTES2X(long,I_)
 BYTES2X(int,I_)
 BYTES2X(short,I_)
 
-BYTES2FX(float,StgFloat,assign_flt)
-BYTES2FX(double,StgDouble,assign_dbl)
+BYTES2FX(float,StgFloat,ASSIGN_FLT)
+BYTES2FX(double,StgDouble,ASSIGN_DBL)

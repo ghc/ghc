@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 %************************************************************************
 %*									*
@@ -29,15 +29,13 @@ module SATMonad (
 	SATEnv(..), isStatic, dropStatics
     ) where
 
-import Type		( mkTyVarTy, mkSigmaTy, TyVarTemplate,
+import Type		( mkTyVarTy, mkSigmaTy,
 			  splitSigmaTy, splitFunTys,
-			  glueTyArgs, instantiateTy, TauType,
-			  Class, ThetaType, SigmaType,
+			  glueTyArgs, substTy,
 			  InstTyEnv(..)
 			)
 import MkId		( mkSysLocal )
-import Id		( idType )
-import SrcLoc		( SrcLoc, noSrcLoc )
+import Id		( idType, idName, mkUserId )
 import UniqSupply
 import Util
 
@@ -59,7 +57,7 @@ data Arg a = Static a | NotStatic
     deriving Eq
 
 delOneFromSAEnv v us env
-  = ((), delOneFromIdEnv env v)
+  = ((), delVarEnv env v)
 
 updSAEnv :: Maybe (Id,SATInfo) -> SatM ()
 updSAEnv Nothing
@@ -83,7 +81,7 @@ notStatics n = nOfThem n NotStatic
 
 insSAEnv :: Id -> SATInfo -> SatM ()
 insSAEnv b info us env
-  = ((), addOneToIdEnv env b info)
+  = ((), extendVarEnv env b info)
 \end{code}
 
 %************************************************************************
@@ -100,7 +98,7 @@ type SatM result
 
 initSAT :: SatM a -> UniqSupply -> a
 
-initSAT f us = fst (f us nullIdEnv)
+initSAT f us = fst (f us emptyVarEnv)
 
 thenSAT m k us env
   = case splitUniqSupply us	of { (s1, s2) ->
@@ -113,7 +111,7 @@ thenSAT_ m k us env
     k s2 menv }}
 
 emptyEnvSAT :: SatM ()
-emptyEnvSAT us _ = ((), nullIdEnv)
+emptyEnvSAT us _ = ((), emptyVarEnv)
 
 returnSAT v us env = (v, env)
 
@@ -133,14 +131,15 @@ mapSAT f (x:xs)
 \begin{code}
 getSATInfo :: Id -> SatM (Maybe SATInfo)
 getSATInfo var us env
-  = (lookupIdEnv env var, env)
+  = (lookupVarEnv env var, env)
 
 newSATName :: Id -> Type -> SatM Id
 newSATName id ty us env
   = case (getUnique us) of { unique ->
-    (mkSysLocal new_str unique ty noSrcLoc, env) }
-  where
-    new_str = getOccName id _APPEND_ SLIT("_sat")
+    let
+	new_name = mkCompoundName SLIT("$sat") unique (idName id)
+    in
+    (mkUserId new_name ty, env) }
 
 getArgLists :: CoreExpr -> ([Arg Type],[Arg Id])
 getArgLists expr
@@ -215,10 +214,8 @@ saTransform binder rhs
 	    -- A better fix is to use binder directly but with the TopLevel
 	    -- tag (or Exported tag) modified.
 	    fake_binder = mkSysLocal
-			    (getOccName binder _APPEND_ SLIT("_fsat"))
-			    (uniqueOf binder)
+			    (getUnique binder)
 			    (idType binder)
-			    noSrcLoc
 	    rec_body = mkValLam non_static_args
 			       ( Let (NonRec fake_binder nonrec_rhs)
 				 {-in-} (dropArgs rhs))
@@ -234,7 +231,7 @@ saTransform binder rhs
 		   origLams' _		     e' = e'
 
     new_ty tyargs args
-      = instantiateTy (mk_inst_tyenv tyargs tv_tmpl)
+      = substTy (mk_inst_tyenv tyargs tv_tmpl)
 		      (mkSigmaTy tv_tmpl' dict_tys' tau_ty')
       where
 	-- get type info for the local function:
@@ -249,8 +246,8 @@ saTransform binder rhs
 	reg_arg_tys' = dropStatics (drop l args) reg_arg_tys
 	tau_ty'	     = glueTyArgs reg_arg_tys' res_type
 
-	mk_inst_tyenv []		    _ = emptyTyVarEnv
-	mk_inst_tyenv (Static s:args) (t:ts)  = addToTyVarEnv (mk_inst_tyenv args ts) t s
+	mk_inst_tyenv []		    _ = emptyVarEnv
+	mk_inst_tyenv (Static s:args) (t:ts)  = extendVarEnv (mk_inst_tyenv args ts) t s
 	mk_inst_tyenv (_:args)	    (_:ts)    = mk_inst_tyenv args ts
 
 dropStatics [] t = t

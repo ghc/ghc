@@ -1,0 +1,5 @@
+ERROR "test/typechecker/t010.hs" (line 5): Existentially quantified variable in result type
+variable     : _4
+from pattern : MkAppl f x i
+result type  : Appl -> _4
+

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[IdInfo]{@IdInfos@: Non-essential information about @Ids@}
 
@@ -16,25 +16,23 @@ module IdInfo (
 	-- Arity
 	ArityInfo(..),
 	exactArity, atLeastArity, unknownArity,
-	arityInfo, setArityInfo, ppArityInfo,
-
-	-- Demand
-	DemandInfo,
-	noDemandInfo, mkDemandInfo, demandInfo, ppDemandInfo, setDemandInfo, willBeDemanded,
-	Demand(..), 	 				-- Non-abstract
+	arityInfo, setArityInfo, ppArityInfo, arityLowerBound,
 
 	-- Strictness
 	StrictnessInfo(..),				-- Non-abstract
-	workerExists,
-	mkStrictnessInfo, mkBottomStrictnessInfo, noStrictnessInfo, bottomIsGuaranteed,
-	strictnessInfo, ppStrictnessInfo, setStrictnessInfo, 
+	workerExists, mkStrictnessInfo, mkBottomStrictnessInfo, 
+	noStrictnessInfo, bottomIsGuaranteed, strictnessInfo, 
+	ppStrictnessInfo, setStrictnessInfo, 
 
 	-- Unfolding
 	unfoldingInfo, setUnfoldingInfo, 
 
+	-- DemandInfo
+	demandInfo, setDemandInfo, 
+
 	-- Inline prags
-	InlinePragInfo(..),
-	inlinePragInfo, setInlinePragInfo,
+	InlinePragInfo(..), OccInfo(..),
+	inlinePragInfo, setInlinePragInfo, notInsideLambda,
 
 	-- Specialisation
 	IdSpecEnv, specInfo, setSpecInfo,
@@ -43,13 +41,8 @@ module IdInfo (
 	UpdateInfo, UpdateSpec,
 	mkUpdateInfo, updateInfo, updateInfoMaybe, ppUpdateInfo, setUpdateInfo,
 
-	-- Arg usage 
-	ArgUsageInfo, ArgUsage(..), ArgUsageType,
-	mkArgUsageInfo, argUsageInfo, setArgUsageInfo, getArgUsage,
-
-	-- FB type
-	FBTypeInfo, FBType(..), FBConsum(..), FBProd(..),
-	fbTypeInfo, ppFBTypeInfo, setFBTypeInfo, mkFBTypeInfo, getFBType
+	-- CAF info
+	CafInfo(..), cafInfo, setCafInfo, ppCafInfo,
     ) where
 
 #include "HsVersions.h"
@@ -58,16 +51,9 @@ module IdInfo (
 import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding )
 import {-# SOURCE #-} CoreSyn	 ( CoreExpr )
 
--- for mkdependHS, CoreSyn.hi-boot refers to it:
-import BinderInfo ( BinderInfo )
-
 import SpecEnv	        ( SpecEnv, emptySpecEnv )
-import BasicTypes	( NewOrData )
-
-import Demand
+import Demand		( Demand,  isLazy, wwLazy, pprDemands )
 import Outputable	
-
-import Char 		( ord )
 \end{code}
 
 An @IdInfo@ gives {\em optional} information about an @Id@.  If
@@ -86,31 +72,19 @@ The @IdInfo@ gives information about the value, or definition, of the
 data IdInfo
   = IdInfo {
 	arityInfo :: ArityInfo,			-- Its arity
-
-	demandInfo :: DemandInfo,		-- Whether or not it is definitely demanded
-
+	demandInfo :: Demand,			-- Whether or not it is definitely demanded
 	specInfo :: IdSpecEnv,			-- Specialisations of this function which exist
-
 	strictnessInfo :: StrictnessInfo,	-- Strictness properties
-
-	unfoldingInfo :: Unfolding,		-- Its unfolding; for locally-defined
-						-- things, this can *only* be NoUnfolding
-
+	unfoldingInfo :: Unfolding,		-- Its unfolding
 	updateInfo :: UpdateInfo,		-- Which args should be updated
-
-	argUsageInfo :: ArgUsageInfo, 		-- how this Id uses its arguments
-
-	fbTypeInfo :: FBTypeInfo,		-- the Foldr/Build W/W property of this function.
-
-	inlinePragInfo :: InlinePragInfo	-- Inline pragmas
+	cafInfo :: CafInfo,
+	inlinePragInfo :: !InlinePragInfo	-- Inline pragmas
     }
 \end{code}
 
 Setters
 
 \begin{code}
-setFBTypeInfo 	  fb info = info { fbTypeInfo = fb }
-setArgUsageInfo   au info = info { argUsageInfo = au }
 setUpdateInfo	  ud info = info { updateInfo = ud }
 setDemandInfo	  dd info = info { demandInfo = dd }
 setStrictnessInfo st info = info { strictnessInfo = st }
@@ -118,34 +92,40 @@ setSpecInfo 	  sp info = info { specInfo = sp }
 setArityInfo	  ar info = info { arityInfo = ar  }
 setInlinePragInfo pr info = info { inlinePragInfo = pr }
 setUnfoldingInfo  uf info = info { unfoldingInfo = uf }
+setCafInfo        cf info = info { cafInfo = cf }
 \end{code}
 
 
 \begin{code}
 noIdInfo = IdInfo {
 		arityInfo	= UnknownArity,
-		demandInfo	= UnknownDemand,
+		demandInfo	= wwLazy,
 		specInfo	= emptySpecEnv,
 		strictnessInfo	= NoStrictnessInfo,
 		unfoldingInfo	= noUnfolding,
 		updateInfo	= NoUpdateInfo,
-		argUsageInfo	= NoArgUsageInfo,
-		fbTypeInfo	= NoFBTypeInfo, 
-		inlinePragInfo  = NoPragmaInfo
+		cafInfo		= MayHaveCafRefs,
+		inlinePragInfo  = NoInlinePragInfo
 	   }
 \end{code}
 
 \begin{code}
-ppIdInfo :: Bool	-- True <=> print specialisations, please
-	 -> IdInfo
-	 -> SDoc
-
-ppIdInfo specs_please (IdInfo {arityInfo, updateInfo, strictnessInfo, demandInfo})
+ppIdInfo :: IdInfo -> SDoc
+ppIdInfo (IdInfo {arityInfo, 
+		  demandInfo,
+		  specInfo,
+		  strictnessInfo, 
+		  unfoldingInfo,
+		  updateInfo, 
+		  cafInfo,
+		  inlinePragInfo})
   = hsep [
 	    ppArityInfo arityInfo,
 	    ppUpdateInfo updateInfo,
 	    ppStrictnessInfo strictnessInfo,
-	    ppDemandInfo demandInfo
+	    ppr demandInfo,
+	    ppCafInfo cafInfo
+	-- Inline pragma printed out with all binders; see PprCore.pprIdBndr
 	]
 \end{code}
 
@@ -154,6 +134,10 @@ ppIdInfo specs_please (IdInfo {arityInfo, updateInfo, strictnessInfo, demandInfo
 \subsection[arity-IdInfo]{Arity info about an @Id@}
 %*									*
 %************************************************************************
+
+For locally-defined Ids, the code generator maintains its own notion
+of their arities; so it should not be asking...	 (but other things
+besides the code-generator need arity info!)
 
 \begin{code}
 data ArityInfo
@@ -165,9 +149,15 @@ exactArity   = ArityExactly
 atLeastArity = ArityAtLeast
 unknownArity = UnknownArity
 
+arityLowerBound :: ArityInfo -> Int
+arityLowerBound UnknownArity     = 0
+arityLowerBound (ArityAtLeast n) = n
+arityLowerBound (ArityExactly n) = n
+
+
 ppArityInfo UnknownArity	 = empty
-ppArityInfo (ArityExactly arity) = hsep [ptext SLIT("_A_"), int arity]
-ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("_A>_"), int arity]
+ppArityInfo (ArityExactly arity) = hsep [ptext SLIT("__A"), int arity]
+ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("__AL"), int arity]
 \end{code}
 
 %************************************************************************
@@ -178,18 +168,80 @@ ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("_A>_"), int arity]
 
 \begin{code}
 data InlinePragInfo
-  = NoPragmaInfo
+  = NoInlinePragInfo
 
-  | IWantToBeINLINEd	  -- user requests that we inline this
+  | IAmASpecPragmaId	-- Used for spec-pragma Ids; don't discard or inline
 
-  | IDontWantToBeINLINEd  -- user requests that we don't inline this
+  | IWantToBeINLINEd	-- User INLINE pragma
+  | IMustNotBeINLINEd	-- User NOINLINE pragma
 
-  | IMustNotBeINLINEd	-- Used by the simplifier to prevent looping
-			-- on recursive definitions
+  | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
+			-- in a group of recursive definitions
 
-  | IMustBeINLINEd	-- Absolutely must inline; used for PrimOps only
+  | ICanSafelyBeINLINEd	-- Used by the occurrence analyser to mark things
+			-- that manifesly occur once, not inside SCCs, 
+			-- not in constructor arguments
+
+	OccInfo		-- Says whether the occurrence is inside a lambda
+			--	If so, must only substitute WHNFs
+
+	Bool		-- False <=> occurs in more than one case branch
+			--	If so, there's a code-duplication issue
+
+  | IAmDead		-- Marks unused variables.  Sometimes useful for
+			-- lambda and case-bound variables.
+
+  | IMustBeINLINEd	-- Absolutely must inline; used for PrimOps and
+			-- constructors only.
+
+instance Outputable InlinePragInfo where
+  ppr NoInlinePragInfo  	= empty
+  ppr IMustBeINLINEd    	= ptext SLIT("__UU")
+  ppr IWantToBeINLINEd  	= ptext SLIT("__U")
+  ppr IMustNotBeINLINEd 	= ptext SLIT("__Unot")
+  ppr IAmALoopBreaker   	= ptext SLIT("__Ux")
+  ppr IAmDead			= ptext SLIT("__Ud")
+  ppr (ICanSafelyBeINLINEd _ _) = ptext SLIT("__Us")
+  ppr IAmASpecPragmaId 		= ptext SLIT("__US")
+
+instance Show InlinePragInfo where
+  showsPrec p prag = showsPrecSDoc p (ppr prag)
 \end{code}
 
+The @IMustNotBeDiscarded@ exists only to make Ids that are
+on the *LHS* of bindings created by SPECIALISE pragmas; 
+eg:		s = f Int d
+The SpecPragmaId is never itself mentioned; it
+exists solely so that the specialiser will find
+the call to f, and make specialised version of it.
+The SpecPragmaId binding is discarded by the specialiser
+when it gathers up overloaded calls.
+Meanwhile, it is not discarded as dead code.
+
+\begin{code}
+data OccInfo
+  = StrictOcc		-- Occurs syntactically strictly;
+			-- i.e. in a function position or case scrutinee
+
+  | LazyOcc		-- Not syntactically strict (*even* that of a strict function)
+			-- or in a case branch where there's more than one alternative
+
+  | InsideLam		-- Inside a non-linear lambda (that is, a lambda which
+			-- is sure to be instantiated only once).
+			-- Substituting a redex for this occurrence is
+			-- dangerous because it might duplicate work.
+
+instance Outputable OccInfo where
+  ppr StrictOcc = text "s"
+  ppr LazyOcc   = empty
+  ppr InsideLam = text "l"
+
+
+notInsideLambda :: OccInfo -> Bool
+notInsideLambda StrictOcc = True
+notInsideLambda LazyOcc   = True
+notInsideLambda InsideLam = False
+\end{code}
 
 %************************************************************************
 %*									*
@@ -275,11 +327,8 @@ data StrictnessInfo
 mkStrictnessInfo :: [Demand] -> Bool -> StrictnessInfo
 
 mkStrictnessInfo xs has_wrkr
-  | all is_lazy xs	 = NoStrictnessInfo		-- Uninteresting
+  | all isLazy xs	 = NoStrictnessInfo		-- Uninteresting
   | otherwise		 = StrictnessInfo xs has_wrkr
-  where
-    is_lazy (WwLazy False) = True	-- NB "Absent" args do *not* count!
-    is_lazy _	           = False	-- (as they imply a worker)
 
 noStrictnessInfo       = NoStrictnessInfo
 mkBottomStrictnessInfo = BottomGuaranteed
@@ -288,10 +337,10 @@ bottomIsGuaranteed BottomGuaranteed = True
 bottomIsGuaranteed other    	    = False
 
 ppStrictnessInfo NoStrictnessInfo = empty
-ppStrictnessInfo BottomGuaranteed = ptext SLIT("_bot_")
+ppStrictnessInfo BottomGuaranteed = ptext SLIT("__bot")
 
 ppStrictnessInfo (StrictnessInfo wrapper_args wrkr_maybe)
-  = hsep [ptext SLIT("_S_"), text (showList wrapper_args "")]
+  = hsep [ptext SLIT("__S"), pprDemands wrapper_args]
 \end{code}
 
 
@@ -299,40 +348,6 @@ ppStrictnessInfo (StrictnessInfo wrapper_args wrkr_maybe)
 workerExists :: StrictnessInfo -> Bool
 workerExists (StrictnessInfo _ worker_exists) = worker_exists
 workerExists other			      = False
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[demand-IdInfo]{Demand info about an @Id@}
-%*									*
-%************************************************************************
-
-Whether a value is certain to be demanded or not.  (This is the
-information that is computed by the ``front-end'' of the strictness
-analyser.)
-
-This information is only used within a module, it is not exported
-(obviously).
-
-\begin{code}
-data DemandInfo
-  = UnknownDemand
-  | DemandedAsPer Demand
-\end{code}
-
-\begin{code}
-noDemandInfo = UnknownDemand
-
-mkDemandInfo :: Demand -> DemandInfo
-mkDemandInfo demand = DemandedAsPer demand
-
-willBeDemanded :: DemandInfo -> Bool
-willBeDemanded (DemandedAsPer demand) = isStrict demand
-willBeDemanded _		      = False
-
-ppDemandInfo UnknownDemand	      = text "{-# L #-}"
-ppDemandInfo (DemandedAsPer info) = hsep [text "{-#", text (showList [info] ""), text "#-}"]
 \end{code}
 
 
@@ -364,88 +379,34 @@ updateInfoMaybe (SomeUpdateInfo	 u) = Just u
 Text instance so that the update annotations can be read in.
 
 \begin{code}
-ppUpdateInfo NoUpdateInfo	       = empty
+ppUpdateInfo NoUpdateInfo	   = empty
 ppUpdateInfo (SomeUpdateInfo [])   = empty
-ppUpdateInfo (SomeUpdateInfo spec) = (<>) (ptext SLIT("_U_ ")) (hcat (map int spec))
+ppUpdateInfo (SomeUpdateInfo spec) = (<>) (ptext SLIT("__U ")) (hcat (map int spec))
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[argUsage-IdInfo]{Argument Usage info about an @Id@}
+\subsection[CAF-IdInfo]{CAF-related information}
 %*									*
 %************************************************************************
 
-\begin{code}
-data ArgUsageInfo
-  = NoArgUsageInfo
-  | SomeArgUsageInfo ArgUsageType
-
-data ArgUsage = ArgUsage Int	-- number of arguments (is linear!)
-	      | UnknownArgUsage
-
-type ArgUsageType  = [ArgUsage]		-- c_1 -> ... -> BLOB
-\end{code}
+This information is used to build Static Reference Tables (see
+simplStg/ComputeSRT.lhs).
 
 \begin{code}
-mkArgUsageInfo [] = NoArgUsageInfo
-mkArgUsageInfo au = SomeArgUsageInfo au
+data CafInfo 
+	= MayHaveCafRefs		-- either:
+					-- (1) A function or static constructor
+					--     that refers to one or more CAFs,
+					-- (2) A real live CAF
 
-getArgUsage :: ArgUsageInfo -> ArgUsageType
-getArgUsage NoArgUsageInfo	  = []
-getArgUsage (SomeArgUsageInfo u)  = u
-\end{code}
+	| NoCafRefs			-- A function or static constructor
+				        -- that refers to no CAFs.
 
-\begin{code}
-{- UNUSED:
-ppArgUsageInfo NoArgUsageInfo	  = empty
-ppArgUsageInfo (SomeArgUsageInfo aut) = (<>) (ptext SLIT("_L_ ")) (ppArgUsageType aut)
--}
-
-ppArgUsage (ArgUsage n)      = int n
-ppArgUsage (UnknownArgUsage) = char '-'
-
-ppArgUsageType aut = hcat
-	[ char '"' ,
-	  hcat (punctuate comma (map ppArgUsage aut)),
-	  char '"' ]
-\end{code}
+-- LATER: not sure how easy this is...
+--      | OneCafRef Id
 
 
-%************************************************************************
-%*									*
-\subsection[FBType-IdInfo]{Type of an expression through Foldr/build's eyes}
-%*									*
-%************************************************************************
-
-\begin{code}
-data FBTypeInfo
-  = NoFBTypeInfo
-  | SomeFBTypeInfo FBType
-
-data FBType = FBType [FBConsum] FBProd deriving (Eq)
-
-data FBConsum = FBGoodConsum | FBBadConsum deriving(Eq)
-data FBProd = FBGoodProd | FBBadProd deriving(Eq)
-\end{code}
-
-\begin{code}
-mkFBTypeInfo = SomeFBTypeInfo
-
-getFBType :: FBTypeInfo -> Maybe FBType
-getFBType NoFBTypeInfo	      = Nothing
-getFBType (SomeFBTypeInfo u)  = Just u
-\end{code}
-
-\begin{code}
-ppFBTypeInfo NoFBTypeInfo = empty
-ppFBTypeInfo (SomeFBTypeInfo (FBType cons prod))
-      = (<>) (ptext SLIT("_F_ ")) (ppFBType cons prod)
-
-ppFBType cons prod = hcat
-	([ char '"' ] ++ map ppCons cons ++ [ char '-', ppProd prod, char '"' ])
-  where
-	ppCons FBGoodConsum = char 'G'
-	ppCons FBBadConsum  = char 'B'
-	ppProd FBGoodProd   = char 'G'
-	ppProd FBBadProd    = char 'B'
+ppCafInfo NoCafRefs = ptext SLIT("__C")
+ppCafInfo MayHaveCafRefs = empty
 \end{code}

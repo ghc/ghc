@@ -1,0 +1,1 @@
+ERROR "test/static/s080.hs" (line 3): Undefined qualified variable "N.g"

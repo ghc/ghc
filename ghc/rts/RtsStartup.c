@@ -1,0 +1,169 @@
+/* -----------------------------------------------------------------------------
+ * $Id: RtsStartup.c,v 1.2 1998/12/02 13:28:41 simonm Exp $
+ *
+ * Main function for a standalone Haskell program.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "Rts.h"
+#include "RtsAPI.h"
+#include "RtsUtils.h"
+#include "RtsFlags.h"  
+#include "Storage.h"    /* initStorage, exitStorage */
+#include "StablePtr.h"  /* initStablePtrTable */
+#include "Schedule.h"   /* initScheduler */
+#include "Stats.h"      /* initStats */
+#include "Weak.h"
+
+#if defined(PROFILING)
+# include "ProfRTS.h"
+#elif defined(DEBUG)
+# include "DebugProf.h"
+#endif
+
+#ifdef PAR
+#include "ParInit.h"
+#include "Parallel.h"
+#include "LLC.h"
+#endif
+
+/*
+ * Flag Structure
+ */
+struct RTS_FLAGS RtsFlags;
+
+extern void startupHaskell(int argc, char *argv[])
+{
+#if defined(PAR)
+    int nPEs = 0;		    /* Number of PEs */
+#endif
+
+    /* The very first thing we do is grab the start time...just in case we're
+     * collecting timing statistics.
+     */
+    start_time();
+
+#ifdef PAR
+/*
+ *The parallel system needs to be initialised and synchronised before
+ *the program is run.  
+ */
+    if (*argv[0] == '-') {     /* Look to see whether we're the Main Thread */
+	IAmMainThread = rtsTrue;
+        argv++; argc--;			/* Strip off flag argument */
+/*	fprintf(stderr, "I am Main Thread\n"); */
+    }
+    /* 
+     * Grab the number of PEs out of the argument vector, and
+     * eliminate it from further argument processing.
+     */
+    nPEs = atoi(argv[1]);
+    argv[1] = argv[0];
+    argv++; argc--;
+    initEachPEHook();                  /* HWL: hook to be execed on each PE */
+    SynchroniseSystem();
+#endif
+
+    /* Set the RTS flags to default values. */
+    initRtsFlagsDefaults();
+
+    /* Call the user hook to reset defaults, if present */
+    defaultsHook();
+
+    /* Parse the flags, separating the RTS flags from the programs args */
+    setupRtsFlags(&argc, argv, &rts_argc, rts_argv);
+    prog_argc = argc;
+    prog_argv = argv;
+
+#if defined(PAR)
+   /* Initialise the parallel system -- before initHeap! */
+    initParallelSystem();
+   /* And start GranSim profiling if required: omitted for now
+    *if (Rtsflags.ParFlags.granSimStats)
+    *init_gr_profiling(rts_argc, rts_argv, prog_argc, prog_argv);
+    */
+#endif	/* PAR */
+
+    /* initialize the storage manager */
+    initStorage();
+
+    /* initialise the stable pointer table */
+    initStablePtrTable();
+
+#if defined(PROFILING) || defined(DEBUG)
+    initProfiling();
+#endif
+
+    /* Initialise the scheduler */
+    initScheduler();
+
+    /* Initialise the stats department */
+    initStats();
+
+#if 0
+    initUserSignals();
+#endif
+
+    /* Record initialization times */
+    end_init();
+}
+
+void
+shutdownHaskell(void)
+{
+  /* Finalise any remaining weak pointers */
+  finaliseWeakPointersNow();
+
+#if defined(GRAN)
+  #error FixMe.
+  if (!RTSflags.GranFlags.granSimStats_suppressed)
+    end_gr_simulation();
+#endif
+
+  /* clean up things from the storage manager's point of view */
+  exitStorage();
+
+#if defined(PROFILING) || defined(DEBUG)
+  endProfiling();
+#endif
+
+#if defined(PROFILING) 
+  report_ccs_profiling( );
+#endif
+
+#if defined(TICKY_TICKY)
+  #error FixMe.
+  if (RTSflags.TickyFlags.showTickyStats) PrintTickyInfo();
+#endif
+
+  /*
+    This fflush is important, because: if "main" just returns,
+    then we will end up in pre-supplied exit code that will close
+    streams and flush buffers.  In particular we have seen: it
+    will close fd 0 (stdin), then flush fd 1 (stdout), then <who
+    cares>...
+    
+    But if you're playing with sockets, that "close fd 0" might
+    suggest to the daemon that all is over, only to be presented
+    with more stuff on "fd 1" at the flush.
+    
+    The fflush avoids this sad possibility.
+   */
+  fflush(stdout);
+}
+
+
+/* 
+ * called from STG-land to exit the program cleanly 
+ */
+
+void  
+stg_exit(I_ n)
+{
+#ifdef PAR
+  par_exit(n);
+#else
+  OnExitHook();
+  exit(n);
+#endif
+}

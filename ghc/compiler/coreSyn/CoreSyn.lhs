@@ -1,202 +1,114 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[CoreSyn]{A data type for the Haskell compiler midsection}
 
 \begin{code}
 module CoreSyn (
-	GenCoreBinding(..), GenCoreExpr(..),
-	GenCoreArg(..), GenCoreBinder(..), GenCoreCaseAlts(..),
-	GenCoreCaseDefault(..), CoreNote(..),
+	Expr(..), Alt, Bind(..), Arg(..), Note(..),
+	CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
+	TaggedExpr, TaggedAlt, TaggedBind, TaggedArg,
 
-	bindersOf, pairsFromCoreBinds, rhssOfBind,
+	mkLets, mkLams,
+	mkApps, mkTyApps, mkValApps,
+	mkLit, mkStringLit, mkConApp, mkPrimApp, mkNote, mkNilExpr,
+	bindNonRec, mkIfThenElse, varToCoreExpr,
 
-	mkGenApp, mkValApp, mkTyApp, 
-	mkApp, mkCon, mkPrim,
-	mkValLam, mkTyLam, 
-	mkLam,
-	collectBinders, collectValBinders, collectTyBinders,
-	isValBinder, notValBinder,
-	
-	collectArgs, initialTyArgs, initialValArgs, isValArg, notValArg, numValArgs,
+	bindersOf, rhssOfBind, rhssOfAlts, isDeadBinder, isTyVar, isId,
+	collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
+	collectArgs,
+	coreExprCc,
 
-	mkCoLetAny, mkCoLetNoUnboxed, mkCoLetUnboxedToCase,
-	mkCoLetsAny, mkCoLetsNoUnboxed, mkCoLetsUnboxedToCase,
-	mkCoLetrecAny, mkCoLetrecNoUnboxed,
+	isValArg, isTypeArg, valArgCount,
 
-	rhssOfAlts,
-
-	-- Common type instantiation...
-	CoreBinding,
-	CoreExpr,
-	CoreBinder,
-	CoreArg,
-	CoreCaseAlts,
-	CoreCaseDefault,
-
-	-- And not-so-common type instantiations...
-	TaggedCoreBinding,
-	TaggedCoreExpr,
-	TaggedCoreBinder,
-	TaggedCoreArg,
-	TaggedCoreCaseAlts,
-	TaggedCoreCaseDefault,
-
-	SimplifiableCoreBinding,
-	SimplifiableCoreExpr,
-	SimplifiableCoreBinder,
-	SimplifiableCoreArg,
-	SimplifiableCoreCaseAlts,
-	SimplifiableCoreCaseDefault
+	-- Annotated expressions
+	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, deAnnotate
     ) where
 
 #include "HsVersions.h"
 
-import CostCentre	( CostCentre )
-import Id		( idType, Id )
-import Type		( isUnboxedType,GenType, Type )
-import TyVar		( GenTyVar, TyVar )
-import Util		( panic, assertPanic )
-import BinderInfo       ( BinderInfo )
+import TysWiredIn	( boolTy, stringTy, nilDataCon )
+import CostCentre	( CostCentre, isDupdCC, noCostCentre )
+import Var		( Var, GenId, Id, TyVar, IdOrTyVar, isTyVar, isId, idType )
+import Id		( mkWildId, getInlinePragma )
+import Type		( GenType, Type, mkTyVarTy, isUnLiftedType )
+import IdInfo		( InlinePragInfo(..) )
 import BasicTypes	( Unused )
-import Literal          ( Literal )
-import PrimOp           ( PrimOp )
+import Const	        ( Con(..), DataCon, Literal(NoRepStr), PrimOp )
+import TysWiredIn	( trueDataCon, falseDataCon )
+import Outputable
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[CoreTopBinding_and_CoreBinding]{@CoreTopBinding@ and @GenCoreBinding@}
+\subsection{The main data types}
 %*									*
 %************************************************************************
 
-Core programs, bindings, expressions, etc., are parameterised with
-respect to the information kept about binding and bound occurrences of
-variables, called {\em binders} and {\em val_occ tyvar uvars}, respectively.  [I
-don't really like the pair of names; I prefer {\em binder} and {\em
-bounder}.  Or {\em binder} and {\em var}.]
-
-A @GenCoreBinding@ is either a single non-recursive binding of a
-``binder'' to an expression, or a mutually-recursive blob of same.
-\begin{code}
-data GenCoreBinding val_bdr val_occ flexi
-  = NonRec	val_bdr (GenCoreExpr val_bdr val_occ flexi)
-  | Rec		[(val_bdr, GenCoreExpr val_bdr val_occ flexi)]
-\end{code}
+These data types are the heart of the compiler
 
 \begin{code}
-bindersOf :: GenCoreBinding val_bdr val_occ flexi -> [val_bdr]
+data Expr b f	-- "b" for the type of binders, 
+		-- "f" for the flexi slot in types
+  = Var	  (GenId f)
+  | Con   Con [Arg b f]		-- Guaranteed saturated
+  | App   (Expr b f) (Arg b f)
+  | Lam   b (Expr b f)
+  | Let   (Bind b f) (Expr b f)
+  | Case  (Expr b f) b [Alt b f]  -- Binder gets bound to value of scrutinee
+				  -- DEFAULT case must be last, if it occurs at all
+  | Note  (Note f) (Expr b f)
+  | Type  (GenType f)		  -- This should only show up at the top
+				  -- level of an Arg
 
-pairsFromCoreBinds ::
-  [GenCoreBinding val_bdr val_occ flexi] ->
-  [(val_bdr, GenCoreExpr val_bdr val_occ flexi)]
+type Arg b f = Expr b f		-- Can be a Type
 
-rhssOfBind :: GenCoreBinding val_bdr val_occ flexi -> [GenCoreExpr val_bdr val_occ flexi]
+type Alt b f = (Con, [b], Expr b f)
+	-- (DEFAULT, [], rhs) is the default alternative
+	-- Remember, a Con can be a literal or a data constructor
 
-bindersOf (NonRec binder _) = [binder]
-bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
+data Bind b f = NonRec b (Expr b f)
+	      | Rec [(b, (Expr b f))]
 
-pairsFromCoreBinds []		       = []
-pairsFromCoreBinds ((NonRec b e) : bs) = (b,e) :  pairsFromCoreBinds bs
-pairsFromCoreBinds ((Rec  pairs) : bs) = pairs ++ pairsFromCoreBinds bs
-
-rhssOfBind (NonRec _ rhs) = [rhs]
-rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[GenCoreExpr]{Core expressions: @GenCoreExpr@}
-%*									*
-%************************************************************************
-
-@GenCoreExpr@ is the heart of the ``core'' data types; it is
-(more-or-less) boiled-down second-order polymorphic lambda calculus.
-For types in the core world, we just keep using @Types@.
-\begin{code}
-data GenCoreExpr val_bdr val_occ flexi
-     = Var    val_occ
-     | Lit    Literal	-- literal constants
-\end{code}
-
-@Cons@ and @Prims@ are saturated constructor and primitive-op
-applications (see the comment).  Note: @Con@s are only set up by the
-simplifier (and by the desugarer when it knows what it's doing).  The
-desugarer sets up constructors as applications of global @Vars@s.
-
-\begin{code}
-     | Con	Id [GenCoreArg val_occ flexi]
-		-- Saturated constructor application:
-		-- The constructor is a function of the form:
-		--	/\ a1 -> ... /\ am -> \ b1 -> ... \ bn ->
-		-- <expr> where "/\" is a type lambda and "\" the
-		-- regular kind; there will be "m" Types and
-		-- "n" bindees in the Con args.
-
-     | Prim	PrimOp [GenCoreArg val_occ flexi]
-		-- saturated primitive operation;
-
-		-- comment on Cons applies here, too.
-\end{code}
-
-Ye olde abstraction and application operators.
-\begin{code}
-     | Lam	(GenCoreBinder val_bdr flexi)
-		(GenCoreExpr   val_bdr val_occ flexi)
-
-     | App	(GenCoreExpr val_bdr val_occ flexi)
-		(GenCoreArg  val_occ flexi)
-\end{code}
-
-Case expressions (\tr{case <expr> of <List of alternatives>}): there
-are really two flavours masquerading here---those for scrutinising
-{\em algebraic} types and those for {\em primitive} types.  Please see
-under @GenCoreCaseAlts@.
-\begin{code}
-     | Case	(GenCoreExpr val_bdr val_occ flexi)
-		(GenCoreCaseAlts val_bdr val_occ flexi)
-\end{code}
-
-A Core case expression \tr{case e of v -> ...} implies evaluation of
-\tr{e}; it is not equivalent to \tr{let v = in ...} (as with a Haskell
-\tr{case}).
-
-Non-recursive @Lets@ only have one binding; having more than one
-doesn't buy you much, and it is an easy way to mess up variable
-scoping.
-\begin{code}
-     | Let	(GenCoreBinding val_bdr val_occ flexi)
-		(GenCoreExpr val_bdr val_occ flexi)
-		-- both recursive and non-.
-		-- The "GenCoreBinding" records that information
-\end{code}
-
-A @Note@ annotates a @CoreExpr@ with useful information
-of some kind.
-\begin{code}
-     | Note	(CoreNote flexi)
-		(GenCoreExpr val_bdr val_occ flexi)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Core-notes}
-%*									*
-%************************************************************************
-
-\begin{code}
-data CoreNote flexi
-  = SCC 
-	CostCentre
+data Note f
+  = SCC CostCentre
 
   | Coerce	
-	(GenType flexi)		-- The to-type:   type of whole coerce expression
-	(GenType flexi)		-- The from-type: type of enclosed expression
+	(GenType f)	-- The to-type:   type of whole coerce expression
+	(GenType f)	-- The from-type: type of enclosed expression
 
-  | InlineCall			-- Instructs simplifier to inline
-				-- the enclosed call
+  | InlineCall		-- Instructs simplifier to inline
+			-- the enclosed call
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Useful synonyms}
+%*									*
+%************************************************************************
+
+The common case
+
+\begin{code}
+type CoreBndr = IdOrTyVar
+type CoreExpr = Expr CoreBndr Unused
+type CoreArg  = Arg  CoreBndr Unused
+type CoreBind = Bind CoreBndr Unused
+type CoreAlt  = Alt  CoreBndr Unused
+type CoreNote = Note Unused
+\end{code}
+
+Binders are ``tagged'' with a \tr{t}:
+
+\begin{code}
+type Tagged t = (CoreBndr, t)
+
+type TaggedBind t = Bind (Tagged t) Unused
+type TaggedExpr t = Expr (Tagged t) Unused
+type TaggedArg  t = Arg  (Tagged t) Unused
+type TaggedAlt  t = Alt  (Tagged t) Unused
+\end{code}
 
 
 %************************************************************************
@@ -205,352 +117,237 @@ data CoreNote flexi
 %*									*
 %************************************************************************
 
-When making @Lets@, we may want to take evasive action if the thing
-being bound has unboxed type. We have different variants ...
-
-@mkCoLet(s|rec)Any@ 		let-binds any binding, regardless of type
-@mkCoLet(s|rec)NoUnboxed@ 	prohibits unboxed bindings
-@mkCoLet(s)UnboxedToCase@ 	converts an unboxed binding to a case
-				(unboxed bindings in a letrec are still prohibited)
-
 \begin{code}
-mkCoLetAny :: GenCoreBinding Id Id flexi
-	   -> GenCoreExpr    Id Id flexi
-	   -> GenCoreExpr    Id Id flexi
-mkCoLetsAny :: [GenCoreBinding Id Id flexi] ->
-		GenCoreExpr Id Id flexi ->
-		GenCoreExpr Id Id flexi
+mkApps    :: Expr b f -> [Arg b f]    -> Expr b f
+mkTyApps  :: Expr b f -> [GenType f]  -> Expr b f
+mkValApps :: Expr b f -> [Expr b f]   -> Expr b f
 
-mkCoLetrecAny :: [(val_bdr, GenCoreExpr val_bdr val_occ flexi)]
-	      -> GenCoreExpr val_bdr val_occ flexi
-	      -> GenCoreExpr val_bdr val_occ flexi
+mkApps    f args = foldl App		  	   f args
+mkTyApps  f args = foldl (\ e a -> App e (Type a)) f args
+mkValApps f args = foldl (\ e a -> App e a)	   f args
 
-mkCoLetrecAny []    body = body
-mkCoLetrecAny binds body = Let (Rec binds) body
+mkLit       :: Literal -> Expr b f
+mkStringLit :: String  -> Expr b f
+mkConApp    :: DataCon -> [Arg b f] -> Expr b f
+mkPrimApp   :: PrimOp  -> [Arg b f] -> Expr b f
 
-mkCoLetsAny []    expr = expr
-mkCoLetsAny binds expr = foldr mkCoLetAny expr binds
+mkLit lit	  = Con (Literal lit) []
+mkStringLit str	  = Con (Literal (NoRepStr (_PK_ str) stringTy)) []
+mkConApp con args = Con (DataCon con) args
+mkPrimApp op args = Con (PrimOp op)   args
 
-mkCoLetAny bind@(Rec binds)         body = mkCoLetrecAny binds body
-mkCoLetAny bind@(NonRec binder rhs) body = Let bind body
+mkNilExpr :: Type -> CoreExpr
+mkNilExpr ty = Con (DataCon nilDataCon) [Type ty]
+
+varToCoreExpr :: CoreBndr -> CoreExpr
+varToCoreExpr v | isId v    = Var v
+                | otherwise = Type (mkTyVarTy v)
+\end{code}
+
 \end{code}
 
 \begin{code}
-mkCoLetNoUnboxed bind@(Rec binds) body
-  = mkCoLetrecNoUnboxed binds body
+mkLets :: [Bind b f] -> Expr b f -> Expr b f
+mkLets binds body = foldr Let body binds
 
-mkCoLetNoUnboxed bind@(NonRec binder rhs) body
-  = --ASSERT (not (isUnboxedType (idType binder)))
-    case body of
-      Var binder2 | binder == binder2
-	 -> rhs   -- hey, I have the rhs
-      other
-	 -> Let bind body
-
-mkCoLetsNoUnboxed []    expr = expr
-mkCoLetsNoUnboxed binds expr = foldr mkCoLetNoUnboxed expr binds
-
-mkCoLetrecNoUnboxed []    body = body
-mkCoLetrecNoUnboxed binds body
-  = ASSERT (all is_boxed_bind binds)
-    Let (Rec binds) body
-  where
-    is_boxed_bind (binder, rhs)
-      = (not . isUnboxedType . idType) binder
+mkLams :: [b] -> Expr b f -> Expr b f
+mkLams binders body = foldr Lam body binders
 \end{code}
 
 \begin{code}
-mkCoLetUnboxedToCase bind@(Rec binds) body
-  = mkCoLetrecNoUnboxed binds body
+bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
+-- (bindNonRec x r b) produces either
+--	let x = r in b
+-- or
+--	case r of x { _DEFAULT_ -> b }
+--
+-- depending on whether x is unlifted or not
+bindNonRec bndr rhs body
+  | isUnLiftedType (idType bndr) = Case rhs bndr [(DEFAULT,[],body)]
+  | otherwise			  = Let (NonRec bndr rhs) body
 
-mkCoLetUnboxedToCase bind@(NonRec binder rhs) body
-  = case body of
-      Var binder2 | binder == binder2
-	 -> rhs   -- hey, I have the rhs
-      other
-	 -> if (not (isUnboxedType (idType binder))) then
-		Let bind body		 -- boxed...
-	    else
-		Case rhs		  -- unboxed...
-	    	  (PrimAlts []
-		    (BindDefault binder body))
-
-mkCoLetsUnboxedToCase []    expr = expr
-mkCoLetsUnboxedToCase binds expr = foldr mkCoLetUnboxedToCase expr binds
+mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
+mkIfThenElse guard then_expr else_expr
+  = Case guard (mkWildId boolTy) 
+	 [ (DataCon trueDataCon,  [], then_expr),
+	   (DataCon falseDataCon, [], else_expr) ]
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Case alternatives in @GenCoreExpr@}
-%*									*
-%************************************************************************
-
-We have different kinds of @case@s, the differences being reflected in
-the kinds of alternatives a case has.  We maintain a distinction
-between cases for scrutinising algebraic datatypes, as opposed to
-primitive types.  In both cases, we carry around a @TyCon@, as a
-handle with which we can get info about the case (e.g., total number
-of data constructors for this type).
-
-For example:
-\begin{verbatim}
-let# x=e in b
-\end{verbatim}
-becomes
-\begin{verbatim}
-Case e [ BindDefaultAlt x -> b ]
-\end{verbatim}
+mkNote removes redundant coercions, and SCCs where possible
 
 \begin{code}
-data GenCoreCaseAlts val_bdr val_occ flexi
-  = AlgAlts	[(Id,				-- alts: data constructor,
-		  [val_bdr],			-- constructor's parameters,
-		  GenCoreExpr val_bdr val_occ flexi)]	-- rhs.
-		(GenCoreCaseDefault val_bdr val_occ flexi)
+mkNote :: Note f -> Expr b f -> Expr b f
+mkNote (Coerce to_ty1 from_ty1) (Note (Coerce to_ty2 from_ty2) expr)
+ = ASSERT( from_ty1 == to_ty2 )
+   mkNote (Coerce to_ty1 from_ty2) expr
 
-  | PrimAlts	[(Literal,			-- alts: unboxed literal,
-		  GenCoreExpr val_bdr val_occ flexi)]	-- rhs.
-		(GenCoreCaseDefault val_bdr val_occ flexi)
+mkNote (SCC cc1) expr@(Note (SCC cc2) _)
+  | isDupdCC cc1	-- Discard the outer SCC provided we don't need
+  = expr		-- to track its entry count
 
--- obvious things: if there are no alts in the list, then the default
--- can't be NoDefault.
+mkNote note@(SCC cc1) expr@(Lam x e)	-- Move _scc_ inside lambda
+  = Lam x (mkNote note e)
 
-data GenCoreCaseDefault val_bdr val_occ flexi
-  = NoDefault					-- small con family: all
-						-- constructor accounted for
-  | BindDefault val_bdr				-- form: var -> expr;
-		(GenCoreExpr val_bdr val_occ flexi)	-- "val_bdr" may or may not
-						-- be used in RHS.
-\end{code}
+-- Slide InlineCall in around the function
+mkNote InlineCall (App f a) = App (mkNote InlineCall f) a
+mkNote InlineCall (Var v)   = Note InlineCall (Var v)
+mkNote InlineCall expr      = expr
 
-\begin{code}
-rhssOfAlts (AlgAlts alts deflt)  = rhssOfDeflt deflt ++ [rhs | (_,_,rhs) <- alts]
-rhssOfAlts (PrimAlts alts deflt) = rhssOfDeflt deflt ++ [rhs | (_,rhs)   <- alts]
-
-rhssOfDeflt NoDefault		= []
-rhssOfDeflt (BindDefault _ rhs) = [rhs]
+mkNote note expr = Note note expr
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection{Core binders}
+\subsection{Simple access functions}
 %*									*
 %************************************************************************
 
 \begin{code}
-data GenCoreBinder val_bdr flexi
-  = ValBinder	val_bdr
-  | TyBinder	(GenTyVar flexi)
+bindersOf  :: Bind b f -> [b]
+bindersOf (NonRec binder _) = [binder]
+bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 
-isValBinder (ValBinder _) = True
-isValBinder _		  = False
+rhssOfBind :: Bind b f -> [Expr b f]
+rhssOfBind (NonRec _ rhs) = [rhs]
+rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
 
-notValBinder = not . isValBinder
-\end{code}
+rhssOfAlts :: [Alt b f] -> [Expr b f]
+rhssOfAlts alts = [e | (_,_,e) <- alts]
 
-Clump Lams together if possible.
-
-\begin{code}
-mkValLam :: [val_bdr]
-	 -> GenCoreExpr val_bdr val_occ flexi
-	 -> GenCoreExpr val_bdr val_occ flexi
-mkTyLam  :: [GenTyVar flexi]
-	 -> GenCoreExpr val_bdr val_occ flexi
-	 -> GenCoreExpr val_bdr val_occ flexi
-
-mkValLam binders body = foldr (Lam . ValBinder)   body binders
-mkTyLam  binders body = foldr (Lam . TyBinder)    body binders
-
-mkLam :: [GenTyVar flexi] -> [val_bdr] -- ToDo: could add a [uvar] arg...
-	 -> GenCoreExpr val_bdr val_occ flexi
-	 -> GenCoreExpr val_bdr val_occ flexi
-
-mkLam tyvars valvars body
-  = mkTyLam tyvars (mkValLam valvars body)
+isDeadBinder :: CoreBndr -> Bool
+isDeadBinder bndr | isId bndr = case getInlinePragma bndr of
+					IAmDead -> True
+					other	-> False
+		  | otherwise = False	-- TyVars count as not dead
 \end{code}
 
 We often want to strip off leading lambdas before getting down to
 business.  @collectBinders@ is your friend.
 
-We expect (by convention) usage-, type-, and value- lambdas in that
+We expect (by convention) type-, and value- lambdas in that
 order.
 
 \begin{code}
-collectBinders ::
-  GenCoreExpr val_bdr val_occ flexi ->
-  ([GenTyVar flexi], [val_bdr], GenCoreExpr val_bdr val_occ flexi)
+collectBinders	       :: Expr b f -> ([b],         Expr b f)
+collectTyBinders       :: CoreExpr -> ([TyVar],     CoreExpr)
+collectValBinders      :: CoreExpr -> ([Id],        CoreExpr)
+collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
+
+collectTyAndValBinders expr
+  = (tvs, ids, body)
+  where
+    (tvs, body1) = collectTyBinders expr
+    (ids, body)  = collectValBinders body1
 
 collectBinders expr
-  = case collectValBinders body1 of { (vals,body) -> (tyvars, vals, body) }
+  = go [] expr
   where
-    (tyvars, body1) = collectTyBinders expr
+    go tvs (Lam b e) = go (b:tvs) e
+    go tvs e	     = (reverse tvs, e)
 
 collectTyBinders expr
-  = tyvars expr []
+  = go [] expr
   where
-    tyvars (Lam (TyBinder t) body) tacc = tyvars body (t:tacc)
-    tyvars other tacc = (reverse tacc, other)
+    go tvs (Lam b e) | isTyVar b = go (b:tvs) e
+    go tvs e			 = (reverse tvs, e)
 
-collectValBinders :: GenCoreExpr val_bdr val_occ flexi ->
-		     ([val_bdr], GenCoreExpr val_bdr val_occ flexi)
 collectValBinders expr
   = go [] expr
   where
-    go acc (Lam (ValBinder v) b) = go (v:acc) b
-    go acc body 		 = (reverse acc, body)
-
+    go ids (Lam b e) | isId b = go (b:ids) e
+    go ids body		      = (reverse ids, body)
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Core arguments (atoms)}
-%*									*
-%************************************************************************
-
-\begin{code}
-data GenCoreArg val_occ flexi
-  = LitArg	Literal
-  | VarArg	val_occ
-  | TyArg	(GenType flexi)
-\end{code}
-
-General and specific forms:
-\begin{code}
-mkGenApp :: GenCoreExpr val_bdr val_occ flexi
-	 -> [GenCoreArg val_occ flexi]
-	 -> GenCoreExpr val_bdr val_occ flexi
-mkTyApp  :: GenCoreExpr val_bdr val_occ flexi
-	 -> [GenType flexi]
-	 -> GenCoreExpr val_bdr val_occ flexi
-mkValApp :: GenCoreExpr val_bdr val_occ flexi
-	 -> [GenCoreArg val_occ flexi] -- but we ASSERT they are LitArg or VarArg
-	 -> GenCoreExpr val_bdr val_occ flexi
-
-mkGenApp f args = foldl App		  		   f args
-mkTyApp  f args = foldl (\ e a -> App e (TyArg a))	   f args
-mkValApp f args = foldl (\ e a -> App e (is_Lit_or_Var a)) f args
-
-#ifndef DEBUG
-is_Lit_or_Var a = a
-#else
-is_Lit_or_Var a
-  = if isValArg a then a else panic "CoreSyn.mkValApps:not LitArg or VarArg"
-#endif
-
-isValArg (LitArg _) = True  -- often used for sanity-checking
-isValArg (VarArg _) = True
-isValArg _	    = False
-
-notValArg = not . isValArg -- exists only because it's a common use of isValArg
-
-numValArgs as = length [ a | a <- as, isValArg a ] -- again, convenience
-\end{code}
-
-\begin{code}
-mkApp  fun = mk_thing (mkGenApp fun)
-mkCon  con = mk_thing (Con      con)
-mkPrim op  = mk_thing (Prim     op)
-
-mk_thing :: ([GenCoreArg val_occ flexi] -> GenCoreExpr val_bdr val_occ flexi)
-	 -> [GenType flexi] 
-	 -> [GenCoreArg val_occ flexi] 
-	 -> GenCoreExpr val_bdr val_occ flexi
-mk_thing thing tys vals
-  = ASSERT( all isValArg vals )
-    thing (map TyArg tys ++ vals)
-\end{code}
 
 @collectArgs@ takes an application expression, returning the function
 and the arguments to which it is applied.
 
 \begin{code}
-collectArgs :: GenCoreExpr val_bdr val_occ flexi
-	    -> (GenCoreExpr val_bdr val_occ flexi,
-		[GenType flexi],
-	        [GenCoreArg val_occ flexi]{-ValArgs-})
-
+collectArgs :: Expr b f -> (Expr b f, [Arg b f])
 collectArgs expr
-  = valvars expr []
+  = go expr []
   where
-    valvars (App fun v) vacc | isValArg v = valvars fun (v:vacc)
-    valvars fun vacc
-      = case (tyvars fun []) of { (expr, tacc) ->
-	(expr, tacc, vacc) }
-
-    tyvars (App fun (TyArg t)) tacc = tyvars fun (t:tacc)
-    tyvars fun tacc		    = (fun, tacc)
-     -- WAS: tyvars fun tacc	    = (expr, tacc)
-     --   This doesn't look right (i.e., Plain Wrong),
-     --   collectArgs should return the the function and
-     --   not the whole expr.      -- Laszlo 8/98
-
+    go (App f a) as = go f (a:as)
+    go e 	 as = (e, as)
 \end{code}
 
+coreExprCc gets the cost centre enclosing an expression, if any.
+It looks inside lambdas because (scc "foo" \x.e) = \x.scc "foo" e
 
 \begin{code}
-initialTyArgs :: [GenCoreArg val_occ flexi]
-	      -> ([GenType flexi], [GenCoreArg val_occ flexi])
-initialTyArgs (TyArg ty : args) = (ty:tys, args') 
-				where
-				  (tys, args') = initialTyArgs args
-initialTyArgs other 		= ([],other)
-
-initialValArgs :: [GenCoreArg val_occ flexi]
-	      -> ([GenCoreArg val_occ flexi], [GenCoreArg val_occ flexi])
-initialValArgs args = span isValArg args
+coreExprCc :: Expr b f -> CostCentre
+coreExprCc (Note (SCC cc) e)   = cc
+coreExprCc (Note other_note e) = coreExprCc e
+coreExprCc (Lam _ e)           = coreExprCc e
+coreExprCc other               = noCostCentre
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{The main @Core*@ instantiation of the @GenCore*@ types}
+\subsection{Predicates}
 %*									*
 %************************************************************************
 
 \begin{code}
-type CoreBinding = GenCoreBinding  Id Id Unused
-type CoreExpr    = GenCoreExpr     Id Id Unused
-type CoreBinder	 = GenCoreBinder   Id    Unused
-type CoreArg     = GenCoreArg         Id Unused
+isValArg (Type _) = False
+isValArg other    = True
 
-type CoreCaseAlts    = GenCoreCaseAlts    Id Id Unused
-type CoreCaseDefault = GenCoreCaseDefault Id Id Unused
+isTypeArg (Type _) = True
+isTypeArg other    = False
+
+valArgCount :: [Arg b f] -> Int
+valArgCount []		    = 0
+valArgCount (Type _ : args) = valArgCount args
+valArgCount (other  : args) = 1 + valArgCount args
 \end{code}
 
+
 %************************************************************************
 %*									*
-\subsection{The @TaggedCore*@ instantiation of the @GenCore*@ types}
+\subsection{Annotated core; annotation at every node in the tree}
 %*									*
 %************************************************************************
 
-Binders are ``tagged'' with a \tr{t}:
 \begin{code}
-type Tagged t = (Id, t)
+type AnnExpr bndr annot = (annot, AnnExpr' bndr annot)
 
-type TaggedCoreBinding t = GenCoreBinding (Tagged t) Id Unused
-type TaggedCoreExpr    t = GenCoreExpr    (Tagged t) Id Unused
-type TaggedCoreBinder  t = GenCoreBinder  (Tagged t)    Unused
-type TaggedCoreArg     t = GenCoreArg                Id Unused
+data AnnExpr' bndr annot
+  = AnnVar	Id
+  | AnnCon	Con [AnnExpr bndr annot]
+  | AnnLam	bndr (AnnExpr bndr annot)
+  | AnnApp	(AnnExpr bndr annot) (AnnExpr bndr annot)
+  | AnnCase	(AnnExpr bndr annot) bndr [AnnAlt bndr annot]
+  | AnnLet	(AnnBind bndr annot) (AnnExpr bndr annot)
+  | AnnNote	(Note Unused) (AnnExpr bndr annot)
+  | AnnType	Type
 
-type TaggedCoreCaseAlts    t = GenCoreCaseAlts    (Tagged t) Id Unused
-type TaggedCoreCaseDefault t = GenCoreCaseDefault (Tagged t) Id Unused
+type AnnAlt bndr annot = (Con, [bndr], AnnExpr bndr annot)
+
+data AnnBind bndr annot
+  = AnnNonRec bndr (AnnExpr bndr annot)
+  | AnnRec    [(bndr, AnnExpr bndr annot)]
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{The @SimplifiableCore*@ instantiation of the @GenCore*@ types}
-%*									*
-%************************************************************************
-
-Binders are tagged with @BinderInfo@:
 \begin{code}
-type Simplifiable = (Id, BinderInfo)
+deAnnotate :: AnnExpr bndr annot -> Expr bndr Unused
 
-type SimplifiableCoreBinding = GenCoreBinding Simplifiable Id Unused
-type SimplifiableCoreExpr    = GenCoreExpr    Simplifiable Id Unused
-type SimplifiableCoreBinder  = GenCoreBinder  Simplifiable    Unused
-type SimplifiableCoreArg     = GenCoreArg                  Id Unused
+deAnnotate (_, AnnType	t)          = Type t
+deAnnotate (_, AnnVar	v)          = Var v
+deAnnotate (_, AnnCon	con args)   = Con con (map deAnnotate args)
+deAnnotate (_, AnnLam	binder body)= Lam binder (deAnnotate body)
+deAnnotate (_, AnnApp	fun arg)    = App (deAnnotate fun) (deAnnotate arg)
+deAnnotate (_, AnnNote	note body)  = Note note (deAnnotate body)
 
-type SimplifiableCoreCaseAlts    = GenCoreCaseAlts    Simplifiable Id Unused
-type SimplifiableCoreCaseDefault = GenCoreCaseDefault Simplifiable Id Unused
+deAnnotate (_, AnnLet bind body)
+  = Let (deAnnBind bind) (deAnnotate body)
+  where
+    deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)
+    deAnnBind (AnnRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
+
+deAnnotate (_, AnnCase scrut v alts)
+  = Case (deAnnotate scrut) v (map deAnnAlt alts)
+  where
+    deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)
 \end{code}
+

@@ -10,7 +10,7 @@
 #define NON_POSIX_SOURCE
 #endif
 
-#include "rtsdefs.h"
+#include "Rts.h"
 #include "libposix.h"
 
 /* 

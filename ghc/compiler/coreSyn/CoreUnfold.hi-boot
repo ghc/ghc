@@ -1,8 +1,9 @@
 _interface_ CoreUnfold 1
 _exports_
-CoreUnfold Unfolding UnfoldingGuidance mkUnfolding noUnfolding;
+CoreUnfold Unfolding UnfoldingGuidance mkUnfolding noUnfolding hasUnfolding;
 _declarations_
 1 data Unfolding;
 1 data UnfoldingGuidance;
-1 mkUnfolding _:_ CoreSyn.CoreExpr -> CoreUnfold.Unfolding ;;
-1 noUnfolding _:_ CoreUnfold.Unfolding ;;
+1 mkUnfolding _:_ CoreSyn.CoreExpr -> Unfolding ;;
+1 noUnfolding _:_ Unfolding ;;
+1 hasUnfolding _:_ Unfolding -> PrelBase.Bool ;;

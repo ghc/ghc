@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[RdrHsSyn]{Specialisations of the @HsSyn@ syntax for the reader}
 
@@ -43,10 +43,11 @@ module RdrHsSyn (
 	extractHsTyVars, extractHsCtxtTyVars,
 
 	RdrName(..),
-	qual, varQual, tcQual, varUnqual, lexVarQual, lexTcQual,
+	qual, varQual, tcQual, varUnqual, lexVarQual, lexTcQual, 
+	mkTupConRdrName, mkUbxTupConRdrName,
 	dummyRdrVarName, dummyRdrTcName,
 	isUnqual, isQual,
-	showRdr, rdrNameOcc, rdrNameModule, ieOcc,
+	rdrNameOcc, rdrNameModule, ieOcc,
 	cmpRdr, prefixRdrName,
 	mkOpApp, mkClassDecl, isClassDataConRdrName
 
@@ -55,10 +56,11 @@ module RdrHsSyn (
 #include "HsVersions.h"
 
 import HsSyn
-import Lex
 import BasicTypes	( Module, IfaceFlavour(..), Unused )
 import Name		( pprModule, OccName(..), pprOccName, 
-			  prefixOccName, NamedThing(..) )
+			  mkTupNameStr, mkUbxTupNameStr,
+			  prefixOccName, NamedThing(..),
+			  mkClassTyConStr, mkClassDataConStr )
 import Util		( thenCmp )
 import HsPragmas	( GenPragmas, ClassPragmas, DataPragmas, ClassOpPragmas, InstancePragmas )
 import List		( nub )
@@ -112,30 +114,21 @@ extractHsTyVars ty = nub (extract_ty ty [])
 extractHsCtxtTyVars :: Context RdrName -> [RdrName]
 extractHsCtxtTyVars ty = nub (extract_ctxt ty [])
 
-extract_ctxt ctxt acc = foldr extract_ass [] ctxt
+extract_ctxt ctxt acc = foldr extract_ass acc ctxt
 		      where
 			extract_ass (cls, tys) acc = foldr extract_ty acc tys
 
-extract_ty (MonoTyApp ty1 ty2)	 acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (MonoListTy tc ty)	 acc = extract_ty ty acc
-extract_ty (MonoTupleTy tc tys)	 acc = foldr extract_ty acc tys
-extract_ty (MonoFunTy ty1 ty2)	 acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (MonoDictTy cls tys)	 acc = foldr extract_ty acc tys
-extract_ty (MonoTyVar tv)        acc = insert tv acc
-
-	-- In (All a => a -> a) -> Int, there are no free tyvars
-	-- We just assume that we quantify over all type variables mentioned in the context.
-extract_ty (HsPreForAllTy ctxt ty)  acc = filter (`notElem` locals) (extract_ty ty [])
-				          ++ acc
-				        where
-				          locals = extract_ctxt ctxt []
-
+extract_ty (MonoTyApp ty1 ty2)	    acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (MonoListTy ty)	    acc = extract_ty ty acc
+extract_ty (MonoTupleTy tys _)      acc = foldr extract_ty acc tys
+extract_ty (MonoFunTy ty1 ty2)	    acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (MonoDictTy cls tys)	    acc = foldr extract_ty acc tys
+extract_ty (MonoTyVar tv)           acc = insert tv acc
 extract_ty (HsForAllTy tvs ctxt ty) acc = acc ++
 					  (filter (`notElem` locals) $
 				           extract_ctxt ctxt (extract_ty ty []))
 				        where
 				          locals = map getTyVarName tvs
-
 
 insert (Qual _ _ _)	  acc = acc
 insert (Unqual (TCOcc _)) acc = acc
@@ -162,11 +155,11 @@ mkClassDecl cxt cname tyvars sigs mbinds prags loc
     (dname, tname) = case cname of
 	  	       Qual m (TCOcc s) hif -> (Qual m (VarOcc s1) hif, Qual m (TCOcc s1) hif)
 					    where
-					       s1 = SLIT(":") _APPEND_ s
+					       s1 = mkClassTyConStr s
 
 		       Unqual (TCOcc s)     -> (Unqual (VarOcc s1),     Unqual (TCOcc s1))
 					    where
-					       s1 = SLIT(":") _APPEND_ s
+					       s1 = mkClassDataConStr s
 
 -- This nasty little function tests for whether a RdrName was 
 -- constructed by the above process.  It's used only for filtering
@@ -197,6 +190,16 @@ qual     (m,n) = Qual m n HiFile
 tcQual   (m,n) = Qual m (TCOcc n) HiFile
 varQual  (m,n) = Qual m (VarOcc n) HiFile
 
+mkTupConRdrName :: Int -> RdrName  -- The name for the tuple data construtor
+				   -- Hence VarOcc
+mkTupConRdrName arity = case mkTupNameStr arity of
+			   (mod, occ) -> Qual mod (VarOcc occ) HiFile
+
+mkUbxTupConRdrName :: Int -> RdrName  -- The name for the tuple data construtor
+	   			      -- Hence VarOcc
+mkUbxTupConRdrName arity = case mkUbxTupNameStr arity of
+			      (mod, occ) -> Qual mod (VarOcc occ) HiFile
+
 lexTcQual  (m,n,hif) = Qual m (TCOcc n) hif
 lexVarQual (m,n,hif) = Qual m (VarOcc n) hif
 
@@ -216,6 +219,7 @@ isUnqual (Qual _ _ _) = False
 
 isQual (Unqual _)   = False
 isQual (Qual _ _ _) = True
+
 
 	-- Used for adding a prefix to a RdrName
 prefixRdrName :: FAST_STRING -> RdrName -> RdrName
@@ -238,8 +242,8 @@ rdrNameModule (Qual m _ _) = m
 ieOcc :: RdrNameIE -> OccName
 ieOcc ie = rdrNameOcc (ieName ie)
 
-instance Text RdrName where -- debugging
-    showsPrec _ rn = showString (showSDoc (ppr rn))
+instance Show RdrName where -- debugging
+    showsPrec p rn = showsPrecSDoc p (ppr rn)
 
 instance Eq RdrName where
     a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
@@ -259,7 +263,5 @@ instance Outputable RdrName where
 instance NamedThing RdrName where		-- Just so that pretty-printing of expressions works
     getOccName = rdrNameOcc
     getName = panic "no getName for RdrNames"
-
-showRdr rdr = showSDoc (ppr rdr)
 \end{code}
 

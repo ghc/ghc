@@ -12,12 +12,21 @@ individual operations.
 
 module Bits where
 
+#ifdef __HUGS__
+import PreludeBuiltin
+#else
 import PrelBase
+#endif
 
+--ADR: The fixity for .|. conflicts with that for .|. in Fran.
+--     Removing all fixities is a fairly safe fix; fixing the "one fixity
+--     per symbol per program" limitation in Hugs would take a lot longer.
+#ifndef __HUGS__
 infixl 8 `shift`, `rotate`
 infixl 7 .&.
 infixl 6 `xor`
 infixl 5 .|.
+#endif
 
 class Bits a where
   (.&.), (.|.), xor :: a -> a -> a

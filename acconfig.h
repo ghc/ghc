@@ -33,17 +33,8 @@
 /* Define as the symbol which marks the end of the data section */
 #undef DATA_SECTION_END_MARKER
 
-/* Define as the decl which terminates the data section */
-#undef DATA_SECTION_END_MARKER_DECL
-
 /* Define if time.h or sys/time.h define the altzone variable */
 #undef HAVE_ALTZONE
-
-/* Define if you have /bin/sh */
-#define HAVE_BIN_SH 0
-
-/* Define if you have the GetModuleFileName function.  */
-#define HAVE_GETMODULEFILENAME 0
 
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
@@ -51,29 +42,15 @@
 /* Define if fcntl.h defines O_BINARY */
 #undef HAVE_O_BINARY
 
-/* Define if compiler supports prototypes. */
-#define HAVE_PROTOTYPES 0
-
-/* Define if you have the WinExec function.  */
-#define HAVE_WINEXEC 0
-
 /* Define if C Symbols have a leading underscore added by the compiler */
 #undef LEADING_UNDERSCORE
 
 /* Define as the symbol which marks the end of the text section */
 #undef TEXT_SECTION_END_MARKER
 
-/* Define to decl that terminates text section. */
-#undef TEXT_SECTION_END_MARKER_DECL
-
 /* Define to the type of the timezone variable (usually long or time_t) */
 #undef TYPE_TIMEZONE
 
-/* Define if signal handlers have type void (*)(int)
- * (Otherwise, they're assumed to have type int (*)(void).)
- */
-#define VOID_INT_SIGNALS 0
- 
 
 /* Leave that blank line there!!  Autoheader needs it.
    If you're adding to this file, keep in mind:

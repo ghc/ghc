@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[StgLint]{A ``lint'' pass to check for Stg correctness}
 
@@ -11,28 +11,21 @@ module StgLint ( lintStgBindings ) where
 import StgSyn
 
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag, foldBag )
-import Id		( idType, isAlgCon, dataConArgTys,
-			  emptyIdSet, isEmptyIdSet, elementOfIdSet,
-			  mkIdSet, intersectIdSets, 
-			  unionIdSets, idSetToList, IdSet,
-			  GenId{-instanced NamedThing-}, Id
-			)
-import Literal		( literalType, Literal{-instance Outputable-} )
+import Id		( Id, idType )
+import VarSet
+import DataCon		( DataCon, dataConArgTys, dataConType )
+import Const		( literalType, conType, Literal )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc )
 import ErrUtils		( ErrMsg )
-import PrimOp		( primOpType )
-import SrcLoc		( SrcLoc{-instance Outputable-} )
-import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe,
-			  isTyVarTy, Type
+import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe, 
+			  isUnLiftedType, isTyVarTy, Type
 			)
 import TyCon		( TyCon, isDataTyCon )
 import Util		( zipEqual, trace )
 import Outputable
 
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
-
-unDictifyTy = panic "StgLint.unDictifyTy (ToDo)"
 \end{code}
 
 Checks for
@@ -55,7 +48,7 @@ lintStgBindings whodunnit binds
     case (initL (lint_binds binds)) of
       Nothing  -> binds
       Just msg -> pprPanic "" (vcat [
-			ptext SLIT("*** Stg Lint ErrMsgs: in "),text whodunnit, ptext SLIT(" ***"),
+			ptext SLIT("*** Stg Lint ErrMsgs: in") <+> text whodunnit <+> ptext SLIT("***"),
 			msg,
 			ptext SLIT("*** Offending Program ***"),
 			pprStgBindings binds,
@@ -74,12 +67,11 @@ lintStgBindings whodunnit binds
 
 \begin{code}
 lintStgArg :: StgArg -> LintM (Maybe Type)
+lintStgArg (StgConArg con) = returnL (Just (conType con))
+lintStgArg (StgVarArg v)   = lintStgVar v
 
-lintStgArg (StgLitArg lit)       = returnL (Just (literalType lit))
-lintStgArg (StgConArg con)       = returnL (Just (idType con))
-lintStgArg a@(StgVarArg v)
-  = checkInScope v	`thenL_`
-    returnL (Just (idType v))
+lintStgVar v  = checkInScope v	`thenL_`
+		returnL (Just (idType v))
 \end{code}
 
 \begin{code}
@@ -101,22 +93,28 @@ lint_binds_help (binder, rhs)
 	-- Check the rhs
 	lintStgRhs rhs    `thenL` \ maybe_rhs_ty ->
 
+	-- Check binder doesn't have unlifted type
+	checkL (not (isUnLiftedType binder_ty))
+	       (mkUnLiftedTyMsg binder rhs)		`thenL_`
+
 	-- Check match to RHS type
 	(case maybe_rhs_ty of
 	  Nothing     -> returnL ()
-	  Just rhs_ty -> checkTys (idType binder)
+	  Just rhs_ty -> checkTys  binder_ty
 				   rhs_ty
 				   (mkRhsMsg binder rhs_ty)
 	)			`thenL_`
 
 	returnL ()
     )
+  where
+    binder_ty = idType binder
 \end{code}
 
 \begin{code}
 lintStgRhs :: StgRhs -> LintM (Maybe Type)
 
-lintStgRhs (StgRhsClosure _ _ _ _ binders expr)
+lintStgRhs (StgRhsClosure _ _ _ _ _ binders expr)
   = addLoc (LambdaBodyOf binders) (
     addInScopeVars binders (
 	lintStgExpr expr   `thenMaybeL` \ body_ty ->
@@ -129,14 +127,14 @@ lintStgRhs (StgRhsCon _ con args)
       Nothing 	    -> returnL Nothing
       Just arg_tys  -> checkFunApp con_ty arg_tys (mkRhsConMsg con_ty arg_tys)
   where
-    con_ty = idType con
+    con_ty = dataConType con
 \end{code}
 
 \begin{code}
 lintStgExpr :: StgExpr -> LintM (Maybe Type)	-- Nothing if error found
 
-lintStgExpr e@(StgApp fun args _)
-  = lintStgArg fun		`thenMaybeL` \ fun_ty  ->
+lintStgExpr e@(StgApp fun args)
+  = lintStgVar fun		`thenMaybeL` \ fun_ty  ->
     mapMaybeL lintStgArg args	`thenL`      \ maybe_arg_tys ->
     case maybe_arg_tys of
       Nothing 	    -> returnL Nothing
@@ -148,15 +146,7 @@ lintStgExpr e@(StgCon con args _)
       Nothing 	    -> returnL Nothing
       Just arg_tys  -> checkFunApp con_ty arg_tys (mkFunAppMsg con_ty arg_tys e)
   where
-    con_ty = idType con
-
-lintStgExpr e@(StgPrim op args _)
-  = mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
-    case maybe_arg_tys of
-      Nothing      -> returnL Nothing
-      Just arg_tys -> checkFunApp op_ty arg_tys (mkFunAppMsg op_ty arg_tys e)
-  where
-    op_ty = primOpType op
+    con_ty = conType con
 
 lintStgExpr (StgLet binds body)
   = lintStgBinds binds		`thenL` \ binders ->
@@ -172,15 +162,16 @@ lintStgExpr (StgLetNoEscape _ _ binds body)
 	lintStgExpr body
     ))
 
-lintStgExpr (StgSCC _ _ expr)	= lintStgExpr expr
+lintStgExpr (StgSCC _ expr)	= lintStgExpr expr
 
-lintStgExpr e@(StgCase scrut _ _ _ alts)
+lintStgExpr e@(StgCase scrut _ _ bndr _ alts)
   = lintStgExpr scrut		`thenMaybeL` \ _ ->
+    checkTys (idType bndr) scrut_ty (mkDefltMsg bndr) `thenL_`
 
 	-- Check that it is a data type
     case (splitAlgTyConApp_maybe scrut_ty) of
       Just (tycon, _, _) | isDataTyCon tycon
-	      -> lintStgAlts alts scrut_ty tycon
+	      -> addInScopeVars [bndr] (lintStgAlts alts scrut_ty tycon)
       other   -> addErrL (mkCaseDataConMsg e)	`thenL_`
 		 returnL Nothing
   where
@@ -248,11 +239,7 @@ lintPrimAlt scrut_ty alt@(lit,rhs)
    lintStgExpr rhs
 
 lintDeflt StgNoDefault scrut_ty = returnL Nothing
-lintDeflt deflt@(StgBindDefault binder _ rhs) scrut_ty
-  = checkTys (idType binder) scrut_ty (mkDefltMsg deflt)	`thenL_`
-    addInScopeVars [binder] (
-	lintStgExpr rhs
-    )
+lintDeflt deflt@(StgBindDefault rhs) scrut_ty = lintStgExpr rhs
 \end{code}
 
 
@@ -278,8 +265,7 @@ instance Outputable LintLocInfo where
       = hcat [ppr (getSrcLoc v), ptext SLIT(": [RHS of "), pp_binders [v], char ']']
 
     ppr (LambdaBodyOf bs)
-      = hcat [ppr (getSrcLoc (head bs)),
-		ptext SLIT(": [in body of lambda with binders "), pp_binders bs, char ']']
+      = hcat [ptext SLIT(": [in body of lambda with binders "), pp_binders bs, char ']']
 
     ppr (BodyOfLetRec bs)
       = hcat [ppr (getSrcLoc (head bs)),
@@ -296,7 +282,7 @@ pp_binders bs
 \begin{code}
 initL :: LintM a -> Maybe ErrMsg
 initL m
-  = case (m [] emptyIdSet emptyBag) of { (_, errs) ->
+  = case (m [] emptyVarSet emptyBag) of { (_, errs) ->
     if isEmptyBag errs then
 	Nothing
     else
@@ -355,7 +341,10 @@ addErrL msg loc scope errs = ((), addErr errs msg loc)
 addErr :: Bag ErrMsg -> ErrMsg -> [LintLocInfo] -> Bag ErrMsg
 
 addErr errs_so_far msg locs
-  = errs_so_far `snocBag` (hang (ppr (head locs)) 4 msg)
+  = errs_so_far `snocBag` mk_msg locs
+  where
+    mk_msg (loc:_) = hang (ppr loc) 4 msg
+    mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m loc scope errs
@@ -368,16 +357,16 @@ addInScopeVars ids m loc scope errs
     -- For now, it's just a "trace"; we may make
     -- a real error out of it...
     let
-	new_set = mkIdSet ids
+	new_set = mkVarSet ids
 
-	shadowed = scope `intersectIdSets` new_set
+	shadowed = scope `intersectVarSet` new_set
     in
 --  After adding -fliberate-case, Simon decided he likes shadowed
 --  names after all.  WDP 94/07
---  (if isEmptyIdSet shadowed
+--  (if isEmptyVarSet shadowed
 --  then id
---  else pprTrace "Shadowed vars:" (ppr (idSetToList shadowed))) $
-    m loc (scope `unionIdSets` new_set) errs
+--  else pprTrace "Shadowed vars:" (ppr (varSetElems shadowed))) $
+    m loc (scope `unionVarSet` new_set) errs
 \end{code}
 
 \begin{code}
@@ -401,12 +390,12 @@ checkFunApp fun_ty arg_tys msg loc scope errs
       | isTyVarTy res_ty
       = (Just res_ty, errs)
       | otherwise
-      = case splitFunTys (unDictifyTy res_ty) of
+      = case splitFunTys res_ty of
 	  ([], _) 		  -> (Nothing, addErr errs msg loc)	-- Too many args
 	  (new_expected, new_res) -> cfa new_res new_expected arg_tys
 
     cfa res_ty (expected_arg_ty:expected_arg_tys) (arg_ty:arg_tys)
-      = if (sleazy_eq_ty expected_arg_ty arg_ty)
+      = if (expected_arg_ty == arg_ty)
 	then cfa res_ty expected_arg_tys arg_tys
 	else (Nothing, addErr errs msg loc) -- Arg mis-match
 \end{code}
@@ -414,14 +403,14 @@ checkFunApp fun_ty arg_tys msg loc scope errs
 \begin{code}
 checkInScope :: Id -> LintM ()
 checkInScope id loc scope errs
-  = if isLocallyDefined id && not (isAlgCon id) && not (id `elementOfIdSet` scope) then
+  = if isLocallyDefined id && not (id `elemVarSet` scope) then
 	((), addErr errs (hsep [ppr id, ptext SLIT("is out of scope")]) loc)
     else
 	((), errs)
 
 checkTys :: Type -> Type -> ErrMsg -> LintM ()
 checkTys ty1 ty2 msg loc scope errs
-  = if (sleazy_eq_ty ty1 ty2)
+  = if (ty1 == ty2)
     then ((), errs)
     else ((), addErr errs msg loc)
 \end{code}
@@ -436,17 +425,16 @@ mkCaseAltMsg alts
 mkCaseDataConMsg :: StgExpr -> ErrMsg
 mkCaseDataConMsg expr
   = ($$) (ptext SLIT("A case scrutinee not a type-constructor type:"))
-	    (pp_expr expr)
+	    (ppr expr)
 
 mkCaseAbstractMsg :: TyCon -> ErrMsg
 mkCaseAbstractMsg tycon
   = ($$) (ptext SLIT("An algebraic case on an abstract type:"))
 	    (ppr tycon)
 
-mkDefltMsg :: StgCaseDefault -> ErrMsg
-mkDefltMsg deflt
-  = ($$) (ptext SLIT("Binder in default case of a case expression doesn't match type of scrutinee:"))
-	    --LATER: (ppr deflt)
+mkDefltMsg :: Id -> ErrMsg
+mkDefltMsg bndr
+  = ($$) (ptext SLIT("Binder of a case expression doesn't match type of scrutinee:"))
 	    (panic "mkDefltMsg")
 
 mkFunAppMsg :: Type -> [Type] -> StgExpr -> ErrMsg
@@ -454,7 +442,7 @@ mkFunAppMsg fun_ty arg_tys expr
   = vcat [text "In a function application, function type doesn't match arg types:",
 	      hang (ptext SLIT("Function type:")) 4 (ppr fun_ty),
 	      hang (ptext SLIT("Arg types:")) 4 (vcat (map (ppr) arg_tys)),
-	      hang (ptext SLIT("Expression:")) 4 (pp_expr expr)]
+	      hang (ptext SLIT("Expression:")) 4 (ppr expr)]
 
 mkRhsConMsg :: Type -> [Type] -> ErrMsg
 mkRhsConMsg fun_ty arg_tys
@@ -473,7 +461,7 @@ mkAlgAltMsg1 ty
   = ($$) (text "In some case statement, type of scrutinee is not a data type:")
 	    (ppr ty)
 
-mkAlgAltMsg2 :: Type -> Id -> ErrMsg
+mkAlgAltMsg2 :: Type -> DataCon -> ErrMsg
 mkAlgAltMsg2 ty con
   = vcat [
 	text "In some algebraic case alternative, constructor is not a constructor of scrutinee type:",
@@ -481,7 +469,7 @@ mkAlgAltMsg2 ty con
 	ppr con
     ]
 
-mkAlgAltMsg3 :: Id -> [Id] -> ErrMsg
+mkAlgAltMsg3 :: DataCon -> [Id] -> ErrMsg
 mkAlgAltMsg3 con alts
   = vcat [
 	text "In some algebraic case alternative, number of arguments doesn't match constructor:",
@@ -499,8 +487,8 @@ mkAlgAltMsg4 ty arg
 
 mkPrimAltMsg :: (Literal, StgExpr) -> ErrMsg
 mkPrimAltMsg alt
-  = ($$) (text "In a primitive case alternative, type of literal doesn't match type of scrutinee:")
-	    (ppr alt)
+  = text "In a primitive case alternative, type of literal doesn't match type of scrutinee:"
+    $$ ppr alt
 
 mkRhsMsg :: Id -> Type -> ErrMsg
 mkRhsMsg binder ty
@@ -510,17 +498,9 @@ mkRhsMsg binder ty
 	      hsep [ptext SLIT("Rhs type:"), ppr ty]
 	     ]
 
-pp_expr :: StgExpr -> SDoc
-pp_expr expr = ppr expr
-
-sleazy_eq_ty ty1 ty2
-	-- NB: probably severe overkill (WDP 95/04)
-  = trace "StgLint.sleazy_eq_ty:use eqSimplTy?" $
-    case (splitFunTys ty1) of { (tyargs1,tyres1) ->
-    case (splitFunTys ty2) of { (tyargs2,tyres2) ->
-    let
-	ty11 = mkFunTys tyargs1 tyres1
-	ty22 = mkFunTys tyargs2 tyres2
-    in
-    ty11 == ty22 }}
+mkUnLiftedTyMsg binder rhs
+  = (ptext SLIT("Let(rec) binder") <+> quotes (ppr binder) <+> 
+     ptext SLIT("has unlifted type") <+> quotes (ppr (idType binder)))
+    $$
+    (ptext SLIT("RHS:") <+> ppr rhs)
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[RnExpr]{Renaming of expressions}
 
@@ -17,7 +17,7 @@ module RnExpr (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} RnBinds 
+import {-# SOURCE #-} RnBinds  ( rnBinds ) 
 import {-# SOURCE #-} RnSource ( rnHsSigType )
 
 import HsSyn
@@ -31,14 +31,15 @@ import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR,
 			  ccallableClass_RDR, creturnableClass_RDR, 
 			  monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
 			  ratioDataCon_RDR, negate_RDR, assertErr_RDR,
-			  ioDataCon_RDR, ioOkDataCon_RDR
+			  ioDataCon_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
 			)
-import Name
+import Name		( nameUnique, isLocallyDefined, NamedThing(..) )
+import NameSet
 import UniqFM		( isNullUFM )
-import UniqSet		( emptyUniqSet, unionManyUniqSets, UniqSet )
+import UniqSet		( emptyUniqSet, UniqSet )
 import Unique		( assertIdKey )
 import Util		( removeDups )
 import Outputable
@@ -111,14 +112,14 @@ rnPat (NPlusKPatIn name lit)
     returnRn (NPlusKPatIn name' lit)
 
 rnPat (ListPatIn pats)
-  = addImplicitOccRn listType_name	`thenRn_` 
+  = addImplicitOccRn listTyCon_name	`thenRn_` 
     mapRn rnPat pats 			`thenRn` \ patslist ->
     returnRn (ListPatIn patslist)
 
-rnPat (TuplePatIn pats)
-  = addImplicitOccRn (tupleType_name (length pats))	`thenRn_` 
+rnPat (TuplePatIn pats boxed)
+  = addImplicitOccRn (tupleTyCon_name boxed (length pats)) `thenRn_`
     mapRn rnPat pats 					`thenRn` \ patslist ->
-    returnRn (TuplePatIn patslist)
+    returnRn (TuplePatIn patslist boxed)
 
 rnPat (RecPatIn con rpats)
   = lookupOccRn con 	`thenRn` \ con' ->
@@ -187,28 +188,23 @@ rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
 	rnGRHSs grhss  `thenRn` \ (grhss', fvss) ->
 	returnRn (grhs' : grhss', fvs `unionNameSets` fvss)
 
-    rnGRHS (GRHS guard expr locn)
+    rnGRHS (GRHS guarded locn)
       = pushSrcLocRn locn $		    
-	(if not (opt_GlasgowExts || is_standard_guard guard) then
-		addWarnRn (nonStdGuardErr guard)
+	(if not (opt_GlasgowExts || is_standard_guard guarded) then
+		addWarnRn (nonStdGuardErr guarded)
 	 else
 		returnRn ()
 	)		`thenRn_`
 
-	(rnStmts rnExpr guard	$ \ guard' ->
-		-- This nested thing deals with scope and
-		-- the free vars of the guard, and knocking off the
-		-- free vars of the rhs that are bound by the guard
-
-	rnExpr expr	`thenRn` \ (expr',  fvse) ->
-	returnRn (GRHS guard' expr' locn, fvse))
+	rnStmts rnExpr guarded	`thenRn` \ (guarded', fvs) ->
+	returnRn (GRHS guarded' locn, fvs)
 
 	-- Standard Haskell 1.4 guards are just a single boolean
 	-- expression, rather than a list of qualifiers as in the
 	-- Glasgow extension
-    is_standard_guard [] 	      = True
-    is_standard_guard [GuardStmt _ _] = True
-    is_standard_guard other	      = False
+    is_standard_guard [ExprStmt _ _]                = True
+    is_standard_guard [GuardStmt _ _, ExprStmt _ _] = True
+    is_standard_guard other	      		    = False
 \end{code}
 
 %************************************************************************
@@ -317,7 +313,6 @@ rnExpr (CCall fun args may_gc is_casm fake_result_ty)
   = lookupImplicitOccRn ccallableClass_RDR	`thenRn_`
     lookupImplicitOccRn creturnableClass_RDR	`thenRn_`
     lookupImplicitOccRn ioDataCon_RDR		`thenRn_`
-    lookupImplicitOccRn ioOkDataCon_RDR		`thenRn_`
     rnExprs args				`thenRn` \ (args', fvs_args) ->
     returnRn (CCall fun args' may_gc is_casm fake_result_ty, fvs_args)
 
@@ -339,23 +334,23 @@ rnExpr (HsLet binds expr)
 rnExpr (HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
     lookupImplicitOccRn monadZeroClass_RDR	`thenRn_`	-- Forces Monad to come too
-    (rnStmts rnExpr stmts			$ \ stmts' ->
-    returnRn (HsDo do_or_lc stmts' src_loc, emptyNameSet))
+    rnStmts rnExpr stmts			`thenRn` \ (stmts', fvs) ->
+    returnRn (HsDo do_or_lc stmts' src_loc, fvs)
 
 rnExpr (ExplicitList exps)
-  = addImplicitOccRn listType_name	`thenRn_` 
+  = addImplicitOccRn listTyCon_name	`thenRn_` 
     rnExprs exps		 	`thenRn` \ (exps', fvs) ->
     returnRn  (ExplicitList exps', fvs)
 
-rnExpr (ExplicitTuple exps)
-  = addImplicitOccRn (tupleType_name (length exps))	`thenRn_` 
-    rnExprs exps	 				`thenRn` \ (exps', fvExps) ->
-    returnRn (ExplicitTuple exps', fvExps)
+rnExpr (ExplicitTuple exps boxed)
+  = addImplicitOccRn (tupleTyCon_name boxed (length exps)) `thenRn_` 
+    rnExprs exps	 			`thenRn` \ (exps', fvExps) ->
+    returnRn (ExplicitTuple exps' boxed, fvExps)
 
-rnExpr (RecordCon con_id _ rbinds)
+rnExpr (RecordCon con_id rbinds)
   = lookupOccRn con_id 			`thenRn` \ conname ->
     rnRbinds "construction" rbinds	`thenRn` \ (rbinds', fvRbinds) ->
-    returnRn (RecordCon conname (error "rnExpr:RecordCon") rbinds', fvRbinds)
+    returnRn (RecordCon conname rbinds', fvRbinds)
 
 rnExpr (RecordUpd expr rbinds)
   = rnExpr expr			`thenRn` \ (expr', fvExpr) ->
@@ -455,18 +450,19 @@ type RnExprTy s = RdrNameHsExpr -> RnMS s (RenamedHsExpr, FreeVars)
 
 rnStmts :: RnExprTy s
 	-> [RdrNameStmt] 
-	-> ([RenamedStmt] -> RnMS s (a, FreeVars))
-	-> RnMS s (a, FreeVars)
+	-> RnMS s ([RenamedStmt], FreeVars)
 
-rnStmts rn_expr [] thing_inside 
-  = thing_inside []
+rnStmts rn_expr []
+  = returnRn ([], emptyNameSet)
 
-rnStmts rn_expr (stmt:stmts) thing_inside
+rnStmts rn_expr (stmt:stmts)
   = rnStmt rn_expr stmt				$ \ stmt' ->
-    rnStmts rn_expr stmts			$ \ stmts' ->
-    thing_inside (stmt' : stmts')
+    rnStmts rn_expr stmts			`thenRn` \ (stmts', fvs) ->
+    returnRn (stmt' : stmts', fvs)
 
-rnStmt :: RnExprTy s -> RdrNameStmt -> (RenamedStmt -> RnMS s (a, FreeVars)) -> RnMS s (a, FreeVars)
+rnStmt :: RnExprTy s -> RdrNameStmt
+       -> (RenamedStmt -> RnMS s (a, FreeVars))
+       -> RnMS s (a, FreeVars)
 -- Because of mutual recursion we have to pass in rnExpr.
 
 rnStmt rn_expr (BindStmt pat expr src_loc) thing_inside
@@ -681,14 +677,14 @@ are made available.
 
 \begin{code}
 litOccurrence (HsChar _)
-  = addImplicitOccRn charType_name
+  = addImplicitOccRn charTyCon_name
 
 litOccurrence (HsCharPrim _)
   = addImplicitOccRn (getName charPrimTyCon)
 
 litOccurrence (HsString _)
-  = addImplicitOccRn listType_name	`thenRn_`
-    addImplicitOccRn charType_name
+  = addImplicitOccRn listTyCon_name	`thenRn_`
+    addImplicitOccRn charTyCon_name
 
 litOccurrence (HsStringPrim _)
   = addImplicitOccRn (getName addrPrimTyCon)

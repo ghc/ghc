@@ -1,5 +1,5 @@
 %
-% (c) The GRASP Project, Glasgow University, 1992-1996
+% (c) The GRASP Project, Glasgow University, 1992-1998
 %
 \section[Rename]{Renaming and dependency analysis passes}
 
@@ -24,16 +24,15 @@ import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getSpeci
 			  mkSearchPath, getSlurpedNames, getRnStats
 			)
 import RnEnv		( addImplicitOccsRn, availNames )
-import Name		( Name, PrintUnqualified, Provenance, isLocallyDefined,
-			  NameSet,
-			    nameSetToList, minusNameSet,
+import Name		( Name, isLocallyDefined,
 			  NamedThing(..),
-			   nameModule, pprModule, pprOccName, nameOccName
+			  nameModule, pprModule, pprOccName, nameOccName
 			)
-import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
+import NameSet
 import TyCon		( TyCon )
 import PrelMods		( mAIN, pREL_MAIN )
-import PrelInfo		( ioTyCon_NAME )
+import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
+import PrelInfo		( ioTyCon_NAME, thinAirIdNames )
 import ErrUtils		( pprBagOfErrors, pprBagOfWarnings,
 			  doIfSet, dumpIfSet, ghcExit
 			)
@@ -42,7 +41,6 @@ import FiniteMap	( fmToList, delListFromFM )
 import UniqSupply	( UniqSupply )
 import Util		( equivClasses )
 import Maybes		( maybeToBool )
-import List		( partition )
 import Outputable
 \end{code}
 
@@ -165,18 +163,18 @@ mentioned explicitly, but which might be needed by the type checker.
 
 \begin{code}
 addImplicits mod_name
-  = addImplicitOccsRn (implicit_main ++ default_tys)
+  = addImplicitOccsRn (implicit_main ++ default_tys ++ thinAirIdNames)
   where
 	-- Add occurrences for Int, Double, and (), because they
 	-- are the types to which ambigious type variables may be defaulted by
-	-- the type checker; so they won't every appear explicitly.
+	-- the type checker; so they won't always appear explicitly.
 	-- [The () one is a GHC extension for defaulting CCall results.]
     default_tys = [getName intTyCon, getName doubleTyCon, getName unitTyCon ]
 
 	-- Add occurrences for IO or PrimIO
     implicit_main |  mod_name == mAIN
 		  || mod_name == pREL_MAIN = [ioTyCon_NAME]
-		  |  otherwise 		  = []
+		  |  otherwise 		   = []
 \end{code}
 
 

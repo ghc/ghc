@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[RegAllocInfo]{Machine-specific info used for register allocation}
 
@@ -57,13 +57,11 @@ import MachMisc
 import MachRegs
 import MachCode		( InstrList )
 
-import AbsCSyn		( MagicId )
 import BitSet		( unitBS, mkBS, minusBS, unionBS, listBS, BitSet )
 import CLabel		( pprCLabel_asm, CLabel{-instance Ord-} )
 import FiniteMap	( addToFM, lookupFM, FiniteMap )
-import OrdList		( mkUnitList, OrdList )
+import OrdList		( mkUnitList )
 import PrimRep		( PrimRep(..) )
-import Stix		( StixTree, CodeSegment )
 import UniqSet		-- quite a bit of it
 import Outputable
 \end{code}
@@ -419,7 +417,7 @@ regUsage instr = case instr of
     FISUBR sz asrc	-> usage (addrToRegs asrc) [st0]
     FTST 		-> usage [st0] []
     FCOMP sz op		-> usage (st0:opToReg op) [st0] -- allFPRegs
-    FUCOMPP 		-> usage [st0, st1] [] --  allFPRegs
+    FUCOMPP 		-> usage [st0, st1] [st0, st1] --  allFPRegs
     FXCH		-> usage [st0, st1] [st0, st1]
     FNSTSW		-> usage [] [eax]
     _			-> noUsage

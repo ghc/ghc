@@ -1,10 +1,10 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnSource ( rnDecl, rnHsType, rnHsSigType ) where
+module RnSource ( rnDecl, rnHsSigType ) where
 
 #include "HsVersions.h"
 
@@ -16,37 +16,34 @@ import HsTypes		( getTyVarName, pprClassAssertion, cmpHsTypes )
 import RdrHsSyn
 import RnHsSyn
 import HsCore
-import CmdLineOpts	( opt_IgnoreIfacePragmas )
 
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs )
-import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, lookupImplicitOccRn, bindLocalsRn,
-			  newDfunName, checkDupOrQualNames, checkDupNames, lookupGlobalOccRn,
-			  newLocallyDefinedGlobalName, newImportedGlobalName, ifaceFlavour,
-			  listType_RDR, tupleType_RDR, addImplicitOccRn
-			)
+import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, 
+			  lookupImplicitOccRn, addImplicitOccRn,
+			  bindLocalsRn,
+			  newDfunName, checkDupOrQualNames, checkDupNames,
+			  newLocallyDefinedGlobalName, newImportedGlobalName, 
+			  ifaceFlavour, listTyCon_name, tupleTyCon_name )
 import RnMonad
 
 import Name		( Name, OccName(..), occNameString, prefixOccName,
-			  ExportFlag(..), Provenance(..), NameSet, mkNameSet,
-			  elemNameSet, nameOccName, NamedThing(..)
+			  ExportFlag(..), Provenance(..),
+			  nameOccName, NamedThing(..), isLexCon,
+			  mkDefaultMethodName
 			)
+import NameSet
 import BasicTypes	( TopLevelFlag(..) )
-import FiniteMap	( lookupFM )
-import Id		( GenId{-instance NamedThing-} )
-import IdInfo		( FBTypeInfo, ArgUsageInfo )
-import Lex		( isLexCon )
-import PrelInfo		( derivingOccurrences, evalClass_RDR, numClass_RDR, allClass_NAME,
-			  ioOkDataCon_NAME
+import FiniteMap	( elemFM )
+import PrelInfo		( derivingOccurrences, numClass_RDR, 
+			  deRefStablePtr_NAME, makeStablePtr_NAME,
+			  bindIO_NAME
 			)
-import Maybes		( maybeToBool )
 import Bag		( bagToList )
 import Outputable
 import SrcLoc		( SrcLoc )
-import Unique		( Unique )
-import UniqSet		( UniqSet )
-import UniqFM		( UniqFM, lookupUFM )
+import UniqFM		( lookupUFM )
+import Maybes		( maybeToBool )
 import Util
-import List		( partition, nub )
 \end{code}
 
 rnDecl `renames' declarations.
@@ -79,7 +76,7 @@ rnDecl (ValD binds) = rnTopBinds binds	`thenRn` \ new_binds ->
 rnDecl (SigD (IfaceSig name ty id_infos loc))
   = pushSrcLocRn loc $
     lookupBndrRn name		`thenRn` \ name' ->
-    rnHsType ty			`thenRn` \ ty' ->
+    rnHsType doc_str ty		`thenRn` \ ty' ->
 
 	-- Get the pragma info (if any).
     getModeRn			`thenRn` \ (InterfaceMode _ print_unqual) ->
@@ -88,6 +85,8 @@ rnDecl (SigD (IfaceSig name ty id_infos loc))
 	-- so that (a) we don't die
     mapRn rnIdInfo id_infos	`thenRn` \ id_infos' -> 
     returnRn (SigD (IfaceSig name' ty' id_infos' loc))
+  where
+    doc_str = text "the interface signature for" <+> quotes (ppr name)
 \end{code}
 
 %*********************************************************
@@ -113,7 +112,7 @@ rnDecl (TyD (TyData new_or_data context tycon tyvars condecls derivings pragmas 
   = pushSrcLocRn src_loc $
     lookupBndrRn tycon			    		`thenRn` \ tycon' ->
     bindTyVarsRn data_doc tyvars			$ \ tyvars' ->
-    rnContext context   				`thenRn` \ context' ->
+    rnContext data_doc context 				`thenRn` \ context' ->
     checkDupOrQualNames data_doc con_names		`thenRn_`
     mapRn rnConDecl condecls				`thenRn` \ condecls' ->
     rnDerivs derivings					`thenRn` \ derivings' ->
@@ -127,10 +126,10 @@ rnDecl (TyD (TySynonym name tyvars ty src_loc))
   = pushSrcLocRn src_loc $
     lookupBndrRn name				`thenRn` \ name' ->
     bindTyVarsRn syn_doc tyvars 		$ \ tyvars' ->
-    rnHsType ty	    				`thenRn` \ ty' ->
+    rnHsType syn_doc ty				`thenRn` \ ty' ->
     returnRn (TyD (TySynonym name' tyvars' ty' src_loc))
   where
-    syn_doc = text "the declaration for type synonym" <+> ppr name
+    syn_doc = text "the declaration for type synonym" <+> quotes (ppr name)
 \end{code}
 
 %*********************************************************
@@ -152,7 +151,7 @@ rnDecl (ClD (ClassDecl context cname tyvars sigs mbinds pragmas tname dname src_
     lookupBndrRn dname					`thenRn` \ dname' ->
 
     bindTyVarsRn cls_doc tyvars					( \ tyvars' ->
-	rnContext context	    				`thenRn` \ context' ->
+	rnContext cls_doc context				`thenRn` \ context' ->
 
 	     -- Check the signatures
 	let
@@ -185,12 +184,12 @@ rnDecl (ClD (ClassDecl context cname tyvars sigs mbinds pragmas tname dname src_
 
     rn_op clas clas_tyvars sig@(ClassOpSig op maybe_dm ty locn)
       = pushSrcLocRn locn $
-	lookupBndrRn op				`thenRn` \ op_name ->
+ 	lookupBndrRn op				`thenRn` \ op_name ->
 	rnHsSigType (quotes (ppr op)) ty	`thenRn` \ new_ty  ->
 
 		-- Make the default-method name
 	let
-	    dm_occ = prefixOccName SLIT("$m") (rdrNameOcc op)
+	    dm_occ = mkDefaultMethodName (rdrNameOcc op)
 	in
 	getModuleRn			`thenRn` \ mod_name ->
 	getModeRn			`thenRn` \ mode ->
@@ -260,7 +259,6 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
 	where
 	 c_nm = nameOccName (getName cl)
 
-     mkDictPrefix (HsPreForAllTy _ ty) = mkDictPrefix ty
      mkDictPrefix (HsForAllTy _ _ ty)  = mkDictPrefix ty  -- can this 
      mkDictPrefix _		       = (nilOccName, nilOccName)
 
@@ -296,9 +294,11 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
 \begin{code}
 rnDecl (DefD (DefaultDecl tys src_loc))
   = pushSrcLocRn src_loc $
-    mapRn rnHsType tys 			`thenRn` \ tys' ->
+    mapRn (rnHsType doc_str) tys	`thenRn` \ tys' ->
     lookupImplicitOccRn numClass_RDR	`thenRn_` 
     returnRn (DefD (DefaultDecl tys' src_loc))
+  where
+    doc_str = text "a `default' declaration"
 \end{code}
 
 %*********************************************************
@@ -311,22 +311,20 @@ rnDecl (DefD (DefaultDecl tys src_loc))
 rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
   = pushSrcLocRn src_loc $
     lookupBndrRn name		        `thenRn` \ name' ->
-    (if is_import then
-        addImplicitOccRn name'
-     else
-	returnRn name')			`thenRn_`
+    (case imp_exp of
+	FoImport _ | not isDyn -> addImplicitOccRn name'
+	FoLabel    -> addImplicitOccRn name'
+	FoExport   | isDyn ->
+	   addImplicitOccRn makeStablePtr_NAME  `thenRn_`
+	   addImplicitOccRn deRefStablePtr_NAME `thenRn_`
+	   addImplicitOccRn bindIO_NAME         `thenRn_`
+	   returnRn name'
+	_ -> returnRn name')		`thenRn_`
     rnHsSigType fo_decl_msg ty		`thenRn` \ ty' ->
-     -- hack: force the constructors of IO to be slurped in,
-     -- since we need 'em when desugaring a foreign decl.
-    addImplicitOccRn ioOkDataCon_NAME   `thenRn_`
     returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc))
  where
   fo_decl_msg = ptext SLIT("a foreign declaration")
-  is_import   = 
-     not (isDynamic ext_nm) &&
-     case imp_exp of
-       FoImport _ -> True
-       _          -> False
+  isDyn	      = isDynamic ext_nm
 
 \end{code}
 
@@ -340,12 +338,10 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
 rnDerivs :: Maybe [RdrName] -> RnMS s (Maybe [Name])
 
 rnDerivs Nothing -- derivs not specified
-  = lookupImplicitOccRn evalClass_RDR		`thenRn_`
-    returnRn Nothing
+  = returnRn Nothing
 
 rnDerivs (Just ds)
-  = lookupImplicitOccRn evalClass_RDR		`thenRn_`
-    mapRn rn_deriv ds `thenRn` \ derivs ->
+  = mapRn rn_deriv ds `thenRn` \ derivs ->
     returnRn (Just derivs)
   where
     rn_deriv clas
@@ -364,49 +360,51 @@ rnDerivs (Just ds)
 
 \begin{code}
 conDeclName :: RdrNameConDecl -> (RdrName, SrcLoc)
-conDeclName (ConDecl n _ _ l)     = (n,l)
+conDeclName (ConDecl n _ _ _ l) = (n,l)
 
 rnConDecl :: RdrNameConDecl -> RnMS s RenamedConDecl
-rnConDecl (ConDecl name cxt details locn)
+rnConDecl (ConDecl name tvs cxt details locn)
   = pushSrcLocRn locn $
     checkConName name			`thenRn_` 
     lookupBndrRn name			`thenRn` \ new_name ->
-    rnConDetails name locn details	`thenRn` \ new_details -> 
-    rnContext cxt			`thenRn` \ new_context ->
-    returnRn (ConDecl new_name new_context new_details locn)
+    bindTyVarsRn doc tvs 		$ \ new_tyvars ->
+    rnContext doc cxt			`thenRn` \ new_context ->
+    rnConDetails doc locn details	`thenRn` \ new_details -> 
+    returnRn (ConDecl new_name new_tyvars new_context new_details locn)
+  where
+    doc = text "the definition of data constructor" <+> quotes (ppr name)
 
-rnConDetails con locn (VanillaCon tys)
-  = mapRn rnBangTy tys		`thenRn` \ new_tys  ->
+rnConDetails doc locn (VanillaCon tys)
+  = mapRn (rnBangTy doc) tys		`thenRn` \ new_tys  ->
     returnRn (VanillaCon new_tys)
 
-rnConDetails con locn (InfixCon ty1 ty2)
-  = rnBangTy ty1  		`thenRn` \ new_ty1 ->
-    rnBangTy ty2  		`thenRn` \ new_ty2 ->
+rnConDetails doc locn (InfixCon ty1 ty2)
+  = rnBangTy doc ty1  		`thenRn` \ new_ty1 ->
+    rnBangTy doc ty2  		`thenRn` \ new_ty2 ->
     returnRn (InfixCon new_ty1 new_ty2)
 
-rnConDetails con locn (NewCon ty)
-  = rnHsType ty			`thenRn` \ new_ty  ->
+rnConDetails doc locn (NewCon ty)
+  = rnHsType doc ty			`thenRn` \ new_ty  ->
     returnRn (NewCon new_ty)
 
-rnConDetails con locn (RecCon fields)
-  = checkDupOrQualNames fld_doc field_names	`thenRn_`
-    mapRn rnField fields			`thenRn` \ new_fields ->
+rnConDetails doc locn (RecCon fields)
+  = checkDupOrQualNames doc field_names	`thenRn_`
+    mapRn (rnField doc) fields		`thenRn` \ new_fields ->
     returnRn (RecCon new_fields)
   where
-    fld_doc = text "the fields of constructor" <> ppr con
     field_names = [(fld, locn) | (flds, _) <- fields, fld <- flds]
 
-rnField (names, ty)
+rnField doc (names, ty)
   = mapRn lookupBndrRn names	`thenRn` \ new_names ->
-    rnBangTy ty			`thenRn` \ new_ty ->
+    rnBangTy doc ty		`thenRn` \ new_ty ->
     returnRn (new_names, new_ty) 
 
-rnBangTy (Banged ty)
-  = rnHsType ty `thenRn` \ new_ty ->
+rnBangTy doc (Banged ty)
+  = rnHsType doc ty `thenRn` \ new_ty ->
     returnRn (Banged new_ty)
 
-rnBangTy (Unbanged ty)
-  = rnHsType ty `thenRn` \ new_ty ->
+rnBangTy doc (Unbanged ty)
+  = rnHsType doc ty `thenRn` \ new_ty ->
     returnRn (Unbanged new_ty)
 
 -- This data decl will parse OK
@@ -435,139 +433,114 @@ checkConName name
 rnHsSigType :: SDoc -> RdrNameHsType -> RnMS s RenamedHsType 
 	-- rnHsSigType is used for source-language type signatures,
 	-- which use *implicit* universal quantification.
+rnHsSigType doc_str ty = rnHsType (text "the type signature for" <+> doc_str) ty
 
--- Given the signature  C => T  we universally quantify over FV(T) \ {in-scope-tyvars} 
--- 
--- We insist that the universally quantified type vars is a superset of FV(C)
--- It follows that FV(T) is a superset of FV(C), so that the context constrains
--- no type variables that don't appear free in the tau-type part.
 
-rnHsSigType doc_str full_ty@(HsPreForAllTy ctxt ty)	-- From source code (no kinds on tyvars)
+
+
+rnHsType :: SDoc -> RdrNameHsType -> RnMS s RenamedHsType
+
+rnHsType doc (HsForAllTy [] ctxt ty)
+	-- From source code (no kinds on tyvars)
+
+	-- Given the signature  C => T  we universally quantify 
+	-- over FV(T) \ {in-scope-tyvars} 
+	-- 
+	-- We insist that the universally quantified type vars is a superset of FV(C)
+	-- It follows that FV(T) is a superset of FV(C), so that the context constrains
+	-- no type variables that don't appear free in the tau-type part.
+
   = getLocalNameEnv		`thenRn` \ name_env ->
     let
 	mentioned_tyvars = extractHsTyVars ty
-	forall_tyvars    = filter (not . in_scope) mentioned_tyvars
-	in_scope tv      = maybeToBool (lookupFM name_env tv)
+	forall_tyvars    = filter (not . (`elemFM` name_env)) mentioned_tyvars
 
-	constrained_tyvars 	      = extractHsCtxtTyVars ctxt
-	constrained_and_in_scope      = filter in_scope constrained_tyvars
-	constrained_and_not_mentioned = filter (not . (`elem` mentioned_tyvars)) constrained_tyvars
+	ctxt_w_ftvs :: [((RdrName,[RdrNameHsType]), [RdrName])]
+	ctxt_w_ftvs  = [ (constraint, foldr ((++) . extractHsTyVars) [] tys)
+		       | constraint@(_,tys) <- ctxt]
+
+	-- A 'non-poly constraint' is one that does not mention *any*
+	-- of the forall'd type variables
+	non_poly_constraints = filter non_poly ctxt_w_ftvs
+	non_poly (c,ftvs)    = not (any (`elem` forall_tyvars) ftvs)
+
+	-- A 'non-mentioned' constraint is one that mentions a
+	-- type variable that does not appear in 'ty'
+	non_mentioned_constraints = filter non_mentioned ctxt_w_ftvs
+	non_mentioned (c,ftvs)    = any (not . (`elem` mentioned_tyvars)) ftvs
 
 	-- Zap the context if there's a problem, to avoid duplicate error message.
-	ctxt' | null constrained_and_in_scope && null constrained_and_not_mentioned = ctxt
+	ctxt' | null non_poly_constraints && null non_mentioned_constraints = ctxt
 	      | otherwise = []
     in
-    checkRn (null constrained_and_in_scope)
-	    (ctxtErr1 sig_doc constrained_and_in_scope)	`thenRn_`
-    checkRn (null constrained_and_not_mentioned)
-	    (ctxtErr2 sig_doc constrained_and_not_mentioned ty)	`thenRn_`
+    mapRn (ctxtErr1 doc forall_tyvars ty) non_poly_constraints		`thenRn_`
+    mapRn (ctxtErr2 doc ty)               non_mentioned_constraints	`thenRn_`
 
-    (bindTyVarsRn sig_doc (map UserTyVar forall_tyvars)	$ \ new_tyvars ->
-     rnContext ctxt'					`thenRn` \ new_ctxt ->
-     rnHsType ty					`thenRn` \ new_ty ->
-     returnRn (HsForAllTy new_tyvars new_ctxt new_ty)
-    )
-  where
-    sig_doc = text "the type signature for" <+> doc_str
-			     
+    (bindTyVarsRn doc (map UserTyVar forall_tyvars)	$ \ new_tyvars ->
+    rnContext doc ctxt'					`thenRn` \ new_ctxt ->
+    rnHsType doc ty					`thenRn` \ new_ty ->
+    returnRn (mkHsForAllTy new_tyvars new_ctxt new_ty))
 
-rnHsSigType doc_str other_ty = rnHsType other_ty
+rnHsType doc (HsForAllTy tvs ctxt ty)
+	-- tvs are non-empty, hence must be from an interface file
+	-- 	(tyvars may be kinded)
+  = bindTyVarsRn doc tvs		$ \ new_tyvars ->
+    rnContext doc ctxt			`thenRn` \ new_ctxt ->
+    rnHsType doc ty			`thenRn` \ new_ty ->
+    returnRn (mkHsForAllTy new_tyvars new_ctxt new_ty)
 
-rnHsType :: RdrNameHsType -> RnMS s RenamedHsType
-rnHsType (HsForAllTy tvs ctxt ty)		-- From an interface file (tyvars may be kinded)
-  = rn_poly_help tvs ctxt ty
 
-rnHsType full_ty@(HsPreForAllTy ctxt ty)	-- A (context => ty) embedded in a type.
-						-- Universally quantify over tyvars in context
-  = getLocalNameEnv		`thenRn` \ name_env ->
-    let
-	forall_tyvars = extractHsCtxtTyVars ctxt
-    in
-    rn_poly_help (map UserTyVar forall_tyvars) ctxt ty
-
-rnHsType (MonoTyVar tyvar)
+rnHsType doc (MonoTyVar tyvar)
   = lookupOccRn tyvar 		`thenRn` \ tyvar' ->
     returnRn (MonoTyVar tyvar')
 
-rnHsType (MonoFunTy ty1 ty2)
-  = andRn MonoFunTy (rnHsType ty1) (rnHsType ty2)
+rnHsType doc (MonoFunTy ty1 ty2)
+  = andRn MonoFunTy (rnHsType doc ty1) (rnHsType doc ty2)
 
-rnHsType (MonoListTy _ ty)
-  = lookupImplicitOccRn listType_RDR		`thenRn` \ tycon_name ->
-    rnHsType ty					`thenRn` \ ty' ->
-    returnRn (MonoListTy tycon_name ty')
+rnHsType doc (MonoListTy ty)
+  = addImplicitOccRn listTyCon_name		`thenRn_`
+    rnHsType doc ty				`thenRn` \ ty' ->
+    returnRn (MonoListTy ty')
 
-rnHsType (MonoTupleTy _ tys)
-  = lookupImplicitOccRn (tupleType_RDR (length tys))	`thenRn` \ tycon_name ->
-    mapRn rnHsType tys					`thenRn` \ tys' ->
-    returnRn (MonoTupleTy tycon_name tys')
+rnHsType doc (MonoTupleTy tys boxed)
+  = addImplicitOccRn (tupleTyCon_name boxed (length tys)) `thenRn_`
+    mapRn (rnHsType doc) tys				  `thenRn` \ tys' ->
+    returnRn (MonoTupleTy tys' boxed)
 
-rnHsType (MonoTyApp ty1 ty2)
-  = rnHsType ty1		`thenRn` \ ty1' ->
-    rnHsType ty2		`thenRn` \ ty2' ->
+rnHsType doc (MonoTyApp ty1 ty2)
+  = rnHsType doc ty1		`thenRn` \ ty1' ->
+    rnHsType doc ty2		`thenRn` \ ty2' ->
     returnRn (MonoTyApp ty1' ty2')
 
-rnHsType (MonoDictTy clas tys)
+rnHsType doc (MonoDictTy clas tys)
   = lookupOccRn clas		`thenRn` \ clas' ->
-    mapRn rnHsType tys		`thenRn` \ tys' ->
+    mapRn (rnHsType doc) tys	`thenRn` \ tys' ->
     returnRn (MonoDictTy clas' tys')
-
-rn_poly_help :: [HsTyVar RdrName]		-- Universally quantified tyvars
-	     -> RdrNameContext
-	     -> RdrNameHsType
-	     -> RnMS s RenamedHsType
-rn_poly_help tyvars ctxt ty
-  = bindTyVarsRn sig_doc tyvars				$ \ new_tyvars ->
-    rnContext ctxt					`thenRn` \ new_ctxt ->
-    rnHsType ty						`thenRn` \ new_ty ->
-    returnRn (HsForAllTy new_tyvars new_ctxt new_ty)
-  where
-    sig_doc = text "a nested for-all type"
 \end{code}
 
 
 \begin{code}
-rnContext :: RdrNameContext -> RnMS s RenamedContext
+rnContext :: SDoc -> RdrNameContext -> RnMS s RenamedContext
 
-rnContext  ctxt
-  = mapRn rn_ctxt ctxt	`thenRn` \ result ->
+rnContext doc ctxt
+  = mapRn rn_ctxt ctxt		`thenRn` \ theta  ->
     let
-	(_, dup_asserts) = removeDups cmp_assert result
-	(alls, theta)    = partition (\(c,_) -> c == allClass_NAME) result
+	(_, dup_asserts) = removeDups cmp_assert theta
     in
-
 	-- Check for duplicate assertions
 	-- If this isn't an error, then it ought to be:
     mapRn (addWarnRn . dupClassAssertWarn theta) dup_asserts	`thenRn_`
 
-	-- Check for All constraining a non-type-variable
-    mapRn check_All alls					`thenRn_`
-    
-	-- Done.  Return a theta omitting all the "All" constraints.
-	-- They have done done their work by ensuring that we universally
-	-- quantify over their tyvar.
     returnRn theta
   where
     rn_ctxt (clas, tys)
-      =		-- Mini hack here.  If the class is our pseudo-class "All",
-		-- then we don't want to record it as an occurrence, otherwise
-		-- we try to slurp it in later and it doesn't really exist at all.
-		-- Easiest thing is simply not to put it in the occurrence set.
-	lookupBndrRn clas	`thenRn` \ clas_name ->
-	(if clas_name /= allClass_NAME then
-		addOccurrenceName clas_name
-	 else
-		returnRn clas_name
-	)			`thenRn_`
-	mapRn rnHsType tys	`thenRn` \ tys' ->
+      =	lookupBndrRn clas		`thenRn` \ clas_name ->
+	addOccurrenceName clas_name	`thenRn_`
+	mapRn (rnHsType doc) tys	`thenRn` \ tys' ->
 	returnRn (clas_name, tys')
-
 
     cmp_assert (c1,tys1) (c2,tys2)
       = (c1 `compare` c2) `thenCmp` (cmpHsTypes compare tys1 tys2)
-
-    check_All (c, [MonoTyVar _]) = returnRn ()	-- OK!
-    check_All assertion		 = addErrRn (wierdAllErr assertion)
 \end{code}
 
 
@@ -582,16 +555,16 @@ rnIdInfo (HsStrictness strict)
   = rnStrict strict	`thenRn` \ strict' ->
     returnRn (HsStrictness strict')
 
-rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr	`thenRn` \ expr' ->
-				  returnRn (HsUnfold inline expr')
+rnIdInfo (HsUnfold inline (Just expr))	= rnCoreExpr expr	`thenRn` \ expr' ->
+				  	  returnRn (HsUnfold inline (Just expr'))
+rnIdInfo (HsUnfold inline Nothing)	= returnRn (HsUnfold inline Nothing)
 rnIdInfo (HsArity arity)	= returnRn (HsArity arity)
 rnIdInfo (HsUpdate update)	= returnRn (HsUpdate update)
-rnIdInfo (HsFBType fb)		= returnRn (HsFBType fb)
-rnIdInfo (HsArgUsage au)	= returnRn (HsArgUsage au)
+rnIdInfo (HsNoCafRefs)		= returnRn (HsNoCafRefs)
 rnIdInfo (HsSpecialise tyvars tys expr)
   = bindTyVarsRn doc tyvars	$ \ tyvars' ->
     rnCoreExpr expr		`thenRn` \ expr' ->
-    mapRn rnHsType tys		`thenRn` \ tys' ->
+    mapRn (rnHsType doc) tys	`thenRn` \ tys' ->
     returnRn (HsSpecialise tyvars' tys' expr')
   where
     doc = text "Specialise in interface pragma"
@@ -613,31 +586,34 @@ rnStrict HsBottom			  = returnRn HsBottom
 UfCore expressions.
 
 \begin{code}
+rnCoreExpr (UfType ty)
+  = rnHsType (text "unfolding type") ty	`thenRn` \ ty' ->
+    returnRn (UfType ty')
+
 rnCoreExpr (UfVar v)
   = lookupOccRn v 	`thenRn` \ v' ->
     returnRn (UfVar v')
 
-rnCoreExpr (UfLit lit) = returnRn (UfLit lit)
-
 rnCoreExpr (UfCon con args) 
-  = lookupOccRn con		`thenRn` \ con' ->
-    mapRn rnCoreArg args	`thenRn` \ args' ->
+  = rnUfCon con			`thenRn` \ con' ->
+    mapRn rnCoreExpr args	`thenRn` \ args' ->
     returnRn (UfCon con' args')
 
-rnCoreExpr (UfPrim prim args) 
-  = rnCorePrim prim		`thenRn` \ prim' ->
-    mapRn rnCoreArg args	`thenRn` \ args' ->
-    returnRn (UfPrim prim' args')
+rnCoreExpr (UfTuple con args) 
+  = lookupOccRn con		`thenRn` \ con' ->
+    mapRn rnCoreExpr args	`thenRn` \ args' ->
+    returnRn (UfTuple con' args')
 
 rnCoreExpr (UfApp fun arg)
   = rnCoreExpr fun		`thenRn` \ fun' ->
-    rnCoreArg arg		`thenRn` \ arg' ->
+    rnCoreExpr arg		`thenRn` \ arg' ->
     returnRn (UfApp fun' arg')
 
-rnCoreExpr (UfCase scrut alts) 
-  = rnCoreExpr scrut		`thenRn` \ scrut' ->
-    rnCoreAlts alts		`thenRn` \ alts' ->
-    returnRn (UfCase scrut' alts')
+rnCoreExpr (UfCase scrut bndr alts) 
+  = rnCoreExpr scrut			`thenRn` \ scrut' ->
+    bindLocalsRn "UfCase" [bndr]	$ \ [bndr'] ->
+    mapRn rnCoreAlt alts		`thenRn` \ alts' ->
+    returnRn (UfCase scrut' bndr' alts')
 
 rnCoreExpr (UfNote note expr) 
   = rnNote note			`thenRn` \ note' ->
@@ -666,70 +642,62 @@ rnCoreExpr (UfLet (UfRec pairs) body)
 
 \begin{code}
 rnCoreBndr (UfValBinder name ty) thing_inside
-  = rnHsType ty			`thenRn` \ ty' ->
-    bindLocalsRn "unfolding value" [name] $ \ [name'] ->
+  = rnHsType (text str) ty	`thenRn` \ ty' ->
+    bindLocalsRn str [name]	$ \ [name'] ->
     thing_inside (UfValBinder name' ty')
+  where
+    str = "unfolding id"
     
 rnCoreBndr (UfTyBinder name kind) thing_inside
   = bindLocalsRn "unfolding tyvar" [name] $ \ [name'] ->
     thing_inside (UfTyBinder name' kind)
     
 rnCoreBndrs bndrs thing_inside		-- Expect them all to be ValBinders
-  = mapRn rnHsType tys			`thenRn` \ tys' ->
-    bindLocalsRn "unfolding value" names $ \ names' ->
+  = mapRn (rnHsType (text str)) tys	`thenRn` \ tys' ->
+    bindLocalsRn str names		$ \ names' ->
     thing_inside (zipWith UfValBinder names' tys')
   where
-    names = map (\ (UfValBinder name _) -> name) bndrs
-    tys   = map (\ (UfValBinder _   ty) -> ty)   bndrs
-
-rnCoreBndrNamess names thing_inside
-  = bindLocalsRn "unfolding value" names $ \ names' ->
-    thing_inside names'
+    str   = "unfolding id"
+    names = map (\ (UfValBinder name _ ) -> name) bndrs
+    tys   = map (\ (UfValBinder _    ty) -> ty)   bndrs
 \end{code}    
 
 \begin{code}
-rnCoreArg (UfVarArg v)	 = lookupOccRn v	`thenRn` \ v' -> returnRn (UfVarArg v')
-rnCoreArg (UfTyArg ty)	 = rnHsType ty		`thenRn` \ ty' -> returnRn (UfTyArg ty')
-rnCoreArg (UfLitArg lit) = returnRn (UfLitArg lit)
+rnCoreAlt (con, bndrs, rhs)
+  = rnUfCon con				`thenRn` \ con' ->
+    bindLocalsRn "unfolding alt" bndrs	$ \ bndrs' ->
+    rnCoreExpr rhs			`thenRn` \ rhs' ->
+    returnRn (con', bndrs', rhs')
 
-rnCoreAlts (UfAlgAlts alts deflt)
-  = mapRn rn_alt alts		`thenRn` \ alts' ->
-    rnCoreDefault deflt		`thenRn` \ deflt' ->
-    returnRn (UfAlgAlts alts' deflt')
-  where
-    rn_alt (con, bndrs, rhs) =	lookupOccRn con			`thenRn` \ con' ->
-				bindLocalsRn "unfolding alt" bndrs	$ \ bndrs' ->
-				rnCoreExpr rhs				`thenRn` \ rhs' ->
-				returnRn (con', bndrs', rhs')
-
-rnCoreAlts (UfPrimAlts alts deflt)
-  = mapRn rn_alt alts		`thenRn` \ alts' ->
-    rnCoreDefault deflt		`thenRn` \ deflt' ->
-    returnRn (UfPrimAlts alts' deflt')
-  where
-    rn_alt (lit, rhs) =	rnCoreExpr rhs		`thenRn` \ rhs' ->
-			returnRn (lit, rhs')
-
-rnCoreDefault UfNoDefault = returnRn UfNoDefault
-rnCoreDefault (UfBindDefault bndr rhs) = bindLocalsRn "unfolding default" [bndr]	$ \ [bndr'] ->
-					 rnCoreExpr rhs					`thenRn` \ rhs' ->
-				  	 returnRn (UfBindDefault bndr' rhs')
 
 rnNote (UfCoerce ty)
-  = rnHsType ty			`thenRn` \ ty' ->
+  = rnHsType (text "unfolding coerce") ty	`thenRn` \ ty' ->
     returnRn (UfCoerce ty')
 
 rnNote (UfSCC cc)   = returnRn (UfSCC cc)
 rnNote UfInlineCall = returnRn UfInlineCall
 
-rnCorePrim (UfOtherOp op) 
-  = lookupOccRn op	`thenRn` \ op' ->
-    returnRn (UfOtherOp op')
 
-rnCorePrim (UfCCallOp str casm gc arg_tys res_ty)
-  = mapRn rnHsType arg_tys	`thenRn` \ arg_tys' ->
-    rnHsType res_ty		`thenRn` \ res_ty' ->
-    returnRn (UfCCallOp str casm gc arg_tys' res_ty')
+rnUfCon UfDefault
+  = returnRn UfDefault
+
+rnUfCon (UfDataCon con)
+  = lookupOccRn con		`thenRn` \ con' ->
+    returnRn (UfDataCon con')
+
+rnUfCon (UfLitCon lit)
+  = returnRn (UfLitCon lit)
+
+rnUfCon (UfLitLitCon lit ty)
+  = rnHsType (text "litlit") ty		`thenRn` \ ty' ->
+    returnRn (UfLitLitCon lit ty')
+
+rnUfCon (UfPrimOp op)
+  = lookupOccRn op		`thenRn` \ op' ->
+    returnRn (UfPrimOp op')
+
+rnUfCon (UfCCallOp str casm gc)
+  = returnRn (UfCCallOp str casm gc)
 \end{code}
 
 %*********************************************************
@@ -757,19 +725,23 @@ dupClassAssertWarn ctxt (assertion : dups)
 badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
 
-wierdAllErr assertion
-  = ptext SLIT("Mal-formed use of `All':") <+> pprClassAssertion assertion
+ctxtErr1 doc tyvars ty (constraint, _)
+  = addErrRn (
+      sep [ptext SLIT("The constraint") <+> quotes (pprClassAssertion constraint) <+>
+		   ptext SLIT("does not mention any of"),
+	   nest 4 (ptext SLIT("the universally quantified type variables") <+> braces (interpp'SP tyvars)),
+	   nest 4 (ptext SLIT("of the type") <+> quotes (ppr ty))
+      ]
+      $$
+      (ptext SLIT("In") <+> doc)
+    )
 
-ctxtErr1 doc tyvars
-  = hsep [ptext SLIT("Context constrains in-scope type variable(s)"), 
-	  pprQuotedList tyvars]
-    $$
-    nest 4 (ptext SLIT("in") <+> doc)
-
-ctxtErr2 doc tyvars ty
-  = (ptext SLIT("Context constrains type variable(s)")
-	<+> pprQuotedList tyvars)
-    $$
-    nest 4 (vcat [ptext SLIT("that do not appear in") <+> quotes (ppr ty),
-	    	  ptext SLIT("in") <+> doc])
+ctxtErr2 doc ty (constraint,_)
+  = addErrRn (
+	sep [ptext SLIT("The constraint") <+> quotes (pprClassAssertion constraint),
+	nest 4 (ptext SLIT("mentions type variables that do not appear in the type")),
+	nest 4 (quotes (ppr ty))]
+        $$
+	(ptext SLIT("In") <+> doc)
+    )
 \end{code}

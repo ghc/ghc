@@ -10,6 +10,7 @@ definition.
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 
+#ifndef BODY /* Hugs just includes this in PreludeBuiltin so no header needed */
 module IO (
     Handle,		-- abstract, instance of: Eq, Show.
     HandlePosn(..),     -- abstract, instance of: Eq, Show.
@@ -85,11 +86,20 @@ module IO (
 
     -- extensions
     hPutBuf,
+#ifndef __HUGS__
     hPutBufBA,
+#endif
     slurpFile
 
   ) where
 
+#ifdef __HUGS__
+
+import PreludeBuiltin
+
+#else
+
+--import PrelST
 import PrelBase
 
 import PrelIOBase
@@ -104,12 +114,31 @@ import PrelEither	( Either(..) )
 import PrelAddr		( Addr(..), nullAddr )
 import PrelArr		( ByteArray )
 import PrelPack		( unpackNBytesAccST )
+import PrelException    ( fail, catch )
 
 #ifndef __PARALLEL_HASKELL__
 import PrelForeign  ( ForeignObj )
 #endif
 
 import Char		( ord, chr )
+
+#endif /* ndef __HUGS__ */
+#endif /* ndef BODY */
+
+#ifndef HEAD
+
+#ifdef __HUGS__
+#define cat2(x,y)  x/**/y
+#define CCALL(fun) cat2(prim_,fun)
+#define __CONCURRENT_HASKELL__
+#define stToIO id
+#define unpackNBytesAccST primUnpackCStringAcc
+#else
+#define CCALL(fun) _ccall_ fun
+#define ref_freeStdFileObject (``&freeStdFileObject''::Addr)
+#define ref_freeFileObject    (``&freeFileObject''::Addr)
+#define const_BUFSIZ ``BUFSIZ''
+#endif
 
 \end{code}
 
@@ -163,9 +192,9 @@ hReady :: Handle -> IO Bool
 hReady h = hWaitForInput h 0
 
 hWaitForInput :: Handle -> Int -> IO Bool 
-hWaitForInput handle msecs = do
-    handle_  <- wantReadableHandle "hWaitForInput" handle
-    rc       <- _ccall_ inputReady (haFO__ handle_) (msecs::Int)     -- ConcHask: SAFE, won't block
+hWaitForInput handle msecs =
+    wantReadableHandle "hWaitForInput" handle $ \ handle_ -> do
+    rc       <- CCALL(inputReady) (haFO__ handle_) (msecs::Int)     -- ConcHask: SAFE, won't block
     writeHandle handle handle_
     case rc of
       0 -> return False
@@ -178,10 +207,10 @@ blocking until a character is available.
 
 \begin{code}
 hGetChar :: Handle -> IO Char
-hGetChar handle = do
-    handle_  <- wantReadableHandle "hGetChar" handle
+hGetChar handle = 
+    wantReadableHandle "hGetChar" handle $ \ handle_ -> do
     let fo = haFO__ handle_
-    intc     <- mayBlock fo (_ccall_ fileGetc fo)  -- ConcHask: UNSAFE, may block
+    intc     <- mayBlock fo (CCALL(fileGetc) fo)  -- ConcHask: UNSAFE, may block
     writeHandle handle handle_
     if intc /= (-1)
      then return (chr intc)
@@ -205,9 +234,9 @@ character is available.
 \begin{code}
 hLookAhead :: Handle -> IO Char
 hLookAhead handle = do
-    handle_ <- wantReadableHandle "hLookAhead" handle
+    wantReadableHandle "hLookAhead" handle $ \ handle_ -> do
     let fo = haFO__ handle_
-    intc    <- mayBlock fo (_ccall_ fileLookAhead fo)  -- ConcHask: UNSAFE, may block
+    intc    <- mayBlock fo (CCALL(fileLookAhead) fo)  -- ConcHask: UNSAFE, may block
     writeHandle handle handle_
     if intc /= (-1)
      then return (chr intc)
@@ -228,8 +257,8 @@ which is made semi-closed.
 
 \begin{code}
 hGetContents :: Handle -> IO String
-hGetContents handle = do
-    handle_ <- wantReadableHandle "hGetContents" handle
+hGetContents handle = 
+    wantReadableHandle "hGetContents" handle $ \ handle_ -> do
       {- 
         To avoid introducing an extra layer of buffering here,
         we provide three lazy read methods, based on character,
@@ -259,15 +288,15 @@ lazyReadChar  :: Handle -> Addr -> IO String
 #endif
 
 lazyReadBlock handle fo = do
-   buf   <- _ccall_ getBufStart fo (0::Int)
-   bytes <- mayBlock fo (_ccall_ readBlock fo) -- ConcHask: UNSAFE, may block.
+   buf   <- CCALL(getBufStart) fo (0::Int)
+   bytes <- mayBlock fo (CCALL(readBlock) fo) -- ConcHask: UNSAFE, may block.
    case bytes of
      -3 -> -- buffering has been turned off, use lazyReadChar instead
            lazyReadChar handle fo
      -2 -> return ""
-     -1 -> do -- an error occurred, close the handle
-	  handle_ <- readHandle handle
-          _ccall_ closeFile (haFO__ handle_) 0{-don't bother flushing-}  -- ConcHask: SAFE, won't block.
+     -1 -> -- an error occurred, close the handle
+	  withHandle handle $ \ handle_ -> do
+          CCALL(closeFile) (haFO__ handle_) 0{-don't bother flushing-}  -- ConcHask: SAFE, won't block.
 	  writeHandle handle (handle_ { haType__    = ClosedHandle,
 					haFO__      = nullFile__ })
 	  return ""
@@ -276,24 +305,24 @@ lazyReadBlock handle fo = do
       stToIO (unpackNBytesAccST buf bytes more)
 
 lazyReadLine handle fo = do
-     bytes <- mayBlock fo (_ccall_ readLine fo)   -- ConcHask: UNSAFE, may block.
+     bytes <- mayBlock fo (CCALL(readLine) fo)   -- ConcHask: UNSAFE, may block.
      case bytes of
        -3 -> -- buffering has been turned off, use lazyReadChar instead
              lazyReadChar handle fo
        -2 -> return "" -- handle closed by someone else, stop reading.
-       -1 -> do -- an error occurred, close the handle
-	     handle_ <- readHandle handle
-             _ccall_ closeFile (haFO__ handle_) 0{- don't bother flushing-}  -- ConcHask: SAFE, won't block
+       -1 -> -- an error occurred, close the handle
+  	     withHandle handle $ \ handle_ -> do
+             CCALL(closeFile) (haFO__ handle_) 0{- don't bother flushing-}  -- ConcHask: SAFE, won't block
 	     writeHandle handle (handle_ { haType__    = ClosedHandle,
 					   haFO__      = nullFile__ })
 	     return ""
        _ -> do
           more <- unsafeInterleaveIO (lazyReadLine handle fo)
-          buf  <- _ccall_ getBufStart fo bytes  -- ConcHask: won't block
+          buf  <- CCALL(getBufStart) fo bytes  -- ConcHask: won't block
 	  stToIO (unpackNBytesAccST buf bytes more)
 
 lazyReadChar handle fo = do
-    char <- mayBlock fo (_ccall_ readChar fo)   -- ConcHask: UNSAFE, may block.
+    char <- mayBlock fo (CCALL(readChar) fo)   -- ConcHask: UNSAFE, may block.
     case char of
       -4 -> -- buffering is now block-buffered, use lazyReadBlock instead
 	    lazyReadBlock handle fo
@@ -301,9 +330,9 @@ lazyReadChar handle fo = do
       -3 -> -- buffering is now line-buffered, use lazyReadLine instead
 	    lazyReadLine handle fo
       -2 -> return ""
-      -1 -> do -- error, silently close handle.
-         handle_ <- readHandle handle
-         _ccall_ closeFile (haFO__ handle_) 0{-don't bother flusing-}  -- ConcHask: SAFE, won't block
+      -1 -> -- error, silently close handle.
+ 	 withHandle handle $ \ handle_ -> do
+         CCALL(closeFile) (haFO__ handle_) 0{-don't bother flusing-}  -- ConcHask: SAFE, won't block
 	 writeHandle handle (handle_{ haType__  = ClosedHandle,
 				      haFO__    = nullFile__ })
 	 return ""
@@ -326,11 +355,10 @@ buffering is enabled for @hdl@
 
 \begin{code}
 hPutChar :: Handle -> Char -> IO ()
-hPutChar handle c = do
-    handle_  <- wantWriteableHandle "hPutChar" handle
+hPutChar handle c = 
+    wantWriteableHandle "hPutChar" handle $ \ handle_  -> do
     let fo = haFO__ handle_
-    flushConnectedHandle fo    
-    rc       <- mayBlock fo (_ccall_ filePutc fo c)   -- ConcHask: UNSAFE, may block.
+    rc       <- mayBlock fo (CCALL(filePutc) fo c)   -- ConcHask: UNSAFE, may block.
     writeHandle handle handle_
     if rc == 0
      then return ()
@@ -343,20 +371,19 @@ channel managed by @hdl@, buffering the output if needs be.
 
 \begin{code}
 hPutStr :: Handle -> String -> IO ()
-hPutStr handle str = do
-    handle_ <- wantWriteableHandle "hPutStr" handle
+hPutStr handle str = 
+    wantWriteableHandle "hPutStr" handle $ \ handle_ -> do
     let fo = haFO__ handle_
-    flushConnectedHandle fo
     case haBufferMode__ handle_ of
        LineBuffering -> do
-	    buf <- _ccall_ getWriteableBuf fo
-	    pos <- _ccall_ getBufWPtr fo
-	    bsz <- _ccall_ getBufSize fo
+	    buf <- CCALL(getWriteableBuf) fo
+	    pos <- CCALL(getBufWPtr) fo
+	    bsz <- CCALL(getBufSize) fo
 	    writeLines fo buf bsz pos str
        BlockBuffering _ -> do
-	    buf <- _ccall_ getWriteableBuf fo
-	    pos <- _ccall_ getBufWPtr fo
-	    bsz <- _ccall_ getBufSize fo
+	    buf <- CCALL(getWriteableBuf) fo
+	    pos <- CCALL(getBufWPtr) fo
+	    bsz <- CCALL(getBufSize) fo
             writeBlocks fo buf bsz pos str
        NoBuffering -> do
 	    writeChars fo str
@@ -369,25 +396,26 @@ so for block writes we pack the character strings on the Haskell-side
 before passing the external write routine a pointer to the buffer.
 
 \begin{code}
+#ifdef __HUGS__
+
+#ifdef __CONCURRENT_HASKELL__
+/* See comment in shoveString below for explanation */
+#warning delayed update of buffer disnae work with killThread
+#endif
 
 #ifndef __PARALLEL_HASKELL__
 writeLines :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
 #else
 writeLines :: Addr -> Addr -> Int -> Int -> String -> IO ()
 #endif
-writeLines obj buf bf@(I# bufLen) (I# initPos#) s =
+writeLines obj buf bufLen initPos s =
   let
-   write_char :: Addr -> Int# -> Char# -> IO ()
-   write_char (A# buf) n# c# =
-      IO $ \ s# ->
-      case (writeCharOffAddr# buf n# c# s#) of s2# -> IOok s2# () 
-
-   shoveString :: Int# -> [Char] -> IO ()
+   shoveString :: Int -> [Char] -> IO ()
    shoveString n ls = 
      case ls of
       [] ->   
-        if n ==# 0# then
-	  _ccall_ setBufWPtr obj (0::Int)
+        if n == 0 then
+	  CCALL(setBufWPtr) obj (0::Int)
         else do
 	  {-
 	    At the end of a buffer write, update the buffer position
@@ -402,14 +430,62 @@ writeLines obj buf bf@(I# bufLen) (I# initPos#) s =
 	    that killing of threads is supported at the moment.
 
 	  -}
-	  _ccall_ setBufWPtr obj (I# n)
+	  CCALL(setBufWPtr) obj n
+
+      (x:xs) -> do
+        primWriteCharOffAddr buf n x
+          {- Flushing on buffer exhaustion or newlines (even if it isn't the last one) -}
+	if n == bufLen || x == '\n'
+	 then do
+	   rc <-  mayBlock obj (CCALL(writeFileObject) obj (n + 1))  -- ConcHask: UNSAFE, may block.
+	   if rc == 0 
+	    then shoveString 0 xs
+	    else constructErrorAndFail "writeLines"
+         else
+	   shoveString (n + 1) xs
+  in
+  shoveString initPos s
+#else /* ndef __HUGS__ */
+#ifndef __PARALLEL_HASKELL__
+writeLines :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
+#else
+writeLines :: Addr -> Addr -> Int -> Int -> String -> IO ()
+#endif
+writeLines obj buf bf@(I# bufLen) (I# initPos#) s =
+  let
+   write_char :: Addr -> Int# -> Char# -> IO ()
+   write_char (A# buf) n# c# =
+      IO $ \ s# ->
+      case (writeCharOffAddr# buf n# c# s#) of s2# -> (# s2#, () #)
+
+   shoveString :: Int# -> [Char] -> IO ()
+   shoveString n ls = 
+     case ls of
+      [] ->   
+        if n ==# 0# then
+	  CCALL(setBufWPtr) obj (0::Int)
+        else do
+	  {-
+	    At the end of a buffer write, update the buffer position
+	    in the underlying file object, so that if the handle
+	    is subsequently dropped by the program, the whole
+	    buffer will be properly flushed.
+
+	    There's one case where this delayed up-date of the buffer
+	    position can go wrong: if a thread is killed, it might be
+	    in the middle of filling up a buffer, with the result that
+	    the partial buffer update is lost upon finalisation. Not
+	    that killing of threads is supported at the moment.
+
+	  -}
+	  CCALL(setBufWPtr) obj (I# n)
 
       ((C# x):xs) -> do
         write_char buf n x
           {- Flushing on buffer exhaustion or newlines (even if it isn't the last one) -}
 	if n ==# bufLen || x `eqChar#` '\n'#
 	 then do
-	   rc <-  mayBlock obj (_ccall_ writeFileObject obj (I# (n +# 1#)))  -- ConcHask: UNSAFE, may block.
+	   rc <-  mayBlock obj (CCALL(writeFileObject) obj (I# (n +# 1#)))  -- ConcHask: UNSAFE, may block.
 	   if rc == 0 
 	    then shoveString 0# xs
 	    else constructErrorAndFail "writeLines"
@@ -417,25 +493,22 @@ writeLines obj buf bf@(I# bufLen) (I# initPos#) s =
 	   shoveString (n +# 1#) xs
   in
   shoveString initPos# s
+#endif /* ndef __HUGS__ */
 
+#ifdef __HUGS__
 #ifndef __PARALLEL_HASKELL__
 writeBlocks :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
 #else
 writeBlocks :: Addr -> Addr -> Int -> Int -> String -> IO ()
 #endif
-writeBlocks obj buf bf@(I# bufLen) (I# initPos#) s =
+writeBlocks obj buf bufLen initPos s =
   let
-   write_char :: Addr -> Int# -> Char# -> IO ()
-   write_char (A# buf) n# c# =
-      IO $ \ s# ->
-      case (writeCharOffAddr# buf n# c# s#) of s2# -> IOok s2# () 
-
-   shoveString :: Int# -> [Char] -> IO ()
+   shoveString :: Int -> [Char] -> IO ()
    shoveString n ls = 
      case ls of
       [] ->   
-        if n ==# 0# then
-          _ccall_ setBufWPtr obj (0::Int)
+        if n == 0 then
+          CCALL(setBufWPtr) obj (0::Int)
         else do
 	  {-
 	    At the end of a buffer write, update the buffer position
@@ -452,13 +525,62 @@ writeBlocks obj buf bf@(I# bufLen) (I# initPos#) s =
 	    alltogether.
 
 	  -}
-	  _ccall_ setBufWPtr obj (I# n)
+	  CCALL(setBufWPtr) obj n
+
+      (x:xs) -> do
+        primWriteCharOffAddr buf n x
+	if n == bufLen
+	 then do
+	   rc <-  mayBlock obj (CCALL(writeFileObject) obj (n + 1))   -- ConcHask: UNSAFE, may block.
+	   if rc == 0 
+            then shoveString 0 xs
+	    else constructErrorAndFail "writeChunks"
+         else
+	   shoveString (n + 1) xs
+  in
+  shoveString initPos s
+#else /* ndef __HUGS__ */
+#ifndef __PARALLEL_HASKELL__
+writeBlocks :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
+#else
+writeBlocks :: Addr -> Addr -> Int -> Int -> String -> IO ()
+#endif
+writeBlocks obj buf bf@(I# bufLen) (I# initPos#) s =
+  let
+   write_char :: Addr -> Int# -> Char# -> IO ()
+   write_char (A# buf) n# c# =
+      IO $ \ s# ->
+      case (writeCharOffAddr# buf n# c# s#) of s2# -> (# s2#, () #)
+
+   shoveString :: Int# -> [Char] -> IO ()
+   shoveString n ls = 
+     case ls of
+      [] ->   
+        if n ==# 0# then
+          CCALL(setBufWPtr) obj (0::Int)
+        else do
+	  {-
+	    At the end of a buffer write, update the buffer position
+	    in the underlying file object, so that if the handle
+	    is subsequently dropped by the program, the whole
+	    buffer will be properly flushed.
+
+	    There's one case where this delayed up-date of the buffer
+	    position can go wrong: if a thread is killed, it might be
+	    in the middle of filling up a buffer, with the result that
+	    the partial buffer update is lost upon finalisation. However,
+	    by the time killThread is supported, Haskell finalisers are also
+	    likely to be in, which means the 'IOFileObject' hack can go
+	    alltogether.
+
+	  -}
+	  CCALL(setBufWPtr) obj (I# n)
 
       ((C# x):xs) -> do
         write_char buf n x
 	if n ==# bufLen
 	 then do
-	   rc <-  mayBlock obj (_ccall_ writeFileObject obj (I# (n +# 1#)))   -- ConcHask: UNSAFE, may block.
+	   rc <-  mayBlock obj (CCALL(writeFileObject) obj (I# (n +# 1#)))   -- ConcHask: UNSAFE, may block.
 	   if rc == 0 
 	    then shoveString 0# xs
 	    else constructErrorAndFail "writeChunks"
@@ -466,6 +588,7 @@ writeBlocks obj buf bf@(I# bufLen) (I# initPos#) s =
 	   shoveString (n +# 1#) xs
   in
   shoveString initPos# s
+#endif /* ndef __HUGS__ */
 
 #ifndef __PARALLEL_HASKELL__
 writeChars :: ForeignObj -> String -> IO ()
@@ -474,7 +597,7 @@ writeChars :: Addr -> String -> IO ()
 #endif
 writeChars fo "" = return ()
 writeChars fo (c:cs) = do
-  rc <- mayBlock fo (_ccall_ filePutc fo c)   -- ConcHask: UNSAFE, may block.
+  rc <- mayBlock fo (CCALL(filePutc) fo c)   -- ConcHask: UNSAFE, may block.
   if rc == 0 
    then writeChars fo cs
    else constructErrorAndFail "writeChars"
@@ -489,7 +612,7 @@ hdl}.
 
 \begin{code}
 hPrint :: Show a => Handle -> a -> IO ()
-hPrint hdl = hPutStr hdl . show
+hPrint hdl = hPutStrLn hdl . show
 \end{code}
 
 Derived action @hPutStrLn hdl str@ writes the string \tr{str} to
@@ -595,4 +718,7 @@ readLn          :: Read a => IO a
 readLn          =  do l <- getLine
                       r <- readIO l
                       return r
+
+#endif /* ndef HEAD */
+
 \end{code}

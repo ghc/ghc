@@ -1,0 +1,8 @@
+_interface_ Var 1
+_exports_
+Var Var Id ;
+_declarations_
+
+-- Used by Name
+1 type Id = Var BasicTypes.Unused BasicTypes.Unused ;
+1 data Var a b ;

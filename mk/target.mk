@@ -69,7 +69,7 @@ ifneq "$(DOC_SRCS)" ""
 	$(MKDEPENDLIT) -o .depend $(MKDEPENDLIT_OPTS) $(filter %.lit,$(DOC_SRCS))
 endif
 ifneq "$(MKDEPENDC_SRCS)" ""
-	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS)
+	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS) 
 endif
 ifneq "$(MKDEPENDHS_SRCS)" ""
 	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-optdep-o -optdep$(obj)) $(MKDEPENDHS_OPTS) $(patsubst -odir,,$(HC_OPTS)) $(MKDEPENDHS_SRCS)
@@ -865,8 +865,17 @@ ifneq "$(SGML_DOC)" ""
 # multi-file SGML document: main document name is specified in $(SGML_DOC),
 # sub-documents (.sgml files) listed in $(SGML_SRCS).
 
-$(SGML_DOC).sgml : $(SGML_SRCS)
-	cat $(SGML_SRCS) > $(SGML_DOC).sgml
+ifeq "$(VSGML_SRCS)" ""
+VSGML_SRCS = $(wildcard *.vsgml)
+endif
+
+ifeq "$(SGML_SRCS)" ""
+ifneq "$(VSGML_SRCS)" ""
+SGML_SRCS = $(patsubst %.vsgml, %.sgml, $(VSGML_SRCS))
+else
+SGML_SRCS = $(wildcard *.sgml)
+endif
+endif
 
 SGML_DVI  = $(SGML_DOC).dvi
 SGML_PS   = $(SGML_DOC).ps
@@ -874,27 +883,7 @@ SGML_INFO = $(SGML_DOC).info
 SGML_HTML = $(SGML_DOC).html
 SGML_TEXT = $(SGML_DOC).txt
 
-else # no SGML_DOC
-
-ifeq "$(VSGML_SRCS)" ""
-VSGML_SRCS = $(wildcard *.vsgml)
-endif
-
-ifeq "$(SGML_SRCS)" ""
-ifneq "$(VSGML_SRCS)" ""
-SGML_SRCS  = $(addsuffix .sgml, $(basename $(VSGML_SRCS)))
-else
-SGML_SRCS  = $(wildcard *.sgml)
-endif
-endif
-
-SGML_DVI  = $(addsuffix  .dvi, $(basename $(SGML_SRCS)))
-SGML_PS   = $(addsuffix   .ps, $(basename $(SGML_SRCS)))
-SGML_INFO = $(addsuffix .info, $(basename $(SGML_SRCS)))
-SGML_HTML = $(addsuffix .html, $(basename $(SGML_SRCS)))
-SGML_TEXT = $(addsuffix  .txt, $(basename $(SGML_SRCS)))
-
-endif # SGML_DOC
+$(SGML_DVI) $(SGML_PS) $(SGML_INFO) $(SGML_HTML) $(SGML_TEXT) :: $(SGML_SRCS)
 
 dvi  :: $(SGML_DVI)
 info :: $(SGML_INFO)
@@ -902,7 +891,9 @@ html :: $(SGML_HTML)
 txt  :: $(SGML_TXT)
 ps   :: $(SGML_PS)
 
-CLEAN_FILES += $(SGML_TEXT) $(SGML_HTML) $(SGML_PS) $(SGML_DVI)
+CLEAN_FILES += $(SGML_TEXT) $(SGML_DOC)*.html $(SGML_PS) $(SGML_DVI)
+
+endif
 
 ###########################################
 #

@@ -8,6 +8,8 @@ This sits on top of the sequencing/arrays world, notably @ByteArray#@s.
 Glorious hacking (all the hard work) by Bryan O'Sullivan.
 
 \begin{code}
+{-# OPTIONS -#include "cbits/PackedString.h" #-}
+
 module PackedString (
         PackedString,      -- abstract
 
@@ -80,7 +82,6 @@ import PrelPack
 	  )
 import Addr
 
-import PrelArr  ( StateAndMutableByteArray#(..) , StateAndByteArray#(..) )
 import PrelST
 import ST
 import IOExts   ( unsafePerformIO )

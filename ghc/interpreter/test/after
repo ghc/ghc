@@ -1,0 +1,18 @@
+#!/usr/bin/perl
+
+die "Usage: before <regexp>" unless $ARGV[0];
+
+$start = $ARGV[0];
+
+# Filter that trims lines before regexp
+
+# skip the initial part
+while (<STDIN>) {
+    last if /$start/;
+}
+# print the good bit
+while (<STDIN>) {
+    print;
+}
+
+exit 0;

@@ -1,11 +1,7 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Constants]{Info about this compilation}
-
-!!!!! THIS CODE MUST AGREE WITH SMinterface.h !!!!!!
-
-*** This SHOULD BE the only module that is CPP'd with "stgdefs.h" stuff.
 
 \begin{code}
 module Constants (
@@ -19,51 +15,60 @@ module Constants (
 	uNFOLDING_CON_DISCOUNT_WEIGHT,
 	uNFOLDING_KEENESS_FACTOR,
 
-	mAX_SPEC_ALL_PTRS,
-	mAX_SPEC_ALL_NONPTRS,
-	mAX_SPEC_MIXED_FIELDS,
+	mAX_CONTEXT_REDUCTION_DEPTH,
+	mAX_TUPLE_SIZE,
+
 	mAX_SPEC_SELECTEE_SIZE,
+	mAX_SPEC_AP_SIZE,
 
 	tARGET_MIN_INT, tARGET_MAX_INT,
 
 	mIN_UPD_SIZE,
 	mIN_SIZE_NonUpdHeapObject,
-	mIN_SIZE_NonUpdStaticHeapObject,
+
+	sTD_HDR_SIZE,
+	pROF_HDR_SIZE,
+	gRAN_HDR_SIZE,
+	tICKY_HDR_SIZE,
+	aRR_HDR_SIZE,
+
+	sTD_ITBL_SIZE,
+	pROF_ITBL_SIZE,
+	gRAN_ITBL_SIZE,
+	tICKY_ITBL_SIZE,
 
 	mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 
-	sTD_UF_SIZE,	 cON_UF_SIZE,
-	sCC_STD_UF_SIZE, sCC_CON_UF_SIZE,
+	uF_SIZE,
+	sCC_UF_SIZE,
 	uF_RET,
-	uF_SUB,
-	uF_SUA,
+	uF_SU,
 	uF_UPDATEE,
-	uF_COST_CENTRE,
+	uF_CCS,
+
+	sEQ_FRAME_SIZE,
 
 	mAX_Vanilla_REG,
 	mAX_Float_REG,
 	mAX_Double_REG,
 	mAX_Long_REG,
 
-    	mIN_MP_INT_SIZE,
-	mP_STRUCT_SIZE,
+	mAX_Real_Vanilla_REG,
+	mAX_Real_Float_REG,
+	mAX_Real_Double_REG,
 
-	oTHER_TAG, iND_TAG,	-- semi-tagging stuff
-
-	lIVENESS_R1,
-	lIVENESS_R2,
-	lIVENESS_R3,
-	lIVENESS_R4,
-	lIVENESS_R5,
-	lIVENESS_R6,
-	lIVENESS_R7,
-	lIVENESS_R8,
+	oTHER_TAG,
 
 	mAX_INTLIKE, mIN_INTLIKE,
 
+	spRelToInt,
 
-	spARelToInt,
-	spBRelToInt
+	dOUBLE_SIZE,
+	iNT64_SIZE,
+	wORD64_SIZE,
+	
+	interfaceFileFormatVersion
+
     ) where
 
 -- This magical #include brings in all the everybody-knows-these magic
@@ -72,12 +77,20 @@ module Constants (
 -- be in trouble.
 
 #include "HsVersions.h"
-#include "../../includes/GhcConstants.h"
+#include "../includes/config.h"
+#include "../includes/MachRegs.h"
+#include "../includes/Constants.h"
 
 import Util
 \end{code}
 
 All pretty arbitrary:
+
+\begin{code}
+mAX_TUPLE_SIZE = 37
+mAX_CONTEXT_REDUCTION_DEPTH = 20
+\end{code}
+
 \begin{code}
 uNFOLDING_USE_THRESHOLD	      = ( 8 :: Int)
 uNFOLDING_CREATION_THRESHOLD  = (30 :: Int)	-- Discounts can be big
@@ -92,21 +105,14 @@ uNFOLDING_KEENESS_FACTOR      = ( 2.0 :: Float)
 \end{code}
 
 \begin{code}
-mAX_SPEC_ALL_PTRS	= (MAX_SPEC_ALL_PTRS :: Int)
-mAX_SPEC_ALL_NONPTRS	= (MAX_SPEC_ALL_NONPTRS :: Int)
-mAX_SPEC_MIXED_FIELDS	= (MAX_SPEC_OTHER_SIZE :: Int)
-mAX_SPEC_SELECTEE_SIZE	= (MAX_SPEC_SELECTEE_SIZE :: Int)
 
--- closure sizes: these do NOT include the header
+-- pre-compiled thunk types
+mAX_SPEC_SELECTEE_SIZE	= (MAX_SPEC_SELECTEE_SIZE :: Int)
+mAX_SPEC_AP_SIZE        = (MAX_SPEC_AP_SIZE :: Int)
+
+-- closure sizes: these do NOT include the header (see below for header sizes)
 mIN_UPD_SIZE			= (MIN_UPD_SIZE::Int)
 mIN_SIZE_NonUpdHeapObject	= (MIN_NONUPD_SIZE::Int)
-mIN_SIZE_NonUpdStaticHeapObject	= (0::Int)
-\end{code}
-
-Sizes of gmp objects:
-\begin{code}
-mIN_MP_INT_SIZE = (MIN_MP_INT_SIZE :: Int)
-mP_STRUCT_SIZE = (MP_STRUCT_SIZE :: Int)
 \end{code}
 
 \begin{code}
@@ -117,21 +123,9 @@ tARGET_MAX_INT =  536870912
  
 Constants for semi-tagging; the tags associated with the data
 constructors will start at 0 and go up.
+
 \begin{code}
 oTHER_TAG = (INFO_OTHER_TAG :: Integer)	-- (-1) unevaluated, probably
-iND_TAG	  = (INFO_IND_TAG   :: Integer) -- (-2) NOT USED, REALLY
-\end{code}
-
-Stuff for liveness masks:
-\begin{code}
-lIVENESS_R1	= (LIVENESS_R1 :: Int)
-lIVENESS_R2	= (LIVENESS_R2 :: Int)
-lIVENESS_R3	= (LIVENESS_R3 :: Int)
-lIVENESS_R4	= (LIVENESS_R4 :: Int)
-lIVENESS_R5	= (LIVENESS_R5 :: Int)
-lIVENESS_R6	= (LIVENESS_R6 :: Int)
-lIVENESS_R7	= (LIVENESS_R7 :: Int)
-lIVENESS_R8	= (LIVENESS_R8 :: Int)
 \end{code}
 
 \begin{code}
@@ -140,39 +134,84 @@ mIN_INTLIKE = MIN_INTLIKE
 mAX_INTLIKE = MAX_INTLIKE
 \end{code}
 
-\begin{code}
--- THESE ARE DIRECTION SENSITIVE!
-spARelToInt :: Int{-VirtualSpAOffset-} -> Int{-VirtualSpAOffset-} -> Int
-spBRelToInt :: Int{-VirtualSpBOffset-} -> Int{-VirtualSpBOffset-} -> Int
+A little function that abstracts the stack direction.  Note that most
+of the code generator is dependent on the stack direction anyway, so
+changing this on its own spells certain doom.  ToDo: remove?
 
-spARelToInt spA off = spA - off -- equiv to: AREL(spA - off)
-spBRelToInt spB off = off - spB -- equiv to: BREL(spB - off)
+\begin{code}
+-- THIS IS DIRECTION SENSITIVE!
+
+-- stack grows down, positive virtual offsets correspond to negative
+-- additions to the stack pointer.
+
+spRelToInt :: Int{-VirtualSpOffset-} -> Int{-VirtualSpOffset-} -> Int
+spRelToInt sp off = sp - off
 \end{code}
 
 A section of code-generator-related MAGIC CONSTANTS.
+
 \begin{code}
 mAX_FAMILY_SIZE_FOR_VEC_RETURNS = (MAX_VECTORED_RTN::Int)  -- pretty arbitrary
 -- If you change this, you may need to change runtimes/standard/Update.lhc
 
 -- The update frame sizes
-sTD_UF_SIZE	= (NOSCC_STD_UF_SIZE::Int)
-cON_UF_SIZE	= (NOSCC_CON_UF_SIZE::Int)
+uF_SIZE	= (NOSCC_UF_SIZE::Int)
 
 -- Same again, with profiling
-sCC_STD_UF_SIZE	= (SCC_STD_UF_SIZE::Int)
-sCC_CON_UF_SIZE	= (SCC_CON_UF_SIZE::Int)
+sCC_UF_SIZE = (SCC_UF_SIZE::Int)
 
 -- Offsets in an update frame.  They don't change with profiling!
-uF_RET = (UF_RET::Int)
-uF_SUB = (UF_SUB::Int)
-uF_SUA = (UF_SUA::Int)
-uF_UPDATEE = (UF_UPDATEE::Int)
-uF_COST_CENTRE = (UF_COST_CENTRE::Int)
+uF_RET         = (UF_RET::Int)
+uF_SU          = (UF_SU::Int)
+uF_UPDATEE     = (UF_UPDATEE::Int)
+uF_CCS         = (UF_CCS::Int)
+\end{code}
+
+\begin{code}
+sEQ_FRAME_SIZE = (SEQ_FRAME_SIZE::Int)
 \end{code}
 
 \begin{code}
 mAX_Vanilla_REG	= (MAX_VANILLA_REG :: Int)
 mAX_Float_REG	= (MAX_FLOAT_REG :: Int)
 mAX_Double_REG	= (MAX_DOUBLE_REG :: Int)
-mAX_Long_REG    = (MAX_LONG_REG   :: Int)
+
+mAX_Real_Vanilla_REG	= (MAX_REAL_VANILLA_REG :: Int)
+mAX_Real_Float_REG	= (MAX_REAL_FLOAT_REG :: Int)
+mAX_Real_Double_REG	= (MAX_REAL_DOUBLE_REG :: Int)
+\end{code}
+
+Closure header sizes.
+
+\begin{code}
+sTD_HDR_SIZE   = (STD_HDR_SIZE   :: Int)
+pROF_HDR_SIZE  = (PROF_HDR_SIZE  :: Int)
+gRAN_HDR_SIZE  = (GRAN_HDR_SIZE  :: Int)
+tICKY_HDR_SIZE = (TICKY_HDR_SIZE :: Int)
+aRR_HDR_SIZE   = (ARR_HDR_SIZE   :: Int)
+\end{code}
+
+Info Table sizes.
+
+\begin{code}
+sTD_ITBL_SIZE   = (STD_ITBL_SIZE   :: Int)
+pROF_ITBL_SIZE  = (PROF_ITBL_SIZE  :: Int)
+gRAN_ITBL_SIZE  = (GRAN_ITBL_SIZE  :: Int)
+tICKY_ITBL_SIZE = (TICKY_ITBL_SIZE :: Int)
+\end{code}
+
+Size of a double in StgWords.
+
+\begin{code}
+dOUBLE_SIZE    = (DOUBLE_SIZE   :: Int)
+mAX_Long_REG   = (MAX_LONG_REG  :: Int)
+wORD64_SIZE    = (WORD64_SIZE   :: Int)
+iNT64_SIZE     = (INT64_SIZE   :: Int)
+\end{code}
+
+The version of the interface file format we're
+using:
+
+\begin{code}
+interfaceFileFormatVersion = HscIfaceFileVersion
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[TysPrim]{Wired-in knowledge about primitive types}
 
@@ -7,24 +7,76 @@ This module tracks the ``state interface'' document, ``GHC prelude:
 types and operations.''
 
 \begin{code}
-module TysPrim where
+module TysPrim(
+	alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
+	alphaTy, betaTy, gammaTy, deltaTy,
+	openAlphaTyVar, openAlphaTyVars,
+
+	charPrimTyCon, 		charPrimTy,
+	intPrimTyCon,		intPrimTy,
+	wordPrimTyCon,		wordPrimTy,
+	addrPrimTyCon,		addrPrimTy,
+	floatPrimTyCon,		floatPrimTy,
+	doublePrimTyCon,	doublePrimTy,
+
+	statePrimTyCon,		mkStatePrimTy,
+	realWorldTyCon,		realWorldTy, realWorldStatePrimTy,
+
+	arrayPrimTyCon,			mkArrayPrimTy, 
+	byteArrayPrimTyCon,		byteArrayPrimTy,
+	mutableArrayPrimTyCon,		mkMutableArrayPrimTy,
+	mutableByteArrayPrimTyCon,	mkMutableByteArrayPrimTy,
+	mutVarPrimTyCon,		mkMutVarPrimTy,
+
+	mVarPrimTyCon,			mkMVarPrimTy,	
+	stablePtrPrimTyCon,		mkStablePtrPrimTy,
+	weakPrimTyCon,  		mkWeakPrimTy,
+	foreignObjPrimTyCon,		foreignObjPrimTy,
+	threadIdPrimTyCon,		threadIdPrimTy,
+	
+	int64PrimTyCon,		int64PrimTy,
+	word64PrimTyCon,	word64PrimTy,
+
+	primRepTyCon,
+
+	pcPrimTyCon
+  ) where
 
 #include "HsVersions.h"
 
-import Kind		( mkBoxedTypeKind )
+import Var		( TyVar, mkSysTyVar )
 import Name		( mkWiredInTyConName )
-import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
-import TyCon		( mkPrimTyCon, mkDataTyCon, TyCon )
-import BasicTypes	( NewOrData(..), RecFlag(..) )
-import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, Type )
-import TyVar		( GenTyVar(..), alphaTyVars )
+import PrimRep		( PrimRep(..), isFollowableRep )
+import TyCon		( mkPrimTyCon, TyCon )
+import Type		( Type, 
+			  mkTyConApp, mkTyConTy, mkTyVarTys,
+			  unboxedTypeKind, boxedTypeKind, openTypeKind, mkArrowKinds
+			)
 import PrelMods		( pREL_GHC )
+import Outputable
 import Unique
 \end{code}
 
 \begin{code}
+alphaTyVars :: [TyVar]
+alphaTyVars = [ mkSysTyVar u boxedTypeKind
+	      | u <- map mkAlphaTyVarUnique [2..] ]
+
+alphaTyVar, betaTyVar, gammaTyVar :: TyVar
+(alphaTyVar:betaTyVar:gammaTyVar:deltaTyVar:_) = alphaTyVars
+
 alphaTys = mkTyVarTys alphaTyVars
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
+
+	-- openAlphaTyVar is prepared to be instantiated
+	-- to a boxed or unboxed type variable.  It's used for the 
+	-- result type for "error", so that we can have (error Int# "Help")
+openAlphaTyVar :: TyVar
+openAlphaTyVar = mkSysTyVar (mkAlphaTyVarUnique 1) openTypeKind
+
+openAlphaTyVars :: [TyVar]
+openAlphaTyVars = [ mkSysTyVar u openTypeKind
+		  | u <- map mkAlphaTyVarUnique [2..] ]
 \end{code}
 
 %************************************************************************
@@ -36,13 +88,14 @@ alphaTys = mkTyVarTys alphaTyVars
 \begin{code}
 -- only used herein
 pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> PrimRep -> TyCon
-
-pcPrimTyCon key str arity primrep
+pcPrimTyCon key str arity rep
   = the_tycon
   where
     name      = mkWiredInTyConName key pREL_GHC str the_tycon
-    the_tycon = mkPrimTyCon name arity primrep
-
+    the_tycon = mkPrimTyCon name kind arity rep
+    kind      = mkArrowKinds (take arity (repeat openTypeKind)) result_kind
+    result_kind | isFollowableRep rep = boxedTypeKind	-- Represented by a GC-ish ptr
+	        | otherwise	      = unboxedTypeKind	-- Represented by a non-ptr
 
 charPrimTy	= mkTyConTy charPrimTyCon
 charPrimTyCon	= pcPrimTyCon charPrimTyConKey SLIT("Char#") 0 CharRep
@@ -69,28 +122,6 @@ doublePrimTy	= mkTyConTy doublePrimTyCon
 doublePrimTyCon	= pcPrimTyCon doublePrimTyConKey SLIT("Double#") 0 DoubleRep
 \end{code}
 
-@PrimitiveKinds@ are used in @PrimitiveOps@, for which we often need
-to reconstruct various type information.  (It's slightly more
-convenient/efficient to make type info from kinds, than kinds [etc.]
-from type info.)
-
-\begin{code}
-getPrimRepInfo ::
-    PrimRep -> (String,		-- tag string
-		Type, TyCon)	-- prim type and tycon
-
-getPrimRepInfo CharRep       = ("Char",   charPrimTy,   charPrimTyCon)
-getPrimRepInfo IntRep        = ("Int",    intPrimTy,    intPrimTyCon)
-getPrimRepInfo WordRep       = ("Word",   wordPrimTy,   wordPrimTyCon)
-getPrimRepInfo AddrRep       = ("Addr",   addrPrimTy,   addrPrimTyCon)
-getPrimRepInfo FloatRep      = ("Float",  floatPrimTy,  floatPrimTyCon)
-getPrimRepInfo DoubleRep     = ("Double", doublePrimTy, doublePrimTyCon)
-getPrimRepInfo Int64Rep      = ("Int64",  int64PrimTy,  int64PrimTyCon)
-getPrimRepInfo Word64Rep     = ("Word64", word64PrimTy, word64PrimTyCon)
-getPrimRepInfo StablePtrRep  = ("StablePtr", mkStablePtrPrimTy alphaTy, stablePtrPrimTyCon)
-getPrimRepInfo ForeignObjRep = ("ForeignObj", foreignObjPrimTy, foreignObjPrimTyCon)
-
-\end{code}
 
 %************************************************************************
 %*									*
@@ -113,46 +144,19 @@ statePrimTyCon	 = pcPrimTyCon statePrimTyConKey SLIT("State#") 1 VoidRep
 \end{code}
 
 @_RealWorld@ is deeply magical.  It {\em is primitive}, but it
-{\em is not unboxed}.
+{\em is not unboxed} (hence PtrRep).
 We never manipulate values of type RealWorld; it's only used in the type
 system, to parameterise State#.
 
 \begin{code}
 realWorldTy	     = mkTyConTy realWorldTyCon
-realWorldTyCon	     = mk_no_constr_tycon realWorldTyConKey SLIT("RealWorld") 
+realWorldTyCon	     = pcPrimTyCon realWorldTyConKey SLIT("RealWorld") 0 PtrRep
 realWorldStatePrimTy = mkStatePrimTy realWorldTy
 \end{code}
 
 Note: the ``state-pairing'' types are not truly primitive, so they are
 defined in \tr{TysWiredIn.lhs}, not here.
 
-\begin{code}
--- The Void type is represented as a data type with no constructors
--- It's a built in type (i.e. there's no way to define it in Haskell;
---	the nearest would be
---
---		data Void =		-- No constructors!
---
--- ) It's boxed; there is only one value of this
--- type, namely "void", whose semantics is just bottom.
-voidTy    = mkTyConTy voidTyCon
-voidTyCon = mk_no_constr_tycon voidTyConKey SLIT("Void")
-\end{code}
-
-\begin{code}
-mk_no_constr_tycon key str
-  = the_tycon
-  where
-    name      = mkWiredInTyConName key pREL_GHC str the_tycon
-    the_tycon = mkDataTyCon name mkBoxedTypeKind 
-			[]		-- No tyvars
-			[]		-- No context
-			[]		-- No constructors; we tell you *nothing* about this guy
-			[]		-- No derivings
-			Nothing		-- Not a dictionary
-			DataType
-			NonRecursive
-\end{code}
 
 %************************************************************************
 %*									*
@@ -177,14 +181,26 @@ mkMutableByteArrayPrimTy s  = mkTyConApp mutableByteArrayPrimTyCon [s]
 
 %************************************************************************
 %*									*
+\subsection[TysPrim-mut-var]{The mutable variable type}
+%*									*
+%************************************************************************
+
+\begin{code}
+mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConKey SLIT("MutVar#") 2 PtrRep
+
+mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
+\end{code}
+
+%************************************************************************
+%*									*
 \subsection[TysPrim-synch-var]{The synchronizing variable type}
 %*									*
 %************************************************************************
 
 \begin{code}
-synchVarPrimTyCon = pcPrimTyCon synchVarPrimTyConKey SLIT("SynchVar#") 2 PtrRep
+mVarPrimTyCon = pcPrimTyCon mVarPrimTyConKey SLIT("MVar#") 2 PtrRep
 
-mkSynchVarPrimTy s elt 	    = mkTyConApp synchVarPrimTyCon [s, elt]
+mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 \end{code}
 
 %************************************************************************
@@ -205,21 +221,74 @@ mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 %*									*
 %************************************************************************
 
-Foreign objects (formerly ``Malloc'' pointers) provide a mechanism which
-will let Haskell's garbage collector communicate with a {\em simple\/}
-garbage collector in the IO world. We want Haskell to be able to hold
-onto references to objects in the IO world and for Haskell's garbage
-collector to tell the IO world when these references become garbage.
-We are not aiming to provide a mechanism that could
-talk to a sophisticated garbage collector such as that provided by a
-LISP system (with a correspondingly complex interface); in particular,
-we shall ignore the danger of circular structures spread across the
-two systems.
+A Foreign Object is just a boxed, unlifted, Addr#.  They're needed
+because finalisers (weak pointers) can't watch Addr#s, they can only
+watch heap-resident objects.  
 
-There are no primitive operations on @ForeignObj#@s (although equality
-could possibly be added?)
+We can't use a lifted Addr# (such as Addr) because race conditions
+could bite us.  For example, if the program deconstructed the Addr
+before passing its contents to a ccall, and a weak pointer was
+watching the Addr, the weak pointer might deduce that the Addr was
+dead before it really was.
 
 \begin{code}
 foreignObjPrimTy    = mkTyConTy foreignObjPrimTyCon
 foreignObjPrimTyCon = pcPrimTyCon foreignObjPrimTyConKey SLIT("ForeignObj#") 0 ForeignObjRep
+\end{code}
+  
+%************************************************************************
+%*									*
+\subsection[TysPrim-Weak]{The ``weak pointer'' type}
+%*									*
+%************************************************************************
+
+\begin{code}
+weakPrimTyCon = pcPrimTyCon weakPrimTyConKey SLIT("Weak#") 1 WeakPtrRep
+
+mkWeakPrimTy v = mkTyConApp weakPrimTyCon [v]
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[TysPrim-thread-ids]{The ``thread id'' type}
+%*									*
+%************************************************************************
+
+A thread id is represented by a pointer to the TSO itself, to ensure
+that they are always unique and we can always find the TSO for a given
+thread id.  However, this has the unfortunate consequence that a
+ThreadId# for a given thread is treated as a root by the garbage
+collector and can keep TSOs around for too long.
+
+Hence the programmer API for thread manipulation uses a weak pointer
+to the thread id internally.
+
+\begin{code}
+threadIdPrimTy    = mkTyConTy threadIdPrimTyCon
+threadIdPrimTyCon = pcPrimTyCon threadIdPrimTyConKey SLIT("ThreadId#") 0 ThreadIdRep
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[TysPrim-PrimRep]{Making types from PrimReps}
+%*									*
+%************************************************************************
+
+Each of the primitive types from this module is equivalent to a
+PrimRep (see PrimRep.lhs).  The following function returns the
+primitive TyCon for a given PrimRep.
+
+\begin{code}
+primRepTyCon CharRep   = charPrimTyCon
+primRepTyCon IntRep    = intPrimTyCon
+primRepTyCon WordRep   = wordPrimTyCon
+primRepTyCon Int64Rep  = int64PrimTyCon
+primRepTyCon Word64Rep = word64PrimTyCon
+primRepTyCon AddrRep   = addrPrimTyCon
+primRepTyCon FloatRep  = floatPrimTyCon
+primRepTyCon DoubleRep = doublePrimTyCon
+primRepTyCon StablePtrRep  = stablePtrPrimTyCon
+primRepTyCon ForeignObjRep = foreignObjPrimTyCon
+primRepTyCon WeakPtrRep = weakPrimTyCon
+primRepTyCon other     = pprPanic "primRepTyCon" (ppr other)
 \end{code}

@@ -1,0 +1,16 @@
+Reading file "Concurrent.lhs":
+Reading file "ChannelVar.lhs":
+Reading file "PrelConc.hs":
+Reading file "ChannelVar.lhs":
+Reading file "Channel.lhs":
+Reading file "Semaphore.lhs":
+Reading file "Merge.lhs":
+Reading file "SampleVar.lhs":
+Reading file "Concurrent.lhs":
+Reading file "test/exts/mvar.hs":
+Type :? for help
+Hugs:a{Deadlock}
+Hugs:a
+Hugs:ab
+Hugs:Program error: putMVar {full MVar}
+

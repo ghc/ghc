@@ -60,9 +60,6 @@ type2context(t)
       case tfun:
     	hsperror ("type2context: arrow (->) constructor found in a context");
 
-      case context:
-    	hsperror ("type2context: unexpected context-thing found in a context");
-
       default:
     	hsperror ("type2context: totally unexpected input");
     }
@@ -107,10 +104,6 @@ is_context_format(t, tyvars)
 
 	case tfun:
 	  hsperror ("is_context_format: arrow (->) constructor found in a context");
-
-	case context:
-	  hsperror ("is_context_format: unexpected context-thing found in a context");
-
 	default:
 	    hsperror ("is_context_format: totally unexpected input");
       }

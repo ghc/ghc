@@ -1,8 +1,7 @@
 _interface_ MachMisc 1
 _exports_
-MachMisc fixedHdrSizeInWords fmtAsmLbl varHdrSizeInWords underscorePrefix;
+MachMisc fixedHdrSize fmtAsmLbl underscorePrefix;
 _declarations_
-1 fixedHdrSizeInWords _:_ PrelBase.Int ;;
+1 fixedHdrSize _:_ PrelBase.Int ;;
 2 fmtAsmLbl _:_ PrelBase.String -> PrelBase.String ;;
-1 varHdrSizeInWords _:_ SMRep.SMRep -> PrelBase.Int ;;
 1 underscorePrefix _:_ PrelBase.Bool ;;

@@ -1,6 +1,5 @@
 _interface_ CgExpr 1
 _exports_
-CgExpr cgExpr getPrimOpArgAmodes;
+CgExpr cgExpr;
 _declarations_
 1 cgExpr _:_ StgSyn.StgExpr -> CgMonad.Code ;;
-1 getPrimOpArgAmodes _:_ PrimOp.PrimOp -> [StgSyn.StgArg] -> CgMonad.FCode [AbsCSyn.CAddrMode] ;;

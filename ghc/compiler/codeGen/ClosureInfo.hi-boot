@@ -1,14 +1,7 @@
 _interface_ ClosureInfo 1
 _exports_
-ClosureInfo ClosureInfo LambdaFormInfo 
-	;
+ClosureInfo ClosureInfo LambdaFormInfo;
 _declarations_
--- 1 infoTableLabelFromCI _:_ ClosureInfo -> CLabel ;;
--- 1 closureSMRep _:_ ClosureInfo -> SMRep.SMRep ;;
--- 1 closureSizeWithoutFixedHdr _:_ ClosureInfo -> HeapOffs.HeapOffset ;;
--- 1 closureTypeDescr _:_ ClosureInfo -> PrelBase.String ;;
--- 1 closureLabelFromCI _:_ ClosureInfo -> CLabel ;;
-
 1 data LambdaFormInfo;
 1 data ClosureInfo;
 

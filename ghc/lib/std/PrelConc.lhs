@@ -8,66 +8,79 @@ Basic concurrency stuff
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
-module PrelConc(
-		-- Forking and suchlike
-	ST,	forkST,
-	IO,	forkIO,	
-	par, fork,
-	threadDelay, threadWaitRead, threadWaitWrite,
 
-		-- MVars
+module PrelConc (
+
+		-- Thread Ids
+	ThreadId,
+
+		-- Forking and suchlike
+	forkIO,	
+	killThread,
+	seq, par, fork,
+	{-threadDelay, threadWaitRead, threadWaitWrite, -}
+
+  		-- MVars
 	MVar, newMVar, newEmptyMVar, takeMVar, putMVar, readMVar, swapMVar
     ) where
 
 import PrelBase
 import {-# SOURCE #-} PrelErr ( parError )
-import PrelST	  	( ST(..), STret(..), StateAndPtr#(..) )
-import PrelIOBase	( IO(..), IOResult(..), MVar(..) )
+import PrelST	  	( ST(..), STret(..), liftST )
+import PrelIOBase	( IO(..), MVar(..), liftIO, unsafePerformIO )
+import PrelErr		( parError )
 import PrelBase		( Int(..) )
-import PrelGHC		( fork#, delay#, waitRead#, waitWrite#,
-		  	  SynchVar#, newSynchVar#, takeMVar#, putMVar#,
-		  	  State#, RealWorld, par#
-			)
+import PrelErr		( seqError )
 
 infixr 0 `par`, `fork`
 \end{code}
 
-
-
 %************************************************************************
 %*									*
-\subsection{@par@, and @fork@}
+\subsection{@ThreadId@, @par@, and @fork@}
 %*									*
 %************************************************************************
 
 \begin{code}
-forkST :: ST s a -> ST s a
+data ThreadId = ThreadId ThreadId#
+-- ToDo: data ThreadId = ThreadId (WeakPair ThreadId# ())
+-- But since ThreadId# is unlifted, the WeakPair type must use open
+-- type variables.
 
-forkST (ST action) = ST $ \ s -> 
-	let d@(STret _ r) = action s in
-	d `fork` STret s r
+forkIO :: IO () -> IO ThreadId
+forkIO action = IO $ \ s -> 
+   case (fork# action s) of (# s, id #) -> (# s, ThreadId id #)
 
-forkIO :: IO () -> IO ()
-forkIO (IO action) = IO $ \ s -> (action s) `fork` IOok s ()
+killThread :: ThreadId -> IO ()
+killThread (ThreadId id) = IO $ \ s ->
+   case (killThread# id s) of s -> (# s, () #)
 
-par, fork :: Eval a => a -> b -> b
+-- "seq" is defined a bit wierdly (see below)
+--
+-- The reason for the strange "0# -> parError" case is that
+-- it fools the compiler into thinking that seq is non-strict in
+-- its second argument (even if it inlines seq at the call site).
+-- If it thinks seq is strict in "y", then it often evaluates
+-- "y" before "x", which is totally wrong.  
+--
+-- Just before converting from Core to STG there's a bit of magic
+-- that recognises the seq# and eliminates the duff case.
+
+{-# INLINE seq  #-}
+seq :: a -> b -> b
+seq  x y = case (seq#  x) of { 0# -> seqError; _ -> y }
+
+par, fork :: a -> b -> b
 
 {-# INLINE par  #-}
 {-# INLINE fork #-}
-
 #if defined(__PARALLEL_HASKELL__) || defined (__GRANSIM__)
-par  x y = case (par#  x) of { 0# -> parError; _ -> y }
+par  x y = case (par# x) of { 0# -> parError; _ -> y }
 #else
 par  x y = y
 #endif
 
-#if defined(__CONCURRENT_HASKELL__) || defined (__GRANSIM__)
-fork x y = case (fork# x) of { 0# -> parError; _ -> y }
-#else
-fork x y = y
-#endif
-
-runOrBlockIO m = m			-- ?????
+fork x y = unsafePerformIO (forkIO (x `seq` return ())) `seq` y
 
 \end{code}
 
@@ -94,20 +107,18 @@ instance Eq (MVar a) where
 newEmptyMVar  :: IO (MVar a)
 
 newEmptyMVar = IO $ \ s# ->
-    case newSynchVar# s# of
-        StateAndSynchVar# s2# svar# -> IOok s2# (MVar svar#)
+    case newMVar# s# of
+         (# s2#, svar# #) -> (# s2#, MVar svar# #)
 
 takeMVar :: MVar a -> IO a
 
-takeMVar (MVar mvar#) = IO $ \ s# ->
-    case takeMVar# mvar# s# of
-        StateAndPtr# s2# r -> IOok s2# r
+takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 
 putMVar  :: MVar a -> a -> IO ()
 
 putMVar (MVar mvar#) x = IO $ \ s# ->
     case putMVar# mvar# x s# of
-        s2# -> IOok s2# ()
+        s2# -> (# s2#, () #)
 
 newMVar :: a -> IO (MVar a)
 
@@ -151,27 +162,19 @@ specified file descriptor is available for reading (just like select).
 @threadWaitWrite@ is similar, but for writing on a file descriptor.
 
 \begin{code}
+{- Not yet -- SDM
 threadDelay, threadWaitRead, threadWaitWrite :: Int -> IO ()
 
 threadDelay (I# x#) = IO $ \ s# ->
     case delay# x# s# of
-      s2# -> IOok s2# ()
+      s2# -> (# s2#, () #)
 
 threadWaitRead (I# x#) = IO $ \ s# -> 
     case waitRead# x# s# of
-      s2# -> IOok s2# ()
+      s2# -> (# s2#, () #)
 
 threadWaitWrite (I# x#) = IO $ \ s# ->
     case waitWrite# x# s# of
-      s2# -> IOok s2# ()
-\end{code}
-
-%*********************************************************
-%*							*
-\subsection{Ghastly return types}
-%*							*
-%*********************************************************
-
-\begin{code}
-data StateAndSynchVar# s elt = StateAndSynchVar# (State# s) (SynchVar# s elt)
+      s2# -> (# s2#, () #)
+-}
 \end{code}

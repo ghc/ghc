@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[HsDecls]{Abstract syntax: global declarations}
 
@@ -17,12 +17,12 @@ import HsPragmas	( DataPragmas, ClassPragmas )
 import HsTypes
 import HsCore		( UfExpr )
 import BasicTypes	( Fixity, NewOrData(..) )
-import IdInfo		( ArgUsageInfo, FBTypeInfo, ArityInfo, UpdateInfo )
+import IdInfo		( ArityInfo, UpdateInfo, InlinePragInfo )
 import Demand		( Demand )
 import CallConv		( CallConv, pprCallConv )
 
 -- others:
-import Name		( getOccName, OccName, NamedThing(..) )
+import Name		( NamedThing )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Util
@@ -145,7 +145,7 @@ instance (NamedThing name, Outputable name)
 
     ppr (TyData new_or_data context tycon tyvars condecls derivings pragmas src_loc)
       = pp_tydecl
-		  (pp_decl_head keyword (pp_context_and_arrow context) tycon tyvars)
+		  (pp_decl_head keyword (pprContext context) tycon tyvars)
 		  (pp_condecls condecls)
 		  derivings
       where
@@ -168,10 +168,6 @@ pp_tydecl pp_head pp_decl_rhs derivings
 	  Nothing 	   -> empty
 	  Just ds	   -> hsep [ptext SLIT("deriving"), parens (interpp'SP ds)]
     ])
-
-pp_context_and_arrow :: Outputable name => Context name -> SDoc
-pp_context_and_arrow [] = empty
-pp_context_and_arrow theta = hsep [pprContext theta, ptext SLIT("=>")]
 \end{code}
 
 A type for recording what types a datatype should be specialised to.
@@ -200,7 +196,11 @@ instance (NamedThing name, Outputable name)
 \begin{code}
 data ConDecl name
   = ConDecl 	name			-- Constructor name
-		(Context name)		-- Existential context for this constructor
+
+		[HsTyVar name]		-- Existentially quantified type variables
+		(Context name)		-- ...and context
+					-- If both are empty then there are no existentials
+
 		(ConDetails name)
 		SrcLoc
 
@@ -225,8 +225,8 @@ data BangType name
 
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (ConDecl name) where
-    ppr (ConDecl con cxt con_details  loc)
-      = pp_context_and_arrow cxt <+> ppr_con_details con con_details
+    ppr (ConDecl con tvs cxt con_details  loc)
+      = sep [pprForAll tvs, pprContext cxt, ppr_con_details con con_details]
 
 ppr_con_details con (InfixCon ty1 ty2)
   = hsep [ppr_bang ty1, ppr con, ppr_bang ty2]
@@ -281,7 +281,7 @@ instance (NamedThing name, Outputable name, Outputable pat)
 				   ppr methods,
 				   char '}'])]
       where
-        top_matter = hsep [ptext SLIT("class"), pp_context_and_arrow context,
+        top_matter = hsep [ptext SLIT("class"), pprContext context,
                             ppr clas, hsep (map (ppr) tyvars)]
 	ppr_sig sig = ppr sig <> semi
 \end{code}
@@ -418,11 +418,10 @@ instance (NamedThing name, Outputable name) => Outputable (IfaceSig name) where
 data HsIdInfo name
   = HsArity		ArityInfo
   | HsStrictness	(HsStrictnessInfo name)
-  | HsUnfold		Bool (UfExpr name)	-- True <=> INLINE pragma
+  | HsUnfold		InlinePragInfo (Maybe (UfExpr name))
   | HsUpdate		UpdateInfo
-  | HsArgUsage		ArgUsageInfo
-  | HsFBType		FBTypeInfo
   | HsSpecialise	[HsTyVar name] [HsType name] (UfExpr name)
+  | HsNoCafRefs
 
 
 data HsStrictnessInfo name

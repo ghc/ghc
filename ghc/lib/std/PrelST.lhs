@@ -23,46 +23,52 @@ The state-transformer monad proper.  By default the monad is strict;
 too many people got bitten by space leaks when it was lazy.
 
 \begin{code}
-newtype ST s a = ST (State# s -> STret s a)
-
-data STret s a = STret (State# s) a
+newtype ST s a = ST (State# s -> (# State# s, a #))
 
 instance Functor (ST s) where
     map f (ST m) = ST $ \ s ->
-      case (m s) of { STret new_s r ->
-      STret new_s (f r) }
+      case (m s) of { (# new_s, r #) ->
+      (# new_s, f r #) }
 
 instance Monad (ST s) where
     {-# INLINE return #-}
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
-    return x = ST $ \ s -> STret s x
+    return x = ST $ \ s -> (# s, x #)
     m >> k   =  m >>= \ _ -> k
 
     (ST m) >>= k
       = ST $ \ s ->
-	case (m s) of { STret new_s r ->
+	case (m s) of { (# new_s, r #) ->
 	case (k r) of { ST k2 ->
 	(k2 new_s) }}
 
+data STret s a = STret (State# s) a
 
+-- liftST is useful when we want a lifted result from an ST computation.  See
+-- fixST below.
+liftST :: ST s a -> State# s -> STret s a
+liftST (ST m) = \s -> case m s of (# s', r #) -> STret s' r
 
 fixST :: (a -> ST s a) -> ST s a
 fixST k = ST $ \ s ->
-    let (ST k_r)  = k r
-	ans       = k_r s
+    let ans       = liftST (k r) s
 	STret _ r = ans
     in
-    ans
+    case ans of STret s' r -> (# s', r #)
 
 {-# NOINLINE unsafeInterleaveST #-}
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST (ST m) = ST ( \ s ->
     let
-	STret _ r = m s
+	r = case m s of (# _, res #) -> res
     in
-    STret s r)
+    (# s, r #)
+  )
 
+instance  Show (ST s a)  where
+    showsPrec p f  = showString "<<ST action>>"
+    showList	   = showList__ (showsPrec 0)
 \end{code}
 
 Definition of runST
@@ -99,11 +105,11 @@ All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
 
 \begin{code}
 {-# NOINLINE runST #-}
-runST :: (All s => ST s a) -> a
+runST :: (forall s. ST s a) -> a
 runST st = 
   case st of
 	ST m -> case m realWorld# of
-      			STret _ r -> r
+      			(# _, r #) -> r
 \end{code}
 
 %*********************************************************
@@ -118,15 +124,4 @@ the desugarer ensures this.
 
 \begin{code}
 data State	     s     = S#		     (State# s)
-data StateAndPtr#    s elt = StateAndPtr#    (State# s) elt 
-
-data StateAndChar#   s     = StateAndChar#   (State# s) Char# 
-data StateAndInt#    s     = StateAndInt#    (State# s) Int# 
-data StateAndWord#   s     = StateAndWord#   (State# s) Word#
-data StateAndFloat#  s     = StateAndFloat#  (State# s) Float# 
-data StateAndDouble# s     = StateAndDouble# (State# s) Double#  
-data StateAndAddr#   s     = StateAndAddr#   (State# s) Addr#
-
-data StateAndInt64#  s     = StateAndInt64#  (State# s) Int64#
-data StateAndWord64# s     = StateAndWord64# (State# s) Word64#
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Class]{The @Class@ datatype}
 
@@ -17,17 +17,13 @@ module Class (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Id	( Id )
 import {-# SOURCE #-} TyCon	( TyCon )
 import {-# SOURCE #-} Type	( Type )
 import {-# SOURCE #-} SpecEnv	( SpecEnv )
 
-import TyCon		( TyCon )
-import TyVar		( TyVar )
-import Name		( NamedThing(..), Name, getOccName )
+import Var		( Id, TyVar )
+import Name		( NamedThing(..), Name )
 import Unique		( Unique, Uniquable(..) )
-import BasicTypes	( Unused )
-import SrcLoc		( SrcLoc )
 import Outputable
 import Util
 \end{code}
@@ -78,7 +74,7 @@ mkClass :: Name -> [TyVar]
 
 mkClass name tyvars super_classes superdict_sels
 	dict_sels defms tycon class_insts
-  = Class (uniqueOf name) name tyvars
+  = Class (getUnique name) name tyvars
 	  super_classes superdict_sels
   	  dict_sels defms
 	  class_insts
@@ -128,10 +124,16 @@ instance Ord Class where
 
 \begin{code}
 instance Uniquable Class where
-    uniqueOf c = classKey c
+    getUnique c = classKey c
 
 instance NamedThing Class where
     getName (Class _ n _ _ _ _ _ _ _) = n
+
+instance Outputable Class where
+    ppr c = ppr (getName c)
+
+instance Show Class where
+    showsPrec p c = showsPrecSDoc p (ppr c)
 \end{code}
 
 

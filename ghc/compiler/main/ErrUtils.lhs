@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1995
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[ErrsUtils]{Utilities for error reporting}
 

@@ -1,0 +1,72 @@
+Hugs:"abcd"
+Hugs:[]
+Hugs:"abcd\NULefgh\NUL"
+Hugs:"abc
+Program error: def
+
+Hugs:"abc
+Program error: def
+
+Hugs:"abc
+Program error: foo
+
+Hugs:"abc
+Program error: foo
+
+Hugs:"\"
+Program error: foo
+
+Hugs:"abcd"
+Hugs:
+Program error: foo
+
+Hugs:
+Program error: 
+Program error: foo
+
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:1
+Hugs:()
+Hugs:
+Program error: foo
+
+Hugs:10
+Hugs:-10
+Hugs:
+Program error: foo
+
+Hugs:
+Program error: foo
+
+Hugs:10
+Hugs:10
+Hugs:10.0
+Hugs:-10.0
+Hugs:10.0
+Hugs:-10.0
+Hugs:'a'
+Hugs:'\NUL'
+Hugs:'\DEL'
+Hugs:[]
+Hugs:[1]
+Hugs:True
+Hugs:False
+Hugs:('a','b')
+Hugs:('a','b','c')
+Hugs:(1,
+Program error: foo
+
+Hugs:R 1
+Hugs:L 'a'
+Hugs:J True
+Hugs:N
+Hugs:[Leaving Hugs]

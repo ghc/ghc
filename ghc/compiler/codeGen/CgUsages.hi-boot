@@ -1,5 +1,5 @@
 _interface_ CgUsages 1
 _exports_
-CgUsages getSpBRelOffset;
+CgUsages getSpRelOffset;
 _declarations_
-1 getSpBRelOffset _:_ HeapOffs.VirtualSpBOffset -> CgMonad.FCode AbsCSyn.RegRelative ;;
+1 getSpRelOffset _:_ AbsCSyn.VirtualSpOffset -> CgMonad.FCode AbsCSyn.RegRelative ;;

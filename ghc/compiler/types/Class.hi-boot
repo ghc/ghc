@@ -1,7 +1,0 @@
-_interface_ Class 1
-_exports_
-Class Class GenClass;
-_instances_
-_declarations_
-1 type Class = Class.GenClass BasicTypes.Unused ;
-1 data GenClass a;

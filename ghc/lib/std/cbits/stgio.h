@@ -1,3 +1,11 @@
+/* 
+ * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
+ *
+ * $Id: stgio.h,v 1.8 1998/12/02 13:27:58 simonm Exp $
+ *
+ * Helper code for GHC's IO subsystem.
+ */
+
 #ifndef STGIO_H
 #define STGIO_H
 
@@ -9,175 +17,223 @@
  * routines (to check consistency).
  */
 
-/* closeFile.lc */
-StgAddr allocMemory__ PROTO((StgInt));
+#include "error.h"
 
-/* closeFile.lc */
-StgInt closeFile PROTO((StgForeignObj,StgInt));
+/* closeFile.c */
+StgAddr allocMemory__ (StgInt);
 
-/* createDirectory.lc */
-StgInt createDirectory PROTO((StgByteArray));
+/* closeFile.c */
+StgInt closeFile (StgForeignPtr,StgInt);
 
-/* directoryAux.lc */
-StgAddr openDir__ PROTO((StgByteArray));
-StgAddr readDir__ PROTO((StgAddr));
+/* createDirectory.c */
+StgInt createDirectory (StgByteArray);
 
-/* echoAux.lc */
-StgInt setTerminalEcho PROTO((StgForeignObj, StgInt));
-StgInt getTerminalEcho PROTO((StgForeignObj));
-StgInt isTerminalDevice PROTO((StgForeignObj));
+/* directoryAux.c */
+StgAddr openDir__         (StgByteArray);
+StgAddr readDir__         (StgAddr);
+StgAddr get_dirent_d_name (StgAddr);
+StgWord get_stat_st_mode  (StgAddr);
+StgInt64 get_stat_st_mtime(StgAddr);
+void     set_stat_st_mtime(StgByteArray, StgByteArray);
+StgInt  sizeof_stat       (void);
+StgInt  prim_stat         (StgAddr,StgAddr);
+StgInt  const_F_OK        (void);
+StgWord const_S_IRUSR 	  (void);
+StgWord const_S_IWUSR 	  (void);
+StgWord const_S_IXUSR 	  (void);
+StgInt  prim_S_ISDIR  	  (StgWord);
+StgInt  prim_S_ISREG  	  (StgWord);
 
-/* env.lc */
-char *	strDup		PROTO((const char *));
-int	setenviron	PROTO((char **));
-int	copyenv		(STG_NO_ARGS);
-int	_setenv		PROTO((char *));
-int	delenv		PROTO((char *));
+/* echoAux.c */
+StgInt setTerminalEcho (StgForeignPtr, StgInt);
+StgInt getTerminalEcho (StgForeignPtr);
+StgInt isTerminalDevice (StgForeignPtr);
 
-/* errno.lc */
+/* env.c */
+char *	strDup		(const char *);
+int	setenviron	(char **);
+int	copyenv		(void);
+int	_setenv		(char *);
+int	delenv		(char *);
+
+/* errno.c */
 extern	int ghc_errno;
 extern	int ghc_errtype;
-void	cvtErrno(STG_NO_ARGS);
-void	stdErrno(STG_NO_ARGS);
-StgAddr getErrStr__(STG_NO_ARGS);
-StgInt  getErrNo__(STG_NO_ARGS);
-StgInt  getErrType__(STG_NO_ARGS);
+extern	char* ghc_errstr;
 
-/* execvpe.lc */
-int	execvpe PROTO((char *, char **, char **));
+void	cvtErrno(void);
+void	stdErrno(void);
+void    convertErrno(void);
+StgAddr getErrStr__(void);
+StgInt  getErrNo__(void);
+StgInt  getErrType__(void);
 
-/* fileEOF.lc */
-StgInt	fileEOF PROTO((StgForeignObj));
-/* fileGetc.lc */
-StgInt	fileGetc PROTO((StgForeignObj));
+/* execvpe.c */
+int	execvpe (char *, char **, char **);
 
-/* fileLookAhead.lc */
-StgInt	fileLookAhead PROTO((StgForeignObj));
-StgInt	ungetChar PROTO((StgForeignObj,StgChar));
+/* fileEOF.c */
+StgInt	fileEOF (StgForeignPtr);
+/* fileGetc.c */
+StgInt	fileGetc (StgForeignPtr);
 
-/* fileObject.lc */
-void    setBufFlags PROTO((StgForeignObj, StgInt));
-void    setBufWPtr  PROTO((StgForeignObj, StgInt));
-StgInt  getBufWPtr  PROTO((StgForeignObj));
-void    setBuf      PROTO((StgForeignObj, StgAddr, StgInt));
-StgAddr getBuf      PROTO((StgForeignObj));
-StgAddr getWriteableBuf PROTO((StgForeignObj));
-StgAddr getBufStart PROTO((StgForeignObj,StgInt));
-StgInt  getBufSize  PROTO((StgForeignObj));
-void    setFilePtr  PROTO((StgForeignObj, StgAddr));
-StgAddr getFilePtr  PROTO((StgForeignObj));
-void    setConnectedTo  PROTO((StgForeignObj, StgForeignObj, StgInt));
-void    setPushbackBufSize PROTO((StgInt));
-StgInt  getPushbackBufSize (STG_NO_ARGS);
-void    setNonBlockingIOFlag__ PROTO((StgForeignObj));
-void    clearNonBlockingIOFlag__ PROTO((StgForeignObj));
-void    setConnNonBlockingIOFlag__ PROTO((StgForeignObj));
-void    clearConnNonBlockingIOFlag__ PROTO((StgForeignObj));
-StgInt  getFileFd  PROTO((StgForeignObj));
-StgInt  getConnFileFd  PROTO((StgForeignObj));
+/* fileLookAhead.c */
+StgInt	fileLookAhead (StgForeignPtr);
+StgInt	ungetChar (StgForeignPtr,StgChar);
 
-/* filePosn.lc */
-StgInt	getFilePosn PROTO((StgForeignObj));
-StgInt	setFilePosn PROTO((StgForeignObj, StgInt));
+/* fileObject.c */
+void    setBufFlags (StgForeignPtr, StgInt);
+void    setBufWPtr  (StgForeignPtr, StgInt);
+StgInt  getBufWPtr  (StgForeignPtr);
+void    setBuf      (StgForeignPtr, StgAddr, StgInt);
+StgAddr getBuf      (StgForeignPtr);
+StgAddr getWriteableBuf (StgForeignPtr);
+StgAddr getBufStart (StgForeignPtr,StgInt);
+StgInt  getBufSize  (StgForeignPtr);
+void    setFilePtr  (StgForeignPtr, StgAddr);
+StgAddr getFilePtr  (StgForeignPtr);
+void    setConnectedTo  (StgForeignPtr, StgForeignPtr, StgInt);
+void    setPushbackBufSize (StgInt);
+StgInt  getPushbackBufSize (void);
+void    setNonBlockingIOFlag__ (StgForeignPtr);
+void    clearNonBlockingIOFlag__ (StgForeignPtr);
+void    setConnNonBlockingIOFlag__ (StgForeignPtr);
+void    clearConnNonBlockingIOFlag__ (StgForeignPtr);
+StgInt  getFileFd  (StgForeignPtr);
+StgInt  getConnFileFd  (StgForeignPtr);
+StgInt  fill_up_line_buffer(IOFileObject*);
 
-/* filePutc.lc */
-StgInt	filePutc    PROTO((StgForeignObj, StgChar));
+/* filePosn.c */
+StgInt	getFilePosn (StgForeignPtr);
+StgInt	setFilePosn (StgForeignPtr, StgInt);
 
-/* fileSize.lc */
-StgInt	fileSize    PROTO((StgForeignObj, StgByteArray));
+/* filePutc.c */
+StgInt	filePutc    (StgForeignPtr, StgChar);
 
-/* flushFile.lc */
-StgInt	flushFile   PROTO((StgForeignObj));
-StgInt	flushBuffer PROTO((StgForeignObj));
-StgInt	flushReadBuffer PROTO((StgForeignObj));
-void	flushConnectedHandle PROTO((StgForeignObj));
+/* fileSize.c */
+StgInt	fileSize    (StgForeignPtr, StgByteArray);
+StgInt	fileSize_int64 (StgForeignPtr, StgByteArray);
 
-/* freeFile.lc */
-void freeStdFile PROTO((StgForeignObj));
-void freeFile PROTO((StgForeignObj));
-void freeStdFileObject PROTO((StgForeignObj));
-void freeFileObject PROTO((StgForeignObj));
+/* flushFile.c */
+StgInt	flushFile   (StgForeignPtr);
+StgInt	flushBuffer (StgForeignPtr);
+StgInt	flushReadBuffer (StgForeignPtr);
 
-/* getBufferMode.lc */
-StgInt	getBufferMode PROTO((StgForeignObj));
+/* freeFile.c */
+void freeStdFile (StgForeignPtr);
+void freeFile (StgForeignPtr);
+void freeStdFileObject (StgForeignPtr);
+void freeFileObject (StgForeignPtr);
 
-/* getClockTime.lc */
-StgInt	getClockTime PROTO((StgByteArray, StgByteArray));
-StgAddr	showTime     PROTO((I_, StgByteArray, StgByteArray));
-StgAddr	toClockSec   PROTO((I_, I_, I_, I_, I_, I_, I_, StgByteArray));
-StgAddr	toLocalTime  PROTO((I_, StgByteArray, StgByteArray));
-StgAddr	toUTCTime    PROTO((I_, StgByteArray, StgByteArray));
+StgAddr ref_freeStdFileObject (void);
+StgAddr ref_freeFileObject    (void);
 
-/* getCPUTime.lc */
-StgByteArray getCPUTime PROTO((StgByteArray));
-StgInt clockTicks();
+/* getBufferMode.c */
+StgInt	getBufferMode (StgForeignPtr);
 
-/* getCurrentDirectory.lc */
-StgAddr getCurrentDirectory(STG_NO_ARGS);
+/* getClockTime.c */
+StgInt	getClockTime (StgByteArray, StgByteArray);
+StgInt  prim_getClockTime(StgByteArray, StgByteArray);
 
-/* getLock.lc */
-int     lockFile    PROTO((int, int));
-int     unlockFile  PROTO((int));
-StgInt	getLock	    PROTO((StgInt, StgInt));
+/* getCPUTime.c */
+StgByteArray getCPUTime (StgByteArray);
+StgInt clockTicks(void);
 
-/* inputReady.lc */
-StgInt	inputReady  PROTO((StgForeignObj,StgInt));
+/* getCurrentDirectory.c */
+StgAddr getCurrentDirectory(void);
 
-/* openFile.lc */
-IOFileObject* openFile    PROTO((StgByteArray, StgInt, StgInt, StgInt));
-IOFileObject* openFd      PROTO((StgInt, StgInt, StgInt));
-IOFileObject* openStdFile PROTO((StgInt, StgInt, StgInt));
+/* getDirectoryContents.c */
+StgAddr getDirectoryContents (StgByteArray);
 
-/* readFile.lc */
-StgInt	readBlock PROTO((StgForeignObj));
-StgInt	readChunk PROTO((StgForeignObj,StgAddr,StgInt));
-StgInt	readLine PROTO((StgForeignObj));
-StgInt	readChar PROTO((StgForeignObj));
+/* getLock.c */
+int     lockFile    (int, int);
+int     unlockFile  (int);
+StgInt	getLock	    (StgInt, StgInt);
 
-/* removeDirectory.lc */
-StgInt removeDirectory PROTO((StgByteArray));
+/* inputReady.c */
+StgInt	inputReady  (StgForeignPtr, StgInt);
 
-/* removeFile.lc */
-StgInt removeFile PROTO((StgByteArray));
+/* openFile.c */
+IOFileObject* openFile    (StgByteArray, StgInt, StgInt, StgInt);
+IOFileObject* openFd      (StgInt, StgInt, StgInt);
+IOFileObject* openStdFile (StgInt, StgInt, StgInt);
 
-/* renameDirectory.lc */
-StgInt renameDirectory PROTO((StgByteArray, StgByteArray));
+/* progargs.c */
+StgAddr get_prog_argv(void);
+StgInt  get_prog_argc(void);
 
-/* renameFile.lc */
-StgInt renameFile PROTO((StgByteArray, StgByteArray));
+/* readFile.c */
+StgInt	readBlock (StgForeignPtr);
+StgInt	readChunk (StgForeignPtr,StgAddr,StgInt);
+StgInt	readLine  (StgForeignPtr);
+StgInt	readChar  (StgForeignPtr);
 
-/* seekFile.lc */
-StgInt	seekFile  PROTO((StgForeignObj, StgInt, StgInt, StgByteArray));
-StgInt	seekFileP PROTO((StgForeignObj));
+/* removeDirectory.c */
+StgInt removeDirectory (StgByteArray);
 
-/* setBuffering.lc */
-StgInt	setBuffering PROTO((StgForeignObj, StgInt));
+/* removeFile.c */
+StgInt removeFile (StgByteArray);
 
-/* setCurrentDirectory.lc */
-StgInt setCurrentDirectory PROTO((StgByteArray));
+/* renameDirectory.c */
+StgInt renameDirectory (StgByteArray, StgByteArray);
 
-/* showTime.lc */
-StgAddr showTime PROTO((StgInt, StgByteArray, StgByteArray));
+/* renameFile.c */
+StgInt renameFile (StgByteArray, StgByteArray);
 
-/* system.lc */
-StgInt	systemCmd PROTO((StgByteArray));
+/* seekFile.c */
+StgInt	seekFile  (StgForeignPtr, StgInt, StgInt, StgByteArray);
+StgInt	seekFile_int64 (StgForeignPtr, StgInt, StgInt64);
+StgInt	seekFileP (StgForeignPtr);
 
-/* toLocalTime.lc */
-StgAddr toLocalTime PROTO((StgInt, StgByteArray, StgByteArray));
+/* setBuffering.c */
+StgInt	setBuffering (StgForeignPtr, StgInt);
+StgInt  const_BUFSIZ (void);
 
-/* toUTCTime.lc */
-StgAddr toUTCTime PROTO((StgInt, StgByteArray, StgByteArray));
+/* setCurrentDirectory.c */
+StgInt setCurrentDirectory (StgByteArray);
 
-/* toClockSec.lc */
-StgAddr toClockSec PROTO((StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgByteArray));
+/* showTime.c */
+StgAddr showTime (StgInt, StgByteArray, StgByteArray);
 
-/* writeError.lc */
-void    writeErrString__ PROTO((StgAddr, StgByteArray, StgInt));
-/* writeFile.lc */
-StgInt	writeFile PROTO((StgAddr, StgForeignObj, StgInt));
-StgInt	writeBuf  PROTO((StgForeignObj, StgAddr, StgInt));
-StgInt	writeBufBA  PROTO((StgForeignObj, StgByteArray, StgInt));
-StgInt	writeFileObject PROTO((StgForeignObj, StgInt));
-StgInt	writeBuffer PROTO((StgForeignObj, StgInt));
+/* system.c */
+StgInt	systemCmd (StgByteArray);
+
+/* timezone.c */
+StgInt get_tm_sec   ( StgAddr );
+StgInt get_tm_min   ( StgAddr );
+StgInt get_tm_hour  ( StgAddr );
+StgInt get_tm_mday  ( StgAddr );
+StgInt get_tm_mon   ( StgAddr );
+StgInt get_tm_year  ( StgAddr );
+StgInt get_tm_wday  ( StgAddr );
+StgInt get_tm_yday  ( StgAddr );
+StgInt get_tm_isdst ( StgAddr );
+StgAddr prim_ZONE    ( StgAddr );
+StgInt prim_GMTOFF  ( StgAddr );
+StgInt prim_SETZONE ( StgAddr, StgAddr );
+StgInt sizeof_word      ( void ); 
+StgInt sizeof_struct_tm	( void );
+StgInt sizeof_time_t    ( void );
+
+/* toLocalTime.c */
+StgAddr toLocalTime (StgInt, StgByteArray, StgByteArray);
+StgInt prim_toLocalTime ( StgInt64,StgByteArray );
+
+/* toUTCTime.c */
+StgAddr toUTCTime (StgInt, StgByteArray, StgByteArray);
+StgInt prim_toUTCTime ( StgInt64,StgByteArray );
+
+/* toClockSec.c */
+StgAddr toClockSec (StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgByteArray);
+StgInt prim_toClockSec(StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgByteArray);
+
+/* writeError.c */
+void    writeErrString__ (StgAddr, StgByteArray, StgInt);
+/* writeFile.c */
+StgInt	writeBuf  (StgForeignPtr, StgAddr, StgInt);
+StgInt	writeBufBA  (StgForeignPtr, StgByteArray, StgInt);
+StgInt	writeFileObject (StgForeignPtr, StgInt);
+StgInt	writeBuffer (StgForeignPtr, StgInt);
 
 #endif /* ! STGIO_H */
+
+

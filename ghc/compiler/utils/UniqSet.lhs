@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[UniqSet]{Specialised sets, for things with @Uniques@}
 
@@ -15,12 +15,13 @@ module UniqSet (
 	addOneToUniqSet, addListToUniqSet, delOneFromUniqSet,
 	unionUniqSets, unionManyUniqSets, minusUniqSet,
 	elementOfUniqSet, mapUniqSet, intersectUniqSets,
-	isEmptyUniqSet, filterUniqSet, sizeUniqSet
+	isEmptyUniqSet, filterUniqSet, sizeUniqSet, foldUniqSet,
+	elemUniqSet_Directly, lookupUniqSet
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Name
+import {-# SOURCE #-} Name ( Name )
 
 import Maybes		( maybeToBool )
 import UniqFM
@@ -39,7 +40,7 @@ import Unique		( Unique, Uniquable(..) )
 %*									*
 %************************************************************************
 
-We use @UniqFM@, with a (@uniqueOf@-able) @Unique@ as ``key''
+We use @UniqFM@, with a (@getUnique@-able) @Unique@ as ``key''
 and the thing itself as the ``value'' (for later retrieval).
 
 \begin{code}
@@ -56,6 +57,9 @@ unitUniqSet x = MkUniqSet (unitUFM x x)
 
 uniqSetToList :: UniqSet a -> [a]
 uniqSetToList (MkUniqSet set) = eltsUFM set
+
+foldUniqSet :: (a -> b -> b) -> b -> UniqSet a -> b
+foldUniqSet k z (MkUniqSet set) = foldUFM k z set 
 
 mkUniqSet :: Uniquable a => [a]  -> UniqSet a
 mkUniqSet xs = MkUniqSet (listToUFM [ (x, x) | x <- xs])
@@ -90,19 +94,21 @@ intersectUniqSets (MkUniqSet set1) (MkUniqSet set2) = MkUniqSet (intersectUFM se
 elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
 elementOfUniqSet x (MkUniqSet set) = maybeToBool (lookupUFM set x)
 
+lookupUniqSet :: Uniquable a => UniqSet a -> a -> Maybe a
+lookupUniqSet (MkUniqSet set) x = lookupUFM set x
+
+elemUniqSet_Directly :: Unique -> UniqSet a -> Bool
+elemUniqSet_Directly x (MkUniqSet set) = maybeToBool (lookupUFM_Directly set x)
+
 sizeUniqSet :: UniqSet a -> Int
 sizeUniqSet (MkUniqSet set) = sizeUFM set
 
 isEmptyUniqSet :: UniqSet a -> Bool
 isEmptyUniqSet (MkUniqSet set) = isNullUFM set {-SLOW: sizeUFM set == 0-}
 
-mapUniqSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b
-mapUniqSet f (MkUniqSet set)
-  = MkUniqSet (listToUFM [ let
-			     mapped_thing = f thing
-			  in
-			  (mapped_thing, mapped_thing)
-			| thing <- eltsUFM set ])
+mapUniqSet :: (a -> a) -> UniqSet a -> UniqSet a
+  -- VERY IMPORTANT: *assumes* that the function doesn't change the unique
+mapUniqSet f (MkUniqSet set) = MkUniqSet (mapUFM f set)
 \end{code}
 
 \begin{code}

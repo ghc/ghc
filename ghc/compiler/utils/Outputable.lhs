@@ -1,5 +1,5 @@
 %
-% (c) The GRASP Project, Glasgow University, 1992-1996
+% (c) The GRASP Project, Glasgow University, 1992-1998
 %
 \section[Outputable]{Classes for pretty-printing}
 
@@ -7,6 +7,10 @@ Defines classes for pretty-printing and forcing, both forms of
 ``output.''
 
 \begin{code}
+{-# OPTIONS -fno-prune-tydecls #-}
+-- Hopefully temporary; 3.02 complained about not being able
+-- to see the consructors for ForeignObj
+
 module Outputable (
 	Outputable(..),			-- Class
 
@@ -30,9 +34,11 @@ module Outputable (
 	hang, punctuate,
 	speakNth, speakNTimes,
 
-	showSDoc, printSDoc, printErrs, printDump, 
+	printSDoc, printErrs, printDump, 
 	printForC, printForAsm, printForIface,
 	pprCode, pprCols,
+	showSDoc, showsPrecSDoc, pprFSAsString,
+
 
 	-- error handling
 	pprPanic, pprPanic#, pprError, pprTrace, assertPprPanic,
@@ -41,12 +47,15 @@ module Outputable (
 
 #include "HsVersions.h"
 
+
 import IO		( Handle, hPutChar, hPutStr, stderr, stdout )
-import CmdLineOpts	( opt_PprStyle_All, opt_PprStyle_Debug, opt_PprUserLength )
+import CmdLineOpts	( opt_PprStyle_Debug, opt_PprUserLength )
 import FastString
 import qualified Pretty
 import Pretty		( Doc, Mode(..), TextDetails(..), fullRender )
 import Util		( panic, assertPanic, panic#, trace )
+import ST		( runST )
+import Foreign
 \end{code}
 
 
@@ -171,13 +180,17 @@ printForIface handle doc = printDoc OneLineMode handle (doc PprInterface)
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
 
+-- Can't make SDoc an instance of Show because SDoc is just a function type
+-- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
 showSDoc :: SDoc -> String
 showSDoc d = show (d (mkUserStyle AllTheWay))
 
-mkUserStyle depth |  opt_PprStyle_Debug 
-	  	  || opt_PprStyle_All = PprDebug
-	          |  otherwise        = PprUser depth
+showsPrecSDoc :: Int -> SDoc -> ShowS
+showsPrecSDoc p d = showsPrec p (d (mkUserStyle AllTheWay))
+
+mkUserStyle depth |  opt_PprStyle_Debug = PprDebug
+	          |  otherwise          = PprUser depth
 \end{code}
 
 \begin{code}
@@ -257,15 +270,24 @@ instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
-    ppr (x,y) =
-      hang (hcat [lparen, ppr x, comma]) 4 ((<>) (ppr y) rparen)
+    ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
 
 -- ToDo: may not be used
 instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) where
     ppr (x,y,z) =
-      parens (sep [ (<>) (ppr x) comma,
-		      (<>) (ppr y) comma,
-		      ppr z ])
+      parens (sep [ppr x <> comma,
+		   ppr y <> comma,
+		   ppr z ])
+
+instance Outputable FastString where
+    ppr fs = text (unpackFS fs)		-- Prints an unadorned string,
+					-- no double quotes or anything
+
+pprFSAsString :: FastString -> SDoc			-- The Char instance of Show prints
+pprFSAsString fs = text (showList (unpackFS fs) "")	-- strings with double quotes and escapes
+
+instance Show FastString  where
+    showsPrec p fs = showsPrecSDoc p (ppr fs)
 \end{code}
 
 
@@ -351,7 +373,7 @@ pprPanic heading pretty_msg = panic (show (doc PprDebug))
 			    where
 			      doc = text heading <+> pretty_msg
 
-pprError heading pretty_msg = error (heading++ " " ++ (show pretty_msg))
+pprError heading pretty_msg = error (heading++ " " ++ (showSDoc pretty_msg))
 
 pprTrace heading pretty_msg = trace (show (doc PprDebug))
 			    where

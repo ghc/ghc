@@ -1,50 +1,71 @@
 \begin{code}
 module TcEnv(
-	TcIdOcc(..), TcIdBndr, tcIdType, tcIdTyVars, tcInstId,
+	TcIdOcc(..), TcIdBndr, TcIdSet, tcIdType, tcIdTyVars, tcInstId,
+	tcLookupDataCon,
 
 	TcEnv, GlobalValueEnv,
 
-	initEnv, getEnv_LocalIds, getEnv_TyCons, getEnv_Classes,
+	initEnv, getEnv_TyCons, getEnv_Classes,
 	
-	tcExtendTyVarEnv, tcLookupTyVar, 
+	tcExtendTyVarEnv, tcLookupTyVar, tcLookupTyVarBndrs,
 
 	tcExtendTyConEnv, tcLookupTyCon, tcLookupTyConByKey, 
 	tcExtendClassEnv, tcLookupClass, tcLookupClassByKey,
 	tcGetTyConsAndClasses,
 
-	tcExtendGlobalValEnv, tcExtendLocalValEnv, tcGetGlobalValEnv, tcSetGlobalValEnv,
+	tcExtendGlobalValEnv, tcExtendLocalValEnv, tcExtendEnvWithPat,
+	tcGetGlobalValEnv, tcSetGlobalValEnv, lookupGlobalByKey,
 	tcLookupLocalValue, tcLookupLocalValueOK, tcLookupLocalValueByKey, 
 	tcLookupGlobalValue, tcLookupGlobalValueByKey, tcLookupGlobalValueMaybe,
 	tcAddImportedIdInfo, tcExplicitLookupGlobal,
 	tcLookupGlobalValueByKeyMaybe, 
 
-	newMonoIds, newLocalIds, newLocalId, newSpecPragmaId,
-	tcGetGlobalTyVars, tcExtendGlobalTyVars
+	newLocalIds, newLocalId, newSpecPragmaId,
+	tcGetGlobalTyVars, tcExtendGlobalTyVars,
+
+	tidyType, tidyTypes, tidyTyVar,
+
+	badCon, badPrimOp
   ) where
 
 #include "HsVersions.h"
 
-import MkId	( mkUserLocal, mkUserId, mkSpecPragmaId )
-import Id	( Id, GenId, idType, replaceIdInfo, idInfo )
-import TcKind	( TcKind, kindToTcKind, Kind )
-import TcType	( TcType, TcMaybe, TcTyVar, TcTyVarSet, TcThetaType,
-		  newTyVarTys, tcInstTyVars, zonkTcTyVars, tcInstType
+import HsTypes	( getTyVarName )
+import Id	( mkUserLocal, isDataConId_maybe )
+import MkId 	( mkSpecPragmaId )
+import Var	( TyVar, Id, GenId, setVarName,
+		  idType, setIdInfo, idInfo
 		)
-import TyVar	( mkTyVarSet, unionTyVarSets, emptyTyVarSet, TyVar )
-import Type	( tyVarsOfType, tyVarsOfTypes, splitForAllTys, splitRhoTy )
-import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon, Arity )
+import TcType	( TcType, TcTyVar, TcTyVarSet, TcThetaType, TcBox,
+		  tcInstTyVars, zonkTcTyVars,
+		  TcKind, kindToTcKind
+		)
+import VarEnv
+import VarSet
+import Type	( Kind,
+		  tyVarsOfType, tyVarsOfTypes, mkTyVarTy, substTy,
+		  splitForAllTys, splitRhoTy, splitFunTys, substFlexiTy,
+		  splitAlgTyConApp_maybe, getTyVar
+		)
+import DataCon	( DataCon )
+import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon )
 import Class	( Class )
 
 import TcMonad
 
+import BasicTypes	( Arity )
 import IdInfo		( noIdInfo )
-import Name		( Name, OccName(..), nameOccName,
+import Name		( Name, OccName(..), nameOccName, occNameString, mkLocalName,
 			  maybeWiredInTyConName, maybeWiredInIdName, isLocallyDefined,
+			  isSysLocalName,
 			  NamedThing(..)
 			)
-import Unique		( pprUnique10{-, pprUnique ToDo:rm-}, Unique, Uniquable(..) )
-import UniqFM	     
-import Util		( zipEqual, zipWithEqual, zipWith3Equal )
+import Unique		( pprUnique10, Unique, Uniquable(..) )
+import FiniteMap	( lookupFM, addToFM )
+import UniqFM
+import Unique		( Uniquable(..) )
+import Util		( zipEqual, zipWith3Equal, mapAccumL )
+import Bag		( bagToList )
 import Maybes		( maybeToBool )
 import Outputable
 \end{code}
@@ -57,9 +78,11 @@ import Outputable
 
 
 \begin{code}
-type TcIdBndr s = GenId  (TcType s)	-- Binders are all TcTypes
+type TcIdBndr s = GenId  (TcBox s)	-- Binders are all TcTypes
 data TcIdOcc  s = TcId   (TcIdBndr s)	-- Bindees may be either
 		| RealId Id
+
+type TcIdSet s  = GenIdSet (TcBox s)
 
 instance Eq (TcIdOcc s) where
   (TcId id1)   == (TcId id2)   = id1 == id2
@@ -86,8 +109,25 @@ tcIdType (TcId   id) = idType id
 tcIdType (RealId id) = pprPanic "tcIdType:" (ppr id)
 
 tcIdTyVars (TcId id)  = tyVarsOfType (idType id)
-tcIdTyVars (RealId _) = emptyTyVarSet		-- Top level Ids have no free type variables
+tcIdTyVars (RealId _) = emptyVarSet		-- Top level Ids have no free type variables
 
+
+tcLookupDataCon :: Name -> TcM s (DataCon, [TcType s], TcType s)
+tcLookupDataCon con_name
+  = tcLookupGlobalValue con_name		`thenNF_Tc` \ con_id ->
+    case isDataConId_maybe con_id of {
+	Nothing -> failWithTc (badCon con_id);
+ 	Just data_con ->
+
+    tcInstId con_id			`thenNF_Tc` \ (_, _, con_tau) ->
+	     -- Ignore the con_theta; overloaded constructors only
+	     -- behave differently when called, not when used for
+	     -- matching.
+    let
+	(arg_tys, result_ty) = splitFunTys con_tau
+    in
+    ASSERT( maybeToBool (splitAlgTyConApp_maybe result_ty) )
+    returnTc (data_con, arg_tys, result_ty) }
 
 -- A useful function that takes an occurrence of a global thing
 -- and instantiates its type with fresh type variables
@@ -101,11 +141,52 @@ tcInstId id
       (tyvars, rho) = splitForAllTys (idType id)
     in
     tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
-    tcInstType tenv rho		`thenNF_Tc` \ rho' ->
     let
-	(theta', tau') = splitRhoTy rho'
+	rho'	       = substFlexiTy tenv rho
+	(theta', tau') = splitRhoTy rho' 
     in
     returnNF_Tc (tyvars', theta', tau')
+\end{code}
+
+tidyTy tidies up a type for printing in an error message.
+
+\begin{code}
+tidyType :: TidyTypeEnv s -> TcType s -> (TidyTypeEnv s, TcType s)
+tidyType env ty
+  = (env', substTy subst' ty)
+  where
+    env'@(_, subst') = foldl go env (varSetElems (tyVarsOfType ty))
+    go env tyvar     = fst (tidyTyVar env tyvar)
+
+tidyTypes :: TidyTypeEnv s -> [TcType s] -> (TidyTypeEnv s, [TcType s])
+tidyTypes env tys = mapAccumL tidyType env tys
+
+tidyTyVar :: TidyTypeEnv s -> TcTyVar s -> (TidyTypeEnv s, TcTyVar s)
+tidyTyVar (supply,subst) tyvar
+  = case lookupVarEnv subst tyvar of
+	Just ty -> 	-- Already substituted
+		   ((supply,subst), getTyVar "tidyTyVar" ty)
+	Nothing -> 	-- Make a new nice name for it
+		   ((addToFM supply str next,
+		     extendVarEnv subst tyvar (mkTyVarTy new_tyvar)),
+		    new_tyvar)
+  where
+    tyvar_name = getName tyvar
+    is_sys     = isSysLocalName tyvar_name
+
+    str | is_sys    = SLIT("$")
+        | otherwise = occNameString (nameOccName tyvar_name)
+
+    next = case lookupFM supply str of
+		Nothing -> 0
+		Just n  -> n+1
+
+    new_tyvar = mkNewTv str is_sys next tyvar
+			
+mkNewTv :: FastString -> Bool -> Int -> TcTyVar s -> TcTyVar s
+mkNewTv str False  0 tv = tv	-- Leave first non-sys thing alone
+mkNewTv str is_sys n tv = setVarName tv (mkLocalName (getUnique tv) 
+					             (TvOcc (_PK_ ((_UNPK_ str) ++ show n))))
 \end{code}
 
 
@@ -120,7 +201,7 @@ Data type declarations
 
 \begin{code}
 data TcEnv s = TcEnv
-		  (TyVarEnv s)
+		  (TcTyVarEnv s)
 		  (TyConEnv s)
 		  (ClassEnv s)
 		  GlobalValueEnv
@@ -128,9 +209,9 @@ data TcEnv s = TcEnv
 		  (TcRef s (TcTyVarSet s))	-- Free type variables of locals
 						-- ...why mutable? see notes with tcGetGlobalTyVars
 
-type TyVarEnv s  = UniqFM (TcKind s, TyVar)
-type TyConEnv s  = UniqFM (TcKind s, Maybe Arity, TyCon)	-- Arity present for Synonyms only
-type ClassEnv s  = UniqFM ([TcKind s], Class)		-- The kinds are the kinds of the args
+type TcTyVarEnv s = UniqFM (TcKind s, TyVar)
+type TyConEnv s   = UniqFM (TcKind s, Maybe Arity, TyCon)	-- Arity present for Synonyms only
+type ClassEnv s   = UniqFM ([TcKind s], Class)		-- The kinds are the kinds of the args
 							-- to the class
 type ValueEnv id = UniqFM id
 type GlobalValueEnv = ValueEnv Id			-- Globals
@@ -138,7 +219,6 @@ type GlobalValueEnv = ValueEnv Id			-- Globals
 initEnv :: TcRef s (TcTyVarSet s) -> TcEnv s
 initEnv mut = TcEnv emptyUFM emptyUFM emptyUFM emptyUFM emptyUFM mut 
 
-getEnv_LocalIds (TcEnv _ _ _ _ ls _) = eltsUFM ls
 getEnv_TyCons   (TcEnv _ ts _ _ _ _) = [tycon | (_, _, tycon) <- eltsUFM ts]
 getEnv_Classes  (TcEnv _ _ cs _ _ _) = [clas  | (_, clas)     <- eltsUFM cs]
 \end{code}
@@ -184,6 +264,9 @@ tcExtendClassEnv bindings scope
 Looking up in the environments.
 
 \begin{code}
+tcLookupTyVarBndrs tyvar_bndrs		-- [HsTyVar name]
+  = mapAndUnzipNF_Tc (tcLookupTyVar . getTyVarName) tyvar_bndrs
+
 tcLookupTyVar name
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     returnNF_Tc (lookupWithDefaultUFM tve (pprPanic "tcLookupTyVar:" (ppr name)) name)
@@ -260,7 +343,7 @@ Extending and consulting the value environment
 tcExtendGlobalValEnv ids scope
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let
-	gve' = addListToUFM_Directly gve [(uniqueOf id, id) | id <- ids]
+	gve' = addListToUFM_Directly gve [(getUnique id, id) | id <- ids]
     in
     tcSetEnv (TcEnv tve tce ce gve' lve gtvs) scope
 
@@ -270,7 +353,20 @@ tcExtendLocalValEnv names ids scope
     let
 	lve' = addListToUFM lve (zipEqual "tcExtendLocalValEnv" names ids)
 	extra_global_tyvars = tyVarsOfTypes (map idType ids)
-	new_global_tyvars   = global_tvs `unionTyVarSets` extra_global_tyvars
+	new_global_tyvars   = global_tvs `unionVarSet` extra_global_tyvars
+    in
+    tcNewMutVar new_global_tyvars	`thenNF_Tc` \ gtvs' ->
+
+    tcSetEnv (TcEnv tve tce ce gve lve' gtvs') scope
+
+tcExtendEnvWithPat names_w_ids scope
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+    tcReadMutVar gtvs	`thenNF_Tc` \ global_tvs ->
+    let
+	names_w_ids_list    = bagToList names_w_ids
+	lve'		    = addListToUFM lve names_w_ids_list
+	extra_global_tyvars = tyVarsOfTypes (map (idType . snd) names_w_ids_list)
+	new_global_tyvars   = global_tvs `unionVarSet` extra_global_tyvars
     in
     tcNewMutVar new_global_tyvars	`thenNF_Tc` \ gtvs' ->
 
@@ -284,17 +380,20 @@ the environment.
 \begin{code}
 tcGetGlobalTyVars :: NF_TcM s (TcTyVarSet s)
 tcGetGlobalTyVars
-  = tcGetEnv 				`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
-    tcReadMutVar gtvs			`thenNF_Tc` \ global_tvs ->
-    zonkTcTyVars global_tvs		`thenNF_Tc` \ global_tvs' ->
-    tcWriteMutVar gtvs global_tvs'	`thenNF_Tc_` 
+  = tcGetEnv 						`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+    tcReadMutVar gtvs					`thenNF_Tc` \ global_tvs ->
+    zonkTcTyVars (varSetElems global_tvs)		`thenNF_Tc` \ global_tys' ->
+    let
+	global_tvs' = (tyVarsOfTypes global_tys')
+    in
+    tcWriteMutVar gtvs global_tvs'			`thenNF_Tc_` 
     returnNF_Tc global_tvs'
 
 tcExtendGlobalTyVars extra_global_tvs scope
   = tcGetEnv				`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     tcReadMutVar gtvs			`thenNF_Tc` \ global_tvs ->
     let
-	new_global_tyvars = global_tvs `unionTyVarSets` mkTyVarSet extra_global_tvs
+	new_global_tyvars = global_tvs `unionVarSet` extra_global_tvs
     in
     tcNewMutVar new_global_tyvars	`thenNF_Tc` \ gtvs' ->
     tcSetEnv (TcEnv tve tce ce gve lve gtvs') scope
@@ -337,7 +436,11 @@ tcLookupGlobalValueMaybe name
 tcLookupGlobalValueByKey :: Unique -> NF_TcM s Id
 tcLookupGlobalValueByKey uniq
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
-    returnNF_Tc (lookupWithDefaultUFM_Directly gve def uniq)
+    returnNF_Tc (lookupGlobalByKey gve uniq)
+
+lookupGlobalByKey :: GlobalValueEnv -> Unique -> Id
+lookupGlobalByKey gve uniq
+  = lookupWithDefaultUFM_Directly gve def uniq
   where
 #ifdef DEBUG
     def = pprPanic "tcLookupGlobalValueByKey:" (pprUnique10 uniq)
@@ -375,7 +478,7 @@ tcAddImportedIdInfo unf_env id
 				-- have explicit local definitions, so we get a black hole!
   = id
   | otherwise
-  = id `replaceIdInfo` new_info
+  = id `setIdInfo` new_info
 	-- The Id must be returned without a data dependency on maybe_id
   where
     new_info = -- pprTrace "tcAdd" (ppr id) $
@@ -390,40 +493,24 @@ Constructing new Ids
 ~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
--- Uses the Name as the Name of the Id
-newMonoIds :: [Name] -> Kind -> ([TcIdBndr s] -> TcM s a) -> TcM s a
-
-newMonoIds names kind m
-  = newTyVarTys no_of_names kind	`thenNF_Tc` \ tys ->
-    let
-	new_ids       = zipWithEqual "newMonoIds" mk_id names tys
-	mk_id name ty = mkUserId name ty
-    in
-    tcExtendLocalValEnv names new_ids (m new_ids)
-  where
-    no_of_names = length names
-
 newLocalId :: OccName -> TcType s -> NF_TcM s (TcIdBndr s)
 newLocalId name ty
-  = tcGetSrcLoc		`thenNF_Tc` \ loc ->
-    tcGetUnique		`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkUserLocal name uniq ty loc)
+  = tcGetUnique		`thenNF_Tc` \ uniq ->
+    returnNF_Tc (mkUserLocal name uniq ty)
 
 newLocalIds :: [OccName] -> [TcType s] -> NF_TcM s [TcIdBndr s]
 newLocalIds names tys
-  = tcGetSrcLoc			`thenNF_Tc` \ loc ->
-    tcGetUniques (length names) `thenNF_Tc` \ uniqs ->
+  = tcGetUniques (length names) `thenNF_Tc` \ uniqs ->
     let
 	new_ids            = zipWith3Equal "newLocalIds" mk_id names uniqs tys
-	mk_id name uniq ty = mkUserLocal name uniq ty loc
+	mk_id name uniq ty = mkUserLocal name uniq ty
     in
     returnNF_Tc new_ids
 
 newSpecPragmaId :: Name -> TcType s -> NF_TcM s (TcIdBndr s)
 newSpecPragmaId name ty 
-  = tcGetSrcLoc		`thenNF_Tc` \ loc ->
-    tcGetUnique		`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkSpecPragmaId (nameOccName name) uniq ty loc)
+  = tcGetUnique		`thenNF_Tc` \ uniq ->
+    returnNF_Tc (mkSpecPragmaId (nameOccName name) uniq ty)
 \end{code}
 
 
@@ -433,4 +520,9 @@ classAsTyConErr name
 
 tyConAsClassErr name
   = ptext SLIT("Type constructor used as a class:") <+> ppr name
+
+badCon con_id
+  = quotes (ppr con_id) <+> ptext SLIT("is not a data constructor")
+badPrimOp op
+  = quotes (ppr op) <+> ptext SLIT("is not a primop")
 \end{code}

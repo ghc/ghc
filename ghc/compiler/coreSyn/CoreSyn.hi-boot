@@ -4,6 +4,6 @@ CoreSyn CoreExpr ;
 _declarations_
 
 -- Needed by IdInfo
-1 type CoreExpr = GenCoreExpr Id!Id Id!Id BasicTypes.Unused ;
-1 data GenCoreExpr a b c ;
+1 type CoreExpr = Expr Var.IdOrTyVar BasicTypes.Unused;
+1 data Expr b f ;
 

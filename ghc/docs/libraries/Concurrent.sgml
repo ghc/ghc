@@ -1,0 +1,100 @@
+<sect> <idx/Concurrent/
+<label id="sec:Concurrent">
+<p>
+
+This library provides the Concurrent Haskell extensions as described
+in  <url name="Concurrent Haskell" url="http://research.microsoft.com/Users/simonpj/Papers/concurrent-haskell.ps.gz">.
+
+<tscreen><verb>
+module Concurrent where
+
+data ThreadId    -- thread identifiers
+instance Eq  ThreadId
+instance Ord ThreadId
+
+forkIO           :: IO () -> IO ThreadId
+killThread       :: ThreadId -> IO ()
+
+data MVar a      -- Synchronisation variables
+newEmptyMVar     :: IO (MVar a)
+newMVar          :: a -> IO (MVar a)
+takeMVar         :: MVar a -> IO a
+putMVar          :: MVar a -> a -> IO ()
+swapMVar         :: MVar a -> a -> IO a
+readMVar         :: MVar a -> IO a 
+instance Eq (MVar a)
+
+data Chan a      -- channels
+newChan          :: IO (Chan a)
+writeChan        :: Chan a -> a -> IO ()
+readChan         :: Chan a -> IO a
+dupChan          :: Chan a -> IO (Chan a)
+unReadChan       :: Chan a -> a -> IO ()
+getChanContents  :: Chan a -> IO [a]
+writeList2Chan   :: Chan a -> [a] -> IO ()
+                      
+data CVar a       -- one element channels
+newCVar          :: IO (CVar a)
+putCVar          :: CVar a -> a -> IO ()
+getCVar          :: CVar a -> IO a
+                      
+data QSem        -- General/quantity semaphores
+newQSem          :: Int  -> IO QSem
+waitQSem         :: QSem -> IO ()
+signalQSem       :: QSem -> IO ()
+                      
+data QSemN       -- General/quantity semaphores
+newQSemN         :: Int   -> IO QSemN
+waitQSemN        :: QSemN -> Int -> IO ()
+signalQSemN      :: QSemN -> Int -> IO ()
+
+type SampleVar a -- Sample variables 
+newEmptySampleVar:: IO (SampleVar a)
+newSampleVar     :: a -> IO (SampleVar a)
+emptySampleVar   :: SampleVar a -> IO ()
+readSampleVar    :: SampleVar a -> IO a
+writeSampleVar   :: SampleVar a -> a -> IO ()
+</verb></tscreen>
+
+Notes:
+<itemize>
+
+<item> 
+  GHC uses preemptive multitasking:
+  Context switches can occur at any time, except if you call a C
+  function (like <tt/getchar/) that blocks waiting for input.
+
+  Hugs uses cooperative multitasking:
+  Context switches only occur when you use one of the primitives
+  defined in this module.  This means that programs such as:
+s not been implemented yet on
+Hugs
+<tscreen><verb>
+main = forkIO (write 'a') >> write 'b'
+ where write c = putChar c >> write c
+</verb></tscreen>
+
+  will print either <tt/aaaaaaaaaaaaaa.../ or <tt/bbbbbbbbbbbb.../,
+  instead of some random interleaving of <tt/a/s and <tt/b/s.
+
+  In practice, cooperative multitasking is sufficient for writing 
+  simple graphical user interfaces.
+
+<item>
+Hugs does not provide the functions <tt/mergeIO/ or <tt/nmergeIO/ since these
+require preemptive multitasking.
+
+<item>
+Thread identities and <tt/killThread/ have an experimental
+implementation in GHC, but are not yet implemented in Hugs. 
+
+Currently <tt/killThread/ simply kills the nominated thread, but the
+plan is that in the future <tt/killThread/ will raise an exception in
+the killed thread which it can catch --- perhaps allowing it to kill
+its children before exiting.
+
+<item>
+The <tt/Ord/ instance for <tt/ThreadId/s provides an arbitrary total ordering
+which might be used to build an ordered binary tree, say.  
+
+</itemize>

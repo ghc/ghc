@@ -1,0 +1,3 @@
+__interface RnBinds 1 0 where
+__export RnBinds rnBinds;
+1 rnBinds :: __forall [_a _b] => RdrHsSyn.RdrNameHsBinds -> (RnHsSyn.RenamedHsBinds -> RnMonad.RnMS _a (_b, RnMonad.FreeVars)) -> RnMonad.RnMS _a (_b, RnMonad.FreeVars) ;

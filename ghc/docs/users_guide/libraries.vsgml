@@ -1,5 +1,5 @@
 % 
-% $Id: libraries.vsgml,v 1.2 1998/08/25 18:07:57 sof Exp $
+% $Id: libraries.vsgml,v 1.3 1998/12/02 13:20:40 simonm Exp $
 %
 % GHC Prelude and Libraries.
 %
@@ -43,45 +43,106 @@ GHC's prelude contains the following non-standard extensions:
 <tag>@fromInt@ method in class @Num@:</tag> It's there.  Converts from
 an @Int@ to the type.
 
-<tag>@toInt@ method in class @Integral@:</tag> Converts from type type
-to an @Int@.
+<tag>@toInt@ method in class @Integral@:</tag> Converts from Integral
+type to an @Int@.
 
 </descrip>
 
 GHC also internally uses a number of modules that begin with the
-string @Prel@: for this reason, we don't recommend that you use any
-module names beginning with @Prel@ in your own programs.  The @Prel@
-modules are always available: in fact, you can get access to several
-extensions this way (for some you might need to give the
-@-fglasgow-exts@<nidx>-fglasgow-exts option</nidx> flag).
+string @Prel@<nidx>Prel module prefix</nidx>: for this reason, we
+don't recommend that you use any module names beginning with @Prel@ in
+your own programs.  The @Prel@ modules are always available: in fact,
+you can get access to several extensions this way (for some you might
+need to give the @-fglasgow-exts@<nidx>-fglasgow-exts option</nidx>
+flag).
 
 <sect1>The module @PrelGHC@: really primitive stuff
 <label id="ghc-libs-ghc">
 <p>
+<nidx>PrelGHC module</nidx>
 
-This section defines all the types which are primitive in Glasgow
+This module defines all the types which are primitive in Glasgow
 Haskell, and the operations provided for them.
 
 A primitive type is one which cannot be defined in Haskell, and which
 is therefore built into the language and compiler.  Primitive types
-are always unboxed; that is, a value of primitive type cannot be
-bottom.
+are always unlifted; that is, a value of primitive type cannot be
+bottom.  We use the convention that primitive types, values, and
+operations have a @#@ suffix.
 
 Primitive values are often represented by a simple bit-pattern, such
 as @Int#@, @Float#@, @Double#@.  But this is not necessarily the case:
 a primitive value might be represented by a pointer to a
 heap-allocated object.  Examples include @Array#@, the type of
-primitive arrays.  You might think this odd: doesn't being
-heap-allocated mean that it has a box?  No, it does not.  A primitive
-array is heap-allocated because it is too big a value to fit in a
-register, and would be too expensive to copy around; in a sense, it is
-accidental that it is represented by a pointer.  If a pointer
-represents a primitive value, then it really does point to that value:
-no unevaluated thunks, no indirections...nothing can be at the other
-end of the pointer than the primitive value.
+primitive arrays.  A primitive array is heap-allocated because it is
+too big a value to fit in a register, and would be too expensive to
+copy around; in a sense, it is accidental that it is represented by a
+pointer.  If a pointer represents a primitive value, then it really
+does point to that value: no unevaluated thunks, no
+indirections...nothing can be at the other end of the pointer than the
+primitive value.
 
-This section also describes a few non-primitive types, which are needed 
-to express the result types of some primitive operations.
+<sect2>Unboxed Tuples
+<label id="unboxed-tuples">
+<p>
+
+Unboxed tuples aren't really exported by @PrelGHC@, they're available
+by default with @-fglasgow-exts@.  An unboxed tuple looks like this:
+
+<tscreen><verb>
+(# e_1, ..., e_n #)
+</verb></tscreen>
+
+where @e_1..e_n@ are expressions of any type (primitive or
+non-primitive).  The type of an unboxed tuple looks the same.
+
+Unboxed tuples are used for functions that need to return multiple
+values, but they avoid the heap allocation normally associated with
+using fully-fledged tuples.  When an unboxed tuple is returned, the
+components are put directly into registers or on the stack; the
+unboxed tuple itself does not have a composite representation.  Many
+of the primitive operations listed in this section return unboxed
+tuples.
+
+There are some pretty stringent restrictions on the use of unboxed tuples:
+
+<itemize> 
+
+<item> Unboxed tuple types are subject to the same restrictions as
+other unboxed types; i.e. they may not be stored in polymorphic data
+structures or passed to polymorphic functions.
+
+<item> Unboxed tuples may only be constructed as the direct result of
+a function, and may only be deconstructed with a @case@ expression.
+eg. the following are valid:
+
+<tscreen><verb>
+f x y = (# x+1, y-1 #)
+g x = case f x x of { (# a, b #) -> a + b }
+</verb></tscreen>
+
+but the following are invalid:
+
+<tscreen><verb>
+f x y = g (# x, y #)
+g (# x, y #) = x + y
+</verb></tscreen>
+
+<item> No variable can have an unboxed tuple type.  This is illegal:
+
+<tscreen><verb>
+f :: (# Int, Int #) -> (# Int, Int #)
+f x = x
+</verb></tscreen>
+
+because @x@ has an unboxed tuple type.
+
+</itemize>
+
+Note: we may relax some of these restrictions in the future.
+
+The @IO@ and @ST@ monads use unboxed tuples to avoid unnecessary
+allocation during sequences of operations.
 
 <sect2>Character and numeric types
 <p>
@@ -104,7 +165,7 @@ type Double#
 <ncdx>Double#</ncdx>
 
 If you really want to know their exact equivalents in C, see
-@ghc/includes/StgTypes.lh@ in the GHC source tree.
+@ghc/includes/StgTypes.h@ in the GHC source tree.
 
 Literals for these types may be written as follows:
 
@@ -145,7 +206,7 @@ Literals for these types may be written as follows:
 
 <sect2> Primitive-character operations
 <p>
-<nidx>characters, primitive</nidx>
+<nidx>characters, primitive operations</nidx>
 <nidx>operators, primitive character</nidx>
 
 <tscreen><verb>
@@ -158,7 +219,7 @@ chr# :: Int# -> Char#
 
 <sect2> Primitive-@Int@ operations
 <p>
-<nidx>integers, primitive</nidx>
+<nidx>integers, primitive operations</nidx>
 <nidx>operators, primitive integer</nidx>
 
 <tscreen><verb>
@@ -272,16 +333,13 @@ decodeDouble#	:: Double# -> PrelNum.ReturnIntAndGMP
 (And the same for @Float#@s.)
 
 <sect2>Operations on/for @Integers@ (interface to GMP)
-<label id="horrid-Integer-pairing-types">
+<label id="integer-operations">
 <p>
 <nidx>arbitrary precision integers</nidx>
 <nidx>Integer, operations on</nidx>
 
 We implement @Integers@ (arbitrary-precision integers) using the GNU
-multiple-precision (GMP) package (version 1.3.2).
-
-<bf>Note:</bf> some of this might change when we upgrade to using
-GMP~2.x.
+multiple-precision (GMP) package (version 2.0.2).
 
 The data type for @Integer@ must mirror that for @MP_INT@ in @gmp.h@
 (see @gmp.info@ in @ghc/includes/runtime/gmp@).  It comes out as:
@@ -293,18 +351,6 @@ data Integer = J# Int# Int# ByteArray#
 
 So, @Integer@ is really just a ``pairing'' type for a particular
 collection of primitive types.
-
-The operations in the GMP return other combinations of
-GMP-plus-something, so we need ``pairing'' types for those, too:
-
-<tscreen><verb>
-data Return2GMPs     = Return2GMPs Int# Int# ByteArray# Int# Int# ByteArray#
-data ReturnIntAndGMP = ReturnIntAndGMP Int# Int# Int# ByteArray#
-
--- ????? something to return a string of bytes (in the heap?)
-</verb></tscreen>
-<ncdx>Return2GMPs</ncdx>
-<ncdx>ReturnIntAndGMP</ncdx>
 
 The primitive ops to support @Integers@ use the ``pieces'' of the
 representation, and are as follows:
@@ -377,8 +423,8 @@ quotWord#, remWord# :: Word# -> Word# -> Word#
 
 not# :: Word# -> Word#
 
-shiftL#, shiftRL# :: Word# -> Int# -> Word#
-	-- shift left, right logical
+shiftL#, shiftRA#, shiftRL# :: Word# -> Int# -> Word#
+	-- shift left, right arithmetic, right logical
 
 int2Word#	:: Int#  -> Word# -- just a cast, really
 word2Int#	:: Word# -> Int#
@@ -391,6 +437,7 @@ word2Int#	:: Word# -> Int#
 <ncdx>quotWord#</ncdx>
 <ncdx>remWord#</ncdx>
 <ncdx>shiftL#</ncdx>
+<ncdx>shiftRA#</ncdx>
 <ncdx>shiftRL#</ncdx>
 <ncdx>int2Word#</ncdx>
 <ncdx>word2Int#</ncdx>
@@ -516,10 +563,11 @@ objects, because the result is simply the boxed object. So presumably
 it should be entered --- we never usually return an unevaluated
 object!  This is a pain: primitive ops aren't supposed to do
 complicated things like enter objects.  The current solution is to
-return a lifted value, but I don't like it!
+return a single element unboxed tuple (see Section <ref name="Unboxed
+Tuples" id="unboxed-tuples">).
 
 <tscreen><verb>
-indexArray#       :: Array# elt -> Int# -> PrelBase.Lift elt  -- Yuk!
+indexArray#       :: Array# elt -> Int# -> (# elt #)
 </verb></tscreen>
 <ncdx>indexArray#</ncdx>
 
@@ -544,7 +592,7 @@ type State# s
 
 The type @GHC.RealWorld@ is truly opaque: there are no values defined
 of this type, and no operations over it.  It is ``primitive'' in that
-sense - but it is <em>not unboxed!</em> Its only role in life is to be
+sense - but it is <em>not unlifted!</em> Its only role in life is to be
 the type which distinguishes the @IO@ state transformer.
 
 <tscreen><verb>
@@ -557,43 +605,12 @@ data RealWorld
 A single, primitive, value of type @State# RealWorld@ is provided.
 
 <tscreen><verb>
-realWorld# :: State# GHC.RealWorld
+realWorld# :: State# RealWorld
 </verb></tscreen>
 <nidx>realWorld# state object</nidx>
 
 (Note: in the compiler, not a @PrimOp@; just a mucho magic
 @Id@. Exported from @GHC@, though).
-
-<sect2>State pairing types
-<p>
-<label id="horrid-pairing-types">
-
-This subsection defines some types which, while they aren't quite
-primitive because we can define them in Haskell, are very nearly so.
-They define constructors which pair a primitive state with a value of
-each primitive type.  They are required to express the result type of
-the primitive operations in the state monad.
-<tscreen><verb>
-data StateAndPtr#    s elt = StateAndPtr#    (State# s) elt 
-
-data StateAndChar#   s     = StateAndChar#   (State# s) Char# 
-data StateAndInt#    s     = StateAndInt#    (State# s) Int# 
-data StateAndWord#   s     = StateAndWord#   (State# s) Word#
-data StateAndFloat#  s     = StateAndFloat#  (State# s) Float# 
-data StateAndDouble# s     = StateAndDouble# (State# s) Double#  
-data StateAndAddr#   s     = StateAndAddr#   (State# s) Addr#
-
-data StateAndStablePtr# s a = StateAndStablePtr#  (State# s) (StablePtr# a)
-data StateAndForeignObj# s  = StateAndForeignObj# (State# s) ForeignObj#
-data StateAndSynchVar#  s a = StateAndSynchVar#  (State# s) (SynchVar# a)
-
-data StateAndArray#            s elt = StateAndArray#        (State# s) (Array# elt) 
-data StateAndMutableArray#     s elt = StateAndMutableArray# (State# s) (MutableArray# s elt)  
-data StateAndByteArray#        s = StateAndByteArray#        (State# s) ByteArray# 
-data StateAndMutableByteArray# s = StateAndMutableByteArray# (State# s) (MutableByteArray# s)
-</verb></tscreen>
-
-Hideous.
 
 <sect2>Mutable arrays
 <p>
@@ -624,13 +641,13 @@ the array-allocation primitive.  Reason: only the pointer case has to
 worry about GC striking with a partly-initialised array.
 
 <tscreen><verb>
-newArray#       :: Int# -> elt -> State# s -> StateAndMutableArray# s elt 
+newArray#       :: Int# -> elt -> State# s -> (# State# s, MutableArray# s elt #) 
 
-newCharArray#   :: Int# -> State# s -> StateAndMutableByteArray# s 
-newIntArray#    :: Int# -> State# s -> StateAndMutableByteArray# s 
-newAddrArray#   :: Int# -> State# s -> StateAndMutableByteArray# s 
-newFloatArray#  :: Int# -> State# s -> StateAndMutableByteArray# s 
-newDoubleArray# :: Int# -> State# s -> StateAndMutableByteArray# s 
+newCharArray#   :: Int# -> State# s -> (# State# s, MutableByteArray# s elt #)
+newIntArray#    :: Int# -> State# s -> (# State# s, MutableByteArray# s elt #)
+newAddrArray#   :: Int# -> State# s -> (# State# s, MutableByteArray# s elt #)
+newFloatArray#  :: Int# -> State# s -> (# State# s, MutableByteArray# s elt #)
+newDoubleArray# :: Int# -> State# s -> (# State# s, MutableByteArray# s elt #)
 </verb></tscreen>
 <ncdx>newArray#</ncdx>
 <ncdx>newCharArray#</ncdx>
@@ -646,12 +663,12 @@ The size of a @ByteArray#@ is given in bytes.
 <nidx>arrays, reading and writing</nidx>
 
 <tscreen><verb>
-readArray#       :: MutableArray# s elt -> Int# -> State# s -> StateAndPtr#    s elt
-readCharArray#   :: MutableByteArray# s -> Int# -> State# s -> StateAndChar#   s
-readIntArray#    :: MutableByteArray# s -> Int# -> State# s -> StateAndInt#    s
-readAddrArray#	 :: MutableByteArray# s -> Int# -> State# s -> StateAndAddr#   s 
-readFloatArray#  :: MutableByteArray# s -> Int# -> State# s -> StateAndFloat#  s 
-readDoubleArray# :: MutableByteArray# s -> Int# -> State# s -> StateAndDouble# s 
+readArray#       :: MutableArray# s elt -> Int# -> State# s -> (# State# s, elt #)
+readCharArray#   :: MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
+readIntArray#    :: MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+readAddrArray#	 :: MutableByteArray# s -> Int# -> State# s -> (# State# s, Addr# #)
+readFloatArray#  :: MutableByteArray# s -> Int# -> State# s -> (# State# s, Float# #)
+readDoubleArray# :: MutableByteArray# s -> Int# -> State# s -> (# State# s, Double# #)
 
 writeArray#       :: MutableArray# s elt -> Int# -> elt     -> State# s -> State# s 
 writeCharArray#   :: MutableByteArray# s -> Int# -> Char#   -> State# s -> State# s 
@@ -698,8 +715,8 @@ Only unsafe-freeze has a primitive.  (Safe freeze is done directly in Haskell
 by copying the array and then using @unsafeFreeze@.) 
 
 <tscreen><verb>
-unsafeFreezeArray#     :: MutableArray# s elt -> State# s -> StateAndArray#     s elt
-unsafeFreezeByteArray# :: MutableByteArray# s -> State# s -> StateAndByteArray# s
+unsafeFreezeArray#     :: MutableArray# s elt -> State# s -> (# State# s, Array# s elt #)
+unsafeFreezeByteArray# :: MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
 </verb></tscreen>
 <ncdx>unsafeFreezeArray#</ncdx>
 <ncdx>unsafeFreezeByteArray#</ncdx>
@@ -732,9 +749,9 @@ we don't allocate one twice by accident, and then only free one of the
 copies.
 
 <tscreen><verb>
-makeStablePointer#  :: a -> State# RealWorld -> StateAndStablePtr# RealWorld a
+makeStablePointer#  :: a -> State# RealWorld -> (# State# RealWord, StablePtr# a #)
 freeStablePointer#  :: StablePtr# a -> State# RealWorld -> State# RealWorld
-deRefStablePointer# :: StablePtr# a -> State# RealWorld -> StateAndPtr RealWorld a
+deRefStablePointer# :: StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
 </verb></tscreen>
 <ncdx>makeStablePointer#</ncdx>
 <ncdx>freeStablePointer#</ncdx>
@@ -772,7 +789,7 @@ GHC provides two primitives on @ForeignObj#@:
 makeForeignObj# 
 	:: Addr# -- foreign reference
         -> Addr# -- pointer to finalisation routine
-	-> StateAndForeignObj# RealWorld ForeignObj#
+	-> (# State# RealWorld, ForeignObj# )
 writeForeignObj 
 	:: ForeignObj#        -- foreign object
 	-> Addr#              -- datum
@@ -796,35 +813,16 @@ Concurrent Haskell's MVars (see the Concurrent Haskell paper for
 the operational behaviour of these operations).
 
 <tscreen><verb>
-type SynchVar# s elt	-- primitive
+type MVar# s elt	-- primitive
 
-newSynchVar#:: State# s -> StateAndSynchVar# s elt
-takeMVar#   :: SynchVar# s elt -> State# s -> StateAndPtr# s elt
+newMVar#    :: State# s -> (# State# s, MVar# s elt #)
+takeMVar#   :: SynchVar# s elt -> State# s -> (# State# s, elt #)
 putMVar#    :: SynchVar# s elt -> State# s -> State# s
 </verb></tscreen>
 <ncdx>SynchVar#</ncdx>
 <ncdx>newSynchVar#</ncdx>
 <ncdx>takeMVar</ncdx>
 <ncdx>putMVar</ncdx>
-
-<sect2>@spark#@ primitive operation (for parallel execution)
-<p>
-<nidx>spark primitive operation</nidx>
-
-<em>ToDo: say something</em>  It's used in the unfolding for @par@.
-
-<sect2>The @errorIO#@ primitive operation
-<p>
-<nidx>errors, primitive</nidx>
-
-The @errorIO#@ primitive takes an argument much like @IO@.  It aborts
-execution of the current program, and continues instead by performing
-the given @IO@-like value on the current state of the world.
-
-<tscreen><verb>
-errorIO# :: (State# RealWorld# -> a) -> a
-</verb></tscreen>
-<ncdx>errorIO#</ncdx>
 
 <sect1>GHC/Hugs Extension Libraries
 <p>
@@ -897,27 +895,27 @@ newAddrArray       :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix)
 newIntArray        :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
 newFloatArray      :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
 newDoubleArray     :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-
+                 
 boundsOfArray      :: Ix ix => MutableArray s ix elt -> (ix, ix)  
 boundsOfByteArray  :: Ix ix => MutableByteArray s ix -> (ix, ix)
-
-
-readArray   	   :: Ix ix => MutableArray s ix elt -> ix -> ST s elt 
-
+                 
+                 
+readArray          :: Ix ix => MutableArray s ix elt -> ix -> ST s elt 
+                 
 readCharArray      :: Ix ix => MutableByteArray s ix -> ix -> ST s Char 
 readIntArray       :: Ix ix => MutableByteArray s ix -> ix -> ST s Int
 readAddrArray      :: Ix ix => MutableByteArray s ix -> ix -> ST s Addr
 readFloatArray     :: Ix ix => MutableByteArray s ix -> ix -> ST s Float
 readDoubleArray    :: Ix ix => MutableByteArray s ix -> ix -> ST s Double
-
-writeArray  	   :: Ix ix => MutableArray s ix elt -> ix -> elt -> ST s () 
+                 
+writeArray         :: Ix ix => MutableArray s ix elt -> ix -> elt -> ST s () 
 writeCharArray     :: Ix ix => MutableByteArray s ix -> ix -> Char -> ST s () 
 writeIntArray      :: Ix ix => MutableByteArray s ix -> ix -> Int  -> ST s () 
 writeAddrArray     :: Ix ix => MutableByteArray s ix -> ix -> Addr -> ST s () 
 writeFloatArray    :: Ix ix => MutableByteArray s ix -> ix -> Float -> ST s () 
 writeDoubleArray   :: Ix ix => MutableByteArray s ix -> ix -> Double -> ST s () 
-
-freezeArray	   :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
+                 
+freezeArray        :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
 freezeCharArray    :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 freezeIntArray     :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 freezeAddrArray    :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
@@ -929,7 +927,35 @@ unsafeFreezeByteArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 thawArray             :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
 </verb></tscreen>
 
-%ToDo: index these.
+<nidx>newArray</nidx>
+<nidx>newCharArray</nidx>
+<nidx>newAddrArray</nidx>
+<nidx>newIntArray</nidx>
+<nidx>newFloatArray</nidx>
+<nidx>newDoubleArray</nidx>
+<nidx>boundsOfArray</nidx>
+<nidx>boundsOfByteArray</nidx>
+<nidx>readArray</nidx>
+<nidx>readCharArray</nidx>
+<nidx>readIntArray</nidx>
+<nidx>readAddrArray</nidx>
+<nidx>readFloatArray</nidx>
+<nidx>readDoubleArray</nidx>
+<nidx>writeArray</nidx>
+<nidx>writeCharArray</nidx>
+<nidx>writeIntArray</nidx>
+<nidx>writeAddrArray</nidx>
+<nidx>writeFloatArray</nidx>
+<nidx>writeDoubleArray</nidx>
+<nidx>freezeArray</nidx>
+<nidx>freezeCharArray</nidx>
+<nidx>freezeIntArray</nidx>
+<nidx>freezeAddrArray</nidx>
+<nidx>freezeFloatArray</nidx>
+<nidx>freezeDoubleArray</nidx>
+<nidx>unsafeFreezeArray</nidx>
+<nidx>unsafeFreezeByteArray</nidx>
+<nidx>thawArray</nidx>
 
 <sect2>The @ByteArray@ interface
 <label id="sec:byte-array">

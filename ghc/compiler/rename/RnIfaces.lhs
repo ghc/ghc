@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[RnIfaces]{Cacheing and Renaming of Interfaces}
 
@@ -42,20 +42,20 @@ import FiniteMap	( FiniteMap, sizeFM, emptyFM, delFromFM,
 			  lookupFM, addToFM, addToFM_C, addListToFM, 
 			  fmToList
 			)
-import Name		( Name {-instance NamedThing-}, Provenance, OccName(..),
+import Name		( Name {-instance NamedThing-}, OccName(..),
 			  nameModule, moduleString, pprModule, isLocallyDefined,
-			  NameSet, emptyNameSet, unionNameSets, nameSetToList,
-			  minusNameSet, mkNameSet, elemNameSet, nameUnique, addOneToNameSet,
-			  isWiredInName, maybeWiredInTyConName, maybeWiredInIdName,
-			  NamedThing(..)
+			  isWiredInName, maybeWiredInTyConName, 
+			  maybeWiredInIdName, nameUnique, NamedThing(..)
 			 )
-import Id		( GenId, Id, idType, dataConTyCon, isAlgCon )
+import NameSet
+import Id		( idType, isDataConId_maybe )
+import DataCon		( dataConTyCon, dataConType )
 import TyCon		( TyCon, tyConDataCons, isSynTyCon, getSynTyConDefn )
 import Type		( namesOfType )
-import TyVar		( GenTyVar )
+import Var		( Id )
 import SrcLoc		( mkSrcLoc, SrcLoc )
 import PrelMods		( pREL_GHC )
-import PrelInfo		( cCallishTyKeys )
+import PrelInfo		( cCallishTyKeys, thinAirModules )
 import Bag
 import Maybes		( MaybeErr(..), maybeToBool )
 import ListSetOps	( unionLists )
@@ -67,6 +67,7 @@ import Outputable
 
 import IO	( isDoesNotExistError )
 import List	( nub )
+
 \end{code}
 
 
@@ -286,7 +287,6 @@ loadInstDecl mod_name insts decl@(InstDecl inst_ty binds uprags dfun_name src_lo
     let 
 	munged_inst_ty = case inst_ty of
 				HsForAllTy tvs cxt ty -> HsForAllTy tvs [] ty
-				HsPreForAllTy cxt ty  -> HsPreForAllTy [] ty
 				other		      -> inst_ty
     in
 	-- We find the gates by renaming the instance type with in a 
@@ -457,7 +457,6 @@ getNonWiredInDecl needed_name loc mode
 
      is_data_or_newtype (TyData _ _ _ _ _ _ _ _) = True
      is_data_or_newtype other		         = False
-
 \end{code}
 
 @getWiredInDecl@ maps a wired-in @Name@ to what it makes available.
@@ -526,8 +525,8 @@ getWiredInDecl name mode
     get_wired | is_tycon			-- ... a type constructor
 	      = get_wired_tycon the_tycon
 
-	      | (isAlgCon the_id) 		-- ... a wired-in data constructor
-	      = get_wired_tycon (dataConTyCon the_id)
+	      | maybeToBool maybe_data_con 		-- ... a wired-in data constructor
+	      = get_wired_tycon (dataConTyCon data_con)
 
 	      | otherwise			-- ... a wired-in non data-constructor
 	      = get_wired_id the_id
@@ -538,6 +537,8 @@ getWiredInDecl name mode
     maybe_wired_in_id    = maybeWiredInIdName    name
     Just the_tycon	 = maybe_wired_in_tycon
     Just the_id 	 = maybe_wired_in_id
+    maybe_data_con	 = isDataConId_maybe the_id
+    Just data_con	 = maybe_data_con
 
 
 get_wired_id id
@@ -563,7 +564,7 @@ get_wired_tycon tycon
   where
     tycon_name = getName tycon
     data_cons  = tyConDataCons tycon
-    mentioned  = foldr (unionNameSets . namesOfType . idType) emptyNameSet data_cons
+    mentioned  = foldr (unionNameSets . namesOfType . dataConType) emptyNameSet data_cons
 \end{code}
 
 
@@ -922,14 +923,14 @@ getDeclBinders new_name (DefD _)  = returnRn NotAvailable
 getDeclBinders new_name (InstD _) = returnRn NotAvailable
 
 ----------------
-getConFieldNames new_name (ConDecl con _ (RecCon fielddecls) src_loc : rest)
+getConFieldNames new_name (ConDecl con _ _ (RecCon fielddecls) src_loc : rest)
   = mapRn (\n -> new_name n src_loc) (con:fields)	`thenRn` \ cfs ->
     getConFieldNames new_name rest			`thenRn` \ ns  -> 
     returnRn (cfs ++ ns)
   where
     fields = concat (map fst fielddecls)
 
-getConFieldNames new_name (ConDecl con _ _ src_loc : rest)
+getConFieldNames new_name (ConDecl con _ _ _ src_loc : rest)
   = new_name con src_loc		`thenRn` \ n ->
     getConFieldNames new_name rest	`thenRn` \ ns -> 
     returnRn (n:ns)
@@ -954,49 +955,31 @@ findAndReadIface :: SDoc -> Module
 	-- Just x  <=> successfully found and parsed 
 findAndReadIface doc_str mod_name as_source
   = traceRn trace_msg			`thenRn_`
-    getModuleHiMap			`thenRn` \ himap ->
-    case (lookupFM himap real_mod_name) of
-      Nothing    ->
-         traceRn (ptext SLIT("...failed"))	`thenRn_`
-	 returnRn Nothing
-      Just fpath ->
-         readIface fpath
-{-
-    getSearchPathRn			`thenRn` \ dirs ->
-    try dirs
--}
+      -- we keep two maps for interface files,
+      -- one for 'normal' ones, the other for .hi-boot files,
+      -- hence the need to signal which kind we're interested.
+    getModuleHiMap as_source		`thenRn` \ himap ->
+    case (lookupFM himap (moduleString mod_name)) of
+         -- Found the file
+       Just fpath -> readIface fpath
+    	 -- Hack alert!  When compiling PrelBase we have to load the
+	 -- decls for packCString# and friends; they are 'thin-air' Ids
+	 -- (see PrelInfo.lhs).  So if we don't find the HiFile we quietly
+	 -- look for a .hi-boot file instead, and use that
+       Nothing | thinAirLoop mod_name as_source
+	       -> findAndReadIface doc_str mod_name HiBootFile
+               | otherwise		 
+	       -> traceRn (ptext SLIT("...failed"))	`thenRn_`
+	          returnRn Nothing
   where
-    real_mod_name = 
-     case as_source of
-        HiBootFile -> 'b':moduleString mod_name
-	HiFile     -> moduleString mod_name
+    thinAirLoop mod_name HiFile = mod_name `elem` thinAirModules
+    thinAirLoop mod_name hif    = False
 
     trace_msg = sep [hsep [ptext SLIT("Reading"), 
 			   case as_source of { HiBootFile -> ptext SLIT("[boot]"); other -> empty},
 			   ptext SLIT("interface for"), 
 			   ptext mod_name <> semi],
 		     nest 4 (ptext SLIT("reason:") <+> doc_str)]
-
-{-
-	-- For import {-# SOURCE #-} Foo, "as_source" will be True
-	-- and we read Foo.hi-boot, not Foo.hi.  This is used to break
-	-- loops among modules.
-    mod_suffix hi = case as_source of
-			HiBootFile -> ".hi-boot" -- Ignore `ways' for boot files.
-			HiFile     -> hi
-
-    try [] = traceRn (ptext SLIT("...failed"))	`thenRn_`
-	     returnRn Nothing
-
-    try ((dir,hisuf):dirs)
-	= readIface file_path	`thenRn` \ read_result ->
-	  case read_result of
-	      Nothing    -> try dirs
-	      Just iface -> traceRn (ptext SLIT("...done"))	`thenRn_`
-			    returnRn (Just iface)
-	where
-	  file_path = dir ++ '/' : moduleString mod_name ++ (mod_suffix hisuf)
--}
 \end{code}
 
 @readIface@ tries just the one file.

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[UniqSupply]{The @UniqueSupply@ data type and a (monadic) supply thereof}
 
@@ -8,10 +8,11 @@ module UniqSupply (
 
 	UniqSupply,		-- Abstractly
 
-	getUnique, getUniques,	-- basic ops
+	uniqFromSupply, uniqsFromSupply,	-- basic ops
 
 	UniqSM,		-- type: unique supply monad
-	initUs, thenUs, returnUs, fixUs,
+	initUs, thenUs, thenUs_, returnUs, fixUs, getUs, setUs,
+	getUniqueUs, getUniquesUs,
 	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
 	thenMaybeUs, mapAccumLUs,
 
@@ -65,8 +66,8 @@ data UniqSupply
 mkSplitUniqSupply :: Char -> IO UniqSupply
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
-getUnique :: UniqSupply -> Unique
-getUniques :: Int -> UniqSupply -> [Unique]
+uniqFromSupply  :: UniqSupply -> Unique
+uniqsFromSupply :: Int -> UniqSupply -> [Unique]
 \end{code}
 
 \begin{code}
@@ -94,9 +95,9 @@ splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}
 
 \begin{code}
-getUnique (MkSplitUniqSupply (I# n) _ _) = mkUniqueGrimily n
+uniqFromSupply (MkSplitUniqSupply (I# n) _ _) = mkUniqueGrimily n
 
-getUniques (I# i) supply = i `get_from` supply
+uniqsFromSupply (I# i) supply = i `get_from` supply
   where
     get_from 0# _ = []
     get_from n (MkSplitUniqSupply (I# u) _ s2)
@@ -110,13 +111,13 @@ getUniques (I# i) supply = i `get_from` supply
 %************************************************************************
 
 \begin{code}
-type UniqSM result = UniqSupply -> result
+type UniqSM result = UniqSupply -> (result, UniqSupply)
 
 -- the initUs function also returns the final UniqSupply
 
 initUs :: UniqSupply -> UniqSM a -> a
 
-initUs init_us m = m init_us
+initUs init_us m = case m init_us of { (r,_) -> r }
 
 {-# INLINE thenUs #-}
 {-# INLINE returnUs #-}
@@ -127,20 +128,35 @@ initUs init_us m = m init_us
 \begin{code}
 fixUs :: (a -> UniqSM a) -> UniqSM a
 fixUs m us
-  = r  where  r = m r us
+  = (r,us')  where  (r,us') = m r us
 
 thenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
-
 thenUs expr cont us
-  = case (splitUniqSupply us) of { (s1, s2) ->
-    case (expr s1)	      of { result ->
-    cont result s2 }}
+  = case (expr us) of { (result, us') -> cont result us' }
+
+thenUs_ :: UniqSM a -> UniqSM b -> UniqSM b
+thenUs_ expr cont us
+  = case (expr us) of { (_, us') -> cont us' }
+
+returnUs :: a -> UniqSM a
+returnUs result us = (result, us)
+
+getUs :: UniqSM UniqSupply
+getUs us = (us, panic "getUs: bad supply")
+
+setUs :: UniqSupply -> UniqSM ()
+setUs us old_us = ((), us)
+
+getUniqueUs :: UniqSM Unique
+getUniqueUs us = case splitUniqSupply us of
+		   (us1,us2) -> (uniqFromSupply us1, us2)
+
+getUniquesUs :: Int -> UniqSM [Unique]
+getUniquesUs n us = case splitUniqSupply us of
+		      (us1,us2) -> (uniqsFromSupply n us1, us2)
 \end{code}
 
 \begin{code}
-returnUs :: a -> UniqSM a
-returnUs result us = result
-
 mapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
 
 mapUs f []     = returnUs []

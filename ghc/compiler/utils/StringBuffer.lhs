@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1997
+% (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
 %
 \section{String buffers}
 
@@ -35,7 +35,8 @@ module StringBuffer
         stepOnUntil,      -- :: (Char -> Bool) -> StringBuffer -> StringBuffer
         stepOverLexeme,   -- :: StringBuffer   -> StringBuffer
 	scanNumLit,       -- :: Int -> StringBuffer -> (Int, StringBuffer)
-        expandWhile,      -- :: (Char -> Bool) -> StringBuffer -> StringBuffer
+        expandWhile,      -- :: (Char  -> Bool) -> StringBuffer -> StringBuffer
+        expandWhile#,     -- :: (Char# -> Bool) -> StringBuffer -> StringBuffer
         expandUntilMatch, -- :: StrinBuffer -> String -> StringBuffer
          -- at or beyond end of buffer?
         bufferExhausted,  -- :: StringBuffer -> Bool
@@ -228,6 +229,15 @@ expandWhile pred (StringBuffer fo l# s# c#) =
 	 | ch# `eqChar#` '\NUL'# && c# >=# l# -> StringBuffer fo l# l# l# -- EOB, return immediately.
          | otherwise     -> StringBuffer fo l# s# c#
 
+expandWhile# :: (Char# -> Bool) -> StringBuffer -> StringBuffer
+expandWhile# pred (StringBuffer fo l# s# c#) =
+ loop c#
+  where
+   loop c# = 
+    case indexCharOffAddr# fo c# of
+     ch# | pred ch# -> loop (c# +# 1#)
+	 | ch# `eqChar#` '\NUL'# && c# >=# l# -> StringBuffer fo l# s# c# -- EOB, return immediately.
+         | otherwise     -> StringBuffer fo l# s# c#
 
 scanNumLit :: Int -> StringBuffer -> (Int,StringBuffer)
 scanNumLit (I# acc#) (StringBuffer fo l# s# c#) =
@@ -236,7 +246,7 @@ scanNumLit (I# acc#) (StringBuffer fo l# s# c#) =
    loop acc# c# = 
     case indexCharOffAddr# fo c# of
      ch# | isDigit (C# ch#) -> loop (acc# *# 10# +# (ord# ch# -# ord# '0'#)) (c# +# 1#)
-	 | ch# `eqChar#` '\NUL'# && c# >=# l# -> (I# acc#, StringBuffer fo l# l# l#) -- EOB, return immediately.
+	 | ch# `eqChar#` '\NUL'# && c# >=# l# -> (I# acc#, StringBuffer fo l# s# c#) -- EOB, return immediately.
          | otherwise        -> (I# acc#,StringBuffer fo l# s# c#)
 
 

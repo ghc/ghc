@@ -14,7 +14,6 @@ with what the typechecker figures out.
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 module PrelErr 
-
        (
          irrefutPatError
        , noMethodBindingError
@@ -28,15 +27,15 @@ module PrelErr
        , seqError                  -- :: a
 
        , error		           -- :: String -> a
-       , ioError	           -- :: String -> a
        , assertError		   -- :: String -> Bool -> a -> a
        ) where
 
 import PrelBase
-import PrelIOBase   ( IO(..), catch )
-import PrelHandle
+import PrelIOBase   ( IO(..) )
+--import PrelHandle   ( catch )
 import PrelAddr
 import PrelList     ( span )
+import PrelException
 import PrelPack     ( packString )
 import PrelArr      ( ByteArray(..) )
 
@@ -63,6 +62,7 @@ augment = error "GHCbase.augment"
 %*********************************************************
 
 \begin{code}
+{-
 errorIO :: IO () -> a
 
 errorIO (IO io)
@@ -70,14 +70,15 @@ errorIO (IO io)
       _ -> bottom
   where
     bottom = bottom -- Never evaluated
-
-ioError :: String -> a
-ioError s = error__ ``&IOErrorHdrHook'' s 
+-}
+--ioError :: String -> a
+--ioError s = error__ ``&IOErrorHdrHook'' s 
 
 -- error stops execution and displays an error message
 error :: String -> a
-error s = error__ ``&ErrorHdrHook'' s
-
+error s = throw (ErrorCall s)
+--error s = error__ ``&ErrorHdrHook'' s
+{-
 -- This local variant of "error" calls PatErrorHdrHook instead of ErrorHdrHook,
 -- but the former does exactly the same as the latter, so I nuked it.
 --		SLPJ Jan 97
@@ -94,14 +95,14 @@ error__ :: Addr{-C function pointer to hook-} -> String -> a
 error__ msg_hdr s
 #ifdef __PARALLEL_HASKELL__
   = errorIO (do
-     (hFlush stdout) `catch` (\ _ -> return ())
+     (hFlush stdout) `catchException` (\ _ -> return ())
      let bs@(ByteArray (_,len) _) = packString s
      _ccall_ writeErrString__ msg_hdr bs len
      _ccall_ stg_exit (1::Int)
     )
 #else
   = errorIO ( do
-      (hFlush stdout) `catch` (\ _ -> return ())
+      (hFlush stdout) `catchException` (\ _ -> return ())
 	    -- Note: there's potential for trouble here in a
 	    -- a concurrent setting if an error is flagged after the
 	    -- lock on the stdout handle. (I don't see a possibility
@@ -119,6 +120,7 @@ error__ msg_hdr s
    )
 
 #endif {- !parallel -}
+-}
 \end{code}
 
 %*********************************************************
@@ -142,22 +144,20 @@ seqError = error "Oops! Entered seqError (a GHC bug -- please report it!)\n"
 \begin{code}
 irrefutPatError
    , noMethodBindingError
- --, noExplicitMethodError
    , nonExhaustiveGuardsError
    , patError
    , recSelError
    , recConError
    , recUpdError :: String -> a
 
---noDefaultMethodError     s = error ("noDefaultMethodError:"++s)
---noExplicitMethodError    s = error ("No default method for class operation "++s)
-noMethodBindingError     s = error (untangle s "No instance nor default method for class operation")
-irrefutPatError		 s = error (untangle s "Irrefutable pattern failed for pattern")
-nonExhaustiveGuardsError s = error (untangle s "Non-exhaustive guards in")
-recSelError 		 s = error (untangle s "Missing field in record selection:")
-recConError 		 s = error (untangle s "Missing field in record construction:")
-recUpdError 		 s = error (untangle s "Record to doesn't contain field(s) to be updated")
-patError 		 s = patError__ (untangle s "Non-exhaustive patterns in")
+noMethodBindingError     s = throw (NoMethodError (untangle s "No instance nor default method for class operation"))
+irrefutPatError		 s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
+nonExhaustiveGuardsError s = throw (NonExhaustiveGuards (untangle s "Non-exhaustive guards in"))
+patError 		 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
+recSelError 		 s = throw (RecSelError (untangle s "Missing field in record selection:"))
+recConError 		 s = throw (RecConError (untangle s "Missing field in record construction:"))
+recUpdError 		 s = throw (RecUpdError (untangle s "Record to doesn't contain field(s) to be updated"))
+
 
 assertError :: String -> Bool -> a -> a
 assertError str pred v 

@@ -62,18 +62,16 @@
 #define _POSIX_VDISABLE '\0'	/* Just a guess...but it works for Suns */
 #endif
 
-/* For PosixIO only (finaliser for (FILE *) contained in Handles) */
-extern void freeStdFile PROTO((StgForeignObj));
-extern void freeFile PROTO((StgForeignObj));
-
 extern I_ nocldstop;
 
-char	*strDup	    PROTO((const char *));
-int	setenviron  PROTO((char **));
-int	copyenv	    (STG_NO_ARGS);
-int	_setenv	    PROTO((char *));
-int	delenv	    PROTO((char *));
-int	execvpe	    PROTO((char *, char **, char **));
+char	*strDup	    (const char *);
+int	setenviron  (char **);
+int	copyenv	    (void);
+int	_setenv	    (char *);
+int	delenv	    (char *);
+int	execvpe	    (char *, char **, char **);
+void    stg_sigaddset(sigset_t *newset, sigset_t *oldset, int signum);
+void    stg_sigdelset(sigset_t *newset, sigset_t *oldset, int signum);
 
 #define LIBPOSIX_H
 #endif

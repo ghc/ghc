@@ -1,0 +1,444 @@
+#! /bin/sh
+
+CONTEXT_DIFF='@CONTEXT_DIFF@'
+export CONTEXT_DIFF
+DEV_NULL='@DEV_NULL@'
+export DEV_NULL
+
+test_static() {
+  echo "\
+----------------------------------------------------------------
+-- Testing syntax checking, static checking and modules.
+-- This group of checks will produce about 100 lines of output of the form
+-- 
+-- --!!! <description of feature being tested>
+-- 
+-- You should report a problem if any other output is generated.
+----------------------------------------------------------------"
+
+  # Test syntax/static checks on use of qualified names
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/qual1.hs"  "-o1test/qual1.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/qual2.hs"  "-o1test/qual2.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/qual3.hs"  "-o1test/qual3.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/qual4.hs"  "-o1test/qual4.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/qual5.hs"  "-o1test/qual5.output"
+  perl runstdtest hugs +q -pHugs: -s17 "-Otest/syntax.hs" "-o1test/syntax.output"
+
+  # ToDo: test for duplicate modules 
+  perl runstdtest hugs -O-i +q -pHugs: -s13 "-Otest/mod1.hs"   "-o1test/mod1.output"
+  perl runstdtest hugs -O-i +q -pHugs: -s13 "-Otest/mod2.hs"   "-o1test/mod2.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod3.hs"   "-o1test/mod3.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod4.hs"   "-o1test/mod4.output"
+  perl runstdtest hugs +q -pHugs: -s17 "-Otest/mod5.hs"   "-o1test/mod5.output"
+  perl runstdtest hugs +q -pHugs: -s17 "-Otest/mod6.hs"   "-o1test/mod6.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod7.hs"   "-o1test/mod7.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod8.hs"   "-o1test/mod8.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod9.hs"   "-o1test/mod9.output"
+
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod10.hs"  "-o1test/mod10.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod11.hs"  "-o1test/mod11.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod12.hs"  "-o1test/mod12.output"
+  perl runstdtest hugs +q -pHugs: -s17 "-Otest/mod13.hs"  "-o1test/mod13.output"
+  perl runstdtest hugs +q -pHugs: -s17 "-Otest/mod14.hs"  "-o1test/mod14.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod15.hs"  "-o1test/mod15.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod16.hs"  "-o1test/mod16.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod17.hs"  "-o1test/mod17.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod18.hs"  "-o1test/mod18.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod19.hs"  "-o1test/mod19.output"
+
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod20.hs"  "-o1test/mod20.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod21.hs"  "-o1test/mod21.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod22.hs"  "-o1test/mod22.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod23.hs"  "-o1test/mod23.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod24.hs"  "-o1test/mod24.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod25.hs"  "-o1test/mod25.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod26.hs"  "-o1test/mod26.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod27.hs"  "-o1test/mod27.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod28.hs"  "-o1test/mod28.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod29.hs"  "-o1test/mod29.output"
+
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod30.hs"  "-o1test/mod30.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod31.hs"  "-o1test/mod31.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod32.hs"  "-o1test/mod32.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod33.hs"  "-o1test/mod33.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod34.hs"  "-o1test/mod34.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod35.hs"  "-o1test/mod35.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod36.hs"  "-o1test/mod36.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod37.hs"  "-o1test/mod37.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod38.hs"  "-o1test/mod38.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod39.hs"  "-o1test/mod39.output"
+
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod40.hs"  "-o1test/mod40.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod41.hs"  "-o1test/mod41.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod42.hs"  "-o1test/mod42.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod43.hs"  "-o1test/mod43.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod44.hs"  "-o1test/mod44.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod45.hs"  "-o1test/mod45.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod46.hs"  "-o1test/mod46.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod47.hs"  "-o1test/mod47.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod48.hs"  "-o1test/mod48.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod49.hs"  "-o1test/mod49.output"
+
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod50.hs"  "-o1test/mod50.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod51.hs"  "-o1test/mod51.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod52.hs"  "-o1test/mod52.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod53.hs"  "-o1test/mod53.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod54.hs"  "-o1test/mod54.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod55.hs"  "-o1test/mod55.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod56.hs"  "-o1test/mod56.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod57.hs"  "-o1test/mod57.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod58.hs"  "-o1test/mod58.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod59.hs"  "-o1test/mod59.output"
+
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod60.hs"  "-o1test/mod60.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod61.hs"  "-o1test/mod61.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod62.hs"  "-o1test/mod62.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod63.hs"  "-o1test/mod63.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod64.hs"  "-o1test/mod64.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod65.hs"  "-o1test/mod65.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod66.hs"  "-o1test/mod66.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod67.hs"  "-o1test/mod67.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod68.hs"  "-o1test/mod68.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod69.hs"  "-o1test/mod69.output"
+
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod70.hs"  "-o1test/mod70.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod71.hs"  "-o1test/mod71.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod72.hs"  "-o1test/mod72.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod73.hs"  "-o1test/mod73.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod74.hs"  "-o1test/mod74.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod75.hs"  "-o1test/mod75.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod76.hs"  "-o1test/mod76.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod77.hs"  "-o1test/mod77.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod78.hs"  "-o1test/mod78.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod79.hs"  "-o1test/mod79.output"
+
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod80.hs"  "-o1test/mod80.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod81.hs"  "-o1test/mod81.output"
+  perl runstdtest hugs +q -pHugs: -s17 "-Otest/mod82.hs"  "-o1test/mod82.output"
+  perl runstdtest hugs +q -pHugs: -s17 "-Otest/mod83.hs"  "-o1test/mod83.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod84.hs"  "-o1test/mod84.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod85.hs"  "-o1test/mod85.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod86.hs"  "-o1test/mod86.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod87.hs"  "-o1test/mod87.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod88.hs"  "-o1test/mod88.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod89.hs"  "-o1test/mod89.output"
+
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod90.hs"  "-o1test/mod90.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod91.hs"  "-o1test/mod91.output"
+  perl runstdtest hugs +q -pHugs: -s17 "-Otest/mod92.hs"  "-o1test/mod92.output"
+  perl runstdtest hugs +q -pHugs: -s17 "-Otest/mod93.hs"  "-o1test/mod93.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod94.hs"  "-o1test/mod94.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod95.hs"  "-o1test/mod95.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/mod96.hs"  "-o1test/mod96.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod97.hs"  "-o1test/mod97.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/mod98.hs"  "-o1test/mod98.output"
+
+  # Check opaque import/export of tycons
+  perl runstdtest hugs +q -pHugs: -s21 "-Otest/T2.hs"  "-o1test/T2.output"
+  # Check transparent import of type synonyms
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/T3.hs"  "-o1test/T3.output"
+
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/export1.hs"  "-o1test/export1.output"
+
+  # Check opaque import/export of member functions
+  perl runstdtest hugs +q -pHugs: -s20 "-Otest/T7.hs"  "-o1test/Loaded.output"
+
+} # End of static tests
+
+test_tcheck() {
+
+  echo "\
+----------------------------------------------------------------
+-- Testing type checking.
+-- This group of checks will produce about 7 lines of output of the form
+-- 
+-- --!!! <description of feature being tested>
+-- 
+-- It may also produce output that looks like this:
+-- 
+--   ./hugs +q -pHugs:  test/dicts.hs < test/dicts.input
+--   expected stdout not matched by reality
+--   *** test/dicts.output  Fri Jul 11 13:25:27 1997
+--   --- /tmp/runtest3584.3  Fri Jul 11 15:55:13 1997
+--   ***************
+--   *** 1,3 ****
+--     Hugs:\"(14,14,14)\"
+--   ! Hugs:Garbage collection recovered 93815 cells
+--     Hugs:\"(14,14,14)\"
+--   --- 1,3 ----
+--     Hugs:\"(14,14,14)\"
+--   ! Hugs:Garbage collection recovered 93781 cells
+--     Hugs:\"(14,14,14)\"
+-- 
+-- This is harmless and might be caused by minor variations between different
+-- machines, or slightly out of date sample output.
+-- 
+-- You should report a problem if any other output is generated.
+----------------------------------------------------------------"
+
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/types.hs"  "-o1test/types.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/dicts.hs"  "-itest/dicts.input" "-o1test/dicts.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/ty1.hs"    "-o1test/ty1.output"
+  perl runstdtest hugs +q -pHugs: -s13 "-Otest/ty2.hs"    "-o1test/ty2.output"
+  perl runstdtest hugs +q -pHugs: -s17 "-Otest/monad.hs"  "-o1test/monad.output"
+  # Very tricky test - the input script uses /bin/cp to mimic the
+  # effect of editing a file and reloading
+  perl runstdtest hugs -w +q -pHugs: -s13 "-itest/DictHW.input" "-o1test/DictHW.output"
+  perl runstdtest hugs -w +q -pHugs: test/TyErr.hs -s12 "-o1test/TyErr.output"
+}
+
+test_rts() {
+
+  echo "\
+----------------------------------------------------------------
+-- Testing runtime system.
+-- This group of checks will produce 12-16 lines of output of the form
+-- 
+-- --!!! <description of feature being tested>
+-- 
+-- It may also produce output that looks like this:
+-- 
+--   ./hugs +q -pHugs:  test/???.hs < test/???.input
+--   expected stdout not matched by reality
+--   *** test/???.output  Fri Jul 11 13:25:27 1997
+--   --- /tmp/runtest3584.3  Fri Jul 11 15:55:13 1997
+--   ***************
+--   *** 1,3 ****
+--     ...
+--   | Hugs:\"[0.0, 0.304693, 0.643501, 1.5708]\"
+--     ...
+--   --- 1,3 ----
+--     ...
+--   | Hugs:\"[0.0, 0.30469323452, 0.643503234321, 1.5708234234]\"
+--     ...
+-- 
+-- This is harmless and reflects variations in the accuracy of floating
+-- point representation, calculations and printing.
+-- 
+-- You should report a problem if any other output is generated or if
+-- the size of the floating point errors seem excessively large.
+----------------------------------------------------------------"
+
+  # Test bignums early since printing depends on bignums
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/bignums.hs" "-itest/bignums.input" "-o1test/bignums.output"
+
+  # Using generic printer
+  perl runstdtest hugs +q -pHugs: -u    -s18 "-Otest/print.hs"  "-itest/print.input" "-o1test/print1.output"
+  perl runstdtest hugs +q -pHugs: -u -f -s18 "-Otest/print.hs"  "-itest/print.input" "-o1test/print2.output"
+  #perl runstdtest hugs +q -pHugs: -u -f -s18 "-Otest/catch.hs"  "-itest/catch.input" "-o1test/catch.output"
+  perl runstdtest hugs +q -pHugs: -u    -s18 "-Otest/enum.hs"   "-itest/enum.input"  "-o1test/enum.output1"
+  perl runstdtest hugs +q -pHugs: -u   -s18 "-Otest/infix.hs"   "-itest/infix.input"  "-o1test/infix.output"
+
+  # Using derived show instance
+  #perl runstdtest hugs +q -pHugs: +u -f -s18 "-Otest/catch2.hs" "-itest/catch.input" "-o1test/catch2.output"
+
+  # Using derived instances
+  perl runstdtest hugs +q -pHugs: +u    -s18 "-Otest/enum.hs"   "-itest/enum.input"  "-o1test/enum.output2"
+  perl runstdtest hugs +q -pHugs: +u    -s18 "-Otest/maxint.hs"   "-itest/maxint.input"  "-o1test/maxint.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/ord.hs" "-itest/ord.input" "-o1test/ord.output"
+  perl runstdtest hugs +q -pHugs: -s25 "-Otest/read.hs" "-itest/read.input" "-o1test/read.output"
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/arith.hs" "-itest/arith.input" "-o1test/arith.output"
+
+  perl runstdtest hugs +q -pHugs: -s18 "-Otest/testlist.hs"  "-itest/testlist.input" "-o1test/testlist.output"
+
+  perl runstdtest hugs +q -pHugs: -s29 "-Otest/arrayt.hs" "-itest/array1.input" "-o1test/array1.output"
+  perl runstdtest hugs +q -pHugs: -s29 "-Otest/array2.hs" "-itest/array2.input" "-o1test/array2.output"
+  perl runstdtest hugs +q -pHugs: -s29 "-Otest/arrayEx.hs" "-itest/arrayEx.input" "-o1test/arrayEx.output"
+
+
+  # Old test code from hugs +q -pHugs:0 - it will probably get resurrected at some stage
+  # 
+  # if TESTREFS
+  # if IO_REFS
+  #   perl runstdtest hugs +q -pHugs: "-Otest/refs.hs" "-itest/refs.input" "-o1test/refs.output"
+  # fi
+  # else
+  # echo "Not testing Refs"
+  # fi
+  # 
+  # if TESTPTREQ
+  # if IO_REFS
+  #   perl runstdtest hugs +q -pHugs: "-Otest/ptrEq.hs" "-itest/ptrEq.input" "-o1test/ptrEq.output"
+  # fi
+  # else
+  # echo "Not testing Pointer equality"
+  # fi
+  # 
+  # if TESTMUTVARS
+  # if ST_MUTVARS
+  #   perl runstdtest hugs +q -pHugs: "-Otest/mutvars.hs" "-itest/mutvars.input" "-o1test/mutvars.output"
+  # fi
+  # else
+  # echo "Not testing MutVars"
+  # fi
+  # 
+  # if TESTIOERROR
+  # if !OLD_IOMONAD
+  #   perl runstdtest hugs +q -pHugs: "-Otest/ioerror1.hs" "-itest/ioerror1.input" "-o1test/ioerror1.output"
+  #   perl runstdtest hugs +q -pHugs: "-Otest/ioerror2.hs" "-itest/ioerror2.input" "-o1test/ioerror2.output"
+  # if IO_HANDLES
+  # /* Create an unreadable file (its impossible to supply one in a tar file!) */
+  # cat >test/unreadable.tst <<EOF
+  # This file should be read+q -protected.
+  #   perl runstdtests/iohandle.hs attempts to write it.
+  # EOF
+  # CHMOD 200 "test/unreadable.tst"
+  #   perl runstdtest hugs +q -pHugs: "-Otest/iohandle.hs" "-itest/iohandle.input" "-o1test/iohandle.output"
+  # RM "test/unreadable.tst"
+  # fi
+  # fi /* !OLD_IOMONAD */
+  # else
+  # echo "Not testing IOError"
+  # fi /* TESTIOERROR */
+  # 
+  # if TESTCONCURRENCY
+  # if CONCURRENCY
+  #   perl runstdtest hugs +q -pHugs: "-Otest/mvar.hs" "-itest/mvar.input" "-o1test/mvar.output"
+  # fi
+  # else
+  # echo "Not testing concurrency"
+  # fi
+  # 
+  # if TESTGC
+  #   perl runstdtest hugs +q -pHugs:          "-Otest/gc.hs" "-itest/gc1.input" "-o1test/gc1.output"
+  #   perl runstdtest hugs +q -pHugs: -H200000" "-Otest/gc.hs" "-itest/gc1.input" "-o1test/gc1.output"
+  #   perl runstdtest hugs +q -pHugs: -H100000" "-Otest/gc.hs" "-itest/gc2.input" "-o1test/gc2.output"
+  # else
+  # echo "Not testing GC"
+  # fi
+  # 
+  # else
+  # echo "Not testing runtime system"
+  # fi
+
+} # End of test_rts
+
+test_libs() {
+  echo "\
+----------------------------------------------------------------
+-- Testing standard libraries for static errors and some old bugs.
+-- 
+-- This group of checks tests that each of the standard libraries
+-- loads correctly.  This generates no output if it works.
+-- It also tests the results generated by a few of the standard
+-- libraries.  This produces the following output.
+-- 
+--   --!!! Performing static tests on standard libraries - please wait
+--   --!!! Performing static tests on GHC-compatible libraries
+--   --!!! Performing static tests on Hugs libraries
+--   --!!! Performing static tests on Haskore libraries
+--   --!!! Performing dynamic tests on libraries
+--   --!!! Testing (List.\\) and related functions
+--   --!!! Testing System
+--   --!!! Testing Int and Word
+-- 
+-- On Windows, it may also produce output that looks like this:
+-- 
+--   ./hugs +q -pHugs:  test/system1.hs < test/system1.input
+--   expected stdout not matched by reality
+--   *** test/system1.output  Fri Jul 11 13:25:27 1997
+--   --- /tmp/runtest3584.3  Fri Jul 11 15:55:13 1997
+--   ***************
+--   *** 1,3 ****
+--     ...
+--   | Hugs:ExitFailure 1
+--   | Hugs:ExitFailure 2
+--     ...
+--   --- 1,3 ----
+--     ...
+--   | Hugs:ExitSuccess
+--   | Hugs:ExitSuccess
+--     ...
+-- 
+-- This reflects the sad fact that System.system always returns
+-- ExitSuccess on DOS machines.  This is a known bug in DOS.
+-- 
+-- You should report a problem if any other output is generated.
+----------------------------------------------------------------"
+
+  echo "--!!! Performing static tests on standard libraries - please wait"
+  perl runstdtest hugs +q -pHugs: Array   -s27
+  perl runstdtest hugs +q -pHugs: Char    -s19
+  perl runstdtest hugs +q -pHugs: Complex -s19
+  perl runstdtest hugs +q -pHugs: IO      -s24
+  perl runstdtest hugs +q -pHugs: Ix      -s19
+  perl runstdtest hugs +q -pHugs: List    -s22
+  perl runstdtest hugs +q -pHugs: Maybe   -s19
+  perl runstdtest hugs +q -pHugs: Monad   -s19
+  perl runstdtest hugs +q -pHugs: Ratio   -s19
+  perl runstdtest hugs +q -pHugs: System  -s19
+
+  echo "--!!! Performing static tests on GHC-compatible libraries"
+  perl runstdtest hugs +q -pHugs: IOExts     -s27 "-o1test/Loaded.output"
+  perl runstdtest hugs +q -pHugs: ST         -s33 "-o1test/Loaded.output"
+  perl runstdtest hugs +q -pHugs: LazyST     -s33 "-o1test/Loaded.output"
+  perl runstdtest hugs +q -pHugs: Concurrent -s42 "-o1test/Loaded.output"
+  perl runstdtest hugs +q -pHugs: Addr       -s17 "-o1test/Loaded.output"
+  perl runstdtest hugs +q -pHugs: Word       -s22 "-o1test/Loaded.output"
+  perl runstdtest hugs +q -pHugs: Int        -s20 "-o1test/Loaded.output"
+
+  echo "--!!! Performing static tests on Hugs libraries"
+  perl runstdtest hugs +q -pHugs: HugsLibs -s68 "-o1test/HugsLibs.output"
+
+  echo "--!!! Performing static tests on Haskore libraries"
+  perl runstdtest hugs +q -pHugs: Haskore -s60 "-o1test/Loaded.output"
+
+  echo "--!!! Performing dynamic tests on libraries"
+  # Specific tests - checking that old bugs have been fixed 
+  perl runstdtest hugs +q -pHugs: List    -s22 "-Otest/list1.hs" "-itest/list1.input" "-o1test/list1.output"
+  perl runstdtest hugs +q -pHugs: System  -s19 "-Otest/system1.hs" "-itest/system1.input" "-o1test/system1.output"
+  perl runstdtest hugs +q -pHugs: Complex -s17 "-itest/complex1.input" "-o1test/complex1.output"
+  perl runstdtest hugs +q -pHugs: Int     -s25 "-Otest/intTest.hs" "-itest/intTest.input" "-o1test/intTest.output"
+  perl runstdtest hugs +q -pHugs: test/FixIO.lhs -s33 "-itest/FixIO.input" "-o1test/FixIO.output"
+
+} # End of test_libs
+
+test_demos() {
+  echo "\
+----------------------------------------------------------------
+-- Testing demos for static errors.
+-- 
+-- This group of checks tests that each of the demos loads correctly.
+-- It should generate this output:
+-- 
+--   --!!! Performing static checks on demos
+--   --!!! Performing static checks on Haskore demos
+-- 
+-- You should report a problem if any other output is generated.
+----------------------------------------------------------------"
+
+  echo "--!!! Performing static checks on demos"
+  perl runstdtest hugs -w +q -pHugs: ../demos/Demos       -s58 "-o1test/Loaded.output"
+  perl runstdtest hugs -w +q -pHugs: ../demos/prolog/Main -s23 "-o1test/Loaded.output"
+  perl runstdtest hugs -w +q -pHugs: ../demos/cgi/Counter -s30 "-o1test/Loaded.output"
+
+  # Test that Haskore demos load successfully
+  echo "--!!! Performing static checks on Haskore demos"
+  perl runstdtest hugs -w +q -pHugs: ../lib/Haskore/demos/HaskoreExamples -s42 "-o1test/Loaded.output"
+  perl runstdtest hugs -w +q -pHugs: ../lib/Haskore/demos/SelfSim      -s40 "-o1test/Loaded.output"
+  perl runstdtest hugs -w +q -pHugs: ../lib/Haskore/demos/ChildSong6   -s40 "-o1test/Loaded.output"
+
+} # End of test demos
+
+test_temp() {
+  echo "\
+----------------------------------------------------------------
+-- Testing temporary tests
+-- These aren't invoked by the usual "make check" - they serve
+-- as a marshalling area when adding new tests
+----------------------------------------------------------------"
+
+} # End of test temp
+
+case "$1" in
+static) test_static;;
+tcheck) test_tcheck;;
+rts)    test_rts;;
+libs)   test_libs;;
+demos)  test_demos;;
+temp)   test_temp;;
+*)      echo Unknown test $1;;
+esac
+
+echo "----------------------------------------------------------------"
+

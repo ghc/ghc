@@ -1,0 +1,19 @@
+#! /usr/bin/perl
+
+foreach $file (@ARGV) {
+    ($base = $file) =~ s/\.l?hs$//;
+
+    $cmd = "perl test/runstdtest hugs +q -w -h300k -pHugs: -f\"$file\" -l\"Leaving Hugs\"";
+
+    die "Yoiks, file \"$file\" doesn't exist" unless -f "$file";
+    $cmd .= " -O$file";
+
+    $cmd .= " -i$base.in1" if (-f "$base.in1");
+    $cmd .= " -o1$base.out1" if (-f "$base.out1");
+    $cmd .= " -o2$base.out2" if (-f "$base.out2");
+
+    # print "$cmd\n";
+    system($cmd);
+}
+
+exit 0;

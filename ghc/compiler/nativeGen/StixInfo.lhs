@@ -1,145 +1,117 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1996
+% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 
 \begin{code}
-module StixInfo ( genCodeInfoTable ) where
+module StixInfo ( genCodeInfoTable, genBitmapInfoTable ) where
 
 #include "HsVersions.h"
 
-import AbsCSyn		( AbstractC(..), CAddrMode, ReturnInfo,
-			  RegRelative, MagicId, CStmtMacro
-			)
-import ClosureInfo	( closurePtrsSize, closureSizeWithoutFixedHdr,
-			  closureNonHdrSize, closureSemiTag, maybeSelectorInfo,
-			  closureSMRep, closureLabelFromCI,
+import AbsCSyn		( AbstractC(..), Liveness(..) )
+import CLabel		( CLabel )
+import StgSyn		( SRT(..) )
+import ClosureInfo	( closurePtrsSize,
+			  closureNonHdrSize, closureSMRep,
 			  infoTableLabelFromCI
 			)
-import HeapOffs		( hpRelToInt )
-import Maybes		( maybeToBool )
 import PrimRep		( PrimRep(..) )
-import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..),
-			  isSpecRep
-			)
+import SMRep		( SMRep(..), getSMRepClosureTypeInt )
 import Stix		-- all of it
-import StixPrim		( amodeToStix )
 import UniqSupply	( returnUs, UniqSM )
-import Outputable	( hcat, ptext, int, char )
+import Outputable	( int )
+import BitSet		( intBS )
+
+import Bits
+import Word
 \end{code}
 
 Generating code for info tables (arrays of data).
 
 \begin{code}
-static___rtbl	= sStLitLbl SLIT("Static___rtbl") -- out here to avoid CAF (sigh)
-const___rtbl	= sStLitLbl SLIT("Const___rtbl")
-charlike___rtbl	= sStLitLbl SLIT("CharLike___rtbl")
-intlike___rtbl	= sStLitLbl SLIT("IntLike___rtbl")
-gen_N___rtbl	= sStLitLbl SLIT("Gen_N___rtbl")
-gen_S___rtbl	= sStLitLbl SLIT("Gen_S___rtbl")
-gen_U___rtbl	= sStLitLbl SLIT("Gen_U___rtbl")
-tuple___rtbl	= sStLitLbl SLIT("Tuple___rtbl")
-data___rtbl	= sStLitLbl SLIT("Data___rtbl")
-dyn___rtbl	= sStLitLbl SLIT("Dyn___rtbl")
-
 genCodeInfoTable
     :: AbstractC
     -> UniqSM StixTreeList
 
-genCodeInfoTable (CClosureInfoAndCode cl_info _ _ upd cl_descr _)
-  = returnUs (\xs -> info : lbl : xs)
+genCodeInfoTable (CClosureInfoAndCode cl_info _ _ srt cl_descr)
+  = returnUs (\xs -> StData PtrRep table : StLabel info_lbl : xs)
 
     where
-	info = StData PtrRep table
-	lbl = StLabel info_lbl
+	info_lbl = infoTableLabelFromCI cl_info
 
-	table = case sm_rep of
-	    StaticRep _ _ -> [
-		StInt (toInteger ptrs),
-		StInt (toInteger size),
-		upd_code,
-		static___rtbl,
-		tag]
+	table = case srt_len of 
+		   0 -> rest_of_table
+		   _ -> srt_label : rest_of_table
 
-	    SpecialisedRep ConstantRep _ _ _ -> [
-		StCLbl closure_lbl,
-		upd_code,
-		const___rtbl,
-		tag]
+	rest_of_table = 
+		[
+		{- par, prof, debug -} 
+		  StInt (toInteger layout_info)
+		, StInt (toInteger type_info)
+		]
 
-	    SpecialisedRep CharLikeRep _ _ _ -> [
-		upd_code,
-		charlike___rtbl,
-		tag]
+	type_info :: Word32
+        type_info = (fromInt flags `shiftL` 24) .|.
+		    (fromInt closure_type `shiftL` 16) .|.
+		    (fromInt srt_len)
+	     
+	(srt_label,srt_len) = 
+	     case srt of
+		(lbl, NoSRT) -> (StInt 0, 0)
+		(lbl, SRT off len) -> 
+			(StIndex DataPtrRep (StCLbl lbl) 
+				(StInt (toInteger off)), len)
 
-	    SpecialisedRep IntLikeRep _ _ _ -> [
-		upd_code,
-		intlike___rtbl,
-		tag]
+	layout_info :: Word32
+	layout_info = (fromInt ptrs `shiftL` 16) .|. fromInt nptrs
 
-	    SpecialisedRep _ _ _ updatable ->
-		let rtbl = hcat (
-		       if is_selector then
-			  [ptext SLIT("Select__"),
-			   int select_word,
-			   ptext SLIT("_rtbl")]
-		       else
-			  [ptext (case updatable of
-				    SMNormalForm -> SLIT("Spec_N_")
-				    SMSingleEntry -> SLIT("Spec_S_")
-				    SMUpdatable -> SLIT("Spec_U_")
-				   ),
-			   int size,
-			   char '_',
-			   int ptrs,
-			   ptext SLIT("_rtbl")])
-		in
-		    case updatable of
-			SMNormalForm -> [upd_code, StLitLbl rtbl, tag]
-			_            -> [StLitLbl rtbl, tag]
+    	ptrs    = closurePtrsSize cl_info
+	nptrs	= size - ptrs
 
-	    GenericRep _ _ updatable ->
-		let rtbl = case updatable of
-			    SMNormalForm  -> gen_N___rtbl
-			    SMSingleEntry -> gen_S___rtbl
-			    SMUpdatable   -> gen_U___rtbl
-		in [
-		    StInt (toInteger ptrs),
-		    StInt (toInteger size),
-		    upd_code,
-		    rtbl,
-		    tag]
+        size = closureNonHdrSize cl_info
 
-	    BigTupleRep _ -> [
-		tuple___rtbl,
-		tag]
-	    DataRep _     -> [
-		data___rtbl,
-		tag]
-	    DynamicRep    -> [
-		dyn___rtbl,
-		tag]
+	closure_type = getSMRepClosureTypeInt (closureSMRep cl_info)
 
-	    PhantomRep -> [
-		upd_code,
-		info_unused,	-- no rep table
-		tag]
+	flags = 0 -- for now
 
-	info_lbl	= infoTableLabelFromCI cl_info
-	closure_lbl	= closureLabelFromCI   cl_info
 
-	sm_rep	= closureSMRep cl_info
-	maybe_selector = maybeSelectorInfo cl_info
-	is_selector = maybeToBool maybe_selector
-	(Just (_, select_word)) = maybe_selector
+genBitmapInfoTable
+	:: Liveness
+	-> (CLabel, SRT)
+	-> Int
+	-> Bool			-- must include SRT field (i.e. it's a vector)
+	-> UniqSM StixTreeList
 
-	tag = StInt (toInteger (closureSemiTag cl_info))
+genBitmapInfoTable liveness srt closure_type include_srt
+  = returnUs (\xs -> StData PtrRep table : xs)
 
-	size	= if isSpecRep sm_rep
-		  then closureNonHdrSize cl_info
-		  else hpRelToInt (closureSizeWithoutFixedHdr cl_info)
-	ptrs	= closurePtrsSize cl_info
+  where
+	table = if srt_len == 0 && not include_srt then
+		   rest_of_table
+		else
+		   srt_label : rest_of_table
 
-	upd_code = amodeToStix upd
+	rest_of_table = 
+		[
+		{- par, prof, debug -} 
+		  layout_info
+		, StInt (toInteger type_info)
+		]
 
-	info_unused = StInt (-1)
+	layout_info = case liveness of
+			LvSmall mask -> StInt (toInteger (intBS mask))
+			LvLarge lbl  -> StCLbl lbl
+
+	type_info :: Word32
+        type_info = (fromInt flags `shiftL` 24) .|.
+		    (fromInt closure_type `shiftL` 16) .|.
+		    (fromInt srt_len)
+	     
+	(srt_label,srt_len) = 
+	     case srt of
+		(lbl, NoSRT) -> (StInt 0, 0)
+		(lbl, SRT off len) -> 
+			(StIndex DataPtrRep (StCLbl lbl) 
+				(StInt (toInteger off)), len)
+
+	flags = 0 -- for now
 \end{code}

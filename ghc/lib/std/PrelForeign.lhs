@@ -12,8 +12,8 @@ module PrelForeign (
 #ifndef __PARALLEL_HASKELL__
 	ForeignObj(..),
 	makeForeignObj,
+	writeForeignObj
 #endif
-	StateAndForeignObj#(..)
    ) where
 
 import PrelIOBase
@@ -36,24 +36,17 @@ import PrelGHC
 --instance CCallable ForeignObj
 --instance CCallable ForeignObj#
 
+makeForeignObj  :: Addr -> IO ForeignObj
+makeForeignObj (A# obj) = IO ( \ s# ->
+    case makeForeignObj# obj s# of
+      (# s1#, fo# #) -> (# s1#,  ForeignObj fo# #) )
+
 eqForeignObj    :: ForeignObj  -> ForeignObj -> Bool
 --makeForeignObj  :: Addr        -> Addr       -> IO ForeignObj
 writeForeignObj :: ForeignObj  -> Addr       -> IO ()
 
-{- derived op - attaching a free() finaliser to a malloc() allocated reference. -}
-makeMallocPtr   :: Addr        -> IO ForeignObj
-
-{-
---makeForeignObj  :: Addr        -> Addr       -> IO ForeignObj
-makeForeignObj (A# obj) (A# finaliser) = IO ( \ s# ->
-    case makeForeignObj# obj finaliser s# of
-      StateAndForeignObj# s1# fo# -> IOok s1# (ForeignObj fo#))
--}
-
 writeForeignObj (ForeignObj fo#) (A# datum#) = IO ( \ s# ->
-    case writeForeignObj# fo# datum# s# of { s1# -> IOok s1# () } )
-
-makeMallocPtr a = makeForeignObj a (``&free''::Addr)
+    case writeForeignObj# fo# datum# s# of { s1# -> (# s1#, () #) } )
 
 eqForeignObj mp1 mp2
   = unsafePerformIO (_ccall_ eqForeignObj mp1 mp2) /= (0::Int)
@@ -90,17 +83,18 @@ freeStablePtr  :: StablePtr a -> IO ()
 
 makeStablePtr f = IO $ \ rw1# ->
     case makeStablePtr# f rw1# of
-      StateAndStablePtr# rw2# sp# -> IOok rw2# (StablePtr sp#)
+      (# rw2#, sp# #) -> (# rw2#, StablePtr sp# #)
 
 deRefStablePtr (StablePtr sp#) = IO $ \ rw1# ->
-    case deRefStablePtr# sp# rw1# of
-      StateAndPtr# rw2# a -> IOok rw2# a
+    deRefStablePtr# sp# rw1#
 
 freeStablePtr sp = _ccall_ freeStablePointer sp
 
 eqStablePtr :: StablePtr a -> StablePtr b -> Bool
-eqStablePtr s1 s2
-  = unsafePerformIO (_ccall_ eqStablePtr s1 s2) /= (0::Int)
+eqStablePtr (StablePtr sp1#) (StablePtr sp2#) = 
+  case eqStablePtr# sp1# sp2# of
+    0# -> False
+    _  -> True
 
 instance Eq (StablePtr a) where 
     p == q = eqStablePtr p q
@@ -111,13 +105,41 @@ instance Eq (StablePtr a) where
 
 %*********************************************************
 %*							*
-\subsection{Ghastly return types}
+\subsection{Unpacking Foreigns}
 %*							*
 %*********************************************************
 
+Primitives for converting Foreigns pointing to external
+sequence of bytes into a list of @Char@s (a renamed version
+of the code above).
+
 \begin{code}
 #ifndef __PARALLEL_HASKELL__
-data StateAndStablePtr# s a = StateAndStablePtr# (State# s) (StablePtr# a)
+unpackCStringFO :: ForeignObj -> [Char]
+unpackCStringFO (ForeignObj fo#) = unpackCStringFO# fo#
+
+unpackCStringFO# :: ForeignObj# -> [Char]
+unpackCStringFO# fo {- ptr. to NUL terminated string-}
+  = unpack 0#
+  where
+    unpack nh
+      | ch `eqChar#` '\0'# = []
+      | otherwise	   = C# ch : unpack (nh +# 1#)
+      where
+	ch = indexCharOffForeignObj# fo nh
+
+unpackNBytesFO :: ForeignObj -> Int -> [Char]
+unpackNBytesFO (ForeignObj fo) (I# l) = unpackNBytesFO# fo l
+
+unpackNBytesFO#    :: ForeignObj# -> Int#   -> [Char]
+  -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
+unpackNBytesFO# fo len
+  = unpack 0#
+    where
+     unpack i
+      | i >=# len  = []
+      | otherwise  = C# ch : unpack (i +# 1#)
+      where
+	ch = indexCharOffForeignObj# fo i
 #endif
---data StateAndForeignObj# s  = StateAndForeignObj# (State# s) ForeignObj#
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcClassDcl]{Typechecking class declarations}
 
@@ -9,12 +9,12 @@ module TcClassDcl ( tcClassDecl1, tcClassDecls2, tcMethodBind, badMethodErr ) wh
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), ClassDecl(..), Sig(..), MonoBinds(..),
-			  InPat(..), HsBinds(..), GRHSsAndBinds(..), GRHS(..),
+			  InPat(..), HsBinds(..), GRHSsAndBinds(..),
 			  HsExpr(..), HsLit(..), HsType(..), pprClassAssertion,
-			  unguardedRHS, andMonoBinds, getTyVarName
+			  unguardedRHS, andMonoBinds, andMonoBindList, getTyVarName
 			)
 import HsPragmas	( ClassPragmas(..) )
-import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..) )
+import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..), StrictnessMark(..) )
 import RnHsSyn		( RenamedClassDecl, RenamedClassPragmas,
 			  RenamedClassOpSig, RenamedMonoBinds,
 			  RenamedContext, RenamedHsDecl, RenamedSig
@@ -26,41 +26,38 @@ import TcEnv		( TcIdOcc(..), GlobalValueEnv, tcAddImportedIdInfo,
 			  tcLookupClass, tcLookupTyVar, 
 			  tcExtendGlobalTyVars, tcExtendLocalValEnv
 			)
-import TcBinds		( tcBindWithSigs, bindInstsOfLocalFuns, 
-			  checkSigTyVars, sigCtxt, tcPragmaSigs, TcSigInfo(..)
-			)
-import TcKind		( unifyKinds, TcKind )
+import TcBinds		( tcBindWithSigs, tcPragmaSigs )
+import TcUnify		( unifyKinds )
 import TcMonad
-import TcMonoType	( tcHsType, tcContext )
-import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( TcType, TcTyVar, TcTyVarSet, tcInstSigTyVars, 
-			  zonkSigTyVar, tcInstSigTcType
-			)
+import TcMonoType	( tcHsType, tcContext, checkSigTyVars, sigCtxt, mkTcSig )
+import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
+import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcTyVarBndr )
 import PrelVals		( nO_METHOD_BINDING_ERROR_ID )
 import FieldLabel	( firstFieldLabelTag )
 import Bag		( unionManyBags )
 import Class		( mkClass, classBigSig, Class )
 import CmdLineOpts      ( opt_GlasgowExts, opt_WarnMissingMethods )
-import MkId		( mkDataCon, mkSuperDictSelId, 
+import MkId		( mkSuperDictSelId, mkDataConId,
 			  mkMethodSelId, mkDefaultMethodId
 			)
-import Id		( Id, StrictnessMark(..),
+import DataCon		( mkDataCon )
+import Id		( Id,
 			  getIdUnfolding, idType, idName
 			)
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
-import Name		( Name, isLocallyDefined, OccName, nameOccName,
-			  NamedThing(..) )
+import Name		( Name, isLocallyDefined, NamedThing(..) )
 import Outputable
-import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy, splitRhoTy,
-			  mkSigmaTy, mkForAllTys, Type, ThetaType
+import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
+			  mkSigmaTy, mkForAllTys, Type, ThetaType,
+			  boxedTypeKind, mkArrowKind
 			)
-import TyVar		( mkTyVarSet, tyVarKind, TyVar )
-import TyCon		( mkDataTyCon )
-import Kind		( mkBoxedTypeKind, mkArrowKind )
+import Var		( tyVarKind, TyVar )
+import VarSet		( mkVarSet )
+import TyCon		( mkAlgTyCon )
 import Unique		( Unique, Uniquable(..) )
 import Util
-import Maybes		( assocMaybe, maybeToBool, seqMaybe )
+import Maybes		( seqMaybe )
 
 
 -- import TcPragmas	( tcGenPragmas, tcClassOpPragmas )
@@ -146,20 +143,21 @@ tcClassDecl1 rec_env rec_inst_mapper
 			[_]   -> NewType
 			other -> DataType
 
-        dict_con_id = mkDataCon datacon_name
+        dict_con = mkDataCon datacon_name
 			   [NotMarkedStrict | _ <- dict_component_tys]
 			   [{- No labelled fields -}]
 		      	   rec_tyvars
 		      	   [{-No context-}]
 			   [{-No existential tyvars-}] [{-Or context-}]
 			   dict_component_tys
-		      	   tycon
+		      	   tycon dict_con_id
+	dict_con_id = mkDataConId dict_con
 
-	tycon = mkDataTyCon tycon_name
-			    (foldr (mkArrowKind . tyVarKind) mkBoxedTypeKind rec_tyvars)
+	tycon = mkAlgTyCon tycon_name
+			    (foldr (mkArrowKind . tyVarKind) boxedTypeKind rec_tyvars)
 			    rec_tyvars
 			    []			-- No context
-			    [dict_con_id]	-- Constructors
+			    [dict_con]		-- Constructors
 			    []			-- No derivings
 			    (Just clas)		-- Yes!  It's a dictionary 
 			    new_or_data
@@ -325,18 +323,19 @@ tcClassDecl2 (ClassDecl context class_name
 	(tyvars, sc_theta, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
 
 	-- The selector binds are already in the selector Id's unfoldings
-	sel_binds = [ CoreMonoBind (RealId sel_id) (getUnfoldingTemplate (getIdUnfolding sel_id))
-		    | sel_id <- sc_sel_ids ++ op_sel_ids, 
-		      isLocallyDefined sel_id
-		    ]
-
-    	final_sel_binds = andMonoBinds sel_binds
+--	sel_binds = [ CoreMonoBind (RealId sel_id) (getUnfoldingTemplate (getIdUnfolding sel_id))
+--		    | sel_id <- sc_sel_ids ++ op_sel_ids, 
+--		      isLocallyDefined sel_id
+--		    ]
+--
+--    	final_sel_binds = andMonoBindList sel_binds
     in
 	-- Generate bindings for the default methods
     tcDefaultMethodBinds clas default_binds		`thenTc` \ (const_insts, meth_binds) ->
 
-    returnTc (const_insts, 
-	      final_sel_binds `AndMonoBinds` meth_binds)
+    returnTc (const_insts, meth_binds)
+--	      final_sel_binds `AndMonoBinds` meth_binds)
+-- Leave 'em out for now.  They always get inlined anyway.  SLPJ June '98
 \end{code}
 
 %************************************************************************
@@ -420,7 +419,7 @@ tcDefaultMethodBinds
 
 tcDefaultMethodBinds clas default_binds
   = 	-- Construct suitable signatures
-    tcInstSigTyVars tyvars		`thenNF_Tc` \ (clas_tyvars, inst_tys, inst_env) ->
+    tcInstTyVars tyvars		`thenNF_Tc` \ (clas_tyvars, inst_tys, inst_env) ->
 
 	-- Typecheck the default bindings
     let
@@ -438,10 +437,15 @@ tcDefaultMethodBinds clas default_binds
 	avail_insts = this_dict
     in
     tcAddErrCtxt (classDeclCtxt clas) $
-    mapNF_Tc zonkSigTyVar clas_tyvars		`thenNF_Tc` \ clas_tyvars' ->
+
+	-- tcMethodBind has checked that the class_tyvars havn't
+	-- been unified with each other or another type, but we must
+	-- still zonk them
+    mapNF_Tc zonkTcTyVarBndr clas_tyvars	`thenNF_Tc` \ clas_tyvars' ->
+
     tcSimplifyAndCheck
 	(ptext SLIT("class") <+> ppr clas)
-	(mkTyVarSet clas_tyvars')
+	(mkVarSet clas_tyvars')
 	avail_insts
 	(unionManyBags insts_needed)		`thenTc` \ (const_lie, dict_binds) ->
 
@@ -450,7 +454,7 @@ tcDefaultMethodBinds clas default_binds
 		 	clas_tyvars'
 			[this_dict_id]
 			abs_bind_stuff
-			(dict_binds `AndMonoBinds` andMonoBinds defm_binds)
+			(dict_binds `andMonoBinds` andMonoBindList defm_binds)
     in
     returnTc (const_lie, full_binds)
 
@@ -488,74 +492,74 @@ tcMethodBind
 tcMethodBind clas origin inst_tys inst_tyvars 
 	     meth_binds prags supply_default_bind
 	     (sel_id, maybe_dm_id)
- | no_user_bind && not supply_default_bind
- = pprPanic "tcMethodBind" (ppr clas <+> ppr inst_tys)
-
- | otherwise
  = tcGetSrcLoc 		`thenNF_Tc` \ loc -> 
 
+   newMethod origin (RealId sel_id) inst_tys	`thenNF_Tc` \ meth@(_, TcId meth_id) ->
+   mkTcSig meth_id loc				`thenNF_Tc` \ sig_info -> 
+
+   let
+     meth_name	     = idName meth_id
+     maybe_user_bind = find_bind meth_name meth_binds
+
+     no_user_bind    = case maybe_user_bind of {Nothing -> True; other -> False}
+     no_user_default = case maybe_dm_id     of {Nothing -> True; other -> False}
+
+     meth_bind = case maybe_user_bind of
+		 	Just bind -> bind
+			Nothing   -> mk_default_bind meth_name loc
+
+     meth_prags = find_prags meth_name prags
+   in
+
 	-- Warn if no method binding, only if -fwarn-missing-methods
+   if no_user_bind && not supply_default_bind then
+	pprPanic "tcMethodBind" (ppr clas <+> ppr inst_tys)
+   else
    warnTc (opt_WarnMissingMethods && no_user_bind && no_user_default)
 	  (omittedMethodWarn sel_id clas)		`thenNF_Tc_`
 
-   newMethod origin (RealId sel_id) inst_tys	`thenNF_Tc` \ meth@(_, TcId meth_id) ->
-   tcInstSigTcType (idType meth_id)	`thenNF_Tc` \ (tyvars', rho_ty') ->
-   let
-     (theta', tau') = splitRhoTy rho_ty'
-
-     meth_name	= idName meth_id
-     sig_info   = TySigInfo meth_name meth_id tyvars' theta' tau' loc
-     meth_bind	= mk_meth_bind meth_name loc
-     meth_prags = find_prags meth_name prags
-   in
+	-- Check the pragmas
    tcExtendLocalValEnv [meth_name] [meth_id] (
 	tcPragmaSigs meth_prags
    )						`thenTc` \ (prag_info_fn, prag_binds1, prag_lie) ->
 
-	-- Check that the signatures match
-   tcExtendGlobalTyVars inst_tyvars (
+	-- Check the bindings
+   tcExtendGlobalTyVars (mkVarSet inst_tyvars) (
      tcAddErrCtxt (methodCtxt sel_id)		$
-     tcBindWithSigs NotTopLevel [meth_name] meth_bind [sig_info]
+     tcBindWithSigs NotTopLevel meth_bind [sig_info]
 		    NonRecursive prag_info_fn 	
    )							`thenTc` \ (binds, insts, _) ->
+
 
 	-- The prag_lie for a SPECIALISE pragma will mention the function
 	-- itself, so we have to simplify them away right now lest they float
 	-- outwards!
    bindInstsOfLocalFuns prag_lie [meth_id]	`thenTc` \ (prag_lie', prag_binds2) ->
 
+
 	-- Now check that the instance type variables
 	-- (or, in the case of a class decl, the class tyvars)
 	-- have not been unified with anything in the environment
-   tcAddErrCtxt (monoCtxt sel_id) (
-     tcAddErrCtxt (sigCtxt sel_id) $
-     checkSigTyVars inst_tyvars (idType meth_id)
-   )							`thenTc_` 
+   tcAddErrCtxtM (sigCtxt (quotes (ppr sel_id)) (idType meth_id))	(
+   checkSigTyVars inst_tyvars						`thenTc_` 
 
    returnTc (binds `AndMonoBinds` prag_binds1 `AndMonoBinds` prag_binds2, 
 	     insts `plusLIE` prag_lie', 
-	     meth)
+	     meth))
+
  where
    sel_name = idName sel_id
 
-   maybe_user_bind = find meth_binds
-
-   no_user_bind    = case maybe_user_bind of {Nothing -> True; other -> False}
-   no_user_default = case maybe_dm_id     of {Nothing -> True; other -> False}
-
-   find EmptyMonoBinds			       = Nothing
-   find (AndMonoBinds b1 b2)		       = find b1 `seqMaybe` find b2
-   find b@(FunMonoBind op_name _ _ _)	       = if op_name == sel_name then Just b else Nothing
-   find b@(PatMonoBind (VarPatIn op_name) _ _) = if op_name == sel_name then Just b else Nothing
-   find other = panic "Urk! Bad instance method binding"
-
 	-- The renamer just puts the selector ID as the binder in the method binding
 	-- but we must use the method name; so we substitute it here.  Crude but simple.
-   mk_meth_bind meth_name loc
-     = case maybe_user_bind of
-	 Just (FunMonoBind _ fix matches loc)    -> FunMonoBind meth_name fix matches loc
-	 Just (PatMonoBind (VarPatIn _) rhs loc) -> PatMonoBind (VarPatIn meth_name) rhs loc
-	 Nothing				 -> mk_default_bind meth_name loc
+   find_bind meth_name (FunMonoBind op_name fix matches loc)
+	| op_name == sel_name = Just (FunMonoBind meth_name fix matches loc)
+   find_bind meth_name (PatMonoBind (VarPatIn op_name) rhs loc)
+	| op_name == sel_name = Just (PatMonoBind (VarPatIn meth_name) rhs loc)
+   find_bind meth_name (AndMonoBinds b1 b2)
+			      = find_bind meth_name b1 `seqMaybe` find_bind meth_name b2
+   find_bind meth_name other  = Nothing	-- Default case
+
 
 	-- Find the prags for this method, and replace the
 	-- selector name with the method name
@@ -599,11 +603,6 @@ superClassErr class_name sc
 
 methodCtxt sel_id
   = ptext SLIT("In the definition for method") <+> quotes (ppr sel_id)
-
-monoCtxt sel_id
-  = sep [ptext SLIT("Probable cause: the right hand side of") <+> quotes (ppr sel_id),
-         nest 4 (ptext SLIT("mentions a top-level variable subject to the dreaded monomorphism restriction"))
-    ]
 
 badMethodErr bndr clas
   = hsep [ptext SLIT("Class"), quotes (ppr clas), 

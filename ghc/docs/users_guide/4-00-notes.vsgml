@@ -1,0 +1,168 @@
+<sect1>Release notes for version~4.00---10/98
+<label id="release-4-00">
+<p>
+
+<sect2>Language matters
+<p>
+
+<itemize>
+
+<item> Universal and existential quantification: see Section <ref
+name="Explicit universal quantification"
+id="universal-quantification"> and Section <ref name="Existentially
+quantified data constructors" id="existential-quantification">
+respectively.
+
+Universal quantification was in in GHC 2.10 and later, but the
+syntax has changed: it's now @forall a. ...@ instead of @All a => ...@.
+
+<item> Multi-paramter type classes.  We have relaxed some of the rules
+  since GHC 3.00.  In particular
+
+<descrip>
+  <tag>@-fallow-overlapping-instances@</tag>
+	 allows overlapping instances
+  <tag>@-fallow-undecidable-instances@</tag>
+	 allows you to write instance contexts that constrain non-type-variables
+</descrip>
+
+Full details in Section <ref name="Multi-parameter type classes"
+id="multi-param-type-classes">.
+</itemize>
+
+<sect2>New Libraries
+<p>
+
+Documentation in <url name="GHC/Hugs Extension Libraries"
+url="libs.html">.
+
+<descrip>
+
+<tag>@Dynamic@</tag>
+
+Dynamic types.  
+
+<tag>@Exceptions@</tag>
+
+The library @Exception@ in @-syslib exts@ provide an interface for
+exception handling.  Calls to @error@, pattern matching failures and a
+bunch of other exception can be caught.
+
+</descrip>
+
+<sect2>Compiler internals
+<p>
+
+The intermediate language used by GHC has had a radical overhaul.
+The new Core language (coreSyn/CoreSyn.lhs) is much smaller and
+more uniform.  The main transformation engine (the "simplifier")
+has been totally rewritten.  The compiler is several thousand lines
+shorter as a result.  It's also very much easier to understand 
+and modify.  (It's true.  Honest!)
+
+
+<sect2>Run time system
+<p>
+
+There is a completely new runtime system, aimed at integration with
+Hugs.  Tons of cruft removed.  Some changes to code generation; things
+typically run a bit faster as a result.
+
+An overview of the new RTS is available: <url name="The New GHC/Hugs
+Runtime System" url="http://www.dcs.gla.ac.uk/~simonm/rts.ps">.
+
+<sect2>Storage Manager/Garbage Collector
+<p>
+
+The new storage manager features a dynamically resizing heap, so you
+won't need those pesky @-H@ options anymore.  In fact, the @-H@ option
+is now ignored for compatibility with older versions.
+
+Stacks are now also expandable, and the @-K@ option now specifies a
+<em/maximum/ heap size.  The default is (a perhaps conservative) @1M@.
+
+The garbage collector now collects CAFs, so there's no more space
+leaks associated with these.  If you think you have a CAF-related
+space leak, we'd like to hear about it.
+
+The storage manager current only has a two-space garbage collector,
+which will be slower than 3.02's generational collector when the
+amount of live data is large.  A new generational collector is high on
+our priority list.
+
+For the other new tweakables, see Section <ref name="RTS options to
+control the garbage-collector" id="rts-options-gc">.
+
+<sect2>Profiling
+<p>
+
+There is a new profiler based on <em/Cost Centre Stacks/.  This is an
+extension of the previous cost centre scheme, whereby the profilier
+stores information about the call-graph of the program and attributes
+costs to nodes of this graph.
+
+For a quick demo, try compiling a program with @-prof -auto-all@, then
+run it with @+RTS -p@ and see what comes out (in the @<prog>.prof@
+file).
+
+The feature is still experimental, and the call graph may not be
+exactly what you were expecting.  Also, we only have time/allocation
+profiling at the moment; heap profiling will follow shortly.
+
+<sect2>Miscellaneous
+<p>
+
+<itemize>
+
+<item> Concurrent Haskell is now the default.  No need to
+compile/download special libraries.  The context switch interval isn't
+tweakable any more; threads just yield after allocating a fixed amount
+of heap (currently 4k).  If you want a quicker context switch, that
+won't be possible: this decision was made for efficiency reasons (it
+reduces the penalty for runnning threaded code to almost zero).  We
+might allow the context switch interval to be increased in the future;
+but also context switches are pretty fast (faster than before).
+
+<item> @forkIO@ now returns a @ThreadId@, and there's a new operation
+@killThread@ which will terminate an existing thread.  See Section
+<ref name="The Concurrent interface" id="concurrent-interface"> for
+more details.
+
+<item> You need @-syslib concurrent@ to get the @Concurrent@ library.
+
+<item> The rewritten IO library from 3.03 has been ported to 4.00.
+
+<item> New constructs: @foriegn import@ and @foreign export@ for
+H/Direct.
+
+<item> Supported architectures: all the development has been done on
+x86(mainly FreeBSD/Linux) so this is the most stable environment.
+Sparc (Solaris) and x86/Win32 (cygwin32) have also been mildly tested, and
+an Alpha port is in the works.  Everything else will need a little
+porting effort; we don't have machines here, so any help would be
+greatly appreciated.
+
+<item> Code is faster and smaller, but programs might run slower due
+to the garbage collector (see "Storage Manager" above).  Increasing
+the minimum allocation area with the @-A@ RTS option can claw back
+some of this speed.
+
+<item> We now use GMP 2.02, and attempt to use an already-installed
+copy if available.  If you have GMP on your system but the configure
+script doesn't detect it, we'd like to know.
+
+<item> @seq@ works better than in 3.xx - you can now @seq@ functions
+without crashing the program.
+
+<item> The @Eval@ class has been removed (i.e. every type is assumed
+to be in class @Eval@).  This change has been made in anticipation of
+Haskell 98.
+
+<item> The native code generator has had very little testing (it's not used
+on x86 yet), so Sparcs may have some trouble with it.  Try -fvia-C if
+strange errors occur.
+
+<item> The compiler is slightly faster, but sometimes needs more heap.
+If you have an example where this is the case, please let us know.
+
+</itemize>

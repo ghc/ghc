@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.45 1998/08/21 11:03:30 sof Exp $
+# $Id: Makefile,v 1.46 1998/12/02 13:17:15 simonm Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -60,14 +60,21 @@ endif
 
 
 HS_SRCS = $(SRCS_UGNHS) \
-          $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs)) \
-	  rename/ParseIface.hs
+          $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs))
+
+ifneq "$(GhcWithHscBuiltViaC)" "YES"
+HS_SRCS += rename/ParseIface.hs
+endif
 
 # NB: it's no good to include *.hs in the top-line wildcard, because the .hs files
 #     in parser/ may not have been created at that point.
 
 HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 
+# ParseIface.hs ain't part of HS_SRCS when this is on..
+ifeq "$(GhcWithHscBuiltViaC)" "YES"
+HCS      += rename/ParseIface.hc
+endif
 
 HS_OBJS  = \
   $(patsubst %.hc, %.o, $(HCS)) \
@@ -91,15 +98,14 @@ C_SRCS += $(SRCS_UGNC)
 LIBOBJS = \
   $(SRCS_UGN_OBJS) parser/hslexer.o parser/hsparser.tab.o \
   parser/id.o parser/infix.o parser/syntax.o parser/type2context.o \
-  parser/util.o
+  parser/util.o parser/ctypes.o
 
-#
 # stuff you get for free in a source distribution
 # 
-SRC_DIST_FILES += rename/ParseIface.hs \
- parser/U_tree.c parser/tree.h parser/tree.c \
- parser/hsparser.tab.c parser/hsparser.tab.h \
- parser/hslexer.c
+# SRC_DIST_FILES += rename/ParseIface.hs \
+#  parser/U_tree.c parser/tree.h parser/tree.c \
+#  parser/hsparser.tab.c parser/hsparser.tab.h \
+#  parser/hslexer.c
 
 # -----------------------------------------------------------------------------
 # 		Haskell compilations
@@ -138,8 +144,12 @@ absCSyn/PprAbsC_HC_OPTS 	= -H10m
 basicTypes/IdInfo_HC_OPTS 	= -K2m
 hsSyn/HsExpr_HC_OPTS 		= -K2m
 main/Main_HC_OPTS 		= -fvia-C
+main/Constants_HC_OPTS		= -DHscIfaceFileVersion=$(HscIfaceFileVersion)
+
+ifneq "$(GhcWithHscBuiltViaC)" "YES"
 ifeq "$(GhcReportCompiles)" "YES"
 main/Main_HC_OPTS 		+= -syslib misc -DREPORT_TO_MOTHERLODE
+endif
 endif
 
 main/CmdLineOpts_HC_OPTS 	= -fvia-C
@@ -179,13 +189,19 @@ rename/RnExpr_HC_OPTS		= -H10m
 rename/RnNames_HC_OPTS		= -H12m
 rename/RnMonad_HC_OPTS		= -fvia-C
 specialise/Specialise_HC_OPTS 	= -Onot -H12m
+simplCore/Simplify_HC_OPTS	= -H15m	
 typecheck/TcGenDeriv_HC_OPTS	= -H10m
+
+# tmp, -- SDM
+specialise/Specialise_HC_OPTS 	+= -fno-prune-tydecls
 
 # Was 10m for 2.10
 typecheck/TcHsSyn_HC_OPTS	= -H15m	
 
+
 # Was 10m for 2.10
 typecheck/TcExpr_HC_OPTS	= -H15m
+typecheck/TcBinds_HC_OPTS       = -H10m
 
 typecheck/TcEnv_HC_OPTS		= -H10m
 utils/Argv_HC_OPTS 		= -fvia-C
@@ -240,7 +256,7 @@ SRC_FLEX_OPTS += -s
 
 parser/hschooks.o : parser/hschooks.c
 	@$(RM) $@
-	$(HC) -c -o $@ $(HC_OPTS) parser/hschooks.c
+	$(HC) -c -o $@ -I$(GHC_INCLUDE_DIR) $(HC_OPTS) parser/hschooks.c
 
 
 # Interface-file parser uses Happy
@@ -266,8 +282,11 @@ CLEAN_FILES += hsp
 # 		Linking
 
 SRC_LD_OPTS += -no-link-chk
+
+ifneq "$(GhcWithHscBuiltViaC)" "YES"
 ifeq "$(GhcReportCompiles)" "YES"
 SRC_LD_OPTS += -syslib misc -syslib exts
+endif
 endif
 
 #-----------------------------------------------------------------------------
@@ -285,7 +304,11 @@ INSTALL_LIBEXECS += hsc hsp
 #
 # Before doing `make depend', need to build all derived Haskell source files
 #
-depend :: $(LOOPS) $(SRCS_UGNHS) rename/ParseIface.hs
+depend :: $(LOOPS) $(SRCS_UGNHS)
+
+ifneq "$(GhcWithHscBuiltViaC)" "YES"
+depend :: rename/ParseIface.hs
+endif
 
 #-----------------------------------------------------------------------------
 # 		clean

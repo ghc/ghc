@@ -1,23 +1,19 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[LiberateCase]{Unroll recursion to allow evals to be lifted from a loop}
-
-96/03: We aren't using this at the moment
 
 \begin{code}
 module LiberateCase ( liberateCase ) where
 
 #include "HsVersions.h"
 
-import Util		( panic )
-
-liberateCase = panic "LiberateCase.liberateCase: ToDo"
-
-{- LATER: to end of file:
-import CoreUnfold	( UnfoldingGuidance(..) )
-import Id		( localiseId )
-import IdInfo		{ InlinePragInfo(..) }
+import CmdLineOpts	( opt_D_verbose_core2core, opt_LiberateCaseThreshold )
+import CoreLint		( beginPass, endPass )
+import CoreSyn
+import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..) )
+import Var		( Id )
+import VarEnv
 import Maybes
 import Outputable
 import Util
@@ -56,6 +52,32 @@ f = \ t -> case v of
 Better code, because 'a' is  free inside the inner letrec, rather
 than needing projection from v.
 
+Other examples we'd like to catch with this kind of transformation
+
+	last []     = error 
+	last (x:[]) = x
+	last (x:xs) = last xs
+
+We'd like to avoid the redundant pattern match, transforming to
+
+	last [] = error
+	last (x:[]) = x
+	last (x:(y:ys)) = last' y ys
+		where
+		  last' y []     = y
+		  last' _ (y:ys) = last' y ys
+
+	(is this necessarily an improvement)
+
+
+Similarly drop:
+
+	drop n [] = []
+	drop 0 xs = xs
+	drop n (x:xs) = drop (n-1) xs
+
+Would like to pass n along unboxed.
+	
 
 To think about (Apr 94)
 ~~~~~~~~~~~~~~
@@ -105,7 +127,7 @@ data LibCaseEnv
 				-- (top-level and imported things have
 				-- a level of zero)
 
-	(IdEnv CoreBinding)-- Binds *only* recursively defined
+	(IdEnv CoreBind)-- Binds *only* recursively defined
 				-- Ids, to their own binding group,
 				-- and *only* in their own RHSs
 
@@ -119,7 +141,7 @@ data LibCaseEnv
 				-- really
 
 initEnv :: Int -> LibCaseEnv
-initEnv bomb_size = LibCaseEnv bomb_size 0 nullIdEnv nullIdEnv []
+initEnv bomb_size = LibCaseEnv bomb_size 0 emptyVarEnv emptyVarEnv []
 
 bombOutSize (LibCaseEnv bomb_size _ _ _ _) = bomb_size
 \end{code}
@@ -128,9 +150,15 @@ bombOutSize (LibCaseEnv bomb_size _ _ _ _) = bomb_size
 Programs
 ~~~~~~~~
 \begin{code}
-liberateCase :: Int -> [CoreBinding] -> [CoreBinding]
-liberateCase bomb_size prog
-  = do_prog (initEnv bomb_size) prog
+liberateCase :: [CoreBind] -> IO [CoreBind]
+liberateCase binds
+  = do {
+	beginPass "Liberate case" ;
+	let { binds' = do_prog (initEnv opt_LiberateCaseThreshold) binds } ;
+	endPass "Liberate case" 
+	 	opt_D_verbose_core2core		{- no specific flag for dumping -} 
+		binds'
+    }
   where
     do_prog env [] = []
     do_prog env (bind:binds) = bind' : do_prog env' binds
@@ -142,7 +170,7 @@ Bindings
 ~~~~~~~~
 
 \begin{code}
-libCaseBind :: LibCaseEnv -> CoreBinding -> (LibCaseEnv, CoreBinding)
+libCaseBind :: LibCaseEnv -> CoreBind -> (LibCaseEnv, CoreBind)
 
 libCaseBind env (NonRec binder rhs)
   = (addBinders env [binder], NonRec binder (libCase env rhs))
@@ -163,7 +191,7 @@ libCaseBind env (Rec pairs)
 	-- that the same process doesn't occur for ever!
 
     extended_env
-      = addRecBinds env [ (localiseId binder, libCase env_body rhs)
+      = addRecBinds env [ (binder, libCase env_body rhs)
 			| (binder, rhs) <- pairs ]
 
 	-- Why "localiseId" above?  Because we're creating a new local
@@ -177,9 +205,11 @@ libCaseBind env (Rec pairs)
 	-- Why does it matter?  Because the codeGen keeps a separate
 	-- environment for top-level Ids, and it is disastrous for it
 	-- to think that something is top-level when it isn't.
+	--
+	-- [May 98: all this is now handled by SimplCore.tidyCore]
 
     rhs_small_enough rhs
-      = case (calcUnfoldingGuidance NoPragmaInfo lIBERATE_BOMB_SIZE rhs) of
+      = case (calcUnfoldingGuidance lIBERATE_BOMB_SIZE rhs) of
 	  UnfoldNever -> False
 	  _ 	      -> True	-- we didn't BOMB, so it must be OK
 
@@ -195,13 +225,10 @@ libCase :: LibCaseEnv
 	-> CoreExpr
 	-> CoreExpr
 
-libCase env (Lit lit)		= Lit lit
-libCase env (Var v)		= mkCoLetsNoUnboxed (libCaseId env v) (Var v)
-libCase env (App fun arg)       = mkCoLetsNoUnboxed (libCaseAtom env arg) (App (libCase env fun) arg)
-libCase env (CoTyApp fun ty)    = CoTyApp (libCase env fun) ty
-libCase env (Con con tys args)  = mkCoLetsNoUnboxed (libCaseAtoms env args) (Con con tys args)
-libCase env (Prim op tys args)  = mkCoLetsNoUnboxed (libCaseAtoms env args) (Prim op tys args)
-libCase env (CoTyLam tv body)   = CoTyLam tv (libCase env body)
+libCase env (Var v)		= libCaseId env v
+libCase env (Type ty)		= Type ty
+libCase env (App fun arg)       = App (libCase env fun) (libCase env arg)
+libCase env (Con con args)      = Con con (map (libCase env) args)
 libCase env (Note note body)    = Note note (libCase env body)
 
 libCase env (Lam binder body)
@@ -212,58 +239,33 @@ libCase env (Let bind body)
   where
     (env_body, bind') = libCaseBind env bind
 
-libCase env (Case scrut alts)
-  = Case (libCase env scrut) (libCaseAlts env_alts alts)
+libCase env (Case scrut bndr alts)
+  = Case (libCase env scrut) bndr (map (libCaseAlt env_alts) alts)
   where
-    env_alts = case scrut of
-		  Var scrut_var -> addScrutedVar env scrut_var
-		  other		  -> env
+    env_alts = addBinders env [bndr]
+    env_with_scrut = case scrut of
+		  	Var scrut_var -> addScrutedVar env scrut_var
+			other		  -> env
+
+libCaseAlt env (con,args,rhs) = (con, args, libCase (addBinders env args) rhs)
 \end{code}
 
-
-Case alternatives
-~~~~~~~~~~~~~~~~~
-
+Ids
+~~~
 \begin{code}
-libCaseAlts env (AlgAlts alts deflt)
-  = AlgAlts (map do_alt alts) (libCaseDeflt env deflt)
-  where
-    do_alt (con,args,rhs) = (con, args, libCase (addBinders env args) rhs)
-
-libCaseAlts env (PrimAlts alts deflt)
-  = PrimAlts (map do_alt alts) (libCaseDeflt env deflt)
-  where
-    do_alt (lit,rhs) = (lit, libCase env rhs)
-
-libCaseDeflt env NoDefault
-   = NoDefault
-libCaseDeflt env (BindDefault binder rhs)
-   = BindDefault binder (libCase (addBinders env [binder]) rhs)
-\end{code}
-
-Atoms and Ids
-~~~~~~~~~~~~~
-\begin{code}
-libCaseAtoms :: LibCaseEnv -> [CoreArg] -> [CoreBinding]
-libCaseAtoms env atoms = concat [libCaseAtom env atom | atom <- atoms]
-
-libCaseAtom :: LibCaseEnv -> CoreArg -> [CoreBinding]
-libCaseAtom env (VarArg arg_id) = libCaseId env arg_id
-libCaseAtom env (LitArg lit)    = []
-
-libCaseId :: LibCaseEnv -> Id -> [CoreBinding]
+libCaseId :: LibCaseEnv -> Id -> CoreExpr
 libCaseId env v
   | maybeToBool maybe_rec_bind &&	-- It's a use of a recursive thing
     there_are_free_scruts		-- with free vars scrutinised in RHS
-  = [the_bind]
+  = Let the_bind (Var v)
 
   | otherwise
-  = []
+  = Var v
 
   where
-    maybe_rec_bind :: Maybe CoreBinding	-- The binding of the recursive thingy
+    maybe_rec_bind :: Maybe CoreBind	-- The binding of the recursive thingy
     maybe_rec_bind = lookupRecId env v
-    Just the_bind = maybe_rec_bind
+    Just the_bind  = maybe_rec_bind
 
     rec_id_level = lookupLevel env v
 
@@ -275,19 +277,19 @@ libCaseId env v
 Utility functions
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-addBinders :: LibCaseEnv -> [Id] -> LibCaseEnv
+addBinders :: LibCaseEnv -> [CoreBndr] -> LibCaseEnv
 addBinders (LibCaseEnv bomb lvl lvl_env rec_env scruts) binders
   = LibCaseEnv bomb lvl lvl_env' rec_env scruts
   where
-    lvl_env' = growIdEnvList lvl_env (binders `zip` repeat lvl)
+    lvl_env' = extendVarEnvList lvl_env (binders `zip` repeat lvl)
 
 addRecBinds :: LibCaseEnv -> [(Id,CoreExpr)] -> LibCaseEnv
 addRecBinds (LibCaseEnv bomb lvl lvl_env rec_env scruts) pairs
   = LibCaseEnv bomb lvl' lvl_env' rec_env' scruts
   where
     lvl'     = lvl + 1
-    lvl_env' = growIdEnvList lvl_env [(binder,lvl) | (binder,_) <- pairs]
-    rec_env' = growIdEnvList rec_env [(binder, Rec pairs) | (binder,_) <- pairs]
+    lvl_env' = extendVarEnvList lvl_env [(binder,lvl) | (binder,_) <- pairs]
+    rec_env' = extendVarEnvList rec_env [(binder, Rec pairs) | (binder,_) <- pairs]
 
 addScrutedVar :: LibCaseEnv
 	      -> Id		-- This Id is being scrutinised by a case expression
@@ -302,23 +304,23 @@ addScrutedVar env@(LibCaseEnv bomb lvl lvl_env rec_env scruts) scrut_var
   | otherwise = env
   where
     scruts'  = (scrut_var, lvl) : scruts
-    bind_lvl = case lookupIdEnv lvl_env scrut_var of
+    bind_lvl = case lookupVarEnv lvl_env scrut_var of
 		 Just lvl -> lvl
 		 Nothing  -> topLevel
 
-lookupRecId :: LibCaseEnv -> Id -> Maybe CoreBinding
+lookupRecId :: LibCaseEnv -> Id -> Maybe CoreBind
 lookupRecId (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
 #ifndef DEBUG
-  = lookupIdEnv rec_env id
+  = lookupVarEnv rec_env id
 #else
-  = case (lookupIdEnv rec_env id) of
+  = case (lookupVarEnv rec_env id) of
       xxx@(Just _) -> xxx
       xxx	   -> xxx
 #endif
 
 lookupLevel :: LibCaseEnv -> Id -> LibCaseLevel
 lookupLevel (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
-  = case lookupIdEnv lvl_env id of
+  = case lookupVarEnv lvl_env id of
       Just lvl -> lvl
       Nothing  -> topLevel
 
@@ -330,5 +332,4 @@ freeScruts (LibCaseEnv bomb lvl lvl_env rec_env scruts) rec_bind_lvl
   = not (null free_scruts)
   where
     free_scruts = [v | (v,lvl) <- scruts, lvl > rec_bind_lvl]
--}
 \end{code}

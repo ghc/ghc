@@ -1,51 +1,93 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
-module TcPat ( tcPat, badFieldsCon ) where
+module TcPat ( tcPat, tcVarPat, badFieldCon ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( InPat(..), OutPat(..), HsLit(..), HsExpr(..) )
+import HsSyn		( InPat(..), OutPat(..), HsLit(..), HsExpr(..), Sig(..) )
 import RnHsSyn		( RenamedPat )
-import TcHsSyn		( TcPat )
+import TcHsSyn		( TcPat, TcIdBndr )
 
 import TcMonad
 import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
-			  emptyLIE, plusLIE, plusLIEs, LIE,
-			  newMethod, newOverloadedLit
+			  emptyLIE, plusLIE, LIE,
+			  newMethod, newMethodWithGivenTy, newOverloadedLit, 
+			  newDicts, instToIdBndr
 			)
-import Name		( Name {- instance Outputable -} )
-import TcEnv		( TcIdOcc(..), tcLookupGlobalValue, tcLookupGlobalValueByKey, 
-			  tcLookupLocalValueOK, tcInstId
-			)
-import TcType 		( TcType, TcMaybe, newTyVarTy, newTyVarTys )
+import Name		( Name, getOccName, getSrcLoc )
 import FieldLabel	( fieldLabelName )
-import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
+import TcEnv		( TcIdOcc(..), tcLookupGlobalValue, 
+			  tcLookupGlobalValueByKey, newLocalId, badCon
+			)
+import TcType 		( TcType, TcTyVar, tcInstTyVars )
+import TcUnify 		( unifyTauTy, unifyListTy,
+			  unifyTupleTy, unifyUnboxedTupleTy
+			)
 
-import Maybes		( maybeToBool )
 import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
-import Id		( GenId, idType, Id, dataConFieldLabels )
-import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
-import Type		( splitFunTys, splitRhoTy,
-			  splitFunTy_maybe, splitAlgTyConApp_maybe,
-			  Type
-			)
+import DataCon		( DataCon, dataConSig, dataConFieldLabels, dataConSourceArity )
+import Id		( Id, idType, isDataConId_maybe )
+import Type		( Type, substFlexiTy, substFlexiTheta, mkTyConApp )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
-import TysWiredIn	( charTy, stringTy, mkListTy, mkTupleTy, intTy )
-import Unique		( Unique, eqClassOpKey, geClassOpKey, minusClassOpKey )
-import Util		( assertPanic, panic )
+import TysWiredIn	( charTy, stringTy, intTy )
+import SrcLoc		( SrcLoc )
+import Unique		( eqClassOpKey, geClassOpKey, minusClassOpKey )
+import Bag
+import Util		( zipEqual )
 import Outputable
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Variable patterns}
+%*									*
+%************************************************************************
+
 \begin{code}
-tcPat :: RenamedPat -> TcM s (TcPat s, LIE s, TcType s)
+tcVarPat :: (Name -> Maybe (TcIdBndr s))	-- Info about signatures
+         -> Name
+         -> TcType s			-- Expected type
+         -> TcM s (TcIdBndr s)		-- The monomorphic Id; this is put in the pattern itself
+
+tcVarPat sig_fn binder_name pat_ty
+ = case sig_fn binder_name of
+	Nothing -> newLocalId (getOccName binder_name) pat_ty		`thenNF_Tc` \ bndr_id ->
+		   returnTc bndr_id
+
+	Just bndr_id -> tcAddSrcLoc (getSrcLoc binder_name) 		$
+			unifyTauTy pat_ty (idType bndr_id) 		`thenTc_`
+			returnTc bndr_id
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Typechecking patterns}
+%*									*
+%************************************************************************
+
+\begin{code}
+tcPat :: (Name -> Maybe (TcIdBndr s))	-- Info about signatures
+      -> RenamedPat
+      -> TcType s			-- Expected type
+      -> TcM s (TcPat s, 
+		LIE s,			-- Required by n+k and literal pats
+		Bag (TcTyVar s),	-- TyVars bound by the pattern
+		Bag (Name, TcIdBndr s),	-- Ids bound by the pattern, along with the Name under
+					--	which it occurs in the pattern
+					-- 	The two aren't the same because we conjure up a new
+					-- 	local name for each variable.
+		LIE s)			-- Dicts or methods [see below] bound by the pattern
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -54,34 +96,34 @@ tcPat :: RenamedPat -> TcM s (TcPat s, LIE s, TcType s)
 %************************************************************************
 
 \begin{code}
-tcPat (VarPatIn name)
-  = tcLookupLocalValueOK "tcPat1:" name		`thenNF_Tc` \ id ->
-    returnTc (VarPat (TcId id), emptyLIE, idType id)
+tcPat sig_fn (VarPatIn name) pat_ty
+  = tcVarPat sig_fn name pat_ty		`thenTc` \ bndr_id ->
+    returnTc (VarPat (TcId bndr_id), emptyLIE, emptyBag, unitBag (name, bndr_id), emptyLIE)
 
-tcPat (LazyPatIn pat)
-  = tcPat pat		`thenTc` \ (pat', lie, ty) ->
-    returnTc (LazyPat pat', lie, ty)
+tcPat sig_fn (LazyPatIn pat) pat_ty
+  = tcPat sig_fn pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
+    returnTc (LazyPat pat', lie_req, tvs, ids, lie_avail)
 
-tcPat pat_in@(AsPatIn name pat)
-  = tcLookupLocalValueOK "tcPat2"  name	`thenNF_Tc` \ id ->
-    tcPat pat				`thenTc` \ (pat', lie, ty) ->
+tcPat sig_fn pat_in@(AsPatIn name pat) pat_ty
+  = tcVarPat sig_fn name pat_ty		`thenTc` \ bndr_id ->
+    tcPat sig_fn pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
     tcAddErrCtxt (patCtxt pat_in) 	$
-    unifyTauTy (idType id) ty		`thenTc_`
-    returnTc (AsPat (TcId id) pat', lie, ty)
+    returnTc (AsPat (TcId bndr_id) pat', lie_req, 
+	      tvs, (name, bndr_id) `consBag` ids, 
+	      lie_avail)
 
-tcPat WildPatIn
-  = newTyVarTy mkTypeKind	`thenNF_Tc` \ tyvar_ty ->
-    returnTc (WildPat tyvar_ty, emptyLIE, tyvar_ty)
+tcPat sig_fn WildPatIn pat_ty
+  = returnTc (WildPat pat_ty, emptyLIE, emptyBag, emptyBag, emptyLIE)
 
-tcPat (NegPatIn pat)
-  = tcPat (negate_lit pat)
+tcPat sig_fn (NegPatIn pat) pat_ty
+  = tcPat sig_fn (negate_lit pat) pat_ty
   where
     negate_lit (LitPatIn (HsInt  i)) = LitPatIn (HsInt  (-i))
     negate_lit (LitPatIn (HsFrac f)) = LitPatIn (HsFrac (-f))
     negate_lit _                     = panic "TcPat:negate_pat"
 
-tcPat (ParPatIn parend_pat)
-  = tcPat parend_pat
+tcPat sig_fn (ParPatIn parend_pat) pat_ty
+  = tcPat sig_fn parend_pat pat_ty
 \end{code}
 
 %************************************************************************
@@ -91,29 +133,24 @@ tcPat (ParPatIn parend_pat)
 %************************************************************************
 
 \begin{code}
-tcPat pat_in@(ListPatIn pats)
-  = tcPats pats				`thenTc`    \ (pats', lie, tys) ->
-    newTyVarTy mkBoxedTypeKind		`thenNF_Tc` \ tyvar_ty ->
-    tcAddErrCtxt (patCtxt pat_in)	$
-    unifyTauTyList (tyvar_ty:tys)	`thenTc_`
+tcPat sig_fn pat_in@(ListPatIn pats) pat_ty
+  = tcAddErrCtxt (patCtxt pat_in)		$
+    unifyListTy pat_ty				`thenTc` \ elem_ty ->
+    tcPats sig_fn pats (repeat elem_ty)		`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
+    returnTc (ListPat elem_ty pats', lie_req, tvs, ids, lie_avail)
 
-    returnTc (ListPat tyvar_ty pats', lie, mkListTy tyvar_ty)
+tcPat sig_fn pat_in@(TuplePatIn pats boxed) pat_ty
+  = tcAddErrCtxt (patCtxt pat_in)	$
 
-tcPat pat_in@(TuplePatIn pats)
-  = let
-	arity = length pats
-    in
-    tcPats pats   			`thenTc` \ (pats', lie, tys) ->
+    (if boxed
+     then unifyTupleTy        arity pat_ty
+     else unifyUnboxedTupleTy arity pat_ty)	`thenTc` \ arg_tys ->
 
-	-- Make sure we record that the tuples can only contain boxed types
-    newTyVarTys arity mkBoxedTypeKind  	`thenNF_Tc` \ tyvar_tys ->
-
-    tcAddErrCtxt (patCtxt pat_in)	$
-    unifyTauTyLists tyvar_tys tys	`thenTc_`
+    tcPats sig_fn pats arg_tys 	 		`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
 
 	-- possibly do the "make all tuple-pats irrefutable" test:
     let
-	unmangled_result = TuplePat pats'
+	unmangled_result = TuplePat pats' boxed
 
 	-- Under flag control turn a pattern (x,y,z) into ~(x,y,z)
 	-- so that we can experiment with lazy tuple-matching.
@@ -121,64 +158,29 @@ tcPat pat_in@(TuplePatIn pats)
 	-- it was easy to do.
 
 	possibly_mangled_result
-	  = if opt_IrrefutableTuples
-	    then LazyPat unmangled_result
-	    else unmangled_result
-
-	-- ToDo: IrrefutableEverything
+	  | opt_IrrefutableTuples && boxed = LazyPat unmangled_result
+	  | otherwise			   = unmangled_result
     in
-    returnTc (possibly_mangled_result, lie, mkTupleTy arity tys)
+    returnTc (possibly_mangled_result, lie_req, tvs, ids, lie_avail)
+  where
+    arity = length pats
 \end{code}
 
 %************************************************************************
 %*									*
 \subsection{Other constructors}
 %*									*
+
 %************************************************************************
 
-Constructor patterns are a little fun:
-\begin{itemize}
-\item
-typecheck the arguments
-\item
-look up the constructor
-\item
-specialise its type (ignore the translation this produces)
-\item
-check that the context produced by this specialisation is empty
-\item
-get the arguments out of the function type produced from specialising
-\item
-unify them with the types of the patterns
-\item
-back substitute with the type of the result of the constructor
-\end{itemize}
-
-ToDo: exploit new representation of constructors to make this more
-efficient?
-
 \begin{code}
-tcPat pat_in@(ConPatIn name pats)
-  = tcPats pats				`thenTc` \ (pats', lie, tys) ->
+tcPat sig_fn pat@(ConPatIn name arg_pats) pat_ty
+  = tcConPat sig_fn pat name arg_pats pat_ty
 
-    tcAddErrCtxt (patCtxt pat_in)	$
-    matchConArgTys name tys 		`thenTc` \ (con_id, data_ty) ->
-
-    returnTc (ConPat con_id data_ty pats', 
-	      lie, 
-	      data_ty)
-
-tcPat pat_in@(ConOpPatIn pat1 op _ pat2) 	-- in binary-op form...
-  = tcPat pat1				`thenTc` \ (pat1', lie1, ty1) ->
-    tcPat pat2				`thenTc` \ (pat2', lie2, ty2) ->
-
-    tcAddErrCtxt (patCtxt pat_in)	$
-    matchConArgTys op [ty1,ty2]	`thenTc` \ (con_id, data_ty) ->
-
-    returnTc (ConOpPat pat1' con_id pat2' data_ty, 
-	      lie1 `plusLIE` lie2, 
-	      data_ty)
+tcPat sig_fn pat@(ConOpPatIn pat1 op _ pat2) pat_ty
+  = tcConPat sig_fn pat op [pat1, pat2] pat_ty
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -187,50 +189,50 @@ tcPat pat_in@(ConOpPatIn pat1 op _ pat2) 	-- in binary-op form...
 %************************************************************************
 
 \begin{code}
-tcPat pat_in@(RecPatIn name rpats)
-  = tcLookupGlobalValue name		`thenNF_Tc` \ con_id ->
-    tcInstId con_id			`thenNF_Tc` \ (_, _, con_tau) ->
+tcPat sig_fn pat@(RecPatIn name rpats) pat_ty
+  = tcAddErrCtxt (patCtxt pat)	$
+
+ 	-- Check the constructor itself
+    tcConstructor pat name pat_ty	`thenTc` \ (data_con, ex_tvs, dicts, lie_avail1, arg_tys) ->
     let
-	     -- Ignore the con_theta; overloaded constructors only
-	     -- behave differently when called, not when used for
-	     -- matching.
-	(_, record_ty) = splitFunTys con_tau
-
-	field_names = map fieldLabelName (dataConFieldLabels con_id)
-	bad_fields  = [f | (f,_,_) <- rpats, not (f `elem` field_names)]
+	field_tys = zipEqual "tcPat" 
+			     (map fieldLabelName (dataConFieldLabels data_con))
+			     arg_tys
     in
-	-- Check that all the fields are from this constructor
-    checkTc (null bad_fields) (badFieldsCon name bad_fields)	`thenTc_`
-    
-	-- Con is syntactically constrained to be a data constructor
-    ASSERT( maybeToBool (splitAlgTyConApp_maybe record_ty) )
 
-    mapAndUnzipTc (do_bind record_ty) rpats	`thenTc` \ (rpats', lies) ->
+	-- Check the fields
+    tc_fields field_tys rpats		`thenTc` \ (rpats', lie_req, tvs, ids, lie_avail2) ->
 
-    returnTc (RecPat con_id record_ty rpats', 
-	      plusLIEs lies, 
-	      record_ty)
+    returnTc (RecPat data_con pat_ty ex_tvs dicts rpats',
+	      lie_req,
+	      listToBag ex_tvs `unionBags` tvs,
+	      ids,
+	      lie_avail1 `plusLIE` lie_avail2)
 
   where
-    do_bind expected_record_ty (field_label, rhs_pat, pun_flag)
-      = tcLookupGlobalValue field_label		`thenNF_Tc` \ sel_id ->
-	tcInstId sel_id				`thenNF_Tc` \ (_, _, tau) ->
+    tc_fields field_tys []
+      = returnTc ([], emptyLIE, emptyBag, emptyBag, emptyLIE)
 
-		-- Record selectors all have type
-		-- 	forall a1..an.  T a1 .. an -> tau
-	ASSERT( maybeToBool (splitFunTy_maybe tau) )
-	let
-		-- Selector must have type RecordType -> FieldType
-	  Just (record_ty, field_ty) = splitFunTy_maybe tau
-	in
-	tcAddErrCtxt (recordLabel field_label) (
-	  unifyTauTy expected_record_ty record_ty
-	)						`thenTc_`
-	tcPat rhs_pat					`thenTc` \ (rhs_pat', lie, rhs_ty) ->
-	tcAddErrCtxt (recordRhs field_label rhs_pat) (
-	  unifyTauTy field_ty rhs_ty
-	)			 			`thenTc_`
-	returnTc ((sel_id, rhs_pat', pun_flag), lie)
+    tc_fields field_tys ((field_label, rhs_pat, pun_flag) : rpats)
+      | null matching_fields
+      = addErrTc (badFieldCon name field_label)		`thenNF_Tc_`
+	tc_fields field_tys rpats
+
+      | otherwise
+      = ASSERT( null extras )
+	tc_fields field_tys rpats	`thenTc` \ (rpats', lie_req1, tvs1, ids1, lie_avail1) ->
+
+	tcLookupGlobalValue field_label	`thenNF_Tc` \ sel_id ->
+	tcPat sig_fn rhs_pat rhs_ty	`thenTc` \ (rhs_pat', lie_req2, tvs2, ids2, lie_avail2) ->
+
+	returnTc ((sel_id, rhs_pat', pun_flag) : rpats',
+		  lie_req1 `plusLIE` lie_req2,
+		  tvs1 `unionBags` tvs2,
+		  ids1 `unionBags` ids2,
+		  lie_avail1 `plusLIE` lie_avail2)
+      where
+ 	matching_fields   = [ty | (f,ty) <- field_tys, f == field_label]
+	(rhs_ty : extras) = matching_fields
 \end{code}
 
 %************************************************************************
@@ -240,28 +242,15 @@ tcPat pat_in@(RecPatIn name rpats)
 %************************************************************************
 
 \begin{code}
-tcPat (LitPatIn lit@(HsChar str))
-  = returnTc (LitPat lit charTy, emptyLIE, charTy)
+tcPat sig_fn (LitPatIn lit@(HsChar _))       pat_ty = tcSimpleLitPat lit charTy       pat_ty
+tcPat sig_fn (LitPatIn lit@(HsIntPrim _))    pat_ty = tcSimpleLitPat lit intPrimTy    pat_ty
+tcPat sig_fn (LitPatIn lit@(HsCharPrim _))   pat_ty = tcSimpleLitPat lit charPrimTy   pat_ty
+tcPat sig_fn (LitPatIn lit@(HsStringPrim _)) pat_ty = tcSimpleLitPat lit addrPrimTy   pat_ty
+tcPat sig_fn (LitPatIn lit@(HsFloatPrim _))  pat_ty = tcSimpleLitPat lit floatPrimTy  pat_ty
+tcPat sig_fn (LitPatIn lit@(HsDoublePrim _)) pat_ty = tcSimpleLitPat lit doublePrimTy pat_ty
 
-tcPat (LitPatIn lit@(HsString str))
-  = tcLookupGlobalValueByKey eqClassOpKey	`thenNF_Tc` \ sel_id ->
-    newMethod (LiteralOrigin lit) 
-	      (RealId sel_id) [stringTy]	`thenNF_Tc` \ (lie, eq_id) ->
-    let
-	comp_op = HsApp (HsVar eq_id) (HsLitOut lit stringTy)
-    in
-    returnTc (NPat lit stringTy comp_op, lie, stringTy)
-
-tcPat (LitPatIn lit@(HsIntPrim _))
-  = returnTc (LitPat lit intPrimTy, emptyLIE, intPrimTy)
-tcPat (LitPatIn lit@(HsCharPrim _))
-  = returnTc (LitPat lit charPrimTy, emptyLIE, charPrimTy)
-tcPat (LitPatIn lit@(HsStringPrim _))
-  = returnTc (LitPat lit addrPrimTy, emptyLIE, addrPrimTy)
-tcPat (LitPatIn lit@(HsFloatPrim _))
-  = returnTc (LitPat lit floatPrimTy, emptyLIE, floatPrimTy)
-tcPat (LitPatIn lit@(HsDoublePrim _))
-  = returnTc (LitPat lit doublePrimTy, emptyLIE, doublePrimTy)
+tcPat sig_fn (LitPatIn lit@(HsLitLit s))     pat_ty = tcSimpleLitPat lit intTy pat_ty
+	-- This one looks weird!
 \end{code}
 
 %************************************************************************
@@ -271,63 +260,45 @@ tcPat (LitPatIn lit@(HsDoublePrim _))
 %************************************************************************
 
 \begin{code}
-tcPat (LitPatIn lit@(HsInt i))
-  = newTyVarTy mkBoxedTypeKind				`thenNF_Tc` \ tyvar_ty ->
-    newOverloadedLit origin  
-		     (OverloadedIntegral i) tyvar_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
-
-    tcLookupGlobalValueByKey eqClassOpKey		`thenNF_Tc` \ eq_sel_id ->
-    newMethod origin (RealId eq_sel_id) [tyvar_ty]	`thenNF_Tc` \ (lie2, eq_id) ->
-
-    returnTc (NPat lit tyvar_ty (HsApp (HsVar eq_id)
-				       over_lit_expr),
-	      lie1 `plusLIE` lie2,
-	      tyvar_ty)
-  where
-    origin = LiteralOrigin lit
-
-tcPat (LitPatIn lit@(HsFrac f))
-  = newTyVarTy mkBoxedTypeKind				`thenNF_Tc` \ tyvar_ty ->
-    newOverloadedLit origin
-		     (OverloadedFractional f) tyvar_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
-
-    tcLookupGlobalValueByKey eqClassOpKey		`thenNF_Tc` \ eq_sel_id ->
-    newMethod origin (RealId eq_sel_id) [tyvar_ty]	`thenNF_Tc` \ (lie2, eq_id) ->
-
-    returnTc (NPat lit tyvar_ty (HsApp (HsVar eq_id)
-				       over_lit_expr),
-	      lie1 `plusLIE` lie2,
-	      tyvar_ty)
-  where
-    origin = LiteralOrigin lit
-
-tcPat (LitPatIn lit@(HsLitLit s))
---  = error "tcPat: can't handle ``literal-literal'' patterns"
-  = returnTc (LitPat lit intTy, emptyLIE, intTy)
-
-tcPat (NPlusKPatIn name lit@(HsInt i))
-  = tcLookupLocalValueOK "tcPat1:n+k" name	`thenNF_Tc` \ local ->
+tcPat sig_fn pat@(LitPatIn lit@(HsString str)) pat_ty
+  = unifyTauTy pat_ty stringTy			`thenTc_` 
+    tcLookupGlobalValueByKey eqClassOpKey	`thenNF_Tc` \ sel_id ->
+    newMethod (PatOrigin pat) 
+	      (RealId sel_id) [stringTy]	`thenNF_Tc` \ (lie, eq_id) ->
     let
-	local_ty = idType local
+	comp_op = HsApp (HsVar eq_id) (HsLitOut lit stringTy)
     in
+    returnTc (NPat lit stringTy comp_op, lie, emptyBag, emptyBag, emptyLIE)
+
+
+tcPat sig_fn pat@(LitPatIn lit@(HsInt i)) pat_ty
+  = tcOverloadedLitPat pat lit (OverloadedIntegral i) pat_ty
+
+tcPat sig_fn pat@(LitPatIn lit@(HsFrac f)) pat_ty
+  = tcOverloadedLitPat pat lit (OverloadedFractional f) pat_ty
+
+
+tcPat sig_fn pat@(NPlusKPatIn name lit@(HsInt i)) pat_ty
+  = tcVarPat sig_fn name pat_ty				`thenTc` \ bndr_id ->
     tcLookupGlobalValueByKey geClassOpKey		`thenNF_Tc` \ ge_sel_id ->
     tcLookupGlobalValueByKey minusClassOpKey		`thenNF_Tc` \ minus_sel_id ->
 
     newOverloadedLit origin
-		     (OverloadedIntegral i) local_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
+		     (OverloadedIntegral i) pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
 
-    newMethod origin (RealId ge_sel_id)    [local_ty]	`thenNF_Tc` \ (lie2, ge_id) ->
-    newMethod origin (RealId minus_sel_id) [local_ty]	`thenNF_Tc` \ (lie3, minus_id) ->
+    newMethod origin (RealId ge_sel_id)    [pat_ty]	`thenNF_Tc` \ (lie2, ge_id) ->
+    newMethod origin (RealId minus_sel_id) [pat_ty]	`thenNF_Tc` \ (lie3, minus_id) ->
 
-    returnTc (NPlusKPat (TcId local) lit local_ty
+    returnTc (NPlusKPat (TcId bndr_id) lit pat_ty
 			(SectionR (HsVar ge_id) over_lit_expr)
 			(SectionR (HsVar minus_id) over_lit_expr),
 	      lie1 `plusLIE` lie2 `plusLIE` lie3,
-	      local_ty)
+	      emptyBag, unitBag (name, bndr_id), emptyLIE)
   where
-    origin = LiteralOrigin lit	-- Not very good!
+    origin = PatOrigin pat
 
-tcPat (NPlusKPatIn pat other) = panic "TcPat:NPlusKPat: not an HsInt literal"
+tcPat sig_fn (NPlusKPatIn pat other) pat_ty
+  = panic "TcPat:NPlusKPat: not an HsInt literal"
 \end{code}
 
 %************************************************************************
@@ -336,46 +307,115 @@ tcPat (NPlusKPatIn pat other) = panic "TcPat:NPlusKPat: not an HsInt literal"
 %*									*
 %************************************************************************
 
+Helper functions
+
 \begin{code}
-tcPats :: [RenamedPat] -> TcM s ([TcPat s], LIE s, [TcType s])
+tcPats :: (Name -> Maybe (TcIdBndr s))	-- Info about signatures
+       -> [RenamedPat] -> [TcType s]	-- Excess 'expected types' discarded
+       -> TcM s ([TcPat s], 
+		 LIE s,				-- Required by n+k and literal pats
+		 Bag (TcTyVar s),
+		 Bag (Name, TcIdBndr s),	-- Ids bound by the pattern
+		 LIE s)				-- Dicts bound by the pattern
 
-tcPats [] = returnTc ([], emptyLIE, [])
+tcPats sig_fn [] tys = returnTc ([], emptyLIE, emptyBag, emptyBag, emptyLIE)
 
-tcPats (pat:pats)
-  = tcPat pat		`thenTc` \ (pat',  lie,  ty)  ->
-    tcPats pats		`thenTc` \ (pats', lie', tys) ->
+tcPats sig_fn (ty:tys) (pat:pats)
+  = tcPat sig_fn ty pat		`thenTc` \ (pat',  lie_req1, tvs1, ids1, lie_avail1) ->
+    tcPats sig_fn tys pats	`thenTc` \ (pats', lie_req2, tvs2, ids2, lie_avail2) ->
 
-    returnTc (pat':pats', plusLIE lie lie', ty:tys)
+    returnTc (pat':pats', lie_req1 `plusLIE` lie_req2,
+	      tvs1 `unionBags` tvs2, ids1 `unionBags` ids2, 
+	      lie_avail1 `plusLIE` lie_avail2)
 \end{code}
 
-@matchConArgTys@ grabs the signature of the data constructor, and
-unifies the actual args against the expected ones.
-
+------------------------------------------------------
 \begin{code}
-matchConArgTys :: Name -> [TcType s] -> TcM s (Id, TcType s)
+tcSimpleLitPat lit lit_ty pat_ty
+  = unifyTauTy pat_ty lit_ty	`thenTc_` 
+    returnTc (LitPat lit lit_ty, emptyLIE, emptyBag, emptyBag, emptyLIE)
 
-matchConArgTys con arg_tys
-  = tcLookupGlobalValue con		`thenNF_Tc` \ con_id ->
-    tcInstId con_id			`thenNF_Tc` \ (_, _, con_tau) ->
-	     -- Ignore the con_theta; overloaded constructors only
+
+tcOverloadedLitPat pat lit over_lit pat_ty
+  = newOverloadedLit (PatOrigin pat) over_lit pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
+    tcLookupGlobalValueByKey eqClassOpKey		`thenNF_Tc` \ eq_sel_id ->
+    newMethod origin (RealId eq_sel_id) [pat_ty]	`thenNF_Tc` \ (lie2, eq_id) ->
+
+    returnTc (NPat lit pat_ty (HsApp (HsVar eq_id)
+				     over_lit_expr),
+	      lie1 `plusLIE` lie2,
+	      emptyBag, emptyBag, emptyLIE)
+  where
+    origin = PatOrigin pat
+\end{code}
+
+------------------------------------------------------
+\begin{code}
+tcConstructor pat con_name pat_ty
+  = 	-- Check that it's a constructor
+    tcLookupGlobalValue con_name		`thenNF_Tc` \ con_id ->
+    case isDataConId_maybe con_id of {
+	Nothing -> failWithTc (badCon con_id);
+ 	Just data_con ->
+
+	-- Instantiate it
+    let 
+	(tvs, theta, ex_tvs, ex_theta, arg_tys, tycon) = dataConSig data_con
+	     -- Ignore the theta; overloaded constructors only
 	     -- behave differently when called, not when used for
 	     -- matching.
+    in
+    tcInstTyVars (ex_tvs ++ tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
     let
-	(con_args, con_result) = splitFunTys con_tau
-	con_arity  = length con_args
-	no_of_args = length arg_tys
+	ex_theta' = substFlexiTheta tenv ex_theta
+	arg_tys'  = map (substFlexiTy tenv) arg_tys
+
+	n_ex_tvs  = length ex_tvs
+	ex_tvs'   = take n_ex_tvs all_tvs'
+	result_ty = mkTyConApp tycon (drop n_ex_tvs ty_args')
+    in
+    newDicts (PatOrigin pat) ex_theta'	`thenNF_Tc` \ (lie_avail, dicts) ->
+
+	-- Check overall type matches
+    unifyTauTy pat_ty result_ty		`thenTc_`
+
+    returnTc (data_con, ex_tvs', dicts, lie_avail, arg_tys')
+    }
+\end{code}	      
+
+------------------------------------------------------
+\begin{code}
+tcConPat sig_fn pat con_name arg_pats pat_ty
+  = tcAddErrCtxt (patCtxt pat)	$
+
+	-- Check the constructor itself
+    tcConstructor pat con_name pat_ty	`thenTc` \ (data_con, ex_tvs', dicts, lie_avail1, arg_tys') ->
+
+	-- Check correct arity
+    let
+	con_arity  = dataConSourceArity data_con
+	no_of_args = length arg_pats
     in
     checkTc (con_arity == no_of_args)
-	    (arityErr "Constructor" con_id con_arity no_of_args)	`thenTc_`
+	    (arityErr "Constructor" data_con con_arity no_of_args)	`thenTc_`
 
-    unifyTauTyLists con_args arg_tys	 				`thenTc_`
-    returnTc (con_id, con_result)
+	-- Check arguments
+    tcPats sig_fn arg_pats arg_tys'	`thenTc` \ (arg_pats', lie_req, tvs, ids, lie_avail2) ->
+
+    returnTc (ConPat data_con pat_ty ex_tvs' dicts arg_pats',
+	      lie_req,
+	      listToBag ex_tvs' `unionBags` tvs,
+	      ids,
+	      lie_avail1 `plusLIE` lie_avail2)
 \end{code}
 
-% =================================================
 
-Errors and contexts
-~~~~~~~~~~~~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{Errors and contexts}
+%*									*
+%************************************************************************
+
 \begin{code}
 patCtxt pat = hang (ptext SLIT("In the pattern:")) 
 		 4 (ppr pat)
@@ -388,9 +428,9 @@ recordRhs field_label pat
   = hang (ptext SLIT("In the record field pattern"))
 	 4 (sep [ppr field_label, char '=', ppr pat])
 
-badFieldsCon :: Name -> [Name] -> SDoc
-badFieldsCon con fields
+badFieldCon :: Name -> Name -> SDoc
+badFieldCon con field
   = hsep [ptext SLIT("Constructor") <+> quotes (ppr con),
-	  ptext SLIT("does not have field(s):"), pprQuotedList fields]
+	  ptext SLIT("does not have field"), quotes (ppr field)]
 \end{code}
 

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1996
+% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 
 \begin{code}
@@ -7,24 +7,25 @@ module Stix (
 	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList,
 	sStLitLbl,
 
-	stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg,
-	stgSpA, stgSuA, stgSpB, stgSuB, stgHp, stgHpLim, stgLivenessReg,
-	stgStdUpdRetVecReg, stgStkStubReg,
-	getUniqLabelNCG
+	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, stgHp, stgHpLim, stgTagReg,
+	getUniqLabelNCG,
+
+	fixedHS, arrHS
     ) where
 
 #include "HsVersions.h"
 
 import Ratio		( Rational )
 
-import AbsCSyn		( node, infoptr, MagicId(..) )
+import AbsCSyn		( node, tagreg, MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
 import CallConv		( CallConv )
 import CLabel		( mkAsmTempLabel, CLabel )
 import PrimRep          ( PrimRep )
 import PrimOp           ( PrimOp )
 import Unique           ( Unique )
-import UniqSupply	( returnUs, thenUs, getUnique, UniqSM )
+import SMRep		( fixedHdrSize, arrHdrSize )
+import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Outputable
 \end{code}
 
@@ -129,28 +130,23 @@ type StixTreeList = [StixTree] -> [StixTree]
 
 Stix Trees for STG registers:
 \begin{code}
-stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg, stgSpA,
-    stgSuA, stgSpB, stgSuB, stgHp, stgHpLim, stgLivenessReg,
-    stgStdUpdRetVecReg, stgStkStubReg :: StixTree
+stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, stgHp, stgHpLim 
+	:: StixTree
 
 stgBaseReg 	    = StReg (StixMagicId BaseReg)
-stgStkOReg 	    = StReg (StixMagicId StkOReg)
 stgNode    	    = StReg (StixMagicId node)
-stgInfoPtr 	    = StReg (StixMagicId infoptr)
-stgTagReg  	    = StReg (StixMagicId TagReg)
-stgRetReg  	    = StReg (StixMagicId RetReg)
-stgSpA 		    = StReg (StixMagicId SpA)
-stgSuA 		    = StReg (StixMagicId SuA)
-stgSpB 		    = StReg (StixMagicId SpB)
-stgSuB 		    = StReg (StixMagicId SuB)
+stgTagReg	    = StReg (StixMagicId tagreg)
+stgSp 		    = StReg (StixMagicId Sp)
+stgSu 		    = StReg (StixMagicId Su)
+stgSpLim	    = StReg (StixMagicId SpLim)
 stgHp		    = StReg (StixMagicId Hp)
 stgHpLim	    = StReg (StixMagicId HpLim)
-stgLivenessReg	    = StReg (StixMagicId LivenessReg)
-stgStdUpdRetVecReg  = StReg (StixMagicId StdUpdRetVecReg)
-stgStkStubReg	    = StReg (StixMagicId StkStubReg)
 
 getUniqLabelNCG :: UniqSM CLabel
 getUniqLabelNCG
-  = getUnique	      `thenUs` \ u ->
+  = getUniqueUs	      `thenUs` \ u ->
     returnUs (mkAsmTempLabel u)
+
+fixedHS = StInt (toInteger fixedHdrSize)
+arrHS   = StInt (toInteger arrHdrSize)
 \end{code}

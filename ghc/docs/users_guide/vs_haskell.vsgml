@@ -1,6 +1,6 @@
 %************************************************************************
 %*                                                                      *
-<sect1>Haskell~1.4 vs.~Glasgow Haskell~3.00: language non-compliance
+<sect1>Haskell~1.4 vs.~Glasgow Haskell~4.00: language non-compliance
 <label id="vs-Haskell-defn">
 <p>
 <nidx>GHC vs the Haskell 1.4 language</nidx>
@@ -79,13 +79,14 @@ all other constructors.
 
 Several modules internal to GHC are visible in the standard namespace.
 All of these modules begin with @Prel@, so the rule is: don't use any
-modules beginning with @Prel@ in your programl, or you will be
+modules beginning with @Prel@ in your program, or you will be
 comprehensively screwed.
 
+% Not true anymore? -- Simon M.
 %-------------------------------------------------------------------
-<tag>Can't export primitive types (e.g., @Int#@):</tag>
+% <tag>Can't export primitive types (e.g., @Int#@):</tag>
+% Don't even try...
 
-Don't even try...
 </descrip>
 
 %************************************************************************
@@ -97,17 +98,18 @@ Don't even try...
 %************************************************************************
 
 <descrip>
+% Not true anymore? We use Rationals all the way -- Simon M.
 %-------------------------------------------------------------------
-<tag>Very large/small fractional constants:</tag>
-(i.e., with a decimal point somewhere) GHC does not check that these
-are out of range (e.g., for a @Float@), and bad things will inevitably
-follow.  (To be corrected?)
-
-This problem does <em>not</em> exist for integral constants.
-
-For very large/small fractional constants near the limits of your
-floating-point precision, things may go wrong.  (It's better than it
-used to be.)  Please report any such bugs.
+% <tag>Very large/small fractional constants:</tag>
+% (i.e., with a decimal point somewhere) GHC does not check that these
+% are out of range (e.g., for a @Float@), and bad things will inevitably
+% follow.  (To be corrected?)
+% 
+% This problem does <em>not</em> exist for integral constants.
+% 
+% For very large/small fractional constants near the limits of your
+% floating-point precision, things may go wrong.  (It's better than it
+% used to be.)  Please report any such bugs.
 
 %-------------------------------------------------------------------
 <tag>Unchecked arithmetic:</tag>
@@ -116,7 +118,8 @@ Arguably <em>not</em> an infelicity, but... Bear in mind that
 operations on @Int@, @Float@, and @Double@ numbers are
 <em>unchecked</em> for overflow, underflow, and other sad occurrences.
 (note, however that some architectures trap floating-point overflow
-and loss-of-precision and report a floating-point exception).
+and loss-of-precision and report a floating-point
+exception)<nidx>floating-point exceptions</nidx>.
 
 Use @Integer@, @Rational@, etc., numeric types if this stuff
 keeps you awake at night.
@@ -152,7 +155,7 @@ stuck on them.
 
 %-------------------------------------------------------------------
 <tag>Unicode character set:</tag>
-Haskell~1.4 embraces the Unicode character set, but GHC~3.00 doesn't
+Haskell 1.4 embraces the Unicode character set, but GHC 4.00 doesn't
 handle it. Yet.
 
 </descrip>

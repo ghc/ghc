@@ -1,0 +1,1 @@
+ERROR "test/static/s068.hs" (line 3): Binding for qualified variable "M.y" not allowed

@@ -1,0 +1,3 @@
+__interface SpecEnv 1 0 where
+__export SpecEnv SpecEnv ;
+1 data SpecEnv a;

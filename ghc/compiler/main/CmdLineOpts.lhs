@@ -14,18 +14,18 @@ module CmdLineOpts (
 	intSwitchSet,
 	switchIsOn,
 
-	maybe_CompilingGhcInternals,
 	opt_AllStrict,
         opt_AllowOverlappingInstances,
+ 	opt_AllowUndecidableInstances,
 	opt_AutoSccsOnAllToplevs,
 	opt_AutoSccsOnExportedToplevs,
 	opt_AutoSccsOnIndividualCafs,
-	opt_CompilingGhcInternals,
 	opt_D_dump_absC,
 	opt_D_dump_asm,
 	opt_D_dump_deriv,
 	opt_D_dump_ds,
 	opt_D_dump_flatC,
+	opt_D_dump_inlinings,
 	opt_D_dump_foreign,
 	opt_D_dump_occur_anal,
 	opt_D_dump_rdr,
@@ -44,6 +44,7 @@ module CmdLineOpts (
 	opt_D_source_stats,
 	opt_D_verbose_core2core,
 	opt_D_verbose_stg2stg,
+	opt_DictsStrict,
 	opt_DoCoreLinting,
 	opt_DoStgLinting,
 	opt_DoSemiTagging,
@@ -52,7 +53,6 @@ module CmdLineOpts (
 	opt_EmitCExternDecls,
 	opt_EnsureSplittableC,
 	opt_FoldrBuildOn,
-	opt_ForConcurrent,
 	opt_GlasgowExts,
 	opt_GranMacros,
 	opt_HiMap,
@@ -60,35 +60,28 @@ module CmdLineOpts (
 	opt_IgnoreIfacePragmas,
 	opt_IrrefutableTuples,
 	opt_LiberateCaseThreshold,
+        opt_MaxContextReductionDepth,
 	opt_MultiParamClasses,
         opt_NoHiCheck,
 	opt_NoImplicitPrelude,
+	opt_NoPreInlining,
 	opt_NumbersStrict,
 	opt_OmitBlackHoling,
 	opt_OmitInterfacePragmas,
-	opt_PprStyle_All,
+	opt_PprStyle_NoPrags,
 	opt_PprStyle_Debug,
-	opt_PprStyle_User,		-- ToDo: rm
 	opt_PprUserLength,
 	opt_ProduceC,
 	opt_ProduceHi,
 	opt_ProduceS,
 	opt_ProduceExportCStubs,
 	opt_ProduceExportHStubs,
-	opt_ReportWhyUnfoldingsDisallowed,
-	opt_ReturnInRegsThreshold,
 	opt_ReportCompile,
 	opt_SccGroup,
 	opt_SccProfilingOn,
-	opt_ShowImportSpecs,
-	opt_SigsRequired,
 	opt_SourceUnchanged,
-	opt_SpecialiseAll,
-	opt_SpecialiseImports,
-	opt_SpecialiseOverloaded,
-	opt_SpecialiseTrace,
-	opt_SpecialiseUnboxed,
 	opt_StgDoLetNoEscapes,
+	opt_Parallel,
 
 	opt_InterfaceUnfoldThreshold,
 	opt_UnfoldCasms,
@@ -108,6 +101,7 @@ module CmdLineOpts (
 	opt_WarnMissingMethods,
 	opt_WarnDuplicateExports,
 	opt_WarnHiShadows,
+	opt_WarnMissingSigs,
 	opt_PruneTyDecls, opt_PruneInstDecls,
 	opt_D_show_rn_stats
     ) where
@@ -196,7 +190,6 @@ data SimplifierSwitch
   | SimplOkToFloatPrimOps
   | SimplAlwaysFloatLetsFromLets
   | SimplDoCaseElim
-  | SimplReuseCon
   | SimplCaseOfCase
   | SimplLetToCase
   | SimplMayDeleteConjurableIds
@@ -215,36 +208,14 @@ data SimplifierSwitch
 			    -- do unfoldings that *must* be done
 			    -- (to saturate constructors and primitives)
 
-  | ShowSimplifierProgress  -- report counts on every interation
-
   | MaxSimplifierIterations Int
 
   | SimplNoLetFromCase	    -- used when turning off floating entirely
   | SimplNoLetFromApp	    -- (for experimentation only) WDP 95/10
   | SimplNoLetFromStrictLet
 
-  | SimplDontFoldBackAppend
-		 	-- we fold `foldr (:)' back into flip (++),
-			-- but we *don't* want to do it when compiling
-			-- List.hs, otherwise
-			-- xs ++ ys = foldr (:) ys xs
-			-- {- via our loopback -}
-			-- xs ++ ys = xs ++ ys
-			-- Oops!
-			-- So only use this flag inside List.hs
-			-- (Sigh, what a HACK, Andy.  WDP 96/01)
-
   | SimplCaseMerge
-  | SimplCaseScrutinee	-- This flag tells that the expression being simplified is
-			-- the scrutinee of a case expression, so we should
-			-- apply the scrutinee discount when considering inlinings.
-			-- See SimplVar.lhs
-
-  | SimplCloneBinds	-- This flag controls whether the simplifier should 
-			-- always clone binder ids when creating expression 
-			-- copies. The default is NO, but it needs to be turned on
-			-- prior to floating binders outwards.
-			-- (see comment inside SimplVar.simplBinder)
+  | SimplPleaseClone
 \end{code}
 
 %************************************************************************
@@ -301,16 +272,16 @@ unpacked_opts =
 \begin{code}
 opt_AllStrict			= lookUp  SLIT("-fall-strict")
 opt_AllowOverlappingInstances   = lookUp  SLIT("-fallow-overlapping-instances")
+opt_AllowUndecidableInstances 	= lookUp  SLIT("-fallow-undecidable-instances")
 opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs	= lookUp  SLIT("-fauto-sccs-on-individual-cafs")
-opt_CompilingGhcInternals	= maybeToBool maybe_CompilingGhcInternals
-maybe_CompilingGhcInternals	= lookup_str "-fcompiling-ghc-internals="
 opt_D_dump_absC			= lookUp  SLIT("-ddump-absC")
 opt_D_dump_asm			= lookUp  SLIT("-ddump-asm")
 opt_D_dump_deriv		= lookUp  SLIT("-ddump-deriv")
 opt_D_dump_ds			= lookUp  SLIT("-ddump-ds")
 opt_D_dump_flatC		= lookUp  SLIT("-ddump-flatC")
+opt_D_dump_inlinings		= lookUp  SLIT("-ddump-inlinings")
 opt_D_dump_foreign		= lookUp  SLIT("-ddump-foreign-stubs")
 opt_D_dump_occur_anal		= lookUp  SLIT("-ddump-occur-anal")
 opt_D_dump_rdr			= lookUp  SLIT("-ddump-rdr")
@@ -329,6 +300,7 @@ opt_D_simplifier_stats		= lookUp  SLIT("-dsimplifier-stats")
 opt_D_source_stats		= lookUp  SLIT("-dsource-stats")
 opt_D_verbose_core2core		= lookUp  SLIT("-dverbose-simpl")
 opt_D_verbose_stg2stg		= lookUp  SLIT("-dverbose-stg")
+opt_DictsStrict			= lookUp  SLIT("-fdicts-strict")
 opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
 opt_DoStgLinting		= lookUp  SLIT("-dstg-lint")
 opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
@@ -337,41 +309,33 @@ opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
 opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
-opt_ForConcurrent		= lookUp  SLIT("-fconcurrent")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
 opt_HiMap 			= lookup_str "-himap="       -- file saying where to look for .hi files
 opt_HiVersion			= lookup_def_int "-fhi-version=" 0 -- what version we're compiling.
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
+opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
 opt_MultiParamClasses		= opt_GlasgowExts
-opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
 opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
+opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
+opt_NoPreInlining		= lookUp  SLIT("-fno-pre-inlining")
 opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
-opt_PprStyle_All		= lookUp  SLIT("-dppr-all")
+opt_PprStyle_NoPrags		= lookUp  SLIT("-dppr-noprags")
 opt_PprStyle_Debug		= lookUp  SLIT("-dppr-debug")
-opt_PprStyle_User		= lookUp  SLIT("-dppr-user")
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 opt_ProduceC  			= lookup_str "-C="
 opt_ProduceS  			= lookup_str "-S="
 opt_ProduceExportCStubs		= lookup_str "-F="
 opt_ProduceExportHStubs		= lookup_str "-FH="
 opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
-opt_ReportWhyUnfoldingsDisallowed= lookUp SLIT("-freport-disallowed-unfoldings")
 opt_ReportCompile                = lookUp SLIT("-freport-compile")
-opt_ReturnInRegsThreshold	= lookup_int "-freturn-in-regs-threshold"
 opt_SccProfilingOn		= lookUp  SLIT("-fscc-profiling")
-opt_ShowImportSpecs		= lookUp  SLIT("-fshow-import-specs")
-opt_SigsRequired		= lookUp  SLIT("-fsignatures-required")
 opt_SourceUnchanged		= lookUp  SLIT("-fsource-unchanged")
-opt_SpecialiseAll		= lookUp  SLIT("-fspecialise-all")
-opt_SpecialiseImports		= lookUp  SLIT("-fspecialise-imports")
-opt_SpecialiseOverloaded	= lookUp  SLIT("-fspecialise-overloaded")
-opt_SpecialiseTrace		= lookUp  SLIT("-ftrace-specialisation")
-opt_SpecialiseUnboxed		= lookUp  SLIT("-fspecialise-unboxed")
 opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
+opt_Parallel			= lookUp  SLIT("-fparallel")
 opt_SccGroup  			= lookup_str "-G="
 opt_Verbose			= lookUp  SLIT("-v")
 
@@ -393,6 +357,7 @@ opt_WarnUnusedBinds		= lookUp  SLIT("-fwarn-unused-binds")
 opt_WarnUnusedImports		= lookUp  SLIT("-fwarn-unused-imports")
 opt_WarnMissingMethods		= lookUp  SLIT("-fwarn-missing-methods")
 opt_WarnDuplicateExports	= lookUp  SLIT("-fwarn-duplicate-exports")
+opt_WarnMissingSigs		= lookUp  SLIT("-fwarn-missing-signatures")
 opt_PruneTyDecls		= not (lookUp SLIT("-fno-prune-tydecls"))
 opt_PruneInstDecls		= not (lookUp SLIT("-fno-prune-instdecls"))
 opt_D_show_rn_stats		= lookUp SLIT("-dshow-rn-stats")
@@ -472,7 +437,6 @@ classifyOpts = sep argv [] [] -- accumulators...
 #	  define SIMPL_SW(sw) simpl_sep opts (sw:simpl_sw) core_td stg_td
 
 	  -- the non-"just match a string" options are at the end...
-	  "-fshow-simplifier-progress"	    -> SIMPL_SW(ShowSimplifierProgress)
 	  "-fcode-duplication-ok"	    -> SIMPL_SW(SimplOkToDupCode)
 	  "-ffloat-lets-exposing-whnf"	    -> SIMPL_SW(SimplFloatLetsExposingWHNF)
 	  "-ffloat-primops-ok"		    -> SIMPL_SW(SimplOkToFloatPrimOps)
@@ -480,10 +444,8 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fdo-case-elim"		    -> SIMPL_SW(SimplDoCaseElim)
 	  "-fdo-lambda-eta-expansion"	    -> SIMPL_SW(SimplDoLambdaEtaExpansion)
 	  "-fdo-foldr-build"		    -> SIMPL_SW(SimplDoFoldrBuild)
-	  "-fdo-not-fold-back-append"	    -> SIMPL_SW(SimplDontFoldBackAppend)
 	  "-fdo-arity-expand"		    -> SIMPL_SW(SimplDoArityExpand)
 	  "-fdo-inline-foldr-build"	    -> SIMPL_SW(SimplDoInlineFoldrBuild)
-	  "-freuse-con"			    -> SIMPL_SW(SimplReuseCon)
 	  "-fcase-of-case"		    -> SIMPL_SW(SimplCaseOfCase)
 	  "-fcase-merge"		    -> SIMPL_SW(SimplCaseMerge)
 	  "-flet-to-case"		    -> SIMPL_SW(SimplLetToCase)
@@ -494,7 +456,7 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fno-let-from-case"		    -> SIMPL_SW(SimplNoLetFromCase)
 	  "-fno-let-from-app"		    -> SIMPL_SW(SimplNoLetFromApp)
 	  "-fno-let-from-strict-let"	    -> SIMPL_SW(SimplNoLetFromStrictLet)
-	  "-fclone-binds"		    -> SIMPL_SW(SimplCloneBinds)
+	  "-fclone-binds"		    -> SIMPL_SW(SimplPleaseClone)
 
 	  o | starts_with_msi  -> SIMPL_SW(MaxSimplifierIterations (read after_msi))
 	   where
@@ -528,7 +490,6 @@ tagOf_SimplSwitch SimplFloatLetsExposingWHNF	= ILIT(1)
 tagOf_SimplSwitch SimplOkToFloatPrimOps		= ILIT(2)
 tagOf_SimplSwitch SimplAlwaysFloatLetsFromLets	= ILIT(3)
 tagOf_SimplSwitch SimplDoCaseElim		= ILIT(4)
-tagOf_SimplSwitch SimplReuseCon			= ILIT(5)
 tagOf_SimplSwitch SimplCaseOfCase		= ILIT(6)
 tagOf_SimplSwitch SimplLetToCase		= ILIT(7)
 tagOf_SimplSwitch SimplMayDeleteConjurableIds	= ILIT(9)
@@ -539,21 +500,18 @@ tagOf_SimplSwitch SimplDoInlineFoldrBuild	= ILIT(14)
 tagOf_SimplSwitch IgnoreINLINEPragma 		= ILIT(15)
 tagOf_SimplSwitch SimplDoLambdaEtaExpansion	= ILIT(16)
 tagOf_SimplSwitch EssentialUnfoldingsOnly	= ILIT(19)
-tagOf_SimplSwitch ShowSimplifierProgress	= ILIT(20)
 tagOf_SimplSwitch (MaxSimplifierIterations _)	= ILIT(21)
 tagOf_SimplSwitch SimplNoLetFromCase		= ILIT(27)
 tagOf_SimplSwitch SimplNoLetFromApp		= ILIT(28)
 tagOf_SimplSwitch SimplNoLetFromStrictLet	= ILIT(29)
-tagOf_SimplSwitch SimplDontFoldBackAppend       = ILIT(30)
 tagOf_SimplSwitch SimplCaseMerge		= ILIT(31)
-tagOf_SimplSwitch SimplCaseScrutinee		= ILIT(32)
-tagOf_SimplSwitch SimplCloneBinds	        = ILIT(33)
+tagOf_SimplSwitch SimplPleaseClone		= ILIT(32)
 
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
 tagOf_SimplSwitch _ = panic# "tagOf_SimplSwitch"
 
-lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplCloneBinds)
+lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplPleaseClone)
 \end{code}
 
 %************************************************************************
@@ -586,7 +544,11 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
     case sw_tbl of { Array bounds_who_needs_'em stuff ->
     \ switch ->
 	case (indexArray# stuff (tagOf_SimplSwitch switch)) of
+#if __GLASGOW_HASKELL__ < 400
 	  Lift v -> v
+#else
+	  (# _, v #) -> v
+#endif
     }
   where
     mk_assoc_elem k@(MaxSimplifierIterations lvl)       = (IBOX(tagOf_SimplSwitch k), SwInt lvl)

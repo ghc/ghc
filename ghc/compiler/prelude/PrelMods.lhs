@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[PrelMods]{Definitions of prelude modules}
 
@@ -15,7 +15,6 @@ module PrelMods
 	pREL_GHC, pRELUDE, mONAD, rATIO, iX, mAIN, pREL_MAIN, pREL_ERR,
 	pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ,
 	pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR, pREL_FOREIGN,
-	pREL_CCALL,
 
 	iNT, wORD
 	) where
@@ -44,7 +43,6 @@ pREL_IO_BASE = SLIT("PrelIOBase")
 pREL_ST	     = SLIT("PrelST")
 pREL_ARR     = SLIT("PrelArr")
 pREL_FOREIGN = SLIT("PrelForeign")
-pREL_CCALL   = SLIT("PrelCCall")
 pREL_ADDR    = SLIT("PrelAddr")
 pREL_ERR     = SLIT("PrelErr")
 

@@ -1,6 +1,5 @@
 _interface_ MkId 1
 _exports_
-MkId mkDataCon mkTupleCon ;
+MkId mkDataConId ;
 _declarations_
-1 mkDataCon _:_ Name.Name -> [Id!StrictnessMark] -> [FieldLabel!FieldLabel] -> [TyVar.TyVar] -> Type.ThetaType -> [TyVar.TyVar] -> Type!ThetaType -> [Type!TauType] -> TyCon!TyCon -> Id!Id ;;
-1 mkTupleCon _:_ PrelBase.Int -> Name.Name -> Type!Type -> Id!Id ;;
+1 mkDataConId _:_ DataCon.DataCon -> Var.Id ;;

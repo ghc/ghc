@@ -43,7 +43,6 @@ module PrelPack
 	write_ps_array,		-- MutableByteArray s Int -> Int# -> Char# -> ST s () 
 	freeze_ps_array		-- MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
-
        ) 
 	where
 
@@ -152,7 +151,7 @@ unpackNBytesBA (ByteArray (l,u) bytes) i
  = unpackNBytesBA# bytes len#
    where
     len# = case max 0 (min i len) of I# v# -> v#
-    len | u > l     = 0
+    len | l > u     = 0
         | otherwise = u-l+1
 
 unpackNBytesBA# :: ByteArray# -> Int# -> [Char]
@@ -219,19 +218,19 @@ write_ps_array	:: MutableByteArray s Int -> Int# -> Char# -> ST s ()
 freeze_ps_array :: MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
 new_ps_array size = ST $ \ s ->
-    case (newCharArray# size s)	  of { StateAndMutableByteArray# s2# barr# ->
-    STret s2# (MutableByteArray bot barr#) }
+    case (newCharArray# size s)	  of { (# s2#, barr# #) ->
+    (# s2#, MutableByteArray bot barr# #) }
   where
     bot = error "new_ps_array"
 
 write_ps_array (MutableByteArray _ barr#) n ch = ST $ \ s# ->
     case writeCharArray# barr# n ch s#	of { s2#   ->
-    STret s2# () }
+    (# s2#, () #) }
 
 -- same as unsafeFreezeByteArray
 freeze_ps_array (MutableByteArray _ arr#) len# = ST $ \ s# ->
-    case unsafeFreezeByteArray# arr# s# of { StateAndByteArray# s2# frozen# ->
-    STret s2# (ByteArray (0,I# len#) frozen#) }
+    case unsafeFreezeByteArray# arr# s# of { (# s2#, frozen# #) ->
+    (# s2#, ByteArray (0,I# len#) frozen# #) }
 \end{code}
 
 

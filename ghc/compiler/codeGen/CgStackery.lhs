@@ -1,5 +1,7 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+%
+% $Id: CgStackery.lhs,v 1.9 1998/12/02 13:17:51 simonm Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -8,10 +10,11 @@ Stack-twiddling operations, which are pretty low-down and grimy.
 
 \begin{code}
 module CgStackery (
-	allocAStack, allocBStack, allocAStackTop, allocBStackTop,
+	allocStack, allocPrimStack, allocStackTop, deAllocStackTop,
 	allocUpdateFrame,
-	adjustRealSps, getFinalStackHW,
-	mkVirtStkOffsets, mkStkAmodes
+	adjustRealSp, adjustStackHW, getFinalStackHW,
+	mkTaggedVirtStkOffsets, mkTaggedStkAmodes, mkTagAssts,
+	freeStackSlots, addFreeSlots
     ) where
 
 #include "HsVersions.h"
@@ -19,12 +22,10 @@ module CgStackery (
 import CgMonad
 import AbsCSyn
 
+import CgUsages		( getRealSp )
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
-import HeapOffs		( VirtualSpAOffset, VirtualSpBOffset )
-import PrimRep		( getPrimRepSize, separateByPtrFollowness,
-			  PrimRep(..)
-			)
-import Util		( mapAccumR, panic )
+import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
+import Util		( panic )
 \end{code}
 
 %************************************************************************
@@ -33,88 +34,92 @@ import Util		( mapAccumR, panic )
 %*									*
 %************************************************************************
 
-@mkVirtStkOffsets@ is given a list of arguments.  The first argument
-gets the {\em largest} virtual stack offset (remember, virtual offsets
-increase towards the top of stack).
+@mkTaggedVirtStkOffsets@ is given a list of arguments.  The first
+argument gets the {\em largest} virtual stack offset (remember,
+virtual offsets increase towards the top of stack).  This function
+also computes the correct tagging arrangement for standard function
+entry points.  Each non-pointer on the stack is preceded by a tag word
+indicating the number of non-pointer words above it on the stack.
+
+		offset --> |       |  <---- last allocated stack word
+			   ---------  <
+			   |       |  .
+			   ---------  .
+			   |       |  total_nptrs (words)
+			   ---------  .
+			   |       |  .
+			   ---------  <
+offset + tot_nptrs + 1 --> |  tag  |  
+			   ---------
 
 \begin{code}
-mkVirtStkOffsets :: VirtualSpAOffset 	-- Offset of the last allocated thing
-	  -> VirtualSpBOffset		-- ditto
+mkTaggedVirtStkOffsets
+	  :: VirtualSpOffset 	-- Offset of the last allocated thing
 	  -> (a -> PrimRep)	-- to be able to grab kinds
 	  -> [a]			-- things to make offsets for
-	  -> (VirtualSpAOffset,		-- OUTPUTS: Topmost allocated word
-	      VirtualSpBOffset,		-- ditto
-	      [(a, VirtualSpAOffset)],	--  boxed things with offsets
-	      [(a, VirtualSpBOffset)])	--  unboxed things with offsets
+	  -> (VirtualSpOffset,		-- OUTPUTS: Topmost allocated word
+	      [(a, VirtualSpOffset)],	-- things with offsets
+	      [(VirtualSpOffset,Int)])  -- offsets for tags
 
-mkVirtStkOffsets init_SpA_offset init_SpB_offset kind_fun things
-  = let (boxeds, unboxeds)
-	    = separateByPtrFollowness kind_fun things
-	(last_SpA_offset, boxd_w_offsets)
-	    = mapAccumR computeOffset init_SpA_offset boxeds
-	(last_SpB_offset, ubxd_w_offsets)
-	    = mapAccumR computeOffset init_SpB_offset unboxeds
-    in
-	(last_SpA_offset, last_SpB_offset, boxd_w_offsets, ubxd_w_offsets)
+mkTaggedVirtStkOffsets init_Sp_offset kind_fun things
+    = loop init_Sp_offset [] [] (reverse things)
   where
-    computeOffset offset thing
-      = (offset + (max 1 . getPrimRepSize . kind_fun) thing, (thing, offset+(1::Int)))
-	-- The "max 1" bit is ULTRA important
-	-- Why?  mkVirtStkOffsets is the unique function that lays out function
-	-- arguments on the stack. The "max 1" ensures that every argument takes
-	-- at least one stack slot, even if it's of kind VoidKind that actually
-	-- takes no space at all.
-	-- This is important to make sure that argument satisfaction checks work
-	-- properly.  Consider
-	--	f a b s# = (a,b)
-	-- where s# is a VoidKind.  f's argument satisfaction check will check
-	-- that s# is on the B stack above SuB; but if s# takes zero space, the
-	-- check will be ARGS_B_CHK(0), which always succeeds.  As a result, even
-	-- if a,b aren't available either, the PAP update won't trigger and
-	-- we are throughly hosed. (SLPJ 96/05)
+    loop offset tags offs [] = (offset,offs,tags)
+    loop offset tags offs (t:things) 
+	 | isFollowableRep (kind_fun t) =
+	     loop (offset+1) tags ((t,offset+1):offs) things
+	 | otherwise =
+	     let
+		 size = getPrimRepSize (kind_fun t)
+		 tag_slot = offset+size+1
+	     in
+	     loop tag_slot ((tag_slot,size):tags) ((t,offset+size):offs) things
+    -- offset of thing is offset+size, because we're growing the stack
+    -- *downwards* as the offsets increase.
 \end{code}
 
-@mkStackAmodes@ is a higher-level version of @mkStackOffsets@.
-It starts from the tail-call locations.
-It returns a single list of addressing modes for the stack locations,
-and therefore is in the monad.
+@mkTaggedStkAmodes@ is a higher-level version of
+@mkTaggedVirtStkOffsets@.  It starts from the tail-call locations.  It
+returns a single list of addressing modes for the stack locations, and
+therefore is in the monad.
 
-It also adjusts the high water mark if necessary.
+It *doesn't* adjust the high water mark.  
 
 \begin{code}
-mkStkAmodes :: VirtualSpAOffset	    	    -- Tail call positions
-    	    -> VirtualSpBOffset
-	    -> [CAddrMode]		    -- things to make offsets for
-	    -> FCode (VirtualSpAOffset,	    -- OUTPUTS: Topmost allocated word
-		      VirtualSpBOffset,	    -- ditto
-		      AbstractC)	    -- Assignments to appropriate stk slots
+mkTaggedStkAmodes 
+	:: VirtualSpOffset	    -- Tail call positions
+	-> [CAddrMode]		    -- things to make offsets for
+	-> FCode (VirtualSpOffset,  -- OUTPUTS: Topmost allocated word
+	          AbstractC,	    -- Assignments to appropriate stk slots
+		  AbstractC)	    -- Assignments for tagging
 
-mkStkAmodes tail_spa tail_spb things
-	    info_down (MkCgState absC binds usage)
-  = (result, MkCgState absC binds new_usage)
-  where
-    result = (last_SpA_offset, last_SpB_offset, mkAbstractCs abs_cs)
+mkTaggedStkAmodes tail_Sp things
+  = getRealSp `thenFC` \ realSp ->
+    let
+      (last_Sp_offset, offsets, tags)
+    	= mkTaggedVirtStkOffsets tail_Sp getAmodeRep things
 
-    (last_SpA_offset, last_SpB_offset, ptrs_w_offsets, non_ptrs_w_offsets)
-    	= mkVirtStkOffsets tail_spa tail_spb getAmodeRep things
-
-    abs_cs
-	= [ CAssign (CVal (SpARel realSpA offset) PtrRep) thing
-	  | (thing, offset) <- ptrs_w_offsets
+      abs_cs =
+	  [ CAssign (CVal (spRel realSp offset) (getAmodeRep thing)) thing
+	  | (thing, offset) <- offsets
 	  ]
-	  ++
-	  [ CAssign (CVal (SpBRel realSpB offset) (getAmodeRep thing)) thing
-	  | (thing, offset) <- non_ptrs_w_offsets
+ 
+      tag_cs =
+	  [ CAssign (CVal (spRel realSp offset) WordRep)
+		    (CMacroExpr WordRep ARG_TAG [mkIntCLit size])
+	  | (offset,size) <- tags
 	  ]
+    in
+    returnFC (last_Sp_offset, mkAbstractCs abs_cs, mkAbstractCs tag_cs)
 
-    ((vspA,fspA,realSpA,hwSpA), (vspB,fspB,realSpB,hwSpB), h_usage) = usage
-
-    new_usage = ((vspA,fspA,realSpA,max last_SpA_offset hwSpA),
-		 (vspB,fspB,realSpB,max last_SpB_offset hwSpB),
-		 h_usage)
-    -- No need to fiddle with virtual SpA etc because this call is
-    -- only done just before the end of a block
-
+mkTagAssts :: [(VirtualSpOffset,Int)] -> FCode AbstractC
+mkTagAssts tags = 
+   getRealSp `thenFC` \realSp ->
+   returnFC (mkAbstractCs
+	  [ CAssign (CVal (spRel realSp offset) WordRep)
+		    (CMacroExpr WordRep ARG_TAG [mkIntCLit size])
+	  | (offset,size) <- tags
+	  ])
 
 \end{code}
 
@@ -125,123 +130,112 @@ mkStkAmodes tail_spa tail_spb things
 %************************************************************************
 
 Allocate a virtual offset for something.
+
 \begin{code}
-allocAStack :: FCode VirtualSpAOffset
+allocStack :: FCode VirtualSpOffset
+allocStack = allocPrimStack 1
 
-allocAStack info_down (MkCgState absC binds
-		    ((virt_a, free_a, real_a, hw_a), b_usage, h_usage))
-  = (chosen_slot, MkCgState absC binds (new_a_usage, b_usage, h_usage))
+allocPrimStack :: Int -> FCode VirtualSpOffset
+allocPrimStack size info_down (MkCgState absC binds
+				 ((virt_sp, free_stk, real_sp, hw_sp), h_usage))
+  = (chosen_slot, MkCgState absC binds (new_stk_usage, h_usage))
   where
-    push_virt_a = virt_a + 1
+    push_virt_sp = virt_sp + size
 
-    (chosen_slot, new_a_usage)
-	= if null free_a then
-		-- No free slots, so push a new one
-		-- We need to adjust the high-water mark
-		(push_virt_a, (push_virt_a, [], real_a, hw_a `max` push_virt_a))
-	  else
-		-- Free slots available, so use one
-		(free_slot, (virt_a, new_free_a, real_a, hw_a))
-
-    (free_slot, _) = head ([f | f@(slot, st) <- free_a, not (isStubbed st)] ++ free_a)
-		    -- Try to find an un-stubbed location;
-		    -- if none, return the first in the free list
-		    -- We'll only try this if free_a is known to be non-empty
-
-    -- Free list with the free_slot deleted
-    new_free_a = [ f | f@(s,_) <- free_a, s /= free_slot ]
-
-allocBStack :: Int -> FCode VirtualSpBOffset
-allocBStack size info_down (MkCgState absC binds
-				 (a_usage, (virt_b, free_b, real_b, hw_b), h_usage))
-  = (chosen_slot, MkCgState absC binds (a_usage, new_b_usage, h_usage))
-  where
-    push_virt_b = virt_b + size
-
-    (chosen_slot, new_b_usage)
-	= case find_block free_b of
-		Nothing -> (virt_b+1, (push_virt_b, free_b, real_b,
-				       hw_b `max` push_virt_b))
+    (chosen_slot, new_stk_usage)
+	= case find_block free_stk of
+		Nothing -> (push_virt_sp, (push_virt_sp, free_stk, real_sp,
+				       hw_sp `max` push_virt_sp))
 				       -- Adjust high water mark
 
-		Just slot -> (slot, (virt_b, delete_block free_b slot, real_b, hw_b))
+		Just slot -> (slot, (virt_sp, 
+				    delete_block free_stk slot, real_sp, hw_sp))
 
     -- find_block looks for a contiguous chunk of free slots
-    find_block :: [VirtualSpBOffset] -> Maybe VirtualSpBOffset
+    find_block :: [VirtualSpOffset] -> Maybe VirtualSpOffset
     find_block [] = Nothing
     find_block (slot:slots)
-      | take size (slot:slots) == [slot..slot+size-1]
-      = Just slot
-      | otherwise
-      = find_block slots
+      | take size (slot:slots) == [slot..top_slot] = Just top_slot
+      | otherwise				   = find_block slots
+	-- The stack grows downwards, with increasing virtual offsets.
+	-- Therefore, the address of a multi-word object is the *highest*
+	-- virtual offset it occupies (top_slot below).
+      where top_slot = slot+size-1
 
-    delete_block free_b slot = [s | s <- free_b, (s<slot) || (s>=slot+size)]
+    delete_block free_stk slot = [s | s <- free_stk, (s<=slot-size) || (s>slot)]
 			      -- Retain slots which are not in the range
-			      -- slot..slot+size-1
+			      -- slot-size+1..slot
 
 -- Allocate a chunk ON TOP OF the stack
-allocAStackTop :: Int -> FCode VirtualSpAOffset
-allocAStackTop size info_down (MkCgState absC binds
-	                     ((virt_a, free_a, real_a, hw_a), b_usage, h_usage))
-  = (chosen_slot, MkCgState absC binds (new_a_usage, b_usage, h_usage))
+allocStackTop :: Int -> FCode VirtualSpOffset
+allocStackTop size info_down (MkCgState absC binds
+	                     ((virt_sp, free_stk, real_sp, hw_sp), h_usage))
+  = (push_virt_sp, MkCgState absC binds (new_stk_usage, h_usage))
   where
-    push_virt_a = virt_a + size
-    chosen_slot = virt_a + 1
-    new_a_usage = (push_virt_a, free_a, real_a, hw_a `max` push_virt_a)
-				                -- Adjust high water mark
-
--- Allocate a chunk ON TOP OF the stack
-allocBStackTop :: Int -> FCode VirtualSpBOffset
-allocBStackTop size info_down (MkCgState absC binds
-	                     (a_usage, (virt_b, free_b, real_b, hw_b), h_usage))
-  = (chosen_slot, MkCgState absC binds (a_usage, new_b_usage, h_usage))
-  where
-    push_virt_b = virt_b + size
-    chosen_slot = virt_b+1
-    new_b_usage = (push_virt_b, free_b, real_b, hw_b `max` push_virt_b)
+    push_virt_sp = virt_sp + size
+    new_stk_usage = (push_virt_sp, free_stk, real_sp, hw_sp `max` push_virt_sp)
 				                -- Adjust high water mark
 \end{code}
 
-@allocUpdateFrame@ allocates enough space for an update frame
-on the B stack, records the fact in the end-of-block info (in the ``args''
+Pop some words from the current top of stack.  This is used for
+de-allocating the return address in a case alternative.
+
+\begin{code}
+deAllocStackTop :: Int -> FCode VirtualSpOffset
+deAllocStackTop size info_down (MkCgState absC binds
+	                     ((virt_sp, free_stk, real_sp, hw_sp), h_usage))
+  = (pop_virt_sp, MkCgState absC binds (new_stk_usage, h_usage))
+  where
+    pop_virt_sp = virt_sp - size
+    new_stk_usage = (pop_virt_sp, free_stk, real_sp, hw_sp)
+\end{code}
+
+@allocUpdateFrame@ allocates enough space for an update frame on the
+stack, records the fact in the end-of-block info (in the ``args''
 fields), and passes on the old ``args'' fields to the enclosed code.
 
 This is all a bit disgusting.
 
 \begin{code}
 allocUpdateFrame :: Int			-- Size of frame
-		 -> CAddrMode		-- Return address which is to be the
-					-- top word of frame
-		 -> ((VirtualSpAOffset, VirtualSpBOffset, VirtualSpBOffset) -> Code)
-						-- Scope of update
+		 -> Code		-- Scope of update
 		 -> Code
 
-allocUpdateFrame size update_amode code
-	(MkCgInfoDown c_info statics (EndOfBlockInfo args_spa args_spb sequel))
-	(MkCgState absc binds (a_usage, (vB,rr,qq,hwB),h_usage))
+allocUpdateFrame size code
+	(MkCgInfoDown c_info statics srt (EndOfBlockInfo args_Sp sequel))
+	(MkCgState absc binds ((vSp,rr,qq,hwSp),h_usage))
   = case sequel of
 
-	InRetReg -> code (args_spa, args_spb, vB)
-			 (MkCgInfoDown c_info statics new_eob_info)
-			 (MkCgState absc binds new_usage)
+	OnStack _ -> code (MkCgInfoDown c_info statics srt new_eob_info)
+			  (MkCgState absc binds new_usage)
 
-	other    -> panic "allocUpdateFrame"
+	other     -> panic "allocUpdateFrame"
 
   where
-    new_vB = vB + size
-    new_eob_info = EndOfBlockInfo args_spa new_vB (UpdateCode update_amode)
-    new_usage = (a_usage, (new_vB,rr,qq,hwB `max` new_vB), h_usage)
+    new_vSp = vSp + size
+    new_eob_info = EndOfBlockInfo new_vSp UpdateCode
+    new_usage = ((new_vSp,rr,qq,hwSp `max` new_vSp), h_usage)
 \end{code}
 
+\begin{code}
+adjustStackHW :: VirtualSpOffset -> Code
+adjustStackHW offset info_down (MkCgState absC binds usage) 
+  = MkCgState absC binds new_usage
+  where
+    ((vSp,fSp,realSp,hwSp), h_usage) = usage
+    new_usage = ((vSp, fSp, realSp, max offset hwSp), h_usage)
+    -- No need to fiddle with virtual Sp etc because this call is
+    -- only done just before the end of a block
+\end{code}
 
 A knot-tying beast.
 
 \begin{code}
-getFinalStackHW :: (VirtualSpAOffset -> VirtualSpBOffset -> Code) -> Code
+getFinalStackHW :: (VirtualSpOffset -> Code) -> Code
 getFinalStackHW fcode info_down (MkCgState absC binds usages) = state1
   where
-    state1 = fcode hwSpA hwSpB info_down (MkCgState absC binds usages)
-    (MkCgState _ _ ((_,_,_, hwSpA), (_,_,_, hwSpB), _)) = state1
+    state1 = fcode hwSp info_down (MkCgState absC binds usages)
+    (MkCgState _ _ ((_,_,_, hwSp), _)) = state1
 \end{code}
 
 
@@ -260,39 +254,59 @@ These functions {\em do not} deal with high-water-mark adjustment.
 That's done by functions which allocate stack space.
 
 \begin{code}
-adjustRealSpA :: VirtualSpAOffset 	-- New offset for Arg stack ptr
+adjustRealSp :: VirtualSpOffset 	-- New offset for Arg stack ptr
 	      -> Code
-adjustRealSpA newRealSpA info_down (MkCgState absC binds
-					((vspA,fA,realSpA,hwspA),
-				 	b_usage, h_usage))
-  = MkCgState (mkAbsCStmts absC move_instrA) binds new_usage
+adjustRealSp newRealSp info_down (MkCgState absC binds
+					((vSp,fSp,realSp,hwSp),	h_usage))
+  = MkCgState (mkAbsCStmts absC move_instr) binds new_usage
     where
-    move_instrA = if (newRealSpA == realSpA) then AbsCNop
+    move_instr = if (newRealSp == realSp) then AbsCNop
 		 else (CAssign
-			    (CReg SpA)
-			    (CAddr (SpARel realSpA newRealSpA)))
-    new_usage = ((vspA, fA, newRealSpA, hwspA),
-		 b_usage, h_usage)
+			    (CReg Sp)
+			    (CAddr (spRel realSp newRealSp)))
+    new_usage = ((vSp, fSp, newRealSp, hwSp), h_usage)
+\end{code}
 
-adjustRealSpB :: VirtualSpBOffset 	-- New offset for Basic/Control stack ptr
-	      -> Code
-adjustRealSpB newRealSpB info_down (MkCgState absC binds
-					(a_usage,
-				 	(vspB,fB,realSpB,hwspB),
-				 	h_usage))
-  = MkCgState (mkAbsCStmts absC move_instrB) binds new_usage
-    where
-    move_instrB = if (newRealSpB == realSpB) then AbsCNop
-		 else (CAssign {-PtrRep-}
-			    (CReg SpB)
-			    (CAddr (SpBRel realSpB newRealSpB)))
-    new_usage = (a_usage,
-		 (vspB, fB, newRealSpB, hwspB),
-		 h_usage)
+%************************************************************************
+%*									*
+\subsection[CgStackery-free]{Free stack slots}
+%*									*
+%************************************************************************
 
-adjustRealSps :: VirtualSpAOffset 	-- New offset for Arg stack ptr
-	      -> VirtualSpBOffset 	-- Ditto B stack
-	      -> Code
-adjustRealSps newRealSpA newRealSpB
-  = adjustRealSpA newRealSpA `thenC` adjustRealSpB newRealSpB
+Explicitly free some stack space.
+
+\begin{code}
+freeStackSlots :: [VirtualSpOffset] -> Code
+freeStackSlots extra_free info_down
+	state@(MkCgState abs_c binds ((vsp, free, real, hw), heap_usage))
+  = MkCgState abs_c binds new_usage
+  where
+    new_usage = ((new_vsp, new_free, real, hw), heap_usage)
+    (new_vsp, new_free) = trim vsp (addFreeSlots free extra_free)
+
+addFreeSlots :: [Int] -> [Int] -> [Int]
+addFreeSlots cs [] = cs
+addFreeSlots [] ns = ns
+addFreeSlots (c:cs) (n:ns)
+ = if c < n then
+	c : addFreeSlots cs (n:ns)
+   else if c > n then
+	n : addFreeSlots (c:cs) ns
+   else
+	panic ("addFreeSlots: equal slots: " ++ show (c:cs) ++ show (n:ns))
+
+trim :: Int{-offset-} -> [Int] -> (Int{-offset-}, [Int])
+trim current_sp free_slots
+  = try current_sp (reverse free_slots)
+  where
+    try csp [] = (csp, [])
+    try csp (slot:slots)
+      = if csp < slot then
+	    try csp slots		-- Free slot off top of stk; ignore
+
+	else if csp == slot then
+    	    try (csp-1) slots		-- Free slot at top of stk; trim
+
+	else
+	    (csp, reverse (slot:slots))	-- Otherwise gap; give up
 \end{code}

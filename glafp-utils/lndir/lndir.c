@@ -207,8 +207,6 @@ int rel;			/* if true, prepend "../" to fn before using */
     while (dp = readdir (df)) {
 	if (dp->d_name[strlen(dp->d_name) - 1] == '~')
 	    continue;
-	if (dp->d_name[0] == '.' && dp->d_name[1] == '#') /* 'non-conflict files' left behind by CVS */
-	    continue;
 	strcpy (p, dp->d_name);
 
 	if (n_dirs > 0) {

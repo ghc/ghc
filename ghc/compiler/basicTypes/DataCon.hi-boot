@@ -1,0 +1,5 @@
+_interface_ DataCon 1
+_exports_
+DataCon DataCon ;
+_declarations_
+1 data DataCon ;

@@ -10,12 +10,12 @@ CC:=$(HC)
 C_SRCS=$(wildcard *.c)
 
 # Remove Readline.lhs if readline.h isn't available.
-ifneq "$(GhcLibsWithReadline)" "YES"
+ifneq "$(HAVE_READLINE)" "YES"
   C_SRCS := $(filter-out ghcReadline.c,$(C_SRCS))
 endif
 
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
-SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR)
+SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_LIB_DIR)/std/cbits
 
 LIBRARY=libHSmisc_cbits.a
 LIBOBJS=$(C_OBJS)

@@ -1,5 +1,10 @@
 \begin{code}
 module TcMonad(
+	TcType, TcMaybe(..), TcBox,
+	TcTauType, TcThetaType, TcRhoType,
+	TcTyVar, TcTyVarSet,
+	TcKind,
+
 	TcM, NF_TcM, TcDown, TcEnv, 
 	SST_R, FSST_R,
 
@@ -17,6 +22,7 @@ module TcMonad(
 
 	checkTc, checkTcM, checkMaybeTc, checkMaybeTcM, 
 	failTc, failWithTc, addErrTc, warnTc, recoverTc, checkNoErrsTc, recoverNF_Tc, discardErrsTc,
+	addErrTcM, failWithTcM,
 
 	tcGetEnv, tcSetEnv,
 	tcGetDefaultTys, tcSetDefaultTys,
@@ -28,7 +34,7 @@ module TcMonad(
 
 	tcNewMutVar, tcReadMutVar, tcWriteMutVar, TcRef,
 
-	TcError, TcWarning,
+	TcError, TcWarning, TidyTypeEnv, emptyTidyEnv,
 	arityErr
   ) where
 
@@ -38,15 +44,20 @@ import {-# SOURCE #-} TcEnv  ( TcEnv )
 
 import Type		( Type, GenType )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
-import CmdLineOpts      ( opt_PprStyle_All )
+import CmdLineOpts      ( opt_PprStyle_Debug )
 
 import SST
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
-import SrcLoc		( SrcLoc, noSrcLoc )
-import UniqFM		( UniqFM, emptyUFM )
-import UniqSupply	( UniqSupply, getUnique, getUniques, splitUniqSupply,
+import Class		( Class )
+import Var		( GenTyVar )
+import VarEnv		( TyVarEnv, emptyVarEnv )
+import VarSet		( GenTyVarSet )
+import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, splitUniqSupply,
 			  UniqSM, initUs )
+import SrcLoc		( SrcLoc, noSrcLoc )
+import FiniteMap	( FiniteMap, emptyFM )
+import UniqFM		( UniqFM, emptyUFM )
 import Unique		( Unique )
 import Util
 import Outputable
@@ -55,6 +66,34 @@ import GlaExts		( State#, RealWorld )
 
 
 infixr 9 `thenTc`, `thenTc_`, `thenNF_Tc`, `thenNF_Tc_` 
+\end{code}
+
+
+Types
+~~~~~
+\begin{code}
+type TcType s = GenType (TcBox s)	-- Used during typechecker
+	-- Invariant on ForAllTy in TcTypes:
+	-- 	forall a. T
+	-- a cannot occur inside a MutTyVar in T; that is,
+	-- T is "flattened" before quantifying over a
+
+type TcKind s = TcType s
+
+type TcThetaType s = [(Class, [TcType s])]
+type TcRhoType s   = TcType s		-- No ForAllTys
+type TcTauType s   = TcType s		-- No DictTys or ForAllTys
+
+type TcBox s = TcRef s (TcMaybe s)
+
+data TcMaybe s = UnBound
+	       | BoundTo (TcType s)
+
+-- Interestingly, you can't use (Maybe (TcType s)) instead of (TcMaybe s),
+-- because you get a synonym loop if you do!
+
+type TcTyVar s    = GenTyVar (TcBox s)
+type TcTyVarSet s = GenTyVarSet (TcBox s)
 \end{code}
 
 
@@ -267,15 +306,22 @@ failTc :: TcM s a
 failTc down env
   = failFSST ()
 
-failWithTc :: Message -> TcM s a		-- Add an error message and fail
-failWithTc err_msg
-  = addErrTc err_msg	`thenNF_Tc_`
+failWithTc :: Message -> TcM s a			-- Add an error message and fail
+failWithTc err_msg = failWithTcM (emptyTidyEnv, err_msg)
+
+addErrTc :: Message -> NF_TcM s ()
+addErrTc err_msg = addErrTcM (emptyTidyEnv, err_msg)
+
+-- The 'M' variants do the TidyTypeEnv bit
+failWithTcM :: (TidyTypeEnv s, Message) -> TcM s a	-- Add an error message and fail
+failWithTcM env_and_msg
+  = addErrTcM env_and_msg	`thenNF_Tc_`
     failTc
 
-addErrTc :: Message -> NF_TcM s ()	-- Add an error message but don't fail
-addErrTc err_msg down env
-  = readMutVarSST errs_var	`thenSST` \ (warns,errs) ->
-    listNF_Tc ctxt down env	`thenSST` \ ctxt_msgs ->
+addErrTcM :: (TidyTypeEnv s, Message) -> NF_TcM s ()	-- Add an error message but don't fail
+addErrTcM (tidy_env, err_msg) down env
+  = readMutVarSST errs_var		`thenSST` \ (warns,errs) ->
+    do_ctxt tidy_env ctxt down env	`thenSST` \ ctxt_msgs ->
     let
 	err = addShortErrLocLine loc $
 	      vcat (err_msg : ctxt_to_use ctxt_msgs)
@@ -287,11 +333,19 @@ addErrTc err_msg down env
     ctxt     = getErrCtxt down
     loc      = getLoc down
 
+do_ctxt tidy_env [] down env
+  = returnSST []
+do_ctxt tidy_env (c:cs) down env
+  = c tidy_env down env 		`thenSST` \ (tidy_env', m) ->
+    do_ctxt tidy_env' cs down env	`thenSST` \ ms ->
+    returnSST (m:ms)
+
+-- warnings don't have an 'M' variant
 warnTc :: Bool -> Message -> NF_TcM s ()
 warnTc warn_if_true warn_msg down env
   = if warn_if_true then
-	readMutVarSST errs_var	`thenSST` \ (warns,errs) ->
-	listNF_Tc ctxt down env	`thenSST` \ ctxt_msgs ->
+	readMutVarSST errs_var			`thenSST` \ (warns,errs) ->
+	do_ctxt emptyTidyEnv ctxt down env	`thenSST` \ ctxt_msgs ->
 	let
 	    warn = addShortWarnLocLine loc $
 	           vcat (warn_msg : ctxt_to_use ctxt_msgs)
@@ -443,7 +497,8 @@ tcAddSrcLoc loc m down env = m (setLoc down loc) env
 tcGetSrcLoc :: NF_TcM s SrcLoc
 tcGetSrcLoc down env = returnSST (getLoc down)
 
-tcSetErrCtxtM, tcAddErrCtxtM :: NF_TcM s Message -> TcM s a -> TcM s a
+tcSetErrCtxtM, tcAddErrCtxtM :: (TidyTypeEnv s -> NF_TcM s (TidyTypeEnv s, Message))
+			     -> TcM s a -> TcM s a
 tcSetErrCtxtM msg m down env = m (setErrCtxt down msg) env
 tcAddErrCtxtM msg m down env = m (addErrCtxt down msg) env
 
@@ -452,8 +507,8 @@ tcSetErrCtxt, tcAddErrCtxt
 	  -> (TcDown s -> TcEnv s -> State# s -> b)
 	  ->  TcDown s -> TcEnv s -> State# s -> b
 -- Usual thing
-tcSetErrCtxt msg m down env = m (setErrCtxt down (returnNF_Tc msg)) env
-tcAddErrCtxt msg m down env = m (addErrCtxt down (returnNF_Tc msg)) env
+tcSetErrCtxt msg m down env = m (setErrCtxt down (\env -> returnNF_Tc (env, msg))) env
+tcAddErrCtxt msg m down env = m (addErrCtxt down (\env -> returnNF_Tc (env, msg))) env
 \end{code}
 
 
@@ -465,7 +520,7 @@ tcGetUnique down env
   = readMutVarSST u_var				`thenSST` \ uniq_supply ->
     let
       (new_uniq_supply, uniq_s) = splitUniqSupply uniq_supply
-      uniq			= getUnique uniq_s
+      uniq			= uniqFromSupply uniq_s
     in
     writeMutVarSST u_var new_uniq_supply		`thenSST_`
     returnSST uniq
@@ -477,7 +532,7 @@ tcGetUniques n down env
   = readMutVarSST u_var				`thenSST` \ uniq_supply ->
     let
       (new_uniq_supply, uniq_s) = splitUniqSupply uniq_supply
-      uniqs			= getUniques n uniq_s
+      uniqs			= uniqsFromSupply n uniq_s
     in
     writeMutVarSST u_var new_uniq_supply		`thenSST_`
     returnSST uniqs
@@ -512,9 +567,19 @@ data TcDown s
 	(TcRef s (Bag WarnMsg, 
 		  Bag ErrMsg))
 
-type ErrCtxt s = [NF_TcM s Message]	-- Innermost first.  Monadic so that we have a chance
-					-- to deal with bound type variables just before error
-					-- message construction
+-- The TidyTypeEnv gives us a chance to tidy up the type,
+-- so it prints nicely in error messages
+type TidyTypeEnv s = (FiniteMap FastString Int,	-- Says what the 'next' unique to use
+						-- for this occname is
+		      TyVarEnv (TcType s))	-- Current mapping
+
+emptyTidyEnv :: TidyTypeEnv s
+emptyTidyEnv = (emptyFM, emptyVarEnv)
+
+type ErrCtxt s = [TidyTypeEnv s -> NF_TcM s (TidyTypeEnv s, Message)]	
+			-- Innermost first.  Monadic so that we have a chance
+			-- to deal with bound type variables just before error
+			-- message construction
 \end{code}
 
 -- These selectors are *local* to TcMonad.lhs
@@ -546,8 +611,8 @@ TypeChecking Errors
 type TcError   = Message
 type TcWarning = Message
 
-ctxt_to_use ctxt | opt_PprStyle_All = ctxt
-		 | otherwise	    = takeAtMost 3 ctxt
+ctxt_to_use ctxt | opt_PprStyle_Debug = ctxt
+		 | otherwise	      = takeAtMost 3 ctxt
 		 where
 		   takeAtMost :: Int -> [a] -> [a]
      		   takeAtMost 0 ls = []

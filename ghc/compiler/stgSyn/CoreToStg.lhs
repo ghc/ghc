@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 %************************************************************************
 %*									*
@@ -18,23 +18,19 @@ import CoreSyn		-- input
 import StgSyn		-- output
 
 import CoreUtils	( coreExprType )
-import CostCentre	( noCostCentre )
-import MkId		( mkSysLocal ) 
-import Id		( externallyVisibleId, mkIdWithNewUniq,
-			  nullIdEnv, addOneToIdEnv, lookupIdEnv,
-			  IdEnv, Id
+import SimplUtils	( findDefault )
+import CostCentre	( noCCS )
+import Id		( Id, mkUserLocal, idType,
+			  externallyVisibleId, setIdUnique
 			)
-import SrcLoc		( noSrcLoc )
-import Type		( splitAlgTyConApp, Type )
-import UniqSupply	( UniqSupply, UniqSM, 
-			  returnUs, thenUs, initUs,
-			  mapUs, getUnique
-			)
-import PrimOp	        ( PrimOp(..) )
-			
-import Outputable	( panic )
-
-isLeakFreeType x y = False -- safe option; ToDo
+import Name		( varOcc )
+import VarEnv
+import Const		( Con(..), isWHNFCon, Literal(..) )
+import PrimOp		( PrimOp(..) )
+import Type		( isUnLiftedType, isUnboxedTupleType, Type )
+import Unique		( Unique, Uniquable(..) )
+import UniqSupply	-- all of it, really
+import Outputable
 \end{code}
 
 
@@ -66,18 +62,13 @@ The business of this pass is to convert Core to Stg.  On the way:
 %*									*
 %************************************************************************
 
-Because we're going to come across ``boring'' bindings like
-\tr{let x = /\ tyvars -> y in ...}, we want to keep a small
-environment, so we can just replace all occurrences of \tr{x}
-with \tr{y}.
-
-March 98: We also use this environment to give all locally bound
+March 98: We keep a small environment to give all locally bound
 Names new unique ids, since the code generator assumes that binders
 are unique across a module. (Simplifier doesn't maintain this
 invariant any longer.)
 
 \begin{code}
-type StgEnv = IdEnv StgArg
+type StgEnv = IdEnv Id
 \end{code}
 
 No free/live variable information is pinned on in this pass; it's added
@@ -94,13 +85,13 @@ bOGUS_FVs = panic "bOGUS_FVs" -- [] (ditto)
 
 \begin{code}
 topCoreBindsToStg :: UniqSupply	-- name supply
-		  -> [CoreBinding]	-- input
+		  -> [CoreBind]	-- input
 		  -> [StgBinding]	-- output
 
 topCoreBindsToStg us core_binds
-  = initUs us (coreBindsToStg nullIdEnv core_binds)
+  = initUs us (coreBindsToStg emptyVarEnv core_binds)
   where
-    coreBindsToStg :: StgEnv -> [CoreBinding] -> UniqSM [StgBinding]
+    coreBindsToStg :: StgEnv -> [CoreBind] -> UniqSM [StgBinding]
 
     coreBindsToStg env [] = returnUs []
     coreBindsToStg env (b:bs)
@@ -117,54 +108,21 @@ topCoreBindsToStg us core_binds
 
 \begin{code}
 coreBindToStg :: StgEnv
-	      -> CoreBinding
+	      -> CoreBind
 	      -> UniqSM ([StgBinding],	-- Empty or singleton
 		    	 StgEnv)	-- Floats
 
 coreBindToStg env (NonRec binder rhs)
   = coreRhsToStg env rhs	`thenUs` \ stg_rhs ->
-    let
-	-- Binds to return if RHS is trivial
-	triv_binds | externallyVisibleId binder = [StgNonRec binder stg_rhs]	-- Retain it
-		   | otherwise	      	        = []				-- Discard it
-    in
-    case stg_rhs of
-      StgRhsClosure cc bi fvs upd [] (StgApp atom [] lvs) ->
-		-- Trivial RHS, so augment envt, and ditch the binding
-		returnUs (triv_binds, new_env)
-	   where
-		new_env = addOneToIdEnv env binder atom
-
-      StgRhsCon cc con_id [] ->
-		-- Trivial RHS, so augment envt, and ditch the binding
-		returnUs (triv_binds, new_env)
-	   where
-		new_env = addOneToIdEnv env binder (StgConArg con_id)
-
-      other ->    -- Non-trivial RHS
-           mkUniqueBinder env binder   `thenUs` \ (new_env, new_binder) ->
-           returnUs ([StgNonRec new_binder stg_rhs], new_env)
-    where
-     mkUniqueBinder env binder
-       | externallyVisibleId binder = returnUs (env, binder)
-       | otherwise = 
-           -- local binder, give it a new unique Id.
-           newUniqueLocalId binder   `thenUs` \ binder' ->
-           let
-             new_env = addOneToIdEnv env binder (StgVarArg binder')
-           in
-	   returnUs (new_env, binder')
-
+    newLocalId env binder	`thenUs` \ (new_env, new_binder) ->
+    returnUs ([StgNonRec new_binder stg_rhs], new_env)
 
 coreBindToStg env (Rec pairs)
-  = -- NB: *** WE DO NOT CHECK FOR TRIV_BINDS in REC BIND ****
-    -- (possibly ToDo)
-    let
-	(binders, rhss) = unzip pairs
-    in
-    newLocalIds env True{-maybe externally visible-} binders   `thenUs` \ (binders', env') ->
-    mapUs (coreRhsToStg env') rhss                             `thenUs` \ stg_rhss ->
+  = newLocalIds env binders		`thenUs` \ (env', binders') ->
+    mapUs (coreRhsToStg env') rhss      `thenUs` \ stg_rhss ->
     returnUs ([StgRec (binders' `zip` stg_rhss)], env')
+  where
+    (binders, rhss) = unzip pairs
 \end{code}
 
 
@@ -179,25 +137,27 @@ coreRhsToStg :: StgEnv -> CoreExpr -> UniqSM StgRhs
 
 coreRhsToStg env core_rhs
   = coreExprToStg env core_rhs 	`thenUs` \ stg_expr ->
+    returnUs (exprToRhs stg_expr)
 
-    let stg_rhs = case stg_expr of
-		    StgLet (StgNonRec var1 rhs) (StgApp (StgVarArg var2) [] _)
-			| var1 == var2 -> rhs
-			-- This curious stuff is to unravel what a lambda turns into
-			-- We have to do it this way, rather than spot a lambda in the
-			-- incoming rhs.  Why?  Because trivial bindings might conceal
-			-- what the rhs is actually like.
+exprToRhs (StgLet (StgNonRec var1 rhs) (StgApp var2 []))
+  | var1 == var2 
+  = rhs
+	-- This curious stuff is to unravel what a lambda turns into
+	-- We have to do it this way, rather than spot a lambda in the
+	-- incoming rhs.  Why?  Because trivial bindings might conceal
+	-- what the rhs is actually like.
 
-		    StgCon con args _ -> StgRhsCon noCostCentre con args
+exprToRhs (StgCon (DataCon con) args _) = StgRhsCon noCCS con args
 
-		    other -> StgRhsClosure noCostCentre	-- No cost centre (ToDo?)
-					   stgArgOcc	-- safe
-					   bOGUS_FVs
-					   Updatable	-- Be pessimistic
-					   []
-					   stg_expr
-    in
-    returnUs stg_rhs
+exprToRhs expr 
+	= StgRhsClosure noCCS		-- No cost centre (ToDo?)
+		        stgArgOcc	-- safe
+			noSRT		-- figure out later
+			bOGUS_FVs
+			Updatable	-- Be pessimistic
+			[]
+			expr
+
 \end{code}
 
 
@@ -208,16 +168,44 @@ coreRhsToStg env core_rhs
 %************************************************************************
 
 \begin{code}
-coreArgsToStg :: StgEnv -> [CoreArg] -> ([Type], [StgArg])
+coreArgsToStg :: StgEnv -> [CoreArg]
+	      -> UniqSM ([(Id,StgExpr)], [StgArg])
 
-coreArgsToStg env [] = ([], [])
+coreArgsToStg env []
+  = returnUs ([], [])
+
+coreArgsToStg env (Type ty : as)	-- Discard type arguments
+  = coreArgsToStg env as
+
 coreArgsToStg env (a:as)
-  = case a of
-	TyArg    t -> (t:trest, vrest)
-	VarArg   v -> (trest,   stgLookup env v : vrest)
-	LitArg   l -> (trest,   StgLitArg l     : vrest)
-  where
-    (trest,vrest) = coreArgsToStg env as
+  = coreArgToStg env a		`thenUs` \ (bs1, a') ->
+    coreArgsToStg env as	`thenUs` \ (bs2, as') ->
+    returnUs (bs1 ++ bs2, a' : as')
+
+-- This is where we arrange that a non-trivial argument is let-bound
+
+coreArgToStg :: StgEnv -> CoreArg -> UniqSM ([(Id,StgExpr)], StgArg)
+
+coreArgToStg env arg
+  = coreExprToStgFloat env arg	`thenUs` \ (binds, arg') ->
+    case (binds, arg') of
+	([], StgCon con [] _) | isWHNFCon con -> returnUs ([], StgConArg con)
+	([], StgApp v [])		      -> returnUs ([], StgVarArg v)
+
+	-- A non-trivial argument: we must let (or case-bind)
+	-- We don't do the case part here... we leave that to mkStgLets
+
+	-- Further complication: if we're converting this binding into
+	-- a case,  then try to avoid generating any case-of-case
+	-- expressions by pulling out the floats.
+	(_, other) ->
+		 newStgVar ty	`thenUs` \ v ->
+		 if isUnLiftedType ty
+		   then returnUs (binds ++ [(v,arg')], StgVarArg v)
+		   else returnUs ([(v, mkStgLets binds arg')], StgVarArg v)
+	  where 
+		ty = coreExprType arg
+
 \end{code}
 
 
@@ -230,29 +218,8 @@ coreArgsToStg env (a:as)
 \begin{code}
 coreExprToStg :: StgEnv -> CoreExpr -> UniqSM StgExpr
 
-coreExprToStg env (Lit lit)
-  = returnUs (StgApp (StgLitArg lit) [] bOGUS_LVs)
-
 coreExprToStg env (Var var)
-  = returnUs (mk_app (stgLookup env var) [])
-
-coreExprToStg env (Con con args)
-  = let
-	(types, stg_atoms) = coreArgsToStg env args
-    in
-    returnUs (StgCon con stg_atoms bOGUS_LVs)
-
-coreExprToStg env (Prim op args)
-  = mkPrimOpUnique op `thenUs` \ op' ->
-    let
-	(types, stg_atoms) = coreArgsToStg env args
-    in
-    returnUs (StgPrim op' stg_atoms bOGUS_LVs)
-   where
-    mkPrimOpUnique (CCallOp (Right _) a b c d e) =
-       getUnique `thenUs` \ u ->
-       returnUs (CCallOp (Right u) a b c d e)
-    mkPrimOpUnique op = returnUs op
+  = returnUs (StgApp (stgLookup env var) [])
 
 \end{code}
 
@@ -265,148 +232,44 @@ coreExprToStg env (Prim op args)
 \begin{code}
 coreExprToStg env expr@(Lam _ _)
   = let
-	(_, binders, body) = collectBinders expr
+	(binders, body) = collectBinders expr
+	id_binders      = filter isId binders
     in
-    newLocalIds env False{-all local-} binders  `thenUs` \ (binders', env') ->
-    coreExprToStg env' body                     `thenUs` \ stg_body ->
+    newLocalIds env id_binders		`thenUs` \ (env', binders') ->
+    coreExprToStg env' body             `thenUs` \ stg_body ->
 
-    if null binders then -- it was all type/usage binders; tossed
+    if null id_binders then -- it was all type/usage binders; tossed
 	returnUs stg_body
     else
+    case stg_body of
+
+      -- if the body reduced to a lambda too...
+      (StgLet (StgNonRec var (StgRhsClosure cc bi srt fvs uf args body))
+	      (StgApp var' []))
+       | var == var' ->
+ 	returnUs (StgLet (StgNonRec var 
+			    (StgRhsClosure noCCS
+				stgArgOcc
+				noSRT
+				bOGUS_FVs
+				ReEntrant
+				(binders' ++ args)
+				body))
+		(StgApp var []))
+				    
+      other ->
+
+	-- We must let-bind the lambda
 	newStgVar (coreExprType expr)	`thenUs` \ var ->
 	returnUs
-	  (StgLet (StgNonRec var
-				  (StgRhsClosure noCostCentre
+	  (StgLet (StgNonRec var (StgRhsClosure noCCS
 				  stgArgOcc
+				  noSRT
 				  bOGUS_FVs
 				  ReEntrant 	-- binders is non-empty
 				  binders'
 				  stg_body))
-	   (StgApp (StgVarArg var) [] bOGUS_LVs))
-\end{code}
-
-%************************************************************************
-%*									*
-\subsubsection[coreToStg-applications]{Applications}
-%*									*
-%************************************************************************
-
-\begin{code}
-coreExprToStg env expr@(App _ _)
-  = let
-	(fun,args)    = collect_args expr []
-	(_, stg_args) = coreArgsToStg env args
-    in
-	-- Now deal with the function
-    case (fun, args) of
-      (Var fun_id, _) -> 	-- A function Id, so do an StgApp; it's ok if
-				-- there are no arguments.
-			    returnUs (mk_app (stgLookup env fun_id) stg_args)
-
-      (non_var_fun, []) -> 	-- No value args, so recurse into the function
-			    coreExprToStg env non_var_fun
-
-      other ->	-- A non-variable applied to things; better let-bind it.
-		newStgVar (coreExprType fun)	`thenUs` \ fun_id ->
-		coreExprToStg env fun		`thenUs` \ (stg_fun) ->
-		let
-		   fun_rhs = StgRhsClosure noCostCentre	-- No cost centre (ToDo?)
-					   stgArgOcc
-					   bOGUS_FVs
-					   SingleEntry	-- Only entered once
-					   []
-					   stg_fun
-		in
-		returnUs (StgLet (StgNonRec fun_id fun_rhs)
-			   	 (StgApp (StgVarArg fun_id) stg_args bOGUS_LVs))
-  where
-	-- Collect arguments, discarding type/usage applications
-    collect_args (App e   (TyArg _))      args = collect_args e   args
-    collect_args (App fun arg)            args = collect_args fun (arg:args)
-    collect_args (Note (Coerce _ _) expr) args = collect_args expr args
-    collect_args (Note InlineCall   expr) args = collect_args expr args
-    collect_args fun                      args = (fun, args)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsubsection[coreToStg-cases]{Case expressions}
-%*									*
-%************************************************************************
-
-
-******* TO DO TO DO: fix what follows
-
-Special case for
-
-	case (op x1 ... xn) of
-	  y -> e
-
-where the type of the case scrutinee is a multi-constuctor algebraic type.
-Then we simply compile code for
-
-	let y = op x1 ... xn
-	in
-	e
-
-In this case:
-
-	case (op x1 ... xn) of
-	   C a b -> ...
-	   y     -> e
-
-where the type of the case scrutinee is a multi-constuctor algebraic type.
-we just bomb out at the moment. It never happens in practice.
-
-**** END OF TO DO TO DO
-
-\begin{code}
-coreExprToStg env (Case scrut@(Prim op args) (AlgAlts alts (BindDefault binder rhs)))
-  = if not (null alts) then
-    	panic "cgCase: case on PrimOp with default *and* alts\n"
-	-- For now, die if alts are non-empty
-    else
-	coreExprToStg env (Let (NonRec binder scrut) rhs)
-
-coreExprToStg env (Case discrim alts)
-  = coreExprToStg env discrim		`thenUs` \ stg_discrim ->
-    alts_to_stg discrim alts		`thenUs` \ stg_alts ->
-    getUnique				`thenUs` \ uniq ->
-    returnUs (
-	StgCase stg_discrim
-		bOGUS_LVs
-		bOGUS_LVs
-		uniq
-		stg_alts
-    )
-  where
-    discrim_ty		    = coreExprType discrim
-    (_, discrim_ty_args, _) = splitAlgTyConApp discrim_ty
-
-    alts_to_stg discrim (AlgAlts alts deflt)
-      = default_to_stg discrim deflt		`thenUs` \ stg_deflt ->
-	mapUs boxed_alt_to_stg alts		`thenUs` \ stg_alts  ->
-	returnUs (StgAlgAlts discrim_ty stg_alts stg_deflt)
-      where
-	boxed_alt_to_stg (con, bs, rhs)
-	  = coreExprToStg env rhs    `thenUs` \ stg_rhs ->
-	    returnUs (con, bs, [ True | b <- bs ]{-bogus use mask-}, stg_rhs)
-
-    alts_to_stg discrim (PrimAlts alts deflt)
-      = default_to_stg discrim deflt		`thenUs` \ stg_deflt ->
-	mapUs unboxed_alt_to_stg alts		`thenUs` \ stg_alts  ->
-	returnUs (StgPrimAlts discrim_ty stg_alts stg_deflt)
-      where
-	unboxed_alt_to_stg (lit, rhs)
-	  = coreExprToStg env rhs    `thenUs` \ stg_rhs ->
-	    returnUs (lit, stg_rhs)
-
-    default_to_stg discrim NoDefault
-      = returnUs StgNoDefault
-
-    default_to_stg discrim (BindDefault binder rhs)
-      = coreExprToStg env rhs    `thenUs` \ stg_rhs ->
-	returnUs (StgBindDefault binder True{-used? no it is lying-} stg_rhs)
+	   (StgApp var []))
 \end{code}
 
 %************************************************************************
@@ -419,7 +282,7 @@ coreExprToStg env (Case discrim alts)
 coreExprToStg env (Let bind body)
   = coreBindToStg env     bind   `thenUs` \ (stg_binds, new_env) ->
     coreExprToStg new_env body   `thenUs` \ stg_body ->
-    returnUs (mkStgLets stg_binds stg_body)
+    returnUs (foldr StgLet stg_body stg_binds)
 \end{code}
 
 
@@ -433,13 +296,138 @@ Covert core @scc@ expression directly to STG @scc@ expression.
 \begin{code}
 coreExprToStg env (Note (SCC cc) expr)
   = coreExprToStg env expr   `thenUs` \ stg_expr ->
-    returnUs (StgSCC (coreExprType expr) cc stg_expr)
+    returnUs (StgSCC cc stg_expr)
 \end{code}
 
 \begin{code}
 coreExprToStg env (Note other_note expr) = coreExprToStg env expr
 \end{code}
 
+The rest are handled by coreExprStgFloat.
+
+\begin{code}
+coreExprToStg env expr
+  = coreExprToStgFloat env expr  `thenUs` \ (binds,stg_expr) ->
+    returnUs (mkStgLets binds stg_expr)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[coreToStg-applications]{Applications}
+%*									*
+%************************************************************************
+
+\begin{code}
+coreExprToStgFloat env expr@(App _ _)
+  = let
+	(fun,args)    = collect_args expr []
+    in
+    coreArgsToStg env args		`thenUs` \ (binds, stg_args) ->
+
+	-- Now deal with the function
+    case (fun, stg_args) of
+      (Var fun_id, _) -> 	-- A function Id, so do an StgApp; it's ok if
+				-- there are no arguments.
+			    returnUs (binds, 
+				   StgApp (stgLookup env fun_id) stg_args)
+
+      (non_var_fun, []) -> 	-- No value args, so recurse into the function
+			    ASSERT( null binds )
+			    coreExprToStg env non_var_fun `thenUs` \e ->
+			    returnUs ([], e)
+
+      other ->	-- A non-variable applied to things; better let-bind it.
+		newStgVar (coreExprType fun)	`thenUs` \ fun_id ->
+		coreExprToStg env fun		`thenUs` \ (stg_fun) ->
+		let
+		   fun_rhs = StgRhsClosure noCCS    -- No cost centre (ToDo?)
+					   stgArgOcc
+					   noSRT
+					   bOGUS_FVs
+					   SingleEntry	-- Only entered once
+					   []
+					   stg_fun
+		in
+		returnUs (binds,
+			  StgLet (StgNonRec fun_id fun_rhs) $
+			  StgApp fun_id stg_args)
+  where
+	-- Collect arguments
+    collect_args (App fun arg)            args = collect_args fun (arg:args)
+    collect_args (Note (Coerce _ _) expr) args = collect_args expr args
+    collect_args (Note InlineCall   expr) args = collect_args expr args
+    collect_args fun                      args = (fun, args)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[coreToStg-con]{Constructors}
+%*									*
+%************************************************************************
+
+\begin{code}
+coreExprToStgFloat env expr@(Con (PrimOp (CCallOp (Right _) a b c)) args)
+  = getUniqueUs			`thenUs` \ u ->
+    coreArgsToStg env args      `thenUs` \ (binds, stg_atoms) ->
+    let con' = PrimOp (CCallOp (Right u) a b c) in
+    returnUs (binds, StgCon con' stg_atoms (coreExprType expr))
+
+coreExprToStgFloat env expr@(Con con args)
+  = coreArgsToStg env args	`thenUs` \ (binds, stg_atoms) ->
+    returnUs (binds, StgCon con stg_atoms (coreExprType expr))
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[coreToStg-cases]{Case expressions}
+%*									*
+%************************************************************************
+
+\begin{code}
+coreExprToStgFloat env expr@(Case scrut bndr alts)
+  = coreExprToStgFloat env scrut		`thenUs` \ (binds, scrut') ->
+    newLocalId env bndr				`thenUs` \ (env', bndr') ->
+    alts_to_stg env' (findDefault alts)		`thenUs` \ alts' ->
+    returnUs (binds, mkStgCase scrut' bndr' alts')
+  where
+    scrut_ty  = idType bndr
+    prim_case = isUnLiftedType scrut_ty && not (isUnboxedTupleType scrut_ty)
+
+    alts_to_stg env (alts, deflt)
+      | prim_case
+      = default_to_stg env deflt		`thenUs` \ deflt' ->
+	mapUs (prim_alt_to_stg env) alts	`thenUs` \ alts' ->
+	returnUs (StgPrimAlts scrut_ty alts' deflt')
+
+      | otherwise
+      = default_to_stg env deflt		`thenUs` \ deflt' ->
+	mapUs (alg_alt_to_stg env) alts		`thenUs` \ alts' ->
+	returnUs (StgAlgAlts scrut_ty alts' deflt')
+
+    alg_alt_to_stg env (DataCon con, bs, rhs)
+	  = coreExprToStg env rhs    `thenUs` \ stg_rhs ->
+	    returnUs (con, bs, [ True | b <- bs ]{-bogus use mask-}, stg_rhs)
+
+    prim_alt_to_stg env (Literal lit, args, rhs)
+	  = ASSERT( null args )
+	    coreExprToStg env rhs    `thenUs` \ stg_rhs ->
+	    returnUs (lit, stg_rhs)
+
+    default_to_stg env Nothing
+      = returnUs StgNoDefault
+
+    default_to_stg env (Just rhs)
+      = coreExprToStg env rhs    `thenUs` \ stg_rhs ->
+	returnUs (StgBindDefault stg_rhs)
+		-- The binder is used for prim cases and not otherwise
+		-- (hack for old code gen)
+\end{code}
+
+\begin{code}
+coreExprToStgFloat env expr
+  = coreExprToStg env expr `thenUs` \stg_expr ->
+    returnUs ([], stg_expr)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -451,52 +439,61 @@ There's not anything interesting we can ASSERT about \tr{var} if it
 isn't in the StgEnv. (WDP 94/06)
 
 \begin{code}
-stgLookup :: StgEnv -> Id -> StgArg
-stgLookup env var = case (lookupIdEnv env var) of
-		      Nothing   -> StgVarArg var
-		      Just atom -> atom
+stgLookup :: StgEnv -> Id -> Id
+stgLookup env var = case (lookupVarEnv env var) of
+		      Nothing  -> var
+		      Just var -> var
 \end{code}
 
 Invent a fresh @Id@:
 \begin{code}
 newStgVar :: Type -> UniqSM Id
 newStgVar ty
- = getUnique			`thenUs` \ uniq ->
-   returnUs (mkSysLocal SLIT("stg") uniq ty noSrcLoc)
+ = getUniqueUs	 		`thenUs` \ uniq ->
+   returnUs (mkUserLocal (varOcc SLIT("stg")) uniq ty)
 \end{code}
 
 \begin{code}
-newUniqueLocalId :: Id -> UniqSM Id
-newUniqueLocalId i =
-   getUnique			`thenUs` \ uniq ->
-   returnUs (mkIdWithNewUniq i uniq)
+newLocalId env id
+  | externallyVisibleId id
+  = returnUs (env, id)
 
-newLocalIds :: StgEnv -> Bool -> [Id] -> UniqSM ([Id], StgEnv)
-newLocalIds env maybe_visible [] = returnUs ([], env)
-newLocalIds env maybe_visible (i:is)
- | maybe_visible && externallyVisibleId i = 
-     newLocalIds env maybe_visible is `thenUs` \ (is', env') ->
-     returnUs (i:is', env')
- | otherwise             =
-     newUniqueLocalId i `thenUs` \ i' ->
-     let
-      new_env = addOneToIdEnv env i (StgVarArg i')
-     in
-     newLocalIds new_env maybe_visible is `thenUs` \ (is', env') ->
-     returnUs (i':is', env')
+  | otherwise
+  =	-- Local binder, give it a new unique Id.
+    getUniqueUs			`thenUs` \ uniq ->
+    let
+      id'     = setIdUnique id uniq
+      new_env = extendVarEnv env id id'
+    in
+    returnUs (new_env, id')
+
+newLocalIds :: StgEnv -> [Id] -> UniqSM (StgEnv, [Id])
+newLocalIds env []
+  = returnUs (env, [])
+newLocalIds env (b:bs)
+  = newLocalId env b	`thenUs` \ (env', b') ->
+    newLocalIds env' bs	`thenUs` \ (env'', bs') ->
+    returnUs (env'', b':bs')
 \end{code}
 
 
 \begin{code}
-mkStgLets ::   [StgBinding]
-	    -> StgExpr	-- body of let
-	    -> StgExpr
+mkStgLets :: [(Id,StgExpr)] -> StgExpr -> StgExpr
+mkStgLets binds body = foldr mkStgLet body binds
 
-mkStgLets binds body = foldr StgLet body binds
+mkStgLet (bndr, rhs) body
+  | isUnboxedTupleType bndr_ty
+  = panic "mkStgLets: unboxed tuple"
+  | isUnLiftedType bndr_ty
+  = mkStgCase rhs bndr (StgPrimAlts bndr_ty [] (StgBindDefault body))
 
--- mk_app spots an StgCon in a function position, 
--- and turns it into an StgCon. See notes with
--- getArgAmode in CgBindery.
-mk_app (StgConArg con) args = StgCon con       args bOGUS_LVs
-mk_app other_fun       args = StgApp other_fun args bOGUS_LVs
+  | otherwise
+  = StgLet (StgNonRec bndr (exprToRhs rhs)) body
+  where
+    bndr_ty = idType bndr
+
+mkStgCase (StgLet bind expr) bndr alts
+  = StgLet bind (mkStgCase expr bndr alts)
+mkStgCase scrut bndr alts
+  = StgCase scrut bOGUS_LVs bOGUS_LVs bndr noSRT alts
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[SpecEnv]{Specialisation info about an @Id@}
 
@@ -7,15 +7,17 @@
 module SpecEnv (
 	SpecEnv,
 	emptySpecEnv, isEmptySpecEnv,
-	specEnvValues, specEnvToList,
+	specEnvValues, specEnvToList, specEnvFromList,
 	addToSpecEnv, lookupSpecEnv, substSpecEnv
     ) where
 
 #include "HsVersions.h"
 
-import Type		( Type, GenType, mkTyVarTy, matchTys, tyVarsOfTypes, applyToTyVars )
-import TyVar		( TyVar, GenTyVar, TyVarEnv, tyVarFlexi, setTyVarFlexi, lookupTyVarEnv, tyVarSetToList )
-import Unify		( Subst, unifyTyListsX )
+import Var		( TyVar )
+import VarEnv
+import VarSet
+import Type		( Type, GenType, fullSubstTy, substTyVar )
+import Unify		( unifyTyListsX, matchTys )
 import Outputable
 import Maybes
 import Util		( assertPanic )
@@ -30,27 +32,25 @@ import Util		( assertPanic )
 %************************************************************************
 
 \begin{code}
-type TemplateTyVar = GenTyVar Bool
-type TemplateType  = GenType Bool
-      -- The Bool is True for template type variables;
-      -- that is, ones that can be bound
-
 data SpecEnv value 
   = EmptySE 
-  | SpecEnv [([TemplateType], value)]
+  | SpecEnv [([TyVar], 	-- Really a set, but invariably small,
+			-- so kept as a list
+	      [Type], 
+	      value)]
 
 specEnvValues :: SpecEnv value -> [value]
 specEnvValues EmptySE         = []
-specEnvValues (SpecEnv alist) = map snd alist
+specEnvValues (SpecEnv alist) = [val | (_,_,val) <- alist]
 
-specEnvToList :: SpecEnv value -> [([TemplateTyVar], [TemplateType], value)]
+specEnvToList :: SpecEnv value -> [([TyVar], [Type], value)]
 specEnvToList EmptySE         = []
-specEnvToList (SpecEnv alist)
-  = map do_item alist
-  where
-    do_item (tys, val) = (tyvars, tys, val)
-		       where
-			 tyvars = filter tyVarFlexi (tyVarSetToList (tyVarsOfTypes tys))
+specEnvToList (SpecEnv alist) = alist
+
+specEnvFromList :: [([TyVar], [Type], value)] -> SpecEnv value
+	-- Assumes the list is in appropriate order
+specEnvFromList []    = EmptySE
+specEnvFromList alist = SpecEnv alist
 \end{code}
 
 In some SpecEnvs overlap is prohibited; that is, no pair of templates unify.
@@ -95,8 +95,8 @@ lookupSpecEnv doc (SpecEnv alist) key
   = find alist
   where
     find [] = Nothing
-    find ((tpl, val) : rest)
-      = case matchTys tpl key of
+    find ((tpl_tyvars, tpl, val) : rest)
+      = case matchTys tpl_tyvars tpl key of
 	  Nothing                 -> find rest
 	  Just (subst, leftovers) -> ASSERT( null leftovers )
 				     Just (subst, val)
@@ -113,52 +113,61 @@ True => overlap is permitted, but only if one template matches the other;
 addToSpecEnv :: Bool                            -- True <=> overlap permitted
              -> SpecEnv value			-- Envt
 	     -> [TyVar] -> [Type] -> value	-- New item
-	     -> MaybeErr (SpecEnv value)	        -- Success...
-		          ([TemplateType], value)	-- Failure: Offending overlap
+	     -> MaybeErr (SpecEnv value)	-- Success...
+		          ([Type], value)	-- Failure: Offending overlap
 
-addToSpecEnv overlap_ok spec_env tvs tys value
+addToSpecEnv overlap_ok spec_env ins_tvs ins_tys value
   = case spec_env of
        EmptySE       -> returnMaB (SpecEnv [ins_item])
        SpecEnv alist -> insert alist    `thenMaB` \ alist' ->
                         returnMaB (SpecEnv alist')
   where
-    ins_item = (ins_tys, value)
-    ins_tys  = map (applyToTyVars mk_tv) tys
-
-    mk_tv tv = mkTyVarTy (setTyVarFlexi tv (tv `elem` tvs))
-               -- tvs identifies the template variables
+    ins_item = (ins_tvs, ins_tys, value)
 
     insert [] = returnMaB [ins_item]
-    insert alist@(cur_item@(cur_tys, _) : rest)
-      | unifiable && not overlap_ok             = failMaB cur_item
-      | unifiable && ins_item_more_specific     = returnMaB (ins_item : alist)
-      | unifiable && not cur_item_more_specific = failMaB cur_item
-      | otherwise                               = -- Less specific, or not unifiable... carry on
-                                                  insert rest     `thenMaB` \ rest' ->
-                                                  returnMaB (cur_item : rest')
+    insert alist@(cur_item@(tpl_tvs, tpl_tys, val) : rest)
+
+	-- FAIL if:
+	-- (a) they are the same, or
+	-- (b) they unify, and any sort of overlap is prohibited,
+	-- (c) they unify but neither is more specific than t'other
+      |  identical 
+      || (unifiable && not overlap_ok)
+      || (unifiable && not (ins_item_more_specific || cur_item_more_specific))
+      =  failMaB (tpl_tys, val)
+
+	-- New item is an instance of current item, so drop it here
+      | ins_item_more_specific	= returnMaB (ins_item : alist)
+
+	-- Otherwise carry on
+      | otherwise  = insert rest     `thenMaB` \ rest' ->
+                     returnMaB (cur_item : rest')
       where
-        unifiable = maybeToBool (unifyTyListsX cur_tys ins_tys)
-        ins_item_more_specific = maybeToBool (matchTys cur_tys ins_tys)
-        cur_item_more_specific = maybeToBool (matchTys ins_tys cur_tys)
+        unifiable = maybeToBool (unifyTyListsX (ins_tvs ++ tpl_tvs) tpl_tys ins_tys)
+        ins_item_more_specific = maybeToBool (matchTys tpl_tvs tpl_tys ins_tys)
+        cur_item_more_specific = maybeToBool (matchTys ins_tvs ins_tys tpl_tys)
+	identical = ins_item_more_specific && cur_item_more_specific
 \end{code}
 
 Finally, during simplification we must apply the current substitution to
 the SpecEnv.
 
 \begin{code}
-substSpecEnv :: TyVarEnv Type -> (val -> val) -> SpecEnv val -> SpecEnv val
-substSpecEnv ty_env val_fn EmptySE = EmptySE
-substSpecEnv ty_env val_fn (SpecEnv alist)
-  = SpecEnv [(map ty_fn tys, val_fn val) | (tys, val) <- alist]
+substSpecEnv :: TyVarEnv Type -> IdOrTyVarSet 
+	     -> (TyVarEnv Type -> IdOrTyVarSet -> val -> val)
+	     -> SpecEnv val -> SpecEnv val
+substSpecEnv ty_subst in_scope val_fn EmptySE = EmptySE
+substSpecEnv ty_subst in_scope val_fn (SpecEnv alist)
+  = SpecEnv (map subst alist)
   where
-    ty_fn = applyToTyVars tyvar_fn
+    subst (tpl_tyvars, tpl_tys, val)
+	= (tpl_tyvars', 
+	   map (fullSubstTy ty_subst' in_scope') tpl_tys, 
+	   val_fn ty_subst' in_scope' val)
+	where
+	  (ty_subst', in_scope', tpl_tyvars') = go ty_subst in_scope [] tpl_tyvars
 
-    -- Apply the substitution; but if we ever substitute
-    -- we need to convert a Type to a TemplateType
-    tyvar_fn tv | tyVarFlexi tv = mkTyVarTy tv
-                | otherwise     = case lookupTyVarEnv ty_env tv of
-                                    Nothing -> mkTyVarTy tv
-                                    Just ty -> applyToTyVars set_non_tpl ty
-
-    set_non_tpl tv = mkTyVarTy (setTyVarFlexi tv False)
+	  go s i acc []       = (s, i, reverse acc)
+	  go s i acc (tv:tvs) = case substTyVar s i tv of
+				  (s', i', tv') -> go s' i' (tv' : acc) tvs
 \end{code}

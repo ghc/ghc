@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[AnalFBWW]{Spoting good functions for splitting into workers/wrappers}
 
@@ -8,8 +8,9 @@ module AnalFBWW ( analFBWW ) where
 
 #include "HsVersions.h"
 
-import CoreSyn		( CoreBinding )
-import Util		( panic{-ToDo:rm-} )
+-- Just a stub for now
+import CoreSyn		( CoreBind )
+import Util		( panic )
 
 --import Util
 --import Id               	( addIdFBTypeInfo )
@@ -26,8 +27,8 @@ import Util		( panic{-ToDo:rm-} )
 
 \begin{code}
 analFBWW
-	:: [CoreBinding]
-	-> [CoreBinding]
+	:: [CoreBind]
+	-> [CoreBind]
 
 analFBWW = panic "analFBWW (ToDo)"
 
@@ -36,7 +37,7 @@ analFBWW top_binds = trace "ANALFBWW" (snd anno)
  where
 	anals :: [InBinding]
 	anals = newOccurAnalyseBinds top_binds (const False)
-	anno = mapAccumL annotateBindingFBWW nullIdEnv anals
+	anno = mapAccumL annotateBindingFBWW emptyVarEnv anals
 \end{code}
 
 \begin{code}
@@ -105,10 +106,10 @@ analExprFBWW (App (App (App
 		(ppr foldr_id)
 		(foldr_id == foldrId && isCons c) = goodProdFBType
    where
-	isCons c = case lookupIdEnv env c of
+	isCons c = case lookupVarEnv env c of
 		    Just IsCons -> True
 		    _ -> False
-analExprFBWW (Var v) env       = maybeFBtoFB (lookupIdEnv env v)
+analExprFBWW (Var v) env       = maybeFBtoFB (lookupVarEnv env v)
 analExprFBWW (Lit _) _         = unknownFBType
 
 --
@@ -116,7 +117,7 @@ analExprFBWW (Lit _) _         = unknownFBType
 --
 
 analExprFBWW (Con con _ [_,VarArg y]) env
-	| con == consDataCon = maybeFBtoFB (lookupIdEnv env y)
+	| con == consDataCon = maybeFBtoFB (lookupVarEnv env y)
 --
 -- [] is good
 --
@@ -132,7 +133,7 @@ analExprFBWW (Lam (x,_) (Lam (y,_)
   | con == consDataCon && x == x' && y == y'
   = IsCons
 analExprFBWW (Lam (id,_) e) env
-  = addArgs 1 (analExprFBWW e (delOneFromIdEnv env id))
+  = addArgs 1 (analExprFBWW e (delVarEnv env id))
 
 analExprFBWW (CoTyLam tyvar e) env = analExprFBWW e env
 analExprFBWW (App f atom) env   = rmArg (analExprFBWW f env)
@@ -146,7 +147,7 @@ analAltsFBWW (AlgAlts alts deflt) env
 	Just ty -> ty : tys
 	Nothing -> tys
    where
-     tys = map (\(con,binders,e) -> analExprFBWW e (delManyFromIdEnv env (map fst binders))) alts
+     tys = map (\(con,binders,e) -> analExprFBWW e (delVarEnvList env (map fst binders))) alts
 analAltsFBWW (PrimAlts alts deflt) env
   = case analDefFBWW deflt env of
 	Just ty -> ty : tys
@@ -156,7 +157,7 @@ analAltsFBWW (PrimAlts alts deflt) env
 
 
 analDefFBWW NoDefault env = Nothing
-analDefFBWW (BindDefault v e) env = Just (analExprFBWW e (delOneFromIdEnv env (fst v)))
+analDefFBWW (BindDefault v e) env = Just (analExprFBWW e (delVarEnv env (fst v)))
 \end{code}
 
 
@@ -178,17 +179,17 @@ analBindExpr bnd expr env
 analBind :: InBinding -> IdEnv OurFBType -> IdEnv OurFBType
 analBind (NonRec (v,bnd) e) env =
 	case analBindExpr bnd e env of
-	 ty@(IsFB _) -> addOneToIdEnv env v ty
-	 ty@(IsCons) -> addOneToIdEnv env v ty
-	 _ -> delOneFromIdEnv env v	-- remember about shadowing!
+	 ty@(IsFB _) -> extendVarEnv env v ty
+	 ty@(IsCons) -> extendVarEnv env v ty
+	 _ -> delVarEnv env v	-- remember about shadowing!
 
 analBind (Rec binds) env =
    let
 	first_set = [ (v,IsFB (FBType [FBBadConsum | _ <- args ] FBGoodProd)) | ((v,_),e) <- binds,
 				(_,args,_) <- [collectBinders e]]
-	env' = delManyFromIdEnv env (map (fst.fst) binds)
+	env' = delVarEnvList env (map (fst.fst) binds)
    in
-	growIdEnvList env' (fixpoint 0 binds env' first_set)
+	extendVarEnvList env' (fixpoint 0 binds env' first_set)
 
 fixpoint :: Int -> [(InBinder,InExpr)] -> IdEnv OurFBType -> [(Id,OurFBType)] -> [(Id,OurFBType)]
 fixpoint n binds env maps =
@@ -196,7 +197,7 @@ fixpoint n binds env maps =
 	then maps
 	else fixpoint (n+1) binds env maps'
    where
-	env' = growIdEnvList env maps
+	env' = extendVarEnvList env maps
 	maps' = [ (v,ty) | ((v,bind),e) <- binds,
 			(ty@(IsFB (FBType cons prod))) <- [analBindExpr bind e env']]
 
@@ -210,7 +211,7 @@ annotateExprFBWW (Lit i) env = Lit i
 annotateExprFBWW (Con c t a) env = Con c t a
 annotateExprFBWW (Prim p t a) env = Prim p t a
 annotateExprFBWW (Lam (id,_) e) env
-  = Lam id (annotateExprFBWW e (delOneFromIdEnv env id))
+  = Lam id (annotateExprFBWW e (delVarEnv env id))
 
 annotateExprFBWW (CoTyLam tyvar e) env = CoTyLam tyvar (annotateExprFBWW e env)
 annotateExprFBWW (App f atom) env = App (annotateExprFBWW f env) atom
@@ -226,7 +227,7 @@ annotateAltsFBWW (AlgAlts alts deflt) env = AlgAlts alts' deflt'
   where
 	alts' = [ let
 		   binders' = map fst binders
-		  in (con,binders',annotateExprFBWW e (delManyFromIdEnv env binders'))
+		  in (con,binders',annotateExprFBWW e (delVarEnvList env binders'))
 				| (con,binders,e) <- alts ]
 	deflt' = annotateDefFBWW deflt env
 annotateAltsFBWW (PrimAlts alts deflt) env = PrimAlts alts' deflt'
@@ -236,7 +237,7 @@ annotateAltsFBWW (PrimAlts alts deflt) env = PrimAlts alts' deflt'
 
 annotateDefFBWW NoDefault env = NoDefault
 annotateDefFBWW (BindDefault v e) env
-	= BindDefault (fst v) (annotateExprFBWW e (delOneFromIdEnv env (fst v)))
+	= BindDefault (fst v) (annotateExprFBWW e (delVarEnv env (fst v)))
 
 annotateBindingFBWW :: IdEnv OurFBType -> InBinding -> (IdEnv OurFBType,CoreBinding)
 annotateBindingFBWW env bnds = (env',bnds')
@@ -246,7 +247,7 @@ annotateBindingFBWW env bnds = (env',bnds')
 		  NonRec (v,_) e -> NonRec (fixId v) (annotateExprFBWW e env)
 		  Rec bnds -> Rec [ (fixId v,annotateExprFBWW e env') | ((v,_),e) <- bnds ]
 	fixId v =
-		(case lookupIdEnv env' v of
+		(case lookupVarEnv env' v of
 		   Just (IsFB ty@(FBType xs p))
 		    | not (null xs) -> pprTrace "ADDED to:" (ppr v)
 					(addIdFBTypeInfo v (mkFBTypeInfo ty))

@@ -3,7 +3,7 @@
 #
 #  RAWCPP TMPDIR TOP_PWD
 #  libdir libexecdir datadir INSTALLING
-#  ProjectVersionInt SED 
+#  SED 
 #
 # tries to work like mkdependC - capable of dealing with:
 #
@@ -100,6 +100,7 @@ $Include_dirs = '-I.';
 $Makefile = '';
 @Src_files = ();
 $Include_prelude = 0;
+@Defines = ();
 
 # Delete temp. file if script is halted.
 sub quit_upon_signal { print STDERR "Deleting $Tmp_prefix.hs .. \n"; unlink "$Tmp_prefix.hs"; }
@@ -112,10 +113,6 @@ if ( $Status ) {
     print stderr $Usage;
     exit(1);
 }
-
-push(@Defines,
-     ( #OLD: "-D__HASKELL1__=$Haskell_1",
-      "-D__GLASGOW_HASKELL__=$ProjectVersionInt"));
 
 @Import_dirs  = split(/:/,$Import_dirs);
 @Include_dirs = split(/\s+/,$Include_dirs); # still has -I's in it

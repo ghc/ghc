@@ -1,0 +1,1 @@
+ERROR "test/typechecker/t011.hs" (line 5): Existentially quantified variable from pattern MkAppl f x i appears in enclosing assumptions

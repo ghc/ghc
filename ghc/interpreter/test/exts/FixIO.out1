@@ -1,0 +1,22 @@
+Reading file "Monad.hs":
+Reading file "Maybe.hs":
+Reading file "IOExts.lhs":
+Reading file "ST.lhs":
+Reading file "IOExts.lhs":
+Reading file "test/exts/FixIO.lhs":
+Type :? for help
+Hugs:Just (1,2)
+Hugs:Just (2,1)
+Hugs:Just (1,2)
+Hugs:Just (2,1)
+Hugs:storing f
+storing g
+Just (1,2)
+Just (2,1)
+
+Hugs:storing f and g
+Constructed environment
+[("g",(2,1)), ("f",(1,2))]
+Just (1,2)
+Just (2,1)
+

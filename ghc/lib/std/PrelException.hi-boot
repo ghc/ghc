@@ -1,0 +1,11 @@
+---------------------------------------------------------------------------
+--                              PrelException.hi-boot
+-- 
+--      This hand-written interface file is the initial bootstrap version
+--	for PrelException.hi.
+---------------------------------------------------------------------------
+ 
+__interface PrelErr 1 where
+__export PrelException fail catch;
+1 fail :: __forall [a] => PrelIOBase.IOError -> PrelIOBase.IO a ;
+1 catch :: __forall [a] => PrelIOBase.IO a -> (PrelIOBase.IOError -> PrelIOBase.IO a) -> PrelIOBase.IO a ;

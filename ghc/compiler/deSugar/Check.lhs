@@ -16,29 +16,19 @@ import CoreSyn
 
 import DsUtils		( EquationInfo(..),
 			  MatchResult(..),
-			  EqnNo,
 			  EqnSet,
 			  CanItFail(..)
  			)
-import Id		( idType,
-			  Id,
-                          isTupleCon,			   
-                          getIdArity
-			)
-import IdInfo		( ArityInfo(..) )
-import Lex              ( isLexConSym )
-import Name             ( occNameString,
-                          Name,
-                          getName,
-                          nameUnique,
-                          getOccName,
-                          getOccString
+import Id		( idType )
+import DataCon		( DataCon, isTupleCon, isUnboxedTupleCon,
+			  dataConSourceArity )
+import Name             ( Name, occNameString,
+                          getOccName, getOccString, isLexConSym
                         )
 import Type		( Type, 
                           isUnboxedType, 
                           splitTyConApp_maybe
 			)
-import TyVar		( TyVar )
 import TysPrim		( intPrimTy, 
                           charPrimTy, 
                           floatPrimTy, 
@@ -48,6 +38,7 @@ import TysPrim		( intPrimTy,
 			)
 import TysWiredIn	( nilDataCon, consDataCon, 
                           mkTupleTy, tupleCon,
+			  mkUnboxedTupleTy, unboxedTupleCon,
                           mkListTy, 
                           charTy, charDataCon, 
                           intTy, intDataCon,
@@ -59,7 +50,6 @@ import TysWiredIn	( nilDataCon, consDataCon,
 			)
 import TyCon            ( tyConDataCons )
 import UniqSet
-import Unique		( Unique )
 import Outputable
 
 #include "HsVersions.h"
@@ -171,7 +161,7 @@ untidy b (ConPatIn name pats)  =
 untidy b (ConOpPatIn pat1 name fixity pat2) = 
        pars b (ConOpPatIn (untidy_pars pat1) name fixity (untidy_pars pat2)) 
 untidy _ (ListPatIn pats)  = ListPatIn (map untidy_no_pars pats) 
-untidy _ (TuplePatIn pats) = TuplePatIn (map untidy_no_pars pats)
+untidy _ (TuplePatIn pats boxed) = TuplePatIn (map untidy_no_pars pats) boxed
 
 untidy _ (LazyPatIn pat)        = panic "Check.untidy: LazyPatIn"
 untidy _ (AsPatIn name pat)     = panic "Check.untidy: AsPatIn"
@@ -222,10 +212,10 @@ There are several cases:
 check' :: [EquationInfo] -> ([ExhaustivePat],EqnSet)  
 check' []                                              = ([([],[])],emptyUniqSet)
 
-check' [EqnInfo n ctx ps (MatchResult CanFail _ _)] 
+check' [EqnInfo n ctx ps (MatchResult CanFail _)] 
    | all_vars ps  = ([(take (length ps) (repeat new_wild_pat),[])],  unitUniqSet n)
 
-check' qs@((EqnInfo n ctx ps (MatchResult CanFail _ _)):_) 
+check' qs@((EqnInfo n ctx ps (MatchResult CanFail _)):_) 
    | all_vars ps  = (pats,  addOneToUniqSet indexs n)
   where
     (pats,indexs) = check' (tail qs)
@@ -351,7 +341,7 @@ no_need_default_case cons qs = (concat pats, unionManyUniqSets indexs)
       pats_indexs   = map (\x -> construct_matrix x qs) cons
       (pats,indexs) = unzip pats_indexs 
 
-need_default_case :: [TypecheckedPat] -> [Id] -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
+need_default_case :: [TypecheckedPat] -> [DataCon] -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
 need_default_case used_cons unused_cons qs 
   | length default_eqns == 0 = (pats_default_no_eqns,indexs)
   | otherwise                = (pats_default,indexs_default)
@@ -367,7 +357,6 @@ need_default_case used_cons unused_cons qs
 
 construct_matrix :: TypecheckedPat -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
 construct_matrix con qs =
-
     (map (make_con con) pats,indexs) 
   where
     (pats,indexs) = (check' (remove_first_column con qs)) 
@@ -391,15 +380,15 @@ is transformed in:
 remove_first_column :: TypecheckedPat                -- Constructor 
                     -> [EquationInfo] 
                     -> [EquationInfo]
-remove_first_column (ConPat con _ con_pats) qs = 
+remove_first_column (ConPat con _ _ _ con_pats) qs = 
     map shift_var (filter (is_var_con con) qs)
   where
      new_wilds = [WildPat (outPatType arg_pat) | arg_pat <- con_pats]
-     shift_var (EqnInfo n ctx (ConPat _ _ ps':ps) result) = 
-                EqnInfo n ctx (ps'++ps)           result 
-     shift_var (EqnInfo n ctx (WildPat _     :ps) result) = 
-                EqnInfo n ctx (new_wilds ++   ps) result
-     shift_var _                                          = panic "Check.shift_var: Not implemented"
+     shift_var (EqnInfo n ctx (ConPat _ _ _ _ ps':ps) result) = 
+                EqnInfo n ctx (ps'++ps)               result 
+     shift_var (EqnInfo n ctx (WildPat _     :ps)     result) = 
+                EqnInfo n ctx (new_wilds ++   ps)     result
+     shift_var _ = panic "Check.Shift_var:No done"
 
 make_row_vars :: [HsLit] -> EquationInfo -> ExhaustivePat
 make_row_vars used_lits (EqnInfo _ _ pats _ ) = 
@@ -410,7 +399,7 @@ make_row_vars_for_constructor :: EquationInfo -> [WarningPat]
 make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = take (length (tail pats)) (repeat new_wild_pat)
 
 compare_cons :: TypecheckedPat -> TypecheckedPat -> Bool
-compare_cons (ConPat id1 _ _) (ConPat id2 _ _) = id1 == id2  
+compare_cons (ConPat id1 _ _ _ _) (ConPat id2 _ _ _ _) = id1 == id2  
 
 remove_dups :: [TypecheckedPat] -> [TypecheckedPat]
 remove_dups []     = []
@@ -418,7 +407,7 @@ remove_dups (x:xs) | or (map (\y -> compare_cons x y) xs) = remove_dups  xs
                    | otherwise                            = x : remove_dups xs
 
 get_used_cons :: [EquationInfo] -> [TypecheckedPat]
-get_used_cons qs = remove_dups [con | (EqnInfo _ _ (con@(ConPat _ _ _):_) _) <- qs]
+get_used_cons qs = remove_dups [con | (EqnInfo _ _ (con@(ConPat _ _ _ _ _):_) _) <- qs]
 
 remove_dups' :: [HsLit] -> [HsLit] 
 remove_dups' []                   = []
@@ -440,14 +429,14 @@ get_used_lits' ((EqnInfo _ _ ((NPat lit _ _):_) _):qs) =
 get_used_lits' (q:qs)                                  =       
 	       get_used_lits qs
 
-get_unused_cons :: [TypecheckedPat] -> [Id]
+get_unused_cons :: [TypecheckedPat] -> [DataCon]
 get_unused_cons used_cons = unused_cons
      where
-       (ConPat _ ty _) = head used_cons
-       Just (ty_con,_) = splitTyConApp_maybe ty
-       all_cons        = tyConDataCons ty_con
-       used_cons_as_id = map (\ (ConPat id _ _) -> id) used_cons
-       unused_cons     = uniqSetToList (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
+       (ConPat _ ty _ _ _) = head used_cons
+       Just (ty_con,_) 	   = splitTyConApp_maybe ty
+       all_cons        	   = tyConDataCons ty_con
+       used_cons_as_id 	   = map (\ (ConPat id _ _ _ _) -> id) used_cons
+       unused_cons     	   = uniqSetToList (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
 
 all_vars :: [TypecheckedPat] -> Bool
 all_vars []              = True
@@ -459,7 +448,7 @@ remove_var (EqnInfo n ctx (WildPat _:ps) result) = EqnInfo n ctx ps result
 remove_var _                                     = panic "Check:remove_var: equation not begin with a variable"
 
 is_con :: EquationInfo -> Bool
-is_con (EqnInfo _ _ ((ConPat _ _ _):_) _) = True
+is_con (EqnInfo _ _ ((ConPat _ _ _ _ _):_) _) = True
 is_con _                                  = False
 
 is_lit :: EquationInfo -> Bool
@@ -479,10 +468,10 @@ is_var :: EquationInfo -> Bool
 is_var (EqnInfo _ _ ((WildPat _):_) _)  = True
 is_var _                                = False
 
-is_var_con :: Id -> EquationInfo -> Bool
-is_var_con con (EqnInfo _ _ ((WildPat _):_)     _)             = True
-is_var_con con (EqnInfo _ _ ((ConPat id _ _):_) _) | id == con = True
-is_var_con con _                                               = False
+is_var_con :: DataCon -> EquationInfo -> Bool
+is_var_con con (EqnInfo _ _ ((WildPat _):_)     _)                 = True
+is_var_con con (EqnInfo _ _ ((ConPat id _ _ _ _):_) _) | id == con = True
+is_var_con con _                                                   = False
 
 is_var_lit :: HsLit -> EquationInfo -> Bool
 is_var_lit lit (EqnInfo _ _ ((WildPat _):_)     _)               = True
@@ -491,12 +480,12 @@ is_var_lit lit (EqnInfo _ _ ((NPat lit' _ _):_) _) | lit == lit' = True
 is_var_lit lit _                                                 = False
 \end{code}
 
-The difference between make_con and make_whole_con is that make_whole_con 
-creates a new constructor with all their arguments, and make_con takes a 
-list of arguments, creates the constructor getting their arguments from the 
-list. See where are used for details.
+The difference beteewn make_con and make_whole_con is that
+make_wole_con creates a new constructor with all their arguments, and
+make_Con takes a list of argumntes, creates the contructor geting thir
+argumnts from the list. See where are used for details.
 
-We need to reconstruct the patterns (make the constructors infix and 
+We need to reconstruct the patterns (make the constructors infix and
 similar) at the same time that we create the constructors.
 
 You can tell tuple constructors using
@@ -510,9 +499,9 @@ You can see if one constructor is infix with this clearer code :-))))))))))
        Rather clumsy but it works. (Simon Peyton Jones)
 
 
-We don't mind the nilDataCon because it doesn't change the way to print the 
-message, we are searching only for things like: [1,2,3], not x:xs .... 
-
+We con't mind the nilDataCon because it doesn't change the way to
+print the messsage, we are searching only for things like: [1,2,3],
+not x:xs ....
 
 In reconstruct_pat we want to "undo" the work that we have done in simplify_pat
 In particular:
@@ -520,8 +509,8 @@ In particular:
         ((:) x xs) returns to be (x:xs)
         (x:(...:[]) returns to be [x,...]
 
-The difficult case is the third one because we need to follow all the 
-constructors until the [] to know that we need to use the second case, 
+The difficult case is the third one becouse we need to follow all the
+contructors until the [] to know taht we need to use the second case,
 not the second.
 
 \begin{code}
@@ -541,13 +530,15 @@ make_list p (ListPatIn ps) = ListPatIn (p:ps)
 make_list _ _              = panic "Check.make_list: Invalid argument"
 
 make_con :: TypecheckedPat -> ExhaustivePat -> ExhaustivePat           
-make_con (ConPat id ty pats) (p:q:ps, constraints) 
+make_con (ConPat id _ _ _ _) (p:q:ps, constraints) 
      | return_list id q = (make_list p q : ps, constraints)
      | isInfixCon id = ((ConOpPatIn p name fixity q) : ps, constraints) 
     where name   = BS (getOccString id)
           fixity = panic "Check.make_con: Guessing fixity"
-make_con (ConPat id ty pats) (ps,constraints) 
-      | isTupleCon id = (TuplePatIn pats_con : rest_pats,    constraints) 
+
+make_con (ConPat id _ _ _ pats) (ps,constraints) 
+      | isTupleCon id        = (TuplePatIn pats_con True : rest_pats,    constraints) 
+      | isUnboxedTupleCon id = (TuplePatIn pats_con False : rest_pats, constraints)
       | otherwise     = (ConPatIn name pats_con : rest_pats, constraints)
     where num_args  = length pats
           name      = BS (getOccString id)
@@ -555,25 +546,18 @@ make_con (ConPat id ty pats) (ps,constraints)
           rest_pats = drop num_args ps
 	  
 
-make_whole_con :: Id -> WarningPat
+make_whole_con :: DataCon -> WarningPat
 make_whole_con con | isInfixCon con = ConOpPatIn new_wild_pat name fixity new_wild_pat
                    | otherwise      = ConPatIn name pats
                 where 
                   fixity = panic "Check.make_whole_con: Guessing fixity"
                   name   = BS (getOccString con)
-                  arity  = get_int_arity con 
+                  arity  = dataConSourceArity con 
                   pats   = take arity (repeat new_wild_pat)
 
 
 new_wild_pat :: WarningPat
 new_wild_pat = WildPatIn
-
-get_int_arity :: Id -> Int
-get_int_arity id = arity_to_int (getIdArity id)
-    where
-      arity_to_int (ArityExactly n) = n
-      arity_to_int _                = panic "Check.getIntArity: Unknown arity"      
-
 \end{code}
 
 This equation makes the same thing that tidy in Match.lhs, the
@@ -599,34 +583,42 @@ simplify_pat (LazyPat p)   = simplify_pat p
 
 simplify_pat (AsPat id p)  = simplify_pat p
 
-simplify_pat (ConPat id ty ps) = ConPat id ty (map simplify_pat ps)
+simplify_pat (ConPat id ty tvs dicts ps) = ConPat id ty tvs dicts (map simplify_pat ps)
 
-simplify_pat (ConOpPat p1 id p2 ty) = ConPat id ty (map simplify_pat [p1,p2])
-
-simplify_pat (ListPat ty ps) = foldr (\ x -> \y -> ConPat consDataCon list_ty [x, y])
-	                                            (ConPat nilDataCon  list_ty [])
+simplify_pat (ListPat ty ps) = foldr (\ x -> \y -> ConPat consDataCon  list_ty [] [] [x, y])
+	                                            (ConPat nilDataCon list_ty [] [] [])
 	                                            (map simplify_pat ps)
                              where list_ty = mkListTy ty
 
 
-simplify_pat (TuplePat ps) = ConPat (tupleCon arity)
-	                             (mkTupleTy arity (map outPatType ps))
-	                             (map simplify_pat ps)
+simplify_pat (TuplePat ps True) = ConPat (tupleCon arity)
+	                            (mkTupleTy arity (map outPatType ps)) [] []
+	                            (map simplify_pat ps)
                            where
                               arity = length ps
 
-simplify_pat (RecPat id ty [])   = ConPat id ty [wild_pat]
-			         where
-				   wild_pat = WildPat gt
-		                   gt = panic "Check.symplify_pat: gessing gt"
-simplify_pat (RecPat id ty idps) = ConPat id ty pats
-                                 where
-                                   pats = map (\ (id,p,_)-> simplify_pat p) idps
+simplify_pat (TuplePat ps False) 
+  = ConPat (unboxedTupleCon arity)
+	   (mkUnboxedTupleTy arity (map outPatType ps)) [] []
+	   (map simplify_pat ps)
+  where
+    arity = length ps
+
+simplify_pat (RecPat id ty tvs dicts [])   
+  = ConPat id ty tvs dicts [wild_pat]
+  where
+    wild_pat = WildPat gt
+    gt = panic "Check.symplify_pat: gessing gt"
+
+simplify_pat (RecPat id ty tvs dicts idps) 
+  = ConPat id ty tvs dicts pats
+  where
+    pats = map (\ (id,p,_)-> simplify_pat p) idps
 
 simplify_pat pat@(LitPat lit lit_ty) 
   | isUnboxedType lit_ty = pat
 
-  | lit_ty == charTy = ConPat charDataCon charTy [LitPat (mk_char lit) charPrimTy]
+  | lit_ty == charTy = ConPat charDataCon charTy [] [] [LitPat (mk_char lit) charPrimTy]
 
   | otherwise = pprPanic "Check.simplify_pat: LitPat:" (ppr pat)
   where
@@ -635,21 +627,19 @@ simplify_pat pat@(LitPat lit lit_ty)
 simplify_pat (NPat lit lit_ty hsexpr) = better_pat
   where
     better_pat
-      | lit_ty == charTy   = ConPat charDataCon   lit_ty [LitPat (mk_char lit)   charPrimTy]
-      | lit_ty == intTy    = ConPat intDataCon    lit_ty [LitPat (mk_int lit)    intPrimTy]
-      | lit_ty == wordTy   = ConPat wordDataCon   lit_ty [LitPat (mk_word lit)   wordPrimTy]
-      | lit_ty == addrTy   = ConPat addrDataCon   lit_ty [LitPat (mk_addr lit)   addrPrimTy]
-      | lit_ty == floatTy  = ConPat floatDataCon  lit_ty [LitPat (mk_float lit)  floatPrimTy]
-      | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
+      | lit_ty == charTy   = ConPat charDataCon   lit_ty [] [] [LitPat (mk_char lit)   charPrimTy]
+      | lit_ty == intTy    = ConPat intDataCon    lit_ty [] [] [LitPat (mk_int lit)    intPrimTy]
+      | lit_ty == wordTy   = ConPat wordDataCon   lit_ty [] [] [LitPat (mk_word lit)   wordPrimTy]
+      | lit_ty == addrTy   = ConPat addrDataCon   lit_ty [] [] [LitPat (mk_addr lit)   addrPrimTy]
+      | lit_ty == floatTy  = ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
+      | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
 
-	-- Convert the literal pattern "" to the constructor pattern [].
-      | null_str_lit lit      = ConPat nilDataCon    lit_ty []
-
+		-- Convert the literal pattern "" to the constructor pattern [].
+      | null_str_lit lit      = ConPat nilDataCon  lit_ty [] [] []
       | lit_ty == stringTy = 
-            foldr (\ x -> \y -> ConPat consDataCon list_ty [x, y])
-	                        (ConPat nilDataCon  list_ty [])
+            foldr (\ x -> \y -> ConPat consDataCon list_ty [] [] [x, y])
+	                        (ConPat nilDataCon  list_ty [] [] [])
 	                        (mk_string lit)
-				   
       | otherwise	       = NPat lit lit_ty hsexpr
 
     list_ty = mkListTy lit_ty
@@ -659,7 +649,7 @@ simplify_pat (NPat lit lit_ty hsexpr) = better_pat
 
     mk_head_char (HsString s) = HsCharPrim (_HEAD_ s)
     mk_string    (HsString s) = 
-       map (\ c -> ConPat charDataCon charTy 
+       map (\ c -> ConPat charDataCon charTy [] []
 		         [LitPat (HsCharPrim c) charPrimTy]) 
            (_UNPK_ s)
 
@@ -690,9 +680,9 @@ simplify_pat (NPlusKPat	id hslit ty hsexpr1 hsexpr2) =
 
 simplify_pat (DictPat dicts methods) = 
     case num_of_d_and_ms of
-       0 -> simplify_pat (TuplePat []) 
+       0 -> simplify_pat (TuplePat [] True) 
        1 -> simplify_pat (head dict_and_method_pats) 
-       _ -> simplify_pat (TuplePat dict_and_method_pats)
+       _ -> simplify_pat (TuplePat dict_and_method_pats True)
     where
        num_of_d_and_ms	 = length dicts + length methods
        dict_and_method_pats = map VarPat (dicts ++ methods)

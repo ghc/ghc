@@ -1,0 +1,5 @@
+!cp test/DictHW1.hs DictHW.hs
+:l DictHW.hs
+!cp test/DictHW2.hs DictHW.hs
+:r
+f 1

@@ -76,14 +76,19 @@ module Int
 
 	) where
 
+#ifdef __HUGS__
+import PreludeBuiltin
+#else
 import GlaExts
-import Ix
-import Bits
 import PrelGHC
 import CCall
+import PrelForeign
+import PrelAddr ( Int64(..), Word64(..) )
+#endif
+import Ix
+import Bits
 import Numeric ( readDec )
 import Word    ( Word32 )
-import PrelForeign
 
 -----------------------------------------------------------------------------
 -- The "official" coercion functions
@@ -543,7 +548,7 @@ sizeofInt32 = 4
 
 \begin{code}
 #if WORD_SIZE_IN_BYTES == 8
-data Int64 = I64# Int#
+--data Int64 = I64# Int#
 
 int32ToInt64 :: Int32 -> Int64
 int32ToInt64 (I32# i#) = I64# i#
@@ -676,7 +681,9 @@ int64ToInt32 :: Int64 -> Int32
 int64ToInt32 (I64# i#) = I32# (int64ToInt# i#)
 
 int64ToInteger :: Int64 -> Integer
-int64ToInteger (I64# x#) = int64ToInteger# x#
+int64ToInteger (I64# x#) = 
+   case int64ToInteger# x# of
+     (# a#, s#, p# #) -> J# a# s# p#
 
 integerToInt64 :: Integer -> Int64
 integerToInt64 (J# a# s# d#) = I64# (integerToInt64# a# s# d#)

@@ -1,0 +1,5 @@
+ERROR "test/static/s053.hs" (line 6): Cannot build superclass instance
+*** Instance            : Bar [a]
+*** Context supplied    : (Enum a, Eq a)
+*** Required superclass : Foo [a]
+

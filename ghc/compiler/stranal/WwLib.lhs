@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[WwLib]{A library for the ``worker/wrapper'' back-end to the strictness analyser}
 
@@ -14,22 +14,21 @@ module WwLib (
 #include "HsVersions.h"
 
 import CoreSyn
-import MkId		( mkSysLocal )
-import Id		( idType, dataConArgTys, isDataCon, isNewCon, Id )
-import IdInfo		( Demand(..) )
-import PrelVals		( aBSENT_ERROR_ID, voidId )
-import TysPrim		( voidTy )
-import SrcLoc		( noSrcLoc )
-import Type		( isUnpointedType, mkTyVarTys, mkFunTys,
+import Id		( Id, idType, mkSysLocal, getIdDemandInfo, setIdDemandInfo )
+import Const		( Con(..) )
+import DataCon		( dataConArgTys )
+import Demand		( Demand(..) )
+import PrelVals		( aBSENT_ERROR_ID )
+import TysWiredIn	( unitTy, unitDataCon )
+import Type		( isUnLiftedType, mkTyVarTys, mkTyVarTy, mkFunTys,
 			  splitForAllTys, splitFunTys,
 			  splitAlgTyConApp_maybe, 
 			  Type
 			)
-import TyCon		( isNewTyCon, isDataTyCon )
 import BasicTypes	( NewOrData(..) )
-import TyVar            ( TyVar )
-import UniqSupply	( returnUs, thenUs, getUniques, getUnique, UniqSM )
-import Util		( zipEqual, zipWithEqual )
+import Var              ( TyVar )
+import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, UniqSM )
+import Util		( zipWithEqual )
 import Outputable
 \end{code}
 
@@ -45,7 +44,7 @@ an ``intermediate form'' that can later be turned into a \tr{let} or
 
 \begin{code}
 data WwBinding
-  = WwLet  [CoreBinding]
+  = WwLet  [CoreBind]
   | WwCase (CoreExpr -> CoreExpr)
 		-- the "case" will be a "strict let" of the form:
 		--
@@ -200,16 +199,19 @@ nonAbsentArgs (WwLazy True : ds) = nonAbsentArgs ds
 nonAbsentArgs (d	   : ds) = 1 + nonAbsentArgs ds
 
 worthSplitting :: [Demand] -> Bool	-- True <=> the wrapper would not be an identity function
-worthSplitting [] 			= False
-worthSplitting (WwLazy True : ds)	= True		-- Absent arg
-worthSplitting (WwUnpack _ True _ : ds)	= True		-- Arg to unpack
-worthSplitting (d : ds)			= worthSplitting ds
+worthSplitting ds = any worth_it ds
+  where
+    worth_it (WwLazy True)	 = True		-- Absent arg
+    worth_it (WwUnpack _ True _) = True		-- Arg to unpack
+    worth_it WwStrict		 = True
+    worth_it other		 = False
 
 allAbsent :: [Demand] -> Bool
-allAbsent (WwLazy True      : ds)   = allAbsent ds
-allAbsent (WwUnpack _ True cs : ds) = allAbsent cs && allAbsent ds
-allAbsent (d		    : ds)   = False
-allAbsent []			    = True
+allAbsent ds = all absent ds
+  where
+    absent (WwLazy is_absent)   = is_absent
+    absent (WwUnpack _ True cs) = allAbsent cs
+    absent other		= False
 \end{code}
 
 
@@ -231,7 +233,7 @@ mkWrapper fun_ty demands
   = let
 	n_wrap_args = length demands
     in
-    getUniques n_wrap_args	`thenUs` \ wrap_uniqs ->
+    getUniquesUs n_wrap_args	`thenUs` \ wrap_uniqs ->
     let
 	(tyvars, tau_ty)   = splitForAllTys fun_ty
 	(arg_tys, body_ty) = splitFunTys tau_ty
@@ -262,7 +264,7 @@ mkWwBodies :: [TyVar] -> [Id] -> Type		-- Original fn args and body type
 
 mkWwBodies tyvars args body_ty demands
   | allAbsent demands &&
-    isUnpointedType body_ty
+    isUnLiftedType body_ty
   = 	-- Horrid special case.  If the worker would have no arguments, and the
 	-- function returns a primitive type value, that would make the worker into
 	-- an unboxed value.  We box it by passing a dummy void argument, thus:
@@ -270,34 +272,37 @@ mkWwBodies tyvars args body_ty demands
 	--	f = /\abc. \xyz. fw abc void
 	-- 	fw = /\abc. \v. body
 	--
-    getUnique 		`thenUs` \ void_arg_uniq ->
+    getUniqueUs 		`thenUs` \ void_arg_uniq ->
     let
-	void_arg = mk_ww_local void_arg_uniq voidTy
+	void_arg = mk_ww_local void_arg_uniq unitTy
     in
-    returnUs (\ work_id -> mkLam tyvars args (App (mkTyApp (Var work_id) (mkTyVarTys tyvars)) (VarArg voidId)),
-	      \ body    -> mkLam tyvars [void_arg] body,
+    returnUs (\ work_id -> mkLams tyvars $ mkLams args $
+			   mkApps (Var work_id) 
+				  (map (Type . mkTyVarTy) tyvars ++ [mkConApp unitDataCon []]),
+	      \ body    -> mkLams (tyvars ++ [void_arg]) body,
 	      [WwLazy True])
 
-mkWwBodies tyvars args body_ty demands
+mkWwBodies tyvars wrap_args body_ty demands
   | otherwise
   = let
-	args_w_demands = zipEqual "mkWwBodies" args demands
+	wrap_args_w_demands = zipWithEqual "mkWwBodies" setIdDemandInfo wrap_args demands
     in
-    mkWW args_w_demands		`thenUs` \ (wrap_fn, work_args_w_demands, work_fn) ->
-    let
-	(work_args, work_demands) = unzip work_args_w_demands
-    in
-    returnUs (\ work_id -> mkLam tyvars args (wrap_fn (mkTyApp (Var work_id) (mkTyVarTys tyvars))),
-	      \ body    -> mkLam tyvars work_args (work_fn body),
-	      work_demands)
+    mkWW wrap_args_w_demands 		`thenUs` \ (wrap_fn, work_args_w_demands, work_fn) ->
+    returnUs (\ work_id -> mkLams tyvars $ mkLams wrap_args_w_demands $
+			   wrap_fn (mkTyApps (Var work_id) (mkTyVarTys tyvars)),
+
+	      \ body    -> mkLams tyvars $ mkLams work_args_w_demands $
+			   work_fn body,
+
+	      map getIdDemandInfo work_args_w_demands)
 \end{code}    
 
 
 \begin{code}
-mkWW :: [(Id,Demand)]
+mkWW :: [Id]				-- Wrapper args; have their demand info on them
      -> UniqSM (CoreExpr -> CoreExpr,	-- Wrapper body, lacking the inner call to the worker
 					-- and without its lambdas
-		[(Id,Demand)],		-- Worker args and their demand infos
+		[Id],			-- Worker args; have their demand info on them
 		CoreExpr -> CoreExpr)	-- Worker body, lacking the original body of the function
 
 
@@ -308,46 +313,54 @@ mkWW []
 	      \ worker_body  -> worker_body)
 
 
+mkWW (arg : ds)
+  = case getIdDemandInfo arg of
+
 	-- Absent case
-mkWW ((arg,WwLazy True) : ds)
-  = mkWW ds 		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
-    returnUs (\ wrapper_body -> wrap_fn wrapper_body,
-	      worker_args,
-	      \ worker_body  -> mk_absent_let arg (work_fn worker_body))
+      WwLazy True ->
+	mkWW ds 		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
+	returnUs (\ wrapper_body -> wrap_fn wrapper_body,
+		  worker_args,
+	      	  \ worker_body  -> mk_absent_let arg (work_fn worker_body))
 
 
 	-- Unpack case
-mkWW ((arg,WwUnpack new_or_data True cs) : ds)
-  = getUniques (length inst_con_arg_tys)		`thenUs` \ uniqs ->
-    let
-	unpk_args	 = zipWith mk_ww_local uniqs inst_con_arg_tys
-	unpk_args_w_ds   = zipEqual "mkWW" unpk_args cs
-    in
-    mkWW (unpk_args_w_ds ++ ds)		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
-    returnUs (\ wrapper_body -> mk_unpk_case new_or_data arg unpk_args data_con arg_tycon
-					     (wrap_fn wrapper_body),
-	      worker_args,
-	      \ worker_body  -> work_fn (mk_pk_let new_or_data arg data_con 
-						   tycon_arg_tys unpk_args worker_body))
-  where
-    inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
-    (arg_tycon, tycon_arg_tys, data_con)
-	= case (splitAlgTyConApp_maybe (idType arg)) of
+      WwUnpack new_or_data True cs ->
+	getUniquesUs (length inst_con_arg_tys)		`thenUs` \ uniqs ->
+	let
+	  unpk_args	 = zipWith mk_ww_local uniqs inst_con_arg_tys
+	  unpk_args_w_ds = zipWithEqual "mkWW" setIdDemandInfo unpk_args cs
+	in
+	mkWW (unpk_args_w_ds ++ ds)		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
+	returnUs (\ wrapper_body -> mk_unpk_case new_or_data arg unpk_args data_con arg_tycon
+					         (wrap_fn wrapper_body),
+		  worker_args,
+	          \ worker_body  -> work_fn (mk_pk_let new_or_data arg data_con 
+						       tycon_arg_tys unpk_args worker_body))
+	where
+    	  inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
+	  (arg_tycon, tycon_arg_tys, data_con)
+	     = case (splitAlgTyConApp_maybe (idType arg)) of
 
-	      Just (arg_tycon, tycon_arg_tys, [data_con]) ->
-				     -- The main event: a single-constructor data type
-				     (arg_tycon, tycon_arg_tys, data_con)
+	     	 Just (arg_tycon, tycon_arg_tys, [data_con]) ->
+			     -- The main event: a single-constructor data type
+			     (arg_tycon, tycon_arg_tys, data_con)
 
-	      Just (_, _, data_cons) ->  pprPanic "mk_ww_arg_processing: not one constr (interface files not consistent/up to date ?)" ((ppr arg) <+> (ppr (idType arg)))
-	      Nothing		     ->  panic "mk_ww_arg_processing: not datatype"
+	    	 Just (_, _, data_cons) ->
+			pprPanic "mk_ww_arg_processing:" 
+				 (text "not one constr (interface files not consistent/up to date?)"
+				  $$ (ppr arg <+> ppr (idType arg)))
+
+	         Nothing		->
+			panic "mk_ww_arg_processing: not datatype"
 
 
 	-- Other cases
-mkWW ((arg,other_demand) : ds)
-  = mkWW ds		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
-    returnUs (\ wrapper_body -> wrap_fn (App wrapper_body (VarArg arg)),
-	      (arg,other_demand) : worker_args, 
-	      work_fn)
+      other_demand ->
+	mkWW ds		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
+	returnUs (\ wrapper_body -> wrap_fn (App wrapper_body (Var arg)),
+	    	  arg : worker_args, 
+		  work_fn)
 \end{code}
 
 
@@ -360,8 +373,8 @@ mkWW ((arg,other_demand) : ds)
 
 \begin{code}
 mk_absent_let arg body
-  | not (isUnpointedType arg_ty)
-  = Let (NonRec arg (mkTyApp (Var aBSENT_ERROR_ID) [arg_ty])) body
+  | not (isUnLiftedType arg_ty)
+  = Let (NonRec arg (mkTyApps (Var aBSENT_ERROR_ID) [arg_ty])) body
   | otherwise
   = panic "WwLib: haven't done mk_absent_let for primitives yet"
   where
@@ -369,33 +382,28 @@ mk_absent_let arg body
 
 mk_unpk_case NewType arg unpk_args boxing_con boxing_tycon body
   	-- A newtype!  Use a coercion not a case
-  = ASSERT( null other_args && isNewTyCon boxing_tycon )
-    Let (NonRec unpk_arg (Note (Coerce (idType unpk_arg) (idType arg)) (Var arg)))
-	body
+  = ASSERT( null other_args )
+    Case (Note (Coerce (idType unpk_arg) (idType arg)) (Var arg))
+	 unpk_arg
+	 [(DEFAULT,[],body)]
   where
     (unpk_arg:other_args) = unpk_args
 
 mk_unpk_case DataType arg unpk_args boxing_con boxing_tycon body
 	-- A data type
-  = ASSERT( isDataTyCon boxing_tycon )
-    Case (Var arg)
-	 (AlgAlts [(boxing_con, unpk_args, body)]
-		  NoDefault
-	 )
+  = Case (Var arg) arg [(DataCon boxing_con, unpk_args, body)]
 
 mk_pk_let NewType arg boxing_con con_tys unpk_args body
-  = ASSERT( null other_args && isNewCon boxing_con )
+  = ASSERT( null other_args )
     Let (NonRec arg (Note (Coerce (idType arg) (idType unpk_arg)) (Var unpk_arg))) body
   where
     (unpk_arg:other_args) = unpk_args
 
 mk_pk_let DataType arg boxing_con con_tys unpk_args body
-  = ASSERT( isDataCon boxing_con )
-    Let (NonRec arg (Con boxing_con con_args)) body
+  = Let (NonRec arg (Con (DataCon boxing_con) con_args)) body
   where
-    con_args = map TyArg con_tys ++ map VarArg unpk_args
+    con_args = map Type con_tys ++ map Var unpk_args
 
 
-mk_ww_local uniq ty
-  = mkSysLocal SLIT("ww") uniq ty noSrcLoc
+mk_ww_local uniq ty = mkSysLocal uniq ty
 \end{code}

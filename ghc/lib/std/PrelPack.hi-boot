@@ -1,0 +1,18 @@
+---------------------------------------------------------------------------
+--                              PrelPack.hi-boot
+-- 
+--      This hand-written interface file is the initial bootstrap version
+--	for PrelPack.hi.
+--	It's needed for the 'thin-air' Ids, when compiling PrelBase, and
+--	other Prelude files that precede PrelPack
+---------------------------------------------------------------------------
+ 
+__interface PrelPack 1 where
+__export PrelPack packCString# unpackCString# unpackNBytes# unpackAppendCString# unpackFoldrCString#;
+
+1 packCString# :: [PrelBase.Char] -> PrelGHC.ByteArray# ;
+1 unpackCString# :: PrelGHC.Addr# -> [PrelBase.Char] ;
+1 unpackNBytes# :: PrelGHC.Addr# -> PrelGHC.Int# -> [PrelBase.Char] ;
+1 unpackAppendCString# :: PrelGHC.Addr# -> [PrelBase.Char] -> [PrelBase.Char] ;
+1 unpackFoldrCString# :: __forall [a] => PrelGHC.Addr# -> (PrelBase.Char -> a -> a) -> a -> a ;
+

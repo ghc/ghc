@@ -1,0 +1,1 @@
+ERROR "test/static/s062.hs" (line 4): Can only derive instances of Ix for enumeration or product types

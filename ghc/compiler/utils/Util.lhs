@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Util]{Highly random utility functions}
 
@@ -14,7 +14,7 @@ module Util (
 	-- general list processing
 	IF_NOT_GHC(forall COMMA exists COMMA)
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
-        zipLazy,
+        zipLazy, stretchZipEqual,
 	mapAndUnzip, mapAndUnzip3,
 	nOfThem, lengthExceeds, isSingleton,
 	startsWith, endsWith, snocView,
@@ -157,6 +157,18 @@ zipLazy :: [a] -> [b] -> [(a,b)]
 zipLazy [] ys = []
 zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
 \end{code}
+
+
+\begin{code}
+stretchZipEqual :: (a -> b -> Maybe a) -> [a] -> [b] -> [a]
+-- (stretchZipEqual f xs ys) stretches ys to "fit" the places where f returns a Just
+
+stretchZipEqual f [] [] = []
+stretchZipEqual f (x:xs) (y:ys) = case f x y of
+				    Just x' -> x' : stretchZipEqual f xs ys
+				    Nothing -> x  :  stretchZipEqual f xs (y:ys)
+\end{code}
+
 
 \begin{code}
 mapAndUnzip :: (a -> (b, c)) -> [a] -> ([b], [c])

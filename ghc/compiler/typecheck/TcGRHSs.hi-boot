@@ -3,7 +3,8 @@ _exports_
 TcGRHSs tcGRHSsAndBinds;
 _declarations_
 2 tcGRHSsAndBinds _:_ _forall_ [s] => 
-		TcType.TcType s 
-		-> RnHsSyn.RenamedGRHSsAndBinds
+		RnHsSyn.RenamedGRHSsAndBinds
+		-> TcMonad.TcType s
+		-> HsExpr.StmtCtxt
 		-> TcMonad.TcM s (TcHsSyn.TcGRHSsAndBinds s, Inst.LIE s) ;;
 

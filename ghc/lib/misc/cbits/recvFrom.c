@@ -1,22 +1,18 @@
-#if 0
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1998
-%
-\subsection[recvFrom.lc]{recvFrom run-time support}
-
-\begin{code}
-#endif
+/* -----------------------------------------------------------------------------
+ * $Id: recvFrom.c,v 1.3 1998/12/02 13:26:46 simonm Exp $
+ *
+ * recvFrom run-time support
+ *
+ * (c) The GHC Team 1998
+ * -------------------------------------------------------------------------- */
 
 #define NON_POSIX_SOURCE
-#include "rtsdefs.h"
+#include "Rts.h"
 #include "ghcSockets.h"
+#include "stgio.h"
 
 StgInt
-recvFrom__(fd, buf, nbytes, from)
-StgInt fd;
-StgAddr buf;
-StgInt nbytes;
-StgAddr from;
+recvFrom__(StgInt fd, StgAddr buf, StgInt nbytes, StgAddr from)
 {
   StgInt count;
   int sz;

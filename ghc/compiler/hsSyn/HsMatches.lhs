@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[HsMatches]{Abstract syntax: matches and guarded right-hand-sides}
 
@@ -11,13 +11,12 @@ module HsMatches where
 #include "HsVersions.h"
 
 -- Friends
-import HsExpr		( HsExpr, Stmt )
+import HsExpr		( HsExpr, Stmt(..) )
 import HsBinds		( HsBinds, nullBinds )
 
 -- Others
 import Type		( GenType )
 import SrcLoc		( SrcLoc )
-import Util		( panic )
 import Outputable
 import Name		( NamedThing )
 \end{code}
@@ -72,12 +71,13 @@ data GRHSsAndBinds flexi id pat
 			(GenType flexi)
 
 data GRHS flexi id pat
-  = GRHS	    [Stmt flexi id pat]	-- guard(ed)...
-		    (HsExpr flexi id pat)	-- ... right-hand side
+  = GRHS	    [Stmt flexi id pat]		-- The RHS is the final ExprStmt
+						-- I considered using a RetunStmt, but
+						-- it printed 'wrong' in error messages 
 		    SrcLoc
 
 unguardedRHS :: (HsExpr flexi id pat) -> SrcLoc -> [GRHS flexi id pat]
-unguardedRHS rhs loc = [GRHS [] rhs loc]
+unguardedRHS rhs loc = [GRHS [ExprStmt rhs loc] loc]
 \end{code}
 
 @getMatchLoc@ takes a @Match@ and returns the
@@ -86,8 +86,8 @@ THis is something of a nuisance, but no more.
 
 \begin{code}
 getMatchLoc :: Match flexi id pat -> SrcLoc
-getMatchLoc (PatMatch _ m)				       = getMatchLoc m
-getMatchLoc (GRHSMatch (GRHSsAndBindsIn (GRHS _ _ loc : _) _)) = loc
+getMatchLoc (PatMatch _ m)				     = getMatchLoc m
+getMatchLoc (GRHSMatch (GRHSsAndBindsIn (GRHS _ loc : _) _)) = loc
 \end{code}
 
 %************************************************************************
@@ -141,23 +141,26 @@ pprGRHSsAndBinds is_case (GRHSsAndBindsIn grhss binds)
  = ($$) (vcat (map (pprGRHS is_case) grhss))
 	   (if (nullBinds binds)
 	    then empty
-	    else vcat [ text "where", nest 4 (ppr binds) ])
+	    else vcat [ text "where", nest 4 (pprDeeper (ppr binds)) ])
 
 pprGRHSsAndBinds is_case (GRHSsAndBindsOut grhss binds ty)
  = ($$) (vcat (map (pprGRHS is_case) grhss))
 	   (if (nullBinds binds)
 	    then empty
-	    else vcat [text "where", nest 4 (ppr binds) ])
+	    else vcat [text "where", nest 4 (pprDeeper (ppr binds)) ])
 
 ---------------------------------------------
 pprGRHS :: (NamedThing id, Outputable id, Outputable pat)
 	=> Bool -> GRHS flexi id pat -> SDoc
 
-pprGRHS is_case (GRHS [] expr locn)
- =  text (if is_case then "->" else "=") <+> ppr expr
+pprGRHS is_case (GRHS [ExprStmt expr _] locn)
+ =  text (if is_case then "->" else "=") <+> pprDeeper (ppr expr)
 
-pprGRHS is_case (GRHS guard expr locn)
- = sep [char '|' <+> interpp'SP guard,
-	text (if is_case then "->" else "=") <+> ppr expr
+pprGRHS is_case (GRHS guarded locn)
+ = sep [char '|' <+> interpp'SP guards,
+	text (if is_case then "->" else "=") <+> pprDeeper (ppr expr)
    ]
+ where
+    ExprStmt expr _ = last guarded	-- Last stmt should be a ExprStmt for guards
+    guards	    = init guarded
 \end{code}

@@ -46,19 +46,35 @@ head                    :: [a] -> a
 head (x:_)              =  x
 head []                 =  errorEmptyList "head"
 
-last                    :: [a] -> a
-last [x]                =  x
-last (_:xs)             =  last xs
-last []                 =  errorEmptyList "last"
-
 tail                    :: [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
 
+last                    :: [a] -> a
+#ifdef USE_REPORT_PRELUDE
+last [x]                =  x
+last (_:xs)             =  last xs
+last []                 =  errorEmptyList "last"
+#else
+-- eliminate repeated cases
+last []     		=  errorEmptyList "last"
+last (x:xs) 		=  last' x xs
+  where last' x []     = x
+	last' _ (x:xs) = last' x xs
+#endif
+
 init                    :: [a] -> [a]
+#ifdef USE_REPORT_PRELUDE
 init [x]                =  []
 init (x:xs)             =  x : init xs
 init []                 =  errorEmptyList "init"
+#else
+-- eliminate repeated cases
+init []                 =  errorEmptyList "init"
+init (x:xs)             =  init' x xs
+  where init' x []     = []
+	init' x (y:xs) = x : init' y xs
+#endif
 
 null                    :: [a] -> Bool
 null []                 =  True
@@ -408,7 +424,6 @@ unlines			=  concatMap (++ "\n")
 -- here's a more efficient version
 unlines [] = []
 unlines (l:ls) = l ++ '\n' : unlines ls
-
 #endif
 
 unwords			:: [String] -> String

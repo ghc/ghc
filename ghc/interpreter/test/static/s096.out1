@@ -1,0 +1,1 @@
+ERROR "test/static/s096.hs": Unknown entity "Left" imported from module "Prelude"

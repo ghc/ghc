@@ -1,0 +1,1 @@
+ERROR "test/static/s086.hs": Unknown entity "f" imported from module "Prelude"

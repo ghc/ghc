@@ -1,0 +1,59 @@
+<sect> <idx/Pretty/
+<label id="sec:Pretty">
+<p>
+
+This library contains Simon Peyton Jones' implementation of John
+Hughes's pretty printer combinators.
+
+<tscreen><verb>
+module Pretty where
+infixl 6 <> 
+infixl 6 <+>
+infixl 5 $$, $+$
+data Doc  -- the Document datatype
+
+-- The primitive Doc values
+empty                     :: Doc
+text                      :: String   -> Doc 
+char                      :: Char     -> Doc
+int                       :: Int      -> Doc
+integer                   :: Integer  -> Doc
+float                     :: Float    -> Doc
+double                    :: Double   -> Doc
+rational                  :: Rational -> Doc
+semi, comma, colon, space, equals              :: Doc
+lparen, rparen, lbrack, rbrack, lbrace, rbrace :: Doc
+parens, brackets, braces  :: Doc -> Doc 
+quotes, doubleQuotes      :: Doc -> Doc
+
+-- Combining Doc values
+(<>)   :: Doc -> Doc -> Doc     -- Beside
+hcat   :: [Doc] -> Doc          -- List version of <>
+(<+>)  :: Doc -> Doc -> Doc     -- Beside, separated by space
+hsep   :: [Doc] -> Doc          -- List version of <+>
+($$)   :: Doc -> Doc -> Doc     -- Above; if there is no
+                                  -- overlap it "dovetails" the two
+vcat   :: [Doc] -> Doc          -- List version of $$
+cat    :: [Doc] -> Doc          -- Either hcat or vcat
+sep    :: [Doc] -> Doc          -- Either hsep or vcat
+fcat   :: [Doc] -> Doc          -- ``Paragraph fill'' version of cat
+fsep   :: [Doc] -> Doc          -- ``Paragraph fill'' version of sep
+nest   :: Int -> Doc -> Doc     -- Nested
+hang   :: Doc -> Int -> Doc -> Doc
+punctuate :: Doc -> [Doc] -> [Doc]      
+-- punctuate p [d1, ... dn] = [d1 <> p, d2 <> p, ... dn-1 <> p, dn]
+
+-- Displaying Doc values
+instance Show Doc
+render     :: Doc -> String             -- Uses default style
+renderStyle  :: Style -> Doc -> String
+data Style = Style { lineLength     :: Int,   -- In chars
+                       ribbonsPerLine :: Float, -- Ratio of ribbon length
+                                                -- to line length
+                       mode :: Mode
+               }
+data Mode = PageMode            -- Normal 
+            | ZigZagMode          -- With zig-zag cuts
+            | LeftMode            -- No indentation, infinitely long lines
+            | OneLineMode         -- All on one line
+</verb></tscreen>

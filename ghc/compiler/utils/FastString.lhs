@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1997
+% (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
 %
 \section{Fast strings}
 
@@ -58,15 +58,24 @@ import IOBase		( Handle__(..), IOError(..), IOErrorType(..),
 			)
 #else
 import PrelPack
+#if __GLASGOW_HASKELL__ < 400
 import PrelST		( StateAndPtr#(..) )
-import PrelHandle	( readHandle, 
-#if __GLASGOW_HASKELL__ < 303
-			  filePtr,
 #endif
+
+#if __GLASGOW_HASKELL__ <= 303
+import PrelHandle	( readHandle, 
+# if __GLASGOW_HASKELL__ < 303
+			  filePtr,
+# endif
 			  writeHandle
 			)
+#endif
+
 import PrelIOBase	( Handle__(..), IOError(..), IOErrorType(..),
-		  	  IOResult(..), IO(..),
+#if __GLASGOW_HASKELL__ < 400
+		  	  IOResult(..), 
+#endif
+			  IO(..),
 #if __GLASGOW_HASKELL__ >= 303
 			  Handle__Type(..),
 #endif
@@ -90,6 +99,10 @@ import IOExts		( IORef, newIORef, readIORef, writeIORef )
 import IO
 
 #define hASH_TBL_SIZE 993
+
+#if __GLASGOW_HASKELL__ >= 400
+#define IOok STret
+#endif
 \end{code} 
 
 @FastString@s are packed representations of strings
@@ -125,10 +138,6 @@ instance Ord FastString where
     min x y | x <= y	=  x
             | otherwise	=  y
     compare a b = cmpFS a b
-
-instance Text FastString  where
-    showsPrec p ps@(FastString u# _ _) r = showsPrec p (unpackFS ps) r
-    showsPrec p ps r = showsPrec p (unpackFS ps) r
 
 getByteArray# :: FastString -> ByteArray#
 getByteArray# (FastString _ _ ba#) = ba#
@@ -212,12 +221,21 @@ string_table =
 lookupTbl :: FastStringTable -> Int# -> IO [FastString]
 lookupTbl (FastStringTable _ arr#) i# =
   IO ( \ s# ->
+#if __GLASGOW_HASKELL__ < 400
   case readArray# arr# i# s# of { StateAndPtr# s2# r ->
   IOok s2# r })
+#else
+  readArray# arr# i# s#)
+#endif
 
 updTbl :: FastStringTableVar -> FastStringTable -> Int# -> [FastString] -> IO ()
 updTbl fs_table_var (FastStringTable uid# arr#) i# ls =
- IO (\ s# -> case writeArray# arr# i# ls s# of { s2# -> IOok s2# () })	>>
+ IO (\ s# -> case writeArray# arr# i# ls s# of { s2# -> 
+#if __GLASGOW_HASKELL__ < 400
+	IOok s2# () })	>>
+#else
+	(# s2#, () #) }) >>
+#endif
  writeIORef fs_table_var (FastStringTable (uid# +# 1#) arr#)
 
 mkFastString# :: Addr# -> Int# -> FastString
@@ -533,6 +551,8 @@ hPutFS handle (CharStr a# l#) =
           else
               constructError "hPutFS"   	>>= \ err ->
 	      fail err
+
+
 #else
 hPutFS handle (FastString _ l# ba#)
   | l# ==# 0#  = return ()
@@ -540,9 +560,12 @@ hPutFS handle (FastString _ l# ba#)
  where
   bottom = error "hPutFS.ba"
 
+--ToDo: avoid silly code duplic.
+
 hPutFS handle (CharStr a# l#)
   | l# ==# 0#  = return ()
   | otherwise  = hPutBuf handle (A# a#) (I# l#)
+
 
 #endif
 \end{code}

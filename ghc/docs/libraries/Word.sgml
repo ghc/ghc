@@ -1,0 +1,95 @@
+<sect> <idx/Word/
+<label id="sec:Word">
+<p>
+
+This library provides unsigned integers of various sizes.
+The types supported are as follows:
+
+<tabular ca="ll">
+type    | number of bits @
+<!-- <hline>  -->
+Word8    | 8  @
+Word16   | 16 @
+Word32   | 32 @
+Word64   | 64 @
+<!-- <hline>  -->
+</tabular>
+
+For each type <it/W/ above, we provide the following functions and
+instances.  The type <it/I/ refers to the signed integer type of the
+same size.
+
+<tscreen><verb>
+data W            -- Unsigned Ints
+instance Eq       W
+instance Ord      W
+instance Show     W
+instance Read     W
+instance Bounded  W
+instance Num      W
+instance Real     W
+instance Integral W
+instance Enum     W
+instance Ix       W
+instance Bits     W
+</verb></tscreen>
+Plus
+<tscreen><verb>
+word8ToWord32  :: Word8  -> Word32
+word32ToWord8  :: Word32 -> Word8
+word16ToWord32 :: Word16 -> Word32
+word32ToWord16 :: Word32 -> Word16
+
+word8ToInt     :: Word8  -> Int
+intToWord8     :: Int    -> Word8
+word16ToInt    :: Word16 -> Int
+intToWord16    :: Int    -> Word16
+word32ToInt    :: Word32 -> Int
+intToWord32    :: Int    -> Word32
+</verb></tscreen>
+
+Notes: 
+<itemize>
+<item>
+  All arithmetic is performed modulo 2^n
+
+  One non-obvious consequequence of this is that <tt/negate/
+  should <em/not/ raise an error on negative arguments.
+
+<item>
+The coercion <tt/wToI/ converts an unsigned n-bit value to the
+signed n-bit value with the same representation.  For example,
+<tt/word8ToInt8 0xff = -1/. 
+Likewise, <tt/iToW/ converts signed n-bit values to the
+corresponding unsigned n-bit value.
+
+<item>
+ToDo: complete the set of coercion functions.
+
+<item>
+Use <tt/Prelude.fromIntegral :: (Integral a, Num b) => a -> b/ to
+coerce between different sizes or to preserve sign when converting
+between values of the same size.
+
+<item>
+It would be very natural to add a type a type <tt/Natural/ providing
+an unbounded size unsigned integer --- just as <tt/Integer/ provides
+unbounded size signed integers.  We do not do that yet since there is
+no demand for it.  Doing so would require <tt/Bits.bitSize/ to return
+<tt/Maybe Int/.
+
+<item>
+The <tt/Enum/ instances stop when they reach their upper or lower
+bound --- they don't overflow the way the <tt/Int/ and <tt/Float/
+instances do.
+
+<item>
+It would be useful to provide a function (or a family of functions?)
+which coerced between any two Word types (without going through
+Integer).
+
+</itemize>
+
+Hugs only provides <tt/Eq/, <tt/Ord/, <tt/Read/ and <tt/Show/
+instances for <tt/Word64/ at the moment.
+

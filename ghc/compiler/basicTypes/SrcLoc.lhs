@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 %************************************************************************
 %*									*
@@ -30,7 +30,7 @@ module SrcLoc (
 
 import Outputable
 import FastString	( unpackFS )
-import GlaExts		( Int(..), Int#, (+#) )
+import GlaExts		( Int(..), (+#) )
 \end{code}
 
 %************************************************************************

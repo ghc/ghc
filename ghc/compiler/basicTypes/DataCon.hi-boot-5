@@ -1,0 +1,3 @@
+__interface DataCon 1 0 where
+__export DataCon DataCon ;
+1 data DataCon ;

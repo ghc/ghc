@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1996
+% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 \section[AsmRegAlloc]{Register allocator}
 
@@ -13,14 +13,11 @@ import MachMisc		( Instr )
 import MachRegs
 import RegAllocInfo
 
-import AbsCSyn		( MagicId )
-import BitSet		( BitSet )
 import FiniteMap	( emptyFM, addListToFM, delListFromFM, lookupFM, keysFM )
 import Maybes		( maybeToBool )
 import OrdList		( mkEmptyList, mkUnitList, mkSeqList, mkParList,
 			  flattenOrdList, OrdList
 			)
-import Stix		( StixTree )
 import Unique		( mkBuiltinUnique )
 import Util		( mapAccumB, panic, trace )
 import Outputable

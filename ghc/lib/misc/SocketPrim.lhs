@@ -82,6 +82,7 @@ module SocketPrim (
 import GlaExts
 import ST
 import Ix
+import Weak	    ( addForeignFinaliser )
 import PrelIOBase  -- IOError, Handle representation
 import PrelHandle
 import Foreign
@@ -165,16 +166,26 @@ newtype PortNumber = PNum Int  -- 16-bit value stored in network byte order.
 		     deriving ( Eq )
 
 instance Show PortNumber where
-  showsPrec p (PNum pn) = showsPrec p pn_host
-   where
-     pn_host :: Int
-     pn_host = unsafePerformIO  (_casm_ ``%r=(int)ntohs((int)%0); '' pn)
-
+  showsPrec p pn = showsPrec p (ntohs pn)
 
 mkPortNumber :: Int -> PortNumber
 mkPortNumber v = unsafePerformIO $ do
    po <- _casm_ ``%r=(int)htons((int)%0); '' v
    return (PNum po)
+
+ntohs :: PortNumber -> Int
+ntohs (PNum po) = unsafePerformIO (_casm_ ``%r=(int)ntohs((int)%0); '' po)
+
+instance Num PortNumber where
+   fromInt     i = mkPortNumber i
+   fromInteger i = fromInt (fromInteger i)
+    -- for completeness.
+   (+) x y   = mkPortNumber (ntohs x + ntohs y)
+   (-) x y   = mkPortNumber (ntohs x - ntohs y)
+   negate x  = mkPortNumber (-ntohs x)
+   (*) x y   = mkPortNumber (ntohs x * ntohs y)
+   abs n     = mkPortNumber (abs (ntohs n))
+   signum n  = mkPortNumber (signum (ntohs n))
 
 data SockAddr		-- C Names				
 #ifndef cygwin32_TARGET_OS
@@ -881,7 +892,7 @@ unpackFamily family = (range (AF_UNSPEC, AF_MAX))!!family
 
 #endif
 
-#if freebsd_TARGET_OS
+#if freebsd2_TARGET_OS || freebsd3_TARGET_OS
 
 data Family = 
        	AF_UNSPEC	-- unspecified 
@@ -926,7 +937,7 @@ unpackFamily family = (range (AF_UNSPEC, AF_MAX))!!family
 -- Alpha running OSF or a SPARC with SunOS, rather than Solaris.
 
 #if osf1_TARGET_OS || osf3_TARGET_OS || sunos4_TARGET_OS || hpux_TARGET_OS || \
-	aix_TARGET_OS || freebsd_TARGET_OS
+	aix_TARGET_OS || freebsd2_TARGET_OS || freebsd3_TARGET_OS
 data SocketType = 
 	  Stream 
 	| Datagram
@@ -1192,7 +1203,8 @@ socketToHandle :: Socket -> IOMode -> IO Handle
 
 socketToHandle (MkSocket fd family stype protocol status) m = do
     fo <- _ccall_ openFd fd file_mode flush_on_close
-    fo <- makeForeignObj fo (``&freeFileObject'' :: Addr)
+    fo <- makeForeignObj fo
+    addForeignFinaliser fo (freeFileObject fo)
     mkBuffer__ fo 0  -- not buffered
     hndl <- newHandle (Handle__ fo htype NoBuffering socket_str)
     return hndl

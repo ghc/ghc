@@ -80,6 +80,7 @@ type tree;
 		    grestrt	: ttype; >;
 
 	tuple	: < gtuplelist	: list; >;
+	utuple	: < gutuplelist	: list; >;
 	llist	: < gllist	: list; >;
 	eenum	: < gefrom	: tree;
 		    gestep	: maybe;

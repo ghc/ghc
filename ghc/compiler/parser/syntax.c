@@ -197,6 +197,15 @@ expORpat(int wanted, tree e)
 	}
 	break;
 
+      case utuple:
+	{
+	  list tup;
+	  for (tup = gutuplelist(e); tlist(tup) == lcons; tup = ltl(tup)) {
+	      expORpat(wanted, lhd(tup));
+	  }
+	}
+	break;
+
       case llist:
 	{
 	  list l;

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP Project, Glasgow University, 1994-1995
+% (c) The GRASP Project, Glasgow University, 1994-1998
 %
 \section[TysWiredIn]{Wired-in knowledge about {\em non-primitive} types}
 
@@ -29,7 +29,8 @@ module TysWiredIn (
 	floatTy,
 	isFloatTy,
 	floatTyCon,
-	getStatePairingConInfo,
+
+	voidTyCon, voidTy, 
 
 	intDataCon,
 	intTy,
@@ -50,49 +51,23 @@ module TysWiredIn (
 	integerDataCon,
 	isIntegerTy,
 
-	liftDataCon,
-	liftTyCon,
 	listTyCon,
-	foreignObjTyCon,
 
-	mkLiftTy,
 	mkListTy,
+	nilDataCon,
+
+	-- tuples
 	mkTupleTy,
 	tupleTyCon, tupleCon, unitTyCon, unitDataCon, pairTyCon, pairDataCon,
-	nilDataCon,
-	realWorldStateTy,
-	return2GMPsTyCon,
-	returnIntAndGMPTyCon,
 
-	-- ST and STret types
-	mkStateTy,
-	mkStateTransformerTy,
-	mkSTretTy,
-	stTyCon,
-	stDataCon,
-	stRetDataCon,
-	stRetTyCon,
+	-- unboxed tuples
+	mkUnboxedTupleTy,
+	unboxedTupleTyCon, unboxedTupleCon, 
+	unboxedPairTyCon, unboxedPairDataCon,
 
-	-- CCall result types
-	stateAndAddrPrimTyCon,
-	stateAndArrayPrimTyCon,
-	stateAndByteArrayPrimTyCon,
-	stateAndCharPrimTyCon,
-	stateAndDoublePrimTyCon,
-	stateAndFloatPrimTyCon,
-	stateAndIntPrimTyCon,
-	stateAndInt64PrimTyCon,
-	stateAndForeignObjPrimTyCon,
-	stateAndMutableArrayPrimTyCon,
-	stateAndMutableByteArrayPrimTyCon,
-	stateAndPtrPrimTyCon,
-	stateAndPtrPrimDataCon,
-	stateAndStablePtrPrimTyCon,
-	stateAndSynchVarPrimTyCon,
-	stateAndWordPrimTyCon,
-	stateAndWord64PrimTyCon,
 	stateDataCon,
 	stateTyCon,
+	realWorldStateTy,
 
 	stablePtrTyCon,
 	stringTy,
@@ -119,29 +94,31 @@ module TysWiredIn (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} MkId ( mkDataCon, mkTupleCon )
-import {-# SOURCE #-} Id ( Id, StrictnessMark(..) )
+import {-# SOURCE #-} MkId( mkDataConId )
 
 -- friends:
 import PrelMods
 import TysPrim
 
 -- others:
-import Kind		( mkBoxedTypeKind, mkArrowKind )
-import Name		( mkWiredInTyConName, mkWiredInIdName )
-import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
-			  TyCon, Arity
-			)
-import BasicTypes	( Module, NewOrData(..), RecFlag(..) )
+import Constants	( mAX_TUPLE_SIZE )
+import Name		( mkWiredInTyConName, mkWiredInIdName, mkTupNameStr,
+			  mkUbxTupNameStr )
+import DataCon		( DataCon, mkDataCon )
+import Var		( TyVar, tyVarKind )
+import TyCon		( TyCon, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )
+import BasicTypes	( Module, Arity, NewOrData(..), 
+			  RecFlag(..), StrictnessMark(..) )
 import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
-			  mkFunTy, mkFunTys, splitTyConApp_maybe, splitAlgTyConApp_maybe,
-			  GenType(..), ThetaType, TauType, isUnpointedType )
-import TyVar		( GenTyVar, TyVar, tyVarKind, alphaTyVars, alphaTyVar, betaTyVar )
-import Lex		( mkTupNameStr )
+			  mkArrowKinds, boxedTypeKind, unboxedTypeKind,
+			  mkFunTy, mkFunTys, isUnLiftedType,
+			  splitTyConApp_maybe, splitAlgTyConApp_maybe,
+			  GenType(..), ThetaType, TauType )
+import PrimRep		( PrimRep(..) )
 import Unique
 import CmdLineOpts      ( opt_GlasgowExts )
 import Util		( assoc, panic )
-
+import Array
 
 alpha_tyvar	  = [alphaTyVar]
 alpha_ty	  = [alphaTy]
@@ -149,16 +126,16 @@ alpha_beta_tyvars = [alphaTyVar, betaTyVar]
 
 pcRecDataTyCon, pcNonRecDataTyCon, pcNonRecNewTyCon
 	:: Unique{-TyConKey-} -> Module -> FAST_STRING
-	-> [TyVar] -> [Id] -> TyCon
+	-> [TyVar] -> [DataCon] -> TyCon
 
-pcRecDataTyCon    = pc_tycon DataType Recursive
-pcNonRecDataTyCon = pc_tycon DataType NonRecursive
-pcNonRecNewTyCon  = pc_tycon NewType  NonRecursive
+pcRecDataTyCon    = pcTyCon DataType Recursive
+pcNonRecDataTyCon = pcTyCon DataType NonRecursive
+pcNonRecNewTyCon  = pcTyCon NewType  NonRecursive
 
-pc_tycon new_or_data is_rec key mod str tyvars cons
+pcTyCon new_or_data is_rec key mod str tyvars cons
   = tycon
   where
-    tycon = mkDataTyCon name tycon_kind 
+    tycon = mkAlgTyCon name kind 
 		tyvars 
 		[] 		-- No context
 		cons
@@ -168,7 +145,7 @@ pc_tycon new_or_data is_rec key mod str tyvars cons
 		is_rec
 
     name = mkWiredInTyConName key mod str tycon
-    tycon_kind = foldr (mkArrowKind . tyVarKind) mkBoxedTypeKind tyvars
+    kind = mkArrowKinds (map tyVarKind tyvars) boxedTypeKind
 
 pcSynTyCon key mod str kind arity tyvars expansion
   = tycon
@@ -177,15 +154,16 @@ pcSynTyCon key mod str kind arity tyvars expansion
     name  = mkWiredInTyConName key mod str tycon
 
 pcDataCon :: Unique{-DataConKey-} -> Module -> FAST_STRING
-	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> Id
+	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> DataCon
 pcDataCon key mod str tyvars context arg_tys tycon
   = data_con
   where
     data_con = mkDataCon name 
 		[ NotMarkedStrict | a <- arg_tys ]
 		[ {- no labelled fields -} ]
-		tyvars context [] [] arg_tys tycon
-    name = mkWiredInIdName key mod str data_con
+		tyvars context [] [] arg_tys tycon id
+    name = mkWiredInIdName key mod str id
+    id   = mkDataConId data_con
 \end{code}
 
 %************************************************************************
@@ -196,28 +174,38 @@ pcDataCon key mod str tyvars context arg_tys tycon
 
 \begin{code}
 tupleTyCon :: Arity -> TyCon
-tupleTyCon arity
-  = tycon
-  where
-    tycon = mkTupleTyCon uniq name arity
-    uniq  = mkTupleTyConUnique arity
-    name  = mkWiredInTyConName uniq mod_name (mkTupNameStr arity) tycon
-    mod_name | arity == 0 = pREL_BASE
-	     | otherwise  = pREL_TUP 
+tupleTyCon i | i > mAX_TUPLE_SIZE = fst (mk_tuple i)	-- Build one specially
+	     | otherwise	  = tupleTyConArr!i
 
-tupleCon :: Arity -> Id
-tupleCon arity
-  = tuple_con
+tupleCon :: Arity -> DataCon
+tupleCon i | i > mAX_TUPLE_SIZE = snd (mk_tuple i)	-- Build one specially
+	   | otherwise	        = tupleConArr!i
+
+tupleTyCons :: [TyCon]
+tupleTyCons = elems tupleTyConArr
+
+tupleTyConArr :: Array Int TyCon
+tupleTyConArr = array (0,mAX_TUPLE_SIZE) ([0..] `zip` map fst tuples)
+
+tupleConArr :: Array Int DataCon
+tupleConArr = array (0,mAX_TUPLE_SIZE) ([0..] `zip` map snd tuples)
+
+tuples :: [(TyCon,DataCon)]
+tuples = [mk_tuple i | i <- [0..mAX_TUPLE_SIZE]]
+
+mk_tuple :: Int -> (TyCon,DataCon)
+mk_tuple arity = (tycon, tuple_con)
   where
-    tuple_con = mkTupleCon arity name ty
-    uniq      = mkTupleDataConUnique arity
-    name      = mkWiredInIdName uniq mod_name (mkTupNameStr arity) tuple_con
-    mod_name  | arity == 0 = pREL_BASE
-	      | otherwise  = pREL_TUP
-    ty 		= mkSigmaTy tyvars [] (mkFunTys tyvar_tys (mkTyConApp tycon tyvar_tys))
-    tyvars	= take arity alphaTyVars
-    tyvar_tys	= mkTyVarTys tyvars
-    tycon	= tupleTyCon arity
+	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con True
+	tc_name = mkWiredInTyConName tc_uniq mod_name name_str tycon
+    	tc_kind = mkArrowKinds (map tyVarKind tyvars) boxedTypeKind
+
+	tuple_con = pcDataCon dc_uniq mod_name name_str tyvars [] tyvar_tys tycon
+	tyvars    = take arity alphaTyVars
+	tyvar_tys = mkTyVarTys tyvars
+	(mod_name, name_str) = mkTupNameStr arity
+ 	tc_uniq   = mkTupleTyConUnique   arity
+	dc_uniq   = mkTupleDataConUnique arity
 
 unitTyCon = tupleTyCon 0
 pairTyCon = tupleTyCon 2
@@ -226,12 +214,66 @@ unitDataCon = tupleCon 0
 pairDataCon = tupleCon 2
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection[TysWiredIn-ubx-tuples]{Unboxed Tuple Types}
+%*									*
+%************************************************************************
+
+\begin{code}
+unboxedTupleTyCon :: Arity -> TyCon
+unboxedTupleTyCon i | i > mAX_TUPLE_SIZE = fst (mk_unboxed_tuple i)
+	            | otherwise	         = unboxedTupleTyConArr!i
+
+unboxedTupleCon :: Arity -> DataCon
+unboxedTupleCon i | i > mAX_TUPLE_SIZE = snd (mk_unboxed_tuple i)
+	          | otherwise	       = unboxedTupleConArr!i
+
+unboxedTupleTyConArr :: Array Int TyCon
+unboxedTupleTyConArr = array (0,mAX_TUPLE_SIZE) ([0..] `zip` map fst ubx_tuples)
+
+unboxedTupleConArr :: Array Int DataCon
+unboxedTupleConArr = array (0,mAX_TUPLE_SIZE) ([0..] `zip` map snd ubx_tuples)
+
+ubx_tuples :: [(TyCon,DataCon)]
+ubx_tuples = [mk_unboxed_tuple i | i <- [0..mAX_TUPLE_SIZE]]
+
+mk_unboxed_tuple :: Int -> (TyCon,DataCon)
+mk_unboxed_tuple arity = (tycon, tuple_con)
+  where
+	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con False
+	tc_name = mkWiredInTyConName tc_uniq mod_name name_str tycon
+    	tc_kind = mkArrowKinds (map tyVarKind tyvars) unboxedTypeKind
+
+	tuple_con = pcDataCon dc_uniq mod_name name_str tyvars [] tyvar_tys tycon
+	tyvars    = take arity openAlphaTyVars
+	tyvar_tys = mkTyVarTys tyvars
+	(mod_name, name_str) = mkUbxTupNameStr arity
+ 	tc_uniq   = mkUbxTupleTyConUnique   arity
+	dc_uniq   = mkUbxTupleDataConUnique arity
+
+unboxedPairTyCon   = unboxedTupleTyCon 2
+unboxedPairDataCon = unboxedTupleCon 2
+\end{code}
 
 %************************************************************************
 %*									*
 \subsection[TysWiredIn-boxed-prim]{The ``boxed primitive'' types (@Char@, @Int@, etc)}
 %*									*
 %************************************************************************
+
+\begin{code}
+-- The Void type is represented as a data type with no constructors
+-- It's a built in type (i.e. there's no way to define it in Haskell;
+--	the nearest would be
+--
+--		data Void =		-- No constructors!
+--
+-- ) It's boxed; there is only one value of this
+-- type, namely "void", whose semantics is just bottom.
+voidTy    = mkTyConTy voidTyCon
+voidTyCon = pcNonRecDataTyCon voidTyConKey pREL_GHC SLIT("Void") [] [{-No data cons-}]
+\end{code}
 
 \begin{code}
 charTy = mkTyConTy charTyCon
@@ -251,7 +293,7 @@ intDataCon = pcDataCon intDataConKey pREL_BASE SLIT("I#") [] [] [intPrimTy] intT
 isIntTy :: GenType flexi -> Bool
 isIntTy ty
   = case (splitAlgTyConApp_maybe ty) of
-	Just (tycon, [], _) -> uniqueOf tycon == intTyConKey
+	Just (tycon, [], _) -> getUnique tycon == intTyConKey
 	_		    -> False
 
 inIntRange :: Integer -> Bool	-- Tells if an integer lies in the legal range of Ints
@@ -275,16 +317,16 @@ int32TyCon = pcNonRecDataTyCon int32TyConKey iNT SLIT("Int32") [] [int32DataCon]
 
 int64Ty = mkTyConTy int64TyCon 
 
-int64TyCon = pcNonRecDataTyCon int64TyConKey pREL_CCALL SLIT("Int64") [] [int64DataCon]
-int64DataCon = pcDataCon int64DataConKey pREL_CCALL SLIT("I64#") [] [] [int64PrimTy] int64TyCon
+int64TyCon = pcNonRecDataTyCon int64TyConKey pREL_ADDR SLIT("Int64") [] [int64DataCon]
+int64DataCon = pcDataCon int64DataConKey pREL_ADDR SLIT("I64#") [] [] [int64PrimTy] int64TyCon
 \end{code}
 
 \begin{code}
 
 wordTy = mkTyConTy wordTyCon
 
-wordTyCon = pcNonRecDataTyCon wordTyConKey   pREL_FOREIGN SLIT("Word") [] [wordDataCon]
-wordDataCon = pcDataCon wordDataConKey pREL_FOREIGN SLIT("W#") [] [] [wordPrimTy] wordTyCon
+wordTyCon = pcNonRecDataTyCon wordTyConKey   pREL_ADDR SLIT("Word") [] [wordDataCon]
+wordDataCon = pcDataCon wordDataConKey pREL_ADDR SLIT("W#") [] [] [wordPrimTy] wordTyCon
 
 word8TyCon = pcNonRecDataTyCon word8TyConKey   wORD SLIT("Word8") [] [word8DataCon]
   where
@@ -300,8 +342,8 @@ word32TyCon = pcNonRecDataTyCon word32TyConKey   wORD SLIT("Word32") [] [word32D
 
 word64Ty = mkTyConTy word64TyCon
 
-word64TyCon = pcNonRecDataTyCon word64TyConKey   pREL_CCALL SLIT("Word64") [] [word64DataCon]
-word64DataCon = pcDataCon word64DataConKey pREL_CCALL SLIT("W64#") [] [] [word64PrimTy] word64TyCon
+word64TyCon = pcNonRecDataTyCon word64TyConKey   pREL_ADDR SLIT("Word64") [] [word64DataCon]
+word64DataCon = pcDataCon word64DataConKey pREL_ADDR SLIT("W64#") [] [] [word64PrimTy] word64TyCon
 \end{code}
 
 \begin{code}
@@ -313,7 +355,7 @@ addrDataCon = pcDataCon addrDataConKey pREL_ADDR SLIT("A#") [] [] [addrPrimTy] a
 isAddrTy :: GenType flexi -> Bool
 isAddrTy ty
   = case (splitAlgTyConApp_maybe ty) of
-	Just (tycon, [], _) -> uniqueOf tycon == addrTyConKey
+	Just (tycon, [], _) -> getUnique tycon == addrTyConKey
 	_		    -> False
 
 \end{code}
@@ -327,7 +369,7 @@ floatDataCon = pcDataCon floatDataConKey pREL_BASE SLIT("F#") [] [] [floatPrimTy
 isFloatTy :: GenType flexi -> Bool
 isFloatTy ty
   = case (splitAlgTyConApp_maybe ty) of
-	Just (tycon, [], _) -> uniqueOf tycon == floatTyConKey
+	Just (tycon, [], _) -> getUnique tycon == floatTyConKey
 	_		    -> False
 
 \end{code}
@@ -338,7 +380,7 @@ doubleTy = mkTyConTy doubleTyCon
 isDoubleTy :: GenType flexi -> Bool
 isDoubleTy ty
   = case (splitAlgTyConApp_maybe ty) of
-	Just (tycon, [], _) -> uniqueOf tycon == doubleTyConKey
+	Just (tycon, [], _) -> getUnique tycon == doubleTyConKey
 	_		    -> False
 
 doubleTyCon = pcNonRecDataTyCon doubleTyConKey pREL_BASE SLIT("Double") [] [doubleDataCon]
@@ -394,213 +436,8 @@ integerDataCon = pcDataCon integerDataConKey pREL_BASE SLIT("J#")
 isIntegerTy :: GenType flexi -> Bool
 isIntegerTy ty
   = case (splitAlgTyConApp_maybe ty) of
-	Just (tycon, [], _) -> uniqueOf tycon == integerTyConKey
+	Just (tycon, [], _) -> getUnique tycon == integerTyConKey
 	_		    -> False
-\end{code}
-
-And the other pairing types:
-\begin{code}
-return2GMPsTyCon = pcNonRecDataTyCon return2GMPsTyConKey
-	pREL_NUM SLIT("Return2GMPs") [] [return2GMPsDataCon]
-
-return2GMPsDataCon
-  = pcDataCon return2GMPsDataConKey pREL_NUM SLIT("Return2GMPs") [] []
-	[intPrimTy, intPrimTy, byteArrayPrimTy,
-	 intPrimTy, intPrimTy, byteArrayPrimTy] return2GMPsTyCon
-
-returnIntAndGMPTyCon = pcNonRecDataTyCon returnIntAndGMPTyConKey
-	pREL_NUM SLIT("ReturnIntAndGMP") [] [returnIntAndGMPDataCon]
-
-returnIntAndGMPDataCon
-  = pcDataCon returnIntAndGMPDataConKey pREL_NUM SLIT("ReturnIntAndGMP") [] []
-	[intPrimTy, intPrimTy, intPrimTy, byteArrayPrimTy] returnIntAndGMPTyCon
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[TysWiredIn-state-pairing]{``State-pairing'' types}
-%*									*
-%************************************************************************
-
-These boring types pair a \tr{State#} with another primitive type.
-They are not really primitive, so they are given here, not in
-\tr{TysPrim.lhs}.
-
-We fish one of these \tr{StateAnd<blah>#} things with
-@getStatePairingConInfo@ (given a little way down).
-
-\begin{code}
-stateAndPtrPrimTyCon
-  = pcNonRecDataTyCon stateAndPtrPrimTyConKey pREL_ST SLIT("StateAndPtr#")
-		alpha_beta_tyvars [stateAndPtrPrimDataCon]
-stateAndPtrPrimDataCon
-  = pcDataCon stateAndPtrPrimDataConKey pREL_ST SLIT("StateAndPtr#")
-		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, betaTy]
-		stateAndPtrPrimTyCon
-
-stateAndCharPrimTyCon
-  = pcNonRecDataTyCon stateAndCharPrimTyConKey pREL_ST SLIT("StateAndChar#")
-		alpha_tyvar [stateAndCharPrimDataCon]
-stateAndCharPrimDataCon
-  = pcDataCon stateAndCharPrimDataConKey pREL_ST SLIT("StateAndChar#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, charPrimTy]
-		stateAndCharPrimTyCon
-
-stateAndIntPrimTyCon
-  = pcNonRecDataTyCon stateAndIntPrimTyConKey pREL_ST SLIT("StateAndInt#")
-		alpha_tyvar [stateAndIntPrimDataCon]
-stateAndIntPrimDataCon
-  = pcDataCon stateAndIntPrimDataConKey pREL_ST SLIT("StateAndInt#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, intPrimTy]
-		stateAndIntPrimTyCon
-
-stateAndInt64PrimTyCon
-  = pcNonRecDataTyCon stateAndInt64PrimTyConKey pREL_ST SLIT("StateAndInt64#")
-		alpha_tyvar [stateAndInt64PrimDataCon]
-stateAndInt64PrimDataCon
-  = pcDataCon stateAndInt64PrimDataConKey pREL_ST SLIT("StateAndInt64#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, int64PrimTy]
-		stateAndInt64PrimTyCon
-
-stateAndWordPrimTyCon
-  = pcNonRecDataTyCon stateAndWordPrimTyConKey pREL_ST SLIT("StateAndWord#")
-		alpha_tyvar [stateAndWordPrimDataCon]
-stateAndWordPrimDataCon
-  = pcDataCon stateAndWordPrimDataConKey pREL_ST SLIT("StateAndWord#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, wordPrimTy]
-		stateAndWordPrimTyCon
-
-stateAndWord64PrimTyCon
-  = pcNonRecDataTyCon stateAndWord64PrimTyConKey pREL_ST SLIT("StateAndWord64#")
-		alpha_tyvar [stateAndWord64PrimDataCon]
-stateAndWord64PrimDataCon
-  = pcDataCon stateAndWord64PrimDataConKey pREL_ST SLIT("StateAndWord64#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, word64PrimTy]
-		stateAndWord64PrimTyCon
-
-stateAndAddrPrimTyCon
-  = pcNonRecDataTyCon stateAndAddrPrimTyConKey pREL_ST SLIT("StateAndAddr#")
-		alpha_tyvar [stateAndAddrPrimDataCon]
-stateAndAddrPrimDataCon
-  = pcDataCon stateAndAddrPrimDataConKey pREL_ST SLIT("StateAndAddr#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, addrPrimTy]
-		stateAndAddrPrimTyCon
-
-stateAndStablePtrPrimTyCon
-  = pcNonRecDataTyCon stateAndStablePtrPrimTyConKey pREL_FOREIGN SLIT("StateAndStablePtr#")
-		alpha_beta_tyvars [stateAndStablePtrPrimDataCon]
-stateAndStablePtrPrimDataCon
-  = pcDataCon stateAndStablePtrPrimDataConKey pREL_FOREIGN SLIT("StateAndStablePtr#")
-		alpha_beta_tyvars []
-		[mkStatePrimTy alphaTy, mkTyConApp stablePtrPrimTyCon [betaTy]]
-		stateAndStablePtrPrimTyCon
-
-stateAndForeignObjPrimTyCon
-  = pcNonRecDataTyCon stateAndForeignObjPrimTyConKey pREL_IO_BASE SLIT("StateAndForeignObj#")
-		alpha_tyvar [stateAndForeignObjPrimDataCon]
-stateAndForeignObjPrimDataCon
-  = pcDataCon stateAndForeignObjPrimDataConKey pREL_IO_BASE SLIT("StateAndForeignObj#")
-		alpha_tyvar []
-		[mkStatePrimTy alphaTy, mkTyConTy foreignObjPrimTyCon]
-		stateAndForeignObjPrimTyCon
-
-stateAndFloatPrimTyCon
-  = pcNonRecDataTyCon stateAndFloatPrimTyConKey pREL_ST SLIT("StateAndFloat#")
-		alpha_tyvar [stateAndFloatPrimDataCon]
-stateAndFloatPrimDataCon
-  = pcDataCon stateAndFloatPrimDataConKey pREL_ST SLIT("StateAndFloat#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, floatPrimTy]
-		stateAndFloatPrimTyCon
-
-stateAndDoublePrimTyCon
-  = pcNonRecDataTyCon stateAndDoublePrimTyConKey pREL_ST SLIT("StateAndDouble#")
-		alpha_tyvar [stateAndDoublePrimDataCon]
-stateAndDoublePrimDataCon
-  = pcDataCon stateAndDoublePrimDataConKey pREL_ST SLIT("StateAndDouble#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, doublePrimTy]
-		stateAndDoublePrimTyCon
-\end{code}
-
-\begin{code}
-stateAndArrayPrimTyCon
-  = pcNonRecDataTyCon stateAndArrayPrimTyConKey pREL_ARR SLIT("StateAndArray#")
-		alpha_beta_tyvars [stateAndArrayPrimDataCon]
-stateAndArrayPrimDataCon
-  = pcDataCon stateAndArrayPrimDataConKey pREL_ARR SLIT("StateAndArray#")
-		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, mkArrayPrimTy betaTy]
-		stateAndArrayPrimTyCon
-
-stateAndMutableArrayPrimTyCon
-  = pcNonRecDataTyCon stateAndMutableArrayPrimTyConKey pREL_ARR SLIT("StateAndMutableArray#")
-		alpha_beta_tyvars [stateAndMutableArrayPrimDataCon]
-stateAndMutableArrayPrimDataCon
-  = pcDataCon stateAndMutableArrayPrimDataConKey pREL_ARR SLIT("StateAndMutableArray#")
-		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, mkMutableArrayPrimTy alphaTy betaTy]
-		stateAndMutableArrayPrimTyCon
-
-stateAndByteArrayPrimTyCon
-  = pcNonRecDataTyCon stateAndByteArrayPrimTyConKey pREL_ARR SLIT("StateAndByteArray#")
-		alpha_tyvar [stateAndByteArrayPrimDataCon]
-stateAndByteArrayPrimDataCon
-  = pcDataCon stateAndByteArrayPrimDataConKey pREL_ARR SLIT("StateAndByteArray#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, byteArrayPrimTy]
-		stateAndByteArrayPrimTyCon
-
-stateAndMutableByteArrayPrimTyCon
-  = pcNonRecDataTyCon stateAndMutableByteArrayPrimTyConKey pREL_ARR SLIT("StateAndMutableByteArray#")
-		alpha_tyvar [stateAndMutableByteArrayPrimDataCon]
-stateAndMutableByteArrayPrimDataCon
-  = pcDataCon stateAndMutableByteArrayPrimDataConKey pREL_ARR SLIT("StateAndMutableByteArray#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, mkTyConApp mutableByteArrayPrimTyCon alpha_ty]
-		stateAndMutableByteArrayPrimTyCon
-
-stateAndSynchVarPrimTyCon
-  = pcNonRecDataTyCon stateAndSynchVarPrimTyConKey pREL_CONC SLIT("StateAndSynchVar#")
-		alpha_beta_tyvars [stateAndSynchVarPrimDataCon]
-stateAndSynchVarPrimDataCon
-  = pcDataCon stateAndSynchVarPrimDataConKey pREL_CONC SLIT("StateAndSynchVar#")
-		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, mkSynchVarPrimTy alphaTy betaTy]
-		stateAndSynchVarPrimTyCon
-\end{code}
-
-The ccall-desugaring mechanism uses this function to figure out how to
-rebox the result.  It's really a HACK, especially the part about
-how many types to drop from \tr{tys_applied}.
-
-\begin{code}
-getStatePairingConInfo
-	:: Type	-- primitive type
-	-> (Id,		-- state pair constructor for prim type
-	    Type)	-- type of state pair
-
-getStatePairingConInfo prim_ty
-  = case (splitTyConApp_maybe prim_ty) of
-      Nothing -> panic "getStatePairingConInfo:1"
-      Just (prim_tycon, tys_applied) ->
-	let
-	    (pair_con, pair_tycon, num_tys) = assoc "getStatePairingConInfo" tbl prim_tycon
-	    pair_ty = mkTyConApp pair_tycon (realWorldTy : drop num_tys tys_applied)
-	in
-	(pair_con, pair_ty)
-  where
-    tbl = [
-	(charPrimTyCon, (stateAndCharPrimDataCon, stateAndCharPrimTyCon, 0)),
-	(intPrimTyCon, (stateAndIntPrimDataCon, stateAndIntPrimTyCon, 0)),
-	(wordPrimTyCon, (stateAndWordPrimDataCon, stateAndWordPrimTyCon, 0)),
-	(int64PrimTyCon, (stateAndInt64PrimDataCon, stateAndInt64PrimTyCon, 0)),
-	(word64PrimTyCon, (stateAndWord64PrimDataCon, stateAndWord64PrimTyCon, 0)),
-	(addrPrimTyCon, (stateAndAddrPrimDataCon, stateAndAddrPrimTyCon, 0)),
-	(stablePtrPrimTyCon, (stateAndStablePtrPrimDataCon, stateAndStablePtrPrimTyCon, 0)),
-	(foreignObjPrimTyCon, (stateAndForeignObjPrimDataCon, stateAndForeignObjPrimTyCon, 0)),
-	(floatPrimTyCon, (stateAndFloatPrimDataCon, stateAndFloatPrimTyCon, 0)),
-	(doublePrimTyCon, (stateAndDoublePrimDataCon, stateAndDoublePrimTyCon, 0)),
-	(arrayPrimTyCon, (stateAndArrayPrimDataCon, stateAndArrayPrimTyCon, 0)),
-	(mutableArrayPrimTyCon, (stateAndMutableArrayPrimDataCon, stateAndMutableArrayPrimTyCon, 1)),
-	(byteArrayPrimTyCon, (stateAndByteArrayPrimDataCon, stateAndByteArrayPrimTyCon, 0)),
-	(mutableByteArrayPrimTyCon, (stateAndMutableByteArrayPrimDataCon, stateAndMutableByteArrayPrimTyCon, 1)),
-	(synchVarPrimTyCon, (stateAndSynchVarPrimDataCon, stateAndSynchVarPrimTyCon, 1))
-	-- (PtrPrimTyCon, (stateAndPtrPrimDataCon, stateAndPtrPrimTyCon, 0)),
-	]
 \end{code}
 
 
@@ -617,9 +454,9 @@ being the )
 \begin{code}
 isFFIArgumentTy :: Type -> Bool
 isFFIArgumentTy ty =
-  (opt_GlasgowExts && isUnpointedType ty) || --leave out for now: maybeToBool (maybeBoxedPrimType ty))) ||
+  (opt_GlasgowExts && isUnLiftedType ty) || --leave out for now: maybeToBool (maybeBoxedPrimType ty))) ||
   case (splitAlgTyConApp_maybe ty) of
-    Just (tycon, _, _) -> (uniqueOf tycon) `elem` primArgTyConKeys
+    Just (tycon, _, _) -> (getUnique tycon) `elem` primArgTyConKeys
     _		       -> False
 
 -- types that can be passed as arguments to "foreign" functions
@@ -635,11 +472,11 @@ primArgTyConKeys
 -- excludes (mutable) byteArrays.
 isFFIExternalTy :: Type -> Bool
 isFFIExternalTy ty = 
-  (opt_GlasgowExts && isUnpointedType ty) || --leave out for now: maybeToBool (maybeBoxedPrimType ty))) ||
+  (opt_GlasgowExts && isUnLiftedType ty) || --leave out for now: maybeToBool (maybeBoxedPrimType ty))) ||
   case (splitAlgTyConApp_maybe ty) of
     Just (tycon, _, _) -> 
        let 
-        u_tycon = uniqueOf tycon
+        u_tycon = getUnique tycon
        in  
        (u_tycon `elem` primArgTyConKeys) &&
        not (u_tycon `elem` notLegalExternalTyCons)
@@ -648,13 +485,13 @@ isFFIExternalTy ty =
 
 isFFIResultTy :: Type -> Bool
 isFFIResultTy ty =
-   not (isUnpointedType ty) &&
+   not (isUnLiftedType ty) &&
    case (splitAlgTyConApp_maybe ty) of
     Just (tycon, _, _) -> 
 	let
-	 u_tycon = uniqueOf tycon
+	 u_tycon = getUnique tycon
 	in
-	(u_tycon == uniqueOf unitTyCon) ||
+	(u_tycon == getUnique unitTyCon) ||
         ((u_tycon `elem` primArgTyConKeys) && 
 	 not (u_tycon `elem` notLegalExternalTyCons))
     _		       -> False
@@ -665,37 +502,6 @@ isFFIResultTy ty =
 notLegalExternalTyCons =
   [ foreignObjTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey ]
     
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[TysWiredIn-ST]{The basic @_ST@ state-transformer type}
-%*									*
-%************************************************************************
-
-The only reason this is wired in is because we have to represent the
-type of runST.
-
-\begin{code}
-mkStateTransformerTy s a = mkTyConApp stTyCon [s, a]
-
-stTyCon = pcNonRecNewTyCon stTyConKey pREL_ST SLIT("ST") alpha_beta_tyvars [stDataCon]
-
-stDataCon = pcDataCon stDataConKey pREL_ST SLIT("ST")
-			alpha_beta_tyvars [] [ty] stTyCon
-  where
-    ty = mkFunTy (mkStatePrimTy alphaTy) (mkSTretTy alphaTy betaTy)
-
-mkSTretTy alpha beta = mkTyConApp stRetTyCon [alpha,beta]
-
-stRetTyCon
-  = pcNonRecDataTyCon stRetTyConKey pREL_ST SLIT("STret") 
-	alpha_beta_tyvars [stRetDataCon]
-stRetDataCon
-  = pcDataCon stRetDataConKey pREL_ST SLIT("STret")
-	alpha_beta_tyvars [] [mkStatePrimTy alphaTy, betaTy] 
-		stRetTyCon
 \end{code}
 
 %************************************************************************
@@ -749,7 +555,8 @@ primitive counterpart.
 \begin{code}
 boolTy = mkTyConTy boolTyCon
 
-boolTyCon = pcNonRecDataTyCon boolTyConKey pREL_BASE SLIT("Bool") [] [falseDataCon, trueDataCon]
+boolTyCon = pcTyCon EnumType NonRecursive boolTyConKey 
+		    pREL_BASE SLIT("Bool") [] [falseDataCon, trueDataCon]
 
 falseDataCon = pcDataCon falseDataConKey pREL_BASE SLIT("False") [] [] [] boolTyCon
 trueDataCon  = pcDataCon trueDataConKey	 pREL_BASE SLIT("True")  [] [] [] boolTyCon
@@ -835,46 +642,10 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 
 \begin{code}
 mkTupleTy :: Int -> [GenType t] -> GenType t
-
 mkTupleTy arity tys = mkTyConApp (tupleTyCon arity) tys
 
+mkUnboxedTupleTy :: Int -> [GenType t] -> GenType t
+mkUnboxedTupleTy arity tys = mkTyConApp (unboxedTupleTyCon arity) tys
+
 unitTy    = mkTupleTy 0 []
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[TysWiredIn-_Lift]{@_Lift@ type: to support array indexing}
-%*									*
-%************************************************************************
-
-Again, deeply turgid: \tr{data _Lift a = _Lift a}.
-
-\begin{code}
-mkLiftTy ty = mkTyConApp liftTyCon [ty]
-
-{-
-mkLiftTy ty
-  = mkSigmaTy tvs theta (mkTyConApp liftTyCon [tau])
-  where
-    (tvs, theta, tau) = splitSigmaTy ty
-
-isLiftTy ty
-  = case (splitAlgTyConApp_maybeExpandingDicts tau) of
-      Just (tycon, tys, _) -> tycon == liftTyCon
-      Nothing -> False
-  where
-    (tvs, theta, tau) = splitSigmaTy ty
--}
-
-
-alphaLiftTy = mkSigmaTy alpha_tyvar [] (mkTyConApp liftTyCon alpha_ty)
-
-liftTyCon
-  = pcNonRecDataTyCon liftTyConKey pREL_BASE SLIT("Lift") alpha_tyvar [liftDataCon]
-
-liftDataCon
-  = pcDataCon liftDataConKey pREL_BASE SLIT("Lift")
-		alpha_tyvar [] alpha_ty liftTyCon
-  where
-    bottom = panic "liftDataCon:State# _RealWorld"
 \end{code}

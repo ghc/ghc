@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[MatchCon]{Pattern-matching constructors}
 
@@ -10,14 +10,17 @@ module MatchCon ( matchConFamily ) where
 
 import {-# SOURCE #-} Match	( match )
 
-import HsSyn		( OutPat(..), HsLit, HsExpr )
-import DsHsSyn		( outPatType )
+import HsSyn		( OutPat(..) )
 
 import DsMonad
 import DsUtils
 
-import Id		( GenId{-instances-}, Id )
-import Util		( panic, assertPanic )
+import Id		( Id )
+import CoreSyn
+import Type		( mkTyVarTys )
+import Unique		( Uniquable(..), Unique )
+import UniqFM		-- Until equivClassesUniq moves to Util
+import Outputable
 \end{code}
 
 We are confronted with the first column of patterns in a set of
@@ -76,51 +79,63 @@ matchConFamily :: [Id]
 	       -> DsM MatchResult
 
 matchConFamily (var:vars) eqns_info
-  = match_cons_used vars eqns_info `thenDs` \ alts ->
-    mkCoAlgCaseMatchResult var alts
+  = let
+	-- Sort into equivalence classes by the unique on the constructor
+	-- All the EqnInfos should start with a ConPat
+	eqn_groups = equivClassesByUniq get_uniq eqns_info
+	get_uniq (EqnInfo _ _ (ConPat data_con _ _ _ _ : _) _) = getUnique data_con
+    in
+	-- Now make a case alternative out of each group
+    mapDs (match_con vars) eqn_groups	`thenDs` \ alts ->
+
+    returnDs (mkCoAlgCaseMatchResult var alts)
 \end{code}
 
 And here is the local function that does all the work.  It is
 more-or-less the @matchCon@/@matchClause@ functions on page~94 in
 Wadler's chapter in SLPJ.
+
 \begin{code}
-match_cons_used _ [{- no more eqns -}] = returnDs []
-
-match_cons_used vars eqns_info@(EqnInfo n ctx (ConPat data_con _ arg_pats : ps1) _ : eqns)
-  = let
-	(eqns_for_this_con, eqns_not_for_this_con)       = splitByCon eqns_info
-    in
-    -- Go ahead and do the recursive call to make the alts
-    -- for the other ConPats in this con family...
-    match_cons_used vars eqns_not_for_this_con 	          `thenDs` \ rest_of_alts ->
-
-    -- Make new vars for the con arguments; avoid new locals where possible
-    selectMatchVars arg_pats				   `thenDs` \ new_vars ->
+match_con vars all_eqns@(EqnInfo n ctx (ConPat data_con _ ex_tvs ex_dicts arg_pats : pats1) match_result1 : other_eqns)
+  = -- Make new vars for the con arguments; avoid new locals where possible
+    mapDs selectMatchVar arg_pats			   `thenDs` \ arg_vars ->
 
     -- Now do the business to make the alt for _this_ ConPat ...
-    match (new_vars++vars)
-	  (map shift_con_pat eqns_for_this_con)		   `thenDs` \ match_result ->
+    match (ex_dicts ++ arg_vars ++ vars)
+	  (map shift_con_pat all_eqns)	`thenDs` \ match_result ->
 
-    returnDs (
-	(data_con, new_vars, match_result)
-	: rest_of_alts
-    )
+	-- Substitute over the result
+    let
+	match_result' | null ex_tvs = match_result
+		      | otherwise   = adjustMatchResult subst_it match_result
+    in	
+    returnDs (data_con, ex_tvs ++ ex_dicts ++ arg_vars, match_result')
   where
-    splitByCon :: [EquationInfo] -> ([EquationInfo], [EquationInfo])
-    splitByCon [] = ([],[])
-    splitByCon (info@(EqnInfo _ _ (pat : _) _) : rest)
-	= case pat of
-		ConPat n _ _ | n == data_con -> (info:rest_yes, rest_no)
-		other_pat		     -> (rest_yes,      info:rest_no)
-	where
-	  (rest_yes, rest_no) = splitByCon rest
-
     shift_con_pat :: EquationInfo -> EquationInfo
-    shift_con_pat (EqnInfo n ctx (ConPat _ _ pats': pats) match_result)
-      = EqnInfo n ctx (pats' ++ pats) match_result
-    shift_con_pat (EqnInfo n ctx (WildPat _: pats) match_result) -- Will only happen in shadow
-      = EqnInfo n ctx ([WildPat (outPatType arg_pat) | arg_pat <- arg_pats] ++ pats) match_result
-    shift_con_pat other = panic "matchConFamily:match_cons_used:shift_con_pat"
+    shift_con_pat (EqnInfo n ctx (ConPat _ _ ex_tvs' ex_dicts' arg_pats: pats) match_result)
+      = EqnInfo n ctx (new_pats  ++ pats) match_result
+      where
+	new_pats  = map VarPat ex_dicts' ++ arg_pats 
+
+	-- We 'substitute' by going: (/\ tvs' -> e) tvs
+    subst_it e = foldr subst_one e other_eqns
+    subst_one (EqnInfo _ _ (ConPat _ _ ex_tvs' _ _ : _) _) e = mkTyApps (mkLams ex_tvs' e) ex_tys
+    ex_tys = mkTyVarTys ex_tvs
+
+
+-- Belongs in Util.lhs
+equivClassesByUniq :: (a -> Unique) -> [a] -> [[a]]
+	-- NB: it's *very* important that if we have the input list [a,b,c],
+	-- where a,b,c all have the same unique, then we get back the list
+	-- 	[a,b,c]
+	-- not
+	--	[c,b,a]
+	-- Hence the use of foldr, plus the reversed-args tack_on below
+equivClassesByUniq get_uniq xs
+  = eltsUFM (foldr add emptyUFM xs)
+  where
+    add a ufm = addToUFM_C tack_on ufm (get_uniq a) [a]
+    tack_on old new = new++old
 \end{code}
 
 Note on @shift_con_pats@ just above: does what the list comprehension in

@@ -1,0 +1,1 @@
+ERROR "test/static/s040.hs" (line 4): Definition of variable "index" clashes with import

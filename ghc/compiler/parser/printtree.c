@@ -568,7 +568,7 @@ pttype(t)
 			  pqid(gtypeid(t));
 			  break;
 	case namedtvar	: PUTTAG('y');
-			  pqid(gnamedtvar(t));
+			  pstr(gnamedtvar(t));
 			  break;
 	case tllist	: PUTTAG(':');
 			  pttype(gtlist(t));
@@ -587,9 +587,10 @@ pttype(t)
 	case tbang	: PUTTAG('!');
 			  pttype(gtbang(t));
 			  break;
-	case context	: PUTTAG('3');
-			  plist(pttype,gtcontextl(t));
-			  pttype(gtcontextt(t));
+	case forall	: PUTTAG('3');
+			  plist(pstr, gtforalltv(t));
+			  plist(pttype,gtforallctxt(t));
+			  pttype(gtforallt(t));
 			  break;
 	default		: error("bad pttype");
 	}

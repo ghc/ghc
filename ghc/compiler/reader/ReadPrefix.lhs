@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section{Read parse tree built by Yacc parser}
 
@@ -12,21 +12,17 @@ import UgenAll		-- all Yacc parser gumpff...
 import PrefixSyn	-- and various syntaxen.
 import HsSyn
 import HsTypes		( HsTyVar(..) )
-import HsPragmas	( noDataPragmas, noClassPragmas, noInstancePragmas, noGenPragmas )
+import HsPragmas	( noDataPragmas, noClassPragmas )
 import RdrHsSyn         
 import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..) )
 import PrefixToHs
 import CallConv
 
-import CmdLineOpts      ( opt_NoImplicitPrelude )
-import FiniteMap	( elemFM, FiniteMap )
-import Name		( OccName(..), Module )
-import Lex		( isLexConId )
+import CmdLineOpts      ( opt_NoImplicitPrelude, opt_GlasgowExts )
+import Name		( OccName(..), Module, isLexConId )
 import Outputable
 import PrelMods		( pRELUDE )
-import Util		( nOfThem )
 import FastString	( mkFastCharString )
-import IO 		( hPutStr, stderr )
 import PrelRead		( readRational__ )
 \end{code}
 
@@ -57,7 +53,6 @@ wlkMaybe wlk_it (U_just x)
 \end{code}
 
 \begin{code}
-wlkTvId   = wlkQid TvOcc
 wlkTCId   = wlkQid TCOcc
 wlkVarId  = wlkQid VarOcc
 wlkDataId = wlkQid VarOcc
@@ -89,8 +84,12 @@ wlkQid mk_occ_name (U_gid n name)
   | otherwise
 	= returnUgn (Qual pRELUDE (mk_occ_name name) HiFile)
 
-rdTCId  pt = rdU_qid pt `thenUgn` \ qid -> wlkTCId qid
+
+rdTCId  pt = rdU_qid pt `thenUgn` \ qid -> wlkTCId  qid
 rdVarId pt = rdU_qid pt `thenUgn` \ qid -> wlkVarId qid
+
+rdTvId  pt = rdU_stringId pt `thenUgn` \ string -> wlkTvId string
+wlkTvId string = returnUgn (Unqual (TvOcc string))
 
 cvFlag :: U_long -> Bool
 cvFlag 0 = False
@@ -271,7 +270,7 @@ wlkExpr expr
 
       U_restr restre restrt -> 	-- expression with type signature
 	wlkExpr	    restre	`thenUgn` \ expr ->
-	wlkHsType restrt	`thenUgn` \ ty	 ->
+	wlkHsSigType restrt	`thenUgn` \ ty	 ->
 	returnUgn (ExprWithTySig expr ty)
 
       --------------------------------------------------------------
@@ -309,12 +308,16 @@ wlkExpr expr
 
       U_tuple tuplelist -> -- explicit tuple
 	wlkList rdExpr tuplelist `thenUgn` \ exprs ->
-	returnUgn (ExplicitTuple exprs)
+	returnUgn (ExplicitTuple exprs True)
+
+      U_utuple tuplelist -> -- explicit tuple
+	wlkList rdExpr tuplelist `thenUgn` \ exprs ->
+	returnUgn (ExplicitTuple exprs False)
 
       U_record con rbinds -> -- record construction
 	wlkDataId  con		`thenUgn` \ rcon     ->
 	wlkList rdRbind rbinds	`thenUgn` \ recbinds ->
-	returnUgn (RecordCon rcon (HsVar rcon) recbinds)
+	returnUgn (RecordCon rcon recbinds)
 
       U_rupdate updexp updbinds -> -- record update
 	wlkExpr updexp		 `thenUgn` \ aexp ->
@@ -465,7 +468,11 @@ wlkPat pat
 
       U_tuple tuplelist -> 		-- explicit tuple
 	wlkList rdPat tuplelist	`thenUgn` \ pats ->
-	returnUgn (TuplePatIn pats)
+	returnUgn (TuplePatIn pats True)
+
+      U_utuple tuplelist -> 		-- explicit tuple
+	wlkList rdPat tuplelist	`thenUgn` \ pats ->
+	returnUgn (TuplePatIn pats False)
 
       U_record con rpats -> 		-- record destruction
 	wlkDataId  con		`thenUgn` \ rcon     ->
@@ -551,7 +558,7 @@ wlkBinding binding
       U_nbind nbindid nbindas srcline -> 		
 	mkSrcLocUgn	  srcline 	  $ \ src_loc	    ->
 	wlkConAndTyVars   nbindid `thenUgn` \ (tycon, tyvars) ->
-	wlkMonoType	  nbindas `thenUgn` \ expansion	    ->
+	wlkHsType	  nbindas `thenUgn` \ expansion	    ->
 	returnUgn (RdrTyDecl (TySynonym tycon tyvars expansion src_loc))
 
 	-- function binding
@@ -631,7 +638,7 @@ wlkDerivings (U_just pt)
 wlk_sig_thing (U_sbind sbindids sbindid srcline)
   = mkSrcLocUgn		srcline  	$ \ src_loc ->
     wlkList rdVarId	sbindids `thenUgn` \ vars    ->
-    wlkHsType		sbindid  `thenUgn` \ poly_ty ->
+    wlkHsSigType	sbindid  `thenUgn` \ poly_ty ->
     returnUgn (foldr1 RdrAndBindings [RdrSig (Sig var poly_ty src_loc) | var <- vars])
 
 	-- value specialisation user-pragma
@@ -645,14 +652,14 @@ wlk_sig_thing (U_vspec_uprag uvar vspec_tys srcline)
     rd_ty_and_id :: ParseTree -> UgnM (RdrNameHsType, Maybe RdrName)
     rd_ty_and_id pt
       = rdU_binding pt		`thenUgn` \ (U_vspec_ty_and_id vspec_ty vspec_id) ->
-	wlkHsType vspec_ty	`thenUgn` \ ty	     ->
+	wlkHsSigType vspec_ty	`thenUgn` \ ty	     ->
 	wlkMaybe rdVarId vspec_id	`thenUgn` \ id_maybe ->
 	returnUgn(ty, id_maybe)
 
 	-- instance specialisation user-pragma
 wlk_sig_thing (U_ispec_uprag iclas ispec_ty srcline)
   = mkSrcLocUgn srcline		$ \ src_loc ->
-    wlkHsType ispec_ty		`thenUgn` \ ty	    ->
+    wlkHsSigType ispec_ty	`thenUgn` \ ty	    ->
     returnUgn (RdrSig (SpecInstSig ty src_loc))
 
 	-- value inlining user-pragma
@@ -677,30 +684,33 @@ wlk_sig_thing (U_noinline_uprag ivar srcline)
 rdHsType :: ParseTree -> UgnM RdrNameHsType
 rdMonoType :: ParseTree -> UgnM RdrNameHsType
 
-rdHsType pt = rdU_ttype pt `thenUgn` \ ttype -> wlkHsType ttype
-rdMonoType pt = rdU_ttype pt `thenUgn` \ ttype -> wlkMonoType ttype
+rdHsType   pt = rdU_ttype pt `thenUgn` \ ttype -> wlkHsType ttype
+rdMonoType pt = rdU_ttype pt `thenUgn` \ ttype -> wlkHsType ttype
+
+wlkHsConstrArgType ttype
+	-- Used for the argument types of contructors
+	-- Only an implicit quantification point if -fglasgow-exts
+  | opt_GlasgowExts = wlkHsSigType ttype
+  | otherwise       = wlkHsType    ttype
+
+	-- wlkHsSigType is used for type signatures: any place there
+	-- should be *implicit* quantification
+wlkHsSigType ttype
+  = wlkHsType ttype	`thenUgn` \ ty ->
+	-- This is an implicit quantification point, so
+	-- make sure it starts with a ForAll
+    case ty of
+	HsForAllTy _ _ _ -> returnUgn ty
+	other		 -> returnUgn (HsForAllTy [] [] ty)
 
 wlkHsType :: U_ttype -> UgnM RdrNameHsType
-wlkMonoType :: U_ttype -> UgnM RdrNameHsType
-
 wlkHsType ttype
   = case ttype of
-      U_context tcontextl tcontextt -> -- context
-	wlkContext  tcontextl	`thenUgn` \ ctxt ->
-	wlkMonoType tcontextt	`thenUgn` \ ty	 ->
-	returnUgn (HsPreForAllTy ctxt ty)
-
-      other -> -- something else
-	wlkMonoType other   `thenUgn` \ ty ->
-	returnUgn (HsPreForAllTy [{-no context-}] ty)
-
-wlkMonoType ttype
-  = case ttype of
-		-- Glasgow extension: nested polymorhism
-      U_context tcontextl tcontextt -> -- context
-	wlkContext  tcontextl	`thenUgn` \ ctxt ->
-	wlkMonoType tcontextt	`thenUgn` \ ty	 ->
-	returnUgn (HsPreForAllTy ctxt ty)
+      U_forall u_tyvars u_theta u_ty -> -- context
+	wlkList rdTvId u_tyvars		`thenUgn` \ tyvars -> 
+	wlkContext u_theta		`thenUgn` \ theta ->
+	wlkHsType u_ty			`thenUgn` \ ty	 ->
+	returnUgn (HsForAllTy (map UserTyVar tyvars) theta ty)
 
       U_namedtvar tv -> -- type variable
 	wlkTvId tv	`thenUgn` \ tyvar ->
@@ -711,39 +721,44 @@ wlkMonoType ttype
 	returnUgn (MonoTyVar tycon)
 
       U_tapp t1 t2 ->
-	wlkMonoType t1		`thenUgn` \ ty1 ->
-	wlkMonoType t2		`thenUgn` \ ty2 ->
+	wlkHsType t1		`thenUgn` \ ty1 ->
+	wlkHsType t2		`thenUgn` \ ty2 ->
 	returnUgn (MonoTyApp ty1 ty2)
 	      
       U_tllist tlist -> -- list type
-	wlkMonoType tlist	`thenUgn` \ ty ->
-	returnUgn (MonoListTy dummyRdrTcName ty)
+	wlkHsType tlist	`thenUgn` \ ty ->
+	returnUgn (MonoListTy ty)
 
       U_ttuple ttuple ->
 	wlkList rdMonoType ttuple `thenUgn` \ tys ->
-	returnUgn (MonoTupleTy dummyRdrTcName tys)
+	returnUgn (MonoTupleTy tys True)
+
+      U_tutuple ttuple ->
+	wlkList rdMonoType ttuple `thenUgn` \ tys ->
+	returnUgn (MonoTupleTy tys False)
 
       U_tfun tfun targ ->
-	wlkMonoType tfun	`thenUgn` \ ty1 ->
-	wlkMonoType targ	`thenUgn` \ ty2 ->
+	wlkHsType tfun	`thenUgn` \ ty1 ->
+	wlkHsType targ	`thenUgn` \ ty2 ->
 	returnUgn (MonoFunTy ty1 ty2)
 
 wlkInstType ttype
   = case ttype of
-      U_context tcontextl tcontextt -> -- context
-	wlkContext  tcontextl	`thenUgn` \ ctxt ->
-	wlkConAndTys tcontextt	`thenUgn` \ (clas, tys)	 ->
-	returnUgn (HsPreForAllTy ctxt (MonoDictTy clas tys))
+      U_forall u_tyvars u_theta inst_head ->
+	wlkList rdTvId u_tyvars		`thenUgn` \ tyvars -> 
+	wlkContext  u_theta		`thenUgn` \ theta ->
+	wlkConAndTys inst_head		`thenUgn` \ (clas, tys)	 ->
+	returnUgn (HsForAllTy (map UserTyVar tyvars) theta (MonoDictTy clas tys))
 
       other -> -- something else
 	wlkConAndTys other   `thenUgn` \ (clas, tys) ->
-	returnUgn (HsPreForAllTy [{-no context-}] (MonoDictTy clas tys))
+	returnUgn (HsForAllTy [] [] (MonoDictTy clas tys))
 \end{code}
 
 \begin{code}
-wlkConAndTyVars :: U_ttype   -> UgnM (RdrName, [HsTyVar RdrName])
+wlkConAndTyVars :: U_ttype -> UgnM (RdrName, [HsTyVar RdrName])
 wlkConAndTyVars ttype
-  = wlkMonoType ttype	`thenUgn` \ ty ->
+  = wlkHsType ttype	`thenUgn` \ ty ->
     let
 	split (MonoTyApp fun (MonoTyVar arg)) args = split fun (UserTyVar arg : args)
 	split (MonoTyVar tycon)		      args = (tycon,args)
@@ -763,7 +778,7 @@ rdConAndTys pt
     wlkConAndTys ttype
 
 wlkConAndTys ttype
-  = wlkMonoType ttype	`thenUgn` \ ty ->
+  = wlkHsType ttype	`thenUgn` \ ty ->
     let
 	split (MonoTyApp fun ty) tys = split fun (ty : tys)
 	split (MonoTyVar tycon)  tys = (tycon, tys)
@@ -781,35 +796,36 @@ rdConDecl pt
 
 wlkConDecl :: U_constr -> UgnM RdrNameConDecl
 
-wlkConDecl (U_constrcxt ccxt ccdecl)
-  = wlkContext ccxt		`thenUgn` \ theta ->
-    wlkConDecl ccdecl		`thenUgn` \ (ConDecl con _ details loc) ->
-    returnUgn (ConDecl con theta details loc)
+wlkConDecl (U_constrex u_tvs ccxt ccdecl)
+  = wlkList rdTvId u_tvs	`thenUgn` \ tyvars -> 
+    wlkContext ccxt		`thenUgn` \ theta ->
+    wlkConDecl ccdecl		`thenUgn` \ (ConDecl con _ _ details loc) ->
+    returnUgn (ConDecl con (map UserTyVar tyvars) theta details loc)
 
 wlkConDecl (U_constrpre ccon ctys srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
     wlkDataId	ccon		`thenUgn` \ con	    ->
     wlkList     rdBangType ctys	`thenUgn` \ tys	    ->
-    returnUgn (ConDecl con [] (VanillaCon tys) src_loc)
+    returnUgn (ConDecl con [] [] (VanillaCon tys) src_loc)
 
 wlkConDecl (U_constrinf cty1 cop cty2 srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
     wlkBangType cty1		`thenUgn` \ ty1	    ->
     wlkDataId	cop		`thenUgn` \ op	    ->
     wlkBangType cty2		`thenUgn` \ ty2	    ->
-    returnUgn (ConDecl op [] (InfixCon ty1 ty2) src_loc)
+    returnUgn (ConDecl op [] [] (InfixCon ty1 ty2) src_loc)
 
 wlkConDecl (U_constrnew ccon cty srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
     wlkDataId	ccon		`thenUgn` \ con	    ->
-    wlkMonoType cty		`thenUgn` \ ty	    ->
-    returnUgn (ConDecl con [] (NewCon ty) src_loc)
+    wlkHsSigType cty		`thenUgn` \ ty	    ->
+    returnUgn (ConDecl con [] [] (NewCon ty) src_loc)
 
 wlkConDecl (U_constrrec ccon cfields srcline)
   = mkSrcLocUgn srcline			$ \ src_loc      ->
     wlkDataId	ccon		`thenUgn` \ con		 ->
     wlkList rd_field cfields	`thenUgn` \ fields_lists ->
-    returnUgn (ConDecl con [] (RecCon fields_lists) src_loc)
+    returnUgn (ConDecl con [] [] (RecCon fields_lists) src_loc)
   where
     rd_field :: ParseTree -> UgnM ([RdrName], BangType RdrName)
     rd_field pt
@@ -823,9 +839,9 @@ rdBangType pt = rdU_ttype pt `thenUgn` \ ty -> wlkBangType ty
 
 wlkBangType :: U_ttype -> UgnM (BangType RdrName)
 
-wlkBangType (U_tbang bty) = wlkMonoType bty `thenUgn` \ ty ->
+wlkBangType (U_tbang bty) = wlkHsConstrArgType bty	`thenUgn` \ ty ->
 			    returnUgn (Banged   ty)
-wlkBangType uty		  = wlkMonoType uty `thenUgn` \ ty ->
+wlkBangType uty		  = wlkHsConstrArgType uty	`thenUgn` \ ty ->
 			    returnUgn (Unbanged ty)
 \end{code}
 

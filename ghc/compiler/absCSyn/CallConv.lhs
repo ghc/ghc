@@ -8,6 +8,7 @@ module CallConv
        (
 	 CallConv
        , pprCallConv
+       , callConvToInt
 
        , stdCallConv
        , cCallConv
@@ -26,7 +27,7 @@ import PrimRep     ( PrimRep, getPrimRepSizeInBytes )
 type CallConv = Int
 
 pprCallConv :: CallConv -> SDoc
-pprCallConv 0 = ptext SLIT("_stdcall")
+pprCallConv 0 = ptext SLIT("__stdcall")
 pprCallConv _ = ptext SLIT("_ccall")
 
 stdCallConv :: CallConv
@@ -37,6 +38,9 @@ cCallConv = 1
 
 defaultCallConv :: CallConv
 defaultCallConv = cCallConv
+
+callConvToInt :: CallConv -> Int
+callConvToInt x = x
 \end{code}
 
 Generate the gcc attribute corresponding to the given
@@ -68,12 +72,8 @@ This name mangler is only used by the x86 native code generator.
 \begin{code}
 decorateExtName :: CallConv -> FAST_STRING -> [PrimRep] -> FAST_STRING
 decorateExtName cc fs ps
-{- ifdef COMPILING_WIN32 -}
  | cc /= stdCallConv = fs
  | otherwise	     = fs _APPEND_ (_PK_ ('@':show (size::Int)))
-{- else
- = fs
--}
  where
   size = sum (map (adjustParamSize.getPrimRepSizeInBytes) ps)
 

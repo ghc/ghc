@@ -1,5 +1,7 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
+%
+% $Id: CgLetNoEscape.lhs,v 1.11 1998/12/02 13:17:50 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -17,20 +19,24 @@ import {-# SOURCE #-} CgExpr ( cgExpr )
 import StgSyn
 import CgMonad
 import AbsCSyn
+import CLabel		( CLabel )
 
 import CgBindery	( letNoEscapeIdInfo, bindArgsToRegs,
-			  bindNewToAStack, bindNewToBStack,
-			  CgIdInfo
+			  bindNewToStack, buildContLivenessMask, CgIdInfo,
+			  nukeDeadBindings
 			)
-import CgHeapery	( heapCheck )
+import CgHeapery	( altHeapCheck )
 import CgRetConv	( assignRegs )
-import CgStackery	( mkVirtStkOffsets )
-import CgUsages		( setRealAndVirtualSps, getVirtSps )
-import CLabel		( mkStdEntryLabel )
+import CgStackery	( mkTaggedVirtStkOffsets, 
+			  allocStackTop, deAllocStackTop, freeStackSlots )
+import CgUsages		( setRealAndVirtualSp, getRealSp, getSpRelOffset )
+import CLabel		( mkReturnPtLabel )
 import ClosureInfo	( mkLFLetNoEscape )
-import CostCentre       ( CostCentre )
-import HeapOffs		( VirtualSpBOffset )
+import CostCentre       ( CostCentreStack )
 import Id		( idPrimRep, Id )
+import Var		( idUnique )
+import PrimRep		( PrimRep(..), retPrimRepSize )
+import BasicTypes	( RecFlag(..) )
 \end{code}
 
 %************************************************************************
@@ -49,7 +55,7 @@ Consider:
 		if ... then x else ...
 \end{verbatim}
 @x@ is used twice (so we probably can't unfold it), but when it is
-entered, the stack is deeper than it was then the definition of @x@
+entered, the stack is deeper than it was when the definition of @x@
 happened.  Specifically, if instead of allocating a closure for @x@,
 we saved all @x@'s fvs on the stack, and remembered the stack depth at
 that moment, then whenever we enter @x@ we can simply set the stack
@@ -133,75 +139,95 @@ on the stack, if they aren't there already.
 \begin{code}
 cgLetNoEscapeClosure
 	:: Id			-- binder
-	-> CostCentre 	   	-- NB: *** NOT USED *** ToDo (WDP 94/06)
+	-> CostCentreStack   	-- NB: *** NOT USED *** ToDo (WDP 94/06)
 	-> StgBinderInfo	-- NB: ditto
-	-> StgLiveVars	-- variables live in RHS, including the binders
+	-> SRT
+	-> StgLiveVars		-- variables live in RHS, including the binders
 				-- themselves in the case of a recursive group
 	-> EndOfBlockInfo       -- where are we going to?
-	-> Maybe VirtualSpBOffset -- Slot for current cost centre
+	-> Maybe VirtualSpOffset -- Slot for current cost centre
+	-> RecFlag		-- is the binding recursive?
 	-> [Id]			-- args (as in \ args -> body)
     	-> StgExpr		-- body (as in above)
 	-> FCode (Id, CgIdInfo)
 
 -- ToDo: deal with the cost-centre issues
 
-cgLetNoEscapeClosure binder cc bi full_live_in_rhss rhs_eob_info maybe_cc_slot args body
+cgLetNoEscapeClosure 
+	binder cc binder_info srt full_live_in_rhss 
+	rhs_eob_info cc_slot rec args body
   = let
 	arity   = length args
-	lf_info = mkLFLetNoEscape arity full_live_in_rhss{-used???-}
+	lf_info = mkLFLetNoEscape arity
+	uniq    = idUnique binder
+	lbl     = mkReturnPtLabel uniq
     in
+
+    -- saveVolatileVarsAndRegs done earlier in cgExpr.
+
     forkEvalHelp
 	rhs_eob_info
-	(nukeDeadBindings full_live_in_rhss)
-	(forkAbsC (cgLetNoEscapeBody args body))
-	    	    	    	     	`thenFC` \ (vA, vB, code) ->
-    let
-	label = mkStdEntryLabel binder -- arity
-    in
-    absC (CCodeBlock label code) `thenC`
-    returnFC (binder, letNoEscapeIdInfo binder vA vB lf_info)
+
+	(allocStackTop retPrimRepSize	`thenFC` \_ ->
+	 nukeDeadBindings full_live_in_rhss)
+
+	(deAllocStackTop retPrimRepSize   `thenFC` \_ ->
+	 buildContLivenessMask uniq 	  `thenFC` \ liveness ->
+     	 forkAbsC (cgLetNoEscapeBody binder cc args body lbl) 
+						`thenFC` \ code ->
+	 getSRTLabel 				`thenFC` \ srt_label -> 
+	 absC (CRetDirect uniq code (srt_label,srt) liveness)
+		`thenC` returnFC ())
+	    	    	    	     	`thenFC` \ (vSp, _) ->
+
+    returnFC (binder, letNoEscapeIdInfo binder vSp lf_info)
 \end{code}
 
 \begin{code}
-cgLetNoEscapeBody :: [Id]		-- Args
+cgLetNoEscapeBody :: Id
+		  -> CostCentreStack
+		  -> [Id]	-- Args
 		  -> StgExpr	-- Body
+		  -> CLabel     -- Entry label
 		  -> Code
 
-cgLetNoEscapeBody all_args rhs
-  = getVirtSps		`thenFC` \ (vA, vB) ->
-    let
+cgLetNoEscapeBody binder cc all_args body lbl
+   = 
+     -- this is where the stack frame lives:
+     getRealSp   `thenFC` \sp -> 
+
+     let
 	arg_kinds	     = map idPrimRep all_args
 	(arg_regs, _)	     = assignRegs [{-nothing live-}] arg_kinds
 	(reg_args, stk_args) = splitAt (length arg_regs) all_args
 
-    	-- stk_args is the args which are passed on the stack at the fast-entry point
-    	-- Using them, we define the stack layout
-    	(spA_stk_args, spB_stk_args, stk_bxd_w_offsets, stk_ubxd_w_offsets)
-	  = mkVirtStkOffsets
-		vA vB 		-- Initial virtual SpA, SpB
-		idPrimRep
-		stk_args
-    in
+    	(sp_stk_args, stk_offsets, stk_tags)
+	  = mkTaggedVirtStkOffsets sp idPrimRep stk_args
+     in
 
 	-- Bind args to appropriate regs/stk locns
-    bindArgsToRegs reg_args arg_regs		    `thenC`
-    mapCs bindNewToAStack stk_bxd_w_offsets	    `thenC`
-    mapCs bindNewToBStack stk_ubxd_w_offsets	    `thenC`
-    setRealAndVirtualSps spA_stk_args spB_stk_args  `thenC`
+     bindArgsToRegs reg_args arg_regs		    `thenC`
+     mapCs bindNewToStack stk_offsets		    `thenC`
+     setRealAndVirtualSp sp_stk_args		    `thenC`
 
-{- 	ToDo: NOT SURE ABOUT COST CENTRES!
+	-- free up the stack slots containing tags, and the slot
+	-- containing the return address (really frame header).
+ 	-- c.f. CgCase.cgUnboxedTupleAlt.
+     freeStackSlots (sp : map fst stk_tags)	    `thenC`
+
 	-- Enter the closures cc, if required
-	lexEnterCCcode closure_info maybe_cc  	    `thenC`
--}
+     --enterCostCentreCode closure_info cc IsFunction  `thenC`
 
-	-- [No need for stack check; forkEvalHelp dealt with that]
+ 	-- fill in the frame header only if we fail a heap check:
+	-- otherwise it isn't needed.
+     getSpRelOffset sp			`thenFC` \sp_rel ->
+     let frame_hdr_asst = CAssign (CVal sp_rel RetRep) (CLbl lbl RetRep)
+     in
 
 	-- Do heap check [ToDo: omit for non-recursive case by recording in
 	--	in envt and absorbing at call site]
-    heapCheck arg_regs False {- Node doesn't point to it -}  (
-	      -- heapCheck *encloses* the rest
+     altHeapCheck False arg_regs stk_tags frame_hdr_asst (Just lbl) (
+	cgExpr body
+     )
 
-	-- Compile the body
-    cgExpr rhs
-    )
 \end{code}

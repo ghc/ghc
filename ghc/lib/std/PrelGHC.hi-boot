@@ -5,9 +5,10 @@
 --	primitive operations and types that GHC knows about.
 ---------------------------------------------------------------------------
 
-_interface_ PrelGHC 2 0
-_exports_
-PrelGHC
+__interface PrelGHC 2 0 where
+
+__export PrelGHC
+
   ->
 
   All	-- Pseudo class used for universal quantification
@@ -20,13 +21,27 @@ PrelGHC
 -- Magical assert thingy
   assert
 
--- I/O primitives
+  -- I/O primitives
   RealWorld
   realWorld#
   State#
 
+  -- Concurrency primitives
+  ThreadId#
   fork#
-  delay# 
+  killThread#
+  delay#
+  waitRead#
+  waitWrite#
+
+  -- MVars
+  MVar#
+  sameMVar#
+  newMVar#
+  takeMVar#
+  putMVar#
+  
+  -- Parallel
   seq#
   par#
   parGlobal#
@@ -36,16 +51,7 @@ PrelGHC
   parAtRel#
   parAtForNow#
 
-  SynchVar#
-  sameMVar#
-  newSynchVar#
-  takeMVar#
-  putMVar#
-  waitRead#
-  waitWrite#
-  
-  errorIO#
-  
+  -- Character Type
   Char# 
   gtChar#
   geChar#
@@ -56,6 +62,7 @@ PrelGHC
   ord#
   chr#
   
+  -- Int Type
   Int#
   >#
   >=#
@@ -106,7 +113,8 @@ PrelGHC
   leAddr#
   int2Addr#
   addr2Int#
-  
+  addr2Integer#
+
   Float#
   gtFloat#
   geFloat#
@@ -273,20 +281,32 @@ indexWord64OffForeignObj#
   sizeofByteArray#
   sizeofMutableByteArray#
 
+  MutVar#
+  newMutVar#
+  readMutVar#
+  writeMutVar#
+  sameMutVar#
+
+  catch#
+  raise#
+
+  Weak#
+  mkWeak#
+  deRefWeak#
+  
   ForeignObj#
   makeForeignObj#
   writeForeignObj#
-  
+
   StablePtr#
   makeStablePtr#
   deRefStablePtr#
+  eqStablePtr#
   reallyUnsafePtrEquality#
 
   unsafeCoerce#
 ;
 
-_declarations_
-
 1 class CCallable a :: ** ;
 1 class CReturnable a :: ** ;
-1 assert _:_ _forall_ [a] => PrelBase.Bool -> a -> a ;;
+1 assert :: __forall [a] => PrelBase.Bool -> a -> a ;

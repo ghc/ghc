@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[AbsCUtils]{Help functions for Abstract~C datatype}
 
@@ -9,7 +9,7 @@ module AbsCUtils (
 	mkAbstractCs, mkAbsCStmts,
 	mkAlgAltsCSwitch,
 	magicIdPrimRep,
-	getAmodeRep, amodeCanSurviveGC,
+	getAmodeRep,
 	mixedTypeLocn, mixedPtrLocn,
 	flattenAbsC,
 	mkAbsCStmtList
@@ -19,22 +19,18 @@ module AbsCUtils (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} CLabel	( mkReturnPtLabel, CLabel )
-	-- The loop here is (CLabel -> CgRetConv -> AbsCUtils -> CLabel)
-
 import AbsCSyn
-
 import Digraph		( stronglyConnComp, SCC(..) )
-import HeapOffs		( possiblyEqualHeapOffset )
-import Id		( fIRST_TAG, ConTag )
-import Literal		( literalPrimRep, Literal(..), mkMachWord )
+import DataCon		( fIRST_TAG, ConTag )
+import Const		( literalPrimRep, mkMachWord )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Unique		( Unique{-instance Eq-} )
-import UniqSupply	( getUnique, getUniques, splitUniqSupply, UniqSupply )
-import Util		( assocDefaultUsing, panic )
+import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply, 
+			  UniqSupply )
 import CmdLineOpts      ( opt_ProduceC )
 import Maybes		( maybeToBool )
 import PrimOp		( PrimOp(..) )
+import Util		( panic )
 
 infixr 9 `thenFlt`
 \end{code}
@@ -66,7 +62,9 @@ mkAbstractCs cs = foldr1 mkAbsCStmts cs
 
 -- for fiddling around w/ killing off AbsCNops ... (ToDo)
 mkAbsCStmts :: AbstractC -> AbstractC -> AbstractC
-mkAbsCStmts = AbsCStmts
+mkAbsCStmts AbsCNop c = c
+mkAbsCStmts c AbsCNop = c
+mkAbsCStmts c1 c2     = c1 `AbsCStmts` c2
 
 {- Discarded SLPJ June 95; it calls nonemptyAbsC too much!
   = case (case (nonemptyAbsC abc2) of
@@ -112,7 +110,8 @@ mkAlgAltsCSwitch scrutinee tagged_alts deflt_absc
 
    -- We also need to convert to Literals to keep the CSwitch happy
    adjust tagged_alts
-     = [ (mkMachWord (fromInt (tag - fIRST_TAG)), abs_c) | (tag, abs_c) <- tagged_alts ]
+     = [ (mkMachWord (toInteger (tag - fIRST_TAG)), abs_c)
+       | (tag, abs_c) <- tagged_alts ]
 \end{code}
 
 %************************************************************************
@@ -123,22 +122,15 @@ mkAlgAltsCSwitch scrutinee tagged_alts deflt_absc
 
 \begin{code}
 magicIdPrimRep BaseReg		    = PtrRep
-magicIdPrimRep StkOReg		    = PtrRep
-magicIdPrimRep (VanillaReg kind _)  = kind
+magicIdPrimRep (VanillaReg kind _) = kind
 magicIdPrimRep (FloatReg _)	    = FloatRep
 magicIdPrimRep (DoubleReg _)	    = DoubleRep
 magicIdPrimRep (LongReg kind _)	    = kind
-magicIdPrimRep TagReg		    = IntRep
-magicIdPrimRep RetReg		    = RetRep
-magicIdPrimRep SpA		    = PtrRep
-magicIdPrimRep SuA		    = PtrRep
-magicIdPrimRep SpB		    = PtrRep
-magicIdPrimRep SuB		    = PtrRep
+magicIdPrimRep Sp		    = PtrRep
+magicIdPrimRep Su		    = PtrRep
+magicIdPrimRep SpLim		    = PtrRep
 magicIdPrimRep Hp		    = PtrRep
 magicIdPrimRep HpLim		    = PtrRep
-magicIdPrimRep LivenessReg	    = IntRep
-magicIdPrimRep StdUpdRetVecReg	    = PtrRep
-magicIdPrimRep StkStubReg	    = PtrRep
 magicIdPrimRep CurCostCentre	    = CostCentreRep
 magicIdPrimRep VoidReg		    = VoidRep
 \end{code}
@@ -161,47 +153,16 @@ getAmodeRep (CAddr _)		    	    = PtrRep
 getAmodeRep (CReg magic_id)	    	    = magicIdPrimRep magic_id
 getAmodeRep (CTemp uniq kind)	    	    = kind
 getAmodeRep (CLbl label kind)	    	    = kind
-getAmodeRep (CUnVecLbl _ _)	    	    = PtrRep
 getAmodeRep (CCharLike _)	    	    = PtrRep
 getAmodeRep (CIntLike _)	    	    = PtrRep
-getAmodeRep (CString _)	    	    = PtrRep
+getAmodeRep (CString _)	    	    	    = PtrRep
 getAmodeRep (CLit lit)		    	    = literalPrimRep lit
 getAmodeRep (CLitLit _ kind)	    	    = kind
-getAmodeRep (COffset _)	    	    = IntRep
-getAmodeRep (CCode abs_C)		    = CodePtrRep
-getAmodeRep (CLabelledCode label abs_C)    = CodePtrRep
 getAmodeRep (CTableEntry _ _ kind)    	    = kind
 getAmodeRep (CMacroExpr kind _ _)    	    = kind
 #ifdef DEBUG
-getAmodeRep (CJoinPoint _ _)	    	    = panic "getAmodeRep:CJoinPoint"
-getAmodeRep (CCostCentre _ _)		    = panic "getAmodeRep:CCostCentre"
+getAmodeRep (CJoinPoint _)	    	    = panic "getAmodeRep:CJoinPoint"
 #endif
-\end{code}
-
-@amodeCanSurviveGC@ tells, well, whether or not the amode is invariant
-across a garbage collection.  Used only for PrimOp arguments (not that
-it matters).
-
-\begin{code}
-amodeCanSurviveGC :: CAddrMode -> Bool
-
-amodeCanSurviveGC (CTableEntry base offset _)
-  = amodeCanSurviveGC base && amodeCanSurviveGC offset
-    -- "Fixed table, so it's OK" (JSM); code is slightly paranoid
-
-amodeCanSurviveGC (CLbl _ _)		= True
-amodeCanSurviveGC (CUnVecLbl _ _)	= True
-amodeCanSurviveGC (CCharLike arg)	= amodeCanSurviveGC arg
-amodeCanSurviveGC (CIntLike arg)	= amodeCanSurviveGC arg
-amodeCanSurviveGC (CString _)		= True
-amodeCanSurviveGC (CLit _)		= True
-amodeCanSurviveGC (CLitLit _ _)		= True
-amodeCanSurviveGC (COffset _)		= True
-amodeCanSurviveGC (CMacroExpr _ _ args)	= all amodeCanSurviveGC args
-
-amodeCanSurviveGC _ = False
-    -- there are some amodes that "cannot occur" as args
-    -- to a PrimOp, but it is safe to return False (rather than panic)
 \end{code}
 
 @mixedTypeLocn@ tells whether an amode identifies an ``StgWord''
@@ -210,9 +171,9 @@ location; that is, one which can contain values of various types.
 \begin{code}
 mixedTypeLocn :: CAddrMode -> Bool
 
-mixedTypeLocn (CVal (NodeRel _)   _)	= True
-mixedTypeLocn (CVal (SpBRel _ _)  _)	= True
-mixedTypeLocn (CVal (HpRel _ _)	  _)	= True
+mixedTypeLocn (CVal (NodeRel _) _)	= True
+mixedTypeLocn (CVal (SpRel _)   _)	= True
+mixedTypeLocn (CVal (HpRel _)	_)	= True
 mixedTypeLocn other			= False	-- All the rest
 \end{code}
 
@@ -222,7 +183,7 @@ location which can contain values of various pointer types.
 \begin{code}
 mixedPtrLocn :: CAddrMode -> Bool
 
-mixedPtrLocn (CVal (SpARel _ _)  _)	= True
+mixedPtrLocn (CVal (SpRel _)  _)	= True
 mixedPtrLocn other			= False	-- All the rest
 \end{code}
 
@@ -260,10 +221,10 @@ out before the code for the statement itself.
 \end{itemize}
 
 The ``stuff to be carried up'' always includes a label: a
-@CStaticClosure@, @CClosureUpdInfo@, @CRetUnVector@, @CFlatRetVector@, or
+@CStaticClosure@, @CRetDirect@, @CFlatRetVector@, or
 @CCodeBlock@.  The latter turns into a C function, and is never
 actually produced by the code generator.  Rather it always starts life
-as a @CLabelledCode@ addressing mode; when such an addr mode is
+as a @CCodeBlock@ addressing mode; when such an addr mode is
 flattened, the ``tops'' stuff is a @CCodeBlock@.
 
 \begin{code}
@@ -280,31 +241,27 @@ flattenAbsC us abs_C
 %*									*
 %************************************************************************
 
-The flattener is monadised.  It's just a @UniqueSupply@, along with a
-``come-back-to-here'' label to pin on heap and stack checks.
+The flattener is monadised.  It's just a @UniqueSupply@.
 
 \begin{code}
-type FlatM result
-     = CLabel
-    -> UniqSupply
-    -> result
+type FlatM result =  UniqSupply -> result
 
 initFlt :: UniqSupply -> FlatM a -> a
 
-initFlt init_us m = m (panic "initFlt:CLabel") init_us
+initFlt init_us m = m init_us
 
 {-# INLINE thenFlt #-}
 {-# INLINE returnFlt #-}
 
 thenFlt :: FlatM a -> (a -> FlatM b) -> FlatM b
 
-thenFlt expr cont label us
+thenFlt expr cont us
   = case (splitUniqSupply us)   of { (s1, s2) ->
-    case (expr label s1)    	of { result ->
-    cont result label s2 }}
+    case (expr s1)	    	of { result ->
+    cont result s2 }}
 
 returnFlt :: a -> FlatM a
-returnFlt result label us = result
+returnFlt result us = result
 
 mapFlt :: (a -> FlatM b) -> [a] -> FlatM [b]
 
@@ -323,16 +280,10 @@ mapAndUnzipFlt f (x:xs)
     returnFlt (r1:rs1, r2:rs2)
 
 getUniqFlt :: FlatM Unique
-getUniqFlt label us = getUnique us
+getUniqFlt us = uniqFromSupply us
 
 getUniqsFlt :: Int -> FlatM [Unique]
-getUniqsFlt i label us = getUniques i us
-
-setLabelFlt :: CLabel -> FlatM a -> FlatM a
-setLabelFlt new_label cont label us = cont new_label us
-
-getLabelFlt :: FlatM CLabel
-getLabelFlt label us = label
+getUniqsFlt i us = uniqsFromSupply i us
 \end{code}
 
 %************************************************************************
@@ -343,8 +294,8 @@ getLabelFlt label us = label
 
 \begin{code}
 flatAbsC :: AbstractC
-	 -> FlatM (AbstractC,		-- Stuff to put inline		[Both are fully
-		   AbstractC)		-- Stuff to put at top level	 flattened]
+	 -> FlatM (AbstractC,	-- Stuff to put inline		[Both are fully
+		   AbstractC)	-- Stuff to put at top level	 flattened]
 
 flatAbsC AbsCNop = returnFlt (AbsCNop, AbsCNop)
 
@@ -354,206 +305,76 @@ flatAbsC (AbsCStmts s1 s2)
     returnFlt (mkAbsCStmts inline_s1 inline_s2,
 	       mkAbsCStmts top_s1    top_s2)
 
-flatAbsC (CClosureInfoAndCode cl_info slow maybe_fast upd descr liveness)
+flatAbsC (CClosureInfoAndCode cl_info slow maybe_fast srt descr)
   = flatAbsC slow		`thenFlt` \ (slow_heres, slow_tops) ->
     flat_maybe maybe_fast	`thenFlt` \ (fast_heres, fast_tops) ->
-    flatAmode upd               `thenFlt` \ (upd_lbl,    upd_tops) ->
-    returnFlt (AbsCNop, mkAbstractCs [slow_tops, fast_tops, upd_tops,
-       CClosureInfoAndCode cl_info slow_heres fast_heres upd_lbl descr liveness]
+    returnFlt (AbsCNop, mkAbstractCs [slow_tops, fast_tops,
+       CClosureInfoAndCode cl_info slow_heres fast_heres srt descr]
     )
-  where
-    flat_maybe :: Maybe AbstractC -> FlatM (Maybe AbstractC, AbstractC)
-    flat_maybe Nothing      = returnFlt (Nothing, AbsCNop)
-    flat_maybe (Just abs_c) = flatAbsC abs_c `thenFlt` \ (heres, tops) ->
-			      returnFlt (Just heres, tops)
 
 flatAbsC (CCodeBlock label abs_C)
   = flatAbsC abs_C	    `thenFlt` \ (absC_heres, absC_tops) ->
     returnFlt (AbsCNop, absC_tops `mkAbsCStmts` CCodeBlock label absC_heres)
 
-flatAbsC (CClosureUpdInfo info) = flatAbsC info
-
-flatAbsC (CStaticClosure closure_lbl closure_info cost_centre amodes)
-  = flatAmodes (cost_centre:amodes)	`thenFlt` \ (new_cc:new_amodes, tops) ->
-    returnFlt (AbsCNop, tops `mkAbsCStmts`
-			CStaticClosure closure_lbl closure_info new_cc new_amodes)
-
-flatAbsC (CRetVector tbl_label stuff deflt)
-  = do_deflt deflt				`thenFlt` \ (deflt_amode, deflt_tops) ->
-    mapAndUnzipFlt (do_alt deflt_amode) stuff	`thenFlt` \ (alt_amodes, alt_tops) ->
-    returnFlt (AbsCNop, mkAbstractCs [deflt_tops,
-				      mkAbstractCs alt_tops,
-				      CFlatRetVector tbl_label alt_amodes])
-
-  where
-    do_deflt deflt = case nonemptyAbsC deflt of
-			Nothing     -> returnFlt (bogus_default_label, AbsCNop)
-			Just deflt' -> flatAmode (CCode deflt)	-- Deals correctly with the
-								-- CJump (CLabelledCode ...) case
-
-    do_alt deflt_amode Nothing    = returnFlt (deflt_amode, AbsCNop)
-    do_alt deflt_amode (Just alt) = flatAmode alt
-
-    bogus_default_label = panic ("flatAbsC: CRetVector: default needed and not available")
-
-
-flatAbsC (CRetUnVector label amode)
-  = flatAmode amode	`thenFlt` \ (new_amode, tops) ->
-    returnFlt (AbsCNop, tops `mkAbsCStmts` CRetUnVector label new_amode)
-
-flatAbsC (CFlatRetVector label amodes)
-  = flatAmodes amodes	`thenFlt` \ (new_amodes, tops) ->
-    returnFlt (AbsCNop, tops `mkAbsCStmts` CFlatRetVector label new_amodes)
-
-flatAbsC cc@(CCostCentreDecl _ _)  -- at top, already flat
-  = returnFlt (AbsCNop, cc)
-
--- now the real stmts:
-
-flatAbsC (CAssign dest source)
-  = flatAmode dest    `thenFlt` \ (dest_amode, dest_tops) ->
-    flatAmode source  `thenFlt` \ (src_amode,  src_tops)  ->
-    returnFlt ( CAssign dest_amode src_amode, mkAbsCStmts dest_tops src_tops )
-
--- special case: jump to some anonymous code
-flatAbsC (CJump (CCode abs_C)) = flatAbsC abs_C
-
-flatAbsC (CJump target)
-  = flatAmode target `thenFlt` \ (targ_amode, targ_tops) ->
-    returnFlt ( CJump targ_amode, targ_tops )
-
-flatAbsC (CFallThrough target)
-  = flatAmode target `thenFlt` \ (targ_amode, targ_tops) ->
-    returnFlt ( CFallThrough targ_amode, targ_tops )
-
-flatAbsC (CReturn target return_info)
-  = flatAmode target `thenFlt` \ (targ_amode, targ_tops) ->
-    returnFlt ( CReturn targ_amode return_info, targ_tops )
+flatAbsC (CRetDirect uniq slow_code srt liveness)
+  = flatAbsC slow_code		`thenFlt` \ (heres, tops) ->
+    returnFlt (AbsCNop, 
+		mkAbstractCs [ tops, CRetDirect uniq heres srt liveness ])
 
 flatAbsC (CSwitch discrim alts deflt)
-  = flatAmode discrim		 `thenFlt` \ (discrim_amode, discrim_tops) ->
-    mapAndUnzipFlt flat_alt alts `thenFlt` \ (flat_alts, flat_alts_tops) ->
+  = mapAndUnzipFlt flat_alt alts `thenFlt` \ (flat_alts, flat_alts_tops) ->
     flatAbsC deflt		 `thenFlt` \ (flat_def_alt, def_tops) ->
     returnFlt (
-      CSwitch discrim_amode flat_alts flat_def_alt,
-      mkAbstractCs (discrim_tops : def_tops : flat_alts_tops)
+      CSwitch discrim flat_alts flat_def_alt,
+      mkAbstractCs (def_tops : flat_alts_tops)
     )
   where
     flat_alt (tag, absC)
       = flatAbsC absC	`thenFlt` \ (alt_heres, alt_tops) ->
 	returnFlt ( (tag, alt_heres), alt_tops )
 
-flatAbsC stmt@(CInitHdr a b cc u)
-  = flatAmode cc	`thenFlt` \ (new_cc, tops) ->
-    returnFlt (CInitHdr a b new_cc u, tops)
-
-flatAbsC stmt@(COpStmt results td@(CCallOp (Right _) _ _ _ _ _) args liveness_mask vol_regs)
+flatAbsC stmt@(COpStmt results td@(CCallOp (Right _) _ _ _) args vol_regs)
   | maybeToBool opt_ProduceC
-  = flatAmodes results		`thenFlt` \ (results_here, tops1) ->
-    flatAmodes args		`thenFlt` \ (args_here,    tops2) ->
-    let tdef = CCallTypedef td results args in
-    returnFlt (COpStmt results_here td args_here liveness_mask vol_regs,
-	       mkAbsCStmts tdef (mkAbsCStmts tops1 tops2))
-
-flatAbsC stmt@(COpStmt results op args liveness_mask vol_regs)
-  = flatAmodes results		`thenFlt` \ (results_here, tops1) ->
-    flatAmodes args		`thenFlt` \ (args_here,    tops2) ->
-    returnFlt (COpStmt results_here op args_here liveness_mask vol_regs,
-		mkAbsCStmts tops1 tops2)
+  = returnFlt (stmt, tdef)
+  where
+    tdef = CCallTypedef td results args
 
 flatAbsC stmt@(CSimultaneous abs_c)
   = flatAbsC abs_c		`thenFlt` \ (stmts_here, tops) ->
     doSimultaneously stmts_here	`thenFlt` \ new_stmts_here ->
     returnFlt (new_stmts_here, tops)
 
-flatAbsC stmt@(CMacroStmt macro amodes)
-  = flatAmodes amodes		`thenFlt` \ (amodes_here, tops) ->
-    returnFlt (CMacroStmt macro amodes_here, tops)
+flatAbsC stmt@(CCheck macro amodes code)
+  = flatAbsC code		`thenFlt` \ (code_here, code_tops) ->
+    returnFlt (CCheck macro amodes code_here, code_tops)
 
-flatAbsC stmt@(CCallProfCtrMacro str amodes)
-  = flatAmodes amodes		`thenFlt` \ (amodes_here, tops) ->
-    returnFlt (CCallProfCtrMacro str amodes_here, tops)
+-- Some statements need no flattening at all:
+flatAbsC stmt@(CMacroStmt macro amodes) 	= returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CCallProfCtrMacro str amodes) 	= returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CCallProfCCMacro str amodes) 	= returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CAssign dest source) 		= returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CJump target) 			= returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CFallThrough target) 		= returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CReturn target return_info) 	= returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CInitHdr a b cc) 		= returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(COpStmt results op args vol_regs)= returnFlt (stmt, AbsCNop)
 
-flatAbsC stmt@(CCallProfCCMacro str amodes)
-  = flatAmodes amodes		`thenFlt` \ (amodes_here, tops) ->
-    returnFlt (CCallProfCCMacro str amodes_here, tops)
-
-flatAbsC stmt@(CSplitMarker) = returnFlt (AbsCNop, stmt)
+-- Some statements only make sense at the top level, so we always float
+-- them.  This probably isn't necessary.
+flatAbsC stmt@(CStaticClosure _ _ _ _)		= returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CSRT _ _)	  		= returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CBitmap _ _)	  		= returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CCostCentreDecl _ _) 		= returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CCostCentreStackDecl _)		= returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CSplitMarker) 			= returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CRetVector _ _ _ _)              = returnFlt (AbsCNop, stmt)
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection[flat-amodes]{Flattening addressing modes}
-%*									*
-%************************************************************************
-
 \begin{code}
-flatAmode :: CAddrMode -> FlatM (CAddrMode, AbstractC)
-
--- easy ones first
-flatAmode amode@(CVal _ _)	= returnFlt (amode, AbsCNop)
-
-flatAmode amode@(CAddr _)	= returnFlt (amode, AbsCNop)
-flatAmode amode@(CReg _)	= returnFlt (amode, AbsCNop)
-flatAmode amode@(CTemp _ _)	= returnFlt (amode, AbsCNop)
-flatAmode amode@(CLbl _ _)	= returnFlt (amode, AbsCNop)
-flatAmode amode@(CUnVecLbl _ _)	= returnFlt (amode, AbsCNop)
-flatAmode amode@(CString _)	= returnFlt (amode, AbsCNop)
-flatAmode amode@(CLit _)	= returnFlt (amode, AbsCNop)
-flatAmode amode@(CLitLit _ _)	= returnFlt (amode, AbsCNop)
-flatAmode amode@(COffset _)	= returnFlt (amode, AbsCNop)
-
--- CIntLike must be a literal -- no flattening
-flatAmode amode@(CIntLike int)  = returnFlt(amode, AbsCNop)
-
--- CCharLike may be arbitrary value -- have to flatten
-flatAmode amode@(CCharLike char)
-  = flatAmode char	`thenFlt` \ (flat_char, tops) ->
-    returnFlt(CCharLike flat_char, tops)
-
-flatAmode (CJoinPoint _ _) = panic "flatAmode:CJoinPoint"
-
-flatAmode (CLabelledCode label abs_C)
-  -- Push the code (with this label) to the top level
-  = flatAbsC abs_C	`thenFlt` \ (body_code, tops) ->
-    returnFlt (CLbl label CodePtrRep,
-	       tops `mkAbsCStmts` CCodeBlock label body_code)
-
-flatAmode (CCode abs_C)
-  = case mkAbsCStmtList abs_C of
-      [CJump amode] -> flatAmode amode	-- Elide redundant labels
-      _ ->
-	-- de-anonymous-ise the code and push it (labelled) to the top level
-	getUniqFlt 		`thenFlt` \ new_uniq ->
-	case (mkReturnPtLabel new_uniq)    of { return_pt_label ->
-	flatAbsC abs_C	`thenFlt` \ (body_code, tops) ->
-	returnFlt (
-	    CLbl return_pt_label CodePtrRep,
-	    tops `mkAbsCStmts` CCodeBlock return_pt_label body_code
-	    -- DO NOT TOUCH the stuff sent to the top...
-	) }
-
-flatAmode (CTableEntry base index kind)
-  = flatAmode base    	`thenFlt` \ (base_amode, base_tops) ->
-    flatAmode index 	`thenFlt` \ (ix_amode,  ix_tops)  ->
-    returnFlt ( CTableEntry base_amode ix_amode kind, mkAbsCStmts base_tops ix_tops )
-
-flatAmode (CMacroExpr pk macro amodes)
-  = flatAmodes amodes    	`thenFlt` \ (amodes_here, tops) ->
-    returnFlt ( CMacroExpr pk macro amodes_here, tops )
-
-flatAmode amode@(CCostCentre _ _) = returnFlt (amode, AbsCNop)
-\end{code}
-
-And a convenient way to do a whole bunch of 'em.
-\begin{code}
-flatAmodes :: [CAddrMode] -> FlatM ([CAddrMode], AbstractC)
-
-flatAmodes [] = returnFlt ([], AbsCNop)
-
-flatAmodes amodes
-  = mapAndUnzipFlt flatAmode amodes `thenFlt` \ (amodes_here, tops) ->
-    returnFlt (amodes_here, mkAbstractCs tops)
+flat_maybe :: Maybe AbstractC -> FlatM (Maybe AbstractC, AbstractC)
+flat_maybe Nothing      = returnFlt (Nothing, AbsCNop)
+flat_maybe (Just abs_c) = flatAbsC abs_c `thenFlt` \ (heres, tops) ->
+		          returnFlt (Just heres, tops)
 \end{code}
 
 %************************************************************************
@@ -574,36 +395,6 @@ We use the strongly-connected component algorithm, in which
 	* an edge goes from s1 to s2 iff
 		s1 assigns to something s2 uses
 	  that is, if s1 should *follow* s2 in the final order
-
-ADR Comment
-
-Wow - fancy stuff.  But are we ever going to do anything other than
-assignments in parallel?  If not, wouldn't it be simpler to generate
-the following:
-
- x1, x2, x3 = e1, e2, e3
-
-    |
-    |
-    V
- { int t1 = e1;
-   int t2 = e2;
-   int t3 = e3;
-   x1 = t1;
-   x2 = t2;
-   x3 = t3;
- }
-
-and leave it to the C compiler to figure out whether it needs al
-those variables.
-
-(Likewise, why not let the C compiler delete silly code like
-
-    x = x
-
-for us?)
-
-tnemmoC RDA
 
 \begin{code}
 type CVertex = (Int, AbstractC)  -- Give each vertex a unique number,
@@ -632,8 +423,7 @@ sameAmode :: CAddrMode -> CAddrMode -> Bool
 -- At the moment we put in just enough to catch the cases we want:
 -- 	the second (destination) argument is always a CVal.
 sameAmode (CReg r1)		     (CReg r2)		     = r1 == r2
-sameAmode (CVal (SpARel r1 v1) _) (CVal (SpARel r2 v2) _) = r1 == r2 && v1 == v2
-sameAmode (CVal (SpBRel r1 v1) _) (CVal (SpBRel r2 v2) _) = r1 == r2 && v1 == v2
+sameAmode (CVal (SpRel r1) _) (CVal (SpRel r2) _) 	     = r1 _EQ_ r2
 sameAmode other1		     other2		     = False
 
 doSimultaneously1 :: [CVertex] -> FlatM AbstractC
@@ -666,12 +456,12 @@ doSimultaneously1 vertices
 	    in
 	    returnFlt (CAssign the_temp src, CAssign dest the_temp)
 
-	go_via_temps (COpStmt dests op srcs liveness_mask vol_regs)
+	go_via_temps (COpStmt dests op srcs vol_regs)
 	  = getUniqsFlt (length dests)	`thenFlt` \ uniqs ->
 	    let
 		the_temps = zipWith (\ u d -> CTemp u (getAmodeRep d)) uniqs dests
 	    in
-	    returnFlt (COpStmt the_temps op srcs liveness_mask vol_regs,
+	    returnFlt (COpStmt the_temps op srcs vol_regs,
 		       mkAbstractCs (zipWith CAssign dests the_temps))
     in
     mapFlt do_component components `thenFlt` \ abs_cs ->
@@ -681,11 +471,11 @@ doSimultaneously1 vertices
     should_follow :: AbstractC -> AbstractC -> Bool
     (CAssign dest1 _) `should_follow` (CAssign _ src2)
       = dest1 `conflictsWith` src2
-    (COpStmt dests1 _ _ _ _) `should_follow` (CAssign _ src2)
+    (COpStmt dests1 _ _ _) `should_follow` (CAssign _ src2)
       = or [dest1 `conflictsWith` src2 | dest1 <- dests1]
-    (CAssign dest1 _)`should_follow` (COpStmt _ _ srcs2 _ _)
+    (CAssign dest1 _)`should_follow` (COpStmt _ _ srcs2 _)
       = or [dest1 `conflictsWith` src2 | src2 <- srcs2]
-    (COpStmt dests1 _ _ _ _) `should_follow` (COpStmt _ _ srcs2 _ _)
+    (COpStmt dests1 _ _ _) `should_follow` (COpStmt _ _ srcs2 _)
       = or [dest1 `conflictsWith` src2 | dest1 <- dests1, src2 <- srcs2]
 
 --    (COpStmt _ _ _ _ _) `should_follow` (CCallProfCtrMacro _ _) = False
@@ -714,41 +504,28 @@ regConflictsWithRR :: MagicId -> RegRelative -> Bool
 
 regConflictsWithRR (VanillaReg k ILIT(1)) (NodeRel _)	= True
 
-regConflictsWithRR SpA	(SpARel _ _)	= True
-regConflictsWithRR SpB	(SpBRel _ _)	= True
-regConflictsWithRR Hp	(HpRel _ _)	= True
+regConflictsWithRR Sp	(SpRel _)	= True
+regConflictsWithRR Hp	(HpRel _)	= True
 regConflictsWithRR _	_		= False
 
 rrConflictsWithRR :: Int -> Int			-- Sizes of two things
 		  -> RegRelative -> RegRelative -- The two amodes
 		  -> Bool
 
-rrConflictsWithRR s1 s2 rr1 rr2 = rr rr1 rr2
+rrConflictsWithRR (I# s1) (I# s2) rr1 rr2 = rr rr1 rr2
   where
-    rr (SpARel p1 o1)    (SpARel p2 o2)
-	| s1 == 0 || s2 == 0 = False	-- No conflict if either is size zero
-	| s1 == 1 && s2 == 1 = b1 == b2
-	| otherwise	     = (b1+s1) >= b2  &&
-			       (b2+s2) >= b1
-	where
-	  b1 = p1-o1
-	  b2 = p2-o2
-
-    rr (SpBRel p1 o1)    (SpBRel p2 o2)
-	| s1 == 0 || s2 == 0 = False	-- No conflict if either is size zero
-	| s1 == 1 && s2 == 1 = b1 == b2
-	| otherwise	     = (b1+s1) >= b2  &&
-			       (b2+s2) >= b1
-	where
-	  b1 = p1-o1
-	  b2 = p2-o2
+    rr (SpRel o1)    (SpRel o2)
+	| s1 _EQ_ ILIT(0) || s2 _EQ_ ILIT(0) = False -- No conflict if either is size zero
+	| s1 _EQ_ ILIT(1)  && s2 _EQ_ ILIT(1) = o1 _EQ_ o2
+	| otherwise	     = (o1 _ADD_ s1) _GE_ o2  &&
+			       (o2 _ADD_ s2) _GE_ o1
 
     rr (NodeRel o1)	 (NodeRel o2)
-	| s1 == 0 || s2 == 0 = False	-- No conflict if either is size zero
-	| s1 == 1 && s2 == 1 = o1 `possiblyEqualHeapOffset` o2
+	| s1 _EQ_ ILIT(0) || s2 _EQ_ ILIT(0) = False -- No conflict if either is size zero
+	| s1 _EQ_ ILIT(1) && s2 _EQ_ ILIT(1) = o1 _EQ_ o2
 	| otherwise	     = True		-- Give up
 
-    rr (HpRel _ _)	 (HpRel _ _)    = True	-- Give up
+    rr (HpRel _)	 (HpRel _)    = True	-- Give up (ToDo)
 
-    rr other1	         other2	        = False
+    rr other1	         other2	      = False
 \end{code}

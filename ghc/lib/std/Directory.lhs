@@ -36,17 +36,23 @@ module Directory
     doesDirectoryExist,
     getPermissions, 
     setPermissions,
+#ifndef __HUGS__
     getModificationTime
+#endif
    ) where
 
+#ifdef __HUGS__
+import PreludeBuiltin
+#else
 import PrelBase
 import PrelIOBase
+import PrelHandle	
 import PrelST
 import PrelArr
 import PrelPack		( unpackNBytesST )
-import PrelCCall	( Word(..) )
 import PrelAddr
 import Time             ( ClockTime(..) )
+#endif
 
 \end{code}
 
@@ -69,9 +75,28 @@ doesFileExist           :: FilePath -> IO Bool
 doesDirectoryExist      :: FilePath -> IO Bool
 getPermissions          :: FilePath -> IO Permissions
 setPermissions          :: FilePath -> Permissions -> IO ()
+#ifndef __HUGS__
 getModificationTime     :: FilePath -> IO ClockTime
+#endif
 \end{code}
 
+\begin{code}
+#ifdef __HUGS__
+foreign import stdcall "libHS_cbits.so" "createDirectory"  	primCreateDirectory     :: CString -> IO Int
+foreign import stdcall "libHS_cbits.so" "removeDirectory"  	primRemoveDirectory     :: CString -> IO Int
+foreign import stdcall "libHS_cbits.so" "removeFile"       	primRemoveFile          :: CString -> IO Int
+foreign import stdcall "libHS_cbits.so" "renameDirectory"  	primRenameDirectory     :: CString -> CString -> IO Int
+foreign import stdcall "libHS_cbits.so" "renameFile"       	primRenameFile          :: CString -> CString -> IO Int
+foreign import stdcall "libHS_cbits.so" "openDir__"        	primOpenDir     	:: CString -> IO Addr
+foreign import stdcall "libHS_cbits.so" "readDir__"        	primReadDir     	:: Addr -> IO Addr
+foreign import stdcall "libHS_cbits.so" "get_dirent_d_name"   primGetDirentDName      :: Addr -> IO Addr
+foreign import stdcall "libHS_cbits.so" "setCurrentDirectory" primSetCurrentDirectory :: CString -> IO Int
+foreign import stdcall "libHS_cbits.so" "getCurrentDirectory" primGetCurrentDirectory :: IO Addr
+foreign import stdcall "libc.so.6"        "free"                primFree                :: Addr -> IO ()
+foreign import stdcall "libc.so.6"        "malloc"              primMalloc              :: Word -> IO Addr
+foreign import stdcall "libc.so.6"        "chmod"               primChmod               :: CString -> Word -> IO Int
+#endif
+\end{code}
 
 %*********************************************************
 %*							*
@@ -129,8 +154,13 @@ The path refers to an existing non-directory object.
 \end{itemize}
 
 \begin{code}
+
 createDirectory path = do
+#ifdef __HUGS__
+    rc <- primCreateDirectory (primPackString path)
+#else
     rc <- _ccall_ createDirectory path
+#endif
     if rc == 0 then return () else
         constructErrorAndFailWithInfo "createDirectory" path
 \end{code}
@@ -171,7 +201,11 @@ The operand refers to an existing non-directory object.
 
 \begin{code}
 removeDirectory path = do
+#ifdef __HUGS__
+    rc <- primRemoveDirectory (primPackString path)
+#else
     rc <- _ccall_ removeDirectory path
+#endif
     if rc == 0 then 
 	return ()
      else 
@@ -208,7 +242,11 @@ The operand refers to an existing directory.
 
 \begin{code}
 removeFile path = do
+#ifdef __HUGS__
+    rc <- primRemoveFile (primPackString path)
+#else
     rc <- _ccall_ removeFile path
+#endif
     if rc == 0 then
         return ()
      else
@@ -255,7 +293,11 @@ Either path refers to an existing non-directory object.
 
 \begin{code}
 renameDirectory opath npath = do
+#ifdef __HUGS__
+    rc <- primRenameDirectory (primPackString opath) (primPackString npath)
+#else
     rc <- _ccall_ renameDirectory opath npath
+#endif
     if rc == 0 then
         return ()
      else
@@ -300,7 +342,11 @@ Either path refers to an existing directory.
 
 \begin{code}
 renameFile opath npath = do
+#ifdef __HUGS__
+    rc <- primRenameFile (primPackString opath) (primPackString npath)
+#else
     rc <- _ccall_ renameFile opath npath
+#endif
     if rc == 0 then
         return ()
      else
@@ -334,6 +380,27 @@ The path refers to an existing non-directory object.
 
 \begin{code}
 --getDirectoryContents :: FilePath -> IO [FilePath]
+#ifdef __HUGS__
+getDirectoryContents path = do
+    dir <- primOpenDir (primPackString path)
+    if dir == nullAddr
+	then constructErrorAndFailWithInfo "getDirectoryContents" path
+     	else loop dir
+  where
+    loop :: Addr -> IO [String]
+    loop dir  = do
+      dirent_ptr <- primReadDir dir
+      if dirent_ptr == nullAddr
+       then do
+	  -- readDir__ implicitly performs closedir() when the
+	  -- end is reached.
+	  return [] 
+       else do
+          str     <- primGetDirentDName dirent_ptr
+	  entry   <- primUnpackCString str
+	  entries <- loop dir
+          return (entry:entries)
+#else
 getDirectoryContents path = do
     dir <- _ccall_ openDir__ path
     if dir == ``NULL'' 
@@ -357,6 +424,7 @@ getDirectoryContents path = do
 	  entry   <- stToIO (unpackNBytesST str len)
 	  entries <- loop dir
           return (entry:entries)
+#endif
 \end{code}
 
 If the operating system has a notion of current directories,
@@ -382,12 +450,22 @@ The operating system has no notion of current directory.
 
 \begin{code}
 getCurrentDirectory = do
+#ifdef __HUGS__
+    str <- primGetCurrentDirectory
+#else
     str <- _ccall_ getCurrentDirectory
-    if str /= ``NULL'' 
+#endif
+    if str /= nullAddr
 	then do
+#ifdef __HUGS__
+            pwd <- primUnpackCString str
+            primFree str
+#else
+	   	-- don't use unpackCString (see getDirectoryContents above)
             len <- _ccall_ strlen str
-            pwd <- stToIO (unpackNBytesST str len)
-            _ccall_ free str
+	    pwd <- stToIO (unpackNBytesST str len)
+	    _ccall_ free str
+#endif
             return pwd
     	else
             constructErrorAndFail "getCurrentDirectory"
@@ -421,7 +499,11 @@ The path refers to an existing non-directory object.
 
 \begin{code}
 setCurrentDirectory path = do
+#ifdef __HUGS__
+    rc <- primSetCurrentDirectory (primPackString path)
+#else
     rc <- _ccall_ setCurrentDirectory path
+#endif
     if rc == 0 
 	then return ()
 	else constructErrorAndFailWithInfo "setCurrentDirectory" path
@@ -430,9 +512,18 @@ setCurrentDirectory path = do
 
 \begin{code}
 --doesFileExist :: FilePath -> IO Bool
+#ifdef __HUGS__
+foreign import stdcall "libc.so.6"        "access"     primAccess  :: PrimByteArray -> Int -> IO Int
+foreign import stdcall "libHS_cbits.so" "const_F_OK" const_F_OK  :: Int
+
+doesFileExist name = do 
+  rc <- primAccess (primPackString name) const_F_OK
+  return (rc == 0)
+#else
 doesFileExist name = do 
   rc <- _ccall_ access name (``F_OK''::Int)
   return (rc == 0)
+#endif
 
 --doesDirectoryExist :: FilePath -> IO Bool
 doesDirectoryExist name = 
@@ -440,10 +531,12 @@ doesDirectoryExist name =
    `catch` 
  (\ _ -> return False)
 
+#ifndef __HUGS__
 --getModificationTime :: FilePath -> IO ClockTime
 getModificationTime name =
  getFileStatus name >>= \ st ->
  modificationTime st
+#endif
 
 --getPermissions :: FilePath -> IO Permissions
 getPermissions name =
@@ -462,6 +555,20 @@ getPermissions name =
   )
 
 --setPermissions :: FilePath -> Permissions -> IO ()
+#ifdef __HUGS__
+setPermissions name (Permissions r w e s) = do
+    let
+     read  = if r      then ownerReadMode    else emptyFileMode
+     write = if w      then ownerWriteMode   else emptyFileMode
+     exec  = if e || s then ownerExecuteMode else emptyFileMode
+
+     mode  = read `unionFileMode` (write `unionFileMode` exec)
+
+    rc <- primChmod (primPackString name) mode
+    if rc == 0
+	then return ()
+	else fail (IOError Nothing SystemError "setPermissions" "insufficient permissions")
+#else
 setPermissions name (Permissions r w e s) = do
     let
      read#  = case (if r then ownerReadMode else ``0'') of { W# x# -> x# }
@@ -474,13 +581,27 @@ setPermissions name (Permissions r w e s) = do
     if rc == 0
 	then return ()
 	else fail (IOError Nothing SystemError "setPermissions" "insufficient permissions")
-
+#endif
 \end{code}
 
 
 (Sigh)..copied from Posix.Files to avoid dep. on posix library
 
 \begin{code}
+#ifdef __HUGS__
+foreign import stdcall "libHS_cbits.so" "sizeof_stat" sizeof_stat :: Int
+foreign import stdcall "libHS_cbits.so" "prim_stat"   primStat :: PrimByteArray -> PrimMutableByteArray RealWorld -> IO Int
+
+type FileStatus = PrimByteArray
+
+getFileStatus :: FilePath -> IO FileStatus
+getFileStatus name = do
+    bytes <- primNewByteArray sizeof_stat
+    rc <- primStat (primPackString name) bytes
+    if rc == 0 
+	then primUnsafeFreezeByteArray bytes
+     	else fail (IOError Nothing SystemError "getFileStatus" "")
+#else
 type FileStatus = ByteArray Int
 
 getFileStatus :: FilePath -> IO FileStatus
@@ -500,8 +621,7 @@ modificationTime stat = do
   where
     malloc1 = IO $ \ s# ->
 	case newIntArray# 1# s# of 
-          StateAndMutableByteArray# s2# barr# -> 
-		IOok s2# (MutableByteArray bnds barr#)
+          (# s2#, barr# #) -> (# s2#, MutableByteArray bnds barr# #)
 
     bnds = (0,1)
     -- The C routine fills in an unsigned word.  We don't have `unsigned2Integer#,'
@@ -511,14 +631,26 @@ modificationTime stat = do
 
     cvtUnsigned (MutableByteArray _ arr#) = IO $ \ s# ->
 	case readIntArray# arr# 0# s# of 
-	  StateAndInt# s2# r# ->
+	  (# s2#, r# #) ->
             if r# ==# 0# then
-                IOok s2# 0
+                (# s2#, 0 #)
             else
                 case unsafeFreezeByteArray# arr# s2# of
-                  StateAndByteArray# s3# frozen# -> 
-			IOok s3# (J# 1# 1# frozen#)
+                  (# s3#, frozen# #) -> 
+			(# s3#, J# 1# 1# frozen# #)
+#endif
 
+#ifdef __HUGS__
+foreign import stdcall "libHS_cbits.so" "get_stat_st_mode" fileMode     :: FileStatus -> FileMode
+foreign import stdcall "libHS_cbits.so" "prim_S_ISDIR"     prim_S_ISDIR :: FileMode -> Int
+foreign import stdcall "libHS_cbits.so" "prim_S_ISREG"     prim_S_ISREG :: FileMode -> Int
+
+isDirectory :: FileStatus -> Bool
+isDirectory stat = prim_S_ISDIR (fileMode stat) /= 0
+
+isRegularFile :: FileStatus -> Bool
+isRegularFile stat = prim_S_ISREG (fileMode stat) /= 0
+#else
 isDirectory :: FileStatus -> Bool
 isDirectory stat = unsafePerformIO $ do
     rc <- _casm_ ``%r = S_ISDIR(((struct stat *)%0)->st_mode);'' stat
@@ -528,15 +660,30 @@ isRegularFile :: FileStatus -> Bool
 isRegularFile stat = unsafePerformIO $ do
     rc <- _casm_ ``%r = S_ISREG(((struct stat *)%0)->st_mode);'' stat
     return (rc /= 0)
+#endif
 \end{code}
 
 \begin{code}
 type FileMode = Word
-ownerReadMode :: FileMode
-ownerReadMode = ``S_IRUSR''
 
-ownerWriteMode :: FileMode
-ownerWriteMode = ``S_IWUSR''
+#ifdef __HUGS__
+emptyFileMode     :: FileMode
+unionFileMode     :: FileMode -> FileMode -> FileMode
+intersectFileMode :: FileMode -> FileMode -> FileMode
+
+foreign import stdcall "libHS_cbits.so" "const_S_IRUSR" ownerReadMode    :: FileMode
+foreign import stdcall "libHS_cbits.so" "const_S_IWUSR" ownerWriteMode   :: FileMode
+foreign import stdcall "libHS_cbits.so" "const_S_IXUSR" ownerExecuteMode :: FileMode
+
+emptyFileMode     = primIntToWord 0
+unionFileMode     = primOrWord
+intersectFileMode = primAndWord
+#else
+ownerReadMode    :: FileMode
+ownerReadMode    = ``S_IRUSR''
+
+ownerWriteMode   :: FileMode
+ownerWriteMode   = ``S_IWUSR''
 
 ownerExecuteMode :: FileMode
 ownerExecuteMode = ``S_IXUSR''
@@ -544,8 +691,9 @@ ownerExecuteMode = ``S_IXUSR''
 intersectFileMode :: FileMode -> FileMode -> FileMode
 intersectFileMode (W# m1#) (W# m2#) = W# (m1# `and#` m2#)
 
-fileMode :: FileStatus -> FileMode
+fileMode          :: FileStatus -> FileMode
 fileMode stat = unsafePerformIO (
 	_casm_ ``%r = ((struct stat *)%0)->st_mode;'' stat)
+#endif
 
 \end{code}

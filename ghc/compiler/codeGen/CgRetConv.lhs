@@ -1,5 +1,7 @@
 %
-% (c) The GRASP Project, Glasgow University, 1992-1995
+% (c) The GRASP Project, Glasgow University, 1992-1998
+%
+% $Id: CgRetConv.lhs,v 1.15 1998/12/02 13:17:51 simonm Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -8,43 +10,31 @@ about return conventions.
 
 \begin{code}
 module CgRetConv (
-	CtrlReturnConvention(..), DataReturnConvention(..),
-
+	CtrlReturnConvention(..),
 	ctrlReturnConvAlg,
-	dataReturnConvAlg,
-
 	dataReturnConvPrim,
-
-	assignPrimOpResultRegs,
-	makePrimOpArgsRobust,
-	assignRegs
+	assignRegs, assignAllRegs
     ) where
 
 #include "HsVersions.h"
 
 import AbsCSyn		-- quite a few things
-import AbsCUtils	( mkAbstractCs, getAmodeRep,
-			  amodeCanSurviveGC
-			)
 import Constants	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 			  mAX_Vanilla_REG, mAX_Float_REG,
-			  mAX_Double_REG, mAX_Long_REG
-			)
-import CmdLineOpts	( opt_ReturnInRegsThreshold )
-import Id		( isDataCon, dataConRawArgTys,
-			  DataCon, GenId{-instance Eq-},
-			  Id
+			  mAX_Double_REG, 
+			  mAX_Real_Vanilla_REG, mAX_Real_Float_REG,
+			  mAX_Real_Double_REG,
+			  mAX_Long_REG
 			)
 import Maybes		( catMaybes )
-import PprType		( TyCon{-instance Outputable-} )
-import PrimOp		( primOpCanTriggerGC,
-			  getPrimOpResultInfo, PrimOpResultInfo(..),
-			  PrimOp{-instance Outputable-}
-			)
-import PrimRep		( isFloatingRep, is64BitRep, PrimRep(..) )
-import TyCon		( tyConDataCons, tyConFamilySize )
-import Type		( typePrimRep )
-import Util		( zipWithEqual, mapAccumL, isn'tIn )
+import DataCon		( dataConRawArgTys, DataCon )
+import PrimOp		( PrimOp{-instance Outputable-} )
+import PrimRep		( isFloatingRep, PrimRep(..), is64BitRep )
+import TyCon		( TyCon, tyConDataCons, tyConFamilySize )
+import Type		( Type, typePrimRep, isUnLiftedType, 
+			  splitAlgTyConApp_maybe )
+import Util		( isn'tIn )
+
 import Outputable
 \end{code}
 
@@ -61,22 +51,6 @@ data CtrlReturnConvention
   | UnvectoredReturn    Int 	-- family size
 \end{code}
 
-A @DataReturnConvention@ says how the data for a particular
-data-constructor is returned.
-\begin{code}
-data DataReturnConvention
-  = ReturnInHeap
-  | ReturnInRegs	[MagicId]
-\end{code}
-The register assignment given by a @ReturnInRegs@ obeys three rules:
-\begin{itemize}
-\item   R1 is dead.
-\item   R2 points to the info table for the phantom constructor
-\item	The list of @MagicId@ is in the same order as the arguments
-	to the constructor.
-\end{itemize}
-
-
 %************************************************************************
 %*									*
 \subsection[CgRetConv-algebraic]{Return conventions for algebraic datatypes}
@@ -88,40 +62,12 @@ ctrlReturnConvAlg :: TyCon -> CtrlReturnConvention
 
 ctrlReturnConvAlg tycon
   = case (tyConFamilySize tycon) of
-      0 -> pprTrace "ctrlReturnConvAlg:" (ppr tycon) $
-	   UnvectoredReturn 0 -- e.g., w/ "data Bin"
-
+      0 -> panic "ctrlRetConvAlg"
       size -> -- we're supposed to know...
 	if (size > (1::Int) && size <= mAX_FAMILY_SIZE_FOR_VEC_RETURNS) then
 	    VectoredReturn size
 	else
 	    UnvectoredReturn size
-\end{code}
-
-@dataReturnConvAlg@ determines the return conventions from the
-(possibly specialised) data constructor.
-
-(See also @getDataConReturnConv@ (in @Id@).)  We grab the types
-of the data constructor's arguments.  We feed them and a list of
-available registers into @assign_reg@, which sequentially assigns
-registers of the appropriate types to the arguments, based on the
-types.	If @assign_reg@ runs out of a particular kind of register,
-then it gives up, returning @ReturnInHeap@.
-
-\begin{code}
-dataReturnConvAlg :: DataCon -> DataReturnConvention
-
-dataReturnConvAlg data_con
-  = ASSERT2(isDataCon data_con, (ppr data_con))
-    case leftover_kinds of
-	[]    ->	ReturnInRegs reg_assignment
-	other ->	ReturnInHeap	-- Didn't fit in registers
-  where
-    arg_tys = dataConRawArgTys data_con
-
-    (reg_assignment, leftover_kinds)
-      = assignRegs [node, infoptr] -- taken...
-		   (map typePrimRep arg_tys)
 \end{code}
 
 %************************************************************************
@@ -130,9 +76,6 @@ dataReturnConvAlg data_con
 %*									*
 %************************************************************************
 
-WARNING! If you add a return convention which can return a pointer,
-make sure you alter CgCase (cgPrimDefault) to generate the right sort
-of heap check!
 \begin{code}
 dataReturnConvPrim :: PrimRep -> MagicId
 
@@ -152,94 +95,12 @@ dataReturnConvPrim ByteArrayRep = VanillaReg ByteArrayRep ILIT(1)
 
 dataReturnConvPrim StablePtrRep = VanillaReg StablePtrRep ILIT(1)
 dataReturnConvPrim ForeignObjRep = VanillaReg ForeignObjRep ILIT(1)
+dataReturnConvPrim WeakPtrRep   = VanillaReg WeakPtrRep ILIT(1)
 
 #ifdef DEBUG
 dataReturnConvPrim PtrRep	= panic "dataReturnConvPrim: PtrRep"
 dataReturnConvPrim _		= panic "dataReturnConvPrim: other"
 #endif
-\end{code}
-
-%********************************************************
-%*							*
-\subsection[primop-stuff]{Argument and return conventions for Prim Ops}
-%*							*
-%********************************************************
-
-\begin{code}
-assignPrimOpResultRegs
-    :: PrimOp		-- The constructors in canonical order
-    -> [MagicId]	-- The return regs all concatenated to together,
-			-- (*including* one for the tag if necy)
-
-assignPrimOpResultRegs op
- = case (getPrimOpResultInfo op) of
-
-	ReturnsPrim kind -> [dataReturnConvPrim kind]
-
-	ReturnsAlg tycon
-	  -> let
-		cons	    = tyConDataCons tycon
-		result_regs = concat (map get_return_regs cons)
-	     in
-	     -- As R1 is dead, it can hold the tag if necessary
-	     case cons of
-		[_]   -> result_regs
-		other -> (VanillaReg IntRep ILIT(1)) : result_regs
-  where
-    get_return_regs con
-      = case (dataReturnConvAlg con) of
-	  ReturnInRegs regs -> regs
-	  ReturnInHeap	    -> panic "getPrimOpAlgResultRegs"
-\end{code}
-
-@assignPrimOpArgsRobust@ is used only for primitive ops which may
-trigger GC. [MAYBE (WDP 94/05)] For these, we pass all (nonRobust)
-arguments in registers.  This function assigns them and tells us which
-of those registers are now live (because we've shoved a followable
-argument into it).
-
-Bug: it is assumed that robust amodes cannot contain pointers.  This
-seems reasonable but isn't true.  For example, \tr{Array#}'s
-\tr{ForeignObj#}'s are pointers.  (This is only known to bite on
-\tr{_ccall_GC_} with a ForeignObj argument.)
-
-See after for some ADR comments...
-
-\begin{code}
-makePrimOpArgsRobust
-	:: PrimOp
-	-> [CAddrMode]		-- Arguments
-	-> ([CAddrMode],	-- Arg registers
-	    Int,		-- Liveness mask
-	    AbstractC)		-- Simultaneous assignments to assign args to regs
-
-makePrimOpArgsRobust op arg_amodes
-  = ASSERT (primOpCanTriggerGC op)
-    let
-	non_robust_amodes = filter (not . amodeCanSurviveGC) arg_amodes
-    	arg_kinds = map getAmodeRep non_robust_amodes
-
-	(arg_regs, extra_args)
-	  = assignRegs [{-nothing live-}] arg_kinds
-
-		-- Check that all the args fit before returning arg_regs
-	final_arg_regs = case extra_args of
-			   []    -> arg_regs
-			   other -> pprPanic "Cannot allocate enough registers for primop (try rearranging code or reducing number of arguments?)" (ppr op)
-
-	arg_assts
-	  = mkAbstractCs (zipWithEqual "assign_to_reg" assign_to_reg final_arg_regs non_robust_amodes)
-
-	assign_to_reg reg_id amode = CAssign (CReg reg_id) amode
-
-    	safe_arg regs arg
-		| amodeCanSurviveGC arg = (regs, arg)
-    		| otherwise    		= (tail regs, CReg (head regs))
-    	safe_amodes = snd (mapAccumL safe_arg final_arg_regs arg_amodes)
-
-	liveness_mask = mkLiveRegsMask final_arg_regs
-    in
-    (safe_amodes, liveness_mask, arg_assts)
 \end{code}
 
 %************************************************************************
@@ -248,87 +109,113 @@ makePrimOpArgsRobust op arg_amodes
 %*									*
 %************************************************************************
 
-How to assign registers.
+How to assign registers for 
+
+	1) Calling a fast entry point.
+	2) Returning an unboxed tuple.
+	3) Invoking an out-of-line PrimOp.
+
 Registers are assigned in order.
 
-If we run out, we don't attempt to assign
-any further registers (even though we might have run out of only one kind of
-register); we just return immediately with the left-overs specified.
+If we run out, we don't attempt to assign any further registers (even
+though we might have run out of only one kind of register); we just
+return immediately with the left-overs specified.
+
+The alternative version @assignAllRegs@ uses the complete set of
+registers, including those that aren't mapped to real machine
+registers.  This is used for calling special RTS functions and PrimOps
+which expect their arguments to always be in the same registers.
 
 \begin{code}
-assignRegs  :: [MagicId]	-- Unavailable registers
-	    -> [PrimRep]	-- Arg or result kinds to assign
-	    -> ([MagicId],	-- Register assignment in same order
+assignRegs, assignAllRegs
+	:: [MagicId]	-- Unavailable registers
+	-> [PrimRep]	-- Arg or result kinds to assign
+	-> ([MagicId],	-- Register assignment in same order
 				-- for *initial segment of* input list
-		[PrimRep])-- leftover kinds
+	    [PrimRep])-- leftover kinds
 
 assignRegs regs_in_use kinds
  = assign_reg kinds [] (mkRegTbl regs_in_use)
- where
 
-    assign_reg	:: [PrimRep]  -- arg kinds being scrutinized
-		-> [MagicId]	    -- accum. regs assigned so far (reversed)
-		-> ([Int], [Int], [Int], [Int])
-			-- regs still avail: Vanilla, Float, Double, Int64, Word64
-		-> ([MagicId], [PrimRep])
+assignAllRegs regs_in_use kinds
+ = assign_reg kinds [] (mkRegTbl_allRegs regs_in_use)
 
-    assign_reg (VoidRep:ks) acc supply
-	= assign_reg ks (VoidReg:acc) supply -- one VoidReg is enough for everybody!
+assign_reg 
+	:: [PrimRep]              -- arg kinds being scrutinized
+	-> [MagicId]		  -- accum. regs assigned so far (reversed)
+	-> AvailRegs		  -- regs still avail: Vanilla, Float, Double, longs
+	-> ([MagicId], [PrimRep])
 
-    assign_reg (FloatRep:ks) acc (vanilla_rs, IBOX(f):float_rs, double_rs, long_rs)
+assign_reg (VoidRep:ks) acc supply
+	= assign_reg ks (VoidReg:acc) supply 
+	-- one VoidReg is enough for everybody!
+
+assign_reg (FloatRep:ks) acc (vanilla_rs, IBOX(f):float_rs, double_rs, long_rs)
 	= assign_reg ks (FloatReg f:acc) (vanilla_rs, float_rs, double_rs, long_rs)
 
-    assign_reg (DoubleRep:ks) acc (vanilla_rs, float_rs, IBOX(d):double_rs, long_rs)
+assign_reg (DoubleRep:ks) acc (vanilla_rs, float_rs, IBOX(d):double_rs, long_rs)
 	= assign_reg ks (DoubleReg d:acc) (vanilla_rs, float_rs, double_rs, long_rs)
 
-    assign_reg (Word64Rep:ks) acc (vanilla_rs, float_rs, double_rs, IBOX(u):long_rs)
+assign_reg (Word64Rep:ks) acc (vanilla_rs, float_rs, double_rs, IBOX(u):long_rs)
 	= assign_reg ks (LongReg Word64Rep u:acc) (vanilla_rs, float_rs, double_rs, long_rs)
 
-    assign_reg (Int64Rep:ks) acc (vanilla_rs, float_rs, double_rs, IBOX(l):long_rs)
+assign_reg (Int64Rep:ks) acc (vanilla_rs, float_rs, double_rs, IBOX(l):long_rs)
 	= assign_reg ks (LongReg Int64Rep l:acc) (vanilla_rs, float_rs, double_rs, long_rs)
 
-    assign_reg (k:ks) acc (IBOX(v):vanilla_rs, float_rs, double_rs, long_rs)
+assign_reg (k:ks) acc (IBOX(v):vanilla_rs, float_rs, double_rs, long_rs)
 	| not (isFloatingRep k || is64BitRep k)
 	= assign_reg ks (VanillaReg k v:acc) (vanilla_rs, float_rs, double_rs, long_rs)
 
-    -- The catch-all.  It can happen because either
-    --	(a) we've assigned all the regs so leftover_ks is []
-    --  (b) we couldn't find a spare register in the appropriate supply
-    --  or, I suppose,
-    --  (c) we came across a Kind we couldn't handle (this one shouldn't happen)
-    assign_reg leftover_ks acc _ = (reverse acc, leftover_ks)
+-- The catch-all.  It can happen because either
+--	(a) we've assigned all the regs so leftover_ks is []
+--  (b) we couldn't find a spare register in the appropriate supply
+--  or, I suppose,
+--  (c) we came across a Kind we couldn't handle (this one shouldn't happen)
+assign_reg leftover_ks acc _ = (reverse acc, leftover_ks)
+
 \end{code}
 
 Register supplies.  Vanilla registers can contain pointers, Ints, Chars.
-
-\begin{code}
-vanillaRegNos :: [Int]
-vanillaRegNos	= [1 .. mAX_Vanilla_REG]
-\end{code}
-
 Floats and doubles have separate register supplies.
 
+We take these register supplies from the *real* registers, i.e. those
+that are guaranteed to map to machine registers.
+
 \begin{code}
-floatRegNos, doubleRegNos :: [Int]
-floatRegNos	= [1 .. mAX_Float_REG]
-doubleRegNos	= [1 .. mAX_Double_REG]
-longRegNos      = [1 .. mAX_Long_REG]
+vanillaRegNos, floatRegNos, doubleRegNos :: [Int]
+vanillaRegNos	 = [1 .. mAX_Real_Vanilla_REG]
+floatRegNos	 = [1 .. mAX_Real_Float_REG]
+doubleRegNos	 = [1 .. mAX_Real_Double_REG]
+longRegNos       = [1 .. mAX_Long_REG]
 
-mkRegTbl :: [MagicId] -> ([Int], [Int], [Int], [Int])
+allVanillaRegNos, allFloatRegNos, allDoubleRegNos, allLongRegNos :: [Int]
+allVanillaRegNos = [1 .. mAX_Vanilla_REG]
+allFloatRegNos	 = [1 .. mAX_Float_REG]
+allDoubleRegNos	 = [1 .. mAX_Double_REG]
+allLongRegNos	 = [1 .. mAX_Double_REG]
 
+type AvailRegs = ( [Int]   -- available vanilla regs.
+		 , [Int]   -- floats
+		 , [Int]   -- doubles
+		 , [Int]   -- longs (int64 and word64)
+		 )
+
+mkRegTbl :: [MagicId] -> AvailRegs
 mkRegTbl regs_in_use
+  = mkRegTbl' regs_in_use vanillaRegNos floatRegNos doubleRegNos longRegNos
+
+mkRegTbl_allRegs :: [MagicId] -> AvailRegs
+mkRegTbl_allRegs regs_in_use
+  = mkRegTbl' regs_in_use allVanillaRegNos allFloatRegNos allDoubleRegNos allLongRegNos
+
+mkRegTbl' regs_in_use vanillas floats doubles longs
   = (ok_vanilla, ok_float, ok_double, ok_long)
   where
-    ok_vanilla = catMaybes (map (select (VanillaReg VoidRep)) (taker vanillaRegNos))
-    ok_float   = catMaybes (map (select FloatReg)	       floatRegNos)
-    ok_double  = catMaybes (map (select DoubleReg)	       doubleRegNos)
-    ok_long    = catMaybes (map (select (LongReg Int64Rep))    longRegNos)   -- rep isn't looked at, hence we can use any old rep.
-
-    taker :: [Int] -> [Int]
-    taker rs
-      = case (opt_ReturnInRegsThreshold) of
-	  Nothing -> rs -- no flag set; use all of them
-	  Just  n -> take n rs
+    ok_vanilla = catMaybes (map (select (VanillaReg VoidRep))  vanillas)
+    ok_float   = catMaybes (map (select FloatReg)	       floats)
+    ok_double  = catMaybes (map (select DoubleReg)	       doubles)
+    ok_long    = catMaybes (map (select (LongReg Int64Rep))    longs)   
+				    -- rep isn't looked at, hence we can use any old rep.
 
     select :: (FAST_INT -> MagicId) -> Int{-cand-} -> Maybe Int
 	-- one we've unboxed the Int, we make a MagicId

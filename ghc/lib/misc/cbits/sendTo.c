@@ -1,23 +1,18 @@
-#if 0
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1998
-%
-\subsection[sendTo.c]{sendTo run-time support}
-
-\begin{code}
-#endif
+/* -----------------------------------------------------------------------------
+ * $Id: sendTo.c,v 1.3 1998/12/02 13:26:46 simonm Exp $
+ *
+ * sendTo run-time support
+ *
+ * (c) The GHC Team 1998
+ * -------------------------------------------------------------------------- */
 
 #define NON_POSIX_SOURCE
-#include "rtsdefs.h"
+#include "Rts.h"
 #include "ghcSockets.h"
+#include "stgio.h"
 
 StgInt
-sendTo__(fd, buf, nbytes, to, sz)
-StgInt fd;
-StgAddr buf;
-StgInt nbytes;
-StgAddr to;
-StgInt  sz;
+sendTo__(StgInt fd, StgAddr buf, StgInt nbytes, StgAddr to, StgInt sz)
 {
   StgInt count;
   int flags = 0;

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP Project, Glasgow University, 1994-1995
+% (c) The GRASP Project, Glasgow University, 1994-1998
 %
 \section[BitSet]{An implementation of very small sets}
 
@@ -19,7 +19,7 @@ Integer and get virtually unlimited sets.
 module BitSet (
 	BitSet,		-- abstract type
 	mkBS, listBS, emptyBS, unitBS,
-	unionBS, minusBS
+	unionBS, minusBS, intBS
     ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -84,6 +84,10 @@ listBS s = listify s 0
     	    	    	  0# -> more
     	    	    	  _  -> n : more
 	  shiftr x y = shiftRL# x y
+
+-- intBS is a bit naughty.
+intBS :: BitSet -> Int
+intBS (MkBS w#) = I# (word2Int# w#)
 
 #elif defined(__YALE_HASKELL__)
 

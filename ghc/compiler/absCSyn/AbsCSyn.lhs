@@ -1,5 +1,7 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+%
+% $Id: AbsCSyn.lhs,v 1.18 1998/12/02 13:17:16 simonm Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -29,32 +31,28 @@ module AbsCSyn {- (
 
 	-- registers
 	MagicId(..), node, infoptr,
-	isVolatileReg, noLiveRegsMask, mkLiveRegsMask,
+	isVolatileReg,
 	CostRes(Cost)
     )-} where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} ClosureInfo ( ClosureInfo )
-import {-# SOURCE #-} CLabel	  ( CLabel )
 
 #if  ! OMIT_NATIVE_CODEGEN
 import {-# SOURCE #-} MachMisc
 #endif
 
+import CLabel
 import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
-			  mAX_Double_REG, lIVENESS_R1, lIVENESS_R2,
-			  lIVENESS_R3, lIVENESS_R4, lIVENESS_R5,
-			  lIVENESS_R6, lIVENESS_R7, lIVENESS_R8
-			)
-import HeapOffs		( VirtualSpAOffset, VirtualSpBOffset,
-			  VirtualHeapOffset, HeapOffset
-			)
-import CostCentre       ( CostCentre )
-import Literal		( mkMachInt, Literal )
-import PrimRep		( isFollowableRep, PrimRep(..) )
+			  mAX_Double_REG, spRelToInt )
+import CostCentre       ( CostCentre, CostCentreStack )
+import Const		( mkMachInt, Literal )
+import PrimRep		( PrimRep(..) )
 import PrimOp           ( PrimOp )
 import Unique           ( Unique )
+import StgSyn		( SRT(..) )
+import BitSet				-- for liveness masks
 
 \end{code}
 
@@ -108,7 +106,6 @@ stored in a mixed type location.)
 				--  CSwitch m [(tag,code)] AbsCNop == code
 
   | CCodeBlock CLabel AbstractC
-			-- [amode analog: CLabelledCode]
 			-- A labelled block of code; this "statement" is not
 			-- executed; rather, the labelled code will be hoisted
 			-- out to the top level (out of line) & it can be
@@ -119,13 +116,11 @@ stored in a mixed type location.)
 	RegRelative	-- address of the info ptr
 	CAddrMode	-- cost centre to place in closure
 			--   CReg CurCostCentre or CC_HDR(R1.p{-Node-})
-	Bool		-- inplace update or allocate
 
   | COpStmt
 	[CAddrMode]	-- Results
 	PrimOp
 	[CAddrMode]	-- Arguments
-	Int		-- Live registers (may be obtainable from volatility? ADR)
 	[MagicId]	-- Potentially volatile/live registers
 			-- (to save/restore around the call/op)
 
@@ -144,6 +139,17 @@ stored in a mixed type location.)
 			-- sure that permutations work.
 			-- For example { a := b, b := a }
 			-- 	needs to go via (at least one) temporary
+
+  | CCheck 		-- heap or stack checks, or both.  
+	CCheckMacro 	-- These might include some code to fill in tags 
+	[CAddrMode]	-- on the stack, so we can't use CMacroStmt below.
+	AbstractC
+
+  | CRetDirect			-- Direct return
+        Unique			-- for making labels
+	AbstractC   		-- return code
+	(CLabel,SRT)		-- SRT info
+	Liveness		-- stack liveness at the return point
 
   -- see the notes about these next few; they follow below...
   | CMacroStmt		CStmtMacro	[CAddrMode]
@@ -166,50 +172,42 @@ stored in a mixed type location.)
   | CStaticClosure
 	CLabel	-- The (full, not base) label to use for labelling the closure.
 	ClosureInfo
-	CAddrMode	-- cost centre identifier to place in closure
-	[CAddrMode]	-- free vars; ptrs, then non-ptrs
+	CAddrMode		-- cost centre identifier to place in closure
+	[CAddrMode]		-- free vars; ptrs, then non-ptrs.
 
+  | CSRT CLabel [CLabel]  	-- SRT declarations: basically an array of 
+				-- pointers to static closures.
+  
+  | CBitmap CLabel LivenessMask	-- A larger-than-32-bits bitmap.
 
   | CClosureInfoAndCode
-	ClosureInfo	-- Explains placement and layout of closure
-	AbstractC	-- Slow entry point code
+	ClosureInfo		-- Explains placement and layout of closure
+	AbstractC		-- Slow entry point code
 	(Maybe AbstractC)
-			-- Fast entry point code, if any
-	CAddrMode	-- Address of update code; Nothing => should never be used
-			-- (which is the case for all except constructors)
-	String		-- Closure description; NB we can't get this from
-			-- ClosureInfo, because the latter refers to the *right* hand
-			-- side of a defn, whereas the "description" refers to *left*
-			-- hand side
-	Int		-- Liveness info; this is here because it is
-			-- easy to produce w/in the CgMonad; hard
-			-- thereafter.  (WDP 95/11)
+				-- Fast entry point code, if any
+	(CLabel,SRT)		-- SRT info
+	String			-- Closure description; NB we can't get this
+				-- from ClosureInfo, because the latter refers 
+				-- to the *right* hand side of a defn, whereas
+				-- the  "description" refers to *left* hand side
 
-  | CRetVector			-- Return vector with "holes"
-	  			-- (Nothings) for the default
-	CLabel			-- vector-table label
-	[Maybe CAddrMode]
-	AbstractC		-- (and what to put in a "hole" [when Nothing])
-
-  | CRetUnVector	-- Direct return
-	CLabel		-- unvector-table label
-	CAddrMode   	-- return code
-
-  | CFlatRetVector	-- A labelled block of static data
-	CLabel		-- This is the flattened version of CRetVector
+  | CRetVector			-- A labelled block of static data
+	CLabel
 	[CAddrMode]
+	(CLabel,SRT)		-- SRT info
+	Liveness		-- stack liveness at the return point
 
-  | CCostCentreDecl	-- A cost centre *declaration*
-	Bool		-- True  <=> local => full declaration
-			-- False <=> extern; just say so
+  | CCostCentreDecl		-- A cost centre *declaration*
+	Bool			-- True  <=> local => full declaration
+				-- False <=> extern; just say so
 	CostCentre
 
-  | CClosureUpdInfo
-    	AbstractC 	-- InRegs Info Table (CClosureInfoTable)
-			--                    ^^^^^^^^^^^^^^^^^
-			--                                out of date -- HWL
+  | CCostCentreStackDecl	-- A cost centre stack *declaration*
+	CostCentreStack		-- this is the declaration for a
+				-- pre-defined singleton CCS (see 
+				-- CostCentre.lhs)
 
-  | CSplitMarker	-- Split into separate object modules here
+  | CSplitMarker		-- Split into separate object modules here
 \end{code}
 
 About @CMacroStmt@, etc.: notionally, they all just call some
@@ -224,26 +222,46 @@ macros.  An example is @STK_CHK@, which checks for stack-space
 overflow.  This enumeration type lists all such macros:
 \begin{code}
 data CStmtMacro
-  = ARGS_CHK_A_LOAD_NODE
-  | ARGS_CHK_A
-  | ARGS_CHK_B_LOAD_NODE
-  | ARGS_CHK_B
-  | HEAP_CHK
-  | STK_CHK
-  | UPD_CAF
-  | UPD_IND
-  | UPD_INPLACE_NOPTRS
-  | UPD_INPLACE_PTRS
-  | UPD_BH_UPDATABLE
-  | UPD_BH_SINGLE_ENTRY
-  | PUSH_STD_UPD_FRAME
-  | POP_STD_UPD_FRAME
-  | SET_TAG
+  = ARGS_CHK				-- arg satisfaction check
+  | ARGS_CHK_LOAD_NODE			-- arg check for top-level functions
+  | UPD_CAF				-- update CAF closure with indirection
+  | UPD_BH_UPDATABLE			-- eager backholing
+  | UPD_BH_SINGLE_ENTRY			-- more eager blackholing
+  | PUSH_UPD_FRAME			-- push update frame
+  | PUSH_SEQ_FRAME			-- push seq frame
+  | SET_TAG				-- set TagReg if it exists
   | GRAN_FETCH	    		-- for GrAnSim only  -- HWL
   | GRAN_RESCHEDULE   		-- for GrAnSim only  -- HWL
   | GRAN_FETCH_AND_RESCHEDULE	-- for GrAnSim only  -- HWL
   | THREAD_CONTEXT_SWITCH   	-- for GrAnSim only  -- HWL
   | GRAN_YIELD   		-- for GrAnSim only  -- HWL 
+  deriving Text
+\end{code}
+
+Heap/Stack checks.  There are far too many of these.
+
+\begin{code}
+data CCheckMacro
+
+  = HP_CHK_NP				-- heap/stack checks when
+  | STK_CHK_NP				-- node points to the closure
+  | HP_STK_CHK_NP
+  | HP_CHK_SEQ_NP			-- for 'seq' style case alternatives
+
+  | HP_CHK				-- heap/stack checks when
+  | STK_CHK				-- node doesn't point
+  | HP_STK_CHK
+					-- case alternative heap checks:
+
+  | HP_CHK_NOREGS			--   no registers live
+  | HP_CHK_UNPT_R1			--   R1 is boxed/unlifted
+  | HP_CHK_UNBX_R1			--   R1 is unboxed
+  | HP_CHK_F1				--   FloatReg1 (only) is live 
+  | HP_CHK_D1				--   DblReg1   (only) is live
+  | HP_CHK_L1				--   LngReg1   (only) is live
+  | HP_CHK_UT_ALT			--   unboxed tuple return.
+
+  | HP_CHK_GEN				-- generic heap check
   deriving Text
 \end{code}
 
@@ -256,47 +274,12 @@ The @String@ names a macro that, if \tr{#define}d, will perform some
 cost-centre-profiling-related action.
 \end{description}
 
-HERE ARE SOME OLD NOTES ABOUT HEAP-CHK ENTRY POINTS:
-
-\item[@CCallStgC@:]
-Some parts of the system, {\em notably the storage manager}, are
-implemented by C~routines that must know something about the internals
-of the STG world, e.g., where the heap-pointer is.  (The
-``C-as-assembler'' documents describes this stuff in detail.)
-
-This is quite a tricky business, especially with ``optimised~C,'' so
-we keep close tabs on these fellows.  This enumeration type lists all
-such ``STG~C'' routines:
-
-HERE ARE SOME *OLD* NOTES ABOUT HEAP-CHK ENTRY POINTS:
-
-Heap overflow invokes the garbage collector (of your choice :-), and
-we have different entry points, to tell the GC the exact configuration
-before it.
-\begin{description}
-\item[Branch of a boxed case:]
-The @Node@ register points off to somewhere legitimate, the @TagReg@
-holds the tag, and the @RetReg@ points to the code for the
-alterative which should be resumed. (ToDo: update)
-
-\item[Branch of an unboxed case:]
-The @Node@ register points nowhere of any particular interest, a
-kind-specific register (@IntReg@, @FloatReg@, etc.) holds the unboxed
-value, and the @RetReg@ points to the code for the alternative
-which should be resumed. (ToDo: update)
-
-\item[Closure entry:]
-The @Node@ register points to the closure, and the @RetReg@ points
-to the code to be resumed. (ToDo: update)
-\end{description}
-
 %************************************************************************
 %*									*
 \subsection[CAddrMode]{C addressing modes}
 %*									*
 %************************************************************************
 
-Addressing modes: these have @PrimitiveKinds@ pinned on them.
 \begin{code}
 data CAddrMode
   = CVal  RegRelative PrimRep
@@ -324,20 +307,15 @@ data CAddrMode
 	-- native code.
 
   | CLbl    CLabel	-- Labels in the runtime system, etc.
-			-- See comment under CLabelledData about (String,Name)
 	    PrimRep	-- the kind is so we can generate accurate C decls
-
-  | CUnVecLbl 	    	-- A choice of labels left up to the back end
-    	      CLabel	-- direct
-    	      CLabel	-- vectored
 
   | CCharLike CAddrMode	-- The address of a static char-like closure for
 			-- the specified character.  It is guaranteed to be in
 			-- the range 0..255.
 
   | CIntLike CAddrMode	-- The address of a static int-like closure for the
-			-- specified small integer.  It is guaranteed to be in the
-			-- range mIN_INTLIKE..mAX_INTLIKE
+			-- specified small integer.  It is guaranteed to be in
+			-- the range mIN_INTLIKE..mAX_INTLIKE
 
   | CString FAST_STRING	-- The address of the null-terminated string
   | CLit    Literal
@@ -345,38 +323,18 @@ data CAddrMode
 			-- into the C output
 	    PrimRep
 
-  | COffset HeapOffset	-- A literal constant, not an offset *from* anything!
-			-- ToDo: this should really be CLitOffset
-
-  | CCode AbstractC	-- Some code.  Used mainly for return addresses.
-
-  | CLabelledCode CLabel AbstractC  -- Almost defunct? (ToDo?) --JSM
-			-- Some code that must have a particular label
-			-- (which is jumpable to)
-
-  | CJoinPoint		-- This is used as the amode of a let-no-escape-bound variable
-	VirtualSpAOffset	-- SpA and SpB values after any volatile free vars
-	VirtualSpBOffset	-- of the rhs have been saved on stack.
-				-- Just before the code for the thing is jumped to,
-				-- SpA/B will be set to these values,
-				-- and then any stack-passed args pushed,
-				-- then the code for this thing will be entered
-
+  | CJoinPoint		-- This is used as the amode of a let-no-escape-bound
+			-- variable.
+	VirtualSpOffset	  -- Sp value after any volatile free vars
+			  -- of the rhs have been saved on stack.
+			  -- Just before the code for the thing is jumped to,
+			  -- Sp will be set to this value,
+			  -- and then any stack-passed args pushed,
+			  -- then the code for this thing will be entered
   | CMacroExpr
-    	PrimRep    	-- the kind of the result
+    	!PrimRep    	-- the kind of the result
     	CExprMacro    	-- the macro to generate a value
 	[CAddrMode]   	-- and its arguments
-
-  | CCostCentre		-- If Bool is True ==> it to be printed as a String,
-	CostCentre	-- (*not* as a C identifier or some such).
-	Bool		-- (It's not just the double-quotes on either side;
-			-- spaces and other funny characters will have been
-			-- fiddled in the non-String variant.)
-
-mkCCostCentre cc
-  = --ASSERT(not (currentOrSubsumedCosts cc))
-    --FALSE: We do put subsumedCC in static closures
-    CCostCentre cc False
 \end{code}
 
 Various C macros for values which are dependent on the back-end layout.
@@ -384,18 +342,24 @@ Various C macros for values which are dependent on the back-end layout.
 \begin{code}
 
 data CExprMacro
-  = INFO_PTR
-  | ENTRY_CODE
-  | INFO_TAG
-  | EVAL_TAG
+  = ENTRY_CODE
+  | ARG_TAG				-- stack argument tagging
+  | GET_TAG				-- get current constructor tag
   deriving(Text)
 
 \end{code}
 
-A tiny convenience:
+Convenience functions:
+
 \begin{code}
 mkIntCLit :: Int -> CAddrMode
 mkIntCLit i = CLit (mkMachInt (toInteger i))
+
+mkCCostCentre :: CostCentre -> CAddrMode
+mkCCostCentre cc = CLbl (mkCC_Label cc) DataPtrRep
+
+mkCCostCentreStack :: CostCentreStack -> CAddrMode
+mkCCostCentreStack ccs = CLbl (mkCCS_Label ccs) DataPtrRep
 \end{code}
 
 %************************************************************************
@@ -406,18 +370,66 @@ mkIntCLit i = CLit (mkMachInt (toInteger i))
 
 \begin{code}
 data RegRelative
-  = HpRel	 VirtualHeapOffset	-- virtual offset of Hp
-		 VirtualHeapOffset	-- virtual offset of The Thing
-  | SpARel	 VirtualSpAOffset	-- virtual offset of SpA
-		 VirtualSpAOffset	-- virtual offset of The Thing
-  | SpBRel	 VirtualSpBOffset	-- virtual offset of SpB
-		 VirtualSpBOffset	-- virtual offset of The Thing
-  | NodeRel	 VirtualHeapOffset
+  = HpRel 	FAST_INT	-- }
+  | SpRel 	FAST_INT	-- }- offsets in StgWords
+  | NodeRel	FAST_INT	-- }
 
 data ReturnInfo
   = DirectReturn    	    	    	-- Jump directly, if possible
   | StaticVectoredReturn Int		-- Fixed tag, starting at zero
   | DynamicVectoredReturn CAddrMode	-- Dynamic tag given by amode, starting at zero
+
+hpRel :: VirtualHeapOffset 	-- virtual offset of Hp
+      -> VirtualHeapOffset 	-- virtual offset of The Thing
+      -> RegRelative		-- integer offset
+hpRel IBOX(hp) IBOX(off) = HpRel (hp _SUB_ off)
+
+spRel :: VirtualSpOffset 	-- virtual offset of Sp
+      -> VirtualSpOffset 	-- virtual offset of The Thing
+      -> RegRelative		-- integer offset
+spRel sp off = SpRel (case spRelToInt sp off of { IBOX(i) -> i })
+
+nodeRel :: VirtualHeapOffset
+        -> RegRelative
+nodeRel IBOX(off) = NodeRel off
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[RegRelative]{@RegRelatives@: ???}
+%*									*
+%************************************************************************
+
+We represent liveness bitmaps as a BitSet (whose internal
+representation really is a bitmap).  These are pinned onto case return
+vectors to indicate the state of the stack for the garbage collector.
+
+\begin{code}
+type LivenessMask = [BitSet]
+
+data Liveness = LvSmall BitSet
+              | LvLarge CLabel
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[HeapOffset]{@Heap Offsets@}
+%*									*
+%************************************************************************
+
+This used to be a grotesquely complicated datatype in an attempt to
+hide the details of header sizes from the compiler itself.  Now these
+constants are imported from the RTS, and we deal in real Ints.
+
+\begin{code}
+type HeapOffset = Int			-- ToDo: remove
+
+type VirtualHeapOffset	= HeapOffset
+type VirtualSpOffset	= Int
+
+type HpRelOffset	= HeapOffset
+type SpRelOffset	= Int
 \end{code}
 
 %************************************************************************
@@ -426,98 +438,38 @@ data ReturnInfo
 %*									*
 %************************************************************************
 
-Much of what happens in Abstract-C is in terms of ``magic'' locations,
-such as the stack pointer, heap pointer, etc.  If possible, these will
-be held in registers.
-
-Here are some notes about what's active when:
-\begin{description}
-\item[Always active:]
-	Hp, HpLim, SpA, SpB, SuA, SuB
-
-\item[Entry set:]
-	ArgPtr1 (= Node)...
-
-\item[Return set:]
-Ptr regs: RetPtr1 (= Node), RetPtr2...
-Int/char regs:  RetData1 (= TagReg = IntReg), RetData2...
-Float regs: RetFloat1, ...
-Double regs: RetDouble1, ...
-\end{description}
-
 \begin{code}
 data MagicId
   = BaseReg 	-- mentioned only in nativeGen
 
-  | StkOReg 	-- mentioned only in nativeGen
-
   -- Argument and return registers
   | VanillaReg		-- pointers, unboxed ints and chars
-	PrimRep	        -- PtrRep, IntRep, CharRep, StablePtrRep or ForeignObjRep
-			--	(in case we need to distinguish)
+	PrimRep
 	FAST_INT	-- its number (1 .. mAX_Vanilla_REG)
 
-  | FloatReg	-- single-precision floating-point registers
+  | FloatReg		-- single-precision floating-point registers
 	FAST_INT	-- its number (1 .. mAX_Float_REG)
 
-  | DoubleReg	-- double-precision floating-point registers
+  | DoubleReg		-- double-precision floating-point registers
 	FAST_INT	-- its number (1 .. mAX_Double_REG)
 
+  -- STG registers
+  | Sp			-- Stack ptr; points to last occupied stack location.
+  | Su     		-- Stack update frame pointer
+  | SpLim		-- Stack limit
+  | Hp			-- Heap ptr; points to last occupied heap location.
+  | HpLim		-- Heap limit register
+  | CurCostCentre 	-- current cost centre register.
+  | VoidReg 		-- see "VoidPrim" type; just a placeholder; 
+			--   no actual register
   | LongReg	        -- long int registers (64-bit, really)
 	PrimRep	        -- Int64Rep or Word64Rep
 	FAST_INT	-- its number (1 .. mAX_Long_REG)
 
-  | TagReg	-- to return constructor tags; as almost all returns are vectored,
-		-- this is rarely used.
-
-  | RetReg	-- topmost return address from the B stack
-
-  | SpA		-- Stack ptr; points to last occupied stack location.
-		-- Stack grows downward.
-  | SuA     	-- mentioned only in nativeGen
-
-  | SpB		-- Basic values, return addresses and update frames.
-		-- Grows upward.
-  | SuB	    	-- mentioned only in nativeGen
-
-  | Hp		-- Heap ptr; points to last occupied heap location.
-		-- Free space at lower addresses.
-
-  | HpLim	-- Heap limit register: mentioned only in nativeGen
-
-  | LivenessReg	-- (parallel only) used when we need to record explicitly
-		-- what registers are live
-
-  | StdUpdRetVecReg 	-- mentioned only in nativeGen
-  | StkStubReg	    	-- register holding STK_STUB_closure (for stubbing dead stack slots)
-
-  | CurCostCentre -- current cost centre register.
-
-  | VoidReg -- see "VoidPrim" type; just a placeholder; no actual register
 
 node 	= VanillaReg PtrRep     ILIT(1) -- A convenient alias for Node
-infoptr = VanillaReg DataPtrRep ILIT(2) -- An alias for InfoPtr
+tagreg  = VanillaReg WordRep    ILIT(2) -- A convenient alias for TagReg
 
---------------------
-noLiveRegsMask :: Int	-- Mask indicating nothing live
-noLiveRegsMask = 0
-
-mkLiveRegsMask
-	:: [MagicId]	-- Candidate live regs; depends what they have in them
-	-> Int
-
-mkLiveRegsMask regs
-  = foldl do_reg noLiveRegsMask regs
-  where
-    do_reg acc (VanillaReg kind reg_no)
-      | isFollowableRep kind
-      = acc + (reg_tbl !! IBOX(reg_no _SUB_ ILIT(1)))
-
-    do_reg acc anything_else = acc
-
-    reg_tbl -- ToDo: mk Array!
-      = [lIVENESS_R1, lIVENESS_R2, lIVENESS_R3, lIVENESS_R4,
-	 lIVENESS_R5, lIVENESS_R6, lIVENESS_R7, lIVENESS_R8]
 \end{code}
 
 We need magical @Eq@ because @VanillaReg@s come in multiple flavors.
@@ -527,50 +479,30 @@ instance Eq MagicId where
     reg1 == reg2 = tag reg1 _EQ_ tag reg2
      where
 	tag BaseReg	     = (ILIT(0) :: FAST_INT)
-	tag StkOReg	     = ILIT(1)
-	tag TagReg	     = ILIT(2)
-	tag RetReg	     = ILIT(3)
-	tag SpA		     = ILIT(4)
-	tag SuA		     = ILIT(5)
-	tag SpB		     = ILIT(6)
-	tag SuB		     = ILIT(7)
-	tag Hp		     = ILIT(8)
-	tag HpLim	     = ILIT(9)
-	tag LivenessReg	     = ILIT(10)
-	tag StdUpdRetVecReg  = ILIT(12)
-	tag StkStubReg	     = ILIT(13)
-	tag CurCostCentre    = ILIT(14)
-	tag VoidReg	     = ILIT(15)
+	tag Sp		     = ILIT(1)
+	tag Su		     = ILIT(2)
+	tag SpLim	     = ILIT(3)
+	tag Hp		     = ILIT(4)
+	tag HpLim	     = ILIT(5)
+	tag CurCostCentre    = ILIT(6)
+	tag VoidReg	     = ILIT(7)
 
-	tag reg =
-          ILIT(15) _ADD_ (
-	  case reg of
-	    VanillaReg _ i -> i
-	    FloatReg i     -> maxv _ADD_ i
-	    DoubleReg i    -> maxv _ADD_ maxf _ADD_ i
-	    LongReg _ i    -> maxv _ADD_ maxf _ADD_ maxd _ADD_ i
-	  )
-	  where
-	    maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
-	    maxf = case mAX_Float_REG   of { IBOX(x) -> x }
-	    maxd = case mAX_Double_REG of { IBOX(x) -> x }
+	tag (VanillaReg _ i) = ILIT(8) _ADD_ i
+
+	tag (FloatReg i)  = ILIT(8) _ADD_ maxv _ADD_ i
+	tag (DoubleReg i) = ILIT(8) _ADD_ maxv _ADD_ maxf _ADD_ i
+	tag (LongReg _ i) = ILIT(8) _ADD_ maxv _ADD_ maxf _ADD_ maxd _ADD_ i
+
+        maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
+        maxf = case mAX_Float_REG   of { IBOX(x) -> x }
+        maxd = case mAX_Double_REG of { IBOX(x) -> x }
 \end{code}
 
 Returns True for any register that {\em potentially} dies across
 C calls (or anything near equivalent).  We just say @True@ and
 let the (machine-specific) registering macros sort things out...
+
 \begin{code}
 isVolatileReg :: MagicId -> Bool
-
 isVolatileReg any = True
---isVolatileReg (FloatReg _)	= True
---isVolatileReg (DoubleReg _)	= True
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection[AbsCSyn-printing]{Pretty-printing Abstract~C}
-%*									*
-%************************************************************************
-
-It's in \tr{PprAbsC.lhs}.

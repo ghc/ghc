@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+
+die "Usage: before <regexp>" unless $ARGV[0];
+
+$pat = $ARGV[0];
+
+# Filter that trims lines after regexp
+
+# print the initial part
+while (<STDIN>) {
+    last if /$pat/;
+    print;
+}
+
+exit 0;

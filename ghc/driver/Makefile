@@ -5,7 +5,7 @@ TOP=..
 CURRENT_DIR=ghc/driver
 include $(TOP)/mk/boilerplate.mk
 #
-# The driver needs to get at 
+# The driver needs to get at the version
 include $(TOP)/mk/version.mk
 
 INSTALLING=0
@@ -45,7 +45,7 @@ SCRIPT_SUBST_VARS := \
   GHC_LIB_DIR GHC_RUNTIME_DIR GHC_UTILS_DIR GHC_INCLUDE_DIR \
   GHC_OPT_HILEV_ASM GhcWithNativeCodeGen LeadingUnderscore\
   GHC_UNLIT GHC_HSCPP GHC_HSC GHC_SYSMAN \
-  CP RM CONTEXT_DIFF \
+  CP RM CONTEXT_DIFF LibGmp \
   $(WAY_NAMES) $(WAY_OPTS)
 
 #
@@ -136,21 +136,9 @@ WAY_t_HC_OPTS=-fticky-ticky -DTICKY_TICKY -optc-DTICKY_TICKY
 WAY_u_NAME=unregisterized (using portable C only)
 WAY_u_HC_OPTS=
 
-# Way `mc': concurrent
-WAY_mc_NAME=concurrent
-WAY_mc_HC_OPTS+=-fstack-check -fconcurrent -D__CONCURRENT_HASKELL__ -optc-DCONCURRENT
-
-# Way `mr': 
-WAY_mr_NAME=profiled concurrent
-WAY_mr_HC_OPTS+=-fstack-check -fconcurrent -fscc-profiling -D__CONCURRENT_HASKELL__ -DPROFILING -optc-DCONCURRENT -optc-DPROFILING
-
-# Way `mt': 
-WAY_mt_NAME=ticky-ticky concurrent
-WAY_mt_HC_OPTS+=-fstack-check -fconcurrent -fticky-ticky -D__CONCURRENT_HASKELL__ -DTICKY-TICKY -optc-DCONCURRENT -optc-DTICKY_TICKY
-
 # Way `mp': 
 WAY_mp_NAME=parallel
-WAY_mp_HC_OPTS+=-fstack-check -fconcurrent -D__PARALLEL_HASKELL__ -optc-DPAR -optc-DCONCURRENT
+WAY_mp_HC_OPTS+=-fstack-check -fparallel -D__PARALLEL_HASKELL__ -optc-DPAR
 
 #
 # Way `mg': 

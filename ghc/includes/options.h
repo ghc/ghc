@@ -1,0 +1,392 @@
+/* ../options.h.  Generated automatically by configure.  */
+/* --------------------------------------------------------------------------
+ * Configuration options
+ *
+ * Most configuration options are arguments to the configure script
+ * (try running "configure --help").  The following options are either
+ * experimental or require changes to "Prelude.hs", the standard libraries
+ * and demos and therefore cannot be modified using the configure script.
+ * Most users should leave them alone!
+ *
+ * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
+ * All rights reserved. See NOTICE for details and conditions of use etc...
+ * Hugs version 1.4, December 1997
+ *
+ * $RCSfile: options.h,v $
+ * $Revision: 1.2 $
+ * $Date: 1998/12/02 13:21:51 $
+ * ------------------------------------------------------------------------*/
+
+
+/* --------------------------------------------------------------------------
+ * Hugs paths and directories
+ * ------------------------------------------------------------------------*/
+
+/* Define this as the default setting of HUGSPATH.                        
+ * Value may contain string "{Hugs}" (for which we will substitute the
+ * value of HUGSDIR) and should be either colon-separated (Unix)
+ * or semicolon-separated (Macintosh, Windows, DOS).  Escape
+ * characters in the path string are interpreted according to normal
+ * Haskell conventions.
+ *
+ * This value can be overridden from the command line by setting the
+ * HUGSFLAGS environment variable or by storing an appropriate value
+ * for HUGSFLAGS in the registry (Win32 only).  In all cases, use a 
+ * string of the form -P"...".  
+ */
+#define HUGSPATH ""
+
+/* The directory name which is substituted for the string "{Hugs}"
+ * in a path variable.  This normally points to where the Hugs libraries
+ * are installed - ie so that the file HUGSDIR/lib/Prelude.hs exists    
+ * Typical values are:                                  
+ *    "/usr/local/lib/hugs"                             
+ *    "/usr/homes/JFHaskell/hugs"                       
+ *    ".."      
+ *
+ * This value is ignored on Windows and Macintosh versions since
+ * it is assumed that the binary is installed in HUGSDIR.
+ *
+ * This value cannot be overridden from the command line or by using 
+ * environment variables.  This isn't quite as limiting as you'd think
+ * since you can always choose _not_ to use the {Hugs} variable - however,
+ * it's obviously _nicer_ to have it set correctly.
+ */
+#ifndef HUGSDIR
+#define HUGSDIR "."
+#endif
+
+
+/* --------------------------------------------------------------------------
+ * User interface options
+ * ------------------------------------------------------------------------*/
+
+/* Define if you want to use the "Hugs for Windows" GUI.
+ * (Windows 3.1 and compatibles only)
+ */
+#define HUGS_FOR_WINDOWS 0
+
+/* Define if you want filenames to be converted to normal form by:
+ * o replacing relative pathnames with absolute pathnames and
+ *   eliminating .. and . where possible.
+ * o converting to lower case (only in case-insensitive filesystems)
+ */
+#define PATH_CANONICALIZATION 0
+
+/* Define if a command line editor is available and should be used. 
+ * There are two choices of command line editor that can be used with Hugs:
+ * GNU readline and editline (from comp.sources.misc, vol 31, issue 71)
+ */
+#define USE_READLINE 0
+
+/* Define if you want the small startup banner.
+ */
+#define SMALL_BANNER 0
+
+/* Define if you want to be able to redirect stdout/stderr to a buffer.
+ * Only necessary for the Hugs server interface (which is used in the
+ * Netscape plugin and the standalone evaluator "runhugs"). 
+ */
+#define REDIRECT_OUTPUT (!HUGS_FOR_WINDOWS)
+
+
+/* --------------------------------------------------------------------------
+ * Making Hugs smaller
+ * ------------------------------------------------------------------------*/
+
+/* Define one of these to select overall size of Hugs
+ *   SMALL_HUGS     for 16 bit operation on a limited memory PC.
+ *   REGULAR_HUGS   for 32 bit operation using largish default table sizes.
+ *   LARGE_HUGS     for 32 bit operation using larger default table sizes.
+ */
+#define SMALL_HUGS   0
+#define REGULAR_HUGS 0
+#define LARGE_HUGS   1
+
+#define NUM_SYNTAX         100
+#define NUM_TUPLES         100
+#define NUM_OFFSETS        1024
+#define NUM_CHARS          256
+#if TREX
+#define NUM_EXT            100
+#endif
+#define CHAR_MASK          0xff
+
+#if     SMALL_HUGS                      /* the McDonalds mentality :-)     */
+#define Pick(s,r,l)        s
+#endif
+#if     REGULAR_HUGS
+#define Pick(s,r,l)        r
+#endif
+#if     LARGE_HUGS
+#define Pick(s,r,l)        l
+#endif
+
+#define MINIMUMHEAP        Pick(7500,   19000,      19000)
+#define MAXIMUMHEAP        Pick(32765,  0,          0)
+#define DEFAULTHEAP        Pick(28000,  50000,      300000)
+
+#define NUM_SCRIPTS        Pick(64,     100,        100)
+#define NUM_MODULE         NUM_SCRIPTS
+#define NUM_TYCON          Pick(60,     160,        400)
+#define NUM_NAME           Pick(1000,   2000,       16000)
+#define NUM_CLASSES        Pick(30,     40,         80)
+#define NUM_INSTS          Pick(200,    300,        600)
+#define NUM_TEXT           Pick(12000,  20000,      80000)
+#define NUM_TEXTH          Pick(1,      10,         10)
+#define NUM_TYVARS         Pick(800,    2000,       4000)
+#define NUM_STACK          Pick(1800,   12000,      16000)
+#define NUM_DTUPLES        Pick(3,      5,          5)
+
+#define MAXPOSINT          0x7fffffff
+#define MINNEGINT          (-MAXPOSINT-1)
+#define MAXHUGSWORD        0xffffffffU
+
+#define BIGBASE            Pick(100,    10000,      10000)
+#define BIGEXP             Pick(2,      4,          4)
+
+#define minRecovery        Pick(1000,  1000,       1000)
+#define bitsPerWord        Pick(16,    32,         32)
+#define wordShift          Pick(4,     5,          5)
+#define wordMask           Pick(15,    31,         31)
+
+/* Define to force a fixed size (NUM_TYVARS) for the current substitution.
+ * Setting this flag places a limit on the maximum complexity of
+ * expressions handled by the typechecker.  It is normally turned off
+ * but may be required for small machines/configurations.
+ */
+#define FIXED_SUBST 0 
+
+/* Define this to allocate tables dynamically.
+ * This is currently just a memory saving trick, but this may be
+ * extended at a later stage to allow at least some of the tables
+ * to be extended dynamically at run-time to avoid exhausted space errors.
+ */
+#define DYN_TABLES SMALL_HUGS
+
+/* Define this to include support for storing pointers in the heap.
+ * This is required by the code generator (which has to store 
+ * pointers to AsmObjects).
+ */
+#define PTR_ON_HEAP 1
+
+/* Should quantifiers be displayed in error messages.
+ * Warning: not consistently used.
+ */
+#define DISPLAY_QUANTIFIERS 1
+
+/* Flags to determine which raw representations and operations are available
+ * Notes:
+ * o the INTEGER implementation is quite different from GHC's
+ *   implementation so you usually don't PROVIDE_INTEGER if
+ *   using GHC compiled code.
+ * o if you turn everything on, you might end up with more then 256
+ *   bytecodes: check the value of i_ccall (the lst bytecode) to check
+ * o Addrs are used to represent literal Strings in Hugs - so you can't
+ *   really turn them off.
+ * o Either Int64 or Integer has to be provided so that we can
+ *   define BIGNUMTYPE (below)
+ */
+
+#define	PROVIDE_INTEGER
+#define	PROVIDE_INT64
+#define	PROVIDE_WORD
+#define	PROVIDE_ADDR
+#define PROVIDE_STABLE
+#define PROVIDE_FOREIGN
+#define PROVIDE_WEAK
+#define PROVIDE_ARRAY
+#define PROVIDE_CONCURRENT
+#define PROVIDE_PTREQUALITY
+#define PROVIDE_COERCE
+
+/* The following aren't options at the moment - but could be
+ * #define PROVIDE_FLOAT
+ * #define PROVIDE_DOUBLE
+ */
+
+/* Flags to determine how Haskell types are mapped onto internal types.
+ * Note that this has to be an injection: you can't have two names
+ * for the same internal type.
+ * Also, the settings have to be consistent with GHC if GHC is being used.
+ */
+
+#define BIGNUM_IS_INTEGER 1
+#define BIGNUM_IS_INT64   0
+
+#if BIGNUM_IS_INT64
+#define BIGNUMTYPE Int64
+#elif BIGNUM_IS_INTEGER
+#define BIGNUMTYPE Integer
+#else
+#warning BIGNUMTYPE undefined
+#endif
+
+/* Is the default default (Int,Double) or (Integer,Double)?
+ */
+#define DEFAULT_BIGNUM 0
+
+/* Should lambda lifter lift constant expressions out to top level?
+ * Experimental optimisation.
+ */
+#define LIFT_CONSTANTS 1
+
+/* Should we run optimizer on Hugs code?
+ * Experimental optimisation.
+ */
+#define USE_HUGS_OPTIMIZER 1
+
+/* Are things being used in an interactive setting or a batch setting?
+ * In an interactive setting, System.exitWith should not call _exit
+ * getProgName and getProgArgs need to be handled differently, etc.
+ *
+ * Warning: this flag is ignored by an awful lot of code.
+ */
+#define INTERACTIVE
+
+/* Turn bytecode interpreter support on/off.
+ */
+#define INTERPRETER 1 
+
+/* Turn on debugging output and some sanity checks
+ */
+/*#define DEBUG  */
+/*#define NDEBUG */
+
+/* Make stack tags more informative than just their size.
+ * Helps when printing the stack and when running sanity checks.
+ */
+/*#define DEBUG_EXTRA */
+
+/* Turn lazy blackholing on/off.
+ * Warning: Lazy blackholing can't be disabled in GHC generated code.
+ *
+ * Using eager blackholing makes things easier to debug because
+ * the blackholes are more predicatable - but it's slower and less sexy.
+ */
+#define LAZY_BLACKHOLING 
+
+/* Turn miniinterpreter on/off.
+ * 
+ * The mininterpreter is portable but slow - if you turn it off, 
+ * you'll probably need to provide some assembly language support
+ * for your architecture.
+ */
+#define USE_MINIINTERPRETER 1
+
+/* Turn registerisation on/off.
+ * 
+ * If you turn this off, you'll probably need to provide some
+ * assembly language support for your architecture.
+ */
+#define NO_REGS
+
+
+/* --------------------------------------------------------------------------
+ * Fancy features
+ * ------------------------------------------------------------------------*/
+
+/* Define if T-REX; Typed Rows and EXtension should be enabled             */
+/* Doesn't work in current system - I don't know what the primops do       */
+#define TREX 0
+
+/* Define if you want to run Haskell code through a preprocessor
+ * 
+ * Note that the :reload command doesn't know about any dependencies
+ * introduced by using #include so you must :load (not :reload) if
+ * you change any #included files (such as configuration files).
+ */
+#define USE_PREPROCESSOR 1
+
+/* Define if you want to time every evaluation. 
+ *
+ * Timing is included in the Hugs distribution for the purpose of benchmarking
+ * the Hugs interpreter, comparing its performance across a variety of
+ * different machines, and with other systems for similar languages.
+ *
+ * It would be somewhat foolish to try to use the timings produced in this
+ * way for any other purpose.  In particular, using timings to compare the
+ * performance of different versions of an algorithm is likely to give very
+ * misleading results.  The current implementation of Hugs as an interpreter,
+ * without any significant optimizations, means that there are much more
+ * significant overheads than can be accounted for by small variations in
+ * Hugs code.
+ */
+/* #undef WANT_TIMER */
+
+
+/* --------------------------------------------------------------------------
+ * Desugaring options
+ * 
+ * These options are mostly used for developing/debugging the system.
+ * Since they turn off required parts of the Haskell language, you'll
+ * probably need to modify Prelude.hs and the libraries if you change
+ * these flags.
+ * ------------------------------------------------------------------------*/
+
+/* Define if you want to be able to derive instances of each class. */
+#define DERIVE_EQ      1
+#define DERIVE_ORD     1
+#define DERIVE_ENUM    1
+#define DERIVE_IX      1
+#define DERIVE_SHOW    1
+#define DERIVE_READ    1
+#define DERIVE_BOUNDED 1
+
+/* Define if single-element dictionaries are implemented by newtype.
+ * Should be turned on.  Mostly used to make it easier to find which
+ * bits of code implement this optimisation and as a way of documenting
+ * them.
+ */
+#define USE_NEWTYPE_FOR_DICTS 1
+
+/* Define if strings should be represented as normal C strings.
+ * Note that this doesn't work if the string contains '\0'
+ * and makes persistence problematic.
+ * Intended as a stop-gap measure until mutable byte arrays are available.
+ */
+#define USE_ADDR_FOR_STRINGS 1
+
+/* turn this off to avoid wrapping int and float literals in "fromInt"
+ * or "fromFloat" */
+#define OVERLOADED_CONSTANTS 1
+
+/* turn this off to remove the ultramagical treatment of the Eval class */
+#define EVAL_INSTANCES 0
+
+/* Define to include support for (n+k) patterns. 
+ * Warning: many people in the Haskell committee want to remove n+k patterns.
+ */
+#define NPLUSK 1
+
+
+/* --------------------------------------------------------------------------
+ * Debugging options (intended for use by maintainers)
+ * ------------------------------------------------------------------------*/
+
+/* Define if debugging generated bytecodes or the bytecode interpreter     */
+#define DEBUG_CODE 1
+
+/* Define if you want to use a low-level printer from within a debugger    */
+#define DEBUG_PRINTER 1
+
+
+/* --------------------------------------------------------------------------
+ * Experimental features
+ * These are likely to disappear/change in future versions and should not
+ * be used by most people..
+ * ------------------------------------------------------------------------*/
+
+/* In a plain Hugs system, most signals (SIGBUS, SIGTERM, etc) indicate
+ * some kind of error in Hugs - or maybe a stack overflow.  Rather than
+ * just crash, Hugs catches these errors and returns to the main loop.
+ * It does this by calling a function "panic" which longjmp's back to the
+ * main loop.
+ * If you're developing a GreenCard library, this may not be the right
+ * behaviour - it's better if Hugs leaves them for your debugger to
+ * catch rather than trapping them and "panicking".
+ */
+#define DONT_PANIC 1
+
+
+/* ----------------------------------------------------------------------- */

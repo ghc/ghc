@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[RnNames]{Extracting imported and top-level names in scope}
 
@@ -20,7 +20,7 @@ import HsSyn	( HsModule(..), ImportDecl(..), HsDecl(..),
 		  FixityDecl(..),
 		  collectTopBinders
 		)
-import RdrHsSyn	( RdrNameHsDecl, RdrName(..), RdrNameIE, RdrNameImportDecl,
+import RdrHsSyn	( RdrName(..), RdrNameIE, RdrNameImportDecl,
 		  RdrNameHsModule, RdrNameFixityDecl,
 		  rdrNameOcc, ieOcc
 		)
@@ -31,10 +31,11 @@ import RnMonad
 
 import FiniteMap
 import PrelMods
-import UniqFM	( UniqFM, addListToUFM_C, lookupUFM )
-import Bag	( Bag, bagToList )
+import UniqFM	( lookupUFM )
+import Bag	( bagToList )
 import Maybes	( maybeToBool )
 import Name
+import NameSet	( elemNameSet )
 import Outputable
 import Util	( removeDups )
 \end{code}

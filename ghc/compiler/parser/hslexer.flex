@@ -394,11 +394,15 @@ NL  	    	    	[\n\r]
 <Code,GlaExt>"hiding"		{ RETURN(HIDING); }
 <Code,GlaExt>"qualified"	{ RETURN(QUALIFIED); }
 
+<Code,GlaExt>"forall"		{ RETURN(FORALL); }
+
 <Code,GlaExt>"_scc_"		{ RETURN(SCC); }
 <GlaExt>"_ccall_"		{ RETURN(CCALL); }
 <GlaExt>"_ccall_GC_"		{ RETURN(CCALL_GC); }
 <GlaExt>"_casm_"		{ RETURN(CASM); }
 <GlaExt>"_casm_GC_"		{ RETURN(CASM_GC); }
+<GlaExt>"(#"			{ RETURN(OUNBOXPAREN); }
+<GlaExt>"#)"			{ RETURN(CUNBOXPAREN); }
 <GlaExt>"foreign"		{ RETURN(FOREIGN); }
 <GlaExt>"export"		{ RETURN(EXPORT); }
 <GlaExt>"label"			{ RETURN(LABEL); }
@@ -406,7 +410,9 @@ NL  	    	    	[\n\r]
 <GlaExt>"_stdcall"		{ RETURN(STDCALL); }
 <GlaExt>"_ccall"		{ RETURN(C_CALL); }
 <GlaExt>"_pascal"	        { RETURN(PASCAL); }
-<GlaExt>"_fastcall"	        { RETURN(FASTCALL); }
+<GlaExt>"stdcall"		{ RETURN(STDCALL); }
+<GlaExt>"ccall"			{ RETURN(C_CALL); }
+<GlaExt>"pascal"	        { RETURN(PASCAL); }
 <GlaExt>"dynamic"	        { RETURN(DYNAMIC); }
 
 %{
@@ -426,6 +432,7 @@ NL  	    	    	[\n\r]
 <Code,GlaExt>"`"		{ RETURN(BQUOTE); }
 <Code,GlaExt>"_"		{ RETURN(WILDCARD); }
 
+<Code,GlaExt>"."		{ RETURN(DOT); }
 <Code,GlaExt>".."		{ RETURN(DOTDOT); }
 <Code,GlaExt,UserPragma>"::"	{ RETURN(DCOLON); }
 <Code,GlaExt,UserPragma>"="	{ RETURN(EQUAL); }

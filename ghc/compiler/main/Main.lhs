@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
@@ -8,45 +8,35 @@ module Main ( main ) where
 
 #include "HsVersions.h"
 
-import IO	( IOMode(..),
-		  hGetContents, hPutStr, hClose, openFile,
-		  stdin,stderr, hPutStrLn
-		)
+import IO	( IOMode(..), hPutStr, hClose, openFile, stderr	)
 import HsSyn
-import RdrHsSyn		( RdrName )
 import BasicTypes	( NewOrData(..) )
 
 import ReadPrefix	( rdModule )
 import Rename		( renameModule )
-import RnMonad		( ExportEnv )
 
 import MkIface		-- several functions
 import TcModule		( typecheckModule )
-import Desugar		( deSugar, pprDsWarnings )
+import Desugar		( deSugar )
 import SimplCore	( core2core )
 import CoreToStg	( topCoreBindsToStg )
-import StgSyn		( collectFinalStgBinders, pprStgBindings )
+import StgSyn		( collectFinalStgBinders, pprStgBindingsWithSRTs )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 #if ! OMIT_NATIVE_CODEGEN
 import AsmCodeGen	( dumpRealAsm, writeRealAsm )
 #endif
 
-import AbsCSyn		( absCNop, AbstractC )
+import AbsCSyn		( absCNop )
 import AbsCUtils	( flattenAbsC )
-import CoreUnfold	( Unfolding )
-import Bag		( emptyBag, isEmptyBag )
 import CmdLineOpts
-import ErrUtils		( pprBagOfErrors, ghcExit, doIfSet, dumpIfSet )
+import ErrUtils		( ghcExit, doIfSet, dumpIfSet )
 import Maybes		( maybeToBool, MaybeErr(..) )
-import StgSyn		( GenStgBinding )
-import TcInstUtil	( InstInfo )
 import TyCon		( isDataTyCon )
 import Class		( classTyCon )
 import UniqSupply	( mkSplitUniqSupply )
 
 import PprAbsC		( dumpRealC, writeRealC )
-import PprCore		( pprCoreBinding )
 import FiniteMap	( emptyFM )
 import Outputable
 import Char		( isSpace )
@@ -61,21 +51,18 @@ import NativeInfo       ( os, arch )
 
 \begin{code}
 main =
- _scc_ "main" 
- let
-    cmd_line_info = classifyOpts
- in
- doIt cmd_line_info
+ --  _scc_ "main" 
+ doIt classifyOpts
 \end{code}
 
 \begin{code}
 doIt :: ([CoreToDo], [StgToDo]) -> IO ()
 
-doIt (core_cmds, stg_cmds) =
-    doIfSet opt_Verbose 
-	(hPutStr stderr "Glasgow Haskell Compiler, version" >>
-	 hPutStr stderr compiler_version                    >>
-	 hPutStr stderr ", for Haskell 1.4\n")		    >>
+doIt (core_cmds, stg_cmds)
+  = doIfSet opt_Verbose 
+	(hPutStr stderr "Glasgow Haskell Compiler, version " 	>>
+ 	 hPutStr stderr compiler_version                    	>>
+	 hPutStr stderr ", for Haskell 1.4\n")			>>
 
     -- ******* READER
     show_pass "Reader"	>>
@@ -137,15 +124,17 @@ doIt (core_cmds, stg_cmds) =
 	Nothing -> ghcExit 1;	-- Type checker failed
 
 	Just (all_binds,
-	      local_tycons, local_classes, inst_info,
+	      local_tycons, local_classes, inst_info, 
 	      fo_decls,
-	      ddump_deriv) ->
+	      ddump_deriv,
+	      global_env,
+	      global_ids) ->
 
 
     -- ******* DESUGARER
-    show_pass "DeSugar"					>>
+    show_pass "DeSugar"					    >>
     _scc_     "DeSugar"
-    deSugar ds_uniqs mod_name all_binds	fo_decls	>>= \ (desugared, hc_code, h_code, c_code) ->
+    deSugar ds_uniqs global_env mod_name all_binds fo_decls >>= \ (desugared, h_code, c_code) ->
 
 
     -- ******* CORE-TO-CORE SIMPLIFICATION
@@ -155,7 +144,7 @@ doIt (core_cmds, stg_cmds) =
 	local_data_tycons = filter isDataTyCon local_tycons
     in
     core2core core_cmds mod_name
-	      sm_uniqs local_data_tycons desugared
+	      sm_uniqs desugared
 						>>=
 	 \ simplified ->
 
@@ -173,11 +162,12 @@ doIt (core_cmds, stg_cmds) =
 						>>=
 	\ (stg_binds2, cost_centre_info) ->
 
-    dumpIfSet opt_D_dump_stg "STG syntax:" (pprStgBindings stg_binds2)	>>
+    dumpIfSet opt_D_dump_stg "STG syntax:" 
+	(pprStgBindingsWithSRTs stg_binds2)	>>
 
 	-- Dump instance decls and type signatures into the interface file
     let
-	final_ids = collectFinalStgBinders stg_binds2
+	final_ids = collectFinalStgBinders (map fst stg_binds2)
     in
     _scc_     "Interface"
     ifaceDecls if_handle local_tycons local_classes inst_info final_ids simplified	>>
@@ -205,12 +195,6 @@ doIt (core_cmds, stg_cmds) =
 
     	flat_abstractC = flattenAbsC fl_uniqs abstractC
     in
-    dumpIfSet opt_D_dump_absC "Abstract C"
-	(dumpRealC abstractC hc_code)	 	>>
-
-    dumpIfSet opt_D_dump_flatC "Flat Abstract C"
-	(dumpRealC flat_abstractC hc_code)	>>
-
     show_pass "CodeOutput" 			>>
     _scc_     "CodeOutput"
     -- You can have C (c_output) or assembly-language (ncg_output),
@@ -225,9 +209,6 @@ doIt (core_cmds, stg_cmds) =
 	     (False, False) -> (absCNop, absCNop)
 	     (True,  True)  -> error "ERROR: Can't do both .hc and .s at the same time"
 
-	c_output_d = dumpRealC flat_absC_c hc_code
-	c_output_w = (\ f -> writeRealC f flat_absC_c hc_code)
-
         -- C stubs for "foreign export"ed functions.
 	stub_c_output_d = pprCode CStyle c_code
         stub_c_output_w = showSDoc stub_c_output_d
@@ -235,6 +216,9 @@ doIt (core_cmds, stg_cmds) =
         -- Header file protos for "foreign export"ed functions.
 	stub_h_output_d = pprCode CStyle h_code
         stub_h_output_w = showSDoc stub_h_output_d
+
+	c_output_d = dumpRealC flat_absC_c
+	c_output_w = (\ f -> writeRealC f flat_absC_c)
 
 #if OMIT_NATIVE_CODEGEN
 	ncg_output_d = error "*** GHC not built with a native-code generator ***"
@@ -248,14 +232,14 @@ doIt (core_cmds, stg_cmds) =
     dumpIfSet opt_D_dump_asm "Asm code" ncg_output_d 	>>
     doOutput opt_ProduceS ncg_output_w 			>>
 
-    dumpIfSet opt_D_dump_realC "Real C" c_output_d 	>>
-    doOutput opt_ProduceC c_output_w 			>>
-
     dumpIfSet opt_D_dump_foreign "Foreign export header file" stub_h_output_d >>
     outputHStub opt_ProduceExportHStubs stub_h_output_w	>>
 
     dumpIfSet opt_D_dump_foreign "Foreign export stubs" stub_c_output_d >>
     outputCStub mod_name opt_ProduceExportCStubs stub_c_output_w	>>
+
+    dumpIfSet opt_D_dump_realC "Real C" c_output_d 	>>
+    doOutput opt_ProduceC c_output_w 			>>
 
     reportCompile (_UNPK_ mod_name) (showSDoc (ppSourceStats True rdr_module)) >>
 
@@ -285,7 +269,7 @@ doIt (core_cmds, stg_cmds) =
     outputCStub mod_name switch doc_str
       = case switch of
 	  Nothing    -> return ()
-	  Just fname -> writeFile fname ("#include \"rtsdefs.h\"\n"++rest)
+	  Just fname -> writeFile fname ("#include \"Rts.h\"\n#include \"RtsAPI.h\"\n"++rest)
 	    where
 	     rest = "#include "++show ((_UNPK_ mod_name) ++ "_stub.h") ++ '\n':doc_str
 	      
@@ -293,7 +277,7 @@ doIt (core_cmds, stg_cmds) =
     outputHStub switch doc_str
       = case switch of
 	  Nothing    -> return ()
-	  Just fname -> writeFile fname ("#include \"rtsdefs.h\"\n"++doc_str)
+	  Just fname -> writeFile fname ("#include \"Rts.h\"\n"++doc_str)
 
 ppSourceStats short (HsModule name version exports imports fixities decls src_loc)
  = (if short then hcat else vcat)

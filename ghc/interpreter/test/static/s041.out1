@@ -1,0 +1,1 @@
+ERROR "test/static/s041.hs" (line 4): Definition of constructor function "True" clashes with import

@@ -1,0 +1,1 @@
+ERROR "test/static/s074.hs" (line 4): Repeated type declaration for "f"

@@ -1,0 +1,5 @@
+__interface RnSource 1 0 where
+__export RnSource rnHsSigType;
+1 rnHsSigType :: __forall [_a] => (Outputable.SDoc)
+			       -> RdrHsSyn.RdrNameHsType
+			       -> RnMonad.RnMS _a RnHsSyn.RenamedHsType ;

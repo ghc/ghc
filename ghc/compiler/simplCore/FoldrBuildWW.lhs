@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[FoldrBuildWW]{Spliting suitable functions into Workers and Wrappers}
 
@@ -8,9 +8,10 @@ module FoldrBuildWW ( mkFoldrBuildWW ) where
 
 #include "HsVersions.h"
 
-import CoreSyn		( CoreBinding )
+-- Just a stub for now
+import CoreSyn		( CoreBind )
 import UniqSupply	( UniqSupply )
-import Util		( panic{-ToDo:rm?-} )
+import Util		( panic )
 
 --import Type		( cloneTyVarFromTemplate, mkTyVarTy,
 --			  splitFunTyExpandingDicts, eqTyCon,  mkForallTy )
@@ -24,7 +25,7 @@ import Util		( panic{-ToDo:rm?-} )
 --			  foldrId, buildId
 --			)
 --import Id               ( getIdFBTypeInfo, mkWorkerId, getIdInfo,
---			  replaceIdInfo, mkSysLocal, idType
+--			  mkSysLocal, idType
 --			)
 --import IdInfo
 --import Maybes
@@ -35,8 +36,8 @@ import Util		( panic{-ToDo:rm?-} )
 \begin{code}
 mkFoldrBuildWW
 	:: UniqSupply
-	-> [CoreBinding]
-	-> [CoreBinding]
+	-> [CoreBind]
+	-> [CoreBind]
 
 mkFoldrBuildWW = panic "mkFoldrBuildWW (ToDo)"
 
@@ -144,15 +145,14 @@ try_split_bind id expr =
 
 	worker_ty = mkForallTy (templ  ++ [alphaTyVar])
 			(foldr mkFunTy n_ty_templ (arg_tys++[c_ty_templ,n_ty_templ]))
-	wrapper_id  = addInlinePragma id
+	wrapper_id  = setInlinePragma id IWantToBeINLINEd
 	worker_id  = mkWorkerId worker_new_uq id worker_ty
-				noIdInfo
 		-- TODO : CHECK if mkWorkerId is thr
 		-- right function to use ..
 	-- Now the bodies
 
-	c_id = mkSysLocal SLIT("fbww") c_new_uq c_ty noSrcLoc
-	n_id = mkSysLocal SLIT("fbww") n_new_uq n_ty noSrcLoc
+	c_id = mkSysLocal SLIT("fbww") c_new_uq c_ty
+	n_id = mkSysLocal SLIT("fbww") n_new_uq n_ty
 	worker_rhs
 	  = mkTyLam [] (big_args ++ [alphaTyVar]) (args++[c_id,n_id]) worker_body
 			

@@ -22,7 +22,7 @@ randomIO :: (Integer, Integer) -> IO [Integer]
 randomIO lh = do
     ct          <- getCPUTime
     (TOD sec _) <- getClockTime
-    return (random lh (sec * 12345 + ct))
+    return (random lh (toInteger sec * 12345 + ct))
 
 random :: (Integer, Integer) -> Integer -> [Integer]
 random (l, h) s =

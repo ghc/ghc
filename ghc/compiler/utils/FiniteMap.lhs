@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[FiniteMap]{An implementation of finite maps}
 
@@ -59,7 +59,7 @@ module FiniteMap (
 #define OUTPUTABLE_key {--}
 #endif
 
-import {-# SOURCE #-} Name
+import {-# SOURCE #-} Name ( Name )
 import GlaExts
 import FastString
 import Maybes

@@ -1,0 +1,1 @@
+ERROR "test/typechecker/t009.hs" (line 3): Sorry, no type variables are allowed in pattern binding type annotations

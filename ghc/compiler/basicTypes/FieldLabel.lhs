@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[FieldLabel]{The @FieldLabel@ type}
 
@@ -8,9 +8,9 @@ module FieldLabel where
 
 #include "HsVersions.h"
 
-import Name		( Name{-instance Eq/Outputable-}, NamedThing(..), nameUnique )
-import Type		( Type )
+import {-# SOURCE #-}	Type( Type )	-- FieldLabel is compiled very early
 
+import Name		( Name{-instance Eq/Outputable-}, NamedThing(..), nameUnique )
 import Outputable
 import Unique           ( Uniquable(..) )
 \end{code}
@@ -54,5 +54,5 @@ instance NamedThing FieldLabel where
     getName (FieldLabel n _ _) = n
 
 instance Uniquable FieldLabel where
-    uniqueOf (FieldLabel n _ _) = nameUnique n
+    getUnique (FieldLabel n _ _) = nameUnique n
 \end{code}

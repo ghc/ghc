@@ -5,7 +5,8 @@
 #include "config.h"
 
 #if HAVE_READLINE_READLINE_H
-#include "readline/readline.h"
+#include <readline/readline.h>
+#include <readline/history.h>
 #endif
 
 /* For some reason the following 3 aren't defined in readline.h */
@@ -17,7 +18,7 @@ extern int rl_pending_input;
 /* Our C Hackery stuff for Callbacks */
 typedef I_ KeyCode;
 extern StgStablePtr cbackList;
-I_ genericRlCback PROTO((I_, I_));
+I_ genericRlCback (I_, I_);
 extern StgStablePtr haskellRlEntry;
 extern I_ current_narg, rl_return;
 extern KeyCode current_kc;

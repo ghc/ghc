@@ -6,20 +6,27 @@
 
 \begin{code}
 module Addr 
-	( module PrelAddr
+	( Addr
+
+	, module Addr
+#ifndef __HUGS__
 	, module Word
 	, module Int
-	, module Addr 
-	
+	, module PrelAddr 
+#endif
+
         -- (non-standard) coercions
 	, addrToInt		-- :: Addr -> Int  
 	, intToAddr		-- :: Int  -> Addr
 	    
 	) where
 
+#ifdef __HUGS__
+import PreludeBuiltin
+#else
 import PrelAddr
-import PrelCCall  ( Word(..) )
 import PrelBase
+import PrelIOBase ( IO(..) )
 import Word	( indexWord8OffAddr,  indexWord16OffAddr
 		, indexWord32OffAddr, indexWord64OffAddr
 		, readWord8OffAddr,   readWord16OffAddr
@@ -35,10 +42,6 @@ import Int	( indexInt8OffAddr,  indexInt16OffAddr
 		, writeInt8OffAddr,  writeInt16OffAddr
 		, writeInt32OffAddr, writeInt64OffAddr
 		)
-import PrelIOBase ( IO(..), IOResult(..) )
-
-#ifndef __PARALLEL_HASKELL__
-import PrelForeign ( ForeignObj(..), StablePtr(..) )
 #endif
 
 \end{code}
@@ -47,10 +50,15 @@ Coercing between machine ints and words
 
 \begin{code}
 addrToInt :: Addr -> Int
-addrToInt (A# a#) = I# (addr2Int# a#)
-
 intToAddr :: Int -> Addr
+
+#ifdef __HUGS__
+addrToInt = primAddrToInt
+intToAddr = primIntToAddr
+#else
+addrToInt (A# a#) = I# (addr2Int# a#)
 intToAddr (I# i#) = A# (int2Addr# i#)
+#endif
 \end{code}
 
 Indexing immutable memory:
@@ -63,6 +71,14 @@ indexWordOffAddr   :: Addr -> Int -> Word
 indexFloatOffAddr  :: Addr -> Int -> Float
 indexDoubleOffAddr :: Addr -> Int -> Double
 
+#ifdef __HUGS__
+indexCharOffAddr   = primIndexCharOffAddr  
+indexIntOffAddr    = primIndexIntOffAddr   
+indexWordOffAddr   = primIndexWordOffAddr  
+indexAddrOffAddr   = primIndexAddrOffAddr  
+indexFloatOffAddr  = primIndexFloatOffAddr 
+indexDoubleOffAddr = primIndexDoubleOffAddr
+#else
 indexCharOffAddr (A# addr#) n
   = case n  	    		    	of { I# n# ->
     case indexCharOffAddr# addr# n# 	of { r# ->
@@ -87,67 +103,69 @@ indexDoubleOffAddr (A# addr#) n
   = case n  	    	 	    	of { I# n# ->
     case indexDoubleOffAddr# addr# n# 	of { r# ->
     (D# r#)}}
+#endif
 \end{code}
 
 Indexing mutable memory:
 
 \begin{code}
 readCharOffAddr    :: Addr -> Int -> IO Char
-readCharOffAddr a i = _casm_ `` %r=(StgChar)(((StgChar*)%0)[(StgInt)%1]); '' a i
-
-readIntOffAddr    :: Addr -> Int -> IO Int
-readIntOffAddr a i = _casm_ `` %r=(StgInt)(((StgInt*)%0)[(StgInt)%1]); '' a i
-
-readStablePtrOffAddr    :: Addr -> Int -> IO (StablePtr a)
-readStablePtrOffAddr a i = _casm_ `` %r=(StgStablePtr)(((StgStablePtr*)%0)[(StgInt)%1]); '' a i
-
+readIntOffAddr     :: Addr -> Int -> IO Int
 readWordOffAddr    :: Addr -> Int -> IO Word
-readWordOffAddr a i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' a i
-
 readAddrOffAddr    :: Addr -> Int -> IO Addr
-readAddrOffAddr a i = _casm_ `` %r=(StgAddr)(((StgAddr*)%0)[(StgInt)%1]); '' a i
-
-readFloatOffAddr    :: Addr -> Int -> IO Float
-readFloatOffAddr a i = _casm_ `` %r=(StgFloat)(((StgFloat*)%0)[(StgInt)%1]); '' a i
-
+readFloatOffAddr   :: Addr -> Int -> IO Float
 readDoubleOffAddr  :: Addr -> Int -> IO Double
+
+#ifdef __HUGS__
+readCharOffAddr    = primReadCharOffAddr  
+readIntOffAddr     = primReadIntOffAddr   
+readWordOffAddr    = primReadWordOffAddr  
+readAddrOffAddr    = primReadAddrOffAddr  
+readFloatOffAddr   = primReadFloatOffAddr 
+readDoubleOffAddr  = primReadDoubleOffAddr
+#else
+readCharOffAddr   a i = _casm_ `` %r=(StgChar)(((StgChar*)%0)[(StgInt)%1]); '' a i
+readIntOffAddr    a i = _casm_ `` %r=(StgInt)(((StgInt*)%0)[(StgInt)%1]); '' a i
+readWordOffAddr   a i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' a i
+readAddrOffAddr   a i = _casm_ `` %r=(StgAddr)(((StgAddr*)%0)[(StgInt)%1]); '' a i
+readFloatOffAddr  a i = _casm_ `` %r=(StgFloat)(((StgFloat*)%0)[(StgInt)%1]); '' a i
 readDoubleOffAddr a i = _casm_ `` %r=(StgDouble)(((StgDouble*)%0)[(StgInt)%1]); '' a i
+#endif
 \end{code}
 
 
 \begin{code}
 writeCharOffAddr   :: Addr -> Int -> Char   -> IO ()
-writeCharOffAddr (A# a#) (I# i#) (C# c#) = IO $ \ s# ->
-      case (writeCharOffAddr#  a# i# c# s#) of s2# -> IOok s2# () 
-
 writeIntOffAddr    :: Addr -> Int -> Int    -> IO ()
-writeIntOffAddr (A# a#) (I# i#) (I# e#) = IO $ \ s# ->
-      case (writeIntOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
-
-writeStablePtrOffAddr    :: Addr -> Int -> StablePtr a -> IO ()
-writeStablePtrOffAddr (A# a#) (I# i#) (StablePtr e#) = IO $ \ s# ->
-      case (writeStablePtrOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
-
-writeWordOffAddr    :: Addr -> Int -> Word  -> IO ()
-writeWordOffAddr (A# a#) (I# i#) (W# e#) = IO $ \ s# ->
-      case (writeWordOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
-
+writeWordOffAddr   :: Addr -> Int -> Word  -> IO ()
 writeAddrOffAddr   :: Addr -> Int -> Addr   -> IO ()
-writeAddrOffAddr (A# a#) (I# i#) (A# e#) = IO $ \ s# ->
-      case (writeAddrOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
-
-#ifndef __PARALLEL_HASKELL__
-writeForeignObjOffAddr   :: Addr -> Int -> ForeignObj -> IO ()
-writeForeignObjOffAddr (A# a#) (I# i#) (ForeignObj e#) = IO $ \ s# ->
-      case (writeForeignObjOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
-#endif
-
 writeFloatOffAddr  :: Addr -> Int -> Float  -> IO ()
-writeFloatOffAddr (A# a#) (I# i#) (F# e#) = IO $ \ s# ->
-      case (writeFloatOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
-
 writeDoubleOffAddr :: Addr -> Int -> Double -> IO ()
-writeDoubleOffAddr (A# a#) (I# i#) (D# e#) = IO $ \ s# ->
-      case (writeDoubleOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
 
+#ifdef __HUGS__
+writeCharOffAddr    = primWriteCharOffAddr  
+writeIntOffAddr     = primWriteIntOffAddr   
+writeWordOffAddr    = primWriteWordOffAddr  
+writeAddrOffAddr    = primWriteAddrOffAddr  
+writeFloatOffAddr   = primWriteFloatOffAddr 
+writeDoubleOffAddr  = primWriteDoubleOffAddr
+#else
+writeCharOffAddr (A# a#) (I# i#) (C# c#) = IO $ \ s# ->
+      case (writeCharOffAddr#  a# i# c# s#) of s2# -> (# s2#, () #)
+
+writeIntOffAddr (A# a#) (I# i#) (I# e#) = IO $ \ s# ->
+      case (writeIntOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
+
+writeWordOffAddr (A# a#) (I# i#) (W# e#) = IO $ \ s# ->
+      case (writeWordOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
+
+writeAddrOffAddr (A# a#) (I# i#) (A# e#) = IO $ \ s# ->
+      case (writeAddrOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
+
+writeFloatOffAddr (A# a#) (I# i#) (F# e#) = IO $ \ s# ->
+      case (writeFloatOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
+
+writeDoubleOffAddr (A# a#) (I# i#) (D# e#) = IO $ \ s# ->
+      case (writeDoubleOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
+#endif
 \end{code}

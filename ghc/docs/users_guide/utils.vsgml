@@ -192,7 +192,7 @@ Haskell, called @happy@.<nidx>happy parser generator</nidx> @Happy@
 is to Haskell what @Yacc@ is to C.
 
 You can get @happy@ by FTP from @ftp.dcs.gla.ac.uk@ in
-@pub/haskell/happy@, the file @happy-0.8.tar.gz@.
+@pub/haskell/happy@, the file @happy-1.5-src.tar.gz@.
 
 @Happy@ is at its shining best when compiled by GHC.
 

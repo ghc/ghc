@@ -1,42 +1,35 @@
-
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Main_match]{The @match@ function}
 
 \begin{code}
-module Match ( match, matchExport, matchWrapper, matchSimply ) where
+module Match ( match, matchExport, matchWrapper, matchSimply, matchSinglePat ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr  ( dsExpr  )
-import {-# SOURCE #-} DsBinds ( dsBinds )
+import {-# SOURCE #-} DsExpr  ( dsExpr, dsLet  )
 
 import CmdLineOpts	( opt_WarnIncompletePatterns, opt_WarnOverlappingPatterns,
 			  opt_WarnSimplePatterns
      			)
 import HsSyn		
-import TcHsSyn		( TypecheckedPat, TypecheckedMatch,
-			  TypecheckedHsBinds, TypecheckedHsExpr	)
+import TcHsSyn		( TypecheckedPat, TypecheckedMatch )
 import DsHsSyn		( outPatType )
-import Check            ( check, ExhaustivePat, WarningPat, BoxedString )
+import Check            ( check, ExhaustivePat )
 import CoreSyn
 import CoreUtils	( coreExprType )
 import DsMonad
 import DsGRHSs		( dsGRHSs )
 import DsUtils
-import Id		( idType, dataConFieldLabels,
-			  dataConArgTys, recordSelectorFieldLabel,
-			  Id
-			)
+import Id		( idType, recordSelectorFieldLabel, Id )
+import DataCon		( dataConFieldLabels, dataConArgTys )
 import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
-import Name		( Name {--O only-} )
 import PrelVals		( pAT_ERROR_ID )
-import Type		( isUnpointedType, splitAlgTyConApp,
+import Type		( isUnLiftedType, splitAlgTyConApp,
 			  Type
 			)
-import TyVar		( TyVar )
 import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy,
 			  addrPrimTy, wordPrimTy
 			)
@@ -44,7 +37,8 @@ import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  charTy, charDataCon, intTy, intDataCon,
 			  floatTy, floatDataCon, doubleTy, tupleCon,
 			  doubleDataCon, addrTy,
-			  addrDataCon, wordTy, wordDataCon
+			  addrDataCon, wordTy, wordDataCon,
+			  mkUnboxedTupleTy, unboxedTupleCon
 			)
 import UniqSet
 import Outputable
@@ -62,7 +56,7 @@ matchExport :: [Id]	        -- Vars rep'ing the exprs we're matching with
             -> [EquationInfo]   -- Info about patterns, etc. (type synonym below)
             -> DsM MatchResult  -- Desugared result!
 
-matchExport vars qs@((EqnInfo _ ctx _ (MatchResult _ _ _)) : _)
+matchExport vars qs@((EqnInfo _ ctx _ (MatchResult _ _)) : _)
   | incomplete && shadow = 
       dsShadowWarn ctx eqns_shadow		`thenDs`   \ () ->
       dsIncompleteWarn ctx pats			`thenDs`   \ () ->
@@ -176,7 +170,6 @@ ppr_incomplete_pats kind (pats,constraints) =
 ppr_constraint (var,pats) = sep [ppr var, ptext SLIT("`not_elem`"), ppr pats]
 
 ppr_eqn kind (EqnInfo _ _ pats _) = ppr_shadow_pats kind pats
-
 \end{code}
 
 
@@ -289,10 +282,11 @@ match [] eqns_info
     complete_matches (eqn:eqns)
 	= complete_match eqn		`thenDs` \ match_result1 ->
 	  complete_matches eqns 	`thenDs` \ match_result2 ->
-	  combineMatchResults match_result1 match_result2
+	  returnDs (combineMatchResults match_result1 match_result2)
 
-    complete_match (EqnInfo _ _ [] match_result@(MatchResult _ _ _))
-	= returnDs match_result
+    complete_match (EqnInfo _ _ pats match_result)
+	= ASSERT( null pats )
+	  returnDs match_result
 \end{code}
 
 %************************************************************************
@@ -349,7 +343,7 @@ match vars@(v:vs) eqns_info
     match_unmixed_eqn_blks vars (eqn_blk:eqn_blks) 
       = matchUnmixedEqns vars eqn_blk    	`thenDs` \ match_result1 ->  -- try to match with first blk
 	match_unmixed_eqn_blks vars eqn_blks 	`thenDs` \ match_result2 ->
-	combineMatchResults match_result1 match_result2
+	returnDs (combineMatchResults match_result1 match_result2)
 \end{code}
 
 Tidy up the leftmost pattern in an @EquationInfo@, given the variable @v@
@@ -404,17 +398,16 @@ tidy1 :: Id 					-- The Id being scrutinised
 						-- of new bindings to be added to the front
 
 tidy1 v (VarPat var) match_result
-  = returnDs (WildPat (idType var),
-	      mkCoLetsMatchResult extra_binds match_result)
+  = returnDs (WildPat (idType var), match_result')
   where
-    extra_binds | v == var  = []
-		| otherwise = [NonRec var (Var v)]
+    match_result' | v == var  = match_result
+		  | otherwise = adjustMatchResult (bindNonRec var (Var v)) match_result
 
 tidy1 v (AsPat var pat) match_result
-  = tidy1 v pat (mkCoLetsMatchResult extra_binds match_result)
+  = tidy1 v pat match_result'
   where
-    extra_binds | v == var  = []
-		| otherwise = [NonRec var (Var v)]
+    match_result' | v == var  = match_result
+		  | otherwise = adjustMatchResult (bindNonRec var (Var v)) match_result
 
 tidy1 v (WildPat ty) match_result
   = returnDs (WildPat ty, match_result)
@@ -437,18 +430,15 @@ tidy1 v (LazyPat pat) match_result
 
 -- re-express <con-something> as (ConPat ...) [directly]
 
-tidy1 v (ConOpPat pat1 id pat2 ty) match_result
-  = returnDs (ConPat id ty [pat1, pat2], match_result)
-
-tidy1 v (RecPat con_id pat_ty rpats) match_result
-  = returnDs (ConPat con_id pat_ty pats, match_result)
+tidy1 v (RecPat data_con pat_ty tvs dicts rpats) match_result
+  = returnDs (ConPat data_con pat_ty tvs dicts pats, match_result)
   where
     pats 	     = map mk_pat tagged_arg_tys
 
 	-- Boring stuff to find the arg-tys of the constructor
     (_, inst_tys, _) = splitAlgTyConApp pat_ty
-    con_arg_tys'     = dataConArgTys con_id inst_tys 
-    tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels con_id)
+    con_arg_tys'     = dataConArgTys data_con inst_tys 
+    tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels data_con)
 
 	-- mk_pat picks a WildPat of the appropriate type for absent fields,
 	-- and the specified pattern for present fields
@@ -464,24 +454,33 @@ tidy1 v (ListPat ty pats) match_result
   where
     list_ty = mkListTy ty
     list_ConPat
-      = foldr (\ x -> \y -> ConPat consDataCon list_ty [x, y])
-	      (ConPat nilDataCon  list_ty [])
+      = foldr (\ x -> \y -> ConPat consDataCon list_ty [] [] [x, y])
+	      (ConPat nilDataCon  list_ty [] [] [])
 	      pats
 
-tidy1 v (TuplePat pats) match_result
+tidy1 v (TuplePat pats True{-boxed-}) match_result
   = returnDs (tuple_ConPat, match_result)
   where
     arity = length pats
     tuple_ConPat
       = ConPat (tupleCon arity)
-	       (mkTupleTy arity (map outPatType pats))
+	       (mkTupleTy arity (map outPatType pats)) [] [] 
+	       pats
+
+tidy1 v (TuplePat pats False{-unboxed-}) match_result
+  = returnDs (tuple_ConPat, match_result)
+  where
+    arity = length pats
+    tuple_ConPat
+      = ConPat (unboxedTupleCon arity)
+	       (mkUnboxedTupleTy arity (map outPatType pats)) [] [] 
 	       pats
 
 tidy1 v (DictPat dicts methods) match_result
   = case num_of_d_and_ms of
-	0 -> tidy1 v (TuplePat []) match_result
+	0 -> tidy1 v (TuplePat [] True) match_result
 	1 -> tidy1 v (head dict_and_method_pats) match_result
-	_ -> tidy1 v (TuplePat dict_and_method_pats) match_result
+	_ -> tidy1 v (TuplePat dict_and_method_pats True) match_result
   where
     num_of_d_and_ms	 = length dicts + length methods
     dict_and_method_pats = map VarPat (dicts ++ methods)
@@ -492,11 +491,11 @@ tidy1 v (DictPat dicts methods) match_result
 -- LitPats: the desugarer only sees these at well-known types
 
 tidy1 v pat@(LitPat lit lit_ty) match_result
-  | isUnpointedType lit_ty
+  | isUnLiftedType lit_ty
   = returnDs (pat, match_result)
 
   | lit_ty == charTy
-  = returnDs (ConPat charDataCon charTy [LitPat (mk_char lit) charPrimTy],
+  = returnDs (ConPat charDataCon charTy [] [] [LitPat (mk_char lit) charPrimTy],
 	      match_result)
 
   | otherwise = pprPanic "tidy1:LitPat:" (ppr pat)
@@ -510,15 +509,15 @@ tidy1 v pat@(NPat lit lit_ty _) match_result
   = returnDs (better_pat, match_result)
   where
     better_pat
-      | lit_ty == charTy   = ConPat charDataCon   lit_ty [LitPat (mk_char lit)   charPrimTy]
-      | lit_ty == intTy    = ConPat intDataCon    lit_ty [LitPat (mk_int lit)    intPrimTy]
-      | lit_ty == wordTy   = ConPat wordDataCon   lit_ty [LitPat (mk_word lit)   wordPrimTy]
-      | lit_ty == addrTy   = ConPat addrDataCon   lit_ty [LitPat (mk_addr lit)   addrPrimTy]
-      | lit_ty == floatTy  = ConPat floatDataCon  lit_ty [LitPat (mk_float lit)  floatPrimTy]
-      | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
+      | lit_ty == charTy   = ConPat charDataCon   lit_ty [] [] [LitPat (mk_char lit)   charPrimTy]
+      | lit_ty == intTy    = ConPat intDataCon    lit_ty [] [] [LitPat (mk_int lit)    intPrimTy]
+      | lit_ty == wordTy   = ConPat wordDataCon   lit_ty [] [] [LitPat (mk_word lit)   wordPrimTy]
+      | lit_ty == addrTy   = ConPat addrDataCon   lit_ty [] [] [LitPat (mk_addr lit)   addrPrimTy]
+      | lit_ty == floatTy  = ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
+      | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
 
 		-- Convert the literal pattern "" to the constructor pattern [].
-      | null_str_lit lit       = ConPat nilDataCon    lit_ty [] 
+      | null_str_lit lit       = ConPat nilDataCon lit_ty [] [] [] 
 
       | otherwise	   = pat
 
@@ -726,10 +725,10 @@ matchWrapper kind [(PatMatch (WildPat ty) match)] error_string
     returnDs (var:vars, core_expr)
 
 matchWrapper kind [(GRHSMatch
-		     (GRHSsAndBindsOut [GRHS [] expr _] binds _))] error_string
-  = dsBinds False{-don't auto-scc-} binds            `thenDs` \ core_binds ->
-    dsExpr  expr	                             `thenDs` \ core_expr ->
-    returnDs ([], mkCoLetsAny core_binds core_expr)
+		     (GRHSsAndBindsOut [GRHS [ExprStmt expr _]] binds _))] error_string
+  = dsExpr expr			`thenDs` \ core_expr ->
+    dsLet binds core_expr 	`thenDs` \ rhs ->
+    returnDs ([], rhs)
 \end{old_code}
 
  And all the rest... (general case)
@@ -752,15 +751,15 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
  
 \begin{code}
-
 matchWrapper kind matches error_string
-  = flattenMatches kind 1 matches	`thenDs` \ eqns_info@(EqnInfo _ _ arg_pats (MatchResult _ result_ty _) : _) ->
-
-    selectMatchVars arg_pats				`thenDs` \ new_vars ->
+  = flattenMatches kind matches				`thenDs` \ (result_ty, eqns_info) ->
+    let
+	EqnInfo _ _ arg_pats _ : _ = eqns_info
+    in
+    mapDs selectMatchVar arg_pats			`thenDs` \ new_vars ->
     match_fun new_vars eqns_info 		 	`thenDs` \ match_result ->
 
     mkErrorAppDs pAT_ERROR_ID result_ty error_string	`thenDs` \ fail_expr ->
-
     extractMatchResult match_result fail_expr		`thenDs` \ result_expr ->
     returnDs (new_vars, result_expr)
   where match_fun = case kind of 
@@ -783,37 +782,33 @@ pattern. It returns an expression.
 matchSimply :: CoreExpr			-- Scrutinee
 	    -> DsMatchKind              -- Match kind
 	    -> TypecheckedPat		-- Pattern it should match
-	    -> Type			-- Type of result
 	    -> CoreExpr			-- Return this if it matches
-	    -> CoreExpr			-- Return this if it does
+	    -> CoreExpr			-- Return this if it doesn't
 	    -> DsM CoreExpr
 
-matchSimply (Var var) kind pat result_ty result_expr fail_expr
+matchSimply scrut kind pat result_expr fail_expr
   = getSrcLocDs				        `thenDs` \ locn ->
     let
-      ctx = DsMatchContext kind [pat] locn
-      eqn_info = EqnInfo 1 ctx [pat] initial_match_result
+      ctx 	   = DsMatchContext kind [pat] locn
+      match_result = cantFailMatchResult result_expr
     in 
-      match_fun [var] [eqn_info]	        `thenDs` \ match_result ->
-      extractMatchResult match_result fail_expr
+    matchSinglePat scrut ctx pat match_result	`thenDs` \ match_result' ->
+    extractMatchResult match_result' fail_expr
+
+
+matchSinglePat :: CoreExpr -> DsMatchContext -> TypecheckedPat
+	       -> MatchResult -> DsM MatchResult
+
+matchSinglePat (Var var) ctx pat match_result
+  = match_fn [var] [EqnInfo 1 ctx [pat] match_result]
   where
-    initial_match_result = MatchResult CantFail result_ty (\ ignore -> result_expr)
-    match_fun = if opt_WarnSimplePatterns 
-                  then matchExport
-                  else match
+    match_fn | opt_WarnSimplePatterns = matchExport
+	     | otherwise	      = match
 
-matchSimply scrut_expr kind pat result_ty result_expr msg
-  = newSysLocalDs (outPatType pat) 	        			`thenDs` \ scrut_var ->
-    matchSimply (Var scrut_var) kind pat result_ty result_expr msg	`thenDs` \ expr ->
-    returnDs (Let (NonRec scrut_var scrut_expr) expr)
-
-
-extractMatchResult (MatchResult CantFail _ match_fn) fail_expr
-  = returnDs (match_fn (error "It can't fail!"))
-
-extractMatchResult (MatchResult CanFail result_ty match_fn) fail_expr
-  = mkFailurePair result_ty	 	`thenDs` \ (fail_bind_fn, if_it_fails) ->
-    returnDs (Let (fail_bind_fn fail_expr) (match_fn if_it_fails))
+matchSinglePat scrut ctx pat match_result
+  = selectMatchVar pat		 	 		`thenDs` \ var ->
+    matchSinglePat (Var var) ctx pat match_result	`thenDs` \ match_result' ->
+    returnDs (adjustMatchResult (bindNonRec var scrut) match_result')
 \end{code}
 
 %************************************************************************
@@ -821,6 +816,7 @@ extractMatchResult (MatchResult CanFail result_ty match_fn) fail_expr
 %*  flattenMatches : create a list of EquationInfo			*
 %*									*
 %************************************************************************
+
 \subsection[flattenMatches]{@flattenMatches@: create @[EquationInfo]@}
 
 This is actually local to @matchWrapper@.
@@ -828,44 +824,42 @@ This is actually local to @matchWrapper@.
 \begin{code}
 flattenMatches
 	:: DsMatchKind
-        -> EqnNo
 	-> [TypecheckedMatch]
-	-> DsM [EquationInfo]
+	-> DsM (Type, [EquationInfo])
 
-flattenMatches kind n [] = returnDs []
-
-flattenMatches kind n (match : matches)
-  = flatten_match [] n match	`thenDs` \ eqn_info ->
-    flattenMatches kind (n+1) matches	`thenDs` \ eqn_infos ->
-    returnDs (eqn_info : eqn_infos)
+flattenMatches kind matches
+  = mapAndUnzipDs flatten_match (matches `zip` [1..])	`thenDs` \ (result_tys, eqn_infos) ->
+    let
+	result_ty = head result_tys
+    in
+    ASSERT( all (== result_ty) result_tys )
+    returnDs (result_ty, eqn_infos)
   where
-    flatten_match :: [TypecheckedPat] 		-- Reversed list of patterns encountered so far
-                  -> EqnNo
-		  -> TypecheckedMatch
-		  -> DsM EquationInfo
+    flatten_match (match, eqn_no) = flatten_match_help [] match eqn_no
 
-    flatten_match pats_so_far n (PatMatch pat match)
-      = flatten_match (pat:pats_so_far) n match
+    flatten_match_help :: [TypecheckedPat] 	-- Reversed list of patterns encountered so far
+		       -> TypecheckedMatch
+                       -> EqnNo
+		       -> DsM (Type, EquationInfo)
 
-    flatten_match pats_so_far n (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
-      = dsBinds False{-don't auto-scc-} binds	`thenDs` \ core_binds ->
-	dsGRHSs ty kind pats grhss 		`thenDs` \ match_result ->
+    flatten_match_help pats_so_far (PatMatch pat match) n
+      = flatten_match_help (pat:pats_so_far) match n
+
+    flatten_match_help pats_so_far (GRHSMatch (GRHSsAndBindsOut grhss binds ty)) n
+      = dsGRHSs kind pats grhss 		`thenDs` \ match_result ->
         getSrcLocDs				`thenDs` \ locn ->
-	returnDs (EqnInfo n (DsMatchContext kind pats locn) pats 
-                  (mkCoLetsMatchResult core_binds match_result))
+	returnDs (ty, EqnInfo n (DsMatchContext kind pats locn) pats 
+                  	        (adjustMatchResultDs (dsLet binds) match_result))
+		-- NB: nested dsLet inside matchResult
       where
 	pats = reverse pats_so_far	-- They've accumulated in reverse order
 
-    flatten_match pats_so_far n (SimpleMatch expr) 
+    flatten_match_help pats_so_far (SimpleMatch expr) n
       = dsExpr expr		`thenDs` \ core_expr ->
 	getSrcLocDs		`thenDs` \ locn ->
-	returnDs (EqnInfo n (DsMatchContext kind pats locn) pats
-		    (MatchResult CantFail (coreExprType core_expr) 
-			      (\ ignore -> core_expr)))
-
-	 -- the matching can't fail, so we won't generate an error message.
+	returnDs (coreExprType core_expr,
+		  EqnInfo n (DsMatchContext kind pats locn) pats
+			    (cantFailMatchResult core_expr))
         where
 	 pats = reverse pats_so_far	-- They've accumulated in reverse order
-
 \end{code}
-

@@ -1,0 +1,2 @@
+ERROR "test/static/s111.hs" (line 5): No constructor has all of the fields specified in T{x = a, y = b, z = c}
+

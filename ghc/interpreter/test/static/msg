@@ -1,0 +1,8 @@
+----------------------------------------------------------------
+-- Testing syntax checking, static checking and modules.
+-- This group of checks will produce about 100 lines of output of the form
+-- 
+-- --!!! <description of feature being tested>
+-- 
+-- You should report a problem if any other output is generated.
+----------------------------------------------------------------"

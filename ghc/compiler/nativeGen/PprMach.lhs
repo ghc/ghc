@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[PprMach]{Pretty-printing assembly language}
 
@@ -17,12 +17,10 @@ module PprMach ( pprInstr ) where
 import MachRegs		-- may differ per-platform
 import MachMisc
 
-import AbsCSyn		( MagicId )
 import CLabel		( pprCLabel_asm, externallyVisibleCLabel )
 import CStrings		( charToC )
 import Maybes		( maybeToBool )
-import OrdList		( OrdList )
-import Stix		( CodeSegment(..), StixTree )
+import Stix		( CodeSegment(..) )
 import Char		( isPrint, isDigit )
 import Outputable
 \end{code}
@@ -291,6 +289,7 @@ pprImm :: Imm -> SDoc
 pprImm (ImmInt i)     = int i
 pprImm (ImmInteger i) = integer i
 pprImm (ImmCLbl l)    = pprCLabel_asm l
+pprImm (ImmIndex l i) = pprCLabel_asm l <> char '+' <> int i
 pprImm (ImmLit s)     = s
 
 pprImm (ImmLab s) | underscorePrefix = (<>) (char '_') s
@@ -469,7 +468,7 @@ pprInstr (DATA s xs)
 --UNUSED:   HB -> SLIT("\t.byte\t")
 --UNUSED:   S  -> SLIT("\t.word\t")
 	    L  -> SLIT("\t.long\t")
-	    F  -> SLIT("\t.long\t")
+	    F  -> SLIT("\t.float\t")
     	    DF -> SLIT("\t.double\t")
 #endif
 #if sparc_TARGET_ARCH

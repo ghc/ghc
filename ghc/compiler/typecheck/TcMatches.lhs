@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcMatches]{Typecheck some @Matches@}
 
@@ -10,26 +10,28 @@ module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchExpected ) where
 
 import {-# SOURCE #-} TcGRHSs ( tcGRHSsAndBinds )
 
-import HsSyn		( HsBinds(..), Match(..), GRHSsAndBinds(..), GRHS(..),
-			  HsExpr, MonoBinds(..),
-			  collectPatBinders, pprMatch, getMatchLoc
+import HsSyn		( HsBinds(..), Match(..), GRHSsAndBinds(..),
+			  MonoBinds(..), StmtCtxt(..),
+			  pprMatch, getMatchLoc
 			)
 import RnHsSyn		( RenamedMatch )
-import TcHsSyn		( TcIdBndr, TcMatch )
+import TcHsSyn		( TcMatch )
 
 import TcMonad
-import Inst		( Inst, LIE, plusLIE )
-import TcEnv		( TcIdOcc(..), newMonoIds )
+import TcMonoType	( checkSigTyVars, noSigs, existentialPatCtxt )
+import Inst		( Inst, LIE, plusLIE, emptyLIE )
+import TcEnv		( tcExtendEnvWithPat, tcExtendGlobalTyVars )
 import TcPat		( tcPat )
-import TcType		( TcType, TcMaybe, zonkTcType, newTyVarTy )
-import TcSimplify	( bindInstsOfLocalFuns )
-import Unify		( unifyTauTy, unifyFunTy )
-import Name		( Name {- instance Outputable -} )
+import TcType		( TcType, newTyVarTy )
+import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
+import TcUnify		( unifyFunTy )
+import Name		( Name )
 
-import Kind		( Kind, mkTypeKind )
 import BasicTypes	( RecFlag(..) )
-import Type		( isTauTy, mkFunTy )
+import Type		( Kind, tyVarsOfType, isTauTy, mkFunTy, openTypeKind )
+import VarSet
 import Util
+import Bag
 import Outputable
 import SrcLoc           (SrcLoc)
 \end{code}
@@ -62,9 +64,8 @@ tcMatchesFun fun_name expected_ty matches@(first_match:_)
 	-- because inconsistency between branches
 	-- may show up as something wrong with the (non-existent) type signature
 
-	-- We need to substitute so that we can see as much about the type as possible
-    zonkTcType expected_ty		`thenNF_Tc` \ expected_ty' ->
-    tcMatchesExpected expected_ty' (MFun fun_name) matches
+	-- No need to zonk expected_ty, because unifyFunTy does that on the fly
+    tcMatchesExpected matches expected_ty (FunRhs fun_name)
 
     )
   where
@@ -85,80 +86,97 @@ tcMatchesCase :: TcType s 		-- Type of whole case expressions
 			LIE s)
 
 tcMatchesCase expr_ty matches
-  = newTyVarTy mkTypeKind 					`thenNF_Tc` \ scrut_ty ->
-    tcMatchesExpected (mkFunTy scrut_ty expr_ty) MCase matches	`thenTc` \ (matches', lie) ->
+  = newTyVarTy openTypeKind 					`thenNF_Tc` \ scrut_ty ->
+    tcMatchesExpected matches (mkFunTy scrut_ty expr_ty) CaseAlt `thenTc` \ (matches', lie) ->
     returnTc (scrut_ty, matches', lie)
 \end{code}
 
 
 \begin{code}
-data FunOrCase = MCase | MFun Name	-- Records whether doing  fun or case rhss;
-					-- used to produced better error messages
-
-tcMatchesExpected :: TcType s
-		  -> FunOrCase
-		  -> [RenamedMatch]
+tcMatchesExpected :: [RenamedMatch]
+		  -> TcType s
+		  -> StmtCtxt
 		  -> TcM s ([TcMatch s], LIE s)
 
-tcMatchesExpected expected_ty fun_or_case [match]
+tcMatchesExpected [match] expected_ty fun_or_case
   = tcAddSrcLoc (getMatchLoc match)		$
     tcAddErrCtxt (matchCtxt fun_or_case match)	$
-    tcMatchExpected [] expected_ty match	`thenTc` \ (match',  lie) ->
+    tcMatchExpected match expected_ty fun_or_case	`thenTc` \ (match',  lie) ->
     returnTc ([match'], lie)
 
-tcMatchesExpected expected_ty fun_or_case (match1 : matches)
+tcMatchesExpected (match1 : matches) expected_ty fun_or_case
   = tcAddSrcLoc (getMatchLoc match1)	(
 	tcAddErrCtxt (matchCtxt fun_or_case match1)	$
-  	tcMatchExpected [] expected_ty  match1
+  	tcMatchExpected match1 expected_ty fun_or_case
     )						    	`thenTc` \ (match1',  lie1) ->
-    tcMatchesExpected expected_ty fun_or_case matches	`thenTc` \ (matches', lie2) ->
+    tcMatchesExpected matches expected_ty fun_or_case	`thenTc` \ (matches', lie2) ->
     returnTc (match1' : matches', plusLIE lie1 lie2)
 \end{code}
 
 \begin{code}
 tcMatchExpected
-	:: [TcIdBndr s]		-- Ids bound by enclosing matches
-	-> TcType s 		-- This gives the expected
-				-- result-type of the Match.  Early unification
-				-- with this guy gives better error messages
-	-> RenamedMatch
-	-> TcM s (TcMatch s,LIE s)	-- NB No type returned, because it was passed
-					-- in instead!
+	:: RenamedMatch
+	-> TcType s 		-- Expected result-type of the Match.
+				-- Early unification with this guy gives better error messages
+	-> StmtCtxt
+	-> TcM s (TcMatch s,LIE s)
 
-tcMatchExpected matched_ids expected_ty the_match@(PatMatch pat match)
-  = unifyFunTy expected_ty		`thenTc` \ (arg_ty, rest_ty) ->
+tcMatchExpected match expected_ty ctxt
+  = tcMatchExpected_help emptyBag emptyBag emptyLIE match expected_ty ctxt
 
-    let binders = collectPatBinders pat
-    in
-    newMonoIds binders mkTypeKind (\ mono_ids ->
-	tcPat pat			`thenTc` \ (pat', lie_pat, pat_ty) ->
-	unifyTauTy pat_ty arg_ty	`thenTc_`
 
-	tcMatchExpected (mono_ids ++ matched_ids)
-			rest_ty match	`thenTc` \ (match', lie_match) ->
+tcMatchExpected_help bound_tvs bound_ids bound_lie 
+		     the_match@(PatMatch pat match) expected_ty ctxt
+  = unifyFunTy expected_ty	`thenTc` \ (arg_ty, rest_ty) ->
 
-	returnTc (PatMatch pat' match',
-		  plusLIE lie_pat lie_match)
-    )
+    tcPat noSigs pat arg_ty	`thenTc` \ (pat', pat_lie, pat_tvs, pat_ids, avail_lie) ->
 
-tcMatchExpected matched_ids expected_ty (GRHSMatch grhss_and_binds)
+    tcMatchExpected_help
+	(bound_tvs `unionBags` pat_tvs)
+	(bound_ids `unionBags` pat_ids)
+	(bound_lie `plusLIE`   avail_lie)
+	match rest_ty ctxt			`thenTc` \ (match', lie_match) ->
+
+    returnTc (PatMatch pat' match', pat_lie `plusLIE` lie_match)
+
+
+tcMatchExpected_help bound_tvs bound_ids bound_lie
+		     (GRHSMatch grhss_and_binds) expected_ty ctxt
   =     -- Check that the remaining "expected type" is not a rank-2 type
 	-- If it is it'll mess up the unifier when checking the RHS
     checkTc (isTauTy expected_ty)
 	    lurkingRank2SigErr 		`thenTc_`
 
-    tcGRHSsAndBinds expected_ty grhss_and_binds   	`thenTc` \ (GRHSsAndBindsOut grhss binds ty, lie) ->
+    tcExtendEnvWithPat bound_ids (
+        tcGRHSsAndBinds grhss_and_binds expected_ty ctxt
+    )							`thenTc` \ (GRHSsAndBindsOut grhss binds ty, lie) ->
+
+
+	-- Check for existentially bound type variables
+    tcExtendGlobalTyVars (tyVarsOfType expected_ty) (
+      tcAddErrCtxtM (existentialPatCtxt bound_tvs bound_ids)	$
+      checkSigTyVars (bagToList bound_tvs)			`thenTc` \ zonked_pat_tvs ->
+      tcSimplifyAndCheck 
+	(text ("the existential context of a data constructor"))
+	(mkVarSet zonked_pat_tvs)
+	bound_lie lie
+    )							`thenTc` \ (ex_lie, ex_binds) ->
 
     	-- In case there are any polymorpic, overloaded binders in the pattern
 	-- (which can happen in the case of rank-2 type signatures, or data constructors
 	-- with polymorphic arguments), we must do a bindInstsOfLocalFns here
-    bindInstsOfLocalFuns lie matched_ids 	`thenTc` \ (lie', inst_mbinds) ->
+    bindInstsOfLocalFuns ex_lie bound_id_list	 	`thenTc` \ (inst_lie, inst_binds) ->
+
     let
-        binds' = case inst_mbinds of
-		   EmptyMonoBinds -> binds	-- The common case
-		   other	  -> MonoBind inst_mbinds [] Recursive `ThenBinds` binds
+        binds' = ex_binds `glue_on` (inst_binds `glue_on` binds)
     in
-    returnTc (GRHSMatch (GRHSsAndBindsOut grhss binds' ty), lie')
+    returnTc (GRHSMatch (GRHSsAndBindsOut grhss binds' ty), inst_lie)
+  where
+    bound_id_list = map snd (bagToList bound_ids)
+
+	-- glue_on just avoids stupid dross
+    glue_on EmptyMonoBinds binds = binds	-- The common case
+    glue_on mbinds	   binds = MonoBind mbinds [] Recursive `ThenBinds` binds
 \end{code}
 
 
@@ -180,11 +198,11 @@ noOfArgs ms = map args_in_match ms
 Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-matchCtxt MCase match
+matchCtxt CaseAlt match
   = hang (ptext SLIT("In a \"case\" branch:"))
 	 4 (pprMatch True{-is_case-} match)
 
-matchCtxt (MFun fun) match
+matchCtxt (FunRhs fun) match
   = hang (hcat [ptext SLIT("In an equation for function "), quotes (ppr fun), char ':'])
 	 4 (hcat [ppr fun, space, pprMatch False{-not case-} match])
 \end{code}

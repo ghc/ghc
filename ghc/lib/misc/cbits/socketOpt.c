@@ -8,8 +8,9 @@
 #endif
 
 #define NON_POSIX_SOURCE
-#include "rtsdefs.h"
+#include "Rts.h"
 #include "ghcSockets.h"
+#include "stgio.h"
 
 StgInt
 getSocketOption__ (fd, opt)

@@ -1,0 +1,1 @@
+ERROR "test/static/s097.hs": Entity "eq" is not a member of class "Eq"

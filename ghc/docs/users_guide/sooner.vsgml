@@ -37,28 +37,36 @@ send the GC stats straight to standard error.)
 If it says you're using more than 20\% of total time in garbage
 collecting, then more memory would help.
 
-You ask for more heap with the @-H<size>@<nidx>-H&lt;size&gt; option</nidx>
-option; e.g.: @ghc -c -O -H16m Foo.hs@.
+If the heap size is approaching the maximum (64M by default), and you
+have lots of memory, try increasing the maximum with the
+@-M<size>@<nidx>-M&lt;size&gt; option</nidx> option, e.g.: @ghc -c -O
+-M16m Foo.hs@.
+
+Increasing the default allocation area size used by the compiler's RTS
+might also help: use the @-A<size>@<nidx>-A&lt;size&gt; option</nidx>
+option.
 
 If GHC persists in being a bad memory citizen, please report it as a
 bug.
 
 %----------------------------------------------------------------
 <tag>Don't use too much memory!</tag>
-As soon as GHC plus its ``fellow citizens'' (other processes on your machine) start
-using more than the <em>real memory</em> on your machine, and the machine
-starts ``thrashing,'' <em>the party is over</em>.  Compile times will be
-worse than terrible!  Use something like the csh-builtin @time@
-command to get a report on how many page faults you're getting.
+As soon as GHC plus its ``fellow citizens'' (other processes on your
+machine) start using more than the <em>real memory</em> on your
+machine, and the machine starts ``thrashing,'' <em>the party is
+over</em>.  Compile times will be worse than terrible!  Use something
+like the csh-builtin @time@ command to get a report on how many page
+faults you're getting.
 
 If you don't know what virtual memory, thrashing, and page faults are,
-or you don't know the memory configuration of your machine, <em>don't</em> try to be clever about memory use: you'll just make your life a
-misery (and for other people, too, probably).
+or you don't know the memory configuration of your machine,
+<em>don't</em> try to be clever about memory use: you'll just make
+your life a misery (and for other people, too, probably).
 
 %----------------------------------------------------------------
 <tag>Try to use local disks when linking:</tag>
 Because Haskell objects and libraries tend to be large, it can take
-many real seconds to slurp the bits to/from an NFS filesystem (say).
+many real seconds to slurp the bits to/from a remote filesystem.
 
 It would be quite sensible to <em>compile</em> on a fast machine using
 remotely-mounted disks; then <em>link</em> on a slow machine that had
@@ -82,27 +90,25 @@ analysers).  You can turn these off individually with
 @-fno-strictness@<nidx>-fno-strictness anti-option</nidx> and
 @-fno-update-analysis@.<nidx>-fno-update-analysis anti-option</nidx>
 
-If @-ddump-simpl@ produces output after a reasonable time, but
-@-ddump-stg@ doesn't, then it's probably the update analyser
-slowing you down.
+To figure out which part of the compiler is badly behaved, the
+@-dshow-passes@<nidx>-dshow-passes option</nidx> option is your
+friend.
 
 If your module has big wads of constant data, GHC may produce a huge
 basic block that will cause the native-code generator's register
-allocator to founder.
-
-If @-ddump-absC@ produces output after a reasonable time, but
-nothing after that---it's probably the native-code generator.  Bring
-on @-fvia-C@<nidx>-fvia-C option</nidx> (not that GCC will be that quick about it, either).
+allocator to founder.  Bring on @-fvia-C@<nidx>-fvia-C option</nidx>
+(not that GCC will be that quick about it, either).
 
 %----------------------------------------------------------------
 <tag>Avoid the consistency-check on linking:</tag>
-Use @-no-link-chk@<nidx>-no-link-chk</nidx>; saves effort.  This is probably
-safe in a I-only-compile-things-one-way setup.
+
+Use @-no-link-chk@<nidx>-no-link-chk</nidx>; saves effort.  This is
+probably safe in a I-only-compile-things-one-way setup.
 
 %----------------------------------------------------------------
 <tag>Explicit @import@ declarations:</tag>
-Instead of saying @import Foo@, say
-@import Foo (...stuff I want...)@.
+
+Instead of saying @import Foo@, say @import Foo (...stuff I want...)@.
 
 Truthfully, the reduction on compilation time will be very small.
 However, judicious use of @import@ declarations can make a
@@ -119,22 +125,22 @@ program easier to understand, so it may be a good idea anyway.
 %************************************************************************
 
 The key tool to use in making your Haskell program run faster are
-GHC's profiling facilities, described separately in
-Section <ref name="Profiling" id="profiling">.  There is <em>no substitute</em> for finding
-where your program's time/space is <em>really</em> going, as opposed
-to where you imagine it is going.
+GHC's profiling facilities, described separately in Section <ref
+name="Profiling" id="profiling">.  There is <em>no substitute</em> for
+finding where your program's time/space is <em>really</em> going, as
+opposed to where you imagine it is going.
 
 Another point to bear in mind: By far the best way to improve a
-program's performance <em>dramatically</em> is to use better algorithms.
-Once profiling has thrown the spotlight on the guilty
+program's performance <em>dramatically</em> is to use better
+algorithms.  Once profiling has thrown the spotlight on the guilty
 time-consumer(s), it may be better to re-think your program than to
 try all the tweaks listed below.
 
 Another extremely efficient way to make your program snappy is to use
-library code that has been Seriously Tuned By Someone Else.  You <em>might</em> be able
-to write a better quicksort than the one in the HBC library, but it
-will take you much longer than typing @import QSort@.
-(Incidentally, it doesn't hurt if the Someone Else is Lennart
+library code that has been Seriously Tuned By Someone Else.  You
+<em>might</em> be able to write a better quicksort than the one in the
+HBC library, but it will take you much longer than typing @import
+QSort@.  (Incidentally, it doesn't hurt if the Someone Else is Lennart
 Augustsson.)
 
 Please report any overly-slow GHC-compiled programs.  The current
@@ -148,8 +154,6 @@ to make your program go faster.  Compilation time will be slower,
 especially with @-O2@.
 
 At present, @-O2@ is nearly indistinguishable from @-O@.
-
-%At version 2.01, @-O@ is a dodgy proposition, no matter what.
 
 %----------------------------------------------------------------
 <tag>Compile via C and crank up GCC:</tag> Even with @-O@, GHC tries to
@@ -169,10 +173,12 @@ loop.  How can you squash it?
 <descrip>
 <tag>Give explicit type signatures:</tag>
 Signatures are the basic trick; putting them on exported, top-level
-functions is good software-engineering practice, anyway.
+functions is good software-engineering practice, anyway.  (Tip: using
+@-fwarn-missing-signatures@<nidx>-fwarn-missing-signatures
+option</nidx> can help enforce good signature-practice).
 
-The automatic specialisation of overloaded functions should take care
-of overloaded local and/or unexported functions.
+The automatic specialisation of overloaded functions (with @-O@)
+should take care of overloaded local and/or unexported functions.
 
 <tag>Use @SPECIALIZE@ pragmas:</tag>
 <nidx>SPECIALIZE pragma</nidx>
@@ -180,9 +186,11 @@ of overloaded local and/or unexported functions.
 (UK spelling also accepted.)  For key overloaded functions, you can
 create extra versions (NB: more code space) specialised to particular
 types.  Thus, if you have an overloaded function:
+
 <tscreen><verb>
 hammeredLookup :: Ord key => [(key, value)] -> key -> value
 </verb></tscreen>
+
 If it is heavily used on lists with @Widget@ keys, you could
 specialise it as follows:
 <tscreen><verb>
@@ -196,6 +204,8 @@ the specialised value, by adding @= blah@, as in:
 </verb></tscreen>
 It's <em>Your Responsibility</em> to make sure that @blah@ really
 behaves as a specialised version of @hammeredLookup@!!!
+
+[NOTE: this feature isn't implemented in GHC 4.00... ]
 
 An example in which the @= blah@ form will Win Big:
 <tscreen><verb>
@@ -229,19 +239,21 @@ Compatible with HBC, by the way.
 % @SPECIALIZE instance@ pragmas what @= blah@ hacks are to @SPECIALIZE@
 % (value) pragmas...
 
-<tag>``How do I know what's happening with specialisations?'':</tag>
+%ToDo: there's nothing like this at the moment: --SDM
 
-The @-fshow-specialisations@<nidx>-fshow-specialisations option</nidx>
-will show the specialisations that actually take place.
+% <tag>``How do I know what's happening with specialisations?'':</tag>
 
-The @-fshow-import-specs@<nidx>-fshow-import-specs option</nidx> will
-show the specialisations that GHC <em>wished</em> were available, but
-were not.  You can add the relevant pragmas to your code if you wish.
+% The @-fshow-specialisations@<nidx>-fshow-specialisations option</nidx>
+% will show the specialisations that actually take place.
 
-You're a bit stuck if the desired specialisation is of a Prelude
-function.  If it's Really Important, you can just snap a copy of the
-Prelude code, rename it, and then SPECIALIZE that to your heart's
-content.
+% The @-fshow-import-specs@<nidx>-fshow-import-specs option</nidx> will
+% show the specialisations that GHC <em>wished</em> were available, but
+% were not.  You can add the relevant pragmas to your code if you wish.
+
+% You're a bit stuck if the desired specialisation is of a Prelude
+% function.  If it's Really Important, you can just snap a copy of the
+% Prelude code, rename it, and then SPECIALIZE that to your heart's
+% content.
 
 <tag>``But how do I know where overloading is creeping in?'':</tag>
 
@@ -290,6 +302,13 @@ f (Wibble x y)  # ugly, and proud of it
 It's all the better if a function is strict in a single-constructor
 type (a type with only one data-constructor; for example, tuples are
 single-constructor types).
+
+%----------------------------------------------------------------
+<tag>Newtypes are better than datatypes:</tag>
+
+If your datatype has a single constructor with a single field, use a
+@newtype@ declaration instead of a @data@ declaration.  The @newtype@
+will be optimised away in most cases.
 
 %----------------------------------------------------------------
 <tag>``How do I find out a function's strictness?''</tag>
@@ -357,21 +376,14 @@ For example, in GHC's own @UniqueSupply@ monad code, we have:
 #endif
 </verb></tscreen>
 
-GHC reserves the right to <em>disallow</em> any unfolding, even if you
-explicitly asked for one.  That's because a function's body may
-become <em>unexportable</em>, because it mentions a non-exported value,
-to which any importing module would have no access.
-
-If you want to see why candidate unfoldings are rejected, use the
-@-freport-disallowed-unfoldings@
-<nidx>-freport-disallowed-unfoldings</nidx>
-option.
+Incedentally, there's also a @NOINLINE@<nidx>NOINLINE pragma</nidx>
+pragma which does the obvious thing.
 
 %----------------------------------------------------------------
 <tag>Explicit @export@ list:</tag>
 If you do not have an explicit export list in a module, GHC must
 assume that everything in that module will be exported.  This has
-various pessimising effect.  For example, if a bit of code is actually
+various pessimising effects.  For example, if a bit of code is actually
 <em>unused</em> (perhaps because of unfolding effects), GHC will not be
 able to throw it away, because it is exported and some other module
 may be relying on its existence.
@@ -392,10 +404,10 @@ operations (e.g., @eqInt#@) are good, ...
 
 %----------------------------------------------------------------
 <tag>Use unboxed types (a GHC extension):</tag>
-When you are <em>really</em> desperate for speed, and you want to
-get right down to the ``raw bits.''
-Please see Section <ref name="Unboxed types" id="glasgow-unboxed"> for some information about
-using unboxed types.
+When you are <em>really</em> desperate for speed, and you want to get
+right down to the ``raw bits.''  Please see Section <ref name="Unboxed
+types" id="glasgow-unboxed"> for some information about using unboxed
+types.
 
 %----------------------------------------------------------------
 <tag>Use @_ccall_s@ (a GHC extension) to plug into fast libraries:</tag>
@@ -417,26 +429,21 @@ rarely a speed disadvantage---modern machines will use the same
 floating-point unit for both.  With @Doubles@, you are much less
 likely to hang yourself with numerical errors.
 
+One time when @Float@ might be a good idea is if you have a
+<em>lot</em> of them, say a giant array of @Float@s.  They take up
+half the space in the heap compared to @Doubles@.  However, this isn't
+true on a 64-bit machine.
+
 %----------------------------------------------------------------
 <tag>Use a bigger heap!</tag>
+
 If your program's GC stats (@-S@<nidx>-S RTS option</nidx> RTS option)
 indicate that it's doing lots of garbage-collection (say, more than
 20\% of execution time), more memory might help---with the
-@-H<size>@<nidx>-H&lt;size&gt; RTS option</nidx> RTS option.
-
-%----------------------------------------------------------------
-<tag>Use a smaller heap!</tag>
-Some programs with a very small heap residency (toy programs, usually)
-actually benefit from running the heap size way down.  The
-@-H<size>@ RTS option, as above.
-
-%----------------------------------------------------------------
-<tag>Use a smaller ``allocation area'':</tag>
-If you can get the garbage-collector's youngest generation to fit
-entirely in your machine's cache, it may make quite a difference.
-The effect is <em>very machine dependent</em>.  But, for example,
-a @+RTS -A128k@<nidx>-A&lt;size&gt; RTS option</nidx> option on one of our
-DEC Alphas was worth an immediate 5\% performance boost.
+@-M<size>@<nidx>-M&lt;size&gt; RTS option</nidx> or
+@-A<size>@<nidx>-A&lt;size&gt; RTS option</nidx> RTS options (see
+Section <ref name="RTS options to control the garbage-collector"
+id="rts-options-gc">).
 </descrip>
 
 %************************************************************************
@@ -448,12 +455,14 @@ DEC Alphas was worth an immediate 5\% performance boost.
 %*                                                                      *
 %************************************************************************
 
-Decrease the ``go-for-it'' threshold for unfolding smallish expressions.
-Give a @-funfolding-use-threshold0@<nidx>-funfolding-use-threshold0 option</nidx>
-option for the extreme case. (``Only unfoldings with zero cost should proceed.'')
-
-(Note: I have not been too successful at producing code smaller
-than that which comes out with @-O@.  WDP 94/12)
+Decrease the ``go-for-it'' threshold for unfolding smallish
+expressions.  Give a
+@-funfolding-use-threshold0@<nidx>-funfolding-use-threshold0
+option</nidx> option for the extreme case. (``Only unfoldings with
+zero cost should proceed.'')  Warning: except in certain specialiised
+cases (like Happy parsers) this is likely to actually
+<em>increase</em> the size of your program, because unfolding
+generally enables extra simplifying optimisations to be performed.
 
 Avoid @Read@.
 
@@ -476,29 +485,12 @@ Use @strip@ on your executables.
 might be even easier with the @-F2s@<nidx>-F2s RTS option</nidx> RTS
 option; so...  @./a.out +RTS -Sstderr -F2s@...]
 
-Once again, the profiling facilities (Section <ref name="Profiling" id="profiling">) are the
-basic tool for demystifying the space behaviour of your program.
+Once again, the profiling facilities (Section <ref name="Profiling"
+id="profiling">) are the basic tool for demystifying the space
+behaviour of your program.
 
-Strict functions are good to space usage, as they are for time, as
+Strict functions are good for space usage, as they are for time, as
 discussed in the previous section.  Strict functions get right down to
 business, rather than filling up the heap with closures (the system's
 notes to itself about how to evaluate something, should it eventually
 be required).
-
-If you have a true blue ``space leak'' (your program keeps gobbling up
-memory and never ``lets go''), then 7 times out of 10 the problem is
-related to a <em>CAF</em> (constant applicative form).  Real people call
-them ``top-level values that aren't functions.''  Thus, for example:
-<tscreen><verb>
-x = (1 :: Int)
-f y = x
-ones = [ 1, (1 :: Float), .. ]
-</verb></tscreen>
-@x@ and @ones@ are CAFs; @f@ is not.
-
-The GHC garbage collectors are not clever about CAFs.  The part of the
-heap reachable from a CAF is never collected.  In the case of
-@ones@ in the example above, it's <em>disastrous</em>.  For this
-reason, the GHC ``simplifier'' tries hard to avoid creating CAFs, but
-it cannot subvert the will of a determined CAF-writing programmer (as
-in the case above).

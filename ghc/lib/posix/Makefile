@@ -1,4 +1,5 @@
-# $Id: Makefile,v 1.4 1998/04/16 12:50:44 sof Exp $
+#
+# $Id: Makefile,v 1.5 1998/12/02 13:26:49 simonm Exp $
 #
 # Makefile for POSIX library
 #
@@ -53,6 +54,9 @@ PosixProcEnv_HC_OPTS  ='-\#include"cbits/libposix.h"'
 PosixProcPrim_HC_OPTS ='-\#include"cbits/libposix.h"'
 PosixTTY_HC_OPTS      ='-\#include"cbits/libposix.h"' -monly-2-regs
 Posix_HC_OPTS         ='-\#include"cbits/libposix.h"'
+
+# sigh.
+../misc/PackedString_HC_OPTS += -H8m
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation

@@ -51,19 +51,7 @@ sub postprocessHiFile {
     # if we produced an interface file "no matter what",
     # print what we got on stderr (ToDo: honor -ohi flag)
     if ( $HiOnStdout ) {
-        if ( $HiWith ne '' ) {
-	    # output some of the sections
-	    local($hi_after)  = "$Tmp_prefix.hi-now";
-
-	    foreach $hi ( split(' ',$HiWith) ) { 
-	    	$HiSection{$hi} = 1; 
-	    }
-	    &hiSectionsOnly($new_hi, $hi_after);
-
-	    system("$Cat $hi_after 1>&2 ; $Rm $hi_after; ");
-	} else {
-            system("$Cat $new_hi 1>&2");
-	}
+	system("$Cat $new_hi 1>&2");
     } else {
 	&run_something("$Cmp -s $hifile_target $new_hi || ( $Rm $hifile_target && $Cp $new_hi $hifile_target )",
 	   "Replace .$HiSuffix file, if changed");
@@ -78,41 +66,9 @@ sub deUsagifyHi {
 
     # read up to _usages_ line
     $_ = <OLDHIF>;
-    while ($_ ne '' && ! /^_usages_/) {
-	print NEWHIF $_ unless /^(_interface_ |\{-# GHC_PRAGMA)/;
+    while ($_ ne '') {
+	print NEWHIF $_ unless /^(__interface|import)/;
 	$_ = <OLDHIF>;
-    }
-    if ( $_ ne '' ) {
-	# skip to next _<anything> line
-	$_ = <OLDHIF>;
-	while ($_ ne '' && ! /^_/) { $_ = <OLDHIF>; }
-
-	# print the rest
-	while ($_ ne '') {
-	    print NEWHIF $_;
-	    $_ = <OLDHIF>;
-	}
-    }
-
-    close(OLDHIF) || &tidy_up_and_die(1,"Failed reading from $ifile\n");
-    close(NEWHIF) || &tidy_up_and_die(1,"Failed writing to $ofile\n");
-}
-
-sub hiSectionsOnly {
-    local($ifile,$ofile) = @_;
-
-    open(OLDHIF, "< $ifile") || &tidy_up_and_die(1,"Can't open $ifile (read)\n");
-    open(NEWHIF, "> $ofile") || &tidy_up_and_die(1,"Can't open $ofile (write)\n");
-
-    # read up to _usages_ line
-    $_ = <OLDHIF>;
-    while ($_ ne '' ) {
-	if ( /^_(.*)_/ && $HiSection{$1} )  {
-       	     do { print NEWHIF $_;
-       	          $_ = <OLDHIF>;} until ($_ eq '' || /^_/ );
-        } else {
-          $_ = <OLDHIF>;
-	}
     }
 
     close(OLDHIF) || &tidy_up_and_die(1,"Failed reading from $ifile\n");
@@ -140,42 +96,25 @@ sub constructNewHiFile {
 
     open(NEWHI, "> $new_hi") || &tidy_up_and_die(1,"Can't open $new_hi (write)\n");
 
-    local(@decl_names) = ();	# Entities in _declarations_ section of new module
+    local(@decl_names) = ();	# Declarations in new module
     foreach $v (sort (keys %Decl)) {
 	next unless $v =~ /^new:(.*$)/;
 	push(@decl_names,$1);
     }
 
     local($new_module_version) = &calcNewModuleVersion(@decl_names);
-    print NEWHI "_interface_ ", $ModuleName{'new'}, " $new_module_version $ProjectVersionInt\n";
+    print NEWHI "__interface ", $ModuleName{'new'}, " $new_module_version $ProjectVersionInt where\n";
 
-    if ( $Stuff{'new:instance_modules'} ) {
-	print NEWHI "_instance_modules_\n";
-	print NEWHI $Stuff{'new:instance_modules'};
-    }
-
-    print NEWHI "_usages_\n", $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
-
-    print NEWHI "_exports_\n";
+    print NEWHI $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
+    print NEWHI $Stuff{'new:instance_modules'} unless $Stuff{'new:instance_modules'} eq '';
     print NEWHI $Stuff{'new:exports'};
+    print NEWHI $Stuff{'new:fixities'} unless $Stuff{'new:fixities'} eq '';
+    print NEWHI $Stuff{'new:instances'} unless $Stuff{'new:instances'} eq '';
 
-    if ( $Stuff{'new:fixities'} ) {
-	print NEWHI "_fixities_\n";
-	print NEWHI $Stuff{'new:fixities'};
-    }
-
-    if ( $Stuff{'new:instances'} ) {
-	print NEWHI "_instances_\n";
-	print NEWHI $Stuff{'new:instances'};
-    }
-
-    print NEWHI "_declarations_\n";
     foreach $v (@decl_names) {
 	&printNewItemVersion(NEWHI, $v, $new_module_version, $show_hi_diffs);		# Print new version number
 	print NEWHI $Decl{"new:$v"};		# Print the new decl itself
     }
-
-    
 
     close(NEWHI) || &tidy_up_and_die(1,"Failed writing to $new_hi\n");
 }
@@ -220,70 +159,59 @@ sub readHiFile {
 
     open(HIFILE, "< $hifile") || &tidy_up_and_die(1,"Can't open $hifile (read)\n");
     $HiExists{$mod} = 1;
-    local($now_in) = '';
     hi_line: while (<HIFILE>) {
 	next if /^ *$/; # blank line
-	next if /\{-# GHC_PRAGMA INTERFACE VERSION 20 #-\}/;
 
-	# avoid pre-1.3 interfaces
-        #print STDERR "now_in:$now_in:$_";
-	if ( /\{-# GHC_PRAGMA INTERFACE VERSION . #-\}/ ) {
-	    $HiExists{$mod} = 0;
-	    last hi_line;
-	}
+	if ( /^__interface ([A-Z]\S*) (\d+)/ ) {
+	    if ( $mod ne 'new' ) {
+		$ModuleVersion{$mod} = $2;
+	    }
+	    $ModuleName{$mod}    = $1; # used to decide name of iface file.
 
-	if ( /^_interface_ ([A-Z]\S*) (\d+)/ && $mod ne 'new' ) {
-	    $ModuleName{$mod}	 = $1; # used to decide name of interface file.
-	    $ModuleVersion{$mod} = $2;
-
-	} elsif ( /^_interface_ ([A-Z]\S*) (\d+)/ && $mod eq 'new' ) { # special case: no version
-	    $ModuleName{'new'} = $1;
-
-	} elsif ( /^_([a-z_]+)_$/ ) {
-	    $now_in = $1;
-
-	} elsif ( $now_in eq 'usages' && /^(\S+)\s+(!\s+)?(\d+)\s+::(.*)/ ) {
+	} elsif ( /^import / ) {
 	    $Stuff{"$mod:usages"} .= $_; # save the whole thing
 
+	} elsif ( /^__instimport/ ) {
+	    $Stuff{"$mod:instance_modules"} .= $_;
 
-	} elsif ( $now_in =~ /^(exports|instance_modules|instances|fixities)$/ ) {
-	    $Stuff{"$mod:$1"} .= $_; # just save it up
+	} elsif ( /^__export/ ) {
+	    $Stuff{"$mod:exports"} .= $_;
+
+	} elsif ( /^infix(r|l)? / ) {
+	    $Stuff{"$mod:fixities"} .= $_;
+
+	} elsif ( /^instance / ) {
+	    $Stuff{"$mod:instances"} .= $_;
 
 	} elsif ( /^--.*/ ) { # silently ignore comment lines.
 	    ;
-	} elsif ( $now_in eq 'declarations' ) { # relatively special treatment needed...
-	# We're in a declaration
+	} else {  # We're in a declaration
 
 	# Strip off the initial version number, if any
-	   if ( /^([0-9]+) (.*\n)/ ) {
-		# The "\n" is because we need to keep the newline at the end, so that
-		# it looks the same as if there's no version number and this if statement
-		# doesn't fire.
+	   if ( /^([0-9]+)\s+(.*\n)/ ) {
+
+		# The "\n" is because we need to keep the newline at
+		# the end, so that it looks the same as if there's no version 
+	        # number and this if statement doesn't fire.
 
 		# So there's an initial version number
 		$version = $1;
 		$_ = $2;
 	   }
-	
-	    if ( /^(\S+)\s+_:_\s+/ ) {
-			# Value declaration
-		$current_name = $1;
-		$Decl{"$mod:$current_name"} = $_;
-	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
-	    } elsif ( /^type\s+(\S+)/ ) {
+	   if ( /^type\s+(\S+)/ ) {		
 			# Type declaration	
 		$current_name = "type $1";
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
-	    } elsif ( /^(newtype|data)\s+(.*\s+=>\s+)?(\S+)\s+/ ) {
+	   } elsif ( /^(newtype|data)\s+(.*\s+=>\s+)?(\S+)\s+/ ) {
 			# Data declaration	
 		$current_name = "data $3";
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
-	    } elsif ( /^class\s+(\{[^{}]*\}\s+=>\s+)?(\S+)\s+/ ) {
+	   } elsif ( /^class\s+(\{[^{}]*\}\s+=>\s+)?(\S+)\s+/ ) {
 			# Class declaration	
 		# must be wary of => bit matching after "where"...
 		# ..hence the [^{}] part
@@ -292,18 +220,19 @@ sub readHiFile {
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
+	   } elsif ( /^(\S+)\s+::\s+/ ) {
+			# Value declaration
+		$current_name = $1;
+		$Decl{"$mod:$current_name"} = $_;
+	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
+
 	    } else { # Continuation line
-		$Decl{"$mod:$current_name"} .= $_
+		print STDERR "$Pgm:junk old iface line?:$_";
+		# $Decl{"$mod:$current_name"} .= $_
 	    }
 
-	} else {
-	    print STDERR "$Pgm:junk old iface line?:section:$now_in:$_";
-	}
+       }
     }
-
-#   foreach $i ( sort (keys %Decl)) {
-#	print STDERR "$i: ",$Decl{$i}, "\n";
-#   }
 
     close(HIFILE) || &tidy_up_and_die(1,"Failed reading from $hifile\n");
     $HiHasBeenRead{$mod} = 1;
@@ -322,9 +251,6 @@ sub calcNewModuleVersion {
 
     local($unchanged_version) = $ModuleVersion{'old'}; # will return one of these two
     local($changed_version)   = $unchanged_version + 1;
-
-# This statement is curious; it is subsumed by the foreach!
-#    return(&mv_change($changed_version,'usages changed')) if $Stuff{'old:usages'} ne $Stuff{'new:usages'};
 
     foreach $t ( 'usages' , 'exports', 'instance_modules', 'instances', 'fixities' ) {
 	return(&mv_change($changed_version,"$t changed")) if $Stuff{"old:$t"} ne $Stuff{"new:$t"};

@@ -1,0 +1,24 @@
+#! /usr/bin/perl -i.bak
+
+while (<>) {
+    # Insert header line
+    if ($ARGV ne $oldargv) {
+	$ARGV =~ /\d+/;
+	$filenum = $&;
+	print <<EOTXT;
+Reading file "test/typechecker/t$filenum.hs":
+EOTXT
+        $oldargv = $ARGV;
+    }
+
+    # Make this script idempotent
+    next if /^Reading file "test\/typechecker\/t\d+\.hs":/;
+
+    # Fix error messages
+    s#test/T[A-Za-z0-9]*\.hs#test/typechecker/t$filenum.hs#g;
+
+    # Delete trailing line
+    s/^Hugs:\[Leaving Hugs\]\n//;
+
+    print;
+}

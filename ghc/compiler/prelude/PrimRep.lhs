@@ -1,5 +1,5 @@
 %
-% (c) The GRASP Project, Glasgow University, 1992-1996
+% (c) The GRASP Project, Glasgow University, 1992-1998
 %
 \section[PrimRep]{Primitive machine-level kinds of things.}
 
@@ -19,22 +19,15 @@ module PrimRep
       , getPrimRepSizeInBytes
       , retPrimRepSize
       , showPrimRep
+      , primRepString
       , showPrimRepToUser
-      , ppPrimRep
-      , guessPrimRep
-      , decodePrimRep
       ) where
 
 #include "HsVersions.h"
 
+import Constants ( dOUBLE_SIZE, iNT64_SIZE, wORD64_SIZE )
 import Util
 import Outputable
-
--- Oh dear.
--- NOTE: we have to reach out and grab this header file
--- in our current source/build tree, and not the one supplied
--- by whoever's compiling us.
-#include "../../includes/GhcConstants.h"
 \end{code}
 
 %************************************************************************
@@ -54,7 +47,7 @@ data PrimRep
   | CostCentreRep	-- Pointer to a cost centre
 
   | CharRep		-- Machine characters
-  | IntRep		--	   integers (at least 32 bits)
+  | IntRep		--	   integers (same size as ptr on this arch)
   | WordRep		--	   ditto (but *unsigned*)
   | AddrRep		--	   addresses ("C pointers")
   | FloatRep		--	   floats
@@ -62,13 +55,14 @@ data PrimRep
   | Word64Rep	        --    guaranteed to be 64 bits (no more, no less.)
   | Int64Rep	        --    guaranteed to be 64 bits (no more, no less.)
 
-  | ForeignObjRep	-- This has to be a special kind because ccall
-			-- generates special code when passing/returning
-			-- one of these. [ADR]
+  | WeakPtrRep
+  | ForeignObjRep	
 
   | StablePtrRep	-- We could replace this with IntRep but maybe
 			-- there's some documentation gain from having
 			-- it special? [ADR]
+
+  | ThreadIdRep		-- Really a pointer to a TSO
 
   | ArrayRep		-- Primitive array of Haskell pointers
   | ByteArrayRep	-- Primitive array of bytes (no Haskell pointers)
@@ -78,6 +72,16 @@ data PrimRep
   deriving (Eq, Ord)
 	-- Kinds are used in PrimTyCons, which need both Eq and Ord
 \end{code}
+
+These pretty much correspond to the C types declared in StgTypes.h,
+with the following exceptions:
+
+   - when an Array or ByteArray is passed to C, we again pass a pointer
+     to the contents.  The actual type that is passed is StgPtr for
+     ArrayRep, and StgByteArray (probably a char *) for ByteArrayRep.
+
+These hacks are left until the final printing of the C, in
+PprAbsC.lhs.
 
 %************************************************************************
 %*									*
@@ -97,18 +101,11 @@ computation of GC liveness info.
 isFollowableRep :: PrimRep -> Bool
 
 isFollowableRep PtrRep        = True
-isFollowableRep ArrayRep      = True
-isFollowableRep ByteArrayRep  = True
--- why is a ForeignObj followable? 4/96 SOF
---
--- A: they're followable because these objects
--- should be lugged around by the storage manager
--- (==> registers containing them are live) -- 3/97 SOF
-isFollowableRep ForeignObjRep  = True
-
-isFollowableRep StablePtrRep  = False
--- StablePtrs aren't followable because they are just indices into a
--- table for which explicit allocation/ deallocation is required.
+isFollowableRep ArrayRep      = True	-- all heap objects:
+isFollowableRep ByteArrayRep  = True	-- 	''
+isFollowableRep WeakPtrRep    = True	-- 	''
+isFollowableRep ForeignObjRep = True	-- 	''
+isFollowableRep ThreadIdRep   = True	-- pointer to a TSO
 
 isFollowableRep other	    	= False
 
@@ -153,9 +150,9 @@ is64BitRep other     = False
 \begin{code}
 getPrimRepSize :: PrimRep -> Int
 
-getPrimRepSize DoubleRep  = DOUBLE_SIZE	-- "words", of course
-getPrimRepSize Word64Rep  = WORD64_SIZE
-getPrimRepSize Int64Rep   = INT64_SIZE
+getPrimRepSize DoubleRep  = dOUBLE_SIZE	-- "words", of course
+getPrimRepSize Word64Rep  = wORD64_SIZE
+getPrimRepSize Int64Rep   = iNT64_SIZE
 --getPrimRepSize FloatRep = 1
 --getPrimRepSize CharRep  = 1	-- ToDo: count in bytes?
 --getPrimRepSize ArrayRep = 1	-- Listed specifically for *documentation*
@@ -179,6 +176,7 @@ getPrimRepSizeInBytes pr =
     DoubleRep      ->    8
     Word64Rep      ->    8
     Int64Rep       ->    8
+    WeakPtrRep     ->    4
     ForeignObjRep  ->    4
     StablePtrRep   ->    4
     ArrayRep       ->    4
@@ -199,133 +197,47 @@ instance Outputable PrimRep where
 
 showPrimRep  :: PrimRep -> String
 showPrimRepToUser :: PrimRep -> String
--- dumping PrimRep tag for unfoldings
-ppPrimRep  :: PrimRep -> SDoc
 
-guessPrimRep :: String -> PrimRep	-- a horrible "inverse" function
-decodePrimRep :: Char  -> PrimRep       -- of equal nature
+showPrimRep PtrRep	   = "P_"	-- short for StgPtr
 
-ppPrimRep k =
- char 
-  (case k of
-     PtrRep        -> 'P'
-     CodePtrRep    -> 'p'
-     DataPtrRep    -> 'd'
-     CostCentreRep -> 'c'	-- Pointer to a cost centre
-     RetRep        -> 'R'
-     CharRep       -> 'C'
-     IntRep        -> 'I'
-     Int64Rep      -> 'i'
-     WordRep       -> 'W'
-     Word64Rep     -> 'w'
-     AddrRep       -> 'A'
-     FloatRep      -> 'F'
-     DoubleRep     -> 'D'
-     ArrayRep      -> 'a'
-     ByteArrayRep  -> 'b'
-     StablePtrRep  -> 'S'
-     ForeignObjRep -> 'f'
-     VoidRep       -> 'V'
-     _             -> panic "ppPrimRep")
+showPrimRep CodePtrRep     = "P_"	-- DEATH to StgFunPtr! (94/02/22 WDP)
+showPrimRep PtrRep         = "P_"	-- short for StgPtr
+showPrimRep CodePtrRep     = "P_"	-- DEATH to StgFunPtr! (94/02/22 WDP)
+showPrimRep DataPtrRep     = "D_"
+showPrimRep RetRep         = "P_"
+showPrimRep CostCentreRep  = "CostCentre"
+showPrimRep CharRep	   = "C_"
+showPrimRep IntRep	   = "I_"	-- short for StgInt
+showPrimRep WordRep	   = "W_"	-- short for StgWord
+showPrimRep Int64Rep       = "LI_"       -- short for StgLongInt
+showPrimRep Word64Rep      = "LW_"       -- short for StgLongWord
+showPrimRep AddrRep	   = "StgAddr"
+showPrimRep FloatRep	   = "StgFloat"
+showPrimRep DoubleRep	   = "StgDouble"
+showPrimRep ArrayRep	   = "P_" -- see comment below
+showPrimRep ByteArrayRep   = "StgByteArray"
+showPrimRep StablePtrRep   = "StgStablePtr"
+showPrimRep ThreadIdRep	   = "StgTSO*"
+showPrimRep WeakPtrRep     = "P_"
+showPrimRep ForeignObjRep  = "StgAddr"
+showPrimRep VoidRep	   = "!!VOID_KIND!!"
 
-showPrimRep PtrRep	    = "P_"	-- short for StgPtr
+primRepString CharRep   	= "Char"
+primRepString IntRep    	= "Int"
+primRepString WordRep   	= "Word"
+primRepString Int64Rep  	= "Int64"
+primRepString Word64Rep 	= "Word64"
+primRepString AddrRep   	= "Addr"
+primRepString FloatRep  	= "Float"
+primRepString DoubleRep 	= "Double"
+primRepString WeakPtrRep 	= "Weak"
+primRepString ForeignObjRep  	= "ForeignObj"
+primRepString StablePtrRep  	= "StablePtr"
+primRepString other     	= pprPanic "primRepString" (ppr other)
 
-showPrimRep CodePtrRep    = "P_"	-- DEATH to StgFunPtr! (94/02/22 WDP)
-    -- but aren't code pointers and function pointers different sizes
-    -- on some machines (eg 80x86)? ADR
-    -- Are you trying to ruin my life, or what? (WDP)
-
-showPrimRep DataPtrRep    = "D_"
-showPrimRep RetRep        = "StgRetAddr"
-showPrimRep CostCentreRep = "CostCentre"
-showPrimRep CharRep	  = "StgChar"
-showPrimRep IntRep	  = "I_"	-- short for StgInt
-showPrimRep WordRep	  = "W_"	-- short for StgWord
-showPrimRep Int64Rep      = "LI_"       -- short for StgLongInt
-showPrimRep Word64Rep     = "LW_"       -- short for StgLongWord
-showPrimRep AddrRep	  = "StgAddr"
-showPrimRep FloatRep	  = "StgFloat"
-showPrimRep DoubleRep	  = "StgDouble"
-showPrimRep ArrayRep	  = "StgArray" -- see comment below
-showPrimRep ByteArrayRep  = "StgByteArray"
-showPrimRep StablePtrRep  = "StgStablePtr"
-showPrimRep ForeignObjRep  = "StgPtr" -- see comment below
-showPrimRep VoidRep	  = "!!VOID_KIND!!"
-
-showPrimRepToUser pr =
-  case pr of
-    CharRep       -> "StgChar"
-    IntRep        -> "StgInt"
-    WordRep       -> "StgWord"
-    Int64Rep      -> "StgInt64"
-    Word64Rep     -> "StgWord64"
-    AddrRep       -> "StgAddr"
-    FloatRep      -> "StgFloat"
-    DoubleRep     -> "StgDouble"
-    ArrayRep      -> "StgArray"
-    ByteArrayRep  -> "StgByteArray"
-    StablePtrRep  -> "StgStablePtr"
-    ForeignObjRep -> "StgPtr"
-    _		  -> panic ("showPrimRepToUser: " ++ showPrimRep pr)
-    
-
-decodePrimRep ch =
- case ch of
-     'P' -> PtrRep        
-     'p' -> CodePtrRep    
-     'd' -> DataPtrRep    
-     'c' -> CostCentreRep 
-     'R' -> RetRep        
-     'C' -> CharRep       
-     'I' -> IntRep        
-     'W' -> WordRep       
-     'i' -> Int64Rep        
-     'w' -> Word64Rep       
-     'A' -> AddrRep       
-     'F' -> FloatRep      
-     'D' -> DoubleRep     
-     'a' -> ArrayRep      
-     'b' -> ByteArrayRep  
-     'S' -> StablePtrRep  
-     'f' -> ForeignObjRep 
-     'V' -> VoidRep
-     _   -> panic "decodePrimRep"
-
-guessPrimRep "D_"	    = DataPtrRep
-guessPrimRep "StgRetAddr"   = RetRep
-guessPrimRep "StgChar"	    = CharRep
-guessPrimRep "I_"	    = IntRep
-guessPrimRep "LI_"	    = Int64Rep
-guessPrimRep "W_"	    = WordRep
-guessPrimRep "LW_"	    = Word64Rep
-guessPrimRep "StgAddr"	    = AddrRep
-guessPrimRep "StgFloat"     = FloatRep
-guessPrimRep "StgDouble"    = DoubleRep
-guessPrimRep "StgArray"     = ArrayRep
-guessPrimRep "StgByteArray" = ByteArrayRep
-guessPrimRep "StgStablePtr" = StablePtrRep
+showPrimRepToUser pr = primRepString pr
 \end{code}
 
-All local C variables of @ArrayRep@ are declared in C as type
-@StgArray@.  The coercion to a more precise C type is done just before
-indexing (by the relevant C primitive-op macro).
-
-Nota Bene. There are three types associated with @ForeignObj@ (MallocPtr++): 
-\begin{itemize}
-\item
-@StgForeignObjClosure@ is the type of the thing the prim. op @mkForeignObj@ returns.
-{- old comment for MallocPtr
-(This typename is hardwired into @ppr_casm_results@ in
-@PprAbsC.lhs@.)
--}
-
-\item
-@StgForeignObj@ is the type of the thing we give the C world.
-
-\item
-@StgPtr@ is the type of the (pointer to the) heap object which we
-pass around inside the STG machine.
-\end{itemize}
-
-It is really easy to confuse the two.  (I'm not sure this choice of
-type names helps.) [ADR]
+Foreign Objects and Arrays are treated specially by the code for
+_ccall_s: we pass a pointer to the contents of the object, not the
+object itself.

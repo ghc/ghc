@@ -1,7 +1,7 @@
 \section{Update Avoidance Analyser}
 
 (c) Simon Marlow, Andre Santos 1992-1993
-(c) The AQUA Project, Glasgow University, 1995-1996
+(c) The AQUA Project, Glasgow University, 1995-1998
 
 %-----------------------------------------------------------------------------
 \subsection{Module Interface}
@@ -15,20 +15,17 @@ module UpdAnal ( updateAnalyse ) where
 import Prelude hiding ( lookup )
 
 import StgSyn
-import MkId		( mkSysLocal )
-import Id		( IdEnv, growIdEnv, addOneToIdEnv, combineIdEnvs, nullIdEnv, 
-			  unitIdEnv, mkIdEnv, rngIdEnv, lookupIdEnv, 
-			  IdSet,
-			  getIdUpdateInfo, addIdUpdateInfo, idType,
+import VarEnv
+import VarSet
+import Id		( mkSysLocal,
+			  getIdUpdateInfo, setIdUpdateInfo, idType,
 			  externallyVisibleId,
 			  Id
 			)
 import IdInfo		( UpdateInfo, UpdateSpec, mkUpdateInfo, updateInfoMaybe )
 import Name		( isLocallyDefined )
 import Type		( splitFunTys, splitSigmaTy )
-import UniqSet
 import Unique		( getBuiltinUniques )
-import SrcLoc		( noSrcLoc )
 import Util		( panic )
 \end{code}
 
@@ -50,7 +47,7 @@ List of closure references
 
 \begin{code}
 type Refs = IdSet
-x `notInRefs` y = not (x `elementOfUniqSet` y)
+x `notInRefs` y = not (x `elemVarSet` y)
 \end{code}
 
 A closure value: environment of closures that are evaluated on entry,
@@ -71,30 +68,30 @@ type IdEnvClosure = IdEnv (Id, Closure)
 
 -- backward-compat functions
 null_IdEnv :: IdEnv (Id, a)
-null_IdEnv = nullIdEnv
+null_IdEnv = emptyVarEnv
 
 unit_IdEnv :: Id -> a -> IdEnv (Id, a)
-unit_IdEnv k v = unitIdEnv k (k, v)
+unit_IdEnv k v = unitVarEnv k (k, v)
 
 mk_IdEnv :: [(Id, a)] -> IdEnv (Id, a)
-mk_IdEnv pairs = mkIdEnv [ (k, (k,v)) | (k,v) <- pairs ]
+mk_IdEnv pairs = mkVarEnv [ (k, (k,v)) | (k,v) <- pairs ]
 
 grow_IdEnv :: IdEnv (Id, a) -> IdEnv (Id, a) -> IdEnv (Id, a)
-grow_IdEnv env1 env2 = growIdEnv env1 env2
+grow_IdEnv env1 env2 = plusVarEnv env1 env2
 
 addOneTo_IdEnv :: IdEnv (Id, a) -> Id -> a -> IdEnv (Id, a)
-addOneTo_IdEnv env k v = addOneToIdEnv env k (k, v)
+addOneTo_IdEnv env k v = extendVarEnv env k (k, v)
 
 combine_IdEnvs :: (a->a->a) -> IdEnv (Id, a) -> IdEnv (Id, a) -> IdEnv (Id, a)
-combine_IdEnvs combiner env1 env2 = combineIdEnvs new_combiner env1 env2
+combine_IdEnvs combiner env1 env2 = plusVarEnv_C new_combiner env1 env2
   where
     new_combiner (id, x) (_, y) = (id, combiner x y)
 
 dom_IdEnv :: IdEnv (Id, a) -> Refs
-dom_IdEnv env = mkUniqSet [ i | (i,_) <- rngIdEnv env ]
+dom_IdEnv env = mkVarSet [ i | (i,_) <- rngVarEnv env ]
 
 lookup_IdEnv :: IdEnv (Id, a) -> Id -> Maybe a
-lookup_IdEnv env key = case lookupIdEnv env key of
+lookup_IdEnv env key = case lookupVarEnv env key of
 			   Nothing    -> Nothing
 			   Just (_,a) -> Just a
 -- end backward compat stuff
@@ -107,11 +104,11 @@ newtype AbFun = Fun (Closure -> Closure)
 -- partain: speeding-up stuff
 
 type CaseBoundVars = IdSet
-noCaseBound   = emptyUniqSet
-isCaseBound   = elementOfUniqSet
+noCaseBound   = emptyVarSet
+isCaseBound   = elemVarSet
 x `notCaseBound` y = not (isCaseBound x y)
 moreCaseBound :: CaseBoundVars -> [Id] -> CaseBoundVars
-moreCaseBound old new = old `unionUniqSets` mkUniqSet new
+moreCaseBound old new = old `unionVarSet` mkVarSet new
 
 -- end speeding-up
 \end{code}
@@ -141,18 +138,18 @@ Represent a list of references as an ordered list.
 
 \begin{code}
 mkRefs :: [Id] -> Refs
-mkRefs = mkUniqSet
+mkRefs = mkVarSet
 
 noRefs :: Refs
-noRefs = emptyUniqSet
+noRefs = emptyVarSet
 
-elemRefs = elementOfUniqSet
+elemRefs = elemVarSet
 
 merge :: [Refs] -> Refs
-merge xs = foldr merge2 emptyUniqSet xs
+merge xs = foldr merge2 emptyVarSet xs
 
 merge2 :: Refs -> Refs -> Refs
-merge2 = unionUniqSets
+merge2 = unionVarSet
 \end{code}
 
 %-----------------------------------------------------------------------------
@@ -215,12 +212,13 @@ udData vs cvs
 \subsection{Analysing an atom}
 
 \begin{code}
-udAtom :: CaseBoundVars -> StgArg -> AbVal
-udAtom cvs (StgVarArg v)
-	| v `isCaseBound` cvs = const unknownClosure
-	| otherwise	      = lookup v
+udVar :: CaseBoundVars -> Id -> AbVal
+udVar cvs v | v `isCaseBound` cvs = const unknownClosure
+	    | otherwise	          = lookup v
 
-udAtom cvs _		      = const noClosure
+udAtom :: CaseBoundVars -> StgArg -> AbVal
+udAtom cvs (StgVarArg v) = udVar cvs v
+udAtom cvs _		 = const noClosure
 \end{code}
 
 %-----------------------------------------------------------------------------
@@ -232,10 +230,9 @@ ud :: StgExpr			-- Expression to be analysed
    -> IdEnvClosure			-- Current environment
    -> (StgExpr, AbVal)		-- (New expression, abstract value)
 
-ud e@(StgPrim _ vs _) cvs p = (e, udData vs cvs)
 ud e@(StgCon  _ vs _) cvs p = (e, udData vs cvs)
-ud e@(StgSCC ty lab a)   cvs p = ud a cvs p =: \(a', abval_a) ->
-                                 (StgSCC ty lab a', abval_a)
+ud e@(StgSCC lab a)  cvs p = ud a cvs p =: \(a', abval_a) ->
+                                 (StgSCC lab a', abval_a)
 \end{code}
 
 Here is application. The first thing to do is analyse the head, and
@@ -246,11 +243,11 @@ abstract function iff the atom is a local variable.
 I've left the type signature for doApp in to make things a bit clearer.
 
 \begin{code}
-ud e@(StgApp a atoms lvs) cvs p
+ud e@(StgApp a atoms) cvs p
   = (e, abval_app)
   where
     abval_atoms = map (udAtom cvs) atoms
-    abval_a     = udAtom cvs a
+    abval_a     = udVar cvs a
     abval_app = \p ->
 	let doApp :: Closure -> AbVal -> Closure
 	    doApp (c, b, Fun f) abval_atom =
@@ -259,7 +256,7 @@ ud e@(StgApp a atoms lvs) cvs p
 		  (combine_IdEnvs (+) c' c, b', f')
 	in foldl doApp (abval_a p) abval_atoms
 
-ud (StgCase expr lve lva uniq alts) cvs p
+ud (StgCase expr lve lva bndr srt alts) cvs p
   = ud expr cvs p			=: \(expr', abval_selector)  ->
     udAlt alts p			=: \(alts', abval_alts) ->
     let
@@ -269,8 +266,10 @@ ud (StgCase expr lve lva uniq alts) cvs p
 	  let bs' = b `merge2` bs in
      	  (combine_IdEnvs (+) c cs, bs', dont_know bs')
     in
-    (StgCase expr' lve lva uniq alts', abval_case)
+    (StgCase expr' lve lva bndr srt alts', abval_case)
   where
+
+    alts_cvs = moreCaseBound cvs [bndr]
 
     udAlt :: StgCaseAlts
           -> IdEnvClosure
@@ -294,10 +293,11 @@ ud (StgCase expr lve lva uniq alts) cvs p
         = udManyAlts alts def udPrimAlt (StgPrimAlts ty) p
 
     udPrimAlt p (l, e)
-      = ud e cvs p		=: \(e', v) -> ((l, e'), v)
+      = ud e alts_cvs p		=: \(e', v) -> ((l, e'), v)
 
     udAlgAlt p (id, vs, use_mask, e)
-      = ud e (moreCaseBound cvs vs) p	=: \(e', v) -> ((id, vs, use_mask, e'), v)
+      = ud e (moreCaseBound alts_cvs vs) p 	
+				=: \(e', v) -> ((id, vs, use_mask, e'), v)
 
     udDef :: StgCaseDefault
           -> IdEnvClosure
@@ -305,9 +305,9 @@ ud (StgCase expr lve lva uniq alts) cvs p
 
     udDef StgNoDefault p
       = (StgNoDefault, \p -> (null_IdEnv, noRefs, dont_know noRefs))
-    udDef (StgBindDefault v is_used expr) p
-      = ud expr (moreCaseBound cvs [v]) p 	=: \(expr', abval) ->
-	  (StgBindDefault v is_used expr', abval)
+    udDef (StgBindDefault expr) p
+      = ud expr alts_cvs p	=: \(expr', abval) ->
+	  (StgBindDefault expr', abval)
 
     udManyAlts alts def udalt stgalts p
 	= udDef def p				=: \(def', abval_def) ->
@@ -373,7 +373,7 @@ udBinding (StgNonRec v rhs) cvs p
     	   abval p			=: \(c, b, abfun) ->
 	   (c, unit_IdEnv v (a, b, abfun))
 	a = case rhs of
-		StgRhsClosure _ _ _ Updatable [] _ -> unit_IdEnv v 1
+		StgRhsClosure _ _ _ _ Updatable [] _ -> unit_IdEnv v 1
 		_			           -> null_IdEnv
     in (StgNonRec v rhs', [v],  abval_rhs a, abval_rhs null_IdEnv)
 
@@ -402,7 +402,7 @@ udBinding (StgRec ve) cvs p
       = udRhs rhs cvs p		=: \(rhs', abval) ->
 	  (v,(v,rhs'), abval)
 
-    collectfv (_, StgRhsClosure _ _ fv _ _ _) = fv
+    collectfv (_, StgRhsClosure _ _ _ fv _ _ _) = fv
     collectfv (_, StgRhsCon _ con args)       = [ v | (StgVarArg v) <- args ]
 \end{code}
 
@@ -412,9 +412,9 @@ udBinding (StgRec ve) cvs p
 \begin{code}
 udRhs e@(StgRhsCon _ _ vs) cvs p = (e, udData vs cvs)
 
-udRhs (StgRhsClosure cc bi fv u [] body) cvs p
+udRhs (StgRhsClosure cc bi srt fv u [] body) cvs p
   = ud body cvs p			=: \(body', abval_body) ->
-    (StgRhsClosure cc bi fv u [] body', abval_body)
+    (StgRhsClosure cc bi srt fv u [] body', abval_body)
 \end{code}
 
 Here is the code for closures with arguments.  A closure has a number
@@ -423,14 +423,14 @@ We build up the analysis using foldr with the function doLam to
 analyse each lambda expression.
 
 \begin{code}
-udRhs (StgRhsClosure cc bi fv u args body) cvs p
+udRhs (StgRhsClosure cc bi srt fv u args body) cvs p
   = ud body cvs p			=: \(body', abval_body) ->
     let
 	fv' = map lookup (filter (`notCaseBound` cvs) fv)
         abval_rhs = \p ->
 	     foldr doLam (\b -> abval_body) args (getrefs p fv' noRefs) p
     in
-    (StgRhsClosure cc bi fv u args body', abval_rhs)
+    (StgRhsClosure cc bi srt fv u args body', abval_rhs)
     where
 
       doLam :: Id -> (Refs -> AbVal) -> Refs -> AbVal
@@ -451,10 +451,10 @@ arguments (closures with arguments are re-entrant).
 \begin{code}
 tag :: Refs -> IdEnvInt -> StgBinding -> StgBinding
 
-tag b c r@(StgNonRec v (StgRhsClosure cc bi fv Updatable [] body))
+tag b c r@(StgNonRec v (StgRhsClosure cc bi srt fv Updatable [] body))
   = if (v `notInRefs` b) && (lookupc c v <= 1)
     then -- trace "One!" (
-	   StgNonRec v (StgRhsClosure cc bi fv SingleEntry [] body)
+	   StgNonRec v (StgRhsClosure cc bi srt fv SingleEntry [] body)
 	   -- )
     else r
 tag b c other = other
@@ -521,7 +521,7 @@ mkUpdateSpec v f = {- removeSuperfluous2s -} (map countUses ids)
 	    where
 		(c,b,_)     = foldl doApp f ids
 	      	ids         = map mkid (getBuiltinUniques arity)
-	      	mkid u      = mkSysLocal SLIT("upd") u noType noSrcLoc
+	      	mkid u      = mkSysLocal u noType
 	      	countUses u = if u `elemRefs` b then 2 else min (lookupc c u) 2
 	      	noType      = panic "UpdAnal: no type!"
 
@@ -552,7 +552,7 @@ attachUpdateInfoToBinds b p
   where attachOne v
 		| externallyVisibleId v
 			= let c = lookup v p in
-		 		addIdUpdateInfo v
+		 		setIdUpdateInfo v
 					(mkUpdateInfo (mkUpdateSpec v c))
 		| otherwise    = v
 \end{code}

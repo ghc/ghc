@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1997
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[RnMonad]{The monad used by the renamer}
 
@@ -26,30 +26,34 @@ import List		( intersperse )
 
 import HsSyn		
 import RdrHsSyn
-import BasicTypes	( Version, NewOrData, pprModule )
+import BasicTypes	( Version, pprModule, IfaceFlavour(..) )
 import SrcLoc		( noSrcLoc )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg
 			)
-import Maybes	        ( seqMaybe, mapMaybe )			
-import Name		( Module, Name, OccName, PrintUnqualified, NameSet, emptyNameSet,
+import Name		( Module, Name, OccName, PrintUnqualified,
 			  isLocallyDefinedName,
 			  modAndOcc, NamedThing(..)
 			)
+import NameSet		
 import CmdLineOpts	( opt_D_show_rn_trace, opt_IgnoreIfacePragmas, opt_WarnHiShadows )
 import PrelInfo		( builtinNames )
 import TysWiredIn	( boolTyCon )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique )
 import UniqFM		( UniqFM )
-import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM, addListToFM_C )
+import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM, addListToFM_C, addToFM_C )
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
+import Maybes		( seqMaybe, mapMaybe )
 import UniqSet
 import UniqSupply
 import Util
 import Outputable
 import DirUtils		( getDirectoryContents )
 import IO		( hPutStrLn, stderr, isDoesNotExistError )
+import Monad		( foldM )
+import Maybe		( fromMaybe )
+import Constants	( interfaceFileFormatVersion )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -109,7 +113,8 @@ data Necessity = Compulsory | Optional		-- We *must* find definitions for
 
 	-- For getting global names
 data GDown = GDown
-		ModuleHiMap
+		ModuleHiMap   -- for .hi files
+		ModuleHiMap   -- for .hi-boot files
 		(SSTRWRef Ifaces)
 
 	-- For renaming source code
@@ -135,7 +140,7 @@ data RnSMode	= SourceMode			-- Renaming source code
 type SearchPath = [(String,String)]	-- List of (directory,suffix) pairs to search 
                                         -- for interface files.
 
-type ModuleHiMap = FiniteMap String String 
+type ModuleHiMap = FiniteMap String String
    -- mapping from module name to the file path of its corresponding
    -- interface file.
 
@@ -297,12 +302,12 @@ initRn mod us dirs loc do_rn = do
   errs_var  <- sstToIO (newMutVarSST (emptyBag,emptyBag))
   iface_var <- sstToIO (newMutVarSST (emptyIfaces mod))
   occs_var  <- sstToIO (newMutVarSST initOccs)
-  himap     <- mkModuleHiMap dirs
+  (himap, hibmap) <- mkModuleHiMaps dirs
   let
         rn_down = RnDown loc names_var errs_var occs_var
-	g_down  = GDown himap iface_var
+	g_down  = GDown himap hibmap iface_var
 
-	-- do the buisness
+	-- do the business
   res <- sstToIO (do_rn rn_down g_down)
 
 	-- grab errors and return
@@ -334,31 +339,19 @@ initOccs = ([(getName boolTyCon, noSrcLoc)], [])
 \end{code}
 
 \begin{code}
-mkModuleHiMap :: SearchPath -> IO ModuleHiMap
-mkModuleHiMap dirs = do
-  lss <- mapM (uncurry getAllFilesMatching) dirs
-  let ls = concat lss
-  if opt_WarnHiShadows
-   then return (addListToFM_C conflict env ls)
-   else return (addListToFM_C (\ old new -> old) env ls)
+mkModuleHiMaps :: SearchPath -> IO (ModuleHiMap, ModuleHiMap)
+mkModuleHiMaps dirs = foldM (getAllFilesMatching dirs) (env,env) dirs
  where
   env = emptyFM
 
-  conflict old_path new_path
-    | old_path /= new_path = 
-        pprTrace "Warning: " (text "Identically named interface files present on import path, " $$
-			      text (show old_path) <+> text "shadows" $$
-			      text (show new_path) $$
-			      text "on the import path: " <+> 
-			      text (concat (intersperse ":" (map fst dirs))))
-        old_path
-    | otherwise = old_path  -- don't warn about innocous shadowings.
-
-getAllFilesMatching :: FilePath -> String -> IO [(String, FilePath)]
-getAllFilesMatching dir_path suffix = (do
+getAllFilesMatching :: SearchPath
+		    -> (ModuleHiMap, ModuleHiMap)
+		    -> (FilePath, String) 
+		    -> IO (ModuleHiMap, ModuleHiMap)
+getAllFilesMatching dirs hims (dir_path, suffix) = ( do
+    -- fpaths entries do not have dir_path prepended
   fpaths <- getDirectoryContents dir_path
-  -- fpaths entries do not have dir_path prepended
-  return (mapMaybe withSuffix fpaths)
+  return (foldl addModules hims fpaths)
    )  -- soft failure
       `catch` 
         (\ err -> do
@@ -369,7 +362,7 @@ getAllFilesMatching dir_path suffix = (do
 		      else
 	                "' couldn't read, ignoring.")
 	       
-              return [] 
+              return hims
 	    )
  where
    xiffus = reverse dotted_suffix 
@@ -380,27 +373,45 @@ getAllFilesMatching dir_path suffix = (do
       ('.':xs) -> suffix
       ls -> '.':ls
 
-    -- filter out files that have the desired suffix
-   withSuffix nm = go ""  xiffus rev_nm     `seqMaybe` 
-                   go "b" "toob-ih." rev_nm
+   hi_boot_version_xiffus = 
+      reverse (show interfaceFileFormatVersion) ++ '-':hi_boot_xiffus
+   hi_boot_xiffus = "toob-ih." -- .hi-boot reversed.
+
+   addModules his@(hi_env, hib_env) nm = fromMaybe his $ 
+        map (\ (mod_nm,v) -> (addToFM_C addNewOne hi_env mod_nm v, hib_env))
+	    (go xiffus rev_nm)		       `seqMaybe`
+
+        map (\ (mod_nm,v) -> (hi_env, addToFM_C overrideNew hib_env mod_nm v))
+	    (go hi_boot_version_xiffus rev_nm) `seqMaybe`
+
+	map (\ (mod_nm,v) -> (hi_env, addToFM_C addNewOne hib_env mod_nm v))
+	    (go hi_boot_xiffus rev_nm)
     where
      rev_nm  = reverse nm
 
-     -- the prefix is needed to distinguish between a .hi-boot
-     -- file and a normal interface file, i.e., I'm not willing
-     -- to guarantee that the presence of the SOURCE pragma
-     --
-     --   import {-# SOURCE #-} Foo (x)
-     --   import Bar
-     --
-     -- will not cause Foo.hi to somehow be looked at when
-     -- slurping in Bar.
-     -- 
-     go pre [] xs     = Just (pre ++ reverse xs, dir_path ++'/':nm)
-     go _ _  []       = Nothing
-     go pre (x:xs) (y:ys) 
-       | x == y       = go pre xs ys 
+     go [] xs         = Just (reverse xs, dir_path ++'/':nm)
+     go _  []         = Nothing
+     go (x:xs) (y:ys) 
+       | x == y       = go xs ys 
        | otherwise    = Nothing
+
+   addNewOne
+    | opt_WarnHiShadows = conflict
+    | otherwise         = stickWithOld
+
+   stickWithOld old new = old
+   overrideNew old new  = new
+
+   conflict old_path new_path
+    | old_path /= new_path = 
+        pprTrace "Warning: " (text "Identically named interface files present on import path, " $$
+			      text (show old_path) <+> text "shadows" $$
+			      text (show new_path) $$
+			      text "on the import path: " <+> 
+			      text (concat (intersperse ":" (map fst dirs))))
+        old_path
+    | otherwise = old_path  -- don't warn about innocous shadowings.
+
 \end{code}
 
 
@@ -767,22 +778,18 @@ setModeRn new_mode thing_inside rn_down (SDown rn_env local_env mod_name mode)
 
 \begin{code}
 getIfacesRn :: RnMG Ifaces
-getIfacesRn rn_down (GDown dirs iface_var)
+getIfacesRn rn_down (GDown himap hibmap iface_var)
   = readMutVarSST iface_var
 
 setIfacesRn :: Ifaces -> RnMG ()
-setIfacesRn ifaces rn_down (GDown dirs iface_var)
+setIfacesRn ifaces rn_down (GDown himap hibmap iface_var)
   = writeMutVarSST iface_var ifaces
 
-{-
-getSearchPathRn :: RnMG SearchPath
-getSearchPathRn rn_down (GDown dirs iface_var)
-  = returnSST dirs
--}
-
-getModuleHiMap :: RnMG ModuleHiMap
-getModuleHiMap rn_down (GDown himap iface_var)
-  = returnSST himap
+getModuleHiMap :: IfaceFlavour -> RnMG ModuleHiMap
+getModuleHiMap as_source rn_down (GDown himap hibmap iface_var)
+  = case as_source of
+      HiBootFile -> returnSST hibmap
+      _		 -> returnSST himap
 
 \end{code}
 

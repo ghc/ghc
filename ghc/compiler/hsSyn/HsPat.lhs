@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[PatSyntax]{Abstract Haskell syntax---patterns}
 
@@ -23,12 +23,12 @@ import HsExpr		( HsExpr )
 import BasicTypes	( Fixity )
 
 -- others:
-import Id		( Id, dataConTyCon, GenId )
+import Var		( Id, GenTyVar )
+import DataCon		( DataCon, dataConTyCon )
 import Maybes		( maybeToBool )
 import Outputable	
 import TyCon		( maybeTyConSingleCon )
 import Type		( GenType )
-import Name		( NamedThing )
 \end{code}
 
 Patterns come in distinct before- and after-typechecking flavo(u)rs.
@@ -57,7 +57,7 @@ data InPat name
 
   | ListPatIn	    [InPat name]	-- syntactic list
 					-- must have >= 1 elements
-  | TuplePatIn	    [InPat name]	-- tuple
+  | TuplePatIn	    [InPat name] Bool	-- tuple (boxed?)
 
   | RecPatIn	    name 		-- record
 		    [(name, InPat name, Bool)]	-- True <=> source used punning
@@ -72,23 +72,26 @@ data OutPat flexi id
   | AsPat	    id				-- as pattern
 		    (OutPat flexi id)
 
-  | ConPat	    Id				-- Constructor is always an Id
-		    (GenType flexi)    	-- the type of the pattern
-		    [OutPat flexi id]
-
-  | ConOpPat	    (OutPat flexi id)	-- just a special case...
-		    Id
-		    (OutPat flexi id)
-		    (GenType flexi)
   | ListPat		 	    		-- syntactic list
 		    (GenType flexi)	-- the type of the elements
    	    	    [OutPat flexi id]
 
   | TuplePat	    [OutPat flexi id]	-- tuple
+		    Bool		-- boxed?
 						-- UnitPat is TuplePat []
 
-  | RecPat	    Id 				-- record constructor
+  | ConPat	    DataCon
 		    (GenType flexi)    	-- the type of the pattern
+		    [GenTyVar flexi]	-- Existentially bound type variables
+		    [id]		-- Ditto dictionaries
+		    [OutPat flexi id]
+
+  -- ConOpPats are only used on the input side
+
+  | RecPat	    DataCon		-- record constructor
+		    (GenType flexi)    	-- the type of the pattern
+		    [GenTyVar flexi]	-- Existentially bound type variables
+		    [id]		-- Ditto dictionaries
 		    [(Id, OutPat flexi id, Bool)]	-- True <=> source used punning
 
   | LitPat	    -- Used for *non-overloaded* literal patterns:
@@ -160,7 +163,9 @@ pprInPat (ParPatIn pat)
 
 pprInPat (ListPatIn pats)
   = brackets (interpp'SP pats)
-pprInPat (TuplePatIn pats)
+pprInPat (TuplePatIn pats False)
+  = text "(#" <> (interpp'SP pats) <> text "#)"
+pprInPat (TuplePatIn pats True)
   = parens (interpp'SP pats)
 pprInPat (NPlusKPatIn n k)
   = parens (hcat [ppr n, char '+', ppr k])
@@ -184,22 +189,21 @@ pprOutPat (LazyPat pat)	= hcat [char '~', ppr pat]
 pprOutPat (AsPat name pat)
   = parens (hcat [ppr name, char '@', ppr pat])
 
-pprOutPat (ConPat name ty [])
+pprOutPat (ConPat name ty [] [] [])
   = ppr name
 
-pprOutPat (ConPat name ty pats)
-  = hcat [parens (hcat [ppr name, space, interppSP pats])]
-
-pprOutPat (ConOpPat pat1 op pat2 ty)
-  = parens (hcat [ppr pat1, space, ppr op, space, ppr pat2])
+pprOutPat (ConPat name ty tyvars dicts pats)
+  = parens (hsep [ppr name, interppSP tyvars, interppSP dicts, interppSP pats])
 
 pprOutPat (ListPat ty pats)
   = brackets (interpp'SP pats)
-pprOutPat (TuplePat pats)
+pprOutPat (TuplePat pats boxed@True)
   = parens (interpp'SP pats)
+pprOutPat (TuplePat pats unboxed@False)
+  = text "(#" <> (interpp'SP pats) <> text "#)"
 
-pprOutPat (RecPat con ty rpats)
-  = hcat [ppr con, braces (hsep (punctuate comma (map (pp_rpat) rpats)))]
+pprOutPat (RecPat con ty tvs dicts rpats)
+  = hsep [ppr con, interppSP tvs, interppSP dicts, braces (hsep (punctuate comma (map (pp_rpat) rpats)))]
   where
     pp_rpat (v, _, True) = ppr v
     pp_rpat (v, p, _)    = hsep [ppr v, char '=', ppr p]
@@ -261,11 +265,10 @@ failureFreePat (WildPat _) 		  = True
 failureFreePat (VarPat _)  		  = True
 failureFreePat (LazyPat	_) 		  = True
 failureFreePat (AsPat _ pat)		  = failureFreePat pat
-failureFreePat (ConPat con tys pats)	  = only_con con && all failureFreePat pats
-failureFreePat (ConOpPat pat1 con pat2 _) = only_con con && failureFreePat pat1 && failureFreePat pat1
-failureFreePat (RecPat con _ fields)	  = only_con con && and [ failureFreePat pat | (_,pat,_) <- fields ]
+failureFreePat (ConPat con tys _ _ pats)  = only_con con && all failureFreePat pats
+failureFreePat (RecPat con _ _ _ fields)  = only_con con && and [ failureFreePat pat | (_,pat,_) <- fields ]
 failureFreePat (ListPat _ _)		  = False
-failureFreePat (TuplePat pats)		  = all failureFreePat pats
+failureFreePat (TuplePat pats _)	  = all failureFreePat pats
 failureFreePat (DictPat _ _)		  = True
 failureFreePat other_pat		  = False   -- Literals, NPat
 
@@ -277,11 +280,10 @@ patsAreAllCons :: [OutPat a b] -> Bool
 patsAreAllCons pat_list = all isConPat pat_list
 
 isConPat (AsPat _ pat)		= isConPat pat
-isConPat (ConPat _ _ _)		= True
-isConPat (ConOpPat _ _ _ _)	= True
+isConPat (ConPat _ _ _ _ _)	= True
 isConPat (ListPat _ _)		= True
-isConPat (TuplePat _)		= True
-isConPat (RecPat _ _ _)		= True
+isConPat (TuplePat _ _)		= True
+isConPat (RecPat _ _ _ _ _)	= True
 isConPat (DictPat ds ms)	= (length ds + length ms) > 1
 isConPat other			= False
 
@@ -312,6 +314,6 @@ collectPatBinders (ConOpPatIn p1 c f p2) = collectPatBinders p1 ++ collectPatBin
 collectPatBinders (NegPatIn  pat)     	 = collectPatBinders pat
 collectPatBinders (ParPatIn  pat)     	 = collectPatBinders pat
 collectPatBinders (ListPatIn pats)    	 = concat (map collectPatBinders pats)
-collectPatBinders (TuplePatIn pats)   	 = concat (map collectPatBinders pats)
+collectPatBinders (TuplePatIn pats _)  	 = concat (map collectPatBinders pats)
 collectPatBinders (RecPatIn c fields) 	 = concat (map (\ (f,pat,_) -> collectPatBinders pat) fields)
 \end{code}

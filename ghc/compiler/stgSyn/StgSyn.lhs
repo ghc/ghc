@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[StgSyn]{Shared term graph (STG) syntax for spineless-tagless code generation}
 
@@ -16,7 +16,7 @@ module StgSyn (
 	GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
 	GenStgCaseAlts(..), GenStgCaseDefault(..),
 
-	UpdateFlag(..),
+	UpdateFlag(..), isUpdatable,
 
 	StgBinderInfo(..),
 	stgArgOcc, stgUnsatOcc, stgStdHeapOcc, stgNoUpdHeapOcc,
@@ -28,25 +28,30 @@ module StgSyn (
 	StgBinding, StgExpr, StgRhs,
 	StgCaseAlts, StgCaseDefault,
 
-	pprStgBinding, pprStgBindings,
+	-- SRTs
+	SRT(..), noSRT,
+
+	pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs,
 	getArgPrimRep,
 	isLitLitArg,
 	stgArity,
 	collectFinalStgBinders
+
+#ifdef DEBUG
+	, pprStgLVs
+#endif
     ) where
 
 #include "HsVersions.h"
 
-import CostCentre	( showCostCentre, CostCentre )
-import Id		( idPrimRep, DataCon, 
-			  GenId{-instance NamedThing-}, Id )
-import Literal		( literalPrimRep, isLitLitLit, Literal{-instance Outputable-} )
+import CostCentre	( CostCentreStack, CostCentre )
+import Id		( idPrimRep, Id )
+import Const		( Con(..), DataCon, Literal,
+			  conPrimRep, isLitLitLit )
+import PrimRep		( PrimRep(..) )
 import Outputable
-import PrimOp		( PrimOp{-instance Outputable-} )
 import Type             ( Type )
-import Unique		( pprUnique, Unique )
 import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
-import Util		( panic )
 \end{code}
 
 %************************************************************************
@@ -75,17 +80,15 @@ data GenStgBinding bndr occ
 \begin{code}
 data GenStgArg occ
   = StgVarArg	occ
-  | StgLitArg	Literal
-  | StgConArg   DataCon		-- A nullary data constructor
+  | StgConArg   Con		-- A literal or nullary data constructor
 \end{code}
 
 \begin{code}
 getArgPrimRep (StgVarArg  local) = idPrimRep local
-getArgPrimRep (StgConArg  con)	 = idPrimRep con
-getArgPrimRep (StgLitArg  lit)	 = literalPrimRep lit
+getArgPrimRep (StgConArg  con)	 = conPrimRep con
 
-isLitLitArg (StgLitArg x) = isLitLitLit x
-isLitLitArg _		  = False
+isLitLitArg (StgConArg (Literal x)) = isLitLitLit x
+isLitLitArg _		            = False
 \end{code}
 
 %************************************************************************
@@ -115,10 +118,8 @@ type GenStgLiveVars occ = UniqSet occ
 
 data GenStgExpr bndr occ
   = StgApp
-	(GenStgArg occ)	-- function
+	occ		-- function
 	[GenStgArg occ]	-- arguments
-	(GenStgLiveVars occ)	-- Live vars in continuation; ie not
-				-- including the function and args
 
     -- NB: a literal is: StgApp <lit-atom> [] ...
 \end{code}
@@ -129,20 +130,17 @@ data GenStgExpr bndr occ
 %*									*
 %************************************************************************
 
-There are two specialised forms of application, for
-constructors and primitives.
+There are a specialised forms of application, for
+constructors, primitives, and literals.
 \begin{code}
   | StgCon			-- always saturated
-	Id -- data constructor
+	Con
 	[GenStgArg occ]
-	(GenStgLiveVars occ)	-- Live vars in continuation; ie not
-				-- including the constr and args
 
-  | StgPrim			-- always saturated
-	PrimOp
-	[GenStgArg occ]
-	(GenStgLiveVars occ)	-- Live vars in continuation; ie not
-				-- including the op and args
+	Type			-- Result type; this is needed for primops, where
+				-- we need to know the result type so that we can
+				-- assign result registers.
+
 \end{code}
 These forms are to do ``inline versions,'' as it were.
 An example might be: @f x = x:[]@.
@@ -170,10 +168,9 @@ This has the same boxed/unboxed business as Core case expressions.
 			-- binder-variables are NOT counted in the
 			-- free vars for the alt's RHS
 
-	Unique		-- Occasionally needed to compile case
-			-- statements, as the uniq for a local
-			-- variable to hold the tag of a primop with
-			-- algebraic result
+	bndr		-- binds the result of evaluating the scrutinee
+
+	SRT		-- The SRT for the continuation
 
 	(GenStgCaseAlts bndr occ)
 \end{code}
@@ -299,7 +296,6 @@ Finally for @scc@ expressions we introduce a new STG construct.
 
 \begin{code}
   | StgSCC
-	Type			-- the type of the body
 	CostCentre		-- label of SCC expression
 	(GenStgExpr bndr occ)	-- scc expression
   -- end of GenStgExpr
@@ -316,13 +312,14 @@ flavour is for closures:
 \begin{code}
 data GenStgRhs bndr occ
   = StgRhsClosure
-	CostCentre		-- cost centre to be attached (default is CCC)
+	CostCentreStack		-- CCS to be attached (default is CurrentCCS)
 	StgBinderInfo		-- Info about how this binder is used (see below)
+	SRT			-- The closures's SRT
 	[occ]			-- non-global free vars; a list, rather than
 				-- a set, because order is important
 	UpdateFlag		-- ReEntrant | Updatable | SingleEntry
 	[bndr]			-- arguments; if empty, then not a function;
-				-- as above, order is important
+				-- as above, order is important.
 	(GenStgExpr bndr occ)	-- body
 \end{code}
 An example may be in order.  Consider:
@@ -340,12 +337,12 @@ will be exactly that in parentheses above.
 The second flavour of right-hand-side is for constructors (simple but important):
 \begin{code}
   | StgRhsCon
-	CostCentre		-- Cost centre to be attached (default is CCC).
+	CostCentreStack		-- CCS to be attached (default is CurrentCCS).
 				-- Top-level (static) ones will end up with
-				-- DontCareCC, because we don't count static
-				-- data in heap profiles, and we don't set CCC
+				-- DontCareCCS, because we don't count static
+				-- data in heap profiles, and we don't set CCCS
 				-- from static closure.
-	Id			-- constructor
+	DataCon			-- constructor
 	[GenStgArg occ]	-- args
 \end{code}
 
@@ -403,7 +400,7 @@ Just like in @CoreSyntax@ (except no type-world stuff).
 \begin{code}
 data GenStgCaseAlts bndr occ
   = StgAlgAlts	Type	-- so we can find out things about constructor family
-		[(Id,				-- alts: data constructor,
+		[(DataCon,			-- alts: data constructor,
 		  [bndr],			-- constructor's parameters,
 		  [Bool],			-- "use mask", same length as
 						-- parameters; a True in a
@@ -419,10 +416,7 @@ data GenStgCaseAlts bndr occ
 data GenStgCaseDefault bndr occ
   = StgNoDefault				-- small con family: all
 						-- constructor accounted for
-  | StgBindDefault  bndr			-- form: var -> expr
-		    Bool			-- True <=> var is used in rhs
-						-- i.e., False <=> "_ -> expr"
-		    (GenStgExpr bndr occ)
+  | StgBindDefault (GenStgExpr bndr occ)
 \end{code}
 
 %************************************************************************
@@ -457,6 +451,31 @@ data UpdateFlag = ReEntrant | Updatable | SingleEntry
 instance Outputable UpdateFlag where
     ppr u
       = char (case u of { ReEntrant -> 'r';  Updatable -> 'u';  SingleEntry -> 's' })
+
+isUpdatable ReEntrant   = False
+isUpdatable SingleEntry = False
+isUpdatable Updatable   = True
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[Static Reference Tables]{@SRT@}
+%*                                                                      *
+%************************************************************************
+
+There is one SRT per top-level function group.  Each local binding and
+case expression within this binding group has a subrange of the whole
+SRT, expressed as an offset and length.
+
+\begin{code}
+data SRT = NoSRT
+         | SRT !Int{-offset-} !Int{-length-}
+
+noSRT :: SRT
+noSRT = NoSRT
+
+pprSRT (NoSRT) = ptext SLIT("_no_srt_")
+pprSRT (SRT off len) = parens (ppr off <> comma <> ppr len)
 \end{code}
 
 %************************************************************************
@@ -509,7 +528,18 @@ pprStgBinding  :: StgBinding -> SDoc
 pprStgBinding  bind  = pprGenStgBinding bind
 
 pprStgBindings :: [StgBinding] -> SDoc
-pprStgBindings binds = vcat (map (pprGenStgBinding) binds)
+pprStgBindings binds = vcat (map pprGenStgBinding binds)
+
+pprGenStgBindingWithSRT	 
+	:: (Outputable bndr, Outputable bdee, Ord bdee) 
+	=> (GenStgBinding bndr bdee,[Id]) -> SDoc
+
+pprGenStgBindingWithSRT (bind,srt)  
+  = vcat [ pprGenStgBinding bind,
+	   ptext SLIT("SRT: ") <> ppr srt ]
+
+pprStgBindingsWithSRTs :: [(StgBinding,[Id])] -> SDoc
+pprStgBindingsWithSRTs binds = vcat (map pprGenStgBindingWithSRT binds)
 \end{code}
 
 \begin{code}
@@ -534,30 +564,23 @@ pprStgArg :: (Outputable bdee) => GenStgArg bdee -> SDoc
 
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgConArg con) = ppr con
-pprStgArg (StgLitArg lit) = ppr lit
 \end{code}
 
 \begin{code}
 pprStgExpr :: (Outputable bndr, Outputable bdee, Ord bdee)
 	   => GenStgExpr bndr bdee -> SDoc
 -- special case
-pprStgExpr (StgApp func [] lvs)
-  = (<>) (ppr func) (pprStgLVs lvs)
+pprStgExpr (StgApp func []) = ppr func
 
 -- general case
-pprStgExpr (StgApp func args lvs)
-  = hang ((<>) (ppr func) (pprStgLVs lvs))
+pprStgExpr (StgApp func args)
+  = hang (ppr func)
 	 4 (sep (map (ppr) args))
 \end{code}
 
 \begin{code}
-pprStgExpr (StgCon con args lvs)
-  = hcat [ (<>) (ppr con) (pprStgLVs lvs),
-		ptext SLIT("! ["), interppSP args, char ']' ]
-
-pprStgExpr (StgPrim op args lvs)
-  = hcat [ ppr op, char '#', pprStgLVs lvs,
-		ptext SLIT(" ["), interppSP args, char ']' ]
+pprStgExpr (StgCon con args _)
+  = hsep [ ppr con, brackets (interppSP args)]
 \end{code}
 
 \begin{code}
@@ -569,11 +592,11 @@ pprStgExpr (StgPrim op args lvs)
 --
 -- Very special!  Suspicious! (SLPJ)
 
-pprStgExpr (StgLet (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag args rhs))
+pprStgExpr (StgLet (StgNonRec bndr (StgRhsClosure cc bi srt free_vars upd_flag args rhs))
 		    	expr@(StgLet _ _))
   = ($$)
       (hang (hcat [ptext SLIT("let { "), ppr bndr, ptext SLIT(" = "),
-			  text (showCostCentre True{-as string-} cc),
+			  ppr cc,
 			  pp_binder_info bi,
 			  ptext SLIT(" ["), ifPprDebug (interppSP free_vars), ptext SLIT("] \\"),
 			  ppr upd_flag, ptext SLIT(" ["),
@@ -606,30 +629,29 @@ pprStgExpr (StgLetNoEscape lvs_whole lvs_rhss bind expr)
 \end{code}
 
 \begin{code}
-pprStgExpr (StgSCC ty cc expr)
-  = sep [ hsep [ptext SLIT("_scc_"), text (showCostCentre True{-as string-} cc)],
-	    pprStgExpr expr ]
+pprStgExpr (StgSCC cc expr)
+  = sep [ hsep [ptext SLIT("_scc_"), ppr cc],
+	  pprStgExpr expr ]
 \end{code}
 
 \begin{code}
-pprStgExpr (StgCase expr lvs_whole lvs_rhss uniq alts)
+pprStgExpr (StgCase expr lvs_whole lvs_rhss bndr srt alts)
   = sep [sep [ptext SLIT("case"),
 	   nest 4 (hsep [pprStgExpr expr,
 	     ifPprDebug (ptext SLIT("::") <> pp_ty alts)]),
-	   ptext SLIT("of {")],
+	   ptext SLIT("of"), ppr bndr, char '{'],
 	   ifPprDebug (
 	   nest 4 (
 	     hcat [ptext  SLIT("-- lvs: ["), interppSP (uniqSetToList lvs_whole),
 		    ptext SLIT("]; rhs lvs: ["), interppSP (uniqSetToList lvs_rhss),
-		    ptext SLIT("]; uniq: "), pprUnique uniq])),
+		    ptext SLIT("]; "),
+		    pprMaybeSRT srt])),
 	   nest 2 (ppr_alts alts),
 	   char '}']
   where
     ppr_default StgNoDefault = empty
-    ppr_default (StgBindDefault bndr used expr)
-      = hang (hsep [pp_binder, ptext SLIT("->")]) 4 (ppr expr)
-      where
-    	pp_binder = if used then ppr bndr else char '_'
+    ppr_default (StgBindDefault expr)
+      = hang (hsep [ptext SLIT("DEFAULT"), ptext SLIT("->")]) 4 (ppr expr)
 
     pp_ty (StgAlgAlts  ty _ _) = ppr ty
     pp_ty (StgPrimAlts ty _ _) = ppr ty
@@ -666,23 +688,28 @@ pprStgRhs :: (Outputable bndr, Outputable bdee, Ord bdee)
 	  => GenStgRhs bndr bdee -> SDoc
 
 -- special case
-pprStgRhs (StgRhsClosure cc bi [free_var] upd_flag [{-no args-}] (StgApp func [] lvs))
-  = hcat [ text (showCostCentre True{-as String-} cc),
+pprStgRhs (StgRhsClosure cc bi srt [free_var] upd_flag [{-no args-}] (StgApp func []))
+  = hcat [ ppr cc,
 	   pp_binder_info bi,
+	   pprMaybeSRT srt,
 	   brackets (ifPprDebug (ppr free_var)),
 	   ptext SLIT(" \\"), ppr upd_flag, ptext SLIT(" [] "), ppr func ]
 
 -- general case
-pprStgRhs (StgRhsClosure cc bi free_vars upd_flag args body)
-  = hang (hcat [text (showCostCentre True{-as String-} cc),
+pprStgRhs (StgRhsClosure cc bi srt free_vars upd_flag args body)
+  = hang (hcat [ppr cc,
 		pp_binder_info bi,
+		pprMaybeSRT srt,
 		brackets (ifPprDebug (interppSP free_vars)),
 		ptext SLIT(" \\"), ppr upd_flag, brackets (interppSP args)])
 	 4 (ppr body)
 
 pprStgRhs (StgRhsCon cc con args)
-  = hcat [ text (showCostCentre True{-as String-} cc),
+  = hcat [ ppr cc,
 	   space, ppr con, ptext SLIT("! "), brackets (interppSP args)]
+
+pprMaybeSRT (NoSRT) = empty
+pprMaybeSRT srt     = ptext SLIT(" srt: ") <> pprSRT srt
 
 --------------
 
@@ -707,5 +734,5 @@ from the STG bindings.
 stgArity :: StgRhs -> Int
 
 stgArity (StgRhsCon _ _ _)	         = 0 -- it's a constructor, fully applied
-stgArity (StgRhsClosure _ _ _ _ args _ ) = length args
+stgArity (StgRhsClosure _ _ _ _ _ args _ ) = length args
 \end{code}

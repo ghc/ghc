@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1995
+% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 \section[TcDefaults]{Typechecking \tr{default} declarations}
 

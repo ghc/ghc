@@ -1,0 +1,13 @@
+Reading file "IOExts.lhs":
+Reading file "ST.lhs":
+Reading file "Monad.hs":
+Reading file "ST.lhs":
+Reading file "IOExts.lhs":
+Reading file "test/exts/refs1.hs":
+Type :? for help
+Hugs:'a'
+
+Hugs:'b'
+
+Hugs:(True,False,True)
+

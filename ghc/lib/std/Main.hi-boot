@@ -6,8 +6,6 @@
 --      external reference to Main.main
 ---------------------------------------------------------------------------
  
-_interface_ Main 1
-_exports_
-Main main ;
-_declarations_
-1 main _:_ PrelIOBase.IO PrelBase.();;
+__interface Main 1 where
+__export Main main ;
+1 main :: PrelIOBase.IO PrelBase.();

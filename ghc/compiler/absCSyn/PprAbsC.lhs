@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 %************************************************************************
 %*									*
@@ -13,6 +13,7 @@ module PprAbsC (
 	dumpRealC
 #ifdef DEBUG
 	, pprAmode -- otherwise, not exported
+	, pprMagicId
 #endif
     ) where
 
@@ -25,31 +26,38 @@ import ClosureInfo
 import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			  mixedPtrLocn, mixedTypeLocn
 			)
+
+import Constants	( mIN_UPD_SIZE )
 import CallConv		( CallConv, callConvAttribute, cCallConv )
-import Constants	( spARelToInt, spBRelToInt, mIN_UPD_SIZE )
 import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
 			  isReadOnly, needsCDecl, pprCLabel,
-			  CLabel{-instance Ord-}
+			  mkReturnInfoLabel, mkReturnPtLabel,
+			  CLabel, CLabelType(..), labelType
 			)
+
 import CmdLineOpts	( opt_SccProfilingOn, opt_EmitCExternDecls, opt_GranMacros )
-import CostCentre	( uppCostCentre, uppCostCentreDecl )
+import CostCentre	( pprCostCentreDecl, pprCostCentreStackDecl )
+
 import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
 import CStrings		( stringToC )
 import FiniteMap	( addToFM, emptyFM, lookupFM, FiniteMap )
-import HeapOffs		( isZeroOff, subOff, pprHeapOffset )
-import Literal		( showLiteral, Literal(..) )
+import Const		( Literal(..) )
 import Maybes		( maybeToBool, catMaybes )
 import PrimOp		( primOpNeedsWrapper, pprPrimOp, PrimOp(..) )
-import PrimRep		( isFloatingRep, PrimRep(..), showPrimRep )
-import SMRep		( getSMInfoStr, getSMInitHdrStr, getSMUpdInplaceHdrStr,
-			  isConstantRep, isSpecRep, isPhantomRep
-			)
+import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize, showPrimRep )
+import SMRep		( getSMRepStr )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
 			  addOneToUniqSet, UniqSet
 			)
+import StgSyn		( SRT(..) )
+import BitSet		( intBS )
 import Outputable
 import Util		( nOfThem, panic, assertPanic )
+import Addr		( Addr )
+
+import ST
+import MutableArray
 
 infixr 9 `thenTE`
 \end{code}
@@ -60,18 +68,34 @@ call to a cost evaluation function @GRAN_EXEC@. For that,
 @pprAbsC@ has a new ``costs'' argument.  %% HWL
 
 \begin{code}
-writeRealC :: Handle -> AbstractC -> SDoc -> IO ()
---writeRealC handle absC postlude = 
+{-
+writeRealC :: Handle -> AbstractC -> IO ()
+writeRealC handle absC
+     -- avoid holding on to the whole of absC in the !Gransim case.
+     if opt_GranMacros
+	then printForCFast fp (pprAbsC absC (costs absC))
+	else printForCFast fp (pprAbsC absC (panic "costs"))
+	     --printForC handle (pprAbsC absC (panic "costs"))
+dumpRealC :: AbstractC -> SDoc
+dumpRealC absC = pprAbsC absC (costs absC)
+-}
+
+writeRealC :: Handle -> AbstractC -> IO ()
+--writeRealC handle absC = 
 -- _scc_ "writeRealC" 
 -- printDoc LeftMode handle (pprAbsC absC (costs absC))
-writeRealC handle absC postlude = 
- _scc_ "writeRealC" 
- printForC handle (pprAbsC absC (costs absC) $$ postlude)
 
-dumpRealC :: AbstractC -> SDoc -> SDoc
-dumpRealC absC postlude 
- | opt_GranMacros = pprCode CStyle (pprAbsC absC (costs absC)    $$ postlude)
- | otherwise	  = pprCode CStyle (pprAbsC absC (panic "costs") $$ postlude)
+writeRealC handle absC
+ | opt_GranMacros = _scc_ "writeRealC" printForC handle $ 
+				       pprCode CStyle (pprAbsC absC (costs absC))
+ | otherwise	  = _scc_ "writeRealC" printForC handle $
+				       pprCode CStyle (pprAbsC absC (panic "costs"))
+
+dumpRealC :: AbstractC -> SDoc
+dumpRealC absC
+ | opt_GranMacros = pprCode CStyle (pprAbsC absC (costs absC))
+ | otherwise	  = pprCode CStyle (pprAbsC absC (panic "costs"))
+
 \end{code}
 
 This emits the macro,  which is used in GrAnSim  to compute the total costs
@@ -80,7 +104,8 @@ from a cost 5 tuple. %%  HWL
 \begin{code}
 emitMacro :: CostRes -> SDoc
 
--- ToDo: Check a compile time flag to decide whether a macro should be emitted
+emitMacro _ | not opt_GranMacros = empty
+
 emitMacro (Cost (i,b,l,s,f))
   = hcat [ ptext SLIT("GRAN_EXEC"), char '(',
                           int i, comma, int b, comma, int l, comma,
@@ -98,10 +123,8 @@ pprAbsC :: AbstractC -> CostRes -> SDoc
 pprAbsC AbsCNop _ = empty
 pprAbsC (AbsCStmts s1 s2) c = ($$) (pprAbsC s1 c) (pprAbsC s2 c)
 
-pprAbsC (CClosureUpdInfo info) c
-  = pprAbsC info c
-
 pprAbsC (CAssign dest src) _ = pprAssign (getAmodeRep dest) dest src
+
 pprAbsC (CJump target) c
   = ($$) (hcat [emitMacro c {-WDP:, text "/* <--++  CJump */"-} ])
 	     (hcat [ text jmp_lit, pprAmode target, pp_paren_semi ])
@@ -118,10 +141,11 @@ pprAbsC (CReturn am return_info)  c
 	     (hcat [text jmp_lit, target, pp_paren_semi ])
   where
    target = case return_info of
-    	DirectReturn -> hcat [ptext SLIT("DIRECT"),char '(', pprAmode am, rparen]
+    	DirectReturn -> hcat [char '(', pprAmode am, rparen]
 	DynamicVectoredReturn am' -> mk_vector (pprAmode am')
 	StaticVectoredReturn n -> mk_vector (int n)	-- Always positive
-   mk_vector x = hcat [parens (pprAmode am), brackets (text "RVREL" <> parens x)]
+   mk_vector x = hcat [text "RET_VEC", char '(', pprAmode am, comma,
+		       x, rparen ]
 
 pprAbsC (CSplitMarker) _ = ptext SLIT("/* SPLIT */")
 
@@ -185,10 +209,14 @@ pprAbsC (CSwitch discrim alts deflt) c -- general case
     -- Costs for addressing header of switch and cond. branching        -- HWL
     switch_head_cost = addrModeCosts discrim Rhs + (Cost (0, 1, 0, 0, 0))
 
-pprAbsC stmt@(COpStmt results op@(CCallOp _ _ _ _ _ _) args liveness_mask vol_regs) _
-  = pprCCall op args results liveness_mask vol_regs
+{-
+pprAbsC stmt@(COpStmt results op@(CCallOp _ _ _) args vol_regs) _
+  = pprCCall op args results vol_regs
+-}
+pprAbsC stmt@(COpStmt results op@(CCallOp _ _ _ _) args vol_regs) _
+  = pprCCall op args results vol_regs
 
-pprAbsC stmt@(COpStmt results op args liveness_mask vol_regs) _
+pprAbsC stmt@(COpStmt results op args vol_regs) _
   = let
 	non_void_args = grab_non_void_amodes args
 	non_void_results = grab_non_void_amodes results
@@ -221,19 +249,43 @@ pprAbsC stmt@(COpStmt results op args liveness_mask vol_regs) _
       -- primop macros do their own casting of result;
       -- hence we can toss the provided cast...
 
+pprAbsC stmt@(CSRT lbl closures) c
+  = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
+         pp_exts
+      $$ ptext SLIT("SRT") <> lparen <> pprCLabel lbl <> rparen
+      $$ nest 2 (hcat (punctuate comma (map pp_closure_lbl closures)))
+         <> ptext SLIT("};")
+  }
+  where pp_closure_lbl lbl = char '&' <> pprCLabel lbl
+
+pprAbsC stmt@(CBitmap lbl mask) c
+  = vcat [
+	hcat [ ptext SLIT("BITMAP"), lparen, 
+			pprCLabel lbl, comma,
+	       		int (length mask), 
+	       rparen ],
+        hcat (punctuate comma (map (int.intBS) mask)),
+	ptext SLIT("}};")
+    ]
+
 pprAbsC (CSimultaneous abs_c) c
   = hcat [ptext SLIT("{{"), pprAbsC abs_c c, ptext SLIT("}}")]
 
-pprAbsC stmt@(CMacroStmt macro as) _
+pprAbsC (CCheck macro as code) c
+  = hcat [text (show macro), lparen,
+       hcat (punctuate comma (map ppr_amode as)), comma,
+       pprAbsC code c, pp_paren_semi
+    ]
+pprAbsC (CMacroStmt macro as) _
   = hcat [text (show macro), lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi] -- no casting
-pprAbsC stmt@(CCallProfCtrMacro op as) _
+pprAbsC (CCallProfCtrMacro op as) _
   = hcat [ptext op, lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi]
-pprAbsC stmt@(CCallProfCCMacro op as) _
+pprAbsC (CCallProfCCMacro op as) _
   = hcat [ptext op, lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi]
-pprAbsC stmt@(CCallTypedef op@(CCallOp op_str is_asm may_gc cconv _ _) results args) _
+pprAbsC stmt@(CCallTypedef op@(CCallOp op_str is_asm may_gc cconv) results args) _
   =  hsep [ ptext SLIT("typedef")
 	  , ccall_res_ty
 	  , fun_nm
@@ -284,100 +336,80 @@ pprAbsC (CCodeBlock label abs_C) _
 	char '}' ]
     }
 
-pprAbsC (CInitHdr cl_info reg_rel cost_centre inplace_upd) _
-  = hcat [ pp_init_hdr, text "_HDR(",
+
+pprAbsC (CInitHdr cl_info reg_rel cost_centre) _
+  = hcat [ ptext SLIT("SET_HDR_"), char '(',
 		ppr_amode (CAddr reg_rel), comma,
-		pprCLabel info_lbl, comma,
-		if_profiling (pprAmode cost_centre), comma,
-		pprHeapOffset size, comma, int ptr_wds, pp_paren_semi ]
+		pprCLabelAddr info_lbl, comma,
+		if_profiling (pprAmode cost_centre),
+		pp_paren_semi ]
   where
     info_lbl	= infoTableLabelFromCI cl_info
-    sm_rep	= closureSMRep	   cl_info
-    size	= closureSizeWithoutFixedHdr cl_info
-    ptr_wds	= closurePtrsSize  cl_info
-
-    pp_init_hdr = text (if inplace_upd then
-			    getSMUpdInplaceHdrStr sm_rep
-		  	else
-			    getSMInitHdrStr sm_rep)
 
 pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
   = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
     vcat [
 	pp_exts,
 	hcat [
-		ptext SLIT("SET_STATIC_HDR"),char '(',
-		pprCLabel closure_lbl,			comma,
+		ptext SLIT("SET_STATIC_HDR"), char '(',
+		pprCLabel closure_lbl,			        comma,
 		pprCLabel info_lbl,				comma,
-		if_profiling (pprAmode cost_centre),	comma,
+		if_profiling (pprAmode cost_centre), 		comma,
 		ppLocalness closure_lbl,			comma,
-		ppLocalnessMacro False{-for data-} info_lbl,
+		ppLocalnessMacro info_lbl,
 		char ')'
 		],
-	nest 2 (hcat (map ppr_item amodes)),
-	nest 2 (hcat (map ppr_item padding_wds)),
+	nest 2 (ppr_payload (amodes ++ padding_wds)),
 	ptext SLIT("};") ]
     }
   where
     info_lbl = infoTableLabelFromCI cl_info
 
-    ppr_item item
-      = if getAmodeRep item == VoidRep
-	then text ", (W_) 0" -- might not even need this...
-	else (<>) (text ", (W_)") (ppr_amode item)
+    ppr_payload [] = empty
+    ppr_payload ls = comma <+> 
+		     braces (hsep (punctuate comma (map ((text "(L_)" <>).ppr_item) ls)))
 
+    ppr_item item
+      | rep == VoidRep   = text "0" -- might not even need this...
+      | rep == FloatRep  = ppr_amode (floatToWord item)
+      | rep == DoubleRep = hcat (punctuate (text ", (L_)")
+			 	 (map ppr_amode (doubleToWords item)))
+      | otherwise  	 = ppr_amode item
+      where 
+	rep = getAmodeRep item
+
+    -- always at least one padding word: this is the static link field for
+    -- the garbage collector.
     padding_wds =
 	if not (closureUpdReqd cl_info) then
-	    []
+	    [mkIntCLit 0]
     	else
-	    case (max 0 (mIN_UPD_SIZE - length amodes)) of { still_needed ->
+	    case 1 + (max 0 (mIN_UPD_SIZE - length amodes)) of { still_needed ->
 	    nOfThem still_needed (mkIntCLit 0) } -- a bunch of 0s
 
-{-
-   STATIC_INIT_HDR(c,i,localness) blows into:
-	localness W_ c_closure [] = { i_info, extra_fixed_wd<1..n>
-
-   then *NO VarHdr STUFF FOR STATIC*...
-
-   then the amodes are dropped in...
-	,a1 ,a2 ... ,aN
-   then a close brace:
-	};
--}
-
-pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr liveness) _
+pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast srt cl_descr) _
   = vcat [
 	hcat [
-	    pp_info_rep,
-	    ptext SLIT("_ITBL"),char '(',
-	    pprCLabel info_lbl,			comma,
+	     ptext SLIT("INFO_TABLE"),
+	     ( if is_selector then
+	         ptext SLIT("_SELECTOR")
+	       else if is_constr then
+		 ptext SLIT("_CONSTR")
+	       else if needs_srt then
+	         ptext SLIT("_SRT")
+               else empty ), char '(',
 
-		-- CONST_ITBL needs an extra label for
-		-- the static version of the object.
-	    if isConstantRep sm_rep
-	    then (<>) (pprCLabel (closureLabelFromCI cl_info)) comma
-	    else empty,
+	    pprCLabel info_lbl,			        comma,
+	    pprCLabel slow_lbl,				comma,
+	    pp_rest, {- ptrs,nptrs,[srt,]type,-}	comma,
 
-	    pprCLabel slow_lbl,	comma,
-    	    pprAmode upd,		comma,
-	    int liveness,		comma,
+	    ppLocalness info_lbl,			comma,
+	    ppLocalnessMacro slow_lbl,			comma,
 
-	    pp_tag,			comma,
-	    pp_size, 			comma,
-	    pp_ptr_wds,			comma,
-
-	    ppLocalness info_lbl,				comma,
-	    ppLocalnessMacro True{-function-} slow_lbl,		comma,
-
-	    if is_selector
-	    then (<>) (int select_word_i) comma
-	    else empty,
-
-	    if_profiling pp_kind, comma,
 	    if_profiling pp_descr, comma,
 	    if_profiling pp_type,
 	    text ");"
-	],
+	     ],
 	pp_slow,
 	case maybe_fast of
 	    Nothing -> empty
@@ -387,7 +419,6 @@ pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr liveness)
   where
     info_lbl	= infoTableLabelFromCI cl_info
     fast_lbl    = fastLabelFromCI cl_info
-    sm_rep	= closureSMRep	  cl_info
 
     (slow_lbl, pp_slow)
       = case (nonemptyAbsC slow) of
@@ -398,78 +429,127 @@ pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr liveness)
 
     maybe_selector = maybeSelectorInfo cl_info
     is_selector = maybeToBool maybe_selector
-    (Just (_, select_word_i)) = maybe_selector
+    (Just select_word_i) = maybe_selector
 
-    pp_info_rep	    -- special stuff if it's a selector; otherwise, just the SMrep
-      = text (if is_selector then "SELECT" else (getSMInfoStr sm_rep))
+    maybe_tag = closureSemiTag cl_info
+    is_constr = maybeToBool maybe_tag
+    (Just tag) = maybe_tag
 
-    pp_tag = int (closureSemiTag cl_info)
+    needs_srt = has_srt srt && needsSRT cl_info
 
-    is_phantom = isPhantomRep sm_rep
+    size = closureNonHdrSize cl_info
 
-    pp_size = if isSpecRep sm_rep then	-- exploiting: SPEC_VHS == 0 (always)
-		 int (closureNonHdrSize cl_info)
+    ptrs        = closurePtrsSize cl_info
+    nptrs	= size - ptrs
 
-	      else if is_phantom then	-- do not have sizes for these
-		 empty
-	      else
-		 pprHeapOffset (closureSizeWithoutFixedHdr cl_info)
+    pp_rest | is_selector      = int select_word_i
+            | otherwise        = hcat [
+	          int ptrs,		comma,
+		  int nptrs,		comma,
+		  if is_constr then
+			hcat [ int tag, comma ]
+                  else if needs_srt then
+			pp_srt_info srt
+		  else empty,
+		  type_str ]
 
-    pp_ptr_wds	= if is_phantom then
-		     empty
-		  else
-		     int (closurePtrsSize cl_info)
+    type_str = text (getSMRepStr (closureSMRep cl_info))
 
-    pp_kind  = text (closureKind cl_info)
     pp_descr = hcat [char '"', text (stringToC cl_descr), char '"']
     pp_type  = hcat [char '"', text (stringToC (closureTypeDescr cl_info)), char '"']
 
-pprAbsC (CRetVector lbl maybes deflt) c
-  = vcat [ ptext SLIT("{ // CRetVector (lbl????)"),
-	       nest 8 (sep (map ppr_maybe_amode maybes)),
-	       text "} /*default=*/ {", pprAbsC deflt c,
-	       char '}']
+pprAbsC stmt@(CRetDirect uniq code srt liveness) _
+  = vcat [
+      hcat [
+	  ptext SLIT("INFO_TABLE_SRT_BITMAP"), lparen, 
+	  pprCLabel info_lbl, 		comma,
+	  pprCLabel entry_lbl, 		comma,
+          pp_liveness liveness,		comma,	  -- bitmap
+	  pp_srt_info srt,			  -- SRT
+	  ptext type_str,		comma,	  -- closure type
+	  ppLocalness info_lbl, 	comma,	  -- info table storage class
+	  ppLocalnessMacro entry_lbl, 	comma,    -- entry pt storage class
+	  int 0, comma,
+	  int 0, text ");"
+      ],
+      pp_code
+    ]
   where
-    ppr_maybe_amode Nothing  = ptext SLIT("/*default*/")
-    ppr_maybe_amode (Just a) = pprAmode a
+     info_lbl  = mkReturnInfoLabel uniq
+     entry_lbl = mkReturnPtLabel uniq
 
-pprAbsC stmt@(CRetUnVector label amode) _
-  = hcat [ptext SLIT("UNVECTBL"),char '(', pp_static, comma, pprCLabel label, comma,
-	    pprAmode amode, rparen]
+     pp_code   = let stuff = CCodeBlock entry_lbl code in
+	         pprAbsC stuff (costs stuff)
+
+     type_str = case liveness of
+		   LvSmall _ -> SLIT("RET_SMALL")
+		   LvLarge _ -> SLIT("RET_BIG")
+
+pprAbsC stmt@(CRetVector label amodes srt liveness) _
+  = vcat [
+	pp_vector,
+	hcat [
+	ptext SLIT("  }"), comma, ptext SLIT("\n  VEC_INFO_TABLE"),
+	lparen, 
+	pp_liveness liveness, comma,	-- bitmap liveness mask
+	pp_srt_info srt,		-- SRT
+	ptext type_str,			-- or big, depending on the size
+					-- of the liveness mask.
+	rparen 
+       ],
+       text "};"
+    ]
+
   where
-    pp_static = if externallyVisibleCLabel label then empty else ptext SLIT("static")
-
-pprAbsC stmt@(CFlatRetVector label amodes) _
-  =	case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
-	vcat [
+    pp_vector = 
+        case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
+	 vcat [
 	    pp_exts,
-	    hcat [ppLocalness label, ptext SLIT(" W_ "),
-    	    	       pprCLabel label, text "[] = {"],
-	    nest 2 (sep (punctuate comma (map ppr_item amodes))),
-	    text "};" ] }
-  where
-    ppr_item item = (<>) (text "(W_) ") (ppr_amode item)
+	    hcat [ppLocalness label,
+	          ptext SLIT(" vec_info_"), int size, space,
+		  pprCLabel label, text "= { {"
+		  ],
+	    nest 2 (sep (punctuate comma (map ppr_item (reverse amodes))))
+	    ] }
 
-pprAbsC (CCostCentreDecl is_local cc) _ = uppCostCentreDecl is_local cc
+    ppr_item item = (<>) (text "(F_) ") (ppr_amode item)
+    size = length amodes
+
+    type_str = case liveness of
+		   LvSmall _ -> SLIT("RET_VEC_SMALL")
+		   LvLarge _ -> SLIT("RET_VEC_BIG")
+
+
+pprAbsC (CCostCentreDecl is_local cc) _ = pprCostCentreDecl is_local cc
+pprAbsC (CCostCentreStackDecl ccs)    _ = pprCostCentreStackDecl ccs
 \end{code}
 
 \begin{code}
 ppLocalness label
   = (<>) static const
   where
-    static = if (externallyVisibleCLabel label) then empty else ptext SLIT("static ")
-    const  = if not (isReadOnly label)	        then empty else ptext SLIT("const")
+    static = if (externallyVisibleCLabel label) 
+		then empty 
+		else ptext SLIT("static ")
+    const  = if not (isReadOnly label)	        
+		then empty 
+		else ptext SLIT("const")
 
-ppLocalnessMacro for_fun{-vs data-} clabel
-  = hcat [ char (if externallyVisibleCLabel clabel then 'E' else 'I'),
-                 if for_fun then 
-                    ptext SLIT("F_") 
-                 else 
-                    (<>) (ptext SLIT("D_"))
-                              (if isReadOnly clabel then 
-			          ptext SLIT("RO_") 
-			       else 
-			          empty)]
+-- Horrible macros for declaring the types and locality of labels (see
+-- StgMacros.h).
+
+ppLocalnessMacro clabel =
+     hcat [
+       char (if externallyVisibleCLabel clabel then 'E' else 'I'),
+       case labelType clabel of
+	  InfoTblType -> ptext SLIT("I_")
+	  ClosureType -> ptext SLIT("C_")
+	  CodeType    -> ptext SLIT("F_")
+	  DataType    -> ptext SLIT("D_") <>
+				   if isReadOnly clabel 
+				      then ptext SLIT("RO_") 
+				      else empty 
+     ]
 \end{code}
 
 \begin{code}
@@ -502,32 +582,31 @@ ppr_vol_regs (r:rs)
 -- HpLim (see StgRegs.lh) may need to be saved/restored around CCalls,
 -- depending on the platform.  (The "volatile regs" stuff handles all
 -- other registers.)  Just be *sure* BaseReg is OK before trying to do
--- anything else.
+-- anything else. The correct sequence of saves&restores are
+-- encoded by the CALLER_*_SYSTEM macros.
 pp_basic_saves
-  = vcat [
-	ptext SLIT("CALLER_SAVE_Base"),
-	ptext SLIT("CALLER_SAVE_SpA"),
-	ptext SLIT("CALLER_SAVE_SuA"),
-	ptext SLIT("CALLER_SAVE_SpB"),
-	ptext SLIT("CALLER_SAVE_SuB"),
-	ptext SLIT("CALLER_SAVE_Ret"),
---	ptext SLIT("CALLER_SAVE_Activity"),
-	ptext SLIT("CALLER_SAVE_Hp"),
-	ptext SLIT("CALLER_SAVE_HpLim") ]
+  = vcat
+       [ ptext SLIT("CALLER_SAVE_Base")
+       , ptext SLIT("CALLER_SAVE_SYSTEM")
+       ]
 
-pp_basic_restores
-  = vcat [
-	ptext SLIT("CALLER_RESTORE_Base"), -- must be first!
-	ptext SLIT("CALLER_RESTORE_SpA"),
-	ptext SLIT("CALLER_RESTORE_SuA"),
-	ptext SLIT("CALLER_RESTORE_SpB"),
-	ptext SLIT("CALLER_RESTORE_SuB"),
-	ptext SLIT("CALLER_RESTORE_Ret"),
---	ptext SLIT("CALLER_RESTORE_Activity"),
-	ptext SLIT("CALLER_RESTORE_Hp"),
-	ptext SLIT("CALLER_RESTORE_HpLim"),
-	ptext SLIT("CALLER_RESTORE_StdUpdRetVec"),
-	ptext SLIT("CALLER_RESTORE_StkStub") ]
+pp_basic_restores = ptext SLIT("CALLER_RESTORE_SYSTEM")
+\end{code}
+
+\begin{code}
+has_srt (_, NoSRT) = False
+has_srt _ = True
+
+pp_srt_info srt = 
+    case srt of
+	(lbl, NoSRT) -> 
+		hcat [  int 0, comma, 
+			int 0, comma, 
+			int 0, comma ]
+	(lbl, SRT off len) -> 
+		hcat [ 	pprCLabel lbl, comma,
+		       	int off, comma,
+		       	int len, comma ]
 \end{code}
 
 \begin{code}
@@ -597,11 +676,6 @@ Some rough notes on generating code for @CCallOp@:
    (This happens after restoration of essential registers because we
    might need the @Base@ register to access all the others correctly.)
 
-{- Doesn't apply anymore with ForeignObj, structure created via the primop.
-   makeForeignObj (i.e., ForeignObj is not CReturnable)
-7) If returning Malloc Pointer, build a closure containing the
-   appropriate value.
--}
    Otherwise, copy local variable into result register.
 
 8) If ccall (not casm), declare the function being called as extern so
@@ -625,17 +699,13 @@ Amendment to the above: if we can GC, we have to:
   can get at them.
 * be sure that there are no live registers or we're in trouble.
   (This can cause problems if you try something foolish like passing
-   an array or foreign obj to a _ccall_GC_ thing.)
+   an array or a foreign obj to a _ccall_GC_ thing.)
 * increment/decrement the @inCCallGC@ counter before/after the call so
   that the runtime check that PerformGC is being used sensibly will work.
 
 \begin{code}
-pprCCall op@(CCallOp op_str is_asm may_gc cconv _ _) args results liveness_mask vol_regs
-  = if (may_gc && liveness_mask /= noLiveRegsMask)
-    then pprPanic "Live register in _casm_GC_ " 
-		  (doubleQuotes (text casm_str) <+> hsep pp_non_void_args)
-    else
-    vcat [
+pprCCall op@(CCallOp op_str is_asm may_gc cconv) args results vol_regs
+  = vcat [
       char '{',
       declare_local_vars,   -- local var for *result*
       vcat local_arg_decls,
@@ -648,16 +718,12 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv _ _) args results liveness_mask 
     ]
   where
     (pp_saves, pp_restores) = ppr_vol_regs vol_regs
-
     (pp_save_context, pp_restore_context)
-	| may_gc =
-	     ( text "do { extern StgInt inCCallGC; SaveAllStgRegs(); inCCallGC++;"
-	     , text "inCCallGC--; RestoreAllStgRegs();} while(0);"
-	     )
-        | otherwise = 
-	     ( pp_basic_saves $$ pp_saves
-	     , pp_basic_restores $$ pp_restores
-	     )
+	| may_gc  = ( text "do { SaveThreadState();"
+		    , text "LoadThreadState();} while(0);"
+		    )
+	| otherwise = (	pp_basic_saves $$ pp_saves,
+			pp_basic_restores $$ pp_restores)
 
     non_void_args =
 	let nvas = tail args
@@ -674,7 +740,6 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv _ _) args results liveness_mask 
     (local_arg_decls, pp_non_void_args)
       = unzip [ ppr_casm_arg a i | (a,i) <- non_void_args `zip` [1..] ]
 
-    pp_liveness = pprAmode (mkIntCLit liveness_mask)
 
     {-
       In the non-casm case, to ensure that we're entering the given external
@@ -742,7 +807,7 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv _ _) args results liveness_mask 
 	 _       -> empty
 
     (declare_local_vars, local_vars, assign_results)
-      = ppr_casm_results non_void_results pp_liveness
+      = ppr_casm_results non_void_results
 
     (Left asm_str) = op_str
     is_dynamic = 
@@ -778,7 +843,7 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv _ _) args results liveness_mask 
 
 If the argument is a heap object, we need to reach inside and pull out
 the bit the C world wants to see.  The only heap objects which can be
-passed are @Array@s, @ByteArray@s and @ForeignObj@s.
+passed are @Array@s and @ByteArray@s.
 
 \begin{code}
 ppr_casm_arg :: CAddrMode -> Int -> (SDoc, SDoc)
@@ -803,9 +868,10 @@ ppr_casm_arg amode a_num
 				hcat [ptext SLIT("BYTE_ARR_CTS"),char '(', pp_amode, rparen])
 
 	      -- for ForeignObj, use FOREIGN_OBJ_DATA to fish out the contents.
-	      ForeignObjRep -> (ptext SLIT("StgForeignObj"),
-				hcat [ptext SLIT("ForeignObj_CLOSURE_DATA"),char '(', 
-					    pp_amode, char ')'])
+	      ForeignObjRep -> (pp_kind,
+				hcat [ptext SLIT("ForeignObj_CLOSURE_DATA"),
+				      char '(', pp_amode, char ')'])
+
 	      other	    -> (pp_kind, pp_amode)
 
 	declare_local_var
@@ -820,24 +886,18 @@ For l-values, the critical questions are:
 
    We only allow zero or one results.
 
-{- With the introduction of ForeignObj (MallocPtr++), no longer necess.
-2) Is the result is a foreign obj?
-
-   The mallocptr must be encapsulated immediately in a heap object.
--}
 \begin{code}
 ppr_casm_results
 	:: [CAddrMode]	-- list of results (length <= 1)
-	-> SDoc  	-- liveness mask
 	->
 	( SDoc,		-- declaration of any local vars
 	  [SDoc],	-- list of result vars (same length as results)
 	  SDoc )	-- assignment (if any) of results in local var to registers
 
-ppr_casm_results [] liveness
+ppr_casm_results []
   = (empty, [], empty) 	-- no results
 
-ppr_casm_results [r] liveness
+ppr_casm_results [r]
   = let
 	result_reg = ppr_amode r
 	r_kind	   = getAmodeRep r
@@ -845,32 +905,14 @@ ppr_casm_results [r] liveness
 	local_var  = ptext SLIT("_ccall_result")
 
 	(result_type, assign_result)
-	  = case r_kind of
-{- 
-   @ForeignObj@s replaces MallocPtrs and are *not* CReturnable.
-   Instead, external references have to explicitly turned into ForeignObjs
-   using the primop makeForeignObj#. Benefit: Multiple finalisation
-   routines can be accommodated and the below special case is not needed.
-   Price is, of course, that you have to explicitly wrap `foreign objects'
-   with makeForeignObj#.
-
-	      ForeignObjRep ->
-		(ptext SLIT("StgForeignObj"),
-		 hcat [ ptext SLIT("constructForeignObj"),char '(',
-				liveness, comma,
-				result_reg, comma,
-				local_var,
-			     pp_paren_semi ]) 
--}
-	      _ ->
-		(pprPrimKind r_kind,
-		 hcat [ result_reg, equals, local_var, semi ])
+	  = (pprPrimKind r_kind,
+	     hcat [ result_reg, equals, local_var, semi ])
 
 	declare_local_var = hcat [ result_type, space, local_var, semi ]
     in
     (declare_local_var, [local_var], assign_result)
 
-ppr_casm_results rs liveness
+ppr_casm_results rs
   = panic "ppr_casm_results: ccall/casm with many results"
 \end{code}
 
@@ -890,7 +932,9 @@ process_casm :: [SDoc]		-- results (length <= 1)
 process_casm results args string = process results args string
  where
   process []    _ "" = empty
-  process (_:_) _ "" = error ("process_casm: non-void result not assigned while processing _casm_ \"" ++ string ++ "\"\n(Try changing result type to PrimIO ()\n")
+  process (_:_) _ "" = error ("process_casm: non-void result not assigned while processing _casm_ \"" ++ 
+			      string ++ 
+			      "\"\n(Try changing result type to PrimIO ()\n")
 
   process ress args ('%':cs)
     = case cs of
@@ -898,12 +942,12 @@ process_casm results args string = process results args string
 	    error ("process_casm: lonely % while processing _casm_ \"" ++ string ++ "\".\n")
 
 	('%':css) ->
-	    (<>) (char '%') (process ress args css)
+	    char '%' <> process ress args css
 
 	('r':css)  ->
 	  case ress of
 	    []  -> error ("process_casm: no result to match %r while processing _casm_ \"" ++ string ++ "\".\nTry deleting %r or changing result type from PrimIO ()\n")
-	    [r] -> (<>) r (process [] args css)
+	    [r] -> r <> (process [] args css)
 	    _   -> panic ("process_casm: casm with many results while processing _casm_ \"" ++ string ++ "\".\n")
 
 	other ->
@@ -914,13 +958,12 @@ process_casm results args string = process results args string
 	  case (read_int other) of
 	    [(num,css)] ->
 		  if 0 <= num && num < length args
-		  then (<>) (parens (args !! num))
-				 (process ress args css)
-		    else error ("process_casm: no such arg #:"++(show num)++" while processing \"" ++ string ++ "\".\n")
+		  then parens (args !! num) <> process ress args css
+		  else error ("process_casm: no such arg #:"++(show num)++" while processing \"" ++ string ++ "\".\n")
 	    _ -> error ("process_casm: not %<num> while processing _casm_ \"" ++ string ++ "\".\n")
 
   process ress args (other_c:cs)
-    = (<>) (char other_c) (process ress args cs)
+    = char other_c <> process ress args cs
 \end{code}
 
 %************************************************************************
@@ -989,9 +1032,9 @@ pprAssign kind dest src
 
 pprAssign ByteArrayRep dest src
   | mixedPtrLocn src
-    -- Add in a cast to StgPtr (a.k.a. B_) iff the source is mixed
+    -- Add in a cast iff the source is mixed
   = hcat [ ppr_amode dest, equals,
-		text "(B_)(",	-- Here is the cast
+		text "(StgByteArray)(",	-- Here is the cast
 		ppr_amode src, pp_paren_semi ]
 
 pprAssign kind other_dest src
@@ -1059,13 +1102,9 @@ ppr_amode (CAddr reg_rel)
 
 ppr_amode (CReg magic_id) = pprMagicId magic_id
 
-ppr_amode (CTemp uniq kind) = pprUnique uniq <> char '_'
+ppr_amode (CTemp uniq kind) = char '_' <> pprUnique uniq <> char '_'
 
-ppr_amode (CLbl label kind) = pprCLabel label
-
-ppr_amode (CUnVecLbl direct vectored)
-  = hcat [char '(',ptext SLIT("StgRetAddr"),char ')', ptext SLIT("UNVEC"),char '(', pprCLabel direct, comma,
-	       pprCLabel vectored, rparen]
+ppr_amode (CLbl label kind) = pprCLabelAddr label
 
 ppr_amode (CCharLike ch)
   = hcat [ptext SLIT("CHARLIKE_CLOSURE"), char '(', pprAmode ch, rparen ]
@@ -1079,16 +1118,7 @@ ppr_amode (CLit lit) = pprBasicLit lit
 
 ppr_amode (CLitLit str _) = ptext str
 
-ppr_amode (COffset off) = pprHeapOffset off
-
-ppr_amode (CCode abs_C)
-  = vcat [ ptext SLIT("{ -- CCode"), nest 8 (pprAbsC abs_C (costs abs_C)), char '}' ]
-
-ppr_amode (CLabelledCode label abs_C)
-  = vcat [ hcat [pprCLabel label, ptext SLIT(" = { -- CLabelledCode")],
-	       nest 8 (pprAbsC abs_C (costs abs_C)), char '}' ]
-
-ppr_amode (CJoinPoint _ _)
+ppr_amode (CJoinPoint _)
   = panic "ppr_amode: CJoinPoint"
 
 ppr_amode (CTableEntry base index kind)
@@ -1097,11 +1127,23 @@ ppr_amode (CTableEntry base index kind)
     	       ptext SLIT(")]")]
 
 ppr_amode (CMacroExpr pk macro as)
-  = hcat [lparen, pprPrimKind pk, text ")(", text (show macro), lparen,
-	       hcat (punctuate comma (map pprAmode as)), text "))"]
+  = parens (pprPrimKind pk) <+> 
+    parens (text (show macro) <> 
+	    parens (hcat (punctuate comma (map pprAmode as))))
+\end{code}
 
-ppr_amode (CCostCentre cc print_as_string)
-  = uppCostCentre print_as_string cc
+%************************************************************************
+%*									*
+\subsection[ppr-liveness-masks]{Liveness Masks}
+%*									*
+%************************************************************************
+
+\begin{code}
+pp_liveness :: Liveness -> SDoc
+pp_liveness lv = 
+   case lv of
+	LvSmall mask -> int (intBS mask)
+	LvLarge lbl  -> char '&' <> pprCLabel lbl
 \end{code}
 
 %************************************************************************
@@ -1129,30 +1171,24 @@ pprRegRelative :: Bool		-- True <=> Print leading plus sign (if +ve)
 	       -> RegRelative
 	       -> (SDoc, Maybe SDoc)
 
-pprRegRelative sign_wanted (SpARel spA off)
-  = (pprMagicId SpA, pprSignedInt sign_wanted (spARelToInt spA off))
+pprRegRelative sign_wanted (SpRel off)
+  = (pprMagicId Sp, pprSignedInt sign_wanted (I# off))
 
-pprRegRelative sign_wanted (SpBRel spB off)
-  = (pprMagicId SpB, pprSignedInt sign_wanted (spBRelToInt spB off))
-
-pprRegRelative sign_wanted r@(HpRel hp off)
-  = let to_print = hp `subOff` off
-	pp_Hp	 = pprMagicId Hp
+pprRegRelative sign_wanted r@(HpRel o)
+  = let pp_Hp	 = pprMagicId Hp; off = I# o
     in
-    if isZeroOff to_print then
+    if off == 0 then
 	(pp_Hp, Nothing)
     else
-	(pp_Hp, Just ((<>) (char '-') (pprHeapOffset to_print)))
-				-- No parens needed because pprHeapOffset
-				-- does them when necessary
+	(pp_Hp, Just ((<>) (char '-') (int off)))
 
-pprRegRelative sign_wanted (NodeRel off)
-  = let pp_Node = pprMagicId node
+pprRegRelative sign_wanted (NodeRel o)
+  = let pp_Node = pprMagicId node; off = I# o
     in
-    if isZeroOff off then
+    if off == 0 then
 	(pp_Node, Nothing)
     else
-	(pp_Node, Just (addPlusSign sign_wanted (pprHeapOffset off)))
+	(pp_Node, Just (addPlusSign sign_wanted (int off)))
 
 \end{code}
 
@@ -1164,29 +1200,21 @@ to select the union tag.
 pprMagicId :: MagicId -> SDoc
 
 pprMagicId BaseReg	    	    = ptext SLIT("BaseReg")
-pprMagicId StkOReg		    = ptext SLIT("StkOReg")
 pprMagicId (VanillaReg pk n)
 				    = hcat [ pprVanillaReg n, char '.',
 						  pprUnionTag pk ]
-pprMagicId (FloatReg  n)        = (<>) (ptext SLIT("FltReg")) (int IBOX(n))
-pprMagicId (DoubleReg n)	    = (<>) (ptext SLIT("DblReg")) (int IBOX(n))
-pprMagicId (LongReg _ n)	    = (<>) (ptext SLIT("LngReg")) (int IBOX(n))
-pprMagicId TagReg		    = ptext SLIT("TagReg")
-pprMagicId RetReg		    = ptext SLIT("RetReg")
-pprMagicId SpA		    = ptext SLIT("SpA")
-pprMagicId SuA		    = ptext SLIT("SuA")
-pprMagicId SpB		    = ptext SLIT("SpB")
-pprMagicId SuB		    = ptext SLIT("SuB")
-pprMagicId Hp		    = ptext SLIT("Hp")
+pprMagicId (FloatReg  n)            = (<>) (ptext SLIT("F")) (int IBOX(n))
+pprMagicId (DoubleReg n)	    = (<>) (ptext SLIT("D")) (int IBOX(n))
+pprMagicId (LongReg _ n)	    = (<>) (ptext SLIT("L")) (int IBOX(n))
+pprMagicId Sp			    = ptext SLIT("Sp")
+pprMagicId Su			    = ptext SLIT("Su")
+pprMagicId SpLim		    = ptext SLIT("SpLim")
+pprMagicId Hp			    = ptext SLIT("Hp")
 pprMagicId HpLim		    = ptext SLIT("HpLim")
-pprMagicId LivenessReg	    = ptext SLIT("LivenessReg")
-pprMagicId StdUpdRetVecReg      = ptext SLIT("StdUpdRetVecReg")
-pprMagicId StkStubReg	    = ptext SLIT("StkStubReg")
-pprMagicId CurCostCentre	    = ptext SLIT("CCC")
+pprMagicId CurCostCentre	    = ptext SLIT("CCCS")
 pprMagicId VoidReg		    = panic "pprMagicId:VoidReg!"
 
 pprVanillaReg :: FAST_INT -> SDoc
-
 pprVanillaReg n = (<>) (char 'R') (int IBOX(n))
 
 pprUnionTag :: PrimRep -> SDoc
@@ -1194,18 +1222,21 @@ pprUnionTag :: PrimRep -> SDoc
 pprUnionTag PtrRep		= char 'p'
 pprUnionTag CodePtrRep	    	= ptext SLIT("fp")
 pprUnionTag DataPtrRep	    	= char 'd'
-pprUnionTag RetRep 	    	= char 'r'
+pprUnionTag RetRep 	    	= char 'p'
 pprUnionTag CostCentreRep	= panic "pprUnionTag:CostCentre?"
 
 pprUnionTag CharRep		= char 'c'
 pprUnionTag IntRep		= char 'i'
 pprUnionTag WordRep		= char 'w'
-pprUnionTag AddrRep		= char 'v'
+pprUnionTag AddrRep		= char 'a'
 pprUnionTag FloatRep		= char 'f'
 pprUnionTag DoubleRep		= panic "pprUnionTag:Double?"
 
 pprUnionTag StablePtrRep	= char 'i'
+pprUnionTag WeakPtrRep		= char 'p'
 pprUnionTag ForeignObjRep	= char 'p'
+
+pprUnionTag ThreadIdRep		= char 't'
 
 pprUnionTag ArrayRep		= char 'p'
 pprUnionTag ByteArrayRep	= char 'b'
@@ -1320,22 +1351,16 @@ labelSeenTE label env@(seen_uniqs, seen_labels)
 \begin{code}
 pprTempDecl :: Unique -> PrimRep -> SDoc
 pprTempDecl uniq kind
-  = hcat [ pprPrimKind kind, space, pprUnique uniq, ptext SLIT("_;") ]
+  = hcat [ pprPrimKind kind, space, char '_', pprUnique uniq, ptext SLIT("_;") ]
 
 pprExternDecl :: CLabel -> PrimRep -> SDoc
 
 pprExternDecl clabel kind
   = if not (needsCDecl clabel) then
-	empty -- do not print anything for "known external" things (e.g., < PreludeCore)
-    else
-	case (
-	    case kind of
-	      CodePtrRep -> ppLocalnessMacro True{-function-} clabel
-	      _		 -> ppLocalnessMacro False{-data-}    clabel
-	) of { pp_macro_str ->
-
-	hcat [ pp_macro_str, lparen, pprCLabel clabel, pp_paren_semi ]
-	}
+	empty -- do not print anything for "known external" things
+    else 
+	hcat [ ppLocalnessMacro clabel, 
+	       lparen, pprCLabel clabel, pp_paren_semi ]
 \end{code}
 
 \begin{code}
@@ -1347,9 +1372,6 @@ ppr_decls_AbsC (AbsCStmts stmts_1 stmts_2)
   = ppr_decls_AbsC stmts_1  `thenTE` \ p1 ->
     ppr_decls_AbsC stmts_2  `thenTE` \ p2 ->
     returnTE (maybe_vcat [p1, p2])
-
-ppr_decls_AbsC (CClosureUpdInfo info)
-  = ppr_decls_AbsC info
 
 ppr_decls_AbsC (CSplitMarker) = returnTE (Nothing, Nothing)
 
@@ -1375,7 +1397,7 @@ ppr_decls_AbsC (CSwitch discrim alts deflt)
 ppr_decls_AbsC (CCodeBlock label absC)
   = ppr_decls_AbsC absC
 
-ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre inplace_upd)
+ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre)
 	-- ToDo: strictly speaking, should chk "cost_centre" amode
   = labelSeenTE info_lbl     `thenTE` \  label_seen ->
     returnTE (Nothing,
@@ -1386,8 +1408,13 @@ ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre inplace_upd)
   where
     info_lbl = infoTableLabelFromCI cl_info
 
-ppr_decls_AbsC (COpStmt	results	_ args _ _) = ppr_decls_Amodes (results ++ args)
+ppr_decls_AbsC (COpStmt	results	_ args _) = ppr_decls_Amodes (results ++ args)
 ppr_decls_AbsC (CSimultaneous abc)  	    = ppr_decls_AbsC abc
+
+ppr_decls_AbsC (CCheck  	    _ amodes code) = 
+     ppr_decls_Amodes amodes `thenTE` \p1 ->
+     ppr_decls_AbsC code     `thenTE` \p2 ->
+     returnTE (maybe_vcat [p1,p2])
 
 ppr_decls_AbsC (CMacroStmt	    _ amodes)	= ppr_decls_Amodes amodes
 
@@ -1401,8 +1428,8 @@ ppr_decls_AbsC (CStaticClosure closure_lbl closure_info cost_centre amodes)
 	-- ToDo: strictly speaking, should chk "cost_centre" amode
   = ppr_decls_Amodes amodes
 
-ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast upd_lbl _ _)
-  = ppr_decls_Amodes [entry_lbl, upd_lbl]	`thenTE` \ p1 ->
+ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast _ _)
+  = ppr_decls_Amodes [entry_lbl]	    	`thenTE` \ p1 ->
     ppr_decls_AbsC slow				`thenTE` \ p2 ->
     (case maybe_fast of
 	Nothing   -> returnTE (Nothing, Nothing)
@@ -1414,13 +1441,15 @@ ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast upd_lbl _ _)
 		    Nothing -> mkErrorStdEntryLabel
 		    Just _  -> entryLabelFromCI cl_info
 
-ppr_decls_AbsC (CRetVector label maybe_amodes absC)
-  = ppr_decls_Amodes (catMaybes maybe_amodes)	`thenTE` \ p1 ->
-    ppr_decls_AbsC   absC			`thenTE` \ p2 ->
-    returnTE (maybe_vcat [p1, p2])
+ppr_decls_AbsC (CSRT lbl closure_lbls)
+  = mapTE labelSeenTE closure_lbls		`thenTE` \ seen ->
+    returnTE (Nothing, 
+	      if and seen then Nothing
+		else Just (vcat [ pprExternDecl l PtrRep
+				| (l,False) <- zip closure_lbls seen ]))
 
-ppr_decls_AbsC (CRetUnVector   _ amode)  = ppr_decls_Amode amode
-ppr_decls_AbsC (CFlatRetVector _ amodes) = ppr_decls_Amodes amodes
+ppr_decls_AbsC (CRetDirect     _ code _ _)   = ppr_decls_AbsC code
+ppr_decls_AbsC (CRetVector _ amodes _ _)     = ppr_decls_Amodes amodes
 \end{code}
 
 \begin{code}
@@ -1431,7 +1460,6 @@ ppr_decls_Amode (CReg _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CString _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CLit _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CLitLit _ _) 	= returnTE (Nothing, Nothing)
-ppr_decls_Amode (COffset _)	= returnTE (Nothing, Nothing)
 
 -- CIntLike must be a literal -- no decls
 ppr_decls_Amode (CIntLike int)	= returnTE (Nothing, Nothing)
@@ -1456,35 +1484,6 @@ ppr_decls_Amode (CLbl label kind)
   = labelSeenTE label `thenTE` \ label_seen ->
     returnTE (Nothing,
 	      if label_seen then Nothing else Just (pprExternDecl label kind))
-
-{- WRONG:
-ppr_decls_Amode (CUnVecLbl direct vectored)
-  = labelSeenTE direct   `thenTE` \ dlbl_seen ->
-    labelSeenTE vectored `thenTE` \ vlbl_seen ->
-    let
-	ddcl = if dlbl_seen then empty else pprExternDecl direct CodePtrRep
-	vdcl = if vlbl_seen then empty else pprExternDecl vectored DataPtrRep
-    in
-    returnTE (Nothing,
-    	    	if (dlbl_seen || not (needsCDecl direct)) &&
-    	    	   (vlbl_seen || not (needsCDecl vectored)) then Nothing
-    	        else Just (hcat [ptext SLIT("UNVEC"),char '(', ddcl, comma, vdcl, rparen]))
--}
-
-ppr_decls_Amode (CUnVecLbl direct vectored)
-  = -- We don't mark either label as "seen", because
-    -- we don't know which one will be used and which one tossed
-    -- by the C macro...
-    --labelSeenTE direct   `thenTE` \ dlbl_seen ->
-    --labelSeenTE vectored `thenTE` \ vlbl_seen ->
-    let
-	ddcl = {-if dlbl_seen then empty else-} pprExternDecl direct CodePtrRep
-	vdcl = {-if vlbl_seen then empty else-} pprExternDecl vectored DataPtrRep
-    in
-    returnTE (Nothing,
-    	    	if ({-dlbl_seen ||-} not (needsCDecl direct)) &&
-    	    	   ({-vlbl_seen ||-} not (needsCDecl vectored)) then Nothing
-    	        else Just (hcat [ptext SLIT("UNVEC"),char '(', ddcl, comma, vdcl, rparen]))
 
 ppr_decls_Amode (CTableEntry base index _)
   = ppr_decls_Amode base    `thenTE` \ p1 ->
@@ -1512,4 +1511,65 @@ ppr_decls_Amodes :: [CAddrMode] -> TeM (Maybe SDoc, Maybe SDoc)
 ppr_decls_Amodes amodes
   = mapTE ppr_decls_Amode amodes `thenTE` \ ps ->
     returnTE ( maybe_vcat ps )
+\end{code}
+
+Print out a C Label where you want the *address* of the label, not the
+object it refers to.  The distinction is important when the label may
+refer to a C structure (info tables and closures, for instance).
+
+When just generating a declaration for the label, use pprCLabel.
+
+\begin{code}
+pprCLabelAddr :: CLabel -> SDoc
+pprCLabelAddr clabel =
+  case labelType clabel of
+     InfoTblType -> addr_of_label
+     ClosureType -> addr_of_label
+     VecTblType  -> addr_of_label
+     _           -> pp_label
+  where
+    addr_of_label = ptext SLIT("(P_)&") <> pp_label
+    pp_label = pprCLabel clabel
+\end{code}
+
+-----------------------------------------------------------------------------
+Initialising static objects with floating-point numbers.  We can't
+just emit the floating point number, because C will cast it to an int
+by rounding it.  We want the actual bit-representation of the float.
+
+This is a hack to turn the floating point numbers into ints that we
+can safely initialise to static locations.
+
+\begin{code}
+big_doubles = (getPrimRepSize DoubleRep) /= 1
+
+-- floatss are always 1 word
+floatToWord :: CAddrMode -> CAddrMode
+floatToWord (CLit (MachFloat r))
+  = runST (do
+	arr <- newFloatArray (0,0)
+	writeFloatArray arr 0 (fromRational r)
+	i <- readIntArray arr 0
+	return (CLit (MachInt (toInteger i) True))
+    )
+
+doubleToWords :: CAddrMode -> [CAddrMode]
+doubleToWords (CLit (MachDouble r))
+  | big_doubles				-- doubles are 2 words
+  = runST (do
+	arr <- newDoubleArray (0,1)
+	writeDoubleArray arr 0 (fromRational r)
+	i1 <- readIntArray arr 0
+	i2 <- readIntArray arr 1
+	return [ CLit (MachInt (toInteger i1) True)
+	       , CLit (MachInt (toInteger i2) True)
+	       ]
+    )
+  | otherwise				-- doubles are 1 word
+  = runST (do
+	arr <- newDoubleArray (0,0)
+	writeDoubleArray arr 0 (fromRational r)
+	i <- readIntArray arr 0
+	return [ CLit (MachInt (toInteger i) True) ]
+    )
 \end{code}

@@ -1,0 +1,1 @@
+ERROR "test/static/s002.hs" (line 5): Syntax error in type expression (unexpected symbol "A.a")

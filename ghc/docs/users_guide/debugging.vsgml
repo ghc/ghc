@@ -17,13 +17,13 @@ HACKER TERRITORY. HACKER TERRITORY.
 <nidx>GHC phases, changing</nidx>
 <nidx>phases, changing GHC</nidx>
 
-You may specify that a different program
-be used for one of the phases of the compilation system, in place of
-whatever the driver @ghc@ has wired into it.  For example, you
-might want to try a different assembler.  The
-@-pgm<phase-code><program-name>@<nidx>-pgm&lt;phase&gt;&lt;stuff&gt; option</nidx> option to
-@ghc@ will cause it to use @<program-name>@ for phase
-@<phase-code>@, where the codes to indicate the phases are:
+You may specify that a different program be used for one of the phases
+of the compilation system, in place of whatever the driver @ghc@ has
+wired into it.  For example, you might want to try a different
+assembler.  The
+@-pgm<phase-code><program-name>@<nidx>-pgm&lt;phase&gt;&lt;stuff&gt;
+option</nidx> option to @ghc@ will cause it to use @<program-name>@
+for phase @<phase-code>@, where the codes to indicate the phases are:
 
 <tabular ca="ll">
 <bf>code</bf> | <bf>phase</bf> @@
@@ -34,6 +34,7 @@ C    | Haskell compiler @@
 c    | C compiler@@
 a    | assembler @@
 l    | linker @@
+dep  | Makefile dependency generator @@
 </tabular>
 
 %----------------------------------------------------------------------
@@ -46,8 +47,9 @@ The preceding sections describe driver options that are mostly
 applicable to one particular phase.  You may also <em>force</em> a
 specific option @<option>@ to be passed to a particular phase
 @<phase-code>@ by feeding the driver the option
-@-opt<phase-code><option>@.<nidx>-opt&lt;phase&gt;&lt;stuff&gt; option</nidx> The
-codes to indicate the phases are the same as in the previous section.
+@-opt<phase-code><option>@.<nidx>-opt&lt;phase&gt;&lt;stuff&gt;
+option</nidx> The codes to indicate the phases are the same as in the
+previous section.
 
 So, for example, to force an @-Ewurble@ option to the assembler, you
 would tell the driver @-opta-Ewurble@ (the dash before the E is
@@ -84,24 +86,9 @@ example: @ghc -noC -ddump-simpl Foo.hs@
 
 <tag>@-hi@:</tag>
 <nidx>-hi option</nidx>
-<em>Do</em> generate an interface file (on @stdout@.) This would
-normally be used in conjunction with @-noC@, which turns off interface
-generation; thus: @-noC -hi@.
-
-<tag>@-hi-with-&lt;section&gt;@:</tag>
-<nidx>-hi-with option</nidx>
-Generate just the specified section of an interface file. In case you're
-only interested in a subset of what @-hi@ outputs, @-hi-with-&lt;section&gt;@
-is just the ticket. For instance 
-
-<tscreen> <verb>
--noC -hi-with-declarations -hi-with-exports
-</verb> </tscreen>
-
-will output the sections containing the exports and the
-declarations. Legal sections are: @declarations@, @exports@,
-@instances@, @instance_modules@, @usages@, @fixities@, and
-@interface@.
+<em>Do</em> generate an interface file.  This would normally be used in
+conjunction with @-noC@, which turns off interface generation;
+thus: @-noC -hi@.
 
 <tag>@-dshow-passes@:</tag>
 <nidx>-dshow-passes option</nidx>
@@ -158,6 +145,12 @@ really desperate:
 <tscreen><verb>
 % ghc -noC -O -ddump-simpl -dverbose-simpl -dcore-lint Foo.hs
 </verb></tscreen>
+
+<tag>@-ddump-simpl-iterations@:</tag>
+<nidx>-ddump-simpl-iterations option</nidx>
+Show the output of each <em/iteration/ of the simplifier (each run of
+the simplifier has a maximum number of iterations, normally 4).  Used
+when even @-dverbose-simpl@ doesn't cut it.
 
 <tag>@-dppr-{user,debug,all@}:</tag>
 <nidx>-dppr-user option</nidx>

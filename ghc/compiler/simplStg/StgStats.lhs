@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[StgStats]{Gathers statistical information about programs}
 
@@ -27,6 +27,7 @@ module StgStats ( showStgStats ) where
 
 import StgSyn
 
+import Const		( Con(..) )
 import FiniteMap	( emptyFM, plusFM_C, unitFM, fmToList, FiniteMap )
 import Id (Id)
 \end{code}
@@ -128,7 +129,7 @@ statRhs :: Bool -> (Id, StgRhs) -> StatEnv
 statRhs top (b, StgRhsCon cc con args)
   = countOne (ConstructorBinds top)
 
-statRhs top (b, StgRhsClosure cc bi fv u args body)
+statRhs top (b, StgRhsClosure cc bi srt fv u args body)
   = statExpr body			`combineSE`
     countN FreeVariables (length fv)	`combineSE`
     countOne (
@@ -148,18 +149,19 @@ statRhs top (b, StgRhsClosure cc bi fv u args body)
 \begin{code}
 statExpr :: StgExpr -> StatEnv
 
-statExpr (StgApp _ [] lvs)
-  = countOne Literals
-statExpr (StgApp _ _ lvs)
+statExpr (StgApp _ _)
   = countOne Applications
 
-statExpr (StgCon con as lvs)
+statExpr (StgCon (DataCon _) as _)
   = countOne ConstructorApps
 
-statExpr (StgPrim op as lvs)
+statExpr (StgCon (PrimOp _) as _)
   = countOne PrimitiveApps
 
-statExpr (StgSCC ty l e)
+statExpr (StgCon (Literal _) as _)
+  = countOne Literals
+
+statExpr (StgSCC l e)
   = statExpr e
 
 statExpr (StgLetNoEscape lvs_whole lvs_rhss binds body)
@@ -171,7 +173,7 @@ statExpr (StgLet binds body)
   = statBinding False{-not top-level-} binds	`combineSE`
     statExpr body
 
-statExpr (StgCase expr lve lva uniq alts)
+statExpr (StgCase expr lve lva bndr srt alts)
   = statExpr expr	`combineSE`
     stat_alts alts
     where
@@ -189,6 +191,6 @@ statExpr (StgCase expr lve lva uniq alts)
 
       stat_deflt StgNoDefault = emptySE
 
-      stat_deflt (StgBindDefault b u expr) = statExpr expr
+      stat_deflt (StgBindDefault expr) = statExpr expr
 \end{code}
 

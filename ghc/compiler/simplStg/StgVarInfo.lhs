@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[StgVarInfo]{Sets free/live variable info in STG syntax}
 
@@ -13,16 +13,9 @@ module StgVarInfo ( setStgVarInfo ) where
 
 import StgSyn
 
-import Id		( emptyIdSet, mkIdSet, minusIdSet,
-			  unionIdSets, unionManyIdSets, isEmptyIdSet,
-			  unitIdSet, intersectIdSets,
-			  addIdArity, getIdArity,
-			  addOneToIdSet, IdSet,
-			  nullIdEnv, growIdEnvList, lookupIdEnv,
-			  unitIdEnv, combineIdEnvs, delManyFromIdEnv,
-			  rngIdEnv, IdEnv,
-			  GenId{-instance Eq-}, Id
-			)
+import Id		( setIdArity, getIdArity, Id )
+import VarSet
+import VarEnv
 import IdInfo		( ArityInfo(..) )
 import Maybes		( maybeToBool )
 import Name		( isLocallyDefined )
@@ -118,7 +111,7 @@ varsTopBinds :: [StgBinding] -> LneM ([StgBinding], FreeVarsInfo)
 
 varsTopBinds [] = returnLne ([], emptyFVInfo)
 varsTopBinds (bind:binds)
-  = extendVarEnv env_extension (
+  = extendVarEnvLne env_extension (
 	varsTopBinds binds			`thenLne` \ (binds', fv_binds) ->
 	varsTopBind binders' fv_binds bind	`thenLne` \ (bind',  fv_bind) ->
     	returnLne ((bind' : binds'),
@@ -131,7 +124,7 @@ varsTopBinds (bind:binds)
 			StgNonRec binder rhs -> [(binder,rhs)]
 			StgRec pairs         -> pairs
 
-    binders' = [ binder `addIdArity` ArityExactly (rhsArity rhs) 
+    binders' = [ binder `setIdArity` ArityExactly (rhsArity rhs) 
 	       | (binder, rhs) <- pairs
 	       ]
 
@@ -139,7 +132,7 @@ varsTopBinds (bind:binds)
 
     how_bound = LetrecBound
 			True {- top level -}
-			emptyIdSet
+			emptyVarSet
 
 
 varsTopBind :: [Id]			-- New binders (with correct arity)
@@ -174,24 +167,54 @@ varsRhs scope_fv_info (binder, StgRhsCon cc con args)
   = varsAtoms args	`thenLne` \ (args', fvs) ->
     returnLne (StgRhsCon cc con args', fvs, getFVSet fvs)
 
-varsRhs scope_fv_info (binder, StgRhsClosure cc _ _ upd args body)
-  = extendVarEnv [ (zapArity a, LambdaBound) | a <- args ] (
+varsRhs scope_fv_info (binder, StgRhsClosure cc _ srt _ upd args body)
+  = extendVarEnvLne [ (zapArity a, LambdaBound) | a <- args ] (
     do_body args body	`thenLne` \ (body2, body_fvs, body_escs) ->
     let
-	set_of_args	= mkIdSet args
+	set_of_args	= mkVarSet args
 	rhs_fvs		= body_fvs  `minusFVBinders` args
-	rhs_escs	= body_escs `minusIdSet`   set_of_args
+	rhs_escs	= body_escs `minusVarSet`   set_of_args
 	binder_info     = lookupFVInfo scope_fv_info binder
+	upd'  | null args && isPAP body2 = SingleEntry
+	      | otherwise                = upd
     in
-    returnLne (StgRhsClosure cc binder_info (getFVs rhs_fvs) upd args body2,
-	       rhs_fvs, rhs_escs)
+    returnLne (StgRhsClosure cc binder_info srt (getFVs rhs_fvs) upd' 
+		args body2, rhs_fvs, rhs_escs)
     )
   where
 	-- Pick out special case of application in body of thunk
-    do_body [] (StgApp (StgVarArg f) args _) = varsApp (Just upd) f args
-    do_body _ other_body 		      = varsExpr other_body
+    do_body [] (StgApp f args) = varsApp (Just upd) f args
+    do_body _ other_body 	 = varsExpr other_body
 \end{code}
 
+Detect thunks which will reduce immediately to PAPs, and make them
+non-updatable.  This has several advantages:
+
+        - the non-updatable thunk behaves exactly like the PAP,
+
+	- the thunk is more efficient to enter, because it is
+	  specialised to the task.
+
+        - we save one update frame, one stg_update_PAP, one update
+	  and lots of PAP_enters.
+
+	- in the case where the thunk is top-level, we save building
+	  a black hole and futhermore the thunk isn't considered to
+	  be a CAF any more, so it doesn't appear in any SRTs.
+
+We do it here, because the arity information is accurate, and we need
+to do it before the SRT pass to save the SRT entries associated with
+any top-level PAPs.
+
+\begin{code}
+isPAP (StgApp f args) 
+  = case getIdArity f of
+	   ArityExactly n -> n > n_args
+	   ArityAtLeast n -> n > n_args
+	   _              -> False
+   where n_args = length args
+isPAP _ = False
+\end{code}
 
 \begin{code}
 varsAtoms :: [StgArg]
@@ -204,10 +227,9 @@ varsAtoms atoms
   = mapAndUnzipLne var_atom atoms	`thenLne` \ (args', fvs_lists) ->
     returnLne (args', unionFVInfos fvs_lists)
   where
-    var_atom a@(StgLitArg _) = returnLne (a, emptyFVInfo)
     var_atom a@(StgConArg _) = returnLne (a, emptyFVInfo)
     var_atom a@(StgVarArg v)
-      = lookupVarEnv v	`thenLne` \ (v', how_bound) ->
+      = lookupVarLne v	`thenLne` \ (v', how_bound) ->
 	returnLne (StgVarArg v', singletonFVInfo v' how_bound stgArgOcc)
 \end{code}
 
@@ -245,38 +267,31 @@ on these components, but it in turn is not scrutinised as the basis for any
 decisions.  Hence no black holes.
 
 \begin{code}
-varsExpr (StgApp lit@(StgLitArg _) args _)
-  = returnLne (StgApp lit [] emptyIdSet, emptyFVInfo, emptyIdSet)
+varsExpr (StgApp f args) = varsApp Nothing f args
 
-varsExpr (StgApp lit@(StgConArg _) args _)
-  = panic "varsExpr StgConArg"	-- Only occur in argument positions
-
-varsExpr (StgApp fun@(StgVarArg f) args _) = varsApp Nothing f args
-
-varsExpr (StgCon con args _)
+varsExpr (StgCon con args res_ty)
   = getVarsLiveInCont		`thenLne` \ live_in_cont ->
     varsAtoms args		`thenLne` \ (args', args_fvs) ->
+    returnLne (StgCon con args' res_ty, args_fvs, getFVSet args_fvs)
 
-    returnLne (StgCon con args' live_in_cont, args_fvs, getFVSet args_fvs)
-
-varsExpr (StgPrim op args _)
-  = getVarsLiveInCont		`thenLne` \ live_in_cont ->
-    varsAtoms args		`thenLne` \ (args', args_fvs) ->
-    returnLne (StgPrim op args' live_in_cont, args_fvs, getFVSet args_fvs)
-
-varsExpr (StgSCC ty label expr)
+varsExpr (StgSCC label expr)
   = varsExpr expr		`thenLne` ( \ (expr2, fvs, escs) ->
-    returnLne (StgSCC ty label expr2, fvs, escs) )
+    returnLne (StgSCC label expr2, fvs, escs) )
 \end{code}
 
 Cases require a little more real work.
 \begin{code}
-varsExpr (StgCase scrut _ _ uniq alts)
+varsExpr (StgCase scrut _ _ bndr srt alts)
   = getVarsLiveInCont		  `thenLne` \ live_in_cont ->
+    extendVarEnvLne [(zapArity bndr, CaseBound)] (
     vars_alts alts		  `thenLne` \ (alts2, alts_fvs, alts_escs) ->
     lookupLiveVarsForSet alts_fvs `thenLne` \ alts_lvs ->
     let
-	live_in_alts = live_in_cont `unionIdSets` alts_lvs
+	-- don't consider the default binder as being 'live in alts',
+	-- since this is from the point of view of the case expr, where
+	-- the default binder is not free.
+	live_in_alts = live_in_cont `unionVarSet` 
+				(alts_lvs `minusVarSet` unitVarSet bndr)
     in
 	-- we tell the scrutinee that everything live in the alts
 	-- is live in it, too.
@@ -285,30 +300,33 @@ varsExpr (StgCase scrut _ _ uniq alts)
     )				   `thenLne` \ (scrut2, scrut_fvs, scrut_escs) ->
     lookupLiveVarsForSet scrut_fvs `thenLne` \ scrut_lvs ->
     let
-	live_in_whole_case = live_in_alts `unionIdSets` scrut_lvs
+	live_in_whole_case = live_in_alts `unionVarSet` scrut_lvs
     in
     returnLne (
-      StgCase scrut2 live_in_whole_case live_in_alts uniq alts2,
-      scrut_fvs `unionFVInfo` alts_fvs,
-      alts_escs `unionIdSets` (getFVSet scrut_fvs)   -- All free vars in the scrutinee escape
-    )
+      StgCase scrut2 live_in_whole_case live_in_alts bndr srt alts2,
+      (scrut_fvs `unionFVInfo` alts_fvs) 
+	  `minusFVBinders` [bndr],
+      (alts_escs `unionVarSet` (getFVSet scrut_fvs))
+	  `minusVarSet` unitVarSet bndr
+	
+    ))
   where
     vars_alts (StgAlgAlts ty alts deflt)
       = mapAndUnzip3Lne vars_alg_alt alts
 			`thenLne` \ (alts2,  alts_fvs_list,  alts_escs_list) ->
 	let
 	    alts_fvs  = unionFVInfos alts_fvs_list
-	    alts_escs = unionManyIdSets alts_escs_list
+	    alts_escs = unionVarSets alts_escs_list
 	in
 	vars_deflt deflt `thenLne` \ (deflt2, deflt_fvs, deflt_escs) ->
 	returnLne (
 	    StgAlgAlts ty alts2 deflt2,
 	    alts_fvs  `unionFVInfo`   deflt_fvs,
-	    alts_escs `unionIdSets` deflt_escs
+	    alts_escs `unionVarSet` deflt_escs
 	)
       where
 	vars_alg_alt (con, binders, worthless_use_mask, rhs)
-	  = extendVarEnv [(zapArity b, CaseBound) | b <- binders] (
+	  = extendVarEnvLne [(zapArity b, CaseBound) | b <- binders] (
 	    varsExpr rhs	`thenLne` \ (rhs2, rhs_fvs, rhs_escs) ->
 	    let
 		good_use_mask = [ b `elementOfFVInfo` rhs_fvs | b <- binders ]
@@ -317,7 +335,7 @@ varsExpr (StgCase scrut _ _ uniq alts)
 	    returnLne (
 		(con, binders, good_use_mask, rhs2),
 		rhs_fvs	 `minusFVBinders` binders,
-		rhs_escs `minusIdSet`   mkIdSet binders	-- ToDo: remove the minusIdSet;
+		rhs_escs `minusVarSet`   mkVarSet binders	-- ToDo: remove the minusVarSet;
 							-- since escs won't include
 							-- any of these binders
 	    ))
@@ -327,13 +345,13 @@ varsExpr (StgCase scrut _ _ uniq alts)
 			`thenLne` \ (alts2,  alts_fvs_list,  alts_escs_list) ->
 	let
 	    alts_fvs  = unionFVInfos alts_fvs_list
-	    alts_escs = unionManyIdSets alts_escs_list
+	    alts_escs = unionVarSets alts_escs_list
 	in
 	vars_deflt deflt `thenLne` \ (deflt2, deflt_fvs, deflt_escs) ->
 	returnLne (
 	    StgPrimAlts ty alts2 deflt2,
 	    alts_fvs  `unionFVInfo`   deflt_fvs,
-	    alts_escs `unionIdSets` deflt_escs
+	    alts_escs `unionVarSet` deflt_escs
 	)
       where
 	vars_prim_alt (lit, rhs)
@@ -341,19 +359,11 @@ varsExpr (StgCase scrut _ _ uniq alts)
 	    returnLne ((lit, rhs2), rhs_fvs, rhs_escs)
 
     vars_deflt StgNoDefault
-      = returnLne (StgNoDefault, emptyFVInfo, emptyIdSet)
+      = returnLne (StgNoDefault, emptyFVInfo, emptyVarSet)
 
-    vars_deflt (StgBindDefault binder _ rhs)
-      = extendVarEnv [(zapArity binder, CaseBound)] (
-	varsExpr rhs	`thenLne` \ (rhs2, rhs_fvs, rhs_escs) ->
-	let
-	    used_in_rhs = binder `elementOfFVInfo` rhs_fvs
-	in
-	returnLne (
-	    StgBindDefault binder used_in_rhs rhs2,
-	    rhs_fvs  `minusFVBinders` [binder],
-	    rhs_escs `minusIdSet`   unitIdSet binder
-	))
+    vars_deflt (StgBindDefault rhs)
+      = varsExpr rhs	`thenLne` \ (rhs2, rhs_fvs, rhs_escs) ->
+	returnLne ( StgBindDefault rhs2, rhs_fvs, rhs_escs )
 \end{code}
 
 Lets not only take quite a bit of work, but this is where we convert
@@ -391,7 +401,7 @@ varsApp maybe_thunk_body f args
 
     varsAtoms args		`thenLne` \ (args', args_fvs) ->
 
-    lookupVarEnv f		`thenLne` \ (f', how_bound) ->
+    lookupVarLne f		`thenLne` \ (f', how_bound) ->
 
     let
 	n_args		 = length args
@@ -423,12 +433,12 @@ varsApp maybe_thunk_body f args
 		| otherwise ->  stgNormalOcc
 				-- Record only that it occurs free
 
-	myself = unitIdSet f'
+	myself = unitVarSet f'
 
-	fun_escs | not_letrec_bound = emptyIdSet	-- Only letrec-bound escapees are interesting
+	fun_escs | not_letrec_bound = emptyVarSet	-- Only letrec-bound escapees are interesting
 		 | otherwise	    = case f_arity of	-- Letrec bound, so must have its arity
 				        ArityExactly arity
-				          | arity == n_args -> emptyIdSet
+				          | arity == n_args -> emptyVarSet
 					  	-- Function doesn't escape
 					  | otherwise -> myself
 						-- Inexact application; it does escape
@@ -444,15 +454,16 @@ varsApp maybe_thunk_body f args
 	--	   continuation, but it does no harm to just union the
 	--	   two regardless.
 
-	live_at_call
-	  = live_in_cont `unionIdSets` case how_bound of
-				   LetrecBound _ lvs -> lvs `minusIdSet` myself
-				   other	     -> emptyIdSet
+	-- XXX not needed?
+	-- live_at_call
+	--   = live_in_cont `unionVarSet` case how_bound of
+	-- 			      LetrecBound _ lvs -> lvs `minusVarSet` myself
+	--			   other	     -> emptyVarSet
     in
     returnLne (
-	StgApp (StgVarArg f') args' live_at_call,
+	StgApp f' args',
 	fun_fvs  `unionFVInfo` args_fvs,
-	fun_escs `unionIdSets` (getFVSet args_fvs)
+	fun_escs `unionVarSet` (getFVSet args_fvs)
 				-- All the free vars of the args are disqualified
 				-- from being let-no-escaped.
     )
@@ -476,7 +487,7 @@ vars_let let_no_escape bind body
 	-- we ain't in a let-no-escape world
 	getVarsLiveInCont		`thenLne` \ live_in_cont ->
 	setVarsLiveInCont
-		(if let_no_escape then live_in_cont else emptyIdSet)
+		(if let_no_escape then live_in_cont else emptyVarSet)
 		(vars_bind rec_bind_lvs rec_body_fvs bind)
 					`thenLne` \ (bind2, bind_fvs, bind_escs, env_ext) ->
 
@@ -485,14 +496,14 @@ vars_let let_no_escape bind body
 	-- together with the live_in_cont ones
 	lookupLiveVarsForSet (bind_fvs `minusFVBinders` binders)	`thenLne` \ lvs_from_fvs ->
 	let
-		bind_lvs = lvs_from_fvs `unionIdSets` live_in_cont
+		bind_lvs = lvs_from_fvs `unionVarSet` live_in_cont
 	in
 
 	-- bind_fvs and bind_escs still include the binders of the let(rec)
 	-- but bind_lvs does not
 
   	-- Do the body
-	extendVarEnv env_ext (
+	extendVarEnvLne env_ext (
 		varsExpr body			`thenLne` \ (body2, body_fvs, body_escs) ->
 		lookupLiveVarsForSet body_fvs	`thenLne` \ body_lvs ->
 
@@ -516,7 +527,7 @@ vars_let let_no_escape bind body
 	  = (bind_fvs `unionFVInfo` body_fvs) `minusFVBinders` binders
 
 	live_in_whole_let
-	  = bind_lvs `unionIdSets` (body_lvs `minusIdSet` set_of_binders)
+	  = bind_lvs `unionVarSet` (body_lvs `minusVarSet` set_of_binders)
 
 	real_bind_escs = if let_no_escape then
 			    bind_escs
@@ -524,12 +535,12 @@ vars_let let_no_escape bind body
 			    getFVSet bind_fvs
 			    -- Everything escapes which is free in the bindings
 
-	let_escs = (real_bind_escs `unionIdSets` body_escs) `minusIdSet` set_of_binders
+	let_escs = (real_bind_escs `unionVarSet` body_escs) `minusVarSet` set_of_binders
 
-	all_escs = bind_escs `unionIdSets` body_escs	-- Still includes binders of
+	all_escs = bind_escs `unionVarSet` body_escs	-- Still includes binders of
 						-- this let(rec)
 
-	no_binder_escapes = isEmptyIdSet (set_of_binders `intersectIdSets` all_escs)
+	no_binder_escapes = isEmptyVarSet (set_of_binders `intersectVarSet` all_escs)
 		-- Mustn't depend on the passed-in let_no_escape flag, since
 		-- no_binder_escapes is used by the caller to derive the flag!
     in
@@ -540,21 +551,21 @@ vars_let let_no_escape bind body
 	no_binder_escapes
     ))
   where
-    set_of_binders = mkIdSet binders
+    set_of_binders = mkVarSet binders
     binders	   = case bind of
 			StgNonRec binder rhs -> [binder]
 			StgRec pairs         -> map fst pairs
 
     mk_binding bind_lvs (binder,rhs)
-	= (binder `addIdArity` ArityExactly (stgArity rhs),
+	= (binder `setIdArity` ArityExactly (stgArity rhs),
 	   LetrecBound  False		-- Not top level
 			live_vars
 	  )
 	where
 	   live_vars = if let_no_escape then
-			    addOneToIdSet bind_lvs binder
+			    extendVarSet bind_lvs binder
 		       else
-			    unitIdSet binder
+			    unitVarSet binder
 
     vars_bind :: StgLiveVars
 	      -> FreeVarsInfo			-- Free var info for body of binding
@@ -576,7 +587,7 @@ vars_let let_no_escape bind body
 	    env_ext  = map (mk_binding rec_bind_lvs) pairs
 	    binders' = map fst env_ext
 	in
-	extendVarEnv env_ext		  (
+	extendVarEnvLne env_ext		  (
 	fixLne (\ ~(_, rec_rhs_fvs, _, _) ->
 		let
 			rec_scope_fvs = unionFVInfo rec_body_fvs rec_rhs_fvs
@@ -584,7 +595,7 @@ vars_let let_no_escape bind body
 		mapAndUnzip3Lne (varsRhs rec_scope_fvs) pairs `thenLne` \ (rhss2, fvss, escss) ->
 		let
 			fvs  = unionFVInfos      fvss
-			escs = unionManyIdSets escss
+			escs = unionVarSets escss
 		in
 		returnLne (StgRec (binders' `zip` rhss2), fvs, escs, env_ext)
 	))
@@ -628,7 +639,7 @@ in the LetrecBound constructor; x itself *is* included.
 The std monad functions:
 \begin{code}
 initLne :: Bool -> LneM a -> a
-initLne want_LNEs m = m want_LNEs nullIdEnv emptyIdSet
+initLne want_LNEs m = m want_LNEs emptyVarEnv emptyVarSet
 
 {-# INLINE thenLne #-}
 {-# INLINE thenLne_ #-}
@@ -690,15 +701,15 @@ setVarsLiveInCont :: StgLiveVars -> LneM a -> LneM a
 setVarsLiveInCont new_lvs_cont expr sw env lvs_cont
   = expr sw env new_lvs_cont
 
-extendVarEnv :: [(Id, HowBound)] -> LneM a -> LneM a
-extendVarEnv ids_w_howbound expr sw env lvs_cont
-  = expr sw (growIdEnvList env [(id, pair) | pair@(id,_) <- ids_w_howbound]) lvs_cont
+extendVarEnvLne :: [(Id, HowBound)] -> LneM a -> LneM a
+extendVarEnvLne ids_w_howbound expr sw env lvs_cont
+  = expr sw (extendVarEnvList env [(id, pair) | pair@(id,_) <- ids_w_howbound]) lvs_cont
 
 
-lookupVarEnv :: Id -> LneM (Id, HowBound)
-lookupVarEnv v sw env lvs_cont
+lookupVarLne :: Id -> LneM (Id, HowBound)
+lookupVarLne v sw env lvs_cont
   = returnLne (
-      case (lookupIdEnv env v) of
+      case (lookupVarEnv env v) of
 	Just xx -> xx
 	Nothing -> --false:ASSERT(not (isLocallyDefined v))
 		   (v, ImportBound)
@@ -711,17 +722,17 @@ lookupVarEnv v sw env lvs_cont
 lookupLiveVarsForSet :: FreeVarsInfo -> LneM StgLiveVars
 
 lookupLiveVarsForSet fvs sw env lvs_cont
-  = returnLne (unionManyIdSets (map do_one (getFVs fvs)))
+  = returnLne (unionVarSets (map do_one (getFVs fvs)))
 	      sw env lvs_cont
   where
     do_one v
       = if isLocallyDefined v then
-	    case (lookupIdEnv env v) of
-	      Just (_, LetrecBound _ lvs) -> addOneToIdSet lvs v
-	      Just _		            -> unitIdSet v
+	    case (lookupVarEnv env v) of
+	      Just (_, LetrecBound _ lvs) -> extendVarSet lvs v
+	      Just _		            -> unitVarSet v
 	      Nothing -> pprPanic "lookupVarEnv/do_one:" (ppr v)
 	else
-	    emptyIdSet
+	    emptyVarSet
 \end{code}
 
 
@@ -748,35 +759,35 @@ type EscVarsSet   = IdSet
 
 \begin{code}
 emptyFVInfo :: FreeVarsInfo
-emptyFVInfo = nullIdEnv
+emptyFVInfo = emptyVarEnv
 
 singletonFVInfo :: Id -> HowBound -> StgBinderInfo -> FreeVarsInfo
-singletonFVInfo id ImportBound		     info = nullIdEnv
-singletonFVInfo id (LetrecBound top_level _) info = unitIdEnv id (id, top_level, info)
-singletonFVInfo id other		     info = unitIdEnv id (id, False,     info)
+singletonFVInfo id ImportBound		     info = emptyVarEnv
+singletonFVInfo id (LetrecBound top_level _) info = unitVarEnv id (id, top_level, info)
+singletonFVInfo id other		     info = unitVarEnv id (id, False,     info)
 
 unionFVInfo :: FreeVarsInfo -> FreeVarsInfo -> FreeVarsInfo
-unionFVInfo fv1 fv2 = combineIdEnvs plusFVInfo fv1 fv2
+unionFVInfo fv1 fv2 = plusVarEnv_C plusFVInfo fv1 fv2
 
 unionFVInfos :: [FreeVarsInfo] -> FreeVarsInfo
 unionFVInfos fvs = foldr unionFVInfo emptyFVInfo fvs
 
 minusFVBinders :: FreeVarsInfo -> [Id] -> FreeVarsInfo
-minusFVBinders fv ids = fv `delManyFromIdEnv` ids
+minusFVBinders fv ids = fv `delVarEnvList` ids
 
 elementOfFVInfo :: Id -> FreeVarsInfo -> Bool
-elementOfFVInfo id fvs = maybeToBool (lookupIdEnv fvs id)
+elementOfFVInfo id fvs = maybeToBool (lookupVarEnv fvs id)
 
 lookupFVInfo :: FreeVarsInfo -> Id -> StgBinderInfo
-lookupFVInfo fvs id = case lookupIdEnv fvs id of
+lookupFVInfo fvs id = case lookupVarEnv fvs id of
 			Nothing         -> NoStgBinderInfo
 			Just (_,_,info) -> info
 
 getFVs :: FreeVarsInfo -> [Id]	-- Non-top-level things only
-getFVs fvs = [id | (id,False,_) <- rngIdEnv fvs]
+getFVs fvs = [id | (id,False,_) <- rngVarEnv fvs]
 
 getFVSet :: FreeVarsInfo -> IdSet
-getFVSet fvs = mkIdSet (getFVs fvs)
+getFVSet fvs = mkVarSet (getFVs fvs)
 
 plusFVInfo (id1,top1,info1) (id2,top2,info2)
   = ASSERT (id1 == id2 && top1 == top2)
@@ -786,10 +797,10 @@ plusFVInfo (id1,top1,info1) (id2,top2,info2)
 \begin{code}
 rhsArity :: StgRhs -> Arity
 rhsArity (StgRhsCon _ _ _)              = 0
-rhsArity (StgRhsClosure _ _ _ _ args _) = length args
+rhsArity (StgRhsClosure _ _ _ _ _ args _) = length args
 
 zapArity :: Id -> Id
-zapArity id = id `addIdArity` UnknownArity
+zapArity id = id `setIdArity` UnknownArity
 \end{code}
 
 

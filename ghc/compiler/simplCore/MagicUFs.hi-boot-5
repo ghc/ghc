@@ -1,0 +1,4 @@
+__interface MagicUFs 1 0 where
+__export MagicUFs MagicUnfoldingFun mkMagicUnfoldingFun;
+1 data MagicUnfoldingFun;
+1 mkMagicUnfoldingFun :: Unique.Unique -> MagicUnfoldingFun ;

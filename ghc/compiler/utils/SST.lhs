@@ -24,10 +24,14 @@ import ST
 import STBase		( ST(..), STret(..), StateAndPtr#(..) )
 import ArrBase		( StateAndMutableArray#(..) )
 import IOBase		( IO(..), IOResult(..) )
-#else
+#elif __GLASGOW_HASKELL__ < 400
 import PrelST		( ST(..), STret(..), StateAndPtr#(..) )
 import PrelArr		( StateAndMutableArray#(..) )
 import PrelIOBase	( IO(..), IOResult(..) )
+#else
+import PrelST		( ST(..), STret(..) )
+import PrelArr		( MutableVar(..) )
+import PrelIOBase	( IO(..) )
 #endif
 
 \end{code}
@@ -61,19 +65,38 @@ Converting to/from ST
 sstToST :: SST s r -> ST s r
 stToSST :: ST s r -> SST s r
 
-sstToST sst = ST (\ s -> case sst s of SST_R r s' -> STret s' r)
 
+#if __GLASGOW_HASKELL__ < 400
 stToSST (ST st) = \ s -> case st s of STret s' r -> SST_R r s'
+sstToST sst = ST (\ s -> case sst s of SST_R r s' -> STret s' r)
+#else
+stToSST (ST st) = \ s -> case st s of (# s', r #) -> SST_R r s'
+sstToST sst = ST (\ s -> case sst s of SST_R r s' -> (# s', r #))
+#endif
 \end{code}
 
 ...and IO
 
 \begin{code}
 ioToSST :: IO a -> SST RealWorld (Either IOError a)
+
+#if __GLASGOW_HASKELL__ < 400
 ioToSST (IO io)
   = \s -> case io s of
 	    IOok   s' r   -> SST_R (Right r) s'
 	    IOfail s' err -> SST_R (Left err) s'
+#else
+
+-- We should probably be using ST and exceptions instead of SST here, now
+-- that GHC has exceptions and ST is strict.
+
+ioToSST io
+  = \s -> case catch (io >>= return . Right) (return . Left) of { IO m ->
+	  case m s of {
+		(# s', r #) -> SST_R r s'
+	  } }
+#endif
+
 \end{code}
 
 %************************************************************************
@@ -180,14 +203,20 @@ fixFSST m s = result
 %*									*
 %************************************************************************
 
-Here we implement mutable variables.  ToDo: get rid of the array impl.
+Here we implement mutable variables.
 
 \begin{code}
+#if __GLASGOW_HASKELL__ < 400
 type SSTRef s a = MutableArray s Int a
+#else
+type SSTRef s a = MutableVar s a
+#endif
 
 newMutVarSST   :: a -> SST s (SSTRef s a)
 readMutVarSST  :: SSTRef s a -> SST s a
 writeMutVarSST :: SSTRef s a -> a -> SST s ()
+
+#if __GLASGOW_HASKELL__ < 400
 
 newMutVarSST init s#
   = case (newArray# 1# init s#)     of { StateAndMutableArray# s2# arr# ->
@@ -202,5 +231,21 @@ readMutVarSST (MutableArray _ var#) s#
 writeMutVarSST (MutableArray _ var#) val s#
   = case writeArray# var# 0# val s# of { s2# ->
     SST_R () s2# }
+
+#else
+
+newMutVarSST init s#
+  = case (newMutVar# init s#) of { (# s2#, var# #) ->
+    SST_R (MutableVar var#) s2# }
+
+readMutVarSST (MutableVar var#) s#
+  = case readMutVar# var# s#	of { (# s2#, r #) ->
+    SST_R r s2# }
+
+writeMutVarSST (MutableVar var#) val s#
+  = case writeMutVar# var# val s# of { s2# ->
+    SST_R () s2# }
+
+#endif
 \end{code}
 

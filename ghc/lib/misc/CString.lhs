@@ -54,10 +54,7 @@ module CString
 import PrelPack
 import GlaExts
 import Addr
-import PrelIOBase ( IO(..), IOResult(..))
-import PrelArr ( StateAndMutableByteArray#(..), 
-		 StateAndByteArray#(..)
-	       )
+import PrelIOBase ( IO(..) )
 
 \end{code}
 
@@ -164,21 +161,21 @@ out the bounds - use with care.
 allocChars :: Int -> IO (MutableByteArray RealWorld Int)
 allocChars (I# size#) = IO $ \ s# ->
     case newCharArray# size# s# of
-      StateAndMutableByteArray# s2# barr# ->
-	IOok s2# (MutableByteArray (I# 1#, I# size#) barr#)
+      (# s2#, barr# #) ->
+	(# s2#, (MutableByteArray (I# 1#, I# size#) barr#) #)
 
 allocWords :: Int -> IO (MutableByteArray RealWorld Int)
 allocWords (I# size#) = IO $ \ s# ->
     case newIntArray# size# s# of
-      StateAndMutableByteArray# s2# barr# ->
-	IOok s2# (MutableByteArray (I# 1#, I# size#) barr#)
+      (# s2#, barr# #) ->
+	(# s2#, (MutableByteArray (I# 1#, I# size#) barr#) #)
 
 -- Freeze these index-free mutable arrays
 freeze :: MutableByteArray RealWorld Int -> IO (ByteArray Int)
 freeze (MutableByteArray ixs arr#) = IO $ \ s# ->
     case unsafeFreezeByteArray# arr# s# of
-      StateAndByteArray# s2# frozen# ->
-	IOok s2# (ByteArray ixs frozen#)
+      (# s2#, frozen# #) ->
+	(# s2#, (ByteArray ixs frozen#) #)
 
 -- Copy a null-terminated string from outside the heap to
 -- Haskellized nonsense inside the heap

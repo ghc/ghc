@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[MachRegs]{Machine-specific info about registers}
 
@@ -65,13 +65,11 @@ import AbsCUtils	( magicIdPrimRep )
 import CLabel           ( CLabel )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
-import Stix		( sStLitLbl, StixTree(..), StixReg(..),
-			  CodeSegment
-			)
+import Stix		( sStLitLbl, StixTree(..), StixReg(..) )
 import Unique		( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
 			  Uniquable(..), Unique
 			)
-import UniqSupply	( getUnique, returnUs, thenUs, UniqSM )
+import UniqSupply	( getUniqueUs, returnUs, thenUs, UniqSM )
 import Outputable
 \end{code}
 
@@ -84,6 +82,7 @@ data Imm
   | ImmCLbl	CLabel	    -- AbstractC Label (with baggage)
   | ImmLab	SDoc    -- Simple string label (underscore-able)
   | ImmLit	SDoc    -- Simple string
+  | ImmIndex    CLabel Int
   IF_ARCH_sparc(
   | LO Imm		    -- Possible restrictions...
   | HI Imm
@@ -213,28 +212,8 @@ stgReg x
       Nothing -> sStLitLbl SLIT("MainRegTable")
 
     nonReg = case x of
-      StkStubReg	-> sStLitLbl SLIT("STK_STUB_closure")
-      StdUpdRetVecReg	-> sStLitLbl SLIT("vtbl_StdUpdFrame")
       BaseReg		-> sStLitLbl SLIT("MainRegTable")
-	-- these Hp&HpLim cases perhaps should
-	-- not be here for i386 (???) WDP 96/03
-#ifndef i386_TARGET_ARCH
-	-- Yup, Hp&HpLim are not mapped into registers for x86's at the mo, so
-	-- fetching Hp off BaseReg is the sensible option, since that's
-	-- where gcc generated code stuffs/expects it (RTBL_Hp & RTBL_HpLim).
-	--  SOF 97/09
-	-- In fact, why use StorageMgrInfo at all?
-      Hp		-> StInd PtrRep (sStLitLbl SLIT("StorageMgrInfo"))
-      HpLim		-> StInd PtrRep (sStLitLbl
-				(_PK_ ("StorageMgrInfo+" ++ BYTES_PER_WORD_STR)))
-#endif
-      TagReg		-> StInd IntRep (StPrim IntSubOp [infoptr,
-				StInt (1*BYTES_PER_WORD)])
-			where
-			    r2      = VanillaReg PtrRep ILIT(2)
-			    infoptr = case (stgReg r2) of
-					  Always t -> t
-					  Save   _ -> StReg (StixMagicId r2)
+
       _ -> StInd (magicIdPrimRep x)
 		 (StPrim IntAddOp [baseLoc,
 			StInt (toInteger (offset*BYTES_PER_WORD))])
@@ -299,7 +278,7 @@ mkReg = UnmappedReg
 
 getNewRegNCG :: PrimRep -> UniqSM Reg
 getNewRegNCG pk
-  = getUnique	`thenUs` \ u ->
+  = getUniqueUs	`thenUs` \ u ->
     returnUs (UnmappedReg u pk)
 
 instance Text Reg where
@@ -343,10 +322,10 @@ instance Ord Reg where
     compare a b = cmpReg a b
 
 instance Uniquable Reg where
-    uniqueOf (UnmappedReg u _) = u
-    uniqueOf (FixedReg i)      = mkPseudoUnique1 IBOX(i)
-    uniqueOf (MappedReg i)     = mkPseudoUnique2 IBOX(i)
-    uniqueOf (MemoryReg i _)   = mkPseudoUnique3 i
+    getUnique (UnmappedReg u _) = u
+    getUnique (FixedReg i)      = mkPseudoUnique1 IBOX(i)
+    getUnique (MappedReg i)     = mkPseudoUnique2 IBOX(i)
+    getUnique (MemoryReg i _)   = mkPseudoUnique3 i
 \end{code}
 
 \begin{code}
@@ -406,22 +385,22 @@ gReg x = x
 fReg x = (8 + x)
 
 st0, st1, st2, st3, st4, st5, st6, st7, eax, ebx, ecx, edx, esp :: Reg
-eax = case (gReg 0) of { IBOX(g0) -> FixedReg g0 }
-ebx = case (gReg 1) of { IBOX(g1) -> FixedReg g1 }
-ecx = case (gReg 2) of { IBOX(g2) -> FixedReg g2 }
-edx = case (gReg 3) of { IBOX(g3) -> FixedReg g3 }
-esi = case (gReg 4) of { IBOX(g4) -> FixedReg g4 }
-edi = case (gReg 5) of { IBOX(g5) -> FixedReg g5 }
-ebp = case (gReg 6) of { IBOX(g6) -> FixedReg g6 }
-esp = case (gReg 7) of { IBOX(g7) -> FixedReg g7 }
-st0 = realReg  (fReg 0)
-st1 = realReg  (fReg 1)
-st2 = realReg  (fReg 2)
-st3 = realReg  (fReg 3)
-st4 = realReg  (fReg 4)
-st5 = realReg  (fReg 5)
-st6 = realReg  (fReg 6)
-st7 = realReg  (fReg 7)
+eax = realReg (gReg 0)
+ebx = realReg (gReg 1)
+ecx = realReg (gReg 2)
+edx = realReg (gReg 3)
+esi = realReg (gReg 4)
+edi = realReg (gReg 5)
+ebp = realReg (gReg 6)
+esp = realReg (gReg 7)
+st0 = realReg (fReg 0)
+st1 = realReg (fReg 1)
+st2 = realReg (fReg 2)
+st3 = realReg (fReg 3)
+st4 = realReg (fReg 4)
+st5 = realReg (fReg 5)
+st6 = realReg (fReg 6)
+st7 = realReg (fReg 7)
 
 #endif
 \end{code}
@@ -581,7 +560,6 @@ names in the header files.  Gag me with a spoon, eh?
 \begin{code}
 baseRegOffset :: MagicId -> Int
 
-baseRegOffset StkOReg		     = OFFSET_StkO
 baseRegOffset (VanillaReg _ ILIT(1)) = OFFSET_R1
 baseRegOffset (VanillaReg _ ILIT(2)) = OFFSET_R2
 baseRegOffset (VanillaReg _ ILIT(3)) = OFFSET_R3
@@ -590,31 +568,25 @@ baseRegOffset (VanillaReg _ ILIT(5)) = OFFSET_R5
 baseRegOffset (VanillaReg _ ILIT(6)) = OFFSET_R6
 baseRegOffset (VanillaReg _ ILIT(7)) = OFFSET_R7
 baseRegOffset (VanillaReg _ ILIT(8)) = OFFSET_R8
-baseRegOffset (FloatReg  ILIT(1))    = OFFSET_Flt1
-baseRegOffset (FloatReg  ILIT(2))    = OFFSET_Flt2
-baseRegOffset (FloatReg  ILIT(3))    = OFFSET_Flt3
-baseRegOffset (FloatReg  ILIT(4))    = OFFSET_Flt4
-baseRegOffset (DoubleReg ILIT(1))    = OFFSET_Dbl1
-baseRegOffset (DoubleReg ILIT(2))    = OFFSET_Dbl2
+baseRegOffset (FloatReg  ILIT(1))    = OFFSET_F1
+baseRegOffset (FloatReg  ILIT(2))    = OFFSET_F2
+baseRegOffset (FloatReg  ILIT(3))    = OFFSET_F3
+baseRegOffset (FloatReg  ILIT(4))    = OFFSET_F4
+baseRegOffset (DoubleReg ILIT(1))    = OFFSET_D1
+baseRegOffset (DoubleReg ILIT(2))    = OFFSET_D2
+baseRegOffset Sp		     = OFFSET_Sp
+baseRegOffset Su		     = OFFSET_Su
+baseRegOffset SpLim		     = OFFSET_SpLim
 #ifdef OFFSET_Lng1
 baseRegOffset (LongReg _ ILIT(1))    = OFFSET_Lng1
 #endif
 #ifdef OFFSET_Lng2
 baseRegOffset (LongReg _ ILIT(2))    = OFFSET_Lng2
 #endif
-baseRegOffset TagReg		     = OFFSET_Tag
-baseRegOffset RetReg		     = OFFSET_Ret
-baseRegOffset SpA		     = OFFSET_SpA
-baseRegOffset SuA		     = OFFSET_SuA
-baseRegOffset SpB		     = OFFSET_SpB
-baseRegOffset SuB		     = OFFSET_SuB
 baseRegOffset Hp		     = OFFSET_Hp
 baseRegOffset HpLim		     = OFFSET_HpLim
-baseRegOffset LivenessReg	     = OFFSET_Liveness
 #ifdef DEBUG
 baseRegOffset BaseReg		     = panic "baseRegOffset:BaseReg"
-baseRegOffset StdUpdRetVecReg	     = panic "baseRegOffset:StgUpdRetVecReg"
-baseRegOffset StkStubReg	     = panic "baseRegOffset:StkStubReg"
 baseRegOffset CurCostCentre	     = panic "baseRegOffset:CurCostCentre"
 baseRegOffset VoidReg		     = panic "baseRegOffset:VoidReg"
 #endif
@@ -625,9 +597,6 @@ callerSaves :: MagicId -> Bool
 
 #ifdef CALLER_SAVES_Base
 callerSaves BaseReg			= True
-#endif
-#ifdef CALLER_SAVES_StkO
-callerSaves StkOReg			= True
 #endif
 #ifdef CALLER_SAVES_R1
 callerSaves (VanillaReg _ ILIT(1))	= True
@@ -653,62 +622,41 @@ callerSaves (VanillaReg _ ILIT(7))	= True
 #ifdef CALLER_SAVES_R8
 callerSaves (VanillaReg _ ILIT(8))	= True
 #endif
-#ifdef CALLER_SAVES_FltReg1
+#ifdef CALLER_SAVES_F1
 callerSaves (FloatReg ILIT(1))		= True
 #endif
-#ifdef CALLER_SAVES_FltReg2
+#ifdef CALLER_SAVES_F2
 callerSaves (FloatReg ILIT(2))		= True
 #endif
-#ifdef CALLER_SAVES_FltReg3
+#ifdef CALLER_SAVES_F3
 callerSaves (FloatReg ILIT(3))		= True
 #endif
-#ifdef CALLER_SAVES_FltReg4
+#ifdef CALLER_SAVES_F4
 callerSaves (FloatReg ILIT(4))		= True
 #endif
-#ifdef CALLER_SAVES_DblReg1
+#ifdef CALLER_SAVES_D1
 callerSaves (DoubleReg ILIT(1))		= True
 #endif
-#ifdef CALLER_SAVES_DblReg2
+#ifdef CALLER_SAVES_D2
 callerSaves (DoubleReg ILIT(2))		= True
 #endif
-#ifdef CALLER_SAVES_LngReg1
+#ifdef CALLER_SAVES_L1
 callerSaves (LongReg _ ILIT(1))		= True
 #endif
-#ifdef CALLER_SAVES_LngReg2
-callerSaves (LongReg _ ILIT(2))		= True
+#ifdef CALLER_SAVES_Sp
+callerSaves Sp				= True
 #endif
-#ifdef CALLER_SAVES_Tag
-callerSaves TagReg			= True
+#ifdef CALLER_SAVES_Su
+callerSaves Su				= True
 #endif
-#ifdef CALLER_SAVES_Ret
-callerSaves RetReg			= True
-#endif
-#ifdef CALLER_SAVES_SpA
-callerSaves SpA				= True
-#endif
-#ifdef CALLER_SAVES_SuA
-callerSaves SuA				= True
-#endif
-#ifdef CALLER_SAVES_SpB
-callerSaves SpB				= True
-#endif
-#ifdef CALLER_SAVES_SuB
-callerSaves SuB				= True
+#ifdef CALLER_SAVES_SpLim
+callerSaves SpLim			= True
 #endif
 #ifdef CALLER_SAVES_Hp
 callerSaves Hp				= True
 #endif
 #ifdef CALLER_SAVES_HpLim
 callerSaves HpLim			= True
-#endif
-#ifdef CALLER_SAVES_Liveness
-callerSaves LivenessReg			= True
-#endif
-#ifdef CALLER_SAVES_StdUpdRetVec
-callerSaves StdUpdRetVecReg		= True
-#endif
-#ifdef CALLER_SAVES_StkStub
-callerSaves StkStubReg			= True
 #endif
 callerSaves _				= False
 \end{code}
@@ -718,9 +666,6 @@ magicIdRegMaybe :: MagicId -> Maybe Reg
 
 #ifdef REG_Base
 magicIdRegMaybe BaseReg			= Just (FixedReg ILIT(REG_Base))
-#endif
-#ifdef REG_StkO
-magicIdRegMaybe StkOReg			= Just (FixedReg ILIT(REG_StkOReg))
 #endif
 #ifdef REG_R1
 magicIdRegMaybe (VanillaReg _ ILIT(1)) 	= Just (FixedReg ILIT(REG_R1))
@@ -746,23 +691,26 @@ magicIdRegMaybe (VanillaReg _ ILIT(7)) 	= Just (FixedReg ILIT(REG_R7))
 #ifdef REG_R8 
 magicIdRegMaybe (VanillaReg _ ILIT(8)) 	= Just (FixedReg ILIT(REG_R8))
 #endif
-#ifdef REG_Flt1
-magicIdRegMaybe (FloatReg ILIT(1))	= Just (FixedReg ILIT(REG_Flt1))
+#ifdef REG_F1
+magicIdRegMaybe (FloatReg ILIT(1))	= Just (FixedReg ILIT(REG_F1))
 #endif				 	
-#ifdef REG_Flt2			 	
-magicIdRegMaybe (FloatReg ILIT(2))	= Just (FixedReg ILIT(REG_Flt2))
+#ifdef REG_F2			 	
+magicIdRegMaybe (FloatReg ILIT(2))	= Just (FixedReg ILIT(REG_F2))
 #endif				 	
-#ifdef REG_Flt3			 	
-magicIdRegMaybe (FloatReg ILIT(3))	= Just (FixedReg ILIT(REG_Flt3))
+#ifdef REG_F3			 	
+magicIdRegMaybe (FloatReg ILIT(3))	= Just (FixedReg ILIT(REG_F3))
 #endif				 	
-#ifdef REG_Flt4			 	
-magicIdRegMaybe (FloatReg ILIT(4))	= Just (FixedReg ILIT(REG_Flt4))
+#ifdef REG_F4			 	
+magicIdRegMaybe (FloatReg ILIT(4))	= Just (FixedReg ILIT(REG_F4))
 #endif				 	
-#ifdef REG_Dbl1			 	
-magicIdRegMaybe (DoubleReg ILIT(1))	= Just (FixedReg ILIT(REG_Dbl1))
+#ifdef REG_D1			 	
+magicIdRegMaybe (DoubleReg ILIT(1))	= Just (FixedReg ILIT(REG_D1))
 #endif				 	
-#ifdef REG_Dbl2			 	
-magicIdRegMaybe (DoubleReg ILIT(2))	= Just (FixedReg ILIT(REG_Dbl2))
+#ifdef REG_D2			 	
+magicIdRegMaybe (DoubleReg ILIT(2))	= Just (FixedReg ILIT(REG_D2))
+#endif
+#ifdef REG_Sp	    
+magicIdRegMaybe Sp		   	= Just (FixedReg ILIT(REG_Sp))
 #endif
 #ifdef REG_Lng1			 	
 magicIdRegMaybe (LongReg _ ILIT(1))	= Just (FixedReg ILIT(REG_Lng1))
@@ -770,38 +718,17 @@ magicIdRegMaybe (LongReg _ ILIT(1))	= Just (FixedReg ILIT(REG_Lng1))
 #ifdef REG_Lng2			 	
 magicIdRegMaybe (LongReg _ ILIT(2))	= Just (FixedReg ILIT(REG_Lng2))
 #endif
-#ifdef REG_Tag
-magicIdRegMaybe TagReg			= Just (FixedReg ILIT(REG_TagReg))
-#endif	    
-#ifdef REG_Ret	    
-magicIdRegMaybe RetReg			= Just (FixedReg ILIT(REG_Ret))
-#endif	    
-#ifdef REG_SpA	    
-magicIdRegMaybe SpA		   	= Just (FixedReg ILIT(REG_SpA))
+#ifdef REG_Su	    			
+magicIdRegMaybe Su		   	= Just (FixedReg ILIT(REG_Su))
 #endif	    				
-#ifdef REG_SuA	    			
-magicIdRegMaybe SuA		   	= Just (FixedReg ILIT(REG_SuA))
-#endif	    				
-#ifdef REG_SpB	    			
-magicIdRegMaybe SpB		   	= Just (FixedReg ILIT(REG_SpB))
-#endif	    				
-#ifdef REG_SuB	    			
-magicIdRegMaybe SuB		   	= Just (FixedReg ILIT(REG_SuB))
+#ifdef REG_SpLim	    			
+magicIdRegMaybe SpLim		   	= Just (FixedReg ILIT(REG_SpLim))
 #endif	    				
 #ifdef REG_Hp	   			
 magicIdRegMaybe Hp		   	= Just (FixedReg ILIT(REG_Hp))
 #endif	    				
 #ifdef REG_HpLim      			
 magicIdRegMaybe HpLim		   	= Just (FixedReg ILIT(REG_HpLim))
-#endif	    				
-#ifdef REG_Liveness	 		
-magicIdRegMaybe LivenessReg	   	= Just (FixedReg ILIT(REG_Liveness))
-#endif	    				
-#ifdef REG_StdUpdRetVec	     		
-magicIdRegMaybe StdUpdRetVecReg  	= Just (FixedReg ILIT(REG_StdUpdRetVec))
-#endif	    				
-#ifdef REG_StkStub			
-magicIdRegMaybe StkStubReg	   	= Just (FixedReg ILIT(REG_StkStub))
 #endif	    				
 magicIdRegMaybe _		   	= Nothing
 \end{code}
@@ -945,9 +872,6 @@ freeReg ILIT(o6) = _FALSE_  --	%o6 is our stack pointer.
 #ifdef REG_Base
 freeReg ILIT(REG_Base) = _FALSE_
 #endif
-#ifdef REG_StkO
-freeReg ILIT(REG_StkO) = _FALSE_
-#endif
 #ifdef REG_R1
 freeReg ILIT(REG_R1)   = _FALSE_
 #endif	
@@ -972,41 +896,32 @@ freeReg ILIT(REG_R7)   = _FALSE_
 #ifdef REG_R8  
 freeReg ILIT(REG_R8)   = _FALSE_
 #endif
-#ifdef REG_Flt1
-freeReg ILIT(REG_Flt1) = _FALSE_
+#ifdef REG_F1
+freeReg ILIT(REG_F1) = _FALSE_
 #endif
-#ifdef REG_Flt2
-freeReg ILIT(REG_Flt2) = _FALSE_
+#ifdef REG_F2
+freeReg ILIT(REG_F2) = _FALSE_
 #endif
-#ifdef REG_Flt3
-freeReg ILIT(REG_Flt3) = _FALSE_
+#ifdef REG_F3
+freeReg ILIT(REG_F3) = _FALSE_
 #endif
-#ifdef REG_Flt4
-freeReg ILIT(REG_Flt4) = _FALSE_
+#ifdef REG_F4
+freeReg ILIT(REG_F4) = _FALSE_
 #endif
-#ifdef REG_Dbl1
-freeReg ILIT(REG_Dbl1) = _FALSE_
+#ifdef REG_D1
+freeReg ILIT(REG_D1) = _FALSE_
 #endif
-#ifdef REG_Dbl2
-freeReg ILIT(REG_Dbl2) = _FALSE_
+#ifdef REG_D2
+freeReg ILIT(REG_D2) = _FALSE_
 #endif
-#ifdef REG_Tag
-freeReg ILIT(REG_Tag)  = _FALSE_
+#ifdef REG_Sp 
+freeReg ILIT(REG_Sp)   = _FALSE_
 #endif 
-#ifdef REG_Ret 
-freeReg ILIT(REG_Ret)  = _FALSE_
+#ifdef REG_Su
+freeReg ILIT(REG_Su)   = _FALSE_
 #endif 
-#ifdef REG_SpA 
-freeReg ILIT(REG_SpA)  = _FALSE_
-#endif 
-#ifdef REG_SuA 
-freeReg ILIT(REG_SuA)  = _FALSE_
-#endif 
-#ifdef REG_SpB 
-freeReg ILIT(REG_SpB)  = _FALSE_
-#endif 
-#ifdef REG_SuB 
-freeReg ILIT(REG_SuB)  = _FALSE_
+#ifdef REG_SpLim 
+freeReg ILIT(REG_SpLim) = _FALSE_
 #endif 
 #ifdef REG_Hp 
 freeReg ILIT(REG_Hp)   = _FALSE_
@@ -1014,25 +929,15 @@ freeReg ILIT(REG_Hp)   = _FALSE_
 #ifdef REG_HpLim
 freeReg ILIT(REG_HpLim) = _FALSE_
 #endif
-#ifdef REG_Liveness
-freeReg ILIT(REG_Liveness) = _FALSE_
-#endif
-#ifdef REG_StdUpdRetVec
-freeReg ILIT(REG_StdUpdRetVec) = _FALSE_
-#endif
-#ifdef REG_StkStub
-freeReg ILIT(REG_StkStub) = _FALSE_
-#endif
-freeReg _ = _TRUE_
 freeReg n
   -- we hang onto two double regs for dedicated
   -- use; this is not necessary on Alphas and
   -- may not be on other non-SPARCs.
-#ifdef REG_Dbl1
-  | n _EQ_ (ILIT(REG_Dbl1) _ADD_ ILIT(1)) = _FALSE_
+#ifdef REG_D1
+  | n _EQ_ (ILIT(REG_D1) _ADD_ ILIT(1)) = _FALSE_
 #endif
-#ifdef REG_Dbl2
-  | n _EQ_ (ILIT(REG_Dbl2) _ADD_ ILIT(1)) = _FALSE_
+#ifdef REG_D2
+  | n _EQ_ (ILIT(REG_D2) _ADD_ ILIT(1)) = _FALSE_
 #endif
   | otherwise = _TRUE_
 \end{code}

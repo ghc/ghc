@@ -3,11 +3,14 @@
 %
 \section[BSD]{Misc BSD bindings}
 
-The @BSD@ module defines Haskell bindings to network programming
-functionality that is only provided by BSD-style APIs.
+The @BSD@ module defines Haskell bindings to functionality
+provided by BSD Unix derivatives. Currently this covers
+network programming functionality and symbolic links.
+(OK, so the latter is pretty much supported by most *nixes
+today, but it was BSD that introduced them.)
 
 \begin{code}       
-{-# OPTIONS -#include "cbits/ghcSockets.h" #-}
+{-# OPTIONS -#include "cbits/ghcSockets.h" -#include "stgio.h" #-}
 
 #include "config.h"
 
@@ -60,15 +63,23 @@ module BSD (
 
     NetworkName,
     NetworkAddr,
-    NetworkEntry(..),
+    NetworkEntry(..)
 #ifndef cygwin32_TARGET_OS
-    getNetworkByName,	    -- :: NetworkName -> IO NetworkEntry
-    getNetworkByAddr,       -- :: NetworkAddr -> Family -> IO NetworkEntry
-    setNetworkEntry,	    -- :: Bool -> IO ()
-    getNetworkEntry,	    -- :: IO NetworkEntry
-    endNetworkEntry,	    -- :: IO ()
-    getNetworkEntries       -- :: Bool -> IO [NetworkEntry]
+    , getNetworkByName	    -- :: NetworkName -> IO NetworkEntry
+    , getNetworkByAddr     -- :: NetworkAddr -> Family -> IO NetworkEntry
+    , setNetworkEntry	    -- :: Bool -> IO ()
+    , getNetworkEntry	    -- :: IO NetworkEntry
+    , endNetworkEntry	    -- :: IO ()
+    , getNetworkEntries     -- :: Bool -> IO [NetworkEntry]
 #endif
+
+#ifdef HAVE_SYMLINK
+    , symlink		    -- :: String -> String -> IO ()
+#endif
+#ifdef HAVE_READLINK
+    , readlink		    -- :: String -> IO String
+#endif
+
     ) where
 
 
@@ -77,7 +88,7 @@ import PrelIOBase ( IOError (..), IOErrorType(..) )
 
 import Foreign
 import Addr
-import CString ( unpackCStringIO, unpackCStringBA, unvectorize )
+import CString ( unpackCStringIO, unpackCStringBA, unvectorize, unpackNBytesBA )
 import SocketPrim
 
 \end{code}
@@ -368,10 +379,10 @@ getHostName :: IO HostName
 getHostName = do
   ptr <- stToIO (newCharArray (0,256))
   rc  <- _casm_ ``%r=gethostname(%0, 256);'' ptr
-  ba  <- stToIO (unsafeFreezeByteArray ptr)
   if rc == -1 
      then fail (userError "getHostName: unable to determine host name")
      else do
+       ba  <- stToIO (unsafeFreezeByteArray ptr)
        return (unpackCStringBA ba)
 \end{code}
 
@@ -473,5 +484,45 @@ unvectorizeHostAddrs ptr n  = do
 	   xs <- unvectorizeHostAddrs ptr (n+1)
 	   return (x : xs)
 
+
+\end{code}
+
+%***************************************************************************
+%*                                                                         *
+\subsection[BSD-symlink]{Symbolic links}
+%*                                                                         *
+%***************************************************************************
+
+
+\begin{code}
+#ifdef HAVE_SYMLINK
+symlink :: String -> String -> IO ()
+symlink actual_path sym_path = do
+   rc <- _ccall_ symlink actual_path sym_path
+   if rc == 0 then
+      return ()
+    else do
+      _ccall_ convertErrno
+      cstr <- _ccall_ getErrStr__
+      estr <- unpackCStringIO cstr
+      fail (userError ("BSD.symlink: " ++ estr))
+#endif
+
+#ifdef HAVE_READLINK
+readlink :: String -> IO String
+readlink sym = do
+   mbuf <- stToIO (newCharArray (0, path_max))
+   buf  <- stToIO (unsafeFreezeByteArray mbuf)
+   rc  <- _ccall_ readlink sym buf (path_max + 1)
+   if rc /= -1 then
+      return (unpackNBytesBA buf rc)
+    else do
+      _ccall_ convertErrno
+      cstr <- _ccall_ getErrStr__
+      estr <- unpackCStringIO cstr
+      fail (userError ("BSD.readlink: " ++ estr))
+ where
+  path_max = (``PATH_MAX''::Int)
+#endif
 
 \end{code}

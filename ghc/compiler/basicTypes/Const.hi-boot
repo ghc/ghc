@@ -1,0 +1,5 @@
+_interface_ Const 1
+_exports_
+Const Con ;
+_declarations_
+1 data Con ;

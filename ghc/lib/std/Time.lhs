@@ -33,12 +33,17 @@ module Time
 
        ) where
 
+#ifdef __HUGS__
+import PreludeBuiltin
+#else
 import PrelBase
 import PrelIOBase
+import PrelHandle
 import PrelArr
 import PrelST
 import PrelAddr
 import PrelPack 	( unpackCString )
+#endif
 
 import Ix
 import Char     	( intToDigit )
@@ -67,7 +72,13 @@ Clock times may be compared, converted to strings, or converted to an
 external calendar time @CalendarTime@.
 
 \begin{code}
+#ifdef __HUGS__
+-- I believe Int64 is more than big enough.
+-- In fact, I think one of Int32 or Word32 would do. - ADR
+data ClockTime = TOD Int64 Int64 deriving (Eq, Ord)
+#else
 data ClockTime = TOD Integer Integer deriving (Eq, Ord)
+#endif
 \end{code}
 
 When a @ClockTime@ is shown, it is converted to a string of the form
@@ -78,14 +89,19 @@ Fri Dec 13 20:45:52 1901 through Tue Jan 19 03:14:07 2038, because
 we use the C library routines based on 32 bit integers.
 
 \begin{code}
+#ifdef __HUGS__
+#warning Show ClockTime is bogus
+instance Show ClockTime
+#else
 instance Show ClockTime where
     showsPrec p (TOD sec@(J# a# s# d#) nsec) = 
       showString $ unsafePerformIO $ do
-	    buf <- allocChars 32
+	    buf <- allocChars 38 -- exactly enough for error message
 	    str <- _ccall_ showTime (I# s#) d# buf
 	    return (unpackCString str)
 
     showList = showList__ (showsPrec 0)
+#endif
 \end{code}
 
 
@@ -121,7 +137,11 @@ data CalendarTime
      ctHour    :: Int,
      ctMin     :: Int,
      ctSec     :: Int,
+#ifdef __HUGS__
+     ctPicosec :: Int64,
+#else
      ctPicosec :: Integer,
+#endif
      ctWDay    :: Day,
      ctYDay    :: Int,
      ctTZName  :: String,
@@ -144,7 +164,11 @@ data TimeDiff
      tdHour    :: Int,
      tdMin     :: Int,
      tdSec     :: Int,
+#ifdef __HUGS__
+     tdPicosec :: Int64   -- not standard
+#else
      tdPicosec :: Integer -- not standard
+#endif
    }
    deriving (Eq,Ord,Read,Show)
 \end{code}
@@ -152,6 +176,23 @@ data TimeDiff
 @getClockTime@ returns the current time in its internal representation.
 
 \begin{code}
+#ifdef __HUGS__
+getClockTime :: IO ClockTime
+getClockTime = do
+    i1 <- malloc1
+    i2 <- malloc1
+    rc <- prim_getClockTime i1 i2
+    if rc == 0 
+	then do
+	    sec  <- cvtUnsigned i1
+	    nsec <- cvtUnsigned i2
+	    return (TOD sec (nsec * 1000))
+    	else
+	    constructErrorAndFail "getClockTime"
+  where
+    malloc1 = primNewByteArray sizeof_int64
+    cvtUnsigned arr = primReadInt64Array arr 0
+#else
 getClockTime :: IO ClockTime
 getClockTime = do
     i1 <- malloc1
@@ -167,8 +208,8 @@ getClockTime = do
   where
     malloc1 = IO $ \ s# ->
 	case newIntArray# 1# s# of 
-          StateAndMutableByteArray# s2# barr# -> 
-		IOok s2# (MutableByteArray bottom barr#)
+          (# s2#, barr# #) -> 
+		(# s2#, MutableByteArray bottom barr# #)
 
     --  The C routine fills in an unsigned word.  We don't have 
     --	`unsigned2Integer#,' so we freeze the data bits and use them 
@@ -177,13 +218,13 @@ getClockTime = do
 
     cvtUnsigned (MutableByteArray _ arr#) = IO $ \ s# ->
 	case readIntArray# arr# 0# s# of 
-	  StateAndInt# s2# r# ->
+	  (# s2#, r# #) ->
             if r# ==# 0# 
-		then IOok s2# 0
+		then (# s2#, 0 #)
             	else case unsafeFreezeByteArray# arr# s2# of
-                        StateAndByteArray# s3# frozen# -> 
-				IOok s3# (J# 1# 1# frozen#)
-
+                        (# s3#, frozen# #) -> 
+				(# s3#, J# 1# 1# frozen# #)
+#endif
 \end{code}
 
 @addToClockTime@ {\em d} {\em t} adds a time difference {\em d} and a
@@ -194,21 +235,35 @@ t2} as a @TimeDiff@.
 
 
 \begin{code}
+#ifdef __HUGS__
+addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
+addToClockTime (TimeDiff year mon day hour min sec psec) 
+	       (TOD c_sec c_psec) = unsafePerformIO $ do
+    res <- allocWords sizeof_int64
+    rc <- prim_toClockSec year mon day hour min sec 0 res 
+    if rc /= 0
+     then do
+            diff_sec <- primReadInt64Array res 0
+	    let diff_psec = psec
+            return (TOD (c_sec + diff_sec) (c_psec + diff_psec))
+     else
+          error "Time.addToClockTime: can't perform conversion of TimeDiff"
+#else
 addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
 	       (TOD c_sec c_psec) = unsafePerformIO $ do
     res <- allocWords (``sizeof(time_t)'')
     ptr <- _ccall_ toClockSec year mon day hour min sec 0 res 
     let (A# ptr#) = ptr
-    if ptr /= nullAddr
+    if ptr /= (``0''::Addr)
      then let
-	    diff_sec  = (int2Integer# (indexIntOffAddr# ptr# 0#))
+	    diff_sec  = (int2Integer (indexIntOffAddr# ptr# 0#))
 	    diff_psec = psec
        	  in
           return (TOD (c_sec + diff_sec) (c_psec + diff_psec))
      else
           error "Time.addToClockTime: can't perform conversion of TimeDiff"
-
+#endif
 
 diffClockTimes  :: ClockTime -> ClockTime -> TimeDiff
 diffClockTimes tod_a tod_b =
@@ -233,13 +288,77 @@ converts {\em l} into the corresponding internal @ClockTime@.  The
 ignored.
 
 \begin{code}
+#ifdef __HUGS__
+toCalendarTime :: ClockTime -> IO CalendarTime
+toCalendarTime (TOD sec psec) = do
+    res    <- allocWords sizeof_int64
+    zoneNm <- allocChars 32
+    prim_SETZONE res zoneNm
+    rc <- prim_toLocalTime sec res
+    if rc /= 0
+     then constructErrorAndFail "Time.toCalendarTime: out of range"
+     else do
+       sec   <-  get_tm_sec   res
+       min   <-  get_tm_min   res
+       hour  <-  get_tm_hour  res
+       mday  <-  get_tm_mday  res
+       mon   <-  get_tm_mon   res
+       year  <-  get_tm_year  res
+       wday  <-  get_tm_wday  res
+       yday  <-  get_tm_yday  res
+       isdst <-  get_tm_isdst res
+       zone  <-  prim_ZONE    res
+       tz    <-  prim_GMTOFF  res
+       tzname <- primUnpackCString zone
+       return (CalendarTime (1900+year) mon mday hour min sec psec 
+            		    (toEnum wday) yday tzname tz (isdst /= 0))
+
+toUTCTime :: ClockTime -> CalendarTime
+toUTCTime  (TOD sec psec) = unsafePerformIO $ do
+       res    <- allocWords sizeof_int64
+       zoneNm <- allocChars 32
+       prim_SETZONE res zoneNm
+       rc <- prim_toUTCTime sec res
+       if rc /= 0
+	then error "Time.toUTCTime: out of range"
+        else do
+	    sec   <- get_tm_sec  res
+	    min   <- get_tm_min  res
+	    hour  <- get_tm_hour res
+	    mday  <- get_tm_mday res
+	    mon   <- get_tm_mon  res
+	    year  <- get_tm_year res
+	    wday  <- get_tm_wday res
+	    yday  <- get_tm_yday res
+            return (CalendarTime (1900+year) mon mday hour min sec psec 
+            		  (toEnum wday) yday "UTC" 0 False)
+
+toClockTime :: CalendarTime -> ClockTime
+toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz isdst) =
+    if psec < 0 || psec > 999999999999 then
+        error "Time.toClockTime: picoseconds out of range"
+    else if tz < -43200 || tz > 43200 then
+        error "Time.toClockTime: timezone offset out of range"
+    else
+        unsafePerformIO ( do
+	    res <- allocWords sizeof_int64
+	    rc <- prim_toClockSec year mon mday hour min sec isDst res
+            if rc /= 0
+             then do
+               tm <- primReadInt64Array res 0
+               return (TOD tm psec)
+	     else error "Time.toClockTime: can't perform conversion"
+        )
+    where
+     isDst = if isdst then (1::Int) else 0
+#else
 toCalendarTime :: ClockTime -> IO CalendarTime
 toCalendarTime (TOD sec@(J# a# s# d#) psec) = do
     res    <- allocWords (``sizeof(struct tm)''::Int)
     zoneNm <- allocChars 32
     _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
     tm     <- _ccall_ toLocalTime (I# s#) d# res
-    if tm == nullAddr
+    if tm == (``NULL''::Addr) 
      then constructErrorAndFail "Time.toCalendarTime: out of range"
      else do
        sec   <-  _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm
@@ -289,11 +408,12 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
 	    ptr <- _ccall_ toClockSec year mon mday hour min sec isDst res
             let (A# ptr#) = ptr
             if ptr /= ``NULL''
-             then return (TOD (int2Integer# (indexIntOffAddr# ptr# 0#)) psec)
+             then return (TOD (int2Integer (indexIntOffAddr# ptr# 0#)) psec)
 	     else error "Time.toClockTime: can't perform conversion"
         )
     where
      isDst = if isdst then (1::Int) else 0
+#endif
 
 bottom :: (Int,Int)
 bottom = error "Time.bottom"
@@ -302,11 +422,20 @@ bottom = error "Time.bottom"
 -- (copied from PosixUtil, for now)
 -- Allocate a mutable array of characters with no indices.
 
+#ifdef __HUGS__
+allocChars :: Int -> IO (PrimMutableByteArray RealWorld)
+allocChars size = primNewByteArray size
+
+-- Allocate a mutable array of words with no indices
+
+allocWords :: Int -> IO (PrimMutableByteArray RealWorld)
+allocWords size = primNewByteArray size
+#else
 allocChars :: Int -> IO (MutableByteArray RealWorld ())
 allocChars (I# size#) = IO $ \ s# ->
     case newCharArray# size# s# of 
-      StateAndMutableByteArray# s2# barr# -> 
-	IOok s2# (MutableByteArray bot barr#)
+      (# s2#, barr# #) -> 
+	(# s2#, MutableByteArray bot barr# #)
   where
     bot = error "Time.allocChars"
 
@@ -315,11 +444,11 @@ allocChars (I# size#) = IO $ \ s# ->
 allocWords :: Int -> IO (MutableByteArray RealWorld ())
 allocWords (I# size#) = IO $ \ s# ->
     case newIntArray# size# s# of 
-      StateAndMutableByteArray# s2# barr# -> 
-	IOok s2# (MutableByteArray bot barr#)
+      (# s2#, barr# #) -> 
+	(# s2#, MutableByteArray bot barr# #)
   where
     bot = error "Time.allocWords"
-
+#endif
 \end{code}
 
 \begin{code}
@@ -434,4 +563,36 @@ formatTimeDiff l fmt ct@(TimeDiff year month day hour min sec psec)
       '%' -> "%"
       c   -> [c]
 
+\end{code}
+
+\begin{code}
+#ifdef __HUGS__
+foreign import stdcall "libHS_cbits.so" "get_tm_sec"   get_tm_sec   :: Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "get_tm_min"   get_tm_min   :: Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "get_tm_hour"  get_tm_hour  :: Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "get_tm_mday"  get_tm_mday  :: Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "get_tm_mon"   get_tm_mon   :: Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "get_tm_year"  get_tm_year  :: Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "get_tm_wday"  get_tm_wday  :: Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "get_tm_yday"  get_tm_yday  :: Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "get_tm_isdst" get_tm_isdst :: Bytes -> IO Int
+
+foreign import stdcall "libHS_cbits.so" "prim_ZONE"    prim_ZONE    :: Bytes -> IO Addr
+foreign import stdcall "libHS_cbits.so" "prim_GMTOFF"  prim_GMTOFF  :: Bytes -> IO Int
+
+foreign import stdcall "libHS_cbits.so" "prim_SETZONE" prim_SETZONE :: Bytes -> Bytes -> IO Int
+
+foreign import stdcall "libHS_cbits.so" "sizeof_word"      sizeof_word      :: Int
+foreign import stdcall "libHS_cbits.so" "sizeof_struct_tm" sizeof_struct_tm :: Int
+foreign import stdcall "libHS_cbits.so" "sizeof_time_t"    sizeof_time_t    :: Int
+
+-- believed to be at least 1 bit (the sign bit!) bigger than sizeof_time_t
+sizeof_int64 :: Int
+sizeof_int64 = 8
+
+foreign import stdcall "libHS_cbits.so" "prim_getClockTime" prim_getClockTime :: Bytes -> Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "prim_toClockSec"   prim_toClockSec   :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "prim_toLocalTime"  prim_toLocalTime  :: Int64 -> Bytes -> IO Int
+foreign import stdcall "libHS_cbits.so" "prim_toUTCTime"    prim_toUTCTime    :: Int64 -> Bytes -> IO Int
+#endif
 \end{code}

@@ -61,14 +61,13 @@ module GlaExts
 
 import PrelGHC
 import PrelBase
-import PrelAddr   ( Addr(..) )
+import PrelAddr   ( Addr(..), Word(..) )
 import PrelST
 import IOExts
 import PrelIOBase
 import ByteArray
 import MutableArray
 import Monad
-import PrelCCall   ( Word(..) )
 
 type PrimIO a = IO a
 primIOToIO io = io

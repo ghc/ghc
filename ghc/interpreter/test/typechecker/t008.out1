@@ -1,0 +1,1 @@
+ERROR "test/typechecker/t008.hs" (line 3): Type annotation uses distinct variables a and b where a single variable was inferred

@@ -12,16 +12,18 @@ import U_list
 import U_qid
 %}}
 type ttype;
-	tname	: < gtypeid	: qid; 	>;
-	namedtvar : < gnamedtvar : qid;	>;
+	tname	: < gtypeid	: qid; 	>;	/* tycon */
+	namedtvar : < gnamedtvar : stringId; >;	/* tvar */
 	tllist	: < gtlist	: ttype; >;
 	ttuple	: < gttuple	: list; >;
+	tutuple	: < gtutuple	: list; >;
 	tfun	: < gtin	: ttype;
 		    gtout	: ttype; >;
 	tapp	: < gtapp	: ttype;
 		    gtarg	: ttype; >;
 	tbang	: < gtbang	: ttype; >;
-	context	: < gtcontextl	: list;
-		    gtcontextt	: ttype; >;
+	forall  : < gtforalltv  : list;		/* tyvars */
+		    gtforallctxt : list;	/* theta */
+		    gtforallt   : ttype; >;
 end;
 

@@ -55,6 +55,7 @@ Some details about Concurrent and Parallel Haskell follow.
 %************************************************************************
 %*                                                                      *
 <sect3>The @Concurrent@ interface (recommended)
+<label id="concurrent-interface">
 <p>
 <nidx>Concurrent interface</nidx>
 %*                                                                      *
@@ -64,38 +65,46 @@ GHC provides a @Concurrent@ module, a common interface to a
 collection of useful concurrency abstractions, including those
 mentioned in the ``concurrent paper''.
 
-Just put @import Concurrent@ into your modules, and away you go.
-To create a ``required thread'':
+Just add the flag @-syslib concurrent@ to your GHC command line and
+put @import Concurrent@ into your modules, and away you go.  To create
+a ``required thread'':
 
 <tscreen><verb>
-forkIO :: IO a -> IO a
+forkIO :: IO () -> IO ThreadId
 </verb></tscreen>
 
-The @Concurrent@ interface also provides access to ``I-Vars''
-and ``M-Vars'', which are two flavours of <em>synchronising variables</em>.
+where @ThreadId@ is an abstract type representing a handle to the
+newly created thread.  Threads may also be killed:
+
+<tscreen><verb>
+killThread :: ThreadId -> IO ()
+</verb></tscreen>
+
+this terminates the given thread.  Any work already done by the thread
+isn't lost: the computation is suspended until required by another
+thread.  The memory used by the thread will be garbage collected if it
+isn't referenced from anywhere else.
+
+NOTE: if you have a @ThreadId@, you essentially have a pointer to the
+thread itself.  This means the thread itself can't be garbage
+collected until you drop the @ThreadId@.  This misfeature will
+hopefully be corrected at a later date.
+
+The @Concurrent@ interface also provides access to ``M-Vars'', which
+are <em>synchronising variables</em>.  
+
 <nidx>synchronising variables (Glasgow extension)</nidx>
 <nidx>concurrency -- synchronising variables</nidx>
 
-@IVars@<nidx>IVars (Glasgow extension)</nidx> are write-once
-variables.  They start out empty, and any threads that attempt to read
-them will block until they are filled.  Once they are written, any
-blocked threads are freed, and additional reads are permitted.
-Attempting to write a value to a full @IVar@ results in a runtime
-error.  Interface:
-<tscreen><verb>
-newIVar     :: IO (IVar a)
-readIVar    :: IVar a -> IO a
-writeIVar   :: IVar a -> a -> IO ()
-</verb></tscreen>
-
 @MVars@<nidx>MVars (Glasgow extension)</nidx> are rendezvous points,
-mostly for concurrent threads.  They begin empty, and any attempt to
-read an empty @MVar@ blocks.  When an @MVar@ is written, a
-single blocked thread may be freed.  Reading an @MVar@ toggles its
-state from full back to empty.  Therefore, any value written to an
-@MVar@ may only be read once.  Multiple reads and writes are
-allowed, but there must be at least one read between any two
+mostly for concurrent threads.  They begin either empty or full, and
+any attempt to read an empty @MVar@ blocks.  When an @MVar@ is
+written, a single blocked thread may be freed.  Reading an @MVar@
+toggles its state from full back to empty.  Therefore, any value
+written to an @MVar@ may only be read once.  Multiple reads and writes
+are allowed, but there must be at least one read between any two
 writes. Interface:
+
 <tscreen><verb>
 newEmptyMVar :: IO (MVar a)
 newMVar      :: a -> IO (MVar a)
@@ -150,6 +159,7 @@ nmergeIO :: [[a]] -> IO [a]
 
 A <em>Sample variable</em> (@SampleVar@) is slightly different from a
 normal @MVar@:
+
 <itemize>
 <item> Reading an empty @SampleVar@ causes the reader to block
     (same as @takeMVar@ on empty @MVar@).
@@ -189,13 +199,15 @@ threadWaitWrite :: Int -> IO () -- (read and write, respectively).
 
 %************************************************************************
 %*                                                                      *
-\subsubsubsection{The @Parallel@ interface (recommended)}
+<sect3>The @Parallel@ interface (recommended)
 <nidx>Parallel interface</nidx>
+<p>
 %*                                                                      *
 %************************************************************************
 
 GHC provides two functions for controlling parallel execution, through
 the @Parallel@ interface:
+
 <tscreen><verb>
 interface Parallel where
 infixr 0 `par`
@@ -244,9 +256,10 @@ not generate code to evaluate the addends from left to right.
 
 %************************************************************************
 %*                                                                      *
-\subsubsubsection{Underlying functions and primitives}
+<sect3>Underlying functions and primitives
 <nidx>parallelism primitives</nidx>
 <nidx>primitives for parallelism</nidx>
+<p>
 %*                                                                      *
 %************************************************************************
 
@@ -255,37 +268,22 @@ into uses of the @par#@ and @seq#@ primitives, respectively.  If
 you'd like to see this with your very own eyes, just run GHC with the
 @-ddump-simpl@ option.  (Anything for a good time...)
 
-You can use @par@ and @seq@ in Concurrent Haskell, though
-I'm not sure why you would want to.
-
 %************************************************************************
 %*                                                                      *
-<sect2>Features common to Concurrent and Parallel Haskell
-<p>
-%*                                                                      *
-%************************************************************************
-
-Actually, you can use the @`par`@ and @`seq`@ combinators
-(really for Parallel Haskell) in Concurrent Haskell as well.
-But doing things like ``@par@ to @forkIO@ many required threads''
-counts as ``jumping out the 9th-floor window, just to see what happens.''
-
-%************************************************************************
-%*                                                                      *
-\subsubsubsection{Scheduling policy for concurrent/parallel threads}
+<sect3>Scheduling policy for concurrent/parallel threads
 <nidx>Scheduling---concurrent/parallel</nidx>
 <nidx>Concurrent/parallel scheduling</nidx>
+<p>
 %*                                                                      *
 %************************************************************************
 
 Runnable threads are scheduled in round-robin fashion.  Context
 switches are signalled by the generation of new sparks or by the
 expiry of a virtual timer (the timer interval is configurable with the
-@-C[<num>]@<nidx>-C&lt;num&gt; RTS option (concurrent, parallel)</nidx> RTS option).
-However, a context switch doesn't really happen until the next heap
-allocation.  If you want extremely short time slices, the @-C@ RTS
-option can be used to force a context switch at each and every heap
-allocation.
+@-C[<num>]@<nidx>-C&lt;num&gt; RTS option (concurrent,
+parallel)</nidx> RTS option).  However, a context switch doesn't
+really happen until the current heap block is full.  You can't get any
+faster context switching than this.
 
 When a context switch occurs, pending sparks which have not already
 been reduced to weak head normal form are turned into new threads.

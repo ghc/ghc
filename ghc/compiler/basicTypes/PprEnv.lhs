@@ -1,32 +1,27 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[PprEnv]{The @PprEnv@ type}
 
 \begin{code}
 module PprEnv (
-	PprEnv{-abstract-}, 
+	PprEnv,		-- 
 	BindingSite(..),
 
 	initPprEnv,
 
-	pCon, pLit, pValBndr, pOcc, pPrim, pSCC, 
-	pTy, pTyVarB, pTyVarO
-	
+	pCon, pBndr, pOcc, pSCC, 
+	pTy, pTyVarO
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Id ( Id )
-import {-# SOURCE #-} PrimOp ( PrimOp )
-import {-# SOURCE #-} CostCentre ( CostCentre )
+import {-# SOURCE #-} Const ( Con )
 
+import Var		( GenId, GenTyVar )
+import CostCentre	( CostCentre )
 import Type  		( GenType )
-import TyVar 		( GenTyVar   )
-import Literal          ( Literal )
 import Outputable
-import Unique		( Unique )
-import UniqFM		( emptyUFM, UniqFM )
 \end{code}
 
 %************************************************************************
@@ -36,19 +31,17 @@ import UniqFM		( emptyUFM, UniqFM )
 %************************************************************************
 
 \begin{code}
-data PprEnv flexi bndr occ
-  = PE	(Literal    -> SDoc)
-	(Id	    -> SDoc)
-	(PrimOp     -> SDoc)
-	(CostCentre -> SDoc)
+data PprEnv bndr flexi
+  = PE	{
+	pCon :: Con        -> SDoc,
+	pSCC :: CostCentre -> SDoc,
 
-	(GenTyVar flexi -> SDoc)	-- to print tyvar binders
-	(GenTyVar flexi -> SDoc)	-- to print tyvar occurrences
-	(GenType flexi -> SDoc)		-- to print types
+	pTyVarO :: GenTyVar flexi -> SDoc,	-- to print tyvar occurrences
+	pTy     :: GenType flexi -> SDoc,	-- to print types
 
-	(BindingSite -> bndr -> SDoc)	-- to print val_bdrs
-	(occ 		     -> SDoc)	-- to print bindees
-
+	pBndr :: BindingSite -> bndr -> SDoc,	-- to print value binders
+	pOcc  :: GenId flexi -> SDoc		-- to print value occurrences
+   }
 \end{code}
 
 @BindingSite@ is used to tell the thing that prints binder what
@@ -60,29 +53,23 @@ data BindingSite = LambdaBind | CaseBind | LetBind
 
 \begin{code}
 initPprEnv
-	:: Maybe (Literal -> SDoc)
-	-> Maybe (Id -> SDoc)
-	-> Maybe (PrimOp  -> SDoc)
+	:: Maybe (Con -> SDoc)
 	-> Maybe (CostCentre -> SDoc)
-	-> Maybe (GenTyVar flexi -> SDoc)
 	-> Maybe (GenTyVar flexi -> SDoc)
 	-> Maybe (GenType flexi -> SDoc)
 	-> Maybe (BindingSite -> bndr -> SDoc)
-	-> Maybe (occ -> SDoc)
-	-> PprEnv flexi bndr occ
+	-> Maybe (GenId flexi -> SDoc)
+	-> PprEnv bndr flexi
 
 -- you can specify all the printers individually; if
 -- you don't specify one, you get bottom
 
-initPprEnv l d p c tvb tvo ty val_bndr occ
-  = PE (demaybe l)
-       (demaybe d)
-       (demaybe p)
+initPprEnv p c tvo ty bndr occ
+  = PE (demaybe p)
        (demaybe c)
-       (demaybe tvb)
        (demaybe tvo)
        (demaybe ty)
-       (demaybe val_bndr)
+       (demaybe bndr)
        (demaybe occ)
   where
     demaybe Nothing  = bottom
@@ -91,16 +78,3 @@ initPprEnv l d p c tvb tvo ty val_bndr occ
     bottom = panic "PprEnv.initPprEnv: unspecified printing function"
 \end{code}
 
-\begin{code}
-pLit	 (PE pp  _  _  _  _  _   _  _  _) = pp
-pCon	 (PE  _ pp  _  _  _  _   _  _  _) = pp
-pPrim	 (PE  _  _ pp  _  _  _   _  _  _) = pp
-pSCC	 (PE  _  _  _ pp  _  _   _  _  _) = pp
-	     			    
-pTyVarB	 (PE  _  _  _  _  pp _   _  _  _) = pp
-pTyVarO	 (PE  _  _  _  _  _  pp  _  _  _) = pp
-pTy      (PE  _  _  _  _  _  _   pp _  _) = pp
-      	     			    
-pValBndr (PE  _  _  _  _  _  _   _ pp  _) = pp
-pOcc     (PE  _  _  _  _  _  _   _ _  pp) = pp
-\end{code}

@@ -1,0 +1,5 @@
+_interface_ IdInfo 1
+_exports_
+IdInfo IdInfo ;
+_declarations_
+1 data IdInfo ;

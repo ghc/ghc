@@ -91,13 +91,18 @@ module Word
 
 	) where
 
+#ifdef __HUGS__
+import PreludeBuiltin
+#else
 import GlaExts
-import Ix
-import Bits
 import CCall
-import Numeric (readDec, showInt)
 import PrelForeign
 import PrelIOBase
+import PrelAddr
+#endif
+import Ix
+import Bits
+import Numeric (readDec, showInt)
 
 -----------------------------------------------------------------------------
 -- The "official" coercion functions
@@ -208,7 +213,7 @@ instance Integral Word8 where
   mod  (W8# x)  (W8# y)   = W8# (x `remWord#` y)
   quotRem (W8# x) (W8# y) = (W8# (x `quotWord#` y), W8# (x `remWord#` y))
   divMod  (W8# x) (W8# y) = (W8# (x `quotWord#` y), W8# (x `remWord#` y))
-  toInteger (W8# x)       = word2Integer# x
+  toInteger (W8# x)       = word2Integer x
   toInt x                 = word8ToInt x
 
 instance Ix Word8 where
@@ -274,6 +279,9 @@ instance Bits Word8 where
 
 pow2# :: Int# -> Int#
 pow2# x# = word2Int# (shiftL# (int2Word# 1#) x#)
+
+word2Integer w = case word2Integer# w of
+			(# a, s, d #) -> J# a s d
 
 pow2_64# :: Int# -> Int64#
 pow2_64# x# = word64ToInt64# (shiftL64# (wordToWord64# (int2Word# 1#)) x#)
@@ -355,7 +363,7 @@ instance Integral Word16 where
   mod  (W16# x)  (W16# y)   = W16# (x `remWord#` y)
   quotRem (W16# x) (W16# y) = (W16# (x `quotWord#` y), W16# (x `remWord#` y))
   divMod  (W16# x) (W16# y) = (W16# (x `quotWord#` y), W16# (x `remWord#` y))
-  toInteger (W16# x)        = word2Integer# x
+  toInteger (W16# x)        = word2Integer x
   toInt x                   = word16ToInt x
 
 instance Ix Word16 where
@@ -479,6 +487,7 @@ wordToWord32# :: Word# -> Word#
 #if WORD_SIZE_IN_BYTES == 8
 intToWord32#  i# = (int2Word# i#) `and#` (int2Word# 0xffffffff)
 wordToWord32# w# = w# `and#` (int2Word# 0xffffffff)
+wordToWord64# w# = w#
 #else
 intToWord32#  i# = int2Word# i#
 wordToWord32# w# = w#
@@ -503,7 +512,7 @@ instance Integral Word32 where
     mod  x y           =  remWord32 x y
     quotRem a b        = (a `quotWord32` b, a `remWord32` b)
     divMod x y         = quotRem x y
-    toInteger (W32# x) = word2Integer# x
+    toInteger (W32# x) = word2Integer x
     toInt     (W32# x) = I# (word2Int# x)
 
 {-# INLINE quotWord32 #-}
@@ -524,27 +533,48 @@ instance Ix Word32 where
 instance Enum Word32 where
     toEnum                  = intToWord32
     fromEnum                = word32ToInt   -- lossy, don't use.
-    enumFrom w              = eft32 w 1
-    enumFromTo   w1 w2      = eftt32 w1 1 (> w2)
-    enumFromThen w1 w2      = eftt32 w1 (w2 - w1) (>last)
-        where 
+    enumFrom w              = [w .. maxBound]
+    enumFromTo   w1 w2      
+       | w1 > w2   = []
+       | otherwise = eft32 w1 w2
+
+    enumFromThen w1 w2   = [w1,w2 .. last]
+       where
 	 last
 	  | w1 < w2   = maxBound::Word32
 	  | otherwise = minBound
 
-eftt32 :: Word32 -> Word32 -> (Word32->Bool) -> [Word32]
-eftt32 now step done = go now
+    enumFromThenTo w1 w2 wend  = eftt32 w1 stepWith
+     where
+       diff1 = w2 - w1
+       diff2 = w1 - w2
+
+       increasing = w2 > w1
+
+       stepWith :: Word32 -> Maybe Word32
+       stepWith x
+         | increasing && x > nxt = Nothing --oflow.
+         | wend <= x  = Nothing
+	 | otherwise  = Just nxt
+        where
+	 nxt
+	  | increasing = x + diff1
+	  | otherwise  = x - diff2
+
+eftt32 :: Word32 -> (Word32 -> Maybe Word32) -> [Word32]
+eftt32 now stepper = go now
   where
-   go now
-     | done now  = []
-     | otherwise = now : go (now+step)
+    go now =
+     case stepper now of
+       Nothing -> [now]
+       Just v  -> now : go v
 
 eft32 :: Word32 -> Word32 -> [Word32]
-eft32 now step = go now
+eft32 now last = go now
   where 
    go x
-    | x == maxBound = [x]
-    | otherwise     = x:go (x+step)
+    | x == last = [x]
+    | otherwise = x:go (x+1)
 
 instance Read Word32 where
     readsPrec p = readDec
@@ -594,7 +624,7 @@ sizeofWord32 = 4
 
 \begin{code}
 #if WORD_SIZE_IN_BYTES == 8
-data Word64 = W64# Word#
+--data Word64 = W64# Word#
 
 word32ToWord64 :: Word32 -> Word64
 word32ToWord64 (W32 w#) = W64# w#
@@ -735,7 +765,9 @@ word64ToWord32 :: Word64 -> Word32
 word64ToWord32 (W64# w#) = W32# (word64ToWord# w#)
 
 word64ToInteger :: Word64 -> Integer
-word64ToInteger (W64# w#) = word64ToInteger# w#
+word64ToInteger (W64# w#) = 
+  case word64ToInteger# w# of
+    (# a#, s#, p# #) -> J# a# s# p#
 
 word64ToInt :: Word64 -> Int
 word64ToInt w = 
@@ -1145,36 +1177,36 @@ Read words out of mutable memory:
 
 \begin{code}
 readWord8OffAddr :: Addr -> Int -> IO Word8
-readWord8OffAddr a i = _casm_ `` %r=(StgWord8)(((StgWord8*)%0)[(StgInt)%1]); '' a i
+readWord8OffAddr a i = _casm_ `` %r=(StgNat8)(((StgNat8*)%0)[(StgInt)%1]); '' a i
 
 readWord16OffAddr  :: Addr -> Int -> IO Word16
-readWord16OffAddr a i = _casm_ `` %r=(StgWord16)(((StgWord16*)%0)[(StgInt)%1]); '' a i
+readWord16OffAddr a i = _casm_ `` %r=(StgNat16)(((StgNat16*)%0)[(StgInt)%1]); '' a i
 
 readWord32OffAddr  :: Addr -> Int -> IO Word32
-readWord32OffAddr a i = _casm_ `` %r=(StgWord32)(((StgWord32*)%0)[(StgInt)%1]); '' a i
+readWord32OffAddr a i = _casm_ `` %r=(StgNat32)(((StgNat32*)%0)[(StgInt)%1]); '' a i
 
 readWord64OffAddr  :: Addr -> Int -> IO Word64
 #if WORD_SIZE_IN_BYTES==8
 readWord64OffAddr a i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' a i
 #else
-readWord64OffAddr a i = _casm_ `` %r=(StgWord64)(((StgWord64*)%0)[(StgInt)%1]); '' a i
+readWord64OffAddr a i = _casm_ `` %r=(StgNat64)(((StgNat64*)%0)[(StgInt)%1]); '' a i
 #endif
 
 #ifndef __PARALLEL_HASKELL__
 readWord8OffForeignObj :: ForeignObj -> Int -> IO Word8
-readWord8OffForeignObj fo i = _casm_ `` %r=(StgWord8)(((StgWord8*)%0)[(StgInt)%1]); '' fo i
+readWord8OffForeignObj fo i = _casm_ `` %r=(StgNat8)(((StgNat8*)%0)[(StgInt)%1]); '' fo i
 
 readWord16OffForeignObj  :: ForeignObj -> Int -> IO Word16
-readWord16OffForeignObj fo i = _casm_ `` %r=(StgWord16)(((StgWord16*)%0)[(StgInt)%1]); '' fo i
+readWord16OffForeignObj fo i = _casm_ `` %r=(StgNat16)(((StgNat16*)%0)[(StgInt)%1]); '' fo i
 
 readWord32OffForeignObj  :: ForeignObj -> Int -> IO Word32
-readWord32OffForeignObj fo i = _casm_ `` %r=(StgWord32)(((StgWord32*)%0)[(StgInt)%1]); '' fo i
+readWord32OffForeignObj fo i = _casm_ `` %r=(StgNat32)(((StgNat32*)%0)[(StgInt)%1]); '' fo i
 
 readWord64OffForeignObj  :: ForeignObj -> Int -> IO Word64
 #if WORD_SIZE_IN_BYTES==8
 readWord64OffForeignObj fo i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' fo i
 #else
-readWord64OffForeignObj fo i = _casm_ `` %r=(StgWord64)(((StgWord64*)%0)[(StgInt)%1]); '' fo i
+readWord64OffForeignObj fo i = _casm_ `` %r=(StgNat64)(((StgNat64*)%0)[(StgInt)%1]); '' fo i
 #endif
 
 #endif 
@@ -1187,14 +1219,14 @@ in the IO implementation (a place where we *really* do care about cycles.)
 \begin{code}
 writeWord8OffAddr  :: Addr -> Int -> Word8  -> IO ()
 writeWord8OffAddr (A# a#) (I# i#) (W8# w#) = IO $ \ s# ->
-      case (writeCharOffAddr# a# i# (chr# (word2Int# w#)) s#) of s2# -> IOok s2# () 
+      case (writeCharOffAddr# a# i# (chr# (word2Int# w#)) s#) of s2# -> (# s2#, () #)
 
 writeWord16OffAddr :: Addr -> Int -> Word16 -> IO ()
-writeWord16OffAddr a i e = _casm_ `` (((StgWord16*)%0)[(StgInt)%1])=(StgWord16)%2; '' a i e
+writeWord16OffAddr a i e = _casm_ `` (((StgNat16*)%0)[(StgInt)%1])=(StgNat16)%2; '' a i e
 
 writeWord32OffAddr :: Addr -> Int -> Word32 -> IO ()
 writeWord32OffAddr (A# a#) i@(I# i#) (W32# w#) = IO $ \ s# ->
-      case (writeWordOffAddr#  a# i'# w# s#) of s2# -> IOok s2# () 
+      case (writeWordOffAddr#  a# i'# w# s#) of s2# -> (# s2#, () #)
  where
    -- adjust index to be in Word units, not Word32 ones.
   (I# i'#) 
@@ -1207,22 +1239,22 @@ writeWord32OffAddr (A# a#) i@(I# i#) (W32# w#) = IO $ \ s# ->
 writeWord64OffAddr :: Addr -> Int -> Word64 -> IO ()
 #if WORD_SIZE_IN_BYTES==8
 writeWord64OffAddr (A# a#) (I# i#) (W64# w#) = IO $ \ s# ->
-      case (writeWordOffAddr#  a# i# w# s#) of s2# -> IOok s2# () 
+      case (writeWordOffAddr#  a# i# w# s#) of s2# -> (# s2#, () #)
 #else
 writeWord64OffAddr (A# a#) (I# i#) (W64# w#) = IO $ \ s# ->
-      case (writeWord64OffAddr#  a# i# w# s#) of s2# -> IOok s2# () 
+      case (writeWord64OffAddr#  a# i# w# s#) of s2# -> (# s2#, () #)
 #endif
 
 #ifndef __PARALLEL_HASKELL__
 
 writeWord8OffForeignObj  :: ForeignObj -> Int -> Word8  -> IO ()
-writeWord8OffForeignObj fo i w = _casm_ `` (((StgWord16*)%0)[(StgInt)%1])=(StgWord16)%2; '' fo i w
+writeWord8OffForeignObj fo i w = _casm_ `` (((StgNat16*)%0)[(StgInt)%1])=(StgNat16)%2; '' fo i w
 
 writeWord16OffForeignObj :: ForeignObj -> Int -> Word16 -> IO ()
-writeWord16OffForeignObj fo i w = _casm_ `` (((StgWord16*)%0)[(StgInt)%1])=(StgWord16)%2; '' fo i w
+writeWord16OffForeignObj fo i w = _casm_ `` (((StgNat16*)%0)[(StgInt)%1])=(StgNat16)%2; '' fo i w
 
 writeWord32OffForeignObj :: ForeignObj -> Int -> Word32 -> IO ()
-writeWord32OffForeignObj fo i w = _casm_ `` (((StgWord16*)%0)[(StgInt)%1])=(StgWord16)%2; '' fo i' w
+writeWord32OffForeignObj fo i w = _casm_ `` (((StgNat16*)%0)[(StgInt)%1])=(StgNat16)%2; '' fo i' w
  where
    -- adjust index to be in Word units, not Word32 ones.
   i' 
@@ -1233,11 +1265,11 @@ writeWord32OffForeignObj fo i w = _casm_ `` (((StgWord16*)%0)[(StgInt)%1])=(StgW
 #endif
 
 writeWord64OffForeignObj :: ForeignObj -> Int -> Word64 -> IO ()
-#if WORD_SIZE_IN_BYTES==8
+# if WORD_SIZE_IN_BYTES==8
 writeWord64OffForeignObj fo i e = _casm_ `` (((StgWord*)%0)[(StgInt)%1])=(StgWord)%2; '' fo i e
-#else
-writeWord64OffForeignObj fo i e = _casm_ `` (((StgWord64*)%0)[(StgInt)%1])=(StgWord64)%2; '' fo i e
-#endif
+# else
+writeWord64OffForeignObj fo i e = _casm_ `` (((StgNat64*)%0)[(StgInt)%1])=(StgNat64)%2; '' fo i e
+# endif
 
 #endif
 

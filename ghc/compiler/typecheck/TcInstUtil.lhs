@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcInstUtil]{Utilities for typechecking instance declarations}
 
@@ -8,7 +8,6 @@ The bits common to TcInstDcls and TcDeriv.
 \begin{code}
 module TcInstUtil (
 	InstInfo(..),
-	mkInstanceRelatedIds,
 	buildInstanceEnvs,
 	classDataCon
     ) where
@@ -22,24 +21,19 @@ import TcMonad
 import Inst		( InstanceMapper )
 
 import Bag		( bagToList, Bag )
-import Class		( ClassInstEnv, Class, classBigSig )
-import MkId		( mkDictFunId )
-import Id		( Id )
+import Class		( ClassInstEnv, Class )
+import Var		( TyVar, Id )
 import SpecEnv		( emptySpecEnv, addToSpecEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
-import Name		( getSrcLoc, Name )
+import Name		( getSrcLoc )
 import SrcLoc		( SrcLoc )
-import Type		( mkSigmaTy, mkDictTy, instantiateThetaTy,
-			  ThetaType, Type
-			)
+import Type		( ThetaType, Type )
 import PprType		( pprConstraint )
 import Class		( classTyCon )
+import DataCon		( DataCon )
 import TyCon		( tyConDataCons )
-import TyVar		( TyVar, zipTyVarEnv )
-import Unique		( Unique )
-import Util		( equivClasses, panic, assertPanic )
+import Util		( equivClasses, assertPanic )
 import Outputable
-import List		( nub )
 \end{code}
 
     instance c => k (t tvs) where b
@@ -53,9 +47,6 @@ data InstInfo
       ThetaType		-- inst_decl_theta: the original context, c, from the
 			--   instance declaration.  It constrains (some of)
 			--   the TyVars above
-      ThetaType		-- dfun_theta: the inst_decl_theta, plus one
-			--   element for each superclass; the "Mark
-			--   Jones optimisation"
       Id		-- The dfun id
       RenamedMonoBinds	-- Bindings, b
       SrcLoc		-- Source location assoc'd with this instance's defn
@@ -73,51 +64,10 @@ A tiny function which doesn't belong anywhere else.
 It makes a nasty mutual-recursion knot if you put it in Class.
 
 \begin{code}
-classDataCon :: Class -> Id
+classDataCon :: Class -> DataCon
 classDataCon clas = case tyConDataCons (classTyCon clas) of
 		      (dict_constr:no_more) -> ASSERT( null no_more ) dict_constr 
 \end{code}		      
-
-%************************************************************************
-%*									*
-\subsection{Creating instance related Ids}
-%*									*
-%************************************************************************
-
-\begin{code}
-mkInstanceRelatedIds :: Name		-- Name to use for the dict fun;
-		     -> Class 
-		     -> [TyVar]
-		     -> [Type]
-		     -> ThetaType
-		     -> (Id, ThetaType)
-
-mkInstanceRelatedIds dfun_name clas inst_tyvars inst_tys inst_decl_theta
-  = (dfun_id, dfun_theta)
-  where
-    (class_tyvars, sc_theta, _, _, _) = classBigSig clas
-    sc_theta' = instantiateThetaTy (zipTyVarEnv class_tyvars inst_tys) sc_theta
-
-    dfun_theta = case inst_decl_theta of
-		   []    -> []	-- If inst_decl_theta is empty, then we don't
-					-- want to have any dict arguments, so that we can
-					-- expose the constant methods.
-
-		   other -> nub (inst_decl_theta ++ sc_theta')
-				-- Otherwise we pass the superclass dictionaries to
-				-- the dictionary function; the Mark Jones optimisation.
-				--
-				-- NOTE the "nub".  I got caught by this one:
-				--   class Monad m => MonadT t m where ...
-				--   instance Monad m => MonadT (EnvT env) m where ...
-				-- Here, the inst_decl_theta has (Monad m); but so
-				-- does the sc_theta'!
-
-    dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
-
-    dfun_id = mkDictFunId dfun_name dfun_ty clas inst_tys
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -132,7 +82,7 @@ buildInstanceEnvs :: Bag InstInfo
 buildInstanceEnvs info
   = let
     	icmp :: InstInfo -> InstInfo -> Ordering
-    	(InstInfo c1 _ _ _ _ _ _ _ _) `icmp` (InstInfo c2 _ _ _ _ _ _ _ _)
+    	(InstInfo c1 _ _ _ _ _ _ _) `icmp` (InstInfo c2 _ _ _ _ _ _ _)
 	  = c1 `compare` c2
 
 	info_by_class = equivClasses icmp (bagToList info)
@@ -148,7 +98,7 @@ buildInstanceEnvs info
 buildInstanceEnv :: [InstInfo]		-- Non-empty, and all for same class
 		 -> NF_TcM s (Class, ClassInstEnv)
 
-buildInstanceEnv inst_infos@((InstInfo clas _ _ _ _ _ _ _ _) : _)
+buildInstanceEnv inst_infos@((InstInfo clas _ _ _ _ _ _ _) : _)
   = foldrNF_Tc addClassInstance
 	    emptySpecEnv
 	    inst_infos				`thenNF_Tc` \ class_inst_env ->
@@ -166,7 +116,7 @@ addClassInstance
     -> NF_TcM s ClassInstEnv
 
 addClassInstance 
-    (InstInfo clas inst_tyvars inst_tys _ _ 
+    (InstInfo clas inst_tyvars inst_tys _
 	      dfun_id _ src_loc _)
     class_inst_env
   = 	-- Add the instance to the class's instance environment

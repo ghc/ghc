@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[PrefixToHS]{Support routines for converting ``prefix form'' to Haskell abstract syntax}
 
@@ -24,7 +24,6 @@ module PrefixToHs (
 import PrefixSyn	-- and various syntaxen.
 import HsSyn
 import RdrHsSyn
-import HsPragmas	( noGenPragmas, noClassOpPragmas )
 
 import BasicTypes	( RecFlag(..) )
 import SrcLoc		( mkSrcLoc )
@@ -176,7 +175,9 @@ cvMatch sf is_case rdr_match
 	  RdrMatch_Guards  ln b c gd_exps d -> (c,d, map (cvGRHS sf ln) gd_exps)
 
 cvGRHS :: SrcFile -> SrcLine -> ([RdrNameStmt], RdrNameHsExpr) -> RdrNameGRHS
-cvGRHS sf sl (g, e) = GRHS g e (mkSrcLoc sf sl)
+cvGRHS sf sl (g, e) = GRHS (g ++ [ExprStmt e locn]) locn
+		    where
+		      locn = mkSrcLoc sf sl
 \end{code}
 
 %************************************************************************

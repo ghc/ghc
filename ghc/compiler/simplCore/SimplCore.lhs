@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[SimplCore]{Driver for simplifying @Core@ programs}
 
@@ -8,74 +8,61 @@ module SimplCore ( core2core ) where
 
 #include "HsVersions.h"
 
-import AnalFBWW		( analFBWW )
-import Bag		( isEmptyBag, foldBag )
-import BinderInfo	( BinderInfo{-instance Outputable-} )
-import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), switchIsOn,
-			  opt_D_show_passes,
+import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), 
+			  SwitchResult, switchIsOn,
+			  opt_D_dump_occur_anal,
+			  opt_D_dump_simpl_iterations,
 			  opt_D_simplifier_stats,
 			  opt_D_dump_simpl,
 			  opt_D_verbose_core2core,
-			  opt_DoCoreLinting,
-			  opt_FoldrBuildOn,
-			  opt_ReportWhyUnfoldingsDisallowed,
-			  opt_ShowImportSpecs,
-			  opt_LiberateCaseThreshold
+			  opt_D_dump_occur_anal
 			)
-import CoreLint		( lintCoreBindings )
+import CoreLint		( beginPass, endPass )
 import CoreSyn
-import CoreUtils	( coreExprType )
-import SimplUtils	( etaCoreExpr, typeOkForCase )
+import PprCore		( pprCoreBindings )
+import OccurAnal	( occurAnalyseBinds )
+import CoreUtils	( exprIsTrivial, coreExprType )
+import Simplify		( simplBind )
+import SimplUtils	( etaCoreExpr, findDefault )
+import SimplMonad
 import CoreUnfold
-import Literal		( Literal(..), literalType, mkMachInt, mkMachInt_safe )
-import ErrUtils		( ghcExit, dumpIfSet, doIfSet )
-import FiniteMap	( FiniteMap, emptyFM )
+import Const		( Con(..), Literal(..), literalType, mkMachInt )
+import ErrUtils		( dumpIfSet )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import FoldrBuildWW	( mkFoldrBuildWW )
-import MkId		( mkSysLocal, mkUserId )
-import Id		( setIdVisibility, getIdSpecialisation, setIdSpecialisation,
-                          getIdDemandInfo, idType,
-			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
- 			  lookupIdEnv, IdEnv, 
-			  Id
+import Id		( Id, mkSysLocal, mkUserId,
+			  setIdVisibility, setIdUnfolding,
+			  getIdSpecialisation, setIdSpecialisation,
+			  getInlinePragma, setInlinePragma,
+			  idType, setIdType
 			)
-import IdInfo		( willBeDemanded, DemandInfo )
-import Name		( isExported, isLocallyDefined, 
-			  isLocalName, uniqToOccName,
-                          setNameVisibility,
+import IdInfo		( InlinePragInfo(..) )
+import VarEnv
+import VarSet
+import Name		( isExported, mkSysLocalName,
 			  Module, NamedThing(..), OccName(..)
 			)
-import TyCon		( TyCon )
+import TyCon		( TyCon, isDataTyCon )
 import PrimOp		( PrimOp(..) )
-import PrelVals		( unpackCStringId, unpackCString2Id,
+import PrelInfo		( unpackCStringId, unpackCString2Id,
 			  integerZeroId, integerPlusOneId,
-			  integerPlusTwoId, integerMinusOneId
+			  integerPlusTwoId, integerMinusOneId,
+			  int2IntegerId, addr2IntegerId
 			)
-import Type		( splitAlgTyConApp_maybe, isUnpointedType, Type )
-import TysWiredIn	( stringTy, isIntegerTy )
+import Type		( Type, splitAlgTyConApp_maybe, 
+			  isUnLiftedType, mkTyVarTy, Type )
+import TysWiredIn	( isIntegerTy )
 import LiberateCase	( liberateCase )
-import MagicUFs		( MagicUnfoldingFun )
-import PprCore
 import PprType		( nmbrType )
 import SAT		( doStaticArgs )
-import SimplMonad	( zeroSimplCount, showSimplCount, SimplCount )
-import SimplPgm		( simplifyPgm )
-import Specialise
-import SpecEnv		( substSpecEnv, isEmptySpecEnv )
+import Specialise	( specProgram)
+import SpecEnv		( specEnvToList, specEnvFromList )
 import StrictAnal	( saWwTopBinds )
-import TyVar		( TyVar, nameTyVar, emptyTyVarEnv )
-import Unique		( Unique{-instance Eq-}, Uniquable(..),
-			  integerTyConKey, ratioTyConKey,
-			  mkUnique, incrUnique,
-			  initTidyUniques
+import Var		( TyVar, setTyVarName )
+import Unique		( Unique, Uniquable(..),
+			  ratioTyConKey, mkUnique, incrUnique, initTidyUniques
 		        )
-import UniqSupply	( UniqSupply, mkSplitUniqSupply, 
-                          splitUniqSupply, getUnique
-		        )
-import UniqFM           ( UniqFM, lookupUFM, addToUFM, delFromUFM )
-import Util		( mapAccumL )
-import SrcLoc		( noSrcLoc )
+import UniqSupply	( UniqSupply, splitUniqSupply )
 import Constants	( tARGET_MIN_INT, tARGET_MAX_INT )
 import Bag
 import Maybes
@@ -84,146 +71,125 @@ import Outputable
 \end{code}
 
 \begin{code}
-core2core :: [CoreToDo]			-- spec of what core-to-core passes to do
-	  -> FAST_STRING		-- module name (profiling only)
-	  -> UniqSupply		-- a name supply
-	  -> [TyCon]			-- local data tycons and tycon specialisations
-	  -> [CoreBinding]		-- input...
-	  -> IO [CoreBinding]		-- results: program
+core2core :: [CoreToDo]		-- Spec of what core-to-core passes to do
+	  -> FAST_STRING	-- Module name (profiling only)
+	  -> UniqSupply		-- A name supply
+	  -> [CoreBind]		-- Input
+	  -> IO [CoreBind]	-- Result
 
-core2core core_todos module_name us local_tycons binds
-  = 	-- Do the main business
-     foldl_mn do_core_pass
-		(binds, us, zeroSimplCount)
-		core_todos
-		>>= \ (processed_binds, us', simpl_stats) ->
+core2core core_todos module_name us binds
+  = do
+	-- Do the main business
+	processed_binds <- doCorePasses us binds core_todos
 
 	-- Do the final tidy-up
-     let
-	final_binds = tidyCorePgm module_name processed_binds
-     in
-     lintCoreBindings "TidyCorePgm" True final_binds	>>
-
-
-	-- Dump output
-     dumpIfSet (opt_D_dump_simpl || opt_D_verbose_core2core)
-	"Core transformations" 
-	(pprCoreBindings final_binds)			>>
-
-	-- Report statistics
-     doIfSet opt_D_simplifier_stats
-	 (hPutStr stderr ("\nSimplifier Stats:\n")	>>
-	  hPutStr stderr (showSimplCount simpl_stats)	>>
-	  hPutStr stderr "\n")					>>
+	final_binds <- tidyCorePgm module_name processed_binds
 
 	-- Return results
-    return final_binds
-  where
-    --------------
-    do_core_pass info@(binds, us, simpl_stats) to_do =
-     case (splitUniqSupply us) of 
-      (us1,us2) ->
-    	case to_do of
-	  CoreDoSimplify simpl_sw_chkr
-	    -> _scc_ "CoreSimplify"
-	       begin_pass ("Simplify" ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
-					 then " (foldr/build)" else "") >>
-	       case (simplifyPgm binds simpl_sw_chkr simpl_stats us1) of
-		 (p, it_cnt, simpl_stats2)
-		   -> end_pass us2 p simpl_stats2
-			       ("Simplify (" ++ show it_cnt ++ ")"
-				 ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
-				    then " foldr/build" else "")
+	return final_binds
 
-	  CoreDoFoldrBuildWorkerWrapper
-	    -> _scc_ "CoreDoFoldrBuildWorkerWrapper"
-	       begin_pass "FBWW" >>
-	       case (mkFoldrBuildWW us1 binds) of { binds2 ->
-	       end_pass us2 binds2 simpl_stats "FBWW" }
+doCorePasses us binds []
+  = return binds
 
-	  CoreDoFoldrBuildWWAnal
-	    -> _scc_ "CoreDoFoldrBuildWWAnal"
-	       begin_pass "AnalFBWW" >>
-	       case (analFBWW binds) of { binds2 ->
-	       end_pass us2 binds2 simpl_stats "AnalFBWW" }
+doCorePasses us binds (to_do : to_dos) 
+  = do
+	let (us1, us2) =  splitUniqSupply us
+	binds1 	       <- doCorePass us1 binds to_do
+	doCorePasses us2 binds1 to_dos
 
-	  CoreLiberateCase
-	    -> _scc_ "LiberateCase"
-	       begin_pass "LiberateCase" >>
-	       case (liberateCase opt_LiberateCaseThreshold binds) of { binds2 ->
-	       end_pass us2 binds2 simpl_stats "LiberateCase" }
-
-	  CoreDoFloatInwards
-	    -> _scc_ "FloatInwards"
-	       begin_pass "FloatIn" >>
-	       case (floatInwards binds) of { binds2 ->
-	       end_pass us2 binds2 simpl_stats "FloatIn" }
-
-	  CoreDoFullLaziness
-	    -> _scc_ "CoreFloating"
-	       begin_pass "FloatOut" >>
-	       case (floatOutwards us1 binds) of { binds2 ->
-	       end_pass us2 binds2 simpl_stats "FloatOut" }
-
-	  CoreDoStaticArgs
-	    -> _scc_ "CoreStaticArgs"
-	       begin_pass "StaticArgs" >>
-	       case (doStaticArgs binds us1) of { binds2 ->
-	       end_pass us2 binds2 simpl_stats "StaticArgs" }
-		-- Binds really should be dependency-analysed for static-
-		-- arg transformation... Not to worry, they probably are.
-		-- (I don't think it *dies* if they aren't [WDP 94/04/15])
-
-	  CoreDoStrictness
-	    -> _scc_ "CoreStranal"
-	       begin_pass "StrAnal" >>
-	       case (saWwTopBinds us1 binds) of { binds2 ->
-	       end_pass us2 binds2 simpl_stats "StrAnal" }
-
-	  CoreDoSpecialising
-	    -> _scc_ "Specialise"
-	       begin_pass "Specialise" >>
-	       case (specProgram us1 binds) of { p ->
-	       end_pass us2 p simpl_stats "Specialise"
-	       }
-
-	  CoreDoPrintCore	-- print result of last pass
-	    -> dumpIfSet (not opt_D_verbose_core2core) "Print Core"
-	 	  (pprCoreBindings binds)	>>
-	       return (binds, us1, simpl_stats)
-
-    -------------------------------------------------
-
-    begin_pass what
-      = if opt_D_show_passes
-	then hPutStr stderr ("*** Core2Core: "++what++"\n")
-	else return ()
-
-    end_pass us2 binds2
-	     simpl_stats2 what
-      = -- Report verbosely, if required
-	dumpIfSet opt_D_verbose_core2core what
-	    (pprCoreBindings binds2)		>>
-
-	lintCoreBindings what True {- spec_done -} binds2		>>
-		-- The spec_done flag tells the linter to
-		-- complain about unboxed let-bindings
-		-- But we're not specialising unboxed types any more,
-		-- so its irrelevant.
-
-	return
-	  (binds2,	-- processed binds, possibly run thru CoreLint
-	   us2,		-- UniqSupply for the next guy
-	   simpl_stats2	-- accumulated simplifier stats
-	  )
-
-
--- here so it can be inlined...
-foldl_mn f z []     = return z
-foldl_mn f z (x:xs) = f z x	>>= \ zz ->
-		      foldl_mn f zz xs
+doCorePass us binds (CoreDoSimplify sw_chkr) = _scc_ "Simplify"       simplifyPgm sw_chkr us binds
+doCorePass us binds CoreLiberateCase	     = _scc_ "LiberateCase"   liberateCase binds
+doCorePass us binds CoreDoFloatInwards	     = _scc_ "FloatInwards"   floatInwards binds
+doCorePass us binds CoreDoFullLaziness       = _scc_ "CoreFloating"   floatOutwards us binds
+doCorePass us binds CoreDoStaticArgs	     = _scc_ "CoreStaticArgs" doStaticArgs us binds
+doCorePass us binds CoreDoStrictness	     = _scc_ "CoreStranal"    saWwTopBinds us binds
+doCorePass us binds CoreDoSpecialising	     = _scc_ "Specialise"     specProgram us binds
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{The driver for the simplifier}
+%*									*
+%************************************************************************
+
+\begin{code}
+simplifyPgm :: (SimplifierSwitch -> SwitchResult)
+	    -> UniqSupply
+	    -> [CoreBind]		-- Input
+	    -> IO [CoreBind]		-- New bindings
+
+simplifyPgm sw_chkr us binds
+  = do {
+	beginPass "Simplify";
+
+	(termination_msg, it_count, counts, binds') <- iteration us 1 zeroSimplCount binds;
+
+	dumpIfSet opt_D_simplifier_stats "Simplifier statistics"
+		  (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
+			 text "",
+			 pprSimplCount counts]);
+
+	endPass "Simplify" 
+		(opt_D_verbose_core2core && not opt_D_dump_simpl_iterations)
+		binds'
+    }
+  where
+    max_iterations      = getSimplIntSwitch sw_chkr MaxSimplifierIterations
+    simpl_switch_is_on  = switchIsOn sw_chkr
+
+    core_iter_dump binds | opt_D_verbose_core2core = pprCoreBindings binds
+		         | otherwise		   = empty
+
+    iteration us iteration_no counts binds
+      = do {
+		-- Occurrence analysis
+	   let { tagged_binds = _scc_ "OccAnal" occurAnalyseBinds simpl_switch_is_on binds };
+	   dumpIfSet opt_D_dump_occur_anal "Occurrence analysis"
+		     (pprCoreBindings tagged_binds);
+
+		-- Simplify
+	   let { (binds', counts') = initSmpl sw_chkr us1 (simplTopBinds tagged_binds);
+	         all_counts        = counts `plusSimplCount` counts'
+	       } ;
+
+		-- Stop if nothing happened; don't dump output
+	   if isZeroSimplCount counts' then
+		return ("Simplifier reached fixed point", iteration_no, all_counts, binds')
+	   else do {
+
+		-- Dump the result of this iteration
+	   dumpIfSet opt_D_dump_simpl_iterations
+		     ("Simplifier iteration " ++ show iteration_no 
+		      ++ " out of " ++ show max_iterations)
+		     (vcat[pprSimplCount counts',
+			   text "",
+			   core_iter_dump binds']) ;
+
+		-- Stop if we've run out of iterations
+	   if iteration_no == max_iterations then
+		do {
+		    if  max_iterations > 1 then
+			    hPutStr stderr ("NOTE: Simplifier still going after " ++ 
+				    show max_iterations ++ 
+				    " iterations; bailing out.\n")
+		    else return ();
+
+		    return ("Simplifier baled out", iteration_no, all_counts, binds')
+		}
+
+		-- Else loop
+  	   else iteration us2 (iteration_no + 1) all_counts binds'
+	}  }
+      where
+  	  (us1, us2) = splitUniqSupply us
+
+
+simplTopBinds []              = returnSmpl []
+simplTopBinds (bind1 : binds) = (simplBind bind1	$
+			         simplTopBinds binds)	`thenSmpl` \ (binds1', binds') ->
+				returnSmpl (binds1' ++ binds')
+\end{code}
 
 
 %************************************************************************
@@ -247,55 +213,109 @@ Several tasks are done by @tidyCorePgm@
     time
 
 3.  Make the representation of NoRep literals explicit, and
-    float their bindings to the top level
-
+    float their bindings to the top level.  We only do the floating
+    part for NoRep lits inside a lambda (else no gain).  We need to
+    take care with	let x = "foo" in e
+    that we don't end up with a silly binding
+			let x = y in e
+    with a floated "foo".  What a bore.
+    
 4.  Convert
 	case x of {...; x' -> ...x'...}
     ==>
 	case x of {...; _  -> ...x... }
     See notes in SimplCase.lhs, near simplDefault for the reasoning here.
 
-5.  *Mangle* cases involving fork# and par# in the discriminant.  The
-    original templates for these primops (see @PrelVals.lhs@) constructed
-    case expressions with boolean results solely to fool the strictness
-    analyzer, the simplifier, and anyone else who might want to fool with
-    the evaluation order.  At this point in the compiler our evaluation
-    order is safe.  Therefore, we convert expressions of the form:
+5.  *Mangle* cases involving par# in the discriminant.  The unfolding
+    for par in PrelConc.lhs include case expressions with integer
+    results solely to fool the strictness analyzer, the simplifier,
+    and anyone else who might want to fool with the evaluation order.
+    At this point in the compiler our evaluation order is safe.
+    Therefore, we convert expressions of the form:
 
     	case par# e of
-    	  True -> rhs
-    	  False -> parError#
+    	  0# -> rhs
+    	  _  -> parError#
     ==>
     	case par# e of
     	  _ -> rhs
 
-6.	Eliminate polymorphic case expressions.  We can't generate code for them yet.
+    fork# isn't handled like this - it's an explicit IO operation now.
+    The reason is that fork# returns a ThreadId#, which gets in the
+    way of the above scheme.  And anyway, IO is the only guaranteed
+    way to enforce ordering  --SDM.
 
-7.	Do eta reduction for lambda abstractions appearing in:
-		- the RHS of case alternatives
-		- the body of a let
-	These will otherwise turn into local bindings during Core->STG; better to
-	nuke them if possible.   (In general the simplifier does eta expansion not
-	eta reduction, up to this point.)
+6.  Mangle cases involving seq# in the discriminant.  Up to this
+    point, seq# will appear like this:
 
-8.	Do let-to-case.  See notes in Simplify.lhs for why we defer let-to-case
-	for multi-constructor types.
+	  case seq# e of
+		0# -> seqError#
+		_  -> ...
 
-9.	Give all binders a nice print-name.  Their uniques aren't changed; rather we give
-	them lexically unique occ-names, so that we can safely print the OccNae only
-	in the interface file.  [Bad idea to change the uniques, because the code
-	generator makes global labels from the uniques for local thunks etc.]
+    where the 0# branch is purely to bamboozle the strictness analyser
+    (see case 5 above).  This code comes from an unfolding for 'seq'
+    in Prelude.hs.  We translate this into
+
+	  case e of
+		_ -> ...
+
+    Now that the evaluation order is safe.  The code generator knows
+    how to push a seq frame on the stack if 'e' is of function type,
+    or is polymorphic.
 
 
+7. Do eta reduction for lambda abstractions appearing in:
+	- the RHS of case alternatives
+	- the body of a let
+
+   These will otherwise turn into local bindings during Core->STG;
+   better to nuke them if possible.  (In general the simplifier does
+   eta expansion not eta reduction, up to this point.)
+
+9. Give all binders a nice print-name.  Their uniques aren't changed;
+   rather we give them lexically unique occ-names, so that we can
+   safely print the OccNae only in the interface file.  [Bad idea to
+   change the uniques, because the code generator makes global labels
+   from the uniques for local thunks etc.]
+
+
+Special case
+~~~~~~~~~~~~
+
+NOT ENABLED AT THE MOMENT (because the floated Ids are global-ish
+things, and we need local Ids for non-floated stuff):
+
+  Don't float stuff out of a binder that's marked as a bottoming Id.
+  Reason: it doesn't do any good, and creates more CAFs that increase
+  the size of SRTs.
+
+eg.
+
+	f = error "string"
+
+is translated to
+
+	f' = unpackCString# "string"
+	f = error f'
+
+hence f' and f become CAFs.  Instead, the special case for
+tidyTopBinding below makes sure this comes out as
+
+	f = let f' = unpackCString# "string" in error f'
+
+and we can safely ignore f as a CAF, since it can only ever be entered once.
 
 
 \begin{code}
-tidyCorePgm :: Module -> [CoreBinding] -> [CoreBinding]
+tidyCorePgm :: Module -> [CoreBind] -> IO [CoreBind]
 
 tidyCorePgm mod binds_in
-  = initTM mod nullIdEnv $
-    tidyTopBindings binds_in	`thenTM` \ binds ->
-    returnTM (bagToList binds)
+  = do
+	beginPass "Tidy Core"
+
+	let binds_out = bagToList (initTM mod (tidyTopBindings binds_in))
+
+	endPass "Tidy Core" (opt_D_dump_simpl || opt_D_verbose_core2core) binds_out
 \end{code}
 
 Top level bindings
@@ -306,18 +326,24 @@ tidyTopBindings (b:bs)
   = tidyTopBinding  b		$
     tidyTopBindings bs
 
-tidyTopBinding :: CoreBinding
-	       -> TopTidyM (Bag CoreBinding)
-	       -> TopTidyM (Bag CoreBinding)
+tidyTopBinding :: CoreBind
+	       -> TopTidyM (Bag CoreBind)
+	       -> TopTidyM (Bag CoreBind)
 
 tidyTopBinding (NonRec bndr rhs) thing_inside
   = initNestedTM (tidyCoreExpr rhs)		`thenTM` \ (rhs',floats) ->
-    mungeTopBinder bndr				$ \ bndr' ->
+    tidyTopBinder bndr				$ \ bndr' ->
     thing_inside 				`thenTM` \ binds ->
-    returnTM ((floats `snocBag` NonRec bndr' rhs') `unionBags` binds)
+    let
+	this_bind {- | isBottomingId bndr 	
+			= unitBag (NonRec bndr' (foldrBag Let rhs' floats))
+		  | otherwise  -}
+			= floats `snocBag` NonRec bndr' rhs'
+    in
+    returnTM (this_bind `unionBags` binds)
 
 tidyTopBinding (Rec pairs) thing_inside
-  = mungeTopBinders binders			$ \ binders' ->
+  = tidyTopBinders binders			$ \ binders' ->
     initNestedTM (mapTM tidyCoreExpr rhss)	`thenTM` \ (rhss', floats) ->
     thing_inside				`thenTM` \ binds_inside ->
     returnTM ((floats `snocBag` Rec (binders' `zip` rhss')) `unionBags` binds_inside)
@@ -325,64 +351,83 @@ tidyTopBinding (Rec pairs) thing_inside
     (binders, rhss) = unzip pairs
 \end{code}
 
+\begin{code}
+tidyTopBinder :: Id -> (Id -> TopTidyM (Bag CoreBind)) -> TopTidyM (Bag CoreBind)
+tidyTopBinder id thing_inside
+  = mungeTopBndr id 				$ \ id' ->
+    let
+	spec_items = specEnvToList (getIdSpecialisation id')
+    in
+    if null spec_items then
 
+	-- Common case, no specialisations to tidy
+	thing_inside id'
+    else
+
+	-- Oh well, tidy those specialisations
+    initNestedTM (mapTM tidySpecItem spec_items)	`thenTM` \ (spec_items', floats) ->
+    let
+	id'' = setIdSpecialisation id' (specEnvFromList spec_items')
+    in
+    extendEnvTM id (Var id'')		$
+    thing_inside id''			`thenTM` \ binds ->
+    returnTM (floats `unionBags` binds)
+
+tidyTopBinders []     k = k []
+tidyTopBinders (b:bs) k = tidyTopBinder b	$ \ b' ->
+			  tidyTopBinders bs	$ \ bs' ->
+			  k (b' : bs')
+
+tidySpecItem (tyvars, tys, rhs)
+  = newBndrs tyvars		$ \ tyvars' ->
+    mapTM tidyTy tys		`thenTM` \ tys' ->
+    tidyCoreExpr rhs		`thenTM` \ rhs' ->
+    returnTM (tyvars', tys', rhs')
+\end{code}
 
 Expressions
 ~~~~~~~~~~~
 \begin{code}
-tidyCoreExpr (Var v) = lookupId v	`thenTM` \ v' ->
-		       returnTM (Var v')
+tidyCoreExpr (Var v) = lookupId v
 
-tidyCoreExpr (Lit lit)
-  = litToRep lit	`thenTM` \ (_, lit_expr) ->
-    returnTM lit_expr
+tidyCoreExpr (Type ty)
+  = tidyTy ty 	`thenTM` \ ty' ->
+    returnTM (Type ty')
 
 tidyCoreExpr (App fun arg)
   = tidyCoreExpr fun	`thenTM` \ fun' ->
-    tidyCoreArg arg	`thenTM` \ arg' ->
+    tidyCoreExpr arg	`thenTM` \ arg' ->
     returnTM (App fun' arg')
 
+tidyCoreExpr (Con (Literal lit) args)
+  = ASSERT( null args )
+    litToRep lit	`thenTM` \ (lit_ty, lit_expr) ->
+    getInsideLambda	`thenTM` \ in_lam ->
+    if in_lam && not (exprIsTrivial lit_expr) then
+	-- It must have been a no-rep literal with a
+	-- non-trivial representation; and we're inside a lambda;
+	-- so float it to the top
+	addTopFloat lit_ty lit_expr	`thenTM` \ v ->
+	returnTM (Var v)
+    else
+	returnTM lit_expr
+
 tidyCoreExpr (Con con args)
-  = mapTM tidyCoreArg args	`thenTM` \ args' ->
+  = mapTM tidyCoreExpr args	`thenTM` \ args' ->
     returnTM (Con con args')
 
-tidyCoreExpr (Prim prim args)
-  = tidyPrimOp prim		`thenTM` \ prim' ->
-    mapTM tidyCoreArg args	`thenTM` \ args' ->
-    returnTM (Prim prim' args')
-
-tidyCoreExpr (Lam (ValBinder v) body)
-  = newId v			$ \ v' ->
+tidyCoreExpr (Lam bndr body)
+  = newBndr bndr 		$ \ bndr' ->
+    insideLambda bndr		$
     tidyCoreExpr body		`thenTM` \ body' ->
-    returnTM (Lam (ValBinder v') body')
-
-tidyCoreExpr (Lam (TyBinder tv) body)
-  = newTyVar tv			$ \ tv' ->
-    tidyCoreExpr body		`thenTM` \ body' ->
-    returnTM (Lam (TyBinder tv') body')
-
-	-- Try for let-to-case (see notes in Simplify.lhs for why
-	-- some let-to-case stuff is deferred to now).
-tidyCoreExpr (Let (NonRec bndr rhs) body)
-  | willBeDemanded (getIdDemandInfo bndr) && 
-    not rhs_is_whnf &&		-- Don't do it if RHS is already in WHNF
-    typeOkForCase (idType bndr)
-  = ASSERT( not (isUnpointedType (idType bndr)) )
-    tidyCoreExpr (Case rhs (AlgAlts [] (BindDefault bndr body)))
-  where
-    rhs_is_whnf = case mkFormSummary rhs of
-			VarForm -> True
-			ValueForm -> True
-			other -> False
+    returnTM (Lam bndr' body')
 
 tidyCoreExpr (Let (NonRec bndr rhs) body)
   = tidyCoreExpr rhs		`thenTM` \ rhs' ->
-    newId bndr			$ \ bndr' ->
-    tidyCoreExprEta body	`thenTM` \ body' ->
-    returnTM (Let (NonRec bndr' rhs') body')
+    tidyBindNonRec bndr rhs' body
 
 tidyCoreExpr (Let (Rec pairs) body)
-  = newIds bndrs		$ \ bndrs' ->
+  = newBndrs bndrs		$ \ bndrs' ->
     mapTM tidyCoreExpr rhss	`thenTM` \ rhss' ->
     tidyCoreExprEta body	`thenTM` \ body' ->
     returnTM (Let (Rec (bndrs' `zip` rhss')) body')
@@ -399,96 +444,50 @@ tidyCoreExpr (Note note body)
   = tidyCoreExprEta body	`thenTM` \ body' ->
     returnTM (Note note body')
 
--- Wierd case for par, seq, fork etc. See notes above.
-tidyCoreExpr (Case scrut@(Prim op args) (PrimAlts _ (BindDefault binder rhs)))
-  | funnyParallelOp op
-  = tidyCoreExpr scrut			`thenTM` \ scrut' ->
-    newId binder			$ \ binder' ->
-    tidyCoreExprEta rhs			`thenTM` \ rhs' ->
-    returnTM (Case scrut' (PrimAlts [] (BindDefault binder' rhs')))
-
--- Eliminate polymorphic case, for which we can't generate code just yet
-tidyCoreExpr (Case scrut (AlgAlts [] (BindDefault deflt_bndr rhs)))
-  | not (typeOkForCase (idType deflt_bndr))
-  = pprTrace "Warning: discarding polymorphic case:" (ppr scrut) $
-    case scrut of
-	Var v -> lookupId v	`thenTM` \ v' ->
-		 extendEnvTM deflt_bndr v' (tidyCoreExpr rhs)
-	other -> tidyCoreExpr (Let (NonRec deflt_bndr scrut) rhs)
-  
-tidyCoreExpr (Case scrut alts)
-  = tidyCoreExpr scrut			`thenTM` \ scrut' ->
-    tidy_alts scrut' alts		`thenTM` \ alts' ->
-    returnTM (Case scrut' alts')
+-- seq#: see notes above.
+tidyCoreExpr (Case scrut@(Con (PrimOp SeqOp) [Type _, e]) bndr alts)
+  = tidyCoreExpr e			`thenTM` \ e' ->
+    newBndr bndr 			$ \ bndr' ->
+    let new_bndr = setIdType bndr' (coreExprType e') in
+    tidyCoreExprEta default_rhs		`thenTM` \ rhs' ->
+    returnTM (Case e' new_bndr [(DEFAULT,[],rhs')])
   where
-    tidy_alts scrut (AlgAlts alts deflt)
-	= mapTM tidy_alg_alt alts	`thenTM` \ alts' ->
-	  tidy_deflt scrut deflt	`thenTM` \ deflt' ->
-	  returnTM (AlgAlts alts' deflt')
+    (other_alts, maybe_default)  = findDefault alts
+    Just default_rhs		 = maybe_default
 
-    tidy_alts scrut (PrimAlts alts deflt)
-	= mapTM tidy_prim_alt alts	`thenTM` \ alts' ->
-	  tidy_deflt scrut deflt	`thenTM` \ deflt' ->
-	  returnTM (PrimAlts alts' deflt')
+-- par#: see notes above.
+tidyCoreExpr (Case scrut@(Con (PrimOp op) args) bndr alts)
+  | funnyParallelOp op && maybeToBool maybe_default
+  = tidyCoreExpr scrut			`thenTM` \ scrut' ->
+    newBndr bndr			$ \ bndr' ->
+    tidyCoreExprEta default_rhs		`thenTM` \ rhs' ->
+    returnTM (Case scrut' bndr' [(DEFAULT,[],rhs')])
+  where
+    (other_alts, maybe_default)  = findDefault alts
+    Just default_rhs		 = maybe_default
 
-    tidy_alg_alt (con,bndrs,rhs) = newIds bndrs		$ \ bndrs' ->
-				   tidyCoreExprEta rhs	`thenTM` \ rhs' ->
-				   returnTM (con, bndrs', rhs')
-
-    tidy_prim_alt (lit,rhs) = tidyCoreExprEta rhs	`thenTM` \ rhs' ->
-			      returnTM (lit,rhs')
-
-	-- We convert	case x of {...; x' -> ...x'...}
-	--	to
-	--		case x of {...; _  -> ...x... }
-	--
-	-- See notes in SimplCase.lhs, near simplDefault for the reasoning.
-	-- It's quite easily done: simply extend the environment to bind the
-	-- default binder to the scrutinee.
-
-    tidy_deflt scrut NoDefault = returnTM NoDefault
-    tidy_deflt scrut (BindDefault bndr rhs)
-	= newId bndr				$ \ bndr' ->
-	  extend_env (tidyCoreExprEta rhs)	`thenTM` \ rhs' ->
-	  returnTM (BindDefault bndr' rhs')
-	where
- 	  extend_env = case scrut of
-			    Var v -> extendEnvTM bndr v
-			    other -> \x -> x
+tidyCoreExpr (Case scrut case_bndr alts)
+  = tidyCoreExpr scrut			`thenTM` \ scrut' ->
+    newBndr case_bndr			$ \ case_bndr' ->
+    mapTM tidy_alt alts			`thenTM` \ alts' ->
+    returnTM (Case scrut' case_bndr' alts')
+  where
+    tidy_alt (con,bndrs,rhs) = newBndrs bndrs		$ \ bndrs' ->
+			       tidyCoreExprEta rhs	`thenTM` \ rhs' ->
+			       returnTM (con, bndrs', rhs')
 
 tidyCoreExprEta e = tidyCoreExpr e	`thenTM` \ e' ->
 		    returnTM (etaCoreExpr e')
+
+tidyBindNonRec bndr val' body
+  | exprIsTrivial val'
+  = extendEnvTM bndr val' (tidyCoreExpr body)
+
+  | otherwise
+  = newBndr bndr	$ \ bndr' ->
+    tidyCoreExpr body	`thenTM` \ body' ->
+    returnTM (Let (NonRec bndr' val') body')
 \end{code}
-
-Arguments
-~~~~~~~~~
-\begin{code}
-tidyCoreArg :: CoreArg -> NestTidyM CoreArg
-
-tidyCoreArg (VarArg v)
-  = lookupId v	`thenTM` \ v' ->
-    returnTM (VarArg v')
-
-tidyCoreArg (LitArg lit)
-  = litToRep lit		`thenTM` \ (lit_ty, lit_expr) ->
-    case lit_expr of
-	Var v -> returnTM (VarArg v)
-	Lit l -> returnTM (LitArg l)
-	other -> addTopFloat lit_ty lit_expr	`thenTM` \ v ->
-		 returnTM (VarArg v)
-
-tidyCoreArg (TyArg ty)   = tidyTy ty 	`thenTM` \ ty' ->
-			   returnTM (TyArg ty')
-\end{code}
-
-\begin{code}
-tidyPrimOp (CCallOp fn casm gc cconv tys ty)
-  = mapTM tidyTy tys	`thenTM` \ tys' ->
-    tidyTy ty		`thenTM` \ ty' ->
-    returnTM (CCallOp fn casm gc cconv tys' ty')
-
-tidyPrimOp other_prim_op = returnTM other_prim_op
-\end{code}    
 
 
 %************************************************************************
@@ -505,18 +504,18 @@ binding out to the top level.
 		     
 litToRep :: Literal -> NestTidyM (Type, CoreExpr)
 
-litToRep (NoRepStr s)
-  = returnTM (stringTy, rhs)
+litToRep (NoRepStr s ty)
+  = returnTM (ty, rhs)
   where
     rhs = if (any is_NUL (_UNPK_ s))
 
 	  then	 -- Must cater for NULs in literal string
-		mkGenApp (Var unpackCString2Id)
-			 [LitArg (MachStr s),
-		      	  LitArg (mkMachInt_safe (toInteger (_LENGTH_ s)))]
+		mkApps (Var unpackCString2Id)
+		       [mkLit (MachStr s),
+		      	mkLit (mkMachInt (toInteger (_LENGTH_ s)))]
 
 	  else	-- No NULs in the string
-		App (Var unpackCStringId) (LitArg (MachStr s))
+		App (Var unpackCStringId) (mkLit (MachStr s))
 
     is_NUL c = c == '\0'
 \end{code}
@@ -529,39 +528,37 @@ otherwise, wrap with @litString2Integer@.
 litToRep (NoRepInteger i integer_ty)
   = returnTM (integer_ty, rhs)
   where
-    rhs | i == 0    = Var integerZeroId	  -- Extremely convenient to look out for
-  	| i == 1    = Var integerPlusOneId  -- a few very common Integer literals!
+    rhs | i == 0    = Var integerZeroId		-- Extremely convenient to look out for
+  	| i == 1    = Var integerPlusOneId	-- a few very common Integer literals!
   	| i == 2    = Var integerPlusTwoId
   	| i == (-1) = Var integerMinusOneId
   
   	| i > tARGET_MIN_INT &&		-- Small enough, so start from an Int
 	  i < tARGET_MAX_INT
-	= Prim Int2IntegerOp [LitArg (mkMachInt (fromInteger i))]
+	= App (Var int2IntegerId) (Con (Literal (mkMachInt i)) [])
   
   	| otherwise 			-- Big, so start from a string
-	= Prim Addr2IntegerOp [LitArg (MachStr (_PK_ (show i)))]
+	= App (Var addr2IntegerId) (Con (Literal (MachStr (_PK_ (show i)))) [])
 
 
 litToRep (NoRepRational r rational_ty)
-  = tidyCoreArg (LitArg (NoRepInteger (numerator   r) integer_ty))	`thenTM` \ num_arg ->
-    tidyCoreArg (LitArg (NoRepInteger (denominator r) integer_ty))	`thenTM` \ denom_arg ->
-    returnTM (rational_ty, Con ratio_data_con [TyArg integer_ty, num_arg, denom_arg])
+  = tidyCoreExpr (mkLit (NoRepInteger (numerator   r) integer_ty))	`thenTM` \ num_arg ->
+    tidyCoreExpr (mkLit (NoRepInteger (denominator r) integer_ty))	`thenTM` \ denom_arg ->
+    returnTM (rational_ty, mkConApp ratio_data_con [Type integer_ty, num_arg, denom_arg])
   where
     (ratio_data_con, integer_ty)
       = case (splitAlgTyConApp_maybe rational_ty) of
 	  Just (tycon, [i_ty], [con])
-	    -> ASSERT(isIntegerTy i_ty && uniqueOf tycon == ratioTyConKey)
+	    -> ASSERT(isIntegerTy i_ty && getUnique tycon == ratioTyConKey)
 	       (con, i_ty)
 
 	  _ -> (panic "ratio_data_con", panic "integer_ty")
 
-litToRep other_lit = returnTM (literalType other_lit, Lit other_lit)
+litToRep other_lit = returnTM (literalType other_lit, mkLit other_lit)
 \end{code}
 
 \begin{code}
-funnyParallelOp SeqOp  = True
 funnyParallelOp ParOp  = True
-funnyParallelOp ForkOp = True
 funnyParallelOp _      = False
 \end{code}  
 
@@ -574,165 +571,156 @@ funnyParallelOp _      = False
 
 \begin{code}
 type TidyM a state =  Module
-	     	      -> UniqFM CoreBinder		-- Maps Ids to Ids, TyVars to TyVars etc
+		      -> Bool		-- True <=> inside a *value* lambda
+	     	      -> (TyVarEnv Type, IdEnv CoreExpr, IdOrTyVarSet)
+				-- Substitution and in-scope binders
 		      -> state
 		      -> (a, state)
 
 type TopTidyM  a = TidyM a Unique
 type NestTidyM a = TidyM a (Unique,	 		-- Global names
 			    Unique,	 		-- Local names
-			    Bag CoreBinding)		-- Floats
+			    Bag CoreBind)		-- Floats
 
 
 (initialTopTidyUnique, initialNestedTidyUnique) = initTidyUniques
 
-initTM :: Module -> UniqFM CoreBinder -> TopTidyM a -> a
-initTM mod env m
-  = case m mod env initialTopTidyUnique of 
+initTM :: Module -> TopTidyM a -> a
+initTM mod m
+  = case m mod False {- not inside lambda -} empty_env initialTopTidyUnique of 
 	(result, _) -> result
+  where
+    empty_env = (emptyVarEnv, emptyVarEnv, emptyVarSet)
 
-initNestedTM :: NestTidyM a -> TopTidyM (a, Bag CoreBinding)
-initNestedTM m mod env global_us
-  = case m mod env (global_us, initialNestedTidyUnique, emptyBag) of
+initNestedTM :: NestTidyM a -> TopTidyM (a, Bag CoreBind)
+initNestedTM m mod in_lam env global_us
+  = case m mod in_lam env (global_us, initialNestedTidyUnique, emptyBag) of
 	(result, (global_us', _, floats)) -> ((result, floats), global_us')
 
-returnTM v mod env usf = (v, usf)
-thenTM m k mod env usf = case m mod env usf of
-			   (r, usf') -> k r mod env usf'
+returnTM v mod in_lam env usf = (v, usf)
+thenTM m k mod in_lam env usf = case m mod in_lam env usf of
+			 	  (r, usf') -> k r mod in_lam env usf'
 
 mapTM f []     = returnTM []
-mapTM f (x:xs) = f x	`thenTM` \ r ->
+mapTM f (x:xs) = f x		`thenTM` \ r ->
 		 mapTM f xs	`thenTM` \ rs ->
 		 returnTM (r:rs)
+
+insideLambda :: CoreBndr -> NestTidyM a -> NestTidyM a
+insideLambda bndr m mod in_lam env usf | isId bndr = m mod True   env usf
+				       | otherwise = m mod in_lam env usf
+
+getInsideLambda :: NestTidyM Bool
+getInsideLambda mod in_lam env usf = (in_lam, usf)
 \end{code}
 
+Need to extend the environment when we munge a binder, so that
+occurrences of the binder will print the correct way (e.g. as a global
+not a local).
+
+In cases where we don't clone the binder (because it's an exported
+id), we still zap the unfolding and inline pragma info so that
+unnecessary gumph isn't carried into the code generator.  This fixes a
+nasty space leak.
 
 \begin{code}
--- Need to extend the environment when we munge a binder, so that occurrences
--- of the binder will print the correct way (e.g. as a global not a local)
-mungeTopBinder :: Id -> (Id -> TopTidyM a) -> TopTidyM a
-mungeTopBinder id thing_inside mod env us
-  =  	-- Give it a new print-name unless it's an exported thing
-	-- setNameVisibility also does the local/global thing
-    let
-	(id1, us')  | isExported id = (id, us)
-		    | otherwise
-		    = (setIdVisibility (Just mod) us id, 
-		       incrUnique us)
-
-	-- Tidy the Id's SpecEnv
-	spec_env   = getIdSpecialisation id
-	id2 | isEmptySpecEnv spec_env = id1
-	    | otherwise		      = setIdSpecialisation id1 (tidySpecEnv env spec_env)
-
-	new_env    = addToUFM env id (ValBinder id2)
-    in
-    thing_inside id2 mod new_env us'
-
-tidySpecEnv env spec_env
-  = substSpecEnv 
-	emptyTyVarEnv		-- Top level only
-	(tidy_spec_rhs env)
-	spec_env
+mungeTopBndr id thing_inside mod in_lam env@(ty_env, val_env, in_scope) us
+  = thing_inside id' mod in_lam (ty_env, val_env', in_scope') us'
   where
-	-- tidy_spec_rhs is another horrid little hacked-up function for
-	-- the RHS of specialisation templates.
-	-- It assumes there is no type substitution.
-	--
-	-- See also SimplVar.substSpecEnvRhs Urgh
-    tidy_spec_rhs env (Var v) = case lookupUFM env v of
-				  Just (ValBinder v') -> Var v'
-				  Nothing	      -> Var v
-    tidy_spec_rhs env (App f (VarArg v)) = App (tidy_spec_rhs env f) (case lookupUFM env v of
-								        Just (ValBinder v') -> VarArg v'
-								        Nothing	            -> VarArg v)
-    tidy_spec_rhs env (App f arg) = App (tidy_spec_rhs env f) arg
-    tidy_spec_rhs env (Lam b e)   = Lam b (tidy_spec_rhs env' e)
-				  where
-				    env' = case b of
-					     ValBinder id -> delFromUFM env id
-					     TyBinder _   -> env
-
-mungeTopBinders []     k = k []
-mungeTopBinders (b:bs) k = mungeTopBinder b	$ \ b' ->
-			   mungeTopBinders bs	$ \ bs' ->
-			   k (b' : bs')
+  (id', us') | isExported id = (zapSomeIdInfo id, us)
+	     | otherwise = (zapSomeIdInfo (setIdVisibility (Just mod) us id),
+			    incrUnique us)
+  val_env'  = extendVarEnv val_env id (Var id')
+  in_scope' = extendVarSet in_scope id'	
+    
+zapSomeIdInfo id = id `setIdUnfolding` noUnfolding `setInlinePragma` new_ip
+  where new_ip = case getInlinePragma id of
+			ICanSafelyBeINLINEd _ _ -> NoInlinePragInfo
+			something_else	 	-> something_else
 
 addTopFloat :: Type -> CoreExpr -> NestTidyM Id
-addTopFloat lit_ty lit_rhs mod env (gus, lus, floats)
+addTopFloat lit_ty lit_rhs mod in_lam env (gus, lus, floats)
   = let
         gus'      = incrUnique gus
-        lit_local = mkSysLocal SLIT("lit") gus lit_ty noSrcLoc
+        lit_local = mkSysLocal gus lit_ty
         lit_id    = setIdVisibility (Just mod) gus lit_local
     in
     (lit_id, (gus', lus, floats `snocBag` NonRec lit_id lit_rhs))
 
-lookupId :: Id -> TidyM Id state
-lookupId v mod env usf
-  = case lookupUFM env v of
-	Nothing		    -> (v, usf)
-	Just (ValBinder v') -> (v', usf)
+lookupId :: Id -> TidyM CoreExpr state
+lookupId v mod in_lam (_, val_env, _) usf
+  = case lookupVarEnv val_env v of
+	Nothing	-> (Var v, usf)
+	Just e  -> (e,     usf)
 
-extendEnvTM :: Id -> Id -> (TidyM a state) -> TidyM a state
-extendEnvTM v v' m mod env usf
-  = m mod (addOneToIdEnv env v (ValBinder v')) usf
+extendEnvTM :: Id -> CoreExpr -> (TidyM a state) -> TidyM a state
+extendEnvTM v e m mod in_lam (ty_env, val_env, in_scope) usf
+  = m mod in_lam (ty_env, extendVarEnv val_env v e, in_scope) usf
 \end{code}
 
 
 Making new local binders
 ~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-newId id thing_inside mod env (gus, local_uniq, floats)
+newBndr tyvar thing_inside mod in_lam (ty_env, val_env, in_scope) (gus, local_uniq, floats)
+  | isTyVar tyvar
+  = let
+	local_uniq' = incrUnique local_uniq	
+	tyvar'      = setTyVarName tyvar (mkSysLocalName local_uniq)
+	ty_env'	    = extendVarEnv ty_env tyvar (mkTyVarTy tyvar')
+	in_scope'   = extendVarSet in_scope tyvar'
+    in
+    thing_inside tyvar' mod in_lam (ty_env', val_env, in_scope') (gus, local_uniq', floats)
+
+newBndr id thing_inside mod in_lam (ty_env, val_env, in_scope) (gus, local_uniq, floats)
+  | isId id
   = let 
 	-- Give the Id a fresh print-name, *and* rename its type
 	local_uniq'  = incrUnique local_uniq	
-	name'        = setNameVisibility Nothing local_uniq (getName id)
-        ty'          = nmbr_ty env local_uniq' (idType id)
+	name'        = mkSysLocalName local_uniq
+        ty'          = nmbrType ty_env local_uniq' (idType id)
+
 	id'          = mkUserId name' ty'
-                       -- NB: This throws away the IdInfo of the Id, which we
-                       -- no longer need.  That means we don't need to
-                       -- run over it with env, nor renumber it
-                       --
-                       -- NB: the Id's unique remains unchanged; it's only
-                       -- its print name that is affected by local_uniq
+			-- NB: This throws away the IdInfo of the Id, which we
+			-- no longer need.  That means we don't need to
+			-- run over it with env, nor renumber it.
 
-	env'	     = addToUFM env id (ValBinder id')
+	val_env'     = extendVarEnv val_env id (Var id')
+	in_scope'    = extendVarSet in_scope id'
     in
-    thing_inside id' mod env' (gus, local_uniq', floats)
+    thing_inside id' mod in_lam (ty_env, val_env', in_scope') (gus, local_uniq', floats)
 
-newIds [] thing_inside
+newBndrs [] thing_inside
   = thing_inside []
-newIds (bndr:bndrs) thing_inside
-  = newId bndr		$ \ bndr' ->
-    newIds bndrs	$ \ bndrs' ->
+newBndrs (bndr:bndrs) thing_inside
+  = newBndr bndr	$ \ bndr' ->
+    newBndrs bndrs	$ \ bndrs' ->
     thing_inside (bndr' : bndrs')
-
-
-newTyVar tyvar thing_inside mod env (gus, local_uniq, floats)
-  = let
-	local_uniq' = incrUnique local_uniq	
-	tyvar'      = nameTyVar tyvar (uniqToOccName local_uniq)
-	env'	    = addToUFM env tyvar (TyBinder tyvar')
-    in
-    thing_inside tyvar' mod env' (gus, local_uniq', floats)
 \end{code}
 
 Re-numbering types
 ~~~~~~~~~~~~~~~~~~
 \begin{code}
-tidyTy ty mod env usf@(_, local_uniq, _)
-  = (nmbr_ty env local_uniq ty, usf)
+tidyTy ty mod in_lam (ty_env, val_env, in_scope) usf@(_, local_uniq, _)
+  = (nmbrType ty_env local_uniq ty, usf)
 	-- We can use local_uniq as a base for renaming forall'd variables
 	-- in the type; we don't need to know how many are consumed.
-
--- This little impedance-matcher calls nmbrType with the right arguments
-nmbr_ty env uniq ty
-  = nmbrType tv_env uniq ty
-  where
-    tv_env :: TyVar -> TyVar
-    tv_env tyvar = case lookupUFM env tyvar of
-			Just (TyBinder tyvar') -> tyvar'
-			other		       -> tyvar
 \end{code}
 
+-- Get rid of this function when we move to the new code generator.
 
+\begin{code}
+typeOkForCase :: Type -> Bool
+typeOkForCase ty
+  | isUnLiftedType ty 	-- Primitive case
+  = True
+
+  | otherwise
+  = case (splitAlgTyConApp_maybe ty) of
+      Just (tycon, ty_args, [])                 		    -> False
+      Just (tycon, ty_args, non_null_data_cons) | isDataTyCon tycon -> True
+      other	                                   		    -> False
+      -- Null data cons => type is abstract, which code gen can't 
+      -- currently handle.  (ToDo: when return-in-heap is universal we
+      -- don't need to worry about this.)
+\end{code}

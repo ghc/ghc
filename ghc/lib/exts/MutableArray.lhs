@@ -61,6 +61,8 @@ module MutableArray
     sizeofByteArray,	    -- :: Ix ix => ByteArray ix -> Int
     sizeofMutableByteArray, -- :: Ix ix => MutableByteArray s ix -> Int
 
+    indexStablePtrArray,    -- :: Ix ix => ByteArray ix -> ix -> (StablePtr a)
+
 {-
     readWord8Array,	    -- :: Ix ix => MutableByteArray s ix -> Word8
     readWord16Array,	    -- :: Ix ix => MutableByteArray s ix -> Word16
@@ -69,10 +71,11 @@ module MutableArray
     ) where
 
 import PrelArr
+import PrelArrExtra
 import PrelBase ( sizeofMutableByteArray#, sizeofByteArray#
 		, Int(..), Int#, (+#), (==#)
 		, StablePtr#, MutableByteArray#, State#
-		, unsafeFreezeByteArray#
+		, unsafeFreezeByteArray#, ByteArray#
 		, newStablePtrArray#, readStablePtrArray#
 		, indexStablePtrArray#, writeStablePtrArray#
 		)
@@ -105,14 +108,14 @@ sizeofMutableByteArray (MutableByteArray _ arr#) =
 newStablePtrArray :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
 newStablePtrArray ixs = ST $ \ s# ->
     case rangeSize ixs              of { I# n# ->
-    case (newStablePtrArray# n# s#) of { StateAndMutableByteArray# s2# barr# ->
-    STret s2# (MutableByteArray ixs barr#) }}
+    case (newStablePtrArray# n# s#) of { (# s2#, barr# #) ->
+    (# s2#, (MutableByteArray ixs barr#) #) }}
 
 readStablePtrArray    :: Ix ix => MutableByteArray s ix -> ix -> ST s (StablePtr a)
 readStablePtrArray (MutableByteArray ixs barr#) n = ST $ \ s# ->
     case (index ixs n)	    	    	  of { I# n# ->
-    case readStablePtrArray# barr# n# s#  of { StateAndStablePtr# s2# r# ->
-    STret s2# (StablePtr r#) }}
+    case readStablePtrArray# barr# n# s#  of { (# s2#, r# #) ->
+    (# s2# , (StablePtr r#) #) }}
 
 indexStablePtrArray    :: Ix ix => ByteArray ix -> ix -> (StablePtr a)
 indexStablePtrArray (ByteArray ixs barr#) n
@@ -124,35 +127,35 @@ writeStablePtrArray    :: Ix ix => MutableByteArray s ix -> ix -> StablePtr a  -
 writeStablePtrArray (MutableByteArray ixs barr#) n (StablePtr sp#) = ST $ \ s# ->
     case (index ixs n)	    	    	       of { I# n# ->
     case writeStablePtrArray# barr# n# sp# s#  of { s2#   ->
-    STret s2# () }}
+    (# s2# , () #) }}
 
 freezeStablePtrArray    :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 freezeStablePtrArray (MutableByteArray ixs arr#) = ST $ \ s# ->
     case rangeSize ixs     of { I# n# ->
-    case freeze arr# n# s# of { StateAndByteArray# s2# frozen# ->
-    STret s2# (ByteArray ixs frozen#) }}
+    case freeze arr# n# s# of { (# s2# , frozen# #) ->
+    (# s2# , ByteArray ixs frozen# #) }}
   where
     freeze  :: MutableByteArray# s	-- the thing
 	    -> Int#			-- size of thing to be frozen
 	    -> State# s			-- the Universe and everything
-	    -> StateAndByteArray# s
+	    -> (# State# s, ByteArray# #)
 
     freeze arr# n# s#
-      = case (newStablePtrArray# n# s#)    of { StateAndMutableByteArray# s2# newarr1# ->
-	case copy 0# n# arr# newarr1# s2#  of { StateAndMutableByteArray# s3# newarr2# ->
+      = case (newStablePtrArray# n# s#)    of { (# s2# , newarr1# #) ->
+	case copy 0# n# arr# newarr1# s2#  of { (# s3# , newarr2# #) ->
 	unsafeFreezeByteArray# newarr2# s3#
 	}}
       where
 	copy :: Int# -> Int#
 	     -> MutableByteArray# s -> MutableByteArray# s
 	     -> State# s
-	     -> StateAndMutableByteArray# s
+	     -> (# State# s , MutableByteArray# s #)
 
 	copy cur# end# from# to# s#
 	  | cur# ==# end#
-	    = StateAndMutableByteArray# s# to#
+	    = (# s# , to# #)
 	  | otherwise
-	    = case (readStablePtrArray#  from# cur#       s#) of { StateAndStablePtr# s1# ele ->
+	    = case (readStablePtrArray#  from# cur#       s#) of { (# s1# , ele #) ->
 	      case (writeStablePtrArray# to#   cur# ele  s1#) of { s2# ->
 	      copy (cur# +# 1#) end# from# to# s2#
 	      }}
@@ -173,7 +176,7 @@ readWord8Array (MutableByteArray ixs arr#) n@(I# n#) =
        | n# ># (bytes# -# 1#) -> fail (userError "readWord8Array: index out of bounds "++show n)
        | otherwise            -> IO $ \ s# ->
          case readCharArray# barr# n# s#  of 
-           StateAndChar# s2# r# -> IOok s2# (W8# (int2Word# (ord# r#)))
+           (# s2# , r# #) -> (# s2# , W8# (int2Word# (ord# r#)) #) 
 
 readWord16Array (MutableByteArray ixs arr#) n@(I# n#) =
     case sizeofMutableByteArray# arr#   of 
@@ -181,7 +184,7 @@ readWord16Array (MutableByteArray ixs arr#) n@(I# n#) =
        | (2# *# n#) ># (bytes# -# 1#) -> fail (userError "readWord16Array: index out of bounds "++show n)
        | otherwise                    -> IO $ \ s# ->
          case readWordArray# barr# n# s#  of 
-           StateAndInt# s2# w# -> IOok s2# (wordToWord16 (W# w#))
+           (# s2# , w# #) -> (# s2# , wordToWord16 (W# w#) #)
 
 readWord32Array (MutableByteArray ixs arr#) n@(I# n#) =
     case sizeofMutableByteArray# arr#   of 
@@ -189,6 +192,6 @@ readWord32Array (MutableByteArray ixs arr#) n@(I# n#) =
        | (4# *# n#) ># (bytes# -# 1#) -> fail (userError "readWord32Array: index out of bounds "++show n)
        | otherwise                    -> IO $ \ s# ->
          case readWordArray# barr# n# s#  of 
-           StateAndInt# s2# w# -> IOok s2# (wordToWord32 (W# w#))
+           (# s2# , w# #) -> (# s2# , wordToWord32 (W# w#) #)
 
 end{code}

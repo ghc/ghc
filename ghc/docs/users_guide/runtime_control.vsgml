@@ -21,10 +21,10 @@ arguments bracketed between @+RTS@<nidx>+RTS option</nidx> and
 @-RTS@<nidx>-RTS option</nidx> as its own.  For example:
 
 <tscreen><verb>
-% ./a.out -f +RTS -pT -S -RTS -h foo bar
+% ./a.out -f +RTS -p -S -RTS -h foo bar
 </verb></tscreen>
 
-The RTS will snaffle @-pT -S@ for itself, and the remaining arguments
+The RTS will snaffle @-p -S@ for itself, and the remaining arguments
 @-f -h foo bar@ will be handed to your program if/when it calls
 @System.getArgs@.
 
@@ -32,7 +32,7 @@ No @-RTS@ option is required if the runtime-system options extend to
 the end of the command line, as in this example:
 
 <tscreen><verb>
-% hls -ltr /usr/etc +RTS -H5m
+% hls -ltr /usr/etc +RTS -A5m
 </verb></tscreen>
 
 If you absolutely positively want all the rest of the options in a
@@ -50,28 +50,70 @@ on how you compiled).
 
 %************************************************************************
 %*                                                                      *
-<sect2>Generally-available RTS options
+<sect2>RTS options to control the garbage-collector
+<label id="rts-options-gc">
 <p>
-<nidx>RTS options, general</nidx>
+<nidx>RTS options, garbage-collection</nidx>
 %*                                                                      *
 %************************************************************************
 
-The most important RTS options are:
+There are several options to give you precise control over garbage
+collection.  Hopefully, you won't need any of these in normal
+operation, but there are several things that can be tweaked for
+maximum performance.
+
 <descrip>
-<tag>@-H<size>@:</tag>
-<nidx>-H&lt;size&gt; RTS option</nidx>
-Set the heap size to @<size>@ bytes
-[default: 4M].
+<tag>@-A<size>@:</tag>
+<nidx>-A&lt;size&gt; RTS option</nidx>
+<nidx>allocation area, size</nidx>
+
+[Default: 256k] Set the minimum (and initial) allocation area size
+used by the garbage collector.  The allocation area is resized after
+each garbage collection to be a multiple of the size of the current
+live data (currently a factor of 2).
+
+Increasing the minimum allocation area size will typically give better
+performance for programs which quickly generate a large amount of live
+data.
+
+<tag>@-k<size>@:</tag>
+<nidx>-k&lt;size&gt; RTS option</nidx>
+<nidx>stack, minimum size</nidx>
+
+[Default: 1k] Set the initial stack size for new threads.  Thread
+stacks (including the main thread's stack) live on the heap, and grow
+as required.  The default value is good for concurrent applications
+with lots of small threads; if your program doesn't fit this model
+then increasing this option may help performance.
+
+The main thread is normally started with a slightly larger heap to cut
+down on unnecessary stack growth while the program is starting up.
 
 <tag>@-K<size>@:</tag>
 <nidx>-K&lt;size&gt; RTS option</nidx>
-Set the stack size to @<size>@ bytes [default: 64K].
-For concurrent/parallel programs, it is the stack size of the main
-thread; generally speaking, c/p stacks are in heap.
+<nidx>stack, maximum size</nidx>
 
-Note: if your program seems to be consuming infinite stack space, it
-is probably in a loop :-) Of course, if stacks are in the heap, make
-that infinite <em>heap</em> space...
+[Default: 1M] Set the maximum stack size for an individual thread to
+@<size>@ bytes.  This option is there purely to stop the program
+eating up all the available memory in the machine if it gets into an
+infinite loop.
+
+<tag>@-m<n>@:</tag>
+<nidx>-m&lt;n&gt; RTS option</nidx>
+Minimum \% @<n>@ of heap which must be available for allocation.
+The default is 3\%.
+<nidx>heap, minimum free</nidx>
+
+<tag>@-M<size>@:</tag>
+<nidx>-M&lt;size&gt; RTS option</nidx>
+<nidx>heap size, maximum</nidx>
+
+[Default: 64M] Set the maximum heap size to @<size>@ bytes.  The heap
+normally grows and shrinks according to the memory requirements of the
+program.  The only reason for having this option is to stop the heap
+growing without bound and filling up all the available swap space,
+which at the least will result in the program being summarily killed
+by the operating system.
 
 <tag>@-s<file>@ or @-S<file>@:</tag>
 <nidx>-S&lt;file&gt; RTS option</nidx>
@@ -81,73 +123,24 @@ statistics into file @<file>@. The default @<file>@ is
 @<program>@@.stat@. The @<file>@ @stderr@ is treated
 specially, with the output really being sent to @stderr@.
 
-The amount of heap allocation will typically increase as the total
-heap size is reduced.  The reason for this odd behaviour is that
-updates of promoted-to-old-generation objects may require the extra
-allocation of a new-generation object to ensure that there are never
-any pointers from the old generation to the new generation.
+This option is useful for watching how the storage manager adjusts the
+heap size based on the current amount of live data.
 
-For some garbage collectors (not including the default one, sadly),
-you can convert the @-S@ output into a residency graph (in
-PostScript), using the @stat2resid@<nidx>stat2resid</nidx> utility in
-the GHC distribution (@ghc/utils/stat2resid@).
+% ToDo: --SDM
+%For some garbage collectors (not including the default one, sadly),
+%you can convert the @-S@ output into a residency graph (in
+%PostScript), using the @stat2resid@<nidx>stat2resid</nidx> utility in
+%the GHC distribution (@ghc/utils/stat2resid@).
 
-<tag>@-N@:</tag>
-<nidx>-N RTS option</nidx>
-Normally, the garbage collector black-holes closures which are being
-evaluated, as a space-saving measure.  That's exactly what you want
-for ordinary Haskell programs.
+<tag>@-F2s@:</tag> 
+<nidx>-F2s RTS option</nidx>
 
-When signal handlers are present, however, a computation may be
-abandoned prematurely, leaving black holes behind.  If the signal
-handler shares one of these black-holed closures, disaster can result.
-Use the @-N@ option to prevent black-holing by the garbage collector
-if you suspect that your signal handlers may share <em>any</em>
-subexpressions with the top-level computation.  Expect your heap usage
-to increase, since the lifetimes of some closures may be extended.
-</descrip>
-
-%************************************************************************
-%*                                                                      *
-<sect2>RTS options to control the garbage-collector
-<p>
-<nidx>RTS options, garbage-collection</nidx>
-%*                                                                      *
-%************************************************************************
-
-Besides the @-H@ (set heap size) and @-S@/@-s@ (GC stats) RTS
-options, there are several options to give you precise control over
-garbage collection.
-
-<descrip>
-<tag>@-M<n>@:</tag>
-<nidx>-M&lt;n&gt; RTS option</nidx>
-Minimum \% @<n>@ of heap which must be available for allocation.
-The default is 3\%.
-
-<tag>@-A<size>@:</tag>
-<nidx>-A&lt;size&gt; RTS option</nidx>
-Sets a limit on the size of the allocation area for generational
-garbage collection to @<size>@ bytes (@-A@ gives default of 64k). If
-a negative size is given the size of the allocation is fixed to
--@<size>@. For non-generational collectors, it fixes the minimum
-heap which must be available after a collection, overriding the
-@-M<n>@ RTS option.
-
-<tag>@-G<size>@:</tag>
-<nidx>-G&lt;size&gt; RTS option</nidx>
-Sets the percentage of free space to be promoted before a major
-collection is invoked to @<size>@\%. The default is 66\%. If a
-negative size is given it fixes the size of major generation threshold
-to -@<size>@ bytes.
-
-<tag>@-F2s@:</tag> <nidx>-F2s RTS option</nidx> Forces a program
-compiled for generational GC to use two-space copying collection. The
-two-space collector may outperform the generational collector for
-programs which have a very low heap residency. It can also be used to
-generate a statistics file from which a basic heap residency profile
-can be produced (see Section <ref name="stat2resid - residency info
-from GC stats" id="stat2resid">).
+Forces a program compiled for generational GC to use two-space copying
+collection. The two-space collector may outperform the generational
+collector for programs which have a very low heap residency. It can
+also be used to generate a statistics file from which a basic heap
+residency profile can be produced (see Section <ref name="stat2resid -
+residency info from GC stats" id="stat2resid">).
 
 There will still be a small execution overhead imposed by the
 generational compilation as the test for old generation updates will
@@ -159,6 +152,7 @@ overhead is typically less than 1\%.
 Force a major garbage collection every @<size>@ bytes.  (Normally
 used because you're keen on getting major-GC stats, notably heap residency
 info.)
+
 </descrip>
 
 %************************************************************************
@@ -168,8 +162,11 @@ info.)
 %*                                                                      *
 %************************************************************************
 
-The RTS options related to profiling are described in Section <ref name="How to control your profiled program at runtime" id="prof-rts-options">; and those for concurrent/parallel stuff, in
-Section <ref name="RTS options for Concurrent/Parallel Haskell" id="parallel-rts-opts">.
+The RTS options related to profiling are described in Section <ref
+name="How to control your profiled program at runtime"
+id="prof-rts-options">; and those for concurrent/parallel stuff, in
+Section <ref name="RTS options for Concurrent/Parallel Haskell"
+id="parallel-rts-opts">.
 
 %************************************************************************
 %*                                                                      *
@@ -198,22 +195,35 @@ others in the same office...''
 
 <tag>@-r<file>@:</tag>
 <nidx>-r &lt;file&gt; RTS option</nidx>
+<nidx>ticky ticky profiling</nidx>
 Produce ``ticky-ticky'' statistics at the end of the program run.
 The @<file>@ business works just like on the @-S@ RTS option (above).
 
 ``Ticky-ticky'' statistics are counts of various program actions
-(updates, enters, etc.)
-The program must have been compiled using
+(updates, enters, etc.)  The program must have been compiled using
 @-fstg-reduction-counts@<nidx>-fstg-reduction-counts option</nidx>
 (a.k.a. ``ticky-ticky profiling''), and, for it to be really useful,
 linked with suitable system libraries.  Not a trivial undertaking:
-consult the installation guide on how to set things up for
-easy ``ticky-ticky'' profiling.
+consult the installation guide on how to set things up for easy
+``ticky-ticky'' profiling.
 
-<tag>@-T<num>@:</tag>
-<nidx>-T RTS option</nidx>
-An RTS debugging flag; varying quantities of output depending on which bits
-are set in @<num>@.
+<tag>@-D<num>@:</tag>
+<nidx>-D RTS option</nidx>
+An RTS debugging flag; varying quantities of output depending on which
+bits are set in @<num>@.  Only works if the RTS was compiled with the
+@DEBUG@ option.
+
+<tag>@-N@:</tag>
+<nidx>-N RTS option</nidx>
+
+Normally, the garbage collector black-holes closures which are being
+evaluated, as a space-saving measure.  This option turns off
+blackholing.  You shouldn't ever need to use it.
+
+Historical note: this option used to be used to work around a problem
+with signal handling, where a signal handler might need to evaluate
+blackholed closures.  Signal handlers are now run in a separate
+thread, and don't suffer from this problem.
 
 <tag>@-Z@:</tag>
 <nidx>-Z RTS option</nidx>

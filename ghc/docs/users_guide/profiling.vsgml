@@ -1,4 +1,4 @@
-<sect1>Profiling
+<sect>Profiling
 <label id="profiling">
 <p>
 <nidx>profiling, with cost-centres</nidx>
@@ -8,10 +8,10 @@ Glasgow Haskell comes with a time and space profiling system. Its
 purpose is to help you improve your understanding of your program's
 execution behaviour, so you can improve it.
 
-Any comments, suggestions and/or improvements you have to are welcome.
+Any comments, suggestions and/or improvements you have are welcome.
 Recommended ``profiling tricks'' would be especially cool!
 
-<sect2>How to profile a Haskell program
+<sect1>How to profile a Haskell program
 <label id="profiling-intro">
 <p>
 
@@ -58,7 +58,7 @@ one or more of the Sansom/Peyton Jones papers about the GHC profiling
 system.  Just visit the <url name="Glasgow FP group web page"
 url="http://www.dcs.gla.ac.uk/fp/">...
 
-<sect2>Compiling programs for profiling
+<sect1>Compiling programs for profiling
 <label id="prof-compiler-options">
 <p>
 <nidx>profiling options</nidx>
@@ -123,7 +123,7 @@ to be reported with the @-P@ RTS option.
 
 %-prof-details should also enable age profiling if we get it going again ...
 
-<sect2>How to control your profiled program at runtime
+<sect1>How to control your profiled program at runtime
 <label id="prof-rts-options">
 <p>
 <nidx>profiling RTS options</nidx>
@@ -248,7 +248,7 @@ if the closure satisfies the following logical expression:
 where a particular option is true if the closure (or its attached cost
 centre) is selected by the option (or the option is not specified).
 
-<sect2>What's in a profiling report?
+<sect1>What's in a profiling report?
 <label id="prof-output">
 <p>
 <nidx>profiling report, meaning thereof</nidx>
@@ -337,14 +337,14 @@ addition applied to one argument would be a PAP.  A PAP is really
 just a particular form for a function.
 </descrip>
 
-<sect2>Producing graphical heap profiles
+<sect1>Producing graphical heap profiles
 <label id="prof-graphs">
 <p>
 <nidx>heap profiles, producing</nidx>
 
 Utility programs which produce graphical profiles.
 
-<sect3>@hp2ps@--heap profile to PostScript
+<sect2>@hp2ps@--heap profile to PostScript
 <label id="hp2ps">
 <p>
 <nidx>hp2ps (utility)</nidx>
@@ -440,13 +440,9 @@ percentage to be modified (maximum 5\%).
 ensuring that all the data will be displayed. 
 
 <tag>@-?@</tag> Print out usage information.
-
-<tag>@-c@</tag> Fill in the bands with colours rather than shades of grey.
-Some people find colour plots easier to read (especially when viewed on a
-non-monochrome medium ;-)
 </descrip>
 
-<sect3>@stat2resid@---residency info from GC stats
+<sect2>@stat2resid@---residency info from GC stats
 <label id="stat2resid">
 <p>
 <nidx>stat2resid (utility)</nidx>
@@ -481,7 +477,7 @@ distribution.
 
 %************************************************************************
 %*									*
-<sect2>Using ``ticky-ticky'' profiling (for implementors)
+<sect1>Using ``ticky-ticky'' profiling (for implementors)
 <label id="ticky-ticky">
 <p>
 <nidx>ticky-ticky profiling (implementors)</nidx>

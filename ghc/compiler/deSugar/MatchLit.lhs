@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[MatchLit]{Pattern-matching literal patterns}
 
@@ -11,19 +11,18 @@ module MatchLit ( matchLiterals ) where
 import {-# SOURCE #-} Match  ( match )
 import {-# SOURCE #-} DsExpr ( dsExpr )
 
-import HsSyn		( HsLit(..), OutPat(..), HsExpr(..), Fixity,
-			  Match, HsBinds, DoOrListComp, HsType, ArithSeqInfo )
+import HsSyn		( HsLit(..), OutPat(..), HsExpr(..) )
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedPat )
-import CoreSyn		( CoreExpr, CoreBinding, GenCoreExpr(..), GenCoreBinding(..) )
+import CoreSyn		( Expr(..), Bind(..) )
 import Id		( Id )
 
 import DsMonad
 import DsUtils
 
-import Literal		( mkMachInt_safe, Literal(..) )
+import Const		( mkMachInt, Literal(..) )
 import PrimRep          ( PrimRep(IntRep) )
 import Maybes		( catMaybes )
-import Type		( Type, isUnpointedType )
+import Type		( Type, isUnLiftedType )
 import Util		( panic, assertPanic )
 \end{code}
 
@@ -46,7 +45,7 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_t
     match_prims_used vars eqns_info `thenDs` \ prim_alts ->
 
     -- MAKE THE PRIMITIVE CASE
-    mkCoPrimCaseMatchResult var prim_alts
+    returnDs (mkCoPrimCaseMatchResult var prim_alts)
   where
     match_prims_used _ [{-no more eqns-}] = returnDs []
 
@@ -68,12 +67,12 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_t
       where
 	mk_core_lit :: Type -> HsLit -> Literal
 
-	mk_core_lit ty (HsIntPrim     i) = mkMachInt_safe i
+	mk_core_lit ty (HsIntPrim     i) = mkMachInt  i
 	mk_core_lit ty (HsCharPrim    c) = MachChar   c
 	mk_core_lit ty (HsStringPrim  s) = MachStr    s
 	mk_core_lit ty (HsFloatPrim   f) = MachFloat  f
 	mk_core_lit ty (HsDoublePrim  d) = MachDouble d
-	mk_core_lit ty (HsLitLit      s) = ASSERT(isUnpointedType ty)
+	mk_core_lit ty (HsLitLit      s) = ASSERT(isUnLiftedType ty)
 					   MachLitLit s (panic "MatchLit.matchLiterals:mk_core_lit:HsLitLit; typePrimRep???")
     	mk_core_lit ty other	         = panic "matchLiterals:mk_core_lit:unhandled"
 \end{code}
@@ -86,14 +85,15 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx ((NPat literal lit_ty
     in
     dsExpr (HsApp eq_chk (HsVar var))			  `thenDs` \ pred_expr ->
     match vars shifted_eqns_for_this_lit                  `thenDs` \ inner_match_result ->
-    mkGuardedMatchResult pred_expr inner_match_result	  `thenDs` \ match_result1 ->
-
+    let
+	match_result1 = mkGuardedMatchResult pred_expr inner_match_result
+    in
     if (null eqns_not_for_this_lit)
     then
 	returnDs match_result1
     else
         matchLiterals all_vars eqns_not_for_this_lit  	  `thenDs` \ match_result2 ->
-	combineMatchResults match_result1 match_result2
+	returnDs (combineMatchResults match_result1 match_result2)
 \end{code}
 
 For an n+k pattern, we use the various magic expressions we've been given.
@@ -118,17 +118,17 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx ((NPlusKPat master_n 
     dsExpr (HsApp ge (HsVar var))		`thenDs` \ ge_expr ->
     dsExpr (HsApp sub (HsVar var))		`thenDs` \ nminusk_expr ->
 
-    mkGuardedMatchResult
-	ge_expr
-	(mkCoLetsMatchResult [NonRec master_n nminusk_expr] inner_match_result)
-					`thenDs` \ match_result1 ->
-
+    let
+	match_result1 = mkGuardedMatchResult ge_expr $
+			mkCoLetsMatchResult [NonRec master_n nminusk_expr] $
+			inner_match_result
+    in
     if (null eqns_not_for_this_lit)
     then 
 	returnDs match_result1
     else 
 	matchLiterals all_vars eqns_not_for_this_lit 	`thenDs` \ match_result2 ->
-	combineMatchResults match_result1 match_result2
+	returnDs (combineMatchResults match_result1 match_result2)
 \end{code}
 
 Given a blob of LitPats/NPats, we want to split them into those

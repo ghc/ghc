@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[DsBinds]{Pattern-matching bindings (HsBinds and MonoBinds)}
 
@@ -8,19 +8,17 @@ in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
 lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
-module DsBinds ( dsBinds, dsMonoBinds ) where
+module DsBinds ( dsMonoBinds ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr
+
+import {-# SOURCE #-}	DsExpr( dsExpr )
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import CoreUtils	( coreExprType )
-import TcHsSyn		( TypecheckedHsBinds, TypecheckedHsExpr,
-			  TypecheckedMonoBinds,
-			  TypecheckedPat
-			)
+import TcHsSyn		( TypecheckedMonoBinds )
 import DsMonad
 import DsGRHSs		( dsGuarded )
 import DsUtils
@@ -32,42 +30,13 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs,
 		        )
 import CostCentre	( mkAutoCC, IsCafCC(..), mkAllDictsCC )
 import Id		( idType, Id )
+import VarEnv
 import Name		( isExported )
-import Type		( mkTyVarTy, isDictTy, instantiateTy
+import Type		( mkTyVarTy, isDictTy, substTy
 			)
-import TyVar		( zipTyVarEnv )
-import TysPrim		( voidTy )
-import Outputable	( assertPanic )
+import TysWiredIn	( voidTy )
+import Outputable
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection[toplevel-and-regular-DsBinds]{Regular and top-level @dsBinds@}
-%*									*
-%************************************************************************
-
-Like @dsBinds@, @dsBind@ returns a @[CoreBinding]@, but it may be
-that some of the binders are of unboxed type.  This is sorted out when
-the caller wraps the bindings round an expression.
-
-\begin{code}
-
-dsBinds :: Bool   -- if candidate, auto add scc's on toplevs ?
-	-> TypecheckedHsBinds 
-	-> DsM [CoreBinding]
-
-dsBinds _ EmptyBinds	  	     = returnDs []
-dsBinds auto_scc (ThenBinds binds_1 binds_2) 
-  = andDs (++) (dsBinds auto_scc binds_1) (dsBinds auto_scc binds_2)
-
-dsBinds auto_scc (MonoBind binds sigs is_rec)
-  = dsMonoBinds auto_scc binds []  `thenDs` \ prs ->
-    returnDs (case is_rec of
-		Recursive    -> [Rec prs]
-	        NonRecursive -> [NonRec binder rhs | (binder,rhs) <- prs]
-    )
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -102,10 +71,10 @@ dsMonoBinds _ (VarMonoBind var expr) rest
 dsMonoBinds auto_scc (FunMonoBind fun _ matches locn) rest
   = putSrcLocDs locn	$
     matchWrapper (FunMatch fun) matches error_string	`thenDs` \ (args, body) ->
-    addAutoScc auto_scc (fun, mkValLam args body)       `thenDs` \ pair ->
+    addAutoScc auto_scc (fun, mkLams args body)		`thenDs` \ pair ->
     returnDs (pair : rest)
   where
-    error_string = "function " ++ showForErr fun
+    error_string = "function " ++ showSDoc (ppr fun)
 
 dsMonoBinds _ (PatMonoBind pat grhss_and_binds locn) rest
   = putSrcLocDs locn $
@@ -128,8 +97,8 @@ dsMonoBinds auto_scc (AbsBinds all_tyvars dicts [(tyvars, global, local)] binds)
 	-- makes rather mixed-up dictionary bindings
 	core_binds = [Rec core_prs]
     in
-    addAutoScc auto_scc (global, mkLam tyvars dicts $ 
-			         mkCoLetsAny core_binds (Var local)) `thenDs` \ global' ->
+    addAutoScc auto_scc (global, mkLams tyvars $ mkLams dicts $ 
+			         mkLets core_binds (Var local)) `thenDs` \ global' ->
     returnDs (global' : rest)
 
 dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports binds) rest
@@ -137,33 +106,35 @@ dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports binds) rest
     let 
 	core_binds = [Rec core_prs]
 
-	tup_expr = mkLam all_tyvars dicts $
-		   mkCoLetsAny core_binds $
-		   mkTupleExpr locals
-	locals    = [local | (_, _, local) <- exports]
-	local_tys = map idType locals
+	tup_expr      = mkTupleExpr locals
+	tup_ty	      = coreExprType tup_expr
+	poly_tup_expr = mkLams all_tyvars $ mkLams dicts $
+		        mkLets core_binds tup_expr
+	locals        = [local | (_, _, local) <- exports]
+	local_tys     = map idType locals
     in
-    newSysLocalDs (coreExprType tup_expr)		`thenDs` \ tup_id ->
+    newSysLocalDs (coreExprType poly_tup_expr)		`thenDs` \ poly_tup_id ->
     let
-	dict_args    = map VarArg dicts
+	dict_args = map Var dicts
 
 	mk_bind (tyvars, global, local) n	-- locals !! n == local
 	  = 	-- Need to make fresh locals to bind in the selector, because
 		-- some of the tyvars will be bound to voidTy
-	    newSysLocalsDs (map (instantiateTy env) local_tys) 	`thenDs` \ locals' ->
+	    newSysLocalsDs (map (substTy env) local_tys) 	`thenDs` \ locals' ->
+	    newSysLocalDs  (substTy env tup_ty)			`thenDs` \ tup_id ->
 	    addAutoScc auto_scc
-		       (global, mkLam tyvars dicts $
-		     	        mkTupleSelector locals' (locals' !! n) $
-		     	        mkValApp (mkTyApp (Var tup_id) ty_args) dict_args)
+		       (global, mkLams tyvars $ mkLams dicts $
+		     	        mkTupleSelector locals' (locals' !! n) tup_id $
+		     	        mkApps (mkTyApps (Var poly_tup_id) ty_args) dict_args)
 	  where
 	    mk_ty_arg all_tyvar | all_tyvar `elem` tyvars = mkTyVarTy all_tyvar
 				| otherwise		  = voidTy
 	    ty_args = map mk_ty_arg all_tyvars
-	    env     = all_tyvars `zipTyVarEnv` ty_args
+	    env     = all_tyvars `zipVarEnv` ty_args
     in
     zipWithDs mk_bind exports [0..]		`thenDs` \ export_binds ->
      -- don't scc (auto-)annotate the tuple itself.
-    returnDs ((tup_id, tup_expr) : (export_binds ++ rest))
+    returnDs ((poly_tup_id, poly_tup_expr) : (export_binds ++ rest))
 \end{code}
 
 
