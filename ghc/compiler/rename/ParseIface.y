@@ -681,6 +681,7 @@ id_info_item	:: { HsIdInfo RdrName }
 inline_prag     :: { InlinePragInfo }
                 :  {- empty -}                  { NoInlinePragInfo }
                 | '[' INTEGER ']'               { IMustNotBeINLINEd True  (Just (fromInteger $2)) } -- INLINE n
+                | '[' '!' ']'               	{ IMustNotBeINLINEd True Nothing } -- NOTINLINE
                 | '[' '!' INTEGER ']'           { IMustNotBeINLINEd False (Just (fromInteger $3)) } -- NOINLINE n
 
 -------------------------------------------------------
