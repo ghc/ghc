@@ -1,4 +1,4 @@
 
 rnfail034.hs:4:
     Invalid use of qualified name `M.y'
-    In the binding group for `M.y'
+    In the binding group for: M.y
