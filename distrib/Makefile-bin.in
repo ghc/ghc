@@ -123,8 +123,8 @@ INSTALL_DATA_OPTS = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_DATA_OPTS)
 
 config-pkgs ::
 	@echo "Configuring $(package), version $(version), on $(platform) ..."
-	for i in $(PACKAGE_PRL_SCRIPTS) ""; do \
-	 @if test "$(PACKAGE_PRL_SCRIPTS)"; then \
+	@for i in $(PACKAGE_PRL_SCRIPTS) ""; do \
+	  if test "$$i"; then \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
 	   if [ -f bin/$(platform)/$(package)-$(version)/$$i ]; then $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; fi; \
@@ -140,8 +140,8 @@ config-pkgs ::
 	   echo "Done."; \
 	  fi; \
 	done
-	for i in $(PACKAGE_LIB_PRL_SCRIPTS) ""; do \
-	 @if test "$(PACKAGE_LIB_PRL_SCRIPTS)"; then \
+	@for i in $(PACKAGE_LIB_PRL_SCRIPTS) ""; do \
+	  if test "$$i"; then \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) lib/$(platform)/$(package)-$(version)/$$i.bak; \
 	   if [ -f lib/$(platform)/$(package)-$(version)/$$i ]; then $(MV) lib/$(platform)/$(package)-$(version)/$$i lib/$(platform)/$(package)-$(version)/$$i.bak; fi; \
@@ -157,8 +157,8 @@ config-pkgs ::
 	   echo "Done."; \
 	  fi; \
 	done
-	for i in $(PACKAGE_SH_SCRIPTS) ""; do \
-	 @if test "$(PACKAGE_SH_SCRIPTS)"; then \
+	@for i in $(PACKAGE_SH_SCRIPTS) ""; do \
+	  if test "$$i"; then \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
 	   if [ -f bin/$(platform)/$(package)-$(version)/$$i ]; then $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; fi; \
