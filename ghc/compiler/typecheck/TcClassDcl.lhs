@@ -34,6 +34,7 @@ import TcMonad
 import TcMonoType	( tcHsType, tcContext )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), tcInstType, tcInstSigTyVars, tcInstSigType )
+import PragmaInfo	( PragmaInfo(..) )
 
 import Bag		( foldBag, unionManyBags )
 import Class		( GenClass, GenClassOp, mkClass, mkClassOp, classBigSig, 
@@ -408,11 +409,12 @@ buildDefaultMethodBind
 buildDefaultMethodBind clas clas_tyvar default_binds (sel_id, idx)
   = newDicts origin [(clas,inst_ty)]			`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
     let
-	avail_insts = this_dict
-	defm_id     = classDefaultMethodId clas idx
+	avail_insts   = this_dict
+	defm_id       = classDefaultMethodId clas idx
+	no_prags name = NoPragmaInfo		-- No pragmas yet for default methods
     in
     tcExtendGlobalTyVars clas_tyvar_set (
-	tcMethodBind noDefmExpr inst_ty default_binds (sel_id, idx)
+	tcMethodBind noDefmExpr inst_ty no_prags default_binds (sel_id, idx)
     )						`thenTc` \ (defm_bind, insts_needed, (_, local_defm_id)) ->
 
 	-- CHECK THE CONTEXT OF THE DEFAULT-METHOD BINDS
