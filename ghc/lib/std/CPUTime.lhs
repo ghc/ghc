@@ -40,10 +40,13 @@ integral number of picoseconds.
 \begin{code}
 #ifdef __HUGS__
 
+sizeof_int :: Int
+sizeof_int = 4
+
 getCPUTime :: IO Integer
 getCPUTime = do
     marr <- primNewByteArray (sizeof_int * 4)
-    rc   <- getCPUTime marr
+    rc   <- primGetCPUTime marr
     if rc /= 0 then do
         x0 <- primReadIntArray marr 0
         x1 <- primReadIntArray marr 1
@@ -60,20 +63,21 @@ getCPUTime = do
 #else
 
 getCPUTime :: IO Integer
-getCPUTime =
-    stToIO (newIntArray ((0::Int),3))	>>= \ marr ->
-    stToIO (unsafeFreezeByteArray marr)	>>= \ barr@(ByteArray _ _ frozen#) ->
-    primGetCPUTime barr		        >>= \ rc ->
+getCPUTime = do
+    marr <- stToIO (newIntArray ((0::Int),3))
+    barr <- stToIO (unsafeFreezeByteArray marr)
+    rc   <- primGetCPUTime barr
     if rc /= 0 then
+      case barr of
+       ByteArray _ _ frozen# -> -- avoid bounds checking
         return ((fromIntegral (I# (indexIntArray# frozen# 0#)) * 1000000000 + 
                  fromIntegral (I# (indexIntArray# frozen# 1#)) + 
 		 fromIntegral (I# (indexIntArray# frozen# 2#)) * 1000000000 + 
                  fromIntegral (I# (indexIntArray# frozen# 3#))) * 1000)
-    else
+     else
 	ioError (IOError Nothing UnsupportedOperation 
 			 "getCPUTime"
 		         "can't get CPU time")
-
 #endif
 
 cpuTimePrecision :: Integer
@@ -82,9 +86,6 @@ cpuTimePrecision = round ((1000000000000::Integer) %
 \end{code}
 
 \begin{code}
-sizeof_int :: Int
-sizeof_int = 4
-
 foreign import "libHS_cbits" "getCPUTime" unsafe primGetCPUTime :: ByteArray Int -> IO Int
 foreign import "libHS_cbits" "clockTicks" clockTicks :: IO Int
 

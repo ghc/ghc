@@ -159,18 +159,17 @@ exitFailure = exitWith (ExitFailure 1)
 type CHAR_STAR_STAR	= Addr	-- this is all a  HACK
 type CHAR_STAR		= Addr
 
-unpackArgv	:: CHAR_STAR_STAR -> Int -> [String] -- argv[1 .. argc-1]
-unpackProgName	:: CHAR_STAR_STAR	 -> String   -- argv[0]
-
+unpackArgv :: CHAR_STAR_STAR -> Int -> [String] -- argv[1 .. argc-1]
 unpackArgv argv argc = unpack 1
   where
-    unpack :: Int -> [String]
-    unpack n
-      = if (n >= argc)
-	then ([] :: [String])
-	else case (indexAddrOffAddr argv n) of { item ->
-	     unpackCString item : unpack (n + 1) }
+   unpack :: Int -> [String]
+   unpack n
+     | n >= argc = []
+     | otherwise =
+	 case (indexAddrOffAddr argv n) of 
+	   item -> unpackCString item : unpack (n + 1)
 
+unpackProgName	:: CHAR_STAR_STAR	 -> String   -- argv[0]
 unpackProgName argv
   = case (indexAddrOffAddr argv 0) of { prog ->
     de_slash [] (unpackCString prog) }
