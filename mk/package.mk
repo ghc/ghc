@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.36 2004/02/07 14:08:57 panne Exp $
+# $Id: package.mk,v 1.37 2004/02/24 15:51:33 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -97,7 +97,9 @@ endif
 
 LIBRARY      	= libHS$(PACKAGE)$(_way).a
 
-WAYS         	= $(GhcLibWays)
+ifeq "$(WAYS)" ""
+WAYS = $(GhcLibWays)
+endif
 
 all :: $(LIBRARY)
 
