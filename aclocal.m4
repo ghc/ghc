@@ -1,4 +1,5 @@
-dnl $Id: aclocal.m4,v 1.62 2001/01/15 20:55:14 qrczak Exp $
+dnl $Id: aclocal.m4,v 1.63 2001/01/15 22:24:54 lewie Exp $
+dnl do not read me
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -860,7 +861,7 @@ dnl The variable LIBM (which is not an output variable by default) is
 dnl set to a value which is suitable for use in a Makefile (for example,
 dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.62 2001/01/15 20:55:14 qrczak Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.63 2001/01/15 22:24:54 lewie Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 # FPTOOLS_CHECK_LIBM - check for math library
@@ -948,7 +949,7 @@ dnl Please note that as the ac_opengl macro and the toy example evolves,
 dnl the version number increases, so you may have to adjust the above
 dnl URL accordingly.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.62 2001/01/15 20:55:14 qrczak Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.63 2001/01/15 22:24:54 lewie Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 AC_DEFUN(FPTOOLS_HAVE_OPENGL,
