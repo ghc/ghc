@@ -260,7 +260,7 @@ fvExpr id_cands tyvar_cands (Let (NonRec binder rhs) body)
 	    (leakinessOf rhs' `orLeak` leakinessOf body2),
      AnnLet (AnnNonRec binder rhs') body2)
   where
-    rhs'	= fvExpr id_cands tyvar_cands rhs
+    rhs'	= fvRhs id_cands tyvar_cands (binder, rhs)
     body2	= fvExpr (aFreeId binder `combine` id_cands) tyvar_cands body
     body_fvs	= freeVarsOf body2 `minusIdSet` aFreeId binder
     binder_ftvs = munge_id_ty binder
@@ -275,7 +275,7 @@ fvExpr id_cands tyvar_cands (Let (Rec binds) body)
     (binders, rhss)   = unzip binds
     new_id_cands      = binders_set `combine` id_cands
     binders_set	      = mkIdSet binders
-    rhss'	      = map (fvExpr new_id_cands tyvar_cands) rhss
+    rhss'	      = map (fvRhs new_id_cands tyvar_cands) binds
 
     FVInfo rhss_fvs rhss_tfvs leakiness_of_rhss
 	= foldr1 combineFVInfo [info | (info,_) <- rhss']
@@ -300,6 +300,14 @@ fvExpr id_cands tyvar_cands (Note other_note expr)
   = (fvinfo, AnnNote other_note expr2)
   where
     expr2@(fvinfo,_) = fvExpr id_cands tyvar_cands expr
+
+-- fvRhs returns the annotated RHS, but it adds to the
+-- free vars of the RHS the idSpecVars of the binder,
+-- since those are, in truth, free in the definition.
+fvRhs id_cands tyvar_cands (bndr,rhs)
+  = (FVInfo (fvs `unionIdSets` idSpecVars bndr) ftvs leak, rhs')
+  where
+    (FVInfo fvs ftvs leak, rhs') = fvExpr id_cands tyvar_cands rhs
 \end{code}
 
 \begin{code}
