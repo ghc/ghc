@@ -284,6 +284,19 @@
 	    configuration.</para>
 	  </listitem>
 	</varlistentry>
+	<varlistentry>
+	  <term><option>--update-package</option></term>
+	  <term><option>-u</option></term>
+	  <indexterm><primary><option>--update-package</option></primary></indexterm>
+	  <listitem>
+	    <para>Reads package specification from the input, and
+	    adds it to the database of installed packages. If a package
+	    with the same name is already installed, its configuration
+	    data is replaced with the new information. If the package
+	    doesn't already exist, it's added.
+	    </para>
+	  </listitem>
+	</varlistentry>
       </variablelist>
 
       <para>When modifying the configuration file
