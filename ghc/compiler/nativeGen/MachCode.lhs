@@ -2730,7 +2730,8 @@ trivialCode instr x y
   where
     imm = maybeImm y
     imm__2 = case imm of Just x -> x
-
+{-
+-- This seems pretty dubious to me.  JRS, 000125.
 trivialCode instr x y
   | maybeToBool imm
   = getRegister y		`thenUs` \ register1 ->
@@ -2738,16 +2739,19 @@ trivialCode instr x y
     	code__2 dst = let code1 = registerCode register1 dst
 			  src1  = registerName register1 dst
 		      in code1 .
-			 if isFixed register1 && src1 /= dst
+			 if   isFixed register1 && src1 /= dst
 			 then mkSeqInstrs [MOV L (OpImm imm__2) (OpReg dst),
 					   instr (OpReg src1) (OpReg dst)]
 			 else
+                                -- can't possibly be right, if instr is 
+                                -- non-commutative
 				mkSeqInstr (instr (OpImm imm__2) (OpReg src1))
     in
     returnUs (Any IntRep code__2)
   where
     imm = maybeImm x
     imm__2 = case imm of Just x -> x
+-}
 
 trivialCode instr x y
   = getRegister x		`thenUs` \ register1 ->
@@ -2783,57 +2787,6 @@ trivialUCode instr x
     returnUs (Any IntRep code__2)
 
 -----------
-{-
-trivialFCode pk _ instrr _ _ (StInd pk' mem) y
-  = getRegister y		`thenUs` \ register2 ->
-    getAmode mem		`thenUs` \ amode ->
-    let
-    	code1 = amodeCode amode
-    	src1  = amodeAddr amode
-
-    	code__2 dst = let
-    	                  code2 = registerCode register2 dst
-		      	  src2  = registerName register2 dst
-		      in asmParThen [code1 asmVoid,code2 asmVoid] .
-    	    	         mkSeqInstrs [instrr (primRepToSize pk) (OpAddr src1)]
-    in
-    returnUs (Any pk code__2)
-
-trivialFCode pk instr _ _ _ x (StInd pk' mem)
-  = getRegister x		`thenUs` \ register1 ->
-    getAmode mem		`thenUs` \ amode ->
-    let
-    	code2 = amodeCode amode
-    	src2  = amodeAddr amode
-
-    	code__2 dst = let
-    	                  code1 = registerCode register1 dst
-    	                  src1  = registerName register1 dst
-		      in asmParThen [code2 asmVoid,code1 asmVoid] .
-    	    	         mkSeqInstrs [instr (primRepToSize pk) (OpAddr src2)]
-    in
-    returnUs (Any pk code__2)
-
-trivialFCode pk _ _ _ instrpr x y
-  = getRegister x		`thenUs` \ register1 ->
-    getRegister y		`thenUs` \ register2 ->
-    getNewRegNCG DoubleRep	`thenUs` \ tmp ->
-    let
-    	pk1   = registerRep register1
-    	code1 = registerCode register1 st0 --tmp1
-    	src1  = registerName register1 st0 --tmp1
-
-    	pk2   = registerRep register2
-
-    	code__2 dst = let
-    	                  code2 = registerCode register2 dst
-    	                  src2  = registerName register2 dst
-    	              in asmParThen [code1 asmVoid, code2 asmVoid] .
-    	    	         mkSeqInstr instrpr
-    in
-    returnUs (Any pk1 code__2)
--}
-
 trivialFCode pk instr x y
   = getRegister x		`thenUs` \ register1 ->
     getRegister y		`thenUs` \ register2 ->
@@ -2863,27 +2816,6 @@ trivialUFCode pk instr x
     in
     returnUs (Any pk code__2)
 
-{-
-trivialUFCode pk instr (StInd pk' mem)
-  = getAmode mem		`thenUs` \ amode ->
-    let
-    	code = amodeCode amode
-    	src  = amodeAddr amode
-    	code__2 dst = code . mkSeqInstrs [FLD (primRepToSize pk) (OpAddr src),
-					  instr]
-    in
-    returnUs (Any pk code__2)
-
-trivialUFCode pk instr x
-  = getRegister x		`thenUs` \ register ->
-    let
-    	code__2 dst = let
-    	                  code = registerCode register dst
-    	                  src  = registerName register dst
-		      in code . mkSeqInstrs [instr]
-    in
-    returnUs (Any pk code__2)
--}
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
