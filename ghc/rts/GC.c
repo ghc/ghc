@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.51 1999/03/15 16:30:27 simonm Exp $
+ * $Id: GC.c,v 1.52 1999/03/15 16:53:11 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1288,30 +1288,35 @@ loop:
     q = ((StgInd*)q)->indirectee;
     goto loop;
 
-    /* ToDo: optimise STATIC_LINK for known cases.
-       - FUN_STATIC       : payload[0]
-       - THUNK_STATIC     : payload[1]
-       - IND_STATIC       : payload[1]
-    */
   case THUNK_STATIC:
-  case FUN_STATIC:
-    if (info->srt_len == 0) {	/* small optimisation */
-      return q;
+    if (info->srt_len > 0 && major_gc && 
+	THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
+      THUNK_STATIC_LINK((StgClosure *)q) = static_objects;
+      static_objects = (StgClosure *)q;
     }
-    /* fall through */
-  case CONSTR_STATIC:
-  case IND_STATIC:
-    /* don't want to evacuate these, but we do want to follow pointers
-     * from SRTs  - see scavenge_static.
-     */
+    return q;
 
-    /* put the object on the static list, if necessary.
-     */
+  case FUN_STATIC:
+    if (info->srt_len > 0 && major_gc && 
+	FUN_STATIC_LINK((StgClosure *)q) == NULL) {
+      FUN_STATIC_LINK((StgClosure *)q) = static_objects;
+      static_objects = (StgClosure *)q;
+    }
+    return q;
+
+  case IND_STATIC:
+    if (major_gc && IND_STATIC_LINK((StgClosure *)q) == NULL) {
+      IND_STATIC_LINK((StgClosure *)q) = static_objects;
+      static_objects = (StgClosure *)q;
+    }
+    return q;
+
+  case CONSTR_STATIC:
     if (major_gc && STATIC_LINK(info,(StgClosure *)q) == NULL) {
       STATIC_LINK(info,(StgClosure *)q) = static_objects;
       static_objects = (StgClosure *)q;
     }
-    /* fall through */
+    return q;
 
   case CONSTR_INTLIKE:
   case CONSTR_CHARLIKE:

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.8 1999/03/11 11:21:45 simonm Exp $
+ * $Id: ClosureMacros.h,v 1.9 1999/03/15 16:53:10 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -318,6 +318,14 @@ SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,const);
 #define STATIC_LINK(info,p) \
    (*stgCast(StgClosure**,&((p)->payload[info->layout.payload.ptrs + \
 					info->layout.payload.nptrs])))
+/* These macros are optimised versions of the above for certain
+ * closure types.  They *must* be equivalent to the generic
+ * STATIC_LINK.
+ */
+#define FUN_STATIC_LINK(p)   ((p)->payload[0])
+#define THUNK_STATIC_LINK(p) ((p)->payload[2])
+#define IND_STATIC_LINK(p)   ((p)->payload[1])
+
 #define STATIC_LINK2(info,p) \
    (*stgCast(StgClosure**,&((p)->payload[info->layout.payload.ptrs + \
 					info->layout.payload.nptrs + 1])))
