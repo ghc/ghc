@@ -28,7 +28,8 @@
       <p>
 	Each time the foreign export dynamic is invoked to create a new
 	callback function, a small piece of code has to be dynamically
-	generated.  It is the address of this dynamically generated bit of
+	generated (by code in <a
+	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/rts/Adjustor.c"><code>Adjustor.c</code></a>).  It is the address of this dynamically generated bit of
 	code that is returned as the <code>Addr</code> (or <a
 	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/hslibs/lang/Ptr.lhs"><code>Ptr</code></a>).
 	When called from C, the dynamically generated code must somehow invoke
