@@ -46,6 +46,16 @@ def rm_nofail ( $_files )
    $res = run $cmd
 }
 
+-- Generate unique temporary file names.
+
+def normalise_errmsg ( $errmsg )
+{
+   $unpathify = $confdir ++ "/../../utils/normalise_errmsg/normalise_errmsg"
+   $normd = $errmsg | $unpathify
+   return $normd
+}
+
+
 
 ---------------------------------------------------------------
 --- COMPILATION                                             ---
@@ -239,12 +249,58 @@ def vanilla-comp-test-actions ( $extra_compile_args )
 {
    pretest_cleanup()
    $res = simple_build_Main_WRK ( $extra_compile_args, True )
-   if $res /= "0"
-      || contents(qualify("comp.stderr")) /= ""
+
+   -- If the compiler barf'd, fail.
+   if $res /= "0" then return False fi
+
+   -- If there's an expected .stderr (presumably containing
+   -- warnings), ensure the compiler produced the same.
+   $expected_stderr = qualify("stderr")
+   $actual_stderr = qualify("comp.stderr")
+
+   if   exists($expected_stderr) && 
+        contents($actual_stderr) /= contents($expected_stderr)
+   then return False 
+   fi
+
+   -- There's no expected stderr, so just insist that the compiler
+   -- produced nothing on stderr.
+   if contents($actual_stderr) /= "" then return False fi
+
+   -- Must have succeeded.
+   return True
+}
+
+
+-- Compile with expected fail (should_fail) style test.  Deemed to have
+-- succeeded if the compiler returned nonzero AND testname.comp.stderr
+-- equals testname.stderr.
+
+def vanilla-compfail-test-actions ( $extra_compile_args )
+{
+   pretest_cleanup()
+   $expected_stderr = qualify("stderr")
+
+   -- Sanity check
+   if   not(exists($expected_stderr)) 
+   then framefail "should_fail: expected .stderr is missing" 
+   fi
+
+   $res = simple_build_Main_WRK ( $extra_compile_args, True )
+
+   $stderr_a = normalise_errmsg(contents(qualify("comp.stderr")))
+   $stderr_e = normalise_errmsg(contents($expected_stderr))
+
+   if $stderr_e /= $stderr_a
+   then print ( "-- UNMATCHED ERROR MSGS: EXPECTED\n" ++ $stderr_e ++
+                "-- ACTUAL\n" ++ $stderr_a ++ "-- END\n" )
+   fi
+
+   if $res /= "0" && $stderr_e == $stderr_a
    then
-     return False
-   else
      return True
+   else
+     return False
    fi
 }
 
@@ -281,6 +337,20 @@ def vtc ( $extra_compile_args )
    pass when $test_passed
    fail when otherwise
 }
+
+
+-- Compile only, and expect failure (should_fail) style test
+
+def vtf ( $extra_compile_args )
+{
+   $test_passed 
+      = vanilla-compfail-test-actions ( $extra_compile_args )
+   expect pass
+   pass when $test_passed
+   fail when otherwise
+}
+
+
 
 -----------------------------------------------------------------------
 --- end                                              vanilla-test.T ---
