@@ -684,6 +684,7 @@ on or rebooting may be the quickest cure.
 
 </QandASet>
 
+<!-- doesn't add much value any longer; leave out [sof 7/2002].
 <Para>
 Further information on using GHC under Windows can be found in <ULink
 URL="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's
@@ -692,6 +693,7 @@ out of date; the <Emphasis>Miscellaneous</Emphasis> section at the bottom of
 the page is of most interest, covering topics beyond the scope of this
 manual.
 </Para>
+-->
 </Sect2>
 
 </Sect1>
