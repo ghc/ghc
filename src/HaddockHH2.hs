@@ -77,7 +77,7 @@ ppHH2Index odir maybe_package ifaces = do
 		text "<!DOCTYPE HelpIndex SYSTEM \"ms-help://hx/resources/HelpIndex.DTD\">" $$
 		text "<HelpIndex DTDVersion=\"1.0\" Name=\"NamedURLIndex\">" $$
 		text "<Keyword Term=\"HomePage\">" $$
-		nest 4 (text "<Jump Url=\"index.html\"/>") $$
+		nest 4 (text "<Jump Url=\""<>text contentsHtmlFile<>text "\"/>") $$
 		text "</Keyword>" $$
 		text "</HelpIndex>"
   writeFile (odir ++ pathSeparator:indexKHH2File) (render docK)
