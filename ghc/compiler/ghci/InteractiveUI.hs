@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.167 2004/07/21 09:25:42 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.168 2004/07/21 10:07:33 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -37,6 +37,7 @@ import CmdLineOpts	( DynFlag(..), DynFlags(..), getDynFlags, saveDynFlags,
 			  restoreDynFlags, dopt_unset )
 import Panic 		hiding ( showException )
 import Config
+import SrcLoc		( SrcLoc, isGoodSrcLoc )
 
 #ifndef mingw32_HOST_OS
 import DriverUtil( handle )
@@ -481,14 +482,19 @@ info s  = do { let names = words s
 	     ; io (putStrLn (showSDocForUser (cmGetPrintUnqual cms) $
      		   vcat (intersperse (text "") (map (showThing name) stuff)))) }
 
-showThing :: String -> (IfaceDecl, Fixity) -> SDoc
-showThing name (thing, fixity) 
+showThing :: String -> (IfaceDecl, Fixity, SrcLoc) -> SDoc
+showThing name (thing, fixity, src_loc) 
     = vcat [ showDecl (\occ -> name == occNameUserString occ) thing, 
-	     showFixity fixity ]
+	     showFixity fixity,
+	     showLoc src_loc]
   where
     showFixity fix 
 	| fix == defaultFixity = empty
 	| otherwise            = ppr fix <+> text name
+
+    showLoc loc	-- The ppr function for SrcLocs is a bit wonky
+	| isGoodSrcLoc loc = ptext SLIT("Defined at") <+> ppr loc
+	| otherwise	   = ppr loc
 
 -- Now there is rather a lot of goop just to print declarations in a civilised way
 -- with "..." for the parts we are less interested in.
@@ -559,16 +565,6 @@ ppr_bndr :: OccName -> SDoc
 -- Wrap operators in ()
 ppr_bndr occ | isSymOcc occ = parens (ppr occ)
 	     | otherwise    = ppr occ
-
-{-
-	-- also print out the source location for home things
-    showSrcLoc name
-	| isHomePackageName name && isGoodSrcLoc loc
-	= hsep [ text ", defined at", ppr loc ]
-	| otherwise
-	= empty
-	where loc = nameSrcLoc name
--}
 
 
 -----------------------------------------------------------------------------

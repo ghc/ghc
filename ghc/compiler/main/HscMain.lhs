@@ -29,7 +29,7 @@ import RdrName		( RdrName )
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
-import SrcLoc		( noSrcLoc, Located(..) )
+import SrcLoc		( SrcLoc, noSrcLoc, Located(..) )
 import Kind		( Kind )
 import Var		( Id )
 import CoreLint		( lintUnfolding )
@@ -631,7 +631,7 @@ hscThing -- like hscStmt, but deals with a single identifier
   :: HscEnv
   -> InteractiveContext		-- Context for compiling
   -> String			-- The identifier
-  -> IO [(IfaceDecl, Fixity)]
+  -> IO [(IfaceDecl, Fixity, SrcLoc)]
 
 hscThing hsc_env ic str
    = do maybe_rdr_name <- hscParseIdentifier (hsc_dflags hsc_env) str

@@ -56,10 +56,10 @@ import Id		( mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
 import Module           ( mkHomeModule, mkModuleName, moduleName, moduleEnvElts )
 import OccName		( mkVarOcc )
-import Name		( Name, isExternalName, getSrcLoc, getOccName )
+import Name		( Name, isExternalName, getSrcLoc, getOccName, nameSrcLoc )
 import NameSet
 import TyCon		( tyConHasGenerics )
-import SrcLoc		( srcLocSpan, Located(..), noLoc )
+import SrcLoc		( SrcLoc, srcLocSpan, Located(..), noLoc )
 import Outputable
 import HscTypes		( ModGuts(..), HscEnv(..),
 			  GhciMode(..), Dependencies(..), noDependencies,
@@ -461,7 +461,7 @@ tcRnType hsc_env ictxt rdr_type
 tcRnThing :: HscEnv
 	  -> InteractiveContext
 	  -> RdrName
-	  -> IO (Maybe [(IfaceDecl, Fixity)])
+	  -> IO (Maybe [(IfaceDecl, Fixity, SrcLoc)])
 -- Look up a RdrName and return all the TyThings it might be
 -- A capitalised RdrName is given to us in the DataName namespace,
 -- but we want to treat it as *both* a data constructor 
@@ -501,8 +501,11 @@ tcRnThing hsc_env ictxt rdr_name
     let { do_one name = do { thing <- tcLookupGlobal name
 			   ; let decl = toIfaceDecl ictxt thing
 		           ; fixity <- lookupFixityRn name
-		           ; return (decl, fixity) } ;
-	  cmp (d1,_) (d2,_) = ifName d1 `compare` ifName d2 } ;
+		           ; return (decl, fixity, getSrcLoc thing) } ;
+		-- For the SrcLoc, the 'thing' has better info than
+		-- the 'name' because getting the former forced the
+		-- declaration to be loaded into the cache
+	  cmp (d1,_,_) (d2,_,_) = ifName d1 `compare` ifName d2 } ;
     results <- mapM do_one good_names ;
     return (fst (removeDups cmp results))
     }

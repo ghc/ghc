@@ -95,6 +95,7 @@ import BasicTypes	( Fixity )
 import Linker		( HValue, unload, extendLinkEnv )
 import GHC.Exts		( unsafeCoerce# )
 import Foreign
+import SrcLoc		( SrcLoc )
 import Control.Exception as Exception ( Exception, try )
 #endif
 
@@ -219,7 +220,7 @@ cmSetDFlags cm_state dflags
 -- A string may refer to more than one TyThing (eg. a constructor,
 -- and type constructor), so we return a list of all the possible TyThings.
 
-cmInfoThing :: CmState -> String -> IO [(IfaceDecl,Fixity)]
+cmInfoThing :: CmState -> String -> IO [(IfaceDecl,Fixity,SrcLoc)]
 cmInfoThing cmstate id
    = hscThing (cm_hsc cmstate) (cm_ic cmstate) id
 
