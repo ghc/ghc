@@ -31,7 +31,7 @@ import TcType		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  isBoolTy, isUnitTy, isPrimitiveType,
 			  tcSplitTyConApp_maybe
 			)
-import Type		( splitTyConApp_maybe, repType, eqType )	-- Sees the representation type
+import Type		( repType, eqType )	-- Sees the representation type
 import PrimOp		( PrimOp(TouchOp) )
 import TysPrim		( realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
@@ -153,7 +153,6 @@ unboxArg arg
                              prim_arg 
 			     [(DEFAULT,[],body)])
 
-  -- Newtypes 
   -- Data types with a single constructor, which has a single, primitive-typed arg
   -- This deals with Int, Float etc
   | is_product_type && data_con_arity == 1 
@@ -165,6 +164,9 @@ unboxArg arg
     )
 
   -- Byte-arrays, both mutable and otherwise; hack warning
+  -- We're looking for values of type ByteArray, MutableByteArray
+  --	data ByteArray          ix = ByteArray        ix ix ByteArray#
+  --	data MutableByteArray s ix = MutableByteArray ix ix (MutableByteArray# s)
   | is_product_type &&
     data_con_arity == 3 &&
     maybeToBool maybe_arg3_tycon &&
@@ -183,7 +185,9 @@ unboxArg arg
   where
     arg_ty  					= repType (exprType arg)
 	-- The repType looks through any newtype or 
-	-- implicit-parameter wrappings on the argument.  
+	-- implicit-parameter wrappings on the argument;
+	-- this is necessary, because isBoolTy (in particular) does not.
+
     maybe_product_type 			   	= splitProductType_maybe arg_ty
     is_product_type			   	= maybeToBool maybe_product_type
     Just (_, _, data_con, data_con_arg_tys)	= maybe_product_type
@@ -217,6 +221,8 @@ boxResult :: [Id] -> Type -> DsM (Type, CoreExpr -> CoreExpr)
 
 boxResult arg_ids result_ty
   = case tcSplitTyConApp_maybe result_ty of
+	-- This split absolutely has to be a tcSplit, because we must
+	-- see the IO type; and it's a newtype which is transparent to splitTyConApp.
 
 	-- The result is IO t, so wrap the result in an IO constructor
 	Just (io_tycon, [io_res_ty]) | io_tycon `hasKey` ioTyConKey
@@ -324,6 +330,5 @@ resultWrapper result_ty
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)
   where
-    result_ty_rep = repType result_ty
-
+    result_ty_rep = repType result_ty	-- Look through any newtypes/implicit parameters
 \end{code}

@@ -28,14 +28,10 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 			  NamedThing(..),
 			)
 
-	-- Import Type not TcType; in this module we are generating code
-	-- to marshal representation types across to C
-import Type		( splitTyConApp_maybe, funResultTy,
-			  splitFunTys, splitForAllTys, splitAppTy, 
-			  Type, mkFunTys, mkForAllTys, mkTyConApp,
-			  mkFunTy, applyTy, eqType, repType
-			)
-import TcType		( tcSplitForAllTys, tcSplitFunTys,
+import Type		( repType, eqType )
+import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
+			  mkFunTy, applyTy, 
+			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
 			  tcSplitTyConApp_maybe, tcSplitAppTy,
 			  tcFunResultTy
 			)
@@ -151,6 +147,8 @@ dsFCall mod_Name fn_id fcall
 	ty		     = idType fn_id
 	(tvs, fun_ty)        = tcSplitForAllTys ty
 	(arg_tys, io_res_ty) = tcSplitFunTys fun_ty
+		-- Must use tcSplit* functions because we want to 
+		-- see that (IO t) in the corner
     in
     newSysLocalsDs arg_tys  			`thenDs` \ args ->
     mapAndUnzipDs unboxArg (map Var args)	`thenDs` \ (val_args, arg_wrappers) ->
@@ -225,6 +223,9 @@ dsFExport mod_name fn_id ty ext_name cconv isDyn
 	-- If it's IO t, return		(\x.x,	        IO t, t)
 	-- If it's plain t, return	(\x.returnIO x, IO t, t)
      (case tcSplitTyConApp_maybe orig_res_ty of
+	-- We must use tcSplit here so that we see the (IO t) in
+	-- the type.  [IO t is transparent to plain splitTyConApp.]
+
 	Just (ioTyCon, [res_ty])
 	      -> ASSERT( ioTyCon `hasKey` ioTyConKey )
 			-- The function already returns IO t
@@ -303,15 +304,19 @@ dsFExport mod_name fn_id ty ext_name cconv isDyn
   where
    (tvs,sans_foralls)		= tcSplitForAllTys ty
    (fe_arg_tys', orig_res_ty)	= tcSplitFunTys sans_foralls
-
-   (_, stbl_ptr_ty')		= tcSplitForAllTys stbl_ptr_ty
-   (_, stbl_ptr_to_ty)		= tcSplitAppTy stbl_ptr_ty'
+	-- We must use tcSplits here, because we want to see 
+	-- the (IO t) in the corner of the type!
 
    fe_arg_tys | isDyn	  = tail fe_arg_tys'
 	      | otherwise = fe_arg_tys'
 
    stbl_ptr_ty | isDyn     = head fe_arg_tys'
 	       | otherwise = error "stbl_ptr_ty"
+
+   (_, stbl_ptr_ty')		= tcSplitForAllTys stbl_ptr_ty
+   (_, stbl_ptr_to_ty)		= tcSplitAppTy stbl_ptr_ty'
+	-- Again, stable pointers are just newtypes, 
+	-- so we must see them!  Hence tcSplit*
 \end{code}
 
 @foreign export dynamic@ lets you dress up Haskell IO actions
@@ -395,11 +400,12 @@ dsFExportDynamic mod_name id cconv
      returnDs ([fed, fe], h_code, c_code)
 
  where
-  ty				   = idType id
-  (tvs,sans_foralls)		   = tcSplitForAllTys ty
-  ([arg_ty], io_res_ty)		   = tcSplitFunTys sans_foralls
-  Just (ioTyCon, [res_ty])	   = tcSplitTyConApp_maybe io_res_ty
-  export_ty			   = mkFunTy (mkTyConApp stablePtrTyCon [arg_ty]) arg_ty
+  ty			= idType id
+  (tvs,sans_foralls)	= tcSplitForAllTys ty
+  ([arg_ty], io_res_ty)	= tcSplitFunTys sans_foralls
+  [res_ty]		= tcTyConAppArgs io_res_ty
+	-- Must use tcSplit* to see the (IO t), which is a newtype
+  export_ty		= mkFunTy (mkTyConApp stablePtrTyCon [arg_ty]) arg_ty
 
 toCName :: Id -> String
 toCName i = showSDoc (pprCode CStyle (ppr (idName i)))
@@ -455,7 +461,7 @@ fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
 
   cParamTypes  = map showStgType real_args
 
-  res_ty_is_unit = res_ty `eqType` unitTy
+  res_ty_is_unit = res_ty `eqType` unitTy	-- Look through any newtypes
 
   cResType | res_ty_is_unit = text "void"
 	   | otherwise	    = showStgType res_ty
@@ -503,7 +509,7 @@ showStgType t = text "Hs" <> text (showFFIType t)
 showFFIType :: Type -> String
 showFFIType t = getOccString (getName tc)
  where
-  tc = case splitTyConApp_maybe (repType t) of
+  tc = case tcSplitTyConApp_maybe (repType t) of
 	    Just (tc,_) -> tc
 	    Nothing	-> pprPanic "showFFIType" (ppr t)
 \end{code}
