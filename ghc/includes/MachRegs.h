@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.19 2005/01/13 16:21:14 simonmar Exp $
+ * $Id: MachRegs.h,v 1.20 2005/01/19 18:31:07 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -389,21 +389,29 @@
 
    0		system glue?	(caller-save, volatile)
    1		SP		(callee-save, non-volatile)
-   2		RTOC		(callee-save, non-volatile)
+   2            AIX, powerpc64-linux:
+                    RTOC        (a strange special case)
+                darwin:         
+                                (caller-save, volatile)
+                powerpc32-linux:
+                                reserved for use by system
+                    
    3-10		args/return	(caller-save, volatile)
    11,12	system glue?	(caller-save, volatile)
-   13-31			(callee-save, non-volatile)
+   13           on 64-bit:      reserved for thread state pointer
+                on 32-bit:      (callee-save, non-volatile)
+   14-31			(callee-save, non-volatile)
    
    f0				(caller-save, volatile)
    f1-f13	args/return	(caller-save, volatile)
    f14-f31			(callee-save, non-volatile)
    
-   \tr{13}--\tr{31} are wonderful callee-save registers.
+   \tr{14}--\tr{31} are wonderful callee-save registers on all ppc OSes.
    \tr{0}--\tr{12} are caller-save registers.
    
    \tr{%f14}--\tr{%f31} are callee-save floating-point registers.
    
-   I think we can do the Whole Business with callee-save registers only!
+   We can do the Whole Business with callee-save registers only!
    -------------------------------------------------------------------------- */
 
 #if powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH || rs6000_TARGET_ARCH
