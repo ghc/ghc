@@ -22,6 +22,12 @@ if (ghc_with_native_codegen == 1):
 if (ghc_with_profiling == 1):
 	config.compile_ways.append('prof')
 	config.run_ways.append('prof')
+	config.compile_ways.append('profasm')
+	config.run_ways.append('profasm')
+
+if (ghc_with_unreg == 1):
+	config.compile_ways.append('unreg')
+	config.run_ways.append('unreg')
 
 if (ghc_with_interpreter == 1):
 	config.run_ways.append('ghci')
@@ -29,13 +35,14 @@ if (ghc_with_interpreter == 1):
 if (ghc_with_threaded_rts == 1):
 	config.run_ways.append('threaded')
 
-config.way_flags = { 'normal'     : [],
-		     'opt'        : ['-O'],
-		     'optasm'     : ['-O -fasm'],
-	  	     'prof'       : ['-O -prof -auto-all'],
-		     'unreg'      : ['-unreg'],
-		     'ghci'       : ['--interactive', '-v0'],
-                     'extcore'    : ['-fext-core'],
+config.way_flags = { 'normal' : [],
+		     'opt'    : ['-O'],
+		     'optasm' : ['-O -fasm'],
+	  	     'prof'   : ['-O -prof -auto-all'],
+	  	     'profasm': ['-O -prof -auto-all -fasm'],
+		     'unreg'  : ['-unreg'],
+		     'ghci'   : ['--interactive', '-v0'],
+		     'extcore' : ['-fext-core'],
 		     'optextcore' : ['-O -fext-core'],
 		     'threaded'   : ['-threaded']
 		   }
