@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.174 2001/07/10 14:25:24 rrt Exp $
+# $Id: Makefile,v 1.175 2001/07/16 15:46:09 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -180,7 +180,7 @@ DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
 # Big Fudge to get around inherent problem that Makefile setup
 # has got with 'mkdependC'.
 # 
-SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(GHC_INCLUDES)
+SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(GHC_INCLUDE_DIR)
 
 # -----------------------------------------------------------------------------
 # 		Haskell compilations
