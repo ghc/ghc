@@ -387,10 +387,7 @@ myParseModule dflags src_filename
       _scc_  "Parser" do
       buf <- hGetStringBuffer src_filename
 
-      let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
-			   ffiEF	 = dopt Opt_FFI		dflags,
-			   withEF	 = dopt Opt_With	dflags,
-			   parrEF	 = dopt Opt_PArr	dflags}
+      let exts = mkExtFlags dflags
 	  loc  = mkSrcLoc (mkFastString src_filename) 1
 
       case parseModule buf (mkPState loc exts) of {
@@ -513,10 +510,7 @@ hscParseStmt dflags str
 
       buf <- stringToStringBuffer str
 
-      let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
-			   ffiEF	 = dopt Opt_FFI		dflags,
-			   withEF	 = dopt Opt_With	dflags,
-			   parrEF	 = dopt Opt_PArr	dflags}
+      let exts = mkExtFlags dflags 
 	  loc  = mkSrcLoc FSLIT("<interactive>") 1
 
       case parseStmt buf (mkPState loc exts) of {
@@ -574,10 +568,7 @@ hscThing hsc_env pcs0 ic str
 myParseIdentifier dflags str
   = do buf <- stringToStringBuffer str
  
-       let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
-			    ffiEF	  = dopt Opt_FFI	 dflags,
-			    withEF	  = dopt Opt_With	 dflags,
-			    parrEF	  = dopt Opt_PArr	 dflags}
+       let exts = mkExtFlags dflags
 	   loc  = mkSrcLoc FSLIT("<interactive>") 1
 
        case parseIdentifier buf (mkPState loc exts) of
@@ -683,4 +674,11 @@ initExternalPackageState
 
 initOrigNames :: OrigNameCache
 initOrigNames = foldl extendOrigNameCache emptyModuleEnv knownKeyNames 
+
+mkExtFlags dflags
+  = ExtFlags { glasgowExtsEF = dopt Opt_GlasgowExts dflags,
+	       ffiEF	     = dopt Opt_FFI	 dflags,
+	       withEF	     = dopt Opt_With	 dflags,
+	       arrowsEF	     = dopt Opt_Arrows	 dflags,
+	       parrEF	     = dopt Opt_PArr	 dflags}
 \end{code}

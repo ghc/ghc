@@ -22,7 +22,7 @@ module HsSyn (
 	Fixity, NewOrData, 
 
 	HsModule(..), 
-	collectStmtsBinders,
+	collectStmtsBinders, collectStmtBinders,
 	collectHsBinders,   collectLocatedHsBinders, 
 	collectMonoBinders, collectLocatedMonoBinders,
 	collectSigTysFromHsBinds, collectSigTysFromMonoBinds
@@ -148,6 +148,9 @@ collectMonoBinders binds
     go (PatMonoBind pat _ loc) acc = collectPatBinders pat ++ acc
     go (FunMonoBind f _ _ loc) acc = f : acc
     go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
+    go (VarMonoBind v _)       acc = v : acc
+    go (AbsBinds _ _ dbinds _ binds) acc
+      = [dp | (_,dp,_) <- dbinds] ++ go binds acc
 \end{code}
 
 
@@ -195,6 +198,7 @@ collectStmtBinders (BindStmt pat _ _) = collectPatBinders pat
 collectStmtBinders (LetStmt binds)    = collectHsBinders binds
 collectStmtBinders (ExprStmt _ _ _)   = []
 collectStmtBinders (ResultStmt _ _)   = []
+collectStmtBinders (RecStmt ss _ _ _) = collectStmtsBinders ss
 collectStmtBinders other              = panic "collectStmtBinders"
 \end{code}
 

@@ -360,7 +360,7 @@ newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
   | fi /= fromIntegerName	-- Do not generate a LitInst for rebindable
 				-- syntax.  Reason: tcSyntaxName does unification
 				-- which is very inconvenient in tcSimplify
-  = tcSyntaxName orig expected_ty fromIntegerName fi	`thenM` \ (expr, _) ->
+  = tcSyntaxName orig expected_ty (fromIntegerName, HsVar fi)	`thenM` \ (_,expr) ->
     returnM (HsApp expr (HsLit (HsInteger i)))
 
   | Just expr <- shortCutIntLit i expected_ty 
@@ -371,8 +371,8 @@ newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
 
 newOverloadedLit orig lit@(HsFractional r fr) expected_ty
   | fr /= fromRationalName	-- c.f. HsIntegral case
-  = tcSyntaxName orig expected_ty fromRationalName fr	`thenM` \ (expr, _) ->
-    mkRatLit r						`thenM` \ rat_lit ->
+  = tcSyntaxName orig expected_ty (fromRationalName, HsVar fr)	`thenM` \ (_,expr) ->
+    mkRatLit r							`thenM` \ rat_lit ->
     returnM (HsApp expr rat_lit)
 
   | Just expr <- shortCutFracLit r expected_ty 
@@ -645,18 +645,18 @@ just use the expression inline.
 \begin{code}
 tcSyntaxName :: InstOrigin
 	     -> TcType			-- Type to instantiate it at
-	     -> Name -> Name 		-- (Standard name, user name)
-	     -> TcM (TcExpr, TcType)	-- Suitable expression with its type
+	     -> (Name, HsExpr Name)	-- (Standard name, user name)
+	     -> TcM (Name, TcExpr)	-- (Standard name, suitable expression)
 
 -- NB: tcSyntaxName calls tcExpr, and hence can do unification.
 -- So we do not call it from lookupInst, which is called from tcSimplify
 
-tcSyntaxName orig ty std_nm user_nm
+tcSyntaxName orig ty (std_nm, HsVar user_nm)
   | std_nm == user_nm
   = newMethodFromName orig ty std_nm	`thenM` \ id ->
-    returnM (HsVar id, idType id)
+    returnM (std_nm, HsVar id)
 
-  | otherwise
+tcSyntaxName orig ty (std_nm, user_nm_expr)
   = tcLookupId std_nm		`thenM` \ std_id ->
     let	
 	-- C.f. newMethodAtLoc
@@ -665,9 +665,9 @@ tcSyntaxName orig ty std_nm user_nm
 	-- Actually, the "tau-type" might be a sigma-type in the
 	-- case of locally-polymorphic methods.
     in
-    addErrCtxtM (syntaxNameCtxt user_nm orig tau1)	$
-    tcCheckSigma (HsVar user_nm) tau1			`thenM` \ user_fn ->
-    returnM (user_fn, tau1)
+    addErrCtxtM (syntaxNameCtxt user_nm_expr orig tau1)	$
+    tcCheckSigma user_nm_expr tau1			`thenM` \ expr ->
+    returnM (std_nm, expr)
 
 syntaxNameCtxt name orig ty tidy_env
   = getInstLoc orig		`thenM` \ inst_loc ->

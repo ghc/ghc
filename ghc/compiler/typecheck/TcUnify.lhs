@@ -17,7 +17,7 @@ module TcUnify (
   -- Holes
   Expected(..), newHole, readExpectedType, 
   zapExpectedType, zapExpectedTo, zapExpectedBranches,
-  subFunTy,    	unifyFunTy, 
+  subFunTys,   	unifyFunTy, 
   zapToListTy, 	unifyListTy, 
   zapToPArrTy, 	unifyPArrTy, 
   zapToTupleTy, unifyTupleTy
@@ -35,7 +35,7 @@ import TypeRep		( Type(..), SourceType(..), TyNote(..), openKindCon )
 import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  TcTyVarSet, TcThetaType, TyVarDetails(SigTv),
-			  isTauTy, isSigmaTy, 
+			  isTauTy, isSigmaTy, mkFunTys,
 			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, 
 			  tcGetTyVar_maybe, tcGetTyVar, 
 			  mkFunTy, tyVarsOfType, mkPhiTy,
@@ -128,33 +128,40 @@ creation of type variables.
   type variables, so we should create new ordinary type variables
 
 \begin{code}
-subFunTy :: Expected TcRhoType	-- Fail if ty isn't a function type
-				-- If it's a hole, make two holes, feed them to...
-	 -> (Expected TcRhoType -> Expected TcRhoType -> TcM a)	-- the thing inside
-	 -> TcM a	-- and bind the function type to the hole
+subFunTys :: [pat]
+	 -> Expected TcRhoType	-- Fail if ty isn't a function type
+	 -> ([(pat, Expected TcRhoType)] -> Expected TcRhoType -> TcM a)
+	 -> TcM a
 
-subFunTy (Infer hole) thing_inside
+subFunTys pats (Infer hole) thing_inside
   = 	-- This is the interesting case
-    newHole	  		`thenM` \ arg_hole ->
+    mapM new_pat_hole pats	`thenM` \ pats_w_holes ->
     newHole			`thenM` \ res_hole ->
 
 	-- Do the business
-    thing_inside (Infer arg_hole) (Infer res_hole)	`thenM` \ answer ->
+    thing_inside pats_w_holes (Infer res_hole)	`thenM` \ answer ->
 
 	-- Extract the answers
-    readMutVar arg_hole		`thenM` \ arg_ty ->
-    readMutVar res_hole		`thenM` \ res_ty ->
+    mapM read_pat_hole pats_w_holes	`thenM` \ arg_tys ->
+    readMutVar res_hole			`thenM` \ res_ty ->
 
 	-- Write the answer into the incoming hole
-    writeMutVar hole (mkFunTy arg_ty res_ty)	`thenM_` 
+    writeMutVar hole (mkFunTys arg_tys res_ty)	`thenM_` 
 
 	-- And return the answer
     returnM answer
+  where
+    new_pat_hole pat = newHole `thenM` \ hole -> return (pat, Infer hole)
+    read_pat_hole (pat, Infer hole) = readMutVar hole
 
-subFunTy (Check ty) thing_inside
-  = unifyFunTy ty 	`thenM` \ (arg,res) ->
-    thing_inside (Check arg) (Check res)
-
+subFunTys pats (Check ty) thing_inside
+  = go pats ty		`thenM` \ (pats_w_tys, res_ty) ->
+    thing_inside pats_w_tys res_ty
+  where
+    go []         ty = return ([], Check ty)
+    go (pat:pats) ty = unifyFunTy ty 	`thenM` \ (arg,res) ->
+		       go pats res	`thenM` \ (pats_w_tys, final_res) ->
+		       return ((pat, Check arg) : pats_w_tys, final_res)
 		 
 unifyFunTy :: TcRhoType	 		-- Fail if ty isn't a function type
 	   -> TcM (TcType, TcType)	-- otherwise return arg and result types

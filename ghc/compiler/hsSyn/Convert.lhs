@@ -237,13 +237,12 @@ cvtdd (FromThenToR x y z) = (FromThenTo (cvt x) (cvt y) (cvt z))
 
 
 cvtstmts :: [Meta.Stmt] -> [Hs.Stmt RdrName]
-cvtstmts [] = [] -- this is probably an error as every [stmt] should end with ResultStmt
-cvtstmts [NoBindS e]      = [ResultStmt (cvt e) loc0]      -- when its the last element use ResultStmt
-cvtstmts (NoBindS e : ss) = ExprStmt (cvt e) void loc0     : cvtstmts ss
+cvtstmts []		       = [] -- this is probably an error as every [stmt] should end with ResultStmt
+cvtstmts [NoBindS e]           = [ResultStmt (cvt e) loc0]      -- when its the last element use ResultStmt
+cvtstmts (NoBindS e : ss)      = ExprStmt (cvt e) void loc0     : cvtstmts ss
 cvtstmts (Meta.BindS p e : ss) = BindStmt (cvtp p) (cvt e) loc0 : cvtstmts ss
 cvtstmts (Meta.LetS ds : ss)   = LetStmt (cvtdecs ds)	    : cvtstmts ss
-cvtstmts (Meta.ParS dss : ss)  = ParStmt(map cvtstmts dss)      : cvtstmts ss
-
+cvtstmts (Meta.ParS dss : ss)  = ParStmt [(cvtstmts ds, undefined) | ds <- dss] : cvtstmts ss
 
 cvtm :: Meta.Match -> Hs.Match RdrName
 cvtm (Meta.Match p body wheres)

@@ -26,13 +26,16 @@ module DsUtils (
 
 	mkSelectorBinds, mkTupleExpr, mkTupleSelector, 
 	mkCoreTup, mkCoreSel, mkCoreTupTy,
+	
+	dsReboundNames, lookupReboundName,
 
 	selectMatchVar
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Match ( matchSimply )
+import {-# SOURCE #-}	Match ( matchSimply )
+import {-# SOURCE #-}	DsExpr( dsExpr )
 
 import HsSyn
 import TcHsSyn		( TypecheckedPat, hsPatType )
@@ -43,6 +46,7 @@ import DsMonad
 import CoreUtils	( exprType, mkIfThenElse, mkCoerce )
 import MkId		( iRREFUT_PAT_ERROR_ID, mkReboxingAlt, mkNewTypeBody )
 import Id		( idType, Id, mkWildId, mkTemplateLocals )
+import Name		( Name )
 import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, dataConSourceArity )
@@ -65,9 +69,40 @@ import PrelNames	( unpackCStringName, unpackCStringUtf8Name,
 import Outputable
 import UnicodeUtil      ( intsToUtf8, stringToUtf8 )
 import Util             ( isSingleton, notNull, zipEqual )
+import ListSetOps	( assocDefault )
 import FastString
 \end{code}
 
+
+
+%************************************************************************
+%*									*
+		Rebindable syntax
+%*									*
+%************************************************************************
+
+\begin{code}
+dsReboundNames :: ReboundNames Id 
+	       -> DsM ([CoreBind], 	-- Auxiliary bindings
+		       [(Name,Id)])	-- Maps the standard name to its value
+
+dsReboundNames rebound_ids
+  = mapAndUnzipDs mk_bind rebound_ids	`thenDs` \ (binds_s, prs) ->
+    return (concat binds_s, prs)
+  where
+	-- The cheapo special case can happen when we 
+	-- make an intermediate HsDo when desugaring a RecStmt
+    mk_bind (std_name, HsVar id) = return ([], (std_name, id))
+    mk_bind (std_name, expr) 	 = dsExpr expr				`thenDs` \ rhs ->
+			     	   newSysLocalDs (exprType rhs)		`thenDs` \ id ->
+			     	   return ([NonRec id rhs], (std_name, id))
+
+lookupReboundName :: [(Name,Id)] -> Name -> CoreExpr
+lookupReboundName prs std_name
+  = Var (assocDefault (mk_panic std_name) prs std_name)
+  where
+    mk_panic std_name = pprPanic "dsReboundNames" (ptext SLIT("Not found:") <+> ppr std_name)
+\end{code}
 
 
 %************************************************************************

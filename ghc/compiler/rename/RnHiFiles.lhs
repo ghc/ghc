@@ -665,6 +665,7 @@ read_iface mod file_path is_hi_boot_file
  where
     exts = ExtFlags {glasgowExtsEF = True,
 		     ffiEF	   = True,
+		     arrowsEF	   = True,
 		     withEF	   = True,
 		     parrEF	   = True}
     loc  = mkSrcLoc (mkFastString file_path) 1

@@ -210,6 +210,16 @@ data Token
   | ITreifyDecl
   | ITreifyFixity
 
+  -- Arrow notation extension
+  | ITproc
+  | ITrec
+  | IToparenbar			-- (|
+  | ITcparenbar			-- |)
+  | ITlarrowtail		-- -<
+  | ITrarrowtail		-- >-
+  | ITLarrowtail		-- -<<
+  | ITRarrowtail		-- >>-
+
   | ITunknown String		-- Used when the lexer can't make sense of it
   | ITeof			-- end of file token
   deriving Show -- debugging
@@ -295,6 +305,13 @@ isSpecial _             = False
 ghcExtensionKeywordsFM = listToUFM $
 	map (\(x, y, z) -> (mkFastString x, (y, z)))
      [	( "forall",	ITforall,	 bit glaExtsBit),
+	( "mdo",	ITmdo,		 bit glaExtsBit),
+	( "reifyDecl",  ITreifyDecl,	 bit glaExtsBit),
+	( "reifyType",  ITreifyType,	 bit glaExtsBit),
+	( "reifyFixity",ITreifyFixity,	 bit glaExtsBit),
+
+	( "rec",	ITrec,		 bit glaExtsBit .|. bit arrowsBit),
+
 	( "foreign",	ITforeign,	 bit ffiBit),
 	( "export",	ITexport,	 bit ffiBit),
 	( "label",	ITlabel,	 bit ffiBit),
@@ -302,14 +319,15 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "safe",	ITsafe,		 bit ffiBit),
 	( "threadsafe",	ITthreadsafe,	 bit ffiBit),
 	( "unsafe",	ITunsafe,	 bit ffiBit),
-	( "with",	ITwith,		 bit withBit),
-	( "mdo",	ITmdo,		 bit glaExtsBit),
 	( "stdcall",    ITstdcallconv,	 bit ffiBit),
 	( "ccall",      ITccallconv,	 bit ffiBit),
 	( "dotnet",     ITdotnet,	 bit ffiBit),
-	( "reifyDecl",  ITreifyDecl,	 bit glaExtsBit),
-	( "reifyType",  ITreifyType,	 bit glaExtsBit),
-	( "reifyFixity",ITreifyFixity,	 bit glaExtsBit),
+
+	( "with",	ITwith,		 bit withBit),
+
+	( "proc",	ITproc,		 bit arrowsBit),
+
+	-- On death row
         ("_ccall_",	ITccall (False, False, PlayRisky),
 					 bit glaExtsBit),
         ("_ccall_GC_",	ITccall (False, False, PlaySafe False),
@@ -321,23 +339,29 @@ ghcExtensionKeywordsFM = listToUFM $
      ]
 
 haskellKeySymsFM = listToUFM $
-	map (\ (x,y) -> (mkFastString x,y))
-      [ ("..",		ITdotdot)
-       ,(":",		ITcolon)	-- (:) is a reserved op, 
+	map (\ (x,y,z) -> (mkFastString x,(y,z)))
+      [ ("..",	ITdotdot,	Nothing)
+       ,(":",	ITcolon,	Nothing)	-- (:) is a reserved op, 
 					-- meaning only list cons
-       ,("::",		ITdcolon)
-       ,("=",		ITequal)
-       ,("\\",		ITlam)
-       ,("|",		ITvbar)
-       ,("<-",		ITlarrow)
-       ,("->",		ITrarrow)
-       ,("@",		ITat)
-       ,("~",		ITtilde)
-       ,("=>",		ITdarrow)
-       ,("-",		ITminus)
-       ,("!",		ITbang)
-       ,("*",		ITstar)
-       ,(".",		ITdot)		-- sadly, for 'forall a . t'
+       ,("::",	ITdcolon, 	Nothing)
+       ,("=",	ITequal, 	Nothing)
+       ,("\\",	ITlam, 		Nothing)
+       ,("|",	ITvbar, 	Nothing)
+       ,("<-",	ITlarrow, 	Nothing)
+       ,("->",	ITrarrow, 	Nothing)
+       ,("@",	ITat, 		Nothing)
+       ,("~",	ITtilde, 	Nothing)
+       ,("=>",	ITdarrow, 	Nothing)
+       ,("-",	ITminus, 	Nothing)
+       ,("!",	ITbang, 	Nothing)
+
+       ,("*",	ITstar,		Just (bit glaExtsBit))	-- For data T (a::*) = MkT
+       ,(".",	ITdot,		Just (bit glaExtsBit))	-- For 'forall a . t'
+
+       ,("-<",	ITlarrowtail,	Just (bit arrowsBit))
+       ,(">-",	ITrarrowtail,	Just (bit arrowsBit))
+       ,("-<<",	ITLarrowtail,	Just (bit arrowsBit))
+       ,(">>-",	ITRarrowtail,	Just (bit arrowsBit))
        ]
 
 \end{code}
@@ -537,8 +561,14 @@ lexToken cont exts buf =
   case currentChar# buf of
 
     -- special symbols ----------------------------------------------------
-    '('# | glaExtsEnabled exts && lookAhead# buf 1# `eqChar#` '#'# 
+    '('# | glaExtsEnabled exts && lookAhead# buf 1# `eqChar#` '#'# &&
+	 -- Unboxed tules: '(#' but not '(##'
+	   not (lookAhead# buf 2# `eqChar#` '#'#)
 		-> cont IToubxparen (addToCurrentPos buf 2#)
+	 -- Arrow notation extension: '(|' but not '(||'
+	 | arrowsEnabled exts && lookAhead# buf 1# `eqChar#` '|'# &&
+	   not (lookAhead# buf 2# `eqChar#` '|'#)
+		-> cont IToparenbar (addToCurrentPos buf 2#)
 	 | otherwise
 		-> cont IToparen (incCurrentPos buf)
 
@@ -572,12 +602,15 @@ lexToken cont exts buf =
 	         '}'#  | glaExtsEnabled exts -> cont ITccurlybar 
                                                      (addToCurrentPos buf 2#)
                  -- MetaHaskell extension 
-                 ']'#  |  glaExtsEnabled exts -> cont ITcloseQuote (addToCurrentPos buf 2#)
-                 other -> lex_sym cont (incCurrentPos buf)
+                 ']'#  | glaExtsEnabled exts -> cont ITcloseQuote (addToCurrentPos buf 2#)
+		 -- arrow notation extension
+	         ')'#  | arrowsEnabled exts -> cont ITcparenbar 
+                                                     (addToCurrentPos buf 2#)
+                 other -> lex_sym cont exts (incCurrentPos buf)
     ':'# -> case lookAhead# buf 1# of
 	         ']'#  | parrEnabled exts    -> cont ITcpabrack
                                                      (addToCurrentPos buf 2#)
-                 _                           -> lex_sym cont (incCurrentPos buf)
+                 _                           -> lex_sym cont exts (incCurrentPos buf)
 
                 
     '#'# -> case lookAhead# buf 1# of
@@ -585,8 +618,8 @@ lexToken cont exts buf =
 		     -> cont ITcubxparen (addToCurrentPos buf 2#)
 		'-'# -> case lookAhead# buf 2# of
 			   '}'# -> cont ITclose_prag (addToCurrentPos buf 3#)
-			   _    -> lex_sym cont (incCurrentPos buf)
-		_    -> lex_sym cont (incCurrentPos buf)
+			   _    -> lex_sym cont exts (incCurrentPos buf)
+		_    -> lex_sym cont exts (incCurrentPos buf)
 
     '`'# | glaExtsEnabled exts && lookAhead# buf 1# `eqChar#` '`'#
 		-> lex_cstring cont (addToCurrentPos buf 2#)
@@ -637,7 +670,7 @@ lexToken cont exts buf =
            ((lookAhead# buf 1#) `eqChar#` '('#) -> cont ITparenEscape (addToCurrentPos buf 2#)
           
     c | is_digit  c -> lex_num cont exts 0 buf
-      | is_symbol c -> lex_sym cont buf
+      | is_symbol c -> lex_sym cont exts buf
       | is_upper  c -> lex_con cont exts buf
       | is_lower  c -> lex_id  cont exts buf
       | otherwise   -> lexError "illegal character" buf
@@ -964,14 +997,16 @@ lex_id cont exts buf =
 
  }}}
 
-lex_sym cont buf =
+lex_sym cont exts buf =
  -- trace "lex_sym" $
  case expandWhile# is_symbol buf of
    buf' -> case lookupUFM haskellKeySymsFM lexeme of {
-	 	Just kwd_token -> --trace ("keysym: "++unpackFS lexeme) $
-				  cont kwd_token buf' ;
-	 	Nothing        -> --trace ("sym: "++unpackFS lexeme) $ 
-			  cont (mk_var_token lexeme) buf'
+	 	Just (kwd_token, Nothing) 
+			-> cont kwd_token buf' ;
+	 	Just (kwd_token, Just validExts) 
+			| validExts .&. toInt32 exts /= 0
+			-> cont kwd_token buf' ;
+	 	other   -> cont (mk_var_token lexeme) buf'
            }
    	where lexeme = lexemeToFastString buf'
 
@@ -1275,12 +1310,14 @@ glaExtsBit = 0
 ffiBit	   = 1
 parrBit	   = 2
 withBit	   = 3
+arrowsBit  = 4
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int# -> Bool
 glaExtsEnabled flags = testBit (toInt32 flags) glaExtsBit
 ffiEnabled     flags = testBit (toInt32 flags) ffiBit
 withEnabled    flags = testBit (toInt32 flags) withBit
 parrEnabled    flags = testBit (toInt32 flags) parrBit
+arrowsEnabled  flags = testBit (toInt32 flags) arrowsBit
 
 toInt32 :: Int# -> Int32
 toInt32 x# = fromIntegral (I# x#)
@@ -1293,7 +1330,8 @@ data ExtFlags = ExtFlags {
 		  glasgowExtsEF :: Bool,
 		  ffiEF		:: Bool,
 		  withEF	:: Bool,
-		  parrEF	:: Bool
+		  parrEF	:: Bool,
+		  arrowsEF	:: Bool
 		}
 
 -- create a parse state
@@ -1313,6 +1351,7 @@ mkPState loc exts  =
 					  || glasgowExtsEF exts)
 	       .|. withBit    `setBitIf` withEF		   exts
 	       .|. parrBit    `setBitIf` parrEF		   exts
+	       .|. arrowsBit  `setBitIf` arrowsEF	   exts
       --
       setBitIf :: Int -> Bool -> Int32
       b `setBitIf` cond | cond      = bit b

@@ -98,6 +98,7 @@ loadPackageConfig conf_filename = do
    let loc  = mkSrcLoc (mkFastString conf_filename) 1
        exts = ExtFlags {glasgowExtsEF = False,
 		        ffiEF	      = False,
+		        arrowsEF      = False,
 			withEF	      = False,
 			parrEF	      = False}
    case parse buf (mkPState loc exts) of

@@ -6,11 +6,11 @@
 \begin{code}
 module TcRnDriver (
 #ifdef GHCI
-	mkGlobalContext, getModuleContents,
+	mkGlobalContext, getModuleContents, tcRnStmt, tcRnThing, tcRnExpr,
 #endif
 	tcRnModule, checkOldIface, 
 	importSupportingDecls, tcTopSrcDecls,
-	tcRnIface, tcRnExtCore, tcRnStmt, tcRnExpr, tcRnThing
+	tcRnIface, tcRnExtCore
     ) where
 
 #include "HsVersions.h"
@@ -34,7 +34,7 @@ import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameStmt, RdrNameHsExpr,
 
 import PrelNames	( iNTERACTIVE, ioTyConName, printName,
 			  returnIOName, bindIOName, failIOName, thenIOName, runIOName, 
-			  dollarMainName, itName, mAIN_Name
+			  dollarMainName, itName, mAIN_Name, unsafeCoerceName
 			)
 import MkId		( unsafeCoerceId )
 import RdrName		( RdrName, getRdrName, mkRdrUnqual, 
@@ -47,14 +47,14 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedRuleDecl,
 			  zonkTopExpr, zonkTopBndrs
 			)
 
-import TcExpr 		( tcInferRho )
+import TcExpr 		( tcInferRho, tcCheckRho )
 import TcRnMonad
 import TcMType		( newTyVarTy, zonkTcType )
 import TcType		( Type, liftedTypeKind, 
 			  tyVarsOfType, tcFunResultTy, tidyTopType,
 			  mkForAllTys, mkFunTys, mkTyConApp, tcSplitForAllTys
 			)
-import TcMatches	( tcStmtsAndThen )
+import TcMatches	( tcStmtsAndThen, TcStmtCtxt(..) )
 import Inst		( showLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
@@ -260,6 +260,7 @@ hsCoreRules rules = [(id,rule) | IfaceRuleOut id rule <- rules]
 %************************************************************************
 
 \begin{code}
+#ifdef GHCI
 tcRnStmt :: HscEnv -> PersistentCompilerState
 	 -> InteractiveContext
 	 -> RdrNameStmt
@@ -381,33 +382,39 @@ tcUserStmt stmt = tc_stmts [stmt]
 
 ---------------------------
 tc_stmts stmts
- = do { io_ids <- mappM tcLookupId 
-			[returnIOName, failIOName, bindIOName, thenIOName] ;
-	ioTyCon <- tcLookupTyCon ioTyConName ;
-	res_ty  <- newTyVarTy liftedTypeKind ;
+ = do { ioTyCon <- tcLookupTyCon ioTyConName ;
 	let {
-	    names      = collectStmtsBinders stmts ;
-	    return_id  = head io_ids ;	-- Rather gruesome
+	    ret_ty = mkListTy unitTy ;
+	    names  = collectStmtsBinders stmts ;
 
-	    io_ty = (\ ty -> mkTyConApp ioTyCon [ty], res_ty) ;
+	    stmt_ctxt = SC { sc_what = DoExpr, 
+			     sc_rhs  = check_rhs,
+			     sc_body = check_body,
+			     sc_ty   = ret_ty } ;
 
-		-- mk_return builds the expression
-		--	returnIO @ [()] [coerce () x, ..,  coerce () z]
-	    mk_return ids = HsApp (TyApp (HsVar return_id) [mkListTy unitTy]) 
-			          (ExplicitList unitTy (map mk_item ids)) ;
+	    check_rhs rhs rhs_ty = tcCheckRho rhs  (mkTyConApp ioTyCon [rhs_ty]) ;
+	    check_body body      = tcCheckRho body (mkTyConApp ioTyCon [ret_ty]) ;
 
-	    mk_item id = HsApp (TyApp (HsVar unsafeCoerceId) [idType id, unitTy])
-		    	       (HsVar id) } ;
+		-- ret_expr is the expression
+		--	returnIO [coerce () x, ..,  coerce () z]
+	    ret_stmt = ResultStmt ret_expr noSrcLoc ;
+	    ret_expr = HsApp (HsVar returnIOName) 
+			     (ExplicitList placeHolderType (map mk_item names)) ;
+	    mk_item name = HsApp (HsVar unsafeCoerceName) (HsVar name) ;
+
+	    all_stmts = stmts ++ [ret_stmt]
+	 } ;
 
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "tcs 2") ;
 	((ids, tc_stmts), lie) <- 
-		getLIE $ tcStmtsAndThen combine DoExpr io_ty stmts $ 
+		getLIE 					$ 
+		tcStmtsAndThen combine stmt_ctxt stmts	$ 
 		do {
 		    -- Look up the names right in the middle,
 		    -- where they will all be in scope
 		    ids <- mappM tcLookupId names ;
-		    return (ids, [ResultStmt (mk_return ids) noSrcLoc])
+		    return (ids, [])
 		} ;
 
 	-- Simplify the context right here, so that we fail
@@ -420,9 +427,11 @@ tc_stmts stmts
 	const_binds <- tcSimplifyTop lie ;
 
 	-- Build result expression and zonk it
+	io_ids <- mappM mk_rebound
+			[returnIOName, failIOName, bindIOName, thenIOName] ;
 	let { expr = mkHsLet const_binds $
 		     HsDo DoExpr tc_stmts io_ids
-		 	  (mkTyConApp ioTyCon [mkListTy unitTy]) noSrcLoc } ;
+		 	  (mkTyConApp ioTyCon [ret_ty]) noSrcLoc } ;
 	zonked_expr <- zonkTopExpr expr ;
 	zonked_ids  <- zonkTopBndrs ids ;
 
@@ -430,6 +439,8 @@ tc_stmts stmts
 	}
   where
     combine stmt (ids, stmts) = (ids, stmt:stmts)
+    mk_rebound n = do { id <- tcLookupId n; return (n, HsVar id) }
+	-- A bit hackoid
 \end{code}
 
 
@@ -523,6 +534,7 @@ initRnInteractive ictxt rn_thing
   = initRn CmdLineMode $
     setLocalRdrEnv (ic_rn_local_env ictxt) $
     rn_thing
+#endif
 \end{code}
 
 %************************************************************************

@@ -6,7 +6,7 @@
 \begin{code}
 module DsMonad (
 	DsM,
-	initDs, returnDs, thenDs, mapDs, listDs,
+	initDs, returnDs, thenDs, mapDs, listDs, fixDs,
 	mapAndUnzipDs, zipWithDs, foldlDs,
 	uniqSMtoDsM,
 	newTyVarsDs, cloneTyVarsDs,
@@ -15,8 +15,9 @@ module DsMonad (
 	getSrcLocDs, putSrcLocDs,
 	getModuleDs,
 	getUniqueDs, getUniquesDs,
+	UniqSupply, getUniqSupplyDs,
 	getDOptsDs,
-	dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon,
+	dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon, dsLookupDataCon,
 
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
@@ -30,7 +31,9 @@ module DsMonad (
 import TcHsSyn		( TypecheckedPat, TypecheckedMatchContext, TypecheckedHsExpr )
 import HscTypes		( TyThing(..) )
 import Bag		( emptyBag, snocBag, Bag )
+import DataCon		( DataCon )
 import TyCon		( TyCon )
+import DataCon		( DataCon )
 import Id		( mkSysLocal, setIdUnique, Id )
 import Module		( Module )
 import Var		( TyVar, setTyVarUnique )
@@ -38,7 +41,7 @@ import Outputable
 import SrcLoc		( noSrcLoc, SrcLoc )
 import Type             ( Type )
 import UniqSupply	( initUs_, getUniqueUs, getUniquesUs, thenUs, returnUs, 
-			  UniqSM, UniqSupply )
+			  fixUs, UniqSM, UniqSupply, getUs )
 import Unique		( Unique ) 
 import Name		( Name, nameOccName )
 import NameEnv
@@ -113,6 +116,9 @@ thenDs (DsM m1) m2 = DsM( \ env warns ->
 returnDs :: a -> DsM a
 returnDs result = DsM (\ env warns -> returnUs (result, warns))
 
+fixDs :: (a -> DsM a) -> DsM a
+fixDs f = DsM (\env warns -> fixUs (\ ~(a, _warns') -> unDsM (f a) env warns))
+
 listDs :: [DsM a] -> DsM [a]
 listDs []     = returnDs []
 listDs (x:xs)
@@ -171,6 +177,11 @@ getUniqueDs = DsM (\ env warns ->
 getUniquesDs :: DsM [Unique]
 getUniquesDs = DsM(\ env warns -> 
     getUniquesUs		`thenUs` \ uniqs -> 
+    returnUs (uniqs, warns))
+
+getUniqSupplyDs :: DsM UniqSupply
+getUniqSupplyDs = DsM(\ env warns -> 
+    getUs		`thenUs` \ uniqs -> 
     returnUs (uniqs, warns))
 
 -- Make a new Id with the same print name, but different type, and new unique
@@ -238,18 +249,23 @@ dsLookupGlobal name
 dsLookupGlobalId :: Name -> DsM Id
 dsLookupGlobalId name 
   = dsLookupGlobal name		`thenDs` \ thing ->
-    returnDs (get_id name thing)
+    returnDs $ case thing of
+		AnId id -> id
+		other   -> pprPanic "dsLookupGlobalId" (ppr name)
 
 dsLookupTyCon :: Name -> DsM TyCon
 dsLookupTyCon name
   = dsLookupGlobal name		`thenDs` \ thing ->
-    returnDs (get_tycon name thing)
+    returnDs $ case thing of
+		 ATyCon tc -> tc
+		 other     -> pprPanic "dsLookupTyCon" (ppr name)
 
-get_id name (AnId id) = id
-get_id name other     = pprPanic "dsLookupGlobalId" (ppr name)
-
-get_tycon name (ATyCon tc) = tc
-get_tycon name other       = pprPanic "dsLookupTyCon" (ppr name)
+dsLookupDataCon :: Name -> DsM DataCon
+dsLookupDataCon name
+  = dsLookupGlobal name		`thenDs` \ thing ->
+    returnDs $ case thing of
+		 ADataCon dc -> dc
+		 other       -> pprPanic "dsLookupDataCon" (ppr name)
 \end{code}
 
 \begin{code}

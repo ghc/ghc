@@ -30,8 +30,11 @@ module TcRnTypes(
 	TcTyThing(..),
 
 	-- Template Haskell
-	Stage(..), topStage, topSpliceStage,
-	Level, impLevel, topLevel,
+	ThStage(..), topStage, topSpliceStage,
+	ThLevel, impLevel, topLevel,
+
+	-- Arrows
+	ArrowCtxt(..), topArrowCtxt, ProcLevel, topProcLevel, 
 
 	-- Insts
 	Inst(..), InstOrigin(..), InstLoc(..), pprInstLoc, instLocSrcLoc,
@@ -389,7 +392,8 @@ data TcLclEnv
   = TcLclEnv {
 	tcl_ctxt :: ErrCtxt,	-- Error context
 
-	tcl_level  :: Stage,		-- Template Haskell context
+	tcl_th_ctxt    :: ThStage,	-- Template Haskell context
+	tcl_arrow_ctxt :: ArrowCtxt,	-- Arrow-notation context
 
 	tcl_env    :: NameEnv TcTyThing,  -- The local type environment: Ids and TyVars
 					  -- defined in this module
@@ -403,20 +407,24 @@ data TcLclEnv
 	tcl_lie :: TcRef LIE		-- Place to accumulate type constraints
     }
 
-type Level = Int
+---------------------------
+-- Template Haskell levels 
+---------------------------
 
-data Stage
+type ThLevel = Int	-- Always >= 0
+
+data ThStage
   = Comp   				-- Ordinary compiling, at level topLevel
-  | Splice Level 			-- Inside a splice
-  | Brack  Level 			-- Inside brackets; 
+  | Splice ThLevel 			-- Inside a splice
+  | Brack  ThLevel 			-- Inside brackets; 
 	   (TcRef [PendingSplice])	--   accumulate pending splices here
 	   (TcRef LIE)			--   and type constraints here
-topStage, topSpliceStage :: Stage
+topStage, topSpliceStage :: ThStage
 topStage       = Comp
 topSpliceStage = Splice (topLevel - 1)	-- Stage for the body of a top-level splice
 
 
-impLevel, topLevel :: Level
+impLevel, topLevel :: ThLevel
 topLevel = 1	-- Things defined at top level of this module
 impLevel = 0	-- Imported things; they can be used inside a top level splice
 --
@@ -425,11 +433,50 @@ impLevel = 0	-- Imported things; they can be used inside a top level splice
 --	g1 = $(map ...)		is OK
 --	g2 = $(f ...)		is not OK; because we havn't compiled f yet
 
+
+---------------------------
+-- Arrow-notation stages
+---------------------------
+
+-- In arrow notation, a variable bound by a proc (or enclosed let/kappa)
+-- is not in scope to the left of an arrow tail (-<).  For example
+--
+--	proc x -> (e1 -< e2)
+--
+-- Here, x is not in scope in e1, but it is in scope in e2.  This can get 
+-- a bit complicated:
+--
+--	let x = 3 in
+--	prox y -> (proc z -> e1) -< e2
+--
+-- Here, x and z are in scope in e1, but y is not.  Here's how we track this:
+--	a) Assign an "proc level" to each proc, being the number of
+--	   lexically-enclosing procs + 1.  
+--	b) Assign to each local variable the proc-level of its lexically
+--	   enclosing proc.
+--	c) Keep a list of out-of-scope procs.  When moving to the left of
+--	   an arrow-tail, add the proc-level of the immediately enclosing
+--	   proc to the list.
+--	d) When looking up a variable, complain if its proc-level is in
+--	   the banned list
+
+type ProcLevel = Int	-- Always >= 0
+topProcLevel = 0	-- Not inside any proc
+
+data ArrowCtxt = ArrCtxt { proc_level :: ProcLevel, 	-- Current level
+			   proc_banned :: [ProcLevel] }	-- Out of scope proc-levels
+
+topArrowCtxt = ArrCtxt { proc_level = topProcLevel, proc_banned = [] }
+
+---------------------------
+-- TcTyThing
+---------------------------
+
 data TcTyThing
-  = AGlobal TyThing		-- Used only in the return type of a lookup
-  | ATcId   TcId Level 		-- Ids defined in this module; may not be fully zonked
-  | ATyVar  TyVar 		-- Type variables
-  | AThing  TcKind		-- Used temporarily, during kind checking
+  = AGlobal TyThing			-- Used only in the return type of a lookup
+  | ATcId   TcId ThLevel ProcLevel 	-- Ids defined in this module; may not be fully zonked
+  | ATyVar  TyVar 			-- Type variables
+  | AThing  TcKind			-- Used temporarily, during kind checking
 -- Here's an example of how the AThing guy is used
 -- Suppose we are checking (forall a. T a Int):
 --	1. We first bind (a -> AThink kv), where kv is a kind variable. 
@@ -438,10 +485,10 @@ data TcTyThing
 --	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
 
 instance Outputable TcTyThing where	-- Debugging only
-   ppr (AGlobal g) = text "AGlobal" <+> ppr g
-   ppr (ATcId g l) = text "ATcId" <+> ppr g <+> ppr l
-   ppr (ATyVar t)  = text "ATyVar" <+> ppr t
-   ppr (AThing k)  = text "AThing" <+> ppr k
+   ppr (AGlobal g)     = text "AGlobal" <+> ppr g
+   ppr (ATcId g tl pl) = text "ATcId" <+> ppr g <+> ppr tl <+> ppr pl
+   ppr (ATyVar t)      = text "ATyVar" <+> ppr t
+   ppr (AThing k)      = text "AThing" <+> ppr k
 \end{code}
 
 \begin{code}
@@ -849,6 +896,7 @@ data InstOrigin
 				-- of a rank-2 typed function
 
   | DoOrigin			-- The monad for a do expression
+  | ProcOrigin			-- A proc expression
 
   | ClassDeclOrigin		-- Manufactured during a class decl
 
@@ -907,6 +955,8 @@ pprInstLoc (InstLoc orig locn ctxt)
 	=  ptext SLIT("a function with an overloaded argument type")
     pp_orig (DoOrigin)
 	=  ptext SLIT("a do statement")
+    pp_orig (ProcOrigin)
+	=  ptext SLIT("a proc expression")
     pp_orig (ClassDeclOrigin)
 	=  ptext SLIT("a class declaration")
     pp_orig (InstanceSpecOrigin clas ty)

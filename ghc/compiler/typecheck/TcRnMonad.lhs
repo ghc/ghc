@@ -150,11 +150,12 @@ initTc  (HscEnv { hsc_mode   = ghci_mode,
 		tcg_fords    = [] } ;
 
 	     lcl_env = TcLclEnv {
-		tcl_ctxt   = [],
-		tcl_level  = topStage,
-		tcl_env    = emptyNameEnv,
-		tcl_tyvars = tvs_var,
-		tcl_lie	   = panic "initTc:LIE" } ;
+		tcl_ctxt       = [],
+		tcl_th_ctxt    = topStage,
+		tcl_arrow_ctxt = topArrowCtxt,
+		tcl_env        = emptyNameEnv,
+		tcl_tyvars     = tvs_var,
+		tcl_lie	       = panic "initTc:LIE" } ;
 			-- LIE only valid inside a getLIE
 	     } ;
    
@@ -253,6 +254,7 @@ getEnvs = do { env <- getEnv; return (env_gbl env, env_lcl env) }
 setEnvs :: (TcGblEnv, m) -> TcRn m a -> TcRn m a
 setEnvs (gbl_env, lcl_env) = updEnv (\ env -> env { env_gbl = gbl_env, env_lcl = lcl_env })
 \end{code}
+
 
 Command-line flags
 
@@ -683,7 +685,7 @@ ctxt_to_use ctxt | opt_PprStyle_Debug = ctxt
 
 %************************************************************************
 %*									*
-	     Other stuff specific to type checker
+	     Type constraints (the so-called LIE)
 %*									*
 %************************************************************************
 
@@ -718,14 +720,7 @@ extendLIEs insts
 	 writeMutVar lie_var (mkLIE insts `plusLIE` lie) }
 \end{code}
 
-
 \begin{code}
-getStage :: TcM Stage
-getStage = do { env <- getLclEnv; return (tcl_level env) }
-
-setStage :: Stage -> TcM a -> TcM a 
-setStage s = updLclEnv (\ env -> env { tcl_level = s })
-
 setLclTypeEnv :: TcLclEnv -> TcM a -> TcM a
 -- Set the local type envt, but do *not* disturb other fields,
 -- notably the lie_var
@@ -734,6 +729,47 @@ setLclTypeEnv lcl_env thing_inside
   where
     upd env = env { tcl_env = tcl_env lcl_env,
 		    tcl_tyvars = tcl_tyvars lcl_env }
+\end{code}
+
+
+%************************************************************************
+%*									*
+	     Template Haskell context
+%*									*
+%************************************************************************
+
+\begin{code}
+getStage :: TcM ThStage
+getStage = do { env <- getLclEnv; return (tcl_th_ctxt env) }
+
+setStage :: ThStage -> TcM a -> TcM a 
+setStage s = updLclEnv (\ env -> env { tcl_th_ctxt = s })
+\end{code}
+
+
+%************************************************************************
+%*									*
+	     Arrow context
+%*									*
+%************************************************************************
+
+\begin{code}
+popArrowBinders :: TcM a -> TcM a	-- Move to the left of a (-<); see comments in TcRnTypes
+popArrowBinders 
+  = updLclEnv (\ env -> env { tcl_arrow_ctxt = pop (tcl_arrow_ctxt env)  })
+  where
+    pop (ArrCtxt {proc_level = curr_lvl, proc_banned = banned})
+	= ASSERT( not (curr_lvl `elem` banned) )
+	  ArrCtxt {proc_level = curr_lvl, proc_banned = curr_lvl : banned}
+
+getBannedProcLevels :: TcM [ProcLevel]
+  = do { env <- getLclEnv; return (proc_banned (tcl_arrow_ctxt env)) }
+
+incProcLevel :: TcM a -> TcM a
+incProcLevel 
+  = updLclEnv (\ env -> env { tcl_arrow_ctxt = inc (tcl_arrow_ctxt env) })
+  where
+    inc ctxt = ctxt { proc_level = proc_level ctxt + 1 }
 \end{code}
 
 

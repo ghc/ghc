@@ -67,8 +67,8 @@ dsListComp quals elt_ty
     returnDs (Var build_id `App` Type elt_ty 
 			   `App` mkLams [n_tyvar, c, n] result)
 
-  where isParallelComp (ParStmtOut bndrstmtss : _) = True
-	isParallelComp _                           = False
+  where isParallelComp (ParStmt bndrstmtss : _) = True
+	isParallelComp _                        = False
 \end{code}
 
 %************************************************************************
@@ -125,7 +125,7 @@ comprehensions.  The translation goes roughly as follows:
 where (x1, .., xn) are the variables bound in p1, v1, p2
       (y1, .., ym) are the variables bound in q1, v2, q2
 
-In the translation below, the ParStmtOut branch translates each parallel branch
+In the translation below, the ParStmt branch translates each parallel branch
 into a sub-comprehension, and desugars each independently.  The resulting lists
 are fed to a zip function, we create a binding for all the variables bound in all
 the comprehensions, and then we hand things off the the desugarer for bindings.
@@ -139,22 +139,25 @@ with the Unboxed variety.
 
 deListComp :: [TypecheckedStmt] -> CoreExpr -> DsM CoreExpr
 
-deListComp (ParStmtOut bndrstmtss : quals) list
-  = mapDs do_list_comp bndrstmtss	`thenDs` \ exps ->
+deListComp (ParStmt stmtss_w_bndrs : quals) list
+  = mapDs do_list_comp stmtss_w_bndrs	`thenDs` \ exps ->
     mkZipBind qual_tys			`thenDs` \ (zip_fn, zip_rhs) ->
 
 	-- Deal with [e | pat <- zip l1 .. ln] in example above
     deBindComp pat (Let (Rec [(zip_fn, zip_rhs)]) (mkApps (Var zip_fn) exps)) 
 		   quals list
 
-  where -- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
-	pat	       = TuplePat pats Boxed
-	pats	       = map (\(bs,_) -> mk_hs_tuple_pat bs) bndrstmtss
+  where 
+	bndrs_s = map snd stmtss_w_bndrs
+
+	-- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
+	pat	 = TuplePat pats Boxed
+	pats	 = map mk_hs_tuple_pat bndrs_s
 
 	-- Types of (x1,..,xn), (y1,..,yn) etc
-	qual_tys = [ mk_bndrs_tys bndrs | (bndrs,_) <- bndrstmtss ]
+	qual_tys = map mk_bndrs_tys bndrs_s
 
-	do_list_comp (bndrs, stmts)
+	do_list_comp (stmts, bndrs)
 	  = dsListComp (stmts ++ [ResultStmt (mk_hs_tuple_expr bndrs) noSrcLoc])
 		       (mk_bndrs_tys bndrs)
 
@@ -428,8 +431,8 @@ dePArrComp (LetStmt ds : qs) pa cea =
 --    where
 --      {x_1, ..., x_n} = DV (qs)
 --
-dePArrComp (ParStmtOut []             : qss2) pa cea = dePArrComp qss2 pa cea
-dePArrComp (ParStmtOut ((xs, qs):qss) : qss2) pa cea =
+dePArrComp (ParStmt []             : qss2) pa cea = dePArrComp qss2 pa cea
+dePArrComp (ParStmt ((qs, xs):qss) : qss2) pa cea =
   dsLookupGlobalId zipPName				  `thenDs` \zipP    ->
   let pa'     = TuplePat [pa, TuplePat (map VarPat xs) Boxed] Boxed
       ty'cea  = parrElemType cea
@@ -439,7 +442,7 @@ dePArrComp (ParStmtOut ((xs, qs):qss) : qss2) pa cea =
   let ty'cqs = parrElemType cqs
       cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]
   in
-  dePArrComp (ParStmtOut qss : qss2) pa' cea'
+  dePArrComp (ParStmt qss : qss2) pa' cea'
 
 -- generate Core corresponding to `\p -> e'
 --

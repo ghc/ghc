@@ -767,6 +767,6 @@ wrongThingErr expected thing name
     pp_thing (AGlobal (AnId   _))   = ptext SLIT("Identifier")
     pp_thing (AGlobal (ADataCon _)) = ptext SLIT("Data constructor")
     pp_thing (ATyVar _) 	  = ptext SLIT("Type variable")
-    pp_thing (ATcId _ _)  	  = ptext SLIT("Local identifier")
+    pp_thing (ATcId _ _ _)  	  = ptext SLIT("Local identifier")
     pp_thing (AThing _) 	  = ptext SLIT("Utterly bogus")
 \end{code}

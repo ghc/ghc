@@ -175,6 +175,10 @@ basicKnownKeyNames
 	-- MonadRec stuff
 	mfixName,
 
+	-- Arrow stuff
+	arrAName, composeAName, firstAName,
+	appAName, choiceAName, loopAName,
+
 	-- Ix stuff
 	ixClassName, 
 
@@ -215,6 +219,9 @@ basicKnownKeyNames
 	-- Booleans
 	andName, orName
 	
+	-- The Either type
+	, eitherTyConName, leftDataConName, rightDataConName
+
 	-- dotnet interop
 	, objectTyConName, marshalObjectName, unmarshalObjectName
 	, marshalStringName, unmarshalStringName, checkDotnetResName
@@ -244,6 +251,7 @@ pREL_NUM_Name     = mkModuleName "GHC.Num"
 pREL_LIST_Name    = mkModuleName "GHC.List"
 pREL_PARR_Name    = mkModuleName "GHC.PArr"
 pREL_TUP_Name     = mkModuleName "Data.Tuple"
+pREL_EITHER_Name  = mkModuleName "Data.Either"
 pREL_PACK_Name    = mkModuleName "GHC.Pack"
 pREL_CONC_Name    = mkModuleName "GHC.Conc"
 pREL_IO_BASE_Name = mkModuleName "GHC.IOBase"
@@ -270,6 +278,7 @@ mAIN_Name	  = mkModuleName "Main"
 pREL_INT_Name	  = mkModuleName "GHC.Int"
 pREL_WORD_Name	  = mkModuleName "GHC.Word"
 mONAD_FIX_Name	  = mkModuleName "Control.Monad.Fix"
+aRROW_Name	  = mkModuleName "Control.Arrow"
 aDDR_Name	  = mkModuleName "Addr"
 
 gLA_EXTS_Name   = mkModuleName "GHC.Exts"
@@ -357,6 +366,9 @@ failM_RDR 		= nameRdrName failMName
 false_RDR		= nameRdrName falseDataConName
 true_RDR		= nameRdrName trueDataConName
 and_RDR			= nameRdrName andName
+
+left_RDR		= nameRdrName leftDataConName
+right_RDR		= nameRdrName rightDataConName
 
 error_RDR		= nameRdrName errorName
 
@@ -520,6 +532,10 @@ nilDataConName 	  = wDataQual pREL_BASE_Name FSLIT("[]") nilDataConKey
 consDataConName	  = wDataQual pREL_BASE_Name FSLIT(":") consDataConKey
 eqName		  = varQual  pREL_BASE_Name FSLIT("==") eqClassOpKey
 geName		  = varQual  pREL_BASE_Name FSLIT(">=") geClassOpKey
+
+eitherTyConName	  = tcQual   pREL_EITHER_Name FSLIT("Either") eitherTyConKey
+leftDataConName   = dataQual pREL_EITHER_Name FSLIT("Left")   leftDataConKey
+rightDataConName  = dataQual pREL_EITHER_Name FSLIT("Right")  rightDataConKey
 
 -- Generics
 crossTyConName     = tcQual   pREL_BASE_Name FSLIT(":*:") crossTyConKey
@@ -699,6 +715,14 @@ splitName          = varQual gLA_EXTS_Name FSLIT("split") splitIdKey
 -- Recursive-do notation
 mfixName	   = varQual mONAD_FIX_Name FSLIT("mfix") mfixIdKey
 
+-- Arrow notation
+arrAName	   = varQual aRROW_Name FSLIT("arr")	arrAIdKey
+composeAName	   = varQual aRROW_Name FSLIT(">>>")	composeAIdKey
+firstAName	   = varQual aRROW_Name FSLIT("first")	firstAIdKey
+appAName	   = varQual aRROW_Name FSLIT("app")	appAIdKey
+choiceAName	   = varQual aRROW_Name FSLIT("|||")	choiceAIdKey
+loopAName	   = varQual aRROW_Name FSLIT("loop")	loopAIdKey
+
 -- dotnet interop
 objectTyConName	    = wTcQual  dOTNET_Name FSLIT("Object") objectTyConKey
 unmarshalObjectName = varQual  dOTNET_Name FSLIT("unmarshalObject") unmarshalObjectIdKey
@@ -851,6 +875,8 @@ parrTyConKey				= mkPreludeTyConUnique 82
 -- dotnet interop
 objectTyConKey				= mkPreludeTyConUnique 83
 
+eitherTyConKey				= mkPreludeTyConUnique 84
+
 ---------------- Template Haskell -------------------
 --	USES TyConUniques 100-119
 -----------------------------------------------------
@@ -888,6 +914,9 @@ genUnitDataConKey			= mkPreludeDataConUnique 23
 
 -- Data constructor for parallel arrays
 parrDataConKey				= mkPreludeDataConUnique 24
+
+leftDataConKey				= mkPreludeDataConUnique 25
+rightDataConKey				= mkPreludeDataConUnique 26
 \end{code}
 
 %************************************************************************
@@ -1008,6 +1037,14 @@ returnMClassOpKey	      = mkPreludeMiscIdUnique 117
 
 -- Recursive do notation
 mfixIdKey	= mkPreludeMiscIdUnique 118
+
+-- Arrow notation
+arrAIdKey	= mkPreludeMiscIdUnique 119
+composeAIdKey	= mkPreludeMiscIdUnique 120 -- >>>
+firstAIdKey	= mkPreludeMiscIdUnique 121
+appAIdKey	= mkPreludeMiscIdUnique 122
+choiceAIdKey	= mkPreludeMiscIdUnique 123 -- |||
+loopAIdKey	= mkPreludeMiscIdUnique 124
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-299

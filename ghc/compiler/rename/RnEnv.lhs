@@ -648,21 +648,34 @@ checks the type of the user thing against the type of the standard thing.
 lookupSyntaxName :: Name 			-- The standard name
 	         -> RnM (Name, FreeVars)	-- Possibly a non-standard name
 lookupSyntaxName std_name
-  = getModeRn				`thenM` \ mode ->
-    if isInterfaceMode mode then
-	returnM (std_name, unitFV std_name)
-				-- Happens for 'derived' code
-				-- where we don't want to rebind
+  = doptM Opt_NoImplicitPrelude		`thenM` \ no_prelude -> 
+    if not no_prelude then normal_case
     else
-
-    doptM Opt_NoImplicitPrelude		`thenM` \ no_prelude -> 
-    if not no_prelude then
-	returnM (std_name, unitFV std_name)	-- Normal case
-
+    getModeRn				`thenM` \ mode ->
+    if isInterfaceMode mode then normal_case
+	-- Happens for 'derived' code where we don't want to rebind
     else
 	-- Get the similarly named thing from the local environment
     lookupOccRn (mkRdrUnqual (nameOccName std_name)) `thenM` \ usr_name ->
     returnM (usr_name, mkFVs [usr_name, std_name])
+  where
+    normal_case = returnM (std_name, unitFV std_name)
+
+lookupSyntaxNames :: [Name]				-- Standard names
+		  -> RnM (ReboundNames Name, FreeVars)	-- See comments with HsExpr.ReboundNames
+lookupSyntaxNames std_names
+  = doptM Opt_NoImplicitPrelude		`thenM` \ no_prelude -> 
+    if not no_prelude then normal_case 
+    else
+    getModeRn				`thenM` \ mode ->
+    if isInterfaceMode mode then normal_case
+    else
+    	-- Get the similarly named thing from the local environment
+    mappM (lookupOccRn . mkRdrUnqual . nameOccName) std_names 	`thenM` \ usr_names ->
+
+    returnM (std_names `zip` map HsVar usr_names, mkFVs std_names `plusFV` mkFVs usr_names)
+  where
+    normal_case = returnM (std_names `zip` map HsVar std_names, mkFVs std_names)
 \end{code}
 
 

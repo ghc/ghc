@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.116 2003/06/23 10:35:17 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.117 2003/06/24 07:58:20 simonpj Exp $
 --
 -- Driver flags
 --
@@ -455,6 +455,7 @@ fFlags = [
   ( "fi",				Opt_FFI ),  -- support `-ffi'...
   ( "ffi",				Opt_FFI ),  -- ...and also `-fffi'
   ( "with",				Opt_With ), -- with keyword
+  ( "arrows",				Opt_Arrows ), -- arrow syntax
   ( "parr",				Opt_PArr ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),

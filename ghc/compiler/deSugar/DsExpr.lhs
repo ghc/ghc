@@ -15,7 +15,10 @@ import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsGRHSs		( dsGuarded )
 import DsCCall		( dsCCall )
 import DsListComp	( dsListComp, dsPArrComp )
-import DsUtils		( mkErrorAppDs, mkStringLit, mkConsExpr, mkNilExpr, mkCoreTupTy, selectMatchVar )
+import DsUtils		( mkErrorAppDs, mkStringLit, mkConsExpr, mkNilExpr,
+			  mkCoreTupTy, selectMatchVar,
+			  dsReboundNames, lookupReboundName )
+import DsArrows		( dsProcExpr )
 import DsMonad
 
 #ifdef GHCI
@@ -26,6 +29,7 @@ import DsMeta		( dsBracket, dsReify )
 import HsSyn		( HsExpr(..), Pat(..), ArithSeqInfo(..),
 			  Stmt(..), HsMatchContext(..), HsStmtContext(..), 
 			  Match(..), HsBinds(..), MonoBinds(..), HsConDetails(..),
+			  ReboundNames,
 			  mkSimpleMatch, isDoExpr
 			)
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds, TypecheckedStmt, hsPatType )
@@ -52,7 +56,9 @@ import Name		( Name )
 import TyCon		( tyConDataCons )
 import TysWiredIn	( tupleCon, mkTupleTy )
 import BasicTypes	( RecFlag(..), Boxity(..), ipNameName )
-import PrelNames	( toPName )
+import PrelNames	( toPName,
+			  returnMName, bindMName, thenMName, failMName,
+			  mfixName )
 import SrcLoc		( noSrcLoc )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
@@ -559,6 +565,8 @@ dsExpr (HsReify r)	   = dsReify r
 dsExpr (HsSplice n e _)    = pprPanic "dsExpr:splice" (ppr e)
 #endif
 
+-- Arrow notation extension
+dsExpr (HsProc pat cmd src_loc) = dsProcExpr pat cmd src_loc
 \end{code}
 
 
@@ -580,13 +588,18 @@ Basically does the translation given in the Haskell~1.3 report:
 \begin{code}
 dsDo	:: HsStmtContext Name
 	-> [TypecheckedStmt]
-	-> [Id]		-- id for: [return,fail,>>=,>>] and possibly mfixName
-	-> Type		-- Element type; the whole expression has type (m t)
+	-> ReboundNames Id	-- id for: [return,fail,>>=,>>] and possibly mfixName
+	-> Type			-- Element type; the whole expression has type (m t)
 	-> DsM CoreExpr
 
 dsDo do_or_lc stmts ids result_ty
-  = let
-  	(return_id : fail_id : bind_id : then_id : _) = ids
+  = dsReboundNames ids		`thenDs` \ (meth_binds, ds_meths) ->
+    let
+  	return_id = lookupReboundName ds_meths returnMName
+	fail_id   = lookupReboundName ds_meths failMName
+	bind_id   = lookupReboundName ds_meths bindMName
+	then_id   = lookupReboundName ds_meths thenMName
+
 	(m_ty, b_ty) = tcSplitAppTy result_ty	-- result_ty must be of the form (m b)
 	is_do	     = isDoExpr do_or_lc 	-- True for both MDo and Do
 	
@@ -598,13 +611,13 @@ dsDo do_or_lc stmts ids result_ty
 	go [ResultStmt expr locn]
 	  | is_do     = do_expr expr locn
 	  | otherwise = do_expr expr locn	`thenDs` \ expr2 ->
-			returnDs (mkApps (Var return_id) [Type b_ty, expr2])
+			returnDs (mkApps return_id [Type b_ty, expr2])
 
 	go (ExprStmt expr a_ty locn : stmts)
 	  | is_do	-- Do expression
 	  = do_expr expr locn		`thenDs` \ expr2 ->
 	    go stmts     		`thenDs` \ rest  ->
-	    returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2, rest])
+	    returnDs (mkApps then_id [Type a_ty, Type b_ty, expr2, rest])
 
 	   | otherwise	-- List comprehension
 	  = do_expr expr locn			`thenDs` \ expr2 ->
@@ -614,7 +627,7 @@ dsDo do_or_lc stmts ids result_ty
 	    in
 	    mkStringLit msg			`thenDs` \ core_msg ->
 	    returnDs (mkIfThenElse expr2 rest 
-				   (App (App (Var fail_id) (Type b_ty)) core_msg))
+				   (App (App fail_id (Type b_ty)) core_msg))
     
 	go (LetStmt binds : stmts )
 	  = go stmts 		`thenDs` \ rest   ->
@@ -628,21 +641,22 @@ dsDo do_or_lc stmts ids result_ty
 	    let
 		-- In a do expression, pattern-match failure just calls
 		-- the monadic 'fail' rather than throwing an exception
-		fail_expr  = mkApps (Var fail_id) [Type b_ty, core_msg]
+		fail_expr  = mkApps fail_id [Type b_ty, core_msg]
 		a_ty       = hsPatType pat
 	    in
 	    selectMatchVar pat		 	 		`thenDs` \ var ->
     	    matchSimply (Var var) (StmtCtxt do_or_lc) pat
 			body fail_expr				`thenDs` \ match_code ->
-	    returnDs (mkApps (Var bind_id) [Type a_ty, Type b_ty, rhs, Lam var match_code])
+	    returnDs (mkApps bind_id [Type a_ty, Type b_ty, rhs, Lam var match_code])
 
-	go (RecStmt rec_vars rec_stmts rec_rets : stmts)
+	go (RecStmt rec_stmts later_vars rec_vars rec_rets : stmts)
 	  = go (bind_stmt : stmts)
 	  where
-	    bind_stmt = dsRecStmt m_ty ids rec_vars rec_stmts rec_rets
+	    bind_stmt = dsRecStmt m_ty ds_meths rec_stmts later_vars rec_vars rec_rets
 	    
     in
-    go stmts
+    go stmts				`thenDs` \ stmts_code ->
+    returnDs (foldr Let stmts_code meth_binds)
 
   where
     do_expr expr locn = putSrcLocDs locn (dsExpr expr)
@@ -658,16 +672,17 @@ We turn (RecStmt [v1,..vn] stmts) into:
 
 \begin{code}
 dsRecStmt :: Type		-- Monad type constructor :: * -> *
-	  -> [Id]		-- Ids for: [return,fail,>>=,>>,mfix]
-	  -> [Id] -> [TypecheckedStmt]	-> [TypecheckedHsExpr] 	-- Guts of the RecStmt
+	  -> [(Name,Id)]	-- Rebound Ids
+	  -> [TypecheckedStmt]
+  	  -> [Id] -> [Id] -> [TypecheckedHsExpr]
 	  -> TypecheckedStmt
-dsRecStmt m_ty ids@[return_id, _, _, _, mfix_id] vars stmts rets
+dsRecStmt m_ty ds_meths stmts later_vars rec_vars rec_rets
   = ASSERT( length vars == length rets )
     BindStmt tup_pat mfix_app noSrcLoc
   where 
-	(var1:rest) = vars		-- Always at least one
-	(ret1:_)    = rets
-	one_var     = null rest
+	vars@(var1:rest) = later_vars           ++ rec_vars		-- Always at least one
+	rets@(ret1:_)    = map HsVar later_vars ++ rec_rets
+	one_var          = null rest
 
 	mfix_app = HsApp (TyApp (HsVar mfix_id) [tup_ty]) mfix_arg
 	mfix_arg = HsLam (mkSimpleMatch [tup_pat] body tup_ty noSrcLoc)
@@ -680,9 +695,12 @@ dsRecStmt m_ty ids@[return_id, _, _, _, mfix_id] vars stmts rets
 		 | otherwise = LazyPat (TuplePat (map VarPat vars) Boxed)
 
 	body = HsDo DoExpr (stmts ++ [return_stmt]) 
-			   ids	-- Don't need the mfix, but it does no harm
+			   [(n, HsVar id) | (n,id) <- ds_meths]	-- A bit of a hack
 			   (mkAppTy m_ty tup_ty)
 			   noSrcLoc
+
+  	Var return_id = lookupReboundName ds_meths returnMName
+	Var mfix_id   = lookupReboundName ds_meths mfixName
 
 	return_stmt = ResultStmt return_app noSrcLoc
 	return_app  = HsApp (TyApp (HsVar return_id) [tup_ty]) tup_expr

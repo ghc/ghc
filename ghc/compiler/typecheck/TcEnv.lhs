@@ -21,7 +21,7 @@ module TcEnv(
 	tcExtendTyVarEnv,    tcExtendTyVarEnv2, 
 	tcExtendLocalValEnv, tcExtendLocalValEnv2, 
 	tcLookup, tcLookupLocalIds, tcLookup_maybe, 
-	tcLookupId, tcLookupIdLvl, 
+	tcLookupId, 
 	lclEnvElts, getInLocalScope, findGlobals, 
 
 	-- Instance environment
@@ -34,8 +34,11 @@ module TcEnv(
 	tcGetGlobalTyVars,
 
 	-- Template Haskell stuff
-	checkWellStaged, spliceOK, bracketOK, tcMetaTy, metaLevel, 
+	checkWellStaged, spliceOK, bracketOK, tcMetaTy, thLevel, 
 	topIdLvl, 
+
+	-- Arrow stuff
+	checkProcLevel,
 
 	-- New Ids
 	newLocalName, newDFunName,
@@ -85,26 +88,45 @@ import List		( partition )
 
 %************************************************************************
 %*									*
+		Arrow notation proc levels
+%*									*
+%************************************************************************
+
+\begin{code}
+checkProcLevel :: TcId -> ProcLevel -> TcM ()
+checkProcLevel id id_lvl
+  = do	{ banned <- getBannedProcLevels
+	; checkTc (not (id_lvl `elem` banned))
+		  (procLevelErr id id_lvl) }
+
+procLevelErr id id_lvl
+  = hang (ptext SLIT("Command-bound variable") <+> quotes (ppr id) <+> ptext SLIT("is not in scope here"))
+	 4 (ptext SLIT("Reason: it is used in the left argument of (-<)"))
+\end{code}
+		
+
+%************************************************************************
+%*									*
 		Meta level
 %*									*
 %************************************************************************
 
 \begin{code}
-instance Outputable Stage where
+instance Outputable ThStage where
    ppr Comp	     = text "Comp"
    ppr (Brack l _ _) = text "Brack" <+> int l
    ppr (Splice l)    = text "Splice" <+> int l
 
 
-metaLevel :: Stage -> Level
-metaLevel Comp	        = topLevel
-metaLevel (Splice l)    = l
-metaLevel (Brack l _ _) = l
+thLevel :: ThStage -> ThLevel
+thLevel Comp	      = topLevel
+thLevel (Splice l)    = l
+thLevel (Brack l _ _) = l
 
 
 checkWellStaged :: SDoc		-- What the stage check is for
-		-> Level 	-- Binding level
-	        -> Stage	-- Use stage
+		-> ThLevel 	-- Binding level
+	        -> ThStage	-- Use stage
 		-> TcM ()	-- Fail if badly staged, adding an error
 checkWellStaged pp_thing bind_lvl use_stage
   | bind_lvl <= use_lvl 	-- OK!
@@ -121,10 +143,10 @@ checkWellStaged pp_thing bind_lvl use_stage
 	hsep   [ptext SLIT("is bound at stage") <+> ppr bind_lvl,
 		ptext SLIT("but used at stage") <+> ppr use_lvl]
   where
-    use_lvl = metaLevel use_stage
+    use_lvl = thLevel use_stage
 
 
-topIdLvl :: Id -> Level
+topIdLvl :: Id -> ThLevel
 -- Globals may either be imported, or may be from an earlier "chunk" 
 -- (separated by declaration splices) of this module.  The former
 -- *can* be used inside a top-level splice, but the latter cannot.
@@ -138,14 +160,14 @@ topIdLvl id | isLocalId id = topLevel
 	    | otherwise    = impLevel
 
 -- Indicates the legal transitions on bracket( [| |] ).
-bracketOK :: Stage -> Maybe Level
+bracketOK :: ThStage -> Maybe ThLevel
 bracketOK (Brack _ _ _) = Nothing	-- Bracket illegal inside a bracket
-bracketOK stage         = (Just (metaLevel stage + 1))
+bracketOK stage         = (Just (thLevel stage + 1))
 
 -- Indicates the legal transitions on splice($).
-spliceOK :: Stage -> Maybe Level
+spliceOK :: ThStage -> Maybe ThLevel
 spliceOK (Splice _) = Nothing	-- Splice illegal inside splice
-spliceOK stage      = Just (metaLevel stage - 1)
+spliceOK stage      = Just (thLevel stage - 1)
 
 tcMetaTy :: Name -> TcM Type
 -- Given the name of a Template Haskell data type, 
@@ -354,30 +376,21 @@ tcLookupId :: Name -> TcM Id
 tcLookupId name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
-	ATcId tc_id lvl	  -> returnM tc_id
+	ATcId tc_id _ _	  -> returnM tc_id
 	AGlobal (AnId id) -> returnM id
 	other		  -> pprPanic "tcLookupId" (ppr name)
-
-tcLookupIdLvl :: Name -> TcM (Id, Level)
--- DataCons dealt with separately
-tcLookupIdLvl name
-  = tcLookup name	`thenM` \ thing -> 
-    case thing of
-	ATcId tc_id lvl	  -> returnM (tc_id, lvl)
-	AGlobal (AnId id) -> returnM (id, topIdLvl id)
-	other		  -> pprPanic "tcLookupIdLvl" (ppr name)
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- We expect the variables to all be bound, and all at
 -- the same level as the lookup.  Only used in one place...
 tcLookupLocalIds ns
   = getLclEnv 		`thenM` \ env ->
-    returnM (map (lookup (tcl_env env) (metaLevel (tcl_level env))) ns)
+    returnM (map (lookup (tcl_env env) (thLevel (tcl_th_ctxt env))) ns)
   where
     lookup lenv lvl name 
 	= case lookupNameEnv lenv name of
-		Just (ATcId id lvl1) -> ASSERT( lvl == lvl1 ) id
-		other		     -> pprPanic "tcLookupLocalIds" (ppr name)
+		Just (ATcId id lvl1 _) -> ASSERT( lvl == lvl1 ) id
+		other		       -> pprPanic "tcLookupLocalIds" (ppr name)
 
 lclEnvElts :: TcLclEnv -> [TcTyThing]
 lclEnvElts env = nameEnvElts (tcl_env env)
@@ -433,8 +446,9 @@ tcExtendLocalValEnv ids thing_inside
   = getLclEnv		`thenM` \ env ->
     let
 	extra_global_tyvars = tyVarsOfTypes [idType id | id <- ids]
-	lvl		    = metaLevel (tcl_level env)
-	extra_env	    = [(idName id, ATcId id lvl) | id <- ids]
+	th_lvl		    = thLevel (tcl_th_ctxt env)
+	proc_lvl	    = proc_level (tcl_arrow_ctxt env)
+	extra_env	    = [(idName id, ATcId id th_lvl proc_lvl) | id <- ids]
 	le'		    = extendNameEnvList (tcl_env env) extra_env
     in
     tc_extend_gtvs (tcl_tyvars env) extra_global_tyvars	`thenM` \ gtvs' ->
@@ -445,8 +459,9 @@ tcExtendLocalValEnv2 names_w_ids thing_inside
   = getLclEnv		`thenM` \ env ->
     let
 	extra_global_tyvars = tyVarsOfTypes [idType id | (name,id) <- names_w_ids]
-	lvl		    = metaLevel (tcl_level env)
-	extra_env	    = [(name, ATcId id lvl) | (name,id) <- names_w_ids]
+	th_lvl		    = thLevel    (tcl_th_ctxt   env)
+	proc_lvl	    = proc_level (tcl_arrow_ctxt env)
+	extra_env	    = [(name, ATcId id th_lvl proc_lvl) | (name,id) <- names_w_ids]
 	le'		    = extendNameEnvList (tcl_env env) extra_env
     in
     tc_extend_gtvs (tcl_tyvars env) extra_global_tyvars	`thenM` \ gtvs' ->
@@ -479,7 +494,7 @@ findGlobals tvs tidy_env
     ignore_it ty = not (tvs `intersectsVarSet` tyVarsOfType ty)
 
 -----------------------
-find_thing ignore_it tidy_env (ATcId id _)
+find_thing ignore_it tidy_env (ATcId id _ _)
   = zonkTcType  (idType id)	`thenM` \ id_ty ->
     if ignore_it id_ty then
 	returnM (tidy_env, Nothing)

@@ -271,8 +271,8 @@ tcPat tc_bndr pat@(NPatIn over_lit mb_neg) pat_ty
 	Nothing  -> returnM pos_lit_expr	-- Positive literal
 	Just neg -> 	-- Negative literal
 			-- The 'negate' is re-mappable syntax
-		    tcSyntaxName origin pat_ty' negateName neg	`thenM` \ (neg_expr, _) ->
-		    returnM (HsApp neg_expr pos_lit_expr)
+	    tcSyntaxName origin pat_ty' (negateName, HsVar neg)	`thenM` \ (_, neg_expr) ->
+	    returnM (HsApp neg_expr pos_lit_expr)
     )								`thenM` \ lit_expr ->
 
     let
@@ -307,7 +307,7 @@ tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus_name) pat_ty
     newMethodFromName origin pat_ty' geName	 `thenM` \ ge ->
 
 	-- The '-' part is re-mappable syntax
-    tcSyntaxName origin pat_ty' minusName minus_name	`thenM` \ (minus_expr, _) ->
+    tcSyntaxName origin pat_ty' (minusName, HsVar minus_name)	`thenM` \ (_, minus_expr) ->
 
 	-- The Report says that n+k patterns must be in Integral
 	-- We may not want this when using re-mappable syntax, though (ToDo?)

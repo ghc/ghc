@@ -20,6 +20,8 @@ module RdrHsSyn (
 	RdrNameGRHS,
 	RdrNameGRHSs,
 	RdrNameHsBinds,
+	RdrNameHsCmd,
+	RdrNameHsCmdTop,
 	RdrNameHsDecl,
 	RdrNameHsExpr,
 	RdrNameHsModule,
@@ -134,6 +136,8 @@ type RdrNameGRHS		= GRHS			RdrName
 type RdrNameGRHSs		= GRHSs			RdrName
 type RdrNameHsBinds		= HsBinds		RdrName
 type RdrNameHsExpr		= HsExpr		RdrName
+type RdrNameHsCmd		= HsCmd			RdrName
+type RdrNameHsCmdTop		= HsCmdTop		RdrName
 type RdrNameHsModule		= HsModule		RdrName
 type RdrNameIE			= IE			RdrName
 type RdrNameImportDecl 		= ImportDecl		RdrName

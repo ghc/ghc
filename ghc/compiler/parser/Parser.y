@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.119 2003/06/23 10:35:22 simonpj Exp $
+$Id: Parser.y,v 1.120 2003/06/24 07:58:22 simonpj Exp $
 
 Haskell grammar.
 
@@ -130,6 +130,8 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
  'stdcall'      { ITstdcallconv }
  'ccall'        { ITccallconv }
  'dotnet'       { ITdotnet }
+ 'proc'		{ ITproc }		-- for arrow notation extension
+ 'rec'		{ ITrec }		-- for arrow notation extension
  '_ccall_'	{ ITccall (False, False, PlayRisky) }
  '_ccall_GC_'	{ ITccall (False, False, PlaySafe False) }
  '_casm_'	{ ITccall (False, True,  PlayRisky) }
@@ -189,6 +191,10 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
  '-'		{ ITminus }
  '!'		{ ITbang }
  '*'		{ ITstar }
+ '-<'		{ ITlarrowtail }		-- for arrow notation
+ '>-'		{ ITrarrowtail }		-- for arrow notation
+ '-<<'		{ ITLarrowtail }		-- for arrow notation
+ '>>-'		{ ITRarrowtail }		-- for arrow notation
  '.'		{ ITdot }
 
  '{'		{ ITocurly } 			-- special symbols
@@ -204,6 +210,8 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
  ')'		{ ITcparen }
  '(#'		{ IToubxparen }
  '#)'		{ ITcubxparen }
+ '(|'		{ IToparenbar }
+ '|)'		{ ITcparenbar }
  ';'		{ ITsemi }
  ','		{ ITcomma }
  '`'		{ ITbackquote }
@@ -927,6 +935,10 @@ sigdecl :: { RdrBinding }
 exp   :: { RdrNameHsExpr }
 	: infixexp '::' sigtype		{ ExprWithTySig $1 $3 }
 	| infixexp 'with' dbinding	{ HsLet (IPBinds $3 True{-not a let-}) $1 }
+	| fexp srcloc '-<' exp		{ HsArrApp $1 $4 placeHolderType HsFirstOrderApp True $2 }
+	| fexp srcloc '>-' exp		{ HsArrApp $4 $1 placeHolderType HsFirstOrderApp False $2 }
+	| fexp srcloc '-<<' exp		{ HsArrApp $1 $4 placeHolderType HsHigherOrderApp True $2 }
+	| fexp srcloc '>>-' exp		{ HsArrApp $4 $1 placeHolderType HsHigherOrderApp False $2 }
 	| infixexp			{ $1 }
 
 infixexp :: { RdrNameHsExpr }
@@ -957,6 +969,12 @@ exp10 :: { RdrNameHsExpr }
         | scc_annot exp		    		{ if opt_SccProfilingOn
 							then HsSCC $1 $2
 							else HsPar $2 }
+
+	| 'proc' srcloc aexp '->' srcloc exp	
+			{% checkPattern $2 $3 `thenP` \ p -> 
+			   returnP (HsProc p (HsCmdTop $6 [] placeHolderType undefined) $5) }
+
+	| srcloc operator cmdargs		{ HsArrForm $2 Nothing (reverse $3) $1 }
 
         | '{-# CORE' STRING '#-}' exp           { HsCoreAnn $2 $4 }    -- hdaume: core annotation
 
@@ -1026,6 +1044,17 @@ aexp2	:: { RdrNameHsExpr }
 					   returnP (HsBracket (PatBr p) $1) }
 	| srcloc '[d|' cvtopbody '|]'	{ HsBracket (DecBr (mkGroup $3)) $1 }
 
+cmdargs	:: { [RdrNameHsCmdTop] }
+	: cmdargs acmd			{ HsCmdTop $2 [] placeHolderType undefined : $1 }
+  	| {- empty -}			{ [] }
+
+acmd	:: { RdrNameHsExpr }
+	: '(' exp ')'			{ HsPar $2 }
+	| srcloc operator		{ HsArrForm $2 Nothing [] $1 }
+
+operator :: { RdrNameHsExpr }
+	: '(|' exp '|)'			{ $2 }
+
 cvtopbody :: { [RdrNameHsDecl] }
 	:  '{'            cvtopdecls '}'		{ $2 }
 	|      layout_on  cvtopdecls close		{ $2 }
@@ -1048,13 +1077,9 @@ list :: { RdrNameHsExpr }
 	| exp ',' exp '..' 		{ ArithSeqIn (FromThen $1 $3) }
 	| exp '..' exp	 		{ ArithSeqIn (FromTo $1 $3) }
 	| exp ',' exp '..' exp		{ ArithSeqIn (FromThenTo $1 $3 $5) }
-	| exp srcloc pquals		{% let { body [qs] = qs;
-					         body  qss = [ParStmt (map reverse qss)] }
-					   in
-					   returnP ( mkHsDo ListComp
-							    (reverse (ResultStmt $1 $2 : body $3))
-							    $2
-						  )
+	| exp srcloc pquals		{ mkHsDo ListComp
+						 (reverse (ResultStmt $1 $2 : $3))
+						 $2
 					}
 
 lexps :: { [RdrNameHsExpr] }
@@ -1064,8 +1089,17 @@ lexps :: { [RdrNameHsExpr] }
 -----------------------------------------------------------------------------
 -- List Comprehensions
 
-pquals :: { [[RdrNameStmt]] }
-	: pquals '|' quals		{ $3 : $1 }
+pquals :: { [RdrNameStmt] }	-- Either a singleton ParStmt, or a reversed list of Stmts
+	: pquals1			{ case $1 of
+					    [qs] -> qs
+					    qss  -> [ParStmt stmtss]
+						 where
+						    stmtss = [ (reverse qs, undefined) 
+						    	     | qs <- qss ]
+					}
+			
+pquals1 :: { [[RdrNameStmt]] }
+	: pquals1 '|' quals		{ $3 : $1 }
 	| '|' quals			{ [$2] }
 
 quals :: { [RdrNameStmt] }
@@ -1087,16 +1121,9 @@ parr :: { RdrNameHsExpr }
 						       (reverse $1) }
 	| exp '..' exp	 		{ PArrSeqIn (FromTo $1 $3) }
 	| exp ',' exp '..' exp		{ PArrSeqIn (FromThenTo $1 $3 $5) }
-	| exp srcloc pquals		{% let {
-					     body [qs] = qs;
-					     body  qss = [ParStmt 
-							   (map reverse qss)]}
-					   in
-					   returnP $ 
-					     mkHsDo PArrComp 
-						    (reverse (ResultStmt $1 $2 
-							     : body $3))
-						    $2
+	| exp srcloc pquals		{  mkHsDo PArrComp 
+						  (reverse (ResultStmt $1 $2 : $3))
+						  $2
 					}
 
 -- We are reusing `lexps' and `pquals' from the list case.
@@ -1166,6 +1193,7 @@ stmt  :: { RdrNameStmt }
 					   returnP (BindStmt p $4 $1) }
 	| srcloc exp			{ ExprStmt $2 placeHolderType $1 }
   	| srcloc 'let' binds		{ LetStmt $3 }
+  	| srcloc 'rec' stmtlist		{ RecStmt $3 undefined undefined undefined }
 
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction

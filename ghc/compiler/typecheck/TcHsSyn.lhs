@@ -13,6 +13,7 @@ module TcHsSyn (
 	TcStmt, TcArithSeqInfo, TcRecordBinds,
 	TcHsModule, TcDictBinds,
 	TcForeignDecl,
+	TcCmd, TcCmdTop,
 	
 	TypecheckedHsBinds, TypecheckedRuleDecl,
 	TypecheckedMonoBinds, TypecheckedPat,
@@ -22,6 +23,7 @@ module TcHsSyn (
 	TypecheckedGRHSs, TypecheckedGRHS,
 	TypecheckedRecordBinds, TypecheckedDictBinds,
 	TypecheckedMatchContext, TypecheckedCoreBind,
+	TypecheckedHsCmd, TypecheckedHsCmdTop,
 
 	mkHsTyApp, mkHsDictApp, mkHsConApp,
 	mkHsTyLam, mkHsDictLam, mkHsLet,
@@ -103,6 +105,8 @@ type TcRecordBinds	= HsRecordBinds TcId
 type TcHsModule		= HsModule	TcId
 type TcForeignDecl      = ForeignDecl  TcId
 type TcRuleDecl 	= RuleDecl     TcId
+type TcCmd	     	= HsCmd		TcId 
+type TcCmdTop	     	= HsCmdTop     	TcId 
 
 type TypecheckedPat		= OutPat	Id
 type TypecheckedMonoBinds 	= MonoBinds	Id
@@ -119,6 +123,8 @@ type TypecheckedHsModule	= HsModule	Id
 type TypecheckedForeignDecl     = ForeignDecl   Id
 type TypecheckedRuleDecl	= RuleDecl      Id
 type TypecheckedCoreBind        = (Id, CoreExpr)
+type TypecheckedHsCmd		= HsCmd		Id
+type TypecheckedHsCmdTop	= HsCmdTop	Id
 
 type TypecheckedMatchContext	= HsMatchContext Name	-- Keeps consistency with 
 							-- HsDo arg StmtContext
@@ -553,9 +559,9 @@ zonkExpr env (HsLet binds expr)
 zonkExpr env (HsDo do_or_lc stmts ids ty src_loc)
   = zonkStmts env stmts 	`thenM` \ new_stmts ->
     zonkTcTypeToType env ty	`thenM` \ new_ty   ->
-    returnM (HsDo do_or_lc new_stmts 
-		      (zonkIdOccs env ids) 
-		      new_ty src_loc)
+    zonkReboundNames env ids	`thenM` \ new_ids ->
+    returnM (HsDo do_or_lc new_stmts new_ids
+		  new_ty src_loc)
 
 zonkExpr env (ExplicitList ty exprs)
   = zonkTcTypeToType env ty	`thenM` \ new_ty ->
@@ -637,6 +643,42 @@ zonkExpr env (DictApp expr dicts)
   = zonkExpr env expr    	    	`thenM` \ new_expr ->
     returnM (DictApp new_expr (zonkIdOccs env dicts))
 
+-- arrow notation extensions
+zonkExpr env (HsProc pat body src_loc)
+  = zonkPat env pat	    	    	`thenM` \ (new_pat, new_ids) ->
+    let
+	env1 = extendZonkEnv env (bagToList new_ids)
+    in
+    zonkCmdTop env1 body    	    	`thenM` \ new_body ->
+    returnM (HsProc new_pat new_body src_loc)
+
+zonkExpr env (HsArrApp e1 e2 ty ho rl src_loc)
+  = zonkExpr env e1	    	    	`thenM` \ new_e1 ->
+    zonkExpr env e2	    	    	`thenM` \ new_e2 ->
+    zonkTcTypeToType env ty 		`thenM` \ new_ty ->
+    returnM (HsArrApp new_e1 new_e2 new_ty ho rl src_loc)
+
+zonkExpr env (HsArrForm op fixity args src_loc)
+  = zonkExpr env op	    	    	`thenM` \ new_op ->
+    mappM (zonkCmdTop env) args		`thenM` \ new_args ->
+    returnM (HsArrForm new_op fixity new_args src_loc)
+
+zonkCmdTop :: ZonkEnv -> TcCmdTop -> TcM TypecheckedHsCmdTop
+zonkCmdTop env (HsCmdTop cmd stack_tys ty ids)
+  = zonkExpr env cmd	    	    	`thenM` \ new_cmd ->
+    mappM (zonkTcTypeToType env) stack_tys
+			 		`thenM` \ new_stack_tys ->
+    zonkTcTypeToType env ty 		`thenM` \ new_ty ->
+    zonkReboundNames env ids		`thenM` \ new_ids ->
+    returnM (HsCmdTop new_cmd new_stack_tys new_ty new_ids)
+
+-------------------------------------------------------------------------
+zonkReboundNames :: ZonkEnv -> ReboundNames Id -> TcM (ReboundNames Id)
+zonkReboundNames env prs 
+  = mapM zonk prs
+  where
+    zonk (n, e) = zonkExpr env e `thenM` \ new_e ->
+		  returnM (n, new_e)
 
 
 -------------------------------------------------------------------------
@@ -673,29 +715,33 @@ zonk_stmts :: ZonkEnv -> [TcStmt] -> TcM (ZonkEnv, [TypecheckedStmt])
 
 zonk_stmts env [] = returnM (env, [])
 
-zonk_stmts env (ParStmtOut bndrstmtss : stmts)
-  = mappM (mappM zonkId) bndrss		`thenM` \ new_bndrss ->
-    mappM (zonkStmts env) stmtss	`thenM` \ new_stmtss ->
+zonk_stmts env (ParStmt stmts_w_bndrs : stmts)
+  = mappM zonk_branch stmts_w_bndrs	`thenM` \ new_stmts_w_bndrs ->
     let 
-	new_binders = concat new_bndrss
+	new_binders = concat (map snd new_stmts_w_bndrs)
 	env1 = extendZonkEnv env new_binders
     in
     zonk_stmts env1 stmts		`thenM` \ (env2, new_stmts) ->
-    returnM (env2, ParStmtOut (zip new_bndrss new_stmtss) : new_stmts)
+    returnM (env2, ParStmt new_stmts_w_bndrs : new_stmts)
   where
-    (bndrss, stmtss) = unzip bndrstmtss
+    zonk_branch (stmts, bndrs) = zonk_stmts env stmts	`thenM` \ (env1, new_stmts) ->
+				 returnM (new_stmts, zonkIdOccs env1 bndrs)
 
-zonk_stmts env (RecStmt vs segStmts rets : stmts)
-  = mappM zonkId vs		`thenM` \ new_vs ->
+zonk_stmts env (RecStmt segStmts lvs rvs rets : stmts)
+  = zonkIdBndrs env rvs		`thenM` \ new_rvs ->
     let
-	env1 = extendZonkEnv env new_vs
+	env1 = extendZonkEnv env new_rvs
     in
     zonk_stmts env1 segStmts	`thenM` \ (env2, new_segStmts) ->
 	-- Zonk the ret-expressions in an envt that 
 	-- has the polymorphic bindings in the envt
     zonkExprs env2 rets		`thenM` \ new_rets ->
-    zonk_stmts env1 stmts	`thenM` \ (env3, new_stmts) ->
-    returnM (env3, RecStmt new_vs new_segStmts new_rets : new_stmts)
+    let
+	new_lvs = zonkIdOccs env2 lvs
+	env3 = extendZonkEnv env new_lvs	-- Only the lvs are needed
+    in
+    zonk_stmts env3 stmts	`thenM` \ (env4, new_stmts) ->
+    returnM (env4, RecStmt new_segStmts new_lvs new_rvs new_rets : new_stmts)
 
 zonk_stmts env (ResultStmt expr locn : stmts)
   = ASSERT( null stmts )

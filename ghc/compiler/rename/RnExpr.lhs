@@ -38,6 +38,7 @@ import PrelNames	( hasKey, assertIdKey,
 			  foldrName, buildName, 
 			  cCallableClassName, cReturnableClassName, 
 			  enumClassName, 
+			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  splitName, fstName, sndName, ioDataConName, 
 			  replicatePName, mapPName, filterPName,
 			  crossPName, zipPName, toPName,
@@ -48,10 +49,11 @@ import NameSet
 import UnicodeUtil	( stringToUtf8 )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
-import Util		( isSingleton )
+import Util		( isSingleton, mapAndUnzip )
 import List		( intersectBy, unzip4 )
 import ListSetOps	( removeDups )
 import Outputable
+import SrcLoc		( noSrcLoc )
 import FastString
 \end{code}
 
@@ -295,20 +297,20 @@ rnExpr e@(HsDo do_or_lc stmts _ _ src_loc)
     }					`thenM_`
 
 	-- Generate the rebindable syntax for the monad
-    mapAndUnzipM lookupSyntaxName 
-	 (syntax_names do_or_lc)	`thenM` \ (monad_names', monad_fvs) ->
+    lookupSyntaxNames syntax_names	`thenM` \ (syntax_names', monad_fvs) ->
 
-    returnM (HsDo do_or_lc stmts' monad_names' placeHolderType src_loc, 
-	     fvs `plusFV` implicit_fvs do_or_lc `plusFV` plusFVs monad_fvs)
+    returnM (HsDo do_or_lc stmts' syntax_names' placeHolderType src_loc, 
+	     fvs `plusFV` implicit_fvs do_or_lc `plusFV` monad_fvs)
   where
     implicit_fvs PArrComp = mkFVs [replicatePName, mapPName, filterPName, crossPName, zipPName]
     implicit_fvs ListComp = mkFVs [foldrName, buildName]
     implicit_fvs DoExpr   = emptyFVs
     implicit_fvs MDoExpr  = emptyFVs
 
-    syntax_names DoExpr  = monadNames
-    syntax_names MDoExpr = monadNames ++ [mfixName]
-    syntax_names other   = []
+    syntax_names = case do_or_lc of
+			DoExpr  -> monadNames
+			MDoExpr -> monadNames ++ [mfixName]
+			other   -> []
 
 rnExpr (ExplicitList _ exps)
   = rnExprs exps		 	`thenM` \ (exps', fvs) ->
@@ -381,6 +383,212 @@ rnExpr e@(EAsPat _ _) = addErr (patSynErr e)	`thenM_`
 rnExpr e@(ELazyPat _) = addErr (patSynErr e)	`thenM_`
 		        returnM (EWildPat, emptyFVs)
 \end{code}
+
+%************************************************************************
+%*									*
+	Arrow notation
+%*									*
+%************************************************************************
+
+\begin{code}
+rnExpr (HsProc pat body src_loc)
+  = addSrcLoc src_loc $
+    rnPatsAndThen ProcExpr [pat] $ \ [pat'] ->
+    rnCmdTop body	`thenM` \ (body',fvBody) ->
+    returnM (HsProc pat' body' src_loc, fvBody)
+
+rnExpr (HsArrApp arrow arg _ ho rtl srcloc)
+  = rnExpr arrow	`thenM` \ (arrow',fvArrow) ->
+    rnExpr arg		`thenM` \ (arg',fvArg) ->
+    returnM (HsArrApp arrow' arg' placeHolderType ho rtl srcloc,
+	     fvArrow `plusFV` fvArg)
+
+-- infix form
+rnExpr (HsArrForm op (Just _) [arg1, arg2] srcloc)
+  = rnExpr op		`thenM` \ (op'@(HsVar op_name),fv_op) ->
+    rnCmdTop arg1	`thenM` \ (arg1',fv_arg1) ->
+    rnCmdTop arg2	`thenM` \ (arg2',fv_arg2) ->
+
+	-- Deal with fixity
+
+    lookupFixityRn op_name		`thenM` \ fixity ->
+    mkOpFormRn arg1' op' fixity arg2'	`thenM` \ final_e -> 
+
+    returnM (final_e,
+	      fv_arg1 `plusFV` fv_op `plusFV` fv_arg2)
+
+rnExpr (HsArrForm op fixity cmds srcloc)
+  = rnExpr op		`thenM` \ (op',fvOp) ->
+    rnCmdArgs cmds	`thenM` \ (cmds',fvCmds) ->
+    returnM (HsArrForm op' fixity cmds' srcloc,
+	     fvOp `plusFV` fvCmds)
+
+---------------------------
+-- Deal with fixity (cf mkOpAppRn for the method)
+
+mkOpFormRn :: RenamedHsCmdTop		-- Left operand; already rearranged
+	  -> RenamedHsExpr -> Fixity 	-- Operator and fixity
+	  -> RenamedHsCmdTop		-- Right operand (not an infix)
+	  -> RnM RenamedHsCmd
+
+---------------------------
+-- (e11 `op1` e12) `op2` e2
+mkOpFormRn a1@(HsCmdTop (HsArrForm op1 (Just fix1) [a11,a12] loc1) _ _ _) op2 fix2 a2
+  | nofix_error
+  = addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenM_`
+    returnM (HsArrForm op2 (Just fix2) [a1, a2] loc1)
+
+  | associate_right
+  = mkOpFormRn a12 op2 fix2 a2		`thenM` \ new_c ->
+    returnM (HsArrForm op1 (Just fix1)
+	[a11, HsCmdTop new_c [] placeHolderType []] loc1)
+  where
+    (nofix_error, associate_right) = compareFixity fix1 fix2
+
+---------------------------
+--	Default case
+mkOpFormRn arg1 op fix arg2 			-- Default case, no rearrangment
+  = returnM (HsArrForm op (Just fix) [arg1, arg2] noSrcLoc)
+
+\end{code}
+
+
+%************************************************************************
+%*									*
+	Arrow commands
+%*									*
+%************************************************************************
+
+\begin{code}
+rnCmdArgs [] = returnM ([], emptyFVs)
+rnCmdArgs (arg:args)
+  = rnCmdTop arg	`thenM` \ (arg',fvArg) ->
+    rnCmdArgs args	`thenM` \ (args',fvArgs) ->
+    returnM (arg':args', fvArg `plusFV` fvArgs)
+
+rnCmdTop (HsCmdTop cmd _ _ _) 
+  = rnExpr (convertOpFormsCmd cmd)	`thenM` \ (cmd', fvCmd) ->
+    let 
+	cmd_names = [arrAName, composeAName, firstAName] ++
+		    nameSetToList (methodNamesCmd cmd')
+    in
+	-- Generate the rebindable syntax for the monad
+    lookupSyntaxNames cmd_names		`thenM` \ (cmd_names', cmd_fvs) ->
+
+    returnM (HsCmdTop cmd' [] placeHolderType cmd_names', 
+	     fvCmd `plusFV` cmd_fvs)
+
+---------------------------------------------------
+-- convert OpApp's in a command context to HsArrForm's
+
+convertOpFormsCmd :: HsCmd id -> HsCmd id
+
+convertOpFormsCmd (HsLam match) = HsLam (convertOpFormsMatch match)
+
+convertOpFormsCmd (OpApp c1 op fixity c2)
+  = let
+	arg1 = HsCmdTop (convertOpFormsCmd c1) [] placeHolderType []
+	arg2 = HsCmdTop (convertOpFormsCmd c2) [] placeHolderType []
+    in
+    HsArrForm op (Just fixity) [arg1, arg2] noSrcLoc
+
+convertOpFormsCmd (HsPar c) = HsPar (convertOpFormsCmd c)
+
+convertOpFormsCmd (HsCase exp matches locn)
+  = HsCase exp (map convertOpFormsMatch matches) locn
+
+convertOpFormsCmd (HsIf exp c1 c2 locn)
+  = HsIf exp (convertOpFormsCmd c1) (convertOpFormsCmd c2) locn
+
+convertOpFormsCmd (HsLet binds cmd)
+  = HsLet binds (convertOpFormsCmd cmd)
+
+convertOpFormsCmd (HsDo ctxt stmts ids ty locn)
+  = HsDo ctxt (map convertOpFormsStmt stmts) ids ty locn
+
+-- Anything else is unchanged.  This includes HsArrForm (already done),
+-- things with no sub-commands, and illegal commands (which will be
+-- caught by the type checker)
+convertOpFormsCmd c = c
+
+convertOpFormsStmt (BindStmt pat cmd locn)
+  = BindStmt pat (convertOpFormsCmd cmd) locn
+convertOpFormsStmt (ResultStmt cmd locn)
+  = ResultStmt (convertOpFormsCmd cmd) locn
+convertOpFormsStmt (ExprStmt cmd ty locn)
+  = ExprStmt (convertOpFormsCmd cmd) ty locn
+convertOpFormsStmt (RecStmt stmts lvs rvs es)
+  = RecStmt (map convertOpFormsStmt stmts) lvs rvs es
+convertOpFormsStmt stmt = stmt
+
+convertOpFormsMatch (Match pat mty grhss)
+  = Match pat mty (convertOpFormsGRHSs grhss)
+
+convertOpFormsGRHSs (GRHSs grhss binds ty)
+  = GRHSs (map convertOpFormsGRHS grhss) binds ty
+
+convertOpFormsGRHS (GRHS stmts locn)
+  = let
+	(ResultStmt cmd locn') = last stmts
+    in
+    GRHS (init stmts ++ [ResultStmt (convertOpFormsCmd cmd) locn']) locn
+
+---------------------------------------------------
+type CmdNeeds = FreeVars	-- Only inhabitants are 
+				-- 	appAName, choiceAName, loopAName
+
+-- find what methods the Cmd needs (loop, choice, apply)
+methodNamesCmd :: HsCmd Name -> CmdNeeds
+
+methodNamesCmd cmd@(HsArrApp _arrow _arg _ HsFirstOrderApp _rtl _srcloc)
+  = emptyFVs
+methodNamesCmd cmd@(HsArrApp _arrow _arg _ HsHigherOrderApp _rtl _srcloc)
+  = unitFV appAName
+methodNamesCmd cmd@(HsArrForm {}) = emptyFVs
+
+methodNamesCmd (HsPar c) = methodNamesCmd c
+
+methodNamesCmd (HsIf p c1 c2 loc)
+  = methodNamesCmd c1 `plusFV` methodNamesCmd c2 `addOneFV` choiceAName
+
+methodNamesCmd (HsLet b c) = methodNamesCmd c
+
+methodNamesCmd (HsDo sc stmts rbs ty loc) = methodNamesStmts stmts
+
+methodNamesCmd (HsLam match) = methodNamesMatch match
+
+methodNamesCmd (HsCase scrut matches loc)
+  = plusFVs (map methodNamesMatch matches) `addOneFV` choiceAName
+
+methodNamesCmd other = emptyFVs
+   -- Other forms can't occur in commands, but it's not convenient 
+   -- to error here so we just do what's convenient.
+   -- The type checker will complain later
+
+---------------------------------------------------
+methodNamesMatch (Match pats sig_ty grhss) = methodNamesGRHSs grhss
+
+-------------------------------------------------
+methodNamesGRHSs (GRHSs grhss binds ty) = plusFVs (map methodNamesGRHS grhss)
+
+-------------------------------------------------
+methodNamesGRHS (GRHS stmts loc) = methodNamesStmt (last stmts)
+
+---------------------------------------------------
+methodNamesStmts stmts = plusFVs (map methodNamesStmt stmts)
+
+---------------------------------------------------
+methodNamesStmt (ResultStmt cmd loc) = methodNamesCmd cmd
+methodNamesStmt (ExprStmt cmd ty loc) = methodNamesCmd cmd
+methodNamesStmt (BindStmt pat cmd loc) = methodNamesCmd cmd
+methodNamesStmt (RecStmt stmts lvs rvs es)
+  = methodNamesStmts stmts `addOneFV` loopAName
+methodNamesStmt (LetStmt b)  = emptyFVs
+methodNamesStmt (ParStmt ss) = emptyFVs
+   -- ParStmt can't occur in commands, but it's not convenient to error 
+   -- here so we just do what's convenient
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -517,59 +725,80 @@ rnNormalStmts ctxt (LetStmt binds : stmts)
 rnNormalStmts ctxt (ParStmt stmtss : stmts)
   = doptM Opt_GlasgowExts		`thenM` \ opt_GlasgowExts ->
     checkM opt_GlasgowExts parStmtErr 	`thenM_`
-    mapFvRn (rnNormalStmts (ParStmtCtxt ctxt)) stmtss	`thenM` \ (stmtss', fv_stmtss) ->
+    mapFvRn rn_branch stmtss 		`thenM` \ (stmtss', fv_stmtss) ->
     let
-	bndrss = map collectStmtsBinders stmtss'
+	bndrss :: [[Name]]	-- NB: Name, not RdrName
+	bndrss        = map collectStmtsBinders stmtss'
+	(bndrs, dups) = removeDups cmpByOcc (concat bndrss)
     in
-    foldlM checkBndrs [] bndrss		`thenM` \ new_binders ->
-    bindLocalNamesFV new_binders	$
+    mappM dupErr dups			`thenM` \ _ ->
+    bindLocalNamesFV bndrs		$
 	-- Note: binders are returned in scope order, so one may
 	--       shadow the next; e.g. x <- xs; x <- ys
     rnNormalStmts ctxt stmts			`thenM` \ (stmts', fvs) ->
-    returnM (ParStmtOut (bndrss `zip` stmtss') : stmts', 
+
+	-- Cut down the exported binders to just the ones neede in the body
+    let
+	used_bndrs_s = map (filter (`elemNameSet` fvs)) bndrss
+    in
+    returnM (ParStmt (stmtss' `zip` used_bndrs_s) : stmts', 
 	     fv_stmtss `plusFV` fvs)
 	     
   where
-    checkBndrs all_bndrs bndrs
-	  = checkErr (null common) (err (head common)) `thenM_`
-	    returnM (bndrs ++ all_bndrs)
-	where
-	  common = intersectBy eqOcc all_bndrs bndrs
+    rn_branch (stmts, _) = rnNormalStmts (ParStmtCtxt ctxt) stmts
 
-    eqOcc n1 n2 = nameOccName n1 == nameOccName n2
-    err v = ptext SLIT("Duplicate binding in parallel list comprehension for:")
-	    <+> quotes (ppr v)
+    cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
+    dupErr (v:_) = addErr (ptext SLIT("Duplicate binding in parallel list comprehension for:")
+			    <+> quotes (ppr v))
 
-rnNormalStmts ctxt stmts = pprPanic "rnNormalStmts" (ppr stmts)
+rnNormalStmts ctxt (RecStmt rec_stmts _ _ _ : stmts)
+  = bindLocalsRn doc (collectStmtsBinders rec_stmts)	$ \ _ ->
+    rn_rec_stmts rec_stmts				`thenM` \ segs ->
+    rnNormalStmts ctxt stmts				`thenM` \ (stmts', fvs) ->
+    let
+	segs_w_fwd_refs     	 = addFwdRefs segs
+	(ds, us, fs, rec_stmts') = unzip4 segs_w_fwd_refs
+	later_vars = nameSetToList (plusFVs ds `intersectNameSet` fvs)
+	fwd_vars   = nameSetToList (plusFVs fs)
+	uses	   = plusFVs us
+    in	
+    returnM (RecStmt rec_stmts' later_vars fwd_vars [] : stmts', uses `plusFV` fvs)
+  where
+    doc = text "In a recursive do statement"
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsubsection{Precedence Parsing}
+\subsubsection{mdo expressions}
 %*									*
 %************************************************************************
 
 \begin{code}
 type FwdRefs = NameSet
-type Segment = (Defs,
-		Uses, 		-- May include defs
-		FwdRefs,	-- A subset of uses that are 
+type Segment stmts = (Defs,
+		      Uses, 	-- May include defs
+		      FwdRefs,	-- A subset of uses that are 
 				--   (a) used before they are bound in this segment, or 
 				--   (b) used here, and bound in subsequent segments
-		[RenamedStmt])
+		      stmts)	-- Either Stmt or [Stmt]
+
 
 ----------------------------------------------------
 rnMDoStmts :: [RdrNameStmt] -> RnM ([RenamedStmt], FreeVars)
 rnMDoStmts stmts
   = 	-- Step1: bring all the binders of the mdo into scope
+	-- Remember that this also removes the binders from the
+	-- finally-returned free-vars
     bindLocalsRn doc (collectStmtsBinders stmts)	$ \ _ ->
 	
 	-- Step 2: Rename each individual stmt, making a
 	--	   singleton segment.  At this stage the FwdRefs field
 	--	   isn't finished: it's empty for all except a BindStmt
 	--	   for which it's the fwd refs within the bind itself
-    mappM rn_mdo_stmt stmts				`thenM` \ segs ->
+	-- 	   (This set may not be empty, because we're in a recursive 
+	--	    context.)
+    rn_rec_stmts stmts					`thenM` \ segs ->
     let
 	-- Step 3: Fill in the fwd refs.
 	-- 	   The segments are all singletons, but their fwd-ref
@@ -593,22 +822,24 @@ rnMDoStmts stmts
   where
     doc = text "In a mdo-expression"
 
+
 ----------------------------------------------------
-rn_mdo_stmt :: RdrNameStmt -> RnM Segment
+rn_rec_stmt :: RdrNameStmt -> RnM [Segment RenamedStmt]
+	-- Rename a Stmt that is inside a RecStmt (or mdo)
 	-- Assumes all binders are already in scope
 	-- Turns each stmt into a singleton Stmt
 
-rn_mdo_stmt (ExprStmt expr _ src_loc)
+rn_rec_stmt (ExprStmt expr _ src_loc)
   = addSrcLoc src_loc (rnExpr expr)	`thenM` \ (expr', fvs) ->
-    returnM (emptyNameSet, fvs, emptyNameSet,
-	     [ExprStmt expr' placeHolderType src_loc])
+    returnM [(emptyNameSet, fvs, emptyNameSet,
+	      ExprStmt expr' placeHolderType src_loc)]
 
-rn_mdo_stmt (ResultStmt expr src_loc)
+rn_rec_stmt (ResultStmt expr src_loc)
   = addSrcLoc src_loc (rnExpr expr)	`thenM` \ (expr', fvs) ->
-    returnM (emptyNameSet, fvs, emptyNameSet,
-	     [ResultStmt expr' src_loc])
+    returnM [(emptyNameSet, fvs, emptyNameSet,
+	      ResultStmt expr' src_loc)]
 
-rn_mdo_stmt (BindStmt pat expr src_loc)
+rn_rec_stmt (BindStmt pat expr src_loc)
   = addSrcLoc src_loc 	$
     rnExpr expr		`thenM` \ (expr', fv_expr) ->
     rnPat pat		`thenM` \ (pat', fv_pat) ->
@@ -616,19 +847,28 @@ rn_mdo_stmt (BindStmt pat expr src_loc)
 	bndrs = mkNameSet (collectPatBinders pat')
 	fvs   = fv_expr `plusFV` fv_pat
     in
-    returnM (bndrs, fvs, bndrs `intersectNameSet` fvs,
-	     [BindStmt pat' expr' src_loc])
+    returnM [(bndrs, fvs, bndrs `intersectNameSet` fvs,
+	      BindStmt pat' expr' src_loc)]
 
-rn_mdo_stmt (LetStmt binds)
+rn_rec_stmt (LetStmt binds)
   = rnBinds binds		`thenM` \ (binds', du_binds) ->
-    returnM (duDefs du_binds, duUses du_binds, 
-	     emptyNameSet, [LetStmt binds'])
+    returnM [(duDefs du_binds, duUses du_binds, 
+	      emptyNameSet, LetStmt binds')]
 
-rn_mdo_stmt stmt@(ParStmt _)	-- Syntactically illegal in mdo
-  = pprPanic "rn_mdo_stmt" (ppr stmt)
+rn_rec_stmt (RecStmt stmts _ _ _)	-- Flatten Rec inside Rec
+  = rn_rec_stmts stmts
+
+rn_rec_stmt stmt@(ParStmt _)	-- Syntactically illegal in mdo
+  = pprPanic "rn_rec_stmt" (ppr stmt)
+
+---------------------------------------------
+rn_rec_stmts :: [RdrNameStmt] -> RnM [Segment RenamedStmt]
+rn_rec_stmts stmts = mappM rn_rec_stmt stmts	`thenM` \ segs_s ->
+		     returnM (concat segs_s)
 
 
-addFwdRefs :: [Segment] -> [Segment]
+---------------------------------------------
+addFwdRefs :: [Segment a] -> [Segment a]
 -- So far the segments only have forward refs *within* the Stmt
 -- 	(which happens for bind:  x <- ...x...)
 -- This function adds the cross-seg fwd ref info
@@ -636,12 +876,12 @@ addFwdRefs :: [Segment] -> [Segment]
 addFwdRefs pairs 
   = fst (foldr mk_seg ([], emptyNameSet) pairs)
   where
-    mk_seg (defs, uses, fwds, stmts) (segs, seg_defs)
+    mk_seg (defs, uses, fwds, stmts) (segs, later_defs)
 	= (new_seg : segs, all_defs)
 	where
 	  new_seg = (defs, uses, new_fwds, stmts)
-	  all_defs = seg_defs `unionNameSets` defs
-	  new_fwds = fwds `unionNameSets` (uses `intersectNameSet` seg_defs)
+	  all_defs = later_defs `unionNameSets` defs
+	  new_fwds = fwds `unionNameSets` (uses `intersectNameSet` later_defs)
 		-- Add the downstream fwd refs here
 
 ----------------------------------------------------
@@ -679,10 +919,10 @@ addFwdRefs pairs
 --		q <- x ; z <- y } ; 
 -- 	  r <- x }
 
-glomSegments :: [Segment] -> [Segment]
+glomSegments :: [Segment RenamedStmt] -> [Segment [RenamedStmt]]
 
-glomSegments [seg] = [seg]
-glomSegments ((defs,uses,fwds,stmts) : segs)
+glomSegments [] = []
+glomSegments ((defs,uses,fwds,stmt) : segs)
 	-- Actually stmts will always be a singleton
   = (seg_defs, seg_uses, seg_fwds, seg_stmts)  : others
   where
@@ -693,12 +933,12 @@ glomSegments ((defs,uses,fwds,stmts) : segs)
     seg_defs  = plusFVs ds `plusFV` defs
     seg_uses  = plusFVs us `plusFV` uses
     seg_fwds  = plusFVs fs `plusFV` fwds
-    seg_stmts = stmts ++ concat ss
+    seg_stmts = stmt : concat ss
 
     grab :: NameSet	 	-- The client
-	 -> [Segment]
-	 -> ([Segment],		-- Needed by the 'client'
-	     [Segment])		-- Not needed by the client
+	 -> [Segment a]
+	 -> ([Segment a],	-- Needed by the 'client'
+	     [Segment a])	-- Not needed by the client
 	-- The result is simply a split of the input
     grab uses dus 
 	= (reverse yeses, reverse noes)
@@ -708,7 +948,7 @@ glomSegments ((defs,uses,fwds,stmts) : segs)
 
 
 ----------------------------------------------------
-segsToStmts :: [Segment] -> ([RenamedStmt], FreeVars)
+segsToStmts :: [Segment [RenamedStmt]] -> ([RenamedStmt], FreeVars)
 
 segsToStmts [] = ([], emptyFVs)
 segsToStmts ((defs, uses, fwds, ss) : segs)
@@ -716,13 +956,11 @@ segsToStmts ((defs, uses, fwds, ss) : segs)
   where
     (later_stmts, later_uses) = segsToStmts segs
     new_stmt | non_rec	 = head ss
-	     | otherwise = RecStmt rec_names ss []
+	     | otherwise = RecStmt ss (nameSetToList used_later) (nameSetToList fwds) []
 	     where
-	       non_rec   = isSingleton ss && isEmptyNameSet fwds
-	       rec_names = nameSetToList (fwds `plusFV` (defs `intersectNameSet` later_uses))
-		-- The names for the fixpoint are
-		--	(a) the ones needed after the RecStmt
-		--	(b) the forward refs within the fixpoint
+	       non_rec    = isSingleton ss && isEmptyNameSet fwds
+	       used_later = defs `intersectNameSet` later_uses
+				-- The ones needed after the RecStmt
 \end{code}
 
 %************************************************************************

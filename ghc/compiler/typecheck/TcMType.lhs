@@ -11,7 +11,7 @@ module TcMType (
 
   --------------------------------
   -- Creating new mutable type variables
-  newTyVar, 
+  newTyVar, newSigTyVar,
   newTyVarTy,		-- Kind -> TcM TcType
   newTyVarTys,		-- Int -> Kind -> TcM [TcType]
   newKindVar, newKindVars, newOpenTypeKind,
@@ -111,6 +111,11 @@ newTyVar :: Kind -> TcM TcTyVar
 newTyVar kind
   = newUnique 	`thenM` \ uniq ->
     newMutTyVar (mkSystemTvNameEncoded uniq FSLIT("t")) kind VanillaTv
+
+newSigTyVar :: Kind -> TcM TcTyVar
+newSigTyVar kind
+  = newUnique 	`thenM` \ uniq ->
+    newMutTyVar (mkSystemTvNameEncoded uniq FSLIT("s")) kind SigTv
 
 newTyVarTy  :: Kind -> TcM TcType
 newTyVarTy kind

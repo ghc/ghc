@@ -12,7 +12,7 @@ module TcExpr ( tcCheckSigma, tcCheckRho, tcInferRho, tcMonoExpr ) where
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import HsSyn		( HsReify(..), ReifyFlavour(..) )
 import TcType		( isTauTy )
-import TcEnv		( bracketOK, tcMetaTy, checkWellStaged, metaLevel )
+import TcEnv		( bracketOK, tcMetaTy, checkWellStaged )
 import Name		( isExternalName )
 import qualified DsMeta
 #endif
@@ -30,9 +30,10 @@ import Inst		( InstOrigin(..),
 			  instToId, tcInstCall, tcInstDataCon
 			)
 import TcBinds		( tcBindsAndThen )
-import TcEnv		( tcLookupClass, tcLookupGlobal_maybe, tcLookupIdLvl,
-			  tcLookupTyCon, tcLookupDataCon, tcLookupId
+import TcEnv		( tcLookupClass, tcLookupGlobal_maybe, tcLookup,
+			  tcLookupTyCon, tcLookupDataCon, tcLookupId, checkProcLevel
 			)
+import TcArrows		( tcProc )
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcThingWithSig )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon )
@@ -281,8 +282,8 @@ tcMonoExpr (HsDo do_or_lc stmts method_names _ src_loc) res_ty
   = addSrcLoc src_loc					$
     zapExpectedType res_ty				`thenM` \ res_ty' ->
 	-- All comprehensions yield a monotype
-    tcDoStmts do_or_lc stmts method_names res_ty'	`thenM` \ (binds, stmts', methods') ->
-    returnM (mkHsLet binds (HsDo do_or_lc stmts' methods' res_ty' src_loc))
+    tcDoStmts do_or_lc stmts method_names res_ty'	`thenM` \ (stmts', methods') ->
+    returnM (HsDo do_or_lc stmts' methods' res_ty' src_loc)
 
 tcMonoExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
   = zapToListTy res_ty                `thenM` \ elt_ty ->  
@@ -306,6 +307,11 @@ tcMonoExpr (ExplicitTuple exprs boxity) res_ty
   = zapToTupleTy boxity (length exprs) res_ty	`thenM` \ arg_tys ->
     tcCheckRhos exprs arg_tys 			`thenM` \ exprs' ->
     returnM (ExplicitTuple exprs' boxity)
+
+tcMonoExpr (HsProc pat cmd loc) res_ty
+  = addSrcLoc loc $
+    tcProc pat cmd res_ty			`thenM` \ (pat', cmd') ->
+    returnM (HsProc pat' cmd' loc)
 \end{code}
 
 
@@ -786,64 +792,65 @@ tcId name	-- Look up the Id and instantiate its type
   = 	-- First check whether it's a DataCon
 	-- Reason: we must not forget to chuck in the
 	--	   constraints from their "silly context"
-    tcLookupGlobal_maybe name		`thenM` \ maybe_thing ->
+    tcLookup name		`thenM` \ maybe_thing ->
     case maybe_thing of {
-	Just (ADataCon data_con) -> inst_data_con data_con ;
-	other			 ->
+	AGlobal (ADataCon data_con)  -> inst_data_con data_con 
+    ;	AGlobal (AnId id)	     -> loop (HsVar id) (idType id)
+		-- A global cannot possibly be ill-staged
+		-- nor does it need the 'lifting' treatment
 
-	-- OK, so now look for ordinary Ids
-    tcLookupIdLvl name			`thenM` \ (id, bind_lvl) ->
+    ;	ATcId id th_level proc_level -> tc_local_id id th_level proc_level
+    ;	other 			     -> pprPanic "tcId" (ppr name)
+    }
+  where
 
 #ifndef GHCI
-    loop (HsVar id) (idType id)		-- Non-TH case
+    tc_local_id id th_bind_lvl proc_lvl			-- Non-TH case
+	= checkProcLevel id proc_lvl	`thenM_`
+	  loop (HsVar id) (idType id)
 
-#else /* GHCI is on */
+#else /* GHCI and TH is on */
+    tc_local_id id th_bind_lvl proc_lvl			-- TH case
+	= checkProcLevel id proc_lvl	`thenM_`
+
 	-- Check for cross-stage lifting
-    getStage				`thenM` \ use_stage -> 
-    case use_stage of
-      Brack use_lvl ps_var lie_var
-	| use_lvl > bind_lvl && not (isExternalName name)
-	-> 	-- E.g. \x -> [| h x |]
+    	  getStage				`thenM` \ use_stage -> 
+	  case use_stage of
+	      Brack use_lvl ps_var lie_var
+		| use_lvl > th_bind_lvl 
+		-> 	-- E.g. \x -> [| h x |]
 		-- We must behave as if the reference to x was
+
 		--	h $(lift x)	
 		-- We use 'x' itself as the splice proxy, used by 
 		-- the desugarer to stitch it all back together.
 		-- If 'x' occurs many times we may get many identical
 		-- bindings of the same splice proxy, but that doesn't
 		-- matter, although it's a mite untidy.
-		--
-		-- NB: During type-checking, isExernalName is true of 
-		-- top level things, and false of nested bindings
-		-- Top-level things don't need lifting.
-	
-	let
-	    id_ty = idType id
-	in
-	checkTc (isTauTy id_ty)	(polySpliceErr id)	`thenM_` 
+		let
+		    id_ty = idType id
+		in
+		checkTc (isTauTy id_ty)	(polySpliceErr id)	`thenM_` 
 		    -- If x is polymorphic, its occurrence sites might
 		    -- have different instantiations, so we can't use plain
 		    -- 'x' as the splice proxy name.  I don't know how to 
 		    -- solve this, and it's probably unimportant, so I'm
 		    -- just going to flag an error for now
 
-	setLIEVar lie_var	(
-	newMethodFromName orig id_ty DsMeta.liftName	`thenM` \ lift ->
-		-- Put the 'lift' constraint into the right LIE
+		setLIEVar lie_var	(
+		newMethodFromName orig id_ty DsMeta.liftName	`thenM` \ lift ->
+			-- Put the 'lift' constraint into the right LIE
 	
-	-- Update the pending splices
-        readMutVar ps_var			`thenM` \ ps ->
-        writeMutVar ps_var ((name, HsApp (HsVar lift) (HsVar id)) : ps)	`thenM_`
+		-- Update the pending splices
+	        readMutVar ps_var			`thenM` \ ps ->
+	        writeMutVar ps_var ((name, HsApp (HsVar lift) (HsVar id)) : ps)	`thenM_`
+	
+		returnM (HsVar id, id_ty))
 
-	returnM (HsVar id, id_ty))
-
-      other -> 
-	checkWellStaged (quotes (ppr id)) bind_lvl use_stage	`thenM_`
-	loop (HsVar id) (idType id)
-#endif
-    }
-
-  where
-    orig = OccurrenceOf name
+	      other -> 
+		checkWellStaged (quotes (ppr id)) th_bind_lvl use_stage	`thenM_`
+		loop (HsVar id) (idType id)
+#endif /* GHCI */
 
     loop (HsVar fun_id) fun_ty
 	| want_method_inst fun_ty
@@ -885,6 +892,8 @@ tcId name	-- Look up the Id and instantiate its type
 	returnM (mkHsDictApp (mkHsTyApp (HsVar (dataConWrapId data_con)) ty_args) 
 			     (map instToId ex_dicts), 
 		 mkFunTys arg_tys result_ty)
+
+    orig = OccurrenceOf name
 \end{code}
 
 %************************************************************************
