@@ -59,6 +59,22 @@ data ParseResult a = POk PState a
       for GHCi.  All three require a parser state (of type
       <code>PState</code>) and are invoked from <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/main/HscMain.lhs"><code>HscMain</code></a>.
+    <p>
+      Parsing of Haskell is a rather involved process.  The most challenging
+      features are probably the treatment of layout and expressions that
+      contain infix operators.  The latter may be user-defined and so are not
+      easily captured in a static syntax specification.  Infix operators may
+      also appear in the right hand sides of value definitions, and so, GHC's
+      parser treats those in the same way as expressions.  In other words, as
+      general expressions are a syntactic superset of expressions - ok, they
+      <em>nearly</em> are - the parser simply attempts to parse a general
+      expression in such positions.  Afterwards, the generated parse tree is
+      inspected to ensure that the accepted phrase indeed forms a legal
+      pattern.  This and similar checks are performed by the routines from <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/parser/ParseUtil.lhs"><code>ParseUtil</code></a>. In
+      some cases, these routines do, in addition to checking for
+      wellformedness, also transform the parse tree, such that it fits into the
+      syntactic context in which it has been parsed.
 
     <h2>The Haskell Interface Parser</h2>
     <p>
@@ -73,7 +89,7 @@ data ParseResult a = POk PState a
     
     <p><small>
 <!-- hhmts start -->
-Last modified: Sun Nov 18 21:22:38 EST 2001
+Last modified: Wed Dec 12 17:45:36 EST 2001
 <!-- hhmts end -->
     </small>
   </body>
