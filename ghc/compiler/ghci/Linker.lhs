@@ -204,7 +204,7 @@ linkExpr hsc_env pcs root_ul_bco
      needed_mods :: [Module]
      needed_mods = [ nameModule n | n <- free_names, isExternalName n ]
  
-dieWith msg = throwDyn (UsageError (showSDoc msg))
+dieWith msg = throwDyn (ProgramError (showSDoc msg))
 
 getLinkDeps :: HomePackageTable -> PackageIfaceTable
 	    -> [Module]				-- If you need these
