@@ -20,7 +20,7 @@ matchSimply
 
 matchSinglePat
 	:: CoreSyn.CoreExpr
-	-> DsMonad.DsMatchContext
+	-> HsExpr.HsMatchContext Name.Name
 	-> HsPat.LPat Var.Id
         -> TcType.TcType
 	-> DsMonad.MatchResult

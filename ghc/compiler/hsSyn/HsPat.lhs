@@ -271,7 +271,7 @@ isLitPat other		        = False
 
 isIrrefutableHsPat :: LPat id -> Bool
 -- This function returns False if it's in doubt; specifically
--- on a ConPatIn it doesn't know th size of the constructor family
+-- on a ConPatIn it doesn't know the size of the constructor family
 -- But if it returns True, the pattern is definitely irrefutable
 isIrrefutableHsPat pat
   = go pat
@@ -281,14 +281,14 @@ isIrrefutableHsPat pat
     go1 (WildPat _)       = True
     go1 (VarPat _)        = True
     go1 (VarPatOut _ _)   = True
-    go1 (LazyPat _)       = True
+    go1 (LazyPat pat)     = True
     go1 (ParPat pat)      = go pat
     go1 (AsPat _ pat)     = go pat
     go1 (SigPatIn pat _)  = go pat
     go1 (SigPatOut pat _) = go pat
-    go1 (ListPat pats _)  = all go pats
     go1 (TuplePat pats _) = all go pats
-    go1 (PArrPat pats _)  = all go pats
+    go1 (ListPat pats _)  = False
+    go1 (PArrPat pats _)  = False	-- ?
 
     go1 (ConPatIn _ _) = False	-- Conservative
     go1 (ConPatOut (L _ con) _ _ _ details _) 
