@@ -540,18 +540,35 @@ tcExtendLocalInstEnv dfuns thing_inside
  = do { traceDFuns dfuns
       ; eps <- getEps
       ; env <- getGblEnv
-      ; inst_env' <- foldlM (extend (eps_inst_env eps)) 
+      ; dflags  <- getDOpts
+      ; inst_env' <- foldlM (extend dflags (eps_inst_env eps)) 
 			    (tcg_inst_env env) 
 			    dfuns
       ; let env' = env { tcg_insts = dfuns ++ tcg_insts env,
 			 tcg_inst_env = inst_env' }
       ; setGblEnv env' thing_inside }
  where
-  extend pkg_ie home_ie dfun
-   = do	{ case checkFunDeps (home_ie, pkg_ie) dfun of
+  extend dflags pkg_ie home_ie dfun
+   = do	{ checkNewInst dflags (home_ie, pkg_ie) dfun
+	; return (extendInstEnv home_ie dfun) }
+
+checkNewInst :: DynFlags -> (InstEnv, InstEnv) -> DFunId -> TcM ()
+-- Check that the proposed new instance is OK
+checkNewInst dflags ies dfun
+  = do	{ 	-- Check functional dependencies
+	  case checkFunDeps (home_ie, pkg_ie) dfun of
 		Just dfuns -> funDepErr dfun dfuns
 		Nothing    -> return ()
-	; return (extendInstEnv home_ie dfun) }
+
+		-- Check for duplicate instance decls
+	; mappM_ (dupInstErr dfun) dup_dfuns }
+  where
+    (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
+    (matches, _) = lookupInstEnv dflags ies clas tys
+    dup_dfuns = [dfun | (_, (_, dup_tys, dup_dfun)) <- matches,
+			isJust (matchTys tvs tys dup_tys)]
+	-- Find memebers of the match list which 
+	-- dfun itself matches. If the match is 2-way, it's a duplicate
 
 traceDFuns dfuns
   = traceTc (text "Adding instances:" <+> vcat (map pp dfuns))
@@ -562,6 +579,10 @@ funDepErr dfun dfuns
   = addSrcLoc (getSrcLoc dfun) $
     addErr (hang (ptext SLIT("Functional dependencies conflict between instance declarations:"))
 	       2 (pprDFuns (dfun:dfuns)))
+dupInstErr dfun dup_dfun
+  = addSrcLoc (getSrcLoc dfun) $
+    addErr (hang (ptext SLIT("Duplicate instance declarations:"))
+	       2 (pprDFuns [dfun, dup_dfun]))
 \end{code}
 
 %************************************************************************

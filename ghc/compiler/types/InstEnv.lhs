@@ -272,20 +272,20 @@ lookupInstEnv dflags (home_ie, pkg_ie) cls tys
   where
     incoherent_ok = dopt Opt_AllowIncoherentInstances  dflags
     overlap_ok    = dopt Opt_AllowOverlappingInstances dflags
-    (home_matches, home_unifs) = lookup_inst_env incoherent_ok home_ie cls tys
-    (pkg_matches,  pkg_unifs)  = lookup_inst_env incoherent_ok pkg_ie  cls tys
+    (home_matches, home_unifs) = lookup_inst_env home_ie cls tys
+    (pkg_matches,  pkg_unifs)  = lookup_inst_env pkg_ie  cls tys
     all_matches = home_matches ++ pkg_matches
-    all_unifs   = home_unifs ++ pkg_unifs
+    all_unifs | incoherent_ok = []	-- Don't worry about these if incoherent is ok!
+	      | otherwise     = home_unifs ++ pkg_unifs
 
     pruned_matches | overlap_ok = foldr insert_overlapping [] all_matches
 		   | otherwise  = all_matches
 
-lookup_inst_env :: Bool
-	      -> InstEnv 				-- The envt
-	      -> Class -> [Type]			-- What we are looking for
-	      -> ([(TyVarSubstEnv, InstEnvElt)], 	-- Successful matches
-		  [Id])					-- These don't match but do unify
-lookup_inst_env incoherent_ok env key_cls key_tys
+lookup_inst_env :: InstEnv 				-- The envt
+	      	-> Class -> [Type]			-- What we are looking for
+	      	-> ([(TyVarSubstEnv, InstEnvElt)], 	-- Successful matches
+	 	    [Id])				-- These don't match but do unify
+lookup_inst_env env key_cls key_tys
   = find (classInstEnv env key_cls) [] []
   where
     key_vars = tyVarsOfTypes key_tys
@@ -296,10 +296,6 @@ lookup_inst_env incoherent_ok env key_cls key_tys
 	  Just (subst, leftovers) -> ASSERT( null leftovers )
 				     find rest ((subst,item):ms) us
 	  Nothing 
-	   | incoherent_ok -> find rest ms us
-		-- If we allow incoherent instances we don't worry about the 
-		-- test and just blaze on anyhow.  Requested by John Hughes.
-	   | otherwise
 		-- Does not match, so next check whether the things unify
 		-- [see notes about overlapping instances above]
 	   -> case unifyTyListsX (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
