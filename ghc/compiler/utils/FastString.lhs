@@ -48,7 +48,7 @@ module FastString
 #define COMPILING_FAST_STRING
 #include "HsVersions.h"
 
-#if 0 && __GLASGOW_HASKELL__ < 301
+#if __GLASGOW_HASKELL__ < 301
 import PackBase
 import STBase		( StateAndPtr#(..) )
 import IOHandle		( filePtr, readHandle, writeHandle )
