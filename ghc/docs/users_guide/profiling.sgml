@@ -1,906 +1,806 @@
-<Chapter id="profiling">
-<Title>Profiling
-</Title>
-
-<Para>
-<IndexTerm><Primary>profiling, with cost-centres</Primary></IndexTerm>
-<IndexTerm><Primary>cost-centre profiling</Primary></IndexTerm>
-Glasgow Haskell comes with a time and space profiling system. Its
-purpose is to help you improve your understanding of your program's
-execution behaviour, so you can improve it.
-</Para>
-
-<Para>
-Any comments, suggestions and/or improvements you have are welcome.
-Recommended &ldquo;profiling tricks&rdquo; would be especially cool!
-</Para>
-
-<Sect1 id="profiling-intro">
-<Title>How to profile a Haskell program
-</Title>
-
-<Para>
-The GHC approach to profiling is very simple: annotate the expressions
-you consider &ldquo;interesting&rdquo; with <Emphasis>cost centre</Emphasis> labels (strings);
-so, for example, you might have:
-</Para>
-
-<Para>
-
-<ProgramListing>
-f x y
-  = let
-        output1 = _scc_ "Pass1" ( pass1 x )
-        output2 = _scc_ "Pass2" ( pass2 output1 y )
-        output3 = _scc_ "Pass3" ( pass3 (output2 `zip` [1 .. ]) )
-    in concat output3
-</ProgramListing>
-
-</Para>
-
-<Para>
-The costs of the evaluating the expressions bound to <VarName>output1</VarName>,
-<VarName>output2</VarName> and <VarName>output3</VarName> will be attributed to the &ldquo;cost
-centres&rdquo; <VarName>Pass1</VarName>, <VarName>Pass2</VarName> and <VarName>Pass3</VarName>, respectively.
-</Para>
-
-<Para>
-The costs of evaluating other expressions, e.g., <Literal>concat output4</Literal>,
-will be inherited by the scope which referenced the function <Function>f</Function>.
-</Para>
-
-<Para>
-You can put in cost-centres via <Function>&lowbar;scc&lowbar;</Function> constructs by hand, as in the
-example above.  Perfectly cool.  That's probably what you
-<Emphasis>would</Emphasis> do if your program divided into obvious &ldquo;passes&rdquo; or
-&ldquo;phases&rdquo;, or whatever.
-</Para>
-
-<Para>
-If your program is large or you have no clue what might be gobbling
-all the time, you can get GHC to mark all functions with <Function>&lowbar;scc&lowbar;</Function>
-constructs, automagically.  Add an <Option>-auto</Option> compilation flag to the
-usual <Option>-prof</Option> option.
-</Para>
-
-<Para>
-Once you start homing in on the Guilty Suspects, you may well switch
-from automagically-inserted cost-centres to a few well-chosen ones of
-your own.
-</Para>
-
-<Para>
-To use profiling, you must <Emphasis>compile</Emphasis> and <Emphasis>run</Emphasis> with special
-options.  (We usually forget the &ldquo;run&rdquo; magic!&mdash;Do as we say, not as
-we do&hellip;) Details follow.
-</Para>
-
-<Para>
-If you're serious about this profiling game, you should probably read
-one or more of the Sansom/Peyton Jones papers about the GHC profiling
-system.  Just visit the <ULink URL="http://www.dcs.gla.ac.uk/fp/">Glasgow FP group web page</ULink>&hellip;
-</Para>
-
-</Sect1>
-
-<Sect1 id="prof-compiler-options">
-<Title>Compiling programs for profiling
-</Title>
-
-<Para>
-<IndexTerm><Primary>profiling options</Primary></IndexTerm>
-<IndexTerm><Primary>options, for profiling</Primary></IndexTerm>
-</Para>
-
-<Para>
-To make use of the cost centre profiling system <Emphasis>all</Emphasis> modules must
-be compiled and linked with the <Option>-prof</Option> option.<IndexTerm><Primary>-prof option</Primary></IndexTerm>
-Any <Function>&lowbar;scc&lowbar;</Function> constructs you've put in your source will spring to life.
-</Para>
-
-<Para>
-Without a <Option>-prof</Option> option, your <Function>&lowbar;scc&lowbar;</Function>s are ignored; so you can
-compiled <Function>&lowbar;scc&lowbar;</Function>-laden code without changing it.
-</Para>
-
-<Para>
-There are a few other profiling-related compilation options.  Use them
-<Emphasis>in addition to</Emphasis> <Option>-prof</Option>.  These do not have to be used
-consistently for all modules in a program.
-</Para>
-
-<Para>
-<VariableList>
-
-<VarListEntry>
-<Term><Option>-auto</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-auto option</Primary></IndexTerm>
-<IndexTerm><Primary>cost centres, automatically inserting</Primary></IndexTerm>
-GHC will automatically add <Function>&lowbar;scc&lowbar;</Function> constructs for
-all top-level, exported functions.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-auto-all</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-auto-all option</Primary></IndexTerm>
-<Emphasis>All</Emphasis> top-level functions, exported or not, will be automatically
-<Function>&lowbar;scc&lowbar;</Function>'d.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-caf-all</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-caf-all option</Primary></IndexTerm>
-The costs of all CAFs in a module are usually attributed to one
-&ldquo;big&rdquo; CAF cost-centre. With this option, all CAFs get their own cost-centre.
-An &ldquo;if all else fails&rdquo; option&hellip;
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-ignore-scc</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-ignore-scc option</Primary></IndexTerm>
-Ignore any <Function>&lowbar;scc&lowbar;</Function> constructs,
-so a module which already has <Function>&lowbar;scc&lowbar;</Function>s can be
-compiled for profiling with the annotations ignored.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-G&lt;group&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-G&lt;group&gt; option</Primary></IndexTerm>
-Specifies the <Literal>&lt;group&gt;</Literal> to be attached to all the cost-centres
-declared in the module. If no group is specified it defaults to the
-module name.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
-
-<Para>
-In addition to the <Option>-prof</Option> option your system might be setup to enable
-you to compile and link with the <Option>-prof-details</Option> <IndexTerm><Primary>-prof-details
-option</Primary></IndexTerm> option instead. This enables additional detailed counts
-to be reported with the <Option>-P</Option> RTS option.
-</Para>
-
-</Sect1>
-
-<Sect1 id="prof-rts-options">
-<Title>How to control your profiled program at runtime
-</Title>
-
-<Para>
-<IndexTerm><Primary>profiling RTS options</Primary></IndexTerm>
-<IndexTerm><Primary>RTS options, for profiling</Primary></IndexTerm>
-</Para>
-
-<Para>
-It isn't enough to compile your program for profiling with <Option>-prof</Option>!
-</Para>
-
-<Para>
-When you <Emphasis>run</Emphasis> your profiled program, you must tell the runtime
-system (RTS) what you want to profile (e.g., time and/or space), and
-how you wish the collected data to be reported.  You also may wish to
-set the sampling interval used in time profiling.
-</Para>
-
-<Para>
-Executive summary: <Command>./a.out +RTS -pT</Command> produces a time profile in
-<Filename>a.out.prof</Filename>; <Command>./a.out +RTS -hC</Command> produces space-profiling
-info which can be mangled by <Command>hp2ps</Command> and viewed with <Command>ghostview</Command>
-(or equivalent).
-</Para>
-
-<Para>
-Profiling runtime flags are passed to your program between the usual
-<Option>+RTS</Option> and <Option>-RTS</Option> options.
-</Para>
-
-<Para>
-<VariableList>
-
-<VarListEntry>
-<Term><Option>-p&lt;sort&gt;</Option> or <Option>-P&lt;sort&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-p&lt;sort&gt; RTS option (profiling)</Primary></IndexTerm>
-<IndexTerm><Primary>-P&lt;sort&gt; RTS option (profiling)</Primary></IndexTerm>
-<IndexTerm><Primary>time profile</Primary></IndexTerm>
-<IndexTerm><Primary>serial time profile</Primary></IndexTerm>
-The <Option>-p?</Option> option produces a standard <Emphasis>time profile</Emphasis> report.
-It is written into the file <Filename>&lt;program&gt;@.prof</Filename>.
-</Para>
-
-<Para>
-The <Option>-P?</Option> option produces a more detailed report containing the
-actual time and allocation data as well.  (Not used much.)
-</Para>
-
-<Para>
-The <Literal>&lt;sort&gt;</Literal> indicates how the cost centres are to be sorted in the
-report. Valid <Literal>&lt;sort&gt;</Literal> options are:
-<VariableList>
-
-<VarListEntry>
-<Term><Option>T</Option>:</Term>
-<ListItem>
-<Para>
-by time, largest first (the default);
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>A</Option>:</Term>
-<ListItem>
-<Para>
-by bytes allocated, largest first;
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>C</Option>:</Term>
-<ListItem>
-<Para>
-alphabetically by group, module and cost centre.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-i&lt;secs&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-i&lt;secs&gt; RTS option
-(profiling)</Primary></IndexTerm> Set the profiling (sampling) interval to <Literal>&lt;secs&gt;</Literal>
-seconds (the default is 1&nbsp;second).  Fractions are allowed: for example
-<Option>-i0.2</Option> will get 5 samples per second.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-h&lt;break-down&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-h&lt;break-down&gt; RTS option (profiling)</Primary></IndexTerm>
-<IndexTerm><Primary>heap profile</Primary></IndexTerm>
-</Para>
-
-<Para>
-Produce a detailed <Emphasis>space profile</Emphasis> of the heap occupied by live
-closures. The profile is written to the file <Filename>&lt;program&gt;@.hp</Filename> from
-which a PostScript graph can be produced using <Command>hp2ps</Command> (see 
-<XRef LinkEnd="hp2ps">).
-</Para>
-
-<Para>
-The heap space profile may be broken down by different criteria:
-<VariableList>
-
-<VarListEntry>
-<Term><Option>-hC</Option>:</Term>
-<ListItem>
-<Para>
-cost centre which produced the closure (the default).
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-hM</Option>:</Term>
-<ListItem>
-<Para>
-cost centre module which produced the closure.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-hG</Option>:</Term>
-<ListItem>
-<Para>
-cost centre group which produced the closure.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-hD</Option>:</Term>
-<ListItem>
-<Para>
-closure description&mdash;a string describing the closure.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-hY</Option>:</Term>
-<ListItem>
-<Para>
-closure type&mdash;a string describing the closure's type.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-By default all live closures in the heap are profiled, but particular
-closures of interest can be selected (see below).
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
-
-<Para>
-Heap (space) profiling uses hash tables. If these tables
-should fill the run will abort. The
-<Option>-z&lt;tbl&gt;&lt;size&gt;</Option><IndexTerm><Primary>-z&lt;tbl&gt;&lt;size&gt; RTS option (profiling)</Primary></IndexTerm> option is used to
-increase the size of the relevant hash table (<Literal>C</Literal>, <Literal>M</Literal>,
-<Literal>G</Literal>, <Literal>D</Literal> or <Literal>Y</Literal>, defined as for <Literal>&lt;break-down&gt;</Literal> above). The
-actual size used is the next largest power of 2.
-</Para>
-
-<Para>
-The heap profile can be restricted to particular closures of interest.
-The closures of interest can selected by the attached cost centre
-(module:label, module and group), closure category (description, type,
-and kind) using the following options:
-</Para>
-
-<Para>
-<VariableList>
-
-<VarListEntry>
-<Term><Option>-c&lcub;&lt;mod&gt;:&lt;lab&gt;,&lt;mod&gt;:&lt;lab&gt;...</Option>&rcub;:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-c&lcub;&lt;lab&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
-Selects individual cost centre(s).
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-m&lcub;&lt;mod&gt;,&lt;mod&gt;...</Option>&rcub;:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-m&lcub;&lt;mod&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
-Selects all cost centres from the module(s) specified.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-g&lcub;&lt;grp&gt;,&lt;grp&gt;...</Option>&rcub;:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-g&lcub;&lt;grp&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
-Selects all cost centres from the groups(s) specified.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-d&lcub;&lt;des&gt;,&lt;des&gt;...</Option>&rcub;:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-d&lcub;&lt;des&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
-Selects closures which have one of the specified descriptions.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-y&lcub;&lt;typ&gt;,&lt;typ&gt;...</Option>&rcub;:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-y&lcub;&lt;typ&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
-Selects closures which have one of the specified type descriptions.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-k&lcub;&lt;knd&gt;,&lt;knd&gt;...</Option>&rcub;:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-k&lcub;&lt;knd&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
-Selects closures which are of one of the specified closure kinds.
-Valid closure kinds are <Literal>CON</Literal> (constructor), <Literal>FN</Literal> (manifest
-function), <Literal>PAP</Literal> (partial application), <Literal>BH</Literal> (black hole) and
-<Literal>THK</Literal> (thunk).
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
-
-<Para>
-The space occupied by a closure will be reported in the heap profile
-if the closure satisfies the following logical expression:
-</Para>
-
-<Para>
-<Quote>(&lsqb;-c&rsqb; or &lsqb;-m&rsqb; or &lsqb;-g&rsqb;) and (&lsqb;-d&rsqb; or &lsqb;-y&rsqb; or &lsqb;-k&rsqb;)</Quote>
-</Para>
-
-<Para>
-where a particular option is true if the closure (or its attached cost
-centre) is selected by the option (or the option is not specified).
-</Para>
-
-</Sect1>
-
-<Sect1 id="prof-output">
-<Title>What's in a profiling report?
-</Title>
-
-<Para>
-<IndexTerm><Primary>profiling report, meaning thereof</Primary></IndexTerm>
-</Para>
-
-<Para>
-When you run your profiled program with the <Option>-p</Option> RTS option <IndexTerm><Primary>-p
-RTS option</Primary></IndexTerm>, you get the following information about your &ldquo;cost
-centres&rdquo;:
-</Para>
-
-<Para>
-<VariableList>
-
-<VarListEntry>
-<Term><Literal>COST CENTRE</Literal>:</Term>
-<ListItem>
-<Para>
-The cost-centre's name.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>MODULE</Literal>:</Term>
-<ListItem>
-<Para>
-The module associated with the cost-centre;
-important mostly if you have identically-named cost-centres in
-different modules.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>scc</Literal>:</Term>
-<ListItem>
-<Para>
-How many times this cost-centre was entered; think
-of it as &ldquo;I got to the <Function>&lowbar;scc&lowbar;</Function> construct this many times&hellip;&rdquo;
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>&percnt;time</Literal>:</Term>
-<ListItem>
-<Para>
-What part of the time was spent in this cost-centre (see also &ldquo;ticks,&rdquo;
-below).
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>&percnt;alloc</Literal>:</Term>
-<ListItem>
-<Para>
-What part of the memory allocation was done in this cost-centre
-(see also &ldquo;bytes,&rdquo; below).
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>inner</Literal>:</Term>
-<ListItem>
-<Para>
-How many times this cost-centre &ldquo;passed control&rdquo; to an inner
-cost-centre; for example, <Literal>scc=4</Literal> plus <Literal>subscc=8</Literal> means
-&ldquo;This <Literal>&lowbar;scc&lowbar;</Literal> was entered four times, but went out to
-other <Literal>&lowbar;scc&lowbar;s</Literal> eight times.&rdquo;
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>cafs</Literal>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>CAF, profiling</Primary></IndexTerm>
-How many CAFs this cost centre evaluated.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>dicts</Literal>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>Dictionaries, profiling</Primary></IndexTerm>
-How many dictionaries this cost centre evaluated.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
-
-<Para>
-In addition you can use the <Option>-P</Option> RTS option <IndexTerm><Primary></Primary></IndexTerm> to get the following additional information:
-<VariableList>
-
-<VarListEntry>
-<Term><Literal>ticks</Literal>:</Term>
-<ListItem>
-<Para>
-The raw number of time &ldquo;ticks&rdquo; which were
-attributed to this cost-centre; from this, we get the <Literal>&percnt;time</Literal>
-figure mentioned above.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>bytes</Literal>:</Term>
-<ListItem>
-<Para>
-Number of bytes allocated in the heap while in
-this cost-centre; again, this is the raw number from which we
-get the <Literal>&percnt;alloc</Literal> figure mentioned above.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
-
-<Para>
-Finally if you built your program with <Option>-prof-details</Option>
-<IndexTerm><Primary></Primary></IndexTerm> the <Option>-P</Option> RTS option will also
-produce the following information:
-<VariableList>
-
-<VarListEntry>
-<Term><Literal>closures</Literal>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>closures, profiling</Primary></IndexTerm>
-How many heap objects were allocated; these objects may be of varying
-size.  If you divide the number of bytes (mentioned below) by this
-number of &ldquo;closures&rdquo;, then you will get the average object size.
-(Not too interesting, but still&hellip;)
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>thunks</Literal>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>thunks, profiling</Primary></IndexTerm>
-How many times we entered (evaluated) a thunk&mdash;an unevaluated
-object in the heap&mdash;while we were in this cost-centre.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>funcs</Literal>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>functions, profiling</Primary></IndexTerm>
-How many times we entered (evaluated) a function while we we in this
-cost-centre.  (In Haskell, functions are first-class values and may be
-passed as arguments, returned as results, evaluated, and generally
-manipulated just like data values)
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Literal>PAPs</Literal>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>partial applications, profiling</Primary></IndexTerm>
-How many times we entered (evaluated) a partial application (PAP), i.e.,
-a function applied to fewer arguments than it needs.  For example, <Literal>Int</Literal>
-addition applied to one argument would be a PAP.  A PAP is really
-just a particular form for a function.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
-
-</Sect1>
-
-<Sect1 id="prof-graphs">
-<Title>Producing graphical heap profiles
-</Title>
-
-<Para>
-<IndexTerm><Primary>heap profiles, producing</Primary></IndexTerm>
-</Para>
-
-<Para>
-Utility programs which produce graphical profiles.
-</Para>
-
-<Sect2 id="hp2ps">
-<Title><Command>hp2ps</Command>--heap profile to PostScript
-</Title>
-
-<Para>
-<IndexTerm><Primary>hp2ps (utility)</Primary></IndexTerm>
-<IndexTerm><Primary>heap profiles</Primary></IndexTerm>
-<IndexTerm><Primary>PostScript, from heap profiles</Primary></IndexTerm>
-</Para>
-
-<Para>
-Usage:
-</Para>
-
-<Para>
-
-<Screen>
-hp2ps [flags] [&#60;file&#62;[.stat]]
-</Screen>
-
-</Para>
-
-<Para>
-The program <Command>hp2ps</Command><IndexTerm><Primary>hp2ps program</Primary></IndexTerm> converts a heap profile
-as produced by the <Option>-h&lt;break-down&gt;</Option><IndexTerm><Primary>-h&lt;break-down&gt; RTS
-option</Primary></IndexTerm> runtime option into a PostScript graph of the heap
-profile. By convention, the file to be processed by <Command>hp2ps</Command> has a
-<Filename>.hp</Filename> extension. The PostScript output is written to <Filename>&lt;file&gt;@.ps</Filename>. If
-<Filename>&lt;file&gt;</Filename> is omitted entirely, then the program behaves as a filter.
-</Para>
-
-<Para>
-<Command>hp2ps</Command> is distributed in <Filename>ghc/utils/hp2ps</Filename> in a GHC source
-distribution. It was originally developed by Dave Wakeling as part of
-the HBC/LML heap profiler.
-</Para>
-
-<Para>
-The flags are:
-<VariableList>
-
-<VarListEntry>
-<Term><Option>-d</Option></Term>
-<ListItem>
-<Para>
-In order to make graphs more readable, <Command>hp2ps</Command> sorts the shaded
-bands for each identifier. The default sort ordering is for the bands
-with the largest area to be stacked on top of the smaller ones.  The
-<Option>-d</Option> option causes rougher bands (those representing series of
-values with the largest standard deviations) to be stacked on top of
-smoother ones.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-b</Option></Term>
-<ListItem>
-<Para>
-Normally, <Command>hp2ps</Command> puts the title of the graph in a small box at the
-top of the page. However, if the JOB string is too long to fit in a
-small box (more than 35 characters), then
-<Command>hp2ps</Command> will choose to use a big box instead.  The <Option>-b</Option>
-option forces <Command>hp2ps</Command> to use a big box.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-e&lt;float&gt;[in&verbar;mm&verbar;pt]</Option></Term>
-<ListItem>
-<Para>
-Generate encapsulated PostScript suitable for inclusion in LaTeX
-documents.  Usually, the PostScript graph is drawn in landscape mode
-in an area 9 inches wide by 6 inches high, and <Command>hp2ps</Command> arranges
-for this area to be approximately centred on a sheet of a4 paper.
-This format is convenient of studying the graph in detail, but it is
-unsuitable for inclusion in LaTeX documents.  The <Option>-e</Option> option
-causes the graph to be drawn in portrait mode, with float specifying
-the width in inches, millimetres or points (the default).  The
-resulting PostScript file conforms to the Encapsulated PostScript
-(EPS) convention, and it can be included in a LaTeX document using
-Rokicki's dvi-to-PostScript converter <Command>dvips</Command>.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-g</Option></Term>
-<ListItem>
-<Para>
-Create output suitable for the <Command>gs</Command> PostScript previewer (or
-similar). In this case the graph is printed in portrait mode without
-scaling. The output is unsuitable for a laser printer.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-l</Option></Term>
-<ListItem>
-<Para>
-Normally a profile is limited to 20 bands with additional identifiers
-being grouped into an <Literal>OTHER</Literal> band. The <Option>-l</Option> flag removes this
-20 band and limit, producing as many bands as necessary. No key is
-produced as it won't fit!. It is useful for creation time profiles
-with many bands.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-m&lt;int&gt;</Option></Term>
-<ListItem>
-<Para>
-Normally a profile is limited to 20 bands with additional identifiers
-being grouped into an <Literal>OTHER</Literal> band. The <Option>-m</Option> flag specifies an
-alternative band limit (the maximum is 20).
-</Para>
-
-<Para>
-<Option>-m0</Option> requests the band limit to be removed. As many bands as
-necessary are produced. However no key is produced as it won't fit! It
-is useful for displaying creation time profiles with many bands.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-p</Option></Term>
-<ListItem>
-<Para>
-Use previous parameters. By default, the PostScript graph is
-automatically scaled both horizontally and vertically so that it fills
-the page.  However, when preparing a series of graphs for use in a
-presentation, it is often useful to draw a new graph using the same
-scale, shading and ordering as a previous one. The <Option>-p</Option> flag causes
-the graph to be drawn using the parameters determined by a previous
-run of <Command>hp2ps</Command> on <Filename>file</Filename>. These are extracted from
-<Filename>file@.aux</Filename>.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-s</Option></Term>
-<ListItem>
-<Para>
-Use a small box for the title.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-t&lt;float&gt;</Option></Term>
-<ListItem>
-<Para>
-Normally trace elements which sum to a total of less than 1&percnt; of the
-profile are removed from the profile. The <Option>-t</Option> option allows this
-percentage to be modified (maximum 5&percnt;).
-</Para>
-
-<Para>
-<Option>-t0</Option> requests no trace elements to be removed from the profile,
-ensuring that all the data will be displayed.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-?</Option></Term>
-<ListItem>
-<Para>
-Print out usage information.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
-
-</Sect2>
-
-<Sect2 id="stat2resid">
-<Title><Command>stat2resid</Command>&mdash;residency info from GC stats
-</Title>
-
-<Para>
-<IndexTerm><Primary>stat2resid (utility)</Primary></IndexTerm>
-<IndexTerm><Primary>GC stats&mdash;residency info</Primary></IndexTerm>
-<IndexTerm><Primary>residency, from GC stats</Primary></IndexTerm>
-</Para>
-
-<Para>
-Usage:
-</Para>
-
-<Para>
-
-<Screen>
-stat2resid [&#60;file&#62;[.stat] [&#60;outfile&#62;]]
-</Screen>
-
-</Para>
-
-<Para>
-The program <Command>stat2resid</Command><IndexTerm><Primary>stat2resid</Primary></IndexTerm> converts a detailed
-garbage collection statistics file produced by the
-<Option>-S</Option><IndexTerm><Primary>-S RTS option</Primary></IndexTerm> runtime option into a PostScript heap
-residency graph. The garbage collection statistics file can be
-produced without compiling your program for profiling.
-</Para>
-
-<Para>
-By convention, the file to be processed by <Command>stat2resid</Command> has a
-<Filename>.stat</Filename> extension. If the <Filename>&lt;outfile&gt;</Filename> is not specified the
-PostScript will be written to <Filename>&lt;file&gt;@.resid.ps</Filename>. If
-<Filename>&lt;file&gt;</Filename> is omitted entirely, then the program behaves as a filter.
-</Para>
-
-<Para>
-The plot can not be produced from the statistics file for a
-generational collector, though a suitable stats file can be produced
-using the <Option>-G1</Option><IndexTerm><Primary>-G RTS
-option</Primary></IndexTerm> runtime option when the program has been
-compiled for generational garbage collection (the default).
-</Para>
-
-<Para>
-<Command>stat2resid</Command> is distributed in <Filename>ghc/utils/stat2resid</Filename> in a GHC source
-distribution.
-</Para>
-
-</Sect2>
-
-</Sect1>
-
-<Sect1 id="ticky-ticky">
-<Title>Using &ldquo;ticky-ticky&rdquo; profiling (for implementors)
-</Title>
-
-<Para>
-<IndexTerm><Primary>ticky-ticky profiling (implementors)</Primary></IndexTerm>
-</Para>
-
-<Para>
-(ToDo: document properly.)
-</Para>
-
-<Para>
-It is possible to compile Glasgow Haskell programs so that they will
-count lots and lots of interesting things, e.g., number of updates,
-number of data constructors entered, etc., etc.  We call this
-&ldquo;ticky-ticky&rdquo; profiling,<IndexTerm><Primary>ticky-ticky profiling</Primary></IndexTerm>
-<IndexTerm><Primary>profiling, ticky-ticky</Primary></IndexTerm> because that's the sound a Sun4 makes
-when it is running up all those counters (<Emphasis>slowly</Emphasis>).
-</Para>
-
-<Para>
-Ticky-ticky profiling is mainly intended for implementors; it is quite
-separate from the main &ldquo;cost-centre&rdquo; profiling system, intended for
-all users everywhere.
-</Para>
-
-<Para>
-To be able to use ticky-ticky profiling, you will need to have built
-appropriate libraries and things when you made the system.  See
-&ldquo;Customising what libraries to build,&rdquo; in the installation guide.
-</Para>
-
-<Para>
-To get your compiled program to spit out the ticky-ticky numbers, use
-a <Option>-r</Option> RTS option<IndexTerm><Primary>-r RTS option</Primary></IndexTerm>.  See <XRef LinkEnd="runtime-control">.
-</Para>
-
-<Para>
-Compiling your program with the <Option>-ticky</Option> switch yields an executable
-that performs these counts.  Here is a sample ticky-ticky statistics
-file, generated by the invocation <Command>foo +RTS -rfoo.ticky</Command>.
-</Para>
-
-<Para>
-
-<Screen>
+<chapter id="profiling">
+  <title>Profiling</Title>
+  <indexterm><primary>profiling</primary>
+  </indexterm>
+  <indexterm><primary>cost-centre profiling</primary></indexterm>
+
+  <Para> Glasgow Haskell comes with a time and space profiling
+  system. Its purpose is to help you improve your understanding of
+  your program's execution behaviour, so you can improve it.</Para>
+  
+  <Para> Any comments, suggestions and/or improvements you have are
+  welcome.  Recommended &ldquo;profiling tricks&rdquo; would be
+  especially cool! </Para>
+
+  <para>Profiling a program is a three-step process:</para>
+
+  <orderedlist>
+    <listitem>
+      <para> Re-compile your program for profiling with the
+      <literal>-prof</literal> option, and probably one of the
+      <literal>-auto</literal> or <literal>-auto-all</literal>
+      options.  These options are described in more detail in <xref
+      linkend="prof-compiler-options"> </para>
+      <indexterm><primary><literal>-prof</literal></primary>
+      </indexterm>
+      <indexterm><primary><literal>-auto</literal></primary>
+      </indexterm>
+      <indexterm><primary><literal>-auto-all</literal></primary>
+      </indexterm>
+    </listitem>
+
+    <listitem>
+      <para> Run your program with one of the profiling options
+      <literal>-p</literal> or <literal>-h</literal>.  This generates
+      a file of profiling information.</para>
+      <indexterm><primary><literal>-p</literal></primary><secondary>RTS
+      option</secondary></indexterm>
+      <indexterm><primary><literal>-h</literal></primary><secondary>RTS
+      option</secondary></indexterm>
+    </listitem>
+      
+    <listitem>
+      <para> Examine the generated profiling information, using one of
+      GHC's profiling tools.  The tool to use will depend on the kind
+      of profiling information generated.</para>
+    </listitem>
+    
+  </orderedlist>
+  
+  <sect1>
+    <title>Cost centres and cost-centre stacks</title>
+    
+    <para>GHC's profiling system assigns <firstterm>costs</firstterm>
+    to <firstterm>cost centres</firstterm>.  A cost is simply the time
+    or space required to evaluate an expression.  Cost centres are
+    program annotations around expressions; all costs incurred by the
+    annotated expression are assigned to the enclosing cost centre.
+    Furthermore, GHC will remember the stack of enclosing cost centres
+    for any given expression at run-time and generate a call-graph of
+    cost attributions.</para>
+
+    <para>Let's take a look at an example:</para>
+
+    <programlisting>
+main = print (nfib 25)
+nfib n = if n < 2 then 1 else nfib (n-1) + nfib (n-2)
+</programlisting>
+
+    <para>Compile and run this program as follows:</para>
+
+    <screen>
+$ ghc -prof -auto-all -o Main Main.hs
+$ ./Main +RTS -p
+121393
+$
+</screen>
+
+    <para>When a GHC-compiled program is run with the
+    <option>-p</option> RTS option, it generates a file called
+    <filename>&lt;prog&gt;.prof</filename>.  In this case, the file
+    will contain something like this:</para>
+
+<screen>
+       Tue Apr 18 12:52 2000 Time and Allocation Profiling Report  (Final)
+
+           Main +RTS -p -RTS
+
+        total time  =        0.14 secs   (7 ticks @ 20 ms)
+        total alloc =   8,741,204 bytes  (excludes profiling overheads)
+
+COST CENTRE          MODULE     %time %alloc
+
+nfib                 Main       100.0  100.0
+
+
+COST CENTRE              MODULE         scc %time %alloc    inner  cafs
+
+MAIN                     MAIN             0   0.0   0.0        0     1
+ main                    Main             0   0.0   0.0        0     1
+ CAF 			 PrelHandle       3   0.0   0.0        0     3
+ CAF 			 PrelAddr         1   0.0   0.0        0     0
+ CAF 			 Main             6   0.0   0.0        1     0
+  main                   Main             1   0.0   0.0        1     1
+   nfib                  Main        242785 100.0 100.0   242784     4
+</screen>
+
+
+    <para>The first part of the file gives the program name and
+    options, and the total time and total memory allocation measured
+    during the run of the program (note that the total memory
+    allocation figure isn't the same as the amount of
+    <emphasis>live</emphasis> memory needed by the program at any one
+    time; the latter can be determined using heap profiling, which we
+    will describe shortly).</para>
+
+    <para>The second part of the file is a break-down by cost centre
+    of the most costly functions in the program.  In this case, there
+    was only one significant function in the program, namely
+    <function>nfib</function>, and it was responsible for 100&percnt;
+    of both the time and allocation costs of the program.</para>
+
+    <para>The third and final section of the file gives a profile
+    break-down by cost-centre stack.  This is roughly a call-graph
+    profile of the program.  In the example above, it is clear that
+    the costly call to <function>nfib</function> came from
+    <function>main</function>.</para>
+
+    <para>The usefulness of cost-centre stacks is better demonstrated
+    by  modifying the example slightly:</para>
+
+    <programlisting>
+main = print (f 25 + g 25)
+f n  = nfib n
+g n  = nfib (n/2)
+nfib n = if n < 2 then 1 else nfib (n-1) + nfib (n-2)
+</programlisting>
+
+    <para>Compile and run this program as before, and take a look at
+    the new profiling results:</para>
+
+<screen>
+COST CENTRE              MODULE         scc %time %alloc    inner  cafs
+
+MAIN                     MAIN             0   0.0   0.0        0     1
+ main                    Main             0   0.0   0.0        0     1
+ CAF                     PrelHandle       3   0.0   0.0        0     3
+ CAF                     PrelAddr         1   0.0   0.0        0     0
+ CAF             	 Main             9   0.0   0.0        1     1
+  main                   Main             1   0.0   0.0        2     2
+   g                     Main             1   0.0   0.0        1     3
+    nfib                 Main           465   0.0   0.2      464     0
+   f                     Main             1   0.0   0.0        1     1
+    nfib                 Main        242785 100.0  99.8   242784     1
+</screen>
+
+    <para>Now although we had two calls to <function>nfib</function>
+    in the program, it is immediately clear that it was the call from
+    <function>f</function> which took all the time.</para>
+
+    <para>The actual meaning of the various columns in the output is:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term>scc</term>
+	<listitem>
+	  <para>The number of times this particular point in the call
+	  graph was entered.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>&percnt;time</term>
+	<listitem>
+	  <para>The percentage of the total run time of the program
+	  spent at this point in the call graph.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>&percnt;alloc</term>
+	<listitem>
+	  <para>The percentage of the total memory allocations
+	  (excluding profiling overheads) of the program made by this
+	  call.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>inner</term>
+	<listitem>
+	  <para>The number of times an inner call-graph context was
+	  entered from here (including recursive calls).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>cafs</term>
+	<listitem>
+	  <para>The number of times a CAF context was entered from
+	  here.  CAFs are described in <xref
+	  linkend="prof-rules">.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>In addition you can use the <Option>-P</Option> RTS option
+    <indexterm><primary><option>-P</option></primary></indexterm> to
+    get the following additional information:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><literal>ticks</literal></term>
+	<listitem>
+	  <Para>The raw number of time &ldquo;ticks&rdquo; which were
+          attributed to this cost-centre; from this, we get the
+          <literal>&percnt;time</literal> figure mentioned
+          above.</Para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>bytes</literal></term>
+	<listItem>
+	  <Para>Number of bytes allocated in the heap while in this
+          cost-centre; again, this is the raw number from which we get
+          the <literal>&percnt;alloc</literal> figure mentioned
+          above.</Para>
+	</listItem>
+      </varListEntry>
+    </variablelist>
+
+    <para>What about recursive functions, and mutually recursive
+    groups of functions?  Where are the costs attributed?  Well,
+    although GHC does keep information about which groups of functions
+    called each other recursively, this information isn't displayed in
+    the basic time and allocation profile, instead the call-graph is
+    flattened into a tree.  The XML profiling tool (described in <xref
+    linkend="prof-xml-tool">) will be able to display real loops in
+    the call-graph.</para>
+
+    <sect2><title>Inserting cost centres by hand</title>
+
+      <para>Cost centres are just program annotations.  When you say
+      <option>-auto-all</option> to the compiler, it automatically
+      inserts a cost centre annotation around every top-level function
+      in your program, but you are entirely free to add the cost
+      centre annotations yourself.</para>
+
+      <para>The syntax of a cost centre annotation is</para>
+
+      <programlisting>
+     _scc_ "name" &lt;expression&gt;
+</programlisting>
+
+      <para>where <literal>"name"</literal> is an aribrary string,
+      that will become the name of your cost centre as it appears
+      in the profiling output, and
+      <literal>&lt;expression&gt;</literal> is any Haskell
+      expression.  An <literal>_scc_</literal> annotation extends as
+      far to the right as possible when parsing.</para>
+
+    </sect2>
+
+    <sect2 id="prof-rules">
+      <title>Rules for attributing costs</title>
+
+      <para>The cost of evaluating any expression in your program is
+      attributed to a cost-centre stack using the following rules:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>If the expression is part of the
+	  <firstterm>one-off</firstterm> costs of evaluating the
+	  enclosing top-level definition, then costs are attributed to
+	  the stack of lexically enclosing <literal>_scc_</literal>
+	  annotations on top of the special <literal>CAF</literal>
+	  cost-centre. </para>
+	</listitem>
+
+	<listitem>
+	  <para>Otherwise, costs are attributed to the stack of
+	  lexically-enclosing <literal>_scc_</literal> annotations,
+	  appended to the cost-centre stack in effect at the
+	  <firstterm>call site</firstterm> of the current top-level
+	  definition<footnote> <para>The call-site is just the place
+	  in the source code which mentions the particular function or
+	  variable.</para></footnote>.  Notice that this is a recursive
+	  definition.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para>What do we mean by one-off costs?  Well, Haskell is a lazy
+      language, and certain expressions are only ever evaluated once.
+      For example, if we write:</para>
+
+      <programlisting>
+x = nfib 25
+</programlisting>
+
+      <para>then <varname>x</varname> will only be evaluated once (if
+      at all), and subsequent demands for <varname>x</varname> will
+      immediately get to see the cached result.  The definition
+      <varname>x</varname> is called a CAF (Constant Applicative
+      Form), because it has no arguments.</para>
+
+      <para>For the purposes of profiling, we say that the expression
+      <literal>nfib 25</literal> belongs to the one-off costs of
+      evaluating <varname>x</varname>.</para>
+
+      <para>Since one-off costs aren't strictly speaking part of the
+      call-graph of the program, they are attributed to a special
+      top-level cost centre, <literal>CAF</literal>.  There may be one
+      <literal>CAF</literal> cost centre for each module (the
+      default), or one for each top-level definition with any one-off
+      costs (this behaviour can be selected by giving GHC the
+      <option>-caf-all</option> flag).</para>
+
+      <indexterm><primary><literal>-caf-all</literal></primary>
+      </indexterm>
+
+      <para>If you think you have a weird profile, or the call-graph
+      doesn't look like you expect it to, feel free to send it (and
+      your program) to us at
+      <email>glasgow-haskell-bugs@haskell.org</email>.</para>
+
+    </sect2>
+  </sect1>
+
+  <sect1 id="prof-heap">
+    <title>Profiling memory usage</title>
+
+    <para>In addition to profiling the time and allocation behaviour
+    of your program, you can also generate a graph of its memory usage
+    over time.  This is useful for detecting the causes of
+    <firstterm>space leaks</firstterm>, when your program holds on to
+    more memory at run-time that it needs to.  Space leaks lead to
+    longer run-times due to heavy garbage collector ativity, and may
+    even cause the program to run out of memory altogether.</para>
+
+    <para>To generate a heap profile from your program, compile it as
+    before, but this time run it with the <option>-h</option> runtime
+    option.  This generates a file
+    <filename>&lt;prog&gt;.hp</filename> file, which you then process
+    with <command>hp2ps</command> to produce a Postscript file
+    <filename>&lt;prog&gt;.ps</filename>.  The Postscript file can be
+    viewed with something like <command>ghostview</command>, or
+    printed out on a Postscript-compatible printer.</para>
+
+    <para>For the RTS options that control the kind of heap profile
+    generated, see <xref linkend="prof-rts-options">.  Details on the
+    usage of the <command>hp2ps</command> program are given in <xref
+    linkend="hp2ps"></para>
+
+  </sect1>
+
+  <sect1 id="prof-xml-tool">
+    <title>Graphical time/allocation profile</title>
+
+    <para>You can view the time and allocation profiling graph of your
+    program graphically, using <command>ghcprof</command>.  This is a
+    new tool with GHC 4.07, and will eventually be the de-facto
+    standard way of viewing GHC profiles.</para>
+
+    <para>To run <command>ghcprof</command>, you need
+    <productname>daVinci</productname> installed, which can be
+    obtained from <ulink
+    url="http://www.tzi.de/~davinci/"><citetitle>The Graph
+    Visualisation Tool daVinci</citetitle></ulink>.  Install one of
+    the binary
+    distributions<footnote><para><productname>daVinci</productname> is
+    sadly not open-source :-(.</para></footnote>, and set your
+    <envar>DAVINCIHOME</envar> environment variable to point to the
+    installation directory.</para>
+
+    <para><command>ghcprof</command> uses an XML-based profiling log
+    format, and you therefore need to run your program with a
+    different option: <option>-px</option>.  The file generated is
+    still called <filename>&lt;prog&gt;.prof</filename>.  To see the
+    profile, run <command>ghcprof</command> like this:</para>
+
+    <indexterm><primary><option>-px</option></primary></indexterm>
+
+<screen>
+$ ghcprof &lt;prog&gt;.prof
+</screen>
+
+    <para>which should pop up a window showing the call-graph of your
+    program in glorious detail.  More information on using
+    <command>ghcprof</command> can be found at <ulink
+    url="http://www.dcs.warwick.ac.uk/people/academic/Stephen.Jarvis/profiler/index.html"><citetitle>The
+    Cost-Centre Stack Profiling Tool for
+    GHC</citetitle></ulink>.</para>
+
+  </sect1>
+
+  <sect1 id="prof-compiler-options">
+    <title>Compiler options for profiling</title>
+
+    <indexterm><primary>profiling</primary><secondary>options</secondary></indexterm>
+    <indexterm><primary>options</primary><secondary>for profiling</secondary></indexterm>
+
+    <Para> To make use of the cost centre profiling system
+    <Emphasis>all</Emphasis> modules must be compiled and linked with
+    the <Option>-prof</Option> option. Any
+    <Function>&lowbar;scc&lowbar;</Function> constructs you've put in
+    your source will spring to life.</Para> 
+
+    <indexterm><primary><literal>-prof</literal></primary></indexterm>
+
+    <Para> Without a <Option>-prof</Option> option, your
+    <Function>&lowbar;scc&lowbar;</Function>s are ignored; so you can
+    compiled <Function>&lowbar;scc&lowbar;</Function>-laden code
+    without changing it.</Para>
+    
+    <Para>There are a few other profiling-related compilation options.
+    Use them <Emphasis>in addition to</Emphasis>
+    <Option>-prof</Option>.  These do not have to be used consistently
+    for all modules in a program.</Para>
+
+    <variableList>
+
+      <varListEntry>
+	<term><Option>-auto</Option>:</Term>
+	<indexterm><primary><literal>-auto</literal></primary></indexterm>
+	<indexterm><primary>cost centres</primary><secondary>automatically inserting</secondary></indexterm>
+	<listItem>
+	  <Para> GHC will automatically add
+          <Function>&lowbar;scc&lowbar;</Function> constructs for all
+          top-level, exported functions.</Para>
+	</listItem>
+      </varListEntry>
+      
+      <varListEntry>
+	<term><Option>-auto-all</Option>:</Term>
+	<indexterm><primary><literal>-auto-all</literal></primary></indexterm>
+	<listItem>
+	  <Para> <Emphasis>All</Emphasis> top-level functions,
+	  exported or not, will be automatically
+	  <Function>&lowbar;scc&lowbar;</Function>'d.</Para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><Option>-caf-all</Option>:</Term>
+	<indexterm><primary><literal>-caf-all</literal></primary></indexterm>
+	<listItem>
+	  <Para> The costs of all CAFs in a module are usually
+	  attributed to one &ldquo;big&rdquo; CAF cost-centre. With
+	  this option, all CAFs get their own cost-centre.  An
+	  &ldquo;if all else fails&rdquo; option&hellip;</Para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><Option>-ignore-scc</Option>:</Term>
+	<indexterm><primary><literal>-ignore-scc</literal></primary></indexterm>
+	<listItem>
+	  <Para>Ignore any <Function>&lowbar;scc&lowbar;</Function>
+          constructs, so a module which already has
+          <Function>&lowbar;scc&lowbar;</Function>s can be compiled
+          for profiling with the annotations ignored.</Para>
+	</listItem>
+      </varListEntry>
+
+    </variableList>
+
+  </sect1>
+
+  <sect1 id="prof-rts-options">
+    <title>Runtime options for profiling</Title>
+
+    <indexterm><primary>profiling RTS options</primary></indexterm>
+    <indexterm><primary>RTS options, for profiling</primary></indexterm>
+
+    <Para>It isn't enough to compile your program for profiling with
+    <Option>-prof</Option>!</Para>
+
+    <Para>When you <Emphasis>run</Emphasis> your profiled program, you
+    must tell the runtime system (RTS) what you want to profile (e.g.,
+    time and/or space), and how you wish the collected data to be
+    reported.  You also may wish to set the sampling interval used in
+    time profiling.</Para>
+
+    <Para>Executive summary: <command>./a.out +RTS -pT</command>
+    produces a time profile in <Filename>a.out.prof</Filename>;
+    <command>./a.out +RTS -hC</command> produces space-profiling info
+    which can be mangled by <command>hp2ps</command> and viewed with
+    <command>ghostview</command> (or equivalent).</Para>
+
+    <Para>Profiling runtime flags are passed to your program between
+    the usual <Option>+RTS</Option> and <Option>-RTS</Option>
+    options.</Para>
+
+    <variableList>
+      
+      <varListEntry>
+	<term><Option>-p</Option> or <Option>-P</Option>:</Term>
+	<indexterm><primary><option>-p</option></primary></indexterm>
+	<indexterm><primary><option>-P</option></primary></indexterm>
+	<indexterm><primary>time profile</primary></indexterm>
+	<listItem>
+	  <Para>The <Option>-p</Option> option produces a standard
+          <Emphasis>time profile</Emphasis> report.  It is written
+          into the file
+          <Filename>&lt;program&gt;.prof</Filename>.</Para>
+
+	  <Para>The <Option>-P</Option> option produces a more
+          detailed report containing the actual time and allocation
+          data as well.  (Not used much.)</Para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-px</option>:</term>
+	<indexterm><primary><option>-px</option></primary></indexterm>
+	<listitem>
+	  <para>The <option>-px</option> option generates profiling
+	  information in the XML format understood by our new
+	  profiling tool, see <xref linkend="prof-xml-tool">.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><Option>-i&lt;secs&gt;</Option>:</Term>
+	<indexterm><primary><option>-i</option></primary></indexterm>
+	<listItem>
+	  <Para> Set the profiling (sampling) interval to
+          <literal>&lt;secs&gt;</literal> seconds (the default is
+          1&nbsp;second).  Fractions are allowed: for example
+          <Option>-i0.2</Option> will get 5 samples per second.  This
+          only affects heap profiling; time profiles are always
+          sampled on a 1/50 second frequency.</Para>
+	</listItem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><Option>-h&lt;break-down&gt;</Option>:</Term>
+	<indexterm><primary><option>-h&lt;break-down&gt</option></primary></indexterm>
+	<indexterm><primary>heap profile</primary></indexterm>
+	<listItem>
+	  <Para>Produce a detailed <Emphasis>heap profile</Emphasis>
+          of the heap occupied by live closures. The profile is
+          written to the file <Filename>&lt;program&gt;.hp</Filename>
+          from which a PostScript graph can be produced using
+          <command>hp2ps</command> (see <XRef
+          LinkEnd="hp2ps">).</Para>
+
+	  <Para>The heap space profile may be broken down by different
+	  criteria:</para>
+
+	  <variableList>
+
+	    <varListEntry>
+	      <term><Option>-hC</Option>:</Term>
+	      <listItem>
+		<Para>cost centre which produced the closure (the
+		default).</Para>
+	      </listItem>
+	    </varListEntry>
+
+	    <varListEntry>
+	      <term><Option>-hM</Option>:</Term>
+	      <listItem>
+		<Para>cost centre module which produced the
+		closure.</Para>
+	      </listItem>
+	    </varListEntry>
+
+	    <varListEntry>
+	      <term><Option>-hD</Option>:</Term>
+	      <listItem>
+		<Para>closure description&mdash;a string describing
+		the closure.</Para>
+	      </listItem>
+	    </varListEntry>
+
+	    <varListEntry>
+	      <term><Option>-hY</Option>:</Term>
+	      <listItem>
+		<Para>closure type&mdash;a string describing the
+		closure's type.</Para>
+	      </listItem>
+	    </varListEntry>
+	  </variableList>
+
+	</listItem>
+      </varListEntry>
+
+      <varlistentry>
+	<term><option>-hx</option>:</term>
+	<indexterm><primary><option>-hx</option></primary></indexterm>
+	<listitem>
+	  <para>The <option>-hx</option> option generates heap
+	  profiling information in the XML format understood by our
+	  new profiling tool (NOTE: heap profiling with the new tool
+	  is not yet working!  Use <command>hp2ps</command>-style heap
+	  profiling for the time being).</para>
+	</listitem>
+      </varlistentry>
+
+    </variableList>
+    
+  </sect1>
+
+  <sect1 id="hp2ps">
+    <title><command>hp2ps</command>--heap profile to PostScript</title>
+
+    <indexterm><primary><command>hp2ps</command></primary></indexterm>
+    <indexterm><primary>heap profiles</primary></indexterm>
+    <indexterm><primary>postscript, from heap profiles</primary></indexterm>
+    <indexterm><primary><option>-h&lt;break-down&gt;</option></primary></indexterm>
+    
+    <para>Usage:</para>
+    
+<screen>
+hp2ps [flags] [&lt;file&gt;[.hp]]
+</screen>
+
+    <para>The program
+    <command>hp2ps</command><indexterm><primary>hp2ps
+    program</primary></indexterm> converts a heap profile as produced
+    by the <Option>-h&lt;break-down&gt;</Option> runtime option into a
+    PostScript graph of the heap profile. By convention, the file to
+    be processed by <command>hp2ps</command> has a
+    <filename>.hp</filename> extension. The PostScript output is
+    written to <filename>&lt;file&gt;@.ps</filename>. If
+    <filename>&lt;file&gt;</filename> is omitted entirely, then the
+    program behaves as a filter.</para>
+
+    <para><command>hp2ps</command> is distributed in
+    <filename>ghc/utils/hp2ps</filename> in a GHC source
+    distribution. It was originally developed by Dave Wakeling as part
+    of the HBC/LML heap profiler.</para>
+
+    <para>The flags are:</para>
+
+    <variableList>
+      
+      <varListEntry>
+	<term><Option>-d</Option></Term>
+	<listItem>
+	  <para>In order to make graphs more readable,
+          <command>hp2ps</command> sorts the shaded bands for each
+          identifier. The default sort ordering is for the bands with
+          the largest area to be stacked on top of the smaller ones.
+          The <Option>-d</Option> option causes rougher bands (those
+          representing series of values with the largest standard
+          deviations) to be stacked on top of smoother ones.</para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><Option>-b</Option></Term>
+	<listItem>
+	  <para>Normally, <command>hp2ps</command> puts the title of
+          the graph in a small box at the top of the page. However, if
+          the JOB string is too long to fit in a small box (more than
+          35 characters), then <command>hp2ps</command> will choose to
+          use a big box instead.  The <Option>-b</Option> option
+          forces <command>hp2ps</command> to use a big box.</para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><Option>-e&lt;float&gt;[in&verbar;mm&verbar;pt]</Option></Term>
+	<listItem>
+	  <para>Generate encapsulated PostScript suitable for
+          inclusion in LaTeX documents.  Usually, the PostScript graph
+          is drawn in landscape mode in an area 9 inches wide by 6
+          inches high, and <command>hp2ps</command> arranges for this
+          area to be approximately centred on a sheet of a4 paper.
+          This format is convenient of studying the graph in detail,
+          but it is unsuitable for inclusion in LaTeX documents.  The
+          <Option>-e</Option> option causes the graph to be drawn in
+          portrait mode, with float specifying the width in inches,
+          millimetres or points (the default).  The resulting
+          PostScript file conforms to the Encapsulated PostScript
+          (EPS) convention, and it can be included in a LaTeX document
+          using Rokicki's dvi-to-PostScript converter
+          <command>dvips</command>.</para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><Option>-g</Option></Term>
+	<listItem>
+	  <para>Create output suitable for the <command>gs</command>
+          PostScript previewer (or similar). In this case the graph is
+          printed in portrait mode without scaling. The output is
+          unsuitable for a laser printer.</para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><Option>-l</Option></Term>
+	<listItem>
+	  <para>Normally a profile is limited to 20 bands with
+          additional identifiers being grouped into an
+          <literal>OTHER</literal> band. The <Option>-l</Option> flag
+          removes this 20 band and limit, producing as many bands as
+          necessary. No key is produced as it won't fit!. It is useful
+          for creation time profiles with many bands.</para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><Option>-m&lt;int&gt;</Option></Term>
+	<listItem>
+	  <para>Normally a profile is limited to 20 bands with
+          additional identifiers being grouped into an
+          <literal>OTHER</literal> band. The <Option>-m</Option> flag
+          specifies an alternative band limit (the maximum is
+          20).</para>
+
+	  <para><Option>-m0</Option> requests the band limit to be
+          removed. As many bands as necessary are produced. However no
+          key is produced as it won't fit! It is useful for displaying
+          creation time profiles with many bands.</para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><Option>-p</Option></Term>
+	<listItem>
+	  <para>Use previous parameters. By default, the PostScript
+          graph is automatically scaled both horizontally and
+          vertically so that it fills the page.  However, when
+          preparing a series of graphs for use in a presentation, it
+          is often useful to draw a new graph using the same scale,
+          shading and ordering as a previous one. The
+          <Option>-p</Option> flag causes the graph to be drawn using
+          the parameters determined by a previous run of
+          <command>hp2ps</command> on <filename>file</filename>. These
+          are extracted from <filename>file@.aux</filename>.</para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><Option>-s</Option></Term>
+	<listItem>
+	  <para>Use a small box for the title.</para>
+	</listItem>
+      </varListEntry>
+      
+      <varListEntry>
+	<term><Option>-t&lt;float&gt;</Option></Term>
+	<listItem>
+	  <para>Normally trace elements which sum to a total of less
+          than 1&percnt; of the profile are removed from the
+          profile. The <option>-t</option> option allows this
+          percentage to be modified (maximum 5&percnt;).</para>
+
+	  <para><Option>-t0</Option> requests no trace elements to be
+          removed from the profile, ensuring that all the data will be
+          displayed.</para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><Option>-?</Option></Term>
+	<listItem>
+	  <para>Print out usage information.</para>
+	</listItem>
+      </varListEntry>
+    </variableList>
+  </sect1>
+
+  <sect1 id="ticky-ticky">
+    <title>Using &ldquo;ticky-ticky&rdquo; profiling (for implementors)</Title>
+    <indexterm><primary>ticky-ticky profiling</primary></indexterm>
+
+    <para>(ToDo: document properly.)</para>
+
+    <para>It is possible to compile Glasgow Haskell programs so that
+    they will count lots and lots of interesting things, e.g., number
+    of updates, number of data constructors entered, etc., etc.  We
+    call this &ldquo;ticky-ticky&rdquo;
+    profiling,<indexterm><primary>ticky-ticky
+    profiling</primary></indexterm> <indexterm><primary>profiling,
+    ticky-ticky</primary></indexterm> because that's the sound a Sun4
+    makes when it is running up all those counters
+    (<Emphasis>slowly</Emphasis>).</para>
+
+    <para>Ticky-ticky profiling is mainly intended for implementors;
+    it is quite separate from the main &ldquo;cost-centre&rdquo;
+    profiling system, intended for all users everywhere.</para>
+
+    <para>To be able to use ticky-ticky profiling, you will need to
+    have built appropriate libraries and things when you made the
+    system.  See &ldquo;Customising what libraries to build,&rdquo; in
+    the installation guide.</para>
+
+    <para>To get your compiled program to spit out the ticky-ticky
+    numbers, use a <Option>-r</Option> RTS
+    option<indexterm><primary>-r RTS option</primary></indexterm>.
+    See <XRef LinkEnd="runtime-control">.</para>
+
+    <para>Compiling your program with the <Option>-ticky</Option>
+    switch yields an executable that performs these counts.  Here is a
+    sample ticky-ticky statistics file, generated by the invocation
+    <command>foo +RTS -rfoo.ticky</command>.</para>
+
+<screen>
  foo +RTS -rfoo.ticky
 
 
@@ -980,30 +880,33 @@ Total bytes copied during GC: 190096
       0 GC_SEL_MAJOR_ctr
       0 GC_FAILED_PROMOTION_ctr
   47524 GC_WORDS_COPIED_ctr
-</Screen>
+</screen>
 
-</Para>
+    <para>The formatting of the information above the row of asterisks
+    is subject to change, but hopefully provides a useful
+    human-readable summary.  Below the asterisks <Emphasis>all
+    counters</Emphasis> maintained by the ticky-ticky system are
+    dumped, in a format intended to be machine-readable: zero or more
+    spaces, an integer, a space, the counter name, and a newline.</para>
 
-<Para>
-The formatting of the information above the row of asterisks is
-subject to change, but hopefully provides a useful human-readable
-summary.  Below the asterisks <Emphasis>all counters</Emphasis> maintained by the
-ticky-ticky system are dumped, in a format intended to be
-machine-readable: zero or more spaces, an integer, a space, the
-counter name, and a newline.
-</Para>
+    <para>In fact, not <Emphasis>all</Emphasis> counters are
+    necessarily dumped; compile- or run-time flags can render certain
+    counters invalid.  In this case, either the counter will simply
+    not appear, or it will appear with a modified counter name,
+    possibly along with an explanation for the omission (notice
+    <literal>ENT&lowbar;PERM&lowbar;IND&lowbar;ctr</literal> appears
+    with an inserted <literal>!</literal> above).  Software analysing
+    this output should always check that it has the counters it
+    expects.  Also, beware: some of the counters can have
+    <Emphasis>large</Emphasis> values!</para>
 
-<Para>
-In fact, not <Emphasis>all</Emphasis> counters are necessarily dumped; compile- or
-run-time flags can render certain counters invalid.  In this case,
-either the counter will simply not appear, or it will appear with a
-modified counter name, possibly along with an explanation for the
-omission (notice <Literal>ENT&lowbar;PERM&lowbar;IND&lowbar;ctr</Literal> appears with an inserted <Literal>!</Literal>
-above).  Software analysing this output should always check that it
-has the counters it expects.  Also, beware: some of the counters can
-have <Emphasis>large</Emphasis> values!
-</Para>
+  </sect1>
 
-</Sect1>
+</chapter>
 
-</Chapter>
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter") ***
+     ;;; End: ***
+ -->
