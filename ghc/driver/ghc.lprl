@@ -1963,18 +1963,18 @@ sub makeHiMap {
     
     foreach $d ( @Import_dir ) {
 	if ($HiIncludeString) { 
-	   $HiIncludeString = "$HiIncludeString:${d}%.${HiSuffix}";
+	   $HiIncludeString = "$HiIncludeString:${d}/%.${HiSuffix}";
 	} else { 
-	   $HiIncludeString = "$d%.${HiSuffix}"; 
+	   $HiIncludeString = "$d/%.${HiSuffix}"; 
 	}
 
     }
 
     foreach $d ( @SysImport_dir ) {
 	if ($HiIncludeString) { 
-	    $HiIncludeString = "$HiIncludeString:${d}%.${HiSuffix_prelude}";
+	    $HiIncludeString = "$HiIncludeString:${d}/%.${HiSuffix_prelude}";
 	} else { 
-	    $HiIncludeString = "${d}%.${HiSuffix_prelude}";
+	    $HiIncludeString = "${d}/%.${HiSuffix_prelude}";
         }
     }
 
@@ -2444,7 +2444,7 @@ sub add_syslib {
 
     push(@SysLibrary, "-lHS$syslib");
     push(@SysLibrary, "-lHS${syslib}_cbits")
-          unless $syslib eq 'contrib' || $syslib eq 'exts' || $syslib eg 'conc';
+          unless $syslib eq 'contrib' || $syslib eq 'exts' || $syslib eq 'conc';
 	  #HACK! they have no cbits
 }
 \end{code}
@@ -2802,8 +2802,8 @@ arg: while($_ = $Args[0]) {
 			    #
 			    &add_syslib($syslib);
 			    if ( $syslib eq 'posix' ) {
-				&add_syslib('ghc');
-			    } elsif ( $syslib eq 'ghc' && 
+				&add_syslib('misc');
+			    } elsif ( $syslib eq 'misc' && 
 				      $TargetName =~ /-solaris2$/ ) {
 				# needed for Berkeley socket/nwork stuff.
 				push(@SysLibrary, '-lnsl');
