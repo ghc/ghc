@@ -1,4 +1,10 @@
 
+drvfail002.hs:15:
+    Ambiguous constraint `X T c'
+	At least one of the forall'd type variables mentioned by the constraint
+	must be reachable from the type after the '=>'
+    In the instance declaration for `Show T'
+
 drvfail002.hs:18:
     Can't derive instances where the instance context mentions
     type variables that are not data type parameters
