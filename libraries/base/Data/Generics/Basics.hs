@@ -54,6 +54,7 @@ module Data.Generics.Basics (
         gmapQr,
         gmapM,
         gmapMp,
+        gmapMo,
 
 	-- * Generic unfolding defined in terms of gfoldl and fromConstr
 	gunfoldM	-- :: Monad m => ... -> m a
@@ -247,8 +248,32 @@ this end, we couple the monadic computation with a Boolean.
       k (Mp c) x
         = Mp ( c >>= \(h,b) -> 
                  (f x >>= \x' -> return (h x',True))
-                 `mplus` return (h x, b)
-               )
+                 `mplus` return (h x,b)
+             )
+
+  -- | Transformation of one immediate subterm with success
+  gmapMo :: MonadPlus m => (forall a. Data a => a -> m a) -> a -> m a
+
+{-
+
+We use the same pairing trick as for gmapMp, 
+i.e., we use an extra Bool component to keep track of the 
+fact whether an immediate subterm was processed successfully.
+However, we cut of mapping over subterms once a first subterm
+was transformed successfully.
+
+-}
+
+  gmapMo f x = unMp (gfoldl k z x) >>= \(x',b) ->
+                if b then return x' else mzero
+    where
+      z g = Mp (return (g,False))
+      k (Mp c) x
+        = Mp ( c >>= \(h,b) -> if b 
+                        then return (h x,b)
+                        else (f x >>= \x' -> return (h x',True))
+                             `mplus` return (h x,b)
+             )
 
 
 -- | The identity type constructor needed for the definition of gmapT
