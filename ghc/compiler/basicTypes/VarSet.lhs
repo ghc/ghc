@@ -37,7 +37,6 @@ type TyVarSet	  = UniqSet TyVar
 
 emptyVarSet	:: VarSet
 intersectVarSet	:: VarSet -> VarSet -> VarSet
-intersectsVarSet:: VarSet -> VarSet -> Bool 	-- True if non-empty intersection
 unionVarSet	:: VarSet -> VarSet -> VarSet
 unionVarSets	:: [VarSet] -> VarSet
 varSetElems	:: VarSet -> [Var]
@@ -55,7 +54,6 @@ lookupVarSet	:: VarSet -> Var -> Maybe Var
 mapVarSet 	:: (Var -> Var) -> VarSet -> VarSet
 sizeVarSet	:: VarSet -> Int
 filterVarSet	:: (Var -> Bool) -> VarSet -> VarSet
-subVarSet	:: VarSet -> VarSet -> Bool
 extendVarSet_C  :: (Var->Var->Var) -> VarSet -> Var -> VarSet
 
 delVarSetByKey	:: VarSet -> Unique -> VarSet
@@ -64,7 +62,12 @@ emptyVarSet	= emptyUniqSet
 unitVarSet	= unitUniqSet
 extendVarSet	= addOneToUniqSet
 intersectVarSet	= intersectUniqSets
-intersectsVarSet s1 s2 = not (isEmptyVarSet (s1 `intersectVarSet` s2))
+
+intersectsVarSet:: VarSet -> VarSet -> Bool 	-- True if non-empty intersection
+	-- (s1 `intersectsVarSet` s2) doesn't compute s2 if s1 is empty
+subVarSet	:: VarSet -> VarSet -> Bool	-- True if first arg is subset of second
+ 	-- (s1 `subVarSet` s2) doesn't compute s2 if s1 is empty
+
 unionVarSet	= unionUniqSets
 unionVarSets	= unionManyUniqSets
 varSetElems	= uniqSetToList
@@ -79,8 +82,13 @@ mapVarSet	= mapUniqSet
 sizeVarSet	= sizeUniqSet
 filterVarSet	= filterUniqSet
 extendVarSet_C combine s x = addToUFM_C combine s x x
-a `subVarSet` b = isEmptyVarSet (a `minusVarSet` b)
 delVarSetByKey	= delFromUFM_Directly	-- Can't be bothered to add this to UniqSet
+\end{code}
+
+\begin{code}
+-- See comments with type signatures
+intersectsVarSet s1 s2 = not (isEmptyVarSet (s1 `intersectVarSet` s2))
+a `subVarSet` b = isEmptyVarSet (a `minusVarSet` b)
 \end{code}
 
 \begin{code}
