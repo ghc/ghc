@@ -111,7 +111,7 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 
 # NB. use := rather than = here, otherwise the wildcard will get re-computed
 # every time PRE_SRCS is expanded (this happens a lot).
-PRE_SRCS    := $(wildcard $(patsubst ./%, %,  \
+ALL_SRCS    = $(wildcard $(patsubst ./%, %,  \
 		   $(patsubst %,%/*.hs,   . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.lhs,  . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.y,    . $(ALL_DIRS)) \
@@ -124,6 +124,8 @@ PRE_SRCS    := $(wildcard $(patsubst ./%, %,  \
 		   $(patsubst %,%/*.verb, . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.hsc,  . $(ALL_DIRS)) \
 	       ))
+
+# ALL_SRCS is computed once and for all into PRE_SRCS at the top of target.mk.
 
 PRE_HS_SRCS  = $(filter %.hs,  $(PRE_SRCS))
 PRE_LHS_SRCS = $(filter %.lhs, $(PRE_SRCS))

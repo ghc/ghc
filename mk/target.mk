@@ -34,6 +34,12 @@
 #
 
 ##################################################################
+# Pre-compute the list of sources so we don't have to do this 
+# multiple times.  See paths.mk.
+
+PRE_SRCS := $(ALL_SRCS)
+
+##################################################################
 # 		FPtools standard targets
 #
 # depend:
