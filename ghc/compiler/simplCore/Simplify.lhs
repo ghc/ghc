@@ -551,12 +551,12 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
 	old_info      = idInfo old_bndr
 	new_bndr_info = substIdInfo subst old_info (idInfo new_bndr)
 		        `setArityInfo` ArityAtLeast (exprArity new_rhs)
-			`setUnfoldingInfo` mkUnfolding top_lvl (cprInfo old_info) new_rhs
+			`setUnfoldingInfo` mkUnfolding top_lvl new_rhs
 
 	final_id = new_bndr `setIdInfo` new_bndr_info
      in
-	-- These seqs force the Ids, and hence the IdInfos, and hence any
-	-- inner substitutions
+	-- These seqs forces the Id, and hence its IdInfo,
+	-- and hence any inner substitutions
      final_id				`seq`
      addLetBind final_id new_rhs 	$
      modifyInScope new_bndr final_id thing_inside
@@ -1395,7 +1395,7 @@ simplAlts zap_occ_info scrut_cons case_bndr' alts cont'
 
 		-- Bind the case-binder to (con args)
 	  let
-		unfolding = mkUnfolding False NoCPRInfo (mkAltExpr con vs' inst_tys')
+		unfolding = mkUnfolding False (mkAltExpr con vs' inst_tys')
 	  in
 	  modifyInScope case_bndr' (case_bndr' `setIdUnfolding` unfolding)	$
 	  simplExprC rhs cont'		`thenSmpl` \ rhs' ->

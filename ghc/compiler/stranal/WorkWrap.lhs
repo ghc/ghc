@@ -14,11 +14,11 @@ import CmdLineOpts	( opt_UF_CreationThreshold , opt_D_verbose_core2core,
                           opt_D_dump_worker_wrapper
 			)
 import CoreLint		( beginPass, endPass )
-import CoreUtils	( exprType, exprArity, exprEtaExpandArity, mkInlineMe )
+import CoreUtils	( exprType, exprArity, exprEtaExpandArity )
 import DataCon		( DataCon )
 import MkId		( mkWorkerId )
 import Id		( Id, idType, idStrictness, setIdArityInfo, isOneShotLambda,
-			  setIdStrictness, idDemandInfo, idInlinePragma, 
+			  setIdStrictness, idInlinePragma, 
 			  setIdWorkerInfo, idCprInfo, setInlinePragma )
 import VarSet
 import Type		( Type, isNewType, splitForAllTys, splitFunTys )
@@ -196,7 +196,7 @@ tryWW non_rec fn_id rhs
 	-- twice, this test also prevents wrappers (which are INLINEd)
 	-- from being re-done.
 	--
-	-- OUT OF DATE NOTE:
+	-- OUT OF DATE NOTE, kept for info:
 	--   In this case we add an INLINE pragma to the RHS.  Why?
 	--   Because consider
 	--	  f = \x -> g x x
@@ -237,6 +237,7 @@ tryWW non_rec fn_id rhs
     in
     returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
 	-- Worker first, because wrapper mentions it
+	-- Arrange to inline the wrapper unconditionally
   where
     fun_ty = idType fn_id
     arity  = exprEtaExpandArity rhs

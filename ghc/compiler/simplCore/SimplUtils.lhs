@@ -27,13 +27,13 @@ import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExp
 import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, lookupIdSubst )
 import Id		( Id, idType, isId, idName, 
 			  idOccInfo, idUnfolding,
-			  idDemandInfo, mkId, idInfo
+			  mkId, idInfo
 			)
 import IdInfo		( arityLowerBound, setOccInfo, vanillaIdInfo )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( isLocalName, setNameUnique )
 import SimplMonad
-import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType,
+import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType, repType,
 			  splitTyConApp_maybe, splitAlgTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
 			)
 import DataCon		( dataConRepArity )
@@ -284,7 +284,9 @@ discardInline cont		   = cont
 -- small arity.  But arity zero isn't good -- we share the single copy
 -- for that case, so no point in sharing.
 
-canUpdateInPlace ty = case splitAlgTyConApp_maybe ty of
+-- Note the repType: we want to look through newtypes for this purpose
+
+canUpdateInPlace ty = case splitAlgTyConApp_maybe (repType ty) of
 			Just (_, _, [dc]) -> arity == 1 || arity == 2
 					  where
 					     arity = dataConRepArity dc

@@ -229,7 +229,7 @@ mkDataConWrapId data_con
     work_id = dataConId data_con
 
     info = mkIdInfo (DataConWrapId data_con)
-	   `setUnfoldingInfo`	mkTopUnfolding cpr_info (mkInlineMe wrap_rhs)
+	   `setUnfoldingInfo`	mkTopUnfolding (mkInlineMe wrap_rhs)
 	   `setCprInfo`		cpr_info
 		-- The Cpr info can be important inside INLINE rhss, where the
 		-- wrapper constructor isn't inlined
@@ -369,7 +369,7 @@ mkRecordSelId tycon field_label
 	   `setCafInfo`		NoCafRefs
 	-- ToDo: consider adding further IdInfo
 
-    unfolding = mkTopUnfolding NoCPRInfo sel_rhs
+    unfolding = mkTopUnfolding sel_rhs
 
 	
     [data_id] = mkTemplateLocals [data_ty]
@@ -430,7 +430,7 @@ mkDictSelId name clas ty
 	-- We no longer use 'must-inline' on record selectors.  They'll
 	-- inline like crazy if they scrutinise a constructor
 
-    unfolding = mkTopUnfolding NoCPRInfo rhs
+    unfolding = mkTopUnfolding rhs
 
     tyvars  = classTyVars clas
 

@@ -202,15 +202,13 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
 	  (op_sigs, non_op_sigs) = partition isClassOpSig sigs
 	  (fix_sigs, non_sigs)   = partition isFixitySig  non_op_sigs
     in
-    checkDupOrQualNames sig_doc sig_rdr_names_w_locs 	`thenRn_` 
-    mapFvRn (rn_op cname' clas_tyvar_names fds') op_sigs
-    `thenRn` \ (sigs', sig_fvs) ->
-    mapRn_  (unknownSigErr) non_sigs			`thenRn_`
+    checkDupOrQualNames sig_doc sig_rdr_names_w_locs 	  `thenRn_` 
+    mapFvRn (rn_op cname' clas_tyvar_names fds') op_sigs  `thenRn` \ (sigs', sig_fvs) ->
+    mapRn_  (unknownSigErr) non_sigs			  `thenRn_`
     let
      binders = mkNameSet [ nm | (ClassOpSig nm _ _ _ _) <- sigs' ]
     in
-    renameSigs False binders lookupOccRn fix_sigs
-    `thenRn` \ (fixs', fix_fvs) ->
+    renameSigs False binders lookupOccRn fix_sigs	  `thenRn` \ (fixs', fix_fvs) ->
 
 	-- Check the methods
     checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`

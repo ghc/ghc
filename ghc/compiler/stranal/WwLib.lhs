@@ -235,8 +235,15 @@ mkWwBodies fun_ty arity demands res_bot one_shots cpr_info
     mkWWfixup cpr_res_ty work_dmds			`thenUs` \ (final_work_dmds, wrap_fn_fixup,  work_fn_fixup) ->
 
     returnUs (final_work_dmds,
-	      mkInlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . wrap_fn_fixup . Var,
+	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . wrap_fn_fixup . Var,
 	      work_fn_fixup . work_fn_str . work_fn_cpr . work_fn_args)
+	-- We use an INLINE unconditionally, even if the wrapper turns out to be
+	-- something trivial like
+	--	fw = ...
+	--	f = __inline__ (coerce T fw)
+	-- The point is to propagate the coerce to f's call sites, so even though
+	-- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
+	-- fw from being inlined into f's RHS
   where
     demands'   = demands   ++ repeat wwLazy
     one_shots' = one_shots ++ repeat False

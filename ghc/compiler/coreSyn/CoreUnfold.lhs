@@ -77,15 +77,15 @@ import GlaExts		( fromInt )
 %************************************************************************
 
 \begin{code}
-mkTopUnfolding cpr_info expr = mkUnfolding True {- Top level -} cpr_info expr
+mkTopUnfolding expr = mkUnfolding True {- Top level -} expr
 
-mkUnfolding top_lvl cpr_info expr
+mkUnfolding top_lvl expr
   = CoreUnfolding (occurAnalyseGlobalExpr expr)
 		  top_lvl
 		  (exprIsCheap expr)
 		  (exprIsValue expr)
 		  (exprIsBottom expr)
-		  (calcUnfoldingGuidance opt_UF_CreationThreshold cpr_info expr)
+		  (calcUnfoldingGuidance opt_UF_CreationThreshold expr)
 	-- Sometimes during simplification, there's a large let-bound thing	
 	-- which has been substituted, and so is now dead; so 'expr' contains
 	-- two copies of the thing while the occurrence-analysed expression doesn't
@@ -120,10 +120,9 @@ instance Outputable UnfoldingGuidance where
 \begin{code}
 calcUnfoldingGuidance
 	:: Int		    	-- bomb out if size gets bigger than this
-	-> CprInfo		-- CPR info for this RHS
 	-> CoreExpr    		-- expression to look at
 	-> UnfoldingGuidance
-calcUnfoldingGuidance bOMB_OUT_SIZE cpr_info expr
+calcUnfoldingGuidance bOMB_OUT_SIZE expr
   = case collect_val_bndrs expr of { (inline, val_binders, body) ->
     let
 	n_val_binders = length val_binders
@@ -134,16 +133,6 @@ calcUnfoldingGuidance bOMB_OUT_SIZE cpr_info expr
 	-- This is just enough to fail the no-size-increase test in callSiteInline,
 	--   so that INLINE things don't get inlined into entirely boring contexts,
 	--   but no more.
-
--- Experimental thing commented in for now
---        max_inline_size = case cpr_info of
---			NoCPRInfo  -> n_val_binders + 2
---			ReturnsCPR -> n_val_binders + 1
-
-	-- However, the wrapper for a CPR'd function is particularly good to inline,
-	-- even in a boring context, because we may get to do update in place:
-	--	let x = case y of { I# y# -> I# (y# +# 1#) }
-	-- Hence the case on cpr_info
 
     in
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
@@ -437,7 +426,7 @@ Just the same as smallEnoughToInline, except that it has no actual arguments.
 
 \begin{code}
 couldBeSmallEnoughToInline :: Int -> CoreExpr -> Bool
-couldBeSmallEnoughToInline threshold rhs = case calcUnfoldingGuidance threshold NoCPRInfo rhs of
+couldBeSmallEnoughToInline threshold rhs = case calcUnfoldingGuidance threshold rhs of
 						UnfoldNever -> False
 						other	    -> True
 

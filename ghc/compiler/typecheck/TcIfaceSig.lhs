@@ -96,7 +96,7 @@ tcIdInfo unf_env in_scope_vars name ty info info_ins
 		-- is never inspected; so the typecheck doesn't even happen
 		unfold_info = case maybe_expr' of
 				Nothing    -> noUnfolding
-				Just expr' -> mkTopUnfolding (cprInfo info) expr' 
+				Just expr' -> mkTopUnfolding expr' 
 		info1 = info `setUnfoldingInfo` unfold_info
 		info2 = info1 `setInlinePragInfo` inline_prag
 	  in
@@ -119,7 +119,7 @@ tcWorkerInfo unf_env ty info worker_name
     let
 	-- Watch out! We can't pull on unf_env too eagerly!
 	info' = case explicitLookupValue unf_env worker_name of
-			Just worker_id -> info `setUnfoldingInfo`  mkTopUnfolding cpr_info (wrap_fn worker_id)
+			Just worker_id -> info `setUnfoldingInfo`  mkTopUnfolding (wrap_fn worker_id)
                                                `setWorkerInfo`     HasWorker worker_id arity
 
     			Nothing        -> pprTrace "tcWorkerInfo failed:" (ppr worker_name) info
