@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.33 2004/01/09 12:42:15 simonmar Exp $
+# $Id: package.mk,v 1.34 2004/01/09 12:43:37 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -237,7 +237,7 @@ $(HTML_DOC) : $(HS_PPS)
 CLEAN_FILES += $(PACKAGE).haddock
 
 %.raw-hs : %.lhs
-	$(HC) $(HC_OPTS) -D__HADDOCK__ -E -optP-P -cpp $< -o $@
+	$(HC) $(HC_OPTS) -D__HADDOCK__ -E -optP-P $< -o $@
 
 %.raw-hs : %.hs
 	$(HC) $(HC_OPTS) -D__HADDOCK__ -E -optP-P $< -o $@
