@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.134 2002/04/19 10:25:00 simonmar Exp $
+ * $Id: GC.c,v 1.135 2002/04/23 06:34:27 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -990,11 +990,11 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   // start any pending finalizers 
   scheduleFinalizers(old_weak_ptr_list);
   
-  ACQUIRE_LOCK(&sched_mutex);
-
   // send exceptions to any threads which were about to die 
   resurrectThreads(resurrected_threads);
   
+  ACQUIRE_LOCK(&sched_mutex);
+
   // Update the stable pointer hash table.
   updateStablePtrTable(major_gc);
 

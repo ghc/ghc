@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.137 2002/04/13 05:33:02 sof Exp $
+ * $Id: Schedule.c,v 1.138 2002/04/23 06:34:27 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -409,7 +409,7 @@ schedule( void )
     /* Check to see whether there are any worker threads
        waiting to deposit external call results. If so,
        yield our capability */
-    yieldToReturningWorker(&sched_mutex, cap);
+    yieldToReturningWorker(&sched_mutex, &cap);
 #endif
 
     /* If we're interrupted (the user pressed ^C, or some other
@@ -543,7 +543,9 @@ schedule( void )
     /* check for signals each time around the scheduler */
 #ifndef mingw32_TARGET_OS
     if (signals_pending()) {
+      RELEASE_LOCK(&sched_mutex); /* ToDo: kill */
       startSignalHandlers();
+      ACQUIRE_LOCK(&sched_mutex);
     }
 #endif
 
@@ -608,7 +610,19 @@ schedule( void )
 	 * for signals to arrive rather then bombing out with a
 	 * deadlock.
 	 */
+#if defined(RTS_SUPPORTS_THREADS)
+	if ( 0 ) { /* hmm..what to do? Simply stop waiting for
+		      a signal with no runnable threads (or I/O
+		      suspended ones) leads nowhere quick.
+		      For now, simply shut down when we reach this
+		      condition.
+		      
+		      ToDo: define precisely under what conditions
+		      the Scheduler should shut down in an MT setting.
+		   */
+#else
 	if ( anyUserHandlers() ) {
+#endif
 	    IF_DEBUG(scheduler, 
 		     sched_belch("still deadlocked, waiting for signals..."));
 
@@ -618,7 +632,9 @@ schedule( void )
 	    if (interrupted) { continue; }
 
 	    if (signals_pending()) {
+		RELEASE_LOCK(&sched_mutex);
 		startSignalHandlers();
+		ACQUIRE_LOCK(&sched_mutex);
 	    }
 	    ASSERT(!EMPTY_RUN_QUEUE());
 	    goto not_deadlocked;
@@ -636,11 +652,11 @@ schedule( void )
 	    for (m = main_threads; m != NULL; m = m->link) {
 		switch (m->tso->why_blocked) {
 		case BlockedOnBlackHole:
-		    raiseAsyncWithLock(m->tso, (StgClosure *)NonTermination_closure);
+		    raiseAsync(m->tso, (StgClosure *)NonTermination_closure);
 		    break;
 		case BlockedOnException:
 		case BlockedOnMVar:
-		    raiseAsyncWithLock(m->tso, (StgClosure *)Deadlock_closure);
+		    raiseAsync(m->tso, (StgClosure *)Deadlock_closure);
 		    break;
 		default:
 		    barf("deadlock: main thread blocked in a strange way");
@@ -650,11 +666,11 @@ schedule( void )
 	    m = main_threads;
 	    switch (m->tso->why_blocked) {
 	    case BlockedOnBlackHole:
-		raiseAsyncWithLock(m->tso, (StgClosure *)NonTermination_closure);
+		raiseAsync(m->tso, (StgClosure *)NonTermination_closure);
 		break;
 	    case BlockedOnException:
 	    case BlockedOnMVar:
-		raiseAsyncWithLock(m->tso, (StgClosure *)Deadlock_closure);
+		raiseAsync(m->tso, (StgClosure *)Deadlock_closure);
 		break;
 	    default:
 		barf("deadlock: main thread blocked in a strange way");
@@ -1436,6 +1452,8 @@ StgInt forkProcess(StgTSO* tso) {
  *
  * This is used when we catch a user interrupt (^C), before performing
  * any necessary cleanups and running finalizers.
+ *
+ * Locks: sched_mutex held.
  * ------------------------------------------------------------------------- */
    
 void deleteAllThreads ( void )
@@ -1567,9 +1585,8 @@ resumeThread( StgInt tok,
   /* Reset blocking status */
   tso->why_blocked  = NotBlocked;
 
-  RELEASE_LOCK(&sched_mutex);
-
   cap->r.rCurrentTSO = tso;
+  RELEASE_LOCK(&sched_mutex);
   return &cap->r;
 }
 
@@ -1706,9 +1723,13 @@ createThread_(nat size, rtsBool have_lock)
    * protect the increment operation on next_thread_id.
    * In future, we could use an atomic increment instead.
    */
+#ifdef SMP
   if (!have_lock) { ACQUIRE_LOCK(&sched_mutex); }
+#endif
   tso->id = next_thread_id++; 
+#ifdef SMP
   if (!have_lock) { RELEASE_LOCK(&sched_mutex); }
+#endif
 
   tso->why_blocked  = NotBlocked;
   tso->blocked_exceptions = NULL;
@@ -2844,7 +2865,6 @@ unblockThread(StgTSO *tso)
 {
   StgBlockingQueueElement *t, **last;
 
-  ACQUIRE_LOCK(&sched_mutex);
   switch (tso->why_blocked) {
 
   case NotBlocked:
@@ -2966,7 +2986,6 @@ unblockThread(StgTSO *tso)
   tso->why_blocked = NotBlocked;
   tso->block_info.closure = NULL;
   PUSH_ON_RUN_QUEUE(tso);
-  RELEASE_LOCK(&sched_mutex);
 }
 #else
 static void
@@ -2979,7 +2998,6 @@ unblockThread(StgTSO *tso)
     return;
   }
 
-  ACQUIRE_LOCK(&sched_mutex);
   switch (tso->why_blocked) {
 
   case BlockedOnMVar:
@@ -3093,7 +3111,6 @@ unblockThread(StgTSO *tso)
   tso->why_blocked = NotBlocked;
   tso->block_info.closure = NULL;
   PUSH_ON_RUN_QUEUE(tso);
-  RELEASE_LOCK(&sched_mutex);
 }
 #endif
 
@@ -3127,7 +3144,7 @@ unblockThread(StgTSO *tso)
  * CATCH_FRAME on the stack.  In either case, we strip the entire
  * stack and replace the thread with a zombie.
  *
- * Locks: sched_mutex not held upon entry nor exit.
+ * Locks: sched_mutex held upon entry nor exit.
  *
  * -------------------------------------------------------------------------- */
  
@@ -3140,11 +3157,11 @@ deleteThread(StgTSO *tso)
 void
 raiseAsyncWithLock(StgTSO *tso, StgClosure *exception)
 {
-  /* When raising async exs from contexts where sched_mutex is held;
+  /* When raising async exs from contexts where sched_mutex isn't held;
      use raiseAsyncWithLock(). */
-  RELEASE_LOCK(&sched_mutex);
-  raiseAsync(tso,exception);
   ACQUIRE_LOCK(&sched_mutex);
+  raiseAsync(tso,exception);
+  RELEASE_LOCK(&sched_mutex);
 }
 
 void
@@ -3366,10 +3383,10 @@ resurrectThreads( StgTSO *threads )
     case BlockedOnMVar:
     case BlockedOnException:
       /* Called by GC - sched_mutex lock is currently held. */
-      raiseAsyncWithLock(tso,(StgClosure *)BlockedOnDeadMVar_closure);
+      raiseAsync(tso,(StgClosure *)BlockedOnDeadMVar_closure);
       break;
     case BlockedOnBlackHole:
-      raiseAsyncWithLock(tso,(StgClosure *)NonTermination_closure);
+      raiseAsync(tso,(StgClosure *)NonTermination_closure);
       break;
     case NotBlocked:
       /* This might happen if the thread was blocked on a black hole
@@ -3424,7 +3441,7 @@ detectBlackHoles( void )
 		     */
 		    IF_DEBUG(scheduler, 
 			     sched_belch("thread %d is blocked on itself", t->id));
-		    raiseAsyncWithLock(t, (StgClosure *)NonTermination_closure);
+		    raiseAsync(t, (StgClosure *)NonTermination_closure);
 		    goto done;
 		}
 		else {

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.24 2002/02/28 18:44:28 sof Exp $
+ * $Id: Exception.hc,v 1.25 2002/04/23 06:34:26 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -191,7 +191,7 @@ FN_(killThreadzh_fast)
    */
   if (R1.t == CurrentTSO) {
 	SaveThreadState();	/* inline! */
-	STGCALL2(raiseAsync, R1.t, R2.cl);
+	STGCALL2(raiseAsyncWithLock, R1.t, R2.cl);
 	if (CurrentTSO->what_next == ThreadKilled) {
 		R1.w = ThreadFinished;
 		JMP_(StgReturn);
@@ -205,7 +205,7 @@ FN_(killThreadzh_fast)
 	  	barf("killThreadzh_fast");
 	}
   } else {
-	STGCALL2(raiseAsync, R1.t, R2.cl);
+	STGCALL2(raiseAsyncWithLock, R1.t, R2.cl);
   }
 
   JMP_(ENTRY_CODE(Sp[0]));
