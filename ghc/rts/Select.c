@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.8 2000/01/17 17:33:30 simonmar Exp $
+ * $Id: Select.c,v 1.9 2000/03/16 17:24:08 simonmar Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -153,8 +153,8 @@ awaitEvent(rtsBool wait)
 	 * serviced.
 	 */
 	if (signals_pending()) {
-	  start_signal_handlers();
 	  RELEASE_LOCK(&sched_mutex);
+	  start_signal_handlers();
 	  break;
 	}
 
