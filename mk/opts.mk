@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.3 1997/08/22 16:13:01 reid Exp $
+# 	$Id: opts.mk,v 1.4 1998/01/14 11:22:21 sof Exp $
 #
 #################################################################################
 
@@ -46,7 +46,7 @@
 #################################################################################
 
 # These flags make flex 8-bit
-SRC_FLEX_OPTS	+= -s -8
+SRC_FLEX_OPTS	+= -8
 
 #
 # Make sure we install things with group 'grasp' at Glasgow
