@@ -87,7 +87,7 @@ instance  Monad Maybe  where
 -- | The 'maybe' function takes a default value, a function, and a 'Maybe'
 -- value.  If the 'Maybe' value is 'Nothing', the function returns the
 -- default value.  Otherwise, it applies the function to the value inside
--- the 'Just' and returns that.
+-- the 'Just' and returns the result.
 maybe :: b -> (a -> b) -> Maybe a -> b
 maybe n _ Nothing  = n
 maybe _ f (Just x) = f x
@@ -136,8 +136,8 @@ catMaybes ls = [x | Just x <- ls]
 -- | The 'mapMaybe' function is a version of 'map' which can throw
 -- out elements.  In particular, the functional argument returns
 -- something of type @'Maybe' b@.  If this is 'Nothing', no element
--- is added on to the result list.  If it just @'Just' a@, then @a@ is
--- added on to the result.
+-- is added on to the result list.  If it just @'Just' b@, then @b@ is
+-- included in the result list.
 mapMaybe          :: (a -> Maybe b) -> [a] -> [b]
 mapMaybe _ []     = []
 mapMaybe f (x:xs) =
