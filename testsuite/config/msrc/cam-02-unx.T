@@ -1,2 +1,2 @@
-
-$platform = "i386-unknown-linux"
+$arch = "i386"
+$os   = "linux"
