@@ -1,10 +1,10 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1995-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1995-1998
 %
 \section[SocketPrim]{Low-level socket bindings}
 
 The @SocketPrim@ module is for when you want full control over the
-sockets, something like what you have in C (which is very messy).
+sockets, exposing the C socket API.
 
 \begin{code}	   
 {-# OPTIONS -#include "stgio.h" -#include "cbits/ghcSockets.h" #-}
@@ -19,8 +19,9 @@ module SocketPrim (
     SockAddr(..),
     HostAddress,
     ShutdownCmd(..),
+    ProtocolNumber,
 
-    socket,		-- :: Family -> SocketType -> Int -> IO Socket 
+    socket,		-- :: Family -> SocketType -> ProtocolNumber -> IO Socket 
     connect,		-- :: Socket -> SockAddr -> IO ()
     bindSocket,		-- :: Socket -> SockAddr -> IO ()
     listen,		-- :: Socket -> Int -> IO ()
@@ -28,7 +29,7 @@ module SocketPrim (
     getPeerName,	-- :: Socket -> IO SockAddr
     getSocketName,	-- :: Socket -> IO SockAddr
 
-    socketPort,		-- :: Socket -> IO Int
+    socketPort,		-- :: Socket -> IO PortNumber
 
     writeSocket,	-- :: Socket -> String -> IO Int
     readSocket,		-- :: Socket -> Int -> IO (String, Int)
@@ -45,8 +46,8 @@ module SocketPrim (
     shutdown,		-- :: Socket -> ShutdownCmd -> IO ()
     sClose,		-- :: Socket -> IO ()
 
-    inet_addr,		-- :: String -> HostAddress
-    inet_ntoa,		-- :: HostAddress -> String
+    inet_addr,		-- :: String -> IO HostAddress
+    inet_ntoa,		-- :: HostAddress -> IO String
 
     sIsConnected,	-- :: Socket -> IO Bool
     sIsBound,		-- :: Socket -> IO Bool
@@ -54,6 +55,9 @@ module SocketPrim (
     sIsReadable,	-- :: Socket -> IO Bool
     sIsWritable,	-- :: Socket -> IO Bool
 
+
+    PortNumber(..),
+    mkPortNumber,	    -- :: Int -> PortNumber
 
 -- Special Constants
 
@@ -75,6 +79,7 @@ module SocketPrim (
  
 import GlaExts
 import ST
+import Ix
 import PrelIOBase  -- IOError, Handle representation
 import PrelHandle
 import Foreign
@@ -83,9 +88,10 @@ import Posix
 import PosixUtil
 import IO
 import IOExts	    ( IORef, newIORef, readIORef, writeIORef )
-import PackedString ( unpackPS, byteArrayToPS, unpackCString, packCBytesST )
-
-import Ix
+import PackedString ( unpackNBytesPS, byteArrayToPS, 
+		      unpackCString, unpackCStringIO,
+		      unpackCStringLenIO
+		    )
 \end{code}
 
 
@@ -101,13 +107,13 @@ structs used in the C library into an equivalent Haskell type.	An
 other possible implementation is to keep all the internals in the C
 code and use an Int\# and a status flag. The second method is used here
 since a lot of the C structures are not required to be manipulated.
-Originally the status was non mutable so we had to return a new socket
+
+Originally the status was non-mutable so we had to return a new socket
 each time we changed the status.  This version now uses mutable
 variables to avoid the need to do this.	 The result is a cleaner
 interface and better security since the application programmer now
 can't circumvent the status information to perform invalid operations
-on sockets.	      
-
+on sockets.
 
 \begin{code}  
 data SocketStatus
@@ -117,20 +123,21 @@ data SocketStatus
   | Listening		-- listen
   | Connected		-- connect/accept
   | Error String	-- Any
-  deriving (Eq, Show)
+    deriving (Eq, Show)
 
 data Socket
-  = MkSocket 
-     Int				  -- File Descriptor Part
-     Family				  
-     SocketType				  
-     Int				  -- Protocol Number
-     (IORef SocketStatus) -- Status Flag
+  = MkSocket
+	    Int		         -- File Descriptor
+	    Family				  
+	    SocketType				  
+	    Int			 -- Protocol Number
+	    (IORef SocketStatus) -- Status Flag
 \end{code}
 
 The scheme used for addressing sockets is somewhat quirky. The
 calls in the BSD socket API that need to know the socket address all
 operate in terms of \tr{struct sockaddr}, a `virtual' type of socket address. 
+
 The Internet family of sockets are addressed as \tr{struct sockaddr\_in},
 so when calling functions that operate on \tr{struct sockaddr}, we have
 to type cast the Internet socket address into a \tr{struct sockaddr}. By luck(!),
@@ -142,20 +149,40 @@ and use a union/algebraic type for the different families. Currently only
 Unix domain sockets and the Internet family is supported.
 
 \begin{code}
+
+-- NOTE: HostAddresses are represented in network byte order.
+--       Functions that expect the address in machine byte order
+--       will have to perform the necessary translation.
 type HostAddress = Word
+
+--
+-- newtyped to prevent accidental use of sane-looking
+-- port numbers that haven't actually been converted to
+-- network-byte-order first.
+--
+newtype PortNumber = PNum Int  -- 16-bit value stored in network byte order.
+		     deriving ( Eq )
+
+mkPortNumber :: Int -> PortNumber
+mkPortNumber v = unsafePerformIO $ do
+   po <- _casm_ ``%r=(int)htons((int)%0); '' v
+   return (PNum po)
 
 data SockAddr		-- C Names				
 #ifndef cygwin32_TARGET_OS
-  = SockAddrUnix	-- struct sockaddr_un
-	String		-- sun_path
-  |
+  = SockAddrUnix        -- struct sockaddr_un
+        String          -- sun_path
+  | SockAddrInet	-- struct sockaddr_in
+	PortNumber	-- sin_port  (network byte order)
+	HostAddress	-- sin_addr  (ditto)
 #else
-  =
+  = SockAddrUnix        -- struct sockaddr_un
+        String          -- sun_path
 #endif
-    SockAddrInet	-- struct sockaddr_in
-	Int		-- sin_port
-	HostAddress	-- sin_addr
-  deriving Eq
+    deriving Eq
+
+type ProtocolNumber = Int
+
 \end{code}
 
 
@@ -173,22 +200,23 @@ have thus been renamed by appending the prefix Socket.
 
 Create an unconnected socket of the given family, type and protocol.
 The most common invocation of $socket$ is the following:
+
 \begin{verbatim}
    ...
-   socket AF_INET Stream 6	>>= \ my_socket ->
+   my_socket <- socket AF_INET Stream 6
    ...
 \end{verbatim}
 
 \begin{code}	   
-socket :: Family 	-- Family Name (usually AF_INET)
-       -> SocketType 	-- Socket Type (usually Stream)
-       -> Int		-- Protocol Number (getProtocolByName to find value)
-       -> IO Socket	-- Unconnected Socket
+socket :: Family 	 -- Family Name (usually AF_INET)
+       -> SocketType 	 -- Socket Type (usually Stream)
+       -> ProtocolNumber -- Protocol Number (getProtocolByName to find value)
+       -> IO Socket	 -- Unconnected Socket
 
 socket family stype protocol = do
     status <- _ccall_ createSocket (packFamily family) 
-		         (packSocketType stype) 
-		         protocol
+				   (packSocketType stype) 
+				   protocol
     case status of
       -1 -> constructErrorAndFail "socket"
       n  -> do
@@ -379,7 +407,7 @@ readSocket (MkSocket s family stype protocol status) nbytes = do
       -1 -> constructErrorAndFail "readSocket"
       n  -> do
 	    barr <- stToIO (unsafeFreezeByteArray ptr)
-            return (unpackPS (byteArrayToPS barr), n)
+            return (unpackNBytesPS (byteArrayToPS barr) n, n)
 
 readSocketAll :: Socket -> IO String
 readSocketAll s =
@@ -402,7 +430,7 @@ was given $aNY\_PORT$.
 
 \begin{code}
 socketPort :: Socket		-- Connected & Bound Socket
-	   -> IO Int		-- Port Number of Socket
+	   -> IO PortNumber	-- Port Number of Socket
 socketPort sock@(MkSocket s AF_INET stype protocol status) =
     getSocketName sock >>= \(SockAddrInet port _) ->
     return port
@@ -482,7 +510,7 @@ setSocketOptions :: Socket ->
 		    String ->		-- Option Value
 		    IO ()
 
-getSocketOptons :: Socket ->
+getSocketOptions :: Socket ->
 		   Int ->		-- Level
 		   SocketOption ->	-- Option Name
 		   IO String		-- Option Value
@@ -527,7 +555,7 @@ write  &	&   +	  &	       &  +	&  +	 &  +	& + \\
 
     
 The following Family and Socket Type declarations were manually derived
-from /usr/include/sys/socket.h on the appropriate machines.
+from @<sys/socket.h>@ on the appropriate machines.
 
 Maybe a configure script that could parse the socket.h file to produce
 the following declaration is required to make it ``portable'' rather than
@@ -917,20 +945,6 @@ sClose (MkSocket s family stype protocol status) = _ccall_ close s
 
 -------------------------------------------------------------------------------
 
-inet_addr :: String -> HostAddress
-inet_addr ipstr = unsafePerformIO (_ccall_ inet_addr ipstr)
-
--------------------------------------------------------------------------------
-
-inet_ntoa :: HostAddress -> String
-inet_ntoa haddr = unsafePerformIO (
-    _casm_ ``struct in_addr addr;
-	     addr.s_addr = htonl(%0);
-	     %r = inet_ntoa (addr);'' haddr    >>= \ str ->
-    return (unpackCString str))
-
--------------------------------------------------------------------------------
-
 sIsConnected :: Socket -> IO Bool
 sIsConnected (MkSocket s family stype protocol status) = do
     value <- readIORef status
@@ -983,6 +997,31 @@ sSetBlocking :: Socket -> Bool -> IO ()
 sIsBlocking  :: Socket -> IO Bool
 -}
 
+\end{code}
+
+Internet address manipulation routines:
+
+\begin{code}
+inet_addr :: String -> IO HostAddress
+inet_addr ipstr = do
+   had <- _ccall_ inet_addr ipstr
+   if had == (W# (int2Word# (negateInt# 1#))) -- hack to avoid depending on Int.intToWord here.
+    then fail (userError ("inet_addr: Malformed address: " ++ ipstr))
+    else return had  -- network byte order
+
+inet_ntoa :: HostAddress -> IO String
+inet_ntoa haddr = do
+  pstr <- _casm_ ``struct in_addr addr;
+		   addr.s_addr = %0;
+		   %r = inet_ntoa (addr);'' haddr
+  -- unpack straight away, since pstr points to static buffer.
+  unpackCStringIO pstr
+
+\end{code}
+
+Marshaling and allocation helper functions:
+
+\begin{code}
 -------------------------------------------------------------------------------
 
 allocSockAddr :: Family -> IO (MutableByteArray RealWorld Int, Int)
@@ -1012,25 +1051,27 @@ unpackSockAddr arr len = do
 
 -------------------------------------------------------------------------------
 
+#ifndef cygwin32_TARGET_OS
+
 {-
-  sun_path is *not* NULL terminated, hence we *do* the need to know the
+  sun_path is *not* NULL terminated, hence we *do* need to know the
   length of it.
 -}
-#ifndef cygwin32_TARGET_OS
 unpackSockAddrUnix :: (MutableByteArray RealWorld Int) -> Int -> IO SockAddr
 unpackSockAddrUnix ptr len = do
     char_star <- _casm_ ``%r = ((struct sockaddr_un*)%0)->sun_path;'' ptr
-    path <- stToIO (packCBytesST len char_star)
-    return (SockAddrUnix (unpackPS path))
+    path      <- unpackCStringLenIO char_star len
+    return (SockAddrUnix path)
+
 #endif
+
 -------------------------------------------------------------------------------
 
 unpackSockAddrInet :: (MutableByteArray RealWorld Int) -> IO SockAddr
 unpackSockAddrInet ptr = do
-    port <- _casm_ ``%r = ntohs(((struct sockaddr_in*)%0)->sin_port);'' ptr
-    addr <- _casm_ ``%r = ntohl(((struct sockaddr_in*)%0)->sin_addr.s_addr);'' 
-		   ptr
-    return (SockAddrInet port addr)
+  port <- _casm_ ``%r = ((struct sockaddr_in*)%0)->sin_port;''        ptr
+  addr <- _casm_ ``%r = ((struct sockaddr_in*)%0)->sin_addr.s_addr;'' ptr
+  return (SockAddrInet (PNum port) addr)
 
 -------------------------------------------------------------------------------
 
@@ -1039,26 +1080,21 @@ packSockAddr :: SockAddr -> IO (MutableByteArray RealWorld Int)
 #ifndef cygwin32_TARGET_OS
 packSockAddr (SockAddrUnix path) = do
     (ptr,_) <- allocSockAddr AF_UNIX
-    _casm_ ``(((struct sockaddr_un *)%0)->sun_family) = AF_UNIX;'' 
-	   ptr
-    _casm_ ``strcpy ((((struct sockaddr_un *)%0)->sun_path),%1);'' 
-	   ptr path
+    _casm_ ``(((struct sockaddr_un *)%0)->sun_family) = AF_UNIX;''    ptr
+    _casm_ ``strcpy ((((struct sockaddr_un *)%0)->sun_path),%1);''    ptr path
     return ptr
 #endif
-packSockAddr (SockAddrInet port address) = do
-    (ptr,_) <- allocSockAddr AF_INET
-    _casm_ ``(((struct sockaddr_in *)%0)->sin_family) = AF_INET;'' 
-	   ptr
-    _casm_ ``(((struct sockaddr_in *)%0)->sin_port) = htons((int)%1);''	
-	   ptr port
-    _casm_ ``(((struct sockaddr_in *)%0)->sin_addr.s_addr) = htonl(%1);'' 
-	   ptr address
-    return ptr
+packSockAddr (SockAddrInet (PNum port) address) = do
+  (ptr,_) <- allocSockAddr AF_INET
+  _casm_ ``(((struct sockaddr_in *)%0)->sin_family) = AF_INET;''  ptr
+  _casm_ ``(((struct sockaddr_in *)%0)->sin_port) = (int)%1;''    ptr port
+  _casm_ ``(((struct sockaddr_in *)%0)->sin_addr.s_addr) = %1;''  ptr address
+  return ptr
 
 -------------------------------------------------------------------------------
 \end{code}
 
-@socketHandle@ turns a @Socket@ into a 1.3 @Handle@. By default, the new
+@socketHandle@ turns a @Socket@ into a Haskell IO @Handle@. By default, the new
 handle will not be buffered, use @hSetBuffering@ if you want to change
 it subsequently.
 
