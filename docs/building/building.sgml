@@ -2652,7 +2652,7 @@ guide) before continuing to read these notes.
 <para>
 Before you start, make sure you've installed the Cygwin packages
 <filename>openssh</filename>, <filename>openssl</filename>,
-<filename>cvs</filename>, <filename>m4</filename> and
+<filename>cvs</filename>, <filename>gdbm</filename>, <filename>m4</filename> and
 <filename>autoconf</filename>. You also need to make sure that the
 user environment variable <Constant>MAKE_MODE</Constant> is set to <Literal>UNIX</Literal>.  If you don't do
 this you get very weird messages when you type <Command>make</Command>, such as:
