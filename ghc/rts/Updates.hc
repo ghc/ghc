@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.3 1999/01/13 17:25:49 simonm Exp $
+ * $Id: Updates.hc,v 1.4 1999/01/14 14:35:04 simonm Exp $
  *
  * Code to perform updates.
  *
@@ -173,7 +173,7 @@ STGFUN(PAP_entry)
   /* 
    * Check for stack overflow.
    */
-  STK_CHK(Words,PAP_entry,R2.p,1,);
+  STK_CHK(Words,PAP_entry,R1.p,1,);
   Sp -= Words;
 
   TICK_ENT_PAP(pap);
