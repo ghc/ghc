@@ -12,7 +12,7 @@ module SpecConstr(
 
 import CoreSyn
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprType, exprIsConApp_maybe, eqExpr )
+import CoreUtils	( exprType, eqExpr )
 import CoreFVs 		( exprsFreeVars )
 import DataCon		( dataConRepArity )
 import Type		( tyConAppArgs )
@@ -231,7 +231,11 @@ extendBndr  env bndr  = env { scope = extendVarEnv (scope env) bndr Other }
     --	case scrut of b
     --	    C x y -> ...
     -- we want to bind b, and perhaps scrut too, to (C x y)
-extendCaseBndr env case_bndr scrut con alt_bndrs
+extendCaseBndrs :: ScEnv -> Id -> CoreExpr -> AltCon -> [Var] -> ScEnv
+extendCaseBndrs env case_bndr scrut DEFAULT alt_bndrs
+  = extendBndrs env (case_bndr : alt_bndrs)
+
+extendCaseBndrs env case_bndr scrut con alt_bndrs
   = case scrut of
 	Var v ->   -- Bind the scrutinee in the ConstrEnv if it's a variable
 		   -- Also forget if the scrutinee is a RecArg, because we're
@@ -337,7 +341,7 @@ scExpr env (Case scrut b alts)
     sc_alt (con,bs,rhs) = scExpr env1 rhs	`thenUs` \ (usg,rhs') ->
 			  returnUs (usg, (con,bs,rhs'))
 			where
-			  env1 = extendCaseBndr env b scrut con bs
+			  env1 = extendCaseBndrs env b scrut con bs
 
 scExpr env (Let bind body)
   = scBind env bind	`thenUs` \ (env', bind_usg, bind') ->
