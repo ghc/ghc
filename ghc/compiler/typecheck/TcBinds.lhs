@@ -814,5 +814,7 @@ genCtxt binder_names
   = ptext SLIT("When generalising the type(s) for") <+> pprBinders binder_names
 
 -- Used in error messages
-pprBinders bndrs = pprWithCommas ppr bndrs
+-- Use quotes for a single one; they look a bit "busy" for several
+pprBinders [bndr] = quotes (ppr bndr)
+pprBinders bndrs  = pprWithCommas ppr bndrs
 \end{code}

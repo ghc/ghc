@@ -179,8 +179,13 @@ tc_sub _ (FunTy exp_arg exp_res) _ (FunTy act_arg act_res)
 
 -----------------------------------
 -- Type variable meets function: imitate
-
--- MARK: can we short-cut to an error case?
+--
+-- NB 1: we can't just unify the type variable with the type
+--	 because the type might not be a tau-type, and we aren't
+--	 allowed to instantiate an ordinary type variable with
+--	 a sigma-type
+--
+-- NB 2: can we short-cut to an error case?
 --	 when the arg/res is not a tau-type?
 -- NO!  e.g.   f :: ((forall a. a->a) -> Int) -> Int
 --	then   x = (f,f)
@@ -190,14 +195,14 @@ tc_sub exp_sty exp_ty@(FunTy exp_arg exp_res) _ (TyVarTy tv)
   = getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> tc_sub exp_sty exp_ty ty ty
-	Nothing -> imitateFun tv	`thenNF_Tc` \ (act_arg, act_res) ->
+	Nothing -> imitateFun tv exp_sty	`thenNF_Tc` \ (act_arg, act_res) ->
 		   tcSub_fun exp_arg exp_res act_arg act_res
 
 tc_sub _ (TyVarTy tv) act_sty act_ty@(FunTy act_arg act_res)
   = getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> tc_sub ty ty act_sty act_ty
-	Nothing -> imitateFun tv	`thenNF_Tc` \ (exp_arg, exp_res) ->
+	Nothing -> imitateFun tv act_sty	`thenNF_Tc` \ (exp_arg, exp_res) ->
 		   tcSub_fun exp_arg exp_res act_arg act_res
 
 -----------------------------------
@@ -238,12 +243,19 @@ tcSub_fun exp_arg exp_res act_arg act_res
     in
     returnTc (coercion, lie1 `plusLIE` lie2)
 
-imitateFun :: TcTyVar -> NF_TcM (TcType, TcType)
-imitateFun tv
+imitateFun :: TcTyVar -> TcType -> NF_TcM (TcType, TcType)
+imitateFun tv ty
   = ASSERT( not (isHoleTyVar tv) )
+	-- NB: tv is an *ordinary* tyvar and so are the new ones
+
+   	-- Check that tv isn't a type-signature type variable
+	-- (This would be found later in checkSigTyVars, but
+	--  we get a better error message if we do it here.)
+    checkTcM (not (isSkolemTyVar tv))
+	     (failWithTcM (unifyWithSigErr tv ty))	`thenTc_`
+
     newTyVarTy openTypeKind		`thenNF_Tc` \ arg ->
     newTyVarTy openTypeKind		`thenNF_Tc` \ res ->
-	-- NB: tv is an *ordinary* tyvar and so are the new ones
     putTcTyVar tv (mkFunTy arg res)	`thenNF_Tc_`
     returnNF_Tc (arg,res)
 \end{code}

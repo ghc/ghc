@@ -593,15 +593,17 @@ tcApp fun args res_ty
 	split_fun_ty fun_ty (length args)
     )						`thenTc` \ (expected_arg_tys, actual_result_ty) ->
 
-	-- Unify with expected result before type-checking the args
-	-- so that the info from res_ty percolates to expected_arg_tys
-	-- This is when we might detect a too-few args situation
-    tcAddErrCtxtM (checkArgsCtxt fun args res_ty actual_result_ty)
-		  (tcSub res_ty actual_result_ty)	`thenTc` \ (co_fn, lie_res) ->
-
 	-- Now typecheck the args
     mapAndUnzipTc (tcArg fun)
 	  (zip3 args expected_arg_tys [1..])	`thenTc` \ (args', lie_args_s) ->
+
+	-- Unify with expected result after type-checking the args
+	-- so that the info from args percolates to actual_result_ty.
+	-- This is when we might detect a too-few args situation.
+	-- (One can think of cases when the opposite order would give
+	-- a better error message.)
+    tcAddErrCtxtM (checkArgsCtxt fun args res_ty actual_result_ty)
+		  (tcSub res_ty actual_result_ty)	`thenTc` \ (co_fn, lie_res) ->
 
     returnTc (co_fn <$> foldl HsApp fun' args', 
 	      lie_res `plusLIE` lie_fun `plusLIE` plusLIEs lie_args_s)
@@ -674,7 +676,7 @@ Typecheck expression which in most cases will be an Id.
 tcExpr_id :: RenamedHsExpr -> TcM (TcExpr, LIE, TcType)
 tcExpr_id (HsVar name) = tcId name
 tcExpr_id expr         = newTyVarTy openTypeKind	`thenNF_Tc` \ id_ty ->
-			 tcMonoExpr expr id_ty	`thenTc`    \ (expr', lie_id) ->
+			 tcMonoExpr expr id_ty		`thenTc`    \ (expr', lie_id) ->
 		         returnTc (expr', lie_id, id_ty) 
 \end{code}
 
