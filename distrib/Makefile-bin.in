@@ -7,7 +7,7 @@
 # by using the unpacked distribution tree in-situ or by installing the
 # package.
 #
-# Using the package directly is easy, just do `make config'. (The
+# Using the package directly is easy, just do `make in-place'. (The
 # distribution will *not* work straight out of the box, you'll have to do
 # this first)
 #
@@ -77,8 +77,6 @@ dvidir    = $(datadir)
 real_libdir      = $(libdir)/$(package)-$(version)
 real_datadir     = $(datadir)/$(package)-$(version)
 
-package     = ghc
-version     = 2.09
 PERL        = @PerlCmd@
 SH	    = /bin/sh
 RM          = rm -f
@@ -97,15 +95,7 @@ INSTALL_DIR  = ./mkdirhier
 # to be created, i.e., create a symlink, ghc-$(version), pointing to ghc to
 # avoid version vertigo.
 #
-VERSION_SYMLINKS_FOR=ghc
-
-#
-# List of files in bin directory that need to have
-# local setup/install information prepended.
-#
-PACKAGE_SCRIPTS=ghc stat2resid hstags mkdependHS
-PACKAGE_SH_SCRIPTS=happy
-PACKAGE_LIB_SCRIPTS=hscpp
+VERSION_SYMLINKS_FOR=$(package)
 
 # Binaries to install
 PACKAGE_BINS=$(PACKAGE_SCRIPTS) $(PACKAGE_SH_SCRIPTS) hp2ps
@@ -133,8 +123,7 @@ INSTALL_DATA_OPTS = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_DATA_OPTS)
 
 config-pkgs ::
 	@echo "Configuring $(package), version $(version), on $(platform) ..."
-	$(RM) bin/$(platform)/$(package)-$(version)/$(package)-$(version)
-	@for i in $(PACKAGE_SCRIPTS); do \
+	@for i in $(PACKAGE_PRL_SCRIPTS); do \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
 	   test -f bin/$(platform)/$(package)-$(version)/$$i && $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; \
@@ -149,7 +138,7 @@ config-pkgs ::
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
 	done
-	@for i in $(PACKAGE_LIB_SCRIPTS); do \
+	@for i in $(PACKAGE_LIB_PRL_SCRIPTS); do \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) lib/$(platform)/$(package)-$(version)/$$i.bak; \
 	   test -f lib/$(platform)/$(package)-$(version)/$$i && $(MV) lib/$(platform)/$(package)-$(version)/$$i lib/$(platform)/$(package)-$(version)/$$i.bak; \
