@@ -1,9 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
-List 1 :: partition 1;
+List 2 :: partition 1;
 PrelBase 1 :: $d12 1 $d13 1 $d16 1 $d17 1 $d18 1 $d19 1 $d2 1 $d20 1 $d21 1 $d26 1 $d28 1 $d29 1 $d31 1 $d33 1 $d36 1 $d37 1 $d38 1 $d39 1 $d41 1 $d6 1 $d7 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $m>> 1 $mcompare 1 $mmax 1 $mmin 1 otherwise 1 Eq 1 Eval 1 Functor 1 Monad 1 MonadPlus 1 MonadZero 1 Ord 1 Ordering 1;
 PrelList 1 :: elem 1 head 1;
 PrelNum 1 :: $d17 1 $d18 1;
@@ -13,21 +13,21 @@ _exports_
 ShouldSucceed dfs isCyclic isRecursiveCycle lookupVertex mkDigraph mkEdges mkVertices stronglyConnComp topSort Cycle Digraph(MkDigraph) Edge FlattenedDependencyInfo MaybeErr(Succeeded Failed);
 _instances_
 instance _forall_ [a b] => {PrelBase.Eval (MaybeErr a b)} = $d1;
-instance _forall_ [vertex] => {PrelBase.Eval (Digraph vertex)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (Digraph a)} = $d2;
 _declarations_
 1 $d1 _:_ _forall_ [a b] => {PrelBase.Eval (MaybeErr a b)} ;;
-1 $d2 _:_ _forall_ [vertex] => {PrelBase.Eval (Digraph vertex)} ;;
-1 type Cycle vertex = [vertex] ;
+1 $d2 _:_ _forall_ [a] => {PrelBase.Eval (Digraph a)} ;;
 1 data Digraph vertex = MkDigraph [vertex] ;
+1 data MaybeErr a b = Succeeded a |  Failed b ;
+1 dfs _:_ _forall_ [a] {PrelBase.Eq a} => (a -> [a]) -> ([a], [a]) -> [a] -> ([a], [a]) ;;
+1 isCyclic _:_ _forall_ [a] {PrelBase.Eq a} => [Edge a] -> [a] -> PrelBase.Bool ;;
+1 isRecursiveCycle _:_ _forall_ [a] {PrelBase.Eq a} => Cycle a -> [Edge a] -> PrelBase.Bool ;;
+1 lookupVertex _:_ _forall_ [a b c] {PrelBase.Eq a, PrelBase.Ord b} => FlattenedDependencyInfo a b c -> a -> c ;;
+1 mkDigraph _:_ _forall_ [a] => [a] -> Digraph a ;;
+1 mkEdges _:_ _forall_ [a b c] {PrelBase.Eq a, PrelBase.Ord b} => [a] -> FlattenedDependencyInfo a b c -> [Edge a] ;;
+1 mkVertices _:_ _forall_ [a b c] => FlattenedDependencyInfo a b c -> [a] ;;
+1 stronglyConnComp _:_ _forall_ [a] {PrelBase.Eq a} => [Edge a] -> [a] -> [[a]] ;;
+1 topSort _:_ _forall_ [a] {PrelBase.Eq a} => [Edge a] -> [a] -> MaybeErr [a] [[a]] ;;
+1 type Cycle vertex = [vertex] ;
 1 type Edge vertex = (vertex, vertex) ;
 1 type FlattenedDependencyInfo vertex name code = [(vertex, Set.Set name, Set.Set name, code)] ;
-1 data MaybeErr a b = Succeeded a |  Failed b ;
-1 dfs _:_ _forall_ [ta] {PrelBase.Eq ta} => (ta -> [ta]) -> ([ta], [ta]) -> [ta] -> ([ta], [ta]) ;;
-1 isCyclic _:_ _forall_ [ta] {PrelBase.Eq ta} => [Edge ta] -> [ta] -> PrelBase.Bool ;;
-1 isRecursiveCycle _:_ _forall_ [ta] {PrelBase.Eq ta} => Cycle ta -> [Edge ta] -> PrelBase.Bool ;;
-1 lookupVertex _:_ _forall_ [ta tb tc] {PrelBase.Eq tb, PrelBase.Ord ta} => FlattenedDependencyInfo tb ta tc -> tb -> tc ;;
-1 mkDigraph _:_ _forall_ [ta] => [ta] -> Digraph ta ;;
-1 mkEdges _:_ _forall_ [ta tb tc] {PrelBase.Eq tc, PrelBase.Ord ta} => [tc] -> FlattenedDependencyInfo tc ta tb -> [Edge tc] ;;
-1 mkVertices _:_ _forall_ [ta tb tc] => FlattenedDependencyInfo tc ta tb -> [tc] ;;
-1 stronglyConnComp _:_ _forall_ [ta] {PrelBase.Eq ta} => [Edge ta] -> [ta] -> [[ta]] ;;
-1 topSort _:_ _forall_ [ta] {PrelBase.Eq ta} => [Edge ta] -> [ta] -> MaybeErr [ta] [[ta]] ;;

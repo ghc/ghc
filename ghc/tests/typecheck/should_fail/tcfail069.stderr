@@ -1,14 +1,10 @@
  
-tcfail069.hs:21: Couldn't match the type `(,) taAi' against `[]'
-    Expected: `[taAm]'
-    Inferred: `([Int], [Int])'
-    In a "case" branch: `[]' -> `error "foo"'
-    In the case expression `case (list1, (list2)) of [] -> error "foo"'
-    In an equation for function `too_much':
-	`too_much ds ((k, m) : q1) s0
-		  = case (list1, (list2)) of [] -> error "foo"
-		  where
-		      list2 = ds
-		      list1 = ds'
+tcfail069.hs:21:
+    Couldn't match the type `(aBr, aBt)' against `[aBw]'
+	Expected: [aBw]
+	Inferred: ([Int], [Int])
+	In a "case" branch: [] -> error "foo"
+	In the case expression: case (list1, (list2)) of [] -> error "foo"
+
 
 Compilation had errors

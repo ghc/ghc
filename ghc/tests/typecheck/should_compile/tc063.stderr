@@ -1,19 +1,19 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
 PrelBase 1 :: $d2 1 $d29 1 $d31 1 $d33 1 $d38 1 Eval 1;
 _exports_
-ShouldSucceed g Reps(f) X(Tag);
+ShouldSucceed g Reps(:Reps :Reps f) X(Tag);
 _instances_
 instance {Reps PrelBase.Bool} = $d1;
-instance _forall_ [q] => {Reps (X q)} = $d2;
+instance _forall_ [a] => {Reps (X a)} = $d2;
 instance _forall_ [a] => {PrelBase.Eval (X a)} = $d3;
 _declarations_
 1 $d1 _:_ {Reps PrelBase.Bool} ;;
-1 $d2 _:_ _forall_ [q] => {Reps (X q)} ;;
+1 $d2 _:_ _forall_ [a] => {Reps (X a)} ;;
 1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (X a)} ;;
 1 class Reps r where {f :: r -> r -> r} ;
 1 data X a = Tag a ;
-1 g _:_ _forall_ [ta] {Reps ta} => ta -> ta ;;
+1 g _:_ _forall_ [a] {Reps a} => a -> a ;;

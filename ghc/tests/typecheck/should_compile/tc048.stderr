@@ -1,24 +1,24 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
 PrelBase 1 :: $d2 1 $d29 1 $d31 1 $d33 1 $d36 1 $d38 1 Eval 1;
 PrelTup 1 :: $d13 1;
 _exports_
 ShouldSucceed mAp ranAFE ranOAL sNd AFE(MkAFE) FG(MkFG) OL(MkOL);
 _instances_
-instance _forall_ [n a b] => {PrelBase.Eval (AFE n a b)} = $d1;
+instance _forall_ [a b c] => {PrelBase.Eval (AFE a b c)} = $d1;
 instance _forall_ [a b] => {PrelBase.Eval (FG a b)} = $d2;
 instance _forall_ [a] => {PrelBase.Eval (OL a)} = $d3;
 _declarations_
-1 $d1 _:_ _forall_ [n a b] => {PrelBase.Eval (AFE n a b)} ;;
+1 $d1 _:_ _forall_ [a b c] => {PrelBase.Eval (AFE a b c)} ;;
 1 $d2 _:_ _forall_ [a b] => {PrelBase.Eval (FG a b)} ;;
 1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (OL a)} ;;
 1 data AFE n a b = MkAFE (OL (n, FG a b)) ;
 1 data FG a b = MkFG (OL (a, b)) ;
 1 data OL a = MkOL [a] ;
-1 mAp _:_ _forall_ [ta tb] => (ta -> tb) -> [ta] -> [tb] ;;
-1 ranAFE _:_ _forall_ [ta tb tc] => AFE ta tb tc -> [FG tb tc] ;;
-1 ranOAL _:_ _forall_ [ta tb] => OL (ta, tb) -> [tb] ;;
-1 sNd _:_ _forall_ [ta tb] => (ta, tb) -> tb ;;
+1 mAp _:_ _forall_ [a b] => (a -> b) -> [a] -> [b] ;;
+1 ranAFE _:_ _forall_ [a b c] => AFE a b c -> [FG b c] ;;
+1 ranOAL _:_ _forall_ [a b] => OL (a, b) -> [b] ;;
+1 sNd _:_ _forall_ [a b] => (a, b) -> b ;;

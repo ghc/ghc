@@ -1,7 +1,9 @@
  
-tcfail034.hs:13: Context `{Integral taW7}'
-		     required by inferred type, but missing on a type signature
-		     `Integral taW7' arising from use of `mod' at tcfail034.hs:17
-    When checking signature(s) for: `test'
+tcfail034.hs:17:
+    No instance for: `Integral a'
+	arising from use of `mod', at tcfail034.hs:17
+	Available context: (Num a, Eq a)
+	When checking the type signature(s) for `test'
+
 
 Compilation had errors

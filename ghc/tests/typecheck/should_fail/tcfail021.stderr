@@ -1,6 +1,7 @@
  
 tcfail021.hs:8:
     Can't handle multiple methods defined by one pattern binding
-	`(==, /=) = (\ x -> \ y -> True, (\ x -> \ y -> False))'
+	(==, /=) = (\ x -> \ y -> True, (\ x -> \ y -> False))
+
 
 Compilation had errors

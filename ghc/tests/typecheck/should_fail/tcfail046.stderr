@@ -1,14 +1,7 @@
  
-tcfail046.hs:4: No instance for: `Eq (Process a)'
-    When deriving classes for `Message'
- 
-tcfail046.hs:4: No instance for: `Eq (Process a)'
-    When deriving classes for `Continuation'
- 
-tcfail046.hs:4: No instance for: `Eq (Process a)'
-    When deriving classes for `Message'
- 
-tcfail046.hs:4: No instance for: `Eq (Process a)'
-    When deriving classes for `Continuation'
+tcfail046.hs:4:
+    No instance for: `Eq (Process a)'
+	When deriving classes for `Message'
+
 
 Compilation had errors

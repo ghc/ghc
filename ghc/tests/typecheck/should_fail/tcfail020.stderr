@@ -1,6 +1,9 @@
  
-tcfail020.hs:11: No instance for: `A [taDM]'
-    arising from an instance declaration at tcfail020.hs:11
-    When checking superclass constraints of an instance declaration
+tcfail020.hs:11:
+    No instance for: `A [a]'
+	arising from an instance declaration, at tcfail020.hs:11
+	Available context: (A [a])
+	From the superclasses of the instance declaration
+
 
 Compilation had errors

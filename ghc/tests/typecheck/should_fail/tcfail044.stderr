@@ -1,13 +1,17 @@
  
-tcfail044.hs:12: The type
-		     `a -> a'
-		 cannot be used as an instance type
+tcfail044.hs:12:
+    Illegal instance declaration for `Num (a -> a)'
+	(the instance type must be of form (T a b c)
+	 where T is not a synonym, and a,b,c are distinct type variables)
  
-tcfail044.hs:5: The type
-		    `a -> a'
-		cannot be used as an instance type
+tcfail044.hs:5:
+    Illegal instance declaration for `Eq (a -> a)'
+	(the instance type must be of form (T a b c)
+	 where T is not a synonym, and a,b,c are distinct type variables)
  
-tcfail044.hs:20: No instance for: `Num (Float -> Float)'
-    arising from use of `+' at tcfail044.hs:20
+tcfail044.hs:20:
+    No instance for: `Num (Float -> Float)'
+	arising from use of `+', at tcfail044.hs:20
+
 
 Compilation had errors

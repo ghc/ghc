@@ -1,37 +1,37 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
 PrelBase 1 :: $d2 1 $d29 1 $d31 1 $d33 1 $d38 1 Eval 1;
 _exports_
 ShouldSucceed add app before flatten idb idl lEngth nUll neg rEverse sUm swap Boolean(FF TT) List(Nil Cons) Nat(Zero Succ) Pair(Mkpair) Tree(Leaf Node);
 _instances_
-instance _forall_ [t] => {PrelBase.Eval (Tree t)} = $d1;
+instance _forall_ [a] => {PrelBase.Eval (Tree a)} = $d1;
 instance {PrelBase.Eval Nat} = $d2;
-instance _forall_ [alpha] => {PrelBase.Eval (List alpha)} = $d3;
+instance _forall_ [a] => {PrelBase.Eval (List a)} = $d3;
 instance _forall_ [a b] => {PrelBase.Eval (Pair a b)} = $d4;
 instance {PrelBase.Eval Boolean} = $d5;
 _declarations_
-1 $d1 _:_ _forall_ [t] => {PrelBase.Eval (Tree t)} ;;
+1 $d1 _:_ _forall_ [a] => {PrelBase.Eval (Tree a)} ;;
 1 $d2 _:_ {PrelBase.Eval Nat} ;;
-1 $d3 _:_ _forall_ [alpha] => {PrelBase.Eval (List alpha)} ;;
+1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (List a)} ;;
 1 $d4 _:_ _forall_ [a b] => {PrelBase.Eval (Pair a b)} ;;
 1 $d5 _:_ {PrelBase.Eval Boolean} ;;
+1 add _:_ Nat -> Nat -> Nat ;;
+1 app _:_ _forall_ [a] => List a -> List a -> List a ;;
+1 before _:_ List Nat -> List Nat ;;
 1 data Boolean = FF |  TT ;
 1 data List alpha = Nil |  Cons alpha (List alpha) ;
 1 data Nat = Zero |  Succ Nat ;
 1 data Pair a b = Mkpair a b ;
 1 data Tree t = Leaf t |  Node (Tree t) (Tree t) ;
-1 add _:_ Nat -> Nat -> Nat ;;
-1 app _:_ _forall_ [ta] => List ta -> List ta -> List ta ;;
-1 before _:_ List Nat -> List Nat ;;
-1 flatten _:_ _forall_ [ta] => Tree ta -> List ta ;;
+1 flatten _:_ _forall_ [a] => Tree a -> List a ;;
 1 idb _:_ Boolean -> Boolean ;;
-1 idl _:_ _forall_ [ta] => List ta -> List ta ;;
-1 lEngth _:_ _forall_ [ta] => List ta -> Nat ;;
-1 nUll _:_ _forall_ [ta] => List ta -> Boolean ;;
+1 idl _:_ _forall_ [a] => List a -> List a ;;
+1 lEngth _:_ _forall_ [a] => List a -> Nat ;;
+1 nUll _:_ _forall_ [a] => List a -> Boolean ;;
 1 neg _:_ Boolean -> Boolean ;;
-1 rEverse _:_ _forall_ [ta] => List ta -> List ta ;;
+1 rEverse _:_ _forall_ [a] => List a -> List a ;;
 1 sUm _:_ Tree Nat -> Nat ;;
-1 swap _:_ _forall_ [ta tb] => Pair tb ta -> Pair ta tb ;;
+1 swap _:_ _forall_ [a b] => Pair a b -> Pair b a ;;

@@ -1,8 +1,9 @@
  
-tcfail033.hs:4: Cannot construct the infinite type (occur check)
-		    `taHe' = `(taHe, taHh)'
-    Expected: `aaHj taHe'
-    Inferred: `aaHj (taHe, taHh)'
-    In a pattern binding: `buglet = [x | (x, y) <- buglet]'
+tcfail033.hs:4:
+    Occurs check: cannot construct the infinite type: aIB = (aIB, aIE)
+	Expected: aIF aIB
+	Inferred: aIF (aIB, aIE)
+	In a pattern binding: buglet = [x | (x, y) <- buglet]
+
 
 Compilation had errors

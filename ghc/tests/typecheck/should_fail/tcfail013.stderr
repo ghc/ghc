@@ -1,7 +1,9 @@
  
-tcfail013.hs:4: Couldn't match the type `[taE1]' against `Bool'
-    Expected: `Bool'
-    Inferred: `[taE1]'
-    In an equation for function `f': `f True = 2'
+tcfail013.hs:4:
+    Couldn't match the type `[aG8]' against `Bool'
+	Expected: Bool
+	Inferred: [aG8]
+	In an equation for function `f': f True = 2
+
 
 Compilation had errors

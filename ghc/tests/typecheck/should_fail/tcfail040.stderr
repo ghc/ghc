@@ -1,5 +1,7 @@
  
-tcfail040.hs:3: Ambiguous context `{ORD taDQ}'
-		    `ORD taDQ' arising from use of `<<' at tcfail040.hs:19
+tcfail040.hs:19:
+    Cannot resolve the ambiguous context (ORD aG5)
+	`ORD aG5' arising from use of `<<', at tcfail040.hs:19
+
 
 Compilation had errors

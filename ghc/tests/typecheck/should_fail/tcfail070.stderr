@@ -1,6 +1,10 @@
  
-tcfail070.hs:13: Couldn't match the kind `*' against `* -> ka1937'
-    When unifying two kinds `*' and `* -> ka1937'
-    In the type declaration for `State'
+tcfail070.hs:13:
+    Couldn't match the kind * against * -> kawG
+	Expected: *
+	Found:    * -> kawG
+	In the type `[Int] Bool'
+	In the type declaration for `State'
+
 
 Compilation had errors

@@ -1,10 +1,10 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
 PrelBase 1 :: otherwise 1;
 _exports_
 ShouldSucceed f;
 _declarations_
-1 f _:_ _forall_ [ta] => ta -> PrelBase.() ;;
+1 f _:_ _forall_ [a] => a -> PrelBase.() ;;

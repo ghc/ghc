@@ -1,8 +1,9 @@
  
-tcfail002.hs:4: Cannot construct the infinite type (occur check)
-		    `talq' = `[talq]'
-    Expected: `[talq]'
-    Inferred: `talq'
-    In an equation for function `c': `c z = z'
+tcfail002.hs:4:
+    Occurs check: cannot construct the infinite type: amA = [amA]
+	Expected: [amA]
+	Inferred: amA
+	In an equation for function `c': c z = z
+
 
 Compilation had errors

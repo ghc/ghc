@@ -7,6 +7,7 @@ HC_OPTS += -dcore-lint
 cg012_HC_OPTS = -fglasgow-exts
 cg015_HC_OPTS = -fglasgow-exts
 cg018_HC_OPTS = -fglasgow-exts
+cg025_HC_OPTS = -fglasgow-exts
 cg026_HC_OPTS = -fglasgow-exts
 cg029_HC_OPTS = -fglasgow-exts
 cg030_HC_OPTS = -fglasgow-exts

@@ -1,18 +1,20 @@
+
 ==================== Typechecked ====================
-bitRsh{-r3h,x-} =
-    _/\_ t12 -> \ tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-bitLsh{-r3g,x-} =
-    _/\_ t12 -> \ tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-AbsBinds [talO] [d.Bits_alN] []
+Word.bitRsh{-r3z-} =
+    _/\_ a_tr3x -> \ tpl_B1 ->
+	case tpl_B1 of { Word.:Bits{-r3B-} tpl_B2 tpl_B3  -> tpl_B2;}
+Word.bitLsh{-r3y-} =
+    _/\_ a_tr3x -> \ tpl_B1 ->
+	case tpl_B1 of { Word.:Bits{-r3B-} tpl_B2 tpl_B3  -> tpl_B3;}
+AbsBinds [a_tan2] [d.Bits_an1] []
+
 
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ Word 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _exports_
-Word Bits(bitRsh bitLsh);
+Word Bits(:Bits :Bits bitRsh bitLsh);
 _fixities_
 infixl 8 bitLsh;
 infixl 8 bitRsh;

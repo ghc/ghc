@@ -1,7 +1,8 @@
  
 rnfail002.hs:4:
-    Conflicting definitions for: `y'
+    Conflicting definitions for `y'
 	Defined at rnfail002.hs:6
 	Defined at rnfail002.hs:5
+
 
 Compilation had errors

@@ -1,73 +1,80 @@
  
-tcfail068.hs:45: A type signature is more polymorphic than the inferred type
-		     Can't for-all the type variable(s) `ta17h'
-		     in the inferred type `ST ta17h (ta17a, IndTree ta17h ta177)'
-    In a polymorphic function argument `(itrapstate' i k s)'
-    In the first argument of `runST', namely `(itrapstate' i k s)'
-    In an equation for function `itrapstate':
-	`itrapstate ((i, k), (j, l)) f c d s arr
-		    = runST (itrapstate' i k s)
-		    where
-			itrapstatesnd i k s
-				      = if i > j then
-					    return (s, (arr))
-					else
-					    ((readArray arr (i, (k)))
+tcfail068.hs:45:
+    A type signature is more polymorphic than the inferred type
+	Can't for-all the type variable(s) `a1cm'
+	in the type `ST a1cm a1ci'
+	In a polymorphic function argument: (itrapstate' i k s)
+	In the first argument of `runST', namely `(itrapstate' i k s)'
+	In an equation for function `itrapstate':
+	    itrapstate ((i, k), (j, l)) f c d s arr
+		       = runST (itrapstate' i k s)
+		       where
+			   itrapstatesnd i k s
+					 = if i > j then
+					       return (s, (arr))
+					   else
+					       ((readArray arr (i, (k)))
+						>>= (\ val
+						       -> let
+							    (newstate, newval) = f (... ... ...) val
+							  in
+							    (... ... ... ...) >> (... ... ... ...)))
+			   itrapstate' i k s
+				       = if k > l then
+					     return (s, (arr))
+					 else
+					     ((itrapstatesnd i k s)
+					      >>= (\ (s, arr) -> itrapstate' i (k + 1) s))
+ 
+tcfail068.hs:32:
+    A type signature is more polymorphic than the inferred type
+	Can't for-all the type variable(s) `a1f3'
+	in the type `ST a1f3 a1eZ'
+	In a polymorphic function argument: (itrap' i k)
+	In the first argument of `runST', namely `(itrap' i k)'
+	In an equation for function `itrap':
+	    itrap ((i, k), (j, l)) f arr
+		  = runST (itrap' i k)
+		  where
+		      itrapsnd i k
+			       = if i > j then
+				     return arr
+				 else
+				     ((readArray arr (i, (k)))
+				      >>= (\ val
+					     -> (writeArray arr (..., ...) (... ...))
+						>> (itrapsnd (... + 1) k)))
+		      itrap' i k
+			     = if k > l then
+				   return arr
+			       else
+				   ((itrapsnd i k) >> (itrap' i (k + 1)))
+ 
+tcfail068.hs:21:
+    A type signature is more polymorphic than the inferred type
+	Can't for-all the type variable(s) `a1fu'
+	in the type `ST a1fu a1fk'
+	In a polymorphic function argument: ((readArray arr i)
 					     >>= (\ val
-						    -> let (newstate, newval) = f (c (i, (k)) s) val
-						       in
-							 (writeArray arr (i, (k)) newval)
-							 >> (itrapstatesnd (i + 1) k (d newstate))))
-			itrapstate' i k s
-				    = if k > l then
-					  return (s, (arr))
-				      else
-					  ((itrapstatesnd i k s)
-					   >>= (\ (s, arr) -> itrapstate' i (k + 1) s))'
+						    -> (writeArray arr i (... ...))
+						       >> (return arr)))
+	In the first argument of `runST', namely
+	    `((readArray arr i)
+	      >>= (\ val -> (writeArray arr i (... ...)) >> (return arr)))'
+	In an equation for function `itiap':
+	    itiap i f arr
+		  = runST ((readArray arr i)
+			   >>= (\ val -> (... ... ... ...) >> (... ...)))
  
-tcfail068.hs:32: A type signature is more polymorphic than the inferred type
-		     Can't for-all the type variable(s) `ta1aj'
-		     in the inferred type `ST ta1aj (IndTree ta1aj ta1ag)'
-    In a polymorphic function argument `(itrap' i k)'
-    In the first argument of `runST', namely `(itrap' i k)'
-    In an equation for function `itrap':
-	`itrap ((i, k), (j, l)) f arr
-	       = runST (itrap' i k)
-	       where
-		   itrapsnd i k
-			    = if i > j then
-				  return arr
-			      else
-				  ((readArray arr (i, (k)))
-				   >>= (\ val
-					  -> (writeArray arr (i, (k)) (f val))
-					     >> (itrapsnd (i + 1) k)))
-		   itrap' i k
-			  = if k > l then
-				return arr
-			    else
-				((itrapsnd i k) >> (itrap' i (k + 1)))'
- 
-tcfail068.hs:21: A type signature is more polymorphic than the inferred type
-		     Can't for-all the type variable(s) `ta1cC'
-		     in the inferred type `ST ta1cC (IndTree ta1cC ta1cn)'
-    In a polymorphic function argument `((readArray arr i)
-					 >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
-    In the first argument of `runST', namely
-	`((readArray arr i)
-	  >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
-    In an equation for function `itiap':
-	`itiap i f arr
-	       = runST ((readArray arr i)
-			>>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
- 
-tcfail068.hs:14: A type signature is more polymorphic than the inferred type
-		     Can't for-all the type variable(s) `ta1dv'
-		     in the inferred type `ST ta1dv (IndTree ta1dv ta1do)'
-    In a polymorphic function argument `(newArray ((1, (1)), (n)) x)'
-    In the first argument of `runST', namely
-	`(newArray ((1, (1)), (n)) x)'
-    In an equation for function `itgen':
-	`itgen n x = runST (newArray ((1, (1)), (n)) x)'
+tcfail068.hs:14:
+    A type signature is more polymorphic than the inferred type
+	Can't for-all the type variable(s) `a1gq'
+	in the type `ST a1gq a1gm'
+	In a polymorphic function argument: (newArray ((1, (1)), (n)) x)
+	In the first argument of `runST', namely
+	    `(newArray ((1, (1)), (n)) x)'
+	In an equation for function `itgen':
+	    itgen n x = runST (newArray ((1, (1)), (n)) x)
+
 
 Compilation had errors

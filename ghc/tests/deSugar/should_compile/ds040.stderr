@@ -1,0 +1,5 @@
+ds040.hs:7: 
+    Pattern match(es) are overlapped
+	in the definition of function `^^^^'
+	    _ _ = ...
+

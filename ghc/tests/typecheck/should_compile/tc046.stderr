@@ -1,9 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _exports_
-ShouldSucceed B(op2) C(op1);
+ShouldSucceed B(:B :B op2) C(:C :C op1);
 _declarations_
 1 class {C a} => B a where {op2 :: a -> a -> a} ;
 1 class C a where {op1 :: a -> a} ;

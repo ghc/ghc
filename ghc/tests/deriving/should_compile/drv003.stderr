@@ -1,6 +1,9 @@
  
-drv003.hs:15: Warning: no explicit method nor default method for `=='
-	      in an instance declaration for `Eq'
+drv003.hs:15: Warning:
+    No explicit method nor default method for `=='
+    in an instance declaration for `Eq'
  
-drv003.hs:12: Warning: no explicit method nor default method for `=='
-	      in an instance declaration for `Eq'
+drv003.hs:12: Warning:
+    No explicit method nor default method for `=='
+    in an instance declaration for `Eq'
+

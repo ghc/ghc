@@ -1,10 +1,14 @@
  
-tcfail001.hs:9:warning:
-    Duplicated class assertion `A a' in context: `(A a, A a)'
+tcfail001.hs:9: Warning:
+    Duplicated class assertion `A a' in the context: (A a, A a)
+
  
-tcfail001.hs:9: Couldn't match the type `-> oalM' against `[]'
-    Expected: `oalM -> oalN'
-    Inferred: `[talK]'
-    In an equation for function `op': `op [] = []'
+tcfail001.hs:9:
+    Couldn't match the type `an0 -> an1' against `[a]'
+	Expected: an0 -> an1
+	Inferred: [a]
+	In an equation for function `op': op [] = []
+	In the definition for method `op'
+
 
 Compilation had errors

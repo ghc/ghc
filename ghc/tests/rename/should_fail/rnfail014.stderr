@@ -13,4 +13,5 @@ rnfail014.hs:9:
 	that do not appear in `Eq Bool'
 	in the type signature for an instance decl
 
+
 Compilation had errors

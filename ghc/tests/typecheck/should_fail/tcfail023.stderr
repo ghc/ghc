@@ -1,21 +1,21 @@
  
-tcfail023.hs:1: Duplicate or overlapping instance declarations
-    for `A B' at tcfail023.hs:11 and tcfail023.hs:14
+tcfail023.hs:1:
+    Duplicate or overlapping instance declarations
+	for `A B' at tcfail023.hs:14 and tcfail023.hs:11
  
-tcfail023.hs:1: Duplicate or overlapping instance declarations
-    for `A B' at tcfail023.hs:11 and tcfail023.hs:14
+tcfail023.hs:14:
+    Couldn't match the type `Bool' against `B'
+	Expected: Bool
+	Inferred: B
+	In an equation for function `op': op C = True
+	In the definition for method `op'
  
-tcfail023.hs:1: Duplicate or overlapping instance declarations
-    for `A B' at tcfail023.hs:11 and tcfail023.hs:14
- 
-tcfail023.hs:14: Couldn't match the type `Bool' against `B'
-    Expected: `Bool'
-    Inferred: `B'
-    In an equation for function `op': `op C = True'
- 
-tcfail023.hs:11: Couldn't match the type `Bool' against `B'
-    Expected: `Bool'
-    Inferred: `B'
-    In an equation for function `op': `op C = True'
+tcfail023.hs:11:
+    Couldn't match the type `Bool' against `B'
+	Expected: Bool
+	Inferred: B
+	In an equation for function `op': op C = True
+	In the definition for method `op'
+
 
 Compilation had errors

@@ -1,10 +1,13 @@
+
 ==================== Reader ====================
 module Main where
 {- rec -}
 f x = x + (if c then 1 else 2)
 f x = x + 1 :: Int
 
+
  
 expr001.hs:10: Value not in scope: `c'
+
 
 Compilation had errors

@@ -1,7 +1,8 @@
  
 tcfail074.hs:7:
-    Conflicting definitions for: `main'
+    Conflicting definitions for `main'
 	Defined at tcfail074.hs:8
 	Defined at tcfail074.hs:7
+
 
 Compilation had errors

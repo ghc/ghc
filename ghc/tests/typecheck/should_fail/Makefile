@@ -2,7 +2,7 @@ TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_fail.mk
 
-HC_OPTS += -noC -ddump-tc
+HC_OPTS += -noC
 
 tcfail045_HC_OPTS = -fglasgow-exts
 tcfail068_HC_OPTS = -fglasgow-exts

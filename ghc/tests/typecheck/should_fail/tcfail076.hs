@@ -1,3 +1,5 @@
+{-# OPTIONS -fglasgow-exts #-}
+
 {- 
 	From: Ralf Hinze <ralf@uran.informatik.uni-bonn.de>
 	Date: Fri, 15 Aug 1997 15:20:51 +0200 (MET DST)
@@ -7,11 +9,9 @@ program, which I think is ill-typed, passes silently the type checker.
 Needless to say that it uses some of GHC's arcane type extensions.
 -}
 
-{-# OPTIONS -fglasgow-exts #-}
-
 module ShouldFail where
 
-import GHC ( All )
+import GlaExts ( All )
 
 data ContT m a		=  KContT ((All res) => (a -> m res) -> m res)
 unKContT (KContT x)	=  x

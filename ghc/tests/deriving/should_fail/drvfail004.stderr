@@ -1,6 +1,9 @@
  
-drvfail004.hs:5: No instance for: `Eq (Foo taFR taFS)'
-    arising from an instance declaration at drvfail004.hs:5
-    When checking superclass constraints of an instance declaration
+drvfail004.hs:5:
+    No instance for: `Eq (Foo a b)'
+	arising from an instance declaration, at drvfail004.hs:5
+	Available context: (Eq (Foo a b))
+	From the superclasses of the instance declaration
+
 
 Compilation had errors

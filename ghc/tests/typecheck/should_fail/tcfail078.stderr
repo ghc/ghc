@@ -1,4 +1,8 @@
  
-tcfail078.hs:5: Type constructor used as a class: `Integer'
+tcfail078.hs:5:
+    Type constructor used as a class: Integer
+	In the context `(Integer i)'
+	In the type `_forall_ [i] (Integer i) => i'
+
 
 Compilation had errors

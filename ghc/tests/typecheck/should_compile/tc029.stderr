@@ -1,7 +1,7 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
 PrelBase 1 :: $d2 1 $d29 1 $d31 1 $d33 1 $d36 1 $d38 1 Eval 1;
 _exports_
@@ -10,5 +10,5 @@ _instances_
 instance {PrelBase.Eval K} = $d1;
 _declarations_
 1 $d1 _:_ {PrelBase.Eval K} ;;
-1 type G = [PrelBase.Int] ;
 1 data K = H PrelBase.Bool |  M G ;
+1 type G = [PrelBase.Int] ;

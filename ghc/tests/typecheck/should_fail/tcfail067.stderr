@@ -1,18 +1,30 @@
  
-tcfail067.hs:65: Warning: no explicit method nor default method for `abs'
-		 in an instance declaration for `Num'
+tcfail067.hs:65: Warning:
+    No explicit method nor default method for `abs'
+    in an instance declaration for `Num'
  
-tcfail067.hs:65: Warning: no explicit method nor default method for `signum'
-		 in an instance declaration for `Num'
+tcfail067.hs:65: Warning:
+    No explicit method nor default method for `signum'
+    in an instance declaration for `Num'
+
  
-tcfail067.hs:1: Context `{Ord ta18P}'
-		    required by inferred type, but missing on a type signature
-		    `Ord ta18P' arising from use of `SubRange' at tcfail067.hs:76
-    When checking signature(s) for: `numSubRangeBinOp'
+tcfail067.hs:76:
+    No instance for: `Ord a'
+	arising from use of `SubRange', at tcfail067.hs:76
+	Available context: (Num a)
+	When checking the type signature(s) for `numSubRangeBinOp'
  
-tcfail067.hs:65: Context `{Ord ta1al}'
-		     required by inferred type, but missing on a type signature
-		     `Ord ta1al' arising from use of `numSubRangeNegate' at tcfail067.hs:61
-    When checking methods of an instance declaration
+tcfail067.hs:61:
+    No instance for: `Ord a'
+	arising from use of `numSubRangeNegate', at tcfail067.hs:61
+	Available context: (Eq (SubRange a), Show (SubRange a), Eval (SubRange a))
+	From the superclasses of the instance declaration
+ 
+tcfail067.hs:65:
+    No instance for: `Show (SubRange a)'
+	arising from an instance declaration, at tcfail067.hs:65
+	Available context: (Eq (SubRange a), Show (SubRange a), Eval (SubRange a))
+	From the superclasses of the instance declaration
+
 
 Compilation had errors

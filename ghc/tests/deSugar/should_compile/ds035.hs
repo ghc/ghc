@@ -1,6 +1,6 @@
 module ShouldCompile where
 
-import GHC
+import GlaExts
 
 data CList = CNil | CCons Int# CList
 

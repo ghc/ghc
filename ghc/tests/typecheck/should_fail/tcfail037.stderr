@@ -1,7 +1,8 @@
  
 tcfail037.hs:3:
-    Conflicting definitions for: `+'
-	Imported from Prelude at tcfail037.hs:3
+    Conflicting definitions for `+'
+	Imported from `Prelude' at tcfail037.hs:3
 	Defined at tcfail037.hs:10
+
 
 Compilation had errors

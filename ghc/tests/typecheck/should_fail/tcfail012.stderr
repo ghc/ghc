@@ -1,7 +1,9 @@
  
-tcfail012.hs:3: Couldn't match the type `[tala]' against `Bool'
-    Expected: `[tala]'
-    Inferred: `Bool'
-    In a pattern binding: `True = []'
+tcfail012.hs:3:
+    Couldn't match the type `[amk]' against `Bool'
+	Expected: [amk]
+	Inferred: Bool
+	In a pattern binding: True = []
+
 
 Compilation had errors

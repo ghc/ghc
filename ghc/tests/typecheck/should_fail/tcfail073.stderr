@@ -1,16 +1,13 @@
  
-tcfail073.hs:3: Duplicate or overlapping instance declarations
-    for `Eq (a, b)' at tcfail073.hs:8 and <NoSrcLoc>
+tcfail073.hs:3:
+    Duplicate or overlapping instance declarations
+	for `Eq (a, b)' at PrelTup.hi:58 and tcfail073.hs:8
  
-tcfail073.hs:3: Duplicate or overlapping instance declarations
-    for `Eq (a, b)' at tcfail073.hs:8 and <NoSrcLoc>
- 
-tcfail073.hs:3: Duplicate or overlapping instance declarations
-    for `Eq (a, b)' at tcfail073.hs:8 and <NoSrcLoc>
- 
-tcfail073.hs:8: Context `{Eq taT4}'
-		    required by inferred type, but missing on a type signature
-		    `Eq taT4' arising from use of `==' at tcfail073.hs:8
-    When checking methods of an instance declaration
+tcfail073.hs:8:
+    No instance for: `Eq a'
+	arising from use of `==', at tcfail073.hs:8
+	Available context: ()
+	From the superclasses of the instance declaration
+
 
 Compilation had errors

@@ -1,11 +1,11 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _usages_
 PrelBase 1 :: $d13 1 $d21 1 $d26 1 $d7 1 $m/= 1 Eq 1;
 PrelNum 1 :: $d18 1;
 _exports_
 ShouldSucceed f;
 _declarations_
-1 f _:_ _forall_ [ta] {PrelBase.Eq ta} => ta -> [ta] ;;
+1 f _:_ _forall_ [a] {PrelBase.Eq a} => a -> [a] ;;

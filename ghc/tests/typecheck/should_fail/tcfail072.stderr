@@ -1,6 +1,11 @@
  
-tcfail072.hs:17: Ambiguous context `{Ord taE6}'
-		     `Ord taE6' arising from use of `g' at tcfail072.hs:23
-    When checking signature(s) for: `g'
+tcfail072.hs:23:
+    Cannot resolve the ambiguous context (Ord aGd)
+	`Ord aGd' arising from use of `g', at tcfail072.hs:23
+ 
+tcfail072.hs:23:
+    Cannot resolve the ambiguous context (Ord aGg)
+	`Ord aGg' arising from use of `g', at tcfail072.hs:23
+
 
 Compilation had errors

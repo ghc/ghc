@@ -1,9 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
 _exports_
-ShouldSucceed Eq1(deq);
+ShouldSucceed Eq1(:Eq1 :Eq1 deq);
 _instances_
 instance {Eq1 PrelBase.Int} = $d1;
 instance _forall_ [a] {Eq1 a} => {Eq1 [a]} = $d2;

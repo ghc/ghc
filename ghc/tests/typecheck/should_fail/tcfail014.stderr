@@ -1,17 +1,10 @@
  
-tcfail014.hs:5: Cannot construct the infinite type (occur check)
-		    `oaEt' = `oaEt -> oaEv'
-    Expected: `oaEt -> oaEv'
-    Inferred: `oaEt'
-    In the first argument of `z', namely `z'
-    In an equation for function `h': `h z = z z'
-    In an equation for function `g':
-	`g y
-	   = h + 2
-	   where
-	       h z = z z'
- 
-tcfail014.hs:5: No instance for: `Num (taEP -> taER)'
-    arising from use of `+' at tcfail014.hs:5
+tcfail014.hs:5:
+    Occurs check: cannot construct the infinite type: aGA = aGA -> aGC
+	Expected: aGA -> aGC
+	Inferred: aGA
+	In the first argument of `z', namely `z'
+	In an equation for function `h': h z = z z
+
 
 Compilation had errors
