@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.178 2003/10/01 21:16:12 wolfgang Exp $
+ * $Id: Schedule.c,v 1.179 2003/10/05 20:18:36 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -3141,7 +3141,9 @@ interruptStgRts(void)
 {
     interrupted    = 1;
     context_switch = 1;
+#ifdef RTS_SUPPORTS_THREADS
     wakeBlockedWorkerThread();
+#endif
 }
 
 /* -----------------------------------------------------------------------------
