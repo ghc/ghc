@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Exception.lhs,v 1.6 1999/03/16 13:20:11 simonm Exp $
+% $Id: Exception.lhs,v 1.7 1999/03/26 19:43:43 sof Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -42,6 +42,10 @@ module Exception (
 
 	throwDyn, 	-- :: Typeable ex => ex -> b
 	catchDyn, 	-- :: Typeable ex => IO a -> (ex -> IO a) -> IO a
+	
+	-- Assertions
+
+	assert,		-- :: Bool -> a -> a
 
 	-- Utilities
 		
@@ -57,7 +61,7 @@ import PreludeBuiltin hiding (catch)
 import Prelude        hiding (catch)
 #else
 import Prelude hiding (catch)
-import PrelGHC (catch#)
+import PrelGHC (catch#, assert)
 import PrelException hiding (catch)
 import PrelConc ( raiseInThread )
 #endif
