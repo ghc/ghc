@@ -74,11 +74,15 @@ $(OBJDIR)/Data/IntMap.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/Bits.$O \
 $(OBJDIR)/Data/IntSet.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/Bits.$O \
 	$(OBJDIR)/Data/Int.$O $(OBJDIR)/Data/List.$O $(OBJDIR)/Data/Typeable.$O
 $(OBJDIR)/Data/FunctorM.$O: $(OBJDIR)/Data/Array.$O
+$(OBJDIR)/Data/Version.$O: $(OBJDIR)/Text/ParserCombinators/ReadP.$O \
+	$(OBJDIR)/Data/Typeable.$O $(OBJDIR)/Data/List.$O  \
+	$(OBJDIR)/Data/Char.$O $(OBJDIR)/Control/Monad.$O 
 $(OBJDIR)/NHC/SizedTypes.$O: $(OBJDIR)/Data/Bits.$O
 $(OBJDIR)/System/IO.$O: $(OBJDIR)/System/IO/Error.$O
 $(OBJDIR)/System/Directory.$O: $(OBJDIR)/System/Directory/Internals.$O
 $(OBJDIR)/System/Random.$O: $(OBJDIR)/Data/Char.$O $(OBJDIR)/Data/IORef.$O \
 	$(OBJDIR)/System/IO/Unsafe.$O $(OBJDIR)/Foreign/Ptr.$O
+$(OBJDIR)/System/Info.$O: $(OBJDIR)/Data/Version.$O
 $(OBJDIR)/Debug/Trace.$O: $(OBJDIR)/System/IO.$O $(OBJDIR)/System/IO/Unsafe.$O
 $(OBJDIR)/Control/Monad/Fix.$O: $(OBJDIR)/System/IO.$O
 $(OBJDIR)/Foreign/Marshal/Alloc.$O:  $(OBJDIR)/Data/Maybe.$O \
@@ -114,8 +118,11 @@ Data/IntMap.$C:    Data/Monoid.$C Data/Bits.$C Data/Int.$C Data/IntSet.$C \
 Data/IntSet.$C:    Data/Monoid.$C Data/Bits.$C Data/Int.$C Data/List.$C \
 		   Data/Typeable.$C
 Data/FunctorM.$C:  Data/Array.$C
+Data/Version.$C:   Text/ParserCombinators/ReadP.$C Data/Typeable.$C \
+		   Data/List.$C Data/Char.$C Control/Monad.$C
 NHC/SizedTypes.$C: Data/Bits.$C
 System/IO.$C:      System/IO/Error.$C
+System/Info.$C:    Data/Version.$C
 System/Random.$C:  Data/Char.$C Data/IORef.$C System/IO/Unsafe.$C
 Debug/Trace.$C:    System/IO.$C System/IO/Unsafe.$C
 System/Directory.$C:       System/Directory/Internals.$C
