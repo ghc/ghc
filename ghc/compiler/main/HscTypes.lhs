@@ -4,7 +4,10 @@
 \section[HscTypes]{Types for the per-module compiler}
 
 \begin{code}
-module HscTypes ( TyThing(..) )
+module HscTypes ( TyThing(..), GlobalSymbolTable, OrigNameEnv, AvailEnv,
+		  WhetherHasOrphans, ImportVersion, ExportItem,
+		  PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
+		  IfaceInsts, IfaceRules, DeprecationEnv )
 where
 
 #include "HsVersions.h"

@@ -45,13 +45,13 @@ import RdrName		( RdrName, dummyRdrVarName, rdrNameModule, rdrNameOcc,
 			)
 import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  isLocallyDefinedName, nameModule, nameOccName,
-			  decode, mkLocalName, mkUnboundName, mkKnownKeyGlobal,
-			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, extendNameEnvList
+			  decode, mkLocalName, mkKnownKeyGlobal,
+			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
+			  extendNameEnvList
 			)
 import Module		( Module, ModuleName, WhereFrom, moduleName )
 import NameSet		
 import CmdLineOpts	( DynFlags, dopt_D_dump_rn_trace )
-import PrelInfo		( wiredInNames, knownKeyRdrNames )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique )
 import FiniteMap	( FiniteMap, emptyFM, listToFM, plusFM )
@@ -59,6 +59,11 @@ import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
 import CmFind		( Finder )
+import PrelNames	( mkUnboundName )
+import HscTypes		( GlobalSymbolTable, OrigNameEnv, AvailEnv, 
+			  WhetherHasOrphans, ImportVersion, ExportItem,
+			  PersistentRenamerState(..), IsBootInterface, Avails,
+			  DeclsMap, IfaceInsts, IfaceRules, DeprecationEnv )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -181,42 +186,6 @@ type ExportAvails = (FiniteMap ModuleName Avails,
 %===================================================
 
 \begin{code}
-type ExportItem		 = (ModuleName, [RdrAvailInfo])
-
-type ImportVersion name  = (ModuleName, WhetherHasOrphans, IsBootInterface, WhatsImported name)
-
-type ModVersionInfo	= (Version,		-- Version of the whole module
-			   Version,		-- Version number for all fixity decls together
-			   Version)		-- ...ditto all rules together
-
-type WhetherHasOrphans   = Bool
-	-- An "orphan" is 
-	-- 	* an instance decl in a module other than the defn module for 
-	--		one of the tycons or classes in the instance head
-	--	* a transformation rule in a module other than the one defining
-	--		the function in the head of the rule.
-
-type IsBootInterface     = Bool
-
-data WhatsImported name  = NothingAtAll				-- The module is below us in the
-								-- hierarchy, but we import nothing
-
-			 | Everything Version			-- The module version
-
-			 | Specifically Version			-- Module version
-					Version			-- Fixity version
-					Version			-- Rules version
-					[(name,Version)]	-- List guaranteed non-empty
-			 deriving( Eq )
-	-- 'Specifically' doesn't let you say "I imported f but none of the fixities in
-	-- the module". If you use anything in the module you get its fixity and rule version
-	-- So if the fixities or rules change, you'll recompile, even if you don't use either.
-	-- This is easy to implement, and it's safer: you might not have used the rules last
-	-- time round, but if someone has added a new rule you might need it this time
-
-	-- 'Everything' means there was a "module M" in 
-	-- this module's export list, so we just have to go by M's version,
-	-- not the list of (name,version) pairs
 
 data ParsedIface
   = ParsedIface {
@@ -327,10 +296,12 @@ type ImportedModuleInfo
 initRn :: DynFlags -> Finder -> GlobalSymbolTable
        -> PersistentRenamerState
        -> Module -> SrcLoc
+       -> RnMG t
+       -> IO (t, Bag WarnMsg, Bag ErrMsg)
 
 initRn dflags finder gst prs mod loc do_rn
   = do uniqs     <- mkSplitUniqSupply 'r'
-       names_var <- newIORef (uniqs, prsOrig pcs)
+       names_var <- newIORef (uniqs, prsOrig prs)
        errs_var  <- newIORef (emptyBag,emptyBag)
        iface_var <- newIORef (initIfaces prs)
        let rn_down = RnDown { rn_mod = mod,
@@ -358,13 +329,13 @@ initIfaces :: PersistentRenamerState -> Ifaces
 initIfaces prs
   = Ifaces { iDecls = prsDecls prs,
 	     iInsts = prsInsts prs,
-	     iRules = prsRules rules,
+	     iRules = prsRules prs,
 
 	     iFixes   = emptyNameEnv,
 	     iDeprecs = emptyNameEnv,
 
 	     iImpModInfo = emptyFM,
-	     iDeferred   = emptyNameSet,
+	     --iDeferred   = emptyNameSet,
 	     iSlurp      = unitNameSet (mkUnboundName dummyRdrVarName),
 			-- Pretend that the dummy unbound name has already been
 			-- slurped.  This is what's returned for an out-of-scope name,
@@ -409,8 +380,9 @@ renameSourceCode dflags mod prs m
 	-- only do any I/O if we need to read in a fixity declaration;
 	-- and that doesn't happen in pragmas etc
 
-	newIORef name_supply		>>= \ names_var ->
-	newIORef (emptyBag,emptyBag)	>>= \ errs_var ->
+        mkSplitUniqSupply 'r'			>>= \ new_us ->
+	newIORef (new_us, prsOrig prs)		>>= \ names_var ->
+	newIORef (emptyBag,emptyBag)		>>= \ errs_var ->
     	let
 	    rn_down = RnDown { rn_dflags = dflags,
 			       rn_loc = mkGeneratedSrcLoc, rn_ns = names_var,
@@ -587,21 +559,21 @@ getSrcLocRn down l_down
 %=====================
 
 \begin{code}
-getNameSupplyRn :: RnM d NameSupply
+getNameSupplyRn :: RnM d (UniqSupply, OrigNameEnv)
 getNameSupplyRn rn_down l_down
   = readIORef (rn_ns rn_down)
 
-setNameSupplyRn :: NameSupply -> RnM d ()
+setNameSupplyRn :: (UniqSupply, OrigNameEnv) -> RnM d ()
 setNameSupplyRn names' (RnDown {rn_ns = names_var}) l_down
   = writeIORef names_var names'
 
 getUniqRn :: RnM d Unique
 getUniqRn (RnDown {rn_ns = names_var}) l_down
- = readIORef names_var >>= \ (us, cache, ipcache) ->
+ = readIORef names_var >>= \ (us, {-cache,-} ipcache) ->
    let
      (us1,us') = splitUniqSupply us
    in
-   writeIORef names_var (us', cache, ipcache)  >>
+   writeIORef names_var (us', {-cache,-} ipcache)  >>
    return (uniqFromSupply us1)
 \end{code}
 
