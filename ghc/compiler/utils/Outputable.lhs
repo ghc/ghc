@@ -340,8 +340,6 @@ pprQuotedList xs = hsep (punctuate comma (map (quotes . ppr) xs))
 \end{code}
 
 
-
-
 %************************************************************************
 %*									*
 \subsection{Printing numbers verbally}
@@ -386,21 +384,20 @@ speakNTimes t | t == 1 	   = ptext SLIT("once")
 
 \begin{code}
 pprPanic :: String -> SDoc -> a
-pprPanic heading pretty_msg = panic (show (doc PprDebug))
-			    where
-			      doc = text heading <+> pretty_msg
-
 pprError :: String -> SDoc -> a
-pprError heading pretty_msg = error (heading++ " " ++ (showSDoc pretty_msg))
-
 pprTrace :: String -> SDoc -> a -> a
-pprTrace heading pretty_msg = trace (show (doc PprDebug))
-			    where
-			      doc = text heading <+> pretty_msg
+pprPanic  = pprAndThen panic
+pprError  = pprAndThen error
+pprTrace  = pprAndThen trace
 
 pprPanic# heading pretty_msg = panic# (show (doc PprDebug))
 			     where
 			       doc = text heading <+> pretty_msg
+
+pprAndThen :: (String -> a) -> String -> SDoc -> a
+pprAndThen cont heading pretty_msg = cont (show (doc PprDebug))
+    where
+     doc = text heading <+> pretty_msg
 
 assertPprPanic :: String -> Int -> SDoc -> a
 assertPprPanic file line msg
