@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.72 2001/07/23 10:54:48 simonpj Exp $
+$Id: Parser.y,v 1.73 2001/08/20 10:19:47 simonmar Exp $
 
 Haskell grammar.
 
@@ -9,7 +9,7 @@ Author(s): Simon Marlow, Sven Panne 1997, 1998, 1999
 -}
 
 {
-module Parser ( parseModule, parseStmt ) where
+module Parser ( parseModule, parseStmt, parseIdentifier ) where
 
 import HsSyn
 import HsTypes		( mkHsTupCon )
@@ -206,6 +206,7 @@ Conflicts: 14 shift/reduce
 %lexer { lexer } { ITeof }
 %name parseModule module
 %name parseStmt   maybe_stmt
+%name parseIdentifier  identifier
 %tokentype { Token }
 %%
 
@@ -922,6 +923,11 @@ dbind	: ipvar '=' exp			{ ($1, $3) }
 
 -----------------------------------------------------------------------------
 -- Variables, Constructors and Operators.
+
+identifier :: { RdrName }
+	: qvar				{ $1 }
+	| gcon				{ $1 }
+	| qop				{ $1 }
 
 depreclist :: { [RdrName] }
 depreclist : deprec_var			{ [$1] }
