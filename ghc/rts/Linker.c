@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.22 2001/02/11 17:51:07 simonmar Exp $
+ * $Id: Linker.c,v 1.23 2001/02/12 12:22:01 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -285,6 +285,7 @@ void *
 lookupSymbol( char *lbl )
 {
     SymbolVal *val;
+    ASSERT(symhash != NULL);
     val = lookupStrHashTable(symhash, lbl);
 
     if (val == NULL) {
@@ -414,6 +415,9 @@ HsInt
 unloadObj( char *path )
 {
     ObjectCode *oc, *prev;
+
+    ASSERT(symhash != NULL);
+    ASSERT(objects != NULL);
 
     prev = NULL;
     for (oc = objects; oc; prev = oc, oc = oc->next) {
@@ -1289,6 +1293,8 @@ ocGetNames_ELF ( ObjectCode* oc )
    char*       strtab     = findElfSection ( ehdrC, SHT_STRTAB );
    Elf32_Shdr* shdr       = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
    char*       sh_strtab  = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
+
+   ASSERT(symhash != NULL);
 
    if (!strtab) {
       belch("ocGetNames_ELF: no strtab");
