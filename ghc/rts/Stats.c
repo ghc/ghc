@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.37 2001/11/23 10:27:58 simonmar Exp $
+ * $Id: Stats.c,v 1.38 2001/11/25 16:59:11 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -18,7 +18,7 @@
 #include "MBlock.h"
 #include "Schedule.h"
 #include "Stats.h"
-#include "ParTicky.h"                       // ToDo: move into Rts.h
+#include "ParTicky.h"                       /* ToDo: move into Rts.h */
 #include "Profiling.h"
 
 #ifdef HAVE_UNISTD_H
@@ -94,14 +94,22 @@ static TICK_TYPE ExitElapsedTime  = 0;
 static ullong GC_tot_alloc        = 0;
 static ullong GC_tot_copied       = 0;
 
-static TICK_TYPE GC_start_time,  GC_tot_time = 0;    // User GC Time
-static TICK_TYPE GCe_start_time, GCe_tot_time = 0;   // Elapsed GC time
+static TICK_TYPE GC_start_time = 0,  GC_tot_time  = 0;  /* User GC Time */
+static TICK_TYPE GCe_start_time = 0, GCe_tot_time = 0;  /* Elapsed GC time */
 
-static TICK_TYPE RP_start_time, RP_tot_time = 0;     // retainer prof user time
-static TICK_TYPE RPe_start_time, RPe_tot_time = 0;   // retainer prof elap time
+#ifdef PROFILING
+static TICK_TYPE RP_start_time  = 0, RP_tot_time  = 0;  /* retainer prof user time */
+static TICK_TYPE RPe_start_time = 0, RPe_tot_time = 0;  /* retainer prof elap time */
 
-static TICK_TYPE LDV_start_time, LDV_tot_time = 0;   // LDV prof user time
-static TICK_TYPE LDVe_start_time, LDVe_tot_time = 0; // LDV prof elap time
+static TICK_TYPE LDV_start_time  = 0, LDV_tot_time  = 0; /* LDV prof user time */
+static TICK_TYPE LDVe_start_time = 0, LDVe_tot_time = 0; /* LDV prof elap time */
+#endif
+
+#ifdef PROFILING
+#define PROF_VAL(x)   x
+#else
+#define PROF_VAL(x)   0
+#endif
 
 lnat MaxResidency = 0;     /* in words; for stats only */
 lnat AvgResidency = 0;
@@ -219,14 +227,14 @@ getTimes(void)
 double
 mut_user_time_during_GC( void )
 {
-  return TICK_TO_DBL(GC_start_time - GC_tot_time - RP_tot_time - LDV_tot_time);
+  return TICK_TO_DBL(GC_start_time - GC_tot_time - PROF_VAL(RP_tot_time - LDV_tot_time));
 }
 
 double
 mut_user_time( void )
 {
     getTimes();
-    return TICK_TO_DBL(CurrentUserTime - GC_tot_time - RP_tot_time - LDV_tot_time);
+    return TICK_TO_DBL(CurrentUserTime - GC_tot_time - PROF_VAL(RP_tot_time - LDV_tot_time));
 }
 
 #ifdef PROFILING
@@ -246,7 +254,7 @@ mut_user_time_during_LDV( void )
 {
   return TICK_TO_DBL(LDV_start_time - GC_tot_time - RP_tot_time - LDV_tot_time);
 }
-#endif // PROFILING
+#endif /* PROFILING */
 
 static nat
 pageFaults(void)
@@ -358,7 +366,7 @@ stat_startExit(void)
 #ifdef SMP
     MutUserTime = CurrentUserTime;
 #else
-    MutUserTime = CurrentUserTime - GC_tot_time - RP_tot_time - LDV_tot_time - InitUserTime;
+    MutUserTime = CurrentUserTime - GC_tot_time - PROF_VAL(RP_tot_time - LDV_tot_time) - InitUserTime;
     if (MutUserTime < 0) { MutUserTime = 0; }
 #endif
 }
@@ -370,7 +378,7 @@ stat_endExit(void)
 #ifdef SMP
     ExitUserTime = CurrentUserTime - MutUserTime;
 #else
-    ExitUserTime = CurrentUserTime - MutUserTime - GC_tot_time - RP_tot_time - LDV_tot_time - InitUserTime;
+    ExitUserTime = CurrentUserTime - MutUserTime - GC_tot_time - PROF_VAL(RP_tot_time - LDV_tot_time) - InitUserTime;
 #endif
     ExitElapsedTime = CurrentElapsedTime - MutElapsedStamp;
     if (ExitUserTime < 0) {
@@ -507,7 +515,7 @@ stat_startRP(void)
   RP_start_time = CurrentUserTime;
   RPe_start_time = CurrentElapsedTime;
 }
-#endif // PROFILING
+#endif /* PROFILING */
 
 /* -----------------------------------------------------------------------------
    Called at the end of each Retainer Profiliing
@@ -539,7 +547,7 @@ stat_endRP(
   fprintf(prof_file, "\tCurrent total costs in bytes = %u\n", allCost * sizeof(StgWord));
   fprintf(prof_file, "\tNumber of retainer sets = %u\n\n", numSet);
 }
-#endif // PROFILING
+#endif /* PROFILING */
 
 /* -----------------------------------------------------------------------------
    Called at the beginning of each LDV Profiliing
@@ -552,7 +560,7 @@ stat_startLDV(void)
   LDV_start_time = CurrentUserTime;
   LDVe_start_time = CurrentElapsedTime;
 }
-#endif // PROFILING
+#endif /* PROFILING */
 
 /* -----------------------------------------------------------------------------
    Called at the end of each LDV Profiliing
@@ -565,7 +573,7 @@ stat_endLDV(void)
   LDV_tot_time += CurrentUserTime - LDV_start_time;
   LDVe_tot_time += CurrentElapsedTime - LDVe_start_time;
 }
-#endif // PROFILING
+#endif /* PROFILING */
 
 /* -----------------------------------------------------------------------------
    stat_workerStop
@@ -711,20 +719,23 @@ stat_exit(int alloc)
 		    TICK_TO_DBL(GC_tot_time)*100/TICK_TO_DBL(time),
 		    TICK_TO_DBL(GCe_tot_time)*100/TICK_TO_DBL(etime));
 
-	    if (time - GC_tot_time - RP_tot_time - LDV_tot_time == 0)
+	    if (time - GC_tot_time - PROF_VAL(RP_tot_time - LDV_tot_time) == 0)
 		ullong_format_string(0, temp, rtsTrue/*commas*/);
 	    else
 		ullong_format_string(
 		    (ullong)((GC_tot_alloc*sizeof(W_))/
-			     TICK_TO_DBL(time - GC_tot_time - RP_tot_time - LDV_tot_time)),
+			     TICK_TO_DBL(time - GC_tot_time - 
+					 PROF_VAL(RP_tot_time - LDV_tot_time))),
 		    temp, rtsTrue/*commas*/);
 	    
 	    fprintf(sf, "  Alloc rate    %s bytes per MUT second\n\n", temp);
 	
 	    fprintf(sf, "  Productivity %5.1f%% of total user, %.1f%% of total elapsed\n\n",
-		    TICK_TO_DBL(time - GC_tot_time - RP_tot_time - LDV_tot_time - InitUserTime) * 100 
+		    TICK_TO_DBL(time - GC_tot_time - 
+				PROF_VAL(RP_tot_time - LDV_tot_time) - InitUserTime) * 100 
 		    / TICK_TO_DBL(time), 
-		    TICK_TO_DBL(time - GC_tot_time - RP_tot_time - LDV_tot_time - InitUserTime) * 100 
+		    TICK_TO_DBL(time - GC_tot_time - 
+				PROF_VAL(RP_tot_time - LDV_tot_time) - InitUserTime) * 100 
 		    / TICK_TO_DBL(etime));
 	}
 
