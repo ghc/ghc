@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PackageMaintenance.hs,v 1.2 2000/10/11 15:26:18 simonmar Exp $
+-- $Id: PackageMaintenance.hs,v 1.3 2000/10/26 16:21:02 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -27,7 +27,7 @@ import Monad
 
 listPackages :: IO ()
 listPackages = do 
-  details <- readIORef package_details
+  details <- readIORef v_Package_details
   hPutStr stdout (listPkgs details)
   hPutChar stdout '\n'
   exitWith ExitSuccess
@@ -35,7 +35,7 @@ listPackages = do
 newPackage :: IO ()
 newPackage = do
   checkConfigAccess
-  details <- readIORef package_details
+  details <- readIORef v_Package_details
   hPutStr stdout "Reading package info from stdin... "
   stuff <- getContents
   let new_pkg = read stuff :: Package
@@ -46,7 +46,7 @@ newPackage = do
 	then throwDyn (OtherError ("package `" ++ name new_pkg ++ 
 					"' already installed"))
 	else do
-  conf_file <- readIORef path_package_config
+  conf_file <- readIORef v_Path_package_config
   savePackageConfig conf_file
   maybeRestoreOldConfig conf_file $ do
   writeNewConfig conf_file ( ++ [new_pkg])
@@ -55,11 +55,11 @@ newPackage = do
 deletePackage :: String -> IO ()
 deletePackage pkg = do  
   checkConfigAccess
-  details <- readIORef package_details
+  details <- readIORef v_Package_details
   if (pkg `notElem` map name details)
 	then throwDyn (OtherError ("package `" ++ pkg ++ "' not installed"))
 	else do
-  conf_file <- readIORef path_package_config
+  conf_file <- readIORef v_Path_package_config
   savePackageConfig conf_file
   maybeRestoreOldConfig conf_file $ do
   writeNewConfig conf_file (filter ((/= pkg) . name))
@@ -67,7 +67,7 @@ deletePackage pkg = do
 
 checkConfigAccess :: IO ()
 checkConfigAccess = do
-  conf_file <- readIORef path_package_config
+  conf_file <- readIORef v_Path_package_config
   access <- getPermissions conf_file
   unless (writable access)
 	(throwDyn (OtherError "you don't have permission to modify the package configuration file"))
@@ -86,7 +86,7 @@ maybeRestoreOldConfig conf_file io
 writeNewConfig :: String -> ([Package] -> [Package]) -> IO ()
 writeNewConfig conf_file fn = do
   hPutStr stdout "Writing new package config file... "
-  old_details <- readIORef package_details
+  old_details <- readIORef v_Package_details
   h <- openFile conf_file WriteMode
   hPutStr h (dumpPackages (fn old_details))
   hClose h

@@ -105,11 +105,10 @@ hscMain
   -> Maybe ModIface   -- old interface, if available
   -> HomeSymbolTable		-- for home module ModDetails
   -> HomeIfaceTable
-  -> PackageIfaceTable
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> IO HscResult
 
-hscMain dflags finder summary maybe_old_iface hst hit pit pcs
+hscMain dflags finder summary maybe_old_iface hst hit pcs
  = do {
       -- ????? source_unchanged :: Bool -- extracted from summary?
       let source_unchanged = trace "WARNING: source_unchanged?!" False
@@ -126,11 +125,11 @@ hscMain dflags finder summary maybe_old_iface hst hit pit pcs
                     | otherwise                   = hscNoRecomp
       ;
       what_next dflags finder summary maybe_checked_iface
-                hst hit pit pcs_ch
+                hst hit pcs_ch
       }}
 
 
-hscNoRecomp dflags finder summary maybe_checked_iface hst hit pit pcs_ch
+hscNoRecomp dflags finder summary maybe_checked_iface hst hit pcs_ch
  = do {
       -- we definitely expect to have the old interface available
       let old_iface = case maybe_checked_iface of 
@@ -168,7 +167,7 @@ hscNoRecomp dflags finder summary maybe_checked_iface hst hit pit pcs_ch
       }}}}
 
 
-hscRecomp dflags finder summary maybe_checked_iface hst hit pit pcs_ch
+hscRecomp dflags finder summary maybe_checked_iface hst hit pcs_ch
  = do {
       -- what target are we shooting for?
       let toInterp = dopt_HscLang dflags == HscInterpreted
@@ -221,10 +220,9 @@ hscRecomp dflags finder summary maybe_checked_iface hst hit pit pcs_ch
              = case maybe_final_iface_and_sdoc of 
                   Just (fif, sdoc) -> Just fif; Nothing -> Nothing
       ;
-      -- SimonM does this, higher up
-      -- -- Write the interface file
-      -- writeIface finder maybe_final_iface
-      -- ;
+      -- Write the interface file
+      writeIface finder maybe_final_iface
+      ;
       -- do the rest of code generation/emission
       (maybe_stub_h_filename, maybe_stub_c_filename, maybe_ibinds)
          <- restOfCodeGeneration dflags toInterp summary

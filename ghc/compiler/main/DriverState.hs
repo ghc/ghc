@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.6 2000/10/24 16:08:16 simonmar Exp $
+-- $Id: DriverState.hs,v 1.7 2000/10/26 16:21:02 sewardj Exp $
 --
 -- Settings for the driver
 --
@@ -64,13 +64,13 @@ initDriverState = DriverState {
 	opt_m			= [],
    }
 	
-GLOBAL_VAR(driver_state, initDriverState, DriverState)
+GLOBAL_VAR(v_Driver_state, initDriverState, DriverState)
 
 readState :: (DriverState -> a) -> IO a
-readState f = readIORef driver_state >>= return . f
+readState f = readIORef v_Driver_state >>= return . f
 
 updateState :: (DriverState -> DriverState) -> IO ()
-updateState f = readIORef driver_state >>= writeIORef driver_state . f
+updateState f = readIORef v_Driver_state >>= writeIORef v_Driver_state . f
 
 addOpt_L     a = updateState (\s -> s{opt_L      =  a : opt_L      s})
 addOpt_P     a = updateState (\s -> s{opt_P      =  a : opt_P      s})
@@ -93,51 +93,54 @@ cHaskell1Version = "5" -- i.e., Haskell 98
 -----------------------------------------------------------------------------
 -- Global compilation flags
 
+GLOBAL_VAR(v_Static_hsc_opts, [], [String])
+
 -- location of compiler-related files
-GLOBAL_VAR(topDir,  clibdir, String)
-GLOBAL_VAR(inplace, False,   Bool)
+GLOBAL_VAR(v_TopDir,  clibdir, String)
+GLOBAL_VAR(v_Inplace, False,   Bool)
 
 -- Cpp-related flags
-hs_source_cpp_opts = global
+v_Hs_source_cpp_opts = global
 	[ "-D__HASKELL1__="++cHaskell1Version
 	, "-D__GLASGOW_HASKELL__="++cProjectVersionInt				
 	, "-D__HASKELL98__"
 	, "-D__CONCURRENT_HASKELL__"
 	]
+{-# NOINLINE v_Hs_source_cpp_opts #-}
 
 -- Verbose
-GLOBAL_VAR(verbose, False, Bool)
-is_verbose = do v <- readIORef verbose; if v then return "-v" else return ""
+GLOBAL_VAR(v_Verbose, False, Bool)
+is_verbose = do v <- readIORef v_Verbose; if v then return "-v" else return ""
 
 -- where to keep temporary files
 GLOBAL_VAR(v_TmpDir,       cDEFAULT_TMPDIR,  String   )
 
 -- Keep output from intermediate phases
-GLOBAL_VAR(keep_hi_diffs, 	False, 		Bool)
-GLOBAL_VAR(keep_hc_files,	False,		Bool)
-GLOBAL_VAR(keep_s_files,	False,		Bool)
-GLOBAL_VAR(keep_raw_s_files,	False,		Bool)
-GLOBAL_VAR(keep_tmp_files, 	False, 		Bool)
+GLOBAL_VAR(v_Keep_hi_diffs, 		False, 		Bool)
+GLOBAL_VAR(v_Keep_hc_files,		False,		Bool)
+GLOBAL_VAR(v_Keep_s_files,		False,		Bool)
+GLOBAL_VAR(v_Keep_raw_s_files,		False,		Bool)
+GLOBAL_VAR(v_Keep_tmp_files, 		False, 		Bool)
 
 -- Misc
-GLOBAL_VAR(scale_sizes_by,      1.0,		Double)
-GLOBAL_VAR(dry_run, 		False,		Bool)
+GLOBAL_VAR(v_Scale_sizes_by,    	1.0,		Double)
+GLOBAL_VAR(v_Dry_run, 			False,		Bool)
 #if !defined(HAVE_WIN32_DLL_SUPPORT) || defined(DONT_WANT_WIN32_DLL_SUPPORT)
-GLOBAL_VAR(static, 		True,		Bool)
+GLOBAL_VAR(v_Static, 			True,		Bool)
 #else
-GLOBAL_VAR(static,              False,          Bool)
+GLOBAL_VAR(v_Static,            	False,          Bool)
 #endif
-GLOBAL_VAR(recomp,  		True,		Bool)
-GLOBAL_VAR(collect_ghc_timing, 	False,		Bool)
-GLOBAL_VAR(do_asm_mangling,	True,		Bool)
-GLOBAL_VAR(excess_precision,	False,		Bool)
+GLOBAL_VAR(v_Recomp,  			True,		Bool)
+GLOBAL_VAR(v_Collect_ghc_timing, 	False,		Bool)
+GLOBAL_VAR(v_Do_asm_mangling,		True,		Bool)
+GLOBAL_VAR(v_Excess_precision,		False,		Bool)
 
 -----------------------------------------------------------------------------
 -- Splitting object files (for libraries)
 
-GLOBAL_VAR(split_object_files,	False,		Bool)
-GLOBAL_VAR(split_prefix,	"",		String)
-GLOBAL_VAR(n_split_files,	0,		Int)
+GLOBAL_VAR(v_Split_object_files,	False,		Bool)
+GLOBAL_VAR(v_Split_prefix,		"",		String)
+GLOBAL_VAR(v_N_split_files,		0,		Int)
 	
 can_split :: Bool
 can_split =  prefixMatch "i386" cTARGETPLATFORM
@@ -152,30 +155,30 @@ can_split =  prefixMatch "i386" cTARGETPLATFORM
 -----------------------------------------------------------------------------
 -- Compiler output options
 
-GLOBAL_VAR(hsc_lang, if cGhcWithNativeCodeGen == "YES" && 
+GLOBAL_VAR(v_Hsc_Lang, if cGhcWithNativeCodeGen == "YES" && 
 			 (prefixMatch "i386" cTARGETPLATFORM ||
 			  prefixMatch "sparc" cTARGETPLATFORM)
 			then  HscAsm
 			else  HscC, 
 	   HscLang)
 
-GLOBAL_VAR(output_dir,  Nothing, Maybe String)
-GLOBAL_VAR(output_suf,  Nothing, Maybe String)
-GLOBAL_VAR(output_file, Nothing, Maybe String)
-GLOBAL_VAR(output_hi,   Nothing, Maybe String)
+GLOBAL_VAR(v_Output_dir,  Nothing, Maybe String)
+GLOBAL_VAR(v_Output_suf,  Nothing, Maybe String)
+GLOBAL_VAR(v_Output_file, Nothing, Maybe String)
+GLOBAL_VAR(v_Output_hi,   Nothing, Maybe String)
 
-GLOBAL_VAR(ld_inputs,	[],      [String])
+GLOBAL_VAR(v_Ld_inputs,	[],      [String])
 
 odir_ify :: String -> IO String
 odir_ify f = do
-  odir_opt <- readIORef output_dir
+  odir_opt <- readIORef v_Output_dir
   case odir_opt of
 	Nothing -> return f
 	Just d  -> return (newdir d f)
 
 osuf_ify :: String -> IO String
 osuf_ify f = do
-  osuf_opt <- readIORef output_suf
+  osuf_opt <- readIORef v_Output_suf
   case osuf_opt of
 	Nothing -> return f
 	Just s  -> return (newsuf s f)
@@ -183,9 +186,9 @@ osuf_ify f = do
 -----------------------------------------------------------------------------
 -- Hi Files
 
-GLOBAL_VAR(produceHi,    	True,	Bool)
-GLOBAL_VAR(hi_on_stdout, 	False,	Bool)
-GLOBAL_VAR(hi_suf,          	"hi",	String)
+GLOBAL_VAR(v_ProduceHi,    	True,	Bool)
+GLOBAL_VAR(v_Hi_on_stdout, 	False,	Bool)
+GLOBAL_VAR(v_Hi_suf,          	"hi",	String)
 
 -----------------------------------------------------------------------------
 -- Warnings & sanity checking
@@ -222,7 +225,7 @@ minusWallOpts 	  = minusWOpts ++
 		    ]
 
 data WarningState = W_default | W_ | W_all | W_not
-GLOBAL_VAR(warning_opt, W_default, WarningState)
+GLOBAL_VAR(v_Warning_opt, W_default, WarningState)
 
 -----------------------------------------------------------------------------
 -- Compiler optimisation options
@@ -239,8 +242,8 @@ setOptLevel [c] | isDigit c = do
 setOptLevel s = unknownFlagErr ("-O"++s)
 
 go_via_C = do
-   l <- readIORef hsc_lang
-   case l of { HscAsm -> writeIORef hsc_lang HscC; 
+   l <- readIORef v_Hsc_Lang
+   case l of { HscAsm -> writeIORef v_Hsc_Lang HscC; 
 	       _other -> return () }
 
 GLOBAL_VAR(v_minus_o2_for_C, False, Bool)
@@ -400,7 +403,7 @@ buildStgToDo = do
 	     | otherwise = [ ]
 
 	-- STG passes
-  ways_ <- readIORef ways
+  ways_ <- readIORef v_Ways
   let flags2 | WayProf `elem` ways_ = StgDoMassageForProfiling : flags1
 	     | otherwise            = flags1
 
@@ -411,12 +414,12 @@ buildStgToDo = do
 
 split_marker = ':'   -- not configurable (ToDo)
 
-import_paths, include_paths, library_paths :: IORef [String]
-GLOBAL_VAR(import_paths,  ["."], [String])
-GLOBAL_VAR(include_paths, ["."], [String])
-GLOBAL_VAR(library_paths, [],	 [String])
+v_Import_paths, v_Include_paths, v_Library_paths :: IORef [String]
+GLOBAL_VAR(v_Import_paths,  ["."], [String])
+GLOBAL_VAR(v_Include_paths, ["."], [String])
+GLOBAL_VAR(v_Library_paths, [],	 [String])
 
-GLOBAL_VAR(cmdline_libraries,   [], [String])
+GLOBAL_VAR(v_Cmdline_libraries,   [], [String])
 
 addToDirList :: IORef [String] -> String -> IO ()
 addToDirList ref path
@@ -426,55 +429,53 @@ addToDirList ref path
 -----------------------------------------------------------------------------
 -- Packages
 
-GLOBAL_VAR(path_package_config, error "path_package_config", String)
+GLOBAL_VAR(v_Path_package_config, error "path_package_config", String)
 
 -- package list is maintained in dependency order
-packages = global ["std", "rts", "gmp"] :: IORef [String]
--- comma in value, so can't use macro, grrr
-{-# NOINLINE packages #-}
+GLOBAL_VAR(v_Packages, ("std":"rts":"gmp":[]), [String])
 
 addPackage :: String -> IO ()
 addPackage package
-  = do pkg_details <- readIORef package_details
+  = do pkg_details <- readIORef v_Package_details
        case lookupPkg package pkg_details of
 	  Nothing -> throwDyn (OtherError ("unknown package name: " ++ package))
 	  Just details -> do
-	    ps <- readIORef packages
+	    ps <- readIORef v_Packages
 	    unless (package `elem` ps) $ do
 		mapM_ addPackage (package_deps details)
-		ps <- readIORef packages
-		writeIORef packages (package:ps)
+		ps <- readIORef v_Packages
+		writeIORef v_Packages (package:ps)
 
 getPackageImportPath   :: IO [String]
 getPackageImportPath = do
-  ps <- readIORef packages
+  ps <- readIORef v_Packages
   ps' <- getPackageDetails ps
   return (nub (concat (map import_dirs ps')))
 
 getPackageIncludePath   :: IO [String]
 getPackageIncludePath = do
-  ps <- readIORef packages 
+  ps <- readIORef v_Packages 
   ps' <- getPackageDetails ps
   return (nub (filter (not.null) (concatMap include_dirs ps')))
 
 	-- includes are in reverse dependency order (i.e. rts first)
 getPackageCIncludes   :: IO [String]
 getPackageCIncludes = do
-  ps <- readIORef packages
+  ps <- readIORef v_Packages
   ps' <- getPackageDetails ps
   return (reverse (nub (filter (not.null) (concatMap c_includes ps'))))
 
 getPackageLibraryPath  :: IO [String]
 getPackageLibraryPath = do
-  ps <- readIORef packages
+  ps <- readIORef v_Packages
   ps' <- getPackageDetails ps
   return (nub (concat (map library_dirs ps')))
 
 getPackageLibraries    :: IO [String]
 getPackageLibraries = do
-  ps <- readIORef packages
+  ps <- readIORef v_Packages
   ps' <- getPackageDetails ps
-  tag <- readIORef build_tag
+  tag <- readIORef v_Build_tag
   let suffix = if null tag then "" else '_':tag
   return (concat (
 	map (\p -> map (++suffix) (hs_libraries p) ++ extra_libraries p) ps'
@@ -482,28 +483,28 @@ getPackageLibraries = do
 
 getPackageExtraGhcOpts :: IO [String]
 getPackageExtraGhcOpts = do
-  ps <- readIORef packages
+  ps <- readIORef v_Packages
   ps' <- getPackageDetails ps
   return (concatMap extra_ghc_opts ps')
 
 getPackageExtraCcOpts  :: IO [String]
 getPackageExtraCcOpts = do
-  ps <- readIORef packages
+  ps <- readIORef v_Packages
   ps' <- getPackageDetails ps
   return (concatMap extra_cc_opts ps')
 
 getPackageExtraLdOpts  :: IO [String]
 getPackageExtraLdOpts = do
-  ps <- readIORef packages
+  ps <- readIORef v_Packages
   ps' <- getPackageDetails ps
   return (concatMap extra_ld_opts ps')
 
 getPackageDetails :: [String] -> IO [Package]
 getPackageDetails ps = do
-  pkg_details <- readIORef package_details
+  pkg_details <- readIORef v_Package_details
   return [ pkg | p <- ps, Just pkg <- [ lookupPkg p pkg_details ] ]
 
-GLOBAL_VAR(package_details, (error "package_details"), [Package])
+GLOBAL_VAR(v_Package_details, (error "package_details"), [Package])
 
 lookupPkg :: String -> [Package] -> Maybe Package
 lookupPkg nm ps
@@ -526,7 +527,7 @@ lookupPkg nm ps
 -- becomes the suffix used to find .hi files and libraries used in
 -- this compilation.
 
-GLOBAL_VAR(build_tag, "", String)
+GLOBAL_VAR(v_Build_tag, "", String)
 
 data WayName
   = WayProf
@@ -556,7 +557,7 @@ data WayName
   | WayUser_B
   deriving (Eq,Ord)
 
-GLOBAL_VAR(ways, [] ,[WayName])
+GLOBAL_VAR(v_Ways, [] ,[WayName])
 
 -- ToDo: allow WayDll with any other allowed combination
 
@@ -567,13 +568,13 @@ allowed_combinations =
 
 findBuildTag :: IO [String]  -- new options
 findBuildTag = do
-  way_names <- readIORef ways
+  way_names <- readIORef v_Ways
   case sort way_names of
-     []  -> do  writeIORef build_tag ""
+     []  -> do  writeIORef v_Build_tag ""
 	        return []
 
      [w] -> do let details = lkupWay w
-	       writeIORef build_tag (wayTag details)
+	       writeIORef v_Build_tag (wayTag details)
 	       return (wayOpts details)
 
      ws  -> if  ws `notElem` allowed_combinations
@@ -585,7 +586,7 @@ findBuildTag = do
 			 tag   = concat (map wayTag stuff)
 			 flags = map wayOpts stuff
 		     in do
-		     writeIORef build_tag tag
+		     writeIORef v_Build_tag tag
 		     return (concat flags)
 
 lkupWay w = 
@@ -666,19 +667,19 @@ way_details =
 -----------------------------------------------------------------------------
 -- Programs for particular phases
 
-GLOBAL_VAR(pgm_L,   error "pgm_L", String)
-GLOBAL_VAR(pgm_P,   cRAWCPP,       String)
-GLOBAL_VAR(pgm_c,   cGCC,          String)
-GLOBAL_VAR(pgm_m,   error "pgm_m", String)
-GLOBAL_VAR(pgm_s,   error "pgm_s", String)
-GLOBAL_VAR(pgm_a,   cGCC,          String)
-GLOBAL_VAR(pgm_l,   cGCC,          String)
+GLOBAL_VAR(v_Pgm_L,   error "pgm_L", String)
+GLOBAL_VAR(v_Pgm_P,   cRAWCPP,       String)
+GLOBAL_VAR(v_Pgm_c,   cGCC,          String)
+GLOBAL_VAR(v_Pgm_m,   error "pgm_m", String)
+GLOBAL_VAR(v_Pgm_s,   error "pgm_s", String)
+GLOBAL_VAR(v_Pgm_a,   cGCC,          String)
+GLOBAL_VAR(v_Pgm_l,   cGCC,          String)
 
-GLOBAL_VAR(opt_dep,    [], [String])
-GLOBAL_VAR(anti_opt_C, [], [String])
-GLOBAL_VAR(opt_C,      [], [String])
-GLOBAL_VAR(opt_l,      [], [String])
-GLOBAL_VAR(opt_dll,    [], [String])
+GLOBAL_VAR(v_Opt_dep,    [], [String])
+GLOBAL_VAR(v_Anti_opt_C, [], [String])
+GLOBAL_VAR(v_Opt_C,      [], [String])
+GLOBAL_VAR(v_Opt_l,      [], [String])
+GLOBAL_VAR(v_Opt_dll,    [], [String])
 
 getStaticOpts :: IORef [String] -> IO [String]
 getStaticOpts ref = readIORef ref >>= return . reverse
@@ -717,7 +718,7 @@ machdepCCOpts
       -- -fomit-frame-pointer : *must* in .hc files; because we're stealing
       --   the fp (%ebp) for our register maps.
 	= do n_regs <- readState stolen_x86_regs
-	     sta    <- readIORef static
+	     sta    <- readIORef v_Static
 	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else "" ],
 		      [ "-fno-defer-pop", "-fomit-frame-pointer",
 	                "-DSTOLEN_X86_REGS="++show n_regs ]
@@ -738,7 +739,7 @@ machdepCCOpts
 
 run_something phase_name cmd
  = do
-   verb <- readIORef verbose
+   verb <- readIORef v_Verbose
    when verb $ do
 	putStr phase_name
 	putStrLn ":"
@@ -746,7 +747,7 @@ run_something phase_name cmd
 	hFlush stdout
 
    -- test for -n flag
-   n <- readIORef dry_run
+   n <- readIORef v_Dry_run
    unless n $ do 
 
    -- and run it!

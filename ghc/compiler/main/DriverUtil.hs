@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.3 2000/10/11 15:26:18 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.4 2000/10/26 16:21:02 sewardj Exp $
 --
 -- Utils for the driver
 --
@@ -30,10 +30,10 @@ import Monad
 
 short_usage = "Usage: For basic information, try the `--help' option."
    
-GLOBAL_VAR(path_usage,  "",  String)
+GLOBAL_VAR(v_Path_usage,  "",  String)
 
 long_usage = do
-  usage_path <- readIORef path_usage
+  usage_path <- readIORef v_Path_usage
   usage <- readFile usage_path
   dump usage
   exitWith ExitSuccess
@@ -51,9 +51,9 @@ data BarfKind
   | OtherError String			-- just prints the error message
   deriving Eq
 
-GLOBAL_VAR(prog_name, "ghc", String)
+GLOBAL_VAR(v_Prog_name, "ghc", String)
 
-get_prog_name = unsafePerformIO (readIORef prog_name) -- urk!
+get_prog_name = unsafePerformIO (readIORef v_Prog_name) -- urk!
 
 instance Show BarfKind where
   showsPrec _ e = showString get_prog_name . showString ": " . showBarf e

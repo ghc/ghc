@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.7 2000/10/26 14:38:42 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.8 2000/10/26 16:21:02 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -38,6 +38,7 @@ import Module
 import CmdLineOpts
 import Config
 import Util
+import MkIface		( pprIface )
 
 import Posix
 import Directory
@@ -131,12 +132,12 @@ genPipeline
 
 genPipeline todo stop_flag filename
  = do
-   split      <- readIORef split_object_files
-   mangle     <- readIORef do_asm_mangling
-   lang       <- readIORef hsc_lang
-   keep_hc    <- readIORef keep_hc_files
-   keep_raw_s <- readIORef keep_raw_s_files
-   keep_s     <- readIORef keep_s_files
+   split      <- readIORef v_Split_object_files
+   mangle     <- readIORef v_Do_asm_mangling
+   lang       <- readIORef v_Hsc_Lang
+   keep_hc    <- readIORef v_Keep_hc_files
+   keep_raw_s <- readIORef v_Keep_raw_s_files
+   keep_s     <- readIORef v_Keep_s_files
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
@@ -273,7 +274,7 @@ pipeLoop ((phase, keep, o_suffix):phases)
 
   where
      outputFileName last_phase keep suffix
-  	= do o_file <- readIORef output_file
+  	= do o_file <- readIORef v_Output_file
    	     if last_phase && not do_linking && use_ofile && isJust o_file
    	       then case o_file of 
    		       Just s  -> return s
@@ -287,7 +288,7 @@ pipeLoop ((phase, keep, o_suffix):phases)
 -- Unlit phase 
 
 run_phase Unlit _basename _suff input_fn output_fn
-  = do unlit <- readIORef pgm_L
+  = do unlit <- readIORef v_Pgm_L
        unlit_flags <- getOpts opt_L
        run_something "Literate pre-processor"
 	  ("echo '# 1 \"" ++input_fn++"\"' > "++output_fn++" && "
@@ -304,11 +305,11 @@ run_phase Cpp _basename _suff input_fn output_fn
        do_cpp <- readState cpp_flag
        if do_cpp
           then do
-       	    cpp <- readIORef pgm_P
+       	    cpp <- readIORef v_Pgm_P
 	    hscpp_opts <- getOpts opt_P
-       	    hs_src_cpp_opts <- readIORef hs_source_cpp_opts
+       	    hs_src_cpp_opts <- readIORef v_Hs_source_cpp_opts
 
-	    cmdline_include_paths <- readIORef include_paths
+	    cmdline_include_paths <- readIORef v_Include_paths
 	    pkg_include_dirs <- getPackageIncludePath
 	    let include_paths = map (\p -> "-I"++p) (cmdline_include_paths
 							++ pkg_include_dirs)
@@ -339,18 +340,18 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
 
    deps <- mapM (findDependency basename) imports
 
-   osuf_opt <- readIORef output_suf
+   osuf_opt <- readIORef v_Output_suf
    let osuf = case osuf_opt of
 			Nothing -> "o"
 			Just s  -> s
 
-   extra_suffixes <- readIORef dep_suffixes
+   extra_suffixes <- readIORef v_Dep_suffixes
    let suffixes = osuf : map (++ ('_':osuf)) extra_suffixes
        ofiles = map (\suf -> basename ++ '.':suf) suffixes
    	   
    objs <- mapM odir_ify ofiles
    
-   hdl <- readIORef dep_tmp_hdl
+   hdl <- readIORef v_Dep_tmp_hdl
 
 	-- std dependeny of the object(s) on the source file
    hPutStrLn hdl (unwords objs ++ " : " ++ basename ++ '.':suff)
@@ -358,7 +359,7 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
    let genDep (dep, False {- not an hi file -}) = 
 	  hPutStrLn hdl (unwords objs ++ " : " ++ dep)
        genDep (dep, True  {- is an hi file -}) = do
-	  hisuf <- readIORef hi_suf
+	  hisuf <- readIORef v_Hi_suf
 	  let dep_base = remove_suffix '.' dep
 	      deps = (dep_base ++ hisuf)
 		     : map (\suf -> dep_base ++ suf ++ '_':hisuf) extra_suffixes
@@ -398,12 +399,12 @@ run_phase Hsc basename suff input_fn output_fn
   -- what gcc does, and it's probably what you want.
 	let current_dir = getdir basename
 	
-	paths <- readIORef include_paths
-	writeIORef include_paths (current_dir : paths)
+	paths <- readIORef v_Include_paths
+	writeIORef v_Include_paths (current_dir : paths)
 	
   -- figure out where to put the .hi file
-	ohi    <- readIORef output_hi
-	hisuf  <- readIORef hi_suf
+	ohi    <- readIORef v_Output_hi
+	hisuf  <- readIORef v_Hi_suf
 	let hifile = case ohi of
 			   Nothing -> current_dir ++ {-ToDo: modname!!-}basename
 					++ hisuf
@@ -418,7 +419,7 @@ run_phase Hsc basename suff input_fn output_fn
   -- changed (which the compiler itself figures out).
   -- Setting source_unchanged to "" tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
-	do_recomp <- readIORef recomp
+	do_recomp <- readIORef v_Recomp
 	todo <- readIORef v_GhcMode
         o_file <- odir_ify (basename ++ '.':phaseInputExt Ln)
 	source_unchanged <- 
@@ -451,7 +452,6 @@ run_phase Hsc basename suff input_fn output_fn
 			  Nothing	 -- no iface
 			  emptyModuleEnv -- HomeSymbolTable
 			  emptyModuleEnv -- HomeIfaceTable
-			  emptyModuleEnv -- PackageIfaceTable
 			  pcs
 
 	case result of {
@@ -461,31 +461,11 @@ run_phase Hsc basename suff input_fn output_fn
 	    HscOK details maybe_iface maybe_stub_h maybe_stub_c 
 			_maybe_interpreted_code pcs -> do
 
-   -- generate the interface file
-	case maybe_iface of
-	   Nothing -> -- compilation not required
-	     do run_something "Touching object file" ("touch " ++ o_file)
-		return False
-
-	   Just iface -> do
-		-- discover the filename for the .hi file in a roundabout way
-		let mod = moduleString (mi_module iface)
-		ohi    <- readIORef output_hi
-		hifile <- case ohi of
-			    Just fn -> fn
-		   	    Nothing -> do hisuf  <- readIORef hi_suf
-			    	          return (current_dir ++ 
-							'/'mod ++ '.':hisuf)
-		-- write out the interface...
-		if_hdl <- openFile hifile WriteMode
-		printForIface if_hdl (pprIface iface)
-		hClose if_hdl
-
     -- deal with stubs
 	maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
 	case maybe_stub_o of
 		Nothing -> return ()
-		Just stub_o -> add ld_inputs stub_o
+		Just stub_o -> add v_Ld_inputs stub_o
 
 	return True
     }
@@ -498,9 +478,9 @@ run_phase Hsc basename suff input_fn output_fn
 
 run_phase cc_phase _basename _suff input_fn output_fn
    | cc_phase == Cc || cc_phase == HCc
-   = do	cc <- readIORef pgm_c
+   = do	cc <- readIORef v_Pgm_c
        	cc_opts <- (getOpts opt_c)
-       	cmdline_include_dirs <- readIORef include_paths
+       	cmdline_include_dirs <- readIORef v_Include_paths
 
         let hcc = cc_phase == HCc
 
@@ -531,7 +511,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 
 	ccout <- newTempName "ccout"
 
-	mangle <- readIORef do_asm_mangling
+	mangle <- readIORef v_Do_asm_mangling
 	(md_c_flags, md_regd_c_flags) <- machdepCCOpts
 
         verb <- is_verbose
@@ -542,7 +522,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 
 	pkg_extra_cc_opts <- getPackageExtraCcOpts
 
-	excessPrecision <- readIORef excess_precision
+	excessPrecision <- readIORef v_Excess_precision
 
 	run_something "C Compiler"
 	 (unwords ([ cc, "-x", "c", cc_help, "-o", output_fn ]
@@ -569,7 +549,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 -- Mangle phase
 
 run_phase Mangle _basename _suff input_fn output_fn
-  = do mangler <- readIORef pgm_m
+  = do mangler <- readIORef v_Pgm_m
        mangler_opts <- getOpts opt_m
        machdep_opts <-
 	 if (prefixMatch "i386" cTARGETPLATFORM)
@@ -588,13 +568,13 @@ run_phase Mangle _basename _suff input_fn output_fn
 -- Splitting phase
 
 run_phase SplitMangle _basename _suff input_fn _output_fn
-  = do  splitter <- readIORef pgm_s
+  = do  splitter <- readIORef v_Pgm_s
 
 	-- this is the prefix used for the split .s files
 	tmp_pfx <- readIORef v_TmpDir
 	x <- getProcessID
 	let split_s_prefix = tmp_pfx ++ "/ghc" ++ show x
-	writeIORef split_prefix split_s_prefix
+	writeIORef v_Split_prefix split_s_prefix
 	addFilesToClean [split_s_prefix ++ "__*"] -- d:-)
 
 	-- allocate a tmp file to put the no. of split .s files in (sigh)
@@ -610,17 +590,17 @@ run_phase SplitMangle _basename _suff input_fn _output_fn
 	-- save the number of split files for future references
 	s <- readFile n_files
 	let n = read s :: Int
-	writeIORef n_split_files n
+	writeIORef v_N_split_files n
 	return True
 
 -----------------------------------------------------------------------------
 -- As phase
 
 run_phase As _basename _suff input_fn output_fn
-  = do 	as <- readIORef pgm_a
+  = do 	as <- readIORef v_Pgm_a
         as_opts <- getOpts opt_a
 
-        cmdline_include_paths <- readIORef include_paths
+        cmdline_include_paths <- readIORef v_Include_paths
         let cmdline_include_flags = map (\p -> "-I"++p) cmdline_include_paths
         run_something "Assembler"
 	   (unwords (as : as_opts
@@ -630,13 +610,13 @@ run_phase As _basename _suff input_fn output_fn
 	return True
 
 run_phase SplitAs basename _suff _input_fn _output_fn
-  = do  as <- readIORef pgm_a
+  = do  as <- readIORef v_Pgm_a
         as_opts <- getOpts opt_a
 
-	split_s_prefix <- readIORef split_prefix
-	n <- readIORef n_split_files
+	split_s_prefix <- readIORef v_Split_prefix
+	n <- readIORef v_N_split_files
 
-	odir <- readIORef output_dir
+	odir <- readIORef v_Output_dir
 	let real_odir = case odir of
 				Nothing -> basename
 				Just d  -> d
@@ -659,31 +639,31 @@ run_phase SplitAs basename _suff _input_fn _output_fn
 
 doLink :: [String] -> IO ()
 doLink o_files = do
-    ln <- readIORef pgm_l
+    ln <- readIORef v_Pgm_l
     verb <- is_verbose
-    o_file <- readIORef output_file
+    o_file <- readIORef v_Output_file
     let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
 
     pkg_lib_paths <- getPackageLibraryPath
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
 
-    lib_paths <- readIORef library_paths
+    lib_paths <- readIORef v_Library_paths
     let lib_path_opts = map ("-L"++) lib_paths
 
     pkg_libs <- getPackageLibraries
     let pkg_lib_opts = map (\lib -> "-l"++lib) pkg_libs
 
-    libs <- readIORef cmdline_libraries
+    libs <- readIORef v_Cmdline_libraries
     let lib_opts = map ("-l"++) (reverse libs)
 	 -- reverse because they're added in reverse order from the cmd line
 
     pkg_extra_ld_opts <- getPackageExtraLdOpts
 
 	-- probably _stub.o files
-    extra_ld_inputs <- readIORef ld_inputs
+    extra_ld_inputs <- readIORef v_Ld_inputs
 
 	-- opts from -optl-<blah>
-    extra_ld_opts <- getStaticOpts opt_l
+    extra_ld_opts <- getStaticOpts v_Opt_l
 
     run_something "Linker"
        (unwords 
@@ -726,7 +706,8 @@ preprocess filename =
 compile :: Finder                  -- to find modules
         -> ModSummary              -- summary, including source
         -> Maybe ModIface          -- old interface, if available
-        -> HomeSymbolTable         -- for home module ModDetails          
+        -> HomeSymbolTable         -- for home module ModDetails
+	-> HomeIfaceTable	   -- for home module Ifaces
         -> PersistentCompilerState -- persistent compiler state
         -> IO CompResult
 
@@ -740,10 +721,11 @@ data CompResult
    | CompErrs PersistentCompilerState	-- updated PCS
 
 
-compile finder summary old_iface hst pcs = do 
-   verb <- readIORef verbose
-   when verb (hPutStrLn stderr ("compile: compiling " ++ 
-				name_of_summary summary))
+compile finder summary old_iface hst hit pcs = do 
+   verb <- readIORef v_Verbose
+   when verb (hPutStrLn stderr 
+                 (showSDoc (text "compile: compiling" 
+                            <+> ppr (name_of_summary summary))))
 
    init_dyn_flags <- readIORef v_InitDynFlags
    writeIORef v_DynFlags init_dyn_flags
@@ -758,6 +740,7 @@ compile finder summary old_iface hst pcs = do
    processArgs dynamic_flags opts []
    dyn_flags <- readIORef v_DynFlags
 
+   hsc_lang <- readIORef v_Hsc_Lang
    output_fn <- case hsc_lang of
 		    HscAsm         -> newTempName (phaseInputExt As)
 		    HscC           -> newTempName (phaseInputExt HCc)
@@ -765,24 +748,25 @@ compile finder summary old_iface hst pcs = do
 		    HscInterpreted -> return (error "no output file")
 
    -- run the compiler
-   hsc_result <- hscMain dyn_flags summary old_iface output_fn hst pcs
+   hsc_result <- hscMain dyn_flags{ hscOutName = output_fn } 
+                         finder summary old_iface hst hit pcs
 
    case hsc_result of {
       HscFail pcs -> return (CompErrs pcs);
 
       HscOK details maybe_iface 
-	maybe_stub_h maybe_stub_c maybe_interpreted_code pcs warns -> do
+	maybe_stub_h maybe_stub_c maybe_interpreted_code pcs -> do
 	   
 	   -- if no compilation happened, bail out early
 	   case maybe_iface of {
-		Nothing -> return (CompOK details Nothing pcs warns);
+		Nothing -> return (CompOK details Nothing pcs);
 		Just iface -> do
 
 	   let (basename, _) = splitFilename (hs_file (ms_location summary))
 	   maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
-	   stub_unlinked <- case maybe_stub_o of
-				Nothing -> []
-				Just stub_o -> [ DotO stub_o ]
+	   let stub_unlinked = case maybe_stub_o of
+				  Nothing -> []
+				  Just stub_o -> [ DotO stub_o ]
 
 	   hs_unlinked <-
 	     case hsc_lang of
@@ -791,8 +775,8 @@ compile finder summary old_iface hst pcs = do
 		-- as our "unlinked" object.
 		HscInterpreted -> 
 		    case maybe_interpreted_code of
-			Just code -> return (Trees code)
-			Nothing   -> panic "compile: no interpreted code"
+			Just (code,itbl_env) -> return [Trees code itbl_env]
+			Nothing -> panic "compile: no interpreted code"
 
 		-- we're in batch mode: finish the compilation pipeline.
 		_other -> do pipe <- genPipeline (StopBefore Ln) "" output_fn
@@ -802,7 +786,7 @@ compile finder summary old_iface hst pcs = do
 	   let linkable = LM (moduleName (ms_mod summary)) 
 				(hs_unlinked ++ stub_unlinked)
 
-	   return (CompOK details (Just (iface, linkable)) pcs warns)
+	   return (CompOK details (Just (iface, linkable)) pcs)
           }
    }
 

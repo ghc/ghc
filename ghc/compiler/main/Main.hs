@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.9 2000/10/26 14:38:42 simonmar Exp $
+-- $Id: Main.hs,v 1.10 2000/10/26 16:21:02 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -20,6 +20,8 @@ import DriverState
 import DriverFlags
 import DriverMkDepend
 import DriverUtil
+import DriverPhases	( Phase(..) )
+import CmdLineOpts	( HscLang(..), DynFlags(..) )
 import TmpFiles
 import Config
 import Util
@@ -83,9 +85,9 @@ main =
 	      ) $ do
 
    -- make sure we clean up after ourselves
-   later (do  forget_it <- readIORef keep_tmp_files
+   later (do  forget_it <- readIORef v_Keep_tmp_files
 	      unless forget_it $ do
-	      verb <- readIORef verbose
+	      verb <- readIORef v_Verbose
 	      cleanTempFiles verb
      ) $ do
 	-- exceptions will be blocked while we clean the temporary files,
@@ -102,13 +104,13 @@ main =
 #endif
 
    pgm    <- getProgName
-   writeIORef prog_name pgm
+   writeIORef v_Prog_name pgm
 
    argv   <- getArgs
 
 	-- grab any -B options from the command line first
    argv'  <- setTopDir argv
-   top_dir <- readIORef topDir
+   top_dir <- readIORef v_TopDir
 
    let installed s = top_dir ++ s
        inplace s   = top_dir ++ '/':cCURRENT_DIR ++ '/':s
@@ -121,35 +123,35 @@ main =
    am_installed <- doesFileExist installed_pkgconfig
 
    if am_installed
-	then writeIORef path_package_config installed_pkgconfig
+	then writeIORef v_Path_package_config installed_pkgconfig
 	else do am_inplace <- doesFileExist inplace_pkgconfig
 	        if am_inplace
-		    then writeIORef path_package_config inplace_pkgconfig
+		    then writeIORef v_Path_package_config inplace_pkgconfig
 		    else throwDyn (OtherError "can't find package.conf")
 
 	-- set the location of our various files
    if am_installed
-	then do writeIORef path_usage (installed "ghc-usage.txt")
-		writeIORef pgm_L (installed "unlit")
-		writeIORef pgm_m (installed "ghc-asm")
-		writeIORef pgm_s (installed "ghc-split")
+	then do writeIORef v_Path_usage (installed "ghc-usage.txt")
+		writeIORef v_Pgm_L (installed "unlit")
+		writeIORef v_Pgm_m (installed "ghc-asm")
+		writeIORef v_Pgm_s (installed "ghc-split")
 
-	else do writeIORef path_usage (inplace (cGHC_DRIVER_DIR ++ "/ghc-usage.txt"))
-		writeIORef pgm_L (inplace cGHC_UNLIT)
-		writeIORef pgm_m (inplace cGHC_MANGLER)
-		writeIORef pgm_s (inplace cGHC_SPLIT)
+	else do writeIORef v_Path_usage (inplace (cGHC_DRIVER_DIR ++ "/ghc-usage.txt"))
+		writeIORef v_Pgm_L (inplace cGHC_UNLIT)
+		writeIORef v_Pgm_m (inplace cGHC_MANGLER)
+		writeIORef v_Pgm_s (inplace cGHC_SPLIT)
 
 	-- read the package configuration
-   conf_file <- readIORef path_package_config
+   conf_file <- readIORef v_Path_package_config
    contents <- readFile conf_file
-   writeIORef package_details (read contents)
+   writeIORef v_Package_details (read contents)
 
 	-- find the phase to stop after (i.e. -E, -C, -c, -S flags)
    (flags2, mode, stop_flag) <- getGhcMode argv'
    writeIORef v_GhcMode mode
 
 	-- force lang to "C" if the -C flag was given
-   case mode of StopBefore HCc -> writeIORef hsc_lang HscC
+   case mode of StopBefore HCc -> writeIORef v_Hsc_Lang HscC
 	        _ -> return ()
 
 	-- process all the other arguments, and get the source files
@@ -161,11 +163,12 @@ main =
  
 	-- give the static flags to hsc
    static_opts <- buildStaticHscOpts
-   writeIORef static_hsc_opts static_opts
+   writeIORef v_Static_hsc_opts static_opts
 
 	-- warnings
-    warn_level <- readIORef warning_opt
-    let warn_opts =  case warn_level of
+   warn_level <- readIORef v_Warning_opt
+
+   let warn_opts =  case warn_level of
 		  	W_default -> standardWarnings
 		  	W_        -> minusWOpts
 		  	W_all	  -> minusWallOpts
@@ -177,7 +180,7 @@ main =
    core_todo <- buildCoreToDo
    stg_todo  <- buildStgToDo
 
-   lang <- readIORef hsc_lang
+   lang <- readIORef v_Hsc_Lang
    writeIORef v_DynFlags 
 	DynFlags{ coreToDo = core_todo,
 		  stgToDo  = stg_todo,
@@ -189,14 +192,14 @@ main =
    srcs <- processArgs dynamic_flags non_static []
 	-- save the "initial DynFlags" away
    dyn_flags <- readIORef v_DynFlags
-   writeIORef v_InitDynFlags 
+   writeIORef v_InitDynFlags dyn_flags
 
     	-- complain about any unknown flags
    let unknown_flags = [ f | ('-':f) <- srcs ]
    mapM unknownFlagErr unknown_flags
 
 	-- get the -v flag
-   verb <- readIORef verbose
+   verb <- readIORef v_Verbose
 
    when verb (do hPutStr stderr "Glasgow Haskell Compiler, Version "
  	         hPutStr stderr version_str
@@ -215,7 +218,7 @@ main =
    pipelines <- mapM (genPipeline mode stop_flag) srcs
    let src_pipelines = zip srcs pipelines
 
-   o_file <- readIORef output_file
+   o_file <- readIORef v_Output_file
    if isJust o_file && mode /= DoLink && length srcs > 1
 	then throwDyn (UsageError "can't apply -o option to multiple source files")
 	else do
@@ -225,11 +228,11 @@ main =
 	-- save the flag state, because this could be modified by OPTIONS pragmas
 	-- during the compilation, and we'll need to restore it before starting
 	-- the next compilation.
-   saved_driver_state <- readIORef driver_state
+   saved_driver_state <- readIORef v_Driver_state
 
    let compileFile (src, phases) = do
 	  r <- runPipeline phases src (mode==DoLink) True
-	  writeIORef driver_state saved_driver_state
+	  writeIORef v_Driver_state saved_driver_state
 	  return r
 
    o_files <- mapM compileFile src_pipelines
@@ -243,8 +246,8 @@ setTopDir :: [String] -> IO [String]
 setTopDir args = do
   let (minusbs, others) = partition (prefixMatch "-B") args
   (case minusbs of
-    []   -> writeIORef topDir clibdir
-    some -> writeIORef topDir (drop 2 (last some)))
+    []   -> writeIORef v_TopDir clibdir
+    some -> writeIORef v_TopDir (drop 2 (last some)))
   return others
 
 beginMake = panic "`ghc --make' unimplemented"

@@ -37,33 +37,33 @@ source, interface, and object files for a module live.
 \begin{code}
 
 -- caches contents of package directories, never expunged
-GLOBAL_VAR(pkgDirCache,    Nothing,  Maybe (FiniteMap String (PackageName, FilePath)))
+GLOBAL_VAR(v_PkgDirCache,    Nothing,  Maybe (FiniteMap String (PackageName, FilePath)))
 
 -- caches contents of home directories, expunged whenever we
 -- create a new finder.
-GLOBAL_VAR(homeDirCache,   emptyFM,  FiniteMap String FilePath)
+GLOBAL_VAR(v_HomeDirCache,   emptyFM,  FiniteMap String FilePath)
 
 -- caches finder mapping, expunged whenever we create a new finder.
-GLOBAL_VAR(finderMapCache, emptyFM, FiniteMap ModuleName Module)
+GLOBAL_VAR(v_FinderMapCache, emptyFM, FiniteMap ModuleName Module)
 
 
 newFinder :: PackageConfigInfo -> IO Finder
 newFinder (PackageConfigInfo pkgs) = do
   -- expunge our caches
-  writeIORef homeDirCache   emptyFM
-  writeIORef finderMapCache emptyFM
+  writeIORef v_HomeDirCache   emptyFM
+  writeIORef v_FinderMapCache emptyFM
 
   -- populate the home dir cache, using the import path (the import path
   -- is changed by -i flags on the command line, and defaults to ["."]).
-  home_imports <- readIORef import_paths
+  home_imports <- readIORef v_Import_paths
   let extendFM fm path = do
 	  contents <- getDirectoryContents' path
           return (addListToFM fm (zip contents (repeat path)))
   home_map <- foldM extendFM emptyFM home_imports
-  writeIORef homeDirCache home_map
+  writeIORef v_HomeDirCache home_map
 
   -- populate the package cache, if necessary
-  pkg_cache <- readIORef pkgDirCache
+  pkg_cache <- readIORef v_PkgDirCache
   case pkg_cache of 
     Nothing -> do
 
@@ -77,7 +77,7 @@ newFinder (PackageConfigInfo pkgs) = do
                 foldM addDir fm dirs
 
   	pkg_map <- foldM extendFM emptyFM pkgs
-	writeIORef pkgDirCache (Just pkg_map)
+	writeIORef v_PkgDirCache (Just pkg_map)
 
     Just _ -> 
         return ()
@@ -95,7 +95,7 @@ finder name = do
 
 maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 maybeHomeModule mod_name = do
-   home_cache <- readIORef homeDirCache
+   home_cache <- readIORef v_HomeDirCache
 
    let basename = moduleNameString mod_name
        hs  = basename ++ ".hs"
@@ -115,8 +115,8 @@ mkHomeModuleLocn mod_name basename source_fn = do
 
    -- figure out the .hi file name: it lives in the same dir as the
    -- source, unless there's a -ohi flag on the command line.
-   ohi    <- readIORef output_hi
-   hisuf  <- readIORef hi_suf
+   ohi    <- readIORef v_Output_hi
+   hisuf  <- readIORef v_Hi_suf
    let hifile = case ohi of
 		   Nothing -> basename ++ '.':hisuf
 		   Just fn -> fn
@@ -135,14 +135,14 @@ mkHomeModuleLocn mod_name basename source_fn = do
 
 maybePackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 maybePackageModule mod_name = do
-  maybe_pkg_cache <- readIORef pkgDirCache
+  maybe_pkg_cache <- readIORef v_PkgDirCache
   case maybe_pkg_cache of {
      Nothing -> panic "maybePackageModule: no pkg_cache";
      Just pkg_cache -> do
 
   -- hi-suffix for packages depends on the build tag.
   package_hisuf <-
-	do tag <- readIORef build_tag
+	do tag <- readIORef v_Build_tag
 	   if null tag
 		then return "hi"
 		else return (tag ++ "_hi")

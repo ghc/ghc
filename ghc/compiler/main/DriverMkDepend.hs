@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.2 2000/10/17 13:22:10 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.3 2000/10/26 16:21:02 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -32,17 +32,17 @@ import Maybe
 -- mkdependHS
 
 	-- flags
-GLOBAL_VAR(dep_makefile, 	"Makefile", String);
-GLOBAL_VAR(dep_include_prelude, False, Bool);
-GLOBAL_VAR(dep_ignore_dirs,	[], [String]);
-GLOBAL_VAR(dep_suffixes,	[], [String]);
-GLOBAL_VAR(dep_warnings,	True, Bool);
+GLOBAL_VAR(v_Dep_makefile, 		"Makefile", String);
+GLOBAL_VAR(v_Dep_include_prelude, 	False, Bool);
+GLOBAL_VAR(v_Dep_ignore_dirs,		[], [String]);
+GLOBAL_VAR(v_Dep_suffixes,		[], [String]);
+GLOBAL_VAR(v_Dep_warnings,		True, Bool);
 
 	-- global vars
-GLOBAL_VAR(dep_makefile_hdl,   	error "dep_makefile_hdl", Maybe Handle);
-GLOBAL_VAR(dep_tmp_file,       	error "dep_tmp_file", String);
-GLOBAL_VAR(dep_tmp_hdl,        	error "dep_tmp_hdl", Handle);
-GLOBAL_VAR(dep_dir_contents,   	error "dep_dir_contents", [(String,[String])]);
+GLOBAL_VAR(v_Dep_makefile_hdl,  error "dep_makefile_hdl", Maybe Handle);
+GLOBAL_VAR(v_Dep_tmp_file,      error "dep_tmp_file", String);
+GLOBAL_VAR(v_Dep_tmp_hdl,       error "dep_tmp_hdl", Handle);
+GLOBAL_VAR(v_Dep_dir_contents,  error "dep_dir_contents", [(String,[String])]);
 
 depStartMarker = "# DO NOT DELETE: Beginning of Haskell dependencies"
 depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
@@ -50,39 +50,39 @@ depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
 -- for compatibility with the old mkDependHS, we accept options of the form
 -- -optdep-f -optdep.depend, etc.
 dep_opts = [
-   (  "s", 			SepArg (add dep_suffixes) ),
-   (  "f", 			SepArg (writeIORef dep_makefile) ),
-   (  "w", 			NoArg (writeIORef dep_warnings False) ),
-   (  "-include-prelude",  	NoArg (writeIORef dep_include_prelude True) ),
-   (  "X", 			Prefix (addToDirList dep_ignore_dirs) ),
-   (  "-exclude-directory=",	Prefix (addToDirList dep_ignore_dirs) )
+   (  "s", 			SepArg (add v_Dep_suffixes) ),
+   (  "f", 			SepArg (writeIORef v_Dep_makefile) ),
+   (  "w", 			NoArg (writeIORef v_Dep_warnings False) ),
+   (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_prelude True) ),
+   (  "X", 			Prefix (addToDirList v_Dep_ignore_dirs) ),
+   (  "-exclude-directory=",	Prefix (addToDirList v_Dep_ignore_dirs) )
  ]
 
 beginMkDependHS :: IO ()
 beginMkDependHS = do
 
   	-- slurp in the mkdependHS-style options
-  flags <- getStaticOpts opt_dep
+  flags <- getStaticOpts v_Opt_dep
   _ <- processArgs dep_opts flags []
 
      	-- open a new temp file in which to stuff the dependency info
      	-- as we go along.
   dep_file <- newTempName "dep"
-  writeIORef dep_tmp_file dep_file
+  writeIORef v_Dep_tmp_file dep_file
   tmp_hdl <- openFile dep_file WriteMode
-  writeIORef dep_tmp_hdl tmp_hdl
+  writeIORef v_Dep_tmp_hdl tmp_hdl
 
   	-- open the makefile
-  makefile <- readIORef dep_makefile
+  makefile <- readIORef v_Dep_makefile
   exists <- doesFileExist makefile
   if not exists
 	then do 
-	   writeIORef dep_makefile_hdl Nothing
+	   writeIORef v_Dep_makefile_hdl Nothing
 	   return ()
 
 	else do
   	   makefile_hdl <- openFile makefile ReadMode
-  	   writeIORef dep_makefile_hdl (Just makefile_hdl)
+  	   writeIORef v_Dep_makefile_hdl (Just makefile_hdl)
 
 		-- slurp through until we get the magic start string,
 		-- copying the contents into dep_makefile
@@ -111,28 +111,28 @@ beginMkDependHS = do
 
   	-- cache the contents of all the import directories, for future
 	-- reference.
-  import_dirs <- readIORef import_paths
+  import_dirs <- readIORef v_Import_paths
   pkg_import_dirs <- getPackageImportPath
   import_dir_contents <- mapM getDirectoryContents import_dirs
   pkg_import_dir_contents <- mapM getDirectoryContents pkg_import_dirs
-  writeIORef dep_dir_contents 
+  writeIORef v_Dep_dir_contents 
 	(zip import_dirs import_dir_contents ++
   	 zip pkg_import_dirs pkg_import_dir_contents)
 
 	-- ignore packages unless --include-prelude is on
-  include_prelude <- readIORef dep_include_prelude
+  include_prelude <- readIORef v_Dep_include_prelude
   when (not include_prelude) $
-    mapM_ (add dep_ignore_dirs) pkg_import_dirs
+    mapM_ (add v_Dep_ignore_dirs) pkg_import_dirs
 
   return ()
 
 
 endMkDependHS :: IO ()
 endMkDependHS = do
-  makefile     <- readIORef dep_makefile
-  makefile_hdl <- readIORef dep_makefile_hdl
-  tmp_file     <- readIORef dep_tmp_file
-  tmp_hdl      <- readIORef dep_tmp_hdl
+  makefile     <- readIORef v_Dep_makefile
+  makefile_hdl <- readIORef v_Dep_makefile_hdl
+  tmp_file     <- readIORef v_Dep_tmp_file
+  tmp_hdl      <- readIORef v_Dep_tmp_hdl
 
 	-- write the magic marker into the tmp file
   hPutStrLn tmp_hdl depEndMarker
@@ -166,9 +166,9 @@ endMkDependHS = do
 
 findDependency :: String -> ModImport -> IO (Maybe (String, Bool))
 findDependency mod imp = do
-   dir_contents <- readIORef dep_dir_contents
-   ignore_dirs  <- readIORef dep_ignore_dirs
-   hisuf <- readIORef hi_suf
+   dir_contents <- readIORef v_Dep_dir_contents
+   ignore_dirs  <- readIORef v_Dep_ignore_dirs
+   hisuf <- readIORef v_Hi_suf
 
    let
      (imp_mod, is_source) = 

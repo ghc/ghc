@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.8 2000/10/24 16:08:16 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.9 2000/10/26 16:21:02 sewardj Exp $
 --
 -- Driver flags
 --
@@ -152,68 +152,68 @@ static_flags =
 				     exitWith ExitSuccess))
 
       ------- verbosity ----------------------------------------------------
-  ,  ( "v"		, NoArg (writeIORef verbose True) )
-  ,  ( "n"              , NoArg (writeIORef dry_run True) )
+  ,  ( "v"		, NoArg (writeIORef v_Verbose True) )
+  ,  ( "n"              , NoArg (writeIORef v_Dry_run True) )
 
 	------- recompilation checker --------------------------------------
-  ,  ( "recomp"		, NoArg (writeIORef recomp True) )
-  ,  ( "no-recomp"  	, NoArg (writeIORef recomp False) )
+  ,  ( "recomp"		, NoArg (writeIORef v_Recomp True) )
+  ,  ( "no-recomp"  	, NoArg (writeIORef v_Recomp False) )
 
 	------- ways --------------------------------------------------------
-  ,  ( "prof"		, NoArg (addNoDups ways	WayProf) )
-  ,  ( "unreg"		, NoArg (addNoDups ways	WayUnreg) )
-  ,  ( "dll"            , NoArg (addNoDups ways WayDll) )
-  ,  ( "ticky"		, NoArg (addNoDups ways	WayTicky) )
-  ,  ( "parallel"	, NoArg (addNoDups ways	WayPar) )
-  ,  ( "gransim"	, NoArg (addNoDups ways	WayGran) )
-  ,  ( "smp"		, NoArg (addNoDups ways	WaySMP) )
-  ,  ( "debug"		, NoArg (addNoDups ways	WayDebug) )
+  ,  ( "prof"		, NoArg (addNoDups v_Ways	WayProf) )
+  ,  ( "unreg"		, NoArg (addNoDups v_Ways	WayUnreg) )
+  ,  ( "dll"            , NoArg (addNoDups v_Ways WayDll) )
+  ,  ( "ticky"		, NoArg (addNoDups v_Ways	WayTicky) )
+  ,  ( "parallel"	, NoArg (addNoDups v_Ways	WayPar) )
+  ,  ( "gransim"	, NoArg (addNoDups v_Ways	WayGran) )
+  ,  ( "smp"		, NoArg (addNoDups v_Ways	WaySMP) )
+  ,  ( "debug"		, NoArg (addNoDups v_Ways	WayDebug) )
  	-- ToDo: user ways
 
 	------ Debugging ----------------------------------------------------
-  ,  ( "dppr-noprags",     PassFlag (add opt_C) )
-  ,  ( "dppr-debug",       PassFlag (add opt_C) )
-  ,  ( "dppr-user-length", AnySuffix (add opt_C) )
+  ,  ( "dppr-noprags",     PassFlag (add v_Opt_C) )
+  ,  ( "dppr-debug",       PassFlag (add v_Opt_C) )
+  ,  ( "dppr-user-length", AnySuffix (add v_Opt_C) )
       -- rest of the debugging flags are dynamic
 
 	------- Interface files ---------------------------------------------
-  ,  ( "hi"		, NoArg (writeIORef produceHi True) )
-  ,  ( "nohi"		, NoArg (writeIORef produceHi False) )
+  ,  ( "hi"		, NoArg (writeIORef v_ProduceHi True) )
+  ,  ( "nohi"		, NoArg (writeIORef v_ProduceHi False) )
 
 	--------- Profiling --------------------------------------------------
-  ,  ( "auto-dicts"	, NoArg (add opt_C "-fauto-sccs-on-dicts") )
-  ,  ( "auto-all"	, NoArg (add opt_C "-fauto-sccs-on-all-toplevs") )
-  ,  ( "auto"		, NoArg (add opt_C "-fauto-sccs-on-exported-toplevs") )
-  ,  ( "caf-all"	, NoArg (add opt_C "-fauto-sccs-on-individual-cafs") )
+  ,  ( "auto-dicts"	, NoArg (add v_Opt_C "-fauto-sccs-on-dicts") )
+  ,  ( "auto-all"	, NoArg (add v_Opt_C "-fauto-sccs-on-all-toplevs") )
+  ,  ( "auto"		, NoArg (add v_Opt_C "-fauto-sccs-on-exported-toplevs") )
+  ,  ( "caf-all"	, NoArg (add v_Opt_C "-fauto-sccs-on-individual-cafs") )
          -- "ignore-sccs"  doesn't work  (ToDo)
 
-  ,  ( "no-auto-dicts"	, NoArg (add anti_opt_C "-fauto-sccs-on-dicts") )
-  ,  ( "no-auto-all"	, NoArg (add anti_opt_C "-fauto-sccs-on-all-toplevs") )
-  ,  ( "no-auto"	, NoArg (add anti_opt_C "-fauto-sccs-on-exported-toplevs") )
-  ,  ( "no-caf-all"	, NoArg (add anti_opt_C "-fauto-sccs-on-individual-cafs") )
+  ,  ( "no-auto-dicts"	, NoArg (add v_Anti_opt_C "-fauto-sccs-on-dicts") )
+  ,  ( "no-auto-all"	, NoArg (add v_Anti_opt_C "-fauto-sccs-on-all-toplevs") )
+  ,  ( "no-auto"	, NoArg (add v_Anti_opt_C "-fauto-sccs-on-exported-toplevs") )
+  ,  ( "no-caf-all"	, NoArg (add v_Anti_opt_C "-fauto-sccs-on-individual-cafs") )
 
 	------- Miscellaneous -----------------------------------------------
   ,  ( "no-link-chk"    , NoArg (return ()) ) -- ignored for backwards compat
 
 	------- Output Redirection ------------------------------------------
-  ,  ( "odir"		, HasArg (writeIORef output_dir  . Just) )
-  ,  ( "o"		, SepArg (writeIORef output_file . Just) )
-  ,  ( "osuf"		, HasArg (writeIORef output_suf  . Just) )
-  ,  ( "hisuf"		, HasArg (writeIORef hi_suf) )
+  ,  ( "odir"		, HasArg (writeIORef v_Output_dir  . Just) )
+  ,  ( "o"		, SepArg (writeIORef v_Output_file . Just) )
+  ,  ( "osuf"		, HasArg (writeIORef v_Output_suf  . Just) )
+  ,  ( "hisuf"		, HasArg (writeIORef v_Hi_suf) )
   ,  ( "tmpdir"		, HasArg (writeIORef v_TmpDir . (++ "/")) )
   ,  ( "ohi"		, HasArg (\s -> case s of 
-					  "-" -> writeIORef hi_on_stdout True
-					  _   -> writeIORef output_hi (Just s)) )
+					  "-" -> writeIORef v_Hi_on_stdout True
+					  _   -> writeIORef v_Output_hi (Just s)) )
 	-- -odump?
 
-  ,  ( "keep-hc-file"   , AnySuffix (\_ -> writeIORef keep_hc_files True) )
-  ,  ( "keep-s-file"    , AnySuffix (\_ -> writeIORef keep_s_files  True) )
-  ,  ( "keep-raw-s-file", AnySuffix (\_ -> writeIORef keep_raw_s_files  True) )
-  ,  ( "keep-tmp-files" , AnySuffix (\_ -> writeIORef keep_tmp_files True) )
+  ,  ( "keep-hc-file"   , AnySuffix (\_ -> writeIORef v_Keep_hc_files True) )
+  ,  ( "keep-s-file"    , AnySuffix (\_ -> writeIORef v_Keep_s_files  True) )
+  ,  ( "keep-raw-s-file", AnySuffix (\_ -> writeIORef v_Keep_raw_s_files  True) )
+  ,  ( "keep-tmp-files" , AnySuffix (\_ -> writeIORef v_Keep_tmp_files True) )
 
   ,  ( "split-objs"	, NoArg (if can_split
-				    then do writeIORef split_object_files True
-					    add opt_C "-fglobalise-toplev-names"
+				    then do writeIORef v_Split_object_files True
+					    add v_Opt_C "-fglobalise-toplev-names"
 -- TODO!!!!!				    add opt_c "-DUSE_SPLIT_MARKERS"
 				    else hPutStrLn stderr
 					    "warning: don't know how to  split \
@@ -221,15 +221,15 @@ static_flags =
 				) )
   
 	------- Include/Import Paths ----------------------------------------
-  ,  ( "i"		, OptPrefix (addToDirList import_paths) )
-  ,  ( "I" 		, Prefix    (addToDirList include_paths) )
+  ,  ( "i"		, OptPrefix (addToDirList v_Import_paths) )
+  ,  ( "I" 		, Prefix    (addToDirList v_Include_paths) )
 
 	------- Libraries ---------------------------------------------------
-  ,  ( "L"		, Prefix (addToDirList library_paths) )
-  ,  ( "l"		, Prefix (add cmdline_libraries) )
+  ,  ( "L"		, Prefix (addToDirList v_Library_paths) )
+  ,  ( "l"		, Prefix (add v_Cmdline_libraries) )
 
         ------- Packages ----------------------------------------------------
-  ,  ( "package-name"   , HasArg (\s -> add opt_C ("-inpackage="++s)) )
+  ,  ( "package-name"   , HasArg (\s -> add v_Opt_C ("-inpackage="++s)) )
 
   ,  ( "package"        , HasArg (addPackage) )
   ,  ( "syslib"         , HasArg (addPackage) )	-- for compatibility w/ old vsns
@@ -239,59 +239,59 @@ static_flags =
   ,  ( "-delete-package" , SepArg (deletePackage) )
 
         ------- Specific phases  --------------------------------------------
-  ,  ( "pgmL"           , HasArg (writeIORef pgm_L) )
-  ,  ( "pgmP"           , HasArg (writeIORef pgm_P) )
-  ,  ( "pgmc"           , HasArg (writeIORef pgm_c) )
-  ,  ( "pgmm"           , HasArg (writeIORef pgm_m) )
-  ,  ( "pgms"           , HasArg (writeIORef pgm_s) )
-  ,  ( "pgma"           , HasArg (writeIORef pgm_a) )
-  ,  ( "pgml"           , HasArg (writeIORef pgm_l) )
+  ,  ( "pgmL"           , HasArg (writeIORef v_Pgm_L) )
+  ,  ( "pgmP"           , HasArg (writeIORef v_Pgm_P) )
+  ,  ( "pgmc"           , HasArg (writeIORef v_Pgm_c) )
+  ,  ( "pgmm"           , HasArg (writeIORef v_Pgm_m) )
+  ,  ( "pgms"           , HasArg (writeIORef v_Pgm_s) )
+  ,  ( "pgma"           , HasArg (writeIORef v_Pgm_a) )
+  ,  ( "pgml"           , HasArg (writeIORef v_Pgm_l) )
 
-  ,  ( "optdep"		, HasArg (add opt_dep) )
-  ,  ( "optl"		, HasArg (add opt_l) )
-  ,  ( "optdll"		, HasArg (add opt_dll) )
+  ,  ( "optdep"		, HasArg (add v_Opt_dep) )
+  ,  ( "optl"		, HasArg (add v_Opt_l) )
+  ,  ( "optdll"		, HasArg (add v_Opt_dll) )
 
 	------ Warning opts -------------------------------------------------
-  ,  ( "W"		, NoArg (writeIORef warning_opt W_) )
-  ,  ( "Wall"		, NoArg (writeIORef warning_opt	W_all) )
-  ,  ( "Wnot"		, NoArg (writeIORef warning_opt	W_not) )
-  ,  ( "w"		, NoArg (writeIORef warning_opt	W_not) )
+  ,  ( "W"		, NoArg (writeIORef v_Warning_opt W_) )
+  ,  ( "Wall"		, NoArg (writeIORef v_Warning_opt W_all) )
+  ,  ( "Wnot"		, NoArg (writeIORef v_Warning_opt W_not) )
+  ,  ( "w"		, NoArg (writeIORef v_Warning_opt W_not) )
 
 	----- Linker --------------------------------------------------------
-  ,  ( "static" 	, NoArg (writeIORef static True) )
+  ,  ( "static" 	, NoArg (writeIORef v_Static True) )
 
         ------ Compiler flags -----------------------------------------------
   ,  ( "O2-for-C"	   , NoArg (writeIORef v_minus_o2_for_C True) )
   ,  ( "O"		   , OptPrefix (setOptLevel) )
 
-  ,  ( "fasm"		   , OptPrefix (\_ -> writeIORef hsc_lang HscAsm) )
+  ,  ( "fasm"		   , OptPrefix (\_ -> writeIORef v_Hsc_Lang HscAsm) )
 
-  ,  ( "fvia-c"		   , NoArg (writeIORef hsc_lang HscC) )
-  ,  ( "fvia-C"		   , NoArg (writeIORef hsc_lang HscC) )
+  ,  ( "fvia-c"		   , NoArg (writeIORef v_Hsc_Lang HscC) )
+  ,  ( "fvia-C"		   , NoArg (writeIORef v_Hsc_Lang HscC) )
 
-  ,  ( "fno-asm-mangling"  , NoArg (writeIORef do_asm_mangling False) )
+  ,  ( "fno-asm-mangling"  , NoArg (writeIORef v_Do_asm_mangling False) )
 
   ,  ( "fmax-simplifier-iterations", 
 		Prefix (writeIORef v_MaxSimplifierIterations . read) )
 
   ,  ( "fusagesp"	   , NoArg (do writeIORef v_UsageSPInf True
-				       add opt_C "-fusagesp-on") )
+				       add v_Opt_C "-fusagesp-on") )
 
-  ,  ( "fexcess-precision" , NoArg (do writeIORef excess_precision True
-				       add opt_C "-fexcess-precision"))
+  ,  ( "fexcess-precision" , NoArg (do writeIORef v_Excess_precision True
+				       add v_Opt_C "-fexcess-precision"))
 
 	-- flags that are "active negatives"
-  ,  ( "fno-implicit-prelude"	, PassFlag (add opt_C) )
-  ,  ( "fno-prune-tydecls"	, PassFlag (add opt_C) )
-  ,  ( "fno-prune-instdecls"	, PassFlag (add opt_C) )
-  ,  ( "fno-pre-inlining"	, PassFlag (add opt_C) )
+  ,  ( "fno-implicit-prelude"	, PassFlag (add v_Opt_C) )
+  ,  ( "fno-prune-tydecls"	, PassFlag (add v_Opt_C) )
+  ,  ( "fno-prune-instdecls"	, PassFlag (add v_Opt_C) )
+  ,  ( "fno-pre-inlining"	, PassFlag (add v_Opt_C) )
 
 	-- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
   ,  ( "fno-",			PrefixPred (\s -> isStaticHscFlag ("f"++s))
-				    (\s -> add anti_opt_C ("-f"++s)) )
+				    (\s -> add v_Anti_opt_C ("-f"++s)) )
 
 	-- Pass all remaining "-f<blah>" options to hsc
-  ,  ( "f", 			AnySuffixPred (isStaticHscFlag) (add opt_C) )
+  ,  ( "f", 			AnySuffixPred (isStaticHscFlag) (add v_Opt_C) )
   ]
 
 -----------------------------------------------------------------------------
@@ -427,7 +427,7 @@ floatOpt ref str
 buildStaticHscOpts :: IO [String]
 buildStaticHscOpts = do
 
-  opt_C_ <- getStaticOpts opt_C		-- misc hsc opts
+  opt_C_ <- getStaticOpts v_Opt_C		-- misc hsc opts
 
 	-- optimisation
   minus_o <- readIORef v_OptLevel
@@ -444,14 +444,14 @@ buildStaticHscOpts = do
 
 	-- take into account -fno-* flags by removing the equivalent -f*
 	-- flag from our list.
-  anti_flags <- getStaticOpts anti_opt_C
+  anti_flags <- getStaticOpts v_Anti_opt_C
   let basic_opts = opt_C_ ++ optimisation_opts ++ stg_opts
       filtered_opts = filter (`notElem` anti_flags) basic_opts
 
   verb <- is_verbose
   let hi_vers = "-fhi-version="++cProjectVersionInt
 
-  static <- (do s <- readIORef static; if s then return "-static" 
-					    else return "")
+  static <- (do s <- readIORef v_Static; if s then return "-static" 
+					      else return "")
 
   return ( filtered_opts ++ [ hi_vers, static, verb ] )
