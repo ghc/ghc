@@ -1,3 +1,5 @@
+{-# OPTIONS -fno-implicit-prelude #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.FilePath
@@ -43,9 +45,15 @@ module System.FilePath
 	 , dllExtension
          ) where
 
+#ifdef __GLASGOW_HASKELL__
+import GHC.Base
+import GHC.IOBase(FilePath)
+import GHC.Num
+#else
 import Prelude -- necessary to get dependencies right
-
-import Data.List(intersperse)
+#endif
+import Data.Maybe
+import Data.List
 
 --------------------------------------------------------------
 -- * FilePath
