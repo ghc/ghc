@@ -722,7 +722,7 @@ showFloat x  =  showString (formatRealFloat FFGeneric Nothing x)
 
 -- These are the format types.  This type is not exported.
 
-data FFFormat = FFExponent | FFFixed | FFGeneric --no need: deriving (Eq, Ord, Show)
+data FFFormat = FFExponent | FFFixed | FFGeneric
 
 formatRealFloat :: (RealFloat a) => FFFormat -> Maybe Int -> a -> String
 formatRealFloat fmt decs x
