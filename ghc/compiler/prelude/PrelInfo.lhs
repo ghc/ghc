@@ -365,6 +365,7 @@ knownKeyNames
     , (mutableByteArrayTyCon_RDR, mutableByteArrayTyConKey)
     , (foreignObjTyCon_RDR, 	foreignObjTyConKey)
     , (stablePtrTyCon_RDR, 	stablePtrTyConKey)
+    , (stablePtrDataCon_RDR,    stablePtrDataConKey)
 
 	--  Classes.  *Must* include:
 	--  	classes that are grabbed by key (e.g., eqClassKey)
@@ -461,10 +462,11 @@ ratioDataCon_RDR	= dataQual pREL_NUM  SLIT(":%")
 byteArrayTyCon_RDR		= tcQual pREL_ARR  SLIT("ByteArray")
 mutableByteArrayTyCon_RDR	= tcQual pREL_ARR  SLIT("MutableByteArray")
 
-foreignObjTyCon_RDR	= tcQual  pREL_IO_BASE SLIT("ForeignObj")
-stablePtrTyCon_RDR	= tcQual  pREL_STABLE SLIT("StablePtr")
-deRefStablePtr_RDR      = varQual pREL_STABLE SLIT("deRefStablePtr")
-makeStablePtr_RDR       = varQual pREL_STABLE SLIT("makeStablePtr")
+foreignObjTyCon_RDR	= tcQual   pREL_IO_BASE SLIT("ForeignObj")
+stablePtrTyCon_RDR	= tcQual   pREL_STABLE SLIT("StablePtr")
+stablePtrDataCon_RDR	= dataQual pREL_STABLE SLIT("StablePtr")
+deRefStablePtr_RDR      = varQual  pREL_STABLE SLIT("deRefStablePtr")
+makeStablePtr_RDR       = varQual  pREL_STABLE SLIT("makeStablePtr")
 
 eqClass_RDR		= clsQual pREL_BASE SLIT("Eq")
 ordClass_RDR		= clsQual pREL_BASE SLIT("Ord")
