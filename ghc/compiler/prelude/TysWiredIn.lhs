@@ -275,8 +275,8 @@ int32TyCon = pcNonRecDataTyCon int32TyConKey iNT SLIT("Int32") [] [int32DataCon]
 
 int64Ty = mkTyConTy int64TyCon 
 
-int64TyCon = pcNonRecDataTyCon int64TyConKey iNT SLIT("Int64") [] [int64DataCon]
-int64DataCon = pcDataCon int64DataConKey iNT SLIT("I64#") [] [] [int64PrimTy] int64TyCon
+int64TyCon = pcNonRecDataTyCon int64TyConKey pREL_CCALL SLIT("Int64") [] [int64DataCon]
+int64DataCon = pcDataCon int64DataConKey pREL_CCALL SLIT("I64#") [] [] [int64PrimTy] int64TyCon
 \end{code}
 
 \begin{code}
@@ -300,8 +300,8 @@ word32TyCon = pcNonRecDataTyCon word32TyConKey   wORD SLIT("Word32") [] [word32D
 
 word64Ty = mkTyConTy word64TyCon
 
-word64TyCon = pcNonRecDataTyCon word64TyConKey   wORD SLIT("Word64") [] [word64DataCon]
-word64DataCon = pcDataCon word64DataConKey wORD SLIT("W64#") [] [] [word64PrimTy] word64TyCon
+word64TyCon = pcNonRecDataTyCon word64TyConKey   pREL_CCALL SLIT("Word64") [] [word64DataCon]
+word64DataCon = pcDataCon word64DataConKey pREL_CCALL SLIT("W64#") [] [] [word64PrimTy] word64TyCon
 \end{code}
 
 \begin{code}
