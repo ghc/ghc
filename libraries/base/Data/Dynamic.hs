@@ -154,7 +154,7 @@ fromDynamic (Dynamic t v) =
 -- (f::(a->b)) `dynApply` (x::a) = (f a)::b
 dynApply :: Dynamic -> Dynamic -> Maybe Dynamic
 dynApply (Dynamic t1 f) (Dynamic t2 x) =
-  case applyTy t1 t2 of
+  case funResultTy t1 t2 of
     Just t3 -> Just (Dynamic t3 ((unsafeCoerce f) x))
     Nothing -> Nothing
 
