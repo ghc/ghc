@@ -1,0 +1,52 @@
+#! /bin/sh
+
+DB_STYLESHEET=/usr/lib/sgml/stylesheets/cygnus-both.dsl
+ADMON_GRAPHICS=/usr/lib/sgml/stylesheets/nwalsh-modular/images/*.gif
+
+output=db2rtf.rtf
+#TMPFN=db2rtf$$.rtf
+
+# setting SGML_CATALOG_FILES should be done in the Makefile at build time
+# of jade but I set it here anyway in case someone forgets.
+
+# Dave Mason's option to specify a different stylesheet
+case $1 in
+    -d) DB_STYLESHEET=$2
+        shift 2
+	;;
+esac
+
+echo "Using stylesheet: \"${DB_STYLESHEET}\""
+
+if [ $# -gt 2 ]
+then
+  echo "Usage: `basename $0` [filename.sgml]" >&2
+  exit 1
+fi
+
+if [ $# -eq 1 ]
+then
+  if [ ! -r $1 ]
+  then
+    echo Cannot read \"$1\".  Exiting. >&2
+    exit 1
+  fi
+  if echo $1 | egrep -i '\.sgml$|\.sgm$' >/dev/null 2>&1
+  then
+    output="`echo $1 | sed 's,\.sgml$,.rtf,;s,\.sgm$,.rtf,'`"
+  fi
+fi
+
+### echo "about to copy admon graphics to this dir"
+### cp ${ADMON_GRAPHICS} .
+
+cat $* | jade -t rtf -d ${DB_STYLESHEET}\#print
+
+if [ $# -eq 1 ]
+then
+  mv jade-out.rtf $output
+else
+  cat jade-out.rtf
+fi
+
+exit 0
