@@ -1,52 +1,71 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Generics
--- Copyright   :  (c) The University of Glasgow 2001
+-- Copyright   :  (c) The University of Glasgow, CWI 2001--2003
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
--- Maintainer  :  libraries@haskell.org
+-- Maintainer  :  libraries@haskell.org, ralf@cwi.nl
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- Data types for generic definitions (GHC only).
+-- Generic programming in Haskell; 
+-- see <http://www.cs.vu.nl/boilerplate>.
 --
 -----------------------------------------------------------------------------
 
 module Data.Generics ( 
 
+	-- The Typeable class and the type-safe cast operation;
+        -- re-exported for convenience
+	Typeable(..), cast,
+
+	-- * Prime types of generic functions
+        GenericT, GenericQ, GenericM,
+
+	-- * Combinators to \"make\" generic functions
+	mkT, mkQ, mkM, extT, extQ, extM, sameType,
+
+	-- * The Data class for folding and unfolding constructor applications
+	Data( gmapT,
+              gmapQ, 
+              gmapM, 
+	      gfoldl,
+	      conOf,
+              consOf, 
+              gunfold
+            ),
+
+        -- * The Constr datatype for describing datatype constructors
+        Constr(..),	
+
+	-- * Frequently used generic traversal schemes
+        everywhere,
+        everywhere',
+        everywhereBut,
+        everywhereM,
+	everything,
+        something,
+	synthesize,
+
+	-- * Generic operations such as show, equality, read
+	glength,
+	gnodecount,
+	gtypecount,
+	gshow,
+	geq,
+	gzip,
+	gread
+
 #ifndef __HADDOCK__
-	-- * Data types for the sum-of-products type encoding
-	(:*:)(..), (:+:)(..), Unit(..),
+	,
+	-- Data types for the sum-of-products type encoding;
+        -- included for backwards compatibility; maybe obsolete
+	(:*:)(..), (:+:)(..), Unit(..)
 #endif
 
-	-- * Typeable and types-save cast
-	Typeable(..),  cast, sameType, 
-
-	-- * The Data class and related types
-	Data( gmapT, gmapQ, gmapM, 
-	      gfoldl, gfoldr, gunfold,
-	      conOf, consOf ),
-	Constr(..), 
-
-	-- * Transformations (T), queries (Q), monadic transformations (Q), 
-	--   and twin transformations (TT)
-	GenericT, GenericQ, GenericM,
-	mkT,  mkQ,  mkM, 
-	extT, extQ, extM,
-	mkTT,
-
-	-- * Traversal combinators
-	everything, something, everywhere, everywhereBut,
-	synthesize, branches, undefineds,
-
-	-- * Generic operations: equality, zip, read, show
-	geq, gzip, gshow, gread,
-
-	-- * Miscellaneous
-	match, tick, count, alike	
-
-
  ) where
+
+------------------------------------------------------------------------------
 
 import Prelude	-- So that 'make depend' works
 
@@ -61,169 +80,373 @@ import Control.Monad
 
 
 
----------------------------------------------
+------------------------------------------------------------------------------
 --
---	Operations involving Typeable only
+--	Prime types of generic functions
 --
----------------------------------------------
+------------------------------------------------------------------------------
 
--- | Apply a function if appropriate or preserve term
+-- | Generic transformations,
+--   i.e., take an \"a\" and return an \"a\"
+--
+type GenericT = forall a. Data a => a -> a
+
+
+-- | Generic queries of type "r",
+--   i.e., take any \"a\" and return an \"r\"
+--
+type GenericQ r = forall a. Data a => a -> r
+
+
+-- | Generic monadic transformations,
+--   i.e., take an \"a\" and compute an \"a\"
+--
+type GenericM m = forall a. Data a => a -> m a
+
+
+
+------------------------------------------------------------------------------
+--
+--	Combinators to "make" generic functions
+--	We use type-safe cast in a number of ways to make generic functions.
+--
+------------------------------------------------------------------------------
+
+-- | Make a generic transformation;
+--   start from a type-specific case;
+--   preserve the term otherwise
+--
 mkT :: (Typeable a, Typeable b) => (b -> b) -> a -> a
 mkT f = case cast f of
                Just g -> g
                Nothing -> id
 
--- | Apply a function if appropriate or return a constant
+
+-- | Make a generic query;
+--   start from a type-specific case;
+--   return a constant otherwise
+--
 mkQ :: (Typeable a, Typeable b) => r -> (b -> r) -> a -> r
 (r `mkQ` br) a = case cast a of
                     Just b  -> br b
                     Nothing -> r
 
 
-
--- | Apply a monadic transformation if appropriate; resort to return otherwise
+-- | Make a generic monadic transformation;
+--   start from a type-specific case;
+--   resort to return otherwise
+--
 mkM :: (Typeable a, Typeable b, Typeable (m a), Typeable (m b), Monad m)
     => (b -> m b) -> a -> m a
 mkM f = case cast f of
           Just g  -> g
           Nothing -> return
 
--- | Extend a transformation
+
+-- | Extend a generic transformation by a type-specific case
 extT :: (Typeable a, Typeable b) => (a -> a) -> (b -> b) -> a -> a
 extT f g = case cast g of
               Just g' -> g'
               Nothing -> f
 
--- | Extend a query
+
+-- | Extend a generic query by a type-specific case
 extQ :: (Typeable a, Typeable b) => (a -> q) -> (b -> q) -> a -> q
 extQ f g a = case cast a of
                 Just b -> g b
                 Nothing -> f a
 
--- | Extend a monadic transformation
+
+-- | Extend a generic monadic transformation by a type-specific case
 extM :: (Typeable a, Typeable b, Typeable (m a), Typeable (m b), Monad m)
        => (a -> m a) -> (b -> m b) -> a -> m a
 extM f g = case cast g of
               Just g' -> g'
               Nothing -> f
 
--- | Test two entities to be of the same type
+
+-- | Test for two objects to agree on the type
 sameType :: (Typeable a, Typeable b) => a -> b -> Bool
-sameType (_::a) = False `mkQ` (\(_::a) -> True)
+sameType (_::a) = maybe False (\(_::a) -> True) . cast
 
 
 
--- | Make a twin transformation
--- Note: Should be worked on 
-mkTT :: (Typeable a, Typeable b, Typeable c)
-     => (a -> a -> a)
-     -> b -> c -> Maybe c
-mkTT (f::a ->a->a) x y =
-  case (cast x,cast y) of
-    (Just (x'::a),Just (y'::a)) -> cast (f x' y')
-    _ -> Nothing
-
-
-
-
--------------------------------------------------------------------
+------------------------------------------------------------------------------
 --
---	The representation of datatype constructors 
---      To be extended by fixity, associativity, and what else?
+--	The Data class
 --
--------------------------------------------------------------------
-
--- | Describes a constructor
-data Constr = Constr { conString :: String }
-
-
-
----------------------------------------------
---
---	The Data class and its operations
---
----------------------------------------------
-
--- A class for traversal
+------------------------------------------------------------------------------
 
 class Typeable a => Data a where
+
+  -- | A generic transformation that maps over the immediate subterms
   gmapT   :: (forall b. Data b => b -> b) -> a -> a
+
+  -- | A generic query that processes the immediate subterms and returns a list
   gmapQ   :: (forall a. Data a => a -> u) -> a -> [u]
+
+  -- | A monadic variation on generic transformation
   gmapM   :: Monad m => (forall a. Data a => a -> m a) -> a -> m a
 
+  -- | Left-associative fold operation for constructor applications
   gfoldl  :: (forall a b. Data a => c (a -> b) -> a -> c b)
           -> (forall g. g -> c g)
           -> a -> c a
 
-  gfoldr  :: (forall a b. Data a => a -> c (a -> b) -> c b)
-          -> (forall g. g -> c g)
-          -> a -> c a
-
-
-  -- | Find the constructor
+  -- | Obtain the constructor from a given term
   conOf   :: a -> Constr
 
-  -- | Does not look at a; Could live in Typeable as well maybe
+  -- | List all constructors for a given type
   consOf  :: a -> [Constr]
 
+  -- | Unfold operation to build terms from constructors and others
   gunfold :: (forall a b. Data a => c (a -> b) -> c b)
           -> (forall g. g -> c g)
           -> Constr
           -> c a
 
-  -- No default method for gfoldl, gunfold, conOf, consOf
+  -- Default definition for gfoldl
+  -- which copes immediately with basic datatypes
+  --
+  gfoldl _ z = z
 
-  -- Default methods for gfoldr, gmapT, gmapQ, gmapM, 
-  -- in terms of gfoldl
 
-  gfoldr f z = gfoldl (flip f) z
+{-
 
-  gmapT f x = unID (gfoldl k ID x)
-    where
-      k (ID c) x = ID (c (f x))
+The combinators gmapT, gmapQ, gmapM can all be defined in terms of
+gfoldl. We provide corresponding default definitions leaving open the
+opportunity to provide datatype-specific definitions if needed.
 
-  gmapQ f x = unQ (gfoldl k (const (Q id)) x) []
-    where
-      k (Q c) x = Q (\rs -> c (f x : rs))
+(Also, the inclusion of the gmap combinators as members of class Data
+allows the programmer or the compiler to derive specialised, and maybe
+more efficient code per datatype. Note: gfoldl is more higher-order
+than the gmap combinators. This is subject to ongoing benchmarking
+experiments.)
 
+Conceptually, the definition of the gmap combinators in terms of the
+primitive gfoldl requires the identification of the gfoldl function
+arguments. Technically, we also need to identify the type constructor
+c used all over the type of gfoldl. We give the default definitions in
+the order of increasing headache.
+
+-}
+
+  -- Use immediately the monad datatype constructor 
+  -- to instantiate the type constructor c in the type of gfoldl,
+  -- so injection and projection is done by return and >>=.
+  --  
   gmapM f = gfoldl k return
           where
             k c x = do c' <- c
                        x' <- f x
                        return (c' x')
 
+  -- Use an identity datatype constructor ID (see below)
+  -- to instantiate the type constructor c in the type of gfoldl,
+  -- and perform injections ID and projections unID accordingly.
+  --
+  gmapT f x = unID (gfoldl k ID x)
+    where
+      k (ID c) x = ID (c (f x))
 
-  -- Default definition for gfoldl copes with basic datatypes
-  gfoldl _ z = z
+  -- Use a phantom + function datatype constructor Q (see below),
+  -- to instantiate the type constructor c in the type of gfoldl,
+  -- and perform injections Q and projections unQ accordingly.
+  --
+  gmapQ f x = unQ (gfoldl k (const (Q id)) x) []
+    where
+      k (Q c) x = Q (\rs -> c (f x : rs))
+
+
+-- | The identity type constructor needed for the definition of gmapT
+newtype ID x = ID { unID :: x }
+
+
+-- | A phantom datatype constructor used in definition of gmapQ;
+--   the function-typed component is needed to mediate between
+--   left-associative constructor application vs. right-associative lists.
+-- 
+newtype Q r a = Q { unQ  :: [r] -> [r] }
+
+
+
+------------------------------------------------------------------------------
+--
+--	The Constr datatype for describing datatype constructors
+--      To be extended by fixity, associativity, and maybe others.
+--
+------------------------------------------------------------------------------
+
+-- | Description of datatype constructors
+data Constr = Constr { conString :: String }
 
 
 {-
- A variation for gmapQ using an ordinary constant type constructor.
- A problem is here that the associativety might be wrong.
 
-  newtype Phantom x y = Phantom x
-  runPhantom (Phantom x) = x
+It is interesting to observe that we can determine the arity of a
+constructor without further meta-information. To this end, we use
+gunfold to construct a term from a given constructor while leaving the
+subterms undefined. Here we instantiate the type constructor c of the
+gunfold type by the identity type constructor ID. In a subsequent step
+we determine the number of subterms by folding as captured in the
+generic operation glength elsewhere in this module. Note that we need
+an extra argument to specify the intended type of the constructor.
 
-  gmapQ f = runPhantom . gfoldl f' z
-   where
-    f' r a = Phantom (f a : runPhantom r)
-    z  = const (Phantom [])
 -}
- 
 
--- | Instructive type synonyms
-type GenericT = forall a. Data a => a -> a
-type GenericQ r = forall a. Data a => a -> r
-type GenericM m = forall a. Data a => a -> m a
+garity :: Data a => (a -> ()) -> Constr -> Int
+garity (_::a->()) = glength 
+                  . (unID :: ID a -> a)
+                  . gunfold bottom ID
+  where
+    bottom = (\f -> ID (f undefined)) . unID
 
 
--- Auxiliary type constructors for the default methods (not exported)
-newtype ID x = ID { unID :: x }
-newtype Q r a = Q { unQ  :: [r]->[r] }
+
+------------------------------------------------------------------------------
+--
+--	Frequently used generic traversal schemes
+--
+------------------------------------------------------------------------------
+
+-- | Apply a transformation everywhere in bottom-up manner
+everywhere :: (forall a. Data a => a -> a)
+           -> (forall a. Data a => a -> a)
+
+-- use gmapT to recurse into immediate subterms;
+-- recall: gmapT preserves the outermost constructor;
+-- post-process recursively transformed result via f
+-- 
+everywhere f = f . gmapT (everywhere f)
+
+
+-- | Apply a transformation everywhere in top-down manner
+everywhere' :: (forall a. Data a => a -> a)
+            -> (forall a. Data a => a -> a)
+
+-- Arguments of (.) are flipped compared to everywhere
+everywhere' f = gmapT (everywhere' f) . f
+
+
+-- | Variation on everywhere with an extra stop condition
+everywhereBut :: GenericQ Bool -> GenericT -> GenericT
+
+-- Guarded to let traversal cease if predicate q holds for x
+everywhereBut q f x
+    | q x       = x
+    | otherwise = f (gmapT (everywhereBut q f) x)
+
+
+-- | Monadic variation on everywhere
+everywhereM :: Monad m => GenericM m -> GenericM m
+
+-- Bottom-up order is also reflected in order of do-actions
+everywhereM f x = do x' <- gmapM (everywhereM f) x
+                     f x'
+
+
+-- | Summarise all nodes in top-down, left-to-right order
+everything :: (r -> r -> r) -> GenericQ r -> GenericQ r
+
+-- Apply f to x to summarise top-level node;
+-- use gmapQ to recurse into immediate subterms;
+-- use ordinary foldl to reduce list of intermediate results
+-- 
+everything k f x 
+     = foldl k (f x) (gmapQ (everything k f) x)
+
+
+-- | Look up a subterm by means of a maybe-typed filter
+something :: GenericQ (Maybe u) -> GenericQ (Maybe u)
+
+-- "something" can be defined in terms of "everything"
+-- when a suitable "choice" operator is used for reduction
+-- 
+something = everything orElse
+
+
+-- Left-biased choice on maybes (non-strict in right argument)
+orElse :: Maybe a -> Maybe a -> Maybe a
+x `orElse` y = maybe y Just x
+
+
+-- Another definition of orElse
+-- where the folding over maybies as defined by maybe is inlined
+-- to ease readability
+-- 
+x `orElse'` y = case x of
+                  Just _  -> x
+                  Nothing -> y
+
+
+
+
+-- | Bottom-up synthesis of a data structure;
+--   1st argument z is the initial element for the synthesis;
+--   2nd argument o is for reduction of results from subterms;
+--   3rd argument f updates the sythesised data according to the given term
+--
+synthesize :: s  -> (s -> s -> s) -> GenericQ (s -> s) -> GenericQ s
+synthesize z o f x = f x (foldr o z (gmapQ (synthesize z o f) x))
+
+
+
+-----------------------------------------------------------------------------
+--
+--	"Twin" variations on gmapT, gmapQ. gmapM,
+--      i.e., these combinators take two terms at the same time.
+--	They are needed for multi-parameter traversal as generic equality.
+--	They are not exported.
+--
+-----------------------------------------------------------------------------
+
+{-
+
+We need type constructors for twin traversal as we needed type
+constructor for the ordinary gmap combinators. These type constructors
+again serve for the instantiation of the type constructor c used in
+the definition of gfoldl. The type constructors for twin traversal are
+elaborations of the type constructors ID, Q and monads that were used
+for the ordinary gmap combinators. More precisely, we use a pairing
+technique to always attach an additional component to the results of
+folding. This additional component carries the list of generic 
+functions to be used for the intermediate subterms encountered during
+folding.
+
+-}
+
+newtype TT r a = TT { unTT :: (a,[GenericT']) }
 newtype TQ r a = TQ { unTQ :: ([r]->[r],[GenericQ' r]) }
+newtype TM m a = TM { unTM :: (m a,[GenericM' m]) }
+
+
+-- First-class polymorphic versions of GenericT/GenericQ/GenericM;
+-- they are referenced in TQ amd TM above
+-- 
+data GenericT' = T' { unT' :: forall a. Data a => a -> a }
+data GenericQ' u = Q' { unQ' :: forall a. Data a => a -> u }
+data Monad m => GenericM' m = M' { unM' :: forall a. Data a => a -> m a }
+
+
+{-
+
+A twin variation on gmapT, where the pattern "GenericQ GenericT"
+expresses that the argument terms x and y are processed rather
+independently. So firstly, x is "queried" with a generic
+transformation as intermediate result, and secondly, this generic
+transformation is applied to y.
+
+-}
+
+tmapT :: GenericQ GenericT -> GenericQ GenericT
+tmapT g x y = fst (unTT (gfoldl k z y))
+  where
+    k (TT (f,l)) x = TT (f (unT' (head l) x),tail l)
+    z f            = TT (f,gmapQ (\x -> T' (g x)) x)
+
+
 
 -- A twin variation on gmapQ
--- Note: Nested GenericQ (GenericQ ...) buggy in GHC 5.04
 
 tmapQ :: forall r.
          (forall a b. (Data a, Data b) => a -> b -> r)
@@ -234,18 +457,6 @@ tmapQ g x y = fst (unTQ (gfoldl k z y)) []
       k (TQ (c,l)) x = TQ (\rs -> c (unQ' (head l) x:rs), tail l)
       z _            = TQ (id,gmapQ (\x -> Q' (g x)) x)
 
--- A first-class polymorphic version of GenericQ
-
-data GenericQ' u = Q' { unQ' :: forall a. Data a => a -> u }
-
-
-
--- A first-class polymorphic version of GenericM
-
-data Monad m => GenericM' m = M' { unM' :: forall a. Data a => a -> m a }
-
--- A type constructor for monadic twin transformations
-newtype TM m a = TM { unTM :: (m a,[GenericM' m]) }
 
 -- A twin variation on gmapM
 
@@ -257,95 +468,58 @@ tmapM g x y = fst (unTM (gfoldl k z y))
     k (TM (f,l)) x = TM (f >>= \f' -> unM' (head l) x >>= return . f',tail l)
     z f            = TM (return f,gmapQ (\x -> M' (g x)) x)
 
----------------------------------------------
+
+
+------------------------------------------------------------------------------
 --
---	Combinators for data structure traversal
+--	Generic operations such as show, equality, read
 --
----------------------------------------------
+------------------------------------------------------------------------------
 
--- | Summarise all nodes in top-down, left-to-right
-everything :: Data a
-           => (r -> r -> r)
-           -> (forall a. Data a => a -> r)
-           -> a -> r
-everything k f x 
-     = foldl k (f x) (gmapQ (everything k f) x)
+-- | Count the number of immediate subterms of the given term
+glength :: GenericQ Int
+glength = length . gmapQ (const ())
 
 
-
--- | Look up something by means of a recognizer
-something :: (forall a. Data a => a -> Maybe u)
-          -> (forall a. Data a => a -> Maybe u)
-something = everything orElse
+-- | Determine the number of all nodes in a given term
+gnodecount :: GenericQ Int
+gnodecount = everything (+) (const 1)
 
 
-
--- | Left-biased choice
-orElse :: Maybe a -> Maybe a -> Maybe a
-x `orElse` y = case x of
-                Just _  -> x
-                Nothing -> y
+-- | Determine the number of nodes of a given type in a given term
+gtypecount :: Typeable a => (a -> ()) -> GenericQ Int
+gtypecount f = everything (+) (0 `mkQ` (const 1 . f))
 
 
+-- | Generic show: an alternative to "deriving Show"
+gshow :: Data a => a -> String
 
--- | Some people like folding over the first maybe instead
-x `orElse'` y = maybe y Just x
-
-
-
--- | Bottom-up synthesis of a data structure
-synthesize :: (forall a. Data a => a -> s -> s)
-           -> (s -> s -> s)
-           -> s
-           -> (forall a. Data a => a -> s)
-synthesize f o z x = f x (foldr o z (gmapQ (synthesize f o z) x))
+-- This is a prefix-show using surrounding "(" and ")",
+-- where we recurse into subterms with gmapQ.
+-- 
+gshow t =    "("
+          ++ conString (conOf t)
+          ++ concat (gmapQ ((++) " " . gshow) t)
+          ++ ")"
 
 
-
--- | Apply a transformation everywhere in bottom-up manner
-everywhere :: (forall a. Data a => a -> a)
-           -> (forall a. Data a => a -> a)
-everywhere f = f . gmapT (everywhere f)
-
-
-
--- | Variation with stop condition
-everywhereBut :: GenericQ Bool 
-              -> GenericT -> GenericT
-everywhereBut q f x
-    | q x       = x
-    | otherwise = f (gmapT (everywhereBut q f) x)
-
-
-
--- | Monadic variation
-everywhereM :: (Monad m, Data a)
-            => (forall b. Data b => b -> m b)
-            -> a -> m a
-everywhereM f x = do x' <- gmapM (everywhereM f) x
-                     f x'
-
-
--- | Count immediate subterms
-branches :: Data a => a -> Int
-branches = length . gmapQ (const ())
-
-
--- |  Construct term with undefined subterms
-undefineds :: Data a => Constr -> Maybe a
-undefineds i =  gunfold (maybe Nothing (\x -> Just (x undefined)))
-                        Just
-                        i
-
-
----------------------------------------------
---
---	Generic equality, zip, read, show
---
----------------------------------------------
-
--- | Generic equality
+-- | Generic equality: an alternative to "deriving Eq"
 geq :: forall a. Data a => a -> a -> Bool
+
+{-
+
+We establish the equality of the two top-level datatype constructors.
+We use a twin gmap combinator, namely tgmapQ, to compare the two lists
+of immediate subterms.
+
+(Note for the experts: the type of the worker geq' is rather general
+but precision is recovered via the restrictive type of the top-level
+operation geq. The imprecision of geq' is caused by the type system's
+unability to express the type equivalence for the corresponding
+couples of immediate subterms from the two given input terms.)
+
+-}
+
 geq x y = geq' x y
  where
   geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
@@ -354,10 +528,11 @@ geq x y = geq' x y
                  )
 
 
-
--- | Generic zip
+-- | Generic zip controlled by a function with type-specific branches
 gzip :: (forall a b. (Data a, Data b) => a -> b -> Maybe b)
      -> (forall a b. (Data a, Data b) => a -> b -> Maybe b)
+
+-- See testsuite/.../Generics/gzip.hs for an illustration
 gzip f x y = 
   f x y
   `orElse`
@@ -366,83 +541,107 @@ gzip f x y =
    else Nothing
 
 
--- Generic show
-gshow :: Data a => a -> String
-gshow t =    "("
-          ++ conString (conOf t)
-          ++ concat (gmapQ ((++) " ". gshow) t)
-          ++ ")"
-
-
-
--- The type constructor for unfold a la ReadS from the Prelude
+-- | The type constructor for gunfold a la ReadS from the Haskell 98 Prelude
 newtype GRead i a = GRead (i -> Maybe (a, i))
 unGRead (GRead x) = x
 
 
-
--- Generic read
+-- | Generic read: an alternative to "deriving Read"
 gread :: Data a => String -> Maybe (a, String)
+
+{-
+
+This is a read operation which insists on prefix notation.
+(The Haskell 98 read is closer to conrete syntax.)
+We use gunfold to "parse" the input.
+
+-}
+
 gread s
  = do s' <- return $ dropWhile ((==) ' ') s
       guard (not (s' == ""))
       guard (head s' == '(')
-      (c,s'')  <- breakConOf (dropWhile ((==) ' ') (tail s'))
+      (c,s'')  <- prefixConstr (dropWhile ((==) ' ') (tail s'))
       (a,s''') <- unGRead (gunfold f z c) s''
       guard (not (s''' == "")) 
       guard (head s''' == ')')
       return (a,tail s''')
  where
-  f cab = GRead (\s -> do (ab,s') <- unGRead cab s
-                          (a,s'')  <- gread s'
-                          return (ab a,s''))
-  z c = GRead (\s -> Just (c,s))
+
+  -- Argument f for unfolding
+  f :: Data a => GRead String (a -> b) -> GRead String b
+  f x = GRead (\s -> do (r,s') <- unGRead x s
+                        (t,s'')  <- gread s'
+                        return (r t,s''))
+
+  -- Argument z for unfolding
+  z ::  forall g. g -> GRead String g
+  z g = GRead (\s -> return (g,s))
+
+  -- Get Constr at front of string
+  prefixConstr :: String -> Maybe (Constr, String)
+
+  -- Assume an infix operators in parantheses
+  prefixConstr ('(':s)
+    = case break ((==) ')') s of
+        (s'@(_:_),(')':s'')) -> Just (Constr ("(" ++ s' ++ ")"), s'')
+        _ -> Nothing
+
+  -- Special treatment of multiple token constructors
+  prefixConstr ('[':']':s) = Just (Constr "[]",s)
+
+  -- Try lex for ordinary constructor and basic datatypes
+  prefixConstr s
+    = case lex s of
+        [(s'@(_:_),s'')] -> Just (Constr s',s'')
+        _ -> Nothing
 
 
--- Get Constr at front
-breakConOf :: String -> Maybe (Constr, String)
 
--- Assume an infix operators in parantheses
-breakConOf ('(':s)
- = case break ((==) ')') s of
-     (s'@(_:_),(')':s'')) -> Just (Constr ("(" ++ s' ++ ")"), s'')
-     _ -> Nothing
-
--- Special treatment of multiple token constructors
-breakConOf ('[':']':s) = Just (Constr "[]",s)
-
--- Try lex for ordinary constructor and basic datatypes
-breakConOf s
- = case lex s of
-     [(s'@(_:_),s'')] -> Just (Constr s',s'')
-     _ -> Nothing
-
-
-
----------------------------------------------
+------------------------------------------------------------------------------
 --
 --	Instances of the Data class
 --
----------------------------------------------
+------------------------------------------------------------------------------
 
+-- Basic datatype Int; folding and unfolding is trivial
+instance Data Int where
+ conOf x = Constr (show x)
+ consOf _ = []
+ gunfold f z c = z (read (conString c))
+
+-- Another basic datatype instance
+instance Data Integer where
+ conOf x = Constr (show x)
+ consOf _ = []
+ gunfold f z c = z (read (conString c))
+
+-- Another basic datatype instance
 instance Data Float where
  conOf x = Constr (show x)
  consOf _ = []
  gunfold f z c = z (read (conString c))
 
+-- Another basic datatype instance
 instance Data Char where
  conOf x = Constr (show x)
  consOf _ = []
  gunfold f z c = z (read (conString c))
 
-{-	 overlap
-instance Data String where
+{-
+
+Commented out;
+subject to inclusion of a missing Typeable instance
+
+-- Another basic datatype instance
+instance Data Rational where
  conOf x = Constr (show x)
  consOf _ = []
- gunfold f z = z . read
+ gunfold f z c = z (read (conString c))
 
 -}
 
+-- Bool as a kind of enumeration type
 instance Data Bool where
  conOf False = Constr "False"
  conOf True  = Constr "True"
@@ -450,6 +649,26 @@ instance Data Bool where
  gunfold f z (Constr "False") = z False
  gunfold f z (Constr "True")  = z True
 
+{-
+
+We should better not fold over characters in a string for efficiency.
+However, the following instance would clearly overlap with the
+instance for polymorphic lists. Given the current scheme of allowing
+overlapping instances, this would imply that ANY module that imports
+Data.Generics would need to explicitly and generally allow overlapping
+instances. This is prohibitive and calls for a more constrained model
+of allowing overlapping instances.
+
+-- instance Data String where
+ conOf x = Constr (show x)
+ consOf _ = []
+ gunfold f z c = z (read (conString c))
+
+-}
+
+-- Cons-lists are terms with two immediate subterms. Hence, the gmap
+-- combinators do NOT coincide with the list fold/map combinators.
+--
 instance Data a => Data [a] where
   gmapT  f   []     = []
   gmapT  f   (x:xs) = (f x:f xs)
@@ -459,135 +678,33 @@ instance Data a => Data [a] where
   gmapM  f   (x:xs) = f x >>= \x' -> f xs >>= \xs' -> return (x':xs')
   gfoldl f z []     = z []
   gfoldl f z (x:xs) = z (:) `f` x `f` xs
-  gfoldr f z []     = z []
-  gfoldr f z (x:xs) = f xs (f x (z (:)))
   conOf [] = Constr "[]"
   conOf (_:_) = Constr "(:)"
+  consOf _ = [Constr "[]",Constr "(:)"]
   gunfold f z (Constr "[]")  = z []
   gunfold f z (Constr "(:)") = f (f (z (:)))
-  consOf _ = [Constr "[]",Constr "(:)"]
 
+-- Yet enother polymorphic datatype constructor
+instance Data a => Data (Maybe a) where
+ gfoldl f z Nothing  = z Nothing
+ gfoldl f z (Just x) = z Just `f` x
+ conOf Nothing  = Constr "Nothing"
+ conOf (Just _) = Constr "Just"
+ consOf _ = [Constr "Nothing", Constr "Just"]
+ gunfold f z c | conString c == "Nothing" = z Nothing
+ gunfold f z c | conString c == "Just"    = f (z Just)
 
+-- Yet enother polymorphic datatype constructor
+instance (Data a, Data b) => Data (a,b) where
+ gfoldl f z (a,b) = z (,) `f` a `f` b
+ conOf _ = Constr "(,)"
+ consOf _ = [Constr "(,)"]
+ gunfold f z c | conString c == "(,)" = f (f (z (,)))
 
-
-{- ----------------------------------------------------
-	Comments illustrating generic instances
-
-   An illustrative instance for a nested datatype
-   
-   data Nest a = Box a | Wrap (Nest [a])
-    
-    nestTc = mkTyCon "Nest"
-    
-    instance Typeable a => Typeable (Nest a) where
-      typeOf n = mkAppTy nestTc [typeOf (paratype n)]
-       where
-	paratype :: Nest a -> a
-	paratype _ = undefined
-   
-   instance (Data a, Data [a]) => Data (Nest a) where
-    gmapT f (Box a)  = Box (f a)
-    gmapT f (Wrap w) = Wrap (f w)
-    gmapQ f (Box a)  = [f a]
-    gmapQ f (Wrap w) = [f w]
-    gmapM f (Box a)  = f a >>= return . Box
-    gmapM f (Wrap w) = f w >>= return . Wrap
-    conOf (Box _) = Constr "Box"
-    conOf (Wrap _) = Constr "Wrap"
-    consOf _ = map Constr ["Box","Wrap"]
-    gunfold f z "Box"  = f (z Box)
-    gunfold f z "Wrap" = f (z Wrap)
-   
-   
-   
-   -- An illustrative instance for local quantors
-   
-   instance Data GenericT' where
-    gmapT f (T' g) = (T' (f g))
-    conOf _ = Constr "T'"
-    consOf _ = map Constr ["T'"]
-   
-   
-   -- test code only
-   instance Typeable GenericT' where
-    typeOf _ = undefined
-   
-   
-   
-   -- The instance for function types
-   -- needs -fallow-undecidable-instances
-
-instance Typeable (a -> b) => Data (a -> b) where
- gmapT f = id
- gmapQ f = const []
- gmapM f = return
+-- Functions are treated as "non-compound" data regarding folding while
+-- unfolding is out of reach, maybe not anymore with Template Haskell.
+-- 
+instance (Typeable a, Typeable b) => Data (a -> b) where
  conOf _ = Constr "->"
  consOf _ = [Constr "->"]
--}
-
-
---------------------------------------------------------
--- A first-class polymorphic version of GenericT
--- Note: needed because [GenericT] not valid in GHC 5.04
-
-{-	Comment out for now (SLPJ 17 Apr 03)
-
-data GenericT' = T' (forall a. Data a => a -> a)
-unT' (T' x) = x
-
--- A type constructor for twin transformations
-
-newtype IDL r a = IDL (a,[GenericT'])
-unIDL (IDL x) = x
-
-
-
--- A twin variation on gmapT
-
-tmapT :: (forall a b. (Data a, Data b) => a -> b -> b)
-      -> (forall a b. (Data a, Data b) => a -> b -> b)
-tmapT g x y = fst (unIDL (gfoldl k z y))
-  where
-    k (IDL (f,l)) x = IDL (f (unT' (head l) x),tail l)
-    z f             = IDL (f,gmapQ (\x -> T' (g x)) x)
-
-
-
--- A first-class polymorphic version of GenericQ
-
-data GenericQ' u = Q' (forall a. Data a => a -> u)
-unQ' (Q' x) = x
-
-
-
-
--}
-
-
-
-
-
--- Compute arity of term constructor
-
-
--- | Turn a predicate into a filter
-match :: (Typeable a, Typeable b) => (a -> Bool) -> b -> Maybe a
-match f = Nothing `mkQ` (\ a -> if f a then Just a else Nothing)
-
-
-
--- | Turn a predicate into a ticker
-tick :: (Typeable a, Typeable b) => (a -> Bool) -> b -> Int
-tick f = 0 `mkQ` (\a -> if f a then 1 else 0)
-
-
-
--- | Turn a ticker into a counter
-count :: (Typeable a, Data b) => (a -> Bool) -> b -> Int
-count f = everything (+) (tick f)
-
-
-
--- | Lift a monomorphic predicate to the polymorphic level
-alike :: (Typeable a, Typeable b) => (a -> Bool) -> b -> Bool
-alike f = False `mkQ` f
+ gunfold _ _ _ = undefined
