@@ -581,7 +581,10 @@ MKDEPENDHS=$(HC)
 
 # Must do this *after* including target.mk, because $(HS_SRCS) isn't set yet.
 depend :: $(HS_SRCS) $(C_SRCS)
+	touch .depend-BASE
+ifneq "$(BootingFromHc)" "YES"
 	$(MKDEPENDHS) -M -optdep-f -optdep.depend-BASE $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) $(HS_SRCS)
+endif
 	$(MKDEPENDC) -f .depend-BASE $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(C_SRCS) 
 	$(PERL) -pe 'binmode(stdin); binmode(stdout); s@^(\S*\.o)@stage$(stage)/$$1@g; s@(\S*\.hi)@stage$(stage)/$$1@g' <.depend-BASE >.depend-$(stage)
 # The binmode stuff tells perl not to add stupid ^M's to the output
