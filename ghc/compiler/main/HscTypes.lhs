@@ -232,15 +232,15 @@ It contains:
 
 \begin{code}
 data PersistentRenamerState
-  = PRS { prsNS	   :: NameSupply,
+  = PRS { prsOrig  :: OrigNameEnv,
 	  prsDecls :: DeclsMap,
 	  prsInsts :: IfaceInsts,
 	  prsRules :: IfaceRules,
     }
 
-data NameSupply
- = NS { nsNames  :: FiniteMap (Module,OccName) Name	-- Ensures that one original name gets one unique
-	nsIParam :: FiniteMap OccName Name		-- Ensures that one implicit parameter name gets one unique
+data OrigNameEnv
+ = Orig { origNames  :: FiniteMap (Module,OccName) Name	-- Ensures that one original name gets one unique
+	  origIParam :: FiniteMap OccName Name		-- Ensures that one implicit parameter name gets one unique
    }
 
 type DeclsMap = NameEnv (Version, AvailInfo, Bool, (Module, RdrNameHsDecl))

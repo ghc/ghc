@@ -98,7 +98,6 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
 	(ppSourceStats False rdr_module)	 	>>
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
-    mkSplitUniqSupply 'r'	>>= \ rn_uniqs 	-> -- renamer
     mkSplitUniqSupply 'd'	>>= \ ds_uniqs 	-> -- desugarer
     mkSplitUniqSupply 'r'	>>= \ ru_uniqs 	-> -- rules
     mkSplitUniqSupply 'c'	>>= \ c2s_uniqs -> -- core-to-stg
@@ -248,24 +247,22 @@ initPersistentCompilerState
 	  pcsPRS   = initPersistentRenamerState }
 
 initPackageDetails :: PackageSymbolTable
-initPackageDetails = extendTypeEnv emptyModuleEnv (map ATyCon wiredInTyCons)
+initPackageDetails = extendTypeEnv emptyModuleEnv wiredInThings
 
 initPersistentRenamerState :: PersistentRenamerState
-  = PRS { prsNS    = NS { nsNames  = initRenamerNames,
-			  nsIParam = emptyFM },
+  = PRS { prsOrig  = Orig { origNames  = initOrigNames,
+			    origIParam = emptyFM },
 	  prsDecls = emptyNameEnv,
 	  prsInsts = emptyBag,
 	  prsRules = emptyBag
     }
 
-initRenamerNames :: FiniteMap (ModuleName,OccName) Name
-initRenamerNames = grag wiredIn_in `plusFM` listToFM known_key
-	 where
-	   wired_in = [ ((moduleName (nameModule name), nameOccName name), name)
-		      | name <- wiredInNames ]
-
-	   known_key = [ ((rdrNameModule rdr_name, rdrNameOcc rdr_name), mkKnownKeyGlobal rdr_name uniq) 
-		       | (rdr_name, uniq) <- knownKeyRdrNames ]
+initOrigNames :: FiniteMap (ModuleName,OccName) Name
+initOrigNames = grab knownKeyNames `plusFM` grab wiredInNames
+	      where
+		grab names   = foldl add emptyFM names
+		add env name = addToFM env (moduleName (nameModule name), nameOccName name) name
+\end{code}
 
 %************************************************************************
 %*									*

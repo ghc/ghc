@@ -9,6 +9,7 @@ module PrelInfo (
 	module MkId,
 
 	wiredInNames, 	-- Names of wired in things
+	wiredInThings,
 
 	
 	-- Primop RdrNames
@@ -59,30 +60,28 @@ We have two ``builtin name funs,'' one to look up @TyCons@ and
 @Classes@, the other to look up values.
 
 \begin{code}
-wiredInNames :: [Name]
-wiredInNames
-  = bagToList $ unionManyBags
+wiredInThings :: [TyThing]
+wiredInThings
+  = concat
     [		-- Wired in TyCons
-	  unionManyBags (map getTyConNames ([funTyCon] ++ primTyCons ++ wiredInTyCons))
+	  map ATyCon ([funTyCon] ++ primTyCons ++ wiredInTyCons)
 
 		-- Wired in Ids
-	, listToBag (map getName wiredInIds)
+	, map AnId wiredInIds
 
 		-- PrimOps
-	, listToBag (map (getName . mkPrimOpId) allThePrimOps)
+	, map (AnId . mkPrimOpId)) allThePrimOps
     ]
-\end{code}
 
+wiredInNames :: [Name]
+wiredInNames = [n | thing <- wiredInThings, n <- tyThingNames]
 
-\begin{code}
-getTyConNames :: TyCon -> Bag Name
-getTyConNames tycon
-    = getName tycon `consBag` 
-      unionManyBags (map get_data_con_names (tyConDataConsIfAvailable tycon))
-	-- Synonyms return empty list of constructors
-    where
-      get_data_con_names dc = listToBag [getName (dataConId dc),	-- Worker
-					 getName (dataConWrapId dc)]	-- Wrapper
+tyThingNames :: TyCon -> [Name]
+tyThingNames (AnClass cl) = pprPanic "tyThingNames" (ppr cl)	-- Not used
+tyThingNames (AnId    id) = [getName id]
+tyThingNames (ATyCon  tc) = getName tycon : [ getName n | dc <- tyConDataConsIfAvailable tycon, 
+							  n  <- [dataConId dc, dataConWrapId dc] ]
+						-- Synonyms return empty list of constructors
 \end{code}
 
 We let a lot of "non-standard" values be visible, so that we can make

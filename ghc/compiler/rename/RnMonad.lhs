@@ -115,7 +115,7 @@ data RnDown
 						-- this module
 
 	rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
-	rn_ns      :: IORef NameSupply,
+	rn_ns      :: IORef (UniqSupply, OrigNameEnv),
 	rn_ifaces  :: IORef Ifaces
     }
 
@@ -328,22 +328,22 @@ initRn :: DynFlags -> Finder -> GlobalSymbolTable
        -> PersistentRenamerState
        -> Module -> SrcLoc
 
-initRn dflags finder gst prs mod loc do_rn = do
-  names_var <- newIORef (prsNS pcs)
-  errs_var  <- newIORef (emptyBag,emptyBag)
-  iface_var <- newIORef (initIfaces prs)
-  let
-        rn_down = RnDown { rn_mod = mod,
-			   rn_loc = loc, 
-
-			   rn_finder = finder,
-			   rn_dflags = dflags,
-			   rn_gst    = gst,
-				
-			   rn_ns     = names_var, 
-			   rn_errs   = errs_var, 
-		  	   rn_ifaces = iface_var,
-		  }
+initRn dflags finder gst prs mod loc do_rn
+  = do { uniqs     <- mkSplitUniqSupply 'r'
+	 names_var <- newIORef (uniqs, prsOrig pcs)
+	 errs_var  <- newIORef (emptyBag,emptyBag)
+	 iface_var <- newIORef (initIfaces prs)
+	 let rn_down = RnDown { rn_mod = mod,
+			   	rn_loc = loc, 
+     
+			   	rn_finder = finder,
+			   	rn_dflags = dflags,
+			   	rn_gst    = gst,
+			 	     
+			   	rn_ns     = names_var, 
+			   	rn_errs   = errs_var, 
+		  	   	rn_ifaces = iface_var,
+		       }
 
 	-- do the business
   res <- do_rn rn_down ()
