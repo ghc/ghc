@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.6 2000/08/29 13:34:21 qrczak Exp $
+ * $Id: HsFFI.h,v 1.7 2000/11/07 13:30:40 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -104,22 +104,6 @@ typedef void*			HsStablePtr;
 #define HS_WORD32_MAX		UINT32_MAX
 #define HS_WORD64_MAX		UINT64_MAX
 
-#ifdef FLOATS_AS_DOUBLES
-
-#define HS_FLOAT_RADIX		DBL_RADIX
-#define HS_FLOAT_ROUNDS		DBL_ROUNDS
-#define HS_FLOAT_EPSILON	DBL_EPSILON
-#define HS_FLOAT_DIG		DBL_DIG
-#define HS_FLOAT_MANT_DIG	DBL_MANT_DIG
-#define HS_FLOAT_MIN		DBL_MIN
-#define HS_FLOAT_MIN_EXP	DBL_MIN_EXP
-#define HS_FLOAT_MIN_10_EXP	DBL_MIN_10_EXP
-#define HS_FLOAT_MAX		DBL_MAX
-#define HS_FLOAT_MAX_EXP	DBL_MAX_EXP
-#define HS_FLOAT_MAX_10_EXP	DBL_MAX_10_EXP
-			   
-#else			   
-			   
 #define HS_FLOAT_RADIX		FLT_RADIX
 #define HS_FLOAT_ROUNDS		FLT_ROUNDS
 #define HS_FLOAT_EPSILON	FLT_EPSILON
@@ -131,8 +115,6 @@ typedef void*			HsStablePtr;
 #define HS_FLOAT_MAX		FLT_MAX
 #define HS_FLOAT_MAX_EXP	FLT_MAX_EXP
 #define HS_FLOAT_MAX_10_EXP	FLT_MAX_10_EXP
-
-#endif /* FLOATS_AS_DOUBLES */
 
 #define HS_DOUBLE_RADIX		DBL_RADIX
 #define HS_DOUBLE_ROUNDS	DBL_ROUNDS

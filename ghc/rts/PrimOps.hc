@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.56 2000/11/07 10:42:57 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.57 2000/11/07 13:30:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -731,7 +731,6 @@ GMP_TAKE1_RET1(complementIntegerzh_fast, mpz_com);
 GMP_TAKE2_RET2(quotRemIntegerzh_fast, mpz_tdiv_qr);
 GMP_TAKE2_RET2(divModIntegerzh_fast,  mpz_fdiv_qr);
 
-#ifndef FLOATS_AS_DOUBLES
 FN_(decodeFloatzh_fast)
 { 
   MP_INT mantissa;
@@ -761,7 +760,6 @@ FN_(decodeFloatzh_fast)
   RET_NNP(exponent,mantissa._mp_size,p);
   FE_
 }
-#endif /* !FLOATS_AS_DOUBLES */
 
 #define DOUBLE_MANTISSA_SIZE (sizeofW(StgDouble))
 #define ARR_SIZE (sizeofW(StgArrWords) + DOUBLE_MANTISSA_SIZE)
@@ -983,12 +981,17 @@ FN_(putMVarzh_fast)
     if (mvar->head == (StgTSO *)&END_TSO_QUEUE_closure) {
       mvar->tail = (StgTSO *)&END_TSO_QUEUE_closure;
     }
+
+    /* unlocks the MVar in the SMP case */
+    SET_INFO(mvar,&FULL_MVAR_info);
+
+    /* yield, to give the newly woken thread a chance to take the MVar */
+    JMP_(stg_yield_noregs);
   }
 
   /* unlocks the MVar in the SMP case */
   SET_INFO(mvar,&FULL_MVAR_info);
 
-  /* ToDo: yield here for better communication performance? */
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }

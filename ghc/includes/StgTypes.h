@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.13 2000/08/07 23:37:23 qrczak Exp $
+ * $Id: StgTypes.h,v 1.14 2000/11/07 13:30:40 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Various C datatypes used in the run-time system.
 
@@ -91,18 +91,9 @@ typedef void*              StgAddr;
 
 typedef StgWord32          StgChar;
 typedef int                StgBool;
-/*
- * If a double fits in an StgWord, don't bother using floats.
- */
 
-#if SIZEOF_DOUBLE == SIZEOF_VOID_P
-typedef double		   StgFloat;
-typedef double		   StgDouble;
-#define FLOATS_AS_DOUBLES  1
-#else
 typedef float		   StgFloat;
 typedef double		   StgDouble;
-#endif
                            
 typedef void               StgVoid;
                            

@@ -2,11 +2,11 @@
 /* -----------------------------------------------------------------------------
  * Bytecode evaluator
  *
- * Copyright (c) 1994-1998.
+ * Copyright (c) 1994-2000.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.58 $
- * $Date: 2000/10/09 11:20:16 $
+ * $Revision: 1.59 $
+ * $Date: 2000/11/07 13:30:41 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -151,13 +151,11 @@ static int  enterCountI = 0;
 
 StgDouble B__encodeDouble (B* s, I_ e);
 void      B__decodeDouble (B* man, I_* exp, StgDouble dbl);
-#if ! FLOATS_AS_DOUBLES
 StgFloat  B__encodeFloat (B* s, I_ e);
 void      B__decodeFloat (B* man, I_* exp, StgFloat flt);
 StgPtr    CreateByteArrayToHoldInteger ( int );
 B*        IntegerInsideByteArray ( StgPtr );
 void      SloppifyIntegerEnd ( StgPtr );
-#endif
 
 
 
@@ -3983,7 +3981,6 @@ StgDouble B__encodeDouble (B* s, I_ e) /* result = s * 2^e */
 
 
 
-#if ! FLOATS_AS_DOUBLES
 StgFloat B__encodeFloat (B* s, I_ e) /* result = s * 2^e */
 {
     StgFloat r;
@@ -4002,7 +3999,6 @@ StgFloat B__encodeFloat (B* s, I_ e) /* result = s * 2^e */
 
     return r;
 }
-#endif	/* FLOATS_AS_DOUBLES */
 
 
 
@@ -4064,7 +4060,6 @@ void B__decodeDouble (B* man, I_* exp, StgDouble dbl)
 }
 
 
-#if ! FLOATS_AS_DOUBLES
 void B__decodeFloat (B* man, I_* exp, StgFloat flt)
 {
     /* Do some bit fiddling on IEEE */
@@ -4109,5 +4104,4 @@ void B__decodeFloat (B* man, I_* exp, StgFloat flt)
     do_renormalise(man);
 }
 
-#endif	/* FLOATS_AS_DOUBLES */
 #endif /* INTERPRETER */

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgPrimFloat.c,v 1.5 1999/02/22 10:51:18 simonm Exp $
+ * $Id: StgPrimFloat.c,v 1.6 2000/11/07 13:30:41 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Miscellaneous support for floating-point primitives
  *
@@ -15,11 +15,7 @@
  */
 
 #define GMP_BASE 4294967296.0
-#if FLOATS_AS_DOUBLES /* defined in StgTypes.h */
-#define DNBIGIT 1   /* mantissa of a double will fit in one long */
-#else
 #define DNBIGIT	 2  /* mantissa of a double will fit in two longs */
-#endif
 #define FNBIGIT	 1  /* for float, one long */
 
 #if IEEE_FLOATING_POINT
@@ -84,7 +80,6 @@ __int_encodeDouble (I_ j, I_ e)
   return r;
 }
 
-#if ! FLOATS_AS_DOUBLES
 StgFloat
 __encodeFloat (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
 {
@@ -125,8 +120,6 @@ __int_encodeFloat (I_ j, I_ e)
   
   return r;
 }
-
-#endif	/* FLOATS_AS_DOUBLES */
 
 /* This only supports IEEE floating point */
 
@@ -185,7 +178,6 @@ __decodeDouble (MP_INT *man, I_ *exp, StgDouble dbl)
     }
 }
 
-#if ! FLOATS_AS_DOUBLES
 void
 __decodeFloat (MP_INT *man, I_ *exp, StgFloat flt)
 {
@@ -229,7 +221,6 @@ __decodeFloat (MP_INT *man, I_ *exp, StgFloat flt)
 	    man->_mp_size = -man->_mp_size;
     }
 }
-#endif	/* FLOATS_AS_DOUBLES */
 
 /* Convenient union types for checking the layout of IEEE 754 types -
    based on defs in GNU libc <ieee754.h>
@@ -322,8 +313,7 @@ union stg_ieee754_dbl
 #ifdef IEEE_FLOATING_POINT
 
 StgInt
-isDoubleNaN(d)
-StgDouble d;
+isDoubleNaN(StgDouble d)
 {
   union stg_ieee754_dbl u;
   
@@ -337,8 +327,7 @@ StgDouble d;
 }
 
 StgInt
-isDoubleInfinite(d)
-StgDouble d;
+isDoubleInfinite(StgDouble d)
 {
     union stg_ieee754_dbl u;
 
@@ -353,8 +342,7 @@ StgDouble d;
 }
 
 StgInt
-isDoubleDenormalized(d) 
-StgDouble d;
+isDoubleDenormalized(StgDouble d) 
 {
     union stg_ieee754_dbl u;
 
@@ -376,8 +364,7 @@ StgDouble d;
 }
 
 StgInt
-isDoubleNegativeZero(d) 
-StgDouble d;
+isDoubleNegativeZero(StgDouble d) 
 {
     union stg_ieee754_dbl u;
 
@@ -404,12 +391,8 @@ StgDouble d;
 
 
 StgInt
-isFloatNaN(f) 
-StgFloat f;
+isFloatNaN(StgFloat f)
 {
-# ifdef FLOATS_AS_DOUBLES
-    return (isDoubleNaN(f));
-# else
     union stg_ieee754_flt u;
     u.f = f;
 
@@ -418,17 +401,11 @@ StgFloat f;
    return (
    	u.ieee.exponent == 255 /* 2^8 - 1 */ &&
 	u.ieee.mantissa != 0);
-
-# endif /* !FLOATS_AS_DOUBLES */
 }
 
 StgInt
-isFloatInfinite(f) 
-StgFloat f;
+isFloatInfinite(StgFloat f)
 {
-# ifdef FLOATS_AS_DOUBLES
-    return (isDoubleInfinite(f));
-# else
     union stg_ieee754_flt u;
     u.f = f;
   
@@ -437,16 +414,11 @@ StgFloat f;
     return (
     	u.ieee.exponent == 255 /* 2^8 - 1 */ &&
 	u.ieee.mantissa == 0);
-# endif /* !FLOATS_AS_DOUBLES */
 }
 
 StgInt
-isFloatDenormalized(f) 
-StgFloat f;
+isFloatDenormalized(StgFloat f)
 {
-# ifdef FLOATS_AS_DOUBLES
-    return (isDoubleDenormalized(f));
-# else
     union stg_ieee754_flt u;
     u.f = f;
 
@@ -460,16 +432,11 @@ StgFloat f;
     return (
     	u.ieee.exponent == 0 &&
 	u.ieee.mantissa != 0);
-#endif /* !FLOATS_AS_DOUBLES */
 }
 
 StgInt
-isFloatNegativeZero(f) 
-StgFloat f;
+isFloatNegativeZero(StgFloat f) 
 {
-#ifdef FLOATS_AS_DOUBLES
-    return (isDoubleNegativeZero(f));
-# else
     union stg_ieee754_flt u;
     u.f = f;
 
@@ -478,7 +445,6 @@ StgFloat f;
 	u.ieee.negative      &&
 	u.ieee.exponent == 0 &&
 	u.ieee.mantissa == 0);
-# endif /* !FLOATS_AS_DOUBLES */
 }
 
 #else /* ! IEEE_FLOATING_POINT */

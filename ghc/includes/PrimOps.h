@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.65 2000/11/07 10:42:56 simonmar Exp $
+ * $Id: PrimOps.h,v 1.66 2000/11/07 13:30:40 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Macros for primitive operations in STG-ish C code.
  *
@@ -651,22 +651,15 @@ EXTFUN_RTS(newArrayzh_fast);
 /* The decode operations are out-of-line because they need to allocate
  * a byte array.
  */
-#ifdef FLOATS_AS_DOUBLES
-#define decodeFloatzh_fast decodeDoublezh_fast
-#else
 EXTFUN_RTS(decodeFloatzh_fast);
-#endif
-
 EXTFUN_RTS(decodeDoublezh_fast);
 
 /* grimy low-level support functions defined in StgPrimFloat.c */
 
 extern StgDouble __encodeDouble (I_ size, StgByteArray arr, I_ e);
 extern StgDouble __int_encodeDouble (I_ j, I_ e);
-#ifndef FLOATS_AS_DOUBLES
 extern StgFloat  __encodeFloat (I_ size, StgByteArray arr, I_ e);
 extern StgFloat  __int_encodeFloat (I_ j, I_ e);
-#endif
 extern void      __decodeDouble (MP_INT *man, I_ *_exp, StgDouble dbl);
 extern void      __decodeFloat  (MP_INT *man, I_ *_exp, StgFloat flt);
 extern StgInt    isDoubleNaN(StgDouble d);
