@@ -418,20 +418,21 @@ cmpFS (UnicodeStr u1# s1) (UnicodeStr u2# s2) = if u1# ==# u2# then EQ
     else compare s1 s2
 cmpFS (UnicodeStr _ s1) s2 = compare s1 (unpackIntFS s2)
 cmpFS s1 (UnicodeStr _ s2) = compare (unpackIntFS s1) s2
-cmpFS (FastString u1# _ b1#) (FastString u2# _ b2#) = -- assume non-null chars
-  if u1# ==# u2# then
-     EQ
-  else
-   unsafePerformIO (
-    strcmp b1# b2# >>= \ (I# res) ->
+cmpFS (FastString u1# l1# b1#) (FastString u2# l2# b2#) =
+  if u1# ==# u2# then EQ else
+  let l# = if l1# <=# l2# then l1# else l2# in
+  unsafePerformIO (
+    strncmp b1# b2# l# >>= \ (I# res) ->
     return (
     if      res <#  0# then LT
-    else if res ==# 0# then EQ
+    else if res ==# 0# then 
+	if l1# ==# l2# then EQ
+	else if l1# <# l2# then LT else GT
     else		    GT
     ))
 
-foreign import ccall "strcmp" unsafe 
-  strcmp :: ByteArray# -> ByteArray# -> IO Int
+foreign import ccall "strncmp" unsafe 
+  strncmp :: ByteArray# -> ByteArray# -> Int# -> IO Int
 
 -- -----------------------------------------------------------------------------
 -- Outputting 'FastString's
