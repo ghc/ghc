@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.28 $
- * $Date: 2000/04/06 00:36:12 $
+ * $Revision: 1.29 $
+ * $Date: 2000/04/17 13:28:17 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -119,9 +119,9 @@ start     : EXPR exp wherePart      {inputExpr    = letrec($3,$2); sp-=2;}
  */
 
 /*- Top-level interface files -----------------------------*/
-iface     : INTERFACE ifCon NUMLIT ifOrphans ifCheckVersion WHERE ifTopDecls 
-                                        {$$ = gc7(ap(I_INTERFACE, 
-                                                     zpair($2,$7))); }
+iface     : INTERFACE STRINGLIT ifCon NUMLIT ifOrphans ifCheckVersion WHERE ifTopDecls 
+                                        {$$ = gc8(ap(I_INTERFACE, 
+                                                     zpair($3,$8))); }
           | INTERFACE error             {syntaxError("interface file");}
           ;
 

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.54 $
- * $Date: 2000/04/14 15:18:06 $
+ * $Revision: 1.55 $
+ * $Date: 2000/04/17 13:28:17 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2527,6 +2527,7 @@ Type type; {
       Sym(putMVarzh_fast)            \
       Sym(newMVarzh_fast)            \
       Sym(takeMVarzh_fast)           \
+      Sym(takeMaybeMVarzh_fast)      \
       Sym(catchzh_fast)              \
       Sym(raisezh_fast)              \
       Sym(delayzh_fast)              \
@@ -2592,6 +2593,8 @@ Type type; {
       Sym(stg_yield_to_Hugs)         \
       Sym(StgReturn)                 \
       Sym(init_stack)                \
+      Sym(blockAsyncExceptionszh_fast)    \
+      Sym(unblockAsyncExceptionszh_fast)  \
                                      \
       /* needed by libHS_cbits */    \
       SymX(malloc)                   \

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.58 $
- * $Date: 2000/04/07 16:22:12 $
+ * $Revision: 1.59 $
+ * $Date: 2000/04/17 13:28:17 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -694,7 +694,7 @@ assert(nonNull(namePMFail));
                */
                modulePrelBase = findModule(findText("PrelBase"));
                module(modulePrelBase).objectExtraNames 
-                  = singleton(findText("libHS_cbits"));
+                  = singleton(findText("libHSstd_cbits"));
 
                setCurrModule(modulePrelBase);
                pFun(nameId,             "id");
