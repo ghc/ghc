@@ -451,8 +451,20 @@
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>-package</option> <replaceable>name</replaceable></entry>
-	      <entry>Use package <replaceable>name</replaceable></entry>
+	      <entry><option>-package</option> <replaceable>P</replaceable></entry>
+	      <entry>Expose package <replaceable>P</replaceable></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-hide-package</option> <replaceable>name</replaceable></entry>
+	      <entry>Hide package <replaceable>P</replaceable></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ignore-package</option> <replaceable>name</replaceable></entry>
+	      <entry>Ignore package <replaceable>P</replaceable></entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
@@ -463,8 +475,8 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-package-name</option> <replaceable>name</replaceable></entry>
-	      <entry>Compile code for package <replaceable>name</replaceable></entry>
+	      <entry><option>-no-user-package-conf</option></entry>
+	      <entry>Don't load the user's package config file.</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>

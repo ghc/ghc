@@ -1,147 +1,276 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
   <sect1 id="packages">
-    <title>Packages</title>
-    <indexterm><primary>packages</primary></indexterm>
+ <title>
+Packages
+ </title>
+  <indexterm><primary>packages</primary></indexterm>
+  
+  <para>A package is a library of Haskell modules known to the compiler.  GHC
+    comes with several packages: see the accompanying 
+    <ulink url="../libraries/index.html">library documentation</ulink>.</para>
 
-    <para>Packages are collections of libraries, conveniently grouped
-    together as a single entity.  The package system is flexible: a
-    package may consist of Haskell code, foreign language code (eg. C
-    libraries), or a mixture of the two.  A package is a good way to
-    group together related Haskell modules, and is essential if you
-    intend to make the modules into a Windows DLL (see below).</para>
+  <para>Using a package couldn't be simpler: if you're using
+    <option>--make</option> or GHCi, then most of the installed packages will be
+    automatically available to your program without any further options.  The
+    exceptions to this rule are covered below in <xref
+      linkend="using-packages" />.</para>
 
-    <para>Because packages can contain both Haskell and C libraries, they
-    are also a good way to provide convenient access to a Haskell
-    layer over a C library.</para>
+  <para>Building your own packages is also quite straightforward: we provide
+    the <ulink url="http://www.haskell.org/cabal/">Cabal</ulink> infrastructure which
+    automates the process of configuring, building, installing and distributing
+    a package.  All you need to do is write a simple configuration file, put a
+    few files in the right places, and you have a package.  See the Cabal
+    documentation for details, and also the Cabal libraries (<ulink url="../libraries/Cabal/Distribution.Simple.html">Distribution.Simple</ulink>,
+    for example).</para>
 
-    <para>GHC comes with several packages (see the accompanying
-    library documentation), and packages can be added to or removed
-    from an existing GHC installation, using the supplied
-    <literal>ghc-pkg</literal><indexterm><primary><literal>ghc-pkg</literal></primary>
-    </indexterm> tool, described in <xref
-    linkend="package-management"/>.</para>
+  <sect2 id="using-packages">
+  <title>Using Packages
+  </title>
+    <indexterm><primary>packages</primary>
+      <secondary>using</secondary></indexterm>
+    
+    <para>To see which packages are installed, use the
+      <literal>ghc-pkg</literal> command:</para>
 
-    <sect2 id="using-packages">
-      <title>Using a package</title>
-      <indexterm><primary>packages</primary>
-	<secondary>using</secondary></indexterm>
-      
-      <para>Some packages,  called <emphasis>auto packages</emphasis>, 
-      are automatically available: you don't need
-      to specify any extra flags to use them (except in certain
-      circumstances; see below).  All the packages which contain
-      hierarchical libraries fall into this category.</para>
+<screen>
+$ ghc-pkg list
+/usr/lib/ghc-6.4/package.conf:
+    base-1.0, haskell98-1.0, template-haskell-1.0, mtl-1.0, unix-1.0,
+    Cabal-1.0, haskell-src-1.0, parsec-1.0, network-1.0,
+    QuickCheck-1.0, HUnit-1.1, fgl-1.0, X11-1.1, HGL-3.1, OpenGL-2.0,
+    GLUT-2.0, stm-1.0, readline-1.0, (lang-1.0), (concurrent-1.0),
+    (posix-1.0), (util-1.0), (data-1.0), (text-1.0), (net-1.0),
+    (hssource-1.0), rts-1.0
+      </screen>
 
-      <para>Some other packages are <emphasis>not</emphasis>
-      automatically available: those are normally the packages
-      containing old non-hierarchical libraries.  To gain access to a
-      non-auto package, use the <option>-package</option> command-line
-      flag:</para>
+    <para>Packages are either exposed or hidden.  Only
+      modules from exposed packages may be imported by your Haskell code; if
+      you try to import a module from a hidden package, GHC will emit an error
+      message.</para>
 
-      <variablelist>
-	<varlistentry>
-	  <term>
-            <option>-package <replaceable>lib</replaceable></option>
-            <indexterm><primary>-package <replaceable>lib</replaceable> option</primary></indexterm>
-          </term>
-	  <listitem>
-	    <para>This option brings into scope all the modules from
-	    package <literal><replaceable>lib</replaceable></literal> (they still have to
-	    be imported in your Haskell source, however).  It also
-	    causes the relevant libraries to be linked when linking is
-	    being done.</para>
-      	    <para>Some packages depend on other packages, for example the
-      	    <literal>text</literal> package makes use of some of the modules
-      	    in the <literal>lang</literal> package.  The package system
-      	    takes care of all these dependencies, so that when you say
-      	    <literal>-package text</literal> on the command line, you
-      	    automatically get <literal>-package lang</literal> too.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
+    <para>Each package has an exposed flag, which says whether it is exposed by
+      default or not.  Packages hidden by default are listed in
+      parentheses (eg. <literal>(lang-1.0)</literal>) in the output from
+      <literal>ghc-pkg list</literal>.  To expose a package which is hidden by
+      default, use the <option>-package</option>
+      flag (see below).</para>
 
-      <para>There's one case where you need to use the
-      <option>-package</option> option even for auto packages: when
-      linking a program in batch mode mode (<xref linkend="options-order"/>) 
-      <footnote><para>This is because
-      GHC can't figure out from the object files which packages are
-      required; in <option>&ndash;&ndash;make</option> mode and in
-      GHCi the compiler has more information available to figure out
-      the package dependencies.  We might try to lift this restriction
-      in the future.</para></footnote>.  For example, to link a
-      program consisting of objects <filename>Foo.o</filename> and
-      <filename>Main.o</filename>, where we made use of the
-      <literal>network</literal> package, we need to give GHC the <literal>-package</literal> flag thus: 
+   <para>To see which modules are exposed by a package:</para>
+
+<screen>
+$ ghc-pkg field network exposed-modules
+exposed-modules: Network.BSD,
+                 Network.CGI,
+                 Network.Socket,
+                 Network.URI,
+                 Network
+</screen>
+
+    <para>In general, packages containing hierarchical modules are usually
+      exposed by default.  However, it is possible for two packages to contain
+      the same module: in this case, only one of the packages can be
+      exposed.  This might happen if you have two versions of the same package
+      installed, for example.  The general rule is:</para>
+    
+    <blockquote><para>There must be no overlaps in the modules provided by all
+	of the exposed packages, and the packages they depend on, and so
+	on.</para></blockquote>
+
+    <para>The GHC command line options that control packages are:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term>
+	  <option>-package <replaceable>P</replaceable></option>
+	  <indexterm><primary><option>-package</option></primary></indexterm>
+	</term>
+	<listitem>
+	  <para>This option causes package <replaceable>P</replaceable> to be
+	    exposed.  The package <replaceable>P</replaceable> can be specified
+	    in full with its version number
+	    (e.g. <literal>network-1.0</literal>) or the version number can be
+	    omitted if there is only one version of the package
+	    installed.</para>
+
+	  <para>If there are multiple versions of <replaceable>P</replaceable>
+	    installed, then all other versions will become hidden.</para>
+
+	  <para>The <option>-package <replaceable>P</replaceable></option>
+	    option also causes package <replaceable>P</replaceable> to be
+	    linked into the resulting executable.  In
+	    <option>&ndash;&ndash;make</option> mode and GHCi, the compiler 
+	    normally determines which packages are required by the current
+	    Haskell modules, and links only those.  In batch mode however, the
+	    dependency information isn't available, and explicit
+	    <option>-package</option> options must be given when linking.</para>
+
+	  <para>For example, to link a program consisting of objects
+	    <filename>Foo.o</filename> and <filename>Main.o</filename>, where
+	    we made use of the <literal>network</literal> package, we need to
+	    give GHC the <literal>-package</literal> flag thus:  
 
 <screen>$ ghc -o myprog Foo.o Main.o -package network</screen>
 
-    The same flag is necessary even if we compiled the modules from source, because GHC still
-    reckons it's in batch mode:
+	    The same flag is necessary even if we compiled the modules from
+	    source, because GHC still reckons it's in batch mode: 
+
 <screen>$ ghc -o myprog Foo.hs Main.hs -package network</screen>
-In <literal>--make</literal> and <literal>--interactive</literal> modes (<xref linkend="modes"/>), however, GHC figures out 
-the auto packages required for linking without further assistance.
-</para>
 
-    </sect2>
+	    In <literal>--make</literal> and <literal>--interactive</literal>
+	    modes (<xref linkend="modes" />), however, GHC figures out the
+	    packages required for linking without further assistance.</para>
 
-
-    <sect2 id="using-local-packages">
-      <title>Maintaining a local set of packages</title>
+	  <para>The one other time you might need to use
+	    <option>-package</option> to force linking a package is when the
+	    package does not contain any Haskell modules (it might contain a C
+	    library only, for example).  In that case, GHC
+	    will never discover a dependency on it, so it has to be mentioned
+	    explicitly.</para>
+	</listitem>
+      </varlistentry>
       
-      <para>When GHC starts up, it automatically reads the default set
-      of packages from a configuration file, normally named
-      <filename>package.conf</filename> in your GHC installation
-      directory.</para>
+      <varlistentry>
+	<term><option>-hide-package</option> <replaceable>P</replaceable>
+	<indexterm><primary><option>-hide-package</option></primary>
+	  </indexterm></term>
+	<listitem>
+	  <para>This option does the opposite of <option>-package</option>: it
+	    causes the specified package to be <firstterm>hidden</firstterm>,
+	    which means that none of its modules will be available for import
+	    by Haskell <literal>import</literal> directives.</para>
 
-      <para>You can load in additional package configuration files
-      using the <option>-package-conf</option> option:</para>
+	  <para>Note that the package might still end up being linked into the
+	    final program, if it is a dependency (direct or indirect) of
+	    another exposed package.</para>
+	</listitem>
+      </varlistentry>
 
-      <variablelist>
-	<varlistentry>
-	  <term>
-            <option>-package-conf <replaceable>file</replaceable></option>
-            <indexterm><primary><option>-package-conf <replaceable>file</replaceable></option></primary></indexterm>
-          </term>
-	  <listitem>
-	    <para>Read in the package configuration file
+      <varlistentry>
+	<term><option>-ignore-package</option> <replaceable>P</replaceable>
+	<indexterm><primary><option>-ignore-package</option></primary>
+	  </indexterm></term>
+	<listitem>
+	  <para>Causes the compiler to behave as if package
+	    <replaceable>P</replaceable> is not installed at all.  This is not
+	    the same as <option>-hide-package</option>, because under
+	    <option>-hide-package</option> the package might still be present
+	    in the program if another package depends on it.</para>
+	  
+	  <para><option>-ignore-package</option> <replaceable>P</replaceable>
+	    not only causes package <replaceable>P</replaceable> to be removed,
+	    but also everything that depends on <replaceable>P</replaceable>,
+	    and so on.</para>
+
+	  <para>Why do we need <option>-ignore-package</option>?  Well, it is
+	    particularly useful when you're actually compiling package
+	    <replaceable>P</replaceable> itself.  The compiler will refuse to
+	    compile module <replaceable>M</replaceable> if
+	    <replaceable>M</replaceable> is already part of a package.  So we
+	    might try <option>-hide-package</option>
+	    <replaceable>P</replaceable>; but then if
+	    <replaceable>P</replaceable> is a dependency of another package
+	    <replaceable>P'</replaceable> we would have to
+	    <option>-hide-package</option> <replaceable>P'</replaceable> too;
+	    and the author of the code can't know in advance which packages are
+	    installed on the system and hence which
+	    <option>-hide-package</option> flags are required.  So, we provide
+	    <option>-ignore-package</option> which does the Right Thing.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </sect2>
+
+  <sect2 id="package-databases">
+    <title>Package Databases</title>
+      
+    <para>A package database is a file, normally called
+      <literal>package.conf</literal> which contains descriptions of installed
+      packages.  GHC usually knows about two package databases:</para>
+
+    <itemizedlist>
+      <listitem>
+	<para>The global package database, which comes with your GHC
+	  installation.</para>
+      </listitem>
+      <listitem>
+	<para>A package database private to each user.  On Unix
+	  systems this will be
+	  <filename>$HOME/.ghc/<replaceable>arch</replaceable>-<replaceable>os</replaceable>-<replaceable>version</replaceable>/package.conf</filename>, and on
+	  Windows it will be something like
+	  <filename>C:\Documents&nbsp;And&nbsp;Settings\<replaceable>user</replaceable>\ghc</filename>.
+	  The <literal>ghc-pkg</literal> tool knows where this file should be
+	  located, and will create it if it doesn't exist (see <xref
+	    linkend="package-management" />).</para>
+      </listitem>
+    </itemizedlist>
+
+    <para>When GHC starts up, it reads the contents of these two package
+      databases, and builds up a list of the packages it knows about.  You can
+      see GHC's package table by running GHC with the <option>-v</option>
+      flag.</para> 
+
+    <para>Package databases may overlap: for example, packages in the user
+      database will override those of the same name in the global
+      database.</para> 
+
+    <para>You can control the loading of package databses using the following
+      GHC options:</para> 
+
+    <variablelist>
+      <varlistentry>
+	<term>
+	  <option>-package-conf <replaceable>file</replaceable></option>
+	  <indexterm><primary><option>-package-conf</option></primary></indexterm>
+	</term>
+	<listitem>
+	  <para>Read in the package configuration file
 	    <replaceable>file</replaceable> in addition to the system
-	    default file.  This allows the user to have a local set of
-	    packages in addition to the system-wide ones.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
+	    default file and the user's local file.  Packages in additional
+	    files read this way will override those in the global and user
+	    databases.</para>
+	</listitem>
+      </varlistentry>
 
-      <para>To create your own package configuration file, just create
+      <varlistentry>
+	<term><option>-no-user-package-conf</option>
+	  <indexterm><primary><option>-no-user-package-conf</option></primary>
+	  </indexterm>
+	</term>
+	<listitem>
+	  <para>Prevent loading of the user's local package database.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>To create a new package database, just create
       a new file and put the string
       <quote><literal>[]</literal></quote> in it.  Packages can be
-      added to the new configuration file using the
+      added to the file using the
       <literal>ghc-pkg</literal> tool, described in <xref
       linkend="package-management"/>.</para>
-    </sect2>
+  </sect2>
 
-    <sect2 id="building-packages">
-      <title>Building a package from Haskell source</title>
-      <indexterm><primary>packages</primary>
-	<secondary>building</secondary></indexterm>
+  <sect2 id="building-packages">
+    <title>Building a package from Haskell source</title>
+    <indexterm><primary>packages</primary>
+      <secondary>building</secondary></indexterm>
 
-      <para>It takes some special considerations to build a new
-      package:</para>
-
-      <itemizedlist>
-	<listitem>
-	  <para>A package may contain several Haskell modules. A
-          package may span many directories, or many packages may
-          exist in a single directory. Packages may not be mutually
-          recursive.</para>
-	</listitem>
-
-	<listitem>
-	  <para>A package has a name
-  	  (e.g. <filename>base</filename>)</para>
-	</listitem>
-
-	<listitem>
-	  <para>The Haskell code in a package may be built into one or
+    <para>We don't recommend building packages the hard way.  Instead, use the
+      <ulink url="http://www.haskell.org/cabal/">Cabal</ulink> infrastructure
+      if possible.  If your package is particularly complicated or requires a
+      lot of configuration, then you might have to fall back to the low-level
+      mechanisms, so a few hints for those brave souls follow.</para>
+    
+    <itemizedlist>
+      <listitem>
+	<para>You need to build an "installed package info" file for
+	  passing to <literal>ghc-pkg</literal> when installing your
+	  package.  The contents of this file are described in <xref
+	    linkend="installed-pkg-info" />.</para>
+      </listitem>
+      
+      <listitem>
+	<para>The Haskell code in a package may be built into one or
 	  more archive libraries
 	  (e.g. <filename>libHSfoo.a</filename>), or a single DLL on
 	  Windows (e.g. <filename>HSfoo.dll</filename>).  The
@@ -154,19 +283,19 @@ the auto packages required for linking without further assistance.
 	  for the gory details.</emphasis>
 	  </para>
 
-	  <para>Building a static library is done by using the
+	<para>Building a static library is done by using the
 	  <literal>ar</literal> tool, like so:</para>
 
 <screen>ar cqs libHSfoo.a A.o B.o C.o ...</screen>
 
-	  <para>where <filename>A.o</filename>,
+	<para>where <filename>A.o</filename>,
 	  <filename>B.o</filename> and so on are the compiled Haskell
 	  modules, and <filename>libHSfoo.a</filename> is the library
 	  you wish to create.  The syntax may differ slightly on your
 	  system, so check the documentation if you run into
 	  difficulties.</para>
 
-	  <para>Versions of the Haskell libraries for use with GHCi
+	<para>Versions of the Haskell libraries for use with GHCi
 	  may also be included: GHCi cannot load <literal>.a</literal>
 	  files directly, instead it will look for an object file
 	  called <filename>HSfoo.o</filename> and load that.  On some
@@ -178,113 +307,143 @@ the auto packages required for linking without further assistance.
 	  follows:</para>
 
 <screen>ld -r &ndash;&ndash;whole-archive -o HSfoo.o libHSfoo.a</screen>
-	</listitem>
 
-	<listitem>
-	  <para>(replace
+	<para>(replace
           <literal>&ndash;&ndash;--whole-archive</literal> with
           <literal>&ndash;all_load</literal> on MacOS X)</para>
-
+	
 	  <para>GHC does not maintain detailed cross-package
           dependency information.  It does remember which modules in
           other packages the current module depends on, but not which
           things within those imported things.</para>
-	</listitem>
-      </itemizedlist>
+      </listitem>
 
-      <para>To compile a module which is to be part of a new package,
-      use the <literal>-package-name</literal> option:</para>
-
-      <variablelist>
-	<varlistentry>
-	  <term>
-            <option>-package-name <replaceable>foo</replaceable></option>
-            <indexterm><primary><literal>-package-name</literal></primary><secondary>option</secondary></indexterm>
-          </term>
-	  <listitem>
-	    <para>This option is added to the command line when
-	    compiling a module that is destined to be part of package
-	    <literal>foo</literal>.  If this flag is omitted then the
-	    default package <literal>Main</literal> is assumed.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
-
-      <para>Failure to use the <literal>-package-name</literal> option
-      when compiling a package will result in disaster on Windows, but
-      is relatively harmless on Unix at the moment (it will just cause
-      a few extra dependencies in some interface files).  However,
-      bear in mind that we might add support for Unix shared libraries
-      at some point in the future.</para>
-
-      <para>It is worth noting that on Windows, when each package
+      <listitem>
+	<para>When compiling a Haskell module which is to be part of a new package
+	  <replaceable>P</replaceable>, use
+	  <option>-ignore-package</option>&nbsp;<replaceable>P</replaceable>.</para>
+      </listitem>
+    </itemizedlist>
+    
+    <para>It is worth noting that on Windows, when each package
       is built as a DLL, since a reference to a DLL costs an extra
       indirection, intra-package references are cheaper than
       inter-package references. Of course, this applies to the
       <filename>Main</filename> package as well.</para>
     </sect2>
 
-    <sect2 id="package-management">
-      <title>Package management</title>
-      <indexterm><primary>packages</primary>
-	<secondary>management</secondary></indexterm>
-      
-      <para>The <literal>ghc-pkg</literal> tool allows packages to be
-      added or removed from a package configuration file.  By default,
-      the system-wide configuration file is used, but alternatively
-      packages can be added, updated or removed from a user-specified
-      configuration file using the <option>&ndash;&ndash;config-file</option>
-      option.  An empty package configuration file consists of the
-      string <quote><literal>[]</literal></quote>.</para>
+  <sect2 id="package-management">
+    <title>Package management (the <literal>ghc-pkg</literal> command)</title>
+    <indexterm><primary>packages</primary>
+      <secondary>management</secondary></indexterm>
+    
+    <para>The <literal>ghc-pkg</literal> tool allows packages to be
+      added or removed from a package database.  By default,
+      the system-wide package database is used, but alternatively
+      the user's local package database or another specified
+      file can be used.</para>
 
-      <para>The <literal>ghc-pkg</literal> program accepts the
-      following options:</para>
+    <para>The <literal>ghc-pkg</literal> program may be run in the following
+      ways.  Where a package name is required, the package can be named either
+      in full including the version number
+      (e.g. <literal>network-1.0</literal>), or without the version number if
+      that is unambiguous.</para>
 
-      <variablelist>
-	<varlistentry>
-	  <term>
-            <option>&ndash;&ndash;add-package</option>
-            <indexterm><primary><option>&ndash;&ndash;add-package</option></primary></indexterm>
-          </term>
-	  <term>
-            <option>-a</option>
-          </term>
-	  <listitem>
-	    <para>Reads package specification from the input (see below),
-	    and adds it to the database of installed packages.  The
-	    package specification must be a package that isn't already
+    <variablelist>
+      <varlistentry>
+	<term><literal>ghc-pkg register <replaceable>file</replaceable></literal></term>
+	<listitem>
+	  <para>Reads a package specification from
+	    <replaceable>file</replaceable> (which may be &ldquo;<literal>-</literal>&rdquo;
+	    to indicate standard input),
+	    and adds it to the database of installed packages.  The syntax of
+	    <replaceable>file</replaceable> is given in <xref
+	      linkend="installed-pkg-info" />.</para>
+
+	  <para>The package specification must be a package that isn't already
 	    installed.</para>
-	  </listitem>
-	</varlistentry>
+	</listitem>
+      </varlistentry>
 
-	<varlistentry>
-	  <term>
-            <option>&ndash;&ndash;input-file=<replaceable>file</replaceable></option>
-            <indexterm><primary><option>&ndash;&ndash;input-file</option></primary></indexterm>
-          </term>
-	  <term>
-            <option>-i <replaceable>file</replaceable></option>
-          </term>
-	  <listitem>
-	    <para>Read new package specifications from file
-	    <replaceable>file</replaceable>. If a value of
-	    <filename>"-"</filename> is given, standard input is used.
-	    If no <option>-i</option> is present on the command-line,
-	    an input file of <filename>"-"</filename> is assumed.
-	    </para>
-	  </listitem>
-	</varlistentry>
+      <varlistentry>
+	<term><literal>ghc-pkg update <replaceable>file</replaceable></literal></term>
+	<listitem>
+	  <para>The same as <literal>register</literal>, except that if a
+	    package of the same name is already installed, it is
+	    replaced by the new one.</para>
+	</listitem>
+      </varlistentry>
 
-	<varlistentry>
-	  <term>
-            <option>&ndash;&ndash;auto-ghci-libs</option>
-            <indexterm><primary><option>&ndash;&ndash;auto-ghci-libs</option></primary></indexterm>
-          </term>
-	  <term>
-            <option>-g</option>
-          </term>
-	  <listitem>
-	    <para>Automatically generate the GHCi
+      <varlistentry>
+	<term><literal>ghc-pkg unregister <replaceable>P</replaceable></literal></term>
+	<listitem>
+	  <para>Remove the specified package from the database.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>ghc-pkg expose <replaceable>P</replaceable></literal></term>
+	<listitem>
+	  <para>Sets the <literal>exposed</literal> flag for package
+	    <replaceable>P</replaceable> to <literal>True</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>ghc-pkg hide <replaceable>P</replaceable></literal></term>
+	<listitem>
+	  <para>Sets the <literal>exposed</literal> flag for package
+	    <replaceable>P</replaceable> to <literal>False</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>ghc-pkg list</literal></term>
+	<listitem>
+	  <para>This option displays the currently installed
+	    packages, for each of the databases known to
+	    <literal>ghc-pkg</literal>.  That includes the global database, the
+	    user's local database, and any further files 
+	    specified using the <option>-f</option> option on the command
+	    line.</para>
+
+	  <para>Hidden packages (those for which the <literal>exposed</literal>
+	    flag is <literal>False</literal>) are shown in parentheses in the
+	    list of packages.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>ghc-pkg describe <replaceable>P</replaceable></literal></term>
+	<listitem>
+	  <para>Emit the full description of the specified package.  The
+	    description is in the form of an
+	    <literal>InstalledPackageInfo</literal>, the same as the input file
+	    format for <literal>ghc-pkg register</literal>.  See <xref
+	      linkend="installed-pkg-info" /> for details.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>ghc-pkg field <replaceable>P</replaceable> <replaceable>field</replaceable></literal></term>
+	<listitem>
+	  <para>Show just a single field of the installed package description
+	    for <literal>P</literal>.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>Additionally, the following flags are accepted by
+      <literal>ghc-pkg</literal>:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term>
+	  <option>&ndash;&ndash;auto-ghci-libs</option><indexterm><primary><option>&ndash;&ndash;user</option></primary>
+	  </indexterm>
+	</term>
+	<listitem>
+	  <para>Automatically generate the GHCi
 	    <filename>.o</filename> version of each
 	    <filename>.a</filename> Haskell library, using GNU ld (if
 	    that is available).  Without this option,
@@ -297,198 +456,385 @@ the auto packages required for linking without further assistance.
 	    this option will cause the GHCi library to be created in
 	    the same directory as the <literal>.a</literal>
 	    library.</para>
-	  </listitem>
-	</varlistentry>
+	</listitem>
+      </varlistentry>
 
-	<varlistentry>
-	  <term>
-            <option>&ndash;&ndash;config-file <replaceable>file</replaceable></option>
-            <indexterm><primary><option>&ndash;&ndash;config-file</option></primary></indexterm>
-          </term>
-	  <term>
-            <option>-f <replaceable>file</replaceable></option>
-          </term>
-	  <listitem>
-	    <para>Use <replaceable>file</replaceable> as an additional
-	    package configuration file. This is used to modify
-	    configuration files for use with GHC's
-	    <option>-package-conf</option> option.</para>
+      <varlistentry>
+	<term>
+	  <option>-f</option> <replaceable>file</replaceable>
+	  <indexterm><primary><option>-f</option></primary>
+	  </indexterm>
+	</term>
+	<term>
+	  <option>-package-conf</option> <replaceable>file</replaceable>
+	  <indexterm><primary><option>-package-conf</option></primary>
+	  </indexterm>
+	</term>
+	<listitem>
+	  <para>Operate on the package database in
+	    <replaceable>file</replaceable>.
+	    This flag affects the <literal>register</literal>,
+	    <literal>update</literal>, <literal>unregister</literal>,
+	    <literal>expose</literal>, and <literal>hide</literal>
+	    commands.</para>
 
-	    <para>There may be any number of configuration files named
-            on the command line; files mentioned later on the
-            command-line override those mentioned earlier.  The
-            <emphasis>last</emphasis> configuration file mentioned on
-            the command-line is the only one that is actually modified
-            by <literal>ghc-pkg</literal>.</para>
+	  <para>When multiple <option>-f</option> options are given, or
+	    <option>-f</option> is used in conjunction with
+	    <option>--user</option> or <option>--global</option>, the last
+	    one on the command-line takes precedence.  When listing packages
+	    with <literal>ghc-pkg list</literal>, the contents of all the
+	    databases specified on the command-line are listed.</para>
+	</listitem>
+      </varlistentry>
 
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>
-            <option>&ndash;&ndash;list-packages</option>
-            <indexterm><primary><option>&ndash;&ndash;list-packages</option></primary></indexterm>
-          </term>
-	  <term>
-            <option>-l</option>
-          </term>
-	  <listitem>
-	    <para>This option displays the list of currently installed
-	    packages, including those in extra configuration files
-	    specified with the <option>&ndash;&ndash;config-file</option>
-	    option.</para>
-
-<screen>
-  $ ghc-pkg &ndash;&ndash;list-packages
-  /usr/local/lib/ghc-5.05/package.conf:
-    hdirect, readline, lang, concurrent, posix, util, data, text, net,
-    hssource, rts, haskell98, network, haskell-src, unix, base
-</screen>
-
-	    <para>Note that your GHC installation might have a
-            slightly different set of packages installed.</para>
-
-	    <para>The <literal>rts</literal> package is always
-            present, and represents the runtime system library.  The
-            <literal>base</literal> package contains the Haskell
-            prelude and basic hierarchical libraries, and the
-            <literal>haskell98</literal> package contains the Haskell
-            98 standard libraries.  The rest of the packages are
-            optional libraries.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>
-            <option>&ndash;&ndash;list-local-packages</option>
-            <indexterm><primary><option>&ndash;&ndash;list-local-packages</option></primary></indexterm>
-          </term>
-	  <term>
-            <option>-L</option>
-          </term>
-	  <listitem>
-	    <para>Displays the list of packages installed in the
-	    topmost configuration file only: that will be the
-	    configuration file specified using <option>-f</option> on
-	    the command line, or the system configuration file
-	    otherwise.</para>
-	    
-	    <para>This option may be more convenient than
-	    <option>-l</option> when the output needs to be parsed by
-	    a script.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>
-            <option>&ndash;&ndash;remove-package <replaceable>foo</replaceable></option>
-            <indexterm><primary><option>&ndash;&ndash;delete-package</option></primary></indexterm>
-          </term>
-	  <term>
-            <option>-r <replaceable>foo</replaceable></option>
-          </term>
-	  <listitem>
-	    <para>Removes the specified package from the installed
-	    configuration.</para>
-	  </listitem>
-	</varlistentry>
-	<varlistentry>
-	  <term>
-            <option>&ndash;&ndash;update-package</option>
-            <indexterm><primary><option>&ndash;&ndash;update-package</option></primary></indexterm>
-          </term>
-	  <term>
-            <option>-u</option>
-          </term>
-	  <listitem>
-	    <para>Reads package specification from the input, and
-	    adds it to the database of installed packages. If a package
-	    with the same name is already installed, its configuration
-	    data is replaced with the new information. If the package
-	    doesn't already exist, it's added.
-	    </para>
-	  </listitem>
-	</varlistentry>
-	<varlistentry>
-	  <term>
-            <option>&ndash;&ndash;force</option>
-            <indexterm><primary><option>&ndash;&ndash;force</option></primary></indexterm>
-          </term>
-	  <listitem>
-	    <para>Causes <literal>ghc-pkg</literal> to ignore missing
-	    directories and libraries when adding a package, and just
-	    go ahead and add it anyway.  This might be useful if your
+      <varlistentry>
+	<term>
+	  <option>&ndash;&ndash;force</option>
+	  <indexterm><primary>
+	      <option>&ndash;&ndash;force</option>
+	    </primary></indexterm>
+	</term>
+	<listitem>
+	  <para>Causes <literal>ghc-pkg</literal> to ignore missing
+	    dependencies, directories and libraries when registering a package,
+	    and just go ahead and add it anyway.  This might be useful if your
 	    package installation system needs to add the package to
 	    GHC before building and installing the files.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
+	</listitem>
+      </varlistentry>
 
-      <para>When modifying the configuration file
+      <varlistentry>
+	<term>
+	  <option>&ndash;&ndash;global</option><indexterm><primary><option>&ndash;&ndash;user</option></primary>
+	  </indexterm>
+	</term>
+	<listitem>
+	  <para>Operate on the global package database (this is the default).
+	    This flag affects the <literal>register</literal>,
+	    <literal>update</literal>, <literal>unregister</literal>,
+	    <literal>expose</literal>, and <literal>hide</literal>
+	    commands.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <option>&ndash;&ndash;help</option><indexterm><primary><option>&ndash;&ndash;user</option></primary>
+	  </indexterm>
+	</term>
+	<term>
+	  <option>-?</option><indexterm><primary><option>-?</option></primary>
+	  </indexterm>
+	</term>
+	<listitem>
+	  <para>Outputs the command-line syntax.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <option>&ndash;&ndash;user</option><indexterm><primary><option>&ndash;&ndash;user</option></primary>
+	  </indexterm>
+	</term>
+	<listitem>
+	  <para>Operate on the current user's local package database.
+	    This flag affects the <literal>register</literal>,
+	    <literal>update</literal>, <literal>unregister</literal>,
+	    <literal>expose</literal>, and <literal>hide</literal>
+	    commands.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <option>-V</option><indexterm><primary><option>-V</option></primary>
+	  </indexterm>
+	</term>
+	<term>
+	  <option>&ndash;&ndash;version</option><indexterm><primary><option>&ndash;&ndash;user</option></primary>
+	  </indexterm>
+	</term>
+	<listitem>
+	  <para>Output the <literal>ghc-pkg</literal> version number.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>When modifying the package database
       <replaceable>file</replaceable>, a copy of the original file is
       saved in <replaceable>file</replaceable><literal>.old</literal>,
       so in an emergency you can always restore the old settings by
       copying the old file back again.</para>
 
-      <para>A package specification looks like this:</para>
+  </sect2>
+  
+  <sect2 id="installed-pkg-info">
+    <title>
+      <literal>InstalledPackageInfo</literal>: a package specification
+    </title>
+
+    <para>A package specification is a Haskell record; in particular, it is the
+      record <ulink
+	url="../libraries/Cabal/Distribution.InstalledPackageInfo#%tInstalledPackageInfo">InstalledPackageInfo</ulink> in the module Distribution.InstalledPackageInfo, which is part of the Cabal package distributed with GHC.</para>
+
+    <para>An <literal>InstalledPackageInfo</literal> has a human
+      readable/writable syntax.  The functions
+      <literal>parseInstalledPackageInfo</literal> and
+      <literal>showInstalledPackageInfo</literal> read and write this syntax
+      respectively.  Here's an example of the
+      <literal>InstalledPackageInfo</literal> for the <literal>unix</literal> package:</para>
 
 <screen>
-  Package {
-     name            = "mypkg",
-     auto            = True,
-     import_dirs     = ["${installdir}/imports/mypkg"],
-     source_dirs     = [],
-     library_dirs    = ["${installdir}"],
-     hs_libraries    = ["HSmypkg" ],
-     extra_libraries = ["HSmypkg_cbits"],
-     include_dirs    = [],
-     c_includes      = ["HsMyPkg.h"],
-     package_deps    = ["text", "data"],
-     extra_ghc_opts  = [],
-     extra_cc_opts   = [],
-     extra_ld_opts   = ["-lmy_clib"]
-  }
+$ ghc-pkg describe unix
+name: unix
+version: 1.0
+license: BSD3
+copyright:
+maintainer: libraries@haskell.org
+stability:
+homepage:
+package-url:
+description:
+category:
+author:
+exposed: True
+exposed-modules: System.Posix,
+                 System.Posix.DynamicLinker.Module,
+                 System.Posix.DynamicLinker.Prim,
+                 System.Posix.Directory,
+                 System.Posix.DynamicLinker,
+                 System.Posix.Env,
+                 System.Posix.Error,
+                 System.Posix.Files,
+                 System.Posix.IO,
+                 System.Posix.Process,
+                 System.Posix.Resource,
+                 System.Posix.Temp,
+                 System.Posix.Terminal,
+                 System.Posix.Time,
+                 System.Posix.Unistd,
+                 System.Posix.User,
+                 System.Posix.Signals.Exts
+import-dirs: /usr/lib/ghc-6.4/libraries/unix
+library-dirs: /usr/lib/ghc-6.4/libraries/unix
+hs-libraries: HSunix
+extra-libs: HSunix_cbits, dl
+include-dirs: /usr/lib/ghc-6.4/libraries/unix/include
+includes: HsUnix.h
+depends: base-1.0
 </screen>
 
-      <para>Components of a package specification may be specified in
-      any order, and are:</para>
+    <para>The full Cabal documentation is still in preparation (at time of
+      writing), so in the meantime here is a brief description of the syntax of
+      this file:</para>
 
-      <variablelist>
+    <para>A package description consists of a number of field/value pairs.  A
+      field starts with the field name in the left-hand column followed by a
+      &ldquo;<literal>:</literal>&rdquo;, and the value continues until the next line that begins in the
+      left-hand column, or the end of file.</para>
+
+    <para>The syntax of the value depends on the field.   The various field
+      types are:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term>freeform</term>
+	<listitem>
+	  <para>Any arbitrary string, no interpretation or parsing is
+	    done.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>string</term>
+	<listitem>
+	  <para>A sequence of non-space characters, or a sequence of arbitrary
+	    characters surrounded by quotes <literal>"...."</literal>.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>string list</term>
+	<listitem>
+	  <para>A sequence of strings, separated by commas.  The sequence may
+	    be empty.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>In addition, there are some fields with special syntax (e.g. package
+      names, version, dependencies).</para>
+
+    <para>The allowed fields, with their types, are:</para>
+	
+    <variablelist>
+      <varlistentry>
+	<term>
+	  <literal>name</literal>
+	  <indexterm><primary><literal>name</literal></primary><secondary>package specification</secondary></indexterm>
+	</term>
+	<listitem>
+	  <para>The package's name (without the version).</para>
+	</listitem>
+      </varlistentry>
+      
+      <varlistentry>
+	<term>
+	  <literal>version</literal>
+	  <indexterm><primary><literal>version</literal></primary><secondary>package specification</secondary></indexterm>
+	</term>
+	<listitem>
+	  <para>The package's version, usually in the form
+	    <literal>A.B</literal> (any number of components are allowed).</para>
+	</listitem>
+      </varlistentry>
+      
+      <varlistentry>
+	<term>
+	  <literal>license</literal>
+	  <indexterm><primary><literal>auto</literal></primary><secondary>package specification</secondary></indexterm>
+	</term>
+	<listitem>
+	  <para>(string) The type of license under which this package is distributed.
+	    This field is a value of the <ulink
+	url="../libraries/Cabal/Distribution.License.html#t:License"><literal>License</literal></ulink> type.</para>
+	</listitem>
+      </varlistentry>
+
 	<varlistentry>
 	  <term>
-            <literal>name</literal>
-            <indexterm><primary><literal>name</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>license-file</literal>
+            <indexterm><primary><literal>license-file</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-            <para>The package's name, for use with
-            the <literal>-package</literal> flag and as listed in the
-            <literal>&ndash;&ndash;list-packages</literal> list. 
-            </para>
+	    <para>(optional string) The name of a file giving detailed license
+	    information for this package.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
 	  <term>
-            <literal>auto</literal>
-            <indexterm><primary><literal>auto</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>copyright</literal>
+            <indexterm><primary><literal>copyright</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>Set to <literal>True</literal> if the package should
-	    be automatically available (see <xref
-	    linkend="using-packages"/>).  This is normally set to
-	    <literal>True</literal> for packages which contain
-	    hierarchical libraries, because in that case there is no
-	    danger of polluting the module namespace.</para>
+	    <para>(optional freeform) The copyright string.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
 	  <term>
-            <literal>import_dirs</literal>
-            <indexterm><primary><literal>import_dirs</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>maintainer</literal>
+            <indexterm><primary><literal>maintainer</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>A list of directories containing interface files
+	    <para>(optinoal freeform) The email address of the package's maintainer.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <literal>stability</literal>
+            <indexterm><primary><literal>stability</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(optional freeform) A string describing the stability of the package
+	    (eg. stable, provisional or experimental).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <literal>homepage</literal>
+            <indexterm><primary><literal>homepage</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(optional freeform) URL of the package's home page.</para>
+	  </listitem>
+	</varlistentry>
+
+      <varlistentry>
+	<term>
+            <literal>package-url</literal>
+            <indexterm><primary><literal>package-url</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(optional freeform) URL of a downloadable distribution for this
+	    package.  The distribution should be a Cabal package.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <literal>description</literal>
+            <indexterm><primary><literal>description</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(optional freeform) Description of the package.</para>
+	  </listitem>
+	</varlistentry>
+
+      <varlistentry>
+	  <term>
+            <literal>category</literal>
+            <indexterm><primary><literal>category</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(optinoal freeform) Which category the package belongs to.  This field
+	    is for use in conjunction with a future centralised package
+	    distribution framework, tentatively titled Hackage.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <literal>author</literal>
+            <indexterm><primary><literal>author</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(optional freeform) Author of the package.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <literal>exposed</literal>
+            <indexterm><primary><literal>exposed</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(bool) Whether the package is exposed or not.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <literal>exposed-modules</literal>
+            <indexterm><primary><literal>exposed-modules</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(string list) modules exposed by this package.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <literal>hidden-modules</literal>
+            <indexterm><primary><literal>hidden-modules</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(string list) modules provided by this package,
+	    but not exposed to the programmer.  These modules cannot be
+	    imported, but they are still subject to the overlapping constraint:
+	    no other package in the same program may provide a module of the
+	    same name.</para>
+	</listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <literal>import-dirs</literal>
+            <indexterm><primary><literal>import-dirs</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(string list) A list of directories containing interface files
 	    (<literal>.hi</literal> files) for this package.</para>
 
 	    <para>If the package contains profiling libraries, then
@@ -502,35 +848,22 @@ the auto packages required for linking without further assistance.
 
 	<varlistentry>
 	  <term>
-            <literal>source_dirs</literal>
-            <indexterm><primary><literal>source_dirs</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>library-dirs</literal>
+            <indexterm><primary><literal>library-dirs</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>A list of directories containing Haskell source
-	    files for this package.  This field isn't used by GHC, but
-	    could potentially be used by an all-interpreted system
-	    like Hugs.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>
-            <literal>library_dirs</literal>
-            <indexterm><primary><literal>library_dirs</literal></primary><secondary>package specification</secondary></indexterm>
-          </term>
-	  <listitem>
-	    <para>A list of directories containing libraries for this
+	    <para>(string list) A list of directories containing libraries for this
 	    package.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
 	  <term>
-            <literal>hs_libraries</literal>
-            <indexterm><primary><literal>hs_libraries</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>hs-libraries</literal>
+            <indexterm><primary><literal>hs-libraries</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>A list of libraries containing Haskell code for this
+	    <para>(string list) A list of libraries containing Haskell code for this
 	    package, with the <literal>.a</literal> or
 	    <literal>.dll</literal> suffix omitted.  When packages are
 	    built as libraries, the
@@ -572,43 +905,42 @@ the auto packages required for linking without further assistance.
 		</listitem>
 	      </varlistentry>
 	    </variablelist>
-
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
 	  <term>
-            <literal>extra_libraries</literal>
-            <indexterm><primary><literal>extra_libraries</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>extra-libs</literal>
+            <indexterm><primary><literal>extra-libs</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>A list of extra libraries for this package.  The
-	    difference between <literal>hs_libraries</literal> and
-	    <literal>extra_libraries</literal> is that
-	    <literal>hs_libraries</literal> normally have several
+	    <para>(string list) A list of extra libraries for this package.  The
+	    difference between <literal>hs-libraries</literal> and
+	    <literal>extra-libs</literal> is that
+	    <literal>hs-libraries</literal> normally have several
 	    versions, to support profiling, parallel and other build
 	    options.  The various versions are given different
 	    suffixes to distinguish them, for example the profiling
 	    version of the standard prelude library is named
-	    <filename>libHSstd_p.a</filename>, with the
+	    <filename>libHSbase_p.a</filename>, with the
 	    <literal>_p</literal> indicating that this is a profiling
 	    version.  The suffix is added automatically by GHC for
-	    <literal>hs_libraries</literal> only, no suffix is added
+	    <literal>hs-libraries</literal> only, no suffix is added
 	    for libraries in
-	    <literal>extra_libraries</literal>.</para>
+	    <literal>extra-libs</literal>.</para>
 
 	    <para>The libraries listed in
-	    <literal>extra_libraries</literal> may be any libraries
+	    <literal>extra-libs</literal> may be any libraries
 	    supported by your system's linker, including dynamic
 	    libraries (<literal>.so</literal> on Unix,
 	    <literal>.DLL</literal> on Windows).</para>
 
-	    <para>Also, <literal>extra_libraries</literal> are placed
+	    <para>Also, <literal>extra-libs</literal> are placed
 	    on the linker command line after the
-	    <literal>hs_libraries</literal> for the same package.  If
+	    <literal>hs-libraries</literal> for the same package.  If
 	    your package has dependencies in the other direction (i.e.
-	    <literal>extra_libraries</literal> depends on
-	    <literal>hs_libraries</literal>), and the libraries are
+	    <literal>extra-libs</literal> depends on
+	    <literal>hs-libraries</literal>), and the libraries are
 	    static, you might need to make two separate
 	    packages.</para>
 	  </listitem>
@@ -616,23 +948,23 @@ the auto packages required for linking without further assistance.
 
 	<varlistentry>
 	  <term>
-            <literal>include_dirs</literal>
-            <indexterm><primary><literal>include_dirs</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>include-dirs</literal>
+            <indexterm><primary><literal>include-dirs</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>A list of directories containing C includes for this
-	    package (maybe the empty list).</para>
+	    <para>(string list) A list of directories containing C includes for this
+	    package.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
 	  <term>
-           <literal>c_includes</literal>
-           <indexterm><primary><literal>c_includes</literal></primary><secondary>package specification</secondary></indexterm>
+           <literal>includes</literal>
+           <indexterm><primary><literal>includes</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>A list of files to include for via-C compilations
-	    using this package.  Typically this include file will
+	    <para>(string list) A list of files to include for via-C compilations
+	    using this package.  Typically the include file(s) will
 	    contain function prototypes for any C functions used in
 	    the package, in case they end up being called as a result
 	    of Haskell functions from the package being
@@ -642,33 +974,34 @@ the auto packages required for linking without further assistance.
 
 	<varlistentry>
 	  <term>
-            <literal>package_deps</literal>
-            <indexterm><primary><literal>package_deps</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>depends</literal>
+            <indexterm><primary><literal>depends</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>A list of packages which this package depends
-	    on.</para>
+	    <para>(package name list) Packages on which this package depends.  This field contains
+	    packages with explicit versions are required, except that when
+	    submitting a package to <literal>ghc-pkg register</literal>, the
+	    versions will be filled in if they are unambiguous.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
 	  <term>
-            <literal>extra_ghc_opts</literal>
-            <indexterm><primary><literal>extra_ghc_opts</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>extra-hugs-opts</literal>
+            <indexterm><primary><literal>extra-hugs-opts</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>Extra arguments to be added to the GHC command line
-	    when this package is being used.</para>
+	    <para>(string list) Options to pass to Hugs for this package.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
 	  <term>
-            <literal>extra_cc_opts</literal>
-            <indexterm><primary><literal>extra_cc_opts</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>extra-cc-opts</literal>
+            <indexterm><primary><literal>extra-cc-opts</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>Extra arguments to be added to the gcc command line
+	    <para>(string list) Extra arguments to be added to the gcc command line
 	    when this package is being used (only for via-C
 	    compilations).</para>
 	  </listitem>
@@ -676,11 +1009,11 @@ the auto packages required for linking without further assistance.
 
 	<varlistentry>
 	  <term>
-            <literal>extra_ld_opts</literal>
-            <indexterm><primary><literal>extra_ld_opts</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>extra-ld-opts</literal>
+            <indexterm><primary><literal>extra-ld-opts</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>Extra arguments to be added to the
+	    <para>(string list) Extra arguments to be added to the
 	    <command>gcc</command> command line (for linking) when
 	    this package is being used.</para>
 	  </listitem>
@@ -688,29 +1021,55 @@ the auto packages required for linking without further assistance.
 	
 	<varlistentry>
 	  <term>
-            <literal>framework_dirs</literal>
-            <indexterm><primary><literal>framework_dirs</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>framework-dirs</literal>
+            <indexterm><primary><literal>framework-dirs</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>On Darwin/MacOS X, a list of directories containing frameworks for this
-	    package. This corresponds to the <option>-framework-path</option> option.
-	    It is ignored on all other platforms.</para>
+	    <para>(string list) On Darwin/MacOS X, a list of directories containing
+	    frameworks for this package. This corresponds to the
+	    <option>-framework-path</option> option. It is ignored on all other
+	    platforms.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
 	  <term>
-            <literal>extra_frameworks</literal>
-            <indexterm><primary><literal>extra_frameworks</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>extra-frameworks</literal>
+            <indexterm><primary><literal>extra-frameworks</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>On Darwin/MacOS X, a list of frameworks to link to. This corresponds to the
-	    <option>-framework</option> option. Take a look at Apple's developer documentation
-	    to find out what frameworks actually are. This entry is ignored on all other platforms.</para>
+	    <para>(string list) On Darwin/MacOS X, a list of frameworks to link to. This
+	    corresponds to the <option>-framework</option> option. Take a look
+	    at Apple's developer documentation to find out what frameworks
+	    actually are. This entry is ignored on all other platforms.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <literal>haddock-interfaces</literal>
+            <indexterm><primary><literal>haddock-interfaces</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(string list) A list of filenames containing <ulink
+	      url="http://www.haskell.org/haddock/">Haddock</ulink> interface
+	    files (<literal>.haddock</literal> files) for this package.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <literal>haddock-html</literal>
+            <indexterm><primary><literal>haddock-html</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>(optional string) The directory containing the Haddock-generated HTML
+	    for this package.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
       
+<!--  This isn't true any more.  I'm not sure if we still need it -SDM
       <para>
       The <literal>ghc-pkg</literal> tool performs expansion of
       environment variables occurring in input package specifications.
@@ -720,7 +1079,7 @@ the auto packages required for linking without further assistance.
 <screen>
   $ installdir=/usr/local/lib ghc-pkg -a &lt; mypkg.pkg
 </screen>
-      
+
       <para>
       The occurrence of <literal>${installdir}</literal> is replaced
       with <literal>/usr/local/lib</literal> in the package data that
@@ -735,6 +1094,9 @@ the auto packages required for linking without further assistance.
       <para>For examples of more package specifications, take a look
       at the <literal>package.conf</literal> in your GHC
       installation.</para>
+
+-->
+
     </sect2>
   </sect1>
 
