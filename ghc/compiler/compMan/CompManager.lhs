@@ -38,7 +38,7 @@ module CompManager (
     HValue,
     cmCompileExpr,	-- :: CmState -> String -> IO (CmState, Maybe HValue)
 
-    cmGetModInfo	-- :: CmState -> (ModuleGraph, HomePackageTable)
+    cmGetModInfo,	-- :: CmState -> (ModuleGraph, HomePackageTable)
 
     cmSetDFlags,
     cmGetBindings, 	-- :: CmState -> [TyThing]
