@@ -21,7 +21,7 @@ module VarEnv (
 
 	-- SubstEnvs
 	SubstEnv, TyVarSubstEnv, SubstResult(..),
-	emptySubstEnv, 
+	emptySubstEnv, substEnvEnv,
 	mkSubstEnv, lookupSubstEnv, extendSubstEnv, extendSubstEnvList,
 	delSubstEnv, delSubstEnvList, noTypeSubst, isEmptySubstEnv
     ) where
@@ -71,6 +71,9 @@ data SubstEnv      = SE (VarEnv SubstResult)
 
 noTypeSubst :: SubstEnv -> Bool
 noTypeSubst (SE _ nt) = nt
+
+substEnvEnv :: SubstEnv -> VarEnv SubstResult
+substEnvEnv (SE env _) = env
 
 type TyVarSubstEnv = SubstEnv	-- of the form (DoneTy ty) *only*
 
