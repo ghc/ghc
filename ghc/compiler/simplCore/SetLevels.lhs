@@ -58,7 +58,8 @@ import CoreSyn
 import CmdLineOpts	( FloatOutSwitches(..) )
 import CoreUtils	( exprType, exprIsTrivial, exprIsCheap, mkPiTypes )
 import CoreFVs		-- all of it
-import Subst
+import Subst		( Subst, SubstResult(..), emptySubst, extendInScope, extendIdSubst,
+			  substAndCloneId, substAndCloneRecIds )
 import Id		( Id, idType, mkSysLocalUnencoded, 
 			  isOneShotLambda, zapDemandIdInfo,
 			  idSpecialisation, idWorkerInfo, setIdInfo

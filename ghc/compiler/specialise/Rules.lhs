@@ -19,13 +19,12 @@ import OccurAnal	( occurAnalyseRule )
 import CoreFVs		( exprFreeVars, exprsFreeVars, ruleRhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( tcEqExprX )
+import Type		( Type )
 import CoreTidy		( pprTidyIdRules )
-import Subst		( IdSubstEnv, SubstResult(..) )
 import Id		( Id, idUnfolding, idSpecialisation, setIdSpecialisation ) 
 import Var		( Var )
 import VarSet
 import VarEnv
-import TcType		( TvSubstEnv )
 import Unify 		( tcMatchTyX, MatchEnv(..) )
 import BasicTypes	( Activation, CompilerPhase, isActive )
 
@@ -156,12 +155,27 @@ matchN in_scope tmpl_vars tmpl_es target_es
 				Just ty 	-> Type ty
 				Nothing 	-> unbound tmpl_var
 	| otherwise	   = case lookupVarEnv id_subst tmpl_var of
-				Just (DoneEx e) -> e
-				other		-> unbound tmpl_var
+				Just e -> e
+				other  -> unbound tmpl_var
  
     unbound var = pprPanic "Template variable unbound in rewrite rule" (ppr var)
+\end{code}
 
-emptySubstEnv :: (TvSubstEnv, IdSubstEnv)
+
+	---------------------------------------------
+		The inner workings of matching
+	---------------------------------------------
+
+\begin{code}
+-- These two definitions are not the same as in Subst,
+-- but they simple and direct, and purely local to this module
+-- The third, for TvSubstEnv, is the same as in VarEnv, but repeated here
+-- for uniformity with IdSubstEnv
+type SubstEnv   = (TvSubstEnv, IdSubstEnv)	
+type IdSubstEnv = IdEnv    CoreExpr		
+type TvSubstEnv = TyVarEnv Type
+
+emptySubstEnv :: SubstEnv
 emptySubstEnv = (emptyVarEnv, emptyVarEnv)
 
 
@@ -175,10 +189,10 @@ emptySubstEnv = (emptyVarEnv, emptyVarEnv)
 
 
 match :: MatchEnv
-      -> (TvSubstEnv, IdSubstEnv)
+      -> SubstEnv
       -> CoreExpr		-- Template
       -> CoreExpr		-- Target
-      -> Maybe (TvSubstEnv, IdSubstEnv)
+      -> Maybe SubstEnv
 
 -- See the notes with Unify.match, which matches types
 -- Everything is very similar for terms
@@ -204,10 +218,10 @@ match menv subst@(tv_subst, id_subst) (Var v1) e2
 		-- e.g. match forall a. (\x-> a x) against (\y. y y)
 
 		| otherwise
-		-> Just (tv_subst, extendVarEnv id_subst v1 (DoneEx e2))
+		-> Just (tv_subst, extendVarEnv id_subst v1 e2)
 
-	Just (DoneEx e2') | tcEqExprX (nukeRnEnvL rn_env) e2' e2 
-			  -> Just subst
+	Just e2' | tcEqExprX (nukeRnEnvL rn_env) e2' e2 
+		 -> Just subst
 
 	other -> Nothing
 
@@ -294,10 +308,10 @@ match menv subst e1 e2 = Nothing
 
 ------------------------------------------
 match_alts :: MatchEnv
-      -> (TvSubstEnv, IdSubstEnv)
+      -> SubstEnv
       -> [CoreAlt]		-- Template
       -> [CoreAlt]		-- Target
-      -> Maybe (TvSubstEnv, IdSubstEnv)
+      -> Maybe SubstEnv
 match_alts menv subst [] []
   = return subst
 match_alts menv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)

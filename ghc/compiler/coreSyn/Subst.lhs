@@ -14,8 +14,6 @@ module Subst (
 	zapSubstEnv, setSubstEnv, 
 	getTvSubst, getTvSubstEnv, setTvSubstEnv, 
 
-	bindSubst, unBindSubst, bindSubstList, unBindSubstList,
-
 	-- Binders
 	simplBndr, simplBndrs, simplLetId, simplLamBndr, simplIdInfo,
 	substAndCloneId, substAndCloneIds, substAndCloneRecIds,
@@ -39,8 +37,7 @@ import CoreFVs		( exprFreeVars )
 import CoreUtils	( exprIsTrivial )
 
 import qualified Type	( substTy )
-import Type		( Type, tyVarsOfType, mkTyVarTy,
-			  TvSubstEnv, TvSubst(..), substTyVarBndr )
+import Type		( Type, tyVarsOfType, TvSubstEnv, TvSubst(..), substTyVarBndr )
 import VarSet
 import VarEnv
 import Var		( setVarUnique, isId, mustHaveLocalBinding )
@@ -60,7 +57,7 @@ import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply )
 import Var		( Var, Id, TyVar, isTyVar )
 import Outputable
 import PprCore		()		-- Instances
-import Util		( mapAccumL, foldl2 )
+import Util		( mapAccumL )
 import FastTypes
 \end{code}
 
@@ -214,38 +211,6 @@ extendInScopeIds :: Subst -> [Id] -> Subst
 extendInScopeIds (Subst in_scope ids tvs) vs 
   = Subst (in_scope `extendInScopeSetList` vs) 
 	  (ids `delVarEnvList` vs) tvs
-
--------------------------------
-bindSubst :: Subst -> Var -> Var -> Subst
--- Extend with a substitution, v1 -> Var v2
--- and extend the in-scopes with v2
-bindSubst (Subst in_scope ids tvs) old_bndr new_bndr
-  | isId old_bndr
-  = Subst (in_scope `extendInScopeSet` new_bndr)
-	  (extendVarEnv ids old_bndr (DoneEx (Var new_bndr)))
-	  tvs
-  | otherwise
-  = Subst (in_scope `extendInScopeSet` new_bndr)
-	  ids
-	  (extendVarEnv tvs old_bndr (mkTyVarTy new_bndr))
-
-unBindSubst :: Subst -> Var -> Var -> Subst
--- Reverse the effect of bindSubst
--- If old_bndr was already in the substitution, this doesn't quite work
-unBindSubst (Subst in_scope ids tvs) old_bndr new_bndr
-  = Subst (in_scope `delInScopeSet` new_bndr)
-	  (delVarEnv ids old_bndr) 
-	  (delVarEnv tvs old_bndr)
-
--- And the "List" forms
-bindSubstList :: Subst -> [Var] -> [Var] -> Subst
-bindSubstList subst old_bndrs new_bndrs
-  = foldl2 bindSubst subst old_bndrs new_bndrs
-
-unBindSubstList :: Subst -> [Var] -> [Var] -> Subst
-unBindSubstList subst old_bndrs new_bndrs
-  = foldl2 unBindSubst subst old_bndrs new_bndrs
-
 
 -------------------------------
 setInScopeSet :: Subst -> InScopeSet -> Subst
