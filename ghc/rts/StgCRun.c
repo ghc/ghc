@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.3 1999/02/05 16:02:57 simonm Exp $
+ * $Id: StgCRun.c,v 1.4 1999/03/01 17:42:11 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -150,5 +150,93 @@ StgRun(StgFunPtr f)
 }
 
 #endif /* sparc_TARGET_ARCH */
+
+/* -----------------------------------------------------------------------------
+   HP-PA architecture
+   -------------------------------------------------------------------------- */
+
+#ifdef hppa1_1_TARGET_ARCH
+
+StgThreadReturnCode
+StgRun(StgFunPtr f) 
+{
+    StgChar space[RESERVED_C_STACK_BYTES+16*sizeof(long)+10*sizeof(double)];
+    __asm__ volatile ("ldo %0(%%r30),%%r19\n"
+		      "\tstw %%r3, 0(0,%%r19)\n"
+                      "\tstw %%r4, 4(0,%%r19)\n"
+                      "\tstw %%r5, 8(0,%%r19)\n"
+                      "\tstw %%r6,12(0,%%r19)\n"
+                      "\tstw %%r7,16(0,%%r19)\n"
+                      "\tstw %%r8,20(0,%%r19)\n"
+                      "\tstw %%r9,24(0,%%r19)\n"
+		      "\tstw %%r10,28(0,%%r19)\n"
+                      "\tstw %%r11,32(0,%%r19)\n"
+                      "\tstw %%r12,36(0,%%r19)\n"
+                      "\tstw %%r13,40(0,%%r19)\n"
+                      "\tstw %%r14,44(0,%%r19)\n"
+                      "\tstw %%r15,48(0,%%r19)\n"
+                      "\tstw %%r16,52(0,%%r19)\n"
+                      "\tstw %%r17,56(0,%%r19)\n"
+                      "\tstw %%r18,60(0,%%r19)\n"
+		      "\tldo 80(%%r19),%%r19\n"
+		      "\tfstds %%fr12,-16(0,%%r19)\n"
+		      "\tfstds %%fr13, -8(0,%%r19)\n"
+		      "\tfstds %%fr14,  0(0,%%r19)\n"
+		      "\tfstds %%fr15,  8(0,%%r19)\n"
+		      "\tldo 32(%%r19),%%r19\n"
+		      "\tfstds %%fr16,-16(0,%%r19)\n"
+		      "\tfstds %%fr17, -8(0,%%r19)\n"
+		      "\tfstds %%fr18,  0(0,%%r19)\n"
+		      "\tfstds %%fr19,  8(0,%%r19)\n"
+		      "\tldo 32(%%r19),%%r19\n"
+		      "\tfstds %%fr20,-16(0,%%r19)\n"
+		      "\tfstds %%fr21, -8(0,%%r19)\n" : :
+                      "n" (-(116 * sizeof(long) + 10 * sizeof(double))) : "%r19"
+		      );
+
+    f();
+
+    __asm__ volatile (".align 4\n"
+               	      "\t.EXPORT " STG_RETURN ",CODE\n"
+		      "\t.EXPORT " STG_RETURN ",ENTRY,PRIV_LEV=3\n"
+                      STG_RETURN "\n"
+                      /* "\tldo %0(%%r3),%%r19\n" */
+                      "\tldo %0(%%r30),%%r19\n"
+		      "\tldw  0(0,%%r19),%%r3\n"
+                      "\tldw  4(0,%%r19),%%r4\n"
+                      "\tldw  8(0,%%r19),%%r5\n"
+                      "\tldw 12(0,%%r19),%%r6\n"
+                      "\tldw 16(0,%%r19),%%r7\n"
+                      "\tldw 20(0,%%r19),%%r8\n"
+                      "\tldw 24(0,%%r19),%%r9\n"
+		      "\tldw 28(0,%%r19),%%r10\n"
+                      "\tldw 32(0,%%r19),%%r11\n"
+                      "\tldw 36(0,%%r19),%%r12\n"
+                      "\tldw 40(0,%%r19),%%r13\n"
+                      "\tldw 44(0,%%r19),%%r14\n"
+                      "\tldw 48(0,%%r19),%%r15\n"
+                      "\tldw 52(0,%%r19),%%r16\n"
+                      "\tldw 56(0,%%r19),%%r17\n"
+                      "\tldw 60(0,%%r19),%%r18\n"
+		      "\tldo 80(%%r19),%%r19\n"
+		      "\tfldds -16(0,%%r19),%%fr12\n"
+		      "\tfldds  -8(0,%%r19),%%fr13\n"
+		      "\tfldds   0(0,%%r19),%%fr14\n"
+		      "\tfldds   8(0,%%r19),%%fr15\n"
+		      "\tldo 32(%%r19),%%r19\n"
+		      "\tfldds -16(0,%%r19),%%fr16\n"
+		      "\tfldds  -8(0,%%r19),%%fr17\n"
+		      "\tfldds   0(0,%%r19),%%fr18\n"
+		      "\tfldds   8(0,%%r19),%%fr19\n"
+		      "\tldo 32(%%r19),%%r19\n"
+		      "\tfldds -16(0,%%r19),%%fr20\n"
+		      "\tfldds  -8(0,%%r19),%%fr21\n" : :
+                      "n" (-(116 * sizeof(long) + 10 * sizeof(double))) : "%r19"
+		      );
+
+    return (StgThreadReturnCode)R1.i;
+}
+
+#endif /* hppa1_1_TARGET_ARCH */
 
 #endif /* !USE_MINIINTERPRETER */
