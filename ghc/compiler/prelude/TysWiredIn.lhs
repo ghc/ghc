@@ -65,6 +65,8 @@ module TysWiredIn (
 	isFFIArgumentTy,  -- :: Bool -> Type -> Bool
 	isFFIResultTy,    -- :: Type -> Bool
 	isFFIExternalTy,  -- :: Type -> Bool
+ 	isFFIDynResultTy, -- :: Type -> Bool
+ 	isFFILabelTy,     -- :: Type -> Bool
 	isAddrTy,	  -- :: Type -> Bool
 	isForeignObjTy    -- :: Type -> Bool
 
@@ -359,6 +361,14 @@ isFFIResultTy :: Type -> Bool
 -- But we allow () as well
 isFFIResultTy ty = checkRepTyCon (\tc -> tc == unitTyCon || legalIncomingTyCon tc) ty
 
+-- The result type of a foreign export dynamic must be either Addr, or
+-- a newtype of Addr.
+isFFIDynResultTy = checkRepTyCon (== addrTyCon)
+
+-- The type of a foreign label must be either Addr, or
+-- a newtype of Addr.
+isFFILabelTy = checkRepTyCon (== addrTyCon)
+
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 	-- look through newtypes
 checkRepTyCon check_tc ty = checkTyCon check_tc (repType ty)
@@ -384,8 +394,10 @@ legalIncomingTyCon :: TyCon -> Bool
 legalIncomingTyCon tc
   | getUnique tc `elem` [ foreignObjTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey ] 
   = False
+  -- It's also illegal to make foreign exports that take unboxed
+  -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
   | otherwise
-  = marshalableTyCon tc
+  = boxedMarshalableTyCon tc
 
 legalOutgoingTyCon :: Bool -> TyCon -> Bool
 -- Checks validity of types going from Haskell -> external world
@@ -399,7 +411,10 @@ legalOutgoingTyCon be_safe tc
 
 marshalableTyCon tc
   =  (opt_GlasgowExts && isUnLiftedTyCon tc)
-  || getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey
+  || boxedMarshalableTyCon tc
+
+boxedMarshalableTyCon tc
+   = getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey
 			 , wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey
 			 , floatTyConKey, doubleTyConKey
 			 , addrTyConKey, charTyConKey, foreignObjTyConKey

@@ -28,7 +28,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 import TcMonad
 import TcEnv		( newLocalId )
 import TcType		( tcSplitRhoTy, zonkTcTypeToType )
-import TcMonoType	( tcHsBoxedSigType )
+import TcMonoType	( tcHsSigType, tcHsBoxedSigType )
 import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl,
 			  TcForeignExportDecl )
 import TcExpr		( tcId, tcPolyExpr )			
@@ -42,7 +42,8 @@ import Type		( splitFunTys
 			, splitForAllTys
 			)
 import TysWiredIn	( isFFIArgumentTy, isFFIResultTy, 
-			  isFFIExternalTy, isAddrTy
+			  isFFIExternalTy, isAddrTy,
+			  isFFIDynResultTy, isFFILabelTy
 			)
 import Type             ( Type )
 import Unique
@@ -105,7 +106,8 @@ tcFImport fo@(ForeignDecl nm FoLabel hs_ty ext_nm cconv src_loc) =
       -- of the foreign type.
     (_, t_ty) = splitForAllTys sig_ty
    in
-   check (isAddrTy t_ty) (illegalForeignTyErr False{-result-} sig_ty) `thenTc_`
+   check (isFFILabelTy t_ty) 
+	(illegalForeignTyErr False{-result-} sig_ty) 	`thenTc_`
    let i = (mkVanillaId nm sig_ty) in
    returnTc (i, (ForeignDecl i FoLabel undefined ext_nm cconv src_loc))
 
@@ -113,7 +115,7 @@ tcFImport fo@(ForeignDecl nm imp_exp@(FoImport isUnsafe) hs_ty ext_nm cconv src_
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
 
-   tcHsBoxedSigType hs_ty	     `thenTc` \ ty ->
+   tcHsSigType hs_ty		     `thenTc` \ ty ->
     -- Check that the type has the right shape
     -- and that the argument and result types are acceptable.
    let
@@ -183,9 +185,9 @@ checkForeignExport is_dynamic ty args res
      [arg]  ->
 	case splitFunTys arg of
 	   (arg_tys, res_ty) -> 
-		mapTc (checkForeignArg isFFIExternalTy) arg_tys		`thenTc_`
-		checkForeignRes True  {-NonIO ok-} isFFIResultTy res_ty	`thenTc_`
-		checkForeignRes False {-Must be IO-} isAddrTy	   res
+		mapTc (checkForeignArg isFFIExternalTy) arg_tys	`thenTc_`
+		checkForeignRes True {-NonIO ok-} isFFIResultTy res_ty `thenTc_`
+		checkForeignRes False {-Must be IO-} isFFIDynResultTy res
      _      -> check False (illegalForeignTyErr True{-Arg-} ty)
  | otherwise =
      mapTc (checkForeignArg isFFIExternalTy) args  	        `thenTc_`

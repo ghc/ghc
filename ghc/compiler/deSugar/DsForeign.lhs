@@ -12,7 +12,7 @@ module DsForeign ( dsForeigns ) where
 
 import CoreSyn
 
-import DsCCall		( dsCCall, mkCCall, boxResult, unboxArg )
+import DsCCall		( dsCCall, mkCCall, boxResult, unboxArg, resultWrapper )
 import DsMonad
 
 import HsSyn		( ExtName(..), ForeignDecl(..), isDynamicExtName, ForKind(..) )
@@ -39,11 +39,14 @@ import PrimOp		( PrimOp(..), CCall(..),
 import TysWiredIn	( unitTy, addrTy, stablePtrTyCon,
 			  addrDataCon
 			)
+import TysPrim		( addrPrimTy )
 import Unique		( Uniquable(..), hasKey,
 			  ioTyConKey, deRefStablePtrIdKey, returnIOIdKey, 
 			  bindIOIdKey, makeStablePtrIdKey
 		)
 import Outputable
+
+import Maybe 		( fromJust )
 \end{code}
 
 Desugaring of @foreign@ declarations is naturally split up into
@@ -76,7 +79,7 @@ dsForeigns mod_name fos = foldlDs combine ([],[],empty,empty) fos
         dsFImport i (idType i) uns ext_nm cconv  `thenDs` \ bs -> 
 	returnDs (bs ++ acc_fi, acc_fe, acc_h, acc_c)
     | isForeignLabel = 
-        dsFLabel i ext_nm `thenDs` \ b -> 
+        dsFLabel i (idType i) ext_nm `thenDs` \ b -> 
 	returnDs (b:acc_fi, acc_fe, acc_h, acc_c)
     | isDynamicExtName ext_nm =
         dsFExportDynamic i (idType i) mod_name ext_nm cconv  `thenDs` \ (fi,fe,h,c) -> 
@@ -161,10 +164,12 @@ dsFImport fn_id ty may_not_gc ext_name cconv
 Foreign labels 
 
 \begin{code}
-dsFLabel :: Id -> ExtName -> DsM CoreBind
-dsFLabel nm ext_name = returnDs (NonRec nm fo_rhs)
+dsFLabel :: Id -> Type -> ExtName -> DsM CoreBind
+dsFLabel nm ty ext_name = 
+   ASSERT(fromJust res_ty == addrPrimTy) -- typechecker ensures this
+   returnDs (NonRec nm (fo_rhs (mkLit (MachLabel enm))))
   where
-   fo_rhs = mkConApp addrDataCon [mkLit (MachLabel enm)]
+   (res_ty, fo_rhs) = resultWrapper ty
    enm    = extNameStatic ext_name
 \end{code}
 
@@ -325,7 +330,7 @@ dsFExportDynamic i ty mod_name ext_name cconv =
        fe_ext_name = ExtName (_PK_ fe_nm) Nothing
      in
      dsFExport  i export_ty mod_name fe_ext_name cconv True
-     `thenDs` \ (fe@(NonRec fe_helper fe_expr), h_code, c_code) ->
+     	`thenDs` \ (fe@(NonRec fe_helper fe_expr), h_code, c_code) ->
      newSysLocalDs arg_ty			`thenDs` \ cback ->
      dsLookupGlobalValue makeStablePtrIdKey	`thenDs` \ makeStablePtrId ->
      let
@@ -357,7 +362,7 @@ dsFExportDynamic i ty mod_name ext_name cconv =
 	-- (probably in the RTS.) 
       adjustor	    = SLIT("createAdjustor")
      in
-     dsCCall adjustor adj_args False False ioAddrTy `thenDs` \ ccall_adj ->
+     dsCCall adjustor adj_args False False io_res_ty `thenDs` \ ccall_adj ->
      let ccall_adj_ty = exprType ccall_adj
          ccall_io_adj = mkLams [stbl_value]		     $
 			Note (Coerce io_res_ty (unUsgTy ccall_adj_ty))
@@ -365,7 +370,7 @@ dsFExportDynamic i ty mod_name ext_name cconv =
      in
      let io_app = mkLams tvs	 $
 		  mkLams [cback] $
-		  stbl_app ccall_io_adj addrTy
+		  stbl_app ccall_io_adj res_ty
      in
 	-- Never inline the f.e.d. function, because the litlit might not be in scope
 	-- in other modules.
