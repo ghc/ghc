@@ -15,7 +15,7 @@ module DataCon (
 	dataConSourceArity, dataConRepArity,
 	dataConNumInstArgs, dataConId, dataConWrapId, dataConRepStrictness,
 	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
-	isExistentialDataCon,
+	isExistentialDataCon, classDataCon,
 
 	splitProductType_maybe, splitProductType,
 
@@ -35,7 +35,7 @@ import Type		( Type, TauType, ClassContext,
 			)
 import TyCon		( TyCon, tyConDataCons, tyConDataConsIfAvailable, isDataTyCon, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
-import Class		( classTyCon )
+import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique, isLocallyDefined )
 import Var		( TyVar, Id )
 import FieldLabel	( FieldLabel )
@@ -394,6 +394,12 @@ isExistentialDataCon :: DataCon -> Bool
 isExistentialDataCon (MkData {dcExTyVars = tvs}) = not (null tvs)
 \end{code}
 
+
+\begin{code}
+classDataCon :: Class -> DataCon
+classDataCon clas = case tyConDataCons (classTyCon clas) of
+		      (dict_constr:no_more) -> ASSERT( null no_more ) dict_constr 
+\end{code}
 
 %************************************************************************
 %*									*

@@ -30,7 +30,7 @@ import RnHiFiles	( readIface, removeContext,
 import RnEnv		( availName, 
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, groupAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
-			  lookupOrigNames, lookupGlobalRn, newGlobalName
+			  lookupOrigNames, lookupSrcName, newGlobalName
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
@@ -41,7 +41,7 @@ import Name		( Name, NamedThing(..), getSrcLoc,
 			  nameOccName, nameModule,
 			)
 import Name		( mkNameEnv, nameEnvElts, extendNameEnv )
-import RdrName		( elemRdrEnv )
+import RdrName		( elemRdrEnv, foldRdrEnv, isQual )
 import OccName		( occNameFlavour )
 import NameSet
 import TysWiredIn	( unitTyCon, intTyCon, boolTyCon )
@@ -149,6 +149,7 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 		-- when compiling the prelude, locally-defined (), Bool, etc
 		-- override the implicit ones. 
     in
+    traceRn (text "Source FVs:" <+> fsep (map ppr (nameSetToList slurp_fvs)))	`thenRn_`
     slurpImpDecls slurp_fvs		`thenRn` \ rn_imp_decls ->
 
 	-- EXIT IF ERRORS FOUND
@@ -291,39 +292,31 @@ isOrphanDecl _ _  = False
 \begin{code}
 fixitiesFromLocalDecls :: GlobalRdrEnv -> [RdrNameHsDecl] -> RnMG LocalFixityEnv
 fixitiesFromLocalDecls gbl_env decls
-  = doptRn Opt_WarnUnusedBinds				  `thenRn` \ warn_unused ->
-    foldlRn (getFixities warn_unused) emptyNameEnv decls  `thenRn` \ env -> 
-    traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts env)))
-							  `thenRn_`
+  = foldlRn getFixities emptyNameEnv decls				`thenRn` \ env -> 
+    traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts env)))	`thenRn_`
     returnRn env
   where
-    getFixities :: Bool -> LocalFixityEnv -> RdrNameHsDecl -> RnMG LocalFixityEnv
-    getFixities warn_uu acc (FixD fix)
-      = fix_decl warn_uu acc fix
+    getFixities :: LocalFixityEnv -> RdrNameHsDecl -> RnMG LocalFixityEnv
+    getFixities acc (FixD fix)
+      = fix_decl acc fix
 
-    getFixities warn_uu acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ ))
-      = foldlRn (fix_decl warn_uu) acc [sig | FixSig sig <- sigs]
+    getFixities acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ ))
+      = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
 		-- Get fixities from class decl sigs too.
-    getFixities warn_uu acc other_decl
+    getFixities acc other_decl
       = returnRn acc
 
-    fix_decl warn_uu acc sig@(FixitySig rdr_name fixity loc)
+    fix_decl acc sig@(FixitySig rdr_name fixity loc)
 	= 	-- Check for fixity decl for something not declared
 	  pushSrcLocRn loc 			$
-	  lookupGlobalRn gbl_env rdr_name	`thenRn` \  maybe_name ->
-	  case maybe_name of {
-	    Nothing ->	checkRn (not warn_uu) (unusedFixityDecl rdr_name fixity)	`thenRn_` 
-			returnRn acc ;
-
-	    Just name ->
+	  lookupSrcName gbl_env rdr_name	`thenRn` \ name ->
 
 		-- Check for duplicate fixity decl
-	  case lookupNameEnv acc name of {
-	    Just (FixitySig _ _ loc') -> addErrRn (dupFixityDecl rdr_name loc loc')
-					 `thenRn_` returnRn acc ;
+	  case lookupNameEnv acc name of
+	    Just (FixitySig _ _ loc') -> addErrRn (dupFixityDecl rdr_name loc loc')	`thenRn_`
+					 returnRn acc ;
 
-	    Nothing -> returnRn (extendNameEnv acc name (FixitySig name fixity loc))
-	  }}
+	    Nothing		      -> returnRn (extendNameEnv acc name (FixitySig name fixity loc))
 \end{code}
 
 
@@ -352,11 +345,9 @@ rnDeprecs gbl_env Nothing decls
     returnRn (DeprecSome (mkNameEnv (catMaybes pairs)))
  where
    rn_deprec (Deprecation rdr_name txt loc)
-     = pushSrcLocRn loc			$
-       lookupGlobalRn gbl_env rdr_name	`thenRn` \ maybe_name ->
-       case maybe_name of
-	 Just n  -> returnRn (Just (n,(n,txt)))
-	 Nothing -> returnRn Nothing
+     = pushSrcLocRn loc				$
+       lookupSrcName gbl_env rdr_name		`thenRn` \ name ->
+       returnRn (Just (name, (name,txt)))
 \end{code}
 
 
@@ -543,6 +534,7 @@ reportUnusedNames my_mod_iface imports avail_env
     warnUnusedImports bad_imp_names				`thenRn_`
     printMinimalImports this_mod minimal_imports		`thenRn_`
     warnDeprecations this_mod my_deprecs really_used_names	`thenRn_`
+    traceRn (text "Used" <+> fsep (map ppr (nameSetToList used_names)))	`thenRn_`
     returnRn ()
 
   where
@@ -569,10 +561,16 @@ reportUnusedNames my_mod_iface imports avail_env
 			    		other		   -> Nothing]
     	    ]
     
-    defined_names, defined_and_used, defined_but_not_used :: [(Name,Provenance)]
-    defined_names			     = concat (rdrEnvElts gbl_env)
+	-- Collect the defined names from the in-scope environment
+	-- Look for the qualified ones only, else get duplicates
+    defined_names :: [(Name,Provenance)]
+    defined_names = foldRdrEnv add [] gbl_env
+    add rdr_name ns acc | isQual rdr_name = ns ++ acc
+			| otherwise	  = acc
+
+    defined_and_used, defined_but_not_used :: [(Name,Provenance)]
     (defined_and_used, defined_but_not_used) = partition used defined_names
-    used (name,_)	  		     = not (name `elemNameSet` really_used_names)
+    used (name,_)	  		     = name `elemNameSet` really_used_names
     
     -- Filter out the ones only defined implicitly
     bad_locals :: [Name]
@@ -800,9 +798,6 @@ warnDeprec (name, txt)
     sep [ text (occNameFlavour (nameOccName name)) <+> ppr name <+>
           text "is deprecated:", nest 4 (ppr txt) ]
 
-
-unusedFixityDecl rdr_name fixity
-  = hsep [ptext SLIT("Unused fixity declaration for"), quotes (ppr rdr_name)]
 
 dupFixityDecl rdr_name loc1 loc2
   = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),

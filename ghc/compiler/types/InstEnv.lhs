@@ -7,18 +7,18 @@ The bits common to TcInstDcls and TcDeriv.
 
 \begin{code}
 module InstEnv (
-	-- Instance environment
-	InstEnv, emptyInstEnv, extendInstEnv,
+	DFunId, ClsInstEnv, InstEnv,
+
+	emptyInstEnv, extendInstEnv,
 	lookupInstEnv, InstLookupResult(..),
-	classInstEnv, classDataCon, simpleDFunClassTyCon
+	classInstEnv, simpleDFunClassTyCon
     ) where
 
 #include "HsVersions.h"
 
-import HscTypes		( InstEnv, ClsInstEnv, DFunId )
 import Class		( Class )
 import Var		( Id )
-import VarSet		( unionVarSet, mkVarSet )
+import VarSet		( TyVarSet, unionVarSet, mkVarSet )
 import VarEnv		( TyVarSubstEnv )
 import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
 import Name		( getSrcLoc )
@@ -26,23 +26,30 @@ import Type		( Type, splitTyConApp_maybe,
 			  splitSigmaTy, splitDFunTy, tyVarsOfTypes
 			)
 import PprType		( )
-import Class		( classTyCon )
 import DataCon		( DataCon )
-import TyCon		( TyCon, tyConDataCons )
+import TyCon		( TyCon )
 import Outputable
 import Unify		( matchTys, unifyTyListsX )
-import UniqFM		( lookupWithDefaultUFM, addToUFM, emptyUFM )
+import UniqFM		( UniqFM, lookupWithDefaultUFM, addToUFM, emptyUFM )
 import Id		( idType )
 import ErrUtils		( Message )
 import CmdLineOpts
 \end{code}
 
 
-
-A tiny function which doesn't belong anywhere else.
-It makes a nasty mutual-recursion knot if you put it in Class.
+%************************************************************************
+%*									*
+\subsection{The key types}
+%*									*
+%************************************************************************
 
 \begin{code}
+type DFunId	= Id
+
+type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
+
+type ClsInstEnv = [(TyVarSet, [Type], DFunId)]	-- The instances for a particular class
+
 simpleDFunClassTyCon :: DFunId -> (Class, TyCon)
 simpleDFunClassTyCon dfun
   = (clas, tycon)
@@ -50,10 +57,6 @@ simpleDFunClassTyCon dfun
     (_,_,clas,[ty]) = splitDFunTy (idType dfun)
     tycon   	    = case splitTyConApp_maybe ty of
 			Just (tycon,_) -> tycon
-
-classDataCon :: Class -> DataCon
-classDataCon clas = case tyConDataCons (classTyCon clas) of
-		      (dict_constr:no_more) -> ASSERT( null no_more ) dict_constr 
 \end{code}		      
 
 %************************************************************************

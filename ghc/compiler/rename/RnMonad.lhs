@@ -40,7 +40,7 @@ import HscTypes		( AvailEnv, lookupType,
 			  WhetherHasOrphans, ImportVersion, 
 			  PersistentRenamerState(..), IsBootInterface, Avails,
 			  DeclsMap, IfaceInsts, IfaceRules, 
-			  HomeSymbolTable, PackageTypeEnv,
+			  HomeSymbolTable, TyThing,
 			  PersistentCompilerState(..), GlobalRdrEnv,
 			  HomeIfaceTable, PackageIfaceTable,
 			  RdrAvailInfo )
@@ -67,7 +67,6 @@ import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
 import PrelNames	( mkUnboundName )
-import Maybes		( maybeToBool )
 import ErrUtils		( printErrorsAndWarnings )
 
 infixr 9 `thenRn`, `thenRn_`
@@ -127,11 +126,13 @@ data RnDown
 	rn_dflags  :: DynFlags,
 
 	rn_hit     :: HomeIfaceTable,
-	rn_done    :: Name -> Bool,	-- Tells what things (both in the
-					-- home package and other packages)
-					-- were already available (i.e. in
-					-- the relevant SymbolTable) before 
-					-- compiling this module
+	rn_done    :: Name -> Maybe TyThing,	-- Tells what things (both in the
+						-- home package and other packages)
+						-- were already available (i.e. in
+						-- the relevant SymbolTable) before 
+						-- compiling this module
+			-- The Name passed to rn_done is guaranteed to be a Global,
+			-- so it has a Module, so it can be looked up
 
 	rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
 
@@ -330,7 +331,7 @@ initRn dflags hit hst pcs mod do_rn
 	
 			       rn_dflags = dflags,
 			       rn_hit    = hit,
-			       rn_done   = is_done hst pte,
+			       rn_done   = lookupType hst pte,
 					     
 			       rn_ns     = names_var, 
 			       rn_errs   = errs_var, 
@@ -357,11 +358,6 @@ initRn dflags hit hst pcs mod do_rn
 	printErrorsAndWarnings (warns, errs) ;
 
 	return (new_pcs, not (isEmptyBag errs), res)
-
-is_done :: HomeSymbolTable -> PackageTypeEnv -> Name -> Bool
--- Returns True iff the name is in either symbol table
--- The name is a Global, so it has a Module
-is_done hst pte n = maybeToBool (lookupType hst pte n)
 
 initRnMS rn_env fixity_env mode thing_inside rn_down g_down
 	-- The fixity_env appears in both the rn_fixenv field
@@ -589,9 +585,8 @@ getSrcLocRn down l_down
 getHomeIfaceTableRn :: RnM d HomeIfaceTable
 getHomeIfaceTableRn down l_down = return (rn_hit down)
 
-checkAlreadyAvailable :: Name -> RnM d Bool
-	-- Name is a Global name
-checkAlreadyAvailable name down l_down = return (rn_done down name)
+getTypeEnvRn :: RnM d (Name -> Maybe TyThing)
+getTypeEnvRn down l_down = return (rn_done down)
 \end{code}
 
 %================

@@ -342,7 +342,7 @@ loadInstDecl mod insts decl@(InstDecl inst_ty binds uprags dfun_name src_loc)
     in
     setModuleRn mod $
     mapRn lookupIfaceName free_names	`thenRn` \ gate_names ->
-    returnRn ((mkNameSet gate_names, (mod, InstD decl)) `consBag` insts)
+    returnRn ((gate_names, (mod, InstD decl)) `consBag` insts)
 
 
 -- In interface files, the instance decls now look like
@@ -376,7 +376,7 @@ loadRule :: Module -> RdrNameRuleDecl -> RnM d GatedDecl
 -- needed.  We can refine this later.
 loadRule mod decl@(IfaceRule _ _ var _ _ src_loc)
   = lookupIfaceName var		`thenRn` \ var_name ->
-    returnRn (unitNameSet var_name, (mod, RuleD decl))
+    returnRn ([var_name], (mod, RuleD decl))
 
 
 -----------------------------------------------------

@@ -542,46 +542,37 @@ exportsFromAvail this_mod (Just export_items)
 				   returnRn (mod:mods, occs', avails')
 
     exports_from_item warn_dups acc@(mods, occs, avails) ie
-	| not (maybeToBool maybe_in_scope) 
-	= failWithRn acc (unknownNameErr (ieName ie))
+	= lookupSrcName global_name_env (ieName ie)	`thenRn` \ name -> 
 
-	| not (null dup_names)
-	= addNameClashErrRn rdr_name ((name,prov):dup_names)	`thenRn_`
-	  returnRn acc
+		-- See what's available in the current environment
+	  case lookupUFM entity_avail_env name of {
+	    Nothing -> 	-- I can't see why this should ever happen; if the thing 
+			-- is in scope at all it ought to have some availability
+			pprTrace "exportsFromAvail: curious Nothing:" (ppr name)
+			returnRn acc ;
 
-#ifdef DEBUG
-	-- I can't see why this should ever happen; if the thing is in scope
-	-- at all it ought to have some availability
-	| not (maybeToBool maybe_avail)
-	= pprTrace "exportsFromAvail: curious Nothing:" (ppr name)
-	  returnRn acc
-#endif
+	    Just avail ->
 
-	| not enough_avail
-	= failWithRn acc (exportItemErr ie)
+		-- Filter out the bits we want
+	  case filterAvail ie avail of {
+	    Nothing -> 	-- Not enough availability
+			   failWithRn acc (exportItemErr ie) ;
 
-	| otherwise	-- Phew!  It's OK!  Now to check the occurrence stuff!
+	    Just export_avail -> 	
 
-
-	= warnCheckRn (ok_item ie avail) (dodgyExportWarn ie)	`thenRn_`
+		-- Phew!  It's OK!  Now to check the occurrence stuff!
+	  warnCheckRn (ok_item ie avail) (dodgyExportWarn ie)	`thenRn_`
           check_occs ie occs export_avail			`thenRn` \ occs' ->
 	  returnRn (mods, occs', addAvail avails export_avail)
+	  }}
 
-       where
-	  rdr_name	  = ieName ie
-          maybe_in_scope  = lookupFM global_name_env rdr_name
-	  Just ((name,prov):dup_names) = maybe_in_scope
-	  maybe_avail        = lookupUFM entity_avail_env name
-	  Just avail         = maybe_avail
- 	  maybe_export_avail = filterAvail ie avail
-	  enough_avail	     = maybeToBool maybe_export_avail
-	  Just export_avail  = maybe_export_avail
 
-    ok_item (IEThingAll _) (AvailTC _ [n]) = False
-		-- This occurs when you import T(..), but
-		-- only export T abstractly.  The single [n]
-		-- in the AvailTC is the type or class itself
-    ok_item _ _ = True
+
+ok_item (IEThingAll _) (AvailTC _ [n]) = False
+  -- This occurs when you import T(..), but
+  -- only export T abstractly.  The single [n]
+  -- in the AvailTC is the type or class itself
+ok_item _ _ = True
 
 check_occs :: RdrNameIE -> ExportOccMap -> AvailInfo -> RnMG ExportOccMap
 check_occs ie occs avail 

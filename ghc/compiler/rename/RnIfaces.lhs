@@ -33,6 +33,7 @@ import RnSource		( rnTyClDecl, rnDecl )
 import RnEnv
 import RnMonad
 import Id		( idType )
+import DataCon		( classDataCon, dataConId )
 import Type		( namesOfType )
 import TyCon		( isSynTyCon, getSynTyConDefn )
 import Name		( Name {-instance NamedThing-}, nameOccName,
@@ -73,80 +74,6 @@ getInterfaceExports mod_name from
     returnRn (mi_module iface, mi_exports iface)
   where
       doc_str = sep [ppr mod_name, ptext SLIT("is directly imported")]
-\end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Instance declarations are handled specially}
-%*							*
-%*********************************************************
-
-\begin{code}
-getImportedInstDecls :: NameSet -> RnMG [(Module,RdrNameHsDecl)]
-getImportedInstDecls gates
-  =    	-- First, load any orphan-instance modules that aren't aready loaded
-	-- Orphan-instance modules are recorded in the module dependecnies
-    getIfacesRn 					`thenRn` \ ifaces ->
-    let
-	orphan_mods =
-	  [mod | (mod, (True, _)) <- fmToList (iImpModInfo ifaces)]
-    in
-    loadOrphanModules orphan_mods			`thenRn_` 
-
-	-- Now we're ready to grab the instance declarations
-	-- Find the un-gated ones and return them, 
-	-- removing them from the bag kept in Ifaces
-    getIfacesRn 					`thenRn` \ ifaces ->
-    let
-	(decls, new_insts) = selectGated gates (iInsts ifaces)
-    in
-    setIfacesRn (ifaces { iInsts = new_insts })		`thenRn_`
-
-    traceRn (sep [text "getImportedInstDecls:", 
-		  nest 4 (fsep (map ppr gate_list)),
-		  text "Slurped" <+> int (length decls) <+> text "instance declarations",
-		  nest 4 (vcat (map ppr_brief_inst_decl decls))])	`thenRn_`
-    returnRn decls
-  where
-    gate_list      = nameSetToList gates
-
-ppr_brief_inst_decl (mod, InstD (InstDecl inst_ty _ _ _ _))
-  = case inst_ty of
-	HsForAllTy _ _ tau -> ppr tau
-	other		   -> ppr inst_ty
-
-getImportedRules :: RnMG [(Module,RdrNameHsDecl)]
-getImportedRules 
-  | opt_IgnoreIfacePragmas = returnRn []
-  | otherwise
-  = getIfacesRn 	`thenRn` \ ifaces ->
-    let
-	gates		   = iSlurp ifaces	-- Anything at all that's been slurped
-	rules		   = iRules ifaces
-	(decls, new_rules) = selectGated gates rules
-    in
-    if null decls then
-	returnRn []
-    else
-    setIfacesRn (ifaces { iRules = new_rules })		     `thenRn_`
-    traceRn (sep [text "getImportedRules:", 
-		  text "Slurped" <+> int (length decls) <+> text "rules"])   `thenRn_`
-    returnRn decls
-
-selectGated gates decl_bag
-	-- Select only those decls whose gates are *all* in 'gates'
-#ifdef DEBUG
-  | opt_NoPruneDecls	-- Just to try the effect of not gating at all
-  = (foldrBag (\ (_,d) ds -> d:ds) [] decl_bag, emptyBag)	-- Grab them all
-
-  | otherwise
-#endif
-  = foldrBag select ([], emptyBag) decl_bag
-  where
-    select (reqd, decl) (yes, no)
-	| isEmptyNameSet (reqd `minusNameSet` gates) = (decl:yes, no)
-	| otherwise				     = (yes,      (reqd,decl) `consBag` no)
 \end{code}
 
 
@@ -379,9 +306,9 @@ slurpSourceRefs source_binders source_fvs
     go_inner (decls, fvs, gates) wanted_name
 	= importDecl wanted_name 		`thenRn` \ import_result ->
 	  case import_result of
-	    AlreadySlurped -> returnRn (decls, fvs, gates)
-	    WiredIn        -> returnRn (decls, fvs, gates `plusFV` getWiredInGates wanted_name)
-	    Deferred       -> returnRn (decls, fvs, gates `addOneFV` wanted_name)	-- It's a type constructor
+	    AlreadySlurped     -> returnRn (decls, fvs, gates)
+	    InTypeEnv ty_thing -> returnRn (decls, fvs, gates `plusFV` getWiredInGates ty_thing)
+	    Deferred           -> returnRn (decls, fvs, gates `addOneFV` wanted_name)	-- It's a type constructor
 			
 	    HereItIs decl -> rnIfaceTyClDecl decl		`thenRn` \ (new_decl, fvs1) ->
 			     returnRn (TyClD new_decl : decls, 
@@ -530,33 +457,73 @@ stripDecl (mod, TyClD (TyData dt _ tc tvs _ nconstrs _ loc name1 name2))
 %*							 *
 %*********************************************************
 
+The gating story
+~~~~~~~~~~~~~~~~~
+We want to avoid sucking in too many instance declarations.
+An instance decl is only useful if the types and classes mentioned in
+its 'head' are all available in the program being compiled.  E.g.
+
+	instance (..) => C (T1 a) (T2 b) where ...
+
+is only useful if C, T1 and T2 are all available.  So we keep
+instance decls that have been parsed from .hi files, but not yet
+slurped in, in a pool called the 'gated instance pool'.
+Each has its set of 'gates': {C, T1, T2} in the above example.
+
+THE GATING INVARIANT 
+
+    *All* the instances whose gates are entirely in the stuff that's
+    already been through the type checker (i.e. are already in the
+    Persistent Type Environment or Home Symbol Table) have already been
+    slurped in, and are no longer in the gated instance pool.
+
+Hence, when we read a new module, we see what new gates we have,
+and let in any instance decls whose gates are 
+	either	in the new gates, 
+	or	in the HST/PTE
+
+An earlier optimisation: now infeasible
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we import a declaration like
 \begin{verbatim}
 	data T = T1 Wibble | T2 Wobble
 \end{verbatim}
-we don't want to treat @Wibble@ and @Wobble@ as gates
-{\em unless} @T1@, @T2@ respectively are mentioned by the user program.
-If only @T@ is mentioned
-we want only @T@ to be a gate;
-that way we don't suck in useless instance
-decls for (say) @Eq Wibble@, when they can't possibly be useful.
+we don't want to treat @Wibble@ and @Wobble@ as gates {\em unless}
+@T1@, @T2@ respectively are mentioned by the user program.  If only
+@T@ is mentioned we want only @T@ to be a gate; that way we don't suck
+in useless instance decls for (say) @Eq Wibble@, when they can't
+possibly be useful.
+
+BUT, I can't see how to do this and still maintain the GATING INVARIANT.
+So I've simply ditched the optimisation to get things working.
+
+
+
 
 @getGates@ takes a newly imported (and renamed) decl, and the free
 vars of the source program, and extracts from the decl the gate names.
 
 \begin{code}
-getGates source_fvs (IfaceSig _ ty _ _)
+getGates :: FreeVars		-- Things mentioned in the source program
+	 -> RenamedHsDecl
+	 -> FreeVars
+
+get_gates source_fvs decl = get_gates (\n -> True) decl
+	-- We'd use (\n -> n `elemNameSet` source_fvs)
+	-- if we were using the 'earlier optimisation above
+
+get_gates is_used (IfaceSig _ ty _ _)
   = extractHsTyNames ty
 
-getGates source_fvs (ClassDecl ctxt cls tvs _ sigs _ _ _ )
+get_gates is_used (ClassDecl ctxt cls tvs _ sigs _ _ _ )
   = (delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
 		        (hsTyVarNames tvs)
      `addOneToNameSet` cls)
     `plusFV` maybe_double
   where
     get (ClassOpSig n _ ty _) 
-	| n `elemNameSet` source_fvs = extractHsTyNames ty
-	| otherwise		     = emptyFVs
+	| is_used n = extractHsTyNames ty
+	| otherwise = emptyFVs
 
 	-- If we load any numeric class that doesn't have
 	-- Int as an instance, add Double to the gates. 
@@ -568,18 +535,17 @@ getGates source_fvs (ClassDecl ctxt cls tvs _ sigs _ _ _ )
 		 | otherwise
 		 = emptyFVs
 
-getGates source_fvs (TySynonym tycon tvs ty _)
-  = delListFromNameSet (extractHsTyNames ty)
-		       (hsTyVarNames tvs)
+get_gates is_used (TySynonym tycon tvs ty _)
+  = delListFromNameSet (extractHsTyNames ty) (hsTyVarNames tvs)
 	-- A type synonym type constructor isn't a "gate" for instance decls
 
-getGates source_fvs (TyData _ ctxt tycon tvs cons _ _ _ _ _)
+get_gates is_used (TyData _ ctxt tycon tvs cons _ _ _ _ _)
   = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) cons)
 		       (hsTyVarNames tvs)
     `addOneToNameSet` tycon
   where
     get (ConDecl n _ tvs ctxt details _)
-	| n `elemNameSet` source_fvs
+	| is_used n
 		-- If the constructor is method, get fvs from all its fields
 	= delListFromNameSet (get_details details `plusFV` 
 		  	      extractHsCtxtTyNames ctxt)
@@ -597,8 +563,8 @@ getGates source_fvs (TyData _ ctxt tycon tvs cons _ _ _ _ _)
     get_details (InfixCon t1 t2) = get_bang t1 `plusFV` get_bang t2
     get_details (RecCon fields)  = plusFVs [get_bang t | (_, t) <- fields]
 
-    get_field (fs,t) | any (`elemNameSet` source_fvs) fs = get_bang t
-		     | otherwise			 = emptyFVs
+    get_field (fs,t) | any is_used fs = get_bang t
+		     | otherwise      = emptyFVs
 
     get_bang bty = extractHsTyNames (getBangType bty)
 \end{code}
@@ -607,18 +573,23 @@ getGates source_fvs (TyData _ ctxt tycon tvs cons _ _ _ _ _)
 rather than a declaration.
 
 \begin{code}
-getWiredInGates :: Name -> FreeVars
-getWiredInGates name 	-- No classes are wired in
-  = case lookupNameEnv wiredInThingEnv name of
-	Just (AnId the_id) -> getWiredInGates_s (namesOfType (idType the_id))
+getWiredInGates :: TyThing -> FreeVars
+-- The TyThing is one that we already have in our type environment, either
+--	a) because the TyCon or Id is wired in, or
+--	b) from a previous compile
+-- Either way, we might have instance decls in the (persistend) collection
+-- of parsed-but-not-slurped instance decls that should be slurped in.
+-- This might be the first module that mentions both the type and the class
+-- for that instance decl, even though both the type and the class were
+-- mentioned in other modules, and hence are in the type environment
 
-	Just (ATyCon tc)
-	  |  isSynTyCon tc
-	  -> getWiredInGates_s (delListFromNameSet (namesOfType ty) (map getName tyvars))
-	  where
-	     (tyvars,ty)  = getSynTyConDefn tc
-
-	other -> unitFV name
+getWiredInGates (AnId the_id) = getWiredInGates_s (namesOfType (idType the_id))
+getWiredInGates (AClass cl)   = namesOfType (idType (dataConId (classDataCon cl)))	-- Cunning
+getWiredInGates (ATyCon tc)
+  | isSynTyCon tc = getWiredInGates_s (delListFromNameSet (namesOfType ty) (map getName tyvars))
+  | otherwise	  = unitFV (getName tc)
+  where
+    (tyvars,ty)  = getSynTyConDefn tc
 
 getWiredInGates_s names = foldr (plusFV . getWiredInGates) emptyFVs (nameSetToList names)
 \end{code}
@@ -626,6 +597,77 @@ getWiredInGates_s names = foldr (plusFV . getWiredInGates) emptyFVs (nameSetToLi
 \begin{code}
 getInstDeclGates (InstD (InstDecl inst_ty _ _ _ _)) = extractHsTyNames inst_ty
 getInstDeclGates other				    = emptyFVs
+\end{code}
+
+\begin{code}
+getImportedInstDecls :: NameSet -> RnMG [(Module,RdrNameHsDecl)]
+getImportedInstDecls gates
+  =    	-- First, load any orphan-instance modules that aren't aready loaded
+	-- Orphan-instance modules are recorded in the module dependecnies
+    getIfacesRn 					`thenRn` \ ifaces ->
+    let
+	orphan_mods =
+	  [mod | (mod, (True, _)) <- fmToList (iImpModInfo ifaces)]
+    in
+    loadOrphanModules orphan_mods			`thenRn_` 
+
+	-- Now we're ready to grab the instance declarations
+	-- Find the un-gated ones and return them, 
+	-- removing them from the bag kept in Ifaces
+    getIfacesRn 					`thenRn` \ ifaces ->
+    getTypeEnvRn					`thenRn` \ lookup ->
+    let
+	(decls, new_insts) = selectGated gates lookup (iInsts ifaces)
+    in
+    setIfacesRn (ifaces { iInsts = new_insts })		`thenRn_`
+
+    traceRn (sep [text "getImportedInstDecls:", 
+		  nest 4 (fsep (map ppr gate_list)),
+		  text "Slurped" <+> int (length decls) <+> text "instance declarations",
+		  nest 4 (vcat (map ppr_brief_inst_decl decls))])	`thenRn_`
+    returnRn decls
+  where
+    gate_list      = nameSetToList gates
+
+ppr_brief_inst_decl (mod, InstD (InstDecl inst_ty _ _ _ _))
+  = case inst_ty of
+	HsForAllTy _ _ tau -> ppr tau
+	other		   -> ppr inst_ty
+
+getImportedRules :: RnMG [(Module,RdrNameHsDecl)]
+getImportedRules 
+  | opt_IgnoreIfacePragmas = returnRn []
+  | otherwise
+  = getIfacesRn 	`thenRn` \ ifaces ->
+    getTypeEnvRn	`thenRn` \ lookup ->
+    let
+	gates		   = iSlurp ifaces	-- Anything at all that's been slurped
+	rules		   = iRules ifaces
+	(decls, new_rules) = selectGated gates lookup rules
+    in
+    if null decls then
+	returnRn []
+    else
+    setIfacesRn (ifaces { iRules = new_rules })		     `thenRn_`
+    traceRn (sep [text "getImportedRules:", 
+		  text "Slurped" <+> int (length decls) <+> text "rules"])   `thenRn_`
+    returnRn decls
+
+selectGated gates lookup decl_bag
+	-- Select only those decls whose gates are *all* in 'gates'
+	-- or are in the range of lookup
+#ifdef DEBUG
+  | opt_NoPruneDecls	-- Just to try the effect of not gating at all
+  = (foldrBag (\ (_,d) ds -> d:ds) [] decl_bag, emptyBag)	-- Grab them all
+
+  | otherwise
+#endif
+  = foldrBag select ([], emptyBag) decl_bag
+  where
+    available n = n `elemNameSet` gates || maybeToBool (lookup n)
+    select (reqd, decl) (yes, no)
+	| all available reqd = (decl:yes, no)
+	| otherwise	     = (yes,      (reqd,decl) `consBag` no)
 \end{code}
 
 
@@ -640,42 +682,57 @@ importDecl :: Name -> RnMG ImportDeclResult
 
 data ImportDeclResult
   = AlreadySlurped
-  | WiredIn	
+  | InTypeEnv TyThing
   | Deferred
   | HereItIs (Module, RdrNameTyClDecl)
 
 importDecl name
-  = 	-- Check if it was loaded before beginning this module
+  = 	-- STEP 1: Check if it was loaded before beginning this module
     if isLocalName name then
-	returnRn AlreadySlurped
-    else
-    checkAlreadyAvailable name		`thenRn` \ done ->
-    if done then
+	traceRn (text "Already (local)" <+> ppr name) `thenRn_`
 	returnRn AlreadySlurped
     else
 
-	-- Check if we slurped it in while compiling this module
+	-- STEP 2: Check if it's already in the type environment
+    getTypeEnvRn 			`thenRn` \ lookup ->
+    case lookup name of {
+	Just ty_thing | name `elemNameEnv` wiredInThingEnv
+		      -> 	-- When we find a wired-in name we must load its home
+				-- module so that we find any instance decls lurking therein
+			 loadHomeInterface wi_doc name	`thenRn_`
+			 returnRn (InTypeEnv (getWiredInGates ty_thing))
+
+		      | otherwise
+		      ->  returnRn (InTypeEnv ty_thing) ;
+
+	Nothing -> 
+
+	-- STEP 3: Check if we've slurped it in while compiling this module
     getIfacesRn				`thenRn` \ ifaces ->
     if name `elemNameSet` iSlurp ifaces then	
 	returnRn AlreadySlurped	
-    else 
+    else
 
-	-- When we find a wired-in name we must load its home
-	-- module so that we find any instance decls lurking therein
-    if name `elemNameEnv` wiredInThingEnv then
-	loadHomeInterface doc name	`thenRn_`
-	returnRn WiredIn
+	-- STEP 4: OK, we have to slurp it in from an interface file
+	--	   First load the interface file
+    traceRn nd_doc			`thenRn_`
+    loadHomeInterface nd_doc name	`thenRn_`
+    getIfacesRn				`thenRn` \ ifaces ->
 
-    else getNonWiredInDecl name
+	-- STEP 5: Get the declaration out
+    case lookupNameEnv (iDecls ifaces) name of
+      Just (avail,_,decl)
+	-> setIfacesRn (recordSlurp ifaces avail)	`thenRn_`
+	   returnRn (HereItIs decl)
+
+      Nothing 
+	-> addErrRn (getDeclErr name)	`thenRn_` 
+	   returnRn AlreadySlurped
+    }
   where
-    doc = ptext SLIT("need home module for wired in thing") <+> ppr name
+    wi_doc = ptext SLIT("need home module for wired in thing") <+> ppr name
+    nd_doc = ptext SLIT("need decl for") <+> ppr name
 
-getNonWiredInDecl :: Name -> RnMG ImportDeclResult
-getNonWiredInDecl needed_name 
-  = traceRn doc_str				`thenRn_`
-    loadHomeInterface doc_str needed_name	`thenRn_`
-    getIfacesRn					`thenRn` \ ifaces ->
-    case lookupNameEnv (iDecls ifaces) needed_name of
 
 {- 		OMIT DEFERRED STUFF FOR NOW, TILL GHCI WORKS
       Just (version, avail, is_tycon_name, decl@(_, TyClD (TyData DataType _ _ _ _ ncons _ _ _ _)))
@@ -715,16 +772,6 @@ getNonWiredInDecl needed_name
 	where
 	   tycon_name = availName avail
 -}
-
-      Just (avail,_,decl)
-	-> setIfacesRn (recordSlurp ifaces avail)	`thenRn_`
-	   returnRn (HereItIs decl)
-
-      Nothing 
-	-> addErrRn (getDeclErr needed_name)	`thenRn_` 
-	   returnRn AlreadySlurped
-  where
-     doc_str = ptext SLIT("need decl for") <+> ppr needed_name
 
 {-		OMIT FOR NOW
 getDeferredDecls :: RnMG [(Module, RdrNameHsDecl)]

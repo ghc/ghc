@@ -180,7 +180,8 @@ lookupTopBndrRn rdr_name
 			 -- if there are many with the same occ name
 			 -- There must *be* a binding
 		getModuleRn		`thenRn` \ mod ->
-		lookupSrcGlobalOcc (qualifyRdrName (moduleName mod) rdr_name)
+		getGlobalNameEnv	`thenRn` \ global_env ->
+    		lookupSrcName global_env (qualifyRdrName (moduleName mod) rdr_name)
 
 -- lookupSigOccRn is used for type signatures and pragmas
 -- Is this valid?
@@ -209,19 +210,21 @@ lookupOccRn rdr_name
 --	class op names in class and instance decls
 
 lookupGlobalOccRn rdr_name
+  = getModeRn 		`thenRn` \ mode ->
+    case mode of 
+	SourceMode    -> getGlobalNameEnv			`thenRn` \ global_env ->
+    			 lookupSrcName global_env rdr_name
+
+	InterfaceMode -> lookupIfaceName rdr_name
+
+lookupSrcName :: GlobalRdrEnv -> RdrName -> RnM d Name
+-- NB: passed GlobalEnv explicitly, not necessarily in RnMS monad
+lookupSrcName global_env rdr_name
   | isOrig rdr_name	-- Can occur in source code too
   = lookupOrigName rdr_name
 
   | otherwise
-  = getModeRn 		`thenRn` \ mode ->
-    case mode of 
-	SourceMode    -> lookupSrcGlobalOcc rdr_name
-	InterfaceMode -> lookupIfaceUnqual rdr_name
-
-lookupSrcGlobalOcc rdr_name
-  -- Lookup a source-code rdr-name; may be qualified or not
-  = getGlobalNameEnv			`thenRn` \ global_env ->
-    case lookupRdrEnv global_env rdr_name of
+  = case lookupRdrEnv global_env rdr_name of
 	Just [(name,_)]		-> returnRn name
 	Just stuff@((name,_):_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
 		       		   returnRn name
@@ -246,15 +249,6 @@ lookupIfaceName :: RdrName -> RnM d Name
 lookupIfaceName rdr_name
   | isUnqual rdr_name = lookupIfaceUnqual rdr_name
   | otherwise	      = lookupOrigName rdr_name
-
-lookupGlobalRn :: GlobalRdrEnv -> RdrName -> RnM d (Maybe Name)
-  -- Checks that there is exactly one
-lookupGlobalRn global_env rdr_name
-  = case lookupRdrEnv global_env rdr_name of
-	Just [(name,_)]		-> returnRn (Just name)
-	Just stuff@((name,_):_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
-		       		   returnRn (Just name)
-	Nothing			-> returnRn Nothing
 \end{code}
 
 @lookupOrigName@ takes an RdrName representing an {\em original}

@@ -51,10 +51,10 @@ import Name -- Env
 import NameSet		( NameSet )
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
-			  lookupModuleEnv, lookupModuleEnvByName
+			  lookupModuleEnv, lookupModuleEnvByName, emptyModuleEnv
 			)
+import InstEnv		( InstEnv, ClsInstEnv, DFunId )
 import Rules		( RuleBase )
-import VarSet		( TyVarSet )
 import Id		( Id )
 import Class		( Class )
 import TyCon		( TyCon )
@@ -66,12 +66,10 @@ import RdrHsSyn		( RdrNameHsDecl, RdrNameTyClDecl )
 import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
 import CoreSyn		( IdCoreRule )
-import Type		( Type )
 
 import FiniteMap	( FiniteMap )
 import Bag		( Bag )
 import Maybes		( seqMaybe )
-import UniqFM 		( UniqFM, emptyUFM )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import Util		( thenCmp )
@@ -193,7 +191,7 @@ type PackageIfaceTable  = IfaceTable
 type HomeSymbolTable    = SymbolTable	-- Domain = modules in the home package
 
 emptyIfaceTable :: IfaceTable
-emptyIfaceTable = emptyUFM
+emptyIfaceTable = emptyModuleEnv
 \end{code}
 
 Simple lookups in the symbol table.
@@ -308,11 +306,6 @@ lookupDeprec (DeprecAll  txt) name = Just txt
 lookupDeprec (DeprecSome env) name = case lookupNameEnv env name of
 					    Just (_, txt) -> Just txt
 					    Nothing	  -> Nothing
-
-type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
-
-type ClsInstEnv = [(TyVarSet, [Type], DFunId)]	-- The instances for a particular class
-type DFunId	= Id
 \end{code}
 
 
@@ -483,7 +476,7 @@ type DeclsMap = NameEnv (AvailInfo, Bool, (Module, RdrNameTyClDecl))
 type IfaceInsts = Bag GatedDecl
 type IfaceRules = Bag GatedDecl
 
-type GatedDecl = (NameSet, (Module, RdrNameHsDecl))
+type GatedDecl = ([Name], (Module, RdrNameHsDecl))
 \end{code}
 
 

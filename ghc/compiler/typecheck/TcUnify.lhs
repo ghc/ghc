@@ -298,7 +298,7 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
     case maybe_ty2 of
 	Just ty2' -> uUnboundVar swapped tv1 maybe_ty1 ty2' ty2'
 
-	Nothing | tv1_dominates_tv2 
+	Nothing | update_tv2
 
 		-> WARN( not (k1 `hasMoreBoxityInfo` k2), (ppr tv1 <+> ppr k1) $$ (ppr tv2 <+> ppr k2) )
 		   tcPutTyVar tv2 (TyVarTy tv1)		`thenNF_Tc_`
@@ -312,10 +312,11 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
   where
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
-    tv1_dominates_tv2 =    isSigTyVar tv1 
+    update_tv2 = (k2 == openTypeKind) || (k1 /= openTypeKind && nicer_to_update_tv2)
+			-- Try to get rid of open type variables as soon as poss
+
+    nicer_to_update_tv2 =  isSigTyVar tv1 
 				-- Don't unify a signature type variable if poss
-			|| k2 == openTypeKind
-				-- Try to get rid of open type variables as soon as poss
 			|| isSystemName (varName tv2)
 				-- Try to update sys-y type variables in preference to sig-y ones
 
