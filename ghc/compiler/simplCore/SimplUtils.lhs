@@ -910,7 +910,9 @@ mkAlts scrut case_bndr alts
     in
     returnSmpl better_alts
   where
-    impossible_cons   = otherCons (idUnfolding case_bndr)
+    impossible_cons   = case scrut of
+			    Var v -> otherCons (idUnfolding v)
+			    other -> []
     handled_data_cons = [data_con | DataAlt data_con         <- impossible_cons] ++
 			[data_con | (DataAlt data_con, _, _) <- alts]
     is_missing con    = not (con `elem` handled_data_cons)
