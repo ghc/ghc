@@ -1,7 +1,7 @@
 #
 # perl script expect the following variables to be prepended:
 #
-#  RAWCPP TMPDIR TOP_PWD
+#  RAWCPP TMPDIR TOP_PWD HscIfaceFileVersion
 #  libdir libexecdir datadir INSTALLING
 #  SED 
 #
@@ -58,7 +58,7 @@ mkdependHS-specific options (not between --'s):
                 Regard <file> as not "stable"; i.e., generate dependencies
                 on it (if any). This option is normally used in conjunction 
                 with the --exclude-directory option.
-
+		
 EOUSAGE
 
 $Status     = 0; # just used for exit() status
@@ -83,6 +83,9 @@ $InstDataDirGhc    = "${datadir}";
 
 $Unlit = ($INSTALLING) ? "${InstLibExecDirGhc}/unlit" 
 		       : "${TopPwd}/ghc/utils/unlit/unlit";
+
+$HiBootVersion = $HscIfaceFileVersion;
+$hi_boot_with_version = 0;
 
 $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
@@ -466,7 +469,12 @@ sub process_dependency {
             local($source_dep);
 
             if ( $source ) {
-                $source_dep = "$int_file.hi-boot";
+		# if a version specific .hi-boot file exist, use it.
+		if ( -f "$int_file.hi-boot-${HiBootVersion}" ) {
+               	   $source_dep = "$int_file.hi-boot-${HiBootVersion}";
+		} else {
+		   $source_dep = "$int_file.hi-boot";
+		}
             } else {
 	        local($str)="";
 		foreach $obj (@Obj_suffix) {
@@ -535,6 +543,10 @@ sub find_in_Import_dirs {
         }
 
 	if ( $source ) {
+	    $name_to_check = "$import_dir/$modname.hi-boot-${HiBootVersion}";
+	    print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
+	    return($name_to_check) if -f $name_to_check;
+
 	    $name_to_check = "$import_dir/$modname.hi-boot";
 	    print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
 	    return($name_to_check) if -f $name_to_check;
