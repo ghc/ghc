@@ -33,7 +33,7 @@
       <DT>
 	<A HREF="readline/index.html"><TT>readline</TT></a>
       </DT><DD>
-	a library for interactively reading input from  the console
+	a library for interactively reading input from the console.
       </DD>
       <DT>
 	<A HREF="unix/index.html"><TT>unix</TT></a>
@@ -64,7 +64,7 @@
     <H2>Implementation-specific notes</H2>
 
     <DL>
-      <DT>GHC/GHCi</DT>
+      <DT><A HREF="http://www.haskell.org/ghc/">GHC/GHCi</A></DT>
       <DD>
 	Most of the time, all the packages are available without the
 	need to use any additional command-line options.  The only
@@ -77,12 +77,24 @@
 	for more details.
       </DD>
 
-      <DT>Hugs</DT>
+      <DT><A HREF="http://www.haskell.org/hugs/">Hugs 98</A></DT>
       <DD>
-	Hugs currently provides modules from the <tt>base</tt>,
-	<tt>haskell98</tt>, <tt>network</tt> and <tt>haskell-src</tt> packages.
+	Hugs provides almost all of the modules in the <tt>base</tt> package,
+	all the modules in the
+	<tt>haskell98</tt>, <tt>network</tt> and <tt>haskell-src</tt> packages,
+	and some of those in the <tt>unix</tt> package.
 	These modules are always available, as a single hierarchy;
 	Hugs does not use the package subdivision.
+      </DD>
+
+      <DT><A HREF="http://www.haskell.org/nhc98/">Nhc98</A></DT>
+      <DD>
+	To use modules from a package <i>P</i> with Nhc98,
+	add the compile-time option <tt>-package</tt> <i>P</i>.
+	Nhc98 currently provides many of the modules in the
+	<tt>base</tt> package (see the
+	<a href="http://www.haskell.org/nhc98/libraries.html">Nhc98 libraries page</a>
+	for a list).
       </DD>
 
     </DL>
