@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.49 1999/03/09 15:33:16 sewardj Exp $
+ * $Id: GC.c,v 1.50 1999/03/11 09:31:53 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -106,7 +106,7 @@ static void         zero_mutable_list       ( StgMutClosure *first );
 static void         revert_dead_CAFs        ( void );
 
 static rtsBool      traverse_weak_ptr_list  ( void );
-static void         cleanup_weak_ptr_list   ( void );
+static void         cleanup_weak_ptr_list   ( StgWeak **list );
 
 static void         scavenge_stack          ( StgPtr p, StgPtr stack_end );
 static void         scavenge_large          ( step *step );
@@ -420,7 +420,7 @@ void GarbageCollect(void (*get_roots)(void))
   /* Final traversal of the weak pointer list (see comment by
    * cleanUpWeakPtrList below).
    */
-  cleanup_weak_ptr_list();
+  cleanup_weak_ptr_list(&weak_ptr_list);
 
   /* Now see which stable names are still alive.
    */
@@ -788,8 +788,8 @@ traverse_weak_ptr_list(void)
    * of pending finalizers later on.
    */
   if (flag == rtsFalse) {
+    cleanup_weak_ptr_list(&old_weak_ptr_list);
     for (w = old_weak_ptr_list; w; w = w->link) {
-      w->value = evacuate(w->value);
       w->finalizer = evacuate(w->finalizer);
     }
     weak_done = rtsTrue;
@@ -811,12 +811,12 @@ traverse_weak_ptr_list(void)
    -------------------------------------------------------------------------- */
 
 static void
-cleanup_weak_ptr_list ( void )
+cleanup_weak_ptr_list ( StgWeak **list )
 {
   StgWeak *w, **last_w;
 
-  last_w = &weak_ptr_list;
-  for (w = weak_ptr_list; w; w = w->link) {
+  last_w = list;
+  for (w = *list; w; w = w->link) {
 
     if (get_itbl(w)->type == EVACUATED) {
       w = (StgWeak *)((StgEvacuated *)w)->evacuee;
