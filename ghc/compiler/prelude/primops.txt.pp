@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.26 2003/03/24 14:46:53 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.27 2003/06/19 10:42:26 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -1310,6 +1310,15 @@ primop  RaiseOp "raise#" GenPrimOp
    strictness  = { \ arity -> mkStrictSig (mkTopDmdType [lazyDmd] BotRes) }
       -- NB: result is bottom
    usage       = { mangle RaiseOp [mkM] mkM }
+   out_of_line = True
+
+-- raiseIO# needs to be a primop, because exceptions in the IO monad
+-- must be *precise* - we don't want the strictness analyser turning
+-- one kind of bottom into another, as it is allowed to do in pure code.
+
+primop  RaiseIOOp "raiseIO#" GenPrimOp
+   a -> State# RealWorld -> (# State# RealWorld, b #)
+   with
    out_of_line = True
 
 primop  BlockAsyncExceptionsOp "blockAsyncExceptions#" GenPrimOp

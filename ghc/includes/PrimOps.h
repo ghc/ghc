@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.101 2003/06/09 14:10:04 matthewc Exp $
+ * $Id: PrimOps.h,v 1.102 2003/06/19 10:42:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -253,6 +253,7 @@ EXTFUN_RTS(asyncWritezh_fast);
 
 EXTFUN_RTS(catchzh_fast);
 EXTFUN_RTS(raisezh_fast);
+EXTFUN_RTS(raiseIOzh_fast);
 
 extern void stg_exit(int n)  __attribute__ ((noreturn));
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.27 2003/05/14 09:13:59 simonmar Exp $
+ * $Id: Exception.hc,v 1.28 2003/06/19 10:42:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -350,7 +350,7 @@ FN_(raisezh_fast)
   StgPtr p;
   StgClosure *raise_closure;
   FB_
-    /* args : R1 = exception */
+    /* args : R1.p :: Exception */
 
 
 #if defined(PROFILING)
@@ -457,5 +457,13 @@ FN_(raisezh_fast)
     R1.cl = handler;
     Sp--;
     JMP_(stg_ap_p_ret);
+  FE_
+}
+
+FN_(raiseIOzh_fast)
+{
+  FB_
+  /* Args :: R1.p :: Exception */
+  JMP_(raisezh_fast);
   FE_
 }
