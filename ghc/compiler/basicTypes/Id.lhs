@@ -423,12 +423,24 @@ setIdCgInfo id cg_info = modifyIdInfo (`setCgInfo` cg_info) id
 	---------------------------------
 	-- CAF INFO
 idCafInfo :: Id -> CafInfo
+#ifdef DEBUG
+idCafInfo id = case cgInfo (idInfo id) of
+		  NoCgInfo -> pprPanic "idCafInfo" (ppr id)
+		  info     -> cgCafInfo info
+#else
 idCafInfo id = cgCafInfo (idCgInfo id)
+#endif
 
 	---------------------------------
 	-- CG ARITY
 idCgArity :: Id -> Arity
+#ifdef DEBUG
+idCgArity id = case cgInfo (idInfo id) of
+		  NoCgInfo -> pprPanic "idCgArity" (ppr id)
+		  info     -> cgArity info
+#else
 idCgArity id = cgArity (idCgInfo id)
+#endif
 
 	---------------------------------
 	-- CPR INFO
