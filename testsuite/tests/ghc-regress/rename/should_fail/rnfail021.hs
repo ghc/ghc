@@ -2,5 +2,5 @@
 
 module Foo where
 
-Baz.f = True
+(Baz.f, x) = True
 
