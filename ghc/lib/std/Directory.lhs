@@ -17,7 +17,7 @@ some operating systems, it may also be possible to have paths which
 are relative to the current directory.
 
 \begin{code}
-{-# OPTIONS -#include <sys/stat.h> #-}
+{-# OPTIONS -#include <sys/stat.h> -#include <dirent.h> #-}
 module Directory 
    ( 
     Permissions(Permissions),
@@ -334,26 +334,29 @@ The path refers to an existing non-directory object.
 \end{itemize}
 
 \begin{code}
+--getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do
-    ptr <- _ccall_ getDirectoryContents path
-    if ptr == ``NULL'' 
+    dir <- _ccall_ openDir__ path
+    ptr <- _ccall_ malloc (``sizeof(struct dirent**)''::Int)
+    if dir == ``NULL'' 
 	then constructErrorAndFail "getDirectoryContents"
-     	else do
-		entries <- getEntries ptr 0
-		_ccall_ free ptr
-		return entries
+     	else loop dir ptr
   where
-    getEntries :: Addr -> Int -> IO [FilePath]
-    getEntries ptr n = do
-        str <- _casm_ ``%r = ((char **)%0)[%1];'' ptr n
-        if str == ``NULL'' 
-	    then return []
-            else do
-            	len <- _ccall_ strlen str
-	    	entry <- stToIO (unpackNBytesST str len)
-            	_ccall_ free str
-            	entries <- getEntries ptr (n+1)
-	    	return (entry : entries)
+    loop :: Addr -> Addr -> IO [String]
+    loop dir dirent_ptr = do
+      dirent_ptr <- _ccall_ readDir__ dir
+      if dirent_ptr == ``NULL'' 
+       then do
+	  return [] 
+       else do
+          str     <- _casm_ `` %r=(char*)((struct dirent*)%0)->d_name; '' dirent_ptr
+	    -- not using the unpackCString function here, since we have to force
+	    -- the unmarshalling of the directory entry right here as subsequent
+	    -- calls to readdir() may overwrite it.
+          len     <- _ccall_ strlen str
+	  entry   <- stToIO (unpackNBytesST str len)
+	  entries <- loop dir dirent_ptr
+          return (entry:entries)
 \end{code}
 
 If the operating system has a notion of current directories,
