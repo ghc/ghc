@@ -19,11 +19,13 @@ import MachRegs
 
 import AbsCSyn		( MagicId )
 import AbsCUtils	( magicIdPrimRep )
+import CallConv		( CallConv )
 import CLabel		( isAsmTemp, CLabel )
 import Maybes		( maybeToBool, expectJust )
 import OrdList		-- quite a bit of it
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..), showPrimOp )
+import CallConv		( cCallConv )
 import Stix		( getUniqLabelNCG, StixTree(..),
 			  StixReg(..), CodeSegment(..)
 			)
@@ -47,7 +49,7 @@ stmt2Instrs stmt = case stmt of
 
     StJump arg		   -> genJump arg
     StCondJump lab arg	   -> genCondJump lab arg
-    StCall fn VoidRep args -> genCCall fn VoidRep args
+    StCall fn cconv VoidRep args -> genCCall fn cconv VoidRep args
 
     StAssign pk dst src
       | isFloatingRep pk -> assignFltCode pk dst src
@@ -212,8 +214,8 @@ getRegister (StReg (StixTemp u pk))
 
 getRegister tree@(StIndex _ _ _) = getRegister (mangleIndexTree tree)
 
-getRegister (StCall fn kind args)
-  = genCCall fn kind args   	    `thenUs` \ call ->
+getRegister (StCall fn cconv kind args)
+  = genCCall fn cconv kind args   	    `thenUs` \ call ->
     returnUs (Fixed kind reg call)
   where
     reg = if isFloatingRep kind
@@ -308,7 +310,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       Double2FloatOp -> coerceFltCode x
       Float2DoubleOp -> coerceFltCode x
 
-      other_op -> getRegister (StCall fn DoubleRep [x])
+      other_op -> getRegister (StCall fn cconv DoubleRep [x])
 	where
 	  fn = case other_op of
 		 FloatExpOp    -> SLIT("exp")
@@ -405,15 +407,14 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       OrOp   -> trivialCode OR  x y
       XorOp  -> trivialCode XOR x y
       SllOp  -> trivialCode SLL x y
-      SraOp  -> trivialCode SRA x y
       SrlOp  -> trivialCode SRL x y
 
       ISllOp -> panic "AlphaGen:isll"
-      ISraOp -> panic "AlphaGen:isra"
+      ISraOp -> trivialCode SRA x y -- was: panic "AlphaGen:isra"
       ISrlOp -> panic "AlphaGen:isrl"
 
-      FloatPowerOp  -> getRegister (StCall SLIT("pow") DoubleRep [x,y])
-      DoublePowerOp -> getRegister (StCall SLIT("pow") DoubleRep [x,y])
+      FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [x,y])
+      DoublePowerOp -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [x,y])
   where
     {- ------------------------------------------------------------
 	Some bizarre special code for getting condition codes into
@@ -556,7 +557,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 			  then StPrim Float2DoubleOp [x]
 			  else x
 	in
-	getRegister (StCall fn DoubleRep [x])
+	getRegister (StCall fn cCallConv DoubleRep [x])
        where
 	(is_float_op, fn)
 	  = case primop of
@@ -668,17 +669,16 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	-}
 	   
       SllOp -> shift_code (SHL L) x y {-False-}
-      SraOp -> shift_code (SAR L) x y {-False-}
       SrlOp -> shift_code (SHR L) x y {-False-}
 
       {- ToDo: nuke? -}
       ISllOp -> panic "I386Gen:isll"
-      ISraOp -> panic "I386Gen:isra"
+      ISraOp -> shift_code (SAR L) x y {-False-}  --panic "I386Gen:isra"
       ISrlOp -> panic "I386Gen:isrl"
 
-      FloatPowerOp  -> getRegister (StCall SLIT("pow") DoubleRep [promote x, promote y])
+      FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [promote x, promote y])
 		       where promote x = StPrim Float2DoubleOp [x]
-      DoublePowerOp -> getRegister (StCall SLIT("pow") DoubleRep [x, y])
+      DoublePowerOp -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [x, y])
   where
     shift_code :: (Operand -> Operand -> Instr)
 	       -> StixTree
@@ -970,7 +970,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 			  then StPrim Float2DoubleOp [x]
 			  else x
 	in
-	getRegister (StCall fn DoubleRep [x])
+	getRegister (StCall fn cCallConv DoubleRep [x])
        where
 	(is_float_op, fn)
 	  = case primop of
@@ -1073,19 +1073,18 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       OrOp  -> trivialCode (OR  False) x y
       XorOp -> trivialCode (XOR False) x y
       SllOp -> trivialCode SLL x y
-      SraOp -> trivialCode SRA x y
       SrlOp -> trivialCode SRL x y
 
       ISllOp -> panic "SparcGen:isll"
-      ISraOp -> panic "SparcGen:isra"
+      ISraOp -> trivialCode SRA x y  --was: panic "SparcGen:isra"
       ISrlOp -> panic "SparcGen:isrl"
 
-      FloatPowerOp  -> getRegister (StCall SLIT("pow") DoubleRep [promote x, promote y])
+      FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [promote x, promote y])
 		       where promote x = StPrim Float2DoubleOp [x]
-      DoublePowerOp -> getRegister (StCall SLIT("pow") DoubleRep [x, y])
+      DoublePowerOp -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [x, y])
 --      _ -> panic "Prim op " ++ (showPrimOp primop) ++ " not handled!"
   where
-    imul_div fn x y = getRegister (StCall fn IntRep [x, y])
+    imul_div fn x y = getRegister (StCall fn cCallConv IntRep [x, y])
 
 getRegister (StInd pk mem)
   = getAmode mem    	    	    `thenUs` \ amode ->
@@ -2234,13 +2233,14 @@ register allocator.
 \begin{code}
 genCCall
     :: FAST_STRING	-- function to call
+    -> CallConv
     -> PrimRep		-- type of the result
     -> [StixTree]	-- arguments (of mixed type)
     -> UniqSM InstrBlock
 
 #if alpha_TARGET_ARCH
 
-genCCall fn kind args
+genCCall fn cconv kind args
   = mapAccumLUs get_arg (allArgRegs, eXTRA_STK_ARGS_HERE) args
     	    	    	    	    `thenUs` \ ((unused,_), argCode) ->
     let
@@ -2308,7 +2308,7 @@ genCCall fn kind args
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
-genCCall fn kind [StInt i]
+genCCall fn cconv kind [StInt i]
   | fn == SLIT ("PerformGC_wrapper")
   = let
      call = [MOV L (OpImm (ImmInt (fromInteger i))) (OpReg eax),
@@ -2329,7 +2329,7 @@ genCCall fn kind [StInt i]
     returnInstrs call
 -}
 
-genCCall fn kind args
+genCCall fn cconv kind args
   = mapUs get_call_arg args `thenUs` \ argCode ->
     let
 	nargs = length args
@@ -2401,7 +2401,7 @@ genCCall fn kind args
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
-genCCall fn kind args
+genCCall fn cconv kind args
   = mapAccumLUs get_arg (allArgRegs, eXTRA_STK_ARGS_HERE) args
     	    	    	    	    `thenUs` \ ((unused,_), argCode) ->
     let

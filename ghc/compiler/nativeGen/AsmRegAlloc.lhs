@@ -22,8 +22,7 @@ import OrdList		( mkEmptyList, mkUnitList, mkSeqList, mkParList,
 			)
 import Stix		( StixTree )
 import Unique		( mkBuiltinUnique )
-import Util		( mapAccumB, panic )
-import GlaExts		( trace )
+import Util		( mapAccumB, panic, trace )
 import Outputable
 \end{code}
 

@@ -156,8 +156,8 @@ genericOpt (StJump addr) = StJump (genericOpt addr)
 genericOpt (StCondJump addr test)
   = StCondJump addr (genericOpt test)
 
-genericOpt (StCall fn pk args)
-  = StCall fn pk (map genericOpt args)
+genericOpt (StCall fn cconv pk args)
+  = StCall fn cconv pk (map genericOpt args)
 \end{code}
 
 Fold indices together when the types match:
@@ -249,7 +249,6 @@ primOpt op args@[x, y@(StInt 0)]
     	OrOp   	 -> x
     	XorOp  	 -> x
     	SllOp  	 -> x
-    	SraOp  	 -> x
     	SrlOp  	 -> x
     	ISllOp 	 -> x
     	ISraOp 	 -> x
@@ -271,10 +270,10 @@ primOpt op args@[x, y@(StInt n)]
   = case op of
     	IntMulOp -> case exactLog2 n of
 	    Nothing -> StPrim op args
-    	    Just p  -> StPrim SllOp [x, StInt p]
+    	    Just p  -> StPrim ISllOp [x, StInt p]
     	IntQuotOp -> case exactLog2 n of
 	    Nothing -> StPrim op args
-    	    Just p  -> StPrim SraOp [x, StInt p]
+    	    Just p  -> StPrim ISrlOp [x, StInt p]
     	_ -> StPrim op args
 \end{code}
 

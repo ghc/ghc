@@ -13,6 +13,7 @@ import MachRegs
 
 import AbsCSyn
 import AbsCUtils	( getAmodeRep, mixedTypeLocn )
+import CallConv		( cCallConv )
 import Constants	( spARelToInt, spBRelToInt )
 import CostCentre	( noCostCentreAttached )
 import HeapOffs		( hpRelToInt, subOff )
@@ -130,15 +131,14 @@ primCode [res] Word2IntOp [arg]
 \end{code}
 
 The @ErrorIO@ primitive is actually a bit weird...assign a new value
-to the root closure, flush stdout and stderr, and jump to the
-@ErrorIO_innards@.
+to the root closure, and jump to the @ErrorIO_innards@.
 
 \begin{code}
 primCode [] ErrorIOPrimOp [rhs]
   = let
 	changeTop = StAssign PtrRep topClosure (amodeToStix rhs)
     in
-    returnUs (\xs -> changeTop : flushStdout : flushStderr : errorIO : xs)
+    returnUs (\xs -> changeTop : errorIO : xs)
 \end{code}
 
 @newArray#@ ops allocate heap space.
@@ -152,7 +152,7 @@ primCode [res] NewArrayOp args
     	loc = StIndex PtrRep stgHp
     	      (StPrim IntNegOp [StPrim IntSubOp [space, StInt 1]])
     	assign = StAssign PtrRep result loc
-    	initialise = StCall SLIT("newArrZh_init") VoidRep [result, n, initial]
+    	initialise = StCall SLIT("newArrZh_init") cCallConv VoidRep [result, n, initial]
     in
     heapCheck liveness space (StInt 0)	`thenUs` \ heap_chk ->
 
@@ -318,7 +318,7 @@ primCode [lhs] DeRefStablePtrOp [sp]
 	lhs' = amodeToStix lhs
     	pk = getAmodeRep lhs
     	sp' = amodeToStix sp
-	call = StCall SLIT("deRefStablePointer") pk [sp', smStablePtrTable]
+	call = StCall SLIT("deRefStablePointer") cCallConv pk [sp', smStablePtrTable]
     	assign = StAssign pk lhs' call
     in
     returnUs (\xs -> assign : xs)
@@ -439,21 +439,21 @@ primCode [lhs] SeqOp [a]
      lhs'   = amodeToStix lhs
      a'     = amodeToStix a
      pk     = getAmodeRep lhs  -- an IntRep
-     call   = StCall SLIT("SeqZhCode") pk [a']
+     call   = StCall SLIT("SeqZhCode") cCallConv pk [a']
      assign = StAssign pk lhs' call
     in
 --    trace "SeqOp" $ 
     returnUs (\xs -> assign : xs)
 
-primCode lhs (CCallOp fn is_asm may_gc arg_tys result_ty) rhs
+primCode lhs (CCallOp (Just fn) is_asm may_gc cconv arg_tys result_ty) rhs
   | is_asm = error "ERROR: Native code generator can't handle casm"
   | otherwise
   = case lhs of
-      [] -> returnUs (\xs -> (StCall fn VoidRep args) : xs)
+      [] -> returnUs (\xs -> (StCall fn cconv VoidRep args) : xs)
       [lhs] ->
 	  let lhs' = amodeToStix lhs
 	      pk = if isFloatingRep (getAmodeRep lhs) then DoubleRep else IntRep
-	      call = StAssign pk lhs' (StCall fn pk args)
+	      call = StAssign pk lhs' (StCall fn cconv pk args)
 	  in
 	      returnUs (\xs -> call : xs)
   where
@@ -582,7 +582,7 @@ amodeToStix (CCharLike x)
 amodeToStix (CIntLike (CLit (MachInt i _)))
   = StPrim IntAddOp [intLikePtr, StInt off]
   where
-    off = toInteger intLikeSize * i
+    off = toInteger intLikeSize * toInteger i
 
 amodeToStix (CIntLike x)
   = StPrim IntAddOp [intLikePtr, off]
@@ -597,7 +597,7 @@ amodeToStix (CLit core)
       MachChar c     -> StInt (toInteger (ord c))
       MachStr s	     -> StString s
       MachAddr a     -> StInt a
-      MachInt i _    -> StInt i
+      MachInt i _    -> StInt (toInteger i)
       MachLitLit s _ -> StLitLit s
       MachFloat d    -> StDouble d
       MachDouble d   -> StDouble d
@@ -643,10 +643,8 @@ charLike = sStLitLbl SLIT("CHARLIKE_closures")
 
 -- Trees for the ErrorIOPrimOp
 
-topClosure, flushStdout, flushStderr, errorIO :: StixTree
+topClosure, errorIO :: StixTree
 
 topClosure = StInd PtrRep (sStLitLbl SLIT("TopClosure"))
-flushStdout = StCall SLIT("fflush") VoidRep [StLitLit SLIT("stdout")]
-flushStderr = StCall SLIT("fflush") VoidRep [StLitLit SLIT("stderr")]
 errorIO = StJump (StInd PtrRep (sStLitLbl SLIT("ErrorIO_innards")))
 \end{code}

@@ -367,7 +367,7 @@ comparison tree.  (Perhaps this could be tuned.)
 \begin{code}
 
  intTag :: Literal -> Integer
- intTag (MachChar c) = toInteger (ord c)
+ intTag (MachChar c)  = fromInt (ord c)
  intTag (MachInt i _) = i
  intTag _ = panic "intTag"
 
@@ -442,8 +442,8 @@ already finish with a jump to the join point.
  mkJumpTable am alts lowTag highTag dflt
   = getUniqLabelNCG 	    	    	    	    	`thenUs` \ utlbl ->
     mapUs genLabel alts 	  	    	    	`thenUs` \ branches ->
-    let	cjmpLo = StCondJump dflt (StPrim IntLtOp [am, StInt lowTag])
-    	cjmpHi = StCondJump dflt (StPrim IntGtOp [am, StInt highTag])
+    let	cjmpLo = StCondJump dflt (StPrim IntLtOp [am, StInt (toInteger lowTag)])
+    	cjmpHi = StCondJump dflt (StPrim IntGtOp [am, StInt (toInteger highTag)])
 
     	offset = StPrim IntSubOp [am, StInt lowTag]
 

@@ -12,6 +12,7 @@ import {-# SOURCE #-} StixPrim ( amodeToStix )
 import MachMisc
 import MachRegs
 import AbsCSyn		( CStmtMacro(..), MagicId(..), mkIntCLit, CAddrMode )
+import CallConv		( cCallConv )
 import Constants	( uF_RET, uF_SUA, uF_SUB, uF_UPDATEE,
 			  sTD_UF_SIZE
 			)
@@ -284,7 +285,7 @@ heapCheck liveness words reenter
 	cjmp = StCondJump ulbl test
 	arg = StPrim IntAddOp [StPrim IntMulOp [words, StInt 256], liveness]
 	-- ToDo: Overflow?  (JSM)
-	gc = StCall SLIT("PerformGC_wrapper") VoidRep [arg]
+	gc = StCall SLIT("PerformGC_wrapper") cCallConv VoidRep [arg]
 	join = StLabel ulbl
     in
     returnUs (\xs -> assign : cjmp : gc : join : xs)
@@ -306,5 +307,5 @@ ind_info  = sStLitLbl SLIT("Ind_info")
 updatePAP, stackOverflow :: StixTree
 
 updatePAP     = StJump (sStLitLbl SLIT("UpdatePAP"))
-stackOverflow = StCall SLIT("StackOverflow") VoidRep []
+stackOverflow = StCall SLIT("StackOverflow") cCallConv VoidRep []
 \end{code}

@@ -17,6 +17,7 @@ import MachMisc
 import MachRegs
 
 import AbsCSyn		-- bits and bobs...
+import CallConv		( cCallConv )
 import Constants	( mIN_MP_INT_SIZE )
 import Literal		( Literal(..) )
 import OrdList		( OrdList )
@@ -45,9 +46,9 @@ argument2 = mpStruct 2
 result2 = mpStruct 2
 result3 = mpStruct 3
 result4 = mpStruct 4
-init2 = StCall SLIT("mpz_init") VoidRep [result2]
-init3 = StCall SLIT("mpz_init") VoidRep [result3]
-init4 = StCall SLIT("mpz_init") VoidRep [result4]
+init2 = StCall SLIT("mpz_init") cCallConv VoidRep [result2]
+init3 = StCall SLIT("mpz_init") cCallConv VoidRep [result3]
+init4 = StCall SLIT("mpz_init") cCallConv VoidRep [result4]
 
 gmpTake1Return1 res@(car,csr,cdr) rtn arg@(clive,caa,csa,cda)
   = let
@@ -64,7 +65,7 @@ gmpTake1Return1 res@(car,csr,cdr) rtn arg@(clive,caa,csa,cda)
     	safeHp = saveLoc Hp
     	save = StAssign PtrRep safeHp oldHp
     	(a1,a2,a3) = toStruct argument1 (aa,sa,da)
-    	mpz_op = StCall rtn VoidRep [result2, argument1]
+    	mpz_op = StCall rtn cCallConv VoidRep [result2, argument1]
     	restore = StAssign PtrRep stgHp safeHp
     	(r1,r2,r3) = fromStruct result2 (ar,sr,dr)
     in
@@ -99,7 +100,7 @@ gmpTake2Return1 res@(car,csr,cdr) rtn args@(clive, caa1,csa1,cda1, caa2,csa2,cda
     	save = StAssign PtrRep safeHp oldHp
     	(a1,a2,a3) = toStruct argument1 (aa1,sa1,da1)
     	(a4,a5,a6) = toStruct argument2 (aa2,sa2,da2)
-    	mpz_op = StCall rtn VoidRep [result3, argument1, argument2]
+    	mpz_op = StCall rtn cCallConv VoidRep [result3, argument1, argument2]
     	restore = StAssign PtrRep stgHp safeHp
     	(r1,r2,r3) = fromStruct result3 (ar,sr,dr)
     in
@@ -140,7 +141,7 @@ gmpTake2Return2 res@(car1,csr1,cdr1, car2,csr2,cdr2)
     	save = StAssign PtrRep safeHp oldHp
     	(a1,a2,a3) = toStruct argument1 (aa1,sa1,da1)
     	(a4,a5,a6) = toStruct argument2 (aa2,sa2,da2)
-    	mpz_op = StCall rtn VoidRep [result3, result4, argument1, argument2]
+    	mpz_op = StCall rtn cCallConv VoidRep [result3, result4, argument1, argument2]
     	restore = StAssign PtrRep stgHp safeHp
     	(r1,r2,r3) = fromStruct result3 (ar1,sr1,dr1)
     	(r4,r5,r6) = fromStruct result4 (ar2,sr2,dr2)
@@ -181,7 +182,7 @@ gmpCompare res args@(chp, caa1,csa1,cda1, caa2,csa2,cda2)
     	argument2 = StIndex IntRep hp (StInt (toInteger mpIntSize))
     	(a1,a2,a3) = toStruct argument1 (aa1,sa1,da1)
     	(a4,a5,a6) = toStruct argument2 (aa2,sa2,da2)
-    	mpz_cmp = StCall SLIT("mpz_cmp") IntRep [argument1, argument2]
+    	mpz_cmp = StCall SLIT("mpz_cmp") cCallConv IntRep [argument1, argument2]
     	r1 = StAssign IntRep result mpz_cmp
     in
     returnUs (\xs -> a1 : a2 : a3 : a4 : a5 : a6 : r1 : xs)
@@ -204,7 +205,7 @@ gmpInteger2Int res args@(chp, caa,csa,cda)
 	da	= amodeToStix cda
 
     	(a1,a2,a3) = toStruct hp (aa,sa,da)
-    	mpz_get_si = StCall SLIT("mpz_get_si") IntRep [hp]
+    	mpz_get_si = StCall SLIT("mpz_get_si") cCallConv IntRep [hp]
     	r1 = StAssign IntRep result mpz_get_si
     in
     returnUs (\xs -> a1 : a2 : a3 : r1 : xs)
@@ -223,7 +224,7 @@ gmpInteger2Word res args@(chp, caa,csa,cda)
 	da	= amodeToStix cda
 
     	(a1,a2,a3) = toStruct hp (aa,sa,da)
-    	mpz_get_ui = StCall SLIT("mpz_get_ui") IntRep [hp]
+    	mpz_get_ui = StCall SLIT("mpz_get_ui") cCallConv IntRep [hp]
     	r1 = StAssign WordRep result mpz_get_ui
     in
     returnUs (\xs -> a1 : a2 : a3 : r1 : xs)
@@ -305,11 +306,11 @@ gmpString2Integer res@(car,csr,cdr) (liveness, str)
     	safeHp = saveLoc Hp
     	save = StAssign PtrRep safeHp oldHp
     	result = StIndex IntRep stgHpLim (StInt (toInteger (-mpIntSize)))
-    	set_str = StCall SLIT("mpz_init_set_str") IntRep
+    	set_str = StCall SLIT("mpz_init_set_str") cCallConv IntRep
     	    [result, amodeToStix str, StInt 10]
     	test = StPrim IntEqOp [set_str, StInt 0]
     	cjmp = StCondJump ulbl test
-    	abort = StCall SLIT("abort") VoidRep []
+    	abort = StCall SLIT("abort") cCallConv VoidRep []
     	join = StLabel ulbl
     	restore = StAssign PtrRep stgHp safeHp
     	(a1,a2,a3) = fromStruct result (ar,sr,dr)
@@ -346,7 +347,7 @@ encodeFloatingKind pk res args@(chp, caa,csa,cda, cexpon)
     	    FloatRep -> SLIT("__encodeFloat")
     	    DoubleRep -> SLIT("__encodeDouble")
     	    _ -> panic "encodeFloatingKind"
-    	encode = StCall fn pk' [hp, expon]
+    	encode = StCall fn cCallConv pk' [hp, expon]
     	r1 = StAssign pk' result encode
     in
     returnUs (\xs -> a1 : a2 : a3 : r1 : xs)
@@ -376,7 +377,7 @@ decodeFloatingKind pk res@(cexponr,car,csr,cdr) args@(chp, carg)
     	    FloatRep -> SLIT("__decodeFloat")
     	    DoubleRep -> SLIT("__decodeDouble")
     	    _ -> panic "decodeFloatingKind"
-    	decode = StCall fn VoidRep [mantissa, hp, arg]
+    	decode = StCall fn cCallConv VoidRep [mantissa, hp, arg]
     	(a1,a2,a3) = fromStruct mantissa (ar,sr,dr)
     	a4 = StAssign IntRep exponr (StInd IntRep hp)
     in

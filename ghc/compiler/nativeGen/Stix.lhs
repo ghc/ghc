@@ -19,6 +19,7 @@ import Ratio		( Rational )
 
 import AbsCSyn		( node, infoptr, MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
+import CallConv		( CallConv )
 import CLabel		( mkAsmTempLabel, CLabel )
 import PrimRep          ( PrimRep )
 import PrimOp           ( PrimOp )
@@ -95,7 +96,7 @@ data StixTree
 
     -- Calls to C functions
 
-  | StCall FAST_STRING PrimRep [StixTree]
+  | StCall FAST_STRING CallConv PrimRep [StixTree]
 
     -- Assembly-language comments
 

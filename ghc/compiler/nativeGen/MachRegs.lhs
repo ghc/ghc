@@ -596,6 +596,12 @@ baseRegOffset (FloatReg  ILIT(3))    = OFFSET_Flt3
 baseRegOffset (FloatReg  ILIT(4))    = OFFSET_Flt4
 baseRegOffset (DoubleReg ILIT(1))    = OFFSET_Dbl1
 baseRegOffset (DoubleReg ILIT(2))    = OFFSET_Dbl2
+#ifdef OFFSET_Lng1
+baseRegOffset (LongReg _ ILIT(1))    = OFFSET_Lng1
+#endif
+#ifdef OFFSET_Lng2
+baseRegOffset (LongReg _ ILIT(2))    = OFFSET_Lng2
+#endif
 baseRegOffset TagReg		     = OFFSET_Tag
 baseRegOffset RetReg		     = OFFSET_Ret
 baseRegOffset SpA		     = OFFSET_SpA
@@ -664,6 +670,12 @@ callerSaves (DoubleReg ILIT(1))		= True
 #endif
 #ifdef CALLER_SAVES_DblReg2
 callerSaves (DoubleReg ILIT(2))		= True
+#endif
+#ifdef CALLER_SAVES_LngReg1
+callerSaves (LongReg _ ILIT(1))		= True
+#endif
+#ifdef CALLER_SAVES_LngReg2
+callerSaves (LongReg _ ILIT(2))		= True
 #endif
 #ifdef CALLER_SAVES_Tag
 callerSaves TagReg			= True
@@ -751,6 +763,12 @@ magicIdRegMaybe (DoubleReg ILIT(1))	= Just (FixedReg ILIT(REG_Dbl1))
 #endif				 	
 #ifdef REG_Dbl2			 	
 magicIdRegMaybe (DoubleReg ILIT(2))	= Just (FixedReg ILIT(REG_Dbl2))
+#endif
+#ifdef REG_Lng1			 	
+magicIdRegMaybe (LongReg _ ILIT(1))	= Just (FixedReg ILIT(REG_Lng1))
+#endif				 	
+#ifdef REG_Lng2			 	
+magicIdRegMaybe (LongReg _ ILIT(2))	= Just (FixedReg ILIT(REG_Lng2))
 #endif
 #ifdef REG_Tag
 magicIdRegMaybe TagReg			= Just (FixedReg ILIT(REG_TagReg))
