@@ -20,7 +20,7 @@ module RnIfaces (
 #include "HsVersions.h"
 
 import CmdLineOpts	( opt_PruneTyDecls,  opt_PruneInstDecls, 
-			  opt_IgnoreIfacePragmas
+			  opt_D_show_rn_imports, opt_IgnoreIfacePragmas
 			)
 import HsSyn		( HsDecl(..), TyDecl(..), ClassDecl(..), InstDecl(..), IfaceSig(..), 
 			  HsType(..), ConDecl(..), IE(..), ConDetails(..), Sig(..),
@@ -977,22 +977,24 @@ findAndReadIface doc_str mod_name as_source
 	  file_path = dir ++ '/' : moduleString mod_name ++ (mod_suffix hisuf)
 \end{code}
 
-@readIface@ trys just one file.
+@readIface@ tries just the one file.
 
 \begin{code}
 readIface :: String -> RnMG (Maybe ParsedIface)	
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 readIface file_path
-  = ioToRnMG (hGetStringBuffer file_path)                       `thenRn` \ read_result ->
-    --traceRn (hcat[ptext SLIT("Opening...."), text file_path])   `thenRn_`
+  = ioToRnMG (hGetStringBuffer file_path)       `thenRn` \ read_result ->
     case read_result of
 	Right contents	  -> 
              case parseIface contents (mkSrcLoc (mkFastString file_path) 1) of
-	          Failed err      ->
-		     failWithRn Nothing err 
+	          Failed err      -> failWithRn Nothing err 
 		  Succeeded (PIface iface) -> 
-		     returnRn (Just iface)
+		        if opt_D_show_rn_imports then
+			   putDocRn (hcat[ptext SLIT("Read "), text file_path]) `thenRn_`
+			   returnRn (Just iface)
+			else
+			   returnRn (Just iface)
 
         Left err ->
 	  if isDoesNotExistError err then

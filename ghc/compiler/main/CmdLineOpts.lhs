@@ -37,6 +37,7 @@ module CmdLineOpts (
 	opt_D_dump_tc,
 	opt_D_show_passes,
 	opt_D_show_rn_trace,
+	opt_D_show_rn_imports,
 	opt_D_simplifier_stats,
 	opt_D_source_stats,
 	opt_D_verbose_core2core,
@@ -290,6 +291,7 @@ opt_D_dump_stranal		= lookUp  SLIT("-ddump-stranal")
 opt_D_dump_tc			= lookUp  SLIT("-ddump-tc")
 opt_D_show_passes		= lookUp  SLIT("-dshow-passes")
 opt_D_show_rn_trace		= lookUp  SLIT("-dshow-rn-trace")
+opt_D_show_rn_imports		= lookUp  SLIT("-dshow-rn-imports")
 opt_D_simplifier_stats		= lookUp  SLIT("-dsimplifier-stats")
 opt_D_source_stats		= lookUp  SLIT("-dsource-stats")
 opt_D_verbose_core2core		= lookUp  SLIT("-dverbose-simpl")
