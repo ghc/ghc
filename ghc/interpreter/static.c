@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.41 $
- * $Date: 2000/05/17 22:05:44 $
+ * $Revision: 1.42 $
+ * $Date: 2000/06/02 16:19:47 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1322,6 +1322,10 @@ Class c; {
 	}
     }
 
+    /* add in the tyvars from the `supers' so that we don't
+       prematurely complain about undefined tyvars */
+    tyvars = typeVarsIn(cclass(c).supers,NIL,NIL,tyvars);
+
     if (cclass(c).arity==0) {
 	cclass(c).head = c;
     } else {
@@ -1335,6 +1339,23 @@ Class c; {
 
     tcDeps	        = NIL;		/* find dependents		   */
     map2Over(depPredExp,cclass(c).line,tyvars,cclass(c).supers);
+
+    {   /* depPredExp instantiates class names to class structs, so
+         * now we have enough info to check for ambiguity
+         */
+	List tvts = offsetTyvarsIn(cclass(c).head,NIL);
+	List tvps = offsetTyvarsIn(cclass(c).supers,NIL);
+	List fds  = calcFunDeps(cclass(c).supers);
+	tvts = oclose(fds,tvts);
+	tvts = odiff(tvps,tvts);
+
+	if (!isNull(tvts)) {
+	    ERRMSG(cclass(c).line) "Undefined type variable \"%s\"",
+	      textToStr(textOf(nth(offsetOf(hd(tvts)),tyvars)))
+	    EEND;
+	}
+    }
+
     h98CheckCtxt(cclass(c).line,"class definition",FALSE,cclass(c).supers,NIL);
     cclass(c).numSupers = length(cclass(c).supers);
     cclass(c).defaults  = extractBindings(cclass(c).members);   /* defaults*/
