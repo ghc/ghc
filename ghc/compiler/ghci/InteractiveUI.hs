@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.107 2002/01/22 13:04:13 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.108 2002/01/22 16:50:29 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -359,7 +359,6 @@ runStmt stmt
       case result of
 	CmRunFailed      -> return []
 	CmRunException e -> showException e >> return []
-	CmRunDeadlocked  -> io (putStrLn "Deadlocked.") >> return []
 	CmRunOk names    -> return names
 
 -- possibly print the type and revert CAFs after evaluating an expression
