@@ -26,7 +26,6 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			  mixedPtrLocn, mixedTypeLocn
 			)
 
-import Constants	( mIN_UPD_SIZE )
 import ForeignCall	( CCallSpec(..), CCallTarget(..), playSafe, ccallConvAttribute )
 import CLabel		( externallyVisibleCLabel,
 			  needsCDecl, pprCLabel,

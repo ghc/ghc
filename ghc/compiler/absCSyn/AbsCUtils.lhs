@@ -38,7 +38,7 @@ import Outputable
 import Panic		( panic )
 import FastTypes
 
-import Maybe		( isJust, maybeToList )
+import Maybe		( isJust )
 
 infixr 9 `thenFlt`
 \end{code}
