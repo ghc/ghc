@@ -439,6 +439,8 @@ corePrepExprFloat env expr@(App _ _)
 	  returnUs (Note note fun', hd, fun_ty, floats, ss)
 
 	-- non-variable fun, better let-bind it
+	-- ToDo: perhaps we can case-bind rather than let-bind this closure,
+	-- since it is sure to be evaluated.
     collect_args fun depth
 	= corePrepExprFloat env fun			`thenUs` \ (fun_floats, fun') ->
 	  newVar ty			 		`thenUs` \ fn_id ->
