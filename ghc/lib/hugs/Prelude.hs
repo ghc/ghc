@@ -114,6 +114,21 @@ module Prelude (
     ,nh_free,nh_close,nh_errno,nh_flush,nh_read,primIntToChar
     ,unsafeInterleaveIO,nh_write,primCharToInt,
     nullAddr, incAddr, isNullAddr,
+
+    Word,
+    primGtWord, primGeWord, primEqWord, primNeWord,
+    primLtWord, primLeWord, primMinWord, primMaxWord,
+    primPlusWord, primMinusWord, primTimesWord, primQuotWord,
+    primRemWord, primQuotRemWord, primNegateWord, primAndWord,
+    primOrWord, primXorWord, primNotWord, primShiftLWord,
+    primShiftRAWord, primShiftRLWord, primIntToWord, primWordToInt,
+
+    primAndInt, primOrInt, primXorInt, primNotInt,
+    primShiftLInt, primShiftRAInt,  primShiftRLInt,
+
+    primAddrToInt, primIntToAddr,
+
+    primDoubleToFloat, primFloatToDouble,
     -- debugging hacks
     --,ST(..)
     --,primIntToAddr
@@ -1844,7 +1859,6 @@ instance Ord Addr where
   (>=)            = primGeAddr
   (>)             = primGtAddr
 
-
 data Word
 
 instance Eq Word where 
@@ -1856,7 +1870,6 @@ instance Ord Word where
   (<=)            = primLeWord
   (>=)            = primGeWord
   (>)             = primGtWord
-
 
 data StablePtr a
 
