@@ -625,7 +625,7 @@ data ForeignObj  -- abstract, instance of: Eq
 makeForeignObj  :: Addr{-object-} -> Addr{-finaliser-} -> IO ForeignObj
 writeForeignObj :: ForeignObj -> Addr{-new value-} -> IO ()
 
-data StablePtr a
+data StablePtr a  -- abstract, instance of: Eq.
 makeStablePtr  :: a -> IO (StablePtr a)
 deRefStablePtr :: StablePtr a -> IO a
 freeStablePtr  :: StablePtr a -> IO ()
@@ -811,7 +811,7 @@ which might be used to build an ordered binary tree, say.
 
 The <tt/Dynamic/ library provides cheap-and-cheerful dynamic types for
 Haskell. A dynamically typed value is one which carries type
-information with it at run-time, and is represented here by the
+information with it at run-time, and is represented by the
 abstract type <tt/Dynamic/. Values can be converted into <tt/Dynamic/
 ones, which can then be combined and manipulated by the program using
 the operations provided over the abstract, dynamic type. One of
@@ -907,7 +907,10 @@ following,
 A really efficient implementation is possible if we guarantee/demand
 that the strings are unique, and for a particular type constructor,
 the application <tt/mkTyCon/ to the string that represents the type
-constructor is never duplicated. &lsqb;<bf/Q:/ <em>Would this constraint be
+constructor is never duplicated. Provided you follow the 
+the author of <tt/Typeable/
+
+ &lsqb;<bf/Q:/ <em>Would this constraint be
 unworkable in practice?</em>&rsqb;
 <item>
 Both <tt/TyCon/ and <tt/TypeRep/ are instances of the <tt/Show/ type
@@ -1029,33 +1032,35 @@ options in any old order or not.
 
 To hopefully illuminate the role of the different <tt/GetOpt/ data
 structures, here's the command-line options for a (very simple)
-compilere:
+compiler:
 
 <tscreen><verb>
+module Opts where
+
+import GetOpt
+import Maybe ( fromMaybe )
+
 data Flag 
  = Verbose  | Version 
- | Input String | Output String 
+ | Input String | Output String | LibDir String
    deriving Show
 
 options :: [OptDescr Flag]
 options =
  [ Option ['v']     ["verbose"] (NoArg Verbose)       "chatty output on stderr"
  , Option ['V','?'] ["version"] (NoArg Version)       "show version number"
- , Option ['o']     ["output"]  (OptArg out "FILE")   "output FILE"
- , Option ['c']     []          (OptArg in  "FILE")   "input FILE"
+ , Option ['o']     ["output"]  (OptArg outp "FILE")  "output FILE"
+ , Option ['c']     []          (OptArg inp  "FILE")  "input FILE"
+ , Option ['L']     ["libdir"]  (ReqArg LibDir "DIR") "library directory"
  ]
 
-out :: Maybe String -> Flag
-out Nothing   = Output "stdout"
-out (Just of) = Output of
+inp,outp :: Maybe String -> Flag
+outp = Output . fromMaybe "stdout"
+inp  = Input  . fromMaybe "stdout"
 
-in :: Maybe String -> Flag
-in Nothing  = Input "stdin"
-in (Just i) = Input i
-
-compilerOpts :: [String] -> IO (String, String)
+compilerOpts :: [String] -> IO ([Flag], [String])
 compilerOpts argv = 
-   case (getOpt NoOrder options argv) of
+   case (getOpt Permute options argv) of
       (o,n,[]  ) -> return (o,n)
       (_,_,errs) -> fail (userError (concat errs ++ usageInfo header options))
   where header = "Usage: ic [OPTION...] files..."
