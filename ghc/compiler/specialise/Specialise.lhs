@@ -891,6 +891,9 @@ data UsageDetails
     }
 
 type DictBind = (DictVar, CoreExpr, TyVarSet, FreeDicts)
+			-- The FreeDicts are the free dictionaries (only)
+			-- of the RHS of the dictionary bindings
+			-- Similarly the TyVarSet
 
 emptyUDs = MkUD { dict_binds = emptyBag, calls = emptyFM }
 
@@ -1108,6 +1111,11 @@ dictRhsFVs e
     go (Case e _)	   = go e	-- Claim: no free dictionaries in the alternatives
 					-- These case expressions are of the form
 					--   case d of { D a b c -> b }
+
+    go (Lam _ _)	   = emptyIdSet	-- This can happen for a Functor "dict",
+					-- which is represented by the function
+					-- itself; but it won't have any further
+					-- dicts inside it.  I hope.
 
     go other		   = pprPanic "dictRhsFVs" (ppr e)
 
