@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.90 2001/12/18 15:23:16 sewardj Exp $
+ * $Id: PrimOps.h,v 1.91 2002/03/02 17:51:22 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -340,6 +340,18 @@ EXTFUN_RTS(deRefWeakzh_fast);
 
 EXTFUN_RTS(mkForeignObjzh_fast);
 
+
+/* -----------------------------------------------------------------------------
+   Constructor tags
+   -------------------------------------------------------------------------- */
+
+/*
+ * This macro is only used when compiling unregisterised code (see 
+ * AbsCUtils.dsCOpStmt for motivation & the Story).
+ */
+#ifndef TABLES_NEXT_TO_CODE
+# define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
+#endif
 
 /* -----------------------------------------------------------------------------
    BCOs and BCO linkery
