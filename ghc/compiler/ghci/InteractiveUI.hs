@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.9 2000/11/21 15:00:58 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.10 2000/11/21 16:42:58 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -96,7 +96,7 @@ uiLoop = do
   l <- io (hGetLine stdin)
 #endif
   case l of
-    Nothing -> return ()
+    Nothing -> exitGHCi
     Just "" -> uiLoop
     Just l  -> do
 #ifndef NO_READLINE
@@ -104,6 +104,8 @@ uiLoop = do
 #endif
   	  runCommand l
 	  uiLoop  
+
+exitGHCi = io $ do putStrLn "Leaving GHCi."; exitWith ExitSuccess
 
 -- Top level exception handler, just prints out the exception 
 -- and carries on.
@@ -226,7 +228,7 @@ typeOfExpr str
 	 Just ty -> io (putStrLn (showSDoc (ppr ty)))
 
 quit :: String -> GHCi ()
-quit _ = return ()
+quit _ = exitGHCi
 
 shellEscape :: String -> GHCi ()
 shellEscape str = io (system str >> return ())

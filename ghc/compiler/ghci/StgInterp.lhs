@@ -82,8 +82,8 @@ import RdrName		( RdrName, rdrNameModule, rdrNameOcc )
 import FiniteMap
 import Panic		( panic )
 import OccName		( occNameString )
-import ErrUtils		( showPass )
-import CmdLineOpts	( DynFlags )
+import ErrUtils		( showPass, dumpIfSet_dyn )
+import CmdLineOpts	( DynFlags, DynFlag(..) )
 
 import Foreign
 import CTypes
@@ -122,6 +122,8 @@ stgBindsToInterpSyn dflags binds local_tycons local_classes
  = do showPass dflags "StgToInterp"
       let ibinds = concatMap (translateBind emptyUniqSet) binds
       let tycs   = local_tycons ++ map classTyCon local_classes
+      dumpIfSet_dyn dflags Opt_D_dump_InterpSyn
+	 "Convert To InterpSyn" (vcat (map pprIBind ibinds))
       itblenv <- mkITbls tycs
       return (ibinds, itblenv)
 
@@ -130,7 +132,10 @@ stgExprToInterpSyn :: DynFlags
 	           -> IO UnlinkedIExpr
 stgExprToInterpSyn dflags expr
  = do showPass dflags "StgToInterp"
-      return (stg2expr emptyUniqSet expr)
+      let iexpr = stg2expr emptyUniqSet expr
+      dumpIfSet_dyn dflags Opt_D_dump_InterpSyn
+	"Convert To InterpSyn" (pprIExpr iexpr)
+      return iexpr
 
 translateBind :: UniqSet Id -> StgBinding -> [UnlinkedIBind]
 translateBind ie (StgNonRec v e)  = [IBind v (rhs2expr ie e)]

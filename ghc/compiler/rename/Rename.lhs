@@ -27,11 +27,14 @@ import RnIfaces		( slurpImpDecls, mkImportInfo, recordLocalSlurps,
 			  RecompileRequired, outOfDate, recompileRequired
 			)
 import RnHiFiles	( readIface, removeContext, loadInterface,
-			  loadExports, loadFixDecls, loadDeprecs )
+			  loadExports, loadFixDecls, loadDeprecs,
+			  tryLoadInterface )
 import RnEnv		( availsToNameSet, availName, mkIfaceGlobalRdrEnv,
-			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, groupAvails,
-			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
-			  lookupOrigNames, lookupSrcName, newGlobalName, unQualInScope
+			  emptyAvailEnv, unitAvailEnv, availEnvElts, 
+			  plusAvailEnv, groupAvails, warnUnusedImports, 
+			  warnUnusedLocalBinds, warnUnusedModules, 
+			  lookupOrigNames, lookupSrcName, 
+			  newGlobalName, unQualInScope
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
@@ -101,25 +104,38 @@ renameExpr :: DynFlags
 	   -> HomeIfaceTable -> HomeSymbolTable
 	   -> PersistentCompilerState 
 	   -> Module -> RdrNameHsExpr
-	   -> IO (PersistentCompilerState, Maybe (PrintUnqualified, (RenamedHsExpr, [RenamedHsDecl])))
+	   -> IO ( PersistentCompilerState, 
+		   Maybe (PrintUnqualified, (RenamedHsExpr, [RenamedHsDecl]))
+                 )
 
 renameExpr dflags hit hst pcs this_module expr
-  | Just iface <- lookupModuleEnv hit this_module
-  = do	{ let rdr_env      = mi_globals iface
-	; let print_unqual = unQualInScope rdr_env
-	  
-	; renameSource dflags hit hst pcs this_module $
-	  initRnMS rdr_env emptyLocalFixityEnv SourceMode (rnExpr expr)	`thenRn` \ (e,fvs) -> 
-	  slurpImpDecls fvs						`thenRn` \ decls ->
-	  doptRn Opt_D_dump_rn						`thenRn` \ dump_rn ->
-	  ioToRnM (dumpIfSet dump_rn "Renamer:" (ppr e))		`thenRn_`
-	  returnRn (Just (print_unqual, (e, decls)))
-	}
+  = do	{ renameSource dflags hit hst pcs this_module $
+	  tryLoadInterface doc (moduleName this_module) ImportByUser 
+						`thenRn` \ (iface, maybe_err) ->
+	  case maybe_err of {
+	    Just msg -> ioToRnM (printErrs alwaysQualify 
+			  	 (ptext SLIT("failed to load interface for") 
+			   	  <+> quotes (ppr this_module) 
+				  <>  char ':' <+> msg)) `thenRn_`
+		        returnRn Nothing;
+	    Nothing -> 
 
-  | otherwise
-  = do	{ printErrs alwaysQualify (ptext SLIT("renameExpr: Bad module context") <+> ppr this_module)
-	; return (pcs, Nothing)
-	}
+	  let rdr_env      = mi_globals iface
+	      print_unqual = unQualInScope rdr_env
+	  in 
+ 
+	  initRnMS rdr_env emptyLocalFixityEnv SourceMode (rnExpr expr)	
+						`thenRn` \ (e,fvs) -> 
+	  lookupOrigNames implicit_occs		`thenRn` \ implicit_names ->
+	  slurpImpDecls (fvs `plusFV` implicit_names) `thenRn` \ decls ->
+	  doptRn Opt_D_dump_rn			`thenRn` \ dump_rn ->
+	  ioToRnM (dumpIfSet dump_rn "Renamer:" (ppr e))
+						`thenRn_`
+	  returnRn (Just (print_unqual, (e, decls)))
+	}}
+  where
+     implicit_occs = string_occs
+     doc = text "context for compiling expression"
 \end{code}
 
 
@@ -297,9 +313,6 @@ implicitFVs mod_name decls
 	-- generate code
     implicit_occs = string_occs ++ foldr ((++) . get) implicit_main decls
 
-	-- Virtually every program has error messages in it somewhere
-    string_occs = [unpackCString_RDR, unpackCStringFoldr_RDR, 
-		   unpackCStringUtf8_RDR, eqString_RDR]
 
     get (TyClD (TyData _ _ _ _ _ _ (Just deriv_classes) _ _ _))
        = concat (map get_deriv deriv_classes)
@@ -308,6 +321,10 @@ implicitFVs mod_name decls
     get_deriv cls = case lookupUFM derivingOccurrences cls of
 			Nothing   -> []
 			Just occs -> occs
+
+-- Virtually every program has error messages in it somewhere
+string_occs = [unpackCString_RDR, unpackCStringFoldr_RDR, 
+	       unpackCStringUtf8_RDR, eqString_RDR]
 \end{code}
 
 \begin{code}

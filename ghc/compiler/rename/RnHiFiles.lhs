@@ -107,7 +107,7 @@ tryLoadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (ModIface, Maybe Me
 tryLoadInterface doc_str mod_name from
  = getHomeIfaceTableRn		`thenRn` \ hit ->
    getIfacesRn 			`thenRn` \ ifaces@(Ifaces { iPIT = pit }) ->
-	
+
 	-- CHECK WHETHER WE HAVE IT ALREADY
    case lookupIfaceByModName hit pit mod_name of {
 	Just iface |  case from of

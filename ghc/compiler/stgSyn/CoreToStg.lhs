@@ -39,8 +39,8 @@ import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
 import UniqSupply	-- all of it, really
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel )
 import UniqSet		( emptyUniqSet )
-import ErrUtils		( showPass )
-import CmdLineOpts	( DynFlags )
+import ErrUtils		( showPass, dumpIfSet_dyn )
+import CmdLineOpts	( DynFlags, DynFlag(..) )
 import Maybes
 import Outputable
 \end{code}
@@ -220,7 +220,9 @@ coreToStgExpr :: DynFlags -> CoreExpr -> IO StgExpr
 coreToStgExpr dflags core_expr
   = do showPass dflags "Core2Stg"
        us <- mkSplitUniqSupply 'c'
-       return (initUs_ us (coreExprToStg emptyVarEnv core_expr))
+       let stg_expr = initUs_ us (coreExprToStg emptyVarEnv core_expr)
+       dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:" (ppr stg_expr)
+       return stg_expr
 \end{code}
 
 %************************************************************************
