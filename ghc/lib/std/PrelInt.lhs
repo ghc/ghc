@@ -100,14 +100,13 @@ integerToInt8  = fromInteger
 integerToInt16 = fromInteger
 integerToInt32 = fromInteger
 
-int8ToInt16  (I8#  x) = I16# x
-int8ToInt32  (I8#  x) = I32# x
+int8ToInt16    = intToInt16 . int8ToInt
+int8ToInt32    = intToInt32 . int8ToInt
+int16ToInt32   = intToInt32 . int16ToInt
 
-int16ToInt8  (I16# x) = I8#  x
-int16ToInt32 (I16# x) = I32# x
-
-int32ToInt8  (I32# x) = I8#  x
-int32ToInt16 (I32# x) = I16# x
+int16ToInt8  (I16# x) = I8#  (intToInt8# x)
+int32ToInt8  (I32# x) = I8#  (intToInt8# x)
+int32ToInt16 (I32# x) = I16# (intToInt16# x)
 
 int8ToInteger  = toInteger
 int8ToInt64    = int32ToInt64 . int8ToInt32
