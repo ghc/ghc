@@ -7,6 +7,6 @@
 --	because it's wired into the compiler
 ---------------------------------------------------------------------------
 
-__interface PrelErr 2 0 where
+__interface PrelErr 1 where
 __export PrelErr error parError;
 

@@ -25,9 +25,10 @@ module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
 #include "HsVersions.h"
 
 import CoreSyn
+import CoreFVs		( mustHaveLocalBinding )
 import Literal          ( Literal(..) )
 import Var              ( Var, varName, varType, setVarType, mkUVar )
-import Id               ( mayHaveNoBinding, isExportedId )
+import Id               ( isExportedId )
 import Name             ( isLocallyDefined )
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
 import Type             ( UsageAnn(..), isUsgTy, splitFunTys )
@@ -182,8 +183,7 @@ assumed true (exactly) of all imported ids.
 
 \begin{code}
 hasLocalDef :: Var -> Bool
-hasLocalDef var = isLocallyDefined var
-                  && not (mayHaveNoBinding var)
+hasLocalDef var = mustHaveLocalBinding var
 
 hasUsgInfo :: Var -> Bool
 hasUsgInfo var = (not . isLocallyDefined) var

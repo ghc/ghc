@@ -5,6 +5,19 @@
 
 Representing modules and their flavours.
 
+
+Notes on DLLs
+~~~~~~~~~~~~~
+When compiling module A, which imports module B, we need to 
+know whether B will be in the same DLL as A.  
+	If it's in the same DLL, we refer to B_f_closure
+	If it isn't, we refer to _imp__B_f_closure
+When compiling A, we record in B's Module value whether it's
+in a different DLL, by setting the DLL flag.
+
+
+
+
 \begin{code}
 module Module 
     (
@@ -88,27 +101,6 @@ instance Show PackageInfo where	-- Just used in debug prints of lex tokens
 				-- and in debug modde
   showsPrec n ThisPackage        s = "<THIS>"   ++ s
   showsPrec n (AnotherPackage p) s = (_UNPK_ p) ++ s
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{System/user module}
-%*									*
-%************************************************************************
-
-We also track whether an imported module is from a 'system-ish' place.  In this case
-we don't record the fact that this module depends on it, nor usages of things
-inside it.  
-
-Apr 00: We want to record dependencies on all modules other than
-prelude modules else STG Hugs gets confused because it uses this
-info to know what modules to link.  (Compiled GHC uses command line
-options to specify this.)
-
-\begin{code}
-data ModFlavour = PrelMod	-- A Prelude module
-		| UserMod	-- Not library-ish
 \end{code}
 
 
@@ -200,6 +192,7 @@ mkModule mod_nm pack_name
   where
     pack_info | pack_name == opt_InPackage = ThisPackage
 	      | otherwise		   = AnotherPackage pack_name
+
 
 mkVanillaModule :: ModuleName -> Module
 mkVanillaModule name = Module name ThisPackage

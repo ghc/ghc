@@ -44,21 +44,19 @@ import CoreSyn
 
 import CoreUtils	( exprType, exprIsTrivial, exprIsBottom )
 import CoreFVs		-- all of it
+import Subst
 import Id		( Id, idType, idFreeTyVars, mkSysLocal, isOneShotLambda, modifyIdInfo, 
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)
 import IdInfo		( workerExists, vanillaIdInfo, demandInfo, setDemandInfo )
 import Var		( Var, TyVar, setVarUnique )
-import VarEnv
-import Subst
 import VarSet
+import VarEnv
 import Name		( getOccName )
 import OccName		( occNameUserString )
 import Type		( isUnLiftedType, mkPiType, Type )
 import BasicTypes	( TopLevelFlag(..) )
 import Demand		( isStrict, wwLazy )
-import VarSet
-import VarEnv
 import UniqSupply
 import Util		( sortLt, isSingleton, count )
 import Outputable
@@ -674,7 +672,8 @@ cloneVar :: TopLevelFlag -> LevelEnv -> Id -> Level -> Level -> LvlM (LevelEnv, 
 cloneVar TopLevel env v ctxt_lvl dest_lvl
   = returnUs (env, v)	-- Don't clone top level things
 cloneVar NotTopLevel env v ctxt_lvl dest_lvl
-  = getUniqueUs	`thenLvl` \ uniq ->
+  = ASSERT( isId v )
+    getUniqueUs	`thenLvl` \ uniq ->
     let
       v'	 = setVarUnique v uniq
       v''	 = subst_id_info env ctxt_lvl dest_lvl v'
@@ -686,7 +685,8 @@ cloneVars :: TopLevelFlag -> LevelEnv -> [Id] -> Level -> Level -> LvlM (LevelEn
 cloneVars TopLevel env vs ctxt_lvl dest_lvl 
   = returnUs (env, vs)	-- Don't clone top level things
 cloneVars NotTopLevel env vs ctxt_lvl dest_lvl
-  = getUniquesUs (length vs)	`thenLvl` \ uniqs ->
+  = ASSERT( all isId vs )
+    getUniquesUs (length vs)	`thenLvl` \ uniqs ->
     let
       vs'	 = zipWith setVarUnique vs uniqs
       vs''	 = map (subst_id_info env' ctxt_lvl dest_lvl) vs'

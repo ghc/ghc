@@ -153,7 +153,7 @@ graphFromEdges edges
     edges1	    = zipWith (,) [0..] sorted_edges
 
     graph	    = array bounds [(,) v (mapMaybe key_vertex ks) | (,) v (_,    _, ks) <- edges1]
-    key_map	    = array bounds [(,) v k			       | (,) v (_,    k, _ ) <- edges1]
+    key_map	    = array bounds [(,) v k			   | (,) v (_,    k, _ ) <- edges1]
     vertex_map	    = array bounds edges1
 
     (_,k1,_) `lt` (_,k2,_) = case k1 `compare` k2 of { LT -> True; other -> False }

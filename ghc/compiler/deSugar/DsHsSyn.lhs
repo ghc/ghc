@@ -14,7 +14,8 @@ import TcHsSyn		( TypecheckedPat,
 
 import Id		( idType, Id )
 import Type             ( Type )
-import TysWiredIn	( mkListTy, mkTupleTy, mkUnboxedTupleTy, unitTy )
+import TysWiredIn	( mkListTy, mkTupleTy, unitTy )
+import BasicTypes	( Boxity(..) )
 import Panic		( panic )
 \end{code}
 
@@ -29,8 +30,7 @@ outPatType (LazyPat pat)	= outPatType pat
 outPatType (AsPat var pat)	= idType var
 outPatType (ConPat _ ty _ _ _)	= ty
 outPatType (ListPat ty _)	= mkListTy ty
-outPatType (TuplePat pats True)	= mkTupleTy (length pats) (map outPatType pats)
-outPatType (TuplePat pats False)= mkUnboxedTupleTy (length pats) (map outPatType pats)
+outPatType (TuplePat pats box)	= mkTupleTy box (length pats) (map outPatType pats)
 outPatType (RecPat _ ty _ _ _)  = ty
 outPatType (LitPat lit ty)	= ty
 outPatType (NPat lit ty _)	= ty
@@ -38,7 +38,7 @@ outPatType (NPlusKPat _ _ ty _ _) = ty
 outPatType (DictPat ds ms)      = case (length ds_ms) of
 				    0 -> unitTy
 				    1 -> idType (head ds_ms)
-				    n -> mkTupleTy n (map idType ds_ms)
+				    n -> mkTupleTy Boxed n (map idType ds_ms)
 				   where
 				    ds_ms = ds ++ ms
 \end{code}

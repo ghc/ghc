@@ -207,8 +207,9 @@ wORD64_SIZE    = (WORD64_SIZE   :: Int)
 iNT64_SIZE     = (INT64_SIZE   :: Int)
 \end{code}
 
-The version of the interface file format we're
-using:
+The version of the interface file format we're using.  It's propagated
+here by a devious route from ghc/mk/version.mk.  See comments
+there for what it means.
 
 \begin{code}
 interfaceFileFormatVersion :: Int

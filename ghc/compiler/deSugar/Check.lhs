@@ -22,19 +22,18 @@ import DsUtils		( EquationInfo(..),
 			  tidyLitPat
  			)
 import Id		( idType )
-import DataCon		( DataCon, isTupleCon, isUnboxedTupleCon, dataConArgTys,
+import DataCon		( DataCon, dataConTyCon, dataConArgTys,
 			  dataConSourceArity, dataConFieldLabels )
 import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, mkSrcVarOcc )
 import Type		( Type, splitAlgTyConApp, mkTyVarTys,
-                          isUnboxedType, splitTyConApp_maybe
+                          splitTyConApp_maybe
 			)
 import TysWiredIn	( nilDataCon, consDataCon, 
-                          mkListTy, 
-                          mkTupleTy, tupleCon,
-			  mkUnboxedTupleTy, unboxedTupleCon
+                          mkListTy, mkTupleTy, tupleCon
 			)
 import Unique		( unboundKey )
-import TyCon            ( tyConDataCons )
+import TyCon            ( tyConDataCons, tupleTyConBoxity, isTupleTyCon )
+import BasicTypes	( Boxity(..) )
 import SrcLoc		( noSrcLoc )
 import UniqSet
 import Outputable
@@ -538,13 +537,13 @@ make_con (ConPat id _ _ _ _) (p:q:ps, constraints)
           fixity = panic "Check.make_con: Guessing fixity"
 
 make_con (ConPat id _ _ _ pats) (ps,constraints) 
-      | isTupleCon id        = (TuplePatIn pats_con True : rest_pats,    constraints) 
-      | isUnboxedTupleCon id = (TuplePatIn pats_con False : rest_pats, constraints)
-      | otherwise     = (ConPatIn name pats_con : rest_pats, constraints)
+      | isTupleTyCon tc = (TuplePatIn pats_con (tupleTyConBoxity tc) : rest_pats, constraints) 
+      | otherwise       = (ConPatIn name pats_con		     : rest_pats, constraints)
     where num_args  = length pats
           name      = getName id
           pats_con  = take num_args ps
           rest_pats = drop num_args ps
+	  tc	    = dataConTyCon id
 	  
 
 make_whole_con :: DataCon -> WarningPat
@@ -591,15 +590,9 @@ simplify_pat (ListPat ty ps) = foldr (\ x -> \y -> ConPat consDataCon list_ty []
                              where list_ty = mkListTy ty
 
 
-simplify_pat (TuplePat ps True) = ConPat (tupleCon arity)
-	                            (mkTupleTy arity (map outPatType ps)) [] []
-	                            (map simplify_pat ps)
-                           where
-                              arity = length ps
-
-simplify_pat (TuplePat ps False) 
-  = ConPat (unboxedTupleCon arity)
-	   (mkUnboxedTupleTy arity (map outPatType ps)) [] []
+simplify_pat (TuplePat ps boxity)
+  = ConPat (tupleCon boxity arity)
+	   (mkTupleTy boxity arity (map outPatType ps)) [] []
 	   (map simplify_pat ps)
   where
     arity = length ps
@@ -641,9 +634,9 @@ simplify_pat (NPlusKPat	id hslit ty hsexpr1 hsexpr2) =
 
 simplify_pat (DictPat dicts methods) = 
     case num_of_d_and_ms of
-       0 -> simplify_pat (TuplePat [] True) 
+       0 -> simplify_pat (TuplePat [] Boxed) 
        1 -> simplify_pat (head dict_and_method_pats) 
-       _ -> simplify_pat (TuplePat dict_and_method_pats True)
+       _ -> simplify_pat (TuplePat dict_and_method_pats Boxed)
     where
        num_of_d_and_ms	 = length dicts + length methods
        dict_and_method_pats = map VarPat (dicts ++ methods)

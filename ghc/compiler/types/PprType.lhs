@@ -116,7 +116,7 @@ ppr_ty env ctxt_prec (TyVarTy tyvar)
 
 ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
   	-- KIND CASE; it's of the form (Type x)
-  | tycon_uniq == typeConKey && n_tys == 1
+  | tycon `hasKey` typeConKey && n_tys == 1
   = 	-- For kinds, print (Type x) as just x if x is a 
 	-- 	type constructor (must be Boxed, Unboxed, AnyBox)
 	-- Otherwise print as (Type x)
@@ -136,7 +136,7 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
   = parens (char '#' <+> tys_w_commas <+> char '#')
 
 	-- LIST CASE
-  | tycon_uniq == listTyConKey && n_tys == 1
+  | tycon `hasKey` listTyConKey && n_tys == 1
   = brackets (ppr_ty env tOP_PREC ty1)
 
 	-- DICTIONARY CASE, prints {C a}
@@ -154,7 +154,6 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
   = maybeParen ctxt_prec tYCON_PREC (sep [ppr tycon, nest 4 tys_w_spaces])
 
   where
-    tycon_uniq = tyConUnique tycon
     n_tys      = length tys
     (ty1:_)    = tys
     Just pred  = maybe_pred
@@ -167,18 +166,11 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
 ppr_ty env ctxt_prec ty@(ForAllTy _ _)
   = getPprStyle $ \ sty -> 
     maybeParen ctxt_prec fUN_PREC $
-    if ifaceStyle sty then
-       sep [ ptext SLIT("__forall") <+> brackets pp_tyvars <+> ptext SLIT("=>"), 
-	     ppr_ty env tOP_PREC rho
-	   ]
-    else
-	-- The type checker occasionally prints a type in an error message,
-	-- and it had better come out looking like a user type
-       sep [ ptext SLIT("forall") <+> pp_tyvars <> ptext SLIT("."), 
-	     ppr_theta theta,
-	     ppr_ty env tOP_PREC tau
-	   ]
-  where		
+    sep [ ptext SLIT("forall") <+> pp_tyvars <> ptext SLIT("."), 
+	  ppr_theta theta,
+	  ppr_ty env tOP_PREC tau
+    ]
+ where		
     (tyvars, rho) = splitForAllTys ty  -- don't treat theta specially any more (KSW 1999-04)
     (theta, tau)  = splitRhoTy rho
     
@@ -267,7 +259,7 @@ and when in debug mode.
 \begin{code}
 pprTyVarBndr tyvar
   = getPprStyle $ \ sty ->
-    if (ifaceStyle sty || debugStyle sty) && kind /= boxedTypeKind then
+    if (ifaceStyle sty  && kind /= boxedTypeKind) || debugStyle sty then
         hsep [ppr tyvar, dcolon, pprParendKind kind]
 		-- See comments with ppDcolon in PprCore.lhs
     else

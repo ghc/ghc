@@ -21,7 +21,7 @@ module HsPat (
 import HsBasic		( HsLit )
 import HsExpr		( HsExpr )
 import HsTypes		( HsType )
-import BasicTypes	( Fixity )
+import BasicTypes	( Fixity, Boxity, tupleParens )
 
 -- others:
 import Var		( Id, TyVar )
@@ -61,7 +61,7 @@ data InPat name
 
   | ListPatIn	    [InPat name]	-- syntactic list
 					-- must have >= 1 elements
-  | TuplePatIn	    [InPat name] Bool	-- tuple (boxed?)
+  | TuplePatIn	    [InPat name] Boxity	-- tuple (boxed?)
 
   | RecPatIn	    name 		-- record
 		    [(name, InPat name, Bool)]	-- True <=> source used punning
@@ -78,7 +78,7 @@ data OutPat id
    	    	    [OutPat id]
 
   | TuplePat	    [OutPat id]	-- tuple
-		    Bool		-- boxed?
+		    Boxity
 						-- UnitPat is TuplePat []
 
   | ConPat	    DataCon
@@ -165,10 +165,8 @@ pprInPat (ParPatIn pat)
 
 pprInPat (ListPatIn pats)
   = brackets (interpp'SP pats)
-pprInPat (TuplePatIn pats False)
-  = text "(#" <> (interpp'SP pats) <> text "#)"
-pprInPat (TuplePatIn pats True)
-  = parens (interpp'SP pats)
+pprInPat (TuplePatIn pats boxity)
+  = tupleParens boxity (interpp'SP pats)
 pprInPat (NPlusKPatIn n k)
   = parens (hcat [ppr n, char '+', ppr k])
 
@@ -205,12 +203,8 @@ pprOutPat (ConPat name ty tyvars dicts pats)
 	    hsep [ppr p1, ppr name, ppr p2]
       _ -> hsep [ppr name, interppSP tyvars, interppSP dicts, interppSP pats]
 
-pprOutPat (ListPat ty pats)
-  = brackets (interpp'SP pats)
-pprOutPat (TuplePat pats boxed@True)
-  = parens (interpp'SP pats)
-pprOutPat (TuplePat pats unboxed@False)
-  = text "(#" <> (interpp'SP pats) <> text "#)"
+pprOutPat (ListPat ty pats)      = brackets (interpp'SP pats)
+pprOutPat (TuplePat pats boxity) = tupleParens boxity (interpp'SP pats)
 
 pprOutPat (RecPat con ty tvs dicts rpats)
   = hsep [ppr con, interppSP tvs, interppSP dicts, braces (hsep (punctuate comma (map (pp_rpat) rpats)))]

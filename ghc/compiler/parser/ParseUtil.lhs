@@ -18,7 +18,6 @@ module ParseUtil (
 	, checkPrec 		-- String -> P String
 	, checkContext		-- HsType -> P HsContext
 	, checkInstType		-- HsType -> P HsType
-	, checkAssertion	-- HsType -> P HsAsst
 	, checkDataHeader	-- HsQualType -> P (HsContext,HsName,[HsName])
 	, checkSimple		-- HsType -> [HsName] -> P ((HsName,[HsName]))
 	, checkPattern		-- HsExp -> P HsPat
@@ -54,11 +53,12 @@ import SrcLoc
 import RdrHsSyn
 import RdrName
 import CallConv
-import PrelMods 	( pRELUDE_Name, mkUbxTupNameStr, mkTupNameStr )
+import PrelNames 	( pRELUDE_Name, mkTupNameStr )
 import OccName  	( dataName, tcName, varName, tvName, setOccNameSpace, occNameUserString )
 import CmdLineOpts 	( opt_NoImplicitPrelude )
 import StringBuffer 	( lexemeToString )
 import FastString	( unpackFS )
+import BasicTypes	( Boxity(..) )
 import ErrUtils
 import UniqFM		( UniqFM, listToUFM, lookupUFM )
 import Outputable
@@ -86,9 +86,9 @@ splitForConApp :: RdrNameHsType -> [RdrNameBangType]
 
 splitForConApp  t ts = split t ts
  where
-	split (MonoTyApp t u) ts = split t (Unbanged u : ts)
+	split (HsAppTy t u) ts = split t (Unbanged u : ts)
 
-	split (MonoTyVar t)   ts  = returnP (con, ts)
+	split (HsTyVar t)   ts  = returnP (con, ts)
 	   where t_occ = rdrNameOcc t
 		 con   = setRdrNameOcc t (setOccNameSpace t_occ dataName)
 
@@ -117,17 +117,17 @@ checkInstType :: RdrNameHsType -> P RdrNameHsType
 checkInstType t 
   = case t of
 	HsForAllTy tvs ctxt ty ->
-		checkAssertion ty [] `thenP` \(c,ts)->
-	      	returnP (HsForAllTy tvs ctxt (MonoDictTy c ts))
+		checkDictTy ty [] `thenP` \ dict_ty ->
+	      	returnP (HsForAllTy tvs ctxt dict_ty)
 
-	ty ->   checkAssertion ty [] `thenP` \(c,ts)->
-	      	returnP (HsForAllTy Nothing [] (MonoDictTy c ts))
+	ty ->   checkDictTy ty [] `thenP` \ dict_ty->
+	      	returnP (HsForAllTy Nothing [] dict_ty)
 
 checkContext :: RdrNameHsType -> P RdrNameContext
-checkContext (MonoTupleTy ts True) 
+checkContext (HsTupleTy _ ts) 
   = mapP (\t -> checkPred t []) ts `thenP` \ps ->
     returnP ps
-checkContext (MonoTyVar t) -- empty contexts are allowed
+checkContext (HsTyVar t) -- empty contexts are allowed
   | t == unitTyCon_RDR = returnP []
 checkContext t 
   = checkPred t [] `thenP` \p ->
@@ -135,18 +135,17 @@ checkContext t
 
 checkPred :: RdrNameHsType -> [RdrNameHsType] 
 	-> P (HsPred RdrName)
-checkPred (MonoTyVar t) args@(_:_) | not (isRdrTyVar t) 
+checkPred (HsTyVar t) args@(_:_) | not (isRdrTyVar t) 
   	= returnP (HsPClass t args)
-checkPred (MonoTyApp l r) args = checkPred l (r:args)
-checkPred (MonoIParamTy n ty) [] = returnP (HsPIParam n ty)
+checkPred (HsAppTy l r) args = checkPred l (r:args)
+checkPred (HsPredTy (HsPIParam n ty)) [] = returnP (HsPIParam n ty)
 checkPred _ _ = parseError "Illegal class assertion"
 
-checkAssertion :: RdrNameHsType -> [RdrNameHsType] 
-	-> P (HsClassAssertion RdrName)
-checkAssertion (MonoTyVar t) args@(_:_) | not (isRdrTyVar t) 
-  	= returnP (t,args)
-checkAssertion (MonoTyApp l r) args = checkAssertion l (r:args)
-checkAssertion _ _ = parseError "Illegal class assertion"
+checkDictTy :: RdrNameHsType -> [RdrNameHsType] -> P RdrNameHsType
+checkDictTy (HsTyVar t) args@(_:_) | not (isRdrTyVar t) 
+  	= returnP (mkHsDictTy t args)
+checkDictTy (HsAppTy l r) args = checkDictTy l (r:args)
+checkDictTy _ _ = parseError "Illegal class assertion"
 
 checkDataHeader :: RdrNameHsType 
 	-> P (RdrNameContext, RdrName, [RdrNameHsTyVar])
@@ -158,9 +157,9 @@ checkDataHeader t =
    returnP ([],c,map UserTyVar ts)
 
 checkSimple :: RdrNameHsType -> [RdrName] -> P ((RdrName,[RdrName]))
-checkSimple (MonoTyApp l (MonoTyVar a)) xs | isRdrTyVar a 
+checkSimple (HsAppTy l (HsTyVar a)) xs | isRdrTyVar a 
    = checkSimple l (a:xs)
-checkSimple (MonoTyVar t) xs | not (isRdrTyVar t) = returnP (t,xs)
+checkSimple (HsTyVar t) xs | not (isRdrTyVar t) = returnP (t,xs)
 checkSimple t _ = trace (showSDoc (ppr t)) $ parseError "Illegal data/newtype declaration"
 
 ---------------------------------------------------------------------------
@@ -431,25 +430,25 @@ funTyCon_RDR
 	| otherwise		= mkPreludeQual tcName pRELUDE_Name funName
 
 tupleCon_RDR arity
-  | opt_NoImplicitPrelude = mkSrcUnqual   dataName (snd (mkTupNameStr arity))
+  | opt_NoImplicitPrelude = mkSrcUnqual   dataName (snd (mkTupNameStr Boxed arity))
   | otherwise		  = mkPreludeQual dataName pRELUDE_Name
-				(snd (mkTupNameStr arity))
+				(snd (mkTupNameStr Boxed arity))
 
 tupleTyCon_RDR arity
-  | opt_NoImplicitPrelude = mkSrcUnqual   tcName (snd (mkTupNameStr arity))
+  | opt_NoImplicitPrelude = mkSrcUnqual   tcName (snd (mkTupNameStr Boxed arity))
   | otherwise		  = mkPreludeQual tcName pRELUDE_Name
-				(snd (mkTupNameStr arity))
+				(snd (mkTupNameStr Boxed arity))
 
 
 ubxTupleCon_RDR arity
-  | opt_NoImplicitPrelude = mkSrcUnqual   dataName (snd (mkUbxTupNameStr arity))
+  | opt_NoImplicitPrelude = mkSrcUnqual   dataName (snd (mkTupNameStr Unboxed arity))
   | otherwise		  = mkPreludeQual dataName pRELUDE_Name 
-				(snd (mkUbxTupNameStr arity))
+				(snd (mkTupNameStr Unboxed arity))
 
 ubxTupleTyCon_RDR arity
-  | opt_NoImplicitPrelude = mkSrcUnqual   tcName (snd (mkUbxTupNameStr arity))
+  | opt_NoImplicitPrelude = mkSrcUnqual   tcName (snd (mkTupNameStr Unboxed arity))
   | otherwise		  = mkPreludeQual tcName pRELUDE_Name 
-				(snd (mkUbxTupNameStr arity))
+				(snd (mkTupNameStr Unboxed arity))
 
 unitName = SLIT("()")
 funName  = SLIT("(->)")

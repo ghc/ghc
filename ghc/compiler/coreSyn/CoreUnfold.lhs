@@ -46,7 +46,7 @@ import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import BinderInfo	( )
 import CoreUtils	( exprIsValue, exprIsCheap, exprIsBottom, exprIsTrivial )
-import Id		( Id, idType, idFlavour, idUnique, isId, idWorkerInfo,
+import Id		( Id, idType, idFlavour, isId, idWorkerInfo,
 			  idSpecialisation, idInlinePragma, idUnfolding,
 			  isPrimOpId_maybe
 			)
@@ -57,9 +57,8 @@ import PrimOp		( PrimOp(..), primOpIsDupable, primOpOutOfLine, ccallIsCasm )
 import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), IdFlavour(..), CprInfo(..), 
 			  insideLam, workerExists, isNeverInlinePrag
 			)
-import TyCon		( tyConFamilySize )
 import Type		( splitFunTy_maybe, isUnLiftedType )
-import Unique		( Unique, buildIdKey, augmentIdKey )
+import Unique		( Unique, buildIdKey, augmentIdKey, hasKey )
 import Maybes		( maybeToBool )
 import Bag
 import List		( maximumBy )
@@ -279,8 +278,8 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
 	-- Also if the function is a constant Id (constr or primop)
 	-- compute discounts specially
     size_up_fun (Var fun) args
-      | idUnique fun == buildIdKey   = buildSize
-      | idUnique fun == augmentIdKey = augmentSize
+      | fun `hasKey` buildIdKey   = buildSize
+      | fun `hasKey` augmentIdKey = augmentSize
       | otherwise 
       = case idFlavour fun of
 	  DataConId dc -> conSizeN (valArgCount args)

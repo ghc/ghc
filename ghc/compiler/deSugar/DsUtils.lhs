@@ -21,6 +21,7 @@ module DsUtils (
 	mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult,
 
 	mkErrorAppDs, mkNilExpr, mkConsExpr,
+	mkStringLit, mkStringLitFS,
 
 	mkSelectorBinds, mkTupleExpr, mkTupleSelector,
 
@@ -41,7 +42,7 @@ import DsMonad
 import CoreUtils	( exprType, mkIfThenElse )
 import PrelInfo		( iRREFUT_PAT_ERROR_ID )
 import Id		( idType, Id, mkWildId )
-import Literal		( Literal )
+import Literal		( Literal(..) )
 import TyCon		( isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, StrictnessMark, maybeMarkedUnboxed, 
 			  dataConStrictMarks, dataConId, splitProductType_maybe
@@ -67,7 +68,9 @@ import TysWiredIn	( nilDataCon, consDataCon,
                           addrTy, addrDataCon,
                           wordTy, wordDataCon
 			)
+import BasicTypes	( Boxity(..) )
 import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
+import Unique		( unpackCStringIdKey, unpackCString2IdKey )
 import Outputable
 \end{code}
 
@@ -376,8 +379,29 @@ mkErrorAppDs err_id ty msg
     let
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
     in
-    returnDs (mkApps (Var err_id) [(Type . unUsgTy) ty, mkStringLit full_msg])
+    mkStringLit full_msg		`thenDs` \ core_msg ->
+    returnDs (mkApps (Var err_id) [(Type . unUsgTy) ty, core_msg])
     -- unUsgTy *required* -- KSW 1999-04-07
+
+mkStringLit   :: String       -> DsM CoreExpr
+mkStringLit str	= mkStringLitFS (_PK_ str)
+
+mkStringLitFS :: FAST_STRING  -> DsM CoreExpr
+mkStringLitFS str
+  | any is_NUL (_UNPK_ str)
+  = 	 -- Must cater for NULs in literal string
+    dsLookupGlobalValue unpackCString2IdKey	`thenDs` \ unpack_id ->
+    returnDs (mkApps (Var unpack_id)
+		     [Lit (MachStr str),
+		     mkIntLitInt (_LENGTH_ str)])
+
+  | otherwise
+  =	-- No NULs in the string
+    dsLookupGlobalValue unpackCStringIdKey	`thenDs` \ unpack_id ->
+    returnDs (App (Var unpack_id) (Lit (MachStr str)))
+
+  where
+    is_NUL c = c == '\0'
 \end{code}
 
 %************************************************************************
@@ -421,9 +445,10 @@ mkSelectorBinds pat val_expr
     let
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", ppr pat])
     in
+    mkStringLit full_msg			`thenDs` \ core_msg -> 
     mapDs (mk_bind val_var msg_var) binders	`thenDs` \ binds ->
     returnDs ( (val_var, val_expr) : 
-	       (msg_var, mkStringLit full_msg) :
+	       (msg_var, core_msg) :
 	       binds )
 
 
@@ -455,7 +480,7 @@ mkSelectorBinds pat val_expr
         binder_ty = idType bndr_var
         error_expr = mkApps (Var iRREFUT_PAT_ERROR_ID) [Type binder_ty, Var msg_var]
 
-    is_simple_pat (TuplePat ps True{-boxed-}) = all is_triv_pat ps
+    is_simple_pat (TuplePat ps Boxed)  = all is_triv_pat ps
     is_simple_pat (ConPat _ _ _ _ ps)  = all is_triv_pat ps
     is_simple_pat (VarPat _)	       = True
     is_simple_pat (RecPat _ _ _ _ ps)  = and [is_triv_pat p | (_,p,_) <- ps]
@@ -476,7 +501,7 @@ mkTupleExpr :: [Id] -> CoreExpr
 
 mkTupleExpr []	 = Var unitDataConId
 mkTupleExpr [id] = Var id
-mkTupleExpr ids	 = mkConApp (tupleCon (length ids))
+mkTupleExpr ids	 = mkConApp (tupleCon Boxed (length ids))
 			    (map (Type . unUsgTy . idType) ids ++ [ Var i | i <- ids ])
 \end{code}
 
@@ -503,7 +528,7 @@ mkTupleSelector [var] should_be_the_same_var scrut_var scrut
 
 mkTupleSelector vars the_var scrut_var scrut
   = ASSERT( not (null vars) )
-    Case scrut scrut_var [(DataAlt (tupleCon (length vars)), vars, Var the_var)]
+    Case scrut scrut_var [(DataAlt (tupleCon Boxed (length vars)), vars, Var the_var)]
 \end{code}
 
 

@@ -13,7 +13,7 @@ module HsMatches where
 -- Friends
 import HsExpr		( HsExpr, Stmt(..) )
 import HsBinds		( HsBinds(..), nullBinds )
-import HsTypes		( HsTyVar, HsType )
+import HsTypes		( HsTyVarBndr, HsType )
 
 -- Others
 import Type		( Type )
@@ -44,7 +44,7 @@ patterns in each equation.
 \begin{code}
 data Match id pat
   = Match
-	[HsTyVar id] 			-- Tyvars wrt which this match is universally quantified
+	[HsTyVarBndr id] 			-- Tyvars wrt which this match is universally quantified
 					-- 	emtpy after typechecking
 	[pat]				-- The patterns
 	(Maybe (HsType id))		-- A type signature for the result of the match

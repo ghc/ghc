@@ -24,6 +24,7 @@ import Type		( Type )
 import Var		( TyVar, Id )
 import DataCon		( DataCon )
 import CStrings		( CLabelString, pprCLabelString )
+import BasicTypes	( Boxity, tupleParens )
 import SrcLoc		( SrcLoc )
 \end{code}
 
@@ -107,7 +108,7 @@ data HsExpr id pat
 				-- NB: Unit is ExplicitTuple []
 				-- for tuples, we can get the types
 				-- direct from the components
-		Bool		-- boxed?
+		Boxity
 
 
 	-- Record construction
@@ -307,11 +308,8 @@ ppr_expr (ExplicitListOut ty exprs)
   = hcat [ brackets (fsep (punctuate comma (map ppr_expr exprs))),
 	   ifNotPprForUser ((<>) space (parens (pprType ty))) ]
 
-ppr_expr (ExplicitTuple exprs True)
-  = parens (sep (punctuate comma (map ppr_expr exprs)))
-
-ppr_expr (ExplicitTuple exprs False)
-  = ptext SLIT("(#") <> sep (punctuate comma (map ppr_expr exprs)) <> ptext SLIT("#)")
+ppr_expr (ExplicitTuple exprs boxity)
+  = tupleParens boxity (sep (punctuate comma (map ppr_expr exprs)))
 
 ppr_expr (RecordCon con_id rbinds)
   = pp_rbinds (ppr con_id) rbinds

@@ -9,7 +9,8 @@
 
 \begin{code}
 module PprCore (
-	pprCoreExpr, pprParendExpr, pprIfaceUnfolding, 
+	pprCoreExpr, pprParendExpr,
+	pprCoreBinding, pprCoreBindings, pprIdBndr,
 	pprCoreBinding, pprCoreBindings,
 	pprCoreRules, pprCoreRule
     ) where
@@ -29,8 +30,10 @@ import IdInfo		( IdInfo, megaSeqIdInfo, occInfo,
 			  cprInfo, ppCprInfo, lbvarInfo,
 			  workerInfo, ppWorkerInfo
 			)
-import DataCon		( isTupleCon, isUnboxedTupleCon )
+import DataCon		( dataConTyCon )
+import TyCon		( tupleTyConBoxity, isTupleTyCon )
 import PprType		( pprParendType, pprTyVarBndr )
+import BasicTypes	( tupleParens )
 import PprEnv
 import Outputable
 \end{code}
@@ -66,22 +69,13 @@ pprCoreBindings = pprTopBinds pprCoreEnv
 pprCoreBinding  = pprTopBind pprCoreEnv
 pprCoreExpr     = ppr_noparend_expr pprCoreEnv
 pprParendExpr   = ppr_parend_expr   pprCoreEnv
+pprArg 	        = ppr_arg pprCoreEnv
 
 pprCoreEnv = initCoreEnv pprCoreBinder
 \end{code}
 
 Printer for unfoldings in interfaces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-\begin{code}
-pprIfaceUnfolding :: CoreExpr -> SDoc
-pprIfaceUnfolding = ppr_parend_expr pprIfaceEnv
-	-- Notice that it's parenthesised
-
-pprIfaceArg = ppr_arg pprIfaceEnv
-
-pprIfaceEnv = initCoreEnv pprIfaceBinder
-\end{code}
-
 \begin{code}
 instance Outputable b => Outputable (Bind b) where
     ppr bind = ppr_bind pprGenericEnv bind
@@ -182,11 +176,13 @@ ppr_expr add_par pe expr@(App fun arg)
 	Var f -> case isDataConId_maybe f of
 			-- Notice that we print the *worker*
 			-- for tuples in paren'd format.
-		   Just dc | saturated && isTupleCon dc	       -> parens pp_tup_args
-			   | saturated && isUnboxedTupleCon dc -> text "(#" <+> pp_tup_args <+> text "#)"
-		   other				       -> add_par (hang (pOcc pe f) 4 pp_args)
-	      where
-		saturated   = length val_args == idArity f
+		   Just dc | saturated && isTupleTyCon tc
+			   -> tupleParens (tupleTyConBoxity tc) pp_tup_args
+			   where
+			     tc	       = dataConTyCon dc
+			     saturated = length val_args == idArity f
+
+		   other -> add_par (hang (pOcc pe f) 4 pp_args)
 
 	other -> add_par (hang (ppr_parend_expr pe fun) 4 pp_args)
     }
@@ -282,15 +278,11 @@ ppr_expr add_par pe (Note (TermUsg u) expr)
       add_par (ppr u <+> ppr_noparend_expr pe expr)
 
 ppr_case_pat pe con@(DataAlt dc) args
-  | isTupleCon dc
-  = parens (hsep (punctuate comma (map ppr_bndr args))) <+> arrow
-  | isUnboxedTupleCon dc
-  = hsep [text "(# " <> 
-	  hsep (punctuate comma (map ppr_bndr args)) <>
-	  text " #)",
-	  arrow]
+  | isTupleTyCon tc
+  = tupleParens (tupleTyConBoxity tc) (hsep (punctuate comma (map ppr_bndr args))) <+> arrow
   where
     ppr_bndr = pBndr pe CaseBind
+    tc = dataConTyCon dc
 
 ppr_case_pat pe con args
   = ppr con <+> hsep (map ppr_bndr args) <+> arrow
@@ -312,17 +304,13 @@ pprCoreBinder LetBind binder
   = vcat [sig, pragmas, ppr binder]
   where
     sig     = pprTypedBinder binder
-    pragmas = ppIdInfo (idInfo binder)
+    pragmas = ppIdInfo binder (idInfo binder)
 
 -- Lambda bound type variables are preceded by "@"
 pprCoreBinder LambdaBind bndr = pprTypedBinder bndr
 
 -- Case bound things don't get a signature or a herald
 pprCoreBinder CaseBind bndr = pprUntypedBinder bndr
-
--- Used for printing interface-file unfoldings
-pprIfaceBinder CaseBind binder = pprUntypedBinder binder
-pprIfaceBinder other    binder = pprTypedBinder binder
 
 pprUntypedBinder binder
   | isTyVar binder = ptext SLIT("@") <+> pprTyVarBndr binder
@@ -347,8 +335,8 @@ pprIdBndr id = ppr id <+>
 
 
 \begin{code}
-ppIdInfo :: IdInfo -> SDoc
-ppIdInfo info
+ppIdInfo :: Id -> IdInfo -> SDoc
+ppIdInfo b info
   = hsep [
 	    ppFlavourInfo (flavourInfo info),
 	    ppArityInfo a,
@@ -357,7 +345,7 @@ ppIdInfo info
 	    ppStrictnessInfo s,
 	    ppCafInfo c,
             ppCprInfo m,
-	    pprIfaceCoreRules p
+	    pprCoreRules b p
 	-- Inline pragma, occ, demand, lbvar info
 	-- printed out with all binders (when debug is on); 
 	-- see PprCore.pprIdBndr
@@ -374,24 +362,17 @@ ppIdInfo info
 
 \begin{code}
 pprCoreRules :: Id -> CoreRules -> SDoc
-pprCoreRules var (Rules rules _) = vcat (map (pprCoreRule (Just var)) rules)
+pprCoreRules var (Rules rules _) = vcat (map (pprCoreRule (ppr var)) rules)
 
-pprIfaceCoreRules :: CoreRules -> SDoc
-pprIfaceCoreRules (Rules rules _) = vcat (map (pprCoreRule Nothing) rules)
-
-pprCoreRule :: Maybe Id -> CoreRule -> SDoc
-pprCoreRule maybe_fn (BuiltinRule _)
+pprCoreRule :: SDoc -> CoreRule -> SDoc
+pprCoreRule pp_fn (BuiltinRule _)
   = ifPprDebug (ptext SLIT("A built in rule"))
 
-pprCoreRule maybe_fn (Rule name tpl_vars tpl_args rhs)
+pprCoreRule pp_fn (Rule name tpl_vars tpl_args rhs)
   = doubleQuotes (ptext name) <+> 
     sep [
 	  ptext SLIT("__forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
-	  nest 4 (pp_fn <+> sep (map pprIfaceArg tpl_args)),
-	  nest 4 (ptext SLIT("=") <+> pprIfaceUnfolding rhs)
+	  nest 4 (pp_fn <+> sep (map pprArg tpl_args)),
+	  nest 4 (ptext SLIT("=") <+> pprCoreExpr rhs)
     ] <+> semi
-  where
-    pp_fn = case maybe_fn of
-	    	Just id -> ppr id
-		Nothing -> empty		-- Interface file
 \end{code}

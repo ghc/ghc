@@ -13,6 +13,7 @@ module TcModule (
 
 import CmdLineOpts	( opt_D_dump_tc, opt_D_dump_types, opt_PprStyle_Debug )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..) )
+import HsTypes		( toHsType )
 import RnHsSyn		( RenamedHsModule )
 import TcHsSyn		( TcMonoBinds, TypecheckedMonoBinds, 
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
@@ -25,9 +26,9 @@ import TcBinds		( tcTopBindsAndThen )
 import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, tcExtendTypeEnv,
-			  getEnvTyCons, getEnvClasses, tcLookupValueMaybe,
+			  getEnvTyCons, getEnvClasses, tcLookupValueByKeyMaybe,
 			  explicitLookupValueByKey, tcSetValueEnv,
-			  tcLookupTyCon, initEnv, valueEnvIds,
+			  initEnv, 
 			  ValueEnv, TcTyThing(..)
 			)
 import TcExpr		( tcId )
@@ -44,24 +45,23 @@ import TcType		( TcType, typeToTcType,
 			  newTyVarTy
 			)
 
-import RnMonad		( RnNameSupply, getIfaceFixities, Fixities, InterfaceDetails )
+import RnMonad		( RnNameSupply, FixityEnv )
 import Bag		( isEmptyBag )
 import ErrUtils		( Message, printErrorsAndWarnings, dumpIfSet )
-import Id		( Id, idType )
+import Id		( Id, idType, idName )
 import Module           ( pprModuleName )
 import OccName		( isSysOcc )
 import Name		( Name, nameUnique, nameOccName, isLocallyDefined, 
-			  toRdrName, NamedThing(..)
+			  toRdrName, nameEnvElts, NamedThing(..)
 			)
 import TyCon		( TyCon, tyConKind )
 import Class		( Class, classSelIds, classTyCon )
 import Type		( mkTyConApp, mkForAllTy,
 			  boxedTypeKind, getTyVar, Type )
 import TysWiredIn	( unitTy )
-import PrelMods		( mAIN_Name )
-import PrelInfo		( main_NAME, thinAirIdNames, setThinAirIds )
+import PrelInfo		( mAIN_Name )
 import TcUnify		( unifyTauTy )
-import Unique		( Unique  )
+import Unique		( Unique, mainKey )
 import UniqSupply       ( UniqSupply )
 import Maybes		( maybeToBool )
 import Util
@@ -83,33 +83,26 @@ data TcResults
 	tc_insts   :: Bag InstInfo,		-- Instance declaration information
 	tc_fords   :: [TypecheckedForeignDecl], -- Foreign import & exports.
 	tc_rules   :: [TypecheckedRuleDecl],	-- Transformation rules
-	tc_env	   :: ValueEnv,
-	tc_thinair :: [Id]			-- The thin-air Ids
+	tc_env	   :: ValueEnv
     }
 
 ---------------
 typecheckModule
 	:: UniqSupply
 	-> RnNameSupply
-	-> InterfaceDetails
+	-> FixityEnv
 	-> RenamedHsModule
 	-> IO (Maybe TcResults)
 
-typecheckModule us rn_name_supply iface_det mod
-  = initTc us initEnv (tcModule rn_name_supply (getIfaceFixities iface_det) mod)
-		    	>>= \ (maybe_result, warns, errs) ->
+typecheckModule us rn_name_supply fixity_env mod
+  = initTc us initEnv (tcModule rn_name_supply fixity_env mod) 	>>= \ (maybe_result, warns, errs) ->
 		
     printErrorsAndWarnings errs warns		>>
-
-    -- write the thin-air Id map
-    (case maybe_result of
-	Just results -> setThinAirIds (tc_thinair results)
-	Nothing      -> return ()
-    ) 									>>
-
+	
     (case maybe_result of
 	Nothing -> return ()
-	Just results -> dumpIfSet opt_D_dump_tc    "Typechecked"     (dump_tc   results)
+	Just results -> dumpIfSet opt_D_dump_types "Type signatures" (dump_sigs results) >>
+			dumpIfSet opt_D_dump_tc    "Typechecked"     (dump_tc   results)
     )						>>
 			
     return (if isEmptyBag errs then 
@@ -120,6 +113,22 @@ typecheckModule us rn_name_supply iface_det mod
 dump_tc results
   = ppr (tc_binds results) $$ pp_rules (tc_rules results) 
 
+dump_sigs results	-- Print type signatures
+  = 	-- Convert to HsType so that we get source-language style printing
+	-- And sort by RdrName
+    vcat $ map ppr_sig $ sortLt lt_sig $
+    [(toRdrName id, toHsType (idType id)) | id <- nameEnvElts (tc_env results), 
+					    want_sig id
+    ]
+  where
+    lt_sig (n1,_) (n2,_) = n1 < n2
+    ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
+
+    want_sig id | opt_PprStyle_Debug = True
+	        | otherwise	     = isLocallyDefined n && not (isSysOcc (nameOccName n))
+				     where
+				       n = idName id
+
 pp_rules [] = empty
 pp_rules rs = vcat [ptext SLIT("{-# RULES"),
 		    nest 4 (vcat (map ppr rs)),
@@ -129,12 +138,12 @@ pp_rules rs = vcat [ptext SLIT("{-# RULES"),
 The internal monster:
 \begin{code}
 tcModule :: RnNameSupply	-- for renaming derivings
-	 -> Fixities		-- needed for Show/Read derivings.
+	 -> FixityEnv		-- needed for Show/Read derivings.
 	 -> RenamedHsModule	-- input
 	 -> TcM s TcResults	-- output
 
 tcModule rn_name_supply fixities
-	(HsModule mod_name verion exports imports decls _ src_loc)
+	(HsModule mod_name _ _ _ decls _ src_loc)
   = tcAddSrcLoc src_loc $	-- record where we're starting
 
     fixTc (\ ~(unf_env ,_) ->
@@ -165,22 +174,42 @@ tcModule rn_name_supply fixities
     	) `thenTc` \ (_, env, inst_info, deriv_binds) ->
     
     	tcSetEnv env 		(
-    	
-    	    -- Default declarations
-    	tcDefaults decls		`thenTc` \ defaulting_tys ->
-    	tcSetDefaultTys defaulting_tys 	$
-    	
-    	-- Create any necessary record selector Ids and their bindings
-    	-- "Necessary" includes data and newtype declarations
-	-- We don't create bindings for dictionary constructors;
-	-- they are always fully applied, and the bindings are just there
-	-- to support partial applications
     	let
     	    tycons       = getEnvTyCons env
     	    classes      = getEnvClasses env
 	    local_tycons  = filter isLocallyDefined tycons
 	    local_classes = filter isLocallyDefined classes
     	in
+    	
+    	    -- Default declarations
+    	tcDefaults decls		`thenTc` \ defaulting_tys ->
+    	tcSetDefaultTys defaulting_tys 	$
+    	
+	-- Extend the TyCon envt with the tycons corresponding to
+	-- the classes.
+	--  They are mentioned in types in interface files.
+        tcExtendTypeEnv [ (getName tycon, (kindToTcKind (tyConKind tycon), ADataTyCon tycon))
+		        | clas <- classes,
+			  let tycon = classTyCon clas
+		        ]				$
+
+	-- Interface type signatures
+	-- We tie a knot so that the Ids read out of interfaces are in scope
+	--   when we read their pragmas.
+	-- What we rely on is that pragmas are typechecked lazily; if
+	--   any type errors are found (ie there's an inconsistency)
+	--   we silently discard the pragma
+	-- We must do this before mkImplicitDataBinds (which comes next), since
+	-- the latter looks up unpackCStringId, for example, which is usually 
+	-- imported
+	tcInterfaceSigs unf_env decls		`thenTc` \ sig_ids ->
+	tcExtendGlobalValEnv sig_ids		$
+
+    	-- Create any necessary record selector Ids and their bindings
+    	-- "Necessary" includes data and newtype declarations
+	-- We don't create bindings for dictionary constructors;
+	-- they are always fully applied, and the bindings are just there
+	-- to support partial applications
     	mkImplicitDataBinds tycons		`thenTc`    \ (data_ids, imp_data_binds) ->
     	mkImplicitClassBinds classes		`thenNF_Tc` \ (cls_ids,  imp_cls_binds) ->
     	
@@ -193,23 +222,6 @@ tcModule rn_name_supply fixities
 	--	    will find they aren't there and complain.
     	tcExtendGlobalValEnv data_ids		$
     	tcExtendGlobalValEnv cls_ids		$
-
-	-- Extend the TyCon envt with the tycons corresponding to
-	-- the classes.
-	--  They are mentioned in types in interface files.
-        tcExtendTypeEnv [ (getName tycon, (kindToTcKind (tyConKind tycon), Nothing, ATyCon tycon))
-		        | clas <- classes,
-			  let tycon = classTyCon clas
-		        ]				$
-
-	    -- Interface type signatures
-	    -- We tie a knot so that the Ids read out of interfaces are in scope
-	    --   when we read their pragmas.
-	    -- What we rely on is that pragmas are typechecked lazily; if
-	    --   any type errors are found (ie there's an inconsistency)
-	    --   we silently discard the pragma
-	tcInterfaceSigs unf_env decls		`thenTc` \ sig_ids ->
-	tcExtendGlobalValEnv sig_ids		$
 
 	    -- foreign import declarations next.
 	tcForeignImports decls		`thenTc`    \ (fo_ids, foi_decls) ->
@@ -253,7 +265,7 @@ tcModule rn_name_supply fixities
 
 		-- Check that Main defines main
 	(if mod_name == mAIN_Name then
-		tcLookupValueMaybe main_NAME	`thenNF_Tc` \ maybe_main ->
+		tcLookupValueByKeyMaybe mainKey		`thenNF_Tc` \ maybe_main ->
 		checkTc (maybeToBool maybe_main) noMainErr
 	 else
 		returnTc ()
@@ -275,12 +287,6 @@ tcModule rn_name_supply fixities
 	zonkForeignExports foe_decls    `thenNF_Tc` \ foe_decls' ->
 	zonkRules rules			`thenNF_Tc` \ rules' ->
 
-	let
-	   thin_air_ids = map (explicitLookupValueByKey really_final_env . nameUnique) thinAirIdNames
-		-- When looking up the thin-air names we must use
-		-- a global env that includes the zonked locally-defined Ids too
-		-- Hence using really_final_env
-	in
 	returnTc (really_final_env, 
 		  (TcResults {	tc_binds   = all_binds', 
 				tc_tycons  = local_tycons,
@@ -288,8 +294,7 @@ tcModule rn_name_supply fixities
 				tc_insts   = inst_info,
 				tc_fords   = foi_decls ++ foe_decls',
 				tc_rules   = rules',
-				tc_env     = really_final_env,
-				tc_thinair = thin_air_ids
+				tc_env     = really_final_env
 		 }))
 	)
 
@@ -304,6 +309,6 @@ get_val_decls decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]
 \begin{code}
 noMainErr
   = hsep [ptext SLIT("Module"), quotes (pprModuleName mAIN_Name), 
-	  ptext SLIT("must include a definition for"), quotes (ppr main_NAME)]
+	  ptext SLIT("must include a definition for"), quotes (ptext SLIT("main"))]
 \end{code}
 

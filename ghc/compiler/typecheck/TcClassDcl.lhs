@@ -13,7 +13,7 @@ module TcClassDcl ( kcClassDecl, tcClassDecl1, tcClassDecls2, mkImplicitClassBin
 import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
 			  InPat(..), HsBinds(..), GRHSs(..),
 			  HsExpr(..), HsLit(..), HsType(..), HsPred(..),
-			  pprHsClassAssertion, mkSimpleMatch,
+			  mkSimpleMatch,
 			  andMonoBinds, andMonoBindList, getTyVarName, 
 			  isClassDecl, isClassOpSig, isPragSig, collectMonoBinders
 			)
@@ -27,7 +27,7 @@ import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 
 import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, newDicts, newMethod )
 import TcEnv		( TcId, ValueEnv, TcTyThing(..), tcAddImportedIdInfo,
-			  tcLookupClass, tcLookupTy, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
+			  tcLookupTy, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
 			  tcExtendLocalValEnv
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
@@ -117,7 +117,7 @@ kcClassDecl (ClassDecl	context class_name
 	    (classArityErr class_name)		`thenTc_`
 
 	-- Get the (mutable) class kind
-    tcLookupTy class_name			`thenNF_Tc` \ (kind, _, _) ->
+    tcLookupTy class_name			`thenNF_Tc` \ (kind, _) ->
 
 	-- Make suitable tyvars and do kind checking
 	-- The net effect is to mutate the class kind
@@ -145,7 +145,7 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 			tyvar_names fundeps class_sigs def_methods pragmas 
 			tycon_name datacon_name datacon_wkr_name sc_sel_names src_loc)
   = 	-- LOOK THINGS UP IN THE ENVIRONMENT
-    tcLookupTy class_name				`thenTc` \ (class_kind, _, AClass rec_class) ->
+    tcLookupTy class_name				`thenTc` \ (class_kind, AClass rec_class arity) ->
     tcExtendTopTyVarScope class_kind tyvar_names	$ \ tyvars _ ->
 	-- The class kind is by now immutable
 	
@@ -201,7 +201,7 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 			     clas 		-- Yes!  It's a dictionary 
 			     new_or_data
     in
-    returnTc clas
+    returnTc (class_name, AClass clas arity)
 \end{code}
 
 \begin{code}
@@ -211,10 +211,8 @@ tc_fundep (us, vs) =
     mapTc tc_fd_tyvar vs	`thenTc` \ vs' ->
     returnTc (us', vs')
 tc_fd_tyvar v =
-    tcLookupTy v `thenTc` \(_, _, thing) ->
-    case thing of
-        ATyVar tv -> returnTc tv
-	-- ZZ else should fail more gracefully
+    tcLookupTy v	 `thenTc` \(_, ATyVar tv) ->
+    returnTc tv
 \end{code}
 
 \begin{code}
@@ -248,11 +246,11 @@ tcClassContext class_name rec_class rec_tyvars context sc_sel_names
     returnTc (sc_theta', sc_tys, sc_sel_ids)
 
   where
-    check_constraint (HsPClass c tys) = checkTc (all is_tyvar tys)
-					        (superClassErr class_name (c, tys))
+    check_constraint sc@(HsPClass c tys) = checkTc (all is_tyvar tys)
+						   (superClassErr class_name sc)
 
-    is_tyvar (MonoTyVar _) = True
-    is_tyvar other	   = False
+    is_tyvar (HsTyVar _) = True
+    is_tyvar other	 = False
 
 
 tcClassSig :: ValueEnv		-- Knot tying only!
@@ -342,7 +340,7 @@ tcClassDecl2 (ClassDecl context class_name
   | otherwise	-- It is locally defined
   = recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds)) $ 
     tcAddSrcLoc src_loc		     		          $
-    tcLookupClass class_name				`thenNF_Tc` \ clas ->
+    tcLookupTy class_name				`thenNF_Tc` \ (_, AClass clas _) ->
     tcDefaultMethodBinds clas default_binds class_sigs
 \end{code}
 
@@ -642,7 +640,7 @@ classArityErr class_name
   = ptext SLIT("Too many parameters for class") <+> quotes (ppr class_name)
 
 superClassErr class_name sc
-  = ptext SLIT("Illegal superclass constraint") <+> quotes (pprHsClassAssertion sc)
+  = ptext SLIT("Illegal superclass constraint") <+> quotes (ppr sc)
     <+> ptext SLIT("in declaration for class") <+> quotes (ppr class_name)
 
 defltMethCtxt class_name

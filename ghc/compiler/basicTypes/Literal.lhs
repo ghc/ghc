@@ -8,7 +8,7 @@ module Literal
 	( Literal(..)		-- Exported to ParseIface
 	, mkMachInt, mkMachWord
 	, mkMachInt64, mkMachWord64
-	, isLitLitLit
+	, isLitLitLit, maybeLitLit
 	, literalType, literalPrimRep
 	, hashLiteral
 
@@ -38,10 +38,6 @@ import Util		( thenCmp )
 import Ratio 		( numerator, denominator )
 import FastString	( uniqueOfFS )
 import Char		( ord, chr )
-
-#if __GLASGOW_HASKELL__ >= 404
-import GlaExts		( fromInt )
-#endif
 \end{code}
 
 
@@ -179,6 +175,9 @@ double2FloatLit (MachDouble d) = MachFloat  d
 \begin{code}
 isLitLitLit (MachLitLit _ _) = True
 isLitLitLit _	    	     = False
+
+maybeLitLit (MachLitLit s t) = Just (s,t)
+maybeLitLit _		     = Nothing
 \end{code}
 
 	Types

@@ -22,11 +22,11 @@ import CmdLineOpts	( opt_FoldrBuildOn )
 import CoreUtils	( exprType, mkIfThenElse )
 import Id		( idType )
 import Var              ( Id, TyVar )
-import PrelInfo		( foldrId, buildId )
 import Type		( mkTyVarTy, mkForAllTy, mkFunTys, mkFunTy, Type )
 import TysPrim		( alphaTyVar, alphaTy )
 import TysWiredIn	( nilDataCon, consDataCon, listTyCon )
 import Match		( matchSimply )
+import Unique		( foldrIdKey, buildIdKey )
 import Outputable
 \end{code}
 
@@ -51,12 +51,13 @@ dsListComp quals elt_ty
 	n_ty = mkTyVarTy n_tyvar
         c_ty = mkFunTys [elt_ty, n_ty] n_ty
     in
-    newSysLocalsDs [c_ty,n_ty]	`thenDs` \ [c, n] ->
+    newSysLocalsDs [c_ty,n_ty]		`thenDs` \ [c, n] ->
 
-    dfListComp c n quals	`thenDs` \ result ->
+    dfListComp c n quals		`thenDs` \ result ->
 
-    returnDs (Var buildId `App` Type elt_ty 
-			  `App` mkLams [n_tyvar, c, n] result)
+    dsLookupGlobalValue buildIdKey	`thenDs` \ build_id ->
+    returnDs (Var build_id `App` Type elt_ty 
+			   `App` mkLams [n_tyvar, c, n] result)
 \end{code}
 
 %************************************************************************
@@ -207,12 +208,13 @@ dfListComp c_id n_id (BindStmt pat list1 locn : quals)
     matchSimply (Var x) ListCompMatch pat core_rest (Var b)	`thenDs` \ core_expr ->
 
     -- now build the outermost foldr, and return
+    dsLookupGlobalValue foldrIdKey		`thenDs` \ foldr_id ->
     returnDs (
-      Var foldrId `App` Type x_ty 
-		  `App` Type b_ty
-		  `App` mkLams [x, b] core_expr
-		  `App` Var n_id
-		  `App` core_list1
+      Var foldr_id `App` Type x_ty 
+		   `App` Type b_ty
+		   `App` mkLams [x, b] core_expr
+		   `App` Var n_id
+		   `App` core_list1
     )
 \end{code}
 

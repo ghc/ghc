@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.41 2000/04/05 15:17:38 simonmar Exp $
+% $Id: ClosureInfo.lhs,v 1.42 2000/05/25 12:41:15 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -81,8 +81,9 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_OmitBlackHoling,
 			  opt_SMP )
 import Id		( Id, idType, idArityInfo )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon,
-			  isNullaryDataCon, isTupleCon, dataConName
+			  isNullaryDataCon, dataConName
 			)
+import TyCon		( isBoxedTupleTyCon )
 import IdInfo		( ArityInfo(..) )
 import Name		( Name, isExternallyVisibleName, nameUnique, 
 			  getOccName )
@@ -238,7 +239,8 @@ mkConLFInfo :: DataCon -> LambdaFormInfo
 
 mkConLFInfo con
   = -- the isNullaryDataCon will do this: ASSERT(isDataCon con)
-    (if isTupleCon con then LFTuple else LFCon) con (isNullaryDataCon con)
+    (if isBoxedTupleTyCon (dataConTyCon con) then LFTuple else LFCon) 
+	con (isNullaryDataCon con)
 
 mkSelectorLFInfo rhs_ty offset updatable
   = LFThunk rhs_ty NotTopLevel False updatable (SelectorThunk offset)

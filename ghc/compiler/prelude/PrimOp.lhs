@@ -42,9 +42,9 @@ import Type		( Type, mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, mkTyVarTys,
                           UsageAnn(..), mkUsgTy
 			)
 import Unique		( Unique, mkPrimOpIdUnique )
-import BasicTypes	( Arity )
+import BasicTypes	( Arity, Boxity(..) )
 import CStrings		( CLabelString, pprCLabelString )
-import PrelMods		( pREL_GHC, pREL_GHC_Name )
+import PrelNames	( pREL_GHC, pREL_GHC_Name )
 import Outputable
 import Util		( assoc, zipWithEqual )
 import GlaExts		( Int(..), Int#, (==#) )
@@ -832,9 +832,10 @@ an_Integer_and_Int_tys
   = [intPrimTy, byteArrayPrimTy, -- Integer
      intPrimTy]
 
-unboxedPair	 = mkUnboxedTupleTy 2
-unboxedTriple    = mkUnboxedTupleTy 3
-unboxedQuadruple = mkUnboxedTupleTy 4
+unboxedSingleton = mkTupleTy Unboxed 1
+unboxedPair	 = mkTupleTy Unboxed 2
+unboxedTriple    = mkTupleTy Unboxed 3
+unboxedQuadruple = mkTupleTy Unboxed 4
 
 mkIOTy ty = mkFunTy realWorldStatePrimTy 
 		    (unboxedPair [realWorldStatePrimTy,ty])
@@ -1270,7 +1271,7 @@ primOpInfo WriteArrayOp
 primOpInfo IndexArrayOp
   = let { elt = alphaTy; elt_tv = alphaTyVar } in
     mkGenPrimOp SLIT("indexArray#") [elt_tv] [mkArrayPrimTy elt, intPrimTy]
-	(mkUnboxedTupleTy 1 [elt])
+	(unboxedSingleton [elt])
 
 ---------------------------------------------------------------------------
 -- Primitive arrays full of unboxed bytes:
@@ -2302,8 +2303,8 @@ primOpUsg op
                          Nothing    -> pprPanic "primOpUsg:inFun" (ppr op <+> ppr ty)
 
         inUB fs ty  = case splitTyConApp_maybe ty of
-                        Just (tc,tys) -> ASSERT( tc == unboxedTupleTyCon (length fs) )
-                                         mkUnboxedTupleTy (length fs) (zipWithEqual "primOpUsg"
+                        Just (tc,tys) -> ASSERT( tc == tupleTyCon Unboxed (length fs) )
+                                         mkTupleTy Unboxed (length fs) (zipWithEqual "primOpUsg"
                                                                          ($) fs tys)
                         Nothing       -> pprPanic "primOpUsg:inUB" (ppr op <+> ppr ty)
 \end{code}
@@ -2409,6 +2410,7 @@ data CCall
 		Bool		-- True <=> really a "casm"
 		Bool		-- True <=> might invoke Haskell GC
 		CallConv	-- calling convention to use.
+  deriving( Eq )
 
 data CCallTarget
   = StaticTarget  CLabelString  -- An "unboxed" ccall# to `fn'.
@@ -2416,6 +2418,7 @@ data CCallTarget
 				--   (unique is used to generate a 'typedef' to cast
 				--    the function pointer if compiling the ccall# down to
 				--    .hc code - can't do this inline for tedious reasons.)
+  deriving( Eq )
 
 ccallMayGC :: CCall -> Bool
 ccallMayGC (CCall _ _ may_gc _) = may_gc

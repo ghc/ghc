@@ -6,10 +6,13 @@
 \begin{code}
 module RnMonad(
 	module RnMonad,
+
+	module RdrName,		-- Re-exports
+	module Name,		-- from these two
+
 	Module,
 	FiniteMap,
 	Bag,
-	Name,
 	RdrNameHsDecl,
 	RdrNameInstDecl,
 	Version,
@@ -32,33 +35,37 @@ import IOExts		( IORef, newIORef, readIORef, writeIORef, unsafePerformIO )
 import HsSyn		
 import RdrHsSyn
 import RnHsSyn		( RenamedFixitySig, RenamedDeprecation )
-import BasicTypes	( Version )
+import BasicTypes	( Version, defaultFixity )
 import SrcLoc		( noSrcLoc )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg, Message
 			)
-import Name		( Name, OccName, NamedThing(..),
+import RdrName		( RdrName, dummyRdrVarName, rdrNameOcc,
+			  RdrNameEnv, emptyRdrEnv, extendRdrEnv, 
+			  lookupRdrEnv, addListToRdrEnv, rdrEnvToList, rdrEnvElts
+			)
+import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  isLocallyDefinedName, nameModule, nameOccName,
-			  decode, mkLocalName, mkUnboundName
+			  decode, mkLocalName, mkUnboundName,
+			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, extendNameEnv,
+			  addToNameEnv_C, plusNameEnv_C, nameEnvElts, 
+			  elemNameEnv, addToNameEnv, addListToNameEnv
 			)
 import Module		( Module, ModuleName, ModuleHiMap, SearchPath, WhereFrom,
-			  mkModuleHiMaps, moduleName, mkVanillaModule, mkSearchPath
+			  mkModuleHiMaps, moduleName, mkSearchPath
 			)
 import NameSet		
-import RdrName		( RdrName, dummyRdrVarName, rdrNameOcc )
 import CmdLineOpts	( opt_D_dump_rn_trace, opt_HiMap )
 import PrelInfo		( builtinNames )
 import TysWiredIn	( boolTyCon )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique, getUnique, unboundKey )
-import UniqFM		( UniqFM )
 import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM, addListToFM, 
 			  addListToFM_C, addToFM_C, eltsFM, fmToList
 			)
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import Maybes		( mapMaybe )
 import UniqSet
-import UniqFM
 import UniqSupply
 import Util
 import Outputable
@@ -148,56 +155,22 @@ data RnMode	= SourceMode			-- Renaming source code
 
 \begin{code}
 --------------------------------
-type RdrNameEnv a = FiniteMap RdrName a
 type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name clashes
 					-- These only get reported on lookup,
 					-- not on construction
 type LocalRdrEnv  = RdrNameEnv Name
-
-emptyRdrEnv  :: RdrNameEnv a
-lookupRdrEnv :: RdrNameEnv a -> RdrName -> Maybe a
-addListToRdrEnv :: RdrNameEnv a -> [(RdrName,a)] -> RdrNameEnv a
-extendRdrEnv	:: RdrNameEnv a -> RdrName -> a -> RdrNameEnv a
-
-emptyRdrEnv  = emptyFM
-lookupRdrEnv = lookupFM
-addListToRdrEnv = addListToFM
-rdrEnvElts	= eltsFM
-extendRdrEnv    = addToFM
-rdrEnvToList    = fmToList
-
---------------------------------
-type NameEnv a = UniqFM a	-- Domain is Name
-
-emptyNameEnv   :: NameEnv a
-nameEnvElts    :: NameEnv a -> [a]
-addToNameEnv_C :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
-addToNameEnv   :: NameEnv a -> Name -> a -> NameEnv a
-plusNameEnv    :: NameEnv a -> NameEnv a -> NameEnv a
-plusNameEnv_C  :: (a->a->a) -> NameEnv a -> NameEnv a -> NameEnv a
-extendNameEnv  :: NameEnv a -> [(Name,a)] -> NameEnv a
-lookupNameEnv  :: NameEnv a -> Name -> Maybe a
-delFromNameEnv :: NameEnv a -> Name -> NameEnv a
-elemNameEnv    :: Name -> NameEnv a -> Bool
-unitNameEnv    :: Name -> a -> NameEnv a
-
-emptyNameEnv   = emptyUFM
-nameEnvElts    = eltsUFM
-addToNameEnv_C = addToUFM_C
-addToNameEnv   = addToUFM
-plusNameEnv    = plusUFM
-plusNameEnv_C  = plusUFM_C
-extendNameEnv  = addListToUFM
-lookupNameEnv  = lookupUFM
-delFromNameEnv = delFromUFM
-elemNameEnv    = elemUFM
-unitNameEnv    = unitUFM
 
 --------------------------------
 type FixityEnv = NameEnv RenamedFixitySig
 	-- We keep the whole fixity sig so that we
 	-- can report line-number info when there is a duplicate
 	-- fixity declaration
+
+lookupFixity :: FixityEnv -> Name -> Fixity
+lookupFixity env name
+  = case lookupNameEnv env name of 
+	Just (FixitySig _ fix _) -> fix
+	Nothing		  	 -> defaultFixity
 
 --------------------------------
 type DeprecationEnv = NameEnv DeprecTxt
@@ -229,12 +202,7 @@ type RnNameSupply
 
 
 --------------------------------
-data ExportEnv	  = ExportEnv Avails Fixities [ModuleName]
-			-- The list of modules is the modules exported
-			-- with 'module M' in the export list
-
 type Avails	  = [AvailInfo]
-type Fixities	  = [(Name, Fixity)]
 
 type ExportAvails = (FiniteMap ModuleName Avails,
 	-- Used to figure out "module M" export specifiers
@@ -250,6 +218,8 @@ data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 					 -- NB: If the type or class is itself
 					 -- to be in scope, it must be in this list.
 					 -- Thus, typically: AvailTC Eq [Eq, ==, /=]
+			deriving( Eq )
+			-- Equality used when deciding if the interface has changed
 
 type AvailEnv	  = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
 type AvailInfo    = GenAvailInfo Name
@@ -262,10 +232,12 @@ type RdrAvailInfo = GenAvailInfo OccName
 
 \begin{code}
 type ExportItem		 = (ModuleName, [RdrAvailInfo])
-type VersionInfo name    = [ImportVersion name]
 
-type ImportVersion name  = (ModuleName, Version, 
-                            WhetherHasOrphans, IsBootInterface, WhatsImported name)
+type ImportVersion name  = (ModuleName, WhetherHasOrphans, IsBootInterface, WhatsImported name)
+
+type ModVersionInfo	= (Version,		-- Version of the whole module
+			   Version,		-- Version number for all fixity decls together
+			   Version)		-- ...ditto all rules together
 
 type WhetherHasOrphans   = Bool
 	-- An "orphan" is 
@@ -276,15 +248,25 @@ type WhetherHasOrphans   = Bool
 
 type IsBootInterface     = Bool
 
-data WhatsImported name  = Everything 
-			 | Specifically [LocalVersion name] -- List guaranteed non-empty
+data WhatsImported name  = NothingAtAll				-- The module is below us in the
+								-- hierarchy, but we import nothing
 
-    -- ("M", hif, ver, Everything) means there was a "module M" in 
-    -- this module's export list, so we just have to go by M's version, "ver",
-    -- not the list of LocalVersions.
+			 | Everything Version			-- The module version
 
+			 | Specifically Version			-- Module version
+					Version			-- Fixity version
+					Version			-- Rules version
+					[(name,Version)]	-- List guaranteed non-empty
+			 deriving( Eq )
+	-- 'Specifically' doesn't let you say "I imported f but none of the fixities in
+	-- the module. If you use anything in the module you get its fixity and rule version
+	-- So if the fixities or rules change, you'll recompile, even if you don't use either.
+	-- This is easy to implement, and it's safer: you might not have used the rules last
+	-- time round, but if someone has added a new rule you might need it this time
 
-type LocalVersion name   = (name, Version)
+	-- 'Everything' means there was a "module M" in 
+	-- this module's export list, so we just have to go by M's version,
+	-- not the list of (name,version) pairs
 
 data ParsedIface
   = ParsedIface {
@@ -293,22 +275,12 @@ data ParsedIface
       pi_orphan    :: WhetherHasOrphans,		-- Whether this module has orphans
       pi_usages	   :: [ImportVersion OccName],		-- Usages
       pi_exports   :: [ExportItem],			-- Exports
-      pi_decls	   :: [(Version, RdrNameHsDecl)],	-- Local definitions
       pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
-      pi_rules	   :: [RdrNameRuleDecl],		-- Rules
+      pi_decls	   :: [(Version, RdrNameHsDecl)],	-- Local definitions
+      pi_fixity	   :: (Version, [RdrNameFixitySig]),	-- Local fixity declarations, with their version
+      pi_rules	   :: (Version, [RdrNameRuleDecl]),	-- Rules, with their version
       pi_deprecs   :: [RdrNameDeprecation]		-- Deprecations
     }
-
-data InterfaceDetails
-   = InterfaceDetails WhetherHasOrphans
-		      (VersionInfo Name)   -- Version information for what this module imports
-		      ExportEnv		   -- What modules this one depends on
-		      [Deprecation Name]
-
-
--- needed by Main to fish out the fixities assoc list.
-getIfaceFixities :: InterfaceDetails -> Fixities
-getIfaceFixities (InterfaceDetails _ _ (ExportEnv _ fs _) _) = fs
 
 
 type RdrNamePragma = ()				-- Fudge for now
@@ -323,8 +295,14 @@ data Ifaces = Ifaces {
 
 		iDecls :: DeclsMap,	-- A single, global map of Names to decls
 
-		iFixes :: FixityEnv,	-- A single, global map of Names to fixities
-					-- See comments with RnIfaces.lookupFixity
+		iDeferred :: NameSet,	-- data (not newtype) TyCons that have been slurped, 
+					-- but none of their constructors have.
+					-- If this is still the case right at the end
+					-- we can get away with importing them abstractly
+
+		iFixes :: FixityEnv,	
+				-- A single, global map of Names to fixities
+				-- See comments with RnIfaces.lookupFixity
 
 		iSlurp :: NameSet,
 		-- All the names (whether "big" or "small", whether wired-in or not,
@@ -342,17 +320,24 @@ data Ifaces = Ifaces {
 		-- Each is 'gated' by the names that must be available before
 		-- this instance decl is needed.
 
-		iRules :: Bag GatedDecl,
-			-- Ditto transformation rules
+		iRules :: IfaceRules,
+		-- Similar to instance decls, except that we track the version number of the
+		-- rules we import from each module
+		-- [We keep just one rule-version number for each module]
+		-- The Bool is True if we import any rules at all from that module
 
 		iDeprecs :: DeprecationEnv
 	}
 
+type IfaceRules = Bag GatedDecl
+
 type GatedDecl = (NameSet, (Module, RdrNameHsDecl))
 
 type ImportedModuleInfo 
-     = FiniteMap ModuleName (Version, WhetherHasOrphans, IsBootInterface, 
-			     Maybe (Module, WhereFrom, Avails))
+     = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface, 
+			     Maybe (Module, Version, Version, Version, WhereFrom, Avails))
+				-- The three Versions are module version, fixity version, rules version
+
 		-- Suppose the domain element is module 'A'
 		--
 		-- The first Bool is True if A contains 
@@ -427,6 +412,7 @@ initIfaceRnMS mod thing_inside
 emptyIfaces :: Ifaces
 emptyIfaces = Ifaces { iImpModInfo = emptyFM,
 		       iDecls = emptyNameEnv,
+		       iDeferred = emptyNameSet,
 		       iFixes = emptyNameEnv,
 		       iSlurp = unitNameSet (mkUnboundName dummyRdrVarName),
 			-- Pretend that the dummy unbound name has already been

@@ -19,7 +19,7 @@ import Type		( Type )
 import DsMonad
 import DsUtils
 import PrelInfo		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
-import Unique		( otherwiseIdKey, trueDataConKey, Uniquable(..) )
+import Unique		( otherwiseIdKey, trueDataConKey, hasKey, Uniquable(..) )
 import Outputable
 \end{code}
 
@@ -81,11 +81,9 @@ matchGuard (ExprStmt expr locn : should_be_null) ctx
 
 	-- Turn an "otherwise" guard is a no-op
 matchGuard (GuardStmt (HsVar v) _ : stmts) ctx
-  |  uniq == otherwiseIdKey
-  || uniq == trueDataConKey
+  |  v `hasKey` otherwiseIdKey
+  || v `hasKey` trueDataConKey
   = matchGuard stmts ctx
-  where
-    uniq = getUnique v
 
 matchGuard (GuardStmt expr locn : stmts) ctx
   = matchGuard stmts ctx 		`thenDs` \ match_result ->

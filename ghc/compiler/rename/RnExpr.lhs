@@ -18,21 +18,22 @@ module RnExpr (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} RnBinds  ( rnBinds ) 
-import {-# SOURCE #-} RnSource ( rnHsSigType, rnHsPolyType, rnHsType )
+import {-# SOURCE #-} RnSource ( rnHsSigType, rnHsType )
 
 import HsSyn
 import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnEnv
-import RnIfaces		( lookupFixity )
+import RnIfaces		( lookupFixityRn )
 import CmdLineOpts	( opt_GlasgowExts, opt_IgnoreAsserts )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity, negatePrecedence )
 import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 			  ccallableClass_RDR, creturnableClass_RDR, 
 			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
 			  ratioDataCon_RDR, negate_RDR, assertErr_RDR,
-			  ioDataCon_RDR
+			  ioDataCon_RDR, addr2Integer_RDR,
+			  foldr_RDR, build_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
@@ -44,7 +45,7 @@ import NameSet
 import UniqFM		( isNullUFM )
 import FiniteMap	( elemFM )
 import UniqSet		( emptyUniqSet, UniqSet )
-import Unique		( assertIdKey )
+import Unique		( hasKey, assertIdKey )
 import Util		( removeDups )
 import ListSetOps	( unionLists )
 import Maybes		( maybeToBool )
@@ -70,7 +71,7 @@ rnPat (VarPatIn name)
 rnPat (SigPatIn pat ty)
   | opt_GlasgowExts
   = rnPat pat		`thenRn` \ (pat', fvs1) ->
-    rnHsPolyType doc ty	`thenRn` \ (ty',  fvs2) ->
+    rnHsType doc ty	`thenRn` \ (ty',  fvs2) ->
     returnRn (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
 
   | otherwise
@@ -107,7 +108,7 @@ rnPat (ConOpPatIn pat1 con _ pat2)
 	-- See comments with rnExpr (OpApp ...)
     (case mode of
 	InterfaceMode -> returnRn (ConOpPatIn pat1' con' defaultFixity pat2')
-	SourceMode    -> lookupFixity con'	`thenRn` \ fixity ->
+	SourceMode    -> lookupFixityRn con'	`thenRn` \ fixity ->
 			 mkConOpPatRn pat1' con' fixity pat2'
     )								`thenRn` \ pat' ->
     returnRn (pat', fvs1 `plusFV` fvs2 `addOneFV` con')
@@ -191,7 +192,7 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
     rnGRHSs grhss			`thenRn` \ (grhss', grhss_fvs) ->
     (case maybe_rhs_sig of
 	Nothing -> returnRn (Nothing, emptyFVs)
-	Just ty | opt_GlasgowExts -> rnHsPolyType doc_sig ty	`thenRn` \ (ty', ty_fvs) ->
+	Just ty | opt_GlasgowExts -> rnHsType doc_sig ty	`thenRn` \ (ty', ty_fvs) ->
 				     returnRn (Just ty', ty_fvs)
 		| otherwise	  -> addErrRn (patSigErr ty)	`thenRn_`
 				     returnRn (Nothing, emptyFVs)
@@ -276,7 +277,7 @@ rnExpr :: RdrNameHsExpr -> RnMS (RenamedHsExpr, FreeVars)
 
 rnExpr (HsVar v)
   = lookupOccRn v	`thenRn` \ name ->
-    if nameUnique name == assertIdKey then
+    if name `hasKey` assertIdKey then
 	-- We expand it to (GHCerr.assert__ location)
         mkAssertExpr
     else
@@ -312,7 +313,7 @@ rnExpr (OpApp e1 op _ e2)
 	-- Don't even look up the fixity when in interface mode
     getModeRn				`thenRn` \ mode -> 
     (case mode of
-	SourceMode    -> lookupFixity op_name		`thenRn` \ fixity ->
+	SourceMode    -> lookupFixityRn op_name		`thenRn` \ fixity ->
 			 mkOpAppRn e1' op' fixity e2'
 	InterfaceMode -> returnRn (OpApp e1' op' defaultFixity e2')
     )					`thenRn` \ final_e -> 
@@ -350,12 +351,12 @@ rnExpr section@(SectionR op expr)
 
 rnExpr (HsCCall fun args may_gc is_casm fake_result_ty)
 	-- Check out the comment on RnIfaces.getNonWiredDataDecl about ccalls
-  = lookupImplicitOccRn ccallableClass_RDR	`thenRn` \ cc ->
-    lookupImplicitOccRn creturnableClass_RDR	`thenRn` \ cr ->
-    lookupImplicitOccRn ioDataCon_RDR		`thenRn` \ io ->
+  = lookupImplicitOccsRn [ccallableClass_RDR, 
+			  creturnableClass_RDR, 
+			  ioDataCon_RDR]	`thenRn` \ implicit_fvs ->
     rnExprs args				`thenRn` \ (args', fvs_args) ->
     returnRn (HsCCall fun args' may_gc is_casm fake_result_ty, 
-	      fvs_args `addOneFV` cc `addOneFV` cr `addOneFV` io)
+	      fvs_args `plusFV` implicit_fvs)
 
 rnExpr (HsSCC lbl expr)
   = rnExpr expr	 	`thenRn` \ (expr', fvs_expr) ->
@@ -379,7 +380,7 @@ rnExpr (HsWith expr binds)
 
 rnExpr e@(HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
-    lookupImplicitOccRn monadClass_RDR		`thenRn` \ monad ->
+    lookupImplicitOccsRn implicit_rdr_names	`thenRn` \ implicit_fvs ->
     rnStmts rnExpr stmts			`thenRn` \ (stmts', fvs) ->
 	-- check the statement list ends in an expression
     case last stmts' of {
@@ -387,17 +388,23 @@ rnExpr e@(HsDo do_or_lc stmts src_loc)
 	ReturnStmt _ -> returnRn () ;	-- for list comprehensions
 	_            -> addErrRn (doStmtListErr e)
     } 						`thenRn_`
-    returnRn (HsDo do_or_lc stmts' src_loc, fvs `addOneFV` monad)
+    returnRn (HsDo do_or_lc stmts' src_loc, fvs `plusFV` implicit_fvs)
+  where
+    implicit_rdr_names = [foldr_RDR, build_RDR, monadClass_RDR]
+	-- Monad stuff should not be necessary for a list comprehension
+	-- but the typechecker looks up the bind and return Ids anyway
+	-- Oh well.
+
 
 rnExpr (ExplicitList exps)
   = rnExprs exps		 	`thenRn` \ (exps', fvs) ->
     returnRn  (ExplicitList exps', fvs `addOneFV` listTyCon_name)
 
-rnExpr (ExplicitTuple exps boxed)
+rnExpr (ExplicitTuple exps boxity)
   = rnExprs exps	 			`thenRn` \ (exps', fvs) ->
-    returnRn (ExplicitTuple exps' boxed, fvs `addOneFV` tycon_name)
+    returnRn (ExplicitTuple exps' boxity, fvs `addOneFV` tycon_name)
   where
-    tycon_name = tupleTyCon_name boxed (length exps)
+    tycon_name = tupleTyCon_name boxity (length exps)
 
 rnExpr (RecordCon con_id rbinds)
   = lookupOccRn con_id 			`thenRn` \ conname ->
@@ -722,8 +729,8 @@ checkPrecMatch True op (Match _ (p1:p2:_) _ _)
 checkPrecMatch True op _ = panic "checkPrecMatch"
 
 checkPrec op (ConOpPatIn _ op1 _ _) right
-  = lookupFixity op	`thenRn` \  op_fix@(Fixity op_prec  op_dir) ->
-    lookupFixity op1	`thenRn` \ op1_fix@(Fixity op1_prec op1_dir) ->
+  = lookupFixityRn op	`thenRn` \  op_fix@(Fixity op_prec  op_dir) ->
+    lookupFixityRn op1	`thenRn` \ op1_fix@(Fixity op1_prec op1_dir) ->
     let
 	inf_ok = op1_prec > op_prec || 
 	         (op1_prec == op_prec &&
@@ -737,7 +744,7 @@ checkPrec op (ConOpPatIn _ op1 _ _) right
     checkRn inf_ok (precParseErr infol infor)
 
 checkPrec op (NegPatIn _) right
-  = lookupFixity op	`thenRn` \ op_fix@(Fixity op_prec op_dir) ->
+  = lookupFixityRn op	`thenRn` \ op_fix@(Fixity op_prec op_dir) ->
     checkRn (op_prec <= negatePrecedence) (precParseNegPatErr (ppr_op op,op_fix))
 
 checkPrec op pat right
@@ -754,7 +761,7 @@ checkSectionPrec left_or_right section op arg
   where
     HsVar op_name = op
     go_for_it pp_arg_op arg_fix@(Fixity arg_prec _)
-	= lookupFixity op_name	`thenRn` \ op_fix@(Fixity op_prec _) ->
+	= lookupFixityRn op_name	`thenRn` \ op_fix@(Fixity op_prec _) ->
 	  checkRn (op_prec < arg_prec)
 		  (sectionPrecErr (ppr_op op_name, op_fix) (pp_arg_op, arg_fix) section)
 \end{code}
@@ -808,13 +815,11 @@ litOccurrence (HsStringPrim _)
   = returnRn (unitFV (getName addrPrimTyCon))
 
 litOccurrence (HsInt _)
-  = lookupImplicitOccRn numClass_RDR `thenRn` \ num ->
-    returnRn (unitFV num)			-- Int and Integer are forced in by Num
+  = lookupImplicitOccsRn [numClass_RDR, addr2Integer_RDR]
+    -- Int and Integer are forced in by Num
 
 litOccurrence (HsFrac _)
-  = lookupImplicitOccRn fractionalClass_RDR	`thenRn` \ frac ->
-    lookupImplicitOccRn ratioDataCon_RDR	`thenRn` \ ratio ->
-    returnRn (unitFV frac `plusFV` unitFV ratio)
+  = lookupImplicitOccsRn [fractionalClass_RDR,ratioDataCon_RDR,addr2Integer_RDR]
 	-- We have to make sure that the Ratio type is imported with
 	-- its constructor, because literals of type Ratio t are
 	-- built with that constructor.

@@ -7,7 +7,10 @@ Taken quite directly from the Peyton Jones/Lester paper.
 module CoreFVs (
 	exprFreeVars, exprsFreeVars,
 	exprSomeFreeVars, exprsSomeFreeVars,
-	idRuleVars, idFreeVars, ruleSomeFreeVars, ruleSomeLhsFreeVars,
+	idRuleVars, idFreeVars, 
+	ruleSomeFreeVars, ruleSomeLhsFreeVars, ruleRhsFreeVars,
+
+	mustHaveLocalBinding,
 
 	CoreExprWithFVs, CoreBindWithFVs, freeVars, freeVarsOf,
     ) where
@@ -15,13 +18,29 @@ module CoreFVs (
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( Id, idFreeTyVars, idSpecialisation )
+import Id		( Id, idFreeTyVars, mayHaveNoBinding, idSpecialisation )
 import VarSet
 import Var		( Var, isId )
 import Name		( isLocallyDefined )
 import Type		( tyVarsOfType, Type )
 import Util		( mapAndUnzip )
+import Outputable
 \end{code}
+
+%************************************************************************
+%*									*
+\section{Utilities}
+%*									*
+%************************************************************************
+
+\begin{code}
+mustHaveLocalBinding :: Var -> Bool
+-- True <=> the variable must have a binding in this module
+mustHaveLocalBinding v
+  | isId v    = isLocallyDefined v && not (mayHaveNoBinding v)
+  | otherwise = True	-- TyVars etc must
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -75,9 +94,10 @@ noVars fv_cand in_scope = emptyVarSet
 -- is a little weird.  The reason is that the former is more efficient,
 -- but the latter is more fine grained, and a makes a difference when
 -- a variable mentions itself one of its own rule RHSs
-oneVar :: Var -> FV
+oneVar :: Id -> FV
 oneVar var fv_cand in_scope
-  = foldVarSet add_rule_var var_itself_set (idRuleVars var)
+  = ASSERT( isId var ) 
+    foldVarSet add_rule_var var_itself_set (idRuleVars var)
   where
     var_itself_set | keep_it fv_cand in_scope var = unitVarSet var
 	           | otherwise		      = emptyVarSet
@@ -134,14 +154,21 @@ expr_fvs (Let (Rec pairs) body)
 
 \begin{code}
 idRuleVars ::Id -> VarSet
-idRuleVars id = rulesRhsFreeVars (idSpecialisation id)
+idRuleVars id = ASSERT( isId id) rulesRhsFreeVars (idSpecialisation id)
 
 idFreeVars :: Id -> VarSet
-idFreeVars id = idRuleVars id `unionVarSet` idFreeTyVars id
+idFreeVars id = ASSERT( isId id) idRuleVars id `unionVarSet` idFreeTyVars id
 
 rulesSomeFreeVars :: InterestingVarFun -> CoreRules -> VarSet
 rulesSomeFreeVars interesting (Rules rules _)
   = foldr (unionVarSet . ruleSomeFreeVars interesting) emptyVarSet rules
+
+ruleRhsFreeVars :: CoreRule -> VarSet
+ruleRhsFreeVars (BuiltinRule _) = noFVs
+ruleRhsFreeVars (Rule str tpl_vars tpl_args rhs)
+  = rule_fvs isLocallyDefined emptyVarSet
+  where
+    rule_fvs = addBndrs tpl_vars (expr_fvs rhs)
 
 ruleSomeFreeVars :: InterestingVarFun -> CoreRule -> VarSet
 ruleSomeFreeVars interesting (BuiltinRule _) = noFVs

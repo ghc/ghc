@@ -32,7 +32,7 @@ import TcEnv		( tcInstId,
 			  tcLookupValue, tcLookupClassByKey,
 			  tcLookupValueByKey,
 			  tcExtendGlobalTyVars, tcLookupValueMaybe,
-			  tcLookupTyCon, tcLookupDataCon
+			  tcLookupTyConByKey, tcLookupDataCon
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsSigType, checkSigTyVars, sigCtxt )
@@ -72,13 +72,11 @@ import TysPrim		( intPrimTy, charPrimTy, doublePrimTy,
 			  floatPrimTy, addrPrimTy
 			)
 import TysWiredIn	( boolTy, charTy, stringTy )
-import PrelInfo		( ioTyCon_NAME )
-import TcUnify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy,
-			  unifyUnboxedTupleTy )
+import TcUnify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy )
 import Unique		( cCallableClassKey, cReturnableClassKey, 
 			  enumFromClassOpKey, enumFromThenClassOpKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,
-			  thenMClassOpKey, failMClassOpKey, returnMClassOpKey
+			  thenMClassOpKey, failMClassOpKey, returnMClassOpKey, ioTyConKey
 			)
 import Outputable
 import Maybes		( maybeToBool, mapMaybe )
@@ -359,7 +357,7 @@ tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
   = 	-- Get the callable and returnable classes.
     tcLookupClassByKey cCallableClassKey	`thenNF_Tc` \ cCallableClass ->
     tcLookupClassByKey cReturnableClassKey	`thenNF_Tc` \ cReturnableClass ->
-    tcLookupTyCon ioTyCon_NAME			`thenNF_Tc` \ ioTyCon ->
+    tcLookupTyConByKey ioTyConKey		`thenNF_Tc` \ ioTyCon ->
     let
 	new_arg_dict (arg, arg_ty)
 	  = newClassDicts (CCallOrigin (_UNPK_ lbl) (Just arg))
@@ -462,15 +460,12 @@ tcMonoExpr in_expr@(ExplicitList exprs) res_ty	-- Non-empty list
       = tcAddErrCtxt (listCtxt expr) $
 	tcMonoExpr expr elt_ty
 
-tcMonoExpr (ExplicitTuple exprs boxed) res_ty
-  = (if boxed
-	then unifyTupleTy (length exprs) res_ty
-	else unifyUnboxedTupleTy (length exprs) res_ty
-						) `thenTc` \ arg_tys ->
+tcMonoExpr (ExplicitTuple exprs boxity) res_ty
+  = unifyTupleTy boxity (length exprs) res_ty	`thenTc` \ arg_tys ->
     mapAndUnzipTc (\ (expr, arg_ty) -> tcMonoExpr expr arg_ty)
                (exprs `zip` arg_tys) -- we know they're of equal length.
                					`thenTc` \ (exprs', lies) ->
-    returnTc (ExplicitTuple exprs' boxed, plusLIEs lies)
+    returnTc (ExplicitTuple exprs' boxity, plusLIEs lies)
 
 tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
   = tcAddErrCtxt (recordConCtxt expr)		$
@@ -897,11 +892,11 @@ tcId name
     tcLookupValueMaybe name	`thenNF_Tc` \ maybe_local ->
 
     case maybe_local of
-      Just tc_id -> instantiate_it (OccurrenceOf tc_id) (HsVar tc_id) (unannotTy (idType tc_id))
+      Just tc_id -> instantiate_it (OccurrenceOf tc_id) tc_id (unannotTy (idType tc_id))
 
       Nothing ->    tcLookupValue name		`thenNF_Tc` \ id ->
 		    tcInstId id			`thenNF_Tc` \ (tyvars, theta, tau) ->
-		    instantiate_it2 (OccurrenceOf id) (HsVar id) tyvars theta tau
+		    instantiate_it2 (OccurrenceOf id) id tyvars theta tau
 
   where
 	-- The instantiate_it loop runs round instantiating the Id.
@@ -917,7 +912,7 @@ tcId name
 
     instantiate_it2 orig fun tyvars theta tau
       = if null theta then 	-- Is it overloaded?
-		returnNF_Tc (mkHsTyApp fun arg_tys, emptyLIE, tau)
+		returnNF_Tc (mkHsTyApp (HsVar fun) arg_tys, emptyLIE, tau)
 	else
 		-- Yes, it's overloaded
 	instOverloadedFun orig fun arg_tys theta tau	`thenNF_Tc` \ (fun', lie1) ->

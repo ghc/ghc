@@ -41,7 +41,7 @@ import Type             ( Type )
 import UniqSupply	( initUs_, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
 			  UniqSM, UniqSupply )
 import Unique		( Unique )
-import UniqFM		( lookupWithDefaultUFM )
+import UniqFM		( lookupWithDefaultUFM_Directly )
 import Util		( zipWithEqual )
 
 infixr 9 `thenDs`
@@ -201,13 +201,11 @@ getModuleDs us genv loc mod warns = (mod, warns)
 \end{code}
 
 \begin{code}
-dsLookupGlobalValue :: Name -> DsM Id
-dsLookupGlobalValue name us genv loc mod warns
-  = case maybeWiredInIdName name of
-	Just id -> (id, warns)
-	Nothing -> (lookupWithDefaultUFM genv def name, warns)
+dsLookupGlobalValue :: Unique -> DsM Id
+dsLookupGlobalValue key us genv loc mod warns
+  = (lookupWithDefaultUFM_Directly genv def key, warns)
   where
-    def = pprPanic "tcLookupGlobalValue:" (ppr name)
+    def = pprPanic "tcLookupGlobalValue:" (ppr key)
 \end{code}
 
 

@@ -22,7 +22,7 @@ import Type		( Type, mkTyVarTy, splitSigmaTy, splitFunTysN,
 			  mkForAllTys, boxedTypeKind
 			)
 import PprType		( {- instance Outputable Type -} )
-import Subst		( Subst, mkSubst, substTy, emptySubst, substBndrs, extendSubstList,
+import Subst		( Subst, mkSubst, substTy, mkSubst, substBndrs, extendSubstList,
 			  substId, substAndCloneId, substAndCloneIds, lookupIdSubst
 			) 
 import Var		( TyVar, mkSysTyVar, setVarUnique )
@@ -595,9 +595,16 @@ specProgram us binds
 
 	return binds'
   where
+	-- We need to start with a Subst that knows all the things
+	-- that are in scope, so that the substitution engine doesn't
+	-- accidentally re-use a unique that's already in use
+	-- Easiest thing is to do it all at once, as if all the top-level
+	-- decls were mutually recursive
+    top_subst	    = mkSubst (mkVarSet (bindersOfBinds binds)) emptySubstEnv
+
     go []	    = returnSM ([], emptyUDs)
     go (bind:binds) = go binds 				`thenSM` \ (binds', uds) ->
-		      specBind emptySubst bind uds	`thenSM` \ (bind', uds') ->
+		      specBind top_subst bind uds	`thenSM` \ (bind', uds') ->
 		      returnSM (bind' ++ binds', uds')
 
 dump_specs var = pprCoreRules var (idSpecialisation var)
@@ -664,6 +671,7 @@ specExpr subst (Case scrut case_bndr alts)
     returnSM (Case scrut' case_bndr' alts', uds_scrut `plusUDs` uds_alts)
   where
     (subst_alt, case_bndr') = substId subst case_bndr
+	-- No need to clone case binder; it can't float like a let(rec)
 
     spec_alt (con, args, rhs)
 	= specExpr subst_rhs rhs		`thenSM` \ (rhs', uds) ->

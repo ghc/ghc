@@ -9,7 +9,8 @@ module TyCon(
 
 	isFunTyCon, isUnLiftedTyCon, isBoxedTyCon, isProductTyCon,
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
-	isEnumerationTyCon, isTupleTyCon, isUnboxedTupleTyCon,
+	isEnumerationTyCon, 
+	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
 	isRecursiveTyCon, newTyConRep,
 
 	mkAlgTyCon,
@@ -27,7 +28,7 @@ module TyCon(
 	tyConUnique,
 	tyConTyVars,
 	tyConArgVrcs_maybe,
-	tyConDataCons,
+	tyConDataCons, tyConDataConsIfAvailable,
 	tyConFamilySize,
 	tyConDerivings,
 	tyConTheta,
@@ -49,9 +50,9 @@ import {-# SOURCE #-} TypeRep ( Type, Kind, SuperKind )
 
 import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
 
-import Class 		( Class )
+import Class 		( Class, ClassContext )
 import Var   		( TyVar )
-import BasicTypes	( Arity, NewOrData(..), RecFlag(..) )
+import BasicTypes	( Arity, NewOrData(..), RecFlag(..), Boxity(..), isBoxed )
 import Maybes
 import Name		( Name, nameUnique, NamedThing(getName) )
 import Unique		( Unique, Uniquable(..), anyBoxConKey )
@@ -87,7 +88,7 @@ data TyCon
 	
 	tyConTyVars   :: [TyVar],
 	tyConArgVrcs  :: ArgVrcs,
-	algTyConTheta :: [(Class,[Type])],
+	algTyConTheta :: ClassContext,
 
 	dataCons :: [DataCon],
 		-- Its data constructors, with fully polymorphic types
@@ -97,6 +98,13 @@ data TyCon
 		--	       (b) in a quest for fast compilation we don't import 
 		--		   the constructors
 
+	noOfDataCons :: Int,	-- Number of data constructors
+				-- Usually this is the same as the length of the
+				-- dataCons field, but the latter may be empty if
+				-- we imported the type abstractly.  But even if we import
+				-- abstractly we still need to know the number of constructors
+				-- so we can get the return convention right.  Tiresome!
+				
 	algTyConDerivings   :: [Class],	-- Classes which have derived instances
 
 	algTyConFlavour	:: AlgTyConFlavour,
@@ -125,7 +133,7 @@ data TyCon
 	tyConName   :: Name,
 	tyConKind   :: Kind,
 	tyConArity  :: Arity,
-	tyConBoxed  :: Bool,		-- True for boxed; False for unboxed
+	tyConBoxed  :: Boxity,
 	tyConTyVars :: [TyVar],
 	dataCon     :: DataCon
     }
@@ -213,7 +221,7 @@ mkFunTyCon name kind
 	tyConArity  = 2
     }
 			    
-mkAlgTyCon name kind tyvars theta argvrcs cons derivs flavour rec
+mkAlgTyCon name kind tyvars theta argvrcs cons ncons derivs flavour rec
   = AlgTyCon {	
 	tyConName 		= name,
 	tyConUnique		= nameUnique name,
@@ -223,6 +231,7 @@ mkAlgTyCon name kind tyvars theta argvrcs cons derivs flavour rec
 	tyConArgVrcs		= argvrcs,
 	algTyConTheta		= theta,
 	dataCons		= cons, 
+	noOfDataCons		= ncons,
 	algTyConDerivings	= derivs,
 	algTyConClass_maybe	= Nothing,
 	algTyConFlavour 	= flavour,
@@ -239,6 +248,7 @@ mkClassTyCon name kind tyvars argvrcs con clas flavour
 	tyConArgVrcs		= argvrcs,
 	algTyConTheta		= [],
 	dataCons		= [con],
+	noOfDataCons		= 1,
 	algTyConDerivings	= [],
 	algTyConClass_maybe	= Just clas,
 	algTyConFlavour		= flavour,
@@ -289,13 +299,13 @@ isPrimTyCon (PrimTyCon {}) = True
 isPrimTyCon _              = False
 
 isUnLiftedTyCon (PrimTyCon {}) = True
-isUnLiftedTyCon (TupleTyCon { tyConBoxed = False }) = True
+isUnLiftedTyCon (TupleTyCon { tyConBoxed = boxity}) = not (isBoxed boxity)
 isUnLiftedTyCon _              = False
 
 -- isBoxedTyCon should not be applied to SynTyCon, nor KindCon
 isBoxedTyCon (AlgTyCon {}) = True
 isBoxedTyCon (FunTyCon {}) = True
-isBoxedTyCon (TupleTyCon {tyConBoxed = boxed}) = boxed
+isBoxedTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isBoxedTyCon (PrimTyCon {primTyConRep = rep}) = isFollowableRep rep
 
 -- isAlgTyCon returns True for both @data@ and @newtype@
@@ -307,7 +317,7 @@ isAlgTyCon other 	   = False
 isDataTyCon (AlgTyCon {algTyConFlavour = new_or_data})  = case new_or_data of
 								NewTyCon _ -> False
 								other	-> True
-isDataTyCon (TupleTyCon {tyConBoxed = True}) = True	
+isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon other = False
 
 isNewTyCon (AlgTyCon {algTyConFlavour = NewTyCon _}) = True 
@@ -333,12 +343,19 @@ isSynTyCon _		 = False
 isEnumerationTyCon (AlgTyCon {algTyConFlavour = EnumTyCon}) = True
 isEnumerationTyCon other				    = False
 
--- The unit tycon isn't classed as a tuple tycon
-isTupleTyCon (TupleTyCon {tyConArity = arity, tyConBoxed = True}) = arity >= 2
-isTupleTyCon other = False
+-- The unit tycon didn't used to be classed as a tuple tycon
+-- but I thought that was silly so I've undone it
+-- If it can't be for some reason, it should be a AlgTyCon
+isTupleTyCon (TupleTyCon {}) = True
+isTupleTyCon other 	     = False
 
-isUnboxedTupleTyCon (TupleTyCon {tyConBoxed = False}) = True
+isUnboxedTupleTyCon (TupleTyCon {tyConBoxed = boxity}) = not (isBoxed boxity)
 isUnboxedTupleTyCon other = False
+
+isBoxedTupleTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
+isBoxedTupleTyCon other = False
+
+tupleTyConBoxity tc = tyConBoxed tc
 
 isRecursiveTyCon (AlgTyCon {algTyConRec = Recursive}) = True
 isRecursiveTyCon other				      = False
@@ -346,16 +363,20 @@ isRecursiveTyCon other				      = False
 
 \begin{code}
 tyConDataCons :: TyCon -> [DataCon]
-tyConDataCons (AlgTyCon {dataCons = cons}) = cons
-tyConDataCons (TupleTyCon {dataCon = con}) = [con]
-tyConDataCons other			   = []
+tyConDataCons tycon = ASSERT2( not (null cons), ppr tycon ) cons
+		    where
+		      cons = tyConDataConsIfAvailable tycon
+
+tyConDataConsIfAvailable (AlgTyCon {dataCons = cons}) = cons	-- Empty for abstract types
+tyConDataConsIfAvailable (TupleTyCon {dataCon = con}) = [con]
+tyConDataConsIfAvailable other			      = []
 	-- You may think this last equation should fail,
 	-- but it's quite convenient to return no constructors for
 	-- a synonym; see for example the call in TcTyClsDecls.
 
 tyConFamilySize  :: TyCon -> Int
-tyConFamilySize (AlgTyCon {dataCons = cons}) = length cons
-tyConFamilySize (TupleTyCon {}) = 1
+tyConFamilySize (AlgTyCon {noOfDataCons = n}) = n
+tyConFamilySize (TupleTyCon {}) 	      = 1
 #ifdef DEBUG
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 #endif
@@ -372,7 +393,7 @@ tyConDerivings other				       = []
 \end{code}
 
 \begin{code}
-tyConTheta :: TyCon -> [(Class, [Type])]
+tyConTheta :: TyCon -> ClassContext
 tyConTheta (AlgTyCon {algTyConTheta = theta}) = theta
 -- should ask about anything else
 \end{code}

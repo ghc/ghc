@@ -66,7 +66,8 @@ type MaybeAbsent = Bool -- True <=> not even used
 wwLazy	    = WwLazy 	  False
 wwStrict    = WwStrict
 wwUnpackData xs = WwUnpack DataType False xs
-wwUnpackNew  x  = WwUnpack NewType  False [x]
+wwUnpackNew  x  = ASSERT( isStrict x) 	-- Invariant 
+	          WwUnpack NewType False [x]
 wwPrim	    = WwPrim
 wwEnum	    = WwEnum
 
@@ -87,23 +88,18 @@ seqDemands (d:ds) = seqDemand d `seq` seqDemands ds
 %************************************************************************
 
 \begin{code}
+isLazy :: Demand -> Bool
+  -- Even a demand of (WwUnpack NewType _ _) is strict
+  -- We don't create such a thing unless the demand inside is strict
+isLazy (WwLazy _) = True
+isLazy _	  = False
+
 isStrict :: Demand -> Bool
-isStrict (WwUnpack NewType _ ds) = isStrict (head ds)
-isStrict (WwUnpack other _ _)    = True
-isStrict WwStrict = True
-isStrict WwEnum	  = True
-isStrict WwPrim	  = True
-isStrict _	  = False
+isStrict d = not (isLazy d)
 
 isPrim :: Demand -> Bool
 isPrim WwPrim = True
 isPrim other  = False
-\end{code}
-
-\begin{code}
-isLazy :: Demand -> Bool
-isLazy (WwLazy False) = True	-- NB "Absent" args do *not* count!
-isLazy _	      = False	-- (as they imply a worker)
 \end{code}
 
 
@@ -174,6 +170,7 @@ data StrictnessInfo
 				-- BUT NB: f = \x y. error "urk"
 				-- 	   will have info  SI [SS] True
 				-- but still (f) and (f 2) are not bot; only (f 3 2) is bot
+  deriving( Eq )
 
 	-- NOTA BENE: if the arg demands are, say, [S,L], this means that
 	-- 	(f bot) is not necy bot, only (f bot x) is bot
@@ -191,8 +188,11 @@ seqStrictnessInfo other		        = ()
 mkStrictnessInfo :: ([Demand], Bool) -> StrictnessInfo
 
 mkStrictnessInfo (xs, is_bot)
-  | all isLazy xs && not is_bot	= NoStrictnessInfo		-- Uninteresting
-  | otherwise		        = StrictnessInfo xs is_bot
+  | all totally_boring xs && not is_bot	= NoStrictnessInfo		-- Uninteresting
+  | otherwise		    	        = StrictnessInfo xs is_bot
+  where
+    totally_boring (WwLazy False) = True
+    totally_boring other	  = False
 
 noStrictnessInfo = NoStrictnessInfo
 
@@ -203,8 +203,7 @@ isBottomingStrictness NoStrictnessInfo       = False
 appIsBottom (StrictnessInfo ds bot)   n = bot && (n >= length ds)
 appIsBottom  NoStrictnessInfo	      n	= False
 
-ppStrictnessInfo NoStrictnessInfo = empty
-ppStrictnessInfo (StrictnessInfo wrapper_args bot)
-  = hsep [ptext SLIT("__S"), pprDemands wrapper_args bot]
+ppStrictnessInfo NoStrictnessInfo		   = empty
+ppStrictnessInfo (StrictnessInfo wrapper_args bot) = hsep [pprDemands wrapper_args bot]
 \end{code}
 

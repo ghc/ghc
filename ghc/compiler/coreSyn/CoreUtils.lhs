@@ -5,18 +5,18 @@
 
 \begin{code}
 module CoreUtils (
-	exprType, coreAltsType,
-
 	-- Construction
 	mkNote, mkInlineMe, mkSCC, mkCoerce,
 	bindNonRec, mkIfThenElse, mkAltExpr,
 
+	-- Properties of expressions
+	exprType, coreAltsType, exprArity,
 	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
-	exprArity, exprIsConApp_maybe,
-
+	exprIsConApp_maybe,
 	idAppIsBottom, idAppIsCheap,
 
+	-- Expr transformation
 	etaReduceExpr, exprEtaExpandArity,
 
 	-- Size
@@ -231,7 +231,6 @@ mkIfThenElse guard then_expr else_expr
 		duplicate; simple variables and constants, and type
 		applications.  Note that primop Ids aren't considered
 		trivial unless 
-
 
 @exprIsBottom@	is true of expressions that are guaranteed to diverge
 

@@ -13,8 +13,8 @@ module TcMonoType ( tcHsType, tcHsSigType, tcHsTypeKind, tcHsTopType, tcHsTopBox
 
 #include "HsVersions.h"
 
-import HsSyn		( HsType(..), HsTyVar(..), MonoUsageAnn(..),
-                          Sig(..), HsPred(..), pprHsPred, pprParendHsType )
+import HsSyn		( HsType(..), HsTyVarBndr(..), HsUsageAnn(..),
+                          Sig(..), HsPred(..), pprParendHsType, HsTupCon(..) )
 import RnHsSyn		( RenamedHsType, RenamedContext, RenamedSig )
 import TcHsSyn		( TcId )
 
@@ -48,14 +48,14 @@ import VarEnv
 import VarSet
 import Bag		( bagToList )
 import ErrUtils		( Message )
-import PrelInfo		( cCallishClassKeys )
 import TyCon		( TyCon )
 import Name		( Name, OccName, isLocallyDefined )
-import TysWiredIn	( mkListTy, mkTupleTy, mkUnboxedTupleTy )
+import TysWiredIn	( mkListTy, mkTupleTy )
 import UniqFM		( elemUFM, foldUFM )
+import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
 import Unique		( Unique, Uniquable(..) )
-import Util		( mapAccumL, isSingleton )
+import Util		( mapAccumL, isSingleton, removeDups )
 import Outputable
 \end{code}
 
@@ -153,49 +153,45 @@ tc_type ty
     returnTc tc_ty
 
 tc_type_kind :: RenamedHsType -> TcM s (TcKind, Type)
-tc_type_kind ty@(MonoTyVar name)
+tc_type_kind ty@(HsTyVar name)
   = tc_app ty []
 
-tc_type_kind (MonoListTy ty)
+tc_type_kind (HsListTy ty)
   = tc_boxed_type ty		`thenTc` \ tau_ty ->
     returnTc (boxedTypeKind, mkListTy tau_ty)
 
-tc_type_kind (MonoTupleTy tys True {-boxed-})
+tc_type_kind (HsTupleTy (HsTupCon _ Boxed) tys)
   = mapTc tc_boxed_type tys	`thenTc` \ tau_tys ->
-    returnTc (boxedTypeKind, mkTupleTy (length tys) tau_tys)
+    returnTc (boxedTypeKind, mkTupleTy Boxed (length tys) tau_tys)
 
-tc_type_kind (MonoTupleTy tys False {-unboxed-})
+tc_type_kind (HsTupleTy (HsTupCon _ Unboxed) tys)
   = mapTc tc_type tys			`thenTc` \ tau_tys ->
-    returnTc (unboxedTypeKind, mkUnboxedTupleTy (length tys) tau_tys)
+    returnTc (unboxedTypeKind, mkTupleTy Unboxed (length tys) tau_tys)
 
-tc_type_kind (MonoFunTy ty1 ty2)
+tc_type_kind (HsFunTy ty1 ty2)
   = tc_type ty1	`thenTc` \ tau_ty1 ->
     tc_type ty2	`thenTc` \ tau_ty2 ->
     returnTc (boxedTypeKind, mkFunTy tau_ty1 tau_ty2)
 
-tc_type_kind (MonoTyApp ty1 ty2)
+tc_type_kind (HsAppTy ty1 ty2)
   = tc_app ty1 [ty2]
 
-tc_type_kind (MonoIParamTy n ty)
-  = tc_type ty `thenTc` \ tau ->
-    returnTc (boxedTypeKind, mkPredTy (IParam n tau))
+tc_type_kind (HsPredTy pred)
+  = tcClassAssertion True pred	`thenTc` \ pred' ->
+    returnTc (boxedTypeKind, mkPredTy pred')
 
-tc_type_kind (MonoDictTy class_name tys)
-  = tcClassAssertion (HsPClass class_name tys)	`thenTc` \ (Class clas arg_tys) ->
-    returnTc (boxedTypeKind, mkDictTy clas arg_tys)
-
-tc_type_kind (MonoUsgTy usg ty)
+tc_type_kind (HsUsgTy usg ty)
   = newUsg usg                          `thenTc` \ usg' ->
     tc_type_kind ty                     `thenTc` \ (kind, tc_ty) ->
     returnTc (kind, mkUsgTy usg' tc_ty)
   where
     newUsg usg = case usg of
-                   MonoUsOnce        -> returnTc UsOnce
-                   MonoUsMany        -> returnTc UsMany
-                   MonoUsVar uv_name -> tcLookupUVar uv_name `thenTc` \ uv ->
+                   HsUsOnce        -> returnTc UsOnce
+                   HsUsMany        -> returnTc UsMany
+                   HsUsVar uv_name -> tcLookupUVar uv_name `thenTc` \ uv ->
                                         returnTc (UsVar uv)
 
-tc_type_kind (MonoUsgForAllTy uv_name ty)
+tc_type_kind (HsUsgForAllTy uv_name ty)
   = let
         uv = mkNamedUVar uv_name
     in
@@ -217,12 +213,12 @@ tc_type_kind (HsForAllTy (Just tv_names) context ty)
 		--	f :: forall a. Num a => (# a->a, a->a #)
 		-- And we want these to get through the type checker
         check ct@(Class c tys) | ambiguous = failWithTc (ambigErr (c,tys) tau)
-	  where ct_vars = tyVarsOfTypes tys
+	  where ct_vars       = tyVarsOfTypes tys
 		forall_tyvars = map varName in_scope_vars
-		tau_vars = tyVarsOfType tau
-		ambig ct_var = (varName ct_var `elem` forall_tyvars) &&
-			       not (ct_var `elemUFM` tau_vars)
-		ambiguous = foldUFM ((||) . ambig) False ct_vars
+		tau_vars      = tyVarsOfType tau
+		ambig ct_var  = (varName ct_var `elem` forall_tyvars) &&
+			        not (ct_var `elemUFM` tau_vars)
+		ambiguous     = foldUFM ((||) . ambig) False ct_vars
 	check _ = returnTc ()
     in
     mapTc check theta			`thenTc_`
@@ -233,7 +229,7 @@ Help functions for type applications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-tc_app (MonoTyApp ty1 ty2) tys
+tc_app (HsAppTy ty1 ty2) tys
   = tc_app ty1 (ty2:tys)
 
 tc_app ty tys
@@ -257,16 +253,16 @@ tc_app ty tys
 -- But not quite; for synonyms it checks the correct arity, and builds a SynTy
 -- 	hence the rather strange functionality.
 
-tc_fun_type (MonoTyVar name) arg_tys
-  = tcLookupTy name			`thenTc` \ (tycon_kind, maybe_arity, thing) ->
+tc_fun_type (HsTyVar name) arg_tys
+  = tcLookupTy name			`thenTc` \ (tycon_kind, thing) ->
     case thing of
-	ATyVar tv   -> returnTc (tycon_kind, mkAppTys (mkTyVarTy tv) arg_tys)
-	AClass clas -> failWithTc (classAsTyConErr name)
-	ATyCon tc   -> case maybe_arity of
-			 Nothing -> 	-- Data or newtype
-					returnTc (tycon_kind, mkTyConApp tc arg_tys)
+	ATyVar tv     -> returnTc (tycon_kind, mkAppTys (mkTyVarTy tv) arg_tys)
+	AClass clas _ -> failWithTc (classAsTyConErr name)
 
-			 Just arity -> 	-- Type synonym
+	ADataTyCon tc ->  -- Data or newtype
+			  returnTc (tycon_kind, mkTyConApp tc arg_tys)
+
+	ASynTyCon tc arity ->  	-- Type synonym
 			          checkTc (arity <= n_args) err_msg	`thenTc_`
 	  		          returnTc (tycon_kind, result_ty)
 			   where
@@ -290,35 +286,14 @@ Contexts
 \begin{code}
 
 tcContext :: RenamedContext -> TcM s ThetaType
-tcContext context
-  =	--Someone discovered that @CCallable@ and @CReturnable@
-	-- could be used in contexts such as:
-	--	foo :: CCallable a => a -> PrimIO Int
-	-- Doing this utterly wrecks the whole point of introducing these
-	-- classes so we specifically check that this isn't being done.
-	--
-	-- We *don't* do this check in tcClassAssertion, because that's
-	-- called when checking a HsDictTy, and we don't want to reject
-	--	instance CCallable Int 
-	-- etc. Ugh!
-    mapTc check_naughty context `thenTc_`
+tcContext context = mapTc (tcClassAssertion False) context
 
-    mapTc tcClassAssertion context
-
- where
-   check_naughty (HsPClass class_name _) 
-     = checkTc (not (getUnique class_name `elem` cCallishClassKeys))
-	       (naughtyCCallContextErr class_name)
-   check_naughty (HsPIParam _ _) = returnTc ()
-
-tcClassAssertion assn@(HsPClass class_name tys)
-  = tcAddErrCtxt (appKindCtxt (pprHsPred assn))	$
-    mapAndUnzipTc tc_type_kind tys	`thenTc` \ (arg_kinds, arg_tys) ->
-    tcLookupTy class_name		`thenTc` \ (kind, ~(Just arity), thing) ->
+tcClassAssertion ccall_ok assn@(HsPClass class_name tys)
+  = tcAddErrCtxt (appKindCtxt (ppr assn))	$
+    mapAndUnzipTc tc_type_kind tys		`thenTc` \ (arg_kinds, arg_tys) ->
+    tcLookupTy class_name			`thenTc` \ (kind, thing) ->
     case thing of
-	ATyVar  _   -> failWithTc (tyVarAsClassErr class_name)
-	ATyCon  _   -> failWithTc (tyConAsClassErr class_name)
-	AClass clas ->
+	AClass clas arity ->
 		    	-- Check with kind mis-match
 		checkTc (arity == n_tys) err				`thenTc_`
 		unifyKind kind (mkArrowKinds arg_kinds boxedTypeKind)	`thenTc_`
@@ -326,8 +301,10 @@ tcClassAssertion assn@(HsPClass class_name tys)
 	    where
 		n_tys = length tys
 		err   = arityErr "Class" class_name arity n_tys
-tcClassAssertion assn@(HsPIParam name ty)
-  = tcAddErrCtxt (appKindCtxt (pprHsPred assn))	$
+	other -> failWithTc (tyVarAsClassErr class_name)
+
+tcClassAssertion ccall_ok assn@(HsPIParam name ty)
+  = tcAddErrCtxt (appKindCtxt (ppr assn))	$
     tc_type_kind ty	`thenTc` \ (arg_kind, arg_ty) ->
     returnTc (IParam name arg_ty)
 \end{code}
@@ -340,7 +317,7 @@ tcClassAssertion assn@(HsPIParam name ty)
 %************************************************************************
 
 \begin{code}
-tcExtendTopTyVarScope :: TcKind -> [HsTyVar Name]
+tcExtendTopTyVarScope :: TcKind -> [HsTyVarBndr Name]
 		      -> ([TcTyVar] -> TcKind -> TcM s a)
 		      -> TcM s a
 tcExtendTopTyVarScope kind tyvar_names thing_inside
@@ -354,14 +331,14 @@ tcExtendTopTyVarScope kind tyvar_names thing_inside
     mk_tv (IfaceTyVar name _, kind) = mkTyVar name kind
 	-- NB: immutable tyvars, but perhaps with mutable kinds
 
-tcExtendTyVarScope :: [HsTyVar Name] 
+tcExtendTyVarScope :: [HsTyVarBndr Name] 
 		   -> ([TcTyVar] -> TcM s a) -> TcM s a
 tcExtendTyVarScope tv_names thing_inside
   = mapNF_Tc tcHsTyVar tv_names 	`thenNF_Tc` \ tyvars ->
     tcExtendTyVarEnv tyvars		$
     thing_inside tyvars
     
-tcHsTyVar :: HsTyVar Name -> NF_TcM s TcTyVar
+tcHsTyVar :: HsTyVarBndr Name -> NF_TcM s TcTyVar
 tcHsTyVar (UserTyVar name)       = newKindVar		`thenNF_Tc` \ kind ->
 			           tcNewMutTyVar name kind
 	-- NB: mutable kind => mutable tyvar, so that zonking can bind
@@ -369,7 +346,7 @@ tcHsTyVar (UserTyVar name)       = newKindVar		`thenNF_Tc` \ kind ->
 
 tcHsTyVar (IfaceTyVar name kind) = returnNF_Tc (mkTyVar name (kindToTcKind kind))
 
-kcHsTyVar :: HsTyVar name -> NF_TcM s TcKind
+kcHsTyVar :: HsTyVarBndr name -> NF_TcM s TcKind
 kcHsTyVar (UserTyVar name)       = newKindVar
 kcHsTyVar (IfaceTyVar name kind) = returnNF_Tc (kindToTcKind kind)
 \end{code}
@@ -716,10 +693,6 @@ sigPatCtxt bound_tvs bound_ids tidy_env
 %************************************************************************
 
 \begin{code}
-naughtyCCallContextErr clas_name
-  = sep [ptext SLIT("Can't use class") <+> quotes (ppr clas_name), 
-	 ptext SLIT("in a context")]
-
 typeCtxt ty = ptext SLIT("In the type") <+> quotes (ppr ty)
 
 typeKindCtxt :: RenamedHsType -> Message
@@ -742,5 +715,5 @@ tyVarAsClassErr name
 ambigErr (c, ts) ty
   = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprConstraint c ts),
 	 nest 4 (ptext SLIT("for the type:") <+> ppr ty),
-	 nest 4 (ptext SLIT("Each forall'd type variable mentioned by the constraint must appear after the =>."))]
+	 nest 4 (ptext SLIT("Each forall'd type variable mentioned by the constraint must appear after the =>"))]
 \end{code}

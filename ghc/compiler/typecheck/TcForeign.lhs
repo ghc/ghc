@@ -207,7 +207,7 @@ checkForeignRes :: Bool -> (Type -> Bool) -> Type -> TcM s ()
 checkForeignRes non_io_result_ok pred_res_ty ty =
  case (splitTyConApp_maybe ty) of
     Just (io, [res_ty]) 
-        | (getUnique io) == ioTyConKey && pred_res_ty res_ty 
+        | io `hasKey` ioTyConKey && pred_res_ty res_ty 
 	-> returnTc ()
     _   
         -> check (non_io_result_ok && pred_res_ty ty) 

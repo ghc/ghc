@@ -1,3 +1,32 @@
+{-	Notes about the syntax of interface files
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The header
+~~~~~~~~~~
+  interface "edison" M 4 6 2 ! 406 	Module M, version 4, from package 'edison',
+					Fixities version 6, rules version 2
+					Interface syntax version 406
+					! means M contains orphans
+
+Import declarations
+~~~~~~~~~~~~~~~~~~~
+  import Foo ;				To compile M I used nothing from Foo, but it's 
+					below me in the hierarchy
+
+  import Foo ! @ ;			Ditto, but the ! means that Foo contains orphans
+					and        the @ means that Foo is a boot interface
+
+  import Foo :: 3 ;			To compile M I used everything from Foo, which has 
+					module version 3
+
+  import Foo :: 3 2 6 a 1 b 3 c 7 ;	To compile M I used Foo.  It had 
+						module version 3
+						fixity version 2
+						rules  version 6
+					and some specific things besides.
+
+-}
+
+
 {
 module ParseIface ( parseIface, IfaceStuff(..) ) where
 
@@ -5,11 +34,12 @@ module ParseIface ( parseIface, IfaceStuff(..) ) where
 
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
-import HsTypes		( mkHsForAllTy, mkHsUsForAllTy )
+import HsTypes		( mkHsForAllTy, mkHsUsForAllTy, mkHsTupCon )
 import HsCore
+import Demand		( mkStrictnessInfo )
 import Literal		( Literal(..), mkMachInt, mkMachInt64, mkMachWord, mkMachWord64 )
 import BasicTypes	( Fixity(..), FixityDirection(..), 
-			  NewOrData(..), Version
+			  NewOrData(..), Version, initialVersion, Boxity(..)
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import CallConv         ( cCallConv )
@@ -19,7 +49,7 @@ import IdInfo           ( ArityInfo, exactArity, CprInfo(..), InlinePragInfo(..)
 import PrimOp           ( CCall(..), CCallTarget(..) )
 import Lex		
 
-import RnMonad		( ImportVersion, LocalVersion, ParsedIface(..), WhatsImported(..),
+import RnMonad		( ImportVersion, ParsedIface(..), WhatsImported(..),
 			  RdrNamePragma, ExportItem, RdrAvailInfo, GenAvailInfo(..), 
                           WhetherHasOrphans, IsBootInterface
 			) 
@@ -32,11 +62,11 @@ import OccName          ( mkSysOccFS,
 			  EncodedFS 
 			)
 import Module           ( ModuleName, PackageName, mkSysModuleFS, mkModule )			
-import PrelInfo         ( mkTupConRdrName, mkUbxTupConRdrName )
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( opt_InPackage )
 import Maybes
 import Outputable
+import List		( insert )
 
 import GlaExts
 import FastString	( tailFS )
@@ -184,36 +214,42 @@ iface_stuff : iface		{ PIface   $1 }
 
 
 iface		:: { ParsedIface }
-iface		: '__interface' package mod_name INTEGER orphans checkVersion 'where'
+iface		: '__interface' package mod_name 
+			version sub_versions
+			orphans checkVersion 'where'
 		  exports_part
                   import_part
+		  fix_decl_part
 		  instance_decl_part
 		  decls_part
 		  rules_and_deprecs
 		  { ParsedIface {
 			pi_mod  = mkModule $3 $2,	-- Module itself
-			pi_vers = fromInteger $4, 	-- Module version
-			pi_orphan  = $5,
-			pi_exports = $8,        -- Exports
-			pi_usages  = $9,	-- Usages
-			pi_insts   = $10,	-- Local instances
-			pi_decls   = $11,	-- Decls
-		 	pi_rules   = fst $12,	-- Rules 
-		 	pi_deprecs = snd $12	-- Deprecations 
-		      } }
+			pi_vers = $4, 			-- Module version
+			pi_orphan  = $6,
+			pi_exports = $9,    	   	-- Exports
+			pi_usages  = $10,		-- Usages
+			pi_fixity  = (fst $5,$11),	-- Fixies
+			pi_insts   = $12,		-- Local instances
+			pi_decls   = $13,		-- Decls
+		 	pi_rules   = (snd $5,fst $14),	-- Rules 
+		 	pi_deprecs = snd $14		-- Deprecations 
+		   } }
+
+-- Versions for fixities and rules (optional)
+sub_versions :: { (Version,Version) }
+	: '[' version version ']'		{ ($2,$3) }
+	| {- empty -}				{ (initialVersion, initialVersion) }
 
 --------------------------------------------------------------------------
 
 import_part :: { [ImportVersion OccName] }
 import_part :				    		  { [] }
-	    |  import_part import_decl			  { $2 : $1 }
+	    |  import_decl import_part 			  { $1 : $2 }
 	    
 import_decl :: { ImportVersion OccName }
-import_decl : 'import' mod_name INTEGER orphans is_boot whats_imported ';'
-			{ (mkSysModuleFS $2, fromInteger $3, $4, $5, $6) }
-	-- import Foo 3 :: a 1 b 3 c 7 ;	means import a,b,c from Foo
-	-- import Foo 3	;			means import all of Foo
-	-- import Foo 3 ! :: ...stuff... ;	the ! means that Foo contains orphans
+import_decl : 'import' mod_name orphans is_boot whats_imported ';'
+			{ (mkSysModuleFS $2, $3, $4, $5) }
 
 orphans		    :: { WhetherHasOrphans }
 orphans		    : 						{ False }
@@ -224,34 +260,39 @@ is_boot		    : 						{ False }
 		    | '@'					{ True }
 
 whats_imported      :: { WhatsImported OccName }
-whats_imported      :                                           { Everything }
-                    | '::' name_version_pairs      		{ Specifically $2 }
+whats_imported      :                                           	{ NothingAtAll }
+		    | '::' version					{ Everything $2 }
+                    | '::' version version version name_version_pairs   { Specifically $2 $3 $4 $5 }
 
-name_version_pairs  ::	{ [LocalVersion OccName] }
+name_version_pairs  ::	{ [(OccName, Version)] }
 name_version_pairs  :  						{ [] }
 		    |  name_version_pair name_version_pairs	{ $1 : $2 }
 
-name_version_pair   ::	{ LocalVersion OccName }
-name_version_pair   :  var_occ INTEGER			        { ($1, fromInteger $2) }
-                    |  tc_occ  INTEGER                          { ($1, fromInteger $2) }
+name_version_pair   ::	{ (OccName, Version) }
+name_version_pair   :  var_occ version			        { ($1, $2) }
+                    |  tc_occ  version                          { ($1, $2) }
 
 
 --------------------------------------------------------------------------
 
 exports_part	:: { [ExportItem] }
 exports_part	:  					{ [] }
-		| exports_part '__export' 
-		  mod_name entities ';'			{ (mkSysModuleFS $3, $4) : $1 }
+		| '__export' mod_name entities ';'
+			exports_part 			{ (mkSysModuleFS $2, $3) : $5 }
 
 entities	:: { [RdrAvailInfo] }
 entities	: 					{ [] }
 		|  entity entities			{ $1 : $2 }
 
 entity		:: { RdrAvailInfo }
-entity		:  tc_occ 				{ AvailTC $1 [$1] }
-		|  var_occ				{ Avail $1 }
-		|  tc_occ stuff_inside		        { AvailTC $1 ($1:$2) }
+entity		:  var_occ				{ Avail $1 }
+		|  tc_occ 				{ AvailTC $1 [$1] }
 		|  tc_occ '|' stuff_inside		{ AvailTC $1 $3 }
+		|  tc_occ stuff_inside		        { AvailTC $1 (insert $1 $2) }
+		-- The 'insert' is important.  The stuff_inside is sorted, and
+		-- insert keeps it that way.  This is important when comparing 
+		-- against the new interface file, which has the stuff in sorted order
+		-- If they differ, we'll bump the module number when it's unnecessary
 
 stuff_inside	:: { [OccName] }
 stuff_inside	:  '{' val_occs '}'			{ $2 }
@@ -267,14 +308,24 @@ val_occs	:: { [OccName] }
 
 --------------------------------------------------------------------------
 
+fix_decl_part :: { [RdrNameFixitySig] }
+fix_decl_part : {- empty -}				{ [] }
+	      | fix_decls ';'				{ $1 }
+
+fix_decls     :: { [RdrNameFixitySig] }
+fix_decls     : 					{ [] }
+	      | fix_decl fix_decls			{ $1 : $2 }
+
+fix_decl :: { RdrNameFixitySig }
+fix_decl : src_loc fixity prec var_or_data_name		{ FixitySig $4 (Fixity $3 $2) $1 }
+
 fixity      :: { FixityDirection }
 fixity      : 'infixl'                                  { InfixL }
             | 'infixr'                                  { InfixR }
             | 'infix'                                   { InfixN }
    
-mb_fix      :: { Int }
-mb_fix	    : {-nothing-}				{ 9 }
-	    | INTEGER					{ (fromInteger $1) }
+prec        :: { Int }
+prec	    : INTEGER					{ fromInteger $1 }
 
 -----------------------------------------------------------------------------
 
@@ -283,7 +334,7 @@ csigs		:  				{ [] }
 		| 'where' '{' csigs1 '}'	{ $3 }
 
 csigs1		:: { [RdrNameSig] }
-csigs1		: csig				{ [$1] }
+csigs1		: 				{ [] }
 		| csig ';' csigs1		{ $1 : $3 }
 
 csig		:: { RdrNameSig }
@@ -310,22 +361,20 @@ inst_decl	:  src_loc 'instance' type '=' var_name ';'
 decls_part :: { [(Version, RdrNameHsDecl)] }
 decls_part 
 	:  {- empty -}				{ [] }
-	|  decls_part version decl ';'		{ ($2,$3):$1 }
+	|  opt_version decl ';' decls_part 		{ ($1,$2):$4 }
 
 decl	:: { RdrNameHsDecl }
 decl    : src_loc var_name '::' type maybe_idinfo
   		 	 { SigD (IfaceSig $2 $4 ($5 $2) $1) }
 	| src_loc 'type' tc_name tv_bndrs '=' type 		       
 			{ TyClD (TySynonym $3 $4 $6 $1) }
-	| src_loc 'data' decl_context tc_name tv_bndrs constrs 	       
-	       		{ TyClD (TyData DataType $3 $4 $5 $6 Nothing noDataPragmas $1) }
-	| src_loc 'newtype' decl_context tc_name tv_bndrs newtype_constr
-			{ TyClD (TyData NewType $3 $4 $5 $6 Nothing noDataPragmas $1) }
-	| src_loc 'class' decl_context tc_name tv_bndrs fds csigs
+	| src_loc 'data' opt_decl_context tc_name tv_bndrs constrs 	       
+	       		{ TyClD (TyData DataType $3 $4 $5 $6 (length $6) Nothing noDataPragmas $1) }
+	| src_loc 'newtype' opt_decl_context tc_name tv_bndrs newtype_constr
+			{ TyClD (TyData NewType $3 $4 $5 $6 1 Nothing noDataPragmas $1) }
+	| src_loc 'class' opt_decl_context tc_name tv_bndrs fds csigs
 			{ TyClD (mkClassDecl $3 $4 $5 $6 $7 EmptyMonoBinds 
 					noClassPragmas $1) }
-        | src_loc fixity mb_fix var_or_data_name
-                        { FixD (FixitySig $4 (Fixity $3 $2) $1) }
 
 maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }
@@ -371,7 +420,7 @@ rules	   :: { [RdrNameRuleDecl] }
 
 rule	   :: { RdrNameRuleDecl }
 rule	   : src_loc STRING rule_forall qvar_name 
-	     core_args '=' core_expr	{ IfaceRuleDecl $4 (UfRuleBody $2 $3 $5 $7) $1 } 
+	     core_args '=' core_expr	{ IfaceRule $2 $3 $4 $5 $7 $1 } 
 
 rule_forall	:: { [UfBinder RdrName] }
 rule_forall	: '__forall' '{' core_bndrs '}'	{ $3 }
@@ -380,11 +429,11 @@ rule_forall	: '__forall' '{' core_bndrs '}'	{ $3 }
 
 deprecs 	:: { [RdrNameDeprecation] }
 deprecs		: {- empty -}		{ [] }
-		| deprecs deprec ';'	{ $2 : $1 }
+		| deprec ';' deprecs	{ $1 : $3 }
 
 deprec		:: { RdrNameDeprecation }
-deprec		: STRING		{ Deprecation (IEModuleContents undefined) $1 }
-		| deprec_name STRING	{ Deprecation $1 $2 }
+deprec		: src_loc STRING		{ Deprecation (IEModuleContents undefined) $2 $1 }
+		| src_loc deprec_name STRING	{ Deprecation $2 $3 $1 }
 
 -- SUP: TEMPORARY HACK
 deprec_name	:: { RdrNameIE }
@@ -394,11 +443,15 @@ deprec_name	:: { RdrNameIE }
 -----------------------------------------------------------------------------
 
 version		:: { Version }
-version		:  INTEGER				{ fromInteger $1 }
+version		:  INTEGER			{ fromInteger $1 }
 
-decl_context	:: { RdrNameContext }
-decl_context	:  					{ [] }
-		| '{' context_list1 '}' '=>'	{ $2 }
+opt_version	:: { Version }
+opt_version	: version			{ $1 }
+		| {- empty -}			{ initialVersion }
+	
+opt_decl_context  :: { RdrNameContext }
+opt_decl_context  :  				{ [] }
+		  | context '=>'		{ $1 }
 
 ----------------------------------------------------------------------------
 
@@ -421,9 +474,9 @@ newtype_constr	:  					{ [] }
 		| src_loc '=' ex_stuff data_name '{' var_name '::' atype '}'
 							{ [mk_con_decl $4 $3 (NewCon $8 (Just $6)) $1] }
 
-ex_stuff :: { ([HsTyVar RdrName], RdrNameContext) }
+ex_stuff :: { ([HsTyVarBndr RdrName], RdrNameContext) }
 ex_stuff	:                                       { ([],[]) }
-                | '__forall' forall context '=>'            { ($2,$3) }
+                | '__forall' tv_bndrs opt_context '=>'  { ($2,$3) }
 
 batypes		:: { [RdrNameBangType] }
 batypes		:  					{ [] }
@@ -446,20 +499,21 @@ field		:  var_names1 '::' type		{ ($1, Unbanged $3) }
 
 type		:: { RdrNameHsType }
 type		: '__fuall'  fuall '=>' type    { mkHsUsForAllTy $2 $4 }
-                | '__forall' forall context '=>' type	
-						{ mkHsForAllTy (Just $2) $3 $5 }
-		| btype '->' type		{ MonoFunTy $1 $3 }
+                | '__forall' tv_bndrs 
+			opt_context '=>' type	{ mkHsForAllTy (Just $2) $3 $5 }
+		| btype '->' type		{ HsFunTy $1 $3 }
 		| btype				{ $1 }
 
 fuall		:: { [RdrName] }
 fuall		: '[' uv_bndrs ']'		        { $2 }
 
-forall		:: { [HsTyVar RdrName] }
-forall		: '[' tv_bndrs ']'		        { $2 }
+opt_context	:: { RdrNameContext }
+opt_context	:  					{ [] }
+		| context 			        { $1 }
 
 context		:: { RdrNameContext }
-context		:  					{ [] }
-		| '{' context_list1 '}'		        { $2 }
+context		: '(' context_list1 ')'		        { $2 }
+		| '{' context_list1 '}'		        { $2 }	-- Backward compatibility
 
 context_list1	:: { RdrNameContext }
 context_list1	: class					{ [$1] }
@@ -480,26 +534,24 @@ types2		:  type ',' type			{ [$1,$3] }
 
 btype		:: { RdrNameHsType }
 btype		:  atype				{ $1 }
-		|  btype atype				{ MonoTyApp $1 $2 }
-                |  '__u' usage atype			{ MonoUsgTy $2 $3 }
+		|  btype atype				{ HsAppTy $1 $2 }
+                |  '__u' usage atype			{ HsUsgTy $2 $3 }
 
-usage		:: { MonoUsageAnn RdrName }
-usage		: '-' 					{ MonoUsOnce }
-		| '!' 					{ MonoUsMany }
-		| uv_name 				{ MonoUsVar $1 }
+usage		:: { HsUsageAnn RdrName }
+usage		: '-' 					{ HsUsOnce }
+		| '!' 					{ HsUsMany }
+		| uv_name 				{ HsUsVar $1 }
 
 atype		:: { RdrNameHsType }
-atype		:  qtc_name 			  	{ MonoTyVar $1 }
-		|  tv_name			  	{ MonoTyVar $1 }
-		|  '(' types2 ')'	  		{ MonoTupleTy $2 True{-boxed-} }
-		|  '(#' types0 '#)'			{ MonoTupleTy $2 False{-unboxed-} }
-		|  '[' type ']'		  		{ MonoListTy  $2 }
-		|  '{' qcls_name atypes '}'		{ MonoDictTy $2 $3 }
-		|  '{' ipvar_name '::' type '}'		{ MonoIParamTy $2 $4 }
+atype		:  qtc_name 			  	{ HsTyVar $1 }
+		|  tv_name			  	{ HsTyVar $1 }
+	  	|  '(' ')' 				{ HsTupleTy (mkHsTupCon tcName Boxed   []) [] }
+		|  '(' types2 ')'	  		{ HsTupleTy (mkHsTupCon tcName Boxed   $2) $2 }
+		|  '(#' types0 '#)'			{ HsTupleTy (mkHsTupCon tcName Unboxed $2) $2 }
+		|  '[' type ']'		  		{ HsListTy  $2 }
+		|  '{' qcls_name atypes '}'		{ mkHsDictTy $2 $3 }
+		|  '{' ipvar_name '::' type '}'		{ mkHsIParamTy $2 $4 }
 		|  '(' type ')'		  		{ $2 }
-
--- This one is dealt with via qtc_name
---	  	|  '(' ')' 				{ MonoTupleTy [] True }
 
 atypes		:: { [RdrNameHsType] 	{-  Zero or more -} }
 atypes		:  					{ [] }
@@ -626,13 +678,17 @@ tv_name		:: { RdrName }
 		:  VARID 		{ mkSysUnqual tvName $1 }
 		|  VARSYM		{ mkSysUnqual tvName $1 {- Allow t2 as a tyvar -} }
 
-tv_bndr		:: { HsTyVar RdrName }
+tv_bndr		:: { HsTyVarBndr RdrName }
 		:  tv_name '::' akind	{ IfaceTyVar $1 $3 }
 		|  tv_name		{ IfaceTyVar $1 boxedTypeKind }
 
-tv_bndrs	:: { [HsTyVar RdrName] }
+tv_bndrs	:: { [HsTyVarBndr RdrName] }
+tv_bndrs	: tv_bndrs1		{ $1 }
+		| '[' tv_bndrs1 ']'	{ $2 } 	-- Backward compatibility
+
+tv_bndrs1	:: { [HsTyVarBndr RdrName] }
 		:  			{ [] }
-		| tv_bndr tv_bndrs	{ $1 : $2 }
+		| tv_bndr tv_bndrs1	{ $1 : $2 }
 
 ---------------------------------------------------
 fds :: { [([RdrName], [RdrName])] }
@@ -674,15 +730,21 @@ id_info_item	:: { HsIdInfo RdrName }
 		: '__A' INTEGER			{ HsArity (exactArity (fromInteger $2)) }
 		| '__U' inline_prag core_expr	{ HsUnfold $2 $3 }
 		| '__M'				{ HsCprInfo }
-		| '__S'				{ HsStrictness (HsStrictnessInfo $1) }
+		| '__S'				{ HsStrictness (mkStrictnessInfo $1) }
 		| '__C'                         { HsNoCafRefs }
 		| '__P' qvar_name 		{ HsWorker $2 }
 
 inline_prag     :: { InlinePragInfo }
                 :  {- empty -}                  { NoInlinePragInfo }
-                | '[' INTEGER ']'               { IMustNotBeINLINEd True  (Just (fromInteger $2)) } -- INLINE n
-                | '[' '!' ']'               	{ IMustNotBeINLINEd True Nothing } -- NOTINLINE
-                | '[' '!' INTEGER ']'           { IMustNotBeINLINEd False (Just (fromInteger $3)) } -- NOINLINE n
+		| '[' from_prag phase ']'	{ IMustNotBeINLINEd $2 $3 }
+
+from_prag	:: { Bool }
+		: {- empty -}			{ True }
+		| '!'				{ False }
+
+phase		:: { Maybe Int }
+		: {- empty -}			{ Nothing }
+		| INTEGER 			{ Just (fromInteger $1) }
 
 -------------------------------------------------------
 core_expr	:: { UfExpr RdrName }
@@ -697,14 +759,14 @@ core_expr	: '\\' core_bndrs '->' core_expr	{ foldr UfLam $4 $2 }
 
                 | '__litlit' STRING atype               { UfLitLit $2 $3 }
 
-                | '__inline_me' core_expr               { UfNote UfInlineMe $2 }
-                | '__inline_call' core_expr             { UfNote UfInlineCall $2 }
-                | '__coerce' atype core_expr            { UfNote (UfCoerce $2) $3 }
-		| scc core_expr                         { UfNote (UfSCC $1) $2  }
 		| fexpr				        { $1 }
 
 fexpr   :: { UfExpr RdrName }
 fexpr   : fexpr core_arg				{ UfApp $1 $2 }
+	| scc core_aexpr         	                { UfNote (UfSCC $1) $2  }
+        | '__inline_me' core_aexpr 			{ UfNote UfInlineMe $2 }
+        | '__inline_call' core_aexpr			{ UfNote UfInlineCall $2 }
+        | '__coerce' atype core_aexpr			{ UfNote (UfCoerce $2) $3 }
         | core_aexpr					{ $1 }
 
 core_arg	:: { UfExpr RdrName }
@@ -718,25 +780,13 @@ core_args	:: { [UfExpr RdrName] }
 core_aexpr      :: { UfExpr RdrName }              -- Atomic expressions
 core_aexpr      : qvar_name				        { UfVar $1 }
                 | qdata_name                                    { UfVar $1 }
-			-- This one means that e.g. "True" will parse as 
-			-- (UfVar True_Id) rather than (UfCon True_Con []).
-			-- No big deal; it'll be inlined in a jiffy.  I tried 
-			-- parsing it to (Con con []) directly, but got bitten 
-			-- when a real constructor Id showed up in an interface
-			-- file.  As usual, a hack bites you in the end.
-			-- If you want to get a UfCon, then use the
-			-- curly-bracket notation (True {}).
-
--- This one is dealt with by qdata_name: see above comments
---		| '('  ')'	 	 { UfTuple (mkTupConRdrName 0) [] }
 
 		| core_lit		 { UfLit $1 }
 		| '(' core_expr ')'	 { $2 }
 
-			-- Tuple construtors are for the *worker* of the tuple
-			-- Going direct saves needless messing about 
-		| '(' comma_exprs2 ')'	 { UfTuple (mkRdrNameWkr (mkTupConRdrName (length $2))) $2 }
-		| '(#' comma_exprs0 '#)' { UfTuple (mkRdrNameWkr (mkUbxTupConRdrName (length $2))) $2 }
+		| '('  ')'	 	 { UfTuple (mkHsTupCon dataName Boxed [])   [] }
+		| '(' comma_exprs2 ')'	 { UfTuple (mkHsTupCon dataName Boxed $2)   $2 }
+		| '(#' comma_exprs0 '#)' { UfTuple (mkHsTupCon dataName Unboxed $2) $2 }
 
                 | '{' '__ccall' ccall_string type '}'       
                            { let
@@ -765,7 +815,7 @@ rec_binds	:: { [(UfBinder RdrName, UfExpr RdrName)] }
 		| core_val_bndr '=' core_expr ';' rec_binds	{ ($1,$3) : $5 }
 
 core_alts	:: { [UfAlt RdrName] }
-		: core_alt					{ [$1] }
+		: 						{ [] }
 		| core_alt ';' core_alts	                { $1 : $3 }
 
 core_alt        :: { UfAlt RdrName }
@@ -775,8 +825,9 @@ core_pat	:: { (UfConAlt RdrName, [RdrName]) }
 core_pat	: core_lit			{ (UfLitAlt  $1, []) }
 		| '__litlit' STRING atype	{ (UfLitLitAlt $2 $3, []) }
 		| qdata_name core_pat_names	{ (UfDataAlt $1, $2) }
-		| '(' comma_var_names1 ')' 	{ (UfDataAlt (mkTupConRdrName (length $2)), $2) }
-		| '(#' comma_var_names1 '#)'	{ (UfDataAlt (mkUbxTupConRdrName (length $2)), $2) }
+		| '('  ')'	 	 	{ (UfTupleAlt (mkHsTupCon dataName Boxed []),   []) }
+		| '(' comma_var_names1 ')' 	{ (UfTupleAlt (mkHsTupCon dataName Boxed $2),   $2) }
+		| '(#' comma_var_names1 '#)'	{ (UfTupleAlt (mkHsTupCon dataName Unboxed $2), $2) }
 		| '__DEFAULT'			{ (UfDefault, []) }
 		| '(' core_pat ')'		{ $2 }
 
@@ -860,6 +911,9 @@ cc_caf  :: { IsCafCC }
 src_loc :: { SrcLoc }
 src_loc : 				{% getSrcLocP }
 
+-- Check the project version: this makes sure
+-- that the project version (e.g. 407) in the interface
+-- file is the same as that for the compiler that's reading it
 checkVersion :: { () }
 	   : {-empty-}			{% checkVersion Nothing }
 	   | INTEGER			{% checkVersion (Just (fromInteger $1)) }

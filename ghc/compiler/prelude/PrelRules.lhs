@@ -21,15 +21,17 @@ import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
 			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
 			, addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
 			)
+import RdrName		( RdrName )
 import PrimOp		( PrimOp(..), primOpOcc )
 import TysWiredIn	( trueDataConId, falseDataConId )
-import TyCon		( tyConDataCons, isEnumerationTyCon, isNewTyCon )
+import TyCon		( tyConDataConsIfAvailable, isEnumerationTyCon, isNewTyCon )
 import DataCon		( DataCon, dataConTag, dataConRepArity, dataConTyCon, dataConId, fIRST_TAG )
 import CoreUnfold	( maybeUnfoldingTemplate )
 import CoreUtils	( exprIsValue, cheapEqExpr, exprIsConApp_maybe )
 import Type		( splitTyConApp_maybe )
 import OccName		( occNameUserString)
-import ThinAir		( unpackCStringFoldrId )
+import PrelNames	( unpackCStringFoldr_RDR )
+import Unique		( unpackCStringFoldrIdKey, hasKey )
 import Maybes		( maybeToBool )
 import Char		( ord, chr )
 import Bits		( Bits(..) )
@@ -55,7 +57,7 @@ primOpRule op
   = BuiltinRule (primop_rule op)
   where
     op_name = _PK_ (occNameUserString (primOpOcc op))
-    op_name_case = op_name _APPEND_ SLIT("case")
+    op_name_case = op_name _APPEND_ SLIT("->case")
 
     -- ToDo:	something for integer-shift ops?
     --		NotOp
@@ -404,11 +406,15 @@ seqRule other				 = Nothing
 \begin{code}
 tagToEnumRule [Type ty, Lit (MachInt i)]
   = ASSERT( isEnumerationTyCon tycon ) 
-    Just (SLIT("TagToEnum"), Var (dataConId dc))
+    case filter correct_tag (tyConDataConsIfAvailable tycon) of
+
+
+	[]	  -> Nothing	-- Abstract type
+	(dc:rest) -> ASSERT( null rest )
+		     Just (SLIT("TagToEnum"), Var (dataConId dc))
   where 
+    correct_tag dc = (dataConTag dc - fIRST_TAG) == tag
     tag = fromInteger i
-    constrs = tyConDataCons tycon
-    (dc:_) = [ dc | dc <- constrs, tag == dataConTag dc - fIRST_TAG ]
     (Just (tycon,_)) = splitTyConApp_maybe ty
 
 tagToEnumRule other = Nothing
@@ -438,15 +444,14 @@ dataToTagRule other = Nothing
 %************************************************************************
 
 \begin{code}
-builtinRules :: [ProtoCoreRule]
+builtinRules :: [(RdrName, CoreRule)]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [ ProtoCoreRule False unpackCStringFoldrId 
-		    (BuiltinRule match_append_lit_str)
+  = [ (unpackCStringFoldr_RDR, BuiltinRule match_append_lit_str)
     ]
 
 
--- unpack "foo" c (unpack "baz" c n)  =  unpack "foobaz" c n
+-- unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)  =  unpackFoldrCString# "foobaz" c n
 
 match_append_lit_str [Type ty1,
 		      Lit (MachStr s1),
@@ -456,7 +461,7 @@ match_append_lit_str [Type ty1,
 			       `App` c2
 			       `App` n
 		     ]
-  | unpk == unpackCStringFoldrId && 
+  | unpk `hasKey` unpackCStringFoldrIdKey && 
     c1 `cheapEqExpr` c2
   = ASSERT( ty1 == ty2 )
     Just (SLIT("AppendLitString"),

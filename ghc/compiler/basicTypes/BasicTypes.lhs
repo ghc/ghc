@@ -14,7 +14,7 @@ types that
 
 \begin{code}
 module BasicTypes(
-	Version,
+	Version, bumpVersion, initialVersion, bogusVersion,
 
 	Arity, 
 
@@ -29,7 +29,10 @@ module BasicTypes(
 
 	TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
+	Boxity(..), isBoxed, tupleParens,
+
 	OccInfo(..), seqOccInfo, isFragileOccInfo, isLoopBreaker,
+
 	InsideLam, insideLam, notInsideLam,
 	OneBranch, oneBranch, notOneBranch
 
@@ -75,6 +78,15 @@ type Arity = Int
 
 \begin{code}
 type Version = Int
+
+bogusVersion :: Version	-- Shouldn't look at these
+bogusVersion = error "bogusVersion"
+
+bumpVersion :: Version -> Version 
+bumpVersion v = v+1
+
+initialVersion :: Version
+initialVersion = 1
 \end{code}
 
 
@@ -143,6 +155,28 @@ isNotTopLevel TopLevel    = False
 isTopLevel TopLevel	= True
 isTopLevel NotTopLevel  = False
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[Top-level/local]{Top-level/not-top level flag}
+%*									*
+%************************************************************************
+
+\begin{code}
+data Boxity
+  = Boxed
+  | Unboxed
+  deriving( Eq )
+
+isBoxed :: Boxity -> Bool
+isBoxed Boxed   = True
+isBoxed Unboxed = False
+
+tupleParens :: Boxity -> SDoc -> SDoc
+tupleParens Boxed   p = parens p
+tupleParens Unboxed p = ptext SLIT("(#") <+> p <+> ptext SLIT("#)")
+\end{code}
+
 
 %************************************************************************
 %*									*

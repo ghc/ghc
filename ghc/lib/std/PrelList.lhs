@@ -21,7 +21,6 @@ module PrelList (
    any, all, elem, notElem, lookup,
    maximum, minimum, concatMap,
    zip, zip3, zipWith, zipWith3, unzip, unzip3,
-
 #ifdef USE_REPORT_PRELUDE
 
 #else
@@ -482,6 +481,16 @@ foldr2_right  k _z  y  r (x:xs) = k x y (r xs)
 		  foldr2 k z xs (build g) = g (foldr2_right k z) (\_ -> z) xs
  #-}
 \end{code}
+
+The foldr2/right rule isn't exactly right, because it changes
+the strictness of foldr2 (and thereby zip)
+
+E.g. main = print (null (zip nonobviousNil (build undefined)))
+          where   nonobviousNil = f 3
+                  f n = if n == 0 then [] else f (n-1)
+
+I'm going to leave it though.
+
 
 zip takes two lists and returns a list of corresponding pairs.  If one
 input list is short, excess elements of the longer list are discarded.

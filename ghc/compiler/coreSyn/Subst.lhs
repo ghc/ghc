@@ -35,7 +35,7 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr, CoreBndr,
 			  CoreRules(..), CoreRule(..), 
 			  emptyCoreRules, isEmptyCoreRules, seqRules
 			)
-import CoreFVs		( exprFreeVars )
+import CoreFVs		( exprFreeVars, mustHaveLocalBinding )
 import TypeRep		( Type(..), TyNote(..), 
 			)  -- friend
 import Type		( ThetaType, PredType(..), ClassContext,
@@ -45,7 +45,6 @@ import VarSet
 import VarEnv
 import Var		( setVarUnique, isId )
 import Id		( idType, setIdType, idOccInfo, zapFragileIdInfo )
-import Name		( isLocallyDefined )
 import IdInfo		( IdInfo, isFragileOccInfo,
 			  specInfo, setSpecInfo, 
 			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo
@@ -189,7 +188,8 @@ lookupInScope in_scope v
   = case lookupVarEnv in_scope v of
 	Just v' | v == v'   -> v'	-- Reached a fixed point
 		| otherwise -> lookupInScope in_scope v'
-	Nothing		    -> v
+	Nothing		    -> WARN( mustHaveLocalBinding v, ppr v )
+			       v
 
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _) = v `elemVarEnv` in_scope

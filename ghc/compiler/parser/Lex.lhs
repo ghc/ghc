@@ -38,11 +38,11 @@ import List             ( isSuffixOf )
 
 import IdInfo		( InlinePragInfo(..), CprInfo(..) )
 import Name		( isLowerISO, isUpperISO )
-import PrelMods		( mkTupNameStr, mkUbxTupNameStr )
+import PrelNames	( mkTupNameStr )
 import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_HiVersion, opt_NoHiCheck )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( UniqFM, listToUFM, lookupUFM)
-import BasicTypes	( NewOrData(..) )
+import BasicTypes	( NewOrData(..), Boxity(..) )
 import SrcLoc		( SrcLoc, incSrcLine, srcLocFile, srcLocLine,
 			  replaceSrcLine, mkSrcLoc )
 
@@ -1018,7 +1018,7 @@ lex_tuple cont mod buf back_off =
    go n buf =
     case currentChar# buf of
       ','# -> go (n+1) (stepOn buf)
-      ')'# -> cont (ITqconid (mod, snd (mkTupNameStr n))) (stepOn buf)
+      ')'# -> cont (ITqconid (mod, snd (mkTupNameStr Boxed n))) (stepOn buf)
       _    -> back_off
 
 lex_ubx_tuple cont mod buf back_off =
@@ -1028,7 +1028,7 @@ lex_ubx_tuple cont mod buf back_off =
     case currentChar# buf of
       ','# -> go (n+1) (stepOn buf)
       '#'# -> case lookAhead# buf 1# of
-		')'# -> cont (ITqconid (mod, snd (mkUbxTupNameStr n)))
+		')'# -> cont (ITqconid (mod, snd (mkTupNameStr Unboxed n)))
 				 (stepOnBy# buf 2#)
 	        _    -> back_off
       _    -> back_off

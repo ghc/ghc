@@ -14,7 +14,7 @@ import {-# SOURCE #-} HsExpr    ( pprExpr, HsExpr )
 import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSs, GRHSs )
 
 -- friends:
-import HsTypes		( HsType, cmpHsType )
+import HsTypes		( HsType )
 import HsImpExp		( IE(..), ieName )
 import CoreSyn		( CoreExpr )
 import PprCore		()	   -- Instances for Outputable
@@ -265,16 +265,11 @@ data Sig name
 
   | FixSig	(FixitySig name)	-- Fixity declaration
 
-  | DeprecSig	(Deprecation name)	-- DEPRECATED
-		SrcLoc
 
-data FixitySig name  = FixitySig name Fixity SrcLoc
+data FixitySig name = FixitySig name Fixity SrcLoc 
 
--- We use exported entities for things to deprecate. Cunning trick (hack?):
--- `IEModuleContents undefined' is used for module deprecation.
-data Deprecation name = Deprecation (IE name) DeprecTxt
-
-type DeprecTxt = FAST_STRING	-- reason/explanation for deprecation
+instance Eq name => Eq (FixitySig name) where
+   (FixitySig n1 f1 _) == (FixitySig n2 f2 _) = n1==n2 && f1==f2
 \end{code}
 
 \begin{code}
@@ -298,14 +293,6 @@ sigForThisGroup ns sig
 	Just n | isUnboundName n -> True	-- Don't complain about an unbound name again
 	       | otherwise 	 -> n `elemNameSet` ns
 
-sigsForMe :: (name -> Bool) -> [Sig name] -> [Sig name]
-sigsForMe f sigs
-  = filter sig_for_me sigs
-  where
-    sig_for_me sig = case sigName sig of
-			Nothing -> False
-			Just n  -> f n
-
 sigName :: Sig name -> Maybe name
 sigName (Sig         n _ _)             = Just n
 sigName (ClassOpSig  n _ _ _ _)         = Just n
@@ -313,9 +300,6 @@ sigName (SpecSig     n _ _)             = Just n
 sigName (InlineSig   n _   _)           = Just n
 sigName (NoInlineSig n _   _)           = Just n
 sigName (FixSig (FixitySig n _ _))      = Just n
-sigName (DeprecSig (Deprecation d _) _) = case d of
-					    IEModuleContents _ -> Nothing
-					    other	       -> Just (ieName d)
 sigName other				= Nothing
 
 isFixitySig :: Sig name -> Bool
@@ -332,7 +316,6 @@ isPragSig (SpecSig _ _ _)     = True
 isPragSig (InlineSig   _ _ _) = True
 isPragSig (NoInlineSig _ _ _) = True
 isPragSig (SpecInstSig _ _)   = True
-isPragSig (DeprecSig _ _)     = True
 isPragSig other		      = False
 \end{code}
 
@@ -344,7 +327,6 @@ hsSigDoc (InlineSig  _ _    loc)      = (SLIT("INLINE pragma"),loc)
 hsSigDoc (NoInlineSig  _ _  loc)      = (SLIT("NOINLINE pragma"),loc)
 hsSigDoc (SpecInstSig _ loc)	      = (SLIT("SPECIALISE instance pragma"),loc)
 hsSigDoc (FixSig (FixitySig _ _ loc)) = (SLIT("fixity declaration"), loc)
-hsSigDoc (DeprecSig _ loc)            = (SLIT("DEPRECATED pragma"), loc)
 \end{code}
 
 \begin{code}
@@ -355,8 +337,10 @@ ppr_sig :: Outputable name => Sig name -> SDoc
 ppr_sig (Sig var ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
-ppr_sig (ClassOpSig var _ _ ty _)
-      = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
+ppr_sig (ClassOpSig var _ dm ty _)
+      = sep [ppr var <+> pp_dm <+> dcolon, nest 4 (ppr ty)]
+      where
+	pp_dm = if dm then equals else empty	-- Default-method indicator
 
 ppr_sig (SpecSig var ty _)
       = sep [ hsep [text "{-# SPECIALIZE", ppr var, dcolon],
@@ -374,16 +358,9 @@ ppr_sig (SpecInstSig ty _)
 
 ppr_sig (FixSig fix_sig) = ppr fix_sig
 
-ppr_sig (DeprecSig deprec _) = ppr deprec
 
 instance Outputable name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity loc) = sep [ppr fixity, ppr name]
-
-instance Outputable name => Outputable (Deprecation name) where
-   ppr (Deprecation (IEModuleContents _) txt)
-      = hsep [text "{-# DEPRECATED",            doubleQuotes (ppr txt), text "#-}"]
-   ppr (Deprecation thing txt)
-      = hsep [text "{-# DEPRECATED", ppr thing, doubleQuotes (ppr txt), text "#-}"]
 
 ppr_phase :: Maybe Int -> SDoc
 ppr_phase Nothing  = empty
@@ -394,37 +371,16 @@ Checking for distinct signatures; oh, so boring
 
 
 \begin{code}
-cmpHsSig :: Sig Name -> Sig Name -> Ordering
-cmpHsSig (Sig n1 _ _)         (Sig n2 _ _)         = n1 `compare` n2
-cmpHsSig (DeprecSig (Deprecation ie1 _) _)
-         (DeprecSig (Deprecation ie2 _) _)         = cmp_ie ie1 ie2
-cmpHsSig (InlineSig n1 _ _)   (InlineSig n2 _ _)   = n1 `compare` n2
-cmpHsSig (NoInlineSig n1 _ _) (NoInlineSig n2 _ _) = n1 `compare` n2
+eqHsSig :: Sig Name -> Sig Name -> Bool
+eqHsSig (Sig n1 _ _)         (Sig n2 _ _)         = n1 == n2
+eqHsSig (InlineSig n1 _ _)   (InlineSig n2 _ _)   = n1 == n2
+eqHsSig (NoInlineSig n1 _ _) (NoInlineSig n2 _ _) = n1 == n2
 
-cmpHsSig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)  = cmpHsType compare ty1 ty2
-cmpHsSig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _) 
+eqHsSig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)  = ty1 == ty2
+eqHsSig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _) 
   = -- may have many specialisations for one value;
     -- but not ones that are exactly the same...
-    thenCmp (n1 `compare` n2) (cmpHsType compare ty1 ty2)
+    (n1 == n2) && (ty1 == ty2)
 
-cmpHsSig other_1 other_2					-- Tags *must* be different
-  | (sig_tag other_1) _LT_ (sig_tag other_2) = LT 
-  | otherwise				     = GT
-
-cmp_ie :: IE Name -> IE Name -> Ordering
-cmp_ie (IEVar            n1  ) (IEVar            n2  ) = n1 `compare` n2
-cmp_ie (IEThingAbs       n1  ) (IEThingAbs       n2  ) = n1 `compare` n2
-cmp_ie (IEThingAll       n1  ) (IEThingAll       n2  ) = n1 `compare` n2
--- Hmmm...
-cmp_ie (IEThingWith      n1 _) (IEThingWith      n2 _) = n1 `compare` n2
-cmp_ie (IEModuleContents _   ) (IEModuleContents _   ) = EQ
-
-sig_tag (Sig n1 _ _)    	   = (ILIT(1) :: FAST_INT)
-sig_tag (SpecSig n1 _ _)    	   = ILIT(2)
-sig_tag (InlineSig n1 _ _)  	   = ILIT(3)
-sig_tag (NoInlineSig n1 _ _)  	   = ILIT(4)
-sig_tag (SpecInstSig _ _)	   = ILIT(5)
-sig_tag (FixSig _)		   = ILIT(6)
-sig_tag (DeprecSig _ _)		   = ILIT(7)
-sig_tag _			   = panic# "tag(RnBinds)"
+eqHsSig other_1 other_2 = False
 \end{code}

@@ -16,7 +16,7 @@ Haskell).
 
 \begin{code}
 module Unique (
-	Unique, Uniquable(..),
+	Unique, Uniquable(..), hasKey,
 	u2i,				-- hack: used in UniqFM
 
 	pprUnique, pprUnique10,
@@ -30,16 +30,14 @@ module Unique (
 	initTyVarUnique,
 	initTidyUniques,
 
-	isTupleKey,
+	isTupleKey, 
 
 	-- now all the built-in Uniques (and functions to make them)
 	-- [the Oh-So-Wonderful Haskell module system wins again...]
 	mkAlphaTyVarUnique,
 	mkPrimOpIdUnique,
 	mkTupleDataConUnique,
-	mkUbxTupleDataConUnique,
 	mkTupleTyConUnique,
-	mkUbxTupleTyConUnique,
 
 	getBuiltinUniques, mkBuiltinUnique,
 	mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
@@ -198,6 +196,7 @@ module Unique (
 
 #include "HsVersions.h"
 
+import BasicTypes	( Boxity(..) )
 import FastString	( FastString, uniqueOfFS )
 import GlaExts
 import ST
@@ -289,6 +288,9 @@ unpkUnique (MkUnique u)
 \begin{code}
 class Uniquable a where
     getUnique :: a -> Unique
+
+hasKey		:: Uniquable a => a -> Unique -> Bool
+x `hasKey` k	= getUnique x == k
 
 instance Uniquable FastString where
  getUnique fs = mkUniqueGrimily (uniqueOfFS fs)
@@ -430,8 +432,8 @@ mkAlphaTyVarUnique i            = mkUnique '1' i
 
 mkPreludeClassUnique i		= mkUnique '2' i
 mkPreludeTyConUnique i		= mkUnique '3' i
-mkTupleTyConUnique a		= mkUnique '4' a
-mkUbxTupleTyConUnique a		= mkUnique '5' a
+mkTupleTyConUnique Boxed   a	= mkUnique '4' a
+mkTupleTyConUnique Unboxed a	= mkUnique '5' a
 
 -- Data constructor keys occupy *two* slots.  The first is used for the
 -- data constructor itself and its wrapper function (the function that
@@ -440,8 +442,8 @@ mkUbxTupleTyConUnique a		= mkUnique '5' a
 -- representation).
 
 mkPreludeDataConUnique i	= mkUnique '6' (2*i)	-- Must be alphabetic
-mkTupleDataConUnique a		= mkUnique '7' (2*a)	-- ditto (*may* be used in C labels)
-mkUbxTupleDataConUnique a	= mkUnique '8' (2*a)
+mkTupleDataConUnique Boxed a	= mkUnique '7' (2*a)	-- ditto (*may* be used in C labels)
+mkTupleDataConUnique Unboxed a	= mkUnique '8' (2*a)
 
 -- This one is used for a tiresome reason
 -- to improve a consistency-checking error check in the renamer

@@ -37,9 +37,9 @@ import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  charTy, charDataCon, intTy, intDataCon,
 			  floatTy, floatDataCon, doubleTy, tupleCon,
 			  doubleDataCon, addrTy,
-			  addrDataCon, wordTy, wordDataCon,
-			  mkUnboxedTupleTy, unboxedTupleCon
+			  addrDataCon, wordTy, wordDataCon
 			)
+import BasicTypes	( Boxity(..) )
 import UniqSet
 import ErrUtils		( addErrLocHdrLine, dontAddErrLoc )
 import Outputable
@@ -499,29 +499,20 @@ tidy1 v (ListPat ty pats) match_result
 	      (ConPat nilDataCon  list_ty [] [] [])
 	      pats
 
-tidy1 v (TuplePat pats True{-boxed-}) match_result
+tidy1 v (TuplePat pats boxity) match_result
   = returnDs (tuple_ConPat, match_result)
   where
     arity = length pats
     tuple_ConPat
-      = ConPat (tupleCon arity)
-	       (mkTupleTy arity (map outPatType pats)) [] [] 
-	       pats
-
-tidy1 v (TuplePat pats False{-unboxed-}) match_result
-  = returnDs (tuple_ConPat, match_result)
-  where
-    arity = length pats
-    tuple_ConPat
-      = ConPat (unboxedTupleCon arity)
-	       (mkUnboxedTupleTy arity (map outPatType pats)) [] [] 
+      = ConPat (tupleCon boxity arity)
+	       (mkTupleTy boxity arity (map outPatType pats)) [] [] 
 	       pats
 
 tidy1 v (DictPat dicts methods) match_result
   = case num_of_d_and_ms of
-	0 -> tidy1 v (TuplePat [] True) match_result
+	0 -> tidy1 v (TuplePat [] Boxed) match_result
 	1 -> tidy1 v (head dict_and_method_pats) match_result
-	_ -> tidy1 v (TuplePat dict_and_method_pats True) match_result
+	_ -> tidy1 v (TuplePat dict_and_method_pats Boxed) match_result
   where
     num_of_d_and_ms	 = length dicts + length methods
     dict_and_method_pats = map VarPat (dicts ++ methods)

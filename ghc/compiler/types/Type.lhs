@@ -93,7 +93,7 @@ import VarSet
 import Name	( Name, NamedThing(..), mkLocalName, tidyOccName
 		)
 import NameSet
-import Class	( classTyCon, Class )
+import Class	( classTyCon, Class, ClassPred, ClassContext )
 import TyCon	( TyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isDataTyCon, isNewTyCon, newTyConRep,
@@ -316,7 +316,7 @@ splitTyConApp_maybe other		   = Nothing
 -- splitAlgTyConApp_maybe looks for 
 --	*saturated* applications of *algebraic* data types
 -- "Algebraic" => newtype, data type, or dictionary (not function types)
--- We return the constructors too.
+-- We return the constructors too, so there had better be some.
 
 splitAlgTyConApp_maybe :: Type -> Maybe (TyCon, [Type], [DataCon])
 splitAlgTyConApp_maybe (TyConApp tc tys) 
@@ -332,6 +332,9 @@ splitAlgTyConApp :: Type -> (TyCon, [Type], [DataCon])
 splitAlgTyConApp (TyConApp tc tys) = ASSERT( isAlgTyCon tc && tyConArity tc == length tys )
 	      			     (tc, tys, tyConDataCons tc)
 splitAlgTyConApp (NoteTy _ ty)     = splitAlgTyConApp ty
+#ifdef DEBUG
+splitAlgTyConApp ty = pprPanic "splitAlgTyConApp" (pprType ty)
+#endif
 \end{code}
 
 "Dictionary" types are just ordinary data types, but you can
@@ -687,14 +690,14 @@ ClassPred and ClassContext are used in class and instance declarations.
 %************************************************************************
 
 \begin{code}
-type RhoType   = Type
-type TauType   = Type
 data PredType  = Class  Class [Type]
 	       | IParam Name  Type
-type ThetaType = [PredType]
-type ClassPred = (Class, [Type])
-type ClassContext = [ClassPred]
-type SigmaType = Type
+	       deriving( Eq, Ord )
+
+type ThetaType 	  = [PredType]
+type RhoType   	  = Type
+type TauType   	  = Type
+type SigmaType    = Type
 \end{code}
 
 \begin{code}

@@ -69,7 +69,14 @@ pprEncodedFS :: EncodedFS -> SDoc
 pprEncodedFS fs
   = getPprStyle 	$ \ sty ->
     if userStyle sty then
-	text (decode (_UNPK_ fs))
+	let
+	    s = decode (_UNPK_ fs)
+	    c = head s
+	in
+	if startsVarSym c || startsConSym c then
+		parens (text s)
+	else
+		text s 
     else
 	ptext fs
 \end{code}
@@ -614,32 +621,29 @@ isLexSym cs = isLexConSym cs || isLexVarSym cs
 isLexConId cs				-- Prefix type or data constructors
   | _NULL_ cs	     = False		-- 	e.g. "Foo", "[]", "(,)" 
   | cs == SLIT("[]") = True
-  | c  == '('	     = True	-- (), (,), (,,), ...
-  | otherwise	     = isUpper c || isUpperISO c
-  where					
-    c = _HEAD_ cs
+  | otherwise	     = startsConId (_HEAD_ cs)
 
 isLexVarId cs				-- Ordinary prefix identifiers
   | _NULL_ cs	 = False		-- 	e.g. "x", "_x"
-  | otherwise    = isLower c || isLowerISO c || c == '_'
-  where
-    c = _HEAD_ cs
+  | otherwise    = startsVarId (_HEAD_ cs)
 
 isLexConSym cs				-- Infix type or data constructors
   | _NULL_ cs	= False			--	e.g. ":-:", ":", "->"
-  | otherwise	= c  == ':'
-	       || cs == SLIT("->")
-  where
-    c = _HEAD_ cs
+  | cs == SLIT("->") = True
+  | otherwise	= startsConSym (_HEAD_ cs)
 
 isLexVarSym cs				-- Infix identifiers
   | _NULL_ cs = False			-- 	e.g. "+"
-  | otherwise = isSymbolASCII c
-	     || isSymbolISO c
-  where
-    c = _HEAD_ cs
+  | otherwise = startsVarSym (_HEAD_ cs)
 
 -------------
+startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool
+startsVarSym c = isSymbolASCII c || isSymbolISO c	-- Infix Ids
+startsConSym c = c == ':'				-- Infix data constructors
+startsVarId c  = isLower c || isLowerISO c || c == '_'	-- Ordinary Ids
+startsConId c  = isUpper c || isUpperISO c || c == '('	-- Ordinary type constructors and data constructors
+
+
 isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
 isSymbolISO   c = ord c `elem` (0xd7 : 0xf7 : [0xa1 .. 0xbf])
 isUpperISO    (C# c#) = c# `geChar#` '\xc0'# && c# `leChar#` '\xde'# && c# `neChar#` '\xd7'#

@@ -204,6 +204,7 @@ renamer output
 </Para>
 </ListItem>
 </VarListEntry>
+
 <VarListEntry>
 <Term><Option>-ddump-tc</Option>:</Term>
 <ListItem>
@@ -212,6 +213,20 @@ typechecker output
 </Para>
 </ListItem>
 </VarListEntry>
+
+<VarListEntry>
+<Term><Option>-ddump-types</Option>:</Term>
+<ListItem>
+<Para>
+Dump a type signature for each value defined at the top level
+of the module.  The list is sorted alphabetically.  
+Using <Option>-dppr-debug</Option> dumps a type signature for
+all the imported and system-defined things as well; useful
+for debugging the compiler.
+</Para>
+</ListItem>
+</VarListEntry>
+
 <VarListEntry>
 <Term><Option>-ddump-deriv</Option>:</Term>
 <ListItem>

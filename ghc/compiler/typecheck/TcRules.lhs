@@ -8,8 +8,8 @@ module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), RuleDecl(..), RuleBndr(..), HsTyVar(..) )
-import HsCore		( UfRuleBody(..) )
+import HsSyn		( HsDecl(..), RuleDecl(..), RuleBndr(..), HsTyVarBndr(..) )
+import CoreSyn		( CoreRule(..) )
 import RnHsSyn		( RenamedHsDecl )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
@@ -35,16 +35,20 @@ tcRules :: [RenamedHsDecl] -> TcM s (LIE, [TypecheckedRuleDecl])
 tcRules decls = mapAndUnzipTc tcRule [rule | RuleD rule <- decls]	`thenTc` \ (lies, rules) ->
 		returnTc (plusLIEs lies, rules)
 
-tcRule (IfaceRuleDecl fun (UfRuleBody name vars args rhs) src_loc)
+tcRule (IfaceRule name vars fun args rhs src_loc)
   = tcAddSrcLoc src_loc 		$
     tcAddErrCtxt (ruleCtxt name)	$
     tcVar fun				`thenTc` \ fun' ->
     tcCoreLamBndrs vars			$ \ vars' ->
     mapTc tcCoreExpr args		`thenTc` \ args' ->
     tcCoreExpr rhs			`thenTc` \ rhs' ->
-    returnTc (emptyLIE, IfaceRuleDecl fun' (CoreRuleBody name vars' args' rhs') src_loc)
+    returnTc (emptyLIE, IfaceRuleOut fun' (Rule name vars' args' rhs'))
 
-tcRule (RuleDecl name sig_tvs vars lhs rhs src_loc)
+tcRule (IfaceRuleOut fun rule)
+  = tcVar fun				`thenTc` \ fun' ->
+    returnTc (emptyLIE, IfaceRuleOut fun' rule)
+
+tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
   = tcAddSrcLoc src_loc 				$
     tcAddErrCtxt (ruleCtxt name)			$
     newTyVarTy_OpenKind					`thenNF_Tc` \ rule_ty ->
@@ -96,7 +100,7 @@ tcRule (RuleDecl name sig_tvs vars lhs rhs src_loc)
     tcSimplifyAndCheck (text "tcRule") tpl_tvs 
 		       lhs_dicts rhs_lie		`thenTc` \ (lie', rhs_binds) ->
 
-    returnTc (lie', RuleDecl	name (varSetElems tpl_tvs)
+    returnTc (lie', HsRule	name (varSetElems tpl_tvs)
 				(map RuleBndr tpl_ids)	-- yuk
 				(mkHsLet lhs_binds lhs')
 				(mkHsLet rhs_binds rhs')

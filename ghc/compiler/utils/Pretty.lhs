@@ -792,23 +792,12 @@ fillNB g p k ys            = fill1 g p k ys
 *********************************************************
 
 \begin{code}
-best :: Mode
-     -> Int             -- Line length
+best :: Int             -- Line length
      -> Int             -- Ribbon length
      -> RDoc
      -> RDoc            -- No unions in here!
 
-best OneLineMode IBOX(w) IBOX(r) p
-  = get p
-  where
-    get Empty               = Empty
-    get NoDoc               = NoDoc
-    get (NilAbove p)        = nilAbove_ (get p)
-    get (TextBeside s sl p) = textBeside_ s sl (get p)
-    get (Nest k p)          = get p             -- Elide nest
-    get (p `Union` q)       = first (get p) (get q)
-
-best mode IBOX(w) IBOX(r) p
+best IBOX(w) IBOX(r) p
   = get w p
   where
     get :: INT          -- (Remaining) width of line
@@ -858,7 +847,7 @@ minn x y | x LT y    = x
 first p q | nonEmptySet p = p 
           | otherwise     = q
 
-nonEmptySet NoDoc           = False
+nonEmptySet NoDoc              = False
 nonEmptySet (p `Union` q)      = True
 nonEmptySet Empty              = True
 nonEmptySet (NilAbove p)       = True           -- NoDoc always in first line
@@ -903,13 +892,30 @@ string_txt (PStr s1) s2 = _UNPK_ s1 ++ s2
 
 \begin{code}
 
-fullRender OneLineMode _ _ txt end doc = easy_display space_text txt end (reduceDoc doc)
-fullRender LeftMode    _ _ txt end doc = easy_display nl_text    txt end (reduceDoc doc)
+fullRender OneLineMode _ _ txt end doc 
+  = lay (reduceDoc doc)
+  where
+    lay NoDoc               = cant_fail
+    lay (Union p q)         = (lay q)			-- Second arg can't be NoDoc
+    lay (Nest k p)          = lay p
+    lay Empty               = end
+    lay (NilAbove p)        = space_text `txt` lay p	-- NoDoc always on first line
+    lay (TextBeside s sl p) = s `txt` lay p
+
+fullRender LeftMode    _ _ txt end doc 
+  = lay (reduceDoc doc)
+  where
+    lay NoDoc               	= cant_fail
+    lay (Union p q) 		= lay (first p q)
+    lay (Nest k p)          	= lay p
+    lay Empty               	= end
+    lay (NilAbove p)        	= nl_text `txt` lay p	-- NoDoc always on first line
+    lay (TextBeside s sl p) 	= s `txt` lay p
 
 fullRender mode line_length ribbons_per_line txt end doc
   = display mode line_length ribbon_length txt end best_doc
   where 
-    best_doc = best mode hacked_line_length ribbon_length (reduceDoc doc)
+    best_doc = best hacked_line_length ribbon_length (reduceDoc doc)
 
     hacked_line_length, ribbon_length :: Int
     ribbon_length = round (fromInt line_length / ribbons_per_line)
@@ -951,15 +957,6 @@ display mode IBOX(page_width) IBOX(ribbon_width) txt end doc
     }}
 
 cant_fail = error "easy_display: NoDoc"
-easy_display nl_text txt end doc 
-  = lay doc cant_fail
-  where
-    lay NoDoc               no_doc = no_doc
-    lay (Union p q)         no_doc = {- lay p -} (lay q cant_fail)              -- Second arg can't be NoDoc
-    lay (Nest k p)          no_doc = lay p no_doc
-    lay Empty               no_doc = end
-    lay (NilAbove p)        no_doc = nl_text `txt` lay p cant_fail      -- NoDoc always on first line
-    lay (TextBeside s sl p) no_doc = s `txt` lay p no_doc
 
 indent n | n GREQ ILIT(8) = '\t' : indent (n MINUS ILIT(8))
          | otherwise      = spaces n

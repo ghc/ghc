@@ -38,7 +38,7 @@ import TyCon	( TyCon, KindCon,
 
 -- others
 import SrcLoc		( mkBuiltinSrcLoc )
-import PrelMods		( pREL_GHC )
+import PrelNames	( pREL_GHC )
 import Unique		-- quite a few *Keys
 import Util		( thenCmp )
 \end{code}

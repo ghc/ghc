@@ -14,11 +14,11 @@ module Rules (
 #include "HsVersions.h"
 
 import CoreSyn		-- All of it
-import OccurAnal	( occurAnalyseExpr, tagBinders, UsageDetails )
+import OccurAnal	( occurAnalyseRule )
 import BinderInfo	( markMany )
-import CoreFVs		( exprFreeVars, idRuleVars, ruleSomeLhsFreeVars )
+import CoreFVs		( exprFreeVars, idRuleVars, ruleRhsFreeVars, ruleSomeLhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
-import CoreUtils	( eqExpr, cheapEqExpr )
+import CoreUtils	( eqExpr )
 import PprCore		( pprCoreRule )
 import Subst		( Subst, InScopeSet, substBndr, lookupSubst, extendSubst,
 			  mkSubst, substEnv, setSubstEnv, emptySubst, isInScope,
@@ -28,7 +28,6 @@ import Id		( Id, idUnfolding, zapLamIdInfo,
 			  idSpecialisation, setIdSpecialisation,
 			  setIdNoDiscard, maybeModifyIdInfo, modifyIdInfo
 			) 
-import IdInfo		( setSpecInfo, specInfo )
 import Name		( Name, isLocallyDefined )
 import Var		( isTyVar, isId )
 import VarSet
@@ -407,31 +406,29 @@ addRule id (Rules rules rhs_fvs) rule@(BuiltinRule _)
   = Rules (rule:rules) rhs_fvs
 	-- Put it at the start for lack of anything better
 
-addRule id (Rules rules rhs_fvs) (Rule str tpl_vars tpl_args rhs)
-  = Rules (insert rules) (rhs_fvs `unionVarSet` new_rhs_fvs)
+addRule id (Rules rules rhs_fvs) rule
+  = Rules (insertRule rules new_rule) (rhs_fvs `unionVarSet` new_rhs_fvs)
   where
-    new_rule = Rule str tpl_vars' tpl_args rhs'
-		-- Add occ info to tpl_vars, rhs
-
-    (rhs_uds, rhs')	  = occurAnalyseExpr isLocallyDefined rhs
-    (rhs_uds1, tpl_vars') = tagBinders rhs_uds tpl_vars
-
-    insert []					    = [new_rule]
-    insert (rule:rules) | new_is_more_specific rule = (new_rule:rule:rules)
-			| otherwise		    = rule : insert rules
-
-    new_is_more_specific rule = maybeToBool (matchRule tpl_var_set rule tpl_args)
-
-    tpl_var_set = mkVarSet tpl_vars'
-	-- Actually we should probably include the free vars of tpl_args,
-	-- but I can't be bothered
-
-    new_rhs_fvs = (exprFreeVars rhs' `minusVarSet` tpl_var_set) `delVarSet` id
+    new_rule    = occurAnalyseRule rule
+    new_rhs_fvs = ruleRhsFreeVars new_rule `delVarSet` id
 	-- Hack alert!
 	-- Don't include the Id in its own rhs free-var set.
 	-- Otherwise the occurrence analyser makes bindings recursive
 	-- that shoudn't be.  E.g.
 	--	RULE:  f (f x y) z  ==>  f x (f y z)
+
+insertRule rules new_rule@(Rule _ tpl_vars tpl_args _)
+  = go rules
+  where
+    tpl_var_set = mkVarSet tpl_vars
+	-- Actually we should probably include the free vars of tpl_args,
+	-- but I can't be bothered
+
+    go []					= [new_rule]
+    go (rule:rules) | new_is_more_specific rule = (new_rule:rule:rules)
+		    | otherwise		        = rule : go rules
+
+    new_is_more_specific rule = maybeToBool (matchRule tpl_var_set rule tpl_args)
 
 addIdSpecialisations :: Id -> [([CoreBndr], [CoreExpr], CoreExpr)] -> Id
 addIdSpecialisations id spec_stuff
@@ -457,7 +454,7 @@ data ProtoCoreRule
 	CoreRule	-- The rule itself
 	
 
-pprProtoCoreRule (ProtoCoreRule _ fn rule) = pprCoreRule (Just fn) rule
+pprProtoCoreRule (ProtoCoreRule _ fn rule) = pprCoreRule (ppr fn) rule
 
 lookupRule :: InScopeSet -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 lookupRule in_scope fn args

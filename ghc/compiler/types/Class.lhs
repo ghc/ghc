@@ -5,7 +5,7 @@
 
 \begin{code}
 module Class (
-	Class, ClassOpItem,
+	Class, ClassOpItem, ClassPred, ClassContext, FunDep,
 
 	mkClass, classTyVars,
 	classKey, className, classSelIds, classTyCon,
@@ -40,7 +40,7 @@ data Class
 	className :: Name,
 	
 	classTyVars  :: [TyVar],		-- The class type variables
-	classFunDeps :: [([TyVar], [TyVar])],	-- The functional dependencies
+	classFunDeps :: [FunDep TyVar],		-- The functional dependencies
 
 	classSCTheta :: [(Class,[Type])],	-- Immediate superclasses, and the
 	classSCSels  :: [Id],			-- corresponding selector functions to
@@ -53,6 +53,12 @@ data Class
 
 	classTyCon :: TyCon		-- The data type constructor for dictionaries
   }					-- of this class
+
+type ClassPred 	  = (Class, [Type])
+type ClassContext = [ClassPred]
+
+type FunDep a	  = ([a],[a])	--  e.g. class C a b c |  a b -> c, a c -> b  where ...
+				--  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
 
 type ClassOpItem = (Id, 	--   Selector function; contains unfolding
 		    Id, 	--   Default methods

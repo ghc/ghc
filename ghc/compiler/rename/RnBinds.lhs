@@ -21,12 +21,13 @@ module RnBinds (
 import {-# SOURCE #-} RnSource ( rnHsSigType )
 
 import HsSyn
-import HsBinds		( sigsForMe, cmpHsSig, sigName, hsSigDoc )
+import HsBinds		( eqHsSig, sigName, hsSigDoc )
 import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
-import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupGlobalOccRn, lookupOccRn,
+import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, 
+			  lookupGlobalOccRn, lookupOccRn, lookupSigOccRn,
 			  warnUnusedLocalBinds, mapFvRn, 
 			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, addOneFV,
 			  unknownNameErr
@@ -172,11 +173,14 @@ rnTopMonoBinds EmptyMonoBinds sigs
   = returnRn (EmptyBinds, emptyFVs)
 
 rnTopMonoBinds mbinds sigs
- =  mapRn lookupBndrRn binder_rdr_names	`thenRn` \ binder_names ->
-    renameSigs (okBindSig (mkNameSet binder_names)) sigs `thenRn` \ (siglist, sig_fvs) ->
+ =  mapRn lookupBndrRn binder_rdr_names		`thenRn` \ binder_names ->
+    let
+	bndr_name_set = mkNameSet binder_names
+    in
+    renameSigs (okBindSig bndr_name_set) sigs `thenRn` \ (siglist, sig_fvs) ->
     let
 	type_sig_vars	= [n | Sig n _ _ <- siglist]
-	un_sigd_binders | opt_WarnMissingSigs = binder_names `minusList` type_sig_vars
+	un_sigd_binders | opt_WarnMissingSigs = nameSetToList (delListFromNameSet bndr_name_set type_sig_vars)
 			| otherwise	      = []
     in
     mapRn_ (addWarnRn.missingSigWarn) un_sigd_binders	`thenRn_`
@@ -317,8 +321,8 @@ flattenMonoBinds sigs (PatMonoBind pat grhss locn)
 	 -- Find which things are bound in this group
     let
 	names_bound_here = mkNameSet (collectPatBinders pat')
-	sigs_for_me      = sigsForMe (`elemNameSet` names_bound_here) sigs
     in
+    sigsForMe names_bound_here sigs	`thenRn` \ sigs_for_me ->
     rnGRHSs grhss			`thenRn` \ (grhss', fvs) ->
     returnRn 
 	[(names_bound_here,
@@ -331,8 +335,9 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
   = pushSrcLocRn locn				 	$
     lookupBndrRn name					`thenRn` \ new_name ->
     let
-	sigs_for_me = sigsForMe (new_name ==) sigs
+	names_bound_here = unitNameSet new_name
     in
+    sigsForMe names_bound_here sigs			`thenRn` \ sigs_for_me ->
     mapFvRn rnMatch matches				`thenRn` \ (new_matches, fvs) ->
     mapRn_ (checkPrecMatch inf new_name) new_matches	`thenRn_`
     returnRn
@@ -341,6 +346,15 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
 	FunMonoBind new_name inf new_matches locn,
 	sigs_for_me
 	)]
+
+
+sigsForMe names_bound_here sigs
+  = foldlRn check [] (filter (sigForThisGroup names_bound_here) sigs)
+  where
+    check sigs sig = case filter (eqHsSig sig) sigs of
+			[]    -> returnRn (sig:sigs)
+			other -> dupSigDeclErr sig	`thenRn_`
+				 returnRn sigs
 \end{code}
 
 
@@ -477,14 +491,12 @@ renameSigs ok_sig sigs
 	is_in_scope sig	 = case sigName sig of
 				Just n  -> not (isUnboundName n)
 				Nothing -> True
-	(not_dups, dups) = removeDups cmpHsSig in_scope
-	(goods, bads)	 = partition ok_sig not_dups
+	(goods, bads)	 = partition ok_sig in_scope
     in
     mapRn_ unknownSigErr bads			`thenRn_`
-    mapRn_ dupSigDeclErr dups			`thenRn_`
     returnRn (goods, fvs)
 
--- We use lookupOccRn in the signatures, which is a little bit unsatisfactory
+-- We use lookupSigOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:
 --	instance Foo T where
 --	  {-# INLINE op #-}
@@ -497,7 +509,7 @@ renameSig :: Sig RdrName -> RnMS (Sig Name, FreeVars)
 
 renameSig (Sig v ty src_loc)
   = pushSrcLocRn src_loc $
-    lookupOccRn v				`thenRn` \ new_v ->
+    lookupSigOccRn v				`thenRn` \ new_v ->
     rnHsSigType (quotes (ppr v)) ty		`thenRn` \ (new_ty,fvs) ->
     returnRn (Sig new_v new_ty src_loc, fvs `addOneFV` new_v)
 
@@ -508,28 +520,23 @@ renameSig (SpecInstSig ty src_loc)
 
 renameSig (SpecSig v ty src_loc)
   = pushSrcLocRn src_loc $
-    lookupOccRn v			`thenRn` \ new_v ->
+    lookupSigOccRn v			`thenRn` \ new_v ->
     rnHsSigType (quotes (ppr v)) ty	`thenRn` \ (new_ty,fvs) ->
     returnRn (SpecSig new_v new_ty src_loc, fvs `addOneFV` new_v)
 
 renameSig (FixSig (FixitySig v fix src_loc))
   = pushSrcLocRn src_loc $
-    lookupOccRn v		`thenRn` \ new_v ->
+    lookupSigOccRn v		`thenRn` \ new_v ->
     returnRn (FixSig (FixitySig new_v fix src_loc), unitFV new_v)
-
-renameSig (DeprecSig (Deprecation ie txt) src_loc)
-  = pushSrcLocRn src_loc $
-    renameIE lookupOccRn ie	`thenRn` \ (new_ie, fvs) ->
-    returnRn (DeprecSig (Deprecation new_ie txt) src_loc, fvs)
 
 renameSig (InlineSig v p src_loc)
   = pushSrcLocRn src_loc $
-    lookupOccRn v		`thenRn` \ new_v ->
+    lookupSigOccRn v		`thenRn` \ new_v ->
     returnRn (InlineSig new_v p src_loc, unitFV new_v)
 
 renameSig (NoInlineSig v p src_loc)
   = pushSrcLocRn src_loc $
-    lookupOccRn v		`thenRn` \ new_v ->
+    lookupSigOccRn v		`thenRn` \ new_v ->
     returnRn (NoInlineSig new_v p src_loc, unitFV new_v)
 \end{code}
 
@@ -564,7 +571,7 @@ renameIE lookup_occ_nm (IEModuleContents m)
 %************************************************************************
 
 \begin{code}
-dupSigDeclErr (sig:sigs)
+dupSigDeclErr sig
   = pushSrcLocRn loc $
     addErrRn (sep [ptext SLIT("Duplicate") <+> ptext what_it_is <> colon,
 		   ppr sig])

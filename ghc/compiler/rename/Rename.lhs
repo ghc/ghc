@@ -9,24 +9,27 @@ module Rename ( renameModule ) where
 #include "HsVersions.h"
 
 import HsSyn
-import RdrHsSyn		( RdrNameHsModule )
+import HsPragmas	( DataPragmas(..) )
+import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation )
 import RnHsSyn		( RenamedHsModule, RenamedHsDecl, 
 			  extractHsTyNames, extractHsCtxtTyNames
 			)
 
 import CmdLineOpts	( opt_HiMap, opt_D_dump_rn_trace, opt_D_dump_minimal_imports,
-			  opt_D_dump_rn, opt_D_dump_rn_stats, opt_WarnDeprecations
+			  opt_D_dump_rn, opt_D_dump_rn_stats, opt_WarnDeprecations,
+			  opt_WarnUnusedBinds
 		        )
 import RnMonad
 import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnDecl )
-import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getInterfaceExports,
-			  getImportedRules, loadHomeInterface, getSlurped, removeContext
+import RnIfaces		( getImportedInstDecls, importDecl, mkImportExportInfo, getInterfaceExports,
+			  getImportedRules, loadHomeInterface, getSlurped, removeContext,
+			  loadBuiltinRules, getDeferredDecls, ImportDeclResult(..)
 			)
 import RnEnv		( availName, availsToNameSet, unitAvailEnv, availEnvElts, plusAvailEnv, 
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
-			  lookupImplicitOccRn, pprAvail,
-			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs
+			  lookupImplicitOccsRn, pprAvail, unknownNameErr,
+			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs, addOneFV
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, mkSearchPath, moduleName, mkThisModule
@@ -34,22 +37,27 @@ import Module           ( Module, ModuleName, WhereFrom(..),
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
 			  nameOccName, nameUnique, nameModule, maybeUserImportedFrom,
 			  isUserImportedExplicitlyName, isUserImportedName,
-			  maybeWiredInTyConName, maybeWiredInIdName, isWiredInName
+			  maybeWiredInTyConName, maybeWiredInIdName, isWiredInName,
+			  isUserExportedName, toRdrName
 			)
 import OccName		( occNameFlavour, isValOcc )
 import Id		( idType )
 import TyCon		( isSynTyCon, getSynTyConDefn )
 import NameSet
-import PrelMods		( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name )
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon, boolTyCon )
-import PrelInfo		( ioTyCon_NAME, thinAirIdNames, fractionalClassKeys, derivingOccurrences )
+import PrelRules	( builtinRules )
+import PrelInfo		( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
+			  ioTyCon_RDR, unpackCString_RDR, unpackCString2_RDR, unpackCStringFoldr_RDR,
+			  fractionalClassKeys, derivingOccurrences 
+			)
 import Type		( namesOfType, funTyCon )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet, ghcExit )
-import BasicTypes	( NewOrData(..) )
+import BasicTypes	( Version, initialVersion )
 import Bag		( isEmptyBag, bagToList )
 import FiniteMap	( FiniteMap, eltsFM, fmToList, emptyFM, lookupFM, addToFM_C )
 import UniqSupply	( UniqSupply )
 import UniqFM		( lookupUFM )
+import SrcLoc		( noSrcLoc )
 import Maybes		( maybeToBool, expectJust )
 import Outputable
 import IO		( openFile, IOMode(..) )
@@ -58,124 +66,138 @@ import IO		( openFile, IOMode(..) )
 
 
 \begin{code}
-renameModule :: UniqSupply
-	     -> RdrNameHsModule
-	     -> IO (Maybe 
-	              ( Module
-		      , RenamedHsModule   -- Output, after renaming
-		      , InterfaceDetails  -- Interface; for interface file generation
-		      , RnNameSupply      -- Final env; for renaming derivings
-		      , [ModuleName]	  -- Imported modules; for profiling
-		      ))
-
+type RenameResult = ( Module		-- This module
+		    , RenamedHsModule	-- Renamed module
+		    , Maybe ParsedIface	-- The existing interface file, if any
+		    , ParsedIface	-- The new interface
+		    , RnNameSupply	-- Final env; for renaming derivings
+		    , FixityEnv		-- The fixity environment; for derivings
+		    , [ModuleName])	-- Imported modules; for profiling
+		   
+renameModule :: UniqSupply -> RdrNameHsModule -> IO (Maybe RenameResult)
 renameModule us this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
   = 	-- Initialise the renamer monad
-    initRn mod_name us (mkSearchPath opt_HiMap) loc
-	   (rename this_mod)				>>=
-	\ ((maybe_rn_stuff, dump_action), rn_errs_bag, rn_warns_bag) ->
+    do {
+	((maybe_rn_stuff, dump_action), rn_errs_bag, rn_warns_bag) 
+	   <- initRn mod_name us (mkSearchPath opt_HiMap) loc (rename this_mod) ;
 
 	-- Check for warnings
-    printErrorsAndWarnings rn_errs_bag rn_warns_bag	>>
+	printErrorsAndWarnings rn_errs_bag rn_warns_bag ;
 
 	-- Dump any debugging output
-    dump_action 					>>
+	dump_action ;
 
 	-- Return results
-    if not (isEmptyBag rn_errs_bag) then
-	    ghcExit 1 >> return Nothing
-    else
+	if not (isEmptyBag rn_errs_bag) then
+	    do { ghcExit 1 ; return Nothing }
+        else
 	    return maybe_rn_stuff
+    }
 \end{code}
 
-
 \begin{code}
-rename :: RdrNameHsModule
-       -> RnMG (Maybe (Module, RenamedHsModule, InterfaceDetails, RnNameSupply, [ModuleName]), IO ())
-rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
+rename :: RdrNameHsModule -> RnMG (Maybe RenameResult, IO ())
+rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec loc)
   =  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
 
 	-- CHECK FOR EARLY EXIT
-    if not (maybeToBool maybe_stuff) then
-	-- Everything is up to date; no need to recompile further
-	rnDump [] []		`thenRn` \ dump_action ->
-	returnRn (Nothing, dump_action)
-    else
-    let
-  	Just (export_env, gbl_env, fixity_env, global_avail_env) = maybe_stuff
-        ExportEnv export_avails _ _ = export_env
-    in
+    case maybe_stuff of {
+	Nothing -> 	-- Everything is up to date; no need to recompile further
+		rnDump [] []		`thenRn` \ dump_action ->
+		returnRn (Nothing, dump_action) ;
+
+  	Just (gbl_env, local_gbl_env, export_avails, global_avail_env, old_iface) ->
+
+	-- DEAL WITH DEPRECATIONS
+    rnDeprecs local_gbl_env mod_deprec local_decls	`thenRn` \ my_deprecs ->
+
+	-- DEAL WITH LOCAL FIXITIES
+    fixitiesFromLocalDecls local_gbl_env local_decls	`thenRn` \ local_fixity_env ->
 
 	-- RENAME THE SOURCE
-    initRnMS gbl_env fixity_env SourceMode (
+    initRnMS gbl_env local_fixity_env SourceMode (
 	rnSourceDecls local_decls
     )					`thenRn` \ (rn_local_decls, source_fvs) ->
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
     implicitFVs mod_name rn_local_decls 	`thenRn` \ implicit_fvs -> 
     let
-	real_source_fvs = implicit_fvs `plusFV` source_fvs `plusFV` export_fvs
+		-- The export_fvs make the exported names look just as if they
+		-- occurred in the source program.  For the reasoning, see the
+		-- comments with RnIfaces.getImportVersions.
+		-- We only need the 'parent name' of the avail;
+		-- that's enough to suck in the declaration.
+	export_fvs 	= mkNameSet (map availName export_avails)
+	real_source_fvs = source_fvs `plusFV` export_fvs
+
+	slurp_fvs	= implicit_fvs `plusFV` real_source_fvs
 		-- It's important to do the "plus" this way round, so that
 		-- when compiling the prelude, locally-defined (), Bool, etc
 		-- override the implicit ones. 
-
-		-- The export_fvs make the exported names look just as if they
-		-- occurred in the source program.  For the reasoning, see the
-		-- comments with RnIfaces.getImportVersions
-	export_fvs = mkNameSet (map availName export_avails)
     in
-    slurpImpDecls real_source_fvs	`thenRn` \ rn_imp_decls ->
-    let
-	rn_all_decls	   = rn_local_decls ++ rn_imp_decls
-
-	-- COLLECT ALL DEPRECATIONS
-	deprec_sigs = [ ds | ValD bnds <- rn_local_decls, ds <- collectDeprecs bnds ]
-	deprecs = case mod_deprec of
-	   Nothing -> deprec_sigs
-	   Just txt -> Deprecation (IEModuleContents undefined) txt : deprec_sigs
-    in
+    loadBuiltinRules builtinRules	`thenRn_`
+    slurpImpDecls slurp_fvs		`thenRn` \ rn_imp_decls ->
 
 	-- EXIT IF ERRORS FOUND
+    rnDump rn_imp_decls rn_local_decls		`thenRn` \ dump_action ->
     checkErrsRn					`thenRn` \ no_errs_so_far ->
     if not no_errs_so_far then
 	-- Found errors already, so exit now
-	rnDump rn_imp_decls rn_all_decls	`thenRn` \ dump_action ->
 	returnRn (Nothing, dump_action)
     else
 
 	-- GENERATE THE VERSION/USAGE INFO
-    getImportVersions mod_name export_env	`thenRn` \ my_usages ->
-    getNameSupplyRn				`thenRn` \ name_supply ->
+    mkImportExportInfo mod_name export_avails exports 	`thenRn` \ (my_exports, my_usages) ->
 
 	-- RETURN THE RENAMED MODULE
+    getNameSupplyRn				`thenRn` \ name_supply ->
     let
-	has_orphans        = any isOrphanDecl rn_local_decls
+	this_module	   = mkThisModule mod_name
 	direct_import_mods = [mod | ImportDecl mod _ _ _ _ _ <- imports]
+
+	-- Export only those fixities that are for names that are
+	--	(a) defined in this module
+	--	(b) exported
+	exported_fixities
+	  = [ FixitySig (toRdrName name) fixity loc
+	    | FixitySig name fixity loc <- nameEnvElts local_fixity_env,
+	      isUserExportedName name
+	    ]
+
+	new_iface = ParsedIface { pi_mod     = this_module
+				, pi_vers    = initialVersion
+				, pi_orphan  = any isOrphanDecl rn_local_decls
+				, pi_exports = my_exports
+				, pi_usages  = my_usages
+				, pi_fixity  = (initialVersion, exported_fixities)
+				, pi_deprecs = my_deprecs
+				  	-- These ones get filled in later
+				, pi_insts = [], pi_decls = []
+				, pi_rules = (initialVersion, [])
+			}
+	
 	renamed_module = HsModule mod_name vers 
 				  trashed_exports trashed_imports
-				  rn_all_decls
+				  (rn_local_decls ++ rn_imp_decls)
 			          mod_deprec
 			          loc
+
+	result = (this_module,   renamed_module, 
+		  old_iface,   new_iface,
+		  name_supply, local_fixity_env,
+		  direct_import_mods)
     in
+
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
     reportUnusedNames mod_name direct_import_mods
 		      gbl_env global_avail_env
-		      export_env
-		      source_fvs			`thenRn_`
-    rnDump rn_imp_decls	rn_all_decls			`thenRn` \ dump_action ->
+		      export_avails source_fvs		`thenRn_`
 
-    returnRn (Just (mkThisModule mod_name,
-		    renamed_module, 
-		    (InterfaceDetails has_orphans my_usages export_env deprecs),
-		    name_supply,
-		    direct_import_mods), dump_action)
+    returnRn (Just result, dump_action) }
   where
     trashed_exports  = {-trace "rnSource:trashed_exports"-} Nothing
     trashed_imports  = {-trace "rnSource:trashed_imports"-} []
-
-    collectDeprecs EmptyBinds = []
-    collectDeprecs (ThenBinds x y) = collectDeprecs x ++ collectDeprecs y
-    collectDeprecs (MonoBind _ sigs _) = [ d | DeprecSig d _ <- sigs ]
 \end{code}
 
 @implicitFVs@ forces the renamer to slurp in some things which aren't
@@ -183,11 +205,9 @@ mentioned explicitly, but which might be needed by the type checker.
 
 \begin{code}
 implicitFVs mod_name decls
-  = mapRn lookupImplicitOccRn implicit_occs	`thenRn` \ implicit_names ->
-    returnRn (implicit_main				`plusFV` 
-	      mkNameSet (map getName default_tycons)	`plusFV`
-	      mkNameSet thinAirIdNames			`plusFV`
-	      mkNameSet implicit_names)
+  = lookupImplicitOccsRn implicit_occs		`thenRn` \ implicit_names ->
+    returnRn (mkNameSet (map getName default_tycons)	`plusFV`
+	      implicit_names)
   where
  	-- Add occurrences for Int, and (), because they
 	-- are the types to which ambigious type variables may be defaulted by
@@ -201,15 +221,18 @@ implicitFVs mod_name decls
 
 	-- Add occurrences for IO or PrimIO
     implicit_main |  mod_name == mAIN_Name
-		  || mod_name == pREL_MAIN_Name = unitFV ioTyCon_NAME
-		  |  otherwise 		        = emptyFVs
+		  || mod_name == pREL_MAIN_Name = [ioTyCon_RDR]
+		  |  otherwise 		        = []
 
 	-- Now add extra "occurrences" for things that
 	-- the deriving mechanism, or defaulting, will later need in order to
 	-- generate code
-    implicit_occs = foldr ((++) . get) [] decls
+    implicit_occs = string_occs ++ foldr ((++) . get) implicit_main decls
 
-    get (TyClD (TyData _ _ _ _ _ (Just deriv_classes) _ _))
+	-- Virtually every program has error messages in it somewhere
+    string_occs = [unpackCString_RDR, unpackCString2_RDR, unpackCStringFoldr_RDR]
+
+    get (TyClD (TyData _ _ _ _ _ _ (Just deriv_classes) _ _))
        = concat (map get_deriv deriv_classes)
     get other = []
 
@@ -226,7 +249,7 @@ isOrphanDecl (InstD (InstDecl inst_ty _ _ _ _))
 	-- The decl is an orphan if Baz and T are both not locally defined,
 	--	even if Foo *is* locally defined
 
-isOrphanDecl (RuleD (RuleDecl _ _ _ lhs _ _))
+isOrphanDecl (RuleD (HsRule _ _ _ lhs _ _))
   = check lhs
   where
 	-- At the moment we just check for common LHS forms
@@ -273,8 +296,13 @@ slurpImpDecls source_fvs
     getSlurped					`thenRn` \ source_binders ->
     slurpSourceRefs source_binders source_fvs	`thenRn` \ (decls, needed) ->
 
-	-- And finally get everything else
-    closeDecls decls needed
+	-- Then get everything else
+    closeDecls decls needed			`thenRn` \ decls1 ->
+
+	-- Finally, get any deferred data type decls
+    slurpDeferredDecls decls1			`thenRn` \ final_decls -> 
+
+    returnRn final_decls
 
 -------------------------------------------------------
 slurpSourceRefs :: NameSet			-- Variables defined in source
@@ -309,7 +337,7 @@ slurpSourceRefs source_binders source_fvs
 
     go_outer decls fvs all_gates refs	-- refs are not necessarily slurped yet
 	= traceRn (text "go_outer" <+> ppr refs)		`thenRn_`
-	  go_inner decls fvs emptyFVs refs			`thenRn` \ (decls1, fvs1, gates1) ->
+	  foldlRn go_inner (decls, fvs, emptyFVs) refs		`thenRn` \ (decls1, fvs1, gates1) ->
 	  getImportedInstDecls (all_gates `plusFV` gates1)	`thenRn` \ inst_decls ->
 	  rnInstDecls decls1 fvs1 gates1 inst_decls		`thenRn` \ (decls2, fvs2, gates2) ->
 	  go_outer decls2 fvs2 (all_gates `plusFV` gates2)
@@ -317,39 +345,17 @@ slurpSourceRefs source_binders source_fvs
 		-- Knock out the all_gates because even if we don't slurp any new
 		-- decls we can get some apparently-new gates from wired-in names
 
-    go_inner decls fvs gates []
-	= returnRn (decls, fvs, gates)
-
-    go_inner decls fvs gates (wanted_name:refs) 
-	| isWiredInName wanted_name
- 	= load_home wanted_name		`thenRn_`
-	  go_inner decls fvs (gates `plusFV` getWiredInGates wanted_name) refs
-
-	| otherwise
-	= importDecl wanted_name 		`thenRn` \ maybe_decl ->
-	  case maybe_decl of
-	    Nothing   -> go_inner decls fvs gates refs	-- No declaration... (already slurped, or local)
-	    Just decl -> rnIfaceDecl decl		`thenRn` \ (new_decl, fvs1) ->
-			 go_inner (new_decl : decls)
-			          (fvs1 `plusFV` fvs)
-			   	  (gates `plusFV` getGates source_fvs new_decl)
-			   	  refs
-
-	-- When we find a wired-in name we must load its
-	-- home module so that we find any instance decls therein
-    load_home name 
-	| name `elemNameSet` source_binders = returnRn ()
-		-- When compiling the prelude, a wired-in thing may
-		-- be defined in this module, in which case we don't
-		-- want to load its home module!
-		-- Using 'isLocallyDefined' doesn't work because some of
-		-- the free variables returned are simply 'listTyCon_Name',
-		-- with a system provenance.  We could look them up every time
-		-- but that seems a waste.
-	| otherwise = loadHomeInterface doc name	`thenRn_`
-		      returnRn ()
-        where
-	  doc = ptext SLIT("need home module for wired in thing") <+> ppr name
+    go_inner (decls, fvs, gates) wanted_name
+	= importDecl wanted_name 		`thenRn` \ import_result ->
+	  case import_result of
+	    AlreadySlurped -> returnRn (decls, fvs, gates)
+	    WiredIn        -> returnRn (decls, fvs, gates `plusFV` getWiredInGates wanted_name)
+	    Deferred       -> returnRn (decls, fvs, gates `addOneFV` wanted_name)	-- It's a type constructor
+			
+	    HereItIs decl -> rnIfaceDecl decl		`thenRn` \ (new_decl, fvs1) ->
+			     returnRn (new_decl : decls, 
+				       fvs1 `plusFV` fvs,
+			   	       gates `plusFV` getGates source_fvs new_decl)
 
 rnInstDecls decls fvs gates []
   = returnRn (decls, fvs, gates)
@@ -379,17 +385,6 @@ closeDecls decls needed
 		 
 
 -------------------------------------------------------
-rnIfaceDecls :: [RenamedHsDecl] -> FreeVars
-	     -> [(Module, RdrNameHsDecl)]
-	     -> RnM d ([RenamedHsDecl], FreeVars)
-rnIfaceDecls decls fvs []     = returnRn (decls, fvs)
-rnIfaceDecls decls fvs (d:ds) = rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
-				rnIfaceDecls (new_decl:decls) (fvs1 `plusFV` fvs) ds
-
-rnIfaceDecl (mod, decl) = initIfaceRnMS mod (rnDecl decl)	
-			
-
--------------------------------------------------------
 -- Augment decls with any decls needed by needed.
 -- Return also free vars of the new decls (only)
 slurpDecls decls needed
@@ -401,14 +396,66 @@ slurpDecls decls needed
 
 -------------------------------------------------------
 slurpDecl decls fvs wanted_name
-  = importDecl wanted_name 		`thenRn` \ maybe_decl ->
-    case maybe_decl of
-	-- No declaration... (wired in thing)
-	Nothing -> returnRn (decls, fvs)
-
+  = importDecl wanted_name 		`thenRn` \ import_result ->
+    case import_result of
 	-- Found a declaration... rename it
-	Just decl -> rnIfaceDecl decl		`thenRn` \ (new_decl, fvs1) ->
-		     returnRn (new_decl:decls, fvs1 `plusFV` fvs)
+	HereItIs decl -> rnIfaceDecl decl		`thenRn` \ (new_decl, fvs1) ->
+			 returnRn (new_decl:decls, fvs1 `plusFV` fvs)
+
+	-- No declaration... (wired in thing, or deferred, or already slurped)
+	other -> returnRn (decls, fvs)
+
+
+-------------------------------------------------------
+rnIfaceDecls :: [RenamedHsDecl] -> FreeVars
+	     -> [(Module, RdrNameHsDecl)]
+	     -> RnM d ([RenamedHsDecl], FreeVars)
+rnIfaceDecls decls fvs []     = returnRn (decls, fvs)
+rnIfaceDecls decls fvs (d:ds) = rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
+				rnIfaceDecls (new_decl:decls) (fvs1 `plusFV` fvs) ds
+
+rnIfaceDecl (mod, decl) = initIfaceRnMS mod (rnDecl decl)	
+\end{code}
+
+
+%*********************************************************
+%*						 	 *
+\subsection{Deferred declarations}
+%*							 *
+%*********************************************************
+
+The idea of deferred declarations is this.  Suppose we have a function
+	f :: T -> Int
+	data T = T1 A | T2 B
+	data A = A1 X | A2 Y
+	data B = B1 P | B2 Q
+Then we don't want to load T and all its constructors, and all
+the types those constructors refer to, and all the types *those*
+constructors refer to, and so on.  That might mean loading many more
+interface files than is really necessary.  So we 'defer' loading T.
+
+But f might be strict, and the calling convention for evaluating
+values of type T depends on how many constructors T has, so 
+we do need to load T, but not the full details of the type T.
+So we load the full decl for T, but only skeleton decls for A and B:
+	f :: T -> Int
+	data T = {- 2 constructors -}
+
+Whether all this is worth it is moot.
+
+\begin{code}
+slurpDeferredDecls :: [RenamedHsDecl] -> RnMG [RenamedHsDecl]
+slurpDeferredDecls decls
+  = getDeferredDecls						`thenRn` \ def_decls ->
+    rnIfaceDecls decls emptyFVs (map stripDecl def_decls)	`thenRn` \ (decls1, fvs) ->
+    ASSERT( isEmptyFVs fvs )
+    returnRn decls1
+
+stripDecl (mod, TyClD (TyData dt _ tc tvs _ nconstrs _ _ loc))
+  = (mod, TyClD (TyData dt [] tc tvs [] nconstrs Nothing NoDataPragmas loc))
+	-- Nuke the context and constructors
+	-- But retain the *number* of constructors!
+	-- Also the tvs will have kinds on them.
 \end{code}
 
 
@@ -461,7 +508,7 @@ getGates source_fvs (TyClD (TySynonym tycon tvs ty _))
 		       (map getTyVarName tvs)
 	-- A type synonym type constructor isn't a "gate" for instance decls
 
-getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _))
+getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _ _))
   = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) cons)
 		       (map getTyVarName tvs)
     `addOneToNameSet` tycon
@@ -525,6 +572,81 @@ getInstDeclGates other				    = emptyFVs
 
 %*********************************************************
 %*						 	 *
+\subsection{Fixities}
+%*							 *
+%*********************************************************
+
+\begin{code}
+fixitiesFromLocalDecls :: GlobalRdrEnv -> [RdrNameHsDecl] -> RnMG FixityEnv
+fixitiesFromLocalDecls gbl_env decls
+  = foldlRn getFixities emptyNameEnv decls				`thenRn` \ env -> 
+    traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts env)))	`thenRn_`
+    returnRn env
+  where
+    getFixities :: FixityEnv -> RdrNameHsDecl -> RnMG FixityEnv
+    getFixities acc (FixD fix)
+      = fix_decl acc fix
+
+    getFixities acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ _ _ _ _))
+      = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
+		-- Get fixities from class decl sigs too.
+    getFixities acc other_decl
+      = returnRn acc
+
+    fix_decl acc sig@(FixitySig rdr_name fixity loc)
+	= 	-- Check for fixity decl for something not declared
+	  case lookupRdrEnv gbl_env rdr_name of {
+	    Nothing | opt_WarnUnusedBinds 
+		    -> pushSrcLocRn loc (addWarnRn (unusedFixityDecl rdr_name fixity))
+		       `thenRn_` returnRn acc 
+		    | otherwise -> returnRn acc ;
+	
+	    Just (name:_) ->
+
+		-- Check for duplicate fixity decl
+	  case lookupNameEnv acc name of {
+	    Just (FixitySig _ _ loc') -> addErrRn (dupFixityDecl rdr_name loc loc')
+					 `thenRn_` returnRn acc ;
+
+	    Nothing -> returnRn (addToNameEnv acc name (FixitySig name fixity loc))
+	  }}
+\end{code}
+
+
+%*********************************************************
+%*						 	 *
+\subsection{Deprecations}
+%*							 *
+%*********************************************************
+
+For deprecations, all we do is check that the names are in scope.
+It's only imported deprecations, dealt with in RnIfaces, that we
+gather them together.
+
+\begin{code}
+rnDeprecs :: GlobalRdrEnv -> Maybe DeprecTxt
+	   -> [RdrNameHsDecl] -> RnMG [RdrNameDeprecation]
+rnDeprecs gbl_env mod_deprec decls
+ = mapRn rn_deprec deprecs 	`thenRn_` 
+   returnRn (extra_deprec ++ deprecs)
+ where
+   deprecs = [d | DeprecD d <- decls]
+   extra_deprec = case mod_deprec of
+		   Nothing  -> []
+		   Just txt -> [Deprecation (IEModuleContents undefined) txt noSrcLoc]
+
+   rn_deprec (Deprecation ie txt loc)
+     = pushSrcLocRn loc		$
+       mapRn check (ieNames ie)
+
+   check n = case lookupRdrEnv gbl_env n of
+		Nothing -> addErrRn (unknownNameErr n)
+		Just _  -> returnRn ()
+\end{code}
+
+
+%*********************************************************
+%*						 	 *
 \subsection{Unused names}
 %*							 *
 %*********************************************************
@@ -532,10 +654,10 @@ getInstDeclGates other				    = emptyFVs
 \begin{code}
 reportUnusedNames :: ModuleName -> [ModuleName] 
 		  -> GlobalRdrEnv -> AvailEnv
-		  -> ExportEnv -> NameSet -> RnMG ()
+		  -> Avails -> NameSet -> RnMG ()
 reportUnusedNames mod_name direct_import_mods 
 		  gbl_env avail_env 
-		  (ExportEnv export_avails _ _) mentioned_names
+		  export_avails mentioned_names
   = let
 	used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
 
@@ -647,25 +769,18 @@ printMinimalImports mod_name imps
 			      other -> pprTrace "to_ie" (ppr n <+> ppr (nameModule n) <+> ppr other) $
 				       returnRn (IEVar n)
 
-warnDeprec :: (Name, DeprecTxt) -> RnM d ()
-warnDeprec (name, txt)
-  = pushSrcLocRn (getSrcLoc name)	$
-    addWarnRn				$
-    sep [ text (occNameFlavour (nameOccName name)) <+> ppr name <+>
-          text "is deprecated:", nest 4 (ppr txt) ]
-
-
 rnDump  :: [RenamedHsDecl] 	-- Renamed imported decls
 	-> [RenamedHsDecl] 	-- Renamed local decls
 	-> RnMG (IO ())
-rnDump imp_decls decls
+rnDump imp_decls local_decls
         | opt_D_dump_rn_trace || 
 	  opt_D_dump_rn_stats ||
 	  opt_D_dump_rn 
  	= getRnStats imp_decls		`thenRn` \ stats_msg ->
 
 	  returnRn (printErrs stats_msg >> 
-		    dumpIfSet opt_D_dump_rn "Renamer:" (vcat (map ppr decls)))
+		    dumpIfSet opt_D_dump_rn "Renamer:" 
+			      (vcat (map ppr (local_decls ++ imp_decls))))
 
 	| otherwise = returnRn (return ())
 \end{code}
@@ -682,7 +797,7 @@ getRnStats :: [RenamedHsDecl] -> RnMG SDoc
 getRnStats imported_decls
   = getIfacesRn 		`thenRn` \ ifaces ->
     let
-	n_mods = length [() | (_, _, _, Just _) <- eltsFM (iImpModInfo ifaces)]
+	n_mods = length [() | (_, _, Just _) <- eltsFM (iImpModInfo ifaces)]
 
 	decls_read     = [decl | (_, avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces),
 				-- Data, newtype, and class decls are in the decls_fm
@@ -735,3 +850,27 @@ count_decls decls
     inst_decls    = length [() | InstD _  <- decls]
 \end{code}    
 
+
+%************************************************************************
+%*									*
+\subsection{Errors and warnings}
+%*									*
+%************************************************************************
+
+\begin{code}
+warnDeprec :: (Name, DeprecTxt) -> RnM d ()
+warnDeprec (name, txt)
+  = pushSrcLocRn (getSrcLoc name)	$
+    addWarnRn				$
+    sep [ text (occNameFlavour (nameOccName name)) <+> ppr name <+>
+          text "is deprecated:", nest 4 (ppr txt) ]
+
+
+unusedFixityDecl rdr_name fixity
+  = hsep [ptext SLIT("Unused fixity declaration for"), quotes (ppr rdr_name)]
+
+dupFixityDecl rdr_name loc1 loc2
+  = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),
+	  ptext SLIT("at ") <+> ppr loc1,
+	  ptext SLIT("and") <+> ppr loc2]
+\end{code}

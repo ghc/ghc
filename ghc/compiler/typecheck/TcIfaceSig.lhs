@@ -8,7 +8,7 @@ module TcIfaceSig ( tcInterfaceSigs, tcVar, tcCoreExpr, tcCoreLamBndrs ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), IfaceSig(..) )
+import HsSyn		( HsDecl(..), IfaceSig(..), HsTupCon(..) )
 import TcMonad
 import TcMonoType	( tcHsType, tcHsTypeKind, 
 				-- NB: all the tyars in interface files are kinded,
@@ -39,11 +39,10 @@ import Id		( Id, mkId, mkVanillaId,
 import MkId		( mkCCallOpId )
 import IdInfo
 import DataCon		( dataConSig, dataConArgTys )
-import Type		( mkSynTy, mkTyVarTys, splitAlgTyConApp, splitFunTys, unUsgTy )
+import Type		( mkSynTy, mkTyVarTys, splitAlgTyConApp, splitAlgTyConApp_maybe, splitFunTys, unUsgTy )
 import Var		( mkTyVar, tyVarKind )
 import VarEnv
 import Name		( Name, NamedThing(..), isLocallyDefined )
-import Unique		( rationalTyConKey )
 import TysWiredIn	( integerTy, stringTy )
 import Demand		( wwLazy )
 import ErrUtils		( pprBagOfErrors )
@@ -102,8 +101,8 @@ tcIdInfo unf_env in_scope_vars name ty info info_ins
 	  in
 	  returnTc info2
 
-    tcPrag info (HsStrictness (HsStrictnessInfo (demands,bot_result)))
-	= returnTc (info `setStrictnessInfo` StrictnessInfo demands bot_result)
+    tcPrag info (HsStrictness strict_info)
+	= returnTc (info `setStrictnessInfo` strict_info)
 
     tcPrag info (HsWorker nm)
 	= tcWorkerInfo unf_env ty info nm
@@ -214,7 +213,7 @@ tcCoreExpr (UfCCall cc ty)
     tcGetUnique		`thenNF_Tc` \ u ->
     returnTc (Var (mkCCallOpId u cc ty'))
 
-tcCoreExpr (UfTuple name args) 
+tcCoreExpr (UfTuple (HsTupCon name _) args) 
   = tcVar name			`thenTc` \ con_id ->
     mapTc tcCoreExpr args	`thenTc` \ args' ->
     let
@@ -332,16 +331,18 @@ tcCoreAlt scrut_ty (UfLitLitAlt str ty, names, rhs)
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
-tcCoreAlt scrut_ty (UfDataAlt con_name, names, rhs)
+tcCoreAlt scrut_ty alt@(UfDataAlt con_name, names, rhs)
   = tcVar con_name		`thenTc` \ con_id ->
     let
-	con			= case isDataConWrapId_maybe con_id of
-					Just con -> con
-					Nothing  -> pprPanic "tcCoreAlt" (ppr con_id)
+	con = case isDataConWrapId_maybe con_id of
+		Just con -> con
+		Nothing  -> pprPanic "tcCoreAlt" (ppr con_id)
 
 	(main_tyvars, _, ex_tyvars, _, _, _) = dataConSig con
 
-	(_, inst_tys, cons) = splitAlgTyConApp scrut_ty
+	(_, inst_tys, cons) = case splitAlgTyConApp_maybe scrut_ty of
+				    Just stuff -> stuff
+				    Nothing -> pprPanic "tcCoreAlt" (ppr alt)
 	ex_tyvars'	    = [mkTyVar name (tyVarKind tv) | (name,tv) <- names `zip` ex_tyvars] 
 	ex_tys'		    = mkTyVarTys ex_tyvars'
 	arg_tys		    = dataConArgTys con (inst_tys ++ ex_tys')

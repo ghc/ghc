@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.41 2000/04/13 20:41:30 panne Exp $
+% $Id: CgCase.lhs,v 1.42 2000/05/25 12:41:15 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -59,7 +59,7 @@ import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 			)
 import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
 			  isNewTyCon, isAlgTyCon, isFunTyCon, isPrimTyCon,
-			  tyConDataCons, tyConFamilySize )
+			)
 import Type		( Type, typePrimRep, splitAlgTyConApp, 
 			  splitTyConApp_maybe, repType )
 import PprType		( {- instance Outputable Type -} )

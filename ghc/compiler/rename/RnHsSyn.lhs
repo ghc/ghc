@@ -11,10 +11,10 @@ module RnHsSyn where
 import HsSyn
 import HsPragmas	( InstancePragmas, GenPragmas, DataPragmas, ClassPragmas, ClassOpPragmas )
 
-import TysWiredIn	( tupleTyCon, unboxedTupleTyCon, 
-			  listTyCon, charTyCon )
+import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
 import Name		( Name, getName )
 import NameSet
+import BasicTypes	( Boxity )
 import Util
 import Outputable
 \end{code}
@@ -45,7 +45,7 @@ type RenamedRecordBinds		= HsRecordBinds		Name RenamedPat
 type RenamedSig			= Sig			Name
 type RenamedStmt		= Stmt			Name RenamedPat
 type RenamedFixitySig		= FixitySig		Name
-type RenamedDeprecation		= Deprecation		Name
+type RenamedDeprecation		= DeprecDecl		Name
 
 type RenamedClassOpPragmas	= ClassOpPragmas	Name
 type RenamedClassPragmas	= ClassPragmas		Name
@@ -67,27 +67,25 @@ charTyCon_name, listTyCon_name :: Name
 charTyCon_name    = getName charTyCon
 listTyCon_name    = getName listTyCon
 
-tupleTyCon_name :: Bool -> Int -> Name
-tupleTyCon_name True  n = getName (tupleTyCon n)
-tupleTyCon_name False n = getName (unboxedTupleTyCon n)
+tupleTyCon_name :: Boxity -> Int -> Name
+tupleTyCon_name boxity n = getName (tupleTyCon boxity n)
 
 extractHsTyNames   :: RenamedHsType -> NameSet
 extractHsTyNames ty
   = get ty
   where
-    get (MonoTyApp ty1 ty2)      = get ty1 `unionNameSets` get ty2
-    get (MonoListTy ty)          = unitNameSet listTyCon_name 
+    get (HsAppTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
+    get (HsListTy ty)          = unitNameSet listTyCon_name 
 				   `unionNameSets` get ty
-    get (MonoTupleTy tys boxed)  = unitNameSet (tupleTyCon_name boxed (length tys)) 
-				   `unionNameSets` extractHsTyNames_s tys
-    get (MonoFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
-    get (MonoIParamTy n ty)	 = get ty
-    get (MonoDictTy cls tys)     = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
-    get (MonoUsgForAllTy uv ty)  = get ty
-    get (MonoUsgTy u ty)         = get ty
-    get (MonoTyVar tv)	         = unitNameSet tv
+    get (HsTupleTy (HsTupCon n _) tys) = unitNameSet n
+				   	 `unionNameSets` extractHsTyNames_s tys
+    get (HsFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
+    get (HsPredTy p)	       = extractHsPredTyNames p
+    get (HsUsgForAllTy uv ty)  = get ty
+    get (HsUsgTy u ty)         = get ty
+    get (HsTyVar tv)	       = unitNameSet tv
     get (HsForAllTy (Just tvs) 
-		    ctxt ty)     = (extractHsCtxtTyNames ctxt `unionNameSets` get ty)
+		    ctxt ty)   = (extractHsCtxtTyNames ctxt `unionNameSets` get ty)
 					    `minusNameSet`
 				    mkNameSet (map getTyVarName tvs)
     get ty@(HsForAllTy Nothing _ _) = pprPanic "extractHsTyNames" (ppr ty)

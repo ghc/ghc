@@ -5,13 +5,15 @@
 
 \begin{code}
 module RnIfaces (
-	getInterfaceExports, 
-	getImportedInstDecls, getImportedRules,
-	lookupFixity, loadHomeInterface,
-	importDecl, recordSlurp,
-	getImportVersions, getSlurped,
+	findAndReadIface, 
 
-	checkUpToDate,
+	getInterfaceExports, getDeferredDecls,
+	getImportedInstDecls, getImportedRules,
+	lookupFixityRn, loadHomeInterface,
+	importDecl, ImportDeclResult(..), recordLocalSlurps, loadBuiltinRules,
+	mkImportExportInfo, getSlurped, 
+
+	checkModUsage, outOfDate, upToDate,
 
 	getDeclBinders, getDeclSysBinders,
 	removeContext	 	-- removeContext probably belongs somewhere else
@@ -19,20 +21,23 @@ module RnIfaces (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_NoPruneDecls, opt_IgnoreIfacePragmas )
+import CmdLineOpts	( opt_NoPruneDecls, opt_NoPruneTyDecls, opt_IgnoreIfacePragmas )
 import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..), 
 			  HsType(..), ConDecl(..), IE(..), ConDetails(..), Sig(..),
 			  ForeignDecl(..), ForKind(..), isDynamicExtName,
 			  FixitySig(..), RuleDecl(..),
-			  isClassOpSig, Deprecation(..)
+			  isClassOpSig, DeprecDecl(..)
 			)
+import HsImpExp		( ieNames )
+import CoreSyn		( CoreRule )
 import BasicTypes	( Version, NewOrData(..), defaultFixity )
 import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameTyClDecl, RdrNameRuleDecl,
-			  extractHsTyRdrNames, RdrNameDeprecation
+			  RdrNameFixitySig, RdrNameDeprecation, RdrNameIE,
+			  extractHsTyRdrNames 
 			)
-import RnEnv		( mkImportedGlobalName, newImportedBinder, mkImportedGlobalFromRdrName,
+import RnEnv		( mkImportedGlobalName, newTopBinder, mkImportedGlobalFromRdrName,
 			  lookupOccRn, lookupImplicitOccRn,
-			  pprAvail,
+			  pprAvail, rdrAvailInfo,
 			  availName, availNames, addAvailToNameSet, addSysAvails,
 			  FreeVars, emptyFVs
 			)
@@ -40,12 +45,8 @@ import RnMonad
 import RnHsSyn          ( RenamedHsDecl, RenamedDeprecation )
 import ParseIface	( parseIface, IfaceStuff(..) )
 
-import FiniteMap	( FiniteMap, sizeFM, emptyFM, delFromFM, listToFM,
-			  lookupFM, addToFM, addToFM_C, addListToFM, 
-			  fmToList, elemFM, foldFM
-			)
-import Name		( Name {-instance NamedThing-},
-			  nameModule, isLocallyDefined,
+import Name		( Name {-instance NamedThing-}, nameOccName,
+			  nameModule, isLocallyDefined, 
 			  isWiredInName, nameUnique, NamedThing(..)
 			 )
 import Module		( Module, moduleString, pprModule,
@@ -57,18 +58,18 @@ import RdrName		( RdrName, rdrNameOcc )
 import NameSet
 import Var		( Id )
 import SrcLoc		( mkSrcLoc, SrcLoc )
-import PrelMods		( pREL_GHC )
-import PrelInfo		( cCallishTyKeys )
-import Bag
+import PrelInfo		( pREL_GHC, cCallishTyKeys )
 import Maybes		( MaybeErr(..), maybeToBool, orElse )
 import ListSetOps	( unionLists )
-import Outputable
-import Unique		( Unique )
+import Unique		( Unique, Uniquable(..) )
 import StringBuffer     ( StringBuffer, hGetStringBuffer )
 import FastString	( mkFastString )
 import ErrUtils         ( Message )
+import Util		( sortLt, lengthExceeds )
 import Lex
+import FiniteMap
 import Outputable
+import Bag
 
 import IO	( isDoesNotExistError )
 import List	( nub )
@@ -120,7 +121,7 @@ tryLoadInterface doc_str mod_name from
 		     	 ImportByUserSource -> True ;		-- hi-boot
 			 ImportBySystem     -> 
 		       case mod_info of
-			 Just (_, _, is_boot, _) -> is_boot
+			 Just (_, is_boot, _) -> is_boot
 
 			 Nothing -> False
 				-- We're importing a module we know absolutely
@@ -130,12 +131,12 @@ tryLoadInterface doc_str mod_name from
 		       }
 	redundant_source_import 
 	  = case (from, mod_info) of 
-		(ImportByUserSource, Just (_,_,False,_)) -> True
+		(ImportByUserSource, Just (_,False,_)) -> True
 		other					 -> False
    in
 	-- CHECK WHETHER WE HAVE IT ALREADY
    case mod_info of {
-	Just (_, _, _, Just _)
+	Just (_, _, Just _)
 		-> 	-- We're read it already so don't re-read it
 		    returnRn (ifaces, Nothing) ;
 
@@ -154,7 +155,7 @@ tryLoadInterface doc_str mod_name from
 			-- so that we don't look again
 	   let
 		mod         = mkVanillaModule mod_name
-		new_mod_map = addToFM mod_map mod_name (0, False, False, Just (mod, from, []))
+		new_mod_map = addToFM mod_map mod_name (False, False, Just (mod, 0, 0, 0, from, []))
 		new_ifaces  = ifaces { iImpModInfo = new_mod_map }
 	   in
 	   setIfacesRn new_ifaces		`thenRn_`
@@ -172,8 +173,7 @@ tryLoadInterface doc_str mod_name from
 
     getModuleRn 		`thenRn` \ this_mod_nm ->
     let
-	rd_decls = pi_decls iface
-	mod	 = pi_mod   iface
+	mod = pi_mod   iface
     in
 	-- Sanity check.  If we're system-importing a module we know nothing at all
 	-- about, it should be from a different package to this one
@@ -181,16 +181,12 @@ tryLoadInterface doc_str mod_name from
 	  case from of { ImportBySystem -> True; other -> False } &&
 	  isLocalModule mod,
 	  ppr mod )
-    foldlRn (loadDecl mod)	      (iDecls ifaces) rd_decls 			`thenRn` \ new_decls ->
-    foldlRn (loadInstDecl mod)	      (iInsts ifaces) (pi_insts iface)		`thenRn` \ new_insts ->
-    (if opt_IgnoreIfacePragmas
-	then returnRn emptyBag
-	else foldlRn (loadRule mod)   (iRules ifaces) (pi_rules iface))		`thenRn` \ new_rules ->
-    (if opt_IgnoreIfacePragmas
-	then returnRn emptyNameEnv
-	else foldlRn (loadDeprec mod) (iDeprecs ifaces) (pi_deprecs iface))	`thenRn` \ new_deprecs ->
-    foldlRn (loadFixDecl mod_name)    (iFixes ifaces) rd_decls  		`thenRn` \ new_fixities ->
-    mapRn   (loadExport this_mod_nm)  (pi_exports iface)			`thenRn` \ avails_s ->
+    foldlRn (loadDecl mod)	   (iDecls ifaces)   (pi_decls iface)	`thenRn` \ new_decls ->
+    foldlRn (loadInstDecl mod)	   (iInsts ifaces)   (pi_insts iface)	`thenRn` \ new_insts ->
+    loadRules mod		   (iRules ifaces)   (pi_rules iface)	`thenRn` \ new_rules ->
+    loadFixDecls mod_name	   (iFixes ifaces)   (pi_fixity iface)	`thenRn` \ new_fixities ->
+    foldlRn (loadDeprec mod)	   (iDeprecs ifaces) (pi_deprecs iface)	`thenRn` \ new_deprecs ->
+    mapRn (loadExport this_mod_nm) (pi_exports iface)			`thenRn` \ avails_s ->
     let
 	-- For an explicit user import, add to mod_map info about
 	-- the things the imported module depends on, extracted
@@ -201,8 +197,10 @@ tryLoadInterface doc_str mod_name from
 
 	-- Now add info about this module
 	mod_map2    = addToFM mod_map1 mod_name mod_details
-	cts	    = (pi_mod iface, from, concat avails_s)
-	mod_details = (pi_vers iface, pi_orphan iface, hi_boot_file, Just cts)
+	cts	    = (pi_mod iface, pi_vers iface, 
+		       fst (pi_fixity iface), fst (pi_rules iface), 
+		       from, concat avails_s)
+	mod_details = (pi_orphan iface, hi_boot_file, Just cts)
 
 	new_ifaces = ifaces { iImpModInfo = mod_map2,
 			      iDecls      = new_decls,
@@ -215,6 +213,11 @@ tryLoadInterface doc_str mod_name from
     returnRn (new_ifaces, Nothing)
     }}
 
+-----------------------------------------------------
+--	Adding module dependencies from the 
+--	import decls in the interface file
+-----------------------------------------------------
+
 addModDeps :: Module -> [ImportVersion a] 
 	   -> ImportedModuleInfo -> ImportedModuleInfo
 -- (addModDeps M ivs deps)
@@ -226,19 +229,24 @@ addModDeps mod new_deps mod_deps
 	-- Except for its descendents which contain orphans,
 	-- and in that case, forget about the boot indicator
     filtered_new_deps
-	| isLocalModule mod = [ (imp_mod, (version, has_orphans, is_boot, Nothing))
-			      | (imp_mod, version, has_orphans, is_boot, _) <- new_deps 
+	| isLocalModule mod = [ (imp_mod, (has_orphans, is_boot, Nothing))
+			      | (imp_mod, has_orphans, is_boot, _) <- new_deps 
 			      ]			      
-	| otherwise	    = [ (imp_mod, (version, True, False, Nothing))
-			      | (imp_mod, version, has_orphans, _, _) <- new_deps, 
+	| otherwise	    = [ (imp_mod, (True, False, Nothing))
+			      | (imp_mod, has_orphans, _, _) <- new_deps, 
 				has_orphans
 			      ]
     add (imp_mod, dep) deps = addToFM_C combine deps imp_mod dep
 
-    combine old@(_, _, old_is_boot, cts) new
+    combine old@(_, old_is_boot, cts) new
 	| maybeToBool cts || not old_is_boot = old	-- Keep the old info if it's already loaded
 							-- or if it's a non-boot pending load
 	| otherwise			     = new	-- Otherwise pick new info
+
+
+-----------------------------------------------------
+--	Loading the export list
+-----------------------------------------------------
 
 loadExport :: ModuleName -> ExportItem -> RnM d [AvailInfo]
 loadExport this_mod (mod, entities)
@@ -273,21 +281,9 @@ loadExport this_mod (mod, entities)
         returnRn (AvailTC name names)
 
 
-loadFixDecl :: ModuleName -> FixityEnv
-	    -> (Version, RdrNameHsDecl)
-	    -> RnM d FixityEnv
-loadFixDecl mod_name fixity_env (version, FixD sig@(FixitySig rdr_name fixity loc))
-  = 	-- Ignore the version; when the fixity changes the version of
-	-- its 'host' entity changes, so we don't need a separate version
-	-- number for fixities
-    mkImportedGlobalName mod_name (rdrNameOcc rdr_name) 	`thenRn` \ name ->
-    let
-	new_fixity_env = addToNameEnv fixity_env name (FixitySig name fixity loc)
-    in
-    returnRn new_fixity_env
-
-	-- Ignore the other sorts of decl
-loadFixDecl mod_name fixity_env other_decl = returnRn fixity_env
+-----------------------------------------------------
+--	Loading type/class/value decls
+-----------------------------------------------------
 
 loadDecl :: Module 
 	 -> DeclsMap
@@ -318,10 +314,13 @@ loadDecl mod decls_map (version, decl)
     returnRn new_decls_map
     }
   where
-	-- newImportedBinder puts into the cache the binder with the
+	-- newTopBinder puts into the cache the binder with the
 	-- module information set correctly.  When the decl is later renamed,
 	-- the binding site will thereby get the correct module.
-    new_name rdr_name loc = newImportedBinder mod rdr_name
+	-- There maybe occurrences that don't have the correct Module, but
+	-- by the typechecker will propagate the binding definition to all 
+	-- the occurrences, so that doesn't matter
+    new_name rdr_name loc = newTopBinder mod (rdrNameOcc rdr_name)
 
     {-
       If a signature decl is being loaded, and optIgnoreIfacePragmas is on,
@@ -343,6 +342,26 @@ loadDecl mod decls_map (version, decl)
 	       SigD (IfaceSig name tp ls loc) | opt_IgnoreIfacePragmas
 			 ->  SigD (IfaceSig name tp [] loc)
 	       other	 -> decl
+
+-----------------------------------------------------
+--	Loading fixity decls
+-----------------------------------------------------
+
+loadFixDecls mod_name fixity_env (version, decls)
+  | null decls = returnRn fixity_env
+
+  | otherwise
+  = mapRn (loadFixDecl mod_name) decls	`thenRn` \ to_add ->
+    returnRn (addListToNameEnv fixity_env to_add)
+
+loadFixDecl mod_name sig@(FixitySig rdr_name fixity loc)
+  = mkImportedGlobalName mod_name (rdrNameOcc rdr_name) 	`thenRn` \ name ->
+    returnRn (name, FixitySig name fixity loc)
+
+
+-----------------------------------------------------
+--	Loading instance decls
+-----------------------------------------------------
 
 loadInstDecl :: Module
 	     -> Bag GatedDecl
@@ -375,42 +394,66 @@ loadInstDecl mod insts decl@(InstDecl inst_ty binds uprags dfun_name src_loc)
 removeContext (HsForAllTy tvs cxt ty) = HsForAllTy tvs [] (removeFuns ty)
 removeContext ty		      = removeFuns ty
 
-removeFuns (MonoFunTy _ ty) = removeFuns ty
+removeFuns (HsFunTy _ ty) = removeFuns ty
 removeFuns ty		    = ty
 
 
-loadRule :: Module -> Bag GatedDecl 
-	 -> RdrNameRuleDecl -> RnM d (Bag GatedDecl)
+-----------------------------------------------------
+--	Loading Rules
+-----------------------------------------------------
+
+loadRules :: Module -> IfaceRules 
+	  -> (Version, [RdrNameRuleDecl])
+	  -> RnM d IfaceRules
+loadRules mod rule_bag (version, rules)
+  | null rules || opt_IgnoreIfacePragmas 
+  = returnRn rule_bag
+  | otherwise
+  = setModuleRn mod_name	 	$
+    mapRn (loadRule mod) rules		`thenRn` \ new_rules ->
+    returnRn (rule_bag `unionBags` listToBag new_rules)
+  where
+    mod_name = moduleName mod
+
+loadRule :: Module -> RdrNameRuleDecl -> RnM d GatedDecl
 -- "Gate" the rule simply by whether the rule variable is
 -- needed.  We can refine this later.
-loadRule mod rules decl@(IfaceRuleDecl var body src_loc)
-  = setModuleRn (moduleName mod) $
-    mkImportedGlobalFromRdrName var		`thenRn` \ var_name ->
-    returnRn ((unitNameSet var_name, (mod, RuleD decl)) `consBag` rules)
+loadRule mod decl@(IfaceRule _ _ var _ _ src_loc)
+  = mkImportedGlobalFromRdrName var		`thenRn` \ var_name ->
+    returnRn (unitNameSet var_name, (mod, RuleD decl))
 
--- SUP: TEMPORARY HACK, ignoring module deprecations for now
+loadBuiltinRules :: [(RdrName, CoreRule)] -> RnMG ()
+loadBuiltinRules builtin_rules
+  = getIfacesRn				`thenRn` \ ifaces ->
+    mapRn loadBuiltinRule builtin_rules	`thenRn` \ rule_decls ->
+    setIfacesRn (ifaces { iRules = iRules ifaces `unionBags` listToBag rule_decls })
+
+loadBuiltinRule (var, rule)
+  = mkImportedGlobalFromRdrName var		`thenRn` \ var_name ->
+    returnRn (unitNameSet var_name, (nameModule var_name, RuleD (IfaceRuleOut var rule)))
+
+
+-----------------------------------------------------
+--	Loading Deprecations
+-----------------------------------------------------
+
 loadDeprec :: Module -> DeprecationEnv -> RdrNameDeprecation -> RnM d DeprecationEnv
-loadDeprec mod deprec_env (Deprecation (IEModuleContents _) txt)
+loadDeprec mod deprec_env (Deprecation (IEModuleContents _) txt _)
   = traceRn (text "module deprecation not yet implemented:" <+> ppr mod <> colon <+> ppr txt) `thenRn_`
+	-- SUP: TEMPORARY HACK, ignoring module deprecations for now
     returnRn deprec_env
-loadDeprec mod deprec_env (Deprecation ie txt)
+
+loadDeprec mod deprec_env (Deprecation ie txt _)
   = setModuleRn (moduleName mod) $
-    mapRn mkImportedGlobalFromRdrName (namesFromIE ie) `thenRn` \ names ->
+    mapRn mkImportedGlobalFromRdrName (ieNames ie) `thenRn` \ names ->
     traceRn (text "loaded deprecation(s) for" <+> hcat (punctuate comma (map ppr names)) <> colon <+> ppr txt) `thenRn_`
     returnRn (extendNameEnv deprec_env (zip names (repeat txt)))
-
-namesFromIE :: IE a -> [a]
-namesFromIE (IEVar            n   ) = [n]
-namesFromIE (IEThingAbs       n   ) = [n]
-namesFromIE (IEThingAll       n   ) = [n]
-namesFromIE (IEThingWith      n ns) = n:ns
-namesFromIE (IEModuleContents _   ) = []
 \end{code}
 
 
 %********************************************************
 %*							*
-\subsection{Loading usage information}
+\subsection{Checking usage information}
 %*							*
 %********************************************************
 
@@ -418,31 +461,14 @@ namesFromIE (IEModuleContents _   ) = []
 upToDate  = True
 outOfDate = False
 
-checkUpToDate :: ModuleName -> RnMG Bool	-- True <=> no need to recompile
-	-- When this guy is called, we already know that the
-	-- source code is unchanged from last time
-checkUpToDate mod_name
-  = getIfacesRn					`thenRn` \ ifaces ->
-    findAndReadIface doc_str mod_name 
-		     False {- Not hi-boot -}	`thenRn` \ read_result ->
-
-	-- CHECK WHETHER WE HAVE IT ALREADY
-    case read_result of
-	Left err -> 	-- Old interface file not found, or garbled, so we'd better bail out
-		    traceRn (vcat [ptext SLIT("No old iface") <+> pprModuleName mod_name,
-				   err])			`thenRn_`
-		    returnRn outOfDate
-
-	Right iface
-		-> 	-- Found it, so now check it
-		    checkModUsage (pi_usages iface)
-  where
-	-- Only look in current directory, with suffix .hi
-    doc_str = sep [ptext SLIT("need usage info from"), pprModuleName mod_name]
+checkModUsage :: [ImportVersion OccName] -> RnMG Bool
+-- Given the usage information extracted from the old
+-- M.hi file for the module being compiled, figure out
+-- whether M needs to be recompiled.
 
 checkModUsage [] = returnRn upToDate		-- Yes!  Everything is up to date!
 
-checkModUsage ((mod_name, old_mod_vers, _, _, Specifically []) : rest)
+checkModUsage ((mod_name, _, _, NothingAtAll) : rest)
 	-- If CurrentModule.hi contains 
 	--	import Foo :: ;
 	-- then that simply records that Foo lies below CurrentModule in the
@@ -451,19 +477,25 @@ checkModUsage ((mod_name, old_mod_vers, _, _, Specifically []) : rest)
   = traceRn (ptext SLIT("Nothing used from:") <+> ppr mod_name)	`thenRn_`
     checkModUsage rest	-- This one's ok, so check the rest
 
-checkModUsage ((mod_name, old_mod_vers, _, _, whats_imported)  : rest)
+checkModUsage ((mod_name, _, _, whats_imported)  : rest)
   = tryLoadInterface doc_str mod_name ImportBySystem	`thenRn` \ (ifaces, maybe_err) ->
     case maybe_err of {
-	Just err -> traceRn (sep [ptext SLIT("Can't find version number for module"), 
-			     pprModuleName mod_name])		`thenRn_`
-		     returnRn outOfDate ;
+	Just err -> out_of_date (sep [ptext SLIT("Can't find version number for module"), 
+				      pprModuleName mod_name]) ;
 		-- Couldn't find or parse a module mentioned in the
 		-- old interface file.  Don't complain -- it might just be that
 		-- the current module doesn't need that import and it's been deleted
+
 	Nothing -> 
     let
-	new_mod_vers = case lookupFM (iImpModInfo ifaces) mod_name of
-			   Just (version, _, _, _) -> version
+	(_, new_mod_vers, new_fix_vers, new_rule_vers, _, _) 
+		= case lookupFM (iImpModInfo ifaces) mod_name of
+			   Just (_, _, Just stuff) -> stuff
+
+        old_mod_vers = case whats_imported of
+			 Everything v 	     -> v
+			 Specifically v _ _ _ -> v
+			 -- NothingAtAll case dealt with by previous eqn for checkModUsage
     in
 	-- If the module version hasn't changed, just move on
     if new_mod_vers == old_mod_vers then
@@ -477,19 +509,25 @@ checkModUsage ((mod_name, old_mod_vers, _, _, whats_imported)  : rest)
 	-- If the usage info wants to say "I imported everything from this module"
 	--     it does so by making whats_imported equal to Everything
 	-- In that case, we must recompile
-    case whats_imported of {
-      Everything -> traceRn (ptext SLIT("...and I needed the whole module"))	`thenRn_`
-		    returnRn outOfDate;		   -- Bale out
+    case whats_imported of {	-- NothingAtAll dealt with earlier
+	
+      Everything _ 
+	-> out_of_date (ptext SLIT("...and I needed the whole module")) ;
 
-      Specifically old_local_vers ->
+      Specifically _ old_fix_vers old_rule_vers old_local_vers ->
 
+    if old_fix_vers /= new_fix_vers then
+	out_of_date (ptext SLIT("Fixities changed"))
+    else if old_rule_vers /= new_rule_vers then
+	out_of_date (ptext SLIT("Rules changed"))
+    else	
 	-- Non-empty usage list, so check item by item
     checkEntityUsage mod_name (iDecls ifaces) old_local_vers	`thenRn` \ up_to_date ->
     if up_to_date then
 	traceRn (ptext SLIT("...but the bits I use haven't."))	`thenRn_`
 	checkModUsage rest	-- This one's ok, so check the rest
     else
-	returnRn outOfDate		-- This one failed, so just bail out now
+	returnRn outOfDate	-- This one failed, so just bail out now
     }}
   where
     doc_str = sep [ptext SLIT("need version info for"), pprModuleName mod_name]
@@ -503,8 +541,7 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
     case lookupNameEnv decls name of
 
 	Nothing       -> 	-- We used it before, but it ain't there now
-			  traceRn (sep [ptext SLIT("No longer exported:"), ppr name])
-			  `thenRn_` returnRn outOfDate
+			  out_of_date (sep [ptext SLIT("No longer exported:"), ppr name])
 
 	Just (new_vers,_,_,_) 	-- It's there, but is it up to date?
 		| new_vers == old_vers
@@ -513,8 +550,9 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
 
 		| otherwise
 			-- Out of date, so bale out
-		-> traceRn (sep [ptext SLIT("Out of date:"), ppr name])  `thenRn_`
-		   returnRn outOfDate
+		-> out_of_date (sep [ptext SLIT("Out of date:"), ppr name])
+
+out_of_date msg = traceRn msg `thenRn_` returnRn outOfDate
 \end{code}
 
 
@@ -525,44 +563,111 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
 %*********************************************************
 
 \begin{code}
-importDecl :: Name -> RnMG (Maybe (Module, RdrNameHsDecl))
-	-- Returns Nothing for 
-	--	(a) wired in name
-	--	(b) local decl
-	--	(c) already slurped
+importDecl :: Name -> RnMG ImportDeclResult
+
+data ImportDeclResult
+  = AlreadySlurped
+  | WiredIn	
+  | Deferred
+  | HereItIs (Module, RdrNameHsDecl)
 
 importDecl name
-  | isWiredInName name
-  = returnRn Nothing
-  | otherwise
   = getSlurped 				`thenRn` \ already_slurped ->
     if name `elemNameSet` already_slurped then
-	returnRn Nothing	-- Already dealt with
-    else
-	if isLocallyDefined name then	-- Don't bring in decls from
-					-- the renamed module's own interface file
-		  addWarnRn (importDeclWarn name) `thenRn_`
-		  returnRn Nothing
-	else
-	getNonWiredInDecl name
-\end{code}
+	returnRn AlreadySlurped	-- Already dealt with
 
-\begin{code}
-getNonWiredInDecl :: Name -> RnMG (Maybe (Module, RdrNameHsDecl))
+    else if isLocallyDefined name then	-- Don't bring in decls from
+					-- the renamed module's own interface file
+	addWarnRn (importDeclWarn name) `thenRn_`
+	returnRn AlreadySlurped
+
+    else if isWiredInName name then
+	-- When we find a wired-in name we must load its
+	-- home module so that we find any instance decls therein
+	loadHomeInterface doc name	`thenRn_`
+	returnRn WiredIn
+
+    else getNonWiredInDecl name
+  where
+    doc = ptext SLIT("need home module for wired in thing") <+> ppr name
+
+
+{-	I don't think this is necessary any more; SLPJ May 00
+    load_home name 
+	| name `elemNameSet` source_binders = returnRn ()
+		-- When compiling the prelude, a wired-in thing may
+		-- be defined in this module, in which case we don't
+		-- want to load its home module!
+		-- Using 'isLocallyDefined' doesn't work because some of
+		-- the free variables returned are simply 'listTyCon_Name',
+		-- with a system provenance.  We could look them up every time
+		-- but that seems a waste.
+	| otherwise = loadHomeInterface doc name	`thenRn_`
+		      returnRn ()
+-}
+
+getNonWiredInDecl :: Name -> RnMG ImportDeclResult
 getNonWiredInDecl needed_name 
   = traceRn doc_str				`thenRn_`
     loadHomeInterface doc_str needed_name	`thenRn` \ ifaces ->
     case lookupNameEnv (iDecls ifaces) needed_name of
 
-      Just (version,avail,_,decl)
-	-> recordSlurp (Just version) avail	`thenRn_`
-	   returnRn (Just decl)
+      Just (version, avail, is_tycon_name, decl@(_, TyClD (TyData DataType _ _ _ _ ncons _ _ _)))
+	-- This case deals with deferred import of algebraic data types
 
-      Nothing 	 	-- Can happen legitimately for "Optional" occurrences
+	|  not opt_NoPruneTyDecls
+
+	&& (opt_IgnoreIfacePragmas || ncons > 1)
+		-- We only defer if imported interface pragmas are ingored
+		-- or if it's not a product type.
+		-- Sole reason: The wrapper for a strict function may need to look
+		-- inside its arg, and hence need to see its arg type's constructors.
+
+	&& not (getUnique tycon_name `elem` cCallishTyKeys)
+		-- Never defer ccall types; we have to unbox them, 
+		-- and importing them does no harm
+
+	-> 	-- OK, so we're importing a deferrable data type
+	    if needed_name == tycon_name then	
+		-- The needed_name is the TyCon of a data type decl
+		-- Record that it's slurped, put it in the deferred set
+		-- and don't return a declaration at all
+		setIfacesRn (recordSlurp (ifaces {iDeferred = iDeferred ifaces 
+							      `addOneToNameSet` tycon_name})
+				    	 version (AvailTC needed_name [needed_name]))	`thenRn_`
+		returnRn Deferred
+	    else
+	 	-- The needed name is a constructor of a data type decl,
+		-- getting a constructor, so remove the TyCon from the deferred set
+		-- (if it's there) and return the full declaration
+		 setIfacesRn (recordSlurp (ifaces {iDeferred = iDeferred ifaces 
+							       `delFromNameSet` tycon_name})
+				    version avail)	`thenRn_`
+		 returnRn (HereItIs decl)
+	where
+	   tycon_name = availName avail
+
+      Just (version,avail,_,decl)
+	-> setIfacesRn (recordSlurp ifaces version avail)	`thenRn_`
+	   returnRn (HereItIs decl)
+
+      Nothing 
 	-> addErrRn (getDeclErr needed_name)	`thenRn_` 
-	   returnRn Nothing
+	   returnRn AlreadySlurped
   where
      doc_str = ptext SLIT("need decl for") <+> ppr needed_name
+
+getDeferredDecls :: RnMG [(Module, RdrNameHsDecl)]
+getDeferredDecls 
+  = getIfacesRn		`thenRn` \ ifaces ->
+    let
+	decls_map   	    = iDecls ifaces
+	deferred_names	    = nameSetToList (iDeferred ifaces)
+        get_abstract_decl n = case lookupNameEnv decls_map n of
+				 Just (_, _, _, decl) -> decl
+    in
+    traceRn (sep [text "getDeferredDecls", nest 4 (fsep (map ppr deferred_names))])	`thenRn_`
+    returnRn (map get_abstract_decl deferred_names)
 \end{code}
 
 @getWiredInDecl@ maps a wired-in @Name@ to what it makes available.
@@ -600,7 +705,7 @@ getInterfaceExports :: ModuleName -> WhereFrom -> RnMG (Module, Avails)
 getInterfaceExports mod_name from
   = loadInterface doc_str mod_name from	`thenRn` \ ifaces ->
     case lookupFM (iImpModInfo ifaces) mod_name of
-	Just (_, _, _, Just (mod, _, avails)) -> returnRn (mod, avails)
+	Just (_, _, Just (mod, _, _, _, _, avails)) -> returnRn (mod, avails)
 	-- loadInterface always puts something in the map
 	-- even if it's a fake
   where
@@ -622,7 +727,7 @@ getImportedInstDecls gates
     getIfacesRn 					`thenRn` \ ifaces ->
     let
 	orphan_mods =
-	  [mod | (mod, (_, True, _, Nothing)) <- fmToList (iImpModInfo ifaces)]
+	  [mod | (mod, (True, _, Nothing)) <- fmToList (iImpModInfo ifaces)]
     in
     loadOrphanModules orphan_mods			`thenRn_` 
 
@@ -655,11 +760,15 @@ getImportedRules
   = getIfacesRn 	`thenRn` \ ifaces ->
     let
 	gates		   = iSlurp ifaces	-- Anything at all that's been slurped
-	(decls, new_rules) = selectGated gates (iRules ifaces)
+	rules		   = iRules ifaces
+	(decls, new_rules) = selectGated gates rules
     in
-    setIfacesRn (ifaces { iRules = new_rules })		`thenRn_`
+    if null decls then
+	returnRn []
+    else
+    setIfacesRn (ifaces { iRules = new_rules })		     `thenRn_`
     traceRn (sep [text "getImportedRules:", 
-		  text "Slurped" <+> int (length decls) <+> text "rules"])	`thenRn_`
+		  text "Slurped" <+> int (length decls) <+> text "rules"])   `thenRn_`
     returnRn decls
 
 selectGated gates decl_bag
@@ -676,13 +785,11 @@ selectGated gates decl_bag
 	| isEmptyNameSet (reqd `minusNameSet` gates) = (decl:yes, no)
 	| otherwise				     = (yes,      (reqd,decl) `consBag` no)
 
-lookupFixity :: Name -> RnMS Fixity
-lookupFixity name
+lookupFixityRn :: Name -> RnMS Fixity
+lookupFixityRn name
   | isLocallyDefined name
   = getFixityEnv			`thenRn` \ local_fix_env ->
-    case lookupNameEnv local_fix_env name of 
-	Just (FixitySig _ fix _) -> returnRn fix
-	Nothing		  	 -> returnRn defaultFixity
+    returnRn (lookupFixity local_fix_env name)
 
   | otherwise	-- Imported
       -- For imported names, we have to get their fixities by doing a loadHomeInterface,
@@ -693,9 +800,7 @@ lookupFixity name
       -- When we come across a use of 'f', we need to know its fixity, and it's then,
       -- and only then, that we load B.hi.  That is what's happening here.
   = loadHomeInterface doc name		`thenRn` \ ifaces ->
-    case lookupNameEnv (iFixes ifaces) name of
-	Just (FixitySig _ fix _) -> returnRn fix 
-	Nothing 		 -> returnRn defaultFixity
+    returnRn (lookupFixity (iFixes ifaces) name)
   where
     doc = ptext SLIT("Checking fixity for") <+> ppr name
 \end{code}
@@ -759,19 +864,31 @@ imports A.  This line says that A imports B, but uses nothing in it.
 So we'll get an early bale-out when compiling A if B's version changes.
 
 \begin{code}
-getImportVersions :: ModuleName			-- Name of this module
-		  -> ExportEnv			-- Info about exports 
-		  -> RnMG (VersionInfo Name)	-- Version info for these names
+mkImportExportInfo :: ModuleName			-- Name of this module
+		   -> Avails				-- Info about exports 
+		   -> Maybe [RdrNameIE]			-- The export header
+		   -> RnMG ([ExportItem], 		-- Export info for iface file; sorted
+			    [ImportVersion OccName])	-- Import info for iface file; sorted
+			-- Both results are sorted into canonical order to
+			-- reduce needless wobbling of interface files
 
-getImportVersions this_mod (ExportEnv _ _ export_all_mods)
+mkImportExportInfo this_mod export_avails exports
   = getIfacesRn					`thenRn` \ ifaces ->
     let
+	export_all_mods = case exports of
+				Nothing -> []
+				Just es -> [mod | IEModuleContents mod <- es, 
+						  mod /= this_mod]
+
 	mod_map   = iImpModInfo ifaces
 	imp_names = iVSlurp     ifaces
 
 	-- mv_map groups together all the things imported from a particular module.
-	mv_map :: FiniteMap ModuleName [(Name,Version)]
+	mv_map :: FiniteMap ModuleName [(OccName,Version)]
 	mv_map = foldr add_mv emptyFM imp_names
+
+        add_mv (name, version) mv_map = addItem mv_map (moduleName (nameModule name)) 
+						       (nameOccName name, version)
 
 	-- Build the result list by adding info for each module.
 	-- For (a) a library module, we don't record it at all unless it contains orphans
@@ -789,7 +906,7 @@ getImportVersions this_mod (ExportEnv _ _ export_all_mods)
 	-- whether something is a boot file along with the usage info for it, but 
 	-- I can't be bothered just now.
 
-	mk_version_info mod_name (version, has_orphans, is_boot, contents) so_far
+	mk_imp_info mod_name (has_orphans, is_boot, contents) so_far
 	   | mod_name == this_mod	-- Check if M appears in the set of modules 'below' M
 					-- This seems like a convenient place to check
 	   = WARN( not is_boot, ptext SLIT("Wierd:") <+> ppr this_mod <+> 
@@ -798,7 +915,7 @@ getImportVersions this_mod (ExportEnv _ _ export_all_mods)
  
 	   | otherwise
 	   = let
-		go_for_it exports = (mod_name, version, has_orphans, is_boot, exports) 
+		go_for_it exports = (mod_name, has_orphans, is_boot, exports) 
                                     : so_far
 	     in 
 	     case contents of
@@ -809,20 +926,21 @@ getImportVersions this_mod (ExportEnv _ _ export_all_mods)
 			-- information.  The Nothing says that we didn't even open the interface
 			-- file but we must still propagate the dependeny info.
 			-- The module in question must be a local module (in the same package)
-		   go_for_it (Specifically [])
+		   go_for_it NothingAtAll
 
-		Just (mod, how_imported, _)
+		Just (mod, mod_vers, fix_vers, rule_vers, how_imported, _)
 		   |  is_sys_import && is_lib_module && not has_orphans
 		   -> so_far		
 	   
 		   |  is_lib_module 			-- Record the module but not detailed
 		   || mod_name `elem` export_all_mods	-- version information for the imports
-		   -> go_for_it Everything
+		   -> go_for_it (Everything mod_vers)
 
 		   |  otherwise
 		   -> case lookupFM mv_map mod_name of
-			Just whats_imported -> go_for_it (Specifically whats_imported)
-			Nothing		    -> go_for_it (Specifically [])
+			Just whats_imported -> go_for_it (Specifically mod_vers fix_vers rule_vers 
+								       (sortImport whats_imported))
+			Nothing		    -> go_for_it NothingAtAll
 						-- This happens if you have
 						--	import Foo
 						-- but don't actually *use* anything from Foo
@@ -833,15 +951,36 @@ getImportVersions this_mod (ExportEnv _ _ export_all_mods)
 					ImportBySystem -> True
 					other	       -> False
 	     
-    in
 
-    returnRn (foldFM mk_version_info [] mod_map)
-  where
-     add_mv v@(name, version) mv_map
-      = addToFM_C add_item mv_map mod [v] 
-      where
-	 mod = moduleName (nameModule name)
-         add_item vs _ = (v:vs)
+	import_info = foldFM mk_imp_info [] mod_map
+
+	-- Sort exports into groups by module
+	export_fm :: FiniteMap ModuleName [RdrAvailInfo]
+	export_fm = foldr insert emptyFM export_avails
+
+        insert avail efm = addItem efm (moduleName (nameModule (availName avail)))
+				       (rdrAvailInfo avail)
+
+	export_info = [(m, sortExport as) | (m,as) <- fmToList export_fm]
+    in
+    returnRn (export_info, import_info)
+
+
+addItem :: FiniteMap ModuleName [a] -> ModuleName -> a -> FiniteMap ModuleName [a]
+addItem fm mod x = addToFM_C add_item fm mod [x]
+		 where
+		   add_item xs _ = x:xs
+
+sortImport :: [(OccName,Version)] -> [(OccName,Version)]
+	-- Make the usage lists appear in canonical order
+sortImport vs = sortLt lt vs
+	      where
+		lt (n1,v1) (n2,v2) = n1 < n2
+
+sortExport :: [RdrAvailInfo] -> [RdrAvailInfo]
+sortExport as = sortLt lt as
+	      where
+		lt a1 a2 = availName a1 < availName a2
 \end{code}
 
 \begin{code}
@@ -849,20 +988,20 @@ getSlurped
   = getIfacesRn 	`thenRn` \ ifaces ->
     returnRn (iSlurp ifaces)
 
-recordSlurp maybe_version avail
--- Nothing	for locally defined names
--- Just version for imported names
-  = getIfacesRn 	`thenRn` \ ifaces@(Ifaces { iSlurp  = slurped_names,
-					            iVSlurp = imp_names }) ->
-    let
+recordSlurp ifaces@(Ifaces { iSlurp = slurped_names, iVSlurp = imp_names })
+	    version avail
+  = let
 	new_slurped_names = addAvailToNameSet slurped_names avail
-
-	new_imp_names = case maybe_version of
-			   Just version	-> (availName avail, version) : imp_names
-			   Nothing      -> imp_names
+	new_imp_names = (availName avail, version) : imp_names
     in
-    setIfacesRn (ifaces { iSlurp  = new_slurped_names,
-			  iVSlurp = new_imp_names })
+    ifaces { iSlurp  = new_slurped_names, iVSlurp = new_imp_names }
+
+recordLocalSlurps local_avails
+  = getIfacesRn 	`thenRn` \ ifaces ->
+    let
+	new_slurped_names = foldl addAvailToNameSet (iSlurp ifaces) local_avails
+    in
+    setIfacesRn (ifaces { iSlurp  = new_slurped_names })
 \end{code}
 
 
@@ -884,7 +1023,7 @@ getDeclBinders :: (RdrName -> SrcLoc -> RnM d Name)	-- New-name function
 		-> RdrNameHsDecl
 		-> RnM d (Maybe AvailInfo)
 
-getDeclBinders new_name (TyClD (TyData _ _ tycon _ condecls _ _ src_loc))
+getDeclBinders new_name (TyClD (TyData _ _ tycon _ condecls _ _ _ src_loc))
   = new_name tycon src_loc			`thenRn` \ tycon_name ->
     getConFieldNames new_name condecls		`thenRn` \ sub_names ->
     returnRn (Just (AvailTC tycon_name (tycon_name : nub sub_names)))
@@ -911,7 +1050,8 @@ getDeclBinders new_name (SigD (IfaceSig var ty prags src_loc))
   = new_name var src_loc			`thenRn` \ var_name ->
     returnRn (Just (Avail var_name))
 
-getDeclBinders new_name (FixD _)  = returnRn Nothing
+getDeclBinders new_name (FixD _)    = returnRn Nothing
+getDeclBinders new_name (DeprecD _) = returnRn Nothing
 
     -- foreign declarations
 getDeclBinders new_name (ForD (ForeignDecl nm kind _ dyn _ loc))
@@ -967,7 +1107,7 @@ bindings of their own elsewhere.
 getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ tname dname dwname snames src_loc))
   = sequenceRn [new_name n src_loc | n <- (tname : dname : dwname : snames)]
 
-getDeclSysBinders new_name (TyClD (TyData _ _ _ _ cons _ _ _))
+getDeclSysBinders new_name (TyClD (TyData _ _ _ _ cons _ _ _ _))
   = sequenceRn [new_name wkr_name src_loc | ConDecl _ wkr_name _ _ _ src_loc <- cons]
 
 getDeclSysBinders new_name other_decl

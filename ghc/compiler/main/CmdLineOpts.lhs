@@ -137,6 +137,7 @@ module CmdLineOpts (
 	opt_ProduceExportCStubs,
 	opt_ProduceExportHStubs,
 	opt_ProduceHi,
+	opt_NoPruneTyDecls,
 	opt_NoPruneDecls,
 	opt_ReportCompile,
 	opt_SourceUnchanged,
@@ -453,6 +454,7 @@ opt_UF_DearOp   = ( 4 :: Int)
 			
 opt_ReportCompile               = lookUp SLIT("-freport-compile")
 opt_NoPruneDecls		= lookUp SLIT("-fno-prune-decls")
+opt_NoPruneTyDecls		= lookUp SLIT("-fno-prune-tydecls")
 opt_SourceUnchanged		= lookUp SLIT("-fsource-unchanged")
 opt_Static			= lookUp SLIT("-static")
 opt_Unregisterised		= lookUp SLIT("-funregisterised")

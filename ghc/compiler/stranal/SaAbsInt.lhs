@@ -21,12 +21,13 @@ import CoreUnfold	( Unfolding, maybeUnfoldingTemplate )
 import Id		( Id, idType, idArity, idStrictness, idUnfolding, isDataConId_maybe )
 import DataCon		( dataConTyCon, splitProductType_maybe, dataConRepArgTys )
 import IdInfo		( StrictnessInfo(..) )
-import Demand		( Demand(..), wwPrim, wwStrict, wwEnum, wwUnpackData, wwLazy,
-			  wwUnpackNew )
+import Demand		( Demand(..), wwPrim, wwStrict, wwEnum, wwUnpackData, wwLazy, wwUnpackNew,
+			  mkStrictnessInfo, isLazy
+			)
 import SaLib
 import TyCon		( isProductTyCon, isRecursiveTyCon, isEnumerationTyCon, isNewTyCon )
 import BasicTypes	( Arity, NewOrData(..) )
-import Type		( splitAlgTyConApp_maybe, 
+import Type		( splitTyConApp_maybe, 
 		          isUnLiftedType, Type )
 import TyCon		( tyConUnique )
 import PrelInfo		( numericTyKeys )
@@ -602,7 +603,7 @@ findStrictness id (AbsApproxFun str_ds str_res) (AbsApproxFun abs_ds _)
 	-- HOWEVER, if we make diverging functions appear lazy, they
 	-- don't get wrappers, and then we get dreadful reboxing.
 	-- See notes with WwLib.worthSplitting
-  = StrictnessInfo (combineDemands id str_ds abs_ds) (isBot str_res)
+  = find_strictness id str_ds str_res abs_ds
 
 findStrictness id str_val abs_val = NoStrictnessInfo
 
@@ -616,14 +617,20 @@ findStrictness id str_val abs_val = NoStrictnessInfo
 -- Here the strictness value takes three args, but the absence value
 -- takes only one, for reasons I don't quite understand (see cheapFixpoint)
 
-combineDemands id orig_str_ds orig_abs_ds
-  = go orig_str_ds orig_abs_ds 
+find_strictness id orig_str_ds orig_str_res orig_abs_ds
+  = mkStrictnessInfo (go orig_str_ds orig_abs_ds, res_bot)
   where
+    res_bot = isBot orig_str_res
+
     go str_ds abs_ds = zipWith mk_dmd str_ds (abs_ds ++ repeat wwLazy)
 
-    mk_dmd str_dmd (WwLazy True) = WARN( case str_dmd of { WwLazy _ -> False; other -> True },
-					 ppr id <+> ppr orig_str_ds <+> ppr orig_abs_ds )
-				   WwLazy True	-- Best of all
+    mk_dmd str_dmd (WwLazy True)
+	 = WARN( not (res_bot || isLazy str_dmd),
+		 ppr id <+> ppr orig_str_ds <+> ppr orig_abs_ds )
+		-- If the arg isn't used we jolly well don't expect the function
+		-- to be strict in it.  Unless the function diverges.
+	   WwLazy True	-- Best of all
+
     mk_dmd (WwUnpack nd u str_ds) 
 	   (WwUnpack _ _ abs_ds) = WwUnpack nd u (go str_ds abs_ds)
 
@@ -733,12 +740,9 @@ findRecDemand str_fn abs_fn ty
 
   where
     is_numeric_type ty
-      = case (splitAlgTyConApp_maybe ty) of -- NB: duplicates stuff done above
-	  Nothing -> False
-	  Just (tycon, _, _)
-	    | tyConUnique tycon `is_elem` numericTyKeys
-	    -> True
-	  _{-something else-} -> False
+      = case (splitTyConApp_maybe ty) of -- NB: duplicates stuff done above
+	  Nothing	  -> False
+	  Just (tycon, _) -> tyConUnique tycon `is_elem` numericTyKeys
       where
 	is_elem = isIn "is_numeric_type"
 

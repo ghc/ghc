@@ -741,7 +741,7 @@ sub setupOptimiseFlags {
 	# Specialisation is best done before full laziness
 	# so that overloaded functions have all their dictionary lambdas manifest
 	($Oopt_DoSpecialise) ? ( $Oopt_DoSpecialise, ) : (),
-	'-ffloat-outwards',
+#	'-ffloat-outwards',
 	'-ffloat-inwards',
 
 	'-fsimplify',
@@ -1502,7 +1502,7 @@ Now the Haskell compiler, C compiler, and assembler
     }
 
     if (-f $hsc_out_h_stub) {
-	&run_something("cp $hsc_out_h_stub $ofile_h_stub_target", 'Copy foreign export header file');
+	&run_something("mv $hsc_out_h_stub $ofile_h_stub_target", 'Copy foreign export header file');
     }
 
     if (-f $hsc_out_c_stub) {
@@ -1684,7 +1684,7 @@ sub runHscAndProcessInterfaces {
    # See if it bailed out early, saying nothing needed doing.  
    # We work this out by seeing if it created an output .hi file
 
-    if ( ! -f $hsc_hi && $ProduceHi !~ /-nohifile=/ ) {
+    if ( ! -f $hsc_out ) {
 	# Doesn't exist, so we bailed out early.
 	# Tell the C compiler and assembler not to run
 	$do_cc = 0; $do_as = 0;
@@ -1721,10 +1721,14 @@ sub runHscAndProcessInterfaces {
 
 
 	# Interface-handling is important enough to live off by itself
-        if ( $ProduceHi !~ /-nohifile=/ ) { # If we've produced one, process it.
-	   require('ghc-iface.prl') || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-iface.prl!\n");
-	   &postprocessHiFile($hsc_hi, $hifile_target, $going_interactive);
+	if ( -f $hsc_hi ) {
+		# print STDERR "Aha! A new hi file\n" ;
+		&run_something( "mv $hsc_hi $hifile_target", "Copy hi file" ) ;
+ 	} else {
+		# print STDERR "Oh ho! Hi file unchanged\n" ;
 	}
+
+
 	# if we're going to split up object files,
 	# we inject split markers into the .hc file now
 	if ( $HscLang eq 'C' && $SplitObjFiles ) {

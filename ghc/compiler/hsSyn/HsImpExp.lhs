@@ -71,6 +71,13 @@ ieName (IEVar n) 	 = n
 ieName (IEThingAbs  n)   = n
 ieName (IEThingWith n _) = n
 ieName (IEThingAll  n)   = n
+
+ieNames :: IE a -> [a]
+ieNames (IEVar            n   ) = [n]
+ieNames (IEThingAbs       n   ) = [n]
+ieNames (IEThingAll       n   ) = [n]
+ieNames (IEThingWith      n ns) = n:ns
+ieNames (IEModuleContents _   ) = []
 \end{code}
 
 \begin{code}

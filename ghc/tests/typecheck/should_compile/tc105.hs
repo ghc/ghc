@@ -1,3 +1,5 @@
+{-# OPTIONS -fglasgow-exts #-}
+
 -- !!! Scoped type variables in result signatures
 module ShouldCompile where
 

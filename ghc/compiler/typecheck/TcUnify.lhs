@@ -8,7 +8,7 @@ updatable substitution).
 
 \begin{code}
 module TcUnify ( unifyTauTy, unifyTauTyList, unifyTauTyLists, 
-	         unifyFunTy, unifyListTy, unifyTupleTy, unifyUnboxedTupleTy,
+	         unifyFunTy, unifyListTy, unifyTupleTy,
 	 	 unifyKind, unifyKinds, unifyTypeKind
  ) where
 
@@ -25,8 +25,7 @@ import Type	( tyVarsOfType,
 		  splitAppTy_maybe,
 	   	  tidyOpenType, tidyOpenTypes, tidyTyVar
 		)
-import TyCon	( TyCon, isTupleTyCon, isUnboxedTupleTyCon, 
-		  tyConArity )
+import TyCon	( TyCon, isTupleTyCon, tupleTyConBoxity, tyConArity )
 import Name	( hasBetterProv )
 import Var	( TyVar, tyVarKind, varName, isSigTyVar )
 import VarEnv	
@@ -36,8 +35,8 @@ import TcType	( TcType, TcTauType, TcTyVar, TcKind,
 		  tcGetTyVar, tcPutTyVar, zonkTcType, tcTypeKind
 		)
 -- others:
-import BasicTypes ( Arity )
-import TysWiredIn ( listTyCon, mkListTy, mkTupleTy, mkUnboxedTupleTy )
+import BasicTypes ( Arity, Boxity, isBoxed )
+import TysWiredIn ( listTyCon, mkListTy, mkTupleTy )
 import PprType	()		-- Instances
 import Util
 import Outputable
@@ -404,45 +403,29 @@ unify_list_ty_help ty	-- Revert to ordinary unification
 \end{code}
 
 \begin{code}
-unifyTupleTy :: Arity -> TcType -> TcM s [TcType]
-unifyTupleTy arity ty@(TyVarTy tyvar)
+unifyTupleTy :: Boxity -> Arity -> TcType -> TcM s [TcType]
+unifyTupleTy boxity arity ty@(TyVarTy tyvar)
   = tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
-	Just ty' -> unifyTupleTy arity ty'
-	other	    -> unify_tuple_ty_help arity ty
+	Just ty' -> unifyTupleTy boxity arity ty'
+	other	 -> unify_tuple_ty_help boxity arity ty
 
-unifyTupleTy arity ty
+unifyTupleTy boxity arity ty
   = case splitTyConApp_maybe ty of
-	Just (tycon, arg_tys) |  isTupleTyCon tycon 
-			 && tyConArity tycon == arity
-			 -> returnTc arg_tys
-	other -> unify_tuple_ty_help arity ty
+	Just (tycon, arg_tys)
+		|  isTupleTyCon tycon 
+		&& tyConArity tycon == arity
+		&& tupleTyConBoxity tycon == boxity
+		-> returnTc arg_tys
+	other -> unify_tuple_ty_help boxity arity ty
 
-unify_tuple_ty_help arity ty
-  = mapNF_Tc (\ _ -> newTyVarTy boxedTypeKind) [1..arity]	`thenNF_Tc` \ arg_tys ->
-    unifyTauTy ty (mkTupleTy arity arg_tys)			`thenTc_`
+unify_tuple_ty_help boxity arity ty
+  = mapNF_Tc new_tyvar [1..arity]			`thenNF_Tc` \ arg_tys ->
+    unifyTauTy ty (mkTupleTy boxity arity arg_tys)	`thenTc_`
     returnTc arg_tys
-\end{code}
-
-\begin{code}
-unifyUnboxedTupleTy :: Arity -> TcType -> TcM s [TcType]
-unifyUnboxedTupleTy arity ty@(TyVarTy tyvar)
-  = tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
-    case maybe_ty of
-	Just ty' -> unifyUnboxedTupleTy arity ty'
-	other	 -> unify_unboxed_tuple_ty_help arity ty
-
-unifyUnboxedTupleTy arity ty
-  = case splitTyConApp_maybe ty of
-	Just (tycon, arg_tys) |  isUnboxedTupleTyCon tycon 
-			 && tyConArity tycon == arity
-			 -> returnTc arg_tys
-	other -> unify_tuple_ty_help arity ty
-
-unify_unboxed_tuple_ty_help arity ty
-  = mapNF_Tc (\ _ -> newTyVarTy_OpenKind) [1..arity]	`thenNF_Tc` \ arg_tys ->
-    unifyTauTy ty (mkUnboxedTupleTy arity arg_tys)	`thenTc_`
-    returnTc arg_tys
+  where
+    new_tyvar _ | isBoxed boxity = newTyVarTy boxedTypeKind
+	        | otherwise      = newTyVarTy_OpenKind
 \end{code}
 
 Make sure a kind is of the form (Type b) for some boxity b.

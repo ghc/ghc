@@ -28,7 +28,7 @@ import DataCon		( DataCon, splitProductType_maybe, dataConSourceArity, dataConWr
 import CallConv
 import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
 			  splitTyConApp_maybe, tyVarsOfType, mkForAllTys, 
-			  isNewType, repType, isUnLiftedType, mkFunTy,
+			  isNewType, repType, isUnLiftedType, mkFunTy, mkTyConApp,
 			  Type
 			)
 import PprType		( {- instance Outputable Type -} )
@@ -36,14 +36,15 @@ import TysPrim		( byteArrayPrimTy, realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon, intPrimTy
 			)
 import TysWiredIn	( unitDataConId, stringTy,
-			  unboxedPairDataCon,
-			  mkUnboxedTupleTy, unboxedTupleCon,
+			  unboxedSingletonDataCon, unboxedPairDataCon,
+			  unboxedSingletonTyCon, unboxedPairTyCon,
+			  mkTupleTy, tupleCon,
 			  boolTy, trueDataCon, falseDataCon, trueDataConId, falseDataConId,
 			  unitTy
 			)
 import Literal		( mkMachInt )
 import CStrings		( CLabelString )
-import Unique		( Unique, Uniquable(..), ioTyConKey )
+import Unique		( Unique, Uniquable(..), hasKey, ioTyConKey )
 import VarSet		( varSetElems )
 import Outputable
 \end{code}
@@ -212,7 +213,7 @@ boxResult result_ty
   = case splitAlgTyConApp_maybe result_ty of
 
 	-- The result is IO t, so wrap the result in an IO constructor
-	Just (io_tycon, [io_res_ty], [io_data_con]) | getUnique io_tycon == ioTyConKey
+	Just (io_tycon, [io_res_ty], [io_data_con]) | io_tycon `hasKey` ioTyConKey
 		-> mk_alt return_result 
 			  (resultWrapper io_res_ty)	`thenDs` \ (ccall_res_ty, the_alt) ->
 		   newSysLocalDs realWorldStatePrimTy	 `thenDs` \ state_id ->
@@ -247,8 +248,8 @@ boxResult result_ty
 	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
 	  let
 		the_rhs      = return_result (Var state_id) (wrap_result (panic "boxResult"))
-		ccall_res_ty = mkUnboxedTupleTy 1 [realWorldStatePrimTy]
-		the_alt      = (DataAlt (unboxedTupleCon 1), [state_id], the_rhs)
+		ccall_res_ty = mkTyConApp unboxedSingletonTyCon [realWorldStatePrimTy]
+		the_alt      = (DataAlt unboxedSingletonDataCon, [state_id], the_rhs)
 	  in
 	  returnDs (ccall_res_ty, the_alt)
 
@@ -258,7 +259,7 @@ boxResult result_ty
 	  newSysLocalDs prim_res_ty 		`thenDs` \ result_id ->
 	  let
 		the_rhs      = return_result (Var state_id) (wrap_result (Var result_id))
-		ccall_res_ty = mkUnboxedTupleTy 2 [realWorldStatePrimTy, prim_res_ty]
+		ccall_res_ty = mkTyConApp unboxedPairTyCon [realWorldStatePrimTy, prim_res_ty]
 		the_alt	     = (DataAlt unboxedPairDataCon, [state_id, result_id], the_rhs)
 	  in
 	  returnDs (ccall_res_ty, the_alt)

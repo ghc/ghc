@@ -179,7 +179,7 @@ printForAsm handle doc = printDoc LeftMode handle (doc (PprCode AsmStyle))
 -- printForIface prints all on one line for interface files.
 -- It's called repeatedly for successive lines
 printForIface :: Handle -> SDoc -> IO ()
-printForIface handle doc = printDoc OneLineMode handle (doc PprInterface)
+printForIface handle doc = printDoc LeftMode handle (doc PprInterface)
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d

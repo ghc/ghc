@@ -41,7 +41,7 @@ import Name		( isLocallyDefined, getSrcLoc,
 			  OccName, nameOccName
 			)
 import RdrName		( RdrName )
-import RnMonad		( Fixities )
+import RnMonad		( FixityEnv )
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
@@ -188,7 +188,7 @@ context to the instance decl.  The "offending classes" are
 
 \begin{code}
 tcDeriving  :: ModuleName		-- name of module under scrutiny
-	    -> Fixities			-- for the deriving code (Show/Read.)
+	    -> FixityEnv		-- for the deriving code (Show/Read.)
 	    -> RnNameSupply		-- for "renaming" bits of generated code
 	    -> Bag InstInfo		-- What we already know about instances
 	    -> TcM s (Bag InstInfo,	-- The generated "instance decls".
@@ -352,14 +352,12 @@ makeDerivEqns
     ------------------------------------------------------------------
     chk_out :: Class -> TyCon -> Maybe Message
     chk_out clas tycon
-	| clas_key == enumClassKey    && not is_enumeration 	      = bog_out nullary_why
-	| clas_key == boundedClassKey && not is_enumeration_or_single = bog_out single_nullary_why
-	| clas_key == ixClassKey      && not is_enumeration_or_single = bog_out single_nullary_why
+	| clas `hasKey` enumClassKey    && not is_enumeration 	      = bog_out nullary_why
+	| clas `hasKey` boundedClassKey && not is_enumeration_or_single = bog_out single_nullary_why
+	| clas `hasKey` ixClassKey      && not is_enumeration_or_single = bog_out single_nullary_why
 	| any isExistentialDataCon (tyConDataCons tycon)	      = Just (existentialErr clas tycon)
 	| otherwise						      = Nothing
 	where
-	    clas_key = classKey clas
-
 	    is_enumeration = isEnumerationTyCon tycon
 	    is_single_con  = maybeToBool (maybeTyConSingleCon tycon)
 	    is_enumeration_or_single = is_enumeration || is_single_con
@@ -555,13 +553,13 @@ the renamer.  What a great hack!
 -- Generate the method bindings for the required instance
 -- (paired with class name, as we need that when generating dict
 --  names.)
-gen_bind :: Fixities -> InstInfo -> ({-class-}OccName, {-tyCon-}OccName, RdrNameMonoBinds)
+gen_bind :: FixityEnv -> InstInfo -> ({-class-}OccName, {-tyCon-}OccName, RdrNameMonoBinds)
 gen_bind fixities (InstInfo clas _ [ty] _ _ _ _ _)
   | not from_here 
   = (clas_nm, tycon_nm, EmptyMonoBinds)
-  |  ckey == showClassKey 
+  |  clas `hasKey` showClassKey 
   = (clas_nm, tycon_nm, gen_Show_binds fixities tycon)
-  |  ckey == readClassKey 
+  |  clas `hasKey` readClassKey 
   = (clas_nm, tycon_nm, gen_Read_binds fixities tycon)
   | otherwise
   = (clas_nm, tycon_nm,
@@ -572,15 +570,13 @@ gen_bind fixities (InstInfo clas _ [ty] _ _ _ _ _)
 	   ,(boundedClassKey, gen_Bounded_binds)
 	   ,(ixClassKey,      gen_Ix_binds)
 	   ]
-	   ckey
+	   (classKey clas)
 	   tycon)
   where
       clas_nm     = nameOccName (getName clas)
       tycon_nm    = nameOccName (getName tycon)
       from_here   = isLocallyDefined tycon
       (tycon,_,_) = splitAlgTyConApp ty	
-      ckey	  = classKey clas
-	    
 
 gen_inst_info :: InstInfo
 	      -> (Name, RenamedMonoBinds)

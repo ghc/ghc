@@ -37,7 +37,7 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 			  intPrimTy, realWorldStatePrimTy
 			)
 import TysWiredIn	( boolTy, charTy, mkListTy )
-import PrelMods		( pREL_ERR, pREL_GHC )
+import PrelNames	( pREL_ERR, pREL_GHC )
 import PrelRules	( primOpRule )
 import Rules		( addRule )
 import Type		( Type, ClassContext, mkDictTy, mkDictTys, mkTyConApp, mkTyVarTys,
@@ -51,6 +51,7 @@ import PprType		( pprParendType )
 import Module		( Module )
 import CoreUtils	( exprType, mkInlineMe )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
+import Literal		( Literal(..) )
 import Subst		( mkTopTyVarSubst, substClasses )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons, isDataTyCon, 
                           tyConTheta, isProductTyCon, isUnboxedTupleTyCon )
@@ -66,7 +67,7 @@ import PrimOp		( PrimOp(DataToTagOp, CCallOp),
 			  primOpSig, mkPrimOpIdName,
 			  CCall, pprCCallOp
 			)
-import Demand		( wwStrict, wwPrim )
+import Demand		( wwStrict, wwPrim, mkStrictnessInfo )
 import DataCon		( DataCon, StrictnessMark(..), 
 			  dataConFieldLabels, dataConRepArity, dataConTyCon,
 			  dataConArgTys, dataConRepType, dataConRepStrictness, 
@@ -168,7 +169,7 @@ mkDataConId work_name data_con
 
     arity = dataConRepArity data_con
 
-    strict_info = StrictnessInfo (dataConRepStrictness data_con) False
+    strict_info = mkStrictnessInfo (dataConRepStrictness data_con, False)
 
     cpr_info | isProductTyCon tycon && 
 	       not (isUnboxedTupleTyCon tycon) && 
@@ -373,9 +374,11 @@ Similarly for newtypes
 	unN = /\a -> \n:N -> coerce (a->a) n
 
 \begin{code}
-mkRecordSelId tycon field_label
-	-- Assumes that all fields with the same field label
-	-- have the same type
+mkRecordSelId tycon field_label unpack_id
+	-- Assumes that all fields with the same field label have the same type
+	--
+	-- Annoyingly, we have to pass in the unpackCString# Id, because
+	-- we can't conjure it up out of thin air
   = sel_id
   where
     sel_id     = mkId (fieldLabelName field_label) selector_ty info
@@ -441,8 +444,9 @@ mkRecordSelId tycon field_label
 	    field_lbls	     = dataConFieldLabels data_con
 	    maybe_the_arg_id = assocMaybe (field_lbls `zip` arg_ids) field_label
 
-    error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type (unUsgTy field_tau), mkStringLit full_msg]
+    error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type (unUsgTy field_tau), err_string]
        -- preserves invariant that type args are *not* usage-annotated on top.  KSW 1999-04.
+    err_string = App (Var unpack_id) (Lit (MachStr (_PK_ full_msg)))
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
 \end{code}
 
@@ -459,6 +463,7 @@ there's nothing to do.
 ToDo: unify with mkRecordSelId.
 
 \begin{code}
+mkDictSelId :: Name -> Class -> Id
 mkDictSelId name clas
   = sel_id
   where

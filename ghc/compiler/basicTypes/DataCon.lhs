@@ -32,9 +32,9 @@ import TysPrim
 import Type		( Type, ThetaType, TauType, ClassContext,
 			  mkForAllTys, mkFunTys, mkTyConApp, 
 			  mkTyVarTys, mkDictTys,
-			  splitAlgTyConApp_maybe, classesToPreds
+			  splitTyConApp_maybe, classesToPreds
 			)
-import TyCon		( TyCon, tyConDataCons, isDataTyCon, isProductTyCon,
+import TyCon		( TyCon, tyConDataCons, tyConDataConsIfAvailable, isDataTyCon, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
 import Class		( classTyCon )
 import Name		( Name, NamedThing(..), nameUnique, isLocallyDefined )
@@ -120,7 +120,7 @@ data DataCon
 	dcRepArgTys :: [Type],		-- Final, representation argument types, after unboxing and flattening,
 					-- and including existential dictionaries
 
-	dcTyCon  :: TyCon,		-- Result tycon 
+	dcTyCon  :: TyCon,		-- Result tycon
 
 	-- Now the strictness annotations and field labels of the constructor
 	dcUserStricts :: [StrictnessMark], 
@@ -404,6 +404,7 @@ splitProductType_maybe
 		  [Type])		-- Its *representation* arg types
 
 	-- Returns (Just ...) for any 
+	--	concrete (i.e. constructors visible)
 	--	single-constructor
 	--	not existentially quantified
 	-- type whether a data type or a new type
@@ -413,10 +414,13 @@ splitProductType_maybe
 	-- it through till someone finds it's important.
 
 splitProductType_maybe ty
-  = case splitAlgTyConApp_maybe ty of
-	Just (tycon,ty_args,[data_con]) 
-	   | isProductTyCon tycon  		-- Includes check for non-existential
+  = case splitTyConApp_maybe ty of
+	Just (tycon,ty_args) 
+	   | isProductTyCon tycon  	-- Includes check for non-existential,
+					-- and for constructors visible
 	   -> Just (tycon, ty_args, data_con, dataConArgTys data_con ty_args)
+	   where
+	      data_con = head (tyConDataConsIfAvailable tycon)
 	other -> Nothing
 
 splitProductType str ty

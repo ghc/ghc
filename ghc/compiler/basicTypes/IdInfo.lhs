@@ -290,6 +290,7 @@ data ArityInfo
 			-- functions in the module being compiled.  Their arity
 			-- might increase later in the compilation process, if
 			-- an extra lambda floats up to the binding site.
+  deriving( Eq )
 
 seqArity :: ArityInfo -> ()
 seqArity a = arityLowerBound a `seq` ()
@@ -323,6 +324,7 @@ data InlinePragInfo
   = NoInlinePragInfo
   | IMustNotBeINLINEd Bool		-- True <=> came from an INLINE prag, False <=> came from a NOINLINE prag
 		      (Maybe Int)	-- Phase number from pragma, if any
+  deriving( Eq )
 	-- The True, Nothing case doesn't need to be recorded
 
 	-- SEE COMMENTS WITH CoreUnfold.blackListed on the

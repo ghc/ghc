@@ -655,15 +655,16 @@ zonkForeignExport (ForeignDecl i imp_exp hs_ty ext_nm cconv src_loc) =
 zonkRules :: [TcRuleDecl] -> NF_TcM s [TypecheckedRuleDecl]
 zonkRules rs = mapNF_Tc zonkRule rs
 
-zonkRule (RuleDecl name tyvars vars lhs rhs loc)
+zonkRule (HsRule name tyvars vars lhs rhs loc)
   = mapNF_Tc zonkTcTyVarToTyVar tyvars			`thenNF_Tc` \ new_tyvars ->
     mapNF_Tc zonkIdBndr [v | RuleBndr v <- vars]	`thenNF_Tc` \ new_bndrs ->
     tcExtendGlobalValEnv new_bndrs			$
     zonkExpr lhs					`thenNF_Tc` \ new_lhs ->
     zonkExpr rhs					`thenNF_Tc` \ new_rhs ->
-    returnNF_Tc (RuleDecl name new_tyvars (map RuleBndr new_bndrs) new_lhs new_rhs loc)
+    returnNF_Tc (HsRule name new_tyvars (map RuleBndr new_bndrs) new_lhs new_rhs loc)
 	-- I hate this map RuleBndr stuff
 
-zonkRule (IfaceRuleDecl fun rule loc)
-  = returnNF_Tc (IfaceRuleDecl fun rule loc)
+zonkRule (IfaceRuleOut fun rule)
+  = zonkIdOcc fun	`thenNF_Tc` \ fun' ->
+    returnNF_Tc (IfaceRuleOut fun' rule)
 \end{code}

@@ -30,7 +30,7 @@ import Id		( Id, idType, idInfo, idUnique, isDataConId, isDataConId_maybe,
 			  idOccInfo, setIdOccInfo,
 			  zapLamIdInfo, zapFragileIdInfo,
 			  idStrictness, isBottomingId,
-			  setInlinePragma, mayHaveNoBinding,
+			  setInlinePragma, 
 			  setOneShotLambda, maybeModifyIdInfo
 			)
 import IdInfo		( InlinePragInfo(..), OccInfo(..), StrictnessInfo(..), 
@@ -42,9 +42,8 @@ import Demand		( Demand, isStrict, wwLazy )
 import DataCon		( DataCon, dataConNumInstArgs, dataConRepStrictness, dataConRepArity,
 			  dataConSig, dataConArgTys
 			)
-import Name		( isLocallyDefined )
 import CoreSyn
-import CoreFVs		( exprFreeVars )
+import CoreFVs		( exprFreeVars, mustHaveLocalBinding )
 import CoreUnfold	( Unfolding, mkOtherCon, mkUnfolding, otherCons, maybeUnfoldingTemplate,
 			  callSiteInline, hasSomeUnfolding, noUnfolding
 			)
@@ -63,7 +62,9 @@ import Type		( Type, mkTyVarTy, mkTyVarTys, isUnLiftedType, seqType,
 import Subst		( Subst, mkSubst, emptySubst, substTy, substExpr,
 			  substEnv, isInScope, lookupIdSubst, substIdInfo
 			)
-import TyCon		( isDataTyCon, tyConDataCons, tyConClass_maybe, tyConArity, isDataTyCon )
+import TyCon		( isDataTyCon, tyConDataConsIfAvailable, 
+			  tyConClass_maybe, tyConArity, isDataTyCon
+			)
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, isLoopBreaker )
@@ -732,11 +733,8 @@ simplVar var cont
     case lookupIdSubst subst var of
 	DoneEx e	-> zapSubstEnv (simplExprF e cont)
 	ContEx env1 e   -> setSubstEnv env1 (simplExprF e cont)
-	DoneId var1 occ -> WARN( not (isInScope var1 subst) && isLocallyDefined var1 && not (mayHaveNoBinding var1),
+	DoneId var1 occ -> WARN( not (isInScope var1 subst) && mustHaveLocalBinding var1,
 				 text "simplVar:" <+> ppr var )
-					-- The mayHaveNoBinding test accouunts for the fact
-					-- that class dictionary constructors dont have top level
-					-- bindings and hence aren't in scope.
 			   zapSubstEnv (completeCall var1 occ cont)
 		-- The template is already simplified, so don't re-substitute.
 		-- This is VITAL.  Consider
@@ -1358,7 +1356,7 @@ prepareCaseAlts bndr (Just (tycon, inst_tys)) scrut_cons alts
 			[]    -> alts
 			other -> [alt | alt@(con,_,_) <- alts, not (con `elem` scrut_cons)]
 
-    missing_cons = [data_con | data_con <- tyConDataCons tycon, 
+    missing_cons = [data_con | data_con <- tyConDataConsIfAvailable tycon, 
 			       not (data_con `elem` handled_data_cons)]
     handled_data_cons = [data_con | DataAlt data_con         <- scrut_cons] ++
 			[data_con | (DataAlt data_con, _, _) <- filtered_alts]

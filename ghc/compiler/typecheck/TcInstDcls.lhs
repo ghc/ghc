@@ -19,7 +19,7 @@ import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, checkFromThisClass )
 import TcMonad
-import RnMonad		( RnNameSupply, Fixities )
+import RnMonad		( RnNameSupply, FixityEnv )
 import Inst		( Inst, InstOrigin(..),
 			  newDicts, newClassDicts,
 			  LIE, emptyLIE, plusLIE, plusLIEs )
@@ -59,7 +59,7 @@ import Subst		( mkTopTyVarSubst, substClasses )
 import VarSet		( mkVarSet, varSetElems )
 import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( stringTy, isFFIArgumentTy, isFFIResultTy )
-import Unique		( Unique, cCallableClassKey, cReturnableClassKey, Uniquable(..) )
+import Unique		( Unique, cCallableClassKey, cReturnableClassKey, hasKey, Uniquable(..) )
 import Outputable
 \end{code}
 
@@ -140,7 +140,7 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
 	     -> [RenamedHsDecl]
 	     -> ModuleName			-- module name for deriving
-	     -> Fixities
+	     -> FixityEnv
 	     -> RnNameSupply			-- for renaming derivings
 	     -> TcM s (Bag InstInfo,
 		       RenamedHsBinds)
@@ -492,8 +492,8 @@ scrutiniseInstanceHead clas inst_taus
   |	-- CCALL CHECK
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
-    (getUnique clas == cCallableClassKey   && not (ccallable_type   first_inst_tau)) ||
-    (getUnique clas == cReturnableClassKey && not (creturnable_type first_inst_tau))
+    (clas `hasKey` cCallableClassKey   && not (ccallable_type   first_inst_tau)) ||
+    (clas `hasKey` cReturnableClassKey && not (creturnable_type first_inst_tau))
   = addErrTc (nonBoxedPrimCCallErr clas first_inst_tau)
 
   	-- DERIVING CHECK

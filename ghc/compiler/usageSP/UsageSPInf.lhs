@@ -18,6 +18,7 @@ import UsageSPLint
 import UConSet
 
 import CoreSyn
+import CoreFVs		( mustHaveLocalBinding )
 import Rules            ( RuleBase )
 import TypeRep          ( Type(..), TyNote(..) ) -- friend
 import Type             ( UsageAnn(..),
@@ -31,7 +32,7 @@ import TyCon            ( tyConArgVrcs_maybe, isFunTyCon )
 import Literal          ( Literal(..), literalType )
 import Var              ( Var, UVar, varType, setVarType, mkUVar, modifyIdInfo )
 import IdInfo           ( setLBVarInfo, LBVarInfo(..) )
-import Id               ( mayHaveNoBinding, isExportedId )
+import Id               ( isExportedId )
 import Name             ( isLocallyDefined )
 import VarEnv
 import VarSet
@@ -398,7 +399,7 @@ lookupVar :: VarEnv Var -> Var -> Var
 --lookupVar ve v = error "lookupVar unimplemented"
 lookupVar ve v = case lookupVarEnv ve v of
                    Just v' -> v'
-                   Nothing -> ASSERT( not (isLocallyDefined v) || (mayHaveNoBinding v) )
+                   Nothing -> ASSERT( not (mustHaveLocalBinding v) )
                               ASSERT( isUsgTy (varType v) )
                               v
 

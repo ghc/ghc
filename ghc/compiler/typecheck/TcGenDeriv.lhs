@@ -33,9 +33,10 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			)
 import RdrHsSyn		( mkOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
 import RdrName		( RdrName, mkSrcUnqual )
-import RnMonad		( Fixities )
+import RnMonad		( FixityEnv, lookupFixity )
 import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
 			, maxPrecedence, defaultFixity
+			, Boxity(..)
 			)
 import FieldLabel       ( fieldLabelName )
 import DataCon		( isNullaryDataCon, dataConTag,
@@ -648,7 +649,7 @@ gen_Ix_binds tycon
 
     enum_range
       = mk_easy_FunMonoBind tycon_loc range_RDR 
-		[TuplePatIn [a_Pat, b_Pat] True{-boxed-}] [] $
+		[TuplePatIn [a_Pat, b_Pat] Boxed] [] $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
 	  untag_Expr tycon [(b_RDR, bh_RDR)] $
 	  HsApp (mk_easy_App map_RDR [tag2con_RDR tycon]) $
@@ -658,7 +659,7 @@ gen_Ix_binds tycon
 
     enum_index
       = mk_easy_FunMonoBind tycon_loc index_RDR 
-		[AsPatIn c_RDR (TuplePatIn [a_Pat, wildPat] True{-boxed-}), 
+		[AsPatIn c_RDR (TuplePatIn [a_Pat, wildPat] Boxed), 
 				d_Pat] [] (
 	HsIf (HsPar (mk_easy_App inRange_RDR [c_RDR, d_RDR])) (
 	   untag_Expr tycon [(a_RDR, ah_RDR)] (
@@ -678,7 +679,7 @@ gen_Ix_binds tycon
 
     enum_inRange
       = mk_easy_FunMonoBind tycon_loc inRange_RDR 
-	  [TuplePatIn [a_Pat, b_Pat] True{-boxed-}, c_Pat] [] (
+	  [TuplePatIn [a_Pat, b_Pat] Boxed, c_Pat] [] (
 	  untag_Expr tycon [(a_RDR, ah_RDR)] (
 	  untag_Expr tycon [(b_RDR, bh_RDR)] (
 	  untag_Expr tycon [(c_RDR, ch_RDR)] (
@@ -715,7 +716,7 @@ gen_Ix_binds tycon
     --------------------------------------------------------------
     single_con_range
       = mk_easy_FunMonoBind tycon_loc range_RDR 
-	  [TuplePatIn [con_pat as_needed, con_pat bs_needed] True{-boxed-}] [] $
+	  [TuplePatIn [con_pat as_needed, con_pat bs_needed] Boxed] [] $
 	HsDo ListComp stmts tycon_loc
       where
 	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
@@ -724,45 +725,45 @@ gen_Ix_binds tycon
 
 	mk_qual a b c = BindStmt (VarPatIn c)
 				 (HsApp (HsVar range_RDR) 
-					(ExplicitTuple [HsVar a, HsVar b] True))
+					(ExplicitTuple [HsVar a, HsVar b] Boxed))
 				 tycon_loc
 
     ----------------
     single_con_index
       = mk_easy_FunMonoBind tycon_loc index_RDR 
-		[TuplePatIn [con_pat as_needed, con_pat bs_needed] True, 
+		[TuplePatIn [con_pat as_needed, con_pat bs_needed] Boxed, 
 		 con_pat cs_needed] [range_size] (
 	foldl mk_index (HsLit (HsInt 0)) (zip3 as_needed bs_needed cs_needed))
       where
 	mk_index multiply_by (l, u, i)
 	  = genOpApp (
 	       (HsApp (HsApp (HsVar index_RDR) 
-		      (ExplicitTuple [HsVar l, HsVar u] True)) (HsVar i))
+		      (ExplicitTuple [HsVar l, HsVar u] Boxed)) (HsVar i))
 	   ) plus_RDR (
 		genOpApp (
 		    (HsApp (HsVar rangeSize_RDR) 
-			   (ExplicitTuple [HsVar l, HsVar u] True))
+			   (ExplicitTuple [HsVar l, HsVar u] Boxed))
 		) times_RDR multiply_by
 	   )
 
 	range_size
 	  = mk_easy_FunMonoBind tycon_loc rangeSize_RDR 
-			[TuplePatIn [a_Pat, b_Pat] True] [] (
+			[TuplePatIn [a_Pat, b_Pat] Boxed] [] (
 		genOpApp (
 		    (HsApp (HsApp (HsVar index_RDR) 
-			   (ExplicitTuple [a_Expr, b_Expr] True)) b_Expr)
+			   (ExplicitTuple [a_Expr, b_Expr] Boxed)) b_Expr)
 		) plus_RDR (HsLit (HsInt 1)))
 
     ------------------
     single_con_inRange
       = mk_easy_FunMonoBind tycon_loc inRange_RDR 
-		[TuplePatIn [con_pat as_needed, con_pat bs_needed] True, 
+		[TuplePatIn [con_pat as_needed, con_pat bs_needed] Boxed, 
 		 con_pat cs_needed]
 			   [] (
 	  foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed))
       where
     	in_range a b c = HsApp (HsApp (HsVar inRange_RDR) 
-				      (ExplicitTuple [HsVar a, HsVar b] True)) 
+				      (ExplicitTuple [HsVar a, HsVar b] Boxed)) 
 			       (HsVar c)
 \end{code}
 
@@ -773,9 +774,9 @@ gen_Ix_binds tycon
 %************************************************************************
 
 \begin{code}
-gen_Read_binds :: Fixities -> TyCon -> RdrNameMonoBinds
+gen_Read_binds :: FixityEnv -> TyCon -> RdrNameMonoBinds
 
-gen_Read_binds fixities tycon
+gen_Read_binds fixity_env tycon
   = reads_prec `AndMonoBinds` read_list
   where
     tycon_loc = getSrcLoc tycon
@@ -822,25 +823,25 @@ gen_Read_binds fixities tycon
 	   con_qual 
 	     | not is_infix =
                  BindStmt
-		  (TuplePatIn [LitPatIn (mkHsString data_con_str), d_Pat] True)
+		  (TuplePatIn [LitPatIn (mkHsString data_con_str), d_Pat] Boxed)
 	          (HsApp (HsVar lex_RDR) c_Expr)
 	          tycon_loc
 	     | otherwise    =
                  BindStmt
-		  (TuplePatIn [LitPatIn (mkHsString data_con_str), VarPatIn bs2] True)
+		  (TuplePatIn [LitPatIn (mkHsString data_con_str), VarPatIn bs2] Boxed)
 	          (HsApp (HsVar lex_RDR) (HsVar bs1))
 	          tycon_loc
 	        
 
 	   str_qual str res draw_from =
                BindStmt
-		  (TuplePatIn [LitPatIn (mkHsString str), VarPatIn res] True)
+		  (TuplePatIn [LitPatIn (mkHsString str), VarPatIn res] Boxed)
 		  (HsApp (HsVar lex_RDR) draw_from)
 		  tycon_loc
   
 	   str_qual_paren str res draw_from =
                BindStmt
-		  (TuplePatIn [LitPatIn (mkHsString str), VarPatIn res] True)
+		  (TuplePatIn [LitPatIn (mkHsString str), VarPatIn res] Boxed)
 		  (HsApp (readParen_Expr true_Expr (HsVar lex_RDR)) draw_from)
 		  tycon_loc
   
@@ -895,15 +896,15 @@ gen_Read_binds fixities tycon
 
 	   mk_read_qual p con_field res draw_from =
 	      BindStmt
-		 (TuplePatIn [VarPatIn con_field, VarPatIn res] True)
+		 (TuplePatIn [VarPatIn con_field, VarPatIn res] Boxed)
 		 (HsApp (HsApp (HsVar readsPrec_RDR) (HsLit (HsInt p))) draw_from)
 		 tycon_loc
 
  	   result_expr = ExplicitTuple [con_expr, if null bs_needed 
 						    then d_Expr 
-						    else HsVar (last bs_needed)] True
+						    else HsVar (last bs_needed)] Boxed
 
-           [lp,rp] = getLRPrecs is_infix fixities dc_nm
+           [lp,rp] = getLRPrecs is_infix fixity_env dc_nm
 
            quals
 	    | is_infix  = let (h:t) = field_quals in (h:con_qual:t)
@@ -916,7 +917,7 @@ gen_Read_binds fixities tycon
 	    -}
 	   paren_prec_limit
 	     | not is_infix  = fromInt maxPrecedence
-	     | otherwise     = getFixity fixities dc_nm
+	     | otherwise     = getFixity fixity_env dc_nm
 
 	   read_paren_arg   -- parens depend on precedence...
 	    | nullary_con  = false_Expr -- it's optional.
@@ -930,9 +931,9 @@ gen_Read_binds fixities tycon
 %************************************************************************
 
 \begin{code}
-gen_Show_binds :: Fixities -> TyCon -> RdrNameMonoBinds
+gen_Show_binds :: FixityEnv -> TyCon -> RdrNameMonoBinds
 
-gen_Show_binds fixs_assoc tycon
+gen_Show_binds fixity_env tycon
   = shows_prec `AndMonoBinds` show_list
   where
     tycon_loc = getSrcLoc tycon
@@ -1003,7 +1004,7 @@ gen_Show_binds fixs_assoc tycon
              mk_showString_app str = HsApp (HsVar showString_RDR)
 					   (HsLit (mkHsString str))
 
-             prec_cons = getLRPrecs is_infix fixs_assoc dc_nm
+             prec_cons = getLRPrecs is_infix fixity_env dc_nm
 
              real_show_thingies
 		| is_infix  = 
@@ -1024,27 +1025,27 @@ gen_Show_binds fixs_assoc tycon
 				 (map show_label labels) 
 				 real_show_thingies
 			       
-	     (con_left_assoc, con_right_assoc) = isLRAssoc fixs_assoc dc_nm
+	     (con_left_assoc, con_right_assoc) = isLRAssoc fixity_env dc_nm
 
 	      {-
 	        c.f. Figure 16 and 17 in Haskell 1.1 report
 	      -}  
 	     paren_prec_limit
 		| not is_infix = fromInt maxPrecedence + 1
-		| otherwise    = getFixity fixs_assoc dc_nm + 1
+		| otherwise    = getFixity fixity_env dc_nm + 1
 
 \end{code}
 
 \begin{code}
-getLRPrecs :: Bool -> Fixities -> Name -> [Integer]
-getLRPrecs is_infix fixs_assoc nm = [lp, rp]
+getLRPrecs :: Bool -> FixityEnv -> Name -> [Integer]
+getLRPrecs is_infix fixity_env nm = [lp, rp]
     where
      {-
 	Figuring out the fixities of the arguments to a constructor,
 	cf. Figures 16-18 in Haskell 1.1 report.
      -}
-     (con_left_assoc, con_right_assoc) = isLRAssoc fixs_assoc nm
-     paren_con_prec = getFixity fixs_assoc nm
+     (con_left_assoc, con_right_assoc) = isLRAssoc fixity_env nm
+     paren_con_prec = getFixity fixity_env nm
      maxPrec	    = fromInt maxPrecedence
 
      lp
@@ -1057,27 +1058,22 @@ getLRPrecs is_infix fixs_assoc nm = [lp, rp]
       | con_right_assoc = paren_con_prec
       | otherwise       = paren_con_prec + 1
 		  
-getFixity :: Fixities -> Name -> Integer
-getFixity fixs_assoc nm =
-  case lookupFixity fixs_assoc nm of
-     Fixity x _ -> fromInt x
+getFixity :: FixityEnv -> Name -> Integer
+getFixity fixity_env nm = case lookupFixity fixity_env nm of
+			     Fixity x _ -> fromInt x
 
-isLRAssoc :: Fixities -> Name -> (Bool, Bool)
+isLRAssoc :: FixityEnv -> Name -> (Bool, Bool)
 isLRAssoc fixs_assoc nm =
      case lookupFixity fixs_assoc nm of
        Fixity _ InfixN -> (False, False)
        Fixity _ InfixR -> (False, True)
        Fixity _ InfixL -> (True,  False)
 
-lookupFixity :: Fixities -> Name -> Fixity
-lookupFixity fixs_assoc nm = assocDefault defaultFixity fixs_assoc nm
-
 isInfixOccName :: String -> Bool
 isInfixOccName str = 
    case str of
      (':':_) -> True
      _       -> False
-
 \end{code}
 
 
@@ -1130,7 +1126,7 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
   = mk_FunMonoBind (getSrcLoc tycon) rdr_name 
 	[([ConPatIn mkInt_RDR [VarPatIn a_RDR]], 
 	   ExprWithTySig (HsApp tagToEnum_Expr a_Expr) 
-			 (MonoTyVar (qual_orig_name tycon)))]
+			 (HsTyVar (qual_orig_name tycon)))]
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenMaxTag)
   = mk_easy_FunMonoBind (getSrcLoc tycon) 

@@ -12,7 +12,7 @@ module Variance(
 #include "HsVersions.h"
 
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
-import TyCon            ( TyCon, ArgVrcs, tyConKind, tyConArity, tyConDataCons, tyConTyVars,
+import TyCon            ( TyCon, ArgVrcs, tyConKind, tyConArity, tyConDataConsIfAvailable, tyConTyVars,
                           tyConArgVrcs_maybe, getSynTyConDefn, isSynTyCon, isAlgTyCon )
 import DataCon          ( dataConRepArgTys )
 
@@ -45,7 +45,7 @@ calcTyConArgVrcs :: [TyCon]
 
 calcTyConArgVrcs tycons
   = let oi           = foldl (\fm tc -> addToFM fm tc (initial tc)) emptyFM tycons
-        initial tc   = if isAlgTyCon tc && null (tyConDataCons tc) then
+        initial tc   = if isAlgTyCon tc && null (tyConDataConsIfAvailable tc) then
                          -- make pessimistic assumption (and warn)
                          take (tyConArity tc) abstractVrcs
                        else
@@ -75,15 +75,20 @@ calcTyConArgVrcs tycons
 	     -> ArgVrcs                  -- new ArgVrcs for tycon
 
     tcaoIter oi tc | isAlgTyCon tc
-      = let cs        = tyConDataCons tc
-            vs        = tyConTyVars tc
-	    argtys    = concatMap dataConRepArgTys cs
-	    myfao tc  = lookupWithDefaultFM oi (expectJust "tcaoIter(Alg)" $
-                                                  tyConArgVrcs_maybe tc)
-                                               tc
-                        -- we use the already-computed result for tycons not in this SCC
-        in  map (\v -> anyVrc (\ty -> vrcInTy myfao v ty) argtys)
+      = if null data_cons then
+		-- Abstract types get uninformative variances
+	    abstractVrcs
+	else
+            map (\v -> anyVrc (\ty -> vrcInTy myfao v ty) argtys)
                 vs
+      where
+       	data_cons = tyConDataConsIfAvailable tc
+       	vs        = tyConTyVars tc
+       	argtys    = concatMap dataConRepArgTys data_cons
+       	myfao tc  = lookupWithDefaultFM oi (expectJust "tcaoIter(Alg)" $
+       						   tyConArgVrcs_maybe tc)
+       					   tc
+       			 -- we use the already-computed result for tycons not in this SCC
 
     tcaoIter oi tc | isSynTyCon tc
       = let (tyvs,ty) = getSynTyConDefn tc

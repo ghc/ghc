@@ -48,11 +48,9 @@ module TysWiredIn (
 
 	-- tuples
 	mkTupleTy,
-	tupleTyCon, tupleCon, unitTyCon, unitDataConId, pairTyCon, 
-
-	-- unboxed tuples
-	mkUnboxedTupleTy,
-	unboxedTupleTyCon, unboxedTupleCon, 
+	tupleTyCon, tupleCon, 
+	unitTyCon, unitDataConId, pairTyCon, 
+	unboxedSingletonTyCon, unboxedSingletonDataCon,
 	unboxedPairTyCon, unboxedPairDataCon,
 
 	stablePtrTyCon,
@@ -77,7 +75,7 @@ module TysWiredIn (
 import {-# SOURCE #-} MkId( mkDataConId, mkDataConWrapId )
 
 -- friends:
-import PrelMods
+import PrelNames
 import TysPrim
 
 -- others:
@@ -89,7 +87,7 @@ import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConFlavour(..), ArgVrcs, tyConDataCons,
 			  mkAlgTyCon, mkSynTyCon, mkTupleTyCon, isUnLiftedTyCon
 			)
-import BasicTypes	( Arity, NewOrData(..), RecFlag(..) )
+import BasicTypes	( Arity, NewOrData(..), RecFlag(..), Boxity(..), isBoxed )
 import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
 			  mkArrowKinds, boxedTypeKind, unboxedTypeKind,
 			  mkFunTy, mkFunTys,
@@ -121,6 +119,7 @@ pcTyCon new_or_data is_rec key mod str tyvars argvrcs cons
 		[] 		-- No context
                 argvrcs
 		cons
+		(length cons)
 		[]		-- No derivings
 		new_or_data
 		is_rec
@@ -165,88 +164,49 @@ pcDataCon wrap_key mod str tyvars context arg_tys tycon
 %************************************************************************
 
 \begin{code}
-tupleTyCon :: Arity -> TyCon
-tupleTyCon i | i > mAX_TUPLE_SIZE = fst (mk_tuple i)	-- Build one specially
-	     | otherwise	  = tupleTyConArr!i
+tupleTyCon :: Boxity -> Arity -> TyCon
+tupleTyCon boxity i | i > mAX_TUPLE_SIZE = fst (mk_tuple boxity i)	-- Build one specially
+tupleTyCon Boxed   i = fst (boxedTupleArr   ! i)
+tupleTyCon Unboxed i = fst (unboxedTupleArr ! i)
 
-tupleCon :: Arity -> DataCon
-tupleCon i | i > mAX_TUPLE_SIZE = snd (mk_tuple i)	-- Build one specially
-	   | otherwise	        = tupleConArr!i
+tupleCon :: Boxity -> Arity -> DataCon
+tupleCon boxity i | i > mAX_TUPLE_SIZE = snd (mk_tuple boxity i)	-- Build one specially
+tupleCon Boxed   i = snd (boxedTupleArr   ! i)
+tupleCon Unboxed i = snd (unboxedTupleArr ! i)
 
-tupleTyCons :: [TyCon]
-tupleTyCons = elems tupleTyConArr
+boxedTupleArr, unboxedTupleArr :: Array Int (TyCon,DataCon)
+boxedTupleArr   = array (0,mAX_TUPLE_SIZE) [(i,mk_tuple Boxed i)   | i <- [0..mAX_TUPLE_SIZE]]
+unboxedTupleArr = array (0,mAX_TUPLE_SIZE) [(i,mk_tuple Unboxed i) | i <- [0..mAX_TUPLE_SIZE]]
 
-tupleTyConArr :: Array Int TyCon
-tupleTyConArr = array (0,mAX_TUPLE_SIZE) ([0..] `zip` map fst tuples)
-
-tupleConArr :: Array Int DataCon
-tupleConArr = array (0,mAX_TUPLE_SIZE) ([0..] `zip` map snd tuples)
-
-tuples :: [(TyCon,DataCon)]
-tuples = [mk_tuple i | i <- [0..mAX_TUPLE_SIZE]]
-
-mk_tuple :: Int -> (TyCon,DataCon)
-mk_tuple arity = (tycon, tuple_con)
+mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
+mk_tuple boxity arity = (tycon, tuple_con)
   where
-	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con True
+	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con boxity
 	tc_name = mkWiredInTyConName tc_uniq mod name_str tycon
-    	tc_kind = mkArrowKinds (map tyVarKind tyvars) boxedTypeKind
+    	tc_kind = mkArrowKinds (map tyVarKind tyvars) res_kind
+	res_kind | isBoxed boxity = boxedTypeKind
+		 | otherwise	  = unboxedTypeKind
+
+	tyvars   | isBoxed boxity = take arity alphaTyVars
+		 | otherwise	  = take arity openAlphaTyVars
 
 	tuple_con = pcDataCon dc_uniq mod name_str tyvars [] tyvar_tys tycon
-	tyvars    = take arity alphaTyVars
 	tyvar_tys = mkTyVarTys tyvars
-	(mod_name, name_str) = mkTupNameStr arity
- 	tc_uniq   = mkTupleTyConUnique   arity
-	dc_uniq   = mkTupleDataConUnique arity
+	(mod_name, name_str) = mkTupNameStr boxity arity
+ 	tc_uniq   = mkTupleTyConUnique   boxity arity
+	dc_uniq   = mkTupleDataConUnique boxity arity
 	mod	  = mkPrelModule mod_name
 
-unitTyCon     = tupleTyCon 0
+unitTyCon     = tupleTyCon Boxed 0
 unitDataConId = dataConId (head (tyConDataCons unitTyCon))
 
-pairTyCon = tupleTyCon 2
-\end{code}
+pairTyCon = tupleTyCon Boxed 2
 
-%************************************************************************
-%*									*
-\subsection[TysWiredIn-ubx-tuples]{Unboxed Tuple Types}
-%*									*
-%************************************************************************
+unboxedSingletonTyCon   = tupleTyCon Unboxed 1
+unboxedSingletonDataCon = tupleCon   Unboxed 1
 
-\begin{code}
-unboxedTupleTyCon :: Arity -> TyCon
-unboxedTupleTyCon i | i > mAX_TUPLE_SIZE = fst (mk_unboxed_tuple i)
-	            | otherwise	         = unboxedTupleTyConArr!i
-
-unboxedTupleCon :: Arity -> DataCon
-unboxedTupleCon i | i > mAX_TUPLE_SIZE = snd (mk_unboxed_tuple i)
-	          | otherwise	       = unboxedTupleConArr!i
-
-unboxedTupleTyConArr :: Array Int TyCon
-unboxedTupleTyConArr = array (0,mAX_TUPLE_SIZE) ([0..] `zip` map fst ubx_tuples)
-
-unboxedTupleConArr :: Array Int DataCon
-unboxedTupleConArr = array (0,mAX_TUPLE_SIZE) ([0..] `zip` map snd ubx_tuples)
-
-ubx_tuples :: [(TyCon,DataCon)]
-ubx_tuples = [mk_unboxed_tuple i | i <- [0..mAX_TUPLE_SIZE]]
-
-mk_unboxed_tuple :: Int -> (TyCon,DataCon)
-mk_unboxed_tuple arity = (tycon, tuple_con)
-  where
-	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con False
-	tc_name = mkWiredInTyConName tc_uniq mod name_str tycon
-    	tc_kind = mkArrowKinds (map tyVarKind tyvars) unboxedTypeKind
-
-	tuple_con = pcDataCon dc_uniq mod name_str tyvars [] tyvar_tys tycon
-	tyvars    = take arity openAlphaTyVars
-	tyvar_tys = mkTyVarTys tyvars
-	(mod_name, name_str) = mkUbxTupNameStr arity
- 	tc_uniq   = mkUbxTupleTyConUnique   arity
-	dc_uniq   = mkUbxTupleDataConUnique arity
-	mod	  = mkPrelModule mod_name
-
-unboxedPairTyCon   = unboxedTupleTyCon 2
-unboxedPairDataCon = unboxedTupleCon 2
+unboxedPairTyCon   = tupleTyCon Unboxed 2
+unboxedPairDataCon = tupleCon   Unboxed 2
 \end{code}
 
 %************************************************************************
@@ -589,11 +549,8 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 \end{itemize}
 
 \begin{code}
-mkTupleTy :: Int -> [Type] -> Type
-mkTupleTy arity tys = mkTyConApp (tupleTyCon arity) tys
+mkTupleTy :: Boxity -> Int -> [Type] -> Type
+mkTupleTy boxity arity tys = mkTyConApp (tupleTyCon boxity arity) tys
 
-mkUnboxedTupleTy :: Int -> [Type] -> Type
-mkUnboxedTupleTy arity tys = mkTyConApp (unboxedTupleTyCon arity) tys
-
-unitTy    = mkTupleTy 0 []
+unitTy    = mkTupleTy Boxed 0 []
 \end{code}

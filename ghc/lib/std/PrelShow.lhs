@@ -31,6 +31,7 @@ module PrelShow
 
 import {-# SOURCE #-} PrelErr ( error )
 import PrelBase
+import PrelTup
 import PrelMaybe
 import PrelList	( (!!), break, dropWhile
 #ifdef USE_REPORT_PRELUDE

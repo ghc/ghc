@@ -32,14 +32,14 @@ then
 then
 	CoreSyn
 then
-	IdInfo (loop CoreSyn.CoreRules etc, loop CoreUnfold.Unfolding) 
+	IdInfo (CoreSyn.Unfolding, CoreSyn.CoreRules)
 then
 	Id (lots from IdInfo)
 then
 	CoreFVs, PprCore
 then
 	CoreUtils (PprCore.pprCoreExpr, CoreFVs.exprFreeVars,
-		   loop CoreUnfold.isEvaldUnfolding CoreUnfold.maybeUnfoldingTemplate)
+		   CoreSyn.isEvaldUnfolding CoreSyn.maybeUnfoldingTemplate)
 then	
 	OccurAnal (CoreUtils.exprIsTrivial)
 then

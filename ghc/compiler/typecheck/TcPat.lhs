@@ -26,11 +26,8 @@ import TcEnv		( tcLookupValue, tcLookupClassByKey,
 			)
 import TcType 		( TcType, TcTyVar, tcInstTyVars, newTyVarTy )
 import TcMonoType	( tcHsSigType )
-import TcUnify 		( unifyTauTy, unifyListTy,
-			  unifyTupleTy, unifyUnboxedTupleTy
-			)
+import TcUnify 		( unifyTauTy, unifyListTy, unifyTupleTy	)
 
-import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( DataCon, dataConSig, dataConFieldLabels, 
 			  dataConSourceArity
@@ -47,6 +44,7 @@ import SrcLoc		( SrcLoc )
 import Unique		( eqClassOpKey, geClassOpKey, minusClassOpKey,
 			  cCallableClassKey
 			)
+import BasicTypes	( isBoxed )
 import Bag
 import Util		( zipEqual )
 import Outputable
@@ -166,18 +164,15 @@ tcPat tc_bndr pat_in@(ListPatIn pats) pat_ty
     tcPats tc_bndr pats (repeat elem_ty)	`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
     returnTc (ListPat elem_ty pats', lie_req, tvs, ids, lie_avail)
 
-tcPat tc_bndr pat_in@(TuplePatIn pats boxed) pat_ty
+tcPat tc_bndr pat_in@(TuplePatIn pats boxity) pat_ty
   = tcAddErrCtxt (patCtxt pat_in)	$
 
-    (if boxed
-     then unifyTupleTy        arity pat_ty
-     else unifyUnboxedTupleTy arity pat_ty)	`thenTc` \ arg_tys ->
-
-    tcPats tc_bndr pats arg_tys 	 		`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
+    unifyTupleTy boxity arity pat_ty		`thenTc` \ arg_tys ->
+    tcPats tc_bndr pats arg_tys 		`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
 
 	-- possibly do the "make all tuple-pats irrefutable" test:
     let
-	unmangled_result = TuplePat pats' boxed
+	unmangled_result = TuplePat pats' boxity
 
 	-- Under flag control turn a pattern (x,y,z) into ~(x,y,z)
 	-- so that we can experiment with lazy tuple-matching.
@@ -185,8 +180,8 @@ tcPat tc_bndr pat_in@(TuplePatIn pats boxed) pat_ty
 	-- it was easy to do.
 
 	possibly_mangled_result
-	  | opt_IrrefutableTuples && boxed = LazyPat unmangled_result
-	  | otherwise			   = unmangled_result
+	  | opt_IrrefutableTuples && isBoxed boxity = LazyPat unmangled_result
+	  | otherwise			   	    = unmangled_result
     in
     returnTc (possibly_mangled_result, lie_req, tvs, ids, lie_avail)
   where

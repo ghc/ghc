@@ -95,7 +95,7 @@ import OccName		( UserFS )
 import PrimRep		( PrimRep )
 import PrimOp		( PrimOp, primOpIsCheap )
 import TysPrim		( statePrimTyCon )
-import FieldLabel	( FieldLabel(..) )
+import FieldLabel	( FieldLabel )
 import SrcLoc		( SrcLoc )
 import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques )
 import Outputable

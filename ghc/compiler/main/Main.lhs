@@ -20,9 +20,8 @@ import Lex		( PState(..), P, ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
 
 import Rename		( renameModule )
-import RnMonad		( InterfaceDetails(..) )
 
-import MkIface		( startIface, ifaceDecls, endIface )
+import MkIface		( writeIface )
 import TcModule		( TcResults(..), typecheckModule )
 import Desugar		( deSugar )
 import SimplCore	( core2core )
@@ -124,24 +123,18 @@ doIt (core_cmds, stg_cmds)
 			reportCompile mod_name "Compilation NOT required!" >>
 			return ();
 	
-	Just (this_mod, rn_mod, iface_file_stuff@(InterfaceDetails _ _ _ deprecations),
-	      rn_name_supply, imported_modules) ->
+	Just (this_mod, rn_mod, 
+	      old_iface, new_iface,
+	      rn_name_supply, fixity_env,
+	      imported_modules) ->
 			-- Oh well, we've got to recompile for real
-
-
-	--------------------------  Start interface file  ----------------
-    -- Safely past renaming: we can start the interface file:
-    -- (the iface file is produced incrementally, as we have
-    -- the information that we need...; we use "iface<blah>")
-    -- "endIface" finishes the job.
-    startIface this_mod iface_file_stuff	>>= \ if_handle ->
 
 
 	--------------------------  Typechecking ----------------
     show_pass "TypeCheck" 				>>
     _scc_     "TypeCheck"
     typecheckModule tc_uniqs rn_name_supply
-		    iface_file_stuff rn_mod	        >>= \ maybe_tc_stuff ->
+		    fixity_env rn_mod	        >>= \ maybe_tc_stuff ->
     case maybe_tc_stuff of {
 	Nothing -> ghcExit 1;	-- Type checker failed
 
@@ -163,6 +156,12 @@ doIt (core_cmds, stg_cmds)
     tidyCorePgm tidy_uniqs this_mod
 		simplified orphan_rules			>>= \ (tidy_binds, tidy_orphan_rules) -> 
 
+    coreBindsSize tidy_binds `seq`
+--	TEMP: the above call zaps some space usage allocated by the
+--	simplifier, which for reasons I don't understand, persists
+--	thoroughout code generation
+
+
 
 	--------------------------  Convert to STG code -------------------------------
     show_pass "Core2Stg" 			>>
@@ -183,16 +182,9 @@ doIt (core_cmds, stg_cmds)
     let
 	final_ids = collectFinalStgBinders (map fst stg_binds2)
     in
-    coreBindsSize tidy_binds `seq`
---	TEMP: the above call zaps some space usage allocated by the
---	simplifier, which for reasons I don't understand, persists
---	thoroughout code generation
-
-    ifaceDecls if_handle local_tycons local_classes inst_info
-	       final_ids tidy_binds tidy_orphan_rules deprecations	>>
-    endIface if_handle						>>
-	    -- We are definitely done w/ interface-file stuff at this point:
-	    -- (See comments near call to "startIface".)
+    writeIface this_mod old_iface new_iface
+	       local_tycons local_classes inst_info
+	       final_ids tidy_binds tidy_orphan_rules 		>>
 
 
 	--------------------------  Code generation -------------------------------
@@ -331,8 +323,8 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     spec_info (Just (False, _)) = (0,0,0,0,1,0)
     spec_info (Just (True, _))  = (0,0,0,0,0,1)
 
-    data_info (TyData _ _ _ _ constrs derivs _ _)
-	= (length constrs, case derivs of {Nothing -> 0; Just ds -> length ds})
+    data_info (TyData _ _ _ _ _ nconstrs derivs _ _)
+	= (nconstrs, case derivs of {Nothing -> 0; Just ds -> length ds})
     data_info other = (0,0)
 
     class_info (ClassDecl _ _ _ _ meth_sigs def_meths _ _ _ _ _ _)

@@ -28,7 +28,7 @@ module Util (
 	assoc, assocUsing, assocDefault, assocDefaultUsing,
 
 	-- duplicate handling
-	hasNoDups, equivClasses, runs, removeDups, equivClassesByUniq,
+	hasNoDups, equivClasses, runs, removeDups, removeDupsEq, equivClassesByUniq,
 
 	-- sorting
 	IF_NOT_GHC(quicksort COMMA stableSortLt COMMA mergesort COMMA)
@@ -364,6 +364,17 @@ removeDups cmp xs
   where
     collect_dups dups_so_far [x]         = (dups_so_far,      x)
     collect_dups dups_so_far dups@(x:xs) = (dups:dups_so_far, x)
+
+removeDupsEq :: Eq a => [a] -> ([a], [[a]])
+-- Same, but with only equality
+-- It's worst case quadratic, but we only use it on short lists
+removeDupsEq [] = ([], [])
+removeDupsEq (x:xs) | x `elem` xs = (ys, (x : filter (== x) xs) : zs)
+				  where
+				    (ys,zs) = removeDupsEq (filter (/= x) xs)
+removeDupsEq (x:xs) | otherwise   = (x:ys, zs)
+				  where
+				    (ys,zs) = removeDupsEq xs
 \end{code}
 
 

@@ -17,7 +17,15 @@ module RdrName (
 
 	-- Destruction
 	rdrNameModule, rdrNameOcc, setRdrNameOcc,
-	isRdrDataCon, isRdrTyVar, isQual, isUnqual
+	isRdrDataCon, isRdrTyVar, isQual, isUnqual,
+
+	-- Environment
+	RdrNameEnv, 
+	emptyRdrEnv, lookupRdrEnv, addListToRdrEnv, rdrEnvElts, 
+	extendRdrEnv, rdrEnvToList,
+
+	-- Printing;	instance Outputable RdrName
+	pprUnqualRdrName 
   ) where 
 
 #include "HsVersions.h"
@@ -31,6 +39,7 @@ import OccName	( NameSpace, tcName,
 import Module   ( ModuleName, pprModuleName,
 		  mkSysModuleFS, mkSrcModuleFS
 		)
+import FiniteMap
 import Outputable
 import Util	( thenCmp )
 \end{code}
@@ -134,8 +143,10 @@ isQual rdr_name = not (isUnqual rdr_name)
 instance Outputable RdrName where
     ppr (RdrName qual occ) = pp_qual qual <> ppr occ
 			   where
-				pp_qual Unqual = empty
-				pp_qual (Qual mod) = pprModuleName mod <> dot
+			     pp_qual Unqual     = empty
+			     pp_qual (Qual mod) = pprModuleName mod <> dot
+
+pprUnqualRdrName (RdrName qual occ) = ppr occ
 
 instance Eq RdrName where
     a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
@@ -159,3 +170,26 @@ cmpQual (Qual m1) (Qual m2) = m1 `compare` m2
 
 
 
+%************************************************************************
+%*									*
+\subsection{Environment}
+%*									*
+%************************************************************************
+
+\begin{code}
+type RdrNameEnv a = FiniteMap RdrName a
+
+emptyRdrEnv  	:: RdrNameEnv a
+lookupRdrEnv 	:: RdrNameEnv a -> RdrName -> Maybe a
+addListToRdrEnv :: RdrNameEnv a -> [(RdrName,a)] -> RdrNameEnv a
+extendRdrEnv	:: RdrNameEnv a -> RdrName -> a -> RdrNameEnv a
+rdrEnvToList    :: RdrNameEnv a -> [(RdrName, a)]
+rdrEnvElts	:: RdrNameEnv a -> [a]
+
+emptyRdrEnv  = emptyFM
+lookupRdrEnv = lookupFM
+addListToRdrEnv = addListToFM
+rdrEnvElts	= eltsFM
+extendRdrEnv    = addToFM
+rdrEnvToList    = fmToList
+\end{code}

@@ -26,14 +26,16 @@ import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsGRHSs		( dsGuarded )
 import DsCCall		( dsCCall, resultWrapper )
 import DsListComp	( dsListComp )
-import DsUtils		( mkErrorAppDs, mkDsLets, mkConsExpr, mkNilExpr )
+import DsUtils		( mkErrorAppDs, mkDsLets, mkStringLit, mkStringLitFS, 
+			  mkConsExpr, mkNilExpr
+			)
 import Match		( matchWrapper, matchSimply )
 
 import CostCentre	( mkUserCC )
 import FieldLabel	( FieldLabel )
 import Id		( Id, idType, recordSelectorFieldLabel )
+import PrelInfo		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConTyCon, dataConArgTys, dataConFieldLabels )
-import PrelInfo		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID, addr2IntegerId )
 import TyCon		( isNewTyCon )
 import DataCon		( isExistentialDataCon )
 import Literal		( Literal(..), inIntRange )
@@ -42,14 +44,14 @@ import Type		( splitFunTys, mkTyConApp,
 			  isNotUsgTy, unUsgTy,
 			  splitAppTy, isUnLiftedType, Type
 			)
-import TysWiredIn	( tupleCon, unboxedTupleCon,
+import TysWiredIn	( tupleCon, 
 			  listTyCon, mkListTy,
 			  charDataCon, charTy, stringTy,
 			  smallIntegerDataCon, isIntegerTy
 			)
-import BasicTypes	( RecFlag(..) )
+import BasicTypes	( RecFlag(..), Boxity(..) )
 import Maybes		( maybeToBool )
-import Unique		( Uniquable(..), ratioTyConKey )
+import Unique		( Uniquable(..), hasKey, ratioTyConKey, addr2IntegerIdKey )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
 
@@ -160,7 +162,7 @@ dsExpr (HsLitOut (HsString s) _)
 -- "_" => build (\ c n -> c 'c' n)	-- LATER
 
 dsExpr (HsLitOut (HsString str) _)
-  = returnDs (mkStringLitFS str)
+  = mkStringLitFS str
 
 dsExpr (HsLitOut (HsLitLit str) ty)
   = ASSERT( maybeToBool maybe_ty )
@@ -170,22 +172,21 @@ dsExpr (HsLitOut (HsLitLit str) ty)
     Just rep_ty 	= maybe_ty
 
 dsExpr (HsLitOut (HsInt i) ty)
-  = returnDs (mkIntegerLit i)
+  = mkIntegerLit i
 
 
 dsExpr (HsLitOut (HsFrac r) ty)
-  = returnDs (mkConApp ratio_data_con [Type integer_ty,
-				       mkIntegerLit (numerator r),
-				       mkIntegerLit (denominator r)])
+  = mkIntegerLit (numerator r)		`thenDs` \ num ->
+    mkIntegerLit (denominator r)	`thenDs` \ denom ->
+    returnDs (mkConApp ratio_data_con [Type integer_ty, num, denom])
   where
     (ratio_data_con, integer_ty)
       = case (splitAlgTyConApp_maybe ty) of
 	  Just (tycon, [i_ty], [con])
-	    -> ASSERT(isIntegerTy i_ty && getUnique tycon == ratioTyConKey)
+	    -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
 	       (con, i_ty)
 
 	  _ -> (panic "ratio_data_con", panic "integer_ty")
-
 
 
 -- others where we know what to do:
@@ -300,7 +301,7 @@ dsExpr (HsCase discrim matches src_loc)
 		returnDs (Case core_discrim bndr alts)
 	_ -> panic ("dsExpr: tuple pattern:\n" ++ showSDoc (ppr matching_code))
   where
-    ubx_tuple_match (Match _ [TuplePat ps False{-unboxed-}] _ _) = True
+    ubx_tuple_match (Match _ [TuplePat ps Unboxed] _ _) = True
     ubx_tuple_match _ = False
 
 dsExpr (HsCase discrim matches src_loc)
@@ -379,12 +380,10 @@ dsExpr (ExplicitListOut ty xs)
                 ASSERT( isNotUsgTy ty )
 		returnDs (mkConsExpr ty core_x core_xs)
 
-dsExpr (ExplicitTuple expr_list boxed)
+dsExpr (ExplicitTuple expr_list boxity)
   = mapDs dsExpr expr_list	  `thenDs` \ core_exprs  ->
-    returnDs (mkConApp ((if boxed 
-			    then tupleCon 
-			    else unboxedTupleCon) (length expr_list))
-	    	(map (Type . unUsgTy . exprType) core_exprs ++ core_exprs))
+    returnDs (mkConApp (tupleCon boxity (length expr_list))
+	    	       (map (Type . unUsgTy . exprType) core_exprs ++ core_exprs))
                 -- the above unUsgTy is *required* -- KSW 1999-04-07
 
 dsExpr (ArithSeqOut expr (From from))
@@ -592,12 +591,14 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	  = do_expr expr locn			`thenDs` \ expr2 ->
 	    go stmts				`thenDs` \ rest ->
 	    let msg = ASSERT( isNotUsgTy b_ty )
-                 "Pattern match failure in do expression, " ++ showSDoc (ppr locn) in
+                      "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
+	    in
+	    mkStringLit msg			`thenDs` \ core_msg ->
 	    returnDs (mkIfThenElse expr2 
 				   rest 
 				   (App (App (Var fail_id) 
 					     (Type b_ty))
-					     (mkStringLit msg)))
+					     core_msg))
     
 	go (ExprStmt expr locn : stmts)
 	  = do_expr expr locn		`thenDs` \ expr2 ->
@@ -659,12 +660,13 @@ var_pat _ = False
 \end{code}
 
 \begin{code}
-mkIntegerLit :: Integer -> CoreExpr
+mkIntegerLit :: Integer -> DsM CoreExpr
 mkIntegerLit i
   | inIntRange i  	-- Small enough, so start from an Int
-  = mkConApp smallIntegerDataCon [mkIntLit i]
+  = returnDs (mkConApp smallIntegerDataCon [mkIntLit i])
 
   | otherwise 		-- Big, so start from a string
-  = App (Var addr2IntegerId) (Lit (MachStr (_PK_ (show i))))
+  = dsLookupGlobalValue addr2IntegerIdKey	`thenDs` \ addr2IntegerId ->
+    returnDs (App (Var addr2IntegerId) (Lit (MachStr (_PK_ (show i)))))
 \end{code}
 

@@ -12,9 +12,7 @@ core expression with (hopefully) improved usage information.
 
 \begin{code}
 module OccurAnal (
-	occurAnalyseBinds, occurAnalyseExpr, occurAnalyseGlobalExpr,
-	markBinderInsideLambda, tagBinders,
-	UsageDetails
+	occurAnalyseBinds, occurAnalyseGlobalExpr, occurAnalyseRule
     ) where
 
 #include "HsVersions.h"
@@ -42,7 +40,7 @@ import Maybes		( maybeToBool )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import Unique		( u2i, buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import UniqFM		( keysUFM )  
-import Util		( zipWithEqual, mapAndUnzip, count )
+import Util		( zipWithEqual, mapAndUnzip )
 import Outputable
 \end{code}
 
@@ -71,6 +69,15 @@ occurAnalyseGlobalExpr expr
   = 	-- Top level expr, so no interesting free vars, and
 	-- discard occurence info returned
     snd (occurAnalyseExpr (\_ -> False) expr)
+
+occurAnalyseRule :: CoreRule -> CoreRule
+occurAnalyseRule rule@(BuiltinRule _) = rule
+occurAnalyseRule (Rule str tpl_vars tpl_args rhs)
+		-- Add occ info to tpl_vars, rhs
+  = Rule str tpl_vars' tpl_args rhs'
+  where
+    (rhs_uds, rhs')	  = occurAnalyseExpr isLocallyDefined rhs
+    (rhs_uds1, tpl_vars') = tagBinders rhs_uds tpl_vars
 \end{code}
 
 
@@ -852,16 +859,6 @@ setBinderOcc usage bndr
     occ_info = case lookupVarEnv usage bndr of
 		 Nothing   -> IAmDead
 		 Just info -> binderInfoToOccInfo info
-
-markBinderInsideLambda :: CoreBndr -> CoreBndr
-markBinderInsideLambda bndr
-  | isTyVar bndr
-  = bndr
-
-  | otherwise
-  = case idOccInfo bndr of
-	OneOcc _ once -> bndr `setIdOccInfo` OneOcc insideLam once
-	other         -> bndr
 
 funOccZero = funOccurrence 0
 \end{code}

@@ -32,7 +32,7 @@ import CmdLineOpts
 import Maybes		( maybeToBool )
 import ErrUtils		( doIfSet, dumpIfSet )
 import Outputable
-import IO
+import IO		( IOMode(..), hClose, openFile )
 \end{code}
 
 
@@ -109,8 +109,8 @@ outputAsm flat_absC ncg_uniqs
 
 #else /* OMIT_NATIVE_CODEGEN */
 
-  = do 	hPutStrLn stderr "This compiler was built without a native code generator"
-	hPutStrLn stderr "Use -fvia-C instead"
+  = pprPanic "This compiler was built without a native code generator"
+	     (text "Use -fvia-C instead")
 
 #endif
 \end{code}

@@ -25,7 +25,7 @@ import Inst		( Inst, LIE, emptyLIE, mkLIE, plusLIE, plusLIEs, InstOrigin(..),
 			)
 import TcEnv		( tcExtendLocalValEnv,
 			  newSpecPragmaId, newLocalId,
-			  tcLookupTyCon, 
+			  tcLookupTyConByKey, 
 			  tcGetGlobalTyVars, tcExtendGlobalTyVars
 			)
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck, tcSimplifyToDicts )
@@ -41,8 +41,6 @@ import TcType		( TcType, TcThetaType,
 			  zonkTcType, zonkTcTypes, zonkTcThetaType, zonkTcTyVarToTyVar
 			)
 import TcUnify		( unifyTauTy, unifyTauTyLists )
-
-import PrelInfo		( main_NAME, ioTyCon_NAME )
 
 import Id		( Id, mkVanillaId, setInlinePragma, idFreeTyVars )
 import Var		( idType, idName )
@@ -62,6 +60,7 @@ import Util		( isIn )
 import Maybes		( maybeToBool )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNotTopLevel )
 import FiniteMap	( listToFM, lookupFM )
+import Unique		( ioTyConKey, mainKey, hasKey, Uniquable(..) )
 import SrcLoc           ( SrcLoc )
 import Outputable
 \end{code}
@@ -541,13 +540,20 @@ getTyVarsToGen is_unrestricted mono_id_tys lie
     zonkTcTypes mono_id_tys		`thenNF_Tc` \ zonked_mono_id_tys ->
     let
 	body_tyvars = tyVarsOfTypes zonked_mono_id_tys `minusVarSet` free_tyvars
+	fds	    = getAllFunDepsOfLIE lie
     in
     if is_unrestricted
     then
-	let fds = getAllFunDepsOfLIE lie in
+	  -- We need to augment the type variables that appear explicitly in
+	  -- the type by those that are determined by the functional dependencies.
+	  -- e.g. suppose our type is	C a b => a -> a
+	  --	with the fun-dep  a->b
+	  -- Then we should generalise over b too; otherwise it will be
+	  -- reported as ambiguous.
 	zonkFunDeps fds		`thenNF_Tc` \ fds' ->
-	let tvFundep = tyVarFunDep fds'
-	    extended_tyvars = oclose tvFundep body_tyvars in
+	let tvFundep 	    = tyVarFunDep fds'
+	    extended_tyvars = oclose tvFundep body_tyvars
+ 	in
 	-- pprTrace "gTVTG" (ppr (lie, body_tyvars, extended_tyvars)) $
 	returnNF_Tc (emptyVarSet, extended_tyvars)
     else
@@ -734,7 +740,7 @@ checkSigMatch top_lvl binder_names mono_ids sigs
   | main_bound_here
   =	-- First unify the main_id with IO t, for any old t
     tcSetErrCtxt mainTyCheckCtxt (
-	tcLookupTyCon ioTyCon_NAME		`thenTc`    \ ioTyCon ->
+	tcLookupTyConByKey ioTyConKey		`thenTc`    \ ioTyCon ->
 	newTyVarTy boxedTypeKind		`thenNF_Tc` \ t_tv ->
 	unifyTauTy ((mkTyConApp ioTyCon [t_tv]))
 		   (idType main_mono_id)
@@ -808,8 +814,8 @@ checkSigMatch top_lvl binder_names mono_ids sigs
     find_main NotTopLevel binder_names mono_ids = Nothing
     find_main TopLevel    binder_names mono_ids = go binder_names mono_ids
     go [] [] = Nothing
-    go (n:ns) (m:ms) | n == main_NAME = Just m
-		     | otherwise      = go ns ms
+    go (n:ns) (m:ms) | n `hasKey` mainKey = Just m
+		     | otherwise          = go ns ms
 \end{code}
 
 
@@ -936,13 +942,13 @@ sigContextsCtxt s1 s2
 	 4 (ptext SLIT("(the signature contexts in a mutually recursive group should all be identical)"))
 
 mainContextsErr id
-  | getName id == main_NAME = ptext SLIT("Main.main cannot be overloaded")
+  | id `hasKey` mainKey = ptext SLIT("Main.main cannot be overloaded")
   | otherwise
   = quotes (ppr id) <+> ptext SLIT("cannot be overloaded") <> char ',' <> -- sigh; workaround for cpp's inability to deal
     ptext SLIT("because it is mutually recursive with Main.main")         -- with commas inside SLIT strings.
 
 mainTyCheckCtxt
-  = hsep [ptext SLIT("When checking that"), quotes (ppr main_NAME), 
+  = hsep [ptext SLIT("When checking that"), quotes (ptext SLIT("main")),
 	  ptext SLIT("has the required type")]
 
 -----------------------------------------------

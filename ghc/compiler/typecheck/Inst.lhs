@@ -50,7 +50,7 @@ import TcType	( TcThetaType,
 		  zonkTcThetaType
 		)
 import Bag
-import Class	( classInstEnv, Class )
+import Class	( classInstEnv, Class, FunDep )
 import FunDeps	( instantiateFdClassTys )
 import Id	( Id, idFreeTyVars, idType, mkUserLocal, mkSysLocal )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
@@ -176,7 +176,7 @@ data Inst
 
   | FunDep
 	Class		-- the class from which this arises
-	[([TcType], [TcType])]
+	[FunDep TcType]
 	InstLoc
 
 data OverloadedLit
@@ -193,48 +193,25 @@ maps to do their stuff.
 \begin{code}
 instance Ord Inst where
   compare = cmpInst
-instance Ord PredType where
-  compare = cmpPred
 
 instance Eq Inst where
   (==) i1 i2 = case i1 `cmpInst` i2 of
 	         EQ    -> True
 		 other -> False
-instance Eq PredType where
-  (==) p1 p2 = case p1 `cmpPred` p2 of
-	         EQ    -> True
-		 other -> False
 
-cmpInst  (Dict _ pred1 _) (Dict _ pred2 _)
-  = (pred1 `cmpPred` pred2)
-cmpInst (Dict _ _ _) other
-  = LT
+cmpInst (Dict _ pred1 _)     	  (Dict _ pred2 _)	    = (pred1 `compare` pred2)
+cmpInst (Dict _ _ _)	     	  other 		    = LT
 
-cmpInst (Method _ _ _ _ _ _) (Dict _ _ _)
-  = GT
-cmpInst (Method _ id1 tys1 _ _ _) (Method _ id2 tys2 _ _ _)
-  = (id1 `compare` id2) `thenCmp` (tys1 `compare` tys2)
-cmpInst (Method _ _ _ _ _ _) other
-  = LT
+cmpInst (Method _ _ _ _ _ _) 	  (Dict _ _ _)	  	    = GT
+cmpInst (Method _ id1 tys1 _ _ _) (Method _ id2 tys2 _ _ _) = (id1 `compare` id2) `thenCmp` (tys1 `compare` tys2)
+cmpInst (Method _ _ _ _ _ _)      other			    = LT
 
-cmpInst (LitInst _ lit1 ty1 _) (LitInst _ lit2 ty2 _)
-  = (lit1 `cmpOverLit` lit2) `thenCmp` (ty1 `compare` ty2)
-cmpInst (LitInst _ _ _ _) (FunDep _ _ _)
-  = LT
-cmpInst (LitInst _ _ _ _) other
-  = GT
+cmpInst (LitInst _ lit1 ty1 _)	  (LitInst _ lit2 ty2 _)    = (lit1 `cmpOverLit` lit2) `thenCmp` (ty1 `compare` ty2)
+cmpInst (LitInst _ _ _ _)	  (FunDep _ _ _)	    = LT
+cmpInst (LitInst _ _ _ _)	  other 		    = GT
 
-cmpInst (FunDep clas1 fds1 _) (FunDep clas2 fds2 _)
-  = (clas1 `compare` clas2) `thenCmp` (fds1 `compare` fds2)
-cmpInst (FunDep _ _ _) other
-  = GT
-
-cmpPred (Class c1 tys1) (Class c2 tys2)
-  = (c1 `compare` c2) `thenCmp` (tys1 `compare` tys2)
-cmpPred (IParam n1 ty1) (IParam n2 ty2)
-  = (n1 `compare` n2) `thenCmp` (ty1 `compare` ty2)
-cmpPred (Class _ _) (IParam _ _) = LT
-cmpPred _           _            = GT
+cmpInst (FunDep clas1 fds1 _)     (FunDep clas2 fds2 _)     = (clas1 `compare` clas2) `thenCmp` (fds1 `compare` fds2)
+cmpInst (FunDep _ _ _)		  other			    = GT
 
 cmpOverLit (OverloadedIntegral   i1) (OverloadedIntegral   i2) = i1 `compare` i2
 cmpOverLit (OverloadedFractional f1) (OverloadedFractional f2) = f1 `compare` f2
@@ -400,10 +377,11 @@ newMethod orig id tys
     newMethodWithGivenTy orig id tys theta tau	`thenNF_Tc` \ meth_inst ->
     returnNF_Tc (unitLIE meth_inst, instToId meth_inst)
 
-instOverloadedFun orig (HsVar v) arg_tys theta tau
+instOverloadedFun orig v arg_tys theta tau
+-- This is where we introduce new functional dependencies into the LIE
   = newMethodWithGivenTy orig v arg_tys theta tau	`thenNF_Tc` \ inst ->
     instFunDeps orig theta				`thenNF_Tc` \ fds ->
-    returnNF_Tc (HsVar (instToId inst), mkLIE (inst : fds))
+    returnNF_Tc (instToId inst, mkLIE (inst : fds))
 
 instFunDeps orig theta
   = tcGetInstLoc orig	`thenNF_Tc` \ loc ->

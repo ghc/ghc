@@ -16,13 +16,13 @@ import IO	( hPutStr, hPutStrLn, stderr, stdout )
 
 import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting, opt_PprStyle_Debug )
 import CoreSyn
-import CoreFVs		( idFreeVars )
+import CoreFVs		( idFreeVars, mustHaveLocalBinding )
 import CoreUtils	( exprOkForSpeculation, coreBindsSize )
 
 import Bag
 import Literal		( Literal, literalType )
 import DataCon		( DataCon, dataConRepType )
-import Id		( mayHaveNoBinding, isDeadBinder )
+import Id		( isDeadBinder )
 import Var		( Var, Id, TyVar, idType, tyVarKind, isTyVar, isId )
 import VarSet
 import Subst		( mkTyVarSubst, substTy )
@@ -561,19 +561,7 @@ checkBndrIdInScope binder id
 
 checkInScope :: SDoc -> Var -> LintM ()
 checkInScope loc_msg var loc scope errs
-  |  isLocallyDefined var 
-  && not (var `elemVarSet` scope)
-  && not (isId var && mayHaveNoBinding var)
-	-- Micro-hack here... Class decls generate applications of their
-	-- dictionary constructor, but don't generate a binding for the
-	-- constructor (since it would never be used).  After a single round
-	-- of simplification, these dictionary constructors have been
-	-- inlined (from their UnfoldInfo) to CoCons.  Just between
-	-- desugaring and simplfication, though, they appear as naked, unbound
-	-- variables as the function in an application.
-	-- The hack here simply doesn't check for out-of-scope-ness for
-	-- data constructors (at least, in a function position).
-	-- Ditto primitive Ids
+  |  mustHaveLocalBinding var && not (var `elemVarSet` scope)
   = (Nothing, addErr errs (hsep [ppr var, loc_msg]) loc)
   | otherwise
   = (Nothing,errs)

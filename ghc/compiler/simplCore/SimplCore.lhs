@@ -44,7 +44,6 @@ import Name		( mkLocalName, tidyOccName, tidyTopName,
 			  NamedThing(..), OccName
 			)
 import TyCon		( TyCon, isDataTyCon )
-import PrelRules	( builtinRules )
 import Type		( Type, 
 			  isUnLiftedType,
 			  tidyType, tidyTypes, tidyTopType, tidyTyVar, tidyTyVars,
@@ -94,11 +93,8 @@ core2core core_todos binds rules
 
         better_local_rules <- simplRules ru_us local_rules binds
 
-	let all_imported_rules = builtinRules ++ imported_rules
-	-- Here is where we add in the built-in rules
-
         let (binds1, local_rule_base) = prepareLocalRuleBase binds better_local_rules
-            imported_rule_base        = prepareOrphanRuleBase all_imported_rules
+            imported_rule_base        = prepareOrphanRuleBase imported_rules
 
 	-- Do the main business
 	(stats, processed_binds, processed_local_rules)
@@ -205,6 +201,8 @@ simplRules us rules binds
     bind_vars = foldr (unionVarSet . mkVarSet . bindersOf) emptyVarSet binds
 
 
+simplRule rule@(ProtoCoreRule is_local id (BuiltinRule _))
+  = returnSmpl rule
 simplRule rule@(ProtoCoreRule is_local id (Rule name bndrs args rhs))
   | not is_local
   = returnSmpl rule	-- No need to fiddle with imported rules

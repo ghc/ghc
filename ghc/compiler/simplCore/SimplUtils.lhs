@@ -35,8 +35,9 @@ import Maybes		( maybeToBool, catMaybes )
 import Name		( isLocalName, setNameUnique )
 import SimplMonad
 import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType, repType,
-			  splitTyConApp_maybe, splitAlgTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
+			  splitTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
 			)
+import TyCon		( tyConDataConsIfAvailable )
 import PprType		( {- instance Outputable Type -} )
 import DataCon		( dataConRepArity )
 import TysPrim		( statePrimTyCon )
@@ -288,11 +289,16 @@ discardInline cont		   = cont
 
 -- Note the repType: we want to look through newtypes for this purpose
 
-canUpdateInPlace ty = case splitAlgTyConApp_maybe (repType ty) of
-			Just (_, _, [dc]) -> arity == 1 || arity == 2
-					  where
-					     arity = dataConRepArity dc
+canUpdateInPlace ty = case splitTyConApp_maybe (repType ty) of {
+			Nothing		-> False ;
+			Just (tycon, _) -> 
+
+		      case tyConDataConsIfAvailable tycon of
+			[dc]  -> arity == 1 || arity == 2
+			      where
+				 arity = dataConRepArity dc
 			other -> False
+		      }
 \end{code}
 
 

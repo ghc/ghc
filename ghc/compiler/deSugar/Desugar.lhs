@@ -10,7 +10,6 @@ module Desugar ( deSugar ) where
 
 import CmdLineOpts	( opt_D_dump_ds )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), HsExpr(..), HsBinds(..), MonoBinds(..) )
-import HsCore		( UfRuleBody(..) )
 import TcHsSyn		( TypecheckedMonoBinds, TypecheckedForeignDecl, TypecheckedRuleDecl )
 import TcModule		( TcResults(..) )
 import CoreSyn
@@ -77,11 +76,12 @@ deSugar mod_name us (TcResults {tc_env = global_val_env,
 dsProgram mod_name all_binds rules fo_decls
   = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->
     dsForeigns mod_name fo_decls	`thenDs` \ (fi_binds, fe_binds, h_code, c_code) ->
-    mapDs dsRule rules			`thenDs` \ rules' ->
-    let 
-	ds_binds = fi_binds ++ [Rec core_prs] ++ fe_binds
-	fe_binders = bindersOfBinds fe_binds
+    let
+	ds_binds      = fi_binds ++ [Rec core_prs] ++ fe_binds
+	fe_binders    = bindersOfBinds fe_binds
+	local_binders = mkVarSet (bindersOfBinds ds_binds)
     in
+    mapDs (dsRule local_binders) rules	`thenDs` \ rules' ->
     returnDs (ds_binds, rules', h_code, c_code, fe_binders)
   where
     auto_scc | opt_SccProfilingOn = TopLevel
@@ -101,19 +101,19 @@ ppr_ds_rules rules
 %************************************************************************
 
 \begin{code}
-dsRule :: TypecheckedRuleDecl -> DsM ProtoCoreRule
-dsRule (IfaceRuleDecl fn (CoreRuleBody name all_vars args rhs) loc)
-  = returnDs (ProtoCoreRule False {- non-local -} fn 
-			    (Rule name all_vars args rhs))
+dsRule :: IdSet -> TypecheckedRuleDecl -> DsM ProtoCoreRule
+dsRule in_scope (IfaceRuleOut fn rule)
+  = returnDs (ProtoCoreRule False {- non-local -} fn rule)
     
-dsRule (RuleDecl name sig_tvs vars lhs rhs loc)
+dsRule in_scope (HsRule name sig_tvs vars lhs rhs loc)
   = putSrcLocDs loc		$
     ds_lhs all_vars lhs		`thenDs` \ (fn, args) ->
     dsExpr rhs			`thenDs` \ core_rhs ->
     returnDs (ProtoCoreRule True {- local -} fn
-			    (Rule name all_vars args core_rhs))
+			    (Rule name tpl_vars args core_rhs))
   where
-    all_vars = sig_tvs ++ [var | RuleBndr var <- vars]
+    tpl_vars = sig_tvs ++ [var | RuleBndr var <- vars]
+    all_vars = in_scope `unionVarSet` mkVarSet tpl_vars
 
 ds_lhs all_vars lhs
   = let
@@ -132,7 +132,7 @@ ds_lhs all_vars lhs
 			-- Note recursion here... substitution won't terminate
 			-- if there is genuine recursion... which there isn't
 
-	subst = mkSubst (mkVarSet all_vars) subst_env
+	subst = mkSubst all_vars subst_env
 	body'' = substExpr subst body'
     in
 	

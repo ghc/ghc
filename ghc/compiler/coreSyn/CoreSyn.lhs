@@ -12,7 +12,7 @@ module CoreSyn (
 	mkLets, mkLams, 
 	mkApps, mkTyApps, mkValApps, mkVarApps,
 	mkLit, mkIntLitInt, mkIntLit, 
-	mkStringLit, mkStringLitFS, mkConApp, 
+	mkConApp, 
 	varToCoreExpr,
 
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, isTyVar, isId,
@@ -40,7 +40,8 @@ module CoreSyn (
 	CoreRules(..), 	-- Representation needed by friends
 	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
 	RuleName,
-	emptyCoreRules, isEmptyCoreRules, rulesRhsFreeVars, rulesRules
+	emptyCoreRules, isEmptyCoreRules, rulesRhsFreeVars, rulesRules,
+	isBuiltinRule
     ) where
 
 #include "HsVersions.h"
@@ -52,7 +53,6 @@ import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType, seqType )
 import Literal	        ( Literal(MachStr), mkMachInt )
 import PrimOp		( PrimOp )
 import DataCon		( DataCon, dataConId )
-import ThinAir		( unpackCStringId, unpackCString2Id )
 import VarSet
 import Outputable
 \end{code}
@@ -124,6 +124,20 @@ data CoreRules
   = Rules [CoreRule]
 	  VarSet		-- Locally-defined free vars of RHSs
 
+emptyCoreRules :: CoreRules
+emptyCoreRules = Rules [] emptyVarSet
+
+isEmptyCoreRules :: CoreRules -> Bool
+isEmptyCoreRules (Rules rs _) = null rs
+
+rulesRhsFreeVars :: CoreRules -> VarSet
+rulesRhsFreeVars (Rules _ fvs) = fvs
+
+rulesRules :: CoreRules -> [CoreRule]
+rulesRules (Rules rules _) = rules
+\end{code}
+
+\begin{code}
 type RuleName = FAST_STRING
 
 data CoreRule
@@ -136,17 +150,8 @@ data CoreRule
 			-- and suchlike.  It has no free variables.
 	([CoreExpr] -> Maybe (RuleName, CoreExpr))
 
-emptyCoreRules :: CoreRules
-emptyCoreRules = Rules [] emptyVarSet
-
-isEmptyCoreRules :: CoreRules -> Bool
-isEmptyCoreRules (Rules rs _) = null rs
-
-rulesRhsFreeVars :: CoreRules -> VarSet
-rulesRhsFreeVars (Rules _ fvs) = fvs
-
-rulesRules :: CoreRules -> [CoreRule]
-rulesRules (Rules rules _) = rules
+isBuiltinRule (BuiltinRule _) = True
+isBuiltinRule _		      = False
 \end{code}
 
 
@@ -329,8 +334,6 @@ mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
 mkLit         :: Literal -> Expr b
 mkIntLit      :: Integer -> Expr b
 mkIntLitInt   :: Int     -> Expr b
-mkStringLit   :: String  -> Expr b	-- Makes a [Char] literal
-mkStringLitFS :: FAST_STRING  -> Expr b -- Makes a [Char] literal
 mkConApp      :: DataCon -> [Arg b] -> Expr b
 mkLets	      :: [Bind b] -> Expr b -> Expr b
 mkLams	      :: [b] -> Expr b -> Expr b
@@ -343,22 +346,6 @@ mkLets binds body   = foldr Let body binds
 
 mkIntLit    n = Lit (mkMachInt n)
 mkIntLitInt n = Lit (mkMachInt (toInteger n))
-
-mkStringLit str	= mkStringLitFS (_PK_ str)
-
-mkStringLitFS str
-  | any is_NUL (_UNPK_ str)
-  = 	 -- Must cater for NULs in literal string
-    mkApps (Var unpackCString2Id)
-		[Lit (MachStr str),
-		 mkIntLitInt (_LENGTH_ str)]
-
-  | otherwise
-  =	-- No NULs in the string
-    App (Var unpackCStringId) (Lit (MachStr str))
-
-  where
-    is_NUL c = c == '\0'
 
 varToCoreExpr :: CoreBndr -> Expr b
 varToCoreExpr v | isId v    = Var v

@@ -5,15 +5,15 @@ module TcEnv(
 
 	TcEnv, ValueEnv, TcTyThing(..),
 
-	initEnv, getEnvTyCons, getEnvClasses, getAllEnvTyCons,
+	initEnv, getEnvTyCons, getEnvClasses, getEnvAllTyCons,
 	
         tcExtendUVarEnv, tcLookupUVar,
 
 	tcExtendTyVarEnv, tcExtendTyVarEnvForMeths, tcExtendTypeEnv, tcGetInScopeTyVars,
 
 	tcLookupTy,
-	tcLookupTyCon, tcLookupTyConByKey, 
-	tcLookupClass, tcLookupClassByKey, tcLookupClassByKey_maybe,
+	tcLookupTyConByKey, 
+	tcLookupClassByKey, tcLookupClassByKey_maybe,
 
 	tcExtendGlobalValEnv, tcExtendLocalValEnv,
 	tcGetValueEnv,        tcSetValueEnv, 
@@ -32,7 +32,7 @@ module TcEnv(
 
 #include "HsVersions.h"
 
-import HsTypes	( HsTyVar, getTyVarName )
+import HsTypes	( HsTyVarBndr, getTyVarName )
 import Id	( mkUserLocal, isDataConWrapId_maybe )
 import MkId 	( mkSpecPragmaId )
 import Var	( TyVar, Id, setVarName,
@@ -150,7 +150,7 @@ data TcEnv = TcEnv
 type NameEnv val = UniqFM val		-- Keyed by Names
 
 type UsageEnv   = NameEnv UVar
-type TypeEnv	= NameEnv (TcKind, Maybe Arity, TcTyThing)
+type TypeEnv	= NameEnv (TcKind, TcTyThing)
 type ValueEnv	= NameEnv Id	
 
 valueEnvIds :: ValueEnv -> [Id]
@@ -159,20 +159,29 @@ valueEnvIds ve = eltsUFM ve
 data TcTyThing = ATyVar TcTyVar		-- Mutable only so that the kind can be mutable
 					-- if the kind is mutable, the tyvar must be so that
 					-- zonking works
-	       | ATyCon TyCon
-	       | AClass Class
+	       | ADataTyCon TyCon
+	       | ASynTyCon TyCon Arity
+	       | AClass Class Arity
 
 
 initEnv :: TcRef TcTyVarSet -> TcEnv
 initEnv mut = TcEnv emptyUFM emptyUFM emptyUFM (emptyVarSet, mut)
 
-getEnvTyCons  (TcEnv _ te _ _) = [tc | (_, _, ATyCon tc) <- eltsUFM te]
-getEnvClasses (TcEnv _ te _ _) = [cl | (_, _, AClass cl) <- eltsUFM te]
-getAllEnvTyCons (TcEnv _ te _ _) = catMaybes (map gettc (eltsUFM te))
+getEnvClasses (TcEnv _ te _ _) = [cl | (_, AClass cl _) <- eltsUFM te]
+
+getEnvTyCons  (TcEnv _ te _ _) = catMaybes (map get_tc (eltsUFM te))
+    where
+      get_tc (_, ADataTyCon tc)  = Just tc
+      get_tc (_, ASynTyCon tc _) = Just tc
+      get_tc other		 = Nothing
+
+getEnvAllTyCons te_list = catMaybes (map get_tc te_list)
+	-- The 'all' means 'including the tycons from class decls'
     where                          
-      gettc (_,_, ATyCon tc) = Just tc
-      gettc (_,_, AClass cl) = Just (classTyCon cl)
-      gettc _                = Nothing
+      get_tc (_, ADataTyCon tc)  = Just tc
+      get_tc (_, ASynTyCon tc _) = Just tc
+      get_tc (_, AClass cl _)    = Just (classTyCon cl)
+      get_tc other               = Nothing
 \end{code}
 
 The UsageEnv
@@ -209,7 +218,7 @@ tcExtendTyVarEnv :: [TyVar] -> TcM s r -> TcM s r
 tcExtendTyVarEnv tyvars scope
   = tcGetEnv				`thenNF_Tc` \ (TcEnv ue te ve (in_scope_tvs, gtvs)) ->
     let
-	extend_list = [ (getName tv, (kindToTcKind (tyVarKind tv), Nothing, ATyVar tv))
+	extend_list = [ (getName tv, (kindToTcKind (tyVarKind tv), ATyVar tv))
 		      | tv <- tyvars
 		      ]
  	te'           = addListToUFM te extend_list
@@ -239,7 +248,7 @@ tcExtendTyVarEnvForMeths sig_tyvars inst_tyvars thing_inside
     in
     tcSetEnv (TcEnv ue te' ve gtvs) thing_inside
   where
-    stuff = [ (getName sig_tv, (kindToTcKind (tyVarKind inst_tv), Nothing, ATyVar inst_tv))
+    stuff = [ (getName sig_tv, (kindToTcKind (tyVarKind inst_tv), ATyVar inst_tv))
 	    | (sig_tv, inst_tv) <- zipEqual "tcMeth" sig_tyvars inst_tyvars
 	    ]
 
@@ -282,9 +291,9 @@ tcGetInScopeTyVars
 Type constructors and classes
 
 \begin{code}
-tcExtendTypeEnv :: [(Name, (TcKind, Maybe Arity, TcTyThing))] -> TcM s r -> TcM s r
+tcExtendTypeEnv :: [(Name, (TcKind, TcTyThing))] -> TcM s r -> TcM s r
 tcExtendTypeEnv bindings scope
-  = ASSERT( null [tv | (_, (_,_,ATyVar tv)) <- bindings] )
+  = ASSERT( null [tv | (_, (_,ATyVar tv)) <- bindings] )
 	-- Not for tyvars; use tcExtendTyVarEnv
     tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     let
@@ -297,7 +306,7 @@ tcExtendTypeEnv bindings scope
 Looking up in the environments.
 
 \begin{code}
-tcLookupTy :: Name ->  NF_TcM s (TcKind, Maybe Arity, TcTyThing)
+tcLookupTy :: Name ->  NF_TcM s (TcKind, TcTyThing)
 tcLookupTy name
   = tcGetEnv	`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     case lookupUFM te name of {
@@ -305,46 +314,35 @@ tcLookupTy name
  	Nothing    -> 
 
     case maybeWiredInTyConName name of
-	Just tc -> returnNF_Tc (kindToTcKind (tyConKind tc), maybe_arity, ATyCon tc)
-		where
-		   maybe_arity | isSynTyCon tc = Just (tyConArity tc)
-			       | otherwise     = Nothing 
+	Just tc | isSynTyCon tc -> returnNF_Tc (kindToTcKind (tyConKind tc), ASynTyCon tc (tyConArity tc))
+		| otherwise     -> returnNF_Tc (kindToTcKind (tyConKind tc), ADataTyCon tc)
 
 	Nothing -> 	-- This can happen if an interface-file
 			-- unfolding is screwed up
 		   failWithTc (tyNameOutOfScope name)
     }
 	
-tcLookupClass :: Name -> NF_TcM s Class
-tcLookupClass name
-  = tcLookupTy name	`thenNF_Tc` \ (_, _, AClass clas) ->
-    returnNF_Tc clas
-
-tcLookupTyCon :: Name -> NF_TcM s TyCon
-tcLookupTyCon name
-  = tcLookupTy name	`thenNF_Tc` \ (_, _, ATyCon tycon) ->
-    returnNF_Tc tycon
-
 tcLookupClassByKey :: Unique -> NF_TcM s Class
 tcLookupClassByKey key
   = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     case lookupUFM_Directly te key of
-	Just (_, _, AClass cl) -> returnNF_Tc cl
-	other		       -> pprPanic "tcLookupClassByKey:" (pprUnique10 key)
+	Just (_, AClass cl _) -> returnNF_Tc cl
+	other		      -> pprPanic "tcLookupClassByKey:" (pprUnique10 key)
 
 tcLookupClassByKey_maybe :: Unique -> NF_TcM s (Maybe Class)
 tcLookupClassByKey_maybe key
   = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     case lookupUFM_Directly te key of
-	Just (_, _, AClass cl) -> returnNF_Tc (Just cl)
-	other		       -> returnNF_Tc Nothing
+	Just (_, AClass cl _) -> returnNF_Tc (Just cl)
+	other		      -> returnNF_Tc Nothing
 
 tcLookupTyConByKey :: Unique -> NF_TcM s TyCon
 tcLookupTyConByKey key
   = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     case lookupUFM_Directly te key of
-	Just (_, _, ATyCon tc) -> returnNF_Tc tc
-	other		       -> pprPanic "tcLookupTyConByKey:" (pprUnique10 key)
+	Just (_, ADataTyCon tc)  -> returnNF_Tc tc
+	Just (_, ASynTyCon tc _) -> returnNF_Tc tc
+	other		         -> pprPanic "tcLookupTyConByKey:" (pprUnique10 key)
 \end{code}
 
 

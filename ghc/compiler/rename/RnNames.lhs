@@ -24,14 +24,13 @@ import RdrHsSyn	( RdrNameIE, RdrNameImportDecl,
 		  RdrNameHsModule, RdrNameHsDecl
 		)
 import RnIfaces	( getInterfaceExports, getDeclBinders, getDeclSysBinders,
-		  recordSlurp, checkUpToDate
+		  recordLocalSlurps, checkModUsage, findAndReadIface, outOfDate
 		)
 import RnEnv
 import RnMonad
 
 import FiniteMap
-import PrelMods
-import PrelInfo ( main_RDR )
+import PrelInfo ( pRELUDE_Name, mAIN_Name, main_RDR )
 import UniqFM	( lookupUFM )
 import Bag	( bagToList )
 import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )
@@ -40,7 +39,7 @@ import Name	( Name, ExportFlag(..), ImportReason(..), Provenance(..),
 		  isLocallyDefined, setNameProvenance,
 		  nameOccName, getSrcLoc, pprProvenance, getNameProvenance
 		)
-import RdrName	( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isQual )
+import RdrName	( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isQual, isUnqual )
 import OccName	( setOccNameSpace, dataName )
 import SrcLoc	( SrcLoc )
 import NameSet	( elemNameSet, emptyNameSet )
@@ -62,25 +61,26 @@ import List	( partition )
 
 \begin{code}
 getGlobalNames :: RdrNameHsModule
-	       -> RnMG (Maybe (ExportEnv, 
-			       GlobalRdrEnv,
-			       FixityEnv,	 -- Fixities for local decls only
-			       AvailEnv		 -- Maps a name to its parent AvailInfo
-						 -- Just for in-scope things only
+	       -> RnMG (Maybe (GlobalRdrEnv,	-- Maps all in-scope things
+			       GlobalRdrEnv,	-- Maps just *local* things
+			       Avails,		-- The exported stuff
+			       AvailEnv,	-- Maps a name to its parent AvailInfo
+						-- Just for in-scope things only
+			       Maybe ParsedIface	-- The old interface file, if any
 			       ))
 			-- Nothing => no need to recompile
 
 getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
   = 	-- These two fix-loops are to get the right
 	-- provenance information into a Name
-    fixRn (\ ~(rec_gbl_env, rec_exported_avails, _) ->
+    fixRn ( \ ~(Just (rec_gbl_env, _, rec_export_avails, _, _)) ->
 
 	let
 	   rec_unqual_fn :: Name -> Bool	-- Is this chap in scope unqualified?
 	   rec_unqual_fn = unQualInScope rec_gbl_env
 
 	   rec_exp_fn :: Name -> ExportFlag
-	   rec_exp_fn = mk_export_fn (availsToNameSet rec_exported_avails)
+	   rec_exp_fn = mk_export_fn (availsToNameSet rec_export_avails)
 	in
 	setModuleRn this_mod			$
 
@@ -113,74 +113,54 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 
 	    all_avails :: ExportAvails
 	    all_avails = foldr plusExportAvails local_mod_avails (imp_avails_s2 ++ imp_avails_s1)
+	    (_, global_avail_env) = all_avails
 	in
 
-	-- TRY FOR EARLY EXIT
-	-- We can't go for an early exit before this because we have to check
-	-- for name clashes.  Consider:
-	--
-	--	module A where		module B where
-	--  	   import B		   h = True
-	--   	   f = h
-	--
-	-- Suppose I've compiled everything up, and then I add a
-	-- new definition to module B, that defines "f".
-	--
-	-- Then I must detect the name clash in A before going for an early
-	-- exit.  The early-exit code checks what's actually needed from B
-	-- to compile A, and of course that doesn't include B.f.  That's
-	-- why we wait till after the plusEnv stuff to do the early-exit.
-      checkEarlyExit this_mod			`thenRn` \ up_to_date ->
-      if up_to_date then
-	returnRn (gbl_env, junk_exp_fn, Nothing)
-      else
- 
-	-- RECORD BETTER PROVENANCES IN THE CACHE
- 	-- The names in the envirnoment have better provenances (e.g. imported on line x)
-	-- than the names in the name cache.  We update the latter now, so that we
-	-- we start renaming declarations we'll get the good names
-	-- The isQual is because the qualified name is always in scope
-      updateProvenances (concat [names | (rdr_name, names) <- rdrEnvToList imp_gbl_env, 
-					  isQual rdr_name])	`thenRn_`
-
-	-- PROCESS EXPORT LISTS
-      exportsFromAvail this_mod exports all_avails gbl_env      `thenRn` \ exported_avails ->
-
-	-- DONE
-      returnRn (gbl_env, exported_avails, Just all_avails)
-    )		`thenRn` \ (gbl_env, exported_avails, maybe_stuff) ->
-
-    case maybe_stuff of {
-	Nothing -> returnRn Nothing ;
-	Just all_avails ->
-
-	-- DEAL WITH FIXITIES
-   fixitiesFromLocalDecls gbl_env decls		`thenRn` \ local_fixity_env ->
-   let
-	-- Export only those fixities that are for names that are
-	--	(a) defined in this module
-	--	(b) exported
-	exported_fixities :: [(Name,Fixity)]
-	exported_fixities = [(name,fixity)
-			    | FixitySig name fixity _ <- nameEnvElts local_fixity_env,
-			      isLocallyDefined name
-			    ]
-
-	-- CONSTRUCT RESULTS
-	export_mods = case exports of
-			Nothing -> []
-			Just es -> [mod | IEModuleContents mod <- es, mod /= this_mod]
-
-	export_env	      = ExportEnv exported_avails exported_fixities export_mods
-	(_, global_avail_env) = all_avails
-   in
-   traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts local_fixity_env)))	`thenRn_`
-
-   returnRn (Just (export_env, gbl_env, local_fixity_env, global_avail_env))
-   }
+		-- TRY FOR EARLY EXIT
+		-- We can't go for an early exit before this because we have to check
+		-- for name clashes.  Consider:
+		--
+		--	module A where		module B where
+		--  	   import B		   h = True
+		--   	   f = h
+		--
+		-- Suppose I've compiled everything up, and then I add a
+		-- new definition to module B, that defines "f".
+		--
+		-- Then I must detect the name clash in A before going for an early
+		-- exit.  The early-exit code checks what's actually needed from B
+		-- to compile A, and of course that doesn't include B.f.  That's
+		-- why we wait till after the plusEnv stuff to do the early-exit.
+		
+	-- Check For eacly exit
+	checkErrsRn				`thenRn` \ no_errs_so_far ->
+        if not no_errs_so_far then
+		-- Found errors already, so exit now
+		returnRn Nothing
+	else
+	checkEarlyExit this_mod			`thenRn` \ (up_to_date, old_iface) ->
+	if up_to_date then
+		-- Interface files are sufficiently unchanged
+		putDocRn (text "Compilation IS NOT required")	`thenRn_`
+		returnRn Nothing
+	else
+	
+		-- RECORD BETTER PROVENANCES IN THE CACHE
+		-- The names in the envirnoment have better provenances (e.g. imported on line x)
+		-- than the names in the name cache.  We update the latter now, so that we
+		-- we start renaming declarations we'll get the good names
+		-- The isQual is because the qualified name is always in scope
+	updateProvenances (concat [names | (rdr_name, names) <- rdrEnvToList gbl_env, 
+					   isQual rdr_name])	`thenRn_`
+	
+		-- PROCESS EXPORT LISTS
+	exportsFromAvail this_mod exports all_avails gbl_env	`thenRn` \ export_avails ->
+	
+	
+		-- ALL DONE
+	returnRn (Just (gbl_env, local_gbl_env, export_avails, global_avail_env, old_iface))
+   )
   where
-    junk_exp_fn = error "RnNames:export_fn"
-
     all_imports = prel_imports ++ imports
 
 	-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
@@ -203,27 +183,32 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 \end{code}
 	
 \begin{code}
-checkEarlyExit mod
-  = checkErrsRn				`thenRn` \ no_errs_so_far ->
-    if not no_errs_so_far then
-	-- Found errors already, so exit now
-	returnRn True
-    else
+checkEarlyExit mod_name
+  = traceRn (text "Considering whether compilation is required...")	`thenRn_`
 
-    traceRn (text "Considering whether compilation is required...")	`thenRn_`
-    if not opt_SourceUnchanged then
-	-- Source code changed and no errors yet... carry on 
-	traceRn (nest 4 (text "source file changed or recompilation check turned off"))	`thenRn_` 
-	returnRn False
-    else
+	-- Read the old interface file, if any, for the module being compiled
+    findAndReadIface doc_str mod_name False {- Not hi-boot -}	`thenRn` \ maybe_iface ->
 
-	-- Unchanged source, and no errors yet; see if usage info
-	-- up to date, and exit if so
-    checkUpToDate mod						`thenRn` \ up_to_date ->
-    (if up_to_date 
-	then putDocRn (text "Compilation IS NOT required")
-	else returnRn ())					`thenRn_`
-    returnRn up_to_date
+	-- CHECK WHETHER WE HAVE IT ALREADY
+    case maybe_iface of
+	Left err -> 	-- Old interface file not found, so we'd better bail out
+		    traceRn (vcat [ptext SLIT("No old interface file for") <+> pprModuleName mod_name,
+				   err])			`thenRn_`
+		    returnRn (outOfDate, Nothing)
+
+	Right iface
+	  | not opt_SourceUnchanged
+	  -> 	-- Source code changed
+	     traceRn (nest 4 (text "source file changed or recompilation check turned off"))	`thenRn_` 
+	     returnRn (False, Just iface)
+
+	  | otherwise
+	  -> 	-- Source code unchanged and no errors yet... carry on 
+	     checkModUsage (pi_usages iface)	`thenRn` \ up_to_date ->
+	     returnRn (up_to_date, Just iface)
+  where
+	-- Only look in current directory, with suffix .hi
+    doc_str = sep [ptext SLIT("need usage info from"), pprModuleName mod_name]
 \end{code}
 	
 \begin{code}
@@ -285,7 +270,7 @@ importsFromLocalDecls mod_name rec_exp_fn decls
     mapRn_ (addErrRn . dupDeclErr) dups		`thenRn_` 
 
 	-- Record that locally-defined things are available
-    mapRn_ (recordSlurp Nothing) avails		`thenRn_`
+    recordLocalSlurps avails			`thenRn_`
 
 	-- Build the environment
     qualifyImports mod_name 
@@ -298,15 +283,16 @@ importsFromLocalDecls mod_name rec_exp_fn decls
     mod = mkThisModule mod_name
 
     newLocalName rdr_name loc 
-	= (if isQual rdr_name then
-		qualNameErr (text "the binding for" <+> quotes (ppr rdr_name)) (rdr_name,loc)
-		-- There should never be a qualified name in a binding position (except in instance decls)
-		-- The parser doesn't check this because the same parser parses instance decls
-	    else 
-		returnRn ())			`thenRn_`
+	= check_unqual rdr_name loc 			`thenRn_`
+	  newTopBinder mod (rdrNameOcc rdr_name) 	`thenRn` \ name ->
+	  returnRn (setNameProvenance name (LocalDef loc (rec_exp_fn name)))
 
-	  newLocalTopBinder mod (rdrNameOcc rdr_name) rec_exp_fn loc
-
+	-- There should never be a qualified name in a binding position (except in instance decls)
+	-- The parser doesn't check this because the same parser parses instance decls
+    check_unqual rdr_name loc
+	| isUnqual rdr_name = returnRn ()
+	| otherwise	    = qualNameErr (text "the binding for" <+> quotes (ppr rdr_name)) 
+				          (rdr_name,loc)
 
 getLocalDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)	-- New-name function
 		    -> RdrNameHsDecl
@@ -327,38 +313,6 @@ getLocalDeclBinders new_name decl
 	-- The getDeclSysBinders is just to get the names of superclass selectors
 	-- etc, into the cache
     new_sys_name rdr_name loc = newImplicitBinder (rdrNameOcc rdr_name) loc
-
-fixitiesFromLocalDecls :: GlobalRdrEnv -> [RdrNameHsDecl] -> RnMG FixityEnv
-fixitiesFromLocalDecls gbl_env decls
-  = foldlRn getFixities emptyNameEnv decls
-  where
-    getFixities :: FixityEnv -> RdrNameHsDecl -> RnMG FixityEnv
-    getFixities acc (FixD fix)
-      = fix_decl acc fix
-
-    getFixities acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ _ _ _ _))
-      = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
-		-- Get fixities from class decl sigs too.
-    getFixities acc other_decl
-      = returnRn acc
-
-    fix_decl acc sig@(FixitySig rdr_name fixity loc)
-	= 	-- Check for fixity decl for something not declared
-	  case lookupRdrEnv gbl_env rdr_name of {
-	    Nothing | opt_WarnUnusedBinds 
-		    -> pushSrcLocRn loc (addWarnRn (unusedFixityDecl rdr_name fixity))
-		       `thenRn_` returnRn acc 
-		    | otherwise -> returnRn acc ;
-	
-	    Just (name:_) ->
-
-		-- Check for duplicate fixity decl
-	  case lookupNameEnv acc name of {
-	    Just (FixitySig _ _ loc') -> addErrRn (dupFixityDecl rdr_name loc loc')
-					 `thenRn_` returnRn acc ;
-
-	    Nothing -> returnRn (addToNameEnv acc name (FixitySig name fixity loc))
-	  }}
 \end{code}
 
 %************************************************************************
@@ -750,12 +704,4 @@ dupModuleExport mod
   = hsep [ptext SLIT("Duplicate"),
 	  quotes (ptext SLIT("Module") <+> pprModuleName mod), 
           ptext SLIT("in export list")]
-
-unusedFixityDecl rdr_name fixity
-  = hsep [ptext SLIT("Unused fixity declaration for"), quotes (ppr rdr_name)]
-
-dupFixityDecl rdr_name loc1 loc2
-  = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),
-	  ptext SLIT("at ") <+> ppr loc1,
-	  ptext SLIT("and") <+> ppr loc2]
 \end{code}

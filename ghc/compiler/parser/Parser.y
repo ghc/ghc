@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.30 2000/05/23 11:35:37 simonpj Exp $
+$Id: Parser.y,v 1.31 2000/05/25 12:41:17 simonpj Exp $
 
 Haskell grammar.
 
@@ -13,18 +13,19 @@ module Parser ( parse ) where
 
 import HsSyn
 import HsPragmas
+import HsTypes		( mkHsTupCon )
 
 import RdrHsSyn
 import Lex
 import ParseUtil
 import RdrName
-import PrelMods		( mAIN_Name )
-import OccName		( varName, ipName, dataName, tcClsName, tvName )
+import PrelInfo		( mAIN_Name )
+import OccName		( varName, ipName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
 import CallConv
 import CmdLineOpts	( opt_SccProfilingOn )
-import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
+import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), NewOrData(..) )
 import Panic
 
 import GlaExts
@@ -332,13 +333,13 @@ topdecl :: { RdrBinding }
 	| srcloc 'data' ctype '=' constrs deriving
 		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
 		   returnP (RdrHsDecl (TyClD
-		      (TyData DataType cs c ts (reverse $5) $6
+		      (TyData DataType cs c ts (reverse $5) (length $5) $6
 			NoDataPragmas $1))) }
 
 	| srcloc 'newtype' ctype '=' newconstr deriving
 		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
 		   returnP (RdrHsDecl (TyClD
-		      (TyData NewType cs c ts [$5] $6
+		      (TyData NewType cs c ts [$5] 1 $6
 			NoDataPragmas $1))) }
 
 	| srcloc 'class' ctype fds where
@@ -372,7 +373,9 @@ topdecl :: { RdrBinding }
 		{ RdrHsDecl (ForD (ForeignDecl $5 FoLabel $7 (mkExtName $4 $5)
 					defaultCallConv $1)) }
 
-      	| decl		{ $1 }
+	| '{-# DEPRECATED' deprecations '#-}'	 	{ $2 }
+	| '{-# RULES' rules '#-}'		 	{ $2 }
+      	| decl						{ $1 }
 
 decls 	:: { [RdrBinding] }
 	: decls ';' decl		{ $3 : $1 }
@@ -390,8 +393,6 @@ decl 	:: { RdrBinding }
 		    (map (\t -> RdrSig (SpecSig $3 t $2)) $5) }
 	| '{-# SPECIALISE' srcloc 'instance' inst_type '#-}'
 		{ RdrSig (SpecInstSig $4 $2) }
-	| '{-# RULES' rules '#-}' 	{ $2 }
-	| '{-# DEPRECATED' deprecations '#-}' 	{ $2 }
 
 opt_phase :: { Maybe Int }
           : INTEGER                     { Just (fromInteger $1) }
@@ -428,7 +429,7 @@ rules	:: { RdrBinding }
 
 rule  	:: { RdrBinding }
 	: STRING rule_forall fexp '=' srcloc exp
-	     { RdrHsDecl (RuleD (RuleDecl $1 [] $2 $3 $6 $5)) }
+	     { RdrHsDecl (RuleD (HsRule $1 [] $2 $3 $6 $5)) }
 
 rule_forall :: { [RdrNameRuleBndr] }
 	: 'forall' rule_var_list '.'            { $2 }
@@ -454,7 +455,8 @@ deprecations :: { RdrBinding }
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { RdrBinding }
 	: srcloc exportlist STRING
-		{ foldr1 RdrAndBindings [ RdrSig (DeprecSig (Deprecation n $3) $1) | n <- $2 ] }
+		{ foldr RdrAndBindings RdrNullBind 
+			[ RdrHsDecl (DeprecD (Deprecation n $3 $1)) | n <- $2 ] }
 
 -----------------------------------------------------------------------------
 -- Foreign import/export
@@ -508,20 +510,20 @@ ctype	:: { RdrNameHsType }
 	| type				{ $1 }
 
 type :: { RdrNameHsType }
-	: btype '->' type		{ MonoFunTy $1 $3 }
-	| ipvar '::' type		{ MonoIParamTy $1 $3 }
+	: btype '->' type		{ HsFunTy $1 $3 }
+	| ipvar '::' type		{ mkHsIParamTy $1 $3 }
 	| btype				{ $1 }
 
 btype :: { RdrNameHsType }
-	: btype atype			{ MonoTyApp $1 $2 }
+	: btype atype			{ HsAppTy $1 $2 }
 	| atype				{ $1 }
 
 atype :: { RdrNameHsType }
-	: gtycon			{ MonoTyVar $1 }
-	| tyvar				{ MonoTyVar $1 }
-	| '(' type ',' types ')'	{ MonoTupleTy ($2 : reverse $4) True }
-	| '(#' types '#)'		{ MonoTupleTy (reverse $2) False }
-	| '[' type ']'			{ MonoListTy $2 }
+	: gtycon			{ HsTyVar $1 }
+	| tyvar				{ HsTyVar $1 }
+	| '(' type ',' types ')'	{ HsTupleTy (mkHsTupCon tcName Boxed  ($2:$4)) ($2 : reverse $4) }
+	| '(#' types '#)'		{ HsTupleTy (mkHsTupCon tcName Unboxed     $2) (reverse $2)	 }
+	| '[' type ']'			{ HsListTy $2 }
 	| '(' ctype ')'			{ $2 }
 
 gtycon 	:: { RdrName }
@@ -737,8 +739,8 @@ aexp1	:: { RdrNameHsExpr }
 	| gcon				{ HsVar $1 }
   	| literal			{ HsLit $1 }
 	| '(' exp ')'			{ HsPar $2 }
-	| '(' exp ',' texps ')'		{ ExplicitTuple ($2 : reverse $4) True }
-	| '(#' texps '#)'		{ ExplicitTuple (reverse $2) False }
+	| '(' exp ',' texps ')'		{ ExplicitTuple ($2 : reverse $4) Boxed}
+	| '(#' texps '#)'		{ ExplicitTuple (reverse $2)      Unboxed }
 	| '[' list ']'                  { $2 }
 	| '(' infixexp qop ')'		{ SectionL $2 $3  }
 	| '(' qopm infixexp ')'		{ SectionR $2 $3 }

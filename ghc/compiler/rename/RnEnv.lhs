@@ -22,10 +22,9 @@ import RnMonad
 import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  ImportReason(..), getSrcLoc, 
 			  mkLocalName, mkImportedLocalName, mkGlobalName, mkUnboundName,
-			  mkIPName, isSystemName, isWiredInName,
+			  mkIPName, isWiredInName, hasBetterProv,
 			  nameOccName, setNameModule, nameModule,
 			  pprOccName, isLocallyDefined, nameUnique, nameOccName,
-                          occNameUserString,
 			  setNameProvenance, getNameProvenance, pprNameProvenance
 			)
 import NameSet
@@ -33,7 +32,7 @@ import OccName		( OccName,
 			  mkDFunOcc, occNameUserString, occNameString,
 			  occNameFlavour
 			)
-import TysWiredIn	( tupleTyCon, unboxedTupleTyCon, listTyCon )
+import TysWiredIn	( listTyCon )
 import Type		( funTyCon )
 import Module		( ModuleName, mkThisModule, moduleName, mkVanillaModule, pprModuleName )
 import TyCon		( TyCon )
@@ -42,7 +41,7 @@ import Unique		( Unique, Uniquable(..) )
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable
-import Util		( removeDups, equivClasses, thenCmp )
+import Util		( removeDups, equivClasses, thenCmp, sortLt )
 import List		( nub )
 \end{code}
 
@@ -55,63 +54,58 @@ import List		( nub )
 %*********************************************************
 
 \begin{code}
-newLocalTopBinder :: Module -> OccName 
-	       -> (Name -> ExportFlag) -> SrcLoc
-	       -> RnM d Name
-newLocalTopBinder mod occ rec_exp_fn loc
-  = newTopBinder mod occ (\name -> setNameProvenance name (LocalDef loc (rec_exp_fn name)))
-	-- We must set the provenance of the thing in the cache
-	-- correctly, particularly whether or not it is locally defined.
-	--
-	-- Since newLocalTopBinder is used only
-	-- at binding occurrences, we may as well get the provenance
-	-- dead right first time; hence the rec_exp_fn passed in
-
-newImportedBinder :: Module -> RdrName -> RnM d Name
-newImportedBinder mod rdr_name
-  = ASSERT2( isUnqual rdr_name, ppr rdr_name )
-    newTopBinder mod (rdrNameOcc rdr_name) (\name -> name)
-	-- Provenance is already implicitImportProvenance
-
 implicitImportProvenance = NonLocalDef ImplicitImport False
 
-newTopBinder :: Module -> OccName -> (Name -> Name) -> RnM d Name
-newTopBinder mod occ set_prov
+newTopBinder :: Module -> OccName -> RnM d Name
+newTopBinder mod occ
   = 	-- First check the cache
+    traceRn (text "newTopBinder" <+> ppr mod <+> ppr occ) `thenRn_`
+
     getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
     let 
 	key          = (moduleName mod, occ)
     in
     case lookupFM cache key of
 
-	-- A hit in the cache! 
-	-- Set the Module of the thing, and set its provenance (hack pending 
-	-- 	spj update)
+	-- A hit in the cache!  We are at the binding site of the name, which is
+	-- the time we know all about the Name's host Module (in particular, which
+	-- package it comes from), so update the Module in the name.
+	-- But otherwise *leave the Provenance alone*:
 	--
-	-- It also means that if there are two defns for the same thing
-	-- in a module, then each gets a separate SrcLoc
+	--	* For imported names, the Provenance may already be correct.
+	--	  e.g. We imported Prelude.hi, and set the provenance of PrelShow.Show
+	--	       to 'UserImport from Prelude'.  Note that we havn't yet opened PrelShow.hi
+	--	       Later we find we really need PrelShow.Show, so we open PrelShow.hi, and
+	--	       that's when we find the binding occurrence of Show. 
 	--
-	-- There's a complication for wired-in names.  We don't want to
+	--	* For locally defined names, we do a setProvenance on the Name
+	--	  right after newTopBinder, and then use updateProveances to finally
+	--	  set the provenances in the cache correctly.
+	--
+	-- NB: for wired-in names it's important not to
 	-- forget that they are wired in even when compiling that module
 	-- (else we spit out redundant defns into the interface file)
-	-- So for them we just set the provenance
 
 	Just name -> let 
-			new_name  = set_prov (setNameModule name mod)
+			new_name  = setNameModule name mod
 			new_cache = addToFM cache key new_name
 		     in
 		     setNameSupplyRn (us, inst_ns, new_cache, ipcache)	`thenRn_`
+		     traceRn (text "newTopBinder: overwrite" <+> ppr new_name) `thenRn_`
 		     returnRn new_name
 		     
 	-- Miss in the cache!
 	-- Build a completely new Name, and put it in the cache
+	-- Even for locally-defined names we use implicitImportProvenance; 
+	-- updateProvenances will set it to rights
 	Nothing -> let
 			(us', us1) = splitUniqSupply us
 			uniq   	   = uniqFromSupply us1
-			new_name   = set_prov (mkGlobalName uniq mod occ implicitImportProvenance)
+			new_name   = mkGlobalName uniq mod occ implicitImportProvenance
 			new_cache  = addToFM cache key new_name
 		   in
 		   setNameSupplyRn (us', inst_ns, new_cache, ipcache)	`thenRn_`
+		   traceRn (text "newTopBinder: new" <+> ppr new_name) `thenRn_`
 		   returnRn new_name
 
 
@@ -136,8 +130,10 @@ mkImportedGlobalName mod_name occ
 	key = (mod_name, occ)
     in
     case lookupFM cache key of
-	Just name -> returnRn name
-	Nothing   -> setNameSupplyRn (us', inst_ns, new_cache, ipcache)	`thenRn_`
+	Just name -> traceRn (text "mkImportedGlobalName: hit" <+> ppr name) `thenRn_`
+		     returnRn name
+	Nothing   -> setNameSupplyRn (us', inst_ns, new_cache, ipcache)		`thenRn_`
+		     traceRn (text "mkImportedGlobalName: new" <+> ppr name)	`thenRn_`
 		     returnRn name
 		  where
 		     (us', us1) = splitUniqSupply us
@@ -175,7 +171,6 @@ updateProvenances names
 	= setNameProvenance name_in_cache (getNameProvenance name_with_prov)
 			
 
-
 mkImportedGlobalFromRdrName :: RdrName -> RnM d Name 
 mkImportedGlobalFromRdrName rdr_name
   | isQual rdr_name
@@ -209,13 +204,16 @@ getIPName rdr_name
 %*							*
 %*********************************************************
 
-@newImplicitBinder@ is used for (a) dfuns
-(b) default methods, defined in this module.
+@newImplicitBinder@ is used for
+	(a) dfuns		(RnSource.rnDecl on InstDecls)
+	(b) default methods	(RnSource.rnDecl on ClassDecls)
+when these dfuns/default methods are defined in the module being compiled
 
 \begin{code}
 newImplicitBinder occ src_loc
   = getModuleRn				`thenRn` \ mod_name ->
-    newLocalTopBinder (mkThisModule mod_name) occ (\_ -> Exported) src_loc
+    newTopBinder (mkThisModule mod_name) occ 	`thenRn` \ name ->
+    returnRn (setNameProvenance name (LocalDef src_loc Exported))
 \end{code}
 
 Make a name for the dict fun for an instance decl
@@ -232,16 +230,15 @@ newDFunName key@(cl_occ, tycon_occ) loc
 
 \begin{code}
 getDFunKey :: RenamedHsType -> (OccName, OccName)	-- Used to manufacture DFun names
-getDFunKey (HsForAllTy _ _ ty)     = getDFunKey ty
-getDFunKey (MonoFunTy _ ty)        = getDFunKey ty
-getDFunKey (MonoDictTy cls (ty:_)) = (nameOccName cls, get_tycon_key ty)
+getDFunKey (HsForAllTy _ _ ty)              = getDFunKey ty
+getDFunKey (HsFunTy _ ty)                   = getDFunKey ty
+getDFunKey (HsPredTy (HsPClass cls (ty:_))) = (nameOccName cls, get_tycon_key ty)
 
-get_tycon_key (MonoTyVar tv)   = nameOccName (getName tv)
-get_tycon_key (MonoTyApp ty _) = get_tycon_key ty
-get_tycon_key (MonoTupleTy tys True)  = getOccName (tupleTyCon        (length tys))
-get_tycon_key (MonoTupleTy tys False) = getOccName (unboxedTupleTyCon (length tys))
-get_tycon_key (MonoListTy _)   = getOccName listTyCon
-get_tycon_key (MonoFunTy _ _)  = getOccName funTyCon
+get_tycon_key (HsTyVar tv)		     = getOccName tv
+get_tycon_key (HsAppTy ty _)		     = get_tycon_key ty
+get_tycon_key (HsTupleTy (HsTupCon n _) tys) = getOccName n
+get_tycon_key (HsListTy _)   		     = getOccName listTyCon
+get_tycon_key (HsFunTy _ _)		     = getOccName funTyCon
 \end{code}
 
 
@@ -351,7 +348,7 @@ bindUVarRn :: SDoc -> RdrName -> (Name -> RnMS (a, FreeVars)) -> RnMS (a, FreeVa
 bindUVarRn = bindLocalRn
 
 -------------------------------------
-extendTyVarEnvFVRn :: [HsTyVar Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeVars)
+extendTyVarEnvFVRn :: [HsTyVarBndr Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeVars)
 	-- This tiresome function is used only in rnDecl on InstDecl
 extendTyVarEnvFVRn tyvars enclosed_scope
   = getLocalNameEnv		`thenRn` \ env ->
@@ -364,16 +361,16 @@ extendTyVarEnvFVRn tyvars enclosed_scope
     setLocalNameEnv new_env enclosed_scope	`thenRn` \ (thing, fvs) -> 
     returnRn (thing, delListFromNameSet fvs tyvar_names)
 
-bindTyVarsRn :: SDoc -> [HsTyVar RdrName]
-	      -> ([HsTyVar Name] -> RnMS a)
+bindTyVarsRn :: SDoc -> [HsTyVarBndr RdrName]
+	      -> ([HsTyVarBndr Name] -> RnMS a)
 	      -> RnMS a
 bindTyVarsRn doc_str tyvar_names enclosed_scope
   = bindTyVars2Rn doc_str tyvar_names 	$ \ names tyvars ->
     enclosed_scope tyvars
 
 -- Gruesome name: return Names as well as HsTyVars
-bindTyVars2Rn :: SDoc -> [HsTyVar RdrName]
-	      -> ([Name] -> [HsTyVar Name] -> RnMS a)
+bindTyVars2Rn :: SDoc -> [HsTyVarBndr RdrName]
+	      -> ([Name] -> [HsTyVarBndr Name] -> RnMS a)
 	      -> RnMS a
 bindTyVars2Rn doc_str tyvar_names enclosed_scope
   = getSrcLocRn					`thenRn` \ loc ->
@@ -383,16 +380,16 @@ bindTyVars2Rn doc_str tyvar_names enclosed_scope
     bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
     enclosed_scope names (zipWith replaceTyVarName tyvar_names names)
 
-bindTyVarsFVRn :: SDoc -> [HsTyVar RdrName]
-	      -> ([HsTyVar Name] -> RnMS (a, FreeVars))
+bindTyVarsFVRn :: SDoc -> [HsTyVarBndr RdrName]
+	      -> ([HsTyVarBndr Name] -> RnMS (a, FreeVars))
 	      -> RnMS (a, FreeVars)
 bindTyVarsFVRn doc_str rdr_names enclosed_scope
   = bindTyVars2Rn doc_str rdr_names	$ \ names tyvars ->
     enclosed_scope tyvars		`thenRn` \ (thing, fvs) ->
     returnRn (thing, delListFromNameSet fvs names)
 
-bindTyVarsFV2Rn :: SDoc -> [HsTyVar RdrName]
-	      -> ([Name] -> [HsTyVar Name] -> RnMS (a, FreeVars))
+bindTyVarsFV2Rn :: SDoc -> [HsTyVarBndr RdrName]
+	      -> ([Name] -> [HsTyVarBndr Name] -> RnMS (a, FreeVars))
 	      -> RnMS (a, FreeVars)
 bindTyVarsFV2Rn doc_str rdr_names enclosed_scope
   = bindTyVars2Rn doc_str rdr_names	$ \ names tyvars ->
@@ -431,7 +428,8 @@ Looking up a name in the RnEnv.
 
 \begin{code}
 lookupBndrRn rdr_name
-  = getNameEnvs		`thenRn` \ (global_env, local_env) ->
+  = traceRn (text "lookupBndrRn" <+> ppr rdr_name) 	`thenRn_`
+    getNameEnvs		`thenRn` \ (global_env, local_env) ->
 
 	-- Try local env
     case lookupRdrEnv local_env rdr_name of {
@@ -441,7 +439,9 @@ lookupBndrRn rdr_name
     getModeRn	`thenRn` \ mode ->
     case mode of 
 	InterfaceMode -> 	-- Look in the global name cache
-			    mkImportedGlobalFromRdrName rdr_name
+			    mkImportedGlobalFromRdrName rdr_name		`thenRn` \ n ->
+			    traceRn (text "lookupBndrRn result:" <+> ppr n) 	`thenRn_` 
+			    returnRn n
 
 	SourceMode    -> -- Source mode, so look up a *qualified* version
 			 -- of the name, so that we get the right one even
@@ -454,10 +454,7 @@ lookupBndrRn rdr_name
 		  Nothing	   -> pprPanic "lookupBndrRn" (ppr mod <+> ppr rdr_name)
     }
 
--- Just like lookupRn except that we record the occurrence too
--- Perhaps surprisingly, even wired-in names are recorded.
--- Why?  So that we know which wired-in names are referred to when
--- deciding which instance declarations to import.
+-- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn :: RdrName -> RnMS Name
 lookupOccRn rdr_name
   = getNameEnvs				`thenRn` \ (global_env, local_env) ->
@@ -471,6 +468,45 @@ lookupGlobalOccRn :: RdrName -> RnMS Name
 lookupGlobalOccRn rdr_name
   = getNameEnvs				`thenRn` \ (global_env, local_env) ->
     lookup_global_occ global_env rdr_name
+
+-- lookupSigOccRn is used for type signatures and pragmas
+-- Is this valid?
+--   module A
+--	import M( f )
+--	f :: Int -> Int
+--	f x = x
+-- In a sense, it's clear that the 'f' in the signature must refer
+-- to A.f, but the Haskell98 report does not stipulate this, so
+-- I treat the 'f' in the signature as a reference to an unqualified
+-- 'f' and hence fail with an ambiguous reference.
+lookupSigOccRn :: RdrName -> RnMS Name
+lookupSigOccRn = lookupOccRn
+
+{-	OLD VERSION
+-- This code tries to be cleverer than the above.
+-- The variable in a signature must refer to a locally-defined thing,
+-- even if there's an imported thing of the same name.
+-- 
+-- But this doesn't work for instance decls:
+--	instance Enum Int where
+--	  {-# INLINE enumFrom #-}
+--	  ...
+-- Here the enumFrom is an imported reference!
+lookupSigOccRn rdr_name
+  = getNameEnvs				`thenRn` \ (global_env, local_env) ->
+    case (lookupRdrEnv local_env rdr_name, lookupRdrEnv global_env rdr_name) of
+	(Just name, _) -> returnRn name
+
+	(Nothing, Just names) -> case filter isLocallyDefined names of
+				   [n] -> returnRn n
+				   ns  -> pprPanic "lookupSigOccRn" (ppr rdr_name <+> ppr names <+> ppr ns)
+					-- There can't be a local top-level name-clash
+					-- (That's dealt with elsewhere.)
+
+	(Nothing, Nothing) -> failWithRn (mkUnboundName rdr_name)
+					 (unknownNameErr rdr_name)
+-}
+  
 
 -- Look in both local and global env
 lookup_occ global_env local_env rdr_name
@@ -517,6 +553,11 @@ The name cache should have the correct provenance, though.
 \begin{code}
 lookupImplicitOccRn :: RdrName -> RnM d Name 
 lookupImplicitOccRn rdr_name = mkImportedGlobalFromRdrName rdr_name
+
+lookupImplicitOccsRn :: [RdrName] -> RnM d NameSet
+lookupImplicitOccsRn rdr_names
+  = mapRn lookupImplicitOccRn rdr_names	`thenRn` \ names ->
+    returnRn (mkNameSet names)
 \end{code}
 
 @unQualInScope@ returns a function that takes a @Name@ and tells whether
@@ -561,19 +602,9 @@ combine_globals ns_old ns_new	-- ns_new is often short
     add n ns | any (is_duplicate n) ns_old = map choose ns	-- Eliminate duplicates
 	     | otherwise	           = n:ns
 	     where
-	       choose n' | n==n' && better_provenance n n' = n
-			 | otherwise			   = n'
+	       choose m | n==m && n `hasBetterProv` m = n
+			| otherwise		      = m
 
--- Choose 
---	a local thing		      over an	imported thing
---	a user-imported thing	      over a	non-user-imported thing
--- 	an explicitly-imported thing  over an	implicitly imported thing
-better_provenance n1 n2
-  = case (getNameProvenance n1, getNameProvenance n2) of
-	(LocalDef _ _,			      _				  ) -> True
-	(NonLocalDef (UserImport _ _ True) _, _				  ) -> True
-	(NonLocalDef (UserImport _ _ _   ) _, NonLocalDef ImplicitImport _) -> True
-	other								    -> False
 
 is_duplicate :: Name -> Name -> Bool
 is_duplicate n1 n2 | isLocallyDefined n1 && isLocallyDefined n2 = False
@@ -621,17 +652,23 @@ addAvailToNameSet names avail = addListToNameSet names (availNames avail)
 availsToNameSet :: [AvailInfo] -> NameSet
 availsToNameSet avails = foldl addAvailToNameSet emptyNameSet avails
 
-availName :: AvailInfo -> Name
+availName :: GenAvailInfo name -> name
 availName (Avail n)     = n
 availName (AvailTC n _) = n
 
-availNames :: AvailInfo -> [Name]
+availNames :: GenAvailInfo name -> [name]
 availNames (Avail n)      = [n]
 availNames (AvailTC n ns) = ns
 
 addSysAvails :: AvailInfo -> [Name] -> AvailInfo
 addSysAvails avail          []  = avail
 addSysAvails (AvailTC n ns) sys = AvailTC n (sys ++ ns)
+
+rdrAvailInfo :: AvailInfo -> RdrAvailInfo
+-- Used when building the avails we are going to put in an interface file
+-- We sort the components to reduce needless wobbling of interfaces
+rdrAvailInfo (Avail n)	    = Avail   (nameOccName n)
+rdrAvailInfo (AvailTC n ns) = AvailTC (nameOccName n) (sortLt (<) (map nameOccName ns))
 
 filterAvail :: RdrNameIE	-- Wanted
 	    -> AvailInfo	-- Available

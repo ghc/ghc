@@ -25,7 +25,7 @@ import TcMonoType	( tcExtendTopTyVarScope, tcExtendTyVarScope,
 			  tcContext, tcHsTopTypeKind
 			)
 import TcType		( zonkTcTyVarToTyVar, zonkTcClassConstraints )
-import TcEnv		( tcLookupTy, TcTyThing(..) )
+import TcEnv		( tcLookupTy, tcLookupValueByKey, TcTyThing(..) )
 import TcMonad
 import TcUnify		( unifyKind )
 
@@ -40,7 +40,7 @@ import Var		( Id, TyVar )
 import Name		( Name, isLocallyDefined, OccName, NamedThing(..), nameUnique )
 import Outputable
 import TyCon		( TyCon, AlgTyConFlavour(..), ArgVrcs, mkSynTyCon, mkAlgTyCon, 
-			  tyConDataCons, tyConTyVars,
+			  tyConDataConsIfAvailable, tyConTyVars,
 			  isSynTyCon, isNewTyCon
 			)
 import Type		( getTyVar, tyVarsOfTypes, splitFunTy, applyTys,
@@ -52,6 +52,7 @@ import Type		( getTyVar, tyVarsOfTypes, splitFunTy, applyTys,
 import TysWiredIn	( unitTy )
 import Var		( tyVarKind )
 import VarSet		( intersectVarSet, isEmptyVarSet )
+import Unique		( unpackCStringIdKey )
 import Util		( equivClasses )
 import FiniteMap        ( FiniteMap, lookupWithDefaultFM )
 import CmdLineOpts	( opt_GlasgowExts )
@@ -67,13 +68,13 @@ import CmdLineOpts	( opt_GlasgowExts )
 kcTyDecl :: RenamedTyClDecl -> TcM s ()
 
 kcTyDecl (TySynonym name tyvar_names rhs src_loc)
-  = tcLookupTy name				`thenNF_Tc` \ (kind, _, _) ->
+  = tcLookupTy name				`thenNF_Tc` \ (kind, _) ->
     tcExtendTopTyVarScope kind tyvar_names	$ \ _ result_kind ->
     tcHsTypeKind rhs				`thenTc` \ (rhs_kind, _) ->
     unifyKind result_kind rhs_kind
 
-kcTyDecl (TyData _ context tycon_name tyvar_names con_decls _ _ src_loc)
-  = tcLookupTy tycon_name			`thenNF_Tc` \ (kind, _, _) ->
+kcTyDecl (TyData _ context tycon_name tyvar_names con_decls _ _ _ src_loc)
+  = tcLookupTy tycon_name			`thenNF_Tc` \ (kind, _) ->
     tcExtendTopTyVarScope kind tyvar_names	$ \ result_kind _ ->
     tcContext context				`thenTc_` 
     mapTc kcConDecl con_decls			`thenTc_`
@@ -107,10 +108,10 @@ kcConDecl (ConDecl _ _ ex_tvs ex_ctxt details loc)
 %************************************************************************
 
 \begin{code}
-tcTyDecl :: RecFlag -> FiniteMap Name ArgVrcs -> RenamedTyClDecl -> TcM s TyCon
+tcTyDecl :: RecFlag -> FiniteMap Name ArgVrcs -> RenamedTyClDecl -> TcM s (Name, TcTyThing)
 
 tcTyDecl is_rec rec_vrcs (TySynonym tycon_name tyvar_names rhs src_loc)
-  = tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, Just arity, _) ->
+  = tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, ASynTyCon _ arity) ->
     tcExtendTopTyVarScope tycon_kind tyvar_names	$ \ tyvars _ ->
     tcHsTopTypeKind rhs					`thenTc` \ (_, rhs_ty) ->
 	-- If the RHS mentions tyvars that aren't in scope, we'll 
@@ -123,12 +124,12 @@ tcTyDecl is_rec rec_vrcs (TySynonym tycon_name tyvar_names rhs src_loc)
                                       tycon_name
 	tycon = mkSynTyCon tycon_name tycon_kind arity tyvars rhs_ty argvrcs
     in
-    returnTc tycon
+    returnTc (tycon_name, ASynTyCon tycon arity)
 
 
-tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc)
+tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_decls nconstrs derivings pragmas src_loc)
   = 	-- Lookup the pieces
-    tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, _, ATyCon rec_tycon) ->
+    tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, ADataTyCon rec_tycon) ->
     tcExtendTopTyVarScope tycon_kind tyvar_names	$ \ tyvars _ ->
 
 	-- Typecheck the pieces
@@ -148,16 +149,16 @@ tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_
                                       tycon_name
 
 	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt' argvrcs
-			   data_cons
+			   data_cons nconstrs
 			   derived_classes
 			   flavour is_rec
     in
-    returnTc tycon
+    returnTc (tycon_name, ADataTyCon tycon)
   where
 	tc_derivs Nothing   = returnTc []
 	tc_derivs (Just ds) = mapTc tc_deriv ds
 
-	tc_deriv name = tcLookupTy name `thenTc` \ (_, _, AClass clas) ->
+	tc_deriv name = tcLookupTy name `thenTc` \ (_, AClass clas _) ->
 			returnTc clas
 \end{code}
 
@@ -313,7 +314,9 @@ mkImplicitDataBinds_one tycon
     in	
     returnTc (all_ids, binds)
   where
-    data_cons = tyConDataCons tycon
+    data_cons = tyConDataConsIfAvailable tycon
+	-- Abstract types mean we don't bring the 
+	-- data cons into scope, which should be fine
 
     data_con_wrapper_ids = map dataConWrapId data_cons
 
@@ -336,7 +339,8 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
 	-- data type use the same type variables
   = checkTc (all (== field_ty) other_tys)
 	    (fieldTypeMisMatch field_name)	`thenTc_`
-    returnTc (mkRecordSelId tycon first_field_label)
+    tcLookupValueByKey unpackCStringIdKey	`thenTc` \ unpack_id ->
+    returnTc (mkRecordSelId tycon first_field_label unpack_id)
   where
     field_ty   = fieldLabelType first_field_label
     field_name = fieldLabelName first_field_label

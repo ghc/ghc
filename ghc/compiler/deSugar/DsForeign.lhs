@@ -30,7 +30,6 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..), Provenance(..), ExportFlag(..)
 			)
-import PrelInfo		( deRefStablePtr_NAME, returnIO_NAME, bindIO_NAME, makeStablePtr_NAME )
 import Type		( unUsgTy,
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
@@ -41,9 +40,12 @@ import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import Var		( TyVar )
 import TysPrim		( realWorldStatePrimTy, addrPrimTy )
 import TysWiredIn	( unitTy, addrTy, stablePtrTyCon,
-			  unboxedTupleCon, addrDataCon
+			  addrDataCon
 			)
-import Unique
+import Unique		( Uniquable(..), hasKey,
+			  ioTyConKey, deRefStablePtrIdKey, returnIOIdKey, 
+			  bindIOIdKey, makeStablePtrIdKey
+		)
 import Maybes		( maybeToBool )
 import Outputable
 \end{code}
@@ -201,12 +203,12 @@ dsFExport fn_id ty mod_name ext_name cconv isDyn
 	-- If it's plain t, return	(\x.returnIO x, IO t, t)
      (case splitTyConApp_maybe orig_res_ty of
 	Just (ioTyCon, [res_ty])
-	      -> ASSERT( getUnique ioTyCon == ioTyConKey )
+	      -> ASSERT( ioTyCon `hasKey` ioTyConKey )
 			-- The function already returns IO t
 		 returnDs (\body -> body, orig_res_ty, res_ty)
 
 	other -> 	-- The function returns t, so wrap the call in returnIO
-		 dsLookupGlobalValue returnIO_NAME	`thenDs` \ retIOId ->
+		 dsLookupGlobalValue returnIOIdKey	`thenDs` \ retIOId ->
 	         returnDs (\body -> mkApps (Var retIOId) [Type orig_res_ty, body],
 		           funResultTy (applyTy (idType retIOId) orig_res_ty), 
 				-- We don't have ioTyCon conveniently to hand
@@ -221,13 +223,12 @@ dsFExport fn_id ty mod_name ext_name cconv isDyn
      (if isDyn then 
         newSysLocalDs stbl_ptr_ty			`thenDs` \ stbl_ptr ->
 	newSysLocalDs stbl_ptr_to_ty			`thenDs` \ stbl_value ->
-	dsLookupGlobalValue deRefStablePtr_NAME		`thenDs` \ deRefStablePtrId ->
+	dsLookupGlobalValue deRefStablePtrIdKey		`thenDs` \ deRefStablePtrId ->
+        dsLookupGlobalValue bindIOIdKey			`thenDs` \ bindIOId ->
 	let
 	 the_deref_app = mkApps (Var deRefStablePtrId)
 				[ Type stbl_ptr_to_ty, Var stbl_ptr ]
-        in
-        dsLookupGlobalValue bindIO_NAME			 `thenDs` \ bindIOId ->
-	let
+
 	 stbl_app cont = mkApps (Var bindIOId)
 				[ Type stbl_ptr_to_ty
 				, Type res_ty
@@ -338,11 +339,11 @@ dsFExportDynamic i ty mod_name ext_name cconv =
      dsFExport  i export_ty mod_name fe_ext_name cconv True
      `thenDs` \ (fe@(NonRec fe_helper fe_expr), h_code, c_code) ->
      newSysLocalDs arg_ty			`thenDs` \ cback ->
-     dsLookupGlobalValue makeStablePtr_NAME	`thenDs` \ makeStablePtrId ->
+     dsLookupGlobalValue makeStablePtrIdKey	`thenDs` \ makeStablePtrId ->
      let
 	mk_stbl_ptr_app    = mkApps (Var makeStablePtrId) [ Type arg_ty, Var cback ]
      in
-     dsLookupGlobalValue bindIO_NAME		        `thenDs` \ bindIOId ->
+     dsLookupGlobalValue bindIOIdKey		        `thenDs` \ bindIOId ->
      newSysLocalDs (mkTyConApp stablePtrTyCon [arg_ty]) `thenDs` \ stbl_value ->
      let
       stbl_app cont ret_ty 

@@ -53,7 +53,7 @@ import Type		( Type,
 			  mkTyConApp, mkTyConTy, mkTyVarTys,
 			  unboxedTypeKind, boxedTypeKind, openTypeKind, mkArrowKinds
 			)
-import PrelMods		( pREL_GHC )
+import PrelNames	( pREL_GHC )
 import Outputable
 import Unique
 \end{code}

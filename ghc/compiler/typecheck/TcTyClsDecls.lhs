@@ -11,19 +11,19 @@ module TcTyClsDecls (
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), TyClDecl(..),
-			  HsType(..), HsTyVar,
+			  HsType(..), HsTyVarBndr,
 			  ConDecl(..), ConDetails(..), BangType(..),
-			  Sig(..), HsPred(..),
+			  Sig(..), HsPred(..), HsTupCon(..),
 			  tyClDeclName, isClassDecl, isSynDecl
 			)
-import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, listTyCon_name, tupleTyCon_name )
+import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, listTyCon_name )
 import BasicTypes	( RecFlag(..), NewOrData(..), Arity )
 
 import TcMonad
 import Inst		( InstanceMapper )
 import TcClassDcl	( kcClassDecl, tcClassDecl1 )
 import TcEnv		( ValueEnv, TcTyThing(..),
-			  tcExtendTypeEnv, getAllEnvTyCons
+			  tcExtendTypeEnv, getEnvAllTyCons
 			)
 import TcTyDecls	( tcTyDecl, kcTyDecl )
 import TcMonoType	( kcHsTyVar )
@@ -87,9 +87,11 @@ tcGroup unf_env inst_mapper scc
 
 	-- Tie the knot
 --  traceTc (ppr (map fst ty_env_stuff1))		`thenTc_`
-    fixTc ( \ ~(rec_tyclss, rec_vrcs, _) ->
+    fixTc ( \ ~(rec_tyclss,  _) ->
 	let
-	    rec_env = listToUFM rec_tyclss
+	    rec_env    = listToUFM rec_tyclss
+	    rec_tycons = getEnvAllTyCons rec_tyclss
+            rec_vrcs   = calcTyConArgVrcs rec_tycons
 	in
 	
 		-- Do type checking
@@ -99,13 +101,8 @@ tcGroup unf_env inst_mapper scc
                                                                 `thenTc` \ tyclss ->
 
 	tcGetEnv						`thenTc` \ env -> 
-        let
-            tycons = getAllEnvTyCons env
-            vrcs   = calcTyConArgVrcs tycons
-        in
-
-	returnTc (tyclss, vrcs, env)
-    )								`thenTc` \ (_, _, env) ->
+	returnTc (tyclss, env)
+    )								`thenTc` \ (_, env) ->
 --  traceTc (text "done" <+> ppr (map fst ty_env_stuff1))	`thenTc_`
     returnTc env
   where
@@ -135,11 +132,9 @@ tcDecl  :: RecFlag 			-- True => recursive group
 tcDecl is_rec_group unf_env inst_mapper vrcs_env decl
   = tcAddDeclCtxt decl		$
     if isClassDecl decl then
-	tcClassDecl1 unf_env inst_mapper vrcs_env decl	`thenTc` \ clas ->
-	returnTc (getName clas, AClass clas)
+	tcClassDecl1 unf_env inst_mapper vrcs_env decl
     else
-	tcTyDecl is_rec_group vrcs_env decl	`thenTc` \ tycon ->
-	returnTc (getName tycon, ATyCon tycon)
+	tcTyDecl is_rec_group vrcs_env decl
 		
 
 tcAddDeclCtxt decl thing_inside
@@ -150,9 +145,9 @@ tcAddDeclCtxt decl thing_inside
      (name, loc, thing)
 	= case decl of
 	    (ClassDecl _ name _ _ _ _ _ _ _ _ _ loc) -> (name, loc, "class")
-	    (TySynonym name _ _ loc)	         -> (name, loc, "type synonym")
-	    (TyData NewType  _ name _ _ _ _ loc) -> (name, loc, "data type")
-	    (TyData DataType _ name _ _ _ _ loc) -> (name, loc, "newtype")
+	    (TySynonym name _ _ loc)	             -> (name, loc, "type synonym")
+	    (TyData NewType  _ name _ _ _ _ _ loc)   -> (name, loc, "data type")
+	    (TyData DataType _ name _ _ _ _ _ loc)   -> (name, loc, "newtype")
 
      ctxt = hsep [ptext SLIT("In the"), text thing, 
 		  ptext SLIT("declaration for"), quotes (ppr name)]
@@ -169,7 +164,7 @@ bound in type, data, newtype and class declarations,
 Why do we need to grab all these type variables at once, including
 those locally-quantified type variables in class op signatures?
 
-	[Incidentally, this only works because the names are all unique by now.]
+   [Incidentally, this only works because the names are all unique by now.]
 
 Because we can only commit to the final kind of a type variable when
 we've completed the mutually recursive group. For example:
@@ -184,36 +179,35 @@ Here, the kind of the locally-polymorphic type variable "b"
 depends on *all the uses of class D*.  For example, the use of
 Monad c in bop's type signature means that D must have kind Type->Type.
 
+    [April 00: looks as if we've dropped this subtlety; I'm not sure when]
 
 \begin{code}
-getTyBinding1 :: RenamedTyClDecl -> NF_TcM s (Name, (TcKind, Maybe Arity, TcTyThing))
+getTyBinding1 :: RenamedTyClDecl -> NF_TcM s (Name, (TcKind, TcTyThing))
 getTyBinding1 (TySynonym name tyvars _ _)
  = mapNF_Tc kcHsTyVar tyvars		`thenNF_Tc` \ arg_kinds ->
    newKindVar				`thenNF_Tc` \ result_kind  ->
    returnNF_Tc (name, (foldr mkArrowKind result_kind arg_kinds, 
-		       Just (length tyvars), 
-		       ATyCon (pprPanic "ATyCon: syn" (ppr name))))
+		       ASynTyCon (pprPanic "ATyCon: syn" (ppr name)) (length tyvars)))
 
-getTyBinding1 (TyData _ _ name tyvars _ _ _ _)
+getTyBinding1 (TyData _ _ name tyvars _ _ _ _ _)
  = mapNF_Tc kcHsTyVar tyvars		`thenNF_Tc` \ arg_kinds ->
    returnNF_Tc (name, (foldr mkArrowKind boxedTypeKind arg_kinds, 
-		       Nothing,  
-		       ATyCon (error "ATyCon: data")))
+		       ADataTyCon (error "ATyCon: data")))
 
 getTyBinding1 (ClassDecl _ name tyvars _ _ _ _ _ _ _ _ _)
  = mapNF_Tc kcHsTyVar tyvars		`thenNF_Tc` \ arg_kinds ->
    returnNF_Tc (name, (foldr mkArrowKind boxedTypeKind arg_kinds, 
-		       Just (length tyvars), 
-		       AClass (error "AClass")))
+		       AClass (pprPanic "AClass" (ppr name)) (length tyvars)))
 
 -- Zonk the kind to its final form, and lookup the 
 -- recursive tycon/class
-getTyBinding2 rec_env (name, (tc_kind, maybe_arity, thing))
+getTyBinding2 rec_env (name, (tc_kind, thing))
   = zonkTcKindToKind tc_kind		`thenNF_Tc` \ kind ->
-    returnNF_Tc (name, (kind, maybe_arity, mk_thing thing (lookupUFM rec_env name)))
+    returnNF_Tc (name, (kind, mk_thing thing (lookupUFM rec_env name)))
   where
-    mk_thing (ATyCon _) ~(Just (ATyCon tc))  = ATyCon tc
-    mk_thing (AClass _) ~(Just (AClass cls)) = AClass cls
+    mk_thing (ADataTyCon _)      ~(Just (ADataTyCon tc))  = ADataTyCon tc
+    mk_thing (ASynTyCon _ arity) ~(Just (ASynTyCon tc _)) = ASynTyCon tc arity
+    mk_thing (AClass _ arity)    ~(Just (AClass cls _))   = AClass cls arity
 \end{code}
 
 
@@ -272,7 +266,7 @@ mk_cls_edges other_decl
 ----------------------------------------------------
 mk_edges :: RenamedTyClDecl -> (RenamedTyClDecl, Unique, [Unique])
 
-mk_edges decl@(TyData _ ctxt name _ condecls derivs _ _)
+mk_edges decl@(TyData _ ctxt name _ condecls _ derivs _ _)
   = (decl, getUnique name, uniqSetToList (get_ctxt ctxt `unionUniqSets`
 					 get_cons condecls `unionUniqSets`
 					 get_deriv derivs))
@@ -313,30 +307,20 @@ get_bty (Unbanged ty) = get_ty ty
 get_bty (Unpacked ty) = get_ty ty
 
 ----------------------------------------------------
-get_ty (MonoTyVar name)
-  = if isTvOcc (nameOccName name) then emptyUniqSet else set_name name
-get_ty (MonoTyApp ty1 ty2)
-  = unionUniqSets (get_ty ty1) (get_ty ty2)
-get_ty (MonoFunTy ty1 ty2)	
-  = unionUniqSets (get_ty ty1) (get_ty ty2)
-get_ty (MonoListTy ty)
-  = set_name listTyCon_name `unionUniqSets` get_ty ty
-get_ty (MonoTupleTy tys boxed)
-  = set_name (tupleTyCon_name boxed (length tys)) `unionUniqSets` get_tys tys
-get_ty (MonoUsgTy _ ty)
-  = get_ty ty
-get_ty (MonoUsgForAllTy _ ty)
-  = get_ty ty
-get_ty (HsForAllTy _ ctxt mty)
-  = get_ctxt ctxt `unionUniqSets` get_ty mty
-get_ty (MonoDictTy name _)
-  = set_name name
-get_ty (MonoIParamTy name _)
-  = emptyUniqSet
+get_ty (HsTyVar name) | isTvOcc (nameOccName name) = emptyUniqSet 
+		      | otherwise		   = set_name name
+get_ty (HsAppTy ty1 ty2)	      = unionUniqSets (get_ty ty1) (get_ty ty2)
+get_ty (HsFunTy ty1 ty2)	      = unionUniqSets (get_ty ty1) (get_ty ty2)
+get_ty (HsListTy ty)		      = set_name listTyCon_name `unionUniqSets` get_ty ty
+get_ty (HsTupleTy (HsTupCon n _) tys) = set_name n `unionUniqSets` get_tys tys
+get_ty (HsUsgTy _ ty) 		      = get_ty ty
+get_ty (HsUsgForAllTy _ ty) 	      = get_ty ty
+get_ty (HsForAllTy _ ctxt mty) 	      = get_ctxt ctxt `unionUniqSets` get_ty mty
+get_ty (HsPredTy (HsPClass name _))   = set_name name
+get_ty (HsPredTy (HsPIParam _ _))     = emptyUniqSet	-- I think
 
 ----------------------------------------------------
-get_tys tys
-  = unionManyUniqSets (map get_ty tys)
+get_tys tys = unionManyUniqSets (map get_ty tys)
 
 ----------------------------------------------------
 get_sigs sigs

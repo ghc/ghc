@@ -38,6 +38,7 @@ module RdrHsSyn (
 	RdrNameRuleBndr,
 	RdrNameDeprecation,
 	RdrNameHsRecordBinds,
+	RdrNameFixitySig,
 
 	RdrBinding(..),
 	RdrMatch(..),
@@ -106,13 +107,14 @@ type RdrNameMatch		= Match			RdrName RdrNamePat
 type RdrNameMonoBinds		= MonoBinds		RdrName RdrNamePat
 type RdrNamePat			= InPat			RdrName
 type RdrNameHsType		= HsType		RdrName
-type RdrNameHsTyVar		= HsTyVar		RdrName
+type RdrNameHsTyVar		= HsTyVarBndr		RdrName
 type RdrNameSig			= Sig			RdrName
 type RdrNameStmt		= Stmt			RdrName RdrNamePat
 type RdrNameTyClDecl		= TyClDecl		RdrName RdrNamePat
 type RdrNameRuleBndr            = RuleBndr              RdrName
 type RdrNameRuleDecl            = RuleDecl              RdrName RdrNamePat
-type RdrNameDeprecation         = Deprecation           RdrName
+type RdrNameDeprecation         = DeprecDecl            RdrName
+type RdrNameFixitySig		= FixitySig		RdrName
 
 type RdrNameHsRecordBinds	= HsRecordBinds		RdrName RdrNamePat
 
@@ -159,15 +161,14 @@ extract_pred (HsPIParam n ty) acc	= extract_ty ty acc
 
 extract_tys tys acc = foldr extract_ty acc tys
 
-extract_ty (MonoTyApp ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (MonoListTy ty)              acc = extract_ty ty acc
-extract_ty (MonoTupleTy tys _)          acc = foldr extract_ty acc tys
-extract_ty (MonoFunTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (MonoIParamTy n ty)		acc = extract_ty ty acc
-extract_ty (MonoDictTy cls tys)         acc = foldr extract_ty (cls : acc) tys
-extract_ty (MonoUsgTy usg ty)           acc = extract_ty ty acc
-extract_ty (MonoUsgForAllTy uv ty)      acc = extract_ty ty acc
-extract_ty (MonoTyVar tv)               acc = tv : acc
+extract_ty (HsAppTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (HsListTy ty)              acc = extract_ty ty acc
+extract_ty (HsTupleTy _ tys)          acc = foldr extract_ty acc tys
+extract_ty (HsFunTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (HsPredTy p)		      acc = extract_pred p acc
+extract_ty (HsUsgTy usg ty)           acc = extract_ty ty acc
+extract_ty (HsUsgForAllTy uv ty)      acc = extract_ty ty acc
+extract_ty (HsTyVar tv)               acc = tv : acc
 extract_ty (HsForAllTy Nothing ctxt ty) acc = extract_ctxt ctxt (extract_ty ty acc)
 extract_ty (HsForAllTy (Just tvs) ctxt ty) 
                                 acc = acc ++
@@ -293,7 +294,7 @@ cvValSig      sig = sig
 cvInstDeclSig sig = sig
 
 cvClassOpSig (Sig var poly_ty src_loc) = ClassOpSig var (panic "cvClassOpSig:dm_name")
-							(panic "cvClassOpSig:dm_present")
+							False
 							poly_ty src_loc
 cvClassOpSig sig 		       = sig
 \end{code}

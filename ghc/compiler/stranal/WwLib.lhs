@@ -22,7 +22,7 @@ import DataCon		( DataCon, splitProductType )
 import Demand		( Demand(..), wwLazy, wwPrim )
 import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID )
 import TysPrim		( realWorldStatePrimTy )
-import TysWiredIn	( unboxedTupleCon, unboxedTupleTyCon )
+import TysWiredIn	( tupleCon )
 import Type		( isUnLiftedType, 
 			  splitForAllTys, splitFunTys,  isAlgType,
 			  splitNewType_maybe,
@@ -30,7 +30,7 @@ import Type		( isUnLiftedType,
 			  Type
 			)
 import TyCon            ( isNewTyCon, isProductTyCon, TyCon )
-import BasicTypes	( NewOrData(..), Arity )
+import BasicTypes	( NewOrData(..), Arity, Boxity(..) )
 import Var              ( TyVar, Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, 
                           mapUs, UniqSM )
@@ -497,7 +497,7 @@ mkWWcpr body_ty ReturnsCPR
       let
         (wrap_wild : work_wild : args) = zipWith mk_ww_local uniqs (ubx_tup_ty : body_ty : con_arg_tys)
 	arg_vars		       = map Var args
-	ubx_tup_con		       = unboxedTupleCon n_con_args
+	ubx_tup_con		       = tupleCon Unboxed n_con_args
 	ubx_tup_ty		       = exprType ubx_tup_app
 	ubx_tup_app		       = mkConApp ubx_tup_con (map Type con_arg_tys   ++ arg_vars)
         con_app			       = mkConApp data_con    (map Type tycon_arg_tys ++ arg_vars)

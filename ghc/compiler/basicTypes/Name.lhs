@@ -21,7 +21,7 @@ module Name (
 
 	nameUnique, setNameUnique, setNameProvenance, getNameProvenance, setNameImportReason,
 	tidyTopName, 
-	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModule,
+	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModule, toRdrName,
 
 	isUserExportedName, isUserImportedName, isUserImportedExplicitlyName, 
 	maybeUserImportedFrom,
@@ -29,6 +29,13 @@ module Name (
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
 	
+	-- Environment
+	NameEnv,
+	emptyNameEnv, unitNameEnv, nameEnvElts, 
+	addToNameEnv_C, addToNameEnv, addListToNameEnv,
+	plusNameEnv, plusNameEnv_C, extendNameEnv, 
+	lookupNameEnv, delFromNameEnv, elemNameEnv, 
+
 
 	-- Provenance
 	Provenance(..), ImportReason(..), pprProvenance,
@@ -51,7 +58,8 @@ import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
-import Unique		( pprUnique, Unique, Uniquable(..), unboundKey, u2i )
+import Unique		( pprUnique, Unique, Uniquable(..), hasKey, unboundKey, u2i )
+import UniqFM
 import Outputable
 import GlaExts
 \end{code}
@@ -179,7 +187,7 @@ mkUnboundName :: RdrName -> Name
 mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name) noSrcLoc
 
 isUnboundName :: Name -> Bool
-isUnboundName name = getUnique name == unboundKey
+isUnboundName name = name `hasKey` unboundKey
 \end{code}
 
 \begin{code}
@@ -420,6 +428,8 @@ nameSortModule (WiredInId    mod _) = mod
 nameSortModule (WiredInTyCon mod _) = mod
 
 nameRdrName :: Name -> RdrName
+-- Makes a qualified name for top-level (Global) names, whether locally defined or not
+-- and an unqualified name just for Locals
 nameRdrName (Name { n_sort = Local, n_occ = occ }) = mkRdrUnqual occ
 nameRdrName (Name { n_sort = sort,  n_occ = occ }) = mkRdrQual (moduleName (nameSortModule sort)) occ
 
@@ -486,13 +496,16 @@ isGlobalName other	             = True
 isExternallyVisibleName name = isGlobalName name
 
 hasBetterProv :: Name -> Name -> Bool
-hasBetterProv name1 name2
-  = case n_prov name1 of
-	LocalDef _ _ 	-> True
-	SystemProv   	-> False
-	NonLocalDef _ _ -> case n_prov name2 of
-				LocalDef _ _ -> False
-				other 	     -> True
+-- Choose 
+--	a local thing		      over an	imported thing
+--	a user-imported thing	      over a	non-user-imported thing
+-- 	an explicitly-imported thing  over an	implicitly imported thing
+hasBetterProv n1 n2
+  = case (n_prov n1, n_prov n2) of
+	(LocalDef _ _,			      _				  ) -> True
+	(NonLocalDef (UserImport _ _ True) _, _				  ) -> True
+	(NonLocalDef (UserImport _ _ _   ) _, NonLocalDef ImplicitImport _) -> True
+	other								    -> False
 
 isSystemName (Name {n_prov = SystemProv}) = True
 isSystemName other			  = False
@@ -526,6 +539,43 @@ instance Uniquable Name where
 
 instance NamedThing Name where
     getName n = n
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Name environment}
+%*									*
+%************************************************************************
+
+\begin{code}
+type NameEnv a = UniqFM a	-- Domain is Name
+
+emptyNameEnv   	 :: NameEnv a
+nameEnvElts    	 :: NameEnv a -> [a]
+addToNameEnv_C 	 :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
+addToNameEnv   	 :: NameEnv a -> Name -> a -> NameEnv a
+addListToNameEnv :: NameEnv a -> [(Name,a)] -> NameEnv a
+plusNameEnv    	 :: NameEnv a -> NameEnv a -> NameEnv a
+plusNameEnv_C  	 :: (a->a->a) -> NameEnv a -> NameEnv a -> NameEnv a
+extendNameEnv  	 :: NameEnv a -> [(Name,a)] -> NameEnv a
+lookupNameEnv  	 :: NameEnv a -> Name -> Maybe a
+delFromNameEnv 	 :: NameEnv a -> Name -> NameEnv a
+elemNameEnv    	 :: Name -> NameEnv a -> Bool
+unitNameEnv    	 :: Name -> a -> NameEnv a
+
+emptyNameEnv   	 = emptyUFM
+nameEnvElts    	 = eltsUFM
+addToNameEnv_C 	 = addToUFM_C
+addToNameEnv   	 = addToUFM
+addListToNameEnv = addListToUFM
+plusNameEnv    	 = plusUFM
+plusNameEnv_C  	 = plusUFM_C
+extendNameEnv  	 = addListToUFM
+lookupNameEnv  	 = lookupUFM
+delFromNameEnv 	 = delFromUFM
+elemNameEnv    	 = elemUFM
+unitNameEnv    	 = unitUFM
 \end{code}
 
 
