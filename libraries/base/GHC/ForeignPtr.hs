@@ -46,10 +46,10 @@ import GHC.Show
 -- data structures usually managed by the Haskell storage manager.
 -- The essential difference between 'ForeignPtr's and vanilla memory
 -- references of type @Ptr a@ is that the former may be associated
--- with /finalisers/. A finaliser is a routine that is invoked when
+-- with /finalizers/. A finalizer is a routine that is invoked when
 -- the Haskell storage manager detects that - within the Haskell heap
 -- and stack - there are no more references left that are pointing to
--- the 'ForeignPtr'.  Typically, the finaliser will, then, invoke
+-- the 'ForeignPtr'.  Typically, the finalizer will, then, invoke
 -- routines in the foreign language that free the resources bound by
 -- the foreign object.
 --
@@ -73,24 +73,21 @@ instance Show (ForeignPtr a) where
 #include "Typeable.h"
 INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 
--- |A Finaliser is represented as a pointer to a foreign function that, at
+-- |A Finalizer is represented as a pointer to a foreign function that, at
 -- finalisation time, gets as an argument a plain pointer variant of the
 -- foreign pointer that the finalizer is associated with.
 -- 
 type FinalizerPtr a = FunPtr (Ptr a -> IO ())
 
 newConcForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
--- ^Turns a plain memory reference into a foreign object
--- by associating a finaliser - given by the monadic operation
--- - with the reference.  The finaliser will be executed after
--- the last reference to the foreign object is dropped.  Note
--- that there is no guarantee on how soon the finaliser is
--- executed after the last reference was dropped; this depends
--- on the details of the Haskell storage manager. The only
--- guarantee is that the finaliser runs before the program
--- terminates.
 --
--- The finalizer, when invoked, will run in a separate thread.
+-- ^Turns a plain memory reference into a foreign object by
+-- associating a finalizer - given by the monadic operation - with the
+-- reference.  The storage manager will start the finalizer, in a
+-- separate thread, some time after the last reference to the
+-- @ForeignPtr@ is dropped.  There is no guarantee of promptness, and
+-- in fact there is no guarantee that the finalizer will eventually
+-- run at all.
 --
 newConcForeignPtr p finalizer
   = do fObj <- newForeignPtr_ p
@@ -129,7 +126,7 @@ mallocForeignPtrBytes (I# size) = do
      }
 
 addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
--- ^This function adds a finaliser to the given foreign object.  The
+-- ^This function adds a finalizer to the given foreign object.  The
 -- finalizer will run /before/ all other finalizers for the same
 -- object which have already been registered.
 addForeignPtrFinalizer finalizer fptr = 
@@ -137,7 +134,7 @@ addForeignPtrFinalizer finalizer fptr =
 	(mkFinalizer finalizer (unsafeForeignPtrToPtr fptr))
 
 addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
--- ^This function adds a finaliser to the given @ForeignPtr@.  The
+-- ^This function adds a finalizer to the given @ForeignPtr@.  The
 -- finalizer will run /before/ all other finalizers for the same
 -- object which have already been registered.
 --
@@ -198,18 +195,23 @@ touchForeignPtr :: ForeignPtr a -> IO ()
 -- does a 'touchForeignPtr' after it
 -- executes the user action.
 -- 
--- This function can be used to express liveness
--- dependencies between 'ForeignPtr's: for
--- example, if the finalizer for one
--- 'ForeignPtr' touches a second
--- 'ForeignPtr', then it is ensured that the
--- second 'ForeignPtr' will stay alive at
--- least as long as the first.  This can be useful when you
--- want to manipulate /interior pointers/ to
--- a foreign structure: you can use
--- 'touchForeignObj' to express the
--- requirement that the exterior pointer must not be finalized
--- until the interior pointer is no longer referenced.
+-- Note that this function should not be used to express liveness
+-- dependencies between 'ForeignPtr's.  For example, if the finalizer
+-- for a 'ForeignPtr' @F1@ calls 'touchForeignPtr' on a second
+-- 'ForeignPtr' @F2@, then the only guarantee is that the finalizer
+-- for @F2@ is never started before the finalizer for @F1@.  They
+-- might be started together if for example both @F1@ and @F2@ are
+-- otherwise unreachable, and in that case the scheduler might end up
+-- running the finalizer for @F2@ first.
+--
+-- In general, it is not recommended to use finalizers on separate
+-- objects with ordering constraints between them.  To express the
+-- ordering robustly requires explicit synchronisation using @MVar@s
+-- between the finalizers, but even then the runtime sometimes runs
+-- multiple finalizers sequentially in a single thread (for
+-- performance reasons), so synchronisation between finalizers could
+-- result in artificial deadlock.
+--
 touchForeignPtr (ForeignPtr fo r)
    = IO $ \s -> case touch# fo s of s -> (# s, () #)
 touchForeignPtr (MallocPtr fo r)
@@ -219,7 +221,7 @@ unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- ^This function extracts the pointer component of a foreign
 -- pointer.  This is a potentially dangerous operations, as if the
 -- argument to 'unsafeForeignPtrToPtr' is the last usage
--- occurrence of the given foreign pointer, then its finaliser(s) will
+-- occurrence of the given foreign pointer, then its finalizer(s) will
 -- be run, which potentially invalidates the plain pointer just
 -- obtained.  Hence, 'touchForeignPtr' must be used
 -- wherever it has to be guaranteed that the pointer lives on - i.e.,

@@ -29,10 +29,16 @@ garbage collector, then the value is also alive.  A reference from
 the value to the key does /not/ keep the key alive.
 
 A weak pointer may also have a finalizer of type @IO ()@; if it does,
-then the finalizer will be run once, and once only, at a time after
-the key has become unreachable by the program (\"dead\").  The storage
-manager attempts to run the finalizer(s) for an object soon after the
-object dies, but promptness is not guaranteed.  
+then the finalizer will be run at most once, at a time after the key
+has become unreachable by the program (\"dead\").  The storage manager
+attempts to run the finalizer(s) for an object soon after the object
+dies, but promptness is not guaranteed.  
+
+It is not guaranteed that a finalizer will eventually run, and no
+attempt is made to run outstanding finalizers when the program exits.
+Therefore finalizers should not be relied on to clean up resources -
+other methods (eg. exception handlers) should be employed, possibly in
+addition to finalisers.
 
 References from the finalizer to the key are treated in the same way
 as references from the value to the key: they do not keep the key
