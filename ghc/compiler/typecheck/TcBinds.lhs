@@ -4,7 +4,7 @@
 \section[TcBinds]{TcBinds}
 
 \begin{code}
-module TcBinds ( tcBindsAndThen, tcTopBindsAndThen,
+module TcBinds ( tcBindsAndThen, tcTopBinds,y
 	         tcSpecSigs, tcBindWithSigs ) where
 
 #include "HsVersions.h"
@@ -95,14 +95,22 @@ At the top-level the LIE is sure to contain nothing but constant
 dictionaries, which we resolve at the module level.
 
 \begin{code}
-tcTopBindsAndThen, tcBindsAndThen
+tcTopBinds :: RenamedHsBinds -> TcM ((TcMonoBinds, TcEnv), LIE)
+tcTopBinds binds
+  = tc_binds_and_then TopLevel glue binds	$
+    tcGetEnv					`thenNF_Tc` \ env ->
+    returnTc ((EmptyMonoBinds, env), emptyLIE)
+  where
+    glue is_rec binds1 (binds2, thing) = (binds1 `AndMonoBinds` binds2, thing)
+
+
+tcBindsAndThen
 	:: (RecFlag -> TcMonoBinds -> thing -> thing)		-- Combinator
 	-> RenamedHsBinds
 	-> TcM (thing, LIE)
 	-> TcM (thing, LIE)
 
-tcTopBindsAndThen = tc_binds_and_then TopLevel
-tcBindsAndThen    = tc_binds_and_then NotTopLevel
+tcBindsAndThen = tc_binds_and_then NotTopLevel
 
 tc_binds_and_then top_lvl combiner EmptyBinds do_next
   = do_next

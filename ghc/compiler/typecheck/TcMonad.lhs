@@ -21,7 +21,7 @@ module TcMonad(
 	listNF_Tc, mapAndUnzipNF_Tc, mapBagNF_Tc,
 
 	checkTc, checkTcM, checkMaybeTc, checkMaybeTcM, 
-	failTc, failWithTc, addErrTc, warnTc, recoverTc, checkNoErrsTc, recoverNF_Tc, discardErrsTc,
+	failTc, failWithTc, addErrTc, addErrsTc, warnTc, recoverTc, checkNoErrsTc, recoverNF_Tc, discardErrsTc,
 	addErrTcM, addInstErrTcM, failWithTcM,
 
 	tcGetEnv, tcSetEnv,
@@ -123,15 +123,14 @@ type TcRef a = IORef a
 \end{code}
 
 \begin{code}
--- initEnv is passed in to avoid module recursion between TcEnv & TcMonad.
-
-initTc :: UniqSupply
-       -> (TcRef (UniqFM a) -> TcEnv)
+initTc :: TcEnv
+       -> SrcLoc
        -> TcM r
        -> IO (Maybe r, Bag WarnMsg, Bag ErrMsg)
 
-initTc us initenv do_this
+initTc tc_env src_loc do_this
   = do {
+      us       <- mkSplitUniqSupply 'a' ;
       us_var   <- newIORef us ;
       dfun_var <- newIORef emptyFM ;
       errs_var <- newIORef (emptyBag,emptyBag) ;
@@ -139,12 +138,11 @@ initTc us initenv do_this
 
       let
           init_down = TcDown [] us_var dfun_var
-			     noSrcLoc
+			     src_loc
 			     [] errs_var
-	  init_env  = initenv tvs_var
       ;
 
-      maybe_res <- catch (do {  res <- do_this init_down init_env ;
+      maybe_res <- catch (do {  res <- do_this init_down env ;
 				return (Just res)})
 			 (\_ -> return Nothing) ;
         
@@ -302,6 +300,10 @@ failWithTc err_msg = failWithTcM (emptyTidyEnv, err_msg)
 
 addErrTc :: Message -> NF_TcM ()
 addErrTc err_msg = addErrTcM (emptyTidyEnv, err_msg)
+
+addErrsTc :: [Message] -> NF_TcM ()
+addErrsTc []	   = returnNF_Tc ()
+addErrsTc err_msgs = listNF_Tc_ (map addErrTc err_msgs)	`thenNF_Tc_` returnNF_Tc ()
 
 -- The 'M' variants do the TidyEnv bit
 failWithTcM :: (TidyEnv, Message) -> TcM a	-- Add an error message and fail

@@ -33,7 +33,7 @@ module Type (
 
 	-- Predicates and the like
 	mkDictTy, mkDictTys, mkPredTy, splitPredTy_maybe, 
-	splitDictTy_maybe, isDictTy, predRepTy,
+	splitDictTy, splitDictTy_maybe, isDictTy, predRepTy,
 
 	mkSynTy, isSynTy, deNoteType, 
 
@@ -689,10 +689,14 @@ splitPredTy_maybe (NoteTy _ ty) = splitPredTy_maybe ty
 splitPredTy_maybe (PredTy p)    = Just p
 splitPredTy_maybe other	        = Nothing
 
+splitDictTy :: Type -> (Class, [Type])
+splitDictTy (NoteTy _ ty) = splitDictTy ty
+splitDictTy (PredTy (Class clas tys)) = (clas, tys)
+
 splitDictTy_maybe :: Type -> Maybe (Class, [Type])
-splitDictTy_maybe ty = case splitPredTy_maybe ty of
-			    Just p  -> getClassTys_maybe p
-			    Nothing -> Nothing
+splitDictTy_maybe (NoteTy _ ty) = splitDictTy ty
+splitDictTy_maybe (PredTy (Class clas tys)) = Just (clas, tys)
+splitDictTy_maybe other			    = Nothing
 
 getClassTys_maybe :: PredType -> Maybe ClassPred
 getClassTys_maybe (Class clas tys) = Just (clas, tys)

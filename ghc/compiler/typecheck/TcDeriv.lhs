@@ -18,7 +18,7 @@ import CmdLineOpts	( opt_D_dump_deriv )
 import TcMonad
 import TcEnv		( InstEnv, getEnvTyCons, tcSetInstEnv, newDFunName )
 import TcGenDeriv	-- Deriv stuff
-import TcInstUtil	( InstInfo(..), pprInstInfo, instInfoClass, simpleInstInfoTyCon, buildInstanceEnv )
+import TcInstUtil	( InstInfo(..), pprInstInfo, simpleDFunClassTyCon, extendInstEnv )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
@@ -141,10 +141,9 @@ this by simplifying the RHS to a form in which
 So, here are the synonyms for the ``equation'' structures:
 
 \begin{code}
-type DerivEqn = (Class, TyCon, [TyVar], DerivRhs)
-			 -- The tyvars bind all the variables in the RHS
-			 -- NEW: it's convenient to re-use InstInfo
-			 -- We'll "panic" out some fields...
+type DerivEqn = (Name, Class, TyCon, [TyVar], DerivRhs)
+		-- The Name is the name for the DFun we'll build
+		-- The tyvars bind all the variables in the RHS
 
 type DerivRhs = [(Class, [TauType])]	-- Same as a ThetaType!
 
@@ -185,24 +184,24 @@ context to the instance decl.  The "offending classes" are
 \begin{code}
 tcDeriving  :: PersistentRenamerState
 	    -> Module			-- name of module under scrutiny
-	    -> Bag InstInfo		-- What we already know about instances
-	    -> TcM (Bag InstInfo,	-- The generated "instance decls".
-		      RenamedHsBinds)	-- Extra generated bindings
+	    -> InstEnv			-- What we already know about instances
+	    -> TcM ([InstInfo],		-- The generated "instance decls".
+		    RenamedHsBinds)	-- Extra generated bindings
 
-tcDeriving prs mod inst_decl_infos_in
-  = recoverTc (returnTc (emptyBag, EmptyBinds)) $
+tcDeriving prs mod inst_env_in local_tycons
+  = recoverTc (returnTc ([], EmptyBinds)) $
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
-    makeDerivEqns			    	`thenTc` \ eqns ->
+    makeDerivEqns local_tycons			    	`thenTc` \ eqns ->
     if null eqns then
-	returnTc (emptyBag, EmptyBinds)
+	returnTc ([], EmptyBinds)
     else
 
 	-- Take the equation list and solve it, to deliver a list of
 	-- solutions, a.k.a. the contexts for the instance decls
 	-- required for the corresponding equations.
-    solveDerivEqns inst_decl_infos_in eqns    	`thenTc` \ new_inst_infos ->
+    solveDerivEqns inst_env_in eqns	    	`thenTc` \ new_dfuns ->
 
 	-- Now augment the InstInfos, adding in the rather boring
 	-- actual-code-to-do-the-methods binds.  We may also need to
@@ -210,14 +209,13 @@ tcDeriving prs mod inst_decl_infos_in
 	-- "con2tag" and/or "tag2con" functions.  We do these
 	-- separately.
 
-    gen_taggery_Names new_inst_infos		`thenTc` \ nm_alist_etc ->
-
+    gen_taggery_Names new_dfuns			`thenTc` \ nm_alist_etc ->
 
     tcGetEnv					`thenNF_Tc` \ env ->
     let
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
-	method_binds_s   = map (gen_bind (tcGST env)) new_inst_infos
+	method_binds_s   = map (gen_bind (tcGST env)) new_dfuns
 	mbinders	 = collectLocatedMonoBinders extra_mbinds
 	
 	-- Rename to get RenamedBinds.
@@ -231,26 +229,28 @@ tcDeriving prs mod inst_decl_infos_in
 			returnRn (rn_method_binds_s, rn_extra_binds)
 		  )
     in
-    mapNF_Tc gen_inst_info (new_inst_infos `zip` rn_method_binds_s)	`thenNF_Tc` \ really_new_inst_infos ->
+    mapNF_Tc gen_inst_info (new_dfuns `zip` rn_method_binds_s)	`thenNF_Tc` \ new_inst_infos ->
 
     ioToTc (dumpIfSet opt_D_dump_deriv "Derived instances" 
-		      (ddump_deriving really_new_inst_infos rn_extra_binds))	`thenTc_`
+		      (ddump_deriving new_inst_infos rn_extra_binds))	`thenTc_`
 
-    returnTc (listToBag really_new_inst_infos, rn_extra_binds)
+    returnTc (new_inst_infos, rn_extra_binds)
   where
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
     ddump_deriving inst_infos extra_binds
       = vcat (map pprInstInfo inst_infos) $$ ppr extra_binds
       where
 
-	-- Paste the dfun id and method binds into the InstInfo
-    gen_inst_info (InstInfo clas tyvars tys@(ty:_) inst_decl_theta _ _ locn _, meth_binds)
-      = newDFunName mod clas tys locn 	`thenNF_Tc` \ dfun_name ->
-	let
-	    dfun_id = mkDictFunId dfun_name clas tyvars tys inst_decl_theta
-	in
-	returnNF_Tc (InstInfo clas tyvars tys inst_decl_theta
-			      dfun_id meth_binds locn [])
+	-- Make a Real dfun instead of the dummy one we have so far
+    gen_inst_info (dfun, binds)
+      = InstInfo { iLocal = True,
+		   iClass = clas, iTyVars = tyvars, 
+		   iTys = tys, iTheta = theta, 
+		   iDFunId = dfun, iBinds = binds,
+		   iLoc = getSrcLoc dfun, iPrags = [] }
+      where
+	 (tyvars, theta, tau) = splitSigmaTy dfun
+	 (clas, tys)	      = splitDictTy tau
 
     rn_meths meths = rnMethodBinds [] meths `thenRn` \ (meths', _) -> returnRn meths'
 	-- Ignore the free vars returned
@@ -279,15 +279,11 @@ or} has just one data constructor (e.g., tuples).
 all those.
 
 \begin{code}
-makeDerivEqns :: TcM [DerivEqn]
+makeDerivEqns :: Module -> [TyCon] -> TcM [DerivEqn]
 
-makeDerivEqns
-  = tcGetEnv			    `thenNF_Tc` \ env ->
-    let
-	local_data_tycons = filter (\tc -> isLocallyDefined tc && isAlgTyCon tc)
-				   (getEnvTyCons env)
-
-	think_about_deriving = need_deriving local_data_tycons
+makeDerivEqns this_mod local_tycons
+  = let
+	think_about_deriving = need_deriving local_tycons
 	(derive_these, _)    = removeDups cmp_deriv think_about_deriving
     in
     if null local_data_tycons then
@@ -319,7 +315,8 @@ makeDerivEqns
       = case chk_out clas tycon of
 	   Just err ->  addErrTc err	`thenNF_Tc_` 
 			returnNF_Tc Nothing
-	   Nothing  ->  returnNF_Tc (Just (clas, tycon, tyvars, constraints))
+	   Nothing  ->  newDFunName this_mod clas tys locn 	`thenNF_Tc` \ dfun_name ->
+			returnNF_Tc (Just (dfun_name, clas, tycon, tyvars, constraints))
       where
 	clas_key  = classKey clas
 	tyvars    = tyConTyVars tycon	-- ToDo: Do we need new tyvars ???
@@ -383,12 +380,12 @@ ordered by sorting on type varible, tv, (major key) and then class, k,
 \end{itemize}
 
 \begin{code}
-solveDerivEqns :: Bag InstInfo
+solveDerivEqns :: InstEnv
 	       -> [DerivEqn]
-	       -> TcM [InstInfo]	-- Solns in same order as eqns.
-				  	-- This bunch is Absolutely minimal...
+	       -> TcM [DFunId]	-- Solns in same order as eqns.
+				-- This bunch is Absolutely minimal...
 
-solveDerivEqns inst_decl_infos_in orig_eqns
+solveDerivEqns inst_env_in orig_eqns
   = iterateDeriv initial_solutions
   where
 	-- The initial solutions for the equations claim that each
@@ -402,11 +399,11 @@ solveDerivEqns inst_decl_infos_in orig_eqns
 	-- compares it with the current one; finishes if they are the
 	-- same, otherwise recurses with the new solutions.
 	-- It fails if any iteration fails
-    iterateDeriv :: [DerivSoln] ->TcM [InstInfo]
+    iterateDeriv :: [DerivSoln] ->TcM [DFunId]
     iterateDeriv current_solns
-      = checkNoErrsTc (iterateOnce current_solns)	`thenTc` \ (new_inst_infos, new_solns) ->
+      = checkNoErrsTc (iterateOnce current_solns)	`thenTc` \ (new_dfuns, new_solns) ->
 	if (current_solns == new_solns) then
-	    returnTc new_inst_infos
+	    returnTc new_dfuns
 	else
 	    iterateDeriv new_solns
 
@@ -415,70 +412,39 @@ solveDerivEqns inst_decl_infos_in orig_eqns
       =	    -- Extend the inst info from the explicit instance decls
 	    -- with the current set of solutions, giving a
 
-	add_solns inst_decl_infos_in orig_eqns current_solns
-				`thenNF_Tc` \ (new_inst_infos, inst_env) ->
+	add_solns inst_env_in orig_eqns current_solns	`thenNF_Tc` \ (new_dfuns, inst_env) ->
 
 	    -- Simplify each RHS
-
 	tcSetInstEnv inst_env (
 	  listTc [ tcAddErrCtxt (derivCtxt tc) $
 		   tcSimplifyThetas deriv_rhs
-	         | (_,tc,_,deriv_rhs) <- orig_eqns ]  
+	         | (_, _,tc,_,deriv_rhs) <- orig_eqns ]  
 	)						`thenTc` \ next_solns ->
 
 	    -- Canonicalise the solutions, so they compare nicely
-	let canonicalised_next_solns
-	      = [ sortLt (<) next_soln | next_soln <- next_solns ]
+	let canonicalised_next_solns = [ sortLt (<) next_soln | next_soln <- next_solns ]
 	in
-	returnTc (new_inst_infos, canonicalised_next_solns)
+	returnTc (new_dfuns, canonicalised_next_solns)
 \end{code}
 
 \begin{code}
-add_solns :: Bag InstInfo			-- The global, non-derived ones
+add_solns :: InstEnv				-- The global, non-derived ones
 	  -> [DerivEqn] -> [DerivSoln]
-	  -> NF_TcM ([InstInfo], 		-- The new, derived ones
-		       InstEnv)
+	  -> ([DFunId], InstEnv)
     -- the eqns and solns move "in lockstep"; we have the eqns
     -- because we need the LHS info for addClassInstance.
 
-add_solns inst_infos_in eqns solns
-
-  = discardErrsTc (buildInstanceEnv all_inst_infos)	`thenNF_Tc` \ inst_env ->
-	-- We do the discard-errs so that we don't get repeated error messages
-	-- about duplicate instances.
-	-- They'll appear later, when we do the top-level buildInstanceEnv.
-
-    returnNF_Tc (new_inst_infos, inst_env)
+add_solns inst_env_in eqns solns
+  = (new_dfuns, inst_env)
   where
-    new_inst_infos = zipWithEqual "add_solns" mk_deriv_inst_info eqns solns
+    new_dfuns     = zipWithEqual "add_solns" mk_deriv_dfun eqns solns
+    (inst_env, _) = extendInstEnv inst_env_in 	
+	-- Ignore the errors about duplicate instances.
+	-- We don't want repeated error messages
+	-- They'll appear later, when we do the top-level extendInstEnvs
 
-    all_inst_infos = inst_infos_in `unionBags` listToBag new_inst_infos
-
-    mk_deriv_inst_info (clas, tycon, tyvars, _) theta
-      = InstInfo clas tyvars [mkTyConApp tycon (mkTyVarTys tyvars)]
-		 theta'
-		 dummy_dfun_id
-		 (my_panic "binds") (getSrcLoc tycon)
-		 (my_panic "upragmas")
-      where
-	dummy_dfun_id
-	  = mkVanillaId (getName tycon) dummy_dfun_ty
-		-- The name is getSrcLoc'd in an error message 
-
-	theta' = classesToPreds theta
-	dummy_dfun_ty = mkSigmaTy tyvars theta' voidTy
-		-- All we need from the dfun is its "theta" part, used during
-		-- equation simplification (tcSimplifyThetas).  The final
-		-- dfun_id will have the superclass dictionaries as arguments too,
-		-- but that'll be added after the equations are solved.  For now,
-		-- it's enough just to make a dummy dfun with the simple theta part.
-		-- 
-		-- The part after the theta is dummied here as voidTy; actually it's
-		-- 	(C (T a b)), but it doesn't seem worth constructing it.
-		-- We can't leave it as a panic because to get the theta part we
-		-- have to run down the type!
-
-	my_panic str = panic "add_soln" -- pprPanic ("add_soln:"++str) (hsep [char ':', ppr clas, ppr tycon])
+    mk_deriv_dfun (dfun_name clas, tycon, tyvars, _) theta
+      = mkDictFunId dfun_name clas tyvars [mkTyConApp tycon (mkTyVarTys tyvars)] theta
 \end{code}
 
 %************************************************************************
@@ -547,7 +513,7 @@ the renamer.  What a great hack!
 -- Generate the method bindings for the required instance
 -- (paired with class name, as we need that when generating dict
 --  names.)
-gen_bind :: GlobalSymbolTable -> InstInfo -> RdrNameMonoBinds
+gen_bind :: GlobalSymbolTable -> DFunId -> RdrNameMonoBinds
 gen_bind fixities inst
   | not (isLocallyDefined tycon) = EmptyMonoBinds
   | clas `hasKey` showClassKey   = gen_Show_binds fixities tycon
@@ -563,8 +529,7 @@ gen_bind fixities inst
 	   (classKey clas)
 	   tycon
   where
-      clas  = instInfoClass inst
-      tycon = simpleInstInfoTyCon inst
+    (clas, tycon) = simpleDFunClassTyCon dfun
 \end{code}
 
 
@@ -601,18 +566,16 @@ We're deriving @Enum@, or @Ix@ (enum type only???)
 If we have a @tag2con@ function, we also generate a @maxtag@ constant.
 
 \begin{code}
-gen_taggery_Names :: [InstInfo]
+gen_taggery_Names :: [DFunId]
 		  -> TcM [(RdrName,	-- for an assoc list
-		  	     TyCon,	-- related tycon
-			     TagThingWanted)]
+		  	   TyCon,	-- related tycon
+			   TagThingWanted)]
 
-gen_taggery_Names inst_infos
-  = --pprTrace "gen_taggery:\n" (vcat [hsep [ppr c, ppr t] | (c,t) <- all_CTs]) $
-    foldlTc do_con2tag []           tycons_of_interest `thenTc` \ names_so_far ->
+gen_taggery_Names dfuns
+  = foldlTc do_con2tag []           tycons_of_interest `thenTc` \ names_so_far ->
     foldlTc do_tag2con names_so_far tycons_of_interest
   where
-    all_CTs = [ (instInfoClass info, simpleInstInfoTyCon info) | info <- inst_infos ]
-		    
+    all_CTs = map simplDFunClassTyCon dfuns
     all_tycons		    = map snd all_CTs
     (tycons_of_interest, _) = removeDups compare all_tycons
     

@@ -8,10 +8,10 @@ The bits common to TcInstDcls and TcDeriv.
 \begin{code}
 module TcInstUtil (
 	InstInfo(..), pprInstInfo,
-	instInfoClass, simpleInstInfoTy, simpleInstInfoTyCon, 
+	simpleInstInfoTy, simpleInstInfoTyCon, 
 
 	-- Instance environment
-	InstEnv, emptyInstEnv, buildInstanceEnv,
+	InstEnv, emptyInstEnv, extendInstEnv,
 	lookupInstEnv, InstLookupResult(..),
 	classInstEnv, classDataCon
     ) where
@@ -52,27 +52,25 @@ The InstInfo type summarises the information in an instance declaration
 
 \begin{code}
 data InstInfo
-  = InstInfo
-      Class	        -- Class, k
-      [TyVar]		-- Type variables, tvs
-      [Type]		-- The types at which the class is being instantiated
-      ThetaType		-- inst_decl_theta: the original context, c, from the
-			--   instance declaration.  It constrains (some of)
-			--   the TyVars above
-      Id		-- The dfun id
-      RenamedMonoBinds	-- Bindings, b
-      SrcLoc		-- Source location assoc'd with this instance's defn
-      [RenamedSig]	-- User pragmas recorded for generating specialised instances
+  = InstInfo {
+      iClass :: Class,	        -- Class, k
+      iTyVars :: [TyVar],	-- Type variables, tvs
+      iTys    :: [Type],	-- The types at which the class is being instantiated
+      iTheta  :: ThetaType,	-- inst_decl_theta: the original context, c, from the
+				--   instance declaration.  It constrains (some of)
+				--   the TyVars above
+      iLocal  :: Bool,		-- True <=> it's defined in this module
+      iDFunId :: DFunId,		-- The dfun id
+      iBinds  :: RenamedMonoBinds,	-- Bindings, b
+      iLoc    :: SrcLoc			-- Source location assoc'd with this instance's defn
+      iPrags  :: [RenamedSig]		-- User pragmas recorded for generating specialised instances
+    }
 
-pprInstInfo (InstInfo clas tvs tys inst_decl_theta _ mbinds _ _)
- = vcat [ptext SLIT("InstInfo:") <+> ppr (mkSigmaTy tvs inst_decl_theta (mkDictTy clas tys)),
-	 nest 4 (ppr mbinds)]
-
-instInfoClass :: InstInfo -> Class
-instInfoClass (InstInfo clas _ _ _ _ _ _ _) = clas
+pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info)),
+			 nest 4 (ppr (iBinds info))]
 
 simpleInstInfoTy :: InstInfo -> Type
-simpleInstInfoTy (InstInfo _ _ [ty] _ _ _ _ _) = ty
+simpleInstInfoTy (InstInfo {iTys = [ty]}) = ty
 
 simpleInstInfoTyCon :: InstInfo -> TyCon
   -- Gets the type constructor for a simple instance declaration,
@@ -80,6 +78,9 @@ simpleInstInfoTyCon :: InstInfo -> TyCon
 simpleInstInfoTyCon inst
    = case splitTyConApp_maybe (simpleInstInfoTy inst) of 
 	Just (tycon, _) -> tycon
+
+isLocalInst :: InstInfo -> Bool
+isLocalInst info = iLocal info
 \end{code}
 
 
@@ -87,61 +88,19 @@ A tiny function which doesn't belong anywhere else.
 It makes a nasty mutual-recursion knot if you put it in Class.
 
 \begin{code}
+simpleDFunClassTyCon :: DFunId -> (Class, TyCon)
+simpleDFunClassTyCon dfun
+  = (clas, tycon)
+  where
+    (_,_,dict_ty) = splitSigmaTy (idType dfun)
+    (clas, [ty])  = splitDictTy  dict_ty
+    tycon   	  = case splitTyConApp_maybe ty of
+			Just (tycon,_) -> tycon
+
 classDataCon :: Class -> DataCon
 classDataCon clas = case tyConDataCons (classTyCon clas) of
 		      (dict_constr:no_more) -> ASSERT( null no_more ) dict_constr 
 \end{code}		      
-
-%************************************************************************
-%*									*
-\subsection{Converting instance info into suitable InstEnvs}
-%*									*
-%************************************************************************
-
-\begin{code}
-buildInstanceEnv :: Bag InstInfo -> NF_TcM InstEnv
-
-buildInstanceEnv info = --pprTrace "BuildInstanceEnv" (ppr info)
-			foldrNF_Tc addClassInstance emptyInstEnv (bagToList info)
-\end{code}
-
-@addClassInstance@ adds the appropriate stuff to the @ClassInstEnv@
-based on information from a single instance declaration.  It complains
-about any overlap with an existing instance.
-
-\begin{code}
-addClassInstance
-    :: InstInfo
-    -> InstEnv
-    -> NF_TcM InstEnv
-
-addClassInstance 
-    (InstInfo clas inst_tyvars inst_tys _
-	      dfun_id _ src_loc _)
-    inst_env
-  = 	-- Add the instance to the class's instance environment
-    case addToInstEnv opt_AllowOverlappingInstances 
-		      inst_env clas inst_tyvars inst_tys dfun_id of
-	Failed (tys', dfun_id')    -> addErrTc (dupInstErr clas (inst_tys, dfun_id) 
-							        (tys',     dfun_id'))
-						`thenNF_Tc_`
-				     returnNF_Tc inst_env
-
-	Succeeded inst_env' -> returnNF_Tc inst_env'
-\end{code}
-
-\begin{code}
-dupInstErr clas info1@(tys1, dfun1) info2@(tys2, dfun2)
-	-- Overlapping/duplicate instances for given class; msg could be more glamourous
-  = hang (ptext SLIT("Duplicate or overlapping instance declarations"))
-         4 (sep [ptext SLIT("for") <+> quotes (pprConstraint clas tys1),
-		 nest 4 (sep [ppr_loc dfun1, ptext SLIT("and") <+> ppr_loc dfun2])])
-  where
-    ppr_loc dfun
-	| isLocallyDefined dfun = ptext SLIT("defined at")  	     <+> ppr (getSrcLoc dfun)
-	| otherwise		= ptext SLIT("imported from module") <+> quotes (ppr (nameModule (idName dfun)))
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -355,20 +314,43 @@ True => overlap is permitted, but only if one template matches the other;
         not if they unify but neither is 
 
 \begin{code}
-addToInstEnv :: Bool                   			-- True <=> overlap permitted
-             -> InstEnv					-- Envt
-	     -> Class -> [TyVar] -> [Type] -> Id	-- New item
-	     -> MaybeErr InstEnv		 	-- Success...
-		         ([Type], Id)			-- Failure: Offending overlap
+extendInstEnv :: InstEnv -> [DFunId] -> (InstEnv, [Message])
+  -- Similar, but all we have is the DFuns
+extendInstEnvWithDFuns env infos
+  = go env [] infos
+  where
+    go env msgs []	     = (env, msgs)
+    go env msgs (dfun:dfuns) = case addToInstEnv inst_env dfun of
+				    Succeeded new_env -> go new_env msgs dfuns
+				    Failed dfun'      -> go env (msg:msgs) infos
+						     where
+							 msg = dupInstErr dfun dfun'
 
-addToInstEnv overlap_ok inst_env clas ins_tvs ins_tys value
+
+dupInstErr dfun1 dfun2
+	-- Overlapping/duplicate instances for given class; msg could be more glamourous
+  = hang (ptext SLIT("Duplicate or overlapping instance declarations:"))
+       2 (ppr_dfun dfun1 $$ ppr_dfun dfun2)
+  where
+    ppr_dfun dfun = ppr (getSrcLoc dfun) <> colon <+> ppr tau
+		  where
+		    (_,_,tau) = splitSigmaTy (idType dfun)
+
+addToInstEnv :: InstEnv	-> DFunId
+	     -> MaybeErr InstEnv	-- Success...
+		         DFunId		-- Failure: Offending overlap
+
+addToInstEnv inst_env dfun_id
   = case insert_into (classInstEnv inst_env clas) of
 	Failed stuff 	  -> Failed stuff
 	Succeeded new_env -> Succeeded (addToUFM inst_env clas new_env)
 	
   where
+    (ins_tvs, _, dict_ty) = splitSigmaTy (idType dfun_id)
+    (clas, ins_tys)	  = splitDictTy dict_ty
+
     ins_tv_set = mkVarSet ins_tvs
-    ins_item = (ins_tv_set, ins_tys, value)
+    ins_item = (ins_tv_set, ins_tys, dfun_id)
 
     insert_into [] = returnMaB [ins_item]
     insert_into env@(cur_item@(tpl_tvs, tpl_tys, val) : rest)
@@ -378,9 +360,9 @@ addToInstEnv overlap_ok inst_env clas ins_tvs ins_tys value
 	-- (b) they unify, and any sort of overlap is prohibited,
 	-- (c) they unify but neither is more specific than t'other
       |  identical 
-      || (unifiable && not overlap_ok)
+      || (unifiable && not opt_AllowOverlappingInstances)
       || (unifiable && not (ins_item_more_specific || cur_item_more_specific))
-      =  failMaB (tpl_tys, val)
+      =  failMaB val
 
 	-- New item is an instance of current item, so drop it here
       | ins_item_more_specific	= returnMaB (ins_item : env)

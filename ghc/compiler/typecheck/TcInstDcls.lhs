@@ -163,49 +163,74 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 Gather up the instance declarations from their various sources
 
 \begin{code}
-tcInstDecls1 :: PersistentRenamerState
+tcInstDecls1 :: PersistentCompilerState
+	     -> HomeSymbolTable		-- Contains instances
 	     -> TcEnv 			-- Contains IdInfo for dfun ids
-	     -> [RenamedHsDecl]
 	     -> Module			-- Module for deriving
-	     -> FixityEnv		-- For derivings
-	     -> RnNameSupply		-- For renaming derivings
-	     -> TcM (Bag InstInfo,
-		       RenamedHsBinds)
+	     -> [RenamedHsDecl]
+	     -> TcM (PersistentCompilerState, InstEnv, [InstInfo], RenamedHsBinds)
 
-tcInstDecls1 prs unf_env decls mod 
-  = 	-- (1) Do the ordinary instance declarations
-    mapNF_Tc (tcInstDecl1 mod unf_env) 
-	     [inst_decl | InstD inst_decl <- decls]	`thenNF_Tc` \ inst_info_bags ->
-    let
-	decl_inst_info = unionManyBags inst_info_bags
+tcInstDecls1 pcs hst unf_env this_mod decls mod
+  = let
+	inst_decls = [inst_decl | InstD inst_decl <- decls]
+	clas_decls = [clas_decl | TyClD clas_decl <- decls, isClassDecl cl_decl]
     in
-	-- (2) Instances from "deriving" clauses; note that we only do derivings
-	-- for things in this module; we ignore deriving decls from
-	-- interfaces!
-    tcDeriving prs mod decl_inst_info			`thenTc` \ (deriv_inst_info, deriv_binds) ->
+   	-- (1) Do the ordinary instance declarations
+    mapNF_Tc (tcInstDecl1 mod) inst_decls	     	`thenNF_Tc` \ inst_infos ->
 
-	-- (3) Instances from generic class declarations
-    mapTc (getGenericInstances mod) 
-	  [cl_decl | TyClD cl_decl <- decls, isClassDecl cl_decl]	`thenTc` \ cls_inst_info ->
+	-- (2) Instances from generic class declarations
+    getGenericInstances mod clas_decls			`thenTc` \ generic_inst_info -> 
 
+	-- Next, consruct the instance environment so far, consisting of
+	--	a) cached non-home-package InstEnv (gotten from pcs)	pcsInsts pcs
+	--	b) imported instance decls (not in the home package)	inst_env1
+	--	c) other modules in this package (gotten from hst)	inst_env2
+	--	d) local instance decls					inst_env3
+	--	e) generic instances					inst_env4
+	-- The result of (b) replaces the cached InstEnv in the PCS
     let
-	generic_insts  = concat cls_inst_info
-	full_inst_info = deriv_inst_info `unionBags` 
-			 unionManyBags inst_info_bags `unionBags` 
-			 (listToBag generic_insts)
-    in
-    ioToTc (dumpIfSet opt_D_dump_deriv "Generic instances" 
-		      (vcat (map pprInstInfo generic_insts)))	`thenNF_Tc_`
+	(local_inst_info, imported_inst_info) = partition isLocalInst (concat inst_infos)
+	generic_inst_info = concat generic_inst_infos	-- All local
 
-    (returnTc (full_inst_info, deriv_binds)) 
+	imported_dfuns	 = map (tcAddImportedIdInfo unf_env . instInfoDFun) imported_inst_info
+	hst_dfuns	 = foldModuleEnv ((++) . mdInsts) [] hst
+    in
+    addInstDFuns (pcsInsts pcs) imported_dfuns	`thenNF_Tc` \ inst_env1 ->
+    addInstDFuns inst_env1 hst_dfuns		`thenNF_Tc` \ inst_env2 ->
+    addInstInfos inst_env2 local_inst_info	`thenNF_Tc` \ inst_env3 ->
+    addInstInfos inst_env3 generic_inst_info	`thenNF_Tc` \ inst_env4 ->
+    in
+
+	-- (3) Compute instances from "deriving" clauses; 
+	--     note that we only do derivings for things in this module; 
+	--     we ignore deriving decls from interfaces!
+	-- This stuff computes a context for the derived instance decl, so it
+	-- needs to know about all the instances possible; hecne inst_env4
+    tcDeriving (pcsPRS pcs) this_mod inst_env4 local_tycons	`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    addInstInfos inst_env4 deriv_inst_info			`thenNF_Tc` \ final_inst_env ->
+
+    returnTc (pcs { pcsInsts = inst_env1 }, 
+	      final_inst_env, 
+	      generic_inst_info ++ deriv_inst_info ++ local_inst_info,
+	      deriv_binds)
+
+addInstInfos :: InstEnv -> [InstInfo] -> NF_TcM InstEnv
+addInstInfos inst_env infos = addInstDfuns inst_env (map iDFun infos)
+
+addInstDFuns :: InstEnv -> [DFunId] -> NF_TcM InstEnv
+addInstDFuns dfuns infos
+  = addErrsTc errs	`thenNF_Tc_` 
+    returnTc inst_env'
+  where
+    (inst_env', errs) = extendInstEnv env dfuns
 \end{code} 
 
 \begin{code}
-tcInstDecl1 :: Module -> ValueEnv -> RenamedInstDecl -> NF_TcM (Bag InstInfo)
+tcInstDecl1 :: Module -> ValueEnv -> RenamedInstDecl -> NF_TcM [InstInfo]
 -- Deal with a single instance declaration
 tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
   = 	-- Prime error recovery, set source location
-    recoverNF_Tc (returnNF_Tc emptyBag)	$
+    recoverNF_Tc (returnNF_Tc [])	$
     tcAddSrcLoc src_loc			$
 
 	-- Type-check all the stuff before the "where"
@@ -230,17 +255,17 @@ tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
 
 		-- Make the dfun id and return it
 	    newDFunName mod clas inst_tys src_loc		`thenNF_Tc` \ dfun_name ->
-	    returnNF_Tc (mkDictFunId dfun_name clas tyvars inst_tys theta)
+	    returnNF_Tc (True, mkDictFunId dfun_name clas tyvars inst_tys theta)
 
 	Just dfun_name -> 	-- An interface-file instance declaration
-    		-- Make the dfun id and add info from interface file
-	    let
-		dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
-	    in
-	    returnNF_Tc (tcAddImportedIdInfo unf_env dfun_id)
-    )						`thenNF_Tc` \ dfun_id ->
+    		-- Make the dfun id
+	    returnNF_Tc (False, mkDictFunId dfun_name clas tyvars inst_tys theta)
+    )						`thenNF_Tc` \ (is_local, dfun_id) ->
 
-    returnTc (unitBag (InstInfo clas tyvars inst_tys theta dfun_id binds src_loc uprags))
+    returnTc [InstInfo { iLocal = is_local,
+			 iClass = clas, iTyVars = tyvars, iTys = inst_tys,
+			 iTheta = theta, iDFunId = dfun_id, 
+			 iBinds = binds, iLoc = src_loc, iPrags = uprags }]
 \end{code}
 
 
@@ -275,14 +300,25 @@ gives rise to the instance declarations
 
 
 \begin{code}
-getGenericInstances :: Module -> RenamedTyClDecl -> TcM [InstInfo] 
-getGenericInstances mod decl@(ClassDecl context class_name tyvar_names 
-	 			        fundeps class_sigs def_methods pragmas 
-				        name_list loc)
-  | null groups		
-  = returnTc []		-- The comon case
+getGenericInstances :: Module -> [RenamedTyClDecl] -> TcM [InstInfo] 
+getGenericInstances mod class_decls
+  = mapTc (get_generics mod) class_decls			`thenTc` \ gen_inst_infos ->
+    let
+	gen_inst_info = concat gen_inst_infos
+    in
+    ioToTc (dumpIfSet opt_D_dump_deriv "Generic instances" 
+		      (vcat (map pprInstInfo gen_inst_info)))	`thenNF_Tc_`
+    returnTc gen_inst_info
 
-  | otherwise
+get_generics mod decl@(ClassDecl context class_name tyvar_names 
+	 			 fundeps class_sigs def_methods pragmas 
+				 name_list loc)
+  | null groups		
+  = returnTc [] -- The comon case: 
+		--	no generic default methods, or
+		-- 	its an imported class decl (=> has no methods at all)
+
+  | otherwise	-- A local class decl with generic default methods
   = recoverNF_Tc (returnNF_Tc [])				$
     tcAddDeclCtxt decl						$
     tcLookupClass class_name					`thenTc` \ clas ->
@@ -361,8 +397,10 @@ mkGenericInstance mod clas loc (hs_ty, binds)
 	dfun_id    = mkDictFunId dfun_name clas tyvars inst_tys inst_theta
     in
 
-    returnTc (InstInfo clas tyvars inst_tys inst_theta dfun_id binds loc [])
-	-- The "[]" means "no pragmas"
+    returnTc (InstInfo { iLocal = True,
+			 iClass = clas, iTyVars = tyvars, iTys = inst_tys, 
+			 iTheta = inst_theta, iDFunId = dfun_id, iBinds = binds,
+			 iLoc = loc, iPrags = [] })
 \end{code}
 
 
@@ -454,10 +492,9 @@ First comes the easy case of a non-local instance decl.
 \begin{code}
 tcInstDecl2 :: InstInfo -> NF_TcM (LIE, TcMonoBinds)
 
-tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
-		      inst_decl_theta
-		      dfun_id monobinds
-		      locn uprags)
+tcInstDecl2 (InstInfo { iClass = clas, iTyVars = inst_tyvars, iTys = inst_tys,
+			iTheta = inst_decl_theta, iDFunId = dfun_id,
+			iBinds = monobinds, iLoc = locn, iPrags = uprags })
   | not (isLocallyDefined dfun_id)
   = returnNF_Tc (emptyLIE, EmptyMonoBinds)
 

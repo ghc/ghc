@@ -63,8 +63,8 @@ data ModDetails
 	deprecEnv     :: NameEnv DeprecTxt,
         typeEnv       :: TypeEnv,
 
-        instEnv       :: InstEnv,
-        ruleEnv       :: RuleEnv		-- Domain may include Id from other modules
+        mdInsts       :: [DFunId],	-- Dfun-ids for the instances in this module
+        mdRules       :: RuleEnv	-- Domain may include Id from other modules
      }
 
 emptyModDetails :: Module -> ModDetails
@@ -75,10 +75,9 @@ emptyModDetails mod
 		 fixityEnv     = emptyNameEnv,
 		 deprecEnv     = emptyNameEnv,
 		 typeEnv       = emptyNameEnv,
-		 instEnv       = emptyInstEnv,
-    		 ruleEnv       = emptyRuleEnv
+		 mdInsts       = [],
+    		 mdRules       = emptyRuleEnv
     }		
-emptyRuleEnv = panic "emptyRuleEnv"
 \end{code}
 
 Symbol tables map modules to ModDetails:
@@ -178,9 +177,12 @@ type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name c
 					-- not on construction
 
 type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
-type ClsInstEnv = [(TyVarSet, [Type], Id)]	-- The instances for a particular class
+type ClsInstEnv = [(TyVarSet, [Type], DFunId)]	-- The instances for a particular class
+type DFunId	= Id
 
 type RuleEnv    = IdEnv [CoreRule]
+
+emptyRuleEnv    = emptyVarEnv
 \end{code}
 
 
