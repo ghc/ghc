@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.29 2002/12/11 15:36:48 simonmar Exp $
+ * $Id: RtsUtils.c,v 1.30 2003/03/19 18:41:19 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -15,7 +15,6 @@
 #include "RtsAPI.h"
 #include "RtsFlags.h"
 #include "Hooks.h"
-#include "Main.h"
 #include "RtsUtils.h"
 #include "Ticky.h"
 

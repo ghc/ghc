@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.162 2003/02/22 04:51:53 sof Exp $
+ * $Id: Schedule.c,v 1.163 2003/03/19 18:41:19 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -91,7 +91,6 @@
 #include "Interpreter.h"
 #include "Exception.h"
 #include "Printer.h"
-#include "Main.h"
 #include "Signals.h"
 #include "Sanity.h"
 #include "Stats.h"

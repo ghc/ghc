@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.147 2003/02/12 11:59:49 simonmar Exp $
+ * $Id: GC.c,v 1.148 2003/03/19 18:41:18 sof Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -20,7 +20,6 @@
 #include "Sanity.h"
 #include "BlockAlloc.h"
 #include "MBlock.h"
-#include "Main.h"
 #include "ProfHeap.h"
 #include "SchedAPI.h"
 #include "Weak.h"
