@@ -1,5 +1,0 @@
-__interface RnSource 1 0 where
-__export RnSource rnHsType rnHsSigType rnHsTypeFVs;
-1 rnHsTypeFVs :: Outputable.SDoc -> RdrHsSyn.RdrNameHsType -> RnMonad.RnMS (RnHsSyn.RenamedHsType, NameSet.FreeVars) ;
-2 rnHsType    :: Outputable.SDoc -> RdrHsSyn.RdrNameHsType -> RnMonad.RnMS RnHsSyn.RenamedHsType ;
-2 rnHsSigType :: Outputable.SDoc -> RdrHsSyn.RdrNameHsType -> RnMonad.RnMS RnHsSyn.RenamedHsType ;
