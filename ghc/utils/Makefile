@@ -4,6 +4,7 @@ include $(TOP)/mk/boilerplate.mk
 #
 # No ways stuff in here (and further below), please
 #
+override WAYS=
 export WAYS=
 
 ifneq "$(BIN_DIST_NAME)" ""

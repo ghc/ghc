@@ -8,7 +8,7 @@ include $(TOP)/mk/boilerplate.mk
 #
 # Just to make sure, no ways stuff in here, please.
 #
-WAYS=
+override WAYS=
 
 # De-litted header files
 LH_FILES=$(wildcard *.lh)
@@ -95,7 +95,7 @@ boot :: all
 # (ditto for interface files). This is not *really* needed, but
 # it gives (perhaps) a cleaner binary dist structure..might change.
 #
-datadir:=$(libdir)/includes
+override datadir:=$(libdir)/includes
 INSTALL_DATAS += $(DELIT_H_FILES) $(H_FILES) $(TARGETPLATFORM).h $(H_CONFIG)
 
 #

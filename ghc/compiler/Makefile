@@ -1,12 +1,12 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.11 1997/03/19 20:44:52 simonpj Exp $
+# $Id: Makefile,v 1.12 1997/03/24 04:31:45 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
 #-----------------------------------------------------------------------------
 # Building hsc different ways (default is just `normal' sequential)
-WAYS=$(GhcCompilerWays)
+override WAYS=$(GhcCompilerWays)
 
 #-----------------------------------------------------------------------------
 #		Set SUBDIRS
