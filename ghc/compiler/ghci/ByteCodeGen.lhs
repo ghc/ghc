@@ -4,7 +4,7 @@
 \section[ByteCodeGen]{Generate bytecode from Core}
 
 \begin{code}
-module ByteCodeGen ( byteCodeGen, assembleBCO ) where
+module ByteCodeGen ( byteCodeGen, linkIModules ) where
 
 #include "HsVersions.h"
 
@@ -25,30 +25,35 @@ import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon,
 			  dataConRepArgTys )
 import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import Class		( Class, classTyCon )
-import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
+import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem, global )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
 import PrimRep		( getPrimRepSize, isFollowableRep )
 import Constants	( wORD_SIZE )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
-import UniqSet		( emptyUniqSet )
 import ClosureInfo	( mkVirtHeapOffsets )
 
 import List		( intersperse )
 import Monad		( foldM )
 import ST		( runST )
-import MArray		( MArray(..), IOArray, IOUArray, HasBounds(..),
+import MArray		( MArray(..), IOArray, IOUArray, HasBounds(..), freeze, 
+		          mapArray,
 			  castSTUArray, readWord32Array,
 			  newFloatArray, writeFloatArray,
 			  newDoubleArray,  writeDoubleArray,
 			  newIntArray, writeIntArray,
 			  newAddrArray, writeAddrArray )
-import Foreign		( Storable(..), Word8, Word16, Word32, Ptr, 
+import Foreign		( Storable(..), Word8, Word16, Word32, Ptr(..), 
 			  malloc, castPtr, plusPtr )
 import Addr		( Addr, addrToInt, nullAddr )
 import Bits		( Bits(..), shiftR )
---import CTypes		( )
+
+import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, ByteArray#, Array# )
+import IOExts		( IORef, readIORef, writeIORef, fixIO )
+import ArrayBase	
+import PrelArr		( Array(..) )
+import PrelIOBase	( IO(..) )
 \end{code}
 
 Entry point.
@@ -78,15 +83,21 @@ byteCodeGen dflags binds local_tycons local_classes
 
         return (bcos, itblenv)
         
--- TEMPORARY !
-data UnlinkedBCO 
-   = UnlinkedBCO (IOUArray Int Word16)	-- insns
-                 (IOUArray Int Word32)	-- literals
-                 (IOArray Int Name)	-- ptrs
-                 (IOArray Int Name)	-- itbl refs
+
+data UnlinkedBCO
+   = UnlinkedBCO Name
+                 Int (IOUArray Int Word16)	-- insns
+                 Int (IOUArray Int Word32)	-- literals
+                 Int (IOArray Int Name)		-- ptrs
+                 Int (IOArray Int Name)		-- itbl refs
+
+nameOfUnlinkedBCO (UnlinkedBCO nm _ _ _ _ _ _ _ _) = nm
 
 -- needs a proper home
 type ItblEnv    = FiniteMap Name (Ptr StgInfoTable)
+type ClosureEnv = FiniteMap Name HValue
+data HValue = HValue  -- dummy type, actually a pointer to some Real Code.
+
 \end{code}
 
 
@@ -785,11 +796,15 @@ assembleBCO (ProtoBCO nm instrs origin)
 
          -- unwrap the expandable arrays
          let final_insns = stuffXIOU insns
-             final_nptrs = stuffXIOU lits
+             final_lits  = stuffXIOU lits
              final_ptrs  = stuffXIO  ptrs
              final_itbls = stuffXIO  itbls
 
-         return (UnlinkedBCO final_insns final_nptrs final_ptrs final_itbls)
+         return (UnlinkedBCO nm
+                             (usedXIOU insns) final_insns 
+                             (usedXIOU lits)  final_lits 
+                             (usedXIO  ptrs)  final_ptrs 
+                             (usedXIO  itbls) final_itbls)
 
 
 -- instrs nonptrs ptrs itbls
@@ -1083,6 +1098,161 @@ addToXIOArray (XIOArray n_arr arr) x
                             writeArray dst n nx
                             copy (n-1) src dst
 
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Linking interpretables into something we can run}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+{- 
+data UnlinkedBCO
+   = UnlinkedBCO Int (IOUArray Int Word16)	-- #insns insns
+                 Int (IOUArray Int Word32)	-- #literals literals
+                 Int (IOArray Int Name)		-- #ptrs ptrs
+                 Int (IOArray Int Name)		-- #itblrefs itblrefs
+
+data BCO# = BCO# ByteArray# 		-- instrs   :: array Word16#
+                 ByteArray# 		-- literals :: array Word32#
+                 PtrArray# 		-- ptrs     :: Array HValue
+                 ByteArray#		-- itbls    :: Array Addr#
+-}
+
+data LinkedBCO = LinkedBCO BCO#
+
+
+
+GLOBAL_VAR(v_cafTable, [], [HValue])
+
+addCAF :: HValue -> IO ()
+addCAF x = do xs <- readIORef v_cafTable; writeIORef v_cafTable (x:xs)
+
+linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
+	     -> ClosureEnv -- incoming global closure env; returned updated
+	     -> [([UnlinkedBCO], ItblEnv)]
+	     -> IO ([HValue], ItblEnv, ClosureEnv)
+linkIModules gie gce mods = do
+  let (bcoss, ies) = unzip mods
+      bcos = concat bcoss
+      top_level_binders = map nameOfUnlinkedBCO bcos
+      final_gie = foldr plusFM gie ies
+  
+  (new_bcos, new_gce) <-
+    fixIO (\ ~(new_bcos, new_gce) -> do
+
+      new_bcos <- linkBCOs final_gie new_gce bcos
+
+      let new_gce = addListToFM gce (zip top_level_binders new_bcos)
+
+      return (new_bcos, new_gce))
+
+  return (new_bcos, final_gie, new_gce)
+
+
+
+linkBCOs :: ItblEnv -> ClosureEnv -> [UnlinkedBCO] 
+         -> IO [HValue]   -- IO [BCO#] really
+linkBCOs ie ce binds = mapM (linkBCO ie ce) binds
+
+linkBCO ie ce (UnlinkedBCO nm 
+                           n_insns insns n_literals literals 
+                           n_ptrs ptrs n_itbls itbls)
+   = do linked_ptrs <- mapArray (lookupCE ce) ptrs
+        linked_itbls <- mapArray (lookupIE ie) itbls
+
+        ptrs_froz <- freeze linked_ptrs
+        let ptrs_parr = case ptrs_froz of Array lo hi parr -> parr
+
+        insns_froz <- freeze insns
+        let insns_barr = case insns_froz of UArray lo hi barr -> barr
+
+        literals_froz <- freeze literals
+        let literals_barr = case literals_froz of UArray lo hi barr -> barr
+
+        itbls_froz <- freeze linked_itbls
+        let itbls_barr = case itbls_froz of UArray lo hi barr -> barr
+
+        BCO bco# <- newBCO insns_barr literals_barr ptrs_parr itbls_barr
+     
+        return (unsafeCoerce# bco#)
+
+data BCO = BCO BCO#
+
+newBCO :: ByteArray# -> ByteArray# -> Array# a -> ByteArray# -> IO BCO
+newBCO a b c d = IO (\s -> case newBCO# a b c d s of (# s1, bco #) -> (# s1, BCO bco #))
+
+
+lookupCE :: ClosureEnv -> Name -> HValue
+lookupCE ce nm 
+   = case lookupFM ce nm of
+        Just aa -> unsafeCoerce# aa
+        Nothing -> pprPanic "ByteCodeGen.lookupCE" (ppr nm)
+
+lookupIE :: ItblEnv -> Name -> Addr
+lookupIE ie nm 
+   = case lookupFM ie nm of
+        Just (Ptr a) -> a
+        Nothing      -> pprPanic "ByteCodeGen.lookupIE" (ppr nm)
+
+
+
+{-
+lookupCon ie con = 
+  case lookupFM ie con of
+    Just (Ptr addr) -> return addr
+    Nothing   -> do
+	-- try looking up in the object files.
+        m <- lookupSymbol (nameToCLabel con "con_info")
+	case m of
+	    Just addr -> return addr
+  	    Nothing   -> pprPanic "linkIExpr" (ppr con)
+
+-- nullary constructors don't have normal _con_info tables.
+lookupNullaryCon ie con =
+  case lookupFM ie con of
+    Just (Ptr addr) -> return (ConApp addr)
+    Nothing -> do
+	-- try looking up in the object files.
+	m <- lookupSymbol (nameToCLabel con "closure")
+	case m of
+	    Just (A# addr) -> return (Native (unsafeCoerce# addr))
+	    Nothing   -> pprPanic "lookupNullaryCon" (ppr con)
+
+
+lookupNative ce var =
+  unsafeInterleaveIO (do
+      case lookupFM ce var of
+    	Just e  -> return (Native e)
+    	Nothing -> do
+    	    -- try looking up in the object files.
+    	    let lbl = (nameToCLabel var "closure")
+    	    m <- lookupSymbol lbl
+    	    case m of
+    		Just (A# addr)
+		    -> do addCAF (unsafeCoerce# addr)
+			  return (Native (unsafeCoerce# addr))
+    		Nothing   -> pprPanic "linkIExpr" (ppr var)
+  )
+
+-- some VarI/VarP refer to top-level interpreted functions; we change
+-- them into Natives here.
+lookupVar ce f v =
+  unsafeInterleaveIO (
+	case lookupFM ce (getName v) of
+	    Nothing -> return (f v)
+	    Just e  -> return (Native e)
+  )
+
+-- HACK!!!  ToDo: cleaner
+nameToCLabel :: Name -> String{-suffix-} -> String
+nameToCLabel n suffix =
+  _UNPK_(moduleNameFS (rdrNameModule rn)) 
+  ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
+  where rn = toRdrName n
+-}
 \end{code}
 
 %************************************************************************
