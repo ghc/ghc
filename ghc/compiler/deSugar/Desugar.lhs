@@ -9,25 +9,20 @@ module Desugar ( deSugar, pprDsWarnings ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( opt_D_dump_ds )
-import HsSyn		( HsBinds, HsExpr, MonoBinds
-			)
-import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr
-			)
+import HsSyn		( MonoBinds )
+import TcHsSyn		( TypecheckedMonoBinds )
 import CoreSyn
 import PprCore		( pprCoreBindings )
-import Name             ( isExported )
 import DsMonad
 import DsBinds		( dsMonoBinds )
 import DsUtils
 
-import Bag		( unionBags, isEmptyBag )
-import BasicTypes       ( Module, RecFlag(..) )
-import CmdLineOpts	( opt_DoCoreLinting, opt_SccGroup, opt_SccProfilingOn )
-import CostCentre       ( IsCafCC(..), mkAutoCC )
+import Bag		( isEmptyBag )
+import BasicTypes       ( Module )
+import CmdLineOpts	( opt_SccGroup, opt_SccProfilingOn )
 import CoreLift		( liftCoreBindings )
 import CoreLint		( lintCoreBindings )
-import Id		( nullIdEnv, mkIdEnv, idType, 
-			  DictVar, GenId, Id )
+import Id		( nullIdEnv, GenId, Id )
 import ErrUtils		( dumpIfSet, doIfSet )
 import Outputable
 import UniqSupply	( splitUniqSupply, UniqSupply )

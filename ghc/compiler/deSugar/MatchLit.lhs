@@ -12,10 +12,8 @@ import {-# SOURCE #-} Match  ( match )
 import {-# SOURCE #-} DsExpr ( dsExpr )
 
 import HsSyn		( HsLit(..), OutPat(..), HsExpr(..), Fixity,
-			  Match, HsBinds, Stmt(..), DoOrListComp, HsType, ArithSeqInfo )
-import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
-			  TypecheckedPat
-			)
+			  Match, HsBinds, DoOrListComp, HsType, ArithSeqInfo )
+import TcHsSyn		( TypecheckedHsExpr, TypecheckedPat )
 import CoreSyn		( CoreExpr, CoreBinding, GenCoreExpr(..), GenCoreBinding(..) )
 import Id		( GenId {- instance Eq -}, Id )
 
@@ -24,7 +22,7 @@ import DsUtils
 
 import Literal		( mkMachInt, Literal(..) )
 import Maybes		( catMaybes )
-import Type		( isUnpointedType, Type )
+import Type		( Type )
 import Util		( panic, assertPanic )
 \end{code}
 

@@ -8,8 +8,8 @@ module DsHsSyn where
 
 #include "HsVersions.h"
 
-import HsSyn		( OutPat(..), HsBinds(..), MonoBinds(..),
-			  Sig, HsExpr, GRHSsAndBinds, Match, HsLit )
+import HsSyn		( OutPat(..), MonoBinds(..),
+			  HsExpr, GRHSsAndBinds, Match, HsLit )
 import TcHsSyn		( TypecheckedPat,
 			  TypecheckedMonoBinds )
 

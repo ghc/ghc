@@ -37,8 +37,7 @@ module TcHsSyn (
 -- friends:
 import HsSyn	-- oodles of it
 import Id	( GenId(..), IdDetails,	-- Can meddle modestly with Ids
-		  DictVar, idType, dataConArgTys,
-		  Id
+		  dataConArgTys, Id
 		)
 
 -- others:
@@ -53,14 +52,13 @@ import TcType	( TcType, TcMaybe, TcTyVar, TcBox,
 		  zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType
 		)
 import TyCon	( isDataTyCon )
-import Type	( mkTyVarTy, tyVarsOfType, splitAlgTyConApp_maybe, isUnpointedType, Type )
-import TyVar	( TyVar, TyVarEnv, emptyTyVarEnv, growTyVarEnvList, emptyTyVarSet )
+import Type	( mkTyVarTy, splitAlgTyConApp_maybe, isUnpointedType, Type )
+import TyVar	( TyVar, TyVarEnv, emptyTyVarEnv, growTyVarEnvList )
 import TysPrim	( voidTy )
 import CoreSyn  ( GenCoreExpr )
 import Unique	( Unique )		-- instances
 import Bag
 import UniqFM
-import Util	( zipEqual )
 import Outputable
 \end{code}
 

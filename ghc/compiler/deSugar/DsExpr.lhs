@@ -25,35 +25,30 @@ import CoreSyn
 
 import DsMonad
 import DsCCall		( dsCCall )
-import DsHsSyn		( outPatType )
 import DsListComp	( dsListComp )
-import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtomGivenTy, mkTupleExpr,
-			  mkErrorAppDs, showForErr, EquationInfo,
-			  MatchResult, DsCoreArg
+import DsUtils		( mkAppDs, mkConDs, dsExprToAtomGivenTy,
+			  mkErrorAppDs, showForErr, DsCoreArg
 			)
 import Match		( matchWrapper )
 
-import CoreUtils	( coreExprType, substCoreExpr, argToExpr,
-			  mkCoreIfThenElse, unTagBinders )
+import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import CostCentre	( mkUserCC )
-import FieldLabel	( fieldLabelType, FieldLabel )
-import Id		( idType, nullIdEnv, addOneToIdEnv,
-			  dataConTyCon, dataConArgTys, dataConFieldLabels,
+import FieldLabel	( FieldLabel )
+import Id		( dataConTyCon, dataConArgTys, dataConFieldLabels,
 			  recordSelectorFieldLabel, Id
 			)
 import Literal		( mkMachInt, Literal(..) )
 import Name		( Name{--O only-} )
-import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, voidId )
+import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID )
 import TyCon		( isNewTyCon )
-import Type		( splitSigmaTy, splitFunTys, typePrimRep, mkTyConApp,
-			  splitAlgTyConApp, splitTyConApp_maybe, applyTy,
+import Type		( splitFunTys, typePrimRep, mkTyConApp,
+			  splitAlgTyConApp, splitTyConApp_maybe,
 			  splitAppTy, Type
 			)
-import TysPrim		( voidTy )
-import TysWiredIn	( mkTupleTy, tupleCon, nilDataCon, consDataCon, listTyCon, mkListTy,
+import TysWiredIn	( tupleCon, nilDataCon, consDataCon, listTyCon, mkListTy,
 			  charDataCon, charTy
 			)
-import TyVar		( addToTyVarEnv, GenTyVar{-instance Eq-} )
+import TyVar		( GenTyVar{-instance Eq-} )
 import Maybes		( maybeToBool )
 import Util		( zipEqual )
 import Outputable

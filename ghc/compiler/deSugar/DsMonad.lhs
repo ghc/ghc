@@ -26,8 +26,6 @@ module DsMonad (
 
 import Bag		( emptyBag, snocBag, bagToList, Bag )
 import BasicTypes       ( Module )
-import CoreSyn		( CoreExpr )
-import CoreUtils	( substCoreExpr )
 import ErrUtils 	( WarnMsg )
 import HsSyn		( OutPat )
 import Id		( mkSysLocal, mkIdWithNewUniq,
@@ -41,9 +39,8 @@ import TcHsSyn		( TypecheckedPat )
 import Type             ( Type )
 import TyVar		( cloneTyVar, TyVar )
 import UniqSupply	( splitUniqSupply, getUnique, getUniques,
-			  mapUs, thenUs, returnUs, UniqSM,
-			  UniqSupply )
-import Util		( assoc, mapAccumL, zipWithEqual, panic )
+			  UniqSM, UniqSupply )
+import Util		( zipWithEqual, panic )
 
 infixr 9 `thenDs`
 \end{code}

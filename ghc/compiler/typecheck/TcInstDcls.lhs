@@ -22,8 +22,8 @@ import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds,
 			  RenamedSig, RenamedHsDecl
 			)
 import TcHsSyn		( TcMonoBinds, TcIdOcc(..), TcIdBndr, 
-			  maybeBoxedPrimType, mkHsTyLam, mkHsTyApp,
-			  )
+			  maybeBoxedPrimType
+			)
 
 import TcBinds		( tcPragmaSigs, sigThetaCtxt )
 import TcClassDcl	( tcMethodBind, badMethodErr )
@@ -47,7 +47,7 @@ import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			)
 import CmdLineOpts	( opt_GlasgowExts, opt_WarnMissingMethods )
 import Class		( classBigSig, Class )
-import Id		( idType, isNullaryDataCon, dataConArgTys, Id )
+import Id		( isNullaryDataCon, dataConArgTys, Id )
 import Maybes 		( maybeToBool, seqMaybe, catMaybes )
 import Name		( nameOccName, mkLocalName,
 			  isLocallyDefined, Module,
@@ -750,9 +750,6 @@ instTypeErr clas tys msg
 	 nest 4 (parens msg)
     ]
 
-instBndrErr bndr clas
-  = hsep [ptext SLIT("Class"), quotes (ppr clas), ptext SLIT("does not have a method"), quotes (ppr bndr)]
-
 derivingWhenInstanceExistsErr clas tycon
   = hang (hsep [ptext SLIT("Deriving class"), 
 		       quotes (ppr clas), 
@@ -780,20 +777,6 @@ invisibleDataConPrimCCallErr clas inst_ty
                 quotes (ppr clas), ptext SLIT("instance")])
         4 (hsep [text "(Try either importing", ppr inst_ty, 
 	         text "non-abstractly or compile using -fno-prune-tydecls ..)"])
-
-instMethodNotInClassErr occ clas
-  = hang (ptext SLIT("Instance mentions a method not in the class"))
-	 4 (hsep [ptext SLIT("class")  <+> quotes (ppr clas), 
-		  ptext SLIT("method") <+> quotes (ppr occ)])
-
-patMonoBindsCtxt pbind
-  = hang (ptext SLIT("In a pattern binding:"))
-	 4 (ppr pbind)
-
-methodSigCtxt name ty
-  = hang (hsep [ptext SLIT("When matching the definition of class method"),
-	        quotes (ppr name), ptext SLIT("to its signature :") ])
-	 4 (ppr ty)
 
 superClassCtxt = ptext SLIT("From the superclasses of the instance declaration")
 \end{code}

@@ -14,21 +14,17 @@ module TcModule (
 
 import CmdLineOpts	( opt_D_dump_tc, opt_D_dump_deriv )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..) )
-import RnHsSyn		( RenamedHsModule, RenamedFixityDecl(..) )
-import TcHsSyn		( TypecheckedHsBinds, TypecheckedHsExpr,
-			  TypecheckedDictBinds, TcMonoBinds,
-			  TypecheckedMonoBinds,
-			  zonkTopBinds )
+import RnHsSyn		( RenamedHsModule )
+import TcHsSyn		( TcMonoBinds, TypecheckedMonoBinds, zonkTopBinds )
 
 import TcMonad
 import Inst		( Inst, emptyLIE, plusLIE )
 import TcBinds		( tcTopBindsAndThen )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
-import TcEnv		( TcIdOcc(..), tcExtendGlobalValEnv, tcExtendTyConEnv, getEnv_LocalIds,
+import TcEnv		( TcIdOcc(..), tcExtendGlobalValEnv, tcExtendTyConEnv,
 			  getEnv_TyCons, getEnv_Classes, tcLookupLocalValue,
-			  tcLookupLocalValueByKey, tcLookupTyCon,
-			  tcLookupGlobalValueByKeyMaybe, initEnv )
+			  tcLookupTyCon, initEnv )
 import TcExpr		( tcId )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
@@ -42,26 +38,23 @@ import TcKind		( TcKind, kindToTcKind )
 import RnMonad		( RnNameSupply(..) )
 import Bag		( isEmptyBag )
 import ErrUtils		( WarnMsg, ErrMsg, 
-			  pprBagOfErrors, dumpIfSet, ghcExit
+			  pprBagOfErrors, dumpIfSet
 			)
-import Id		( idType, GenId, IdEnv, nullIdEnv )
-import Maybes		( catMaybes, MaybeErr(..) )
+import Id		( idType, GenId )
 import Name		( Name, isLocallyDefined, pprModule, NamedThing(..) )
-import TyCon		( TyCon, isSynTyCon, tyConKind )
+import TyCon		( TyCon, tyConKind )
 import Class		( Class, classSelIds, classTyCon )
-import Type		( mkTyConApp, mkSynTy, Type )
+import Type		( mkTyConApp, Type )
 import TyVar		( emptyTyVarEnv )
 import TysWiredIn	( unitTy )
-import PrelMods		( pREL_MAIN, mAIN )
+import PrelMods		( mAIN )
 import PrelInfo		( main_NAME, ioTyCon_NAME )
 import Unify		( unifyTauTy )
-import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
-		          filterUFM, eltsUFM )
 import Unique		( Unique  )
 import UniqSupply       ( UniqSupply )
 import Util
 import Bag		( Bag, isEmptyBag )
-import FiniteMap	( emptyFM, FiniteMap )
+import FiniteMap	( FiniteMap )
 import Outputable
 \end{code}
 

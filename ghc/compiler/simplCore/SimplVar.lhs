@@ -12,12 +12,9 @@ module SimplVar (
 
 import {-# SOURCE #-} Simplify ( simplExpr )
 
-import Constants	( uNFOLDING_USE_THRESHOLD,
-			  uNFOLDING_CON_DISCOUNT_WEIGHT
-			)
 import CmdLineOpts	( switchIsOn, SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( Unfolding(..), UfExpr, RdrName, UnfoldingGuidance(..), 
+import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..), 
 			  SimpleUnfolding(..),
 			  FormSummary, whnfOrBottom,
 			  smallEnoughToInline )

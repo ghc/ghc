@@ -28,17 +28,16 @@ import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import Id		( GenId, idType, Id )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
-import Maybes		( maybeToBool )
 import PprType		( GenType, GenTyVar )
-import Type		( splitFunTys, splitRhoTy, splitSigmaTy, mkTyVarTys,
-			  splitFunTy_maybe, splitAlgTyConApp_maybe,
+import Type		( splitFunTys, splitRhoTy,
+			  splitFunTy_maybe,
 			  Type, GenType
 			)
 import TyVar		( GenTyVar )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
-import TysWiredIn	( charTy, stringTy, mkListTy, mkTupleTy, addrTy )
+import TysWiredIn	( charTy, stringTy, mkListTy, mkTupleTy )
 import Unique		( Unique, eqClassOpKey, geClassOpKey, minusClassOpKey )
 import Util		( assertPanic, panic )
 import Outputable

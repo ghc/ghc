@@ -21,27 +21,22 @@ module SpecUtils (
 #include "HsVersions.h"
 
 import CmdLineOpts	( opt_SpecialiseOverloaded, opt_SpecialiseUnboxed,
-			  opt_SpecialiseAll, opt_PprUserLength
+			  opt_SpecialiseAll
 			)
 import Bag		( isEmptyBag, bagToList, Bag )
 import Class		( Class )
 import FiniteMap	( emptyFM, addListToFM_C, plusFM_C, keysFM,
 			  lookupWithDefaultFM
 			)
-import Id		( idType, isDictFunId, 
-			  isDefaultMethodId_maybe, 
-			  Id
-			)
+import Id		( Id )
 import Maybes		( maybeToBool, catMaybes, firstJust )
 import Name		( OccName, pprOccName, modAndOcc, NamedThing(..) )
 import Outputable
-import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
-			  TyCon
-			)
+import PprType		( pprParendGenType, pprMaybeTy, TyCon )
 import TyCon		( tyConTyVars )
 import Type		( mkSigmaTy, instantiateTauTy, instantiateThetaTy,
 			  splitSigmaTy, mkTyVarTy, mkForAllTys,
-			  getTyVar_maybe, isUnboxedType, Type
+			  isUnboxedType, Type
 			)
 import TyVar		( TyVar, mkTyVarEnv )
 import Util		( equivClasses, zipWithEqual,

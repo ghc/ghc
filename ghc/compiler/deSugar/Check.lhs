@@ -9,21 +9,11 @@
 module Check ( check , ExhaustivePat, WarningPat, BoxedString(..) ) where
 
 
-import {-# SOURCE #-} DsExpr  ( dsExpr  )
-import {-# SOURCE #-} DsBinds ( dsBinds )
-
 import HsSyn		
-import TcHsSyn		( TypecheckedPat, 
-                          TypecheckedMatch,
-			  TypecheckedHsBinds, 
-                          TypecheckedHsExpr	
-                        )
+import TcHsSyn		( TypecheckedPat )
 import DsHsSyn		( outPatType ) 
 import CoreSyn		
 
-import DsMonad		( DsM, DsMatchContext(..),
-			  DsMatchKind(..)
-                        )
 import DsUtils		( EquationInfo(..),
 			  MatchResult(..),
 			  EqnNo,
@@ -32,7 +22,6 @@ import DsUtils		( EquationInfo(..),
  			)
 import Id		( idType,
 			  Id,
-			  idName,
                           isTupleCon,			   
                           getIdArity
 			)

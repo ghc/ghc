@@ -13,12 +13,12 @@ import {-# SOURCE #-} DsExpr  ( dsExpr  )
 import {-# SOURCE #-} DsBinds ( dsBinds )
 
 import CmdLineOpts	( opt_WarnIncompletePatterns, opt_WarnOverlappingPatterns,
-			  opt_PprUserLength,opt_WarnSimplePatterns
+			  opt_WarnSimplePatterns
      			)
 import HsSyn		
 import TcHsSyn		( TypecheckedPat, TypecheckedMatch,
 			  TypecheckedHsBinds, TypecheckedHsExpr	)
-import DsHsSyn		( outPatType, collectTypedPatBinders )
+import DsHsSyn		( outPatType )
 import Check            ( check, ExhaustivePat, WarningPat, BoxedString )
 import CoreSyn
 import CoreUtils	( coreExprType )
@@ -35,7 +35,7 @@ import Name		( Name {--O only-} )
 import PprType		( GenType{-instance-}, GenTyVar{-ditto-} )        
 import PrelVals		( pAT_ERROR_ID )
 import Type		( isUnpointedType, splitAlgTyConApp,
-			  instantiateTauTy, Type
+			  Type
 			)
 import TyVar		( TyVar )
 import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy,
@@ -44,7 +44,7 @@ import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy,
 import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  charTy, charDataCon, intTy, intDataCon,
 			  floatTy, floatDataCon, doubleTy, tupleCon,
-			  doubleDataCon, stringTy, addrTy,
+			  doubleDataCon, addrTy,
 			  addrDataCon, wordTy, wordDataCon
 			)
 import UniqSet

@@ -29,10 +29,9 @@ module DsUtils (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Match (match, matchSimply )
+import {-# SOURCE #-} Match ( matchSimply )
 
-import HsSyn		( HsExpr(..), OutPat(..), HsLit(..), Fixity,
-			  Match, HsBinds, Stmt, DoOrListComp, HsType, ArithSeqInfo )
+import HsSyn		( OutPat(..), Stmt, DoOrListComp )
 import TcHsSyn		( TypecheckedPat )
 import DsHsSyn		( outPatType, collectTypedPatBinders )
 import CoreSyn
@@ -42,17 +41,17 @@ import DsMonad
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PrelVals		( iRREFUT_PAT_ERROR_ID, voidId )
 import Id		( idType, dataConArgTys, 
-			  DataCon, DictVar, Id, GenId )
+			  DataCon, Id, GenId )
 import Literal		( Literal(..) )
 import PrimOp           ( PrimOp )
 import TyCon		( isNewTyCon, tyConDataCons )
-import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTy,
+import Type		( mkRhoTy, mkFunTy,
 			  isUnpointedType, mkTyConApp, splitAlgTyConApp,
 			  Type
 			)
 import BasicTypes	( Unused )
 import TysPrim		( voidTy )
-import TysWiredIn	( tupleTyCon, unitDataCon, tupleCon )
+import TysWiredIn	( unitDataCon, tupleCon )
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet )
 import Unique		( Unique )
 import Outputable

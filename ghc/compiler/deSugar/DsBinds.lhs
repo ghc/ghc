@@ -30,15 +30,13 @@ import BasicTypes       ( Module, RecFlag(..) )
 import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs, 
 			  opt_AutoSccsOnExportedToplevs
 		        )
-import CostCentre	( mkAutoCC, IsCafCC(..), mkAllDictsCC, preludeDictsCostCentre )
-import Id		( idType, DictVar, Id )
+import CostCentre	( mkAutoCC, IsCafCC(..), mkAllDictsCC )
+import Id		( idType, Id )
 import Name		( isExported )
 import Type		( mkTyVarTy, isDictTy, instantiateTy
 			)
-import TyVar		( tyVarSetToList, zipTyVarEnv )
+import TyVar		( zipTyVarEnv )
 import TysPrim		( voidTy )
-import Util		( isIn )
-import Outputable
 \end{code}
 
 %************************************************************************

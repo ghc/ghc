@@ -32,7 +32,7 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..), GRHS(..),
 			  HsBinds(..), DoOrListComp(..),
 			  unguardedRHS
 			)
-import RdrHsSyn		( RdrName(..), varQual, varUnqual, mkOpApp,
+import RdrHsSyn		( RdrName(..), varUnqual, mkOpApp,
 			  RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat
 			)
 import BasicTypes	( IfaceFlavour(..), RecFlag(..) )

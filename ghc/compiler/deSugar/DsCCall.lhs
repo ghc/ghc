@@ -15,7 +15,7 @@ import DsUtils
 
 import TcHsSyn		( maybeBoxedPrimType )
 import CoreUtils	( coreExprType )
-import Id		( Id(..), dataConArgTys, dataConTyCon, idType )
+import Id		( Id(..), dataConArgTys, idType )
 import Maybes		( maybeToBool )
 import PprType		( GenType{-instances-} )
 import PrelVals		( packStringForCId )
@@ -25,7 +25,7 @@ import Type		( isUnpointedType, splitAlgTyConApp_maybe,
 			  Type
 			)
 import TyCon		( tyConDataCons )
-import TysPrim		( byteArrayPrimTy, realWorldTy,  realWorldStatePrimTy,
+import TysPrim		( byteArrayPrimTy, realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( getStatePairingConInfo,
 			  unitDataCon, stringTy,

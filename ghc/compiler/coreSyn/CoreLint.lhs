@@ -17,12 +17,11 @@ import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting )
 import CoreSyn
 
 import Bag
-import Kind		( hasMoreBoxityInfo, Kind{-instance-}, 
-			  isTypeKind, isBoxedTypeKind {- TEMP --SOF -} )
+import Kind		( hasMoreBoxityInfo, Kind{-instance-} )
 import Literal		( literalType, Literal{-instance-} )
 import Id		( idType, isBottomingId, dataConRepType, isDataCon, isNewCon, isAlgCon,
 			  dataConArgTys, GenId{-instances-},
-			  emptyIdSet, mkIdSet, intersectIdSets,
+			  emptyIdSet, mkIdSet,
 			  unionIdSets, elementOfIdSet, IdSet,
 			  Id
 			)
@@ -32,12 +31,12 @@ import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-},
 import PprCore
 import ErrUtils		( doIfSet, ghcExit )
 import PprType		( GenType, GenTyVar, TyCon )
-import PrimOp		( primOpType, PrimOp(..) )
+import PrimOp		( primOpType )
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc )
 import Type		( mkFunTy, splitFunTy_maybe, mkForAllTy,
 			  splitForAllTy_maybe,
-			  isUnpointedType, typeKind, instantiateTy, splitSigmaTy,
+			  isUnpointedType, typeKind, instantiateTy,
 			  splitAlgTyConApp_maybe, Type
 			)
 import TyCon		( isPrimTyCon, isDataTyCon )
@@ -47,7 +46,7 @@ import Unique		( Unique )
 import Util		( zipEqual )
 import Outputable
 
-infixr 9 `thenL`, `seqL`, `thenMaybeL`, `seqMaybeL`
+infixr 9 `thenL`, `seqL`, `thenMaybeL`
 \end{code}
 
 %************************************************************************
@@ -492,12 +491,6 @@ thenMaybeL m k spec loc scope errs
       (Nothing, errs2) -> (Nothing, errs2)
       (Just r,  errs2) -> k r spec loc scope errs2
 
-seqMaybeL :: LintM (Maybe a) -> LintM (Maybe b) -> LintM (Maybe b)
-seqMaybeL m k spec loc scope errs
-  = case m spec loc scope errs of
-      (Nothing, errs2) -> (Nothing, errs2)
-      (Just _,  errs2) -> k spec loc scope errs2
-
 mapL :: (a -> LintM b) -> [a] -> LintM [b]
 mapL f [] = returnL []
 mapL f (x:xs)
@@ -523,9 +516,6 @@ checkIfSpecDoneL :: Bool -> ErrMsg -> LintM ()
 checkIfSpecDoneL True  msg spec  loc scope errs = ((), errs)
 checkIfSpecDoneL False msg True  loc scope errs = ((), addErr errs msg loc)
 checkIfSpecDoneL False msg False loc scope errs = ((), errs)
-
-addErrIfL pred spec
-  = if pred then addErrL spec else returnL ()
 
 addErrL :: ErrMsg -> LintM ()
 addErrL msg spec loc scope errs = ((), addErr errs msg loc)
@@ -590,21 +580,6 @@ mkCaseAltMsg :: CoreCaseAlts -> ErrMsg
 mkCaseAltMsg alts
   = ($$) (ptext SLIT("Type of case alternatives not the same:"))
 	    (ppr alts)
-
-mkCaseDataConMsg :: CoreExpr -> ErrMsg
-mkCaseDataConMsg expr
-  = ($$) (ptext SLIT("A case scrutinee not of data constructor type:"))
-	    (pprCoreExpr expr)
-
-mkCaseNotPrimMsg :: TyCon -> ErrMsg
-mkCaseNotPrimMsg tycon
-  = ($$) (ptext SLIT("A primitive case on a non-primitive type:"))
-	    (ppr tycon)
-
-mkCasePrimMsg :: TyCon -> ErrMsg
-mkCasePrimMsg tycon
-  = ($$) (ptext SLIT("An algebraic case on a primitive type:"))
-	    (ppr tycon)
 
 mkCaseAbstractMsg :: TyCon -> ErrMsg
 mkCaseAbstractMsg tycon
@@ -690,10 +665,4 @@ mkRhsPrimMsg binder rhs
 		     ppr binder],
 	      hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]
 	     ]
-
-mkSpecTyAppMsg :: CoreArg -> ErrMsg
-mkSpecTyAppMsg arg
-  = ($$)
-      (ptext SLIT("Unboxed types in a type application (after specialisation):"))
-      (ppr arg)
 \end{code}
