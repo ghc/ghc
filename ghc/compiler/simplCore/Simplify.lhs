@@ -24,7 +24,8 @@ import CoreSyn
 import CoreUtils	( coreExprType, nonErrorRHSs, maybeErrorApp,
 			  unTagBinders, squashableDictishCcExpr
 			)
-import Id		( idType, idWantsToBeINLINEd, idMustNotBeINLINEd, addIdArity, getIdArity,
+import Id		( idType, idMustBeINLINEd, idWantsToBeINLINEd, idMustNotBeINLINEd, 
+			  addIdArity, getIdArity,
 			  getIdDemandInfo, addIdDemandInfo,
 			  GenId{-instance NamedThing-}
 			)
@@ -46,7 +47,7 @@ import SimplMonad
 import SimplVar		( completeVar )
 import Unique		( Unique )
 import SimplUtils
-import Type		( mkTyVarTy, mkTyVarTys, mkAppTy, applyTy, mkFunTys,
+import Type		( mkTyVarTy, mkTyVarTys, mkAppTy, applyTy, mkFunTys, maybeAppDataTyCon,
 			  splitFunTy, splitFunTyExpandingDicts, getFunTy_maybe, eqTy
 			)
 import TysWiredIn	( realWorldStateTy )
@@ -499,33 +500,67 @@ simplRhsExpr
 	-> InExpr
 	-> OutId		-- The new binder (used only for its type)
 	-> SmplM (OutExpr, ArityInfo)
+\end{code}
 
--- First a special case for variable right-hand sides
---	v = w
--- It's OK to simplify the RHS, but it's often a waste of time.  Often
--- these v = w things persist because v is exported, and w is used 
--- elsewhere.  So if we're not careful we'll eta expand the rhs, only
--- to eta reduce it in competeNonRec.
---
--- If we leave the binding unchanged, we will certainly replace v by w at 
--- every occurrence of v, which is good enough.  
---
--- In fact, it's better to replace v by w than to inline w in v's rhs,
--- even if this is the only occurrence of w.  Why? Because w might have
--- IdInfo (like strictness) that v doesn't.
+First a special case for variable right-hand sides
+	v = w
+It's OK to simplify the RHS, but it's often a waste of time.  Often
+these v = w things persist because v is exported, and w is used 
+elsewhere.  So if we're not careful we'll eta expand the rhs, only
+to eta reduce it in competeNonRec.
 
+If we leave the binding unchanged, we will certainly replace v by w at 
+every occurrence of v, which is good enough.  
+
+In fact, it's *better* to replace v by w than to inline w in v's rhs,
+even if this is the only occurrence of w.  Why? Because w might have
+IdInfo (like strictness) that v doesn't.
+Furthermore, there might be other uses of w; if so, inlining w in 
+v's rhs will duplicate w's rhs, whereas replacing v by w doesn't.
+
+HOWEVER, we have to be careful if w is something that *must* be
+inlined.  In particular, its binding may have been dropped.  Here's
+an example that actually happened:
+	let x = let y = e in y
+     in f x
+The "let y" was floated out, and then (since y occurs once in a
+definitely inlinable position) the binding was dropped, leaving
+	{y=e} let x = y in f x
+But now using the reasoning of this little section, 
+y wasn't inlined, because it was a let x=y form.
+
+\begin{code}
 simplRhsExpr env binder@(id,occ_info) (Var v) new_id
- = case (runEager $ lookupId env v) of
-      LitArg lit -> returnSmpl (Lit lit, ArityExactly 0)
-      VarArg v'	 -> returnSmpl (Var v', getIdArity v')
+ | maybeToBool maybe_stop_at_var
+ = returnSmpl (Var the_var, getIdArity the_var)
+ where
+   maybe_stop_at_var 
+     = case (runEager $ lookupId env v) of
+	 VarArg v' | not (must_unfold v') -> Just v'
+	 other				  -> Nothing
 
+   Just the_var = maybe_stop_at_var
+
+   must_unfold v' =  idMustBeINLINEd v'
+		  || case lookupOutIdEnv env v' of
+			Just (_, _, InUnfolding _ _) -> True
+			other			     -> False
+\end{code}
+
+\begin{code}
 simplRhsExpr env binder@(id,occ_info) rhs new_id
+  | maybeToBool (maybeAppDataTyCon rhs_ty)
+	-- Deal with the data type case, in which case the elaborate
+	-- eta-expansion nonsense is really quite a waste of time.
+  = simplExpr rhs_env rhs [] rhs_ty		`thenSmpl` \ rhs' ->
+    returnSmpl (rhs', ArityExactly 0)
+
+  | otherwise	-- OK, use the big hammer
   = 	-- Deal with the big lambda part
     ASSERT( null uvars )	-- For now
 
     mapSmpl cloneTyVarSmpl tyvars			`thenSmpl` \ tyvars' ->
     let
-	rhs_ty   = idType new_id
 	new_tys  = mkTyVarTys tyvars'
 	body_ty  = foldl applyTy rhs_ty new_tys
 	lam_env  = extendTyEnvList rhs_env (zipEqual "simplRhsExpr" tyvars new_tys)
@@ -540,6 +575,7 @@ simplRhsExpr env binder@(id,occ_info) rhs new_id
 
     returnSmpl (rhs', arity)
   where
+    rhs_ty  = idType new_id
     rhs_env | idWantsToBeINLINEd id  	-- Don't ever inline in a INLINE thing's rhs
 	    = switchOffInlining env1	-- See comments with switchOffInlining
 	    | otherwise	
@@ -696,7 +732,7 @@ simplCoerce env coercion ty expr args result_ty
 
 %************************************************************************
 %*									*
-\subsection[Simplify-let]{Let-expressions}
+\subsection[Simplify-bind]{Binding groups}
 %*									*
 %************************************************************************
 
@@ -706,8 +742,35 @@ simplBind :: SimplEnv
 	  -> (SimplEnv -> SmplM OutExpr)
 	  -> OutType
 	  -> SmplM OutExpr
+
+simplBind env (NonRec binder rhs) body_c body_ty = simplNonRec env binder rhs body_c body_ty
+simplBind env (Rec pairs)         body_c body_ty = simplRec    env pairs      body_c body_ty
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection[Simplify-let]{Let-expressions}
+%*									*
+%************************************************************************
+
+Float switches
+~~~~~~~~~~~~~~
+The booleans controlling floating have to be set with a little care.
+Here's one performance bug I found:
+
+	let x = let y = let z = case a# +# 1 of {b# -> E1}
+			in E2
+		in E3
+	in E4
+
+Now, if E2, E3 aren't HNFs we won't float the y-binding or the z-binding.
+Before case_floating_ok included float_exposes_hnf, the case expression was floated
+*one level per simplifier iteration* outwards.  So it made th s
+
+
+Floating case from let
+~~~~~~~~~~~~~~~~~~~~~~
 When floating cases out of lets, remember this:
 
 	let x* = case e of alts
@@ -746,120 +809,6 @@ In this particular example join_body will later be inlined,
 achieving the same effect.
 ToDo: check this is OK with andy
 
-
-
-\begin{code}
--- Dead code is now discarded by the occurrence analyser,
-
-simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
-  | idWantsToBeINLINEd id
-  = complete_bind env rhs	-- Don't mess about with floating or let-to-case on
-				-- INLINE things
-  | otherwise
-  = simpl_bind env rhs
-  where
-    -- Try let-to-case; see notes below about let-to-case
-    simpl_bind env rhs | try_let_to_case &&
-			 will_be_demanded &&
-		         (rhs_is_bot ||
-			  not rhs_is_whnf &&
-		          singleConstructorType rhs_ty
-				-- Only do let-to-case for single constructor types. 
-				-- For other types we defer doing it until the tidy-up phase at
-				-- the end of simplification.
-			 )
-      = tick Let2Case				`thenSmpl_`
-        simplCase env rhs (AlgAlts [] (BindDefault binder (Var id)))
-			  (\env rhs -> complete_bind env rhs) body_ty
-		-- OLD COMMENT:  [now the new RHS is only "x" so there's less worry]
-		-- NB: it's tidier to call complete_bind not simpl_bind, else
-		-- we nearly end up in a loop.  Consider:
-		-- 	let x = rhs in b
-		-- ==>  case rhs of (p,q) -> let x=(p,q) in b
-		-- This effectively what the above simplCase call does.
-		-- Now, the inner let is a let-to-case target again!  Actually, since
-		-- the RHS is in WHNF it won't happen, but it's a close thing!
-
-    -- Try let-from-let
-    simpl_bind env (Let bind rhs) | let_floating_ok
-      = tick LetFloatFromLet                    `thenSmpl_`
-	simplBind env (fix_up_demandedness will_be_demanded bind)
-		      (\env -> simpl_bind env rhs) body_ty
-
-    -- Try case-from-let; this deals with a strict let of error too
-    simpl_bind env (Case scrut alts) | case_floating_ok scrut
-      = tick CaseFloatFromLet				`thenSmpl_`
-
-	-- First, bind large let-body if necessary
-	if ok_to_dup || isSingleton (nonErrorRHSs alts)
-	then
-	    simplCase env scrut alts (\env rhs -> simpl_bind env rhs) body_ty
-	else
-	    bindLargeRhs env [binder] body_ty body_c	`thenSmpl` \ (extra_binding, new_body) ->
-	    let
-		body_c' = \env -> simplExpr env new_body [] body_ty
-		case_c  = \env rhs -> simplBind env (NonRec binder rhs) body_c' body_ty
-	    in
-	    simplCase env scrut alts case_c body_ty	`thenSmpl` \ case_expr ->
-	    returnSmpl (Let extra_binding case_expr)
-
-    -- None of the above; simplify rhs and tidy up
-    simpl_bind env rhs = complete_bind env rhs
- 
-    complete_bind env rhs
-      = cloneId env binder			`thenSmpl` \ new_id ->
-	simplRhsExpr env binder rhs new_id	`thenSmpl` \ (rhs',arity) ->
-	completeNonRec env binder 
-		(new_id `withArity` arity) rhs'	`thenSmpl` \ (new_env, binds) ->
-        body_c new_env				`thenSmpl` \ body' ->
-        returnSmpl (mkCoLetsAny binds body')
-
-
-	-- All this stuff is computed at the start of the simpl_bind loop
-    float_lets       	      = switchIsSet env SimplFloatLetsExposingWHNF
-    float_primops    	      = switchIsSet env SimplOkToFloatPrimOps
-    ok_to_dup	     	      = switchIsSet env SimplOkToDupCode
-    always_float_let_from_let = switchIsSet env SimplAlwaysFloatLetsFromLets
-    try_let_to_case           = switchIsSet env SimplLetToCase
-    no_float		      = switchIsSet env SimplNoLetFromStrictLet
-
-    demand_info	     = getIdDemandInfo id
-    will_be_demanded = willBeDemanded demand_info
-    rhs_ty 	     = idType id
-
-    form	= mkFormSummary rhs
-    rhs_is_bot  = case form of
-			BottomForm -> True
-			other	   -> False
-    rhs_is_whnf = case form of
-			VarForm -> True
-			ValueForm -> True
-			other -> False
-
-    float_exposes_hnf = floatExposesHNF float_lets float_primops ok_to_dup rhs
-
-    let_floating_ok  = (will_be_demanded && not no_float) ||
-		       always_float_let_from_let ||
-		       float_exposes_hnf
-
-    case_floating_ok scrut = (will_be_demanded && not no_float) || 
-			     (float_exposes_hnf && is_cheap_prim_app scrut && float_primops)
-	-- See note below 
-\end{code}
-
-Float switches
-~~~~~~~~~~~~~~
-The booleans controlling floating have to be set with a little care.
-Here's one performance bug I found:
-
-	let x = let y = let z = case a# +# 1 of {b# -> E1}
-			in E2
-		in E3
-	in E4
-
-Now, if E2, E3 aren't HNFs we won't float the y-binding or the z-binding.
-Before case_floating_ok included float_exposes_hnf, the case expression was floated
-*one level per simplifier iteration* outwards.  So it made th s
 
 Let to case: two points
 ~~~~~~~~~~~
@@ -935,140 +884,112 @@ Notice that let to case occurs only if x is used strictly in its body
 (obviously).
 
 
-Letrec expressions
-~~~~~~~~~~~~~~~~~~
-
-Simplify each RHS, float any let(recs) from the RHSs (if let-floating is
-on and it'll expose a HNF), and bang the whole resulting mess together
-into a huge letrec.
-
-1. Any "macros" should be expanded.  The main application of this
-macro-expansion is:
-
-	letrec
-		f = ....g...
-		g = ....f...
-	in
-	....f...
-
-Here we would like the single call to g to be inlined.
-
-We can spot this easily, because g will be tagged as having just one
-occurrence.  The "inlineUnconditionally" predicate is just what we want.
-
-A worry: could this lead to non-termination?  For example:
-
-	letrec
-		f = ...g...
-		g = ...f...
-		h = ...h...
-	in
-	..h..
-
-Here, f and g call each other (just once) and neither is used elsewhere.
-But it's OK:
-
-* the occurrence analyser will drop any (sub)-group that isn't used at
-  all.
-
-* If the group is used outside itself (ie in the "in" part), then there
-  can't be a cyle.
-
-** IMPORTANT: check that NewOccAnal has the property that a group of
-   bindings like the above has f&g dropped.! ***
-
-
-2. We'd also like to pull out any top-level let(rec)s from the
-rhs of the defns:
-
-	letrec
-		f = let h = ... in \x -> ....h...f...h...
-	in
-	...f...
-====>
-	letrec
-		h = ...
-		f = \x -> ....h...f...h...
-	in
-	...f...
-
-But floating cases is less easy?  (Don't for now; ToDo?)
-
-
-3.  We'd like to arrange that the RHSs "know" about members of the
-group that are bound to constructors.  For example:
-
-    let rec
-       d.Eq      = (==,/=)
-       f a b c d = case d.Eq of (h,_) -> let x = (a,b); y = (c,d) in not (h x y)
-       /= a b    = unpack tuple a, unpack tuple b, call f
-    in d.Eq
-
-here, by knowing about d.Eq in f's rhs, one could get rid of
-the case (and break out the recursion completely).
-[This occurred with more aggressive inlining threshold (4),
-nofib/spectral/knights]
-
-How to do it?
-	1: we simplify constructor rhss first.
-	2: we record the "known constructors" in the environment
-	3: we simplify the other rhss, with the knowledge about the constructors
-
-
-
 \begin{code}
-simplBind env (Rec pairs) body_c body_ty
-  =	-- Do floating, if necessary
-    floatBind env False (Rec pairs)	`thenSmpl` \ [Rec pairs'] ->
-    let
-	binders = map fst pairs'
-    in
-    cloneIds env binders			`thenSmpl` \ ids' ->
-    let
-       env_w_clones = extendIdEnvWithClones env binders ids'
-    in
-    simplRecursiveGroup env_w_clones ids' pairs'	`thenSmpl` \ (pairs', new_env) ->
+-- Dead code is now discarded by the occurrence analyser,
 
-    body_c new_env				`thenSmpl` \ body' ->
+simplNonRec env binder@(id,occ_info) rhs body_c body_ty
+  | inlineUnconditionally ok_to_dup occ_info
+  = 	-- The binder is used in definitely-inline way in the body
+	-- So add it to the environment, drop the binding, and continue
+    body_c (extendEnvGivenInlining env id occ_info rhs)
 
-    returnSmpl (Let (Rec pairs') body')
-\end{code}
+  | idWantsToBeINLINEd id
+  = complete_bind env rhs	-- Don't mess about with floating or let-to-case on
+				-- INLINE things
+  | otherwise
+  = simpl_bind env rhs
+  where
+    -- Try let-to-case; see notes below about let-to-case
+    simpl_bind env rhs | try_let_to_case &&
+			 will_be_demanded &&
+		         (rhs_is_bot ||
+			  not rhs_is_whnf &&
+		          singleConstructorType rhs_ty
+				-- Only do let-to-case for single constructor types. 
+				-- For other types we defer doing it until the tidy-up phase at
+				-- the end of simplification.
+			 )
+      = tick Let2Case				`thenSmpl_`
+        simplCase env rhs (AlgAlts [] (BindDefault binder (Var id)))
+			  (\env rhs -> complete_bind env rhs) body_ty
+		-- OLD COMMENT:  [now the new RHS is only "x" so there's less worry]
+		-- NB: it's tidier to call complete_bind not simpl_bind, else
+		-- we nearly end up in a loop.  Consider:
+		-- 	let x = rhs in b
+		-- ==>  case rhs of (p,q) -> let x=(p,q) in b
+		-- This effectively what the above simplCase call does.
+		-- Now, the inner let is a let-to-case target again!  Actually, since
+		-- the RHS is in WHNF it won't happen, but it's a close thing!
 
-\begin{code}
--- The env passed to simplRecursiveGroup already has 
--- bindings that clone the variables of the group.
-simplRecursiveGroup env new_ids []
-  = returnSmpl ([], env)
+    -- Try let-from-let
+    simpl_bind env (Let bind rhs) | let_floating_ok
+      = tick LetFloatFromLet                    `thenSmpl_`
+	simplBind env (fix_up_demandedness will_be_demanded bind)
+		      (\env -> simpl_bind env rhs) body_ty
 
-simplRecursiveGroup env (new_id : new_ids) ((binder@(_, occ_info), rhs) : pairs)
-  = simplRhsExpr env binder rhs new_id		`thenSmpl` \ (new_rhs, arity) ->
-    let
-	new_id' = new_id `withArity` arity
-    
-	-- ToDo: this next bit could usefully share code with completeNonRec
+    -- Try case-from-let; this deals with a strict let of error too
+    simpl_bind env (Case scrut alts) | case_floating_ok scrut
+      = tick CaseFloatFromLet				`thenSmpl_`
 
-        new_env 
-	  | idMustNotBeINLINEd new_id		-- Occurrence analyser says "don't inline"
-	  = env
+	-- First, bind large let-body if necessary
+	if ok_to_dup || isSingleton (nonErrorRHSs alts)
+	then
+	    simplCase env scrut alts (\env rhs -> simpl_bind env rhs) body_ty
+	else
+	    bindLargeRhs env [binder] body_ty body_c	`thenSmpl` \ (extra_binding, new_body) ->
+	    let
+		body_c' = \env -> simplExpr env new_body [] body_ty
+		case_c  = \env rhs -> simplNonRec env binder rhs body_c' body_ty
+	    in
+	    simplCase env scrut alts case_c body_ty	`thenSmpl` \ case_expr ->
+	    returnSmpl (Let extra_binding case_expr)
 
-	  | is_atomic eta'd_rhs 		-- If rhs (after eta reduction) is atomic
-	  = extendIdEnvWithAtom env binder the_arg
+    -- None of the above; simplify rhs and tidy up
+    simpl_bind env rhs = complete_bind env rhs
+ 
+    complete_bind env rhs
+      = cloneId env binder			`thenSmpl` \ new_id ->
+	simplRhsExpr env binder rhs new_id	`thenSmpl` \ (rhs',arity) ->
+	completeNonRec env binder 
+		(new_id `withArity` arity) rhs'	`thenSmpl` \ (new_env, binds) ->
+        body_c new_env				`thenSmpl` \ body' ->
+        returnSmpl (mkCoLetsAny binds body')
 
-	  | otherwise				-- Non-atomic
-	  = extendEnvGivenBinding env occ_info new_id new_rhs
-						-- Don't eta if it doesn't eliminate the binding
 
-        eta'd_rhs = etaCoreExpr new_rhs
-        the_arg   = case eta'd_rhs of
-			  Var v -> VarArg v
-			  Lit l -> LitArg l
-    in
-    simplRecursiveGroup new_env new_ids pairs	`thenSmpl` \ (new_pairs, final_env) ->
-    returnSmpl ((new_id', new_rhs) : new_pairs, final_env)   
+	-- All this stuff is computed at the start of the simpl_bind loop
+    float_lets       	      = switchIsSet env SimplFloatLetsExposingWHNF
+    float_primops    	      = switchIsSet env SimplOkToFloatPrimOps
+    ok_to_dup	     	      = switchIsSet env SimplOkToDupCode
+    always_float_let_from_let = switchIsSet env SimplAlwaysFloatLetsFromLets
+    try_let_to_case           = switchIsSet env SimplLetToCase
+    no_float		      = switchIsSet env SimplNoLetFromStrictLet
+
+    demand_info	     = getIdDemandInfo id
+    will_be_demanded = willBeDemanded demand_info
+    rhs_ty 	     = idType id
+
+    form	= mkFormSummary rhs
+    rhs_is_bot  = case form of
+			BottomForm -> True
+			other	   -> False
+    rhs_is_whnf = case form of
+			VarForm -> True
+			ValueForm -> True
+			other -> False
+
+    float_exposes_hnf = floatExposesHNF float_lets float_primops ok_to_dup rhs
+
+    let_floating_ok  = (will_be_demanded && not no_float) ||
+		       always_float_let_from_let ||
+		       float_exposes_hnf
+
+    case_floating_ok scrut = (will_be_demanded && not no_float) || 
+			     (float_exposes_hnf && is_cheap_prim_app scrut && float_primops)
+	-- See note below 
 \end{code}
 
 
-@completeLet@ looks at the simplified post-floating RHS of the
+@completeNonRec@ looks at the simplified post-floating RHS of the
 let-expression, and decides what to do.  There's one interesting
 aspect to this, namely constructor reuse.  Consider
 @
@@ -1182,6 +1103,90 @@ completeNonRec env binder@(id,occ_info) new_id new_rhs
 		  Var v -> VarArg v
 		  Lit l -> LitArg l
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[Simplify-letrec]{Letrec-expressions}
+%*									*
+%************************************************************************
+
+Letrec expressions
+~~~~~~~~~~~~~~~~~~
+Here's the game plan
+
+1. Float any let(rec)s out of the RHSs
+2. Clone all the Ids and extend the envt with these clones
+3. Simplify one binding at a time, adding each binding to the
+   environment once it's done.
+
+This relies on the occurrence analyser to
+	a) break all cycles with an Id marked MustNotBeInlined
+	b) sort the decls into topological order
+The former prevents infinite inlinings, and the latter means
+that we get maximum benefit from working top to bottom.
+
+
+\begin{code}
+simplRec env pairs body_c body_ty
+  =	-- Do floating, if necessary
+    floatBind env False (Rec pairs)	`thenSmpl` \ [Rec pairs'] ->
+    let
+	binders = map fst pairs'
+    in
+    cloneIds env binders			`thenSmpl` \ ids' ->
+    let
+       env_w_clones = extendIdEnvWithClones env binders ids'
+    in
+    simplRecursiveGroup env_w_clones ids' pairs'	`thenSmpl` \ (pairs', new_env) ->
+
+    body_c new_env				`thenSmpl` \ body' ->
+
+    returnSmpl (Let (Rec pairs') body')
+\end{code}
+
+\begin{code}
+-- The env passed to simplRecursiveGroup already has 
+-- bindings that clone the variables of the group.
+simplRecursiveGroup env new_ids []
+  = returnSmpl ([], env)
+
+simplRecursiveGroup env (new_id : new_ids) ((binder@(_, occ_info), rhs) : pairs)
+  | inlineUnconditionally ok_to_dup occ_info
+  = 	-- Single occurrence, so drop binding and extend env with the inlining
+    let
+	new_env = extendEnvGivenInlining env new_id occ_info rhs
+    in
+    simplRecursiveGroup new_env new_ids pairs
+
+  | otherwise
+  = simplRhsExpr env binder rhs new_id		`thenSmpl` \ (new_rhs, arity) ->
+    let
+	new_id' = new_id `withArity` arity
+    
+	-- ToDo: this next bit could usefully share code with completeNonRec
+
+        new_env 
+	  | idMustNotBeINLINEd new_id		-- Occurrence analyser says "don't inline"
+	  = env
+
+	  | is_atomic eta'd_rhs 		-- If rhs (after eta reduction) is atomic
+	  = extendIdEnvWithAtom env binder the_arg
+
+	  | otherwise				-- Non-atomic
+	  = extendEnvGivenBinding env occ_info new_id new_rhs
+						-- Don't eta if it doesn't eliminate the binding
+
+        eta'd_rhs = etaCoreExpr new_rhs
+        the_arg   = case eta'd_rhs of
+			  Var v -> VarArg v
+			  Lit l -> LitArg l
+    in
+    simplRecursiveGroup new_env new_ids pairs	`thenSmpl` \ (new_pairs, final_env) ->
+    returnSmpl ((new_id', new_rhs) : new_pairs, final_env)   
+  where
+    ok_to_dup = switchIsSet env SimplOkToDupCode
+\end{code}
+
 
 
 \begin{code}
