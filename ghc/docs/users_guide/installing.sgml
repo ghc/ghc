@@ -581,8 +581,7 @@ commands:
 
 <Screen>
 mount -f c: /
-mount c:\\cygwin\\usr\\include /usr/include
-</Screen>
+mount c:\\cygwin\\usr\\include /usr/include</Screen>
 
 assuming you installed Cygwin at <Filename>C:\cygwin</Filename>; otherwise
 change the drive and directory as appropriate.
