@@ -115,17 +115,27 @@ arg: while ($_ = $ARGV[0]) {
 }
 
 foreach $out_file ( @PgmStdoutFile ) {
-    #$Status++ ,
-    pop(@PgmStdoutFile),
-    print STDERR "$Pgm: warning: expected-output file missing: $out_file\n"
-	if ! -f $out_file;
+    if ( ! -f $out_file ) {
+        #$Status++;
+        pop(@PgmStdoutFile);
+	if ( $SaveTmpFile ) {
+	    system("touch $out_file");
+	} else {
+    	    print STDERR "$Pgm: warning: expected-stdout file missing: $out_file\n";
+	}
+    }
 }
 
 foreach $out_file ( @PgmStderrFile ) {
-    #$Status++,
-    pop(@PgmStderrFile),
-    print STDERR "$Pgm: warning: expected-stderr file missing: $out_file\n"
-	if ! -f $out_file;
+    if ( ! -f $out_file ) {
+	#$Status++;
+        pop(@PgmStderrFile);
+	if ( $SaveTmpFile ) {
+	    system("touch $out_file");
+	} else {
+    	    print STDERR "$Pgm: warning: expected-stderr file missing: $out_file\n";
+	}
+    }
 }
 
 exit 1 if $Status;
