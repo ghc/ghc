@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.140 2002/04/23 14:20:18 sof Exp $
+ * $Id: Schedule.c,v 1.141 2002/04/26 22:35:54 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -685,7 +685,9 @@ schedule( void )
 	/* ToDo: revisit conditions (and mechanism) for shutting
 	   down a multi-threaded world  */
 	IF_DEBUG(scheduler, sched_belch("all done, i think...shutting down."));
-	shutdownHaskellAndExit(0);
+	RELEASE_LOCK(&sched_mutex);
+	shutdownHaskell();
+	return;
 #endif
     }
   not_deadlocked:
@@ -2195,7 +2197,6 @@ waitThread_(StgTSO *tso,
   } else 
 # endif
   {
-    IF_DEBUG(scheduler, sched_belch("sfoo"));
     do {
       waitCondition(&m->wakeup, &sched_mutex);
     } while (m->stat == NoStatus);

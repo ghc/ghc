@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.61 2002/02/04 20:25:39 sof Exp $
+ * $Id: RtsStartup.c,v 1.62 2002/04/26 22:35:55 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -272,6 +272,7 @@ shutdownHaskell(void)
 {
   if (!rts_has_started_up)
      return;
+  rts_has_started_up=0;
 
   /* start timing the shutdown */
   stat_startExit();
@@ -338,8 +339,6 @@ shutdownHaskell(void)
 #if defined(TICKY_TICKY)
   if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
-
-  rts_has_started_up=0;
 }
 
 /* 
