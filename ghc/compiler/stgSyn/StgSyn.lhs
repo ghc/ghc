@@ -445,6 +445,12 @@ type StgCaseDefault = GenStgCaseDefault	Id Id
 
 This is also used in @LambdaFormInfo@ in the @ClosureInfo@ module.
 
+A @ReEntrant@ closure may be entered multiple times, but should not be
+updated or blackholed.  An @Updatable@ closure should be updated after
+evaluation (and may be blackholed during evaluation).  A @SingleEntry@
+closure will only be entered once, and so need not be updated but may
+safely be blackholed.
+
 \begin{code}
 data UpdateFlag = ReEntrant | Updatable | SingleEntry
 
