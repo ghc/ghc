@@ -528,7 +528,7 @@ getExecDir cmd
   where
     len = 2048::Int -- Plenty, PATH_MAX is 512 under Win32.
 
-foreign import stdcall "GetModuleFileNameA" unsafe 
+foreign import stdcall unsafe  "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
 getExecDir :: String -> IO (Maybe String) 
