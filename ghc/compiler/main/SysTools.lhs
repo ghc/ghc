@@ -308,7 +308,7 @@ setPgm pgm	   = unknownFlagErr ("-pgm" ++ pgm)
 -- 1. Set proto_top_dir
 -- 	a) look for (the last) -B flag, and use it
 --	b) if there are no -B flags, get the directory 
---	   where GHC is running
+--	   where GHC is running (only on Windows)
 --
 -- 2. If package.conf exists in proto_top_dir, we are running
 --	installed; and TopDir = proto_top_dir
@@ -324,24 +324,26 @@ getTopDir :: [String]
 	         String)	-- TopDir (in Unix format '/' separated)
 
 getTopDir minusbs
-  = do { top_dir1 <- get_proto
-       ; let top_dir2 = unDosifyPath top_dir1	-- Convert to standard internal form
+  = do { top_dir <- get_proto
+       ; print top_dir
+       ; if "/ghc/compiler" `isSuffixOf` top_dir then print (remove_suffix top_dir) else print "not"
 
-	-- Discover whether we're running in a build tree or in an installation,
+        -- Discover whether we're running in a build tree or in an installation,
 	-- by looking for the package configuration file.
-       ; am_installed <- doesFileExist (top_dir2 `slash` "package.conf")
+       ; am_installed <- doesFileExist (top_dir `slash` "package.conf")
 
-       ; return (am_installed, top_dir2)
+       ; return (am_installed, top_dir)
        }
   where
-    get_proto | not (null minusbs) 
-	      = return (drop 2 (last minusbs))	-- 2 for "-B"
+    -- get_proto returns a Unix-format path
+    get_proto | not (null minusbs)
+	      = return (unDosifyPath (drop 2 (last minusbs)))	-- 2 for "-B"
 	      | otherwise	   
 	      = do { maybe_exec_dir <- getExecDir -- Get directory of executable
 		   ; case maybe_exec_dir of	  -- (only works on Windows; 
 						  --  returns Nothing on Unix)
 			Nothing  -> throwDyn (InstallationError "missing -B<dir> option")
-			Just dir -> return (remove_suffix dir)
+			Just dir -> return (remove_suffix (unDosifyPath dir))
 		   }
 
     -- In an installed tree, the ghc binary lives in $libexecdir, which
