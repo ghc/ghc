@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalAlloc.lhs,v 1.2 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelMarshalAlloc.lhs,v 1.3 2001/08/08 14:36:14 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -23,7 +23,7 @@ module PrelMarshalAlloc (
 
 #ifdef __GLASGOW_HASKELL__
 import PrelException 	( bracket )
-import PrelPtr	 	( Ptr, nullPtr )
+import PrelPtr	 	( Ptr(..), nullPtr )
 import PrelStorable  	( Storable(sizeOf) )
 import PrelCTypesISO 	( CSize )
 import PrelIOBase
@@ -69,8 +69,21 @@ alloca  = doAlloca undefined
 --   this function; in other words, in `allocaBytes n f' the allocated storage
 --   must not be used after `f' returns
 --
+#ifdef __GLASGOW_HASKELL__
+allocaBytes :: Int -> (Ptr a -> IO b) -> IO b
+allocaBytes (I# size) action = IO $ \ s ->
+     case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
+     case unsafeFreezeByteArray# mbarr# s of { (# s, barr#  #) ->
+     let addr = Ptr (byteArrayContents# barr#) in
+     case action addr    of { IO action ->
+     case action s       of { (# s, r #) ->
+     case touch# barr# s of { s ->
+     (# s, r #)
+  }}}}}
+#else
 allocaBytes      :: Int -> (Ptr a -> IO b) -> IO b
 allocaBytes size  = bracket (mallocBytes size) free
+#endif
 
 -- adjust a malloc'ed storage area to the given size
 --
