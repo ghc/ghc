@@ -130,16 +130,17 @@ tcGroup :: SCC RenamedTyClDecl
 					
 tcGroup scc
   = 	-- Step 1
-    mappM getInitialKind decls 				`thenM` \ initial_kinds ->
+    mappM getInitialKind decls 		`thenM` \ initial_kinds ->
 
 	-- Step 2
     tcExtendKindEnv initial_kinds (mappM kcTyClDecl decls)	`thenM_`
 
 	-- Step 3
-    zonkKindEnv initial_kinds			`thenM` \ final_kinds ->
+    zonkKindEnv initial_kinds		`thenM` \ final_kinds ->
 
-	-- Check for loops
-    checkLoops is_rec decls			`thenM` \ is_rec_tycon ->
+	-- Check for loops; if any are found, bale out now
+	-- because the compiler itself will loop otherwise!
+    checkNoErrs (checkLoops scc)	`thenM` \ is_rec_tycon ->
 
 	-- Tie the knot
     traceTc (text "starting" <+> ppr final_kinds)		`thenM_`
@@ -188,10 +189,6 @@ tcGroup scc
     returnM (env, new_things)
 
   where
-    is_rec = case scc of
-		AcyclicSCC _ -> NonRecursive
-		CyclicSCC _  -> Recursive
-
     decls = case scc of
 		AcyclicSCC decl -> [decl]
 		CyclicSCC decls -> decls
@@ -443,7 +440,7 @@ mkNewTyConRep tc
 Dependency analysis
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-checkLoops :: RecFlag -> [RenamedTyClDecl] 
+checkLoops :: SCC RenamedTyClDecl
 	   -> TcM (Name -> AlgTyConFlavour -> RecFlag)
 -- Check for illegal loops, 
 --	a) type synonyms
@@ -454,11 +451,10 @@ checkLoops :: RecFlag -> [RenamedTyClDecl]
 --	a newtype is recursive if it is part of a recursive
 --		group consisting only of newtype and synonyms
 
-checkLoops is_rec decls
-  | isNonRec is_rec 
+checkLoops (AcyclicSCC _)
   = returnM (\ _ _ -> NonRecursive)
 
-  | otherwise	-- Recursive group
+checkLoops (CyclicSCC decls)
   = let		-- CHECK FOR CLASS CYCLES
 	cls_edges  = mapMaybe mkClassEdges decls
 	cls_cycles = findCycles cls_edges
