@@ -14,16 +14,15 @@
 
 module System.Cmd
     ( system,        -- :: String -> IO ExitCode
-#ifdef __GLASGOW_HASKELL__
       rawSystem,     -- :: FilePath -> [String] -> IO ExitCode
-#endif
     ) where
 
 import Prelude
 
+import System.Exit 	( ExitCode )
+
 #ifdef __GLASGOW_HASKELL__
 import System.Process
-import System.Exit 	( ExitCode )
 import GHC.IOBase	( ioException, IOException(..), IOErrorType(..) )
 #endif
 
@@ -64,9 +63,36 @@ system "" = ioException (IOError Nothing InvalidArgument "system" "null command"
 system cmd = do
   p <- runCommand cmd
   waitForProcess p
+#endif  /* __GLASGOW_HASKELL__ */
 
+{-|
+The computation @'rawSystem' cmd args@ runs the operating system command
+@cmd@ in such a way that it receives as arguments the @args@ strings
+exactly as given, with no funny escaping or shell meta-syntax expansion.
+It will therefore behave more portably between operating systems than 'system'.
+
+The return codes and possible failures are the same as for 'system'.
+-}
 rawSystem :: String -> [String] -> IO ExitCode
+#ifdef __GLASGOW_HASKELL__
 rawSystem cmd args = do
   p <- runProcess cmd args Nothing Nothing Nothing Nothing Nothing
   waitForProcess p
-#endif  /* __GLASGOW_HASKELL__ */
+#else /* ! __GLASGOW_HASKELL__ */
+-- crude fallback implementation: could do much better than this under Unix
+rawSystem cmd args = system (unwords (map translate (cmd:args)))
+
+translate :: String -> String
+#if defined(mingw32_TARGET_OS)
+-- copied from System.Process (qv)
+translate str = '"' : snd (foldr escape (True,"\"") str)
+  where	escape '"'  (b,     str) = (True,  '\\' : '"'  : str)
+	escape '\\' (True,  str) = (True,  '\\' : '\\' : str)
+	escape '\\' (False, str) = (False, '\\' : str)
+	escape c    (b,     str) = (False, c : str)
+#else /* ! mingw32_TARGET_OS */
+translate str = '\'' : foldr escape "'" str
+  where	escape '\'' cs = '\'' : '\\' : '\'' : '\'' : cs
+	escape c    cs = c : cs
+#endif /* ! mingw32_TARGET_OS */
+#endif /* ! __GLASGOW_HASKELL__ */
