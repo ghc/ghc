@@ -1,7 +1,7 @@
 #! /bin/sh
 
-DB_STYLESHEET=/usr/lib/sgml/stylesheets/cygnus-both.dsl
-ADMON_GRAPHICS=/usr/lib/sgml/stylesheets/nwalsh-modular/images/*.gif
+DB_STYLESHEET=$SGML_TOP/stylesheets/cygnus-both.dsl
+ADMON_GRAPHICS=$SGML_TOP/stylesheets/nwalsh-modular/images/*.gif
 
 # Dave Mason's option to specify a different stylesheet
 case $1 in

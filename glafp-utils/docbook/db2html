@@ -1,8 +1,8 @@
 #! /bin/sh
 
-DB_STYLESHEET=/usr/lib/sgml/stylesheets/cygnus-both.dsl
-HTML_STYLESHEET=/usr/lib/sgml/stylesheets/nwalsh-modular/test/docbook.css
-ADMON_GRAPHICS=/usr/lib/sgml/stylesheets/nwalsh-modular/images/*.gif
+DB_STYLESHEET=$SGML_TOP/stylesheets/cygnus-both.dsl
+HTML_STYLESHEET=$SGML_TOP/stylesheets/nwalsh-modular/test/docbook.css
+ADMON_GRAPHICS=$SGML_TOP/stylesheets/nwalsh-modular/images/*.gif
 
 output=db2html-dir
 TMPDIR=DBTOHTML_OUTPUT_DIR$$
