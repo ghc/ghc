@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.33 2003/08/18 13:54:06 panne Exp $
+# 	$Id: opts.mk,v 1.34 2003/08/18 15:45:09 panne Exp $
 #
 #################################################################################
 
@@ -17,8 +17,8 @@
 #
 #		AR AS CPP CTAGS C FLEX HC HSTAGS LD LINT 
 #		LIT2CHANGELOG LIT2HTML LIT2LATEX LIT2PGM
-#		MKDEPENDC MKDEPENDHS MKDEPENDLIT MSUB
-#		RUNTEST UNLIT          
+#		MKDEPENDC MKDEPENDHS MKDEPENDLIT RUNTEST
+#		UNLIT          
 
 
 # For each such utility program P, this file defines

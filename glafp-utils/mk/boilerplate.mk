@@ -26,7 +26,6 @@ TOP:=$(GLAFP_UTILS_TOP)
 # -----------------------------------------------------------------
 
 #Not currently used: -include $(GLAFP_UTILS_TOP)/mk/paths.mk
--include $(GLAFP_UTILS_TOP)/mk/opts.mk
 #Not currently used: -include $(GLAFP_UTILS_TOP)/mk/suffix.mk
 
 # No ways, please

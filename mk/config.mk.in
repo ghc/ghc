@@ -595,7 +595,6 @@ RUNTEST_PREFIX		= $(GLAFP_UTILS)/runstdtest/
 VERBATIM_PREFIX		= $(GLAFP_UTILS)/verbatim/
 SGMLVERB_PREFIX		= $(GLAFP_UTILS)/sgmlverb/
 ETAGS_PREFIX		= $(GLAFP_UTILS)/etags/
-MSUB_PREFIX		= $(GLAFP_UTILS)/msub/
 LNDIR_PREFIX		= $(GLAFP_UTILS)/lndir/
 MKDIRHIER_PREFIX	= $(GLAFP_UTILS)/mkdirhier/
 DOCBOOK_PREFIX		= $(GLAFP_UTILS)/docbook/
@@ -708,11 +707,11 @@ GTK_CONFIG		= @GTK_CONFIG@
 GTK_VERSION		= @GTK_VERSION@
 
 #-----------------------------------------------------------------------------
-# Flex
+# Flex (currently unused, could be moved to glafp-utils)
 
-FLEX			= @LEX@
+# FLEX			= @LEX@
 # Don't bother with -lfl, we define our own yywrap()s anyway.
-FLEX_LIB		= 
+# FLEX_LIB		= 
 #WAS:FLEX_LIB		= @LEXLIB@
 
 #-----------------------------------------------------------------------------
@@ -839,7 +838,6 @@ MKDEPENDC 		= $(MKDEPENDC_PREFIX)mkdependC
 LTX 			= $(LTX_PREFIX)ltx
 MKDIRHIER		= $(MKDIRHIER_PREFIX)mkdirhier
 LNDIR			= $(LNDIR_PREFIX)lndir
-MSUB			= $(MSUB_PREFIX)msub
 ETAGS			= $(ETAGS_PREFIX)etags
 VERBATIM		= $(VERBATIM_PREFIX)verbatim
 SGMLVERB		= $(SGMLVERB_PREFIX)sgmlverb
