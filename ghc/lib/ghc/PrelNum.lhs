@@ -666,30 +666,41 @@ instance  Show Double  where
 %*							*
 %*********************************************************
 
-The Enum instances for Floats and Doubles are slightly unusual.
-The `toEnum' function truncates numbers to Int.  The definitions
-of enumFrom and enumFromThen allow floats to be used in arithmetic
+The @Enum@ instances for Floats and Doubles are slightly unusual.
+The @toEnum@ function truncates numbers to Int.  The definitions
+of @enumFrom@ and @enumFromThen@ allow floats to be used in arithmetic
 series: [0,0.1 .. 1.0].  However, roundoff errors make these somewhat
 dubious.  This example may have either 10 or 11 elements, depending on
 how 0.1 is represented.
 
+NOTE: The instances for Float and Double do not make use of the default
+methods for @enumFromTo@ and @enumFromThenTo@, as these rely on there being
+a `non-lossy' conversion to and from Ints. Instead we make use of the 
+1.2 default methods (back in the days when Enum had Ord as a superclass)
+for these (@numericEnumFromTo@ and @numericEnumFromThenTo@ below.)
+
 \begin{code}
 instance  Enum Float  where
-    toEnum              =  fromIntegral
-    fromEnum            =  fromInteger . truncate   -- may overflow
-    enumFrom		=  numericEnumFrom
-    enumFromThen	=  numericEnumFromThen
+    toEnum         =  fromIntegral
+    fromEnum       =  fromInteger . truncate   -- may overflow
+    enumFrom	   =  numericEnumFrom
+    enumFromThen   =  numericEnumFromThen
+    enumFromThenTo =  numericEnumFromThenTo
 
 instance  Enum Double  where
-    toEnum              =  fromIntegral
-    fromEnum            =  fromInteger . truncate   -- may overflow
-    enumFrom		=  numericEnumFrom
-    enumFromThen	=  numericEnumFromThen
+    toEnum         =  fromIntegral
+    fromEnum       =  fromInteger . truncate   -- may overflow
+    enumFrom	   =  numericEnumFrom
+    enumFromThen   =  numericEnumFromThen
+    enumFromThenTo =  numericEnumFromThenTo
 
 numericEnumFrom		:: (Real a) => a -> [a]
 numericEnumFromThen	:: (Real a) => a -> a -> [a]
+numericEnumFromThenTo   :: (Real a) => a -> a -> a -> [a]
 numericEnumFrom		=  iterate (+1)
 numericEnumFromThen n m	=  iterate (+(m-n)) n
+numericEnumFromThenTo n m p = takeWhile (if m >= n then (<= p) else (>= p))
+				      (numericEnumFromThen n m)
 \end{code}
 
 
