@@ -14,9 +14,8 @@ module HaddockUtil (
 
   -- * Filename utilities
   basename, dirname, splitFilename3, 
-  isPathSeparator, pathSeparator,
   moduleHtmlFile, nameHtmlRef,
-  contentsHtmlFile, indexHtmlFile, subIndexHtmlFile,
+  contentsHtmlFile, indexHtmlFile, subIndexHtmlFile, pathJoin,
   cssFile, iconFile, jsFile, plusFile, minusFile,
 
   -- * Miscellaneous utilities
@@ -28,7 +27,7 @@ module HaddockUtil (
 
 import HsSyn
 
-import List	( intersect, isSuffixOf )
+import List	( intersect, isSuffixOf, intersperse )
 import Maybe
 import IO	( hPutStr, stderr )
 import System
@@ -276,7 +275,7 @@ moduleHtmlFile :: String -> FilePath
 moduleHtmlFile mdl =
   case lookupFM html_xrefs (Module mdl) of
     Nothing  -> mdl ++ ".html"
-    Just fp0 -> fp0 ++ pathSeparator : mdl ++ ".html"
+    Just fp0 -> pathJoin [fp0, mdl ++ ".html"]
 
 nameHtmlRef :: String -> HsName -> String	
 nameHtmlRef mdl str = moduleHtmlFile mdl ++ '#':escapeStr (hsAnchorNameStr str)
@@ -289,6 +288,12 @@ subIndexHtmlFile :: Char -> String
 subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
    where b | isAlpha a = [a]
            | otherwise = show (ord a)
+
+pathJoin :: [FilePath] -> FilePath
+pathJoin = concat . intersperse pathSeparatorStr
+
+pathSeparatorStr :: String
+pathSeparatorStr = [pathSeparator]
 
 -- -----------------------------------------------------------------------------
 -- Files we need to copy from our $libdir

@@ -30,7 +30,7 @@ ppHH2Contents odir doctitle maybe_package tree = do
 		        nest 4 (ppModuleTree [] tree) $+$
 		        text "</HelpTOCNode>") $$
 		text "</HelpTOC>"
-  writeFile (odir ++ pathSeparator:contentsHH2File) (render doc)
+  writeFile (pathJoin [odir, contentsHH2File]) (render doc)
   where
 	package = fromMaybe "pkg" maybe_package
 	
@@ -82,8 +82,8 @@ ppHH2Index odir maybe_package ifaces = do
 		nest 4 (text "<Jump Url=\""<>text contentsHtmlFile<>text "\"/>") $$
 		text "</Keyword>" $$
 		text "</HelpIndex>"
-  writeFile (odir ++ pathSeparator:indexKHH2File) (render docK)
-  writeFile (odir ++ pathSeparator:indexNHH2File) (render docN)
+  writeFile (pathJoin [odir, indexKHH2File]) (render docK)
+  writeFile (pathJoin [odir, indexNHH2File]) (render docN)
   where
 	package = fromMaybe "pkg" maybe_package
     
@@ -118,7 +118,7 @@ ppHH2Files odir maybe_package ifaces pkg_paths = do
                 ppIndexFiles chars $$
                 ppLibFiles ("":pkg_paths)) $$
         text "</HelpFileList>"
-  writeFile (odir ++ pathSeparator:filesHH2File) (render doc)
+  writeFile (pathJoin [odir, filesHH2File]) (render doc)
   where
     package = fromMaybe "pkg" maybe_package
 	
@@ -142,7 +142,7 @@ ppHH2Files odir maybe_package ifaces pkg_paths = do
         ppLibFiles paths
         where
             toPath fname | null path = fname
-                         | otherwise = path++pathSeparator:fname
+                         | otherwise = pathJoin [path, fname]
             ppLibFile fname = text "<File Url=\""<>text (toPath fname)<>text "\"/>"
 
     chars :: [Char]
@@ -176,4 +176,4 @@ ppHH2Collection odir doctitle maybe_package = do
 		        text "<ItemMoniker Name=\"!DefaultNamedUrlIndex\" ProgId=\"HxDs.HxIndex\" InitData=\"NamedURLIndex\"/>" $$
 		        text "<ItemMoniker Name=\"!SampleInfo\" ProgId=\"HxDs.HxSampleCollection\" InitData=\"\"/>") $$
 		text "</HelpCollection>"
-  writeFile (odir ++ pathSeparator:collectionHH2File) (render doc)
+  writeFile (pathJoin [odir, collectionHH2File]) (render doc)

@@ -116,11 +116,11 @@ copyHtmlBits :: FilePath -> FilePath -> Maybe FilePath -> IO ()
 copyHtmlBits odir libdir maybe_css = do
   let 
 	css_file = case maybe_css of
-			Nothing -> libdir ++ pathSeparator:cssFile
+			Nothing -> pathJoin [libdir, cssFile]
 			Just f  -> f
-	css_destination = odir ++ pathSeparator:cssFile
+	css_destination = pathJoin [odir, cssFile]
 	copyLibFile f = do
-	   copyFile (libdir ++ pathSeparator:f) (odir ++ pathSeparator:f)
+	   copyFile (pathJoin [libdir, f]) (pathJoin [odir, f])
  
   copyFile css_file css_destination
   mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile ]
@@ -229,7 +229,7 @@ ppHtmlContents odir doctitle maybe_package maybe_html_help_format maybe_index_ur
 	    s15 </>
 	    footer
 	  )
-  writeFile (odir ++ pathSeparator:contentsHtmlFile) (renderHtml html)
+  writeFile (pathJoin [odir, contentsHtmlFile]) (renderHtml html)
   
   -- Generate contents page for Html Help if requested
   case maybe_html_help_format of
@@ -315,7 +315,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_ur
   when split_indices $
     mapM_ (do_sub_index index) initialChars
 
-  writeFile (odir ++ pathSeparator:indexHtmlFile) (renderHtml html)
+  writeFile (pathJoin [odir, indexHtmlFile]) (renderHtml html)
   
     -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
@@ -345,8 +345,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_ur
 
   do_sub_index this_ix c
     = unless (null index_part) $
-        writeFile (odir ++ pathSeparator:subIndexHtmlFile c)
-                  (renderHtml html)
+        writeFile (pathJoin [odir, subIndexHtmlFile c]) (renderHtml html)
     where 
       html = header (thetitle (toHtml (doctitle ++ " (Index)")) +++
 		thelink ! [href cssFile, 
@@ -435,7 +434,7 @@ ppHtmlModule odir doctitle source_url
 	    ifaceToHtml mdl iface </> s15 </>
 	    footer
          )
-  writeFile (odir ++ pathSeparator:moduleHtmlFile mdl) (renderHtml html)
+  writeFile (pathJoin [odir, moduleHtmlFile mdl]) (renderHtml html)
 
 ifaceToHtml :: String -> Interface -> HtmlTable
 ifaceToHtml _ iface 

@@ -32,7 +32,7 @@ ppDevHelpFile odir doctitle maybe_package ifaces = do
         nest 4 (ppList index) $+$
         text "</functions>" $$
         text "</book>"
-  writeFile (odir ++ pathSeparator:devHelpFile) (render doc)
+  writeFile (pathJoin [odir, devHelpFile]) (render doc)
   where    
     package = fromMaybe "pkg" maybe_package
 

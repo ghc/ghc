@@ -30,7 +30,7 @@ ppHHContents odir doctitle maybe_package tree = do
 	text "</HEAD><BODY>" $$
 	ppModuleTree tree $$
 	text "</BODY><HTML>"
-  writeFile (odir ++ pathSeparator:contentsHHFile) (render html)
+  writeFile (pathJoin [odir, contentsHHFile]) (render html)
   where
 	package = fromMaybe "pkg" maybe_package
 	
@@ -93,7 +93,7 @@ ppHHIndex odir maybe_package ifaces = do
 	nest 4 (ppList index) $+$
 	text "</UL>" $$
 	text "</BODY><HTML>"
-  writeFile (odir ++ pathSeparator:indexHHFile) (render html)
+  writeFile (pathJoin [odir, indexHHFile]) (render html)
   where
 	package = fromMaybe "pkg" maybe_package
   	
@@ -138,7 +138,7 @@ ppHHProject odir doctitle maybe_package ifaces pkg_paths = do
         text indexHtmlFile $$
         ppIndexFiles chars $$
         ppLibFiles ("":pkg_paths)
-  writeFile (odir ++ pathSeparator:projectHHFile) (render doc)
+  writeFile (pathJoin [odir, projectHHFile]) (render doc)
   where
     package = fromMaybe "pkg" maybe_package
 	
@@ -162,7 +162,7 @@ ppHHProject odir doctitle maybe_package ifaces pkg_paths = do
         ppLibFiles paths
         where
             toPath fname | null path = fname
-	                 | otherwise = path++pathSeparator:fname
+	                 | otherwise = pathJoin [path, fname]
             ppLibFile fname = text (toPath fname)
 
     chars :: [Char]
