@@ -3785,10 +3785,10 @@ $ make boot &amp;&amp; make</screen>
 	    </listitem>
 
 	    <listitem>
-<screen>$ cd <replaceable>H</replaceable>/ghc
+<screen>$ cd <replaceable>H</replaceable>/ghc/compiler
 $ make boot stage=2 &amp;&amp; make stage=2</screen>
 	    </listitem>
-	    
+
 	    <listitem>
 <screen>$ cd <replaceable>H</replaceable>/ghc/utils
 $ make clean
