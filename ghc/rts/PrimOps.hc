@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.25 1999/03/22 13:01:38 simonm Exp $
+ * $Id: PrimOps.hc,v 1.26 1999/05/07 11:10:45 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -743,17 +743,14 @@ FN_(forkzh_fast)
   FB_
   /* args: R1 = closure to spark */
   
-  if (closure_SHOULD_SPARK(R1.cl)) {
+  MAYBE_GC(R1_PTR, forkzh_fast);
 
-    MAYBE_GC(R1_PTR, forkzh_fast);
-
-    /* create it right now, return ThreadID in R1 */
-    R1.t = RET_STGCALL2(StgTSO *, createIOThread, 
-			RtsFlags.GcFlags.initialStkSize, R1.cl);
+  /* create it right now, return ThreadID in R1 */
+  R1.t = RET_STGCALL2(StgTSO *, createIOThread, 
+		      RtsFlags.GcFlags.initialStkSize, R1.cl);
       
-    /* switch at the earliest opportunity */ 
-    context_switch = 1;
-  }
+  /* switch at the earliest opportunity */ 
+  context_switch = 1;
   
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
