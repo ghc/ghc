@@ -12,13 +12,13 @@ import HsParseMonad
 %token 	SQUO	{ TokSpecial '\'' }
 	BQUO	{ TokSpecial '`' }
 	DQUO 	{ TokSpecial '\"' }
+	'/'	{ TokSpecial '/' }
 	'@'	{ TokSpecial '@' }
 	URL	{ TokURL $$ }
 	'*'	{ TokBullet }
 	'(n)'	{ TokNumber }
 	'>'	{ TokBirdTrack }
 	PARA    { TokPara }
-        EMPH    { TokEmph $$ }
 	STRING	{ TokString $$ }
 
 %monad { Either String }
@@ -67,7 +67,7 @@ seq1	:: { Doc }
 
 elem1	:: { Doc }
 	: STRING		{ DocString $1 }
-	| EMPH           	{ DocEmphasis (DocString $1) }
+	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
 	| URL			{ DocURL $1 }
 	| squo STRING squo	{ strToHsQNames $2 }
 	| DQUO STRING DQUO	{ DocModule $2 }
