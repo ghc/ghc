@@ -9,6 +9,7 @@
 -- Portability :  portable
 --
 -- This module illustrates & tests most of the features of Haddock.
+-- Testing references from the description: 'T', 'f', 'g', 'Visible.visible'.
 --
 -----------------------------------------------------------------------------
 
@@ -129,6 +130,8 @@ class D a where
    d :: T a b
    e :: (a,a)
 -- ^ This is a class declaration with no separate docs for the methods
+
+instance D Int
 
 class E a where
   ee :: Int
