@@ -48,7 +48,7 @@ import RnHsSyn		( RenamedHsExpr, RenamedPat, RenamedArithSeqInfo )
 import HscTypes		( GhciMode, ExternalPackageState, HomePackageTable, NameCache,
 			  GlobalRdrEnv, LocalRdrEnv, FixityEnv, TypeEnv, TyThing, 
 			  Avails, GenAvailInfo(..), AvailInfo, availName,
-			  IsBootInterface, Deprecations, unQualInScope )
+			  IsBootInterface, Deprecations )
 import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, TcPredType, TcKind,
 			  tcCmpPred, tcCmpType, tcCmpTypes )
 import InstEnv		( DFunId, InstEnv )
@@ -468,13 +468,13 @@ data ImportAvails
 		-- i.e. *excluding* class ops and constructors
 		--	(which appear inside their parent AvailTC)
 
-	imp_unqual :: ModuleEnv Avails,
+	imp_unqual :: ModuleEnv AvailEnv,
 		-- Used to figure out "module M" export specifiers
 		-- Domain is only modules with *unqualified* imports
 		-- (see 1.4 Report Section 5.1.1)
-		-- The list of Avails is cumulative, not necessarily
-		-- nicely uniquified. For example, we might have Maybe(Nothing)
-		-- and Maybe(Just) in the list, separately.
+		-- We keep the stuff as an AvailEnv so that it's easy to 
+		-- combine stuff coming from different (unqualified) 
+		-- imports of the same module
 
 	imp_mods :: ModuleEnv (Module, Bool)
 		-- Domain is all directly-imported modules
@@ -499,12 +499,12 @@ plusImportAvails
   (ImportAvails { imp_env = env1, imp_unqual = unqual1, imp_mods = mods1 })
   (ImportAvails { imp_env = env2, imp_unqual = unqual2, imp_mods = mods2 })
   = ImportAvails { imp_env    = env1 `plusAvailEnv` env2, 
-		   imp_unqual = plusModuleEnv_C (++) unqual1 unqual2, 
+		   imp_unqual = plusModuleEnv_C plusAvailEnv unqual1 unqual2, 
 		   imp_mods   = mods1 `plusModuleEnv` mods2 }
 
 mkImportAvails :: ModuleName -> Bool
-	       -> GlobalRdrEnv -> [AvailInfo] -> ImportAvails
-mkImportAvails mod_name unqual_imp gbl_env avails 
+	       -> [AvailInfo] -> ImportAvails
+mkImportAvails mod_name unqual_imp avails 
   = ImportAvails { imp_unqual = mod_avail_env, 
 		   imp_env    = entity_avail_env,
 		   imp_mods   = emptyModuleEnv }-- Stays empty for module being compiled;
@@ -517,8 +517,8 @@ mkImportAvails mod_name unqual_imp gbl_env avails
 	--	module M ( module P ) where ...
 	-- Then we must export whatever came from P unqualified.
 
-    unqual_avails | not unqual_imp = []	-- Short cut when no unqualified imports
-		  | otherwise      = pruneAvails (unQualInScope gbl_env) avails
+    unqual_avails | not unqual_imp = emptyAvailEnv	-- Qualified import
+		  | otherwise      = entity_avail_env	-- Unqualified import
 
     entity_avail_env = foldl insert emptyAvailEnv avails
     insert env avail = extendNameEnv_C plusAvail env (availName avail) avail

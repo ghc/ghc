@@ -180,7 +180,7 @@ importsFromImportDecl this_mod_name
 
 	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
 	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp mk_prov filtered_avails deprecs
-	imports      = mkImportAvails qual_mod unqual_imp gbl_env filtered_avails
+	imports      = mkImportAvails qual_mod unqual_imp filtered_avails
     in
     returnM (gbl_env, imports { imp_mods = dir_imp})
     }
@@ -241,9 +241,9 @@ importsFromLocalDecls group
 	    -- Optimisation: filter out names for built-in syntax
 	    -- They just clutter up the environment (esp tuples), and the parser
 	    -- will generate Exact RdrNames for them, so the cluttered
-	    -- envt is no use.  To avoid doing this filter all the type,
+	    -- envt is no use.  To avoid doing this filter all the time,
 	    -- we use -fno-implicit-prelude as a clue that the filter is
-	    -- worth while.  Really, it's only useful for Base and Tuple.
+	    -- worth while.  Really, it's only useful for GHC.Base and GHC.Tuple.
 	    --
 	    -- It's worth doing because it makes the environment smaller for
 	    -- every module that imports the Prelude
@@ -255,7 +255,7 @@ importsFromLocalDecls group
 	    -- but that stops them being Exact, so they get looked up.  Sigh.
 	    -- It doesn't matter because it only affects the Data.Tuple really.
 	    -- The important thing is to trim down the exports.
-	imports = mkImportAvails mod_name unqual_imp gbl_env avails'
+	imports = mkImportAvails mod_name unqual_imp avails'
  	avails' | implicit_prelude = filter not_built_in_syntax avails
 		| otherwise	   = avails
 	not_built_in_syntax a = not (all isBuiltInSyntaxName (availNames a))
@@ -513,12 +513,14 @@ exports_from_avail export_items warn_dup_exports
 	= case lookupModuleEnvByName mod_avail_env mod of
 	    Nothing	        -> addErr (modExportErr mod)	`thenM_`
 				   returnM acc
-	    Just mod_avails 
-		-> foldlM (check_occs warn_dup_exports ie) 
-			  occs mod_avails	 	   `thenM` \ occs' ->
-		   let
+	    Just avail_env
+		-> let
+			mod_avails = availEnvElts avail_env
 			avails' = foldl addAvail avails mod_avails
 		   in
+		   foldlM (check_occs warn_dup_exports ie) 
+			  occs mod_avails	`thenM` \ occs' ->
+
 		   returnM (mod:mods, occs', avails')
 
     exports_from_item acc@(mods, occs, avails) ie
