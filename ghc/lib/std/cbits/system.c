@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.10 2001/02/19 16:18:38 rrt Exp $
+ * $Id: system.c,v 1.11 2001/02/20 03:41:31 qrczak Exp $
  *
  * system Runtime Support
  */
@@ -32,8 +32,7 @@
 #  include <sys/wait.h>
 # endif
 #else
-  #include <windows.h> /* for Sleep */
-#endif
+# include <windows.h> /* for Sleep */
 #endif
 
 #ifdef HAVE_VFORK_H
