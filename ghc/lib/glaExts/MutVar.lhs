@@ -14,7 +14,7 @@ module MutVar
 	newVar,      -- :: a -> IO (MutVar a)
 	readVar,     -- :: MutVar a -> IO a
 	writeVar,    -- :: MutVar a -> a -> IO ()
-	sameVar      -- :: MutVar a -> MutVar a -> Bool
+ 	sameVar      -- :: MutVar a -> MutVar a -> Bool
 
        ) where
 
