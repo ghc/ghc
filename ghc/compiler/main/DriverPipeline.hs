@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.92 2001/07/23 20:19:53 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.93 2001/07/24 04:52:49 ken Exp $
 --
 -- GHC Driver
 --
@@ -1004,8 +1004,10 @@ compile ghci_mode summary source_unchanged have_object
 		-- as our "unlinked" object.
 		HscInterpreted -> 
 		    case maybe_interpreted_code of
+#ifdef GHCI
 		       Just (bcos,itbl_env) -> do tm <- getClockTime 
                                                   return ([BCOs bcos itbl_env], tm)
+#endif
 		       Nothing -> panic "compile: no interpreted code"
 
 		-- we're in batch mode: finish the compilation pipeline.

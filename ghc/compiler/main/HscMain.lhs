@@ -106,8 +106,11 @@ data HscResult
                  ModIface		 -- new iface (if any compilation was done)
 	         Bool	 	 	-- stub_h exists
 	         Bool  		 	-- stub_c exists
+#ifdef GHCI
 	         (Maybe ([UnlinkedBCO],ItblEnv)) -- interpreted code, if any
-             
+#else
+	         (Maybe ())			 -- no interpreted code whatsoever
+#endif
 
 	-- no errors or warnings; the individual passes
 	-- (parse/rename/typecheck) print messages themselves
@@ -322,6 +325,7 @@ hscRecomp ghci_mode dflags have_object
 
 	; (stub_h_exists, stub_c_exists, maybe_bcos, final_iface )
 	   <- if toInterp
+#ifdef GHCI
 	        then do 
 		    -----------------  Generate byte code ------------------
 		    (bcos,itbl_env) <- byteCodeGen dflags binds 
@@ -336,6 +340,9 @@ hscRecomp ghci_mode dflags have_object
                                    maybe_checked_iface new_iface tidy_details
 
       		    return ( False, False, Just (bcos,itbl_env), final_iface )
+#else
+		then error "GHC not compiled with interpreter"
+#endif
 
 	        else do
 		    -----------------  Convert to STG ------------------
