@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.59 2002/08/05 10:11:04 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.60 2002/10/01 08:53:14 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -436,7 +436,7 @@ usage_text[] = {
 "",
 "  -R<size>       Set the maximum retainer set size (default: 8)",
 "",
-"  -i<msec>       Time between heap samples (msec, default: 100)",
+"  -i<sec>        Time between heap samples (seconds, default: 0.1)",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
 # endif
