@@ -1,0 +1,15 @@
+Changes in version 0.2:
+
+  * The [...] markup for typewriter-text has been changed to @...@.
+
+  * Module attributes introduced (see the documentation).
+
+  * {- ... -} style comments may now be used for documentation annotations
+
+  * Recursive modules are detected and reported as an error.
+
+  * Existential constructors and rank-N types are now groked by the parser
+
+  * Some type rendering cleaned up
+
+  * Several bugs fixed, and error messages improved.
