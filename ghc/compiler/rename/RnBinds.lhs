@@ -246,19 +246,21 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
 	binder_occ_fm = listToFM [(nameOccName x,x) | x <- new_mbinders]
 
     in
-       -- Report the fixity declarations in this group that 
-       -- don't refer to any of the group's binders.
-       --
-    mapRn_ (unknownSigErr) fixes_not_for_me     `thenRn_`
+	-- Rename the signatures
     renameSigs False binder_set
 	       (lookupSigOccRn binder_occ_fm) sigs_for_me   `thenRn` \ (siglist, sig_fvs) ->
+
+	-- Report the fixity declarations in this group that 
+	-- don't refer to any of the group's binders.
+	-- Then install the fixity declarations that do apply here
+	-- Notice that they scope over thing_inside too
+    mapRn_ (unknownSigErr) fixes_not_for_me     `thenRn_`
     let
 	fixity_sigs = [(name,sig) | FixSig sig@(FixitySig name _ _) <- siglist ]
     in
-       -- Install the fixity declarations that do apply here and go.
-    extendFixityEnv fixity_sigs (
-      rn_mono_binds siglist mbinds
-    )	 				   `thenRn` \ (binds, bind_fvs) ->
+    extendFixityEnv fixity_sigs $
+
+    rn_mono_binds siglist mbinds	   `thenRn` \ (binds, bind_fvs) ->
 
     -- Now do the "thing inside", and deal with the free-variable calculations
     thing_inside binds			   `thenRn` \ (result,result_fvs) ->
