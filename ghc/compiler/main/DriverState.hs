@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.46 2001/06/27 16:38:17 simonmar Exp $
+-- $Id: DriverState.hs,v 1.47 2001/06/28 10:19:48 sewardj Exp $
 --
 -- Settings for the driver
 --
@@ -376,8 +376,29 @@ getPackageLibraries = do
   tag <- readIORef v_Build_tag
   let suffix = if null tag then "" else '_':tag
   return (concat (
-	map (\p -> map (++suffix) (hs_libraries p) ++ extra_libraries p) ps
+	map (\p -> map (++suffix) (hACK (hs_libraries p)) ++ extra_libraries p) ps
      ))
+  where
+     -- This is a totally horrible (temporary) hack, for Win32.  Problem is
+     -- that package.conf for Win32 says that the main prelude lib is 
+     -- split into HSstd1 and HSstd2, which is needed due to limitations in
+     -- the PEi386 file format, to make GHCi work.  However, we still only
+     -- have HSstd.a for static linking, not HSstd1.a and HSstd2.a.  
+     -- getPackageLibraries is called to find the .a's to add to the static
+     -- link line.  On Win32, this hACK detects HSstd1 and HSstd2 and 
+     -- replaces them with HSstd, so static linking still works.
+     -- Libraries needed for dynamic (GHCi) linking are discovered via
+     -- different route (in InteractiveUI.linkPackage).
+     -- See driver/PackageSrc.hs for the HSstd1/HSstd2 split definition.
+     -- THIS IS A STRICTLY TEMPORARY HACK (famous last words ...)
+     hACK libs
+#      ifndef mingw32_TARGET_OS
+       = libs
+#      else
+       = if   "HSstd1" `elem` libs && "HSstd2" `elem` libs
+         then "HSstd" : filter ((/= "HSstd").(take 5)) libs
+         else libs
+#      endif
 
 getPackageExtraGhcOpts :: IO [String]
 getPackageExtraGhcOpts = do
