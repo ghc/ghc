@@ -529,8 +529,9 @@ selectInsts pool@(Pool insts n_in n_out) cls tycons
 
 	-- Reverses the gated decls, but that doesn't matter
     choose2 (gis, decls) (gates, decl)
-	| any (`elem` tycons) gates = (gis, 	           decl:decls)
-	| otherwise		    = ((gates,decl) : gis, decls)
+	|  null gates 	-- Happens when we have 'instance T a where ...'
+        || any (`elem` tycons) gates = (gis, 	           decl:decls)
+	| otherwise		     = ((gates,decl) : gis, decls)
 \end{code}
 
 %************************************************************************
