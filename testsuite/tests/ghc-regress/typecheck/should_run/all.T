@@ -37,4 +37,6 @@ test('tcrun028', expect_fail_for(['extcore','optextcore']), compile_and_run, [''
 test('tcrun029', normal, compile_and_run, [''])
 test('tcrun030', normal, compile_and_run, [''])
 test('tcrun031', only_compiler_types(['ghc']), compile_and_run, [''])
+
 test('church', normal, compile_and_run, [''])
+test('testeq2', normal, compile_and_run, [''])
