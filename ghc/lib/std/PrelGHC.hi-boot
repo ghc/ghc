@@ -83,6 +83,7 @@ __export PrelGHC
   zszh
   quotIntzh
   remIntzh
+  gcdIntzh
   negateIntzh
   iShiftLzh
   iShiftRAzh
@@ -191,6 +192,11 @@ __export PrelGHC
   minusIntegerzh
   timesIntegerzh
   gcdIntegerzh
+  quotIntegerzh
+  remIntegerzh
+  gcdIntegerzh
+  gcdIntegerIntzh
+  divExactIntegerzh
   quotRemIntegerzh
   divModIntegerzh
   integer2Intzh

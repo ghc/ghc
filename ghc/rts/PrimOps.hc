@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.35 1999/12/01 14:34:38 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.36 1999/12/08 14:21:52 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -704,10 +704,13 @@ FN_(name)								\
   FE_									\
 }
 
-GMP_TAKE2_RET1(plusIntegerzh_fast,  mpz_add);
-GMP_TAKE2_RET1(minusIntegerzh_fast, mpz_sub);
-GMP_TAKE2_RET1(timesIntegerzh_fast, mpz_mul);
-GMP_TAKE2_RET1(gcdIntegerzh_fast,   mpz_gcd);
+GMP_TAKE2_RET1(plusIntegerzh_fast,     mpz_add);
+GMP_TAKE2_RET1(minusIntegerzh_fast,    mpz_sub);
+GMP_TAKE2_RET1(timesIntegerzh_fast,    mpz_mul);
+GMP_TAKE2_RET1(gcdIntegerzh_fast,      mpz_gcd);
+GMP_TAKE2_RET1(quotIntegerzh_fast,     mpz_tdiv_q);
+GMP_TAKE2_RET1(remIntegerzh_fast,      mpz_tdiv_r);
+GMP_TAKE2_RET1(divExactIntegerzh_fast, mpz_divexact);
 
 GMP_TAKE2_RET2(quotRemIntegerzh_fast, mpz_tdiv_qr);
 GMP_TAKE2_RET2(divModIntegerzh_fast,  mpz_fdiv_qr);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.40 1999/12/01 14:34:48 simonmar Exp $
+ * $Id: PrimOps.h,v 1.41 1999/12/08 14:21:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -355,6 +355,20 @@ typedef union {
   (r) = RET_PRIM_STGCALL2(I_,mpz_cmp_si,&arg,i);		\
 }
 
+/* I think mp_limb_t must be the same size as StgInt for this to work
+ * properly --SDM
+ */
+#define gcdIntzh(r,a,b) \
+{ StgInt aa = a; \
+  r = (aa) ? (b) ? \
+        RET_STGCALL3(StgInt, mpn_gcd_1, (mp_limb_t *)(&aa), 1, (mp_limb_t)(b)) \
+        : abs(aa) \
+      : abs(b); \
+}
+
+#define gcdIntegerIntzh_fast(r,a,sb,b) \
+  RET_STGCALL3(StgInt, mpn_gcd_1, (unsigned long int *) b, sb, (mp_limb_t)(a))
+
 /* The rest are all out-of-line: -------- */
 
 /* Integer arithmetic */
@@ -363,6 +377,9 @@ EF_(minusIntegerzh_fast);
 EF_(timesIntegerzh_fast);
 EF_(gcdIntegerzh_fast);
 EF_(quotRemIntegerzh_fast);
+EF_(quotIntegerzh_fast);
+EF_(remIntegerzh_fast);
+EF_(divExactIntegerzh_fast);
 EF_(divModIntegerzh_fast);
 
 /* Conversions */

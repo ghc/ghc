@@ -276,29 +276,13 @@ instance  Integral Integer where
 	  (# s3, d3, s4, d4 #)
 	    -> (J# s3 d3, J# s4 d4)
 
-{- USING THE UNDERLYING "GMP" CODE IS DUBIOUS FOR NOW:
-
-    divMod (J# a1 s1 d1) (J# a2 s2 d2)
-      = case (divModInteger# a1 s1 d1 a2 s2 d2) of
-	  Return2GMPs a3 s3 d3 a4 s4 d4
-	    -> (J# a3 s3 d3, J# a4 s4 d4)
--}
     toInteger n	     = n
     toInt (S# i)     = I# i
     toInt (J# s d)   = case (integer2Int# s d) of { n# -> I# n# }
 
-    -- the rest are identical to the report default methods;
-    -- you get slightly better code if you let the compiler
-    -- see them right here:
-    (S# n) `quot` (S# d) = S# (n `quotInt#` d)
-    n `quot` d	=  if d /= 0 then q else 
-		     error "Prelude.Integral.quot{Integer}: divide by 0"  
-		   where (q,_) = quotRem n d
-
-    (S# n) `rem` (S# d) = S# (n `remInt#` d)
-    n `rem` d	=  if d /= 0 then r else 
-		     error "Prelude.Integral.rem{Integer}: divide by 0"  
-		   where (_,r) = quotRem n d
+	-- we've got specialised quot/rem methods for Integer (see below)
+    n `quot` d = n `quotInteger` d
+    n `rem`  d = n `remInteger`  d
 
     n `div` d	=  q  where (q,_) = divMod n d
     n `mod` d	=  r  where (_,r) = divMod n d
@@ -311,6 +295,48 @@ instance  Integral Integer where
       = case (divModInteger# s1 d1 s2 d2) of
 	  (# s3, d3, s4, d4 #)
 	    -> (J# s3 d3, J# s4 d4)
+
+remInteger :: Integer -> Integer -> Integer
+remInteger ia 0
+  = error "Prelude.Integral.rem{Integer}: divide by 0"
+remInteger (S# a) (S# b) = S# (remInt# a b)
+remInteger ia@(S# a) (J# sb b)
+  = if sb ==# 1#
+    then
+      S# (remInt# a (word2Int# (integer2Word# sb b)))
+    else if sb ==# -1# then
+      S# (remInt# a (0# -# (word2Int# (integer2Word# sb b))))
+    else if 0# <# sb then
+      ia
+    else
+      S# (0# -# a)
+remInteger (J# sa a) (S# b)
+  = case int2Integer# b of { (# sb, b #) ->
+    case remInteger# sa a sb b of { (# sr, r #) ->
+    S# (sr *# (word2Int# (integer2Word# sr r))) }}
+remInteger (J# sa a) (J# sb b)
+  = case remInteger# sa a sb b of (# sr, r #) -> J# sr r
+
+quotInteger :: Integer -> Integer -> Integer
+quotInteger ia 0
+  = error "Prelude.Integral.quot{Integer}: divide by 0"
+quotInteger (S# a) (S# b) = S# (quotInt# a b)
+quotInteger (S# a) (J# sb b)
+  = if sb ==# 1#
+    then
+      S# (quotInt# a (word2Int# (integer2Word# sb b)))
+    else if sb ==# -1# then
+      S# (quotInt# a (0# -# (word2Int# (integer2Word# sb b))))
+    else
+      zeroInteger
+quotInteger (J# sa a) (S# b)
+  = case int2Integer# b of { (# sb, b #) ->
+    case quotInteger# sa a sb b of (# sq, q #) -> J# sq q }
+quotInteger (J# sa a) (J# sb b)
+  = case quotInteger# sa a sb b of (# sg, g #) -> J# sg g
+
+zeroInteger :: Integer
+zeroInteger = S# 0#
 
 ------------------------------------------------------------------------
 instance  Enum Integer  where
@@ -448,9 +474,6 @@ even, odd	:: (Integral a) => a -> Bool
 even n		=  n `rem` 2 == 0
 odd		=  not . even
 
-{-# SPECIALISE gcd ::
-	Int -> Int -> Int,
-	Integer -> Integer -> Integer #-}
 gcd		:: (Integral a) => a -> a -> a
 gcd 0 0		=  error "Prelude.gcd: gcd 0 0 is undefined"
 gcd x y		=  gcd' (abs x) (abs y)
@@ -485,3 +508,55 @@ _ ^ _		= error "Prelude.^: negative exponent"
 x ^^ n		=  if n >= 0 then x^n else recip (x^(negate n))
 \end{code}
 
+%*********************************************************
+%*							*
+\subsection{Specialized versions of gcd/lcm for Int/Integer}
+%*							*
+%*********************************************************
+
+\begin{code}
+{-# RULES
+"Int.gcd"      forall a b . gcd  a b = gcdInt a b
+"Integer.gcd"  forall a b . gcd  a b = gcdInteger  a b
+"Integer.lcm"  forall a b . lcm  a b = lcmInteger  a b
+ #-}
+
+gcdInt :: Int -> Int -> Int
+gcdInt (I# a)  (I# b)
+  = I# (gcdInt# a b)
+
+gcdInteger :: Integer -> Integer -> Integer
+gcdInteger (S# a) (S# b)
+  = case gcdInt# a b of g -> S# g
+gcdInteger ia@(S# a) ib@(J# sb b)
+  | a  ==# 0#  = abs ib
+  | sb ==# 0#  = abs ia
+  | otherwise  = case gcdIntegerInt# sb b a of g -> S# g
+gcdInteger ia@(J# sa a) ib@(S# b)
+  | sa ==# 0#  = abs ib
+  | b ==# 0#   = abs ia
+  | otherwise  = case gcdIntegerInt# sa a b of g -> S# g
+gcdInteger (J# sa a) (J# sb b)
+  = case gcdInteger# sa a sb b of (# sg, g #) -> J# sg g
+
+lcmInteger :: Integer -> Integer -> Integer
+lcmInteger a 0
+  = zeroInteger
+lcmInteger 0 b
+  = zeroInteger
+lcmInteger a b
+  = (divExact aa (gcdInteger aa ab)) * ab
+  where aa = abs a
+        ab = abs b
+
+divExact :: Integer -> Integer -> Integer
+divExact (S# a) (S# b)
+  = S# (quotInt# a b)
+divExact (S# a) (J# sb b)
+  = S# (quotInt# a (sb *# (word2Int# (integer2Word# sb b))))
+divExact (J# sa a) (S# b)
+  = case int2Integer# b of
+     (# sb, b #) -> case divExactInteger# sa a sb b of (# sd, d #) -> J# sd d
+divExact (J# sa a) (J# sb b)
+  = case divExactInteger# sa a sb b of (# sd, d #) -> J# sd d
+\end{code}
