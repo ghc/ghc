@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.37 $
- * $Date: 2000/01/12 14:52:53 $
+ * $Revision: 1.38 $
+ * $Date: 2000/01/12 16:29:47 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -333,8 +333,7 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         classFloating            = linkClass("Floating");
         classNum                 = linkClass("Num");
         classMonad               = linkClass("Monad");
-assert(nonNull(typeDouble));
-assert(nonNull(typeInteger));
+
         stdDefaults              = NIL;
         stdDefaults              = cons(typeDouble,stdDefaults);
 #       if DEFAULT_BIGNUM
@@ -490,9 +489,11 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         namePmSubtract    = linkName("hugsprimPmSubtract");
         namePmLe          = linkName("hugsprimPmLe");
 
-        implementCfun ( nameCons, NIL );
-        implementCfun ( nameNil, NIL );
-        implementCfun ( nameUnit, NIL );
+        if (!combined) {
+           implementCfun ( nameCons, NIL );
+           implementCfun ( nameNil, NIL );
+           implementCfun ( nameUnit, NIL );
+        }
     }
 }
 
@@ -522,11 +523,9 @@ Int what; {
            linkPreludeTC();
            linkPreludeCM();
            linkPreludeNames();
-           name(nameNil).stgVar
-              = mkCPtr(lookupOTabName(modulePrelBase, "PrelBase_ZMZN_static_closure"));
-           name(nameCons).stgVar 
-              = mkCPtr(lookupOTabName(modulePrelBase, "PrelBase_ZC_closure"));
+
            nameUnpackString = linkName("hugsprimUnpackString");
+           namePMFail       = linkName("hugsprimPmFail");
 #endif
 #endif
            break;
@@ -615,7 +614,7 @@ Int what; {
                pFun(nameMap,            "map");
 
                /* implementTagToCon                     */
-               pFun(namePMFail,         "primPmFail");
+               pFun(namePMFail,         "hugsprimPmFail");
                pFun(nameError,          "error");
                pFun(nameUnpackString,   "hugsprimUnpackString");
 
