@@ -9,7 +9,7 @@ module Finder (
     findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
     findModuleDep,	-- :: ModuleName -> Bool -> IO (Maybe (Module, ModuleLocation))
     findPackageModule,	-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-    mkHomeModuleLocn,	-- :: ModuleName -> String -> Maybe FilePath 
+    mkHomeModuleLocn,	-- :: ModuleName -> String -> FilePath 
 			--	-> IO ModuleLocation
     emptyHomeDirCache,	-- :: IO ()
     flushPackageCache   -- :: [PackageConfig] -> IO ()
@@ -21,6 +21,7 @@ import HscTypes		( ModuleLocation(..) )
 import Packages		( PackageConfig(..) )
 import DriverPhases
 import DriverState
+import DriverUtil
 import Module
 import FastString
 import Config
@@ -30,7 +31,6 @@ import List
 import Directory
 import IO
 import Monad
-import Outputable
 \end{code}
 
 The Finder provides a thin filesystem abstraction to the rest of the
@@ -74,9 +74,9 @@ maybeHomeModule mod_name is_source = do
         [ (hisuf,
 	   \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
 	, ("hs",      
-	   \ _ fName path -> mkHomeModuleLocn mod_name path (Just fName))
+	   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
 	, ("lhs",
-	   \ _ fName path -> mkHomeModuleLocn mod_name path (Just fName))
+	   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
 	]
 
        boot_exts = 
@@ -106,14 +106,21 @@ mkHiOnlyModuleLocn mod_name hi_file =
 -- file may follow the name of the source file in the case where the
 -- two differ (see summariseFile in compMan/CompManager.lhs).
 
-mkHomeModuleLocn mod_name basename maybe_source_fn = do
+mkHomeModuleLocn mod_name 
+	basename		-- everything but the extension
+	source_fn		-- full path to the source (required)
+  = do
 
    hisuf  <- readIORef v_Hi_suf
    hidir  <- readIORef v_Hi_dir
 
-   let hi_rest = basename ++ '.':hisuf
-       hi_file | Just d <- hidir = d ++ '/':hi_rest
-	       | otherwise       = hi_rest
+   -- take the *last* component of the module name (if a hierarchical name),
+   -- and append it to the directory to get the .hi file name.
+   let (_,mod_str) = split_longest_prefix (moduleNameUserString mod_name) '.'
+       hi_filename = mod_str ++ '.':hisuf
+       hi_path | Just d <- hidir = d
+	       | otherwise       = getdir basename
+       hi = hi_path ++ '/':hi_filename
 
    -- figure out the .o file name.  It also lives in the same dir
    -- as the source, but can be overriden by a -odir flag.
@@ -121,8 +128,8 @@ mkHomeModuleLocn mod_name basename maybe_source_fn = do
 
    return (mkHomeModule mod_name,
            ModuleLocation{ ml_hspp_file = Nothing
-	   		 , ml_hs_file   = maybe_source_fn
-			 , ml_hi_file   = hi_file
+	   		 , ml_hs_file   = Just source_fn
+			 , ml_hi_file   = hi
 			 , ml_obj_file  = Just o_file
 			 })
 
