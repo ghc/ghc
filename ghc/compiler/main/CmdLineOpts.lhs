@@ -1,4 +1,4 @@
-%
+
 % (c) The University of Glasgow, 1996-2000
 %
 \section[CmdLineOpts]{Things to do with command-line options}
@@ -237,7 +237,6 @@ data DynFlag
    | Opt_D_dump_stranal
    | Opt_D_dump_tc
    | Opt_D_dump_types
-   | Opt_D_dump_tc_trace
    | Opt_D_dump_rules
    | Opt_D_dump_usagesp
    | Opt_D_dump_cse
@@ -246,6 +245,7 @@ data DynFlag
    | Opt_D_dump_rn_stats
    | Opt_D_dump_stix
    | Opt_D_dump_simpl_stats
+   | Opt_D_dump_tc_trace
    | Opt_D_dump_BCOs
    | Opt_D_source_stats
    | Opt_D_verbose_core2core
