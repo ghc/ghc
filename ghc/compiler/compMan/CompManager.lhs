@@ -256,16 +256,17 @@ cmModuleIsInterpreted cmstate str
 cmInfoThing :: CmState -> DynFlags -> String -> IO (CmState, [(TyThing,Fixity)])
 cmInfoThing cmstate dflags id
    = do (new_pcs, things) <- hscThing hsc_env pcs icontext id
-	let pairs = map (\x -> (x, getFixity new_pcs (getName x))) things
+	let new_pit = eps_PIT (pcs_EPS new_pcs)
+	    pairs = map (\x -> (x, getFixity new_pit (getName x))) things
 	return (cmstate{ pcs=new_pcs }, pairs)
    where
      CmState{ hpt=hpt, pcs=pcs, ic=icontext } = cmstate
      hsc_env = HscEnv { hsc_mode   = Interactive,
 			hsc_dflags = dflags,
 			hsc_HPT    = hpt }
-     pit = eps_PIT (pcs_EPS pcs)
-     getFixity :: PersistentCompilerState -> Name -> Fixity
-     getFixity pcs name
+
+     getFixity :: PackageIfaceTable -> Name -> Fixity
+     getFixity pit name
 	| isExternalName name,
 	  Just iface  <- lookupIface hpt pit (nameModule name),
 	  Just (FixitySig _ fixity _) <- lookupNameEnv (mi_fixities iface) name
