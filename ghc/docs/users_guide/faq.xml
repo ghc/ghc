@@ -449,6 +449,14 @@ details.</para>
       </listitem>
     </varlistentry>
 
+    <varlistentry>
+      <term>I can't use readline under GHCi on Windows</term>
+      <listitem>
+	<para>In order to load the readline package under GHCi on Windows, you
+	  need to make a version of the readline library that GHCi can load.
+	  Instructions for GHC 6.2.2. are <ulink url="http://www.haskell.org/pipermail/glasgow-haskell-users/2004-November/007370.html">here</ulink>.</para>
+      </listitem>
+    </varlistentry>
   </variablelist>
 
 </chapter>
