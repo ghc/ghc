@@ -1430,8 +1430,13 @@ reduce stack try_me wanted state
     ; ReduceMe ->		-- It should be reduced
 	lookupInst wanted	      `thenM` \ lookup_result ->
 	case lookup_result of
-	    GenInst wanteds' rhs -> reduceList stack try_me wanteds' state	`thenM` \ state' ->
-				    addWanted state' wanted rhs wanteds'
+	    GenInst wanteds' rhs -> addWanted state wanted rhs wanteds'		`thenM` \ state' ->
+				    reduceList stack try_me wanteds' state'
+		-- Experiment with doing addWanted *before* the reduceList, 
+		-- which has the effect of adding the thing we are trying
+		-- to prove to the database before trying to prove the things it
+		-- needs.  See note [RECURSIVE DICTIONARIES]
+
 	    SimpleInst rhs       -> addWanted state wanted rhs []
 
 	    NoInstance ->    -- No such instance!
@@ -1599,6 +1604,42 @@ Now we implement the Right Solution, which is to check for loops directly
 when adding superclasses.  It's a bit like the occurs check in unification.
 
 
+Note [RECURSIVE DICTIONARIES]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider 
+    data D r = ZeroD | SuccD (r (D r));
+    
+    instance (Eq (r (D r))) => Eq (D r) where
+        ZeroD     == ZeroD     = True
+        (SuccD a) == (SuccD b) = a == b
+        _         == _         = False;
+    
+    equalDC :: D [] -> D [] -> Bool;
+    equalDC = (==);
+
+We need to prove (Eq (D [])).  Here's how we go:
+
+	d1 : Eq (D [])
+
+by instance decl, holds if
+	d2 : Eq [D []]
+	where 	d1 = dfEqD d2
+
+by instance decl of Eq, holds if
+	d3 : D []
+	where	d2 = dfEqList d2
+		d1 = dfEqD d2
+
+But now we can "tie the knot" to give
+
+	d3 = d1
+	d2 = dfEqList d2
+	d1 = dfEqD d2
+
+and it'll even run!  The trick is to put the thing we are trying to prove
+(in this case Eq (D []) into the database before trying to prove its
+contributing clauses.
+	
 
 %************************************************************************
 %*									*
