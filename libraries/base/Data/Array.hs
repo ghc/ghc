@@ -44,10 +44,6 @@ module  Data.Array
 
     ) where
 
-#ifndef __NHC__
-import Data.Dynamic
-#endif
-
 import Data.Ix
 
 #ifdef __GLASGOW_HASKELL__
@@ -61,6 +57,10 @@ import Hugs.Array
 
 #ifdef __NHC__
 import Array		-- Haskell'98 arrays
+#endif
+
+#ifndef __NHC__
+import Data.Typeable
 #endif
 
 #ifndef __NHC__

@@ -63,7 +63,7 @@ import Foreign.Storable
 import Data.Bits	( Bits(..) )
 import Data.Int		( Int8,  Int16,  Int32,  Int64  )
 import Data.Word	( Word8, Word16, Word32, Word64 )
-import Data.Dynamic
+import Data.Typeable
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base

@@ -31,7 +31,7 @@ module GHC.ForeignPtr
 import Control.Monad 	( sequence_ )
 import Foreign.Ptr
 import Foreign.Storable
-import Data.Dynamic
+import Data.Typeable
 
 import GHC.List  	( null )
 import GHC.Base

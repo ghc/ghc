@@ -52,7 +52,7 @@ import NHC.FFI
 import Data.Bits	( Bits(..) )
 import Data.Int
 import Data.Word
-import Data.Dynamic
+import Data.Typeable
 import Foreign.Storable
 
 #ifdef __GLASGOW_HASKELL__

@@ -28,13 +28,12 @@ module Data.Array.ST (
 import Prelude
 
 import Data.Array.MArray
-import Data.Array.Base	hiding (MArray(..))
+import Data.Array.Base	( STUArray, castSTUArray )
 
 #ifdef __HUGS__
-import Hugs.ST
+import Hugs.ST		( STArray )
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Arr
-import GHC.ST
+import GHC.Arr		( STArray )
 #endif

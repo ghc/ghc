@@ -47,7 +47,7 @@ module System.Posix.Types (
 
 import Foreign
 import Foreign.C
-import Data.Dynamic
+import Data.Typeable
 import Data.Bits
 
 #ifdef __GLASGOW_HASKELL__

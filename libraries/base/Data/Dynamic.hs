@@ -47,9 +47,6 @@ import GHC.Base
 import GHC.Show
 import GHC.Err
 import GHC.Num
-import GHC.Float
-import GHC.Real( rem )
-import GHC.IOBase
 #endif
 
 #ifdef __HUGS__

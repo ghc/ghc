@@ -33,7 +33,7 @@ module Control.Monad.ST
 import Prelude
 
 import Control.Monad.Fix
-import Data.Dynamic
+import Data.Typeable
 
 #ifdef __HUGS__
 import Hugs.ST

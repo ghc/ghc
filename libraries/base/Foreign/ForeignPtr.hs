@@ -71,7 +71,7 @@ import GHC.ForeignPtr
 
 #if !defined(__NHC__) && !defined(__GLASGOW_HASKELL__)
 import Foreign.Marshal.Alloc	( malloc, mallocBytes, finalizerFree )
-import Data.Dynamic
+import Data.Typeable
 
 #include "Typeable.h"
 INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")

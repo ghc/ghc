@@ -25,7 +25,7 @@ import Prelude
 import Data.Array.MArray
 import Data.Int
 import Data.Word
-import Data.Dynamic
+import Data.Typeable
 
 #ifdef __HUGS__
 import Hugs.IOArray

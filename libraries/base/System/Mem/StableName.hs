@@ -31,7 +31,7 @@ module System.Mem.StableName (
 
 import Prelude
 
-import Data.Dynamic
+import Data.Typeable
 
 #ifdef __HUGS__
 import Hugs.Stable

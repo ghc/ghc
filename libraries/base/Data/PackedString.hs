@@ -71,7 +71,7 @@ import Prelude
 
 import Data.Array.Unboxed
 import Data.Array.IO
-import Data.Dynamic
+import Data.Typeable
 import Data.Char
 
 import System.IO

@@ -62,7 +62,7 @@ module Foreign.Marshal.Array (
 import Control.Monad
 import Foreign.Ptr	(Ptr, plusPtr)
 import Foreign.Storable	(Storable(sizeOf,peekElemOff,pokeElemOff))
-import Foreign.Marshal.Alloc (alloca, mallocBytes, allocaBytes, reallocBytes)
+import Foreign.Marshal.Alloc (mallocBytes, allocaBytes, reallocBytes)
 import Foreign.Marshal.Utils (copyBytes, moveBytes)
 
 #ifdef __GLASGOW_HASKELL__

@@ -56,10 +56,6 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
 import Numeric		( readDec )
 
-#ifdef __GLASGOW_HASKELL__
-import GHC.IOBase	( stToIO )
-#endif
-
 -- The standard nhc98 implementation of Time.ClockTime does not match
 -- the extended one expected in this module, so we lash-up a quick
 -- replacement here.

@@ -32,7 +32,7 @@ import GHC.STRef
 import Hugs.ST
 #endif
 
-import Data.Dynamic
+import Data.Typeable
 
 #include "Typeable.h"
 INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")

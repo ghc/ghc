@@ -69,7 +69,7 @@ module System.Mem.Weak (
 
 import Prelude
 
-import Data.Dynamic
+import Data.Typeable
 
 #ifdef __HUGS__
 import Hugs.Weak

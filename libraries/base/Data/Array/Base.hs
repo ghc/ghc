@@ -19,12 +19,10 @@ module Data.Array.Base where
 import Prelude
 
 import Data.Ix		( Ix, range, index, rangeSize )
-import Data.Bits
 import Data.Int
 import Data.Word
 import Foreign.Ptr
 import Foreign.StablePtr
-import Foreign.Storable
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Arr		( STArray, unsafeIndex )
@@ -41,6 +39,8 @@ import GHC.Word		( Word8(..), Word16(..), Word32(..), Word64(..) )
 #endif
 
 #ifdef __HUGS__
+import Data.Bits
+import Foreign.Storable
 import qualified Hugs.Array as Arr
 import qualified Hugs.ST as ArrST
 import Hugs.Array ( unsafeIndex )
@@ -48,7 +48,7 @@ import Hugs.ST ( STArray, ST(..), runST )
 import Hugs.ByteArray
 #endif
 
-import Data.Dynamic
+import Data.Typeable
 #include "Typeable.h"
 
 #include "MachDeps.h"

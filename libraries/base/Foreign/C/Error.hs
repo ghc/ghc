@@ -107,7 +107,6 @@ import Foreign.Marshal.Error 	( void )
 import Data.Maybe
 
 #if __GLASGOW_HASKELL__
-import GHC.Storable
 import GHC.IOBase
 import GHC.Num
 import GHC.Base

@@ -40,7 +40,7 @@ module Data.Complex
 import Prelude
 
 #ifndef __NHC__
-import Data.Dynamic
+import Data.Typeable
 #endif
 
 #ifdef __HUGS__

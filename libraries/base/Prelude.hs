@@ -123,7 +123,6 @@ import GHC.Num
 import GHC.Real
 import GHC.Float
 import GHC.Show
-import GHC.Conc
 import GHC.Err   ( error, undefined )
 #endif
 
