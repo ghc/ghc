@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.33 2003/10/27 09:56:11 ross Exp $
+ * $Id: HsBase.h,v 1.34 2003/10/30 18:51:26 sof Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -72,7 +72,7 @@
 #ifdef HAVE_SYS_TIMES_H
 #include <sys/times.h>
 #endif
-#if defined(HAVE_WINSOCK_H) && defined(__MINGW32__)
+#if defined(HAVE_WINSOCK_H) && defined(mingw32_TARGET_OS)
 #include <winsock.h>
 #endif
 #ifdef HAVE_LIMITS_H
@@ -104,7 +104,7 @@
 #include "lockFile.h"
 #include "dirUtils.h"
 
-#if defined(__MINGW32__)
+#if defined(mingw32_TARGET_OS)
 #include <io.h>
 #include <fcntl.h>
 #include "timeUtils.h"
@@ -213,7 +213,7 @@ INLINE int __hscore_s_issock(m) { return S_ISSOCK(m); }
 #endif
 #endif
 
-#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER) && !defined(__MINGW32__)
+#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER)
 INLINE int
 __hscore_sigemptyset( sigset_t *set )
 { return sigemptyset(set); }
@@ -380,7 +380,7 @@ __hscore_seek_end( void )
 INLINE HsInt
 __hscore_setmode( HsInt fd, HsBool toBin )
 {
-#if defined(__MINGW32__)
+#if defined(mingw32_TARGET_OS) || defined(_MSC_VER)
   return setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
 #else
   return 0;
@@ -391,7 +391,7 @@ INLINE HsInt
 __hscore_PrelHandle_write( HsInt fd, HsBool isSock, HsAddr ptr, 
 			   HsInt off, int sz )
 {
-#if defined(__MINGW32__)
+#if defined(mingw32_TARGET_OS) || defined(_MSC_VER)
   if (isSock) {
     return send(fd,(char *)ptr + off, sz, 0);
   }
@@ -403,7 +403,7 @@ INLINE HsInt
 __hscore_PrelHandle_read( HsInt fd, HsBool isSock, HsAddr ptr, 
 			  HsInt off, int sz )
 {
-#if defined(__MINGW32__)
+#if defined(mingw32_TARGET_OS) || defined(_MSC_VER)
   if (isSock) {
     return recv(fd,(char *)ptr + off, sz, 0);
   }
@@ -412,7 +412,7 @@ __hscore_PrelHandle_read( HsInt fd, HsBool isSock, HsAddr ptr,
 
 }
 
-#if defined(__MINGW32__)
+#if defined(mingw32_TARGET_OS) || defined(_MSC_VER)
 INLINE long *
 __hscore_Time_ghcTimezone( void ) { return &_timezone; }
 
@@ -423,7 +423,7 @@ __hscore_Time_ghcTzname( void ) { return _tzname; }
 INLINE HsInt
 __hscore_mkdir( HsAddr pathName, HsInt mode )
 {
-#if defined(__MINGW32__)
+#if defined(mingw32_TARGET_OS) || defined(_MSC_VER)
   return mkdir(pathName);
 #else
   return mkdir(pathName,mode);
@@ -474,7 +474,7 @@ INLINE mode_t __hscore_S_IXUSR() { return S_IXUSR; }
 INLINE HsAddr
 __hscore_d_name( struct dirent* d )
 { 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER)
   return (HsAddr)(&d->d_name);
 #else
   return (HsAddr)(d->d_name);
@@ -533,15 +533,11 @@ __hscore_sizeof_termios( void )
 }
 #endif
 
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
+#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER)
 INLINE HsInt
 __hscore_sizeof_sigset_t( void )
 {
-#ifndef mingw32_TARGET_OS
   return sizeof(sigset_t);
-#else
-  return 0;
-#endif
 }
 #endif
 
@@ -648,7 +644,7 @@ extern void __hscore_set_saved_termios(int fd, void* ts);
 
 INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
 
-#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER) && !defined(__MINGW32__)
+#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER)
 INLINE int __hsposix_SIGABRT()   { return SIGABRT; }
 INLINE int __hsposix_SIGALRM()   { return SIGALRM; }
 INLINE int __hsposix_SIGBUS()    { return SIGBUS; }
