@@ -40,6 +40,7 @@ import Class		( GenClass, GenClassOp, mkClass, mkClassOp, classBigSig,
 			  classOps, classOpString, classOpLocalType, classDefaultMethodId,
 			  classOpTagByOccName, SYN_IE(ClassOp), SYN_IE(Class)
 			)
+import CmdLineOpts      ( opt_PprUserLength )
 import Id		( GenId, mkSuperDictSelId, mkMethodSelId, 
 			  mkDefaultMethodId, getIdUnfolding,
 			  idType, SYN_IE(Id)
@@ -47,10 +48,9 @@ import Id		( GenId, mkSuperDictSelId, mkMethodSelId,
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
 import Name		( Name, isLocallyDefined, moduleString, 
-			  modAndOcc, nameString, NamedThing(..) )
+			  nameString, NamedThing(..) )
 import Outputable
 import PrelVals		( nO_DEFAULT_METHOD_ERROR_ID )
-import PprStyle
 import Pretty
 import PprType		( GenClass, GenType, GenTyVar, GenClassOp )
 import SpecEnv		( SpecEnv )
@@ -437,8 +437,8 @@ buildDefaultMethodBind clas clas_tyvar default_binds (sel_id, idx)
     noDefmExpr _      = HsApp (HsVar (getName nO_DEFAULT_METHOD_ERROR_ID)) 
 			      (HsLit (HsString (_PK_ error_msg)))
 
-    error_msg = show (sep [text "Class",  ppr PprForUser clas,
-				  text "Method", ppr PprForUser sel_id])
+    error_msg = show (sep [text "Class",  ppr (PprForUser opt_PprUserLength) clas,
+				  text "Method", ppr (PprForUser opt_PprUserLength) sel_id])
 \end{code}
 
 
