@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.97 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: Schedule.c,v 1.98 2001/07/24 06:31:36 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2920,7 +2920,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
   }
 
   while (1) {
-    int words = ((P_)su - (P_)sp) - 1;
+    nat words = ((P_)su - (P_)sp) - 1;
     nat i;
     StgAP_UPD * ap;
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.33 2001/03/23 16:36:21 simonmar Exp $
+ * $Id: Updates.hc,v 1.34 2001/07/24 06:31:36 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -306,7 +306,7 @@ EXTFUN(stg_update_PAP)
 	/* Now fill in the closure fields */
 
 	p = Hp;
-        for (i = Words-1; i >= 0; i--) {
+        for (i = Words; --i >= 0; ) {
 	   *p-- = (W_) Sp[i];
 	}
     }
@@ -384,7 +384,7 @@ EXTFUN(stg_update_PAP)
       /* 
        * Squeeze out update frame from stack.
        */
-      for (i = Words-1; i >= 0; i--) {
+      for (i = Words; --i >= 0; ) {
 	Sp[i+(sizeofW(StgUpdateFrame))] = Sp[i];
       }
       Sp += sizeofW(StgUpdateFrame);

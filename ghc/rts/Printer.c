@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.41 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: Printer.c,v 1.42 2001/07/24 06:31:36 ken Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -287,7 +287,7 @@ void printClosure( StgClosure *obj )
                 putchar(arrWordsGetChar(obj,i));
 		} */
 	    for (i=0; i<((StgArrWords *)obj)->words; i++)
-	      fprintf(stderr, "%d", ((StgArrWords *)obj)->payload[i]);
+	      fprintf(stderr, "%ld", ((StgArrWords *)obj)->payload[i]);
             fprintf(stderr,"\")\n");
             break;
         }
@@ -399,7 +399,7 @@ StgPtr printStackObj( StgPtr sp )
 
 void printStackChunk( StgPtr sp, StgPtr spBottom )
 {
-    StgWord32 bitmap;
+    StgWord bitmap;
     const StgInfoTable *info;
 
     ASSERT(sp <= spBottom);
@@ -442,12 +442,12 @@ void printStackChunk( StgPtr sp, StgPtr spBottom )
 	  sp++;
 	small_bitmap:
 	  while (bitmap != 0) {
-	    fprintf(stderr,"   stk[%d] (%p) = ", spBottom-sp, sp);
+	    fprintf(stderr,"   stk[%ld] (%p) = ", spBottom-sp, sp);
 	    if ((bitmap & 1) == 0) {
 	      printPtr((P_)*sp);
 	      fprintf(stderr,"\n");
 	    } else {
-	      fprintf(stderr,"Word# %d\n", *sp++);
+	      fprintf(stderr,"Word# %ld\n", *sp++);
 	    }	      
 	    sp++;
 	    bitmap = bitmap >> 1;
@@ -462,7 +462,7 @@ void printStackChunk( StgPtr sp, StgPtr spBottom )
 	  break;
 	}
       }
-      fprintf(stderr,"Stack[%d] (%p) = ", spBottom-sp, sp);
+      fprintf(stderr,"Stack[%ld] (%p) = ", spBottom-sp, sp);
       sp = printStackObj(sp);
     }
 }

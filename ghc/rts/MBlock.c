@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.21 2001/01/16 11:54:25 simonmar Exp $
+ * $Id: MBlock.c,v 1.22 2001/07/24 06:31:36 ken Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -85,7 +85,7 @@ getMBlocks(nat n)
     barf("GetMBlock: misaligned block %p returned when allocating %d megablock(s) at %p", ret, n, next_request);
   }
 
-  IF_DEBUG(gc,fprintf(stderr,"Allocated %d megablock(s) at %x\n",n,(nat)ret));
+  IF_DEBUG(gc,fprintf(stderr,"Allocated %d megablock(s) at %p\n",n,ret));
 
   next_request += size;
 

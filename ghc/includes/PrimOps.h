@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.78 2001/07/14 00:06:14 sof Exp $
+ * $Id: PrimOps.h,v 1.79 2001/07/24 06:31:35 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -99,8 +99,8 @@
  * plugging into a new J#.  
  */
 #define addIntCzh(r,c,a,b)			\
-{ r = a + b;					\
-  c = ((StgWord)(~(a^b) & (a^r)))		\
+{ r = (I_)a + (I_)b;				\
+  c = ((StgWord)(~((I_)a^(I_)b) & ((I_)a^r)))	\
     >> (BITS_IN (I_) - 1);			\
 }
 
@@ -171,13 +171,13 @@ typedef union {
 
 #else
 
-#define HALF_INT  (1 << (BITS_IN (I_) / 2))
+#define HALF_INT  (1LL << (BITS_IN (I_) / 2))
 
 #define stg_abs(a) ((a) < 0 ? -(a) : (a))
 
 #define mulIntCzh(r,c,a,b)			\
 {						\
-  if (stg_abs(a) >= HALF_INT			\
+  if (stg_abs(a) >= HALF_INT ||			\
       stg_abs(b) >= HALF_INT) {			\
     c = 1;					\
   } else {					\

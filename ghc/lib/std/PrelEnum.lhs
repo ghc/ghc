@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelEnum.lhs,v 1.13 2001/02/18 14:45:15 qrczak Exp $
+% $Id: PrelEnum.lhs,v 1.14 2001/07/24 06:31:35 ken Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -314,7 +314,7 @@ instance  Enum Int  where
     fromEnum x = x
 
     {-# INLINE enumFrom #-}
-    enumFrom (I# x) = eftInt x 2147483647#
+    enumFrom (I# x) = case maxInt of I# y -> eftInt x y
 	-- Blarg: technically I guess enumFrom isn't strict!
 
     {-# INLINE enumFromTo #-}
@@ -374,14 +374,14 @@ efdtIntList x1 x2 y
     lim   = y -# delta
 
 efdIntFB c n x1 x2
-  | delta >=# 0# = go_up_int_fb c n x1 delta (  2147483647#  -# delta)
-  | otherwise    = go_dn_int_fb c n x1 delta ((-2147483648#) -# delta)
+  | delta >=# 0# = case maxInt of I# y -> go_up_int_fb c n x1 delta (y -# delta)
+  | otherwise    = case minInt of I# y -> go_dn_int_fb c n x1 delta (y -# delta)
   where
     delta = x2 -# x1
 
 efdIntList x1 x2
-  | delta >=# 0# = go_up_int_list x1 delta (  2147483647#  -# delta)
-  | otherwise    = go_dn_int_list x1 delta ((-2147483648#) -# delta)
+  | delta >=# 0# = case maxInt of I# y -> go_up_int_list x1 delta (y -# delta)
+  | otherwise    = case minInt of I# y -> go_dn_int_list x1 delta (y -# delta)
   where
     delta = x2 -# x1
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.34 2001/07/23 17:23:20 simonmar Exp $
+ * $Id: Storage.h,v 1.35 2001/07/24 06:31:36 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -497,16 +497,13 @@ extern int is_heap_alloced(const void* x);
    Macros for calculating how big a closure will be (used during allocation)
    -------------------------------------------------------------------------- */
 
-/* ToDo: replace unsigned int by nat.  The only fly in the ointment is that
- * nat comes from Rts.h which many folk dont include.  Sigh!
- */
-static __inline__ StgOffset AP_sizeW    ( unsigned int n_args )              
+static __inline__ StgOffset AP_sizeW    ( nat n_args )              
 { return sizeofW(StgAP_UPD) + n_args; }
 
-static __inline__ StgOffset PAP_sizeW   ( unsigned int n_args )              
+static __inline__ StgOffset PAP_sizeW   ( nat n_args )              
 { return sizeofW(StgPAP)    + n_args; }
 
-static __inline__ StgOffset CONSTR_sizeW( unsigned int p, unsigned int np )  
+static __inline__ StgOffset CONSTR_sizeW( nat p, nat np )  
 { return sizeofW(StgHeader) + p + np; }
 
 static __inline__ StgOffset THUNK_SELECTOR_sizeW ( void )                    

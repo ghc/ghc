@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.37 2000/12/04 12:31:20 simonmar Exp $
+ * $Id: StgMacros.h,v 1.38 2001/07/24 06:31:35 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -611,6 +611,29 @@ static inline StgInt64 PK_Int64(W_ p_src[])
     y.iu.dlo = p_src[1];
     return(y.i);
 }
+
+#elif SIZEOF_VOID_P == 8
+
+static inline void ASSIGN_Word64(W_ p_dest[], StgWord64 src)
+{
+	p_dest[0] = src;
+}
+
+static inline StgWord64 PK_Word64(W_ p_src[])
+{
+    return p_src[0];
+}
+
+static inline void ASSIGN_Int64(W_ p_dest[], StgInt64 src)
+{
+    p_dest[0] = src;
+}
+
+static inline StgInt64 PK_Int64(W_ p_src[])
+{
+    return p_src[0];
+}
+
 #endif
 
 /* -----------------------------------------------------------------------------

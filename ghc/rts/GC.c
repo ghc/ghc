@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.105 2001/07/24 05:04:58 ken Exp $
+ * $Id: GC.c,v 1.106 2001/07/24 06:31:36 ken Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -40,6 +40,7 @@
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
 #endif
+#include <stddef.h>
 
 /* STATIC OBJECT LIST.
  *
@@ -527,10 +528,11 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
     // scavenge each step in generations 0..maxgen 
     { 
-      int gen, st; 
+      long gen;
+      int st; 
     loop2:
-      for (gen = RtsFlags.GcFlags.generations-1; gen >= 0; gen--) {
-	for (st = generations[gen].n_steps-1; st >= 0 ; st--) {
+      for (gen = RtsFlags.GcFlags.generations; --gen >= 0; ) {
+	for (st = generations[gen].n_steps; --st >= 0; ) {
 	  if (gen == 0 && st == 0 && RtsFlags.GcFlags.generations > 1) { 
 	    continue; 
 	  }
@@ -791,7 +793,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
     if ( blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 
 	 RtsFlags.GcFlags.maxHeapSize ) {
-      int adjusted_blocks;  // signed on purpose 
+      long adjusted_blocks;  // signed on purpose 
       int pc_free; 
       
       adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
@@ -817,7 +819,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
      */
 
     if (RtsFlags.GcFlags.heapSizeSuggestion) {
-      int blocks;
+      long blocks;
       nat needed = calcNeeded(); 	// approx blocks needed at next GC 
 
       /* Guess how much will be live in generation 0 step 0 next time.
@@ -841,10 +843,10 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
        * collection for collecting all steps except g0s0.
        */
       blocks = 
-	(((int)RtsFlags.GcFlags.heapSizeSuggestion - (int)needed) * 100) /
-	(100 + (int)g0s0_pcnt_kept);
+	(((long)RtsFlags.GcFlags.heapSizeSuggestion - (long)needed) * 100) /
+	(100 + (long)g0s0_pcnt_kept);
       
-      if (blocks < (int)RtsFlags.GcFlags.minAllocAreaSize) {
+      if (blocks < (long)RtsFlags.GcFlags.minAllocAreaSize) {
 	blocks = RtsFlags.GcFlags.minAllocAreaSize;
       }
       
@@ -1548,7 +1550,7 @@ loop:
       case CONSTR_0_2:
       case CONSTR_STATIC:
 	{ 
-	  StgWord32 offset = info->layout.selector_offset;
+	  StgWord offset = info->layout.selector_offset;
 
 	  // check that the size is in range 
 	  ASSERT(offset < 
@@ -1842,7 +1844,7 @@ loop:
 void
 move_TSO(StgTSO *src, StgTSO *dest)
 {
-    int diff;
+    ptrdiff_t diff;
 
     // relocate the stack pointers... 
     diff = (StgPtr)dest - (StgPtr)src; // In *words* 
@@ -1859,7 +1861,7 @@ move_TSO(StgTSO *src, StgTSO *dest)
    -------------------------------------------------------------------------- */
 
 StgTSO *
-relocate_stack(StgTSO *dest, int diff)
+relocate_stack(StgTSO *dest, ptrdiff_t diff)
 {
   StgUpdateFrame *su;
   StgCatchFrame  *cf;
@@ -2736,7 +2738,7 @@ scavenge_mut_once_list(generation *gen)
 	} else {
 	  size = gen->steps[0].scan - start;
 	}
-	fprintf(stderr,"evac IND_OLDGEN: %d bytes\n", size * sizeof(W_));
+	fprintf(stderr,"evac IND_OLDGEN: %ld bytes\n", size * sizeof(W_));
       }
 #endif
 
@@ -3438,7 +3440,7 @@ gcCAFs(void)
     ASSERT(info->type == IND_STATIC);
 
     if (STATIC_LINK(info,p) == NULL) {
-      IF_DEBUG(gccafs, fprintf(stderr, "CAF gc'd at 0x%04x\n", (int)p));
+      IF_DEBUG(gccafs, fprintf(stderr, "CAF gc'd at 0x%04lx\n", (long)p));
       // black hole it 
       SET_INFO(p,&stg_BLACKHOLE_info);
       p = STATIC_LINK2(info,p);
