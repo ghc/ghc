@@ -49,6 +49,12 @@ import Data.Array.Base
 import Data.Array.MArray
 import Foreign hiding (newArray)
 
+#ifdef __HUGS__
+#define MAKE_ARRAY(x) makeForeignPtr (x) free
+#else
+#define MAKE_ARRAY(x) newForeignPtr (x) (free (x))
+#endif
+
 data StorableArray i e = StorableArray !i !i !(ForeignPtr e)
 
 instance HasBounds StorableArray where
@@ -59,14 +65,14 @@ instance Storable e => MArray StorableArray e IO where
     newArray (l,u) init = do
         a <- mallocArray size
         sequence_ [pokeElemOff a i init | i <- [0..size-1]]
-        fp <- newForeignPtr a (free a)
+        fp <- MAKE_ARRAY(a)
         return (StorableArray l u fp)
         where
         size = rangeSize (l,u)
 
     newArray_ (l,u) = do
         a  <- mallocArray (rangeSize (l,u))
-        fp <- newForeignPtr a (free a)
+        fp <- MAKE_ARRAY(a)
         return (StorableArray l u fp)
 
     unsafeRead (StorableArray _ _ fp) i =
