@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable ( requires mulit-parameter type classes )
+-- Portability :  non-portable (multi-parameter type classes)
 --
 -- The List monad.
 --

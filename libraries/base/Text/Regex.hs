@@ -24,10 +24,8 @@ module Text.Regex (
 
 import Prelude
 import qualified Text.Regex.Posix as RE
+import Text.Regex.Posix ( Regex )
 import System.IO.Unsafe
-
--- | A compiled regular expression
-type Regex = RE.Regex
 
 -- | Makes a regular expression with the default options (multi-line,
 -- case-sensitive).  The syntax of regular expressions is

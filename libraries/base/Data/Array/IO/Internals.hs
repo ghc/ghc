@@ -13,6 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
+-- #hide
 module Data.Array.IO.Internals (
    IOArray(..),		-- instance of: Eq, Typeable
    IOUArray(..),	-- instance of: Eq, Typeable
@@ -72,10 +73,10 @@ instance MArray IOArray e IO where
 -- | Mutable, unboxed, strict arrays in the 'IO' monad.  The type
 -- arguments are as follows:
 --
---  * @i@: the index type of the array (should be an instance of @Ix@)
+--  * @i@: the index type of the array (should be an instance of 'Ix')
 --
 --  * @e@: the element type of the array.  Only certain element types
---    are supported: see 'MArray' for a list of instances.
+--    are supported: see "Data.Array.MArray" for a list of instances.
 --
 newtype IOUArray i e = IOUArray (STUArray RealWorld i e)
 

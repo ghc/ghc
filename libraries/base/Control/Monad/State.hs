@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable ( mulit-param classes, functional dependencies )
+-- Portability :  non-portable (multi-param classes, functional dependencies)
 --
 -- State monads.
 --

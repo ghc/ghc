@@ -284,7 +284,7 @@ data Ix i => Array     i e = Array   !i !i (Array# e)
 --
 --  * @s@: the state variable argument for the 'ST' type
 --
---  * @i@: the index type of the array (should be an instance of @Ix@)
+--  * @i@: the index type of the array (should be an instance of 'Ix')
 --
 --  * @e@: the element type of the array.
 --

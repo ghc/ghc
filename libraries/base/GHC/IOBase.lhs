@@ -409,7 +409,7 @@ writeIORef (IORef var) v = stToIO (writeSTRef var v)
 -- | An 'IOArray' is a mutable, boxed, non-strict array in the 'IO' monad.  
 -- The type arguments are as follows:
 --
---  * @i@: the index type of the array (should be an instance of @Ix@)
+--  * @i@: the index type of the array (should be an instance of 'Ix')
 --
 --  * @e@: the element type of the array.
 --

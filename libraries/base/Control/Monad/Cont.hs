@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (multi-parameter type classes)
 --
 -- Continuation monads.
 --

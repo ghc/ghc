@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable (reqruires multi-param type classes)
+-- Portability :  non-portable (multi-parameter type classes)
 --
 -- The Error monad.
 --
