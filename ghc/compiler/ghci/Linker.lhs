@@ -6,9 +6,6 @@
 \begin{code}
 {-# OPTIONS -#include "Linker.h" #-}
 
--- so that we can see defn of LEADING_UNDERSCORE
-#include "../includes/config.h"
-
 module Linker ( 
    initLinker,	 -- :: IO ()
    loadObj,      -- :: String -> IO ()
@@ -23,17 +20,14 @@ import Foreign		( Ptr, nullPtr )
 import PrelByteArr
 import PrelPack 	(packString)
 import Panic		( panic )
+import DriverUtil       ( prefixUnderscore )
 
 -- ---------------------------------------------------------------------------
 -- RTS Linker Interface
 -- ---------------------------------------------------------------------------
 
 lookupSymbol str_in = do
-#  ifdef LEADING_UNDERSCORE
-   let str = '_':str_in
-#  else
-   let str = str_in
-#  endif
+   let str = prefixUnderscore str_in
    addr <- c_lookupSymbol (packString str)
    if addr == nullPtr
 	then return Nothing

@@ -868,13 +868,8 @@ doLink o_files = do
 	 	      ++ pkg_extra_ld_opts
 	 	      ++ extra_ld_opts
 	              ++ if static && not no_hs_main then
-#ifdef LEADING_UNDERSCORE
-			    [ "-u", "_PrelMain_mainIO_closure" ,
-			      "-u", "___init_PrelMain"] 
-#else
 			    [ "-u", prefixUnderscore "PrelMain_mainIO_closure" ,
 			      "-u", prefixUnderscore "__init_PrelMain"] 
-#endif
 			 else []))
 
     -- parallel only: move binary to another dir -- HWL

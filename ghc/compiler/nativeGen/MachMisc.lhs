@@ -55,17 +55,13 @@ import Panic		( panic )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
 import Outputable	( pprPanic, ppr )
 import IOExts		( trace )
+import Config           ( cLeadingUnderscore )
 import FastTypes
 \end{code}
 
 \begin{code}
 underscorePrefix :: Bool   -- leading underscore on assembler labels?
-
-#ifdef LEADING_UNDERSCORE
-underscorePrefix = True
-#else
-underscorePrefix = False
-#endif
+underscorePrefix = (cLeadingUnderscore == "YES")
 
 ---------------------------
 fmtAsmLbl :: String -> String  -- for formatting labels
