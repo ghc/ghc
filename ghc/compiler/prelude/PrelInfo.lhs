@@ -8,7 +8,6 @@ module PrelInfo (
 	module PrelNames,
 	module MkId,
 
-	wiredInThings, 	-- Names of wired in things
 	wiredInThingEnv,
 	ghcPrimExports,
 	cCallableClassDecl, cReturnableClassDecl,
