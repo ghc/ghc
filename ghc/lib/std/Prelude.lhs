@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Prelude.lhs,v 1.23 2001/02/22 13:17:59 simonpj Exp $
+% $Id: Prelude.lhs,v 1.24 2001/02/22 16:48:24 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -51,10 +51,9 @@ module Prelude (
     Ord(..), 
     Enum(..),
     Bounded(..), 
-    Num((+), (-), (*), negate, abs, signum, fromInteger),
+    Num(..),
     Real(..),
-    Integral(quot, rem, div, mod, quotRem, divMod, toInteger),
-	-- The toInt method is exposed only by GlaExts
+    Integral(..),
     Fractional(..),
     Floating(..),
     RealFrac(..),

@@ -234,7 +234,6 @@ instance Integral Int8 where
 
     a@(I8# _) `quotRem` b@(I8# _) = (a `quotInt8` b, a `remInt8` b)
     toInteger i8  = toInteger (int8ToInt i8)
-    toInt     i8  = int8ToInt i8
 
 
 remInt8, quotInt8 :: Int8 -> Int8 -> Int8
@@ -257,7 +256,7 @@ instance Enum Int8 where
       | otherwise     = i-1
 
     toEnum x
-      | x >= toInt (minBound::Int8) && x <= toInt (maxBound::Int8) 
+      | x >= fromIntegral (minBound::Int8) && x <= fromIntegral (maxBound::Int8) 
       = intToInt8 x
       | otherwise
       = toEnumError "Int8" x (minBound::Int8,maxBound::Int8)
@@ -378,7 +377,6 @@ instance Integral Int16 where
 
     a@(I16# _) `quotRem` b@(I16# _) = (a `quotInt16` b, a `remInt16` b)
     toInteger i16  = toInteger (int16ToInt i16)
-    toInt     i16  = int16ToInt i16
 
 remInt16, quotInt16 :: Int16 -> Int16 -> Int16
 remInt16  (I16# x) (I16# y) = I16# (intToInt16# ((i16ToInt# x) `remInt#` (i16ToInt# y)))
@@ -401,7 +399,7 @@ instance Enum Int16 where
       | otherwise     = i-1
 
     toEnum x
-      | x >= toInt (minBound::Int16) && x <= toInt (maxBound::Int16) 
+      | x >= fromIntegral (minBound::Int16) && x <= fromIntegral (maxBound::Int16) 
       = intToInt16 x
       | otherwise
       = toEnumError "Int16" x (minBound::Int16, maxBound::Int16)
@@ -529,7 +527,6 @@ instance Integral Int32 where
 
     a@(I32# _) `quotRem` b@(I32# _) = (a `quotInt32` b, a `remInt32` b)
     toInteger i32  = toInteger (int32ToInt i32)
-    toInt     i32  = int32ToInt i32
 
 remInt32, quotInt32 :: Int32 -> Int32 -> Int32
 remInt32  (I32# x) (I32# y) = I32# (intToInt32# ((i32ToInt# x) `remInt#`  (i32ToInt# y)))
@@ -554,7 +551,7 @@ instance Enum Int32 where
     toEnum x
         -- with Int having the same range as Int32, the following test
 	-- shouldn't fail. However, having it here 
-      | x >= toInt (minBound::Int32) && x <= toInt (maxBound::Int32) 
+      | x >= fromIntegral (minBound::Int32) && x <= fromIntegral (maxBound::Int32) 
       = intToInt32 x
       | otherwise
       = toEnumError "Int32" x (minBound::Int32, maxBound::Int32)
@@ -663,7 +660,6 @@ instance Integral Int64 where
 
     a@(I64# _) `quotRem` b@(I64# _) = (a `quotInt64` b, a `remInt64` b)
     toInteger (I64# i#) = toInteger (I# i#)
-    toInt     (I64# i#) = I# i#
 
 remInt64  (I64# x) (I64# y) = I64# (x `remInt#` y)
 quotInt64 (I64# x) (I64# y) = I64# (x `quotInt#` y)
@@ -743,7 +739,6 @@ instance Integral Int64 where
 
     a@(I64# _) `quotRem` b@(I64# _) = (a `quotInt64` b, a `remInt64` b)
     toInteger i         = int64ToInteger i
-    toInt     i         = int64ToInt i
 
 remInt64, quotInt64 :: Int64 -> Int64 -> Int64
 remInt64  (I64# x) (I64# y) = I64# (x `remInt64#` y)

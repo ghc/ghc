@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelST.lhs,v 1.19 2001/02/22 13:17:59 simonpj Exp $
+% $Id: PrelST.lhs,v 1.20 2001/02/22 16:48:24 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -11,10 +11,9 @@
 
 module PrelST where
 
-import PrelNum	-- To get fromInt etc, needed because of -fno-implicit-prelude
-import PrelShow
 import PrelBase
-import PrelNum ()	-- So that we get the .hi file for system imports
+import PrelShow
+import PrelNum
 
 default ()
 \end{code}

@@ -280,7 +280,6 @@ instance Integral Word8 where
   divMod  (W8# x) (W8# y) = (W8# (x `quotWord#` y), W8# (x `remWord#` y))
 
   toInteger = toInteger . toInt
-  toInt     = word8ToInt
 
 instance Ix Word8 where
     range (m,n)          = [m..n]
@@ -298,7 +297,7 @@ instance Enum Word8 where
       | otherwise     = w-1
 
     toEnum   i@(I# i#)  
-      | i >= toInt (minBound::Word8) && i <= toInt (maxBound::Word8) 
+      | i >= fromIntegral (minBound::Word8) && i <= fromIntegral (maxBound::Word8) 
       = W8# (intToWord8# i#)
       | otherwise
       = toEnumError "Word8" i (minBound::Word8,maxBound::Word8)
@@ -441,8 +440,7 @@ instance Integral Word16 where
   quotRem (W16# x) (W16# y) = (W16# (x `quotWord#` y), W16# (x `remWord#` y))
   divMod  (W16# x) (W16# y) = (W16# (x `quotWord#` y), W16# (x `remWord#` y))
 
-  toInteger = toInteger . toInt
-  toInt     = word16ToInt
+  toInteger = toInteger . word16ToInt
 
 instance Ix Word16 where
   range (m,n)          = [m..n]
@@ -460,7 +458,7 @@ instance Enum Word16 where
       | otherwise     = w-1
 
     toEnum   i@(I# i#)  
-      | i >= toInt (minBound::Word16) && i <= toInt (maxBound::Word16)
+      | i >= fromIntegral (minBound::Word16) && i <= fromIntegral (maxBound::Word16)
       = W16# (intToWord16# i#)
       | otherwise
       = toEnumError "Word16" i (minBound::Word16,maxBound::Word16)
@@ -602,7 +600,6 @@ instance Integral Word32 where
     divMod x y         = quotRem x y
 
     toInteger          = word32ToInteger 
-    toInt              = word32ToInt
 
 
 {-# INLINE quotWord32 #-}
@@ -796,7 +793,6 @@ instance Integral Word64 where
   divMod  (W64# x) (W64# y) = (W64# (x `quotWord#` y), W64# (x `remWord#` y))
 
   toInteger (W64# x)        = word2Integer# x
-  toInt x                   = word64ToInt x
 
 #else /* WORD_SIZE_IN_BYTES < 8 */
 
@@ -815,9 +811,7 @@ word64ToWord16 (W64# w#) = W16# ((word64ToWord# w#) `and#` (int2Word# 0xffff#))
 word64ToInteger (W64# w#) = 
   case word64ToInteger# w# of
     (# s#, p# #) -> J# s# p#
-word64ToInt w = 
-   case w `quotRem` 0x100000000 of 
-     (_,l) -> toInt (word64ToWord32 l)
+word64ToInt (W64# w#) = I# (word2Int# (word64ToWord# w#))
 
 intToWord64# :: Int# -> Word64#
 intToWord64# i# = wordToWord64# (int2Word# i#)
@@ -867,7 +861,6 @@ instance Integral Word64 where
   quotRem (W64# x) (W64# y) = (W64# (x `quotWord64#` y), W64# (x `remWord64#` y))
   divMod  (W64# x) (W64# y) = (W64# (x `quotWord64#` y), W64# (x `remWord64#` y))
   toInteger w64             = word64ToInteger w64
-  toInt x                   = word64ToInt x
 
 compareWord64# :: Word64# -> Word64# -> Ordering
 compareWord64# i# j# 

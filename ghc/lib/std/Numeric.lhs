@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Numeric.lhs,v 1.11 2001/02/22 13:17:58 simonpj Exp $
+% $Id: Numeric.lhs,v 1.12 2001/02/22 16:48:24 qrczak Exp $
 %
 % (c) The University of Glasgow, 1997-2000
 %
@@ -332,6 +332,6 @@ floatToDigits base x =
             else
                 let bk = expt base (-k)
                 in  gen [] (r * bk) s (mUp * bk) (mDn * bk)
-    in  (map toInt (reverse rds), k)
+    in  (map fromIntegral (reverse rds), k)
 \end{code}
 #endif

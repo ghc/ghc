@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Random.lhs,v 1.22 2001/02/22 13:17:59 simonpj Exp $
+% $Id: Random.lhs,v 1.23 2001/02/22 16:48:24 qrczak Exp $
 %
 % (c) The University of Glasgow, 1995-2000
 %
@@ -37,7 +37,6 @@ import PrelShow		( showSignedInt, showSpace )
 import PrelRead		( readDec )
 import PrelIOBase	( unsafePerformIO, stToIO )
 import PrelArr		( STRef, newSTRef, readSTRef, writeSTRef )
-import PrelReal		( toInt )
 import PrelFloat	( float2Double, double2Float )
 import Time		( getClockTime, ClockTime(..) )
 #else
@@ -115,7 +114,7 @@ mkStdGen s
 createStdGen :: Integer -> StdGen
 createStdGen s
  | s < 0     = createStdGen (-s)
- | otherwise = StdGen (toInt (s1+1)) (toInt (s2+1))
+ | otherwise = StdGen (fromInteger (s1+1)) (fromInteger (s2+1))
       where
 	(q, s1) = s `divMod` 2147483562
 	s2      = q `mod` 2147483398

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelReal.lhs,v 1.8 2001/02/22 13:17:59 simonpj Exp $
+% $Id: PrelReal.lhs,v 1.9 2001/02/22 16:48:24 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -89,7 +89,6 @@ class  (Real a, Enum a) => Integral a  where
     quot, rem, div, mod	:: a -> a -> a
     quotRem, divMod	:: a -> a -> (a,a)
     toInteger		:: a -> Integer
-    toInt		:: a -> Int -- partain: Glasgow extension
 
     n `quot` d		=  q  where (q,_) = quotRem n d
     n `rem` d		=  r  where (_,r) = quotRem n d
@@ -97,6 +96,10 @@ class  (Real a, Enum a) => Integral a  where
     n `mod` d		=  r  where (_,r) = divMod n d
     divMod n d 		=  if signum r == negate (signum d) then (q-1, r+d) else qr
 			   where qr@(q,r) = quotRem n d
+
+toInt :: Integral a => a -> Int
+-- For backward compatibility
+toInt i = fromInteger (toInteger i)
 
 class  (Num a) => Fractional a  where
     (/)			:: a -> a -> a
@@ -161,7 +164,6 @@ instance  Real Int  where
 
 instance  Integral Int	where
     toInteger i = int2Integer i  -- give back a full-blown Integer
-    toInt x	= x
 
     -- Following chks for zero divisor are non-standard (WDP)
     a `quot` b	=  if b /= 0
@@ -191,7 +193,6 @@ instance  Real Integer  where
 
 instance  Integral Integer where
     toInteger n	     = n
-    toInt n	     = integer2Int n
 
     n `quot` d = n `quotInteger` d
     n `rem`  d = n `remInteger`  d

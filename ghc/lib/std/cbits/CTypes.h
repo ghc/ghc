@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.3 2001/02/22 13:17:59 simonpj Exp $
+ * $Id: CTypes.h,v 1.4 2001/02/22 16:48:24 qrczak Exp $
  *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
@@ -90,8 +90,7 @@ instance Integral T where { \
    (T i) `mod`     (T j) = T (i `mod`  j) ; \
    (T i) `quotRem` (T j) = let (q,r) = i `quotRem` j in (T q, T r) ; \
    (T i) `divMod`  (T j) = let (d,m) = i `divMod`  j in (T d, T m) ; \
-   toInteger (T i)       = toInteger i ; \
-   toInt     (T i)       = toInt     i }
+   toInteger (T i)       = toInteger i }
 
 #define INSTANCE_BITS(T) \
 instance Bits T where { \
@@ -260,8 +259,7 @@ instance Integral T where { \
     mod			= unsafeCoerce# (mod:: B -> B -> B); \
     quotRem		= unsafeCoerce# (quotRem:: B -> B -> (B,B)); \
     divMod		= unsafeCoerce# (divMod:: B -> B -> (B,B)); \
-    toInteger		= unsafeCoerce# (toInteger:: B -> Integer); \
-    toInt		= unsafeCoerce# (toInt:: B -> Int); }
+    toInteger		= unsafeCoerce# (toInteger:: B -> Integer); }
 
 #define INSTANCE_BITS(T,B) \
 instance Bits T where { \

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.35 2001/02/22 13:17:59 simonpj Exp $
+% $Id: PrelNum.lhs,v 1.36 2001/02/22 16:48:24 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -61,8 +61,8 @@ subtract	:: (Num a) => a -> a -> a
 {-# INLINE subtract #-}
 subtract x y	=  y - x
 
-ord_0 :: Num a => a
-ord_0 = fromInt (ord '0')
+ord_0 :: Int
+ord_0 = ord '0'
 \end{code}
 
 
