@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.47 2001/04/28 04:44:05 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.48 2001/04/28 11:21:47 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -426,7 +426,6 @@ instance Ord Char where
   (C# c1) <= (C# c2) = c1 `leChar#` c2
   (C# c1) <  (C# c2) = c1 `ltChar#` c2
 
-{- XXX
 {-# RULES
 "x# `eqChar#` x#" forall x#. eqChar# x# x# = True
 "x# `neChar#` x#" forall x#. neChar# x# x# = False
@@ -435,7 +434,6 @@ instance Ord Char where
 "x# `leChar#` x#" forall x#. leChar# x# x# = True
 "x# `ltChar#` x#" forall x#. ltChar# x# x# = False
     #-}
--}
 
 chr :: Int -> Char
 chr (I# i#) | int2Word# i# `leWord#` int2Word# 0x10FFFF# = C# (chr# i#)
@@ -619,18 +617,16 @@ plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt, gcdInt :: Int -> I
 (I# x) `divInt`   (I# y) = I# (x `divInt#`  y)
 (I# x) `modInt`   (I# y) = I# (x `modInt#`  y)
 
-{- XXX
 {-# RULES
-"x# +# 0#" forall x#. x# +# 0# = x#
-"0# +# x#" forall x#. 0# +# x# = x#
-"x# -# 0#" forall x#. x# -# 0# = x#
-"x# -# x#" forall x#. x# -# x# = 0#
-"x# *# 0#" forall x#. x# *# 0# = 0#
-"0# *# x#" forall x#. 0# *# x# = 0#
-"x# *# 1#" forall x#. x# *# 1# = x#
-"1# *# x#" forall x#. 1# *# x# = x#
+"x# +# 0#" forall x#. (+#) x# 0# = x#
+"0# +# x#" forall x#. (+#) 0# x# = x#
+"x# -# 0#" forall x#. (-#) x# 0# = x#
+"x# -# x#" forall x#. (-#) x# x# = 0#
+"x# *# 0#" forall x#. (*#) x# 0# = 0#
+"0# *# x#" forall x#. (*#) 0# x# = 0#
+"x# *# 1#" forall x#. (*#) x# 1# = x#
+"1# *# x#" forall x#. (*#) 1# x# = x#
     #-}
--}
 
 gcdInt (I# a) (I# b) = g a b
    where g 0# 0# = error "PrelBase.gcdInt: gcd 0 0 is undefined"
@@ -654,14 +650,13 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 (I# x) `ltInt` (I# y) = x <#  y
 (I# x) `leInt` (I# y) = x <=# y
 
-{- XXX
 {-# RULES
-"x# >#  x#" forall x#. x# >#  x# = False
-"x# >=# x#" forall x#. x# >=# x# = True
-"x# ==# x#" forall x#. x# ==# x# = True
-"x# /=# x#" forall x#. x# /=# x# = False
-"x# <#  x#" forall x#. x# <#  x# = False
-"x# <=# x#" forall x#. x# <=# x# = True
+"x# >#  x#" forall x#. (>#)  x# x# = False
+"x# >=# x#" forall x#. (>=#) x# x# = True
+"x# ==# x#" forall x#. (==#) x# x# = True
+"x# /=# x#" forall x#. (/=#) x# x# = False
+"x# <#  x#" forall x#. (<#)  x# x# = False
+"x# <=# x#" forall x#. (<=#) x# x# = True
     #-}
 
 #if WORD_SIZE_IN_BYTES == 4
@@ -675,7 +670,6 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 "int2Word2Int"  forall x#. int2Word# (word2Int# x#) = x#
 "word2Int2Word" forall x#. word2Int# (int2Word# x#) = x#
     #-}
--}
 \end{code}
 
 
