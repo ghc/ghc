@@ -60,11 +60,17 @@ hscMain
   -> IO HscResult
 
 hscMain flags core_cmds stg_cmds summary maybe_old_iface
-	output_filename mod_details pcs =
+	output_filename mod_details pcs1 =
 
 	--------------------------  Reader  ----------------
     show_pass "Parser"	>>
     _scc_     "Parser"
+
+    let src_filename -- name of the preprocessed source file
+       = case ms_ppsource summary of
+            Just (filename, fingerprint) -> filename
+            Nothing -> pprPanic "hscMain:summary is not of a source module"
+                                (ppr summary)
 
     buf <- hGetStringBuffer True{-expand tabs-} src_filename
 
@@ -75,7 +81,7 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
 		           context = [], glasgow_exts = glaexts,
 		           loc = mkSrcLoc src_filename 1 } of {
 
-	PFailed err -> return (CompErrs pcs err);
+	PFailed err -> return (CompErrs pcs err)
 
 	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) ->
 
@@ -132,11 +138,11 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
 
 	--------------------------  Main Core-language transformations ----------------
     _scc_     "Core2Core"
-    core2core core_cmds desugared rules			>>= \ (simplified, orphan_rules) ->
+    core2core core_cmds desugared rules		>>= \ (simplified, orphan_rules) ->
 
 	-- Do the final tidy-up
     tidyCorePgm tidy_uniqs this_mod
-		simplified orphan_rules			>>= \ (tidy_binds, tidy_orphan_rules) -> 
+		simplified orphan_rules		>>= \ (tidy_binds, tidy_orphan_rules) -> 
 
 	-- Run the occurrence analyser one last time, so that
 	-- dead binders get dead-binder info.  This is exploited by
