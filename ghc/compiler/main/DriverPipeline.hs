@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.61 2001/03/28 11:01:19 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.62 2001/03/28 16:51:03 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -762,7 +762,7 @@ mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
 -- Complain about non-dynamic flags in OPTIONS pragmas
 
 checkProcessArgsResult flags basename suff
-  = do when (not (null flags)) (throwDyn (UserError (
+  = do when (not (null flags)) (throwDyn (ProgramError (
            basename ++ "." ++ suff 
            ++ ": static flags are not allowed in {-# OPTIONS #-} pragmas:\n\t" 
            ++ unwords flags)) (ExitFailure 1))

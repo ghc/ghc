@@ -149,7 +149,7 @@ cmSetContext cmstate str
 		Nothing -> do
 		   mod <- moduleNameToModule mn
 		   if isHomeModule mod 
-			then throwDyn (UserError (showSDoc 
+			then throwDyn (CmdLineError (showSDoc 
 				(quotes (ppr (moduleName mod))
  				  <+> text "is not currently loaded")))
 		   	else return mod
@@ -163,7 +163,7 @@ moduleNameToModule :: ModuleName -> IO Module
 moduleNameToModule mn
  = do maybe_stuff <- findModule mn
       case maybe_stuff of
-	Nothing -> throwDyn (UserError ("can't find module `"
+	Nothing -> throwDyn (CmdLineError ("can't find module `"
 				    ++ moduleNameUserString mn ++ "'"))
 	Just (m,_) -> return m
 
@@ -955,7 +955,7 @@ downsweep rootNm old_summaries
 	   | haskellish_file file
 	   = do exists <- doesFileExist file
 		if exists then summariseFile file else do
-		throwDyn (UserError ("can't find file `" ++ file ++ "'"))	
+		throwDyn (CmdLineError ("can't find file `" ++ file ++ "'"))	
 	   | otherwise
  	   = do exists <- doesFileExist hs_file
 		if exists then summariseFile hs_file else do
@@ -978,7 +978,7 @@ downsweep rootNm old_summaries
 			let old_summary = findModInSummaries old_summaries mod
 			summarise mod location old_summary
 
-		   Nothing -> throwDyn (UserError 
+		   Nothing -> throwDyn (CmdLineError 
                                    ("can't find module `" 
                                      ++ showSDoc (ppr nm) ++ "'"))
 
@@ -1055,7 +1055,7 @@ summarise mod location old_summary
         let (srcimps,imps,mod_name) = getImports modsrc
 
 	when (mod_name /= moduleName mod) $
-		throwDyn (UserError 
+		throwDyn (ProgramError 
 		   (showSDoc (text modsrc
 			      <>  text ": file name does not match module name"
 			      <+> quotes (ppr (moduleName mod)))))
@@ -1070,7 +1070,7 @@ noHsFileErr mod
   = panic (showSDoc (text "no source file for module" <+> quotes (ppr mod)))
 
 packageModErr mod
-  = throwDyn (UserError (showSDoc (text "module" <+>
+  = throwDyn (CmdLineError (showSDoc (text "module" <+>
 				   quotes (ppr mod) <+>
 				   text "is a package module")))
 \end{code}

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.59 2001/03/28 11:01:19 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.60 2001/03/28 16:51:03 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -232,6 +232,8 @@ runCommand c =
 			io ( putStrLn ("Phase " ++ phase ++ " failed (code "
 				        ++ show code ++ ")"))
 		    Interrupted -> io (putStrLn "Interrupted.")
+			-- omit the location for CmdLineError
+		    CmdLineError s -> io (putStrLn s)
 		    other -> io (putStrLn (show (ghc_ex :: GhcException)))
 
 	   other -> io (putStrLn ("*** Exception: " ++ show exception))
@@ -301,7 +303,7 @@ specialCommand str = do
 	         	     	       foldr1 (\a b -> a ++ ',':b) (map fst cs)
 					 ++ ")") >> return False)
 
-noArgs c = throwDyn (UserError ("command `" ++ c ++ "' takes no arguments"))
+noArgs c = throwDyn (CmdLineError ("command `" ++ c ++ "' takes no arguments"))
 
 -----------------------------------------------------------------------------
 -- Commands
@@ -314,9 +316,9 @@ addModule _ = throwDyn (InstallationError ":add not implemented")
 
 setContext :: String -> GHCi ()
 setContext ""
-  = throwDyn (UserError "syntax: `:m <module>'")
+  = throwDyn (CmdLineError "syntax: `:m <module>'")
 setContext m | not (isUpper (head m)) || not (all isAlphaNum (tail m))
-  = throwDyn (UserError ("strange looking module name: `" ++ m ++ "'"))
+  = throwDyn (CmdLineError ("strange looking module name: `" ++ m ++ "'"))
 setContext str
   = do st <- getGHCiState
        new_cmstate <- io (cmSetContext (cmstate st) str)
@@ -333,10 +335,10 @@ defineMacro s = do
   let (macro_name, definition) = break isSpace s
   cmds <- io (readIORef commands)
   if (null macro_name) 
-	then throwDyn (UserError "invalid macro name") 
+	then throwDyn (CmdLineError "invalid macro name") 
 	else do
   if (macro_name `elem` map fst cmds) 
-	then throwDyn (UserError 
+	then throwDyn (CmdLineError 
 		("command `" ++ macro_name ++ "' is already defined"))
 	else do
 
@@ -363,11 +365,11 @@ undefineMacro :: String -> GHCi ()
 undefineMacro macro_name = do
   cmds <- io (readIORef commands)
   if (macro_name `elem` map fst builtin_commands) 
-	then throwDyn (UserError
+	then throwDyn (CmdLineError
 		("command `" ++ macro_name ++ "' cannot be undefined"))
 	else do
   if (macro_name `notElem` map fst cmds) 
-	then throwDyn (UserError 
+	then throwDyn (CmdLineError 
 		("command `" ++ macro_name ++ "' not defined"))
 	else do
   io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
@@ -472,7 +474,7 @@ setOptions str
 	      writeIORef v_InitDynFlags dyn_flags
 
               if (not (null leftovers))
-		 then throwDyn (UserError ("unrecognised flags: " ++ 
+		 then throwDyn (CmdLineError ("unrecognised flags: " ++ 
 						unwords leftovers))
 		 else return ()
          )
@@ -492,7 +494,7 @@ unsetOptions str
  
        -- can't do GHC flags for now
        if (not (null minus_opts))
-	  then throwDyn (UserError "can't unset GHC command-line flags")
+	  then throwDyn (CmdLineError "can't unset GHC command-line flags")
 	  else return ()
 
 isMinus ('-':s) = True
@@ -620,7 +622,7 @@ linkPackages cmdline_lib_specs pkgs
                                      putStr ("failed (" ++ str ++ ")\n")
                                      croak
 
-        croak = throwDyn (UserError "user specified .o/.so/.DLL could not be loaded.")
+        croak = throwDyn (CmdLineError "user specified .o/.so/.DLL could not be loaded.")
 
 
 linkPackage :: PackageConfig -> IO ()
@@ -653,7 +655,7 @@ loadClassified (Right dll_unadorned)
         if    maybe_errmsg == nullPtr
          then return ()
          else do str <- peekCString maybe_errmsg
-                 throwDyn (UserError ("can't find .o or .so/.DLL for: " 
+                 throwDyn (CmdLineError ("can't find .o or .so/.DLL for: " 
                                        ++ dll_unadorned ++ " (" ++ str ++ ")" ))
 
 locateOneObj :: [FilePath] -> String -> IO LibrarySpec

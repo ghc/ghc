@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.8 2001/03/28 11:01:19 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.9 2001/03/28 16:51:03 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -181,7 +181,7 @@ findDependency is_source src imp = do
      deps | is_source = [ imp_hiboot_v, imp_hiboot, imp_hs, imp_lhs ]
      	  | otherwise = [ imp_hi, imp_hs, imp_lhs ]
 
-     search [] = throwDyn (UserError (src ++ ": " ++ "can't find one of the following: " ++
+     search [] = throwDyn (ProgramError (src ++ ": " ++ "can't find one of the following: " ++
 				      unwords (map (\d -> '`': d ++ "'") deps)))
      search ((dir, contents) : dirs)
 	   | null present = search dirs
