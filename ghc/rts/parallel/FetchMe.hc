@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
  Time-stamp: <Fri Jan 14 2000 09:41:07 Stardate: [-30]4202.01 hwloidl>
- $Id: FetchMe.hc,v 1.3 2000/01/14 11:45:22 hwloidl Exp $
+ $Id: FetchMe.hc,v 1.4 2000/01/14 16:15:08 simonmar Exp $
 
  Entry code for a FETCH_ME closure
 
@@ -70,6 +70,7 @@ STGFUN(FETCH_ME_entry)
   StgClosure *p;
   */
 
+  FB_
   rga_GLOBAL = ((StgFetchMe *)R1.p)->ga;
   ASSERT(rga->payload.gc.gtid != mytid);
 
@@ -100,6 +101,7 @@ STGFUN(FETCH_ME_entry)
     /* TSO_QUEUE(CurrentTSO) = Q_FETCHING; */
     CurrentTSO->par.blockedat = CURRENT_TIME;
     /* we are about to send off a FETCH message, so dump a FETCH event */
+    /* following should be an STGCALL --SDM */
     DumpRawGranEvent(CURRENT_PROC, taskIDtoPE(rga_GLOBAL->payload.gc.gtid),
 		     GR_FETCH, CurrentTSO, (StgClosure *)R1.p, 0);
   }
@@ -112,7 +114,6 @@ STGFUN(FETCH_ME_entry)
   splitWeight(&fmbqga_GLOBAL, lga_GLOBAL);
   ASSERT(fmbqga_GLOBAL.weight == 1L << (BITS_IN(unsigned) - 1));
 
-  /* I *hope* it's ok to call this from STG land. --SDM */
   STGCALL3(sendFetch, rga_GLOBAL, &fmbqga_GLOBAL, 0/*load*/);
 
   // sendFetch now called from processTheRealFetch, to make SDM happy
