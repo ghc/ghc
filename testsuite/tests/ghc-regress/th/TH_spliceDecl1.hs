@@ -7,4 +7,4 @@ import Language.Haskell.THSyntax
 
 
 -- splice a simple data declaration
-$(return [DataDec [] "T" [] [NormalCon "C" []] []])
+$(return [DataD [] "T" [] [NormalC "C" []] []])

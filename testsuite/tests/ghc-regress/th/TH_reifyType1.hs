@@ -8,6 +8,6 @@ import Language.Haskell.THSyntax
 foo :: Int -> Int
 foo x = x + 1
 
-type_foo :: TypQ
+type_foo :: TypeQ
 type_foo = reifyType foo
 
