@@ -299,7 +299,10 @@ lookup_inst_env env key_cls key_tys
 	  Nothing 
 		-- Does not match, so next check whether the things unify
 		-- [see notes about overlapping instances above]
-	   -> case unifyTyListsX (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
+	   -> ASSERT( not (key_vars `intersectsVarSet` tpl_tyvars) )
+		-- Unification will break badly if the variables overlap
+		-- They shouldn't because we allocate separate uniques for them
+	      case unifyTyListsX (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
 	        Just _   -> find rest ms (dfun_id:us)
 	        Nothing  -> find rest ms us
 
