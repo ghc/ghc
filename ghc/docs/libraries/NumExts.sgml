@@ -19,6 +19,8 @@ showIntAtBase :: Integral a
 	      -> (a -> Char)  -- digit to char
 	      -> a            -- number to show.
 	      -> ShowS
+
+showListWith  :: (a -> ShowS) -> [a] -> ShowS
 </verb> </tscreen>
 
 Notes: 
@@ -42,8 +44,6 @@ Notes:
     could be defined
 
 <tscreen><verb>
-
-</verb></tscreen>
 showHex :: Integral a => a -> ShowS
 showHex n r = 
  showString "0x" $
@@ -52,4 +52,21 @@ showHex n r =
   toChrHex d
     | d < 10    = chr (ord '0' + fromIntegral d)
     | otherwise = chr (ord 'a' + fromIntegral (d - 10))
+</verb></tscreen>
+
+<item>
+    <tt/showListWith/ is strictly speaking not a '<tt/NumExts/' kind
+    of function, but it's sometimes useful in conjunction with the
+    other <tt/show*/ functions that <tt/NumExts/ exports. It is
+    the non-overloaded version of <tt/showList/, allowing you to 
+    supply the <tt/shows/ function to use per list element. For
+    instance, 
+ 
+<tscreen><code>
+ putStrLn (NumExts.showListWith NumExts.showHex [0..16])
+</code></tscreen>
+
+    will print out the elements of <tt/[1..16]/ in hexidecimal form.
+
+
 </itemize>
