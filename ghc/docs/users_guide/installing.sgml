@@ -578,7 +578,7 @@ between versions of Windows. On NT and XP-ish versions, it might
 be:
 <Filename>c:\Documents and Settings\&lt;username&gt;\Local Settings\Temp</filename>
 </para></listitem>
-</litemizedlist>
+</itemizedlist>
 The main point is that if you don't do anything GHC will work fine;
 but if you want to control where the directory is, you can do so by
 setting TMP or TEMP.
@@ -603,7 +603,6 @@ bash$ </Screen>
 </listitem>
 </itemizedlist>
 
-</Para>
 <para>
 You do <emphasis>not</emphasis> need the Cygwin toolchain, or anything
 else, to install and run GHC.
