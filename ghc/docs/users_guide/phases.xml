@@ -559,6 +559,38 @@ $ cat foo.hspp</screen>
           dumps of the intermediate compilation phases.</para>
         </listitem>
       </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-fPIC</option>
+          <indexterm><primary><option>-fPIC</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Generate position-independent code (code that can be put into
+          shared libraries). This currently works on Mac OS X; it works on
+          PowerPC Linux when using the native code generator (-fasm).
+          It is not quite ready to be used yet for x86 Linux.
+          On Windows, position-independent code is never used,
+          and on PowerPC64 Linux, position-independent code is always used,
+          so the flag is a no-op on those platforms.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-dynamic</option>
+        </term>
+        <listitem>
+          <para>When generating code, assume that entities imported from a
+          different package will reside in a different shared library or
+          binary. This currently works on Mac OS X; it works on PowerPC Linux when
+          using the native code generator. As with <option>-fPIC</option>,
+          x86 Linux support is not quite ready yet. Windows is not supported,
+          and it is a no-op on PowerPC64 Linux.</para>
+          <para>Note that this option also causes GHC to use shared libraries
+          when linking.</para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect2>
 
@@ -717,9 +749,11 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>Tell the linker to use shared Haskell libraries, if
-          available (this option is only supported on Windows at the
+          available (this option is only supported on Mac OS X at the
           moment, and also note that your distribution of GHC may
           not have been supplied with shared libraries).</para>
+          <para>Note that this option also has an effect on
+          code generation (see above).</para>
         </listitem>
       </varlistentry>
 
