@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.21 2000/03/08 17:48:26 simonmar Exp $
+ * $Id: StgMacros.h,v 1.22 2000/03/15 17:36:02 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -679,15 +679,18 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable seq_frame_info;
 static __inline__ void
 SaveThreadState(void)
 {
+  StgTSO *tso;
+
   /* Don't need to save REG_Base, it won't have changed. */
 
-  CurrentTSO->sp       = Sp;
-  CurrentTSO->su       = Su;
-  CurrentTSO->splim    = SpLim;
+  tso = CurrentTSO;
+  tso->sp       = Sp;
+  tso->su       = Su;
+  tso->splim    = SpLim;
   CloseNursery(Hp);
 
 #ifdef REG_CurrentTSO
-  SAVE_CurrentTSO = CurrentTSO;
+  SAVE_CurrentTSO = tso;
 #endif
 #ifdef REG_CurrentNursery
   SAVE_CurrentNursery = CurrentNursery;
@@ -700,14 +703,18 @@ SaveThreadState(void)
 static __inline__ void 
 LoadThreadState (void)
 {
-  Sp    = CurrentTSO->sp;
-  Su    = CurrentTSO->su;
-  SpLim = CurrentTSO->splim;
-  OpenNursery(Hp,HpLim);
+  StgTSO *tso;
 
 #ifdef REG_CurrentTSO
   CurrentTSO = SAVE_CurrentTSO;
 #endif
+
+  tso = CurrentTSO;
+  Sp    = tso->sp;
+  Su    = tso->su;
+  SpLim = tso->splim;
+  OpenNursery(Hp,HpLim);
+
 #ifdef REG_CurrentNursery
   CurrentNursery = SAVE_CurrentNursery;
 #endif
