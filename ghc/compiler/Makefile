@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.139 2001/02/14 11:54:33 simonmar Exp $
+# $Id: Makefile,v 1.140 2001/03/06 15:58:47 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -109,21 +109,22 @@ endif
 endif
 
 HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
-HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs $(CONFIG_HS), $(HS_SRCS))
+HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs main/ParsePkgConf.hs $(CONFIG_HS), $(HS_SRCS))
 HS_SRCS += $(CONFIG_HS)
 
-ifneq "$(GhcWithHscBuiltViaC)" "YES"
-HS_SRCS += rename/ParseIface.hs parser/Parser.hs
+ifneq "$(BootingFromHc)" "YES"
+HS_SRCS += rename/ParseIface.hs parser/Parser.hs main/ParsePkgConf.hs
 endif
 
 HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 
-ifeq "$(GhcWithHscBuiltViaC)" "YES"
-HCS	+= rename/ParseIface.hc parser/Parser.hc
+ifeq "$(BootingFromHc)" "YES"
+HCS	+= rename/ParseIface.hc parser/Parser.hc main/ParsePkgConf.hs
 endif
 
 HS_OBJS  = \
   $(patsubst %.hc, %.o, $(HCS)) \
+  parser/hs_ctype.o \
   parser/hschooks.o
 
 DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
@@ -146,11 +147,7 @@ SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 # Compiler to use for building ghc, use the build tree
 # driver when booting.
 #
-ifneq "$(GhcWithHscBuiltViaC)" "YES"
 HC=$(GHC)
-else
-HC=$(GHC_INPLACE)
-endif
 
 #
 # Use GHC for compiling C bits
@@ -191,6 +188,7 @@ prelude/PrelRules_HC_OPTS	= -fvia-C
 
 rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
 parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns
+main/ParsePkgConf_HC_OPTS	+= -fno-warn-incomplete-patterns
 
 # The latest GHC version doesn't have a -K option yet, and it doesn't
 # seem to be necessary anymore for the modules below.
@@ -316,8 +314,8 @@ CLEAN_FILES += $(PRIMOP_BITS)
 
 # Extra tidy, remove the .hc files (if you've got them).
 MAINTAINER_CLEAN_FILES += $(wildcard */*.hc) \
-	parser/Parser.info rename/ParseIface.info \
-	parser/Parser.hs rename/ParseIface.hs
+	parser/Parser.info rename/ParseIface.info main/ParsePkgConf.info \
+	parser/Parser.hs rename/ParseIface.hs main/ParsePkgConf.hs
 
 #-----------------------------------------------------------------------------
 # 		Include target-rule boilerplate
