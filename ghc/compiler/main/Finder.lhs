@@ -87,7 +87,7 @@ maybeHomeModule mod_name = do
 
         Just home_map -> return home_map
 
-   let basename = moduleNameString mod_name
+   let basename = moduleNameUserString mod_name
        hs  = basename ++ ".hs"
        lhs = basename ++ ".lhs"
 
