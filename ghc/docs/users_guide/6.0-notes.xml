@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
 <sect1 id="release-6-0">
   <title>Release notes for version 6.0</title>
 
@@ -312,7 +313,7 @@
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: sgml ***
-     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter" "sect1") ***
+     ;;; mode: xml ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
      ;;; End: ***
  -->

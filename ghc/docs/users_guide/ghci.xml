@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
 <chapter id="ghci">
   <title>Using GHCi</title>
   <indexterm><primary>GHCi</primary></indexterm>
@@ -800,9 +801,10 @@ $ ghci -lm
 
     <variablelist>
       <varlistentry>
-	<term><literal>:add</literal>
-	<replaceable>module</replaceable> ...</term>
-	<indexterm><primary><literal>:add</literal></primary></indexterm>
+	<term>
+          <literal>:add</literal> <replaceable>module</replaceable> ...
+          <indexterm><primary><literal>:add</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Add <replaceable>module</replaceable>(s) to the
 	  current <firstterm>target set</firstterm>, and perform a
@@ -811,11 +813,10 @@ $ ghci -lm
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:browse</literal>
-	<optional><literal>*</literal></optional><replaceable>module</replaceable>
-	...</term>
-	<indexterm><primary><literal>:browse</literal></primary>
-	</indexterm>
+	<term>
+          <literal>:browse</literal> <optional><literal>*</literal></optional><replaceable>module</replaceable> ...
+          <indexterm><primary><literal>:browse</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Displays the identifiers defined by the module
 	  <replaceable>module</replaceable>, which must be either
@@ -833,8 +834,10 @@ $ ghci -lm
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:cd</literal> <replaceable>dir</replaceable></term>
-	<indexterm><primary><literal>:cd</literal></primary></indexterm>
+	<term>
+          <literal>:cd</literal> <replaceable>dir</replaceable>
+          <indexterm><primary><literal>:cd</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Changes the current working directory to
 	  <replaceable>dir</replaceable>.  A
@@ -852,8 +855,10 @@ $ ghci -lm
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:def</literal> <replaceable>name</replaceable> <replaceable>expr</replaceable></term>
-	<indexterm><primary><literal>:def</literal></primary></indexterm>
+	<term>
+          <literal>:def</literal> <replaceable>name</replaceable> <replaceable>expr</replaceable>
+          <indexterm><primary><literal>:def</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>The command <literal>:def</literal>
 	  <replaceable>name</replaceable>
@@ -905,20 +910,24 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:help</literal></term>
-	<indexterm><primary><literal>:help</literal></primary></indexterm>
-	<term><literal>:?</literal></term>
-	<indexterm><primary><literal>:?</literal></primary></indexterm>
+	<term>
+          <literal>:help</literal>
+          <indexterm><primary><literal>:help</literal></primary></indexterm>
+        </term>
+	<term>
+          <literal>:?</literal>
+          <indexterm><primary><literal>:?</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Displays a list of the available commands.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:info</literal> <replaceable>name</replaceable>
-	...</term>
-	<indexterm><primary><literal>:info</literal></primary>
-	</indexterm>
+	<term>
+          <literal>:info</literal> <replaceable>name</replaceable> ...
+          <indexterm><primary><literal>:info</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Displays information about the given name(s).  For
 	  example, if <replaceable>name</replaceable> is a class, then
@@ -933,9 +942,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:load</literal>
-	<replaceable>module</replaceable> ...</term>
-	<indexterm><primary><literal>:load</literal></primary></indexterm>
+	<term>
+          <literal>:load</literal> <replaceable>module</replaceable> ...
+          <indexterm><primary><literal>:load</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Recursively loads the specified
 	  <replaceable>module</replaceable>s, and all the modules they
@@ -971,8 +981,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:module <optional>+|-</optional> <optional>*</optional><replaceable>mod<subscript>1</subscript></replaceable> ... <optional>*</optional><replaceable>mod<subscript>n</subscript></replaceable></literal></term>
-	<indexterm><primary><literal>:module</literal></primary></indexterm>
+	<term>
+          <literal>:module <optional>+|-</optional> <optional>*</optional><replaceable>mod<subscript>1</subscript></replaceable> ... <optional>*</optional><replaceable>mod<subscript>n</subscript></replaceable></literal>
+          <indexterm><primary><literal>:module</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Sets or modifies the current context for statements
 	  typed at the prompt.  See <xref linkend="ghci-scope"/> for
@@ -981,8 +993,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:quit</literal></term>
-	<indexterm><primary><literal>:quit</literal></primary></indexterm>
+	<term>
+          <literal>:quit</literal>
+          <indexterm><primary><literal>:quit</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Quits GHCi.  You can also quit by typing a control-D
 	  at the prompt.</para>
@@ -990,8 +1004,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:reload</literal></term>
-	<indexterm><primary><literal>:reload</literal></primary></indexterm>
+	<term>
+          <literal>:reload</literal>
+          <indexterm><primary><literal>:reload</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Attempts to reload the current target set (see
 	  <literal>:load</literal>) if any of the modules in the set,
@@ -1002,8 +1018,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:set</literal> <optional><replaceable>option</replaceable>...</optional></term>
-	<indexterm><primary><literal>:set</literal></primary></indexterm>
+	<term>
+          <literal>:set</literal> <optional><replaceable>option</replaceable>...</optional>
+          <indexterm><primary><literal>:set</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Sets various options.  See <xref linkend="ghci-set"/>
 	  for a list of available options.  The
@@ -1013,9 +1031,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:set</literal> <literal>args</literal>
-	<replaceable>arg</replaceable> ...</term>
-	<indexterm><primary><literal>:set</literal></primary></indexterm>
+	<term>
+          <literal>:set</literal> <literal>args</literal> <replaceable>arg</replaceable> ...
+          <indexterm><primary><literal>:set</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Sets the list of arguments which are returned when the
 	  program calls <literal>System.getArgs</literal><indexterm><primary>getArgs</primary>
@@ -1024,9 +1043,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:set</literal> <literal>prog</literal>
-	<replaceable>prog</replaceable></term>
-	<indexterm><primary><literal>:set</literal></primary></indexterm>
+	<term>
+           <literal>:set</literal> <literal>prog</literal> <replaceable>prog</replaceable>
+           <indexterm><primary><literal>:set</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Sets the string to be returned when the program calls
 	  <literal>System.getProgName</literal><indexterm><primary>getProgName</primary>
@@ -1035,8 +1055,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:show bindings</literal></term>
-	<indexterm><primary><literal>:show bindings</literal></primary></indexterm>
+	<term>
+          <literal>:show bindings</literal>
+          <indexterm><primary><literal>:show bindings</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Show the bindings made at the prompt and their
 	  types.</para>
@@ -1044,16 +1066,20 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:show modules</literal></term>
-	<indexterm><primary><literal>:show modules</literal></primary></indexterm>
+	<term>
+          <literal>:show modules</literal>
+          <indexterm><primary><literal>:show modules</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Show the list of modules currently load.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:type</literal> <replaceable>expression</replaceable></term>
-	<indexterm><primary><literal>:type</literal></primary></indexterm>
+	<term>
+         <literal>:type</literal> <replaceable>expression</replaceable>
+         <indexterm><primary><literal>:type</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Infers and prints the type of
 	  <replaceable>expression</replaceable>, including explicit
@@ -1064,8 +1090,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:kind</literal> <replaceable>type</replaceable></term>
-	<indexterm><primary><literal>:kind</literal></primary></indexterm>
+	<term>
+          <literal>:kind</literal> <replaceable>type</replaceable>
+          <indexterm><primary><literal>:kind</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Infers and prints the kind of
 	  <replaceable>type</replaceable>. The latter can be an arbitrary
@@ -1075,8 +1103,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:undef</literal> <replaceable>name</replaceable></term>
-	<indexterm><primary><literal>:undef</literal></primary></indexterm>
+	<term>
+          <literal>:undef</literal> <replaceable>name</replaceable>
+          <indexterm><primary><literal>:undef</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Undefines the user-defined command
 	  <replaceable>name</replaceable> (see <literal>:def</literal>
@@ -1085,8 +1115,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:unset</literal> <replaceable>option</replaceable>...</term>
-	<indexterm><primary><literal>:unset</literal></primary></indexterm>
+	<term>
+          <literal>:unset</literal> <replaceable>option</replaceable>...
+          <indexterm><primary><literal>:unset</literal></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Unsets certain options.  See <xref linkend="ghci-set"/>
 	  for a list of available options.</para>
@@ -1094,9 +1126,11 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:!</literal> <replaceable>command</replaceable>...</term>
-	<indexterm><primary><literal>:!</literal></primary></indexterm>
-	<indexterm><primary>shell commands</primary><secondary>in GHCi</secondary></indexterm>
+	<term>
+          <literal>:!</literal> <replaceable>command</replaceable>...
+          <indexterm><primary><literal>:!</literal></primary></indexterm>
+          <indexterm><primary>shell commands</primary><secondary>in GHCi</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para>Executes the shell command
 	  <replaceable>command</replaceable>.</para>
@@ -1133,10 +1167,12 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 
       <variablelist>
 	<varlistentry>
-	  <term><literal>+r</literal></term>
-	  <indexterm><primary><literal>+r</literal></primary></indexterm>
-	  <indexterm><primary>CAFs</primary><secondary>in GHCi</secondary></indexterm>
-	  <indexterm><primary>Constant Applicative Form</primary><see>CAFs</see></indexterm>
+	  <term>
+            <literal>+r</literal>
+            <indexterm><primary><literal>+r</literal></primary></indexterm>
+            <indexterm><primary>CAFs</primary><secondary>in GHCi</secondary></indexterm>
+            <indexterm><primary>Constant Applicative Form</primary><see>CAFs</see></indexterm>
+          </term>
 	  <listitem>
 	    <para>Normally, any evaluation of top-level expressions
 	    (otherwise known as CAFs or Constant Applicative Forms) in
@@ -1153,8 +1189,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>+s</literal></term>
-	  <indexterm><primary><literal>+s</literal></primary></indexterm>
+	  <term>
+            <literal>+s</literal>
+            <indexterm><primary><literal>+s</literal></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Display some stats after evaluating each expression,
 	    including the elapsed time and number of bytes allocated.
@@ -1166,8 +1204,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>+t</literal></term>
-	  <indexterm><primary><literal>+t</literal></primary></indexterm>
+	  <term>
+            <literal>+t</literal>
+            <indexterm><primary><literal>+t</literal></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Display the type of each variable bound after a
 	    statement is entered at the prompt.  If the statement is a
@@ -1248,18 +1288,20 @@ Prelude> :set -fno-glasgow-exts
 
     <variablelist>
       <varlistentry>
-	<term><option>-ignore-dot-ghci</option></term>
-	<indexterm><primary><option>-ignore-dot-ghci</option></primary>
-	</indexterm>
+	<term>
+          <option>-ignore-dot-ghci</option>
+          <indexterm><primary><option>-ignore-dot-ghci</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Don't read either <filename>./.ghci</filename> or
 	  <filename>$HOME/.ghci</filename> when starting up.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>-read-dot-ghci</option></term>
-	<indexterm><primary><option>-read-dot-ghci</option></primary>
-	</indexterm>
+	<term>
+          <option>-read-dot-ghci</option>
+          <indexterm><primary><option>-read-dot-ghci</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Read <filename>.ghci</filename> and
 	  <filename>$HOME/.ghci</filename>.  This is normally the
@@ -1287,9 +1329,10 @@ Prelude> :set -fno-glasgow-exts
       </varlistentry>
 
       <varlistentry>
-	<term><literal>-O</literal> doesn't work with GHCi!</term>
-	<indexterm><primary><option>-O</option></primary>
-	</indexterm>
+	<term>
+          <literal>-O</literal> doesn't work with GHCi!
+          <indexterm><primary><option>-O</option></primary></indexterm>
+         </term>
 	<listitem>
 	  <para>For technical reasons, the bytecode compiler doesn't
 	  interact well with one of the optimisation passes, so we
@@ -1353,7 +1396,7 @@ Prelude> :set -fno-glasgow-exts
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: sgml ***
-     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter") ***
+     ;;; mode: xml ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
      ;;; End: ***
  -->

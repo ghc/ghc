@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
 <chapter id="utils">
   <title>Other Haskell utility programs</title>
   <indexterm><primary>utilities, Haskell</primary></indexterm>
@@ -557,7 +558,7 @@ tags:
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: sgml ***
-     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter") ***
+     ;;; mode: xml ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
      ;;; End: ***
  -->

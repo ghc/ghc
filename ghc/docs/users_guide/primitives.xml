@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
 <!-- UNBOXED TYPES AND PRIMITIVE OPERATIONS -->
 
 <sect1 id="primitives">
@@ -1208,7 +1209,7 @@ The libraries documentatation gives more details on all these
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: sgml ***
-     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter" "sect1") ***
+     ;;; mode: xml ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
      ;;; End: ***
  -->

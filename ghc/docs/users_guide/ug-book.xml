@@ -1,5 +1,6 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
 <bookinfo>
-<title>The Glasgow Haskell Compiler User's Guide, Version 6.0</title>
+<title>The Glasgow Haskell Compiler User's Guide, Version 6.3</title>
 <author><othername>The GHC Team</othername></author>
 <address>
 <email>glasgow-haskell-&lcub;bugs,users&rcub;-request@haskell.org</email>

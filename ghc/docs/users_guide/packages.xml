@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
   <sect1 id="packages">
     <title>Packages</title>
     <indexterm><primary>packages</primary></indexterm>
@@ -39,8 +40,10 @@
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-package <replaceable>lib</replaceable></option></term>
-	  <indexterm><primary>-package <replaceable>lib</replaceable> option</primary></indexterm>
+	  <term>
+            <option>-package <replaceable>lib</replaceable></option>
+            <indexterm><primary>-package <replaceable>lib</replaceable> option</primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>This option brings into scope all the modules from
 	    package <literal><replaceable>lib</replaceable></literal> (they still have to
@@ -95,9 +98,10 @@ the auto packages required for linking without further assistance.
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-package-conf <replaceable>file</replaceable></option></term>
-	  <indexterm><primary><option>-package-conf <replaceable>file</replaceable></option></primary>
-	  </indexterm>
+	  <term>
+            <option>-package-conf <replaceable>file</replaceable></option>
+            <indexterm><primary><option>-package-conf <replaceable>file</replaceable></option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Read in the package configuration file
 	    <replaceable>file</replaceable> in addition to the system
@@ -193,9 +197,10 @@ the auto packages required for linking without further assistance.
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-package-name <replaceable>foo</replaceable></option></term>
-	  <indexterm><primary><literal>-package-name</literal></primary>
-	    <secondary>option</secondary></indexterm>
+	  <term>
+            <option>-package-name <replaceable>foo</replaceable></option>
+            <indexterm><primary><literal>-package-name</literal></primary><secondary>option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>This option is added to the command line when
 	    compiling a module that is destined to be part of package
@@ -237,9 +242,13 @@ the auto packages required for linking without further assistance.
 
       <variablelist>
 	<varlistentry>
-	  <term><option>&ndash;&ndash;add-package</option></term>
-	  <term><option>-a</option></term>
-	  <indexterm><primary><option>&ndash;&ndash;add-package</option></primary></indexterm>
+	  <term>
+            <option>&ndash;&ndash;add-package</option>
+            <indexterm><primary><option>&ndash;&ndash;add-package</option></primary></indexterm>
+          </term>
+	  <term>
+            <option>-a</option>
+          </term>
 	  <listitem>
 	    <para>Reads package specification from the input (see below),
 	    and adds it to the database of installed packages.  The
@@ -249,9 +258,13 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>&ndash;&ndash;input-file=<replaceable>file</replaceable></option></term>
-	  <term><option>-i <replaceable>file</replaceable></option></term>
-	  <indexterm><primary><option>&ndash;&ndash;input-file</option></primary></indexterm>
+	  <term>
+            <option>&ndash;&ndash;input-file=<replaceable>file</replaceable></option>
+            <indexterm><primary><option>&ndash;&ndash;input-file</option></primary></indexterm>
+          </term>
+	  <term>
+            <option>-i <replaceable>file</replaceable></option>
+          </term>
 	  <listitem>
 	    <para>Read new package specifications from file
 	    <replaceable>file</replaceable>. If a value of
@@ -263,10 +276,13 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>&ndash;&ndash;auto-ghci-libs</option></term>
-	  <term><option>-g</option></term>
-	  <indexterm><primary><option>&ndash;&ndash;auto-ghci-libs</option></primary>
-	      </indexterm>
+	  <term>
+            <option>&ndash;&ndash;auto-ghci-libs</option>
+            <indexterm><primary><option>&ndash;&ndash;auto-ghci-libs</option></primary></indexterm>
+          </term>
+	  <term>
+            <option>-g</option>
+          </term>
 	  <listitem>
 	    <para>Automatically generate the GHCi
 	    <filename>.o</filename> version of each
@@ -690,7 +706,7 @@ the auto packages required for linking without further assistance.
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: sgml ***
+     ;;; mode: xml ***
      ;;; sgml-parent-document: ("using.sgml" "book" "chapter") ***
      ;;; End: ***
  -->

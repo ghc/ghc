@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
 <chapter id="using-ghc">
   <title>Using GHC</title>
 
@@ -123,8 +124,10 @@ module X where
     <variablelist>
 
       <varlistentry>
-	<term><filename>.lhs</filename></term>
-	<indexterm><primary><literal>lhs</literal> suffix</primary></indexterm>
+	<term>
+          <filename>.lhs</filename>
+          <indexterm><primary><literal>lhs</literal> suffix</primary></indexterm>
+	</term>
 	<listitem>
 	  <para>A &ldquo;literate Haskell&rdquo; module.</para>
 	</listitem>
@@ -192,13 +195,13 @@ module X where
 
     <variablelist>
       <varlistentry>
-	<term><cmdsynopsis><command>ghc</command>
+	<term>
+	  <cmdsynopsis><command>ghc</command>
 	    <arg choice='plain'>&ndash;&ndash;interactive</arg>
-	  </cmdsynopsis></term>
-	<indexterm><primary>interactive mode</primary>
-	</indexterm>
-	<indexterm><primary>ghci</primary>
-	</indexterm>
+	  </cmdsynopsis>
+          <indexterm><primary>interactive mode</primary></indexterm>
+          <indexterm><primary>ghci</primary></indexterm>
+	</term>
 	<listitem>
 	  <para>Interactive mode, which is also available as
 	  <command>ghci</command>.  Interactive mode is described in
@@ -207,13 +210,13 @@ module X where
       </varlistentry>
       
       <varlistentry>
-	<term><cmdsynopsis><command>ghc</command>
+	<term>
+	  <cmdsynopsis><command>ghc</command>
 	    <arg choice='plain'>&ndash;&ndash;make</arg>
-	  </cmdsynopsis></term>
-	<indexterm><primary>make mode</primary>
-	</indexterm>
-	<indexterm><primary><option>&ndash;&ndash;make</option></primary>
-	</indexterm>
+	  </cmdsynopsis>
+          <indexterm><primary>make mode</primary></indexterm>
+          <indexterm><primary><option>&ndash;&ndash;make</option></primary></indexterm>
+	</term>
 	<listitem>
 	  <para>In this mode, GHC will build a multi-module Haskell
 	  program automatically, figuring out dependencies for itself.
@@ -225,11 +228,12 @@ module X where
       </varlistentry>
 
       <varlistentry>
-	<term><cmdsynopsis><command>ghc</command>
+	<term>
+	  <cmdsynopsis><command>ghc</command>
 	    <arg choice='plain'>&ndash;e</arg> <arg choice='plain'><replaceable>expr</replaceable></arg>
-	</cmdsynopsis></term>
-	<indexterm><primary>eval mode</primary>
-	</indexterm>
+          </cmdsynopsis>
+          <indexterm><primary>eval mode</primary></indexterm>
+	</term>
 	<listitem>
 	  <para>Expression-evaluation mode.  This is very similar to
 	  interactive mode, except that there is a single expression
@@ -240,7 +244,8 @@ module X where
       </varlistentry>
       
       <varlistentry>
-	<term><cmdsynopsis>
+	<term>
+          <cmdsynopsis>
 	    <command>ghc</command>
 	    <group>
 	      <arg>-E</arg>
@@ -248,11 +253,12 @@ module X where
 	      <arg>-S</arg>
 	      <arg>-c</arg>
 	    </group>
-	  </cmdsynopsis></term>
-	<indexterm><primary><option>-E</option></primary></indexterm>
-	<indexterm><primary><option>-C</option></primary></indexterm>
-	<indexterm><primary><option>-S</option></primary></indexterm>
-	<indexterm><primary><option>-c</option></primary></indexterm>
+	  </cmdsynopsis>
+	  <indexterm><primary><option>-E</option></primary></indexterm>
+	  <indexterm><primary><option>-C</option></primary></indexterm>
+	  <indexterm><primary><option>-S</option></primary></indexterm>
+	  <indexterm><primary><option>-c</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>This is the traditional batch-compiler mode, in which
 	  GHC can compile source files one at a time, or link objects
@@ -265,10 +271,13 @@ module X where
       </varlistentry>
 
       <varlistentry>
-	<term><cmdsynopsis><command>ghc</command>
-	    <arg choice='plain'>&ndash;M</arg></cmdsynopsis></term>
-	<indexterm><primary>dependency-generation mode</primary>
-	</indexterm>
+	<term>
+          <cmdsynopsis>
+            <command>ghc</command>
+	    <arg choice='plain'>&ndash;M</arg>
+          </cmdsynopsis>
+          <indexterm><primary>dependency-generation mode</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Dependency-generation mode.  In this mode, GHC can be
 	  used to generate dependency information suitable for use in
@@ -278,10 +287,13 @@ module X where
       </varlistentry>
 
       <varlistentry>
-	<term><cmdsynopsis><command>ghc</command>
-	    <arg choice='plain'>&ndash;&ndash;mk-dll</arg></cmdsynopsis></term>
-	<indexterm><primary>dependency-generation mode</primary>
-	</indexterm>
+	<term>
+          <cmdsynopsis>
+            <command>ghc</command>
+	    <arg choice='plain'>&ndash;&ndash;mk-dll</arg>
+          </cmdsynopsis>
+	  <indexterm><primary>dependency-generation mode</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>DLL-creation mode (Windows only).  See <xref
 	  linkend="win32-dlls-create"/>.</para>
@@ -291,11 +303,8 @@ module X where
 
     <sect2 id="make-mode">
       <title>Using <command>ghc</command> <option>&ndash;&ndash;make</option></title>
-      
-      <indexterm><primary><option>&ndash;&ndash;make</option></primary>
-      </indexterm>
-      <indexterm><primary>separate compilation</primary>
-      </indexterm>
+      <indexterm><primary><option>&ndash;&ndash;make</option></primary></indexterm>
+      <indexterm><primary>separate compilation</primary></indexterm>
       
       <para>When given the <option>&ndash;&ndash;make</option> option,
       GHC will build a multi-module Haskell program by following
@@ -330,11 +339,9 @@ ghc &ndash;&ndash;make Main.hs
 	  file.</para>
 	</listitem>
 	<listitem>
-	  <para>You don't have to write a
-	<literal>Makefile</literal>.</para>
+	  <para>You don't have to write a<literal>Makefile</literal>.</para>
+          <indexterm><primary><literal>Makefile</literal>s</primary><secondary>avoiding</secondary></indexterm>
 	</listitem>
-	<indexterm><primary><literal>Makefile</literal>s</primary><secondary>avoiding</secondary>
-	</indexterm>
 	<listitem>
 	  <para>GHC re-calculates the dependencies each time it is
 	  invoked, so the dependencies never get out of sync with the
@@ -516,10 +523,14 @@ ghc -c Foo.hs</screen>
 
     <variablelist>
       <varlistentry>
-	<term><option>&ndash;&ndash;help</option></term>
-	<term><option>-?</option></term>
-	<indexterm><primary><option>-?</option></primary></indexterm>
-	<indexterm><primary><option>&ndash;&ndash;help</option></primary></indexterm>
+	<term>
+          <option>&ndash;&ndash;help</option>
+          <indexterm><primary><option>&ndash;&ndash;help</option></primary></indexterm>
+        </term>
+	<term>
+          <option>-?</option>
+          <indexterm><primary><option>-?</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Cause GHC to spew a long usage message to standard
           output and then exit.</para>
@@ -527,8 +538,10 @@ ghc -c Foo.hs</screen>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-v</option></term>
-	<indexterm><primary><option>-v</option></primary></indexterm>
+	<term>
+          <option>-v</option>
+          <indexterm><primary><option>-v</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>The <option>-v</option> option makes GHC
           <emphasis>verbose</emphasis>: it reports its version number
@@ -545,8 +558,10 @@ ghc -c Foo.hs</screen>
       </varlistentry>
 	
       <varlistentry>
-	<term><option>-v</option><replaceable>n</replaceable></term>
-	<indexterm><primary><option>-v</option></primary></indexterm>
+	<term>
+          <option>-v</option><replaceable>n</replaceable>
+          <indexterm><primary><option>-v</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>To provide more control over the compiler's verbosity,
 	  the <option>-v</option> flag takes an optional numeric
@@ -605,26 +620,34 @@ ghc -c Foo.hs</screen>
       </varlistentry>
       
       <varlistentry>
-	<term><option>-V</option></term>
-	<term><option>&ndash;&ndash;version</option></term>
-	<indexterm><primary><option>-V</option></primary></indexterm>
-	<indexterm><primary><option>&ndash;&ndash;version</option></primary></indexterm>
+	<term>
+          <option>-V</option>
+          <indexterm><primary><option>-V</option></primary></indexterm>
+        </term>
+	<term>
+          <option>&ndash;&ndash;version</option>
+          <indexterm><primary><option>&ndash;&ndash;version</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Print a one-line string including GHC's version number.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>&ndash;&ndash;numeric-version</option></term>
-	<indexterm><primary><option>&ndash;&ndash;numeric-version</option></primary></indexterm>
+	<term>
+          <option>&ndash;&ndash;numeric-version</option>
+          <indexterm><primary><option>&ndash;&ndash;numeric-version</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Print GHC's numeric version number only.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>&ndash;&ndash;print-libdir</option></term>
-	<indexterm><primary><option>&ndash;&ndash;print-libdir</option></primary></indexterm>
+	<term>
+          <option>&ndash;&ndash;print-libdir</option>
+          <indexterm><primary><option>&ndash;&ndash;print-libdir</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Print the path to GHC's library directory.  This is
 	  the top of the directory tree containing GHC's libraries,
@@ -779,8 +802,10 @@ g [] = 2
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-misc</option>:</term>
-	<indexterm><primary><option>-fwarn-misc</option></primary></indexterm>
+	<term>
+          <option>-fwarn-misc</option>:
+          <indexterm><primary><option>-fwarn-misc</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Turns on warnings for various harmless but untidy
 	  things.  This currently includes: importing a type with
@@ -790,11 +815,13 @@ g [] = 2
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-missing-fields</option>:</term>
-	<listitem>
+	<term>
+          <option>-fwarn-missing-fields</option>:
 	  <indexterm><primary><option>-fwarn-missing-fields</option></primary></indexterm>
 	  <indexterm><primary>missing fields, warning</primary></indexterm>
 	  <indexterm><primary>fields, missing</primary></indexterm>
+        </term>
+	<listitem>
 
 	  <para>This option is on by default, and warns you whenever
           the construction of a labelled field constructor isn't
@@ -863,10 +890,12 @@ g [] = 2
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-overlapping-patterns</option>:</term>
-	<indexterm><primary><option>-fwarn-overlapping-patterns</option></primary></indexterm>
-	<indexterm><primary>overlapping patterns, warning</primary></indexterm>
-	<indexterm><primary>patterns, overlapping</primary></indexterm>
+	<term>
+          <option>-fwarn-overlapping-patterns</option>:
+          <indexterm><primary><option>-fwarn-overlapping-patterns</option></primary></indexterm>
+          <indexterm><primary>overlapping patterns, warning</primary></indexterm>
+          <indexterm><primary>patterns, overlapping</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>By default, the compiler will warn you if a set of
           patterns are overlapping, i.e.,</para>
@@ -1745,7 +1774,7 @@ ordinary Haskell 98, when translated to External Core, uses things like rank-2 t
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: sgml ***
-     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter") ***
+     ;;; mode: xml ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
      ;;; End: ***
  -->

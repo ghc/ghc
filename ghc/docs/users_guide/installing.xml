@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
 <chapter id="sec-installing-bin-distrib">
   <title>Installing GHC</title>
 <indexterm><primary>binary installations</primary></indexterm>
@@ -887,7 +888,7 @@ with the Win32 distribution of GHC. </para>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: sgml ***
-     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter") ***
+     ;;; mode: xml ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
      ;;; End: ***
  -->

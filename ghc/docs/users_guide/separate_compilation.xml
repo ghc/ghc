@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
   <sect1 id="separate-compilation">
     <title>Filenames and separate compilation</title>
 
@@ -214,8 +215,10 @@
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-o</option> <replaceable>file</replaceable></term>
-	  <indexterm><primary><option>-o</option></primary></indexterm>
+	  <term>
+            <option>-o</option> <replaceable>file</replaceable>
+            <indexterm><primary><option>-o</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>GHC's compiled output normally goes into a
             <filename>.hc</filename>, <filename>.o</filename>, etc.,
@@ -254,8 +257,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-odir</option> <replaceable>dir</replaceable></term>
-	  <indexterm><primary><option>-odir</option></primary></indexterm>
+	  <term>
+            <option>-odir</option> <replaceable>dir</replaceable>
+            <indexterm><primary><option>-odir</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Redirects object files to directory
 	    <replaceable>dir</replaceable>.  For example:</para>
@@ -282,9 +287,10 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-ohi</option>  <replaceable>file</replaceable></term>
-	  <indexterm><primary><option>-ohi</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-ohi</option>  <replaceable>file</replaceable>
+            <indexterm><primary><option>-ohi</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>The interface output may be directed to another file
             <filename>bar2/Wurble.iface</filename> with the option
@@ -307,9 +313,10 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-hidir</option>  <replaceable>dir</replaceable></term>
-	  <indexterm><primary><option>-hidir</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-hidir</option>  <replaceable>dir</replaceable>
+            <indexterm><primary><option>-hidir</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Redirects all generated interface files into
 	    <replaceable>dir</replaceable>, instead of the
@@ -318,12 +325,18 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-osuf</option> <replaceable>suffix</replaceable></term>
-	  <term><option>-hisuf</option> <replaceable>suffix</replaceable></term>
-	  <term><option>-hcsuf</option> <replaceable>suffix</replaceable></term>
-	  <indexterm><primary><option>-osuf</option></primary></indexterm>
-	  <indexterm><primary><option>-hisuf</option></primary></indexterm>
-	  <indexterm><primary><option>-hcsuf</option></primary></indexterm>
+	  <term>
+            <option>-osuf</option> <replaceable>suffix</replaceable>
+            <indexterm><primary><option>-osuf</option></primary></indexterm>
+          </term>
+	  <term>
+            <option>-hisuf</option> <replaceable>suffix</replaceable>
+            <indexterm><primary><option>-hisuf</option></primary></indexterm>
+          </term>
+	  <term>
+            <option>-hcsuf</option> <replaceable>suffix</replaceable>
+            <indexterm><primary><option>-hcsuf</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>The <option>-osuf</option>
             <replaceable>suffix</replaceable> will change the
@@ -372,10 +385,10 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-keep-hc-files</option></term>
-	  <indexterm>
-	    <primary><option>-keep-hc-files</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-keep-hc-files</option>
+            <indexterm><primary><option>-keep-hc-files</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Keep intermediate <literal>.hc</literal> files when
 	    doing <literal>.hs</literal>-to-<literal>.o</literal>
@@ -387,20 +400,20 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-keep-s-files</option></term>
-	  <indexterm>
-	    <primary><option>-keep-s-files</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-keep-s-files</option>
+            <indexterm><primary><option>-keep-s-files</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Keep intermediate <literal>.s</literal> files.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-keep-raw-s-files</option></term>
-	  <indexterm>
-	    <primary><option>-keep-raw-s-files</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-keep-raw-s-files</option>
+            <indexterm><primary><option>-keep-raw-s-files</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Keep intermediate <literal>.raw-s</literal> files.
 	    These are the direct output from the C compiler, before
@@ -411,14 +424,11 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-keep-tmp-files</option></term>
-	  <indexterm>
-	    <primary><option>-keep-tmp-files</option></primary>
-	  </indexterm>
-	  <indexterm>
-	    <primary>temporary files</primary>
-	    <secondary>keeping</secondary>
-	  </indexterm>
+	  <term>
+            <option>-keep-tmp-files</option>
+            <indexterm><primary><option>-keep-tmp-files</option></primary></indexterm>
+            <indexterm><primary>temporary files</primary><secondary>keeping</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Instructs the GHC driver not to delete any of its
 	    temporary files, which it normally keeps in
@@ -441,8 +451,10 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-tmpdir</option></term>
-	  <indexterm><primary><option>-tmpdir</option></primary></indexterm>
+	  <term>
+            <option>-tmpdir</option>
+            <indexterm><primary><option>-tmpdir</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>If you have trouble because of running out of space
             in <filename>/tmp</filename> (or wherever your
@@ -477,18 +489,20 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-ddump-hi</option></term>
-	  <indexterm><primary><option>-ddump-hi</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-ddump-hi</option>
+            <indexterm><primary><option>-ddump-hi</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Dumps the new interface to standard output.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-ddump-hi-diffs</option></term>
-	  <indexterm><primary><option>-ddump-hi-diffs</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-ddump-hi-diffs</option>
+            <indexterm><primary><option>-ddump-hi-diffs</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>The compiler does not overwrite an existing
             <filename>.hi</filename> interface file if the new one is
@@ -502,9 +516,10 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-ddump-minimal-imports</option></term>
-	  <indexterm><primary><option>-ddump-minimal-imports</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-ddump-minimal-imports</option>
+            <indexterm><primary><option>-ddump-minimal-imports</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Dump to the file "M.imports" (where M is the module
             being compiled) a "minimal" set of import declarations.
@@ -519,10 +534,10 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>--show-iface</option>
-	  <replaceable>file</replaceable></term>
-	  <indexterm><primary><option>--show-iface</option></primary>
-	  </indexterm>
+	  <term>
+            <option>--show-iface</option> <replaceable>file</replaceable>
+            <indexterm><primary><option>--show-iface</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Where <replaceable>file</replaceable> is the name of
 	    an interface file, dumps the contents of that interface in
@@ -539,9 +554,11 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-no-recomp</option></term>
-	  <indexterm><primary><option>-recomp</option></primary></indexterm>
-	  <indexterm><primary><option>-no-recomp</option></primary></indexterm>
+	  <term>
+            <option>-no-recomp</option>
+            <indexterm><primary><option>-recomp</option></primary></indexterm>
+            <indexterm><primary><option>-no-recomp</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Turn off recompilation checking (which is on by
             default).  Recompilation checking normally stops
@@ -1066,7 +1083,7 @@ GHC considers it an orphan module.
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: sgml ***
+     ;;; mode: xml ***
      ;;; sgml-parent-document: ("using.sgml" "book" "chapter") ***
      ;;; End: ***
  -->
