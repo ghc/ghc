@@ -1,0 +1,3062 @@
+%
+% (c) The OBFUSCATION-THROUGH-GRATUITOUS-PREPROCESSOR-ABUSE Project,
+%     Glasgow University, 1990-1994
+%
+
+% TODO:
+%
+% o I think it would be worth making the connection with CPS explicit.
+%   Now that we have explicit activation records (on the stack), we can
+%   explain the whole system in terms of CPS and tail calls --- with the
+%   one requirement that we carefuly distinguish stack-allocated objects
+%   from heap-allocated objects.
+
+
+% \documentstyle[preprint]{acmconf}
+\documentclass[11pt]{article}
+\oddsidemargin 0.1 in       %   Note that \oddsidemargin = \evensidemargin
+\evensidemargin 0.1 in
+\marginparwidth 0.85in    %   Narrow margins require narrower marginal notes
+\marginparsep 0 in 
+\sloppy
+
+\newcommand{\note}[1]{{\em Note: #1}}
+% DIMENSION OF TEXT:
+\textheight 8.5 in
+\textwidth 6.25 in
+
+\topmargin 0 in
+\headheight 0 in
+\headsep .25 in
+
+
+\setlength{\parskip}{0.15cm}
+\setlength{\parsep}{0.15cm}
+\setlength{\topsep}{0cm}	% Reduces space before and after verbatim,
+				% which is implemented using trivlist 
+\setlength{\parindent}{0cm}
+
+\renewcommand{\textfraction}{0.2}
+\renewcommand{\floatpagefraction}{0.7}
+
+\begin{document}
+
+\newcommand{\ToDo}[1]{{{\bf ToDo:}\sl #1}}
+\newcommand{\Arg}[1]{\mbox{${\tt arg}_{#1}$}}
+\newcommand{\bottom}{bottom} % foo, can't remember the symbol name
+
+\title{The STG runtime system (revised)}
+\author{Simon Peyton Jones \\ Glasgow University and Oregon Graduate Institute \and
+Alastair Reid \\ Yale University} 
+
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+This document describes the GHC/Hugs run-time system.  It serves as 
+a Glasgow/Yale/Nottingham ``contract'' about what the RTS does.
+
+\subsection{New features compared to GHC 2.04}
+
+\begin{itemize}
+\item The RTS supports mixed compiled/interpreted execution, so
+that a program can consist of a mixture of GHC-compiled and Hugs-interpreted
+code.
+
+\item CAFs are only retained if they are
+reachable.  Since they are referred to by implicit references buried
+in code, this means that the garbage collector must traverse the whole
+accessible code tree.  This feature eliminates a whole class of painful
+space leaks.
+
+\item A running thread has only one stack, which contains a mixture
+of pointers and non-pointers.  Section~\ref{sect:stacks} describes how
+we find out which is which.  (GHC has used two stacks for some while.
+Using one stack instead of two reduces register pressure, reduces the
+size of update frames, and eliminates
+``stack-stubbing'' instructions.)
+
+\end{itemize} 
+
+\subsection{Wish list}
+
+Here's a list of things we'd like to support in the future.
+\begin{itemize}
+\item Interrupts, speculative computation.
+
+\item
+The SM could tune the size of the allocation arena, the number of
+generations, etc taking into account residency, GC rate and page fault
+rate.
+
+\item
+There should be no need to specify the amnount of stack/heap space to
+allocate when you started a program - let it just take as much or as
+little as it wants.  (It might be useful to be able to specify maximum
+sizes and to be able to suggest an initial size.)
+
+\item 
+We could trigger a GC when all threads are blocked waiting for IO if
+the allocation arena (or some of the generations) are nearly full.
+
+\end{itemize}
+
+\subsection{Configuration}
+
+Some of the above features are expensive or less portable, so we
+envision building a number of different configurations supporting
+different subsets of the above features.
+
+You can make the following choices:
+\begin{itemize}
+\item
+Support for concurrency or parallelism.  There are four 
+mutually-exclusive choices.
+
+\begin{description}
+\item[@SEQUENTIAL@] No concurrency or parallelism support.
+  This configuration might not support interrupt recovery.
+\item[@CONCURRENT@]  Support for concurrency but not for parallelism.
+\item[@CONCURRENT@+@GRANSIM@] Concurrency support and simulated parallelism.
+\item[@CONCURRENT@+@PARALLEL@]     Concurrency support and real parallelism.
+\end{description}
+
+\item @PROFILING@ adds cost-centre profiling.
+
+\item @TICKY@ gathers internal statistics (often known as ``ticky-ticky'' code).
+
+\item @DEBUG@ does internal consistency checks.
+
+\item Persistence. (well, not yet).
+
+\item
+Which garbage collector to use.  At the moment we
+only anticipate one, however.
+\end{itemize}
+
+\subsection{Terminology}
+
+\begin{itemize}
+
+\item A {\em word} is (at least) 32 bits and can hold either a signed
+or an unsigned int.
+
+\item A {\em pointer} is (at least) 32 bits and big enough to hold a
+function pointer or a data pointer.  
+
+\item A {\em closure} is a (representation of) a value of a {\em pointed}
+ type.  It may be in HNF or it may be unevaluated --- in either case, you can
+ try to evaluate it again.
+
+\item A {\em thunk} is a (representation of) a value of a {\em pointed}
+ type which is {\em not} in HNF.
+
+\end{itemize}
+
+Occasionally, a field of a data structure must hold either a word or a
+pointer.  In such circumstances, it is {\em not safe} to assume that
+words and pointers are the same size.
+
+% Todo:
+% More terminology to mention.
+% unboxed, unpointed
+
+There are a few other system invariants which need to be mentioned ---
+though not necessarily here:
+
+\begin{itemize}
+
+\item The garbage collector never expands an object when it promotes
+it to the old generation.  This is important because the GC avoids
+performing heap overflow checks by assuming that the amount added to
+the old generation is no bigger than the current new generation.
+
+\end{itemize}
+
+
+\section{The Scheduler}
+
+The Scheduler is the heart of the run-time system.  A running program
+consists of a single running thread, and a list of runnable and
+blocked threads.  The running thread returns to the scheduler when any
+of the following conditions arises:
+
+\begin{itemize}
+\item A heap check fails, and a garbage collection is required
+\item Compiled code needs to switch to interpreted code, and vice
+versa.
+\item The thread becomes blocked.
+\item The thread is preempted.
+\end{itemize}
+
+A world-switch (i.e. when compiled code encounters interpreted code,
+and vice-versa) can happen in six ways:
+
+\begin{itemize}
+\item A GHC thread enters a Hugs-built thunk.
+\item A GHC thread calls a Hugs-compiled function.
+\item A GHC thread returns to a Hugs-compiled return address.
+\item A Hugs thread enters a GHC-built thunk.
+\item A Hugs thread calls a GHC-compiled function.
+\item A Hugs thread returns to a Hugs-compiled return address.
+\end{itemize}
+
+A running system has a global state, consisting of
+
+\begin{itemize}
+\item @Hp@, the current heap pointer, which points to the next
+available address in the Heap.
+\item @HpLim@, the heap limit pointer, which points to the end of the
+heap.
+\item The Thread Preemption Flag, which is set whenever the currently
+running thread should be preempted at the next opportunity.
+\end{itemize}
+
+Each thread has a thread-local state, which consists of
+
+\begin{itemize}
+\item @TSO@, the Thread State Object for this thread.  This is a heap
+object that is used to store the current thread state when the thread
+is blocked or sleeping.
+\item @Sp@, the current stack pointer.
+\item @Su@, the current stack update frame pointer.  This register
+points to the most recent update frame on the stack, and is used to
+calculate the number of arguments available when entering a function.
+\item @SpLim@, the stack limit pointer.  This points to the end of the
+current stack chunk.
+\item Several general purpose registers, used for passing arguments to
+functions.
+\end{itemize}
+
+\noindent and various other bits of information used in specialised
+circumstances, such as profiling and parallel execution.  These are
+described in the appropriate sections.
+
+The following is pseudo-code for the inner loop of the scheduler
+itself.
+
+@
+while (threads_exist) {
+  // handle global problems: GC, parallelism, etc
+  if (need_gc) gc();  
+  if (external_message) service_message();
+  // deal with other urgent stuff
+
+  pick a runnable thread;
+  do {
+    switch (thread->whatNext) {
+      case (RunGHC  pc): status=runGHC(pc);  break;
+      case (RunHugs bc): status=runHugs(bc); break;
+    }
+    switch (status) {  // handle local problems
+      case (StackOverflow): enlargeStack; break;
+      case (Error e)      : error(thread,e); break;
+      case (ExitWith e)   : exit(e); break;
+      case (Yield)        : break;
+    }
+  } while (thread_runnable);
+}
+@
+
+Optimisations to avoid excess trampolining from Hugs into itself.
+How do we invoke GC, ccalls, etc.
+General ccall (@ccall-GC@) and optimised ccall.
+
+\section{Evaluation}
+
+\subsection{Calling conventions}
+
+\subsubsection{The call/return registers}
+
+One of the problems in designing a virtual machine is that we want it
+abstract away from tedious machine details but still reveal enough of
+the underlying hardware that we can make sensible decisions about code
+generation.  A major problem area is the use of registers in
+call/return conventions.  On a machine with lots of registers, it's
+cheaper to pass arguments and results in registers than to pass them
+on the stack.  On a machine with very few registers, it's cheaper to
+pass arguments and results on the stack than to use ``virtual
+registers'' in memory.  We therefore use a hybrid system: the first
+$n$ arguments or results are passed in registers; and the remaining
+arguments or results are passed on the stack.  For register-poor
+architectures, it is important that we allow $n=0$.
+
+We'll label the arguments and results \Arg{1} \ldots \Arg{m} --- with
+the understanding that \Arg{1} \ldots \Arg{n} are in registers and
+\Arg{n+1} \ldots \Arg{m} are on top of the stack.
+
+Note that the mapping of arguments \Arg{1} \ldots \Arg{n} to machine
+registers depends on the {\em kinds} of the arguments.  For example,
+if the first argument is a Float, we might pass it in a different
+register from if it is an Int.  In fact, we might find that a given
+architecture lets us pass varying numbers of arguments according to
+their types.  For example, if a CPU has 2 Int registers and 2 Float
+registers then we could pass between 2 and 4 arguments in machine
+registers --- depending on whether they all have the same kind or they
+have different kinds.
+
+\subsubsection{Entering closures}
+
+To evaluate a closure we jump to the entry code for the closure
+passing a pointer to the closure in \Arg{1} so that the entry code can
+access its environment.
+
+\subsubsection{Function call}
+
+The function-call mechanism is obviously crucial.  There are five different
+cases to consider:
+\begin{enumerate}
+
+\item {\em Known combinator (function with no free variables) and enough arguments.}  
+
+A fast call can be made: push excess arguments onto stack and jump to
+function's {\em fast entry point} passing arguments in \Arg{1} \ldots
+\Arg{m}.  
+
+The {\em fast entry point} is only called with exactly the right
+number of arguments (in \Arg{1} \ldots \Arg{m}) so it can instantly
+start doing useful work without first testing whether it has enough
+registers or having to pop them off the stack first.
+
+\item {\em Known combinator and insufficient arguments.}
+
+A slow call can be made: push all arguments onto stack and jump to
+function's {\em slow entry point}.
+
+Any unpointed arguments which are pushed on the stack must be tagged.
+This means pushing an extra word on the stack below the unpointed
+words, containing the number of unpointed words above it.
+
+%Todo: forward ref about tagging?
+%Todo: picture?
+
+The {\em slow entry point} might be called with insufficient arguments
+and so it must test whether there are enough arguments on the stack.
+This {\em argument satisfaction check} consists of checking that
+@Su-Sp@ is big enough to hold all the arguments (including any tags).
+
+\begin{itemize} 
+
+\item If the argument satisfaction check fails, it is because there is
+one or more update frames on the stack before the rest of the
+arguments that the function needs.  In this case, we construct a PAP
+(partial application, section~\ref{sect:PAP}) containing the arguments
+which are on the stack.  The PAP construction code will return to the
+update frame with the address of the PAP in \Arg{1}.
+
+\item If the argument satisfaction check succeeds, we jump to the fast
+entry point with the arguments in \Arg{1} \ldots \Arg{arity}.
+
+If the fast entry point expects to receive some of \Arg{i} on the
+stack, we can reduce the amount of movement required by making the
+stack layout for the fast entry point look like the stack layout for
+the slow entry point.  Since the slow entry point is entered with the
+first argument on the top of the stack and with tags in front of any
+unpointed arguments, this means that if \Arg{i} is unpointed, there
+should be space below it for a tag and that the highest numbered
+argument should be passed on the top of the stack.
+
+We usually arrange that the fast entry point is placed immediately
+after the slow entry point --- so we can just ``fall through'' to the
+fast entry point without performing a jump.
+
+\end{itemize}
+
+
+\item {\em Known function closure (function with free variables) and enough arguments.}
+
+A fast call can be made: push excess arguments onto stack and jump to
+function's {\em fast entry point} passing a pointer to closure in
+\Arg{1} and arguments in \Arg{2} \ldots \Arg{m+1}.
+
+Like the fast entry point for a combinator, the fast entry point for a
+closure is only called with appropriate values in \Arg{1} \ldots
+\Arg{m+1} so we can start work straight away.  The pointer to the
+closure is used to access the free variables of the closure.
+
+
+\item {\em Known function closure and insufficient arguments.}
+
+A slow call can be made: push all arguments onto stack and jump to the
+closure's slow entry point passing a pointer to the closure in \Arg{1}.
+
+Again, the slow entry point performs an argument satisfaction check
+and either builds a PAP or pops the arguments off the stack into
+\Arg{2} \ldots \Arg{m+1} and jumps to the fast entry point.
+
+
+\item {\em Unknown function closure or thunk.}
+
+Sometimes, the function being called is not statically identifiable.
+Consider, for example, the @compose@ function:
+@
+  compose f g x = f (g x)
+@
+Since @f@ and @g@ are passed as arguments to @compose@, the latter has
+to make a heap call.  In a heap call the arguments are pushed onto the
+stack, and the closure bound to the function is entered.  In the
+example, a thunk for @(g x)@ will be allocated, (a pointer to it)
+pushed on the stack, and the closure bound to @f@ will be
+entered. That is, we will jump to @f@s entry point passing @f@ in
+\Arg{1}.  If \Arg{1} is passed on the stack, it is pushed on top of
+the thunk for @(g x)@.
+
+The {\em entry code} for an updateable thunk (which must have arity 0)
+pushes an update frame on the stack and starts executing the body of
+the closure --- using \Arg{1} to access any free variables.  This is
+described in more detail in section~\ref{sect:data-updates}.
+
+The {\em entry code} for a non-updateable closure is just the
+closure's slow entry point.
+
+\end{enumerate}
+
+In addition to the above considerations, if there are \emph{too many}
+arguments then the extra arguments are simply pushed on the stack with
+appropriate tags.
+
+To summarise, a closure's standard (slow) entry point performs the following:
+\begin{description}
+\item[Argument satisfaction check.] (function closure only)
+\item[Stack overflow check.]
+\item[Heap overflow check.]
+\item[Copy free variables out of closure.] %Todo: why?
+\item[Eager black holing.] (updateable thunk only) %Todo: forward ref.
+\item[Push update frame.]
+\item[Evaluate body of closure.]
+\end{description}
+
+
+\subsection{Case expressions and return conventions}
+\label{sect:return-conventions}
+
+The {\em evaluation} of a thunk is always initiated by
+a @case@ expression.  For example:
+@
+  case x of (a,b) -> E
+@
+In a stack-based evaluator such as the STG machine,
+a @case@ expression is evaluated by pushing a {\em return address} on the stack
+before evaluating the scrutinee (@x@ in this case).  Once evaluation of the  
+scrutinee is complete, execution resumes at the return address, which 
+points to the code for the expression @E@.  
+
+When execution resumes at the return point, there must be some {\em
+return convention} that defines where the components of the pair, @a@
+and @b@, can be found.  The return convention varies according to the
+type of the scrutinee @x@:
+
+\begin{itemize}
+
+\item 
+
+(A space for) the return address is left on the top of the stack.
+Leaving the return address on the stack ensures that the top of the
+stack contains a valid activation record
+(section~\ref{sect:activation-records}) --- should a garbage collection
+be required.
+
+\item If @x@ has a pointed type (e.g.~a data constructor or a function),
+a pointer to @x@ is returned in \Arg{1}.
+
+\ToDo{Warn that components of E should be extracted as soon as
+possible to avoid a space leak.}
+
+\item If @x@ is an unpointed type (e.g.~@Int#@ or @Float#@), @x@ is
+returned in \Arg{1}
+
+\item If @x@ is an unpointed tuple constructor, the components of @x@
+are returned in \Arg{1} \ldots \Arg{n} but no object is constructed in
+the heap.  Unboxed tuple constructors are useful for functions which
+want to return multiple values such as those used in an (explicitly
+encoded) state monad:
+
+\ToDo{Move stuff about unboxed tuples to a separate section}
+
+@
+data unpointed AAndState a = AnS a State
+type S a = State -> AAndState a
+
+bindS m k s0 = case m s0 of { AnS s1 a -> k s1 a }
+returnS a s  = AnS a s
+@
+
+Note that unboxed datatypes can only have one constructor and that
+thunks never have unboxed types --- so we'll never try to update an
+unboxed constructor.  Unboxed tuples are \emph{never} built on the
+heap.
+
+When passing an unboxed tuple to a function, the components are
+flattened out and passed on the stack/in registers as usual.
+
+\end{itemize}
+
+\subsection{Vectored Returns}
+
+Many algebraic data types have more than one constructor.  For
+example, the @Maybe@ type is defined like this:
+@
+  data Maybe a = Nothing | Just a
+@
+How does the return convention encode which of the two constructors is being returned?
+A @case@ expression scrutinising a value of @Maybe@ type would look like this:
+@
+  case E of 
+    Nothing -> ...
+    Just a  -> ...
+@
+Rather than pushing a return address before evaluating the scrutinee,
+@E@, the @case@ expression pushes (a pointer to) a {\em return
+vector}, a static table consisting of two code pointers: one for the
+@Just@ alternative, and one for the @Nothing@ alternative.  
+
+\begin{itemize}
+
+\item
+
+The constructor @Nothing@ returns by jumping to the first item in the
+return vector with a pointer to a (statically built) Nothing closure
+in \Arg{1}.  
+
+It might seem that we could avoid loading \Arg{1} in this case since the
+first item in the return vector will know that @Nothing@ was returned
+(and can easily access the Nothing closure in the (unlikely) event
+that it needs it.  The only reason we load \Arg{1} is in case we have to
+perform an update (section~\ref{sect:data-updates}).
+
+\item 
+
+The constructor @Just@ returns by jumping to the second element of the
+return vector with a pointer to the closure in \Arg{1}.  
+
+\end{itemize}
+
+In this way no test need be made to see which constructor returns;
+instead, execution resumes immediately in the appropriate branch of
+the @case@.
+
+\subsection{Direct Returns}
+
+When a datatype has a large number of constructors, it may be
+inappropriate to use vectored returns.  The vector tables may be
+large and sparse, and it may be better to identify the constructor
+using a test-and-branch sequence on the tag.  For this reason, we
+provide an alternative return convention, called a \emph{direct
+return}.
+
+In a direct return, the return address pushed on the stack really is a
+code pointer.  The returning code loads a pointer to the closure being
+returned in \Arg{1} as usual, and also loads the tag into \Arg{2}.
+The code at the return address will test the tag and jump to the
+appropriate code for the case branch.
+
+\ToDo{Decide whether it's better to load the tag into \Arg{2} or not.
+May be affected by whether \Arg{2} is a real register.}
+
+The choice of whether to use a vectored return or a direct return is
+made on a type-by-type basis --- up to a certain maximum number of
+constructors imposed by the update mechanism
+(section~\ref{sect:data-updates}).
+
+\ToDo{Say whether we pop the return address before returning}
+
+\subsection{Updates}
+\label{sect:data-updates}
+
+The entry code for an updatable thunk (which must also be of arity 0):
+
+\begin{itemize}
+\item copies the free variables out of the thunk into registers or
+  onto the stack.
+\item pushes an {\em update frame} onto the stack.
+
+An update frame is a small activation record consisting of
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+{\em Fixed header} & {\em Update Frame link} & {\em Updatee} \\
+\hline
+\end{tabular}
+\end{center}
+
+\note{In the semantics part of the STG paper (section 5.6), an update
+frame consists of everything down to the last update frame on the
+stack.  This would make sense too --- and would fit in nicely with
+what we're going to do when we add support for speculative
+evaluation.}
+\ToDo{I think update frames contain cost centres sometimes}
+
+\item 
+If we are doing ``eager blackholing,'' we then overwrite the thunk
+with a black hole.  Otherwise, we leave it to the garbage collector to
+black hole the thunk.
+
+\item 
+Start evaluating the body of the expression.
+
+\end{itemize}
+
+When the expression finishes evaluation, it will enter the update
+frame on the top of the stack.  Since the returner doesn't know
+whether it is entering a normal return address/vector or an update
+frame, we follow exactly the same conventions as return addresses and
+return vectors.  That is, on entering the update frame:
+
+\begin{itemize} 
+\item The value of the thunk is in \Arg{1}.  (Recall that only thunks
+are updateable and that thunks return just one value.)
+
+\item If the data type is a direct-return type rather than a
+vectored-return type, then the tag is in \Arg{2}.
+
+\item The update frame is still on the stack.
+\end{itemize}
+
+The update code:
+\begin{itemize}
+\item overwrites the {\em updatee} with an indirection to \Arg{1};
+\item loads @Su@ from the Update Frame link;
+\item removes the update frame from the stack; and 
+\item enters \Arg{1}.
+\end{itemize}
+
+This update code is the same for all data types, and can therefore be
+compiled statically in the runtime system.
+
+Since Haskell is polymorphic, we sometimes have to compile code for
+updatable thunks without knowing the type that will be returned.  In
+this case, the update frame must work for both direct and vectored
+returns.  This requires that we generate an infotable containing both
+a valid direct return address (which will perform the update and then
+perform a direct return) and a valid return vector (each entry of
+which will perform the update and then perform a vectored return).
+
+
+\subsection{Semi-tagging}
+\label{sect:semi-tagging}
+
+When a @case@ expression evaluates a variable that might be bound
+to a thunk it is often the case that the scrutinee is already evaluated.
+In this case we have paid the penalty of (a) pushing the return address (or
+return vector address) on the stack, (b) jumping through the info pointer
+of the scrutinee, and (c) returning by an indirect jump through the
+return address on the stack.
+
+If we knew that the scrutinee was already evaluated we could generate
+(better) code which simply jumps to the appropriate branch of the @case@
+with a pointer to the scrutinee in \Arg{1}.
+
+An obvious idea, therefore, is to test dynamically whether the heap
+closure is a value (using the tag in the info table).  If not, we
+enter the closure as usual; if so, we jump straight to the appropriate
+alternative.  Here, for example, is pseudo-code for the expression
+@(case x of { (a,_,c) -> E }@:
+@
+      \Arg{1} = <pointer to x>;
+      tag = \Arg{1}->entry->tag;
+      if (isWHNF(tag)) {
+          Sp--;  \\ insert space for return address
+      	  goto ret;
+      }
+      push(ret);           
+      goto \Arg{1}->entry;
+      
+      <info table for return address goes here>
+ret:  a = \Arg{1}->data1; \\ suck out a and c to avoid space leak
+      c = \Arg{1}->data3;
+      <code for E2>
+@
+and here is the code for the expression @(case x of { [] -> E1; x:xs -> E2 }@:
+@
+      \Arg{1} = <pointer to x>;
+      tag = \Arg{1}->entry->tag;
+      if (isWHNF(tag)) {
+	  Sp--;  \\ insert space for return address
+      	  goto retvec[tag];
+      }
+      push(retinfo);          
+      goto \Arg{1}->entry;
+      
+      .addr ret2
+      .addr ret1
+retvec:           \\ reversed return vector
+      <return info table for case goes here>
+retinfo:
+      panic("Direct return into vectored case");
+      
+ret1: <code for E1>
+
+ret2: x  = \Arg{1}->head;
+      xs = \Arg{1}->tail;
+      <code for E2>
+@
+There is an obvious cost in compiled code size (but none in the size
+of the bytecodes).  There is also a cost in execution time if we enter
+more thunks than data constructors.
+
+Both the direct and vectored returns are easily modified to chase chains
+of indirections too.  In the vectored case, this is most easily done by
+making sure that @IND = TAG_1 - 1@, and adding an extra field to every
+return vector.  In the above example, the indirection code would be
+@
+ind:  \Arg{1} = \Arg{1}->next;
+      goto ind_loop;
+@
+where @ind_loop@ is the second line of code.
+
+Note that we have to leave space for a return address since the return
+address expects to find one.  If the body of the expression requires a
+heap check, we will actually have to write the return address before
+entering the garbage collector.
+
+
+\subsection{Heap and Stack Checks}
+
+\note{I reckon these deserve a subsection of their own}
+
+Don't move heap pointer before success occurs.
+Talk about how stack check looks ahead into the branches of case expressions.
+
+\subsection{Handling interrupts/signals}
+
+@
+May have to keep C stack pointer in register to placate OS?
+May have to revert black holes - ouch!
+@
+
+
+\section{Heap objects}
+\label{sect:fixed-header}
+
+\ToDo{Fix this picture}
+
+\begin{figure}
+\begin{center}
+\input{closure}
+\end{center}
+\caption{A closure}
+\label{fig:closure}
+\end{figure}
+
+Every {\em heap object}, or {\em closure} is a contiguous block
+of memory, consisting of a fixed-format {\em header} followed
+by zero or more {\em data words}.
+The header consists of
+the following fields:
+\begin{itemize}
+\item A one-word {\em info pointer}, which points to
+the object's static {\em info table}.
+\item Zero or more {\em admin words} that support
+\begin{itemize}
+\item Profiling (notably a {\em cost centre} word).
+  \note{We could possibly omit the cost centre word from some 
+  administrative objects.}
+\item Parallelism (e.g. GranSim keeps the object's global address here,
+though GUM keeps a separate hash table).
+\item Statistics (e.g. a word to track how many times a thunk is entered.).
+
+We add a Ticky word to the fixed-header part of closures.  This is
+used to record indicate if a closure has been updated but not yet
+entered. It is set when the closure is updated and cleared when
+subsequently entered.
+
+NB: It is {\em not} an ``entry count'', it is an
+``entries-after-update count.''  The commoning up of @CONST@,
+@CHARLIKE@ and @INTLIKE@ closures is turned off(?) if this is
+required. This has only been done for 2s collection.
+
+
+
+\end{itemize}
+\end{itemize}
+Most of the RTS is completely insensitive to the number of admin words.
+The total size of the fixed header is @FIXED_HS@.
+
+Many heap objects contain fields allowing them to be inserted onto lists
+during evaluation or during garbage collection. The lists required by
+the evaluator and storage manager are as follows.
+
+\begin{itemize}
+\item 2 lists of threads: runnable threads and sleeping threads.
+
+\item The {\em static object list} is a list of all statically
+allocated objects which might contain pointers into the heap.
+(Section~\ref{sect:static-objects}.)
+
+\item The {\em updated thunk list} is a list of all thunks in the old
+generation which have been updated with an indirection.  
+(Section~\ref{sect:IND_OLDGEN}.)
+
+\item The {\em mutables list} is a list of all other objects in the
+old generation which might contain pointers into the new generation.
+Most of the object on this list are ``mutable.''
+(Section~\ref{sect:mutables}.)
+
+\item The {\em Foreign Object list} is a list of all foreign objects
+ which have not yet been deallocated. (Section~\ref{sect:FOREIGN}.)
+
+\item The {\em Spark pool} is a doubly(?) linked list of Spark objects
+maintained by the parallel system.  (Section~\ref{sect:SPARK}.)
+
+\item The {\em Blocked Fetch list} (or
+lists?). (Section~\ref{sect:BLOCKED_FETCH}.)
+
+\item For each thread, there is a list of all update frames on the
+stack.  (Section~\ref{sect:data-updates}.)
+
+
+\end{itemize}
+
+\ToDo{The links for these fields are usually inserted immediately
+after the fixed header except ...}
+
+\subsection{Info Tables}
+
+An {\em info table} is a contiguous block of memory, {\em laid out
+backwards}.  That is, the first field in the list that follows
+occupies the highest memory address, and the successive fields occupy
+successive decreasing memory addresses.
+
+\begin{center}
+\begin{tabular}{|c|}
+   \hline Parallelism Info 
+\\ \hline Profile Info 
+\\ \hline Debug Info 
+\\ \hline Tag/bytecode pointer
+\\ \hline Static reference table 
+\\ \hline Storage manager layout info
+\\ \hline Closure type 
+\\ \hline entry code \ldots
+\\ \hline
+\end{tabular}
+\end{center}
+An info table has the following contents (working backwards in memory
+addresses):
+\begin{itemize}
+\item The {\em entry code} for the closure.
+This code appears literally as the (large) last entry in the
+info table, immediately preceded by the rest of the info table.
+An {\em info pointer} always points to the first byte of the entry code.
+
+\item A one-word {\em closure type field}, @INFO_TYPE@, identifies what kind
+of closure the object is.  The various types of closure are described
+in Section~\ref{sect:closures}.
+In some configurations, some useful properties of 
+closures (is it a HNF?  can it be sparked?)
+are represented as high-order bits so they can be tested quickly.
+
+\item A single pointer or word --- the {\em storage manager info field},
+@INFO_SM@, contains auxiliary information describing the closure's
+precise layout, for the benefit of the garbage collector and the code
+that stuffs graph into packets for transmission over the network.
+
+\item A one-pointer {\em Static Reference Table (SRT) pointer}, @INFO_SRT@, points to
+a table which enables the garbage collector to identify all accessible
+code and CAFs.  They are fully described in Section~\ref{sect:srt}.
+
+\item A one-pointer {\em tag/bytecode-pointer} field, @INFO_TAG@ or @INFO_BC@.  
+For data constructors this field contains the constructor tag, in the
+range $0..n-1$ where $n$ is the number of constructors.
+
+For other objects that can be entered this field points to the byte
+codes for the object.  For the constructor case you can think of the
+tag as the name of a a suitable bytecode sequence but it can also be used to
+implement semi-tagging (section~\ref{sect:semi-tagging}).
+
+One awkward question (which may not belong here) is ``how does the
+bytecode interpreter know whether to do a vectored return?''  The
+answer is it examines the @INFO_TYPE@ field of the return address:
+@RET_VEC_@$sz$ requires a vectored return and @RET_@$sz$ requires a
+direct return.
+
+\item {\em Profiling info\/}
+
+Closure category records are attached to the info table of the
+closure. They are declared with the info table. We put pointers to
+these ClCat things in info tables.  We need these ClCat things because
+they are mutable, whereas info tables are immutable.  Hashing will map
+similar categories to the same hash value allowing statistics to be
+grouped by closure category.
+
+Cost Centres and Closure Categories are hashed to provide indexes
+against which arbitrary information can be stored. These indexes are
+memoised in the appropriate cost centre or category record and
+subsequent hashes avoided by the index routine (it simply returns the
+memoised index).
+
+There are different features which can be hashed allowing information
+to be stored for different groupings. Cost centres have the cost
+centre recorded (using the pointer), module and group. Closure
+categories have the closure description and the type
+description. Records with the same feature will be hashed to the same
+index value.
+
+The initialisation routines, @init_index_<feature>@, allocate a hash
+table in which the cost centre / category records are stored. The
+lower bound for the table size is taken from @max_<feature>_no@. They
+return the actual table size used (the next power of 2). Unused
+locations in the hash table are indicated by a 0 entry. Successive
+@init_index_<feature>@ calls just return the actual table size.
+
+Calls to @index_<feature>@ will insert the cost centre / category
+record in the @<feature>@ hash table, if not already inserted. The hash
+index is memoised in the record and returned. 
+
+CURRENTLY ONLY ONE MEMOISATION SLOT IS AVILABLE IN EACH RECORD SO
+HASHING CAN ONLY BE DONE ON ONE FEATURE FOR EACH RECORD. This can be
+easily relaxed at the expense of extra memoisation space or continued
+rehashing.
+
+The initialisation routines must be called before initialisation of
+the stacks and heap as they require to allocate storage. It is also
+expected that the caller may want to allocate additional storage in
+which to store profiling information based on the return table size
+value(s).
+
+\begin{center}
+\begin{tabular}{|l|}
+   \hline Hash Index
+\\ \hline Selected
+\\ \hline Kind
+\\ \hline Description String
+\\ \hline Type String
+\\ \hline
+\end{tabular}
+\end{center}
+
+\begin{description}
+\item[Hash Index] Memoised copy
+\item[Selected] 
+  Is this category selected (-1 == not memoised, selected? 0 or 1)
+\item[Kind]
+One of the following values (defined in CostCentre.lh):
+
+\begin{description}
+\item[@CON_K@]
+A constructor.
+\item[@FN_K@]
+A literal function.
+\item[@PAP_K@]
+A partial application.
+\item[@THK_K@]
+A thunk, or suspension.
+\item[@BH_K@]
+A black hole.
+\item[@ARR_K@]
+An array.
+\item[@ForeignObj_K@]
+A Foreign object (non-Haskell heap resident).
+\item[@SPT_K@]
+The Stable Pointer table.  (There should only be one of these but it
+represents a form of weak space leak since it can't shrink to meet
+non-demand so it may be worth watching separately? ADR)
+\item[@INTERNAL_KIND@]
+Something internal to the runtime system.
+\end{description}
+
+
+\item[Description] Source derived string detailing closure description.
+\item[Type] Source derived string detailing closure type.
+\end{description}
+
+\item {\em Parallelism info\/}
+\ToDo{}
+
+\item {\em Debugging info\/}
+\ToDo{}
+
+\end{itemize}
+
+
+
+\section{Kinds of Heap Object}
+\label{sect:closures}
+
+Heap objects can be classified in several ways, but one useful one is
+this:
+\begin{itemize}
+\item 
+{\em Static closures} occupy fixed, statically-allocated memory
+locations, with globally known addresses.
+
+\item 
+{\em Dynamic closures} are individually allocated in the heap.
+
+\item 
+{\em Stack closures} are closures allocated within a thread's stack
+(which is itself a heap object).  Unlike other closures, there are
+never any pointers to stack closures.  Stack closures are discussed in
+Section~\ref{sect:stacks}.
+
+\end{itemize}
+A second useful classification is this:
+\begin{itemize}
+\item 
+{\em Executive closures}, such as thunks and data constructors,
+participate directly in a program's execution.  They can be subdivided into
+two kinds of objects according to their type:
+\begin{itemize}
+\item 
+{\em Pointed objects}, represent values of a {\em pointed} type
+(<.pointed types launchbury.>) --i.e.~a type that includes $\bottom$ such as @Int@ or @Int# -> Int#@.
+
+\item {\em Unpointed objects}, represent values of a {\em unpointed} type --i.e.~a type that does not include $\bottom$ such as @Int#@ or @Array#@.
+
+\item {\em Activation frames}, represent ``continuations''.  They are
+always stored on the stack and are never pointed to by heap objects or
+passed as arguments.  \note{It's not clear if this will still be true
+once we support speculative evaluation.}
+
+\end{itemize}
+
+\item {\em Administrative closures}, such as stack objects and thread
+state objects, do not represent values in the original program.
+\end{itemize}
+
+Only pointed objects can be entered.  All pointed objects share a
+common header format: the ``pointed header''; while all unpointed
+objects share a common header format: the ``unpointed header''.
+\ToDo{Describe the difference and update the diagrams to mention
+an appropriate header type.}
+
+This section enumerates all the kinds of heap objects in the system.
+Each is identified by a distinct @INFO_TYPE@ tag in its info table.
+
+\ToDo{Check this table very carefully}
+
+\begin{tabular}{|l|l|l|l|l|l|l|l|l|l|l|}
+\hline
+
+closure kind          & HNF & UPD & NS & STA & THU & MUT & UPT & BH & IND & Section \\
+
+\hline                                                              
+{\em Pointed} \\ 
+\hline 
+
+@CONSTR@              & 1   &     & 1  &     &     &     &     &    &     & \ref{sect:CONSTR}    \\
+@CONSTR_STATIC@       & 1   &     & 1  & 1   &     &     &     &    &     & \ref{sect:CONSTR}    \\
+@CONSTR_STATIC_NOCAF@ & 1   &     & 1  & 1   &     &     &     &    &     & \ref{sect:CONSTR}    \\
+											         
+@FUN@                 & 1   &     & ?  &     &     &     &     &    &     & \ref{sect:FUN}       \\
+@FUN_STATIC@          & 1   &     & ?  & 1   &     &     &     &    &     & \ref{sect:FUN}       \\
+											         
+@THUNK@               & 1   & 1   &    &     & 1   &     &     &    &     & \ref{sect:THUNK}     \\
+@THUNK_STATIC@        & 1   & 1   &    & 1   & 1   &     &     &    &     & \ref{sect:THUNK}     \\
+@THUNK_SELECTOR@      & 1   & 1   & 1  &     & 1   &     &     &    &     & \ref{sect:THUNK_SEL}     \\
+											         
+@PAP@                 & 1   &     & ?  &     &     &     &     &    &     & \ref{sect:PAP}       \\
+											         
+@IND@                 &     &     & 1  &     & ?   &     &     &    & 1   & \ref{sect:IND}       \\
+@IND_OLDGEN@          & 1   &     & 1  &     & ?   &     &     &    & 1   & \ref{sect:IND}       \\
+@IND_PERM@            &     &     & 1  &     & ?   &     &     &    & 1   & \ref{sect:IND}       \\
+@IND_OLDGEN_PERM@     & 1   &     & 1  &     & ?   &     &     &    & 1   & \ref{sect:IND}       \\
+@IND_STATIC@          & ?   &     & 1  & 1   & ?   &     &     &    & 1   & \ref{sect:IND}       \\
+
+\hline
+{\em Unpointed} \\ 
+\hline
+
+
+@ARR_WORDS@           & 1   &     & 1  &     &     & 1   & 1   &    &     & \ref{sect:ARR_WORDS1},\ref{sect:ARR_WORDS2} \\
+@ARR_PTRS@            & 1   &     & 1  &     &     & 1   & 1   &    &     & \ref{sect:ARR_PTRS}  \\
+@MUTVAR@              & 1   &     & 1  &     &     & 1   & 1   &    &     & \ref{sect:MUTVAR}    \\
+@MUTARR_PTRS@         & 1   &     & 1  &     &     & 1   & 1   &    &     & \ref{sect:MUTARR_PTRS} \\
+@MUTARR_PTRS_FROZEN@  & 1   &     & 1  &     &     & 1   & 1   &    &     & \ref{sect:MUTARR_PTRS_FROZEN} \\
+
+@FOREIGN@             & 1   &     & 1  &     &     &     & 1   &    &     & \ref{sect:FOREIGN}   \\
+
+@BH@                  & ?   & 0/1 & 1  &     & ?   & ?   &     & 1  & ?   & \ref{sect:BH}        \\
+@MVAR@ 		      &     &     &    &     &     &     &     &    &     & \ref{sect:MVAR}      \\
+@IVAR@ 		      &     &     &    &     &     &     &     &    &     & \ref{sect:IVAR}      \\
+@FETCHME@             &     &     &    &     &     &     &     &    &     & \ref{sect:FETCHME}   \\
+\hline
+\end{tabular}
+
+Activation frames do not live (directly) on the heap --- but they have
+a similar organisation.  The classification bits are all zero in
+activation frames.
+
+\begin{tabular}{|l|l|}\hline
+closure kind		& Section			\\ \hline
+@RET_SMALL@ 		& \ref{sect:activation-records}	\\
+@RET_VEC_SMALL@ 	& \ref{sect:activation-records}	\\
+@RET_BIG@		& \ref{sect:activation-records}	\\
+@RET_VEC_BIG@		& \ref{sect:activation-records}	\\
+@UPDATE_FRAME@ 		& \ref{sect:activation-records}	\\
+\hline
+\end{tabular}
+
+There are also a number of administrative objects.  The classification bits are
+all zero in administrative objects.
+
+\begin{tabular}{|l|l|}\hline
+closure kind		& Section 			\\ \hline
+@TSO@                   & \ref{sect:TSO} 		\\
+@STACK_OBJECT@          & \ref{sect:STACK_OBJECT} 	\\
+@STABLEPTR_TABLE@       & \ref{sect:STABLEPTR_TABLE} 	\\
+@SPARK_OBJECT@          & \ref{sect:SPARK}		\\
+@BLOCKED_FETCH@       	& \ref{sect:BLOCKED_FETCH} 	\\
+\hline
+\end{tabular}
+
+\ToDo{I guess the parallel system has something like a stable ptr
+table.  Is there any opportunity for sharing code/data structures
+here?}
+
+
+\subsection{Classification bits}
+
+The top bits of the @INFO_TYPE@ tag tells what sort of animal the
+closure is.
+
+\begin{tabular}{|l|l|l|}					        	\hline
+Abbrev & Bit & Interpretation							\\ \hline
+HNF    & 0   & 1 $\Rightarrow$ Head normal form					\\
+UPD    & 4   & 1 $\Rightarrow$ May be updated (inconsistent with being a HNF)   \\ 
+NS     & 1   & 1 $\Rightarrow$ Don't spark me  (Any HNF will have this set to 1)\\
+STA    & 2   & 1 $\Rightarrow$ This is a static closure				\\
+THU    & 8   & 1 $\Rightarrow$ Is a thunk					\\
+MUT    & 3   & 1 $\Rightarrow$ Has mutable pointer fields                       \\ 
+UPT    & 5   & 1 $\Rightarrow$ Has an unpointed type (eg a primitive array)     \\
+BH     & 6   & 1 $\Rightarrow$ Is a black hole					\\
+IND    & 7   & 1 $\Rightarrow$ Is an indirection				\\
+\hline
+\end{tabular}
+
+Updatable structures (@_UP@) are thunks that may be shared.  Primitive
+arrays (@_BM@ -- Big Mothers) are structures that are always held
+in-memory (basically extensions of a closure).  Because there may be
+offsets into these arrays, a primitive array cannot be handled as a
+FetchMe in the parallel system, but must be shipped in its entirety if
+its parent closure is shipped.
+
+The other bits in the info-type field simply give a unique bit-pattern
+to identify the closure type.
+
+\iffalse
+@
+#define _NF			0x0001  /* Normal form  */
+#define _NS			0x0002	/* Don't spark  */
+#define _ST			0x0004	/* Is static    */
+#define _MU 	    	    	0x0008  /* Is mutable   */
+#define _UP			0x0010	/* Is updatable (but not mutable) */
+#define _BM			0x0020	/* Is a "primitive" array */
+#define _BH			0x0040	/* Is a black hole */
+#define _IN			0x0080	/* Is an indirection */
+#define _TH			0x0100	/* Is a thunk */
+
+
+
+SPEC	
+SPEC_N		SPEC | _NF | _NS
+SPEC_S		SPEC | _TH
+SPEC_U		SPEC | _UP | _TH
+		
+GEN	
+GEN_N		GEN | _NF | _NS
+GEN_S		GEN | _TH
+GEN_U		GEN | _UP | _TH
+		
+DYN	        _NF | _NS
+TUPLE		_NF | _NS | _BM
+DATA		_NF | _NS | _BM
+MUTUPLE		_NF | _NS | _MU | _BM
+IMMUTUPLE	_NF | _NS | _BM
+STATIC		_NS | _ST
+CONST		_NF | _NS
+CHARLIKE	_NF | _NS
+INTLIKE		_NF | _NS
+
+BH		_NS | _BH
+BH_N		BH
+BH_U		BH | _UP
+		
+BQ		_NS | _MU | _BH
+IND		_NS | _IN
+CAF		_NF | _NS | _ST | _IN
+
+FM		
+FETCHME		FM | _MU
+FMBQ		FM | _MU | _BH
+
+TSO		_MU
+
+STKO	
+STKO_DYNAMIC	STKO | _MU
+STKO_STATIC	STKO | _ST
+		
+SPEC_RBH	_NS | _MU | _BH
+GEN_RBH		_NS | _MU | _BH
+BF		_NS | _MU | _BH
+INTERNAL	
+
+@
+\fi
+
+Notes:
+
+An indirection either points to HNF (post update); or is result of
+overwriting a FetchMe, in which case the thing fetched is either
+under evaluation (BH), or by now an HNF.  Thus, indirections get NoSpark flag.
+
+
+
+\subsection{Pointed Objects}
+
+All pointed objects can be entered.
+
+\subsubsection{Function closures}\label{sect:FUN}
+
+Function closures represent lambda abstractions.  For example,
+consider the top-level declaration:
+@
+  f = \x -> let g = \y -> x+y
+	    in g x
+@
+Both @f@ and @g@ are represented by function closures.  The closure
+for @f@ is {\em static} while that for @g@ is {\em dynamic}.
+
+The layout of a function closure is as follows:
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Pointers} & {\em Non-pointers} \\ \hline
+\end{tabular}
+\end{center}
+The data words (pointers and non-pointers) are the free variables of
+the function closure.  
+The number of pointers
+and number of non-pointers are stored in the @INFO_SM@ word, in the least significant
+and most significant half-word respectively.
+
+There are several different sorts of function closure, distinguished
+by their @INFO_TYPE@ field:
+\begin{itemize}
+\item @FUN@: a vanilla, dynamically allocated on the heap. 
+
+\item $@FUN_@p@_@np$: to speed up garbage collection a number of
+specialised forms of @FUN@ are provided, for particular $(p,np)$ pairs,
+where $p$ is the number of pointers and $np$ the number of non-pointers.
+
+\item @FUN_STATIC@.  Top-level, static, function closures (such as
+@f@ above) have a different
+layout than dynamic ones:
+\begin{center}
+\begin{tabular}{|l|l|l|}\hline
+{\em Fixed header}  & {\em Static object link} \\ \hline
+\end{tabular}
+\end{center}
+Static function closurs have no free variables.  (However they may refer to other 
+static closures; these references are recorded in the function closure's SRT.)
+They have one field that is not present in dynamic closures, the {\em static object
+link} field.  This is used by the garbage collector in the same way that to-space
+is, to gather closures that have been determined to be live but that have not yet
+been scavenged.
+\note{Static function closures that have no static references, and hence
+a null SRT pointer, don't need the static object link field.  Is it worth
+taking advantage of this?  See @CONSTR_STATIC_NOCAF@.}
+\end{itemize}
+
+Each lambda abstraction, $f$, in the STG program has its own private info table.
+The following labels are relevant:
+\begin{itemize}
+\item $f$@_info@  is $f$'s info table.
+\item $f$@_entry@ is $f$'s slow entry point (i.e. the entry code of its
+info table; so it will label the same byte as $f$@_info@).
+\item $f@_fast_@k$ is $f$'s fast entry point.  $k$ is the number of arguments
+$f$ takes; encoding this number in the fast-entry label occasionally catches some nasty
+code-generation errors.
+\end{itemize}
+
+\subsubsection{Data Constructors}\label{sect:CONSTR}
+
+Data-constructor closures represent values constructed with
+algebraic data type constructors.
+The general layout of data constructors is the same as that for function
+closures.  That is
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Pointers} & {\em Non-pointers} \\ \hline
+\end{tabular}
+\end{center}
+
+The SRT pointer in a data constructor's info table is never used --- the
+code for a constructor does not make any static references.
+\note{Use it for something else??  E.g. tag?}
+
+There are several different sorts of constructor:
+\begin{itemize}
+\item @CONSTR@: a vanilla, dynamically allocated constructor.
+\item @CONSTR_@$p$@_@$np$: just like $@FUN_@p@_@np$.
+\item @CONSTR_INTLIKE@.
+A dynamically-allocated heap object that looks just like an @Int@.  The 
+garbage collector checks to see if it can common it up with one of a fixed
+set of static int-like closures, thus getting it out of the dynamic heap
+altogether.
+
+\item @CONSTR_CHARLIKE@:  same deal, but for @Char@.
+
+\item @CONSTR_STATIC@ is similar to @FUN_STATIC@, with the complication that
+the layout of the constructor must mimic that of a dynamic constructor,
+because a static constructor might be returned to some code that unpacks it.
+So its layout is like this:
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Pointers} & {\em Non-pointers} & {\em Static object link}\\ \hline
+\end{tabular}
+\end{center}
+The static object link, at the end of the closure, serves the same purpose
+as that for @FUN_STATIC@.  The pointers in the static constructor can point
+only to other static closures.
+
+The static object link occurs last in the closure so that static
+constructors can store their data fields in exactly the same place as
+dynamic constructors.
+
+\item @CONSTR_STATIC_NOCAF@.  A statically allocated data constructor
+that guarantees not to point (directly or indirectly) to any CAF
+(section~\ref{sect:CAF}).  This means it does not need a static object
+link field.  Since we expect that there might be quite a lot of static
+constructors this optimisation makes sense.  Furthermore, the @NOCAF@
+tag allows the compiler to indicate that no CAFs can be reached
+anywhere {\em even indirectly}.
+
+
+\end{itemize}
+
+For each data constructor $Con$, two
+info tables are generated:
+\begin{itemize}
+\item $Con$@_info@ labels $Con$'s dynamic info table, 
+shared by all dynamic instances of the constructor.
+\item $Con$@_static@ labels $Con$'s static info table, 
+shared by all static instances of the constructor.
+\end{itemize}
+
+\subsubsection{Thunks}
+\label{sect:THUNK}
+\label{sect:THUNK_SEL}
+
+A thunk represents an expression that is not obviously in head normal 
+form.  For example, consider the following top-level definitions:
+@
+  range = between 1 10
+  f = \x -> let ys = take x range
+	    in sum ys
+@
+Here the right-hand sides of @range@ and @ys@ are both thunks; the former
+is static while the latter is dynamic.
+
+The layout of a thunk is the same as that for a function closure,
+except that it may have some words of ``slop'' at the end to make sure
+that it has 
+at least @MIN_UPD_PAYLOAD@ words in addition to its
+fixed header.
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Pointers} & {\em Non-pointers} & {\em Slop} \\ \hline
+\end{tabular}
+\end{center}
+The @INFO_SM@ word contains the same information as for function
+closures; that is, number of pointers and number of non-pointers (excluding slop).
+
+A thunk differs from a function closure in that it can be updated.
+
+There are several forms of thunk:
+\begin{itemize}
+\item @THUNK@: a vanilla, dynamically allocated thunk.
+The garbage collection code for thunks whose
+pointer + non-pointer words is less than @MIN_UPD_PAYLOAD@ differs from
+that for function closures and data constructors, because the GC code
+has to account for the slop.
+\item $@THUNK_@p@_@np$.  Similar comments apply.
+\item @THUNK_STATIC@.  A static thunk is also known as 
+a {\em constant applicative form}, or {\em CAF}.
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Pointers} & {\em Non-pointers} & {\em Slop} & {\em Static object link}\\ \hline
+\end{tabular}
+\end{center}
+
+\item @THUNK_SELECTOR@ is a (dynamically allocated) thunk
+whose entry code performs a simple selection operation from
+a data constructor drawn from a single-constructor type.  For example,
+the thunk
+@
+	x = case y of (a,b) -> a
+@
+is a selector thunk.  A selector thunk is laid out like this:
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Selectee pointer} \\ \hline
+\end{tabular}
+\end{center}
+The @INFO_SM@ word contains the byte offset of the desired word in
+the selectee.  Note that this is different from all other thunks.
+
+The garbage collector ``peeks'' at the selectee's
+tag (in its info table).  If it is evaluated, then it goes ahead and do
+the selection, and then behaves just as if the selector thunk was an
+indirection to the selected field.
+If it is not
+evaluated, it treats the selector thunk like any other thunk of that
+shape.  [Implementation notes.  
+Copying: only the evacuate routine needs to be special.
+Compacting: only the PRStart (marking) routine needs to be special.]
+\end{itemize}
+
+
+The only label associated with a thunk is its info table:
+\begin{description}
+\item[$f$@_info@] is $f$'s info table.
+\end{description}
+
+
+\subsubsection{Partial applications (PAPs)}\label{sect:PAP}
+
+A partial application (PAP) represents a function applied to too few arguments.
+It is only built as a result of updating after an argument-satisfaction
+check failure.  A PAP has the following shape:
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+{\em Fixed header}  & {\em No of arg words} & {\em Function closure} & {\em Arg stack} \\ \hline
+\end{tabular}
+\end{center}
+The ``arg stack'' is a copy of of the chunk of stack above the update
+frame; ``no of arg words'' tells how many words it consists of.  The
+function closure is (a pointer to) the closure for the function whose
+argument-satisfaction check failed.
+
+There is just one standard form of PAP with @INFO_TYPE@ = @PAP@.
+There is just one info table too, called @PAP_info@.
+Its entry code simply copies the arg stack chunk back on top of the
+stack and enters the function closure.  (It has to do a stack overflow test first.)
+
+There are no static PAPs.
+
+\subsubsection{Indirections}
+\label{sect:IND}
+\label{sect:IND_OLDGEN}
+
+Indirection closures just point to other closures. They are introduced
+when a thunk is updated to point to its value. 
+The entry code for all indirections simply enters the closure it points to.
+
+There are several forms of indirection:
+\begin{description}
+\item[@IND@] is the vanilla, dynamically-allocated indirection.
+It is removed by the garbage collector. It has the following
+shape:
+\begin{center}
+\begin{tabular}{|l|l|l|}\hline
+{\em Fixed header} & {\em Target closure} \\ \hline
+\end{tabular}
+\end{center}
+
+\item[@IND_OLDGEN@] is the indirection used to update an old-generation
+thunk. Its shape is like this:
+\begin{center}
+\begin{tabular}{|l|l|l|}\hline
+{\em Fixed header} & {\em Mutable link field} & {\em Target closure} \\ \hline
+\end{tabular}
+\end{center}
+It contains a {\em mutable link field} that is used to string together
+all old-generation indirections that might have a pointer into
+the new generation.
+
+
+\item[@IND_PERMANENT@ and @IND_OLDGEN_PERMANENT@.]
+for lexical profiling, it is necessary to maintain cost centre
+information in an indirection, so ``permanent indirections'' are
+retained forever.  Otherwise they are just like vanilla indirections.
+\note{If a permanent indirection points to another permanent
+indirection or a @CONST@ closure, it is possible to elide the indirection
+since it will have no effect on the profiler.}
+\note{Do we still need @IND@ and @IND_OLDGEN@
+in the profiling build, or can we just make
+do with one pair whose behaviour changes when profiling is built?}
+
+\item[@IND_STATIC@] is used for overwriting CAFs when they have been
+evaluated.  Static indirections are not removed by the garbage
+collector; and are statically allocated outside the heap (and should
+stay there).  Their static object link field is used just as for
+@FUN_STATIC@ closures.
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+{\em Fixed header} & {\em Target closure} & {\em Static object link} \\
+\hline
+\end{tabular}
+\end{center}
+
+\end{description}
+
+\subsubsection{Activation Records}
+
+Activation records are parts of the stack described by return address
+info tables (closures with @INFO_TYPE@ values of @RET_SMALL@,
+@RET_VEC_SMALL@, @RET_BIG@ and @RET_VEC_BIG@). They are described in
+section~\ref{sect:activation-records}.
+
+
+\subsubsection{Black holes, MVars and IVars}
+\label{sect:BH}
+\label{sect:MVAR}
+\label{sect:IVAR}
+
+Black hole closures are used to overwrite closures currently being
+evaluated. They inform the garbage collector that there are no live
+roots in the closure, thus removing a potential space leak.  
+
+Black holes also become synchronization points in the threaded world.
+They contain a pointer to a list of blocked threads to be awakened
+when the black hole is updated (or @NULL@ if the list is empty).
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline 
+{\em Fixed header} & {\em Mutable link} & {\em Blocked thread link} \\
+\hline
+\end{tabular}
+\end{center}
+The {\em Blocked thread link} points to the TSO of the first thread
+waiting for the value of this thunk.  All subsequent TSOs in the list
+are linked together using their @TSO_LINK@ field.
+
+When the blocking queue is non-@NULL@, the black hole must be added to
+the mutables list since the TSOs on the list may contain pointers into
+the new generation.  There is no need to clutter up the mutables list
+with black holes with empty blocking queues.
+
+\ToDo{MVars}
+
+
+\subsubsection{FetchMes}\label{sect:FETCHME}
+
+In the parallel systems, FetchMes are used to represent pointers into
+the global heap.  When evaluated, the value they point to is read from
+the global heap.
+
+\ToDo{Describe layout}
+
+
+\subsection{Unpointed Objects}
+
+A variable of unpointed type is always bound to a {\em value}, never to a {\em thunk}.
+For this reason, unpointed objects cannot be entered.
+
+A {\em value} may be:
+\begin{itemize}
+\item {\em Boxed}, i.e.~represented indirectly by a pointer to a heap object (e.g.~foreign objects, arrays); or
+\item {\em Unboxed}, i.e.~represented directly by a bit-pattern in one or more registers (e.g.~@Int#@ and @Float#@).
+\end{itemize}
+All {\em pointed} values are {\em boxed}.  
+
+\subsubsection{Immutable Objects}
+\label{sect:ARR_WORDS1}
+\label{sect:ARR_PTRS}
+
+\begin{description}
+\item[@ARR_WORDS@] is a variable-sized object consisting solely of
+non-pointers.  It is used for arrays of all
+sorts of things (bytes, words, floats, doubles... it doesn't matter).
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em No of non-pointers} & {\em Non-pointers\ldots}	\\ \hline
+\end{tabular}
+\end{center}
+
+\item[@ARR_PTRS@] is an immutable, variable sized array of pointers.
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Mutable link} & {\em No of pointers} & {\em Pointers\ldots}	\\ \hline
+\end{tabular}
+\end{center}
+The mutable link is present so that we can easily freeze and thaw an
+array (by changing the header and adding/removing the array to the
+mutables list).
+
+\end{description}
+
+\subsubsection{Mutable Objects}
+\label{sect:mutables}
+\label{sect:ARR_WORDS2}
+\label{sect:MUTVAR}
+\label{sect:MUTARR_PTRS}
+\label{sect:MUTARR_PTRS_FROZEN}
+
+Some of these objects are {\em mutable}; they represent objects which
+are explicitly mutated by Haskell code through the @ST@ monad.
+They're not used for thunks which are updated precisely once.
+Depending on the garbage collector, mutable closures may contain extra
+header information which allows a generational collector to implement
+the ``write barrier.''
+
+\begin{description}
+
+\item[@ARR_WORDS@] is also used to represent {\em mutable} arrays of
+bytes, words, floats, doubles, etc.  It's possible to use the same
+object type because even generational collectors don't need to
+distinguish them.
+
+\item[@MUTVAR@] is a mutable variable.
+\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Mutable link} & {\em Pointer} \\ \hline
+\end{tabular}
+\end{center}
+
+\item[@MUTARR_PTRS@] is a mutable array of pointers.
+Such an array may be {\em frozen}, becoming an @SM_MUTARR_PTRS_FROZEN@, with a
+different info-table.
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Mutable link} & {\em No of ptrs} & {\em Pointers\ldots} \\ \hline
+\end{tabular}
+\end{center}
+
+\item[@MUTARR_PTRS_FROZEN@] is a frozen @MUTARR_PTRS@ closure.
+The garbage collector converts @MUTARR_PTRS_FROZEN@ to @ARR_PTRS@ as it removes them from
+the mutables list.
+
+\end{description}
+
+
+\subsubsection{Foreign Objects}\label{sect:FOREIGN}
+
+Here's what a ForeignObj looks like:
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|}
+\hline 
+{\em Fixed header} & {\em Data} & {\em Free Routine} & {\em Foreign object link} \\
+\hline
+\end{tabular}
+\end{center}
+
+The @FreeRoutine@ is a reference to the finalisation routine to call
+when the @ForeignObj@ becomes garbage.  If @freeForeignObject@ is
+called on a Foreign Object, the @FreeRoutine@ is set to zero and the
+garbage collector will not attempt to call @FreeRoutine@ when the 
+object becomes garbage.
+
+The Foreign object link is a link to the next foreign object in the
+list.  This list is traversed at the end of garbage collection: if an
+object is about to be deallocated (e.g.~it was not marked or
+evacuated), the free routine is called and the object is deleted from
+the list.  
+
+
+The remaining objects types are all administrative --- none of them may be entered.
+
+\subsection{Thread State Objects (TSOs)}\label{sect:TSO}
+
+In the multi-threaded system, the state of a suspended thread is
+packed up into a Thread State Object (TSO) which contains all the
+information needed to restart the thread and for the garbage collector
+to find all reachable objects.  When a thread is running, it may be
+``unpacked'' into machine registers and various other memory locations
+to provide faster access.
+
+Single-threaded systems don't really {\em need\/} TSOs --- but they do
+need some way to tell the storage manager about live roots so it is
+convenient to use a single TSO to store the mutator state even in
+single-threaded systems.
+
+Rather than manage TSOs' alloc/dealloc, etc., in some {\em ad hoc}
+way, we instead alloc/dealloc/etc them in the heap; then we can use
+all the standard garbage-collection/fetching/flushing/etc machinery on
+them.  So that's why TSOs are ``heap objects,'' albeit very special
+ones.
+\begin{center}
+\begin{tabular}{|l|l|}
+   \hline {\em Fixed header}
+\\ \hline @TSO_LINK@
+\\ \hline @TSO_WHATNEXT@
+\\ \hline @TSO_WHATNEXT_INFO@ 
+\\ \hline @TSO_STACK@ 
+\\ \hline {\em Exception Handlers}
+\\ \hline {\em Ticky Info}
+\\ \hline {\em Profiling Info}
+\\ \hline {\em Parallel Info}
+\\ \hline {\em GranSim Info}
+\\ \hline
+\end{tabular}
+\end{center}
+The contents of a TSO are:
+\begin{itemize}
+
+\item A pointer (@TSO_LINK@) used to maintain a list of threads with a similar
+  state (e.g.~all runable, all sleeping, all blocked on the same black
+  hole, all blocked on the same MVar, etc.)
+
+\item A word (@TSO_WHATNEXT@) which is in suspended threads to record
+ how to awaken it.  This typically requires a program counter which is stored
+ in the pointer @TSO_WHATNEXT_INFO@
+
+\item A pointer (@TSO_STACK@) to the top stack block.
+
+\item Optional information for ``Ticky Ticky'' statistics: @TSO_STK_HWM@ is
+  the maximum number of words allocated to this thread.
+
+\item Optional information for profiling: 
+  @TSO_CCC@ is the current cost centre.
+
+\item Optional information for parallel execution:
+\begin{itemize}
+
+\item The types of threads (@TSO_TYPE@):
+\begin{description}
+\item[@T_MAIN@]     Must be executed locally.
+\item[@T_REQUIRED@] A required thread  -- may be exported.
+\item[@T_ADVISORY@] An advisory thread -- may be exported.
+\item[@T_FAIL@]     A failure thread   -- may be exported.
+\end{description}
+
+\item I've no idea what else
+
+\end{itemize}
+
+\item Optional information for GranSim execution:
+\begin{itemize}
+\item locked         
+\item sparkname	 
+\item started at	 
+\item exported	 
+\item basic blocks	 
+\item allocs	 
+\item exectime	 
+\item fetchtime	 
+\item fetchcount	 
+\item blocktime	 
+\item blockcount	 
+\item global sparks	 
+\item local sparks	 
+\item queue		 
+\item priority	 
+\item clock          (gransim light only)
+\end{itemize}
+
+
+Here are the various queues for GrAnSim-type events.
+@
+Q_RUNNING   
+Q_RUNNABLE  
+Q_BLOCKED   
+Q_FETCHING  
+Q_MIGRATING 
+@
+
+\end{itemize}
+
+\subsection{Other weird objects}
+\label{sect:SPARK}
+\label{sect:BLOCKED_FETCH}
+
+\begin{description}
+\item[@BlockedFetch@ heap objects (`closures')] (parallel only)
+
+@BlockedFetch@s are inbound fetch messages blocked on local closures.
+They arise as entries in a local blocking queue when a fetch has been
+received for a local black hole.  When awakened, we look at their
+contents to figure out where to send a resume.
+
+A @BlockedFetch@ closure has the form:
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|l|}\hline
+{\em Fixed header} & link & node & gtid & slot & weight \\ \hline
+\end{tabular}
+\end{center}
+
+\item[Spark Closures] (parallel only)
+
+Spark closures are used to link together all closures in the spark pool.  When
+the current processor is idle, it may choose to speculatively evaluate some of
+the closures in the pool.  It may also choose to delete sparks from the pool.
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|l|}\hline
+{\em Fixed header} & {\em Spark pool link} & {\em Sparked closure} \\ \hline
+\end{tabular}
+\end{center}
+
+
+\end{description}
+
+
+\subsection{Stack Objects}
+\label{sect:STACK_OBJECT}
+\label{sect:stacks}
+
+These are ``stack objects,'' which are used in the threaded world as
+the stack for each thread is allocated from the heap in smallish
+chunks.  (The stack in the sequential world is allocated outside of
+the heap.)
+
+Each reduction thread has to have its own stack space.  As there may
+be many such threads, and as any given one may need quite a big stack,
+a naive give-'em-a-big-stack-and-let-'em-run approach will cost a {\em
+lot} of memory.
+
+Our approach is to give a thread a small stack space, and then link
+on/off extra ``chunks'' as the need arises.  Again, this is a
+storage-management problem, and, yet again, we choose to graft the
+whole business onto the existing heap-management machinery.  So stack
+objects will live in the heap, be garbage collected, etc., etc..
+
+A stack object is laid out like this:
+
+\begin{center}
+\begin{tabular}{|l|}
+\hline
+{\em Fixed header} 
+\\ \hline
+{\em Link to next stack object (0 for last)}
+\\ \hline
+{\em N, the payload size in words}
+\\ \hline
+{\em @Sp@ (byte offset from head of object)}
+\\ \hline
+{\em @Su@ (byte offset from head of object)}
+\\ \hline
+{\em Payload (N words)}
+\\ \hline
+\end{tabular}
+\end{center}
+
+\ToDo{Are stack objects on the mutable list?}
+
+The stack grows downwards, towards decreasing
+addresses.  This makes it easier to print out the stack
+when debugging, and it means that a return address is
+at the lowest address of the chunk of stack it ``knows about''
+just like an info pointer on a closure.
+
+The garbage collector needs to be able to find all the
+pointers in a stack.  How does it do this?
+
+\begin{itemize}
+
+\item Within the stack there are return addresses, pushed
+by @case@ expressions.  Below a return address (i.e. at higher
+memory addresses, since the stack grows downwards) is a chunk
+of stack that the return address ``knows about'', namely the
+activation record of the currently running function.
+
+\item Below each such activation record is a {\em pending-argument
+section}, a chunk of
+zero or more words that are the arguments to which the result
+of the function should be applied.  The return address does not
+statically
+``know'' how many pending arguments there are, or their types.
+(For example, the function might return a result of type $\alpha$.)
+
+\item Below each pending-argument section is another return address,
+and so on.  Actually, there might be an update frame instead, but we
+can consider update frames as a special case of a return address with
+a well-defined activation record.
+
+\ToDo{Doesn't it {\em have} to be an update frame?  After all, the arg
+satisfaction check is @Su - Sp >= ...@.}
+
+\end{itemize}
+
+The game plan is this.  The garbage collector
+walks the stack from the top, traversing pending-argument sections and
+activation records alternately.  Next we discuss how it finds
+the pointers in each of these two stack regions.
+
+
+\subsubsection{Activation records}\label{sect:activation-records}
+
+An {\em activation record} is a contiguous chunk of stack,
+with a return address as its first word, followed by as many
+data words as the return address ``knows about''.  The return
+address is actually a fully-fledged info pointer.  It points
+to an info table, replete with:
+
+\begin{itemize}
+\item entry code (i.e. the code to return to).
+\item @INFO_TYPE@ is either @RET_SMALL/RET_VEC_SMALL@ or @RET_BIG/RET_VEC_BIG@, depending
+on whether the activation record has more than 32 data words (\note{64 for 8-byte-word architectures}) and on whether 
+to use a direct or a vectored return.
+\item @INFO_SM@ for @RET_SMALL@ is a bitmap telling the layout
+of the activation record, one bit per word.  The least-significant bit
+describes the first data word of the record (adjacent to the fixed
+header) and so on.  A ``@1@'' indicates a non-pointer, a ``@0@''
+indicates
+a pointer.  We don't need to indicate exactly how many words there
+are,
+because when we get to all zeros we can treat the rest of the 
+activation record as part of the next pending-argument region.
+
+For @RET_BIG@ the @INFO_SM@ field points to a block of bitmap
+words, starting with a word that tells how many words are in
+the block.
+
+\item @INFO_SRT@ is the Static Reference Table for the return
+address (Section~\ref{sect:srt}).
+\end{itemize}
+
+The activation record is a fully fledged closure too.
+As well as an info pointer, it has all the other attributes of
+a fixed header (Section~\ref{sect:fixed-header}) including a saved cost
+centre which is reloaded when the return address is entered.
+
+In other words, all the attributes of closures are needed for
+activation records, so it's very convenient to make them look alike.
+
+
+\subsubsection{Pending arguments}
+
+So that the garbage collector can correctly identify pointers
+in pending-argument sections we explicitly tag all non-pointers.
+Every non-pointer in a pending-argument section is preceded
+(at the next lower memory word) by a one-word byte count that
+says how many bytes to skip over (excluding the tag word).
+
+The garbage collector traverses a pending argument section from 
+the top (i.e. lowest memory address).  It looks at each word in turn:
+
+\begin{itemize}
+\item If it is less than or equal to a small constant @MAX_STACK_TAG@
+then
+it treats it as a tag heralding zero or more words of non-pointers,
+so it just skips over them.
+
+\item If it points to the code segment, it must be a return
+address, so we have come to the end of the pending-argument section.
+
+\item Otherwise it must be a bona fide heap pointer.
+\end{itemize}
+
+
+\subsection{The Stable Pointer Table}\label{sect:STABLEPTR_TABLE}
+
+A stable pointer is a name for a Haskell object which can be passed to
+the external world.  It is ``stable'' in the sense that the name does
+not change when the Haskell garbage collector runs---in contrast to
+the address of the object which may well change.
+
+A stable pointer is represented by an index into the
+@StablePointerTable@.  The Haskell garbage collector treats the
+@StablePointerTable@ as a source of roots for GC.
+
+In order to provide efficient access to stable pointers and to be able
+to cope with any number of stable pointers (eg $0 \ldots 100000$), the
+table of stable pointers is an array stored on the heap and can grow
+when it overflows.  (Since we cannot compact the table by moving
+stable pointers about, it seems unlikely that a half-empty table can
+be reduced in size---this could be fixed if necessary by using a
+hash table of some sort.)
+
+In general a stable pointer table closure looks like this:
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|l|l|l|l|l|l|}
+\hline
+{\em Fixed header} & {\em No of pointers} & {\em Free} & $SP_0$ & \ldots & $SP_{n-1}$ 
+\\\hline
+\end{tabular}
+\end{center}
+
+The fields are:
+\begin{description}
+
+\item[@NPtrs@:] number of (stable) pointers.
+
+\item[@Free@:] the byte offset (from the first byte of the object) of the first free stable pointer.
+
+\item[$SP_i$:] A stable pointer slot.  If this entry is in use, it is
+an ``unstable'' pointer to a closure.  If this entry is not in use, it
+is a byte offset of the next free stable pointer slot.
+
+\end{description}
+
+When a stable pointer table is evacuated
+\begin{enumerate}
+\item the free list entries are all set to @NULL@ so that the evacuation
+  code knows they're not pointers;
+
+\item The stable pointer slots are scanned linearly: non-@NULL@ slots
+are evacuated and @NULL@-values are chained together to form a new free list.
+\end{enumerate}
+
+There's no need to link the stable pointer table onto the mutable
+list because we always treat it as a root.
+
+
+
+\section{The Storage Manager}
+
+The generational collector remembers the depth of the last generation
+collected and the value of the heap pointer at the end of the last GC.
+If the mutator has not moved the heap pointer, that means that the
+amount of space recovered is insufficient to satisfy even one request
+and it is time to collect an older generation or report a heap overflow.
+
+A deeper collection is also triggered when a minor collection fails to
+recover at least @...@ bytes of space.
+
+When can a GC happen?
+
+@
+- During updates (ie during returns)
+- When a heap check fails
+- When a stack check fails (concurrent system only)
+- When a context switch happens (concurrent system only)
+
+When do heap checks occur?
+- Immediately after entering a thunk
+- Immediately after entering a case alternative
+
+When do stack checks occur?
+- We calculate the worst-case stack usage of an entire
+  thunk so there's no need to put a check inside each alternative.
+- Immediately after entering a thunk
+  We can't make a similar worst-case calculation for heap usage
+  because the heap isn't used in a stacklike manner so any
+  evaluation inside a case might steal some of the heap we've
+  checked for.
+
+Concurrency
+- Threads can be blocked
+- Threads can be put to sleep
+  - Heap may move while we sleep
+  - Black holing may happen while we sleep (ie during GC)
+@
+
+\subsection{The SM state}
+
+Contains @Hp@, @HpLim@, @StablePtrTable@ plus version-specific info.
+
+\begin{itemize}
+
+\item Static Object list 
+\item Foreign Object list
+\item Stable Pointer Table
+
+\end{itemize}
+
+In addition, the generational collector requires:
+
+\begin{itemize}
+
+\item Old Generation Indirection list
+\item Mutables list --- list of mutable objects in the old generation.
+\item @OldLim@ --- the boundary between the generations
+\item Old Foreign Object list --- foreign objects in the old generation
+
+\end{itemize}
+
+It is passed a table of {\em roots\/} containing
+
+\begin{itemize}
+
+\item All runnable TSOs
+
+\end{itemize}
+
+
+In the parallel system, there must be some extra magic associated with
+global GC.
+
+\subsection{The SM interface}
+
+@initSM@ finalizes any runtime parameters of the storage manager.
+
+@exitSM@ does any cleaning up required by the storage manager before
+the program is executed. Its main purpose is to print any summary
+statistics.
+
+@initHeap@ allocates the heap. It initialises the @hp@ and @hplim@
+fields of @sm@ to represent an empty heap for the compiled-in garbage
+collector.  It also initialises @CAFlist@ to be the empty list. If we
+are using Appel's collector it also initialises the @OldLim@ field.
+It also initialises the stable pointer table and the @ForeignObjList@
+(and @OldForeignObjList@) fields.
+
+@collectHeap@ invokes the garbage collector.  @collectHeap@ requires
+all the fields of @sm@ to be initialised appropriately (from the
+STG-machine registers).  The following are identified as heap roots:
+\begin{itemize}
+\item The updated CAFs recorded in @CAFlist@.
+\item Any pointers found on the stack.
+\item All runnable and sleeping TSOs.
+\item The stable pointer table.
+\end{itemize}
+
+There are two possible results from a garbage collection:
+\begin{description} 
+\item[@GC_FAIL@] 
+The garbage collector is unable to free up any more space.
+
+\item[@GC_SUCCESS@]
+The garbage collector managed to free up more space.
+
+\begin{itemize} 
+\item @hp@ and @hplim@ will indicate the new space available for
+allocation.
+
+\item The elements of @CAFlist@ and the stable pointers will be
+updated to point to the new locations of the closures they reference.
+
+\item Any members of @ForeignObjList@ which became garbage should have
+been reported (by calling their finalising routines; and the
+@(Old)ForeignObjList@ updated to contain only those Foreign objects
+which are still live.  
+
+\end{itemize}
+
+\end{description}
+
+
+%************************************************************************
+%*									*
+\subsection{``What really happens in a garbage collection?''}
+%*									*
+%************************************************************************
+
+This is a brief tutorial on ``what really happens'' going to/from the
+storage manager in a garbage collection.
+
+\begin{description}
+%------------------------------------------------------------------------
+\item[The heap check:]
+
+[OLD-ISH: WDP]
+
+If you gaze into the C output of GHC, you see many macros calls like:
+\begin{verbatim}
+HEAP_CHK_2PtrsLive((_FHS+2));
+\end{verbatim}
+
+This expands into the C (roughly speaking...):
+@
+Hp = Hp + (_FHS+2);	/* optimistically move heap pointer forward */
+
+GC_WHILE_OR_IF (HEAP_OVERFLOW_OP(Hp, HpLim) OR_INTERVAL_EXPIRED) {
+	STGCALL2_GC(PerformGC, <liveness-bits>, (_FHS+2));
+}
+@
+
+In the parallel world, where we will need to re-try the heap check,
+@GC_WHILE_OR_IF@ will be a ``while''; in the sequential world, it will
+be an ``if''.
+
+The ``heap lookahead'' checks, which are similar and used for
+multi-precision @Integer@ ops, have some further complications.  See
+the commentary there (@StgMacros.lh@).
+
+%------------------------------------------------------------------------
+\item[Into @callWrapper_GC@...:]
+
+When we failed the heap check (above), we were inside the
+GCC-registerised ``threaded world.''  @callWrapper_GC@ is all about
+getting in and out of the threaded world.  On SPARCs, with register
+windows, the name of the game is not shifting windows until we have
+what we want out of the old one.  In tricky cases like this, it's best
+written in assembly language.
+
+Performing a GC (potentially) means giving up the thread of control.
+So we must fill in the thread-state-object (TSO) [and its associated
+stk object] with enough information for later resumption:
+\begin{enumerate}
+\item
+Save the return address in the TSO's PC field.
+\item
+Save the machine registers used in the STG threaded world in their
+corresponding TSO fields.  We also save the pointer-liveness
+information in the TSO.
+\item
+The registers that are not thread-specific, notably @Hp@ and
+@HpLim@, are saved in the @StorageMgrInfo@ structure.
+\item
+Call the routine it was asked to call; in this example, call
+@PerformGC@ with arguments @<liveness>@ and @_FHS+2@ (some constant)...
+
+\end{enumerate}
+
+%------------------------------------------------------------------------
+\item[Into the heap overflow wrapper, @PerformGC@ [parallel]:]
+
+Most information has already been saved in the TSO.
+
+\begin{enumerate}
+\item
+The first argument (@<liveness>@, in our example) say what registers
+are live, i.e., are ``roots'' the storage manager needs to know.
+\begin{verbatim}
+StorageMgrInfo.rootno	= 2;
+StorageMgrInfo.roots[0]	= (P_) Ret1_SAVE;
+StorageMgrInfo.roots[1]	= (P_) Ret2_SAVE;
+\end{verbatim}
+
+\item
+We move the heap-pointer back [we had optimistically
+advanced it, in the initial heap check]
+
+\item 
+We load up the @smInfo@ data from the STG registers' @*_SAVE@ locations.
+
+\item
+We mark on the scheduler's big ``blackboard'' that a GC is
+required.
+
+\item
+We reschedule, i.e., this thread gives up control.  (The scheduler
+will presumably initiate a garbage-collection, but it may have to do
+any number of other things---flushing, for example---before ``normal
+execution'' resumes; and it most certainly may not be this thread that
+resumes at that point!)
+\end{enumerate}
+
+IT IS AT THIS POINT THAT THE WORLD IS COMPLETELY TIDY.
+
+%------------------------------------------------------------------------
+\item[Out of @callWrapper_GC@ [parallel]:]
+
+When this thread is finally resumed after GC (and who knows what
+else), it will restart by the normal enter-TSO/enter-stack-object
+sequence, which has the effect of re-loading the registers, etc.,
+(i.e., restoring the state).
+
+Because the address we saved in the TSO's PC field was that at the end
+of the heap check, and because the check is a while-loop in the
+parallel system, we will now loop back around, and make sure there is
+enough space before continuing.
+\end{description}
+
+
+
+\subsection{Static Reference Tables (SRTs)}
+\label{sect:srt}
+\label{sect:CAF}
+\label{sect:static-objects}
+
+In the above, we assumed that objects always contained pointers to all
+their free variables.  In fact, this isn't quite true: GHC omits
+pointers to top-level objects and allocates their closures in static
+memory.  This optimisation reduces the number of free variables in
+heap objects - reducing memory usage and the effort needed to put them
+into heap objects.  However, this optimisation comes at a cost: we
+need to complicate the garbage collector with machinery for tracing
+these static references.
+
+Early versions of GHC used a very simple algorithm: it treated all
+static objects as roots.  This is safe in the sense that no object is
+ever deallocated if there's a chance that it might be required later
+but can lead to some terrible space leaks.  For example, this program
+ought to be able to run in constant space but, because @xs@ is never
+deallocated, it runs in linear space.
+
+@
+main = print xs
+xs = [1..]
+@
+
+The correct behaviour is for the garbage collector to keep a static
+object alive iff it might be required later in execution.  That is, if
+it is reachable from any live heap objects {\em or\/} from any return
+addresses found on the stack or from the current program counter.
+Since it is obviously infeasible for the garbage collector to scan
+machine code looking for static references, the code generator must
+generate a table of all static references in any piece of code (and we
+must place a pointer to this table next to any piece of code we
+generate).
+
+Here's what the SRT has to contain:
+
+@
+...
+@
+
+Here's how we represent it:
+
+@
+...
+must be able to handle 0 references well
+@
+
+@
+Other trickery:
+o The CAF list
+o The scavenge list
+o Generational GC trickery
+@
+
+\subsection{Space leaks and black holes}
+\label{sect:black-hole}
+
+\iffalse
+
+\ToDo{Insert text stolen from update paper}
+
+\else
+
+A program exhibits a {\em space leak} if it retains storage that is
+sure not to be used again.  Space leaks are becoming increasingly
+common in imperative programs that @malloc@ storage and fail
+subsequently to @free@ it.  They are, however, also common in
+garbage-collected systems, especially where lazy evaluation is
+used.[.wadler leak, runciman heap profiling jfp.]
+
+Quite a bit of experience has now accumulated suggesting that
+implementors must be very conscientious about avoiding gratuitous
+space leaks --- that is, ones which are an accidental artefact of some
+implementation technique.[.appel book.]  The update mechanism is
+a case in point, as <.jones jfp leak.> points out.  Consider a thunk for
+the expression
+@
+  let xs = [1..1000] in last xs
+@ 
+where @last@ is a function that returns the last element of its
+argument list.  When the thunk is entered it will call @last@, which
+will consume @xs@ until it finds the last element.  Since the list
+@[1..1000]@ is produced lazily one might reasonably expect the
+expression to evaluate in constant space.  But {\em until the moment
+of update, the thunk itself still retains a pointer to the beginning
+of the list @xs@}.  So, until the update takes place the whole list
+will be retained!
+
+Of course, this is completely gratuitous.  The pointer to @xs@ in the
+thunk will never be used again.  In <.peyton stock hardware.> the solution to
+this problem that we advocated was to overwrite a thunk's info with a
+fixed ``black hole'' info pointer, {\em at the moment of entry}.  The
+storage management information attached to a black-hole info pointer
+tells the garbage collector that the closure contains no pointers,
+thereby plugging the space leak.
+
+\subsubsection{Lazy black-holing}
+
+Black-holing is a well-known idea.  The trouble is that it is
+gallingly expensive.  To avoid the occasional space leak, for every
+single thunk entry we have to load a full-word literal constant into a
+register (often two instructions) and then store that register into a
+memory location.  
+
+Fortunately, this cost can easily be avoided.  The
+idea is simple: {\em instead of black-holing every thunk on entry,
+wait until the garbage collector is called, and then black-hole all
+(and only) the thunks whose evaluation is in progress at that moment}.
+There is no benefit in black-holing a thunk that is updated before
+garbage collection strikes!  In effect, the idea is to perform the
+black-holing operation lazily, only when it is needed.  This
+dramatically cuts down the number of black-holing operations, as our
+results show {\em forward ref}.
+
+How can we find all the thunks whose evaluation is in progress?  They
+are precisely the ones for which update frames are on the stack.  So
+all we need do is find all the update frames (via the @Su@ chain) and
+black-hole their thunks right at the start of garbage collection.
+Notice that it is not enough to refrain from treating update frames as
+roots: firstly because the thunks to which they point may need to be
+moved in a copying collector, but more importantly because the thunk
+might be accessible via some other route.
+
+\subsubsection{Detecting loops}
+
+Black-holing has a second minor advantage: evaluation of a thunk whose
+value depends on itself will cause a black hole closure to be entered,
+which can cause a suitable error message to be displayed. For example,
+consider the definition
+@
+  x = 1+x
+@
+The code to evaluate @x@'s right hand side will evaluate @x@.  In the
+absence of black-holing, the result will be a stack overflow, as the
+evaluator repeatedly pushes a return address and enters @x@.  If
+thunks are black-holed on entry, then this infinite loop can be caught
+almost instantly.
+
+With our new method of lazy black-holing, a self-referential program
+might cause either stack overflow or a black-hole error message,
+depending on exactly when garbage collection strikes.  It is quite
+easy to conceal these differences, however.  If stack overflow occurs,
+all we need do is examine the update frames on the stack to see if
+more than one refers to the same thunk.  If so, there is a loop that
+would have been detected by eager black-holing.
+
+\subsubsection{Lazy locking}
+\label{sect:lock}
+
+In a parallel implementation, it is necessary somehow to ``lock'' a
+thunk that is under evaluation, so that other parallel evaluators
+cannot simultaneously evaluate it and thereby duplicate work.
+Instead, an evaluator that enters a locked thunk should be blocked,
+and made runnable again when the thunk is updated.
+
+This locking is readily arranged in the same way as black-holing, by
+overwriting the thunk's info pointer with a special ``locked'' info
+pointer, at the moment of entry.  If another evaluator enters the
+thunk before it has been updated, it will land in the entry code for
+the ``locked'' info pointer, which blocks the evaluator and queues it
+on the locked thunk.
+
+The details are given by <.portable parallel trinder.>.  However, the close similarity
+between locking and black holing suggests the following question: can
+locking be done lazily too?  The answer is that it can, except that
+locking can be postponed only until the next {\em context switch},
+rather than the next {\em garbage collection}.  We are assuming here
+that the parallel implementation does not use shared memory to allow
+two processors to access the same closure.  If such access is
+permitted then every thunk entry requires a hardware lock, and becomes
+much too expensive.
+
+Is lazy locking worth while, given that it requires extra work every
+context switch?  We believe it is, because contexts switches are
+relatively infrequent, and thousands of thunk-entries typically take
+place between each.
+
+{\em Measurements elsewhere.  Omit this section? If so, fix cross refs to here.}
+
+\fi
+
+
+\subsection{Squeezing identical updates}
+
+\iffalse
+
+\ToDo{Insert text stolen from update paper}
+
+\else
+
+Consider the following Haskell definition of the standard
+function @partition@ that divides a list into two, those elements
+that satisfy a predicate @p@ and those that do not:
+@
+  partition :: (a->Bool) -> [a] -> ([a],[a])
+  partition p [] = ([],[])
+  partition p (x:xs) = if p x then (x:ys, zs)
+                              else (ys, x:zs)
+                     where
+                       (ys,zs) = partition p xs
+@
+By the time this definition has been desugared, it looks like this:
+@
+  partition p xs
+    = case xs of
+        [] -> ([],[])
+        (x:xs) -> let
+                    t = partition p xs
+                    ys = fst t
+                    zs = snd t
+                  in
+                  if p x then (x:ys,zs)
+                         else (ys,x:zs)
+@
+Lazy evaluation demands that the recursive call is bound to an
+intermediate variable, @t@, from which @ys@ and @zs@ are lazily
+selected. (The functions @fst@ and @snd@ select the first and second
+elements of a pair, respectively.)
+
+Now, suppose that @partition@ is applied to a list @[x1,x2]@,
+all of whose
+elements satisfy @p@.  We can get a good idea of what will happen
+at runtime by unrolling the recursion a few times in our heads.
+Unrolling once, and remembering that @(p x1)@ is @True@, we get this:
+@
+  partition p [x1,x2]
+=
+  let t1 = partition [x2]
+      ys1 = fst t1
+      zs1 = snd t1
+  in (x1:ys1, zs1)
+@
+Unrolling the rest of the way gives this:
+@
+  partition p [x1,x2]
+=
+  let t2  = ([],[])
+      ys2 = fst t2
+      zs2 = snd t2
+      t1  = (x2:ys2,zs2)
+      ys1 = fst t1
+      zs1 = snd t1
+   in (x1:ys1,zs1)
+@
+Now consider what happens if @zs1@ is evaluated.  It is bound to a
+thunk, which will push an update frame before evaluating the
+expression @snd t1@.  This expression in turn forces evaluation of
+@zs2@, which pushes an update frame before evaluating @snd t2@.
+Indeed the stack of update frames will grow as deep as the list is
+long when @zs1@ is evaluated.  This is rather galling, since all the
+thunks @zs1@, @zs2@, and so on, have the same value.
+
+\ToDo{Describe the state-transformer case in which we get a space leak from
+pending update frames.}
+
+The solution is simple.  The garbage collector, which is going to traverse the
+update stack in any case, can easily identify two update frames that are directly
+on top of each other.  The second of these will update its target with the same
+value as the first.  Therefore, the garbage collector can perform the update 
+right away, by overwriting one update target with an indirection to the second,
+and eliminate the corresponding update frame.  In this way ever-growing stacks of
+update frames are reduced to a single representative at garbage collection time.
+If this is done at the start of garbage collection then, if it turns out that
+some of these update targets are garbage they will be collected right away.
+
+\fi
+
+\subsection{Space leaks and selectors}
+
+\iffalse
+
+\ToDo{Insert text stolen from update paper}
+
+\else
+
+In 1987, Wadler identified an important source of space leaks in
+lazy functional programs.  Consider the Haskell function definition:
+@
+  f p = (g1 a, g2 b) where (a,b) = p
+@
+The pattern-matching in the @where@ clause is known as
+{\em lazy pattern-matching}, because it is performed only if @a@
+or @b@ is actually evaluated.  The desugarer translates lazy pattern matching
+to the use of selectors, @fst@ and @snd@ in this case:
+@
+  f p = let a = fst p
+	    b = snd p
+	in
+	(b, a)
+@
+Now suppose that the second component of the pair @(f p)@, namely @a@,
+is evaluated and discarded, but the first is not although it remains
+reachable.  The garbage collector will find that the thunk for @b@ refers
+to @p@ and hence to @a@.  Thus, although @a@ cannot ever be used again, its
+space is retained.  It turns out that this space leak can have a very bad effect
+indeed on a program's space behaviour (Section~\ref{sect:selector-results}).
+
+Wadler's paper also proposed a solution: if the garbage collector
+encounters a thunk of the form @snd p@, where @p@ is evaluated, then
+the garbage collector should perform the selection and overwrite the
+thunk with a pointer to the second component of the pair.  In effect, the
+garbage collector thereby performs a bounded amount of as-yet-undemanded evaluation
+in the hope of improving space behaviour.
+We implement this idea directly, by making the garbage collector
+eagerly execute all selector thunks\footnote{A word of caution: it is rather easy 
+to make a mistake in the implementation, especially if the garbage collector
+uses pointer reversal to traverse the reachable graph.},
+with results 
+reported in Section~\ref{sect:THUNK_SEL}.
+
+One could easily imagine generalisations of this idea, with the garbage 
+collector performing bounded amounts of space-saving work.  One example is
+this:
+@
+  f x []     = (x,x)
+  f x (y:ys) = f (x+1) ys
+@
+Most lazy evaluators will build up a chain of thunks for the accumulating
+parameter, @x@, each of which increments @x@.  It is not safe to evaluate
+any of these thunks eagerly, since @f@ is not strict in @x@, and we know nothing
+about the value of @x@ passed in the initial call to @f@.
+On the other hand, if the garbage collector found a thunk @(x+1)@ where
+@x@ happened to be evaluated, then it could ``execute'' it eagerly.
+If done carefully, the entire chain could be eliminated in a single
+garbage collection.   We have not (yet) implemented this idea.
+A very similar idea, dubbed ``stingy evaluation'', is described 
+by <.stingy.>.
+
+<.sparud lazy pattern matching.> describes another solution to the
+lazy-pattern-matching
+problem.  His solution involves adding code to the two thunks for
+@a@ and @b@ so that if either is evaluated it arranges to update the
+other as well as itself.  The garbage-collector solution is a little
+more general, since it applies whether or not the selectors were
+generated by lazy pattern matching, and in our setting it was easier
+to implement than Sparud's.
+
+\fi
+
+
+\subsection{Internal workings of the Compacting Collector}
+
+\subsection{Internal workings of the Copying Collector}
+
+\subsection{Internal workings of the Generational Collector}
+
+
+
+\section{Profiling}
+
+Registering costs centres looks awkward - can we tidy it up?
+
+\section{Parallelism}
+
+Something about global GC, inter-process messages and fetchmes.
+
+\section{Debugging}
+
+\section{Ticky Ticky profiling}
+
+Measure what proportion of ...:
+\begin{itemize}
+\item
+... Enters are to data values, function values, thunks.
+\item
+... allocations are for data values, functions values, thunks.
+\item
+... updates are for data values, function values.
+\item
+... updates ``fit''
+\item
+... return-in-heap (dynamic)
+\item
+... vectored return (dynamic)
+\item
+... updates are wasted (never re-entered).
+\item
+... constructor returns get away without hitting an update.
+\end{itemize}
+
+%************************************************************************
+%*									*
+\subsubsection[ticky-stk-heap-use]{Stack and heap usage}
+%*									*
+%************************************************************************
+
+Things we are interested in here:
+\begin{itemize}
+\item
+How many times we do a heap check and move @Hp@; comparing this with
+the allocations gives an indication of how many things we get per trip
+to the well:
+
+If we do a ``heap lookahead,'' we haven't really allocated any
+heap, so we need to undo the effects of an @ALLOC_HEAP@:
+
+\item
+The stack high-water mark.
+
+\item
+Re-use of stack slots, and stubbing of stack slots:
+
+\end{itemize}
+
+%************************************************************************
+%*									*
+\subsubsection[ticky-allocs]{Allocations}
+%*									*
+%************************************************************************
+
+We count things every time we allocate something in the dynamic heap.
+For each, we count the number of words of (1)~``admin'' (header),
+(2)~good stuff (useful pointers and data), and (3)~``slop'' (extra
+space, in hopes it will allow an in-place update).
+
+The first five macros are inserted when the compiler generates code
+to allocate something; the categories correspond to the @ClosureClass@
+datatype (manifest functions, thunks, constructors, big tuples, and
+partial applications).
+
+We may also allocate space when we do an update, and there isn't
+enough space.  These macros suffice (for: updating with a partial
+application and a constructor):
+
+In the threaded world, we allocate space for the spark pool, stack objects,
+and thread state objects.
+
+The histogrammy bit is fairly straightforward; the @-2@ is: one for
+0-origin C arrays; the other one because we do {\em no} one-word
+allocations, so we would never inc that histogram slot; so we shift
+everything over by one.
+
+Some hard-to-account-for words are allocated by/for primitives,
+includes Integer support.  @ALLOC_PRIM2@ tells us about these.  We
+count everything as ``goods'', which is not strictly correct.
+(@ALLOC_PRIM@ is the same sort of stuff, but we know the
+admin/goods/slop breakdown.)
+
+%************************************************************************
+%*									*
+\subsubsection[ticky-enters]{Enters}
+%*									*
+%************************************************************************
+
+We do more magical things with @ENT_FUN_DIRECT@.  Besides simply knowing
+how many ``fast-entry-point'' enters there were, we'd like {\em simple}
+information about where those enters were, and the properties thereof.
+@
+struct ent_counter {
+    unsigned	registeredp:16,	/* 0 == no, 1 == yes */
+    		arity:16,	/* arity (static info) */
+    		Astk_args:16,	/* # of args off A stack */
+    		Bstk_args:16;	/* # of args off B stack */
+				/* (rest of args are in registers) */
+    StgChar	*f_str;		/* name of the thing */
+    StgChar	*f_arg_kinds;	/* info about the args types */
+    StgChar	*wrap_str;	/* name of its wrapper (if any) */
+    StgChar	*wrap_arg_kinds;/* info about the orig wrapper's arg types */
+    I_		ctr;		/* the actual counter */
+    struct ent_counter *link;	/* link to chain them all together */
+};
+@
+
+%************************************************************************
+%*									*
+\subsubsection[ticky-returns]{Returns}
+%*									*
+%************************************************************************
+
+Whenever a ``return'' occurs, it is returning the constituent parts of
+a data constructor.  The parts can be returned either in registers, or
+by allocating some heap to put it in (the @ALLOC_*@ macros account for
+the allocation).  The constructor can either be an existing one
+(@*OLD*@) or we could have {\em just} figured out this stuff
+(@*NEW*@).
+
+Here's some special magic that Simon wants [edited to match names
+actually used]:
+
+@
+From: Simon L Peyton Jones <simonpj>
+To: partain, simonpj
+Subject: counting updates
+Date: Wed, 25 Mar 92 08:39:48 +0000
+
+I'd like to count how many times we update in place when actually Node
+points to the thing.  Here's how:
+
+@RET_OLD_IN_REGS@ sets the variable @ReturnInRegsNodeValid@ to @True@;
+@RET_NEW_IN_REGS@ sets it to @False@.
+
+@RET_SEMI_???@ sets it to??? ToDo [WDP]
+
+@UPD_CON_IN_PLACE@ tests the variable, and increments @UPD_IN_PLACE_COPY_ctr@
+if it is true.
+
+Then we need to report it along with the update-in-place info.
+@
+
+
+Of all the returns (sum of four categories above), how many were
+vectored?  (The rest were obviously unvectored).
+
+%************************************************************************
+%*									*
+\subsubsection[ticky-update-frames]{Update frames}
+%*									*
+%************************************************************************
+
+These macros count up the following update information.
+
+\begin{tabular}{|l|l|} \hline
+Macro			&	Counts					\\ \hline
+			&						\\
+@UPDF_STD_PUSHED@ 	& 	Update frame pushed			\\
+@UPDF_CON_PUSHED@	&	Constructor update frame pushed		\\
+@UPDF_HOLE_PUSHED@	&	An update frame to update a black hole	\\
+@UPDF_OMITTED@		&	A thunk decided not to push an update frame \\
+			&	(all subsets of @ENT_THK@)		\\
+@UPDF_RCC_PUSHED@	&	Cost Centre restore frame pushed	\\
+@UPDF_RCC_OMITTED@	&	Cost Centres not required -- not pushed \\\hline
+\end{tabular}
+
+%************************************************************************
+%*									*
+\subsubsection[ticky-updates]{Updates}
+%*									*
+%************************************************************************
+
+These macros record information when we do an update.  We always
+update either with a data constructor (CON) or a partial application
+(PAP).
+
+\begin{tabular}{|l|l|}\hline
+Macro			&	Where						\\ \hline
+  			&							\\
+@UPD_EXISTING@		&	Updating with an indirection to something	\\
+			&	already in the heap				\\
+@UPD_SQUEEZED@		&	Same as @UPD_EXISTING@ but because		\\
+			&	of stack-squeezing				\\
+@UPD_CON_W_NODE@	&	Updating with a CON: by indirecting to Node	\\
+@UPD_CON_IN_PLACE@	&	Ditto, but in place				\\
+@UPD_CON_IN_NEW@	&	Ditto, but allocating the object		\\
+@UPD_PAP_IN_PLACE@	&	Same, but updating w/ a PAP			\\
+@UPD_PAP_IN_NEW@	&							\\\hline
+\end{tabular}
+
+%************************************************************************
+%*									*
+\subsubsection[ticky-selectors]{Doing selectors at GC time}
+%*									*
+%************************************************************************
+
+@GC_SEL_ABANDONED@: we could've done the selection, but we gave up
+(e.g., to avoid overflowing the C stack); @GC_SEL_MINOR@: did a
+selection in a minor GC; @GC_SEL_MAJOR@: ditto, but major GC.
+
+
+
+\section{History}
+
+We're nuking the following:
+
+\begin{itemize}
+\item
+  Two stacks
+
+\item
+  Return in registers.
+  This lets us remove update code pointers from info tables,
+  removes the need for phantom info tables, simplifies 
+  semi-tagging, etc.
+
+\item
+  Threaded GC.
+  Careful analysis suggests that it doesn't buy us very much
+  and it is hard to work with.
+
+  Eliminating threaded GCs eliminates the desire to share SMReps
+  so they are (once more) part of the Info table.
+
+\item
+  RetReg.
+  Doesn't buy us anything on a register-poor architecture and
+  isn't so important if we have semi-tagging.
+
+@
+    - Probably bad on register poor architecture 
+    - Can avoid need to write return address to stack on reg rich arch.
+      - when a function does a small amount of work, doesn't 
+  	enter any other thunks and then returns.
+  	eg entering a known constructor (but semitagging will catch this)
+    - Adds complications
+@
+
+\item
+  Update in place
+
+  This lets us drop CONST closures and CHARLIKE closures (assuming we
+  don't support Unicode).  The only point of these closures was to 
+  avoid updating with an indirection.
+
+  We also drop @MIN_UPD_SIZE@ --- all we need is space to insert an
+  indirection or a black hole.
+
+\item
+  STATIC SMReps are now called CONST
+
+\item
+  @SM_MUTVAR@ is new
+
+\item The profiling ``kind'' field is now encoded in the @INFO_TYPE@ field.
+This identifies the general sort of the closure for profiling purposes.
+
+\item Various papers describe deleting update frames for unreachable objects.
+  This has never been implemented and we don't plan to anytime soon.
+
+\end{itemize}
+
+\section{Old tricks}
+
+@CAF@ indirections:
+
+These are statically defined closures which have been updated with a
+heap-allocated result.  Initially these are exactly the same as a
+@STATIC@ closure but with special entry code. On entering the closure
+the entry code must:
+
+\begin{itemize}
+\item Allocate a black hole in the heap which will be updated with
+      the result.
+\item Overwrite the static closure with a special @CAF@ indirection.
+
+\item Link the static indirection onto the list of updated @CAF@s.
+\end{itemize}
+
+The indirection and the link field require the initial @STATIC@
+closure to be of at least size @MIN_UPD_SIZE@ (excluding the fixed
+header).
+
+@CAF@s are treated as special garbage collection roots.  These roots
+are explicitly collected by the garbage collector, since they may
+appear in code even if they are not linked with the main heap.  They
+consequently represent potentially enormous space-leaks.  A @CAF@
+closure retains a fixed location in statically allocated data space.
+When updated, the contents of the @CAF@ indirection are changed to
+reflect the new closure. @CAF@ indirections require special garbage
+collection code.
+
+\section{Old stuff about SRTs}
+
+Garbage collection of @CAF@s is tricky.  We have to cope with explicit
+collection from the @CAFlist@ as well as potential references from the
+stack and heap which will cause the @CAF@ evacuation code to be
+called.  They are treated like indirections which are shorted out.
+However they must also be updated to point to the new location of the
+new closure as the @CAF@ may still be used by references which
+reside in the code.
+
+{\bf Copying Collection}
+
+A first scheme might use evacuation code which evacuates the reference
+and updates the indirection. This is no good as subsequent evacuations
+will result in an already evacuated closure being evacuated. This will
+leave a forward reference in to-space!
+
+An alternative scheme evacuates the @CAFlist@ first. The closures
+referenced are evacuated and the @CAF@ indirection updated to point to
+the evacuated closure. The @CAF@ evacuation code simply returns the
+updated indirection pointer --- the pointer to the evacuated closure.
+Unfortunately the closure the @CAF@ references may be a static
+closure, in fact, it may be another @CAF@. This will cause the second
+@CAF@'s evacuation code to be called before the @CAF@ has been
+evacuated, returning an unevacuated pointer.
+
+Another scheme leaves updating the @CAF@ indirections to the end of
+the garbage collection.  All the references are evacuated and
+scavenged as usual (including the @CAFlist@). Once collection is
+complete the @CAFlist@ is traversed updating the @CAF@ references with
+the result of evacuating the referenced closure again. This will
+immediately return as it must be a forward reference, a static
+closure, or a @CAF@ which will indirect by evacuating its reference.
+
+The crux of the problem is that the @CAF@ evacuation code needs to
+know if its reference has already been evacuated and updated. If not,
+then the reference can be evacuated, updated and returned safely
+(possibly evacuating another @CAF@). If it has, then the updated
+reference can be returned. This can be done using two @CAF@
+info-tables. At the start of a collection the @CAFlist@ is traversed
+and set to an internal {\em evacuate and update} info-table. During
+collection, evacution of such a @CAF@ also results in the info-table
+being reset back to the standard @CAF@ info-table. Thus subsequent
+evacuations will simply return the updated reference. On completion of
+the collection all @CAF@s will have {\em return reference} info-tables
+again.
+
+This is the scheme we adopt. A @CAF@ indirection has evacuation code
+which returns the evacuated and updated reference. During garbage
+collection, all the @CAF@s are overwritten with an internal @CAF@ info
+table which has evacuation code which performs this evacuate and
+update and restores the original @CAF@ code. At some point during the
+collection we must ensure that all the @CAF@s are indeed evacuated.
+
+The only potential problem with this scheme is a cyclic list of @CAF@s
+all directly referencing (possibly via indirections) another @CAF@!
+Evacuation of the first @CAF@ will fail in an infinite loop of @CAF@
+evacuations. This is solved by ensuring that the @CAF@ info-table is
+updated to a {\em return reference} info-table before performing the
+evacuate and update. If this {\em return reference} evacuation code is
+called before the actual evacuation is complete it must be because
+such a cycle of references exists. Returning the still unevacuated
+reference is OK --- all the @CAF@s will now reference the same
+@CAF@ which will reference itself! Construction of such a structure
+indicates the program must be in an infinite loop.
+
+{\bf Compacting Collector}
+
+When shorting out a @CAF@, its reference must be marked. A first
+attempt might explicitly mark the @CAF@s, updating the reference with
+the marked reference (possibly short circuting indirections). The
+actual @CAF@ marking code can indicate that they have already been
+marked (though this might not have actually been done yet) and return
+the indirection pointer so it is shorted out. Unfortunately the @CAF@
+reference might point to an indirection which will be subsequently
+shorted out. Rather than returning the @CAF@ reference we treat the
+@CAF@ as an indirection, calling the mark code of the reference, which
+will return the appropriately shorted reference.
+
+Problem: Cyclic list of @CAF@s all directly referencing (possibly via
+indirections) another @CAF@!
+
+Before compacting, the locations of the @CAF@ references are
+explicitly linked to the closures they reference (if they reference
+heap allocated closures) so that the compacting process will update
+them to the closure's new location. Unfortunately these locations'
+@CAF@ indirections are static.  This causes premature termination
+since the test to find the info pointer at the end of the location
+list will match more than one value.  This can be solved by using an
+auxiliary dynamic array (on the top of the A stack).  One location for
+each @CAF@ indirection is linked to the closure that the @CAF@
+references. Once collection is complete this array is traversed and
+the corresponding @CAF@ is then updated with the updated pointer from
+the auxiliary array.
+
+
+It is possible to use an alternative marking scheme, using a similar
+idea to the copying solution. This scheme avoids the need to update
+the @CAF@ references explicitly. We introduce an auxillary {\em mark
+and update} @CAF@ info-table which is used to update all @CAF@s at the
+start of a collection. The new code marks the @CAF@ reference,
+updating it with the returned reference.  The returned reference is
+itself returned so the @CAF@ is shorted out.  The code also modifies the
+@CAF@ info-table to be a {\em return reference}.  Subsequent attempts to
+mark the @CAF@ simply return the updated reference.
+
+A cyclic @CAF@ reference will result in an attempt to mark the @CAF@
+before the marking has been completed and the reference updated. We
+cannot start marking the @CAF@ as it is already being marked. Nor can
+we return the reference as it has not yet been updated. Neither can we
+treat the CAF as an indirection since the @CAF@ reference has been
+obscured by the pointer reversal stack. All we can do is return the
+@CAF@ itself. This will result in some @CAF@ references not being
+shorted out.
+
+This scheme has not been adopted but has been implemented. The code is
+commented out with @#if 0@.
+
+\subsection{The virtual register set}
+
+We refer to any (atomic) part of the virtual machine state as a ``register.''
+These ``registers'' may be shared between all threads in the system or may be
+specific to each thread.
+
+Global: 
+@
+  Hp
+  HpLim
+  Thread preemption flag
+@
+
+Thread specific:
+@
+  TSO - pointer to the TSO for when we have to pack thread away
+  Sp
+  SpLim
+  Su - used to calculate number of arguments on stack
+     - this is a more convenient representation
+  Call/return registers (aka General purpose registers)
+  Cost centre (and other debug/profile info)
+  Statistic gathering (not in production system)
+  Exception handlers 
+    Heap overflow  - possible global?
+    Stack overflow - possibly global?
+    Pattern match failure
+    maybe a failWith handler?
+    maybe an exitWith handler?
+    ...
+@
+
+Some of these virtual ``registers'' are used very frequently and should
+be mapped onto machine registers if at all possible.  Others are used
+very infrequently and can be kept in memory to free up registers for
+other uses.
+
+On register-poor architectures, we can play a few tricks to reduce the
+number of virtual registers which need to be accessed on a regular
+basis:
+
+@
+- HpLim trick
+- Grow stack and heap towards each other (single-threaded system only)
+- We might need to keep the C stack pointer in a register if that
+  is what the OS expects when a signal occurs.
+- Preemption flag trick
+- If any of the frequently accessed registers cannot be mapped onto
+  machine registers we should keep the TSO in a machine register to
+  allow faster access to all the other non-machine registers.
+@
+
+
+\end{document}
+
+
