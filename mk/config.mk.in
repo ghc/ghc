@@ -159,7 +159,7 @@ GhcCompilerWays=
 #
 #	-dcore-lint	check the types after every pass of the compiler;
 #			a pretty strong internal check
-GhcHcOpts=-O
+GhcHcOpts=-O -Rghc-timing
 
 # GhcWithHscBuiltViaC - build GHC compiler proper (\`hsc') from .hc files?
 GhcWithHscBuiltViaC=@BootingFromHc@
@@ -214,7 +214,7 @@ endif
 # 	-O is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
 
-GhcLibHcOpts=-O
+GhcLibHcOpts=-O -Rghc-timing
 
 # Win32 only: Enable the RTS and libraries to be built as DLLs
 # Don't split object files for libs if we're building DLLs
