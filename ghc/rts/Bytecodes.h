@@ -1,8 +1,8 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.18 2000/12/06 15:23:31 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.19 2000/12/08 14:34:52 sewardj Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Bytecode definitions.
  *
@@ -28,6 +28,7 @@
 #define bci_ARGCHECK  1
 #define bci_PUSH_L    2
 #define bci_PUSH_G    3
+#define bci_PUSH_AS   26
 #define bci_PUSHT_I   4
 #define bci_PUSHT_F   5
 #define bci_PUSHT_D   6
