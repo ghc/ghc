@@ -285,8 +285,7 @@ getAllFilesMatching :: SearchPath
 		    -> (ModuleHiMap, ModuleHiMap)
 		    -> (FilePath, String) 
 		    -> IO (ModuleHiMap, ModuleHiMap)
-getAllFilesMatching dirs hims (dir_path, suffix) = 
- do
+getAllFilesMatching dirs hims (dir_path, suffix) = ( do
     -- fpaths entries do not have dir_path prepended
   fpaths  <- getDirectoryContents dir_path
   is_dll <- catch
@@ -297,7 +296,7 @@ getAllFilesMatching dirs hims (dir_path, suffix) =
 			 return (if exists then Dll else NotDll)
 		)
 		(\ _ {-don't care-} -> return NotDll)
-  return (foldl (addModules is_dll) hims fpaths)
+  return (foldl (addModules is_dll) hims fpaths))
   -- soft failure
       `catch` 
         (\ err -> do
