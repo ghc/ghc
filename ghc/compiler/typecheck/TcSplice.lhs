@@ -33,7 +33,6 @@ import TcRnMonad
 
 import TysWiredIn	( mkListTy )
 import DsMeta		( exprTyConName, declTyConName, decTyConName, qTyConName )
-import CmdLineOpts	( DynFlags(..), CoreToDo(..), SimplifierMode(..), SimplifierSwitch(..) )
 import Outputable
 import GHC.Base		( unsafeCoerce# )	-- Should have a better home in the module hierarchy
 \end{code}
@@ -225,21 +224,21 @@ runMeta expr
     getGlobalRdrEnv	`thenM` \ rdr_env -> 
     let
 	ghci_mode = top_mode top_env
-	dflags    = top_dflags top_env
 
-	-- Compile the Template Haskell stuff with low 
-	-- optimisation even if the main compilation has
-	-- high optimisation.  This is a bit of a hack.
-	th_dflags = dflags { coreToDo = thCoreToDo }
-
-	hsc_env = HscEnv { hsc_mode   = ghci_mode, 
-			   hsc_HPT    = top_hpt top_env,
-			   hsc_dflags = th_dflags }
+	hsc_env = HscEnv { hsc_mode = ghci_mode, hsc_HPT = top_hpt top_env,
+			   hsc_dflags = top_dflags top_env }
 
 	pcs = PCS { pcs_nc = name_cache, pcs_EPS = eps }
 
 	print_unqual = unQualInScope rdr_env
     in
+    if (ghci_mode == OneShot) then
+	failWithTc (ptext SLIT("You must use --make or --interactive to run splice expressions"))
+	-- The reason for this is that the demand-linker doesn't have
+	-- enough information available to link all the things that
+	-- are needed when you try to run a splice
+    else
+
     ioToTcRn (HscMain.compileExpr hsc_env pcs this_mod 
 				  print_unqual expr) `thenM` \ hval ->
 
@@ -250,10 +249,6 @@ runMeta expr
 				        nest 4 (vcat [text "Code:" <+> ppr expr,
 						      text ("Exn: " ++ show exn)])])
 	  Right v  -> returnM v
-
-
-thCoreToDo :: [CoreToDo]
-thCoreToDo = [] -- CoreDoSimplify (SimplPhase 0) [MaxSimplifierIterations 3]]
 \end{code}
 
 
