@@ -65,13 +65,12 @@ int mprotect PROTO((caddr_t, size_t, int));
 #endif
 
 void 
-unmapMiddleStackPage(addr_, size)
-char * /*caddr_t*/ addr_;
+unmapMiddleStackPage(addr, size)
+char * /*caddr_t*/ addr;
 int size;
 {
     int pagesize = GETPAGESIZE();
-    caddr_t addr = addr_;
-    caddr_t middle = (caddr_t) (((W_) (addr + size / 2)) / pagesize * pagesize);
+    char * middle = (caddr_t) (((W_) (addr + size / 2)) / pagesize * pagesize);
 #if defined(cygwin32_TARGET_OS)
     unsigned int old_prot;
 #endif
