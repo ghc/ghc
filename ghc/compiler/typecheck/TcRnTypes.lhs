@@ -74,7 +74,7 @@ import UNSAFE_IO	( unsafeInterleaveIO )
 import FIX_IO		( fixIO )
 import Maybe		( mapMaybe )
 import List		( nub )
-import Control.Exception as Exception ( try, Exception )
+import EXCEPTION as Exception ( try, Exception )
 \end{code}
 
 
