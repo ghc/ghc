@@ -27,7 +27,7 @@ module Panic
 import Config
 import FastTypes
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 # if __GLASGOW_HASKELL__ > 504
 import System.Posix.Signals
 # else
@@ -41,7 +41,7 @@ import EXCEPTION        ( raiseInThread )
 # else
 import EXCEPTION	( throwTo )
 # endif /* GHC < 500 */
-#endif /* mingw32_TARGET_OS */
+#endif /* mingw32_HOST_OS */
 
 import DYNAMIC
 import qualified EXCEPTION as Exception
@@ -185,7 +185,7 @@ thread.
 \begin{code}
 installSignalHandlers :: IO ()
 installSignalHandlers = do
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
   main_thread <- myThreadId
   let sig_handler = Catch (throwTo main_thread 
 				(Exception.DynException (toDyn Interrupted)))

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.22 2002/09/13 15:02:34 simonpj Exp $
+-- $Id: DriverPhases.hs,v 1.23 2003/02/24 12:39:27 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -106,6 +106,8 @@ cish_suffix           = (`elem` [ "c", "cpp", "C", "cc", "cxx", "s", "S" ])
 hsbootish_suffix      = (`elem` [ "hs-boot" ])
 extcoreish_suffix     = (`elem` [ "hcr" ])
 
+-- Use the appropriate suffix for the system on which 
+-- the GHC-compiled code will run
 #if mingw32_TARGET_OS || cygwin32_TARGET_OS
 objish_suffix     = (`elem` [ "o", "O", "obj", "OBJ" ])
 #else

@@ -4129,6 +4129,36 @@ that Haskell programs compiled by GHC-cygwin can import the (Haskell) Posix libr
 </para>
 </sect3>
 
+<sect3><title>HOST_OS vs TARGET_OS</title>
+
+<para>
+In the source code you'll find various ifdefs looking like:
+<programlisting>
+  #ifdef mingw32_HOST_OS
+    ...blah blah...
+  #endif
+</programlisting>
+and 
+<programlisting>
+  #ifdef mingw32_TARGET_OS
+    ...blah blah...
+  #endif
+</programlisting>
+These macros are set by the configure script (via the file config.h).
+Which is which?  The criterion is this.  In the ifdefs in GHC's source code:
+<itemizedlist>
+  <listitem> <para>
+  The "host" system is the one on which GHC itself will be run.
+  </para> </listitem>
+  <listitem> <para>
+  The "target" system is the one for which the program compiled by GHC will be run.
+  </para> </listitem>
+</itemizedlist>
+For a stage-2 compiler, in which GHCi is available, the "host" and "target" systems must be the same.
+So then it doesn't really matter whether you use the HOST_OS or TARGET_OS cpp macros.
+</para>
+</sect3>
+
 <sect3><title>Summary</title>
 
 <para>Notice that "GHC-mingw" means "GHC that <emphasis>targets</emphasis> MinGW".  It says nothing about 

@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.147 2003/02/20 13:12:40 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.148 2003/02/24 12:39:26 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -45,7 +45,7 @@ import CmdLineOpts	( DynFlag(..), DynFlags(..), getDynFlags, saveDynFlags,
 import Panic 		hiding ( showException )
 import Config
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 import System.Posix
 #endif
 
@@ -234,7 +234,7 @@ runGHCi paths dflags = do
 	loadModule paths
 
   -- enter the interactive loop
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
    -- always show prompt, since hIsTerminalDevice returns True for Consoles
    -- only, which we may or may not be running under (cf. Emacs sub-shells.)
   interactiveLoop True
@@ -274,7 +274,7 @@ interactiveLoop is_tty = do
 
 checkPerms :: String -> IO Bool
 checkPerms name =
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
   return True
 #else
   DriverUtil.handle (\_ -> return False) $ do
