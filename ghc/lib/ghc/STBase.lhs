@@ -56,13 +56,6 @@ returnST = return
 thenST   = (>>=)
 seqST	 = (>>)
 
-unsafeInterleaveST :: ST s a -> ST s a
-unsafeInterleaveST (ST m) = ST $ \ s ->
-    let
-	(r, new_s) = m s
-    in
-    (r, s)
-
 fixST :: (a -> ST s a) -> ST s a
 fixST k = ST $ \ s ->
     let (ST k_r)  = k r
@@ -94,17 +87,6 @@ type PrimIO a = ST RealWorld a
 
 fixPrimIO :: (a -> PrimIO a) -> PrimIO a
 fixPrimIO = fixST
-
-{-# GENERATE_SPECS unsafePerformPrimIO a #-}
-unsafePerformPrimIO	:: PrimIO a -> a
-	-- We give a fresh definition here.  There are no
-	-- magical universal types kicking around.
-unsafePerformPrimIO (ST m)
-  = case m (S# realWorld#) of
-      (r,_) -> r
-
-unsafeInterleavePrimIO	:: PrimIO a -> PrimIO a
-unsafeInterleavePrimIO	= unsafeInterleaveST
 
 -- the following functions are now there for backward compatibility mostly:
 
