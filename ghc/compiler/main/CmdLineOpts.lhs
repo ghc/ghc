@@ -247,6 +247,7 @@ data DynFlag
    | Opt_D_source_stats
    | Opt_D_verbose_core2core
    | Opt_D_verbose_stg2stg
+   | Opt_D_dump_hi
    | Opt_D_dump_hi_diffs
    | Opt_D_dump_minimal_imports
    | Opt_DoCoreLinting

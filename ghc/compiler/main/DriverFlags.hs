@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.17 2000/11/10 14:29:21 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.18 2000/11/13 16:16:05 sewardj Exp $
 --
 -- Driver flags
 --
@@ -18,7 +18,6 @@ import TmpFiles 	( v_TmpDir )
 import CmdLineOpts
 import Config
 import Util
-import CmdLineOpts
 
 import Exception
 import IOExts
@@ -360,6 +359,7 @@ dynamic_flags = [
   ,  ( "dverbose-core2core",     NoArg (setDynFlag Opt_D_verbose_core2core) )
   ,  ( "dverbose-stg2stg",       NoArg (setDynFlag Opt_D_verbose_stg2stg) )
   ,  ( "ddump-hi-diffs",         NoArg (setDynFlag Opt_D_dump_hi_diffs) )
+  ,  ( "ddump-hi",               NoArg (setDynFlag Opt_D_dump_hi) )
   ,  ( "ddump-minimal-imports",  NoArg (setDynFlag Opt_D_dump_minimal_imports) )
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting) )
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting) )

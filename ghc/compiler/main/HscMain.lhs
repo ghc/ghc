@@ -23,7 +23,7 @@ import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelNames	( knownKeyNames )
 import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
-			  writeIface )
+			  writeIface, pprIface )
 import TcModule		( TcResults(..), typecheckModule )
 import InstEnv		( emptyInstEnv )
 import Desugar		( deSugar )
@@ -58,6 +58,7 @@ import Name		( Name, nameModule, nameOccName, getName  )
 import Name		( emptyNameEnv )
 import Module		( Module, lookupModuleEnvByName )
 
+import Monad		( when )
 \end{code}
 
 
@@ -182,7 +183,7 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
 	; maybe_tc_result <- typecheckModule dflags this_mod pcs_rn hst new_iface 
 					     print_unqualified rn_hs_decls
 	; case maybe_tc_result of {
-      	     Nothing -> do { hPutStrLn stderr "Typechecked failed" 
+      	     Nothing -> do { hPutStrLn stderr "Typecheck failed" 
  			   ; return (HscFail pcs_rn) } ;
       	     Just tc_result -> do {
     
@@ -233,12 +234,14 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
 mkFinalIface dflags location maybe_old_iface new_iface new_details
  = case completeIface maybe_old_iface new_iface new_details of
       (new_iface, Nothing) -- no change in the interfacfe
-         -> do if dopt Opt_D_dump_hi_diffs dflags  then
-		 	printDump (text "INTERFACE UNCHANGED")
-		  else  return ()
+         -> do when (dopt Opt_D_dump_hi_diffs dflags)
+                    (printDump (text "INTERFACE UNCHANGED"))
+               dumpIfSet_dyn dflags Opt_D_dump_hi
+                             "UNCHANGED FINAL INTERFACE" (pprIface new_iface)
 	       return new_iface
-      (new_iface, Just sdoc)
-         -> do dumpIfSet_dyn dflags Opt_D_dump_hi_diffs "NEW INTERFACE" sdoc
+      (new_iface, Just sdoc_diffs)
+         -> do dumpIfSet_dyn dflags Opt_D_dump_hi_diffs "INTERFACE HAS CHANGED" sdoc_diffs
+               dumpIfSet_dyn dflags Opt_D_dump_hi "NEW FINAL INTERFACE" (pprIface new_iface)
                -- Write the interface file
                writeIface (unJust (ml_hi_file location) "hscRecomp:hi") new_iface
                return new_iface
