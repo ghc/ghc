@@ -12,6 +12,7 @@ module Maybes (
 --	Maybe(..), -- no, it's in 1.3
 	MaybeErr(..),
 
+	mapMaybe,
 	allMaybes,
 	firstJust,
 	expectJust,
@@ -80,6 +81,12 @@ allMaybes (Nothing : ms) = Nothing
 allMaybes (Just x  : ms) = case (allMaybes ms) of
 			     Nothing -> Nothing
 			     Just xs -> Just (x:xs)
+
+mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+mapMaybe f [] = []
+mapMaybe f (x:xs) = case f x of
+			Just y  -> y : mapMaybe f xs
+			Nothing -> mapMaybe f xs
 \end{code}
 
 @firstJust@ takes a list of @Maybes@ and returns the
