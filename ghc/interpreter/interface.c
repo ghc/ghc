@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.48 $
- * $Date: 2000/04/07 09:59:36 $
+ * $Revision: 1.49 $
+ * $Date: 2000/04/07 16:25:19 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2626,7 +2626,8 @@ Type type; {
       SymX(chdir)                    \
       SymX(execl)                    \
       Sym(waitpid)                   \
-      SymX(getenv)
+      SymX(getenv)                   \
+      Sym(chmod)
 
 #define EXTERN_SYMS_cygwin32         \
       SymX(GetCurrentProcess)        \
@@ -2764,30 +2765,34 @@ void* lookupObjName ( char* nm )
       t = unZcodeThenFindText(nm2+first_real_char+7);
       if (t == findText("PrelGHC")) return (4+NULL); /* kludge */
       m = findModule(t);
-      if (isNull(m)) goto not_found;
+      if (isNull(m)) goto dire_straits;
       a = lookupOTabName ( m, nm );
       if (a) return a;
-      goto not_found;
+      goto dire_straits;
    }
 
    /* if not an RTS name, look in the 
       relevant module's object symbol table
    */
    pp = strchr(nm2+first_real_char, '_');
-   if (!pp || !isupper(nm2[first_real_char])) goto not_found;
+   if (!pp || !isupper(nm2[first_real_char])) goto dire_straits;
    *pp = 0;
    t = unZcodeThenFindText(nm2+first_real_char);
    m = findModule(t);
-   if (isNull(m)) goto not_found;
+   if (isNull(m)) goto dire_straits;
 
    a = lookupOTabName ( m, nm );  /* RATIONALISE */
    if (a) return a;
 
-  not_found:
+  dire_straits:
+   /* make a desperate, last-ditch attempt to find it */
+   a = lookupOTabNameAbsolutelyEverywhere ( nm );
+   if (a) return a;
+
    fprintf ( stderr, 
              "lookupObjName: can't resolve name `%s'\n", 
              nm );
-   assert(4-4);
+   assert(0);
    return NULL;
 }
 

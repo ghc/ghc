@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.41 $
- * $Date: 2000/04/06 14:23:55 $
+ * $Revision: 1.42 $
+ * $Date: 2000/04/07 16:25:20 $
  * ------------------------------------------------------------------------*/
 
 #define DEBUG_STORAGE               /* a moderate level of sanity checking */
@@ -634,7 +634,8 @@ extern char*        nameFromOPtr    ( void* );
 
 extern void         addSection      ( Module,void*,void*,OSectionKind );
 extern OSectionKind lookupSection   ( void* );
-extern void*    lookupOExtraTabName ( char* sym );
+extern void*    lookupOExtraTabName                ( char* sym );
+extern void*    lookupOTabNameAbsolutelyEverywhere ( char* sym );
 
 #define isPrelude(m) (m==modulePrelude)
 

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.67 $
- * $Date: 2000/04/07 09:58:34 $
+ * $Revision: 1.68 $
+ * $Date: 2000/04/07 16:25:19 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1823,6 +1823,31 @@ void* lookupOExtraTabName ( char* sym )
             void* ad = ocLookupSym ( oc, sym );
             if (ad) return ad;
          }
+   }
+   return NULL;
+}
+
+
+/* Only call this if in dire straits; searches every object symtab
+   in the system -- so is therefore slow.
+*/
+void* lookupOTabNameAbsolutelyEverywhere ( char* sym )
+{
+   ObjectCode* oc;
+   Module      m;
+   void*       ad;
+   for (m = MODULE_BASE_ADDR; 
+        m < MODULE_BASE_ADDR+tabModuleSz; m++) {
+      if (tabModule[m-MODULE_BASE_ADDR].inUse) {
+         if (module(m).object) {
+            ad = ocLookupSym ( module(m).object, sym );
+            if (ad) return ad;
+         }
+         for (oc = module(m).objectExtras; oc; oc=oc->next) {
+            ad = ocLookupSym ( oc, sym );
+            if (ad) return ad;
+         }
+      }
    }
    return NULL;
 }
