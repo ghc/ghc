@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.28 2001/07/02 18:05:10 rrt Exp $
+ * $Id: Stats.c,v 1.29 2001/07/03 16:26:03 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -108,13 +108,13 @@ static nat   pageFaults(void);
 /* elapsedtime() -- The current elapsed time in seconds */
 
 #if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
-#define NS_PER_SEC 10000000LL
-/* Convert FILETIMEs into secs since the Epoch (Jan1-1970) */
+#define HNS_PER_SEC 10000000LL /* FILETIMES are in units of 100ns */
+/* Convert FILETIMEs into secs */
 #define FT2longlong(ll,ft)    \
     (ll)=(ft).dwHighDateTime; \
     (ll) <<= 32;              \
     (ll) |= (ft).dwLowDateTime; \
-    (ll) /= (unsigned long long) (NS_PER_SEC / CLOCKS_PER_SEC)
+    (ll) /= (unsigned long long) (HNS_PER_SEC / CLOCKS_PER_SEC)
 #endif
 
 #if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
@@ -146,14 +146,14 @@ static void
 getTimes(void)
 {
 
-# if !defined(HAVE_TIMES)
+#ifndef HAVE_TIMES
     /* We will #ifdef around the fprintf for machines
        we *know* are unsupported. (WDP 94/05)
     */
     fprintf(stderr, "NOTE: `getTimes' does nothing!\n");
     return 0.0;
 
-# else /* not stumped */
+#else /* not stumped */
     struct tms t;
     clock_t r = times(&t);
 
