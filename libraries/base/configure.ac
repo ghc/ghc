@@ -15,6 +15,11 @@ AC_CHECK_HEADERS([ctype.h fcntl.h signal.h sys/resource.h termios.h time.h])
 # rlim_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
 
+dnl ** check for wide-char classifications
+dnl FreeBSD has an emtpy wctype.h, so test one of the affected
+dnl functions if it's really there.
+AC_CHECK_HEADERS([wctype.h], [AC_CHECK_FUNCS(iswspace)])
+
 # map standard C types and ISO types to Haskell types
 FPTOOLS_CHECK_HTYPE(char)
 FPTOOLS_CHECK_HTYPE(signed char)
