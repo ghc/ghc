@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.166 2004/05/10 11:53:41 simonmar Exp $
+ * $Id: GC.c,v 1.167 2004/05/21 13:28:59 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -2025,13 +2025,28 @@ loop:
    thunk is unchanged.
    -------------------------------------------------------------------------- */
 
+static inline rtsBool
+is_to_space ( StgClosure *p )
+{
+    bdescr *bd;
+
+    bd = Bdescr((StgPtr)p);
+    if (HEAP_ALLOCED(p) &&
+	((bd->flags & BF_EVACUATED) 
+	 || ((bd->flags & BF_COMPACTED) &&
+	     is_marked((P_)p,bd)))) {
+	return rtsTrue;
+    } else {
+	return rtsFalse;
+    }
+}    
+
 static StgClosure *
 eval_thunk_selector( nat field, StgSelector * p )
 {
     StgInfoTable *info;
     const StgInfoTable *info_ptr;
     StgClosure *selectee;
-    bdescr *bd;
     
     selectee = p->selectee;
 
@@ -2078,12 +2093,10 @@ selector_loop:
     //  point to to-space objects, because that happens when
     //  scavenging.
     //
-    bd = Bdescr((StgPtr)selectee);
-    if (HEAP_ALLOCED(selectee) &&
-	((bd->flags & BF_EVACUATED) 
-	 || ((bd->flags & BF_COMPACTED) &&
-	     bd->gen_no <= N &&
-	     is_marked((P_)selectee,bd)))) {
+    //  The to-space test is now embodied in the in_to_space() inline
+    //  function, as it is re-used below.
+    //
+    if (is_to_space(selectee)) {
 	goto bale_out;
     }
 
@@ -2101,9 +2114,21 @@ selector_loop:
 	  ASSERT(field <  (StgWord32)(info->layout.payload.ptrs + 
 				      info->layout.payload.nptrs));
 	  
-	  // ToDo: shouldn't we test whether this pointer is in
-	  // to-space?
-	  return selectee->payload[field];
+	  // Select the right field from the constructor, and check
+	  // that the result isn't in to-space.  It might be in
+	  // to-space if, for example, this constructor contains
+	  // pointers to younger-gen objects (and is on the mut-once
+	  // list).
+	  //
+	  { 
+	      StgClosure *q;
+	      q = selectee->payload[field];
+	      if (is_to_space(q)) {
+		  goto bale_out;
+	      } else {
+		  return q;
+	      }
+	  }
 
       case IND:
       case IND_PERM:
