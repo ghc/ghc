@@ -1,8 +1,10 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStable.lhs,v 1.6 2000/05/01 14:53:47 panne Exp $
+% $Id: PrelStable.lhs,v 1.7 2000/06/30 13:39:36 simonmar Exp $
 %
-% (c) The GHC Team, 1992-1999
+% (c) The GHC Team, 1992-2000
 %
+
+\section{Module @PrelStable@}
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}

@@ -1,6 +1,9 @@
+% -----------------------------------------------------------------------------
+% $Id: PrelArrExtra.lhs,v 1.10 2000/06/30 13:39:35 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The University of Glasgow, 1994-2000
 %
+
 \section[PrelArrExtra]{Module @PrelArrExtra@}
 
 The following functions should be in PrelArr, but need -monly-2-regs

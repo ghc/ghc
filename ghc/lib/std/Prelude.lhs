@@ -1,3 +1,11 @@
+% ------------------------------------------------------------------------------
+% $Id: Prelude.lhs,v 1.22 2000/06/30 13:39:36 simonmar Exp $
+%
+% (c) The University of Glasgow, 1992-2000
+%
+
+\section[Prelude]{Module @Prelude@}
+
 We add the option -fno-implicit-prelude here to tell the reader that
 special names such as () and -> shouldn't be resolved to Prelude.()
 and Prelude.-> (as they are normally). -- SDM 8/10/97

@@ -1,6 +1,9 @@
+% -----------------------------------------------------------------------------
+% $Id: Numeric.lhs,v 1.9 2000/06/30 13:39:35 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1997-99
+% (c) The University of Glasgow, 1997-2000
 %
+
 \section[Numeric]{Numeric interface}
 
 Odds and ends, mostly functions for reading and showing

@@ -1,5 +1,7 @@
+% ------------------------------------------------------------------------------
+% $Id: PrelMain.lhs,v 1.7 2000/06/30 13:39:36 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1997
+% (c) The University of Glasgow, 1994-2000
 %
 
 \section[PrelMain]{Module @PrelMain@}

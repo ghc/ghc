@@ -1,6 +1,9 @@
+% ------------------------------------------------------------------------------
+% $Id: PrelST.lhs,v 1.15 2000/06/30 13:39:36 simonmar Exp $
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The University of Glasgow, 1992-2000
 %
+
 \section[PrelST]{The @ST@ monad}
 
 \begin{code}

@@ -1,6 +1,9 @@
+% -----------------------------------------------------------------------------
+% $Id: PrelArr.lhs,v 1.23 2000/06/30 13:39:35 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The University of Glasgow, 1994-2000
 %
+
 \section[PrelArr]{Module @PrelArr@}
 
 Array implementation, @PrelArr@ exports the basic array

@@ -1,6 +1,9 @@
+% ------------------------------------------------------------------------------
+% $Id: PrelPack.lhs,v 1.13 2000/06/30 13:39:36 simonmar Exp $
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1997
+% (c) The University of Glasgow, 1997-2000
 %
+
 \section[PrelPack]{Packing/unpacking bytes}
 
 This module provides a small set of low-level functions for packing

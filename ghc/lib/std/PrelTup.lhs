@@ -1,5 +1,7 @@
+% -----------------------------------------------------------------------------
+% $Id: PrelTup.lhs,v 1.9 2000/06/30 13:39:36 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The University of Glasgow, 1992-2000
 %
 
 \section[PrelTup]{Module @PrelTup@}

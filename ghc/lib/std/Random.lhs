@@ -1,7 +1,10 @@
+% ------------------------------------------------------------------------------
+% $Id: Random.lhs,v 1.21 2000/06/30 13:39:36 simonmar Exp $
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1995-99
+% (c) The University of Glasgow, 1995-2000
 %
 
+\section[Random]{Module @Random@}
 
 The June 1988 (v31 #6) issue of the Communications of the ACM has an
 article by Pierre L'Ecuyer called, "Efficient and Portable Combined

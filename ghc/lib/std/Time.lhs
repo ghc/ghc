@@ -1,6 +1,9 @@
-e%
-% (c) The GRASP/AQUA Project, Glasgow University, 1995-99
+% ------------------------------------------------------------------------------
+% $Id: Time.lhs,v 1.22 2000/06/30 13:39:36 simonmar Exp $
 %
+% (c) The University of Glasgow, 1995-2000
+%
+
 \section[Time]{Haskell 1.4 Time of Day Library}
 
 The {\em Time} library provides standard functionality for

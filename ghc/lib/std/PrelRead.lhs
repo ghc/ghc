@@ -1,5 +1,7 @@
+% ------------------------------------------------------------------------------
+% $Id: PrelRead.lhs,v 1.15 2000/06/30 13:39:36 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1998
+% (c) The University of Glasgow, 1994-2000
 %
 
 \section[PrelRead]{Module @PrelRead@}
@@ -17,7 +19,6 @@ import PrelNum
 import PrelReal
 import PrelFloat
 import PrelList
-import PrelTup
 import PrelMaybe
 import PrelShow		-- isAlpha etc
 import PrelBase

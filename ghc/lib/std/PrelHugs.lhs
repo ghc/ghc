@@ -1,5 +1,7 @@
+% ------------------------------------------------------------------------------
+% $Id: PrelHugs.lhs,v 1.13 2000/06/30 13:39:35 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-2000
+% (c) The University of Glasgow, 2000
 %
 
 \begin{code}

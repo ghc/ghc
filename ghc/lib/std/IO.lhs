@@ -1,6 +1,9 @@
+% -----------------------------------------------------------------------------
+% $Id: IO.lhs,v 1.40 2000/06/30 13:39:35 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1998
+% (c) The University of Glasgow, 1994-2000
 %
+
 \section[IO]{Module @IO@}
 
 Implementation of the standard Haskell IO interface, see

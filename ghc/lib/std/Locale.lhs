@@ -1,6 +1,9 @@
+% -----------------------------------------------------------------------------
+% $Id: Locale.lhs,v 1.5 2000/06/30 13:39:35 simonmar Exp $
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1995-99
+% (c) The University of Glasgow, 1995-2000
 %
+
 \section[Time]{Haskell 1.4 Locale Library}
 
 

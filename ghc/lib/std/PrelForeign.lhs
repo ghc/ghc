@@ -1,5 +1,7 @@
+% ------------------------------------------------------------------------------
+% $Id: PrelForeign.lhs,v 1.15 2000/06/30 13:39:35 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The University of Glasgow, 1994-2000
 %
 
 \section[Foreign]{Module @Foreign@}
@@ -19,10 +21,8 @@ module PrelForeign (
    ) where
 
 import PrelIOBase
-import PrelST
 import PrelBase
 import PrelAddr
-import PrelGHC
 import PrelWeak	( addForeignFinalizer )
 \end{code}
 

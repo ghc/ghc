@@ -1,6 +1,9 @@
+% ------------------------------------------------------------------------------
+% $Id: PrelMaybe.lhs,v 1.6 2000/06/30 13:39:36 simonmar Exp $
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The University of Glasgow, 1992-2000
 %
+
 \section[PrelMaybe]{Module @PrelMaybe@}
 
 The @Maybe@ type.

@@ -1,5 +1,7 @@
+% -----------------------------------------------------------------------------
+% $Id: PrelDynamic.lhs,v 1.5 2000/06/30 13:39:35 simonmar Exp $
 %
-% (c) AQUA Project, Glasgow University, 1998
+% (c) The University of Glasgow, 1998-2000
 %
 
 The Dynamic type is used in the Exception type, so we have to have

@@ -1,6 +1,9 @@
+% ------------------------------------------------------------------------------
+% $Id: PrelShow.lhs,v 1.11 2000/06/30 13:39:36 simonmar Exp $
 %
-% (c) The GRAP/AQUA Project, Glasgow University, 1992-1996
+% (c) The University of Glasgow, 1992-2000
 %
+
 \section{Module @PrelShow@}
 
 

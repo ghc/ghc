@@ -1,6 +1,9 @@
+% -----------------------------------------------------------------------------
+% $Id: PrelEnum.lhs,v 1.11 2000/06/30 13:39:35 simonmar Exp $
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The University of Glasgow, 1992-2000
 %
+
 \section[PrelBounded]{Module @PrelBounded@}
 
 Instances of Bounded for various datatypes.

@@ -1,5 +1,7 @@
+% -----------------------------------------------------------------------------
+% $Id: Ix.lhs,v 1.18 2000/06/30 13:39:35 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1999
+% (c) The University of Glasgow, 1994-2000
 %
 
 \section[Ix]{Module @Ix@}
