@@ -137,10 +137,8 @@ static Capability *returning_capabilities;
  */ 
 void grabCapability(Capability** cap)
 {
-#ifdef RTS_SUPPORTS_THREADS
-  ASSERT(rts_n_free_capabilities > 0);
-#endif
 #if !defined(SMP)
+  ASSERT(rts_n_free_capabilities == 1);
   rts_n_free_capabilities = 0;
   *cap = &MainCapability;
   handleSignalsInThisThread();
@@ -150,9 +148,7 @@ void grabCapability(Capability** cap)
   rts_n_free_capabilities--;
 #endif
 #ifdef RTS_SUPPORTS_THREADS
-  IF_DEBUG(scheduler,
-	   fprintf(stderr,"worker thread (%p): got capability\n",
-		   osThreadId()));
+    IF_DEBUG(scheduler, sched_belch("worker: got capability"));
 #endif
 }
 
@@ -189,6 +185,7 @@ void releaseCapability(Capability* cap
 #endif
     rts_n_waiting_workers--;
     signalCondition(&returning_worker_cond);
+    IF_DEBUG(scheduler, sched_belch("worker: released capability to returning worker"));
   } else /*if ( !EMPTY_RUN_QUEUE() )*/ {
 #if defined(SMP)
     cap->link = free_capabilities;
@@ -204,9 +201,7 @@ void releaseCapability(Capability* cap
   }
 #endif
 #ifdef RTS_SUPPORTS_THREADS
-  IF_DEBUG(scheduler,
-	   fprintf(stderr,"worker thread (%p): released capability\n",
-		   osThreadId()));
+    IF_DEBUG(scheduler, sched_belch("worker: released capability"));
 #endif
   return;
 }
@@ -247,11 +242,9 @@ void releaseCapability(Capability* cap
 void
 grabReturnCapability(Mutex* pMutex, Capability** pCap)
 {
-  IF_DEBUG(scheduler,
-	   fprintf(stderr,"worker (%p): returning, waiting for lock.\n", osThreadId()));
-  IF_DEBUG(scheduler,
-	   fprintf(stderr,"worker (%p): returning; workers waiting: %d\n",
-		   osThreadId(), rts_n_waiting_workers));
+  IF_DEBUG(scheduler, 
+	   sched_belch("worker: returning; workers waiting: %d",
+		       rts_n_waiting_workers));
   if ( noCapabilities() ) {
     rts_n_waiting_workers++;
     wakeBlockedWorkerThread();
@@ -296,14 +289,12 @@ void
 yieldToReturningWorker(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
 {
   if ( rts_n_waiting_workers > 0 ) {
-    IF_DEBUG(scheduler,
-	     fprintf(stderr,"worker thread (%p): giving up RTS token\n", osThreadId()));
+    IF_DEBUG(scheduler, sched_belch("worker: giving up capability"));
     releaseCapability(*pCap);
         /* And wait for work */
     waitForWorkCapability(pMutex, pCap, pThreadCond);
     IF_DEBUG(scheduler,
-	     fprintf(stderr,"worker thread (%p): got back RTS token (after yieldToReturningWorker)\n",
-	     	osThreadId()));
+	     sched_belch("worker: got back capability (after yieldToReturningWorker)"));
   }
   return;
 }
@@ -334,25 +325,21 @@ waitForWorkCapability(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
 #ifdef SMP
   #error SMP version not implemented
 #endif
-  IF_DEBUG(scheduler,
-	   fprintf(stderr,"worker thread (%p): wait for cap (cond: %p)\n",
-	      osThreadId(),pThreadCond));
   while ( noCapabilities() || (passingCapability && passTarget != pThreadCond)) {
+    IF_DEBUG(scheduler,
+	     sched_belch("worker: wait for capability (cond: %p)",
+			 pThreadCond));
     if(pThreadCond)
     {
       waitCondition(pThreadCond, pMutex);
-      IF_DEBUG(scheduler,
-	       fprintf(stderr,"worker thread (%p): get passed capability\n",
-		  osThreadId()));
+      IF_DEBUG(scheduler, sched_belch("worker: get passed capability"));
     }
     else
     {
       rts_n_waiting_tasks++;
       waitCondition(&thread_ready_cond, pMutex);
       rts_n_waiting_tasks--;
-      IF_DEBUG(scheduler,
-	       fprintf(stderr,"worker thread (%p): get normal capability\n",
-		  osThreadId()));
+      IF_DEBUG(scheduler, sched_belch("worker: get normal capability"));
     }
   }
   passingCapability = rtsFalse;
@@ -380,10 +367,8 @@ passCapability(Mutex* pMutex, Capability* cap, Condition *pTargetThreadCond)
     rts_n_free_capabilities = 1;
     signalCondition(pTargetThreadCond);
     passTarget = pTargetThreadCond;
-	passingCapability = rtsTrue;
-    IF_DEBUG(scheduler,
-	     fprintf(stderr,"worker thread (%p): passCapability\n",
-	     	osThreadId()));
+    passingCapability = rtsTrue;
+    IF_DEBUG(scheduler, sched_belch("worker: passCapability"));
 }
 
 /*
@@ -408,9 +393,7 @@ passCapabilityToWorker(Mutex* pMutex, Capability* cap)
     startSchedulerTaskIfNecessary();
     passTarget = NULL;
     passingCapability = rtsTrue;
-    IF_DEBUG(scheduler,
-	     fprintf(stderr,"worker thread (%p): passCapabilityToWorker\n",
-	     	osThreadId()));
+    IF_DEBUG(scheduler, sched_belch("worker: passCapabilityToWorker"));
 }
 
 
@@ -442,7 +425,8 @@ initCapabilities_(nat n)
   free_capabilities = cap;
   rts_n_free_capabilities = n;
   returning_capabilities = NULL;
-  IF_DEBUG(scheduler,fprintf(stderr,"scheduler: Allocated %d capabilities\n", n_free_capabilities););
+  IF_DEBUG(scheduler,
+	   sched_belch("allocated %d capabilities", n_free_capabilities));
 }
 #endif /* SMP */
 

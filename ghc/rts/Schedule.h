@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.42 2003/11/12 17:49:11 sof Exp $
+ * $Id: Schedule.h,v 1.43 2003/12/12 16:35:21 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -312,6 +312,10 @@ void labelThread(StgPtr tso, char *label);
  */
 void
 startSchedulerTaskIfNecessary(void);
+#endif
+
+#ifdef DEBUG
+extern void sched_belch(char *s, ...);
 #endif
 
 #endif /* __SCHEDULE_H__ */

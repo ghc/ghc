@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.181 2003/12/05 09:50:39 stolz Exp $
+ * $Id: Schedule.c,v 1.182 2003/12/12 16:35:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -261,10 +261,6 @@ static void     schedule          ( StgMainThread *mainThread, Capability *initi
 
 static void     detectBlackHoles  ( void );
 
-#ifdef DEBUG
-static void sched_belch(char *s, ...);
-#endif
-
 #if defined(RTS_SUPPORTS_THREADS)
 /* ToDo: carefully document the invariants that go together
  *       with these synchronisation objects.
@@ -412,16 +408,15 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
   ACQUIRE_LOCK(&sched_mutex);
  
 #if defined(RTS_SUPPORTS_THREADS)
-  /* in the threaded case, the capability is either passed in via the initialCapability
-     parameter, or initialized inside the scheduler loop */
-
+  //
+  // in the threaded case, the capability is either passed in via the
+  // initialCapability parameter, or initialized inside the scheduler
+  // loop 
+  //
   IF_DEBUG(scheduler,
-    fprintf(stderr,"### NEW SCHEDULER LOOP in os thread %u(%p)\n",
-	    osThreadId(), osThreadId()));
-  IF_DEBUG(scheduler,
-    fprintf(stderr,"### main thread: %p\n",mainThread));
-  IF_DEBUG(scheduler,
-    fprintf(stderr,"### initial cap: %p\n",initialCapability));
+	   sched_belch("### NEW SCHEDULER LOOP (main thr: %p, cap: %p)",
+		       mainThread, initialCapability);
+      );
 #else
   /* simply initialise it in the non-threaded case */
   grabCapability(&cap);
@@ -454,57 +449,62 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 
   while (!receivedFinish) {    /* set by processMessages */
                                /* when receiving PP_FINISH message         */ 
-#else
+
+#else // everything except GRAN and PAR
 
   while (1) {
 
 #endif
 
-    IF_DEBUG(scheduler, printAllThreads());
+     IF_DEBUG(scheduler, printAllThreads());
 
 #if defined(RTS_SUPPORTS_THREADS)
-    /* Check to see whether there are any worker threads
-       waiting to deposit external call results. If so,
-       yield our capability... if we have a capability, that is. */
-    if(cap)
-      yieldToReturningWorker(&sched_mutex, &cap,
-	  mainThread ? &mainThread->bound_thread_cond : NULL);
+    //
+    // Check to see whether there are any worker threads
+    // waiting to deposit external call results. If so,
+    // yield our capability... if we have a capability, that is.
+    //
+    if (cap != NULL) {
+	yieldToReturningWorker(&sched_mutex, &cap,
+			       mainThread ? &mainThread->bound_thread_cond
+			                  : NULL);
+    }
 
-    /* If we do not currently hold a capability, we wait for one */
-    if(!cap)
-    {
-      waitForWorkCapability(&sched_mutex, &cap,
-	  mainThread ? &mainThread->bound_thread_cond : NULL);
-      IF_DEBUG(scheduler, sched_belch("worker thread (osthread %p): got cap",
-				      osThreadId()));
+    // If we do not currently hold a capability, we wait for one
+    if (cap == NULL) {
+	waitForWorkCapability(&sched_mutex, &cap,
+			      mainThread ? &mainThread->bound_thread_cond
+			                 : NULL);
     }
 #endif
 
-    /* If we're interrupted (the user pressed ^C, or some other
-     * termination condition occurred), kill all the currently running
-     * threads.
-     */
+    //
+    // If we're interrupted (the user pressed ^C, or some other
+    // termination condition occurred), kill all the currently running
+    // threads.
+    //
     if (interrupted) {
-      IF_DEBUG(scheduler, sched_belch("interrupted"));
-      interrupted = rtsFalse;
-      was_interrupted = rtsTrue;
+	IF_DEBUG(scheduler, sched_belch("interrupted"));
+	interrupted = rtsFalse;
+	was_interrupted = rtsTrue;
 #if defined(RTS_SUPPORTS_THREADS)
-      // In the threaded RTS, deadlock detection doesn't work,
-      // so just exit right away.
-      prog_belch("interrupted");
-      releaseCapability(cap);
-      RELEASE_LOCK(&sched_mutex);
-      shutdownHaskellAndExit(EXIT_SUCCESS);
+	// In the threaded RTS, deadlock detection doesn't work,
+	// so just exit right away.
+	prog_belch("interrupted");
+	releaseCapability(cap);
+	RELEASE_LOCK(&sched_mutex);
+	shutdownHaskellAndExit(EXIT_SUCCESS);
 #else
-      deleteAllThreads();
+	deleteAllThreads();
 #endif
     }
 
-    /* Go through the list of main threads and wake up any
-     * clients whose computations have finished.  ToDo: this
-     * should be done more efficiently without a linear scan
-     * of the main threads list, somehow...
-     */
+    //
+    // Go through the list of main threads and wake up any
+    // clients whose computations have finished.  ToDo: this
+    // should be done more efficiently without a linear scan
+    // of the main threads list, somehow...
+    //
 #if defined(RTS_SUPPORTS_THREADS)
     { 
 	StgMainThread *m, **prev;
@@ -513,9 +513,9 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	  if (m->tso->what_next == ThreadComplete
 	      || m->tso->what_next == ThreadKilled)
 	  {
-	    if(m == mainThread)
+	    if (m == mainThread)
 	    {
-              if(m->tso->what_next == ThreadComplete)
+              if (m->tso->what_next == ThreadComplete)
               {
                 if (m->ret)
                 {
@@ -550,19 +550,22 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
             }
             else
             {
-                // The current OS thread can not handle the fact that the Haskell
-                // thread "m" has ended. 
-                // "m" is bound; the scheduler loop in it's bound OS thread has
-                // to return, so let's pass our capability directly to that thread.
-              passCapability(&sched_mutex, cap, &m->bound_thread_cond);
-              cap = NULL;
+                // The current OS thread can not handle the fact that
+                // the Haskell thread "m" has ended.  "m" is bound;
+                // the scheduler loop in it's bound OS thread has to
+                // return, so let's pass our capability directly to
+                // that thread.
+		passCapability(&sched_mutex, cap, &m->bound_thread_cond);
+		cap = NULL;
             }
           }
 	}
     }
     
-    if(!cap)	// If we gave our capability away,
-      continue;	// go to the top to get it back
+    // If we gave our capability away, go to the top to get it back
+    if (cap == NULL) {
+	continue;	
+    }
       
 #else /* not threaded */
 
@@ -599,6 +602,8 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     }
 #endif
 
+
+#if 0 /* defined(SMP) */
     /* Top up the run queue from our spark pool.  We try to make the
      * number of threads in the run queue equal to the number of
      * free capabilities.
@@ -606,7 +611,6 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
      * Disable spark support in SMP for now, non-essential & requires
      * a little bit of work to make it compile cleanly. -- sof 1/02.
      */
-#if 0 /* defined(SMP) */
     {
       nat n = getFreeCapabilities();
       StgTSO *tso = run_queue_hd;
@@ -641,8 +645,8 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     }
 #endif // SMP
 
-    /* check for signals each time around the scheduler */
 #if defined(RTS_USER_SIGNALS)
+    // check for signals each time around the scheduler
     if (signals_pending()) {
       RELEASE_LOCK(&sched_mutex); /* ToDo: kill */
       startSignalHandlers();
@@ -826,9 +830,9 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	RELEASE_LOCK(&sched_mutex);
 	return;
       }
-      IF_DEBUG(scheduler, sched_belch("thread %d: waiting for work", osThreadId()));
+      IF_DEBUG(scheduler, sched_belch("waiting for work"));
       waitForWorkCapability(&sched_mutex, &cap, rtsTrue);
-      IF_DEBUG(scheduler, sched_belch("thread %d: work now available", osThreadId()));
+      IF_DEBUG(scheduler, sched_belch("work now available"));
     }
 #else
     if ( EMPTY_RUN_QUEUE() ) {
@@ -1111,9 +1115,10 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 # endif
 #else /* !GRAN && !PAR */
   
-    /* grab a thread from the run queue */
+    // grab a thread from the run queue
     ASSERT(run_queue_hd != END_TSO_QUEUE);
     POP_RUN_QUEUE(t);
+
     // Sanity check the thread we're about to run.  This can be
     // expensive if there is lots of thread switching going on...
     IF_DEBUG(sanity,checkTSO(t));
@@ -1133,15 +1138,13 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	if(m == mainThread)
 	{
 	  IF_DEBUG(scheduler,
-	    fprintf(stderr,"### Running TSO %p in bound OS thread %u\n",
-		    t, osThreadId()));
+	    sched_belch("### Running thread %d in bound thread", t->id));
 	  // yes, the Haskell thread is bound to the current native thread
 	}
 	else
 	{
 	  IF_DEBUG(scheduler,
-	    fprintf(stderr,"### TSO %p bound to other OS thread than %u\n",
-		    t, osThreadId()));
+	    sched_belch("### thread %d bound to another OS thread", t->id));
 	  // no, bound to a different Haskell thread: pass to that thread
 	  PUSH_ON_RUN_QUEUE(t);
 	  passCapability(&sched_mutex,cap,&m->bound_thread_cond);
@@ -1151,20 +1154,11 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
       }
       else
       {
-        // The thread we want to run is not bound.
-	if(mainThread == NULL)
+	if(mainThread != NULL)
+        // The thread we want to run is bound.
 	{
 	  IF_DEBUG(scheduler,
-	    fprintf(stderr,"### Running TSO %p in worker OS thread %u\n",
-		    t, osThreadId()));
-          // if we are a worker thread,
-	  // we may run it here
-	}
-	else
-	{
-	  IF_DEBUG(scheduler,
-	    fprintf(stderr,"### TSO %p is not appropriate for main thread %p in OS thread %u\n",
-		    t, mainThread, osThreadId()));
+	    sched_belch("### this OS thread cannot run thread %d", t->id));
 	  // no, the current native thread is bound to a different
 	  // Haskell thread, so pass it to any worker thread
 	  PUSH_ON_RUN_QUEUE(t);
@@ -1233,9 +1227,9 @@ run_thread:
     ACQUIRE_LOCK(&sched_mutex);
     
 #ifdef RTS_SUPPORTS_THREADS
-    IF_DEBUG(scheduler,fprintf(stderr,"scheduler (task %p): ", osThreadId()););
+    IF_DEBUG(scheduler,fprintf(stderr,"sched (task %p): ", osThreadId()););
 #elif !defined(GRAN) && !defined(PAR)
-    IF_DEBUG(scheduler,fprintf(stderr,"scheduler: "););
+    IF_DEBUG(scheduler,fprintf(stderr,"sched: "););
 #endif
     t = cap->r.rCurrentTSO;
     
@@ -1500,6 +1494,7 @@ run_thread:
 		       t->id, whatNext_strs[t->what_next]);
 	       printThreadBlockage(t);
 	       fprintf(stderr, "\n"));
+      fflush(stderr);
 
       /* Only for dumping event to log file 
 	 ToDo: do I need this in GranSim, too?
@@ -1508,7 +1503,7 @@ run_thread:
 #endif
       threadPaused(t);
       break;
-      
+
     case ThreadFinished:
       /* Need to check whether this was a main thread, and if so, signal
        * the task that started it with the return value.  If we have no
@@ -1800,7 +1795,7 @@ suspendThread( StgRegTable *reg,
   /* Preparing to leave the RTS, so ensure there's a native thread/task
      waiting to take over.
   */
-  IF_DEBUG(scheduler, sched_belch("worker thread (%d, osthread %p): leaving RTS", tok, osThreadId()));
+  IF_DEBUG(scheduler, sched_belch("worker (token %d): leaving RTS", tok));
 #endif
 
   /* Other threads _might_ be available for execution; signal this */
@@ -1824,7 +1819,7 @@ resumeThread( StgInt tok,
   ACQUIRE_LOCK(&sched_mutex);
   grabReturnCapability(&sched_mutex, &cap);
 
-  IF_DEBUG(scheduler, sched_belch("worker thread (%d, osthread %p): re-entering RTS", tok, osThreadId()));
+  IF_DEBUG(scheduler, sched_belch("worker (token %d): re-entering RTS", tok));
 #else
   grabCapability(&cap);
 #endif
@@ -2229,7 +2224,7 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *initialCap
      signal the completion of the its work item for the main thread to
      see (==> it got stuck waiting.)    -- sof 6/02.
   */
-  IF_DEBUG(scheduler, sched_belch("waiting for thread (%d)\n", tso->id));
+  IF_DEBUG(scheduler, sched_belch("waiting for thread (%d)", tso->id));
   
   m->link = main_threads;
   main_threads = m;
@@ -2455,7 +2450,7 @@ waitThread_(StgMainThread* m, Capability *initialCapability)
   SchedulerStatus stat;
 
   // Precondition: sched_mutex must be held.
-  IF_DEBUG(scheduler, sched_belch("== scheduler: new main thread (%d)\n", m->tso->id));
+  IF_DEBUG(scheduler, sched_belch("new main thread (%d)", m->tso->id));
 
 #if defined(RTS_SUPPORTS_THREADS) && !defined(THREADED_RTS)
   {	// FIXME: does this still make sense?
@@ -2489,7 +2484,7 @@ waitThread_(StgMainThread* m, Capability *initialCapability)
 #endif
 #endif
 
-  IF_DEBUG(scheduler, fprintf(stderr, "== scheduler: main thread (%d) finished\n", 
+  IF_DEBUG(scheduler, fprintf(stderr, "== sched: main thread (%d) finished\n", 
 			      m->tso->id));
   stgFree(m);
 
@@ -2780,7 +2775,7 @@ threadStackOverflow(StgTSO *tso)
   new_tso_size = round_to_mblocks(new_tso_size);  /* Be MBLOCK-friendly */
   new_stack_size = new_tso_size - TSO_STRUCT_SIZEW;
 
-  IF_DEBUG(scheduler, fprintf(stderr,"== scheduler: increasing stack size from %d words to %d.\n", tso->stack_size, new_stack_size));
+  IF_DEBUG(scheduler, fprintf(stderr,"== sched: increasing stack size from %d words to %d.\n", tso->stack_size, new_stack_size));
 
   dest = (StgTSO *)allocate(new_tso_size);
   TICK_ALLOC_TSO(new_stack_size,0);
@@ -3616,7 +3611,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	    TICK_ALLOC_UP_THK(words+1,0);
 	    
 	    IF_DEBUG(scheduler,
-		     fprintf(stderr,  "scheduler: Updating ");
+		     fprintf(stderr,  "sched: Updating ");
 		     printPtr((P_)((StgUpdateFrame *)frame)->updatee); 
 		     fprintf(stderr,  " with ");
 		     printObj((StgClosure *)ap);
@@ -4043,20 +4038,21 @@ run_queue_len(void)
 }
 #endif
 
-static void
+void
 sched_belch(char *s, ...)
 {
   va_list ap;
   va_start(ap,s);
-#ifdef SMP
-  fprintf(stderr, "scheduler (task %ld): ", osThreadId());
+#ifdef RTS_SUPPORTS_THREADS
+  fprintf(stderr, "sched (task %p): ", osThreadId());
 #elif defined(PAR)
   fprintf(stderr, "== ");
 #else
-  fprintf(stderr, "scheduler: ");
+  fprintf(stderr, "sched: ");
 #endif
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");
+  fflush(stderr);
   va_end(ap);
 }
 
