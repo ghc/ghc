@@ -72,11 +72,11 @@ on how you compiled).
 </Para>
 
 <Para>
-NOTE: to send RTS options to the compiler itself, you need to prefix
-the option with <Option>-optCrts</Option>, eg. to increase the maximum heap size for
-a compilation to 128M, you would add <Option>-optCrts-M128m</Option> to the command
-line.  The compiler understands some options directly without needing
-<Option>-optCrts</Option>: these are <Option>-H</Option> and <Option>-K</Option>.
+NOTE: since GHC is itself compiled by GHC, you can change RTS options
+in the compiler using the normal <literal>+RTS ... -RTS</literal>
+combination.  eg. to increase the maximum heap size for a compilation
+to 128M, you would add <literal>+RTS -M128m -RTS</literal> to the
+command line.
 </Para>
 
 <Sect2 id="rts-options-gc">
