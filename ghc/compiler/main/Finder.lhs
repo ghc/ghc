@@ -312,13 +312,11 @@ mkHomeModLocation mod_name is_root path basename extension = do
 
    addToFinderCache mod_name result
    return result
-\end{code}
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here, 
 -- but there' no other obvious place for it
 
-\begin{code}
 findLinkable :: ModuleName -> ModLocation -> IO (Maybe Linkable)
 findLinkable mod locn
    | Just obj_fn <- ml_obj_file locn
@@ -327,7 +325,7 @@ findLinkable mod locn
          then return Nothing 
          else 
          do let stub_fn = case splitFilename3 obj_fn of
-                             (dir, base, ext) -> dir ++ "/" ++ base ++ ".stub_o"
+                             (dir, base, ext) -> dir ++ "/" ++ base ++ "_stub.o"
             stub_exist <- doesFileExist stub_fn
             obj_time <- getModificationTime obj_fn
             if stub_exist
