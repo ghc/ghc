@@ -23,7 +23,7 @@ module Foreign.ForeignPtr
         , newForeignPtr
         , addForeignPtrFinalizer
 	, withForeignPtr
-	, foreignPtrToPtr
+	, foreignPtrToPtr	-- will soon become unsafeForeignPtrToPtr
 	, touchForeignPtr
 	, castForeignPtr
 
@@ -45,7 +45,7 @@ import NHC.FFI
   , newForeignPtr
   , addForeignPtrFinalizer
   , withForeignPtr
-  , foreignPtrToPtr
+  , unsafeForeignPtrToPtr
   , touchForeignPtr
   , castForeignPtr
   )
@@ -111,6 +111,11 @@ withForeignPtr fo io
        touchForeignPtr fo
        return r
 #endif /* ! __NHC__ */
+
+#ifdef __NHC__
+-- temporary aliasing until ghc and hugs catch up
+foreignPtrToPtr = unsafeForeignPtrToPtr
+#endif
 
 #ifdef __HUGS__
 mallocForeignPtr :: Storable a => IO (ForeignPtr a)
