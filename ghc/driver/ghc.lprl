@@ -1706,7 +1706,7 @@ sub runLit2pgm {
     local($to_do) = "";
 
     # Only add #line pragma if we're going to need it.
-    $to_do  = "echo '#line 1 \"$in_lit2pgm\"' > $lit2pgm_hscpp && " if ($HsCpp ne $Cat);
+    $to_do  = "echo '#line 1 \"$in_lit2pgm\"' > $lit2pgm_hscpp && " if ($Cpp_flag_set);
     $to_do .= "$Unlit @Unlit_flags $in_lit2pgm -  >> $lit2pgm_hscpp";
      
     @Files_to_tidy = ( $lit2pgm_hscpp );
