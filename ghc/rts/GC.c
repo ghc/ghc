@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.123 2001/10/01 10:52:36 simonmar Exp $
+ * $Id: GC.c,v 1.124 2001/10/17 15:19:24 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1603,6 +1603,7 @@ loop:
       case CONSTR_1_1:
       case CONSTR_0_2:
       case CONSTR_STATIC:
+      case CONSTR_NOCAF_STATIC:
 	{ 
 	  StgWord offset = info->layout.selector_offset;
 
