@@ -576,7 +576,7 @@ hscParseStmt dflags str
 
       case parseStmt buf PState{ bol = 0#, atbol = 1#,
 	 		         context = [], glasgow_exts = glaexts,
-			         loc = mkSrcLoc SLIT("<no file>") 0 } of {
+			         loc = mkSrcLoc SLIT("<interactive>") 1 } of {
 
 	PFailed err -> do { hPutStrLn stderr (showSDoc err);
 --	Not yet implemented in <4.11    freeStringBuffer buf;
