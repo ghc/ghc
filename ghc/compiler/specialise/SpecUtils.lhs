@@ -26,20 +26,19 @@ import CmdLineOpts	( opt_SpecialiseOverloaded, opt_SpecialiseUnboxed,
 			  opt_SpecialiseAll, opt_PprUserLength
 			)
 import Bag		( isEmptyBag, bagToList, Bag )
-import Class		( GenClass{-instance NamedThing-}, SYN_IE(Class),
-			  GenClassOp {- instance NamedThing -} )
+import Class		( GenClass{-instance NamedThing-}, SYN_IE(Class) )
 import FiniteMap	( emptyFM, addListToFM_C, plusFM_C, keysFM,
 			  lookupWithDefaultFM
 			)
-import Id		( idType, isDictFunId, isConstMethodId_maybe,
-			  isDefaultMethodId_maybe,
+import Id		( idType, isDictFunId, 
+			  isDefaultMethodId_maybe, mkSameSpecCon,
 			  GenId {-instance NamedThing -}, SYN_IE(Id)
 			)
 import Maybes		( maybeToBool, catMaybes, firstJust )
 import Name		( OccName, pprOccName, modAndOcc, NamedThing(..) )
 import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
-			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar, GenClassOp
+			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar
 			)
 import Pretty		-- plenty of it
 import TyCon		( tyConTyVars, TyCon{-instance NamedThing-} )
@@ -52,11 +51,9 @@ import Util		( equivClasses, zipWithEqual, cmpPString,
 			  assertPanic, panic{-ToDo:rm-}
 			)
 
+
 cmpType = panic "SpecUtils.cmpType (ToDo: get rid of)"
-mkSameSpecCon = panic "SpecUtils.mkSameSpecCon (ToDo)"
 getInstIdModule = panic "SpecUtils.getInstIdModule (ToDo)"
-specialiseTy :: Type -> [Maybe Type] -> Int -> Type
-specialiseTy = panic "SpecUtils.specialiseTy (ToDo)"
 \end{code}
 
 @specialiseCallTys@ works out which type args don't need to be specialised on,
@@ -291,6 +288,9 @@ pp_tyspec sty pp_mod (_, tycon, tys)
     choose_ty (tv, Just ty) = (ty, Nothing)
 
 pp_idspec :: PprStyle -> Doc -> (OccName, Id, [Maybe Type], Bool) -> Doc
+pp_idspec = error "pp_idspec"
+
+{-	LATER
 
 pp_idspec sty pp_mod (_, id, tys, is_err)
   | isDictFunId id
@@ -338,4 +338,6 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
 
     default_method_maybe = isDefaultMethodId_maybe id
     is_default_method_id = maybeToBool default_method_maybe
+
+-}
 \end{code}

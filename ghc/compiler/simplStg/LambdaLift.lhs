@@ -448,7 +448,7 @@ newSupercombinator :: Type
 		   -> LiftM Id
 
 newSupercombinator ty arity mod ci us idenv
-  = setIdVisibility mod (mkSysLocal SLIT("sc") uniq ty noSrcLoc)
+  = setIdVisibility (Just mod) uniq (mkSysLocal SLIT("sc") uniq ty noSrcLoc)
     `addIdArity` exactArity arity
 	-- ToDo: rm the addIdArity?  Just let subsequent stg-saturation pass do it?
   where
