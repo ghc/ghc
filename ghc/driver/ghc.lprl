@@ -1154,7 +1154,9 @@ sub setupSyslibs {
   }
 
   # Push library HSrts, plus boring clib bit
-  push(@SysLibrary, "-lHSrts${BuildTag}");
+  # Note: The scheduler references a closure from PrelException,
+  # so the prelude lib is mentioned once again here.
+  push(@SysLibrary, "-lHSrts${BuildTag} -lHS${BuildTag}");
 
   #
   # RTS compiled with cygwin32, uses the WinMM API
