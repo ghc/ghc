@@ -8,8 +8,7 @@ module IlxGen( ilxGen ) where
 
 import Char	( ord, chr )
 import StgSyn
-import Id	( idType, idName, isDeadBinder, idArityInfo )
-import IdInfo   ( arityLowerBound )
+import Id	( idType, idName, isDeadBinder, idArity )
 import Var	( Var, Id, TyVar, isId, isTyVar, tyVarKind, tyVarName )
 import VarEnv
 import VarSet   ( isEmptyVarSet )
@@ -772,7 +771,7 @@ ilxFunAppAfterPush env fun args tail_call
       case lookupIlxBindEnv env fun of
 	  Just (_, StgRhsClosure  _ _ _ Updatable _ _)   -> Nothing 
 	  Just (place, StgRhsClosure  _ _ fvs _ args _)  -> Just (place,fun,args,fvs)
-	  _ -> Nothing -- trace (show fun ++ " --> " ++ show (arityLowerBound (idArityInfo fun)))
+	  _ -> Nothing -- trace (show fun ++ " --> " ++ show (idArity fun))
 
 type KnownClosure = Maybe (  IlxEnv	-- Of the binding site of the function
 			   , Id		-- The function

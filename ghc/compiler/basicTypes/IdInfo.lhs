@@ -20,8 +20,8 @@ module IdInfo (
 
 	-- Arity
 	ArityInfo,
-	exactArity, unknownArity, hasArity,
-	arityInfo, setArityInfo, ppArityInfo, arityLowerBound,
+	unknownArity, 
+	arityInfo, setArityInfo, ppArityInfo, 
 
 	-- New demand and strictness info
  	newStrictnessInfo, setNewStrictnessInfo, mkNewStrictnessInfo,
@@ -49,7 +49,7 @@ module IdInfo (
 	demandInfo, setDemandInfo, 
 
 	-- Inline prags
-	InlinePragInfo(..), 
+	InlinePragInfo, 
 	inlinePragInfo, setInlinePragInfo, 
 
 	-- Occurrence info
@@ -310,7 +310,7 @@ setUnfoldingInfo  info uf
   = info { unfoldingInfo = uf }
 
 setDemandInfo	  info dd = info { demandInfo = dd }
-setArityInfo	  info ar = info { arityInfo = Just ar  }
+setArityInfo	  info ar = info { arityInfo = ar  }
 setCgInfo         info cg = info { cgInfo = cg }
 setCprInfo        info cp = info { cprInfo = cp }
 setLBVarInfo      info lb = info { lbvarInfo = lb }
@@ -359,7 +359,7 @@ of their arities; so it should not be asking...	 (but other things
 besides the code-generator need arity info!)
 
 \begin{code}
-type ArityInfo = Maybe Arity
+type ArityInfo = Arity
   	-- A partial application of this Id to up to n-1 value arguments
 	-- does essentially no work.  That is not necessarily the
 	-- same as saying that it has n leading lambdas, because coerces
@@ -369,21 +369,12 @@ type ArityInfo = Maybe Arity
 	-- an extra lambda floats up to the binding site.
 
 seqArity :: ArityInfo -> ()
-seqArity a = arityLowerBound a `seq` ()
+seqArity a = a `seq` ()
 
-exactArity   = Just
-unknownArity = Nothing
+unknownArity = 0 :: Arity
 
-arityLowerBound :: ArityInfo -> Arity
-arityLowerBound Nothing  = 0
-arityLowerBound (Just n) = n
-
-hasArity :: ArityInfo -> Bool
-hasArity Nothing = False
-hasArity other   = True
-
-ppArityInfo Nothing	 = empty
-ppArityInfo (Just arity) = hsep [ptext SLIT("Arity"), int arity]
+ppArityInfo 0 = empty
+ppArityInfo n = hsep [ptext SLIT("Arity"), int n]
 \end{code}
 
 %************************************************************************

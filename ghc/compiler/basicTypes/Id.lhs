@@ -43,7 +43,7 @@ module Id (
 
 	-- IdInfo stuff
 	setIdUnfolding,
-	setIdArityInfo,
+	setIdArity,
 	setIdDemandInfo, setIdNewDemandInfo, 
 	setIdStrictness, setIdNewStrictness, zapIdNewStrictness,
         setIdTyGenInfo,
@@ -53,7 +53,7 @@ module Id (
 	setIdCprInfo,
 	setIdOccInfo,
 
-	idArity, idArityInfo, 
+	idArity, 
 	idDemandInfo, idNewDemandInfo,
 	idStrictness, idNewStrictness, idNewStrictness_maybe, getNewStrictness,
         idTyGenInfo,
@@ -108,7 +108,7 @@ import Outputable
 import Unique		( Unique, mkBuiltinUnique )
 
 infixl 	1 `setIdUnfolding`,
-	  `setIdArityInfo`,
+	  `setIdArity`,
 	  `setIdDemandInfo`,
 	  `setIdStrictness`,
 	  `setIdNewDemandInfo`,
@@ -309,14 +309,11 @@ isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
 \begin{code}
 	---------------------------------
 	-- ARITY
-idArityInfo :: Id -> ArityInfo
-idArityInfo id = arityInfo (idInfo id)
-
 idArity :: Id -> Arity
-idArity id = arityLowerBound (idArityInfo id)
+idArity id = arityInfo (idInfo id)
 
-setIdArityInfo :: Id -> Arity -> Id
-setIdArityInfo id arity = modifyIdInfo (`setArityInfo` arity) id
+setIdArity :: Id -> Arity -> Id
+setIdArity id arity = modifyIdInfo (`setArityInfo` arity) id
 
 	---------------------------------
 	-- STRICTNESS 

@@ -24,7 +24,7 @@ import Id		( idType, idInfo, idName, isExportedId,
 			  idSpecialisation, idUnique, isDataConWrapId,
 			  mkVanillaGlobal, mkGlobalId, isLocalId, 
 			  isDataConId, mkUserLocal, isGlobalId, globalIdDetails,
-			  idNewDemandInfo, setIdNewDemandInfo, 
+			  idNewDemandInfo, setIdNewDemandInfo, setIdCgInfo,
 			  idNewStrictness, setIdNewStrictness
 			) 
 import IdInfo		{- loads of stuff -}
@@ -155,7 +155,7 @@ tidyCorePgm dflags mod pcs cg_info_env
 				 	           isGlobalName (idName bndr)]
 
 	; let ((orig_ns', occ_env, subst_env), tidy_binds) 
-	       		= mapAccumL (tidyTopBind mod ext_ids cg_info_env) 
+	       		= mapAccumL (tidyTopBind mod ext_ids) 
 				    init_tidy_env binds_in
 
 	; let tidy_rules = tidyIdRules (occ_env,subst_env) ext_rules
@@ -163,7 +163,8 @@ tidyCorePgm dflags mod pcs cg_info_env
 	; let prs' = prs { prsOrig = orig_ns' }
 	      pcs' = pcs { pcs_PRS = prs' }
 
-	; let final_ids  = [ id | bind <- tidy_binds
+	; let final_ids  = [ addCgInfo cg_info_env id 
+			   | bind <- tidy_binds
 			   , id <- bindersOf bind
 			   , isGlobalName (idName id)]
 
@@ -188,6 +189,16 @@ tidyCorePgm dflags mod pcs cg_info_env
 
 	; return (pcs', tidy_details)
 	}
+
+addCgInfo :: CgInfoEnv -> Id -> Id
+-- Pin on the info that comes from the code generator
+-- This doesn't make its way into the *bindings* that 
+-- go on to the code generator (that might give black holes etc)
+-- Rather, it's pinned onto the Id in the type environment 
+-- that (a) generates the interface file
+--	(b) in GHCi goes into subsequent compilations
+addCgInfo cg_info_env id 
+  = id `setIdCgInfo` lookupCgInfo cg_info_env (idName id)
 
 tidyCoreExpr :: CoreExpr -> IO CoreExpr
 tidyCoreExpr expr = return (tidyExpr emptyTidyEnv expr)
@@ -375,19 +386,18 @@ type TopTidyEnv = (NameSupply, TidyOccEnv, VarEnv Var)
 tidyTopBind :: Module
 	    -> IdEnv Bool	-- Domain = Ids that should be external
 				-- True <=> their unfolding is external too
-	    -> CgInfoEnv
 	    -> TopTidyEnv -> CoreBind
 	    -> (TopTidyEnv, CoreBind)
 
-tidyTopBind mod ext_ids cg_info_env top_tidy_env (NonRec bndr rhs)
+tidyTopBind mod ext_ids top_tidy_env (NonRec bndr rhs)
   = ((orig,occ,subst) , NonRec bndr' rhs')
   where
     ((orig,occ,subst), bndr')
-	 = tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs' top_tidy_env bndr
+	 = tidyTopBinder mod ext_ids rec_tidy_env rhs' top_tidy_env bndr
     rec_tidy_env = (occ,subst)
     rhs' = tidyExpr rec_tidy_env rhs
 
-tidyTopBind mod ext_ids cg_info_env top_tidy_env (Rec prs)
+tidyTopBind mod ext_ids top_tidy_env (Rec prs)
   = (final_env, Rec prs')
   where
     (final_env@(_,occ,subst), prs') = mapAccumL do_one top_tidy_env prs
@@ -397,13 +407,12 @@ tidyTopBind mod ext_ids cg_info_env top_tidy_env (Rec prs)
 	= ((orig,occ,subst), (bndr',rhs'))
 	where
 	((orig,occ,subst), bndr')
-	   = tidyTopBinder mod ext_ids cg_info_env 
+	   = tidyTopBinder mod ext_ids
 		rec_tidy_env rhs' top_tidy_env bndr
 
         rhs' = tidyExpr rec_tidy_env rhs
 
 tidyTopBinder :: Module -> IdEnv Bool
-	      -> CgInfoEnv
 	      -> TidyEnv -> CoreExpr
 			-- The TidyEnv is used to tidy the IdInfo
 			-- The expr is the already-tided RHS
@@ -411,7 +420,7 @@ tidyTopBinder :: Module -> IdEnv Bool
 	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
   -- NB: tidyTopBinder doesn't affect the unique supply
 
-tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
+tidyTopBinder mod ext_ids tidy_env rhs
 	      env@(ns2, occ_env2, subst_env2) id
 
   | isDataConWrapId id	-- Don't tidy constructor wrappers
@@ -451,8 +460,7 @@ tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
 					       is_external
 					       (idName id)
     ty'	    = tidyTopType (idType id)
-    cg_info = lookupCgInfo cg_info_env name'
-    idinfo' = tidyIdInfo tidy_env is_external unfold_info cg_info id
+    idinfo' = tidyIdInfo tidy_env is_external unfold_info id
 
     id' | isGlobalId id = mkGlobalId (globalIdDetails id) name' ty' idinfo'
 	| otherwise     = mkVanillaGlobal		  name' ty' idinfo'
@@ -470,17 +478,17 @@ tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
 		| otherwise   = noUnfolding
 
 
-tidyIdInfo tidy_env is_external unfold_info cg_info id
+tidyIdInfo tidy_env is_external unfold_info id
   | opt_OmitInterfacePragmas || not is_external
 	-- No IdInfo if the Id isn't external, or if we don't have -O
   = vanillaIdInfo 
-	`setCgInfo` 	       cg_info
+	`setArityInfo`	       arityInfo core_idinfo
 	`setNewStrictnessInfo` newStrictnessInfo core_idinfo
-	-- Keep strictness; it's used by CorePrep
+	-- Keep strictness and arity; both are used by CorePrep
 
   | otherwise
   =  vanillaIdInfo 
-	`setCgInfo` 	       cg_info
+	`setArityInfo`	       arityInfo core_idinfo
 	`setNewStrictnessInfo` newStrictnessInfo core_idinfo
 	`setInlinePragInfo`    inlinePragInfo core_idinfo
 	`setUnfoldingInfo`     unfold_info
