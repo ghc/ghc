@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * $Id: mkNativeHdr.c,v 1.11 2002/12/11 15:36:40 simonmar Exp $
+ * $Id: mkNativeHdr.c,v 1.12 2003/03/21 15:48:06 sof Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
@@ -112,10 +112,6 @@ main()
     printf("#define BDESCR_START %d\n", BDESCR_START);
     printf("#define BDESCR_FREE %d\n", BDESCR_FREE);
     printf("#define BDESCR_BLOCKS %d\n", BDESCR_BLOCKS);
-
-    printf("\n-- FILE size for the Native Code Generator\n");
-
-    printf("#define FILE_SIZE %d\n", sizeof(*stdin));
 
     exit(0);
 }
