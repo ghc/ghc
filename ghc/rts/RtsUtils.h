@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.8 2000/03/16 17:23:35 simonmar Exp $
+ * $Id: RtsUtils.h,v 1.9 2000/04/14 14:07:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -29,6 +29,7 @@ extern void stg_exit(I_ n) __attribute__((noreturn));
 
 char *time_str(void);
 char *ullong_format_string(ullong, char *, rtsBool);
-//ullong   msTime(void);
+
+ullong   msTime(void);
 
 
