@@ -1,9 +1,13 @@
 /*
  *
- * $Id: ghci.c,v 1.6 2003/06/02 16:24:07 sof Exp $
+ * $Id: ghci.c,v 1.7 2003/06/11 07:23:06 simonpj Exp $
  *
- * ghci wrapper - invokes ghc.exe with the added command-line
+ * ghci wrapper for Win32 only
+ * 
+ * This wrapper invokes ghc.exe with the added command-line
  *                option "--interactive".
+ * (On Unix this is done by the ghci.sh shell script, but
+ *  that does not work so well on Win32.)
  *
  * (c) The GHC Team 2001
  *
@@ -118,8 +122,12 @@ main(int argc, char** argv)
      Cygwin gives me the right behaviour, but does it by
      implementing it in terms of spawnv(), so you pay
      the cost of having to create an extra process.
+     Plus, of course, we aren't allowed to use Cygwin here, because
+     GHC does not assume Cygwin.
      
-     ==> Just use spawnv().
+     ==> Just use spawnv(), which is provided by msvcrt.dll, the
+         Microsoft C runtime to which mingw delegates almost all
+	 system calls
   */
 #if 0
   fprintf(stderr, "Invoking ghc: ");
