@@ -17,7 +17,6 @@ import StgSyn
 
 import Type
 import TyCon		( isAlgTyCon )
-import Literal
 import Id
 import Var		( Var, globalIdDetails, varType )
 import TyCon		( isUnboxedTupleTyCon, isPrimTyCon, isFunTyCon )

@@ -15,7 +15,7 @@ import TcRnDriver	( importSupportingDecls, tcTopSrcDecls )
 
 import qualified Language.Haskell.THSyntax as Meta
 
-import HscTypes		( HscEnv(..), GhciMode(..), PersistentCompilerState(..), unQualInScope )
+import HscTypes		( HscEnv(..), PersistentCompilerState(..) )
 import HsSyn		( HsBracket(..), HsExpr(..) )
 import Convert		( convertToHsExpr, convertToHsDecls )
 import RnExpr		( rnExpr )
@@ -24,7 +24,7 @@ import RnHsSyn		( RenamedHsExpr )
 import TcExpr		( tcCheckRho, tcMonoExpr )
 import TcHsSyn		( TcExpr, TypecheckedHsExpr, mkHsLet, zonkTopExpr )
 import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
-import TcUnify		( Expected, unifyTauTy, zapExpectedTo, zapExpectedType )
+import TcUnify		( Expected, zapExpectedTo, zapExpectedType )
 import TcType		( TcType, openTypeKind, mkAppTy )
 import TcEnv		( spliceOK, tcMetaTy, tcWithTempInstEnv, bracketOK )
 import TcRnTypes	( TopEnv(..) )
@@ -34,7 +34,7 @@ import Name		( Name )
 import TcRnMonad
 
 import TysWiredIn	( mkListTy )
-import DsMeta		( expQTyConName, decQTyConName, typeQTyConName, decTyConName, qTyConName )
+import DsMeta		( expQTyConName, typeQTyConName, decTyConName, qTyConName )
 import ErrUtils (Message)
 import Outputable
 import Panic		( showException )

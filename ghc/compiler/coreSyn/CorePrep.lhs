@@ -26,7 +26,7 @@ import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		  isLocalId, hasNoBinding, idNewStrictness, 
 		  idUnfolding, isDataConWorkId_maybe
 		)
-import HscTypes   ( ModGuts(..), ModGuts, TypeEnv, typeEnvElts )
+import HscTypes   ( TypeEnv, typeEnvElts )
 import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
 		  )

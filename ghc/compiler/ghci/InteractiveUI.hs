@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.154 2003/05/21 12:38:37 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.155 2003/07/02 14:59:07 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -22,7 +22,7 @@ import HsSyn		( TyClDecl(..), ConDecl(..), Sig(..) )
 import MkIface		( ifaceTyThing )
 import DriverFlags
 import DriverState
-import DriverUtil	( remove_spaces, handle )
+import DriverUtil	( remove_spaces )
 import Linker		( showLinkerState, linkPackages )
 import Util
 import IdInfo		( GlobalIdDetails(..) )
@@ -46,6 +46,7 @@ import Config
 
 #ifndef mingw32_HOST_OS
 import System.Posix
+import DriverUtil( handle )
 #if __GLASGOW_HASKELL__ > 504
 	hiding (getEnv)
 #endif

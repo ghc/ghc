@@ -22,7 +22,6 @@ import		      DsMeta   ( templateHaskellNames )
 
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
 import DriverState	( v_MainModIs, v_MainFunIs )
-import DriverUtil	( split_longest_prefix )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsExpr(..),
 			  Stmt(..), Pat(VarPat), HsStmtContext(..), RuleDecl(..),
 			  HsGroup(..), SpliceDecl(..),
@@ -36,7 +35,6 @@ import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames,
 			  returnIOName, runIOName, 
 			  dollarMainName, itName, mAIN_Name, unsafeCoerceName
 			)
-import MkId		( unsafeCoerceId )
 import RdrName		( RdrName, getRdrName, mkRdrUnqual, 
 			  lookupRdrEnv, elemRdrEnv )
 
@@ -49,12 +47,10 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedRuleDecl,
 
 import TcExpr 		( tcInferRho, tcCheckRho )
 import TcRnMonad
-import TcMType		( newTyVarTy, zonkTcType )
-import TcType		( Type, liftedTypeKind, 
+import TcType		( Type, 
 			  tyVarsOfType, tcFunResultTy, tidyTopType,
 			  mkForAllTys, mkFunTys, mkTyConApp, tcSplitForAllTys
 			)
-import TcMatches	( tcStmtsAndThen, TcStmtCtxt(..) )
 import Inst		( showLIE, tcStdSyntaxName )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
@@ -77,21 +73,17 @@ import RnIfaces		( slurpImpDecls, checkVersions, RecompileRequired, outOfDate )
 import RnHiFiles	( readIface, loadOldIface )
 import RnEnv		( lookupSrcName, lookupOccRn, plusGlobalRdrEnv,
 			  ubiquitousNames, implicitModuleFVs, implicitStmtFVs, dataTcOccs )
-import RnExpr		( rnStmts, rnExpr )
 import RnSource		( rnSrcDecls, checkModDeprec, rnStats )
 
 import CoreUnfold	( unfoldingTemplate )
 import CoreSyn		( IdCoreRule, Bind(..) )
 import PprCore		( pprIdRules, pprCoreBindings )
-import TysWiredIn	( mkListTy, unitTy )
 import ErrUtils		( mkDumpDoc, showPass, pprBagOfErrors )
 import Id		( Id, mkLocalId, isLocalId, idName, idType, idUnfolding, setIdLocalExported )
-import IdInfo		( GlobalIdDetails(..) )
 import Var		( Var, setGlobalIdDetails )
-import Module           ( Module, ModuleName, mkHomeModule, mkModuleName, moduleName, moduleUserString, moduleEnvElts )
+import Module           ( Module, mkHomeModule, mkModuleName, moduleName, moduleUserString, moduleEnvElts )
 import OccName		( mkVarOcc )
 import Name		( Name, isExternalName, getSrcLoc, nameOccName )
-import NameEnv		( delListFromNameEnv )
 import NameSet
 import TyCon		( tyConGenInfo )
 import BasicTypes       ( EP(..), RecFlag(..) )
@@ -111,9 +103,15 @@ import HscTypes		( PersistentCompilerState(..), InteractiveContext(..),
 			  extendLocalRdrEnv, emptyFixityEnv
 			)
 #ifdef GHCI
+import TcMType		( zonkTcType )
+import TcMatches	( tcStmtsAndThen, TcStmtCtxt(..) )
 import RdrName		( rdrEnvElts )
+import RnExpr		( rnStmts, rnExpr )
 import RnHiFiles	( loadInterface )
 import RnEnv		( mkGlobalRdrEnv )
+import TysWiredIn	( mkListTy, unitTy )
+import IdInfo		( GlobalIdDetails(..) )
+import NameEnv		( delListFromNameEnv )
 import HscTypes		( GlobalRdrElt(..), GlobalRdrEnv, ImportReason(..), Provenance(..), 
 			  isLocalGRE )
 #endif
@@ -532,7 +530,7 @@ initRnInteractive ictxt rn_thing
   = initRn CmdLineMode $
     setLocalRdrEnv (ic_rn_local_env ictxt) $
     rn_thing
-#endif
+#endif /* GHCI */
 \end{code}
 
 %************************************************************************

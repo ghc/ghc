@@ -19,8 +19,7 @@ import Name		( Name, getName, mkSystemName )
 import Id
 import FiniteMap
 import ForeignCall	( ForeignCall(..), CCallTarget(..), CCallSpec(..) )
-import HscTypes		( ModGuts(..), ModGuts, 
-			  TypeEnv, typeEnvTyCons, typeEnvClasses )
+import HscTypes		( TypeEnv, typeEnvTyCons, typeEnvClasses )
 import CoreUtils	( exprType )
 import CoreSyn
 import PprCore		( pprCoreExpr )
@@ -28,21 +27,19 @@ import Literal		( Literal(..), literalPrimRep )
 import PrimRep
 import PrimOp		( PrimOp(..) )
 import CoreFVs		( freeVars )
-import Type		( typePrimRep, isUnLiftedType, splitTyConApp_maybe, 
-			  isTyVarTy )
+import Type		( typePrimRep, isUnLiftedType, splitTyConApp_maybe )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon, 
                           isUnboxedTupleCon, isNullaryDataCon, dataConWorkId,
 			  dataConRepArity )
 import TyCon		( tyConFamilySize, isDataTyCon, tyConDataCons,
-			  isFunTyCon, isUnboxedTupleTyCon )
+			  isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
 import Type		( Type, repType, splitFunTys, dropForAlls )
 import Util
 import DataCon		( dataConRepArity )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
-import TysPrim		( foreignObjPrimTyCon, 
-			  arrayPrimTyCon, mutableArrayPrimTyCon,
+import TysPrim		( arrayPrimTyCon, mutableArrayPrimTyCon,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon
 			)
 import PrimRep		( isFollowableRep )
@@ -56,7 +53,6 @@ import SMRep		( arrWordsHdrSize, arrPtrsHdrSize, StgWord )
 import Bitmap		( intsToReverseBitmap, mkBitmap )
 import OrdList
 import Constants	( wORD_SIZE )
-import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel )
 
 import Data.List	( intersperse, sortBy, zip4, zip5, partition )
 import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8 )
@@ -65,9 +61,8 @@ import Control.Exception	( throwDyn )
 
 import GHC.Exts		( Int(..), ByteArray# )
 
-import Control.Monad	( when, mapAndUnzipM )
+import Control.Monad	( when )
 import Data.Char	( ord )
-import Data.Bits
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module 

@@ -50,7 +50,6 @@ import Flattening       ( flatten )
 import SimplCore
 import TidyPgm		( tidyCorePgm )
 import CorePrep		( corePrepPgm )
-import StgSyn
 import CoreToStg	( coreToStg )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )

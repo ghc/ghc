@@ -56,7 +56,7 @@ module Flattening (
 
 -- friends
 import NDPCoreUtils (tupleTyArgs, funTyArgs, parrElemTy, isDefault,
-		     isLit, mkPArrTy, mkTuple, isSimpleExpr, boolTy, substIdEnv)
+		     isLit, mkPArrTy, mkTuple, isSimpleExpr, substIdEnv)
 import FlattenMonad (Flatten, runFlatten, mkBind, extendContext, packContext,
 		     liftVar, liftConst, intersectWithContext, mk'fst,
 		     mk'lengthP, mk'replicateP, mk'mapP, mk'bpermuteDftP,

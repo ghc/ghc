@@ -15,7 +15,7 @@ import DsUtils		( mkErrorAppDs,
 			  dsReboundNames, lookupReboundName )
 import DsMonad
 
-import HsSyn		( HsExpr(..), Pat(..),
+import HsSyn		( HsExpr(..), 
 			  Stmt(..), HsMatchContext(..), HsStmtContext(..), 
 			  Match(..), GRHSs(..), GRHS(..),
 			  HsCmdTop(..), HsArrAppType(..),
@@ -41,12 +41,12 @@ import TcType		( Type, tcSplitAppTy )
 import Type		( mkTyConApp )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
-import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
+import CoreUtils	( mkIfThenElse, bindNonRec )
 
 import Id		( Id, idType )
 import PrelInfo		( pAT_ERROR_ID )
-import DataCon		( DataCon, dataConWrapId )
-import TysWiredIn	( tupleCon, mkTupleTy )
+import DataCon		( dataConWrapId )
+import TysWiredIn	( tupleCon )
 import BasicTypes	( Boxity(..) )
 import PrelNames	( eitherTyConName, leftDataConName, rightDataConName,
 			  arrAName, composeAName, firstAName,
@@ -55,7 +55,7 @@ import Util		( mapAccumL )
 import Outputable
 
 import HsPat		( collectPatBinders, collectPatsBinders )
-import VarSet		( IdSet, emptyVarSet, mkVarSet, varSetElems,
+import VarSet		( IdSet, mkVarSet, varSetElems,
 			  intersectVarSet, minusVarSet, 
 			  unionVarSet, unionVarSets, elemVarSet )
 import SrcLoc		( SrcLoc )

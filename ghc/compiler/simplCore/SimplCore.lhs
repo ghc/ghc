@@ -14,8 +14,7 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 			)
 import CoreSyn
 import CoreFVs		( ruleRhsFreeVars )
-import HscTypes		( PersistentCompilerState(..), ExternalPackageState(..),
-			  HscEnv(..), GhciMode(..),
+import HscTypes		( HscEnv(..), GhciMode(..),
 			  ModGuts(..), ModGuts, Avails, availsToNameSet, 
 			  PackageRuleBase, HomePackageTable, ModDetails(..),
 			  HomeModInfo(..)

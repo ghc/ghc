@@ -54,7 +54,7 @@ import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArg
 import DataCon		( isExistentialDataCon )
 import Name		( Name )
 import TyCon		( tyConDataCons )
-import TysWiredIn	( tupleCon, mkTupleTy )
+import TysWiredIn	( tupleCon )
 import BasicTypes	( RecFlag(..), Boxity(..), ipNameName )
 import PrelNames	( toPName,
 			  returnMName, bindMName, thenMName, failMName,

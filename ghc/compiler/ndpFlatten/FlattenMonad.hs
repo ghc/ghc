@@ -64,7 +64,6 @@ module FlattenMonad (
 import Monad	    (mplus)
 
 -- GHC
-import CmdLineOpts  (opt_Flatten)
 import Panic        (panic)
 import Outputable   (Outputable(ppr), pprPanic)
 import UniqSupply   (UniqSupply, splitUniqSupply, uniqFromSupply)
