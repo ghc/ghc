@@ -636,7 +636,7 @@ isDirectory stat = do
 
 fileNameEndClean :: String -> String
 fileNameEndClean name = 
-  if i >= 0 && (ec == '\\' || ec == '/') then 
+  if i > 0 && (ec == '\\' || ec == '/') then 
      fileNameEndClean (take i name)
    else
      name
