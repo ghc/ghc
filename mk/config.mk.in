@@ -794,6 +794,7 @@ CTAGS 			= $(ETAGS)
 #
 RAWCPP_FLAGS            = -undef -traditional
 FIND			= @FindCmd@
+SORT		        = @SortCmd@
 INSTALL			= @INSTALL@
 #
 # Sigh - the autoconf macro for INSTALL will subst a relative path to the fallback

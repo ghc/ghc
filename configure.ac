@@ -833,6 +833,9 @@ FP_PROG_CONTEXT_DIFF
 dnl ** Find find command (for Win32's benefit)
 FP_PROG_FIND
 
+dnl ** Find sort command (for the benefit of Win32 environs)
+FP_PROG_SORT
+
 dnl ** figure out how to do a BSD-ish install
 AC_PROG_INSTALL
 
