@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.168 2001/07/03 16:46:21 rrt Exp $
+# $Id: Makefile,v 1.169 2001/07/04 15:51:23 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -126,17 +126,28 @@ endif
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ghc_501_at_least = $(shell if (test $(CANON_HC_VERSION) -gt 5000); then echo YES; else echo NO; fi)
 
+# -----------------------------------------------
+# GHCi calls the C procedure 'system', but alas GHC 4.08's 
+# implementation of this (in the library System) didn't work 
+# properly on Windows.  Everything is fine if you are compiling
+# GHC with GHC 5.01 or better, but lacking that we have the following
+# hack: 
+#	copy system.c from lib/std (where it is correct) 
+#	into main/system.c (where it'll be compiled and
+#			    linked with the compiler)
+
 ifneq "$(ghc_501_at_least)" "YES"
-boot ::
-	$(CP) ../lib/std/cbits/system.c main
-# Build GHC 5.xx's version of systemCmd, so that even when bootstrapping with 4.08, we
-# can assume that system works properly on Win32
 C_SRCS += main/system.c
 SRC_CC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 SRC_MKDEPENDC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 HS_OBJS += main/system.o
+
+main/system.c : ../lib/std/cbits/system.c
+	$(CP) ../lib/std/cbits/system.c main
 endif
 endif
+#		End of system hack
+# -----------------------------------------------
 
 HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
 HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs main/ParsePkgConf.hs $(CONFIG_HS), $(HS_SRCS))
@@ -198,14 +209,15 @@ SRC_HC_OPTS += \
   -I. -IcodeGen -InativeGen -Iparser \
   -i$(subst $(space),:,$(DIRS)) 
 
-# We should do this, to avoid the use of an explicit path
-# 	in GHC source files (include "../includes/config.h"
+# Omitted: 	-I$(GHC_INCLUDE_DIR)
+# We should have -I$(GHC_INCLUDE_DIR) in SRC_HC_OPTS, 
+# to avoid the use of an explicit path in GHC source files
+#	(include "../includes/config.h"
 # But alas GHC 4.08 (and others for all I know) uses this very
 # same include path when compiling the .hc files it generates.
 # Disaster!  Then the hc file sees the GHC 5.02 (or whatever)
 # include files.   For the moment we've reverted to using
 # an explicit path in the .hs sources
-#  -I$(GHC_INCLUDE_DIR) \
 
 ifneq "$(mingw32_TARGET_OS)" "1"
 SRC_HC_OPTS += -package concurrent -package posix -package text -package util
