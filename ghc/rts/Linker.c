@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.131 2003/09/24 11:06:53 simonmar Exp $
+ * $Id: Linker.c,v 1.132 2003/09/25 09:19:23 simonmar Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -460,6 +460,7 @@ typedef struct _RtsSymbolVal {
       SymX(rts_unlock)				\
       SymX(rtsSupportsBoundThreads)		\
       SymX(run_queue_hd)			\
+      Sym(saved_termios)			\
       SymX(setProgArgv)				\
       SymX(startupHaskell)			\
       SymX(shutdownHaskell)			\
