@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
 -- 
 -- Module      :  Numeric
@@ -8,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Numeric.hs,v 1.4 2002/02/05 17:32:24 simonmar Exp $
+-- $Id: Numeric.hs,v 1.5 2002/02/12 10:52:18 simonmar Exp $
 --
 -- Odds and ends, mostly functions for reading and showing
 -- RealFloat-like kind of values.
@@ -44,14 +45,16 @@ module Numeric (
 
 	) where
 
-import Prelude		-- For dependencies
 import Data.Char
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Base		( Char(..), unsafeChr )
+import GHC.Base
 import GHC.Read
-import GHC.Real		( showSigned )
+import GHC.Real
 import GHC.Float
+import GHC.Num
+import GHC.Show
+import Data.Maybe
 #endif
 
 #ifdef __HUGS__
