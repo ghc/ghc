@@ -137,7 +137,7 @@ unpackFS :: FastString -> String
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 205
 unpackFS (FastString _ l# ba#) = byteArrayToString (_ByteArray (0,I# l#) ba#)
 #else
-unpackFS (FastString _ l# ba#) = unpackCStringBA# l# ba#
+unpackFS (FastString _ l# ba#) = unpackCStringBA# ba# l#
 #endif
 unpackFS (CharStr addr len#) =
  unpack 0#
