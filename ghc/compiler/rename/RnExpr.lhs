@@ -349,10 +349,10 @@ rnExpr (ExplicitTuple exps)
     rnExprs exps	 				`thenRn` \ (exps', fvExps) ->
     returnRn (ExplicitTuple exps', fvExps)
 
-rnExpr (RecordCon (HsVar con) rbinds)
+rnExpr (RecordCon con rbinds)
   = lookupOccRn con 			`thenRn` \ conname ->
     rnRbinds "construction" rbinds	`thenRn` \ (rbinds', fvRbinds) ->
-    returnRn (RecordCon (HsVar conname) rbinds', fvRbinds)
+    returnRn (RecordCon conname rbinds', fvRbinds)
 
 rnExpr (RecordUpd expr rbinds)
   = rnExpr expr			`thenRn` \ (expr', fvExpr) ->
