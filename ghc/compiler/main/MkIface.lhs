@@ -5,7 +5,8 @@
 
 \begin{code}
 module MkIface ( 
-	mkModDetails, mkModDetailsFromIface, completeIface, writeIface
+	mkModDetails, mkModDetailsFromIface, completeIface, 
+	writeIface, pprIface
   ) where
 
 #include "HsVersions.h"
@@ -266,7 +267,7 @@ ifaceTyCls (AnId id)
 %*				 					*
 %************************************************************************
 
-\begin{code}			 
+\begin{code}
 ifaceInstance :: DFunId -> RenamedInstDecl
 ifaceInstance dfun_id
   = InstDecl (toHsType tidy_ty) EmptyMonoBinds [] (Just (getName dfun_id)) noSrcLoc			 
@@ -621,6 +622,7 @@ writeIface finder (Just mod_iface)
   where
     mod_name = moduleName (mi_module mod_iface)
 	 
+pprIface :: ModIface -> SDoc
 pprIface iface
  = vcat [ ptext SLIT("__interface")
 		<+> doubleQuotes (ptext opt_InPackage)

@@ -4,7 +4,8 @@
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
 \begin{code}
-module HscMain ( hscMain ) where
+module HscMain ( HscResult(..), hscMain, 
+		 initPersistentCompilerState ) where
 
 #include "HsVersions.h"
 

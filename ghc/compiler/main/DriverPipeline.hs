@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.6 2000/10/25 14:42:32 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.7 2000/10/26 14:38:42 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -29,18 +29,17 @@ import DriverUtil
 import DriverMkDepend
 import DriverPhases
 import DriverFlags
+import HscMain
 import Finder
 import TmpFiles
 import HscTypes
-import UniqFM
 import Outputable
 import Module
-import ErrUtils
 import CmdLineOpts
 import Config
 import Util
-import Panic
 
+import Posix
 import Directory
 import System
 import IOExts
@@ -149,10 +148,8 @@ genPipeline todo stop_flag filename
     cish = cish_suffix suffix
 
    -- for a .hc file, or if the -C flag is given, we need to force lang to HscC
-    real_lang 
-	| suffix == "hc"  = HscC
-	| todo == StopBefore HCc && haskellish = HscC
-	| otherwise = lang
+    real_lang | suffix == "hc"  = HscC
+	      | otherwise       = lang
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
@@ -302,8 +299,6 @@ run_phase Unlit _basename _suff input_fn output_fn
 
 run_phase Cpp _basename _suff input_fn output_fn
   = do src_opts <- getOptionsFromSource input_fn
-	-- ToDo: this is *wrong* if we're processing more than one file:
-	-- the OPTIONS will persist through the subsequent compilations.
        _ <- processArgs dynamic_flags src_opts []
 
        do_cpp <- readState cpp_flag
@@ -395,7 +390,7 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
 -----------------------------------------------------------------------------
 -- Hsc phase
 
-run_phase Hsc	basename suff input_fn output_fn
+run_phase Hsc basename suff input_fn output_fn
   = do
 	
   -- we add the current directory (i.e. the directory in which
@@ -441,44 +436,54 @@ run_phase Hsc	basename suff input_fn output_fn
    -- build a bogus ModSummary to pass to hscMain.
 	let summary = ModSummary {
 			ms_location = error "no loc",
-			ms_ppsource = Just (loc, error "no fingerprint"),
+			ms_ppsource = Just (input_fn, error "no fingerprint"),
 			ms_imports = error "no imports"
 		     }
 
+  -- get the DynFlags
+        dyn_flags <- readIORef v_DynFlags
+
   -- run the compiler!
-	result <- hscMain dyn_flags mod_summary 
-				Nothing{-no iface-}
-				output_fn emptyUFM emptyPCS
+        pcs <- initPersistentCompilerState
+	result <- hscMain dyn_flags{ hscOutName = output_fn }
+			  (error "no Finder!")
+			  summary 
+			  Nothing	 -- no iface
+			  emptyModuleEnv -- HomeSymbolTable
+			  emptyModuleEnv -- HomeIfaceTable
+			  emptyModuleEnv -- PackageIfaceTable
+			  pcs
 
 	case result of {
 
-	    HscErrs pcs errs warns -> do {
-		printErrorsAndWarnings errs warns
-		throwDyn (PhaseFailed "hsc" (ExitFailure 1)) };
+	    HscFail pcs -> throwDyn (PhaseFailed "hsc" (ExitFailure 1));
 
-	    HscOK details maybe_iface maybe_stub_h maybe_stub_c pcs warns -> do
-
-	pprBagOfWarnings warns
-
-   -- get the module name
+	    HscOK details maybe_iface maybe_stub_h maybe_stub_c 
+			_maybe_interpreted_code pcs -> do
 
    -- generate the interface file
-	case iface of
+	case maybe_iface of
 	   Nothing -> -- compilation not required
 	     do run_something "Touching object file" ("touch " ++ o_file)
 		return False
 
 	   Just iface -> do
 		-- discover the filename for the .hi file in a roundabout way
-		let mod = md_id details
-		locn <- mkHomeModule mod basename input_fn
-		let hifile = hi_file locn
-		-- write out the interface file here...
-		return ()		
+		let mod = moduleString (mi_module iface)
+		ohi    <- readIORef output_hi
+		hifile <- case ohi of
+			    Just fn -> fn
+		   	    Nothing -> do hisuf  <- readIORef hi_suf
+			    	          return (current_dir ++ 
+							'/'mod ++ '.':hisuf)
+		-- write out the interface...
+		if_hdl <- openFile hifile WriteMode
+		printForIface if_hdl (pprIface iface)
+		hClose if_hdl
 
     -- deal with stubs
 	maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
-	case stub_o of
+	case maybe_stub_o of
 		Nothing -> return ()
 		Just stub_o -> add ld_inputs stub_o
 
@@ -531,7 +536,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 
         verb <- is_verbose
 
-	o2 <- readIORef opt_minus_o2_for_C
+	o2 <- readIORef v_minus_o2_for_C
 	let opt_flag | o2        = "-O2"
 		     | otherwise = "-O"
 
@@ -720,7 +725,7 @@ preprocess filename =
 
 compile :: Finder                  -- to find modules
         -> ModSummary              -- summary, including source
-        -> Maybe ModIFace          -- old interface, if available
+        -> Maybe ModIface          -- old interface, if available
         -> HomeSymbolTable         -- for home module ModDetails          
         -> PersistentCompilerState -- persistent compiler state
         -> IO CompResult
@@ -757,13 +762,13 @@ compile finder summary old_iface hst pcs = do
 		    HscAsm         -> newTempName (phaseInputExt As)
 		    HscC           -> newTempName (phaseInputExt HCc)
         	    HscJava        -> newTempName "java" -- ToDo
-		    HscInterpreter -> return (error "no output file")
+		    HscInterpreted -> return (error "no output file")
 
    -- run the compiler
    hsc_result <- hscMain dyn_flags summary old_iface output_fn hst pcs
 
    case hsc_result of {
-      HscErrs pcs errs warns -> return (CompErrs pcs errs warns);
+      HscFail pcs -> return (CompErrs pcs);
 
       HscOK details maybe_iface 
 	maybe_stub_h maybe_stub_c maybe_interpreted_code pcs warns -> do
@@ -784,7 +789,7 @@ compile finder summary old_iface hst pcs = do
 
 		-- in interpreted mode, just return the compiled code
 		-- as our "unlinked" object.
-		HscInterpreter -> 
+		HscInterpreted -> 
 		    case maybe_interpreted_code of
 			Just code -> return (Trees code)
 			Nothing   -> panic "compile: no interpreted code"

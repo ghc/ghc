@@ -118,12 +118,12 @@ mkHomeModuleLocn mod_name basename source_fn = do
    ohi    <- readIORef output_hi
    hisuf  <- readIORef hi_suf
    let hifile = case ohi of
-		   Nothing -> basename ++ hisuf
+		   Nothing -> basename ++ '.':hisuf
 		   Just fn -> fn
 
    -- figure out the .o file name.  It also lives in the same dir
    -- as the source, but can be overriden by a -odir flag.
-   o_file <- odir_ify (basename ++ '.':phaseInputExt Ln)
+   o_file <- odir_ify (basename ++ '.':phaseInputExt Ln) >>= osuf_ify
 
    return (Just (mkHomeModule mod_name,
                  ModuleLocation{

@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.8 2000/10/24 16:08:16 simonmar Exp $
+-- $Id: Main.hs,v 1.9 2000/10/26 14:38:42 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -94,7 +94,6 @@ main =
 
 	-- install signal handlers
    main_thread <- myThreadId
-
 #ifndef mingw32_TARGET_OS
    let sig_handler = Catch (throwTo main_thread 
 				(DynException (toDyn Interrupted)))
@@ -149,6 +148,10 @@ main =
    (flags2, mode, stop_flag) <- getGhcMode argv'
    writeIORef v_GhcMode mode
 
+	-- force lang to "C" if the -C flag was given
+   case mode of StopBefore HCc -> writeIORef hsc_lang HscC
+	        _ -> return ()
+
 	-- process all the other arguments, and get the source files
    non_static <- processArgs static_flags flags2 []
 
@@ -159,6 +162,14 @@ main =
 	-- give the static flags to hsc
    static_opts <- buildStaticHscOpts
    writeIORef static_hsc_opts static_opts
+
+	-- warnings
+    warn_level <- readIORef warning_opt
+    let warn_opts =  case warn_level of
+		  	W_default -> standardWarnings
+		  	W_        -> minusWOpts
+		  	W_all	  -> minusWallOpts
+		  	W_not     -> []
 
 	-- build the default DynFlags (these may be adjusted on a per
 	-- module basis by OPTIONS pragmas and settings in the interpreter).
@@ -173,14 +184,6 @@ main =
                   hscLang  = lang,
 		  -- leave out hscOutName for now
 		  flags = [] }
-
-	-- warnings
-    warn_level <- readIORef warning_opt
-    let warn_opts =  case warn_level of
-		  	W_default -> standardWarnings
-		  	W_        -> minusWOpts
-		  	W_all	  -> minusWallOpts
-		  	W_not     -> []
 
 	-- the rest of the arguments are "dynamic"
    srcs <- processArgs dynamic_flags non_static []
