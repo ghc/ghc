@@ -30,8 +30,9 @@ BuildRequires:  alex >= 2.0, happy >= 1.14, ghc >= 5, haddock, docbk31, jade, ja
 Summary:        Glasgow Haskell Compilation system
 
 %description
-Haskell is the standard purely functional programming language; the
-current language version is Haskell 98, agreed in December 1998.
+Haskell is the standard lazy purely functional programming language.
+The current language version is Haskell 98, agreed in December 1998,
+with a revised version published in January 2003.
 
 GHC is a state-of-the-art programming suite for Haskell. Included is
 an optimising compiler generating good code for a variety of
@@ -45,6 +46,29 @@ A wide variety of Haskell related resources (tutorials, libraries,
 specifications, documentation, compilers, interpreters, references,
 contact information, links to research groups) are available from the
 Haskell home page at http://haskell.org/.
+
+Authors:
+--------
+    Krasimir Angelov <ka2_mail@yahoo.com>
+    Manuel Chakravarty <chak@cse.unsw.edu.au>
+    Koen Claessen <koen@cs.chalmers.se>
+    Robert Ennals <Robert.Ennals@cl.cam.ac.uk>
+    Sigbjorn Finne <sof@galconn.com>
+    Gabrielle Keller <keller@cvs.haskell.org>
+    Marcin Kowalczyk <qrczak@knm.org.pl>
+    Jeff Lewis <jeff@galconn.com>
+    Ian Lynagh <igloo@earth.li>
+    Simon Marlow <simonmar@microsoft.com>
+    Sven Panne <sven.panne@aedion.de>
+    Ross Paterson <ross@soi.city.ac.uk>
+    Simon Peyton Jones <simonpj@microsoft.com>
+    Don Stewart <dons@cse.unsw.edu.au>
+    Volker Stolz <stolz@i2.informatik.rwth-aachen.de>
+    Wolfgang Thaller <wolfgang.thaller@gmx.net>
+    Andrew Tolmach <apt@cs.pdx.edu>
+    Keith Wansbrough <Keith.Wansbrough@cl.cam.ac.uk>
+    Michael Weber <michael.weber@post.rwth-aachen.de>
+    plus a dozen helping hands...
 
 %package prof
 Summary: Profiling libraries for GHC
