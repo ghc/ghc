@@ -27,11 +27,9 @@ module Data.Char
     , isLower, isUpper,  isAlpha,   isAlphaNum, isPrint
     , isDigit, isOctDigit, isHexDigit
     , isAsciiUpper, isAsciiLower
-#ifndef __NHC__
     , isLetter, isMark, isNumber, isPunctuation, isSymbol, isSeparator
 
     , GeneralCategory(..), generalCategory
-#endif
 
     -- * Case conversion
     , toUpper, toLower, toTitle  -- :: Char -> Char
