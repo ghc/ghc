@@ -13,6 +13,7 @@ test "hGetBuffering001" { $stdin = "hGetBuffering001.hs"
 test "hGetChar001" 	{ vtr("","","") }
 test "hGetLine001" 	{ $stdin = "hGetLine001.hs"
 			  vtr("-cpp","","") }
+test "hGetLine002" 	{ vtr("","","") }
 test "hGetPosn001" 	{ vtr("-cpp","","") }
 test "hIsEOF001" 	{ vtr("","","") }
 test "hIsEOF002" 	{ vtr("-cpp","","") }
