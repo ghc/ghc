@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: CPUTime.hsc,v 1.9 2001/07/13 11:48:52 rrt Exp $
+-- $Id: CPUTime.hsc,v 1.10 2001/08/10 09:53:40 sewardj Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -69,10 +69,10 @@ foreign import unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
     u_ticks  <- (#peek struct tms,tms_utime) p_tms :: IO CClock
     s_ticks  <- (#peek struct tms,tms_stime) p_tms :: IO CClock
     return (( (fromIntegral u_ticks + fromIntegral s_ticks) * 1000000000000) 
-			`div` clockTicks)
+			`div` fromIntegral clockTicks)
 
 type CTms = ()
-foreign import unsafe times :: Ptr CTms -> CClock
+foreign import unsafe times :: Ptr CTms -> IO CClock
 # else
     ioException (IOError Nothing UnsupportedOperation 
 			 "getCPUTime"
