@@ -125,6 +125,7 @@ prim_tycons
     , doublePrimTyCon
     , floatPrimTyCon
     , intPrimTyCon
+    , int64PrimTyCon
     , foreignObjPrimTyCon
     , mutableArrayPrimTyCon
     , mutableByteArrayPrimTyCon
@@ -133,6 +134,7 @@ prim_tycons
     , stablePtrPrimTyCon
     , statePrimTyCon
     , wordPrimTyCon
+    , word64PrimTyCon
     ]
 
 tuple_tycons = unitTyCon : [tupleTyCon i | i <- [2..37] ]
@@ -147,6 +149,10 @@ data_tycons
     , floatTyCon
     , foreignObjTyCon
     , intTyCon
+    , int8TyCon
+    , int16TyCon
+    , int32TyCon
+    , int64TyCon
     , integerTyCon
     , liftTyCon
     , return2GMPsTyCon
@@ -170,6 +176,10 @@ data_tycons
     , stateAndWordPrimTyCon
     , voidTyCon
     , wordTyCon
+    , word8TyCon
+    , word16TyCon
+    , word32TyCon
+    , word64TyCon
     ]
 \end{code}
 
@@ -203,7 +213,7 @@ wired_in_ids
     , rEC_CON_ERROR_ID
     , rEC_UPD_ERROR_ID
     , realWorldPrimId
-    , tRACE_ID
+--    , tRACE_ID
     , unpackCString2Id
     , unpackCStringAppendId
     , unpackCStringFoldrId
