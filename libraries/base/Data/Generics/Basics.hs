@@ -29,24 +29,33 @@ module Data.Generics.Basics (
 		cast0to2	-- mediate types and binary type constructors
             ),
 
-	-- * Constructor representations
+	-- * Datatype representations (incl. constructors)
 	Constr,		-- abstract, instance of: Eq, Show
+	PrimRep(..),	-- instance of: Eq, Show
 	ConIndex,	-- alias for Int, start at 1
 	Fixity(..),	-- instance of: Eq, Show
 	DataType,	-- abstract, instance of: Show
+	PrimCons(..),	-- instance of: Eq, Show
 
-	-- * Constructing constructor representations
-	mkConstr,   	-- :: ConIndex -> String -> Fixity -> Constr
+	-- * Constructing datatype representations
+	mkDataConstr,   -- :: ConIndex -> String -> Fixity -> Constr
+        mkPrimConstr,   -- :: PrimRep -> Constr
 	mkDataType,	-- :: [Constr] -> DataType
+	mkPrimType,	-- :: Typeable a => PrimCons -> a -> DataType
 
-	-- * Observing constructor representations
+	-- * Observing datatype representations
+	dataTyCon,	-- :: DataType -> String
+	dataTyMod,	-- :: DataType -> String
+	isPrimType,	-- :: DataType -> Bool
+	dataCons, 	-- :: DataType -> [Constr]
+	primCons, 	-- :: DataType -> PrimCons
+	constrPrimRep,  -- :: Constr -> PrimRep
 	conString,	-- :: Constr -> String
 	conFixity,	-- :: Constr -> Fixity
 	conIndex,	-- :: Constr -> ConIndex
 	stringCon,	-- :: DataType -> String -> Maybe Constr
 	indexCon,	-- :: DataType -> ConIndex -> Constr
 	maxConIndex,	-- :: DataType -> ConIndex
-	dataTypeCons, 	-- :: DataType -> [Constr]
 
         -- * Generic maps defined in terms of gfoldl 
 	gmapT,
@@ -66,10 +75,17 @@ module Data.Generics.Basics (
 #ifdef __HADDOCK__
 import Prelude
 #endif
+
 import Data.Typeable
 import Data.Maybe
 import Control.Monad
+import Data.Int              -- So we can give Data instance for Int8, ...
+import Data.Word             -- So we can give Data instance for Word8, ...
 
+import GHC.Real( Ratio(..) ) -- So we can give Data instance for Ratio
+-- import GHC.Ptr	     -- So we can give Data instance for Ptr
+-- import GHC.Stable	     -- So we can give Data instance for StablePtr
+#include "Typeable.h"
 
 
 ------------------------------------------------------------------------------
@@ -241,7 +257,7 @@ unit.
 
   -- | A generic query that processes one child by index (zero-based)
   gmapQi :: Int -> (forall a. Data a => a -> u) -> a -> u
-  gmapQi i f x = case gfoldl k z x of { Qi _ (Just q) -> q } 
+  gmapQi i f x = case gfoldl k z x of { Qi _ q -> fromJust q } 
     where
       k (Qi i' q) a = Qi (i'+1) (if i==i' then Just (f a) else q) 
       z f           = Qi 0 Nothing
@@ -330,29 +346,66 @@ newtype Mp m x = Mp { unMp :: m (x, Bool) }
 
 ------------------------------------------------------------------------------
 --
---	Constructor representations
+--	Datatype and constructor representations
 --
 ------------------------------------------------------------------------------
+
+-- | Representation of datatypes.
+--   A package of constructor representations with names of type and module.
+--   The list of constructors could be an array, a balanced tree, or others.
+--
+data DataType = DataType
+	 { tycon    :: String,
+           tymod    :: String,
+	   datacons :: DataCons
+         }
+
+              deriving Show
+
+
+-- | Datatype constructors
+data DataCons = DataCons [Constr]
+              | PrimCons PrimCons
+
+              deriving Show
+
+
+-- | Primitive constructors
+data PrimCons = PrimStringCons
+              | PrimIntCons
+              | PrimFloatCons
+
+              deriving (Eq, Show)
 
 
 -- | Representation of constructors
 data Constr =
-	-- The prime case for proper datatype constructors
-	       DataConstr ConIndex String Fixity
+	      -- The prime case for algebraic datatypes
+	      DataConstr ConIndex String Fixity
 
-	-- Provision for built-in types
-	    | IntConstr     Int
-	    | IntegerConstr Integer
-	    | FloatConstr   Float
-	    | CharConstr    Char
+	      -- Provision for primitive types
+	    | PrimConstr PrimRep
 
-	-- Provision for any type that can be read/shown as string
-	    | StringConstr  String
-
-	-- Provision for function types
+	      -- Provision for function types
 	    | FunConstr
 
-              deriving (Show, Typeable)
+              deriving Show
+
+
+-- | Primitive types
+data PrimRep 
+	= PrimStringRep String 
+        | PrimIntRep    Integer 
+	| PrimFloatRep  Double
+
+              deriving (Eq, Show)
+
+
+-- | Select primitive representation
+constrPrimRep :: Constr -> PrimRep
+constrPrimRep (PrimConstr x) = x
+constrPrimRep _              = error "constrPrimRep"
+
 
 -- 
 -- Equality of datatype constructors via index.
@@ -360,12 +413,8 @@ data Constr =
 -- 
 instance Eq Constr where
   (DataConstr i1 _ _) == (DataConstr i2 _ _) = i1 == i2
-  (IntConstr i1)      == (IntConstr i2)      = i1 == i2
-  (IntegerConstr i1)  == (IntegerConstr i2)  = i1 == i2
-  (FloatConstr i1)    == (FloatConstr i2)    = i1 == i2
-  (CharConstr i1)     == (CharConstr i2)     = i1 == i2
-  (StringConstr i1)   == (StringConstr i2)   = i1 == i2
-  _ == _ = False
+  (PrimConstr x)      == (PrimConstr y)      = x  == y
+  _                   == _                   = False
 
 
 -- | Unique index for datatype constructors.
@@ -379,61 +428,85 @@ data Fixity = Prefix
             | Infix	-- Later: add associativity and precedence
 	    deriving (Eq,Show)
 
--- | A package of constructor representations;
---   could be a list, an array, a balanced tree, or others.
---
-data DataType =
-	-- The prime case for algebraic datatypes
-	       DataType [Constr]
-
-	-- Provision for built-in types
-	    | IntType
-	    | IntegerType
-	    | FloatType
-	    | CharType
-
-	-- Provision for any type that can be read/shown as string
-	    | StringType
-
-	-- Provision for function types
-	    | FunType
-
-              deriving Show
 
 
 ------------------------------------------------------------------------------
 --
---	Constructing constructor representations
+--	Constructing representations
 --
 ------------------------------------------------------------------------------
 
 
--- | Make a representation for a datatype constructor
-mkConstr   :: ConIndex -> String -> Fixity -> Constr
+-- | Make a datatype constructor
+mkDataConstr   :: ConIndex -> String -> Fixity -> Constr
 --	ToDo: consider adding arity?
-mkConstr = DataConstr
+mkDataConstr = DataConstr
+
+
+-- | Make a constructor for primitive types
+mkPrimConstr :: PrimRep -> Constr
+mkPrimConstr = PrimConstr
+
 
 -- | Make a package of constructor representations
-mkDataType :: [Constr] -> DataType
-mkDataType = DataType
+mkDataType :: Typeable a => [Constr] -> a -> DataType
+mkDataType cs x = DataType { tycon    = typeTyCon x
+                           , tymod    = typeMod x
+                           , datacons = DataCons cs }
+
+
+-- | Make a datatype representation for a primitive type
+mkPrimType :: Typeable a => PrimCons -> a -> DataType
+mkPrimType pc x = DataType { tycon    = typeTyCon x
+                           , tymod    = typeMod x
+                           , datacons = PrimCons pc }
 
 
 ------------------------------------------------------------------------------
 --
---	Observing constructor representations
+--	Observing representations
 --
 ------------------------------------------------------------------------------
+
+
+-- | Gets the type constructor
+dataTyCon :: DataType -> String
+dataTyCon = tycon
+
+
+-- | Gets the module
+dataTyMod :: DataType -> String
+dataTyMod = tymod
+
+
+-- | Tests for primitive types
+isPrimType :: DataType -> Bool
+isPrimType dt = case datacons dt of
+                     (DataCons _) -> False
+                     _            -> True
+
+
+-- | Gets datatype constructors in increasing order of indicies;
+dataCons :: DataType -> [Constr] 
+dataCons dt = case datacons dt of
+               (DataCons cs) -> cs
+               _             -> error "dataCons"
+
+
+-- | Gets datatype constructors in increasing order of indicies;
+primCons :: DataType -> PrimCons
+primCons dt = case datacons dt of
+               (PrimCons pc) -> pc
+               _             -> error "primCons"
 
 
 -- | Turn a constructor into a string
 conString :: Constr -> String
 conString (DataConstr _ str _) = str
-conString (IntConstr int)      = show int
-conString (IntegerConstr int)  = show int
-conString (FloatConstr real)   = show real
-conString (CharConstr char)    = show char
-conString (StringConstr str)   = show str
-conString FunConstr            = "->"
+conString (PrimConstr (PrimStringRep x)) = x
+conString (PrimConstr (PrimIntRep x))    = show x
+conString (PrimConstr (PrimFloatRep x))  = show x
+conString FunConstr = "->"
 
 
 -- | Determine fixity of a constructor;
@@ -452,7 +525,8 @@ conIndex _                    = undefined
 
 -- | Lookup a constructor via a string
 stringCon :: DataType -> String -> Maybe Constr
-stringCon (DataType cs) str = worker cs
+stringCon dt str | not (isPrimType dt)
+ = worker (dataCons dt)
   where
     worker []     = Nothing
     worker (c:cs) =
@@ -460,94 +534,80 @@ stringCon (DataType cs) str = worker cs
         (DataConstr _ str' _) -> if str == str'
                                    then Just c
                                    else worker cs
-        _ -> undefined -- other forms of Constr not valid here
 
-stringCon IntType str       = Just . IntConstr     $ read str
-stringCon IntegerType str   = Just . IntegerConstr $ read str
-stringCon FloatType str     = Just . FloatConstr   $ read str
-stringCon CharType str      = Just . CharConstr    $ read str
-stringCon StringType str    = Just . StringConstr  $ read str
-stringCon FunType str       = Just FunConstr
+	-- other forms of Constr not valid here
+        _ -> error "stringCon"
+
+stringCon dt str | primCons dt == PrimStringCons =
+  Just $ mkPrimConstr (PrimStringRep str)
+
+stringCon dt str | primCons dt == PrimIntCons =
+  Just $ mkPrimConstr (PrimIntRep (read str))
+
+stringCon dt str | primCons dt == PrimFloatCons =
+  Just $ mkPrimConstr (PrimFloatRep (read str))
+
+stringCon _ _ = error "stringCon"
 
 
 -- | Lookup a constructor by its index;
 ---  not defined for primitive types.
 indexCon :: DataType -> ConIndex -> Constr
-indexCon (DataType cs) idx = cs !! (idx-1)
-indexCon _ _ = undefined -- otherwise
+indexCon dt idx = (dataCons dt) !! (idx-1)
 
 
 -- | Return maximum index;
---   0 for primitive types
+---  not defined for primitive types.
 maxConIndex :: DataType -> ConIndex
-maxConIndex (DataType cs) = length cs
-maxConIndex _ = 0 -- otherwise
+maxConIndex dt = length (dataCons dt)
 
 
--- | Return all constructors in increasing order of indicies;
--- empty list for primitive types
-dataTypeCons :: DataType -> [Constr] 
-dataTypeCons (DataType cs) = cs
-dataTypeCons _ = [] -- otherwise
+-- | Determine type constructor for a typeable
+typeTyCon :: Typeable a => a -> String
+typeTyCon = select         -- Drop module prefix
+          . typeString     -- Determine full string for type
+ where
+  -- Drop *.*.*... before name
+  select :: String -> String
+  select x = let x' = dropWhile (not . (==) '.') x
+              in if x' == [] then x else select (tail x')
 
 
+-- | Determine module of a typeable
+typeMod :: Typeable a => a -> String
+typeMod = select         -- Take module prefix
+        . typeString     -- Determine full string for type
+ where
+  -- Take *.*.*... before name
+  select :: String -> String
+  select x = let (a,b) = break ((==) '.') x
+              in if b == ""
+                  then b 
+                  else a++select' (tail b)
+    where
+     select' x = let x' = select x
+                  in if x' == "" then "" else ('.':x')
+
+
+-- | Determine full string for type
+typeString :: Typeable a => a -> String
+typeString = tyconString   -- Turn into string
+           . typerepTyCon  -- Extract type constructor
+           . typeOf        -- Query type of term
+
+
+ 
 ------------------------------------------------------------------------------
 --
 --	Instances of the Data class for Prelude types
+--	We define top-level definitions for representations.
 --
 ------------------------------------------------------------------------------
 
--- Basic datatype Int; folding and unfolding is trivial
-instance Data Int where
-  toConstr x = IntConstr x
-  fromConstr (IntConstr x) = x
-  dataTypeOf _ = IntType
 
--- Another basic datatype instance
-instance Data Integer where
-  toConstr x = IntegerConstr x
-  fromConstr (IntegerConstr x) = x
-  dataTypeOf _ = IntegerType
-
--- Another basic datatype instance
-instance Data Float where
-  toConstr x = FloatConstr x
-  fromConstr (FloatConstr x) = x
-  dataTypeOf _ = FloatType
-
--- Another basic datatype instance
-instance Data Char where
-  toConstr x = CharConstr x
-  fromConstr (CharConstr x) = x
-  dataTypeOf _ = CharType
-
--- A basic datatype without a specific branch in Constr
-instance Data Rational where
-  toConstr x = StringConstr (show x)
-  fromConstr (StringConstr x) = read x
-  dataTypeOf _ = StringType
-
---
--- () as the most trivial algebraic datatype;
--- define top-level definitions for representations.
---
-
-emptyTupleConstr = mkConstr 1 "()" Prefix
-unitDataType     = mkDataType [emptyTupleConstr]
-
-instance Data () where
-  toConstr _ = emptyTupleConstr
-  fromConstr c | conIndex c == 1 = ()  
-  dataTypeOf _ = unitDataType
-
---
--- Bool as another trivial algebraic datatype;
--- define top-level definitions for representations.
---
-
-falseConstr  = mkConstr 1 "False" Prefix
-trueConstr   = mkConstr 2 "True"  Prefix
-boolDataType = mkDataType [falseConstr,trueConstr]
+falseConstr    = mkDataConstr 1 "False" Prefix
+trueConstr     = mkDataConstr 2 "True"  Prefix
+boolDataType x = mkDataType [falseConstr,trueConstr] x
 
 instance Data Bool where
   toConstr False = falseConstr
@@ -555,17 +615,168 @@ instance Data Bool where
   fromConstr c = case conIndex c of
                    1 -> False
                    2 -> True
-  dataTypeOf _ = boolDataType
+                   _ -> error "fromConstr"
+  dataTypeOf = boolDataType
 
 
---
--- Lists as an example of a polymorphic algebraic datatype.
--- Cons-lists are terms with two immediate subterms.
---
+------------------------------------------------------------------------------
 
-nilConstr    = mkConstr 1 "[]"  Prefix
-consConstr   = mkConstr 2 "(:)" Infix
-listDataType = mkDataType [nilConstr,consConstr]
+
+instance Data Char where
+  toConstr x = mkPrimConstr (PrimStringRep [x])
+  fromConstr (PrimConstr (PrimStringRep [x])) = x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimStringCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Float where
+  toConstr x = mkPrimConstr (PrimFloatRep (realToFrac x))
+  fromConstr (PrimConstr (PrimFloatRep x)) = realToFrac x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimFloatCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Double where
+  toConstr x = mkPrimConstr (PrimFloatRep x)
+  fromConstr (PrimConstr (PrimFloatRep x)) = x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimFloatCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Int where
+  toConstr x = mkPrimConstr (PrimIntRep (fromIntegral x))
+  fromConstr (PrimConstr (PrimIntRep x)) = fromIntegral x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Integer where
+  toConstr x = mkPrimConstr (PrimIntRep x)
+  fromConstr (PrimConstr (PrimIntRep x)) = x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Int8 where
+  toConstr x = mkPrimConstr (PrimIntRep (fromIntegral x))
+  fromConstr (PrimConstr (PrimIntRep x)) = fromIntegral x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Int16 where
+  toConstr x = mkPrimConstr (PrimIntRep (fromIntegral x))
+  fromConstr (PrimConstr (PrimIntRep x)) = fromIntegral x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Int32 where
+  toConstr x = mkPrimConstr (PrimIntRep (fromIntegral x))
+  fromConstr (PrimConstr (PrimIntRep x)) = fromIntegral x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Int64 where
+  toConstr x = mkPrimConstr (PrimIntRep (fromIntegral x))
+  fromConstr (PrimConstr (PrimIntRep x)) = fromIntegral x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Word8 where
+  toConstr x = mkPrimConstr (PrimIntRep (fromIntegral x))
+  fromConstr (PrimConstr (PrimIntRep x)) = fromIntegral x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+instance Data Word where
+  toConstr x = mkPrimConstr (PrimIntRep (fromIntegral x))
+  fromConstr (PrimConstr (PrimIntRep x)) = fromIntegral x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Word16 where
+  toConstr x = mkPrimConstr (PrimIntRep (fromIntegral x))
+  fromConstr (PrimConstr (PrimIntRep x)) = fromIntegral x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Word32 where
+  toConstr x = mkPrimConstr (PrimIntRep (fromIntegral x))
+  fromConstr (PrimConstr (PrimIntRep x)) = fromIntegral x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+------------------------------------------------------------------------------
+
+
+instance Data Word64 where
+  toConstr x = mkPrimConstr (PrimIntRep (fromIntegral x))
+  fromConstr (PrimConstr (PrimIntRep x)) = fromIntegral x
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = mkPrimType PrimIntCons
+
+
+------------------------------------------------------------------------------
+
+
+ratioConstr    = mkDataConstr 1 ":%" Infix
+ratioDataType x = mkDataType [ratioConstr] x
+
+instance (Data a, Integral a) => Data (Ratio a) where
+  toConstr _ = ratioConstr
+  fromConstr c | conIndex c == 1 = undefined :% undefined
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = ratioDataType
+
+
+
+------------------------------------------------------------------------------
+
+
+
+nilConstr      = mkDataConstr 1 "[]"  Prefix
+consConstr     = mkDataConstr 2 "(:)" Infix
+listDataType x = mkDataType [nilConstr,consConstr] x
 
 instance Data a => Data [a] where
   gfoldl f z []     = z []
@@ -575,8 +786,9 @@ instance Data a => Data [a] where
   fromConstr c = case conIndex c of
                    1 -> []
                    2 -> undefined:undefined
-  dataTypeOf _ = listDataType
-  cast0to1     = cast1
+                   _ -> error "fromConstr"
+  dataTypeOf = listDataType
+  cast0to1   = cast1
 
 --
 -- The gmaps are given as an illustration.
@@ -590,14 +802,12 @@ instance Data a => Data [a] where
   gmapM  f   (x:xs) = f x >>= \x' -> f xs >>= \xs' -> return (x':xs')
 
 
---
--- Yet another polymorphic datatype constructor
--- No surprises.
---
+------------------------------------------------------------------------------
 
-nothingConstr = mkConstr 1 "Nothing" Prefix
-justConstr    = mkConstr 2 "Just"    Prefix
-maybeDataType = mkDataType [nothingConstr,justConstr]
+
+nothingConstr   = mkDataConstr 1 "Nothing" Prefix
+justConstr      = mkDataConstr 2 "Just"    Prefix
+maybeDataType x = mkDataType [nothingConstr,justConstr] x
 
 instance Data a => Data (Maybe a) where
   gfoldl f z Nothing  = z Nothing
@@ -607,61 +817,40 @@ instance Data a => Data (Maybe a) where
   fromConstr c = case conIndex c of
                    1 -> Nothing
                    2 -> Just undefined
-  dataTypeOf _ = maybeDataType
-  cast0to1     = cast1
+                   _ -> error "fromConstr"
+  dataTypeOf = maybeDataType
+  cast0to1   = cast1
 
 
---
--- Yet another polymorphic datatype constructor.
--- No surprises.
---
+------------------------------------------------------------------------------
 
-pairConstr = mkConstr 1 "(,)" Infix
-productDataType = mkDataType [pairConstr]
 
-instance (Data a, Data b) => Data (a,b) where
-  gfoldl f z (a,b) = z (,) `f` a `f` b
-  toConstr _ = pairConstr
+ltConstr           = mkDataConstr 1 "LT" Prefix
+eqConstr           = mkDataConstr 2 "EQ" Prefix
+gtConstr           = mkDataConstr 3 "GT" Prefix
+orderingDataType x = mkDataType [ltConstr,eqConstr,gtConstr] x
+
+instance Data Ordering where
+  gfoldl f z LT  = z LT
+  gfoldl f z EQ  = z EQ
+  gfoldl f z GT  = z GT
+  toConstr LT  = ltConstr
+  toConstr EQ  = eqConstr
+  toConstr GT  = gtConstr
   fromConstr c = case conIndex c of
-                   1 -> (undefined,undefined)
-  dataTypeOf _ = productDataType
-  cast0to2     = cast2
+                   1 -> LT
+                   2 -> EQ
+                   3 -> GT
+                   _ -> error "fromConstr"
+  dataTypeOf = orderingDataType
 
 
---
--- Yet another polymorphic datatype constructor.
--- No surprises.
---
- 
-tripleConstr = mkConstr 1 "(,,)" Infix
-tripleDataType = mkDataType [tripleConstr]
-
-instance (Data a, Data b, Data c) => Data (a,b,c) where
-  gfoldl f z (a,b,c) = z (,,) `f` a `f` b `f` c
-  toConstr _ = tripleConstr
-  fromConstr c = case conIndex c of
-                   1 -> (undefined,undefined,undefined)
-  dataTypeOf _ = tripleDataType
- 
-quadrupleConstr = mkConstr 1 "(,,,)" Infix
-quadrupleDataType = mkDataType [quadrupleConstr]
- 
-instance (Data a, Data b, Data c, Data d) => Data (a,b,c,d) where
-  gfoldl f z (a,b,c,d) = z (,,,) `f` a `f` b `f` c `f` d
-  toConstr _ = quadrupleConstr
-  fromConstr c = case conIndex c of
-                   1 -> (undefined,undefined,undefined,undefined)
-  dataTypeOf _ = quadrupleDataType
+------------------------------------------------------------------------------
 
 
---
--- Yet another polymorphic datatype constructor.
--- No surprises.
---
-
-leftConstr     = mkConstr 1 "Left"  Prefix
-rightConstr    = mkConstr 2 "Right" Prefix
-eitherDataType = mkDataType [leftConstr,rightConstr]
+leftConstr       = mkDataConstr 1 "Left"  Prefix
+rightConstr      = mkDataConstr 2 "Right" Prefix
+eitherDataType x = mkDataType [leftConstr,rightConstr] x
 
 instance (Data a, Data b) => Data (Either a b) where
   gfoldl f z (Left a)   = z Left  `f` a
@@ -671,33 +860,217 @@ instance (Data a, Data b) => Data (Either a b) where
   fromConstr c = case conIndex c of
                    1 -> Left undefined
                    2 -> Right undefined
-  dataTypeOf _ = eitherDataType
-  cast0to2     = cast2
+                   _ -> error "fromConstr"
+  dataTypeOf = eitherDataType
+  cast0to2   = cast2
 
 
-{-
+------------------------------------------------------------------------------
 
-We should better not FOLD over characters in a string for efficiency.
-However, the following instance would clearly overlap with the
-instance for polymorphic lists. Given the current scheme of allowing
-overlapping instances, this would imply that ANY module that imports
-Data.Generics would need to explicitly and generally allow overlapping
-instances. This is prohibitive and calls for a more constrained model
-of allowing overlapping instances. The present instance would be
-sensible even more for UNFOLDING. In the definition of "gread"
-(generic read --- based on unfolding), we succeed handling strings in a
-special way by using a type-specific case for String.
 
-instance Data String where
-  toConstr x = StringConstr x
-  fromConstr (StringConstr x) = x
-  dataTypeOf _ = StringType
-
--}
-
+--
 -- A last resort for functions
+--
+ 
 instance (Data a, Data b) => Data (a -> b) where
   toConstr _   = FunConstr
-  fromConstr _ = undefined
-  dataTypeOf _ = FunType
+  fromConstr _ = error "fromConstr"
+  dataTypeOf   = error "dataTypeOf"
   cast0to2     = cast2
+
+
+------------------------------------------------------------------------------
+
+
+tuple0Constr     = mkDataConstr 1 "()" Prefix
+tuple0DataType x = mkDataType [tuple0Constr] x
+
+instance Data () where
+  toConstr _ = tuple0Constr
+  fromConstr c | conIndex c == 1 = ()  
+  fromConstr _ = error "fromConstr"
+  dataTypeOf = tuple0DataType
+
+
+------------------------------------------------------------------------------
+
+
+tuple2Constr     = mkDataConstr 1 "(,)" Infix
+tuple2DataType x = mkDataType [tuple2Constr] x
+
+instance (Data a, Data b) => Data (a,b) where
+  gfoldl f z (a,b) = z (,) `f` a `f` b
+  toConstr _ = tuple2Constr
+  fromConstr c = case conIndex c of
+                   1 -> (undefined,undefined)
+                   _ -> error "fromConstr"
+  dataTypeOf = tuple2DataType
+  cast0to2   = cast2
+
+
+------------------------------------------------------------------------------
+
+
+tuple3Constr     = mkDataConstr 1 "(,,)" Infix
+tuple3DataType x = mkDataType [tuple3Constr] x
+
+instance (Data a, Data b, Data c) => Data (a,b,c) where
+  gfoldl f z (a,b,c) = z (,,) `f` a `f` b `f` c
+  toConstr _ = tuple3Constr
+  fromConstr c = case conIndex c of
+                   1 -> (undefined,undefined,undefined)
+                   _ -> error "fromConstr"
+  dataTypeOf = tuple3DataType
+
+
+------------------------------------------------------------------------------
+
+
+tuple4Constr     = mkDataConstr 1 "(,,,)" Infix
+tuple4DataType x = mkDataType [tuple4Constr] x
+
+instance (Data a, Data b, Data c, Data d)
+         => Data (a,b,c,d) where
+  gfoldl f z (a,b,c,d) = z (,,,) `f` a `f` b `f` c `f` d
+  toConstr _ = tuple4Constr
+  fromConstr c = case conIndex c of
+                   1 -> (undefined,undefined,undefined,undefined)
+                   _ -> error "fromConstr"
+  dataTypeOf = tuple4DataType
+
+
+------------------------------------------------------------------------------
+
+
+tuple5Constr     = mkDataConstr 1 "(,,,,)" Infix
+tuple5DataType x = mkDataType [tuple5Constr] x
+
+instance (Data a, Data b, Data c, Data d, Data e)
+         => Data (a,b,c,d,e) where
+  gfoldl f z (a,b,c,d,e) = z (,,,,) `f` a `f` b `f` c `f` d `f` e
+  toConstr _ = tuple5Constr
+  fromConstr c = case conIndex c of
+                   1 -> (undefined,undefined,undefined,undefined,undefined)
+                   _ -> error "fromConstr"
+  dataTypeOf = tuple5DataType
+
+
+------------------------------------------------------------------------------
+
+
+tuple6Constr     = mkDataConstr 1 "(,,,,,)" Infix
+tuple6DataType x = mkDataType [tuple6Constr] x
+
+instance (Data a, Data b, Data c, Data d, Data e, Data f)
+         => Data (a,b,c,d,e,f) where
+  gfoldl f z (a,b,c,d,e,f') = z (,,,,,) `f` a `f` b `f` c `f` d `f` e `f` f'
+  toConstr _ = tuple6Constr
+  fromConstr c =
+    case conIndex c of
+           1 -> (undefined,undefined,undefined,undefined,undefined,undefined)
+           _ -> error "fromConstr"
+  dataTypeOf = tuple6DataType
+
+
+------------------------------------------------------------------------------
+
+
+tuple7Constr     = mkDataConstr 1 "(,,,,,,)" Infix
+tuple7DataType x = mkDataType [tuple7Constr] x
+
+instance (Data a, Data b, Data c, Data d, Data e, Data f, Data g)
+         => Data (a,b,c,d,e,f,g) where
+  gfoldl f z (a,b,c,d,e,f',g) =
+    z (,,,,,,) `f` a `f` b `f` c `f` d `f` e `f` f' `f` g
+  toConstr _ = tuple7Constr
+  fromConstr c = case conIndex c of
+   1 -> (undefined,undefined,undefined,undefined,undefined,undefined,undefined)
+   _ -> error "fromConstr"
+  dataTypeOf = tuple7DataType
+
+
+------------------------------------------------------------------------------
+
+
+instance Data TypeRep where
+  toConstr _   = error "toConstr"
+  fromConstr _ = error "fromConstr"
+  dataTypeOf   = error "dataTypeOf"
+
+
+------------------------------------------------------------------------------
+
+
+instance Data TyCon where
+  toConstr _   = error "toConstr"
+  fromConstr _ = error "fromConstr"
+  dataTypeOf   = error "dataTypeOf"
+
+
+------------------------------------------------------------------------------
+
+
+INSTANCE_TYPEABLE0(DataType,dataTypeTc,"DataType")
+
+instance Data DataType where
+  toConstr _   = error "toConstr"
+  fromConstr _ = error "fromConstr"
+  dataTypeOf   = error "dataTypeOf"
+
+
+------------------------------------------------------------------------------
+
+
+INSTANCE_TYPEABLE0(DataCons,dataConsTc,"DataCons")
+
+instance Data DataCons where
+  toConstr _   = error "toConstr"
+  fromConstr _ = error "fromConstr"
+  dataTypeOf   = error "dataTypeOf"
+
+
+------------------------------------------------------------------------------
+
+
+INSTANCE_TYPEABLE0(PrimCons,primConsTc,"PrimCons")
+
+instance Data PrimCons where
+  toConstr _   = error "toConstr"
+  fromConstr _ = error "fromConstr"
+  dataTypeOf   = error "dataTypeOf"
+
+
+------------------------------------------------------------------------------
+
+
+INSTANCE_TYPEABLE0(Constr,constrTc,"Constr")
+
+instance Data Constr where
+  toConstr _   = error "toConstr"
+  fromConstr _ = error "fromConstr"
+  dataTypeOf   = error "dataTypeOf"
+
+
+------------------------------------------------------------------------------
+
+
+INSTANCE_TYPEABLE0(PrimRep,primRepTc,"PrimRep")
+
+instance Data PrimRep where
+  toConstr _   = error "toConstr"
+  fromConstr _ = error "fromConstr"
+  dataTypeOf   = error "dataTypeOf"
+
+
+------------------------------------------------------------------------------
+
+
+INSTANCE_TYPEABLE0(Fixity,fixityTc,"Fixity")
+
+instance Data Fixity where
+  toConstr _   = error "toConstr"
+  fromConstr _ = error "fromConstr"
+  dataTypeOf   = error "dataTypeOf"
+
+
+------------------------------------------------------------------------------

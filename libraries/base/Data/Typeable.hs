@@ -343,6 +343,42 @@ instance ( Typeable a
 			      typeOf ((undefined :: (a,b,c,d,e) -> d) tu),
 			      typeOf ((undefined :: (a,b,c,d,e) -> e) tu)]
 
+tup6Tc :: TyCon
+tup6Tc = mkTyCon ",,,,"
+
+instance ( Typeable a
+	 , Typeable b
+	 , Typeable c
+	 , Typeable d
+	 , Typeable e
+         , Typeable f) => Typeable (a,b,c,d,e,f) where
+  typeOf tu = mkAppTy tup6Tc 
+      [typeOf (         (undefined :: (a,b,c,d,e,f) -> a) tu),
+	        typeOf ((undefined :: (a,b,c,d,e,f) -> b) tu),
+		typeOf ((undefined :: (a,b,c,d,e,f) -> c) tu),
+		typeOf ((undefined :: (a,b,c,d,e,f) -> d) tu),
+		typeOf ((undefined :: (a,b,c,d,e,f) -> e) tu),
+		typeOf ((undefined :: (a,b,c,d,e,f) -> f) tu)]
+
+tup7Tc :: TyCon
+tup7Tc = mkTyCon ",,,,"
+
+instance ( Typeable a
+	 , Typeable b
+	 , Typeable c
+	 , Typeable d
+	 , Typeable e
+         , Typeable f
+         , Typeable g) => Typeable (a,b,c,d,e,f,g) where
+  typeOf tu = mkAppTy tup7Tc
+      [typeOf (               (undefined :: (a,b,c,d,e,f,g) -> a) tu),
+		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> b) tu),
+		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> c) tu),
+		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> d) tu),
+		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> e) tu),
+		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> f) tu),
+		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> g) tu)]
+
 instance (Typeable a, Typeable b) => Typeable (a -> b) where
   typeOf f = mkFunTy (typeOf ((undefined :: (a -> b) -> a) f))
 		     (typeOf ((undefined :: (a -> b) -> b) f))
@@ -385,6 +421,10 @@ INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 
 INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
+#endif
+
+#ifdef __GLASGOW_HASKELL__
+INSTANCE_TYPEABLE0(Word,wordTc,"Word" )
 #endif
 
 
@@ -488,7 +528,9 @@ class Typeable1 t where
 class Typeable2 t where
   typeOf2 :: t a b -> TyCon
 
+
 #ifndef __NHC__
+
 -- | Instance for lists
 instance Typeable1 [] where
   typeOf1 _ = typerepTyCon (typeOf (undefined::[()]))
@@ -497,6 +539,11 @@ instance Typeable1 [] where
 -- | Instance for maybes
 instance Typeable1 Maybe where
   typeOf1 _ = typerepTyCon (typeOf (undefined::Maybe ()))
+
+
+-- | Instance for ratios
+instance Typeable1 Ratio where
+  typeOf1 _ = typerepTyCon (typeOf (undefined::Ratio ()))
 
 
 -- | Instance for products
@@ -512,7 +559,9 @@ instance Typeable2 Either where
 -- | Instance for functions
 instance Typeable2 (->) where
   typeOf2 _ = typerepTyCon (typeOf (undefined::() -> ()))
+
 #endif
+
 
 -- | Cast for * -> *
 cast1 :: (Typeable1 t, Typeable1 t') => c (t a) -> Maybe (c (t' a)) 
