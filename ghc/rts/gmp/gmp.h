@@ -21,6 +21,12 @@ MA 02111-1307, USA. */
 
 #ifndef __GMP_H__
 
+#ifndef STG_H
+/* Get DLL_IMPORT_RTS */
+#include "../../includes/config.h"
+#include "../../includes/StgDLL.h"
+#endif
+
 #ifndef __GNU_MP__
 #define __GNU_MP__ 2
 #define __need_size_t
@@ -168,192 +174,192 @@ typedef __mpq_struct *mpq_ptr;
 #define _GMP_H_HAVE_FILE 1
 #endif
 
-void mp_set_memory_functions _PROTO ((void *(*) (size_t),
+DLL_IMPORT_RTS void mp_set_memory_functions _PROTO ((void *(*) (size_t),
 				      void *(*) (void *, size_t, size_t),
 				      void (*) (void *, size_t)));
-extern __gmp_const int mp_bits_per_limb;
+DLL_IMPORT_RTS extern __gmp_const int mp_bits_per_limb;
 
 /**************** Integer (i.e. Z) routines.  ****************/
 
 #if defined (__cplusplus)
 extern "C" {
 #endif
-void *_mpz_realloc _PROTO ((mpz_ptr, mp_size_t));
+DLL_IMPORT_RTS void *_mpz_realloc _PROTO ((mpz_ptr, mp_size_t));
 
-void mpz_abs _PROTO ((mpz_ptr, mpz_srcptr));
-void mpz_add _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_add_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_and _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_array_init _PROTO ((mpz_ptr, mp_size_t, mp_size_t));
-void mpz_cdiv_q _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-unsigned long int mpz_cdiv_q_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_cdiv_qr _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, mpz_srcptr));
-unsigned long int mpz_cdiv_qr_ui _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_cdiv_r _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-unsigned long int mpz_cdiv_r_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-unsigned long int mpz_cdiv_ui _PROTO ((mpz_srcptr, unsigned long int));
-void mpz_clear _PROTO ((mpz_ptr));
-void mpz_clrbit _PROTO ((mpz_ptr, unsigned long int));
-int mpz_cmp _PROTO ((mpz_srcptr, mpz_srcptr));
-int mpz_cmp_si _PROTO ((mpz_srcptr, signed long int));
-int mpz_cmp_ui _PROTO ((mpz_srcptr, unsigned long int));
-void mpz_com _PROTO ((mpz_ptr, mpz_srcptr));
-void mpz_divexact _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_fac_ui _PROTO ((mpz_ptr, unsigned long int));
-void mpz_fdiv_q _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_fdiv_q_2exp _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-unsigned long int mpz_fdiv_q_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_fdiv_qr _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, mpz_srcptr));
-unsigned long int mpz_fdiv_qr_ui _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_fdiv_r _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_fdiv_r_2exp _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-unsigned long int mpz_fdiv_r_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-unsigned long int mpz_fdiv_ui _PROTO ((mpz_srcptr, unsigned long int));
-void mpz_gcd _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-unsigned long int mpz_gcd_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_gcdext _PROTO ((mpz_ptr, mpz_ptr, mpz_ptr, mpz_srcptr, mpz_srcptr));
-double mpz_get_d _PROTO ((mpz_srcptr));
+DLL_IMPORT_RTS void mpz_abs _PROTO ((mpz_ptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_add _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_add_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_and _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_array_init _PROTO ((mpz_ptr, mp_size_t, mp_size_t));
+DLL_IMPORT_RTS void mpz_cdiv_q _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS unsigned long int mpz_cdiv_q_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_cdiv_qr _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS unsigned long int mpz_cdiv_qr_ui _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_cdiv_r _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS unsigned long int mpz_cdiv_r_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS unsigned long int mpz_cdiv_ui _PROTO ((mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_clear _PROTO ((mpz_ptr));
+DLL_IMPORT_RTS void mpz_clrbit _PROTO ((mpz_ptr, unsigned long int));
+DLL_IMPORT_RTS int mpz_cmp _PROTO ((mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS int mpz_cmp_si _PROTO ((mpz_srcptr, signed long int));
+DLL_IMPORT_RTS int mpz_cmp_ui _PROTO ((mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_com _PROTO ((mpz_ptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_divexact _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_fac_ui _PROTO ((mpz_ptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_fdiv_q _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_fdiv_q_2exp _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS unsigned long int mpz_fdiv_q_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_fdiv_qr _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS unsigned long int mpz_fdiv_qr_ui _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_fdiv_r _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_fdiv_r_2exp _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS unsigned long int mpz_fdiv_r_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS unsigned long int mpz_fdiv_ui _PROTO ((mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_gcd _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS unsigned long int mpz_gcd_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_gcdext _PROTO ((mpz_ptr, mpz_ptr, mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS double mpz_get_d _PROTO ((mpz_srcptr));
 /* signed */ long int mpz_get_si _PROTO ((mpz_srcptr));
-char *mpz_get_str _PROTO ((char *, int, mpz_srcptr));
-unsigned long int mpz_get_ui _PROTO ((mpz_srcptr));
-mp_limb_t mpz_getlimbn _PROTO ((mpz_srcptr, mp_size_t));
-unsigned long int mpz_hamdist _PROTO ((mpz_srcptr, mpz_srcptr));
-void mpz_init _PROTO ((mpz_ptr));
+DLL_IMPORT_RTS char *mpz_get_str _PROTO ((char *, int, mpz_srcptr));
+DLL_IMPORT_RTS unsigned long int mpz_get_ui _PROTO ((mpz_srcptr));
+DLL_IMPORT_RTS mp_limb_t mpz_getlimbn _PROTO ((mpz_srcptr, mp_size_t));
+DLL_IMPORT_RTS unsigned long int mpz_hamdist _PROTO ((mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_init _PROTO ((mpz_ptr));
 #ifdef _GMP_H_HAVE_FILE
-size_t mpz_inp_binary _PROTO ((mpz_ptr, FILE *));
-size_t mpz_inp_raw _PROTO ((mpz_ptr, FILE *));
-size_t mpz_inp_str _PROTO ((mpz_ptr, FILE *, int));
+DLL_IMPORT_RTS size_t mpz_inp_binary _PROTO ((mpz_ptr, FILE *));
+DLL_IMPORT_RTS size_t mpz_inp_raw _PROTO ((mpz_ptr, FILE *));
+DLL_IMPORT_RTS size_t mpz_inp_str _PROTO ((mpz_ptr, FILE *, int));
 #endif
-void mpz_init_set _PROTO ((mpz_ptr, mpz_srcptr));
-void mpz_init_set_d _PROTO ((mpz_ptr, double));
-void mpz_init_set_si _PROTO ((mpz_ptr, signed long int));
-int mpz_init_set_str _PROTO ((mpz_ptr, const char *, int));
-void mpz_init_set_ui _PROTO ((mpz_ptr, unsigned long int));
-int mpz_invert _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_ior _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-int mpz_jacobi _PROTO ((mpz_srcptr, mpz_srcptr));
-int mpz_legendre _PROTO ((mpz_srcptr, mpz_srcptr));
-void mpz_mod _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_mul _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_mul_2exp _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_mul_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_neg _PROTO ((mpz_ptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_init_set _PROTO ((mpz_ptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_init_set_d _PROTO ((mpz_ptr, double));
+DLL_IMPORT_RTS void mpz_init_set_si _PROTO ((mpz_ptr, signed long int));
+DLL_IMPORT_RTS int mpz_init_set_str _PROTO ((mpz_ptr, const char *, int));
+DLL_IMPORT_RTS void mpz_init_set_ui _PROTO ((mpz_ptr, unsigned long int));
+DLL_IMPORT_RTS int mpz_invert _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_ior _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS int mpz_jacobi _PROTO ((mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS int mpz_legendre _PROTO ((mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_mod _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_mul _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_mul_2exp _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_mul_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_neg _PROTO ((mpz_ptr, mpz_srcptr));
 #ifdef _GMP_H_HAVE_FILE
-size_t mpz_out_binary _PROTO ((FILE *, mpz_srcptr));
-size_t mpz_out_raw _PROTO ((FILE *, mpz_srcptr));
-size_t mpz_out_str _PROTO ((FILE *, int, mpz_srcptr));
+DLL_IMPORT_RTS size_t mpz_out_binary _PROTO ((FILE *, mpz_srcptr));
+DLL_IMPORT_RTS size_t mpz_out_raw _PROTO ((FILE *, mpz_srcptr));
+DLL_IMPORT_RTS size_t mpz_out_str _PROTO ((FILE *, int, mpz_srcptr));
 #endif
-int mpz_perfect_square_p _PROTO ((mpz_srcptr));
-unsigned long int mpz_popcount _PROTO ((mpz_srcptr));
-void mpz_pow_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_powm _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr, mpz_srcptr));
-void mpz_powm_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int, mpz_srcptr));
-int mpz_probab_prime_p _PROTO ((mpz_srcptr, int));
-void mpz_random _PROTO ((mpz_ptr, mp_size_t));
-void mpz_random2 _PROTO ((mpz_ptr, mp_size_t));
-unsigned long int mpz_scan0 _PROTO ((mpz_srcptr, unsigned long int));
-unsigned long int mpz_scan1 _PROTO ((mpz_srcptr, unsigned long int));
-void mpz_set _PROTO ((mpz_ptr, mpz_srcptr));
-void mpz_set_d _PROTO ((mpz_ptr, double));
-void mpz_set_f _PROTO ((mpz_ptr, mpf_srcptr));
-void mpz_set_q _PROTO ((mpz_ptr, mpq_srcptr));
-void mpz_set_si _PROTO ((mpz_ptr, signed long int));
-int mpz_set_str _PROTO ((mpz_ptr, const char *, int));
-void mpz_set_ui _PROTO ((mpz_ptr, unsigned long int));
-void mpz_setbit _PROTO ((mpz_ptr, unsigned long int));
-size_t mpz_size _PROTO ((mpz_srcptr));
-size_t mpz_sizeinbase _PROTO ((mpz_srcptr, int));
-void mpz_sqrt _PROTO ((mpz_ptr, mpz_srcptr));
-void mpz_sqrtrem _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr));
-void mpz_sub _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_sub_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_tdiv_q _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_tdiv_q_2exp _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_tdiv_q_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_tdiv_qr _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_tdiv_qr_ui _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_tdiv_r _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
-void mpz_tdiv_r_2exp _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_tdiv_r_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
-void mpz_ui_pow_ui _PROTO ((mpz_ptr, unsigned long int, unsigned long int));
+DLL_IMPORT_RTS int mpz_perfect_square_p _PROTO ((mpz_srcptr));
+DLL_IMPORT_RTS unsigned long int mpz_popcount _PROTO ((mpz_srcptr));
+DLL_IMPORT_RTS void mpz_pow_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_powm _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_powm_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int, mpz_srcptr));
+DLL_IMPORT_RTS int mpz_probab_prime_p _PROTO ((mpz_srcptr, int));
+DLL_IMPORT_RTS void mpz_random _PROTO ((mpz_ptr, mp_size_t));
+DLL_IMPORT_RTS void mpz_random2 _PROTO ((mpz_ptr, mp_size_t));
+DLL_IMPORT_RTS unsigned long int mpz_scan0 _PROTO ((mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS unsigned long int mpz_scan1 _PROTO ((mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_set _PROTO ((mpz_ptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_set_d _PROTO ((mpz_ptr, double));
+DLL_IMPORT_RTS void mpz_set_f _PROTO ((mpz_ptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpz_set_q _PROTO ((mpz_ptr, mpq_srcptr));
+DLL_IMPORT_RTS void mpz_set_si _PROTO ((mpz_ptr, signed long int));
+DLL_IMPORT_RTS int mpz_set_str _PROTO ((mpz_ptr, const char *, int));
+DLL_IMPORT_RTS void mpz_set_ui _PROTO ((mpz_ptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_setbit _PROTO ((mpz_ptr, unsigned long int));
+DLL_IMPORT_RTS size_t mpz_size _PROTO ((mpz_srcptr));
+DLL_IMPORT_RTS size_t mpz_sizeinbase _PROTO ((mpz_srcptr, int));
+DLL_IMPORT_RTS void mpz_sqrt _PROTO ((mpz_ptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_sqrtrem _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_sub _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_sub_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_tdiv_q _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_tdiv_q_2exp _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_tdiv_q_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_tdiv_qr _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_tdiv_qr_ui _PROTO ((mpz_ptr, mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_tdiv_r _PROTO ((mpz_ptr, mpz_srcptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpz_tdiv_r_2exp _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_tdiv_r_ui _PROTO ((mpz_ptr, mpz_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpz_ui_pow_ui _PROTO ((mpz_ptr, unsigned long int, unsigned long int));
 
 /**************** Rational (i.e. Q) routines.  ****************/
 
-void mpq_init _PROTO ((mpq_ptr));
-void mpq_clear _PROTO ((mpq_ptr));
-void mpq_set _PROTO ((mpq_ptr, mpq_srcptr));
-void mpq_set_ui _PROTO ((mpq_ptr, unsigned long int, unsigned long int));
-void mpq_set_si _PROTO ((mpq_ptr, signed long int, unsigned long int));
-void mpq_set_z _PROTO ((mpq_ptr, mpz_srcptr));
-void mpq_add _PROTO ((mpq_ptr, mpq_srcptr, mpq_srcptr));
-void mpq_sub _PROTO ((mpq_ptr, mpq_srcptr, mpq_srcptr));
-void mpq_mul _PROTO ((mpq_ptr, mpq_srcptr, mpq_srcptr));
-void mpq_div _PROTO ((mpq_ptr, mpq_srcptr, mpq_srcptr));
-void mpq_neg _PROTO ((mpq_ptr, mpq_srcptr));
-int mpq_cmp _PROTO ((mpq_srcptr, mpq_srcptr));
-int mpq_cmp_ui _PROTO ((mpq_srcptr, unsigned long int, unsigned long int));
-int mpq_equal _PROTO ((mpq_srcptr, mpq_srcptr));
-void mpq_inv _PROTO ((mpq_ptr, mpq_srcptr));
-void mpq_set_num _PROTO ((mpq_ptr, mpz_srcptr));
-void mpq_set_den _PROTO ((mpq_ptr, mpz_srcptr));
-void mpq_get_num _PROTO ((mpz_ptr, mpq_srcptr));
-void mpq_get_den _PROTO ((mpz_ptr, mpq_srcptr));
-double mpq_get_d _PROTO ((mpq_srcptr));
-void mpq_canonicalize _PROTO ((mpq_ptr));
+DLL_IMPORT_RTS void mpq_init _PROTO ((mpq_ptr));
+DLL_IMPORT_RTS void mpq_clear _PROTO ((mpq_ptr));
+DLL_IMPORT_RTS void mpq_set _PROTO ((mpq_ptr, mpq_srcptr));
+DLL_IMPORT_RTS void mpq_set_ui _PROTO ((mpq_ptr, unsigned long int, unsigned long int));
+DLL_IMPORT_RTS void mpq_set_si _PROTO ((mpq_ptr, signed long int, unsigned long int));
+DLL_IMPORT_RTS void mpq_set_z _PROTO ((mpq_ptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpq_add _PROTO ((mpq_ptr, mpq_srcptr, mpq_srcptr));
+DLL_IMPORT_RTS void mpq_sub _PROTO ((mpq_ptr, mpq_srcptr, mpq_srcptr));
+DLL_IMPORT_RTS void mpq_mul _PROTO ((mpq_ptr, mpq_srcptr, mpq_srcptr));
+DLL_IMPORT_RTS void mpq_div _PROTO ((mpq_ptr, mpq_srcptr, mpq_srcptr));
+DLL_IMPORT_RTS void mpq_neg _PROTO ((mpq_ptr, mpq_srcptr));
+DLL_IMPORT_RTS int mpq_cmp _PROTO ((mpq_srcptr, mpq_srcptr));
+DLL_IMPORT_RTS int mpq_cmp_ui _PROTO ((mpq_srcptr, unsigned long int, unsigned long int));
+DLL_IMPORT_RTS int mpq_equal _PROTO ((mpq_srcptr, mpq_srcptr));
+DLL_IMPORT_RTS void mpq_inv _PROTO ((mpq_ptr, mpq_srcptr));
+DLL_IMPORT_RTS void mpq_set_num _PROTO ((mpq_ptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpq_set_den _PROTO ((mpq_ptr, mpz_srcptr));
+DLL_IMPORT_RTS void mpq_get_num _PROTO ((mpz_ptr, mpq_srcptr));
+DLL_IMPORT_RTS void mpq_get_den _PROTO ((mpz_ptr, mpq_srcptr));
+DLL_IMPORT_RTS double mpq_get_d _PROTO ((mpq_srcptr));
+DLL_IMPORT_RTS void mpq_canonicalize _PROTO ((mpq_ptr));
 
 /**************** Float (i.e. F) routines.  ****************/
 
-void mpf_abs _PROTO ((mpf_ptr, mpf_srcptr));
-void mpf_add _PROTO ((mpf_ptr, mpf_srcptr, mpf_srcptr));
-void mpf_add_ui _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
-void mpf_clear _PROTO ((mpf_ptr));
-int mpf_cmp _PROTO ((mpf_srcptr, mpf_srcptr));
-int mpf_cmp_si _PROTO ((mpf_srcptr, signed long int));
-int mpf_cmp_ui _PROTO ((mpf_srcptr, unsigned long int));
-void mpf_div _PROTO ((mpf_ptr, mpf_srcptr, mpf_srcptr));
-void mpf_div_2exp _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
-void mpf_div_ui _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
-void mpf_dump _PROTO ((mpf_srcptr));
-int mpf_eq _PROTO ((mpf_srcptr, mpf_srcptr, unsigned long int));
-double mpf_get_d _PROTO ((mpf_srcptr));
-unsigned long int mpf_get_prec _PROTO ((mpf_srcptr));
-char *mpf_get_str _PROTO ((char *, mp_exp_t *, int, size_t, mpf_srcptr));
-void mpf_init _PROTO ((mpf_ptr));
-void mpf_init2 _PROTO ((mpf_ptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_abs _PROTO ((mpf_ptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_add _PROTO ((mpf_ptr, mpf_srcptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_add_ui _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_clear _PROTO ((mpf_ptr));
+DLL_IMPORT_RTS int mpf_cmp _PROTO ((mpf_srcptr, mpf_srcptr));
+DLL_IMPORT_RTS int mpf_cmp_si _PROTO ((mpf_srcptr, signed long int));
+DLL_IMPORT_RTS int mpf_cmp_ui _PROTO ((mpf_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_div _PROTO ((mpf_ptr, mpf_srcptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_div_2exp _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_div_ui _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_dump _PROTO ((mpf_srcptr));
+DLL_IMPORT_RTS int mpf_eq _PROTO ((mpf_srcptr, mpf_srcptr, unsigned long int));
+DLL_IMPORT_RTS double mpf_get_d _PROTO ((mpf_srcptr));
+DLL_IMPORT_RTS unsigned long int mpf_get_prec _PROTO ((mpf_srcptr));
+DLL_IMPORT_RTS char *mpf_get_str _PROTO ((char *, mp_exp_t *, int, size_t, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_init _PROTO ((mpf_ptr));
+DLL_IMPORT_RTS void mpf_init2 _PROTO ((mpf_ptr, unsigned long int));
 #ifdef _GMP_H_HAVE_FILE
-size_t mpf_inp_str _PROTO ((mpf_ptr, FILE *, int));
+DLL_IMPORT_RTS size_t mpf_inp_str _PROTO ((mpf_ptr, FILE *, int));
 #endif
-void mpf_init_set _PROTO ((mpf_ptr, mpf_srcptr));
-void mpf_init_set_d _PROTO ((mpf_ptr, double));
-void mpf_init_set_si _PROTO ((mpf_ptr, signed long int));
-int mpf_init_set_str _PROTO ((mpf_ptr, const char *, int));
-void mpf_init_set_ui _PROTO ((mpf_ptr, unsigned long int));
-void mpf_mul _PROTO ((mpf_ptr, mpf_srcptr, mpf_srcptr));
-void mpf_mul_2exp _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
-void mpf_mul_ui _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
-void mpf_neg _PROTO ((mpf_ptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_init_set _PROTO ((mpf_ptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_init_set_d _PROTO ((mpf_ptr, double));
+DLL_IMPORT_RTS void mpf_init_set_si _PROTO ((mpf_ptr, signed long int));
+DLL_IMPORT_RTS int mpf_init_set_str _PROTO ((mpf_ptr, const char *, int));
+DLL_IMPORT_RTS void mpf_init_set_ui _PROTO ((mpf_ptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_mul _PROTO ((mpf_ptr, mpf_srcptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_mul_2exp _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_mul_ui _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_neg _PROTO ((mpf_ptr, mpf_srcptr));
 #ifdef _GMP_H_HAVE_FILE
-size_t mpf_out_str _PROTO ((FILE *, int, size_t, mpf_srcptr));
+DLL_IMPORT_RTS size_t mpf_out_str _PROTO ((FILE *, int, size_t, mpf_srcptr));
 #endif
-void mpf_random2 _PROTO ((mpf_ptr, mp_size_t, mp_exp_t));
-void mpf_reldiff _PROTO ((mpf_ptr, mpf_srcptr, mpf_srcptr));
-void mpf_set _PROTO ((mpf_ptr, mpf_srcptr));
-void mpf_set_d _PROTO ((mpf_ptr, double));
-void mpf_set_default_prec _PROTO ((unsigned long int));
-void mpf_set_prec _PROTO ((mpf_ptr, unsigned long int));
-void mpf_set_prec_raw _PROTO ((mpf_ptr, unsigned long int));
-void mpf_set_q _PROTO ((mpf_ptr, mpq_srcptr));
-void mpf_set_si _PROTO ((mpf_ptr, signed long int));
-int mpf_set_str _PROTO ((mpf_ptr, const char *, int));
-void mpf_set_ui _PROTO ((mpf_ptr, unsigned long int));
-void mpf_set_z _PROTO ((mpf_ptr, mpz_srcptr));
-size_t mpf_size _PROTO ((mpf_srcptr));
-void mpf_sqrt _PROTO ((mpf_ptr, mpf_srcptr));
-void mpf_sqrt_ui _PROTO ((mpf_ptr, unsigned long int));
-void mpf_sub _PROTO ((mpf_ptr, mpf_srcptr, mpf_srcptr));
-void mpf_sub_ui _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
-void mpf_ui_div _PROTO ((mpf_ptr, unsigned long int, mpf_srcptr));
-void mpf_ui_sub _PROTO ((mpf_ptr, unsigned long int, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_random2 _PROTO ((mpf_ptr, mp_size_t, mp_exp_t));
+DLL_IMPORT_RTS void mpf_reldiff _PROTO ((mpf_ptr, mpf_srcptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_set _PROTO ((mpf_ptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_set_d _PROTO ((mpf_ptr, double));
+DLL_IMPORT_RTS void mpf_set_default_prec _PROTO ((unsigned long int));
+DLL_IMPORT_RTS void mpf_set_prec _PROTO ((mpf_ptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_set_prec_raw _PROTO ((mpf_ptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_set_q _PROTO ((mpf_ptr, mpq_srcptr));
+DLL_IMPORT_RTS void mpf_set_si _PROTO ((mpf_ptr, signed long int));
+DLL_IMPORT_RTS int mpf_set_str _PROTO ((mpf_ptr, const char *, int));
+DLL_IMPORT_RTS void mpf_set_ui _PROTO ((mpf_ptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_set_z _PROTO ((mpf_ptr, mpz_srcptr));
+DLL_IMPORT_RTS size_t mpf_size _PROTO ((mpf_srcptr));
+DLL_IMPORT_RTS void mpf_sqrt _PROTO ((mpf_ptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_sqrt_ui _PROTO ((mpf_ptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_sub _PROTO ((mpf_ptr, mpf_srcptr, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_sub_ui _PROTO ((mpf_ptr, mpf_srcptr, unsigned long int));
+DLL_IMPORT_RTS void mpf_ui_div _PROTO ((mpf_ptr, unsigned long int, mpf_srcptr));
+DLL_IMPORT_RTS void mpf_ui_sub _PROTO ((mpf_ptr, unsigned long int, mpf_srcptr));
 #if defined (__cplusplus)
 }
 #endif
@@ -398,39 +404,39 @@ void mpf_ui_sub _PROTO ((mpf_ptr, unsigned long int, mpf_srcptr));
 #if defined (__cplusplus)
 extern "C" {
 #endif
-mp_limb_t mpn_add _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_srcptr,mp_size_t));
-mp_limb_t mpn_add_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
-mp_limb_t mpn_add_n _PROTO ((mp_ptr, mp_srcptr, mp_srcptr, mp_size_t));
-mp_limb_t mpn_addmul_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
-mp_limb_t mpn_bdivmod _PROTO ((mp_ptr, mp_ptr, mp_size_t, mp_srcptr, mp_size_t, unsigned long int));
-int mpn_cmp _PROTO ((mp_srcptr, mp_srcptr, mp_size_t));
-mp_limb_t mpn_divmod_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
-mp_limb_t mpn_divrem _PROTO ((mp_ptr, mp_size_t, mp_ptr, mp_size_t, mp_srcptr, mp_size_t));
-mp_limb_t mpn_divrem_1 _PROTO ((mp_ptr, mp_size_t, mp_srcptr, mp_size_t, mp_limb_t));
-void mpn_dump _PROTO ((mp_srcptr, mp_size_t));
-mp_size_t mpn_gcd _PROTO ((mp_ptr, mp_ptr, mp_size_t, mp_ptr, mp_size_t));
-mp_limb_t mpn_gcd_1 _PROTO ((mp_srcptr, mp_size_t, mp_limb_t));
-mp_size_t mpn_gcdext _PROTO ((mp_ptr, mp_ptr, mp_ptr, mp_size_t, mp_ptr, mp_size_t));
-size_t mpn_get_str _PROTO ((unsigned char *, int, mp_ptr, mp_size_t));
-unsigned long int mpn_hamdist _PROTO ((mp_srcptr, mp_srcptr, mp_size_t));
-mp_limb_t mpn_lshift _PROTO ((mp_ptr, mp_srcptr, mp_size_t, unsigned int));
-mp_limb_t mpn_mod_1 _PROTO ((mp_srcptr, mp_size_t, mp_limb_t));
-mp_limb_t mpn_mul _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_srcptr, mp_size_t));
-mp_limb_t mpn_mul_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
-void mpn_mul_n _PROTO ((mp_ptr, mp_srcptr, mp_srcptr, mp_size_t));
-int mpn_perfect_square_p _PROTO ((mp_srcptr, mp_size_t));
-unsigned long int mpn_popcount _PROTO ((mp_srcptr, mp_size_t));
-mp_limb_t mpn_preinv_mod_1 _PROTO ((mp_srcptr, mp_size_t, mp_limb_t, mp_limb_t));
-void mpn_random2 _PROTO ((mp_ptr, mp_size_t));
-mp_limb_t mpn_rshift _PROTO ((mp_ptr, mp_srcptr, mp_size_t, unsigned int));
-unsigned long int mpn_scan0 _PROTO ((mp_srcptr, unsigned long int));
-unsigned long int mpn_scan1 _PROTO ((mp_srcptr, unsigned long int));
-mp_size_t mpn_set_str _PROTO ((mp_ptr, const unsigned char *, size_t, int));
-mp_size_t mpn_sqrtrem _PROTO ((mp_ptr, mp_ptr, mp_srcptr, mp_size_t));
-mp_limb_t mpn_sub _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_srcptr,mp_size_t));
-mp_limb_t mpn_sub_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
-mp_limb_t mpn_sub_n _PROTO ((mp_ptr, mp_srcptr, mp_srcptr, mp_size_t));
-mp_limb_t mpn_submul_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
+DLL_IMPORT_RTS mp_limb_t mpn_add _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_srcptr,mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_add_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
+DLL_IMPORT_RTS mp_limb_t mpn_add_n _PROTO ((mp_ptr, mp_srcptr, mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_addmul_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
+DLL_IMPORT_RTS mp_limb_t mpn_bdivmod _PROTO ((mp_ptr, mp_ptr, mp_size_t, mp_srcptr, mp_size_t, unsigned long int));
+DLL_IMPORT_RTS int mpn_cmp _PROTO ((mp_srcptr, mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_divmod_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
+DLL_IMPORT_RTS mp_limb_t mpn_divrem _PROTO ((mp_ptr, mp_size_t, mp_ptr, mp_size_t, mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_divrem_1 _PROTO ((mp_ptr, mp_size_t, mp_srcptr, mp_size_t, mp_limb_t));
+DLL_IMPORT_RTS void mpn_dump _PROTO ((mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS mp_size_t mpn_gcd _PROTO ((mp_ptr, mp_ptr, mp_size_t, mp_ptr, mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_gcd_1 _PROTO ((mp_srcptr, mp_size_t, mp_limb_t));
+DLL_IMPORT_RTS mp_size_t mpn_gcdext _PROTO ((mp_ptr, mp_ptr, mp_ptr, mp_size_t, mp_ptr, mp_size_t));
+DLL_IMPORT_RTS size_t mpn_get_str _PROTO ((unsigned char *, int, mp_ptr, mp_size_t));
+DLL_IMPORT_RTS unsigned long int mpn_hamdist _PROTO ((mp_srcptr, mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_lshift _PROTO ((mp_ptr, mp_srcptr, mp_size_t, unsigned int));
+DLL_IMPORT_RTS mp_limb_t mpn_mod_1 _PROTO ((mp_srcptr, mp_size_t, mp_limb_t));
+DLL_IMPORT_RTS mp_limb_t mpn_mul _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_mul_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
+DLL_IMPORT_RTS void mpn_mul_n _PROTO ((mp_ptr, mp_srcptr, mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS int mpn_perfect_square_p _PROTO ((mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS unsigned long int mpn_popcount _PROTO ((mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_preinv_mod_1 _PROTO ((mp_srcptr, mp_size_t, mp_limb_t, mp_limb_t));
+DLL_IMPORT_RTS void mpn_random2 _PROTO ((mp_ptr, mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_rshift _PROTO ((mp_ptr, mp_srcptr, mp_size_t, unsigned int));
+DLL_IMPORT_RTS unsigned long int mpn_scan0 _PROTO ((mp_srcptr, unsigned long int));
+DLL_IMPORT_RTS unsigned long int mpn_scan1 _PROTO ((mp_srcptr, unsigned long int));
+DLL_IMPORT_RTS mp_size_t mpn_set_str _PROTO ((mp_ptr, const unsigned char *, size_t, int));
+DLL_IMPORT_RTS mp_size_t mpn_sqrtrem _PROTO ((mp_ptr, mp_ptr, mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_sub _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_srcptr,mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_sub_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
+DLL_IMPORT_RTS mp_limb_t mpn_sub_n _PROTO ((mp_ptr, mp_srcptr, mp_srcptr, mp_size_t));
+DLL_IMPORT_RTS mp_limb_t mpn_submul_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t));
 #if defined (__cplusplus)
 }
 #endif

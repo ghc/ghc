@@ -22,7 +22,7 @@ MA 02111-1307, USA. */
 /* When using gcc, make sure to use its builtin alloca.  */
 #if ! defined (alloca) && defined (__GNUC__)
 #define alloca __builtin_alloca
-#define HAVE_ALLOCA
+#define HAVE_ALLOCA 1
 #endif
 
 /* When using cc, do whatever necessary to allow use of alloca.  For many
