@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.79 2001/06/15 08:29:58 simonpj Exp $
+-- $Id: DriverPipeline.hs,v 1.80 2001/06/15 15:15:33 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -799,7 +799,15 @@ doLink o_files = do
 	 	      ++ pkg_lib_opts
 	 	      ++ pkg_extra_ld_opts
 	 	      ++ extra_ld_opts
-	              ++ if static then [ "-u _PrelMain_mainIO_closure" , "-u ___init_PrelMain"] else [])
+	              ++ if static then
+#ifdef LEADING_UNDERSCORE
+			    [ "-u _PrelMain_mainIO_closure" ,
+			      "-u ___init_PrelMain"] 
+#else
+			    [ "-u PrelMain_mainIO_closure" ,
+			      "-u __init_PrelMain"] 
+#endif
+			 else [])
 
     -- parallel only: move binary to another dir -- HWL
     ways_ <- readIORef v_Ways
