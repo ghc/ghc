@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.177 2004/10/11 14:44:38 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.178 2004/10/13 08:48:47 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -266,7 +266,7 @@ interactiveLoop is_tty show_prompt = do
 
   -- read commands from stdin
 #ifdef USE_READLINE
-  if (True || is_tty) 
+  if (is_tty) 
 	then readlineLoop
 	else fileLoop stdin show_prompt
 #else
