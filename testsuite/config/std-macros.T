@@ -37,7 +37,7 @@ def guess_compiler_flags()
    else 
    if   $tool contains "nhc"
    then 
-        return "-an-nhc-specific-flag"
+        return "-98"
    else
    if   $tool contains "hbc"
    then
