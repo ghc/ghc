@@ -21,7 +21,7 @@ import Bag		( emptyBag, unitBag, isEmptyBag, unionBags,
 			)
 import Class		( GenClass{-instance Eq-}, SYN_IE(Class) )
 import CmdLineOpts	( opt_SpecialiseImports, opt_D_simplifier_stats,
-			  opt_CompilingGhcInternals, opt_SpecialiseTrace
+			  opt_SpecialiseTrace
 			)
 import CoreLift		( mkLiftedId, liftExpr, bindUnlift, applyBindUnlifts )
 import CoreSyn
@@ -1230,7 +1230,7 @@ specTyConsAndScope scopeM
   = scopeM			`thenSM` \ (binds, scope_uds) ->
     let
        (tycons_cis, gotci_scope_uds)
-	 = getLocalSpecTyConIs opt_CompilingGhcInternals scope_uds
+	 = getLocalSpecTyConIs False{-OLD:opt_CompilingGhcInternals-} scope_uds
 
        tycon_specs_list = collectTyConSpecs tycons_cis
     in
