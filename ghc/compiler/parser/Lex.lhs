@@ -1198,13 +1198,25 @@ h = h
 	- we still need to insert another '}' followed by a ';',
 	  hence the atbol trick.
 
+There's also a special hack in here to deal with
+
+	do
+	   ....
+	   e $ do
+	   blah
+
+i.e. the inner context is at the same indentation level as the outer
+context.  This is strictly illegal according to Haskell 98, but
+there's a lot of existing code using this style and it doesn't make
+any sense to disallow it, since empty 'do' lists don't make sense.
 -}
 
-layoutOn :: P ()
-layoutOn buf s@(PState{ bol = bol, context = ctx }) =
+layoutOn :: Bool -> P ()
+layoutOn strict buf s@(PState{ bol = bol, context = ctx }) =
     let offset = lexemeIndex buf -# bol in
     case ctx of
-	Layout prev_off : _ | prev_off >=# offset ->
+	Layout prev_off : _ 
+	   | if strict then prev_off >=# offset else prev_off ># offset ->
 		--trace ("layout on, column: " ++  show (I# offset)) $
 		POk s{ context = Layout (offset +# 1#) : ctx, atbol = 1# } ()
 	other -> 

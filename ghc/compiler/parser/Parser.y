@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.9 1999/06/28 16:42:23 simonmar Exp $
+$Id: Parser.y,v 1.10 1999/06/30 11:29:53 simonmar Exp $
 
 Haskell grammar.
 
@@ -760,8 +760,8 @@ gdpat	:: { RdrNameGRHS }
 -- Statement sequences
 
 stmtlist :: { [RdrNameStmt] }
-	: '{'            stmts '}'	{ reverse $2 }
-	|     layout_on  stmts close	{ reverse $2 }
+	: '{'            	stmts '}'	{ reverse $2 }
+	|     layout_on_for_do  stmts close	{ reverse $2 }
 
 stmts :: { [RdrNameStmt] }
 	: ';' stmts1			{ $2 }
@@ -949,7 +949,8 @@ close :: { () }
 	: vccurly		{ () } -- context popped in lexer.
 	| error			{% popContext }
 
-layout_on  :: { () }	:	{% layoutOn  }
+layout_on  	  :: { () }	: {% layoutOn True{-strict-} }
+layout_on_for_do  :: { () }	: {% layoutOn False }
 
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
