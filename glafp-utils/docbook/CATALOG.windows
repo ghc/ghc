@@ -1,0 +1,23 @@
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Arrow Relations//EN" /docbook/ISOamsa
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Binary Operators//EN" /docbook/ISOamsb
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Delimiters//EN" /docbook/ISOamsc
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Negated Relations//EN" /docbook/ISOamsn
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Ordinary//EN" /docbook/ISOamso
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Relations//EN" /docbook/ISOamsr
+PUBLIC        "ISO 8879:1986//ENTITIES Box and Line Drawing//EN" /docbook/ISObox
+PUBLIC        "ISO 8879:1986//ENTITIES Russian Cyrillic//EN" /docbook/ISOcyr1
+PUBLIC        "ISO 8879:1986//ENTITIES Non-Russian Cyrillic//EN" /docbook/ISOcyr2
+PUBLIC        "ISO 8879:1986//ENTITIES Diacritical Marks//EN" /docbook/ISOdia
+PUBLIC        "ISO 8879:1986//ENTITIES Greek Letters//EN" /docbook/ISOgrk1
+PUBLIC        "ISO 8879:1986//ENTITIES Monotoniko Greek//EN" /docbook/ISOgrk2
+PUBLIC        "ISO 8879:1986//ENTITIES Greek Symbols//EN" /docbook/ISOgrk3
+PUBLIC        "ISO 8879:1986//ENTITIES Alternative Greek Symbols//EN" /docbook/ISOgrk4
+PUBLIC        "ISO 8879:1986//ENTITIES Added Latin 1//EN" /docbook/ISOlat1
+PUBLIC        "ISO 8879:1986//ENTITIES Added Latin 2//EN" /docbook/ISOlat2
+PUBLIC        "ISO 8879:1986//ENTITIES Numeric and Special Graphic//EN" /docbook/ISOnum
+PUBLIC        "ISO 8879:1986//ENTITIES Publishing//EN" /docbook/ISOpub
+PUBLIC        "ISO 8879:1986//ENTITIES General Technical//EN" /docbook/ISOtech
+
+CATALOG       /docbook/stylesheets/docbook/catalog
+CATALOG       /docbook/docbook.cat
+CATALOG       /jade/catalog
