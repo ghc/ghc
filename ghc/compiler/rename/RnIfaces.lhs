@@ -691,13 +691,20 @@ getNonWiredDataDecl needed_name
 		    version
 	 	    avail@(AvailTC tycon_name _) 
 		    ty_decl@(TyData new_or_data context tycon tyvars condecls derivings pragmas src_loc)
-  |  needed_name == tycon_name
-  && opt_PruneTyDecls
+  |  null condecls ||
+	-- HACK ALERT!  If the data type is abstract then it must from a 
+	-- hand-written hi-boot file.  We put it in the deferred pile unconditionally,
+	-- because we don't want to read it in, and then later find a decl for a constructor
+	-- from that type, read the real interface file, and read in the full data type
+	-- decl again!!!  
+
+     (needed_name == tycon_name
+     && opt_PruneTyDecls
         -- don't prune newtypes, as the code generator may
 	-- want to peer inside a newtype type constructor
 	-- (ClosureInfo.fun_result_ty is the culprit.)
-  && not (new_or_data == NewType)
-  && not (nameUnique needed_name `elem` cCallishTyKeys)		
+     && not (new_or_data == NewType)
+     && not (nameUnique needed_name `elem` cCallishTyKeys))
 	-- Hack!  Don't prune these tycons whose constructors
 	-- the desugarer must be able to see when desugaring
 	-- a CCall.  Ugh!
