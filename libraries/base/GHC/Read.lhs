@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Read.lhs,v 1.4 2002/04/11 12:03:44 simonpj Exp $
+% $Id: Read.lhs,v 1.5 2002/04/13 05:08:55 sof Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -384,6 +384,24 @@ readNumber convert =
          _          -> pfail
   )
 
+readIEEENumber :: (RealFloat a) => (Number -> Maybe a) -> ReadPrec a
+-- Read a Float/Double.
+readIEEENumber convert =
+  parens
+  ( do x <- lexP
+       case x of
+         Ident "NaN"      -> return (0/0)
+	 Ident "Infinity" -> return (1/0)
+         Symbol "-" -> do n <- readIEEENumber convert
+                          return (negate n)
+       
+         Number y   -> case convert y of
+                         Just n  -> return n
+                         Nothing -> pfail
+         
+         _          -> pfail
+  )
+
 instance Read Int where
   readPrec     = readNumber numberToInt
   readListPrec = readListPrecDefault
@@ -395,12 +413,12 @@ instance Read Integer where
   readList     = readListDefault
 
 instance Read Float where
-  readPrec     = readNumber numberToFloat
+  readPrec     = readIEEENumber numberToFloat
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance Read Double where
-  readPrec     = readNumber numberToDouble
+  readPrec     = readIEEENumber numberToDouble
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
