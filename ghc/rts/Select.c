@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.21 2002/07/17 09:21:51 simonmar Exp $
+ * $Id: Select.c,v 1.22 2002/07/24 03:38:58 sof Exp $
  *
  * (c) The GHC Team 1995-2002
  *
@@ -90,7 +90,6 @@ awaitEvent(rtsBool wait)
 #endif
     rtsBool select_succeeded = rtsTrue;
     rtsBool unblock_all = rtsFalse;
-    static rtsBool prev_unblocked_all = rtsFalse;
     struct timeval tv;
     lnat min, ticks;
 
@@ -188,12 +187,16 @@ awaitEvent(rtsBool wait)
 	       should we see a bad file descriptor & give the threads
 	       a chance to clean up their act. 
 	       
-	       To avoid getting stuck in a loop, repeated EBADF failures
-	       are 'handled' through barfing.
+	       Note: assume here that threads becoming unblocked
+	       will try to read/write the file descriptor before trying
+	       to issue a threadWaitRead/threadWaitWrite again (==> an
+	       IOError will result for the thread that's got the bad
+	       file descriptor.) Hence, there's no danger of a bad
+	       file descriptor being repeatedly select()'ed on, so
+	       the RTS won't loop.
 	    */
-	    if ( errno == EBADF && !prev_unblocked_all) {
+	    if ( errno == EBADF ) {
 	      unblock_all = rtsTrue;
-	      prev_unblocked_all = rtsTrue;
 	      break;
 	    } else {
  	      fprintf(stderr,"%d\n", errno);
@@ -207,8 +210,6 @@ awaitEvent(rtsBool wait)
 	  Sleep(0); /* don't busy wait */
 #endif /* mingw32_TARGET_OS */
 	  ACQUIRE_LOCK(&sched_mutex);
-
-	  prev_unblocked_all = rtsFalse;
 
 #ifndef mingw32_TARGET_OS
 	  /* We got a signal; could be one of ours.  If so, we need
