@@ -278,8 +278,8 @@ instance (Monoid w, MonadState s m) => MonadState s (WriterT w m) where
 -- > plus n x = execState (sequence $ replicate n tick) x
 --
 -- An example from /The Craft of Functional Programming/, Simon
--- Thompson (<http://www.cs.ukc.ac.uk/people/staff/sjt/>),
--- Addison-wesley 1999: \"Given an arbitrary tree, transform it to a
+-- Thompson (<http://www.cs.kent.ac.uk/people/staff/sjt/>),
+-- Addison-Wesley 1999: \"Given an arbitrary tree, transform it to a
 -- tree of integers in which the original elements are replaced by
 -- natural numbers, starting from 0.  The same element has to be
 -- replaced by the same number at every occurrence, and when we meet

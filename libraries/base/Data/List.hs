@@ -520,7 +520,7 @@ deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 -- | The 'group' function takes a list and returns a list of lists such
 -- that the concatenation of the result is equal to the argument.  Moreover,
 -- each sublist in the result contains only equal elements.  For example,
--- when applied to the string `Mississippi', the result is @["M","i","ss","i","ss","i","pp","i"]@.
+-- when applied to the string \"Mississippi\", the result is @[\"M\",\"i\",\"ss\",\"i\",\"ss\",\"i\",\"pp\",\"i\"]@.
 group                   :: (Eq a) => [a] -> [[a]]
 group                   =  groupBy (==)
 

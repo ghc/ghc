@@ -9,7 +9,7 @@
 -- Portability :  non-portable
 --
 -- Generic programming in Haskell; 
--- see <http://www.cs.vu.nl/boilerplate>.
+-- see <http://www.cs.vu.nl/boilerplate/>.
 --
 -----------------------------------------------------------------------------
 
@@ -107,7 +107,7 @@ import Control.Monad
 type GenericT = forall a. Data a => a -> a
 
 
--- | Generic queries of type "r",
+-- | Generic queries of type \"r\",
 --   i.e., take any \"a\" and return an \"r\"
 --
 type GenericQ r = forall a. Data a => a -> r
@@ -174,7 +174,7 @@ use a point-free style whenever possible.
 
 
 -- | Make a generic monadic transformation for MonadPlus;
---   use "const mzero" (i.e., failure) instead of return as default.
+--   use \"const mzero\" (i.e., failure) instead of return as default.
 --
 mkF :: (Typeable a, Typeable b, Typeable (m a), Typeable (m b), MonadPlus m)
     => (b -> m b) -> a -> m a
@@ -643,7 +643,7 @@ gtypecount :: Typeable a => (a -> ()) -> GenericQ Int
 gtypecount f = gcount (False `mkQ` (const True . f))
 
 
--- | Generic show: an alternative to "deriving Show"
+-- | Generic show: an alternative to \"deriving Show\"
 gshow :: Data a => a -> String
 
 -- This is a prefix-show using surrounding "(" and ")",
@@ -657,7 +657,7 @@ gshow = ( \t ->
         ) `extQ` (show :: String -> String)
 
 
--- | Generic equality: an alternative to "deriving Eq"
+-- | Generic equality: an alternative to \"deriving Eq\"
 geq :: Data a => a -> a -> Bool
 
 {-
@@ -702,7 +702,7 @@ newtype GRead i a = GRead (i -> Maybe (a, i))
 unGRead (GRead x) = x
 
 
--- | Generic read: an alternative to "deriving Read"
+-- | Generic read: an alternative to \"deriving Read\"
 gread :: GenericB Maybe String
 
 {-
