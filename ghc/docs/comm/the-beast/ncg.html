@@ -616,16 +616,19 @@ There are, however, two unforeseen bad side effects:
 <li>This doesn't work properly, because it doesn't observe the normal
     conventions for x86 FP code generation.  It turns out that each of
     the 8 elements in the x86 FP register stack has a tag bit which
-    indicates whether or not that slot contains a valid value.  If you
-    do a FPU operation which happens to read such a value, you get a
-    x87 FPU exception, which is normally handled by the FPU without
-    passing it to the OS: the program keeps going, but the resulting
-    FP values are garbage.  (The OS can ask for the FPU to pass it FP
-    stack-invalid exceptions, but it usually doesn't).
+    indicates whether or not that register is notionally in use or
+    not.  If you do a FPU operation which happens to read a
+    tagged-as-empty register, you get an x87 FPU (stack invalid)
+    exception, which is normally handled by the FPU without passing it
+    to the OS: the program keeps going, but the resulting FP values
+    are garbage.  The OS can ask for the FPU to pass it FP
+    stack-invalid exceptions, but it usually doesn't.
     <p>
-    Anyways: inside NCG created x86 FP code this all works fine, but
-    when control returns to a gcc-generated world, the stack tag bits
-    soon cause stack exceptions, and thus garbage results.
+    Anyways: inside NCG created x86 FP code this all works fine.
+    However, the NCG's fiction of a flat register set does not operate
+    the x87 register stack in the required stack-like way.  When
+    control returns to a gcc-generated world, the stack tag bits soon
+    cause stack exceptions, and thus garbage results.
     <p>
     The only fix I could think of -- and it is horrible -- is to clear
     all the tag bits just before the next STG-level entry, in chunks
