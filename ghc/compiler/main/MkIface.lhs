@@ -576,14 +576,14 @@ pprRulesAndDeprecs rules deprecs
     pp_rules []    = empty
     pp_rules rules = ptext SLIT("__R") <+> vcat (map ppr rules)
 
-    ppr_deprecs NoDeprecs = empty
-    ppr_deprecs deprecs   = ptext SLIT("__D") <+> guts
+    pp_deprecs NoDeprecs = empty
+    pp_deprecs deprecs   = ptext SLIT("__D") <+> guts
 			  where
 			    guts = case deprecs of
 					DeprecAll txt  -> doubleQuotes (ptext txt)
-					DeprecSome env -> pp_deprecs env
+					DeprecSome env -> ppr_deprec_env env
 
-pp_deprecs env = vcat (punctuate semi (map pp_deprec (nameEnvElts env)))
-	       where
-		 pp_deprec (name, txt) = pprOcc name <+> doubleQuotes (ptext txt)
+ppr_deprec_env env = vcat (punctuate semi (map pp_deprec (nameEnvElts env)))
+	           where
+   	 	     pp_deprec (name, txt) = pprOcc name <+> doubleQuotes (ptext txt)
 \end{code}
