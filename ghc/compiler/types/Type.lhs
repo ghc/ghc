@@ -31,7 +31,7 @@ module Type (
 	mkAppTy, mkAppTys, splitAppTy, splitAppTys, splitAppTy_maybe,
 
 	mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe, splitFunTys, 
-	funResultTy, funArgTy, zipFunTys,
+	funResultTy, funArgTy, zipFunTys, isFunTy,
 
 	mkTyConApp, mkTyConTy, 
 	tyConAppTyCon, tyConAppArgs, 
@@ -39,10 +39,10 @@ module Type (
 
 	mkSynTy, 
 
-	repType, splitRepFunTys, typePrimRep,
+	repType, typePrimRep,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
-	applyTy, applyTys, isForAllTy,
+	applyTy, applyTys, isForAllTy, dropForAlls,
 
 	-- Source types
 	SourceType(..), sourceTypeRep, mkPredTy, mkPredTys,
@@ -107,6 +107,7 @@ import Unique		( Uniquable(..) )
 import Util		( mapAccumL, seqList, lengthIs )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
+import Maybe		( isJust )
 \end{code}
 
 
@@ -253,6 +254,9 @@ mkFunTy arg res = FunTy arg res
 mkFunTys :: [Type] -> Type -> Type
 mkFunTys tys ty = foldr FunTy ty tys
 
+isFunTy :: Type -> Bool 
+isFunTy ty = isJust (splitFunTy_maybe ty)
+
 splitFunTy :: Type -> (Type, Type)
 splitFunTy (FunTy arg res) = (arg, res)
 splitFunTy (NoteTy _ ty)   = splitFunTy ty
@@ -389,7 +393,6 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 
 		Representation types
 		~~~~~~~~~~~~~~~~~~~~
-
 repType looks through 
 	(a) for-alls, and
 	(b) synonyms
@@ -411,12 +414,6 @@ repType (TyConApp tc tys) | isNewTyCon tc && tys `lengthIs` tyConArity tc
 			  = repType (newTypeRep tc tys)
 repType ty	 	  = ty
 
-splitRepFunTys :: Type -> ([Type], Type)
--- Like splitFunTys, but looks through newtypes and for-alls
-splitRepFunTys ty = split [] (repType ty)
-  where
-    split args (FunTy arg res)  = split (arg:args) (repType res)
-    split args ty               = (reverse args, ty)
 
 typePrimRep :: Type -> PrimRep
 typePrimRep ty = case repType ty of
@@ -460,6 +457,9 @@ splitForAllTys ty = split ty ty []
      split orig_ty (NoteTy _ ty)	  tvs = split orig_ty ty tvs
      split orig_ty (SourceTy p)		  tvs = split orig_ty (sourceTypeRep p) tvs
      split orig_ty t			  tvs = (reverse tvs, orig_ty)
+
+dropForAlls :: Type -> Type
+dropForAlls ty = snd (splitForAllTys ty)
 \end{code}
 
 -- (mkPiType now in CoreUtils)

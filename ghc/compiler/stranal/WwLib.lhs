@@ -244,8 +244,8 @@ mkWWargs fun_ty demands one_shots
   | not (null demands)
   = getUniquesUs 		`thenUs` \ wrap_uniqs ->
     let
-      (tyvars, tau)      	= splitForAllTys fun_ty
-      (arg_tys, body_ty) 	= splitFunTys tau
+      (tyvars, tau)      = splitForAllTys fun_ty
+      (arg_tys, body_ty) = splitFunTys tau
 
       n_demands	= length demands
       n_arg_tys	= length arg_tys

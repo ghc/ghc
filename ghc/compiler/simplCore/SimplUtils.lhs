@@ -36,7 +36,7 @@ import Id		( Id, idType, idInfo,
 			)
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
-import Type		( Type, seqType, splitRepFunTys, isStrictType,
+import Type		( Type, seqType, splitFunTys, dropForAlls, isStrictType,
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys
 			)
 import TcType		( isDictTy )
@@ -232,14 +232,14 @@ getContArgs chkr fun orig_cont
     computed_stricts = zipWith (||) fun_stricts arg_stricts
 
     ----------------------------
-    (val_arg_tys, _) = splitRepFunTys (idType fun)
+    (val_arg_tys, _) = splitFunTys (dropForAlls (idType fun))
     arg_stricts      = map isStrictType val_arg_tys ++ repeat False
 	-- These argument types are used as a cheap and cheerful way to find
 	-- unboxed arguments, which must be strict.  But it's an InType
 	-- and so there might be a type variable where we expect a function
 	-- type (the substitution hasn't happened yet).  And we don't bother
 	-- doing the type applications for a polymorphic function.
-	-- Hence the split*Rep*FunTys
+	-- Hence the splitFunTys*IgnoringForAlls*
 
     ----------------------------
 	-- If fun_stricts is finite, it means the function returns bottom

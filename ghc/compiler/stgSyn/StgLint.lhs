@@ -20,7 +20,7 @@ import Maybes		( catMaybes )
 import Name		( getSrcLoc )
 import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErrLoc )
 import Type		( mkFunTys, splitFunTys, splitTyConApp_maybe,
-			  isUnLiftedType, isTyVarTy, splitForAllTys, Type
+			  isUnLiftedType, isTyVarTy, dropForAlls, Type
 			)
 import TyCon		( TyCon, isAlgTyCon, isNewTyCon, tyConDataCons )
 import Util		( zipEqual, equalLength )
@@ -427,8 +427,7 @@ checkFunApp :: Type 		    -- The function type
 checkFunApp fun_ty arg_tys msg loc scope errs
   = cfa res_ty expected_arg_tys arg_tys
   where
-    (_, de_forall_ty) 	       = splitForAllTys fun_ty
-    (expected_arg_tys, res_ty) = splitFunTys de_forall_ty
+    (expected_arg_tys, res_ty) = splitFunTys (dropForAlls fun_ty)
 
     cfa res_ty expected []	-- Args have run out; that's fine
       = (Just (mkFunTys expected res_ty), errs)

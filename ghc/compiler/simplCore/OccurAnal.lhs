@@ -32,8 +32,8 @@ import BasicTypes	( OccInfo(..), isOneOcc )
 import VarSet
 import VarEnv
 
-import Type		( splitFunTy_maybe, splitForAllTys )
-import Maybes		( maybeToBool, orElse )
+import Type		( isFunTy, dropForAlls )
+import Maybes		( orElse )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( Unique )
@@ -485,9 +485,7 @@ reOrderRec env (CyclicSCC (bind : binds))
 	-- we didn't stupidly choose d as the loop breaker.
 	-- But we won't because constructor args are marked "Many".
 
-    not_fun_ty ty = not (maybeToBool (splitFunTy_maybe rho_ty))
-		  where
-		    (_, rho_ty) = splitForAllTys ty
+    not_fun_ty ty = not (isFunTy (dropForAlls ty))
 \end{code}
 
 @occAnalRhs@ deals with the question of bindings where the Id is marked

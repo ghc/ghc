@@ -32,7 +32,7 @@ import DataCon		( dataConTag, fIRST_TAG, dataConTyCon,
 import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons,
 			  isFunTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
-import Type		( Type, repType, splitRepFunTys )
+import Type		( Type, repType, splitFunTys, dropForAlls )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem,
 			  isSingleton, lengthIs )
 import DataCon		( dataConRepArity )
@@ -976,7 +976,7 @@ mkDummyLiteral pr
 
 maybe_getCCallReturnRep :: Type -> Maybe PrimRep
 maybe_getCCallReturnRep fn_ty
-   = let (a_tys, r_ty) = splitRepFunTys fn_ty
+   = let (a_tys, r_ty) = splitFunTys (dropForAlls fn_ty)
          maybe_r_rep_to_go  
             = if isSingleton r_reps then Nothing else Just (r_reps !! 1)
          (r_tycon, r_reps) 

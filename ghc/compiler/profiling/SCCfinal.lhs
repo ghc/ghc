@@ -291,7 +291,7 @@ boxHigherOrderArgs almost_expr args
 
     do_arg ids bindings arg@(StgVarArg old_var)
 	|  (not (isLocalVar old_var) || elemVarSet old_var ids)
-	&& isFunType var_type
+	&& isFunTy (dropForAlls var_type)
       =     -- make a trivial let-binding for the top-level function
 	getUniqueMM		`thenMM` \ uniq ->
 	let
@@ -314,10 +314,6 @@ boxHigherOrderArgs almost_expr args
 	StgLet (StgNonRec NoSRT{-eeek!!!-} new_var rhs_closure) body
       where
 	bOGUS_LVs = emptyUniqSet -- easier to print than: panic "mk_stg_let: LVs"
-
-isFunType var_type 
-  = case splitForAllTys var_type of
-	(_, ty) -> maybeToBool (splitFunTy_Maybe ty)
 #endif
 \end{code}
 
