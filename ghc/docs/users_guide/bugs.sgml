@@ -271,10 +271,44 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 
 
 <sect1 id="bugs">
-  <title>Known bugs</title>
+  <title>Known bugs or infelicities</title>
 
-<para>GHC has the following known bugs:
+<para>GHC has the following known bugs or infelicities:
 <itemizedlist>
+
+<listitem><para>Dangers with multiple Main modules.</para>
+
+	<para>
+	GHC does not insist that module <literal>Main</literal> lives in a file called <filename>Main.hs</filename>.
+	This is useful if you want multiple versions of <literal>Main</literal>.  But there's a danger: when
+	compiling module  <literal>Main</literal> (regardless of what file it comes from), GHC looks for 
+	the interface <filename>Main.hi</filename>; it uses this to get version information from the last
+	time it recompiled <literal>Main</literal>.   The trouble is that this  <filename>Main.hi</filename>
+	may not correspond to the source file being compiled.
+	  </para>
+	<para>
+	  Solution: remove <filename>Main.hi</filename> first.  A better solution would be for GHC to
+	    record the source-file filename in the interface file, or even an MD5 checksum.
+	    </para>
+     </listitem>
+    
+
+<listitem><para>
+GHCi does not respect the <literal>default</literal> declaration in the module whose
+scope you are in.  Instead, for expressions typed at the command line, you always 
+get the default default-type behaviour; that is, <literal>default(Int,Double)</literal>.
+</para>
+<para>
+It would be better for GHCi to record what the default settings in each module are, and
+use those of the 'current' module (whatever that is).
+</para></listitem>
+
+<listitem><para>
+GHCi does not keep careful track of what instance declarations are 'in scope' if they
+come from other packages.
+Instead, all instance declarations that GHC has seen in other packages are all in scope
+everywhere, whether or not the module from that package is used by the command-line expression.
+</para></listitem>
 
 <listitem><para>
 GHC's inliner can be persuaded into non-termination using the standard way to encode
