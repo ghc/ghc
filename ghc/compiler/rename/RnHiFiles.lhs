@@ -407,7 +407,7 @@ loadDeprecs m (Just (Right prs)) = setModuleRn m 				$
 loadDeprec deprec_env (n, txt)
   = lookupOrigName n 		`thenRn` \ name ->
     traceRn (text "Loaded deprecation(s) for" <+> ppr name <> colon <+> ppr txt) `thenRn_`
-    returnRn (extendNameEnv deprec_env name txt)
+    returnRn (extendNameEnv deprec_env name (name,txt))
 \end{code}
 
 
@@ -493,7 +493,7 @@ findAndReadIface doc_str mod_name hi_boot_file
 
     case maybe_found of
       Right (Just (mod,locn))
-	| hi_boot_file -> readIface mod (hi_file locn ++ "-hi-boot")
+	| hi_boot_file -> readIface mod (hi_file locn ++ "-boot")
 	| otherwise    -> readIface mod (hi_file locn)
 	
 	-- Can't find it

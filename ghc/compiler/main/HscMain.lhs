@@ -106,12 +106,12 @@ hscMain dflags core_cmds stg_cmds summary maybe_old_iface
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
       ;
-      return (what_next dflags core_cmds stg_cmds summary hit hst 
+      return (what_next dflags finder core_cmds stg_cmds summary hit hst 
                         pcs2 maybe_checked_iface)
       }}
 
 
-hscNoRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
+hscNoRecomp dflags finder core_cmds stg_cmds summary hit hst pcs maybe_old_iface
  = do {
       -- we definitely expect to have the old interface available
       let old_iface = case maybe_old_iface of 
@@ -135,8 +135,6 @@ hscNoRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
       let pcs_tc        = tc_pcs tc_result
           env_tc        = tc_env tc_result
           binds_tc      = tc_binds tc_result
-          local_tycons  = tc_tycons tc_result
-          local_classes = tc_classes tc_result
           local_insts   = tc_insts tc_result
           local_rules   = tc_rules tc_result
       ;
@@ -151,7 +149,7 @@ hscNoRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
       }}}}
 
 
-hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
+hscRecomp dflags finder core_cmds stg_cmds summary hit hst pcs maybe_old_iface
  = do {
       -- what target are we shooting for?
       let toInterp = dopt_HscLang dflags == HscInterpreted
@@ -179,8 +177,6 @@ hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
       let pcs_tc        = tc_pcs tc_result
           env_tc        = tc_env tc_result
           binds_tc      = tc_binds tc_result
-          local_tycons  = tc_tycons tc_result
-          local_classes = tc_classes tc_result
           local_insts   = tc_insts tc_result
       ;
       -- DESUGAR, SIMPLIFY, TIDY-CORE
@@ -190,7 +186,7 @@ hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
       ;
       -- CONVERT TO STG
       (stg_binds, cost_centre_info, top_level_ids) 
-         <- myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
+         <- myCoreToStg finder c2s_uniqs st_uniqs this_mod tidy_binds
       ;
       -- cook up a new ModDetails now we (finally) have all the bits
       let new_details = mkModDetails tc_env local_insts tidy_binds 
@@ -199,6 +195,11 @@ hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
       -- and possibly create a new ModIface
       let maybe_final_iface = completeIface maybe_old_iface new_iface new_details 
       ;
+
+      -- Write the interface file
+      writeIface finder maybe_final_iface
+      ;
+
       -- do the rest of code generation/emission
       (maybe_ibinds, maybe_stub_h_filename, maybe_stub_c_filename) 
          <- restOfCodeGeneration toInterp
@@ -309,61 +310,6 @@ myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
       let final_ids = collectFinalStgBinders (map fst stg_binds2)
 
       return (stg_binds2, cost_centre_info, final_ids)
-
-#if 0
--- BEGIN old stuff
-    -- UniqueSupplies for later use (these are the only lower case uniques)
-    mkSplitUniqSupply 'd'	>>= \ ds_uniqs 	-> -- desugarer
-    mkSplitUniqSupply 'r'	>>= \ ru_uniqs 	-> -- rules
-    mkSplitUniqSupply 'c'	>>= \ c2s_uniqs -> -- core-to-stg
-    mkSplitUniqSupply 'g'	>>= \ st_uniqs  -> -- stg-to-stg passes
-    mkSplitUniqSupply 'n'	>>= \ ncg_uniqs -> -- native-code generator
-
-	--------------------------  Interface file -------------------------------
-	-- Dump instance decls and type signatures into the interface file
-    _scc_     "Interface"
-    let
-	final_ids = collectFinalStgBinders (map fst stg_binds2)
-    in
-    writeIface this_mod old_iface new_iface
-	       local_tycons local_classes inst_info
-	       final_ids occ_anal_tidy_binds tidy_orphan_rules 		>>
-
-
-	--------------------------  Code generation -------------------------------
-    show_pass "CodeGen" 			>>
-    _scc_     "CodeGen"
-    codeGen this_mod imported_modules
-	    cost_centre_info
-	    fe_binders
-	    local_tycons local_classes 
-	    stg_binds2				>>= \ abstractC ->
-
-
-	--------------------------  Code output -------------------------------
-    show_pass "CodeOutput" 				>>
-    _scc_     "CodeOutput"
-    codeOutput this_mod local_tycons local_classes
-	       occ_anal_tidy_binds stg_binds2
-	       c_code h_code abstractC 
-	       ncg_uniqs				>>
-
-
-	--------------------------  Final report -------------------------------
-    reportCompile mod_name (showSDoc (ppSourceStats True rdr_module)) >>
-
-    ghcExit 0
-    } }
-  where
-    -------------------------------------------------------------
-    -- ****** help functions:
-
-    show_pass
-      = if opt_D_show_passes
-	then \ what -> hPutStr stderr ("*** "++what++":\n")
-	else \ what -> return ()
--- END old stuff
-#endif
 \end{code}
 
 
@@ -413,146 +359,3 @@ initRules = foldl add emptyVarEnv builtinRules
 	    add env (name,rule) = extendNameEnv_C add1 env name [rule]
 	    add1 rules _	= rule : rules
 \end{code}
-
-
-
-\begin{code}
-writeIface this_mod old_iface new_iface
-	   local_tycons local_classes inst_info
-	   final_ids tidy_binds tidy_orphan_rules
-  = 
-    if isNothing opt_HiDir && isNothing opt_HiFile
-	then return ()  -- not producing any .hi file
-	else 
-
-    let 
-	hi_suf = case opt_HiSuf of { Nothing -> "hi"; Just suf -> suf }
-	filename = case opt_HiFile of {
-			Just f  -> f;
-			Nothing -> 
-		   case opt_HiDir of {
-			Just dir -> dir ++ '/':moduleUserString this_mod 
-					++ '.':hi_suf;
-			Nothing  -> panic "writeIface"
-		}}
-    in
-
-    do maybe_final_iface <- checkIface old_iface full_new_iface 	
-       case maybe_final_iface of {
-	  Nothing -> when opt_D_dump_rn_trace $
-		     putStrLn "Interface file unchanged" ;  -- No need to update .hi file
-
-	  Just final_iface ->
-
-       do  let mod_vers_unchanged = case old_iface of
-				      Just iface -> pi_vers iface == pi_vers final_iface
-				      Nothing -> False
-     	   when (mod_vers_unchanged && opt_D_dump_rn_trace) $
-	        putStrLn "Module version unchanged, but usages differ; hence need new hi file"
-
-	   if_hdl <- openFile filename WriteMode
-	   printForIface if_hdl (pprIface final_iface)
-	   hClose if_hdl
-    }   
-  where
-    full_new_iface = completeIface new_iface local_tycons local_classes
-				   	     inst_info final_ids tidy_binds
-					     tidy_orphan_rules
-    isNothing = not . isJust
-\end{code}
-
-
-%************************************************************************
-%*				 					*
-\subsection{Printing the interface}
-%*				 					*
-%************************************************************************
-
-\begin{code}
-pprIface (ParsedIface { pi_mod = mod, pi_vers = mod_vers, pi_orphan = orphan,
-			pi_usages = usages, pi_exports = exports, 
-			pi_fixity = (fix_vers, fixities),
-			pi_insts = insts, pi_decls = decls, 
-			pi_rules = (rule_vers, rules), pi_deprecs = deprecs })
- = vcat [ ptext SLIT("__interface")
-		<+> doubleQuotes (ptext opt_InPackage)
-		<+> ppr mod <+> ppr mod_vers <+> pp_sub_vers
-		<+> (if orphan then char '!' else empty)
-		<+> int opt_HiVersion
-		<+> ptext SLIT("where")
-	, vcat (map pprExport exports)
-	, vcat (map pprUsage usages)
-	, pprFixities fixities
-	, vcat [ppr i <+> semi | i <- insts]
-	, vcat [ppr_vers v <+> ppr d <> semi | (v,d) <- decls]
-	, pprRules rules
-	, pprDeprecs deprecs
-	]
-  where
-    ppr_vers v | v == initialVersion = empty
-	       | otherwise	     = int v
-    pp_sub_vers 
-	| fix_vers == initialVersion && rule_vers == initialVersion = empty
-	| otherwise = brackets (ppr fix_vers <+> ppr rule_vers)
-\end{code}
-
-When printing export lists, we print like this:
-	Avail   f		f
-	AvailTC C [C, x, y]	C(x,y)
-	AvailTC C [x, y]	C!(x,y)		-- Exporting x, y but not C
-
-\begin{code}
-pprExport :: ExportItem -> SDoc
-pprExport (mod, items)
- = hsep [ ptext SLIT("__export "), ppr mod, hsep (map upp_avail items) ] <> semi
-  where
-    upp_avail :: RdrAvailInfo -> SDoc
-    upp_avail (Avail name)      = pprOccName name
-    upp_avail (AvailTC name []) = empty
-    upp_avail (AvailTC name ns) = hcat [pprOccName name, bang, upp_export ns']
-				where
-				  bang | name `elem` ns = empty
-				       | otherwise	= char '|'
-				  ns' = filter (/= name) ns
-    
-    upp_export []    = empty
-    upp_export names = braces (hsep (map pprOccName names))
-\end{code}
-
-
-\begin{code}
-pprUsage :: ImportVersion OccName -> SDoc
-pprUsage (m, has_orphans, is_boot, whats_imported)
-  = hsep [ptext SLIT("import"), ppr (moduleName m), 
-	  pp_orphan, pp_boot,
-	  upp_import_versions whats_imported
-    ] <> semi
-  where
-    pp_orphan | has_orphans = char '!'
-	      | otherwise   = empty
-    pp_boot   | is_boot     = char '@'
-              | otherwise   = empty
-
-	-- Importing the whole module is indicated by an empty list
-    upp_import_versions NothingAtAll   = empty
-    upp_import_versions (Everything v) = dcolon <+> int v
-    upp_import_versions (Specifically vm vf vr nvs)
-      = dcolon <+> int vm <+> int vf <+> int vr <+> hsep [ ppr n <+> int v | (n,v) <- nvs ]
-\end{code}
-
-
-\begin{code}
-pprFixities []    = empty
-pprFixities fixes = hsep (map ppr fixes) <> semi
-
-pprRules []    = empty
-pprRules rules = hsep [ptext SLIT("{-## __R"), hsep (map ppr rules), ptext SLIT("##-}")]
-
-pprDeprecs []   = empty
-pprDeprecs deps = hsep [ ptext SLIT("{-## __D"), guts, ptext SLIT("##-}")]
-		where
-		  guts = hsep [ ppr ie <+> doubleQuotes (ppr txt) <> semi 
-			      | Deprecation ie txt _ <- deps ]
-\end{code}
-
-

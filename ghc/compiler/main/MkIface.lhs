@@ -21,8 +21,9 @@ import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import TcHsSyn		( TypecheckedRuleDecl )
 import HscTypes		( VersionInfo(..), IfaceDecls(..), ModIface(..), ModDetails(..),
 			  TyThing(..), DFunId, TypeEnv, isTyClThing, Avails,
-			  WhatsImported(..), GenAvailInfo(..), RdrAvailInfo,
-			  ImportVersion
+			  WhatsImported(..), GenAvailInfo(..), 
+			  ImportVersion, AvailInfo, Deprecations(..), 
+			  Finder, ModuleLocation(..)
 			)
 
 import CmdLineOpts
@@ -602,14 +603,24 @@ diffDecls old_vers old_fixities new_fixities old new
 %************************************************************************
 
 \begin{code}
---writeIface :: Finder -> ModIface -> IO ()
-writeIface {-finder-} mod_iface
-  = do	{ let filename = error "... find the right file..."
+writeIface :: Finder -> Maybe ModIface -> IO ()
+writeIface finder Nothing
+  = return ()
+
+writeIface finder (Just mod_iface)
+  = do	{ maybe_found <- finder mod_name ;
+	; case maybe_found of {
+	    Nothing -> printErrs (text "Can't write interface file for" <+> ppr mod_name) ;
+	    Just (_, locn) ->
+
+    do	{ let filename = hi_file locn 
 	; if_hdl <- openFile filename WriteMode
 	; printForIface if_hdl (pprIface mod_iface)
 	; hClose if_hdl
-	}
-
+	}}}
+  where
+    mod_name = moduleName (mi_module mod_iface)
+	 
 pprIface iface
  = vcat [ ptext SLIT("__interface")
 		<+> doubleQuotes (ptext opt_InPackage)
@@ -619,7 +630,7 @@ pprIface iface
 		<+> int opt_HiVersion
 		<+> ptext SLIT("where")
 
-	, pprExport (mi_exports iface)
+	, vcat (map pprExport (mi_exports iface))
 	, vcat (map pprUsage (mi_usages iface))
 
 	, pprIfaceDecls (vers_decls version_info) 
@@ -647,24 +658,27 @@ pprExport :: (ModuleName, Avails) -> SDoc
 pprExport (mod, items)
  = hsep [ ptext SLIT("__export "), ppr mod, hsep (map pp_avail items) ] <> semi
   where
-    pp_avail :: RdrAvailInfo -> SDoc
-    pp_avail (Avail name)      = pprOccName name
+    ppr_name :: Name -> SDoc	-- Print the occurrence name only
+    ppr_name n = ppr (nameOccName n)
+
+    pp_avail :: AvailInfo -> SDoc
+    pp_avail (Avail name)      = ppr_name name
     pp_avail (AvailTC name []) = empty
-    pp_avail (AvailTC name ns) = hcat [pprOccName name, bang, pp_export ns']
+    pp_avail (AvailTC name ns) = hcat [ppr_name name, bang, pp_export ns']
 				where
 				  bang | name `elem` ns = empty
 				       | otherwise	= char '|'
 				  ns' = filter (/= name) ns
     
     pp_export []    = empty
-    pp_export names = braces (hsep (map pprOccName names))
+    pp_export names = braces (hsep (map ppr_name names))
 \end{code}
 
 
 \begin{code}
 pprUsage :: ImportVersion Name -> SDoc
 pprUsage (m, has_orphans, is_boot, whats_imported)
-  = hsep [ptext SLIT("import"), ppr (moduleName m), 
+  = hsep [ptext SLIT("import"), ppr m, 
 	  pp_orphan, pp_boot,
 	  pp_versions whats_imported
     ] <> semi
@@ -701,20 +715,24 @@ pprIfaceDecls version_map fixity_map decls
 		   Just v  -> int v
 
 	-- Print fixities relevant to the decl
-    ppr_fixes d = vcat (map ppr_fix d)
-    ppr_fix d   = [ ppr fix <+> ppr n <> semi
-		  | n <- tyClDeclNames d, 
-		    [Just fix] <- lookupNameEnv fixity_map n
-		  ]
+    ppr_fixes d = vcat [ ppr fix <+> ppr n <> semi
+		       | (n,_) <- tyClDeclNames d, 
+			 Just fix <- [lookupNameEnv fixity_map n]
+		       ]
 \end{code}
 
 \begin{code}
 pprRules []    = empty
 pprRules rules = hsep [ptext SLIT("{-## __R"), vcat (map ppr rules), ptext SLIT("##-}")]
 
-pprDeprecs []   = empty
-pprDeprecs deps = hsep [ ptext SLIT("{-## __D"), guts, ptext SLIT("##-}")]
-		where
-		  guts = hsep [ ppr ie <+> doubleQuotes (ppr txt) <> semi 
-			      | Deprecation ie txt _ <- deps ]
+pprDeprecs NoDeprecs = empty
+pprDeprecs deprecs   = ptext SLIT("{-## __D") <+> guts <+> ptext SLIT("##-}")
+		     where
+		       guts = case deprecs of
+				DeprecAll txt  -> ptext txt
+				DeprecSome env -> pp_deprecs env
+
+pp_deprecs env = vcat (punctuate semi (map pp_deprec (nameEnvElts env)))
+	       where
+		 pp_deprec (name, txt) = pprOccName (nameOccName name) <+> ptext txt
 \end{code}

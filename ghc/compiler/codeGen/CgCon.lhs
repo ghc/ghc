@@ -22,7 +22,7 @@ import StgSyn
 
 import AbsCUtils	( getAmodeRep )
 import CgBindery	( getArgAmodes, bindNewToNode,
-			  bindArgsToRegs, newTempAmodeAndIdInfo,
+			  bindArgsToRegs, 
 			  idInfoToAmode, stableAmodeIdInfo,
 			  heapIdInfo, CgIdInfo, bindNewToStack
 			)
@@ -31,7 +31,6 @@ import CgStackery	( mkTaggedVirtStkOffsets, freeStackSlots,
 			)
 import CgUsages		( getRealSp, getVirtSp, setRealAndVirtualSp,
 			  getSpRelOffset )
-import CgClosure	( cgTopRhsClosure )
 import CgRetConv	( assignRegs )
 import Constants	( mAX_INTLIKE, mIN_INTLIKE, mAX_CHARLIKE, mIN_CHARLIKE,
 			  mIN_UPD_SIZE )
@@ -39,23 +38,22 @@ import CgHeapery	( allocDynClosure, inPlaceAllocDynClosure )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode, doTailCall,
 			  mkUnboxedTupleReturnCode )
 import CLabel		( mkClosureLabel )
-import ClosureInfo	( mkClosureLFInfo, mkConLFInfo, mkLFArgument,
+import ClosureInfo	( mkConLFInfo, mkLFArgument,
 			  layOutDynCon, layOutDynClosure,
 			  layOutStaticClosure, closureSize
 			)
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
-import DataCon		( DataCon, dataConName, dataConTag, dataConTyCon,
+import DataCon		( DataCon, dataConName, dataConTag, 
 			  isUnboxedTupleCon, isNullaryDataCon, dataConId, dataConWrapId
 			)
-import Id		( Id, idName, idType, idPrimRep )
-import Name		( nameModule, isLocallyDefinedName )
+import Id		( Id, idName, idPrimRep )
 import Literal		( Literal(..) )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Unique		( Uniquable(..) )
 import Util
-import Panic		( assertPanic, trace )
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -170,8 +168,6 @@ buildDynCon binder cc con [arg_amode]
   | maybeIntLikeCon con && in_range_int_lit arg_amode
   = returnFC (stableAmodeIdInfo binder (CIntLike arg_amode) (mkConLFInfo con))
   where
-    (temp_amode, temp_id_info) = newTempAmodeAndIdInfo binder (mkConLFInfo con)
-
     in_range_int_lit (CLit (MachInt val)) = val <= mAX_INTLIKE && val >= mIN_INTLIKE
     in_range_int_lit _other_amode	  = False
 
@@ -179,8 +175,6 @@ buildDynCon binder cc con [arg_amode]
   | maybeCharLikeCon con && in_range_char_lit arg_amode
   = returnFC (stableAmodeIdInfo binder (CCharLike arg_amode) (mkConLFInfo con))
   where
-    (temp_amode, temp_id_info) = newTempAmodeAndIdInfo binder (mkConLFInfo con)
-
     in_range_char_lit (CLit (MachChar val)) = val <= mAX_CHARLIKE && val >= mIN_CHARLIKE
     in_range_char_lit _other_amode	    = False
 \end{code}

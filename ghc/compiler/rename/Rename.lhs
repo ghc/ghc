@@ -339,7 +339,7 @@ rnDeprecs gbl_env Nothing decls
      = pushSrcLocRn loc			$
        lookupGlobalRn gbl_env rdr_name	`thenRn` \ maybe_name ->
        case maybe_name of
-	 Just n  -> returnRn (Just (n,txt))
+	 Just n  -> returnRn (Just (n,(n,txt)))
 	 Nothing -> returnRn Nothing
 \end{code}
 

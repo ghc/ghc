@@ -293,16 +293,19 @@ initialVersionInfo = VersionInfo { vers_module  = initialVersion,
 				   vers_decls   = emptyNameEnv }
 
 data Deprecations = NoDeprecs
-	 	  | DeprecAll DeprecTxt			-- Whole module deprecated
-		  | DeprecSome (NameEnv DeprecTxt)	-- Some things deprecated
-							-- Just "big" names
+	 	  | DeprecAll DeprecTxt				-- Whole module deprecated
+		  | DeprecSome (NameEnv (Name,DeprecTxt))	-- Some things deprecated
+								-- Just "big" names
+		-- We keep the Name in the range, so we can print them out
 
 lookupDeprec :: ModIface -> Name -> Maybe DeprecTxt
 lookupDeprec iface name
   = case mi_deprecs iface of
 	NoDeprecs      -> Nothing
 	DeprecAll txt  -> Just txt
-	DeprecSome env -> lookupNameEnv env name
+	DeprecSome env -> case lookupNameEnv env name of
+			    Just (_, txt) -> Just txt
+			    Nothing	  -> Nothing
 
 type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
 
