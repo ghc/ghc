@@ -1556,14 +1556,34 @@ freezeSTUArray (STUArray l u marr#) = ST $ \s1# ->
 -- have a reference to the array at the point where you unsafely
 -- freeze it (and, subsequently mutate it, I suspect).
 
-{-# INLINE unsafeFreeze #-}
+{- |
+   Converts an mutable array into an immutable array.  The 
+   implementation may either simply cast the array from
+   one type to the other without copying the array, or it
+   may take a full copy of the array.
 
--- | Converts a mutable array to an immutable array /without taking a
--- copy/.  This function is \"unsafe\" because if any further
--- modifications are made to the original mutable array then they will
--- be shared with the immutable version.  It is safe to use,
--- therefore, if the mutable version is never modified after the
--- freeze operation.
+   Note that because the array is possibly not copied, any subsequent
+   modifications made to the mutable version of the array may be
+   shared with the immutable version.  It is safe to use, therefore, if
+   the mutable version is never modified after the freeze operation.
+
+   The non-copying implementation is supported between certain pairs
+   of array types only; one constraint is that the array types must
+   have identical representations.  In GHC, The following pairs of
+   array types have a non-copying O(1) implementation of
+   'unsafeFreeze'.  Because the optimised versions are enabled by
+   specialisations, you will need to compile with optimisation (-O) to
+   get them.
+
+     * 'Data.Array.IO.IOUArray' -> 'Data.Array.Unboxed.UArray'
+
+     * 'Data.Array.ST.STUArray' -> 'Data.Array.Unboxed.UArray'
+
+     * 'Data.Array.IO.IOArray' -> 'Data.Array.Array'
+
+     * 'Data.Array.ST.STArray' -> 'Data.Array.Array'
+-}
+{-# INLINE unsafeFreeze #-}
 unsafeFreeze :: (Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
 unsafeFreeze = freeze
 
@@ -1615,13 +1635,34 @@ thawSTUArray (UArray l u arr) = do
 -- have a reference to the array at the point where you unsafely
 -- thaw it (and, subsequently mutate it, I suspect).
 
-{-# INLINE unsafeThaw #-}
+{- |
+   Converts an immutable array into a mutable array.  The 
+   implementation may either simply cast the array from
+   one type to the other without copying the array, or it
+   may take a full copy of the array.  
 
--- | Converts an immutable array into a mutable array /without taking
--- a copy/.  This function is \"unsafe\" because any subsequent
--- modifications made to the mutable version of the array will be
--- shared with the immutable version.  It is safe to use, therefore, if
--- the immutable version is never referenced again.
+   Note that because the array is possibly not copied, any subsequent
+   modifications made to the mutable version of the array may be
+   shared with the immutable version.  It is safe to use, therefore, if
+   the immutable version is never referenced again.
+
+   The non-copying implementation is supported between certain pairs
+   of array types only; one constraint is that the array types must
+   have identical representations.  In GHC, The following pairs of
+   array types have a non-copying O(1) implementation of
+   'unsafeFreeze'.  Because the optimised versions are enabled by
+   specialisations, you will need to compile with optimisation (-O) to
+   get them.
+
+     * 'Data.Array.Unboxed.UArray' -> 'Data.Array.IO.IOUArray'
+
+     * 'Data.Array.Unboxed.UArray' -> 'Data.Array.ST.STUArray'
+
+     * 'Data.Array.Array'  -> 'Data.Array.IO.IOArray'
+
+     * 'Data.Array.Array'  -> 'Data.Array.ST.STArray'
+-}
+{-# INLINE unsafeThaw #-}
 unsafeThaw :: (Ix i, IArray a e, MArray b e m) => a i e -> m (b i e)
 unsafeThaw = thaw
 
