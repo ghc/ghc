@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.18 2000/09/11 15:04:08 rrt Exp $
+ * $Id: Itimer.c,v 1.19 2000/10/06 11:05:57 rrt Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -53,8 +53,11 @@ static
 void
 #if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
 CALLBACK
-#endif
+handle_tick(UINT uID STG_UNUSED, UINT uMsg STG_UNUSED, DWORD dwUser STG_UNUSED,
+	    DWORD dw1 STG_UNUSED, DWORD d STG_UNUSED);
+#else
 handle_tick(int unused STG_UNUSED);
+#endif
 
 /* -----------------------------------------------------------------------------
    Tick handler
@@ -70,8 +73,11 @@ static
 void
 #if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
 CALLBACK
-#endif
+handle_tick(UINT uID STG_UNUSED, UINT uMsg STG_UNUSED, DWORD dwUser STG_UNUSED,
+	    DWORD dw1 STG_UNUSED, DWORD d STG_UNUSED)
+#else
 handle_tick(int unused STG_UNUSED)
+#endif
 {
   total_ticks++;
 
@@ -105,16 +111,8 @@ handle_tick(int unused STG_UNUSED)
 
 #if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
 
-/*
-  vtalrm_handler is assigned and set up in Signals.c
+LPTIMECALLBACK vtalrm_cback;
 
-  vtalrm_id (defined in Signals.c) holds
-  the system id for the current timer (used to 
-  later block/kill it.)
-*/
-extern nat vtalrm_id;
-TIMECALLBACK *vtalrm_cback;
- 
 nat
 initialize_virtual_timer(nat ms)
 {
@@ -125,22 +123,26 @@ initialize_virtual_timer(nat ms)
      
      As the delivery of ticks isn't free, we only
      enable it if we really needed, i.e., when profiling.
-     (the RTS now also needs timer ticks to implement
-     threadDelay in non-profiling mode, but the pure
-     Win32 port doesn't support that.....yet.)
+     (GetTickCount is used for threadDelay)
   */
-  unsigned int delay,vtalrm_id;
+  unsigned int delay;
+  static unsigned int vtalrm_id;
  
-  delay = timeBeginPeriod(1);
-  if (delay == TIMERR_NOCANDO) { /* error of some sort. */
-     return delay;
+  if (ms) {
+    delay = timeBeginPeriod(1);
+    if (delay == TIMERR_NOCANDO) { /* error of some sort. */
+      return delay;
+    }
+    vtalrm_id =
+      timeSetEvent(ms,      /* event every `delay' milliseconds. */
+		   1,       /* precision is within 1 ms */
+		   vtalrm_cback,
+		   TIME_CALLBACK_FUNCTION,     /* ordinary callback */
+		   TIME_PERIODIC);
+  } else {
+    timeKillEvent(vtalrm_id);
+    timeEndPeriod(1);
   }
-  vtalrm_id =
-    timeSetEvent(ms,     /* event every `delay' milliseconds. */
- 	        1,       /* precision is within 5 millisecs. */
- 	        (LPTIMECALLBACK)vtalrm_cback,
- 		0,
- 		TIME_PERIODIC);
 # endif
 
   return 0;
