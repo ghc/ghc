@@ -422,15 +422,12 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     default_alt | all isJust alts = []	-- No default needed
 		| otherwise	  = [(DEFAULT, [], error_expr)]
 
-    sel_rhs | isNewTyCon tycon = new_sel_rhs
-	    | otherwise	       = data_sel_rhs
+    sel_rhs = mkLams tyvars $ mkLams field_tyvars $ 
+	      mkLams dict_ids $ Lam data_id $
+	      sel_body
 
-    data_sel_rhs = mkLams tyvars $ mkLams field_tyvars $ 
-		   mkLams dict_ids $ Lam data_id $
-	 	   Case (Var data_id) data_id (the_alts ++ default_alt)
-
-    new_sel_rhs  = mkLams tyvars $ mkLams field_tyvars $ Lam data_id $
-		    Note (Coerce (unUsgTy field_tau) (unUsgTy data_ty)) (Var data_id)
+    sel_body | isNewTyCon tycon = Note (Coerce (unUsgTy field_tau) (unUsgTy data_ty)) (Var data_id)
+	     | otherwise	= Case (Var data_id) data_id (the_alts ++ default_alt)
 
     mk_maybe_alt data_con 
 	  = case maybe_the_arg_id of
