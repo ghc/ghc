@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.7 1999/01/14 18:12:58 sof Exp $
+% $Id: PrelIOBase.lhs,v 1.8 1999/03/31 09:52:05 sof Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -114,27 +114,6 @@ ioToST (IO m) = (ST m)
 \end{code}
 
 %*********************************************************
-%*							 *
-\subsection{Utility functions}
-%*							 *
-%*********************************************************
-
-I'm not sure why this little function is here...
-
-\begin{code}
---fputs :: Addr{-FILE*-} -> String -> IO Bool
-
-userError       :: String  -> IOError
-userError str	=  IOError Nothing (UserError Nothing) "" str
-
-{-
-fputs stream (c : cs)
-  = CCALL(filePutc) stream c >>
-    fputs stream cs
--}
-\end{code}
-
-%*********************************************************
 %*							*
 \subsection{Unsafe @IO@ operations}
 %*							*
@@ -181,8 +160,12 @@ data IOErrorType
   | ResourceBusy         | ResourceExhausted
   | ResourceVanished     | SystemError
   | TimeExpired          | UnsatisfiedConstraints
-  | UnsupportedOperation | UserError (Maybe Addr)
+  | UnsupportedOperation | UserError
   | EOF
+#ifdef _WIN32
+  | ComError Int           -- HRESULT
+	     (Maybe Addr)  -- Pointer to 'exception' object. (IExceptionInfo..)
+#endif
   deriving (Eq)
 
 instance Show IOErrorType where
@@ -205,10 +188,14 @@ instance Show IOErrorType where
       SystemError	-> "system error"
       TimeExpired       -> "timeout"
       UnsatisfiedConstraints -> "unsatisified constraints" -- ultra-precise!
-      UserError _       -> "failed"
+      UserError         -> "failed"
       UnsupportedOperation -> "unsupported operation"
       EOF		-> "end of file"
 
+
+
+userError       :: String  -> IOError
+userError str	=  IOError Nothing UserError "" str
 \end{code}
 
 Predicates on IOError; little effort made on these so far...
@@ -244,8 +231,8 @@ isDoesNotExistError (IOError _ NoSuchThing _ _) = True
 isDoesNotExistError _                           = False
 
 isUserError :: IOError -> Bool
-isUserError (IOError _ (UserError _) _ _) = True
-isUserError _		                  = False
+isUserError (IOError _ UserError _ _) = True
+isUserError _		              = False
 \end{code}
 
 Showing @IOError@s
