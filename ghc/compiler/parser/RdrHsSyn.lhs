@@ -391,15 +391,15 @@ getMonoBind :: RdrNameMonoBinds -> [RdrBinding] -> (RdrNameMonoBinds, [RdrBindin
 --
 -- No AndMonoBinds or EmptyMonoBinds here; just single equations
 
-getMonoBind (FunMonoBind f1 inf1 mtchs1 loc1) binds
-  | has_args mtchs1
-  = go mtchs1 loc1 binds
+getMonoBind (FunMonoBind f inf mtchs loc) binds
+  | has_args mtchs
+  = go mtchs loc binds
   where
-    go mtchs loc (RdrValBinding (FunMonoBind f2 inf2 mtchs2 loc2) : binds)
-	| f1 == f2 = go (mtchs2 ++ mtchs1) loc2 binds
+    go mtchs1 loc1 (RdrValBinding (FunMonoBind f2 inf2 mtchs2 loc2) : binds)
+	| f == f2 = go (mtchs2 ++ mtchs1) loc2 binds
 	-- Remember binds is reversed, so glue mtchs2 on the front
 	-- and use loc2 as the final location
-    go mtchs loc binds = (FunMonoBind f1 inf1 mtchs loc, binds)
+    go mtchs1 loc1 binds = (FunMonoBind f inf mtchs1 loc1, binds)
 
 getMonoBind bind binds = (bind, binds)
 
@@ -440,7 +440,7 @@ add gp (SpliceD e : ds) = (gp, Just (e, ds))
 -- Class declarations: pull out the fixity signatures to the top
 add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) (TyClD d : ds)   
 	| isClassDecl d = add (gp { hs_tyclds = d : ts, 
-				    hs_fixds  = [f | FixSig f <- tcdSigs d] }) ds
+				    hs_fixds  = [f | FixSig f <- tcdSigs d] ++ fs }) ds
 	| otherwise 	= add (gp { hs_tyclds = d : ts }) ds
 
 -- Signatures: fixity sigs go a different place than all others
