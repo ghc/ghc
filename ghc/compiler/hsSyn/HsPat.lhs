@@ -133,6 +133,8 @@ data OutPat id
 						-- the desugarer can readily identify
 						-- equations with identical literal-patterns
 						-- Always HsInteger, HsRat or HsString.
+						-- *Unlike* NPatIn, for negative literals, the
+						-- 	literal is acutally negative!
 		    Type	 		-- Type of pattern, t
    	    	    (HsExpr id (OutPat id))	-- Of type t -> Bool; detects match
 
