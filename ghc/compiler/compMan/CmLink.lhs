@@ -28,7 +28,6 @@ import Interpreter
 import DriverPipeline
 import CmTypes
 import HscTypes		( GhciMode(..) )
-import Outputable	( SDoc )
 import Name		( Name )
 import Module		( ModuleName )
 import FiniteMap
@@ -199,8 +198,8 @@ unload Interactive dflags linkables pls = panic "CmLink.unload: no interpreter"
 -- Linking
 
 data LinkResult
-   = LinkOK   PersistentLinkerState
-   | LinkErrs PersistentLinkerState [SDoc]
+   = LinkOK     PersistentLinkerState
+   | LinkFailed PersistentLinkerState
 
 link :: GhciMode		-- interactive or batch
      -> DynFlags		-- dynamic flags
@@ -270,7 +269,13 @@ link' Interactive dflags batch_attempt_linking linkables pls
 	    writeIORef v_ObjectsLoaded objs_loaded'
 
 	    -- resolve symbols within the object files
-	    resolveObjs
+	    ok <- resolveObjs
+	    -- if resolving failed, unload all our object modules and
+	    -- carry on.
+	    if (not ok)
+               then do pls <- unload Interactive dflags [] pls
+		       return (LinkFailed pls)
+	       else do
 
 	    -- finally link the interpreted linkables
 	    linkBCOs bcos [] pls

@@ -525,30 +525,30 @@ cmLoadModule cmstate1 rootnames
 
 
 -- Finish up after a cmLoad.
---
+
+-- If the link failed, unload everything and return.
+cmLoadFinish ok (LinkFailed pls) hst hit ui mods ghci_mode pcs = do
+  dflags <- getDynFlags
+  new_pls <- CmLink.unload ghci_mode dflags [] pls 
+  new_state <- cmInit ghci_mode
+  return (new_state{ pcs=pcs, pls=new_pls }, False, [])
+
 -- Empty the interactive context and set the module context to the topmost
 -- newly loaded module, or the Prelude if none were loaded.
-cmLoadFinish ok linkresult hst hit ui mods ghci_mode pcs
-  = do case linkresult of {
-          LinkErrs _ _ -> panic "cmLoadModule: link failed (2)";
-          LinkOK pls   -> do
-
-       def_mod <- readIORef defaultCurrentModule
+cmLoadFinish ok (LinkOK pls) hst hit ui mods ghci_mode pcs
+  = do def_mod <- readIORef defaultCurrentModule
        let current_mod = case mods of 
 				[]    -> def_mod
 				(x:_) -> ms_mod x
 
        	   new_ic = emptyInteractiveContext current_mod
 
-           new_cmstate = CmState{ hst=hst, hit=hit, 
-                                  ui=ui, mg=mods,
-                                  gmode=ghci_mode, pcs=pcs, 
-				  pls=pls,
+           new_cmstate = CmState{ hst=hst, hit=hit, ui=ui, mg=mods,
+                                  gmode=ghci_mode, pcs=pcs, pls=pls,
 				  ic = new_ic }
            mods_loaded = map (moduleNameUserString.name_of_summary) mods
 
        return (new_cmstate, ok, mods_loaded)
-    }
 
 -- used to fish out the preprocess output files for the purposes
 -- of cleaning up.
