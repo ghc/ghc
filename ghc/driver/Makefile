@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.37 2000/06/25 19:17:58 panne Exp $
+# $Id: Makefile,v 1.38 2000/06/28 14:00:37 simonmar Exp $
 #
 
 TOP=..
@@ -45,7 +45,6 @@ Config.hs : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> Config.hs      
 	@echo "cGHC_MKDEPENDHS       = \"$(GHC_MKDEPENDHS)\"" >> Config.hs
 	@echo "cGHC_UNLIT            = \"$(GHC_UNLIT)\"" >> Config.hs              
-	@echo "cGHC_HSCPP            = \"$(GHC_HSCPP)\"" >> Config.hs              
 	@echo "cGHC_HSC              = \"$(GHC_HSC)\"" >> Config.hs                
 	@echo "cGHC_MANGLER          = \"$(GHC_MANGLER)\"" >> Config.hs
 	@echo "cGHC_SPLIT            = \"$(GHC_SPLIT)\"" >> Config.hs
@@ -65,6 +64,7 @@ Config.hs : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cbindir               = \"$(bindir)\"" >> Config.hs                 
 	@echo "cTMPDIR               = \"$(TMPDIR)\"" >> Config.hs                 
 	@echo "cFPTOOLS_TOP_ABS      = \"$(FPTOOLS_TOP_ABS)\"" >> Config.hs
+	@echo "cRAWCPP               = \"$(RAWCPP)\"" >> Config.hs
 	@echo done.
 
 CLEAN_FILES += Config.hs

@@ -37,6 +37,7 @@ module StringBuffer
         stepOnBy#,        -- :: StringBuffer -> Int# -> StringBuffer
         stepOnTo#,        -- :: StringBuffer -> Int# -> StringBuffer
         stepOnUntil,      -- :: (Char -> Bool) -> StringBuffer -> StringBuffer
+	stepOnUntilChar#, -- :: StringBuffer -> Char# -> StringBuffer
         stepOverLexeme,   -- :: StringBuffer   -> StringBuffer
 	scanNumLit,       -- :: Int -> StringBuffer -> (Int, StringBuffer)
 	squeezeLexeme,	  -- :: StringBuffer -> Int# -> StringBuffer
@@ -51,7 +52,6 @@ module StringBuffer
 	 -- matching
         prefixMatch,       -- :: StringBuffer -> String -> Bool
 	untilEndOfString#, -- :: StringBuffer -> Int#
-	untilChar#,        -- :: StringBuffer -> Char# -> Int#
 
          -- conversion
         lexemeToString,     -- :: StringBuffer -> String
@@ -486,13 +486,13 @@ untilEndOfString# (StringBuffer fo l# s# c#) =
     _ -> loop (c# +# 1#)
 
 
-untilChar# :: StringBuffer -> Char# -> StringBuffer
-untilChar# (StringBuffer fo l# s# c#) x# = 
+stepOnUntilChar# :: StringBuffer -> Char# -> StringBuffer
+stepOnUntilChar# (StringBuffer fo l# s# c#) x# = 
  loop c# 
  where
   loop c#
    | c# >=# l# || indexCharOffAddr# fo c# `eqChar#` x#
-   = StringBuffer fo l# s# c#
+   = StringBuffer fo l# c# c#
    | otherwise
    = loop (c# +# 1#)
 

@@ -755,7 +755,7 @@ way_details =
 
 GLOBAL_VAR(pgm_dep, findFile "mkdependHS" cGHC_MKDEPENDHS, String)
 GLOBAL_VAR(pgm_L,   findFile "unlit"      cGHC_UNLIT,      String)
-GLOBAL_VAR(pgm_P,   findFile "hscpp"      cGHC_HSCPP,      String)
+GLOBAL_VAR(pgm_P,   cRAWCPP,				   String)
 GLOBAL_VAR(pgm_C,   findFile "hsc"        cGHC_HSC,        String)
 GLOBAL_VAR(pgm_c,   cGCC,	      	     	      	   String)
 GLOBAL_VAR(pgm_m,   findFile "ghc-asm"    cGHC_MANGLER,    String)
@@ -1225,11 +1225,11 @@ run_phase Unlit basename input_fn output_fn
   = do unlit <- readIORef pgm_L
        unlit_flags <- getOpts opt_L
        run_something "Literate pre-processor"
-	  ("echo '{-# LINE 1 \"" ++input_fn++"\" -}' > "++output_fn++" && "
+	  ("echo '# 1 \"" ++input_fn++"\"' > "++output_fn++" && "
 	   ++ unlit ++ ' ':input_fn ++ " - >> " ++ output_fn)
 
 -------------------------------------------------------------------------------
--- HsCpp phase 
+-- Cpp phase 
 
 run_phase Cpp basename input_fn output_fn
   = do src_opts <- getOptionsFromSource input_fn
@@ -1255,7 +1255,7 @@ run_phase Cpp basename input_fn output_fn
 		    ++ include_paths
 		    ++ hs_src_cpp_opts
 		    ++ hscpp_opts
-		    ++ [ input_fn, ">>", output_fn ]
+		    ++ [ "-x", "c", input_fn, ">>", output_fn ]
 		   ))
 	  else do
 	    run_something "Inefective C pre-processor"

@@ -33,30 +33,26 @@ module Lex (
 
 #include "HsVersions.h"
 
-import Char 		( ord, isSpace, toUpper )
+import Char 		( isSpace, toUpper )
 import List             ( isSuffixOf )
 
-import IdInfo		( InlinePragInfo(..), CprInfo(..) )
-import Name		( isLowerISO, isUpperISO )
+import IdInfo		( InlinePragInfo(..) )
 import PrelNames	( mkTupNameStr )
-import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_HiVersion, opt_NoHiCheck )
+import CmdLineOpts	( opt_HiVersion, opt_NoHiCheck )
 import Demand		( Demand(..) {- instance Read -} )
-import UniqFM           ( UniqFM, listToUFM, lookupUFM)
+import UniqFM           ( listToUFM, lookupUFM )
 import BasicTypes	( NewOrData(..), Boxity(..) )
 import SrcLoc		( SrcLoc, incSrcLine, srcLocFile, srcLocLine,
 			  replaceSrcLine, mkSrcLoc )
 
-import Maybes		( MaybeErr(..) )
 import ErrUtils		( Message )
 import Outputable
 
 import FastString
 import StringBuffer
 import GlaExts
-import ST		( runST )
 import Ctype
 import Char		( chr )
-import Addr
 import PrelRead 	( readRational__ ) -- Glasgow non-std
 \end{code}
 
@@ -401,9 +397,8 @@ lexer cont buf s@(PState{
 			  if next `eqChar#` '-'# then trundle (n +# 1#)
 			  else if is_symbol next || n <# 2#
 				then is_a_token
-			        else case untilChar# (stepOnBy# buf n) '\n'# of 
-				    { buf' -> tab y bol atbol (stepOverLexeme buf')
-				    }
+			        else tab y bol atbol 
+					 (stepOnUntilChar# (stepOnBy# buf n) '\n'#)
 		    in trundle 1#
 
 		-- comments and pragmas.  We deal with LINE pragmas here,
@@ -419,14 +414,21 @@ lexer cont buf s@(PState{
 		  let lexeme = mkFastString -- ToDo: too slow
 			          (map toUpper (lexemeToString buf2)) in
 		  case lookupUFM pragmaKeywordsFM lexeme of
-			Just ITline_prag -> line_prag (lexer cont) buf2 s'
+			Just ITline_prag -> 
+			   line_prag skip_to_end buf2 s'
 			Just other -> is_a_token
-			Nothing -> skip_to_end (stepOnBy# buf 2#)
+			Nothing -> skip_to_end (stepOnBy# buf 2#) s'
 		  }}
-		
-		else skip_to_end (stepOnBy# buf 2#)
+
+		else skip_to_end (stepOnBy# buf 2#) s'
 		where
-		    skip_to_end buf = nested_comment (lexer cont) buf s'
+		    skip_to_end = nested_comment (lexer cont)
+
+		-- special GHC extension: we grok cpp-style #line pragmas
+	    '#'# | lexemeIndex buf ==# bol -> 	-- the '#' must be in column 0
+		line_prag next_line (stepOn buf) s'
+		where
+		next_line buf = lexer cont (stepOnUntilChar# buf '\n'#)
 
 		-- tabs have been expanded beforehand
 	    c | is_space c -> tab y bol atbol (stepOn buf)
@@ -440,23 +442,27 @@ lexer cont buf s@(PState{
 	      		    | otherwise    = lexToken cont glaexts buf s'
 
 -- {-# LINE .. #-} pragmas.  yeuch.
-line_prag cont buf =
+line_prag cont buf s@PState{loc=loc} =
   case expandWhile# is_space buf 		of { buf1 ->
   case scanNumLit 0 (stepOverLexeme buf1) 	of { (line,buf2) ->
   -- subtract one: the line number refers to the *following* line.
   let real_line = line - 1 in
   case fromInteger real_line 			of { i@(I# l) -> 
+	-- ToDo, if no filename then we skip the newline.... d'oh
   case expandWhile# is_space buf2 		of { buf3 ->
   case currentChar# buf3 			of
      '\"'#{-"-} -> 
 	case untilEndOfString# (stepOn (stepOverLexeme buf3)) of { buf4 ->
-	let file = lexemeToFastString buf4 in
-	\s@PState{loc=loc} -> skipToEnd buf4 s{loc = mkSrcLoc file i}
+	let 
+	    file = lexemeToFastString buf4 
+	    new_buf = stepOn (stepOverLexeme buf4)
+	in
+	if nullFastString file
+		then cont new_buf s{loc = replaceSrcLine loc l}
+		else cont new_buf s{loc = mkSrcLoc file i}
 	}
-     other -> \s@PState{loc=loc} -> skipToEnd buf3 s{loc = replaceSrcLine loc l}
+     _other -> cont (stepOverLexeme buf3) s{loc = replaceSrcLine loc l}
   }}}}
-  where
-	skipToEnd buf = nested_comment cont buf
 
 nested_comment :: P a -> P a
 nested_comment cont buf = loop buf
@@ -872,7 +878,8 @@ lex_ip cont buf =
 	   where lexeme = lexemeToFastString buf'
 
 lex_id cont glaexts buf =
- case expandWhile# is_ident buf of { buf1 -> 
+ let buf1 = expandWhile# is_ident buf in
+ seq buf1 $
 
  case (if flag glaexts 
 	then expandWhile# (eqChar# '#'#) buf1 -- slurp trailing hashes
@@ -885,7 +892,7 @@ lex_id cont glaexts buf =
 			  cont kwd_token buf';
  	Nothing        -> 
 
- let var_token = cont (mk_var_token lexeme) buf' in
+ let var_token = cont (ITvarid lexeme) buf' in
 
  if not (flag glaexts)
    then var_token
@@ -895,7 +902,7 @@ lex_id cont glaexts buf =
 	Just kwd_token -> cont kwd_token buf';
 	Nothing        -> var_token
 
- }}}}
+ }}}
 
 lex_sym cont buf =
  case expandWhile# is_symbol buf of
