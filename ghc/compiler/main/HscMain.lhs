@@ -84,7 +84,7 @@ import Name		( Name, nameModule, nameOccName, getName, isGlobalName )
 import NameEnv		( emptyNameEnv, mkNameEnv )
 import Module		( Module )
 
-import IOExts		( newIORef, readIORef, writeIORef, modifyIORef,
+import IOExts		( newIORef, readIORef, writeIORef, 
 			  unsafePerformIO )
 
 import Monad		( when )
@@ -351,7 +351,8 @@ hscRecomp ghci_mode dflags have_object
 	  -- ...and add the string to the headers requested via command line
 	  -- options 
 	  --
-	; modifyIORef v_HCHeader (++ foreign_headers)
+        ; fhdrs <- readIORef v_HCHeader
+        ; writeIORef v_HCHeader (fhdrs ++ foreign_headers)
 
         ; imported_modules <- mapM mod_name_to_Module imported_module_names
 
