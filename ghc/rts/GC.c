@@ -26,6 +26,7 @@
 #include "ParTicky.h"		// ToDo: move into Rts.h
 #include "GCCompact.h"
 #include "Signals.h"
+#include "STM.h"
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"
 # include "ParallelRts.h"
@@ -313,6 +314,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   // block signals
   blockUserSignals();
 #endif
+
+  // tell the STM to discard any cached closures its hoping to re-use
+  stmPreGCHook();
 
   // tell the stats department that we've started a GC 
   stat_startGC();
@@ -1881,6 +1885,9 @@ loop:
   case UPDATE_FRAME:
   case STOP_FRAME:
   case CATCH_FRAME:
+  case CATCH_STM_FRAME:
+  case CATCH_RETRY_FRAME:
+  case ATOMICALLY_FRAME:
     // shouldn't see these 
     barf("evacuate: stack frame at %p\n", q);
 
@@ -1988,6 +1995,18 @@ loop:
 		   q, info_type(q), to, info_type(to)));
     return to;
 #endif
+
+  case TREC_HEADER: 
+    return copy(q,sizeofW(StgTRecHeader),stp);
+
+  case TVAR_WAIT_QUEUE:
+    return copy(q,sizeofW(StgTVarWaitQueue),stp);
+
+  case TVAR:
+    return copy(q,sizeofW(StgTVar),stp);
+    
+  case TREC_CHUNK:
+    return copy(q,sizeofW(StgTRecChunk),stp);
 
   default:
     barf("evacuate: strange closure type %d", (int)(info->type));
@@ -2347,6 +2366,9 @@ scavengeTSO (StgTSO *tso)
 	tso->blocked_exceptions = 
 	    (StgTSO *)evacuate((StgClosure *)tso->blocked_exceptions);
     }
+    
+    // scavange current transaction record
+    (StgClosure *)tso->trec = evacuate((StgClosure *)tso->trec);
     
     // scavenge this thread's stack 
     scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
@@ -2800,6 +2822,65 @@ scavenge(step *stp)
     }
 #endif
 
+    case TVAR_WAIT_QUEUE:
+      {
+	StgTVarWaitQueue *wq = ((StgTVarWaitQueue *) p);
+	evac_gen = 0;
+	(StgClosure *)wq->waiting_tso = evacuate((StgClosure*)wq->waiting_tso);
+	(StgClosure *)wq->next_queue_entry = evacuate((StgClosure*)wq->next_queue_entry);
+	(StgClosure *)wq->prev_queue_entry = evacuate((StgClosure*)wq->prev_queue_entry);
+	evac_gen = saved_evac_gen;
+	recordMutable((StgMutClosure *)wq);
+	failed_to_evac = rtsFalse; // mutable
+	p += sizeofW(StgTVarWaitQueue);
+	break;
+      }
+
+    case TVAR:
+      {
+	StgTVar *tvar = ((StgTVar *) p);
+	evac_gen = 0;
+	(StgClosure *)tvar->current_value = evacuate((StgClosure*)tvar->current_value);
+	(StgClosure *)tvar->first_wait_queue_entry = evacuate((StgClosure*)tvar->first_wait_queue_entry);
+	evac_gen = saved_evac_gen;
+	recordMutable((StgMutClosure *)tvar);
+	failed_to_evac = rtsFalse; // mutable
+	p += sizeofW(StgTVar);
+	break;
+      }
+
+    case TREC_HEADER:
+      {
+        StgTRecHeader *trec = ((StgTRecHeader *) p);
+        evac_gen = 0;
+	(StgClosure *)trec->enclosing_trec = evacuate((StgClosure*)trec->enclosing_trec);
+	(StgClosure *)trec->current_chunk = evacuate((StgClosure*)trec->current_chunk);
+	evac_gen = saved_evac_gen;
+	recordMutable((StgMutClosure *)trec);
+	failed_to_evac = rtsFalse; // mutable
+	p += sizeofW(StgTRecHeader);
+        break;
+      }
+
+    case TREC_CHUNK:
+      {
+	StgWord i;
+	StgTRecChunk *tc = ((StgTRecChunk *) p);
+	TRecEntry *e = &(tc -> entries[0]);
+	evac_gen = 0;
+	(StgClosure *)tc->prev_chunk = evacuate((StgClosure*)tc->prev_chunk);
+	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
+	  (StgClosure *)e->tvar = evacuate((StgClosure*)e->tvar);
+	  (StgClosure *)e->expected_value = evacuate((StgClosure*)e->expected_value);
+	  (StgClosure *)e->new_value = evacuate((StgClosure*)e->new_value);
+	}
+	evac_gen = saved_evac_gen;
+	recordMutable((StgMutClosure *)tc);
+	failed_to_evac = rtsFalse; // mutable
+	p += sizeofW(StgTRecChunk);
+	break;
+      }
+
     default:
 	barf("scavenge: unimplemented/strange closure type %d @ %p", 
 	     info->type, p);
@@ -3103,6 +3184,61 @@ linear_scan:
 	    break;
 	}
 #endif // PAR
+
+	case TVAR_WAIT_QUEUE:
+	  {
+	    StgTVarWaitQueue *wq = ((StgTVarWaitQueue *) p);
+	    evac_gen = 0;
+	    (StgClosure *)wq->waiting_tso = evacuate((StgClosure*)wq->waiting_tso);
+	    (StgClosure *)wq->next_queue_entry = evacuate((StgClosure*)wq->next_queue_entry);
+	    (StgClosure *)wq->prev_queue_entry = evacuate((StgClosure*)wq->prev_queue_entry);
+	    evac_gen = saved_evac_gen;
+	    recordMutable((StgMutClosure *)wq);
+	    failed_to_evac = rtsFalse; // mutable
+	    break;
+	  }
+	  
+	case TVAR:
+	  {
+	    StgTVar *tvar = ((StgTVar *) p);
+	    evac_gen = 0;
+	    (StgClosure *)tvar->current_value = evacuate((StgClosure*)tvar->current_value);
+	    (StgClosure *)tvar->first_wait_queue_entry = evacuate((StgClosure*)tvar->first_wait_queue_entry);
+	    evac_gen = saved_evac_gen;
+	    recordMutable((StgMutClosure *)tvar);
+	    failed_to_evac = rtsFalse; // mutable
+	    break;
+	  }
+	  
+	case TREC_CHUNK:
+	  {
+	    StgWord i;
+	    StgTRecChunk *tc = ((StgTRecChunk *) p);
+	    TRecEntry *e = &(tc -> entries[0]);
+	    evac_gen = 0;
+	    (StgClosure *)tc->prev_chunk = evacuate((StgClosure*)tc->prev_chunk);
+	    for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
+	      (StgClosure *)e->tvar = evacuate((StgClosure*)e->tvar);
+	      (StgClosure *)e->expected_value = evacuate((StgClosure*)e->expected_value);
+	      (StgClosure *)e->new_value = evacuate((StgClosure*)e->new_value);
+	    }
+	    evac_gen = saved_evac_gen;
+	    recordMutable((StgMutClosure *)tc);
+	    failed_to_evac = rtsFalse; // mutable
+	    break;
+	  }
+
+	case TREC_HEADER:
+	  {
+	    StgTRecHeader *trec = ((StgTRecHeader *) p);
+	    evac_gen = 0;
+	    (StgClosure *)trec->enclosing_trec = evacuate((StgClosure*)trec->enclosing_trec);
+	    (StgClosure *)trec->current_chunk = evacuate((StgClosure*)trec->current_chunk);
+	    evac_gen = saved_evac_gen;
+	    recordMutable((StgMutClosure *)trec);
+	    failed_to_evac = rtsFalse; // mutable
+	    break;
+	  }
 
 	default:
 	    barf("scavenge_mark_stack: unimplemented/strange closure type %d @ %p", 
@@ -3594,6 +3730,53 @@ scavenge_mutable_list(generation *gen)
       }
 #endif
 
+    case TVAR_WAIT_QUEUE:
+      {
+	StgTVarWaitQueue *wq = ((StgTVarWaitQueue *) p);
+	(StgClosure *)wq->waiting_tso = evacuate((StgClosure*)wq->waiting_tso);
+	(StgClosure *)wq->next_queue_entry = evacuate((StgClosure*)wq->next_queue_entry);
+	(StgClosure *)wq->prev_queue_entry = evacuate((StgClosure*)wq->prev_queue_entry);
+	p->mut_link = gen->mut_list;
+	gen->mut_list = p;
+	continue;
+      }
+
+    case TVAR:
+      {
+	StgTVar *tvar = ((StgTVar *) p);
+	(StgClosure *)tvar->current_value = evacuate((StgClosure*)tvar->current_value);
+	(StgClosure *)tvar->first_wait_queue_entry = evacuate((StgClosure*)tvar->first_wait_queue_entry);
+	p->mut_link = gen->mut_list;
+	gen->mut_list = p;
+	continue;
+      }
+
+    case TREC_CHUNK:
+      {
+	StgWord i;
+	StgTRecChunk *tc = ((StgTRecChunk *) p);
+	TRecEntry *e = &(tc -> entries[0]);
+	(StgClosure *)tc->prev_chunk = evacuate((StgClosure*)tc->prev_chunk);
+	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
+	  (StgClosure *)e->tvar = evacuate((StgClosure*)e->tvar);
+	  (StgClosure *)e->expected_value = evacuate((StgClosure*)e->expected_value);
+	  (StgClosure *)e->new_value = evacuate((StgClosure*)e->new_value);
+	}
+	p->mut_link = gen->mut_list;
+	gen->mut_list = p;
+	continue;
+      }
+
+    case TREC_HEADER:
+      {
+	StgTRecHeader *trec = ((StgTRecHeader *) p);
+	(StgClosure *)trec->enclosing_trec = evacuate((StgClosure*)trec->enclosing_trec);
+	(StgClosure *)trec->current_chunk = evacuate((StgClosure*)trec->current_chunk);
+	p->mut_link = gen->mut_list;
+	gen->mut_list = p;
+	continue;
+      }
+
     default:
       // shouldn't have anything else on the mutables list 
       barf("scavenge_mutable_list: strange object? %d", (int)(info->type));
@@ -3760,6 +3943,9 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	continue;
 
       // small bitmap (< 32 entries, or 64 on a 64-bit machine) 
+    case CATCH_STM_FRAME:
+    case CATCH_RETRY_FRAME:
+    case ATOMICALLY_FRAME:
     case STOP_FRAME:
     case CATCH_FRAME:
     case RET_SMALL:

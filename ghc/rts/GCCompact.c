@@ -142,6 +142,14 @@ obj_sizeW( StgClosure *p, StgInfoTable *info )
 	return tso_sizeW((StgTSO *)p);
     case BCO:
 	return bco_sizeW((StgBCO *)p);
+    case TVAR_WAIT_QUEUE:
+        return sizeofW(StgTVarWaitQueue);
+    case TVAR:
+        return sizeofW(StgTVar);
+    case TREC_CHUNK:
+        return sizeofW(StgTRecChunk);
+    case TREC_HEADER:
+        return sizeofW(StgTRecHeader);
     default:
 	return sizeW_fromITBL(info);
     }
@@ -289,6 +297,9 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	}
 	    
 	    // small bitmap (<= 32 entries, or 64 on a 64-bit machine) 
+        case CATCH_RETRY_FRAME:
+        case CATCH_STM_FRAME:
+        case ATOMICALLY_FRAME:
 	case UPDATE_FRAME:
 	case STOP_FRAME:
 	case CATCH_FRAME:
@@ -424,6 +435,8 @@ thread_TSO (StgTSO *tso)
 	thread((StgPtr)&tso->blocked_exceptions);
     }
     
+    thread((StgPtr)&tso->trec);
+
     thread_stack(tso->sp, &(tso->stack[tso->stack_size]));
     return (StgPtr)tso + tso_sizeW(tso);
 }
@@ -605,6 +618,45 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case TSO:
 	return thread_TSO((StgTSO *)p);
     
+    case TVAR_WAIT_QUEUE:
+    {
+        StgTVarWaitQueue *wq = (StgTVarWaitQueue *)p;
+	thread((StgPtr)&wq->waiting_tso);
+	thread((StgPtr)&wq->next_queue_entry);
+	thread((StgPtr)&wq->prev_queue_entry);
+	return p + sizeofW(StgTVarWaitQueue);
+    }
+    
+    case TVAR:
+    {
+        StgTVar *tvar = (StgTVar *)p;
+	thread((StgPtr)&tvar->current_value);
+	thread((StgPtr)&tvar->first_wait_queue_entry);
+	return p + sizeofW(StgTVar);
+    }
+    
+    case TREC_HEADER:
+    {
+        StgTRecHeader *trec = (StgTRecHeader *)p;
+	thread((StgPtr)&trec->enclosing_trec);
+	thread((StgPtr)&trec->current_chunk);
+	return p + sizeofW(StgTRecHeader);
+    }
+
+    case TREC_CHUNK:
+    {
+        int i;
+        StgTRecChunk *tc = (StgTRecChunk *)p;
+	TRecEntry *e = &(tc -> entries[0]);
+	thread((StgPtr)&tc->prev_chunk);
+	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
+	  thread((StgPtr)&e->tvar);
+	  thread((StgPtr)&e->expected_value);
+	  thread((StgPtr)&e->new_value);
+	}
+	return p + sizeofW(StgTRecChunk);
+    }
+
     default:
 	barf("update_fwd: unknown/strange object  %d", (int)(info->type));
 	return NULL;

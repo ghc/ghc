@@ -28,6 +28,7 @@ module TysPrim(
 	mutVarPrimTyCon,		mkMutVarPrimTy,
 
 	mVarPrimTyCon,			mkMVarPrimTy,	
+        tVarPrimTyCon,                  mkTVarPrimTy,
 	stablePtrPrimTyCon,		mkStablePtrPrimTy,
 	stableNamePrimTyCon,		mkStableNamePrimTy,
 	bcoPrimTyCon,			bcoPrimTy,
@@ -87,6 +88,7 @@ primTyCons
     , mutableArrayPrimTyCon
     , mutableByteArrayPrimTyCon
     , mVarPrimTyCon
+    , tVarPrimTyCon
     , mutVarPrimTyCon
     , realWorldTyCon
     , stablePtrPrimTyCon
@@ -124,6 +126,7 @@ mutableArrayPrimTyConName     = mkPrimTc FSLIT("MutableArray#") mutableArrayPrim
 mutableByteArrayPrimTyConName = mkPrimTc FSLIT("MutableByteArray#") mutableByteArrayPrimTyConKey mutableByteArrayPrimTyCon
 mutVarPrimTyConName	      = mkPrimTc FSLIT("MutVar#") mutVarPrimTyConKey mutVarPrimTyCon
 mVarPrimTyConName	      = mkPrimTc FSLIT("MVar#") mVarPrimTyConKey mVarPrimTyCon
+tVarPrimTyConName	      = mkPrimTc FSLIT("TVar#") tVarPrimTyConKey tVarPrimTyCon
 stablePtrPrimTyConName        = mkPrimTc FSLIT("StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
 stableNamePrimTyConName       = mkPrimTc FSLIT("StableName#") stableNamePrimTyConKey stableNamePrimTyCon
 foreignObjPrimTyConName       = mkPrimTc FSLIT("ForeignObj#") foreignObjPrimTyConKey foreignObjPrimTyCon
@@ -310,6 +313,18 @@ mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 mVarPrimTyCon = pcPrimTyCon mVarPrimTyConName vrcsZP PtrRep
 
 mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[TysPrim-stm-var]{The transactional variable type}
+%*									*
+%************************************************************************
+
+\begin{code}
+tVarPrimTyCon = pcPrimTyCon tVarPrimTyConName vrcsZP PtrRep
+
+mkTVarPrimTy s elt 	    = mkTyConApp tVarPrimTyCon [s, elt]
 \end{code}
 
 %************************************************************************

@@ -253,6 +253,7 @@ main(int argc, char *argv[])
     closure_field(StgTSO, blocked_exceptions);
     closure_field(StgTSO, id);
     closure_field(StgTSO, saved_errno);
+    closure_field(StgTSO, trec);
     closure_field_("StgTSO_CCCS", StgTSO, prof.CCCS);
     tso_field(StgTSO, sp);
     tso_offset(StgTSO, stack);
@@ -298,6 +299,19 @@ main(int argc, char *argv[])
     closure_size(StgMutVar);
     closure_field(StgMutVar, var);
 
+    closure_size(StgAtomicallyFrame);
+    closure_field(StgAtomicallyFrame, waiting);
+    closure_field(StgAtomicallyFrame, code);
+
+    closure_size(StgCatchSTMFrame);
+    closure_field(StgCatchSTMFrame, handler);
+
+    closure_size(StgCatchRetryFrame);
+    closure_field(StgCatchRetryFrame, running_alt_code);
+    closure_field(StgCatchRetryFrame, first_code);
+    closure_field(StgCatchRetryFrame, alt_code);
+    closure_field(StgCatchRetryFrame, first_code_trec);
+
     closure_size(StgForeignObj);
     closure_field(StgForeignObj,data);
 
@@ -314,6 +328,10 @@ main(int argc, char *argv[])
     closure_field(StgMVar,head);
     closure_field(StgMVar,tail);
     closure_field(StgMVar,value);
+
+    closure_size(StgTVar);
+    closure_field(StgTVar,current_value);
+    closure_field(StgTVar,first_wait_queue_entry);
 
     closure_size(StgBCO);
     closure_field(StgBCO, instrs);

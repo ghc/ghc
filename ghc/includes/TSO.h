@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.38 2004/11/10 02:13:12 wolfgang Exp $
+ * $Id: TSO.h,v 1.39 2004/11/18 09:56:22 tharris Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -136,6 +136,7 @@ typedef struct StgTSO_ {
   StgThreadID        id;
   int                saved_errno;
   struct StgMainThread_* main;
+  struct StgTRecHeader_ *trec;       // STM transaction record 
   
 #ifdef TICKY_TICKY
   // TICKY-specific stuff would go here.
@@ -183,6 +184,8 @@ typedef struct StgTSO_ {
         BlockedOnBlackHole     the BLACKHOLE_BQ     the BLACKHOLE_BQ's queue
 	
         BlockedOnMVar          the MVAR             the MVAR's queue
+
+	BlockedOnSTM           END_TSO_QUEUE        STM wait queue(s)
 	
         BlockedOnException     the TSO              TSO->blocked_exception
 

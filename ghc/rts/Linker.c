@@ -388,9 +388,12 @@ typedef struct _RtsSymbolVal {
       SymX(__int_encodeDouble)			\
       SymX(__int_encodeFloat)			\
       SymX(andIntegerzh_fast)			\
+      SymX(atomicallyzh_fast)			\
       SymX(barf)				\
       SymX(blockAsyncExceptionszh_fast)		\
       SymX(catchzh_fast)			\
+      SymX(catchRetryzh_fast)			\
+      SymX(catchSTMzh_fast)			\
       SymX(closure_flags)                       \
       SymX(cmp_thread)				\
       SymX(cmpIntegerzh_fast)	        	\
@@ -445,6 +448,7 @@ typedef struct _RtsSymbolVal {
       SymX_redirect(newCAF, newDynCAF)		\
       SymX(newMVarzh_fast)			\
       SymX(newMutVarzh_fast)			\
+      SymX(newTVarzh_fast)			\
       SymX(atomicModifyMutVarzh_fast)		\
       SymX(newPinnedByteArrayzh_fast)		\
       SymX(orIntegerzh_fast)			\
@@ -458,10 +462,12 @@ typedef struct _RtsSymbolVal {
       SymX(quotRemIntegerzh_fast)		\
       SymX(raisezh_fast)			\
       SymX(raiseIOzh_fast)			\
+      SymX(readTVarzh_fast)			\
       SymX(remIntegerzh_fast)			\
       SymX(resetNonBlockingFd)			\
       SymX(resumeThread)			\
       SymX(resolveObjs)                         \
+      SymX(retryzh_fast)                        \
       SymX(rts_apply)				\
       SymX(rts_checkSchedStatus)		\
       SymX(rts_eval)				\
@@ -571,6 +577,7 @@ typedef struct _RtsSymbolVal {
       SymX(waitReadzh_fast)			\
       SymX(waitWritezh_fast)			\
       SymX(word2Integerzh_fast)			\
+      SymX(writeTVarzh_fast)			\
       SymX(xorIntegerzh_fast)			\
       SymX(yieldzh_fast)
 

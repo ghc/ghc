@@ -129,6 +129,13 @@ RTS_INFO(stg_AP_info);
 RTS_INFO(stg_AP_STACK_info);
 RTS_INFO(stg_dummy_ret_info);
 RTS_INFO(stg_raise_info);
+RTS_INFO(stg_TVAR_WAIT_QUEUE_info);
+RTS_INFO(stg_TVAR_info);
+RTS_INFO(stg_TREC_CHUNK_info);
+RTS_INFO(stg_TREC_HEADER_info);
+RTS_INFO(stg_END_STM_WAIT_QUEUE_info);
+RTS_INFO(stg_END_STM_CHUNK_LIST_info);
+RTS_INFO(stg_NO_TREC_info);
 
 RTS_ENTRY(stg_IND_entry);
 RTS_ENTRY(stg_IND_direct_entry);
@@ -182,6 +189,9 @@ RTS_ENTRY(stg_AP_entry);
 RTS_ENTRY(stg_AP_STACK_entry);
 RTS_ENTRY(stg_dummy_ret_entry);
 RTS_ENTRY(stg_raise_entry);
+RTS_ENTRY(stg_END_STM_WAIT_QUEUE_entry);
+RTS_ENTRY(stg_END_STM_CHUNK_LIST_entry);
+RTS_ENTRY(stg_NO_TREC_entry);
 
 
 RTS_ENTRY(stg_unblockAsyncExceptionszh_ret_ret);
@@ -197,6 +207,10 @@ RTS_CLOSURE(stg_END_MUT_LIST_closure);
 RTS_CLOSURE(stg_NO_FINALIZER_closure);
 RTS_CLOSURE(stg_dummy_ret_closure);
 RTS_CLOSURE(stg_forceIO_closure);
+
+RTS_CLOSURE(stg_END_STM_WAIT_QUEUE_closure);
+RTS_CLOSURE(stg_END_STM_CHUNK_LIST_closure);
+RTS_CLOSURE(stg_NO_TREC_closure);
 
 RTS_ENTRY(stg_NO_FINALIZER_entry);
 RTS_ENTRY(stg_END_EXCEPTION_LIST_entry);
@@ -543,5 +557,13 @@ RTS_FUN(mkForeignObjzh_fast);
 
 RTS_FUN(newBCOzh_fast);
 RTS_FUN(mkApUpd0zh_fast);
+
+RTS_FUN(retryzh_fast);
+RTS_FUN(catchRetryzh_fast);
+RTS_FUN(catchSTMzh_fast);
+RTS_FUN(atomicallyzh_fast);
+RTS_FUN(newTVarzh_fast);
+RTS_FUN(readTVarzh_fast);
+RTS_FUN(writeTVarzh_fast);
 
 #endif /* STGMISCCLOSURES_H */

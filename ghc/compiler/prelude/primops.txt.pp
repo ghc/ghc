@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.30 2003/10/01 10:57:39 wolfgang Exp $
+-- $Id: primops.txt.pp,v 1.31 2004/11/18 09:56:15 tharris Exp $
 --
 -- Primitive Operations
 --
@@ -1332,6 +1332,66 @@ primop  UnblockAsyncExceptionsOp "unblockAsyncExceptions#" GenPrimOp
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
    out_of_line = True
+
+------------------------------------------------------------------------
+section "STM-accessible Mutable Variables"
+------------------------------------------------------------------------
+
+primop	AtomicallyOp "atomically#" GenPrimOp
+      (State# RealWorld -> (# State# RealWorld, a #) )
+   -> State# RealWorld -> (# State# RealWorld, a #)
+   with
+   out_of_line = True
+   has_side_effects = True
+
+primop  RetryOp "retry#" GenPrimOp
+   State# RealWorld -> (# State# RealWorld, a #)
+   with 
+   out_of_line = True
+   has_side_effects = True
+
+primop  CatchRetryOp "catchRetry#" GenPrimOp
+      (State# RealWorld -> (# State# RealWorld, a #) )
+   -> (State# RealWorld -> (# State# RealWorld, a #) )
+   -> (State# RealWorld -> (# State# RealWorld, a #) )
+   with 
+   out_of_line = True
+   has_side_effects = True
+
+primop  CatchSTMOp "catchSTM#" GenPrimOp
+      (State# RealWorld -> (# State# RealWorld, a #) )
+   -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
+   -> (State# RealWorld -> (# State# RealWorld, a #) )
+   with 
+   out_of_line = True
+   has_side_effects = True
+
+primop	NewTVarOp "newTVar#" GenPrimOp
+       a
+    -> State# s -> (# State# s, TVar# s a #)
+   {Create a new Tar\# holding a specified initial value.}
+   with
+   out_of_line  = True
+
+primop	ReadTVarOp "readTVar#" GenPrimOp
+       TVar# s a
+    -> State# s -> (# State# s, a #)
+   {Read contents of TVar\#.  Result is not yet evaluated.}
+   with
+   out_of_line	= True
+
+primop	WriteTVarOp "writeTVar#" GenPrimOp
+       TVar# s a
+    -> a
+    -> State# s -> State# s
+   {Write contents of TVar\#.}
+   with
+   out_of_line	    = True
+   has_side_effects = True
+
+primop  SameTVarOp "sameTVar#" GenPrimOp
+   TVar# s a -> TVar# s a -> Bool
+
 
 ------------------------------------------------------------------------
 section "Synchronized Mutable Variables"

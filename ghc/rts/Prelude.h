@@ -38,6 +38,7 @@ extern StgClosure ZCMain_main_closure;
 PRELUDE_CLOSURE(GHCziIOBase_stackOverflow_closure);
 PRELUDE_CLOSURE(GHCziIOBase_heapOverflow_closure);
 PRELUDE_CLOSURE(GHCziIOBase_BlockedOnDeadMVar_closure);
+PRELUDE_CLOSURE(GHCziIOBase_BlockedIndefinitely_closure);
 PRELUDE_CLOSURE(GHCziIOBase_NonTermination_closure);
 
 PRELUDE_INFO(GHCziBase_Czh_static_info);
@@ -84,6 +85,7 @@ PRELUDE_INFO(GHCziStable_StablePtr_con_info);
 #define stackOverflow_closure     (&GHCziIOBase_stackOverflow_closure)
 #define heapOverflow_closure      (&GHCziIOBase_heapOverflow_closure)
 #define BlockedOnDeadMVar_closure (&GHCziIOBase_BlockedOnDeadMVar_closure)
+#define BlockedIndefinitely_closure (&GHCziIOBase_BlockedIndefinitely_closure)
 #define NonTermination_closure    (&GHCziIOBase_NonTermination_closure)
 
 #define Czh_static_info           (&GHCziBase_Czh_static_info)

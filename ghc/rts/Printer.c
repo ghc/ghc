@@ -718,7 +718,13 @@ static char *closure_type_names[] = {
     "FETCH_ME_BQ",
     "RBH",
     "EVACUATED",
-    "REMOTE_REF"
+    "REMOTE_REF",
+    "TVAR_WAIT_QUEUE",
+    "TVAR",
+    "TREC_CHUNK",
+    "TREC_HEADER",
+    "ATOMICALLY_FRAME",
+    "CATCH_RETRY_FRAME"
 };
 
 

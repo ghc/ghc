@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.26 2004/08/13 13:09:13 simonmar Exp $
+ * $Id: Constants.h,v 1.27 2004/11/18 09:56:19 tharris Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -222,18 +222,19 @@
 #define BlockedOnRead       4
 #define BlockedOnWrite      5
 #define BlockedOnDelay      6
+#define BlockedOnSTM        7
 
 /* Win32 only: */
-#define BlockedOnDoProc     7
+#define BlockedOnDoProc     8
 
 /* Only relevant for PAR: */
   /* blocked on a remote closure represented by a Global Address: */
-#define BlockedOnGA         8
+#define BlockedOnGA         9
   /* same as above but without sending a Fetch message */
-#define BlockedOnGA_NoSend  9
+#define BlockedOnGA_NoSend  10
 /* Only relevant for RTS_SUPPORTS_THREADS: */
-#define BlockedOnCCall      10
-#define BlockedOnCCall_NoUnblockExc 11
+#define BlockedOnCCall      11
+#define BlockedOnCCall_NoUnblockExc 12
    /* same as above but don't unblock async exceptions in resumeThread() */
 
 /*

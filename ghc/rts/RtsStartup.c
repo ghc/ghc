@@ -14,6 +14,7 @@
 #include "Storage.h"    /* initStorage, exitStorage */
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */
+#include "STM.h"        /* initSTM */
 #include "Signals.h"
 #include "Timer.h"      /* startTimer, stopTimer */
 #include "Weak.h"
@@ -218,6 +219,8 @@ hs_init(int *argc, char **argv[])
 #if defined(mingw32_TARGET_OS)
     startupAsyncIO();
 #endif
+
+    initSTM();
 
 #ifdef RTS_GTK_FRONTPANEL
     if (RtsFlags.GcFlags.frontpanel) {

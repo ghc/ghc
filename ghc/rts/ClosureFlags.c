@@ -92,5 +92,12 @@ StgWord16 closure_flags[] = {
 /* RBH                  = */ ( 	        _NS|         _MUT|_UPT           ),
 /* EVACUATED		= */ ( 0                                         ),
 /* REMOTE_REF		= */ (_HNF|     _NS|              _UPT           ),
+/* TVAR_WAIT_QUEUE      = */ (          _NS|         _MUT|_UPT           ),
+/* TVAR                 = */ (_HNF|     _NS|         _MUT|_UPT           ), 
+/* TREC_CHUNK           = */ (          _NS|         _MUT|_UPT           ),
+/* TREC_HEADER          = */ (          _NS|         _MUT|_UPT           ),
+/* ATOMICALLY_FRAME     = */ (     _BTM                                  ),
+/* CATCH_RETRY_FRAME    = */ (     _BTM                                  ),
+/* CATCH_STM_FRAME      = */ (     _BTM                                  ),
 /* STACK		= */ (_HNF|     _NS|         _MUT                )
 };

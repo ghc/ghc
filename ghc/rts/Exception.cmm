@@ -335,9 +335,34 @@ raisezh_fast
     }
 #endif
 
+retry_pop_stack:
     StgTSO_sp(CurrentTSO) = Sp;
     frame_type = foreign "C" raiseExceptionHelper(CurrentTSO "ptr", R1 "ptr");
     Sp = StgTSO_sp(CurrentTSO);
+    if (frame_type == ATOMICALLY_FRAME) {
+      /* The exception has reached the edge of a memory transaction.  Check that 
+       * the transaction is valid.  If not then perhaps the exception should
+       * not have been thrown: re-run the transaction */
+      W_ trec;
+      W_ r;
+      trec = StgTSO_trec(CurrentTSO);
+      r = foreign "C" stmValidateTransaction(trec "ptr");
+      foreign "C" stmAbortTransaction(trec "ptr");
+      StgTSO_trec(CurrentTSO) = NO_TREC;
+      if (r) {
+        // Transaction was valid: continue searching for a catch frame
+        Sp = Sp + SIZEOF_StgAtomicallyFrame;
+        goto retry_pop_stack;
+      } else {
+        // Transaction was not valid: we retry the exception (otherwise continue
+        // with a further call to raiseExceptionHelper)
+        "ptr" trec = foreign "C" stmStartTransaction(NO_TREC "ptr");
+        StgTSO_trec(CurrentTSO) = trec;
+        R1 = StgAtomicallyFrame_code(Sp);
+        Sp_adj(-1);
+        jump RET_LBL(stg_ap_v);
+      }          
+    }
 
     if (frame_type == STOP_FRAME) {
 	/* We've stripped the entire stack, the thread is now dead. */
@@ -350,10 +375,14 @@ raisezh_fast
 	jump StgReturn;
     }
 
-    /* Ok, Sp points to the enclosing CATCH_FRAME.  Pop everything down to
-     * and including this frame, update Su, push R1, and enter the handler.
+    /* Ok, Sp points to the enclosing CATCH_FRAME or CATCH_STM_FRAME.  Pop everything
+     * down to and including this frame, update Su, push R1, and enter the handler.
      */
-    handler = StgCatchFrame_handler(Sp);
+    if (frame_type == CATCH_FRAME) {
+      handler = StgCatchFrame_handler(Sp);
+    } else {
+      handler = StgCatchSTMFrame_handler(Sp);
+    }
 
     /* Restore the blocked/unblocked state for asynchronous exceptions
      * at the CATCH_FRAME.  
@@ -364,11 +393,14 @@ raisezh_fast
      */
     W_ frame;
     frame = Sp;
-    Sp = Sp + SIZEOF_StgCatchFrame;
-
-    if (StgCatchFrame_exceptions_blocked(frame) == 0) {
-      Sp_adj(-1);
-      Sp(0) = stg_unblockAsyncExceptionszh_ret_info;
+    if (frame_type == CATCH_FRAME) {
+      Sp = Sp + SIZEOF_StgCatchFrame;
+      if (StgCatchFrame_exceptions_blocked(frame) == 0) {
+        Sp_adj(-1);
+        Sp(0) = stg_unblockAsyncExceptionszh_ret_info;
+      }
+    } else {
+      Sp = Sp + SIZEOF_StgCatchSTMFrame;
     }
 
     /* Ensure that async excpetions are blocked when running the handler.

@@ -789,6 +789,7 @@ threadIdPrimTyConKey			= mkPreludeTyConUnique 72
 bcoPrimTyConKey				= mkPreludeTyConUnique 73
 ptrTyConKey				= mkPreludeTyConUnique 74
 funPtrTyConKey				= mkPreludeTyConUnique 75
+tVarPrimTyConKey		    	= mkPreludeTyConUnique 76
 
 -- Generic Type Constructors
 crossTyConKey		      		= mkPreludeTyConUnique 79

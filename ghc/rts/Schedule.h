@@ -63,6 +63,9 @@ void raiseAsyncWithLock(StgTSO *tso, StgClosure *exception);
 /* raiseExceptionHelper */
 StgWord raiseExceptionHelper (StgTSO *tso, StgClosure *exception);
 
+/* findRetryFrameHelper */
+StgWord findRetryFrameHelper (StgTSO *tso);
+
 /* awaitEvent(rtsBool wait)
  *
  * Checks for blocked threads that need to be woken.

@@ -300,6 +300,7 @@ SRC_HC_OPTS += \
   -\#include Schedule.h \
   -\#include Printer.h \
   -\#include Sanity.h \
+  -\#include STM.h \
   -\#include Storage.h \
   -\#include SchedAPI.h \
   -\#include Timer.h \

@@ -486,6 +486,7 @@ translateOp SameMutVarOp           = Just mo_wordEq
 translateOp SameMVarOp             = Just mo_wordEq
 translateOp SameMutableArrayOp     = Just mo_wordEq
 translateOp SameMutableByteArrayOp = Just mo_wordEq
+translateOp SameTVarOp             = Just mo_wordEq
 translateOp EqForeignObj           = Just mo_wordEq
 translateOp EqStablePtrOp          = Just mo_wordEq
 

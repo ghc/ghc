@@ -900,6 +900,438 @@ isCurrentThreadBoundzh_fast
   RET_N(r);
 }
 
+
+/* -----------------------------------------------------------------------------
+ * TVar primitives
+ * -------------------------------------------------------------------------- */
+
+#ifdef REG_R1
+#define SP_OFF 0
+#define IF_NOT_REG_R1(x) 
+#else
+#define SP_OFF 1
+#define IF_NOT_REG_R1(x) x
+#endif
+
+// Catch retry frame ------------------------------------------------------------
+
+
+#define CATCH_RETRY_FRAME_ENTRY_TEMPLATE(label,ret)                                       \
+   label                                                                                  \
+   {                                                                                      \
+      W_ r, frame, trec, outer;                                                           \
+      IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )                                 \
+                                                                                          \
+      frame = Sp;                                                                         \
+      trec = StgTSO_trec(CurrentTSO);                                                     \
+      "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr");                          \
+      r = foreign "C" stmCommitTransaction(trec "ptr");                                   \
+      if (r) {                                                                            \
+        /* Succeeded (either first branch or second branch) */                            \
+        StgTSO_trec(CurrentTSO) = outer;                                                  \
+        Sp = Sp + SIZEOF_StgCatchRetryFrame;                                              \
+        IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)                                          \
+        jump ret;                                                                         \
+      } else {                                                                            \
+        /* Did not commit: retry */                                                       \
+        W_ new_trec;                                                                      \
+        "ptr" new_trec = foreign "C" stmStartTransaction(outer "ptr");                    \
+        StgTSO_trec(CurrentTSO) = new_trec;                                               \
+        if (StgCatchRetryFrame_running_alt_code(frame)) {                                 \
+          R1 = StgCatchRetryFrame_alt_code(frame);                                        \
+        } else {                                                                          \
+          R1 = StgCatchRetryFrame_first_code(frame);                                      \
+          StgCatchRetryFrame_first_code_trec(frame) = new_trec;                           \
+        }                                                                                 \
+        Sp_adj(-1);                                                                       \
+        jump RET_LBL(stg_ap_v);                                                           \
+      }                                                                                   \
+   }
+
+CATCH_RETRY_FRAME_ENTRY_TEMPLATE(stg_catch_retry_frame_0_ret,%RET_VEC(Sp(SP_OFF),0))
+CATCH_RETRY_FRAME_ENTRY_TEMPLATE(stg_catch_retry_frame_1_ret,%RET_VEC(Sp(SP_OFF),1))
+CATCH_RETRY_FRAME_ENTRY_TEMPLATE(stg_catch_retry_frame_2_ret,%RET_VEC(Sp(SP_OFF),2))
+CATCH_RETRY_FRAME_ENTRY_TEMPLATE(stg_catch_retry_frame_3_ret,%RET_VEC(Sp(SP_OFF),3))
+CATCH_RETRY_FRAME_ENTRY_TEMPLATE(stg_catch_retry_frame_4_ret,%RET_VEC(Sp(SP_OFF),4))
+CATCH_RETRY_FRAME_ENTRY_TEMPLATE(stg_catch_retry_frame_5_ret,%RET_VEC(Sp(SP_OFF),5))
+CATCH_RETRY_FRAME_ENTRY_TEMPLATE(stg_catch_retry_frame_6_ret,%RET_VEC(Sp(SP_OFF),6))
+CATCH_RETRY_FRAME_ENTRY_TEMPLATE(stg_catch_retry_frame_7_ret,%RET_VEC(Sp(SP_OFF),7))
+
+#if MAX_VECTORED_RTN > 8
+#error MAX_VECTORED_RTN has changed: please modify stg_catch_retry_frame too.
+#endif
+
+#if defined(PROFILING)
+#define CATCH_RETRY_FRAME_BITMAP 7
+#define CATCH_RETRY_FRAME_WORDS  6
+#else
+#define CATCH_RETRY_FRAME_BITMAP 1
+#define CATCH_RETRY_FRAME_WORDS  4
+#endif
+
+INFO_TABLE_RET(stg_catch_retry_frame,
+	       CATCH_RETRY_FRAME_WORDS, CATCH_RETRY_FRAME_BITMAP,
+	       CATCH_RETRY_FRAME,
+	       stg_catch_retry_frame_0_ret,
+	       stg_catch_retry_frame_1_ret,
+	       stg_catch_retry_frame_2_ret,
+	       stg_catch_retry_frame_3_ret,
+	       stg_catch_retry_frame_4_ret,
+	       stg_catch_retry_frame_5_ret,
+	       stg_catch_retry_frame_6_ret,
+	       stg_catch_retry_frame_7_ret)
+CATCH_RETRY_FRAME_ENTRY_TEMPLATE(,%ENTRY_CODE(Sp(SP_OFF)))
+
+
+
+// Atomically frame -------------------------------------------------------------
+
+#define ATOMICALLY_FRAME_ENTRY_TEMPLATE(label,ret)                                       \
+   label                                                                                 \
+   {                                                                                     \
+      W_ frame, trec, valid;                                                             \
+      IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )                                \
+                                                                                         \
+      frame = Sp;                                                                        \
+      trec = StgTSO_trec(CurrentTSO);                                                    \
+      if (StgAtomicallyFrame_waiting(frame)) {                                           \
+        /* The TSO is currently waiting: should we stop waiting? */                      \
+        valid = foreign "C" stmReWait(trec "ptr");                                       \
+        if (valid) {                                                                     \
+          /* Previous attempt is still valid: no point trying again yet */               \
+          IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)                                       \
+          jump stg_block_noregs;                                                         \
+        } else {                                                                         \
+          /* Previous attempt is no longer valid: try again */                           \
+          "ptr" trec = foreign "C" stmStartTransaction(NO_TREC "ptr");                   \
+          StgTSO_trec(CurrentTSO) = trec;                                                \
+          StgAtomicallyFrame_waiting(frame) = 0; /* false; */                            \
+          R1 = StgAtomicallyFrame_code(frame);                                           \
+          Sp_adj(-1);                                                                    \
+          jump RET_LBL(stg_ap_v);                                                        \
+        }                                                                                \
+      } else {                                                                           \
+        /* The TSO is not currently waiting: try to commit the transaction */            \
+        valid = foreign "C" stmCommitTransaction(trec "ptr");                            \
+        if (valid) {                                                                     \
+          /* Transaction was valid: commit succeeded */                                  \
+          StgTSO_trec(CurrentTSO) = NO_TREC;                                             \
+          Sp = Sp + SIZEOF_StgAtomicallyFrame;                                           \
+          IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)                                       \
+          jump ret;                                                                      \
+        } else {                                                                         \
+          /* Transaction was not valid: try again */                                     \
+          "ptr" trec = foreign "C" stmStartTransaction(NO_TREC "ptr");                   \
+          StgTSO_trec(CurrentTSO) = trec;                                                \
+          R1 = StgAtomicallyFrame_code(frame);                                           \
+          Sp_adj(-1);                                                                    \
+          jump RET_LBL(stg_ap_v);                                                        \
+        }                                                                                \
+      }                                                                                  \
+   }
+
+ATOMICALLY_FRAME_ENTRY_TEMPLATE(stg_atomically_frame_0_ret,%RET_VEC(Sp(SP_OFF),0))
+ATOMICALLY_FRAME_ENTRY_TEMPLATE(stg_atomically_frame_1_ret,%RET_VEC(Sp(SP_OFF),1))
+ATOMICALLY_FRAME_ENTRY_TEMPLATE(stg_atomically_frame_2_ret,%RET_VEC(Sp(SP_OFF),2))
+ATOMICALLY_FRAME_ENTRY_TEMPLATE(stg_atomically_frame_3_ret,%RET_VEC(Sp(SP_OFF),3))
+ATOMICALLY_FRAME_ENTRY_TEMPLATE(stg_atomically_frame_4_ret,%RET_VEC(Sp(SP_OFF),4))
+ATOMICALLY_FRAME_ENTRY_TEMPLATE(stg_atomically_frame_5_ret,%RET_VEC(Sp(SP_OFF),5))
+ATOMICALLY_FRAME_ENTRY_TEMPLATE(stg_atomically_frame_6_ret,%RET_VEC(Sp(SP_OFF),6))
+ATOMICALLY_FRAME_ENTRY_TEMPLATE(stg_atomically_frame_7_ret,%RET_VEC(Sp(SP_OFF),7))
+
+#if MAX_VECTORED_RTN > 8
+#error MAX_VECTORED_RTN has changed: please modify stg_atomically_frame too.
+#endif
+
+#if defined(PROFILING)
+#define ATOMICALLY_FRAME_BITMAP 7
+#define ATOMICALLY_FRAME_WORDS  4
+#else
+#define ATOMICALLY_FRAME_BITMAP 1
+#define ATOMICALLY_FRAME_WORDS  2
+#endif
+
+INFO_TABLE_RET(stg_atomically_frame,
+	       ATOMICALLY_FRAME_WORDS, ATOMICALLY_FRAME_BITMAP,
+	       ATOMICALLY_FRAME,
+	       stg_atomically_frame_0_ret,
+	       stg_atomically_frame_1_ret,
+	       stg_atomically_frame_2_ret,
+	       stg_atomically_frame_3_ret,
+	       stg_atomically_frame_4_ret,
+	       stg_atomically_frame_5_ret,
+	       stg_atomically_frame_6_ret,
+	       stg_atomically_frame_7_ret)
+ATOMICALLY_FRAME_ENTRY_TEMPLATE(,%ENTRY_CODE(Sp(SP_OFF)))
+
+
+// STM catch frame --------------------------------------------------------------
+
+#define CATCH_STM_FRAME_ENTRY_TEMPLATE(label,ret)          \
+   label                                                   \
+   {                                                       \
+      IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )  \
+      Sp = Sp + SIZEOF_StgCatchSTMFrame;                   \
+      IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)             \
+      jump ret;                                            \
+   }
+
+#ifdef REG_R1
+#define SP_OFF 0
+#else
+#define SP_OFF 1
+#endif
+
+CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_0_ret,%RET_VEC(Sp(SP_OFF),0))
+CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_1_ret,%RET_VEC(Sp(SP_OFF),1))
+CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_2_ret,%RET_VEC(Sp(SP_OFF),2))
+CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_3_ret,%RET_VEC(Sp(SP_OFF),3))
+CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_4_ret,%RET_VEC(Sp(SP_OFF),4))
+CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_5_ret,%RET_VEC(Sp(SP_OFF),5))
+CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_6_ret,%RET_VEC(Sp(SP_OFF),6))
+CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_7_ret,%RET_VEC(Sp(SP_OFF),7))
+
+#if MAX_VECTORED_RTN > 8
+#error MAX_VECTORED_RTN has changed: please modify stg_catch_stm_frame too.
+#endif
+
+#if defined(PROFILING)
+#define CATCH_STM_FRAME_BITMAP 3
+#define CATCH_STM_FRAME_WORDS  3
+#else
+#define CATCH_STM_FRAME_BITMAP 0
+#define CATCH_STM_FRAME_WORDS  1
+#endif
+
+/* Catch frames are very similar to update frames, but when entering
+ * one we just pop the frame off the stack and perform the correct
+ * kind of return to the activation record underneath us on the stack.
+ */
+
+INFO_TABLE_RET(stg_catch_stm_frame,
+	       CATCH_STM_FRAME_WORDS, CATCH_STM_FRAME_BITMAP,
+	       CATCH_STM_FRAME,
+	       stg_catch_stm_frame_0_ret,
+	       stg_catch_stm_frame_1_ret,
+	       stg_catch_stm_frame_2_ret,
+	       stg_catch_stm_frame_3_ret,
+	       stg_catch_stm_frame_4_ret,
+	       stg_catch_stm_frame_5_ret,
+	       stg_catch_stm_frame_6_ret,
+	       stg_catch_stm_frame_7_ret)
+CATCH_STM_FRAME_ENTRY_TEMPLATE(,%ENTRY_CODE(Sp(SP_OFF)))
+
+
+// Primop definition ------------------------------------------------------------
+
+atomicallyzh_fast
+{
+  W_ frame;
+  W_ old_trec;
+  W_ new_trec;
+  
+  /* Args: R1 = m :: STM a */
+  STK_CHK_GEN(SIZEOF_StgAtomicallyFrame + WDS(1), R1_PTR, atomicallyzh_fast);
+
+  /* Set up the atomically frame */
+  Sp = Sp - SIZEOF_StgAtomicallyFrame;
+  frame = Sp;
+
+  SET_HDR(frame,stg_atomically_frame_info,CCCS);
+  StgAtomicallyFrame_waiting(frame) = 0; // False
+  StgAtomicallyFrame_code(frame) = R1;
+
+  /* Start the memory transcation */
+  old_trec = StgTSO_trec(CurrentTSO);
+  "ptr" new_trec = foreign "C" stmStartTransaction(old_trec "ptr");
+  StgTSO_trec(CurrentTSO) = new_trec;
+
+  /* Apply R1 to the realworld token */
+  Sp_adj(-1);
+  jump RET_LBL(stg_ap_v);
+}
+
+
+catchSTMzh_fast
+{
+  W_ frame;
+  
+  /* Args: R1 :: STM a */
+  /* Args: R2 :: Exception -> STM a */
+  STK_CHK_GEN(SIZEOF_StgCatchSTMFrame + WDS(1), R1_PTR & R2_PTR, catchSTMzh_fast);
+
+  /* Set up the catch frame */
+  Sp = Sp - SIZEOF_StgCatchSTMFrame;
+  frame = Sp;
+
+  SET_HDR(frame, stg_catch_stm_frame_info, CCCS);
+  StgCatchSTMFrame_handler(frame) = R2;
+
+  /* Apply R1 to the realworld token */
+  Sp_adj(-1);
+  jump RET_LBL(stg_ap_v);
+}
+
+
+catchRetryzh_fast
+{
+  W_ frame;
+  W_ new_trec;
+  W_ trec;
+
+  /* Args: R1 :: STM a */
+  /* Args: R2 :: STM a */
+  STK_CHK_GEN(SIZEOF_StgCatchRetryFrame + WDS(1), R1_PTR & R2_PTR, catchRetryzh_fast);
+
+  /* Start a nested transaction within which to run the first code */
+  trec = StgTSO_trec(CurrentTSO);
+  "ptr" new_trec = foreign "C" stmStartTransaction(trec "ptr");
+  StgTSO_trec(CurrentTSO) = new_trec;
+
+  /* Set up the catch-retry frame */
+  Sp = Sp - SIZEOF_StgCatchRetryFrame;
+  frame = Sp;
+  
+  SET_HDR(frame, stg_catch_retry_frame_info, CCCS);
+  StgCatchRetryFrame_running_alt_code(frame) = 0; // false;
+  StgCatchRetryFrame_first_code(frame) = R1;
+  StgCatchRetryFrame_alt_code(frame) = R2;
+  StgCatchRetryFrame_first_code_trec(frame) = new_trec;
+
+  /* Apply R1 to the realworld token */
+  Sp_adj(-1);
+  jump RET_LBL(stg_ap_v);  
+}
+
+
+retryzh_fast
+{
+  W_ frame_type;
+  W_ frame;
+  W_ trec;
+  W_ outer;
+  W_ r;
+
+  MAYBE_GC (NO_PTRS, readTVarzh_fast); // STM operations may allocate
+
+  // Find the enclosing ATOMICALLY_FRAME or CATCH_RETRY_FRAME
+retry_pop_stack:
+  trec = StgTSO_trec(CurrentTSO);
+  "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr");
+  StgTSO_sp(CurrentTSO) = Sp;
+  frame_type = foreign "C" findRetryFrameHelper(CurrentTSO "ptr");
+  Sp = StgTSO_sp(CurrentTSO);
+  frame = Sp;
+
+  if (frame_type == CATCH_RETRY_FRAME) {
+    // The retry reaches a CATCH_RETRY_FRAME before the atomic frame
+    ASSERT(outer != NO_TREC);
+    if (!StgCatchRetryFrame_running_alt_code(frame)) {
+      // Retry in the first code: try the alternative
+      "ptr" trec = foreign "C" stmStartTransaction(outer "ptr");
+      StgTSO_trec(CurrentTSO) = trec;
+      StgCatchRetryFrame_running_alt_code(frame) = 1; // true;
+      R1 = StgCatchRetryFrame_alt_code(frame);
+      Sp_adj(-1);
+      jump RET_LBL(stg_ap_v);
+    } else {
+      // Retry in the alternative code: propagate
+      W_ other_trec;
+      other_trec = StgCatchRetryFrame_first_code_trec(frame);
+      r = foreign "C" stmMergeForWaiting(trec "ptr", other_trec "ptr");
+      if (r) {
+        // Merge between siblings succeeded: commit it back to enclosing transaction
+        // and then propagate the retry
+        r = foreign "C" stmCommitTransaction(trec "ptr");
+        StgTSO_trec(CurrentTSO) = outer;
+        Sp = Sp + SIZEOF_StgCatchRetryFrame;
+        goto retry_pop_stack;
+      } else {
+        // Merge failed: we musn't propagate the retry.  Try both paths again.
+        "ptr" trec = foreign "C" stmStartTransaction(outer "ptr");
+        StgCatchRetryFrame_first_code_trec(frame) = trec;
+        StgCatchRetryFrame_running_alt_code(frame) = 0; // false;
+        StgTSO_trec(CurrentTSO) = trec;
+        R1 = StgCatchRetryFrame_first_code(frame);
+        Sp_adj(-1);
+        jump RET_LBL(stg_ap_v);
+      }
+    }
+  }
+
+  // We've reached the ATOMICALLY_FRAME: attempt to wait 
+  ASSERT(frame_type == ATOMICALLY_FRAME);
+  ASSERT(outer == NO_TREC);
+  r = foreign "C" stmWait(CurrentTSO "ptr", trec "ptr");
+  if (r) {
+    // Transaction was valid: stmWait put us on the TVars' queues, we now block
+    StgAtomicallyFrame_waiting(frame) = 1; // true
+    Sp = frame;
+    jump stg_block_noregs;
+  } else {
+    // Transaction was not valid: retry immediately
+    "ptr" trec = foreign "C" stmStartTransaction(outer "ptr");
+    StgTSO_trec(CurrentTSO) = trec;
+    R1 = StgAtomicallyFrame_code(frame);
+    Sp = frame;
+    Sp_adj(-1);
+    jump RET_LBL(stg_ap_v);
+  }
+}
+
+
+newTVarzh_fast
+{
+  W_ tv;
+
+  /* Args: R1 = initialisation value */
+
+  ALLOC_PRIM( SIZEOF_StgTVar, R1_PTR, newTVarzh_fast);
+  tv = Hp - SIZEOF_StgTVar + WDS(1);
+  SET_HDR(tv,stg_TVAR_info,W_[CCCS]);
+  StgTVar_current_value(tv) = R1;
+  StgTVar_first_wait_queue_entry(tv) = stg_END_STM_WAIT_QUEUE_closure;
+    
+  RET_P(tv);
+}
+
+
+readTVarzh_fast
+{
+  W_ trec;
+  W_ tvar;
+  W_ result;
+
+  /* Args: R1 = TVar closure */
+
+  MAYBE_GC (R1_PTR, readTVarzh_fast); // Call to stmReadTVar may allocate
+  trec = StgTSO_trec(CurrentTSO);
+  tvar = R1;
+  "ptr" result = foreign "C" stmReadTVar(trec "ptr", tvar "ptr");
+
+  RET_P(result);
+}
+
+
+writeTVarzh_fast
+{
+  W_ trec;
+  W_ tvar;
+  W_ new_value;
+  
+  /* Args: R1 = TVar closure */
+  /*       R2 = New value    */
+
+  MAYBE_GC (R1_PTR & R2_PTR, writeTVarzh_fast); // Call to stmWriteTVar may allocate
+  trec = StgTSO_trec(CurrentTSO);
+  tvar = R1;
+  new_value = R2;
+  foreign "C" stmWriteTVar(trec "ptr", tvar "ptr", new_value "ptr");
+
+  jump %ENTRY_CODE(Sp(0));
+}
+
+
 /* -----------------------------------------------------------------------------
  * MVar primitives
  *

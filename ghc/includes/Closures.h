@@ -308,6 +308,93 @@ typedef struct {
   StgClosure*     value;
 } StgMVar;
 
+/* STM data structures
+ *
+ *  StgTVar defines the only type that can be updated through the STM
+ *  interface.
+ * 
+ *  Note that various optimisations may be possible in order to use less
+ *  space for these data structures at the cost of more complexity in the
+ *  implementation:
+ *
+ *   - In StgTVar, current_value and first_wait_queue_entry could be held in
+ *     the same field: if any thread is waiting then its expected_value for
+ *     the tvar is the current value.  
+ *
+ *   - In StgTRecHeader, it might be worthwhile having separate chunks
+ *     of read-only and read-write locations.  This would save a
+ *     new_value field in the read-only locations.
+ */
+
+typedef struct StgTVarWaitQueue_ {
+  StgHeader                  header;
+  struct StgTSO_            *waiting_tso;
+  StgMutClosure             *mut_link;
+  struct StgTVarWaitQueue_  *next_queue_entry;
+  struct StgTVarWaitQueue_  *prev_queue_entry;
+} StgTVarWaitQueue;
+
+typedef struct {
+  StgHeader                  header;
+  StgClosure                *current_value;
+  StgMutClosure             *mut_link;
+  StgTVarWaitQueue          *first_wait_queue_entry;
+} StgTVar;
+
+// new_value == expected_value for read-only accesses
+// new_value is a StgTVarWaitQueue entry when trec in state TREC_WAITING
+typedef struct {
+  StgTVar                   *tvar;
+  StgClosure                *expected_value;
+  StgClosure                *new_value; 
+} TRecEntry;
+
+#define TREC_CHUNK_NUM_ENTRIES 256
+
+typedef struct StgTRecChunk_ {
+  StgHeader                  header;
+  struct StgTRecChunk_      *prev_chunk;
+  StgMutClosure             *mut_link;
+  StgWord                    next_entry_idx;
+  TRecEntry                  entries[TREC_CHUNK_NUM_ENTRIES];
+} StgTRecChunk;
+
+typedef enum { 
+  TREC_ACTIVE,        // Transaction in progress, outcome undecided
+  TREC_CANNOT_COMMIT, // Transaction in progress, inconsistent writes performed
+  TREC_MUST_ABORT,    // Transaction in progress, inconsistent / out of date reads
+  TREC_COMMITTED,     // Transaction has committed, now updating tvars
+  TREC_ABORTED,       // Transaction has aborted, now reverting tvars
+  TREC_WAITING,       // Transaction currently waiting
+} TRecState;
+
+typedef struct StgTRecHeader_ {
+  StgHeader                  header;
+  TRecState                  state;
+  StgMutClosure             *mut_link;
+  struct StgTRecHeader_     *enclosing_trec;
+  StgTRecChunk              *current_chunk;
+} StgTRecHeader;
+
+typedef struct {
+    StgHeader   header;
+    StgBool     waiting;
+    StgClosure *code;
+} StgAtomicallyFrame;
+
+typedef struct {
+    StgHeader   header;
+    StgClosure *handler;
+} StgCatchSTMFrame;
+
+typedef struct {
+    StgHeader      header;
+    StgBool        running_alt_code;
+    StgClosure    *first_code;
+    StgClosure    *alt_code;
+    StgTRecHeader *first_code_trec;
+} StgCatchRetryFrame;
+
 #if defined(PAR) || defined(GRAN)
 /*
   StgBlockingQueueElement is a ``collective type'' representing the types

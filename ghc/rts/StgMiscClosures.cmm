@@ -567,6 +567,37 @@ INFO_TABLE(stg_FULL_MVAR,4,0,MVAR,"MVAR","MVAR")
 INFO_TABLE(stg_EMPTY_MVAR,4,0,MVAR,"MVAR","MVAR")
 { foreign "C" barf("EMPTY_MVAR object entered!"); }
 
+/* -----------------------------------------------------------------------------
+   STM
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_TVAR, 0, 0, TVAR, "TVAR", "TVAR")
+{ foreign "C" barf("TVAR object entered!"); }
+
+INFO_TABLE(stg_TVAR_WAIT_QUEUE, 0, 0, TVAR_WAIT_QUEUE, "TVAR_WAIT_QUEUE", "TVAR_WAIT_QUEUE")
+{ foreign "C" barf("TVAR_WAIT_QUEUE object entered!"); }
+
+INFO_TABLE(stg_TREC_CHUNK, 0, 0, TREC_CHUNK, "TREC_CHUNK", "TREC_CHUNK")
+{ foreign "C" barf("TREC_CHUNK object entered!"); }
+
+INFO_TABLE(stg_TREC_HEADER, 0, 0, TREC_HEADER, "TREC_HEADER", "TREC_HEADER")
+{ foreign "C" barf("TREC_HEADER object entered!"); }
+
+INFO_TABLE_CONSTR(stg_END_STM_WAIT_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_STM_WAIT_QUEUE","END_STM_WAIT_QUEUE")
+{ foreign "C" barf("END_STM_WAIT_QUEUE object entered!"); }
+
+INFO_TABLE_CONSTR(stg_END_STM_CHUNK_LIST,0,0,0,CONSTR_NOCAF_STATIC,"END_STM_CHUNK_LIST","END_STM_CHUNK_LIST")
+{ foreign "C" barf("END_STM_CHUNK_LIST object entered!"); }
+
+INFO_TABLE_CONSTR(stg_NO_TREC,0,0,0,CONSTR_NOCAF_STATIC,"NO_TREC","NO_TREC")
+{ foreign "C" barf("NO_TREC object entered!"); }
+
+CLOSURE(stg_END_STM_WAIT_QUEUE_closure,stg_END_STM_WAIT_QUEUE);
+
+CLOSURE(stg_END_STM_CHUNK_LIST_closure,stg_END_STM_CHUNK_LIST);
+
+CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
+
 /* ----------------------------------------------------------------------------
    END_TSO_QUEUE
 

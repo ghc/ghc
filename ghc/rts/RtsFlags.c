@@ -1,3 +1,4 @@
+
 /* -----------------------------------------------------------------------------
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
@@ -183,6 +184,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.block_alloc	= rtsFalse;
     RtsFlags.DebugFlags.sanity		= rtsFalse;
     RtsFlags.DebugFlags.stable		= rtsFalse;
+    RtsFlags.DebugFlags.stm             = rtsFalse;
     RtsFlags.DebugFlags.prof		= rtsFalse;
     RtsFlags.DebugFlags.gran		= rtsFalse;
     RtsFlags.DebugFlags.par		= rtsFalse;
@@ -424,6 +426,7 @@ usage_text[] = {
 "  -Dr  DEBUG: gran",
 "  -DP  DEBUG: par",
 "  -Dl  DEBUG: linker",
+"  -Dm  DEBUG: stm",
 "",
 #endif // DEBUG
 #if defined(SMP)
@@ -728,6 +731,9 @@ error = rtsTrue;
 			  break;
 		      case 'a':
 			  RtsFlags.DebugFlags.apply = rtsTrue;
+			  break;
+		      case 'm':
+			  RtsFlags.DebugFlags.stm = rtsTrue;
 			  break;
 		      default:
 			  bad_option( rts_argv[arg] );

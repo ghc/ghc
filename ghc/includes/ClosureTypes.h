@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.18 2002/12/11 15:36:37 simonmar Exp $
+ * $Id: ClosureTypes.h,v 1.19 2004/11/18 09:56:17 tharris Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -79,6 +79,13 @@
 #define RBH                     63
 #define EVACUATED               64
 #define REMOTE_REF              65
-#define N_CLOSURE_TYPES         66
+#define TVAR_WAIT_QUEUE         66
+#define TVAR                    67
+#define TREC_CHUNK              68
+#define TREC_HEADER             69
+#define ATOMICALLY_FRAME        70
+#define CATCH_RETRY_FRAME       71
+#define CATCH_STM_FRAME         72
+#define N_CLOSURE_TYPES         73
 				
 #endif /* CLOSURETYPES_H */

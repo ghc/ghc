@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.46 2004/08/13 13:09:29 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.47 2004/11/18 09:56:20 tharris Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -60,6 +60,7 @@ struct DEBUG_FLAGS {
     rtsBool par;            // 'P'
     rtsBool linker;         // 'l'   the object linker
     rtsBool apply;          // 'a'
+    rtsBool stm;            // 'm'
 };
 
 struct COST_CENTRE_FLAGS {
