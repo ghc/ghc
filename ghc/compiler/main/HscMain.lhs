@@ -18,9 +18,10 @@ import ByteCodeGen	( byteCodeGen )
 import CoreTidy		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
 import Rename		( renameStmt, renameRdrName )
-import RdrName          ( mkUnqual, mkQual )
+import RdrName          ( rdrNameOcc, setRdrNameOcc )
 import RdrHsSyn		( RdrNameStmt )
-import OccName          ( varName, dataName, tcClsName )
+import OccName          ( dataName, tcClsName, 
+			  occNameSpace, setOccNameSpace )
 import Type		( Type )
 import Id		( Id, idName, setGlobalIdDetails )
 import IdInfo		( GlobalIdDetails(VanillaGlobal) )
@@ -623,22 +624,23 @@ hscThing dflags hst hit pcs0 icontext str
    = do let 
 	  InteractiveContext {
 	     ic_rn_env   = rn_env,
-	     ic_type_env = type_env,
 	     ic_module   = scope_mod } = icontext
 
-	  rdr_names
-	     | '.' `elem` str 
-		= [ mkQual ns (fmod,fvar) | ns <- namespaces var ]
-	     | otherwise
-		= [ mkUnqual ns fstr | ns <- namespaces str ]
- 	     where (mod,var) = split_longest_prefix str '.'
-		   fmod = mkFastString mod
-		   fvar = mkFastString var
-		   fstr = mkFastString str
-	  	   namespaces s 
-			| isUpper c || c == ':' = [ tcClsName, dataName ]
-			| otherwise             = [ varName ]
-		        where c = head s
+	maybe_rdr_name <- myParseIdentifier dflags str
+	case maybe_rdr_name of {
+	  Nothing -> return (pcs0, []);
+	  Just rdr_name -> do
+
+	-- if the identifier is a constructor (begins with an
+	-- upper-case letter), then we need to consider both
+	-- constructor and type class identifiers.
+	let rdr_names
+		| occNameSpace occ == dataName = [ rdr_name, tccls_name ]
+		| otherwise                    = [ rdr_name ]
+	      where
+		occ        = rdrNameOcc rdr_name
+		tccls_occ  = setOccNameSpace occ tcClsName
+		tccls_name = setRdrNameOcc rdr_name tccls_occ
 
 	(pcs, unqual, maybe_rn_result) <- 
 	   renameRdrName dflags hit hst pcs0 scope_mod scope_mod 
@@ -657,7 +659,25 @@ hscThing dflags hst hit pcs0 icontext str
 		let maybe_ty_things = map (lookupType hst (pcs_PTE pcs)) names
 		in
 		return (pcs, catMaybes maybe_ty_things) }
-        }}
+        }}}
+
+myParseIdentifier dflags str
+  = do buf <- stringToStringBuffer str
+ 
+       let glaexts | dopt Opt_GlasgowExts dflags = 1#
+		   | otherwise			 = 0#
+
+       case parseIdentifier buf 
+		PState{ bol = 0#, atbol = 1#,
+ 		        context = [], glasgow_exts = glaexts,
+		        loc = mkSrcLoc SLIT("<interactive>") 1 } of
+
+	  PFailed err -> do { hPutStrLn stderr (showSDoc err);
+           		      freeStringBuffer buf;
+                              return Nothing }
+
+	  POk _ rdr_name -> do { --should, but can't: freeStringBuffer buf;
+			         return (Just rdr_name) }
 #endif
 \end{code}
 
