@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.88 2001/12/05 17:21:43 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.89 2001/12/10 01:21:17 sebc Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1039,7 +1039,7 @@ AC_DEFUN(FPTOOLS_CHECK_LIBM,
 [AC_REQUIRE([AC_CANONICAL_HOST])dnl
 LIBM=
 case "$host" in
-*-*-beos* | *-*-macosx*)
+*-*-beos*)
   # These system don't have libm
   ;;
 *-ncr-sysv4.3*)
