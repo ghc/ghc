@@ -60,7 +60,7 @@ import Directory        ( getModificationTime, doesFileExist )
 import IO
 import Monad
 import List		( nub )
-import Maybe		( catMaybes, fromMaybe, isJust )
+import Maybe		( catMaybes, fromMaybe, isJust, maybeToList )
 \end{code}
 
 
@@ -180,9 +180,13 @@ cmLoadModule cmstate1 rootname
         let pcms1     = pcms   cmstate1
         let pls1      = pls    cmstate1
         let pcs1      = pcs    cmstate1
+	-- mg1 is the complete (home) set of summaries from the
+        -- previous pass of cmLoadModule, if there was one.
         let mg1       = mg     pcms1
         let hst1      = hst    pcms1
         let hit1      = hit    pcms1
+	-- similarly, ui1 is the (complete) set of linkables from
+	-- the previous pass, if any.
         let ui1       = ui     pcms1
    
         let ghci_mode = gmode pcms1 -- this never changes
@@ -227,56 +231,32 @@ cmLoadModule cmstate1 rootname
         --        | batch = linkable exists on disk, and is younger 
         --                  than source.
 
-        let mkStableSet :: [ModuleName] -- accumulating stable modules
-                        -> [Linkable]   -- their linkables, in batch mode
-                        -> [[ModSummary]] 
-                        -> IO ([ModuleName], [Linkable])
-            mkStableSet stable lis [] = return (stable, lis)
-            mkStableSet stable lis (scc:sccs)
-               = do let scc_allhomeimps :: [ModuleName]
-                        scc_allhomeimps 
-                           = nub (
-                                filter (`elem` mg2unsorted_names)
-                                   (concatMap (\m -> ms_srcimps m ++ ms_imps m) scc))
-                        all_imports_in_scc_or_stable
-                           = all in_stable_or_scc scc_allhomeimps
-                        scc_names
-                           = map name_of_summary scc
-                        in_stable_or_scc m
-                           = m `elem` scc_names || m `elem` stable
-                    (all_scc_stable, more_lis)
-                       <- if   not all_imports_in_scc_or_stable
-                          then do --putStrLn ("PART1 fail " ++ showSDoc (ppr scc_allhomeimps <+> ppr (filter (not.in_stable_or_scc) scc_allhomeimps)))
-                                  return (False, [])
-                          else do bools_n_lis <- mapM (good_enough ghci_mode mg1) scc
-                                  let (bools, liss) = unzip bools_n_lis
-                                  return (and bools, concat liss)
-                    if not all_scc_stable
-                     then mkStableSet stable lis sccs
-                     else mkStableSet (scc_names++stable) (more_lis++lis) sccs
-
-        (stable_mods, linkables_for_stable_mods_BATCH_ONLY)
-           <- --return ([],[]) 
-              mkStableSet [] [] (map flattenSCC mg2_with_srcimps)
+        (stable_mods, linkables_for_stable_mods)
+           <- preUpsweep ghci_mode ui1 mg1 mg2unsorted_names [] [] mg2_with_srcimps
+        let stable_old_summaries
+               = concatMap (findInSummaries mg1) stable_mods
 
         when (verb >= 2) $
-           putStrLn ("STABLE MODS: " ++ show (map moduleNameUserString stable_mods))
+           putStrLn (showSDoc (text "STABLE MODULES:" 
+                               <+> sep (map (text.moduleNameUserString) stable_mods)))
 
-        let (hst2, hit2, ui2)
-               = retainInTopLevelEnvs stable_mods (hst1, hit1, ui1)
+
+        let (hst2, hit2, [])
+               = retainInTopLevelEnvs stable_mods (hst1, hit1, [])
+            ui2 
+               = linkables_for_stable_mods
+
+	-- Now hst2, hit2, ui2 now hold the 'reduced system', just the set of
+	-- modules which are stable.
+
+        -- We could at this point detect cycles which aren't broken by
+        -- a source-import, and complain immediately, but it seems better 
+        -- to let upsweep_mods do this, so at least some useful work gets 
+        -- done before the upsweep is abandoned.
         let upsweep_these
-               = filter (\scc -> case scc of 
-                                   AcyclicSCC m -> name_of_summary m `notElem` stable_mods)
-                 mg2
-
-        -- In batch mode, we need to pre-load UI with linkables for 
-        -- modules in the stable set, since there is no other way for
-        -- them to be there.  In interactive mode, we re-use the 
-        -- linkables retained from ui1, generated in the previous
-        -- sweep.
-        let ui2a | ghci_mode == Interactive = ui2
-                 | ghci_mode == Batch       = ASSERT(null ui2) 
-                                              linkables_for_stable_mods_BATCH_ONLY
+               = filter (\scc -> any (`notElem` stable_mods) 
+                                     (map name_of_summary (flattenSCC scc)))
+                        mg2
 
         --hPutStrLn stderr "after tsort:\n"
         --hPutStrLn stderr (showSDoc (vcat (map ppr mg2)))
@@ -291,15 +271,24 @@ cmLoadModule cmstate1 rootname
 
         let threaded2 = CmThreaded pcs1 hst2 hit2
 
-        (upsweep_complete_success, threaded3, modsDone, newLis)
-           <- upsweep_mods ghci_mode dflags ui2 reachable_from threaded2 upsweep_these
+        (upsweep_complete_success, threaded3, modsUpswept, newLis)
+           <- upsweep_mods ghci_mode dflags ui2 reachable_from 
+                           threaded2 upsweep_these
 
-        let ui3 = add_to_ui ui2a newLis
+        let ui3 = add_to_ui ui2 newLis
         let (CmThreaded pcs3 hst3 hit3) = threaded3
 
-        -- At this point, modsDone and newLis should have the same
+        -- At this point, modsUpswept and newLis should have the same
         -- length, so there is one new (or old) linkable for each 
         -- mod which was processed (passed to compile).
+
+	-- Make modsDone be the summaries for each home module now
+	-- available; this should equal the domains of hst3 and hit3.
+	-- (NOT STRICTLY TRUE if an interactive session was started
+	--  with some object on disk ???)
+        -- Get in in a roughly top .. bottom order (hence reverse).
+
+        let modsDone = reverse modsUpswept ++ stable_old_summaries
 
         -- Try and do linking in some form, depending on whether the
         -- upsweep was completely or only partially successful.
@@ -309,11 +298,9 @@ cmLoadModule cmstate1 rootname
          then 
            -- Easy; just relink it all.
            do when (verb >= 2) $ 
-		hPutStrLn stderr "Upsweep completely successful."
+		 hPutStrLn stderr "Upsweep completely successful."
               linkresult 
-                 <- link ghci_mode dflags 
-			a_root_is_Main --(any exports_main (moduleEnvElts hst3)) 
-                        ui3 pls1
+                 <- link ghci_mode dflags a_root_is_Main ui3 pls1
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (1)"
@@ -324,7 +311,7 @@ cmLoadModule cmstate1 rootname
                           let cmstate3 
                                  = CmState { pcms=pcms3, pcs=pcs3, pls=pls3 }
                           return (cmstate3, True, 
-                                  reverse (map name_of_summary modsDone))
+                                  map name_of_summary modsDone)
 
          else 
            -- Tricky.  We need to back out the effects of compiling any
@@ -359,20 +346,89 @@ cmLoadModule cmstate1 rootname
                                                           gmode=ghci_mode }
                           let cmstate4 
                                  = CmState { pcms=pcms4, pcs=pcs3, pls=pls4 }
-                          return (cmstate4, False, reverse mods_to_keep_names)
+                          return (cmstate4, False, 
+                                  mods_to_keep_names)
 
 
 
-good_enough :: GhciMode -> [ModSummary] -> ModSummary -> IO (Bool, [Linkable])
-good_enough ghci_mode old_summaries new_summary
-   | ghci_mode == Interactive
+-- Do a pre-upsweep without use of "compile", to establish a 
+-- (downward-closed) set of stable modules which can be retained
+-- in the top-level environments.  Also return linkables for those 
+-- modules determined to be stable, since (in Batch mode, at least)
+-- there's no other way for them to get into UI.
+preUpsweep :: GhciMode
+           -> [Linkable]	-- linkables from previous cmLoadModule pass
+				-- should be [] in batch mode
+           -> [ModSummary]      -- summaries from previous cmLoadModule pass
+				-- should be [] in batch mode
+           -> [ModuleName]      -- names of all mods encountered in downsweep
+           -> [ModuleName]      -- accumulating stable modules
+           -> [Linkable]        -- their linkables, in batch mode
+           -> [SCC ModSummary]  -- scc-ified mod graph, including src imps
+           -> IO ([ModuleName], [Linkable])
+				-- stable modules and their linkables
+
+preUpsweep ghci_mode old_lis old_summaries all_home_mods stable lis [] 
+   = return (stable, lis)
+preUpsweep ghci_mode old_lis old_summaries all_home_mods stable lis (scc0:sccs)
+   = do let scc = flattenSCC scc0
+            scc_allhomeimps :: [ModuleName]
+            scc_allhomeimps 
+               = nub (filter (`elem` all_home_mods) (concatMap ms_allimps scc))
+            all_imports_in_scc_or_stable
+               = all in_stable_or_scc scc_allhomeimps
+            scc_names
+               = map name_of_summary scc
+            in_stable_or_scc m
+               = --trace (showSDoc (text "ISOS" <+> ppr m <+> ppr scc_names <+> ppr stable)) (
+                 m `elem` scc_names || m `elem` stable
+                 --)
+        (all_scc_stable, more_lis)
+           <- if   not all_imports_in_scc_or_stable
+               then do --putStrLn ("PART1 fail " ++ showSDoc (ppr scc_allhomeimps <+> ppr (filter (not.in_stable_or_scc) scc_allhomeimps)))
+                       return (False, [])
+               else do bools_n_lis 
+                          <- mapM (is_stable ghci_mode old_lis old_summaries) scc
+                       let (bools, liss) = unzip bools_n_lis
+                       --when (not (and bools)) (putStrLn ("PART2 fail: " ++ showSDoc (ppr scc_names)))
+                       return (and bools, concat liss)
+        if not all_scc_stable
+         then preUpsweep ghci_mode old_lis old_summaries all_home_mods stable lis sccs
+         else preUpsweep ghci_mode old_lis old_summaries all_home_mods 
+                         (scc_names++stable) (more_lis++lis) sccs
+
+
+-- Helper for preUpsweep.  Assuming that new_summary's imports are all
+-- stable (in the sense of preUpsweep), determine if new_summary is itself
+-- stable, and, if so, in batch mode, return its linkable.
+findInSummaries :: [ModSummary] -> ModuleName -> [ModSummary]
+findInSummaries old_summaries mod_name
+   = [s | s <- old_summaries, name_of_summary s == mod_name]
+
+is_stable :: GhciMode 
+          -> [Linkable] -> [ModSummary] -- OLD lis and summs, in Interactive mode
+          -> ModSummary			-- this module
+          -> IO (Bool, [Linkable])
+
+is_stable Interactive old_lis old_summaries new_summary
+   -- Only true if the old summary exists and
+   -- the new source date matches the old one.
    = case found_old_summarys of
-        [] -> return (False, bomb)
-        [old_summary]
+        [] -> return (False, old_linkable)
+        (old_summary:_)
            -> case (ms_hs_date new_summary, ms_hs_date old_summary) of
-                 (Just d1, Just d2) -> return (d1 == d2, bomb)
-                 (_,       _      ) -> return (False, bomb)
-   | ghci_mode == Batch
+                 (Just d1, Just d2) -> return (d1 == d2, old_linkable)
+                 (_,       _      ) -> return (False, old_linkable)
+     where
+        old_linkable
+           = maybeToList
+                (findModuleLinkable_maybe old_lis (name_of_summary new_summary))
+        found_old_summarys
+           = findInSummaries old_summaries (name_of_summary new_summary)
+
+is_stable Batch [] [] new_summary
+   -- Only true if we can find a linkable, and it is younger than
+   -- the source time.
    = case ms_hs_date new_summary of
         Nothing -> return (False, [])  -- no source date (?!)
         Just hs_time 
@@ -384,12 +440,7 @@ good_enough ghci_mode old_summaries new_summary
                       case maybe_li of
                          Nothing -> return (False, []) -- no object file on disk
                          Just li -> return (linkableTime li >= hs_time, [li])
-   where
-      bomb
-         = panic "good_enough: inappropriate request for batch linkables"
-      found_old_summarys
-         = [s | s <- old_summaries, 
-                name_of_summary s == name_of_summary new_summary]
+
 
 
 -- Return (names of) all those in modsDone who are part of a cycle
@@ -472,7 +523,7 @@ upsweep_mods ghci_mode dflags oldUI reachable_from threaded
 
         (threaded1, maybe_linkable) 
            <- upsweep_mod ghci_mode dflags oldUI threaded mod 
-                          (reachable_from (name_of_summary mod)) 
+                          (reachable_from (name_of_summary mod))
         case maybe_linkable of
            Just linkable 
               -> -- No errors; do the rest
@@ -554,7 +605,9 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
                = not compilation_mandatory
 
             (hst1_strictDC, hit1_strictDC, [])
-               = retainInTopLevelEnvs reachable_from_here (hst1,hit1,[])
+               = retainInTopLevelEnvs 
+                    (filter (/= (name_of_summary summary1)) reachable_from_here)
+                    (hst1,hit1,[])
 
             old_linkable 
                = unJust "upsweep_mod:old_linkable" maybe_old_linkable
@@ -634,8 +687,7 @@ retainInTopLevelEnvs keep_these (hst, hit, ui)
 downwards_closure_of_module :: [ModSummary] -> ModuleName -> [ModuleName]
 downwards_closure_of_module summaries root
    = let toEdge :: ModSummary -> (ModuleName,[ModuleName])
-         toEdge summ
-             = (name_of_summary summ, ms_srcimps summ ++ ms_imps summ)
+         toEdge summ = (name_of_summary summ, ms_allimps summ)
          res = simple_transitive_closure (map toEdge summaries) [root]             
      in
          --trace (showSDoc (text "DC of mod" <+> ppr root

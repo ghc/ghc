@@ -7,7 +7,7 @@
 module CmTypes ( 
    Unlinked(..),  isObject, nameOfObject, isInterpretable,
    Linkable(..), linkableTime,
-   ModSummary(..), name_of_summary, pprSummaryTime
+   ModSummary(..), ms_allimps, name_of_summary, pprSummaryTime
   ) where
 
 import Interpreter
@@ -87,6 +87,9 @@ instance Outputable ModSummary where
 
 pprSummaryTime ms
    = text "ms_hs_date = " <> parens (text (show (ms_hs_date ms)))
+
+ms_allimps ms 
+   = ms_srcimps ms ++ ms_imps ms
 
 name_of_summary :: ModSummary -> ModuleName
 name_of_summary = moduleName . ms_mod
