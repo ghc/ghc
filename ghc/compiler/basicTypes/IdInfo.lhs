@@ -351,19 +351,6 @@ setUnfoldingInfoLazily info uf 	-- Lazy variant to avoid looking at the
     info { unfoldingInfo = uf }	-- (In this case the demand-zapping is redundant.)
 
 setUnfoldingInfo info uf 
-  | isEvaldUnfolding uf
-	-- If the unfolding is a value, the demand info may
-	-- go pear-shaped, so we nuke it.  Example:
-	--	let x = (a,b) in
-	--	case x of (p,q) -> h p q x
-	-- Here x is certainly demanded. But after we've nuked
-	-- the case, we'll get just
-	--	let x = (a,b) in h a b x
-	-- and now x is not demanded (I'm assuming h is lazy)
-	-- This really happens.  The solution here is a bit ad hoc...
-  = info { unfoldingInfo = uf, newDemandInfo = Nothing }
-
-  | otherwise
 	-- We do *not* seq on the unfolding info, For some reason, doing so 
 	-- actually increases residency significantly. 
   = info { unfoldingInfo = uf }

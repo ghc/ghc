@@ -28,7 +28,7 @@ import Id		( Id, idType, idInfo, idArity, isDataConWorkId,
 			)
 import OccName		( encodeFS )
 import IdInfo		( OccInfo(..), isLoopBreaker,
-			  setArityInfo, 
+			  setArityInfo, zapDemandInfo,
 			  setUnfoldingInfo, 
 			  occInfo
 			)
@@ -59,6 +59,7 @@ import BasicTypes	( TopLevelFlag(..), isTopLevel,
 			)
 import OrdList
 import Maybe		( Maybe )
+import Maybes		( orElse )
 import Outputable
 import Util             ( notNull )
 \end{code}
@@ -612,16 +613,32 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
 		-- Add arity info
   	new_bndr_info = idInfo new_bndr `setArityInfo` exprArity new_rhs
 
-		-- Add the unfolding *only* for non-loop-breakers
-		-- Making loop breakers not have an unfolding at all 
-		-- means that we can avoid tests in exprIsConApp, for example.
-		-- This is important: if exprIsConApp says 'yes' for a recursive
-		-- thing, then we can get into an infinite loop
-        info_w_unf | loop_breaker = new_bndr_info
-		   | otherwise    = new_bndr_info `setUnfoldingInfo` unfolding
-	unfolding = mkUnfolding (isTopLevel top_lvl) new_rhs
+	-- Add the unfolding *only* for non-loop-breakers
+	-- Making loop breakers not have an unfolding at all 
+	-- means that we can avoid tests in exprIsConApp, for example.
+	-- This is important: if exprIsConApp says 'yes' for a recursive
+	-- thing, then we can get into an infinite loop
 
-	final_id = new_bndr `setIdInfo` info_w_unf
+	-- If the unfolding is a value, the demand info may
+	-- go pear-shaped, so we nuke it.  Example:
+	--	let x = (a,b) in
+	--	case x of (p,q) -> h p q x
+	-- Here x is certainly demanded. But after we've nuked
+	-- the case, we'll get just
+	--	let x = (a,b) in h a b x
+	-- and now x is not demanded (I'm assuming h is lazy)
+	-- This really happens.  Similarly
+	--	let f = \x -> e in ...f..f...
+	-- After inling f at some of its call sites the original binding may
+	-- (for example) be no longer strictly demanded.
+	-- The solution here is a bit ad hoc...
+	unfolding  = mkUnfolding (isTopLevel top_lvl) new_rhs
+ 	info_w_unf = new_bndr_info `setUnfoldingInfo` unfolding
+        final_info | loop_breaker		= new_bndr_info
+		   | isEvaldUnfolding unfolding = zapDemandInfo info_w_unf `orElse` info_w_unf
+		   | otherwise			= info_w_unf
+
+	final_id = new_bndr `setIdInfo` final_info
     in
 		-- These seqs forces the Id, and hence its IdInfo,
 		-- and hence any inner substitutions
