@@ -4,7 +4,7 @@
  * Win32 Console API support
  */
 #include "config.h"
-#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
+#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS) || defined(__MINGW32__) || defined(_MSC_VER)
 /* to the end */
 
 #include "consUtils.h"
@@ -64,4 +64,4 @@ get_console_echo__(int fd)
     return -1;
 }
 
-#endif /* defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS) */
+#endif /* defined(mingw32_TARGET_OS) || ... */

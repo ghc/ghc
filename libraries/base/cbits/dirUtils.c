@@ -14,7 +14,7 @@
 
 #include "HsBase.h"
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_TARGET_OS) || defined(__MINGW32__) || defined(_MSC_VER)
 #include <windows.h>
 
 static
