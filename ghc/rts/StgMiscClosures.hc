@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.27 1999/08/25 16:11:51 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.28 1999/11/02 15:06:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,6 +14,7 @@
 #include "Storage.h"
 #include "StoragePriv.h"
 #include "ProfRts.h"
+#include "SMP.h"
 
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -183,17 +184,20 @@ INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,0,2,BLACKHOLE,,EF_,0,0);
 STGFUN(BLACKHOLE_entry)
 {
   FB_
+#ifdef SMP
+    CMPXCHG(R1.cl->header.info, &BLACKHOLE_info, &WHITEHOLE_info);
+#endif
+
     TICK_ENT_BH();
 
-    /* Change the BLACKHOLE into a BLACKHOLE_BQ */
-    ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
     /* Put ourselves on the blocking queue for this black hole */
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
     CurrentTSO->why_blocked = BlockedOnBlackHole;
     CurrentTSO->block_info.closure = R1.cl;
     recordMutable((StgMutClosure *)R1.cl);
-
+    /* Change the BLACKHOLE into a BLACKHOLE_BQ */
+    ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
   FE_
@@ -203,6 +207,10 @@ INFO_TABLE(BLACKHOLE_BQ_info, BLACKHOLE_BQ_entry,1,1,BLACKHOLE_BQ,,EF_,0,0);
 STGFUN(BLACKHOLE_BQ_entry)
 {
   FB_
+#ifdef SMP
+    CMPXCHG(R1.cl->header.info, &BLACKHOLE_info, &WHITEHOLE_info);
+#endif
+
     TICK_ENT_BH();
 
     /* Put ourselves on the blocking queue for this black hole */
@@ -210,6 +218,9 @@ STGFUN(BLACKHOLE_BQ_entry)
     CurrentTSO->block_info.closure = R1.cl;
     CurrentTSO->link = ((StgBlockingQueue *)R1.p)->blocking_queue;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
+#ifdef SMP
+    ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
+#endif
 
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
@@ -241,6 +252,16 @@ STGFUN(SE_CAF_BLACKHOLE_entry)
   FB_
     STGCALL3(fprintf,stderr,"SE_CAF_BLACKHOLE at %p entered!\n",R1.p);
     STGCALL1(shutdownHaskellAndExit,EXIT_FAILURE);
+  FE_
+}
+#endif
+
+#ifdef SMP
+INFO_TABLE(WHITEHOLE_info, WHITEHOLE_entry,0,2,CONSTR_NOCAF_STATIC,,EF_,0,0);
+STGFUN(WHITEHOLE_entry)
+{
+  FB_
+     JMP_(GET_ENTRY(R1.cl));
   FE_
 }
 #endif
@@ -365,6 +386,19 @@ SET_STATIC_HDR(END_MUT_LIST_closure,END_MUT_LIST_info,0/*CC*/,,EI_)
 
 INFO_TABLE(MUT_CONS_info, MUT_CONS_entry, 1, 1, MUT_VAR, , EF_, 0, 0);
 NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
+
+/* -----------------------------------------------------------------------------
+   Exception lists
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(END_EXCEPTION_LIST_info,END_EXCEPTION_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+NON_ENTERABLE_ENTRY_CODE(END_EXCEPTION_LIST);
+
+SET_STATIC_HDR(END_EXCEPTION_LIST_closure,END_EXCEPTION_LIST_info,0/*CC*/,,EI_)
+};
+
+INFO_TABLE(EXCEPTION_CONS_info, EXCEPTION_CONS_entry, 1, 1, CONSTR, , EF_, 0, 0);
+NON_ENTERABLE_ENTRY_CODE(EXCEPTION_CONS);
 
 /* -----------------------------------------------------------------------------
    Arrays

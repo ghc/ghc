@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.37 1999/08/25 16:11:43 simonmar Exp $
+ * $Id: PrimOps.h,v 1.38 1999/11/02 15:05:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -710,6 +710,12 @@ EF_(forkzh_fast);
 EF_(yieldzh_fast);
 EF_(killThreadzh_fast);
 EF_(seqzh_fast);
+EF_(unblockExceptionszh_fast);
+
+#define blockExceptionszh_fast						\
+  if (CurrentTSO->pending_exceptions == NULL) {				\
+     CurrentTSO->pending_exceptions = &END_EXCEPTION_LIST_closure;	\
+  }
 
 #define myThreadIdzh(t) (t = CurrentTSO)
 

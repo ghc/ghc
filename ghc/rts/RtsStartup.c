@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.21 1999/09/22 11:53:33 sof Exp $
+ * $Id: RtsStartup.c,v 1.22 1999/11/02 15:06:01 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -101,6 +101,11 @@ startupHaskell(int argc, char *argv[])
     */
 #endif	/* PAR */
 
+    /* initialise scheduler data structures (needs to be done before
+     * initStorage()).
+     */
+    initScheduler();
+
     /* initialize the storage manager */
     initStorage();
 
@@ -115,8 +120,10 @@ startupHaskell(int argc, char *argv[])
     install_vtalrm_handler();
     initialize_virtual_timer(TICK_MILLISECS);
 
-    /* Initialise the scheduler */
-    initScheduler();
+    /* start our haskell execution tasks */
+#ifdef SMP
+    startTasks();
+#endif
 
     /* Initialise the stats department */
     initStats();
@@ -175,6 +182,9 @@ shutdownHaskell(void)
   if (!RTSflags.GranFlags.granSimStats_suppressed)
     end_gr_simulation();
 #endif
+
+  /* stop all running tasks */
+  exitScheduler();
 
   /* clean up things from the storage manager's point of view */
   exitStorage();

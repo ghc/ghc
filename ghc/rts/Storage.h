@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.9 1999/05/11 16:47:59 keithw Exp $
+ * $Id: Storage.h,v 1.10 1999/11/02 15:06:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -38,6 +38,9 @@ extern void exitStorage(void);
    lnat  allocated_bytes(void)  Returns the number of bytes allocated
                                 via allocate() since the last GC.
 				Used in the reoprting of statistics.
+
+   SMP: allocate and doYouWantToGC can be used from STG code, they are
+   surrounded by a mutex.
    -------------------------------------------------------------------------- */
 
 extern StgPtr  allocate(nat n);
@@ -56,9 +59,9 @@ extern lnat allocated_bytes(void);
   -------------------------------------------------------------------------- */
 
 #define ExtendNursery(hp,hplim)			\
-  (current_nursery->free = (P_)(hp)+1,		\
-   current_nursery->link == NULL ? rtsFalse :	\
-   (current_nursery = current_nursery->link,	\
+  (CurrentNursery->free = (P_)(hp)+1,		\
+   CurrentNursery->link == NULL ? rtsFalse :	\
+   (CurrentNursery = CurrentNursery->link,	\
     OpenNursery(hp,hplim),			\
     rtsTrue))
 
@@ -100,7 +103,11 @@ recordMutable(StgMutClosure *p)
 {
   bdescr *bd;
 
+#ifdef SMP
+  ASSERT(p->header.info == &WHITEHOLE_info || closure_MUTABLE(p));
+#else
   ASSERT(closure_MUTABLE(p));
+#endif
 
   bd = Bdescr((P_)p);
   if (bd->gen->no > 0) {
@@ -121,24 +128,23 @@ recordOldToNewPtrs(StgMutClosure *p)
   }
 }
 
-static inline void
-updateWithIndirection(StgClosure *p1, StgClosure *p2) 
-{
-  bdescr *bd;
-
-  bd = Bdescr((P_)p1);
-  if (bd->gen->no == 0) {
-    SET_INFO(p1,&IND_info);
-    ((StgInd *)p1)->indirectee = p2;
-    TICK_UPD_NEW_IND();
-  } else {
-    SET_INFO(p1,&IND_OLDGEN_info);
-    ((StgIndOldGen *)p1)->indirectee = p2;
-    ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;
-    bd->gen->mut_once_list = (StgMutClosure *)p1;
-    TICK_UPD_OLD_IND();
+#define updateWithIndirection(p1, p2)				\
+  {								\
+    bdescr *bd;							\
+								\
+    bd = Bdescr((P_)p1);					\
+    if (bd->gen->no == 0) {					\
+      ((StgInd *)p1)->indirectee = p2;				\
+      SET_INFO(p1,&IND_info);					\
+      TICK_UPD_NEW_IND();					\
+    } else {							\
+      ((StgIndOldGen *)p1)->indirectee = p2;			\
+      ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;	\
+      bd->gen->mut_once_list = (StgMutClosure *)p1;		\
+      SET_INFO(p1,&IND_OLDGEN_info);				\
+      TICK_UPD_OLD_IND();					\
+    }								\
   }
-}
 
 #if defined(TICKY_TICKY) || defined(PROFILING)
 static inline void
@@ -148,14 +154,14 @@ updateWithPermIndirection(StgClosure *p1, StgClosure *p2)
 
   bd = Bdescr((P_)p1);
   if (bd->gen->no == 0) {
-    SET_INFO(p1,&IND_PERM_info);
     ((StgInd *)p1)->indirectee = p2;
+    SET_INFO(p1,&IND_PERM_info);
     TICK_UPD_NEW_PERM_IND(p1);
   } else {
-    SET_INFO(p1,&IND_OLDGEN_PERM_info);
     ((StgIndOldGen *)p1)->indirectee = p2;
     ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;
     bd->gen->mut_once_list = (StgMutClosure *)p1;
+    SET_INFO(p1,&IND_OLDGEN_PERM_info);
     TICK_UPD_OLD_PERM_IND();
   }
 }

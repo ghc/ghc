@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.13 1999/10/20 10:14:47 simonmar Exp $
+ * $Id: Updates.h,v 1.14 1999/11/02 15:05:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,10 +35,25 @@
 /* UPD_IND actually does a PERM_IND if TICKY_TICKY is on;
    if you *really* need an IND use UPD_REAL_IND
  */
-#define UPD_REAL_IND(updclosure, heapptr)                       \
-        AWAKEN_BQ(updclosure);                                  \
+#ifdef SMP
+#define UPD_REAL_IND(updclosure, heapptr)		\
+   {							\
+	const StgInfoTable *info;			\
+	info = LOCK_CLOSURE(updclosure);		\
+							\
+     	if (info == &BLACKHOLE_BQ_info) {				\
+	   STGCALL1(awakenBlockedQueue, 				\
+		    ((StgBlockingQueue *)updclosure)->blocking_queue); 	\
+	}						\
 	updateWithIndirection((StgClosure *)updclosure,         \
+			      (StgClosure *)heapptr);		\
+   }
+#else
+#define UPD_REAL_IND(updclosure, heapptr)		\
+        AWAKEN_BQ(updclosure);				\
+	updateWithIndirection((StgClosure *)updclosure,	\
 			      (StgClosure *)heapptr);
+#endif
 
 #if defined(PROFILING) || defined(TICKY_TICKY)
 #define UPD_PERM_IND(updclosure, heapptr)                       \
@@ -110,11 +125,12 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable Upd_frame_info;
 
 extern void newCAF(StgClosure*);
 
-#define UPD_CAF(cafptr, bhptr)					\
-  {								\
-    SET_INFO((StgInd *)cafptr,(const StgInfoTable*)&IND_STATIC_info);	        \
-    ((StgInd *)cafptr)->indirectee   = (StgClosure *)(bhptr);	\
-    STGCALL1(newCAF,(StgClosure *)cafptr);			\
+#define UPD_CAF(cafptr, bhptr)						\
+  {									\
+    LOCK_CLOSURE(cafptr);						\
+    ((StgInd *)cafptr)->indirectee   = (StgClosure *)(bhptr);		\
+    SET_INFO((StgInd *)cafptr,(const StgInfoTable*)&IND_STATIC_info);	\
+    STGCALL1(newCAF,(StgClosure *)cafptr);				\
   }
 
 /* -----------------------------------------------------------------------------

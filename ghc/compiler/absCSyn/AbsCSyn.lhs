@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.25 1999/10/31 15:35:32 sof Exp $
+% $Id: AbsCSyn.lhs,v 1.26 1999/11/02 15:05:39 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -473,6 +473,7 @@ data MagicId
 node 	= VanillaReg PtrRep     ILIT(1) -- A convenient alias for Node
 tagreg  = VanillaReg WordRep    ILIT(2) -- A convenient alias for TagReg
 
+nodeReg = CReg node
 \end{code}
 
 We need magical @Eq@ because @VanillaReg@s come in multiple flavors.

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.19 1999/09/15 13:45:19 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.20 1999/11/02 15:06:00 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -102,6 +102,9 @@ void initRtsFlagsDefaults(void)
 #endif
 
     RtsFlags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
+#ifdef SMP
+    RtsFlags.ConcFlags.nNodes	= 1;
+#endif
 #ifdef PAR
     RtsFlags.ParFlags.parallelStats	= rtsFalse;
     RtsFlags.ParFlags.granSimStats	= rtsFalse;
@@ -267,6 +270,9 @@ usage_text[] = {
 "  -C<secs>  Context-switch interval in seconds",
 "                (0 or no argument means switch as often as possible)",
 "                the default is .01 sec; resolution is .01 sec",
+# ifdef SMP
+"  -N<n>     Use <n> OS threads (default: 1)",
+# endif
 # ifdef PAR
 "  -q        Enable activity profile (output files in ~/<program>*.gr)",
 "  -qb       Enable binary activity profile (output file /tmp/<program>.gb)",
@@ -718,6 +724,18 @@ error = rtsTrue;
 		}
     	    	break;
 
+#ifdef SMP
+	      case 'N':
+		if (rts_argv[arg][2] != '\0') {
+		    RtsFlags.ConcFlags.nNodes
+		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
+		    if (RtsFlags.ConcFlags.nNodes <= 0) {
+			fprintf(stderr, "setupRtsFlags: bad value for -N\n");
+			error = rtsTrue;
+		    }
+		}
+		break;
+#endif
 	      /* =========== PARALLEL =========================== */
 	      case 'e':
 		PAR_BUILD_ONLY(

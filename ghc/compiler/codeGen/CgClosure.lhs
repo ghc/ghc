@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.36 1999/11/01 17:10:07 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.37 1999/11/02 15:05:43 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -269,6 +269,7 @@ closureCodeBody binder_info closure_info cc [] body
     cl_descr mod_name = closureDescription mod_name (closureName closure_info)
 
     body_label   = entryLabelFromCI closure_info
+    
     is_box  = case body of { StgApp fun [] -> True; _ -> False }
 
     body_code   = profCtrC SLIT("TICK_ENT_THK") []		`thenC`
@@ -577,7 +578,7 @@ thunkWrapper closure_info lbl thunk_code
     thunkChecks lbl node_points (
 
 	-- Overwrite with black hole if necessary
-    blackHoleIt closure_info node_points	`thenC`
+    blackHoleIt closure_info node_points  `thenC`
 
     setupUpdate closure_info (			-- setupUpdate *encloses* the rest
 
@@ -624,10 +625,14 @@ blackHoleIt :: ClosureInfo -> Bool -> Code	-- Only called for closures with no a
 blackHoleIt closure_info node_points
   = if blackHoleOnEntry closure_info && node_points
     then
+	let
+	  info_label = infoTableLabelFromCI closure_info
+	  args = [ CLbl info_label DataPtrRep ]
+	in
 	absC (if closureSingleEntry(closure_info) then
-		CMacroStmt UPD_BH_SINGLE_ENTRY [CReg node]
+		CMacroStmt UPD_BH_SINGLE_ENTRY args
 	      else
-		CMacroStmt UPD_BH_UPDATABLE [CReg node])
+		CMacroStmt UPD_BH_UPDATABLE args)
     else
 	nopC
 \end{code}

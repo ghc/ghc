@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.19 1999/10/13 16:39:23 simonmar Exp $
+ * $Id: Storage.c,v 1.20 1999/11/02 15:06:04 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,10 +19,12 @@
 #include "Sanity.h"
 
 #include "Storage.h"
+#include "Schedule.h"
 #include "StoragePriv.h"
 
-bdescr *current_nursery;	/* next available nursery block, or NULL */
+#ifndef SMP
 nat nursery_blocks;		/* number of blocks in the nursery */
+#endif
 
 StgClosure    *caf_list         = NULL;
 
@@ -38,6 +40,14 @@ generation *generations;	/* all the generations */
 generation *g0;			/* generation 0, for convenience */
 generation *oldest_gen;		/* oldest generation, for convenience */
 step *g0s0;			/* generation 0, step 0, for convenience */
+
+/*
+ * Storage manager mutex:  protects all the above state from
+ * simultaneous access by two STG threads.
+ */
+#ifdef SMP
+pthread_mutex_t sm_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 /*
  * Forward references
@@ -156,14 +166,9 @@ initStorage (void)
    * don't want it to be a big one.  This vague idea is borne out by 
    * rigorous experimental evidence.
    */
-  step = &generations[0].steps[0];
-  g0s0 = step;
-  nursery_blocks = RtsFlags.GcFlags.minAllocAreaSize;
-  step->blocks   = allocNursery(NULL, nursery_blocks);
-  step->n_blocks = nursery_blocks;
-  current_nursery = step->blocks;
-  g0s0->to_space = NULL;
-  /* hp, hpLim, hp_bd, to_space etc. aren't used in G0S0 */
+  g0s0 = &generations[0].steps[0];
+
+  allocNurseries();
 
   weak_ptr_list = NULL;
   caf_list = NULL;
@@ -179,10 +184,109 @@ initStorage (void)
   mp_set_memory_functions(stgAllocForGMP, stgReallocForGMP, stgDeallocForGMP);
 #endif
 
+#ifdef SMP
+  pthread_mutex_init(&sm_mutex, NULL);
+#endif
+
   IF_DEBUG(gc, stat_describe_gens());
 }
 
-extern bdescr *
+void
+exitStorage (void)
+{
+  stat_exit(calcAllocated());
+}
+
+void
+newCAF(StgClosure* caf)
+{
+  /* Put this CAF on the mutable list for the old generation.
+   * This is a HACK - the IND_STATIC closure doesn't really have
+   * a mut_link field, but we pretend it has - in fact we re-use
+   * the STATIC_LINK field for the time being, because when we
+   * come to do a major GC we won't need the mut_link field
+   * any more and can use it as a STATIC_LINK.
+   */
+  ACQUIRE_LOCK(&sm_mutex);
+  ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
+  oldest_gen->mut_once_list = (StgMutClosure *)caf;
+
+#ifdef DEBUG
+  { 
+    const StgInfoTable *info;
+    
+    info = get_itbl(caf);
+    ASSERT(info->type == IND_STATIC);
+#if 0
+    STATIC_LINK2(info,caf) = caf_list;
+    caf_list = caf;
+#endif
+  }
+#endif
+  RELEASE_LOCK(&sm_mutex);
+}
+
+/* -----------------------------------------------------------------------------
+   Nursery management.
+   -------------------------------------------------------------------------- */
+
+void
+allocNurseries( void )
+{ 
+#ifdef SMP
+  {
+    Capability *cap;
+    
+    g0s0->blocks = NULL;
+    g0s0->n_blocks = 0;
+    for (cap = free_capabilities; cap != NULL; cap = cap->link) {
+      cap->rNursery = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
+      cap->rCurrentNursery = cap->rNursery;
+    }
+  }
+#else /* SMP */
+  nursery_blocks  = RtsFlags.GcFlags.minAllocAreaSize;
+  g0s0->blocks    = allocNursery(NULL, nursery_blocks);
+  g0s0->n_blocks  = nursery_blocks;
+  g0s0->to_space  = NULL;
+  MainRegTable.rNursery        = g0s0->blocks;
+  MainRegTable.rCurrentNursery = g0s0->blocks;
+  /* hp, hpLim, hp_bd, to_space etc. aren't used in G0S0 */
+#endif
+}
+      
+void
+resetNurseries( void )
+{
+  bdescr *bd;
+#ifdef SMP
+  Capability *cap;
+  
+  /* All tasks must be stopped */
+  ASSERT(n_free_capabilities == RtsFlags.ConcFlags.nNodes);
+
+  for (cap = free_capabilities; cap != NULL; cap = cap->link) {
+    for (bd = cap->rNursery; bd; bd = bd->link) {
+      bd->free = bd->start;
+      ASSERT(bd->gen == g0);
+      ASSERT(bd->step == g0s0);
+      IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
+    }
+    cap->rCurrentNursery = cap->rNursery;
+  }
+#else
+  for (bd = g0s0->blocks; bd; bd = bd->link) {
+    bd->free = bd->start;
+    ASSERT(bd->gen == g0);
+    ASSERT(bd->step == g0s0);
+    IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
+  }
+  MainRegTable.rNursery = g0s0->blocks;
+  MainRegTable.rCurrentNursery = g0s0->blocks;
+#endif
+}
+
+bdescr *
 allocNursery (bdescr *last_bd, nat blocks)
 {
   bdescr *bd;
@@ -201,10 +305,14 @@ allocNursery (bdescr *last_bd, nat blocks)
   return last_bd;
 }
 
-extern void
+void
 resizeNursery ( nat blocks )
 {
   bdescr *bd;
+
+#ifdef SMP
+  barf("resizeNursery: can't resize in SMP mode");
+#endif
 
   if (nursery_blocks == blocks) {
     ASSERT(g0s0->n_blocks == blocks);
@@ -233,48 +341,6 @@ resizeNursery ( nat blocks )
   g0s0->n_blocks = nursery_blocks = blocks;
 }
 
-void
-exitStorage (void)
-{
-  lnat allocated;
-  bdescr *bd;
-
-  /* Return code ignored for now */
-  /* ToDo: allocation figure is slightly wrong (see also GarbageCollect()) */
-  allocated = (nursery_blocks * BLOCK_SIZE_W) + allocated_bytes();
-  for ( bd = current_nursery->link; bd != NULL; bd = bd->link ) {
-    allocated -= BLOCK_SIZE_W;
-  }
-  stat_exit(allocated);
-}
-
-void
-newCAF(StgClosure* caf)
-{
-  /* Put this CAF on the mutable list for the old generation.
-   * This is a HACK - the IND_STATIC closure doesn't really have
-   * a mut_link field, but we pretend it has - in fact we re-use
-   * the STATIC_LINK field for the time being, because when we
-   * come to do a major GC we won't need the mut_link field
-   * any more and can use it as a STATIC_LINK.
-   */
-  ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
-  oldest_gen->mut_once_list = (StgMutClosure *)caf;
-
-#ifdef DEBUG
-  { 
-    const StgInfoTable *info;
-    
-    info = get_itbl(caf);
-    ASSERT(info->type == IND_STATIC);
-#if 0
-    STATIC_LINK2(info,caf) = caf_list;
-    caf_list = caf;
-#endif
-  }
-#endif
-}
-
 /* -----------------------------------------------------------------------------
    The allocate() interface
 
@@ -288,6 +354,8 @@ allocate(nat n)
 {
   bdescr *bd;
   StgPtr p;
+
+  ACQUIRE_LOCK(&sm_mutex);
 
   TICK_ALLOC_HEAP_NOCTR(n);
   CCS_ALLOC(CCCS,n);
@@ -307,6 +375,7 @@ allocate(nat n)
      * (eg. running threads), so garbage collecting early won't make
      * much difference.
      */
+    RELEASE_LOCK(&sm_mutex);
     return bd->start;
 
   /* small allocation (<LARGE_OBJECT_THRESHOLD) */
@@ -327,6 +396,7 @@ allocate(nat n)
   
   p = alloc_Hp;
   alloc_Hp += n;
+  RELEASE_LOCK(&sm_mutex);
   return p;
 }
 
@@ -389,8 +459,60 @@ stgDeallocForGMP (void *ptr STG_UNUSED,
 }
 
 /* -----------------------------------------------------------------------------
-   Stats and stuff
-   -------------------------------------------------------------------------- */
+ * Stats and stuff
+ * -------------------------------------------------------------------------- */
+
+/* -----------------------------------------------------------------------------
+ * calcAllocated()
+ *
+ * Approximate how much we've allocated: number of blocks in the
+ * nursery + blocks allocated via allocate() - unused nusery blocks.
+ * This leaves a little slop at the end of each block, and doesn't
+ * take into account large objects (ToDo).
+ * -------------------------------------------------------------------------- */
+
+lnat
+calcAllocated( void )
+{
+  nat allocated;
+  bdescr *bd;
+
+#ifdef SMP
+  Capability *cap;
+
+  /* All tasks must be stopped */
+  ASSERT(n_free_capabilities == RtsFlags.ConcFlags.nNodes);
+
+  allocated = 
+    n_free_capabilities * RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W
+    + allocated_bytes();
+
+  for (cap = free_capabilities; cap != NULL; cap = cap->link) {
+    for ( bd = cap->rCurrentNursery->link; bd != NULL; bd = bd->link ) {
+      allocated -= BLOCK_SIZE_W;
+    }
+    if (cap->rCurrentNursery->free < cap->rCurrentNursery->start 
+	+ BLOCK_SIZE_W) {
+      allocated -= (cap->rCurrentNursery->start + BLOCK_SIZE_W)
+	- cap->rCurrentNursery->free;
+    }
+  }
+
+#else /* !SMP */
+  bdescr *current_nursery = MainRegTable.rCurrentNursery;
+
+  allocated = (nursery_blocks * BLOCK_SIZE_W) + allocated_bytes();
+  for ( bd = current_nursery->link; bd != NULL; bd = bd->link ) {
+    allocated -= BLOCK_SIZE_W;
+  }
+  if (current_nursery->free < current_nursery->start + BLOCK_SIZE_W) {
+    allocated -= (current_nursery->start + BLOCK_SIZE_W)
+      - current_nursery->free;
+  }
+#endif
+
+  return allocated;
+}  
 
 /* Approximate the amount of live data in the heap.  To be called just
  * after garbage collection (see GarbageCollect()).
@@ -488,7 +610,7 @@ memInventory(void)
 	*/
 	if (bd->blocks > BLOCKS_PER_MBLOCK) {
 	  total_blocks -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
-	                  * bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE);
+	                  * (bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE));
 	}
       }
     }

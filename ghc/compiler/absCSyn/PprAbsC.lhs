@@ -787,8 +787,8 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv) args results vol_regs
   where
     (pp_saves, pp_restores) = ppr_vol_regs vol_regs
     (pp_save_context, pp_restore_context)
-	| may_gc  = ( text "do { SaveThreadState();"
-		    , text "LoadThreadState();} while(0);"
+	| may_gc  = ( text "do { I_ id; SaveThreadState(); id = suspendThread(BaseReg);"
+		    , text "BaseReg = resumeThread(id); LoadThreadState();} while(0);"
 		    )
 	| otherwise = (	pp_basic_saves $$ pp_saves,
 			pp_basic_restores $$ pp_restores)

@@ -1,13 +1,15 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgRun.S,v 1.2 1998/12/15 09:41:57 simonm Exp $
+ * $Id: StgRun.S,v 1.3 1999/11/02 15:06:04 simonmar Exp $
  *
  * Tiny assembler 'layer' between the C and STG worlds.
  * 
  * To run an STG function from C land, call
  *
- *		rv = StgRun(f);
+ *		rv = StgRun(f,BaseReg);
  *
- * where "f" is the STG function to call.
+ * where "f" is the STG function to call, and BaseReg is the address of the
+ * RegTable for this run (we might have separate RegTables if we're running
+ * multiple threads on an SMP machine).
  *
  * In the end, "f" must JMP to StgReturn (defined below),
  * passing the return-value "rv" in R1,
@@ -68,6 +70,11 @@ StgRun:
         movl %edi,8(%eax)
         movl %ebp,12(%eax)
 
+	/*
+	 * Set BaseReg
+	 */
+	movl 12(%ebp),%ebx
+	
 	/*
 	 * grab the function argument from the stack, and jump to it.
 	 */

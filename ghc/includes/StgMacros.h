@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.13 1999/10/13 16:39:21 simonmar Exp $
+ * $Id: StgMacros.h,v 1.14 1999/11/02 15:05:52 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -416,12 +416,23 @@ EDI_(stg_gen_chk_info);
 #define SET_TAG(t)  /* nothing */
 
 #ifdef EAGER_BLACKHOLING
-#  define UPD_BH_UPDATABLE(thunk)                        \
-        TICK_UPD_BH_UPDATABLE();                         \
-        SET_INFO((StgClosure *)thunk,&BLACKHOLE_info)
-#  define UPD_BH_SINGLE_ENTRY(thunk)                     \
-        TICK_UPD_BH_SINGLE_ENTRY();                      \
-        SET_INFO((StgClosure *)thunk,&SE_BLACKHOLE_info)
+#  ifdef SMP
+#    define UPD_BH_UPDATABLE(info)		\
+        TICK_UPD_BH_UPDATABLE();		\
+        LOCK_THUNK(info);			\
+        SET_INFO(R1.cl,&BLACKHOLE_info)
+#    define UPD_BH_SINGLE_ENTRY(info)		\
+        TICK_UPD_BH_SINGLE_ENTRY();		\
+        LOCK_THUNK(info);			\
+        SET_INFO(R1.cl,&BLACKHOLE_info)
+#  else
+#    define UPD_BH_UPDATABLE(info)		\
+        TICK_UPD_BH_UPDATABLE();		\
+        SET_INFO(R1.cl,&BLACKHOLE_info)
+#    define UPD_BH_SINGLE_ENTRY(info)		\
+        TICK_UPD_BH_SINGLE_ENTRY();		\
+        SET_INFO(R1.cl,&SE_BLACKHOLE_info)
+#  endif
 #else /* !EAGER_BLACKHOLING */
 #  define UPD_BH_UPDATABLE(thunk)    /* nothing */
 #  define UPD_BH_SINGLE_ENTRY(thunk) /* nothing */
@@ -642,9 +653,14 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable seq_frame_info;
    We save all the STG registers (that is, the ones that are mapped to
    machine registers) in their places in the TSO.  
 
-   The stack registers go into the current stack object, and the heap
-   registers are saved in global locations.
+   The stack registers go into the current stack object, and the
+   current nursery is updated from the heap pointer.
+
+   These functions assume that BaseReg is loaded appropriately (if
+   we have one).
    -------------------------------------------------------------------------- */
+
+#ifndef NO_REGS
 
 static __inline__ void
 SaveThreadState(void)
@@ -656,6 +672,12 @@ SaveThreadState(void)
   CurrentTSO->splim    = SpLim;
   CloseNursery(Hp);
 
+#ifdef REG_CurrentTSO
+  SAVE_CurrentTSO = CurrentTSO;
+#endif
+#ifdef REG_CurrentNursery
+  SAVE_CurrentNursery = CurrentNursery;
+#endif
 #if defined(PROFILING)
   CurrentTSO->prof.CCCS = CCCS;
 #endif
@@ -664,19 +686,30 @@ SaveThreadState(void)
 static __inline__ void 
 LoadThreadState (void)
 {
-#ifdef REG_Base
-  BaseReg = (StgRegTable*)&MainRegTable;
-#endif
-
   Sp    = CurrentTSO->sp;
   Su    = CurrentTSO->su;
   SpLim = CurrentTSO->splim;
   OpenNursery(Hp,HpLim);
 
+#ifdef REG_CurrentTSO
+  CurrentTSO = SAVE_CurrentTSO;
+#endif
+#ifdef REG_CurrentNursery
+  CurrentNursery = SAVE_CurrentNursery;
+#endif
 # if defined(PROFILING)
   CCCS = CurrentTSO->prof.CCCS;
 # endif
 }
+
+/* 
+ * Suspending/resuming threads for doing external C-calls (_ccall_GC).
+ * These functions are defined in rts/Schedule.c.
+ */
+StgInt        suspendThread ( StgRegTable *cap );
+StgRegTable * resumeThread  ( StgInt );
+
+#endif /* NO_REGS */
 
 #endif /* STGMACROS_H */
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.9 1999/09/15 13:45:18 simonmar Exp $
+ * $Id: Profiling.c,v 1.10 1999/11/02 15:05:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -356,8 +356,10 @@ AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
     return ccs1;
   }
   
-  ASSERT(ccs2->prevStack != NULL);
-  ccs = AppendCCS(ccs1, ccs2->prevStack);
+  if (ccs2->prevStack != NULL) {
+    ccs = AppendCCS(ccs1, ccs2->prevStack);
+  }
+
   return PushCostCentre(ccs,ccs2->cc);
 }
 

@@ -87,6 +87,7 @@ module CmdLineOpts (
 	opt_IrrefutableTuples,
 	opt_NumbersStrict,
 	opt_Parallel,
+	opt_SMP,
 
 	-- optimisation opts
 	opt_DoEtaReduction,
@@ -375,6 +376,7 @@ opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
 opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
 opt_Parallel			= lookUp  SLIT("-fparallel")
+opt_SMP				= lookUp  SLIT("-fsmp")
 
 -- optimisation opts
 opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.17 1999/07/06 09:42:39 sof Exp $
+ * $Id: Stg.h,v 1.18 1999/11/02 15:05:52 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,6 +14,17 @@
 
 #ifndef NON_POSIX_SOURCE
 #define _POSIX_SOURCE
+#endif
+
+/* If we include "Stg.h" directly, we're in STG code, and we therefore
+ * get all the global register variables, macros etc. that go along
+ * with that.  If "Stg.h" is included via "Rts.h", we're assumed to
+ * be in vanilla C.
+ */
+#ifdef NOT_IN_STG_CODE
+#define NO_REGS			/* don't define fixed registers */
+#else
+#define IN_STG_CODE
 #endif
 
 /* Configuration */
@@ -33,13 +44,17 @@
  * For now, do lazy and not eager.
  */
 
-#define LAZY_BLACKHOLING
-/* #define EAGER_BLACKHOLING */
-
-#ifdef TICKY_TICKY
-/* TICKY_TICKY needs EAGER_BLACKHOLING to verify no double-entries of single-entry thunks. */
-# undef  LAZY_BLACKHOLING 
-# define EAGER_BLACKHOLING
+/* TICKY_TICKY needs EAGER_BLACKHOLING to verify no double-entries of
+ * single-entry thunks.
+ *
+ * SMP needs EAGER_BLACKHOLING because it has to lock thunks
+ * synchronously, in case another thread is trying to evaluate the
+ * same thunk simultaneously.
+ */
+#if defined(SMP) || defined(TICKY_TICKY)
+#  define EAGER_BLACKHOLING
+#else
+#  define LAZY_BLACKHOLING
 #endif
 
 /* ToDo: Set this flag properly: COMPILER and INTERPRETER should not be mutually exclusive. */
@@ -96,8 +111,10 @@ void _stgAssert (char *, unsigned int);
 #include "ClosureTypes.h"
 #include "InfoTables.h"
 #include "TSO.h"
+#include "Block.h"
 
 /* STG/Optimised-C related stuff */
+#include "SMP.h"
 #include "MachRegs.h"
 #include "Regs.h"
 #include "TailCalls.h"
@@ -119,6 +136,10 @@ void _stgAssert (char *, unsigned int);
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+
+#ifdef SMP
+#include <pthread.h>
 #endif
 
 /* GNU mp library */

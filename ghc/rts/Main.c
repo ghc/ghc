@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.11 1999/09/16 08:29:01 sof Exp $
+ * $Id: Main.c,v 1.12 1999/11/02 15:05:58 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -13,7 +13,6 @@
 #include "RtsAPI.h"
 #include "SchedAPI.h"
 #include "RtsFlags.h"
-#include "Schedule.h"  /* for MainTSO */
 #include "RtsUtils.h"
 
 #ifdef DEBUG
@@ -45,19 +44,14 @@ int main(int argc, char *argv[])
     startupHaskell(argc,argv);
 
 #  ifndef PAR
-    MainTSO = createIOThread(stg_max(BLOCK_SIZE_W,
-				     RtsFlags.GcFlags.initialStkSize),
-			     (StgClosure *)&mainIO_closure);
-    status = schedule(MainTSO,NULL);
+    /* ToDo: want to start with a larger stack size */
+    status = rts_evalIO((StgClosure *)&mainIO_closure, NULL);
 #  else
     if (IAmMainThread == rtsTrue) {
     /*Just to show we're alive */
       fprintf(stderr, "Main Thread Started ...\n");
      
-      MainTSO = createIOThread(stg_max(BLOCK_SIZE_W,
-				       RtsFlags.GcFlags.initialStkSize),
-			       (StgClosure *)&mainIO_closure);
-      status = schedule(MainTSO,NULL);
+      status = rts_evalIO((StgClosure *)&mainIO_closure, NULL);
     } else {
       WaitForPEOp(PP_FINISH,SysManTask);
       exit(EXIT_SUCCESS);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.8 1999/09/22 11:53:33 sof Exp $
+ * $Id: Signals.c,v 1.9 1999/11/02 15:06:02 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -245,16 +245,37 @@ start_signal_handlers(void)
 }
 #endif
 
+/* -----------------------------------------------------------------------------
+   SIGINT handler.
+
+   We like to shutdown nicely after receiving a SIGINT, write out the
+   stats, write profiling info, close open files and flush buffers etc.
+   -------------------------------------------------------------------------- */
+
+#ifdef SMP
+pthread_t startup_guy;
+#endif
+
 static void
 shutdown_handler(int sig)
 {
+#ifdef SMP
+  /* if I'm a worker thread, send this signal to the guy who
+   * originally called startupHaskell().  Since we're handling
+   * the signal, it won't be a "send to all threads" type of signal
+   * (according to the POSIX threads spec).
+   */
+  if (pthread_self() != startup_guy) {
+    pthread_kill(startup_guy, sig);
+  } else
+#endif
+
   shutdownHaskellAndExit(EXIT_FAILURE);
 }
 
 /*
  * The RTS installs a default signal handler for catching
- * SIGINT, so that we can perform an orderly shutdown (finalising
- * objects and flushing buffers etc.)
+ * SIGINT, so that we can perform an orderly shutdown.
  *
  * Haskell code may install their own SIGINT handler, which is
  * fine, provided they're so kind as to put back the old one
@@ -265,6 +286,9 @@ init_shutdown_handler()
 {
     struct sigaction action,oact;
 
+#ifdef SMP
+    startup_guy = pthread_self();
+#endif
     action.sa_handler = shutdown_handler;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.38 1999/05/18 15:03:50 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.39 1999/11/02 15:05:44 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -77,7 +77,8 @@ import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
 			  mkReturnPtLabel
 			)
 import CmdLineOpts	( opt_SccProfilingOn, opt_OmitBlackHoling,
-			  opt_Parallel, opt_DoTickyProfiling )
+			  opt_Parallel, opt_DoTickyProfiling,
+			  opt_SMP )
 import Id		( Id, idType, getIdArity )
 import DataCon		( DataCon, dataConTag, fIRST_TAG,
 			  isNullaryDataCon, isTupleCon, dataConName
@@ -679,6 +680,9 @@ getEntryConvention name lf_info arg_kinds
 
 	LFThunk _ _ _ updatable std_form_info _ _
 	  -> if updatable || opt_DoTickyProfiling  -- to catch double entry
+		|| opt_SMP  -- always enter via node on SMP, since the
+			    -- thunk might have been blackholed in the 
+			    -- meantime.
 	     then ViaNode
              else StdEntry (thunkEntryLabel name std_form_info updatable)
 

@@ -352,7 +352,7 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 	'_p',  "-fscc-profiling -DPROFILING -optc-DPROFILING",
 	'_t',  "-fticky-ticky -DTICKY_TICKY -optc-DTICKY_TICKY",
 	'_u',  "-optc-DNO_REGS -optc-DUSE_MINIINTERPRETER -fno-asm-mangling -funregisterised",
-	'_s',  "-fparallel -optc-pthread -optl-pthread -optc-DSMP",
+	'_s',  "-fsmp -optc-pthread -optl-pthread -optc-DSMP",
 	'_mp', "-fparallel -D__PARALLEL_HASKELL__ -optc-DPAR",
 	'_mg', "-fgransim -D__GRANSIM__ -optc-DGRAN");
 
@@ -3054,6 +3054,7 @@ arg: while($_ = $Args[0]) {
     /^-fticky-ticky$/     && do { push(@HsC_flags,$_); next arg; };
     /^-fgransim$/ 	  && do { push(@HsC_flags,$_); next arg; };
     /^-fparallel$/        && do { push(@HsC_flags,$_); next arg; };
+    /^-fsmp$/             && do { push(@HsC_flags,$_); next arg; };
 
     /^-split-objs$/	&& do {
 			if ( $TargetPlatform !~ /^(alpha|hppa1\.1|i386|m68k|mips|powerpc|rs6000|sparc)-/ ) {

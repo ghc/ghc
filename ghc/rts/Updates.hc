@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.19 1999/09/14 12:16:36 simonmar Exp $
+ * $Id: Updates.hc,v 1.20 1999/11/02 15:06:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -46,6 +46,34 @@
    update code. 
    */
 
+#if defined(REG_Su)
+#define UPD_FRAME_ENTRY_TEMPLATE(label,ret)				\
+        STGFUN(label);							\
+	STGFUN(label)							\
+	{								\
+	  FB_								\
+									\
+          Su = (StgUpdateFrame *)((StgUpdateFrame *)Sp)->updatee;	\
+									\
+	  /* Tick - it must be a con, all the paps are handled		\
+	   * in stg_upd_PAP and PAP_entry below				\
+	   */								\
+	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(get_itbl(Su)));	\
+									\
+	  /* update the updatee with an indirection to the return value */\
+	  UPD_IND(Su,R1.p);					\
+									\
+	  /* reset Su to the next update frame */			\
+	  Su = ((StgUpdateFrame *)Sp)->link;				\
+									\
+	  /* remove the update frame from the stack */			\
+	  Sp += sizeofW(StgUpdateFrame);				\
+									\
+	  JMP_(ret);							\
+	  FE_								\
+	}
+#else
+
 #define UPD_FRAME_ENTRY_TEMPLATE(label,ret)				\
         STGFUN(label);							\
 	STGFUN(label)							\
@@ -72,6 +100,7 @@
 	  JMP_(ret);							\
 	  FE_								\
 	}
+#endif
 
 UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_entry,ENTRY_CODE(Sp[0]));
 UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_0_entry,RET_VEC(Sp[0],0));

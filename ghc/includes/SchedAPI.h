@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.6 1999/07/06 09:42:39 sof Exp $
+ * $Id: SchedAPI.h,v 1.7 1999/11/02 15:05:52 simonmar Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -17,13 +17,14 @@
  * not compiling rts/ bits.   -- sof 7/99
  * 
  */
-SchedulerStatus schedule(StgTSO *main_thread, /*out*/StgClosure **ret);
+SchedulerStatus waitThread(StgTSO *main_thread, /*out*/StgClosure **ret);
 
 /* 
  * Creating threads
  */
 
-StgTSO *createThread   (nat stack_size);
+StgTSO *createThread(nat stack_size);
+void scheduleThread(StgTSO *tso);
 
 static inline void pushClosure   (StgTSO *tso, StgClosure *c) {
   tso->sp--;

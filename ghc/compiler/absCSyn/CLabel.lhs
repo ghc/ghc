@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.28 1999/10/13 16:39:10 simonmar Exp $
+% $Id: CLabel.lhs,v 1.29 1999/11/02 15:05:40 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -37,6 +37,7 @@ module CLabel (
 	mkErrorStdEntryLabel,
 	mkUpdInfoLabel,
 	mkTopTickyCtrLabel,
+	mkBlackHoleInfoTableLabel,
         mkCAFBlackHoleInfoTableLabel,
         mkSECAFBlackHoleInfoTableLabel,
 	mkRtsPrimOpLabel,
@@ -215,6 +216,7 @@ mkAsmTempLabel 			= AsmTempLabel
 mkErrorStdEntryLabel		= RtsLabel RtsShouldNeverHappenCode
 mkUpdInfoLabel			= RtsLabel RtsUpdInfo
 mkTopTickyCtrLabel		= RtsLabel RtsTopTickyCtr
+mkBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("BLACKHOLE_info"))
 mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("CAF_BLACKHOLE_info"))
 mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
                                     RtsLabel (RtsBlackHoleInfoTbl SLIT("SE_CAF_BLACKHOLE_info"))

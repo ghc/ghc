@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.16 1999/09/15 13:45:19 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.17 1999/11/02 15:06:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -118,7 +118,10 @@ struct PROFILING_FLAGS {
 #endif /* DEBUG || PROFILING */
 
 struct CONCURRENT_FLAGS {
-    int	    ctxtSwitchTime; /* in milliseconds */
+  int	  ctxtSwitchTime; /* in milliseconds */
+#ifdef SMP
+  nat     nNodes;         /* number of threads to run simultaneously */
+#endif
 };
 
 #ifdef PAR

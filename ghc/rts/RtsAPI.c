@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.9 1999/10/15 11:03:10 sewardj Exp $
+ * $Id: RtsAPI.c,v 1.10 1999/11/02 15:05:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -331,14 +331,16 @@ SchedulerStatus
 rts_eval (HaskellObj p, /*out*/HaskellObj *ret)
 {
   StgTSO *tso = createGenThread(RtsFlags.GcFlags.initialStkSize, p);
-  return schedule(tso, ret);
+  scheduleThread(tso);
+  return waitThread(tso, ret);
 }
 
 SchedulerStatus
 rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 {
   StgTSO *tso = createGenThread(stack_size, p);
-  return schedule(tso, ret);
+  scheduleThread(tso);
+  return waitThread(tso, ret);
 }
 
 /*
@@ -349,7 +351,8 @@ SchedulerStatus
 rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
 {
   StgTSO* tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
-  return schedule(tso, ret);
+  scheduleThread(tso);
+  return waitThread(tso, ret);
 }
 
 /*
@@ -359,7 +362,8 @@ SchedulerStatus
 rts_evalLazyIO (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 {
   StgTSO *tso = createIOThread(stack_size, p);
-  return schedule(tso, ret);
+  scheduleThread(tso);
+  return waitThread(tso, ret);
 }
 
 /* Convenience function for decoding the returned status. */

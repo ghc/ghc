@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.22 1999/06/22 08:00:00 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.23 1999/11/02 15:05:43 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -39,7 +39,8 @@ import CgRetConv	( dataReturnConvPrim,
 import CgStackery	( mkTaggedStkAmodes, adjustStackHW )
 import CgUsages		( getSpRelOffset, adjustSpAndHp )
 import CgUpdate		( pushSeqFrame )
-import CLabel		( mkUpdInfoLabel, mkRtsPrimOpLabel )
+import CLabel		( mkUpdInfoLabel, mkRtsPrimOpLabel, 
+			  mkBlackHoleInfoTableLabel )
 import ClosureInfo	( nodeMustPointToIt,
 			  getEntryConvention, EntryConvention(..),
 			  LambdaFormInfo
@@ -55,6 +56,7 @@ import Type		( isUnLiftedType )
 import TyCon            ( TyCon )
 import PrimOp		( PrimOp )
 import Util		( zipWithEqual )
+import Unique		( mkPseudoUnique1 )
 import Outputable
 import Panic		( panic, assertPanic )
 \end{code}
@@ -425,6 +427,23 @@ doTailCall arg_amodes arg_regs finish_code arity pending_assts
 
 	(fast_stk_amodes, tagged_stk_amodes) = 
 		splitAt arity stk_arg_amodes
+
+	-- eager blackholing, at the end of the basic block.
+	node_save = CTemp (mkPseudoUnique1 2) DataPtrRep
+	(r1_tmp_asst, bh_asst)
+	 = case sequel of
+#if 0
+	-- no: UpdateCode doesn't tell us that we're in a thunk's entry code.
+	-- we might be in a case continuation later down the line.  Also,
+	-- we might have pushed a return address on the stack, if we're in
+	-- a case scrut, and still be in the thunk's entry code.
+		UpdateCode -> 
+		   (CAssign node_save nodeReg,
+		    CAssign (CVal (CIndex node_save (mkIntCLit 0) PtrRep) 
+				  PtrRep)
+			    (CLbl mkBlackHoleInfoTableLabel DataPtrRep))
+#endif
+		_ -> (AbsCNop, AbsCNop)
     in
 	-- We can omit tags on the arguments passed to the fast entry point, 
 	-- but we have to be careful to fill in the tags on any *extra*
@@ -442,12 +461,14 @@ doTailCall arg_amodes arg_regs finish_code arity pending_assts
 		-- The stack space for the pushed return addess, 
 		-- with any args pushed on top, is recorded in final_sp.
 	
-		-- Do the simultaneous assignments,
-	doSimAssts (mkAbstractCs [pending_assts,
+			-- Do the simultaneous assignments,
+	doSimAssts (mkAbstractCs [r1_tmp_asst,
+				  pending_assts,
 			          reg_arg_assts, 
 				  fast_arg_assts, 
 				  tagged_arg_assts,
 			          tag_assts])	`thenC`
+	absC bh_asst `thenC`
 	
 		-- push a return address if necessary
 		-- (after the assignments above, in case we clobber a live

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.64 1999/11/01 18:17:45 sewardj Exp $
+ * $Id: GC.c,v 1.65 1999/11/02 15:05:56 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -162,25 +162,8 @@ void GarbageCollect(void (*get_roots)(void))
   CCCS = CCS_GC;
 #endif
 
-  /* We might have been called from Haskell land by _ccall_GC, in
-   * which case we need to call threadPaused() because the scheduler
-   * won't have done it.
-   */
-  if (CurrentTSO) { threadPaused(CurrentTSO); }
-
-  /* Approximate how much we allocated: number of blocks in the
-   * nursery + blocks allocated via allocate() - unused nusery blocks.
-   * This leaves a little slop at the end of each block, and doesn't
-   * take into account large objects (ToDo).
-   */
-  allocated = (nursery_blocks * BLOCK_SIZE_W) + allocated_bytes();
-  for ( bd = current_nursery->link; bd != NULL; bd = bd->link ) {
-    allocated -= BLOCK_SIZE_W;
-  }
-  if (current_nursery->free < current_nursery->start + BLOCK_SIZE_W) {
-    allocated -= (current_nursery->start + BLOCK_SIZE_W)
-      - current_nursery->free;
-  }
+  /* Approximate how much we allocated */
+  allocated = calcAllocated();
 
   /* Figure out which generation to collect
    */
@@ -333,12 +316,6 @@ void GarbageCollect(void (*get_roots)(void))
    */
   evac_gen = 0;
   get_roots();
-
-  /* And don't forget to mark the TSO if we got here direct from
-   * Haskell! */
-  if (CurrentTSO) {
-    CurrentTSO = (StgTSO *)MarkRoot((StgClosure *)CurrentTSO);
-  }
 
   /* Mark the weak pointer list, and prepare to detect dead weak
    * pointers.
@@ -669,13 +646,7 @@ void GarbageCollect(void (*get_roots)(void))
 
   /* Reset the nursery
    */
-  for (bd = g0s0->blocks; bd; bd = bd->link) {
-    bd->free = bd->start;
-    ASSERT(bd->gen == g0);
-    ASSERT(bd->step == g0s0);
-    IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
-  }
-  current_nursery = g0s0->blocks;
+  resetNurseries();
 
   /* start any pending finalizers */
   scheduleFinalizers(old_weak_ptr_list);
@@ -2919,9 +2890,10 @@ threadSqueezeStack(StgTSO *tso)
 #endif
 
       TICK_UPD_SQUEEZED();
-      /* wasn't there something about update squeezing and ticky to be sorted out?
-       * oh yes: we aren't counting each enter properly in this case.  See the log somewhere.
-       * KSW 1999-04-21 */
+      /* wasn't there something about update squeezing and ticky to be
+       * sorted out?  oh yes: we aren't counting each enter properly
+       * in this case.  See the log somewhere.  KSW 1999-04-21
+       */
       UPD_IND(updatee_bypass, updatee_keep); /* this wakes the threads up */
       
       sp = (P_)frame - 1;	/* sp = stuff to slide */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.7 1999/08/25 16:11:44 simonmar Exp $
+ * $Id: Rts.h,v 1.8 1999/11/02 15:05:52 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -10,8 +10,8 @@
 #ifndef RTS_H
 #define RTS_H
 
-#ifndef NO_REGS
-#define NO_REGS			/* don't define fixed registers */
+#ifndef IN_STG_CODE
+#define NOT_IN_STG_CODE
 #endif
 #include "Stg.h"
 

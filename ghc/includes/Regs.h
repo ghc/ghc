@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.4 1999/03/02 19:44:14 sof Exp $
+ * $Id: Regs.h,v 1.5 1999/11/02 15:05:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -25,7 +25,7 @@
  *     2) caller-saves registers are saved across a CCall
  */
 
-typedef struct {
+typedef struct StgRegTable_ {
   StgUnion 	  rR1;
   StgUnion   	  rR2;
   StgUnion   	  rR3;
@@ -48,9 +48,22 @@ typedef struct {
   StgPtr 	  rSpLim;
   StgPtr 	  rHp;
   StgPtr 	  rHpLim;
+  StgTSO         *rCurrentTSO;
+  bdescr         *rNursery;
+  bdescr         *rCurrentNursery;
+#ifdef SMP
+  struct StgRegTable_ *link;
+#endif
 } StgRegTable;
 
+/* No such thing as a MainRegTable under SMP - each thread must
+ * have its own MainRegTable.
+ */
+#ifndef SMP
 extern DLL_IMPORT_RTS StgRegTable  MainRegTable;
+#endif
+
+#ifdef IN_STG_CODE
 
 /*
  * Registers Hp and HpLim are global across the entire system, and are
@@ -85,32 +98,35 @@ extern DLL_IMPORT_RTS StgRegTable  MainRegTable;
 #define SAVE_Su    	    (CurrentTSO->su)
 #define SAVE_SpLim    	    (CurrentTSO->splim)
 
-#define SAVE_Hp	    	    (MainRegTable.rHp)
-#define SAVE_HpLim	    (MainRegTable.rHpLim)
+#define SAVE_Hp	    	    (BaseReg->rHp)
+#define SAVE_HpLim	    (BaseReg->rHpLim)
+
+#define SAVE_CurrentTSO     (BaseReg->rCurrentTSO)
+#define SAVE_CurrentNursery (BaseReg->rCurrentNursery)
 
 /* We sometimes need to save registers across a C-call, eg. if they
  * are clobbered in the standard calling convention.  We define the
  * save locations for all registers in the register table.
  */
 
-#define SAVE_R1             (MainRegTable.rR1)
-#define SAVE_R2             (MainRegTable.rR2)
-#define SAVE_R3             (MainRegTable.rR3)
-#define SAVE_R4             (MainRegTable.rR4)
-#define SAVE_R5             (MainRegTable.rR5)
-#define SAVE_R6             (MainRegTable.rR6)
-#define SAVE_R7             (MainRegTable.rR7)
-#define SAVE_R8             (MainRegTable.rR8)
+#define SAVE_R1             (BaseReg->rR1)
+#define SAVE_R2             (BaseReg->rR2)
+#define SAVE_R3             (BaseReg->rR3)
+#define SAVE_R4             (BaseReg->rR4)
+#define SAVE_R5             (BaseReg->rR5)
+#define SAVE_R6             (BaseReg->rR6)
+#define SAVE_R7             (BaseReg->rR7)
+#define SAVE_R8             (BaseReg->rR8)
  
-#define SAVE_F1             (MainRegTable.rF1)
-#define SAVE_F2             (MainRegTable.rF2)
-#define SAVE_F3             (MainRegTable.rF3)
-#define SAVE_F4             (MainRegTable.rF4)
+#define SAVE_F1             (BaseReg->rF1)
+#define SAVE_F2             (BaseReg->rF2)
+#define SAVE_F3             (BaseReg->rF3)
+#define SAVE_F4             (BaseReg->rF4)
 
-#define SAVE_D1             (MainRegTable.rD1)
-#define SAVE_D2             (MainRegTable.rD2)
+#define SAVE_D1             (BaseReg->rD1)
+#define SAVE_D2             (BaseReg->rD2)
 
-#define SAVE_L1             (MainRegTable.rL1)
+#define SAVE_L1             (BaseReg->rL1)
 
 /* -----------------------------------------------------------------------------
  * Emit the GCC-specific register declarations for each machine
@@ -240,6 +256,9 @@ GLOBAL_REG_DECL(StgWord64,L1,REG_L1)
 #ifdef REG_Base
 GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
 #else
+#ifdef SMP
+#error BaseReg must be in a register for SMP
+#endif
 #define BaseReg (&MainRegTable)
 #endif
 
@@ -271,6 +290,18 @@ GLOBAL_REG_DECL(P_,Hp,REG_Hp)
 GLOBAL_REG_DECL(P_,HpLim,REG_HpLim)
 #else
 #define HpLim (BaseReg->rHpLim)
+#endif
+
+#ifdef REG_CurrentTSO
+GLOBAL_REG_DECL(StgTSO *,CurrentTSO,REG_CurrentTSO)
+#else
+#define CurrentTSO (BaseReg->rCurrentTSO)
+#endif
+
+#ifdef REG_CurrentNursery
+GLOBAL_REG_DECL(bdescr *,CurrentNursery,REG_CurrentNursery)
+#else
+#define CurrentNursery (BaseReg->rCurrentNursery)
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -456,6 +487,9 @@ GLOBAL_REG_DECL(P_,HpLim,REG_HpLim)
 #endif
 
 #ifdef CALLER_SAVES_Base
+#ifdef SMP
+#error "Can't have caller-saved BaseReg with SMP"
+#endif
 #define CALLER_SAVE_Base	/* nothing */
 #define CALLER_RESTORE_Base	BaseReg = &MainRegTable;
 #else
@@ -463,9 +497,29 @@ GLOBAL_REG_DECL(P_,HpLim,REG_HpLim)
 #define CALLER_RESTORE_Base	/* nothing */
 #endif
 
+#ifdef CALLER_SAVES_CurrentTSO
+#define CALLER_SAVE_CurrentTSO   	SAVE_CurrentTSO = CurrentTSO;
+#define CALLER_RESTORE_CurrentTSO	CurrentTSO = SAVE_CurrentTSO;
+#else
+#define CALLER_SAVE_CurrentTSO   	/* nothing */
+#define CALLER_RESTORE_CurrentTSO   	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_CurrentNursery
+#define CALLER_SAVE_CurrentNursery   	SAVE_CurrentNursery = CurrentNursery;
+#define CALLER_RESTORE_CurrentNursery	CurrentNursery = SAVE_CurrentNursery;
+#else
+#define CALLER_SAVE_CurrentNursery   	/* nothing */
+#define CALLER_RESTORE_CurrentNursery   /* nothing */
+#endif
+
+#endif /* IN_STG_CODE */
+
 /* ----------------------------------------------------------------------------
    Handy bunches of saves/restores 
    ------------------------------------------------------------------------  */
+
+#ifdef IN_STG_CODE
 
 #define CALLER_SAVE_USER			\
   CALLER_SAVE_R1				\
@@ -489,7 +543,9 @@ GLOBAL_REG_DECL(P_,HpLim,REG_HpLim)
   CALLER_SAVE_Su				\
   CALLER_SAVE_SpLim				\
   CALLER_SAVE_Hp				\
-  CALLER_SAVE_HpLim
+  CALLER_SAVE_HpLim				\
+  CALLER_SAVE_CurrentTSO			\
+  CALLER_SAVE_CurrentNursery
 
 #define CALLER_RESTORE_USER			\
   CALLER_RESTORE_R1				\
@@ -514,7 +570,18 @@ GLOBAL_REG_DECL(P_,HpLim,REG_HpLim)
   CALLER_RESTORE_Su				\
   CALLER_RESTORE_SpLim				\
   CALLER_RESTORE_Hp				\
-  CALLER_RESTORE_HpLim
+  CALLER_RESTORE_HpLim				\
+  CALLER_RESTORE_CurrentTSO			\
+  CALLER_RESTORE_CurrentNursery
+
+#else /* not IN_STG_CODE */
+
+#define CALLER_SAVE_USER       /* nothing */
+#define CALLER_SAVE_SYSTEM     /* nothing */
+#define CALLER_RESTORE_USER    /* nothing */
+#define CALLER_RESTORE_SYSTEM  /* nothing */
+
+#endif /* IN_STG_CODE */
 
 #define CALLER_SAVE_ALL				\
   CALLER_SAVE_SYSTEM				\

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.32 1999/10/15 09:50:22 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.33 1999/11/02 15:05:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -790,6 +790,7 @@ FN_(forkzh_fast)
   /* create it right now, return ThreadID in R1 */
   R1.t = RET_STGCALL2(StgTSO *, createIOThread, 
 		      RtsFlags.GcFlags.initialStkSize, R1.cl);
+  STGCALL1(scheduleThread, R1.t);
       
   /* switch at the earliest opportunity */ 
   context_switch = 1;
@@ -868,16 +869,23 @@ FN_(takeMVarzh_fast)
 {
   StgMVar *mvar;
   StgClosure *val;
+  const StgInfoTable *info;
 
   FB_
   /* args: R1 = MVar closure */
 
   mvar = (StgMVar *)R1.p;
 
+#ifdef SMP
+  info = LOCK_CLOSURE(mvar);
+#else
+  info = GET_INFO(mvar);
+#endif
+
   /* If the MVar is empty, put ourselves on its blocking queue,
    * and wait until we're woken up.
    */
-  if (GET_INFO(mvar) != &FULL_MVAR_info) {
+  if (info == &EMPTY_MVAR_info) {
     if (mvar->head == (StgTSO *)&END_TSO_QUEUE_closure) {
       mvar->head = CurrentTSO;
     } else {
@@ -888,12 +896,20 @@ FN_(takeMVarzh_fast)
     CurrentTSO->block_info.closure = (StgClosure *)mvar;
     mvar->tail = CurrentTSO;
 
+#ifdef SMP
+    /* unlock the MVar */
+    mvar->header.info = &EMPTY_MVAR_info;
+#endif
     BLOCK(R1_PTR, takeMVarzh_fast);
   }
 
-  SET_INFO(mvar,&EMPTY_MVAR_info);
   val = mvar->value;
   mvar->value = (StgClosure *)&END_TSO_QUEUE_closure;
+
+  /* do this last... we might have locked the MVar in the SMP case,
+   * and writing the info pointer will unlock it.
+   */
+  SET_INFO(mvar,&EMPTY_MVAR_info);
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(val);
@@ -903,17 +919,24 @@ FN_(takeMVarzh_fast)
 FN_(putMVarzh_fast)
 {
   StgMVar *mvar;
+  const StgInfoTable *info;
 
   FB_
   /* args: R1 = MVar, R2 = value */
 
   mvar = (StgMVar *)R1.p;
-  if (GET_INFO(mvar) == &FULL_MVAR_info) {
+
+#ifdef SMP
+  info = LOCK_CLOSURE(mvar);
+#else
+  info = GET_INFO(mvar);
+#endif
+
+  if (info == &FULL_MVAR_info) {
     fprintf(stderr, "putMVar#: MVar already full.\n");
     stg_exit(EXIT_FAILURE);
   }
   
-  SET_INFO(mvar,&FULL_MVAR_info);
   mvar->value = R2.cl;
 
   /* wake up the first thread on the queue, it will continue with the
@@ -926,6 +949,9 @@ FN_(putMVarzh_fast)
       mvar->tail = (StgTSO *)&END_TSO_QUEUE_closure;
     }
   }
+
+  /* unlocks the MVar in the SMP case */
+  SET_INFO(mvar,&FULL_MVAR_info);
 
   /* ToDo: yield here for better communication performance? */
   JMP_(ENTRY_CODE(Sp[0]));
@@ -974,7 +1000,9 @@ FN_(waitReadzh_fast)
     ASSERT(CurrentTSO->why_blocked == NotBlocked);
     CurrentTSO->why_blocked = BlockedOnRead;
     CurrentTSO->block_info.fd = R1.i;
-    PUSH_ON_BLOCKED_QUEUE(CurrentTSO);
+    ACQUIRE_LOCK(&sched_mutex);
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    RELEASE_LOCK(&sched_mutex);
     JMP_(stg_block_noregs);
   FE_
 }
@@ -986,7 +1014,9 @@ FN_(waitWritezh_fast)
     ASSERT(CurrentTSO->why_blocked == NotBlocked);
     CurrentTSO->why_blocked = BlockedOnWrite;
     CurrentTSO->block_info.fd = R1.i;
-    PUSH_ON_BLOCKED_QUEUE(CurrentTSO);
+    ACQUIRE_LOCK(&sched_mutex);
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    RELEASE_LOCK(&sched_mutex);
     JMP_(stg_block_noregs);
   FE_
 }
@@ -1003,7 +1033,9 @@ FN_(delayzh_fast)
      */
     CurrentTSO->block_info.delay = R1.i + ticks_since_select;
 
-    PUSH_ON_BLOCKED_QUEUE(CurrentTSO);
+    ACQUIRE_LOCK(&sched_mutex);
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    RELEASE_LOCK(&sched_mutex);
     JMP_(stg_block_noregs);
   FE_
 }

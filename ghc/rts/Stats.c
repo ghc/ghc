@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.14 1999/09/15 13:45:20 simonmar Exp $
+ * $Id: Stats.c,v 1.15 1999/11/02 15:06:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,41 +14,7 @@
 #include "RtsUtils.h"
 #include "StoragePriv.h"
 #include "MBlock.h"
-
-/**
- *  Ian: For the moment we just want to ignore
- * these on Nemesis
- **/
-#ifdef _NEMESIS_OS_
-#ifdef HAVE_SYS_TIMES_H
-#undef HAVE_SYS_TIMES_H /* <sys/times.h> */
-#endif
-#ifdef HAVE_SYS_RESOURCE_H /* <sys/resource.h> */
-#undef HAVE_SYS_RESOURCE_H
-#endif
-#ifdef HAVE_SYS_TIME_H  /* <sys/time.h> */
-#undef HAVE_SYS_TIME_H
-#endif
-#ifdef HAVE_SYS_TIMEB_H 
-#undef HAVE_SYS_TIMEB_H /* <sys/timeb.h> */
-#endif
-#ifdef HAVE_UNISTD_H
-#undef HAVE_UNISTD_H    /* <unistd.h> */
-#endif
-#ifdef HAVE_TIMES
-#undef HAVE_TIMES
-#endif 
-#ifdef HAVE_FTIME
-#undef HAVE_FTIME
-#endif
-#ifdef HAVE_GETRUSAGE
-#undef HAVE_GETRUSAGE
-#endif
-#ifdef HAVE_SYSCONF
-#undef HAVE_SYSCONF
-#endif
-#endif /* _NEMESIS_OS_ */
-
+#include "Schedule.h"
 #include "Stats.h"
 
 #ifdef HAVE_UNISTD_H
@@ -369,8 +335,10 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
     FILE *sf = RtsFlags.GcFlags.statsFile;
 
     if (sf != NULL) {
-	double time = usertime();
-	double etime = elapsedtime();
+	double time     = usertime();
+	double etime    = elapsedtime();
+	double gc_time  = time-GC_start_time;
+	double gc_etime = etime-GCe_start_time;
 
 	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
 	    nat faults = pagefaults();
@@ -378,8 +346,8 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 	    fprintf(sf, "%9ld %9ld %9ld",
 		    alloc*sizeof(W_), collect*sizeof(W_), live*sizeof(W_));
 	    fprintf(sf, " %5.2f %5.2f %7.2f %7.2f %4ld %4ld  (Gen: %2ld)\n", 
-		    (time-GC_start_time), 
-		    (etime-GCe_start_time), 
+		    gc_time, 
+		    gc_etime,
 		    time,
 		    etime,
 		    faults - GC_start_faults,
@@ -396,6 +364,21 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 	GC_tot_alloc  += (ullong) alloc;
 	GC_tot_time   += time-GC_start_time;
 	GCe_tot_time  += etime-GCe_start_time;
+
+#ifdef SMP
+	{
+	  nat i;
+	  pthread_t me = pthread_self();
+
+	  for (i = 0; i < RtsFlags.ConcFlags.nNodes; i++) {
+	    if (me == task_ids[i].id) {
+	      task_ids[i].gc_time += gc_time;
+	      task_ids[i].gc_etime += gc_etime;
+	      break;
+	    }
+	  }
+	}
+#endif
 
 	if (gen == RtsFlags.GcFlags.generations-1) { /* major GC? */
 	  if (live > MaxResidency) {
@@ -434,10 +417,10 @@ stat_exit(int alloc)
 	if (time  == 0.0)  time = 0.0001;
 	if (etime == 0.0) etime = 0.0001;
 	
-
-	fprintf(sf, "%9ld %9.9s %9.9s",
-		(lnat)alloc*sizeof(W_), "", "");
-	fprintf(sf, " %5.2f %5.2f\n\n", 0.0, 0.0);
+	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
+	  fprintf(sf, "%9ld %9.9s %9.9s",	(lnat)alloc*sizeof(W_), "", "");
+	  fprintf(sf, " %5.2f %5.2f\n\n", 0.0, 0.0);
+	}
 
 	GC_tot_alloc += alloc;
 
@@ -465,10 +448,29 @@ stat_exit(int alloc)
 	fprintf(sf,"\n%11ld Mb total memory in use\n\n", 
 		mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
 
-	MutTime = time - GC_tot_time - InitUserTime;
-	if (MutTime < 0) { MutTime = 0; }
 	MutElapsedTime = etime - GCe_tot_time - InitElapsedTime;
 	if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
+
+#ifndef SMP
+	MutTime = time - GC_tot_time - InitUserTime;
+	if (MutTime < 0) { MutTime = 0; }
+
+#else /* SMP */
+	/* For SMP, we have to get the user time from each thread
+	 * and try to work out the total time.
+	 */
+	{
+	  nat i;
+	  MutTime = 0.0;
+	  for (i = 0; i < RtsFlags.ConcFlags.nNodes; i++) {
+	    fprintf(sf, "  Task %2d:  MUT time: %6.2fs,  GC time: %6.2fs\n", 
+		    i, task_ids[i].mut_time, task_ids[i].gc_time);
+	    MutTime += task_ids[i].mut_time;
+	  }
+	}
+	time = MutTime + GC_tot_time + InitUserTime;
+	fprintf(sf,"\n");
+#endif
 
 	fprintf(sf, "  INIT  time  %6.2fs  (%6.2fs elapsed)\n",
 		InitUserTime, InitElapsedTime);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.8 1999/02/05 16:03:02 simonm Exp $
+ * $Id: StoragePriv.h,v 1.9 1999/11/02 15:06:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -109,11 +109,16 @@ extern nat nursery_blocks;
 extern nat alloc_blocks;
 extern nat alloc_blocks_lim;
 
-extern bdescr *allocNursery ( bdescr *last_bd, nat blocks );
-extern void resizeNursery ( nat blocks );
+/* Nursery manipulation */
+extern void     allocNurseries ( void );
+extern void     resetNurseries ( void );
+extern bdescr * allocNursery   ( bdescr *last_bd, nat blocks );
+extern void     resizeNursery  ( nat blocks );
 
-extern lnat calcLive( void );
-extern lnat calcNeeded( void );
+/* Stats 'n' stuff */
+extern lnat calcAllocated  ( void );
+extern lnat calcLive       ( void );
+extern lnat calcNeeded     ( void );
 
 static inline void
 dbl_link_onto(bdescr *bd, bdescr **list)
