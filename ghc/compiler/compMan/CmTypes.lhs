@@ -70,8 +70,7 @@ data ModSummary
         ms_location :: ModuleLocation,       -- location
         ms_srcimps  :: [ModuleName],         -- source imports
         ms_imps     :: [ModuleName],         -- non-source imports
-        ms_hs_date  :: Maybe ClockTime       -- timestamp of summarised
-                                             -- file, if home && source
+        ms_hs_date  :: ClockTime      	     -- timestamp of summarised file
      }
 
 -- ToDo: shouldn't ms_srcimps and ms_imps be [Module]?  --SDM

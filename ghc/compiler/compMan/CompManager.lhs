@@ -34,31 +34,28 @@ where
 
 import CmLink
 import CmTypes
+import CmStaticInfo	( GhciMode(..) )
+import DriverPipeline
+import DriverFlags	( getDynFlags )
+import DriverPhases
+import DriverUtil
+import Finder
+import HscMain		( initPersistentCompilerState )
 import HscTypes
 import RnEnv		( unQualInScope )
 import Id		( idType, idName )
 import Name		( Name, NamedThing(..), nameRdrName )
 import NameEnv
 import RdrName		( lookupRdrEnv, emptyRdrEnv )
-import Module		( Module, ModuleName, moduleName, isHomeModule,
-			  mkModuleName, moduleNameUserString, moduleUserString )
-import CmStaticInfo	( GhciMode(..) )
-import DriverPipeline
+import Module
 import GetImports
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
-import HscTypes
-import HscMain		( initPersistentCompilerState )
-import Finder
 import UniqFM
 import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC )
-import DriverFlags	( getDynFlags )
-import DriverPhases
-import DriverUtil	( splitFilename3 )
 import ErrUtils		( showPass )
 import Util
-import DriverUtil
 import TmpFiles
 import Outputable
 import Panic
@@ -75,7 +72,6 @@ import PrelGHC		( unsafeCoerce# )
 import Exception	( throwDyn )
 
 -- std
-import Time             ( ClockTime )
 import Directory        ( getModificationTime, doesFileExist )
 import IO
 import Monad
@@ -632,13 +628,10 @@ getValidLinkable old_linkables objects_allowed new_linkables summary
 		    | otherwise          = maybeToList maybe_old_linkable
 
            -- only linkables newer than the source code are valid
-           maybe_src_date = ms_hs_date summary
+           src_date = ms_hs_date summary
 
 	   valid_linkable
-	      = case maybe_src_date of
-		  Nothing -> panic "valid_linkable_list"
-		  Just src_date	
-		     -> filter (\l -> linkableTime l > src_date) linkable
+	      =  filter (\l -> linkableTime l > src_date) linkable
 
        return (valid_linkable ++ new_linkables)
 
@@ -890,8 +883,12 @@ retainInTopLevelEnvs keep_these (hst, hit)
 downwards_closure_of_module :: [ModSummary] -> ModuleName -> [ModuleName]
 downwards_closure_of_module summaries root
    = let toEdge :: ModSummary -> (ModuleName,[ModuleName])
-         toEdge summ = (name_of_summary summ, ms_allimps summ)
-         res = simple_transitive_closure (map toEdge summaries) [root]             
+         toEdge summ = (name_of_summary summ, 
+			filter (`elem` all_mods) (ms_allimps summ))
+
+	 all_mods = map name_of_summary summaries
+
+         res = simple_transitive_closure (map toEdge summaries) [root]
      in
          --trace (showSDoc (text "DC of mod" <+> ppr root
          --                 <+> text "=" <+> ppr res)) (
@@ -948,7 +945,9 @@ downsweep rootNm old_summaries
                      rootSummaries
         all_summaries
            <- loop (concat (map ms_imps rootSummaries))
-		(filter (isHomeModule.ms_mod) rootSummaries)
+		(mkModuleEnv [ (mod, s) | s <- rootSummaries, 
+					  let mod = ms_mod s, isHomeModule mod 
+			     ])
         return (all_summaries, a_root_is_Main)
      where
 	getRootSummary :: FilePath -> IO ModSummary
@@ -962,46 +961,44 @@ downsweep rootNm old_summaries
 		if exists then summariseFile hs_file else do
 		exists <- doesFileExist lhs_file
 		if exists then summariseFile lhs_file else do
-		getSummary (mkModuleName file)
+		let mod_name = mkModuleName file
+		maybe_summary <- getSummary mod_name
+		case maybe_summary of
+		   Nothing -> packageModErr mod_name
+		   Just s  -> return s
            where 
 		 hs_file = file ++ ".hs"
 		 lhs_file = file ++ ".lhs"
 
-        getSummary :: ModuleName -> IO ModSummary
+        getSummary :: ModuleName -> IO (Maybe ModSummary)
         getSummary nm
            = do found <- findModule nm
 		case found of
 		   Just (mod, location) -> do
 			let old_summary = findModInSummaries old_summaries mod
-			new_summary <- summarise mod location old_summary
-			case new_summary of
-			   Nothing -> return (fromJust old_summary)
-			   Just s  -> return s
+			summarise mod location old_summary
 
 		   Nothing -> throwDyn (OtherError 
                                    ("can't find module `" 
                                      ++ showSDoc (ppr nm) ++ "'"))
-                                 
-        -- loop invariant: home_summaries doesn't contain package modules
-        loop :: [ModuleName] -> [ModSummary] -> IO [ModSummary]
-	loop [] home_summaries = return home_summaries
-        loop imps home_summaries
-           = do -- all modules currently in homeSummaries
-		let all_home = map (moduleName.ms_mod) home_summaries
 
-		-- imports for modules we don't already have
-                let needed_imps = nub (filter (`notElem` all_home) imps)
+        -- loop invariant: env doesn't contain package modules
+        loop :: [ModuleName] -> ModuleEnv ModSummary -> IO [ModSummary]
+	loop [] env = return (moduleEnvElts env)
+        loop imps env
+           = do -- imports for modules we don't already have
+                let needed_imps = nub (filter (not . (`elemUFM` env)) imps)
 
 		-- summarise them
                 needed_summaries <- mapM getSummary needed_imps
 
 		-- get just the "home" modules
-                let new_home_summaries
-                       = filter (isHomeModule.ms_mod) needed_summaries
+                let new_home_summaries = [ s | Just s <- needed_summaries ]
 
 		-- loop, checking the new imports
 		let new_imps = concat (map ms_imps new_home_summaries)
-                loop new_imps (new_home_summaries ++ home_summaries)
+                loop new_imps (extendModuleEnvList env 
+				[ (ms_mod s, s) | s <- new_home_summaries ])
 
 -----------------------------------------------------------------------------
 -- Summarising modules
@@ -1027,41 +1024,35 @@ summariseFile file
 	Just (mod, location)
 	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) file
 	   
-        maybe_src_timestamp
+        src_timestamp
            <- case ml_hs_file location of 
-                 Nothing     -> return Nothing
-                 Just src_fn -> maybe_getModificationTime src_fn
+                 Nothing     -> noHsFileErr mod_name
+                 Just src_fn -> getModificationTime src_fn
 
         return (ModSummary mod
                            location{ml_hspp_file=Just hspp_fn}
-                           srcimps imps
-                           maybe_src_timestamp)
+                           srcimps imps src_timestamp)
 
 -- Summarise a module, and pick up source and timestamp.
-summarise :: Module -> ModuleLocation -> Maybe ModSummary 
-    -> IO (Maybe ModSummary)
+summarise :: Module -> ModuleLocation -> Maybe ModSummary
+	 -> IO (Maybe ModSummary)
 summarise mod location old_summary
    | isHomeModule mod
    = do let hs_fn = unJust "summarise" (ml_hs_file location)
 
-        maybe_src_timestamp
+        src_timestamp
            <- case ml_hs_file location of 
-                 Nothing     -> return Nothing
-                 Just src_fn -> maybe_getModificationTime src_fn
+                 Nothing     -> noHsFileErr mod
+                 Just src_fn -> getModificationTime src_fn
 
 	-- return the cached summary if the source didn't change
 	case old_summary of {
-	   Just s | ms_hs_date s == maybe_src_timestamp -> return Nothing;
+	   Just s | ms_hs_date s == src_timestamp -> return (Just s);
 	   _ -> do
 
         hspp_fn <- preprocess hs_fn
         modsrc <- readFile hspp_fn
         let (srcimps,imps,mod_name) = getImports modsrc
-
-        maybe_src_timestamp
-           <- case ml_hs_file location of 
-                 Nothing     -> return Nothing
-                 Just src_fn -> maybe_getModificationTime src_fn
 
 	when (mod_name /= moduleName mod) $
 		throwDyn (OtherError 
@@ -1070,17 +1061,17 @@ summarise mod location old_summary
 			      <+> ppr mod_name)))
 
         return (Just (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
-                                 srcimps imps
-                                 maybe_src_timestamp))
+                                 srcimps imps src_timestamp))
         }
 
-   | otherwise
-   = return (Just (ModSummary mod location [] [] Nothing))
+   | otherwise = return Nothing
 
-maybe_getModificationTime :: FilePath -> IO (Maybe ClockTime)
-maybe_getModificationTime fn
-   = (do time <- getModificationTime fn
-         return (Just time)) 
-     `catch`
-     (\err -> return Nothing)
+noHsFileErr mod
+  = throwDyn (OtherError (showSDoc (text "no source file for module"
+			  	    <+> quotes (ppr mod))))
+
+packageModErr mod
+  = throwDyn (OtherError (showSDoc (text "module" <+>
+				    quotes (ppr mod) <+>
+				    text "is a package module")))
 \end{code}
