@@ -21,7 +21,7 @@ import CoreSyn
 import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
 import Id		( isDataConWorkId, isOneShotBndr, setOneShotLambda, 
-			  idOccInfo, setIdOccInfo,
+			  idOccInfo, setIdOccInfo, isLocalId,
 			  isExportedId, idArity, idSpecialisation, 
 			  idType, idUnique, Id
 			)
@@ -52,7 +52,7 @@ Here's the externally-callable interface:
 \begin{code}
 occurAnalysePgm :: [CoreBind] -> [CoreBind]
 occurAnalysePgm binds
-  = snd (go (initOccEnv emptyVarSet) binds)
+  = snd (go initOccEnv binds)
   where
     go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
     go env [] 
@@ -60,15 +60,14 @@ occurAnalysePgm binds
     go env (bind:binds) 
 	= (final_usage, bind' ++ binds')
 	where
-	   new_env	        = env `addNewCands` (bindersOf bind)
-	   (bs_usage, binds')   = go new_env binds
+	   (bs_usage, binds')   = go env binds
 	   (final_usage, bind') = occAnalBind env bind bs_usage
 
 occurAnalyseGlobalExpr :: CoreExpr -> CoreExpr
 occurAnalyseGlobalExpr expr
   = 	-- Top level expr, so no interesting free vars, and
 	-- discard occurence info returned
-    snd (occAnal (initOccEnv emptyVarSet) expr)
+    snd (occAnal initOccEnv expr)
 
 occurAnalyseRule :: CoreRule -> CoreRule
 occurAnalyseRule rule@(BuiltinRule _ _) = rule
@@ -76,7 +75,7 @@ occurAnalyseRule (Rule str act tpl_vars tpl_args rhs)
 		-- Add occ info to tpl_vars, rhs
   = Rule str act tpl_vars' tpl_args rhs'
   where
-    (rhs_uds, rhs') = occAnal (initOccEnv (mkVarSet tpl_vars)) rhs
+    (rhs_uds, rhs') = occAnal initOccEnv rhs
     (_, tpl_vars')  = tagBinders rhs_uds tpl_vars
 \end{code}
 
@@ -158,12 +157,11 @@ occAnalBind env (Rec pairs) body_usage
   = foldr (_scc_ "occAnalBind.dofinal" do_final_bind) (body_usage, []) sccs
   where
     binders = map fst pairs
-    rhs_env = env `addNewCands` binders
 
     analysed_pairs :: [Details1]
     analysed_pairs  = [ (bndr, rhs_usage, rhs')
 		      | (bndr, rhs) <- pairs,
-			let (rhs_usage, rhs') = occAnalRhs rhs_env bndr rhs
+			let (rhs_usage, rhs') = occAnalRhs env bndr rhs
 		      ]
 
     sccs :: [SCC (Node Details1)]
@@ -380,7 +378,7 @@ occAnalRhs env id rhs
   where
     (rhs_usage, rhs') = occAnal ctxt rhs
     ctxt | certainly_inline id = env
-	 | otherwise	       = rhsCtxt env
+	 | otherwise	       = rhsCtxt
 	-- Note that we generally use an rhsCtxt.  This tells the occ anal n
 	-- that it's looking at an RHS, which has an effect in occAnalApp
 	--
@@ -431,8 +429,8 @@ occAnal env (Type t)  = (emptyDetails, Type t)
 occAnal env (Var v) 
   = (var_uds, Var v)
   where
-    var_uds | isCandidate env v = unitVarEnv v oneOcc
-	    | otherwise	        = emptyDetails
+    var_uds | isLocalId v = unitVarEnv v oneOcc
+	    | otherwise	 = emptyDetails
 
     -- At one stage, I gathered the idRuleVars for v here too,
     -- which in a way is the right thing to do.
@@ -440,7 +438,6 @@ occAnal env (Var v)
     -- the *occurrences* of the overloaded function didn't have any
     -- rules in them, so the *specialised* versions looked as if they
     -- weren't used at all.
-
 \end{code}
 
 We regard variables that occur as constructor arguments as "dangerousToDup":
@@ -517,14 +514,15 @@ occAnal env expr@(Lam _ _)
     (really_final_usage,
      mkLams tagged_binders body') }
   where
-    (binders, body)   = collectBinders expr
-    (linear, env1, _) = oneShotGroup env binders
-    env2	      = env1 `addNewCands` binders	-- Add in-scope binders
-    env_body	      = vanillaCtxt env2		-- Body is (no longer) an RhsContext
+    env_body	    = vanillaCtxt			-- Body is (no longer) an RhsContext
+    (binders, body) = collectBinders expr
+    binders' 	    = oneShotGroup env binders
+    linear	    = all is_one_shot binders'
+    is_one_shot b   = isId b && isOneShotBndr b
 
 occAnal env (Case scrut bndr ty alts)
-  = case mapAndUnzip (occAnalAlt alt_env bndr) alts of { (alts_usage_s, alts')   -> 
-    case occAnal (vanillaCtxt env) scrut	    of { (scrut_usage, scrut') ->
+  = case mapAndUnzip (occAnalAlt env bndr) alts of { (alts_usage_s, alts')   -> 
+    case occAnal vanillaCtxt scrut		    of { (scrut_usage, scrut') ->
 	-- No need for rhsCtxt
     let
 	alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
@@ -534,8 +532,6 @@ occAnal env (Case scrut bndr ty alts)
     in
     total_usage `seq` (total_usage, Case scrut' tagged_bndr ty alts') }}
   where
-    alt_env = env `addNewCand` bndr
-
 	-- The case binder gets a usage of either "many" or "dead", never "one".
 	-- Reason: we like to inline single occurrences, to eliminate a binding,
 	-- but inlining a case binder *doesn't* eliminate a binding.
@@ -548,17 +544,15 @@ occAnal env (Case scrut bndr ty alts)
 				Just occ -> extendVarEnv usage bndr (markMany occ)
 
 occAnal env (Let bind body)
-  = case occAnal new_env body            of { (body_usage, body') ->
+  = case occAnal env body     	         of { (body_usage, body') ->
     case occAnalBind env bind body_usage of { (final_usage, new_binds) ->
        (final_usage, mkLets new_binds body') }}
-  where
-    new_env = env `addNewCands` (bindersOf bind)
 
 occAnalArgs env args
   = case mapAndUnzip (occAnal arg_env) args of	{ (arg_uds_s, args') ->
     (foldr combineUsageDetails emptyDetails arg_uds_s, args')}
   where
-    arg_env = vanillaCtxt env
+    arg_env = vanillaCtxt
 \end{code}
 
 Applications are dealt with specially because we want
@@ -586,8 +580,8 @@ occAnalApp env (Var fun, args) is_rhs
   where
     fun_uniq = idUnique fun
 
-    fun_uds | isCandidate env fun = unitVarEnv fun oneOcc
-	    | otherwise	  	  = emptyDetails
+    fun_uds | isLocalId fun = unitVarEnv fun oneOcc
+	    | otherwise	    = emptyDetails
 
     args_stuff	| fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args
 		| fun_uniq == augmentIdKey  = appSpecial env 2 [True,True]  args
@@ -624,7 +618,7 @@ appSpecial :: OccEnv
 appSpecial env n ctxt args
   = go n args
   where
-    arg_env = vanillaCtxt env
+    arg_env = vanillaCtxt
 
     go n [] = (emptyDetails, [])	-- Too few args
 
@@ -652,7 +646,7 @@ If e turns out to be (e1,e2) we indeed get something like
 
 \begin{code}
 occAnalAlt env case_bndr (con, bndrs, rhs)
-  = case occAnal (env `addNewCands` bndrs) rhs of { (rhs_usage, rhs') ->
+  = case occAnal env rhs of { (rhs_usage, rhs') ->
     let
         (final_usage, tagged_bndrs) = tagBinders rhs_usage bndrs
 	final_bndrs | case_bndr `elemVarEnv` final_usage = bndrs
@@ -672,8 +666,7 @@ occAnalAlt env case_bndr (con, bndrs, rhs)
 
 \begin{code}
 data OccEnv
-  = OccEnv IdSet	-- In-scope Ids; we gather info about these only
-	   OccEncl	-- Enclosing context information
+  = OccEnv OccEncl	-- Enclosing context information
 	   CtxtTy	-- Tells about linearity
 
 -- OccEncl is used to control whether to inline into constructor arguments
@@ -700,42 +693,28 @@ type CtxtTy = [Bool]
 	--			be applied many times; but when it is, 
 	--			the CtxtTy inside applies
 
-initOccEnv :: VarSet -> OccEnv
-initOccEnv vars = OccEnv vars OccRhs []
+initOccEnv :: OccEnv
+initOccEnv = OccEnv OccRhs []
 
-isRhsEnv (OccEnv _ OccRhs     _) = True
-isRhsEnv (OccEnv _ OccVanilla _) = False
+vanillaCtxt = OccEnv OccVanilla []
+rhsCtxt     = OccEnv OccRhs     []
 
-isCandidate :: OccEnv -> Id -> Bool
-isCandidate (OccEnv cands encl _) id = id `elemVarSet` cands 
-
-addNewCands :: OccEnv -> [Id] -> OccEnv
-addNewCands (OccEnv cands encl ctxt) ids
-  = OccEnv (extendVarSetList cands ids) encl ctxt
-
-addNewCand :: OccEnv -> Id -> OccEnv
-addNewCand (OccEnv cands encl ctxt) id
-  = OccEnv (extendVarSet cands id) encl ctxt
+isRhsEnv (OccEnv OccRhs     _) = True
+isRhsEnv (OccEnv OccVanilla _) = False
 
 setCtxt :: OccEnv -> CtxtTy -> OccEnv
-setCtxt (OccEnv cands encl _) ctxt = OccEnv cands encl ctxt
+setCtxt (OccEnv encl _) ctxt = OccEnv encl ctxt
 
-oneShotGroup :: OccEnv -> [CoreBndr] -> (Bool, OccEnv, [CoreBndr])
-	-- True <=> this is a one-shot linear lambda group
-	-- The [CoreBndr] are the binders.
-
+oneShotGroup :: OccEnv -> [CoreBndr] -> [CoreBndr]
 	-- The result binders have one-shot-ness set that they might not have had originally.
 	-- This happens in (build (\cn -> e)).  Here the occurrence analyser
 	-- linearity context knows that c,n are one-shot, and it records that fact in
 	-- the binder. This is useful to guide subsequent float-in/float-out tranformations
 
-oneShotGroup (OccEnv cands encl ctxt) bndrs 
-  = case go ctxt bndrs [] of
-	(new_ctxt, new_bndrs) -> (all is_one_shot new_bndrs, OccEnv cands encl new_ctxt, new_bndrs)
+oneShotGroup (OccEnv encl ctxt) bndrs 
+  = go ctxt bndrs []
   where
-    is_one_shot b = isId b && isOneShotBndr b
-
-    go ctxt [] rev_bndrs = (ctxt, reverse rev_bndrs)
+    go ctxt [] rev_bndrs = reverse rev_bndrs
 
     go (lin_ctxt:ctxt) (bndr:bndrs) rev_bndrs
 	| isId bndr = go ctxt bndrs (bndr':rev_bndrs)
@@ -745,12 +724,8 @@ oneShotGroup (OccEnv cands encl ctxt) bndrs
 
     go ctxt (bndr:bndrs) rev_bndrs = go ctxt bndrs (bndr:rev_bndrs)
 
-
-vanillaCtxt (OccEnv cands _ _) = OccEnv cands OccVanilla []
-rhsCtxt     (OccEnv cands _ _) = OccEnv cands OccRhs     []
-
-addAppCtxt (OccEnv cands encl ctxt) args 
-  = OccEnv cands encl (replicate (valArgCount args) True ++ ctxt)
+addAppCtxt (OccEnv encl ctxt) args 
+  = OccEnv encl (replicate (valArgCount args) True ++ ctxt)
 \end{code}
 
 %************************************************************************
