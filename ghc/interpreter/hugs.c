@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.77 $
- * $Date: 2000/06/23 12:09:01 $
+ * $Revision: 1.78 $
+ * $Date: 2000/06/28 10:42:17 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -873,6 +873,18 @@ HugsBreakAction setBreakAction ( HugsBreakAction newAction )
 {
    HugsBreakAction tmp = currentBreakAction;
    currentBreakAction = newAction;
+
+#  if defined(mingw32_TARGET_OS)
+   /* Be wierd.  You can't longjmp in a signal handler,
+      and posix signals are not supported.
+   */
+   if (newAction == HugsRtsInterrupt) {
+      setHandler ( handler_RtsInterrupt );
+   } else {
+      signal(SIGINT,SIG_IGN);
+   }
+#  else
+   /* do it Right */
    switch (newAction) {
       case HugsIgnoreBreak:
          setHandler ( handler_IgnoreBreak ); break;
@@ -883,6 +895,8 @@ HugsBreakAction setBreakAction ( HugsBreakAction newAction )
       default:
          internal("setBreakAction");
    }
+#  endif
+
    return tmp;
 }
 

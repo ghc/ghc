@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.43 $
- * $Date: 2000/05/26 10:14:33 $
+ * $Revision: 1.44 $
+ * $Date: 2000/06/28 10:42:17 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -578,7 +578,9 @@ extern HugsBreakAction setBreakAction ( HugsBreakAction );
 
 #else
 
-#define setHandler(bh)  do { } while(0)
+#define setHandler(bh)  { void* old_hdlr = signal(SIGINT,bh);\
+                          if (old_hdlr == SIG_ERR) internal("setHandler"); \
+                         }
 
 #endif /* !defined(mingw32_TARGET_OS) */
 
