@@ -42,8 +42,6 @@ module Numeric (
 
 	) where
 
-import Data.Char
-
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Read
@@ -54,6 +52,8 @@ import GHC.Show
 import Data.Maybe
 import Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )
 import qualified Text.Read.Lex as L
+#else
+import Data.Char
 #endif
 
 #ifdef __HUGS__
