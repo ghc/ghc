@@ -106,13 +106,17 @@ instance (Outputable name) => Outputable (HsType name) where
     ppr = pprHsType
 
 instance (Outputable name) => Outputable (HsTyVar name) where
-    ppr sty (UserTyVar name) = ppr_hs_tyvar sty name
-    ppr sty (IfaceTyVar name kind) = ppCat [ppr_hs_tyvar sty name, ppStr "::", ppr sty kind]
+    ppr sty (UserTyVar name) = ppr_hs_tyname sty name
+    ppr sty (IfaceTyVar name kind) = ppCat [ppr_hs_tyname sty name, ppStr "::", ppr sty kind]
 
 
--- Here
-ppr_hs_tyvar PprInterface tv_name = ppr PprForUser tv_name
-ppr_hs_tyvar other_sty    tv_name = ppr other_sty tv_name
+-- Here comes a rather gross hack.  
+-- We want to print data and class decls in interface files, from the original source
+-- When we do, we want the type variables to come out with their original names, not
+-- some new unique (or else interfaces wobble too much).  So when we come to one of
+-- these type variables we sneakily change the style to PprForUser!
+ppr_hs_tyname PprInterface tv_name = ppr PprForUser tv_name
+ppr_hs_tyname other_sty    tv_name = ppr other_sty tv_name
 
 ppr_forall sty ctxt_prec [] [] ty
    = ppr_mono_ty sty ctxt_prec ty
@@ -148,7 +152,7 @@ pprParendHsType sty ty = ppr_mono_ty sty pREC_CON ty
 ppr_mono_ty sty ctxt_prec (HsPreForAllTy ctxt ty)     = ppr_forall sty ctxt_prec [] ctxt ty
 ppr_mono_ty sty ctxt_prec (HsForAllTy tvs ctxt ty)    = ppr_forall sty ctxt_prec tvs ctxt ty
 
-ppr_mono_ty sty ctxt_prec (MonoTyVar name) = ppr_hs_tyvar sty name
+ppr_mono_ty sty ctxt_prec (MonoTyVar name) = ppr_hs_tyname sty name
 
 ppr_mono_ty sty ctxt_prec (MonoFunTy ty1 ty2)
   = let p1 = ppr_mono_ty sty pREC_FUN ty1
@@ -164,7 +168,7 @@ ppr_mono_ty sty ctxt_prec (MonoListTy _ ty)
  = ppBesides [ppLbrack, ppr_mono_ty sty pREC_TOP ty, ppRbrack]
 
 ppr_mono_ty sty ctxt_prec (MonoTyApp tycon tys)
-  = let pp_tycon = ppr sty tycon in
+  = let pp_tycon = ppr_hs_tyname sty tycon in
     if null tys then
 	pp_tycon
     else 
