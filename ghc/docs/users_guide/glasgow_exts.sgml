@@ -139,63 +139,142 @@ program), you may wish to check if there are libraries that provide a
 <xref linkend="book-hslibs">.
 </Para>
 
-<Sect1 id="language-options">
-<Title>Language variations
-</Title>
+  <sect1 id="options-language">
+    <title>Language options</title>
 
-<Para> There are several flags that control what variation of the language are permitted.
-Leaving out all of them gives you standard Haskell 98.</Para>
+    <indexterm><primary>language</primary><secondary>option</secondary>
+    </indexterm>
+    <indexterm><primary>options</primary><secondary>language</secondary>
+    </indexterm>
+    <indexterm><primary>extensions</primary><secondary>options controlling</secondary>
+    </indexterm>
 
-<VariableList>
+    <para> These flags control what variation of the language are
+    permitted.  Leaving out all of them gives you standard Haskell
+    98.</Para>
 
-<VarListEntry>
-<Term><Option>-fglasgow-exts</Option>:</Term>
-<ListItem>
-<Para>This simultaneously enables all of the extensions to Haskell 98 described in this
-chapter, except where otherwise noted. </Para>
-</ListItem> </VarListEntry>
+    <variablelist>
 
-<VarListEntry>
-<Term><Option>-fno-monomorphism-restriction</Option>:</Term>
-<ListItem>
-<Para> Switch off the Haskell 98 monomorphism restriction.  Independent of the <Option>-fglasgow-exts</Option>
-flag. </Para>
-</ListItem> </VarListEntry>
+      <varlistentry>
+	<term><option>-fglasgow-exts</option>:</term>
+	<indexterm><primary><option>-fglasgow-exts</option></primary></indexterm>
+	<listitem>
+	  <para>This simultaneously enables all of the extensions to
+          Haskell 98 described in <xref
+          linkend="ghc-language-features">, except where otherwise
+          noted. </para>
+	</listitem>
+      </varlistentry>
 
-<VarListEntry>
-<Term><Option>-fallow-overlapping-instances</Option>,
-      <Option>-fallow-undecidable-instances</Option>,  
-      <Option>-fcontext-stack</Option>:</Term>
-<ListItem>
-<Para> See <XRef LinkEnd="instance-decls">. 
-Only relevant if you also use <Option>-fglasgow-exts</Option>.
-</Para>
-</ListItem> </VarListEntry>
+      <varlistentry>
+	<term><option>-fno-monomorphism-restriction</option>:</term>
+	<indexterm><primary><option>-fno-monomorphism-restriction</option></primary></indexterm>
+	<listitem>
+	  <para> Switch off the Haskell 98 monomorphism restriction.
+          Independent of the <Option>-fglasgow-exts</Option>
+          flag. </para>
+	</listitem>
+      </varlistentry>
 
-<VarListEntry>
-<Term><Option>-fignore-asserts</Option>:</Term>
-<ListItem>
-<Para> See <XRef LinkEnd="sec-assertions">.
-Only relevant if you also use <Option>-fglasgow-exts</Option>.
-</Para>
-</ListItem> </VarListEntry>
+      <varlistentry>
+	<term><option>-fallow-overlapping-instances</option></term>
+	<term><option>-fallow-undecidable-instances</option></term>
+	<term><option>-fcontext-stack</option></term>
+	<indexterm><primary><option>-fallow-overlapping-instances</option></primary></indexterm>
+	<indexterm><primary><option>-fallow-undecidable-instances</option></primary></indexterm>
+	<indexterm><primary><option>-fcontext-stack</option></primary></indexterm>
+	<listitem>
+	  <para> See <XRef LinkEnd="instance-decls">.  Only relevant
+          if you also use <option>-fglasgow-exts</option>.</para>
+	</listitem>
+      </varlistentry>
 
-<VarListEntry>
-<Term> <Option>-finline-phase</Option>:</Term>
-<ListItem>
-<Para> See <XRef LinkEnd="rewrite-rules">.
-Only relevant if you also use <Option>-fglasgow-exts</Option>.</para>
-</ListItem> </VarListEntry>
+      <varlistentry>
+	<term><option>-fignore-asserts</option>:</term>
+	<indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
+	<listitem>
+	  <para>See <XRef LinkEnd="sec-assertions">.  Only relevant if
+          you also use <option>-fglasgow-exts</option>.</Para>
+	</listitem>
+      </varlistentry>
 
-<VarListEntry>
-<Term> <Option>-fgenerics</Option>:</Term>
-<ListItem>
-<Para> See <XRef LinkEnd="generic-classes">.
-Independent of <Option>-fglasgow-exts</Option>.
-</Para>
-</ListItem> </VarListEntry>
+      <varlistentry>
+	<term><option>-finline-phase</option></term>
+	<indexterm><primary><option>-finline-phase</option></primary></indexterm>
+	<listitem>
+	  <para>See <XRef LinkEnd="rewrite-rules">.  Only relevant if
+          you also use <Option>-fglasgow-exts</Option>.</para>
+	</listitem>
+      </varlistentry>
 
-</VariableList>
+      <varlistentry>
+	<term><option>-fgenerics</option></term>
+	<indexterm><primary><option>-fgenerics</option></primary></indexterm>
+	<listitem>
+	  <para>See <XRef LinkEnd="generic-classes">.  Independent of
+          <Option>-fglasgow-exts</Option>.</para>
+	</listitem>
+      </varlistentry>
+
+	<varlistentry>
+	  <term><option>-fno-implicit-prelude</option></term>
+	  <listitem>
+	    <para><indexterm><primary>-fno-implicit-prelude
+            option</primary></indexterm> GHC normally imports
+            <filename>Prelude.hi</filename> files for you.  If you'd
+            rather it didn't, then give it a
+            <option>-fno-implicit-prelude</option> option.  The idea
+            is that you can then import a Prelude of your own.  (But
+            don't call it <literal>Prelude</literal>; the Haskell
+            module namespace is flat, and you must not conflict with
+            any Prelude module.)</para>
+
+	    <para>Even though you have not imported the Prelude, all
+            the built-in syntax still refers to the built-in Haskell
+            Prelude types and values, as specified by the Haskell
+            Report.  For example, the type <literal>[Int]</literal>
+            still means <literal>Prelude.[] Int</literal>; tuples
+            continue to refer to the standard Prelude tuples; the
+            translation for list comprehensions continues to use
+            <literal>Prelude.map</literal> etc.</para>
+
+	    <para> With one group of exceptions!  You may want to
+            define your own numeric class hierarchy.  It completely
+            defeats that purpose if the literal "1" means
+            "<literal>Prelude.fromInteger 1</literal>", which is what
+            the Haskell Report specifies.  So the
+            <option>-fno-implicit-prelude</option> flag causes the
+            following pieces of built-in syntax to refer to whatever
+            is in scope, not the Prelude versions:</para>
+
+	    <itemizedlist>
+	      <listitem>
+		<para>Integer and fractional literals mean
+                "<literal>fromInteger 1</literal>" and
+                "<literal>fromRational 3.2</literal>", not the
+                Prelude-qualified versions; both in expressions and in
+                patterns.</para>
+	      </listitem>
+
+	      <listitem>
+		<para>Negation (e.g. "<literal>- (f x)</literal>")
+		means "<literal>negate (f x)</literal>" (not
+		<literal>Prelude.negate</literal>).</para>
+	      </listitem>
+
+	      <listitem>
+		<para>In an n+k pattern, the standard Prelude
+                <literal>Ord</literal> class is used for comparison,
+                but the necessary subtraction uses whatever
+                "<literal>(-)</literal>" is in scope (not
+                "<literal>Prelude.(-)</literal>").</para>
+	      </listitem>
+	    </itemizedlist>
+
+	  </listitem>
+	</varlistentry>
+
+    </variablelist>
   </sect1>
 
 <Sect1 id="primitives">

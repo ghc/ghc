@@ -1,0 +1,1577 @@
+  <sect1>
+    <title>Flag reference</title>
+
+    <sect2>
+      <title>Help and verbosity options (<xref linkend="options-help">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-?</option></entry>
+	      <entry>help</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-help</option></entry>
+	      <entry>help</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-v</option></entry>
+	      <entry>verbose mode (equivalent to <option>-v3</option>)</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-v</option><replaceable>n</replaceable></entry>
+	      <entry>set verbosity level</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>--version</option></entry>
+	      <entry>display GHC version</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>--numeric-version</option></entry>
+	      <entry>display GHC version (numeric only)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+
+    </sect2>
+    <sect2>
+      <title>Which phases to run (<xref linkend="options-order">)</title>
+      
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-cpp</option></entry>
+	      <entry>Run the C pre-processor on the Haskell source</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-E</option></entry>
+	      <entry>Stop after preprocessing (<literal>.hspp</literal> file)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-C</option></entry>
+	      <entry>Stop after generating C (<literal>.hc</literal> file)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-S</option></entry>
+	      <entry>Stop after generating assembly (<literal>.s</literal> file)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-c</option></entry>
+	      <entry>Stop after compiling to object code (<literal>.o</literal> file)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fasm</option></entry>
+	      <entry>Use the native code generator</entry>
+	      <entry>dynamic</entry>
+	      <entry>-fvia-C</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fvia-C</option></entry>
+	      <entry>Compile via C</entry>
+	      <entry>dynamic</entry>
+	      <entry>-fasm</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Redirecting output (<xref linkend="options-output">)</title>
+      
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-hisuf</option> <replaceable>suffix</replaceable></entry>
+	      <entry>set the suffix to use for interface files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-o</option> <replaceable>filename</replaceable></entry>
+	      <entry>set output filename</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-odir</option> <replaceable>dir</replaceable></entry>
+	      <entry>set output directory</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ohi</option> <replaceable>filename</replaceable></entry>
+	      <entry>set the filename in which to put the interface</entry>
+	      <entry>static</entry>
+	      <entry></entry>
+	    </row>
+	    <row>
+	      <entry><option>-osuf</option> <replaceable>suffix</replaceable></entry>
+	      <entry>set the output file suffix</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Keeping intermediate files (<xref linkend="keeping-intermediates">)</title>
+      
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-keep-hc-file</option></entry>
+	      <entry>retain intermediate <literal>.hc</literal> files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-keep-s-file</option></entry>
+	      <entry>retain intermediate <literal>.s</literal> files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-keep-raw-s-file</option></entry>
+	      <entry>retain intermediate <literal>.raw_s</literal> files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-keep-tmp-files</option></entry>
+	      <entry>retain all intermediate temporary files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Temporary files (<xref linkend="temp-files">)</title>
+      
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-tmpdir</option></entry>
+	      <entry>set the directory for temporary files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Finding imports (<xref linkend="options-finding-imports">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-i</option><replaceable>dir1</replaceable>:<replaceable>dir2</replaceable>:...</entry>
+	      <entry>add <replaceable>dir</replaceable>,
+	          <replaceable>dir2</replaceable>, etc. to import path</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-i</option></entry>
+	      <entry>Empty the import directory list</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Interface file options (<xref linkend="hi-options">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-ohi</option> <replaceable>file</replaceable></entry>
+	      <entry>Put the interface file in <replaceable>file</replaceable></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-hi</option></entry>
+	      <entry>Dump the new interface to stdout</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-hi-diffs</option></entry>
+	      <entry>Show the differences vs. the old interface</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+    
+    <sect2>
+      <title>Recompilation checking (<xref linkend="recomp">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-no-recomp</option></entry>
+	      <entry>Turn off recompilation checking</entry>
+	      <entry>static</entry>
+	      <entry>-recomp</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Packages (<xref linkend="packages">)</title>
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+    	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>--add-package</option></entry>
+	      <entry>Install a new package</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>--delete-package</option> <replaceable>name</replaceable></entry>
+	      <entry>Delete package entry <replaceable>name</replaceable></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>--list-packages</option></entry>
+	      <entry>List installed packages</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-package</option> <replaceable>name</replaceable></entry>
+	      <entry>Use package <replaceable>name</replaceable></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-package-name</option> <replaceable>name</replaceable></entry>
+	      <entry>Compile code for package <replaceable>name</replaceable></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Language options (<xref linkend="options-language">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+    	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-fallow-overlapping-instances</option></entry>
+	      <entry></entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-allow-overlapping-instances</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fallow-undecidable-instances</option></entry>
+	      <entry>Enable undecidable instances</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-allow-undecidable-instances</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fgenerics</option></entry>
+	      <entry>Enable generics</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-fgenerics</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fglasgow-exts</option></entry>
+	      <entry>Enable most language extensions</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-glasgow-exts</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fignore-asserts</option></entry>
+	      <entry>Ignore assertions</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-ignore-asserts</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fno-implicit-prelude</option></entry>
+	      <entry>Don't implicitly <literal>import Prelude</literal></entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fno-monomorphism-restriction</option></entry>
+	      <entry>Disable the monomorphism restriction</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-firrefutable-tuples</option></entry>
+	      <entry>Make tuple pattern matching irrefutable</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-irrefutable-tuples</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fcontext-stack</option><replaceable>n</replaceable></entry>
+	      <entry>set the limit for context reduction</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-</option></entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Warnings (<xref linkend="options-sanity">)</title>
+      
+    <informaltable>
+      <tgroup cols=3 align=left colsep=1 rowsep=1>
+	<thead>
+	  <row>
+	    <entry>Flag</entry>
+	    <entry>Description</entry>
+	    <entry>Static/Dynamic</entry>
+	    <entry>Reverse</entry>
+	  </row>
+	</thead>
+	<tbody>
+	  <row>
+	    <entry><option>-W</option></entry>
+	    <entry>enable normal warnings</entry>
+	    <entry>static</entry>
+	    <entry><option>-w</option></entry>
+	  </row>
+	  <row>
+	    <entry><option>-w</option></entry>
+	    <entry>disable all warnings</entry>
+	    <entry>static</entry>
+	    <entry>-</entry>
+	  </row>
+	  <row>
+	    <entry><option>-Wall</option></entry>
+	    <entry>enable all warnings</entry>
+	    <entry>static</entry>
+	    <entry><option>-w</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-deprecations</option></entry>
+	    <entry>warn about uses of functions & types that are deprecated</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-deprecations</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-duplicate-exports</option></entry>
+	    <entry>warn when an entity is exported multiple times</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-duplicate-exports</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-hi-shadowing</option></entry>
+	    <entry>warn when a <literal>.hi</literal> file in the
+	    current directory shadows a library</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-hi-shadowing</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-incomplete-patterns</option></entry>
+	    <entry>warn when a pattern match could fail</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-incomplete-patterns</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-missing-fields</option></entry>
+	    <entry>warn when fields of a record are uninitialised</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-missing-fields</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-missing-methods</option></entry>
+	    <entry>warn when class methods are undefined</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-missing-methods</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-missing-signatures</option></entry>
+	    <entry>warn about top-level functions without signatures</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-missing-signatures</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-name-shadowing</option></entry>
+	    <entry>warn when names are shadowed</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-name-shadowing</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-overlapping-patterns</option></entry>
+	    <entry>warn about overlapping patterns</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-overlapping-patterns</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-simple-patterns</option></entry>
+	    <entry>warn about lambda-patterns that can fail</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-simple-patterns</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-type-defaults</option></entry>
+	    <entry>warn when defaulting happens</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-type-defaults</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-unused-binds</option></entry>
+	    <entry>warn about bindings that are unused</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-unused-binds</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-unused-imports</option></entry>
+	    <entry>warn about unnecessary imports</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-unused-imports</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-unused-matches</option></entry>
+	    <entry>warn about variables in patterns that aren't used</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-unused-matches</option></entry>
+	  </row>
+
+	  </tbody>
+	</tgroup>
+      </informaltable>
+
+    </sect2>
+    <sect2>
+      <title>Optimisation levels (<xref linkend="options-optimise">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-O</option></entry>
+	      <entry>Enable default optimisation (level 1)</entry>
+	      <entry>static</entry>
+	      <entry><option>-O0</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-O</option><replaceable>n</replaceable></entry>
+	      <entry>Set optimisation level <replaceable>n</replaceable></entry>
+	      <entry>static</entry>
+	      <entry><option>-O0</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-O2-for-C</option></entry>
+	      <entry>Run <command>gcc</command> with <option>-O2</option></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+	      
+    </sect2>
+    <sect2>
+      <title>Individual optimisations (<xref linkend="options-f">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-fall-strict</option></entry>
+	      <entry>Make everything strict</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-all-strict</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fcase-merge</option></entry>
+	      <entry>Enable case-merging</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-case-merge</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fdicts-strict</option></entry>
+	      <entry>Make dictionaries strict</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-dicts-strict</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fdo-eta-reduction</option></entry>
+	      <entry>Enable eta-reduction</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-do-eta-reduction</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fdo-lambda-eta-expansion</option></entry>
+	      <entry>Enable lambda eta-reduction</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-do-lambda-eta-expansion</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fexcess-precision</option></entry>
+	      <entry>Enable excess intermediate precision</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-excess-precision</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-ffoldr-build-on</option></entry>
+	      <entry>Enable foldr-build optimisation</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-foldr-build-on</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fignore-asserts</option></entry>
+	      <entry>Ignore assertions in the source</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-ignore-asserts</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fignore-interface-pragmas</option></entry>
+	      <entry>Ignore pragmas in interface files</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-ignore-interface-pragmas</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-flet-no-escape</option></entry>
+	      <entry>Enable let-no-escape optimisation</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-let-no-escape</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fliberate-case-threshold</option></entry>
+	      <entry>Tweak the liberate-case optimisation</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-liberate-case-threshold</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fomit-interface-pragmas</option></entry>
+	      <entry>Don't generate interface pragmas</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-omit-interface-pragmas</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fmax-simplifier-iterations</option></entry>
+	      <entry>Set the max iterations for the simplifier</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fno-cpr</option></entry>
+	      <entry>Turn off CPR analysis</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fno-cse</option></entry>
+	      <entry>Turn off common sub-expression</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fno-pre-inlining</option></entry>
+	      <entry>Turn off pre-inlining</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fno-strictness</option></entry>
+	      <entry>Turn off strictness analysis</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fnumbers-strict</option></entry>
+	      <entry>Make numbers strict</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-numbers-strict</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-funbox-strict-fields</option></entry>
+	      <entry>Flatten strict constructor fields</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-unbox-strict-fields</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-funfolding-creation-threshold</option></entry>
+	      <entry>Tweak unfolding settings</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-unfolding-creation-threshold</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-funfolding-fun-discount</option></entry>
+	      <entry>Tweak unfolding settings</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-unfolding-fun-discount</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-funfolding-keeness-factor</option></entry>
+	      <entry>Tweak unfolding settings</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-unfolding-keeness-factor</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-funfolding-interface-threshold</option></entry>
+	      <entry>Tweak unfolding settings</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-unfolding-interface-threshold</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-funfolding-update-in-place</option></entry>
+	      <entry>Tweak unfolding settings</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-unfolding-update-in-place</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-funfolding-use-threshold</option></entry>
+	      <entry>Tweak unfolding settings</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-unfolding-use-threshold</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fusagesp</option></entry>
+	      <entry>Turn on UsageSP analysis</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-usagesp</option></entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Profiling options (<xref linkend="profiling">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-auto</option></entry>
+	      <entry>Auto-add <literal>_scc_</literal>s to all
+	      exported functions</entry>
+	      <entry>static</entry>
+	      <entry><option>-no-auto</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-auto-all</option></entry>
+	      <entry>Auto-add <literal>_scc_</literal>s to all
+	      top-level functions</entry>
+	      <entry>static</entry>
+	      <entry><option>-no-auto-all</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-auto-dicts</option></entry>
+	      <entry>Auto-add <literal>_scc_</literal>s to all dictionaries</entry>
+	      <entry>static</entry>
+	      <entry><option>-no-auto-dicts</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-caf-all</option></entry>
+	      <entry>Auto-add <literal>_scc_</literal>s to all CAFs</entry>
+	      <entry>static</entry>
+	      <entry><option>-no-caf-all</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-prof</option></entry>
+	      <entry>Turn on profiling</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ticky</option></entry>
+	      <entry>Turn on ticky-ticky profiling</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Parallelism options (<xref linkend="sec-using-parallel">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-gransim</option></entry>
+	      <entry>Enable GRANSIM</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-parallel</option></entry>
+	      <entry>Enable Parallel Haskell</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-smp</option></entry>
+	      <entry>Enable SMP support</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>C pre-processor options (<xref linkend="c-pre-processor">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-D</option><replaceable>symbol</replaceable><optional>=<replaceable>value</replaceable></optional></entry>
+	      <entry>Define a symbol in the C pre-processor</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-U</option><replaceable>symbol</replaceable></entry>
+	    </row>
+	    <row>
+	      <entry><option>-U</option><replaceable>symbol</replaceable></entry>
+	      <entry>Undefine a symbol in the C pre-processor</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-I</option><replaceable>dir</replaceable></entry>
+	      <entry>Add <replaceable>dir</replaceable> to the
+	      directory search list for <literal>#include</literal> files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>C compiler options (<xref linkend="options-C-compiler">)</title>
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-#include</option> <replaceable>file</replaceable></entry>
+	      <entry>Include <replaceable>file</replaceable> when
+	      compiling the <filename>.hc</filename> file</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Linking options (<xref linkend="options-linker">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-dynamic</option></entry>
+	      <entry>Use dynamic Haskell libraries (if available)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-l</option><replaceable>lib</replaceable></entry>
+	      <entry>Link in library <replaceable>lib</replaceable></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-L</option><replaceable>dir</replaceable></entry>
+	      <entry>Add <replaceable>dir</replaceable> to the list of
+	      directories searched for libraries</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-package</option> <replaceable>name</replaceable></entry>
+	      <entry>Link in package <replaceable>name</replaceable></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-split-objs</option></entry>
+	      <entry>Split objects (for libraries)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-static</option></entry>
+	      <entry>Use static Haskell libraries</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-no-hs-main</option></entry>
+	      <entry>Don't asssume this program contains <literal>main</literal></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Replacing phases (<xref linkend="replacing-phases">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-pgmL</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the literate pre-processor</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-pgmP</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the C
+	      pre-processor (with <option>-cpp</option> only)</entry>
+	      <entry>static</entry> <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-pgmc</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the C compiler</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-pgma</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the assembler</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-pgml</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the linker</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-pgmdll</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the DLL generator</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-pgmdep</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the dependency generator</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+      <indexterm><primary><option>-pgmL</option></primary></indexterm>
+      <indexterm><primary><option>-pgmP</option></primary></indexterm>
+      <indexterm><primary><option>-pgmc</option></primary></indexterm>
+      <indexterm><primary><option>-pgma</option></primary></indexterm>
+      <indexterm><primary><option>-pgml</option></primary></indexterm>
+      <indexterm><primary><option>-pgmdll</option></primary></indexterm>
+      <indexterm><primary><option>-pgmdep</option></primary></indexterm>
+
+    </sect2>
+
+    <sect2>
+      <title>Forcing options to particular phases (<xref linkend="forcing-options-through">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-optL</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to the literate pre-processor</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-optP</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to cpp (with
+	      <option>-cpp</option> only)</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-optc</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to the C compiler</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-opta</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to the assembler</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-optl</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to the linker</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-optdll</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to the DLL generator</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-optdep</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to the dependency generator</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Platform-specific options (<xref linkend="options-platform">)</title>
+      
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-mv8</option></entry>
+	      <entry>(SPARC only) enable version 8 support</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-mlong-calls</option></entry>
+	      <entry>(HPPA only) enable long call support</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-monly-[32]-regs</option></entry>
+	      <entry>(x86 only) give some registers back to the C compiler</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Compiler debugging options (<xref linkend="options-debugging">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-dcore-lint</option></entry>
+	      <entry>Turn on internal sanity checking</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-absC</option></entry>
+	      <entry>Dump abstract C</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-asm</option></entry>
+	      <entry>Dump assembly</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-bcos</option></entry>
+	      <entry>Dump interpreter byte code</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-cpranal</option></entry>
+	      <entry>Dump output from CPR analysis</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-cse</option></entry>
+	      <entry>Dump CSE output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-deriv</option></entry>
+	      <entry>Dump deriving output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-ds</option></entry>
+	      <entry>Dump desugarer output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-flatC</option></entry>
+	      <entry>Dump &ldquo;flat&rdquo; C</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-foreign</option></entry>
+	      <entry>Dump FFI-related output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-inlinings</option></entry>
+	      <entry>Dump inlining info</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-occur-anal</option></entry>
+	      <entry>Dump occurrence analysis output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-parsed</option></entry>
+	      <entry>Dump parse tree</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-realC</option></entry>
+	      <entry>Dump &ldquo;real&rdquo; C</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-rn</option></entry>
+	      <entry>Dump renamer output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-rules</option></entry>
+	      <entry>Dump rules</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-sat</option></entry>
+	      <entry>Dump saturated output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-simpl</option></entry>
+	      <entry>Dump final simplifier output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-simpl-iterations</option></entry>
+	      <entry>Dump output from each simplifier iteration</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-spec</option></entry>
+	      <entry>Dump specialiser output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-stg</option></entry>
+	      <entry>Dump final STG</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-stranal</option></entry>
+	      <entry>Dump strictness analyser output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-tc</option></entry>
+	      <entry>Dump typechecker output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-types</option></entry>
+	      <entry>Dump type signatures</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-usagesp</option></entry>
+	      <entry>Dump UsageSP analysis output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-worker-wrapper</option></entry>
+	      <entry>Dump worker-wrapper output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dshow-passes</option></entry>
+	      <entry>(equivalent to <option>-v2</option>)</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-rn-trace</option></entry>
+	      <entry>Trace renamer</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-rn-stats</option></entry>
+	      <entry>Renamer stats</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-stix</option></entry>
+	      <entry>Native code generator intermediate form</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-simpl-stats</option></entry>
+	      <entry>Dump simplifier stats</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dppr-debug</option></entry>
+	      <entry>Turn on debug printing (more verbose)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dppr-noprags</option></entry>
+	      <entry>Don't output pragma info in dumps</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dppr-user-length</option></entry>
+	      <entry>Set the depth for printing expressions in error msgs</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsource-stats</option></entry>
+	      <entry>Dump haskell source stats</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dstg-lint</option></entry>
+	      <entry>STG pass sanity checking</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dstg-stats</option></entry>
+	      <entry>Dump STG stats</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dusagesp-lint</option></entry>
+	      <entry>UsageSP sanity checker</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dverbose-core2core</option></entry>
+	      <entry>Show output from each core-to-core pass</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dverbose-stg2stg</option></entry>
+	      <entry>Show output from each STG-to-STG pass</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+      
+    <sect2>
+      <title>Misc compiler options</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-funfold-casms-in-hi-file</option></entry>
+	      <entry>Allow casms in unfoldings</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-femit-extern-decls</option></entry>
+	      <entry>???</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fglobalise-toplev-names</option></entry>
+	      <entry>Make all top-level names global (for <option>-split-objs</option>)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fno-hi-version-check</option></entry>
+	      <entry>Don't complain about <literal>.hi</literal> file mismatches</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dno-black-holing</option></entry>
+	      <entry>Turn off black holing (probably doesn't work)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fno-method-sharing</option></entry>
+	      <entry>???</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fno-prune-decls</option></entry>
+	      <entry>Renamer: don't prune declarations</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fno-prune-tydecls</option></entry>
+	      <entry>Renamer: don't prune type declarations</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fhistory-size</option></entry>
+	      <entry>Set simplification history size</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-funregisterised</option></entry>
+	      <entry>Unregisterised compilation (use <option>-unreg</option> instead)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fno-asm-mangling</option></entry>
+	      <entry>Turn off assembly mangling (use <option>-unreg</option> instead)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+  </sect1>
+
+
+<!--
+Still to document:
+
+Misc:
+  ,  ( "H"                 , HasArg (setHeapSize . fromIntegral . decodeSize) )
+  ,  ( "Rghc-timing"	   , NoArg  (enableTimingStats) )
+
+  ,  ( "unreg"		, NoArg (addNoDups v_Ways	WayUnreg) )
+-->
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter") ***
+     ;;; End: ***
+ -->

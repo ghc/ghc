@@ -1,6 +1,6 @@
 <Chapter id="using-GHC">
-<Title>Using GHC
-</Title>
+<title>Using GHC
+</title>
 
 <para>
 <IndexTerm><Primary>GHC, using</Primary></IndexTerm>
@@ -8,14 +8,14 @@
 GHC is a command-line compiler: in order to compile a Haskell program,
 GHC must be invoked on the source file(s) by typing a command to the
 shell.  The steps involved in compiling a program can be automated
-using the <Command>make</Command> tool (this is especially useful if the program
+using the <command>make</command> tool (this is especially useful if the program
 consists of multiple source files which depend on each other).  This
 section describes how to use GHC from the command-line.
 </para>
 
 <Sect1 id="command-line-structure">
-<Title>Overall command-line structure
-</Title>
+<title>Overall command-line structure
+</title>
 
 <para>
 <IndexTerm><Primary>structure, command-line</Primary></IndexTerm>
@@ -39,12 +39,12 @@ Command-line arguments are either options or file names.
 </para>
 
 <para>
-Command-line options begin with <literal>-</literal>.  They may <Emphasis>not</Emphasis> be
+Command-line options begin with <literal>-</literal>.  They may <emphasis>not</emphasis> be
 grouped: <option>-vO</option> is different from <option>-v -O</option>.  Options need not
-precede filenames: e.g., <Command>ghc *.o -o foo</Command>.  All options are
+precede filenames: e.g., <command>ghc *.o -o foo</command>.  All options are
 processed and then applied to all files; you cannot, for example, invoke
-<Command>ghc -c -O1 Foo.hs -O2 Bar.hs</Command> to apply different optimisation
-levels to the files <Filename>Foo.hs</Filename> and <Filename>Bar.hs</Filename>.  For conflicting
+<command>ghc -c -O1 Foo.hs -O2 Bar.hs</command> to apply different optimisation
+levels to the files <filename>Foo.hs</filename> and <filename>Bar.hs</filename>.  For conflicting
 options, e.g., <option>-c -S</option>, we reserve the right to do anything we
 want.  (Usually, the last one applies.)
 </para>
@@ -52,8 +52,8 @@ want.  (Usually, the last one applies.)
 </Sect1>
 
 <Sect1 id="file-suffixes">
-<Title>Meaningful file suffixes
-</Title>
+<title>Meaningful file suffixes
+</title>
 
 <para>
 <IndexTerm><Primary>suffixes, file</Primary></IndexTerm>
@@ -61,7 +61,7 @@ want.  (Usually, the last one applies.)
 </para>
 
 <para>
-File names with &ldquo;meaningful&rdquo; suffixes (e.g., <Filename>.lhs</Filename> or <Filename>.o</Filename>)
+File names with &ldquo;meaningful&rdquo; suffixes (e.g., <filename>.lhs</filename> or <filename>.o</filename>)
 cause the &ldquo;right thing&rdquo; to happen to those files.
 </para>
 
@@ -69,7 +69,7 @@ cause the &ldquo;right thing&rdquo; to happen to those files.
 <VariableList>
 
 <VarListEntry>
-<Term><Filename>.lhs</Filename>:</Term>
+<Term><filename>.lhs</filename>:</Term>
 <ListItem>
 <para>
 <IndexTerm><Primary>lhs suffix</Primary></IndexTerm>
@@ -78,7 +78,7 @@ A &ldquo;literate Haskell&rdquo; module.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Filename>.hs</Filename>:</Term>
+<Term><filename>.hs</filename>:</Term>
 <ListItem>
 <para>
 A not-so-literate Haskell module.
@@ -86,7 +86,7 @@ A not-so-literate Haskell module.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Filename>.hi</Filename>:</Term>
+<Term><filename>.hi</filename>:</Term>
 <ListItem>
 <para>
 A Haskell interface file, probably compiler-generated.
@@ -94,7 +94,7 @@ A Haskell interface file, probably compiler-generated.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Filename>.hc</Filename>:</Term>
+<Term><filename>.hc</filename>:</Term>
 <ListItem>
 <para>
 Intermediate C file produced by the Haskell compiler.
@@ -102,7 +102,7 @@ Intermediate C file produced by the Haskell compiler.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Filename>.c</Filename>:</Term>
+<Term><filename>.c</filename>:</Term>
 <ListItem>
 <para>
 A C&nbsp;file not produced by the Haskell compiler.
@@ -110,7 +110,7 @@ A C&nbsp;file not produced by the Haskell compiler.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Filename>.s</Filename>:</Term>
+<Term><filename>.s</filename>:</Term>
 <ListItem>
 <para>
 An assembly-language source file, usually
@@ -119,7 +119,7 @@ produced by the compiler.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Filename>.o</Filename>:</Term>
+<Term><filename>.o</filename>:</Term>
 <ListItem>
 <para>
 An object file, produced by an assembler.
@@ -136,66 +136,11 @@ to the linker.
 
 </Sect1>
 
-<Sect1 id="options-help">
-<Title>Help and verbosity options
-</Title>
+  <sect1 id="options-help">
+    <title>Help and verbosity options</title>
 
-<para>
-<IndexTerm><Primary>help options (GHC)</Primary></IndexTerm>
-<IndexTerm><Primary>verbose option (GHC)</Primary></IndexTerm>
-</para>
-
-    <informaltable>
-      <tgroup cols=3 align=left colsep=1 rowsep=1>
-	<thead>
-	  <row>
-	    <entry>Flag</entry>
-	    <entry>Description</entry>
-	    <entry>Static/Dynamic</entry>
-	    <entry>Reverse</entry>
-	  </row>
-	</thead>
-	<tbody>
-	<row>
-	  <entry><literal>-?</literal></entry>
-	  <entry>help</entry>
-	  <entry>static</entry>
-	  <entry>-</entry>
-	</row>
-	<row>
-	  <entry><literal>-help</literal></entry>
-	  <entry>help</entry>
-	  <entry>static</entry>
-	  <entry>-</entry>
-	</row>
-	<row>
-	  <entry><literal>-v</literal></entry>
-	  <entry>verbose mode (equivalent to <literal>-v3</literal>)</entry>
-	  <entry>dynamic</entry>
-	  <entry>-</entry>
-	</row>
-	<row>
-	  <entry><literal>-v</literal><emphasis>n</emphasis></entry>
-	  <entry>set verbosity level</entry>
-	  <entry>dynamic</entry>
-	  <entry>-</entry>
-	</row>
-	<row>
-	  <entry><literal>--version</literal></entry>
-	  <entry>display GHC version</entry>
-	  <entry>static</entry>
-	  <entry>-</entry>
-	</row>
-	<row>
-	  <entry><literal>--numeric-version</literal></entry>
-	  <entry>display GHC version (numeric only)</entry>
-	  <entry>static</entry>
-	  <entry>-</entry>
-	</row>
-	</tbody>
-      </tgroup>
-    </informaltable>
-
+    <IndexTerm><Primary>help options</Primary></IndexTerm>
+    <IndexTerm><Primary>verbosity options</Primary></IndexTerm>
 
     <variablelist>
       <varlistentry>
@@ -214,7 +159,7 @@ to the linker.
 	<indexterm><primary><literal>-v</literal></primary></indexterm>
 	<listitem>
 	  <para>The <option>-v</option> option makes GHC
-          <Emphasis>verbose</Emphasis>: it reports its version number
+          <emphasis>verbose</emphasis>: it reports its version number
           and shows (on stderr) exactly how it invokes each phase of
           the compilation system.  Moreover, it passes the
           <option>-v</option> flag to most phases; each reports its
@@ -228,8 +173,8 @@ to the linker.
       </varlistentry>
 	
       <varlistentry>
-	<term><literal>-v</literal><emphasis>n</emphasis></term>
-	<indexterm><primary><literal>-v</literal><emphasis>n</emphasis></primary></indexterm>
+	<term><literal>-v</literal><replaceable>n</replaceable></term>
+	<indexterm><primary><option>-v</option></primary></indexterm>
 	<listitem>
 	  <para>To provide more control over the compiler's verbosity,
 	  the <option>-v</option> flag takes an optional numeric
@@ -311,52 +256,8 @@ to the linker.
     <indexterm><primary>order of passes in GHC</primary></indexterm>
     <indexterm><primary>pass ordering in GHC</primary></indexterm>
 
-    <informaltable>
-      <tgroup cols=3 align=left colsep=1 rowsep=1>
-	<thead>
-	  <row>
-	    <entry>Flag</entry>
-	    <entry>Description</entry>
-	    <entry>Static/Dynamic</entry>
-	    <entry>Reverse</entry>
-	  </row>
-	</thead>
-	<tbody>
-	  <row>
-	    <entry><literal>-cpp</literal></entry>
-	    <entry>Run the C pre-processor on the Haskell source</entry>
-	    <entry>dynamic</entry>
-	    <entry>-</entry>
-	  </row>
-	  <row>
-	    <entry><literal>-E</literal></entry>
-	    <entry>Stop after preprocessing (<literal>.hspp</literal> file)</entry>
-	    <entry>static</entry>
-	    <entry>-</entry>
-	  </row>
-	  <row>
-	    <entry><literal>-C</literal></entry>
-	    <entry>Stop after generating C (<literal>.hc</literal> file)</entry>
-	    <entry>static</entry>
-	    <entry>-</entry>
-	  </row>
-	  <row>
-	    <entry><literal>-S</literal></entry>
-	    <entry>Stop after generating assembly (<literal>.s</literal> file)</entry>
-	    <entry>static</entry>
-	    <entry>-</entry>
-	  </row>
-	  <row>
-	    <entry><literal>-c</literal></entry>
-	    <entry>Stop after compiling to object code (<literal>.o</literal> file)</entry>
-	    <entry>static</entry>
-	    <entry>-</entry>
-	  </row>
-	</tbody>
-      </tgroup>
-    </informaltable>
 
-    <para>The basic task of the <Command>ghc</Command> driver is to
+    <para>The basic task of the <command>ghc</command> driver is to
     run each input file through the right phases (compiling, linking,
     etc.).</para>
 
@@ -431,7 +332,7 @@ linker </Entry>
 <IndexTerm><Primary>-c option</Primary></IndexTerm>
 
 <para>
-Thus, a common invocation would be: <Command>ghc -c Foo.hs</Command>
+Thus, a common invocation would be: <command>ghc -c Foo.hs</command>
 </para>
 
 <para>
@@ -450,6 +351,43 @@ native-code generator is used (producing assembly language) or not
     pre-processor. Sans <option>-cpp</option>, the output is the
     de-litted version of the original source.</para>
 
+    <para>The following options also affect which phases get run:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><option>-cpp</option></term>
+	<indexterm><primary><option>-cpp</option></primary></indexterm>
+	<listitem>
+	  <para>Run the C pre-processor on the Haskell source before
+	  compiling it.  See <xref linkend="c-pre-processor"> for more
+	  details.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fasm</option></term>
+	<indexterm><primary><option>-fasm</option></primary></indexterm>
+	<listitem>
+	  <para>Use GHC's native code generator rather than compiling
+	  via C.  This will compile faster (up to twice as fast), but
+	  may produce code that is slightly slower than compiling via
+	  C.  <option>-fasm</option> is the default when optimisation
+	  is off (see <xref linkend="options-optimise">).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fvia-C</option></term>
+	<indexterm><primary><option>-fvia-C</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>Compile via C instead of using the native code
+	  generator.  This is default for optimised compilations, and
+	  on architectures for which GHC doesn't have a native code
+	  generator.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
   </sect1>
 
   <sect1 id="options-output">
@@ -458,50 +396,6 @@ native-code generator is used (producing assembly language) or not
     <indexterm><primary>output-directing options</primary></indexterm>
     <indexterm><primary>redirecting compilation output</primary></indexterm>
 
-    <informaltable>
-      <tgroup cols=3 align=left colsep=1 rowsep=1>
-	<thead>
-	  <row>
-	    <entry>Flag</entry>
-	    <entry>Description</entry>
-	    <entry>Static/Dynamic</entry>
-	    <entry>Reverse</entry>
-	  </row>
-	</thead>
-	<tbody>
-	<row>
-	  <entry><literal>-hisuf</literal></entry>
-	  <entry>set the suffix to use for interface files</entry>
-	  <entry>static</entry>
-	  <entry>-</entry>
-	</row>
-	<row>
-	  <entry><literal>-o</literal></entry>
-	  <entry>set output filename</entry>
-	  <entry>static</entry>
-	  <entry>-</entry>
-	</row>
-	<row>
-	  <entry><literal>-odir</literal></entry>
-	  <entry>set output directory</entry>
-	  <entry>static</entry>
-	  <entry>-</entry>
-	</row>
-	<row>
-	  <entry><literal>-ohi</literal></entry>
-	  <entry>set the filename in which to put the interface</entry>
-	  <entry>static</entry>
-	  <entry></entry>
-	</row>
-	<row>
-	  <entry><literal>-osuf</literal></entry>
-	  <entry>set the output file suffix</entry>
-	  <entry>static</entry>
-	  <entry>-</entry>
-	</row>
-	</tbody>
-      </tgroup>
-    </informaltable>
 
     <variablelist>
       <varlistentry>
@@ -509,16 +403,16 @@ native-code generator is used (producing assembly language) or not
 	<indexterm><primary><literal>-o</literal></primary></indexterm>
 	<listitem>
 	  <para>GHC's compiled output normally goes into a
-          <Filename>.hc</Filename>, <Filename>.o</Filename>, etc.,
+          <filename>.hc</filename>, <filename>.o</filename>, etc.,
           file, depending on the last-run compilation phase.  The
           option <option>-o foo</option><IndexTerm><Primary>-o
           option</Primary></IndexTerm> re-directs the output of that
-          last-run phase to file <Filename>foo</Filename>.</para>
+          last-run phase to file <filename>foo</filename>.</para>
 
 	  <para>Note: this &ldquo;feature&rdquo; can be
-          counterintuitive: <Command>ghc -C -o foo.o foo.hs</Command>
+          counterintuitive: <command>ghc -C -o foo.o foo.hs</command>
           will put the intermediate C code in the file
-          <Filename>foo.o</Filename>, name notwithstanding!</para>
+          <filename>foo.o</filename>, name notwithstanding!</para>
 	</listitem>
       </varlistentry>
 
@@ -527,7 +421,7 @@ native-code generator is used (producing assembly language) or not
 	<indexterm><primary><literal>-odir</literal></primary></indexterm>
 	<listitem>
 	  <para>The <option>-o</option> option isn't of much use if
-          you have <Emphasis>several</Emphasis> input files&hellip;
+          you have <emphasis>several</emphasis> input files&hellip;
           Non-interface output files are normally put in the same
           directory as their corresponding input file came from.  You
           may specify that they be put in another directory using the
@@ -539,20 +433,20 @@ native-code generator is used (producing assembly language) or not
 % ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 </Screen>
 
-          <para>The output files, <Filename>Foo.o</Filename>,
-          <Filename>Bar.o</Filename>, and
-          <Filename>Bumble.o</Filename> would be put into a
+          <para>The output files, <filename>Foo.o</filename>,
+          <filename>Bar.o</filename>, and
+          <filename>Bumble.o</filename> would be put into a
           subdirectory named after the architecture of the executing
-          machine (<Filename>sun4</Filename>,
-          <Filename>mips</Filename>, etc).  The directory must already
+          machine (<filename>sun4</filename>,
+          <filename>mips</filename>, etc).  The directory must already
           exist; it won't be created.</para>
 
           <para>Note that the <option>-odir</option> option does
-          <Emphasis>not</Emphasis> affect where the interface files
+          <emphasis>not</emphasis> affect where the interface files
           are put.  In the above example, they would still be put in
-          <Filename>parse/Foo.hi</Filename>,
-          <Filename>parse/Bar.hi</Filename>, and
-          <Filename>gurgle/Bumble.hi</Filename>.</para>
+          <filename>parse/Foo.hi</filename>,
+          <filename>parse/Bar.hi</filename>, and
+          <filename>gurgle/Bumble.hi</filename>.</para>
 	</listitem>
       </varlistentry>
 
@@ -573,22 +467,22 @@ native-code generator is used (producing assembly language) or not
 	  <para>EXOTICA: The <option>-osuf
           &lt;suffix&gt;</option><IndexTerm><Primary>-osuf
           &lt;suffix&gt; option</Primary></IndexTerm> will change the
-          <Filename>.o</Filename> file suffix for object files to
+          <filename>.o</filename> file suffix for object files to
           whatever you specify.  (We use this in compiling the
           prelude.).</para>
 
 	  <para>Similarly, the <option>-hisuf
           &lt;suffix&gt;</option><IndexTerm><Primary>-hisuf
           &lt;suffix&gt; option</Primary></IndexTerm> will change the
-          <Filename>.hi</Filename> file suffix for non-system
+          <filename>.hi</filename> file suffix for non-system
           interface files (see <XRef LinkEnd="hi-options">).</para>
 
 	  <para>The <option>-hisuf</option>/<option>-osuf</option>
           game is useful if you want to compile a program with both
           GHC and HBC (say) in the same directory.  Let HBC use the
-          standard <Filename>.hi</Filename>/<Filename>.o</Filename>
+          standard <filename>.hi</filename>/<filename>.o</filename>
           suffixes; add <option>-hisuf g&lowbar;hi -osuf
-          g&lowbar;o</option> to your <Command>make</Command> rule for
+          g&lowbar;o</option> to your <command>make</command> rule for
           GHC compiling&hellip;</para>
 	</listitem>
       </varlistentry>
@@ -603,44 +497,6 @@ native-code generator is used (producing assembly language) or not
       <indexterm><primary><literal>.s</literal> files, saving</primary>
       </indexterm>
 
-      <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
-	  <thead>
-	    <row>
-	      <entry>Flag</entry>
-	      <entry>Description</entry>
-	      <entry>Static/Dynamic</entry>
-	      <entry>Reverse</entry>
-	    </row>
-	  </thead>
-	  <tbody>
-	    <row>
-	      <entry><literal>-keep-hc-file</literal></entry>
-	      <entry>retain intermediate <literal>.hc</literal> files</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><literal>-keep-s-file</literal></entry>
-	      <entry>retain intermediate <literal>.s</literal> files</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><literal>-keep-raw-s-file</literal></entry>
-	      <entry>retain intermediate <literal>.raw_s</literal> files</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><literal>-keep-tmp-files</literal></entry>
-	      <entry>retain all intermediate temporary files</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	  </tbody>
-	</tgroup>
-      </informaltable>
 
       <para>The following options are useful for keeping certain
       intermediate files around, when normally GHC would throw these
@@ -715,34 +571,13 @@ native-code generator is used (producing assembly language) or not
 	<secondary>redirecting</secondary>
       </indexterm>
 
-      <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
-	  <thead>
-	    <row>
-	      <entry>Flag</entry>
-	      <entry>Description</entry>
-	      <entry>Static/Dynamic</entry>
-	      <entry>Reverse</entry>
-	    </row>
-	  </thead>
-	  <tbody>
-	    <row>
-	      <entry><literal>-tmpdir</literal></entry>
-	      <entry>set the directory for temporary files</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	  </tbody>
-	</tgroup>
-      </informaltable>
-
       <variablelist>
 	<varlistentry>
 	  <term><literal>-tmpdir</literal></term>
 	  <indexterm><primary><literal>-tmpdir</literal></primary></indexterm>
 	  <listitem>
 	    <para>If you have trouble because of running out of space
-            in <Filename>/tmp</Filename> (or wherever your
+            in <filename>/tmp</filename> (or wherever your
             installation thinks temporary files should go), you may
             use the <option>-tmpdir
             &lt;dir&gt;</option><IndexTerm><Primary>-tmpdir
@@ -776,138 +611,6 @@ native-code generator is used (producing assembly language) or not
     <indexterm><primary>sanity-checking options</primary></indexterm>
     <indexterm><primary>warnings</primary></indexterm>
 
-    <informaltable>
-      <tgroup cols=3 align=left colsep=1 rowsep=1>
-	<thead>
-	  <row>
-	    <entry>Flag</entry>
-	    <entry>Description</entry>
-	    <entry>Static/Dynamic</entry>
-	    <entry>Reverse</entry>
-	  </row>
-	</thead>
-	<tbody>
-	  <row>
-	    <entry><literal>-W</literal></entry>
-	    <entry>enable normal warnings</entry>
-	    <entry>static</entry>
-	    <entry><literal>-w</literal></entry>
-	  </row>
-	  <row>
-	    <entry><literal>-w</literal></entry>
-	    <entry>disable all warnings</entry>
-	    <entry>static</entry>
-	    <entry>-</entry>
-	  </row>
-	  <row>
-	    <entry><literal>-Wall</literal></entry>
-	    <entry>enable all warnings</entry>
-	    <entry>static</entry>
-	    <entry><literal>-w</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-deprecations</literal></entry>
-	    <entry>warn about uses of functions & types that are deprecated</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-deprecations</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-duplicate-exports</literal></entry>
-	    <entry>warn when an entity is exported multiple times</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-duplicate-exports</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-hi-shadowing</literal></entry>
-	    <entry>warn when a <literal>.hi</literal> file in the
-	    current directory shadows a library</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-hi-shadowing</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-incomplete-patterns</literal></entry>
-	    <entry>warn when a pattern match could fail</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-incomplete-patterns</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-missing-fields</literal></entry>
-	    <entry>warn when fields of a record are uninitialised</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-missing-fields</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-missing-methods</literal></entry>
-	    <entry>warn when class methods are undefined</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-missing-methods</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-missing-signatures</literal></entry>
-	    <entry>warn about top-level functions without signatures</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-missing-signatures</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-name-shadowing</literal></entry>
-	    <entry>warn when names are shadowed</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-name-shadowing</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-overlapping-patterns</literal></entry>
-	    <entry>warn about overlapping patterns</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-overlapping-patterns</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-simple-patterns</literal></entry>
-	    <entry>warn about lambda-patterns that can fail</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-simple-patterns</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-type-defaults</literal></entry>
-	    <entry>warn when defaulting happens</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-type-defaults</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-unused-binds</literal></entry>
-	    <entry>warn about bindings that are unused</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-unused-binds</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-unused-imports</literal></entry>
-	    <entry>warn about unnecessary imports</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-unused-imports</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry><literal>-fwarn-unused-matches</literal></entry>
-	    <entry>warn about variables in patterns that aren't used</entry>
-	    <entry>dynamic</entry>
-	    <entry><literal>-fno-warn-unused-matches</literal></entry>
-	  </row>
-
-	</tbody>
-      </tgroup>
-    </informaltable>
 
     <para>GHC has a number of options that select which types of
     non-fatal error messages, otherwise known as warnings, can be
@@ -1194,2023 +897,328 @@ f "2"    = 2
 
   </sect1>
 
-<Sect1 id="separate-compilation">
-<Title>Separate compilation
-</Title>
-
-<para>
-<indexterm><primary>separate compilation</primary></indexterm>
-<indexterm><primary>recompilation checker</primary></indexterm>
-<indexterm><primary>make and recompilation</primary></indexterm>
-This section describes how GHC supports separate compilation.
-</para>
-
-<Sect2 id="hi-files">
-<Title>Interface files
-</Title>
-
-<para>
-<indexterm><primary>interface files</primary></indexterm>
-<indexterm><primary>.hi files</primary></indexterm>
-</para>
-
-<para>
-When GHC compiles a source file <Filename>F</Filename> which contains a module <literal>A</literal>, say,
-it generates an object <Filename>F.o</Filename>, <Emphasis>and</Emphasis> a companion <Emphasis>interface
-file</Emphasis> <Filename>A.hi</Filename>.  The interface file is not intended for human
-consumption, as you'll see if you take a look at one.  It's merely
-there to help the compiler compile other modules in the same program.
-</para>
-
-<para>
-NOTE: Having the name of the interface file follow the module name and
-not the file name, means that working with tools such as <Command>make</Command>
-become harder. <Command>make</Command> implicitly assumes that any output files
-produced by processing a translation unit will have file names that
-can be derived from the file name of the translation unit.  For
-instance, pattern rules becomes unusable.  For this reason, we
-recommend you stick to using the same file name as the module name.
-</para>
-
-<para>
-The interface file for <literal>A</literal> contains information needed by the compiler
-when it compiles any module <literal>B</literal> that imports <literal>A</literal>, whether directly or
-indirectly.  When compiling <literal>B</literal>, GHC will read <Filename>A.hi</Filename> to find the
-details that it needs to know about things defined in <literal>A</literal>.
-</para>
-
-<para>
-Furthermore, when compiling module <literal>C</literal> which imports <literal>B</literal>, GHC may
-decide that it needs to know something about <literal>A</literal>&mdash;for example, <literal>B</literal>
-might export a function that involves a type defined in <literal>A</literal>.  In this
-case, GHC will go and read <Command>A.hi</Command> even though <literal>C</literal> does not explicitly
-import <literal>A</literal> at all.
-</para>
-
-<para>
-The interface file may contain all sorts of things that aren't
-explicitly exported from <literal>A</literal> by the programmer.  For example, even
-though a data type is exported abstractly, <Filename>A.hi</Filename> will contain the
-full data type definition.  For small function definitions, <Filename>A.hi</Filename>
-will contain the complete definition of the function.  For bigger
-functions, <Filename>A.hi</Filename> will contain strictness information about the
-function.  And so on.  GHC puts much more information into <Filename>.hi</Filename> files
-when optimisation is turned on with the <option>-O</option> flag.  Without <option>-O</option> it
-puts in just the minimum; with <option>-O</option> it lobs in a whole pile of stuff.
-<indexterm><primary>optimsation, effect on .hi files</primary></indexterm>
-</para>
-
-<para>
-<Filename>A.hi</Filename> should really be thought of as a compiler-readable version of
-<Filename>A.o</Filename>.  If you use a <Filename>.hi</Filename> file that wasn't generated by the same
-compilation run that generates the <Filename>.o</Filename> file the compiler may assume
-all sorts of incorrect things about <literal>A</literal>, resulting in core dumps and
-other unpleasant happenings.
-</para>
-
-</sect2>
-
-<Sect2 id="options-finding-imports">
-<Title>Finding interface files
-</Title>
-
-<para>
-<indexterm><primary>interface files, finding them</primary></indexterm>
-<indexterm><primary>finding interface files</primary></indexterm>
-</para>
-
-<para>
-In your program, you import a module <literal>Foo</literal> by saying
-<literal>import Foo</literal>.  GHC goes looking for an interface file, <Filename>Foo.hi</Filename>.
-It has a builtin list of directories (notably including <Filename>.</Filename>) where
-it looks.
-</para>
-
-<para>
-<VariableList>
-
-<varlistentry>
-<term><option>-i&lt;dirs&gt;</option></term>
-<listitem>
-<para>
-<indexterm><primary>-i&lt;dirs&gt; option</primary></indexterm>This flag
-prepends a colon-separated list of <Filename>dirs</Filename> to the &ldquo;import
-directories&rdquo; list.
-See also <XRef LinkEnd="recomp"> for the significance of using
-relative and absolute pathnames in the <option>-i</option> list.
-</para>
-</listitem>
-</varlistentry>
-
-<varlistentry>
-<term><option>-i</option></term>
-<listitem>
-<para>
-resets the &ldquo;import directories&rdquo; list back to nothing.
-</para>
-</listitem>
-</varlistentry>
-
-<varlistentry>
-<term><option>-fno-implicit-prelude</option></term>
-<listitem>
-<para>
-<indexterm><primary>-fno-implicit-prelude option</primary></indexterm>
-GHC normally imports <Filename>Prelude.hi</Filename> files for you.  If you'd rather it
-didn't, then give it a <option>-fno-implicit-prelude</option> option.  
-The idea is that you can then import a Prelude of your own.  (But don't call it <literal>Prelude</literal>;
-the Haskell module namespace is flat, and you must not conflict with any Prelude module.)
-</para>
-<para>
-Even though you have not imported the Prelude, all the built-in syntax still refers to 
-the built-in Haskell Prelude types and values, as specified by the Haskell Report.  
-For example, the type <literal>[Int]</literal>
-still means <literal>Prelude.[] Int</literal>; tuples continue to refer to the standard Prelude
-tuples; the translation for list comprehensions continues to use <literal>Prelude.map</literal> etc.
-</para>
-<para> With one group of exceptions!  You may want to define your own numeric class hierarchy.
-It completely defeats that purpose if the literal "1" means "<literal>Prelude.fromInteger 1</literal>",
-which is what the Haskell Report specifies.  So the <option>-fno-implicit-prelude</option> flag causes
-the following pieces of built-in syntax to refer to whatever is in scope, not the Prelude versions:
-<ItemizedList>
-<listitem>
-<para>
-Integer and fractional literals mean "<literal>fromInteger 1</literal>" and "<literal>fromRational 3.2</literal>",
-not the Prelude-qualified versions; both in expressions and in patterns.
-</para>
-</listitem>
-<listitem>
-<para>
-Negation (e.g. "<literal>- (f x)</literal>") means "<literal>negate (f x)</literal>" (not <literal>Prelude.negate</literal>).
-</para>
-</listitem>
-<listitem>
-<para>
-In an n+k pattern, the standard Prelude <literal>Ord</literal> class is used for comparison, but the 
-necessary subtraction uses 
-whatever "<literal>(-)</literal>" is in scope (not "<literal>Prelude.(-)</literal>").
-</para>
-</listitem>
-</ItemizedList>
-</para>
-</listitem>
-</varlistentry>
-
-<varlistentry>
-<term><option>-I&lt;dir&gt;</option></term>
-<listitem>
-<para>
-<indexterm><primary>-I&lt;dir&gt; option</primary></indexterm>
-Once a Haskell module has been compiled to C (<Filename>.hc</Filename> file), you may
-wish to specify where GHC tells the C compiler to look for <Filename>.h</Filename> files.
-(Or, if you are using the <option>-cpp</option> option<indexterm><primary>-cpp option</primary></indexterm>, where
-it tells the C pre-processor to look&hellip;)  For this purpose, use a <option>-I</option>
-option in the usual C-ish way.
-</para>
-</listitem>
-</varlistentry>
-
-</VariableList>
-</para>
-
-</sect2>
-
-<Sect2 id="hi-options">
-<Title>Other options related to interface files
-</Title>
-
-<para>
-<indexterm><primary>interface files, options</primary></indexterm>
-The interface output may be directed to another file
-<Filename>bar2/Wurble.iface</Filename> with the option <option>-ohi bar2/Wurble.iface</option><indexterm><primary>-ohi
-&lt;file&gt; option</primary></indexterm> (not recommended).
-</para>
-
-<para>
-To avoid generating an interface file at all, use a <option>-nohi</option>
-option.<indexterm><primary>-nohi option</primary></indexterm>
-</para>
-
-<para>
-The compiler does not overwrite an existing <Filename>.hi</Filename> interface file if
-the new one is byte-for-byte the same as the old one; this is friendly
-to <Command>make</Command>.  When an interface does change, it is often enlightening to
-be informed.  The <option>-hi-diffs</option><indexterm><primary>-hi-diffs option</primary></indexterm> option will
-make GHC run <Command>diff</Command> on the old and new <Filename>.hi</Filename> files. You can also
-record the difference in the interface file itself, the
-<option>-keep-hi-diffs</option><indexterm><primary>-keep-hi-diffs</primary></indexterm> option takes care of that.
-</para>
-
-<para>
-The <Filename>.hi</Filename> files from GHC contain &ldquo;usage&rdquo; information which changes
-often and uninterestingly.  If you really want to see these changes
-reported, you need to use the
-<option>-hi-diffs-with-usages</option><indexterm><primary>-hi-diffs-with-usages option</primary></indexterm>
-option.
-</para>
-
-<para>
-Interface files are normally jammed full of compiler-produced
-<Emphasis>pragmas</Emphasis>, which record arities, strictness info, etc.  If you
-think these pragmas are messing you up (or you are doing some kind of
-weird experiment), you can tell GHC to ignore them with the
-<option>-fignore-interface-pragmas</option><indexterm><primary>-fignore-interface-pragmas
-option</primary></indexterm> option.
-</para>
-
-<para>
-When compiling without optimisations on, the compiler is extra-careful
-about not slurping in data constructors and instance declarations that
-it will not need. If you believe it is getting it wrong and not
-importing stuff which you think it should, this optimisation can be
-turned off with <option>-fno-prune-tydecls</option> and <option>-fno-prune-instdecls</option>.
-<indexterm><primary>-fno-prune-tydecls option</primary></indexterm><indexterm><primary>-fno-prune-instdecls
-option</primary></indexterm>
-</para>
-
-<para>
-See also <XRef LinkEnd="options-linker">, which describes how the linker finds standard
-Haskell libraries.
-</para>
-
-</sect2>
-
-<Sect2 id="recomp">
-<Title>The recompilation checker
-</Title>
-
-<indexterm><primary>recompilation checker</primary></indexterm>
-
-<para>
-<variablelist>
-<varlistentry>
-<term><option>-recomp</option></term>
-<indexterm><primary><option>-recomp</option> option</primary></indexterm>
-<listitem>
-<para>
-(On by default) Turn on recompilation checking.  This will stop
-compilation early, leaving an existing <filename>.o</filename> file in
-place, if it can be determined that the module does not need to be
-recompiled.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-no-recomp</option></term>
-<indexterm><primary><option>-recomp</option> option</primary></indexterm>
-<listitem>
-<para>
-Turn off recompilation checking.
-</para>
-</listitem>
-</varlistentry>
-</VariableList>
-</para>
-
-<para>
-In the olden days, GHC compared the newly-generated
-<Filename>.hi</Filename> file with the previous version; if they were
-identical, it left the old one alone and didn't change its
-modification date.  In consequence, importers of a module with an
-unchanged output <Filename>.hi</Filename> file were not recompiled.
-</para>
-
-<para>
-This doesn't work any more.  In our earlier example, module
-<literal>C</literal> does not import module <literal>A</literal>
-directly, yet changes to <Filename>A.hi</Filename> should force a
-recompilation of <literal>C</literal>.  And some changes to
-<literal>A</literal> (changing the definition of a function that
-appears in an inlining of a function exported by <literal>B</literal>,
-say) may conceivably not change <Filename>B.hi</Filename> one jot.  So
-now&hellip;
-</para>
-
-<para>
-GHC keeps a version number on each interface file, and on each type
-signature within the interface file.  It also keeps in every interface
-file a list of the version numbers of everything it used when it last
-compiled the file.  If the source file's modification date is earlier
-than the <Filename>.o</Filename> file's date (i.e. the source hasn't
-changed since the file was last compiled), and the
-<option>-recomp</option> is given on the command line, GHC will be
-clever.  It compares the version numbers on the things it needs this
-time with the version numbers on the things it needed last time
-(gleaned from the interface file of the module being compiled); if
-they are all the same it stops compiling rather early in the process
-saying &ldquo;Compilation IS NOT required&rdquo;.  What a beautiful
-sight!
-</para>
-
-<para>
-Patrick Sansom had a workshop paper about how all this is done (though
-the details have changed quite a bit). <ULink URL="mailto:sansom@dcs.gla.ac.uk">Ask him</ULink> if you want a copy.
-</para>
-
-</sect2>
-
-
-<Sect2 id="using-make">
-<Title>Using <Command>make</Command>
-</Title>
-
-<para>
-<indexterm><primary><literal>make</literal></primary></indexterm>
-</para>
-
-<para>
-It is reasonably straightforward to set up a <Filename>Makefile</Filename> to use with GHC, assuming you name your source files the same as your modules.
-Thus:
-</para>
-
-<para>
-
-<ProgramListing>
-HC      = ghc
-HC_OPTS = -cpp $(EXTRA_HC_OPTS)
-
-SRCS = Main.lhs Foo.lhs Bar.lhs
-OBJS = Main.o   Foo.o   Bar.o
-
-.SUFFIXES : .o .hs .hi .lhs .hc .s
-
-cool_pgm : $(OBJS)
-        rm $@
-        $(HC) -o $@ $(HC_OPTS) $(OBJS)
-
-# Standard suffix rules
-.o.hi:
-        @:
-
-.lhs.o:
-        $(HC) -c $&#60; $(HC_OPTS)
-
-.hs.o:
-        $(HC) -c $&#60; $(HC_OPTS)
-
-# Inter-module dependencies
-Foo.o Foo.hc Foo.s    : Baz.hi          # Foo imports Baz
-Main.o Main.hc Main.s : Foo.hi Baz.hi   # Main imports Foo and Baz
-</ProgramListing>
-
-</para>
-
-<para>
-(Sophisticated <Command>make</Command> variants may achieve some of the above more
-elegantly.  Notably, <Command>gmake</Command>'s pattern rules let you write the more
-comprehensible:
-</para>
-
-<para>
-
-<ProgramListing>
-%.o : %.lhs
-        $(HC) -c $&#60; $(HC_OPTS)
-</ProgramListing>
-
-</para>
-
-<para>
-What we've shown should work with any <Command>make</Command>.)
-</para>
-
-<para>
-Note the cheesy <literal>.o.hi</literal> rule: It records the dependency of the
-interface (<Filename>.hi</Filename>) file on the source.  The rule says a <Filename>.hi</Filename> file can
-be made from a <Filename>.o</Filename> file by doing&hellip;nothing.  Which is true.
-</para>
-
-<para>
-Note the inter-module dependencies at the end of the Makefile, which
-take the form
-</para>
-
-<para>
-
-<ProgramListing>
-Foo.o Foo.hc Foo.s    : Baz.hi          # Foo imports Baz
-</ProgramListing>
-
-</para>
-
-<para>
-They tell <Command>make</Command> that if any of <literal>Foo.o</literal>, <literal>Foo.hc</literal> or <literal>Foo.s</literal> have an
-earlier modification date than <literal>Baz.hi</literal>, then the out-of-date file
-must be brought up to date.  To bring it up to date, <literal>make</literal> looks for
-a rule to do so; one of the preceding suffix rules does the job
-nicely.
-</para>
-
-    </sect2>
-
-    <sect2 id="sec-makefile-dependencies">
-      <title>Dependency generation</title>
-      <indexterm><primary>dependencies in Makefiles</primary></indexterm>
-      <indexterm><primary>Makefile dependencies</primary></indexterm>
-
-      <para>Putting inter-dependencies of the form <literal>Foo.o :
-      Bar.hi</literal> into your <Filename>Makefile</Filename> by hand
-      is rather error-prone.  Don't worry, GHC has support for
-      automatically generating the required dependencies.  Add the
-      following to your <Filename>Makefile</Filename>:</para>
-
-<ProgramListing>
-depend :
-        ghc -M $(HC_OPTS) $(SRCS)
-</ProgramListing>
-
-      <para>Now, before you start compiling, and any time you change
-      the <literal>imports</literal> in your program, do <Command>make
-      depend</Command> before you do <Command>make
-      cool&lowbar;pgm</Command>.  <Command>ghc -M</Command> will append
-      the needed dependencies to your
-      <Filename>Makefile</Filename>.</para>
-
-      <para>In general, if module <literal>A</literal> contains the
-      line
-
-<programlisting>
-import B ...blah...
-</programlisting>
-
-       then <command>ghc -M</command> will generate a dependency
-       line of the form:
-
-<programlisting>
-A.o : B.hi
-</programlisting>
-
-       If module <literal>A</literal> contains the line 
-
-<programlisting>
-import {-# SOURCE #-} B ...blah...
-</programlisting>
-
-       then <command>ghc -M</command> will generate a dependency
-       line of the form:
-
-<programlisting>
-A.o : B.hi-boot
-</programlisting>
-
-       (See <xref linkend="hi-files"> for details of interface files.)
-       If <literal>A</literal> imports multiple modules, then there
-       will be multiple lines with <filename>A.o</filename> as the
-       target.</para>
-
-      <para>By default, <Command>ghc -M</Command> generates all the
-      dependencies, and then concatenates them onto the end of
-      <Filename>makefile</Filename> (or <Filename>Makefile</Filename>
-      if <Filename>makefile</Filename> doesn't exist) bracketed by the
-      lines "<literal>&num; DO NOT DELETE: Beginning of Haskell
-      dependencies</literal>" and "<literal>&num; DO NOT DELETE: End
-      of Haskell dependencies</literal>".  If these lines already
-      exist in the <Filename>makefile</Filename>, then the old
-      dependencies are deleted first.</para>
-
-      <para>Internally, GHC uses a script to generate the
-      dependencies, called <command>mkdependHS</command>.  This script
-      has some options of its own, which you might find useful.
-      Options can be passed directly to <command>mkdependHS</command>
-      with GHC's <literal>-optdep</literal> option.  For example, to
-      generate the dependencies into a file called
-      <literal>.depend</literal> instead of
-      <literal>Makefile</literal>:</para>
-
-<screen>
-ghc -M -optdep-f optdep.depend ...
-</screen>
-      
-      <para>The full list of options accepted by
-      <command>mkdependHS</command> is:</para>
+  &separate;
+  &packages;
+
+  <sect1 id="options-optimise">
+    <title>Optimisation (code improvement)</title>
+
+    <indexterm><primary>optimisation</primary></indexterm>
+    <indexterm><primary>improvement, code</primary></indexterm>
+
+    <para>The <option>-O*</option> options specify convenient
+    &ldquo;packages&rdquo; of optimisation flags; the
+    <option>-f*</option> options described later on specify
+    <emphasis>individual</emphasis> optimisations to be turned on/off;
+    the <option>-m*</option> options specify
+    <emphasis>machine-specific</emphasis> optimisations to be turned
+    on/off.</para>
+
+    <sect2 id="optimise-pkgs">
+      <title><option>-O*</option>: convenient &ldquo;packages&rdquo; of optimisation flags.</title>
+
+      <para>There are <emphasis>many</emphasis> options that affect
+      the quality of code produced by GHC.  Most people only have a
+      general goal, something like &ldquo;Compile quickly&rdquo; or
+      &ldquo;Make my program run like greased lightning.&rdquo; The
+      following &ldquo;packages&rdquo; of optimisations (or lack
+      thereof) should suffice.</para>
+
+      <para>Once you choose a <option>-O*</option>
+      &ldquo;package,&rdquo; stick with it&mdash;don't chop and
+      change.  Modules' interfaces <emphasis>will</emphasis> change
+      with a shift to a new <option>-O*</option> option, and you may
+      have to recompile a large chunk of all importing modules before
+      your program can again be run safely (see <XRef
+      LinkEnd="recomp">).</para>
 
       <variablelist>
 
 	<varlistentry>
-	  <term><option>-w</option></term>
+	  <term>No <option>-O*</option>-type option specified:</term>
+	  <indexterm><primary>-O* not specified</primary></indexterm>
 	  <listitem>
-	    <para>Turn off warnings about interface file shadowing.</para>
+	    <para>This is taken to mean: &ldquo;Please compile
+            quickly; I'm not over-bothered about compiled-code
+            quality.&rdquo; So, for example: <command>ghc -c
+            Foo.hs</command></para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-f blah</option></term>
+	  <term><option>-O0</option>:</term>
+	  <indexterm><primary><option>-O0</option></primary></indexterm>
 	  <listitem>
-	    <para>Use <Filename>blah</Filename> as the makefile,
-            rather than <Filename>makefile</Filename> or
-            <Filename>Makefile</Filename>.  If
-            <Filename>blah</Filename> doesn't exist,
-            <Command>mkdependHS</Command> creates it.  We often use
-            <option>-f .depend</option> to put the dependencies in
-            <Filename>.depend</Filename> and then
-            <Command>include</Command> the file
-            <Filename>.depend</Filename> into
-            <Filename>Makefile</Filename>.</para>
+	    <para>Means &ldquo;turn off all optimisation&rdquo;,
+	    reverting to the same settings as if no
+	    <option>-O</option> options had been specified.  Saying
+	    <option>-O0</option> can be useful if
+	    eg. <command>make</command> has inserted a
+	    <option>-O</option> on the command line already.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-o &lt;osuf&gt;</option></term>
+	  <term><option>-O</option> or <option>-O1</option>:</term>
+	  <indexterm><primary>-O option</primary></indexterm>
+	  <indexterm><primary>-O1 option</primary></indexterm>
+	  <indexterm><primary>optimise</primary><secondary>normally</secondary></indexterm>
 	  <listitem>
-	    <para>Use <Filename>.&lt;osuf&gt;</Filename> as the
-            "target file" suffix ( default: <literal>o</literal>).
-            Multiple <option>-o</option> flags are permitted (GHC2.05
-            onwards).  Thus "<option>-o hc -o o</option>" will
-            generate dependencies for <Filename>.hc</Filename> and
-            <Filename>.o</Filename> files.</para>
+	    <para>Means: &ldquo;Generate good-quality code without
+            taking too long about it.&rdquo; Thus, for example:
+            <command>ghc -c -O Main.lhs</command></para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-s &lt;suf&gt;</option></term>
+	  <term><option>-O2</option>:</term>
+	  <indexterm><primary>-O2 option</primary></indexterm>
+	  <indexterm><primary>optimise</primary><secondary>aggressively</secondary></indexterm>
 	  <listitem>
-	    <para>Make extra dependencies that declare that files with
-            suffix
-            <Filename>.&lt;suf&gt;&lowbar;&lt;osuf&gt;</Filename>
-            depend on interface files with suffix
-            <Filename>.&lt;suf&gt;&lowbar;hi</Filename>, or (for
-            <literal>&lcub;-&num; SOURCE &num;-&rcub;</literal>
-            imports) on <Filename>.hi-boot</Filename>.  Multiple
-            <option>-s</option> flags are permitted.  For example,
-            <option>-o hc -s a -s b</option> will make dependencies
-            for <Filename>.hc</Filename> on <Filename>.hi</Filename>,
-            <Filename>.a&lowbar;hc</Filename> on
-            <Filename>.a&lowbar;hi</Filename>, and
-            <Filename>.b&lowbar;hc</Filename> on
-            <Filename>.b&lowbar;hi</Filename>.  (Useful in conjunction
-            with NoFib "ways".)</para>
+	    <para>Means: &ldquo;Apply every non-dangerous
+            optimisation, even if it means significantly longer
+            compile times.&rdquo;</para>
+
+	    <para>The avoided &ldquo;dangerous&rdquo; optimisations
+            are those that can make runtime or space
+            <emphasis>worse</emphasis> if you're unlucky.  They are
+            normally turned on or off individually.</para>
+
+	    <para>At the moment, <option>-O2</option> is
+            <emphasis>unlikely</emphasis> to produce better code than
+            <option>-O</option>.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>--exclude-module=&lt;file&gt;</option></term>
+	  <term><option>-O2-for-C</option>:</term>
+	  <indexterm><primary>-O2-for-C option</primary></indexterm>
+	  <indexterm><primary>gcc, invoking with -O2</primary></indexterm>
 	  <listitem>
-	    <para>Regard <Filename>&lt;file&gt;</Filename> as
-            "stable"; i.e., exclude it from having dependencies on
-            it.</para>
+	    <para>Says to run GCC with <option>-O2</option>, which may
+            be worth a few percent in execution speed.  Don't forget
+            <option>-fvia-C</option>, lest you use the native-code
+            generator and bypass GCC altogether!</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-x</option></term>
+	  <term><option>-Ofile &lt;file&gt;</option>:</term>
+	  <indexterm><primary>-Ofile &lt;file&gt; option</primary></indexterm>
+	  <indexterm><primary>optimising, customised</primary></indexterm>
 	  <listitem>
-	    <para>same as <option>--exclude-module</option></para>
-	  </listitem>
-	</varlistentry>
+	    <para>(NOTE: not supported yet in GHC 5.x.  Please ask if
+	    you're interested in this.)</para>
+	    
+	    <para>For those who need <emphasis>absolute</emphasis>
+            control over <emphasis>exactly</emphasis> what options are
+            used (e.g., compiler writers, sometimes :-), a list of
+            options can be put in a file and then slurped in with
+            <option>-Ofile</option>.</para>
 
-	<varlistentry>
-	  <term><option>--exclude-directory=&lt;dirs&gt;</option></term>
-	  <listitem>
-	    <para>Regard the colon-separated list of directories
-            <Filename>&lt;dirs&gt;</Filename> as containing stable,
-            don't generate any dependencies on modules therein.</para>
-	  </listitem>
-	</varlistentry>
+	    <para>In that file, comments are of the
+            <literal>&num;</literal>-to-end-of-line variety; blank
+            lines and most whitespace is ignored.</para>
 
-	<varlistentry>
-	  <term><option>-xdirs</option></term>
-	  <listitem>
-	    <para>same as <option>--exclude-directory</option>.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><option>--include-module=&lt;file&gt;</option></term>
-	  <listitem>
-	    <para>Regard <Filename>&lt;file&gt;</Filename> as not
-            "stable"; i.e., generate dependencies on it (if any). This
-            option is normally used in conjunction with the
-            <option>--exclude-directory</option> option.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><option>--include-prelude</option></term>
-	  <listitem>
-	    <para>Regard prelude libraries as unstable, i.e., generate
-            dependencies on the prelude modules used (including
-            <literal>Prelude</literal>).  This option is normally only
-            used by the various system libraries. If a
-            <option>-package</option> option is used, dependencies will
-            also be generated on the library's interfaces.</para>
+	    <para>Please ask if you are baffled and would like an
+	    example of <option>-Ofile</option>!</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
 
-</sect2>
+      <para>We don't use a <option>-O*</option> flag for day-to-day
+      work.  We use <option>-O</option> to get respectable speed;
+      e.g., when we want to measure something.  When we want to go for
+      broke, we tend to use <option>-O -fvia-C -O2-for-C</option> (and
+      we go for lots of coffee breaks).</para>
 
-<Sect2 id="mutual-recursion">
-<Title>How to compile mutually recursive modules
-</Title>
-
-<para>
-<indexterm><primary>module system, recursion</primary></indexterm>
-<indexterm><primary>recursion, between modules</primary></indexterm>
-</para>
-
-<para>
-Currently, the compiler does not have proper support for dealing with
-mutually recursive modules:
-</para>
-
-<para>
-
-<ProgramListing>
-module A where
-
-import B
-
-newtype TA = MkTA Int
-
-f :: TB -&#62; TA
-f (MkTB x) = MkTA x
---------
-module B where
-
-import A
-
-data TB = MkTB !Int
-
-g :: TA -&#62; TB
-g (MkTA x) = MkTB x
-</ProgramListing>
-
-</para>
-
-<para>
-When compiling either module A and B, the compiler will try (in vain)
-to look for the interface file of the other. So, to get mutually
-recursive modules off the ground, you need to hand write an interface
-file for A or B, so as to break the loop.  These hand-written
-interface files are called <literal>hi-boot</literal> files, and are placed in a file
-called <Filename>&lt;module&gt;.hi-boot</Filename>.  To import from an <literal>hi-boot</literal> file instead
-of the standard <Filename>.hi</Filename> file, use the following syntax in the importing module:
-<indexterm><primary>hi-boot files</primary></indexterm>
-<indexterm><primary>importing, hi-boot files</primary></indexterm>
-</para>
-
-<para>
-
-<ProgramListing>
-import {-# SOURCE #-} A
-</ProgramListing>
-
-</para>
-
-<para>
-The hand-written interface need only contain the bare minimum of
-information needed to get the bootstrapping process started.  For
-example, it doesn't need to contain declarations for <Emphasis>everything</Emphasis>
-that module <literal>A</literal> exports, only the things required by the module that
-imports <literal>A</literal> recursively.
-</para>
-
-<para>
-For the example at hand, the boot interface file for A would look like
-the following:
-</para>
-
-<para>
-
-<ProgramListing>
-__interface A 1 404 where
-__export A TA{MkTA} ;
-1 newtype TA = MkTA PrelBase.Int ;
-</ProgramListing>
-
-</para>
-
-<para>
-The syntax is essentially the same as a normal <Filename>.hi</Filename> file
-(unfortunately), but you can usually tailor an existing <Filename>.hi</Filename> file to
-make a <Filename>.hi-boot</Filename> file.
-</para>
-
-<para>
-Notice that we only put the declaration for the newtype <literal>TA</literal> in the
-<literal>hi-boot</literal> file, not the signature for <Function>f</Function>, since <Function>f</Function> isn't used by
-<literal>B</literal>.
-</para>
-
-<para>
-The number &ldquo;1&rdquo; after &ldquo;&lowbar;&lowbar;interface A&rdquo; gives the version number of module A;
-it is incremented whenever anything in A's interface file changes.  The &ldquo;404&rdquo; is
-the version number of the interface file <Emphasis>syntax</Emphasis>; we change it when
-we change the syntax of interface files so that you get a better error message when
-you try to read an old-format file with a new-format compiler.
-</para>
-
-<para>
-The number &ldquo;1&rdquo; at the beginning of a declaration is the <Emphasis>version
-number</Emphasis> of that declaration: for the purposes of <Filename>.hi-boot</Filename> files
-these can all be set to 1.  All names must be fully qualified with the
-<Emphasis>original</Emphasis> module that an object comes from: for example, the
-reference to <literal>Int</literal> in the interface for <literal>A</literal> comes from <literal>PrelBase</literal>,
-which is a module internal to GHC's prelude.  It's a pain, but that's
-the way it is.
-</para>
-
-<para>
-If you want an hi-boot file to export a data type, but you don't want to give its constructors
-(because the constructors aren't used by the SOURCE-importing module), you can write simply:
-</para>
-
-<para>
-
-<ProgramListing>
-__interface A 1 404 where
-__export A TA;
-1 data TA
-</ProgramListing>
-
-</para>
-
-<para>
-(You must write all the type parameters, but leave out the '=' and everything that follows it.)
-</para>
-
-<para>
-<Emphasis>Note:</Emphasis> This is all a temporary solution, a version of the
-compiler that handles mutually recursive modules properly without the manual
-construction of interface files, is (allegedly) in the works.
-</para>
-
-</sect2>
-
-</Sect1>
-
-  <sect1 id="packages">
-    <title>Packages</title>
-    <indexterm><primary>packages</primary></indexterm>
-
-    <para>Packages are collections of libraries, conveniently grouped
-    together as a single entity.  The package system is flexible: a
-    package may consist of Haskell code, foreign language code (eg. C
-    libraries), or a mixture of the two.  A package is a good way to
-    group together related Haskell modules, and is essential if you
-    intend to make the modules into a Windows DLL (see below).</para>
-
-    <para>Because packages can contain both Haskell and C libraries, they
-    are also a good way to provide convenient access to a Haskell
-    layer over a C library.</para>
-
-    <para>GHC comes with several packages (see <xref
-    linkend="book-hslibs">), and packages can be added/removed from an
-    existing GHC installation.</para>
-
-    <sect2 id="listing-packages">
-      <title>Listing the available packages</title>
-      <indexterm><primary>packages</primary>
-	<secondary>listing</secondary></indexterm>
-
-      <para>To see what packages are currently installed, use the
-      <literal>--list-packages</literal> option:</para>
-      <indexterm><primary><literal>--list-packages</literal></primary>
-      </indexterm>
-
-<screen>
-  $ ghc --list-packages
-  gmp, rts, std, lang, concurrent, data, net, posix, text, util
-</screen>
-
-      <para>Note that your GHC installation might have a slightly
-      different set of packages installed.</para>
-
-      <para>The <literal>gmp</literal> and <literal>rts</literal>
-      packages are always present, and represent the multi-precision
-      integer and runtime system libraries respectively.  The
-      <literal>std</literal> package contains the Haskell prelude.
-      The rest of the packages are optional libraries.</para>
-
+      <para>The easiest way to see what <option>-O</option> (etc.)
+      &ldquo;really mean&rdquo; is to run with <option>-v</option>,
+      then stand back in amazement.</para>
     </sect2>
 
-    <sect2 id="using-packages">
-      <title>Using a package</title>
-      <indexterm><primary>packages</primary>
-	<secondary>using</secondary></indexterm>
-      
-      <para>To use a package, add the <literal>-package</literal> flag
-      to the command line:</para>
+    <sect2 id="options-f">
+      <title><option>-f*</option>: platform-independent flags</title>
+
+      <indexterm><primary>-f* options (GHC)</primary></indexterm>
+      <indexterm><primary>-fno-* options (GHC)</primary></indexterm>
+
+      <para>These flags turn on and off individual optimisations.
+      They are normally set via the <option>-O</option> options
+      described above, and as such, you shouldn't need to set any of
+      them explicitly (indeed, doing so could lead to unexpected
+      results).  However, there are one or two that may be of
+      interest:</para>
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-package &lt;lib&gt;</option></term>
-	  <indexterm><primary>-package &lt;lib&gt; option</primary></indexterm>
+	  <term><option>-fexcess-precision</option>:</term>
 	  <listitem>
-	    <para>This option brings into scope all the modules from
-	    package <literal>&lt;lib&gt;</literal> (they still have to
-	    be imported in your Haskell source, however).  It also
-	    causes the relevant libraries to be linked when linking is
-	    being done.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
-
-      <para>Some packages depend on other packages, for example the
-      <literal>text</literal> package makes use of some of the modules
-      in the <literal>lang</literal> package.  The package system
-      takes care of all these dependencies, so that when you say
-      <literal>-package text</literal> on the command line, you
-      automatically get <literal>-package lang</literal> too.</para>
-    </sect2>
-
-    <sect2 id="building-packages">
-      <title>Building a package from Haskell source</title>
-      <indexterm><primary>packages</primary>
-	<secondary>building</secondary></indexterm>
-
-      <para>It takes some special considerations to build a new
-      package:</para>
-
-      <itemizedlist>
-	<listitem>
-	  <para>A package may contain several Haskell modules. A
-          package may span many directories, or many packages may
-          exist in a single directory. Packages may not be mutually
-          recursive.</para>
-	</listitem>
-
-	<listitem>
-	  <para>A package has a name
-  	  (e.g. <filename>std</filename>)</para>
-	</listitem>
-
-	<listitem>
-	  <para>The Haskell code in a package may be built into one or
-	  more Unix libraries (e.g. <Filename>libHSfoo.a</Filename>),
-	  or a single DLL on Windows
-	  (e.g. <Filename>HSfoo.dll</Filename>).  The restriction to a
-	  single DLL on Windows is that the package system is used to
-	  tell the compiler when it should make an inter-DLL call
-	  rather than an intra-DLL call (inter-DLL calls require an
-	  extra indirection).</para>
-	</listitem>
-
-	<listitem>
-	  <para>GHC does not maintain detailed cross-package
-          dependency information.  It does remember which modules in
-          other packages the current module depends on, but not which
-          things within those imported things.</para>
-	</listitem>
-      </itemizedlist>
-
-      <para>To compile a module which is to be part of a new package,
-      use the <literal>-package-name</literal> option:</para>
-
-      <variablelist>
-	<varlistentry>
-	  <term><option>-package-name &lt;foo&gt;</option></term>
-	  <indexterm><primary><literal>-package-name</literal></primary>
-	    <secondary>option</secondary></indexterm>
-	  <listitem>
-	    <para>This option is added to the command line when
-	    compiling a module that is destined to be part of package
-	    <literal>foo</literal>.  If this flag is omitted then the
-	    default package <literal>Main</literal> is assumed.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
-
-      <para>Failure to use the <literal>-package-name</literal> option
-      when compiling a package will result in disaster on Windows, but
-      is relatively harmless on Unix at the moment (it will just cause
-      a few extra dependencies in some interface files).  However,
-      bear in mind that we might add support for Unix shared libraries
-      at some point in the future.</para>
-
-      <para>It is worth noting that on Windows, because each package
-      is built as a DLL, and a reference to a DLL costs an extra
-      indirection, intra-package references are cheaper than
-      inter-package references. Of course, this applies to the
-      <Filename>Main</Filename> package as well.</para>
-
-    </sect2>
-    <sect2 id="package-management">
-      <title>Package management</title>
-      <indexterm><primary>packages</primary>
-	<secondary>management</secondary></indexterm>
-      
-      <para>GHC uses a package configuration file, called
-      <literal>packages.conf</literal>, which can be found in your GHC
-      install directory.  This file isn't intended to be edited
-      directly, instead GHC provides options for adding & removing
-      packages:</para>
-
-      <variablelist>
-	<varlistentry>
-	  <term><option>--add-package</option></term>
-	  <indexterm><primary><literal>--add-package</literal></primary>
-	      <secondary>option</secondary></indexterm>
-	  <listitem>
-	    <para>Reads a package specification (see below) on stdin,
-	    and adds it to the database of installed packages.  The
-	    package specification must be a package that isn't already
-	    installed.</para>
+	    <indexterm><primary><option>-fexcess-precision</option></primary></indexterm>
+	    <para>When this option is given, intermediate floating
+	    point values can have a <emphasis>greater</emphasis>
+	    precision/range than the final type.  Generally this is a
+	    good thing, but some programs may rely on the exact
+	    precision/range of
+	    <literal>Float</literal>/<literal>Double</literal> values
+	    and should not use this option for their compilation.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>--delete-package &lt;foo&gt;</option></term>
-	  <indexterm><primary><literal>--delete-package</literal></primary>
-	      <secondary>option</secondary></indexterm>
+	  <term><option>-fno-strictness</option></term>
+	  <indexterm><primary><option>-fno-strictness</option></primary>
+	  </indexterm>
 	  <listitem>
-	    <para>Removes the specified package from the installed
-	    configuration.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
-
-      <para>In both cases, the old package configuration file is saved
-      in <literal>packages.conf.old</literal> in your GHC install
-      directory, so in an emergency you can always copy this file into
-      <literal>package.conf</literal> to restore the old
-      settings.</para>
-
-      <para>A package specification looks like this:</para>
-
-<screen>
-  Package {
-     name            = "mypkg",
-     import_dirs     = ["/usr/local/lib/imports/mypkg"],
-     library_dirs    = ["/usr/local/lib"],
-     hs_libraries    = ["HSmypkg" ],
-     extra_libraries = ["HSmypkg_cbits"],
-     include_dirs    = [],
-     c_includes      = ["HsMyPkg.h"],
-     package_deps    = ["text", "data"],
-     extra_ghc_opts  = [],
-     extra_cc_opts   = [],
-     extra_ld_opts   = ["-lmy_clib"]
-  }
-</screen>
-
-      <para>Components of a package specification may be specified in
-      any order, and are:</para>
-
-      <variablelist>
-	<varlistentry>
-	  <term><literal>name</literal></term>
-	  <indexterm><primary><literal>name</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
-	  <listitem>
-            <para>The package's name, for use with
-            the <literal>-package</literal> flag and as listed in the
-            <literal>--list-packages</literal> list. 
-            </para>
+	    <para>Turns off the strictness analyser; sometimes it eats
+	    too many cycles.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>import_dirs</literal></term>
-	  <indexterm><primary><literal>import_dirs</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term><option>-fno-cpr-analyse</option></term>
+	  <indexterm><primary><option>-fno-cpr-analyse</option></primary>
+	  </indexterm>
 	  <listitem>
-	    <para>A list of directories containing interface files
-	    (<literal>.hi</literal> files) for this package.</para>
+	    <para>Turns off the CPR (constructed product result)
+	    analysis; it is somewhat experimental.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>library_dirs</literal></term>
-	  <indexterm><primary><literal>library_dirs</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term><option>-funbox-strict-fields</option>:</term>
 	  <listitem>
-	    <para>A list of directories containing libraries for this
-	    package.</para>
-	  </listitem>
-	</varlistentry>
+	    <indexterm><primary><option>-funbox-strict-fields</option></primary></indexterm>
+	    <indexterm><primary>strict constructor fields</primary></indexterm>
+	    <indexterm><primary>constructor fields, strict</primary></indexterm>
 
-	<varlistentry>
-	  <term><literal>hs_libraries</literal></term>
-	  <indexterm><primary><literal>hs_libraries</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
-	  <listitem>
-	    <para>A list of libraries containing Haskell code for this
-	    package, with the <literal>.a</literal> or
-	    <literal>.dll</literal> suffix omitted.  On Unix, the
-	    <literal>lib</literal> prefix is also omitted.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>extra_libraries</literal></term>
-	  <indexterm><primary><literal>extra_libraries</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
-	  <listitem>
-	    <para>A list of extra libraries for this package.  The
-	    difference between <literal>hs_libraries</literal> and
-	    <literal>extra_libraries</literal> is that
-	    <literal>hs_libraries</literal> normally have several
-	    versions, to support profiling, parallel and other build
-	    options.  The various versions are given different
-	    suffixes to distinguish them, for example the profiling
-	    version of the standard prelude library is named
-	    <filename>libHSstd_p.a</filename>, with the
-	    <literal>_p</literal> indicating that this is a profiling
-	    version.  The suffix is added automatically by GHC for
-	    <literal>hs_libraries</literal> only, no suffix is added
-	    for libraries in
-	    <literal>extra_libraries</literal>.</para>
-
-	    <para>Also, <literal>extra_libraries</literal> are placed
-	    on the linker command line before the
-	    <literal>hs_libraries</literal> for the same package.  If
-	    your package has dependencies in the other direction, you
-	    might need to make two separate packages.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>include_dirs</literal></term>
-	  <indexterm><primary><literal>include_dirs</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
-	  <listitem>
-	    <para>A list of directories containing C includes for this
-	    package (maybe the empty list).</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>c_includes</literal></term>
-	  <indexterm><primary><literal>c_includes</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
-	  <listitem>
-	    <para>A list of files to include for via-C compilations
-	    using this package.  Typically this include file will
-	    contain function prototypes for any C functions used in
-	    the package, in case they end up being called as a result
-	    of Haskell functions from the package being
-	    inlined.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>package_deps</literal></term>
-	  <indexterm><primary><literal>package_deps</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
-	  <listitem>
-	    <para>A list of packages which this package depends
-	    on.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>extra_ghc_opts</literal></term>
-	  <indexterm><primary><literal>extra_ghc_opts</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
-	  <listitem>
-	    <para>Extra arguments to be added to the GHC command line
-	    when this package is being used.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>extra_cc_opts</literal></term>
-	  <indexterm><primary><literal>extra_cc_opts</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
-	  <listitem>
-	    <para>Extra arguments to be added to the gcc command line
-	    when this package is being used (only for via-C
-	    compilations).</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>extra_ld_opts</literal></term>
-	  <indexterm><primary><literal>extra_ld_opts</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
-	  <listitem>
-	    <para>Extra arguments to be added to the gcc command line
-	    (for linking) when this package is being used.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
-
-      <para>For examples of more package specifications, take a look
-      at the <literal>package.conf</literal> in your GHC
-      installation.</para>
-    </sect2>
-  </sect1>
-
-
-<Sect1 id="options-optimise">
-<Title>Optimisation (code improvement)
-</Title>
-
-<para>
-<indexterm><primary>optimisation (GHC)</primary></indexterm>
-<indexterm><primary>improvement, code (GHC)</primary></indexterm>
-</para>
-
-<para>
-The <option>-O*</option> options specify convenient &ldquo;packages&rdquo; of optimisation
-flags; the <option>-f*</option> options described later on specify
-<Emphasis>individual</Emphasis> optimisations to be turned on/off; the <option>-m*</option>
-options specify <Emphasis>machine-specific</Emphasis> optimisations to be turned
-on/off.
-</para>
-
-<Sect2 id="optimise-pkgs">
-<Title><option>-O*</option>: convenient &ldquo;packages&rdquo; of optimisation flags.
-</Title>
-
-<para>
-<indexterm><primary>-O options</primary></indexterm>
-</para>
-
-<para>
-There are <Emphasis>many</Emphasis> options that affect the quality of code
-produced by GHC.  Most people only have a general goal, something like
-&ldquo;Compile quickly&rdquo; or &ldquo;Make my program run like greased lightning.&rdquo;
-The following &ldquo;packages&rdquo; of optimisations (or lack thereof) should
-suffice.
-</para>
-
-<para>
-Once you choose a <option>-O*</option> &ldquo;package,&rdquo; stick with it&mdash;don't chop and
-change.  Modules' interfaces <Emphasis>will</Emphasis> change with a shift to a new
-<option>-O*</option> option, and you may have to recompile a large chunk of all
-importing modules before your program can again be run
-safely (see <XRef LinkEnd="recomp">).
-</para>
-
-<para>
-<VariableList>
-
-<varlistentry>
-<term>No <option>-O*</option>-type option specified:</term>
-<indexterm><primary>-O* not specified</primary></indexterm>
-<listitem>
-<para>
-This is taken to mean: &ldquo;Please compile quickly; I'm not over-bothered
-about compiled-code quality.&rdquo;  So, for example: <Command>ghc -c Foo.hs</Command>
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-O</option> or <option>-O1</option>:</term>
-<indexterm><primary>-O option</primary></indexterm>
-<indexterm><primary>-O1 option</primary></indexterm>
-<indexterm><primary>optimise</primary><secondary>normally</secondary></indexterm>
-<listitem>
-<para>
-Means: &ldquo;Generate good-quality code without taking too long about
-it.&rdquo; Thus, for example: <Command>ghc -c -O Main.lhs</Command>
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-O2</option>:</term>
-<indexterm><primary>-O2 option</primary></indexterm>
-<indexterm><primary>optimise</primary><secondary>aggressively</secondary></indexterm>
-<listitem>
-<para>
-Means: &ldquo;Apply every non-dangerous optimisation, even if it means
-significantly longer compile times.&rdquo;
-</para>
-
-<para>
-The avoided &ldquo;dangerous&rdquo; optimisations are those that can make
-runtime or space <Emphasis>worse</Emphasis> if you're unlucky.  They are
-normally turned on or off individually.
-</para>
-
-<para>
-At the moment, <option>-O2</option> is <Emphasis>unlikely</Emphasis> to produce
-better code than <option>-O</option>.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-O2-for-C</option>:</term>
-<indexterm><primary>-O2-for-C option</primary></indexterm>
-<indexterm><primary>gcc, invoking with -O2</primary></indexterm>
-<listitem>
-<para>
-Says to run GCC with <option>-O2</option>, which may be worth a few percent in
-execution speed.  Don't forget <option>-fvia-C</option>, lest you use the native-code
-generator and bypass GCC altogether!
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-Onot</option>:</term>
-<indexterm><primary>-Onot option</primary></indexterm>
-<indexterm><primary>optimising, reset</primary></indexterm>
-<listitem>
-<para>
-This option will make GHC &ldquo;forget&rdquo; any
-<option>-O</option>ish options it has seen so far.  Sometimes useful;
-for example: <Command>make all
-EXTRA&lowbar;HC&lowbar;OPTS=-Onot</Command>.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-Ofile &lt;file&gt;</option>:</term>
-<indexterm><primary>-Ofile &lt;file&gt; option</primary></indexterm>
-<indexterm><primary>optimising, customised</primary></indexterm>
-<listitem>
-<para>
-For those who need <Emphasis>absolute</Emphasis> control over
-<Emphasis>exactly</Emphasis> what options are used (e.g., compiler
-writers, sometimes :-), a list of options can be put in a file and
-then slurped in with <option>-Ofile</option>.
-</para>
-
-<para>
-In that file, comments are of the
-<literal>&num;</literal>-to-end-of-line variety; blank lines and most
-whitespace is ignored.
-</para>
-
-<para>
-Please ask if you are baffled and would like an example of <option>-Ofile</option>!
-</para>
-</listitem>
-</varlistentry>
-</VariableList>
-</para>
-
-<para>
-At Glasgow, we don't use a <option>-O*</option> flag for day-to-day work.  We use
-<option>-O</option> to get respectable speed; e.g., when we want to measure
-something.  When we want to go for broke, we tend to use <option>-O -fvia-C
--O2-for-C</option> (and we go for lots of coffee breaks).
-</para>
-
-<para>
-The easiest way to see what <option>-O</option> (etc.) &ldquo;really mean&rdquo; is to run with
-<option>-v</option>, then stand back in amazement.  Alternatively, just look at the
-<literal>HsC&lowbar;minus&lt;blah&gt;</literal> lists in the GHC driver script.
-</para>
-
-</sect2>
-
-<sect2>
-<Title><option>-f*</option>: platform-independent flags</Title>
-
-<para>
-<indexterm><primary>-f* options (GHC)</primary></indexterm>
-<indexterm><primary>-fno-* options (GHC)</primary></indexterm>
-</para>
-
-<para>
-Flags can be turned <Emphasis>off</Emphasis> individually.  (NB: I hope you have a
-good reason for doing this&hellip;) To turn off the <option>-ffoo</option> flag, just use
-the <option>-fno-foo</option> flag.<indexterm><primary>-fno-&lt;opt&gt; anti-option</primary></indexterm> So, for
-example, you can say <option>-O2 -fno-strictness</option>, which will then drop out
-any running of the strictness analyser.
-</para>
-
-<para>
-The options you are most likely to want to turn off are:
-
-<ItemizedList>
-<listitem>
-
-<para>
-<option>-fno-strictness</option><indexterm><primary>-fno-strictness option</primary></indexterm> (strictness
-analyser, because it is sometimes slow),
-</para>
-</listitem>
-<listitem>
-
-<para>
-<option>-fno-specialise</option><indexterm><primary>-fno-specialise option</primary></indexterm> (automatic
-specialisation of overloaded functions, because it can make your code
-bigger) (US spelling also accepted), and
-</para>
-</listitem>
-<listitem>
-
-<para>
-<option>-fno-cpr-analyse</option><indexterm><primary>-fno-cpr-analyse option</primary></indexterm> switches off the CPR (constructed product
-result) analyser.
-</para>
-</listitem>
-
-</ItemizedList>
-
-</para>
-
-<para>
-Should you wish to turn individual flags <Emphasis>on</Emphasis>, you are advised
-to use the <option>-Ofile</option> option, described above.  Because the order in
-which optimisation passes are run is sometimes crucial, it's quite
-hard to do with command-line options.
-</para>
-
-<para>
-Here are some &ldquo;dangerous&rdquo; optimisations you <Emphasis>might</Emphasis> want to try:
-<VariableList>
-
-<varlistentry>
-<term><option>-fvia-C</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-fvia-C option</primary></indexterm>
-<indexterm><primary>native code generator, turning off</primary></indexterm>
-</para>
-
-<para>
-Compile via C, and don't use the native-code generator.  (There are many
-cases when GHC does this on its own.) You might pick up a little bit of
-speed by compiling via C (e.g. for floating-point intensive code on Intel).
-If you use <Function>&lowbar;casm&lowbar;</Function>s (which are utterly
-deprecated), you probably <Emphasis>have</Emphasis> to use
-<option>-fvia-C</option>.
-</para>
-
-<para>
-The lower-case incantation, <option>-fvia-c</option>, is synonymous.
-</para>
-
-<para>
-Compiling via C will probably be slower (in compilation time) than
-using GHC's native code generator.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-funfolding-interface-threshold&lt;n&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-funfolding-interface-threshold option</primary></indexterm>
-<indexterm><primary>inlining, controlling</primary></indexterm>
-<indexterm><primary>unfolding, controlling</primary></indexterm>
-(Default: 30) By raising or lowering this number, you can raise or
-lower the amount of pragmatic junk that gets spewed into interface
-files.  (An unfolding has a &ldquo;size&rdquo; that reflects the cost in terms
-of &ldquo;code bloat&rdquo; of expanding that unfolding in another module.  A
-bigger function would be assigned a bigger cost.)
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-funfolding-creation-threshold&lt;n&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-funfolding-creation-threshold option</primary></indexterm>
-<indexterm><primary>inlining, controlling</primary></indexterm>
-<indexterm><primary>unfolding, controlling</primary></indexterm>
-(Default: 30) This option is similar to
-<option>-funfolding-interface-threshold</option>, except that it governs unfoldings
-within a single module.  Increasing this figure is more likely to
-result in longer compile times than faster code.  The next option is
-more useful:
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-funfolding-use-threshold&lt;n&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-funfolding-use-threshold option</primary></indexterm>
-<indexterm><primary>inlining, controlling</primary></indexterm>
-<indexterm><primary>unfolding, controlling</primary></indexterm>
-(Default: 8) This is the magic cut-off figure for unfolding: below
-this size, a function definition will be unfolded at the call-site,
-any bigger and it won't.  The size computed for a function depends on
-two things: the actual size of the expression minus any discounts that
-apply (see <option>-funfolding-con-discount</option>).
-</para>
-</listitem>
-</varlistentry>
-
-<varlistentry>
-<term><option>-funfolding-update-in-place&lt;n&gt;</option>:</term>
-<listitem>
-<para>
-Switches on an experimental "optimisation".  Switching it on makes the compiler
-a little keener to inline a function that returns a constructor, if the context is
-that of a thunk.
-<ProgramListing>
-   x = plusInt a b
-</ProgramListing>
-If we inlined plusInt we might get an opportunity to use update-in-place for
-the thunk 'x'.
-</para>
-</listitem>
-</varlistentry>
-
-<varlistentry>
-<term><option>-funbox-strict-fields</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-funbox-strict-fields option</primary></indexterm>
-<indexterm><primary>strict constructor fields</primary></indexterm>
-<indexterm><primary>constructor fields, strict</primary></indexterm>
-</para>
-
-<para>
-This option causes all constructor fields which are marked strict
-(i.e. &ldquo;!&rdquo;) to be unboxed or unpacked if possible.  For example:
-</para>
-
-<para>
+	    <para>This option causes all constructor fields which are
+            marked strict (i.e. &ldquo;!&rdquo;) to be unboxed or
+            unpacked if possible.  For example:</para>
 
 <ProgramListing>
 data T = T !Float !Float
 </ProgramListing>
 
-</para>
+	    <para>will create a constructor <literal>T</literal>
+            containing two unboxed floats if the
+            <option>-funbox-strict-fields</option> flag is given.
+            This may not always be an optimisation: if the
+            <Function>T</Function> constructor is scrutinised and the
+            floats passed to a non-strict function for example, they
+            will have to be reboxed (this is done automatically by the
+            compiler).</para>
 
-<para>
-will create a constructor <literal>T</literal> containing two unboxed floats if the
-<option>-funbox-strict-fields</option> flag is given.  This may not always be an
-optimisation: if the <Function>T</Function> constructor is scrutinised and the floats
-passed to a non-strict function for example, they will have to be
-reboxed (this is done automatically by the compiler).
-</para>
-
-<para>
-This option should only be used in conjunction with <option>-O</option>, in order to
-expose unfoldings to the compiler so the reboxing can be removed as
-often as possible.  For example:
-</para>
-
-<para>
+	    <para>This option should only be used in conjunction with
+            <option>-O</option>, in order to expose unfoldings to the
+            compiler so the reboxing can be removed as often as
+            possible.  For example:</para>
 
 <ProgramListing>
 f :: T -&#62; Float
 f (T f1 f2) = f1 + f2
 </ProgramListing>
 
-</para>
+	    <para>The compiler will avoid reboxing
+            <Function>f1</Function> and <Function>f2</Function> by
+            inlining <Function>+</Function> on floats, but only when
+            <option>-O</option> is on.</para>
 
-<para>
-The compiler will avoid reboxing <Function>f1</Function> and <Function>f2</Function> by inlining <Function>+</Function> on
-floats, but only when <option>-O</option> is on.
-</para>
-
-<para>
-Any single-constructor data is eligible for unpacking; for example
-</para>
-
-<para>
+	    <para>Any single-constructor data is eligible for
+	    unpacking; for example</para>
 
 <ProgramListing>
 data T = T !(Int,Int)
 </ProgramListing>
 
-</para>
-
-<para>
-will store the two <literal>Int</literal>s directly in the <Function>T</Function> constructor, by flattening
-the pair.  Multi-level unpacking is also supported:
-</para>
-
-<para>
+	    <para>will store the two <literal>Int</literal>s directly
+            in the <Function>T</Function> constructor, by flattening
+            the pair.  Multi-level unpacking is also supported:</para>
 
 <ProgramListing>
 data T = T !S
 data S = S !Int !Int
 </ProgramListing>
 
-</para>
+	    <para>will store two unboxed <literal>Int&num;</literal>s
+	    directly in the <Function>T</Function> constructor.</para>
+	  </listitem>
+	</varlistentry>
 
-<para>
-will store two unboxed <literal>Int&num;</literal>s directly in the <Function>T</Function> constructor.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-fsemi-tagging</option>:</term>
-<listitem>
-<para>
-This option (which <Emphasis>does not work</Emphasis> with the native-code generator)
-tells the compiler to add extra code to test for already-evaluated
-values.  You win if you have lots of such values during a run of your
-program, you lose otherwise.  (And you pay in extra code space.)
-</para>
-
-<para>
-We have not played with <option>-fsemi-tagging</option> enough to recommend it.
-(For all we know, it doesn't even work anymore&hellip; Sigh.)
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-fexcess-precision</option>:</term>
-<listitem>
-<para>
-When this option is given, intermediate floating point values can have
-a <Emphasis>greater</Emphasis> precision/range than the final type.
-Generally this is a good thing, but some programs may rely on the
-exact precision/range of <literal>Float</literal>/<literal>Double</literal>
-values and should not use this option for their compilation.
-</para>
-</listitem>
-</varlistentry>
-</VariableList>
-</para>
-
-</sect2>
-
-<sect2>
-<Title><option>-m*</option>: platform-specific flags</Title>
-
-<para>
-<indexterm><primary>-m* options (GHC)</primary></indexterm>
-<indexterm><primary>platform-specific options</primary></indexterm>
-<indexterm><primary>machine-specific options</primary></indexterm>
-</para>
-
-<para>
-Some flags only make sense for particular target platforms.
-</para>
-
-<para>
-<VariableList>
-
-<varlistentry>
-<term><option>-mv8</option>:</term>
-<listitem>
-<para>
-(SPARC machines)<indexterm><primary>-mv8 option (SPARC only)</primary></indexterm>
-Means to pass the like-named option to GCC; it says to use the
-Version 8 SPARC instructions, notably integer multiply and divide.
-The similiar <option>-m*</option> GCC options for SPARC also work, actually.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-mlong-calls</option>:</term>
-<listitem>
-<para>
-(HPPA machines)<indexterm><primary>-mlong-calls option (HPPA only)</primary></indexterm>
-Means to pass the like-named option to GCC.  Required for Very Big
-modules, maybe.  (Probably means you're in trouble&hellip;)
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-monly-[32]-regs</option>:</term>
-<listitem>
-<para>
-(iX86 machines)<indexterm><primary>-monly-N-regs option (iX86 only)</primary></indexterm>
-GHC tries to &ldquo;steal&rdquo; four registers from GCC, for performance
-reasons; it almost always works.  However, when GCC is compiling some
-modules with four stolen registers, it will crash, probably saying:
-
-<Screen>
-Foo.hc:533: fixed or forbidden register was spilled.
-This may be due to a compiler bug or to impossible asm
-statements or clauses.
-</Screen>
-
-Just give some registers back with <option>-monly-N-regs</option>.  Try `3' first,
-then `2'.  If `2' doesn't work, please report the bug to us.
-</para>
-</listitem>
-</varlistentry>
-</VariableList>
-</para>
-
-</sect2>
-
-<Sect2 id="optimise-C-compiler">
-<Title>Code improvement by the C compiler.
-</Title>
-
-<para>
-<indexterm><primary>optimisation by GCC</primary></indexterm>
-<indexterm><primary>GCC optimisation</primary></indexterm>
-</para>
-
-<para>
-The C&nbsp;compiler (GCC) is run with <option>-O</option> turned on.  (It has
-to be, actually).
-</para>
-
-<para>
-If you want to run GCC with <option>-O2</option>&mdash;which may be worth a few
-percent in execution speed&mdash;you can give a
-<option>-O2-for-C</option><indexterm><primary>-O2-for-C option</primary></indexterm> option.
-</para>
-
-</sect2>
-
-</Sect1>
-
-<Sect1 id="options-phases">
-<Title>Options related to a particular phase
-</Title>
-
-<Sect2 id="c-pre-processor">
-<Title>The C pre-processor
-</Title>
-
-<para>
-<indexterm><primary>pre-processing: cpp</primary></indexterm>
-<indexterm><primary>C pre-processor options</primary></indexterm>
-<indexterm><primary>cpp, pre-processing with</primary></indexterm>
-</para>
-
-<para>
-The C pre-processor <Command>cpp</Command> is run over your Haskell code only if the
-<option>-cpp</option> option <indexterm><primary>-cpp option</primary></indexterm> is given.  Unless you are
-building a large system with significant doses of conditional
-compilation, you really shouldn't need it.
-<VariableList>
-
-<varlistentry>
-<term><option>-D&lt;foo&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-D&lt;name&gt; option</primary></indexterm>
-Define macro <Constant>&lt;foo&gt;</Constant> in the usual way.  NB: does <Emphasis>not</Emphasis> affect
-<option>-D</option> macros passed to the C&nbsp;compiler when compiling via C!  For those,
-use the <option>-optc-Dfoo</option> hack&hellip; (see <XRef LinkEnd="forcing-options-through">).
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-U&lt;foo&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-U&lt;name&gt; option</primary></indexterm>
-Undefine macro <Command>&lt;foo&gt;</Command> in the usual way.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-I&lt;dir&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-I&lt;dir&gt; option</primary></indexterm>
-Specify a directory in which to look for <literal>&num;include</literal> files, in
-the usual C way.
-</para>
-</listitem>
-</varlistentry>
-</VariableList>
-</para>
-
-<para>
-The GHC driver pre-defines several macros when processing Haskell
-source code (<Filename>.hs</Filename> or <Filename>.lhs</Filename> files):
-</para>
-
-<para>
-<VariableList>
-
-<varlistentry>
-<term><Constant>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</Constant>:</term>
-<listitem>
-<para>
-<indexterm><primary>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</primary></indexterm>
-If defined, this means that GHC supports the language defined by the
-Haskell 98 report.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><Constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;=98</Constant>:</term>
-<listitem>
-<para>
-<indexterm><primary>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;</primary></indexterm>
-In GHC 4.04 and later, the <Constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;</Constant> macro is defined as having
-the value <Constant>98</Constant>.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><Constant>&lowbar;&lowbar;HASKELL1&lowbar;&lowbar;</Constant>:</term>
-<listitem>
-<para>
-<indexterm><primary>&lowbar;&lowbar;HASKELL1&lowbar;&lowbar; macro</primary></indexterm>
-If defined to <Emphasis>n</Emphasis>, that means GHC supports the Haskell language
-defined in the Haskell report version <Emphasis>1.n</Emphasis>.  Currently 5.  This
-macro is deprecated, and will probably disappear in future versions.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><Constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</Constant>:</term>
-<listitem>
-<para>
-<indexterm><primary>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar; macro</primary></indexterm>
-For version <Emphasis>n</Emphasis> of the GHC system, this will be <literal>&num;define</literal>d to
-<Emphasis>100n</Emphasis>.  So, for version 4.00, it is 400.
-</para>
-
-<para>
-With any luck, <Constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</Constant> will be undefined in all other
-implementations that support C-style pre-processing.
-</para>
-
-<para>
-(For reference: the comparable symbols for other systems are:
-<Constant>&lowbar;&lowbar;HUGS&lowbar;&lowbar;</Constant> for Hugs and <Constant>&lowbar;&lowbar;HBC&lowbar;&lowbar;</Constant> for Chalmers.)
-</para>
-
-<para>
-NB. This macro is set when pre-processing both Haskell source and C
-source, including the C source generated from a Haskell module
-(i.e. <Filename>.hs</Filename>, <Filename>.lhs</Filename>, <Filename>.c</Filename> and <Filename>.hc</Filename> files).
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><Constant>&lowbar;&lowbar;CONCURRENT&lowbar;HASKELL&lowbar;&lowbar;</Constant>:</term>
-<listitem>
-<para>
-<indexterm><primary>&lowbar;&lowbar;CONCURRENT&lowbar;HASKELL&lowbar;&lowbar; macro</primary></indexterm>
-This symbol is defined when pre-processing Haskell (input) and
-pre-processing C (GHC output).  Since GHC from verion 4.00 now
-supports concurrent haskell by default, this symbol is always defined.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><Constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</Constant>:</term>
-<listitem>
-<para>
-<indexterm><primary>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar; macro</primary></indexterm>
-Only defined when <option>-parallel</option> is in use!  This symbol is defined when
-pre-processing Haskell (input) and pre-processing C (GHC output).
-</para>
-</listitem>
-</varlistentry>
-</VariableList>
-</para>
-
-<para>
-Options other than the above can be forced through to the C
-pre-processor with the <option>-opt</option> flags (see
-<XRef LinkEnd="forcing-options-through">).
-</para>
-
-<para>
-A small word of warning: <option>-cpp</option> is not friendly to &ldquo;string
-gaps&rdquo;.<indexterm><primary>-cpp vs string gaps</primary></indexterm><indexterm><primary>string gaps vs
--cpp</primary></indexterm>.  In other words, strings such as the following:
-</para>
-
-<para>
-
+	<varlistentry>
+	  <term><option>-funfolding-update-in-place&lt;n&gt;</option></term>
+	  <indexterm><primary><option>-funfolding-update-in-place</option></primary></indexterm>
+	  <listitem>
+	    <para>Switches on an experimental "optimisation".
+            Switching it on makes the compiler a little keener to
+            inline a function that returns a constructor, if the
+            context is that of a thunk.
 <ProgramListing>
-strmod = "\
-\ p \
-\ "
+   x = plusInt a b
 </ProgramListing>
+            If we inlined plusInt we might get an opportunity to use
+            update-in-place for the thunk 'x'.</para>
+	  </listitem>
+	</varlistentry>
 
-</para>
+	<varlistentry>
+	  <term><option>-funfolding-interface-threshold&lt;n&gt;</option>:</term>
+	  <listitem>
+	    <indexterm><primary><option>-funfolding-interface-threshold</option></primary></indexterm>
+	    <indexterm><primary>inlining, controlling</primary></indexterm>
+	    <indexterm><primary>unfolding, controlling</primary></indexterm>
 
-<para>
-don't work with <option>-cpp</option>; <Filename>/usr/bin/cpp</Filename> elides the
-backslash-newline pairs.
-</para>
+	    <para>(Default: 30) By raising or lowering this number,
+            you can raise or lower the amount of pragmatic junk that
+            gets spewed into interface files.  (An unfolding has a
+            &ldquo;size&rdquo; that reflects the cost in terms of
+            &ldquo;code bloat&rdquo; of expanding that unfolding in
+            another module.  A bigger function would be assigned a
+            bigger cost.)</para>
+	  </listitem>
+	</varlistentry>
 
-<para>
-However, it appears that if you add a space at the end of the line,
-then <Command>cpp</Command> (at least GNU <Command>cpp</Command> and possibly other <Command>cpp</Command>s)
-leaves the backslash-space pairs alone and the string gap works as
-expected.
-</para>
+	<varlistentry>
+	  <term><option>-funfolding-creation-threshold&lt;n&gt;</option>:</term>
+	  <listitem>
+	    <indexterm><primary><option>-funfolding-creation-threshold</option></primary></indexterm>
+	    <indexterm><primary>inlining, controlling</primary></indexterm>
+	    <indexterm><primary>unfolding, controlling</primary></indexterm>
+	    
+	    <para>(Default: 30) This option is similar to
+            <option>-funfolding-interface-threshold</option>, except
+            that it governs unfoldings within a single module.
+            Increasing this figure is more likely to result in longer
+            compile times than faster code.  The next option is more
+            useful:</para>
+	  </listitem>
+	</varlistentry>
 
-</sect2>
+	<varlistentry>
+	  <term><option>-funfolding-use-threshold&lt;n&gt;</option>:</term>
+	  <listitem>
+	    <indexterm><primary><option>-funfolding-use-threshold</option></primary></indexterm>
+	    <indexterm><primary>inlining, controlling</primary></indexterm>
+	    <indexterm><primary>unfolding, controlling</primary></indexterm>
 
-<Sect2 id="options-C-compiler">
-<Title>Options affecting the C compiler (if applicable)
-</Title>
+	    <para>(Default: 8) This is the magic cut-off figure for
+            unfolding: below this size, a function definition will be
+            unfolded at the call-site, any bigger and it won't.  The
+            size computed for a function depends on two things: the
+            actual size of the expression minus any discounts that
+            apply (see <option>-funfolding-con-discount</option>).</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
-<para>
-<indexterm><primary>include-file options</primary></indexterm>
-<indexterm><primary>C compiler options</primary></indexterm>
-<indexterm><primary>GCC options</primary></indexterm>
-</para>
+    </sect2>
 
-<para>
-At the moment, quite a few common C-compiler options are passed on
-quietly to the C compilation of Haskell-compiler-generated C files.
-THIS MAY CHANGE.  Meanwhile, options so sent are:
-</para>
+  </sect1>
 
-<para>
-
-<InformalTable>
-<TGroup Cols="2">
-<ColSpec Align="Left" Colsep="0">
-<ColSpec Align="Left" Colsep="0">
-<TBody>
-<Row>
-<Entry><option>-ansi</option> </Entry>
-<Entry> do ANSI C (not K&amp;R) </Entry>
-</Row>
-<Row>
-<Entry>
-<option>-pedantic</option> </Entry>
-<Entry> be so</Entry>
-</Row>
-<Row>
-<Entry>
-<option>-dgcc-lint</option> </Entry>
-<Entry> (hack) short for &ldquo;make GCC very paranoid&rdquo;</Entry>
-</Row>
-
-</TBody>
-
-</TGroup>
-</InformalTable>
-
-<indexterm><primary>-ansi option (for GCC)</primary></indexterm>
-<indexterm><primary>-pedantic option (for GCC)</primary></indexterm>
-<indexterm><primary>-dgcc-lint option (GCC paranoia)</primary></indexterm>
-</para>
-
-<para>
-If you are compiling with lots of foreign calls, you may need to
-tell the C&nbsp;compiler about some <literal>&num;include</literal> files.  There is no real
-pretty way to do this, but you can use this hack from the
-command-line:
-</para>
-
-<para>
-
-<Screen>
-% ghc -c '-#include &#60;X/Xlib.h&#62;' Xstuff.lhs
-</Screen>
-
-</para>
-
-</sect2>
-
-<Sect2 id="options-linker">
-<Title>Linking and consistency-checking
-</Title>
-
-<para>
-<indexterm><primary>linker options</primary></indexterm>
-<indexterm><primary>ld options</primary></indexterm>
-</para>
-
-<para>
-GHC has to link your code with various libraries, possibly including:
-user-supplied, GHC-supplied, and system-supplied (<option>-lm</option> math
-library, for example).
-</para>
-
-<para>
-<VariableList>
-
-<varlistentry>
-<term><option>-l&lt;FOO&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-l&lt;lib&gt; option</primary></indexterm>
-Link in a library named <Filename>lib&lt;FOO&gt;.a</Filename> which resides somewhere on the
-library directories path.
-</para>
-
-<para>
-Because of the sad state of most UNIX linkers, the order of such
-options does matter.  Thus: <Command>ghc -lbar *.o</Command> is almost certainly
-wrong, because it will search <Filename>libbar.a</Filename> <Emphasis>before</Emphasis> it has
-collected unresolved symbols from the <Filename>*.o</Filename> files.
-<Command>ghc *.o -lbar</Command> is probably better.
-</para>
-
-<para>
-The linker will of course be informed about some GHC-supplied
-libraries automatically; these are:
-</para>
-
-<para>
-
-<InformalTable>
-<TGroup Cols="2">
-<ColSpec Align="Left" Colsep="0">
-<ColSpec Align="Left" Colsep="0">
-<TBody>
-<Row>
-<Entry><Emphasis>-l equivalent</Emphasis> </Entry>
-<Entry> <Emphasis>description</Emphasis> </Entry>
-</Row>
-
-<Row>
-<Entry>
-<option>-lHSrts,-lHSclib</option> </Entry>
-<Entry> basic runtime libraries </Entry>
-</Row>
-<Row>
-<Entry>
-<option>-lHS</option> </Entry>
-<Entry> standard Prelude library </Entry>
-</Row>
-<Row>
-<Entry>
-<option>-lHS&lowbar;cbits</option> </Entry>
-<Entry> C support code for standard Prelude library </Entry>
-</Row>
-<Row>
-<Entry>
-<option>-lgmp</option> </Entry>
-<Entry> GNU multi-precision library (for Integers)</Entry>
-</Row>
-
-</TBody>
-
-</TGroup>
-</InformalTable>
-
-</para>
-
-<para>
-<indexterm><primary>-lHS library</primary></indexterm>
-<indexterm><primary>-lHS&lowbar;cbits library</primary></indexterm>
-<indexterm><primary>-lHSrts library</primary></indexterm>
-<indexterm><primary>-lgmp library</primary></indexterm>
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-package &lt;name&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-package &lt;name&gt; option</primary></indexterm>
-</para>
-
-<para>
-If you are using a Haskell &ldquo;package&rdquo; (e.g., the POSIX
-library), just use the <option>-package posix</option> option, and the
-correct code should be linked in.  See <xref linkend="packages"> for
-more details.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-L&lt;dir&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-L&lt;dir&gt; option</primary></indexterm>
-Where to find user-supplied libraries&hellip;  Prepend the directory
-<Filename>&lt;dir&gt;</Filename> to the library directories path.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-static</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-static option</primary></indexterm>
-Tell the linker to avoid shared libraries.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-no-link-chk</option> and <option>-link-chk</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-no-link-chk option</primary></indexterm>
-<indexterm><primary>-link-chk option</primary></indexterm>
-<indexterm><primary>consistency checking of executables</primary></indexterm>
-By default, immediately after linking an executable, GHC verifies that
-the pieces that went into it were compiled with compatible flags; a
-&ldquo;consistency check&rdquo;.
-(This is to avoid mysterious failures caused by non-meshing of
-incompatibly-compiled programs; e.g., if one <Filename>.o</Filename> file was compiled
-for a parallel machine and the others weren't.)  You may turn off this
-check with <option>-no-link-chk</option>.  You can turn it (back) on with
-<option>-link-chk</option> (the default).
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-no-hs-main</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-no-hs-main option</primary></indexterm>
-<indexterm><primary>linking Haskell libraries with foreign code</primary></indexterm>
-</para>
-
-<para>
-In the event you want to include ghc-compiled code as part of another
-(non-Haskell) program, the RTS will not be supplying its definition of
-<Function>main()</Function> at link-time, you will have to. To signal that to the
-driver script when linking, use <option>-no-hs-main</option>.
-</para>
-
-<para>
-Notice that since the command-line passed to the linker is rather
-involved, you probably want to use the ghc driver script to do the
-final link of your `mixed-language' application. This is not a
-requirement though, just try linking once with <option>-v</option> on to see what
-options the driver passes through to the linker.
-</para>
-</listitem>
-</varlistentry>
-</VariableList>
-</para>
-
-</sect2>
-
-</Sect1>
+&phases;  
 
 <Sect1 id="sec-using-concurrent">
-<Title>Using Concurrent Haskell</Title>
+<title>Using Concurrent Haskell</title>
 
 <para>
 <indexterm><primary>Concurrent Haskell&mdash;use</primary></indexterm>
@@ -3239,7 +1247,7 @@ LinkEnd="sec-Concurrent">.
 </Sect1>
 
 <Sect1 id="sec-using-parallel">
-<Title>Using Parallel Haskell</Title>
+<title>Using Parallel Haskell</title>
 
 <para>
 <indexterm><primary>Parallel Haskell&mdash;use</primary></indexterm>
@@ -3253,8 +1261,8 @@ LinkEnd="sec-Concurrent">.
 <para>
 To compile a Haskell program for parallel execution under PVM, use the
 <option>-parallel</option> option,<indexterm><primary>-parallel
-option</primary></indexterm> both when compiling <Emphasis>and
-linking</Emphasis>.  You will probably want to <literal>import
+option</primary></indexterm> both when compiling <emphasis>and
+linking</emphasis>.  You will probably want to <literal>import
 Parallel</literal> into your Haskell modules.
 </para>
 
@@ -3274,14 +1282,14 @@ PVM, detailed in the following sections.
 </para>
 
 <sect2>
-<Title>Dummy's guide to using PVM</Title>
+<title>Dummy's guide to using PVM</title>
 
 <para>
 <indexterm><primary>PVM, how to use</primary></indexterm>
 <indexterm><primary>Parallel Haskell&mdash;PVM use</primary></indexterm>
 Before you can run a parallel program under PVM, you must set the
 required environment variables (PVM's idea, not ours); something like,
-probably in your <Filename>.cshrc</Filename> or equivalent:
+probably in your <filename>.cshrc</filename> or equivalent:
 
 <ProgramListing>
 setenv PVM_ROOT /wherever/you/put/it
@@ -3297,7 +1305,7 @@ business; nothing specific to Parallel Haskell.
 </para>
 
 <para>
-You use the <Command>pvm</Command><indexterm><primary>pvm command</primary></indexterm> command to start PVM on your
+You use the <command>pvm</command><indexterm><primary>pvm command</primary></indexterm> command to start PVM on your
 machine.  You can then do various things to control/monitor your
 &ldquo;parallel machine;&rdquo; the most useful being:
 </para>
@@ -3310,41 +1318,41 @@ machine.  You can then do various things to control/monitor your
 
 <Row>
 <Entry><KeyCombo><KeyCap>Control</KeyCap><KeyCap>D</KeyCap></KeyCombo></Entry>
-<Entry>exit <Command>pvm</Command>, leaving it running</Entry>
+<Entry>exit <command>pvm</command>, leaving it running</Entry>
 </Row>
 
 <Row>
-<Entry><Command>halt</Command></Entry>
+<Entry><command>halt</command></Entry>
 <Entry>kill off this &ldquo;parallel machine&rdquo; &amp; exit</Entry>
 </Row>
 
 <Row>
-<Entry><Command>add &lt;host&gt;</Command></Entry>
-<Entry>add <Command>&lt;host&gt;</Command> as a processor</Entry>
+<Entry><command>add &lt;host&gt;</command></Entry>
+<Entry>add <command>&lt;host&gt;</command> as a processor</Entry>
 </Row>
 
 <Row>
-<Entry><Command>delete &lt;host&gt;</Command></Entry>
-<Entry>delete <Command>&lt;host&gt;</Command></Entry>
+<Entry><command>delete &lt;host&gt;</command></Entry>
+<Entry>delete <command>&lt;host&gt;</command></Entry>
 </Row>
 
 <Row>
-<Entry><Command>reset</Command></Entry>
+<Entry><command>reset</command></Entry>
 <Entry>kill what's going, but leave PVM up</Entry>
 </Row>
 
 <Row>
-<Entry><Command>conf</Command></Entry>
+<Entry><command>conf</command></Entry>
 <Entry>list the current configuration</Entry>
 </Row>
 
 <Row>
-<Entry><Command>ps</Command></Entry>
+<Entry><command>ps</command></Entry>
 <Entry>report processes' status</Entry>
 </Row>
 
 <Row>
-<Entry><Command>pstat &lt;pid&gt;</Command></Entry>
+<Entry><command>pstat &lt;pid&gt;</command></Entry>
 <Entry>status of a particular process</Entry>
 </Row>
 
@@ -3354,13 +1362,13 @@ machine.  You can then do various things to control/monitor your
 </para>
 
 <para>
-The PVM documentation can tell you much, much more about <Command>pvm</Command>!
+The PVM documentation can tell you much, much more about <command>pvm</command>!
 </para>
 
 </sect2>
 
 <sect2>
-<Title>Parallelism profiles</Title>
+<title>Parallelism profiles</title>
 
 <para>
 <indexterm><primary>parallelism profiles</primary></indexterm>
@@ -3374,12 +1382,12 @@ results&mdash;only with &ldquo;how parallel&rdquo; it was!  We want pretty pictu
 </para>
 
 <para>
-Parallelism profiles (&agrave; la <Command>hbcpp</Command>) can be generated with the
+Parallelism profiles (&agrave; la <command>hbcpp</command>) can be generated with the
 <option>-q</option><indexterm><primary>-q RTS option (concurrent, parallel)</primary></indexterm> RTS option.  The
 per-processor profiling info is dumped into files named
-<Filename>&lt;full-path&gt;&lt;program&gt;.gr</Filename>.  These are then munged into a PostScript picture,
+<filename>&lt;full-path&gt;&lt;program&gt;.gr</filename>.  These are then munged into a PostScript picture,
 which you can then display.  For example, to run your program
-<Filename>a.out</Filename> on 8 processors, then view the parallelism profile, do:
+<filename>a.out</filename> on 8 processors, then view the parallelism profile, do:
 </para>
 
 <para>
@@ -3395,13 +1403,13 @@ which you can then display.  For example, to run your program
 
 <para>
 The scripts for processing the parallelism profiles are distributed
-in <Filename>ghc/utils/parallel/</Filename>.
+in <filename>ghc/utils/parallel/</filename>.
 </para>
 
 </sect2>
 
 <sect2>
-<Title>Other useful info about running parallel programs</Title>
+<title>Other useful info about running parallel programs</title>
 
 <para>
 The &ldquo;garbage-collection statistics&rdquo; RTS options can be useful for
@@ -3409,19 +1417,19 @@ seeing what parallel programs are doing.  If you do either
 <option>+RTS -Sstderr</option><indexterm><primary>-Sstderr RTS option</primary></indexterm> or <option>+RTS -sstderr</option>, then
 you'll get mutator, garbage-collection, etc., times on standard
 error. The standard error of all PE's other than the `main thread'
-appears in <Filename>/tmp/pvml.nnn</Filename>, courtesy of PVM.
+appears in <filename>/tmp/pvml.nnn</filename>, courtesy of PVM.
 </para>
 
 <para>
 Whether doing <option>+RTS -Sstderr</option> or not, a handy way to watch
-what's happening overall is: <Command>tail -f /tmp/pvml.nnn</Command>.
+what's happening overall is: <command>tail -f /tmp/pvml.nnn</command>.
 </para>
 
 </sect2>
 
 <Sect2 id="parallel-rts-opts">
-<Title>RTS options for Concurrent/Parallel Haskell
-</Title>
+<title>RTS options for Concurrent/Parallel Haskell
+</title>
 
 <para>
 <indexterm><primary>RTS options, concurrent</primary></indexterm>
@@ -3472,13 +1480,13 @@ is the maximum granularity available for timed context switches.
 <para>
 <indexterm><primary>-q RTS option</primary></indexterm>
 (PARALLEL ONLY) Produce a quasi-parallel profile of thread activity,
-in the file <FIlename>&lt;program&gt;.qp</FIlename>.  In the style of <Command>hbcpp</Command>, this profile
+in the file <FIlename>&lt;program&gt;.qp</FIlename>.  In the style of <command>hbcpp</command>, this profile
 records the movement of threads between the green (runnable) and red
 (blocked) queues.  If you specify the verbose suboption (<option>-qv</option>), the
 green queue is split into green (for the currently running thread
 only) and amber (for other runnable threads).  We do not recommend
 that you use the verbose suboption if you are planning to use the
-<Command>hbcpp</Command> profiling tools or if you are context switching at every heap
+<command>hbcpp</command> profiling tools or if you are context switching at every heap
 check (with <option>-C</option>).
 </para>
 </listitem>
@@ -3490,7 +1498,7 @@ check (with <option>-C</option>).
 <indexterm><primary>-t&lt;num&gt; RTS option</primary></indexterm>
 (PARALLEL ONLY) Limit the number of concurrent threads per processor
 to <literal>&lt;num&gt;</literal>.  The default is 32.  Each thread requires slightly over 1K
-<Emphasis>words</Emphasis> in the heap for thread state and stack objects.  (For
+<emphasis>words</emphasis> in the heap for thread state and stack objects.  (For
 32-bit machines, this translates to 4K bytes, and for 64-bit machines,
 8K bytes.)
 </para>
@@ -3502,10 +1510,10 @@ to <literal>&lt;num&gt;</literal>.  The default is 32.  Each thread requires sli
 <para>
 <indexterm><primary>-d RTS option (parallel)</primary></indexterm>
 (PARALLEL ONLY) Turn on debugging.  It pops up one xterm (or GDB, or
-something&hellip;) per PVM processor.  We use the standard <Command>debugger</Command>
+something&hellip;) per PVM processor.  We use the standard <command>debugger</command>
 script that comes with PVM3, but we sometimes meddle with the
-<Command>debugger2</Command> script.  We include ours in the GHC distribution,
-in <Filename>ghc/utils/pvm/</Filename>.
+<command>debugger2</command> script.  We include ours in the GHC distribution,
+in <filename>ghc/utils/pvm/</filename>.
 </para>
 </listitem>
 </varlistentry>
@@ -3539,8 +1547,68 @@ computation speed.
 
 </Sect1>
 
+  <sect1 id="options-platform">
+    <title>Platform-specific Flags</title>
+
+    <indexterm><primary>-m* options</primary></indexterm>
+    <indexterm><primary>platform-specific options</primary></indexterm>
+    <indexterm><primary>machine-specific options</primary></indexterm>
+
+    <para>Some flags only make sense for particular target
+    platforms.</para>
+
+    <variablelist>
+
+      <varlistentry>
+	<term><option>-mv8</option>:</term>
+	<listitem>
+	  <para>(SPARC machines)<indexterm><primary>-mv8 option (SPARC
+          only)</primary></indexterm> Means to pass the like-named
+          option to GCC; it says to use the Version 8 SPARC
+          instructions, notably integer multiply and divide.  The
+          similiar <option>-m*</option> GCC options for SPARC also
+          work, actually.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-mlong-calls</option>:</term>
+	<listitem>
+	  <para>(HPPA machines)<indexterm><primary>-mlong-calls option
+          (HPPA only)</primary></indexterm> Means to pass the
+          like-named option to GCC.  Required for Very Big modules,
+          maybe.  (Probably means you're in trouble&hellip;)</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-monly-[32]-regs</option>:</term>
+	<listitem>
+	  <para>(iX86 machines)<indexterm><primary>-monly-N-regs
+          option (iX86 only)</primary></indexterm> GHC tries to
+          &ldquo;steal&rdquo; four registers from GCC, for performance
+          reasons; it almost always works.  However, when GCC is
+          compiling some modules with four stolen registers, it will
+          crash, probably saying:
+
+<Screen>
+Foo.hc:533: fixed or forbidden register was spilled.
+This may be due to a compiler bug or to impossible asm
+statements or clauses.
+</Screen>
+
+          Just give some registers back with
+          <option>-monly-N-regs</option>.  Try `3' first, then `2'.
+          If `2' doesn't work, please report the bug to us.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+  </sect1>
+
 &runtime
 &debug
+&flags
 
 </Chapter>
 

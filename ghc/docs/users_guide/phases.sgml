@@ -1,0 +1,363 @@
+  <sect1 id="options-phases">
+    <title>Options related to a particular phase</title>
+
+    <sect2 id="replacing-phases">
+      <title>Replacing the program for one or more phases.</title>
+      <indexterm><primary>phases, changing</primary></indexterm>
+
+      <para>You may specify that a different program be used for one
+      of the phases of the compilation system, in place of whatever
+      the <Command>ghc</Command> has wired into it.  For example, you
+      might want to try a different assembler.  The following options
+      allow you to change the external program used for a given
+      compilation phases:</para>
+
+    </sect2>
+
+    <sect2 id="forcing-options-through">
+      <title>Forcing options to a particular phase.</title>
+      <indexterm><primary>forcing GHC-phase options</primary></indexterm>
+
+      <para>Options can be forced through to a particlar compilation
+      phase, using the following flags:</para>
+
+
+      <para>So, for example, to force an <option>-Ewurble</option>
+      option to the assembler, you would tell the driver
+      <option>-opta-Ewurble</option> (the dash before the E is
+      required).</para>
+
+      <para>GHC is itself a Haskell program, so if you need to pass
+      options directly to GHC's runtime system you can enclose them in
+      <literal>+RTS ... -RTS</literal> (see <xref
+      linkend="runtime-control">).</para>
+
+    </sect2>
+
+    <sect2 id="c-pre-processor">
+      <title>Options affecting the C pre-processor</title>
+
+      <indexterm><primary>pre-processing: cpp</primary></indexterm>
+      <indexterm><primary>C pre-processor options</primary></indexterm>
+      <indexterm><primary>cpp, pre-processing with</primary></indexterm>
+
+      <para>The C pre-processor <command>cpp</command> is run over
+      your Haskell code only if the <option>-cpp</option> option
+      <indexterm><primary>-cpp option</primary></indexterm> is given.
+      Unless you are building a large system with significant doses of
+      conditional compilation, you really shouldn't need it.</para>
+
+      <variablelist>
+
+	<varlistentry>
+	  <term><option>-D</option><replaceable>symbol</replaceable><optional>=<replaceable>value</replaceable></optional></term>
+	  <indexterm><primary><option>-D</option></primary></indexterm>
+	  <listitem>
+	    <para>Define macro <replaceable>symbol</replaceable> in the
+            usual way.  NB: does <emphasis>not</emphasis> affect
+            <option>-D</option> macros passed to the C&nbsp;compiler
+            when compiling via C!  For those, use the
+            <option>-optc-Dfoo</option> hack&hellip; (see <xref
+            linkend="forcing-options-through">).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-U</option><replaceable>symbol</replaceable></term>
+	  <indexterm><primary><option>-U</option></primary></indexterm>
+	  <listitem>
+	    <para> Undefine macro <replaceable>symbol</replaceable> in the
+	    usual way.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-I</option><replaceable>dir</replaceable></term>
+	  <indexterm><primary><option>-I</option></primary></indexterm>
+	  <listitem>
+	    <para> Specify a directory in which to look for
+            <literal>&num;include</literal> files, in the usual C
+            way.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para>The GHC driver pre-defines several macros when processing
+      Haskell source code (<filename>.hs</filename> or
+      <filename>.lhs</filename> files):</para>
+
+      <variablelist>
+
+	<varlistentry>
+	  <term><constant>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</constant></term>
+	  <indexterm><primary><literal>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</literal></primary></indexterm>
+	  <listitem>
+	    <para>If defined, this means that GHC supports the
+            language defined by the Haskell 98 report.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;=98</constant></term>
+	  <indexterm><primary><constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;=98</constant></primary></indexterm>
+	  <listitem>
+	    <para>In GHC 4.04 and later, the
+            <constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;</constant>
+            macro is defined as having the value
+            <constant>98</constant>.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><constant>&lowbar;&lowbar;HASKELL1&lowbar;&lowbar;</constant></term>
+	  <indexterm><primary><constant>&lowbar;&lowbar;HASKELL1&lowbar;&lowbar;
+	  </constant></primary></indexterm>
+	  <listitem>
+	    <para>If defined to <replaceable>n</replaceable>, that
+            means GHC supports the Haskell language defined in the
+            Haskell report version <emphasis>1.n</emphasis>.
+            Currently 5.  This macro is deprecated, and will probably
+            disappear in future versions.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</constant></term>
+	  <indexterm><primary><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
+	  <listitem>
+	    <para>For version <replaceable>n</replaceable> of the GHC
+            system, this will be <literal>&num;define</literal>d to
+            <replaceable>100n</replaceable>.  For example, for version
+            5.00, it is 500.</para>
+
+	    <para>With any luck,
+            <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</constant>
+            will be undefined in all other implementations that
+            support C-style pre-processing.</para>
+
+	    <para>(For reference: the comparable symbols for other
+            systems are:
+            <constant>&lowbar;&lowbar;HUGS&lowbar;&lowbar;</constant>
+            for Hugs and
+            <constant>&lowbar;&lowbar;HBC&lowbar;&lowbar;</constant>
+            for Chalmers.)</para>
+
+	    <para>NB. This macro is set when pre-processing both
+            Haskell source and C source, including the C source
+            generated from a Haskell module
+            (i.e. <filename>.hs</filename>, <filename>.lhs</filename>,
+            <filename>.c</filename> and <filename>.hc</filename>
+            files).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><constant>&lowbar;&lowbar;CONCURRENT&lowbar;HASKELL&lowbar;&lowbar;</constant></term>
+	  <indexterm><primary><constant>&lowbar;&lowbar;CONCURRENT&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
+	  <listitem>
+	    <para>This symbol is defined when pre-processing Haskell
+            (input) and pre-processing C (GHC output).  Since GHC from
+            verion 4.00 now supports concurrent haskell by default,
+            this symbol is always defined.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant></term>
+	  <indexterm><primary><constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
+	  <listitem>
+	    <para>Only defined when <option>-parallel</option> is in
+            use!  This symbol is defined when pre-processing Haskell
+            (input) and pre-processing C (GHC output).</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para>A small word of warning: <option>-cpp</option> is not
+      friendly to &ldquo;string gaps&rdquo;.<indexterm><primary>-cpp
+      vs string gaps</primary></indexterm><indexterm><primary>string
+      gaps vs -cpp</primary></indexterm>.  In other words, strings
+      such as the following:</para>
+
+<ProgramListing>
+strmod = "\
+\ p \
+\ "
+</ProgramListing>
+
+      <para>don't work with <option>-cpp</option>;
+      <filename>/usr/bin/cpp</filename> elides the backslash-newline
+      pairs.</para>
+
+      <para>However, it appears that if you add a space at the end of
+      the line, then <command>cpp</command> (at least GNU
+      <command>cpp</command> and possibly other
+      <command>cpp</command>s) leaves the backslash-space pairs alone
+      and the string gap works as expected.</para>
+    </sect2>
+
+    <sect2 id="options-C-compiler">
+      <title>Options affecting the C compiler (if applicable)</title>
+
+      <indexterm><primary>include-file options</primary></indexterm>
+      <indexterm><primary>C compiler options</primary></indexterm>
+      <indexterm><primary>GCC options</primary></indexterm>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-#include</option> <replaceable>file</replaceable></entry>
+	      <entry>Include <replaceable>file</replaceable> when
+	      compiling the <filename>.hc</filename> file</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+
+      <para>If you are compiling with lots of foreign calls, you may
+      need to tell the C&nbsp;compiler about some
+      <literal>&num;include</literal> files.  There is no real pretty
+      way to do this, but you can use this hack from the
+      command-line:</para>
+
+<Screen>
+% ghc -c '-#include &lt;X/Xlib.h&gt;' Xstuff.lhs
+</Screen>
+
+    </sect2>
+
+    <sect2 id="options-linker">
+      <title>Options affecting linking</title>
+
+      <indexterm><primary>linker options</primary></indexterm>
+      <indexterm><primary>ld options</primary></indexterm>
+
+
+      <para>GHC has to link your code with various libraries, possibly
+      including: user-supplied, GHC-supplied, and system-supplied
+      (<option>-lm</option> math library, for example).</para>
+
+      <variablelist>
+
+	<varlistentry>
+	  <term><option>-l</option><replaceable>lib</replaceable></term>
+	  <indexterm><primary><option>-l</option></primary></indexterm>
+	  <listitem>
+	    <para>Link in the <replaceable>lib</replaceable> library.
+	    On Unix systems, this will be in a file called
+	    <filename>lib<replaceable>lib</replaceable>.a</filename>
+	    or
+	    <filename>lib<replaceable>lib</replaceable>.so</filename>
+	    which resides somewhere on the library directories path.</para>
+
+	    <para>Because of the sad state of most UNIX linkers, the
+            order of such options does matter.  If library
+            <replaceable>foo</replaceable> requires library
+            <replaceable>bar</replaceable>, then in general
+            <option>-l</option><replaceable>foo</replaceable> should
+            come <emphasis>before</emphasis>
+            <option>-l</option><replaceable>bar</replaceable> on the
+            command line.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-package</option> <replaceable>name</replaceable></term>
+	  <indexterm><primary><option>-package</option></primary></indexterm>
+	  <listitem>
+	    <para>If you are using a Haskell &ldquo;package&rdquo;
+            (see <xref linkend="packages">), don't forget to add the
+            relevant <option>-package</option> option when linking the
+            program too: it will cause the appropriate libraries to be
+            linked in with the program.  Forgetting the
+            <option>-package</option> option will likely result in
+            several pages of link errors.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-L</option><replaceable>dir</replaceable></term>
+	  <indexterm><primary><option>-L</option></primary></indexterm>
+	  <listitem>
+	    <para>Where to find user-supplied libraries&hellip;
+            Prepend the directory <replaceable>dir</replaceable> to
+            the library directories path.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-split-objs</option></term>
+	  <indexterm><primary><option>-split-objs</option></primary></indexterm>
+	  <listitem>
+	    <para>Tell the linker to split the single object file that
+            would normally be generated into multiple object files,
+            one per top-level Haskell function or type in the module.
+            We use this feature for building GHC's libraries libraries
+            (warning: don't use it unless you know what you're
+            doing!).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-static</option></term>
+	  <indexterm><primary><option>-static</option></primary></indexterm>
+	  <listitem>
+	    <para>Tell the linker to avoid shared Haskell libraries,
+	    if possible.  This is the default.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-dynamic</option></term>
+	  <indexterm><primary><option>-dynamic</option></primary></indexterm>
+	  <listitem>
+	    <para>Tell the linker to use shared Haskell libraries, if
+	    available (this option is only supported on Windows at the
+	    moment, and also note that your distribution of GHC may
+	    not have been supplied with shared libraries).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-no-hs-main</option></term>
+	  <indexterm><primary><option>-no-hs-main</option></primary></indexterm>
+	  <indexterm><primary>linking Haskell libraries with foreign code</primary></indexterm>
+	  <listitem>
+	    <para>In the event you want to include ghc-compiled code
+            as part of another (non-Haskell) program, the RTS will not
+            be supplying its definition of <function>main()</function>
+            at link-time, you will have to. To signal that to the
+            driver script when linking, use
+            <option>-no-hs-main</option>.</para>
+
+	    <para>Notice that since the command-line passed to the
+            linker is rather involved, you probably want to use
+            <command>ghc</command> to do the final link of your
+            `mixed-language' application. This is not a requirement
+            though, just try linking once with <option>-v</option> on
+            to see what options the driver passes through to the
+            linker.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </sect2>
+
+  </sect1>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter") ***
+     ;;; End: ***
+ -->
