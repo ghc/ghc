@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.23 2001/10/12 14:29:11 rrt Exp $
+# $Id: Makefile,v 1.24 2001/10/12 18:44:52 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -69,7 +69,10 @@ INSTALL_DATAS += template-hsc.h
 # Create driver configuration
 
 CONFIG_HS = Config.hs
+
 boot :: $(CONFIG_HS)
+
+all :: $(CONFIG_HS)
 
 $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@$(RM) -f $(CONFIG_HS)
@@ -88,9 +91,11 @@ all clean distclean maintainer-clean ::
 	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
 endif
 
+MKDEPENDHS_SRCS += $(CONFIG_HS)
+
+include $(TOP)/mk/target.mk
+
 # hsc2hs-inplace is needed to boot in ghc/lib/std...
 ifneq "$(BootingFromHc)" "YES"
 boot :: all
 endif
-
-include $(TOP)/mk/target.mk
