@@ -92,7 +92,6 @@ void	 hsindentoff PROTO((void));
 
 int	 checkfixity PROTO((char *));
 void	 checksamefn PROTO((tree));
-void	 checkinpat PROTO((void));
 
 void	 expORpat PROTO((int,tree));
 /* the "int" arg says what we want; it is one of: */

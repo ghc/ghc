@@ -61,6 +61,11 @@ extern int modulelineno;
 extern int startlineno;
 extern int endlineno;
 
+/* Local helper functions */
+static void checkinpat        PROTO((void));
+static void punningNowIllegal PROTO((void));
+
+
 /**********************************************************************
 *                                                                     *
 *                                                                     *
@@ -1090,8 +1095,9 @@ rbinds1	:  rbind				{ $$ = lsing($1); }
 	|  rbinds1 COMMA rbind			{ $$ = lapp($1,$3); }
 	;
 
-rbind  	:  qvar EQUAL exp			{ $$ = mkrbind($1,mkjust($3)); }
-;	
+rbind  	: qvar					{ punningNowIllegal();	       }
+	| qvar EQUAL exp			{ $$ = mkrbind($1,mkjust($3)); }
+	;	
 
 texps	:  exp					{ $$ = lsing($1); }
 	|  exp COMMA texps			{ $$ = mklcons($1, $3) }
@@ -1298,7 +1304,8 @@ rpats1	: rpat					{ $$ = lsing($1); }
 	| rpats1 COMMA rpat			{ $$ = lapp($1,$3); }
 	;
 
-rpat	:  qvar EQUAL pat			{ $$ = mkrbind($1,mkjust($3)); }
+rpat	: qvar					{ punningNowIllegal();         } 
+	| qvar EQUAL pat			{ $$ = mkrbind($1,mkjust($3)); }
 	;
 
 
@@ -1622,12 +1629,17 @@ vccurly1:
 **********************************************************************/
 
 
-void
-checkinpat()
+static void checkinpat()
 {
   if(pat_check)
     hsperror("pattern syntax used in expression");
 }
+
+static void punningNowIllegal()
+{
+  hsperror("Haskell 98 does not support 'punning' on records");
+}
+
 
 /* The parser calls "hsperror" when it sees a
    `report this and die' error.  It sets the stage
