@@ -300,12 +300,12 @@ pprImm (ImmLab s) | underscorePrefix = (<>) (char '_') s
 pprImm (LO i)
   = hcat [ pp_lo, pprImm i, rparen ]
   where
-    pp_lo = ptext SLIT("%lo(")
+    pp_lo = text "%lo("
 
 pprImm (HI i)
   = hcat [ pp_hi, pprImm i, rparen ]
   where
-    pp_hi = ptext SLIT("%hi(")
+    pp_hi = text "%hi("
 #endif
 \end{code}
 
@@ -442,7 +442,7 @@ pprInstr (ASCII True str)
     asciify ('\\':cs)      n = (<>) (text "\\\\") (asciify cs (n-1))
     asciify ('\"':cs)      n = (<>) (text "\\\"") (asciify cs (n-1))
     asciify (c:cs) n | isPrint c = (<>) (char c) (asciify cs (n-1))
-    asciify [c]            _ = (<>) (text (charToC c)) (text ("\\0\""))
+    asciify [c]            _ = (<>) (text (charToC c)) (text ("\\0\"")){-"-}
     asciify (c:(cs@(d:_))) n
       | isDigit d = (<>) (text (charToC c)) (asciify cs 0)
       | otherwise = (<>) (text (charToC c)) (asciify cs (n-1))
@@ -1369,9 +1369,9 @@ pprRIReg name b ri reg1
     ]
 
 pp_ld_lbracket    = ptext SLIT("\tld\t[")
-pp_rbracket_comma = ptext SLIT("],")
-pp_comma_lbracket = ptext SLIT(",[")
-pp_comma_a	  = ptext SLIT(",a")
+pp_rbracket_comma = text "],"
+pp_comma_lbracket = text ",["
+pp_comma_a	  = text ",a"
 
 #endif {-sparc_TARGET_ARCH-}
 \end{code}
