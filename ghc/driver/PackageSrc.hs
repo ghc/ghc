@@ -49,7 +49,7 @@ package_details installing =
 #ifndef mingw32_TARGET_OS
 	extra_libraries   = [],
 #else
-        extra_libraries   = [ "-lwinmm" ], -- for the threadDelay timer
+        extra_libraries   = [ "winmm" ], -- for the threadDelay timer
 #endif
         include_dirs   = if installing
                             then [ clibdir ++ "/includes" ]
