@@ -48,6 +48,7 @@ module RdrHsSyn (
  
 	mkHsOpApp, mkClassDecl, mkClassOpSigDM, mkConDecl,
 	mkHsNegApp, mkNPlusKPat, mkHsIntegral, mkHsFractional,
+	mkHsDo,
 
 	cvBinds,
 	cvMonoBindsAndSigs,
@@ -61,12 +62,14 @@ module RdrHsSyn (
 import HsSyn		-- Lots of it
 import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
                           mkSuperDictSelOcc, mkDefaultMethodOcc, mkGenOcc1,
-			  mkGenOcc2, 
+			  mkGenOcc2, mkVarOcc
                       	)
-import PrelNames	( minusName, negateName, fromIntegerName, fromRationalName )
+import PrelNames	( unboundKey )
+import Name		( mkInternalName )
 import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc, isRdrTyVar )
 import List		( nub )
 import BasicTypes	( RecFlag(..) )
+import SrcLoc		( builtinSrcLoc )
 import Class            ( DefMeth (..) )
 \end{code}
 
@@ -241,7 +244,7 @@ mkHsNegApp :: RdrNameHsExpr -> RdrNameHsExpr
 mkHsNegApp (HsLit (HsIntPrim i))    = HsLit (HsIntPrim (-i))    
 mkHsNegApp (HsLit (HsFloatPrim i))  = HsLit (HsFloatPrim (-i))  
 mkHsNegApp (HsLit (HsDoublePrim i)) = HsLit (HsDoublePrim (-i)) 
-mkHsNegApp expr		  	    = NegApp expr negateName
+mkHsNegApp expr	    		    = NegApp expr     placeHolderName
 \end{code}
 
 A useful function for building @OpApps@.  The operator is always a
@@ -255,9 +258,14 @@ These are the bits of syntax that contain rebindable names
 See RnEnv.lookupSyntaxName
 
 \begin{code}
-mkHsIntegral   i = HsIntegral   i fromIntegerName
-mkHsFractional f = HsFractional f fromRationalName
-mkNPlusKPat n k  = NPlusKPatIn n k minusName
+mkHsIntegral   i      = HsIntegral   i  placeHolderName
+mkHsFractional f      = HsFractional f  placeHolderName
+mkNPlusKPat n k       = NPlusKPatIn n k placeHolderName
+mkHsDo ctxt stmts loc = HsDo ctxt stmts [] placeHolderType loc
+
+placeHolderName = mkInternalName unboundKey 
+			(mkVarOcc FSLIT("syntaxPlaceHolder")) 
+			builtinSrcLoc
 \end{code}
 
 

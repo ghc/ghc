@@ -482,13 +482,11 @@ zonkExpr (HsWith expr binds is_with)
 	      zonkExpr e		`thenNF_Tc` \ e' ->
 	      returnNF_Tc (n', e')
 
-zonkExpr (HsDo _ _ _) = panic "zonkExpr:HsDo"
-
-zonkExpr (HsDoOut do_or_lc stmts ids ty src_loc)
+zonkExpr (HsDo do_or_lc stmts ids ty src_loc)
   = zonkStmts stmts 		`thenNF_Tc` \ new_stmts ->
     zonkTcTypeToType ty		`thenNF_Tc` \ new_ty   ->
     mapNF_Tc zonkIdOcc ids	`thenNF_Tc` \ new_ids ->
-    returnNF_Tc (HsDoOut do_or_lc new_stmts new_ids new_ty src_loc)
+    returnNF_Tc (HsDo do_or_lc new_stmts new_ids new_ty src_loc)
 
 zonkExpr (ExplicitList ty exprs)
   = zonkTcTypeToType ty		`thenNF_Tc` \ new_ty ->

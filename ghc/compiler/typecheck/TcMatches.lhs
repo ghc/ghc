@@ -39,7 +39,7 @@ import BasicTypes	( RecFlag(..) )
 import VarSet
 import Var		( Id )
 import Bag
-import Util		( isSingleton, lengthExceeds )
+import Util		( isSingleton, lengthExceeds, notNull )
 import Outputable
 
 import List		( nub )
@@ -338,7 +338,8 @@ group.  But that's fine; there's no shadowing to worry about.
 
 \begin{code}
 tcStmts do_or_lc m_ty stmts
-  = tcStmtsAndThen (:) do_or_lc m_ty stmts (returnTc ([], emptyLIE))
+  = ASSERT( notNull stmts )
+    tcStmtsAndThen (:) do_or_lc m_ty stmts (returnTc ([], emptyLIE))
 
 tcStmtsAndThen
 	:: (TcStmt -> thing -> thing)	-- Combiner

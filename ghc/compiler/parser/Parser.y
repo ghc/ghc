@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.98 2002/05/27 15:28:08 simonpj Exp $
+$Id: Parser.y,v 1.99 2002/06/05 14:39:28 simonpj Exp $
 
 Haskell grammar.
 
@@ -987,7 +987,7 @@ exp10 :: { RdrNameHsExpr }
    	| 'case' srcloc exp 'of' altslist	{ HsCase $3 $5 $2 }
 	| '-' fexp				{ mkHsNegApp $2 }
   	| srcloc 'do' stmtlist			{% checkDo $3  `thenP` \ stmts ->
-						   returnP (HsDo DoExpr stmts $1) }
+						   returnP (mkHsDo DoExpr stmts $1) }
 
 	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 PlayRisky False placeHolderType }
 	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 (PlaySafe False) False placeHolderType }
@@ -1071,9 +1071,9 @@ list :: { RdrNameHsExpr }
 	| exp srcloc pquals		{% let { body [qs] = qs;
 					         body  qss = [ParStmt (map reverse qss)] }
 					   in
-					   returnP ( HsDo ListComp
-							   (reverse (ResultStmt $1 $2 : body $3))
-							   $2
+					   returnP ( mkHsDo ListComp
+							    (reverse (ResultStmt $1 $2 : body $3))
+							    $2
 						  )
 					}
 
@@ -1113,10 +1113,10 @@ parr :: { RdrNameHsExpr }
 							   (map reverse qss)]}
 					   in
 					   returnP $ 
-					     HsDo PArrComp 
-						  (reverse (ResultStmt $1 $2 
-							    : body $3))
-						  $2
+					     mkHsDo PArrComp 
+						    (reverse (ResultStmt $1 $2 
+							     : body $3))
+						    $2
 					}
 
 -- We are reusing `lexps' and `pquals' from the list case.

@@ -38,7 +38,7 @@ import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy, zapToType,
 			  newTyVarTy, newTyVarTys, zonkTcType, readHoleResult )
 import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
-			  isSigmaTy, mkFunTy, mkAppTy, mkTyConTy, mkFunTys,
+			  isSigmaTy, mkFunTy, mkAppTy, mkFunTys,
 			  mkTyConApp, mkClassPred, tcFunArgTy,
 			  tyVarsOfTypes, isLinearPred,
 			  liftedTypeKind, openTypeKind, mkArrowKind,
@@ -54,13 +54,13 @@ import Name		( Name )
 import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( emptyVarSet, elemVarSet )
-import TysWiredIn	( boolTy, mkListTy, mkPArrTy, listTyCon, parrTyCon )
+import TysWiredIn	( boolTy, mkListTy, mkPArrTy )
 import PrelNames	( cCallableClassName, 
 			  cReturnableClassName, 
 			  enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
 			  enumFromToPName, enumFromThenToPName,
-			  thenMName, bindMName, failMName, returnMName, ioTyConName
+			  ioTyConName
 			)
 import ListSetOps	( minusList )
 import CmdLineOpts
@@ -336,8 +336,8 @@ tcMonoExpr (HsIf pred b1 b2 src_loc) res_ty
 \end{code}
 
 \begin{code}
-tcMonoExpr expr@(HsDo do_or_lc stmts src_loc) res_ty
-  = tcDoStmts do_or_lc stmts src_loc res_ty
+tcMonoExpr expr@(HsDo do_or_lc stmts method_names _ src_loc) res_ty
+  = tcAddSrcLoc src_loc (tcDoStmts do_or_lc stmts method_names src_loc res_ty)
 \end{code}
 
 \begin{code}
@@ -820,51 +820,30 @@ tcExpr_id expr         = newHoleTyVarTy			`thenNF_Tc` \ id_ty ->
 %************************************************************************
 
 \begin{code}
--- I don't like this lumping together of do expression and list/array
--- comprehensions; creating the monad instances is entirely pointless in the
--- latter case; I'll leave the list case as it is for the moment, but handle
--- arrays extra (would be better to handle arrays and lists together, though)
--- -=chak
---
-tcDoStmts PArrComp stmts src_loc res_ty
-  =
-    ASSERT( notNull stmts )
-    tcAddSrcLoc src_loc	$
-
-    unifyPArrTy res_ty			      `thenTc` \elt_ty              ->
-    let tc_ty = mkTyConTy parrTyCon
-	m_ty  = (mkPArrTy, elt_ty)
-    in
-    tcStmts (DoCtxt PArrComp) m_ty stmts      `thenTc` \(stmts', stmts_lie) ->
-    returnTc (HsDoOut PArrComp stmts'
-		      undefined 	-- don't touch!
-		      res_ty src_loc,
+tcDoStmts PArrComp stmts method_names src_loc res_ty
+  = unifyPArrTy res_ty			  `thenTc` \elt_ty              ->
+    tcStmts (DoCtxt PArrComp) 
+	    (mkPArrTy, elt_ty) stmts      `thenTc` \(stmts', stmts_lie) ->
+    returnTc (HsDo PArrComp stmts'
+		   []		 	-- Unused
+		   res_ty src_loc,
 	      stmts_lie)
 
-tcDoStmts do_or_lc stmts src_loc res_ty
-  =	-- get the Monad and MonadZero classes
-	-- create type consisting of a fresh monad tyvar
-    ASSERT( notNull stmts )
-    tcAddSrcLoc src_loc	$
+tcDoStmts ListComp stmts method_names src_loc res_ty
+  = unifyListTy res_ty			`thenTc` \ elt_ty ->
+    tcStmts (DoCtxt ListComp) 
+	    (mkListTy, elt_ty) stmts	`thenTc` \ (stmts', stmts_lie) ->
+    returnTc (HsDo ListComp stmts'
+		   []			-- Unused
+		   res_ty src_loc,
+	      stmts_lie)
 
-	-- If it's a comprehension we're dealing with, 
-	-- force it to be a list comprehension.
-	-- (as of Haskell 98, monad comprehensions are no more.)
-	-- Similarily, array comprehensions must involve parallel arrays types
-	--   -=chak
-    (case do_or_lc of
-       ListComp -> unifyListTy res_ty			`thenTc` \ elt_ty ->
-		   returnNF_Tc (mkTyConTy listTyCon, (mkListTy, elt_ty))
+tcDoStmts DoExpr stmts method_names src_loc res_ty
+  = newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenNF_Tc` \ tc_ty ->
+    newTyVarTy liftedTypeKind 					`thenNF_Tc` \ elt_ty ->
+    unifyTauTy res_ty (mkAppTy tc_ty elt_ty)			`thenTc_`
 
-       PArrComp -> panic "TcExpr.tcDoStmts: How did we get here?!?"
-
-       _	-> newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenNF_Tc` \ m_ty ->
-		   newTyVarTy liftedTypeKind 					`thenNF_Tc` \ elt_ty ->
-		   unifyTauTy res_ty (mkAppTy m_ty elt_ty)			`thenTc_`
-		   returnNF_Tc (m_ty, (mkAppTy m_ty, elt_ty))
-    )							`thenNF_Tc` \ (tc_ty, m_ty) ->
-
-    tcStmts (DoCtxt do_or_lc) m_ty stmts		`thenTc`   \ (stmts', stmts_lie) ->
+    tcStmts (DoCtxt DoExpr) (mkAppTy tc_ty, elt_ty) stmts	`thenTc`   \ (stmts', stmts_lie) ->
 
 	-- Build the then and zero methods in case we need them
 	-- It's important that "then" and "return" appear just once in the final LIE,
@@ -874,12 +853,11 @@ tcDoStmts do_or_lc stmts src_loc res_ty
 	--	then = then
 	-- where the second "then" sees that it already exists in the "available" stuff.
 	--
-    mapNF_Tc (newMethodFromName DoOrigin tc_ty)
-	     [returnMName, failMName, bindMName, thenMName]	`thenNF_Tc` \ insts ->
+    mapNF_Tc (newMethodFromName DoOrigin tc_ty) method_names	`thenNF_Tc` \ insts ->
 
-    returnTc (HsDoOut do_or_lc stmts'
-		      (map instToId insts)
-		      res_ty src_loc,
+    returnTc (HsDo DoExpr stmts'
+		   (map instToId insts)
+		   res_ty src_loc,
 	      stmts_lie `plusLIE` mkLIE insts)
 \end{code}
 

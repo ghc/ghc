@@ -31,8 +31,8 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			  HsBinds(..), HsType(..), HsDoContext(..),
 			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList, placeHolderType
 			)
-import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
 import RdrName		( RdrName, mkUnqual )
+import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat, mkHsDo )
 import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
 			, maxPrecedence
 			, Boxity(..)
@@ -685,7 +685,7 @@ gen_Ix_binds tycon
     single_con_range
       = mk_easy_FunMonoBind tycon_loc range_RDR 
 	  [TuplePatIn [con_pat as_needed, con_pat bs_needed] Boxed] [] $
-	HsDo ListComp stmts tycon_loc
+	mkHsDo ListComp stmts tycon_loc
       where
 	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
 		++
@@ -802,8 +802,8 @@ gen_Read_binds get_fixity tycon
     read_nullary_cons 
       = case nullary_cons of
     	    []    -> []
-    	    [con] -> [HsDo DoExpr [bindLex (ident_pat (data_con_str con)),
-    		      result_stmt con []] loc]
+    	    [con] -> [mkHsDo DoExpr [bindLex (ident_pat (data_con_str con)),
+		    		     result_stmt con []] loc]
             _     -> [HsApp (HsVar choose_RDR) 
     		   	    (ExplicitList placeHolderType (map mk_pair nullary_cons))]
     
@@ -812,7 +812,7 @@ gen_Read_binds get_fixity tycon
 				Boxed
     
     read_non_nullary_con data_con
-      = mkHsApps prec_RDR [mkHsIntLit prec, HsDo DoExpr stmts loc]
+      = mkHsApps prec_RDR [mkHsIntLit prec, mkHsDo DoExpr stmts loc]
       where
        	stmts | is_infix 	  = infix_stmts
      	      | length labels > 0 = lbl_stmts

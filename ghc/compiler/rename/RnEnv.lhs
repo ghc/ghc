@@ -608,11 +608,13 @@ At the moment this just happens for
   * fromInteger, fromRational on literals (in expressions and patterns)
   * negate (in expressions)
   * minus  (arising from n+k patterns)
+  * "do" notation
 
 We store the relevant Name in the HsSyn tree, in 
   * HsIntegral/HsFractional	
   * NegApp
   * NPlusKPatIn
+  * HsDo
 respectively.  Initially, we just store the "standard" name (PrelNames.fromIntegralName,
 fromRationalName etc), but the renamer changes this to the appropriate user
 name if Opt_NoImplicitPrelude is on.  That is what lookupSyntaxName does.
@@ -621,15 +623,18 @@ name if Opt_NoImplicitPrelude is on.  That is what lookupSyntaxName does.
 lookupSyntaxName :: Name 	-- The standard name
 	         -> RnMS Name	-- Possibly a non-standard name
 lookupSyntaxName std_name
-  = doptRn Opt_NoImplicitPrelude	`thenRn` \ no_prelude -> 
+  = getModeRn				`thenRn` \ mode ->
+    case mode of {
+	InterfaceMode -> returnRn std_name ;	-- Happens for 'derived' code
+						-- where we don't want to rebind
+   	other ->
+
+    doptRn Opt_NoImplicitPrelude	`thenRn` \ no_prelude -> 
     if not no_prelude then
 	returnRn std_name	-- Normal case
     else
-    let
-	rdr_name = mkRdrUnqual (nameOccName std_name)
 	-- Get the similarly named thing from the local environment
-    in
-    lookupOccRn rdr_name
+    lookupOccRn (mkRdrUnqual (nameOccName std_name)) }
 \end{code}
 
 

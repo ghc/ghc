@@ -213,8 +213,8 @@ tc_stmts names stmts
     traceTc (text "tcs 4") `thenNF_Tc_`
 
     returnTc (mkHsLet const_binds $
-	      HsDoOut DoExpr tc_stmts io_ids
-		      (mkTyConApp ioTyCon [mkListTy unitTy]) noSrcLoc,
+	      HsDo DoExpr tc_stmts io_ids
+		   (mkTyConApp ioTyCon [mkListTy unitTy]) noSrcLoc,
 	      ids)
   where
     combine stmt (ids, stmts) = (ids, stmt:stmts)
