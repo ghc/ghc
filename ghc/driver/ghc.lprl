@@ -1462,7 +1462,7 @@ Now the Haskell compiler, C compiler, and assembler
     }
 
     if (-f $hsc_out_c_stub) {
-	&run_something("cp $hsc_out_c_stub $ofile_c_stub_target", 'Copy foreign export C stubs');
+	&run_something("rm -f $ofile_c_stub_target && echo '#include \"${ofile_h_stub_target}\"' > $ofile_c_stub_target && cat $hsc_out_c_stub >> $ofile_c_stub_target", 'Copy foreign export C stubs');
 	local ($hsc_out_s_stub);
 	local ($hsc_out_o_stub);
 	($ofile_s_stub_target = $ofile_c_stub_target) =~ s/\.(.*)$/\.s/;

@@ -40,10 +40,10 @@ codeOutput mod_name c_code h_code flat_abstractC ncg_uniqs
     doOutput opt_ProduceS ncg_output_w 			>>
 
     dumpIfSet opt_D_dump_foreign "Foreign export header file" stub_h_output_d >>
-    outputHStub opt_ProduceExportHStubs stub_h_output_w	>>
+    outputForeignStubs True{-.h output-} opt_ProduceExportHStubs stub_h_output_w	>>
 
     dumpIfSet opt_D_dump_foreign "Foreign export stubs" stub_c_output_d >>
-    outputCStub mod_name opt_ProduceExportCStubs stub_c_output_w	>>
+    outputForeignStubs False{-not .h-}   opt_ProduceExportCStubs stub_c_output_w	>>
 
     dumpIfSet opt_D_dump_realC "Real C" c_output_d 	>>
     doOutput opt_ProduceC c_output_w
@@ -81,21 +81,15 @@ codeOutput mod_name c_code h_code flat_abstractC ncg_uniqs
     -- don't use doOutput for dumping the f. export stubs
     -- since it is more than likely that the stubs file will
     -- turn out to be empty, in which case no file should be created.
-outputCStub mod_name switch ""
-  = return ()
-outputCStub mod_name switch doc_str
-  = case switch of
-	  Nothing    -> return ()
-	  Just fname -> writeFile fname ("#include \"Rts.h\"\n#include \"RtsAPI.h\"\n"++rest)
-	    where
-	     rest = "#include "++show (moduleString mod_name ++ "_stub.h") ++ '\n':doc_str
-	      
-outputHStub switch ""
-  = return ()
-outputHStub switch doc_str
-  = case switch of
-	  Nothing    -> return ()
-	  Just fname -> writeFile fname ("#include \"Rts.h\"\n"++doc_str)
+outputForeignStubs is_header switch ""      = return ()
+outputForeignStubs is_header switch doc_str =
+  case switch of
+    Nothing    -> return ()
+    Just fname -> writeFile fname (include_prefix ++ doc_str)
+ where
+  include_prefix
+   | is_header   = "#include \"Rts.h\"\n"
+   | otherwise   = "#include \"RtsAPI.h\"\n"
 
 doOutput switch io_action
   = case switch of
