@@ -437,20 +437,25 @@ ifneq "$(way)" "u"
 
 SRC_HC_OPTS += -split-objs
 
+# We generate the archive into a temporary file libfoo.a.tmp, then
+# rename it at the end.  This avoids the problem that ar may sometimes
+# fail, leaving a partially built archive behind.
 ifeq "$(ArSupportsInput)" ""
 define BUILD_LIB
-$(RM) $@
-(echo $(STUBOBJS); $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o') | xargs ar q $@
-$(RANLIB) $@
+$(RM) $@ $@.tmp
+(echo $(STUBOBJS); $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o') | xargs ar q $@.tmp
+$(RANLIB) $@.tmp
+$(MV) $@.tmp $@
 endef
 else
 define BUILD_LIB
-$(RM) $@
+$(RM) $@ $@.tmp
 echo $(STUBOBJS) > $@.list
 $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' >> $@.list
-$(AR) $(AR_OPTS) $@ $(ArSupportsInput) $@.list
+$(AR) $(AR_OPTS) $@.tmp $(ArSupportsInput) $@.list
 $(RM) $@.list
-$(RANLIB) $@
+$(RANLIB) $@.tmp
+$(MV) $@.tmp $@
 endef
 endif
 
