@@ -23,7 +23,6 @@ endif
 #
 
 HC 	   = $(GHC_INPLACE)
-MKDEPENDHS = $(GHC)
 
 ifneq "$(DLLized)" "YES"
 PACKAGE = -package-name std
