@@ -1134,7 +1134,11 @@ AC_CHECK_LIB(iberty, xmalloc)
 AC_CHECK_LIB(bfd,    bfd_init)
 
 dnl ** check for wide-char classifications
-AC_CHECK_HEADERS(wctype.h)
+dnl FreeBSD has an emtpy wctype.h, so test one of the affected
+dnl functions if it's really there.
+AC_CHECK_HEADERS(wctype.h,
+  AC_CHECK_FUNCS(iswspace)
+)
 
 dnl ** check for readline, for Hugs and hslibs' Readline
 dnl ncurses supersedes termcap and curses, but for compatibility,
