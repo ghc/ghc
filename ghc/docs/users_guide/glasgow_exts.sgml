@@ -3426,7 +3426,10 @@ where clause and over-ride whichever methods you please.
       <para>To use generics you need to</para>
       <itemizedlist>
 	<listitem>
-	  <para>Use the <option>-fgenerics</option> flag.</para>
+	  <para>Use the flags <option>-fglasgow-exts</option> (to enable the extra syntax), 
+                <option>-fgenerics</option> (to generate extra per-data-type code),
+                and <option>-package lang</option> (to make the <literal>Generics</literal> library
+                available.  </para>
 	</listitem>
 	<listitem>
 	  <para>Import the module <literal>Generics</literal> from the
