@@ -397,9 +397,6 @@ foreign import ccall unsafe "tcgetattr"
 foreign import ccall unsafe "tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
 
-foreign import ccall unsafe "uname"
-   c_uname :: Ptr CUtsname -> IO CInt
-
 foreign import ccall unsafe "utime"
    c_utime :: CString -> Ptr CUtimbuf -> IO CMode
 
