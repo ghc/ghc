@@ -736,7 +736,7 @@ We do, however, generate polymorphic, but not overloaded, specialisations:
   f :: Eq a => [a] -> b -> b -> b
   {#- SPECIALISE f :: [Int] -> b -> b -> b #-}
 
-The invariant is this: 
+Hence, the invariant is this: 
 
 	*** no specialised version is overloaded ***
 
@@ -819,11 +819,15 @@ specExpr (Case scrut alts)
 
 ---------------- Finally, let is the interesting case --------------------
 specExpr (Let (NonRec bndr rhs) body)
-  = specExpr body				`thenSM` \ (body', body_uds) ->
+  =   -- Deal with the body
+    specExpr body				`thenSM` \ (body', body_uds) ->
+
+      -- Deal with the RHS, specialising it according
+      -- to the calls found in the body
     specDefn (calls body_uds) (bndr,rhs)	`thenSM` \ ((bndr',rhs'), spec_defns, spec_uds) ->
 
     let
-	all_uds = rhs_uds `plusUDs` body_uds
+	all_uds = deleteCalls (rhs_uds `plusUDs` body_uds) bndr'
     in
     if bndr `elementOfIdSet` free_dicts body_uds then
 	-- This is a dictionary binding; we must pick it up
@@ -831,7 +835,7 @@ specExpr (Let (NonRec bndr rhs) body)
 	ASSERT( null spec_defns )
 	returnSM (body', addDictBind all_uds bndr' rhs')
 
-    else if isSpecPragmaId bnd then
+    else if isSpecPragmaId bndr then
 	-- SpecPragmaIds are there solely to generate specialisations
 	-- Just drop the whole binding
 	ASSERT( null spec_defns )
@@ -841,7 +845,7 @@ specExpr (Let (NonRec bndr rhs) body)
 	-- An ordinary binding, so glue it all together
     returnSM (
 	Let (NonRec bndr' rhs') (mkLets spec_defns body'),
-	deleteCalls all_uds bndr'
+	all_uds
     )
 
 specDefn :: CallDetails			-- Info on how it is used in its scope
@@ -857,8 +861,11 @@ specDefn calls (fn, rhs)
   |  n_tyvars == length rhs_tyvars	-- Rhs of fn's defn has right number of big lambdas
   && n_dicts <= length rhs_bndrs	-- and enough dict args
   && not (null calls_for_me)		-- And there are some calls to specialise
-  = specExpr body					`thenSM` \ (body', body_uds) ->
-    mapSM (specCall body_uds) calls_for_me		`thenSM` \ stuff ->
+  =   -- Specialise the body of the function
+    specExpr body					`thenSM` \ (body', body_uds) ->
+
+      -- Make a specialised version for each call in calls_for_me
+    mapSM (spec_call body_uds) calls_for_me		`thenSM` \ stuff ->
     let
 	(spec_defns, spec_uds, spec_env_stuff) = unzip3 stuff
 
@@ -867,7 +874,9 @@ specDefn calls (fn, rhs)
 
 	fn' = addIdSpecialisations fn spec_env_stuff
     in
-    returnSM ((fn',rhs'), spec_defns, rhs_uds `plusUDs` plusUDList spec_uds)
+    returnSM ((fn',rhs'), 
+	      spec_defns, 
+	      rhs_uds `plusUDs` plusUDList spec_uds)
 
   | otherwise	-- No calls or RHS doesn't fit our preconceptions
   = specExpr rhs			`thenSM` \ (rhs', rhs_uds) ->
@@ -890,37 +899,50 @@ specDefn calls (fn, rhs)
 
 
 	-- Specialise to one particular call pattern
+    spec_call :: UsageDetails               -- From the original body
+              -> ([Maybe Type], [DictVar])  -- Call instance
+              -> ((Id, CoreExpr),           -- Specialised definition
+                  UsageDetails,             -- Usage details from specialised body
+                  ([Type], CoreExpr))       -- Info for the Id's SpecEnv
     spec_call body_uds (call_ts, call_ds)
       = ASSERT( length call_ts == n_tyvars && length call_ds == n_dicts )
-		-- The calls are only recorded for properly-saturated applications
+		-- Calls are only recorded for properly-saturated applications
 	
+        -- Supppose the call is for f [Just t1, Nothing, Just t3, Nothing] [d1, d2]
+
 		-- Construct the new binding
 		-- 	f1 = /\ b d -> (..body of f..) t1 b t3 d d1 d2
 		-- and the type of this binder
         let
-	   spec_tys = zipNothings call_ts tyvars
-	   spec_rhs = mkTyLam tyvars (mkGenApp rhs (map TyArg spec_tys ++ map VarArg call_ds))
-  	   spec_ty  = mkForAllTys tyvars (applyTys (idType f) spec_tys)
+           spec_tyvars = [tyvar | (tyvar, Nothing) <- tyvars `zip` call_tys]
+	   spec_tys    = zipWith mk_spec_ty call_ts tyvars
+	   spec_rhs    = mkTyLam spec_tyvars $
+                         mkGenApp rhs (map TyArg spec_tys ++ map VarArg call_ds)
+  	   spec_id_ty  = mkForAllTys spec_tyvars (applyTys (idType f) spec_tys)
+
+           mk_spec_ty (Just ty) _     = ty
+           mk_spec_ty Nothing   tyvar = mkTyVarTy tyvar
 	in
-	newIdSM f spec_ty		`thenSM` \ spec_f ->
+	newIdSM f spec_id_ty		`thenSM` \ spec_f ->
 
 
 		-- Construct the stuff for f's spec env
 		--	[t1,b,t3,d]  |->  \d1 d2 -> f1 b d
 	let
-	   spec_env_rhs = mkValLam call_ds $
-			  mkTyApp (Var spec_f) $
-			  map mkTyVarTy tyvars
+	   spec_env_rhs  = mkValLam call_ds $
+			   mkTyApp (Var spec_f) $
+			   map mkTyVarTy spec_tyvars
+           spec_env_info = (spec_tys, spec_env_rhs)
         in
 
 		-- Specialise the UDs from f's RHS
-        specUDs (zipEqual defn_tvs call_ts)
-		(zipEqual rhs_dicts call_ds)
+        specUDs (zipEqual rhs_tyvars call_ts)
+		(zipEqual rhs_dicts  call_ds)
 		body_uds				`thenSM` \ spec_uds ->
 
         returnSM ((spec_f, spec_rhs),
 	          spec_uds,
-		  (spec_tys, spec_env_rhs)
+		  spec_env_info
 	)
 \end{code}
 
