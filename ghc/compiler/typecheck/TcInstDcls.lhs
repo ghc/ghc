@@ -489,7 +489,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
     addSrcLoc (getSrcLoc dfun_id)			   	$
     addErrCtxt (instDeclCtxt (toHsType (idType dfun_id)))	$
     let
-	inst_ty = idType dfun_id
+	inst_ty 	 = idType dfun_id
 	(inst_tyvars, _) = tcSplitForAllTys inst_ty
 		-- The tyvars of the instance decl scope over the 'where' part
 		-- Those tyvars are inside the dfun_id's type, which is a bit

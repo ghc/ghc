@@ -372,14 +372,7 @@ tcDefMeth clas tyvars binds_in prags (_, GenDefMeth) = returnM (EmptyMonoBinds, 
 tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
   = tcInstTyVars ClsTv tyvars		`thenM` \ (clas_tyvars, inst_tys, _) ->
     let
-	dm_ty = idType sel_id	-- Same as dict selector!
-          -- The default method's type should really come from the
-          -- iface file, since it could be usage-generalised, but this
-          -- requires altering the mess of knots in TcModule and I'm
-          -- too scared to do that.  Instead, I have disabled generalisation
-          -- of types of default methods (and dict funs) by annotating them
-          -- TyGenNever (in MkId).  Ugh!  KSW 1999-09.
-
+	dm_ty       = idType sel_id	-- Same as dict selector!
         theta       = [mkClassPred clas inst_tys]
 	local_dm_id = mkDefaultMethodId dm_name dm_ty
 	xtve 	    = tyvars `zip` clas_tyvars
