@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.44 2001/11/14 11:39:29 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.45 2001/11/26 20:04:00 sof Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -152,6 +152,7 @@ data Handle__
       haFD	    :: !FD,		     -- file descriptor
       haType        :: HandleType,	     -- type (read/write/append etc.)
       haIsBin       :: Bool,		     -- binary mode?
+      haIsStream    :: Bool,		     -- is this a stream handle?
       haBufferMode  :: BufferMode,	     -- buffer contains read/write data?
       haFilePath    :: FilePath,	     -- file name, possibly
       haBuffer	    :: !(IORef Buffer),	     -- the current buffer

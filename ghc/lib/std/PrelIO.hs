@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hs,v 1.3 2001/11/14 11:35:23 simonmar Exp $
+-- $Id: PrelIO.hs,v 1.4 2001/11/26 20:04:00 sof Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -162,16 +162,16 @@ hGetChar handle =
   -- buffer is empty.
   case haBufferMode handle_ of
     LineBuffering    -> do
-	new_buf <- fillReadBuffer fd True buf
+	new_buf <- fillReadBuffer fd True (haIsStream handle_) buf
 	hGetcBuffered fd ref new_buf
     BlockBuffering _ -> do
-	new_buf <- fillReadBuffer fd False buf
+	new_buf <- fillReadBuffer fd False (haIsStream handle_) buf
 	hGetcBuffered fd ref new_buf
     NoBuffering -> do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
 	r <- throwErrnoIfMinus1RetryMayBlock "hGetChar"
-	        (read_off (fromIntegral fd) raw 0 1)
+	        (read_off (fromIntegral fd) (haIsStream handle_) raw 0 1)
 	        (threadWaitRead fd)
 	if r == 0
 	   then ioe_EOF
@@ -241,7 +241,7 @@ hGetLineBufferedLoop handle_ ref
 		   else writeIORef ref buf{ bufRPtr = off + 1 }
 	        return (concat (reverse (xs:xss)))
 	else do
-	     maybe_buf <- maybeFillReadBuffer (haFD handle_) True 
+	     maybe_buf <- maybeFillReadBuffer (haFD handle_) True (haIsStream handle_)
 				buf{ bufWPtr=0, bufRPtr=0 }
 	     case maybe_buf of
 		-- Nothing indicates we caught an EOF, and we may have a
@@ -254,9 +254,9 @@ hGetLineBufferedLoop handle_ ref
 		     hGetLineBufferedLoop handle_ ref new_buf (xs:xss)
 
 
-maybeFillReadBuffer fd is_line buf
+maybeFillReadBuffer fd is_line is_stream buf
   = catch 
-     (do buf <- fillReadBuffer fd is_line buf
+     (do buf <- fillReadBuffer fd is_line is_stream buf
 	 return (Just buf)
      )
      (\e -> do if isEOFError e 
@@ -351,7 +351,7 @@ lazyRead' h handle_ = do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
 	r <- throwErrnoIfMinus1RetryMayBlock "lazyRead"
-	        (read_off (fromIntegral fd) raw 0 1)
+	        (read_off (fromIntegral fd) (haIsStream handle_) raw 0 1)
 	        (threadWaitRead fd)
 	if r == 0
 	   then do handle_ <- hClose_help handle_ 
@@ -367,7 +367,7 @@ lazyRead' h handle_ = do
 -- is_line==True, which tells it to "just read what there is".
 lazyReadBuffered h handle_ fd ref buf = do
    catch 
-   	(do buf <- fillReadBuffer fd True{-is_line-} buf
+   	(do buf <- fillReadBuffer fd True{-is_line-} (haIsStream handle_) buf
 	    lazyReadHaveBuffer h handle_ fd ref buf
      	)
 	-- all I/O errors are discarded.  Additionally, we close the handle.
@@ -422,7 +422,7 @@ hPutcBuffered handle_ is_line c = do
   let new_buf = buf{ bufWPtr = w' }
   if bufferFull new_buf || is_line && c == '\n'
      then do 
-  	flushed_buf <- flushWriteBuffer (haFD handle_) new_buf
+  	flushed_buf <- flushWriteBuffer (haFD handle_) (haIsStream handle_) new_buf
   	writeIORef ref flushed_buf
      else do 
   	writeIORef ref new_buf
@@ -598,7 +598,7 @@ commitBuffer' hdl raw sz@(I# _) count@(I# _) flush release
 		    return (newEmptyBuffer raw WriteBuffer sz)
 
 		-- else, we have to flush
-	    else do flushed_buf <- flushWriteBuffer fd old_buf
+	    else do flushed_buf <- flushWriteBuffer fd (haIsStream handle_) old_buf
 
 		    let this_buf = 
 			    Buffer{ bufBuf=raw, bufState=WriteBuffer, 
@@ -616,7 +616,7 @@ commitBuffer' hdl raw sz@(I# _) count@(I# _) flush release
 			-- otherwise, we have to flush the new data too,
 			-- and start with a fresh buffer
 			else do 
-			  flushWriteBuffer fd this_buf
+			  flushWriteBuffer fd (haIsStream handle_) this_buf
 			  writeIORef ref flushed_buf
 			    -- if the sizes were different, then allocate
 			    -- a new buffer of the correct size.

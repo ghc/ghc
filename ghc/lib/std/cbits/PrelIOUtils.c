@@ -65,14 +65,25 @@ HsInt prel_setmode(HsInt fd, HsBool toBin)
 #endif  
 }
 
-HsInt prel_PrelHandle_write(HsInt fd, HsAddr ptr, HsInt off, int sz)
+HsInt prel_PrelHandle_write(HsInt fd, HsBool isSock, HsAddr ptr, HsInt off, int sz)
 {
+#ifdef _WIN32
+  if (isSock) {
+    return send(fd,ptr + off, sz, 0);
+  }
+#endif
   return write(fd,ptr + off, sz);
 }
 
-HsInt prel_PrelHandle_read(HsInt fd, HsAddr ptr, HsInt off, int sz)
+HsInt prel_PrelHandle_read(HsInt fd, HsBool isSock, HsAddr ptr, HsInt off, int sz)
 {
+#ifdef _WIN32
+  if (isSock) {
+    return recv(fd,ptr + off, sz, 0);
+  }
+#endif
   return read(fd,ptr + off, sz);
+
 }
 
 void *prel_PrelIO_memcpy(char *dst, HsInt dst_off, const char *src, size_t sz)

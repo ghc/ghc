@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hs,v 1.3 2001/11/14 11:39:29 simonmar Exp $
+-- $Id: PrelHandle.hs,v 1.4 2001/11/26 20:04:00 sof Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -232,7 +232,7 @@ checkReadableHandle act handle_ =
 	let ref = haBuffer handle_
 	buf <- readIORef ref
 	when (bufferIsWritable buf) $ do
-	   new_buf <- flushWriteBuffer (haFD handle_) buf
+	   new_buf <- flushWriteBuffer (haFD handle_) (haIsStream handle_) buf
 	   writeIORef ref new_buf{ bufState=ReadBuffer }
 	act handle_
       _other 		   -> act handle_
@@ -308,7 +308,12 @@ handleFinalizer m = do
   let fd = fromIntegral (haFD h_)
   unlockFile fd
   -- ToDo: closesocket() for a WINSOCK socket?
-  when (fd /= -1) (c_close fd >> return ())
+  when (fd /= -1) 
+#ifdef mingw32_TARGET_OS
+       (c_close fd >> return ())
+#else
+       (closeFd (haIsStream handle_ fd >> return ())
+#endif
   return ()
 
 -- ---------------------------------------------------------------------------
@@ -375,7 +380,7 @@ flushWriteBufferOnly h_ = do
       ref = haBuffer h_
   buf <- readIORef ref
   new_buf <- if bufferIsWritable buf 
-		then flushWriteBuffer fd buf 
+		then flushWriteBuffer fd (haIsStream h_) buf 
 		else return buf
   writeIORef ref new_buf
 
@@ -389,7 +394,7 @@ flushBuffer h_ = do
   flushed_buf <-
     case bufState buf of
       ReadBuffer  -> flushReadBuffer  (haFD h_) buf
-      WriteBuffer -> flushWriteBuffer (haFD h_) buf
+      WriteBuffer -> flushWriteBuffer (haFD h_) (haIsStream h_) buf
 
   writeIORef ref flushed_buf
 
@@ -410,8 +415,8 @@ flushReadBuffer fd buf
    	 (c_lseek (fromIntegral fd) (fromIntegral off) sEEK_CUR)
      return buf{ bufWPtr=0, bufRPtr=0 }
 
-flushWriteBuffer :: FD -> Buffer -> IO Buffer
-flushWriteBuffer fd buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  = do
+flushWriteBuffer :: FD -> Bool -> Buffer -> IO Buffer
+flushWriteBuffer fd is_stream buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  = do
   let bytes = w - r
 #ifdef DEBUG_DUMP
   puts ("flushWriteBuffer, fd=" ++ show fd ++ ", bytes=" ++ show bytes ++ "\n")
@@ -420,24 +425,24 @@ flushWriteBuffer fd buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  = do
      then return (buf{ bufRPtr=0, bufWPtr=0 })
      else do
   res <- throwErrnoIfMinus1RetryMayBlock "flushWriteBuffer"
-		(write_off (fromIntegral fd) b (fromIntegral r) 
+		(write_off (fromIntegral fd) is_stream b (fromIntegral r)
 			(fromIntegral bytes))
 		(threadWaitWrite fd)
   let res' = fromIntegral res
   if res' < bytes 
-     then flushWriteBuffer fd (buf{ bufRPtr = r + res' })
+     then flushWriteBuffer fd is_stream (buf{ bufRPtr = r + res' })
      else return buf{ bufRPtr=0, bufWPtr=0 }
 
 foreign import "prel_PrelHandle_write" unsafe
-   write_off :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
+   write_off :: CInt -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 
 
-fillReadBuffer :: FD -> Bool -> Buffer -> IO Buffer
-fillReadBuffer fd is_line 
+fillReadBuffer :: FD -> Bool -> Bool -> Buffer -> IO Buffer
+fillReadBuffer fd is_line is_stream
       buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w, bufSize=size } =
   -- buffer better be empty:
   assert (r == 0 && w == 0) $ do
-  fillReadBufferLoop fd is_line buf b w size
+  fillReadBufferLoop fd is_line is_stream buf b w size
 
 -- For a line buffer, we just get the first chunk of data to arrive,
 -- and don't wait for the whole buffer to be full (but we *do* wait
@@ -445,7 +450,7 @@ fillReadBuffer fd is_line
 -- appears to be what GHC has done for a long time, and I suspect it
 -- is more useful than line buffering in most cases.
 
-fillReadBufferLoop fd is_line buf b w size = do
+fillReadBufferLoop fd is_line is_stream buf b w size = do
   let bytes = size - w
   if bytes == 0  -- buffer full?
      then return buf{ bufRPtr=0, bufWPtr=w }
@@ -454,7 +459,7 @@ fillReadBufferLoop fd is_line buf b w size = do
   puts ("fillReadBufferLoop: bytes = " ++ show bytes ++ "\n")
 #endif
   res <- throwErrnoIfMinus1RetryMayBlock "fillReadBuffer"
-	    (read_off fd b (fromIntegral w) (fromIntegral bytes))
+	    (read_off fd is_stream b (fromIntegral w) (fromIntegral bytes))
 	    (threadWaitRead fd)
   let res' = fromIntegral res
 #ifdef DEBUG_DUMP
@@ -465,11 +470,11 @@ fillReadBufferLoop fd is_line buf b w size = do
 	     then ioe_EOF
 	     else return buf{ bufRPtr=0, bufWPtr=w }
      else if res' < bytes && not is_line
-     	     then fillReadBufferLoop fd is_line buf b (w+res') size
+     	     then fillReadBufferLoop fd is_line is_stream buf b (w+res') size
      	     else return buf{ bufRPtr=0, bufWPtr=w+res' }
  
 foreign import "prel_PrelHandle_read" unsafe
-   read_off :: FD -> RawBuffer -> Int -> CInt -> IO CInt
+   read_off :: FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 
 -- ---------------------------------------------------------------------------
 -- Standard Handles
@@ -599,7 +604,7 @@ openFile' filepath ex_mode =
 	      throwErrnoIfMinus1Retry "openFile"
  	        (c_open f (fromIntegral oflags) 0o666)
 
-    openFd fd filepath mode binary truncate
+    openFd fd Nothing filepath mode binary truncate
 	-- ASSERT: if we just created the file, then openFd won't fail
 	-- (so we don't need to worry about removing the newly created file
 	--  in the event of an error).
@@ -615,8 +620,8 @@ append_flags = write_flags  .|. o_APPEND
 -- ---------------------------------------------------------------------------
 -- openFd
 
-openFd :: FD -> FilePath -> IOMode -> Bool -> Bool -> IO Handle
-openFd fd filepath mode binary truncate = do
+openFd :: FD -> Maybe FDType -> FilePath -> IOMode -> Bool -> Bool -> IO Handle
+openFd fd mb_fd_type filepath mode binary truncate = do
     -- turn on non-blocking mode
     setNonBlockingFD fd
 
@@ -629,15 +634,19 @@ openFd fd filepath mode binary truncate = do
 
     -- open() won't tell us if it was a directory if we only opened for
     -- reading, so check again.
-    fd_type <- fdType fd
+    fd_type <- 
+      case mb_fd_type of
+        Just x  -> return x
+	Nothing -> fdType fd
+    let is_stream = fd_type == Stream
     case fd_type of
 	Directory -> 
 	   ioException (IOError Nothing InappropriateType "openFile"
 			   "is a directory" Nothing) 
 
 	Stream
-	   | ReadWriteHandle <- ha_type -> mkDuplexHandle fd filepath binary
-	   | otherwise                  -> mkFileHandle fd filepath ha_type binary
+	   | ReadWriteHandle <- ha_type -> mkDuplexHandle fd is_stream filepath binary
+	   | otherwise                  -> mkFileHandle fd is_stream filepath ha_type binary
 
 	-- regular files need to be locked
 	RegularFile -> do
@@ -649,7 +658,7 @@ openFd fd filepath mode binary truncate = do
 	   -- truncate the file if necessary
 	   when truncate (fileTruncate filepath)
 
-	   mkFileHandle fd filepath ha_type binary
+	   mkFileHandle fd is_stream filepath ha_type binary
 
 
 foreign import "lockFile" unsafe
@@ -666,6 +675,7 @@ mkStdHandle fd filepath ha_type buf bmode = do
 	    (Handle__ { haFD = fd,
 			haType = ha_type,
                         haIsBin = dEFAULT_OPEN_IN_BINARY_MODE,
+			haIsStream = False,
 			haBufferMode = bmode,
 			haFilePath = filepath,
 			haBuffer = buf,
@@ -673,14 +683,15 @@ mkStdHandle fd filepath ha_type buf bmode = do
 			haOtherSide = Nothing
 		      })
 
-mkFileHandle :: FD -> FilePath -> HandleType -> Bool -> IO Handle
-mkFileHandle fd filepath ha_type binary = do
+mkFileHandle :: FD -> Bool -> FilePath -> HandleType -> Bool -> IO Handle
+mkFileHandle fd is_stream filepath ha_type binary = do
   (buf, bmode) <- getBuffer fd (initBufferState ha_type)
   spares <- newIORef BufferListNil
   newFileHandle handleFinalizer
 	    (Handle__ { haFD = fd,
 			haType = ha_type,
                         haIsBin = binary,
+			haIsStream = is_stream,
 			haBufferMode = bmode,
 			haFilePath = filepath,
 			haBuffer = buf,
@@ -688,14 +699,15 @@ mkFileHandle fd filepath ha_type binary = do
 		        haOtherSide = Nothing
 		      })
 
-mkDuplexHandle :: FD -> FilePath -> Bool -> IO Handle
-mkDuplexHandle fd filepath binary = do
+mkDuplexHandle :: FD -> Bool -> FilePath -> Bool -> IO Handle
+mkDuplexHandle fd is_stream filepath binary = do
   (w_buf, w_bmode) <- getBuffer fd WriteBuffer
   w_spares <- newIORef BufferListNil
   let w_handle_ = 
 	     Handle__ { haFD = fd,
 			haType = WriteHandle,
                         haIsBin = binary,
+			haIsStream = is_stream,
 			haBufferMode = w_bmode,
 			haFilePath = filepath,
 			haBuffer = w_buf,
@@ -710,6 +722,7 @@ mkDuplexHandle fd filepath binary = do
 	     Handle__ { haFD = fd,
 			haType = ReadHandle,
                         haIsBin = binary,
+			haIsStream = is_stream,
 			haBufferMode = r_bmode,
 			haFilePath = filepath,
 			haBuffer = r_buf,
@@ -756,7 +769,7 @@ hClose_help handle_ =
 	  -- close the file descriptor, but not when this is the read side
 	  -- of a duplex handle.
 	  case haOtherSide handle_ of
-	    Nothing -> throwErrnoIfMinus1Retry_ "hClose" (c_close fd)
+	    Nothing -> throwErrnoIfMinus1Retry_ "hClose" (closeFd (haIsStream handle_) fd)
 	    Just _  -> return ()
 
 	  -- free the spare buffers
@@ -825,7 +838,7 @@ hLookAhead handle = do
 
   -- fill up the read buffer if necessary
   new_buf <- if bufferEmpty buf
-		then fillReadBuffer fd is_line buf
+		then fillReadBuffer fd is_line (haIsStream handle_) buf
 		else return buf
   
   writeIORef ref new_buf
@@ -914,7 +927,7 @@ hFlush handle =
    wantWritableHandle "hFlush" handle $ \ handle_ -> do
    buf <- readIORef (haBuffer handle_)
    if bufferIsWritable buf && not (bufferEmpty buf)
-	then do flushed_buf <- flushWriteBuffer (haFD handle_) buf
+	then do flushed_buf <- flushWriteBuffer (haFD handle_) (haIsStream handle_) buf
 		writeIORef (haBuffer handle_) flushed_buf
 	else return ()
 
@@ -1028,7 +1041,7 @@ hSeek handle mode offset =
                    SeekFromEnd  -> sEEK_END
 
     if bufferIsWritable buf
-	then do new_buf <- flushWriteBuffer fd buf
+	then do new_buf <- flushWriteBuffer fd (haIsStream handle_) buf
 	        writeIORef ref new_buf
 	        do_seek
 	else do

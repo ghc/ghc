@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsStd.h,v 1.4 2001/08/17 11:06:58 simonmar Exp $
+ * $Id: HsStd.h,v 1.5 2001/11/26 20:04:00 sof Exp $
  *
  * Definitions for package `std' which are visible in Haskell land.
  *
@@ -55,6 +55,9 @@
 #endif
 #ifdef HAVE_SYS_TIMES_H
 #include <sys/times.h>
+#endif
+#ifdef HAVE_WINSOCK_H
+#include <winsock.h>
 #endif
 
 #if !defined(mingw32_TARGET_OS) && !defined(irix_TARGET_OS)

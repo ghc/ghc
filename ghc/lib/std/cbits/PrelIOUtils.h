@@ -17,8 +17,8 @@ extern HsInt prel_o_binary();
 
 extern HsInt prel_setmode(HsInt fd, HsBool isBin);
 
-extern HsInt prel_PrelHandle_write(HsInt fd, HsAddr ptr, HsInt off, int sz);
-extern HsInt prel_PrelHandle_read(HsInt fd, HsAddr ptr, HsInt off, int sz);
+extern HsInt prel_PrelHandle_write(HsInt fd, HsBool isSock, HsAddr ptr, HsInt off, int sz);
+extern HsInt prel_PrelHandle_read(HsInt fd, HsBool isSock, HsAddr ptr, HsInt off, int sz);
 
 extern void* prel_PrelIO_memcpy(char *dst, HsInt dst_off, const char *src, size_t sz);
 
