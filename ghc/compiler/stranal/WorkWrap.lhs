@@ -25,6 +25,7 @@ import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..),
 			)
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import BasicTypes	( RecFlag(..), isNonRec, Activation(..) )
+import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
 import CmdLineOpts
 import WwLib
@@ -201,26 +202,38 @@ tryWW is_rec fn_id rhs
 	--	fw = \ab -> (__inline (\x -> E)) (a,b)
 	-- and the original __inline now vanishes, so E is no longer
 	-- inside its __inline wrapper.  Death!  Disaster!
-  = returnUs [ (fn_id, rhs) ]
+  = returnUs [ (fn_id', rhs) ]
 
   | is_thunk && worthSplittingThunk fn_dmd res_info
   = ASSERT( isNonRec is_rec )	-- The thunk must be non-recursive
-    splitThunk fn_id rhs
+    splitThunk fn_id' rhs
 
   | is_fun && worthSplittingFun wrap_dmds res_info
-  = splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
+  = splitFun fn_id' fn_info wrap_dmds res_info inline_prag rhs
 
   | otherwise
-  = returnUs [ (fn_id, rhs) ]
+  = returnUs [ (fn_id', rhs) ]
 
   where
     fn_info   	= idInfo fn_id
     fn_dmd    	= newDemandInfo fn_info
     unfolding 	= unfoldingInfo fn_info
     inline_prag = inlinePragInfo fn_info
-    strict_sig  = newStrictnessInfo fn_info `orElse` topSig
+    maybe_sig   = newStrictnessInfo fn_info
 
-    StrictSig (DmdType _ wrap_dmds res_info) = strict_sig
+	-- In practice it always will have a strictness 
+	-- signature, even if it's a uninformative one
+    strict_sig  = newStrictnessInfo fn_info `orElse` topSig
+    StrictSig (DmdType env wrap_dmds res_info) = strict_sig
+
+	-- fn_id' has the DmdEnv zapped.  
+	--	(a) it is never used again
+	--	(b) it wastes space
+	--	(c) it becomes incorrect as things are cloned, because
+	--	    we don't push the substitution into it
+    fn_id' | isEmptyVarEnv env = fn_id
+	   | otherwise	       = fn_id `setIdNewStrictness` 
+				   StrictSig (mkTopDmdType wrap_dmds res_info)
 
     is_fun    = not (null wrap_dmds)
     is_thunk  = not is_fun && not (exprIsValue rhs)
