@@ -37,6 +37,9 @@ thawSTArray         :: Ix ix => Array ix elt -> ST s (STArray s ix elt)
 freezeSTArray       :: Ix ix => STArray s ix elt -> ST s (Array ix elt)
 unsafeFreezeSTArray :: Ix ix => STArray s ix elt -> ST s (Array ix elt)  
 instance Eq (STArray s ix elt)
+
+unsafeIOToST	    :: IO   a -> ST s a
+stToIO              :: ST s a -> IO a
 </verb></tscreen>
 
 Notes:
@@ -52,12 +55,6 @@ to copying the array and they are usually implemented that way.  The
 operation <tt/unsafeFreezeSTArray/ is a faster version of
 <tt/freezeSTArray/ which omits the copying step.  It's a safe substitute for
 <tt/freezeSTArray/ if you don't modify the mutable array after freezing it.
-
-<item>
-In the current version of Hugs, the <tt/<idx/runST// operation,
-used to specify encapsulation, is implemented as a language construct,
-and <tt/runST/ is treated as a keyword.  We plan to change this to match
-GHC soon.
 
 <!-- 
   <item>
@@ -76,4 +73,10 @@ places where it matters.  GHC implements LazyST and ST using different
 types, so this isn't possible.
 </item>
 
+<item>
+Operations for coercing an <tt/ST/ action into an <tt/IO/ one, and
+vice versa are also provided. Notice that coercing an <tt/IO/ action
+into an <tt/ST/ action is 'lossy', since any exception raised within the
+<tt/IO/ action will not be caught within the <tt/ST/ monad, as it
+doesn't support (monadic) exceptions.
 </itemize>
