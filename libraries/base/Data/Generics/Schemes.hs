@@ -157,7 +157,7 @@ gtypecount (_::a) = gcount (False `mkQ` (\(_::a) -> True))
 
 
 -- | Find (unambiguously) an immediate subterm of a given type
-gfindtype :: (Data x, Data y) => x -> Maybe y
+gfindtype :: (Data x, Typeable y) => x -> Maybe y
 gfindtype = singleton
           . foldl unJust []
           . gmapQ (Nothing `mkQ` Just)
