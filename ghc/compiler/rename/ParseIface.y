@@ -526,13 +526,12 @@ akind		:: { Kind }
 --------------------------------------------------------------------------
 
 id_info		:: { [HsIdInfo RdrName] }
-id_info		: 	 			{ [] }
+		: 	 			{ [] }
 		| id_info_item id_info		{ $1 : $2 }
+                | strict_info id_info		{ $1 ++ $2 }
 
 id_info_item	:: { HsIdInfo RdrName }
-id_info_item	: '__A' arity_info		{ HsArity $2 }
-		| strict_info			{ HsStrictness $1 }
-                | '__M' 		        { HsCprInfo $1 }
+		: '__A' arity_info		{ HsArity $2 }
 		| '__U' core_expr		{ HsUnfold $1 (Just $2) }
                 | '__U' 		 	{ HsUnfold $1 Nothing }
                 | '__P' spec_tvs
@@ -540,18 +539,28 @@ id_info_item	: '__A' arity_info		{ HsArity $2 }
 		| '__C'                         { HsNoCafRefs }
 
 
+strict_info     :: { [HsIdInfo RdrName] }
+		: cpr worker			{ ($1:$2) }
+		| strict worker			{ ($1:$2) }
+		| cpr strict worker		{ ($1:$2:$3) }
+
+cpr		:: { HsIdInfo RdrName }
+		: '__M'				{ HsCprInfo $1 }
+
+strict		:: { HsIdInfo RdrName }
+		: '__S'			{ HsStrictness (HsStrictnessInfo $1) }
+
+worker		:: { [HsIdInfo RdrName] }
+		: qvar_name '{' qdata_names '}' { [HsWorker $1 $3] }
+		| qvar_name 			{ [HsWorker $1 []] }
+		| {- nothing -}			{ [] }
+
 spec_tvs	:: { [HsTyVar RdrName] }
-spec_tvs	: '[' tv_bndrs ']' 		{ $2 }
+		: '[' tv_bndrs ']' 		{ $2 }
 	
 
 arity_info	:: { ArityInfo }
-arity_info	: INTEGER			{ exactArity (fromInteger $1) }
-
-strict_info	:: { HsStrictnessInfo RdrName }
-strict_info	: '__S' qvar_name '{' qdata_names '}' 	
-					{ HsStrictnessInfo $1 (Just ($2,$4)) }
-		| '__S' qvar_name 	{ HsStrictnessInfo $1 (Just ($2,[])) }
-		| '__S'			{ HsStrictnessInfo $1 Nothing }
+		: INTEGER			{ exactArity (fromInteger $1) }
 
 -------------------------------------------------------
 core_expr	:: { UfExpr RdrName }

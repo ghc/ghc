@@ -448,17 +448,16 @@ instance (Outputable name) => Outputable (IfaceSig name) where
 
 data HsIdInfo name
   = HsArity		ArityInfo
-  | HsStrictness	(HsStrictnessInfo name)
+  | HsStrictness	HsStrictnessInfo
   | HsUnfold		InlinePragInfo (Maybe (UfExpr name))
   | HsUpdate		UpdateInfo
   | HsSpecialise	[HsTyVar name] [HsType name] (UfExpr name)
   | HsNoCafRefs
   | HsCprInfo           CprInfo
-
-
-data HsStrictnessInfo name
-  = HsStrictnessInfo ([Demand], Bool)
-		     (Maybe (name, [name]))	-- Worker, if any
+  | HsWorker		name [name]		-- Worker, if any
 						-- and needed constructors
+
+data HsStrictnessInfo
+  = HsStrictnessInfo ([Demand], Bool)
   | HsBottom
 \end{code}

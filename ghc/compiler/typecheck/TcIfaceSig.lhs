@@ -107,8 +107,11 @@ tcIdInfo unf_env name ty info info_ins
 	  in
 	  returnTc info2
 
-    tcPrag info (HsStrictness strict)
-	= tcStrictness unf_env ty info strict
+    tcPrag info (HsStrictness (HsStrictnessInfo (demands,bot_result)))
+	= returnTc (StrictnessInfo demands bot_result `setStrictnessInfo` info)
+
+    tcPrag info (HsWorker nm cons)
+	= tcWorkerInfo unf_env ty info nm cons
 
     tcPrag info (HsSpecialise tyvars tys rhs)
 	= tcExtendTyVarScope tyvars		$ \ tyvars' ->
@@ -134,12 +137,17 @@ tcIdInfo unf_env name ty info info_ins
 \end{code}
 
 \begin{code}
-tcStrictness unf_env ty info (HsStrictnessInfo (demands, bot_result) maybe_worker)
-  = tcWorker unf_env maybe_worker		`thenNF_Tc` \ maybe_worker_id ->
-    -- We are relying here on cpr info always appearing before strictness info
-    -- fingers crossed ....
-    uniqSMToTcM (mkWrapper ty demands (cprInfo info))
-      		                                `thenNF_Tc` \ wrap_fn ->
+tcWorkerInfo unf_env ty info nm cons
+  = tcWorker unf_env (Just (nm,cons))	`thenNF_Tc` \ maybe_worker_id ->
+    -- We are relying here on cpr and strictness info always appearing 
+    -- before strictness info,  fingers crossed ....
+    let
+      demands = case strictnessInfo info of
+			StrictnessInfo d _ -> d
+			_                  -> []
+      cpr_info = cprInfo info
+    in	
+    uniqSMToTcM (mkWrapper ty demands cpr_info) `thenNF_Tc` \ wrap_fn ->
     let
 	-- Watch out! We can't pull on maybe_worker_id too eagerly!
 	info' = case maybe_worker_id of
@@ -151,7 +159,7 @@ tcStrictness unf_env ty info (HsStrictnessInfo (demands, bot_result) maybe_worke
 
 	has_worker = maybeToBool maybe_worker_id
     in
-    returnTc (StrictnessInfo demands bot_result `setStrictnessInfo` info')
+    returnTc info'
 \end{code}
 
 \begin{code}

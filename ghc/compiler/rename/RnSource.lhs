@@ -630,9 +630,16 @@ rnContext doc ctxt
 %*********************************************************
 
 \begin{code}
-rnIdInfo (HsStrictness strict)
-  = rnStrict strict	`thenRn` \ strict' ->
-    returnRn (HsStrictness strict')
+rnIdInfo (HsStrictness str) = returnRn (HsStrictness str)
+
+rnIdInfo (HsWorker worker cons)
+	-- The sole purpose of the "cons" field is so that we can mark the 
+	-- constructors needed to build the wrapper as "needed", so that their
+	-- data type decl will be slurped in. After that their usefulness is 
+	-- o'er, so we just put in the empty list.
+  = lookupOccRn worker			`thenRn` \ worker' ->
+    mapRn lookupOccRn cons		`thenRn_` 
+    returnRn (HsWorker worker' [])
 
 rnIdInfo (HsUnfold inline (Just expr))	= rnCoreExpr expr	`thenRn` \ expr' ->
 				  	  returnRn (HsUnfold inline (Just expr'))
@@ -648,19 +655,6 @@ rnIdInfo (HsSpecialise tyvars tys expr)
     returnRn (HsSpecialise tyvars' tys' expr')
   where
     doc = text "Specialise in interface pragma"
-    
-
-rnStrict (HsStrictnessInfo demands (Just (worker,cons)))
-	-- The sole purpose of the "cons" field is so that we can mark the constructors
-	-- needed to build the wrapper as "needed", so that their data type decl will be
-	-- slurped in. After that their usefulness is o'er, so we just put in the empty list.
-  = lookupOccRn worker			`thenRn` \ worker' ->
-    mapRn lookupOccRn cons		`thenRn_` 
-    returnRn (HsStrictnessInfo demands (Just (worker',[])))
-
--- Boring, but necessary for the type checker.
-rnStrict (HsStrictnessInfo demands Nothing) = returnRn (HsStrictnessInfo demands Nothing)
-rnStrict HsBottom			  = returnRn HsBottom
 \end{code}
 
 UfCore expressions.
