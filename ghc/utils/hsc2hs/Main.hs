@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.37 2002/02/13 10:39:36 simonpj Exp $
+-- $Id: Main.hs,v 1.38 2002/04/18 12:15:56 simonmar Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -516,8 +516,11 @@ output flags name toks = do
         _                 -> return ()
     removeFile oProgName
     
-    system (execProgName++" >"++outName)
+    progStatus <- system (execProgName++" >"++outName)
     removeFile progName
+    case progStatus of
+        e@(ExitFailure _) -> exitWith e
+        _                 -> return ()
     
     when needsH $ writeFile outHName $
         "#ifndef "++includeGuard++"\n\ 
