@@ -692,17 +692,24 @@ now (ToDo).
 \begin{code}
 checkSigMatch top_lvl binder_names mono_ids sigs
   | main_bound_here
-  = mapTc check_one_sig sigs			`thenTc_`
-    mapTc check_main_ctxt sigs			`thenTc_` 
-
-	-- Now unify the main_id with IO t, for any old t
+  =	-- First unify the main_id with IO t, for any old t
     tcSetErrCtxt mainTyCheckCtxt (
 	tcLookupTyCon ioTyCon_NAME		`thenTc`    \ ioTyCon ->
 	newTyVarTy boxedTypeKind		`thenNF_Tc` \ t_tv ->
 	unifyTauTy ((mkTyConApp ioTyCon [t_tv]))
 		   (idType main_mono_id)
     )						`thenTc_`
-    returnTc (Just ([], emptyLIE))
+
+	-- Now check the signatures
+	-- Must do this after the unification with IO t, 
+	-- in case of a silly signature like
+	-- 	main :: forall a. a
+	-- The unification to IO t will bind the type variable 'a',
+	-- which is just waht check_one_sig looks for
+    mapTc check_one_sig sigs			`thenTc_`
+    mapTc check_main_ctxt sigs			`thenTc_` 
+
+	    returnTc (Just ([], emptyLIE))
 
   | not (null sigs)
   = mapTc check_one_sig sigs			`thenTc_`
