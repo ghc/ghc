@@ -1,6 +1,6 @@
 /*
  *
- * $Id: ghci.c,v 1.1 2001/07/30 10:40:36 rrt Exp $
+ * $Id: ghci.c,v 1.2 2001/08/01 21:55:04 sof Exp $
  *
  * ghci wrapper - invokes ghc.exe with the added command-line
  *                option "--interactive".
@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <process.h>
 #include <malloc.h>
+#include <stdlib.h>
 
 #define BINARY_NAME "ghc.exe"
 #define IACTIVE_OPTION "--interactive"
@@ -49,22 +50,31 @@ int
 main(int argc, char** argv)
 {
   TCHAR  binPath[FILENAME_MAX+1];
+  TCHAR  binPathShort[MAX_PATH+1];
   DWORD  dwSize = FILENAME_MAX;
   DWORD  dwRes;
   TCHAR* szEnd;
   char** new_argv;
   int    i;
-
+  
   /* Locate the binary we want to start up */
   dwRes = 
     SearchPath(NULL,
 	       BINARY_NAME,
 	       NULL,
 	       dwSize,
-	       binPath,
+	       (char*)binPath,
 	       &szEnd);
 	       
   if (dwRes == 0) {	       
+    errmsg("Unable to locate ghc.exe");
+    return 1;
+  }
+  
+  dwSize = MAX_PATH;
+  /* Turn the path into short form - LFN form causes problems
+     when passed in argv[0]. */
+  if ( !(GetShortPathName(binPath, binPathShort, dwSize)) ) {
     errmsg("Unable to locate ghc.exe");
     return 1;
   }
@@ -74,7 +84,7 @@ main(int argc, char** argv)
     errmsg("failed to start up ghc.exe");
     return 1;
   }
-  new_argv[0] = binPath;
+  new_argv[0] = binPathShort;
 
   new_argv[1] = (char*)malloc(sizeof(char) * (strlen(IACTIVE_OPTION) + 1));
   if (new_argv[1]) {
