@@ -179,7 +179,7 @@ unboxArg arg
 	      \ body -> Case arg case_bndr [(DataAlt box_data_con,[prim_arg],body)]
     )
 
-  -- Booleans; Hacking alert: the 0/1 literals should match the HsFalse/HsTrue constants
+  -- Booleans
   | arg_ty == boolTy
   = newSysLocalDs intPrimTy		`thenDs` \ prim_arg ->
     returnDs (Var prim_arg,
