@@ -1,20 +1,12 @@
 
 tcfail046.hs:9:8:
-    No instance for (Eq (Pid -> Time -> Message a -> (MessList a, Continuation a)))
+    No instance for (Eq (Process a))
       arising from the 'deriving' clause of a data type declaration at tcfail046.hs:9:8
-    Probable fix:
-      add an instance declaration for (Eq (Pid
-					   -> Time
-					   -> Message a
-					   -> (MessList a, Continuation a)))
+    Probable fix: add an instance declaration for (Eq (Process a))
     When deriving the `Eq' instance for type `Continuation'
 
 tcfail046.hs:17:5:
-    No instance for (Eq (Pid -> Time -> Message a -> (MessList a, Continuation a)))
+    No instance for (Eq (Process a))
       arising from the 'deriving' clause of a data type declaration at tcfail046.hs:17:5
-    Probable fix:
-      add an instance declaration for (Eq (Pid
-					   -> Time
-					   -> Message a
-					   -> (MessList a, Continuation a)))
+    Probable fix: add an instance declaration for (Eq (Process a))
     When deriving the `Eq' instance for type `Message'

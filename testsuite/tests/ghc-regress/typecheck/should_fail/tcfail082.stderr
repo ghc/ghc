@@ -1,5 +1,4 @@
 
 tcfail082.hs:2:0:
     Failed to load interface for `Data82':
-	Could not find interface file for `Data82'
-	(use -v to see a list of the files searched for)
+	Could not find module `Data82': use -v to see a list of the files searched for

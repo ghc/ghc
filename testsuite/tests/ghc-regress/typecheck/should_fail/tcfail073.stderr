@@ -2,4 +2,4 @@
 tcfail073.hs:8:0:
     Duplicate instance declarations:
       tcfail073.hs:8:0: instance (Eq a) => Eq (a, b)
-      Imported from `Data.Tuple': instance (Eq a, Eq b) => Eq (a, b)
+      Imported from Data.Tuple: instance (Eq a, Eq b) => Eq (a, b)
