@@ -3,21 +3,20 @@
 --
 module ShouldFail where
 
-import MutableArray
 import ST
 
-type IndTree s t = MutableArray s (Int,Int) t
+type IndTree s t = STArray s (Int,Int) t
 
 itgen :: Constructed a => (Int,Int) -> a -> IndTree s a
 itgen n x = 
 	runST (
-	newArray ((1,1),n) x)
+	newSTArray ((1,1),n) x)
 
 itiap :: Constructed a => (Int,Int) -> (a->a) -> IndTree s a -> IndTree s a
 itiap i f arr =
 	runST (
-	readArray arr i >>= \val ->
-	writeArray arr i (f val) >>
+	readSTArray arr i >>= \val ->
+	writeSTArray arr i (f val) >>
 	return arr)
 
 itrap :: Constructed a => ((Int,Int),(Int,Int)) -> (a->a) -> IndTree s a -> IndTree s a
@@ -27,8 +26,8 @@ itrap ((i,k),(j,l)) f arr = runST(itrap' i k)
 		     else (itrapsnd i k >>
 			itrap' i (k+1))
 	itrapsnd i k = if i > j then return arr
-                     else (readArray arr (i,k) >>= \val ->
-		        writeArray arr (i,k) (f val) >>
+                     else (readSTArray arr (i,k) >>= \val ->
+		        writeSTArray arr (i,k) (f val) >>
 		        itrapsnd (i+1) k)
 
 itrapstate :: Constructed b => ((Int,Int),(Int,Int)) -> (a->b->(a,b)) -> ((Int,Int)->c->a) ->
@@ -39,9 +38,9 @@ itrapstate ((i,k),(j,l)) f c d s arr = runST(itrapstate' i k s)
 			    else (itrapstatesnd i k s >>= \(s,arr) ->
 				itrapstate' i (k+1) s)
 	itrapstatesnd i k s = if i > j then return (s,arr)
-                            else (readArray arr (i,k) >>= \val ->
+                            else (readSTArray arr (i,k) >>= \val ->
 		               let (newstate, newval) = f (c (i,k) s) val
-		               in writeArray arr (i,k) newval >>
+		               in writeSTArray arr (i,k) newval >>
 		               itrapstatesnd (i+1) k (d newstate))
 
 -- stuff from Auxiliary: copied here (partain)
