@@ -275,7 +275,7 @@ renameExportItems items = mapM rn items
 	        return (ExportGroup lev id0 doc)
 	rn (ExportDecl x decl0 insts) -- x is an original name, don't rename it
 	   = do decl <- renameDecl decl0
-		mapM renameInstHead insts
+		insts <- mapM renameInstHead insts
 		return (ExportDecl x decl insts)
 	rn (ExportNoDecl x y subs)
 	   = do y' <- lookupRn id y
