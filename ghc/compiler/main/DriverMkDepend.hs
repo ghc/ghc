@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.17 2002/02/05 14:42:08 simonpj Exp $
+-- $Id: DriverMkDepend.hs,v 1.18 2002/03/05 14:30:51 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -37,7 +37,7 @@ import Maybe
 	-- flags
 GLOBAL_VAR(v_Dep_makefile, 		"Makefile", String);
 GLOBAL_VAR(v_Dep_include_prelude, 	False, Bool);
-GLOBAL_VAR(v_Dep_exclude_mods,          [], [String]);
+GLOBAL_VAR(v_Dep_exclude_mods,          ["GHC.Prim"], [String]);
 GLOBAL_VAR(v_Dep_suffixes,		[], [String]);
 GLOBAL_VAR(v_Dep_warnings,		True, Bool);
 
