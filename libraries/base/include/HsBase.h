@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.20 2003/04/11 11:43:09 ross Exp $
+ * $Id: HsBase.h,v 1.21 2003/05/08 16:06:41 ross Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -377,10 +377,10 @@ __hscore_PrelHandle_write( HsInt fd, HsBool isSock, HsAddr ptr,
 {
 #if defined(__MINGW32__)
   if (isSock) {
-    return send(fd,ptr + off, sz, 0);
+    return send(fd,(char *)ptr + off, sz, 0);
   }
 #endif
-  return write(fd,ptr + off, sz);
+  return write(fd,(char *)ptr + off, sz);
 }
 
 INLINE HsInt
@@ -389,10 +389,10 @@ __hscore_PrelHandle_read( HsInt fd, HsBool isSock, HsAddr ptr,
 {
 #if defined(__MINGW32__)
   if (isSock) {
-    return recv(fd,ptr + off, sz, 0);
+    return recv(fd,(char *)ptr + off, sz, 0);
   }
 #endif
-  return read(fd,ptr + off, sz);
+  return read(fd,(char *)ptr + off, sz);
 
 }
 
