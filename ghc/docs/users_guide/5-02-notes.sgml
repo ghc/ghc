@@ -56,7 +56,7 @@
       <listitem>
 	<para><option>+RTS
           -i<replaceable>seconds</replaceable></option> flag reinstated for heap
-          profiling.  See <xref linkend="prof-rts-options">.</para>
+          profiling.  See <xref linkend="rts-options-heap-prof">.</para>
       </listitem>
 
       <listitem>
