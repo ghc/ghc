@@ -731,6 +731,7 @@ GLOBAL_VAR(build_tag, "", String)
 data WayName
   = WayProf
   | WayUnreg
+  | WayDll
   | WayTicky
   | WayPar
   | WayGran
@@ -756,6 +757,8 @@ data WayName
   deriving (Eq,Ord)
 
 GLOBAL_VAR(ways, [] ,[WayName])
+
+-- ToDo: allow WayDll with any other allowed combination
 
 allowed_combinations = 
    [  [WayProf,WayUnreg],
@@ -810,6 +813,9 @@ way_details =
 	, "-optc-DUSE_MINIINTERPRETER"
 	, "-fno-asm-mangling"
 	, "-funregisterised" ]),
+
+    (WayDll, Way  "dll" "DLLized"
+        [ ]),
 
     (WayPar, Way  "mp" "Parallel" 
 	[ "-fstack-check"
@@ -1684,6 +1690,7 @@ run_something phase_name cmd
 	putStr phase_name
 	putStrLn ":"
 	putStrLn cmd
+	hFlush stdout
 
    -- test for -n flag
    n <- readIORef dry_run
@@ -1748,6 +1755,7 @@ opts =
 	------- ways --------------------------------------------------------
   ,  ( "prof"		, NoArg (addNoDups ways	WayProf) )
   ,  ( "unreg"		, NoArg (addNoDups ways	WayUnreg) )
+  ,  ( "dll"            , NoArg (addNoDups ways WayDll) )
   ,  ( "ticky"		, NoArg (addNoDups ways	WayTicky) )
   ,  ( "parallel"	, NoArg (addNoDups ways	WayPar) )
   ,  ( "gransim"	, NoArg (addNoDups ways	WayGran) )
