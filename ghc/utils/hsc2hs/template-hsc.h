@@ -66,6 +66,9 @@
 #define hsc_ptr(t, f) \
     printf ("(\\hsc_ptr -> hsc_ptr `plusPtr` %ld)", (long) offsetof (t, f));
 
+#define hsc_offset(t, f) \
+    printf("(%ld)", (long) offsetof (t, f));
+
 #define hsc_enum(t, f, print_name, x)         \
     print_name;                               \
     printf (" :: %s\n", #t);                  \
