@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.84 2000/08/15 14:18:43 simonmar Exp $
+ * $Id: GC.c,v 1.85 2000/10/06 15:38:06 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -51,6 +51,10 @@
 #  include "Printer.h"
 #  include "ParallelDebug.h"
 # endif
+#endif
+#if defined(GHCI)
+# include "HsFFI.h"
+# include "Linker.h"
 #endif
 
 //@node STATIC OBJECT LIST, Static function declarations, Includes

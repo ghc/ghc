@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.25 2000/08/17 15:19:17 rrt Exp $
+ * $Id: ClosureMacros.h,v 1.26 2000/10/06 15:38:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -100,15 +100,15 @@ extern StgFun start;
 extern void* TEXT_SECTION_END_MARKER_DECL;
 extern void* DATA_SECTION_END_MARKER_DECL;
 
-#ifdef INTERPRETER
+#if defined(INTERPRETER) || defined(GHCI)
 /* Take into account code sections in dynamically loaded object files. */
 #define IS_CODE_PTR(p) (  ((P_)(p) < (P_)&TEXT_SECTION_END_MARKER) \
-                       || is_dynamically_loaded_code_or_rodata_ptr(p) )
+                       || is_dynamically_loaded_code_or_rodata_ptr((char *)p) )
 #define IS_DATA_PTR(p) ( ((P_)(p) >= (P_)&TEXT_SECTION_END_MARKER && \
                           (P_)(p) < (P_)&DATA_SECTION_END_MARKER) \
-                       || is_dynamically_loaded_rwdata_ptr(p) )
+                       || is_dynamically_loaded_rwdata_ptr((char *)p) )
 #define IS_USER_PTR(p) ( ((P_)(p) >= (P_)&DATA_SECTION_END_MARKER) \
-                       && is_not_dynamically_loaded_ptr(p) )
+                       && is_not_dynamically_loaded_ptr((char *)p) )
 #else
 #define IS_CODE_PTR(p) ((P_)(p) < (P_)&TEXT_SECTION_END_MARKER)
 #define IS_DATA_PTR(p) ((P_)(p) >= (P_)&TEXT_SECTION_END_MARKER && (P_)(p) < (P_)&DATA_SECTION_END_MARKER)
