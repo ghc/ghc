@@ -19,7 +19,8 @@ import CoreSyn		( CoreExpr )
 import PprCore		( {- Instances -} )
 
 --others:
-import Name		( Name, isUnboundName )
+import Name		( Name )
+import PrelNames	( isUnboundName )
 import NameSet		( NameSet, elemNameSet, nameSetToList )
 import BasicTypes	( RecFlag(..), Fixity )
 import Outputable	
