@@ -7,7 +7,8 @@
 --	other Prelude files that precede PrelPack
 ---------------------------------------------------------------------------
  
-__interface PrelPack 1 1 1 where
-__export PrelPack packCStringzh ;
+__interface "std" PrelPack 1 407 where
+__export PrelPack packCStringzh unpackCString ;
 
 1 packCStringzh :: [PrelBase.Char] -> PrelGHC.ByteArrayzh ;
+1 unpackCString :: PrelAddr.Addr -> [PrelBase.Char] ;
