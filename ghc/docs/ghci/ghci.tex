@@ -334,15 +334,15 @@ It pretty much implements the HEP interface.  First, though, define a
 containing structure for the state of the entire CM system and its
 subsystems @compile@ and @link@:
 \begin{verbatim}
-   data SysState 
-      = SysState PCMS      -- CM's stuff
-                 PCS       -- compile's stuff
-                 PLS       -- link's stuff
-                 SI        -- the static info, never changes
-                 Finder    -- the finder
+   data CmState 
+      = CmState PCMS      -- CM's stuff
+                PCS       -- compile's stuff
+                PLS       -- link's stuff
+                SI        -- the static info, never changes
+                Finder    -- the finder
 \end{verbatim}
 
-Then @SysState@ is threaded through the HEP interface.  In reality
+The @CmState@ is threaded through the HEP interface.  In reality
 this might be done using @IORef@s, but for clarity:
 \begin{verbatim}
   type ModHandle = ... (opaque to CM/HEP clients) ...
@@ -350,23 +350,23 @@ this might be done using @IORef@s, but for clarity:
 
   cmInit       :: FLAGS 
                -> [PkgInfo]
-               -> IO SysState
+               -> IO CmState
 
-  cmLoadModule :: SysState 
+  cmLoadModule :: CmState 
                -> ModName 
-               -> IO (SysState, Either [SDoc] ModHandle)
+               -> IO (CmState, Either [SDoc] ModHandle)
 
   cmGetExpr    :: ModHandle 
-               -> SysState 
-               -> String -> IO (SysState, Either [SDoc] HValue)
+               -> CmState 
+               -> String -> IO (CmState, Either [SDoc] HValue)
 
-  cmRunExpr    :: HValue -> IO ()   -- don't need SysState here
+  cmRunExpr    :: HValue -> IO ()   -- don't need CmState here
 \end{verbatim}
 Almost all the huff and puff in this document pertains to @cmLoadModule@.
 
 
 \subsubsection{Implementing \mbox{\tt cmInit}}
-@cmInit@ creates an empty @SysState@ using @emptyPCMS@, @emptyPCS@,
+@cmInit@ creates an empty @CmState@ using @emptyPCMS@, @emptyPCS@,
 @emptyPLS@, making SI from the supplied flags and package info, and 
 by supplying the package info the @newFinder@.
 
@@ -478,7 +478,7 @@ date.  There are three parts to it:
    on both success and failure.
 
    \item 
-      {\bf Holding Pen (HP)} @:: Ifaces@ 
+      {\bf Holding Pen (HP)} @:: HoldingPen@ 
 
    HP holds parsed but not-yet renamed-or-typechecked fragments of
    package interfaces.  As typechecking of other modules progresses,
@@ -510,7 +510,7 @@ with private global variables -- they make the design specification
 less clear, although the implementation might use them.  Without
 further ado:
 \begin{verbatim}
-   compile :: FLAGS       -- obvious
+   compile :: SI          -- obvious
            -> Finder      -- to find modules
            -> ModSummary  -- summary, including source
            -> Maybe ModIFace
@@ -518,14 +518,13 @@ further ado:
            -> HST         -- for home module ModDetails
            -> PCS         -- IN: the persistent compiler state
 
-           -> CompResult
+           -> IO CompResult
 
    data CompResult
       = CompOK  ModDetails   -- new details (== HST additions)
-                Maybe (ModIFace, Linkable)
+                (Maybe (ModIFace, Linkable))
                              -- summary and code; Nothing => compilation
                              -- not needed (old summary and code are still valid)
-                             -- compilation was not needed
                 PCS          -- updated PCS
                 [SDoc]       -- warnings
 
@@ -534,7 +533,8 @@ further ado:
 
    data PCS
       = MkPCS PIT         -- package interfaces
-              PST         -- rename cache/global symtab contents
+              PST         -- post slurping global symtab contribs
+              HoldingPen  -- pre slurping interface bits and pieces
 
    emptyPCS :: IO PCS     -- since CM has no other way to make one
 \end{verbatim}
@@ -590,7 +590,7 @@ What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
 
 
 \subsubsection{Contents of \mbox{\tt ModDetails}, 
-               \mbox{\tt ModIFace} and \mbox{\tt Ifaces}}
+               \mbox{\tt ModIFace} and \mbox{\tt HoldingPen}}
 Only @compile@ can see inside these three types -- they are opaque to
 everyone else.  @ModDetails@ holds the post-renaming,
 post-typechecking environment created by compiling a module.
@@ -626,11 +626,11 @@ post-typechecking environment created by compiling a module.
        }
 \end{verbatim}
 
-@Ifaces@ is a cleaned-up version of that found in @RnMonad.lhs@, 
+@HoldingPen@ is a cleaned-up version of that found in @RnMonad.lhs@, 
 retaining just the 3 pieces actually comprising the holding pen:
 \begin{verbatim}
-   data Ifaces 
-      = Ifaces {
+   data HoldingPen 
+      = HoldingPen {
            iDecls :: DeclsMap,     -- A single, global map of Names to decls
 
            iInsts :: IfaceInsts,
