@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hs,v 1.8 2001/12/27 11:30:10 sof Exp $
+-- $Id: PrelHandle.hs,v 1.9 2002/01/28 13:47:05 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -768,17 +768,22 @@ hClose_help handle_ =
   case haType handle_ of 
       ClosedHandle -> return handle_
       _ -> do
-	  let fd = fromIntegral (haFD handle_)
+	  let fd = haFD handle_
+	      c_fd = fromIntegral fd
+
 	  flushWriteBufferOnly handle_
 
-	  -- close the file descriptor, but not when this is the read side
-	  -- of a duplex handle.
+	  -- close the file descriptor, but not when this is the read
+	  -- side of a duplex handle, and not when this is one of the
+	  -- std file handles.
 	  case haOtherSide handle_ of
-	    Nothing -> throwErrnoIfMinus1Retry_ "hClose" 
+	    Nothing -> 
+		when (fd /= fd_stdin && fd /= fd_stdout && fd /= fd_stderr) $
+			throwErrnoIfMinus1Retry_ "hClose" 
 #ifdef mingw32_TARGET_OS
-	    					(closeFd (haIsStream handle_) fd)
+	    			(closeFd (haIsStream handle_) c_fd)
 #else
-	    					(c_close fd)
+	    			(c_close c_fd)
 #endif
 	    Just _  -> return ()
 
@@ -786,7 +791,7 @@ hClose_help handle_ =
 	  writeIORef (haBuffers handle_) BufferListNil
 
 	  -- unlock it
-	  unlockFile fd
+	  unlockFile c_fd
 
 	  -- we must set the fd to -1, because the finalizer is going
 	  -- to run eventually and try to close/unlock it.
