@@ -289,10 +289,12 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 	Nothing   -> []
 	Just unif -> [ (qtvs', substTy full_unif r1, substTy full_unif r2)
 		     | (r1,r2) <- rs1 `zip` rs2,
-		       not (maybeToBool (unifyExtendTysX qtvs' unif r1 r2))]
+		       not (maybeToBool (unifyExtendTysX qtvs unif r1 r2))]
 			-- Don't include any equations that already hold
 			-- taking account of the fact that any qtvs that aren't 
 			-- already instantiated can be instantiated to anything at all
+			-- NB: qtvs, not qtvs' because unifyExtendTysX only tries to
+			--     look template tyvars up in the substitution
 		  where
 		    full_unif = mkSubst emptyInScopeSet unif
 			-- No for-alls in sight; hmm
