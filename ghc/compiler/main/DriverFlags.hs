@@ -183,7 +183,7 @@ static_flags =
   ,  ( "S"		, PassFlag (setMode (StopBefore As)))
   ,  ( "-make"		, PassFlag (setMode DoMake))
   ,  ( "-interactive"	, PassFlag (setMode DoInteractive))
-  ,  ( "-mk-dll"	, NoArg (writeIORef v_GhcLink NoLink))
+  ,  ( "-mk-dll"	, NoArg (writeIORef v_GhcLink MkDLL))
   ,  ( "e"              , HasArg   (\s -> setMode (DoEval s) "-e"))
 
 	-- -fno-code says to stop after Hsc but don't generate any code.
