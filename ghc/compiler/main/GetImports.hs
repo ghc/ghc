@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: GetImports.hs,v 1.5 2001/04/20 10:42:46 sewardj Exp $
+-- $Id: GetImports.hs,v 1.6 2001/05/01 16:01:06 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -7,12 +7,25 @@
 --
 -----------------------------------------------------------------------------
 
-module GetImports ( getImports ) where
+module GetImports ( getImportsFromFile, getImports ) where
 
 import Module
+
+import IO
 import List
 import Char
 
+-- getImportsFromFile is careful to close the file afterwards, otherwise
+-- we can end up with a large number of open handles before the garbage
+-- collector gets around to closing them.
+getImportsFromFile :: String -> IO ([ModuleName], [ModuleName], ModuleName)
+getImportsFromFile filename
+  = do  hdl <- openFile filename ReadMode
+        modsrc <- hGetContents hdl
+        let (srcimps,imps,mod_name) = getImports modsrc
+	length srcimps `seq` length imps `seq` return ()
+	hClose hdl
+	return (srcimps,imps,mod_name)
 
 getImports :: String -> ([ModuleName], [ModuleName], ModuleName)
 getImports s

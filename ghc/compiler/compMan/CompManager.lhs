@@ -1015,14 +1015,13 @@ downsweep rootNm old_summaries
 summariseFile :: FilePath -> IO ModSummary
 summariseFile file
    = do hspp_fn <- preprocess file
-        modsrc <- readFile hspp_fn
+        (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
 
-        let (srcimps,imps,mod_name) = getImports modsrc
-	    (path, basename, ext) = splitFilename3 file
+        let (path, basename, ext) = splitFilename3 file
 
 	Just (mod, location)
 	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) file
-	   
+
         src_timestamp
            <- case ml_hs_file location of 
                  Nothing     -> noHsFileErr mod_name
@@ -1050,12 +1049,11 @@ summarise mod location old_summary
 	   _ -> do
 
         hspp_fn <- preprocess hs_fn
-        modsrc <- readFile hspp_fn
-        let (srcimps,imps,mod_name) = getImports modsrc
+        (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
 
 	when (mod_name /= moduleName mod) $
 		throwDyn (ProgramError 
-		   (showSDoc (text modsrc
+		   (showSDoc (text hs_fn
 			      <>  text ": file name does not match module name"
 			      <+> quotes (ppr (moduleName mod)))))
 

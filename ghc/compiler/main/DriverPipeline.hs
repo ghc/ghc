@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.64 2001/04/05 09:17:15 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.65 2001/05/01 16:01:06 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -482,8 +482,7 @@ run_phase Hsc basename suff input_fn output_fn
 				  else return False
 
 	 -- build a ModuleLocation to pass to hscMain.
-        modsrc <- readFile input_fn
-        let (srcimps,imps,mod_name) = getImports modsrc
+        (srcimps,imps,mod_name) <- getImportsFromFile input_fn
 
 	Just (mod, location)
 	   <- mkHomeModuleLocn mod_name basename (basename ++ '.':suff)
