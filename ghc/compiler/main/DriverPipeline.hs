@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.98 2001/08/15 09:32:40 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.99 2001/08/15 13:27:43 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -174,8 +174,10 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 
 	HscJava	| split	          -> not_valid
 		| otherwise       -> error "not implemented: compiling via Java"
+#ifdef ILX
 	HscILX  | split           -> not_valid
 		| otherwise       -> [ Unlit, Cpp, Hsc, Ilx2Il, Ilasm ]
+#endif
 
       | cish      = [ Cc, As ]
 
@@ -1023,7 +1025,9 @@ compile ghci_mode summary source_unchanged have_object
 	   HscC    | keep_hc   -> return (basename ++ '.':phaseInputExt HCc)
 		   | otherwise -> newTempName (phaseInputExt HCc)
            HscJava             -> newTempName "java" -- ToDo
+#ifdef ILX
 	   HscILX              -> return (phaseInputExt Ilx2Il) 	
+#endif
 	   HscInterpreted      -> return (error "no output file")
 
    let dyn_flags' = dyn_flags { hscOutName = output_fn,
