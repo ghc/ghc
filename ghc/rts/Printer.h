@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.h,v 1.4 1999/06/29 13:04:40 panne Exp $
+ * $Id: Printer.h,v 1.5 2000/01/14 14:56:40 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Prototypes for functions in Printer.c
  *
@@ -18,6 +18,9 @@ extern void        printStack      ( StgStackPtr sp, StgStackPtr spLim,
 				     StgUpdateFrame* su );
 extern void        printTSO        ( StgTSO *tso );
 
+void   	           info_hdr_type   ( StgClosure *closure, char *res );
+char  *	           info_type       ( StgClosure *closure );
+char  *	           info_type_by_ip ( StgInfoTable *ip );
 
 extern void DEBUG_LoadSymbols( char *name );
 

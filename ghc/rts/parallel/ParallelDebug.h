@@ -37,21 +37,10 @@ void GIT(StgPtr node);
 #if defined(GRAN) || defined(PAR)
 
 char  *display_info_type(StgClosure *closure, char *str);
-void   info_hdr_type(StgClosure *closure, char *res);
-char  *info_type(StgClosure *closure);
-char  *info_type_by_ip(StgInfoTable *ip);
 
 void   PrintPacket(rtsPackBuffer *buffer);
 void   PrintGraph(StgClosure *p, int indent_level);
 
 #endif /* GRAN || PAR */
-
-#if !defined(GRAN) && !defined(PAR)
-
-void   info_hdr_type(StgClosure *closure, char *res);
-char  *info_type(StgClosure *closure);
-char  *info_type_by_ip(StgInfoTable *ip);
-
-#endif
 
 #endif /* PARALLEL_DEBUG_H */

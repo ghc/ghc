@@ -32,6 +32,7 @@ Various debugging routines for GranSim and GUM
 #include "GranSimRts.h"
 #include "ParallelRts.h"
 #include "StgMiscClosures.h"
+#include "Printer.h"
 # if defined(DEBUG)
 # include "ParallelDebug.h"
 # endif
@@ -44,77 +45,6 @@ rtsBool  isFixed(globalAddr *ga);
 */
 //@node Constants and Variables, Closures, Prototypes, Debugging routines for GranSim and GUM
 //@subsection Constants and Variables
-
-/* Names as strings; needed by get_closure_info in ClosureMacros.h -- HWL */
-static char *closure_type_names[] = {
-  "INVALID_OBJECT",          /* 0 */
-  "CONSTR",                  /* 1 */
-  "CONSTR_1_0",		/* 2 */
-  "CONSTR_0_1",		/* 3 */
-  "CONSTR_2_0",		/* 4 */
-  "CONSTR_1_1",		/* 5 */
-  "CONSTR_0_2",		/* 6 */
-  "CONSTR_INTLIKE",	        /* 7  */
-  "CONSTR_CHARLIKE",	        /* 8  */
-  "CONSTR_STATIC",	        /* 9  */
-  "CONSTR_NOCAF_STATIC",     /* 10 */
-  "FUN",		        /* 11 */
-  "FUN_1_0",		  	/* 12 */
-  "FUN_0_1",		  	/* 13 */
-  "FUN_2_0",		  	/* 14 */
-  "FUN_1_1",		  	/* 15 */
-  "FUN_0_2",			/* 16 */
-  "FUN_STATIC",	        /* 17 */
-  "THUNK",		        /* 18 */
-  "THUNK_1_0",	  	/* 19 */
-  "THUNK_0_1",	  	/* 20 */
-  "THUNK_2_0",	  	/* 21 */
-  "THUNK_1_1",	  	/* 22 */
-  "THUNK_0_2",		/* 23 */
-  "THUNK_STATIC",	        /* 24 */
-  "THUNK_SELECTOR",	        /* 25 */
-  "BCO",		        /* 26 */
-  "AP_UPD",		        /* 27 */
-  "PAP",			/* 28 */
-  "IND",		        /* 29 */
-  "IND_OLDGEN",	        /* 30 */
-  "IND_PERM",	        /* 31 */
-  "IND_OLDGEN_PERM",	        /* 32 */
-  "IND_STATIC",	        /* 33 */
-  "CAF_UNENTERED",           /* 34 */
-  "CAF_ENTERED",		/* 35 */
-  "CAF_BLACKHOLE",		/* 36 */
-  "RET_BCO",                 /* 37 */
-  "RET_SMALL",	        /* 38 */
-  "RET_VEC_SMALL",	        /* 39 */
-  "RET_BIG",		        /* 40 */
-  "RET_VEC_BIG",	        /* 41 */
-  "RET_DYN",		        /* 42 */
-  "UPDATE_FRAME",	        /* 43 */
-  "CATCH_FRAME",	        /* 44 */
-  "STOP_FRAME",	        /* 45 */
-  "SEQ_FRAME",	        /* 46 */
-  "BLACKHOLE",	        /* 47 */
-  "BLACKHOLE_BQ",	        /* 48 */
-  "SE_BLACKHOLE",		/* 49 */
-  "SE_CAF_BLACKHOLE",	/* 50 */
-  "MVAR",		        /* 51 */
-  "ARR_WORDS",	        /* 52 */
-  "MUT_ARR_PTRS",	        /* 53 */
-  "MUT_ARR_PTRS_FROZEN",     /* 54 */
-  "MUT_VAR",		        /* 55 */
-  "WEAK",		        /* 56 */
-  "FOREIGN",		        /* 57 */
-  "STABLE_NAME",	        /* 58 */
-  "TSO",		        /* 59 */
-  "BLOCKED_FETCH",	        /* 60 */
-  "FETCH_ME",                /* 61 */
-  "EVACUATED",               /* 62 */
-  "N_CLOSURE_TYPES",         /* 63 */
-  "FETCH_ME_BQ",             /* 64 */
-  "RBH"                     /* 65 */
-};
-
 
 #if defined(GRAN) && defined(GRAN_CHECK)
 //@node Closures, Threads, Constants and Variables, Debugging routines for GranSim and GUM
@@ -810,21 +740,6 @@ char *str;
   return(str);
 }
 
-char *
-info_type(StgClosure *closure){ 
-  return closure_type_names[get_itbl(closure)->type];
-}
-
-char *
-info_type_by_ip(StgInfoTable *ip){ 
-  return closure_type_names[ip->type];
-}
-
-void
-info_hdr_type(StgClosure *closure, char *res){ 
-  strcpy(res,closure_type_names[get_itbl(closure)->type]);
-}
-
 /*
   PrintPacket is in Pack.c because it makes use of closure queues
 */
@@ -1385,27 +1300,6 @@ PrintGraph(StgClosure *p, int indent_level)
 
 #endif /* GRAN */
 
-#endif /* GRAN || PAR */
-
-#if !defined(GRAN) && !defined(PAR)
-// just dummy defs in this setup
-#include "Rts.h"
-#include "ParallelDebug.h"
-
-char *
-info_type(StgClosure *closure){ 
-  return "petaQ";
-}
-
-char *
-info_type_by_ip(StgInfoTable *ip){ 
-  return "petaQ";
-}
-
-void
-info_hdr_type(StgClosure *closure, char *res){ 
-  strcpy(res,"petaQ");
-}
 #endif /* GRAN || PAR */
 
 //@node End of File,  , Printing Packet Contents, Debugging routines for GranSim and GUM
