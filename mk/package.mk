@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.20 2002/12/12 13:28:35 simonmar Exp $
+# $Id: package.mk,v 1.21 2003/01/14 13:17:43 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -161,6 +161,8 @@ HTML_DOC = $(HTML_DIR)/index.html
 
 ifneq "$(HS_PPS)" ""
 
+CLEAN_FILES += $(HS_PPS) $(addsuffix .tmp, $(basename $(HS_PPS)))
+
 ifeq "$(HADDOCK)" ""
 html ::
 	@echo Haddock must be installed in order to build HTML library documentation.
@@ -169,6 +171,9 @@ html ::
 endif
 
 html :: $(HTML_DOC)
+
+extraclean :: 
+	$(RM) -rf $(HTML_DIR)
 
 $(HTML_DOC) : $(HS_PPS)
 	@$(INSTALL_DIR) $(HTML_DIR)
