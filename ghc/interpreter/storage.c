@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.77 $
- * $Date: 2000/05/12 13:34:07 $
+ * $Revision: 1.78 $
+ * $Date: 2000/06/23 13:13:10 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -500,7 +500,7 @@ static Bool debugStorageExtra = FALSE;
          assert(n < TAB_BASE_ADDR+tab_size);                            \
          assert(tab_name[n-TAB_BASE_ADDR].inUse);                       \
          tab_name[n-TAB_BASE_ADDR].inUse = FALSE;                       \
-         if (1 || (!debugStorageExtra)) {                               \
+         if (!debugStorageExtra) {                                      \
             tab_name[n-TAB_BASE_ADDR].nextFree = free_list;             \
             free_list = n;                                              \
          }                                                              \
@@ -1921,15 +1921,18 @@ OSectionKind lookupSection ( void* ad )
    ObjectCode*  oc;
    OSectionKind sect;
 
+   /* speedup hack */
+   if (!combined) return HUGS_SECTIONKIND_OTHER;
+
    for (m = MODULE_BASE_ADDR; 
         m < MODULE_BASE_ADDR+tabModuleSz; m++) {
       if (tabModule[m-MODULE_BASE_ADDR].inUse) {
-         if (module(m).object) {
-            sect = ocLookupSection ( module(m).object, ad );
+         if (tabModule[m-MODULE_BASE_ADDR].object) {
+            sect = ocLookupSection ( tabModule[m-MODULE_BASE_ADDR].object, ad );
             if (sect != HUGS_SECTIONKIND_NOINFOAVAIL)
                return sect;
          }
-         for (oc = module(m).objectExtras; oc; oc=oc->next) {
+         for (oc = tabModule[m-MODULE_BASE_ADDR].objectExtras; oc; oc=oc->next) {
             sect = ocLookupSection ( oc, ad );
             if (sect != HUGS_SECTIONKIND_NOINFOAVAIL)
                return sect;
@@ -1951,7 +1954,7 @@ void markHugsObjects( void )
     for ( nm = NAME_BASE_ADDR; 
           nm < NAME_BASE_ADDR+tabNameSz; ++nm ) {
        if (tabName[nm-NAME_BASE_ADDR].inUse) {
-           Cell cl = name(nm).closure;
+           Cell cl = tabName[nm-NAME_BASE_ADDR].closure;
            if (nonNull(cl)) {
               assert(isCPtr(cl));
               snd(cl) = (Cell)MarkRoot ( (StgClosure*)(snd(cl)) );
@@ -1962,14 +1965,13 @@ void markHugsObjects( void )
     for ( tc = TYCON_BASE_ADDR; 
           tc < TYCON_BASE_ADDR+tabTyconSz; ++tc ) {
        if (tabTycon[tc-TYCON_BASE_ADDR].inUse) {
-           Cell cl = tycon(tc).closure;
+           Cell cl = tabTycon[tc-TYCON_BASE_ADDR].closure;
            if (nonNull(cl)) {
               assert(isCPtr(cl));
               snd(cl) = (Cell)MarkRoot ( (StgClosure*)(snd(cl)) );
 	   }
        }
     }
-
 }
 
 
