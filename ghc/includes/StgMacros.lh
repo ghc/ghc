@@ -232,7 +232,7 @@ I_ StackOverflow PROTO((W_, W_));
 do {								\
   DO_ASTK_HWM(); /* ticky-ticky profiling */			\
   DO_BSTK_HWM();						\
-  if (STKS_OVERFLOW_OP((a_headroom) + 1, (b_headroom) + 1)) {	\
+  if (STKS_OVERFLOW_OP(((a_headroom) + 1), ((b_headroom) + 1))) {	\
     STACK_OVERFLOW(liveness_mask,a_headroom,b_headroom,spa,spb,ret_type,reenter);\
   }								\
 }while(0)
