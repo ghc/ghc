@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.12 2001/11/08 12:41:07 simonmar Exp $
+ * $Id: BlockAlloc.c,v 1.13 2001/11/08 14:42:11 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -196,14 +196,15 @@ static inline bdescr *
 coalesce(bdescr *p)
 {
   bdescr *bd, *q;
-  nat i;
+  nat i, blocks;
 
   q = p->link;
   if (q != NULL && p->start + p->blocks * BLOCK_SIZE_W == q->start) {
     /* can coalesce */
     p->blocks += q->blocks;
     p->link    = q->link;
-    for (i = 0, bd = q; i < q->blocks; bd++, i++) {
+    blocks = q->blocks;
+    for (i = 0, bd = q; i < blocks; bd++, i++) {
 	bd->free = 0;
 	bd->blocks = 0;
 	bd->link = p;
@@ -303,6 +304,18 @@ initMBlock(void *mblock)
    -------------------------------------------------------------------------- */
 
 #ifdef DEBUG
+static void
+checkWellFormedGroup( bdescr *bd )
+{
+    nat i;
+
+    for (i = 1; i < bd->blocks; i++) {
+	ASSERT(bd[i].blocks == 0);
+	ASSERT(bd[i].free   == 0);
+	ASSERT(bd[i].link   == bd);
+    }
+}
+
 void
 checkFreeListSanity(void)
 {
@@ -313,6 +326,7 @@ checkFreeListSanity(void)
 	     fprintf(stderr,"group at 0x%x, length %d blocks\n", 
 		     (nat)bd->start, bd->blocks));
     ASSERT(bd->blocks > 0);
+    checkWellFormedGroup(bd);
     if (bd->link != NULL) {
       /* make sure we're fully coalesced */
       ASSERT(bd->start + bd->blocks * BLOCK_SIZE_W != bd->link->start);
