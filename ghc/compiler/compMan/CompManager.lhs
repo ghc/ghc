@@ -45,6 +45,9 @@ import Panic		( panic )
 
 import Exception	( throwDyn )
 import IO
+import Time             ( ClockTime )
+import Directory        ( getModificationTime )
+
 \end{code}
 
 
@@ -140,6 +143,12 @@ cmLoadModule cmstate1 rootname
         let pcii      = pci   pcms1 -- this never changes
         let ghci_mode = gmode pcms1 -- ToDo: fix!
 
+        -- During upsweep, look at new summaries to see if source has
+        -- changed.  Here's a function to pass down; it takes a new
+        -- summary.
+        let source_changed :: ModSummary -> Bool
+            source_changed = summary_indicates_source_changed mg1
+
         -- Do the downsweep to reestablish the module graph
         -- then generate version 2's by removing from HIT,HST,UI any
         -- modules in the old MG which are not in the new one.
@@ -177,7 +186,7 @@ cmLoadModule cmstate1 rootname
         let threaded2 = CmThreaded pcs1 hst2 hit2
 
         (upsweep_complete_success, threaded3, modsDone, newLis)
-           <- upsweep_mods ui2 threaded2 mg2
+           <- upsweep_mods ghci_mode ui2 source_changed threaded2 mg2
 
         let ui3 = add_to_ui ui2 newLis
         let (CmThreaded pcs3 hst3 hit3) = threaded3
@@ -245,6 +254,35 @@ cmLoadModule cmstate1 rootname
                                      else Just (last mods_to_keep_names))
 
 
+-- Given a bunch of old summaries and a new summary, try and
+-- find the corresponding old summary, and, if found, compare
+-- its source timestamp with that of the new summary.  If in
+-- doubt say True.
+summary_indicates_source_changed :: [ModSummary] -> ModSummary -> Bool
+summary_indicates_source_changed old_summaries new_summary
+   = case [old | old <- old_summaries, 
+                 name_of_summary old == name_of_summary new_summary] of
+
+        (_:_:_) -> panic "summary_indicates_newer_source"
+                   
+        []      -> -- can't find a corresponding old summary, so
+                   -- compare source and iface dates in the new summary.
+                   trace (showSDoc (text "SISC: no old summary, new =" 
+                                    <+> pprSummaryTimes new_summary)) (
+                   case (ms_hs_date new_summary, ms_hi_date new_summary) of
+                      (Just hs_t, Just hi_t) -> hs_t > hi_t
+                      other                  -> True
+                   )
+
+        [old]   -> -- found old summary; compare source timestamps
+                   trace (showSDoc (text "SISC: old =" 
+                                    <+> pprSummaryTimes old
+                                    <+> pprSummaryTimes new_summary)) (
+                   case (ms_hs_date old, ms_hs_date new_summary) of
+                      (Just old_t, Just new_t) -> new_t > old_t
+                      other                    -> True
+                   )
+
 -- Return (names of) all those in modsDone who are part of a cycle
 -- as defined by theGraph.
 findPartiallyCompletedCycles :: [ModuleName] -> [SCC ModSummary] -> [ModuleName]
@@ -266,6 +304,7 @@ findPartiallyCompletedCycles modsDone theGraph
              else chewed_rest
 
 
+-- Does this ModDetails export Main.main?
 exports_main :: ModDetails -> Bool
 exports_main md
    = maybeToBool (lookupNameEnv (md_types md) mainName)
@@ -294,7 +333,9 @@ data CmThreaded  -- stuff threaded through individual module compilations
 
 -- Compile multiple modules, stopping as soon as an error appears.
 -- There better had not be any cyclic groups here -- we check for them.
-upsweep_mods :: UnlinkedImage         -- old linkables
+upsweep_mods :: GhciMode
+             -> UnlinkedImage         -- old linkables
+             -> (ModSummary -> Bool)  -- has source changed?
              -> CmThreaded            -- PCS & HST & HIT
              -> [SCC ModSummary]      -- mods to do (the worklist)
                                       -- ...... RETURNING ......
@@ -303,21 +344,22 @@ upsweep_mods :: UnlinkedImage         -- old linkables
                     [ModSummary],     -- mods which succeeded
                     [Linkable])       -- new linkables
 
-upsweep_mods oldUI threaded []
+upsweep_mods ghci_mode oldUI source_changed threaded []
    = return (True, threaded, [], [])
 
-upsweep_mods oldUI threaded ((CyclicSCC ms):_)
+upsweep_mods ghci_mode oldUI source_changed threaded ((CyclicSCC ms):_)
    = do hPutStrLn stderr ("ghc: module imports form a cycle for modules:\n\t" ++
                           unwords (map (moduleNameUserString.name_of_summary) ms))
         return (False, threaded, [], [])
 
-upsweep_mods oldUI threaded ((AcyclicSCC mod):mods)
-   = do (threaded1, maybe_linkable) <- upsweep_mod oldUI threaded mod
+upsweep_mods ghci_mode oldUI source_changed threaded ((AcyclicSCC mod):mods)
+   = do (threaded1, maybe_linkable) 
+           <- upsweep_mod ghci_mode oldUI threaded mod (source_changed mod)
         case maybe_linkable of
            Just linkable 
               -> -- No errors; do the rest
                  do (restOK, threaded2, modOKs, linkables) 
-                       <- upsweep_mods oldUI threaded1 mods
+                       <- upsweep_mods ghci_mode oldUI source_changed threaded1 mods
                     return (restOK, threaded2, mod:modOKs, linkable:linkables)
            Nothing -- we got a compilation error; give up now
               -> return (False, threaded1, [], [])
@@ -325,16 +367,19 @@ upsweep_mods oldUI threaded ((AcyclicSCC mod):mods)
 
 -- Compile a single module.  Always produce a Linkable for it if 
 -- successful.  If no compilation happened, return the old Linkable.
-upsweep_mod :: UnlinkedImage 
+upsweep_mod :: GhciMode 
+            -> UnlinkedImage
             -> CmThreaded
             -> ModSummary
+            -> Bool
             -> IO (CmThreaded, Maybe Linkable)
 
-upsweep_mod oldUI threaded1 summary1
+upsweep_mod ghci_mode oldUI threaded1 summary1 source_might_have_changed
    = do let mod_name = name_of_summary summary1
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 (name_of_summary summary1)
-        compresult <- compile summary1 old_iface hst1 hit1 pcs1
+        compresult <- compile ghci_mode summary1 (not source_might_have_changed) 
+                              old_iface hst1 hit1 pcs1
 
         case compresult of
 
@@ -363,6 +408,7 @@ upsweep_mod oldUI threaded1 summary1
                  in  return (threaded2, Nothing)
 
 
+-- Remove unwanted modules from the top level envs (HST, HIT, UI).
 removeFromTopLevelEnvs :: [ModuleName]
                        -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
                        -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
@@ -434,6 +480,7 @@ downsweep rootNm
                  else loop (newHomeSummaries ++ homeSummaries)
 
 
+-- Summarise a module, and pick and source and interface timestamps.
 summarise :: Module -> ModuleLocation -> IO ModSummary
 summarise mod location
    | isModuleInThisPackage mod
@@ -442,14 +489,26 @@ summarise mod location
         modsrc <- readFile hspp_fn
         let (srcimps,imps) = getImports modsrc
 
---        maybe_timestamp
---           <- case ml_hs_file location of 
---                 Nothing     -> return Nothing
---                 Just src_fn -> getModificationTime src_fn >>= Just
+        maybe_src_timestamp
+           <- case ml_hs_file location of 
+                 Nothing     -> return Nothing
+                 Just src_fn -> maybe_getModificationTime src_fn
+        maybe_iface_timestamp
+           <- case ml_hi_file location of 
+                 Nothing     -> return Nothing
+                 Just if_fn  -> maybe_getModificationTime if_fn
 
         return (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
                                srcimps imps
-                                {-maybe_timestamp-} )
+                               maybe_src_timestamp maybe_iface_timestamp)
    | otherwise
-   = return (ModSummary mod location [] [])
+   = return (ModSummary mod location [] [] Nothing Nothing)
+
+   where
+      maybe_getModificationTime :: FilePath -> IO (Maybe ClockTime)
+      maybe_getModificationTime fn
+         = (do time <- getModificationTime fn
+               return (Just time)) 
+           `catch`
+           (\err -> return Nothing)
 \end{code}

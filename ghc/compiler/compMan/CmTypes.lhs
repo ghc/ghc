@@ -7,7 +7,7 @@
 module CmTypes ( 
    Unlinked(..),  isObject, nameOfObject, isInterpretable,
    Linkable(..),
-   ModSummary(..), name_of_summary
+   ModSummary(..), name_of_summary, pprSummaryTimes
   ) where
 
 import Interpreter
@@ -15,6 +15,9 @@ import HscTypes
 import Module
 import CmStaticInfo
 import Outputable
+
+import Time		( ClockTime )
+
 
 data Unlinked
    = DotO FilePath
@@ -58,22 +61,29 @@ instance Outputable Linkable where
 data ModSummary
    = ModSummary {
         ms_mod      :: Module,               -- name, package
-	ms_location :: ModuleLocation,	     -- location
+        ms_location :: ModuleLocation,       -- location
         ms_srcimps  :: [ModuleName],         -- source imports
-        ms_imps     :: [ModuleName]          -- non-source imports
-        --ms_date     :: Maybe ClockTime       -- timestamp of summarised
-					     -- file, if home && source
+        ms_imps     :: [ModuleName],         -- non-source imports
+        ms_hs_date  :: Maybe ClockTime,      -- timestamp of summarised
+                                             -- file, if home && source
+        ms_hi_date  :: Maybe ClockTime       -- timestamp of old iface,
+                                             -- if home && source
      }
 
 instance Outputable ModSummary where
    ppr ms
-      = sep [--text "ModSummary { ms_date = " <> text (show ms_date),
-             text "ModSummary {",
-             nest 3 (sep [text "ms_mod =" <+> ppr (ms_mod ms) <> comma,
+      = sep [text "ModSummary {",
+             nest 3 (sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
+                          text "ms_hi_date = " <> text (show (ms_hi_date ms)),
+                          text "ms_mod =" <+> ppr (ms_mod ms) <> comma,
                           text "ms_imps =" <+> ppr (ms_imps ms),
                           text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
              char '}'
             ]
+
+pprSummaryTimes ms
+   = sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
+          text "ms_hi_date = " <> text (show (ms_hi_date ms))]
 
 name_of_summary :: ModSummary -> ModuleName
 name_of_summary = moduleName . ms_mod

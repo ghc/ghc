@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.2 2000/11/13 14:34:37 sewardj Exp $
+-- $Id: DriverPhases.hs,v 1.3 2000/11/16 16:23:04 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -47,7 +47,7 @@ data Phase
 	| SplitAs
 	| As
 	| Ln 
-  deriving (Eq)
+  deriving (Eq, Show)
 
 -- the first compilation phase for a given file is determined
 -- by its suffix.

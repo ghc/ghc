@@ -149,6 +149,7 @@ filterModuleLinkables p (li:lis)
 
 #ifndef GHCI
 linkObjs = panic "CmLink.linkObjs: no interpreter"
+unload = panic "CmLink.unload: no interpreter"
 #else
 linkObjs [] pls = linkFinish pls [] []
 linkObjs (l@(LM _ uls) : ls) pls

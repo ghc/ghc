@@ -12,7 +12,8 @@ where
 \end{code}
 
 \begin{code}
-data GhciMode = Batch | Interactive
+data GhciMode = Batch | Interactive | OneShot 
+     deriving Eq
 
 type PackageConfigInfo = [Package]
 

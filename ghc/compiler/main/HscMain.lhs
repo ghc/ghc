@@ -46,6 +46,7 @@ import UniqSupply	( mkSplitUniqSupply )
 import Bag		( emptyBag )
 import Outputable
 import Interpreter	( UnlinkedIBind, ItblEnv, stgToInterpSyn )
+import CmStaticInfo	( GhciMode(..) )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  PersistentRenamerState(..), ModuleLocation(..),
@@ -82,7 +83,8 @@ data HscResult
 	-- (parse/rename/typecheck) print messages themselves
 
 hscMain
-  :: DynFlags
+  :: GhciMode
+  -> DynFlags
   -> Bool			-- source unchanged?
   -> ModuleLocation		-- location info
   -> Maybe ModIface		-- old interface, if available
@@ -91,7 +93,7 @@ hscMain
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> IO HscResult
 
-hscMain dflags source_unchanged location maybe_old_iface hst hit pcs
+hscMain ghci_mode dflags source_unchanged location maybe_old_iface hst hit pcs
  = do {
       putStrLn ("CHECKING OLD IFACE for hs = " ++ show (ml_hs_file location)
                 ++ ", hspp = " ++ show (ml_hspp_file location));
@@ -108,18 +110,24 @@ hscMain dflags source_unchanged location maybe_old_iface hst hit pcs
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
       ;
-      what_next dflags location maybe_checked_iface
+      what_next ghci_mode dflags location maybe_checked_iface
                 hst hit pcs_ch
       }}
 
 
-hscNoRecomp dflags location maybe_checked_iface hst hit pcs_ch
+-- we definitely expect to have the old interface available
+hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
+ | ghci_mode == OneShot
+ = return (HscOK
+           (panic "hscNoRecomp:OneShot") -- no details
+           Nothing -- makes run_phase Hsc stop
+           Nothing Nothing -- foreign export stuff
+           Nothing -- ibinds
+           pcs_ch)
+ | otherwise
  = do {
       hPutStrLn stderr "COMPILATION NOT REQUIRED";
-      -- we definitely expect to have the old interface available
-      let old_iface = case maybe_checked_iface of 
-                         Just old_if -> old_if
-                         Nothing -> panic "hscNoRecomp:old_iface"
+      let this_mod = mi_module old_iface
       ;
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
@@ -150,7 +158,7 @@ hscNoRecomp dflags location maybe_checked_iface hst hit pcs_ch
       }}}}
 
 
-hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
+hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  = do	{
       	; hPutStrLn stderr "COMPILATION IS REQUIRED";
 
@@ -173,7 +181,7 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
       	     <- renameModule dflags hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
       	     Nothing -> return (HscFail pcs_rn);
-      	     Just (print_unqualified, is_exported, new_iface, rn_hs_decls) -> do {
+      	     Just (print_unqualified, (is_exported, new_iface, rn_hs_decls)) -> do {
     
  	    -------------------
  	    -- TYPECHECK

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.27 2000/11/16 15:57:05 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.28 2000/11/16 16:23:04 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -22,6 +22,7 @@ module DriverPipeline (
 
 #include "HsVersions.h"
 
+import CmStaticInfo ( GhciMode(..) )
 import CmTypes
 import GetImports
 import DriverState
@@ -114,7 +115,7 @@ getGhcMode flags
 data IntermediateFileType
   = Temporary
   | Persistent
-  deriving (Eq)
+  deriving (Eq, Show)
 
 genPipeline
    :: GhcMode		-- when to stop
@@ -452,7 +453,8 @@ run_phase Hsc basename suff input_fn output_fn
 
   -- run the compiler!
         pcs <- initPersistentCompilerState
-	result <- hscMain dyn_flags{ hscOutName = output_fn }
+	result <- hscMain OneShot
+                          dyn_flags{ hscOutName = output_fn }
 			  source_unchanged
 			  location
 			  Nothing	 -- no iface
@@ -609,7 +611,7 @@ run_phase SplitMangle _basename _suff input_fn _output_fn
 -- As phase
 
 run_phase As _basename _suff input_fn output_fn
-  = do 	as <- readIORef v_Pgm_a
+  = do	as <- readIORef v_Pgm_a
         as_opts <- getOpts opt_a
 
         cmdline_include_paths <- readIORef v_Include_paths
@@ -740,7 +742,11 @@ preprocess filename =
 -- the .hs file if necessary, and compiling up the .stub_c files to
 -- generate Linkables.
 
-compile :: ModSummary              -- summary, including source
+-- NB.  No old interface can also mean that the source has changed.
+
+compile :: GhciMode                -- distinguish batch from interactive
+        -> ModSummary              -- summary, including source
+	-> Bool			   -- source unchanged?
         -> Maybe ModIface          -- old interface, if available
         -> HomeSymbolTable         -- for home module ModDetails
 	-> HomeIfaceTable	   -- for home module Ifaces
@@ -757,7 +763,7 @@ data CompResult
    | CompErrs PersistentCompilerState	-- updated PCS
 
 
-compile summary old_iface hst hit pcs = do 
+compile ghci_mode summary source_unchanged old_iface hst hit pcs = do 
    verb <- readIORef v_Verbose
    when verb (hPutStrLn stderr 
                  (showSDoc (text "compile: compiling" 
@@ -784,8 +790,8 @@ compile summary old_iface hst hit pcs = do
 		    HscInterpreted -> return (error "no output file")
 
    -- run the compiler
-   hsc_result <- hscMain dyn_flags{ hscOutName = output_fn } 
-			 False -- (panic "compile:source_unchanged")
+   hsc_result <- hscMain ghci_mode dyn_flags{ hscOutName = output_fn } 
+			 source_unchanged
                          location old_iface hst hit pcs
 
    case hsc_result of {
@@ -818,7 +824,11 @@ compile summary old_iface hst hit pcs = do
 		-- we're in batch mode: finish the compilation pipeline.
 		_other -> do pipe <- genPipeline (StopBefore Ln) "" True 
 					hsc_lang output_fn
-			     o_file <- runPipeline pipe output_fn False False
+                             -- runPipeline takes input_fn so it can split off 
+                             -- the base name and use it as the base of 
+                             -- the output object file.
+                             let (basename, suffix) = splitFilename input_fn
+			     o_file <- pipeLoop pipe output_fn False False basename suffix
 			     return [ DotO o_file ]
 
 	   let linkable = LM (moduleName (ms_mod summary)) 
