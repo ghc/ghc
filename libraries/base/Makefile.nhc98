@@ -45,8 +45,6 @@ SRCS	= \
 include ../Makefile.common
 
 # some extra rules
-NHC/SizedTypes.hs: NHC/SizedTypes.hs.cpp
-	$(CC) -E $< >$@
 
 # Here are the dependencies.
 $(OBJDIR)/Data/FiniteMap.$O: $(OBJDIR)/Data/Maybe.$O
