@@ -1,13 +1,37 @@
 {-# OPTIONS -fglasgow-exts #-}
-
 -----------------------------------------------------------------------------
+--
+-- (c) The University of Glasgow 2004.
+--
 -- Package management tool
+--
 -----------------------------------------------------------------------------
 
-module Main where
+-- TODO:
+--	- validate modules
+--	- expose/hide
+--	- expanding of variables in new-style package conf
+--	- version manipulation (checking whether old version exists,
+--	  hiding old version?)
 
-import Package
-import Version	 ( version )
+module Main (main) where
+
+import Version	( version, targetOS, targetARCH )
+import Distribution.InstalledPackageInfo
+import Distribution.Compat.ReadP
+import Distribution.Package
+import Distribution.License
+import Distribution.Version
+import Compat.Directory 	( getAppUserDataDirectory )
+import Control.Exception	( catch, throw, evaluate )
+
+import Prelude hiding ( catch )
+
+import Package -- the old package config type
+
+#if __GLASGOW_HASKELL__ < 603
+#include "config.h"
+#endif
 
 #if __GLASGOW_HASKELL__ >= 504
 import System.Console.GetOpt
@@ -19,13 +43,14 @@ import Pretty
 import qualified Exception
 #endif
 
+import Data.Char	( isSpace )
 import Monad
 import Directory
 import System	( getEnv, getArgs, getProgName,
 		  system, exitWith,
 		  ExitCode(..)
 		)
-import IO
+import IO hiding ( catch )
 import List ( isPrefixOf, isSuffixOf )
 
 import ParsePkgConfLite
@@ -42,206 +67,428 @@ import CString
 #endif
 #endif
 
+-- -----------------------------------------------------------------------------
+-- Entry point
+
 main :: IO ()
 main = do
   args <- getArgs
 
   case getOpt Permute flags args of
-	(cli,_,[]) | DumpHelp `elem` cli -> do
+	(cli,_,[]) | FlagHelp `elem` cli -> do
 	   prog <- getProgramName
 	   bye (usageInfo (usageHeader prog) flags)
-	(cli,_,[]) | DumpVersion `elem` cli ->
-	   bye copyright
-	(cli@(_:_),[],[]) ->
-	   runit cli
-	(_,_,errors) -> do
+	(cli,_,[]) | FlagVersion `elem` cli ->
+	   bye ourCopyright
+	(cli@(_:_),nonopts,[]) ->
+	   runit cli nonopts
+	(_,_,errors) -> tryOldCmdLine errors args
+
+-- If the new command-line syntax fails, then we try the old.  If that
+-- fails too, then we output the original errors and the new syntax
+-- (so the old syntax is still available, but hidden).
+tryOldCmdLine :: [String] -> [String] -> IO ()
+tryOldCmdLine errors args = do
+  case getOpt Permute oldFlags args of
+	(cli@(_:_),[],[]) -> 
+	   oldRunit cli
+	_failed -> do
 	   prog <- getProgramName
 	   die (concat errors ++ usageInfo (usageHeader prog) flags)
 
-data Flag 
-  = Config FilePath
-  | Input FilePath
-  | List
-  | ListLocal
-  | Add Bool {- True => replace existing info -}
-  | Remove String | Show String 
-  | Field String | AutoGHCiLibs | Force
-  | DefinedName String String
-  | DumpHelp
-  | DumpVersion
-  deriving (Eq)
+-- -----------------------------------------------------------------------------
+-- Command-line syntax
 
-isAction :: Flag -> Bool
-isAction (Config _)     = False
-isAction (Field _)      = False
-isAction (Input _)      = False
-isAction (AutoGHCiLibs) = False
-isAction (Force)	= False
-isAction DefinedName{}  = False
-isAction _              = True
-
-copyright :: String
-copyright = "GHC package manager version " ++ version ++ "\n"
-
-usageHeader :: String -> String
-usageHeader prog = "Usage: " ++ prog ++ " [OPTION...]\n"
+data Flag
+  = FlagUser
+  | FlagGlobal
+  | FlagHelp
+  | FlagVersion
+  | FlagConfig	FilePath
+  | FlagGlobalConfig FilePath
+  | FlagForce
+  deriving Eq
 
 flags :: [OptDescr Flag]
 flags = [
-  Option ['f'] ["config-file"] (ReqArg Config "FILE")
-	"use the specified package config file",
-  Option ['l'] ["list-packages"] (NoArg List)
- 	"list packages in all config files",
-  Option ['L'] ["list-local-packages"] (NoArg ListLocal)
- 	"list packages in the specified config file",
-  Option ['a'] ["add-package"] (NoArg (Add False))
- 	"add a new package",
-  Option ['u'] ["update-package"] (NoArg (Add True))
- 	"update package with new configuration",
-  Option ['i'] ["input-file"] (ReqArg Input "FILE")
-	"read new package info from specified file",
-  Option ['s'] ["show-package"] (ReqArg Show "NAME")
- 	"show the configuration for package NAME",
-  Option [] ["field"] (ReqArg Field "FIELD")
- 	"(with --show-package) Show field FIELD only",
-  Option [] ["force"] (NoArg Force)
- 	"ignore missing directories/libraries",
-  Option ['r'] ["remove-package"] (ReqArg Remove "NAME")
- 	"remove an installed package",
-  Option ['g'] ["auto-ghci-libs"] (NoArg AutoGHCiLibs)
-	"automatically build libs for GHCi (with -a)",
-  Option ['D'] ["define-name"] (ReqArg toDefined "NAME=VALUE")
-  	"define NAME as VALUE",
-   Option ['?'] ["help"] (NoArg DumpHelp)
+  Option [] ["user"] (NoArg FlagUser)
+	"use the current user's package database",
+  Option [] ["global"] (NoArg FlagGlobal)
+	"(default) use the global package database",
+  Option ['f'] ["package-conf"] (ReqArg FlagConfig "FILE")
+	"act upon specified package config file (only)",
+  Option [] ["global-conf"] (ReqArg FlagGlobalConfig "FILE")
+	"location of the global package config",
+  Option [] ["force"] (NoArg FlagForce)
+ 	"ignore missing dependencies, directories, and libraries",
+  Option ['?'] ["help"] (NoArg FlagHelp)
 	"display this help and exit",
-   Option ['V'] ["version"] (NoArg DumpVersion)
+   Option ['V'] ["version"] (NoArg FlagVersion)
 	"output version information and exit"
   ]
- where
-  toDefined str = 
-    case break (=='=') str of
-      (nm,[]) -> DefinedName nm []
-      (nm,_:val) -> DefinedName nm val
 
-runit :: [Flag] -> IO ()
-runit clis = do
-  let err_msg = "missing -f option, location of package.conf unknown\n"
-  conf_filenames <- 
-     case [ f | Config f <- clis ] of
-        fs@(_:_) -> return (reverse fs) -- NOTE reverse
+ourCopyright :: String
+ourCopyright = "GHC package manager version " ++ version ++ "\n"
+
+usageHeader :: String -> String
+usageHeader prog = substProg prog $
+  "Usage:\n" ++
+  "  $p {--help | -?}\n" ++
+  "    Produce this usage message.\n" ++
+  "\n" ++
+  "  $p register {filename | -} [--user | --global]\n" ++
+  "    Register the package using the specified installed package\n" ++
+  "    description. The syntax for the latter is given in the $p\n" ++
+  "    documentation.\n" ++
+  "\n" ++
+  "  $p unregister {pkg-id}\n" ++
+  "    Unregister the specified package.\n" ++
+  "\n" ++
+  "  $p expose {pkg-id}\n" ++
+  "    Expose the specified package.\n" ++
+  "\n" ++
+  "  $p hide {pkg-id}\n" ++
+  "    Hide the specified package.\n" ++
+  "\n" ++
+  "  $p list [--global | --user]\n" ++
+  "    List all registered packages, both global and user (unless either\n" ++
+  "    --global or --user is specified), and both hidden and exposed.\n" ++
+  "\n" ++
+  "  $p describe {pkg-id}\n" ++
+  "    Give the registered description for the specified package. The\n" ++
+  "    description is returned in precisely the syntax required by $p\n" ++
+  "    register.\n" ++
+  "\n" ++
+  "  $p field {pkg-id} {field}\n" ++
+  "    Extract the specified field of the package description for the\n" ++
+  "    specified package.\n"
+
+substProg :: String -> String -> String
+substProg _ [] = []
+substProg prog ('$':'p':xs) = prog ++ substProg prog xs
+substProg prog (c:xs) = c : substProg prog xs
+
+-- -----------------------------------------------------------------------------
+-- Do the business
+
+runit :: [Flag] -> [String] -> IO ()
+runit cli nonopts = do
+  prog <- getProgramName
+  dbs <- getPkgDatabases cli
+  db_stack <- mapM readParseDatabase dbs
+  let
+	force = FlagForce `elem` cli
+  --
+  -- first, parse the command
+  case nonopts of
+    ["register", filename] -> 
+	registerPackage filename [] db_stack False False force
+    ["update", filename] -> 
+	registerPackage filename [] db_stack False True force
+    ["unregister", pkgid_str] -> do
+	pkgid <- readPkgId pkgid_str
+	unregisterPackage db_stack pkgid
+    ["expose", pkgid_str] -> do
+	pkgid <- readPkgId pkgid_str
+	exposePackage pkgid db_stack
+    ["hide",   pkgid_str] -> do
+	pkgid <- readPkgId pkgid_str
+	hidePackage pkgid db_stack
+    ["list"] -> do
+	listPackages db_stack
+    ["describe", pkgid_str] -> do
+	pkgid <- readPkgId pkgid_str
+	describePackage db_stack pkgid
+    ["field", pkgid_str, field] -> do
+	pkgid <- readPkgId pkgid_str
+	describeField db_stack pkgid field
+    [] -> do
+	die ("missing command\n" ++ 
+		usageInfo (usageHeader prog) flags)
+    (_cmd:_) -> do
+	die ("command-line syntax error\n" ++ 
+		usageInfo (usageHeader prog) flags)
+
+parseCheck :: ReadP a a -> String -> String -> IO a
+parseCheck parser str what = 
+  case readP_to_S parser str of
+    [(x,ys)] | all isSpace ys -> return x
+    _ -> die ("cannot parse \'" ++ str ++ "\' as a " ++ what)
+
+readPkgId :: String -> IO PackageIdentifier
+readPkgId str = parseCheck parsePackageId str "package identifier"
+
+-- -----------------------------------------------------------------------------
+-- Package databases
+
+-- Some commands operate on a single database:
+--	register, unregister, expose, hide
+-- however these commands also check the union of the available databases
+-- in order to check consistency.  For example, register will check that
+-- dependencies exist before registering a package.
+--
+-- Some commands operate  on multiple databases, with overlapping semantics:
+--	list, describe, field
+
+type PackageDBName  = FilePath
+type PackageDB      = [InstalledPackageInfo]
+
+type PackageDBStack = [(PackageDBName,PackageDB)]
+	-- A stack of package databases.  Convention: head is the topmost
+	-- in the stack.  Earlier entries override later one.
+
+-- The output of this function is the list of databases to act upon, with
+-- the "topmost" overlapped database last.  The commands which operate on a
+-- single database will use the last one.  Commands which operate on multiple
+-- databases will interpret the databases as overlapping.
+getPkgDatabases :: [Flag] -> IO [PackageDBName]
+getPkgDatabases flags = do
+  -- first we determine the location of the global package config.  On Windows,
+  -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
+  -- location is passed to the binary using the --global-config flag by the
+  -- wrapper script.
+  let err_msg = "missing --global-conf option, location of global package.conf unknown\n"
+  global_conf <- 
+     case [ f | FlagGlobalConfig f <- flags ] of
 	[] -> do mb_dir <- getExecDir "/bin/ghc-pkg.exe"
 		 case mb_dir of
 			Nothing  -> die err_msg
-			Just dir -> return [dir ++ "/package.conf"]
+			Just dir -> return (dir `joinFileName` "package.conf")
+        fs -> return (last fs)
 
-  let toField "import_dirs"     = return import_dirs
-      toField "source_dirs"     = return source_dirs
-      toField "library_dirs"    = return library_dirs
-      toField "hs_libraries"    = return hs_libraries
-      toField "extra_libraries" = return extra_libraries
-      toField "include_dirs"    = return include_dirs
-      toField "c_includes"      = return c_includes
-      toField "package_deps"    = return package_deps
-      toField "extra_ghc_opts"  = return extra_ghc_opts
-      toField "extra_cc_opts"   = return extra_cc_opts
-      toField "extra_ld_opts"   = return extra_ld_opts  
-      toField "framework_dirs"  = return framework_dirs  
-      toField "extra_frameworks"= return extra_frameworks  
-      toField s			= die ("unknown field: `" ++ s ++ "'\n")
+  -- get the location of the user package database, and create it if necessary
+  appdir <- getAppUserDataDirectory "ghc"
 
-  fields <- mapM toField [ f | Field f <- clis ]
+  let
+	subdir = targetARCH ++ '-':targetOS ++ '-':version
+	user_conf = appdir `joinFileName` subdir `joinFileName` "package.conf"
+  b <- doesFileExist user_conf
+  when (not b) $ do
+	putStrLn ("Creating user package database in " ++ user_conf)
+	createParents user_conf
+	writeFile user_conf emptyPackageConfig
 
-  let read_parse_conf filename = do
-	  str <- readFile filename
-	  let packages = parsePackageConfig str
-	  eval_catch packages
-	    (\_ -> die (filename ++ ": parse error in package config file\n"))
+  let
+	databases = foldl addDB [global_conf] flags
 
-  pkg_confs <- mapM read_parse_conf conf_filenames
+	-- implement the following rules:
+	-- 	global database is the default
+	-- 	--user means overlap with the user database
+	-- 	--global means reset to just the global database
+	--	-f <file> means overlap with <file>
+	addDB dbs FlagUser       = user_conf : dbs
+	addDB dbs FlagGlobal     = [global_conf]
+	addDB dbs (FlagConfig f) = f : dbs
+	addDB dbs _		 = dbs
 
-  let conf_filename = head conf_filenames
-	-- this is the file we're going to update: the last one specified
-	-- on the command-line.
+  return databases
 
-  let auto_ghci_libs = any isAuto clis 
-	 where isAuto AutoGHCiLibs = True; isAuto _ = False
-      input_file = head ([ f | (Input f) <- clis] ++ ["-"])
+readParseDatabase :: PackageDBName -> IO (PackageDBName,PackageDB)
+readParseDatabase filename = do
+  str <- readFile filename
+  let packages = read str
+  evaluate packages
+    `catch` \_ -> die (filename ++ ": parse error in package config file\n")
+  return (filename,packages)
 
-      force = Force `elem` clis
-      
-      defines = [ (nm,val) | DefinedName nm val <- clis ]
+emptyPackageConfig :: String
+emptyPackageConfig = "[]"
 
-  case [ c | c <- clis, isAction c ] of
-    [ List ]      -> listPackages pkg_confs conf_filenames
-    [ ListLocal ] -> listPackages [head pkg_confs] [""]
-    [ Add upd ]  -> addPackage pkg_confs defines 
-    			       conf_filename input_file
-			       auto_ghci_libs upd force
-    [ Remove p ] -> removePackage pkg_confs conf_filename p
-    [ Show p ]   -> showPackage pkg_confs conf_filename p fields
-    _            -> do prog <- getProgramName
-		       die (usageInfo (usageHeader prog) flags)
+-- -----------------------------------------------------------------------------
+-- Registering
 
+registerPackage :: FilePath
+		-> [(String,String)] --  defines, ToDo: maybe remove?
+	        -> PackageDBStack
+		-> Bool		-- auto_ghci_libs
+		-> Bool		-- update
+		-> Bool		-- force
+		-> IO ()
+registerPackage input defines db_stack auto_ghci_libs update force = do
+  let
+	db_to_operate_on = head db_stack
+	db_filename	 = fst db_to_operate_on
+  --
+  checkConfigAccess db_filename
 
-listPackages :: [[PackageConfig]] -> [FilePath] -> IO ()
-listPackages pkg_confs conf_filenames = do
-  zipWithM_ show_pkgconf pkg_confs conf_filenames
-  where show_pkgconf pkg_conf filename =
-	  hPutStrLn stdout (render $
-		if null filename 
-			then packages	
-			else text (filename ++ ":") $$ nest 4 packages
-		)
-	   where packages = fsep (punctuate comma (map (text . name) pkg_conf))
-
-showPackage :: [[PackageConfig]]
-	    -> FilePath
-	    -> String
-	    -> [PackageConfig -> [String]]
-	    -> IO ()
-showPackage pkg_confs _ pkg_name fields =
-  case [ p | pkgs <- pkg_confs, p <- pkgs, name p == pkg_name ] of
-    []    -> die ("can't find package `" ++ pkg_name ++ "'\n")
-    [pkg] | null fields -> hPutStrLn stdout (render (dumpPkgGuts pkg))
-	  | otherwise   -> hPutStrLn stdout (render (vcat 
-				(map (vcat . map text) (map ($ pkg) fields))))
-    _     -> die "showPackage: internal error\n"
-
-addPackage :: [[PackageConfig]] -> [(String, String)] 
-	   -> FilePath -> FilePath
- 	   -> Bool -> Bool -> Bool -> IO ()
-addPackage pkg_confs defines 
-	   filename inputFile
-	   auto_ghci_libs updatePkg force = do
-  checkConfigAccess filename
   s <-
-    case inputFile of
+    case input of
       "-" -> do
-	hPutStr stdout "Reading package info from stdin... "
+	putStr "Reading package info from stdin... "
         getContents
       f   -> do
-        hPutStr stdout ("Reading package info from " ++ show f)
+        putStr ("Reading package info from " ++ show f)
 	readFile f
-  let new_pkg = parseOnePackageConfig s
-  eval_catch new_pkg (\_ -> die "parse error in package info\n")
-  hPutStrLn stdout "done."
-  hPutStr stdout "Expanding embedded variables... "
-  new_exp_pkg <- expandEnvVars new_pkg defines force
-  hPutStrLn stdout "done."
-  new_details <- validatePackageConfig new_exp_pkg pkg_confs 
-			auto_ghci_libs updatePkg force
-  savePackageConfig filename
-  maybeRestoreOldConfig filename $
-    writeNewConfig filename new_details
 
-removePackage :: [[PackageConfig]] -> FilePath -> String -> IO ()
-removePackage (packages : _) filename pkgName = do  
-  checkConfigAccess filename
-  when (pkgName `notElem` map name packages)
-       (die (filename ++ ": package `" ++ pkgName ++ "' not found\n"))
-  savePackageConfig filename
-  maybeRestoreOldConfig filename $
-    writeNewConfig filename (filter ((/= pkgName) . name) packages)
+  pkg <- parsePackageInfo s defines force
+  putStrLn "done."
+
+  validatePackageConfig pkg db_stack auto_ghci_libs update force
+  new_details <- updatePackageDB (snd db_to_operate_on) pkg
+  savePackageConfig db_filename
+  maybeRestoreOldConfig db_filename $
+    writeNewConfig db_filename new_details
+
+parsePackageInfo
+	:: String
+	-> [(String,String)]
+	-> Bool
+	-> IO InstalledPackageInfo
+parsePackageInfo str defines force =
+  case parseInstalledPackageInfo str of
+    Right ok -> return ok
+    Left err -> do
+	old_pkg <- evaluate (parseOnePackageConfig str)
+		 	    `catch` \_ -> parse_failed
+	putStr "Expanding embedded variables... "
+	new_old_pkg <- expandEnvVars old_pkg defines force
+	return (convertOldPackage old_pkg)
+ where
+   parse_failed = die "parse error in package info\n"
+
+convertOldPackage :: PackageConfig -> InstalledPackageInfo
+convertOldPackage
+   Package {
+	name 		= name,
+	auto 		= auto,
+	import_dirs     = import_dirs,
+	source_dirs     = source_dirs,
+	library_dirs    = library_dirs,
+	hs_libraries    = hs_libraries,
+	extra_libraries = extra_libraries,
+	include_dirs    = include_dirs,
+	c_includes      = c_includes,
+	package_deps    = package_deps,
+	extra_ghc_opts  = extra_ghc_opts,
+	extra_cc_opts   = extra_cc_opts,
+	extra_ld_opts   = extra_ld_opts,
+	framework_dirs  = framework_dirs,
+	extra_frameworks= extra_frameworks
+    }
+   = InstalledPackageInfo {
+        package          = pkgNameToId name,
+        license          = AllRightsReserved,
+        copyright        = "",
+        maintainer       = "",
+	author		 = "",
+        stability        = "",
+	homepage	 = "",
+	pkgUrl		 = "",
+	description	 = "",
+	category	 = "",
+        exposed          = auto,
+	exposedModules	 = [],
+	hiddenModules    = [],
+        importDirs       = import_dirs,
+        libraryDirs      = library_dirs,
+        hsLibraries      = hs_libraries,
+        extraLibraries   = extra_libraries,
+        includeDirs      = include_dirs,
+        includes	 = c_includes,
+        depends          = map pkgNameToId package_deps,
+        extraHugsOpts    = [],
+        extraCcOpts      = extra_cc_opts,
+        extraLdOpts      = extra_ld_opts,
+        frameworkDirs    = framework_dirs,
+        extraFrameworks  = extra_frameworks,
+	haddockInterfaces = [],
+	haddockHTMLs      = []
+    }
+
+
+-- Used for converting old versionless package names to new PackageIdentifiers.
+-- "Version [] []" is special: it means "no version" or "any version"
+pkgNameToId :: String -> PackageIdentifier
+pkgNameToId name = PackageIdentifier name (Version [] [])
+
+-- -----------------------------------------------------------------------------
+-- Unregistering
+
+unregisterPackage :: PackageDBStack -> PackageIdentifier -> IO ()
+unregisterPackage [] _ = error "unregisterPackage"
+unregisterPackage ((db_name, pkgs) : _) pkgid = do  
+  checkConfigAccess db_name
+  when (pkgid `notElem` map package pkgs)
+       (die (db_name ++ ": package '" ++ showPackageId pkgid
+		 ++ "' not found\n"))
+  savePackageConfig db_name
+  maybeRestoreOldConfig db_name $
+    writeNewConfig db_name (filter ((/= pkgid) . package) pkgs)
+
+-- -----------------------------------------------------------------------------
+-- Exposing
+
+exposePackage :: PackageIdentifier ->  PackageDBStack -> IO ()
+exposePackage = error "TODO"
+
+-- -----------------------------------------------------------------------------
+-- Hiding
+
+hidePackage :: PackageIdentifier ->  PackageDBStack -> IO ()
+hidePackage = error "TODO"
+
+-- -----------------------------------------------------------------------------
+-- Listing packages
+
+listPackages ::  PackageDBStack -> IO ()
+listPackages db_confs = do
+  mapM_ show_pkgconf (reverse db_confs)
+  where show_pkgconf (db_name,pkg_confs) =
+	  hPutStrLn stdout (render $
+		text (db_name ++ ":") $$ nest 4 packages
+		)
+	   where packages = fsep (punctuate comma (map pp_pkg pkg_confs))
+		 pp_pkg = text . showPackageId . package
+
+
+-- -----------------------------------------------------------------------------
+-- Describe
+
+describePackage :: PackageDBStack -> PackageIdentifier -> IO ()
+describePackage db_stack pkgid = do
+  p <- findPackage db_stack pkgid
+  putStrLn (showInstalledPackageInfo p)
+
+findPackage :: PackageDBStack -> PackageIdentifier -> IO InstalledPackageInfo
+findPackage db_stack pkgid
+  = case [ p | p <- all_pkgs, pkgid == package p ] of
+	[] -> die ("cannot find package " ++ showPackageId pkgid)
+	(p:ps) -> return p
+  where
+	all_pkgs = concat (map snd db_stack)
+
+-- -----------------------------------------------------------------------------
+-- Field
+
+describeField :: PackageDBStack -> PackageIdentifier -> String -> IO ()
+describeField db_stack pkgid field = do
+  case toField field of
+    Nothing -> die ("unknown field: " ++ field)
+    Just fn -> do
+	p <- findPackage db_stack pkgid 
+	putStrLn (fn p)
+
+toField :: String -> Maybe (InstalledPackageInfo -> String)
+-- backwards compatibility:
+toField "import_dirs"     = Just $ strList . importDirs
+toField "source_dirs"     = Just $ strList . importDirs
+toField "library_dirs"    = Just $ strList . libraryDirs
+toField "hs_libraries"    = Just $ strList . hsLibraries
+toField "extra_libraries" = Just $ strList . extraLibraries
+toField "include_dirs"    = Just $ strList . includeDirs
+toField "c_includes"      = Just $ strList . includes
+toField "package_deps"    = Just $ strList . map showPackageId. depends
+toField "extra_cc_opts"   = Just $ strList . extraCcOpts
+toField "extra_ld_opts"   = Just $ strList . extraLdOpts  
+toField "framework_dirs"  = Just $ strList . frameworkDirs  
+toField "extra_frameworks"= Just $ strList . extraFrameworks  
+toField s 	 	  = showInstalledPackageInfoField s
+
+strList :: [String] -> String
+strList = show
+
+-- -----------------------------------------------------------------------------
+-- Manipulating package.conf files
 
 checkConfigAccess :: FilePath -> IO ()
 checkConfigAccess filename = do
@@ -251,20 +498,20 @@ checkConfigAccess filename = do
 
 maybeRestoreOldConfig :: FilePath -> IO () -> IO ()
 maybeRestoreOldConfig filename io
-  = my_catch io (\e -> do
+  = io `catch` \e -> do
+	hPutStrLn stderr (show e)
         hPutStr stdout ("\nWARNING: an error was encountered while the new \n"++
         	          "configuration was being written.  Attempting to \n"++
         	          "restore the old configuration... ")
 	renameFile (filename ++ ".old")  filename
         hPutStrLn stdout "done."
-	my_throw e
-    )
+	throw e
 
-writeNewConfig :: FilePath -> [PackageConfig] -> IO ()
+writeNewConfig :: FilePath -> [InstalledPackageInfo] -> IO ()
 writeNewConfig filename packages = do
   hPutStr stdout "Writing new package config file... "
   h <- openFile filename WriteMode
-  hPutStrLn h (dumpPackages packages)
+  hPutStrLn h (show packages)
   hClose h
   hPutStrLn stdout "done."
 
@@ -291,28 +538,50 @@ savePackageConfig filename = do
 -- Sanity-check a new package config, and automatically build GHCi libs
 -- if requested.
 
-validatePackageConfig :: PackageConfig 
-		      -> [[PackageConfig]]
-		      -> Bool
-		      -> Bool
-		      -> Bool
-		      -> IO [PackageConfig]
-validatePackageConfig pkg pkg_confs@(pkgs:_) auto_ghci_libs updatePkg force = do
-  when (not updatePkg && (name pkg `elem` map name pkgs))
-       (die ("package `" ++ name pkg ++ "' is already installed\n"))
-  mapM_	(checkDep pkg_confs force) (package_deps pkg)
-  mapM_	(checkDir force) (import_dirs pkg)
-  mapM_	(checkDir force) (source_dirs pkg)
-  mapM_	(checkDir force) (library_dirs pkg)
-  mapM_	(checkDir force) (include_dirs pkg)
-  mapM_ (checkHSLib (library_dirs pkg) auto_ghci_libs force) (hs_libraries pkg)
+validatePackageConfig :: InstalledPackageInfo
+		      -> PackageDBStack
+		      -> Bool	-- auto-ghc-libs
+		      -> Bool	-- update
+		      -> Bool	-- force
+		      -> IO ()
+validatePackageConfig pkg db_stack auto_ghci_libs update force = do
+  checkDuplicates db_stack pkg update
+  mapM_	(checkDep db_stack force) (depends pkg)
+  mapM_	(checkDir force) (importDirs pkg)
+  mapM_	(checkDir force) (libraryDirs pkg)
+  mapM_	(checkDir force) (includeDirs pkg)
+  mapM_ (checkHSLib (libraryDirs pkg) auto_ghci_libs force) (hsLibraries pkg)
   -- ToDo: check these somehow?
   --	extra_libraries :: [String],
   --	c_includes      :: [String],
-  let existing_pkgs
-       | updatePkg = filter ((/=(name pkg)).name) pkgs  
-       | otherwise = pkgs
-  return (existing_pkgs ++ [pkg])
+
+
+checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> IO ()
+checkDuplicates db_stack pkg update = do
+  let
+	pkgid = package pkg
+
+	(_top_db_name, pkgs) : _  = db_stack
+
+	pkgs_with_same_name = 
+		[ p | p <- pkgs, pkgName (package p) == pkgName pkgid]
+	exposed_pkgs_with_same_name =
+		filter exposed pkgs_with_same_name
+  --
+  -- Check whether this package id already exists in this DB
+  --
+  when (not update && (package pkg `elem` map package pkgs)) $
+       die ("package " ++ showPackageId pkgid ++ " is already installed\n")
+  --
+  -- if we are exposing this new package, then check that
+  -- there are no other exposed packages with the same name.
+  --
+  when (not update && exposed pkg && not (null exposed_pkgs_with_same_name)) $
+	die ("trying to register " ++ showPackageId pkgid 
+		  ++ " as exposed, but "
+		  ++ showPackageId (package (head exposed_pkgs_with_same_name))
+		  ++ " is also exposed.")
+
 
 checkDir :: Bool -> String -> IO ()
 checkDir force d
@@ -321,14 +590,22 @@ checkDir force d
  | otherwise = do
    there <- doesDirectoryExist d
    when (not there)
-       (dieOrForce force ("`" ++ d ++ "' doesn't exist or isn't a directory\n"))
+       (dieOrForce force (d ++ " doesn't exist or isn't a directory\n"))
 
-checkDep :: [[PackageConfig]] -> Bool -> String -> IO ()
-checkDep pkgs force n
-  | n `elem` pkg_names = return ()
-  | otherwise = dieOrForce force ("dependency `" ++ n ++ "' doesn't exist\n")
+checkDep :: PackageDBStack -> Bool -> PackageIdentifier -> IO ()
+checkDep db_stack force pkgid
+  | real_version && pkgid `elem` pkgids = return ()
+  | not real_version && pkgName pkgid `elem` pkg_names = return ()
+  | otherwise = dieOrForce force ("dependency " ++ showPackageId pkgid
+					++ " doesn't exist\n")
   where
-    pkg_names = concat (map (map name) pkgs)
+	-- for backwards compat, we treat 0.0 as a special version,
+	-- and don't check that it actually exists.
+ 	real_version = versionBranch (pkgVersion pkgid) /= []
+	
+	all_pkgs = concat (map snd db_stack)
+	pkgids = map package all_pkgs
+	pkg_names = map pkgName pkgids
 
 checkHSLib :: [String] -> Bool -> Bool -> String -> IO ()
 checkHSLib dirs auto_ghci_libs force lib = do
@@ -378,12 +655,132 @@ autoBuildGHCiLib dir batch_file ghci_file = do
 #endif
   hPutStrLn stderr (" done.")
 
------------------------------------------------------------------------------
-expandEnvVars :: PackageConfig -> [(String, String)] -> Bool -> IO PackageConfig
+-- -----------------------------------------------------------------------------
+-- Updating the DB with the new package.
+
+updatePackageDB
+	:: [InstalledPackageInfo]
+	-> InstalledPackageInfo
+	-> IO [InstalledPackageInfo]
+updatePackageDB pkgs new_pkg = do
+  let
+	is_exposed = exposed new_pkg
+	pkgid      = package new_pkg
+	name       = pkgName pkgid
+
+	pkgs' = [ maybe_hide p | p <- pkgs, package p /= pkgid ]
+	
+	-- When update is on, and we're exposing the new package,
+	-- we hide any packages with the same name (different versions)
+	-- in the current DB.  Earlier checks will have failed if
+	-- update isn't on.
+	maybe_hide p
+	  | is_exposed && pkgName (package p) == name = p{ exposed = False }
+	  | otherwise = p
+  --
+  return (pkgs'++[new_pkg])
+
+-- -----------------------------------------------------------------------------
+-- The old command-line syntax, supported for backwards compatibility
+
+data OldFlag 
+  = OF_Config FilePath
+  | OF_Input FilePath
+  | OF_List
+  | OF_ListLocal
+  | OF_Add Bool {- True => replace existing info -}
+  | OF_Remove String | OF_Show String 
+  | OF_Field String | OF_AutoGHCiLibs | OF_Force
+  | OF_DefinedName String String
+  | OF_GlobalConfig FilePath
+  deriving (Eq)
+
+isAction :: OldFlag -> Bool
+isAction OF_Config{}        = False
+isAction OF_Field{}         = False
+isAction OF_Input{}         = False
+isAction OF_AutoGHCiLibs{}  = False
+isAction OF_Force{}	    = False
+isAction OF_DefinedName{}   = False
+isAction OF_GlobalConfig{}  = False
+isAction _                  = True
+
+oldFlags :: [OptDescr OldFlag]
+oldFlags = [
+  Option ['f'] ["config-file"] (ReqArg OF_Config "FILE")
+	"use the specified package config file",
+  Option ['l'] ["list-packages"] (NoArg OF_List)
+ 	"list packages in all config files",
+  Option ['L'] ["list-local-packages"] (NoArg OF_ListLocal)
+ 	"list packages in the specified config file",
+  Option ['a'] ["add-package"] (NoArg (OF_Add False))
+ 	"add a new package",
+  Option ['u'] ["update-package"] (NoArg (OF_Add True))
+ 	"update package with new configuration",
+  Option ['i'] ["input-file"] (ReqArg OF_Input "FILE")
+	"read new package info from specified file",
+  Option ['s'] ["show-package"] (ReqArg OF_Show "NAME")
+ 	"show the configuration for package NAME",
+  Option [] ["field"] (ReqArg OF_Field "FIELD")
+ 	"(with --show-package) Show field FIELD only",
+  Option [] ["force"] (NoArg OF_Force)
+ 	"ignore missing directories/libraries",
+  Option ['r'] ["remove-package"] (ReqArg OF_Remove "NAME")
+ 	"remove an installed package",
+  Option ['g'] ["auto-ghci-libs"] (NoArg OF_AutoGHCiLibs)
+	"automatically build libs for GHCi (with -a)",
+  Option ['D'] ["define-name"] (ReqArg toDefined "NAME=VALUE")
+  	"define NAME as VALUE",
+  Option [] ["global-conf"] (ReqArg OF_GlobalConfig "FILE")
+	"location of the global package config"
+  ]
+ where
+  toDefined str = 
+    case break (=='=') str of
+      (nm,[]) -> OF_DefinedName nm []
+      (nm,_:val) -> OF_DefinedName nm val
+
+oldRunit :: [OldFlag] -> IO ()
+oldRunit clis = do
+  let config_flags = [ f | Just f <- map conv clis ]
+
+      conv (OF_GlobalConfig f) = Just (FlagGlobalConfig f)
+      conv (OF_Config f)       = Just (FlagConfig f)
+      conv _                   = Nothing
+
+  db_names <- getPkgDatabases config_flags
+  db_stack <- mapM readParseDatabase db_names
+
+  let fields = [ f | OF_Field f <- clis ]
+
+  let auto_ghci_libs = any isAuto clis 
+	 where isAuto OF_AutoGHCiLibs = True; isAuto _ = False
+      input_file = head ([ f | (OF_Input f) <- clis] ++ ["-"])
+
+      force = OF_Force `elem` clis
+      
+      defines = [ (nm,val) | OF_DefinedName nm val <- clis ]
+
+  case [ c | c <- clis, isAction c ] of
+    [ OF_List ]      -> listPackages db_stack
+    [ OF_ListLocal ] -> listPackages db_stack
+    [ OF_Add upd ]   -> registerPackage input_file defines db_stack
+				auto_ghci_libs upd force
+    [ OF_Remove p ]  -> unregisterPackage db_stack (pkgNameToId p)
+    [ OF_Show p ]
+	| null fields -> describePackage db_stack (pkgNameToId p)
+	| otherwise   -> mapM_ (describeField db_stack (pkgNameToId p)) fields
+    _            -> do prog <- getProgramName
+		       die (usageInfo (usageHeader prog) flags)
+
+-- ---------------------------------------------------------------------------
+
+expandEnvVars :: PackageConfig -> [(String, String)]
+	-> Bool -> IO PackageConfig
 expandEnvVars pkg defines force = do
    -- permit _all_ strings to contain ${..} environment variable references,
    -- arguably too flexible.
-  nm       <- expandString (name pkg)
+  nm       <- expandString  (name pkg)
   imp_dirs <- expandStrings (import_dirs pkg) 
   src_dirs <- expandStrings (source_dirs pkg) 
   lib_dirs <- expandStrings (library_dirs pkg) 
@@ -474,34 +871,28 @@ bye :: String -> IO a
 bye s = putStr s >> exitWith ExitSuccess
 
 die :: String -> IO a
-die s = do { hFlush stdout ; hPutStr stderr s; exitWith (ExitFailure 1) }
+die s = do 
+  hFlush stdout
+  prog <- getProgramName
+  hPutStr stderr (prog ++ ": " ++ s)
+  exitWith (ExitFailure 1)
 
 dieOrForce :: Bool -> String -> IO ()
 dieOrForce force s 
   | force     = do hFlush stdout; hPutStrLn stderr (s ++ " (ignoring)")
   | otherwise = die (s ++ "\n")
 
+
 -----------------------------------------------------------------------------
--- Exceptions
+-- Create a hierarchy of directories
 
-#ifndef __GLASGOW_HASKELL__
-
-eval_catch a h = a `seq` return ()
-my_catch = IO.catch
-my_throw = IO.fail
-
-#else /* GHC */
-
-my_throw = Exception.throw
-#if __GLASGOW_HASKELL__ > 408
-eval_catch = Exception.catch . Exception.evaluate
-my_catch = Exception.catch
-#else
-eval_catch = Exception.catchAll
-my_catch = Exception.catchAllIO
-#endif
-
-#endif
+createParents :: FilePath -> IO ()
+createParents dir = do
+  let parent = directoryOf dir
+  b <- doesDirectoryExist parent
+  when (not b) $ do
+	createParents parent
+	createDirectory parent
 
 -----------------------------------------
 --	Cut and pasted from ghc/compiler/SysTools
@@ -530,4 +921,48 @@ foreign import stdcall unsafe  "GetModuleFileNameA"
 #else
 getExecDir :: String -> IO (Maybe String) 
 getExecDir _ = return Nothing
+#endif
+
+-- -----------------------------------------------------------------------------
+-- Utils from Krasimir's FilePath library, copied here for now
+
+directoryOf :: FilePath -> FilePath
+directoryOf = fst.splitFileName
+
+splitFileName :: FilePath -> (String, String)
+splitFileName p = (reverse (path2++drive), reverse fname)
+  where
+#ifdef mingw32_TARGET_OS
+    (path,drive) = break (== ':') (reverse p)
+#else
+    (path,drive) = (reverse p,"")
+#endif
+    (fname,path1) = break isPathSeparator path
+    path2 = case path1 of
+      []                           -> "."
+      [_]                          -> path1   -- don't remove the trailing slash if 
+                                              -- there is only one character
+      (c:path) | isPathSeparator c -> path
+      _                            -> path1
+
+joinFileName :: String -> String -> FilePath
+joinFileName ""  fname = fname
+joinFileName "." fname = fname
+joinFileName dir fname
+  | isPathSeparator (last dir) = dir++fname
+  | otherwise                  = dir++pathSeparator:fname
+
+isPathSeparator :: Char -> Bool
+isPathSeparator ch =
+#ifdef mingw32_TARGET_OS
+  ch == '/' || ch == '\\'
+#else
+  ch == '/'
+#endif
+
+pathSeparator :: Char
+#ifdef mingw32_TARGET_OS
+pathSeparator = '\\'
+#else
+pathSeparator = '/'
 #endif

@@ -11,7 +11,10 @@ INSTALLING=1
 
 ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
 
-SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY
+SRC_HC_OPTS      += -cpp -Wall -fno-warn-name-shadowing -fno-warn-unused-matches
+
+SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
+SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
 
 ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package lang -package util -package text
@@ -37,11 +40,13 @@ EXTRA_SRCS += $(VERSION_HS)
 
 boot :: $(VERSION_HS)
 
-Version.hs : $(TOP)/mk/version.mk
+Version.hs : Makefile $(TOP)/mk/version.mk
 	@$(RM) -f $(VERSION_HS)
 	@echo "Creating $(VERSION_HS) ... "
 	@echo "module Version where" >>$(VERSION_HS)
-	@echo "version = \"$(ProjectVersion)\"" >> $(VERSION_HS)
+	@echo "version    = \"$(ProjectVersion)\"" >> $(VERSION_HS)
+	@echo "targetOS   = \"$(TargetOS_CPP)\"" >> $(VERSION_HS)
+	@echo "targetARCH = \"$(TargetArch_CPP)\"" >> $(VERSION_HS)
 
 # -----------------------------------------------------------------------------
 # ghc-pkg script
@@ -70,7 +75,7 @@ SCRIPT_SUBST_VARS = GHCPKGBIN PKGCONFOPT
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALL_SCRIPTS  += $(SCRIPT_PROG)
 endif
-PKGCONFOPT 	  = -f $(PKGCONF)
+PKGCONFOPT 	  = --global-conf $(PKGCONF)
 
 ifeq "$(INSTALLING)" "1"
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)

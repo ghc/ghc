@@ -1,27 +1,26 @@
 -----------------------------------------------------------------------------
--- $Id: Package.hs,v 1.6 2002/12/18 16:29:34 simonmar Exp $
 --
--- Package configuration defn.
+-- (c) The University of Glasgow 2004
+--
+-- BACKWARDS COMPATIBILITY only.  This is the old (pre-6.4) package
+-- configuration type, which is still accepted by ghc-pkg for
+-- compatibility.  The new type is InstalledPackageInfo from the
+-- Distribution.InstalledPackageInfo module.
+--
 -----------------------------------------------------------------------------
 
-#ifdef PKG_TOOL
 module Package ( 
 	PackageConfig(..), defaultPackageConfig
-#ifdef WANT_PRETTY
 	, listPkgs	 	-- :: [PackageConfig] -> String
 	, dumpPackages		-- :: [PackageConfig] -> String
 	, dumpPkgGuts		-- :: PackageConfig -> Doc
 	, dumpFieldContents	-- :: [String] -> Doc
-#endif
  ) where
-#endif
 
-#ifdef WANT_PRETTY
 #if __GLASGOW_HASKELL__ >= 504 && !defined(INTERNAL_PRETTY)
 import Text.PrettyPrint
 #else
 import Pretty
-#endif
 #endif
 
 data PackageConfig
@@ -65,7 +64,6 @@ defaultPackageConfig
 -----------------------------------------------------------------------------
 -- Pretty printing package info
 
-#ifdef WANT_PRETTY
 listPkgs :: [PackageConfig] -> String
 listPkgs pkgs = render (fsep (punctuate comma (map (text . name) pkgs)))
 
@@ -99,5 +97,4 @@ dumpField name val = hang (text name <+> equals) 2  (dumpFieldContents val)
 
 dumpFieldContents :: [String] -> Doc
 dumpFieldContents val = brackets (sep (punctuate comma (map (text . show) val)))
-#endif
 
