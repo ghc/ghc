@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.21 2001/08/08 13:21:04 qrczak Exp $
+# $Id: Makefile,v 1.22 2001/09/12 11:16:05 rrt Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -10,7 +10,10 @@ INCLUDE_DIR=ghc/includes
 INSTALLING=1
 
 HS_PROG           = hsc2hs-bin
-SRC_HC_OPTS      += -package util
+SRC_HC_OPTS      += -package util -cpp
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+SRC_HC_OPTS      += -package win32
+endif 
 
 INSTALLED_SCRIPT_PROG  = hsc2hs
 INPLACE_SCRIPT_PROG    = hsc2hs-inplace

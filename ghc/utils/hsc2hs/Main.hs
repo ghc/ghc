@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.32 2001/07/24 05:49:32 ken Exp $
+-- $Id: Main.hs,v 1.33 2001/09/12 11:16:05 rrt Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -16,6 +16,12 @@ import Directory     (removeFile)
 import Monad         (MonadPlus(..), liftM, liftM2, when, unless)
 import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit, ord)
 import List          (intersperse)
+
+#include "../../includes/config.h"
+
+#ifdef mingw32_TARGET_OS
+import Win32DLL
+#endif
 
 version :: String
 version = "hsc2hs-0.65"
@@ -64,7 +70,15 @@ main = do
     prog <- getProgName
     let header = "Usage: "++prog++" [OPTIONS] INPUT.hsc [...]"
     args <- getArgs
-    case getOpt Permute options args of
+#ifdef mingw32_TARGET_OS
+    h <- getModuleHandle Nothing
+    n <- getModuleFileName h
+    let tempName = reverse (drop (length "\\bin\\hsc2hs.exe") (reverse n)) ++ "\\template-hsc.h"
+#endif
+    let (flags, files, errs) = getOpt Permute options args
+    let fflags = if [t | Template t <- flags] /= [] then flags else (Template tempName) : flags
+    let opts = (fflags, files, errs)
+    case opts of
         (flags, _, _)
             | any isHelp    flags -> putStrLn (usageInfo header options)
             | any isVersion flags -> putStrLn version
@@ -494,15 +508,16 @@ output flags name toks = do
     removeFile progName
     
     when needsH $ writeFile outHName $
-        "#ifndef "++includeGuard++"\n\
-        \#define "++includeGuard++"\n\
-        \#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\
-        \#include <Rts.h>\n\
-        \#endif\n\
-        \#include <HsFFI.h>\n\
-        \#if __NHC__\n\
-        \#undef HsChar\n\
-        \#define HsChar int\n\
+        "#ifndef "++includeGuard++"\n\ 
+        \#define "++includeGuard++"\n\ 
+        \#if " ++
+	"__GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\ 
+        \#include <Rts.h>\n\ 
+        \#endif\n\ 
+        \#include <HsFFI.h>\n\ 
+        \#if __NHC__\n\ 
+        \#undef HsChar\n\ 
+        \#define HsChar int\n\ 
         \#endif\n"++
         concatMap outFlagH flags++
         concatMap outTokenH specials++
@@ -539,7 +554,7 @@ outHeaderCProg (pos, key, arg) = case key of
         (header, _:body) -> case break isSpace header of
             (name, args) ->
                 outCLine pos++
-                "#define hsc_"++name++"("++dropWhile isSpace args++") \
+                "#define hsc_"++name++"("++dropWhile isSpace args++") \ 
                 \printf ("++joinLines body++");\n"
     _ -> ""
     where
@@ -547,9 +562,11 @@ outHeaderCProg (pos, key, arg) = case key of
 
 outHeaderHs :: [Flag] -> Maybe String -> [(SourcePos, String, String)] -> String
 outHeaderHs flags inH toks =
-    "#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\
-    \    printf (\"{-# OPTIONS -optc-D__GLASGOW_HASKELL__=%d #-}\\n\", \
-    \__GLASGOW_HASKELL__);\n\
+    "#if " ++
+    "__GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\ 
+    \    printf (\"{-# OPTIONS -optc-D" ++
+    "__GLASGOW_HASKELL__=%d #-}\\n\", \ 
+    \__GLASGOW_HASKELL__);\n\ 
     \#endif\n"++
     case inH of
         Nothing -> concatMap outFlag flags++concatMap outSpecial toks
@@ -608,11 +625,11 @@ outEnum arg =
                     (enum, rest) -> let
                         this = case break (== '=') $ dropWhile isSpace enum of
                             (name, []) ->
-                                "    hsc_enum ("++t++", "++f++", \
+                                "    hsc_enum ("++t++", "++f++", \ 
                                 \hsc_haskellize (\""++name++"\"), "++
                                 name++");\n"
                             (hsName, _:cName) ->
-                                "    hsc_enum ("++t++", "++f++", \
+                                "    hsc_enum ("++t++", "++f++", \ 
                                 \printf (\"%s\", \""++hsName++"\"), "++
                                 cName++");\n"
                         in this++enums rest
@@ -634,8 +651,8 @@ outTokenH (pos, key, arg) =
             's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
             't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
             'i':'n':'l':'i':'n':'e':' ':_ ->
-                "#ifdef __GNUC__\n\
-                \extern\n\
+                "#ifdef __GNUC__\n\ 
+                \extern\n\ 
                 \#endif\n"++
                 arg++"\n"
             _ -> "extern "++header++";\n"
@@ -653,12 +670,12 @@ outTokenC (pos, key, arg) =
 		case span (\c -> c /= '{' && c /= '=') arg' of
 		(header, body) ->
 		    outCLine pos++
-		    "#ifndef __GNUC__\n\
-		    \extern inline\n\
+		    "#ifndef __GNUC__\n\ 
+		    \extern inline\n\ 
 		    \#endif\n"++
 		    header++
-		    "\n#ifndef __GNUC__\n\
-		    \;\n\
+		    "\n#ifndef __GNUC__\n\ 
+		    \;\n\ 
 		    \#else\n"++
 		    body++
 		    "\n#endif\n"
