@@ -29,7 +29,7 @@ module Stix (
 import Ratio		( Rational )
 
 import AbsCSyn		( node, tagreg, MagicId(..) )
-import CallConv		( CallConv, pprCallConv )
+import ForeignCall	( CCallConv )
 import CLabel		( mkAsmTempLabel, CLabel, pprCLabel )
 import PrimRep          ( PrimRep(..) )
 import PrimOp           ( PrimOp )
@@ -112,7 +112,7 @@ data StixTree
 
     -- Calls to C functions
 
-  | StCall FAST_STRING CallConv PrimRep [StixTree]
+  | StCall FAST_STRING CCallConv PrimRep [StixTree]
 
     -- A volatile memory scratch array, which is allocated
     -- relative to the stack pointer.  It is an array of
@@ -180,7 +180,7 @@ pprStixTree t
                                   hsep (map pprStixTree ts))
        StCall nm cc k args
                         -> paren (text "Call" <+> ptext nm <+>
-                                  pprCallConv cc <+> ppr k <+> 
+                                  ppr cc <+> ppr k <+> 
                                   hsep (map pprStixTree args))
        StScratchWord i  -> text "ScratchWord" <> paren (int i)
 \end{code}

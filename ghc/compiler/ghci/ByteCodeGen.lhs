@@ -13,7 +13,7 @@ module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
 
 import Outputable
 import Name		( Name, getName )
-import Id		( Id, idType, isDataConId_maybe, isPrimOpId_maybe,
+import Id		( Id, idType, isDataConId_maybe, isPrimOpId_maybe, isFCallId,
 			  idPrimRep, mkSysLocal, idName )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
@@ -33,7 +33,7 @@ import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons,
 import Class		( Class, classTyCon )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
 import Var		( isTyVar )
-import VarSet		( VarSet, varSetElems, unitVarSet, unionVarSet )
+import VarSet		( VarSet, varSetElems )
 import PrimRep		( getPrimRepSize, isFollowableRep )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
@@ -496,11 +496,8 @@ schemeT d s p app
            case app of
               (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType t)) arg)
                  -> case isPrimOpId_maybe v of
-                       Nothing -> Nothing
-                       Just primop |  primop == TagToEnumOp
-                                   -> Just (snd arg, extract_constr_Names t)
-                                   |  otherwise
-                                   -> Nothing
+                       Just TagToEnumOp -> Just (snd arg, extract_constr_Names t)
+		       other		-> Nothing
               other -> Nothing
 
       -- Extract the args (R->L) and fn
@@ -692,13 +689,15 @@ pushAtom tagged d p (AnnVar v)
    = ASSERT(tagged)
      (unitOL (PUSH_TAG 0), 1)
 
+   | isFCallId v
+   = pprPanic "pushAtom: byte code generator can't handle CCalls" (ppr v)
+
    | Just primop <- isPrimOpId_maybe v
-   = case primop of
-        CCallOp _ -> panic "pushAtom: byte code generator can't handle CCalls"
-        other     -> (unitOL (PUSH_G (Right primop)), 1)
+   = (unitOL (PUSH_G (Right primop)), 1)
 
    | otherwise
-   = let str = "\npushAtom " ++ showSDocDebug (ppr v) 
+   = let  {-
+	  str = "\npushAtom " ++ showSDocDebug (ppr v) 
                ++ " :: " ++ showSDocDebug (pprType (idType v))
                ++ ", depth = " ++ show d
                ++ ", tagged = " ++ show tagged ++ ", env =\n" ++ 
@@ -706,9 +705,7 @@ pushAtom tagged d p (AnnVar v)
                ++ " --> words: " ++ show (snd result) ++ "\n" ++
                showSDoc (nest 4 (vcat (map ppr (fromOL (fst result)))))
                ++ "\nendPushAtom " ++ showSDocDebug (ppr v)
-                  where
-                     cmp_snd x y = compare (snd x) (snd y)
-         str' = if str == str then str else str
+	 -}
 
          result
             = case lookupBCEnv_maybe p v of
@@ -723,7 +720,6 @@ pushAtom tagged d p (AnnVar v)
          sz_u   = untaggedIdSizeW v
          nwords = if tagged then sz_t else sz_u
      in
-         --trace str'
          result
 
 pushAtom True d p (AnnLit lit)

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.51 2000/12/06 13:19:49 simonmar Exp $
+% $Id: CgCase.lhs,v 1.52 2001/05/22 13:43:15 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -56,7 +56,7 @@ import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 import TyCon		( isEnumerationTyCon, isUnboxedTupleTyCon, tyConPrimRep	)
 import Unique           ( Unique, Uniquable(..), newTagUnique )
 import Maybes		( maybeToBool )
-import Util
+import Util		( only )
 import Outputable
 \end{code}
 
@@ -142,30 +142,32 @@ CoreToStg), so we just change its tag to 'C' (for 'case') to ensure it
 doesn't clash with anything else.
 
 \begin{code}
-cgCase (StgPrimApp op args _)
+cgCase (StgOpApp op args _)
        live_in_whole_case live_in_alts bndr srt (StgAlgAlts (Just tycon) alts deflt)
   | isEnumerationTyCon tycon
   = getArgAmodes args `thenFC` \ arg_amodes ->
 
-    let tag_amode = case op of 
-			TagToEnumOp -> only arg_amodes
-			_ -> CTemp (newTagUnique (getUnique bndr) 'C') IntRep
+    case op of {
+	StgPrimOp TagToEnumOp	-- No code!
+	   -> returnFC (only arg_amodes) ;
 
-	closure = CVal (CIndex (CLbl (mkClosureTblLabel tycon) PtrRep) tag_amode PtrRep) PtrRep
+	_  -> 		-- Perform the operation
+	      let
+		tag_amode = CTemp (newTagUnique (getUnique bndr) 'C') IntRep
+	      in
+	      getVolatileRegs live_in_alts			`thenFC` \ vol_regs ->
+ 	      absC (COpStmt [tag_amode] op arg_amodes vol_regs)	`thenC`
+				-- NB: no liveness arg
+	      returnFC tag_amode
+    }						`thenFC` \ tag_amode ->
+
+    let
+	closure = CVal (CIndex (CLbl (mkClosureTblLabel tycon) PtrRep) 
+			       tag_amode PtrRep) 
+		       PtrRep
     in
 
-    case op of {
-	TagToEnumOp -> nopC;  -- no code!
-
-	_ -> 	-- Perform the operation
-	       getVolatileRegs live_in_alts     `thenFC` \ vol_regs ->
-
- 	       absC (COpStmt [tag_amode] op
-		 arg_amodes -- note: no liveness arg
-		 vol_regs)
-    } 						`thenC`
-
- 	-- bind the default binder if necessary
+ 	-- Bind the default binder if necessary
 	-- The deadness info is set by StgVarInfo
     (if (isDeadBinder bndr)
 	then nopC
@@ -185,9 +187,9 @@ cgCase (StgPrimApp op args _)
 Special case #2: inline PrimOps.
 
 \begin{code}
-cgCase (StgPrimApp op args _) 
+cgCase (StgOpApp op@(StgPrimOp primop) args _) 
        live_in_whole_case live_in_alts bndr srt alts
-  | not (primOpOutOfLine op)
+  | not (primOpOutOfLine primop)
   =
 	-- Get amodes for the arguments and results
     getArgAmodes args			`thenFC` \ arg_amodes ->

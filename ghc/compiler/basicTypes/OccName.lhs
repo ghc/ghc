@@ -14,7 +14,7 @@ module OccName (
 	OccName, 	-- Abstract, instance of Outputable
 	pprOccName, 
 
-	mkOccFS, mkSysOcc, mkSysOccFS, mkCCallOcc, mkVarOcc, mkKindOccFS,
+	mkOccFS, mkSysOcc, mkSysOccFS, mkFCallOcc, mkVarOcc, mkKindOccFS,
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
 	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
@@ -164,12 +164,12 @@ mkSysOccFS :: NameSpace -> EncodedFS -> OccName
 mkSysOccFS occ_sp fs = ASSERT2( alreadyEncodedFS fs, ppr fs )
 		       OccName occ_sp fs
 
-mkCCallOcc :: EncodedString -> OccName
+mkFCallOcc :: EncodedString -> OccName
 -- This version of mkSysOcc doesn't check that the string is already encoded,
 -- because it will be something like "{__ccall f dyn Int# -> Int#}" 
 -- This encodes a lot into something that then parses like an Id.
 -- But then alreadyEncoded complains about the braces!
-mkCCallOcc str = OccName varName (_PK_ str)
+mkFCallOcc str = OccName varName (_PK_ str)
 
 -- Kind constructors get a special function.  Uniquely, they are not encoded,
 -- so that they have names like '*'.  This means that *even in interface files*

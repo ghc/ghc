@@ -148,11 +148,11 @@ statRhs top (b, StgRhsClosure cc bi fv u args body)
 \begin{code}
 statExpr :: StgExpr -> StatEnv
 
-statExpr (StgApp _ _)	    = countOne Applications
-statExpr (StgLit _)	    = countOne Literals
-statExpr (StgConApp _ _)    = countOne ConstructorApps
-statExpr (StgPrimApp _ _ _) = countOne PrimitiveApps
-statExpr (StgSCC l e) 	    = statExpr e
+statExpr (StgApp _ _)	  = countOne Applications
+statExpr (StgLit _)	  = countOne Literals
+statExpr (StgConApp _ _)  = countOne ConstructorApps
+statExpr (StgOpApp _ _ _) = countOne PrimitiveApps
+statExpr (StgSCC l e) 	  = statExpr e
 
 statExpr (StgLetNoEscape lvs_whole lvs_rhss binds body)
   = statBinding False{-not top-level-} binds	`combineSE`

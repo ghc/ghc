@@ -23,7 +23,8 @@ import TypeRep	( Type(..) )
 import DataCon	( isUnboxedTupleCon, dataConTyCon, dataConRepType, dataConRepArgTys )
 import Literal	( Literal(..) )
 import PrelNames	-- Lots of keys
-import PrimOp		( PrimOp(..), CCallTarget(..),CCall(..) )
+import PrimOp		( PrimOp(..) )
+import ForeignCall	( ForeignCall(..), CCall(..), CCallTarget(..) )
 import TysWiredIn	( mkTupleTy, tupleCon )
 import PrimRep		( PrimRep(..) )
 import Name		( nameModule, nameOccName, isGlobalName, isLocalName, NamedThing(getName) )
@@ -38,7 +39,7 @@ import Module		( Module, PackageName, ModuleName, moduleName,
 import UniqFM
 import BasicTypes	( Boxity(..) )
 import CStrings		( CLabelString, pprCLabelString )
-import CallConv		( CallConv )
+import CCallConv	( CCallConv )
 import Outputable
 import Char		( ord )
 import List		( partition, elem, insertBy,any  )
@@ -110,12 +111,12 @@ importsExpr :: IlxEnv -> StgExpr -> ImportsInfo -> ImportsInfo
 importsExpr env (StgLit _) = importsNone
 importsExpr env (StgApp f args) = importsVar env f.importsStgArgs env args
 importsExpr env (StgConApp con args) = importsDataCon env con.importsStgArgs env args
-importsExpr env (StgPrimApp (CCallOp (CCall (StaticTarget c) _ _ cc)) args rty)
+importsExpr env (StgOpApp (StgFCallOp (CCall (CCallSpec (StaticTarget c) cc _ _)) _) args rty)
   = addCCallInfo (c,cc, map stgArgType tm_args, rty) . importsStgArgs env args
   where 
     (ty_args,tm_args) = splitTyArgs1 args 
 
-importsExpr env (StgPrimApp _ args res_ty) = importsType env res_ty. importsStgArgs env args
+importsExpr env (StgOpApp _ args res_ty) = importsType env res_ty. importsStgArgs env args
 
 
 importsExpr env (StgSCC _ expr) = importsExpr env expr
@@ -186,7 +187,7 @@ importsTyCon env tc | otherwise = importsName env (getName tc) . addTyConImpInfo
 importsPrelude | inPrelude = addModuleImpInfo (mkModuleName "PrelGHC")
 	       | otherwise = addPackageImpInfo preludePackage
 
-type StaticCCallInfo = (CLabelString,CallConv,[Type],Type)
+type StaticCCallInfo = (CLabelString,CCallConv,[Type],Type)
 type ImportsInfo = (UniqSet PackageName, UniqSet ModuleName, UniqSet TyCon, UniqFM StaticCCallInfo)
    -- (Packages, Modules, Datatypes, Imported CCalls)
 
@@ -393,7 +394,7 @@ ilxExprLocals env (StgCase scrut _ _ bndr _ alts)
      = ilxExprLocals (ilxPlaceStgCaseScrut env) scrut ++ 
        (if isDeadBinder bndr then [] else [(LocalId bndr,Nothing)]) ++ 
        ilxAltsLocals env alts
-ilxExprLocals env (StgPrimApp (CCallOp (CCall (StaticTarget _)_ _ _)) args _) 
+ilxExprLocals env (StgOpApp (StgFCallOp (CCall (CCallSpec (StaticTarget _) _ _ _)) _) args _) 
      = concat (ilxMapPlaceArgs 0 ilxCCallArgLocals env args)
 ilxExprLocals _ _  = []
 
@@ -421,7 +422,7 @@ ilxExprClosures env (StgApp _ args)
   = vcat (ilxMapPlaceArgs 0 (ilxArgClosures) env args)  -- get strings
 ilxExprClosures env (StgConApp _ args)
   = vcat (ilxMapPlaceArgs 0 (ilxArgClosures) env args) -- get strings
-ilxExprClosures env (StgPrimApp _ args _)
+ilxExprClosures env (StgOpApp _ args _)
   = vcat (ilxMapPlaceArgs 0 (ilxArgClosures) env args) -- get strings
 ilxExprClosures env (StgLet bind body)
   = ilxBindClosures env bind $$ ilxExprClosures (extendIlxEnvWithBinds env (ilxPairs1 bind)) body
@@ -503,8 +504,11 @@ ilxExpr (IlxEEnv env _) (StgConApp data_con args) sequel
   = text " /* ilxExpr:StgConApp */ " <+>  ilxConApp env data_con args $$ ilxSequel sequel
 
 -- ilxExpr eenv (StgPrimApp primop args _) sequel
-ilxExpr (IlxEEnv env _) (StgPrimApp primop args ret_ty) sequel
-  = ilxPrimApp env primop args ret_ty $$ ilxSequel sequel
+ilxExpr (IlxEEnv env _) (StgOpApp (StgFCallOp fcall) args ret_ty) sequel
+  = ilxFCall env fcall args ret_ty $$ ilxSequel sequel
+
+ilxExpr (IlxEEnv env _) (StgOpApp (StgPrimOp primop) args ret_ty) sequel
+  = ilxPrimOpTable primop args env $$ ilxSequel sequel
 
 --BEGIN TEMPORARY
 -- The following are versions of a peephole optimizations for "let t = \[] t2[fvs] in t"
@@ -534,9 +538,9 @@ ilxExpr eenv@(IlxEEnv env live) (StgCase (StgApp fun args) live_in_case _live_in
     ]
 
 -- StgCase: Special case 2 to avoid spurious branch.
-ilxExpr eenv@(IlxEEnv env live) (StgCase (StgPrimApp primop args ret_ty) live_in_case _live_in_alts bndr _ alts) sequel
+ilxExpr eenv@(IlxEEnv env live) (StgCase (StgOpApp (StgPrimOp primop) args ret_ty) live_in_case _live_in_alts bndr _ alts) sequel
   = vcat [ilxWipe env (uniqSetToList (live `minusUniqSet` live_in_case)),
-	  ilxPrimApp (ilxPlaceStgCaseScrut env) primop args ret_ty,
+	  ilxPrimOpTable primop args (ilxPlaceStgCaseScrut env),
           --ilxWipe env (uniqSetToList (live_in_case `minusUniqSet` _live_in_alts)),
 	  --ilxAlts (IlxEEnv env _live_in_alts) bndr alts sequel
 	  ilxAlts (IlxEEnv env live_in_case) bndr alts sequel
@@ -1580,7 +1584,6 @@ ilxConRef env data_con
 
 \begin{code}
 
-ilxPrimApp env (CCallOp ccall) args ret_ty = ilxCCall env ccall args ret_ty
 ilxPrimApp env op 	       args ret_ty = ilxPrimOpTable op args env
 
 
@@ -2177,7 +2180,6 @@ ilxPrimOpTable op
 
 	WaitReadOp  -> warn_op "WaitReadOp" (simp_op (ilxOp "/* WaitReadOp skipped... */ pop"))
    	WaitWriteOp -> warn_op "WaitWriteOp" (simp_op (ilxOp " /* WaitWriteOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
-        CCallOp _ ->  panic "CCallOp should already be done..."
 	ParAtForNowOp -> warn_op "ParAtForNowOp" (simp_op (ilxOp " /* ParAtForNowOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
 	ParAtRelOp -> warn_op "ParAtRelOp" (simp_op (ilxOp " /* ParAtRelOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
 	ParAtAbsOp -> warn_op "ParAtAbsOp" (simp_op (ilxOp " /* ParAtAbsOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
@@ -2256,20 +2258,18 @@ warn_op  warning f args = trace ("WARNING! IlxGen cannot translate primop " ++ w
 %************************************************************************
 
 \begin{code}
-
 -- Call the P/Invoke stub wrapper generated in the import section.
 -- We eliminate voids in and around an IL C Call.  
 -- We also do some type-directed translation for pinning Haskell-managed blobs
 -- of data as we throw them across the boundary.
-ilxCCall env (CCall (StaticTarget c) casm gc cconv) args ret_ty =
-   ilxComment (text "C call <+> pprCLabelString c") <+> 
+ilxFCall env (CCall (CCallSpec (StaticTarget c) cconv gc casm)) args ret_ty
+ = ilxComment (text "C call <+> pprCLabelString c") <+> 
 	vcat [vcat (ilxMapPlaceArgs 0 pushCArg env args),
               text "call" <+> retdoc <+> pprCLabelString c  <+> pprTypeArgs ilxTypeR env ty_args
                     <+> pprCValArgTys ilxTypeL env (map deepIlxRepType (filter (not. isVoidIlxRepType) (map stgArgType tm_args))) ]
   where 
-    retdoc = 
-          if isVoidIlxRepType ret_ty then text "void" 
-          else ilxTypeR env (deepIlxRepType ret_ty)
+    retdoc | isVoidIlxRepType ret_ty = text "void" 
+	   | otherwis		     = ilxTypeR env (deepIlxRepType ret_ty)
     (ty_args,tm_args) = splitTyArgs1 args 
 
 

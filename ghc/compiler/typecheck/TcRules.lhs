@@ -15,7 +15,7 @@ import HscTypes		( PackageRuleBase )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
-import TcType		( zonkTcTyVarToTyVar, newTyVarTy )
+import TcType		( newTyVarTy )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( kcHsSigTypes, tcHsSigType, tcScopedTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )

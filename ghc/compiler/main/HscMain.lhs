@@ -22,7 +22,7 @@ import RdrHsSyn		( RdrNameStmt )
 import Type		( Type )
 import Id		( Id, idName, setGlobalIdDetails )
 import IdInfo		( GlobalIdDetails(VanillaGlobal) )
-import HscTypes		( InteractiveContext(..), TyThing(..) )
+import HscTypes		( InteractiveContext(..) )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 #endif
@@ -71,8 +71,7 @@ import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
 import Name		( Name, nameModule, nameOccName, getName, isGlobalName )
 import NameEnv		( emptyNameEnv, mkNameEnv )
-import Module		( Module, lookupModuleEnvByName )
-import Maybes		( orElse )
+import Module		( Module )
 
 import IOExts		( newIORef, readIORef, writeIORef, unsafePerformIO )
 
@@ -621,14 +620,4 @@ initOrigNames
         grab names = foldl add emptyFM names
         add env name 
            = addToFM env (moduleName (nameModule name), nameOccName name) name
-
-
-initRules :: PackageRuleBase
-initRules = emptyRuleBase
-{- SHOULD BE (ish)
-            foldl add emptyVarEnv builtinRules
-	  where
-	    add env (name,rule) 
-              = extendRuleBase env name rule
--}
 \end{code}

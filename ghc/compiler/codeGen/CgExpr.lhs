@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.42 2001/03/13 12:50:30 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.43 2001/05/22 13:43:15 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -114,13 +114,13 @@ get in a tail-call position, however, we need to actually perform the
 call, so we treat it as an inline primop.
 
 \begin{code}
-cgExpr (StgPrimApp op@(CCallOp ccall) args res_ty)
+cgExpr (StgOpApp op@(StgFCallOp _ _) args res_ty)
   = primRetUnboxedTuple op args res_ty
 
 -- tagToEnum# is special: we need to pull the constructor out of the table,
 -- and perform an appropriate return.
 
-cgExpr (StgPrimApp TagToEnumOp [arg] res_ty) 
+cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty) 
   = ASSERT(isEnumerationTyCon tycon)
     getArgAmode arg `thenFC` \amode ->
 	-- save the tag in a temporary in case amode overlaps
@@ -145,14 +145,16 @@ cgExpr (StgPrimApp TagToEnumOp [arg] res_ty)
 	tycon = tyConAppTyCon res_ty
 
 
-cgExpr x@(StgPrimApp op args res_ty)
-  | primOpOutOfLine op = tailCallPrimOp op args
+cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
+  | primOpOutOfLine primop 
+  = tailCallPrimOp primop args
+
   | otherwise
-  = ASSERT(op /= SeqOp) -- can't handle SeqOp
+  = ASSERT(primop /= SeqOp) -- can't handle SeqOp
 
     getArgAmodes args	`thenFC` \ arg_amodes ->
 
-    case (getPrimOpResultInfo op) of
+    case (getPrimOpResultInfo primop) of
 
 	ReturnsPrim kind ->
 	    let result_amode = CReg (dataReturnConvPrim kind) in
@@ -446,7 +448,7 @@ Little helper for primitives that return unboxed tuples.
 
 
 \begin{code}
-primRetUnboxedTuple :: PrimOp -> [StgArg] -> Type -> Code
+primRetUnboxedTuple :: StgOp -> [StgArg] -> Type -> Code
 primRetUnboxedTuple op args res_ty
   = getArgAmodes args	    `thenFC` \ arg_amodes ->
     {-

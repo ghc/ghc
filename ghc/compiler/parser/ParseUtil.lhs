@@ -38,7 +38,7 @@ import RdrHsSyn		( RdrBinding(..),
 			)
 import RdrName
 import PrelNames	( unitTyCon_RDR )
-import CallConv
+import ForeignCall	( CCallConv(..) )
 import OccName  	( dataName, varName, tcClsName,
 			  occNameSpace, setOccNameSpace, occNameUserString )
 import FastString	( unpackFS )
@@ -90,15 +90,6 @@ tyConToDataCon tc
 
 ----------------------------------------------------------------------------
 -- Various Syntactic Checks
-
-callConvFM :: UniqFM CallConv
-callConvFM = listToUFM $
-      map (\ (x,y) -> (_PK_ x,y))
-     [  ("stdcall",  stdCallConv),
-	("ccall",    cCallConv)
---	("pascal",   pascalCallConv),
---	("fastcall", fastCallConv)
-     ]
 
 checkInstType :: RdrNameHsType -> P RdrNameHsType
 checkInstType t 

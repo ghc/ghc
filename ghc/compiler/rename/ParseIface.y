@@ -43,10 +43,9 @@ import BasicTypes	( Fixity(..), FixityDirection(..),
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import Demand		( StrictnessMark(..) )
-import CallConv         ( cCallConv )
 import Type		( Kind, mkArrowKind, liftedTypeKind, openTypeKind, usageTypeKind )
 import IdInfo           ( InlinePragInfo(..) )
-import PrimOp           ( CCall(..), CCallTarget(..) )
+import ForeignCall	( ForeignCall(..), CCallConv(..), CCallSpec(..), CCallTarget(..) )
 import Lex		
 
 import RnMonad		( ParsedIface(..), ExportItem, IfaceDeprecs ) 
@@ -808,12 +807,12 @@ core_aexpr      : qvar_name				        { UfVar $1 }
                            { let
                                  (is_dyn, is_casm, may_gc) = $2
 
-			         target | is_dyn    = DynamicTarget (error "CCall dyn target bogus unique")
+			         target | is_dyn    = DynamicTarget
 					| otherwise = StaticTarget $3
 
-	                         ccall = CCall target is_casm may_gc cCallConv
+	                         ccall = CCallSpec target CCallConv may_gc is_casm
  	                     in
-			     UfCCall ccall $4
+			     UfFCall (CCall ccall) $4
 			   }
 
 

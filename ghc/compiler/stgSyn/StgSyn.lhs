@@ -10,7 +10,7 @@ suited to spineless tagless code generation.
 
 \begin{code}
 module StgSyn (
-	GenStgArg(..),
+	GenStgArg(..), 
 	GenStgLiveVars,
 
 	GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
@@ -26,6 +26,9 @@ module StgSyn (
 	StgArg, StgLiveVars,
 	StgBinding, StgExpr, StgRhs,
 	StgCaseAlts, StgCaseDefault,
+
+	-- StgOp
+	StgOp(..),
 
 	-- SRTs
 	SRT(..), noSRT,
@@ -49,12 +52,14 @@ import VarSet		( IdSet, isEmptyVarSet )
 import Id		( Id, idName, idPrimRep, idType )
 import Name		( isDllName )
 import Literal		( Literal, literalType, isLitLitLit, literalPrimRep )
+import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, dataConName )
 import PrimOp		( PrimOp )
 import Outputable
 import Type             ( Type )
 import TyCon            ( TyCon )
 import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
+import Unique		( Unique )
 import CmdLineOpts	( opt_SccProfilingOn )
 \end{code}
 
@@ -166,7 +171,7 @@ constructors, primitives, and literals.
   | StgConApp	DataCon
 		[GenStgArg occ]	-- Saturated
 
-  | StgPrimApp	PrimOp
+  | StgOpApp	StgOp		-- Primitive op or foreign call
 		[GenStgArg occ]	-- Saturated
 		Type		-- Result type; we need to know the result type
 				-- so that we can assign result registers.
@@ -533,6 +538,26 @@ isUpdatable Updatable   = True
 
 %************************************************************************
 %*                                                                      *
+\subsubsection{StgOp}
+%*                                                                      *
+%************************************************************************
+
+An StgOp allows us to group together PrimOps and ForeignCalls.
+It's quite useful to move these around together, notably
+in StgOpApp and COpStmt.
+
+\begin{code}
+data StgOp = StgPrimOp  PrimOp
+
+	   | StgFCallOp ForeignCall Unique
+		-- The Unique is occasionally needed by the C pretty-printer
+		-- (which lacks a unique supply), notably when generating a
+		-- typedef for foreign-export-dynamic
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
 \subsubsection[Static Reference Tables]{@SRT@}
 %*                                                                      *
 %************************************************************************
@@ -646,8 +671,8 @@ pprStgExpr (StgApp func args)
 pprStgExpr (StgConApp con args)
   = hsep [ ppr con, brackets (interppSP args)]
 
-pprStgExpr (StgPrimApp op args _)
-  = hsep [ ppr op, brackets (interppSP args)]
+pprStgExpr (StgOpApp op args _)
+  = hsep [ pprStgOp op, brackets (interppSP args)]
 
 pprStgExpr (StgLam _ bndrs body)
   =sep [ char '\\' <+> ppr bndrs <+> ptext SLIT("->"),
@@ -746,6 +771,8 @@ pprStgDefault StgNoDefault	    = empty
 pprStgDefault (StgBindDefault expr) = hang (hsep [ptext SLIT("DEFAULT"), ptext SLIT("->")]) 
 					 4 (ppr expr)
 
+pprStgOp (StgPrimOp  op)   = ppr op
+pprStgOp (StgFCallOp op _) = ppr op
 \end{code}
 
 \begin{code}

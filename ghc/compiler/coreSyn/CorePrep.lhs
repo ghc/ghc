@@ -18,15 +18,14 @@ import Type	( Type, applyTy, splitFunTy_maybe, isTyVarTy,
 		  isUnLiftedType, isUnboxedTupleType, repType,	
 		  uaUTy, usOnce, usMany, seqType )
 import Demand	( Demand, isStrict, wwLazy, StrictnessInfo(..) )
-import PrimOp	( PrimOp(..), setCCallUnique )
-import Var 	( Var, Id, setVarUnique, globalIdDetails, setGlobalIdDetails )
+import PrimOp	( PrimOp(..) )
+import Var 	( Var, Id, setVarUnique )
 import VarSet
 import VarEnv
 import Id	( mkSysLocal, idType, idStrictness, idDemandInfo, idArity,
-		  setIdType, isPrimOpId_maybe, isLocalId, modifyIdInfo,
+		  setIdType, isPrimOpId_maybe, isFCallId, isLocalId, 
 		  hasNoBinding
 		)
-import IdInfo	( GlobalIdDetails(..) )
 import HscTypes ( ModDetails(..) )
 import UniqSupply
 import Maybes
@@ -588,13 +587,9 @@ cloneBndr env bndr
 
 fiddleCCall :: Id -> UniqSM Id
 fiddleCCall id 
-  = case globalIdDetails id of
-         PrimOpId (CCallOp ccall) ->
-	    -- Make a guaranteed unique name for a dynamic ccall.
-	    getUniqueUs   	`thenUs` \ uniq ->
-	    returnUs (setGlobalIdDetails id 
-			    (PrimOpId (CCallOp (setCCallUnique ccall uniq))))
-	 other -> returnUs id
+  | isFCallId id = getUniqueUs   	`thenUs` \ uniq ->
+		   returnUs (id `setVarUnique` uniq)
+  | otherwise    = returnUs id
 
 ------------------------------------------------------------------------------
 -- Generating new binders

@@ -16,6 +16,7 @@ import HsTypes		( HsType )
 import HsImpExp		( isOperator )
 
 -- others:
+import ForeignCall	( Safety )
 import Name		( Name )
 import Outputable	
 import PprType		( pprParendType )
@@ -139,7 +140,7 @@ data HsExpr id pat
   | HsCCall	CLabelString	-- call into the C world; string is
 		[HsExpr id pat]	-- the C function; exprs are the
 				-- arguments to pass.
-		Bool		-- True <=> might cause Haskell
+		Safety		-- True <=> might cause Haskell
 				-- garbage-collection (must generate
 				-- more paranoid code)
 		Bool		-- True <=> it's really a "casm"

@@ -10,7 +10,7 @@ module Name (
 
 	-- The Name type
 	Name,					-- Abstract
-	mkLocalName, mkSysLocalName, mkCCallName,
+	mkLocalName, mkSysLocalName, mkFCallName,
 	mkIPName,
 	mkGlobalName, mkKnownKeyGlobal, mkWiredInName,
 
@@ -180,10 +180,10 @@ mkSysLocalName :: Unique -> UserFS -> Name
 mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = System, 
 				n_occ = mkVarOcc fs, n_loc = noSrcLoc }
 
-mkCCallName :: Unique -> EncodedString -> Name
+mkFCallName :: Unique -> EncodedString -> Name
 	-- The encoded string completely describes the ccall
-mkCCallName uniq str =  Name { n_uniq = uniq, n_sort = Local, 
-			       n_occ = mkCCallOcc str, n_loc = noSrcLoc }
+mkFCallName uniq str =  Name { n_uniq = uniq, n_sort = Local, 
+			       n_occ = mkFCallOcc str, n_loc = noSrcLoc }
 
 mkIPName :: Unique -> OccName -> Name
 mkIPName uniq occ

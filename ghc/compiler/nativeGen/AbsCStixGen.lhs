@@ -35,7 +35,7 @@ import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
 import PrimRep	    	( isFloatingRep, PrimRep(..) )
 import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable )
 import StixMacro	( macroCode, checkCode )
-import StixPrim		( primCode, amodeToStix, amodeToStix' )
+import StixPrim		( primCode, foreignCallCode, amodeToStix, amodeToStix' )
 import Outputable       ( pprPanic, ppr )
 import UniqSupply	( returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import Util		( naturalMergeSortLe )
@@ -371,12 +371,15 @@ which varies depending on whether we're profiling etc.
 Now the PrimOps, some of which may need caller-saves register wrappers.
 
 \begin{code}
+ gencode (COpStmt results (StgFCallOp fcall _) args vols)
+  = ASSERT( null vols )
+    foreignCallCode (nonVoid results) fcall (nonVoid args)
 
- gencode (COpStmt results op args vols)
+ gencode (COpStmt results (StgPrimOp op) args vols)
   -- ToDo (ADR?): use that liveness mask
   | primOpNeedsWrapper op
   = let
-	saves = volsaves vols
+	saves    = volsaves vols
     	restores = volrestores vols
     in
     	p2stix (nonVoid results) op (nonVoid args)
@@ -386,7 +389,6 @@ Now the PrimOps, some of which may need caller-saves register wrappers.
   | otherwise = p2stix (nonVoid results) op (nonVoid args)
     where
 	nonVoid = filter ((/= VoidRep) . getAmodeRep)
-
 \end{code}
 
 Now the dreaded conditional jump.

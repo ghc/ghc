@@ -23,22 +23,34 @@ import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 			  mkMAP_FROZEN_infoLabel, mkEMPTY_MVAR_infoLabel,
 			  mkForeignLabel )
-import CallConv		( cCallConv )
+import ForeignCall	( CCallConv(..) )
 import Outputable
 import FastTypes
 
 #include "NCG.h"
 \end{code}
 
-The main honcho here is primCode, which handles the guts of COpStmts.
+The main honchos here are primCode anf foreignCallCode, which handle the guts of COpStmts.
 
 \begin{code}
+foreignCallCode
+    :: [CAddrMode]  	-- results
+    -> ForeignCall    	-- op
+    -> [CAddrMode]  	-- args
+    -> UniqSM StixTreeList
+
 primCode
     :: [CAddrMode]  	-- results
     -> PrimOp 	    	-- op
     -> [CAddrMode]  	-- args
     -> UniqSM StixTreeList
 \end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{Code for foreign calls}
+%*									*
+%************************************************************************
 
 First, the dreaded @ccall@.  We can't handle @casm@s.
 
@@ -47,6 +59,65 @@ is empty, we just perform the call and ignore the result.
 
 btw Why not let programmer use casm to provide assembly code instead
 of C code?  ADR
+
+ToDo: saving/restoring of volatile regs around ccalls.
+
+JRS, 001113: always do the call of suspendThread and resumeThread as a ccall
+rather than inheriting the calling convention of the thing which we're really
+calling.
+
+\begin{code}
+foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety is_asm)) rhs
+  | is_asm		  = error "ERROR: Native code generator can't handle casm"
+  | not (playSafe safety) = returnUs (\xs -> ccall : xs)
+
+  | otherwise
+  = save_thread_state	`thenUs` \ save ->
+    load_thread_state	`thenUs` \ load -> 
+    getUniqueUs		`thenUs` \ uniq -> 
+    let
+       id  = StReg (StixTemp uniq IntRep)
+    
+       suspend = StAssign IntRep id 
+    		(StCall SLIT("suspendThread") {-no:cconv-} CCallConv
+                            IntRep [stgBaseReg])
+       resume  = StCall SLIT("resumeThread") {-no:cconv-} CCallConv
+                        VoidRep [id]
+    in
+    returnUs (\xs -> save (suspend : ccall : resume : load xs))
+
+  where
+    args = map amodeCodeForCCall rhs
+    amodeCodeForCCall x =
+	let base = amodeToStix' x
+	in
+	    case getAmodeRep x of
+	      ArrayRep      -> StIndex PtrRep base arrPtrsHS
+	      ByteArrayRep  -> StIndex IntRep base arrWordsHS
+	      ForeignObjRep -> StInd PtrRep (StIndex PtrRep base fixedHS)
+	      _ -> base
+
+    ccall = case lhs of
+      []    -> StCall fn cconv VoidRep args
+      [lhs] ->
+	  let lhs' = amodeToStix lhs
+	      pk   = case getAmodeRep lhs of
+                        FloatRep  -> FloatRep
+                        DoubleRep -> DoubleRep
+                        other     -> IntRep
+	  in
+	      StAssign pk lhs' (StCall fn cconv pk args)
+
+foreignCallCode lhs call rhs
+  = pprPanic "Native code generator can't handle foreign call" (ppr call)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection{Code for primops}
+%*									*
+%************************************************************************
 
 The (MP) integer operations are a true nightmare.  Since we don't have
 a convenient abstract way of allocating temporary variables on the (C)
@@ -338,53 +409,6 @@ primCode ls WriteOffAddrOp_Word64    rs = primCode_WriteOffAddrOp Word64Rep    l
 
 \end{code}
 
-ToDo: saving/restoring of volatile regs around ccalls.
-
-JRS, 001113: always do the call of suspendThread and resumeThread as a ccall
-rather than inheriting the calling convention of the thing which we're really
-calling.
-
-\begin{code}
-primCode lhs (CCallOp (CCall (StaticTarget fn) is_asm may_gc cconv)) rhs
-  | is_asm = error "ERROR: Native code generator can't handle casm"
-  | not may_gc = returnUs (\xs -> ccall : xs)
-  | otherwise =
-	save_thread_state	`thenUs` \ save ->
-	load_thread_state	`thenUs` \ load -> 
-	getUniqueUs		`thenUs` \ uniq -> 
-	let
-	   id  = StReg (StixTemp uniq IntRep)
-
-    	   suspend = StAssign IntRep id 
-			(StCall SLIT("suspendThread") {-no:cconv-} cCallConv
-                                IntRep [stgBaseReg])
-	   resume  = StCall SLIT("resumeThread") {-no:cconv-} cCallConv
-                            VoidRep [id]
-	in
-	returnUs (\xs -> save (suspend : ccall : resume : load xs))
-
-  where
-    args = map amodeCodeForCCall rhs
-    amodeCodeForCCall x =
-	let base = amodeToStix' x
-	in
-	    case getAmodeRep x of
-	      ArrayRep      -> StIndex PtrRep base arrPtrsHS
-	      ByteArrayRep  -> StIndex IntRep base arrWordsHS
-	      ForeignObjRep -> StInd PtrRep (StIndex PtrRep base fixedHS)
-	      _ -> base
-
-    ccall = case lhs of
-      [] -> StCall fn cconv VoidRep args
-      [lhs] ->
-	  let lhs' = amodeToStix lhs
-	      pk   = case getAmodeRep lhs of
-                        FloatRep  -> FloatRep
-                        DoubleRep -> DoubleRep
-                        other     -> IntRep
-	  in
-	      StAssign pk lhs' (StCall fn cconv pk args)
-\end{code}
 
 DataToTagOp won't work for 64-bit archs, as it is.
 

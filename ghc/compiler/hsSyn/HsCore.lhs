@@ -31,7 +31,7 @@ import HsTypes		( HsType, pprParendHsType, pprHsTyVarBndr, toHsType,
 			)
 
 -- others:
-import Id		( idArity, idType, isDataConId_maybe, isPrimOpId_maybe )
+import Id		( idArity, idType, isDataConId_maybe, isFCallId_maybe )
 import Var		( varType, isId )
 import IdInfo		( InlinePragInfo, pprInlinePragInfo, ppStrictnessInfo )
 import Name		( Name, NamedThing(..), getName, toRdrName )
@@ -39,10 +39,9 @@ import RdrName		( RdrName, rdrNameOcc )
 import OccName		( isTvOcc )
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
-import PrimOp		( PrimOp(CCallOp) )
 import Demand		( StrictnessInfo )
 import Literal		( Literal, maybeLitLit )
-import PrimOp		( CCall, pprCCallOp )
+import ForeignCall	( ForeignCall )
 import DataCon		( dataConTyCon, dataConSourceArity )
 import TyCon		( isTupleTyCon, tupleTyConBoxity )
 import Type		( Kind )
@@ -70,7 +69,7 @@ data UfExpr name
   | UfNote	(UfNote name) (UfExpr name)
   | UfLit	Literal
   | UfLitLit	FAST_STRING (HsType name)
-  | UfCCall	CCall (HsType name)
+  | UfFCall	ForeignCall (HsType name)
 
 data UfNote name = UfSCC CostCentre
 	         | UfCoerce (HsType name)
@@ -171,10 +170,10 @@ toUfApp e as = mkUfApps (toUfExpr e) as
 mkUfApps = foldl (\f a -> UfApp f (toUfExpr a))
 
 ---------------------
-toUfVar v = case isPrimOpId_maybe v of
-		-- Ccalls has special syntax
-		Just (CCallOp cc) -> UfCCall cc (toHsType (idType v))
-		other		  -> UfVar (getName v)
+toUfVar v = case isFCallId_maybe v of
+		-- Foreign calls have special syntax
+		Just fcall -> UfFCall fcall (toHsType (idType v))
+		other	   -> UfVar (getName v)
 \end{code}
 
 
@@ -206,7 +205,7 @@ pprUfExpr :: (NamedThing name, Outputable name) => (SDoc -> SDoc) -> UfExpr name
 pprUfExpr add_par (UfVar v)       = ppr v
 pprUfExpr add_par (UfLit l)       = ppr l
 pprUfExpr add_par (UfLitLit l ty) = add_par (hsep [ptext SLIT("__litlit"), pprHsString l, pprParendHsType ty])
-pprUfExpr add_par (UfCCall cc ty) = braces (pprCCallOp cc <+> ppr ty)
+pprUfExpr add_par (UfFCall cc ty) = braces (ppr cc <+> ppr ty)
 pprUfExpr add_par (UfType ty)     = char '@' <+> pprParendHsType ty
 
 pprUfExpr add_par e@(UfLam _ _)   = add_par (char '\\' <+> hsep (map ppr bndrs)
@@ -323,7 +322,7 @@ eq_ufExpr :: (NamedThing name, Ord name) => EqHsEnv name -> UfExpr name -> UfExp
 eq_ufExpr env (UfVar v1)	(UfVar v2)	  = eq_ufVar env v1 v2
 eq_ufExpr env (UfLit l1)        (UfLit l2) 	  = l1 == l2
 eq_ufExpr env (UfLitLit l1 ty1) (UfLitLit l2 ty2) = l1==l2 && eq_hsType env ty1 ty2
-eq_ufExpr env (UfCCall c1 ty1)  (UfCCall c2 ty2)  = c1==c2 && eq_hsType env ty1 ty2
+eq_ufExpr env (UfFCall c1 ty1)  (UfFCall c2 ty2)  = c1==c2 && eq_hsType env ty1 ty2
 eq_ufExpr env (UfType ty1)      (UfType ty2)	  = eq_hsType env ty1 ty2
 eq_ufExpr env (UfTuple n1 as1)  (UfTuple n2 as2)  = n1==n2 && eqListBy (eq_ufExpr env) as1 as2
 eq_ufExpr env (UfLam b1 body1)  (UfLam b2 body2)  = eq_ufBinder env b1 b2 (\env -> eq_ufExpr env body1 body2)

@@ -44,11 +44,12 @@ import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( exprIsValue, exprIsCheap, exprIsTrivial )
 import Id		( Id, idType, isId,
 			  idSpecialisation, idInlinePragma, idUnfolding,
-			  isPrimOpId_maybe, globalIdDetails
+			  isFCallId_maybe, globalIdDetails
 			)
 import VarSet
 import Literal		( isLitLitLit, litSize )
-import PrimOp		( PrimOp(..), primOpIsDupable, primOpOutOfLine, ccallIsCasm )
+import PrimOp		( primOpIsDupable, primOpOutOfLine )
+import ForeignCall	( ForeignCall(..), ccallIsCasm )
 import IdInfo		( InlinePragInfo(..), OccInfo(..), GlobalIdDetails(..),
 			  isNeverInlinePrag
 			)
@@ -299,6 +300,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
       = case globalIdDetails fun of
 	  DataConId dc -> conSizeN (valArgCount args)
 
+	  FCallId fc   -> sizeN opt_UF_DearOp
 	  PrimOpId op  -> primOpSize op (valArgCount args)
 			  -- foldr addSize (primOpSize op) (map arg_discount args)
 			  -- At one time I tried giving an arg-discount if a primop 
@@ -370,7 +372,6 @@ maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 ># n2  = s1
 
 sizeZero     	= SizeIs (_ILIT 0) emptyBag (_ILIT 0)
 sizeOne      	= SizeIs (_ILIT 1) emptyBag (_ILIT 0)
-sizeTwo      	= SizeIs (_ILIT 2) emptyBag (_ILIT 0)
 sizeN n 	= SizeIs (iUnbox n) emptyBag (_ILIT 0)
 conSizeN n      = SizeIs (_ILIT 1) emptyBag (iUnbox n +# _ILIT 1)
 	-- Treat constructors as size 1; we are keen to expose them
@@ -478,9 +479,9 @@ okToUnfoldInHiFile :: CoreExpr -> Bool
 okToUnfoldInHiFile e = opt_UnfoldCasms || go e
  where
     -- Race over an expression looking for CCalls..
-    go (Var v)                = case isPrimOpId_maybe v of
-				  Just op -> okToUnfoldPrimOp op
-				  Nothing -> True
+    go (Var v)                = case isFCallId_maybe v of
+				  Just fcall -> okToExposeFCall fcall
+				  Nothing    -> True
     go (Lit lit)	      = not (isLitLitLit lit)
     go (App fun arg)          = go fun && go arg
     go (Lam _ body)           = go body
@@ -491,8 +492,8 @@ okToUnfoldInHiFile e = opt_UnfoldCasms || go e
     go (Type _)		      = True
 
     -- ok to unfold a PrimOp as long as it's not a _casm_
-    okToUnfoldPrimOp (CCallOp ccall) = not (ccallIsCasm ccall)
-    okToUnfoldPrimOp _               = True
+    okToExposeFCall (CCall cc) = not (ccallIsCasm cc)
+    okToExposeFCall other      = True
 \end{code}
 
 

@@ -15,10 +15,7 @@ module PrimOp (
 	primOpOkForSpeculation, primOpIsCheap, primOpIsDupable,
 	primOpHasSideEffects,
 
-	getPrimOpResultInfo,  PrimOpResultInfo(..),
-
-	CCall(..), CCallTarget(..), ccallMayGC, ccallIsCasm, pprCCallOp,
-	isDynamicTarget, dynamicTarget, setCCallUnique
+	getPrimOpResultInfo,  PrimOpResultInfo(..)
     ) where
 
 #include "HsVersions.h"
@@ -29,19 +26,16 @@ import TysWiredIn
 
 import Demand		( wwLazy, wwPrim, wwStrict, StrictnessInfo(..) )
 import Var		( TyVar )
-import CallConv		( CallConv, pprCallConv )
 import Name		( Name, mkWiredInName )
 import RdrName		( RdrName, mkRdrOrig )
 import OccName		( OccName, pprOccName, mkVarOcc )
-import TyCon		( TyCon, tyConArity )
-import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, mkTyVarTys,
-			  mkTyConApp, typePrimRep,
+import TyCon		( TyCon )
+import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep,
 			  splitFunTy_maybe, splitAlgTyConApp_maybe, splitTyConApp,
                           mkUTy, usOnce, usMany
 			)
-import Unique		( Unique, mkPrimOpIdUnique )
+import Unique		( mkPrimOpIdUnique )
 import BasicTypes	( Arity, Boxity(..) )
-import CStrings		( CLabelString, pprCLabelString )
 import PrelNames	( pREL_GHC, pREL_GHC_Name )
 import Outputable
 import Util		( zipWithEqual )
@@ -61,7 +55,6 @@ These are in \tr{state-interface.verb} order.
 -- supplies: 
 -- data PrimOp = ...
 #include "primop-data-decl.hs-incl"
-    | CCallOp CCall          -- and don't forget to add CCall
 \end{code}
 
 Used for the Ord instance
@@ -100,7 +93,6 @@ An @Enum@-derived list would be better; meanwhile... (ToDo)
 allThePrimOps :: [PrimOp]
 allThePrimOps =
 #include "primop-list.hs-incl"
--- Doesn't include CCall, which is really a family of primops
 \end{code}
 
 %************************************************************************
@@ -334,7 +326,6 @@ Some PrimOps need to be called out-of-line because they either need to
 perform a heap check or they block.
 
 \begin{code}
-primOpOutOfLine (CCallOp c_call) = ccallMayGC c_call
 #include "primop-out-of-line.hs-incl"
 \end{code}
 
@@ -404,7 +395,6 @@ duplicated.
 
 \begin{code}
 primOpHasSideEffects :: PrimOp -> Bool
-primOpHasSideEffects (CCallOp _) 	= True
 #include "primop-has-side-effects.hs-incl"
 \end{code}
 
@@ -413,7 +403,6 @@ any live variables that are stored in caller-saves registers.
 
 \begin{code}
 primOpNeedsWrapper :: PrimOp -> Bool
-primOpNeedsWrapper (CCallOp _) 		= True
 #include "primop-needs-wrapper.hs-incl"
 \end{code}
 
@@ -475,7 +464,6 @@ primOpSig op
 -- as required by the UsageSP inference.
 
 primOpUsg :: PrimOp -> ([TyVar],[Type],Type)
-primOpUsg p@(CCallOp _) = mangle p [] mkM
 #include "primop-usage.hs-incl"
 
 -- Things with no Haskell pointers inside: in actuality, usages are
@@ -525,8 +513,6 @@ data PrimOpResultInfo
 -- be out of line, or the code generator won't work.
 
 getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
-getPrimOpResultInfo (CCallOp _)
-  = ReturnsAlg unboxedPairTyCon
 getPrimOpResultInfo op
   = case (primOpInfo op) of
       Dyadic  _ ty		 -> ReturnsPrim (typePrimRep ty)
@@ -552,15 +538,6 @@ commutableOp :: PrimOp -> Bool
 
 Utils:
 \begin{code}
-mkPrimTyApp :: [TyVar] -> PrimRep -> ([TyVar], Type)
-	-- CharRep       -->  ([],  Char#)
-	-- StablePtrRep  -->  ([a], StablePtr# a)
-mkPrimTyApp tvs kind
-  = (forall_tvs, mkTyConApp tycon (mkTyVarTys forall_tvs))
-  where
-    tycon      = primRepTyCon kind
-    forall_tvs = take (tyConArity tycon) tvs
-
 dyadic_fun_ty  ty = mkFunTys [ty, ty] ty
 monadic_fun_ty ty = mkFunTy  ty ty
 compare_fun_ty ty = mkFunTys [ty, ty] boolTy
@@ -569,8 +546,6 @@ compare_fun_ty ty = mkFunTys [ty, ty] boolTy
 Output stuff:
 \begin{code}
 pprPrimOp  :: PrimOp -> SDoc
-
-pprPrimOp (CCallOp c_call) = pprCCallOp c_call
 pprPrimOp other_op
   = getPprStyle $ \ sty ->
     if ifaceStyle sty then	-- For interfaces Print it qualified with PrelGHC.
@@ -582,80 +557,3 @@ pprPrimOp other_op
 \end{code}
 
 
-%************************************************************************
-%*									*
-\subsubsection{CCalls}
-%*									*
-%************************************************************************
-
-A special ``trap-door'' to use in making calls direct to C functions:
-\begin{code}
-data CCall
-  =  CCall	CCallTarget
-		Bool		-- True <=> really a "casm"
-		Bool		-- True <=> might invoke Haskell GC
-		CallConv	-- calling convention to use.
-  deriving( Eq )
-
-data CCallTarget
-  = StaticTarget  CLabelString  -- An "unboxed" ccall# to `fn'.
-  | DynamicTarget Unique	-- First argument (an Addr#) is the function pointer
-				--   (unique is used to generate a 'typedef' to cast
-				--    the function pointer if compiling the ccall# down to
-				--    .hc code - can't do this inline for tedious reasons.)
-
-instance Eq CCallTarget where
-  (StaticTarget l1) == (StaticTarget l2) = l1 == l2
-  (DynamicTarget _) == (DynamicTarget _) = True	
-	-- Ignore the arbitrary unique; this is important when comparing
-	-- a dynamic ccall read from an interface file A.hi with the
-	-- one constructed from A.hs, when deciding whether the interface
-	-- has changed
-  t1 == t2 = False
-
-ccallMayGC :: CCall -> Bool
-ccallMayGC (CCall _ _ may_gc _) = may_gc
-
-ccallIsCasm :: CCall -> Bool
-ccallIsCasm (CCall _ c_asm _ _) = c_asm
-
-isDynamicTarget (DynamicTarget _) = True
-isDynamicTarget (StaticTarget _)  = False
-
-dynamicTarget :: CCallTarget
-dynamicTarget = DynamicTarget (panic "Unique in DynamicTarget not yet set")
-	-- The unique is really only to do with code generation, so it
-	-- is only set in CoreToStg; before then it's just an error message
-
-setCCallUnique :: CCall -> Unique -> CCall
-setCCallUnique (CCall (DynamicTarget _) is_asm may_gc cconv) uniq
-  = CCall (DynamicTarget uniq) is_asm may_gc cconv
-setCCallUnique ccall uniq = ccall
-\end{code}
-
-\begin{code}
-pprCCallOp (CCall fun is_casm may_gc cconv)
-  = hcat [ ifPprDebug callconv
-	 , text "__", ppr_dyn
-         , text before , ppr_fun , after]
-  where
-        callconv = text "{-" <> pprCallConv cconv <> text "-}"
-
-	before
-	  | is_casm && may_gc = "casm_GC ``"
-	  | is_casm	      = "casm ``"
-	  | may_gc	      = "ccall_GC "
-	  | otherwise	      = "ccall "
-
-	after
-	  | is_casm   = text "''"
-	  | otherwise = empty
-	  
-	ppr_dyn = case fun of
-		    DynamicTarget _ -> text "dyn_"
-		    _	   	    -> empty
-
-	ppr_fun = case fun of
-		     DynamicTarget _ -> text "\"\""
-		     StaticTarget fn -> pprCLabelString fn
-\end{code}

@@ -16,7 +16,7 @@ module StixInteger (
 import {-# SOURCE #-} StixPrim ( amodeToStix )
 
 import AbsCSyn		hiding (spRel) -- bits and bobs..
-import CallConv		( cCallConv )
+import ForeignCall	( CCallConv(..) )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import Stix		( StixTree(..), StixTreeList, arrWordsHS )
@@ -56,7 +56,7 @@ gmpCompare res args@(csa1,cda1, csa2,cda2)
 
     	(a1,a2,a3) = toStruct scratch1 (aa1,sa1,da1)
     	(a4,a5,a6) = toStruct scratch2 (aa2,sa2,da2)
-    	mpz_cmp = StCall SLIT("__gmpz_cmp") cCallConv IntRep [scratch1, scratch2]
+    	mpz_cmp = StCall SLIT("__gmpz_cmp") CCallConv IntRep [scratch1, scratch2]
     	r1 = StAssign IntRep result mpz_cmp
     in
     returnUs (\xs -> a1 : a2 : a3 : a4 : a5 : a6 : r1 : xs)
@@ -75,7 +75,7 @@ gmpCompareInt res args@(csa1,cda1, cai)
 	da1	 = stgArrWords__BYTE_ARR_CTS (amodeToStix cda1)
         ai       = amodeToStix cai
     	(a1,a2,a3) = toStruct scratch1 (aa1,sa1,da1)
-    	mpz_cmp_si = StCall SLIT("__gmpz_cmp_si") cCallConv IntRep [scratch1, ai]
+    	mpz_cmp_si = StCall SLIT("__gmpz_cmp_si") CCallConv IntRep [scratch1, ai]
     	r1 = StAssign IntRep result mpz_cmp_si
     in
     returnUs (\xs -> a1 : a2 : a3 : r1 : xs)
@@ -95,7 +95,7 @@ gmpInteger2Int res args@(csa,cda)
 	da	= stgArrWords__BYTE_ARR_CTS (amodeToStix cda)
 
     	(a1,a2,a3) = toStruct scratch1 (aa,sa,da)
-    	mpz_get_si = StCall SLIT("__gmpz_get_si") cCallConv IntRep [scratch1]
+    	mpz_get_si = StCall SLIT("__gmpz_get_si") CCallConv IntRep [scratch1]
     	r1 = StAssign IntRep result mpz_get_si
     in
     returnUs (\xs -> a1 : a2 : a3 : r1 : xs)
@@ -113,7 +113,7 @@ gmpInteger2Word res args@(csa,cda)
 	da	= stgArrWords__BYTE_ARR_CTS (amodeToStix cda)
 
     	(a1,a2,a3) = toStruct scratch1 (aa,sa,da)
-    	mpz_get_ui = StCall SLIT("__gmpz_get_ui") cCallConv IntRep [scratch1]
+    	mpz_get_ui = StCall SLIT("__gmpz_get_ui") CCallConv IntRep [scratch1]
     	r1 = StAssign WordRep result mpz_get_ui
     in
     returnUs (\xs -> a1 : a2 : a3 : r1 : xs)

@@ -12,12 +12,11 @@ module DsForeign ( dsForeigns ) where
 
 import CoreSyn
 
-import DsCCall		( dsCCall, mkCCall, boxResult, unboxArg, resultWrapper )
+import DsCCall		( dsCCall, mkFCall, boxResult, unboxArg, resultWrapper )
 import DsMonad
 
 import HsSyn		( ExtName(..), ForeignDecl(..), isDynamicExtName, ForKind(..) )
 import HsDecls		( extNameStatic )
-import CallConv
 import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkVanillaGlobal, mkSysLocal,
@@ -34,7 +33,11 @@ import Type		( repType, splitTyConApp_maybe,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, splitAppTy, applyTy, funResultTy
 			)
-import PrimOp		( CCall(..), CCallTarget(..), dynamicTarget )
+import ForeignCall	( ForeignCall(..), CCallSpec(..), 
+			  Safety(..), playSafe,
+			  CCallTarget(..), dynamicTarget,
+			  CCallConv(..), ccallConvToInt
+			)
 import TysWiredIn	( unitTy, addrTy, stablePtrTyCon )
 import TysPrim		( addrPrimTy )
 import PrelNames	( hasKey, ioTyConKey, deRefStablePtrName, newStablePtrName,
@@ -99,8 +102,7 @@ dsForeigns mod_name fos = foldlDs combine ([], [], empty, empty) fos
 	  FoLabel -> True
 	  _       -> False
 
-    (FoImport uns)   = imp_exp
-
+    FoImport uns = imp_exp
 \end{code}
 
 Desugaring foreign imports is just the matter of creating a binding
@@ -125,11 +127,11 @@ because it exposes the boxing to the call site.
 \begin{code}
 dsFImport :: Id
 	  -> Type		-- Type of foreign import.
-	  -> Bool		-- True <=> cannot re-enter the Haskell RTS
+	  -> Safety		-- Whether can re-enter the Haskell RTS, do GC etc
 	  -> ExtName
-	  -> CallConv
+	  -> CCallConv
 	  -> DsM [Binding]
-dsFImport fn_id ty unsafe ext_name cconv 
+dsFImport fn_id ty safety ext_name cconv 
   = let
 	(tvs, fun_ty)        = splitForAllTys ty
 	(arg_tys, io_res_ty) = splitFunTys fun_ty
@@ -140,11 +142,11 @@ dsFImport fn_id ty unsafe ext_name cconv
     let
 	work_arg_ids  = [v | Var v <- val_args]	-- All guaranteed to be vars
 
-	-- these are the ids we pass to boxResult, which are used to decide
+	-- These are the ids we pass to boxResult, which are used to decide
 	-- whether to touch# an argument after the call (used to keep
 	-- ForeignObj#s live across a 'safe' foreign import).
-	maybe_arg_ids | unsafe    = []
-		      | otherwise = work_arg_ids
+	maybe_arg_ids | playSafe safety = work_arg_ids
+		      | otherwise	= []
     in
     boxResult maybe_arg_ids io_res_ty  		`thenDs` \ (ccall_result_ty, res_wrapper) ->
 
@@ -157,8 +159,8 @@ dsFImport fn_id ty unsafe ext_name cconv
 
 	-- Build the worker
 	worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
-	the_ccall     = CCall lbl False (not unsafe) cconv
- 	the_ccall_app = mkCCall ccall_uniq the_ccall val_args ccall_result_ty
+	the_ccall     = CCall (CCallSpec lbl cconv safety False)
+ 	the_ccall_app = mkFCall ccall_uniq the_ccall val_args ccall_result_ty
 	work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
 	work_id       = mkSysLocal SLIT("$wccall") work_uniq worker_ty
 
@@ -198,7 +200,7 @@ dsFExport :: Id
 	  -> Type		-- Type of foreign export.
 	  -> Module
 	  -> ExtName
-	  -> CallConv
+	  -> CCallConv
 	  -> Bool		-- True => invoke IO action that's hanging off 
 				-- the first argument's stable pointer
 	  -> DsM ( Id		-- The foreign-exported Id
@@ -329,7 +331,7 @@ dsFExportDynamic :: Id
 		 -> Type		-- Type of foreign export.
 		 -> Module
 		 -> ExtName
-		 -> CallConv
+		 -> CCallConv
 		 -> DsM (Id, [Binding], SDoc, SDoc)
 dsFExportDynamic i ty mod_name ext_name cconv =
      newSysLocalDs ty					 `thenDs` \ fe_id ->
@@ -363,7 +365,7 @@ dsFExportDynamic i ty mod_name ext_name cconv =
 	to be entered using an external calling convention
 	(stdcall, ccall).
        -}
-      adj_args      = [ mkIntLitInt (callConvToInt cconv)
+      adj_args      = [ mkIntLitInt (ccallConvToInt cconv)
 		      , Var stbl_value
 		      , mkLit (MachLabel (_PK_ fe_nm))
 		      ]
@@ -371,13 +373,13 @@ dsFExportDynamic i ty mod_name ext_name cconv =
 	-- (probably in the RTS.) 
       adjustor	    = SLIT("createAdjustor")
      in
-     dsCCall adjustor adj_args False False io_res_ty `thenDs` \ ccall_adj ->
+     dsCCall adjustor adj_args PlayRisky False io_res_ty	`thenDs` \ ccall_adj ->
+	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
      let ccall_adj_ty = exprType ccall_adj
          ccall_io_adj = mkLams [stbl_value]		     $
 			Note (Coerce io_res_ty ccall_adj_ty)
 			     ccall_adj
-     in
-     let io_app = mkLams tvs	 $
+         io_app = mkLams tvs	 $
 		  mkLams [cback] $
 		  stbl_app ccall_io_adj res_ty
 	 fed = (i `setInlinePragma` neverInlinePrag, io_app)
@@ -389,13 +391,8 @@ dsFExportDynamic i ty mod_name ext_name cconv =
  where
   (tvs,sans_foralls)		   = splitForAllTys ty
   ([arg_ty], io_res_ty)		   = splitFunTys sans_foralls
-
   Just (ioTyCon, [res_ty])	   = splitTyConApp_maybe io_res_ty
-
   export_ty			   = mkFunTy (mkTyConApp stablePtrTyCon [arg_ty]) arg_ty
-
-  ioAddrTy :: Type	-- IO Addr
-  ioAddrTy = mkTyConApp ioTyCon [addrTy]
 
 toCName :: Id -> String
 toCName i = showSDoc (pprCode CStyle (ppr (idName i)))
@@ -417,7 +414,7 @@ fexportEntry :: String
 	     -> Id 
 	     -> [Type] 
 	     -> Type 
-	     -> CallConv 
+	     -> CCallConv 
 	     -> Bool
 	     -> (SDoc, SDoc)
 fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
@@ -456,9 +453,9 @@ fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
   cResType | res_ty_is_unit = text "void"
 	   | otherwise	    = showStgType res_ty
 
-  pprCconv
-   | cc == cCallConv = empty
-   | otherwise	     = pprCallConv cc
+  pprCconv = case cc of
+		CCallConv   -> empty
+		StdCallConv -> ppr cc
      
   declareResult  = text "HaskellObj ret;"
 
@@ -479,9 +476,10 @@ fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
    needed by the Adjustor.c code to get the stack cleanup right.
   -}
   (proto_args, real_args)
-    | cc == cCallConv && isDyn = ( text "a0" : text "a_" : mkCArgNames 1 (tail args)
-				, head args : addrTy : tail args)
-    | otherwise = (mkCArgNames 0 args, args)
+    = case cc of
+	CCallConv | isDyn -> ( text "a0" : text "a_" : mkCArgNames 1 (tail args)
+			     , head args : addrTy : tail args)
+        other		  -> (mkCArgNames 0 args, args)
 
 mkCArgNames :: Int -> [a] -> [SDoc]
 mkCArgNames n as = zipWith (\ _ n -> text ('a':show n)) as [n..] 

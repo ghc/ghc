@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.35 2000/10/12 15:17:07 sewardj Exp $
+% $Id: AbsCSyn.lhs,v 1.36 2001/05/22 13:43:14 simonpj Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -44,10 +44,10 @@ import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
 			  mAX_Double_REG, spRelToInt )
 import CostCentre       ( CostCentre, CostCentreStack )
 import Literal		( mkMachInt, Literal(..) )
+import ForeignCall	( CCallSpec )
 import PrimRep		( PrimRep(..) )
-import PrimOp           ( PrimOp, CCall )
 import Unique           ( Unique )
-import StgSyn		( SRT(..) )
+import StgSyn		( StgOp, SRT(..) )
 import TyCon		( TyCon )
 import BitSet				-- for liveness masks
 import FastTypes
@@ -117,7 +117,7 @@ stored in a mixed type location.)
 
   | COpStmt
 	[CAddrMode]	-- Results
-	PrimOp
+	StgOp
 	[CAddrMode]	-- Arguments
 	[MagicId]	-- Potentially volatile/live registers
 			-- (to save/restore around the call/op)
@@ -164,7 +164,7 @@ stored in a mixed type location.)
        compiling 'foreign import dynamic's)
     -}
   | CCallTypedef Bool {- True => use "typedef"; False => use "extern"-}
-  		 CCall [CAddrMode] [CAddrMode]
+  		 CCallSpec Unique [CAddrMode] [CAddrMode]
 
   -- *** the next three [or so...] are DATA (those above are CODE) ***
 

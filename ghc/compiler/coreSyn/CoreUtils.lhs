@@ -49,11 +49,10 @@ import VarEnv
 import Name		( hashName )
 import Literal		( hashLiteral, literalType, litIsDupable )
 import DataCon		( DataCon, dataConRepArity )
-import PrimOp		( primOpOkForSpeculation, primOpIsCheap, 
-			  primOpIsDupable )
+import PrimOp		( primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idStrictness, idLBVarInfo, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo, isOneShotLambda,
-			  isDataConId_maybe, isPrimOpId_maybe, mkSysLocal, hasNoBinding
+			  isDataConId_maybe, mkSysLocal, hasNoBinding
 			)
 import IdInfo		( LBVarInfo(..),  
 			  GlobalIdDetails(..),
@@ -66,7 +65,6 @@ import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply )
-import Maybes		( maybeToBool )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
 \end{code}

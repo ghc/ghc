@@ -39,6 +39,7 @@ import List             ( isSuffixOf )
 import IdInfo		( InlinePragInfo(..) )
 import PrelNames	( mkTupNameStr )
 import CmdLineOpts	( opt_HiVersion, opt_NoHiCheck )
+import ForeignCall	( Safety(..) )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( listToUFM, lookupUFM )
 import BasicTypes	( NewOrData(..), Boxity(..) )
@@ -130,7 +131,7 @@ data Token
   | ITcoerce
   | ITinlineMe
   | ITinlineCall
-  | ITccall (Bool,Bool,Bool)	-- (is_dyn, is_casm, may_gc)
+  | ITccall (Bool,Bool,Safety)	-- (is_dyn, is_casm, may_gc)
   | ITdefaultbranch
   | ITbottom
   | ITinteger_lit 
@@ -307,10 +308,10 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "with",	ITwith ),
 	( "stdcall",    ITstdcallconv),
 	( "ccall",      ITccallconv),
-        ("_ccall_",	ITccall (False, False, False)),
-        ("_ccall_GC_",	ITccall (False, False, True)),
-        ("_casm_",	ITccall (False, True,  False)),
-        ("_casm_GC_",	ITccall (False, True,  True)),
+        ("_ccall_",	ITccall (False, False, PlayRisky)),
+        ("_ccall_GC_",	ITccall (False, False, PlaySafe)),
+        ("_casm_",	ITccall (False, True,  PlayRisky)),
+        ("_casm_GC_",	ITccall (False, True,  PlaySafe)),
 
 	-- interface keywords
         ("__interface",		ITinterface),
@@ -344,14 +345,14 @@ ghcExtensionKeywordsFM = listToUFM $
         ("__D",			ITdeprecated),
         ("__U",			ITunfold NoInlinePragInfo),
 	
-        ("__ccall",		ITccall (False, False, False)),
-        ("__ccall_GC",		ITccall (False, False, True)),
-        ("__dyn_ccall",		ITccall (True,  False, False)),
-        ("__dyn_ccall_GC",	ITccall (True,  False, True)),
-        ("__casm",		ITccall (False, True,  False)),
-        ("__dyn_casm",		ITccall (True,  True,  False)),
-        ("__casm_GC",		ITccall (False, True,  True)),
-        ("__dyn_casm_GC",	ITccall (True,  True,  True)),
+        ("__ccall",		ITccall (False, False, PlayRisky)),
+        ("__ccall_GC",		ITccall (False, False, PlaySafe)),
+        ("__dyn_ccall",		ITccall (True,  False, PlayRisky)),
+        ("__dyn_ccall_GC",	ITccall (True,  False, PlaySafe)),
+        ("__casm",		ITccall (False, True,  PlayRisky)),
+        ("__dyn_casm",		ITccall (True,  True,  PlayRisky)),
+        ("__casm_GC",		ITccall (False, True,  PlaySafe)),
+        ("__dyn_casm_GC",	ITccall (True,  True,  PlaySafe)),
 
         ("/\\",			ITbiglam)
      ]

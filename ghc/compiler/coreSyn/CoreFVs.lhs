@@ -199,10 +199,6 @@ del_binders names bndrs = foldl (\s b -> delFromNameSet s (varName b)) names bnd
 
 
 \begin{code}
-rulesSomeFreeVars :: InterestingVarFun -> CoreRules -> VarSet
-rulesSomeFreeVars interesting (Rules rules _)
-  = foldr (unionVarSet . ruleSomeFreeVars interesting) emptyVarSet rules
-
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule _) = noFVs
 ruleRhsFreeVars (Rule str tpl_vars tpl_args rhs)

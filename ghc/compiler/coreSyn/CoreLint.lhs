@@ -566,9 +566,6 @@ checkL False msg = addErrL msg
 addErrL :: Message -> LintM a
 addErrL msg loc scope errs warns = (Nothing, addErr errs msg loc, warns)
 
-addWarnL :: Message -> LintM a
-addWarnL msg loc scope errs warns = (Nothing, errs, addErr warns msg loc)
-
 addErr :: Bag ErrMsg -> Message -> [LintLocInfo] -> Bag ErrMsg
 -- errors or warnings, actually... they're the same type.
 addErr errs_so_far msg locs

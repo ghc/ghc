@@ -27,7 +27,6 @@ import VarSet
 import VarEnv
 import DataCon		( dataConWrapId )
 import IdInfo		( OccInfo(..) )
-import TysPrim		( foreignObjPrimTyCon )
 import Maybes		( maybeToBool )
 import Name		( getOccName, isExternallyVisibleName, isDllName )
 import OccName		( occNameUserString )
@@ -468,20 +467,6 @@ coreToStgExpr (Let bind body)
     returnLne (new_let, fvs, escs)
 \end{code}
 
-If we've got a case containing a _ccall_GC_ primop, we need to
-ensure that the arguments are kept live for the duration of the
-call. This only an issue
-
-\begin{code}
-isForeignObjArg :: Id -> Bool
-isForeignObjArg x = isId x && isForeignObjPrimTy (idType x)
-
-isForeignObjPrimTy ty
-   = case splitTyConApp_maybe ty of
-	Just (tycon, _) -> tycon == foreignObjPrimTyCon
-	Nothing		-> False
-\end{code}
-
 \begin{code}
 mkStgAlgAlts ty alts deflt
  =  case alts of
@@ -552,9 +537,11 @@ coreToStgApp maybe_thunk_body f args
 	--	   continuation, but it does no harm to just union the
 	--	   two regardless.
 
+	res_ty = exprType (mkApps (Var f) args)
 	app = case globalIdDetails f of
-      		DataConId dc -> StgConApp dc args'
-	        PrimOpId op  -> StgPrimApp op args' (exprType (mkApps (Var f) args))
+      		DataConId dc -> StgConApp dc				 args'
+	        PrimOpId op  -> StgOpApp  (StgPrimOp op)		 args' res_ty
+		FCallId call -> StgOpApp  (StgFCallOp call (idUnique f)) args' res_ty
 		_other       -> StgApp f args'
 
     in

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.28 2001/01/15 16:55:24 sewardj Exp $
+% $Id: Costs.lhs,v 1.29 2001/05/22 13:43:14 simonpj Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -62,6 +62,7 @@ module Costs( costs,
 #include "HsVersions.h"
 
 import AbsCSyn
+import StgSyn		( StgOp(..) )
 import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
 import Panic		( trace )
 
@@ -87,10 +88,6 @@ instance Num CostRes where
 
 mapOp :: (Int -> Int) -> CostRes -> CostRes
 mapOp g ( Cost (i, b, l, s, f) )  = Cost (g i, g b, g l, g s, g f)
-
-foldrOp :: (Int -> a -> a) -> a -> CostRes -> a
-foldrOp o x  ( Cost (i1, b1, l1, s1, f1) )   =
-	i1 `o` ( b1 `o` ( l1 `o` ( s1 `o` ( f1 `o` x))))
 
 binOp :: (Int -> Int -> Int) -> CostRes -> CostRes -> CostRes
 binOp o ( Cost (i1, b1, l1, s1, f1) ) ( Cost  (i2, b2, l2, s2, f2) )  =
@@ -185,7 +182,7 @@ costs absC =
 			   For costing the args of this macro
 			   see PprAbsC.lhs where args are inserted -}
 
-   COpStmt modes_res primOp modes_args _ ->
+   COpStmt modes_res op modes_args _ ->
 	{-
 	   let
 		n = length modes_res
@@ -198,9 +195,7 @@ costs absC =
 	-}
 	foldl (+) nullCosts [addrModeCosts mode Lhs | mode <- modes_res]  +
 	foldl (+) nullCosts [addrModeCosts mode Rhs | mode <- modes_args]  +
-	primOpCosts primOp +
-	if primOpNeedsWrapper primOp then SAVE_COSTS + RESTORE_COSTS
-				     else nullCosts
+	opCosts op
 
    CSimultaneous absC	     -> costs absC
 
@@ -220,7 +215,7 @@ costs absC =
   -- *** the next three [or so...] are DATA (those above are CODE) ***
   -- as they are data rather than code they all have nullCosts	       -- HWL
 
-   CCallTypedef _ _ _ _      -> nullCosts
+   CCallTypedef _ _ _ _ _    -> nullCosts
 
    CStaticClosure _ _ _ _    -> nullCosts
 
@@ -241,6 +236,7 @@ costs absC =
    CSplitMarker		     -> nullCosts
 
    _ -> trace ("Costs.costs") nullCosts
+
 
 -- ---------------------------------------------------------------------------
 
@@ -368,17 +364,24 @@ umul_costs = Cost (21,4,0,0,0)	   -- due to spy counts
 rem_costs =  Cost (30,15,0,0,0)	   -- due to spy counts
 div_costs =  Cost (30,15,0,0,0)	   -- due to spy counts
 
+
+
+-- ---------------------------------------------------------------------------
+
+opCosts :: StgOp -> CostRes
+
+opCosts (StgFCallOp _ _) = SAVE_COSTS + RESTORE_COSTS  	
+	-- Don't guess costs of ccall proper
+        -- for exact costing use a GRAN_EXEC in the C code
+
+opCosts (StgPrimOp primop)
+  = primOpCosts primop +
+    if primOpNeedsWrapper primop then SAVE_COSTS + RESTORE_COSTS
+				 else nullCosts
+
 primOpCosts :: PrimOp -> CostRes
 
--- Special cases
-
-primOpCosts (CCallOp _) = SAVE_COSTS + RESTORE_COSTS  	
-	                          -- don't guess costs of ccall proper
-                                  -- for exact costing use a GRAN_EXEC
-                                  -- in the C code
-
 -- Usually 3 mov instructions are needed to get args and res in right place.
-
 primOpCosts IntMulOp  = Cost (3, 1, 0, 0, 0)  + umul_costs
 primOpCosts IntQuotOp = Cost (3, 1, 0, 0, 0)  + div_costs
 primOpCosts IntRemOp  = Cost (3, 1, 0, 0, 0)  + rem_costs
@@ -421,19 +424,4 @@ primOpCosts primOp
   | primOp `elem` gmpOps   = Cost (30, 5, 10, 10, 0) :: CostRes  -- GUESS; check it
   | otherwise		   = Cost (1, 0, 0, 0, 0)
 
--- ---------------------------------------------------------------------------
-{- HWL: currently unused
-
-costsByKind :: PrimRep -> Side -> CostRes
-
--- The following PrimKinds say that the data is already in a reg
-
-costsByKind CharRep	_ = nullCosts
-costsByKind IntRep	_ = nullCosts
-costsByKind WordRep	_ = nullCosts
-costsByKind AddrRep	_ = nullCosts
-costsByKind FloatRep	_ = nullCosts
-costsByKind DoubleRep	_ = nullCosts
--}
--- ---------------------------------------------------------------------------
 \end{code}

@@ -6,7 +6,7 @@
 \begin{code}
 module DsCCall 
 	( dsCCall
-	, mkCCall
+	, mkFCall
 	, unboxArg
 	, boxResult
 	, resultWrapper
@@ -20,11 +20,11 @@ import DsMonad
 
 import CoreUtils	( exprType, mkCoerce )
 import Id		( Id, mkWildId, idType )
-import MkId		( mkCCallOpId, realWorldPrimId, mkPrimOpId )
+import MkId		( mkFCallId, realWorldPrimId, mkPrimOpId )
 import Maybes		( maybeToBool )
-import PrimOp		( CCall(..), CCallTarget(..) )
+import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety, CCallConv(..) )
 import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
-import CallConv
+import ForeignCall	( ForeignCall, CCallTarget(..) )
 import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
 			  splitTyConApp_maybe, tyVarsOfType, mkForAllTys, 
 			  isNewType, repType, isUnLiftedType, mkFunTy, mkTyConApp,
@@ -86,7 +86,7 @@ follows:
 \begin{code}
 dsCCall :: CLabelString	-- C routine to invoke
 	-> [CoreExpr]	-- Arguments (desugared)
-	-> Bool		-- True <=> might cause Haskell GC
+	-> Safety	-- Safety of the call
 	-> Bool		-- True <=> really a "_casm_"
 	-> Type		-- Type of the result: IO t
 	-> DsM CoreExpr
@@ -96,12 +96,12 @@ dsCCall lbl args may_gc is_asm result_ty
     boxResult [] result_ty	`thenDs` \ (ccall_result_ty, res_wrapper) ->
     getUniqueDs			`thenDs` \ uniq ->
     let
-	the_ccall    = CCall (StaticTarget lbl) is_asm may_gc cCallConv
- 	the_prim_app = mkCCall uniq the_ccall unboxed_args ccall_result_ty
+	the_fcall    = CCall (CCallSpec (StaticTarget lbl) CCallConv may_gc is_asm)
+ 	the_prim_app = mkFCall uniq the_fcall unboxed_args ccall_result_ty
     in
     returnDs (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
 
-mkCCall :: Unique -> CCall 
+mkFCall :: Unique -> ForeignCall 
 	-> [CoreExpr] 	-- Args
 	-> Type 	-- Result type
 	-> CoreExpr
@@ -114,14 +114,14 @@ mkCCall :: Unique -> CCall
 -- Here we build a ccall thus
 --	(ccallid::(forall a b.  StablePtr (a -> b) -> Addr -> Char -> IO Addr))
 --			a b s x c
-mkCCall uniq the_ccall val_args res_ty
-  = mkApps (mkVarApps (Var the_ccall_id) tyvars) val_args
+mkFCall uniq the_fcall val_args res_ty
+  = mkApps (mkVarApps (Var the_fcall_id) tyvars) val_args
   where
     arg_tys = map exprType val_args
     body_ty = (mkFunTys arg_tys res_ty)
     tyvars  = varSetElems (tyVarsOfType body_ty)
     ty 	    = mkForAllTys tyvars body_ty
-    the_ccall_id = mkCCallOpId uniq the_ccall ty
+    the_fcall_id = mkFCallId uniq the_fcall ty
 \end{code}
 
 \begin{code}

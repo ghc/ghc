@@ -24,7 +24,7 @@ import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat )
 import TcMonad
 import TcMonoType	( kcHsSigTypes, tcScopedTyVars, checkSigTyVars, tcHsSigType, sigPatCtxt )
 import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
-import TcEnv		( TcId, tcLookupLocalIds, tcExtendTyVarEnv, tcExtendLocalValEnv, tcExtendGlobalTyVars,
+import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendGlobalTyVars,
 			  tcInLocalScope )
 import TcPat		( tcPat, tcMonoPatBndr, polyPatSig )
 import TcType		( TcType, newTyVarTy )
@@ -32,7 +32,7 @@ import TcBinds		( tcBindsAndThen )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import TcUnify		( unifyFunTy, unifyTauTy )
 import Name		( Name )
-import TysWiredIn	( boolTy, mkListTy )
+import TysWiredIn	( boolTy )
 import Id		( idType )
 import BasicTypes	( RecFlag(..) )
 import Type		( tyVarsOfType, isTauTy,  mkFunTy,

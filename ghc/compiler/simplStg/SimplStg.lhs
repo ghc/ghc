@@ -17,14 +17,12 @@ import StgStats	        ( showStgStats )
 import SRT		( computeSRTs )
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, 
-			  opt_StgDoLetNoEscapes,
 			  StgToDo(..), dopt_StgToDo
 			)
 import Id		( Id )
 import Module		( Module )
 import ErrUtils		( doIfSet_dyn, dumpIfSet_dyn, showPass )
-import UniqSupply	( mkSplitUniqSupply, splitUniqSupply, UniqSupply )
-import IO		( hPutStr, stdout )
+import UniqSupply	( mkSplitUniqSupply, splitUniqSupply )
 import Outputable
 \end{code}
 

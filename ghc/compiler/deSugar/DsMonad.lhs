@@ -38,7 +38,6 @@ import Type             ( Type )
 import UniqSupply	( initUs_, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
 			  UniqSM, UniqSupply )
 import Unique		( Unique )
-import Util		( zipWithEqual )
 import Name		( Name )
 import CmdLineOpts	( DynFlags )
 

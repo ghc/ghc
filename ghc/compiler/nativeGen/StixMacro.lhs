@@ -14,7 +14,7 @@ import MachRegs
 import AbsCSyn		( CStmtMacro(..), CAddrMode, tagreg,
 			  CCheckMacro(..) )
 import Constants	( uF_RET, uF_SU, uF_UPDATEE, uF_SIZE )
-import CallConv		( cCallConv )
+import ForeignCall	( CCallConv(..) )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import Stix
@@ -76,7 +76,7 @@ macroCode UPD_CAF args
 	w1 = StInd PtrRep (StIndex PtrRep cafptr fixedHS)
 	a1 = StAssign PtrRep w0 ind_static_info
 	a2 = StAssign PtrRep w1 bhptr
-	a3 = StCall SLIT("newCAF") cCallConv VoidRep [cafptr]
+	a3 = StCall SLIT("newCAF") CCallConv VoidRep [cafptr]
     in
     returnUs (\xs -> a1 : a2 : a3 : xs)
 \end{code}
@@ -180,7 +180,7 @@ macroCode REGISTER_IMPORT [arg]
 
 macroCode REGISTER_FOREIGN_EXPORT [arg]
    = returnUs (
-	\xs -> StCall SLIT("getStablePtr") cCallConv VoidRep [amodeToStix arg]
+	\xs -> StCall SLIT("getStablePtr") CCallConv VoidRep [amodeToStix arg]
 	     : xs
      )
 
@@ -213,7 +213,7 @@ stg_update_PAP  = StCLbl mkStgUpdatePAPLabel
 updatePAP, stackOverflow :: StixTree
 
 updatePAP     = StJump NoDestInfo stg_update_PAP
-stackOverflow = StCall SLIT("StackOverflow") cCallConv VoidRep []
+stackOverflow = StCall SLIT("StackOverflow") CCallConv VoidRep []
 \end{code}
 
 -----------------------------------------------------------------------------

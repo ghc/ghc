@@ -75,7 +75,7 @@ module TysWiredIn (
 	wordTy,
 	wordTyCon,
 
-	isFFIArgumentTy,     -- :: DynFlags -> Bool -> Type -> Bool
+	isFFIArgumentTy,     -- :: DynFlags -> Safety -> Type -> Bool
 	isFFIImportResultTy, -- :: DynFlags -> Type -> Bool
 	isFFIExportResultTy, -- :: Type -> Bool
 	isFFIExternalTy,     -- :: Type -> Bool
@@ -97,6 +97,7 @@ import PrelNames
 import TysPrim
 
 -- others:
+import ForeignCall	( Safety, playSafe )
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( mkPrelModule )
 import Name		( Name, nameRdrName, nameUnique, nameOccName, 
@@ -393,9 +394,6 @@ foreignObjTyCon
     foreignObjDataCon
       = pcDataCon foreignObjDataConName
 	    [] [] [foreignObjPrimTy] foreignObjTyCon
-
-isForeignObjTy :: Type -> Bool
-isForeignObjTy = isTyCon foreignObjTyConKey
 \end{code}
 
 \begin{code}
@@ -447,10 +445,10 @@ restricted set of types as arguments and results (the restricting factor
 being the )
 
 \begin{code}
-isFFIArgumentTy :: DynFlags -> Bool -> Type -> Bool
+isFFIArgumentTy :: DynFlags -> Safety -> Type -> Bool
 -- Checks for valid argument type for a 'foreign import'
-isFFIArgumentTy dflags is_safe ty 
-   = checkRepTyCon (legalOutgoingTyCon dflags is_safe) ty
+isFFIArgumentTy dflags safety ty 
+   = checkRepTyCon (legalOutgoingTyCon dflags safety) ty
 
 isFFIExternalTy :: Type -> Bool
 -- Types that are allowed as arguments of a 'foreign export'
@@ -525,12 +523,10 @@ legalFEResultTyCon tc
   | tc == unitTyCon = True
   | otherwise       = boxedMarshalableTyCon tc
 
-legalOutgoingTyCon :: DynFlags -> Bool -> TyCon -> Bool
+legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Bool
 -- Checks validity of types going from Haskell -> external world
--- The boolean is true for a 'safe' call (when we don't want to
--- pass Haskell pointers to the world)
-legalOutgoingTyCon dflags be_safe tc
-  | be_safe && getUnique tc `elem` [byteArrayTyConKey, mutableByteArrayTyConKey]
+legalOutgoingTyCon dflags safety tc
+  | playSafe safety && getUnique tc `elem` [byteArrayTyConKey, mutableByteArrayTyConKey]
   = False
   | otherwise
   = marshalableTyCon dflags tc

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.46 2001/03/13 12:50:30 simonmar Exp $
+% $Id: ClosureInfo.lhs,v 1.47 2001/05/22 13:43:15 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -84,7 +84,6 @@ import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon,
 			  isNullaryDataCon, dataConName
 			)
 import TyCon		( isBoxedTupleTyCon )
-import IdInfo		( ArityInfo(..) )
 import Name		( Name, nameUnique, getOccName )
 import OccName		( occNameUserString )
 import PprType		( getTyDescription )
@@ -908,13 +907,6 @@ isToplevClosure (MkClosureInfo _ lf_info _)
       LFReEntrant _ TopLevel _ _ _ _ -> True
       LFThunk _ TopLevel _ _ _ _ _   -> True
       other -> False
-\end{code}
-
-\begin{code}
-isLetNoEscape :: ClosureInfo -> Bool
-
-isLetNoEscape (MkClosureInfo _ (LFLetNoEscape _) _) = True
-isLetNoEscape _ = False
 \end{code}
 
 Label generation.

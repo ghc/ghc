@@ -88,6 +88,7 @@ import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBrea
 			  Arity
 			)
 import DataCon		( DataCon )
+import ForeignCall	( ForeignCall )
 import FieldLabel	( FieldLabel )
 import Type		( usOnce, usMany )
 import Demand		-- Lots of stuff
@@ -134,6 +135,7 @@ data GlobalIdDetails
 				--     Id back to the data con]
 
   | PrimOpId PrimOp		-- The Id for a primitive operator
+  | FCallId ForeignCall		-- The Id for a foreign call
 
   | NotGlobalId			-- Used as a convenient extra return value from globalIdDetails
     
@@ -145,6 +147,7 @@ instance Outputable GlobalIdDetails where
     ppr (DataConId _)     = ptext SLIT("[DataCon]")
     ppr (DataConWrapId _) = ptext SLIT("[DataConWrapper]")
     ppr (PrimOpId _)      = ptext SLIT("[PrimOp]")
+    ppr (FCallId _)       = ptext SLIT("[ForeignCall]")
     ppr (RecordSelId _)   = ptext SLIT("[RecSel]")
 \end{code}
 

@@ -19,12 +19,11 @@ import MachRegs
 import OrdList		( OrdList, nilOL, isNilOL, unitOL, appOL, toOL,
 			  snocOL, consOL, concatOL )
 import AbsCUtils	( magicIdPrimRep )
-import CallConv		( CallConv )
+import ForeignCall	( CCallConv(..) )
 import CLabel		( isAsmTemp, CLabel, labelDynamic )
 import Maybes		( maybeToBool, expectJust )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
-import CallConv		( cCallConv, stdCallConv )
 import Stix		( getNatLabelNCG, StixTree(..),
 			  StixReg(..), CodeSegment(..), 
                           DestInfo, hasDestInfo,
@@ -399,7 +398,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       Double2FloatOp -> coerceFltCode x
       Float2DoubleOp -> coerceFltCode x
 
-      other_op -> getRegister (StCall fn cCallConv DoubleRep [x])
+      other_op -> getRegister (StCall fn CCallConv DoubleRep [x])
 	where
 	  fn = case other_op of
 		 FloatExpOp    -> SLIT("exp")
@@ -505,8 +504,8 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       ISraOp -> trivialCode SRA x y -- was: panic "AlphaGen:isra"
       ISrlOp -> trivialCode SRL x y -- was: panic "AlphaGen:isrl"
 
-      FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [x,y])
-      DoublePowerOp -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [x,y])
+      FloatPowerOp  -> getRegister (StCall SLIT("pow") CCallConv DoubleRep [x,y])
+      DoublePowerOp -> getRegister (StCall SLIT("pow") CCallConv DoubleRep [x,y])
   where
     {- ------------------------------------------------------------
 	Some bizarre special code for getting condition codes into
@@ -672,7 +671,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       Int2DoubleOp -> coerceInt2FP DoubleRep x
 
       other_op ->
-	getRegister (StCall fn cCallConv DoubleRep [x])
+	getRegister (StCall fn CCallConv DoubleRep [x])
        where
 	(is_float_op, fn)
 	  = case primop of
@@ -781,10 +780,10 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       ISraOp -> shift_code (SAR L) x y {-False-}
       ISrlOp -> shift_code (SHR L) x y {-False-}
 
-      FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep 
+      FloatPowerOp  -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
                                            [promote x, promote y])
 		       where promote x = StPrim Float2DoubleOp [x]
-      DoublePowerOp -> getRegister (StCall SLIT("pow") cCallConv DoubleRep 
+      DoublePowerOp -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
                                            [x, y])
       other
          -> pprPanic "getRegister(x86,dyadic primop)" 
@@ -1027,7 +1026,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
                      then StPrim Float2DoubleOp [x]
                      else x
 	in
-	getRegister (StCall fn cCallConv DoubleRep [fixed_x])
+	getRegister (StCall fn CCallConv DoubleRep [fixed_x])
        where
 	(is_float_op, fn)
 	  = case primop of
@@ -1143,10 +1142,10 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       ISraOp -> trivialCode SRA x y
       ISrlOp -> trivialCode SRL x y
 
-      FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep 
+      FloatPowerOp  -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
                                            [promote x, promote y])
 		       where promote x = StPrim Float2DoubleOp [x]
-      DoublePowerOp -> getRegister (StCall SLIT("pow") cCallConv DoubleRep 
+      DoublePowerOp -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
                                            [x, y])
 
       other
@@ -1154,7 +1153,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
                      (pprStixTree (StPrim primop [x, y]))
 
   where
-    imul_div fn x y = getRegister (StCall fn cCallConv IntRep [x, y])
+    imul_div fn x y = getRegister (StCall fn CCallConv IntRep [x, y])
 
 getRegister (StInd pk mem)
   = getAmode mem    	    	    `thenNat` \ amode ->
@@ -2442,7 +2441,7 @@ genCCall fn cconv kind args
 	call = toOL (
                   [CALL (fn__2 tot_arg_size)]
                   ++
-                  (if cconv == stdCallConv then [] else 
+                  (if cconv == StdCallConv then [] else 
 		   [ADD L (OpImm (ImmInt tot_arg_size)) (OpReg esp)])
                   ++
                   [DELTA (delta + tot_arg_size)]
@@ -2464,7 +2463,7 @@ genCCall fn cconv kind args
        = ImmLab False (text (fn_u ++ stdcallsize tot_arg_size))
 
     stdcallsize tot_arg_size
-       | cconv == stdCallConv = '@':show tot_arg_size
+       | cconv == StdCallConv = '@':show tot_arg_size
        | otherwise            = ""
 
     arg_size DF = 8

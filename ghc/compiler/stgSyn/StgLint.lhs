@@ -166,7 +166,13 @@ lintStgExpr e@(StgConApp con args)
   where
     con_ty = dataConRepType con
 
-lintStgExpr e@(StgPrimApp op args _)
+lintStgExpr e@(StgOpApp (StgFCallOp _ _) args res_ty)
+  = 	-- We don't have enough type information to check
+	-- the application; ToDo
+    mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
+    returnL (Just res_ty)
+
+lintStgExpr e@(StgOpApp (StgPrimOp op) args _)
   = mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
     case maybe_arg_tys of
       Nothing 	    -> returnL Nothing

@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.64 2001/05/18 08:46:20 simonpj Exp $
+$Id: Parser.y,v 1.65 2001/05/22 13:43:17 simonpj Exp $
 
 Haskell grammar.
 
@@ -21,10 +21,10 @@ import RdrName
 import PrelNames	( mAIN_Name, unitTyCon_RDR, funTyCon_RDR, listTyCon_RDR,
 			  tupleTyCon_RDR, unitCon_RDR, nilCon_RDR, tupleCon_RDR
 			)
+import ForeignCall	( Safety(..), CCallConv(..), defaultCCallConv )
 import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
-import CallConv
 import Demand		( StrictnessMark(..) )
 import CmdLineOpts	( opt_SccProfilingOn )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), NewOrData(..) )
@@ -102,10 +102,10 @@ Conflicts: 14 shift/reduce
  'with' 	{ ITwith }
  'stdcall'      { ITstdcallconv }
  'ccall'        { ITccallconv }
- '_ccall_'	{ ITccall (False, False, False) }
- '_ccall_GC_'	{ ITccall (False, False, True)  }
- '_casm_'	{ ITccall (False, True,  False) }
- '_casm_GC_'	{ ITccall (False, True,  True)  }
+ '_ccall_'	{ ITccall (False, False, PlayRisky) }
+ '_ccall_GC_'	{ ITccall (False, False, PlaySafe)  }
+ '_casm_'	{ ITccall (False, True,  PlayRisky) }
+ '_casm_GC_'	{ ITccall (False, True,  PlaySafe)  }
 
  '{-# SPECIALISE'  { ITspecialise_prag }
  '{-# SOURCE'	   { ITsource_prag }
@@ -372,7 +372,7 @@ topdecl :: { RdrBinding }
 
 	| srcloc 'foreign' 'label' ext_name varid '::' sigtype
 		{ RdrHsDecl (ForD (ForeignDecl $5 FoLabel $7 (mkExtName $4 $5)
-					defaultCallConv $1)) }
+					defaultCCallConv $1)) }
 
 	| '{-# DEPRECATED' deprecations '#-}'	 	{ $2 }
 	| '{-# RULES' rules '#-}'		 	{ $2 }
@@ -462,14 +462,14 @@ deprecation :: { RdrBinding }
 -----------------------------------------------------------------------------
 -- Foreign import/export
 
-callconv :: { Int }
-	: 'stdcall'		{ stdCallConv }
-	| 'ccall'               { cCallConv }
-	| {- empty -}		{ defaultCallConv }
+callconv :: { CCallConv }
+	: 'stdcall'		{ StdCallConv }
+	| 'ccall'               { CCallConv }
+	| {- empty -}		{ defaultCCallConv }
 
-unsafe_flag :: { Bool }
-	: 'unsafe'		{ True }
-	| {- empty -}		{ False }
+unsafe_flag :: { Safety }
+	: 'unsafe'		{ PlayRisky }
+	| {- empty -}		{ PlaySafe }
 
 ext_name :: { Maybe ExtName }
 	: 'dynamic'		{ Just Dynamic }
@@ -701,10 +701,10 @@ exp10 :: { RdrNameHsExpr }
   	| srcloc 'do' stmtlist			{% checkDo $3  `thenP` \ stmts ->
 						   returnP (HsDo DoExpr stmts $1) }
 
-	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 False False cbot }
-	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 True  False cbot }
-	| '_casm_'     CLITLIT aexps0		{ HsCCall $2 $3 False True  cbot }
-	| '_casm_GC_'  CLITLIT aexps0		{ HsCCall $2 $3 True  True  cbot }
+	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 PlayRisky False cbot }
+	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 PlaySafe  False cbot }
+	| '_casm_'     CLITLIT aexps0		{ HsCCall $2 $3 PlayRisky True  cbot }
+	| '_casm_GC_'  CLITLIT aexps0		{ HsCCall $2 $3 PlaySafe  True  cbot }
 
         | scc_annot exp		    		{ if opt_SccProfilingOn
 							then HsSCC $1 $2

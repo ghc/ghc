@@ -26,7 +26,7 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			)
 
 import Constants	( mIN_UPD_SIZE )
-import CallConv		( callConvAttribute )
+import ForeignCall	( CCallSpec(..), CCallTarget(..), playSafe, ccallConvAttribute )
 import CLabel		( externallyVisibleCLabel,
 			  needsCDecl, pprCLabel,
 			  mkReturnInfoLabel, mkReturnPtLabel, mkClosureTblLabel,
@@ -45,15 +45,15 @@ import TyCon		( tyConDataCons )
 import Name		( NamedThing(..) )
 import DataCon		( dataConWrapId )
 import Maybes		( maybeToBool, catMaybes )
-import PrimOp		( primOpNeedsWrapper, pprCCallOp, 
-			  PrimOp(..), CCall(..), CCallTarget(..), isDynamicTarget )
+import PrimOp		( primOpNeedsWrapper )
+import ForeignCall	( ForeignCall(..), isDynamicTarget )
 import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize )
 import SMRep		( pprSMRep )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
 			  addOneToUniqSet, UniqSet
 			)
-import StgSyn		( SRT(..) )
+import StgSyn		( SRT(..), StgOp(..) )
 import BitSet		( intBS )
 import Outputable
 import GlaExts
@@ -213,10 +213,10 @@ pprAbsC (CSwitch discrim alts deflt) c -- general case
     -- Costs for addressing header of switch and cond. branching        -- HWL
     switch_head_cost = addrModeCosts discrim Rhs + (Cost (0, 1, 0, 0, 0))
 
-pprAbsC stmt@(COpStmt results (CCallOp ccall) args vol_regs) _
-  = pprCCall ccall args results vol_regs
+pprAbsC stmt@(COpStmt results (StgFCallOp fcall uniq) args vol_regs) _
+  = pprFCall fcall uniq args results vol_regs
 
-pprAbsC stmt@(COpStmt results op args vol_regs) _
+pprAbsC stmt@(COpStmt results (StgPrimOp op) args vol_regs) _
   = let
 	non_void_args = grab_non_void_amodes args
 	non_void_results = grab_non_void_amodes results
@@ -284,7 +284,7 @@ pprAbsC (CCallProfCtrMacro op as) _
 pprAbsC (CCallProfCCMacro op as) _
   = hcat [ptext op, lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi]
-pprAbsC stmt@(CCallTypedef is_tdef (CCall op_str is_asm may_gc cconv) results args) _
+pprAbsC stmt@(CCallTypedef is_tdef (CCallSpec op_str cconv _ _) uniq results args) _
   =  hsep [ ptext (if is_tdef then SLIT("typedef") else SLIT("extern"))
 	  , ccall_res_ty
 	  , fun_nm
@@ -322,13 +322,13 @@ pprAbsC stmt@(CCallTypedef is_tdef (CCall op_str is_asm may_gc cconv) results ar
     -}
 
      fun_nm
-       | is_tdef   = parens (text (callConvAttribute cconv) <+> char '*' <> ccall_fun_ty)
-       | otherwise = text (callConvAttribute cconv) <+> ccall_fun_ty
+       | is_tdef   = parens (text (ccallConvAttribute cconv) <+> char '*' <> ccall_fun_ty)
+       | otherwise = text (ccallConvAttribute cconv) <+> ccall_fun_ty
 
      ccall_fun_ty = 
         case op_str of
-	  DynamicTarget u -> ptext SLIT("_ccall_fun_ty") <> ppr u
-	  StaticTarget x  -> pprCLabelString x
+	  DynamicTarget  -> ptext SLIT("_ccall_fun_ty") <> ppr uniq
+	  StaticTarget x -> pprCLabelString x
 
      ccall_res_ty = 
        case non_void_results of
@@ -775,7 +775,7 @@ Amendment to the above: if we can GC, we have to:
   that the runtime check that PerformGC is being used sensibly will work.
 
 \begin{code}
-pprCCall call@(CCall op_str is_asm may_gc cconv) args results vol_regs
+pprFCall call@(CCall (CCallSpec op_str cconv safety is_asm)) uniq args results vol_regs
   = vcat [
       char '{',
       declare_local_vars,   -- local var for *result*
@@ -789,15 +789,15 @@ pprCCall call@(CCall op_str is_asm may_gc cconv) args results vol_regs
   where
     (pp_saves, pp_restores) = ppr_vol_regs vol_regs
     (pp_save_context, pp_restore_context)
-	| may_gc  = ( text "{ I_ id; SUSPEND_THREAD(id);"
-		    , text "RESUME_THREAD(id);}"
-		    )
+	| playSafe safety = ( text "{ I_ id; SUSPEND_THREAD(id);"
+			    , text "RESUME_THREAD(id);}"
+			    )
 	| otherwise = (	pp_basic_saves $$ pp_saves,
 			pp_basic_restores $$ pp_restores)
 
     non_void_args = 
 	let nvas = init args
-	in ASSERT2 ( all non_void nvas, pprCCallOp call <+> hsep (map pprAmode args) )
+	in ASSERT2 ( all non_void nvas, ppr call <+> hsep (map pprAmode args) )
 	nvas
     -- the last argument will be the "I/O world" token (a VoidRep)
     -- all others should be non-void
@@ -820,7 +820,7 @@ pprCCall call@(CCall op_str is_asm may_gc cconv) args results vol_regs
     -- Remainder only used for ccall
 
     fun_name = case op_str of
-		 DynamicTarget u -> parens (parens (ptext SLIT("_ccall_fun_ty") <> ppr u) <> text "%0")
+		 DynamicTarget   -> parens (parens (ptext SLIT("_ccall_fun_ty") <> ppr uniq) <> text "%0")
 		 StaticTarget st -> pprCLabelString st
 
     ccall_str = showSDoc
@@ -837,7 +837,6 @@ pprCCall call@(CCall op_str is_asm may_gc cconv) args results vol_regs
 		   | otherwise 		    = ccall_args
 
     ccall_args    = zipWith (\ _ i -> char '%' <> int i) non_void_args [0..]
-
 \end{code}
 
 If the argument is a heap object, we need to reach inside and pull out
@@ -1478,7 +1477,7 @@ ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre)
     info_lbl = infoTableLabelFromCI cl_info
 
 ppr_decls_AbsC (COpStmt	results	_ args _) = ppr_decls_Amodes (results ++ args)
-ppr_decls_AbsC (CSimultaneous abc)  	    = ppr_decls_AbsC abc
+ppr_decls_AbsC (CSimultaneous abc)  	  = ppr_decls_AbsC abc
 
 ppr_decls_AbsC (CCheck  	    _ amodes code) = 
      ppr_decls_Amodes amodes `thenTE` \p1 ->

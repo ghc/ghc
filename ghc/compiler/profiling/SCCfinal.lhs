@@ -169,8 +169,8 @@ stgMassageForProfiling mod_name us stg_binds
     do_expr (StgConApp con args)
       = boxHigherOrderArgs (\args -> StgConApp con args) args
 
-    do_expr (StgPrimApp con args res_ty)
-      = boxHigherOrderArgs (\args -> StgPrimApp con args res_ty) args
+    do_expr (StgOpApp con args res_ty)
+      = boxHigherOrderArgs (\args -> StgOpApp con args res_ty) args
 
     do_expr (StgSCC cc expr)	-- Ha, we found a cost centre!
       = collectCC cc		`thenMM_`

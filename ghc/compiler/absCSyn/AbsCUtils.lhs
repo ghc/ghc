@@ -28,7 +28,8 @@ import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply, 
 			  UniqSupply )
 import CmdLineOpts      ( opt_EmitCExternDecls )
-import PrimOp		( PrimOp(..), CCall(..), isDynamicTarget )
+import ForeignCall	( ForeignCall(..), CCallSpec(..), isDynamicTarget )
+import StgSyn		( StgOp(..) )
 import Panic		( panic )
 import FastTypes
 
@@ -340,16 +341,12 @@ flatAbsC (CSwitch discrim alts deflt)
       = flatAbsC absC	`thenFlt` \ (alt_heres, alt_tops) ->
 	returnFlt ( (tag, alt_heres), alt_tops )
 
-flatAbsC stmt@(COpStmt results (CCallOp ccall@(CCall target is_asm _ _)) args vol_regs)
-  | isCandidate
-  = returnFlt (stmt, tdef)
-  | otherwise
-  = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(COpStmt results (StgFCallOp (CCall ccall@(CCallSpec target _ _ is_asm)) uniq) args _)
+  |  is_dynamic	 				-- Emit a typedef if its a dynamic call
+  || (opt_EmitCExternDecls && not is_asm)	-- or we want extern decls
+  = returnFlt (stmt, CCallTypedef is_dynamic ccall uniq results args)
   where
-    isCandidate = is_dynamic || opt_EmitCExternDecls && not is_asm
-    is_dynamic  = isDynamicTarget target
-
-    tdef = CCallTypedef is_dynamic ccall results args
+    is_dynamic = isDynamicTarget target
 
 flatAbsC stmt@(CSimultaneous abs_c)
   = flatAbsC abs_c		`thenFlt` \ (stmts_here, tops) ->
@@ -367,14 +364,14 @@ flatAbsC stmt@(CCallProfCtrMacro str amodes)
   | otherwise		 	= returnFlt (stmt, AbsCNop)
 
 -- Some statements need no flattening at all:
-flatAbsC stmt@(CMacroStmt macro amodes) 	= returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(CCallProfCCMacro str amodes) 	= returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(CAssign dest source) 		= returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(CJump target) 			= returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(CFallThrough target) 		= returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(CReturn target return_info) 	= returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(CInitHdr a b cc) 		= returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(COpStmt results op args vol_regs)= returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CMacroStmt macro amodes) 	 = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CCallProfCCMacro str amodes) 	 = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CAssign dest source) 		 = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CJump target) 			 = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CFallThrough target) 		 = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CReturn target return_info) 	 = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CInitHdr a b cc) 		 = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(COpStmt results op args vol_regs) = returnFlt (stmt, AbsCNop)
 
 -- Some statements only make sense at the top level, so we always float
 -- them.  This probably isn't necessary.
@@ -494,11 +491,6 @@ doSimultaneously1 vertices
       = or [dest1 `conflictsWith` src2 | src2 <- srcs2]
     (COpStmt dests1 _ _ _) `should_follow` (COpStmt _ _ srcs2 _)
       = or [dest1 `conflictsWith` src2 | dest1 <- dests1, src2 <- srcs2]
-
---    (COpStmt _ _ _ _ _) `should_follow` (CCallProfCtrMacro _ _) = False
---    (CCallProfCtrMacro _ _) `should_follow` (COpStmt _ _ _ _ _) = False
-
-
 \end{code}
 
 

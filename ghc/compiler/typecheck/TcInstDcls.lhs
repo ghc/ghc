@@ -52,7 +52,7 @@ import FunDeps		( checkInstFDs )
 import Generics		( validGenericInstanceType )
 import Module		( Module, foldModuleEnv )
 import Name		( getSrcLoc )
-import NameSet		( emptyNameSet, unitNameSet, nameSetToList )
+import NameSet		( unitNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
 import PprType		( pprClassPred, pprPred )
 import TyCon		( TyCon, isSynTyCon )
@@ -65,6 +65,7 @@ import Type		( splitDFunTy, isTyVarTy,
 import Subst		( mkTopTyVarSubst, substTheta )
 import VarSet		( varSetElems )
 import TysWiredIn	( genericTyCons, isFFIArgumentTy, isFFIImportResultTy )
+import ForeignCall	( Safety(..) )
 import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
 import Name             ( Name )
 import SrcLoc           ( SrcLoc )
@@ -814,7 +815,7 @@ checkInstHead dflags theta clas inst_taus
     maybe_tycon_app	  = splitTyConApp_maybe first_inst_tau
     Just (tycon, arg_tys) = maybe_tycon_app
 
-    ccallable_type   dflags ty = isFFIArgumentTy dflags False {- Not safe call -} ty
+    ccallable_type   dflags ty = isFFIArgumentTy dflags PlayRisky ty
     creturnable_type        ty = isFFIImportResultTy dflags ty
 	
 check_tyvars dflags clas inst_taus

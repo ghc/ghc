@@ -28,6 +28,7 @@ module Id (
 	isSpecPragmaId,	isExportedId, isLocalId, isGlobalId,
 	isRecordSelector,
 	isPrimOpId, isPrimOpId_maybe, 
+	isFCallId, isFCallId_maybe,
 	isDataConId, isDataConId_maybe, 
 	isDataConWrapId, isDataConWrapId_maybe,
 	isBottomingId,
@@ -233,6 +234,14 @@ isPrimOpId_maybe id = case globalIdDetails id of
 			    PrimOpId op -> Just op
 			    other	-> Nothing
 
+isFCallId id = case globalIdDetails id of
+		    FCallId call -> True
+		    other	 -> False
+
+isFCallId_maybe id = case globalIdDetails id of
+			    FCallId call -> Just call
+			    other	 -> Nothing
+
 isDataConId id = case globalIdDetails id of
 			DataConId _ -> True
 			other	    -> False
@@ -255,6 +264,7 @@ isDataConWrapId id = case globalIdDetails id of
 hasNoBinding id = case globalIdDetails id of
 			DataConId _ -> True
 			PrimOpId _  -> True
+			FCallId _   -> True
 			other	    -> False
 
 isImplicitId :: Id -> Bool
@@ -264,6 +274,7 @@ isImplicitId :: Id -> Bool
 isImplicitId id
   = case globalIdDetails id of
 	RecordSelId _   -> True	-- Includes dictionary selectors
+        FCallId _       -> True
         PrimOpId _      -> True
         DataConId _     -> True
 	DataConWrapId _ -> True

@@ -33,9 +33,10 @@ import HsCore		( UfExpr, UfBinder, HsIdInfo, pprHsIdInfo,
 import CoreSyn		( CoreRule(..) )
 import BasicTypes	( NewOrData(..) )
 import Demand		( StrictnessMark(..) )
-import CallConv		( CallConv, pprCallConv )
+import ForeignCall	( CCallConv )
 
 -- others:
+import ForeignCall	( Safety )
 import Name		( NamedThing )
 import FunDeps		( pprFundeps )
 import Class		( FunDep, DefMeth(..) )
@@ -675,28 +676,26 @@ data ForeignDecl name =
 	ForKind   
 	(HsType name)
 	ExtName
-	CallConv
+	CCallConv
 	SrcLoc
 
 instance (Outputable name)
 	      => Outputable (ForeignDecl name) where
 
     ppr (ForeignDecl nm imp_exp ty ext_name cconv src_loc)
-      = ptext SLIT("foreign") <+> ppr_imp_exp <+> pprCallConv cconv <+> 
+      = ptext SLIT("foreign") <+> ppr_imp_exp <+> ppr cconv <+> 
         ppr ext_name <+> ppr_unsafe <+> ppr nm <+> dcolon <+> ppr ty
         where
          (ppr_imp_exp, ppr_unsafe) =
 	   case imp_exp of
 	     FoLabel     -> (ptext SLIT("label"), empty)
 	     FoExport    -> (ptext SLIT("export"), empty)
-	     FoImport us 
-		| us        -> (ptext SLIT("import"), ptext SLIT("unsafe"))
-		| otherwise -> (ptext SLIT("import"), empty)
+	     FoImport us -> (ptext SLIT("import"), ppr us)
 
 data ForKind
  = FoLabel
  | FoExport
- | FoImport Bool -- True  => unsafe call.
+ | FoImport Safety
 
 data ExtName
  = Dynamic 

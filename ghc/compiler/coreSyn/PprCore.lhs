@@ -27,7 +27,7 @@ import Var		( isTyVar )
 import IdInfo		( IdInfo, megaSeqIdInfo, 
 			  arityInfo, ppArityInfo, 
 			  specInfo, cprInfo, ppCprInfo, 
-			  strictnessInfo, ppStrictnessInfo, cgInfo, pprCgInfo,
+			  strictnessInfo, ppStrictnessInfo, cgInfo,
 			  cprInfo, ppCprInfo, 
 			  workerInfo, ppWorkerInfo,
                           tyGenInfo, ppTyGenInfo
@@ -356,7 +356,7 @@ ppIdInfo b info
     a = arityInfo info
     g = tyGenInfo info
     s = strictnessInfo info
-    c = cgInfo info
+--  c = cgInfo info
     m = cprInfo info
     p = specInfo info
 \end{code}

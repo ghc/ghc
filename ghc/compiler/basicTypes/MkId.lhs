@@ -18,7 +18,7 @@ module MkId (
 
 	mkDataConId, mkDataConWrapId,
 	mkRecordSelId, rebuildConArgs,
-	mkPrimOpId, mkCCallOpId,
+	mkPrimOpId, mkFCallId,
 
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds,
@@ -54,12 +54,10 @@ import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
 import Class		( Class, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar )
 import VarSet		( isEmptyVarSet )
-import Name		( mkWiredInName, mkCCallName, Name )
+import Name		( mkWiredInName, mkFCallName, Name )
 import OccName		( mkVarOcc )
-import PrimOp		( PrimOp(DataToTagOp, CCallOp), 
-			  primOpSig, mkPrimOpIdName,
-			  CCall, pprCCallOp
-			)
+import PrimOp		( PrimOp(DataToTagOp), primOpSig, mkPrimOpIdName )
+import ForeignCall	( ForeignCall )
 import Demand		( wwStrict, wwPrim, mkStrictnessInfo, 
 			  StrictnessMark(..), isMarkedUnboxed, isMarkedStrict )
 import DataCon		( DataCon, 
@@ -631,19 +629,18 @@ mkPrimOpId prim_op
 -- details of the ccall, type and all.  This means that the interface 
 -- file reader can reconstruct a suitable Id
 
-mkCCallOpId :: Unique -> CCall -> Type -> Id
-mkCCallOpId uniq ccall ty
+mkFCallId :: Unique -> ForeignCall -> Type -> Id
+mkFCallId uniq fcall ty
   = ASSERT( isEmptyVarSet (tyVarsOfType ty) )
 	-- A CCallOpId should have no free type variables; 
 	-- when doing substitutions won't substitute over it
-    mkGlobalId (PrimOpId prim_op) name ty info
+    mkGlobalId (FCallId fcall) name ty info
   where
-    occ_str = showSDocIface (braces (pprCCallOp ccall <+> ppr ty))
+    occ_str = showSDocIface (braces (ppr fcall <+> ppr ty))
 	-- The "occurrence name" of a ccall is the full info about the
 	-- ccall; it is encoded, but may have embedded spaces etc!
 
-    name    = mkCCallName uniq occ_str
-    prim_op = CCallOp ccall
+    name = mkFCallName uniq occ_str
 
     info = noCafNoTyGenIdInfo
 	   `setCgArity` 	arity

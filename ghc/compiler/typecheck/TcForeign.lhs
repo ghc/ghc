@@ -46,6 +46,7 @@ import TysWiredIn	( isFFIArgumentTy, isFFIImportResultTy,
 			  isFFILabelTy
 			)
 import Type             ( Type )
+import ForeignCall	( Safety )
 import PrelNames	( hasKey, ioTyConKey )
 import Outputable
 
@@ -111,7 +112,7 @@ tcFImport fo@(ForeignDecl nm FoLabel hs_ty ext_nm cconv src_loc) =
    let i = (mkLocalId nm sig_ty) in
    returnTc (i, (ForeignDecl i FoLabel undefined ext_nm cconv src_loc))
 
-tcFImport fo@(ForeignDecl nm imp_exp@(FoImport isUnsafe) hs_ty ext_nm cconv src_loc) =
+tcFImport fo@(ForeignDecl nm imp_exp@(FoImport safety) hs_ty ext_nm cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
 
@@ -125,7 +126,7 @@ tcFImport fo@(ForeignDecl nm imp_exp@(FoImport isUnsafe) hs_ty ext_nm cconv src_
    in
    case splitFunTys t_ty of
      (arg_tys, res_ty) ->
-        checkForeignImport (isDynamicExtName ext_nm) (not isUnsafe) ty arg_tys res_ty `thenTc_`
+        checkForeignImport (isDynamicExtName ext_nm) safety ty arg_tys res_ty `thenTc_`
 	let i = (mkLocalId nm ty) in
 	returnTc (i, (ForeignDecl i imp_exp undefined ext_nm cconv src_loc))
 
@@ -161,8 +162,8 @@ tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
 
 
 \begin{code}
-checkForeignImport :: Bool -> Bool -> Type -> [Type] -> Type -> TcM ()
-checkForeignImport is_dynamic is_safe ty args res
+checkForeignImport :: Bool -> Safety -> Type -> [Type] -> Type -> TcM ()
+checkForeignImport is_dynamic safety ty args res
  | is_dynamic =
     -- * first arg has got to be an Addr
    case args of
@@ -170,11 +171,11 @@ checkForeignImport is_dynamic is_safe ty args res
      (x:xs) ->
 	getDOptsTc						`thenTc` \ dflags ->
         check (isFFIDynArgumentTy x) (illegalForeignTyErr True{-Arg-} ty) `thenTc_`
-        mapTc (checkForeignArg (isFFIArgumentTy dflags is_safe)) xs	`thenTc_`
+        mapTc (checkForeignArg (isFFIArgumentTy dflags safety)) xs	`thenTc_`
 	checkForeignRes True {-NonIO ok-} (isFFIImportResultTy dflags) res
  | otherwise =
      getDOptsTc							   `thenTc` \ dflags ->
-     mapTc (checkForeignArg (isFFIArgumentTy dflags is_safe)) args `thenTc_`
+     mapTc (checkForeignArg (isFFIArgumentTy dflags safety)) args `thenTc_`
      checkForeignRes True {-NonIO ok-} (isFFIImportResultTy dflags) res
 
 checkForeignExport :: Bool -> Type -> [Type] -> Type -> TcM ()

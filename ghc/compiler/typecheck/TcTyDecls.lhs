@@ -10,7 +10,7 @@ module TcTyDecls (
 
 #include "HsVersions.h"
 
-import HsSyn		( TyClDecl(..), ConDecl(..), ConDetails(..), BangType(..),
+import HsSyn		( TyClDecl(..), ConDecl(..), ConDetails(..), 
 			  getBangType, getBangStrictness, conDetailsTys
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )

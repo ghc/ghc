@@ -715,9 +715,9 @@ rnCoreExpr (UfLitLit l ty)
   = rnHsType (text "litlit") ty	`thenRn` \ ty' ->
     returnRn (UfLitLit l ty')
 
-rnCoreExpr (UfCCall cc ty)
+rnCoreExpr (UfFCall cc ty)
   = rnHsType (text "ccall") ty	`thenRn` \ ty' ->
-    returnRn (UfCCall cc ty')
+    returnRn (UfFCall cc ty')
 
 rnCoreExpr (UfTuple (HsTupCon _ boxity arity) args) 
   = mapRn rnCoreExpr args		`thenRn` \ args' ->

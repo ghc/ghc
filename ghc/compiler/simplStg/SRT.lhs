@@ -145,10 +145,10 @@ Expressions
 \begin{code}
 srtExpr :: SrtOffset -> StgExpr -> (StgExpr, SrtIds, SrtOffset)
 
-srtExpr off e@(StgApp f args) 	      = (e, [], off)
-srtExpr off e@(StgLit l)      	      = (e, [], off)
-srtExpr off e@(StgConApp con args)    = (e, [], off)
-srtExpr off e@(StgPrimApp op args ty) = (e, [], off)
+srtExpr off e@(StgApp f args) 	    = (e, [], off)
+srtExpr off e@(StgLit l)      	    = (e, [], off)
+srtExpr off e@(StgConApp con args)  = (e, [], off)
+srtExpr off e@(StgOpApp op args ty) = (e, [], off)
 
 srtExpr off (StgSCC cc expr) =
    srtExpr off expr	=: \(expr, srt, off) ->

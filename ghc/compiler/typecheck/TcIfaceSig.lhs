@@ -27,7 +27,7 @@ import WorkWrap		( mkWrapper )
 
 import Id		( Id, mkVanillaGlobal, mkLocalId, idName, isDataConWrapId_maybe )
 import Module		( Module )
-import MkId		( mkCCallOpId )
+import MkId		( mkFCallId )
 import IdInfo
 import DataCon		( DataCon, dataConId, dataConSig, dataConArgTys )
 import Type		( mkTyVarTys, splitAlgTyConApp_maybe )
@@ -212,10 +212,10 @@ tcCoreExpr (UfLitLit lit ty)
   = tcIfaceType ty		`thenTc` \ ty' ->
     returnTc (Lit (MachLitLit lit ty'))
 
-tcCoreExpr (UfCCall cc ty)
+tcCoreExpr (UfFCall cc ty)
   = tcIfaceType ty 	`thenTc` \ ty' ->
     tcGetUnique		`thenNF_Tc` \ u ->
-    returnTc (Var (mkCCallOpId u cc ty'))
+    returnTc (Var (mkFCallId u cc ty'))
 
 tcCoreExpr (UfTuple (HsTupCon _ boxity arity) args) 
   = mapTc tcCoreExpr args	`thenTc` \ args' ->
