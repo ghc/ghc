@@ -440,6 +440,10 @@ percentage to be modified (maximum 5\%).
 ensuring that all the data will be displayed. 
 
 <tag>@-?@</tag> Print out usage information.
+
+<tag>@-c@</tag> Fill in the bands with colours rather than shades of grey.
+Some people find colour plots easier to read (especially when viewed on a
+non-monochrome medium ;-)
 </descrip>
 
 <sect3>@stat2resid@---residency info from GC stats

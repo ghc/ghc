@@ -132,7 +132,8 @@ compiler), which produces an object file and passes it to
 <item>
 The linker, which links your code with the appropriate libraries
 (including the standard prelude), producing an executable program in
-the default output file named @a.out@.
+the default output file named either @a.out@ (*NIX platforms) or @main.exe@
+(Windows port.)
 </enum>
 
 You have considerable control over the compilation process.  You feed
@@ -171,23 +172,23 @@ join, as you feel is appropriate.
 <tag>glasgow-haskell-users:</tag>
 
 This list is for GHC users to chat among themselves.  Subscribe by
-sending mail to <htmlurl name="majordomo@@dcs.gla.ac.uk"
-url="mailto:majordomo@@dcs.gla.ac.uk">, with a message body (not
+sending mail to <htmlurl name="majordomo@dcs.gla.ac.uk"
+url="mailto:majordomo@dcs.gla.ac.uk">, with a message body (not
 header) like this:
 
 <tscreen><verb> 
-subscribe glasgow-haskell-users MyName <m.y.self@@bigbucks.com> 
+subscribe glasgow-haskell-users MyName <m.y.self@bigbucks.com> 
 </verb></tscreen> 
 
 (The last bit is your all-important e-mail address, of course.)
 
 To communicate with your fellow users, send mail to <url
-name="glasgow-haskell-users@@dcs.gla.ac.uk"
-url="mailto:glasgow-haskell-users@@dcs.gla.ac.uk">.
+name="glasgow-haskell-users@dcs.gla.ac.uk"
+url="mailto:glasgow-haskell-users@dcs.gla.ac.uk">.
 
 To contact the list administrator, send mail to <htmlurl
-name="glasgow-haskell-users-request@@dcs.gla.ac.uk"
-url="mailto:glasgow-haskell-users-request@@dcs.gla.ac.uk">.  An archive
+name="glasgow-haskell-users-request@dcs.gla.ac.uk"
+url="mailto:glasgow-haskell-users-request@dcs.gla.ac.uk">.  An archive
 of the list is available on the Web: <url name="glasgow-haskell-users
 mailing list archive"
 url="http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-users">.
@@ -197,16 +198,16 @@ Send bug reports for GHC to this address!  The sad and lonely people
 who subscribe to this list will muse upon what's wrong and what you
 might do about it.
 
-Subscribe via <htmlurl name="majordomo@@dcs.gla.ac.uk"
-url="mailto:majordomo@@dcs.gla.ac.uk"> with:
+Subscribe via <htmlurl name="majordomo@dcs.gla.ac.uk"
+url="mailto:majordomo@dcs.gla.ac.uk"> with:
 
 <tscreen><verb>
-subscribe glasgow-haskell-bugs My Name <m.y.self@@hackers.r.us>
+subscribe glasgow-haskell-bugs My Name <m.y.self@hackers.r.us>
 </verb></tscreen>
 
 Again, you may contact the list administrator at <htmlurl
-name="glasgow-haskell-bugs-request@@dcs.gla.ac.uk"
-url="mailto:glasgow-haskell-bugs-request@@dcs.gla.ac.uk">.
+name="glasgow-haskell-bugs-request@dcs.gla.ac.uk"
+url="mailto:glasgow-haskell-bugs-request@dcs.gla.ac.uk">.
 And, yes, an archive of the list is available on the Web at: : <url
 name="glasgow-haskell-bugs mailing list archive"
 url="http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-bugs">
@@ -214,11 +215,11 @@ url="http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-bugs">
 </descrip>
 
 There is also the general Haskell mailing list.  Subscribe by sending
-email to <htmlurl name="majordomo@@dcs.gla.ac.uk"
-url="mailto:majordomo@@dcs.gla.ac.uk">, with the usual message body:
+email to <htmlurl name="majordomo@dcs.gla.ac.uk"
+url="mailto:majordomo@dcs.gla.ac.uk">, with the usual message body:
 
 <tscreen><verb>
-subscribe haskell My Name <m.y.self@@fp.rules.ok.org>
+subscribe haskell My Name <m.y.self@fp.rules.ok.org>
 </verb></tscreen>
 
 Some Haskell-related discussion takes place in the Usenet newsgroup

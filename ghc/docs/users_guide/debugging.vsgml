@@ -84,9 +84,24 @@ example: @ghc -noC -ddump-simpl Foo.hs@
 
 <tag>@-hi@:</tag>
 <nidx>-hi option</nidx>
-<em>Do</em> generate an interface file.  This would normally be used in
-conjunction with @-noC@, which turns off interface generation;
-thus: @-noC -hi@.
+<em>Do</em> generate an interface file (on @stdout@.) This would
+normally be used in conjunction with @-noC@, which turns off interface
+generation; thus: @-noC -hi@.
+
+<tag>@-hi-with-&lt;section&gt;@:</tag>
+<nidx>-hi-with option</nidx>
+Generate just the specified section of an interface file. In case you're
+only interested in a subset of what @-hi@ outputs, @-hi-with-&lt;section&gt;@
+is just the ticket. For instance 
+
+<tscreen> <verb>
+-noC -hi-with-declarations -hi-with-exports
+</verb> </tscreen>
+
+will output the sections containing the exports and the
+declarations. Legal sections are: @declarations@, @exports@,
+@instances@, @instance_modules@, @usages@, @fixities@, and
+@interface@.
 
 <tag>@-dshow-passes@:</tag>
 <nidx>-dshow-passes option</nidx>
