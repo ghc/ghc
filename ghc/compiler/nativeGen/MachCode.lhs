@@ -2262,17 +2262,15 @@ genCCall fn cconv kind [StInt i]
 
 
 genCCall fn cconv kind args
-  = mapUs get_call_arg args `thenUs` \ sizes_and_argCodes ->
+  = get_call_args args `thenUs` \ (tot_arg_size, argCode) ->
     let
-        (sizes, argCode) = unzip sizes_and_argCodes
-        tot_arg_size = sum (map (\sz -> case sz of DF -> 8; _ -> 4) sizes)
-
-	code2 = asmParThen (map ($ asmVoid) (reverse argCode))
-	call = [CALL fn__2 ,
+	code2 = asmParThen (map ($ asmVoid) argCode)
+	call = [SUB L (OpImm (ImmInt tot_arg_size)) (OpReg esp),
+                CALL fn__2 ,
 		ADD L (OpImm (ImmInt tot_arg_size)) (OpReg esp)
                ]
     in
-    returnSeq (code2) call
+    returnSeq code2 call
 
   where
     -- function names that begin with '.' are assumed to be special
@@ -2283,42 +2281,52 @@ genCCall fn cconv kind args
 	      '.' -> ImmLit (ptext fn)
 	      _   -> ImmLab (ptext fn)
 
+    arg_size DF = 8
+    arg_size _  = 4
+
     ------------
-    get_call_arg :: StixTree{-current argument-} 
-                    -> UniqSM (Size, InstrBlock)  -- arg size, code
+    -- do get_call_arg on each arg, threading the total arg size along
+    -- process the args right-to-left
+    get_call_args :: [StixTree] -> UniqSM (Int, [InstrBlock])
+    get_call_args args
+       = f 0 args
+         where
+            f curr_sz [] 
+               = returnUs (curr_sz, [])
+            f curr_sz (arg:args)             
+               = f curr_sz args          `thenUs` \ (new_sz, iblocks) ->
+                 get_call_arg arg new_sz `thenUs` \ (new_sz2, iblock) ->
+                 returnUs (new_sz2, iblock:iblocks)
 
-    get_call_arg arg
-      = get_op arg		`thenUs` \ (code, op, sz) ->
+
+    ------------
+    get_call_arg :: StixTree{-current argument-}
+                    -> Int{-running total of arg sizes seen so far-}
+                    -> UniqSM (Int, InstrBlock)  -- updated tot argsz, code
+
+    get_call_arg arg old_sz
+      = get_op arg		`thenUs` \ (code, reg, sz) ->
+        let new_sz = old_sz + arg_size sz
+        in
         case sz of
-           DF -> --getNewRegNCG DoubleRep `thenUs` \ tmp ->
-                 returnUs (sz,
+           DF -> returnUs (new_sz,
                            code .
-                           --mkSeqInstr (GLD DF op tmp) .
-                           mkSeqInstr (SUB L (OpImm (ImmInt 8)) (OpReg esp)) .
-                           mkSeqInstr (GST DF {-tmp-}op (AddrBaseIndex 
-                                                          (Just esp) 
-                                                          Nothing (ImmInt 0)))
+                           mkSeqInstr (GST DF reg
+                                              (AddrBaseIndex (Just esp) 
+                                                  Nothing (ImmInt (- new_sz))))
                           )
-	   _  -> returnUs (sz,
-                           code . mkSeqInstr (PUSH sz (OpReg op)))
-
+	   _  -> returnUs (new_sz,
+                           code . 
+                           mkSeqInstr (MOV sz (OpReg reg)
+                                              (OpAddr 
+                                                  (AddrBaseIndex (Just esp) 
+                                                     Nothing (ImmInt (- new_sz)))))
+                          )
     ------------
     get_op
 	:: StixTree
-	-> UniqSM (InstrBlock, {-Operand-}Reg, Size)	-- code, operator, size
-{-
-    get_op (StInt i)
-      = returnUs (asmParThen [], OpImm (ImmInt (fromInteger i)), L)
+	-> UniqSM (InstrBlock, Reg, Size) -- code, reg, size
 
-    get_op (StInd pk mem)
-      = getAmode mem		`thenUs` \ amode ->
-	let
-	    code = amodeCode amode --asmVoid
-	    addr = amodeAddr amode
-	    sz	 = primRepToSize pk
-	in
-	returnUs (code, OpAddr addr, sz)
--}
     get_op op
       = getRegister op		`thenUs` \ register ->
 	getNewRegNCG (registerRep register)
@@ -2329,7 +2337,7 @@ genCCall fn cconv kind args
 	    pk   = registerRep  register
 	    sz   = primRepToSize pk
 	in
-	returnUs (code, {-OpReg-} reg, sz)
+	returnUs (code, reg, sz)
 
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
