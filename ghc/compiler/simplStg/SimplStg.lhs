@@ -11,8 +11,6 @@ module SimplStg ( stg2stg ) where
 import StgSyn
 
 import LambdaLift	( liftProgram )
-import Name		( isLocallyDefined )
-import UniqSet          ( UniqSet, mapUniqSet )
 import CostCentre       ( CostCentre )
 import SCCfinal		( stgMassageForProfiling )
 import StgLint		( lintStgBindings )
@@ -25,17 +23,11 @@ import CmdLineOpts	( opt_SccGroup, --Not used:opt_EnsureSplittableC,
 			  opt_DoStgLinting,
 			  StgToDo(..)
 			)
-import Id		( nullIdEnv, lookupIdEnv, addOneToIdEnv,
-			  growIdEnvList, isNullIdEnv, IdEnv,
-			  GenId{-instance Eq/Outputable -}, Id
-			)
-import Maybes		( maybeToBool )
 import ErrUtils		( doIfSet )
 import UniqSupply	( splitUniqSupply, UniqSupply )
-import Util		( mapAccumL, panic, assertPanic )
+import Util		( panic, assertPanic, trace )
 import IO		( hPutStr, stderr )
 import Outputable
-import GlaExts		( trace )
 \end{code}
 
 \begin{code}

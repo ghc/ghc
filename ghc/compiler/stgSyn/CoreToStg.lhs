@@ -17,30 +17,20 @@ module CoreToStg ( topCoreBindsToStg ) where
 import CoreSyn		-- input
 import StgSyn		-- output
 
-import Bag		( emptyBag, unitBag, unionBags, unionManyBags, bagToList )
 import CoreUtils	( coreExprType )
 import CostCentre	( noCostCentre )
 import MkId		( mkSysLocal ) 
-import Id		( idType, isBottomingId,
-			  externallyVisibleId, mkIdWithNewUniq,
-			  nullIdEnv, addOneToIdEnv, lookupIdEnv, growIdEnvList,
+import Id		( externallyVisibleId, mkIdWithNewUniq,
+			  nullIdEnv, addOneToIdEnv, lookupIdEnv,
 			  IdEnv, Id
 			)
-import Literal		( mkMachInt, Literal(..) )
-import PrelVals		( unpackCStringId, unpackCString2Id,
-			  integerZeroId, integerPlusOneId,
-			  integerPlusTwoId, integerMinusOneId
-			)
-import PrimOp		( PrimOp(..) )
 import SrcLoc		( noSrcLoc )
-import TyCon		( TyCon{-instance Uniquable-} )
 import Type		( splitAlgTyConApp, Type )
-import TysWiredIn	( stringTy )
-import Unique		( integerTyConKey, ratioTyConKey, Unique{-instance Eq-} )
-import UniqSupply	-- all of it, really
-import Util		( zipLazy )
-import Outputable
-import Ratio 		( numerator, denominator )
+import UniqSupply	( UniqSupply, UniqSM, 
+			  returnUs, thenUs, initUs,
+			  mapUs, getUnique
+			)
+import Outputable	( panic )
 
 isLeakFreeType x y = False -- safe option; ToDo
 \end{code}

@@ -27,8 +27,7 @@ import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe,
 			  isTyVarTy, Type
 			)
 import TyCon		( TyCon, isDataTyCon )
-import Util		( zipEqual )
-import GlaExts		( trace )
+import Util		( zipEqual, trace )
 import Outputable
 
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
