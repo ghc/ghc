@@ -349,6 +349,7 @@ tidyIdInfo (_, occ_env, subst_env) is_external unfold_info id
     new_flavour = case flavourInfo core_idinfo of
 		    VanillaId  -> ConstantId
 		    ExportedId -> ConstantId
+		    ConstantId -> ConstantId	-- e.g. Default methods
 		    DictFunId  -> DictFunId
 		    flavour    -> pprTrace "tidyIdInfo" (ppr id <+> ppFlavourInfo flavour)
 				  flavour
