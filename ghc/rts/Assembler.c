@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.16 $
- * $Date: 1999/11/18 12:10:24 $
+ * $Revision: 1.17 $
+ * $Date: 1999/11/19 13:54:53 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -1323,9 +1323,9 @@ const AsmPrim asmPrimOps[] = {
     , { "primIsIEEEDouble",          "",   "B",  MONAD_Id, i_PRIMOP1, i_isIEEEDouble }
 
     /* Ref operations */
-    , { "primNewRef",                "a",  "R",  MONAD_ST, i_PRIMOP2, i_newRef }
-    , { "primWriteRef",              "Ra", "",   MONAD_ST, i_PRIMOP2, i_writeRef }
-    , { "primReadRef",               "R",  "a",  MONAD_ST, i_PRIMOP2, i_readRef }
+    , { "primNewRef",                "a",  "R",  MONAD_IO, i_PRIMOP2, i_newRef }
+    , { "primWriteRef",              "Ra", "",   MONAD_IO, i_PRIMOP2, i_writeRef }
+    , { "primReadRef",               "R",  "a",  MONAD_IO, i_PRIMOP2, i_readRef }
     , { "primSameRef",               "RR", "B",  MONAD_Id, i_PRIMOP2, i_sameRef }
 
     /* PrimArray operations */

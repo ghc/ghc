@@ -1889,15 +1889,15 @@ freeStablePtr    = primFreeStablePtr
 data PrimArray              a -- immutable arrays with Int indices
 data PrimByteArray
 
-data Ref                  s a -- mutable variables
+data Ref                    a -- mutable variables
 data PrimMutableArray     s a -- mutable arrays with Int indices
 data PrimMutableByteArray s
 
-newRef   :: a -> ST s (Ref s a)
+newRef   :: a -> IO (Ref a)
 newRef    = primNewRef
-readRef  :: Ref s a -> ST s a
+readRef  :: Ref a -> IO a
 readRef   = primReadRef
-writeRef :: Ref s a -> a -> ST s ()
+writeRef :: Ref a -> a -> IO ()
 writeRef  = primWriteRef
 
 
