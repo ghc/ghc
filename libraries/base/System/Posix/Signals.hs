@@ -12,6 +12,8 @@
 --
 -----------------------------------------------------------------------------
 
+#include "HsBaseConfig.h"
+
 module System.Posix.Signals (
 #ifndef mingw32_HOST_OS
   -- * The Signal type
@@ -97,8 +99,6 @@ import Prelude -- necessary to get dependencies right
 #ifdef __GLASGOW_HASKELL__
 #include "Signals.h"
 #endif
-
-#include "HsBaseConfig.h"
 
 import Foreign
 import Foreign.C
