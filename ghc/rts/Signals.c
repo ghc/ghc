@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.26 2002/07/17 09:21:51 simonmar Exp $
+ * $Id: Signals.c,v 1.27 2002/09/03 14:07:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -199,14 +199,14 @@ awaitUserSignals(void)
 StgInt 
 stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, void *mask)
 {
-    sigset_t signals;
+    sigset_t signals, osignals;
     struct sigaction action;
     StgInt previous_spi;
 
     // Block the signal until we figure out what to do
     // Count on this to fail if the signal number is invalid
     if (sig < 0 || sigemptyset(&signals) ||
-	sigaddset(&signals, sig) || sigprocmask(SIG_BLOCK, &signals, NULL)) {
+	sigaddset(&signals, sig) || sigprocmask(SIG_BLOCK, &signals, &osignals)) {
 	return STG_SIG_ERR;
     }
     
@@ -246,7 +246,7 @@ stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, void *mask)
     action.sa_flags = sig == SIGCHLD && nocldstop ? SA_NOCLDSTOP : 0;
 
     if (sigaction(sig, &action, NULL) || 
-	sigprocmask(SIG_UNBLOCK, &signals, NULL)) 
+	sigprocmask(SIG_SETMASK, &osignals, NULL)) 
     {
 	// need to return an error code, so avoid a stable pointer leak
 	// by freeing the previous handler if there was one.
