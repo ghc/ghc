@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 1996/11/21 16:48:17 simonm Exp $
+# $Id: Makefile,v 1.3 1997/01/07 13:17:25 simonm Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -89,26 +89,6 @@ install :: main/TopClosure.o
 #-----------------------------------------------------------------------------
 # libHSrts.a, in several different 'ways'
 
-all ::
-	@for i in $(WAY_SUFFIXES); do \
-		echo; \
-		echo =========== Making runtime system for way $$i; \
-		echo; \
-		$(MAKE) -f Makefile.libHSrts suffix=$$i; \
-	done
-
-install ::
-	@for i in $(WAY_SUFFIXES); do \
-		$(MAKE) -f Makefile.libHSrts suffix=$$i install; \
-	done
-
-clean ::
-	@$(MAKE) -f Makefile.libHSrts clean
-	@for i in $(WAY_SUFFIXES); do \
-		$(MAKE) -f Makefile.libHSrts suffix=$$i cleanobj; \
-	done
-
-# Dependencies are done by Makefile.libHSrts
-
-depend ::
-	@$(MAKE) -f Makefile.libHSrts depend
+MAKEFILE = Makefile.libHSrts
+DESCR = runtime system
+include $(TOP)/ghc/mk/ways.mk
