@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.36 1999/12/01 14:34:40 simonmar Exp $
+ * $Id: Schedule.c,v 1.37 1999/12/01 14:58:09 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -1266,13 +1266,13 @@ unblockThread(StgTSO *tso)
 
   case BlockedOnException:
     {
-      StgTSO *tso  = tso->block_info.tso;
+      StgTSO *target  = tso->block_info.tso;
 
-      ASSERT(get_itbl(tso)->type == TSO);
-      ASSERT(tso->blocked_exceptions != NULL);
+      ASSERT(get_itbl(target)->type == TSO);
+      ASSERT(target->blocked_exceptions != NULL);
 
-      last = &tso->blocked_exceptions;
-      for (t = tso->blocked_exceptions; t != END_TSO_QUEUE; 
+      last = &target->blocked_exceptions;
+      for (t = target->blocked_exceptions; t != END_TSO_QUEUE; 
 	   last = &t->link, t = t->link) {
 	ASSERT(get_itbl(t)->type == TSO);
 	if (t == tso) {
