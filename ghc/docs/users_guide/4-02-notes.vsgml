@@ -4,17 +4,11 @@
 
 <itemize>
 
-<item> Some Haskell 98 changes:
-	<itemize>
-	<item> Lazy name-clash detection.
-	<item> Scoped infix declarations.
-	<item> <tt/Eval/ class now completely removed.
-	</itemize>
+<item> Full Haskell 98 language support.
 
 <item> Scoped type variables implemented.
 
 <item> Several bugs in _ccall_GC and foreign export fixed.
-
 
 <item> Warnings for unused variables should work now (they didn't before).
 
@@ -34,4 +28,17 @@ the simplifier.
 
 <item> <tt/OccName/ is a separate module, and is an abstract data type.
  
+<item> A new generational garbage collector: the number of generations
+is variable, using the -G RTS option (see <ref id="rts-options-gc"
+name="RTS options to control the garbage-collector">).  This collector
+is faster and more space-efficient than the two-space collector in 4.01.
+
+<item> Error messages and warnings are now printed out in the order they
+occur in the source code.
+
+<item> <tt/isEmptyMVar/ operation added to the <tt/Concurrent/ library.
+
+<item> Two functions exported from <tt/IOExts/: <tt/unsafeIOToST/ and
+<tt/stToIO/.
+
 </itemize>
