@@ -13,14 +13,13 @@ module ByteCodeLink ( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
 import Outputable
 import Name		( Name, getName, nameModule, toRdrName )
 import RdrName		( rdrNameOcc, rdrNameModule )
-import OccName		( occNameString, occNameUserString )
+import OccName		( occNameString )
 import FiniteMap	( FiniteMap, addListToFM, filterFM,
 			  addToFM, lookupFM, emptyFM )
 import CoreSyn
 import Literal		( Literal(..) )
 import PrimOp		( PrimOp, primOpOcc )
 import PrimRep		( PrimRep(..) )
-import Util		( global )
 import Constants	( wORD_SIZE )
 import Module		( ModuleName, moduleName, moduleNameFS )
 import Linker		( lookupSymbol )
@@ -42,7 +41,7 @@ import Addr 		( Word, Addr )
 import PrelBase		( Int(..) )
 import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
 			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
-import IOExts		( IORef, fixIO, readIORef, writeIORef )
+import IOExts		( fixIO )
 import ArrayBase	
 import PrelArr		( Array(..) )
 import PrelIOBase	( IO(..) )
@@ -411,14 +410,6 @@ data BCO# = BCO# ByteArray# 		-- instrs   :: array Word16#
                  ByteArray#		-- itbls    :: Array Addr#
 -}
 
-GLOBAL_VAR(v_cafTable, [], [HValue])
-
-addCAF :: HValue -> IO ()
-addCAF x = do xs <- readIORef v_cafTable
-              --putStrLn ("addCAF " ++ show (1 + length xs))
-              writeIORef v_cafTable (x:xs)
-
-
 linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
    = do insns    <- listFromSS insnsSS
         literals <- listFromSS literalsSS
@@ -475,8 +466,7 @@ lookupCE ce (Right primop)
    = do m <- lookupSymbol (primopToCLabel primop "closure")
         case m of
            Just (Ptr addr) -> case addrToHValue# addr of
-                                 (# hval #) -> do addCAF hval
-                                                  return hval
+                                 (# hval #) -> return hval
            Nothing -> pprPanic "ByteCodeGen.lookupCE(primop)" (ppr primop)
 lookupCE ce (Left nm)
    = case lookupFM ce nm of
@@ -485,8 +475,7 @@ lookupCE ce (Left nm)
            -> do m <- lookupSymbol (nameToCLabel nm "closure")
                  case m of
                     Just (Ptr addr) -> case addrToHValue# addr of
-                                          (# hval #) -> do addCAF hval
-                                                           return hval
+                                          (# hval #) -> return hval
                     Nothing        -> pprPanic "ByteCodeGen.lookupCE" (ppr nm)
 
 lookupIE :: ItblEnv -> Name -> IO (Ptr a)
