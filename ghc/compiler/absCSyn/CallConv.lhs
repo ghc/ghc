@@ -11,6 +11,7 @@ module CallConv
 
        , stdCallConv
        , cCallConv
+       , defaultCallConv
        , callConvAttribute
        , decorateExtName
        ) where
@@ -33,6 +34,9 @@ stdCallConv = 0
 
 cCallConv  :: CallConv
 cCallConv = 1
+
+defaultCallConv :: CallConv
+defaultCallConv = cCallConv
 \end{code}
 
 Generate the gcc attribute corresponding to the given

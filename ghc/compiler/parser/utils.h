@@ -115,6 +115,7 @@ void	checkprec PROTO((tree, qid, BOOLEAN));
 */
 
 /* FFI predefines */
+#define CALLCONV_NONE     (-1)
 #define CALLCONV_STDCALL  0
 #define CALLCONV_CCALL    1
 #define CALLCONV_PASCAL   2

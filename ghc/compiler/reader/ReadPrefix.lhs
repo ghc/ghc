@@ -962,7 +962,12 @@ wlkExtName (U_just pt)
       [mod,nm] -> returnUgn (ExtName nm (Just mod))
 
 rdCallConv :: Int -> UgnM CallConv
-rdCallConv x = returnUgn x
+rdCallConv x = 
+   -- this tracks the #defines in parser/utils.h
+  case x of
+    (-1) -> -- no calling convention specified, use default.
+          returnUgn defaultCallConv
+    _    -> returnUgn x
 
 rdForKind :: Int -> Bool -> UgnM ForKind
 rdForKind 0 isUnsafe = -- foreign import
