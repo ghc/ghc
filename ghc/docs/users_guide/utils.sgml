@@ -282,9 +282,10 @@ tags:
 	</varlistentry>
       </variablelist>
 
-      <para>The input file should end with .hsc. Output files by
-      default get names with the <literal>.hsc</literal> suffix
-      replaced:</para>
+      <para>The input file should end with .hsc (it should be plain
+      Haskell source only; literate Haskell is not supported at the
+      moment). Output files by default get names with the
+      <literal>.hsc</literal> suffix replaced:</para>
 
       <informaltable>
 	<tgroup cols=2>
