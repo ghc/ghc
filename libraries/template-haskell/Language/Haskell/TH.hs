@@ -5,7 +5,7 @@ module Language.Haskell.TH(
 	Q, runQ, 
 	report,		-- :: Bool -> String -> Q ()
 	recover, 	-- :: Q a -> Q a -> Q a
-	reify, 		-- :: Name -> Q Decl
+	reify, 		-- :: Name -> Q Info
 	currentModule, 	-- :: Q String
 	runIO, 		-- :: IO a -> Q a
 
