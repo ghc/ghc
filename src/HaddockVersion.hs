@@ -8,10 +8,10 @@ module HaddockVersion (
 	projectName, projectVersion, projectUrl
    ) where
 
+import Version ( version )
+
 projectName, projectUrl :: String
 projectName = "Haddock"
 projectUrl = "http://www.haskell.org/haddock/"
 
--- The version comes in via CPP from mk/version.mk
-projectVersion :: String
-projectVersion = HADDOCK_VERSION
+projectVersion = version

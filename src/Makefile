@@ -5,7 +5,6 @@ INSTALLING=1
 
 ghc_ge_504 := $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
 ghc_ge_603 := $(shell if (test $(GhcCanonVersion) -ge 603); then echo YES; else echo NO; fi)
-ghc_le_600 := $(shell if (test $(GhcCanonVersion) -le 600); then echo YES; else echo NO; fi)
 
 SRC_HC_OPTS += -fglasgow-exts -cpp
 
@@ -35,15 +34,21 @@ endif
 HsParser_HC_OPTS      += -Onot
 HaddockParse_HC_OPTS  += -Onot
 
-# <= 6.0.x (double-)quotes all arguments when invoking utils, hence
-# the need to escape the string quotes here. >= 6.2.x does add a
-# layer of quoting.
-ifeq "$(ghc_le_600)" "YES"
-HaddockVersion_HC_OPTS = -D'HADDOCK_VERSION=\"$(ProjectVersion)\"'
-else
-HaddockVersion_HC_OPTS = -D'HADDOCK_VERSION="$(ProjectVersion)"'
-endif
-HaddockVersion : ../mk/version.mk
+# -----------------------------------------------------------------------------
+# Create the Version.hs file
+
+VERSION_HS = Version.hs
+EXTRA_SRCS += $(VERSION_HS)
+
+boot :: $(VERSION_HS)
+
+Version.hs : $(TOP)/mk/version.mk
+	@$(RM) -f $(VERSION_HS)
+	@echo "Creating $(VERSION_HS) ... "
+	@echo "module Version where" >>$(VERSION_HS)
+	@echo "version = \"$(ProjectVersion)\"" >> $(VERSION_HS)
+
+# -----------------------------------------------------------------------------
 
 ifeq "$(INSTALLING)" "1"
 ifeq "$(BIN_DIST)"   "1"
