@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.6 1999/07/01 13:48:22 panne Exp $
+ * $Id: BlockAlloc.c,v 1.7 2000/01/30 10:17:44 simonmar Exp $
  *
- * (c) The GHC Team 1998-1999
+ * (c) The GHC Team 1998-2000
  * 
  * The block allocator and free list manager.
  *
@@ -73,6 +73,9 @@ allocGroup(nat n)
       *last = bd->link;
       /* no initialisation necessary - this is already a
        * self-contained block group. */
+#ifdef DEBUG
+      bd->free = bd->start;	/* block isn't free now */
+#endif
       return bd;
     }
     if (bd->blocks >  n) {	/* block too big... */
