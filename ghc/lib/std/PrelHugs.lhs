@@ -19,7 +19,9 @@ module PrelHugs (
    hugsprimMkIO,
    hugsprimCreateAdjThunk,
    hugsprimUnpackString,
-   hugsprimPmFail
+   hugsprimPmFail,
+   hugsprimCompAux,
+   hugsprimError
 )
 where
 import PrelGHC
@@ -87,6 +89,11 @@ hugsprimUnpackString a = unpackCString a
 hugsprimPmFail       :: a
 hugsprimPmFail        = error "Pattern Match Failure"
 
+hugsprimCompAux      :: Ord a => a -> a -> Ordering -> Ordering
+hugsprimCompAux x y o = case compare x y of EQ -> o; LT -> LT; GT -> GT
+
+hugsprimError        :: String -> a
+hugsprimError s       = error s
 
 -- used when Hugs invokes top level function
 {-
