@@ -40,7 +40,7 @@ module OccName (
 
 #include "HsVersions.h"
 
-import Char	( isDigit, isUpper, isLower, ISALPHANUM, ord, chr, digitToInt )
+import Char	( isDigit, isUpper, isLower, isAlphaNum, ord, chr, digitToInt )
 import Util	( thenCmp )
 import Unique	( Unique )
 import FiniteMap ( FiniteMap, emptyFM, lookupFM, addToFM, elemFM )
@@ -458,7 +458,7 @@ alreadyEncoded s = all ok s
 			-- in names we'd have to encode them.  But we do put
 			-- spaces in ccall "occurrences", and we don't want to
 			-- reject them here
-		   ok ch  = ISALPHANUM ch
+		   ok ch  = isAlphaNum ch
 
 alreadyEncodedFS :: FAST_STRING -> Bool
 alreadyEncodedFS fs = alreadyEncoded (_UNPK_ fs)

@@ -282,7 +282,7 @@ Setters
 
 \begin{code}
 setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
-setSpecInfo 	  info sp = PSEQ sp (info { specInfo = sp })
+setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
 setTyGenInfo      info tg = tg `seq` info { tyGenInfo = tg }
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo	  info oc = oc `seq` info { occInfo = oc }

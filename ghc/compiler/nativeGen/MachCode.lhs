@@ -256,7 +256,7 @@ maybeImm (StCLbl l)
 maybeImm (StIndex rep (StCLbl l) (StInt off)) 
    = Just (ImmIndex l (fromInteger off * sizeOf rep))
 maybeImm (StInt i)
-  | i >= toInteger minInt && i <= toInteger maxInt
+  | i >= toInteger (minBound::Int) && i <= toInteger (maxBound::Int)
   = Just (ImmInt (fromInteger i))
   | otherwise
   = Just (ImmInteger i)

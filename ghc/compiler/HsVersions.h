@@ -37,21 +37,6 @@ name = Util.global (value) :: IORef (ty); \
 #define UASSERT2(e,msg)
 #endif
 
-#if __STDC__
-#define CAT2(a,b)a##b
-#else
-#define CAT2(a,b)a/**/b
-#endif
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 202
-# define failWith fail
-# define MkIOError(h,errt,msg) (IOError (Just h) errt msg)
-# define minInt (minBound::Int)
-# define maxInt (maxBound::Int)
-#else
-# define MkIOError(h,errt,msg) (errt msg)
-#endif
-
 #if __GLASGOW_HASKELL__ >= 23
 
 -- This #ifndef lets us switch off the "import FastString"
@@ -72,11 +57,9 @@ import qualified FastString
 # define _TAIL_		FastString.tailFS
 # define _LENGTH_	FastString.lengthFS
 # define _PK_		FastString.mkFastString
-# define _PK_INT_	FastString.mkFastStringInt
 # define _UNPK_		FastString.unpackFS
 # define _UNPK_INT_	FastString.unpackIntFS
 # define _APPEND_	`FastString.appendFS`
-# define _CONCAT_	FastString.concatFS
 #else
 # error I think that FastString is now always used. If not, fix this.
 # define FAST_STRING String
@@ -92,21 +75,6 @@ import qualified FastString
 # define _UNPK_	      (\x->x)
 # define _SUBSTR_     substr{-from Utils-}
 # define _APPEND_     ++
-# define _CONCAT_     concat
-#endif
-
-#if __HASKELL1__ > 4
-# define FMAP fmap
-# define ISALPHANUM isAlphaNum
-# define IOERROR ioError
-# define PSEQ seq
-# define SAPPLY $!
-#else
-# define FMAP map
-# define ISALPHANUM isAlphanum
-# define IOERROR fail
-# define PSEQ (\x y -> y)
-# define SAPPLY $
 #endif
 
 #endif
