@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.39 $
- * $Date: 2000/04/06 00:36:12 $
+ * $Revision: 1.40 $
+ * $Date: 2000/04/07 10:00:28 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -3263,15 +3263,14 @@ Cell intName;
 Cell type; {
     Text t = textOf(intName);
     Name n = findName(t);
-    Int  l = intOf(line);
 
     if (isNull(n)) {
         n = newName(t,NIL);
     } else if (name(n).defn!=PREDEFINED) {
-        ERRMSG(l) "Redeclaration of foreign \"%s\"", textToStr(t)
+        ERRMSG(line) "Redeclaration of foreign \"%s\"", textToStr(t)
         EEND;
     }
-    name(n).line     = l;
+    name(n).line     = line;
     name(n).defn     = extName;
     name(n).type     = type;
     name(n).callconv = callconv;
@@ -3301,15 +3300,14 @@ Cell intName;
 Cell type; {
     Text t = textOf(intName);
     Name n = findName(t);
-    Int  l = intOf(line);
 
     if (isNull(n)) {
         n = newName(t,NIL);
     } else if (name(n).defn!=PREDEFINED) {
-        ERRMSG(l) "Redeclaration of foreign \"%s\"", textToStr(t)
+        ERRMSG(line) "Redeclaration of foreign \"%s\"", textToStr(t)
         EEND;
     }
-    name(n).line     = l;
+    name(n).line     = line;
     name(n).defn     = NIL;  /* nothing to say */
     name(n).type     = type;
     name(n).callconv = callconv;

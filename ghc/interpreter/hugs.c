@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.61 $
- * $Date: 2000/04/06 00:01:26 $
+ * $Revision: 1.62 $
+ * $Date: 2000/04/07 10:00:28 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -1086,23 +1086,23 @@ static void processModule ( Module m )
             addUnqualImport(zfst(te2),zsnd(te2));
             break;
          case M_TYCON:
-            tyconDefn(zsel14(te2),zsel24(te2),zsel34(te2),zsel44(te2));
+            tyconDefn(intOf(zsel14(te2)),zsel24(te2),zsel34(te2),zsel44(te2));
             break;
          case M_CLASS:
-            classDefn(zsel14(te2),zsel24(te2),zsel34(te2),zsel44(te2));
+            classDefn(intOf(zsel14(te2)),zsel24(te2),zsel34(te2),zsel44(te2));
             break;
          case M_INST:
-            instDefn(zfst3(te2),zsnd3(te2),zthd3(te2));
+            instDefn(intOf(zfst3(te2)),zsnd3(te2),zthd3(te2));
             break;
          case M_DEFAULT:
-            defaultDefn(zfst(te2),zsnd(te2));
+            defaultDefn(intOf(zfst(te2)),zsnd(te2));
             break;
          case M_FOREIGN_IM:
-            foreignImport(zsel15(te2),zsel25(te2),zsel35(te2),
+            foreignImport(intOf(zsel15(te2)),zsel25(te2),zsel35(te2),
                           zsel45(te2),zsel55(te2));
             break;
          case M_FOREIGN_EX:
-            foreignExport(zsel15(te2),zsel25(te2),zsel35(te2),
+            foreignExport(intOf(zsel15(te2)),zsel25(te2),zsel35(te2),
                           zsel45(te2),zsel55(te2));
          case M_VALUE:
             valDefns = cons(te2,valDefns);
