@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.155 2003/05/14 09:13:59 simonmar Exp $
+ * $Id: GC.c,v 1.156 2003/06/19 12:47:08 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -1930,8 +1930,18 @@ loop:
        * list it contains.  
        */
       {
-	  StgTSO *new_tso = (StgTSO *)copy((StgClosure *)tso,tso_sizeW(tso),stp);
+	  StgTSO *new_tso;
+	  StgPtr p, q;
+
+	  new_tso = (StgTSO *)copyPart((StgClosure *)tso,
+				       tso_sizeW(tso),
+				       sizeofW(StgTSO), stp);
 	  move_TSO(tso, new_tso);
+	  for (p = tso->sp, q = new_tso->sp;
+	       p < tso->stack+tso->stack_size;) {
+	      *q++ = *p++;
+	  }
+	  
 	  return (StgClosure *)new_tso;
       }
     }
@@ -2165,7 +2175,7 @@ move_TSO (StgTSO *src, StgTSO *dest)
 {
     ptrdiff_t diff;
 
-    // relocate the stack pointers... 
+    // relocate the stack pointer... 
     diff = (StgPtr)dest - (StgPtr)src; // In *words* 
     dest->sp = (StgPtr)dest->sp + diff;
 }
