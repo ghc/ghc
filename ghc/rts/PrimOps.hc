@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.93 2002/02/28 18:44:29 sof Exp $
+ * $Id: PrimOps.hc,v 1.94 2002/03/02 17:40:24 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -791,7 +791,10 @@ FN_(gcdIntegerIntzh_fast)
   I_ r;
   FB_
   r = RET_STGCALL3(StgInt,mpn_gcd_1,(mp_limb_t *)(BYTE_ARR_CTS(R2.p)), R1.i, R3.i);
-  RET_N(r);
+
+  R1.i = r;
+  /* Result parked in R1, return via info-pointer at TOS */
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 
@@ -1002,7 +1005,7 @@ FN_(forkzh_fast)
   /* switch at the earliest opportunity */ 
   context_switch = 1;
   
-  RET_N(R1.t);
+  RET_P(R1.t);
   FE_
 }
 
@@ -1017,7 +1020,7 @@ FN_(myThreadIdzh_fast)
 {
   /* no args. */
   FB_
-  RET_N((P_)CurrentTSO);
+  RET_P((P_)CurrentTSO);
   FE_
 }
 
@@ -1089,10 +1092,19 @@ FN_(newMVarzh_fast)
   FE_
 }
 
-#define PerformTake(tso, value) ({			\
-    (tso)->sp[1] = (W_)value;				\
+/* If R1 isn't available, pass it on the stack */
+#ifdef REG_R1
+#define PerformTake(tso, value) ({		\
+    (tso)->sp[1] = (W_)value;			\
     (tso)->sp[0] = (W_)&stg_gc_unpt_r1_info;	\
   })
+#else
+#define PerformTake(tso, value) ({		\
+    (tso)->sp[1] = (W_)value;			\
+    (tso)->sp[0] = (W_)&stg_ut_1_0_unreg_info;	\
+  })
+#endif
+
 
 #define PerformPut(tso) ({				\
     StgClosure *val = (StgClosure *)(tso)->sp[2];	\
