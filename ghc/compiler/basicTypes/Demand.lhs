@@ -4,6 +4,10 @@
 \section[Demand]{@Demand@: the amount of demand on a value}
 
 \begin{code}
+#ifndef OLD_STRICTNESS
+module Demand () where
+#else
+
 module Demand(
 	Demand(..),
 
@@ -199,6 +203,6 @@ ppStrictnessInfo NoStrictnessInfo		   = empty
 ppStrictnessInfo (StrictnessInfo wrapper_args bot) = hsep [pprDemands wrapper_args bot]
 \end{code}
 
-
-
-
+\begin{code}
+#endif /* OLD_STRICTNESS */
+\end{code}

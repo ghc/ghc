@@ -26,12 +26,14 @@ module IdInfo (
 	-- New demand and strictness info
  	newStrictnessInfo, setNewStrictnessInfo, 
   	newDemandInfo, setNewDemandInfo, pprNewStrictness,
+	setAllStrictnessInfo,
 
+#ifdef OLD_STRICTNESS
 	-- Strictness; imported from Demand
 	StrictnessInfo(..),
 	mkStrictnessInfo, noStrictnessInfo,
 	ppStrictnessInfo,isBottomingStrictness, 
-	setAllStrictnessInfo,
+#endif
 
         -- Worker
         WorkerInfo(..), workerExists, wrapperArity, workerId,
@@ -78,9 +80,6 @@ import CoreSyn
 import TyCon		( TyCon )
 import Class		( Class )
 import PrimOp	 	( PrimOp )
-#ifdef OLD_STRICTNESS
-import Name		( Name )
-#endif
 import Var              ( Id )
 import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBreaker,
 			  InsideLam, insideLam, notInsideLam, 
@@ -91,12 +90,14 @@ import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBrea
 import DataCon		( DataCon )
 import ForeignCall	( ForeignCall )
 import FieldLabel	( FieldLabel )
-import Demand		hiding( Demand, seqDemand )
-import qualified Demand
 import NewDemand
 import Outputable	
 import Maybe		( isJust )
+
 #ifdef OLD_STRICTNESS
+import Name		( Name )
+import Demand		hiding( Demand, seqDemand )
+import qualified Demand
 import Util		( listLengthCmp )
 import List		( replicate )
 #endif

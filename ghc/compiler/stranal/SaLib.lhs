@@ -6,6 +6,10 @@
 See also: the ``library'' for the ``back end'' (@SaBackLib@).
 
 \begin{code}
+#ifndef OLD_STRICTNESS
+module SaLib () where
+#else
+
 module SaLib (
 	AbsVal(..),
 	AnalysisKind(..),
@@ -119,4 +123,8 @@ absValFromStrictness anal (StrictnessInfo args_info bot_result)
 	| otherwise      = case anal of
 				StrAnal -> AbsBot
 				AbsAnal -> AbsTop
+\end{code}
+
+\begin{code}
+#endif /* OLD_STRICTNESS */
 \end{code}

@@ -95,7 +95,9 @@ import Type		( Type, typePrimRep, addFreeTyVars,
 
 import IdInfo 
 
+#ifdef OLD_STRICTNESS
 import qualified Demand	( Demand )
+#endif
 import DataCon		( isUnboxedTupleCon )
 import NewDemand	( Demand, StrictSig, topDmd, topSig, isBottomingSig )
 import Name	 	( Name, OccName,
