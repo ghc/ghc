@@ -1087,7 +1087,15 @@ match (TyVarTy v) ty tmpls k senv
   | v `elemVarSet` tmpls
   =     -- v is a template variable
     case lookupSubstEnv senv v of
-	Nothing -> k (extendSubstEnv senv v (DoneTy ty))
+	Nothing | typeKind ty `eqKind` tyVarKind v	
+			-- We do a kind check, just as in the uVarX above
+			-- The kind check is needed to avoid bogus matches
+			-- of 	(a b) with (c d), where the kinds don't match
+			-- An occur check isn't needed when matching.
+		-> k (extendSubstEnv senv v (DoneTy ty))
+
+		| otherwise  -> Nothing -- Fails
+
 	Just (DoneTy ty')  | ty' `tcEqType` ty   -> k senv   -- Succeeds
 			   | otherwise	         -> Nothing  -- Fails
 

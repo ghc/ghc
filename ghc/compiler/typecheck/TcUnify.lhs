@@ -637,19 +637,18 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
 
 checkKinds swapped tv1 ty2
 -- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
--- ty2 has been zonked at this stage
+-- ty2 has been zonked at this stage.
 
-  | tk1 `eqKind` liftedTypeKind && tk2 `eqKind` unliftedTypeKind
-	-- Check that we don't unify a lifted type variable with an
-	-- unlifted type: e.g.  (id 3#) is illegal
+  | tk2 `hasMoreBoxityInfo` tk1 = returnTc ()
+
+  | otherwise
+	-- Either the kinds aren't compatible
+	--	(can happen if we unify (a b) with (c d))
+	-- or we are unifying a lifted type variable with an
+	-- 	unlifted type: e.g.  (id 3#) is illegal
   = tcAddErrCtxtM (unifyKindCtxt swapped tv1 ty2)	$
     unifyMisMatch k1 k2
 
-  | otherwise
-  =	-- Check that we aren't losing boxity info (shouldn't happen)
-    WARN (not (tk2 `hasMoreBoxityInfo` tk1),
-	  (ppr tv1 <+> ppr tk1) $$ (ppr ty2 <+> ppr tk2))
-    returnTc ()
   where
     (k1,k2) | swapped   = (tk2,tk1)
 	    | otherwise = (tk1,tk2)

@@ -119,20 +119,25 @@ import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 
 \begin{code}
 hasMoreBoxityInfo :: Kind -> Kind -> Bool
+-- (k1 `hasMoreBoxityInfo` k2) checks that k1 <: k2
 hasMoreBoxityInfo k1 k2
-  | k2 `eqKind` openTypeKind = True
-  | otherwise	  	     = k1 `eqType` k2
+  | k2 `eqKind` openTypeKind = ok k1
+  | otherwise	  	     = k1 `eqKind` k2
+  where
+    ok (TyConApp tc _) = tc == typeCon || tc == openKindCon
+    ok (NoteTy _ k)    = ok k
+    ok other	       = False
+
+isTypeKind :: Kind -> Bool
+-- True of kind * and *#
+isTypeKind (TyConApp tc _) = tc == typeCon
+isTypeKind (NoteTy _ k)    = isTypeKind k
+isTypeKind other	   = False
 
 defaultKind :: Kind -> Kind
 -- Used when generalising: default kind '?' to '*'
 defaultKind kind | kind `eqKind` openTypeKind = liftedTypeKind
 	         | otherwise	 	      = kind
-
-isTypeKind :: Kind -> Bool
--- True of kind * and *#
-isTypeKind k = case splitTyConApp_maybe k of
-		 Just (tc,[k]) -> tc == typeCon
-		 other	       -> False
 \end{code}
 
 
