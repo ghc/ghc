@@ -591,7 +591,7 @@ schemeE d s p other
 -- and enter.  Four cases:
 --
 -- 0.  (Nasty hack).
---     An application "PrelGHC.tagToEnum# <type> unboxed-int".
+--     An application "GHC.Prim.tagToEnum# <type> unboxed-int".
 --     The int will be on the stack.  Generate a code sequence
 --     to convert it to the relevant constructor, SLIDE and ENTER.
 --
@@ -961,16 +961,16 @@ mkDummyLiteral pr
 
 
 -- Convert (eg) 
---     PrelGHC.Char# -> PrelGHC.State# PrelGHC.RealWorld
---                   -> (# PrelGHC.State# PrelGHC.RealWorld, PrelGHC.Int# #)
+--     GHC.Prim.Char# -> GHC.Prim.State# GHC.Prim.RealWorld
+--                   -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Prim.Int# #)
 --
 -- to  Just IntRep
 -- and check that an unboxed pair is returned wherein the first arg is VoidRep'd.
 --
 -- Alternatively, for call-targets returning nothing, convert
 --
---     PrelGHC.Char# -> PrelGHC.State# PrelGHC.RealWorld
---                   -> (# PrelGHC.State# PrelGHC.RealWorld #)
+--     GHC.Prim.Char# -> GHC.Prim.State# GHC.Prim.RealWorld
+--                   -> (# GHC.Prim.State# GHC.Prim.RealWorld #)
 --
 -- to  Nothing
 
