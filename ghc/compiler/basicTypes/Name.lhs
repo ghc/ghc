@@ -328,8 +328,12 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
       Internal    	 	    -> pprInternal sty uniq occ
 
 pprExternal sty uniq mod occ is_wired
-  | unqualStyle sty mod_name occ = pprOccName occ
   | codeStyle sty        = ppr mod_name <> char '_' <> pprOccName occ
+	-- In code style, always qualify
+	-- ToDo: maybe we could print all wired-in things unqualified
+	-- 	 in code style, to reduce symbol table bloat?
+  | unqualStyle sty mod_name occ = pprOccName occ
+	-- Never qualify built-in syntax otherwise
   | debugStyle sty       = sep [ppr mod_name <> dot <> pprOccName occ,
 				hsep [text "{-" 
 				     , if is_wired then ptext SLIT("(w)") else empty
