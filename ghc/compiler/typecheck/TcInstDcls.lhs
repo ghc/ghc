@@ -26,7 +26,7 @@ import TcEnv		( tcExtendGlobalValEnv, tcExtendTyVarEnv,
 			)
 import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
-import TcSimplify	( tcSimplifyCheck, tcSimplifyTop )
+import TcSimplify	( tcSimplifyCheck, tcSimplifySuperClasses )
 import Type		( zipOpenTvSubst, substTheta, substTys )
 import DataCon		( classDataCon )
 import Class		( classBigSig )
@@ -338,7 +338,6 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 		-- Default-method Ids may be mentioned in synthesised RHSs,
 		-- but they'll already be in the environment.
 
-	------------------
 	-- Typecheck the methods
     let		-- These insts are in scope; quite a few, eh?
 	avail_insts = [this_dict] ++ dfun_arg_dicts ++ sc_dicts
@@ -348,10 +347,15 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 	      op_items binds		`thenM` \ (meth_ids, meth_binds) ->
 
 	-- Figure out bindings for the superclass context
-    tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts	
-		`thenM` \ (sc_binds_inner, sc_binds_outer) ->
+	-- Don't include this_dict in the 'givens', else
+	-- sc_dicts get bound by just selecting  from this_dict!!
+    addErrCtxt superClassCtxt
+	(tcSimplifySuperClasses inst_tyvars'
+			 dfun_arg_dicts
+			 sc_dicts)	`thenM` \ sc_binds ->
 
-	-- It's possible that the superclass stuff might have done unification
+	-- It's possible that the superclass stuff might unified one
+	-- of the inst_tyavars' with something in the envt
     checkSigTyVars inst_tyvars' 	`thenM_`
 
 	-- Deal with 'SPECIALISE instance' pragmas by making them
@@ -411,7 +415,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 	    msg = "Compiler error: bad dictionary " ++ showSDoc (ppr clas)
 
 	dict_bind  = noLoc (VarBind this_dict_id dict_rhs)
-	all_binds  = dict_bind `consBag` (sc_binds_inner `unionBags` meth_binds)
+	all_binds  = dict_bind `consBag` (sc_binds `unionBags` meth_binds)
 
 	main_bind = noLoc $ AbsBinds
 		 	    inst_tyvars'
@@ -421,8 +425,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
     in
     showLIE (text "instance") 		`thenM_`
     returnM (unitBag main_bind `unionBags` 
-	     prag_binds `unionBags`
-	     sc_binds_outer)
+	     prag_binds )
 
 
 tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
@@ -513,65 +516,6 @@ tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
 	-- have the skolemised version, so we substitute them in here
     rep_tys' = substTys subst rep_tys
     subst    = zipOpenTvSubst inst_tyvars' (mkTyVarTys inst_tyvars')
-\end{code}
-
-Note: [Superclass loops]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-We have to be very, very careful when generating superclasses, lest we
-accidentally build a loop. Here's an example:
-
-  class S a
-
-  class S a => C a where { opc :: a -> a }
-  class S b => D b where { opd :: b -> b }
-  
-  instance C Int where
-     opc = opd
-  
-  instance D Int where
-     opd = opc
-
-From (instance C Int) we get the constraint set {ds1:S Int, dd:D Int}
-Simplifying, we may well get:
-	$dfCInt = :C ds1 (opd dd)
-	dd  = $dfDInt
-	ds1 = $p1 dd
-Notice that we spot that we can extract ds1 from dd.  
-
-Alas!  Alack! We can do the same for (instance D Int):
-
-	$dfDInt = :D ds2 (opc dc)
-	dc  = $dfCInt
-	ds2 = $p1 dc
-
-And now we've defined the superclass in terms of itself.
-
-
-Solution: treat the superclass context separately, and simplify it
-all the way down to nothing on its own.  Don't toss any 'free' parts
-out to be simplified together with other bits of context.
-Hence the tcSimplifyTop below.
-
-At a more basic level, don't include this_dict in the context wrt
-which we simplify sc_dicts, else sc_dicts get bound by just selecting
-from this_dict!!
-
-\begin{code}
-tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts
-  = addErrCtxt superClassCtxt 	$
-    getLIE (tcSimplifyCheck doc inst_tyvars'
-			    dfun_arg_dicts
-			    sc_dicts)		`thenM` \ (sc_binds1, sc_lie) ->
-
-	-- We must simplify this all the way down 
-	-- lest we build superclass loops
-	-- See Note [Superclass loops] above
-    tcSimplifyTop sc_lie		`thenM` \ sc_binds2 ->
-
-    returnM (sc_binds1, sc_binds2)
-
-  where
-    doc = ptext SLIT("instance declaration superclass context")
 \end{code}
 
 

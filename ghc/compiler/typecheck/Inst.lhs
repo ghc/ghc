@@ -12,7 +12,7 @@ module Inst (
 
 	tidyInsts, tidyMoreInsts,
 
-	newDictsFromOld, newDicts, newDictsAtLoc, cloneDict, 
+	newDicts, newDictAtLoc, newDictsAtLoc, cloneDict, 
 	newOverloadedLit, newIPDict, 
 	newMethod, newMethodFromName, newMethodWithGivenTy, 
 	tcInstClassOp, tcInstCall, tcInstStupidTheta,
@@ -22,7 +22,7 @@ module Inst (
 	ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst, fdPredsOfInsts,
 	instLoc, getDictClassTys, dictPred,
 
-	lookupInst, LookupInstResult(..),
+	lookupInst, LookupInstResult(..), lookupPred, 
 	tcExtendLocalInstEnv, tcGetInstEnvs, 
 
 	isDict, isClassDict, isMethod, 
@@ -228,21 +228,20 @@ cloneDict :: Inst -> TcM Inst
 cloneDict (Dict nm ty loc) = newUnique	`thenM` \ uniq ->
 			     returnM (Dict (setNameUnique nm uniq) ty loc)
 
-newDictsFromOld :: Inst -> TcThetaType -> TcM [Inst]
-newDictsFromOld (Dict _ _ loc) theta = newDictsAtLoc loc theta
+newDictAtLoc :: InstLoc -> TcPredType -> TcM Inst
+newDictAtLoc inst_loc pred
+  = do	{ uniq <- newUnique
+  	; return (mkDict inst_loc uniq pred) }
 
--- Local function, similar to newDicts, 
--- but with slightly different interface
-newDictsAtLoc :: InstLoc
- 	      -> TcThetaType
-	      -> TcM [Inst]
+newDictsAtLoc :: InstLoc -> TcThetaType -> TcM [Inst]
 newDictsAtLoc inst_loc theta
   = newUniqueSupply		`thenM` \ us ->
-    returnM (zipWith mk_dict (uniqsFromSupply us) theta)
+    returnM (zipWith (mkDict inst_loc) (uniqsFromSupply us) theta)
+
+mkDict inst_loc uniq pred
+  = Dict name pred inst_loc
   where
-    mk_dict uniq pred = Dict (mkPredName uniq loc pred)
-			     pred inst_loc
-    loc = instLocSrcLoc inst_loc
+    name = mkPredName uniq (instLocSrcLoc inst_loc) pred 
 
 -- For vanilla implicit parameters, there is only one in scope
 -- at any time, so we used to use the name of the implicit parameter itself
@@ -683,30 +682,13 @@ lookupInst inst@(LitInst _nm (HsFractional f from_rat_name) ty loc)
 					       (HsVar (instToId method_inst))) rat_lit))
 
 -- Dictionaries
-lookupInst dict@(Dict _ pred@(ClassP clas tys) loc)
-  = do	{ pkg_ie <- loadImportedInsts clas tys
-		-- Suck in any instance decls that may be relevant
-	; tcg_env <- getGblEnv
-	; dflags  <- getDOpts
-	; case lookupInstEnv dflags (pkg_ie, tcg_inst_env tcg_env) clas tys of {
-	    ([(tenv, (_,_,dfun_id))], []) -> instantiate_dfun tenv dfun_id pred loc ;
-	    (matches, unifs)		  -> do
-	{ traceTc (text "lookupInst fail" <+> vcat [text "dict" <+> ppr pred,
-						    text "matches" <+> ppr matches,
-					            text "unifs" <+> ppr unifs])
-	; return NoInstance } } }
-		-- In the case of overlap (multiple matches) we report
-		-- NoInstance here.  That has the effect of making the 
-		-- context-simplifier return the dict as an irreducible one.
-		-- Then it'll be given to addNoInstanceErrs, which will do another
-		-- lookupInstEnv to get the detailed info about what went wrong.
+lookupInst (Dict _ pred loc)
+  = do 	{ mb_result <- lookupPred pred
+	; case mb_result of {
+	    Nothing -> return NoInstance ;
+	    Just (tenv, dfun_id) -> do
 
-lookupInst (Dict _ _ _) = returnM NoInstance
-
------------------
-instantiate_dfun :: TvSubst -> DFunId -> TcPredType -> InstLoc -> TcM LookupInstResult
-instantiate_dfun tenv dfun_id pred loc
-  = -- tenv is a substitution that instantiates the dfun_id 
+    -- tenv is a substitution that instantiates the dfun_id 
     -- to match the requested result type.   
     -- 
     -- We ASSUME that the dfun is quantified over the very same tyvars 
@@ -717,27 +699,19 @@ instantiate_dfun tenv dfun_id pred loc
     --	dfun :: forall a b. C a b, Ord b => D [a]
     -- We instantiate b to a flexi type variable -- it'll presumably
     -- become fixed later via functional dependencies
-    traceTc (text "lookupInst success" <+> 
-		vcat [text "dict" <+> ppr pred, 
-		      text "witness" <+> ppr dfun_id <+> ppr (idType dfun_id) ]) `thenM_`
-	-- Record that this dfun is needed
-    record_dfun_usage dfun_id		`thenM_`
-
-    getStage						`thenM` \ use_stage ->
-    checkWellStaged (ptext SLIT("instance for") <+> quotes (ppr pred))
-    		    (topIdLvl dfun_id) use_stage	`thenM_`
+    { use_stage <- getStage
+    ; checkWellStaged (ptext SLIT("instance for") <+> quotes (ppr pred))
+    		      (topIdLvl dfun_id) use_stage
 
  	-- It's possible that not all the tyvars are in
 	-- the substitution, tenv. For example:
 	--	instance C X a => D X where ...
 	-- (presumably there's a functional dependency in class C)
 	-- Hence the open_tvs to instantiate any un-substituted tyvars.	
-    let
-    	(tyvars, rho) = tcSplitForAllTys (idType dfun_id)
-	open_tvs      = filter (`notElemTvSubst` tenv) tyvars
-    in
-    mappM tcInstTyVar open_tvs	`thenM` \ open_tvs' ->
-    let
+    ; let (tyvars, rho) = tcSplitForAllTys (idType dfun_id)
+	  open_tvs      = filter (`notElemTvSubst` tenv) tyvars
+    ; open_tvs' <- mappM tcInstTyVar open_tvs
+    ; let
  	tenv' = extendTvSubstList tenv open_tvs (mkTyVarTys open_tvs')
 		-- Since the open_tvs' are freshly made, they cannot possibly be captured by
 		-- any nested for-alls in rho.  So the in-scope set is unchanged
@@ -745,25 +719,57 @@ instantiate_dfun tenv dfun_id pred loc
     	(theta, _) = tcSplitPhiTy dfun_rho
     	ty_app     = mkHsTyApp (L (instLocSrcSpan loc) (HsVar dfun_id)) 
 			       (map (substTyVar tenv') tyvars)
-    in
-    if null theta then
+    ; if null theta then
     	returnM (SimpleInst ty_app)
-    else
-    newDictsAtLoc loc theta	`thenM` \ dicts ->
-    let 
-    	rhs = mkHsDictApp ty_app (map instToId dicts)
-    in
-    returnM (GenInst dicts rhs)
+      else do
+    { dicts <- newDictsAtLoc loc theta
+    ; let rhs = mkHsDictApp ty_app (map instToId dicts)
+    ; returnM (GenInst dicts rhs)
+    }}}}
 
-record_dfun_usage dfun_id = do
-  dflags <- getDOpts
-  let  dfun_name = idName dfun_id
-       dfun_mod  = nameModule dfun_name
-  if isInternalName dfun_name || not (isHomeModule dflags dfun_mod)
-	then return () -- internal, or in another package
-	else do tcg_env <- getGblEnv
-	        updMutVar (tcg_inst_uses tcg_env)
-			  (`addOneToNameSet` idName dfun_id)
+---------------
+lookupPred :: TcPredType -> TcM (Maybe (TvSubst, DFunId))
+-- Look up a class constraint in the instance environment
+lookupPred pred@(ClassP clas tys)
+  = do	{ pkg_ie <- loadImportedInsts clas tys
+		-- Suck in any instance decls that may be relevant
+	; tcg_env <- getGblEnv
+	; dflags  <- getDOpts
+	; case lookupInstEnv dflags (pkg_ie, tcg_inst_env tcg_env) clas tys of {
+	    ([(tenv, (_,_,dfun_id))], []) 
+		-> do	{ traceTc (text "lookupInst success" <+> 
+				   vcat [text "dict" <+> ppr pred, 
+				         text "witness" <+> ppr dfun_id
+					 <+> ppr (idType dfun_id) ])
+				-- Record that this dfun is needed
+			; record_dfun_usage dfun_id
+			; return (Just (tenv, dfun_id)) } ;
+
+     	    (matches, unifs)
+		-> do	{ traceTc (text "lookupInst fail" <+> 
+				   vcat [text "dict" <+> ppr pred,
+				   	 text "matches" <+> ppr matches,
+				   	 text "unifs" <+> ppr unifs])
+		-- In the case of overlap (multiple matches) we report
+		-- NoInstance here.  That has the effect of making the 
+		-- context-simplifier return the dict as an irreducible one.
+		-- Then it'll be given to addNoInstanceErrs, which will do another
+		-- lookupInstEnv to get the detailed info about what went wrong.
+			; return Nothing }
+	}}
+
+lookupPred ip_pred = return Nothing
+
+record_dfun_usage dfun_id 
+  = do	{ dflags <- getDOpts
+	; let  dfun_name = idName dfun_id
+	       dfun_mod  = nameModule dfun_name
+	; if isInternalName dfun_name || not (isHomeModule dflags dfun_mod)
+	  then return () -- internal, or in another package
+	   else do { tcg_env <- getGblEnv
+	  	   ; updMutVar (tcg_inst_uses tcg_env)
+			       (`addOneToNameSet` idName dfun_id) }}
+
 
 tcGetInstEnvs :: TcM (InstEnv, InstEnv)
 -- Gets both the external-package inst-env
