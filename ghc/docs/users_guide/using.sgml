@@ -1185,54 +1185,15 @@ f "2"    = 2
 
 	    <para>This option causes all constructor fields which are
             marked strict (i.e. &ldquo;!&rdquo;) to be unboxed or
-            unpacked if possible.  For example:</para>
+            unpacked if possible.  It is equivalent to adding an
+            <literal>UNPACK</literal> pragma to every strict
+            constructor field (see <xref
+            linkend="unpack-pragma">).</para>
 
-<ProgramListing>
-data T = T !Float !Float
-</ProgramListing>
-
-	    <para>will create a constructor <literal>T</literal>
-            containing two unboxed floats if the
-            <option>-funbox-strict-fields</option> flag is given.
-            This may not always be an optimisation: if the
-            <Function>T</Function> constructor is scrutinised and the
-            floats passed to a non-strict function for example, they
-            will have to be reboxed (this is done automatically by the
-            compiler).</para>
-
-	    <para>This option should only be used in conjunction with
-            <option>-O</option>, in order to expose unfoldings to the
-            compiler so the reboxing can be removed as often as
-            possible.  For example:</para>
-
-<ProgramListing>
-f :: T -&#62; Float
-f (T f1 f2) = f1 + f2
-</ProgramListing>
-
-	    <para>The compiler will avoid reboxing
-            <Function>f1</Function> and <Function>f2</Function> by
-            inlining <Function>+</Function> on floats, but only when
-            <option>-O</option> is on.</para>
-
-	    <para>Any single-constructor data is eligible for
-	    unpacking; for example</para>
-
-<ProgramListing>
-data T = T !(Int,Int)
-</ProgramListing>
-
-	    <para>will store the two <literal>Int</literal>s directly
-            in the <Function>T</Function> constructor, by flattening
-            the pair.  Multi-level unpacking is also supported:</para>
-
-<ProgramListing>
-data T = T !S
-data S = S !Int !Int
-</ProgramListing>
-
-	    <para>will store two unboxed <literal>Int&num;</literal>s
-	    directly in the <Function>T</Function> constructor.</para>
+	    <para>This option is a bit of a sledgehammer: it might
+	    sometimes make things worse.  Selectively unboxing fields
+	    by using <literal>UNPACK</literal> pragmas might be
+	    better.</para>
 	  </listitem>
 	</varlistentry>
 

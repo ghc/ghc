@@ -4247,7 +4247,66 @@ of the pragma.
 
 </sect2>
 
+    <sect2 id="unpack-pragma">
+      <title>UNPACK pragma</title>
 
+      <indexterm><primary>UNPACK</primary> </indexterm>
+      
+      <para>There is another use for the <literal>UNPACK</literal>
+      pragma: to indicate that the compiler should unpack the contents
+      of a constructor field into the constructor itself, removing a
+      level of indirection.  For example:</para>
+
+<ProgramListing>
+data T = T {-# UNPACK #-} !Float
+           {-# UNPACK #-} !Float
+</ProgramListing>
+
+      <para>will create a constructor <literal>T</literal> containing
+      two unboxed floats.  This may not always be an optimisation: if
+      the <Function>T</Function> constructor is scrutinised and the
+      floats passed to a non-strict function for example, they will
+      have to be reboxed (this is done automatically by the
+      compiler).</para>
+
+      <para>Unpacking constructor fields should only be used in
+      conjunction with <option>-O</option>, in order to expose
+      unfoldings to the compiler so the reboxing can be removed as
+      often as possible.  For example:</para>
+
+<ProgramListing>
+f :: T -&#62; Float
+f (T f1 f2) = f1 + f2
+</ProgramListing>
+
+      <para>The compiler will avoid reboxing <Function>f1</Function>
+      and <Function>f2</Function> by inlining <Function>+</Function>
+      on floats, but only when <option>-O</option> is on.</para>
+
+      <para>Any single-constructor data is eligible for unpacking; for
+      example</para>
+
+<ProgramListing>
+data T = T {-# UNPACK #-} !(Int,Int)
+</ProgramListing>
+
+      <para>will store the two <literal>Int</literal>s directly in the
+      <Function>T</Function> constructor, by flattening the pair.
+      Multi-level unpacking is also supported:</para>
+
+<ProgramListing>
+data T = T {-# UNPACK #-} !S
+data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
+</ProgramListing>
+
+      <para>will store two unboxed <literal>Int&num;</literal>s
+      directly in the <Function>T</Function> constructor.</para>
+
+      <para>See also the <option>-funbox-strict-fields</option> flag,
+      which essentially has the effect of adding
+      <literal>{-#&nbsp;UNPACK&nbsp;#-}</literal> to every strict
+      constructor field.</para>
+    </sect2>
 
 </sect1>
 
