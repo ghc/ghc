@@ -626,7 +626,7 @@ hPutFS handle (FastString _ l# ba#)
   | l# ==# 0#  = return ()
 #if __GLASGOW_HASKELL__ < 405
   | otherwise  = hPutBufBA handle (ByteArray bot ba#) (I# l#)
-#elsif __GLASGOW_HASKELL__ < 407
+#elif __GLASGOW_HASKELL__ < 407
   | otherwise  = hPutBufBA handle (ByteArray bot bot ba#) (I# l#)
 #else
   | otherwise  = do mba <- stToIO $ unsafeThawByteArray (ByteArray (bot::Int) bot ba#)
