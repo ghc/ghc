@@ -1,5 +1,5 @@
 /*
-  Time-stamp: <2004-11-08 12:17:01 simonmar>
+  Time-stamp: <2005-03-30 12:02:33 simonmar>
 
   RTS specific types.
 */
@@ -11,11 +11,7 @@
 #ifndef RTS_TYPES_H
 #define RTS_TYPES_H
 
-#if SIZEOF_VOID_P == 8
-typedef unsigned long nat;           /* at least 32 bits (like int) */
-#else
 typedef unsigned int  nat;           /* at least 32 bits (like int) */
-#endif
 typedef unsigned long lnat;          /* at least 32 bits            */
 #ifndef _MSC_VER
 typedef unsigned long long ullong;   /* at least 32 bits            */
