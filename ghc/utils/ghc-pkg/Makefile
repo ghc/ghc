@@ -16,7 +16,7 @@ SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY
 
 # <= 6.0.x quotes all arguments when invoking utils (using double quotes), hence
 # the need to escape the double quotes. >= 6.2.x does not.
-ifeq "$(ghc_le_600)" "NO"
+ifeq "$(ghc_le_600)" "YES"
 SRC_HC_OPTS += -D'GHC_PKG_VERSION=\"$(ProjectVersion)\"'
 else
 SRC_HC_OPTS += -D'GHC_PKG_VERSION="$(ProjectVersion)"'
