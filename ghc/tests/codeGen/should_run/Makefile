@@ -2,7 +2,7 @@ TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_run.mk
 
-HC_OPTS += -dcore-lint
+SRC_HC_OPTS += -dcore-lint
 
 cg012_HC_OPTS = -fglasgow-exts
 cg015_HC_OPTS = -fglasgow-exts
