@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.36 1999/02/17 17:35:32 simonm Exp $
+ * $Id: GC.c,v 1.37 1999/02/17 17:47:09 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -399,7 +399,7 @@ void GarbageCollect(void (*get_roots)(void))
     loop2:
       for (gen = RtsFlags.GcFlags.generations-1; gen >= 0; gen--) {
 	for (st = generations[gen].n_steps-1; st >= 0 ; st--) {
-	  if (gen == 0 && step == 0) { 
+	  if (gen == 0 && st == 0) { 
 	    continue; 
 	  }
 	  step = &generations[gen].steps[st];
