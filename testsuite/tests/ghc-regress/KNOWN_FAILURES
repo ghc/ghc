@@ -16,6 +16,10 @@ lib/IO/hReady001
 parser/should_fail/read002
 		-- we don't disallow certain characters in strings (eg. newline)
 
+rename/should_compile/rn038
+		-- hiding a non-exported identifer is now legal in the revised
+	 	-- Haskell 98 report.
+
 typecheck/should_fail/tcfail080
 		-- ambiguity test: ambiguity isn't detected early enough
 		-- (behaviour is sound but could be more helpful, according
