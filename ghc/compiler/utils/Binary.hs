@@ -84,7 +84,7 @@ import Data.IORef
 import Data.Char		( ord, chr )
 import Data.Array.Base  	( unsafeRead, unsafeWrite )
 import Control.Monad		( when )
-import Control.Exception	( throw )
+import Control.Exception	( throw, throwDyn )
 import System.IO as IO
 import System.IO.Unsafe		( unsafeInterleaveIO )
 import System.IO.Error		( mkIOError, eofErrorType )
