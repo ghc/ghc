@@ -42,24 +42,28 @@ import ClosureInfo	( mkVirtHeapOffsets )
 import Module		( ModuleName, moduleName, moduleNameFS )
 import Unique		( mkPseudoUnique3 )
 import Linker		( lookupSymbol )
+import FastString	( FastString(..) )
+
 
 import List		( intersperse )
 import Monad		( foldM )
 import ST		( runST )
 import MArray		( castSTUArray, 
 			  newFloatArray, writeFloatArray,
-			  newDoubleArray,  writeDoubleArray,
+			  newDoubleArray, writeDoubleArray,
 			  newIntArray, writeIntArray,
 			  newAddrArray, writeAddrArray )
 import Foreign		( Storable(..), Word8, Word16, Word32, Ptr(..), 
-			  malloc, castPtr, plusPtr )
-import Addr		( Word, addrToInt, nullAddr )
+			  malloc, castPtr, plusPtr, mallocBytes )
+import Addr		( Word, addrToInt, nullAddr, writeCharOffAddr )
 import Bits		( Bits(..), shiftR )
+import CTypes		( CInt )
 
+import PrelBase		( Int(..) )
 import PrelAddr		( Addr(..) )
 import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
 			  ByteArray#, Array#, addrToHValue# )
-import IOExts		( IORef, fixIO )
+import IOExts		( IORef, fixIO, unsafePerformIO )
 import ArrayBase	
 import PrelArr		( Array(..) )
 import PrelIOBase	( IO(..) )
@@ -488,7 +492,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
              returnBc (my_discr alt, rhs_code)
 
         my_discr (DEFAULT, binds, rhs)  = NoDiscr
-        my_discr (DataAlt dc, binds, rhs) = DiscrP (dataConTag dc)
+        my_discr (DataAlt dc, binds, rhs) = DiscrP (dataConTag dc - fIRST_TAG)
         my_discr (LitAlt l, binds, rhs)
            = case l of MachInt i     -> DiscrI (fromInteger i)
                        MachFloat r   -> DiscrF (fromRational r)
@@ -505,8 +509,9 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
      mapBc codeAlt alts 				`thenBc` \ alt_stuff ->
      mkMultiBranch maybe_ncons alt_stuff		`thenBc` \ alt_final ->
      let 
+         alt_final_ac = ARGCHECK (taggedIdSizeW bndr) `consOL` alt_final
          alt_bco_name = getName bndr
-         alt_bco      = mkProtoBCO alt_bco_name alt_final (Left alts)
+         alt_bco      = mkProtoBCO alt_bco_name alt_final_ac (Left alts)
      in
      schemeE (d + ret_frame_sizeW) 
              (d + ret_frame_sizeW) p scrut		`thenBc` \ scrut_code ->
@@ -543,7 +548,9 @@ schemeT enTag d s narg_words p (_, AnnApp f a)
 schemeT enTag d s narg_words p (_, AnnVar f)
    | Just con <- isDataConId_maybe f
    = ASSERT(enTag == False)
-     PACK con narg_words `consOL` (mkSLIDE 1 (d-s-1) `snocOL` ENTER)
+     --trace ("schemeT: d = " ++ show d ++ ", s = " ++ show s ++ ", naw = " ++ show narg_words) (
+     PACK con narg_words `consOL` (mkSLIDE 1 (d - narg_words - s) `snocOL` ENTER)
+     --)
    | otherwise
    = ASSERT(enTag == True)
      let (push, arg_words) = pushAtom True d p (AnnVar f)
@@ -628,7 +635,10 @@ pushAtom tagged d p (AnnVar v)
                  Just d_v -> (toOL (nOfThem nwords (PUSH_L (d-d_v+sz_t-2))), sz_t)
                  Nothing  -> ASSERT(sz_t == 1) (unitOL (PUSH_G nm), sz_t)
 
-         nm     = getName v
+         nm = case isDataConId_maybe v of
+                 Just c  -> getName c
+                 Nothing -> getName v
+
          sz_t   = taggedIdSizeW v
          sz_u   = untaggedIdSizeW v
          nwords = if tagged then sz_t else sz_u
@@ -646,10 +656,42 @@ pushAtom False d p (AnnLit lit)
         MachFloat r  -> code FloatRep
         MachDouble r -> code DoubleRep
         MachChar c   -> code CharRep
+        MachStr s    -> pushStr s
      where
         code rep
            = let size_host_words = untaggedSizeW rep
              in (unitOL (PUSH_UBX lit size_host_words), size_host_words)
+
+        pushStr s 
+           = let mallocvilleAddr
+                    = case s of
+                         CharStr s i -> A# s
+
+                         FastString _ l ba -> 
+                            -- sigh, a string in the heap is no good to us.
+                            -- We need a static C pointer, since the type of 
+                            -- a string literal is Addr#.  So, copy the string 
+                            -- into C land and introduce a memory leak 
+                            -- at the same time.
+                            let n = I# l
+                            -- CAREFUL!  Chars are 32 bits in ghc 4.09+
+                            in  unsafePerformIO (
+                                   do a@(Ptr addr) <- mallocBytes (n+1)
+                                      strncpy a ba (fromIntegral n)
+                                      writeCharOffAddr addr n '\0'
+                                      return addr
+                                   )
+                         _ -> panic "StgInterp.lit2expr: unhandled string constant type"
+
+                 addrLit 
+                    = MachInt (toInteger (addrToInt mallocvilleAddr))
+             in
+                -- Get the addr on the stack, untaggedly
+                (unitOL (PUSH_UBX addrLit 1), 1)
+
+
+
+
 
 pushAtom tagged d p (AnnApp f (_, AnnType _))
    = pushAtom tagged d p (snd f)
@@ -657,6 +699,8 @@ pushAtom tagged d p (AnnApp f (_, AnnType _))
 pushAtom tagged d p other
    = pprPanic "ByteCodeGen.pushAtom" 
               (pprCoreExpr (deAnnotate (undefined, other)))
+
+foreign import "strncpy" strncpy :: Ptr a -> ByteArray# -> CInt -> IO ()
 
 
 -- Given a bunch of alts code and their discrs, do the donkey work
@@ -730,7 +774,7 @@ mkMultiBranch maybe_ncons raw_ways
 
          (algMinBound, algMaxBound)
             = case maybe_ncons of
-                 Just n  -> (fIRST_TAG, fIRST_TAG + n - 1)
+                 Just n  -> (0, n - 1)
                  Nothing -> (minBound, maxBound)
 
          (DiscrI i1) `eqAlt` (DiscrI i2) = i1 == i2
@@ -896,7 +940,7 @@ assembleBCO (ProtoBCO nm instrs origin)
          mkLabelEnv env i_offset (i:is)
             = let new_env 
                      = case i of LABEL n -> addToFM env n i_offset ; _ -> env
-              in  mkLabelEnv new_env (i_offset + instrSizeB i) is
+              in  mkLabelEnv new_env (i_offset + instrSize16s i) is
 
          findLabel lab
             = case lookupFM label_env lab of
@@ -1039,9 +1083,11 @@ mkBits findLabel st proto_insns
           = addr st ret_itbl_addr
             where
                ret_itbl_addr = case pk of
+                                  PtrRep    -> stg_ctoi_ret_R1_info
                                   IntRep    -> stg_ctoi_ret_R1_info
                                   FloatRep  -> stg_ctoi_ret_F1_info
                                   DoubleRep -> stg_ctoi_ret_D1_info
+                                  _ -> pprPanic "mkBits.ctoi_itbl" (ppr pk)
                                where  -- TEMP HACK
                                   stg_ctoi_ret_F1_info = nullAddr
                                   stg_ctoi_ret_D1_info = nullAddr
@@ -1062,36 +1108,36 @@ foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Addr
 foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Addr
 foreign label "stg_gc_d1_info"      stg_gc_d1_info :: Addr
 
--- The size in bytes of an instruction.
-instrSizeB :: BCInstr -> Int
-instrSizeB instr
+-- The size in 16-bit entities of an instruction.
+instrSize16s :: BCInstr -> Int
+instrSize16s instr
    = case instr of
-        ARGCHECK _     -> 4
-        PUSH_L   _     -> 4
-        PUSH_LL  _ _   -> 6
-        PUSH_LLL _ _ _ -> 8
-        PUSH_G   _     -> 4
-        PUSH_AS  _ _   -> 6
-        PUSH_UBX _ _   -> 6
-        PUSH_TAG _     -> 4
-        SLIDE    _ _   -> 6
-        ALLOC    _     -> 4
-        MKAP     _ _   -> 6
-        UNPACK   _     -> 4
-        UPK_TAG  _ _ _ -> 8
-        PACK     _ _   -> 6
+        ARGCHECK _     -> 2
+        PUSH_L   _     -> 2
+        PUSH_LL  _ _   -> 3
+        PUSH_LLL _ _ _ -> 4
+        PUSH_G   _     -> 2
+        PUSH_AS  _ _   -> 3
+        PUSH_UBX _ _   -> 3
+        PUSH_TAG _     -> 2
+        SLIDE    _ _   -> 3
+        ALLOC    _     -> 2
+        MKAP     _ _   -> 3
+        UNPACK   _     -> 2
+        UPK_TAG  _ _ _ -> 4
+        PACK     _ _   -> 3
         LABEL    _     -> 0	-- !!
-        TESTLT_I _ _   -> 6
-        TESTEQ_I _ _   -> 6
-        TESTLT_F _ _   -> 6
-        TESTEQ_F _ _   -> 6
-        TESTLT_D _ _   -> 6
-        TESTEQ_D _ _   -> 6
-        TESTLT_P _ _   -> 6
-        TESTEQ_P _ _   -> 6
-        CASEFAIL       -> 2
-        ENTER          -> 2
-        RETURN   _     -> 4
+        TESTLT_I _ _   -> 3
+        TESTEQ_I _ _   -> 3
+        TESTLT_F _ _   -> 3
+        TESTEQ_F _ _   -> 3
+        TESTLT_D _ _   -> 3
+        TESTEQ_D _ _   -> 3
+        TESTLT_P _ _   -> 3
+        TESTEQ_P _ _   -> 3
+        CASEFAIL       -> 1
+        ENTER          -> 1
+        RETURN   _     -> 2
 
 
 -- Make lists of host-sized words for literals, so that when the
@@ -1239,12 +1285,17 @@ lookupIE :: ItblEnv -> Name -> IO Addr
 lookupIE ie con_nm 
    = case lookupFM ie con_nm of
         Just (Ptr a) -> return a
-        Nothing      
+        Nothing
            -> do -- try looking up in the object files.
                  m <- lookupSymbol (nameToCLabel con_nm "con_info")
                  case m of
                     Just addr -> return addr
-                    Nothing   -> pprPanic "ByteCodeGen.lookupIE" (ppr con_nm)
+                    Nothing 
+                       -> do -- perhaps a nullary constructor?
+                             n <- lookupSymbol (nameToCLabel con_nm "static_info")
+                             case n of
+                                Just addr -> return addr
+                                Nothing -> pprPanic "ByteCodeGen.lookupIE" (ppr con_nm)
 
 -- HACK!!!  ToDo: cleaner
 nameToCLabel :: Name -> String{-suffix-} -> String
@@ -1253,54 +1304,6 @@ nameToCLabel n suffix
      ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
      where rn = toRdrName n
 
-
-{-
-lookupCon ie con = 
-  case lookupFM ie con of
-    Just (Ptr addr) -> return addr
-    Nothing   -> do
-	-- try looking up in the object files.
-        m <- lookupSymbol (nameToCLabel con "con_info")
-	case m of
-	    Just addr -> return addr
-  	    Nothing   -> pprPanic "linkIExpr" (ppr con)
-
--- nullary constructors don't have normal _con_info tables.
-lookupNullaryCon ie con =
-  case lookupFM ie con of
-    Just (Ptr addr) -> return (ConApp addr)
-    Nothing -> do
-	-- try looking up in the object files.
-	m <- lookupSymbol (nameToCLabel con "closure")
-	case m of
-	    Just (A# addr) -> return (Native (unsafeCoerce# addr))
-	    Nothing   -> pprPanic "lookupNullaryCon" (ppr con)
-
-
-lookupNative ce var =
-  unsafeInterleaveIO (do
-      case lookupFM ce var of
-    	Just e  -> return (Native e)
-    	Nothing -> do
-    	    -- try looking up in the object files.
-    	    let lbl = (nameToCLabel var "closure")
-    	    m <- lookupSymbol lbl
-    	    case m of
-    		Just (A# addr)
-		    -> do addCAF (unsafeCoerce# addr)
-			  return (Native (unsafeCoerce# addr))
-    		Nothing   -> pprPanic "linkIExpr" (ppr var)
-  )
-
--- some VarI/VarP refer to top-level interpreted functions; we change
--- them into Natives here.
-lookupVar ce f v =
-  unsafeInterleaveIO (
-	case lookupFM ce (getName v) of
-	    Nothing -> return (f v)
-	    Just e  -> return (Native e)
-  )
--}
 \end{code}
 
 %************************************************************************
@@ -1326,8 +1329,6 @@ mkITbls (tc:tcs) = do itbls  <- mkITbl tc
 
 mkITbl :: TyCon -> IO ItblEnv
 mkITbl tc
---   | trace ("TYCON: " ++ showSDoc (ppr tc)) False
---   = error "?!?!"
    | not (isDataTyCon tc) 
    = return emptyFM
    | n == length dcs  -- paranoia; this is an assertion.
