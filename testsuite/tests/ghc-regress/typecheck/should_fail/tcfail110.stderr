@@ -1,0 +1,8 @@
+
+tcfail110.hs:8:
+    Couldn't match `*' against `* -> *'
+	Expected kind: *
+	Inferred kind: * -> *
+    When checking that `Foo a' is a type
+    In the type: String -> (forall a. Foo a) -> IO GHC.Base.()
+    While checking the type signature for `bar'
