@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.5 1999/08/25 16:11:48 simonmar Exp $
+ * $Id: Itimer.c,v 1.6 1999/09/16 08:33:54 sof Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -96,10 +96,16 @@ TIMECALLBACK *vtalrm_cback;
 nat
 initialize_virtual_timer(nat ms)
 {
-  /* VTALRM is currently not supported by  cygwin32, 
-     so we use the Timer support provided by the
-     MultiMedia API that is part of Win32. The
-     parameters to timeSetEvent may require some tweaking.
+# ifdef PROFILING
+  /* On Win32 setups that don't have support for
+     setitimer(), we use the MultiMedia API's timer
+     support.
+     
+     As the delivery of ticks isn't free, we only
+     enable it if we really needed, i.e., when profiling.
+     (the RTS now also needs timer ticks to implement
+     threadDelay in non-profiling mode, but the pure
+     Win32 port doesn't support that.....yet.)
   */
   unsigned int delay,vtalrm_id;
  
@@ -113,6 +119,7 @@ initialize_virtual_timer(nat ms)
  	        (LPTIMECALLBACK)vtalrm_cback,
  		0,
  		TIME_PERIODIC);
+# endif
   return 0;
 }
  
