@@ -24,6 +24,7 @@ import TcMonoType	( tcExtendTopTyVarScope, tcExtendTyVarScope,
 			  tcHsTypeKind, tcHsType, tcHsTopType, tcHsTopBoxedType,
 			  tcContext
 			)
+import TcType		( zonkTcTyVarToTyVar, zonkTcThetaType )
 import TcEnv		( tcLookupTy, TcTyThing(..) )
 import TcMonad
 import TcUnify		( unifyKind )
@@ -176,13 +177,13 @@ tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
 	    tys	        = map get_pty btys
         in
 	mapTc tcHsTopType tys `thenTc` \ arg_tys ->
-	returnTc (mk_data_con arg_stricts arg_tys [])
+	mk_data_con arg_stricts arg_tys []
 
     tc_newcon ty 
       = tcHsTopBoxedType ty	`thenTc` \ arg_ty ->
 	    -- can't allow an unboxed type here, because we're effectively
 	    -- going to remove the constructor while coercing it to a boxed type.
-	returnTc (mk_data_con [NotMarkedStrict] [arg_ty] [])
+	mk_data_con [NotMarkedStrict] [arg_ty] []
 
     tc_rec_con fields
       = checkTc (null ex_tyvars) (exRecConErr name)	    `thenTc_`
@@ -195,21 +196,29 @@ tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
 	    field_labels      = [ mkFieldLabel (getName name) ty tag 
 			      | ((name, ty, _), tag) <- field_label_infos `zip` allFieldLabelTags ]
 	in
-	returnTc (mk_data_con arg_stricts arg_tys field_labels)
+	mk_data_con arg_stricts arg_tys field_labels
 
     tc_field (field_label_names, bty)
       = tcHsTopType (get_pty bty)	`thenTc` \ field_ty ->
 	returnTc [(name, field_ty, get_strictness bty) | name <- field_label_names]
 
-    mk_data_con arg_stricts arg_tys fields = data_con
-	where
+    mk_data_con arg_stricts arg_tys fields
+      = 	-- Now we've checked all the field types we must
+		-- zonk the existential tyvars to finish the kind
+		-- inference on their kinds, and commit them to being
+		-- immutable type variables.  (The top-level tyvars are
+		-- already fixed, by the preceding kind-inference pass.)
+	mapNF_Tc zonkTcTyVarToTyVar ex_tyvars	`thenNF_Tc` \ ex_tyvars' ->
+	zonkTcThetaType	ex_theta		`thenNF_Tc` \ ex_theta' ->
+	let
 	   data_con = mkDataCon name arg_stricts fields
 		      	   tyvars (thinContext arg_tys ctxt)
-			   ex_tyvars ex_theta
+			   ex_tyvars' ex_theta'
 		      	   arg_tys
 		      	   tycon data_con_id
 	   data_con_id = mkDataConId data_con
-
+	in
+	returnNF_Tc data_con
 
 -- The context for a data constructor should be limited to
 -- the type variables mentioned in the arg_tys

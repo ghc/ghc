@@ -207,7 +207,7 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
             grhss'' = glue_on Recursive ex_binds $
 		      glue_on Recursive inst_binds grhss'
 	in
-	returnTc (pat_ids, (Match [] pats' Nothing grhss', lie_req''))
+	returnTc (pat_ids, (Match [] pats' Nothing grhss'', lie_req''))
 
 	-- glue_on just avoids stupid dross
 glue_on _ EmptyMonoBinds grhss = grhss		-- The common case
