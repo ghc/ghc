@@ -18,7 +18,9 @@ HADDOCKLIB=$$\"\"libdir/haddock
 HADDOCKBIN=$$\"\"libexecdir/$(HS_PROG)
 else
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-HADDOCKLIB=$(shell cygpath --mixed $(libdir))
+# --mixed is only provided by newer versions of cygpath (1.2 doesn't have it, for instance.)
+#HADDOCKLIB=$(shell cygpath --mixed $(libdir))
+HADDOCKLIB=$(shell cygpath -w $(libdir) | sed -e 's%\\%/%g')
 else
 HADDOCKLIB=$(libdir)
 endif # mingw
@@ -26,12 +28,16 @@ HADDOCKBIN=$(libexecdir)/$(HS_PROG)
 endif # BIN_DIST
 else
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-HADDOCKLIB=$(shell cygpath --mixed $(FPTOOLS_TOP_ABS)/haddock/html)
+# See above comment re: --mixed
+#HADDOCKLIB=$(shell cygpath --mixed $(FPTOOLS_TOP_ABS)/haddock/html)
+HADDOCKLIB=$(shell cygpath -w $(FPTOOLS_TOP_ABS)/haddock/html | sed -e 's%\\%/%g')
 else
 HADDOCKLIB=$(FPTOOLS_TOP_ABS)/haddock/html
 endif
 HADDOCKBIN=$(FPTOOLS_TOP_ABS)/haddock/src/$(HS_PROG)
 endif # INSTALLING
+
+HADDOCKLIB=$(shell cygpath -w $(libdir) | sed -e 's%\\%/%g')
 
 HAPPY_OPTS += $(GHC_HAPPY_OPTS)
 
