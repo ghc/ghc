@@ -240,8 +240,8 @@ program), you may wish to check if there are libraries that provide a
             "<literal>Prelude.fromInteger 1</literal>", which is what
             the Haskell Report specifies.  So the
             <option>-fno-implicit-prelude</option> flag causes the
-            following pieces of built-in syntax to refer to whatever
-            is in scope, not the Prelude versions:</para>
+            following pieces of built-in syntax to refer to <emphasis>whatever
+            is in scope</emphasis>, not the Prelude versions:</para>
 
 	    <itemizedlist>
 	      <listitem>
@@ -260,12 +260,24 @@ program), you may wish to check if there are libraries that provide a
 
 	      <listitem>
 		<para>In an n+k pattern, the standard Prelude
-                <literal>Ord</literal> class is used for comparison,
+                <literal>Ord</literal> class is still used for comparison,
                 but the necessary subtraction uses whatever
                 "<literal>(-)</literal>" is in scope (not
                 "<literal>Prelude.(-)</literal>").</para>
 	      </listitem>
 	    </itemizedlist>
+
+	     <para>Note: Negative literals, such as <literal>-3</literal>, are
+             specified by (a careful reading of) the Haskell Report as 
+             meaning <literal>Prelude.negate (Prelude.fromInteger 3)</literal>.
+             However, GHC deviates from this slightly, and treats them as meaning
+             <literal>fromInteger (-3)</literal>.  One particular effect of this
+             slightly-non-standard reading is that there is no difficulty with
+             the literal <literal>-2147483648</literal> at type <literal>Int</literal>;
+             it means <literal>fromInteger (-2147483648)</literal>.  The strict interpretation
+             would be <literal>negate (fromInteger 21474836483)</literal>, 
+             and the call to <literal>fromInteger</literal> would overflow (at type <literal>Int</literal>, remember).
+             </para>
 
 	  </listitem>
 	</varlistentry>
