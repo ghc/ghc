@@ -23,7 +23,7 @@ module System.Posix.Types (
 
 #ifndef mingw32_TARGET_OS
   CGid(..), CNlink(..), CSsize(..), CUid(..), CCc(..), CSpeed(..),
-  CTcflag(..), CBlkCnt(..), 
+  CTcflag(..),
 #endif
 
   Fd(..),
@@ -82,10 +82,9 @@ INTEGRAL_TYPE(CUid,tyConCUid,"CUid",HTYPE_UID_T)
 NUMERIC_TYPE(CCc,tyConCCc,"CCc",HTYPE_CC_T)
 NUMERIC_TYPE(CSpeed,tyConCSpeed,"CSpeed",HTYPE_SPEED_T)
 INTEGRAL_TYPE(CTcflag,tyConCTcflag,"CTcflag",HTYPE_TCFLAG_T)
-INTEGRAL_TYPE(CBlkCnt,tyConBlkCnd,"CBlkCnt",HTYPE_BLKCNT_T)
 #endif
 
--- ToDo: blksize_t, clockid_t, fsblkcnt_t, fsfilcnt_t, id_t, key_t
+-- ToDo: blksize_t, clockid_t, blkcnt_t, fsblkcnt_t, fsfilcnt_t, id_t, key_t
 -- suseconds_t, timer_t, useconds_t
 
 -- Make an Fd type rather than using CInt everywhere
