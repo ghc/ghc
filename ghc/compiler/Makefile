@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.149 2001/03/27 10:32:42 simonmar Exp $
+# $Id: Makefile,v 1.150 2001/03/27 16:32:46 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -85,10 +85,11 @@ ifeq ($(GhcWithNativeCodeGen),YES)
 DIRS += nativeGen
 else
 SRC_HC_OPTS += -DOMIT_NATIVE_CODEGEN
+endif
+
 ifeq ($(GhcWithIlx),YES)
 DIRS += ilxGen
 SRC_HC_OPTS += -DILX
-endif
 endif
 
 ifeq "$(BootingFromHc)" "YES"
@@ -170,6 +171,7 @@ ifneq "$(mingw32_TARGET_OS)" "1"
 SRC_HC_OPTS += -package concurrent -package posix -package text -package util
 else
 SRC_HC_OPTS += -package concurrent -package text -package util
+main/TmpFiles_HC_OPTS += -Dmingw32_TARGET_OS
 endif
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O

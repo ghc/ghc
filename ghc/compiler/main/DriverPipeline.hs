@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.59 2001/03/26 12:28:15 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.60 2001/03/27 16:32:46 rrt Exp $
 --
 -- GHC Driver
 --
@@ -148,6 +148,9 @@ genPipeline todo stop_flag persistent_output lang filename
    keep_hc    <- readIORef v_Keep_hc_files
    keep_raw_s <- readIORef v_Keep_raw_s_files
    keep_s     <- readIORef v_Keep_s_files
+#ifdef ILX
+   writeIORef v_Object_suf (Just "ilx")
+#endif
    osuf       <- readIORef v_Object_suf
 
    let

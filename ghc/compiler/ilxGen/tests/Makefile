@@ -1,7 +1,7 @@
 include ../../../lib/std/Makefile.src
 
 # These settings are if you use a visual studio build
-CVS=/cvs/cvs
+CVS=cvs
 CORENV_DEBUG=
 CORENV_RETAIL=
 LOCALRUN=./
@@ -13,13 +13,13 @@ LOCALRUN=.\\
 ILX_FAST=
 endif    
 
-ILXASM_HOME=/devel/fcom/src
+ILXASM_HOME=C:/devel/fcom/src
 ILXASM=$(ILXASM_HOME)/bin/ilxasm$(ILX_FAST).exe 
 ILVALID=$(ILXASM_HOME)/bin/ilvalid$(ILX_FAST).exe 
 ILXASM_FLAGS=-l $(ILXASM_HOME)/ilxasm --no-ilasm  --tailcall-indirect
 
 ghc:
-	$(MAKE) -C ../.. ilxGen/IlxGen.o hsc
+	$(MAKE) -C ../.. ghc
 
 ilxasm:
 	$(MAKE) -C $(ILXASM_HOME) bin/ilxasm.exe
@@ -89,8 +89,8 @@ ovgtprel:
 	$(MAKE) -C ../../../lib/std ilxasm std.O.vmeth-erased.generic.traced.dll
 	$(MAKE) -C $(ILXASM_HOME)  bin/msilxlib.vmeth-erased.generic.traced.dll
 
-%.o: %.hs ../../hsc.exe
-	../../../driver/ghc-inplace -o $@ -c $*.hs
+%.o: %.hs ../../ghc-4.11
+	../../ghc-inplace -o $@ -c $*.hs
 
 std_NONGENERIC_STATIC_IL=$(patsubst %.lhs,../../../lib/std/%.nongeneric.boxed.static.il,$(std_SRC)) ../../../lib/std/PrelGHC.nongeneric.boxed.static.il
 std_GENERIC_STATIC_IL=$(patsubst %.lhs,../../../lib/std/%.generic.static.il,$(std_SRC)) ../../../lib/std/PrelGHC.generic.static.il
@@ -98,11 +98,11 @@ std_GENERIC_STATIC_IL=$(patsubst %.lhs,../../../lib/std/%.generic.static.il,$(st
 #========================================================================
 # 1. From Haskell to ILX 
 
-%.Onot.ilx: %.hs ../../hsc.exe
-	../../../driver/ghc-inplace  -fglasgow-exts -o $@ -i../../../lib/std/.Onot -Onot --ilx $*.hs
+%.Onot.ilx: %.hs ../../ghc-4.11
+	../../ghc-inplace -c -fglasgow-exts -o $@ -i../../../lib/std/.Onot -Onot -filx $*.hs -osuf Onot.ilx
 
-%.O.ilx: %.hs ../../hsc.exe
-	../../../driver/ghc-inplace  -fglasgow-exts -o $@ -i../../../lib/std/.O -O --ilx $*.hs
+%.O.ilx: %.hs ../../ghc-4.11
+	../../ghc-inplace -c -fglasgow-exts -o $@ -i../../../lib/std/.O -O -filx $*.hs -osuf O.ilx
 
 ../Entry.Onot.ilx: ../Entry.ilx
 	sed -e "s|ilx std|ilx std.Onot|g" ../Entry.ilx > $@.tmp
@@ -224,9 +224,10 @@ HSstd_cbits.dll: ../../../lib/std/cbits/HSstd_cbits.dll
 #------------------------------------------------------------------------
 # From IL to .EXE
 
-%.retail.exe: %.il
+%.retail.exe: %.il ../Entry.Onot.mono.il
+	cat %.il ../Entry.Onot.mono.il > $@.tmp
 	echo "$(CORENV_RETAIL)" > $@.bat
-	echo "ilasm -exe -quiet -out=$(subst /,\\,$@) $(subst /,\\,$<)" >> $@.bat
+	echo "ilasm -exe -quiet -out=$(subst /,\\,$@.tmp) $(subst /,\\,$<)" >> $@.bat
 	time -p cmd /c $(subst /,\\,$@).bat
 	rm $@.bat
 
@@ -237,6 +238,7 @@ HSstd_cbits.dll: ../../../lib/std/cbits/HSstd_cbits.dll
 	rm $@.bat
 #------------------------------------------------------------------------
 # From .HS to .EXE without using ILX
+# Used to run performance comparisons against native code GHC
 
 %.Onot.exe: %.hs
 	ghc -Onot -o $@ $<
@@ -244,7 +246,11 @@ HSstd_cbits.dll: ../../../lib/std/cbits/HSstd_cbits.dll
 %.O.exe: %.hs
 	ghc -O -o $@ $<
 
+%.o: %.hs ../../hsc.exe
+	../../../driver/ghc-inplace -o $@ -c $*.hs
 
+%.run: %.exe
+	time -p $<
 
 #------------------------------------------------------------------------
 # Running:
