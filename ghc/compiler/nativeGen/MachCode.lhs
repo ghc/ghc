@@ -409,9 +409,9 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       SllOp  -> trivialCode SLL x y
       SrlOp  -> trivialCode SRL x y
 
-      ISllOp -> panic "AlphaGen:isll"
+      ISllOp -> trivialCode SLL x y -- was: panic "AlphaGen:isll"
       ISraOp -> trivialCode SRA x y -- was: panic "AlphaGen:isra"
-      ISrlOp -> panic "AlphaGen:isrl"
+      ISrlOp -> trivialCode SRL x y -- was: panic "AlphaGen:isrl"
 
       FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [x,y])
       DoublePowerOp -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [x,y])
@@ -671,10 +671,9 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       SllOp -> shift_code (SHL L) x y {-False-}
       SrlOp -> shift_code (SHR L) x y {-False-}
 
-      {- ToDo: nuke? -}
-      ISllOp -> panic "I386Gen:isll"
-      ISraOp -> shift_code (SAR L) x y {-False-}  --panic "I386Gen:isra"
-      ISrlOp -> panic "I386Gen:isrl"
+      ISllOp -> shift_code (SHL L) x y {-False-}  --was:panic "I386Gen:isll"
+      ISraOp -> shift_code (SAR L) x y {-False-}  --was:panic "I386Gen:isra"
+      ISrlOp -> shift_code (SHR L) x y {-False-}  --was:panic "I386Gen:isrl"
 
       FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [promote x, promote y])
 		       where promote x = StPrim Float2DoubleOp [x]
@@ -1075,9 +1074,9 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       SllOp -> trivialCode SLL x y
       SrlOp -> trivialCode SRL x y
 
-      ISllOp -> panic "SparcGen:isll"
+      ISllOp -> trivialCode SLL x y  --was: panic "SparcGen:isll"
       ISraOp -> trivialCode SRA x y  --was: panic "SparcGen:isra"
-      ISrlOp -> panic "SparcGen:isrl"
+      ISrlOp -> trivialCode SRL x y  --was: panic "SparcGen:isrl"
 
       FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [promote x, promote y])
 		       where promote x = StPrim Float2DoubleOp [x]
