@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.18 1999/02/26 17:46:09 simonm Exp $
+ * $Id: PrimOps.hc,v 1.19 1999/03/01 10:17:15 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -77,7 +77,7 @@ const
         JMP_(ENTRY_CODE(Sp[0]));
 
 # define RET_NPNP(a,b,c,d) \
-        R1.w = (W_)(a); R2.w = (W_)(b); R3.w = (W_)(c); R4.w = (W_)(d);
+        R1.w = (W_)(a); R2.w = (W_)(b); R3.w = (W_)(c); R4.w = (W_)(d); \
 	JMP_(ENTRY_CODE(Sp[0]));
 
 # define RET_NNPNNP(a,b,c,d,e,f) \
