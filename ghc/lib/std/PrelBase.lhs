@@ -133,7 +133,7 @@ The rest of the prelude list functions are in PrelList.
 ----------------------------------------------
 --	foldr/build/augment
 ----------------------------------------------
-
+  
 \begin{code}
 foldr            :: (a -> b -> b) -> b -> [a] -> b
 foldr _ z []     =  z
