@@ -500,7 +500,7 @@ simplRhsExpr env binder@(id,occ_info) rhs new_id
 
   | otherwise	-- OK, use the big hammer
   = 	-- Deal with the big lambda part
-    simplTyBinders env tyvars			`thenSmpl` \ (lam_env, tyvars') ->
+    simplTyBinders rhs_env tyvars			`thenSmpl` \ (lam_env, tyvars') ->
     let
 	body_ty  = applyTys rhs_ty (mkTyVarTys tyvars')
     in

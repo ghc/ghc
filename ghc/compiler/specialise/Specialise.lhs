@@ -1167,17 +1167,32 @@ instantiateDictRhs :: TyVarEnv Type -> IdEnv Id -> CoreExpr -> CoreExpr
 instantiateDictRhs ty_env id_env rhs
   = go rhs
   where
-    go (App e1 (VarArg a)) = App (go e1) (VarArg (lookupId id_env a))
-    go (App e1 (TyArg t))  = App (go e1) (TyArg (instantiateTy ty_env t))
-    go (Var v)		   = Var (lookupId id_env v)
-    go (Lit l)		   = Lit l
+    go_arg (VarArg a) = VarArg (lookupId id_env a)
+    go_arg (TyArg t)  = TyArg (instantiateTy ty_env t)
+
+    go (App e1 arg)   = App (go e1) (go_arg arg)
+    go (Var v)	      = Var (lookupId id_env v)
+    go (Lit l)	      = Lit l
+    go (Con con args) = Con con (map go_arg args)
+    go (Case e alts)  = Case (go e) alts		-- See comment below re alts
+    go other	      = pprPanic "instantiateDictRhs" (ppr rhs)
 
 dictRhsFVs :: CoreExpr -> IdSet
 	-- Cheapo function for simple RHSs
-dictRhsFVs (App e1 (VarArg a)) = dictRhsFVs e1 `addOneToIdSet` a
-dictRhsFVs (App e1 (TyArg t))  = dictRhsFVs e1
-dictRhsFVs (Var v)	       = unitIdSet v
-dictRhsFVs (Lit l)	       = emptyIdSet
+dictRhsFVs e
+  = go e
+  where
+    go (App e1 (VarArg a)) = go e1 `addOneToIdSet` a
+    go (App e1 (TyArg t))  = go e1
+    go (Var v)	           = unitIdSet v
+    go (Lit l)	           = emptyIdSet
+    go (Con _ args)        = mkIdSet [id | VarArg id <- args]
+
+    go (Case e _)	   = go e	-- Claim: no free dictionaries in the alternatives
+					-- These case expressions are of the form
+					--   case d of { D a b c -> b }
+
+    go other		   = pprPanic "dictRhsFVs" (ppr e)
 
 
 addIdSpecialisations id spec_stuff

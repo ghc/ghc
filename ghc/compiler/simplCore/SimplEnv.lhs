@@ -53,7 +53,10 @@ import CoreUnfold	( mkFormSummary, couldBeSmallEnoughToInline, whnfOrBottom,
 			  Unfolding(..), FormSummary(..),
 			  calcUnfoldingGuidance	)
 import CoreUtils	( coreExprCc )
-import CostCentre	( CostCentre, isCurrentCostCentre, useCurrentCostCentre, costsAreSubsumed, noCostCentreAttached )
+import CostCentre	( CostCentre, isCurrentCostCentre, useCurrentCostCentre, 
+			  costsAreSubsumed, noCostCentreAttached, subsumedCosts,
+			  currentOrSubsumedCosts
+			)
 import FiniteMap	-- lots of things
 import Id		( getInlinePragma,
 			  nullIdEnv, growIdEnvList, lookupIdEnv, delOneFromIdEnv,
@@ -177,10 +180,18 @@ type StuffAboutId = (OutId, 		-- Always has the same unique as the
 nullSimplEnv :: SwitchChecker -> SimplEnv
 
 nullSimplEnv sw_chkr
-  = SimplEnv sw_chkr useCurrentCostCentre 
+  = SimplEnv sw_chkr subsumedCosts
 	     (emptyTyVarSet, emptyTyVarEnv)
 	     (nullIdEnv, nullIdEnv)
 	     nullConApps
+
+	-- The top level "enclosing CC" is "SUBSUMED".  But the enclosing CC
+	-- for the rhs of top level defs is "OST_CENTRE".  Consider
+	--	f = \x -> e
+	--	g = \y -> let v = f y in scc "x" (v ...)
+	-- Here we want to inline "f", since its CC is SUBSUMED, but we don't
+	-- want to inline "v" since its CC is dynamically determined.
+
 
 getEnvs :: SimplEnv -> (SimplTypeEnv, SimplValEnv)
 getEnvs (SimplEnv _ _ ty_env id_env _) = (ty_env, id_env)
@@ -282,9 +293,6 @@ switchOffInlining (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_app
 setEnclosingCC :: SimplEnv -> CostCentre -> SimplEnv
 
 setEnclosingCC env@(SimplEnv chkr _ ty_env id_env con_apps) encl_cc
-  | costsAreSubsumed encl_cc
-  = env
-  | otherwise
   = SimplEnv chkr encl_cc ty_env id_env con_apps
 
 getEnclosingCC :: SimplEnv -> CostCentre
@@ -643,7 +651,7 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst)
 	       mkSimplUnfoldingGuidance chkr out_id rhs
 
 	-- Attach a cost centre to the RHS if necessary
-    rhs_w_cc  | isCurrentCostCentre encl_cc
+    rhs_w_cc  | currentOrSubsumedCosts encl_cc
 	      || not (noCostCentreAttached (coreExprCc rhs))
 	      = rhs
 	      | otherwise

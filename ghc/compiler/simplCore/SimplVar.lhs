@@ -172,7 +172,7 @@ When we hit a binder we may need to
 
 \begin{code}
 simplBinder :: SimplEnv -> InBinder -> SmplM (SimplEnv, OutId)
-simplBinder env (id, _)
+simplBinder env (id, occ_info)
   |  not_in_scope	 	-- Not in scope, so no need to clone
   && empty_ty_subst 		-- No type substitution to do inside the Id
   && isNullIdEnv id_subst	-- No id substitution to do inside the Id
@@ -219,7 +219,7 @@ simplBinder env (id, _)
     empty_ty_subst   	 = isEmptyTyVarEnv ty_subst
     not_in_scope     	 = not (id `elemIdEnv` in_scope_ids)
 
-    new_in_scope_ids id' = addOneToIdEnv in_scope_ids id' (id', noBinderInfo, NoUnfolding)
+    new_in_scope_ids id' = addOneToIdEnv in_scope_ids id' (id', occ_info, NoUnfolding)
     
     ty               	 = idType id
     ty'              	 = instantiateTy ty_subst ty
