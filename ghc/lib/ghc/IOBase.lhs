@@ -16,6 +16,7 @@ module IOBase where
 import {-# SOURCE #-} Error
 import STBase
 import PrelTup
+import PrelMaybe
 import Addr
 import PackBase	( unpackCString )
 import PrelBase

@@ -23,6 +23,7 @@ module Maybe
 import Error	( error )
 import Monad	( filter )
 import PrelList
+import PrelMaybe
 import PrelBase
 \end{code}
 

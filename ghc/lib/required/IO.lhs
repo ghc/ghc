@@ -40,6 +40,8 @@ import ArrBase		( MutableByteArray(..), newCharArray )
 import IOHandle		-- much of the real stuff is in here
 import PackBase		( unpackNBytesST )
 import PrelBase
+import PrelMaybe
+import PrelEither
 import GHC
 import Addr
 

@@ -309,41 +309,6 @@ otherwise 		=  True
 
 %*********************************************************
 %*							*
-\subsection{Type @Maybe@}
-%*							*
-%*********************************************************
-
-\begin{code}
-data  Maybe a  =  Nothing | Just a	deriving (Eq, Ord, Show {- Read -})
-
-maybe :: b -> (a -> b) -> Maybe a -> b
-maybe n f Nothing  = n
-maybe n f (Just x) = f x
-
-instance  Functor Maybe  where
-    map f Nothing       = Nothing
-    map f (Just a)      = Just (f a)
-
-instance  Monad Maybe  where
-    (Just x) >>= k      = k x
-    Nothing  >>= k      = Nothing
-
-    (Just x) >>  k      = k
-    Nothing  >>  k      = Nothing
-
-    return              = Just
-
-instance  MonadZero Maybe  where
-    zero                = Nothing
-
-instance  MonadPlus Maybe  where
-    Nothing ++ ys       = ys
-    xs      ++ ys       = xs
-\end{code}
-
-
-%*********************************************************
-%*							*
 \subsection{The @()@ type}
 %*							*
 %*********************************************************
@@ -388,21 +353,6 @@ instance  Show ()  where
     showsPrec p () = showString "()"
     showList ls    = showList__ (showsPrec 0) ls
 \end{code}
-
-%*********************************************************
-%*							*
-\subsection{Type @Either@}
-%*							*
-%*********************************************************
-
-\begin{code}
-data  Either a b  =  Left a | Right b	deriving (Eq, Ord, Show {- Read -} )
-
-either                  :: (a -> c) -> (b -> c) -> Either a b -> c
-either f g (Left x)     =  f x
-either f g (Right y)    =  g y
-\end{code}
-
 
 %*********************************************************
 %*							*

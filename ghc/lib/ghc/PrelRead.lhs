@@ -15,6 +15,8 @@ import {-# SOURCE #-} Error ( error )
 import PrelNum
 import PrelList
 import PrelTup
+import PrelMaybe
+import PrelEither
 import PrelBase
 \end{code}
 

@@ -23,6 +23,7 @@ import PrelBase
 import GHC
 import {-# SOURCE #-} Error ( error )
 import PrelList
+import PrelMaybe
 
 import ArrBase	( Array, array, (!) )
 import Unsafe   ( unsafePerformIO )
@@ -1184,7 +1185,6 @@ integerLogBase b i =
 	    doDiv i l = if i < b then l else doDiv (i `div` b) (l+1)
 	in  doDiv (i `div` (b^l)) l
 \end{code}
-
 
 %*********************************************************
 %*							*

@@ -23,6 +23,7 @@ import Ix
 import IOBase
 import Unsafe   ( unsafePerformIO )
 import PrelTup
+import PrelMaybe
 import PrelBase
 import GHC
 import Addr

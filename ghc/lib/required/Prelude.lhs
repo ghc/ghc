@@ -67,6 +67,8 @@ import PrelIO
 import PrelRead
 import PrelNum
 import PrelTup
+import PrelMaybe
+import PrelEither
 import Monad
 import Maybe
 import Error	( error )

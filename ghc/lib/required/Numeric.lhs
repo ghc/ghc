@@ -32,6 +32,7 @@ module Numeric
 	) where
 
 import PrelBase
+import PrelMaybe
 import ArrBase
 import PrelNum
 import PrelRead

@@ -24,6 +24,7 @@ module PrelList (
 
 import {-# SOURCE #-} Error ( error )
 import PrelTup
+import PrelMaybe
 import PrelBase
 
 infix  4 `elem`, `notElem`
