@@ -34,7 +34,6 @@ import Foreign.C
 import Control.Exception 	( bracket )
 import Control.Monad
 import GHC.IOBase
-#include "ghcconfig.h"
 #endif
 
 #ifdef __HUGS__

@@ -27,8 +27,6 @@ module GHC.IO (
    memcpy_baoff_ptr,
  ) where
 
-#include "ghcconfig.h"
-
 import Foreign
 import Foreign.C
 

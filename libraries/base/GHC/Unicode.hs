@@ -30,7 +30,6 @@ import GHC.Int
 import GHC.Word
 import GHC.Num	 (fromInteger)
 
-#include "ghcconfig.h"
 #include "HsBaseConfig.h"
 
 -- | Selects the first 128 characters of the Unicode character set,

@@ -54,8 +54,6 @@ module GHC.Handle (
 
  ) where
 
-#include "ghcconfig.h"
-
 import System.Directory.Internals
 import Control.Monad
 import Data.Bits
