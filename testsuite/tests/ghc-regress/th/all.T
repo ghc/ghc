@@ -13,3 +13,7 @@ test('TH_reifyDecl4', normal, compile, [''])
 
 test('TH_reifyType1', normal, compile, [''])
 test('TH_reifyType2', normal, compile, [''])
+
+test('TH_spliceDecl1', normal, compile, [''])
+test('TH_spliceDecl2', normal, compile, [''])
+test('TH_spliceDecl3', normal, compile, [''])
