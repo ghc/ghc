@@ -262,8 +262,8 @@ getLinkDeps hpt pit mods
 		-- so use the Finder to get a ModLocation...
 	  do { mb_stuff <- findModule mod_name ;
 	       case mb_stuff of {
-		  Nothing -> no_obj mod_name ;
-		  Just (_, loc) -> do {
+		  Left _ -> no_obj mod_name ;
+		  Right (_, loc) -> do {
 
 		-- ...and then find the linkable for it
 	       mb_lnk <- findLinkable mod_name loc ;
@@ -271,7 +271,7 @@ getLinkDeps hpt pit mods
 		  Nothing -> no_obj mod_name ;
 		  Just lnk -> return lnk
 	  }}}} 
-\end{code}			  
+\end{code}
 
 
 %************************************************************************
