@@ -31,7 +31,7 @@ else
 # Hack by SPJ to delay if-then-else until the pattern rule when we have $*
 PACKAGE = $(subst ~, ,$(word $(words dummy $(findstr $(notdir $*), PrelMain )), -package-name~std))
 endif
-LIBRARY = libHS$(PACKAGE)$(_way).a
+LIBRARY = libHSstd$(_way).a
 
 LIBOBJS = $(HS_OBJS)
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
