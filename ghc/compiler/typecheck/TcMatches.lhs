@@ -11,7 +11,7 @@ module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchExpected ) where
 import {-# SOURCE #-} TcGRHSs ( tcGRHSsAndBinds )
 
 import HsSyn		( HsBinds(..), Match(..), GRHSsAndBinds(..), GRHS(..),
-			  HsExpr(..), MonoBinds(..),
+			  HsExpr, MonoBinds(..),
 			  collectPatBinders, pprMatch, getMatchLoc
 			)
 import RnHsSyn		( RenamedMatch )
@@ -23,12 +23,12 @@ import TcEnv		( TcIdOcc(..), newMonoIds )
 import TcPat		( tcPat )
 import TcType		( TcType, TcMaybe, zonkTcType, newTyVarTy )
 import TcSimplify	( bindInstsOfLocalFuns )
-import Unify		( unifyTauTy, unifyTauTyList, unifyFunTy )
+import Unify		( unifyTauTy, unifyFunTy )
 import Name		( Name {- instance Outputable -} )
 
 import Kind		( Kind, mkTypeKind )
 import BasicTypes	( RecFlag(..) )
-import Type		( isTyVarTy, isTauTy, mkFunTy, splitFunTy_maybe )
+import Type		( isTauTy, mkFunTy )
 import Util
 import Outputable
 import SrcLoc           (SrcLoc)

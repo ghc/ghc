@@ -15,8 +15,7 @@ module TcInstUtil (
 
 #include "HsVersions.h"
 
-import RnHsSyn		( RenamedMonoBinds, RenamedSig(..), 
-			  RenamedInstancePragmas(..) )
+import RnHsSyn		( RenamedMonoBinds, RenamedSig(..) )
 
 import TcMonad
 import Inst		( InstanceMapper )
@@ -28,7 +27,7 @@ import SpecEnv		( emptySpecEnv, addToSpecEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc, Name )
 import SrcLoc		( SrcLoc )
-import Type		( mkSigmaTy, mkForAllTys, mkDictTy, mkTyVarTys, instantiateThetaTy,
+import Type		( mkSigmaTy, mkDictTy, instantiateThetaTy,
 			  ThetaType, Type
 			)
 import PprType		( pprConstraint )
@@ -36,7 +35,7 @@ import Class		( classTyCon )
 import TyCon		( tyConDataCons )
 import TyVar		( TyVar, zipTyVarEnv )
 import Unique		( Unique )
-import Util		( equivClasses, zipWithEqual, panic{-, pprTrace-}, assertPanic )
+import Util		( equivClasses, panic, assertPanic )
 import Outputable
 \end{code}
 

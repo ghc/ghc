@@ -11,13 +11,12 @@ module TcDeriv ( tcDeriving ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsBinds(..), MonoBinds(..), collectMonoBinders )
-import HsPragmas	( InstancePragmas(..) )
 import RdrHsSyn		( RdrName, RdrNameMonoBinds )
-import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedFixityDecl )
+import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
 
 import TcMonad
 import Inst		( InstanceMapper )
-import TcEnv		( TcIdOcc, getEnv_TyCons, tcLookupClassByKey )
+import TcEnv		( getEnv_TyCons, tcLookupClassByKey )
 import TcKind		( TcKind )
 import TcGenDeriv	-- Deriv stuff
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
@@ -25,16 +24,16 @@ import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( newDfunName, bindLocatedLocalsRn )
-import RnMonad		( RnM, RnDown, GDown, SDown, RnNameSupply(..), 
-			  setNameSupplyRn, renameSourceCode, thenRn, mapRn, returnRn )
+import RnMonad		( RnM, RnDown, SDown, RnNameSupply(..), 
+			  renameSourceCode, thenRn, mapRn, returnRn )
 
-import Bag		( Bag, emptyBag, isEmptyBag, unionBags, listToBag )
+import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
 import ErrUtils		( ErrMsg )
 import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
-import Name		( isLocallyDefined, getSrcLoc, ExportFlag(..), Provenance, 
+import Name		( isLocallyDefined, getSrcLoc, Provenance, 
 			  Name{--O only-}, Module, NamedThing(..)
 			)
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
@@ -48,12 +47,9 @@ import Type		( GenType(..), TauType, mkTyVarTys, mkTyConApp,
 			)
 import TysPrim		( voidTy )
 import TyVar		( GenTyVar, TyVar )
-import UniqFM		( emptyUFM )
 import Unique		-- Keys stuff
 import Bag		( bagToList )
-import Util		( zipWithEqual, zipEqual, sortLt, removeDups,  assoc,
-			  thenCmp, cmpList
-			)
+import Util		( zipWithEqual, sortLt, removeDups,  assoc, thenCmp )
 import Outputable
 \end{code}
 

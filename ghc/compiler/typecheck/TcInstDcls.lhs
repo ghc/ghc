@@ -11,77 +11,62 @@ module TcInstDcls (
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), InstDecl(..), HsType(..), 
+import HsSyn		( HsDecl(..), InstDecl(..),
 			  HsBinds(..), MonoBinds(..), GRHSsAndBinds(..), GRHS(..),
 			  HsExpr(..), InPat(..), HsLit(..),
 			  unguardedRHS,
 			  collectMonoBinders, andMonoBinds
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds,
-			  RenamedInstDecl, RenamedFixityDecl, RenamedHsExpr,
-			  RenamedSig, RenamedSpecInstSig, RenamedHsDecl
+			  RenamedInstDecl, RenamedHsExpr,
+			  RenamedSig, RenamedHsDecl
 			)
-import TcHsSyn		( TcHsBinds,
-			  TcMonoBinds, TcExpr, TcIdOcc(..), TcIdBndr, 
-			  tcIdType, maybeBoxedPrimType, 
-			  mkHsTyLam, mkHsTyApp,
-			  mkHsDictLam, mkHsDictApp )
+import TcHsSyn		( TcMonoBinds, TcIdOcc(..), TcIdBndr, 
+			  maybeBoxedPrimType, mkHsTyLam, mkHsTyApp,
+			  )
 
 import TcBinds		( tcPragmaSigs, sigThetaCtxt )
 import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad
 import RnMonad		( RnNameSupply )
-import Inst		( Inst, InstOrigin(..), InstanceMapper,
-			  instToId, newDicts, newMethod, LIE, emptyLIE, plusLIE )
+import Inst		( Inst, InstOrigin(..),
+			  newDicts, LIE, emptyLIE, plusLIE )
 import PragmaInfo	( PragmaInfo(..) )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcLookupClass, newLocalId, tcGetGlobalTyVars,
-			  tcExtendGlobalValEnv, tcAddImportedIdInfo
-			)
-import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs, classDataCon )
+import TcEnv		( tcExtendGlobalValEnv, tcAddImportedIdInfo )
+import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, classDataCon )
 import TcKind		( TcKind, unifyKind )
-import TcMatches	( tcMatchesFun )
-import TcMonoType	( tcTyVarScope, tcContext, tcHsTypeKind, tcHsType )
+import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( TcType, TcTyVar, TcTyVarSet, 
-			  zonkSigTyVar,
-			  tcInstSigTyVars, tcInstType, tcInstSigTcType, 
-			  tcInstTheta, tcInstTcType
+			  zonkSigTyVar, tcInstSigTyVars, tcInstType, tcInstTheta
 			)
-import Unify		( unifyTauTy, unifyTauTyLists )
-
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
-			  concatBag, foldBag, bagToList, listToBag,
-			  Bag
+			  foldBag, bagToList, Bag
 			)
-import CmdLineOpts	( opt_GlasgowExts, 
-			  opt_SpecialiseOverloaded, opt_WarnMissingMethods
-			)
-import Class		( classBigSig, classTyCon, Class )
-import Id		( idType, replacePragmaInfo,
-			  isNullaryDataCon, dataConArgTys, Id )
-import ListSetOps	( minusList )
-import Maybes 		( maybeToBool, expectJust, seqMaybe, catMaybes )
-import Name		( nameOccName, getSrcLoc, mkLocalName,
+import CmdLineOpts	( opt_GlasgowExts, opt_WarnMissingMethods )
+import Class		( classBigSig, Class )
+import Id		( idType, isNullaryDataCon, dataConArgTys, Id )
+import Maybes 		( maybeToBool, seqMaybe, catMaybes )
+import Name		( nameOccName, mkLocalName,
 			  isLocallyDefined, Module,
 			  NamedThing(..)
 			)
 import PrelVals		( nO_METHOD_BINDING_ERROR_ID )
 import PprType		( pprParendGenType,  pprConstraint )
 import SrcLoc		( SrcLoc, noSrcLoc )
-import TyCon		( tyConDataCons, isSynTyCon, isDataTyCon, tyConDerivings )
-import Type		( Type, ThetaType, mkTyVarTys, isUnpointedType,
-			  splitSigmaTy, splitAppTys, isTyVarTy, matchTy, mkSigmaTy,
-			  splitTyConApp_maybe, getTyVar, splitDictTy_maybe,
-			  splitAlgTyConApp_maybe, splitRhoTy, isSynTy,
+import TyCon		( isSynTyCon, isDataTyCon, tyConDerivings )
+import Type		( Type, ThetaType, isUnpointedType,
+			  splitSigmaTy, isTyVarTy, mkSigmaTy,
+			  splitTyConApp_maybe, splitDictTy_maybe,
+			  splitAlgTyConApp_maybe, splitRhoTy,
 			  tyVarsOfTypes
 			)
 import TyVar		( zipTyVarEnv, mkTyVarSet, tyVarSetToList, TyVar )
 import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( stringTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, Uniquable(..) )
-import Util		( zipEqual, removeDups )
 import Outputable
 \end{code}
 

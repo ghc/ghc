@@ -18,7 +18,7 @@ import TcKind		( TcKind, mkBoxedTypeKind, mkTypeKind, mkArrowKind,
 			  kindToTcKind, tcDefaultKind
 			)
 import Type		( Type, ThetaType, 
-			  mkTyVarTy, mkFunTy, mkAppTy, mkSynTy,
+			  mkTyVarTy, mkFunTy, mkSynTy,
 			  mkSigmaTy, mkDictTy, mkTyConApp, mkAppTys
 			)
 import TyVar		( TyVar, mkTyVar )

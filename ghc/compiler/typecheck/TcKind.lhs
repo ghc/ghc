@@ -20,7 +20,7 @@ module TcKind (
 import Kind
 import TcMonad
 
-import Unique	( Unique, pprUnique10 )
+import Unique	( Unique )
 import Util	( nOfThem, panic )
 import Outputable
 \end{code}

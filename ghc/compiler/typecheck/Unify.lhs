@@ -17,7 +17,7 @@ module Unify ( unifyTauTy, unifyTauTyList, unifyTauTyLists,
 -- friends: 
 import TcMonad
 import Type	( GenType(..), Type, tyVarsOfType,
-		  typeKind, mkFunTy, splitFunTy_maybe, splitAppTys, splitTyConApp_maybe )
+		  typeKind, mkFunTy, splitFunTy_maybe, splitTyConApp_maybe )
 import TyCon	( TyCon, mkFunTyCon, isTupleTyCon, tyConArity, Arity )
 import TyVar	( GenTyVar(..), TyVar, tyVarKind, tyVarSetToList,
 		  TyVarEnv, lookupTyVarEnv, emptyTyVarEnv, addToTyVarEnv
@@ -480,10 +480,6 @@ unifyCtxt ty1 ty2		-- ty1 expected, ty2 inferred
 unifyMisMatch ty1 ty2
   = hang (ptext SLIT("Couldn't match the type"))
 	 4 (sep [quotes (ppr ty1), ptext SLIT("against"), quotes (ppr ty2)])
-
-expectedFunErr ty
-  = hang (text "Function type expected, but found the type")
-	 4 (ppr ty)
 
 unifyKindErr tyvar ty
   = hang (ptext SLIT("Compiler bug: kind mis-match between"))

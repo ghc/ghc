@@ -131,34 +131,31 @@ import TcHsSyn		( TcExpr, TcIdOcc(..), TcIdBndr,
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  tyVarsOfInst, 
-			  isTyVarDict, isDict, isStdClassTyVarDict, isMethodFor,
+			  isDict, isStdClassTyVarDict, isMethodFor,
 			  instToId, instBindingRequired, instCanBeGeneralised,
 			  newDictFromOld,
 			  instLoc, getDictClassTys,
 			  pprInst, zonkInst,
 			  Inst(..), LIE, pprInsts, pprInstsInFull, mkLIE, 
-			  InstOrigin(..), pprOrigin
+			  InstOrigin, pprOrigin
 			)
-import TcEnv		( TcIdOcc(..), tcGetGlobalTyVars )
-import TcType		( TcType, TcTyVar, TcTyVarSet, TcMaybe, tcInstType, tcInstTheta )
+import TcEnv		( TcIdOcc(..) )
+import TcType		( TcType, TcTyVarSet, TcMaybe, tcInstType, tcInstTheta )
 import Unify		( unifyTauTy )
 import Id		( mkIdSet )
 
-import Bag		( Bag, unitBag, listToBag, foldBag, filterBag, emptyBag, bagToList, 
-			  snocBag, consBag, unionBags, isEmptyBag )
+import Bag		( Bag, bagToList, snocBag )
 import Class		( Class, ClassInstEnv, classBigSig, classInstEnv )
 import PrelInfo		( isNumericClass, isCcallishClass )
 
-import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool )
+import Maybes		( maybeToBool )
 import Type		( Type, ThetaType, TauType, mkTyVarTy, getTyVar,
-			  isTyVarTy, getTyVar_maybe, instantiateThetaTy
+			  isTyVarTy, instantiateThetaTy
 			)
 import PprType		( pprConstraint )
-import TysWiredIn	( intTy, unitTy )
-import TyVar		( elementOfTyVarSet, emptyTyVarSet, unionTyVarSets,
-			  intersectTyVarSets, unionManyTyVarSets,
-			  isEmptyTyVarSet, tyVarSetToList, 
-			  zipTyVarEnv, emptyTyVarEnv
+import TysWiredIn	( unitTy )
+import TyVar		( intersectTyVarSets, unionManyTyVarSets,
+			  isEmptyTyVarSet, zipTyVarEnv, emptyTyVarEnv
 			)
 import FiniteMap
 import BasicTypes	( TopLevelFlag(..) )

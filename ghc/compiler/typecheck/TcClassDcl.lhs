@@ -9,21 +9,18 @@ module TcClassDcl ( tcClassDecl1, tcClassDecls2, tcMethodBind, badMethodErr ) wh
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), ClassDecl(..), Sig(..), MonoBinds(..),
-			  InPat(..),
-			  andMonoBinds, collectMonoBinders,
-			  getTyVarName
+			  InPat(..), andMonoBinds, getTyVarName
 			)
 import HsPragmas	( ClassPragmas(..) )
 import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..) )
 import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
 			  RenamedClassOpSig(..), RenamedMonoBinds,
-			  RenamedGenPragmas(..), RenamedContext(..), RenamedHsDecl
+			  RenamedContext(..), RenamedHsDecl
 			)
-import TcHsSyn		( TcHsBinds, TcMonoBinds, TcExpr,
-			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, tcIdType )
+import TcHsSyn		( TcMonoBinds )
 
 import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, newDicts, newMethod )
-import TcEnv		( TcIdOcc(..), newLocalIds, tcAddImportedIdInfo,
+import TcEnv		( TcIdOcc(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcLookupTyVar, 
 			  tcExtendGlobalTyVars )
 import TcBinds		( tcBindWithSigs, checkSigTyVars, sigCtxt, sigThetaCtxt, TcSigInfo(..) )
@@ -36,9 +33,9 @@ import TcType		( TcType, TcTyVar, TcTyVarSet, tcInstSigTyVars,
 			)
 import PragmaInfo	( PragmaInfo(..) )
 
-import Bag		( bagToList, unionManyBags )
+import Bag		( unionManyBags )
 import Class		( mkClass, classBigSig, Class )
-import CmdLineOpts      ( opt_PprUserLength, opt_GlasgowExts )
+import CmdLineOpts      ( opt_GlasgowExts )
 import Id		( Id, StrictnessMark(..),
 			  mkSuperDictSelId, mkMethodSelId, 
 			  mkDefaultMethodId, getIdUnfolding, mkDataCon, 
@@ -46,16 +43,13 @@ import Id		( Id, StrictnessMark(..),
 			)
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
-import Name		( Name, isLocallyDefined, moduleString, getSrcLoc, 
-			  OccName, nameOccName,
-			  nameString, NamedThing(..) )
+import Name		( Name, isLocallyDefined, OccName, nameOccName,
+			  NamedThing(..) )
 import Outputable
-import SrcLoc		( mkGeneratedSrcLoc )
 import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy, splitRhoTy,
-			  mkForAllTy, mkSigmaTy, splitSigmaTy, mkForAllTys, Type, ThetaType
+			  mkSigmaTy, mkForAllTys, Type, ThetaType
 			)
-import TysWiredIn	( stringTy )
-import TyVar		( unitTyVarSet, tyVarSetToList, mkTyVarSet, tyVarKind, TyVar )
+import TyVar		( mkTyVarSet, tyVarKind, TyVar )
 import TyCon		( mkDataTyCon )
 import Kind		( mkBoxedTypeKind, mkArrowKind )
 import Unique		( Unique, Uniquable(..) )

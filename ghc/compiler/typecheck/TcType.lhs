@@ -1,3 +1,8 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+%
+\section[TcType]{Types used in the typechecker}
+
 \begin{code}
 module TcType (
   
@@ -36,33 +41,27 @@ module TcType (
 
 
 -- friends:
-import Type	( Type, ThetaType, GenType(..), mkAppTy,
-		  tyVarsOfTypes, getTyVar_maybe, splitDictTy_maybe,
-		  splitForAllTys, splitRhoTy, isTyVarTy,
-		  mkForAllTys, instantiateTy
-		)
-import TyVar	( TyVar, GenTyVar(..), TyVarSet, GenTyVarSet, 
-		  TyVarEnv, lookupTyVarEnv, addToTyVarEnv,
-		  emptyTyVarEnv, mkTyVarEnv, zipTyVarEnv,
-		  tyVarSetToList
-		)
+import Type		( Type, ThetaType, GenType(..), mkAppTy,
+			  tyVarsOfTypes, splitDictTy_maybe,
+			  isTyVarTy, instantiateTy
+			)
+import TyVar		( TyVar, GenTyVar(..), GenTyVarSet, 
+			  TyVarEnv, lookupTyVarEnv, addToTyVarEnv,
+			  emptyTyVarEnv, zipTyVarEnv, tyVarSetToList
+			)
 
 -- others:
-import Class	( Class )
-import TyCon	( isFunTyCon )
-import Kind	( Kind )
-import TcKind	( TcKind )
+import Class		( Class )
+import TyCon		( isFunTyCon )
+import Kind		( Kind )
 import TcMonad
 
 import TysPrim		( voidTy )
 
-import Name		( NamedThing(..) )
 import Unique		( Unique )
 import UniqFM		( UniqFM )
-import Maybes		( assocMaybe )
 import BasicTypes	( unused )
-import Util		( zipEqual, nOfThem )
-import Outputable
+import Util		( nOfThem, panic )
 \end{code}
 
 

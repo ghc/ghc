@@ -29,20 +29,19 @@ module Inst (
 
 #include "HsVersions.h"
 
-import HsSyn	( HsLit(..), HsExpr(..), MonoBinds(..) )
+import HsSyn	( HsLit(..), HsExpr(..), MonoBinds )
 import RnHsSyn	( RenamedArithSeqInfo, RenamedHsExpr )
 import TcHsSyn	( TcExpr, TcIdOcc(..), TcIdBndr, 
-		  TcDictBinds, TcMonoBinds,
 		  mkHsTyApp, mkHsDictApp, tcIdTyVars, zonkTcId
 		)
 import TcMonad
 import TcEnv	( tcLookupGlobalValueByKey, tcLookupTyConByKey )
 import TcType	( TcThetaType,
-		  TcType, TcRhoType, TcTauType, TcMaybe, TcTyVarSet,
-		  tcInstType, zonkTcType, zonkTcTypes, tcSplitForAllTy, tcSplitRhoTy,
+		  TcType, TcTauType, TcMaybe, TcTyVarSet,
+		  tcInstType, zonkTcType, zonkTcTypes, tcSplitForAllTy,
 		  zonkTcThetaType
 		)
-import Bag	( emptyBag, unitBag, unionBags, unionManyBags, bagToList,
+import Bag	( emptyBag, unitBag, unionBags, unionManyBags,
 		  listToBag, consBag, Bag )
 import Class	( classInstEnv,
 		  Class, ClassInstEnv 
@@ -51,14 +50,13 @@ import Id	( idType, mkUserLocal, mkSysLocal, Id,
 		  GenIdSet, elementOfIdSet
 		)
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
-import Name	( OccName(..), Name, mkLocalName, 
-		  mkSysLocalName, occNameString, getOccName )
+import Name	( OccName(..), Name, occNameString, getOccName )
 import PprType	( TyCon, pprConstraint )	
 import SpecEnv	( SpecEnv, matchSpecEnv, addToSpecEnv )
 import SrcLoc	( SrcLoc )
 import Type	( Type, ThetaType, instantiateTy, instantiateThetaTy, matchTys,
 		  isTyVarTy, mkDictTy, splitForAllTys, splitSigmaTy,
-		  splitRhoTy, matchTy, tyVarsOfType, tyVarsOfTypes,
+		  splitRhoTy, tyVarsOfType, tyVarsOfTypes,
 		  mkSynTy
 		)
 import TyVar	( zipTyVarEnv, lookupTyVarEnv, unionTyVarSets )
@@ -68,7 +66,7 @@ import Unique	( fromRationalClassOpKey, rationalTyConKey,
 		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
 		)
 import Maybes	( MaybeErr, expectJust )
-import Util	( thenCmp, zipEqual, zipWithEqual, isIn )
+import Util	( thenCmp, zipWithEqual )
 import Outputable
 \end{code}
 

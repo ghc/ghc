@@ -9,15 +9,14 @@ module TcDefaults ( tcDefaults ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), DefaultDecl(..) )
-import RnHsSyn		( RenamedHsDecl(..), RenamedDefaultDecl(..) )
+import RnHsSyn		( RenamedHsDecl(..) )
 
 import TcMonad
-import Inst		( InstOrigin(..) )
-import TcEnv		( TcIdOcc, tcLookupClassByKey )
+import TcEnv		( tcLookupClassByKey )
 import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyCheckThetas )
 
-import TysWiredIn	( intTy, doubleTy, unitTy )
+import TysWiredIn	( intTy, doubleTy )
 import Type             ( Type )
 import Unique		( numClassKey )
 import ErrUtils		( addShortErrLocLine )

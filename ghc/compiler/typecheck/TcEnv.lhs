@@ -24,14 +24,13 @@ module TcEnv(
 
 #include "HsVersions.h"
 
-import HsTypes	( HsTyVar(..) )
 import Id	( Id, GenId, idType, mkUserLocal, mkUserId, replaceIdInfo, getIdInfo )
 import PragmaInfo ( PragmaInfo(..) )
-import TcKind	( TcKind, newKindVars, newKindVar, tcDefaultKind, kindToTcKind, Kind )
+import TcKind	( TcKind, kindToTcKind, Kind )
 import TcType	( TcType, TcMaybe, TcTyVar, TcTyVarSet, TcThetaType,
 		  newTyVarTys, tcInstTyVars, zonkTcTyVars, tcInstType
 		)
-import TyVar	( mkTyVarSet, unionTyVarSets, emptyTyVarSet, tyVarSetToList, TyVar )
+import TyVar	( mkTyVarSet, unionTyVarSets, emptyTyVarSet, TyVar )
 import PprType	( GenTyVar )
 import Type	( tyVarsOfType, tyVarsOfTypes, splitForAllTys, splitRhoTy )
 import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon, Arity )
@@ -40,14 +39,13 @@ import Class	( Class )
 import TcMonad
 
 import IdInfo		( noIdInfo )
-import Name		( Name, OccName(..), getSrcLoc, occNameString,
+import Name		( Name, OccName(..), 
 			  maybeWiredInTyConName, maybeWiredInIdName, isLocallyDefined,
 			  NamedThing(..)
 			)
 import Unique		( pprUnique10{-, pprUnique ToDo:rm-}, Unique, Uniquable(..) )
 import UniqFM	     
-import Util		( zipEqual, zipWithEqual, zipWith3Equal, zipLazy
-			)
+import Util		( zipEqual, zipWithEqual, zipWith3Equal )
 import Maybes		( maybeToBool )
 import Outputable
 \end{code}

@@ -16,10 +16,7 @@ import TcMonad
 import Inst		( Inst, LIE, plusLIE )
 import TcBinds		( tcBindsAndThen )
 import TcExpr		( tcExpr, tcStmt )
-import TcType		( TcType, newTyVarTy ) 
-import TcEnv		( TcIdOcc(..) )
-
-import TysWiredIn	( boolTy )
+import TcType		( TcType ) 
 \end{code}
 
 \begin{code}

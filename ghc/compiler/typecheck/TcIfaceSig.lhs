@@ -11,8 +11,8 @@ module TcIfaceSig ( tcInterfaceSigs ) where
 import HsSyn		( HsDecl(..), IfaceSig(..) )
 import TcMonad
 import TcMonoType	( tcHsType, tcHsTypeKind )
-import TcEnv		( tcLookupGlobalValue, tcExtendTyVarEnv, tcExtendGlobalValEnv,
-			  tcLookupTyConByKey, tcLookupGlobalValueMaybe, tcLookupLocalValue,
+import TcEnv		( tcExtendTyVarEnv, tcExtendGlobalValEnv,
+			  tcLookupTyConByKey, tcLookupGlobalValueMaybe,
 			  tcExplicitLookupGlobal
 			)
 import TcKind		( TcKind, kindToTcKind )

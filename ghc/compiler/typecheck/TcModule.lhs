@@ -28,7 +28,7 @@ import TcDefaults	( tcDefaults )
 import TcEnv		( TcIdOcc(..), tcExtendGlobalValEnv, tcExtendTyConEnv, getEnv_LocalIds,
 			  getEnv_TyCons, getEnv_Classes, tcLookupLocalValue,
 			  tcLookupLocalValueByKey, tcLookupTyCon,
-			  tcLookupGlobalValueByKeyMaybe )
+			  tcLookupGlobalValueByKeyMaybe, initEnv )
 import TcExpr		( tcId )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
@@ -86,7 +86,8 @@ typecheckModule
 
 typecheckModule us rn_name_supply mod
   = let
-      (maybe_result, warns, errs) = initTc us (tcModule rn_name_supply mod)
+      (maybe_result, warns, errs) = 
+		initTc us initEnv (tcModule rn_name_supply mod)
     in
     print_errs warns	>>
     print_errs errs	>>

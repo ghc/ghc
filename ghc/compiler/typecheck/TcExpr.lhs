@@ -10,7 +10,7 @@ module TcExpr ( tcExpr, tcStmt, tcId ) where
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
 			  HsBinds(..), Stmt(..), DoOrListComp(..),
-			  pprParendExpr, failureFreePat, collectPatBinders
+			  failureFreePat, collectPatBinders
 			)
 import RnHsSyn		( RenamedHsExpr, 
 			  RenamedStmt, RenamedRecordBinds
@@ -29,7 +29,7 @@ import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 import TcBinds		( tcBindsAndThen, checkSigTyVars, sigThetaCtxt )
 import TcEnv		( TcIdOcc(..), tcInstId,
 			  tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
-			  tcLookupGlobalValueByKey, newMonoIds, tcGetGlobalTyVars,
+			  tcLookupGlobalValueByKey, newMonoIds,
 			  tcExtendGlobalTyVars, tcLookupGlobalValueMaybe,
 			  tcLookupTyCon
 			)
@@ -40,7 +40,7 @@ import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( TcType, TcMaybe(..),
 			  tcInstType, tcInstSigTcType, tcInstTyVars,
 			  tcInstSigType, tcInstTcType, tcInstTheta, tcSplitRhoTy,
-			  newTyVarTy, newTyVarTys, zonkTcTyVars, zonkTcType )
+			  newTyVarTy, newTyVarTys, zonkTcType )
 import TcKind		( TcKind )
 
 import Class		( Class )
@@ -51,27 +51,23 @@ import Id		( idType, dataConFieldLabels, dataConSig, recordSelectorFieldLabel,
 			)
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import Name		( Name{-instance Eq-} )
-import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys, mkRhoTy,
+import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  splitFunTy_maybe, splitFunTys,
 			  mkTyConApp,
 			  splitForAllTys, splitRhoTy, splitSigmaTy, 
-			  isTauTy, mkFunTys, tyVarsOfType, tyVarsOfTypes, 
+			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
 			  splitForAllTy_maybe, splitAlgTyConApp, splitAlgTyConApp_maybe
 			)
-import TyVar		( TyVarSet, emptyTyVarEnv, zipTyVarEnv,
-			  unionTyVarSets, elementOfTyVarSet, mkTyVarSet, tyVarSetToList
+import TyVar		( emptyTyVarEnv, zipTyVarEnv,
+			  elementOfTyVarSet, mkTyVarSet, tyVarSetToList
 			)
 import TyCon		( tyConDataCons )
 import TysPrim		( intPrimTy, charPrimTy, doublePrimTy,
-			  floatPrimTy, addrPrimTy, realWorldTy
+			  floatPrimTy, addrPrimTy
 			)
-import TysWiredIn	( addrTy, mkTupleTy,
-			  boolTy, charTy, stringTy, mkListTy
-			)
+import TysWiredIn	( boolTy, charTy, stringTy )
 import PrelInfo		( ioTyCon_NAME )
-import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists, 
-			  unifyFunTy, unifyListTy, unifyTupleTy
-			)
+import Unify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, 
 			  enumFromClassOpKey, enumFromThenClassOpKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,

@@ -19,7 +19,7 @@ import RnHsSyn		( RenamedHsBinds, RenamedSig(..),
 			  RenamedMonoBinds
 			)
 import TcHsSyn		( TcHsBinds, TcMonoBinds,
-			  TcExpr, TcIdOcc(..), TcIdBndr, 
+			  TcIdOcc(..), TcIdBndr, 
 			  tcIdType
 			)
 
@@ -38,7 +38,7 @@ import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
 import TcType		( TcType, TcThetaType, TcTauType, 
 			  TcTyVarSet, TcTyVar,
-			  newTyVarTy, newTcTyVar, tcInstSigType, newTyVarTys,
+			  newTyVarTy, newTcTyVar, tcInstSigType,
 			  zonkTcType, zonkTcTypes, zonkTcThetaType, zonkTcTyVar
 			)
 import Unify		( unifyTauTy, unifyTauTyLists )
@@ -46,16 +46,16 @@ import Unify		( unifyTauTy, unifyTauTyLists )
 import Kind		( isUnboxedTypeKind, mkTypeKind, isTypeKind, mkBoxedTypeKind )
 import Id		( GenId, idType, mkUserId )
 import IdInfo		( noIdInfo )
-import Maybes		( maybeToBool, assocMaybe, catMaybes )
+import Maybes		( maybeToBool, assocMaybe )
 import Name		( getOccName, getSrcLoc, Name )
 import PragmaInfo	( PragmaInfo(..) )
 import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy, tyVarsOfTypes,
-			  mkSigmaTy, splitSigmaTy, mkForAllTys, mkFunTys, getTyVar, mkDictTy,
+			  splitSigmaTy, mkForAllTys, mkFunTys, getTyVar, mkDictTy,
 			  splitRhoTy, mkForAllTy, splitForAllTys )
 import TyVar		( GenTyVar, TyVar, tyVarKind, mkTyVarSet, minusTyVarSet, emptyTyVarSet,
 			  elementOfTyVarSet, unionTyVarSets, tyVarSetToList )
-import Bag		( bagToList, foldrBag, isEmptyBag )
-import Util		( isIn, zipEqual, zipWithEqual, zipWith3Equal, hasNoDups, assoc )
+import Bag		( bagToList, foldrBag, )
+import Util		( isIn, hasNoDups, assoc )
 import Unique		( Unique )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
 import SrcLoc           ( SrcLoc )

@@ -1,6 +1,5 @@
 _interface_ TcEnv 1
 _exports_
-TcEnv TcEnv initEnv;
+TcEnv TcEnv;
 _declarations_
 1 data TcEnv a;
-1 initEnv _:_ _forall_ [a] => ArrBase.MutableVar a (TcType.TcTyVarSet a) -> TcEnv.TcEnv a ;;

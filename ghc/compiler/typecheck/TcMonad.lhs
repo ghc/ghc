@@ -34,19 +34,15 @@ module TcMonad(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TcEnv  ( TcEnv, initEnv )
-import {-# SOURCE #-} TcType ( TcMaybe, TcTyVarSet )
+import {-# SOURCE #-} TcEnv  ( TcEnv )
 
 import Type		( Type, GenType )
-import TyVar		( TyVar, GenTyVar )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
-import CmdLineOpts      ( opt_PprStyle_All, opt_PprUserLength )
+import CmdLineOpts      ( opt_PprStyle_All )
 
 import SST
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
-import FiniteMap	( FiniteMap, emptyFM, isEmptyFM{-, keysFM ToDo:rm-} )
-import Maybes		( MaybeErr(..) )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )
 import UniqSupply	( UniqSupply, getUnique, getUniques, splitUniqSupply,
@@ -74,11 +70,14 @@ type TcM    s r =  TcDown s -> TcEnv s -> FSST s r ()
 -- With a builtin polymorphic type for runSST the type for
 -- initTc should use  TcM s r  instead of  TcM RealWorld r 
 
+-- initEnv is passed in to avoid module recursion between TcEnv & TcMonad.
+
 initTc :: UniqSupply
+       -> (TcRef RealWorld (UniqFM a) -> TcEnv RealWorld)
        -> TcM RealWorld r
        -> (Maybe r, Bag WarnMsg, Bag ErrMsg)
 
-initTc us do_this
+initTc us initenv do_this
   = runSST (
       newMutVarSST us 			`thenSST` \ us_var ->
       newMutVarSST (emptyBag,emptyBag)	`thenSST` \ errs_var ->
@@ -87,7 +86,7 @@ initTc us do_this
           init_down = TcDown [] us_var
 			     noSrcLoc
 			     [] errs_var
-	  init_env  = initEnv tvs_var
+	  init_env  = initenv tvs_var
       in
       recoverSST
 	(\_ -> returnSST Nothing)
@@ -559,9 +558,6 @@ arityErr kind name n m
   = hsep [ ppr name, ptext SLIT("should have"),
 	   n_arguments <> comma, text "but has been given", int m, char '.']
     where
-	errmsg = kind ++ " has too " ++ quantity ++ " arguments"
-	quantity | m < n     = "few"
-		 | otherwise = "many"
 	n_arguments | n == 0 = ptext SLIT("no arguments")
 		    | n == 1 = ptext SLIT("1 argument")
 		    | True   = hsep [int n, ptext SLIT("arguments")]
