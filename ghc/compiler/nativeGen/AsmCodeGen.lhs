@@ -16,7 +16,7 @@ import MachCode
 import PprMach
 
 import AbsCStixGen	( genCodeAbstractC )
-import AbsCSyn		( AbstractC )
+import AbsCSyn		( AbstractC, MagicId(..) )
 import AbsCUtils	( mkAbsCStmtList, magicIdPrimRep )
 import AsmRegAlloc	( runRegAllocate )
 import MachOp		( MachOp(..), isCommutableMachOp, isComparisonMachOp )
@@ -228,13 +228,17 @@ stixStmt_ConFold stmt
            -> StAssignReg pk reg (stixExpr_ConFold src)
         StAssignReg pk reg@(StixMagicId mid) src
            -- Replace register leaves with appropriate StixTrees for 
-           -- the given target.
-           -> case get_MagicId_reg_or_addr mid of
-                 Left  realreg 
-                    -> StAssignReg pk reg (stixExpr_ConFold src)
-                 Right baseRegAddr 
-                    -> stixStmt_ConFold
-                          (StAssignMem pk baseRegAddr src)
+           -- the given target. MagicIds which map to a reg on this arch are left unchanged. 
+           -- Assigning to BaseReg is always illegal, so we check for that.
+           -> case mid of { 
+                 BaseReg -> panic "stixStmt_ConFold: assignment to BaseReg";
+                 other ->
+                 case get_MagicId_reg_or_addr mid of
+                    Left  realreg 
+                       -> StAssignReg pk reg (stixExpr_ConFold src)
+                    Right baseRegAddr 
+                       -> stixStmt_ConFold (StAssignMem pk baseRegAddr src)
+              }
         StAssignMem pk addr src
            -> StAssignMem pk (stixExpr_ConFold addr) (stixExpr_ConFold src)
         StVoidable expr
@@ -275,11 +279,16 @@ stixExpr_ConFold expr
            -> stixMachOpFold mop (map stixExpr_ConFold args)
         StReg (StixMagicId mid)
            -- Replace register leaves with appropriate StixTrees for 
-           -- the given target.
+           -- the given target.  MagicIds which map to a reg on this arch are left unchanged. 
+           -- For the rest, BaseReg is taken to mean the address of the reg table 
+           -- in MainCapability, and for all others we generate an indirection to 
+           -- its location in the register table.
            -> case get_MagicId_reg_or_addr mid of
                  Left  realreg -> expr
                  Right baseRegAddr 
-                    -> stixExpr_ConFold (StInd (magicIdPrimRep mid) baseRegAddr)
+                    -> case mid of 
+                          BaseReg -> stixExpr_ConFold baseRegAddr
+                          other   -> stixExpr_ConFold (StInd (magicIdPrimRep mid) baseRegAddr)
         other
            -> other
 \end{code}

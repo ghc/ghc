@@ -113,6 +113,8 @@ volatileSavesOrRestores do_saves vols
    = catMaybes (map mkCode vols)
      where
         mkCode mid
+           | case mid of { BaseReg -> True; _ -> False } 
+           = panic "volatileSavesOrRestores:BaseReg" 
            | not (callerSaves mid)
            = Nothing
            | otherwise	-- must be callee-saves ...
