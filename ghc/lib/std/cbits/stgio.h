@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.19 2000/04/12 17:33:16 simonmar Exp $
+ * $Id: stgio.h,v 1.20 2000/05/18 11:33:21 panne Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -227,7 +227,9 @@ StgInt prim_toUTCTime ( StgInt64,StgByteArray );
 StgInt toClockSec (StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgByteArray);
 
 /* writeError.c */
+StgAddr addrOf_ErrorHdrHook(void);
 void    writeErrString__ (StgAddr, StgByteArray, StgInt);
+
 /* writeFile.c */
 StgInt	writeBuf  (StgForeignPtr, StgAddr, StgInt, StgInt);
 StgInt	writeBufBA  (StgForeignPtr, StgByteArray, StgInt, StgInt);
