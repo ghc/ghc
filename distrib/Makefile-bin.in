@@ -240,8 +240,8 @@ install-info: install-dirs-info
 	$(INSTALL_DATA) info/* $(infodir)
 
 install-html: install-dirs-html
-	$(CHMOD) -R $(LIB_PERMS) html/*
 	$(CP) -r html/* $(htmldir)
+	$(CHMOD) -R $(LIB_PERMS) $(htmldir)
 #	$(INSTALL_DATA) html/* $(htmldir)
 
 install-dirs-html:
