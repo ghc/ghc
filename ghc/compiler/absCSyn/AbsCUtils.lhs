@@ -367,7 +367,7 @@ flatAbsC stmt@(CCheck macro amodes code)
 -- the TICKY_CTR macro always needs to be hoisted out to the top level. 
 -- This is a HACK.
 flatAbsC stmt@(CCallProfCtrMacro str amodes)
-  | str == SLIT("TICK_CTR") 	= returnFlt (AbsCNop, stmt)
+  | str == FSLIT("TICK_CTR") 	= returnFlt (AbsCNop, stmt)
   | otherwise		 	= returnFlt (stmt, AbsCNop)
 
 -- Some statements need no flattening at all:
@@ -401,7 +401,7 @@ flatAbsC stmt@(COpStmt results (StgPrimOp op) args vol_regs)
            = COpStmt 
                 []
                 (StgFCallOp
-                    (CCall (CCallSpec (CasmTarget (_PK_ (mktxt op_str))) 
+                    (CCall (CCallSpec (CasmTarget (mkFastString (mktxt op_str))) 
                                       defaultCCallConv (PlaySafe False)))
                     uu
                 )

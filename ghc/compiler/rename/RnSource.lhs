@@ -246,7 +246,7 @@ rnHsRuleDecl (HsRule rule_name act vars lhs rhs src_loc)
     returnRn (HsRule rule_name act vars' lhs' rhs' src_loc,
 	      fv_vars `plusFV` fv_lhs `plusFV` fv_rhs)
   where
-    doc = text "In the transformation rule" <+> ptext rule_name
+    doc = text "In the transformation rule" <+> ftext rule_name
   
     get_var (RuleBndr v)      = v
     get_var (RuleBndrSig v _) = v
@@ -734,13 +734,13 @@ badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
 
 badRuleLhsErr name lhs
-  = sep [ptext SLIT("Rule") <+> ptext name <> colon,
+  = sep [ptext SLIT("Rule") <+> ftext name <> colon,
 	 nest 4 (ptext SLIT("Illegal left-hand side:") <+> ppr lhs)]
     $$
     ptext SLIT("LHS must be of form (f e1 .. en) where f is not forall'd")
 
 badRuleVar name var
-  = sep [ptext SLIT("Rule") <+> doubleQuotes (ptext name) <> colon,
+  = sep [ptext SLIT("Rule") <+> doubleQuotes (ftext name) <> colon,
 	 ptext SLIT("Forall'd variable") <+> quotes (ppr var) <+> 
 		ptext SLIT("does not appear on left hand side")]
 

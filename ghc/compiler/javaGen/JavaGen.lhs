@@ -228,7 +228,7 @@ javaLit (MachInt i)  = Literal (IntLit (fromInteger i))
 javaLit (MachChar c) = Literal (CharLit c)
 javaLit (MachStr fs) = Literal (StringLit str)
    where
-	str = concatMap renderString (_UNPK_ fs) ++ "\\000"
+	str = concatMap renderString (unpackFS fs) ++ "\\000"
 	-- This should really handle all the chars 0..31.
 	renderString '\NUL' = "\\000"
 	renderString other  = [other]

@@ -36,6 +36,7 @@ import CStrings		( pprFSInCStyle )
 
 import Outputable
 import FastTypes
+import FastString
 import Binary
 import Util		( thenCmp )
 
@@ -98,7 +99,7 @@ data Literal
   =	------------------
 	-- First the primitive guys
     MachChar	Int             -- Char#        At least 31 bits
-  | MachStr	FAST_STRING
+  | MachStr	FastString
 
   | MachAddr	Integer	-- Whatever this machine thinks is a "pointer"
 
@@ -114,13 +115,13 @@ data Literal
 	-- "foreign label" declaration.
 	-- string argument is the name of a symbol.  This literal
 	-- refers to the *address* of the label.
-  | MachLabel   FAST_STRING		-- always an Addr#
+  | MachLabel   FastString		-- always an Addr#
 
 	-- lit-lits only work for via-C compilation, hence they
 	-- are deprecated.  The string is emitted verbatim into
 	-- the C file, and can therefore be any C expression,
 	-- macro call, #defined constant etc.
-  | MachLitLit  FAST_STRING Type	-- Type might be Addr# or Int# etc
+  | MachLitLit  FastString Type	-- Type might be Addr# or Int# etc
 \end{code}
 
 Binary instance: must do this manually, because we don't want the type
@@ -399,10 +400,10 @@ pprLit lit
       MachAddr p | code_style -> ptext SLIT("(void*)") <> integer p
 	         | otherwise  -> ptext SLIT("__addr") <+> integer p
 
-      MachLabel l | code_style -> ptext SLIT("(&") <> ptext l <> char ')'
+      MachLabel l | code_style -> ptext SLIT("(&") <> ftext l <> char ')'
 		  | otherwise  -> ptext SLIT("__label") <+> pprHsString l
 
-      MachLitLit s ty | code_style  -> ptext s
+      MachLitLit s ty | code_style  -> ftext s
 		      | otherwise   -> parens (hsep [ptext SLIT("__litlit"), 
 						     pprHsString s,
 						     pprParendType ty])
@@ -457,6 +458,6 @@ hashInteger i = 1 + abs (fromInteger (i `rem` 10000))
 		-- The 1+ is to avoid zero, which is a Bad Number
 		-- since we use * to combine hash values
 
-hashFS :: FAST_STRING -> Int
+hashFS :: FastString -> Int
 hashFS s = iBox (uniqueOfFS s)
 \end{code}

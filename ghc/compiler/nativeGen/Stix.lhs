@@ -49,6 +49,7 @@ import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply,
 import Constants	( wORD_SIZE )
 import Outputable
 import FastTypes
+import FastString
 \end{code}
 
 Two types, StixStmt and StixValue, define Stix.
@@ -62,7 +63,7 @@ data StixStmt
     StSegment CodeSegment
 
     -- Assembly-language comments
-  | StComment FAST_STRING
+  | StComment FastString
 
     -- Assignments are typed to determine size and register placement.
     -- Assign a value to a StixReg
@@ -98,7 +99,7 @@ data StixStmt
     -- Raw data (as in an info table).
   | StData PrimRep [StixExpr]
     -- String which has been lifted to the top level (sigh).
-  | StDataString FAST_STRING
+  | StDataString FastString
 
     -- A value computed only for its side effects; result is discarded
     -- (A handy trapdoor to allow CCalls with no results to appear as
@@ -134,7 +135,7 @@ data StixExpr
     StInt	Integer	    -- ** add Kind at some point
   | StFloat	Rational
   | StDouble	Rational
-  | StString	FAST_STRING
+  | StString	FastString
   | StCLbl	CLabel	    -- labels that we might index into
 
     -- Abstract registers of various kinds
@@ -150,7 +151,7 @@ data StixExpr
   | StMachOp MachOp [StixExpr]
 
     -- Calls to C functions
-  | StCall (Either FAST_STRING StixExpr) -- Left: static, Right: dynamic
+  | StCall (Either FastString StixExpr) -- Left: static, Right: dynamic
            CCallConv PrimRep [StixExpr]
 
 
@@ -197,7 +198,7 @@ pprStixExpr t
        StInt i          -> (if i < 0 then parens else id) (integer i)
        StFloat rat      -> parens (text "Float" <+> rational rat)
        StDouble	rat     -> parens (text "Double" <+> rational rat)
-       StString str     -> parens (text "Str `" <> ptext str <> char '\'')
+       StString str     -> parens (text "Str `" <> ftext str <> char '\'')
        StIndex k b o    -> parens (pprStixExpr b <+> char '+' <> 
                                    ppr k <+> pprStixExpr o)
        StInd k t        -> ppr k <> char '[' <> pprStixExpr t <> char ']'
@@ -210,14 +211,14 @@ pprStixExpr t
                                    hsep (map pprStixExpr args))
                            where
                               targ = case fn of
-                                        Left  t_static -> ptext t_static
+                                        Left  t_static -> ftext t_static
                                         Right t_dyn    -> parens (pprStixExpr t_dyn)
 
 pprStixStmt :: StixStmt -> SDoc
 pprStixStmt t 
    = case t of
        StSegment cseg   -> parens (ppCodeSegment cseg)
-       StComment str    -> parens (text "Comment" <+> ptext str)
+       StComment str    -> parens (text "Comment" <+> ftext str)
        StAssignReg pr reg rhs
                         -> pprStixReg reg <> text "  :=" <> ppr pr
                                           <> text "  " <> pprStixExpr rhs
@@ -493,7 +494,7 @@ liftStrings stmts
 
 liftStrings_wrk :: [StixStmt]    -- originals
                 -> [StixStmt]    -- (reverse) originals with strings lifted out
-                -> [(CLabel, FAST_STRING)]   -- lifted strs, and their new labels
+                -> [(CLabel, FastString)]   -- lifted strs, and their new labels
                 -> UniqSM [StixStmt]
 
 -- First, examine the original trees and lift out strings in top-level StDatas.

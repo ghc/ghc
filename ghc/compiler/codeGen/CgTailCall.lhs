@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.32 2002/03/14 15:27:17 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.33 2002/04/29 14:03:42 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -147,7 +147,7 @@ mkStaticAlgReturnCode :: DataCon	-- The constructor
 mkStaticAlgReturnCode con sequel
   =	-- Generate profiling code if necessary
     (case return_convention of
-	VectoredReturn sz -> profCtrC SLIT("TICK_VEC_RETURN") [mkIntCLit sz]
+	VectoredReturn sz -> profCtrC FSLIT("TICK_VEC_RETURN") [mkIntCLit sz]
 	other		  -> nopC
     )					`thenC`
 
@@ -226,7 +226,7 @@ mkDynamicAlgReturnCode tycon dyn_tag sequel
   = case ctrlReturnConvAlg tycon of
 	VectoredReturn sz ->
 
-		profCtrC SLIT("TICK_VEC_RETURN") [mkIntCLit sz] `thenC`
+		profCtrC FSLIT("TICK_VEC_RETURN") [mkIntCLit sz] `thenC`
 		sequelToAmode sequel		`thenFC` \ ret_addr ->
 		absC (CReturn ret_addr (DynamicVectoredReturn dyn_tag))
 
@@ -308,7 +308,7 @@ returnUnboxedTuple amodes before_jump
     let (ret_regs, leftovers) = assignRegs [] (map getAmodeRep amodes)
     in
 
-    profCtrC SLIT("TICK_RET_UNBOXED_TUP") [mkIntCLit (length amodes)] `thenC`
+    profCtrC FSLIT("TICK_RET_UNBOXED_TUP") [mkIntCLit (length amodes)] `thenC`
 
     doTailCall amodes ret_regs
 		mkUnboxedTupleReturnCode
@@ -360,7 +360,7 @@ tailCallFun fun fun_amode lf_info arg_amodes pending_assts
 	  = case entry_conv of
 	      ViaNode ->
 		([],
-		     profCtrC SLIT("TICK_ENT_VIA_NODE") [] `thenC`
+		     profCtrC FSLIT("TICK_ENT_VIA_NODE") [] `thenC`
 		     absC (CJump (CMacroExpr CodePtrRep ENTRY_CODE 
 			        [CVal (nodeRel 0) DataPtrRep]))
 		     , 0)
@@ -518,7 +518,7 @@ doTailCall arg_amodes arg_regs finish_code arity pending_assts
 		    enter_jump
 		      -- Enter Node (we know infoptr will have the info ptr in it)!
 		      = mkAbstractCs [
-			CCallProfCtrMacro SLIT("RET_SEMI_FAILED")
+			CCallProfCtrMacro FSLIT("RET_SEMI_FAILED")
 					[CMacroExpr IntRep INFO_TAG [CReg infoptr]],
 			CJump (CMacroExpr CodePtrRep ENTRY_CODE [CReg infoptr]) ]
 		in

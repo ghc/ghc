@@ -39,6 +39,7 @@ import Module		( Module, ModuleName, moduleName,
 import Outputable	
 import CStrings		( pprStringInCStyle )
 import FastTypes
+import FastString
 import Util	        ( thenCmp )
 \end{code}
 
@@ -361,7 +362,7 @@ pprCostCentreCore (AllCafsCC {cc_mod = m})
 pprCostCentreCore (NormalCC {cc_name = n, cc_mod = m,
 			     cc_is_caf = caf, cc_is_dupd = dup})
   = text "__scc" <+> braces (hsep [
-	ptext n,
+	ftext n,
 	ppr m,	
 	pp_dup dup,
 	pp_caf caf
@@ -378,7 +379,7 @@ pp_caf other   = empty
 ppCostCentreLbl (NoCostCentre)		  = text "NONE_cc"
 ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = ppr m <> text "_CAFs_cc"
 ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf}) 
-  = ppr m <> ptext n <> 
+  = ppr m <> ftext n <> 
 	text (case is_caf of { CafCC -> "_CAF"; _ -> "" }) <> text "_cc"
 
 -- This is the name to go in the user-displayed string, 
@@ -386,7 +387,7 @@ ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf})
 costCentreUserName (NoCostCentre)  = "NO_CC"
 costCentreUserName (AllCafsCC {})  = "CAF"
 costCentreUserName cc@(NormalCC {cc_name = name, cc_is_caf = is_caf})
-  =  case is_caf of { CafCC -> "CAF:";   _ -> "" } ++ decode (_UNPK_ name)
+  =  case is_caf of { CafCC -> "CAF:";   _ -> "" } ++ decode (unpackFS name)
 \end{code}
 
 Cost Centre Declarations
@@ -403,7 +404,7 @@ pprCostCentreDecl is_local cc
 	    cc_ident, 		  					comma,
 	    pprStringInCStyle (costCentreUserName cc),			comma,
 	    pprStringInCStyle (moduleNameUserString mod_name),		comma,
-	    ptext is_subsumed,						comma,
+	    is_subsumed,						comma,
 	    empty,	-- Now always externally visible
 	    text ");"]
     else
@@ -413,7 +414,7 @@ pprCostCentreDecl is_local cc
     mod_name 	= cc_mod cc
     is_subsumed = ccSubsumed cc
 
-ccSubsumed :: CostCentre -> FAST_STRING		-- subsumed value
-ccSubsumed cc | isCafCC  cc = SLIT("CC_IS_CAF")
-	      | otherwise   = SLIT("CC_IS_BORING")
+ccSubsumed :: CostCentre -> SDoc		-- subsumed value
+ccSubsumed cc | isCafCC  cc = ptext SLIT("CC_IS_CAF")
+	      | otherwise   = ptext SLIT("CC_IS_BORING")
 \end{code}

@@ -15,11 +15,11 @@ module ParseUtil (
 
 	, CallConv(..)
 	, mkImport            -- CallConv -> Safety 
-			      -- -> (FAST_STRING, RdrName, RdrNameHsType)
+			      -- -> (FastString, RdrName, RdrNameHsType)
 			      -- -> SrcLoc 
 			      -- -> P RdrNameHsDecl
 	, mkExport            -- CallConv
-			      -- -> (FAST_STRING, RdrName, RdrNameHsType)
+			      -- -> (FastString, RdrName, RdrNameHsType)
 			      -- -> SrcLoc 
 			      -- -> P RdrNameHsDecl
 	, mkExtName           -- RdrName -> CLabelString
@@ -52,7 +52,7 @@ import PrelNames	( unitTyCon_RDR )
 import OccName  	( dataName, varName, tcClsName, isDataOcc,
 			  occNameSpace, setOccNameSpace, occNameUserString )
 import CStrings		( CLabelString )
-import FastString	( nullFastString )
+import FastString
 import Outputable
 
 -----------------------------------------------------------------------------
@@ -319,7 +319,7 @@ data CallConv = CCall  CCallConv	-- ccall or stdcall
 --
 mkImport :: CallConv 
 	 -> Safety 
-	 -> (FAST_STRING, RdrName, RdrNameHsType) 
+	 -> (FastString, RdrName, RdrNameHsType) 
 	 -> SrcLoc 
 	 -> P RdrNameHsDecl
 mkImport (CCall  cconv) safety (entity, v, ty) loc =
@@ -331,7 +331,7 @@ mkImport (DNCall      ) _      (entity, v, ty) loc =
 -- parse the entity string of a foreign import declaration for the `ccall' or
 -- `stdcall' calling convention'
 --
-parseCImport :: FAST_STRING 
+parseCImport :: FastString 
 	     -> CCallConv 
 	     -> Safety 
 	     -> RdrName 
@@ -339,43 +339,43 @@ parseCImport :: FAST_STRING
 parseCImport entity cconv safety v
   -- FIXME: we should allow white space around `dynamic' and `wrapper' -=chak
   | entity == FSLIT ("dynamic") = 
-    returnP $ CImport cconv safety _NIL_ _NIL_ (CFunction DynamicTarget)
+    returnP $ CImport cconv safety nilFS nilFS (CFunction DynamicTarget)
   | entity == FSLIT ("wrapper") =
-    returnP $ CImport cconv safety _NIL_ _NIL_ CWrapper
-  | otherwise		       = parse0 (_UNPK_ entity)
+    returnP $ CImport cconv safety nilFS nilFS CWrapper
+  | otherwise		       = parse0 (unpackFS entity)
     where
       -- using the static keyword?
       parse0 (' ':                    rest) = parse0 rest
       parse0 ('s':'t':'a':'t':'i':'c':rest) = parse1 rest
       parse0                          rest  = parse1 rest
       -- check for header file name
-      parse1     ""               = parse4 ""    _NIL_        False _NIL_
+      parse1     ""               = parse4 ""    nilFS        False nilFS
       parse1     (' ':rest)       = parse1 rest
-      parse1 str@('&':_   )       = parse2 str   _NIL_
-      parse1 str@('[':_   )       = parse3 str   _NIL_        False
+      parse1 str@('&':_   )       = parse2 str   nilFS
+      parse1 str@('[':_   )       = parse3 str   nilFS        False
       parse1 str
-	| ".h" `isSuffixOf` first = parse2 rest  (_PK_ first)
-        | otherwise               = parse4 str   _NIL_        False _NIL_
+	| ".h" `isSuffixOf` first = parse2 rest  (mkFastString first)
+        | otherwise               = parse4 str   nilFS        False nilFS
         where
 	  (first, rest) = break (\c -> c == ' ' || c == '&' || c == '[') str
       -- check for address operator (indicating a label import)
-      parse2     ""         header = parse4 ""   header False _NIL_
+      parse2     ""         header = parse4 ""   header False nilFS
       parse2     (' ':rest) header = parse2 rest header
       parse2     ('&':rest) header = parse3 rest header True
       parse2 str@('[':_   ) header = parse3 str	 header False
-      parse2 str	    header = parse4 str	 header False _NIL_
+      parse2 str	    header = parse4 str	 header False nilFS
       -- check for library object name
       parse3 (' ':rest) header isLbl = parse3 rest header isLbl
       parse3 ('[':rest) header isLbl = 
         case break (== ']') rest of 
-	  (lib, ']':rest)           -> parse4 rest header isLbl (_PK_ lib)
+	  (lib, ']':rest)           -> parse4 rest header isLbl (mkFastString lib)
 	  _			    -> parseError "Missing ']' in entity"
-      parse3 str	header isLbl = parse4 str  header isLbl _NIL_
+      parse3 str	header isLbl = parse4 str  header isLbl nilFS
       -- check for name of C function
       parse4 ""         header isLbl lib = build (mkExtName v) header isLbl lib
       parse4 (' ':rest) header isLbl lib = parse4 rest         header isLbl lib
       parse4 str	header isLbl lib
-        | all (== ' ') rest              = build (_PK_ first)  header isLbl lib
+        | all (== ' ') rest              = build (mkFastString first)  header isLbl lib
 	| otherwise			 = parseError "Malformed entity string"
         where
 	  (first, rest) = break (== ' ') str
@@ -388,7 +388,7 @@ parseCImport entity cconv safety v
 -- construct a foreign export declaration
 --
 mkExport :: CallConv
-         -> (FAST_STRING, RdrName, RdrNameHsType) 
+         -> (FastString, RdrName, RdrNameHsType) 
 	 -> SrcLoc 
 	 -> P RdrNameHsDecl
 mkExport (CCall  cconv) (entity, v, ty) loc = returnP $ 
@@ -407,7 +407,7 @@ mkExport DNCall (entity, v, ty) loc =
 -- (This is why we use occNameUserString.)
 --
 mkExtName :: RdrName -> CLabelString
-mkExtName rdrNm = _PK_ (occNameUserString (rdrNameOcc rdrNm))
+mkExtName rdrNm = mkFastString (occNameUserString (rdrNameOcc rdrNm))
 
 -----------------------------------------------------------------------------
 -- group function bindings into equation groups

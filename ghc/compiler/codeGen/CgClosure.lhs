@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.56 2002/03/14 15:27:17 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.57 2002/04/29 14:03:41 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -54,6 +54,7 @@ import PprType          ( showTypeCategory )
 import Util		( isIn, splitAtList )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Outputable
+import FastString
 
 import Name             ( nameOccName )
 import OccName          ( occNameFS )
@@ -262,8 +263,8 @@ closureCodeBody binder_info closure_info cc [] body
     is_box  = case body of { StgApp fun [] -> True; _ -> False }
 
     ticky_ent_lit = if (isStaticClosure closure_info)
-                    then SLIT("TICK_ENT_STATIC_THK")
-                    else SLIT("TICK_ENT_DYN_THK")
+                    then FSLIT("TICK_ENT_STATIC_THK")
+                    else FSLIT("TICK_ENT_DYN_THK")
 
     body_code   = profCtrC ticky_ent_lit []			`thenC`
 		  -- node always points when profiling, so this is ok:
@@ -372,12 +373,12 @@ closureCodeBody binder_info closure_info cc all_args body
 
 	fast_entry_code = do
 		mod_name <- moduleName
-		profCtrC SLIT("TICK_CTR") [ 
+		profCtrC FSLIT("TICK_CTR") [ 
 			CLbl ticky_ctr_label DataPtrRep,
-			mkCString (_PK_ (ppr_for_ticky_name mod_name name)),
+			mkCString (mkFastString (ppr_for_ticky_name mod_name name)),
 			mkIntCLit stg_arity,	-- total # of args
 			mkIntCLit sp_stk_args,	-- # passed on stk
-			mkCString (_PK_ (map (showTypeCategory . idType) all_args))
+			mkCString (mkFastString (map (showTypeCategory . idType) all_args))
 			] 
 		let prof = 
 			profCtrC fast_ticky_ent_lit [
@@ -385,8 +386,8 @@ closureCodeBody binder_info closure_info cc all_args body
 			] 
 
 -- Nuked for now; see comment at end of file
---		    CString (_PK_ (show_wrapper_name wrapper_maybe)),
---		    CString (_PK_ (show_wrapper_arg_kinds wrapper_maybe))
+--		    CString (mkFastString (show_wrapper_name wrapper_maybe)),
+--		    CString (mkFastString (show_wrapper_arg_kinds wrapper_maybe))
 
 
 		-- Bind args to regs/stack as appropriate, and
@@ -431,8 +432,8 @@ closureCodeBody binder_info closure_info cc all_args body
 
     (slow_ticky_ent_lit, fast_ticky_ent_lit) = 
         if (isStaticClosure closure_info)
-        then (SLIT("TICK_ENT_STATIC_FUN_STD"), SLIT("TICK_ENT_STATIC_FUN_DIRECT"))
-        else (SLIT("TICK_ENT_DYN_FUN_STD"), SLIT("TICK_ENT_DYN_FUN_DIRECT"))
+        then (FSLIT("TICK_ENT_STATIC_FUN_STD"), FSLIT("TICK_ENT_STATIC_FUN_DIRECT"))
+        else (FSLIT("TICK_ENT_DYN_FUN_STD"), FSLIT("TICK_ENT_DYN_FUN_DIRECT"))
         
     stg_arity = length all_args
     lf_info = closureLFInfo closure_info
@@ -481,20 +482,20 @@ enterCostCentreCode closure_info ccs is_thunk is_box
 	if isSubsumedCCS ccs then
 	    ASSERT(isToplevClosure closure_info)
 	    ASSERT(is_thunk == IsFunction)
-	    costCentresC SLIT("ENTER_CCS_FSUB") []
+	    costCentresC FSLIT("ENTER_CCS_FSUB") []
  
 	else if isDerivedFromCurrentCCS ccs then 
 	    if re_entrant && not is_box
-		then costCentresC SLIT("ENTER_CCS_FCL") [CReg node]
-		else costCentresC SLIT("ENTER_CCS_TCL") [CReg node]
+		then costCentresC FSLIT("ENTER_CCS_FCL") [CReg node]
+		else costCentresC FSLIT("ENTER_CCS_TCL") [CReg node]
 
 	else if isCafCCS ccs then
 	    ASSERT(isToplevClosure closure_info)
 	    ASSERT(is_thunk == IsThunk)
 		-- might be a PAP, in which case we want to subsume costs
 	    if re_entrant
-		then costCentresC SLIT("ENTER_CCS_FSUB") []
-		else costCentresC SLIT("ENTER_CCS_CAF") c_ccs
+		then costCentresC FSLIT("ENTER_CCS_FSUB") []
+		else costCentresC FSLIT("ENTER_CCS_CAF") c_ccs
 
 	else panic "enterCostCentreCode"
 
@@ -652,7 +653,7 @@ setupUpdate closure_info code
      code
    else
      case (closureUpdReqd closure_info, isStaticClosure closure_info) of
-       (False,False) -> profCtrC SLIT("TICK_UPDF_OMITTED") [] `thenC`
+       (False,False) -> profCtrC FSLIT("TICK_UPDF_OMITTED") [] `thenC`
 	                code
        (False,True ) -> (if opt_DoTickyProfiling
                          then
@@ -660,16 +661,16 @@ setupUpdate closure_info code
                            link_caf seCafBlackHoleClosureInfo `thenFC` \ _ -> nopC
                          else
                            nopC)                                                       `thenC`
-                        profCtrC SLIT("TICK_UPD_CAF_BH_SINGLE_ENTRY") [mkCString cl_name] `thenC`
-                        profCtrC SLIT("TICK_UPDF_OMITTED") []                           `thenC`
+                        profCtrC FSLIT("TICK_UPD_CAF_BH_SINGLE_ENTRY") [mkCString cl_name] `thenC`
+                        profCtrC FSLIT("TICK_UPDF_OMITTED") []                           `thenC`
 	                code
        (True ,False) -> pushUpdateFrame (CReg node) code
        (True ,True ) -> -- blackhole the (updatable) CAF:
                         link_caf cafBlackHoleClosureInfo           `thenFC` \ update_closure ->
-                        profCtrC SLIT("TICK_UPD_CAF_BH_UPDATABLE") [mkCString cl_name]    `thenC`
+                        profCtrC FSLIT("TICK_UPD_CAF_BH_UPDATABLE") [mkCString cl_name]    `thenC`
                         pushUpdateFrame update_closure code
  where
-   cl_name :: FAST_STRING
+   cl_name :: FastString
    cl_name  = (occNameFS . nameOccName . closureName) closure_info
 
    link_caf :: (ClosureInfo -> ClosureInfo)  -- function yielding BH closure_info

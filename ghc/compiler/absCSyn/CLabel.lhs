@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.51 2002/03/14 15:27:15 simonpj Exp $
+% $Id: CLabel.lhs,v 1.52 2002/04/29 14:03:39 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -90,6 +90,7 @@ import Unique		( pprUnique, Unique )
 import PrimOp		( PrimOp )
 import CostCentre	( CostCentre, CostCentreStack )
 import Outputable
+import FastString
 \end{code}
 
 things we want to find out:
@@ -126,7 +127,7 @@ data CLabel
 
   | RtsLabel	    RtsLabelInfo
 
-  | ForeignLabel FAST_STRING Bool  -- a 'C' (or otherwise foreign) label
+  | ForeignLabel FastString Bool  -- a 'C' (or otherwise foreign) label
 				   -- Bool <=> is dynamic
 
   | CC_Label CostCentre
@@ -173,7 +174,7 @@ data CaseLabelInfo
 data RtsLabelInfo
   = RtsShouldNeverHappenCode
 
-  | RtsBlackHoleInfoTbl FAST_STRING  -- black hole with info table name
+  | RtsBlackHoleInfoTbl FastString  -- black hole with info table name
 
   | RtsUpdInfo            	-- upd_frame_info
   | RtsSeqInfo			-- seq_frame_info
@@ -254,10 +255,10 @@ mkMAP_FROZEN_infoLabel		= RtsLabel (Rts_Info "stg_MUT_ARR_PTRS_FROZEN_info")
 mkEMPTY_MVAR_infoLabel		= RtsLabel (Rts_Info "stg_EMPTY_MVAR_info")
 
 mkTopTickyCtrLabel		= RtsLabel RtsTopTickyCtr
-mkBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_BLACKHOLE_info"))
-mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_CAF_BLACKHOLE_info"))
+mkBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl FSLIT("stg_BLACKHOLE_info"))
+mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl FSLIT("stg_CAF_BLACKHOLE_info"))
 mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
-                                    RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_SE_CAF_BLACKHOLE_info"))
+                                    RtsLabel (RtsBlackHoleInfoTbl FSLIT("stg_SE_CAF_BLACKHOLE_info"))
                                   else  -- RTS won't have info table unless -ticky is on
                                     panic "mkSECAFBlackHoleInfoTableLabel requires -ticky"
 mkRtsPrimOpLabel primop		= RtsLabel (RtsPrimOp primop)
@@ -272,7 +273,7 @@ mkApEntryLabel upd off		= RtsLabel (RtsApEntry   upd off)
 
 	-- Foreign labels
 
-mkForeignLabel :: FAST_STRING -> Bool -> CLabel
+mkForeignLabel :: FastString -> Bool -> CLabel
 mkForeignLabel str is_dynamic	= ForeignLabel str is_dynamic
 
 	-- Cost centres etc.
@@ -472,7 +473,7 @@ pprCLbl (RtsLabel (Rts_Code str))        = text str
 
 pprCLbl (RtsLabel RtsTopTickyCtr) = ptext SLIT("top_ct")
 
-pprCLbl (RtsLabel (RtsBlackHoleInfoTbl info)) = ptext info
+pprCLbl (RtsLabel (RtsBlackHoleInfoTbl info)) = ftext info
 
 pprCLbl (RtsLabel (RtsSelectorInfoTbl upd_reqd offset))
   = hcat [ptext SLIT("stg_sel_"), text (show offset),
@@ -509,7 +510,7 @@ pprCLbl (RtsLabel RtsModuleRegd)
   = ptext SLIT("module_registered")
 
 pprCLbl (ForeignLabel str _)
-  = ptext str
+  = ftext str
 
 pprCLbl (TyConLabel tc)
   = hcat [ppr tc, pp_cSEP, ptext SLIT("closure_tbl")]
@@ -521,7 +522,7 @@ pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs
 
 pprCLbl (ModuleInitLabel mod)	
-   = ptext SLIT("__stginit_") <> ptext (moduleNameFS (moduleName mod))
+   = ptext SLIT("__stginit_") <> ftext (moduleNameFS (moduleName mod))
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 

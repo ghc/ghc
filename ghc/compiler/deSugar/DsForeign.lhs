@@ -44,6 +44,7 @@ import BasicTypes	( Activation( NeverActive ) )
 import ErrUtils         ( addShortWarnLocLine )
 import Outputable
 import Maybe 		( fromJust )
+import FastString
 \end{code}
 
 Desugaring of @foreign@ declarations is naturally split up into
@@ -72,7 +73,7 @@ dsForeigns :: Module
                                       -- "foreign exported" functions.
 		  , SDoc 	      -- C stubs to use when calling
                                       -- "foreign exported" functions.
-		  , [FAST_STRING]     -- headers that need to be included
+		  , [FastString]     -- headers that need to be included
 				      -- into C code generated for this module
 		  )
 dsForeigns mod_name fos
@@ -126,13 +127,13 @@ because it exposes the boxing to the call site.
 dsFImport :: Module
 	  -> Id
 	  -> ForeignImport
-	  -> DsM ([Binding], SDoc, SDoc, [FAST_STRING])
+	  -> DsM ([Binding], SDoc, SDoc, [FastString])
 dsFImport modName id (CImport cconv safety header lib spec)
   = dsCImport modName id spec cconv safety	  `thenDs` \(ids, h, c) ->
-    returnDs (ids, h, c, if _NULL_ header then [] else [header])
+    returnDs (ids, h, c, if nullFastString header then [] else [header])
   -- FIXME: the `lib' field is needed for .NET ILX generation when invoking
   --	    routines that are external to the .NET runtime, but GHC doesn't
-  --	    support such calls yet; if `_NULL_ lib', the value was not given
+  --	    support such calls yet; if `nullFastString lib', the value was not given
 dsFImport modName id (DNImport spec)
   = dsFCall modName id (DNCall spec)	          `thenDs` \(ids, h, c) ->
     returnDs (ids, h, c, [])
@@ -192,7 +193,7 @@ dsFCall mod_Name fn_id fcall
 	worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
  	the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
 	work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-	work_id       = mkSysLocal (encodeFS SLIT("$wccall")) work_uniq worker_ty
+	work_id       = mkSysLocal (encodeFS FSLIT("$wccall")) work_uniq worker_ty
 
 	-- Build the wrapper
 	work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
@@ -306,7 +307,7 @@ dsFExportDynamic mod_name id cconv
   =  newSysLocalDs ty					 `thenDs` \ fe_id ->
      let 
         -- hack: need to get at the name of the C stub we're about to generate.
-       fe_nm	   = _PK_ (moduleUserString mod_name ++ "_" ++ toCName fe_id)
+       fe_nm	   = mkFastString (moduleUserString mod_name ++ "_" ++ toCName fe_id)
      in
      dsFExport mod_name id export_ty fe_nm cconv True  	`thenDs` \ (h_code, c_code) ->
      newSysLocalDs arg_ty				`thenDs` \ cback ->
@@ -338,7 +339,7 @@ dsFExportDynamic mod_name id cconv
 		      ]
         -- name of external entry point providing these services.
 	-- (probably in the RTS.) 
-      adjustor	    = SLIT("createAdjustor")
+      adjustor	    = FSLIT("createAdjustor")
      in
      dsCCall adjustor adj_args PlayRisky False io_res_ty	`thenDs` \ ccall_adj ->
 	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
@@ -379,7 +380,7 @@ using the hugs/ghc rts invocation API.
 
 \begin{code}
 mkFExportCBits :: String
-	       -> FAST_STRING
+	       -> FastString
 	       -> Maybe Id 	-- Just==static, Nothing==dynamic
 	       -> [Type] 
 	       -> Type 
@@ -422,7 +423,7 @@ mkFExportCBits mod_nm c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   header_bits = ptext SLIT("extern") <+> fun_proto <> semi
 
-  fun_proto = cResType <+> pprCconv <+> ptext c_nm <>
+  fun_proto = cResType <+> pprCconv <+> ftext c_nm <>
 	      parens (hsep (punctuate comma (map (\(nm,ty) -> ty <+> nm) 
                                                  all_cnames_and_ctys)))
 
@@ -465,7 +466,7 @@ mkFExportCBits mod_nm c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ,   text (if is_IO_res_ty then "rc=rts_evalIO" else "rc=rts_eval")
          <> parens (expr_to_run <+> comma <> text "&ret")
          <> semi
-     ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (ptext c_nm)
+     ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (ftext c_nm)
 						<> comma <> text "rc") <> semi
      ,   text "return" <> return_what <> semi
      , rbrace

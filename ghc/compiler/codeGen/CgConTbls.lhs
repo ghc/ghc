@@ -118,11 +118,11 @@ genConInfo comp_info data_con
     (static_ci,_) = layOutStaticConstr con_name data_con typePrimRep arg_tys
 
     static_body  = initC comp_info (
-                      profCtrC SLIT("TICK_ENT_STATIC_CON") [CReg node] `thenC`
+                      profCtrC FSLIT("TICK_ENT_STATIC_CON") [CReg node] `thenC`
                       ldv_enter_and_body_code)
 
     closure_body = initC comp_info (
-                      profCtrC SLIT("TICK_ENT_DYN_CON") [CReg node] `thenC`
+                      profCtrC FSLIT("TICK_ENT_DYN_CON") [CReg node] `thenC`
                       ldv_enter_and_body_code)
 
     ldv_enter_and_body_code = ldvEnter `thenC` body_code
@@ -159,7 +159,7 @@ mkConCodeAndInfo con
 
 	body_code
 		= -- NB: We don't set CC when entering data (WDP 94/06)
-		  profCtrC SLIT("TICK_RET_OLD") 
+		  profCtrC FSLIT("TICK_RET_OLD") 
 			[mkIntCLit (length arg_things)] `thenC`
 
 		  performReturn AbsCNop		-- Ptr to thing already in Node

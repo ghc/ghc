@@ -35,6 +35,7 @@ import MachMisc		( IF_ARCH_i386(i386_insert_ffrees,) )
 
 import qualified Pretty
 import Outputable
+import FastString
 
 -- DEBUGGING ONLY
 --import OrdList
@@ -249,7 +250,7 @@ stixStmt_ConFold stmt
            -> let test_opt = stixExpr_ConFold test
               in 
               if  manifestlyZero test_opt
-              then StComment (_PK_ ("deleted: " ++ showSDoc (pprStixStmt stmt)))
+              then StComment (mkFastString ("deleted: " ++ showSDoc (pprStixStmt stmt)))
               else StCondJump addr (stixExpr_ConFold test)
         StData pk datas
            -> StData pk (map stixExpr_ConFold datas)

@@ -125,7 +125,7 @@ pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
 ppr_pats pats = sep (map ppr pats)
 
 ppr_shadow_pats kind pats
-  = sep [ppr_pats pats, ptext (matchSeparator kind), ptext SLIT("...")]
+  = sep [ppr_pats pats, matchSeparator kind, ptext SLIT("...")]
     
 ppr_incomplete_pats kind (pats,[]) = ppr_pats pats
 ppr_incomplete_pats kind (pats,constraints) = 

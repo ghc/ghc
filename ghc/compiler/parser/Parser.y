@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.95 2002/04/02 13:56:32 simonmar Exp $
+$Id: Parser.y,v 1.96 2002/04/29 14:03:57 simonmar Exp $
 
 Haskell grammar.
 
@@ -597,7 +597,7 @@ fdecl1DEPRECATED :: { Bool -> SrcLoc -> ForeignDecl RdrName }
 fdecl1DEPRECATED 
   ----------- DEPRECATED label decls ------------
   : 'label' ext_name varid '::' sigtype
-    { ForeignImport $3 $5 (CImport defaultCCallConv (PlaySafe False) _NIL_ _NIL_ 
+    { ForeignImport $3 $5 (CImport defaultCCallConv (PlaySafe False) nilFS nilFS 
 				   (CLabel ($2 `orElse` mkExtName $3))) }
 
   ----------- DEPRECATED ccall/stdcall decls ------------
@@ -611,7 +611,7 @@ fdecl1DEPRECATED
     { let
 	target = StaticTarget ($2 `orElse` mkExtName $4)
       in
-      ForeignImport $4 $6 (CImport defaultCCallConv $3 _NIL_ _NIL_ 
+      ForeignImport $4 $6 (CImport defaultCCallConv $3 nilFS nilFS 
 				   (CFunction target)) }
 
     -- DEPRECATED variant #2: external name consists of two separate strings
@@ -623,7 +623,7 @@ fdecl1DEPRECATED
            let
 	     imp = CFunction (StaticTarget $4)
 	   in
-	   ForeignImport $6 $8 (CImport cconv $5 _NIL_ _NIL_ imp) }
+	   ForeignImport $6 $8 (CImport cconv $5 nilFS nilFS imp) }
 
     -- DEPRECATED variant #3: `unsafe' after entity
   | 'import' callconv STRING 'unsafe' varid_no_unsafe '::' sigtype
@@ -633,12 +633,12 @@ fdecl1DEPRECATED
            let
 	     imp = CFunction (StaticTarget $3)
 	   in
-	   ForeignImport $5 $7 (CImport cconv PlayRisky _NIL_ _NIL_ imp) }
+	   ForeignImport $5 $7 (CImport cconv PlayRisky nilFS nilFS imp) }
 
     -- DEPRECATED variant #4: use of the special identifier `dynamic' without
     --			      an explicit calling convention (import)
   | 'import' {-no callconv-} 'dynamic' safety varid_no_unsafe '::' sigtype
-    { ForeignImport $4 $6 (CImport defaultCCallConv $3 _NIL_ _NIL_ 
+    { ForeignImport $4 $6 (CImport defaultCCallConv $3 nilFS nilFS 
 				   (CFunction DynamicTarget)) }
 
     -- DEPRECATED variant #5: use of the special identifier `dynamic' (import)
@@ -646,7 +646,7 @@ fdecl1DEPRECATED
     {% case $2 of
          DNCall      -> parseError "Illegal format of .NET foreign import"
 	 CCall cconv -> returnP $
-	   ForeignImport $5 $7 (CImport cconv $4 _NIL_ _NIL_ 
+	   ForeignImport $5 $7 (CImport cconv $4 nilFS nilFS 
 					(CFunction DynamicTarget)) }
 
     -- DEPRECATED variant #6: lack of a calling convention specification
@@ -667,7 +667,7 @@ fdecl1DEPRECATED
     -- DEPRECATED variant #8: use of the special identifier `dynamic' without
     --			      an explicit calling convention (export)
   | 'export' {-no callconv-} 'dynamic' varid '::' sigtype
-    { ForeignImport $3 $5 (CImport defaultCCallConv (PlaySafe False) _NIL_ _NIL_ 
+    { ForeignImport $3 $5 (CImport defaultCCallConv (PlaySafe False) nilFS nilFS 
 				   CWrapper) }
 
     -- DEPRECATED variant #9: use of the special identifier `dynamic' (export)
@@ -675,7 +675,7 @@ fdecl1DEPRECATED
     {% case $2 of
          DNCall      -> parseError "Illegal format of .NET foreign import"
 	 CCall cconv -> returnP $
-	   ForeignImport $4 $6 (CImport cconv (PlaySafe False) _NIL_ _NIL_ CWrapper) }
+	   ForeignImport $4 $6 (CImport cconv (PlaySafe False) nilFS nilFS CWrapper) }
 
   ----------- DEPRECATED .NET decls ------------
   -- NB: removed the .NET call declaration, as it is entirely subsumed
@@ -706,9 +706,9 @@ safety1 :: { Safety }
 	| 'threadsafe'			{ PlaySafe  True }
 	  -- only needed to avoid conflicts with the DEPRECATED rules
 
-fspec :: { (FAST_STRING, RdrName, RdrNameHsType) }
+fspec :: { (FastString, RdrName, RdrNameHsType) }
        : STRING varid '::' sigtype      { ($1      , $2, $4) }
-       |        varid '::' sigtype      { (SLIT(""), $1, $3) }
+       |        varid '::' sigtype      { (nilFS, $1, $3) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
@@ -981,11 +981,11 @@ exp10 :: { RdrNameHsExpr }
 
 	| fexp					{ $1 }
 
-scc_annot :: { FAST_STRING }
+scc_annot :: { FastString }
 	: '_scc_' STRING			{ $2 }
 	| '{-# SCC' STRING '#-}'		{ $2 }
 
-ccallid :: { FAST_STRING }
+ccallid :: { FastString }
 	:  VARID				{ $1 }
 	|  CONID				{ $1 }
 

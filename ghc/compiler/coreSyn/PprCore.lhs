@@ -386,10 +386,11 @@ pprIdRule (id,rule) = pprCoreRule (ppr id) rule
 
 pprCoreRule :: SDoc -> CoreRule -> SDoc
 pprCoreRule pp_fn (BuiltinRule name _)
-  = ifPprDebug (ptext SLIT("Built in rule for") <+> pp_fn <> colon <+> doubleQuotes (ptext name))
+  = ifPprDebug (ptext SLIT("Built in rule for") <+> pp_fn <> colon
+		 <+> doubleQuotes (ftext name))
 
 pprCoreRule pp_fn (Rule name act tpl_vars tpl_args rhs)
-  = doubleQuotes (ptext name) <+> ppr act <+>
+  = doubleQuotes (ftext name) <+> ppr act <+>
     sep [
 	  ptext SLIT("__forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
 	  nest 2 (pp_fn <+> sep (map pprArg tpl_args)),

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.56 2001/12/17 12:33:45 simonmar Exp $
+% $Id: CgCase.lhs,v 1.57 2002/04/29 14:03:41 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -638,14 +638,14 @@ cgSemiTaggedAlts binder alts deflt
 
     st_deflt (StgBindDefault _)
       = Just (Just binder,
-	      (CCallProfCtrMacro SLIT("RET_SEMI_BY_DEFAULT") [], -- ToDo: monadise?
+	      (CCallProfCtrMacro FSLIT("RET_SEMI_BY_DEFAULT") [], -- ToDo: monadise?
 	       mkDefaultLabel uniq)
 	     )
 
     st_alt (con, args, use_mask, _)
       =  -- Ha!  Nothing to do; Node already points to the thing
 	 (con_tag,
-	   (CCallProfCtrMacro SLIT("RET_SEMI_IN_HEAP") -- ToDo: monadise?
+	   (CCallProfCtrMacro FSLIT("RET_SEMI_IN_HEAP") -- ToDo: monadise?
 		[mkIntCLit (length args)], -- how big the thing in the heap is
 	     join_label)
 	    )
@@ -798,7 +798,7 @@ restoreCurrentCostCentre Nothing = returnFC AbsCNop
 restoreCurrentCostCentre (Just slot)
  = getSpRelOffset slot				 `thenFC` \ sp_rel ->
    freeStackSlots [slot]			 `thenC`
-   returnFC (CCallProfCCMacro SLIT("RESTORE_CCCS") [CVal sp_rel CostCentreRep])
+   returnFC (CCallProfCCMacro FSLIT("RESTORE_CCCS") [CVal sp_rel CostCentreRep])
     -- we use the RESTORE_CCCS macro, rather than just
     -- assigning into CurCostCentre, in case RESTORE_CCCS
     -- has some sanity-checking in it.

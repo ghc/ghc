@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.30 2002/02/05 14:39:24 simonpj Exp $
+% $Id: CgHeapery.lhs,v 1.31 2002/04/29 14:03:41 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -118,7 +118,7 @@ fastEntryChecks regs tags ret node_points code
         = mkAbstractCs 
 	  [ real_check,
             if hp == 0 then AbsCNop 
-	    else profCtrAbsC SLIT("TICK_ALLOC_HEAP") 
+	    else profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
 		  [ mkIntCLit hp, CLbl ctr DataPtrRep ]
 	  ]
 
@@ -258,7 +258,7 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
 		  then  AbsCNop
 		  else  mkAbstractCs 
 			[ checking_code tag_assts,
-          	          profCtrAbsC SLIT("TICK_ALLOC_HEAP") 
+          	          profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
 			    [ mkIntCLit words_required, CLbl ctr DataPtrRep ]
 			]
 	)  `thenC`
@@ -317,7 +317,7 @@ altHeapCheck is_fun regs [] AbsCNop Nothing code
 		 then  AbsCNop
 		 else  mkAbstractCs 
 		       [ checking_code,
-          	         profCtrAbsC SLIT("TICK_ALLOC_HEAP") 
+          	         profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
 			    [ mkIntCLit words_required, CLbl ctr DataPtrRep ]
 		       ]
 	)  `thenC`

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.47 2001/11/19 16:34:12 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.48 2002/04/29 14:03:41 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -257,7 +257,7 @@ centre.
 cgExpr (StgSCC cc expr)
   = ASSERT(sccAbleCostCentre cc)
     costCentresC
-	SLIT("SET_CCC")
+	FSLIT("SET_CCC")
 	[mkCCostCentre cc, mkIntCLit (if isSccCountCostCentre cc then 1 else 0)]
     `thenC`
     cgExpr expr

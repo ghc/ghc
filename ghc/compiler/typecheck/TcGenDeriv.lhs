@@ -65,6 +65,7 @@ import Maybes		( maybeToBool )
 import Char		( ord )
 import Constants
 import List		( partition, intersperse )
+import FastString
 \end{code}
 
 %************************************************************************
@@ -640,7 +641,7 @@ gen_Ix_binds tycon
 	     tycon_loc
 	   ))
 	) {-else-} (
-	   HsApp (HsVar error_RDR) (HsLit (HsString (_PK_ ("Ix."++tycon_str++".index: out of range\n"))))
+	   HsApp (HsVar error_RDR) (HsLit (HsString (mkFastString ("Ix."++tycon_str++".index: out of range\n"))))
 	)
 	tycon_loc)
 
@@ -1138,7 +1139,7 @@ mkHsApps    f xs = foldl HsApp (HsVar f) xs
 mkHsVarApps f xs = foldl HsApp (HsVar f) (map HsVar xs)
 
 mkHsIntLit n = HsLit (HsInt n)
-mkHsString s = HsString (_PK_ s)
+mkHsString s = HsString (mkFastString s)
 mkHsChar c   = HsChar   (ord c)
 \end{code}
 
@@ -1264,31 +1265,31 @@ nested_compose_Expr (e:es)
 
 -- impossible_Expr is used in case RHSs that should never happen.
 -- We generate these to keep the desugarer from complaining that they *might* happen!
-impossible_Expr = HsApp (HsVar error_RDR) (HsLit (HsString (_PK_ "Urk! in TcGenDeriv")))
+impossible_Expr = HsApp (HsVar error_RDR) (HsLit (HsString (mkFastString "Urk! in TcGenDeriv")))
 
 -- illegal_Expr is used when signalling error conditions in the RHS of a derived
 -- method. It is currently only used by Enum.{succ,pred}
 illegal_Expr meth tp msg = 
-   HsApp (HsVar error_RDR) (HsLit (HsString (_PK_ (meth ++ '{':tp ++ "}: " ++ msg))))
+   HsApp (HsVar error_RDR) (HsLit (HsString (mkFastString (meth ++ '{':tp ++ "}: " ++ msg))))
 
 -- illegal_toEnum_tag is an extended version of illegal_Expr, which also allows you
 -- to include the value of a_RDR in the error string.
 illegal_toEnum_tag tp maxtag =
    HsApp (HsVar error_RDR) 
          (HsApp (HsApp (HsVar append_RDR)
-	               (HsLit (HsString (_PK_ ("toEnum{" ++ tp ++ "}: tag (")))))
+	               (HsLit (HsString (mkFastString ("toEnum{" ++ tp ++ "}: tag (")))))
 	               (HsApp (HsApp (HsApp 
 		           (HsVar showsPrec_RDR)
 			   (mkHsIntLit 0))
    		           (HsVar a_RDR))
 			   (HsApp (HsApp 
 			       (HsVar append_RDR)
-			       (HsLit (HsString (_PK_ ") is outside of enumeration's range (0,"))))
+			       (HsLit (HsString (mkFastString ") is outside of enumeration's range (0,"))))
 			       (HsApp (HsApp (HsApp 
 					(HsVar showsPrec_RDR)
 				        (mkHsIntLit 0))
 					(HsVar maxtag))
-					(HsLit (HsString (_PK_ ")")))))))
+					(HsLit (HsString (mkFastString ")")))))))
 
 parenify e@(HsVar _) = e
 parenify e	     = HsPar e
@@ -1317,9 +1318,9 @@ dh_RDR		= varUnqual FSLIT("d#")
 cmp_eq_RDR	= varUnqual FSLIT("cmp_eq")
 rangeSize_RDR	= varUnqual FSLIT("rangeSize")
 
-as_RDRs		= [ varUnqual (_PK_ ("a"++show i)) | i <- [(1::Int) .. ] ]
-bs_RDRs		= [ varUnqual (_PK_ ("b"++show i)) | i <- [(1::Int) .. ] ]
-cs_RDRs		= [ varUnqual (_PK_ ("c"++show i)) | i <- [(1::Int) .. ] ]
+as_RDRs		= [ varUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) .. ] ]
+bs_RDRs		= [ varUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
+cs_RDRs		= [ varUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
 zz_a_Expr	= HsVar zz_a_RDR
 a_Expr		= HsVar a_RDR
@@ -1345,7 +1346,7 @@ d_Pat		= VarPatIn d_RDR
 
 con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
 
-con2tag_RDR tycon = varUnqual (_PK_ ("con2tag_" ++ occNameString (getOccName tycon) ++ "#"))
-tag2con_RDR tycon = varUnqual (_PK_ ("tag2con_" ++ occNameString (getOccName tycon) ++ "#"))
-maxtag_RDR tycon  = varUnqual (_PK_ ("maxtag_"  ++ occNameString (getOccName tycon) ++ "#"))
+con2tag_RDR tycon = varUnqual (mkFastString ("con2tag_" ++ occNameString (getOccName tycon) ++ "#"))
+tag2con_RDR tycon = varUnqual (mkFastString ("tag2con_" ++ occNameString (getOccName tycon) ++ "#"))
+maxtag_RDR tycon  = varUnqual (mkFastString ("maxtag_"  ++ occNameString (getOccName tycon) ++ "#"))
 \end{code}

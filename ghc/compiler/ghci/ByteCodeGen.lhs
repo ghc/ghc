@@ -883,7 +883,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
                  DynamicTarget
                     -> returnBc (False, panic "ByteCodeGen.generateCCall(dyn)")
                  StaticTarget target
-                    -> let sym_to_find = _UNPK_ target in
+                    -> let sym_to_find = unpackFS target in
                        ioToBc (lookupSymbol sym_to_find) `thenBc` \res ->
                        case res of
                            Just aa -> returnBc (True, aa)

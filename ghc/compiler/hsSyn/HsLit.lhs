@@ -12,6 +12,7 @@ import Type	( Type )
 import Name	( Name )
 import HsTypes	( PostTcType )
 import Outputable
+import FastString
 import Ratio	( Rational )
 \end{code}
 
@@ -27,8 +28,8 @@ import Ratio	( Rational )
 data HsLit
   = HsChar	    Int			-- Character
   | HsCharPrim	    Int			-- Unboxed character
-  | HsString	    FAST_STRING		-- String
-  | HsStringPrim    FAST_STRING		-- Packed string
+  | HsString	    FastString		-- String
+  | HsStringPrim    FastString		-- Packed string
   | HsInt	    Integer		-- Genuinely an Int; arises from TcGenDeriv, 
 					--	and from TRANSLATION
   | HsIntPrim	    Integer		-- Unboxed Int
@@ -36,7 +37,7 @@ data HsLit
   | HsRat	    Rational Type	-- Genuinely a rational; arises only from TRANSLATION
   | HsFloatPrim	    Rational		-- Unboxed Float
   | HsDoublePrim    Rational		-- Unboxed Double
-  | HsLitLit	    FAST_STRING PostTcType	-- to pass ``literal literals'' through to C
+  | HsLitLit	    FastString PostTcType	-- to pass ``literal literals'' through to C
 						-- also: "overloaded" type; but
 						-- must resolve to boxed-primitive!
 	-- The Type in HsLitLit is needed when desuaring;
@@ -86,7 +87,7 @@ instance Outputable HsLit where
     ppr (HsFloatPrim f)	 = rational f <> char '#'
     ppr (HsDoublePrim d) = rational d <> text "##"
     ppr (HsIntPrim i)	 = integer i  <> char '#'
-    ppr (HsLitLit s _)	 = hcat [text "``", ptext s, text "''"]
+    ppr (HsLitLit s _)	 = hcat [text "``", ftext s, text "''"]
 
 instance Outputable HsOverLit where
   ppr (HsIntegral i _)   = integer i

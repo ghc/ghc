@@ -79,7 +79,7 @@ import VarEnv       (IdEnv, mkVarEnv, zipVarEnv, extendVarEnv)
 import TysWiredIn   (mkTupleTy)
 import BasicTypes   (Boxity(..))
 import Outputable   (showSDoc, Outputable(..))
-
+import FastString
 
 -- friends
 import NDPCoreUtils (tupleTyArgs, funTyArgs, parrElemTy, isDefault,
@@ -94,9 +94,6 @@ import IOExts    (trace)
 
 
 #include "HsVersions.h"
-{-# INLINE slit #-}
-slit x = FastString.mkFastCharString# x
--- FIXME: SLIT() doesn't work for some strange reason
 
 
 -- toplevel transformation
@@ -505,10 +502,10 @@ liftSingleDataCon b dcon bnds expr =
   do 
     let dconId           = dataConTag dcon
     indexExpr           <- mkIndexOfExprDCon (varType b)  b dconId
-    (b', bbind)         <- mkBind (slit "is"#) indexExpr
+    (bb, bbind)         <- mkBind FSLIT("is") indexExpr
     lbnds               <- mapM liftBinderType bnds
-    ((lExpr, _), bnds') <- packContext  b' (extendContext lbnds (lift expr))
-    (_, vbind)          <- mkBind (slit "r"#) lExpr
+    ((lExpr, _), bnds') <- packContext  bb (extendContext lbnds (lift expr))
+    (_, vbind)          <- mkBind FSLIT("r") lExpr
     return (bbind, vbind, bnds')
 
 -- FIXME: clean this up. the datacon and the literal case are so
@@ -521,9 +518,9 @@ liftCaseDataConDefault b (_, _, def) alts =
   do
     let dconIds        = map (\(DataAlt d, _, _) -> dataConTag d) alts
     indexExpr         <- mkIndexOfExprDConDft (varType b) b dconIds
-    (b', bbind)       <- mkBind (slit "is"#) indexExpr
-    ((lDef, _), bnds) <- packContext  b' (lift def)     
-    (_, vbind)        <- mkBind (slit "r"#) lDef
+    (bb, bbind)       <- mkBind FSLIT("is") indexExpr
+    ((lDef, _), bnds) <- packContext  bb (lift def)     
+    (_, vbind)        <- mkBind FSLIT("r") lDef
     return (bbind, vbind, bnds)
 
 -- liftCaseLit: checks if we have a default case and handles it 
@@ -552,9 +549,9 @@ liftCaseLitDefault b (_, _, def) alts =
   do
     let lits           = map (\(LitAlt l, _, _) -> l) alts
     indexExpr         <- mkIndexOfExprDft (varType b) b lits
-    (b', bbind)       <- mkBind (slit "is"#) indexExpr
-    ((lDef, _), bnds) <- packContext  b' (lift def)     
-    (_, vbind)        <- mkBind (slit "r"#) lDef
+    (bb, bbind)       <- mkBind FSLIT("is") indexExpr
+    ((lDef, _), bnds) <- packContext  bb (lift def)     
+    (_, vbind)        <- mkBind FSLIT("r") lDef
     return (bbind, vbind, bnds)
 
 -- FIXME: 
@@ -591,9 +588,9 @@ liftSingleCaseLit:: CoreBndr -> Literal -> CoreExpr  ->
 liftSingleCaseLit b lit expr =
  do 
    indexExpr          <- mkIndexOfExpr (varType b) b lit -- (a)
-   (b', bbind)        <- mkBind (slit "is"#) indexExpr
-   ((lExpr, t), bnds) <- packContext  b' (lift expr)     -- (b)         
-   (_, vbind)         <- mkBind (slit "r"#) lExpr
+   (bb, bbind)        <- mkBind FSLIT("is") indexExpr
+   ((lExpr, t), bnds) <- packContext  bb (lift expr)     -- (b)         
+   (_, vbind)         <- mkBind FSLIT("r") lExpr
    return (bbind, vbind, bnds)
 
 -- letWrapper lExpr b ([indexbnd_i], [exprbnd_i], [pckbnd_ij])
@@ -767,7 +764,7 @@ mkDftBackpermute :: Type -> Var -> Var -> Var -> Flatten CoreBind
 mkDftBackpermute ty idx src dft = 
   do
     rhs <- mk'bpermuteDftP ty (Var idx) (Var src) (Var dft)
-    liftM snd $ mkBind (slit "dbp"#) rhs
+    liftM snd $ mkBind FSLIT("dbp") rhs
 
 -- create a dummy array with elements of the given type, which can be used as
 -- default array for the combination of the subresults of the lifted case
@@ -781,7 +778,7 @@ createDftArrayBind e  =
     let ty = parrElemTy . exprType $ expr
     len <- mk'lengthP e
     rhs <- mk'replicateP ty len err??
-    lift snd $ mkBind (slit "dft"#) rhs
+    lift snd $ mkBind FSLIT("dft") rhs
 FIXME: nicht so einfach; man kann kein "error"-Wert nehmen, denn der w"urde
   beim bpermuteDftP sofort evaluiert, aber es ist auch schwer m"oglich einen
   generischen Wert f"ur jeden beliebigen Typ zu erfinden.

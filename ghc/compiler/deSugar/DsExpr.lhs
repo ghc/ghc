@@ -52,6 +52,7 @@ import Maybes		( maybeToBool )
 import PrelNames	( hasKey, ratioTyConKey, toPName )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
+import FastString
 
 import Ratio 		( numerator, denominator )
 \end{code}
@@ -603,7 +604,7 @@ dsDo do_or_lc stmts ids@[return_id, fail_id, bind_id, then_id] result_ty
 	    let
 		a_ty       = outPatType pat
 		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty])
-                                   (HsLit (HsString (_PK_ msg)))
+                                   (HsLit (HsString (mkFastString msg)))
 	        msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
 		main_match = mkSimpleMatch [pat] 
 					   (HsDoOut do_or_lc stmts ids result_ty locn)

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.33 2002/01/03 11:44:17 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.34 2002/04/29 14:03:42 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -62,6 +62,7 @@ import DataCon		( ConTag )
 import Id		( Id )
 import VarEnv
 import PrimRep		( PrimRep(..) )
+import FastString
 import Outputable
 
 infixr 9 `thenC`	-- Right-associative!
@@ -549,23 +550,23 @@ info (whether SCC profiling or profiling-ctrs going) and possibly emit
 nothing.
 
 \begin{code}
-costCentresC :: FAST_STRING -> [CAddrMode] -> Code
+costCentresC :: FastString -> [CAddrMode] -> Code
 costCentresC macro args
  | opt_SccProfilingOn  = absC (CCallProfCCMacro macro args)
  | otherwise           = nopC
 
-profCtrC :: FAST_STRING -> [CAddrMode] -> Code
+profCtrC :: FastString -> [CAddrMode] -> Code
 profCtrC macro args
  | opt_DoTickyProfiling = absC (CCallProfCtrMacro macro args)
  | otherwise            = nopC
 
-profCtrAbsC :: FAST_STRING -> [CAddrMode] -> AbstractC
+profCtrAbsC :: FastString -> [CAddrMode] -> AbstractC
 profCtrAbsC macro args
  | opt_DoTickyProfiling = CCallProfCtrMacro macro args
  | otherwise            = AbsCNop
 
 ldvEnter :: Code
-ldvEnter = costCentresC SLIT("LDV_ENTER") [CReg node]
+ldvEnter = costCentresC FSLIT("LDV_ENTER") [CReg node]
 
 {- Try to avoid adding too many special compilation strategies here.
    It's better to modify the header files as necessary for particular

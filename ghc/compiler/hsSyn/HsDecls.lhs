@@ -829,10 +829,10 @@ instance Outputable ForeignImport where
     char '"' <> pprCEntity header lib spec <> char '"'
     where
       pprCEntity header lib (CLabel lbl) = 
-        ptext SLIT("static") <+> ptext header <+> char '&' <>
+        ptext SLIT("static") <+> ftext header <+> char '&' <>
 	pprLib lib <> ppr lbl
       pprCEntity header lib (CFunction (StaticTarget lbl)) = 
-        ptext SLIT("static") <+> ptext header <+> char '&' <>
+        ptext SLIT("static") <+> ftext header <+> char '&' <>
 	pprLib lib <> ppr lbl
       pprCEntity header lib (CFunction (DynamicTarget)) = 
         ptext SLIT("dynamic")
@@ -905,7 +905,7 @@ instance (NamedThing name, Ord name) => Eq (RuleDecl name pat) where
 instance (NamedThing name, Outputable name, Outputable pat)
 	      => Outputable (RuleDecl name pat) where
   ppr (HsRule name act ns lhs rhs loc)
-	= sep [text "{-# RULES" <+> doubleQuotes (ptext name) <+> ppr act,
+	= sep [text "{-# RULES" <+> doubleQuotes (ftext name) <+> ppr act,
 	       pp_forall, ppr lhs, equals <+> ppr rhs,
                text "#-}" ]
 	where
@@ -913,7 +913,7 @@ instance (NamedThing name, Outputable name, Outputable pat)
 		    | otherwise	= text "forall" <+> fsep (map ppr ns) <> dot
 
   ppr (IfaceRule name act tpl_vars fn tpl_args rhs loc) 
-    = hsep [ doubleQuotes (ptext name), ppr act,
+    = hsep [ doubleQuotes (ftext name), ppr act,
 	   ptext SLIT("__forall") <+> braces (interppSP tpl_vars),
 	   ppr fn <+> sep (map (pprUfExpr parens) tpl_args),
 	   ptext SLIT("=") <+> ppr rhs
@@ -938,7 +938,7 @@ We use exported entities for things to deprecate.
 \begin{code}
 data DeprecDecl name = Deprecation name DeprecTxt SrcLoc
 
-type DeprecTxt = FAST_STRING	-- reason/explanation for deprecation
+type DeprecTxt = FastString	-- reason/explanation for deprecation
 
 instance Outputable name => Outputable (DeprecDecl name) where
     ppr (Deprecation thing txt _)

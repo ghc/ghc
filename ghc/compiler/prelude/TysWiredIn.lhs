@@ -107,6 +107,7 @@ import Unique		( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
 import PrelNames
 import Array
+import FastString
 
 alpha_tyvar	  = [alphaTyVar]
 alpha_ty	  = [alphaTy]
@@ -626,7 +627,7 @@ mkPArrFakeCon arity  = pcDataCon name [tyvar] [] tyvarTys parrTyCon
   where
 	tyvar     = head alphaTyVars
 	tyvarTys  = replicate arity $ mkTyVarTy tyvar
-        nameStr   = _PK_ ("MkPArr" ++ show arity)
+        nameStr   = mkFastString ("MkPArr" ++ show arity)
 	name      = mkWiredInName mod (mkOccFS dataName nameStr) uniq
 	uniq      = mkPArrDataConUnique arity
 	mod	  = mkPrelModule pREL_PARR_Name

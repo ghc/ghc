@@ -52,6 +52,7 @@ import UniqSet		( emptyUniqSet )
 import List		( intersectBy )
 import ListSetOps	( removeDups )
 import Outputable
+import FastString
 \end{code}
 
 
@@ -918,7 +919,7 @@ mkAssertExpr =
     let
      expr = 
           HsApp (HsVar name)
-	        (HsLit (HsStringPrim (_PK_ (stringToUtf8 (showSDoc (ppr sloc))))))
+	        (HsLit (HsStringPrim (mkFastString (stringToUtf8 (showSDoc (ppr sloc))))))
     in
     returnRn (expr, unitFV name)
 \end{code}

@@ -30,6 +30,7 @@ import Util		( thenCmp )
 import Outputable
 import FastString	( unpackFS )
 import FastTypes
+import FastString
 import GlaExts		( (+#) )
 \end{code}
 
@@ -43,10 +44,10 @@ We keep information about the {\em definition} point for each entity;
 this is the obvious stuff:
 \begin{code}
 data SrcLoc
-  = SrcLoc	FAST_STRING	-- A precise location (file name)
+  = SrcLoc	FastString	-- A precise location (file name)
 		FastInt
 
-  | UnhelpfulSrcLoc FAST_STRING	-- Just a general indication
+  | UnhelpfulSrcLoc FastString	-- Just a general indication
 
   | NoSrcLoc
 \end{code}
@@ -66,14 +67,14 @@ Things to make 'em:
 \begin{code}
 mkSrcLoc x y      = SrcLoc x (iUnbox y)
 noSrcLoc	  = NoSrcLoc
-importedSrcLoc	  = UnhelpfulSrcLoc SLIT("<imported>")
-builtinSrcLoc	  = UnhelpfulSrcLoc SLIT("<built-into-the-compiler>")
-generatedSrcLoc   = UnhelpfulSrcLoc SLIT("<compiler-generated-code>")
+importedSrcLoc	  = UnhelpfulSrcLoc FSLIT("<imported>")
+builtinSrcLoc	  = UnhelpfulSrcLoc FSLIT("<built-into-the-compiler>")
+generatedSrcLoc   = UnhelpfulSrcLoc FSLIT("<compiler-generated-code>")
 
 isGoodSrcLoc (SrcLoc _ _) = True
 isGoodSrcLoc other        = False
 
-srcLocFile :: SrcLoc -> FAST_STRING
+srcLocFile :: SrcLoc -> FastString
 srcLocFile (SrcLoc fname _) = fname
 
 srcLocLine :: SrcLoc -> FastInt
@@ -120,18 +121,15 @@ cmpSrcLoc (SrcLoc s1 l1) (SrcLoc s2 l2)      = (s1 `compare` s2) `thenCmp` (l1 `
 instance Outputable SrcLoc where
     ppr (SrcLoc src_path src_line)
       = getPprStyle $ \ sty ->
-        if userStyle sty then
-	   hcat [ text src_file, char ':', int (iBox src_line) ]
-	else
-	if debugStyle sty then
-	   hcat [ ptext src_path, char ':', int (iBox src_line) ]
+        if userStyle sty || debugStyle sty then
+	   hcat [ ftext src_path, char ':', int (iBox src_line) ]
 	else
 	   hcat [text "{-# LINE ", int (iBox src_line), space,
-		 char '\"', ptext src_path, text " #-}"]
+		 char '\"', ftext src_path, text " #-}"]
       where
 	src_file = unpackFS src_path	-- Leave the directory prefix intact,
 					-- so emacs can find the file
 
-    ppr (UnhelpfulSrcLoc s) = ptext s
+    ppr (UnhelpfulSrcLoc s) = ftext s
     ppr NoSrcLoc	    = ptext SLIT("<No locn>")
 \end{code}

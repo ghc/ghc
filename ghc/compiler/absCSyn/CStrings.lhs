@@ -4,7 +4,7 @@ This module deals with printing C string literals
 module CStrings(
 	CLabelString, isCLabelString, pprCLabelString,
 
-	cSEP, pp_cSEP,
+	pp_cSEP,
 
 	pprFSInCStyle, pprStringInCStyle
   ) where
@@ -12,31 +12,32 @@ module CStrings(
 #include "HsVersions.h"
 
 import Char	( ord, chr, isAlphaNum )
+import FastString
 import Outputable
 \end{code}
 
 
 \begin{code}
-type CLabelString = FAST_STRING		-- A C label, completely unencoded
+type CLabelString = FastString		-- A C label, completely unencoded
 
-pprCLabelString lbl = ptext lbl
+pprCLabelString :: CLabelString -> SDoc
+pprCLabelString lbl = ftext lbl
 
 isCLabelString :: CLabelString -> Bool	-- Checks to see if this is a valid C label
 isCLabelString lbl 
-  = all ok (_UNPK_ lbl)
+  = all ok (unpackFS lbl)
   where
     ok c = isAlphaNum c || c == '_' || c == '.'
 	-- The '.' appears in e.g. "foo.so" in the 
 	-- module part of a ExtName.  Maybe it should be separate
 
-cSEP    = SLIT("_")	-- official C separator
 pp_cSEP = char '_'
 \end{code}
 
 \begin{code}
-pprFSInCStyle :: FAST_STRING -> SDoc
+pprFSInCStyle :: FastString -> SDoc
 -- Assumes it contains only characters '\0'..'\xFF'!
-pprFSInCStyle fs = pprStringInCStyle (_UNPK_ fs)
+pprFSInCStyle fs = pprStringInCStyle (unpackFS fs)
 
 pprStringInCStyle :: String -> SDoc
 pprStringInCStyle s = doubleQuotes (text (concatMap charToC s))

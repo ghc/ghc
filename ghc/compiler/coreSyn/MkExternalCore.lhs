@@ -29,6 +29,7 @@ import ForeignCall
 import PprExternalCore	
 import CmdLineOpts
 import IO
+import FastString
 
 emitExternalCore :: DynFlags -> ModIface -> ModDetails -> IO ()
 emitExternalCore dflags iface details 
@@ -95,10 +96,10 @@ make_exp (Var v) =
   case globalIdDetails v of
      -- a DataConId represents the Id of a worker, which is a varName. -- sof 4/02
 --    DataConId _ -> C.Dcon (make_con_qid (Var.varName v))
-    FCallId (CCall (CCallSpec (StaticTarget nm) _ _)) -> C.External (_UNPK_ nm) (make_ty (varType v))
+    FCallId (CCall (CCallSpec (StaticTarget nm) _ _)) -> C.External (unpackFS nm) (make_ty (varType v))
     FCallId _ -> error "MkExternalCore died: can't handle non-static-C foreign call"
     _ -> C.Var (make_var_qid (Var.varName v))
-make_exp (Lit (l@(MachLabel s))) = C.External (_UNPK_ s) (make_ty (literalType l))
+make_exp (Lit (l@(MachLabel s))) = C.External (unpackFS s) (make_ty (literalType l))
 make_exp (Lit l) = C.Lit (make_lit l)
 make_exp (App e (Type t)) = C.Appt (make_exp e) (make_ty t)
 make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)
@@ -127,7 +128,7 @@ make_lit l =
   case l of
     MachChar i | i <= 0xff -> C.Lchar (chr i) t
     MachChar i | otherwise -> C.Lint (toEnum i) t
-    MachStr s -> C.Lstring (_UNPK_ s) t
+    MachStr s -> C.Lstring (unpackFS s) t
     MachAddr i -> C.Lint i t  
     MachInt i -> C.Lint i t
     MachInt64 i -> C.Lint i t

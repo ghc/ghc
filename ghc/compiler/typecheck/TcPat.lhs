@@ -39,6 +39,7 @@ import PrelNames	( eqStringName, eqName, geName, cCallableClassName )
 import BasicTypes	( isBoxed )
 import Bag
 import Outputable
+import FastString
 \end{code}
 
 
@@ -291,7 +292,7 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
 tcPat tc_bndr (LitPatIn lit@(HsLitLit s _)) pat_ty 
 	-- cf tcExpr on LitLits
   = tcLookupClass cCallableClassName		`thenNF_Tc` \ cCallableClass ->
-    newDicts (LitLitOrigin (_UNPK_ s))
+    newDicts (LitLitOrigin (unpackFS s))
 	     [mkClassPred cCallableClass [pat_ty]]	`thenNF_Tc` \ dicts ->
     returnTc (LitPat (HsLitLit s pat_ty) pat_ty, mkLIE dicts, emptyBag, emptyBag, emptyLIE)
 

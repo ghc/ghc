@@ -11,6 +11,7 @@ module HsImpExp where
 import Name 		( isLexSym )
 import Module		( ModuleName, WhereFrom )
 import Outputable
+import FastString
 import SrcLoc		( SrcLoc )
 \end{code}
 
@@ -99,7 +100,7 @@ ppr_var v | isOperator v = parens (ppr v)
 
 \begin{code}
 isOperator :: Outputable a => a -> Bool
-isOperator v = isLexSym (_PK_ (showSDocUnqual (ppr v)))
+isOperator v = isLexSym (mkFastString (showSDocUnqual (ppr v)))
 	-- We use (showSDoc (ppr v)), rather than isSymOcc (getOccName v) simply so
 	-- that we don't need NamedThing in the context of all these functions.
 	-- Gruesome, but simple.

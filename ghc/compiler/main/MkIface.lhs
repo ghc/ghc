@@ -61,6 +61,7 @@ import Util		( sortLt, dropList )
 import Binary		( getBinFileWithDict )
 import BinIface		( writeBinIface )
 import ErrUtils		( dumpIfSet_dyn )
+import FastString
 
 import Monad		( when )
 import Maybe		( catMaybes )
@@ -377,7 +378,7 @@ ifaceRule (id, Rule name act bndrs args rhs)
 
 bogusIfaceRule :: (NamedThing a) => a -> RuleDecl Name pat
 bogusIfaceRule id
-  = IfaceRule SLIT("bogus") NeverActive [] (getName id) [] (UfVar (getName id)) noSrcLoc
+  = IfaceRule FSLIT("bogus") NeverActive [] (getName id) [] (UfVar (getName id)) noSrcLoc
 \end{code}
 
 
@@ -554,7 +555,7 @@ dump_rules rs = vcat [ptext SLIT("{-# RULES"),
 pprIface :: ModIface -> SDoc
 pprIface iface
  = vcat [ ptext SLIT("__interface")
-		<+> doubleQuotes (ptext (mi_package iface))
+		<+> doubleQuotes (ftext (mi_package iface))
 		<+> ppr (mi_module iface) <+> ppr (vers_module version_info)
 		<+> pp_sub_vers
 		<+> (if mi_orphan iface then char '!' else empty)
@@ -671,11 +672,11 @@ pprRulesAndDeprecs rules deprecs
     pp_deprecs deprecs   = ptext SLIT("__D") <+> guts
 			  where
 			    guts = case deprecs of
-					DeprecAll txt  -> doubleQuotes (ptext txt)
+					DeprecAll txt  -> doubleQuotes (ftext txt)
 					DeprecSome env -> ppr_deprec_env env
 
-ppr_deprec_env :: NameEnv (Name, FAST_STRING) -> SDoc
+ppr_deprec_env :: NameEnv (Name, FastString) -> SDoc
 ppr_deprec_env env = vcat (punctuate semi (map pp_deprec (nameEnvElts env)))
 	           where
-   	 	     pp_deprec (name, txt) = pprOcc name <+> doubleQuotes (ptext txt)
+   	 	     pp_deprec (name, txt) = pprOcc name <+> doubleQuotes (ftext txt)
 \end{code}

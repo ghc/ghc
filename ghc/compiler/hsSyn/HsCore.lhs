@@ -50,6 +50,7 @@ import FiniteMap	( lookupFM )
 import CostCentre
 import Util		( eqListBy, lengthIs )
 import Outputable
+import FastString
 \end{code}
 
 %************************************************************************
@@ -69,7 +70,7 @@ data UfExpr name
   | UfLet	(UfBinding name)  (UfExpr name)
   | UfNote	(UfNote name) (UfExpr name)
   | UfLit	Literal
-  | UfLitLit	FAST_STRING (HsType name)
+  | UfLitLit	FastString (HsType name)
   | UfFCall	ForeignCall (HsType name)
 
 data UfNote name = UfSCC CostCentre
@@ -83,7 +84,7 @@ data UfConAlt name = UfDefault
  		   | UfDataAlt name
 		   | UfTupleAlt (HsTupCon name)
 		   | UfLitAlt Literal
-		   | UfLitLitAlt FAST_STRING (HsType name)
+		   | UfLitLitAlt FastString (HsType name)
 
 data UfBinding name
   = UfNonRec	(UfBinder name)

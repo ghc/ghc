@@ -193,7 +193,7 @@ data DNCallSpec = DNCallSpec FastString
   {-! derive: Binary !-}
 
 instance Outputable DNCallSpec where
-  ppr (DNCallSpec s) = char '"' <> ptext s <> char '"'
+  ppr (DNCallSpec s) = char '"' <> ftext s <> char '"'
 \end{code}
 
 

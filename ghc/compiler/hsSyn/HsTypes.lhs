@@ -115,8 +115,8 @@ data HsType name
 
 -----------------------
 hsUsOnce, hsUsMany :: HsType RdrName
-hsUsOnce = HsTyVar (mkUnqual tvName SLIT("."))  -- deep magic
-hsUsMany = HsTyVar (mkUnqual tvName SLIT("!"))  -- deep magic
+hsUsOnce = HsTyVar (mkUnqual tvName FSLIT("."))  -- deep magic
+hsUsMany = HsTyVar (mkUnqual tvName FSLIT("!"))  -- deep magic
 
 hsUsOnce_Name, hsUsMany_Name :: HsType Name
 hsUsOnce_Name = HsTyVar usOnceTyConName

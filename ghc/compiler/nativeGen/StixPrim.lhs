@@ -82,10 +82,10 @@ foreignCallCode lhs call@(CCall (CCallSpec ctarget cconv safety)) rhs
 	| otherwise             = 0
     
        suspend = StAssignReg IntRep id 
-   		 (StCall (Left SLIT("suspendThread")) {-no:cconv-} CCallConv
+   		 (StCall (Left FSLIT("suspendThread")) {-no:cconv-} CCallConv
                          IntRep [StReg stgBaseReg, StInt is_threadSafe ])
        resume  = StVoidable 
-                 (StCall (Left SLIT("resumeThread")) {-no:cconv-} CCallConv
+                 (StCall (Left FSLIT("resumeThread")) {-no:cconv-} CCallConv
                          VoidRep [StReg id, StInt is_threadSafe ])
     in
     returnUs (\xs -> save (suspend : ccall : resume : load xs))

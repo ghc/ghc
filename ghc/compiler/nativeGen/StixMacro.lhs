@@ -72,7 +72,7 @@ adding an indirection.
 macroCode UPD_CAF args
   = let
 	[cafptr,bhptr] = map amodeToStix args
-	new_caf = StVoidable (StCall (Left SLIT("newCAF")) CCallConv VoidRep [cafptr])
+	new_caf = StVoidable (StCall (Left FSLIT("newCAF")) CCallConv VoidRep [cafptr])
 	a1 = StAssignMem PtrRep (StIndex PtrRep cafptr fixedHS) bhptr
 	a2 = StAssignMem PtrRep cafptr ind_static_info
     in
@@ -178,7 +178,7 @@ macroCode REGISTER_IMPORT [arg]
 macroCode REGISTER_FOREIGN_EXPORT [arg]
    = returnUs (
 	\xs -> StVoidable (
-                  StCall (Left SLIT("getStablePtr")) CCallConv VoidRep 
+                  StCall (Left FSLIT("getStablePtr")) CCallConv VoidRep 
                          [amodeToStix arg]
                )
 	     : xs

@@ -544,7 +544,7 @@ unpacked_opts :: [String]
 unpacked_opts =
   concat $
   map (expandAts) $
-  map _UNPK_ argv  -- NOT ARGV any more: v_Static_hsc_opts
+  map unpackFS argv  -- NOT ARGV any more: v_Static_hsc_opts
   where
    expandAts ('@':fname) = words (unsafePerformIO (readFile fname))
    expandAts l = [l]
@@ -601,7 +601,7 @@ opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
    The Prelude, for example is compiled with '-inpackage std'
 -}
 opt_InPackage			= case lookup_str "-inpackage=" of
-				    Just p  -> _PK_ p
+				    Just p  -> mkFastString p
 				    Nothing -> FSLIT("Main")	-- The package name if none is specified
 
 opt_EmitCExternDecls	        = lookUp  FSLIT("-femit-extern-decls")

@@ -123,7 +123,7 @@ linkSomeBCOs toplevs_only ie ce_in ul_bcos
 data UnlinkedBCO
    = UnlinkedBCO Name
                  (SizedSeq Word16)		 -- insns
-                 (SizedSeq (Either Word FAST_STRING))	 -- literals
+                 (SizedSeq (Either Word FastString))	 -- literals
 			-- Either literal words or a pointer to a asciiz
 			-- string, denoting a label whose *address* should
 			-- be determined at link time
@@ -195,7 +195,7 @@ assembleBCO (ProtoBCO nm instrs origin malloced)
      in
      do  -- pass 2: generate the instruction, ptr and nonptr bits
          insns <- return emptySS :: IO (SizedSeq Word16)
-         lits  <- return emptySS :: IO (SizedSeq (Either Word FAST_STRING))
+         lits  <- return emptySS :: IO (SizedSeq (Either Word FastString))
          ptrs  <- return emptySS :: IO (SizedSeq (Either Name PrimOp))
          itbls <- return emptySS :: IO (SizedSeq Name)
          let init_asm_state = (insns,lits,ptrs,itbls)
@@ -216,7 +216,7 @@ assembleBCO (ProtoBCO nm instrs origin malloced)
 
 -- instrs nonptrs ptrs itbls
 type AsmState = (SizedSeq Word16, 
-                 SizedSeq (Either Word FAST_STRING),
+                 SizedSeq (Either Word FastString),
                  SizedSeq (Either Name PrimOp), 
                  SizedSeq Name)
 
@@ -578,10 +578,10 @@ newBCO a b c d
    = IO (\s -> case newBCO# a b c d s of (# s1, bco #) -> (# s1, BCO bco #))
 
 
-lookupLiteral :: Either Word FAST_STRING -> IO Word
+lookupLiteral :: Either Word FastString -> IO Word
 lookupLiteral (Left w) = return w
 lookupLiteral (Right addr_of_label_string)
-   = do let label_to_find = _UNPK_ addr_of_label_string
+   = do let label_to_find = unpackFS addr_of_label_string
         m <- lookupSymbol label_to_find 
         case m of
            -- Can't be bothered to find the official way to convert Addr# to Word#;
@@ -649,7 +649,7 @@ linkFail who what
 -- HACKS!!!  ToDo: cleaner
 nameToCLabel :: Name -> String{-suffix-} -> String
 nameToCLabel n suffix
-   = _UNPK_(moduleNameFS (rdrNameModule rn)) 
+   = unpackFS(moduleNameFS (rdrNameModule rn)) 
      ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
      where rn = toRdrName n
 

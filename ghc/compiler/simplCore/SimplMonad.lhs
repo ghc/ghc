@@ -85,6 +85,7 @@ import Outputable
 import Array		( array, (//) )
 import FastTypes
 import GlaExts		( indexArray# )
+import FastString
 
 #if __GLASGOW_HASKELL__ < 503
 import PrelArr  ( Array(..) )
@@ -446,7 +447,7 @@ data Tick
   | PostInlineUnconditionally	Id
 
   | UnfoldingDone    		Id
-  | RuleFired			FAST_STRING	-- Rule name
+  | RuleFired			FastString	-- Rule name
 
   | LetFloatFromLet
   | EtaExpansion		Id	-- LHS binder
@@ -964,7 +965,7 @@ type SwitchChecker = SimplifierSwitch -> SwitchResult
 
 data SwitchResult
   = SwBool	Bool		-- on/off
-  | SwString	FAST_STRING	-- nothing or a String
+  | SwString	FastString	-- nothing or a String
   | SwInt	Int		-- nothing or an Int
 
 isAmongSimpl :: [SimplifierSwitch] -> SimplifierSwitch -> SwitchResult

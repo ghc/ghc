@@ -50,6 +50,7 @@ import Stix		( pprStixStmt )
 -- DEBUGGING ONLY
 import IOExts		( trace )
 import Outputable	( assertPanic )
+import FastString
 
 infixr 3 `bind`
 \end{code}
@@ -135,7 +136,7 @@ stmtToInstrs stmt = case stmt of
     -- Top-level lifted-out string.  The segment will already have been set
     -- (see Stix.liftStrings).
     StDataString str
-      -> returnNat (unitOL (ASCII True (_UNPK_ str)))
+      -> returnNat (unitOL (ASCII True (unpackFS str)))
 
 #ifdef DEBUG
     other -> pprPanic "stmtToInstrs" (pprStixStmt other)
@@ -543,7 +544,7 @@ getRegister (StString s)
 	code dst = toOL [
 	    SEGMENT RoDataSegment,
 	    LABEL lbl,
-	    ASCII True (_UNPK_ s),
+	    ASCII True (unpackFS s),
 	    SEGMENT TextSegment,
 #if alpha_TARGET_ARCH
 	    LDA dst (AddrImm imm_lbl)
@@ -600,30 +601,30 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       other_op -> getRegister (StCall fn CCallConv DoubleRep [x])
 	where
 	  fn = case other_op of
-		 FloatExpOp    -> SLIT("exp")
-		 FloatLogOp    -> SLIT("log")
-		 FloatSqrtOp   -> SLIT("sqrt")
-		 FloatSinOp    -> SLIT("sin")
-		 FloatCosOp    -> SLIT("cos")
-		 FloatTanOp    -> SLIT("tan")
-		 FloatAsinOp   -> SLIT("asin")
-		 FloatAcosOp   -> SLIT("acos")
-		 FloatAtanOp   -> SLIT("atan")
-		 FloatSinhOp   -> SLIT("sinh")
-		 FloatCoshOp   -> SLIT("cosh")
-		 FloatTanhOp   -> SLIT("tanh")
-		 DoubleExpOp   -> SLIT("exp")
-		 DoubleLogOp   -> SLIT("log")
-		 DoubleSqrtOp  -> SLIT("sqrt")
-		 DoubleSinOp   -> SLIT("sin")
-		 DoubleCosOp   -> SLIT("cos")
-		 DoubleTanOp   -> SLIT("tan")
-		 DoubleAsinOp  -> SLIT("asin")
-		 DoubleAcosOp  -> SLIT("acos")
-		 DoubleAtanOp  -> SLIT("atan")
-		 DoubleSinhOp  -> SLIT("sinh")
-		 DoubleCoshOp  -> SLIT("cosh")
-		 DoubleTanhOp  -> SLIT("tanh")
+		 FloatExpOp    -> FSLIT("exp")
+		 FloatLogOp    -> FSLIT("log")
+		 FloatSqrtOp   -> FSLIT("sqrt")
+		 FloatSinOp    -> FSLIT("sin")
+		 FloatCosOp    -> FSLIT("cos")
+		 FloatTanOp    -> FSLIT("tan")
+		 FloatAsinOp   -> FSLIT("asin")
+		 FloatAcosOp   -> FSLIT("acos")
+		 FloatAtanOp   -> FSLIT("atan")
+		 FloatSinhOp   -> FSLIT("sinh")
+		 FloatCoshOp   -> FSLIT("cosh")
+		 FloatTanhOp   -> FSLIT("tanh")
+		 DoubleExpOp   -> FSLIT("exp")
+		 DoubleLogOp   -> FSLIT("log")
+		 DoubleSqrtOp  -> FSLIT("sqrt")
+		 DoubleSinOp   -> FSLIT("sin")
+		 DoubleCosOp   -> FSLIT("cos")
+		 DoubleTanOp   -> FSLIT("tan")
+		 DoubleAsinOp  -> FSLIT("asin")
+		 DoubleAcosOp  -> FSLIT("acos")
+		 DoubleAtanOp  -> FSLIT("atan")
+		 DoubleSinhOp  -> FSLIT("sinh")
+		 DoubleCoshOp  -> FSLIT("cosh")
+		 DoubleTanhOp  -> FSLIT("tanh")
   where
     pr = panic "MachCode.getRegister: no primrep needed for Alpha"
 
@@ -707,8 +708,8 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       ISraOp -> trivialCode SRA x y -- was: panic "AlphaGen:isra"
       ISrlOp -> trivialCode SRL x y -- was: panic "AlphaGen:isrl"
 
-      FloatPowerOp  -> getRegister (StCall SLIT("pow") CCallConv DoubleRep [x,y])
-      DoublePowerOp -> getRegister (StCall SLIT("pow") CCallConv DoubleRep [x,y])
+      FloatPowerOp  -> getRegister (StCall FSLIT("pow") CCallConv DoubleRep [x,y])
+      DoublePowerOp -> getRegister (StCall FSLIT("pow") CCallConv DoubleRep [x,y])
   where
     {- ------------------------------------------------------------
 	Some bizarre special code for getting condition codes into
@@ -902,27 +903,27 @@ getRegister (StMachOp mop [x]) -- unary MachOps
         demote  x = StMachOp MO_Dbl_to_Flt [x]
 	(is_float_op, fn)
 	  = case mop of
-	      MO_Flt_Exp   -> (True,  SLIT("exp"))
-	      MO_Flt_Log   -> (True,  SLIT("log"))
+	      MO_Flt_Exp   -> (True,  FSLIT("exp"))
+	      MO_Flt_Log   -> (True,  FSLIT("log"))
 
-	      MO_Flt_Asin  -> (True,  SLIT("asin"))
-	      MO_Flt_Acos  -> (True,  SLIT("acos"))
-	      MO_Flt_Atan  -> (True,  SLIT("atan"))
+	      MO_Flt_Asin  -> (True,  FSLIT("asin"))
+	      MO_Flt_Acos  -> (True,  FSLIT("acos"))
+	      MO_Flt_Atan  -> (True,  FSLIT("atan"))
 
-	      MO_Flt_Sinh  -> (True,  SLIT("sinh"))
-	      MO_Flt_Cosh  -> (True,  SLIT("cosh"))
-	      MO_Flt_Tanh  -> (True,  SLIT("tanh"))
+	      MO_Flt_Sinh  -> (True,  FSLIT("sinh"))
+	      MO_Flt_Cosh  -> (True,  FSLIT("cosh"))
+	      MO_Flt_Tanh  -> (True,  FSLIT("tanh"))
 
-	      MO_Dbl_Exp   -> (False, SLIT("exp"))
-	      MO_Dbl_Log   -> (False, SLIT("log"))
+	      MO_Dbl_Exp   -> (False, FSLIT("exp"))
+	      MO_Dbl_Log   -> (False, FSLIT("log"))
 
-	      MO_Dbl_Asin  -> (False, SLIT("asin"))
-	      MO_Dbl_Acos  -> (False, SLIT("acos"))
-	      MO_Dbl_Atan  -> (False, SLIT("atan"))
+	      MO_Dbl_Asin  -> (False, FSLIT("asin"))
+	      MO_Dbl_Acos  -> (False, FSLIT("acos"))
+	      MO_Dbl_Atan  -> (False, FSLIT("atan"))
 
-	      MO_Dbl_Sinh  -> (False, SLIT("sinh"))
-	      MO_Dbl_Cosh  -> (False, SLIT("cosh"))
-	      MO_Dbl_Tanh  -> (False, SLIT("tanh"))
+	      MO_Dbl_Sinh  -> (False, FSLIT("sinh"))
+	      MO_Dbl_Cosh  -> (False, FSLIT("cosh"))
+	      MO_Dbl_Tanh  -> (False, FSLIT("tanh"))
 
               other -> pprPanic "getRegister(x86) - binary StMachOp (2)" 
                                 (pprMachOp mop)
@@ -997,10 +998,10 @@ getRegister (StMachOp mop [x, y]) -- dyadic MachOps
       MO_Nat_Sar  -> shift_code (SAR L) x y {-False-}
 
       MO_Flt_Pwr  -> getRegister (demote 
-                                 (StCall (Left SLIT("pow")) CCallConv DoubleRep 
+                                 (StCall (Left FSLIT("pow")) CCallConv DoubleRep 
                                          [promote x, promote y])
                                  )
-      MO_Dbl_Pwr -> getRegister (StCall (Left SLIT("pow")) CCallConv DoubleRep 
+      MO_Dbl_Pwr -> getRegister (StCall (Left FSLIT("pow")) CCallConv DoubleRep 
                                         [x, y])
       other -> pprPanic "getRegister(x86) - binary StMachOp (1)" (pprMachOp mop)
   where
@@ -1089,7 +1090,7 @@ getRegister (StMachOp mop [x, y]) -- dyadic MachOps
                     code_val `snocOL`
                     MOV L (OpReg src_val) r_dst `appOL`
                     toOL [
-                       COMMENT (_PK_ "begin shift sequence"),
+                       COMMENT (mkFastString "begin shift sequence"),
                        MOV L (OpReg src_val) r_dst,
                        MOV L (OpReg src_amt) r_tmp,
 
@@ -1118,7 +1119,7 @@ getRegister (StMachOp mop [x, y]) -- dyadic MachOps
                        instr (ImmInt 1) r_dst,
                        LABEL lbl_after,
                                            
-                       COMMENT (_PK_ "end shift sequence")
+                       COMMENT (mkFastString "end shift sequence")
                     ]
        in
        returnNat (Any IntRep code__2)
@@ -1290,37 +1291,37 @@ getRegister (StMachOp mop [x]) -- unary PrimOps
 
 	(is_float_op, fn)
 	  = case mop of
-	      MO_Flt_Exp    -> (True,  SLIT("exp"))
-	      MO_Flt_Log    -> (True,  SLIT("log"))
-	      MO_Flt_Sqrt   -> (True,  SLIT("sqrt"))
+	      MO_Flt_Exp    -> (True,  FSLIT("exp"))
+	      MO_Flt_Log    -> (True,  FSLIT("log"))
+	      MO_Flt_Sqrt   -> (True,  FSLIT("sqrt"))
 
-	      MO_Flt_Sin    -> (True,  SLIT("sin"))
-	      MO_Flt_Cos    -> (True,  SLIT("cos"))
-	      MO_Flt_Tan    -> (True,  SLIT("tan"))
+	      MO_Flt_Sin    -> (True,  FSLIT("sin"))
+	      MO_Flt_Cos    -> (True,  FSLIT("cos"))
+	      MO_Flt_Tan    -> (True,  FSLIT("tan"))
 
-	      MO_Flt_Asin   -> (True,  SLIT("asin"))
-	      MO_Flt_Acos   -> (True,  SLIT("acos"))
-	      MO_Flt_Atan   -> (True,  SLIT("atan"))
+	      MO_Flt_Asin   -> (True,  FSLIT("asin"))
+	      MO_Flt_Acos   -> (True,  FSLIT("acos"))
+	      MO_Flt_Atan   -> (True,  FSLIT("atan"))
 
-	      MO_Flt_Sinh   -> (True,  SLIT("sinh"))
-	      MO_Flt_Cosh   -> (True,  SLIT("cosh"))
-	      MO_Flt_Tanh   -> (True,  SLIT("tanh"))
+	      MO_Flt_Sinh   -> (True,  FSLIT("sinh"))
+	      MO_Flt_Cosh   -> (True,  FSLIT("cosh"))
+	      MO_Flt_Tanh   -> (True,  FSLIT("tanh"))
 
-	      MO_Dbl_Exp    -> (False, SLIT("exp"))
-	      MO_Dbl_Log    -> (False, SLIT("log"))
-	      MO_Dbl_Sqrt   -> (False, SLIT("sqrt"))
+	      MO_Dbl_Exp    -> (False, FSLIT("exp"))
+	      MO_Dbl_Log    -> (False, FSLIT("log"))
+	      MO_Dbl_Sqrt   -> (False, FSLIT("sqrt"))
 
-	      MO_Dbl_Sin    -> (False, SLIT("sin"))
-	      MO_Dbl_Cos    -> (False, SLIT("cos"))
-	      MO_Dbl_Tan    -> (False, SLIT("tan"))
+	      MO_Dbl_Sin    -> (False, FSLIT("sin"))
+	      MO_Dbl_Cos    -> (False, FSLIT("cos"))
+	      MO_Dbl_Tan    -> (False, FSLIT("tan"))
 
-	      MO_Dbl_Asin   -> (False, SLIT("asin"))
-	      MO_Dbl_Acos   -> (False, SLIT("acos"))
-	      MO_Dbl_Atan   -> (False, SLIT("atan"))
+	      MO_Dbl_Asin   -> (False, FSLIT("asin"))
+	      MO_Dbl_Acos   -> (False, FSLIT("acos"))
+	      MO_Dbl_Atan   -> (False, FSLIT("atan"))
 
-	      MO_Dbl_Sinh   -> (False, SLIT("sinh"))
-	      MO_Dbl_Cosh   -> (False, SLIT("cosh"))
-	      MO_Dbl_Tanh   -> (False, SLIT("tanh"))
+	      MO_Dbl_Sinh   -> (False, FSLIT("sinh"))
+	      MO_Dbl_Cosh   -> (False, FSLIT("cosh"))
+	      MO_Dbl_Tanh   -> (False, FSLIT("tanh"))
 
               other -> pprPanic "getRegister(sparc) - binary StMachOp (2)" 
                                 (pprMachOp mop)
@@ -1370,10 +1371,10 @@ getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
       MO_NatS_MulMayOflo -> imulMayOflo x y
 
       -- ToDo: teach about V8+ SPARC div instructions
-      MO_NatS_Quot -> idiv SLIT(".div")  x y
-      MO_NatS_Rem  -> idiv SLIT(".rem")  x y
-      MO_NatU_Quot -> idiv SLIT(".udiv")  x y
-      MO_NatU_Rem  -> idiv SLIT(".urem")  x y
+      MO_NatS_Quot -> idiv FSLIT(".div")  x y
+      MO_NatS_Rem  -> idiv FSLIT(".rem")  x y
+      MO_NatU_Quot -> idiv FSLIT(".udiv")  x y
+      MO_NatU_Rem  -> idiv FSLIT(".urem")  x y
 
       MO_Flt_Add   -> trivialFCode FloatRep  FADD x y
       MO_Flt_Sub   -> trivialFCode FloatRep  FSUB x y
@@ -1393,10 +1394,10 @@ getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
       MO_Nat_Shr   -> trivialCode SRL x y
       MO_Nat_Sar   -> trivialCode SRA x y
 
-      MO_Flt_Pwr  -> getRegister (StCall (Left SLIT("pow")) CCallConv DoubleRep 
+      MO_Flt_Pwr  -> getRegister (StCall (Left FSLIT("pow")) CCallConv DoubleRep 
                                          [promote x, promote y])
 		       where promote x = StMachOp MO_Flt_to_Dbl [x]
-      MO_Dbl_Pwr -> getRegister (StCall (Left SLIT("pow")) CCallConv DoubleRep 
+      MO_Dbl_Pwr -> getRegister (StCall (Left FSLIT("pow")) CCallConv DoubleRep 
                                         [x, y])
 
       other -> pprPanic "getRegister(sparc) - binary StMachOp (1)" (pprMachOp mop)
@@ -2625,7 +2626,7 @@ register allocator.
 
 \begin{code}
 genCCall
-    :: (Either FAST_STRING StixExpr)	-- function to call
+    :: (Either FastString StixExpr)	-- function to call
     -> CCallConv
     -> PrimRep		-- type of the result
     -> [StixExpr]	-- arguments (of mixed type)
@@ -2741,7 +2742,7 @@ genCCall fn cconv ret_rep args
     -- internally generated names like '.mul,' which don't get an
     -- underscore prefix
     -- ToDo:needed (WDP 96/03) ???
-    fn_u  = _UNPK_ (unLeft fn)
+    fn_u  = unpackFS (unLeft fn)
     fn__2 tot_arg_size
        | head fn_u == '.'
        = ImmLit (text (fn_u ++ stdcallsize tot_arg_size))
@@ -2886,7 +2887,7 @@ genCCall fn cconv kind args
      -- underscore prefix
      -- ToDo:needed (WDP 96/03) ???
      fn_static = unLeft fn
-     fn__2 = case (_HEAD_ fn_static) of
+     fn__2 = case (headFS fn_static) of
 	        '.' -> ImmLit (ptext fn_static)
 	        _   -> ImmLab False (ptext fn_static)
 

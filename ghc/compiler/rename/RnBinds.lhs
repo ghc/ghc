@@ -556,14 +556,14 @@ renameSig (InlineSig b v p src_loc)
 \begin{code}
 dupSigDeclErr sig
   = pushSrcLocRn loc $
-    addErrRn (sep [ptext SLIT("Duplicate") <+> ptext what_it_is <> colon,
+    addErrRn (sep [ptext SLIT("Duplicate") <+> what_it_is <> colon,
 		   ppr sig])
   where
     (what_it_is, loc) = hsSigDoc sig
 
 unknownSigErr sig
   = pushSrcLocRn loc $
-    addErrRn (sep [ptext SLIT("Misplaced") <+> ptext what_it_is <> colon,
+    addErrRn (sep [ptext SLIT("Misplaced") <+> what_it_is <> colon,
 		   ppr sig])
   where
     (what_it_is, loc) = hsSigDoc sig

@@ -64,6 +64,7 @@ import PrelNames	( unpackCStringName, unpackCStringUtf8Name,
 import Outputable
 import UnicodeUtil      ( intsToUtf8, stringToUtf8 )
 import Util             ( isSingleton, notNull )
+import FastString
 \end{code}
 
 
@@ -81,9 +82,9 @@ tidyLitPat lit        pat = pat
 
 tidyNPat :: HsLit -> Type -> TypecheckedPat -> TypecheckedPat
 tidyNPat (HsString s) _ pat
-  | _LENGTH_ s <= 1	-- Short string literals only
+  | lengthFS s <= 1	-- Short string literals only
   = foldr (\c pat -> ConPat consDataCon stringTy [] [] [mk_char_lit c,pat])
-	  (ConPat nilDataCon stringTy [] [] []) (_UNPK_INT_ s)
+	  (ConPat nilDataCon stringTy [] [] []) (unpackIntFS s)
 	-- The stringTy is the type of the whole pattern, not 
 	-- the type to instantiate (:) or [] with!
   where
@@ -389,7 +390,7 @@ mkErrorAppDs err_id ty msg
   = getSrcLocDs			`thenDs` \ src_loc ->
     let
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
-	core_msg = Lit (MachStr (_PK_ (stringToUtf8 full_msg)))
+	core_msg = Lit (MachStr (mkFastString (stringToUtf8 full_msg)))
     in
     returnDs (mkApps (Var err_id) [Type ty, core_msg])
 \end{code}
@@ -434,16 +435,16 @@ mkIntegerLit i
 mkSmallIntegerLit i = mkConApp smallIntegerDataCon [mkIntLit i]
 
 mkStringLit   :: String       -> DsM CoreExpr
-mkStringLit str	= mkStringLitFS (_PK_ str)
+mkStringLit str	= mkStringLitFS (mkFastString str)
 
-mkStringLitFS :: FAST_STRING  -> DsM CoreExpr
+mkStringLitFS :: FastString  -> DsM CoreExpr
 mkStringLitFS str
-  | _NULL_ str
+  | nullFastString str
   = returnDs (mkNilExpr charTy)
 
-  | _LENGTH_ str == 1
+  | lengthFS str == 1
   = let
-	the_char = mkConApp charDataCon [mkLit (MachChar (_HEAD_INT_ str))]
+	the_char = mkConApp charDataCon [mkLit (MachChar (headIntFS str))]
     in
     returnDs (mkConsExpr charTy the_char (mkNilExpr charTy))
 
@@ -453,10 +454,10 @@ mkStringLitFS str
 
   | otherwise
   = dsLookupGlobalValue unpackCStringUtf8Name	`thenDs` \ unpack_id ->
-    returnDs (App (Var unpack_id) (Lit (MachStr (_PK_ (intsToUtf8 int_chars)))))
+    returnDs (App (Var unpack_id) (Lit (MachStr (mkFastString (intsToUtf8 int_chars)))))
 
   where
-    int_chars = _UNPK_INT_ str
+    int_chars = unpackIntFS str
     safeChar c = c >= 1 && c <= 0xFF
 \end{code}
 

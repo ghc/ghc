@@ -62,12 +62,13 @@ import PrelNames	( cCallableClassName,
 			  enumFromToPName, enumFromThenToPName,
 			  thenMName, bindMName, failMName, returnMName, ioTyConName
 			)
-import Outputable
 import ListSetOps	( minusList )
-import Util
 import CmdLineOpts
 import HscTypes		( TyThing(..) )
 
+import Util
+import Outputable
+import FastString
 \end{code}
 
 %************************************************************************
@@ -239,11 +240,11 @@ tcMonoExpr e0@(HsCCall lbl args may_gc is_casm ignored_fake_result_ty) res_ty
     tcLookupTyCon ioTyConName		`thenNF_Tc` \ ioTyCon ->
     let
 	new_arg_dict (arg, arg_ty)
-	  = newDicts (CCallOrigin (_UNPK_ lbl) (Just arg))
+	  = newDicts (CCallOrigin (unpackFS lbl) (Just arg))
 		     [mkClassPred cCallableClass [arg_ty]]	`thenNF_Tc` \ arg_dicts ->
 	    returnNF_Tc arg_dicts	-- Actually a singleton bag
 
-	result_origin = CCallOrigin (_UNPK_ lbl) Nothing {- Not an arg -}
+	result_origin = CCallOrigin (unpackFS lbl) Nothing {- Not an arg -}
     in
 
 	-- Arguments
@@ -993,7 +994,7 @@ Overloaded literals.
 tcLit :: HsLit -> TcType -> TcM (TcExpr, LIE)
 tcLit (HsLitLit s _) res_ty
   = tcLookupClass cCallableClassName			`thenNF_Tc` \ cCallableClass ->
-    newDicts (LitLitOrigin (_UNPK_ s))
+    newDicts (LitLitOrigin (unpackFS s))
 	     [mkClassPred cCallableClass [res_ty]]	`thenNF_Tc` \ dicts ->
     returnTc (HsLit (HsLitLit s res_ty), mkLIE dicts)
 

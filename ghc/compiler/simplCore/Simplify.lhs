@@ -916,7 +916,7 @@ completeCall env var occ_info cont
 		tick (RuleFired rule_name)			`thenSmpl_`
 		(if dopt Opt_D_dump_inlinings dflags then
 		   pprTrace "Rule fired" (vcat [
-			text "Rule:" <+> ptext rule_name,
+			text "Rule:" <+> ftext rule_name,
 			text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
 			text "After: " <+> pprCoreExpr rule_rhs,
 			text "Cont:  " <+> ppr call_cont])
@@ -1687,7 +1687,7 @@ mkDupableAlt env case_bndr' cont alt@(con, bndrs, rhs)
     )							`thenSmpl` \ (final_bndrs', final_args) ->
 
 	-- See comment about "$j" name above
-    newId (encodeFS SLIT("$j")) (mkPiTypes final_bndrs' rhs_ty')	`thenSmpl` \ join_bndr ->
+    newId (encodeFS FSLIT("$j")) (mkPiTypes final_bndrs' rhs_ty')	`thenSmpl` \ join_bndr ->
 	-- Notice the funky mkPiTypes.  If the contructor has existentials
 	-- it's possible that the join point will be abstracted over
 	-- type varaibles as well as term variables.

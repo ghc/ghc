@@ -162,7 +162,7 @@ adjustSpAndHp newRealSp = do
 		if (rHp == vHp) then AbsCNop
 	 	else mkAbstractCs [
 		CAssign (CReg Hp) (CAddr (hpRel rHp vHp)),
-			profCtrAbsC SLIT("TICK_ALLOC_HEAP") 
+			profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
 			[ mkIntCLit (vHp - rHp), CLbl ticky_ctr DataPtrRep ]
 		]
 	let new_usage = ((vSp, fSp, newRealSp, hwSp), (vHp,vHp))

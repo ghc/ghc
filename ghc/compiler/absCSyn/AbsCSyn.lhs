@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.46 2002/03/02 18:02:30 sof Exp $
+% $Id: AbsCSyn.lhs,v 1.47 2002/04/29 14:03:39 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -53,8 +53,7 @@ import StgSyn		( StgOp )
 import TyCon		( TyCon )
 import BitSet				-- for liveness masks
 import FastTypes
-
-import Outputable
+import FastString
 \end{code}
 
 @AbstractC@ is a list of Abstract~C statements, but the data structure
@@ -174,8 +173,8 @@ stored in a mixed type location.)
 
   -- see the notes about these next few; they follow below...
   | CMacroStmt		CStmtMacro	[CAddrMode]
-  | CCallProfCtrMacro	FAST_STRING	[CAddrMode]
-  | CCallProfCCMacro	FAST_STRING	[CAddrMode]
+  | CCallProfCtrMacro	FastString	[CAddrMode]
+  | CCallProfCCMacro	FastString	[CAddrMode]
 
     {- The presence of this constructor is a makeshift solution;
        it being used to work around a gcc-related problem of
@@ -401,7 +400,7 @@ Convenience functions:
 mkIntCLit :: Int -> CAddrMode
 mkIntCLit i = CLit (mkMachInt (toInteger i))
 
-mkCString :: FAST_STRING -> CAddrMode
+mkCString :: FastString -> CAddrMode
 mkCString s = CLit (MachStr s)
 
 mkCCostCentre :: CostCentre -> CAddrMode

@@ -93,6 +93,7 @@ import PrelNames
 import Maybe            ( isJust )
 import Util             ( dropList, isSingleton )
 import Outputable
+import FastString
 import ListSetOps	( assoc, assocMaybe )
 import UnicodeUtil      ( stringToUtf8 )
 import List		( nubBy )
@@ -914,7 +915,7 @@ mkRuntimeErrorApp
 mkRuntimeErrorApp err_id res_ty err_msg 
   = mkApps (Var err_id) [Type res_ty, err_string]
   where
-    err_string = Lit (MachStr (_PK_ (stringToUtf8 err_msg)))
+    err_string = Lit (MachStr (mkFastString (stringToUtf8 err_msg)))
 
 rEC_SEL_ERROR_ID		= mkRuntimeErrorId recSelErrIdKey 	    	 FSLIT("recSelError")
 rUNTIME_ERROR_ID	 	= mkRuntimeErrorId runtimeErrorIdKey 	    	 FSLIT("runtimeError")
@@ -948,7 +949,7 @@ errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy
 %************************************************************************
 
 \begin{code}
-pcMiscPrelId :: Unique{-IdKey-} -> Module -> FAST_STRING -> Type -> IdInfo -> Id
+pcMiscPrelId :: Unique{-IdKey-} -> Module -> FastString -> Type -> IdInfo -> Id
 pcMiscPrelId key mod str ty info
   = let
 	name = mkWiredInName mod (mkVarOcc str) key

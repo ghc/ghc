@@ -34,6 +34,7 @@ import qualified TcType ( match )
 import BasicTypes	( Activation, CompilerPhase, isActive )
 
 import Outputable
+import FastString
 import Maybe		( isJust, isNothing, fromMaybe )
 import Util		( sortLt )
 import Bag
@@ -541,7 +542,7 @@ ruleCheckFun (phase, pat) fn args
   where
     name_match_rules = case idSpecialisation fn of
 			  Rules rules _ -> filter match rules
-    match rule = pat `isPrefixOf` _UNPK_ (ruleName rule)
+    match rule = pat `isPrefixOf` unpackFS (ruleName rule)
 
 ruleAppCheck_help :: CompilerPhase -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
 ruleAppCheck_help phase fn args rules
@@ -554,8 +555,10 @@ ruleAppCheck_help phase fn args rules
 
     check_rule rule = rule_herald rule <> colon <+> rule_info rule
 
-    rule_herald (BuiltinRule name _) = text "Builtin rule" <+> doubleQuotes (ptext name)
-    rule_herald (Rule name _ _ _ _)  = text "Rule" <+> doubleQuotes (ptext name)
+    rule_herald (BuiltinRule name _) = 
+	ptext SLIT("Builtin rule") <+> doubleQuotes (ftext name)
+    rule_herald (Rule name _ _ _ _)  = 
+	ptext SLIT("Rule") <+> doubleQuotes (ftext name)
 
     rule_info rule
 	| Just (name,_) <- matchRule noBlackList emptyInScopeSet rule args

@@ -28,6 +28,7 @@ import ST
 import MutableArray
 import Char		( chr, ord )
 import Maybe		( isJust )
+import FastString
 
 asmSDoc d = Outputable.withPprStyleDoc (
 	      Outputable.mkCodeStyle Outputable.AsmStyle) d
@@ -387,13 +388,13 @@ pprInstr :: Instr -> Doc
 
 --pprInstr (COMMENT s) = empty -- nuke 'em
 pprInstr (COMMENT s)
-   =  IF_ARCH_alpha( ((<>) (ptext SLIT("\t# ")) (ptext s))
-     ,IF_ARCH_sparc( ((<>) (ptext SLIT("! "))   (ptext s))
-     ,IF_ARCH_i386( ((<>) (ptext SLIT("# "))   (ptext s))
+   =  IF_ARCH_alpha( ((<>) (ptext SLIT("\t# ")) (ftext s))
+     ,IF_ARCH_sparc( ((<>) (ptext SLIT("! "))   (ftext s))
+     ,IF_ARCH_i386( ((<>) (ptext SLIT("# "))   (ftext s))
      ,)))
 
 pprInstr (DELTA d)
-   = pprInstr (COMMENT (_PK_ ("\tdelta = " ++ show d)))
+   = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
 
 pprInstr (SEGMENT TextSegment)
     =  IF_ARCH_alpha(ptext SLIT("\t.text\n\t.align 3") {-word boundary-}
@@ -868,8 +869,7 @@ pprRI :: RI -> Doc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprRegRIReg :: FAST_STRING -> Reg -> RI -> Reg -> Doc
-
+pprRegRIReg :: LitString -> Reg -> RI -> Reg -> Doc
 pprRegRIReg name reg1 ri reg2
   = hcat [
  	char '\t',
@@ -882,8 +882,7 @@ pprRegRIReg name reg1 ri reg2
 	pprReg reg2
     ]
 
-pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Doc
-
+pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
 	char '\t',
@@ -1293,7 +1292,7 @@ pprOperand s (OpReg r)   = pprReg s r
 pprOperand s (OpImm i)   = pprDollImm i
 pprOperand s (OpAddr ea) = pprAddr ea
 
-pprSizeImmOp :: FAST_STRING -> Size -> Imm -> Operand -> Doc
+pprSizeImmOp :: LitString -> Size -> Imm -> Operand -> Doc
 pprSizeImmOp name size imm op1
   = hcat [
         char '\t',
@@ -1306,7 +1305,7 @@ pprSizeImmOp name size imm op1
 	pprOperand size op1
     ]
 	
-pprSizeOp :: FAST_STRING -> Size -> Operand -> Doc
+pprSizeOp :: LitString -> Size -> Operand -> Doc
 pprSizeOp name size op1
   = hcat [
     	char '\t',
@@ -1316,7 +1315,7 @@ pprSizeOp name size op1
 	pprOperand size op1
     ]
 
-pprSizeOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
+pprSizeOpOp :: LitString -> Size -> Operand -> Operand -> Doc
 pprSizeOpOp name size op1 op2
   = hcat [
     	char '\t',
@@ -1328,7 +1327,7 @@ pprSizeOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprSizeByteOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
+pprSizeByteOpOp :: LitString -> Size -> Operand -> Operand -> Doc
 pprSizeByteOpOp name size op1 op2
   = hcat [
     	char '\t',
@@ -1340,7 +1339,7 @@ pprSizeByteOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprSizeOpReg :: FAST_STRING -> Size -> Operand -> Reg -> Doc
+pprSizeOpReg :: LitString -> Size -> Operand -> Reg -> Doc
 pprSizeOpReg name size op1 reg
   = hcat [
     	char '\t',
@@ -1352,7 +1351,7 @@ pprSizeOpReg name size op1 reg
 	pprReg size reg
     ]
 
-pprSizeReg :: FAST_STRING -> Size -> Reg -> Doc
+pprSizeReg :: LitString -> Size -> Reg -> Doc
 pprSizeReg name size reg1
   = hcat [
     	char '\t',
@@ -1362,7 +1361,7 @@ pprSizeReg name size reg1
 	pprReg size reg1
     ]
 
-pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Doc
+pprSizeRegReg :: LitString -> Size -> Reg -> Reg -> Doc
 pprSizeRegReg name size reg1 reg2
   = hcat [
     	char '\t',
@@ -1374,7 +1373,7 @@ pprSizeRegReg name size reg1 reg2
         pprReg size reg2
     ]
 
-pprCondRegReg :: FAST_STRING -> Size -> Cond -> Reg -> Reg -> Doc
+pprCondRegReg :: LitString -> Size -> Cond -> Reg -> Reg -> Doc
 pprCondRegReg name size cond reg1 reg2
   = hcat [
     	char '\t',
@@ -1386,7 +1385,7 @@ pprCondRegReg name size cond reg1 reg2
         pprReg size reg2
     ]
 
-pprSizeSizeRegReg :: FAST_STRING -> Size -> Size -> Reg -> Reg -> Doc
+pprSizeSizeRegReg :: LitString -> Size -> Size -> Reg -> Reg -> Doc
 pprSizeSizeRegReg name size1 size2 reg1 reg2
   = hcat [
     	char '\t',
@@ -1395,11 +1394,12 @@ pprSizeSizeRegReg name size1 size2 reg1 reg2
         pprSize size2,
 	space,
 	pprReg size1 reg1,
+
         comma,
         pprReg size2 reg2
     ]
 
-pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Doc
+pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
     	char '\t',
@@ -1413,7 +1413,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
         pprReg size reg3
     ]
 
-pprSizeAddr :: FAST_STRING -> Size -> MachRegsAddr -> Doc
+pprSizeAddr :: LitString -> Size -> MachRegsAddr -> Doc
 pprSizeAddr name size op
   = hcat [
     	char '\t',
@@ -1423,7 +1423,7 @@ pprSizeAddr name size op
 	pprAddr op
     ]
 
-pprSizeAddrReg :: FAST_STRING -> Size -> MachRegsAddr -> Reg -> Doc
+pprSizeAddrReg :: LitString -> Size -> MachRegsAddr -> Reg -> Doc
 pprSizeAddrReg name size op dst
   = hcat [
     	char '\t',
@@ -1435,7 +1435,7 @@ pprSizeAddrReg name size op dst
 	pprReg size dst
     ]
 
-pprSizeRegAddr :: FAST_STRING -> Size -> Reg -> MachRegsAddr -> Doc
+pprSizeRegAddr :: LitString -> Size -> Reg -> MachRegsAddr -> Doc
 pprSizeRegAddr name size src op
   = hcat [
     	char '\t',
@@ -1447,7 +1447,7 @@ pprSizeRegAddr name size src op
 	pprAddr op
     ]
 
-pprOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
+pprOpOp :: LitString -> Size -> Operand -> Operand -> Doc
 pprOpOp name size op1 op2
   = hcat [
     	char '\t',
@@ -1457,7 +1457,7 @@ pprOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprSizeOpOpCoerce :: FAST_STRING -> Size -> Size -> Operand -> Operand -> Doc
+pprSizeOpOpCoerce :: LitString -> Size -> Size -> Operand -> Operand -> Doc
 pprSizeOpOpCoerce name size1 size2 op1 op2
   = hcat [ char '\t', ptext name, pprSize size1, pprSize size2, space,
 	pprOperand size1 op1,
@@ -1465,7 +1465,7 @@ pprSizeOpOpCoerce name size1 size2 op1 op2
 	pprOperand size2 op2
     ]
 
-pprCondInstr :: FAST_STRING -> Cond -> Doc -> Doc
+pprCondInstr :: LitString -> Cond -> Doc -> Doc
 pprCondInstr name cond arg
   = hcat [ char '\t', ptext name, pprCond cond, space, arg]
 
@@ -1699,7 +1699,7 @@ pprRI :: RI -> Doc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Doc
+pprSizeRegReg :: LitString -> Size -> Reg -> Reg -> Doc
 pprSizeRegReg name size reg1 reg2
   = hcat [
     	char '\t',
@@ -1712,7 +1712,7 @@ pprSizeRegReg name size reg1 reg2
 	pprReg reg2
     ]
 
-pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Doc
+pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
     	char '\t',
@@ -1727,7 +1727,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 	pprReg reg3
     ]
 
-pprRegRIReg :: FAST_STRING -> Bool -> Reg -> RI -> Reg -> Doc
+pprRegRIReg :: LitString -> Bool -> Reg -> RI -> Reg -> Doc
 pprRegRIReg name b reg1 ri reg2
   = hcat [
 	char '\t',
@@ -1740,7 +1740,7 @@ pprRegRIReg name b reg1 ri reg2
 	pprReg reg2
     ]
 
-pprRIReg :: FAST_STRING -> Bool -> RI -> Reg -> Doc
+pprRIReg :: LitString -> Bool -> RI -> Reg -> Doc
 pprRIReg name b ri reg1
   = hcat [
 	char '\t',

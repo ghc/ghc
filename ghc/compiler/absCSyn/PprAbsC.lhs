@@ -59,6 +59,7 @@ import StgSyn		( StgOp(..) )
 import BitSet		( BitSet, intBS )
 import Outputable
 import GlaExts
+import FastString
 import Util		( lengthExceeds, listLengthCmp )
 
 import ST
@@ -309,10 +310,10 @@ pprAbsC (CMacroStmt macro as) _
   = hcat [ptext (cStmtMacroText macro), lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi] -- no casting
 pprAbsC (CCallProfCtrMacro op as) _
-  = hcat [ptext op, lparen,
+  = hcat [ftext op, lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi]
 pprAbsC (CCallProfCCMacro op as) _
-  = hcat [ptext op, lparen,
+  = hcat [ftext op, lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi]
 pprAbsC stmt@(CCallTypedef is_tdef (CCallSpec op_str cconv _) uniq results args) _
   =  hsep [ ptext (if is_tdef then SLIT("typedef") else SLIT("extern"))
@@ -971,7 +972,7 @@ pprFCall call@(CCall (CCallSpec target cconv safety)) uniq args results vol_regs
       = ppr_casm_results non_void_results
 
     call_str = case target of
-		  CasmTarget str  -> _UNPK_ str
+		  CasmTarget str  -> unpackFS str
 		  StaticTarget fn -> mk_ccall_str (pprCLabelString fn) ccall_args
 		  DynamicTarget   -> mk_ccall_str dyn_fun	       (tail ccall_args)
 

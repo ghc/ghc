@@ -81,7 +81,7 @@ happyError buf PState{ loc = loc } = PFailed (srcParseErr buf loc)
 loadPackageConfig :: FilePath -> IO [PackageConfig]
 loadPackageConfig conf_filename = do
    buf <- hGetStringBuffer conf_filename
-   let loc  = mkSrcLoc (_PK_ conf_filename) 1
+   let loc  = mkSrcLoc (mkFastString conf_filename) 1
        exts = ExtFlags {glasgowExtsEF = False,
 			parrEF	      = False}
    case parse buf (mkPState loc exts) of

@@ -11,20 +11,12 @@ module FastString
        (
 	FastString(..),     -- not abstract, for now.
 
-         --names?
         mkFastString,       -- :: String -> FastString
         mkFastStringNarrow, -- :: String -> FastString
         mkFastSubString,    -- :: Addr -> Int -> Int -> FastString
 
-	-- These ones hold on to the Addr after they return, and aren't hashed; 
-	-- they are used for literals
-	mkFastCharString,   -- :: Addr -> FastString
-	mkFastCharString#,  -- :: Addr# -> FastString
-	mkFastCharString2,  -- :: Addr -> Int -> FastString
-
 	mkFastString#,      -- :: Addr# -> FastString
         mkFastSubStringBA#, -- :: ByteArray# -> Int# -> Int# -> FastString
-        mkFastSubString#,   -- :: Addr# -> Int# -> Int# -> FastString
 
         mkFastStringInt,    -- :: [Int] -> FastString
 
@@ -41,8 +33,12 @@ module FastString
 	concatFS,	    -- :: [FastString] -> FastString
         consFS,             -- :: Char -> FastString -> FastString
 	indexFS,	    -- :: FastString -> Int -> Char
+	nilFS,		    -- :: FastString
 
-        hPutFS		    -- :: Handle -> FastString -> IO ()
+        hPutFS,		    -- :: Handle -> FastString -> IO ()
+
+	LitString, 
+	mkLitString#	    -- :: Addr# -> Addr
        ) where
 
 -- This #define suppresses the "import FastString" that
@@ -68,10 +64,9 @@ import Ptr		( Ptr(..) )
 #endif
 #if __GLASGOW_HASKELL__ < 503
 import PrelArr		( STArray(..), newSTArray )
-import IOExts		( hPutBufFull, hPutBufBAFull )
+import IOExts		( hPutBufBAFull )
 #else
 import GHC.Arr		( STArray(..), newSTArray )
-import System.IO	( hPutBuf )
 import IOExts 		( hPutBufBA )
 import CString		( unpackNBytesBA# )
 #endif
@@ -83,7 +78,6 @@ import Char             ( chr, ord )
 #define hASH_TBL_SIZE 993
 
 #if __GLASGOW_HASKELL__ < 503
-hPutBuf = hPutBufFull
 hPutBufBA = hPutBufBAFull
 #endif
 \end{code} 
@@ -103,10 +97,6 @@ data FastString
       Int#       -- length
       ByteArray# -- stuff
 
-  | CharStr      -- external C string
-      Addr#      -- pointer to the (null-terminated) bytes in C land.
-      Int#       -- length  (cached)
-
   | UnicodeStr   -- if contains characters outside '\1'..'\xFF'
       Int#       -- unique id
       [Int]      -- character numbers
@@ -114,20 +104,10 @@ data FastString
 instance Eq FastString where
 	-- shortcut for real FastStrings
   (FastString u1 _ _) == (FastString u2 _ _) = u1 ==# u2
-  a == b = 
-#ifdef DEBUG
-	trace ("slow FastString comparison: " ++ 
-		unpackFS a ++ "/" ++ unpackFS b) $
-#endif
-	case cmpFS a b of { LT -> False; EQ -> True;  GT -> False }
+  a == b = case cmpFS a b of { LT -> False; EQ -> True;  GT -> False }
 
-  (FastString u1 _ _) == (FastString u2 _ _) = u1 /=# u2
-  a /= b = 
-#ifdef DEBUG
-	trace ("slow FastString comparison: " ++ 
-		unpackFS a ++ "/" ++ unpackFS b) $
-#endif
-	case cmpFS a b of { LT -> True;  EQ -> False; GT -> True  }
+  (FastString u1 _ _) /= (FastString u2 _ _) = u1 /=# u2
+  a /= b = case cmpFS a b of { LT -> True;  EQ -> False; GT -> True  }
 
 instance Ord FastString where
     a <= b = case cmpFS a b of { LT -> True;  EQ -> True;  GT -> False }
@@ -142,25 +122,15 @@ instance Ord FastString where
 
 lengthFS :: FastString -> Int
 lengthFS (FastString _ l# _) = I# l#
-lengthFS (CharStr a# l#) = I# l#
 lengthFS (UnicodeStr _ s) = length s
 
 nullFastString :: FastString -> Bool
 nullFastString (FastString _ l# _) = l# ==# 0#
-nullFastString (CharStr _ l#) = l# ==# 0#
 nullFastString (UnicodeStr _ []) = True
 nullFastString (UnicodeStr _ (_:_)) = False
 
 unpackFS :: FastString -> String
 unpackFS (FastString _ l# ba#) = unpackNBytesBA# ba# l#
-unpackFS (CharStr addr len#) =
- unpack 0#
- where
-    unpack nh
-      | nh ==# len# = []
-      | otherwise   = C# ch : unpack (nh +# 1#)
-      where
-	ch = indexCharOffAddr# addr nh
 unpackFS (UnicodeStr _ s) = map chr s
 
 unpackIntFS :: FastString -> [Int]
@@ -176,8 +146,6 @@ concatFS ls = mkFastStringInt (concat (map unpackIntFS ls)) -- ToDo: do better
 headFS :: FastString -> Char
 headFS (FastString _ l# ba#) = 
  if l# ># 0# then C# (indexCharArray# ba# 0#) else error ("headFS: empty FS")
-headFS (CharStr a# l#) = 
- if l# ># 0# then C# (indexCharOffAddr# a# 0#) else error ("headFS: empty FS")
 headFS (UnicodeStr _ (c:_)) = chr c
 headFS (UnicodeStr _ []) = error ("headFS: empty FS")
 
@@ -190,9 +158,6 @@ indexFS f i@(I# i#) =
  case f of
    FastString _ l# ba#
      | l# ># 0# && l# ># i#  -> C# (indexCharArray# ba# i#)
-     | otherwise	     -> error (msg (I# l#))
-   CharStr a# l#
-     | l# ># 0# && l# ># i#  -> C# (indexCharOffAddr# a# i#)
      | otherwise	     -> error (msg (I# l#))
    UnicodeStr _ s	     -> chr (s!!i)
  where
@@ -207,20 +172,9 @@ consFS c fs = mkFastStringInt (ord c : unpackIntFS fs)
 
 uniqueOfFS :: FastString -> Int#
 uniqueOfFS (FastString u# _ _) = u#
-uniqueOfFS (CharStr a# l#)     = case mkFastStringLen# a# l# of { FastString u# _ _ -> u#} -- Ugh!
-   {-
-     [A somewhat moby hack]: to avoid entering all sorts
-     of junk into the hash table, all C char strings
-     are by default left out. The benefit of being in
-     the table is that string comparisons are lightning fast,
-     just an Int# comparison.
-   
-     But, if you want to get the Unique of a CharStr, we 
-     enter it into the table and return that unique. This
-     works, but causes the CharStr to be looked up in the hash
-     table each time it is accessed..
-   -}
 uniqueOfFS (UnicodeStr u# _) = u#
+
+nilFS = mkFastString ""
 \end{code}
 
 Internally, the compiler will maintain a fast string symbol
@@ -302,9 +256,6 @@ mkFastStringLen# a# len# =
 	 bucket_match ls len# a#
    bucket_match (UnicodeStr _ _ : ls) len# a# =
       bucket_match ls len# a#
-
-mkFastSubString# :: Addr# -> Int# -> Int# -> FastString
-mkFastSubString# a# start# len# = mkFastCharString2 (A# (addrOffset# a# start#)) (I# len#)
 
 mkFastSubStringBA# :: ByteArray# -> Int# -> Int# -> FastString
 mkFastSubStringBA# barr# start# len# =
@@ -391,17 +342,6 @@ mkFastStringUnicode s =
    bucket_match (v@(UnicodeStr _ s'):ls) =
        if s' == s then Just v else bucket_match ls
    bucket_match (FastString _ _ _ : ls) = bucket_match ls
-
-mkFastCharString :: Addr -> FastString
-mkFastCharString a@(A# a#) = 
- case strLength a of{ (I# len#) -> CharStr a# len# }
-
-mkFastCharString# :: Addr# -> FastString
-mkFastCharString# a# = 
- case strLength (A# a#) of { (I# len#) -> CharStr a# len# }
-
-mkFastCharString2 :: Addr -> Int -> FastString
-mkFastCharString2 a@(A# a#) (I# len#) = CharStr a# len#
 
 mkFastStringNarrow :: String -> FastString
 mkFastStringNarrow str =
@@ -498,33 +438,6 @@ cmpFS (FastString u1# _ b1#) (FastString u2# _ b2#) = -- assume non-null chars
   where
    bot :: Int
    bot = error "tagCmp"
-cmpFS (CharStr bs1 len1) (CharStr bs2 len2)
-  = unsafePerformIO (
-    _ccall_ strcmp ba1 ba2	>>= \ (I# res) ->
-    return (
-    if      res <#  0# then LT
-    else if res ==# 0# then EQ
-    else		    GT
-    ))
-  where
-    ba1 = A# bs1
-    ba2 = A# bs2
-cmpFS (FastString _ len1 bs1) (CharStr bs2 len2)
- = unsafePerformIO (
-    _ccall_ strcmp ba1 ba2	>>= \ (I# res) ->
-    return (
-     if      res <#  0# then LT
-     else if res ==# 0# then EQ
-     else		     GT
-    ))
-  where
-    ba1 = ByteArray (error "") ((error "")::Int) bs1
-    ba2 = A# bs2
-
-cmpFS a@(CharStr _ _) b@(FastString _ _ _)
-  = -- try them the other way 'round
-    case (cmpFS b a) of { LT -> GT; EQ -> EQ; GT -> LT }
-
 \end{code}
 
 Outputting @FastString@s is quick, just block copying the chunk (using
@@ -539,18 +452,18 @@ hPutFS handle (FastString _ l# ba#)
  where
   bot = error "hPutFS.ba"
 
---ToDo: avoid silly code duplic.
-
-hPutFS handle (CharStr a# l#)
-  | l# ==# 0#  = return ()
-#if __GLASGOW_HASKELL__ < 411
-  | otherwise  = hPutBuf handle (A# a#) (I# l#)
-#else
-  | otherwise  = hPutBuf handle (Ptr a#) (I# l#)
-#endif
-
 -- ONLY here for debugging the NCG (so -ddump-stix works for string
 -- literals); no idea if this is really necessary.  JRS, 010131
 hPutFS handle (UnicodeStr _ is) 
   = hPutStr handle ("(UnicodeStr " ++ show is ++ ")")
+\end{code}
+
+Here for convenience only.
+
+\begin{code}
+type LitString = Addr
+-- ToDo: make it a Ptr when we don't have to support 4.08 any more
+
+mkLitString# :: Addr# -> LitString
+mkLitString# a# = A# a#
 \end{code}

@@ -46,6 +46,7 @@ import Char	( isDigit, isUpper, isLower, isAlphaNum, ord, chr, digitToInt )
 import Util	( thenCmp )
 import Unique	( Unique )
 import FiniteMap ( FiniteMap, emptyFM, lookupFM, addToFM, elemFM )
+import FastString
 import Outputable
 import Binary
 
@@ -64,8 +65,8 @@ code the encoding operation is not performed on each occurrence.
 These type synonyms help documentation.
 
 \begin{code}
-type UserFS    = FAST_STRING	-- As the user typed it
-type EncodedFS = FAST_STRING	-- Encoded form
+type UserFS    = FastString	-- As the user typed it
+type EncodedFS = FastString	-- Encoded form
 
 type UserString = String	-- As the user typed it
 type EncodedString = String	-- Encoded form
@@ -75,9 +76,9 @@ pprEncodedFS :: EncodedFS -> SDoc
 pprEncodedFS fs
   = getPprStyle 	$ \ sty ->
     if userStyle sty
-	-- ptext (decodeFS fs) would needlessly pack the string again
-	then text (decode (_UNPK_ fs))
-        else ptext fs
+	-- ftext (decodeFS fs) would needlessly pack the string again
+	then text (decode (unpackFS fs))
+        else ftext fs
 \end{code}
 
 %************************************************************************
@@ -165,7 +166,7 @@ already encoded
 \begin{code}
 mkSysOcc :: NameSpace -> EncodedString -> OccName
 mkSysOcc occ_sp str = ASSERT2( alreadyEncoded str, text str )
-		      OccName occ_sp (_PK_ str)
+		      OccName occ_sp (mkFastString str)
 
 mkSysOccFS :: NameSpace -> EncodedFS -> OccName
 mkSysOccFS occ_sp fs = ASSERT2( alreadyEncodedFS fs, ppr fs )
@@ -176,7 +177,7 @@ mkFCallOcc :: EncodedString -> OccName
 -- because it will be something like "{__ccall f dyn Int# -> Int#}" 
 -- This encodes a lot into something that then parses like an Id.
 -- But then alreadyEncoded complains about the braces!
-mkFCallOcc str = OccName varName (_PK_ str)
+mkFCallOcc str = OccName varName (mkFastString str)
 
 -- Kind constructors get a special function.  Uniquely, they are not encoded,
 -- so that they have names like '*'.  This means that *even in interface files*
@@ -212,7 +213,7 @@ occNameFS :: OccName -> EncodedFS
 occNameFS (OccName _ s) = s
 
 occNameString :: OccName -> EncodedString
-occNameString (OccName _ s) = _UNPK_ s
+occNameString (OccName _ s) = unpackFS s
 
 occNameUserString :: OccName -> UserString
 occNameUserString occ = decode (occNameString occ)
@@ -384,7 +385,7 @@ because that isn't a single lexeme.  So we encode it to 'lle' and *then*
 tack on the '1', if necessary.
 
 \begin{code}
-type TidyOccEnv = FiniteMap FAST_STRING Int	-- The in-scope OccNames
+type TidyOccEnv = FiniteMap FastString Int	-- The in-scope OccNames
 emptyTidyOccEnv = emptyFM
 
 initTidyOccEnv :: [OccName] -> TidyOccEnv	-- Initialise with names to avoid!
@@ -397,7 +398,7 @@ tidyOccName in_scope occ@(OccName occ_sp fs)
   = (addToFM in_scope fs 1, occ)	-- First occurrence
 
   | otherwise				-- Already occurs
-  = go in_scope (_UNPK_ fs)
+  = go in_scope (unpackFS fs)
   where
 
     go in_scope str = case lookupFM in_scope pk_str of
@@ -408,7 +409,7 @@ tidyOccName in_scope occ@(OccName occ_sp fs)
 			Nothing -> (addToFM in_scope pk_str 1, mkSysOccFS occ_sp pk_str)
 				-- str is now unique
 		    where
-		      pk_str = _PK_ str
+		      pk_str = mkFastString str
 \end{code}
 
 
@@ -469,8 +470,8 @@ alreadyEncoded s = all ok s
 			-- reject them here
 		   ok ch  = isAlphaNum ch
 
-alreadyEncodedFS :: FAST_STRING -> Bool
-alreadyEncodedFS fs = alreadyEncoded (_UNPK_ fs)
+alreadyEncodedFS :: FastString -> Bool
+alreadyEncodedFS fs = alreadyEncoded (unpackFS fs)
 
 encode :: UserString -> EncodedString
 encode cs = case maybe_tuple cs of
@@ -496,9 +497,9 @@ count_commas n cs	  = (n,cs)
 
 encodeFS :: UserFS -> EncodedFS
 encodeFS fast_str  | all unencodedChar str = fast_str
-		   | otherwise	           = _PK_ (encode str)
+		   | otherwise	           = mkFastString (encode str)
 		   where
-		     str = _UNPK_ fast_str
+		     str = unpackFS fast_str
 
 unencodedChar :: Char -> Bool	-- True for chars that don't need encoding
 unencodedChar 'Z' = False
@@ -544,8 +545,8 @@ encode_ch c    = 'z' : shows (ord c) "U"
 Decode is used for user printing.
 
 \begin{code}
-decodeFS :: FAST_STRING -> FAST_STRING
-decodeFS fs = _PK_ (decode (_UNPK_ fs))
+decodeFS :: FastString -> FastString
+decodeFS fs = mkFastString (decode (unpackFS fs))
 
 decode :: EncodedString -> UserString
 decode [] = []
@@ -610,8 +611,8 @@ These functions test strings to see if they fit the lexical categories
 defined in the Haskell report.
 
 \begin{code}
-isLexCon,   isLexVar,    isLexId,    isLexSym    :: FAST_STRING -> Bool
-isLexConId, isLexConSym, isLexVarId, isLexVarSym :: FAST_STRING -> Bool
+isLexCon,   isLexVar,    isLexId,    isLexSym    :: FastString -> Bool
+isLexConId, isLexConSym, isLexVarId, isLexVarSym :: FastString -> Bool
 
 isLexCon cs = isLexConId  cs || isLexConSym cs
 isLexVar cs = isLexVarId  cs || isLexVarSym cs
@@ -622,22 +623,22 @@ isLexSym cs = isLexConSym cs || isLexVarSym cs
 -------------
 
 isLexConId cs				-- Prefix type or data constructors
-  | _NULL_ cs	      = False		-- 	e.g. "Foo", "[]", "(,)" 
+  | nullFastString cs	      = False		-- 	e.g. "Foo", "[]", "(,)" 
   | cs == FSLIT("[]") = True
-  | otherwise	      = startsConId (_HEAD_ cs)
+  | otherwise	      = startsConId (headFS cs)
 
 isLexVarId cs				-- Ordinary prefix identifiers
-  | _NULL_ cs	 = False		-- 	e.g. "x", "_x"
-  | otherwise    = startsVarId (_HEAD_ cs)
+  | nullFastString cs	 = False		-- 	e.g. "x", "_x"
+  | otherwise    = startsVarId (headFS cs)
 
 isLexConSym cs				-- Infix type or data constructors
-  | _NULL_ cs	= False			--	e.g. ":-:", ":", "->"
+  | nullFastString cs	= False			--	e.g. ":-:", ":", "->"
   | cs == FSLIT("->") = True
-  | otherwise	= startsConSym (_HEAD_ cs)
+  | otherwise	= startsConSym (headFS cs)
 
 isLexVarSym cs				-- Infix identifiers
-  | _NULL_ cs = False			-- 	e.g. "+"
-  | otherwise = startsVarSym (_HEAD_ cs)
+  | nullFastString cs = False			-- 	e.g. "+"
+  | otherwise = startsVarSym (headFS cs)
 
 -------------
 startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool

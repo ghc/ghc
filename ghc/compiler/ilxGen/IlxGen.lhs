@@ -1491,8 +1491,8 @@ inPrelude = preludePackage == opt_InPackage
 -- still a mess though.  Also, still have to do the
 -- right thing for embedded nulls.
 
-pprFSInILStyle :: FAST_STRING -> SDoc
-pprFSInILStyle fs = doubleQuotes (text (stringToC (_UNPK_ fs)))
+pprFSInILStyle :: FastString -> SDoc
+pprFSInILStyle fs = doubleQuotes (text (stringToC (unpackFS fs)))
 
 stringToC   :: String -> String
 -- Convert a string to the form required by C in a C literal string

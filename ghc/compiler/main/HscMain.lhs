@@ -85,6 +85,7 @@ import OccName		( OccName )
 import Name		( Name, nameModule, nameOccName, getName )
 import NameEnv		( emptyNameEnv, mkNameEnv )
 import Module		( Module )
+import FastString
 
 import IOExts		( newIORef, readIORef, writeIORef, 
 			  unsafePerformIO )
@@ -321,7 +322,7 @@ hscRecomp ghci_mode dflags have_object
 	    --
 	    foreign_headers =   
 	        unlines 
-	      . map (\fname -> "#include \"" ++ _UNPK_ fname ++ "\"")
+	      . map (\fname -> "#include \"" ++ unpackFS fname ++ "\"")
 	      . reverse 
 	      $ headers
 
@@ -486,7 +487,7 @@ myParseModule dflags src_filename
 
       let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
 			   parrEF	 = dopt Opt_PArr	dflags}
-	  loc  = mkSrcLoc (_PK_ src_filename) 1
+	  loc  = mkSrcLoc (mkFastString src_filename) 1
 
       case parseModule buf (mkPState loc exts) of {
 

@@ -37,6 +37,7 @@ import Util		( mapAccumL, lengthAtLeast, notNull )
 import List		( nubBy, partition )
 import UniqSupply
 import Outputable
+import FastString
 \end{code}
 
 -----------------------------------------------------
@@ -508,7 +509,7 @@ spec_one env fn rhs (pats, rule_number)
 		-- Usual w/w hack to avoid generating 
 		-- a spec_rhs of unlifted type and no args
 	
-	rule_name = _PK_ ("SC:" ++ showSDoc (ppr fn <> int rule_number))
+	rule_name = mkFastString ("SC:" ++ showSDoc (ppr fn <> int rule_number))
 	spec_rhs  = mkLams spec_lam_args spec_body
 	spec_id   = mkUserLocal spec_occ spec_uniq (mkPiTypes spec_lam_args body_ty) fn_loc
 	rule      = Rule rule_name specConstrActivation

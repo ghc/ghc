@@ -124,7 +124,7 @@ tcSourceRule (HsRule name act vars lhs rhs src_loc)
 				     returnNF_Tc (mkLocalId var ty)
 
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 
-		doubleQuotes (ptext name)
+		doubleQuotes (ftext name)
 \end{code}
 
 

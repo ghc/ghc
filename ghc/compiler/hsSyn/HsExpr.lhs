@@ -27,6 +27,7 @@ import DataCon		( DataCon )
 import CStrings		( CLabelString, pprCLabelString )
 import BasicTypes	( IPName, Boxity, tupleParens )
 import SrcLoc		( SrcLoc )
+import FastString
 \end{code}
 
 %************************************************************************
@@ -160,7 +161,7 @@ data HsExpr id pat
 		PostTcType	-- The result type; will be *bottom*
 				-- until the typechecker gets ahold of it
 
-  | HsSCC	FAST_STRING	-- "set cost centre" (_scc_) annotation
+  | HsSCC	FastString	-- "set cost centre" (_scc_) annotation
 		(HsExpr id pat) -- expr whose cost is to be measured
 
 \end{code}
@@ -356,7 +357,7 @@ ppr_expr (HsCCall fun args _ is_asm result_ty)
        4 (sep (map pprParendExpr args))
 
 ppr_expr (HsSCC lbl expr)
-  = sep [ ptext SLIT("_scc_") <+> doubleQuotes (ptext lbl), pprParendExpr expr ]
+  = sep [ ptext SLIT("_scc_") <+> doubleQuotes (ftext lbl), pprParendExpr expr ]
 
 ppr_expr (TyLam tyvars expr)
   = hang (hsep [ptext SLIT("/\\"), interppSP tyvars, ptext SLIT("->")])
@@ -554,7 +555,7 @@ pprGRHS ctxt (GRHS guarded locn)
     ResultStmt expr _ = last guarded	-- Last stmt should be a ResultStmt for guards
     guards	      = init guarded
 
-pp_rhs ctxt rhs = ptext (matchSeparator ctxt) <+> pprDeeper (ppr rhs)
+pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 \end{code}
 
 
@@ -708,11 +709,11 @@ isDoExpr other 		 = False
 \end{code}
 
 \begin{code}
-matchSeparator (FunRhs _)   = SLIT("=")
-matchSeparator CaseAlt      = SLIT("->") 
-matchSeparator LambdaExpr   = SLIT("->") 
-matchSeparator PatBindRhs   = SLIT("=") 
-matchSeparator (DoCtxt _)   = SLIT("<-")  
+matchSeparator (FunRhs _)   = ptext SLIT("=")
+matchSeparator CaseAlt      = ptext SLIT("->") 
+matchSeparator LambdaExpr   = ptext SLIT("->") 
+matchSeparator PatBindRhs   = ptext SLIT("=") 
+matchSeparator (DoCtxt _)   = ptext SLIT("<-")  
 matchSeparator RecUpd       = panic "When is this used?"
 \end{code}
 

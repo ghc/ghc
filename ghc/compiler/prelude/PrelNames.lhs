@@ -54,6 +54,7 @@ import RdrName    ( rdrNameOcc )
 import SrcLoc     ( builtinSrcLoc, noSrcLoc )
 import Util	  ( nOfThem )
 import Panic	  ( panic )
+import FastString
 \end{code}
 
 
@@ -290,17 +291,17 @@ mkTupNameStr :: Boxity -> Int -> (ModuleName, UserFS)
 
 mkTupNameStr Boxed 0 = (pREL_BASE_Name, FSLIT("()"))
 mkTupNameStr Boxed 1 = panic "Name.mkTupNameStr: 1 ???"
-mkTupNameStr Boxed 2 = (pREL_TUP_Name, _PK_ "(,)")   -- not strictly necessary
-mkTupNameStr Boxed 3 = (pREL_TUP_Name, _PK_ "(,,)")  -- ditto
-mkTupNameStr Boxed 4 = (pREL_TUP_Name, _PK_ "(,,,)") -- ditto
-mkTupNameStr Boxed n = (pREL_TUP_Name, _PK_ ("(" ++ nOfThem (n-1) ',' ++ ")"))
+mkTupNameStr Boxed 2 = (pREL_TUP_Name, mkFastString "(,)")   -- not strictly necessary
+mkTupNameStr Boxed 3 = (pREL_TUP_Name, mkFastString "(,,)")  -- ditto
+mkTupNameStr Boxed 4 = (pREL_TUP_Name, mkFastString "(,,,)") -- ditto
+mkTupNameStr Boxed n = (pREL_TUP_Name, mkFastString ("(" ++ nOfThem (n-1) ',' ++ ")"))
 
 mkTupNameStr Unboxed 0 = panic "Name.mkUbxTupNameStr: 0 ???"
-mkTupNameStr Unboxed 1 = (gHC_PRIM_Name, _PK_ "(# #)") -- 1 and 0 both make sense!!!
-mkTupNameStr Unboxed 2 = (gHC_PRIM_Name, _PK_ "(#,#)")
-mkTupNameStr Unboxed 3 = (gHC_PRIM_Name, _PK_ "(#,,#)")
-mkTupNameStr Unboxed 4 = (gHC_PRIM_Name, _PK_ "(#,,,#)")
-mkTupNameStr Unboxed n = (gHC_PRIM_Name, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
+mkTupNameStr Unboxed 1 = (gHC_PRIM_Name, mkFastString "(# #)") -- 1 and 0 both make sense!!!
+mkTupNameStr Unboxed 2 = (gHC_PRIM_Name, mkFastString "(#,#)")
+mkTupNameStr Unboxed 3 = (gHC_PRIM_Name, mkFastString "(#,,#)")
+mkTupNameStr Unboxed 4 = (gHC_PRIM_Name, mkFastString "(#,,,#)")
+mkTupNameStr Unboxed n = (gHC_PRIM_Name, mkFastString ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
 
 mkTupConRdrName :: NameSpace -> Boxity -> Arity -> RdrName 
 mkTupConRdrName space boxity arity   = case mkTupNameStr boxity arity of

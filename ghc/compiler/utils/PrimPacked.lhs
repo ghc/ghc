@@ -161,6 +161,7 @@ eqStrPrefix a# barr# len# =
    x <- memcmp_ba a# barr# (I# len#)
    return (x == 0)
 
+-- unused???
 eqCharStrPrefix :: Addr# -> Addr# -> Int# -> Bool
 eqCharStrPrefix a1# a2# len# = 
   unsafePerformIO $ do

@@ -316,7 +316,7 @@ cgReturnDataCon con amodes
 	       	temp = CTemp uniq PtrRep 
 	   in
 
-	   profCtrC SLIT("TICK_UPD_CON_IN_PLACE") 
+	   profCtrC FSLIT("TICK_UPD_CON_IN_PLACE") 
 			[mkIntCLit (length amodes)] `thenC`
 
 	   getSpRelOffset args_sp			`thenFC` \ sp_rel ->
@@ -352,7 +352,7 @@ cgReturnDataCon con amodes
 		  let (ret_regs, leftovers) = 
 			 assignRegs [] (map getAmodeRep amodes)
 		  in
-		  profCtrC SLIT("TICK_RET_UNBOXED_TUP") 
+		  profCtrC FSLIT("TICK_RET_UNBOXED_TUP") 
 				[mkIntCLit (length amodes)] `thenC`
 
 		  doTailCall amodes ret_regs 
@@ -384,7 +384,7 @@ cgReturnDataCon con amodes
 
 
 		-- RETURN
-	  profCtrC SLIT("TICK_RET_NEW") [mkIntCLit (length amodes)] `thenC`
+	  profCtrC FSLIT("TICK_RET_NEW") [mkIntCLit (length amodes)] `thenC`
 	  -- could use doTailCall here.
 	  performReturn (move_to_reg amode node) return
 \end{code}

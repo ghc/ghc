@@ -39,6 +39,7 @@ import SrcLoc		( builtinSrcLoc )
 import Unique		( Unique, builtinUniques, mkBuiltinUnique )
 import Util             ( takeList, dropList )
 import Outputable 
+import FastString
 
 #include "HsVersions.h"
 \end{code}
@@ -554,7 +555,7 @@ bimapTuple eps
 
 -------------------
 genericNames :: [Name]
-genericNames = [mkSystemName (mkBuiltinUnique i) (_PK_ ('g' : show i)) | i <- [1..]]
+genericNames = [mkSystemName (mkBuiltinUnique i) (mkFastString ('g' : show i)) | i <- [1..]]
 (g1:g2:g3:_) = genericNames
 
 mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body placeHolderType builtinSrcLoc))

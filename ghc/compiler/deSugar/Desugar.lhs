@@ -37,6 +37,7 @@ import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings )
 import Outputable
 import UniqSupply	( mkSplitUniqSupply )
 import HscTypes		( HomeSymbolTable, PersistentCompilerState(..), TyThing(..), lookupType,  )
+import FastString
 \end{code}
 
 %************************************************************************
@@ -53,7 +54,7 @@ deSugar :: DynFlags
 	-> PersistentCompilerState -> HomeSymbolTable
 	-> Module -> PrintUnqualified
         -> TcResults
-	-> IO (ModDetails, (SDoc, SDoc, [FAST_STRING], [CoreBndr]))
+	-> IO (ModDetails, (SDoc, SDoc, [FastString], [CoreBndr]))
 
 deSugar dflags pcs hst mod_name unqual
         (TcResults {tc_env    = type_env,
@@ -159,7 +160,7 @@ Simplest thing in the world, desugaring External Core:
 
 \begin{code}
 deSugarCore :: (TypeEnv, [TypecheckedCoreBind], [TypecheckedRuleDecl])
-	    -> IO (ModDetails, (SDoc, SDoc, [FAST_STRING], [CoreBndr]))
+	    -> IO (ModDetails, (SDoc, SDoc, [FastString], [CoreBndr]))
 deSugarCore (type_env, pairs, rules) 
   = return (mod_details, no_foreign_stuff)
   where

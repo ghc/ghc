@@ -169,31 +169,31 @@ data Token
   | ITunderscore
   | ITbackquote
 
-  | ITvarid   FAST_STRING	-- identifiers
-  | ITconid   FAST_STRING
-  | ITvarsym  FAST_STRING
-  | ITconsym  FAST_STRING
-  | ITqvarid  (FAST_STRING,FAST_STRING)
-  | ITqconid  (FAST_STRING,FAST_STRING)
-  | ITqvarsym (FAST_STRING,FAST_STRING)
-  | ITqconsym (FAST_STRING,FAST_STRING)
+  | ITvarid   FastString	-- identifiers
+  | ITconid   FastString
+  | ITvarsym  FastString
+  | ITconsym  FastString
+  | ITqvarid  (FastString,FastString)
+  | ITqconid  (FastString,FastString)
+  | ITqvarsym (FastString,FastString)
+  | ITqconsym (FastString,FastString)
 
-  | ITdupipvarid   FAST_STRING	-- GHC extension: implicit param: ?x
-  | ITsplitipvarid FAST_STRING	-- GHC extension: implicit param: %x
+  | ITdupipvarid   FastString	-- GHC extension: implicit param: ?x
+  | ITsplitipvarid FastString	-- GHC extension: implicit param: %x
 
   | ITpragma StringBuffer
 
   | ITchar       Int
-  | ITstring     FAST_STRING
+  | ITstring     FastString
   | ITinteger    Integer
   | ITrational   Rational
 
   | ITprimchar   Int
-  | ITprimstring FAST_STRING
+  | ITprimstring FastString
   | ITprimint    Integer
   | ITprimfloat  Rational
   | ITprimdouble Rational
-  | ITlitlit     FAST_STRING
+  | ITlitlit     FastString
 
   | ITunknown String		-- Used when the lexer can't make sense of it
   | ITeof			-- end of file token
@@ -205,7 +205,7 @@ Keyword Lists
 
 \begin{code}
 pragmaKeywordsFM = listToUFM $
-      map (\ (x,y) -> (_PK_ x,y))
+      map (\ (x,y) -> (mkFastString x,y))
        [( "SPECIALISE", ITspecialise_prag ),
 	( "SPECIALIZE", ITspecialise_prag ),
 	( "SOURCE",	ITsource_prag ),
@@ -220,7 +220,7 @@ pragmaKeywordsFM = listToUFM $
  	]
 
 haskellKeywordsFM = listToUFM $
-      map (\ (x,y) -> (_PK_ x,y))
+      map (\ (x,y) -> (mkFastString x,y))
        [( "_",		ITunderscore ),
 	( "as",		ITas ),
 	( "case",	ITcase ),     
@@ -270,7 +270,7 @@ isSpecial _             = False
 
 -- IMPORTANT: Keep this in synch with ParseIface.y's var_fs production! (SUP)
 ghcExtensionKeywordsFM = listToUFM $
-	map (\ (x,y) -> (_PK_ x,y))
+	map (\ (x,y) -> (mkFastString x,y))
      [	( "forall",	ITforall ),
 	( "foreign",	ITforeign ),
 	( "export",	ITexport ),
@@ -291,7 +291,7 @@ ghcExtensionKeywordsFM = listToUFM $
 
 
 haskellKeySymsFM = listToUFM $
-	map (\ (x,y) -> (_PK_ x,y))
+	map (\ (x,y) -> (mkFastString x,y))
       [ ("..",		ITdotdot)
        ,("::",		ITdcolon)
        ,("=",		ITequal)
@@ -873,7 +873,7 @@ lex_id cont exts buf =
  let lexeme  = lexemeToFastString buf' in
 
  case _scc_ "haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
- 	Just kwd_token -> --trace ("hkeywd: "++_UNPK_(lexeme)) $
+ 	Just kwd_token -> --trace ("hkeywd: "++unpackFS(lexeme)) $
 			  cont kwd_token buf';
  	Nothing        -> 
 
@@ -934,7 +934,7 @@ maybe_qualified cont exts mod buf just_a_conid =
  case currentChar# buf of
   '['# -> 	-- Special case for []
     case lookAhead# buf 1# of
-     ']'# -> cont (ITqconid  (mod,SLIT("[]"))) (setCurrentPos# buf 2#)
+     ']'# -> cont (ITqconid  (mod,FSLIT("[]"))) (setCurrentPos# buf 2#)
      _    -> just_a_conid
 
   '('# ->  -- Special case for (,,,)
@@ -944,12 +944,12 @@ maybe_qualified cont exts mod buf just_a_conid =
 		','# -> lex_ubx_tuple cont mod (setCurrentPos# buf 3#) 
 				just_a_conid
 		_    -> just_a_conid
-     ')'# -> cont (ITqconid (mod,SLIT("()"))) (setCurrentPos# buf 2#)
+     ')'# -> cont (ITqconid (mod,FSLIT("()"))) (setCurrentPos# buf 2#)
      ','# -> lex_tuple cont mod (setCurrentPos# buf 2#) just_a_conid
      _    -> just_a_conid
 
   '-'# -> case lookAhead# buf 1# of
-            '>'# -> cont (ITqconid (mod,SLIT("(->)"))) (setCurrentPos# buf 2#)
+            '>'# -> cont (ITqconid (mod,FSLIT("(->)"))) (setCurrentPos# buf 2#)
             _    -> lex_id3 cont exts mod buf just_a_conid
 
   _    -> lex_id3 cont exts mod buf just_a_conid
@@ -1011,7 +1011,7 @@ mk_var_token pk_str
   | f `eqChar#` ':'#	= ITconsym pk_str
   | otherwise		= ITvarsym pk_str
   where
-      (C# f) = _HEAD_ pk_str
+      (C# f) = headFS pk_str
       -- tl     = _TAIL_ pk_str
 
 mk_qvar_token m token =
@@ -1112,7 +1112,7 @@ setSrcLocP new_loc p buf s =
       POk _ a   -> POk s a
       PFailed e -> PFailed e
   
-getSrcFile :: P FAST_STRING
+getSrcFile :: P FastString
 getSrcFile buf s@(PState{ loc = loc }) = POk s (srcLocFile loc)
 
 pushContext :: LayoutContext -> P ()

@@ -58,6 +58,7 @@ import Outputable	( pprPanic, ppr, showSDoc )
 import IOExts		( trace )
 import Config           ( cLeadingUnderscore )
 import FastTypes
+import FastString
 
 import Maybe		( catMaybes )
 \end{code}
@@ -328,7 +329,7 @@ mostly all of @Instr@ is machine-specific.
 
 \begin{code}
 data Instr
-  = COMMENT FAST_STRING		-- comment pseudo-op
+  = COMMENT FastString		-- comment pseudo-op
   | SEGMENT CodeSegment		-- {data,text} segment pseudo-op
   | LABEL   CLabel		-- global label pseudo-op
   | ASCII   Bool		-- True <=> needs backslash conversion

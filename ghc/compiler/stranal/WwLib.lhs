@@ -22,7 +22,6 @@ import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
 			  splitForAllTys, splitFunTys, splitNewType_maybe, isAlgType
 			)
-import Literal		( Literal(MachStr) )
 import BasicTypes	( Boxity(..) )
 import Var              ( Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniquesUs, UniqSM )

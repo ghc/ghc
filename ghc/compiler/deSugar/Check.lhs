@@ -30,6 +30,7 @@ import SrcLoc		( noSrcLoc )
 import UniqSet
 import Util             ( takeList, splitAtList, notNull )
 import Outputable
+import FastString
 
 #include "HsVersions.h"
 \end{code}
@@ -376,7 +377,7 @@ make_row_vars used_lits (EqnInfo _ _ pats _ ) =
   where new_var = hash_x
 
 hash_x = mkInternalName unboundKey {- doesn't matter much -}
-		     (mkVarOcc SLIT("#x"))
+		     (mkVarOcc FSLIT("#x"))
 		     noSrcLoc
 
 make_row_vars_for_constructor :: EquationInfo -> [WarningPat]
@@ -640,7 +641,7 @@ simplify_pat pat@(LitPat lit lit_ty)        = tidyLitPat lit pat
 -- each other, or even explicit lists of Chars.
 simplify_pat pat@(NPat (HsString s) _ _) = 
    foldr (\c pat -> ConPat consDataCon stringTy [] [] [mk_char_lit c,pat])
-	(ConPat nilDataCon stringTy [] [] []) (_UNPK_INT_ s)
+	(ConPat nilDataCon stringTy [] [] []) (unpackIntFS s)
   where
     mk_char_lit c = ConPat charDataCon charTy [] [] 
 			[LitPat (HsCharPrim c) charPrimTy]

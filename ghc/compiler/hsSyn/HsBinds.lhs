@@ -317,13 +317,13 @@ isPragSig other		      = False
 \end{code}
 
 \begin{code}
-hsSigDoc (Sig        _ _ loc) 	      = (SLIT("type signature"),loc)
-hsSigDoc (ClassOpSig _ _ _ loc)       = (SLIT("class-method type signature"), loc)
-hsSigDoc (SpecSig    _ _ loc) 	      = (SLIT("SPECIALISE pragma"),loc)
-hsSigDoc (InlineSig True  _ _ loc)    = (SLIT("INLINE pragma"),loc)
-hsSigDoc (InlineSig False _ _ loc)    = (SLIT("NOINLINE pragma"),loc)
-hsSigDoc (SpecInstSig _ loc)	      = (SLIT("SPECIALISE instance pragma"),loc)
-hsSigDoc (FixSig (FixitySig _ _ loc)) = (SLIT("fixity declaration"), loc)
+hsSigDoc (Sig        _ _ loc) 	      = (ptext SLIT("type signature"),loc)
+hsSigDoc (ClassOpSig _ _ _ loc)       = (ptext SLIT("class-method type signature"), loc)
+hsSigDoc (SpecSig    _ _ loc) 	      = (ptext SLIT("SPECIALISE pragma"),loc)
+hsSigDoc (InlineSig True  _ _ loc)    = (ptext SLIT("INLINE pragma"),loc)
+hsSigDoc (InlineSig False _ _ loc)    = (ptext SLIT("NOINLINE pragma"),loc)
+hsSigDoc (SpecInstSig _ loc)	      = (ptext SLIT("SPECIALISE instance pragma"),loc)
+hsSigDoc (FixSig (FixitySig _ _ loc)) = (ptext SLIT("fixity declaration"), loc)
 \end{code}
 
 \begin{code}

@@ -20,7 +20,7 @@ module Outputable (
 	docToSDoc,
 	interppSP, interpp'SP, pprQuotedList, pprWithCommas,
 	empty, nest,
-	text, char, ptext,
+	text, char, ftext, ptext,
 	int, integer, float, double, rational,
 	parens, brackets, braces, quotes, doubleQuotes, angleBrackets,
 	semi, comma, colon, dcolon, space, equals, dot,
@@ -53,7 +53,7 @@ import {-# SOURCE #-} 	Name( Name )
 import CmdLineOpts	( opt_PprStyle_Debug, opt_PprUserLength )
 import FastString
 import qualified Pretty
-import Pretty		( Doc, Mode(..), TextDetails(..), fullRender )
+import Pretty		( Doc, Mode(..) )
 import Panic
 
 import Word		( Word32 )
@@ -227,6 +227,7 @@ docToSDoc d = \_ -> d
 empty sty      = Pretty.empty
 text s sty     = Pretty.text s
 char c sty     = Pretty.char c
+ftext s sty    = Pretty.ftext s
 ptext s sty    = Pretty.ptext s
 int n sty      = Pretty.int n
 integer n sty  = Pretty.integer n
@@ -346,8 +347,8 @@ instance Outputable FastString where
 pprHsChar :: Int -> SDoc
 pprHsChar c = char '\'' <> text (showCharLit c "") <> char '\''
 
-pprHsString :: FAST_STRING -> SDoc
-pprHsString fs = doubleQuotes (text (foldr showCharLit "" (_UNPK_INT_ fs)))
+pprHsString :: FastString -> SDoc
+pprHsString fs = doubleQuotes (text (foldr showCharLit "" (unpackIntFS fs)))
 
 showCharLit :: Int -> String -> String
 showCharLit c rest
@@ -389,17 +390,6 @@ instance Show FastString  where
 \subsection{Other helper functions}
 %*									*
 %************************************************************************
-
-\begin{code}
-showDocWith :: Mode -> Doc -> String
-showDocWith mode doc
-  = fullRender mode 100 1.5 put "" doc
-  where
-    put (Chr c)   s  = c:s
-    put (Str s1)  s2 = s1 ++ s2
-    put (PStr s1) s2 = _UNPK_ s1 ++ s2
-\end{code}
-
 
 \begin{code}
 pprWithCommas :: (a -> SDoc) -> [a] -> SDoc

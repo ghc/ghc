@@ -93,6 +93,7 @@ import Unique		( Uniquable(..) )
 import UniqFM
 import UniqSet
 import Binary
+import FastString
 \end{code}
 
 
@@ -212,14 +213,14 @@ moduleNameFS :: ModuleName -> EncodedFS
 moduleNameFS (ModuleName mod) = mod
 
 moduleNameString :: ModuleName -> EncodedString
-moduleNameString (ModuleName mod) = _UNPK_ mod
+moduleNameString (ModuleName mod) = unpackFS mod
 
 moduleNameUserString :: ModuleName -> UserString
-moduleNameUserString (ModuleName mod) = decode (_UNPK_ mod)
+moduleNameUserString (ModuleName mod) = decode (unpackFS mod)
 
 -- used to be called mkSrcModule
 mkModuleName :: UserString -> ModuleName
-mkModuleName s = ModuleName (_PK_ (encode s))
+mkModuleName s = ModuleName (mkFastString (encode s))
 
 -- used to be called mkSrcModuleFS
 mkModuleNameFS :: UserFS -> ModuleName
@@ -294,7 +295,7 @@ mkPrelModule :: ModuleName -> Module
 mkPrelModule name = mkModule name preludePackage
 
 moduleString :: Module -> EncodedString
-moduleString (Module (ModuleName fs) _) = _UNPK_ fs
+moduleString (Module (ModuleName fs) _) = unpackFS fs
 
 moduleName :: Module -> ModuleName
 moduleName (Module mod pkg_info) = mod

@@ -43,7 +43,7 @@ import List		( partition )
 import Util		( zipEqual, zipWithEqual, cmpList, lengthIs,
 			  equalLength, lengthAtLeast, notNull )
 import Outputable
-
+import FastString
 
 infixr 9 `thenSM`
 \end{code}
@@ -887,7 +887,7 @@ specDefn subst calls (fn, rhs)
 	let
 		-- The rule to put in the function's specialisation is:
 		--	forall b,d, d1',d2'.  f t1 b t3 d d1' d2' = f1 b d  
-           spec_env_rule = Rule (_PK_ ("SPEC " ++ showSDoc (ppr fn)))
+           spec_env_rule = Rule (mkFastString ("SPEC " ++ showSDoc (ppr fn)))
 				AlwaysActive
 			        (poly_tyvars ++ rhs_dicts')
 				inst_args 

@@ -37,8 +37,6 @@ name = Util.global (value) :: IORef (ty); \
 #define UASSERT2(e,msg)
 #endif
 
-#if __GLASGOW_HASKELL__ >= 23
-
 -- This #ifndef lets us switch off the "import FastString"
 -- when compiling FastString itself
 #ifndef COMPILING_FAST_STRING
@@ -46,36 +44,7 @@ name = Util.global (value) :: IORef (ty); \
 import qualified FastString 
 #endif
 
-# define USE_FAST_STRINGS 1
-# define FAST_STRING	FastString.FastString
-# define SLIT(x)	(FastString.mkFastCharString# (x#))
-# define FSLIT(x)	(FastString.mkFastString# (x#))
-# define _NULL_		FastString.nullFastString
-# define _NIL_		(FastString.mkFastString "")
-# define _CONS_		FastString.consFS
-# define _HEAD_		FastString.headFS
-# define _HEAD_INT_	FastString.headIntFS
-# define _TAIL_		FastString.tailFS
-# define _LENGTH_	FastString.lengthFS
-# define _PK_		FastString.mkFastString
-# define _UNPK_		FastString.unpackFS
-# define _UNPK_INT_	FastString.unpackIntFS
-# define _APPEND_	`FastString.appendFS`
-#else
-# error I think that FastString is now always used. If not, fix this.
-# define FAST_STRING String
-# define SLIT(x)      (x)
-# define _CMP_STRING_ cmpString
-# define _NULL_	      null
-# define _NIL_	      ""
-# define _CONS_	      (:)
-# define _HEAD_	      head
-# define _TAIL_	      tail
-# define _LENGTH_     length
-# define _PK_	      (\x->x)
-# define _UNPK_	      (\x->x)
-# define _SUBSTR_     substr{-from Utils-}
-# define _APPEND_     ++
-#endif
+#define SLIT(x)	 (FastString.mkLitString# (x#))
+#define FSLIT(x) (FastString.mkFastString# (x#))
 
-#endif
+#endif // HSVERSIONS_H

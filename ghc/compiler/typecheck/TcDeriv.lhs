@@ -55,7 +55,6 @@ import Util		( zipWithEqual, sortLt, notNull )
 import ListSetOps	( removeDups,  assoc )
 import Outputable
 import Maybe		( isJust )
-import FastString 	( FastString )
 \end{code}
 
 %************************************************************************
@@ -436,13 +435,12 @@ makeDerivEqns tycl_decls
 	      && (tyVarsOfTypes args_to_keep `subVarSet` mkVarSet tyvars_to_keep) 
 
 	cant_derive_err = derivingThingErr clas tys tycon tyvars_to_keep
-					   SLIT("too hard for cunning newtype deriving")
-
+				(ptext SLIT("too hard for cunning newtype deriving"))
 
     bale_out err = addErrTc err `thenNF_Tc_` returnNF_Tc (Nothing, Nothing) 
 
     ------------------------------------------------------------------
-    chk_out :: Class -> TyCon -> [TcType] -> Maybe FastString
+    chk_out :: Class -> TyCon -> [TcType] -> Maybe SDoc
     chk_out clas tycon tys
 	| notNull tys						        = Just non_std_why
 	| not (getUnique clas `elem` derivableClassKeys)		= Just non_std_why
@@ -458,11 +456,11 @@ makeDerivEqns tycl_decls
 	    is_single_con  = maybeToBool (maybeTyConSingleCon tycon)
 	    is_enumeration_or_single = is_enumeration || is_single_con
 
-    single_nullary_why = SLIT("one constructor data type or type with all nullary constructors expected")
-    nullary_why        = SLIT("data type with all nullary constructors expected")
-    no_cons_why	       = SLIT("type has no data constructors")
-    non_std_why	       = SLIT("not a derivable class")
-    existential_why    = SLIT("it has existentially-quantified constructor(s)")
+    single_nullary_why = ptext SLIT("one constructor data type or type with all nullary constructors expected")
+    nullary_why        = ptext SLIT("data type with all nullary constructors expected")
+    no_cons_why	       = ptext SLIT("type has no data constructors")
+    non_std_why	       = ptext SLIT("not a derivable class")
+    existential_why    = ptext SLIT("it has existentially-quantified constructor(s)")
 
 new_dfun_name clas tycon 	-- Just a simple wrapper
   = newDFunName clas [mkTyConApp tycon []] (getSrcLoc tycon)
@@ -728,7 +726,7 @@ gen_taggery_Names dfuns
 \begin{code}
 derivingThingErr clas tys tycon tyvars why
   = sep [hsep [ptext SLIT("Can't make a derived instance of"), quotes (ppr pred)],
-	 parens (ptext why)]
+	 parens why]
   where
     pred = mkClassPred clas (tys ++ [mkTyConApp tycon (mkTyVarTys tyvars)])
 

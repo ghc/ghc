@@ -57,6 +57,7 @@ import Literal	        ( Literal, mkMachInt )
 import DataCon		( DataCon, dataConWorkId )
 import BasicTypes	( Activation )
 import VarSet
+import FastString
 import Outputable
 \end{code}
 
@@ -165,7 +166,7 @@ rulesRules (Rules rules _) = rules
 \end{code}
 
 \begin{code}
-type RuleName = FAST_STRING
+type RuleName = FastString
 type IdCoreRule = (Id,CoreRule)		-- Rules don't have their leading Id inside them
 
 data CoreRule

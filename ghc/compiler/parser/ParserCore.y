@@ -15,6 +15,7 @@ import Literal
 import BasicTypes
 import Type
 import SrcLoc
+import FastString
 
 #include "../HsVersions.h"
 
@@ -203,10 +204,10 @@ lit	:: { Literal }
 	: '(' INTEGER '::' aty ')'	{ MachInt $2 }
 	| '(' RATIONAL '::' aty ')'	{ MachDouble $2 }
 	| '(' CHAR '::' aty ')'		{ MachChar (fromEnum $2) }
-	| '(' STRING '::' aty ')'	{ MachStr (_PK_ $2) }
+	| '(' STRING '::' aty ')'	{ MachStr (mkFastString $2) }
 
 name	:: { RdrName }
-	: NAME	{ mkRdrUnqual (mkVarOccEncoded (_PK_ $1)) }
+	: NAME	{ mkRdrUnqual (mkVarOccEncoded (mkFastString $1)) }
 
 cname	:: { String }
 	: CNAME	{ $1 }
@@ -215,22 +216,22 @@ mname	:: { String }
 	: CNAME	{ $1 }
 
 modid	:: { ModuleName }
-	: CNAME	{ mkSysModuleNameFS (_PK_ $1) }
+	: CNAME	{ mkSysModuleNameFS (mkFastString $1) }
 
 qname	:: { RdrName }
 	: name	{ $1 }
 	| mname '.' NAME
-	  { mkIfaceOrig varName (_PK_ $1,_PK_ $3) }
+	  { mkIfaceOrig varName (mkFastString $1,mkFastString $3) }
 
 -- Type constructor
 q_tc_name	:: { RdrName }
         : mname '.' cname 
-		{ mkIfaceOrig tcName (_PK_ $1,_PK_ $3) }
+		{ mkIfaceOrig tcName (mkFastString $1,mkFastString $3) }
 
 -- Data constructor
 q_d_name	:: { RdrName }
         : mname '.' cname 
-		{ mkIfaceOrig dataName (_PK_ $1,_PK_ $3) }
+		{ mkIfaceOrig dataName (mkFastString $1,mkFastString $3) }
 
 
 {

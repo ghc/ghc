@@ -48,6 +48,7 @@ import Word		( Word )
 import Word		( Word64 )
 #endif
 import Outputable
+import FastString
 import CmdLineOpts      ( opt_SimplExcessPrecision )
 \end{code}
 
@@ -56,8 +57,8 @@ import CmdLineOpts      ( opt_SimplExcessPrecision )
 primOpRules :: PrimOp -> [CoreRule]
 primOpRules op = primop_rule op
   where
-    op_name = _PK_ (occNameUserString (primOpOcc op))
-    op_name_case = op_name _APPEND_ SLIT("->case")
+    op_name = mkFastString (occNameUserString (primOpOcc op))
+    op_name_case = op_name `appendFS` FSLIT("->case")
 
 	-- A useful shorthand
     one_rule rule_fn = [BuiltinRule op_name rule_fn]
@@ -459,8 +460,8 @@ dataToTagRule other = Nothing
 builtinRules :: [(Name, CoreRule)]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [ (unpackCStringFoldrName, BuiltinRule SLIT("AppendLitString") match_append_lit),
-      (eqStringName,	       BuiltinRule SLIT("EqString") match_eq_string)
+  = [ (unpackCStringFoldrName, BuiltinRule FSLIT("AppendLitString") match_append_lit),
+      (eqStringName,	       BuiltinRule FSLIT("EqString") match_eq_string)
     ]
 
 
@@ -479,7 +480,7 @@ match_append_lit [Type ty1,
     c1 `cheapEqExpr` c2
   = ASSERT( ty1 `eqType` ty2 )
     Just (Var unpk `App` Type ty1
-		   `App` Lit (MachStr (s1 _APPEND_ s2))
+		   `App` Lit (MachStr (s1 `appendFS` s2))
 		   `App` c1
 		   `App` n)
 

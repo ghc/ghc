@@ -156,10 +156,10 @@ mkCostCentreStuff (local_CCs, extern_CCs, singleton_CCSs)
 	[ register_ccs, register_cc_stacks ]
       where
 	mk_register cc
-	  = CCallProfCCMacro SLIT("REGISTER_CC") [mkCCostCentre cc]
+	  = CCallProfCCMacro FSLIT("REGISTER_CC") [mkCCostCentre cc]
 
 	mk_register_ccs ccs
-	  = CCallProfCCMacro SLIT("REGISTER_CCS") [mkCCostCentreStack ccs]
+	  = CCallProfCCMacro FSLIT("REGISTER_CCS") [mkCCostCentreStack ccs]
 \end{code}
 
 %************************************************************************

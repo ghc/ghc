@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.51 2002/01/02 12:32:19 simonmar Exp $
+% $Id: ClosureInfo.lhs,v 1.52 2002/04/29 14:03:43 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -90,6 +90,7 @@ import SMRep		-- all of it
 import Type		( isUnLiftedType, Type )
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel, isTopLevel )
 import Util		( mapAccumL, listLengthCmp, lengthIs )
+import FastString
 import Outputable
 \end{code}
 
@@ -999,16 +1000,16 @@ thunkEntryLabel thunk_id _ is_updatable
 \end{code}
 
 \begin{code}
-allocProfilingMsg :: ClosureInfo -> FAST_STRING
+allocProfilingMsg :: ClosureInfo -> FastString
 
 allocProfilingMsg cl_info
   = case closureLFInfo cl_info of
-      LFReEntrant _ _ _ _   -> SLIT("TICK_ALLOC_FUN")
-      LFCon _ _		    -> SLIT("TICK_ALLOC_CON")
-      LFTuple _ _	    -> SLIT("TICK_ALLOC_CON")
-      LFThunk _ _ _ True _  -> SLIT("TICK_ALLOC_UP_THK")  -- updatable
-      LFThunk _ _ _ False _ -> SLIT("TICK_ALLOC_SE_THK")  -- nonupdatable
-      LFBlackHole _	    -> SLIT("TICK_ALLOC_BH")
+      LFReEntrant _ _ _ _   -> FSLIT("TICK_ALLOC_FUN")
+      LFCon _ _		    -> FSLIT("TICK_ALLOC_CON")
+      LFTuple _ _	    -> FSLIT("TICK_ALLOC_CON")
+      LFThunk _ _ _ True _  -> FSLIT("TICK_ALLOC_UP_THK")  -- updatable
+      LFThunk _ _ _ False _ -> FSLIT("TICK_ALLOC_SE_THK")  -- nonupdatable
+      LFBlackHole _	    -> FSLIT("TICK_ALLOC_BH")
       LFImported	    -> panic "TICK_ALLOC_IMP"
 \end{code}
 
