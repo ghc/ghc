@@ -31,9 +31,7 @@ IMP_Ubiq(){-uitous-}
 
 import StgSyn
 
-import CmdLineOpts	( opt_AutoSccsOnIndividualCafs,
-			  opt_CompilingGhcInternals
-			)
+import CmdLineOpts	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
 import Id		( idType, mkSysLocal, emptyIdSet, SYN_IE(Id) )
 import SrcLoc		( noSrcLoc )
@@ -63,7 +61,7 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 	  = initMM mod_name us (mapMM do_top_binding stg_binds)
 
 	fixed_ccs
-	  = if do_auto_sccs_on_cafs || doing_prelude
+	  = if do_auto_sccs_on_cafs
 	    then [] -- don't need "all CAFs" CC (for Prelude, we use PreludeCC)
 	    else [all_cafs_cc]
 
@@ -73,11 +71,8 @@ stgMassageForProfiling mod_name grp_name us stg_binds
     ((fixed_ccs ++ local_ccs_no_dups, extern_ccs_no_dups), stg_binds2)
   where
     do_auto_sccs_on_cafs  = opt_AutoSccsOnIndividualCafs  -- only use!
-    doing_prelude	  = opt_CompilingGhcInternals
 
-    all_cafs_cc = if doing_prelude
-		  then preludeCafsCostCentre
-		  else mkAllCafsCC mod_name grp_name
+    all_cafs_cc = mkAllCafsCC mod_name grp_name
 
     ----------
     do_top_binding :: StgBinding -> MassageM StgBinding
