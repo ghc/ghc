@@ -29,6 +29,8 @@ module Foreign.ForeignPtr
 #ifndef __NHC__
 	, mallocForeignPtr	--  :: Storable a => IO (ForeignPtr a)
 	, mallocForeignPtrBytes	--  :: Int -> IO (ForeignPtr a)
+	, mallocForeignPtrArray --  :: Storable a => Int -> IO (ForeignPtr a)
+	, mallocForeignPtrArray0 -- :: Storable a => Int -> IO (ForeignPtr a)
 #endif
         ) 
 	where
@@ -228,3 +230,13 @@ castForeignPtr (ForeignPtr a) = ForeignPtr a
 castForeignPtr (MallocPtr  a) = MallocPtr  a
 #endif
 
+#ifndef __NHC__
+mallocForeignPtrArray :: Storable a => Int -> IO (ForeignPtr a)
+mallocForeignPtrArray  = doMalloc undefined
+  where
+    doMalloc            :: Storable a => a -> Int -> IO (ForeignPtr a)
+    doMalloc dummy size  = mallocForeignPtrBytes (size * sizeOf dummy)
+
+mallocForeignPtrArray0      :: Storable a => Int -> IO (ForeignPtr a)
+mallocForeignPtrArray0 size  = mallocForeignPtrArray (size + 1)
+#endif
