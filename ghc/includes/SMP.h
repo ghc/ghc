@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: SMP.h,v 1.3 2001/02/09 13:09:17 simonmar Exp $
+ * $Id: SMP.h,v 1.4 2002/02/04 20:10:47 sof Exp $
  *
  * (c) The GHC Team, 1999
  *
@@ -74,15 +74,10 @@
 #define LOCK_THUNK(__info)				\
   CMPXCHG(R1.cl->header.info, __info, &stg_WHITEHOLE_info);
 
-#define ACQUIRE_LOCK(mutex) pthread_mutex_lock(mutex);
-#define RELEASE_LOCK(mutex) pthread_mutex_unlock(mutex);
-
 #else /* !SMP */
 
 #define LOCK_CLOSURE(c)     /* nothing */
 #define LOCK_THUNK(__info)  /* nothing */
-#define ACQUIRE_LOCK(mutex) /* nothing */
-#define RELEASE_LOCK(mutex) /* nothing */
 
 #endif /* SMP */
 
