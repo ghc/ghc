@@ -37,7 +37,7 @@ import VarSet     ( TyVarSet )
 import Name	  ( Name, NamedThing(..), mkWiredInName )
 import OccName	  ( mkOccFS, tcName )
 import BasicTypes ( IPName, tupleParens )
-import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon )
+import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, isRecursiveTyCon )
 import Class	  ( Class )
 
 -- others
@@ -356,7 +356,10 @@ ppr_type p (NoteTy (SynNote ty1) ty2) = ppr_type p ty1
 ppr_type p (NoteTy other         ty2) = ppr_type p ty2
 
 ppr_type p (TyConApp tc tys) = ppr_tc_app p tc tys
-ppr_type p (NewTcApp tc tys) = ifPprDebug (ptext SLIT("<nt>")) <> 
+ppr_type p (NewTcApp tc tys) = ifPprDebug (if isRecursiveTyCon tc 
+					   then ptext SLIT("<recnt>")
+					   else ptext SLIT("<nt>")
+				  ) <> 
 			       ppr_tc_app p tc tys
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
