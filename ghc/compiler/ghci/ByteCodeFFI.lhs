@@ -257,6 +257,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
            fstps       4(%esi)
      -}
      ++ case r_rep of
+           CharRep   -> movl_eax_offesimem 4
            IntRep    -> movl_eax_offesimem 4
            WordRep   -> movl_eax_offesimem 4
            AddrRep   -> movl_eax_offesimem 4
@@ -455,6 +456,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
             f64 = [mkSTF f0 i0 4, mkSTF f1 i0 8]
         in
             case r_rep of
+               CharRep   -> i32
                IntRep    -> i32
                WordRep   -> i32
                AddrRep   -> i32

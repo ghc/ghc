@@ -838,6 +838,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
 mkDummyLiteral :: PrimRep -> Literal
 mkDummyLiteral pr
    = case pr of
+        CharRep   -> MachChar 0
         IntRep    -> MachInt 0
         DoubleRep -> MachDouble 0
         FloatRep  -> MachFloat 0
