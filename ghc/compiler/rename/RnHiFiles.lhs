@@ -106,6 +106,7 @@ tryLoadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (ModIface, Maybe Me
   -- (If the load fails, we plug in a vanilla placeholder)
 tryLoadInterface doc_str mod_name from
  = getHomeIfaceTableRn		`thenRn` \ hit ->
+   getModuleRn			`thenRn` \ this_mod ->
    getIfacesRn 			`thenRn` \ ifaces@(Ifaces { iPIT = pit }) ->
 
 	-- CHECK WHETHER WE HAVE IT ALREADY
@@ -147,6 +148,12 @@ tryLoadInterface doc_str mod_name from
 	-- any of the {- SOURCE -} imports
    warnCheckRn	(not redundant_source_import)
 		(warnRedundantSourceImport mod_name)	`thenRn_`
+
+	-- Check that we aren't importing ourselves. 
+	-- That only happens in Rename.checkOldIface, 
+	-- which doesn't call tryLoadInterface
+   warnCheckRn	(moduleName this_mod == mod_name)
+		(warnSelfImport this_mod)		`thenRn_`
 
 	-- READ THE MODULE IN
    findAndReadIface doc_str mod_name hi_boot_file   `thenRn` \ read_result ->
@@ -198,7 +205,14 @@ tryLoadInterface doc_str mod_name from
 			ImportByUser -> addModDeps mod is_loaded (pi_usages iface) mod_map
 			other        -> mod_map
 	mod_map2 = delFromFM mod_map1 mod_name
-	is_loaded m = maybeToBool (lookupIfaceByModName hit pit m)
+
+ 	this_mod_name = moduleName this_mod
+	is_loaded m   =  m == this_mod_name 
+		      || maybeToBool (lookupIfaceByModName hit pit m)
+		-- We treat the currently-being-compiled module as 'loaded' because
+		-- even though it isn't yet in the HIT or PIT; otherwise it gets
+		-- put into iImpModInfo, and then spat out into its own interface
+		-- file as a dependency
 
 	-- Now add info about this module to the PIT
 	has_orphans = pi_orphan iface
@@ -262,13 +276,12 @@ addModDeps mod is_loaded new_deps mod_deps
 
 loadExports :: (Version, [ExportItem]) -> RnM d (Version, [(ModuleName,Avails)])
 loadExports (vers, items)
-  = getModuleRn 				`thenRn` \ this_mod ->
-    mapRn (loadExport this_mod) items		`thenRn` \ avails_s ->
+  = mapRn loadExport items	`thenRn` \ avails_s ->
     returnRn (vers, avails_s)
 
 
-loadExport :: Module -> ExportItem -> RnM d (ModuleName, Avails)
-loadExport this_mod (mod, entities)
+loadExport :: ExportItem -> RnM d (ModuleName, Avails)
+loadExport (mod, entities)
   = mapRn (load_entity mod) entities	`thenRn` \ avails ->
     returnRn (mod, avails)
   where
@@ -602,5 +615,8 @@ hiModuleNameMismatchWarn requested_mod read_mod =
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
           <+> quotes (ppr mod_name)
+
+warnSelfImport mod
+  = ptext SLIT("Importing my own interface: module") <+> ppr mod
 \end{code}
 

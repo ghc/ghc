@@ -290,8 +290,8 @@ data Ifaces = Ifaces {
     }
 
 type ImportedModuleInfo = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface)
-	-- Contains info ONLY about modules that have not yet
-	--- been loaded into the iPIT
+	-- Contains info ONLY about modules that 
+	-- have not yet been loaded into the iPIT
 \end{code}
 
 

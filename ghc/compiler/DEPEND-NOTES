@@ -24,7 +24,7 @@ then
 then
 	Unify, PprType (PprEnv)
 then
-	Literal (TysPrim, PprType), DataCon
+	Literal (TysPrim, PprType), DataCon (PprType)
 then
 	TysWiredIn (DataCon.mkDataCon, loop MkId.mkDataConId, loop Generics.mkGenInfo)
 then
