@@ -413,14 +413,10 @@ exeExtension = ""
 #endif
 
 -- ToDo: This should be determined via autoconf (AC_OBJEXT)
--- | Extension for object files
--- (typically @\"o\"@ on Unix and @\"obj\"@ on Windows)
+-- | Extension for object files. For GHC and NHC the extension is @\"o\"@.
+-- Hugs uses either @\"o\"@ or @\"obj\"@ depending on the used C compiler.
 objExtension :: String
-#ifdef mingw32_TARGET_OS
-objExtension = "obj"
-#else
 objExtension = "o"
-#endif
 
 -- | Extension for dynamically linked (or shared) libraries
 -- (typically @\"so\"@ on Unix and @\"dll\"@ on Windows)
