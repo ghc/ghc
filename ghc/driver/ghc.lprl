@@ -1114,6 +1114,7 @@ sub setupLinkOpts {
           ,'-u', "${uscore}PrelException_NonTermination_closure"
           ,'-u', "${uscore}PrelException_PutFullMVar_closure"
           ,'-u', "${uscore}PrelException_BlockedOnDeadMVar_closure"
+          ,'-u', "${uscore}PrelWeak_runFinalizzerBatch_closure"
           ,'-u', "${uscore}__init_Prelude"
           ,'-u', "${uscore}__init_PrelMain"
 	));
@@ -3275,7 +3276,13 @@ arg: while($_ = $Args[0]) {
 
     # --------------- Warnings etc. ------
 
-    /^-fwarn-(.*)$/      && do { push(@HsC_flags, $_); next arg; };
+    /^-fwarn-(.*)$/ && do { if (!grep(/$1/,@MinusWallOpts)) {
+				print STDERR "$Pgm: unrecognised warning option: $_\n";
+				$Status++;
+			    } else {				
+				push(@HsC_flags, $_); 
+			    }
+			    next arg; };
 
     /^-fno-(.*)$/   && do { push(@HsC_antiflags, "-f$1");
 			    &squashHscFlag("-f$1");
