@@ -18,6 +18,10 @@ These are the single, global static instances of each rep table type.
 #include "rtsdefs.h"
 #include "../storage/SMinternal.h"
 
+#ifdef aix_TARGET_OS /* AIX gives link errors with consts in this file (RO assembler section) */
+#define const /* */
+#endif
+
 EXTFUN(_PRIn_0);
 EXTFUN(_PRIn_1);
 EXTFUN(_PRIn_2);
