@@ -1,8 +1,13 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.9 1999/09/16 19:37:58 sof Exp $
+# $Id: Makefile,v 1.10 2000/05/10 14:33:41 rrt Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+OMITTED_RUNTESTS = cg030.run cg035.run
+endif
+
 include $(TOP)/mk/should_run.mk
 
 SRC_HC_OPTS += -dcore-lint
