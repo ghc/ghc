@@ -69,6 +69,10 @@ in this Software without prior written authorization from the X Consortium.
 #define MAXPATHLEN 2048
 #endif
 
+#ifdef __CYGWIN32__
+#include <sys/cygwin.h>
+#endif
+
 #if NeedVarargsPrototypes
 #include <stdarg.h>
 #endif
@@ -226,7 +230,9 @@ int rel;			/* if true, prepend "../" to fn before using */
 #endif
 	    {
 		/* directory */
+#ifndef __CYGWIN32__   /* don't trust cygwin's n_dirs count */
 		n_dirs--;
+#endif
 		if (dp->d_name[0] == '.' &&
 		    (dp->d_name[1] == '\0' || (dp->d_name[1] == '.' &&
 					       dp->d_name[2] == '\0')))
@@ -312,8 +318,20 @@ int ac;
 char **av;
 {
     char *prog_name = av[0];
-    char *fn, *tn;
+    char* tn;
     struct stat fs, ts;
+#ifdef __CYGWIN32__
+    /*   
+    The lndir code assumes unix-style paths to work. cygwin
+    lets you get away with using dos'ish paths (e.g., "f:/oo")
+    in most contexts. Using them with 'lndir' will seriously
+    confuse the user though, so under-the-hood, we convert the
+    path into something POSIX-like.
+    */
+    static char fn[MAXPATHLEN+1];
+#else
+    char *fn;
+#endif
 
     while (++av, --ac) {
 	if (strcmp(*av, "-silent") == 0)
@@ -334,7 +352,12 @@ char **av;
 	quit (1, "usage: %s [-f] [-silent] [-ignorelinks] fromdir [todir]",
 	      prog_name);
 
+#ifdef __CYGWIN32__
+    cygwin_conv_to_full_posix_path(av[0], fn);
+#else
     fn = av[0];
+#endif
+
     if (ac == 2)
 	tn = av[1];
     else
