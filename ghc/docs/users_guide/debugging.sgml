@@ -192,7 +192,7 @@ Some of the most useful ones are:
 <Term><Option>-ddump-parsed</Option>:</Term>
 <ListItem>
 <Para>
-oarser output
+parser output
 </Para>
 </ListItem>
 </VarListEntry>
