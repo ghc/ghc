@@ -15,7 +15,9 @@ module TcModule (
 import CmdLineOpts	( opt_D_dump_tc, opt_D_dump_deriv )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..) )
 import RnHsSyn		( RenamedHsModule )
-import TcHsSyn		( TcMonoBinds, TypecheckedMonoBinds, zonkTopBinds )
+import TcHsSyn		( TcMonoBinds, TypecheckedMonoBinds, zonkTopBinds,
+			  TypecheckedForeignDecl, zonkForeignExports
+			)
 
 import TcMonad
 import Inst		( Inst, emptyLIE, plusLIE )
@@ -24,8 +26,9 @@ import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
 import TcEnv		( TcIdOcc(..), tcExtendGlobalValEnv, tcExtendTyConEnv,
 			  getEnv_TyCons, getEnv_Classes, tcLookupLocalValue,
-			  tcLookupTyCon, initEnv )
+			  tcLookupTyCon, initEnv, tcSetGlobalValEnv )
 import TcExpr		( tcId )
+import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
 import TcInstUtil	( buildInstanceEnvs, classDataCon, InstInfo )
@@ -65,7 +68,8 @@ Outside-world interface:
 type TcResults
   = (TypecheckedMonoBinds,
      [TyCon], [Class],
-     Bag InstInfo,		-- Instance declaration information
+     Bag InstInfo,	       -- Instance declaration information
+     [TypecheckedForeignDecl], -- foreign import & exports.
      TcDDumpDeriv)
 
 type TcDDumpDeriv = SDoc
@@ -87,13 +91,13 @@ typecheckModule us rn_name_supply mod
 
     dumpIfSet opt_D_dump_tc "Typechecked"
 	(case maybe_result of
-	    Just (binds, _, _, _, _) -> ppr binds
-	    Nothing 		     -> text "Typecheck failed")  	>>
+	    Just (binds, _, _, _, ds, _) -> ppr binds $$ ppr ds
+	    Nothing 		         -> text "Typecheck failed")  	>>
 
     dumpIfSet opt_D_dump_deriv "Derived instances"
 	(case maybe_result of
-	    Just (_, _, _, _, dump_deriv) -> dump_deriv
-	    Nothing 		          -> empty)  	>>
+	    Just (_, _, _, _, _, dump_deriv) -> dump_deriv
+	    Nothing 		             -> empty)  	>>
 
     return (if isEmptyBag errs then 
 		maybe_result 
@@ -193,6 +197,9 @@ tcModule rn_name_supply
 	tcInterfaceSigs unf_env decls		`thenTc` \ sig_ids ->
 	tcExtendGlobalValEnv sig_ids		$
 
+	    -- foreign import declarations next.
+	tcForeignImports decls		`thenTc`    \ (fo_ids, foi_decls) ->
+	tcExtendGlobalValEnv fo_ids		$
 
 	-- Value declarations next.
 	-- We also typecheck any extra binds that came out of the "deriving" process
@@ -205,14 +212,14 @@ tcModule rn_name_supply
 	    )				`thenTc` \ ((val_binds, final_env), lie_valdecls) ->
 	tcSetEnv final_env $
 
+	    -- foreign export declarations next.
+	tcForeignExports decls		`thenTc`    \ (lie_fodecls, foe_binds, foe_decls) ->
 
 		-- Second pass over class and instance declarations,
 		-- to compile the bindings themselves.
 	-- trace "tc8" $
 	tcInstDecls2  inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
 	tcClassDecls2 decls		`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
-
-
 
 	-- Check that "main" has the right signature
 	tcCheckMainSig mod_name		`thenTc_` 
@@ -225,7 +232,10 @@ tcModule rn_name_supply
 	     -- during the generalisation step.)
 	-- trace "tc9" $
 	let
-	    lie_alldecls = lie_valdecls `plusLIE` lie_instdecls `plusLIE` lie_clasdecls
+	    lie_alldecls = lie_valdecls  `plusLIE`
+			   lie_instdecls `plusLIE`
+			   lie_clasdecls `plusLIE`
+			   lie_fodecls
 	in
 	tcSimplifyTop lie_alldecls			`thenTc` \ const_inst_binds ->
 
@@ -237,12 +247,16 @@ tcModule rn_name_supply
 			val_binds		`AndMonoBinds`
 		        inst_binds		`AndMonoBinds`
 		        cls_binds		`AndMonoBinds`
-		        const_inst_binds
+		        const_inst_binds	`AndMonoBinds`
+			foe_binds
 	in
-	zonkTopBinds all_binds	`thenNF_Tc` \ (all_binds', really_final_env)  ->
+	zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', really_final_env)  ->
+	tcSetGlobalValEnv really_final_env $
+	zonkForeignExports foe_decls	`thenNF_Tc` \ foe_decls' ->
 
 	returnTc (really_final_env, 
-		  (all_binds', local_tycons, local_classes, inst_info, ddump_deriv))
+		  (all_binds',local_tycons, local_classes,
+		   inst_info, foi_decls ++ foe_decls', ddump_deriv))
 
     -- End of outer fix loop
     ) `thenTc` \ (final_env, stuff) ->

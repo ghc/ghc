@@ -28,6 +28,7 @@ import CoreUnfold
 import MagicUFs		( MagicUnfoldingFun )
 import WwLib		( mkWrapper )
 import PrimOp		( PrimOp(..) )
+import CallConv		( cCallConv )
 
 import MkId		( mkImportedId, mkUserId )
 import Id		( Id, addInlinePragma, isPrimitiveId_maybe, dataConArgTys )
@@ -355,7 +356,7 @@ tcCorePrim (UfOtherOp op)
 tcCorePrim (UfCCallOp str casm gc arg_tys res_ty)
   = mapTc tcHsType arg_tys	`thenTc` \ arg_tys' ->
     tcHsType res_ty		`thenTc` \ res_ty' ->
-    returnTc (CCallOp str casm gc arg_tys' res_ty')
+    returnTc (CCallOp (Just str) casm gc cCallConv arg_tys' res_ty')
 \end{code}
 
 \begin{code}

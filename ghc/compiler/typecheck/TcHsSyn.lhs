@@ -12,11 +12,12 @@ module TcHsSyn (
 	TcExpr, TcGRHSsAndBinds, TcGRHS, TcMatch,
 	TcStmt, TcArithSeqInfo, TcRecordBinds,
 	TcHsModule, TcCoreExpr, TcDictBinds,
+	TcForeignExportDecl,
 	
 	TypecheckedHsBinds, 
 	TypecheckedMonoBinds, TypecheckedPat,
 	TypecheckedHsExpr, TypecheckedArithSeqInfo,
-	TypecheckedStmt,
+	TypecheckedStmt, TypecheckedForeignDecl,
 	TypecheckedMatch, TypecheckedHsModule,
 	TypecheckedGRHSsAndBinds, TypecheckedGRHS,
 	TypecheckedRecordBinds, TypecheckedDictBinds,
@@ -29,7 +30,8 @@ module TcHsSyn (
 
 	maybeBoxedPrimType,
 
-	zonkTopBinds, zonkBinds, zonkMonoBinds, zonkTcId
+	zonkTopBinds, zonkBinds, zonkMonoBinds, zonkTcId,
+	zonkForeignExports
   ) where
 
 #include "HsVersions.h"
@@ -87,7 +89,8 @@ type TcArithSeqInfo s	= ArithSeqInfo (TcBox s) (TcIdOcc s) (TcPat s)
 type TcRecordBinds s	= HsRecordBinds (TcBox s) (TcIdOcc s) (TcPat s)
 type TcHsModule s	= HsModule (TcBox s) (TcIdOcc s) (TcPat s)
 
-type TcCoreExpr s	= GenCoreExpr (TcIdOcc s) (TcIdOcc s) (TcBox s)
+type TcCoreExpr s	   = GenCoreExpr (TcIdOcc s) (TcIdOcc s) (TcBox s)
+type TcForeignExportDecl s = ForeignDecl (TcIdOcc s)
 
 type TypecheckedPat		= OutPat	Unused Id
 type TypecheckedMonoBinds 	= MonoBinds	Unused Id TypecheckedPat
@@ -101,6 +104,7 @@ type TypecheckedGRHSsAndBinds	= GRHSsAndBinds Unused Id TypecheckedPat
 type TypecheckedGRHS		= GRHS		Unused Id TypecheckedPat
 type TypecheckedRecordBinds	= HsRecordBinds Unused Id TypecheckedPat
 type TypecheckedHsModule	= HsModule	Unused Id TypecheckedPat
+type TypecheckedForeignDecl     = ForeignDecl Id
 \end{code}
 
 \begin{code}
@@ -652,4 +656,20 @@ zonkPats te (pat:pats)
     returnNF_Tc (pat':pats', ids1 `unionBags` ids2)
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection[BackSubst-Foreign]{Foreign exports}
+%*									*
+%************************************************************************
 
+
+\begin{code}
+zonkForeignExports :: [TcForeignExportDecl s] -> NF_TcM s [TypecheckedForeignDecl]
+zonkForeignExports ls = mapNF_Tc zonkForeignExport ls
+
+zonkForeignExport :: TcForeignExportDecl s -> NF_TcM s (TypecheckedForeignDecl)
+zonkForeignExport (ForeignDecl i imp_exp hs_ty ext_nm cconv src_loc) =
+   zonkIdOcc i	`thenNF_Tc` \ i' ->
+   returnNF_Tc (ForeignDecl i' imp_exp undefined ext_nm cconv src_loc)
+
+\end{code}
