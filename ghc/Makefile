@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.11 2000/06/25 17:18:15 panne Exp $
+# $Id: Makefile,v 1.12 2000/11/03 17:08:36 simonmar Exp $
 #
 
 TOP=.
@@ -36,5 +36,8 @@ SUBDIRS += tests
 endif
 
 SRC_DIST_FILES += configure
+
+DIST_CLEAN_FILES += ghc.spec
+MAINTAINER_CLEAN_FILES += configure config.status
 
 include $(TOP)/mk/target.mk
