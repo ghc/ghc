@@ -19,11 +19,7 @@ module HsSyn (
  	module HsUtils,
 	Fixity, NewOrData, 
 
-	HsModule(..), HsExtCore(..),
-	collectStmtsBinders, collectStmtBinders, collectLStmtBinders,
-	collectGroupBinders, collectHsBindLocatedBinders,
-	collectHsBindBinders,
-	collectSigTysFromHsBind, collectSigTysFromHsBinds
+	HsModule(..), HsExtCore(..)
      ) where
 
 #include "HsVersions.h"
