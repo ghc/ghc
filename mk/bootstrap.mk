@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.24 2003/07/24 11:03:07 simonmar Exp $
+# $Id: bootstrap.mk,v 1.25 2003/07/24 11:46:01 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -118,7 +118,7 @@ HC_BOOT_LD_OPTS =				\
    -u "$(UNDERSCORE)GHCziWeak_runFinalizzerBatch_closure" \
    -u "$(UNDERSCORE)__stginit_Prelude"
 
-HC_BOOT_LIBS = -lHStext -lHStext_cbits -lHSutil -lHSposix -lHSposix_cbits -lHSconcurrent -lHSlang -lHSlang_cbits -lHShaskell98 -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
+HC_BOOT_LIBS = -lHShaskell98 -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
 
 ifeq "$(GhcLibsWithReadline)" "YES"
 HC_BOOT_LIBS += $(patsubst %, -l%, $(LibsReadline))
