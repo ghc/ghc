@@ -60,11 +60,23 @@ cvt_top (Data tc tvs constrs derivs)
                            (DataCons (map mk_con constrs))
                            (mk_derivs derivs) loc0)
   where
-    mk_con (Constr c tys)
+    mk_con (Constr c strtys)
 	= ConDecl (cName c) noExistentials noContext
-		  (PrefixCon (map mk_arg tys)) loc0
+		  (PrefixCon (map mk_arg strtys)) loc0
+    mk_con (RecConstr c varstrtys)
+	= ConDecl (cName c) noExistentials noContext
+		  (RecCon (map mk_id_arg varstrtys)) loc0
+    mk_con (InfixConstr st1 c st2)
+	= ConDecl (cName c) noExistentials noContext
+		  (InfixCon (mk_arg st1) (mk_arg st2)) loc0
 
-    mk_arg ty = BangType NotMarkedStrict (cvtType ty)
+    mk_arg (Strict, ty) = BangType MarkedUserStrict (cvtType ty)
+    mk_arg (NonStrict, ty) = BangType NotMarkedStrict (cvtType ty)
+
+    mk_id_arg (i, Strict, ty)
+        = (vName i, BangType MarkedUserStrict (cvtType ty))
+    mk_id_arg (i, NonStrict, ty)
+        = (vName i, BangType NotMarkedStrict (cvtType ty))
 
     mk_derivs [] = Nothing
     mk_derivs cs = Just [HsClassP (tconName c) [] | c <- cs]

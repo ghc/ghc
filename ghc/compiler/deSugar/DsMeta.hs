@@ -74,6 +74,8 @@ import BasicTypes ( NewOrData(..), StrictnessMark(..), isBoxed )
 
 import Outputable
 import FastString	( mkFastString )
+
+import Monad ( zipWithM )
  
 -----------------------------------------------------------------------------
 dsBracket :: HsBracket Name -> [PendingSplice] -> DsM CoreExpr
@@ -257,15 +259,15 @@ repInstD (InstDecl ty binds _ _ loc)
 repC :: ConDecl Name -> DsM (Core M.Cons)
 repC (ConDecl con [] [] details loc)
   = do { con1     <- lookupOcc con ;		-- See note [Binders and occurrences] 
-	 arg_tys  <- mapM (repBangTy con) (hsConArgs details) ;
-	 arg_tys1 <- coreList typeTyConName arg_tys ;
-	 repConstr con1 arg_tys1 }
+	 repConstr con1 details }
 
-repBangTy con (BangType NotMarkedStrict ty) = repTy ty
-repBangTy con bty = do { addDsWarn msg ; repTy (getBangType bty) }
-   where
-     msg = ptext SLIT("Ignoring stricness on argument of constructor")
-		 <+> quotes (ppr con)
+repBangTy :: BangType Name -> DsM (Core (M.Q (M.Strictness, M.Typ)))
+repBangTy (BangType str ty) = do MkC s <- rep2 strName []
+                                 MkC t <- repTy ty
+                                 rep2 strictTypeName [s, t]
+    where strName = case str of
+                        NotMarkedStrict -> nonstrictName
+                        _ -> strictName
 
 -------------------------------------------------------
 -- 			Deriving clause
@@ -999,8 +1001,23 @@ repProto (MkC s) (MkC ty) = rep2 protoName [s, ty]
 repCtxt :: Core [M.Type] -> DsM (Core M.Ctxt)
 repCtxt (MkC tys) = rep2 ctxtName [tys]
 
-repConstr :: Core String -> Core [M.Type] -> DsM (Core M.Cons)
-repConstr (MkC con) (MkC tys) = rep2 constrName [con, tys]
+repConstr :: Core String -> HsConDetails Name (BangType Name)
+          -> DsM (Core M.Cons)
+repConstr con (PrefixCon ps)
+    = do arg_tys  <- mapM repBangTy ps
+         arg_tys1 <- coreList strTypeTyConName arg_tys
+         rep2 constrName [unC con, unC arg_tys1]
+repConstr con (RecCon ips)
+    = do arg_vs   <- mapM lookupOcc (map fst ips)
+         arg_tys  <- mapM repBangTy (map snd ips)
+         arg_vtys <- zipWithM (\x y -> rep2 varStrictTypeName [unC x, unC y])
+                              arg_vs arg_tys
+         arg_vtys' <- coreList varStrTypeTyConName arg_vtys
+         rep2 recConstrName [unC con, unC arg_vtys']
+repConstr con (InfixCon st1 st2)
+    = do arg1 <- repBangTy st1
+         arg2 <- repBangTy st2
+         rep2 infixConstrName [unC arg1, unC con, unC arg2]
 
 ------------ Types -------------------
 
@@ -1134,11 +1151,13 @@ templateHaskellNames
 		matchName, clauseName, funName, valName, tySynDName, dataDName, classDName,
 		instName, protoName, tforallName, tvarName, tconName, tappName,
 		arrowTyConName, tupleTyConName, listTyConName, namedTyConName,
-		ctxtName, constrName,
+		ctxtName, constrName, recConstrName, infixConstrName,
 		exprTyConName, declTyConName, pattTyConName, mtchTyConName, 
 		clseTyConName, stmtTyConName, consTyConName, typeTyConName,
+        strTypeTyConName, varStrTypeTyConName,
 		qTyConName, expTyConName, matTyConName, clsTyConName,
-		decTyConName, typTyConName ]
+		decTyConName, typTyConName, strictTypeName, varStrictTypeName,
+        strictName, nonstrictName ]
 
 
 varQual  = mk_known_key_name OccName.varName
@@ -1227,6 +1246,8 @@ ctxtName       = varQual FSLIT("ctxt")          ctxtIdKey
 			 
 -- data Con = ...	 
 constrName     = varQual FSLIT("constr")        constrIdKey
+recConstrName  = varQual FSLIT("recConstr")     recConstrIdKey
+infixConstrName = varQual FSLIT("infixConstr")  infixConstrIdKey
 			 
 exprTyConName  = tcQual  FSLIT("Expr")  	       exprTyConKey
 declTyConName  = tcQual  FSLIT("Decl")  	       declTyConKey
@@ -1236,6 +1257,8 @@ clseTyConName  = tcQual  FSLIT("Clse")  	       clseTyConKey
 stmtTyConName  = tcQual  FSLIT("Stmt") 	       stmtTyConKey
 consTyConName  = tcQual  FSLIT("Cons")  	       consTyConKey
 typeTyConName  = tcQual  FSLIT("Type")  	       typeTyConKey
+strTypeTyConName  = tcQual  FSLIT("StrType")       strTypeTyConKey
+varStrTypeTyConName  = tcQual  FSLIT("VarStrType")       varStrTypeTyConKey
 			 
 qTyConName     = tcQual  FSLIT("Q")  	       qTyConKey
 expTyConName   = tcQual  FSLIT("Exp")  	       expTyConKey
@@ -1243,6 +1266,11 @@ decTyConName   = tcQual  FSLIT("Dec")  	       decTyConKey
 typTyConName   = tcQual  FSLIT("Typ")  	       typTyConKey
 matTyConName   = tcQual  FSLIT("Mat")  	       matTyConKey
 clsTyConName   = tcQual  FSLIT("Cls")  	       clsTyConKey
+
+strictTypeName = varQual  FSLIT("strictType")   strictTypeKey
+varStrictTypeName = varQual  FSLIT("varStrictType")   varStrictTypeKey
+strictName     = varQual  FSLIT("strict")       strictKey
+nonstrictName  = varQual  FSLIT("nonstrict")    nonstrictKey
 
 --	TyConUniques available: 100-119
 -- 	Check in PrelNames if you want to change this
@@ -1261,6 +1289,8 @@ consTyConKey = mkPreludeTyConUnique 110
 typeTyConKey = mkPreludeTyConUnique 111
 typTyConKey  = mkPreludeTyConUnique 112
 decTyConKey  = mkPreludeTyConUnique 113
+varStrTypeTyConKey = mkPreludeTyConUnique 114
+strTypeTyConKey = mkPreludeTyConUnique 115
 
 
 
@@ -1339,7 +1369,13 @@ rationalLIdKey	= mkPreludeMiscIdUnique 262
 
 sigExpIdKey     = mkPreludeMiscIdUnique 263
 
+strictTypeKey = mkPreludeMiscIdUnique 264
+strictKey = mkPreludeMiscIdUnique 265
+nonstrictKey = mkPreludeMiscIdUnique 266
+varStrictTypeKey = mkPreludeMiscIdUnique 267
 
+recConstrIdKey	= mkPreludeMiscIdUnique 268
+infixConstrIdKey	= mkPreludeMiscIdUnique 269
 
 -- %************************************************************************
 -- %*									*
