@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.12 2002/07/24 09:42:18 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.13 2003/08/18 10:04:47 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -165,6 +165,7 @@ reserved_ids = [
  ( "infixr", 	KW_InfixR ),   
  ( "instance",  KW_Instance ), 
  ( "let", 	KW_Let ),      
+ ( "mdo",       KW_Do ),       -- pretend mdo is do, for now.
  ( "module", 	KW_Module ),   
  ( "newtype",   KW_NewType ),  
  ( "of", 	KW_Of ),       
