@@ -19,7 +19,10 @@ test('conc008', normal, compile_and_run, [''])
 test('conc009', exit_code(1), compile_and_run, [''])
 test('conc010', normal, compile_and_run, [''])
 test('conc012', normal, compile_and_run, [''])
-test('conc013', normal, compile_and_run, [''])
+
+# skip this, hangs for ever with the threaded RTS
+test('conc013', skip, compile_and_run, [''])
+
 test('conc014', normal, compile_and_run, [''])
 test('conc015', normal, compile_and_run, [''])
 test('conc016', normal, compile_and_run, [''])
