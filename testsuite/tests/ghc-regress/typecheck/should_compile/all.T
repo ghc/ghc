@@ -167,5 +167,10 @@ test('tc166', normal, compile, [''])
 test('tc167', expect_fail, compile, [''])
 test('tc168', normal, compile, ['-ddump-types'])
 test('tc169', normal, compile, [''])
-test('tc170', normal, multimod_compile, ['tc170', '-O'])
+
+# The bug in tc170 is triggered only by batch compilation
+# which we do by steam here, with a pair of tests
+test('Tc170_Aux', normal, compile, ['-O'])
+test('tc170', normal, compile, ['-O'])
+
 test('tc171', normal, compile, [''])

@@ -12,4 +12,5 @@ import Tc170_Aux
 
 data Bitmap = Bitmap
 
-instance Dimensions Bitmap 
+instance Dimensions Bitmap where
+  frame = error "urk"
