@@ -2,20 +2,28 @@ For 1.0:
 
 * parse module headers, augment Interface with info from header
 
-* Short contents at the top of each module?
-
 * IDoc compatibility, as far as possible
 
 * named chunks of documentation?
-
-* sort the names in the module tree
 
 * Handle parse errors better in doc strings
 
 * Do the unlitting/CPPing from Haddock itself
 
+* facilities for saving interfaces so that you can run Haddock against
+  something that isn't the Prelude.
+
+* copy haddock.css into the right place when run
+
+* allow the HTML/DocBook to be generated into a specified directory
+
+* remove extra whitespace from the generated HTML
+
 -----------------------------------------------------------------------------
 Post 1.0:
+
+* split large modules into several pages (perhaps split at each
+  section 1 heading?)
 
 * pay attention to import specs!
 
@@ -23,8 +31,6 @@ Post 1.0:
   datatypes.
 
 * include file revision info in module headers
-
-* handle scoped type variables in the parser
 
 * Allow fully hiding modules from the output
 
