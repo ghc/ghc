@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.94 2002/05/15 08:59:59 chak Exp $
+-- $Id: DriverFlags.hs,v 1.95 2002/06/03 13:08:37 matthewc Exp $
 --
 -- Driver flags
 --
@@ -564,6 +564,9 @@ machdepCCOpts
 		      [ "-fno-defer-pop", "-fomit-frame-pointer",
 	                "-DSTOLEN_X86_REGS="++show n_regs ]
 		    )
+
+   | prefixMatch "ia64"    cTARGETPLATFORM  
+	= return ( [], ["-fomit-frame-pointer", "-G0"] )
 
    | prefixMatch "mips"    cTARGETPLATFORM
 	= return ( ["-static"], [] )

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.33 2002/05/21 14:58:49 wolfgang Exp $
+ * $Id: StgCRun.c,v 1.34 2002/06/03 13:08:41 matthewc Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -465,7 +465,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
 
-void StgRunIsImplementedInAssembler()
+void StgRunIsImplementedInAssembler(void)
 {
 	__asm__ volatile (
 		"\n.globl _StgRun\n"
@@ -484,6 +484,42 @@ void StgRunIsImplementedInAssembler()
 		"\tlmw r14,-216(r1)\n"
 		"\tb restFP # f14\n"
 	);
+}
+
+#endif
+
+/* -----------------------------------------------------------------------------
+   IA64 architecture
+
+   Again, in assembler - so we can fiddle with the register stack.
+   -------------------------------------------------------------------------- */
+
+#ifdef ia64_TARGET_ARCH
+
+/* the memory stack is rarely used, so 16K is excessive */
+#undef RESERVED_C_STACK_BYTES
+#define RESERVED_C_STACK_BYTES 1024
+
+void StgRunIsImplementedInAssembler(void)
+{
+    __asm__ volatile(
+		".global StgRun\n"
+		"StgRun:\n"
+		"\talloc r55 = ar.pfs, 0, 24, 8, 0\n"	/* setup register frame */
+		"\tmov r54 = b0\n"			/* save return address */
+		"\tadds sp = -%0, sp\n"			/* setup stack */
+		"\tld8 r16=[r32],8 ;;\n"	/* branch to f using descriptor */
+		"\tld8 r1=[r32]\n"
+		"\tmov b6=r16\n"
+		"\tbr.few b6 ;;\n"
+		".global StgReturn\n"
+		"StgReturn:\n"
+		"\tmov r8 = 0\n"		/* return value in r8 */
+		"\tmov ar.pfs = r55\n"		/* restore register frame */
+		"\tmov b0 = r54\n"		/* restore return address */
+		"\tadds sp = %0, sp\n"		/* restore stack */
+		"\tbr.ret.sptk.many b0 ;;\n"	/* return */
+	: : "i"(RESERVED_C_STACK_BYTES));
 }
 
 #endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.9 2002/05/28 09:22:08 wolfgang Exp $
+ * $Id: TailCalls.h,v 1.10 2002/06/03 13:08:41 matthewc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -184,6 +184,21 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
 */
 
 #endif /* powerpc_TARGET_ARCH */
+
+/* -----------------------------------------------------------------------------
+   Tail calling on IA64
+   -------------------------------------------------------------------------- */
+
+#ifdef ia64_TARGET_ARCH
+
+/* The compiler can more intelligently decide how to do this.  We therefore
+ * implement it as a call and optimise to a jump at mangle time. */
+#define JMP_(cont)	((F_) (cont))(); __asm__ volatile ("--- TAILCALL ---");
+
+/* Don't emit calls to __DISCARD__ as this causes hassles */
+#define __DISCARD__()
+
+#endif
 
 /* -----------------------------------------------------------------------------
   FUNBEGIN and FUNEND.

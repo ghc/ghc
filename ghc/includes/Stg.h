@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.45 2002/02/13 07:48:19 sof Exp $
+ * $Id: Stg.h,v 1.46 2002/06/03 13:08:41 matthewc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -81,7 +81,7 @@
  *
  * UNDEFINING THIS WON'T WORK ON ITS OWN.  You have been warned.
  */
-#ifndef USE_MINIINTERPRETER
+#if !defined(USE_MINIINTERPRETER) && !defined(ia64_TARGET_ARCH)
 #define TABLES_NEXT_TO_CODE
 #endif
 
