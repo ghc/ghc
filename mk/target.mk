@@ -324,7 +324,7 @@ HC_SPLIT_PRE = \
     $(RM) $@; if [ ! -d $(basename $@)_split ]; then mkdir $(basename $@)_split; else \
     $(FIND) $(basename $@)_split -name '*.$(way_)o' -print | xargs $(RM) __rm_food; fi
 ifeq "$(GhcWithInterpreter)" "YES"
-HC_SPLIT_POST = (cd $(dir $@) && $(LD) -r $(LD_X) -o $(notdir $@) $(basename $(notdir $@))_split/*.$(way_)o)
+HC_SPLIT_POST = (cd $(basename $@)_split && $(LD) -r $(LD_X) -o ../$(notdir $@) *.$(way_)o)
 else
 HC_SPLIT_POST = touch $@
 endif # GhcWithInterpreter == YES
