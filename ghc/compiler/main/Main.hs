@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.90 2001/10/26 00:53:27 sof Exp $
+-- $Id: Main.hs,v 1.91 2001/11/03 01:30:42 sof Exp $
 --
 -- GHC Driver program
 --
@@ -113,6 +113,7 @@ import Dynamic		( toDyn )
 main =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
   handle (\exception -> do
+  	   hFlush stdout
 	   case exception of
 		-- an IO exception probably isn't our fault, so don't panic
 		IOException _ ->  hPutStr stderr (show exception)
@@ -121,11 +122,13 @@ main =
          ) $ do
 
   -- all error messages are propagated as exceptions
-  handleDyn (\dyn -> case dyn of
-			  PhaseFailed _phase code -> exitWith code
-			  Interrupted -> exitWith (ExitFailure 1)
-			  _ -> do hPutStrLn stderr (show (dyn :: GhcException))
-			          exitWith (ExitFailure 1)
+  handleDyn (\dyn -> do
+  		hFlush stdout
+  		case dyn of
+		     PhaseFailed _phase code -> exitWith code
+		     Interrupted -> exitWith (ExitFailure 1)
+		     _ -> do hPutStrLn stderr (show (dyn :: GhcException))
+			     exitWith (ExitFailure 1)
 	    ) $ do
 
    -- make sure we clean up after ourselves
