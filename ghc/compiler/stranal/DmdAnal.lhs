@@ -279,10 +279,10 @@ dmdFix :: TopLevelFlag
        -> (SigEnv, DmdEnv,
 	   [(Id,CoreExpr)])	-- Binders annotated with stricness info
 
-dmdFix top_lvl sigs pairs
-  = loop 1 initial_sigs pairs
+dmdFix top_lvl sigs orig_pairs
+  = loop 1 initial_sigs orig_pairs
   where
-    bndrs        = map fst pairs
+    bndrs        = map fst orig_pairs
     initial_sigs = extendSigEnvList sigs [(id, (initial_sig id, top_lvl)) | id <- bndrs]
     
     loop :: Int
@@ -296,11 +296,11 @@ dmdFix top_lvl sigs pairs
 		-- processing the RHSs with sigs (= sigs'), whereas pairs 
 		-- is the result of processing the RHSs with the *previous* 
 		-- iteration of sigs.
-      | n >= 5       = pprTrace "dmdFix loop" (ppr n <+> (vcat 
+      | n >= 10       = pprTrace "dmdFix loop" (ppr n <+> (vcat 
 				[ text "Sigs:" <+> ppr [(id,lookup sigs id, lookup sigs' id) | (id,_) <- pairs],
 				  text "env:" <+> ppr (ufmToList sigs),
 				  text "binds:" <+> pprCoreBinding (Rec pairs)]))
-			      (loop (n+1) sigs' pairs')
+			      (emptySigEnv, emptyDmdEnv, orig_pairs)	-- Safe output
       | otherwise    = loop (n+1) sigs' pairs'
       where
 		-- Use the new signature to do the next pair
