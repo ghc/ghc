@@ -1,11 +1,13 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.5 1999/02/26 16:46:50 simonm Exp $
+ * $Id: Main.c,v 1.6 1999/03/03 19:20:42 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
  * Main function for a standalone Haskell program.
  *
  * ---------------------------------------------------------------------------*/
+
+#define COMPILING_RTS_MAIN
 
 #include "Rts.h"
 #include "RtsAPI.h"
@@ -14,7 +16,6 @@
 #include "RtsUtils.h"
 
 #ifdef DEBUG
-#include "RtsFlags.h"  /* for debugging flags */
 #include "Printer.h"   /* for printing        */
 #endif
 

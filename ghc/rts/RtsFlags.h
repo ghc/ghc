@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.10 1999/02/18 13:00:28 sewardj Exp $
+ * $Id: RtsFlags.h,v 1.11 1999/03/03 19:20:41 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -249,7 +249,11 @@ struct RTS_FLAGS {
 #endif
 };
 
+#ifdef COMPILING_RTS_MAIN
+extern DLLIMPORT struct RTS_FLAGS RtsFlags;
+#else
 extern struct RTS_FLAGS RtsFlags;
+#endif
 
 /* Routines that operate-on/to-do-with RTS flags: */
 
@@ -276,8 +280,11 @@ void setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[]);
 #define TIME_FILENAME_FMT	"%0.122s.time"
 #define TIME_FILENAME_FMT_GUM	"%0.118s.%03d.time"
 
-extern int     prog_argc; /* an "int" so as to match normal "argc" */
+/* an "int" so as to match normal "argc" */
+/* Now defined in Stg.h (lib/std/cbits need these too.)
+extern int     prog_argc;
 extern char  **prog_argv;
+*/
 extern int     rts_argc;  /* ditto */
 extern char   *rts_argv[];
 
