@@ -898,7 +898,8 @@ docToHtml doc = markup htmlMarkup (unParagraph (markup htmlCleanup doc))
 -- separate them.  So we catch the single paragraph case and transform it
 -- here.
 unParagraph (DocParagraph d) = d
-unParagraph (DocCodeBlock d) = (DocMonospaced d)
+--NO: This eliminates line breaks in the code block:  (SDM, 6/5/2003)
+--unParagraph (DocCodeBlock d) = (DocMonospaced d)
 unParagraph doc              = doc
 
 htmlCleanup :: DocMarkup [HsQName] Doc
