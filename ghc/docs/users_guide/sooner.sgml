@@ -1,5 +1,5 @@
 <Chapter id="sooner-faster-quicker">
-<Title>Advice on: sooner, faster, smaller, stingier
+<Title>Advice on: sooner, faster, smaller, thriftier
 </Title>
 
 <Para>
@@ -536,8 +536,8 @@ Use <Literal>strip</Literal> on your executables.
 
 </Sect1>
 
-<Sect1 id="stingier">
-<Title>Stingier: producing a program that gobbles less heap space
+<Sect1 id="thriftier">
+<Title>Thriftier: producing a program that gobbles less heap space
 </Title>
 
 <Para>
