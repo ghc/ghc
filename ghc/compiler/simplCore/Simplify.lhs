@@ -795,12 +795,14 @@ simplNote env (Coerce to from) body cont
 						-- the inner one is redundant
 
 	addCoerce t1t2 s1s2 (ApplyTo dup arg arg_se cont)
-	  | Just (s1, s2) <- splitFunTy_maybe s1s2
+	  | not (isTypeArg arg),	-- This whole case only works for value args
+					-- Could upgrade to have equiv thing for type apps too	
+ 	    Just (s1, s2) <- splitFunTy_maybe s1s2
 		--	(coerce (T1->T2) (S1->S2) F) E
 		-- ===> 
 		--	coerce T2 S2 (F (coerce S1 T1 E))
 		--
-		-- t1t2 must be a function type, T1->T2
+		-- t1t2 must be a function type, T1->T2, because it's applied to something
 		-- but s1s2 might conceivably not be
 		--
 		-- When we build the ApplyTo we can't mix the out-types
