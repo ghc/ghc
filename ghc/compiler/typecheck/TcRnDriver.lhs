@@ -94,8 +94,10 @@ import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
 			  IfaceExtName(..), IfaceConDecls(..),
 			  tyThingToIfaceDecl )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
-import Id		( Id, isImplicitId )
+import Id		( Id, isImplicitId, globalIdDetails )
+import FieldLabel	( fieldLabelTyCon )
 import MkId		( unsafeCoerceId )
+import DataCon		( dataConTyCon )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
 import SrcLoc		( interactiveSrcLoc, unLoc )
@@ -111,6 +113,7 @@ import HscTypes		( InteractiveContext(..),
 			  ModIface(..), ModDetails(..) )
 import BasicTypes	( RecFlag(..), Fixity )
 import Bag		( unitBag )
+import ListSetOps	( removeDups )
 import Panic		( ghcError, GhcException(..) )
 #endif
 
@@ -492,22 +495,35 @@ tcRnThing hsc_env ictxt rdr_name
       else 			-- Add deprecation warnings
 	mapM_ addMessages warns_s ;
 	
-	-- And lookup up the entities
-    mapM do_one good_names
+	-- And lookup up the entities, avoiding duplicates, which arise
+	-- because constructors and record selectors are represented by
+	-- their parent declaration
+    let { do_one name = do { thing <- tcLookupGlobal name
+			   ; let decl = toIfaceDecl ictxt thing
+		           ; fixity <- lookupFixityRn name
+		           ; return (decl, fixity) } ;
+	  cmp (d1,_) (d2,_) = ifName d1 `compare` ifName d2 } ;
+    results <- mapM do_one good_names ;
+    return (fst (removeDups cmp results))
     }
-  where
-    do_one name = do { thing <- tcLookupGlobal name
-		     ; fixity <- lookupFixityRn name
-		     ; return (toIfaceDecl ictxt thing, fixity) }
 
 toIfaceDecl :: InteractiveContext -> TyThing -> IfaceDecl
 toIfaceDecl ictxt thing
-  = tyThingToIfaceDecl True {- Discard IdInfo -} emptyNameSet {- Show data cons -} 
-		       ext_nm thing
+  = tyThingToIfaceDecl True 		-- Discard IdInfo
+		       emptyNameSet	-- Show data cons
+		       ext_nm (munge thing)
   where
     unqual = icPrintUnqual ictxt
     ext_nm n | unqual n  = LocalTop (nameOccName n)	-- What a hack
 	     | otherwise = ExtPkg (nameModuleName n) (nameOccName n)
+
+	-- munge transforms a thing to it's "parent" thing
+    munge (ADataCon dc) = ATyCon (dataConTyCon dc)
+    munge (AnId id) = case globalIdDetails id of
+			RecordSelId lbl -> ATyCon (fieldLabelTyCon lbl)
+			ClassOpId cls   -> AClass cls
+			other		-> AnId id
+    munge other_thing = other_thing
 \end{code}
 
 
@@ -874,7 +890,7 @@ getModuleContents hsc_env ictxt mod exports_only
  = initTcPrintErrors hsc_env iNTERACTIVE (get_mod_contents exports_only)
  where
    get_mod_contents exports_only
-      | not exports_only	-- We want the whole top-level type env
+      | not exports_only  -- We want the whole top-level type env
  			  -- so it had better be a home module
       = do { hpt <- getHpt
  	   ; case lookupModuleEnvByName hpt mod of

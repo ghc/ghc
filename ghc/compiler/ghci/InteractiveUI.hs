@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.166 2004/05/27 09:29:29 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.167 2004/07/21 09:25:42 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -18,7 +18,9 @@ module InteractiveUI (
 import CompManager
 import HscTypes		( TyThing(..), HomeModInfo(hm_linkable), HomePackageTable,
 			  isObjectLinkable, GhciMode(..) )
-import IfaceSyn		( IfaceDecl( ifName ) )
+import IfaceSyn		( IfaceType, IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..), IfaceConDecl(..), 
+		   	  pprIfaceDeclHead, pprParendIfaceType, pprIfaceForAllPart )
+import FunDeps		( pprFundeps )
 import DriverFlags
 import DriverState
 import DriverUtil	( remove_spaces )
@@ -27,8 +29,8 @@ import Util
 import Module		( showModMsg, lookupModuleEnv )
 import Name		( Name, isHomePackageName, nameSrcLoc, nameOccName,
 			  NamedThing(..) )
-import OccName		( isSymOcc )
-import BasicTypes	( defaultFixity, SuccessFlag(..) )
+import OccName		( OccName, isSymOcc, occNameUserString )
+import BasicTypes	( StrictnessMark(..), Fixity, defaultFixity, SuccessFlag(..) )
 import Packages
 import Outputable
 import CmdLineOpts	( DynFlag(..), DynFlags(..), getDynFlags, saveDynFlags,
@@ -470,53 +472,95 @@ help _ = io (putStr helpText)
 
 info :: String -> GHCi ()
 info "" = throwDyn (CmdLineError "syntax: `:i <thing-you-want-info-about>'")
-info s = do
-  let names = words s
-  init_cms <- getCmState
-  let 
-    infoThings cms [] = return cms
-    infoThings cms (name:names) = do
-      stuff <- io (cmInfoThing cms name)
-      io (putStrLn (showSDocForUser unqual (
-	    vcat (intersperse (text "") (map showThing stuff))))
-         )
-      infoThings cms names
+info s  = do { let names = words s
+	     ; init_cms <- getCmState
+	     ; mapM_ (infoThing init_cms) names }
+  where
+    infoThing cms name
+	= do { stuff <- io (cmInfoThing cms name)
+	     ; io (putStrLn (showSDocForUser (cmGetPrintUnqual cms) $
+     		   vcat (intersperse (text "") (map (showThing name) stuff)))) }
 
-    unqual = cmGetPrintUnqual init_cms
-
-    showThing (decl, fixity) 
-	= vcat [ text "-- " <> showTyThing decl, 
-		 showFixity fixity (ifName decl),
-	         showTyThing decl ]
-
-    showFixity fix name
+showThing :: String -> (IfaceDecl, Fixity) -> SDoc
+showThing name (thing, fixity) 
+    = vcat [ showDecl (\occ -> name == occNameUserString occ) thing, 
+	     showFixity fixity ]
+  where
+    showFixity fix 
 	| fix == defaultFixity = empty
-	| otherwise            = ppr fix <+> 
-				 (if isSymOcc name
-				  then ppr name
-				  else char '`' <> ppr name <> char '`')
+	| otherwise            = ppr fix <+> text name
 
-    showTyThing decl = ppr decl
+-- Now there is rather a lot of goop just to print declarations in a civilised way
+-- with "..." for the parts we are less interested in.
+
+showDecl :: (OccName -> Bool) -> IfaceDecl -> SDoc
+showDecl want_name (IfaceId {ifName = var, ifType = ty})
+  = ppr var <+> dcolon <+> ppr ty 
+
+showDecl want_name (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty})
+  = hang (ptext SLIT("type") <+> pprIfaceDeclHead [] tycon tyvars)
+       2 (equals <+> ppr mono_ty)
+
+showDecl want_name (IfaceData {ifCtxt = context, ifName = tycon, 
+		     ifTyVars = tyvars, ifCons = condecls})
+  = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
+       2 (add_bars (ppr_trim show_con cs))
+  where
+    show_con (IfaceConDecl con_name is_infix ex_tvs ex_cxt tys strs flds)
+	| want_name tycon || want_name con_name || any want_name flds
+	= Just (pprIfaceForAllPart ex_tvs ex_cxt (show_guts con_name is_infix tys_w_strs flds))
+	| otherwise = Nothing
+	where
+	  tys_w_strs = tys `zip` (strs ++ repeat NotMarkedStrict)
+
+    show_guts con True [ty1, ty2] flds = sep [ppr_bangty ty1, ppr con, ppr_bangty ty2]
+    show_guts con _ tys []   = ppr_bndr con <+> sep (map ppr_bangty tys)
+    show_guts con _ tys flds 
+	= ppr_bndr con <+> braces (sep (punctuate comma (ppr_trim show_fld (tys `zip` flds))))
+	where
+	  show_fld (bty, fld) | want_name tycon || want_name con || want_name fld
+			      = Just (ppr_bndr fld <+> dcolon <+> ppr_bangty bty)
+			      | otherwise = Nothing
+
+    (pp_nd, cs) = case condecls of
+		    IfAbstractTyCon -> (ptext SLIT("data"),    [])
+		    IfDataTyCon cs  -> (ptext SLIT("data"),    cs)
+		    IfNewTyCon c    -> (ptext SLIT("newtype"), [c])
+
+    add_bars []      = empty
+    add_bars [c]     = equals <+> c
+    add_bars (c:cs)  = equals <+> sep (c : map (char '|' <+>) cs)
+
+    ppr_bangty (ty, str) = ppr_str str <> pprParendIfaceType ty
+    ppr_str MarkedStrict    = char '!'
+    ppr_str MarkedUnboxed   = ptext SLIT("!!")
+    ppr_str NotMarkedStrict = empty
+
+showDecl want_name (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
+		      ifFDs = fds, ifSigs = sigs})
+  = hang (ptext SLIT("class") <+> pprIfaceDeclHead context clas tyvars
+		<+> pprFundeps fds <+> ptext SLIT("where"))
+       2 (vcat (ppr_trim show_op sigs))
+  where
+    show_op (IfaceClassOp op dm ty) 
+	| want_name clas || want_name op = Just (ppr_bndr op <+> dcolon <+> ppr ty)
+	| otherwise			 = Nothing
+
+ppr_trim :: (a -> Maybe SDoc) -> [a] -> [SDoc]
+ppr_trim show xs
+  = snd (foldr go (False, []) xs)
+  where
+    go x (eliding, so_far)
+	| Just doc <- show x = (False, doc : so_far)
+	| otherwise = if eliding then (True, so_far)
+		                 else (True, ptext SLIT("...") : so_far)
+
+ppr_bndr :: OccName -> SDoc
+-- Wrap operators in ()
+ppr_bndr occ | isSymOcc occ = parens (ppr occ)
+	     | otherwise    = ppr occ
 
 {-
-    showTyThing (AClass cl)
-       = hcat [ppr cl, text " is a class", showSrcLoc (className cl)]
-    showTyThing (ADataCon dc)
-       = hcat [ppr dc, text " is a data constructor", showSrcLoc (dataConName dc)]
-    showTyThing (ATyCon ty)
-       | isPrimTyCon ty
-       = hcat [ppr ty, text " is a primitive type constructor"]
-       | otherwise
-       = hcat [ppr ty, text " is a type constructor", showSrcLoc (tyConName ty)]
-    showTyThing (AnId   id)
-       = hcat [ppr id, text " is a ", idDescr id, showSrcLoc (idName id)]
-
-    idDescr id
-       = case globalIdDetails id of
-	    RecordSelId lbl -> text "record selector for type" <+> ppr (fieldLabelTyCon lbl)
-	    ClassOpId cls   -> text "method in class" <+> ppr cls
-       	    otherwise       -> text "variable"
-
 	-- also print out the source location for home things
     showSrcLoc name
 	| isHomePackageName name && isGoodSrcLoc loc
@@ -526,8 +570,9 @@ info s = do
 	where loc = nameSrcLoc name
 -}
 
-  infoThings init_cms names
-  return ()
+
+-----------------------------------------------------------------------------
+-- Commands
 
 addModule :: [FilePath] -> GHCi ()
 addModule files = do
@@ -714,7 +759,7 @@ browseModule m exports_only = do
   let unqual = cmGetPrintUnqual cms1 -- NOTE: cms1 with the new context
 
   io (putStrLn (showSDocForUser unqual (
-   	 vcat (map ppr things)
+   	 vcat (map (showDecl (const True)) things)
       )))
 
 -----------------------------------------------------------------------------

@@ -30,7 +30,7 @@ module IfaceSyn (
 	eqIfDecl, eqIfInst, eqIfRule, 
 	
 	-- Pretty printing
-	pprIfaceExpr, pprIfaceDecl
+	pprIfaceExpr, pprIfaceDecl, pprIfaceDeclHead 
     ) where
 
 #include "HsVersions.h"
@@ -249,13 +249,13 @@ pprIfaceDecl (IfaceForeign {ifName = tycon})
   = hsep [ptext SLIT("foreign import type dotnet"), ppr tycon]
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty, ifVrcs = vrcs})
-  = hang (ptext SLIT("type") <+> pp_decl_head [] tycon tyvars)
+  = hang (ptext SLIT("type") <+> pprIfaceDeclHead [] tycon tyvars)
        4 (vcat [equals <+> ppr mono_ty,
 		pprVrcs vrcs])
 
 pprIfaceDecl (IfaceData {ifCtxt = context, ifName = tycon, ifGeneric = gen,
 			 ifTyVars = tyvars, ifCons = condecls, ifRec = isrec, ifVrcs = vrcs})
-  = hang (pp_nd <+> pp_decl_head context tycon tyvars)
+  = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
        4 (vcat [pprVrcs vrcs, pprRec isrec, pprGen gen, pp_condecls condecls])
   where
     pp_nd = case condecls of
@@ -265,7 +265,7 @@ pprIfaceDecl (IfaceData {ifCtxt = context, ifName = tycon, ifGeneric = gen,
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
 			  ifFDs = fds, ifSigs = sigs, ifVrcs = vrcs, ifRec = isrec})
-  = hang (ptext SLIT("class") <+> pp_decl_head context clas tyvars <+> pprFundeps fds)
+  = hang (ptext SLIT("class") <+> pprIfaceDeclHead context clas tyvars <+> pprFundeps fds)
        4 (vcat [pprVrcs vrcs, 
 		pprRec isrec,
 	        sep (map ppr sigs)])
@@ -278,8 +278,8 @@ pprGen False = ptext SLIT("Generics: no")
 instance Outputable IfaceClassOp where
    ppr (IfaceClassOp n dm ty) = ppr n <+> ppr dm <+> dcolon <+> ppr ty
 
-pp_decl_head :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
-pp_decl_head context thing tyvars 
+pprIfaceDeclHead :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
+pprIfaceDeclHead context thing tyvars 
   = hsep [pprIfaceContext context, ppr thing, pprIfaceTvBndrs tyvars]
 
 pp_condecls IfAbstractTyCon  = ptext SLIT("{- abstract -}")
@@ -505,20 +505,9 @@ tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
           field_labels = dataConFieldLabels data_con
           strict_marks = dataConStrictMarks data_con
 
-	-- This case only happens in the call to ifaceThing in InteractiveUI
-	-- Otherwise DataCons are filtered out in ifaceThing_acc
-tyThingToIfaceDecl _ _ ext (ADataCon dc)
- = IfaceId { ifName   = getOccName dc, 
-	     ifType   = toIfaceType ext full_ty,
-	     ifIdInfo = NoInfo }
- where
-    (tvs, stupid_theta, ex_tvs, ex_theta, arg_tys, tycon) = dataConSig dc
+tyThingToIfaceDecl dis abstr ext (ADataCon dc)
+ = pprPanic "toIfaceDecl" (ppr dc)
 
-	-- The "stupid context" isn't part of the wrapper-Id type
-	-- (for better or worse -- see note in DataCon.lhs), so we
-	-- have to make it up here
-    full_ty = mkSigmaTy (tvs ++ ex_tvs) (stupid_theta ++ ex_theta) 
-			(mkFunTys arg_tys (mkTyConApp tycon (mkTyVarTys tvs)))
 
 --------------------------
 dfunToIfaceInst :: ModuleName -> DFunId -> IfaceInst
