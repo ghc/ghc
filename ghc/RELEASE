@@ -1,68 +1,129 @@
-This is the release notes for GHC-2.03, describing what's new since the
+This is the release notes for GHC-2.04, describing what's new since the
 previous release:
 
-GHC 2.03 is a minor upgrade of GHC 2.02.  It differs in the following
-ways:
+GHC 2.04 is a minor upgrade of GHC 2.02 (and the bugfix release,
+2.03), representing work done through May '97. This new release
+adds the following:
 
-* A slew of small bugs are fixed.  You can find the complete list at
+* Data constructors can now have polymorphic fields, and ordinary
+  functions can have polymorphic arguments.  Details on
 
-    http://www.cse.ogi.edu/~simonpj/ghc-bugs.html
+    http://www.cse.ogi.edu/~simonpj/quantification.html
 
-  One bug remains un-fixed, namely the crash when there's an empty
-  comment at the end of file.It's wierd!
+  Existential types coming, but not done yet.
 
-* Last-minute language changes have been implemented (minor changes
-  to the libraries, and to module export/hiding scope rules)
+* Pattern guards implemented, see
+	
+   http://www.cse.ogi.edu/~simonpj/guards.html
 
-* It is only available as a source distribution.  If you want to
-  use it you'll have to build it from source.  Nowadays this is
-  a well-documented process (see the build and installation guide, but
-  note that this release is still not self-booting, you still need
-  to have The Good Old Compiler (0.29) at your disposal).
+* Compiler can now compile itself.
 
-None of the bugs in GHC 2.02 are show-stoppers, so you'll only want
-to upgrade if you are a build-from-source junkie and the bugs are 
-irritating you.
+* INLINE pragmas honoured (caveat: not yet
+   working on instance-decl methods) 
 
-Apart from bug-fixes, which are itemized elsewhere, 
-the exact language and standard-library changes are as follows:
+* Simplifier improvements and better inlining gives
+   better code; not sure how *much* better.
 
-* A hiding clause hides the unqualified name, but not the qualified name.
+* -dshow-rn-stats print out amusing statistics about what
+  the renamer does.
 
-* There's a new @Numeric@ library, containing mostly mildly marginal
-  code for showing and reading numbers.  Parts of its exports used to be
-  exported by @Prelude@, but now you'll have to import them explicitly.
-  It also defines some functions that weren't provided before; have a
-  look in the Haskell library report for details of complete interface.
+* When compiling without -O, the renamer (the pass responsible for
+  slurping in interface file and making sure everything is in scope
+  etc.) is now more careful about what it will bring in (especially
+  data constructors and instance declarations). The upshot of this
+  change is that a lot of the (unnecessary) work this pass did in
+  2.02/2.03 is now avoided.
 
-* The following extra functions are exported from IO:
- 
-     try, bracket, bracket_, hGetLine, hWaitForInput
+  -fno-prune-tydecls and -fno-prune-instdecls switch off these
+  renamer optimisations. You can try the effect with the renamer
+  statistics. War stories welcome.
 
-In addition, we've made following changes to GHC libraries/GHC's
-implementation of the Haskell standard prelude:
+* The Heroic Efforts of \tr{Andr\'e Santos <alms@di.ufpe.br>} have
+  been included, AIX/RS6000 is now a supported \tr{ghc}
+  platform! Bug reports concerning this port to (as always)
+  glasgow-haskell-bugs@dcs.gla.ac.uk
+
+* A lot of the bugs that were present in versions 2.02/2.03
+  have been fixed (thanks to everyone that reported bugs!).
+  A list of the reported problems with 2.02/2.03 can be found at
+
+    http://www.dcs.gla.ac.uk/fp/software/ghc/ghc-bugs.html
+
+    No doubt entries for 2.04 will be added here as well :-)
+
+* This release is available in source format only. To build it you'll
+  need to have either a copy of GHC~0.29 or GHC~2.02/3 installed.
+  For people either doing porting work or work on a (supported) 
+  platform for which there is no GHC binary bundles available, the
+  necessary intermediate files are also available (.hc and .hi files).
+
+  Consult the installation guide for more information on how
+  to build or bootstrap. The guide is included in the distribution
+  (in the fptools/docs directory), and an on-line version of the
+  document can be found at
+
+    http://www.dcs.gla.ac.uk/fp/software/ghc/ghc-doc/install-guide.html
 
 
-* The function fromRational__, exported from PrelNum, is now called fromRat
-  (And it's exported by @Numeric@).
+In addition to the above, we've made the following minor changes to
+the GHC libraries/our implementation of the Haskell standard prelude:
 
-* Documentation for the Glasgow specific interfaces plus the system
-  libraries have been re-instated. Posix library documentation
-  included also.
+* `isPrefixOf' and `isSuffixOf' has been added to `List'
+* The empty type `Void' is now exported from the prelude.
+* `GlaExts' exports the `Lift' data type:
 
-* `maybe' is now exported from Prelude, as it should have been in 2.02.
+    data Lift a = Lift a
 
-* Equality on IO.Handle is now defined as specified by the library report.
+  you might need it someday...
 
-* Ix.rangeSize returns `0' on an empty range;previously it failed.
+* The `Foreign' interface now also exports the representations
+  for `Word' and `Addr'
 
-* The new interface GlaExts which is meant to be the gateway to the
-  various Glasgow extensions has now been documented.
+* The low-level file handle interface in the POSIX system
+  library has been reworked a bit, most notably is the renaming of
+  `Channel' to `Fd' and the introduction of operations for converting
+  to and from `Handle' and `Fd' values. The changes are:
 
-* GlaExts now exports the representation of Char
+   --Renamed functions (old name in square brackets)
+   openFd :: FilePath       
+          -> OpenMode 
+          -> Maybe FileMode 
+          -> OpenFileFlags 
+          -> IO Fd
+    -- [openChannel]
+   fdSeek  :: Fd -> SeekMode -> FileOffset -> IO FileOffset 
+    --[seekChannel]
+   fdRead  :: Fd -> ByteCount -> IO (String, ByteCount)     
+    --[readChannel]
+   fdWrite :: Fd -> String -> IO ByteCount                  
+    --[writeChannel]
+   fdClose :: Fd -> IO ()          
+    --[closeChannel]
+   setFdOption :: Fd -> FdOption -> Bool -> IO ()
+    --[setChannelOption]
+   queryFdOption :: Fd -> FdOption -> IO Bool
+    --[queryChannelOption]
+   dup :: Fd -> IO Fd
+    --[dupChannel]
+   dupTo :: Fd -> Fd -> IO ()
+    --[dupChannelTo]
 
-* The mutable variable interface, MutVar, has also been documented,
-  together with ByteArray, MutableArray and Foreign.
+   data FdOption = AppendOnWrite | CloseOnExec | NonBlockingRead
+    --[ChannelOption]
+   getFdStatus :: Fd -> IO FileStatus
+    --[getChannelStatus]
 
-* Added documentation on how to compile mutually recursive modules with
-  2.03.
+   -- New data structure collecting together misc flags passed to openFd
+   data OpenFileFlags =
+    OpenFileFlags {
+      append    :: Bool,
+      exclusive :: Bool,
+      noctty    :: Bool,
+      nonBlock  :: Bool,
+      trunc     :: Bool
+    }
+
+   --New ops for converting between Fd and Handle:
+   fdToHandle :: Fd -> IO Handle
+   handleToFd :: Handle -> IO Fd
+   intToFd    :: Int -> Fd -- use with care.
