@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.14 1999/02/11 14:22:54 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.15 1999/03/02 19:59:40 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -450,16 +450,32 @@ INFO_TABLE_CONSTR(StablePtr_static_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr
    replace them with references to the static objects.
    -------------------------------------------------------------------------- */
 
+#ifdef HAVE_WIN32_DLL_SUPPORT
+/*
+ * When sticking the RTS in a DLL, we delay populating the
+ * Charlike and Intlike tables until load-time, which is only
+ * when we've got the real addresses to the C# and I# closures.
+ *
+ */
+static const StgInfoTable czh_static_info;
+static const StgInfoTable izh_static_info;
+#define Char_hash_static_info czh_static_info
+#define Int_hash_static_info izh_static_info
+#else
+#define Char_hash_static_info Czh_static_info
+#define Int_hash_static_info Izh_static_info
+#endif
+
 #define CHARLIKE_HDR(n)						\
 	{							\
-	  STATIC_HDR(Czh_static_info, /* C# */     		\
+	  STATIC_HDR(Char_hash_static_info, /* C# */   		\
 			 CCS_DONTZuCARE),			\
           data : n						\
 	}
 					     
 #define INTLIKE_HDR(n)						\
 	{							\
-	  STATIC_HDR(Izh_static_info,  /* I# */    		\
+	  STATIC_HDR(Int_hash_static_info,  /* I# */  		\
 			 CCS_DONTZuCARE),			\
           data : n						\
 	}
