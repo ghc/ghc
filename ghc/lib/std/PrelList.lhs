@@ -168,12 +168,30 @@ scanr1 _ []             =  errorEmptyList "scanr1"
 
 -- iterate f x returns an infinite list of repeated applications of f to x:
 -- iterate f x == [x, f x, f (f x), ...]
-iterate                 :: (a -> a) -> a -> [a]
-iterate f x             =  x : iterate f (f x)
+iterate :: (a -> a) -> a -> [a]
+{-# INLINE iterate #-}
+iterate f x = build (\c n -> iterateFB c f x)
+
+iterateFB c f x = x `c` iterateFB c f (f x)
+
+iterateList f x =  x : iterateList f (f x)
+
+{-# RULES
+"iterate" 	iterateFB (:) = iterateList
+ #-}
+
 
 -- repeat x is an infinite list, with x the value of every element.
-repeat                  :: a -> [a]
-repeat x                =  xs where xs = x:xs
+repeat :: a -> [a]
+{-# INLINE repeat #-}
+repeat x = build (\c n -> repeatFB c x)
+
+repeatFB c x = xs where xs = x `c` xs
+repeatList x = xs where xs = x :   xs
+
+{-# RULES
+"repeat" 	repeatFB (:) = repeatList
+ #-}
 
 -- replicate n x is a list of length n with x the value of every element
 replicate               :: Int -> a -> [a]
@@ -347,9 +365,9 @@ all _ []	=  True
 all p (x:xs)	=  p x && all p xs
 {-# RULES
 "any/build"	forall p, g::forall b.(a->b->b)->b->b . 
-		any p (build g) = g ((&&) . p) True
+		any p (build g) = g ((||) . p) False
 "all/build"	forall p, g::forall b.(a->b->b)->b->b . 
-		all p (build g) = g ((||) . p) False
+		all p (build g) = g ((&&) . p) True
  #-}
 #endif
 
