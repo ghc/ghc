@@ -1,0 +1,19 @@
+
+"hasktags" is a very simple Haskell program that produces ctags TAGS files for Haskell programs.
+
+As such, it does essentially the same job that hstags and fptags used to do, but, both of those seem to no longer be maintained, and it seemed to be easier to write my own version rather than to get one of them to work.
+
+Example usage:
+
+find /homes/rje33/src/fptools/ghc/ -name \*.\*hs | xargs hasktags > TAGS
+
+
+Features
+	* Includes top level functions, provided a type signature is given
+	* Includes data declarations, and constructors
+	* Includes newtypes
+	
+	- But sometimes gets things wrong or misses things out
+		It's only a simple program
+		
+		
