@@ -192,7 +192,7 @@ instance Storable (T) where {			\
 STORABLE(Char,SIZEOF_INT32,ALIGNMENT_INT32,
 	 readWideCharOffPtr,writeWideCharOffPtr)
 #elif defined(__HUGS__)
-STORABLE(Char,SIZEOF_CHAR,ALIGNMENT_HSCHAR,
+STORABLE(Char,SIZEOF_HSCHAR,ALIGNMENT_HSCHAR,
 	 readCharOffPtr,writeCharOffPtr)
 #endif
 
