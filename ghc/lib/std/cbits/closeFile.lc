@@ -17,7 +17,7 @@ StgForeignObj fp;
 
     if ( unlockFile(fileno((FILE *) fp)) ) {
       /* If the file has already been unlocked (or an entry
-         for it in the locking tables couldn't be fond), could
+         for it in the locking tables couldn't be found), could
          mean two things:
 
 	    - we're repeating an hClose on an already
