@@ -7,12 +7,12 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (uses Text.ParserCombinators.ReadP)
 --
 -- The "Text.Read" library is the canonical library to import for
--- 'Read'-class facilities.  It offers an extended and much improved
--- 'Read' class, which constitutes a proposed alternative to the 
--- Haskell98 'Read'.  In particular, writing parsers is easier, and
+-- 'Read'-class facilities.  For GHC only, it offers an extended and much
+-- improved 'Read' class, which constitutes a proposed alternative to the 
+-- Haskell 98 'Read'.  In particular, writing parsers is easier, and
 -- the parsers are much more efficient.
 --
 -----------------------------------------------------------------------------
@@ -28,11 +28,13 @@ module Text.Read (
    readParen, 		-- :: Bool -> ReadS a -> ReadS a
    lex,			-- :: ReadS String
 
-#ifdef __GLASGOW_HASKELL__
+#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
    -- * New parsing functions
    module Text.ParserCombinators.ReadPrec,
    L.Lexeme(..),	
    lexP,		-- :: ReadPrec Lexeme
+#endif
+#ifdef __GLASGOW_HASKELL__
    readListDefault,	-- :: Read a => ReadS [a]
    readListPrecDefault,	-- :: Read a => ReadPrec [a]
 #endif
@@ -41,6 +43,15 @@ module Text.Read (
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Read
+#endif   
+#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 import Text.ParserCombinators.ReadPrec
 import qualified Text.Read.Lex as L
 #endif   
+
+#ifdef __HUGS__
+-- copied from GHC.Read
+
+lexP :: ReadPrec L.Lexeme
+lexP = lift L.lex
+#endif
