@@ -48,6 +48,94 @@ the first lookup is the right choice.
 
 For now we just use association lists.
 
+\subsection{Avoiding a problem with overlapping}
+
+Consider this little program:
+
+\begin{pseudocode}
+     class C a        where c :: a
+     class C a => D a where d :: a
+
+     instance C Int where c = 17
+     instance D Int where d = 13
+
+     instance C a => C [a] where c = [c]
+     instance ({- C [a], -} D a) => D [a] where d = c
+
+     instance C [Int] where c = [37]
+
+     main = print (d :: [Int])
+\end{pseudocode}
+
+What do you think `main' prints  (assuming we have overlapping instances, and
+all that turned on)?  Well, the instance for `D' at type `[a]' is defined to
+be `c' at the same type, and we've got an instance of `C' at `[Int]', so the
+answer is `[37]', right? (the generic `C [a]' instance shouldn't apply because
+the `C [Int]' instance is more specific).
+
+Ghc-4.04 gives `[37]', while ghc-4.06 gives `[17]', so 4.06 is wrong.  That
+was easy ;-)  Let's just consult hugs for good measure.  Wait - if I use old
+hugs (pre-September99), I get `[17]', and stranger yet, if I use hugs98, it
+doesn't even compile!  What's going on!?
+
+What hugs complains about is the `D [a]' instance decl.
+
+\begin{pseudocode}
+     ERROR "mj.hs" (line 10): Cannot build superclass instance
+     *** Instance            : D [a]
+     *** Context supplied    : D a
+     *** Required superclass : C [a]
+\end{pseudocode}
+
+You might wonder what hugs is complaining about.  It's saying that you need to
+add `C [a]' to the context of the `D [a]' instance (as appears in comments).
+But there's that `C [a]' instance decl one line above that says that I can
+reduce the need for a `C [a]' instance to the need for a `C a' instance, and
+in this case, I already have the necessary `C a' instance (since we have `D a'
+explicitly in the context, and `C' is a superclass of `D').
+
+Unfortunately, the above reasoning indicates a premature commitment to the
+generic `C [a]' instance.  I.e., it prematurely rules out the more specific
+instance `C [Int]'.  This is the mistake that ghc-4.06 makes.  The fix is to
+add the context that hugs suggests (uncomment the `C [a]'), effectively
+deferring the decision about which instance to use.
+
+Now, interestingly enough, 4.04 has this same bug, but it's covered up in this
+case by a little known `optimization' that was disabled in 4.06.  Ghc-4.04
+silently inserts any missing superclass context into an instance declaration.
+In this case, it silently inserts the `C [a]', and everything happens to work
+out.
+
+(See `basicTypes/MkId:mkDictFunId' for the code in question.  Search for
+`Mark Jones', although Mark claims no credit for the `optimization' in
+question, and would rather it stopped being called the `Mark Jones
+optimization' ;-)
+
+So, what's the fix?  I think hugs has it right.  Here's why.  Let's try
+something else out with ghc-4.04.  Let's add the following line:
+
+    d' :: D a => [a]
+    d' = c
+
+Everyone raise their hand who thinks that `d :: [Int]' should give a different
+answer from `d' :: [Int]'.  Well, in ghc-4.04, it does.  The `optimization'
+only applies to instance decls, not to regular bindings, giving inconsistent
+behavior.
+
+Old hugs had this same bug.  Here's how we fixed it: like GHC, the list of
+instances for a given class is ordered, so that more specific instances come
+before more generic ones.  For example, the instance list for C might contain:
+    ..., C Int, ..., C a, ...
+When we go to look for a `C Int' instance we'll get that one first.  But what
+if we go looking for a `C b' (`b' is unconstrained)?  We'll pass the `C Int'
+instance, and keep going.  But if `b' is unconstrained, then we don't know yet
+if the more specific instance will eventually apply.  GHC keeps going, and
+matches on the generic `C a'.  The fix is to, at each step, check to see if
+there's a reverse match, and if so, abort the search.  This prevents hugs
+from prematurely chosing a generic instance when a more specific one exists.
+
+--Jeff
+
 \begin{code}
 emptyInstEnv :: InstEnv
 emptyInstEnv = []
@@ -65,14 +153,18 @@ lookupInstEnv :: SDoc		-- For error report
 	      -> InstEnv 	-- The envt
 	      -> [Type]		-- Key
 	      -> Maybe (TyVarSubstEnv, Id)
-		     
+
 lookupInstEnv doc env key
   = find env
   where
+    key_vars = tyVarsOfTypes key
     find [] = Nothing
     find ((tpl_tyvars, tpl, val) : rest)
       = case matchTys tpl_tyvars tpl key of
-	  Nothing                 -> find rest
+	  Nothing                 ->
+	    case matchTys key_vars key tpl of
+	      Nothing             -> find rest
+	      Just (_, _)         -> Nothing
 	  Just (subst, leftovers) -> ASSERT( null leftovers )
 				     Just (subst, val)
 \end{code}

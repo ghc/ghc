@@ -473,6 +473,7 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
 
 {-  1 dec 99: disable the Mark Jones optimisation for the sake
     of compatibility with Hugs.
+    See `types/InstEnv' for a discussion related to this.
 
     dfun_theta = case inst_decl_theta of
 		   []    -> []	-- If inst_decl_theta is empty, then we don't
