@@ -994,9 +994,7 @@ unknownNameErr name
 
 qualNameErr descriptor (name,loc)
   = pushSrcLocRn loc $
-    addErrRn (hsep [ ptext SLIT("Invalid use of qualified name"), 
-		     quotes (ppr name),
-		     ptext SLIT("in"),
+    addErrRn (vcat [ ptext SLIT("Invalid use of qualified name") <+> quotes (ppr name),
 		     descriptor])
 
 dupNamesErr descriptor ((name,loc) : dup_things)
