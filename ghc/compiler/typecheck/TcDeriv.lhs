@@ -36,7 +36,7 @@ import Class		( className, classArity, classKey, classTyVars, classSCTheta, Clas
 import Subst		( mkTyVarSubst, substTheta )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
-import DataCon		( dataConRepArgTys, dataConOrigArgTys, isNullaryDataCon, isExistentialDataCon )
+import DataCon		( dataConOrigArgTys, isNullaryDataCon, isExistentialDataCon )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( Name, getSrcLoc, nameUnique )
 import NameSet
@@ -344,7 +344,7 @@ makeDerivEqns tycl_decls
 	constraints = extra_constraints ++ 
 	  	      [ mkClassPred clas [arg_ty] 
 		      | data_con <- tyConDataCons tycon,
-		        arg_ty   <- dataConRepArgTys data_con,		-- dataConOrigArgTys???
+		        arg_ty   <- dataConOrigArgTys data_con,
 				-- Use the same type variables
 				-- as the type constructor,
 				-- hence no need to instantiate
