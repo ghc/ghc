@@ -37,23 +37,19 @@ module Util (
 	transitiveClosure,
 
 	-- accumulating
-	mapAccumL, mapAccumR, mapAccumB, foldl2, count,
+	mapAccumL, mapAccumR, mapAccumB, 
+	foldl2, count,
 
 	-- comparisons
 	thenCmp, cmpList, prefixMatch, suffixMatch,
 
 	-- strictness
-	seqList, ($!),
+	foldl', seqList,
 
 	-- pairs
 	IF_NOT_GHC(cfst COMMA applyToPair COMMA applyToFst COMMA)
 	IF_NOT_GHC(applyToSnd COMMA foldPair COMMA)
 	unzipWith
-
-	-- I/O
-#if __GLASGOW_HASKELL__ < 402
-	, bracket
-#endif
 
 	, global
 	, myGetProcessID
@@ -611,6 +607,16 @@ mapAccumB f a b (x:xs) = (a'',b'',y:ys)
 	(a'',b',ys) = mapAccumB f a' b xs
 \end{code}
 
+A strict version of foldl.
+
+\begin{code}
+foldl'        :: (a -> b -> a) -> a -> [b] -> a
+foldl' f z xs = lgo z xs
+	     where
+		lgo z []     =  z
+		lgo z (x:xs) = (lgo $! (f z x)) xs
+\end{code}
+
 A combination of foldl with zip.  It works with equal length lists.
 
 \begin{code}
@@ -700,29 +706,9 @@ unzipWith f pairs = map ( \ (a, b) -> f a b ) pairs
 \end{code}
 
 \begin{code}
-#if __HASKELL1__ > 4
 seqList :: [a] -> b -> b
-#else
-seqList :: (Eval a) => [a] -> b -> b
-#endif
 seqList [] b = b
 seqList (x:xs) b = x `seq` seqList xs b
-
-#if __HASKELL1__ <= 4
-($!)    :: (Eval a) => (a -> b) -> a -> b
-f $! x  = x `seq` f x
-#endif
-\end{code}
-
-\begin{code}
-#if __GLASGOW_HASKELL__ < 402
-bracket :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
-bracket before after thing = do
-  a <- before 
-  r <- (thing a) `catch` (\err -> after a >> fail err)
-  after a
-  return r
-#endif
 \end{code}
 
 Global variables:
