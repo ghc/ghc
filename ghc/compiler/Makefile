@@ -49,13 +49,7 @@ ifeq ($(GhcWithDeforester),YES)
 endif
 
 ifeq ($(GhcWithNativeCodeGen),YES)
-  ifeq ($(GhcWithHscBuiltViaC),YES)
-    # If building via C, we *assume* that it is the distributed C files,
-    # which do not have a native-code generator in them
-    SRC_MKDEPENDHS_OPTS += -DOMIT_NATIVE_CODEGEN
-  else
-    DIRS += nativeGen
-  endif
+DIRS += nativeGen
 else
 SRC_HC_OPTS += -DOMIT_NATIVE_CODEGEN
 endif
@@ -143,9 +137,9 @@ SRC_HC_OPTS += -recomp
 endif
 
 ifeq ($(GhcWithDeforester),NO)
-ifeq "$(Ghc2_0)" "NO"
+ ifeq "$(Ghc2_0)" "NO"
   SRC_MKDEPENDHS_OPTS += -DOMIT_DEFORESTER
-endif
+ endif
 SRC_HC_OPTS += -DOMIT_DEFORESTER
 endif
 
@@ -343,7 +337,11 @@ depend :: $(LOOPS) $(SRCS_UGNHS) rename/ParseIface.hs rename/ParseUnfolding.hs r
 
 
 ifeq "$(GhcWithHscBuiltViaC)" "YES"
-SRC_MKDEPENDHS_OPTS += -o .hc
+ifeq "$(Ghc2_0)" "NO"
+SRC_MKDEPENDHS_OPTS += -o hc
+else
+SRC_MKDEPENDHS_OPTS += -optdep-o -optdephc
+endif
 # When booting from .hc, (hackily) remove the suffix rule for 
 # .l?hs -> .o, so that the .hc -> .o is used instead.
 %.$(way_)o : %.lhs
