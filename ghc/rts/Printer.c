@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.14 1999/06/29 13:04:39 panne Exp $
+ * $Id: Printer.c,v 1.15 1999/07/14 13:44:19 simonmar Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -821,6 +821,28 @@ extern void DEBUG_LoadSymbols( char *name )
 }
 
 #endif /* HAVE_BFD_H */
+
+#include "StoragePriv.h"
+
+void
+findPtr(P_ p)
+{
+  nat s, g;
+  P_ q;
+  bdescr *bd;
+
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+    for (s = 0; s < generations[g].n_steps; s++) {
+      for (bd = generations[g].steps[s].blocks; bd; bd = bd->link) {
+	for (q = bd->start; q < bd->free; q++) {
+	  if (*q == (W_)p) {
+	    printf("%p\n", q);
+	  }
+	}
+      }
+    }
+  }
+}
 
 #else /* DEBUG */
 void printPtr( StgPtr p )
