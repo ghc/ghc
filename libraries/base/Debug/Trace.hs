@@ -12,10 +12,6 @@
 --
 -----------------------------------------------------------------------------
 
-#ifdef __GLASGOW_HASKELL__
-#include "ghcconfig.h"
-#endif
-
 module Debug.Trace (
 	-- * Tracing
 	
