@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.95 2002/04/10 11:43:45 stolz Exp $
+ * $Id: PrimOps.hc,v 1.96 2002/04/23 09:56:29 stolz Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1046,6 +1046,7 @@ FN_(labelThreadzh_fast)
 #ifdef DEBUG
   STGCALL2(labelThread,CurrentTSO,(char *)R1.p);
 #endif
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.138 2002/04/23 06:34:27 sof Exp $
+ * $Id: Schedule.c,v 1.139 2002/04/23 09:56:28 stolz Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -443,6 +443,7 @@ schedule( void )
 	  broadcastCondition(&m->wakeup);
 #ifdef DEBUG
 	  free(m->tso->label);
+	  m->tso->label = NULL;
 #endif
 	  break;
 	case ThreadKilled:
@@ -456,6 +457,7 @@ schedule( void )
 	  broadcastCondition(&m->wakeup);
 #ifdef DEBUG
 	  free(m->tso->label);
+	  m->tso->label = NULL;
 #endif
 	  break;
 	default:
@@ -478,6 +480,7 @@ schedule( void )
 	  || m->tso->what_next == ThreadKilled) {
 #ifdef DEBUG
 	free(m->tso->label);
+	m->tso->label = NULL;
 #endif
 	main_threads = main_threads->link;
 	if (m->tso->what_next == ThreadComplete) {
@@ -1635,6 +1638,7 @@ void labelThread(StgTSO *tso, char *label)
   if (buf == NULL) {
     fprintf(stderr,"insufficient memory for labelThread!\n");
     free(tso->label);
+    tso->label = NULL;
   } else
     strncpy(buf,label,len);
   tso->label = buf;
