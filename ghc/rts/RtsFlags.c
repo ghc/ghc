@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.41 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.42 2001/07/23 23:37:35 andy Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -403,9 +403,9 @@ usage_text[] = {
 #if defined(PROFILING) || defined(PAR)
 "",
 "  -px      Time/allocation profile (XML)  (output file <program>.prof)",
-"  -p<sort> Time/allocation profile        (output file <program>.prof)",
-"             sort: T = time (default), A = alloc, C = cost centre label",
-"  -P<sort> More detailed Time/Allocation profile",
+"  -p       Time/allocation profile        (output file <program>.prof)",
+"  -P       More detailed Time/Allocation profile",
+"  -Pa      Give information about *all* cost centres",
 
 # if defined(PROFILING)
 "",
@@ -744,6 +744,9 @@ error = rtsTrue;
 		switch (rts_argv[arg][2]) {
 		  case 'x':
 		    RtsFlags.CcFlags.doCostCentres = COST_CENTRES_XML;
+		    break;
+		  case 'a':
+		    RtsFlags.CcFlags.doCostCentres = COST_CENTRES_ALL;
 		    break;
 		  default:
 		    RtsFlags.CcFlags.doCostCentres = COST_CENTRES_SUMMARY;

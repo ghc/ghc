@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.20 2000/05/12 13:01:04 simonmar Exp $
+ * $Id: Profiling.c,v 1.21 2001/07/23 23:37:35 andy Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -134,6 +134,8 @@ static  CostCentreStack * ActualPush      ( CostCentreStack *, CostCentre * );
 static  CostCentreStack * IsInIndexTable  ( IndexTable *, CostCentre * );
 static  IndexTable *      AddToIndexTable ( IndexTable *, CostCentreStack *, 
 					    CostCentre *, unsigned int );
+
+
 
 #ifdef DEBUG
 static    void printCCS            ( CostCentreStack *ccs );
@@ -568,7 +570,8 @@ report_per_cc_costs( void )
   for (cc = CC_LIST; cc != NULL; cc = next) {
     next = cc->link;
     if (cc->time_ticks > total_prof_ticks/100
-	|| cc->mem_alloc > total_alloc/100) {
+	|| cc->mem_alloc > total_alloc/100
+	|| RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL) {
       insert_cc_in_sorted_list(cc);
     }
   }
@@ -723,6 +726,7 @@ reportCCS(CostCentreStack *ccs, nat indent)
     }
   }
 }
+
 
 /* Traverse the cost centre stack tree and accumulate
  * ticks/allocations.
