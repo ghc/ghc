@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.14 2000/04/04 13:40:27 panne Exp $
+ * $Id: RtsAPI.c,v 1.15 2000/04/05 13:53:33 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -316,9 +316,9 @@ int
 rts_getBool (HaskellObj p)
 {
   if (p == True_closure) {
-    return 1; /* NOTE: This should better be HsTrue */
+    return 1;
   } else if (p == False_closure) {
-    return 0; /* ... and this HsFalse */
+    return 0;
   } else {
     barf("getBool: not a Bool");
   }
