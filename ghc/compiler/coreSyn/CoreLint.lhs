@@ -116,13 +116,9 @@ lintCoreBindings dflags whoDunnit binds
 
 lintCoreBindings dflags whoDunnit binds
   = case (initL (lint_binds binds)) of
-      (Nothing, Nothing)       -> done_lint
-
-      (Nothing, Just warnings) -> printDump (warn warnings) >>
-                                  done_lint
-
-      (Just bad_news, warns)   -> printDump (display bad_news warns)	>>
-		                  ghcExit 1
+      Nothing       -> done_lint
+      Just bad_news -> printDump (display bad_news)	>>
+		       ghcExit 1
   where
 	-- Put all the top-level binders in scope at the start
 	-- This is because transformation rules can bring something
@@ -136,22 +132,10 @@ lintCoreBindings dflags whoDunnit binds
 
     done_lint = doIfSet (verbosity dflags >= 2)
 		        (hPutStr stdout ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
-    warn warnings
-      = vcat [
-                text ("*** Core Lint Warnings: in result of " ++ whoDunnit ++ " ***"),
-                warnings,
-                offender
-        ]
 
-    display bad_news warns
-      = vcat [
-		text ("*** Core Lint Errors: in result of " ++ whoDunnit ++ " ***"),
+    display bad_news
+      = vcat [  text ("*** Core Lint Errors: in result of " ++ whoDunnit ++ " ***"),
 		bad_news,
-                maybe offender warn warns  -- either offender or warnings (with offender)
-        ]
-
-    offender
-      = vcat [
 		ptext SLIT("*** Offending Program ***"),
 		pprCoreBindings binds,
 		ptext SLIT("*** End of Offense ***")
@@ -168,17 +152,12 @@ We use this to check all unfoldings that come in from interfaces
 (it is very painful to catch errors otherwise):
 
 \begin{code}
-lintUnfolding :: DynFlags 
-	      -> SrcLoc
+lintUnfolding :: SrcLoc
 	      -> [Var]		-- Treat these as in scope
 	      -> CoreExpr
-	      -> (Maybe Message, Maybe Message)		-- (Nothing,_) => OK
+	      -> Maybe Message	-- Nothing => OK
 
-lintUnfolding dflags locn vars expr
-  | not (dopt Opt_DoCoreLinting dflags)
-  = (Nothing, Nothing)
-
-  | otherwise
+lintUnfolding locn vars expr
   = initL (addLoc (ImportedUnfolding locn) $
 	   addInScopeVars vars	           $
 	   lintCoreExpr expr)
@@ -481,8 +460,7 @@ lintTy ty = mapL checkIdInScope (varSetElems (tyVarsOfType ty))	`seqL`
 type LintM a = [LintLocInfo] 	-- Locations
 	    -> IdSet		-- Local vars in scope
 	    -> Bag Message	-- Error messages so far
-            -> Bag Message      -- Warning messages so far
-	    -> (Maybe a, Bag Message, Bag Message)  -- Result and error/warning messages (if any)
+	    -> (Maybe a, Bag Message)  -- Result and error messages (if any)
 
 data LintLocInfo
   = RhsOf Id		-- The variable bound
@@ -494,32 +472,28 @@ data LintLocInfo
 \end{code}
 
 \begin{code}
-initL :: LintM a -> (Maybe Message {- errors -}, Maybe Message {- warnings -})
+initL :: LintM a -> Maybe Message {- errors -}
 initL m
-  = case m [] emptyVarSet emptyBag emptyBag of
-      (_, errs, warns) -> (ifNonEmptyBag errs,
-                           ifNonEmptyBag warns)
-  where
-    ifNonEmptyBag bag 
-	| isEmptyBag bag = Nothing
-        | otherwise      = Just (vcat (punctuate (text "") (bagToList bag)))
+  = case m [] emptyVarSet emptyBag of
+      (_, errs) | isEmptyBag errs -> Nothing
+		| otherwise	  -> Just (vcat (punctuate (text "") (bagToList errs)))
 
 returnL :: a -> LintM a
-returnL r loc scope errs warns = (Just r, errs, warns)
+returnL r loc scope errs = (Just r, errs)
 
 nopL :: LintM a
-nopL loc scope errs warns = (Nothing, errs, warns)
+nopL loc scope errs = (Nothing, errs)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
-thenL m k loc scope errs warns
-  = case m loc scope errs warns of
-      (Just r, errs', warns')  -> k r loc scope errs' warns'
-      (Nothing, errs', warns') -> (Nothing, errs', warns')
+thenL m k loc scope errs
+  = case m loc scope errs of
+      (Just r, errs')  -> k r loc scope errs'
+      (Nothing, errs') -> (Nothing, errs')
 
 seqL :: LintM a -> LintM b -> LintM b
-seqL m k loc scope errs warns
-  = case m loc scope errs warns of
-      (_, errs', warns') -> k loc scope errs' warns'
+seqL m k loc scope errs
+  = case m loc scope errs of
+      (_, errs') -> k loc scope errs'
 
 mapL :: (a -> LintM b) -> [a] -> LintM [b]
 mapL f [] = returnL []
@@ -535,10 +509,9 @@ checkL True  msg = nopL
 checkL False msg = addErrL msg
 
 addErrL :: Message -> LintM a
-addErrL msg loc scope errs warns = (Nothing, addErr errs msg loc, warns)
+addErrL msg loc scope errs = (Nothing, addErr errs msg loc)
 
 addErr :: Bag Message -> Message -> [LintLocInfo] -> Bag Message
--- errors or warnings, actually... they're the same type.
 addErr errs_so_far msg locs
   = ASSERT( notNull locs )
     errs_so_far `snocBag` mk_msg msg
@@ -551,12 +524,12 @@ addErr errs_so_far msg locs
    mk_msg msg = addErrLocHdrLine loc context msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m loc scope errs warns
-  = m (extra_loc:loc) scope errs warns
+addLoc extra_loc m loc scope errs
+  = m (extra_loc:loc) scope errs
 
 addInScopeVars :: [Var] -> LintM a -> LintM a
-addInScopeVars ids m loc scope errs warns
-  = m loc (scope `unionVarSet` mkVarSet ids) errs warns
+addInScopeVars ids m loc scope errs
+  = m loc (scope `unionVarSet` mkVarSet ids) errs
 \end{code}
 
 \begin{code}
@@ -572,11 +545,11 @@ checkBndrIdInScope binder id
 	   ppr binder
 
 checkInScope :: SDoc -> Var -> LintM ()
-checkInScope loc_msg var loc scope errs warns
+checkInScope loc_msg var loc scope errs
   |  mustHaveLocalBinding var && not (var `elemVarSet` scope)
-  = (Nothing, addErr errs (hsep [ppr var, loc_msg]) loc, warns)
+  = (Nothing, addErr errs (hsep [ppr var, loc_msg]) loc)
   | otherwise
-  = nopL loc scope errs warns
+  = nopL loc scope errs
 
 checkTys :: Type -> Type -> Message -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage

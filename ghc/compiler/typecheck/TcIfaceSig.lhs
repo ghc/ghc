@@ -15,7 +15,7 @@ module TcIfaceSig ( tcInterfaceSigs,
 import HsSyn		( CoreDecl(..), TyClDecl(..), HsTupCon(..) )
 import TcHsSyn		( TypecheckedCoreBind )
 import TcRnMonad
-import TcMonoType	( tcIfaceType )
+import TcMonoType	( tcIfaceType, kcHsSigType )
 import TcEnv		( RecTcGblEnv, tcExtendTyVarEnv, 
 			  tcExtendGlobalValEnv, 
 			  tcLookupGlobal_maybe, tcLookupRecId_maybe
@@ -43,6 +43,7 @@ import UniqSupply	( initUs_ )
 import Outputable	
 import Util		( zipWithEqual, dropList, equalLength )
 import HscTypes		( TyThing(..) )
+import CmdLineOpts	( DynFlag(..) )
 \end{code}
 
 Ultimately, type signatures in interfaces will have pragmatic
@@ -150,11 +151,14 @@ tcPragExpr unf_env name in_scope_vars expr
     tcCoreExpr expr		`thenM` \ core_expr' ->
 
 		-- Check for type consistency in the unfolding
-    getSrcLocM		`thenM` \ src_loc -> 
-    getDOpts		`thenM` \ dflags ->
-    case lintUnfolding dflags src_loc in_scope_vars core_expr' of
-	  (Nothing,_)       -> returnM core_expr'  -- ignore warnings
-	  (Just fail_msg,_) -> failWithTc ((doc <+> text "failed Lint") $$ fail_msg)
+    ifOptM Opt_DoCoreLinting (
+	getSrcLocM		`thenM` \ src_loc -> 
+	case lintUnfolding src_loc in_scope_vars core_expr' of
+	  Nothing       -> returnM ()
+	  Just fail_msg -> failWithTc ((doc <+> text "Failed Lint") $$ fail_msg)
+    )				`thenM_`
+
+   returnM core_expr'	
   where
     doc = text "unfolding of" <+> ppr name
 \end{code}
@@ -374,15 +378,23 @@ tcCoreBinds :: [RenamedCoreDecl] -> TcM [TypecheckedCoreBind]
 -- So first build the environment, then check the RHSs
 tcCoreBinds ls = mappM tcCoreBinder ls		`thenM` \ bndrs ->
 		 tcExtendGlobalValEnv bndrs	$
-		 mappM tcCoreBind ls
+		 mappM (tcCoreBind bndrs) ls
 
 tcCoreBinder (CoreDecl nm ty _ _)
- = tcIfaceType ty   `thenM` \ ty' ->
+ = kcHsSigType ty	`thenM_`
+   tcIfaceType ty 	`thenM` \ ty' ->
    returnM (mkLocalId nm ty')
 
-tcCoreBind (CoreDecl nm _ rhs _)
+tcCoreBind bndrs (CoreDecl nm _ rhs loc)
  = tcVar nm		`thenM` \ id ->
    tcCoreExpr rhs	`thenM` \ rhs' ->
+   let
+	mb_err = lintUnfolding loc bndrs rhs'
+   in
+   (case mb_err of
+	Just err -> addErr err
+	Nothing  -> returnM ())	`thenM_`
+
    returnM (id, rhs')
 \end{code}
 
