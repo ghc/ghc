@@ -39,6 +39,7 @@ import TyCon		( isNewTyCon, tyConDataCons, isDataTyCon )
 import FieldLabel	( FieldLabel )
 import PrelVals		( pAT_ERROR_ID )
 import Maybes
+import Maybe            ( isJust )
 import Outputable
 import Util		( assoc )
 \end{code}		
@@ -153,10 +154,17 @@ addStandardIdInfo sel_id
 	tyvar_tys	      = mkTyVarTys tyvars
 	
 	[data_id] = mkTemplateLocals [data_ty]
-	sel_rhs = mkTyLam tyvars $
-		  mkValLam [data_id] $
-		  Case (Var data_id) (AlgAlts (catMaybes (map mk_maybe_alt data_cons))
-					      (BindDefault data_id error_expr))
+        alts      = map mk_maybe_alt data_cons
+	sel_rhs   = mkTyLam tyvars $
+		    mkValLam [data_id] $
+		    Case (Var data_id) 
+		         -- if any of the constructors don't have the label, ...
+			 (if any (not . isJust) alts then
+		           AlgAlts (catMaybes alts) 
+			           (BindDefault data_id error_expr)
+			  else
+			   AlgAlts (catMaybes alts) NoDefault)
+
 	mk_maybe_alt data_con 
 	  = case maybe_the_arg_id of
 		Nothing		-> Nothing
