@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.12 1999/06/29 14:18:14 simonmar Exp $
+# $Id: Makefile,v 1.13 1999/09/16 08:35:38 sof Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -24,6 +24,12 @@ WAYS=$(GhcLibWays)
 SRCS_RTS_C  = $(wildcard *.c) $(wildcard hooks/*.c) $(filter-out gum/SysMan.c,$(wildcard gum/*.c))
 SRCS_RTS_S  = $(wildcard *.S)
 SRCS_RTS_HC = $(wildcard *.hc)
+
+ifneq "$(way)" "dll"
+SRCS_RTS_C  := $(filter-out RtsDllMain.c, $(SRCS_RTS_C))
+else
+SRCS_RTS_C  := $(filter-out Main.c, $(SRCS_RTS_C))
+endif
 
 #-----------------------------------------------------------------------------
 # creating and installing libHSrts.a (in its many flavors)
@@ -89,6 +95,7 @@ unexport CC
 # 
 ifeq "$(way)" "dll"
 DLL_NAME          = HSrts.dll
+DLL_IMPLIB_NAME   = libHSrts_imp.a
 SRC_BLD_DLL_OPTS += --def HSrts.def -lwinmm -lHS_imp_stub -lgmp -L. -Lgmp
 
 #
@@ -164,6 +171,11 @@ endif
 # Just libHSrts is installed uniformly across ways
 #
 INSTALL_LIBS += $(LIBRARY)
+ifeq "$(EnableWin32DLLs)" "YES"
+INSTALL_PROGS += $(DLL_NAME) gmp/gmp.dll
+INSTALL_LIBS += $(patsubst %.a, %_imp.a, $(LIBRARY))
+INSTALL_LIBS += gmp/libgmp_imp.a Main.o
+endif
 
 include $(TOP)/mk/target.mk
 
