@@ -18,13 +18,14 @@ IMPORT_1_3(IO(Handle,hPutStr,openFile,hClose,IOMode(..)))
 import HsSyn
 import RdrHsSyn		( RdrName(..) )
 import RnHsSyn		( SYN_IE(RenamedHsModule) )
+import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
 import RnMonad
 import RnEnv		( availName )
 
 import TcInstUtil	( InstInfo(..) )
 
 import CmdLineOpts
-import Id		( idType, dataConRawArgTys, dataConFieldLabels, isDataCon,
+import Id		( idType, dataConRawArgTys, dataConFieldLabels, 
 			  getIdInfo, getInlinePragma, omitIfaceSigForId,
 			  dataConStrictMarks, StrictnessMark(..), 
 			  SYN_IE(IdSet), idSetToList, unionIdSets, unitIdSet, minusIdSet, 
@@ -39,7 +40,7 @@ import IdInfo		( StrictnessInfo, ArityInfo,
 import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(CoreBinding), GenCoreExpr, GenCoreBinding(..) )
 import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), Unfolding )
 import FreeVars		( addExprFVs )
-import Name		( isLocallyDefined, isWiredInName, modAndOcc, getName, pprOccName,
+import Name		( isLocallyDefined, isWiredInName, modAndOcc, getName, nameModule, pprOccName,
 			  OccName, occNameString, nameOccName, nameString, isExported,
 			  Name {-instance NamedThing-}, Provenance, NamedThing(..)
 			)
@@ -48,14 +49,14 @@ import Class		( GenClass(..){-instance NamedThing-}, SYN_IE(Class), GenClassOp,
 			  classOpLocalType, classSig )
 import FieldLabel	( FieldLabel{-instance NamedThing-}, 
 		          fieldLabelName, fieldLabelType )
-import Type		( mkSigmaTy, mkDictTy, getAppTyCon, splitForAllTy,
+import Type		( mkSigmaTy, mkDictTy, getAppTyCon,
 			  mkTyVarTy, SYN_IE(Type)
 		        )
 import TyVar		( GenTyVar {- instance Eq -} )
 import Unique		( Unique {- instance Eq -} )
 
 import PprEnv		-- not sure how much...
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import PprType
 import PprCore		( pprIfaceUnfolding )
 import Pretty
@@ -70,8 +71,6 @@ import Util		( sortLt, zipWithEqual, zipWith3Equal, mapAccumL,
 			  assertPanic, panic{-ToDo:rm-}, pprTrace,
 			  pprPanic 
 			)
-import Outputable       ( Outputable(..) )
-
 \end{code}
 
 We have a function @startIface@ to open the output file and put
@@ -179,7 +178,7 @@ ifaceExports if_hdl avails
     insert NotAvailable efm = efm
     insert avail efm = addToFM_C (++) efm mod [avail] 
 		     where
-		       (mod,_) = modAndOcc (availName avail)
+		       mod = nameModule (availName avail)
 
 	-- Print one module's worth of stuff
     do_one_module (mod_name, avails)
