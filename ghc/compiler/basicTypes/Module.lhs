@@ -23,7 +23,7 @@ module Module
     , mkPrelModule          -- :: UserString -> Module
     
     , isDynamicModule       -- :: Module -> Bool
-    , isLibModule
+    , isPrelModule
 
     , mkSrcModule
 
@@ -36,7 +36,7 @@ module Module
     , DllFlavour, dll, notDll
 
 	-- ModFlavour
-    , ModFlavour, libMod, userMod
+    , ModFlavour,
 
 	-- Where to find a .hi file
     , WhereFrom(..), SearchPath, mkSearchPath
@@ -101,12 +101,14 @@ We also track whether an imported module is from a 'system-ish' place.  In this 
 we don't record the fact that this module depends on it, nor usages of things
 inside it.  
 
-\begin{code}
-data ModFlavour = LibMod	-- A library-ish module
-		| UserMod	-- Not library-ish
+Apr 00: We want to record dependencies on all modules other than
+prelude modules else STG Hugs gets confused because it uses this
+info to know what modules to link.  (Compiled GHC uses command line
+options to specify this.)
 
-libMod  = LibMod
-userMod = UserMod
+\begin{code}
+data ModFlavour = PrelMod	-- A Prelude module
+		| UserMod	-- Not library-ish
 \end{code}
 
 
@@ -143,6 +145,9 @@ type ModuleName = EncodedFS
 	-- Haskell module names can include the quote character ',
 	-- so the module names have the z-encoding applied to them
 
+isPrelModuleName :: ModuleName -> Bool
+	-- True for names of prelude modules
+isPrelModuleName m = take 4 (_UNPK_ m) == "Prel"
 
 pprModuleName :: ModuleName -> SDoc
 pprModuleName nm = pprEncodedFS nm
@@ -193,7 +198,16 @@ pprModule (Module mod _ _) = getPprStyle $ \ sty ->
 
 
 \begin{code}
-mkModule = Module
+mkModule :: FilePath	-- Directory in which this module is
+	 -> ModuleName	-- Name of the module
+	 -> DllFlavour
+	 -> Module
+mkModule dir_path mod_nm is_dll
+  | isPrelModuleName mod_nm = mkPrelModule mod_nm
+  | otherwise		    = Module mod_nm UserMod is_dll
+	-- Make every module into a 'user module'
+	-- except those constructed by mkPrelModule
+
 
 mkVanillaModule :: ModuleName -> Module
 mkVanillaModule name = Module name UserMod dell
@@ -217,7 +231,7 @@ mkPrelModule :: ModuleName -> Module
 mkPrelModule name = Module name sys dll
  where 
   sys | opt_CompilingPrelude = UserMod
-      | otherwise	     = LibMod
+      | otherwise	     = PrelMod
 
   dll | opt_Static || opt_CompilingPrelude = NotDll
       | otherwise		 	   = Dll
@@ -237,9 +251,9 @@ isDynamicModule :: Module -> Bool
 isDynamicModule (Module _ _ Dll)  = True
 isDynamicModule _		  = False
 
-isLibModule :: Module -> Bool
-isLibModule (Module _ LibMod _) = True
-isLibModule _			= False
+isPrelModule :: Module -> Bool
+isPrelModule (Module _ PrelMod _) = True
+isPrelModule _			  = False
 \end{code}
 
 
@@ -310,21 +324,6 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
               return hims
 	)
  where
-  
-   is_sys | isLibraryPath dir_path = LibMod
-	  | otherwise 		   = UserMod
-
-	-- Dreadfully crude way to tell whether a module is a "library"
-	-- module or not.  The current story is simply that if path is
-	-- absolute we treat it as a library.  Specifically:
-	--	/usr/lib/ghc/
-	--	C:/usr/lib/ghc
-	--	C:\user\lib
-   isLibraryPath ('/' : _	      ) = True
-   isLibraryPath (_   : ':' : '/'  : _) = True
-   isLibraryPath (_   : ':' : '\\' : _) = True
-   isLibraryPath other			= False
-
    xiffus	 = reverse dotted_suffix 
    dotted_suffix = case suffix of
 		      []       -> []
@@ -355,7 +354,7 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
 	add_hib   file_nm = (hi_env, add_to_map addNewOne   hib_env file_nm)
 
 	add_to_map combiner env file_nm 
-	  = addToFM_C combiner env mod_nm (path, mkModule mod_nm is_sys is_dll)
+	  = addToFM_C combiner env mod_nm (path, mkModule dir_path mod_nm is_dll)
 	  where
      	    mod_nm = mkSrcModuleFS file_nm
 

@@ -50,7 +50,7 @@ import Name		( Name {-instance NamedThing-},
 			 )
 import Module		( Module, moduleString, pprModule,
 			  mkVanillaModule, pprModuleName,
-			  moduleUserString, moduleName, isLibModule,
+			  moduleUserString, moduleName, isPrelModule,
 			  ModuleName, WhereFrom(..),
 			)
 import RdrName		( RdrName, rdrNameOcc )
@@ -187,7 +187,7 @@ addModDeps :: Module -> ImportedModuleInfo
 addModDeps mod mod_deps new_deps
   = foldr add mod_deps new_deps
   where
-    is_lib = isLibModule mod	-- Don't record dependencies when importing a library module
+    is_lib = isPrelModule mod	-- Don't record dependencies when importing a prelude module
     add (imp_mod, version, has_orphans, is_boot, _) deps
 	| is_lib && not has_orphans = deps
 	| otherwise  =  addToFM_C combine deps imp_mod (version, has_orphans, is_boot, Nothing)
@@ -795,7 +795,7 @@ getImportVersions this_mod (ExportEnv _ _ export_all_mods)
 						-- but don't actually *use* anything from Foo
 					 	-- In which case record an empty dependency list
 		   where
-		     is_lib_module     = isLibModule mod
+		     is_lib_module = isPrelModule mod
 	     
     in
 
@@ -982,11 +982,11 @@ findAndReadIface doc_str mod_name from hi_file
          (False, lookupFM hi_map mod_name)
 
       | otherwise
-		-- Check if there's a library module of that name
+		-- Check if there's a prelude module of that name
 		-- If not, look for an hi-boot file
       = case lookupFM hi_map mod_name of
-	   stuff@(Just (_, mod)) | isLibModule mod -> (False, stuff)
-	   other		 		   -> (True, lookupFM hiboot_map mod_name)
+	   stuff@(Just (_, mod)) | isPrelModule mod -> (False, stuff)
+	   other		 		    -> (True, lookupFM hiboot_map mod_name)
 
     trace_msg = sep [hsep [ptext SLIT("Reading"), 
 			   ppr from,

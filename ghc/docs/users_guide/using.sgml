@@ -991,7 +991,12 @@ sight!
 
 <Para>
 GHC <Emphasis>only</Emphasis> keeps detailed dependency information
-for &ldquo;user&rdquo; modules, not for &ldquo;library&rdquo; modules.
+for &ldquo;user&rdquo; modules, not for &ldquo;Prelude&rdquo; modules.
+It distinguishes Prelude modules because their names start with
+"Prel", so don't start your modules that way!
+
+<!--       April 2000: hack disabled.  Now we use a different hack!
+
 It distinguishes the two by a hack: a module whose
 <Filename>.hi</Filename> file has an absolute path name is considered
 a library module, while a relative path name indicates a user module.
@@ -1010,6 +1015,7 @@ A path is considered &ldquo;absolute&rdquo; if it starts with
 &ldquo;<Filename>B:/</Filename>&rdquo;,
 &ldquo;<Filename>B:\</Filename>&rdquo; etc).
 </Para>
+-->
 
 <Para>
 Patrick Sansom had a workshop paper about how all this is done (though

@@ -35,7 +35,7 @@ import OccName		( OccName,
 			)
 import TysWiredIn	( tupleTyCon, unboxedTupleTyCon, listTyCon )
 import Type		( funTyCon )
-import Module		( ModuleName, mkThisModule, mkVanillaModule, moduleName )
+import Module		( ModuleName, mkThisModule, moduleName )
 import TyCon		( TyCon )
 import FiniteMap
 import Unique		( Unique, Uniquable(..) )
@@ -93,7 +93,7 @@ newImportedBinder mod rdr_name
 mkImportedGlobalName :: ModuleName -> OccName -> RnM d Name
 mkImportedGlobalName mod_name occ
   = lookupModuleRn mod_name `thenRn` \ mod ->
-    newImportedGlobalName mod_name occ mod --(mkVanillaModule mod_name)
+    newImportedGlobalName mod_name occ mod
 	
 mkImportedGlobalFromRdrName :: RdrName -> RnM d Name 
 mkImportedGlobalFromRdrName rdr_name
