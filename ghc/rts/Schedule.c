@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.48 2000/03/07 11:58:49 simonmar Exp $
+ * $Id: Schedule.c,v 1.49 2000/03/13 09:56:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -295,6 +295,7 @@ schedule( void )
   StgTSO *tso;
   GlobalTaskId pe;
 #endif
+  rtsBool was_interrupted = rtsFalse;
   
   ACQUIRE_LOCK(&sched_mutex);
 
@@ -324,6 +325,8 @@ schedule( void )
       }
       run_queue_hd = run_queue_tl = END_TSO_QUEUE;
       blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
+      interrupted = rtsFalse;
+      was_interrupted = rtsTrue;
     }
 
     /* Go through the list of main threads and wake up any
@@ -347,7 +350,7 @@ schedule( void )
 	  break;
 	case ThreadKilled:
 	  *prev = m->link;
-	  if (interrupted) {
+	  if (was_interrupted) {
 	    m->stat = Interrupted;
 	  } else {
 	    m->stat = Killed;
@@ -373,7 +376,7 @@ schedule( void )
 	  m->stat = Success;
 	  return;
 	} else {
-	  if (interrupted) {
+	  if (was_interrupted) {
 	    m->stat = Interrupted;
 	  } else {
 	    m->stat = Killed;
