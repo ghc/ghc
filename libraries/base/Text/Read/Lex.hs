@@ -35,7 +35,7 @@ import GHC.Num( Num(..), Integer )
 import GHC.Show( Show(.. ), showChar, showString,
 		 isSpace, isAlpha, isAlphaNum,
 		 isOctDigit, isHexDigit, toUpper )
-import GHC.Real( Ratio, Integral, Rational, (%), fromIntegral, fromRational, 
+import GHC.Real( Ratio(..), Integral, Rational, (%), fromIntegral, fromRational, 
 		 toInteger, (^), (^^) )
 import GHC.Float( Float, Double )
 import GHC.List
@@ -285,8 +285,8 @@ lexString =
 --  Lexing numbers
 
 infinity, notANumber :: Rational
-infinity   = 1 % 0
-notANumber = 0 % 0
+infinity   = 1 :% 0
+notANumber = 0 :% 0
 
 type Base   = Int
 type Digits = [Int]
