@@ -688,7 +688,6 @@ instance Integral Int where
 
 instance Integral Integer where
     quotRem       = primQuotRemInteger 
-    --divMod        = primDivModInteger 
     toInteger     = id
     toInt         = primIntegerToInt
 
@@ -1587,17 +1586,21 @@ instance Show IOError where
    showsPrec _ (IOError s) = showString ("I/O error: " ++ s)
 
 ioError :: IOError -> IO a
-ioError (IOError s) = primRaise (IOExcept s)
+ioError e@(IOError _) = primRaise (IOException e)
 
 userError :: String -> IOError
 userError s = primRaise (ErrorCall s)
 
-catch :: IO a -> (IOError -> IO a) -> IO a
-catch m k 
-  = IO (\s -> unIO m s `primCatch` \ err -> unIO (k (e2ioe err)) s)
-    where
-       e2ioe (IOExcept s) = IOError s
-       e2ioe other        = IOError (show other)
+throw :: Exception -> a
+throw exception = primRaise exception
+
+catchException :: IO a -> (Exception -> IO a) -> IO a
+catchException m k =  IO (\s -> unIO m s `primCatch` \ err -> unIO (k err) s)
+
+catch           :: IO a -> (IOError -> IO a) -> IO a 
+catch m k	=  catchException m handler
+  where handler (IOException err) = k err
+	handler other             = throw other
 
 putChar :: Char -> IO ()
 putChar c = nh_stdout >>= \h -> nh_write h c
@@ -1677,14 +1680,80 @@ readLn           = do l <- getLine
 
 
 -- End of Hugs standard prelude ----------------------------------------------
+data Exception
+  = IOException 	IOError		-- IO exceptions (from 'ioError')
+  | ArithException  	ArithException	-- Arithmetic exceptions
+  | ErrorCall		String		-- Calls to 'error'
+  | NoMethodError       String		-- A non-existent method was invoked
+  | PatternMatchFail	String		-- A pattern match failed
+  | NonExhaustiveGuards String		-- A guard match failed
+  | RecSelError		String		-- Selecting a non-existent field
+  | RecConError		String		-- Field missing in record construction
+  | RecUpdError		String		-- Record doesn't contain updated field
+  | AssertionFailed	String		-- Assertions
+  | DynException	Dynamic		-- Dynamic exceptions
+  | AsyncException	AsyncException	-- Externally generated errors
+  | PutFullMVar				-- Put on a full MVar
+  | NonTermination
 
-data Exception 
-   = ErrorCall String
-   | IOExcept  String 
+data ArithException
+  = Overflow
+  | Underflow
+  | LossOfPrecision
+  | DivideByZero
+  | Denormal
+  deriving (Eq, Ord)
+
+data AsyncException
+  = StackOverflow
+  | HeapOverflow
+  | ThreadKilled
+  deriving (Eq, Ord)
+
+stackOverflow, heapOverflow :: Exception -- for the RTS
+stackOverflow = AsyncException StackOverflow
+heapOverflow  = AsyncException HeapOverflow
+
+instance Show ArithException where
+  showsPrec _ Overflow        = showString "arithmetic overflow"
+  showsPrec _ Underflow       = showString "arithmetic underflow"
+  showsPrec _ LossOfPrecision = showString "loss of precision"
+  showsPrec _ DivideByZero    = showString "divide by zero"
+  showsPrec _ Denormal        = showString "denormal"
+
+instance Show AsyncException where
+  showsPrec _ StackOverflow   = showString "stack overflow"
+  showsPrec _ HeapOverflow    = showString "heap overflow"
+  showsPrec _ ThreadKilled    = showString "thread killed"
 
 instance Show Exception where
-   showsPrec _ (ErrorCall s) = showString ("error: " ++ s)
-   showsPrec _ (IOExcept s)  = showString ("I/O error: " ++ s)
+  showsPrec _ (IOException err)	         = shows err
+  showsPrec _ (ArithException err)       = shows err
+  showsPrec _ (ErrorCall err)	         = showString err
+  showsPrec _ (NoMethodError err)        = showString err
+  showsPrec _ (PatternMatchFail err)     = showString err
+  showsPrec _ (NonExhaustiveGuards err)  = showString err
+  showsPrec _ (RecSelError err)	         = showString err
+  showsPrec _ (RecConError err)	         = showString err
+  showsPrec _ (RecUpdError err)	         = showString err
+  showsPrec _ (AssertionFailed err)      = showString err
+  showsPrec _ (AsyncException e)	 = shows e
+  showsPrec _ (DynException _err)        = showString "unknown exception"
+  showsPrec _ (PutFullMVar)		 = showString "putMVar: full MVar"
+  showsPrec _ (NonTermination)           = showString "<<loop>>"
+
+data Dynamic = Dynamic TypeRep Obj
+
+data Obj = Obj   -- dummy type to hold the dynamically typed value.
+data TypeRep
+ = App TyCon   [TypeRep]
+ | Fun TypeRep TypeRep
+   deriving ( Eq )
+
+data TyCon = TyCon Int String
+
+instance Eq TyCon where
+  (TyCon t1 _) == (TyCon t2 _) = t1 == t2
 
 data IOResult  = IOResult  deriving (Show)
 
@@ -1777,20 +1846,16 @@ primGetEnv v
 ------------------------------------------------------------------------------
 
 newtype ST s a = ST (s -> (a,s))
+unST :: ST s a -> s -> (a,s)
 unST (ST a) = a
+mkST :: (s -> (a,s)) -> ST s a
+mkST = ST
 data RealWorld
 
 runST :: (__forall s . ST s a) -> a
 runST m = fst (unST m alpha)
    where
       alpha = error "runST: entered the RealWorld"
-
-fixST :: (a -> ST s a) -> ST s a
-fixST m = ST (\ s -> 
-		let 
-		   (r,s) = unST (m r) s
-		in
-		   (r,s))
 
 instance Functor (ST s) where
    fmap f x  = x >>= (return . f)
