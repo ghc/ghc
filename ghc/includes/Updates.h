@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.29 2003/01/25 15:54:48 wolfgang Exp $
+ * $Id: Updates.h,v 1.30 2003/03/27 13:54:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -27,16 +27,22 @@
  */
 
 #ifdef TICKY_TICKY
-# define UPD_IND(updclosure, heapptr) UPD_PERM_IND(updclosure,heapptr)
+# define UPD_IND(updclosure, heapptr) \
+   UPD_PERM_IND(updclosure,heapptr)
+# define UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
+   UPD_PERM_IND(updclosure,heapptr); and_then
 #else
-# define UPD_IND(updclosure, heapptr) UPD_REAL_IND(updclosure,heapptr)
+# define UPD_IND(updclosure, heapptr) \
+   UPD_REAL_IND(updclosure,&stg_IND_info,heapptr,)
+# define UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
+   UPD_REAL_IND(updclosure,ind_info,heapptr,and_then)
 #endif
 
 /* UPD_IND actually does a PERM_IND if TICKY_TICKY is on;
    if you *really* need an IND use UPD_REAL_IND
  */
 #ifdef SMP
-#define UPD_REAL_IND(updclosure, heapptr)				\
+#define UPD_REAL_IND(updclosure, ind_info, heapptr, and_then)		\
    {									\
 	const StgInfoTable *info;					\
 	if (Bdescr((P_)updclosure)->u.back != (bdescr *)BaseReg) {	\
@@ -45,19 +51,21 @@
 		info = updclosure->header.info;				\
 	}								\
         AWAKEN_BQ(info,updclosure);					\
-	updateWithIndirection(info,					\
+	updateWithIndirection(info, ind_info,				\
 			      (StgClosure *)updclosure,			\
-			      (StgClosure *)heapptr);			\
+			      (StgClosure *)heapptr,			\
+	                      and_then);				\
    }
 #else
-#define UPD_REAL_IND(updclosure, heapptr)		\
+#define UPD_REAL_IND(updclosure, ind_info, heapptr, and_then)	\
    {							\
 	const StgInfoTable *info;			\
 	info = ((StgClosure *)updclosure)->header.info;	\
         AWAKEN_BQ(info,updclosure);			\
-	updateWithIndirection(info,			\
+	updateWithIndirection(((StgClosure *)updclosure)->header.info, ind_info,		\
 			      (StgClosure *)updclosure,	\
-			      (StgClosure *)heapptr);	\
+			      (StgClosure *)heapptr,	\
+			      and_then);		\
    }
 #endif
 
@@ -91,7 +99,7 @@
         AWAKEN_BQ(info,updclosure);					\
 	updateWithIndirection(info,					\
 			      (StgClosure *)updclosure,			\
-			      (StgClosure *)heapptr);			\
+			      (StgClosure *)heapptr,);			\
    }
 #elif defined(RTS_SUPPORTS_THREADS)
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.83 2003/01/08 12:37:45 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.84 2003/03/27 13:54:32 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -246,7 +246,13 @@ FN_(stg_BCO_entry) {
 }
 
 /* -----------------------------------------------------------------------------
-   Entry code for an indirection.
+   Info tables for indirections.
+
+   SPECIALISED INDIRECTIONS: we have a specialised indirection for each
+   kind of return (direct, vectored 0-7), so that we can avoid entering
+   the object when we know what kind of return it will do.  The update
+   code (Updates.hc) updates objects with the appropriate kind of
+   indirection.  We only do this for young-gen indirections.
    -------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_IND_info,stg_IND_entry,1,0,IND,,IF_,"IND","IND");
@@ -259,6 +265,28 @@ IF_(stg_IND_entry)
     JMP_(GET_ENTRY(R1.cl));
     FE_
 }
+
+#define IND_SPEC(n,ret) \
+INFO_TABLE(stg_IND_##n##_info,stg_IND_##n##_entry,1,0,IND,,IF_,"IND","IND"); \
+IF_(stg_IND_##n##_entry)			\
+{						\
+    FB_						\
+    TICK_ENT_DYN_IND(Node);	/* tick */	\
+    R1.p = (P_) ((StgInd*)R1.p)->indirectee;	\
+    TICK_ENT_VIA_NODE();			\
+    JMP_(ret);					\
+    FE_						\
+}
+
+IND_SPEC(direct, ENTRY_CODE(Sp[0]))
+IND_SPEC(0, RET_VEC(Sp[0],0))
+IND_SPEC(1, RET_VEC(Sp[0],1))
+IND_SPEC(2, RET_VEC(Sp[0],2))
+IND_SPEC(3, RET_VEC(Sp[0],3))
+IND_SPEC(4, RET_VEC(Sp[0],4))
+IND_SPEC(5, RET_VEC(Sp[0],5))
+IND_SPEC(6, RET_VEC(Sp[0],6))
+IND_SPEC(7, RET_VEC(Sp[0],7))
 
 INFO_TABLE(stg_IND_STATIC_info,stg_IND_STATIC_entry,1,0,IND_STATIC,,IF_,"IND_STATIC","IND_STATIC");
 IF_(stg_IND_STATIC_entry)
@@ -580,7 +608,7 @@ IF_(stg_CAF_BLACKHOLE_entry)
   FE_
 }
 
-#ifdef TICKY_TICKY
+#ifdef EAGER_BLACKHOLING
 INFO_TABLE(stg_SE_BLACKHOLE_info, stg_SE_BLACKHOLE_entry,0,2,SE_BLACKHOLE,,IF_,"SE_BLACKHOLE","SE_BLACKHOLE");
 IF_(stg_SE_BLACKHOLE_entry)
 {

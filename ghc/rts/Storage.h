@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.50 2003/03/26 17:40:57 sof Exp $
+ * $Id: Storage.h,v 1.51 2003/03/27 13:54:32 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -163,15 +163,16 @@ recordOldToNewPtrs(StgMutClosure *p)
 // We zero out the slop when PROFILING is on.
 // #ifndef DEBUG
 #if !defined(DEBUG) && !defined(PROFILING)
-#define updateWithIndirection(info, p1, p2)				\
+#define updateWithIndirection(info, ind_info, p1, p2, and_then)		\
   {									\
     bdescr *bd;								\
 									\
     bd = Bdescr((P_)p1);						\
     if (bd->gen_no == 0) {						\
       ((StgInd *)p1)->indirectee = p2;					\
-      SET_INFO(p1,&stg_IND_info);					\
+      SET_INFO(p1,ind_info);						\
       TICK_UPD_NEW_IND();						\
+      and_then;								\
     } else {								\
       ((StgIndOldGen *)p1)->indirectee = p2;				\
       if (info != &stg_BLACKHOLE_BQ_info) {				\
@@ -182,6 +183,7 @@ recordOldToNewPtrs(StgMutClosure *p)
       }									\
       SET_INFO(p1,&stg_IND_OLDGEN_info);				\
       TICK_UPD_OLD_IND();						\
+      and_then;								\
     }									\
   }
 #elif defined(PROFILING)
@@ -195,7 +197,7 @@ recordOldToNewPtrs(StgMutClosure *p)
 //   the invariants that every closure keeps its creation time in the profiling
 //   field. So, we call LDV_recordCreate().
 
-#define updateWithIndirection(info, p1, p2)				\
+#define updateWithIndirection(info, ind_info, p1, p2, and_then)		\
   {									\
     bdescr *bd;								\
 									\
@@ -203,9 +205,10 @@ recordOldToNewPtrs(StgMutClosure *p)
     bd = Bdescr((P_)p1);						\
     if (bd->gen_no == 0) {						\
       ((StgInd *)p1)->indirectee = p2;					\
-      SET_INFO(p1,&stg_IND_info);					\
+      SET_INFO(p1,ind_info);						\
       LDV_recordCreate((p1));                                           \
       TICK_UPD_NEW_IND();						\
+      and_then;								\
     } else {								\
       ((StgIndOldGen *)p1)->indirectee = p2;				\
       if (info != &stg_BLACKHOLE_BQ_info) {				\
@@ -216,6 +219,7 @@ recordOldToNewPtrs(StgMutClosure *p)
       }									\
       SET_INFO(p1,&stg_IND_OLDGEN_info);				\
       LDV_recordCreate((p1));                                           \
+      and_then;								\
     }									\
   }
 
@@ -229,7 +233,7 @@ recordOldToNewPtrs(StgMutClosure *p)
  * already have been updated (the mutable list will get messed up
  * otherwise).
  */
-#define updateWithIndirection(info, p1, p2)				\
+#define updateWithIndirection(info, ind_info, p1, p2, and_then)		\
   {									\
     bdescr *bd;								\
 									\
@@ -237,8 +241,9 @@ recordOldToNewPtrs(StgMutClosure *p)
     bd = Bdescr((P_)p1);						\
     if (bd->gen_no == 0) {						\
       ((StgInd *)p1)->indirectee = p2;					\
-      SET_INFO(p1,&stg_IND_info);					\
+      SET_INFO(p1,ind_info);						\
       TICK_UPD_NEW_IND();						\
+      and_then;								\
     } else {								\
       if (info != &stg_BLACKHOLE_BQ_info) {				\
 	{								\
@@ -259,6 +264,7 @@ recordOldToNewPtrs(StgMutClosure *p)
       ((StgIndOldGen *)p1)->indirectee = p2;				\
       SET_INFO(p1,&stg_IND_OLDGEN_info);				\
       TICK_UPD_OLD_IND();						\
+      and_then;								\
     }									\
   }
 #endif

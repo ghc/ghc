@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.46 2003/02/21 05:34:15 sof Exp $
+ * $Id: StgMiscClosures.h,v 1.47 2003/03/27 13:54:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -54,6 +54,15 @@ extern DLL_IMPORT_RTS const StgRetInfoTable stg_apply_interp_info;
 /* info tables */
 
 extern DLL_IMPORT_RTS const StgInfoTable stg_IND_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_direct_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_0_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_1_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_2_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_3_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_4_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_5_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_6_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_7_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_IND_STATIC_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_IND_PERM_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_IND_OLDGEN_info;

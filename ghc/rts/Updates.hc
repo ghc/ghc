@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.38 2002/12/11 15:36:54 simonmar Exp $
+ * $Id: Updates.hc,v 1.39 2003/03/27 13:54:32 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -32,17 +32,19 @@
 
 /* on entry to the update code
    (1) R1 points to the closure being returned
-   (2) R2 contains the tag (if we returned directly, non-vectored)
-   (3) Sp points to the update frame
+   (2) Sp points to the update frame
    */
 
-/* Why updatee is placed in a temporary variable here: this helps
-   gcc's aliasing by indicating that the location of the updatee
-   doesn't change across assignments.  Saves one instruction in the
-   update code. 
-   */
+/* The update fragment has been tuned so as to generate reasonable
+   code with gcc, which accounts for some of the strangeness in the
+   way it is written.  
 
-#define UPD_FRAME_ENTRY_TEMPLATE(label,ret)				\
+   In particular, the JMP_(ret) bit is passed down and pinned on the
+   end of each branch (there end up being two major branches in the
+   code), since we don't mind duplicating this jump.
+*/
+
+#define UPD_FRAME_ENTRY_TEMPLATE(label,ind_info,ret)			\
         STGFUN(label);							\
 	STGFUN(label)							\
 	{								\
@@ -51,29 +53,27 @@
 									\
           updatee = ((StgUpdateFrame *)Sp)->updatee;			\
 									\
+	  /* remove the update frame from the stack */			\
+	  Sp += sizeofW(StgUpdateFrame);				\
+									\
 	  /* Tick - it must be a con, all the paps are handled		\
 	   * in stg_upd_PAP and PAP_entry below				\
 	   */								\
 	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(get_itbl(updatee)));	\
 									\
-	  UPD_IND(updatee, R1.cl);					\
-									\
-	  /* remove the update frame from the stack */			\
-	  Sp += sizeofW(StgUpdateFrame);				\
-									\
-	  JMP_(ret);							\
+	  UPD_SPEC_IND(updatee, ind_info, R1.cl, JMP_(ret));		\
 	  FE_								\
 	}
 
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_ret,ENTRY_CODE(Sp[0]));
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_0_ret,RET_VEC(Sp[0],0));
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_1_ret,RET_VEC(Sp[0],1));
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_2_ret,RET_VEC(Sp[0],2));
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_3_ret,RET_VEC(Sp[0],3));
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_4_ret,RET_VEC(Sp[0],4));
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_5_ret,RET_VEC(Sp[0],5));
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_6_ret,RET_VEC(Sp[0],6));
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_7_ret,RET_VEC(Sp[0],7));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_ret,&stg_IND_direct_info,ENTRY_CODE(Sp[0]));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_0_ret,&stg_IND_0_info,RET_VEC(Sp[0],0));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_1_ret,&stg_IND_1_info,RET_VEC(Sp[0],1));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_2_ret,&stg_IND_2_info,RET_VEC(Sp[0],2));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_3_ret,&stg_IND_3_info,RET_VEC(Sp[0],3));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_4_ret,&stg_IND_4_info,RET_VEC(Sp[0],4));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_5_ret,&stg_IND_5_info,RET_VEC(Sp[0],5));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_6_ret,&stg_IND_6_info,RET_VEC(Sp[0],6));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_7_ret,&stg_IND_7_info,RET_VEC(Sp[0],7));
 
 /*
   Make sure this table is big enough to handle the maximum vectored
