@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.23 1998/07/24 10:42:34 sof Exp $
+dnl $Id: aclocal.m4,v 1.24 1998/08/06 10:28:34 simonm Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -105,7 +105,7 @@ char **argv;
 changequote([, ])dnl
 #endif
     exit(1);
-}], ac_cv_lead_uscore=yes, ac_cv_lead_uscore=no, ac_cv_lead_uscore=NO)
+}], fptools_cv_lead_uscore=yes, fptools_cv_lead_uscore=no, fptools_cv_lead_uscore=NO)
 ;;
 esac);
 LeadingUnderscore=`echo $fptools_cv_lead_uscore | sed 'y/yesno/YESNO/'`
