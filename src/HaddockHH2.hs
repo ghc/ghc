@@ -111,8 +111,8 @@ ppHH2Files odir package ifaces = do
         text "<!DOCTYPE HelpFileList SYSTEM \"ms-help://hx/resources/HelpFileList.DTD\">" $$
         text "<HelpFileList DTDVersion=\"1.0\">" $$
         nest 4 (ppMods ifaces $$
-                text "<File Url=\"index.html\"/>" $$
-                text "<File Url=\"doc-index.html\"/>" $$
+                text "<File Url=\""<>text contentsHtmlFile<>text "\"/>" $$
+                text "<File Url=\""<>text indexHtmlFile<>text "\"/>" $$
                 ppIndexFiles chars $$
                 text "<File Url=\""<>text cssFile  <>text "\"/>") $$
                 text "<File Url=\""<>text iconFile <>text "\"/>" $$
@@ -129,7 +129,7 @@ ppHH2Files odir package ifaces = do
 		
     ppIndexFiles []     = empty
     ppIndexFiles (c:cs) =
-        text "<File Url=\"doc-index-" <> char c <> text ".html\"/>" $$
+        text "<File Url=\""<>text (subIndexHtmlFile c)<>text "\"/>" $$
         ppIndexFiles cs
 	
     chars :: [Char]

@@ -16,6 +16,7 @@ module HaddockUtil (
   basename, dirname, splitFilename3, 
   isPathSeparator, pathSeparator,
   moduleHtmlFile, nameHtmlRef,
+  contentsHtmlFile, indexHtmlFile, subIndexHtmlFile,
   cssFile, iconFile, jsFile, plusFile, minusFile,
 
   -- * Miscellaneous utilities
@@ -33,6 +34,7 @@ import IO	( hPutStr, stderr )
 import System
 import Binary
 import Monad
+import Char	( isAlpha, ord )
 
 #if __GLASGOW_HASKELL__ < 503
 import RegexString
@@ -276,6 +278,15 @@ moduleHtmlFile dir mod0 = dir ++ pathSeparator : mod0 ++ ".html"
 
 nameHtmlRef :: FilePath -> String -> HsName -> String	
 nameHtmlRef fp mdl str = moduleHtmlFile fp mdl ++ '#':escapeStr (hsAnchorNameStr str)
+
+contentsHtmlFile, indexHtmlFile :: String
+contentsHtmlFile = "index.html"
+indexHtmlFile = "doc-index.html"
+
+subIndexHtmlFile :: Char -> String
+subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
+   where b | isAlpha a = [a]
+           | otherwise = show (ord a)
 
 -- -----------------------------------------------------------------------------
 -- Files we need to copy from our $libdir

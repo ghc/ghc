@@ -21,7 +21,7 @@ import HsSyn
 import IO
 import Maybe	( fromJust, isJust, fromMaybe )
 import List 	( sortBy )
-import Char	( isUpper, toUpper, isAlpha, ord )
+import Char	( isUpper, toUpper )
 import Monad	( when, unless )
 
 #if __GLASGOW_HASKELL__ < 503
@@ -96,16 +96,6 @@ copyHtmlBits odir libdir maybe_css = do
   css_contents <- readFile css_file
   writeFile css_destination css_contents
   mapM_ copyFile [ iconFile, plusFile, minusFile, jsFile ]
-
-
-contentsHtmlFile, indexHtmlFile :: String
-contentsHtmlFile = "index.html"
-indexHtmlFile = "doc-index.html"
-
-subIndexHtmlFile :: Char -> String
-subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
-   where b | isAlpha a = [a]
-           | otherwise = show (ord a)
 
 footer :: HtmlTable
 footer = 
