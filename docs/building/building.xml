@@ -2952,6 +2952,58 @@ directive.
       ones in <filename>boilerplate.mk</filename>.</para>
     </sect2>
 
+    <sect2 id="sec-platforms">
+      <title>Platform settings</title>
+      <indexterm><primary>Platform settings</primary>
+      </indexterm>
+
+      <para>There are three platforms of interest when building GHC:</para>
+      
+      <variablelist>
+	<varlistentry>
+	  <term>The <emphasis>build</emphasis> platform</term>
+	  <listitem>
+	    <para>The platform on which we are doing this build.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>The <emphasis>host</emphasis> platform</term>
+	  <listitem>
+	    <para>The platform on which these binaries will run.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>The <emphasis>target</emphasis> platform</term>
+	  <listitem>
+	    <para>The platform for which this compiler will generate code.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+      
+      <para>These platforms are set when running the
+	<literal>configure</literal> script, using the
+	<option>--build</option>, <option>--host</option>, and
+	<option>--target</option> options.  The <filename>mk/config.mk</filename>
+	file defines several symbols related to the platform settings (see
+	<filename>mk/config.mk</filename> for details).</para>
+
+      <para>We don't currently support build &amp; host being different, because
+	the build process creates binaries that are both run during the build,
+	and also installed.</para>
+
+      <para>If host and target are different, then we are building a
+	cross-compiler.  For GHC, this means a compiler
+	which will generate intermediate .hc files to port to the target
+	architecture for bootstrapping.  The libraries and stage 2 compiler
+	will be built as HC files for the target system (see <xref
+	  linkend="sec-porting-ghc" /> for details.</para>
+
+      <para>More details on when to use BUILD, HOST or TARGET can be found in
+	the comments in <filename>config.mk</filename>.</para>
+    </sect2>
+
     <sect2 id="sec-suffix">
       <title>Pattern rules and options</title>
       <indexterm><primary>Pattern rules</primary></indexterm>
@@ -3695,7 +3747,7 @@ $ ./configure --enable-hc-boot --enable-hc-boot-unregisterised</screen>
   
 	    <listitem>
 <screen>$ cd <replaceable>T</replaceable>/ghc/includes
-$ make ghcconfig.h</screen>
+$ make</screen>
 	    </listitem>
 	  </itemizedlist>
 	  </listitem>
@@ -3755,7 +3807,7 @@ GhcBootLibs = YES</programlisting>
 
 	    <listitem>
 	      <para>Copy
-	      <filename><replaceable>T</replaceable>/ghc/includes/ghcconfig.h</filename>
+	      <filename><replaceable>T</replaceable>/ghc/includes/ghcautoconf.h</filename>
 	      to
 	      <filename><replaceable>H</replaceable>/ghc/includes</filename>.
 	      Note that we are building on the host machine, using the
@@ -3766,9 +3818,9 @@ GhcBootLibs = YES</programlisting>
 	    </listitem>
 
 	      <listitem>
-		<para>Touch <literal>ghcconfig.h</literal>, just to make
+		<para>Touch <literal>ghcautoconf.h</literal>, just to make
 		sure it doesn't get replaced during the build:</para>
-<screen>$ touch <replaceable>H</replaceable>/ghc/includes/ghcconfig.h</screen>
+<screen>$ touch <replaceable>H</replaceable>/ghc/includes/ghcautoconf.h</screen>
 	      </listitem>
 
 	    <listitem>
