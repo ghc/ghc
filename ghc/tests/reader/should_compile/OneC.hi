@@ -1,3 +1,0 @@
-interface OneC where
-
-fC :: a -> a
