@@ -11,7 +11,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.2 2001/07/31 13:05:02 simonmar Exp $
+-- $Id: Time.hsc,v 1.3 2001/07/31 13:05:33 simonmar Exp $
 --
 -- The standard Time library.
 --
@@ -366,18 +366,42 @@ gmtoff x = do
 
 
 toCalendarTime :: ClockTime -> IO CalendarTime
-toCalendarTime =  clockToCalendarTime localtime False
+#if HAVE_LOCALTIME_R
+toCalendarTime =  clockToCalendarTime_reentrant (throwAwayReturnPointer localtime_r) False
+#else
+toCalendarTime =  clockToCalendarTime_static localtime False
+#endif
 
 toUTCTime      :: ClockTime -> CalendarTime
-toUTCTime      =  unsafePerformIO . clockToCalendarTime gmtime True
+#if HAVE_GMTIME_R
+toUTCTime      =  unsafePerformIO . clockToCalendarTime_reentrant (throwAwayReturnPointer gmtime_r) True
+#else
+toUTCTime      =  unsafePerformIO . clockToCalendarTime_static gmtime True
+#endif
 
--- ToDo: should be made thread safe, because localtime uses static storage,
--- or use the localtime_r version.
-clockToCalendarTime :: (Ptr CTime -> IO (Ptr CTm)) -> Bool -> ClockTime
+throwAwayReturnPointer :: (Ptr CTime -> Ptr CTm -> IO (Ptr CTm))
+                       -> (Ptr CTime -> Ptr CTm -> IO (       ))
+throwAwayReturnPointer fun x y = fun x y >> return ()
+
+clockToCalendarTime_static :: (Ptr CTime -> IO (Ptr CTm)) -> Bool -> ClockTime
 	 -> IO CalendarTime
-clockToCalendarTime fun is_utc (TOD secs psec) = do
+clockToCalendarTime_static fun is_utc (TOD secs psec) = do
+  putStrLn ("clockToCalendarTime: TOD " ++ show secs ++ " " ++ show psec)
   withObject (fromIntegral secs :: CTime)  $ \ p_timer -> do
+    case p_timer of Ptr addr -> putStrLn ("const time_t * = " ++ show (I## (addr2Int## addr)))
     p_tm <- fun p_timer 	-- can't fail, according to POSIX
+    clockToCalendarTime_aux is_utc p_tm psec
+
+clockToCalendarTime_reentrant :: (Ptr CTime -> Ptr CTm -> IO ()) -> Bool -> ClockTime
+	 -> IO CalendarTime
+clockToCalendarTime_reentrant fun is_utc (TOD secs psec) = do
+  withObject (fromIntegral secs :: CTime)  $ \ p_timer -> do
+    allocaBytes (#const sizeof(struct tm)) $ \ p_tm -> do
+      fun p_timer p_tm
+      clockToCalendarTime_aux is_utc p_tm psec
+
+clockToCalendarTime_aux :: Bool -> Ptr CTm -> Integer -> IO CalendarTime
+clockToCalendarTime_aux is_utc p_tm psec = do
     sec   <-  (#peek struct tm,tm_sec  ) p_tm :: IO CInt
     min   <-  (#peek struct tm,tm_min  ) p_tm :: IO CInt
     hour  <-  (#peek struct tm,tm_hour ) p_tm :: IO CInt
@@ -599,10 +623,18 @@ formatTimeDiff l fmt td@(TimeDiff year month day hour min sec _)
 
 type CTm = () -- struct tm
 
-foreign import unsafe localtime :: Ptr CTime -> IO (Ptr CTm)
-foreign import unsafe gmtime    :: Ptr CTime -> IO (Ptr CTm)
-foreign import unsafe mktime    :: Ptr CTm   -> IO CTime
-foreign import unsafe time      :: Ptr CTime -> IO CTime
+#if HAVE_LOCALTIME_R
+foreign import unsafe localtime_r :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
+#else
+foreign import unsafe localtime   :: Ptr CTime -> IO (Ptr CTm)
+#endif
+#if HAVE_GMTIME_R
+foreign import unsafe gmtime_r    :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
+#else
+foreign import unsafe gmtime      :: Ptr CTime -> IO (Ptr CTm)
+#endif
+foreign import unsafe mktime      :: Ptr CTm   -> IO CTime
+foreign import unsafe time        :: Ptr CTime -> IO CTime
 
 #if HAVE_GETTIMEOFDAY
 type CTimeVal = ()
