@@ -36,8 +36,7 @@ import UniqSupply	( getUnique, getUniques, splitUniqSupply,
 			)
 import Util		( zipWithEqual, panic, SYN_IE(Eager), appEager, pprTrace )
 import Pretty
-import PprStyle
-import Outputable	( Outputable(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 
 infixr 9  `thenSmpl`, `thenSmpl_`
 \end{code}
