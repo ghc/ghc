@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.19 2002/09/26 09:07:50 simonmar Exp $
+# $Id: package.mk,v 1.20 2002/12/12 13:28:35 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -189,6 +189,7 @@ install-docs :: $(HTML_DOC)
 	   echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/$(PACKAGE); \
 	   $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/$(PACKAGE); \
 	done
+	$(INSTALL_DATA) $(INSTALL_OPTS) $(PACKAGE).haddock $(datadir)/html/$(PACKAGE)
 
 endif # HS_PPS
 endif # NO_HADDOCK_DOCS
