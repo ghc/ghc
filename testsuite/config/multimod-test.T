@@ -8,6 +8,8 @@
 -- global variables:
 $stdin = ""
 $expect = "pass"
+$normalise_errmsg = False
+$normalise_output = False
 
 ---------------------------------------------------------------
 --- UTILITY FNs                                             ---
@@ -90,45 +92,6 @@ def simple_build_prog_WRK ( $_main, $_extra_args )
    return $res
 }
 
-
----------------------------------------------------------------
---- RUNNING, AND ASSESSING RUN RESULTS                      ---
----------------------------------------------------------------
-
--- Check that the run.stdout file matches at least one spec'd stdout.
-def check_stdout_ok()
-{
-   $r_stdout  = qualify("run.stdout")
-   $s_stdout  = qualify("stdout")
-
-   if   not ( exists($s_stdout) )
-   then if ((contents $r_stdout) == "")
-	   then return True
-	   else say_fail_because_nonempty($r_stdout)
-		return False
-	fi
-   fi
-
-   return same($s_stdout, $r_stdout)
-}
-
--- If there's any spec'd stderr files, check that the run.stderr matches it.
--- Check that the run.stdout file matches at least one spec'd stdout.
-def check_stderr_ok()
-{
-   $r_stderr  = qualify("run.stderr")
-   $s_stderr  = qualify("stderr")
-
-   if   not ( exists($s_stderr) )
-   then if ((contents $r_stderr) == "")
-	   then return True
-	   else say_fail_because_output_produced($r_stdout)
-		return False
-	fi
-   fi
-
-   return same($s_stderr, $r_stderr)
-}
 
 ---------------------------------------------------------------
 --- CONDUCTING A COMPLETE TEST                              ---

@@ -1,10 +1,11 @@
 -- !!! RW files 
+
 module Main(main) where
 
 import IO
 import Directory ( removeFile, doesFileExist )
 import Monad
-#if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
 import PrelHandle(hSetBinaryMode)
 #endif
 
@@ -12,9 +13,9 @@ main = do
   f <- doesFileExist "readwrite001.inout" 
   when f (removeFile "readwrite001.inout")
   hdl <- openFile "readwrite001.inout" ReadWriteMode
-# if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
   hSetBinaryMode hdl True
-# endif
+#endif
   hSetBuffering hdl LineBuffering
   hPutStr hdl "as"
   hSeek hdl AbsoluteSeek 0

@@ -18,6 +18,8 @@
 # ghastly hack, because the driver requires that $tool be an absolute path name.
 GHC_INPLACE_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/ghc-inplace
 
+EXTRA_HC_OPTS += -D$(HostPlatform_CPP)
+  # ideally TargetPlatform_CPP, but that doesn't exist; they're always the same anyway
 RUNTESTS     = $(TOP)/driver/runtests
 RUNTEST_OPTS =  --config=$(CONFIG) tool=$(GHC_INPLACE_ABS) extra_hc_flags="$(EXTRA_HC_OPTS)" $(EXTRA_RUNTEST_OPTS)
 CONFIG       = $(TOP)/config/msrc/cam-02-unx.T
@@ -28,11 +30,11 @@ TEST	     =
 all :: test
 
 test:
-	$(RUNTESTS) $(RUNTEST_OPTS) $(TEST) $(TESTS)
+	$(RUNTESTS) $(RUNTEST_OPTS) platform=$(TARGETPLATFORM) $(TEST) $(TESTS)
 
 verbose:
-	$(RUNTESTS) $(RUNTEST_OPTS) verbose= $(TEST) $(TESTS)
+	$(RUNTESTS) $(RUNTEST_OPTS) platform=$(TARGETPLATFORM) verbose= $(TEST) $(TESTS)
 
 accept:
-	$(RUNTESTS) $(RUNTEST_OPTS) accept= verbose= $(TEST) $(TESTS)
+	$(RUNTESTS) $(RUNTEST_OPTS) platform=$(TARGETPLATFORM) verbose= accept= $(TEST) $(TESTS)
 

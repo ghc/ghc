@@ -29,9 +29,7 @@ die :: String -> IO a
 die s = do officialMsg s; exitWith (ExitFailure 1)
 
 my_system s
-   = do -- putStrLn ("***" ++ s)
-	exit_code <- system s
-	-- putStrLn "ok"
+   = do exit_code <- system s
         return exit_code
 
 isLeft (Left _)  = True

@@ -1,13 +1,13 @@
 -- !!! can't seek an AppendMode handle
 
 import IO
-#if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
 import PrelHandle(hSetBinaryMode)
 #endif
 
 main = do
   h <- openFile "hSeek004.out" AppendMode
-# if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
   hSetBinaryMode h True
-# endif
+#endif
   try (hSeek h AbsoluteSeek 0) >>= print

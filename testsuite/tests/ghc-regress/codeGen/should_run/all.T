@@ -41,7 +41,8 @@ test "cg034" { vtr("", "", "") }
 test "cg035" { vtr("-package lang -fglasgow-exts", "", "") }
 test "cg036" { vtr("", "", "") }
 test "cg037" { vtr("", "", "") }
-test "cg038" { vtr("", "", "") }
+test "cg038" { if $platform=="i386-unknown-mingw32" then $expect="fail" fi
+               vtr("", "", "") }
 test "cg039" { vtr("", "", "") }
 test "cg040" { vtr("", "", "") }
 test "cg042" { vtr("-package lang -fglasgow-exts", "", "") }

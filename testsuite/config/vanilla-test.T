@@ -7,10 +7,13 @@
 -- global variables:
 $stdin = ""
 $expect = "pass"
+$normalise_errmsg = False
+$normalise_output = False
 
 ---------------------------------------------------------------
 -- Define the following things on the command line:
 --
+-- $platform    TARGETPLATFORM from config.mk
 -- $verbose	print command lines
 -- $accept	accept any changed output
 
@@ -69,45 +72,9 @@ def simple_build_Main_WRK ( $_extra_args, $compile_only )
                   	then " -c " 
                   	else " -o " ++ $testname ++ " ")
           ++ $srcname ++ " >" ++ $errname ++ " 2>&1"
+   print $cmd
    $res = runCmd($cmd)
    return $res
-}
-
-
--- Check that the run.stdout file matches at least one spec'd stdout.
-def check_stdout_ok()
-{
-   $r_stdout  = qualify("run.stdout")
-   $s_stdout  = qualify("stdout")
-
-   if   not ( exists($s_stdout) )
-   then if ((contents $r_stdout) == "")
-	   then return True
-	   else say_fail_because_nonempty($r_stdout)
-		return False
-	fi
-   fi
-
-   return same($s_stdout, $r_stdout)
-}
-
-
--- If there's any spec'd stderr files, check that the run.stderr matches it.
--- Check that the run.stdout file matches at least one spec'd stdout.
-def check_stderr_ok()
-{
-   $r_stderr  = qualify("run.stderr")
-   $s_stderr  = qualify("stderr")
-
-   if   not ( exists($s_stderr) )
-   then if ((contents $r_stderr) == "")
-	   then return True
-	   else say_fail_because_nonempty($r_stderr)
-		return False
-	fi
-   fi
-
-   return same($s_stderr, $r_stderr)
 }
 
 
@@ -157,7 +124,7 @@ def vanilla-compok-test-actions ( $extra_compile_args )
    -- If there's an expected .stderr, presumably containing
    -- warnings, ensure the compiler produced the same.
    $actual_stderr   = qualify("comp.stderr")
-   $expected_stderr = qualify("stderr")
+   $expected_stderr = platform_qualify("stderr")
    if   exists($expected_stderr)
    then $stderr_a = normalise_errmsg(contents($actual_stderr))
         $stderr_e = normalise_errmsg(contents($expected_stderr))
@@ -187,7 +154,7 @@ def vanilla-compok-test-actions ( $extra_compile_args )
 def vanilla-compfail-test-actions ( $extra_compile_args )
 {
    pretest_cleanup()
-   $expected_stderr = qualify("stderr")
+   $expected_stderr = platform_qualify("stderr")
 
    -- Sanity check
    if   not(exists($expected_stderr)) 

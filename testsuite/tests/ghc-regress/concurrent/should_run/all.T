@@ -1,9 +1,10 @@
 
 include ($confdir ++ "/../vanilla-test.T")
 
--- Args to vt are: extra compile flags
---                 extra run flags
---                 expected process return value, if not zero
+-- Args to vtr are: extra compile flags
+--                  extra run flags
+--                  expected process return value, if not zero
+--                  whether to normalise (depathify) stderr output
 
 def myvtr ( $args_c, $args_r, $ret_res )
 {
@@ -29,14 +30,8 @@ test "conc016" { myvtr("", "", "") }
 test "conc017" { myvtr("", "", "") }
 test "conc018" { myvtr("", "", "") }
 test "conc019" { myvtr("", "", "") }
-
---# conc020 *should* work on mingw32
-test "conc020" { skip when $os == "mingw32"
-                 myvtr("", "", "") }
-
-test "conc021" { skip when $os == "mingw32"
-                 myvtr("", "", "250") }
-
+test "conc020" { myvtr("", "", "") }
+test "conc021" { $normalise_errmsg = True myvtr("", "", "250") }
 test "conc022" { myvtr("", "", "") }
 test "conc023" { myvtr("", "", "") }
 test "conc024" { myvtr("", "", "") }

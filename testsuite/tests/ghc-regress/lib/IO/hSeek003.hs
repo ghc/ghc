@@ -1,9 +1,10 @@
 -- !!! file positions (hGetPosn and hSetPosn)
+
 module Main(main) where
 
 import IO
 import Monad ( sequence )
-#if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
 import PrelHandle(hSetBinaryMode)
 #endif
 
@@ -18,9 +19,9 @@ bmo_ls = [NoBuffering, LineBuffering, BlockBuffering Nothing,
 
 main = do
   hdl  <- openFile "hSeek003.hs" ReadMode
-# if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
   hSetBinaryMode hdl True
-# endif
+#endif
   sequence (zipWith testPosns (repeat hdl) bmo_ls)
   hClose hdl
 

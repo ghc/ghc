@@ -4,13 +4,13 @@
  -- but in GHC it returns True (known bug).
 
 import IO
-#if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
 import PrelHandle(hSetBinaryMode)
 #endif
 
 main = do
  h <- openFile "hReady001.hs" ReadMode
-#if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
  hSetBinaryMode h True
 #endif
  hSeek h SeekFromEnd 0

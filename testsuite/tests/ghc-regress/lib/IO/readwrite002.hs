@@ -1,8 +1,9 @@
 -- !!! Testing RW handles 
+
 import IO
 import Directory (removeFile, doesFileExist)
 import Monad
-#if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
 import PrelHandle(hSetBinaryMode)
 #endif
 
@@ -14,9 +15,9 @@ main = do
    f <- doesFileExist username
    when f (removeFile username)
    cd <- openFile username ReadWriteMode
-#  if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
    hSetBinaryMode cd True
-#  endif
+#endif
    hSetBuffering stdin NoBuffering
    hSetBuffering stdout NoBuffering
    hSetBuffering cd NoBuffering

@@ -59,6 +59,16 @@ def qualify ( $_filename_frag )
    fi
 }
 
+-- "foo" -> qualify("foo-platform") if it exists, or qualify("foo") otherwise
+def platform_qualify ( $_filename_frag )
+{
+   $name = qualify($_filename_frag)
+   if   exists($name ++ "-" ++ $platform)
+   then return $name ++ "-" ++ $platform
+   else return $name
+   fi
+}
+
 def testnameWith ( $_filename_frag )
 {
    if   $_filename_frag == ""
@@ -99,6 +109,22 @@ def same ( $_file1, $_file2 )
    fi
    $cts1 = contents($_file1)
    $cts2 = contents($_file2)
+   $same = $cts1 == $cts2
+   if not($same) then 
+	say_fail_because_noteq($_file1, $_file2) 
+   fi
+   return $same
+}
+
+-- returns True if both files are identical when normalised (unpathified)
+def same_normalised ( $_file1, $_file2 )
+{
+   if defined $verbose 
+	then print "vanilla-test: comparing " ++ $_file1
+		 ++ " and " ++ $_file2
+   fi
+   $cts1 = normalise_errmsg(contents($_file1))
+   $cts2 = normalise_errmsg(contents($_file2))
    $same = $cts1 == $cts2
    if not($same) then 
 	say_fail_because_noteq($_file1, $_file2) 
@@ -190,4 +216,48 @@ def simple_run_pgm( $extra_args, $exit_code )
    $test_passed = check_stdout_ok() && check_stderr_ok()
 
    return $test_passed
+}
+
+-- Check that the run.stdout file matches either the .stdout-TARGETPLATFORM
+-- (if it exists) or the .stdout otherwise.
+def check_stdout_ok()
+{
+   $r_stdout  = qualify("run.stdout")
+   $s_stdout  = platform_qualify("stdout")
+
+   if   not ( exists($s_stdout) )
+   then if ((contents $r_stdout) == "")
+     then return True
+     else say_fail_because_nonempty($r_stdout)
+	  return False
+     fi
+   fi
+
+   if   $normalise_output
+   then return same_normalised($s_stdout, $r_stdout)
+   else return same($s_stdout, $r_stdout)
+   fi
+}
+
+-- Check that the run.stderr matches either the .stderr-TARGETPLATFORM
+-- (if it exists) or the .stderr otherwise. Normalise the stderr if
+-- $normalise_errmsg is set
+def check_stderr_ok()
+{
+   $r_stderr  = qualify("run.stderr")
+   $s_stderr  = platform_qualify("stderr")
+
+   if   not ( exists($s_stderr) )
+   then if ((contents $r_stderr) == "")
+	   then return True
+	   else say_fail_because_nonempty($r_stderr)
+		return False
+	fi
+   fi
+
+--   if   $normalise_errmsg
+--   then
+	return same_normalised($s_stderr, $r_stderr)
+--   else return same($s_stderr, $r_stderr)
+--   fi
 }

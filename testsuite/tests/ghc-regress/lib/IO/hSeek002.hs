@@ -1,18 +1,19 @@
 -- !!! Testing EOF (and the clearing of it)
+
 module Main(main) where
 
 import IO
 import Directory ( removeFile )
-#if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
 import PrelHandle(hSetBinaryMode)
 #endif
 
 main :: IO ()
 main = do
    hdl <- openFile "hSeek002.hs" ReadMode
-#  if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
    hSetBinaryMode hdl True
-#  endif
+#endif
    flg <- hIsEOF hdl
    print flg
    hSeek hdl SeekFromEnd 0

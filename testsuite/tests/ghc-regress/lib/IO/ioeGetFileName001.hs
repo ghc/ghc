@@ -1,15 +1,15 @@
 -- !!! test ioeGetFileName
 
 import IO
-#if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
 import PrelHandle(hSetBinaryMode)
 #endif
 
 main = do
   h <- openFile "ioeGetFileName001.hs" ReadMode
-# if defined(__MINGW32__)
+#ifdef i386_unknown_mingw32
   hSetBinaryMode h True
-# endif
+#endif
   hSeek h SeekFromEnd 0
   (hGetChar h >> return ()) `catch`
 	\e -> if isEOFError e 
