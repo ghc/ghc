@@ -31,8 +31,8 @@ import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply, 
 			  UniqSupply )
 import CmdLineOpts      ( opt_EmitCExternDecls, opt_Unregisterised )
-import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety(..),
-			  isDynamicTarget, isCasmTarget, defaultCCallConv )
+import ForeignCall	( ForeignCall(..), CCallSpec(..),
+			  isDynamicTarget, isCasmTarget )
 import StgSyn		( StgOp(..) )
 import SMRep		( arrPtrsHdrSize, arrWordsHdrSize, fixedHdrSize )
 import Outputable
@@ -894,6 +894,14 @@ dscCOpStmt [res] EqStableNameOp [arg1,arg2] vols
         CAssign sn1 (mkDerefOff WordRep arg1 fixedHdrSize),
         CAssign sn2 (mkDerefOff WordRep arg2 fixedHdrSize),
         CMachOpStmt res MO_Nat_Eq [sn1,sn2] Nothing
+     ]
+
+dscCOpStmt [res] ReallyUnsafePtrEqualityOp [arg1,arg2] vols
+   = mkTemps [WordRep, WordRep] 	`thenFlt` \ [w1,w2] ->
+     (returnFlt . CSequential) [
+ 	CMachOpStmt w1 MO_NatP_to_NatU [arg1] Nothing,
+ 	CMachOpStmt w2 MO_NatP_to_NatU [arg2] Nothing,
+        CMachOpStmt res MO_Nat_Eq [w1,w2] Nothing{- because it's inline? -}
      ]
 
 -- #define addrToHValuezh(r,a) r=(P_)a

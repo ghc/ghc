@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.18 2002/04/10 11:43:43 stolz Exp $
+-- $Id: primops.txt.pp,v 1.19 2002/05/01 13:16:04 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -1519,6 +1519,16 @@ primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
    StableName# a -> Int#
    with
    usage = { mangle StableNameToIntOp [mkP] mkR }
+
+------------------------------------------------------------------------
+section "Unsafe pointer equality"
+--  (#1 Bad Guy: Alistair Reid :)   
+------------------------------------------------------------------------
+
+primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
+   a -> a -> Int#
+   with
+   usage = { mangle ReallyUnsafePtrEqualityOp [mkZ, mkZ] mkR }
 
 ------------------------------------------------------------------------
 section "Parallelism"
