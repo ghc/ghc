@@ -41,6 +41,7 @@ import Foreign.Ptr
 #ifdef __NHC__
 import NHC.FFI
   ( ForeignPtr
+  , FinalizerPtr
   , newForeignPtr
   , addForeignPtrFinalizer
   , withForeignPtr
@@ -82,6 +83,7 @@ instance Ord (ForeignPtr a) where
 instance Show (ForeignPtr a) where
     showsPrec p f = showsPrec p (foreignPtrToPtr f)
 #endif
+
 
 #ifndef __NHC__
 withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b

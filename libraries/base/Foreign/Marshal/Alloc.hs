@@ -41,6 +41,7 @@ import GHC.Ptr
 import GHC.Err
 import GHC.Base
 #elif defined(__NHC__)
+import NHC.FFI			( FinalizerPtr, CInt(..) )
 import IO			( bracket )
 #else
 import Control.Exception	( bracket )
@@ -49,6 +50,7 @@ import Control.Exception	( bracket )
 #ifdef __HUGS__
 import Hugs.ForeignPtr		( FinalizerPtr )
 #endif
+
 
 -- exported functions
 -- ------------------
