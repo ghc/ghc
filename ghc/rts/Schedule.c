@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.63 2000/04/04 15:02:02 simonmar Exp $
+ * $Id: Schedule.c,v 1.64 2000/04/05 15:28:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1326,7 +1326,7 @@ createThread_(nat size, rtsBool have_lock)
   tso = (StgTSO *)allocate(size);
   TICK_ALLOC_TSO(size-TSO_STRUCT_SIZEW, 0);
 
-  SET_HDR(tso, &TSO_info, CCS_MAIN);
+  SET_HDR(tso, &TSO_info, CCS_SYSTEM);
 #if defined(GRAN)
   SET_GRAN_HDR(tso, ThisPE);
 #endif
@@ -1355,7 +1355,7 @@ createThread_(nat size, rtsBool have_lock)
 
   /* put a stop frame on the stack */
   tso->sp -= sizeofW(StgStopFrame);
-  SET_HDR((StgClosure*)tso->sp,(StgInfoTable *)&stg_stop_thread_info,CCS_MAIN);
+  SET_HDR((StgClosure*)tso->sp,(StgInfoTable *)&stg_stop_thread_info,CCS_SYSTEM);
   tso->su = (StgUpdateFrame*)tso->sp;
 
   IF_DEBUG(scheduler,belch("---- Initialised TSO %ld (%p), stack size = %lx words", 
