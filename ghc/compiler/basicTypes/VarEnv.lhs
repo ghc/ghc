@@ -8,7 +8,7 @@ module VarEnv (
 	VarEnv, IdEnv, TyVarEnv,
 	emptyVarEnv, unitVarEnv, mkVarEnv,
 	elemVarEnv, rngVarEnv,
-	extendVarEnv, extendVarEnvList,
+	extendVarEnv, extendVarEnv_C, extendVarEnvList,
 	plusVarEnv, plusVarEnv_C,
 	delVarEnvList, delVarEnv,
 	lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
@@ -127,6 +127,7 @@ mkVarEnv	  :: [(Var, a)] -> VarEnv a
 zipVarEnv	  :: [Var] -> [a] -> VarEnv a
 unitVarEnv	  :: Var -> a -> VarEnv a
 extendVarEnv	  :: VarEnv a -> Var -> a -> VarEnv a
+extendVarEnv_C	  :: (a->a->a) -> VarEnv a -> Var -> a -> VarEnv a
 plusVarEnv	  :: VarEnv a -> VarEnv a -> VarEnv a
 extendVarEnvList  :: VarEnv a -> [(Var, a)] -> VarEnv a
 		  
@@ -148,6 +149,7 @@ foldVarEnv	  :: (a -> b -> b) -> b -> VarEnv a -> b
 \begin{code}
 elemVarEnv       = elemUFM
 extendVarEnv	 = addToUFM
+extendVarEnv_C	 = addToUFM_C
 extendVarEnvList = addListToUFM
 plusVarEnv_C	 = plusUFM_C
 delVarEnvList	 = delListFromUFM

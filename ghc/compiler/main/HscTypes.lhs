@@ -21,7 +21,7 @@ module HscTypes (
 
 	WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
-	IfaceInsts, IfaceRules, DeprecationEnv, GatedDecl,
+	IfaceInsts, IfaceRules, Deprecations(..), GatedDecl,
 	OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
 	AvailEnv, AvailInfo, GenAvailInfo(..),
 	PersistentCompilerState(..),
@@ -113,13 +113,16 @@ data ModIface
         mi_module   :: Module,			-- Complete with package info
         mi_version  :: VersionInfo,		-- Module version number
         mi_orphan   :: WhetherHasOrphans,       -- Whether this module has orphans
+
         mi_usages   :: [ImportVersion Name],	-- Usages
 
-        mi_exports  :: Avails,			-- What it exports
+        mi_exports  :: Avails,			-- What it exports; kept sorted by (mod,occ),
+						-- to make version comparisons easier
+
         mi_globals  :: GlobalRdrEnv,		-- Its top level environment
 
         mi_fixities :: NameEnv Fixity,		-- Fixities
-	mi_deprecs  :: NameEnv DeprecTxt,	-- Deprecations
+	mi_deprecs  :: Deprecations,		-- Deprecations
 
 	mi_decls    :: [RenamedHsDecl]		-- types, classes 
 						-- inst decls, rules, iface sigs
@@ -149,7 +152,7 @@ emptyModIface mod
   = ModIface { mi_module   = mod,
 	       mi_exports  = [],
 	       mi_globals  = emptyRdrEnv,
-	       mi_deprecs  = emptyNameEnv,
+	       mi_deprecs  = NoDeprecs
     }		
 \end{code}
 
@@ -258,13 +261,16 @@ data VersionInfo
 		-- the parent class/tycon changes
     }
 
-type DeprecationEnv = NameEnv DeprecTxt		-- Give reason for deprecation
+data Deprecations = NoDeprecs
+	 	  | DeprecAll DeprecTxt			-- Whole module deprecated
+		  | DeprecSome (NameEnv DeprecTxt)	-- Some things deprecated
+							-- Just "big" names
 
 type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
 type ClsInstEnv = [(TyVarSet, [Type], DFunId)]	-- The instances for a particular class
 type DFunId	= Id
 
-type RuleEnv    = IdEnv [CoreRule]
+type RuleEnv    = NameEnv [CoreRule]
 
 emptyRuleEnv    = emptyVarEnv
 \end{code}
@@ -468,16 +474,6 @@ instance Ord ImportReason where
       = (m1 `compare` m2) `thenCmp` (loc1 `compare` loc2)
 
 
-{-
-Moved here from Name.
-pp_prov (LocalDef _ Exported)          = char 'x'
-pp_prov (LocalDef _ NotExported)       = char 'l'
-pp_prov (NonLocalDef ImplicitImport _) = char 'j'
-pp_prov (NonLocalDef (UserImport _ _ True ) _) = char 'I'	-- Imported by name
-pp_prov (NonLocalDef (UserImport _ _ False) _) = char 'i'	-- Imported by ..
-pp_prov SystemProv	     	       = char 's'
--}
-
 data ImportReason
   = UserImport Module SrcLoc Bool	-- Imported from module M on line L
 					-- Note the M may well not be the defining module
@@ -510,7 +506,7 @@ hasBetterProv (NonLocalDef (UserImport _ _ _   ) _) (NonLocalDef ImplicitImport 
 hasBetterProv _					    _				   = False
 
 pprNameProvenance :: Name -> Provenance -> SDoc
-pprNameProvenance name LocalDef   	       = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
+pprNameProvenance name LocalDef   	   = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
 pprNameProvenance name (NonLocalDef why _) = sep [ppr_reason why, 
 					      nest 2 (parens (ppr_defn (nameSrcLoc name)))]
 

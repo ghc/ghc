@@ -19,8 +19,7 @@ import RdrHsSyn		( RdrNameIE, RdrNameImportDecl,
 			  RdrNameHsModule, RdrNameHsDecl
 			)
 import RnIfaces		( getInterfaceExports, getDeclBinders, 
-			  recordLocalSlurps, checkModUsage, 
-			  outOfDate, findAndReadIface )
+			  recordLocalSlurps, findAndReadIface )
 import RnEnv
 import RnMonad
 
@@ -59,16 +58,15 @@ getGlobalNames :: RdrNameHsModule
 	       -> RnMG (Maybe (GlobalRdrEnv,	-- Maps all in-scope things
 			       GlobalRdrEnv,	-- Maps just *local* things
 			       Avails,		-- The exported stuff
-			       AvailEnv,	-- Maps a name to its parent AvailInfo
+			       AvailEnv		-- Maps a name to its parent AvailInfo
 						-- Just for in-scope things only
-			       Maybe ParsedIface	-- The old interface file, if any
 			       ))
 			-- Nothing => no need to recompile
 
 getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
   = 	-- These two fix-loops are to get the right
 	-- provenance information into a Name
-    fixRn ( \ ~(Just (rec_gbl_env, _, rec_export_avails, _, _)) ->
+    fixRn ( \ ~(Just (rec_gbl_env, _, rec_export_avails, _)) ->
 
 	let
 	   rec_unqual_fn :: Name -> Bool	-- Is this chap in scope unqualified?
@@ -132,19 +130,13 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 		-- Found errors already, so exit now
 		returnRn Nothing
 	else
-	checkEarlyExit this_mod			`thenRn` \ (up_to_date, old_iface) ->
-	if up_to_date then
-		-- Interface files are sufficiently unchanged
-		putDocRn (text "Compilation IS NOT required")	`thenRn_`
-		returnRn Nothing
-	else
 	
 		-- PROCESS EXPORT LISTS
 	exportsFromAvail this_mod exports all_avails gbl_env	`thenRn` \ export_avails ->
 	
 	
 		-- ALL DONE
-	returnRn (Just (gbl_env, local_gbl_env, export_avails, global_avail_env, old_iface))
+	returnRn (Just (gbl_env, local_gbl_env, export_avails, global_avail_env))
    )
   where
     all_imports = prel_imports ++ imports

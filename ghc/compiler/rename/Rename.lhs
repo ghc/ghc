@@ -19,41 +19,37 @@ import CmdLineOpts	( DynFlags, DynFlag(..) )
 import RnMonad
 import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnDecl )
-import RnIfaces		( getImportedInstDecls, importDecl, mkImportExportInfo, 
+import RnIfaces		( getImportedInstDecls, importDecl, mkImportInfo, 
 			  getInterfaceExports,
 			  getImportedRules, getSlurped, removeContext,
-			  loadBuiltinRules, getDeferredDecls, ImportDeclResult(..)
+			  ImportDeclResult(..), findAndReadIface
 			)
 import RnEnv		( availName, availsToNameSet, 
-			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, 
+			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, sortAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
 			  lookupOrigNames, unknownNameErr,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs, addOneFV
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
-			  moduleNameUserString, moduleName, mkModuleInThisPackage
+			  moduleNameUserString, moduleName, mkModuleInThisPackage,
+			  lookupModuleEnv
 			)
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
-			  nameOccName, nameUnique, nameModule, 
---			  maybeUserImportedFrom,
---			  isUserImportedExplicitlyName, isUserImportedName,
---			  maybeWiredInTyConName, maybeWiredInIdName,
+			  nameOccName, nameUnique, nameModule,
 			  isUserExportedName, toRdrName,
-			  nameEnvElts, extendNameEnv
+			  mkNameEnv, nameEnvElts, extendNameEnv
 			)
 import OccName		( occNameFlavour, isValOcc )
 import Id		( idType )
 import TyCon		( isSynTyCon, getSynTyConDefn )
 import NameSet
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon, boolTyCon )
-import PrelRules	( builtinRules )
 import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
 			  ioTyCon_RDR,
 			  unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
 			  eqString_RDR
 			)
-import PrelInfo		( fractionalClassKeys, derivingOccurrences,
-			  maybeWiredInTyConName, maybeWiredInIdName )
+import PrelInfo		( fractionalClassKeys, derivingOccurrences, wiredInThingEnv )
 import Type		( namesOfType, funTyCon )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet, ghcExit )
 import BasicTypes	( Version, initialVersion )
@@ -67,38 +63,30 @@ import SrcLoc		( noSrcLoc )
 import Maybes		( maybeToBool, expectJust )
 import Outputable
 import IO		( openFile, IOMode(..) )
-import HscTypes		( Finder, PersistentCompilerState, HomeSymbolTable, GlobalRdrEnv,
-			  AvailEnv, Avails, GenAvailInfo(..), AvailInfo, 
-			  Provenance(..), ImportReason(..) )
-
--- HACKS:
-maybeUserImportedFrom        = panic "maybeUserImportedFrom"
-isUserImportedExplicitlyName = panic "isUserImportedExplicitlyName"
-isUserImportedName           = panic "isUserImportedName"
-iDeprecs                     = panic "iDeprecs"
-type FixityEnv = LocalFixityEnv
+import HscTypes		( Finder, PersistentCompilerState, HomeIfaceTable, HomeSymbolTable, 
+			  ModIface(..), TyThing(..),
+			  GlobalRdrEnv, AvailEnv, Avails, GenAvailInfo(..), AvailInfo, 
+			  Provenance(..), pprNameProvenance, ImportReason(..) )
+import List		( partition, nub )
 \end{code}
 
 
 
 \begin{code}
-type RenameResult = ( PersistentCompilerState
-		    , ModIface	
-		    )	
-		   
 renameModule :: DynFlags -> Finder 
-	     -> PersistentCompilerState -> HomeSymbolTable
-	     -> RdrNameHsModule 
+	     -> HomeIfaceTable -> HomeSymbolTable
+	     -> PersistentCompilerState 
+	     -> Module -> RdrNameHsModule 
 	     -> IO (PersistentCompilerState, Maybe ModIface)
 			-- The mi_decls in the ModIface include
 			-- ones imported from packages too
 
-renameModule dflags finder old_pcs hst 
-             this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
+renameModule dflags finder hit hst old_pcs this_module 
+	     this_mod@(HsModule _ _ _ _ _ _ loc)
   = 	-- Initialise the renamer monad
     do {
 	((maybe_rn_stuff, dump_action), (rn_warns_bag, rn_errs_bag), new_pcs) 
-	   <- initRn dflags finder old_pcs hst loc (rename this_mod) ;
+	   <- initRn dflags finder hit hst old_pcs this_module loc (rename this_module this_mod) ;
 
 	-- Check for warnings
 	printErrorsAndWarnings (rn_warns_bag, rn_errs_bag) ;
@@ -115,8 +103,8 @@ renameModule dflags finder old_pcs hst
 \end{code}
 
 \begin{code}
-rename :: RdrNameHsModule -> RnMG (Maybe ModIface, IO ())
-rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec loc)
+rename :: Module -> RdrNameHsModule -> RnMG (Maybe ModIface, IO ())
+rename this_module this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec loc)
   =  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
 
@@ -126,7 +114,7 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
 		rnDump [] []		`thenRn` \ dump_action ->
 		returnRn (Nothing, dump_action) ;
 
-  	Just (gbl_env, local_gbl_env, export_avails, global_avail_env, old_iface) ->
+  	Just (gbl_env, local_gbl_env, export_avails, global_avail_env) ->
 
 	-- DEAL WITH DEPRECATIONS
     rnDeprecs local_gbl_env mod_deprec local_decls	`thenRn` \ my_deprecs ->
@@ -155,7 +143,6 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
 		-- when compiling the prelude, locally-defined (), Bool, etc
 		-- override the implicit ones. 
     in
-    loadBuiltinRules builtinRules	`thenRn_`
     slurpImpDecls slurp_fvs		`thenRn` \ rn_imp_decls ->
 
 	-- EXIT IF ERRORS FOUND
@@ -167,23 +154,20 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
     else
 
 	-- GENERATE THE VERSION/USAGE INFO
-    mkImportExportInfo mod_name export_avails imports 	`thenRn` \ (my_exports, my_usages) ->
+    mkImportInfo mod_name imports 	`thenRn` \ my_usages ->
 
 	-- RETURN THE RENAMED MODULE
     getNameSupplyRn			`thenRn` \ name_supply ->
     getIfacesRn 			`thenRn` \ ifaces ->
     let
-	direct_import_mods :: [Module]
-	direct_import_mods = [m | (_, _, Just (m, _, _, _, imp, _))
-				  <- eltsFM (iImpModInfo ifaces), user_import imp]
+	direct_import_mods :: [ModuleName]
+	direct_import_mods = nub [m | ImportDecl m _ _ _ _ _ <- imports]
 
 		-- *don't* just pick the forward edges.  It's entirely possible
 		-- that a module is only reachable via back edges.
 	user_import ImportByUser = True
 	user_import ImportByUserSource = True
 	user_import _ = False
-
-	this_module	   = mkModuleInThisPackage mod_name
 
 	-- Export only those fixities that are for names that are
 	--	(a) defined in this module
@@ -194,14 +178,18 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
 			isUserExportedName name
 		      ]
 
-	mod_iface = ModIface {	mi_module  = this_module
-				mi_version = panic "mi_version: not filled in yet",
-				mi_orphan  = any isOrphanDecl rn_local_decls,
-				mi_exports = my_exports,
-				mi_usages  = my_usages,
-				mi_fixity  = exported_fixities)
-				mi_deprecs = my_deprecs
-				mi_decls   = rn_local_decls ++ rn_imp_decls
+
+	-- Sort the exports to make them easier to compare for versions
+	my_exports = sortAvails export_avails
+	
+	mod_iface = ModIface {	mi_module   = this_module,
+				mi_version  = panic "mi_version: not filled in yet",
+				mi_orphan   = any isOrphanDecl rn_local_decls,
+				mi_exports  = my_exports,
+				mi_usages   = my_usages,
+				mi_fixities = exported_fixities,
+				mi_deprecs  = my_deprecs,
+				mi_decls    = rn_local_decls ++ rn_imp_decls
 		    }
     in
 
@@ -464,6 +452,10 @@ Whether all this is worth it is moot.
 
 \begin{code}
 slurpDeferredDecls :: [RenamedHsDecl] -> RnMG [RenamedHsDecl]
+slurpDeferredDecls decls = returnRn decls
+
+{-	OMIT FOR NOW
+slurpDeferredDecls :: [RenamedHsDecl] -> RnMG [RenamedHsDecl]
 slurpDeferredDecls decls
   = getDeferredDecls						`thenRn` \ def_decls ->
     rnIfaceDecls decls emptyFVs (map stripDecl def_decls)	`thenRn` \ (decls1, fvs) ->
@@ -476,6 +468,7 @@ stripDecl (mod, TyClD (TyData dt _ tc tvs _ nconstrs _ _ loc name1 name2))
 	-- Nuke the context and constructors
 	-- But retain the *number* of constructors!
 	-- Also the tvs will have kinds on them.
+-}
 \end{code}
 
 
@@ -566,17 +559,16 @@ rather than a declaration.
 \begin{code}
 getWiredInGates :: Name -> FreeVars
 getWiredInGates name 	-- No classes are wired in
-  | is_id	         = getWiredInGates_s (namesOfType (idType the_id))
-  | isSynTyCon the_tycon = getWiredInGates_s
-	 (delListFromNameSet (namesOfType ty) (map getName tyvars))
-  | otherwise 	         = unitFV name
-  where
-    maybe_wired_in_id    = maybeWiredInIdName name
-    is_id		 = maybeToBool maybe_wired_in_id
-    maybe_wired_in_tycon = maybeWiredInTyConName name
-    Just the_id 	 = maybe_wired_in_id
-    Just the_tycon	 = maybe_wired_in_tycon
-    (tyvars,ty) 	 = getSynTyConDefn the_tycon
+  = case lookupNameEnv wiredInThingEnv name of
+	Just (AnId the_id) -> getWiredInGates_s (namesOfType (idType the_id))
+
+	Just (ATyCon tc)
+	  |  isSynTyCon tc
+	  -> getWiredInGates_s (delListFromNameSet (namesOfType ty) (map getName tyvars))
+	  where
+	     (tyvars,ty)  = getSynTyConDefn tc
+
+	other -> unitFV name
 
 getWiredInGates_s names = foldr (plusFV . getWiredInGates) emptyFVs (nameSetToList names)
 \end{code}
@@ -594,7 +586,7 @@ getInstDeclGates other				    = emptyFVs
 %*********************************************************
 
 \begin{code}
-fixitiesFromLocalDecls :: GlobalRdrEnv -> [RdrNameHsDecl] -> RnMG FixityEnv
+fixitiesFromLocalDecls :: GlobalRdrEnv -> [RdrNameHsDecl] -> RnMG LocalFixityEnv
 fixitiesFromLocalDecls gbl_env decls
   = doptRn Opt_WarnUnusedBinds				  `thenRn` \ warn_unused ->
     foldlRn (getFixities warn_unused) emptyNameEnv decls  `thenRn` \ env -> 
@@ -602,7 +594,7 @@ fixitiesFromLocalDecls gbl_env decls
 							  `thenRn_`
     returnRn env
   where
-    getFixities :: Bool -> FixityEnv -> RdrNameHsDecl -> RnMG FixityEnv
+    getFixities :: Bool -> LocalFixityEnv -> RdrNameHsDecl -> RnMG LocalFixityEnv
     getFixities warn_uu acc (FixD fix)
       = fix_decl warn_uu acc fix
 
@@ -671,7 +663,7 @@ rnDeprecs gbl_env mod_deprec decls
 %*********************************************************
 
 \begin{code}
-reportUnusedNames :: ModuleName -> [Module] 
+reportUnusedNames :: ModuleName -> [ModuleName] 
 		  -> GlobalRdrEnv -> AvailEnv
 		  -> Avails -> NameSet -> [RenamedHsDecl] 
 		  -> RnMG ()
@@ -679,127 +671,136 @@ reportUnusedNames mod_name direct_import_mods
 		  gbl_env avail_env 
 		  export_avails mentioned_names
 		  imported_decls
-  = let
-	used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
-
-	-- Now, a use of C implies a use of T,
-	-- if C was brought into scope by T(..) or T(C)
-	really_used_names = used_names `unionNameSets`
-	  mkNameSet [ availName parent_avail
-		    | sub_name <- nameSetToList used_names
-		    , isValOcc (getOccName sub_name)
-
-			-- Usually, every used name will appear in avail_env, but there 
-			-- is one time when it doesn't: tuples and other built in syntax.  When you
-			-- write (a,b) that gives rise to a *use* of "(,)", so that the
-			-- instances will get pulled in, but the tycon "(,)" isn't actually
-			-- in scope.  Hence the isValOcc filter.
-			--
-			-- Also, (-x) gives rise to an implicit use of 'negate'; similarly, 
-			--   3.5 gives rise to an implcit use of :%
-			-- hence the isUserImportedName filter on the warning
-		      
-		    , let parent_avail 
-			    = case lookupNameEnv avail_env sub_name of
-				Just avail -> avail
-				Nothing -> WARN( isUserImportedName sub_name,
-						 text "reportUnusedName: not in avail_env" <+> 
-							ppr sub_name )
-					   Avail sub_name
-		      
-		    , case parent_avail of { AvailTC _ _ -> True; other -> False }
-		    ]
-
-	defined_names, defined_but_not_used :: [(Name,Provenance)]
-	defined_names	     = concat (rdrEnvElts gbl_env)
-	defined_but_not_used = filter not_used defined_names
- 	not_used name	     = not (name `elemNameSet` really_used_names)
-
-	-- Filter out the ones only defined implicitly
-	bad_locals :: [Name]
-	bad_locals     = [n     | (n,LocalDef) <- defined_but_not_used]
-	
-	bad_imp_names :: [(Name,Provenance)]
-	bad_imp_names  = [(n,p) | (n,p@(UserImport mod _ True)) <- defined_but_not_used,
-				  not (module_unused mod)]
-
-	deprec_used deprec_env = [ (n,txt)
-                                 | n <- nameSetToList mentioned_names,
-                                   not (isLocallyDefined n),
-                                   Just txt <- [lookupNameEnv deprec_env n] ]
-
-	-- inst_mods are directly-imported modules that 
-	--	contain instance decl(s) that the renamer decided to suck in
-	-- It's not necessarily redundant to import such modules.
-	--
-	-- NOTE: Consider 
-	--	      module This
-	--		import M ()
-	--
-	--	 The import M() is not *necessarily* redundant, even if
-	-- 	 we suck in no instance decls from M (e.g. it contains 
-	--	 no instance decls, or This contains no code).  It may be 
-	--	 that we import M solely to ensure that M's orphan instance 
-	--	 decls (or those in its imports) are visible to people who 
-	--	 import This.  Sigh. 
-	--	 There's really no good way to detect this, so the error message 
-	--	 in RnEnv.warnUnusedModules is weakened instead
-	inst_mods = [m | InstD (InstDecl _ _ _ (Just dfun) _) <- imported_decls,
-			 let m = nameModule dfun,
-			 m `elem` direct_import_mods
-		    ]
-
-	minimal_imports :: FiniteMap Module AvailEnv
-	minimal_imports0 = emptyFM
-	minimal_imports1 = foldNameSet add_name minimal_imports0 really_used_names
-	minimal_imports  = foldr   add_inst_mod minimal_imports1 inst_mods
-	
-	add_name n acc = case maybeUserImportedFrom n of
-			   Nothing -> acc
-			   Just m  -> addToFM_C plusAvailEnv acc m
-					        (unitAvailEnv (mk_avail n))
-	add_inst_mod m acc 
-	  | m `elemFM` acc = acc	-- We import something already
-	  | otherwise	   = addToFM acc m emptyAvailEnv
-		-- Add an empty collection of imports for a module
-		-- from which we have sucked only instance decls
-
-	mk_avail n = case lookupNameEnv avail_env n of
-			Just (AvailTC m _) | n==m      -> AvailTC n [n]
-					   | otherwise -> AvailTC m [n,m]
-			Just avail	   -> Avail n
-			Nothing		   -> pprPanic "mk_avail" (ppr n)
-
-	-- unused_imp_mods are the directly-imported modules 
-	-- that are not mentioned in minimal_imports
-	unused_imp_mods = [m | m <- direct_import_mods,
-			       not (maybeToBool (lookupFM minimal_imports m)),
-			       moduleName m /= pRELUDE_Name]
-
-	module_unused :: Module -> Bool
-	module_unused mod = mod `elem` unused_imp_mods
-
-    in
-    warnUnusedModules unused_imp_mods				`thenRn_`
+  = warnUnusedModules unused_imp_mods				`thenRn_`
     warnUnusedLocalBinds bad_locals				`thenRn_`
     warnUnusedImports bad_imp_names				`thenRn_`
     printMinimalImports mod_name minimal_imports		`thenRn_`
-    getIfacesRn							`thenRn` \ ifaces ->
-    doptRn Opt_WarnDeprecations					`thenRn` \ warn_drs ->
-    (if warn_drs
-	then mapRn_ warnDeprec (deprec_used (iDeprecs ifaces))
-	else returnRn ())
+    warnDeprecations really_used_names				`thenRn_`
+    returnRn ()
+
+  where
+    used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
+    
+    -- Now, a use of C implies a use of T,
+    -- if C was brought into scope by T(..) or T(C)
+    really_used_names = used_names `unionNameSets`
+      mkNameSet [ parent_name
+	        | sub_name <- nameSetToList used_names
+    
+    		-- Usually, every used name will appear in avail_env, but there 
+    		-- is one time when it doesn't: tuples and other built in syntax.  When you
+    		-- write (a,b) that gives rise to a *use* of "(,)", so that the
+    		-- instances will get pulled in, but the tycon "(,)" isn't actually
+    		-- in scope.  Also, (-x) gives rise to an implicit use of 'negate'; 
+    		-- similarly,   3.5 gives rise to an implcit use of :%
+    		-- Hence the silent 'False' in all other cases
+    	      
+	        , Just parent_name <- [case lookupNameEnv avail_env sub_name of
+			    		Just (AvailTC n _) -> Just n
+			    		other		   -> Nothing]
+    	    ]
+    
+    defined_names, defined_and_used, defined_but_not_used :: [(Name,Provenance)]
+    defined_names			     = concat (rdrEnvElts gbl_env)
+    (defined_and_used, defined_but_not_used) = partition used defined_names
+    used (name,_)	  		     = not (name `elemNameSet` really_used_names)
+    
+    -- Filter out the ones only defined implicitly
+    bad_locals :: [Name]
+    bad_locals     = [n     | (n,LocalDef) <- defined_but_not_used]
+    
+    bad_imp_names :: [(Name,Provenance)]
+    bad_imp_names  = [(n,p) | (n,p@(NonLocalDef (UserImport mod _ True) _)) <- defined_but_not_used,
+  	  		      not (module_unused mod)]
+    
+    -- inst_mods are directly-imported modules that 
+    --	contain instance decl(s) that the renamer decided to suck in
+    -- It's not necessarily redundant to import such modules.
+    --
+    -- NOTE: Consider 
+    --	      module This
+    --		import M ()
+    --
+    --	 The import M() is not *necessarily* redundant, even if
+    -- 	 we suck in no instance decls from M (e.g. it contains 
+    --	 no instance decls, or This contains no code).  It may be 
+    --	 that we import M solely to ensure that M's orphan instance 
+    --	 decls (or those in its imports) are visible to people who 
+    --	 import This.  Sigh. 
+    --	 There's really no good way to detect this, so the error message 
+    --	 in RnEnv.warnUnusedModules is weakened instead
+    inst_mods :: [ModuleName]
+    inst_mods = [m | InstD (InstDecl _ _ _ (Just dfun) _) <- imported_decls,
+    		 let m = moduleName (nameModule dfun),
+    		 m `elem` direct_import_mods
+    	    ]
+    
+    -- To figure out the minimal set of imports, start with the things
+    -- that are in scope (i.e. in gbl_env).  Then just combine them
+    -- into a bunch of avails, so they are properly grouped
+    minimal_imports :: FiniteMap ModuleName AvailEnv
+    minimal_imports0 = emptyFM
+    minimal_imports1 = foldr add_name     minimal_imports0 defined_and_used
+    minimal_imports  = foldr add_inst_mod minimal_imports1 inst_mods
+    
+    add_name (n,NonLocalDef (UserImport m _ _) _) acc = addToFM_C plusAvailEnv acc (moduleName (nameModule n))
+					    			  (unitAvailEnv (mk_avail n))
+    add_name (n,other_prov)			  acc = acc
+
+    mk_avail n = case lookupNameEnv avail_env n of
+    		Just (AvailTC m _) | n==m      -> AvailTC n [n]
+    				   | otherwise -> AvailTC m [n,m]
+    		Just avail	   -> Avail n
+    		Nothing		   -> pprPanic "mk_avail" (ppr n)
+    
+    add_inst_mod m acc 
+      | m `elemFM` acc = acc	-- We import something already
+      | otherwise      = addToFM acc m emptyAvailEnv
+    	-- Add an empty collection of imports for a module
+    	-- from which we have sucked only instance decls
+    
+    -- unused_imp_mods are the directly-imported modules 
+    -- that are not mentioned in minimal_imports
+    unused_imp_mods = [m | m <- direct_import_mods,
+    		       not (maybeToBool (lookupFM minimal_imports m)),
+    		       m /= pRELUDE_Name]
+    
+    module_unused :: ModuleName -> Bool
+    module_unused mod = mod `elem` unused_imp_mods
+
+
+warnDeprecations used_names
+  = doptRn Opt_WarnDeprecations				`thenRn` \ warn_drs ->
+    if not warn_drs then returnRn () else
+
+    getIfacesRn						`thenRn` \ ifaces ->
+    getHomeIfaceTableRn					`thenRn` \ hit ->
+    let
+	pit     = iPIT ifaces
+	deprecs = [ (n,txt)
+                  | n <- nameSetToList used_names,
+                    Just txt <- [lookup_deprec hit pit n] ]
+    in			  
+    mapRn_ warnDeprec deprecs
+
+  where
+    lookup_deprec hit pit n
+	= case lookupModuleEnv hit mod of
+		Just iface -> lookup_iface iface n
+		Nothing	   -> case lookupModuleEnv pit mod of
+				Just iface -> lookup_iface iface n
+				Nothing	   -> pprPanic "warnDeprecations:" (ppr n)
+	where
+	  mod = nameModule n
+
+    lookup_iface iface n = lookupNameEnv (mi_deprecs iface) n
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
 printMinimalImports mod_name imps
   = doptRn Opt_D_dump_minimal_imports		`thenRn` \ dump_minimal ->
-    printMinimalImports_wrk dump_minimal mod_name imps
+    if not dump_minimal then returnRn () else
 
-printMinimalImports_wrk dump_minimal mod_name imps
-  | not dump_minimal
-  = returnRn ()
-  | otherwise
-  = mapRn to_ies (fmToList imps)		`thenRn` \ mod_ies ->
+    mapRn to_ies (fmToList imps)		`thenRn` \ mod_ies ->
     ioToRnM (do { h <- openFile filename WriteMode ;
 		  printForUser h (vcat (map ppr_mod_ie mod_ies))
 	})					`thenRn_`
@@ -814,7 +815,7 @@ printMinimalImports_wrk dump_minimal mod_name imps
 			    parens (fsep (punctuate comma (map ppr ies)))
 
     to_ies (mod, avail_env) = mapRn to_ie (availEnvElts avail_env)	`thenRn` \ ies ->
-			      returnRn (moduleName mod, ies)
+			      returnRn (mod, ies)
 
     to_ie :: AvailInfo -> RnMG (IE Name)
     to_ie (Avail n)       = returnRn (IEVar n)
@@ -856,9 +857,9 @@ getRnStats :: [RenamedHsDecl] -> RnMG SDoc
 getRnStats imported_decls
   = getIfacesRn 		`thenRn` \ ifaces ->
     let
-	n_mods = length [() | (_, _, Just _) <- eltsFM (iImpModInfo ifaces)]
+	n_mods = length [() | (_, _, True) <- eltsFM (iImpModInfo ifaces)]
 
-	decls_read     = [decl | (_, avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces),
+	decls_read     = [decl | (avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces),
 				-- Data, newtype, and class decls are in the decls_fm
 				-- under multiple names; the tycon/class, and each
 				-- constructor/class op too.
@@ -935,7 +936,14 @@ dupFixityDecl rdr_name loc1 loc2
 \end{code}
 
 
+%********************************************************
+%*							*
+\subsection{Checking usage information}
+%*							*
+%********************************************************
+
 \begin{code}
+{-
 checkEarlyExit mod_name
   = traceRn (text "Considering whether compilation is required...")	`thenRn_`
 
@@ -964,12 +972,6 @@ checkEarlyExit mod_name
     doc_str = sep [ptext SLIT("need usage info from"), ppr mod_name]
 \end{code}
 	
-%********************************************************
-%*							*
-\subsection{Checking usage information}
-%*							*
-%********************************************************
-
 \begin{code}
 upToDate  = True
 outOfDate = False
@@ -1066,6 +1068,7 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
 		-> out_of_date (sep [ptext SLIT("Out of date:"), ppr name])
 
 out_of_date msg = traceRn msg `thenRn_` returnRn outOfDate
+-}
 \end{code}
 
 

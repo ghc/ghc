@@ -201,11 +201,10 @@ data ParsedIface
       pi_vers	   :: Version,		 		-- Module version number
       pi_orphan    :: WhetherHasOrphans,		-- Whether this module has orphans
       pi_usages	   :: [ImportVersion OccName],		-- Usages
-      pi_exports   :: [ExportItem],			-- Exports
+      pi_exports   :: (Version, [ExportItem]),		-- Exports
       pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
       pi_decls	   :: [(Version, RdrNameHsDecl)],	-- Local definitions
-      pi_fixity	   :: (Version, [RdrNameFixitySig]),	-- Local fixity declarations,
-							--   with their version
+      pi_fixity	   :: [RdrNameFixitySig],		-- Local fixity declarations,
       pi_rules	   :: (Version, [RdrNameRuleDecl]),	-- Rules, with their version
       pi_deprecs   :: [RdrNameDeprecation]		-- Deprecations
     }
@@ -290,7 +289,7 @@ initRn :: DynFlags
        -> Module 
        -> SrcLoc
        -> RnMG t
-       -> IO (t, PersistentCompilerState, (Bag WarnMsg, Bag ErrMsg))
+       -> IO (t, (Bag WarnMsg, Bag ErrMsg), PersistentCompilerState)
 
 initRn dflags finder hit hst pcs mod loc do_rn
   = do 
@@ -330,7 +329,7 @@ initRn dflags finder hit hst pcs mod loc do_rn
 	let new_pcs = pcs { pcs_PIT = iPIT new_ifaces, 
 			    pcs_PRS = new_prs }
 	
-	return (res, new_pcs, (warns, errs))
+	return (res, (warns, errs), new_pcs)
 
 is_done :: HomeSymbolTable -> PackageSymbolTable -> Name -> Bool
 -- Returns True iff the name is in either symbol table
@@ -402,8 +401,8 @@ renameSourceCode dflags mod prs m
 			       rn_loc = generatedSrcLoc, rn_ns = names_var,
 			       rn_errs = errs_var, 
 			       rn_mod = mod, 
-			       rn_ifaces = panic "rnameSourceCode: rn_ifaces",  -- Not required
-			       rn_finder = panic "rnameSourceCode: rn_finder"  -- Not required
+			       rn_done   = bogus "rn_done",	rn_hit    = bogus "rn_hit",
+			       rn_ifaces = bogus "rn_ifaces",   rn_finder = bogus "rn_finder"
 			     }
 	    s_down = SDown { rn_mode = InterfaceMode,
 			       -- So that we can refer to PrelBase.True etc
@@ -427,6 +426,8 @@ renameSourceCode dflags mod prs m
     )
   where
     display errs = pprBagOfErrors errs
+
+bogus s = panic ("rnameSourceCode: " ++ s)  -- Used for unused record fields
 
 {-# INLINE thenRn #-}
 {-# INLINE thenRn_ #-}

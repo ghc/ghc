@@ -11,8 +11,8 @@ module RnIfaces
 	getInterfaceExports,
 	getImportedInstDecls, getImportedRules,
 	lookupFixityRn, loadHomeInterface,
-	importDecl, ImportDeclResult(..), recordLocalSlurps, loadBuiltinRules,
-	mkImportExportInfo, getSlurped, 
+	importDecl, ImportDeclResult(..), recordLocalSlurps, 
+	mkImportInfo, getSlurped, 
 
 	getDeclBinders, getDeclSysBinders,
 	removeContext	 	-- removeContext probably belongs somewhere else
@@ -47,8 +47,8 @@ import Name		( Name {-instance NamedThing-}, nameOccName,
 import Module		( Module, ModuleEnv,
 			  moduleName, isModuleInThisPackage,
 			  ModuleName, WhereFrom(..),
-			  extendModuleEnv, lookupModuleEnv, lookupModuleEnvByName,
-			  plusModuleEnv_C, lookupWithDefaultModuleEnv
+			  emptyModuleEnv, extendModuleEnv, lookupModuleEnv, lookupModuleEnvByName,
+			  extendModuleEnv_C, lookupWithDefaultModuleEnv
 			)
 import RdrName		( RdrName, rdrNameOcc )
 import NameSet
@@ -171,13 +171,13 @@ tryLoadInterface doc_str mod_name from
 
     loadDecls mod		(iDecls ifaces)	  (pi_decls iface)	`thenRn` \ (decls_vers, new_decls) ->
     loadRules mod		(iRules ifaces)   (pi_rules iface)	`thenRn` \ (rule_vers, new_rules) ->
-    loadFixDecls mod_name	 		  (pi_fixity iface)	`thenRn` \ (fix_vers, fix_env) ->
-    foldlRn (loadDeprec mod)	emptyNameEnv	  (pi_deprecs iface)	`thenRn` \ deprec_env ->
+    loadFixDecls mod_name	 		  (pi_fixity iface)	`thenRn` \ fix_env ->
+    loadDeprecs mod				  (pi_deprecs iface)	`thenRn` \ deprec_env ->
     foldlRn (loadInstDecl mod)	(iInsts ifaces)   (pi_insts iface)	`thenRn` \ new_insts ->
-    loadExports 			 	  (pi_exports iface)	`thenRn` \ avails ->
+    loadExports 			 	  (pi_exports iface)	`thenRn` \ (export_vers, avails) ->
     let
 	version	= VersionInfo { vers_module  = pi_vers iface, 
-				fixVers  = fix_vers,
+				vers_exports = export_vers,
 				vers_rules = rule_vers,
 				vers_decls = decls_vers }
 
@@ -225,7 +225,7 @@ addModDeps mod new_deps mod_deps
 	-- Don't record dependencies when importing a module from another package
 	-- Except for its descendents which contain orphans,
 	-- and in that case, forget about the boot indicator
-    filtered_new_deps :: [(ModuleName, (WhetherHasOrphans, IsBootInterface))]
+    filtered_new_deps :: [(ModuleName, (WhetherHasOrphans, IsBootInterface, IsLoaded))]
     filtered_new_deps
 	| isModuleInThisPackage mod 
 			    = [ (imp_mod, (has_orphans, is_boot, False))
@@ -247,11 +247,11 @@ addModDeps mod new_deps mod_deps
 --	Loading the export list
 -----------------------------------------------------
 
-loadExports :: [ExportItem] -> RnM d Avails
-loadExports items
+loadExports :: (Version, [ExportItem]) -> RnM d (Version, Avails)
+loadExports (vers, items)
   = getModuleRn 				`thenRn` \ this_mod ->
     mapRn (loadExport this_mod) items		`thenRn` \ avails_s ->
-    returnRn (concat avails_s)
+    returnRn (vers, concat avails_s)
 
 
 loadExport :: Module -> ExportItem -> RnM d [AvailInfo]
@@ -361,9 +361,9 @@ loadDecl mod (version_map, decls_map) (version, decl)
 --	Loading fixity decls
 -----------------------------------------------------
 
-loadFixDecls mod_name (version, decls)
+loadFixDecls mod_name decls
   = mapRn (loadFixDecl mod_name) decls	`thenRn` \ to_add ->
-    returnRn (version, mkNameEnv to_add)
+    returnRn (mkNameEnv to_add)
 
 loadFixDecl mod_name sig@(FixitySig rdr_name fixity loc)
   = newGlobalName mod_name (rdrNameOcc rdr_name) 	`thenRn` \ name ->
@@ -431,31 +431,20 @@ loadRule mod decl@(IfaceRule _ _ var _ _ src_loc)
   = lookupOrigName var		`thenRn` \ var_name ->
     returnRn (unitNameSet var_name, (mod, RuleD decl))
 
-loadBuiltinRules :: [(RdrName, CoreRule)] -> RnMG ()
-loadBuiltinRules builtin_rules
-  = getIfacesRn				`thenRn` \ ifaces ->
-    mapRn loadBuiltinRule builtin_rules	`thenRn` \ rule_decls ->
-    setIfacesRn (ifaces { iRules = iRules ifaces `unionBags` listToBag rule_decls })
-
-loadBuiltinRule (var, rule)
-  = lookupOrigName var		`thenRn` \ var_name ->
-    returnRn (unitNameSet var_name, (nameModule var_name, RuleD (IfaceRuleOut var rule)))
-
 
 -----------------------------------------------------
 --	Loading Deprecations
 -----------------------------------------------------
 
-loadDeprec :: Module -> DeprecationEnv -> RdrNameDeprecation -> RnM d DeprecationEnv
-loadDeprec mod deprec_env (Deprecation (IEModuleContents _) txt _)
-  = traceRn (text "module deprecation not yet implemented:" <+> ppr mod <> colon <+> ppr txt) `thenRn_`
-	-- SUP: TEMPORARY HACK, ignoring module deprecations for now
-    returnRn deprec_env
-
-loadDeprec mod deprec_env (Deprecation ie txt _)
-  = setModuleRn mod					$
-    mapRn lookupOrigName (ieNames ie)		`thenRn` \ names ->
-    traceRn (text "loaded deprecation(s) for" <+> hcat (punctuate comma (map ppr names)) <> colon <+> ppr txt) `thenRn_`
+loadDeprecs :: Module -> [RdrNameDeprecation] -> RnM d Deprecations
+loadDeprecs m []				       = returnRn NoDeprecs
+loadDeprecs m [Deprecation (IEModuleContents _) txt _] = returnRn (DeprecAll txt)
+loadDeprecs m deprecs				       = setModuleRn m 		$
+    							 foldlRn loadDeprec emptyNameEnv deprecs	`thenRn` \ env ->
+							 returnRn (DeprecSome env)
+loadDeprec deprec_env (Deprecation ie txt _)
+  = mapRn lookupOrigName (ieNames ie)		`thenRn` \ names ->
+    traceRn (text "Loaded deprecation(s) for" <+> hcat (punctuate comma (map ppr names)) <> colon <+> ppr txt) `thenRn_`
     returnRn (extendNameEnvList deprec_env (zip names (repeat txt)))
 \end{code}
 
@@ -782,33 +771,32 @@ imports A.  This line says that A imports B, but uses nothing in it.
 So we'll get an early bale-out when compiling A if B's version changes.
 
 \begin{code}
-mkImportExportInfo :: ModuleName			-- Name of this module
-		   -> Avails				-- Info about exports 
-		   -> [ImportDecl n]			-- The import decls
-		   -> RnMG ([ExportItem], 		-- Export info for iface file; sorted
-			    [ImportVersion Name])	-- Import info for iface file; sorted
-			-- Both results are sorted into canonical order to
-			-- reduce needless wobbling of interface files
+mkImportInfo :: ModuleName			-- Name of this module
+	     -> [ImportDecl n]			-- The import decls
+	     -> RnMG [ImportVersion Name]
 
-mkImportExportInfo this_mod export_avails exports
+mkImportInfo this_mod imports
   = getIfacesRn					`thenRn` \ ifaces ->
+    getHomeIfaceTableRn				`thenRn` \ hit -> 
     let
 	import_all_mods :: [ModuleName]
 		-- Modules where we imported all the names
 		-- (apart from hiding some, perhaps)
-	import_all_mods = nub [ m | ImportDecl m _ _ _ imp_list _ <- imports ]
+	import_all_mods = nub [ m | ImportDecl m _ _ _ imp_list _ <- imports,
+				    import_all imp_list ]
 
 	import_all (Just (False, _)) = False	-- Imports are specified explicitly
 	import_all other	     = True	-- Everything is imported
 
 	mod_map   = iImpModInfo ifaces
 	imp_names = iVSlurp     ifaces
+	pit	  = iPIT 	ifaces
 
 	-- mv_map groups together all the things imported from a particular module.
 	mv_map :: ModuleEnv [Name]
-	mv_map = foldr add_mv emptyFM imp_names
+	mv_map = foldr add_mv emptyModuleEnv imp_names
 
-        add_mv (name, version) mv_map = addItem mv_map (nameModule name) name
+        add_mv name mv_map = addItem mv_map (nameModule name) name
 
 	-- Build the result list by adding info for each module.
 	-- For (a) a library module, we don't record it at all unless it contains orphans
@@ -847,10 +835,10 @@ mkImportExportInfo this_mod export_avails exports
 	   = so_far		
 	   
 	   | is_lib_module 			-- Record the module version only
-	   = go_for_it (Everything vers_module)
+	   = go_for_it (Everything module_vers)
 
 	   | otherwise
-	   = go_for_it (mk_whats_imported mod vers_module)
+	   = go_for_it whats_imported
 
 	     where
 		go_for_it exports = (mod_name, has_orphans, is_boot, exports) : so_far
@@ -859,12 +847,14 @@ mkImportExportInfo this_mod export_avails exports
 	        is_lib_module     = not (isModuleInThisPackage mod)
 	        version_info      = mi_version mod_iface
 	        version_env       = vers_decls version_info
+		module_vers	  = vers_module version_info
 
-		whats_imported = Specifically mod_vers export_vers import_items 
+		whats_imported = Specifically module_vers
+					      export_vers import_items 
 					      (vers_rules version_info)
 
 	        import_items = [(n,v) | n <- lookupWithDefaultModuleEnv mv_map [] mod,
-				        let v = lookupNameEnv version_env `orElse` 
+				        let v = lookupNameEnv version_env n `orElse` 
 					        pprPanic "mk_whats_imported" (ppr n)
 			       ]
 	        export_vers | moduleName mod `elem` import_all_mods 
@@ -873,22 +863,13 @@ mkImportExportInfo this_mod export_avails exports
 			    = Nothing
 	
 	import_info = foldFM mk_imp_info [] mod_map
-
-	-- Sort exports into groups by module
-	export_fm :: FiniteMap Module [RdrAvailInfo]
-	export_fm = foldr insert emptyFM export_avails
-
-        insert avail efm = addItem efm (nameModule (availName avail))
-				       avail
-
-	export_info = fmToList export_fm
     in
     traceRn (text "Modules in Ifaces: " <+> fsep (map ppr (keysFM mod_map)))	`thenRn_`
-    returnRn (export_info, import_info)
+    returnRn import_info
 
 
 addItem :: ModuleEnv [a] -> Module -> a -> ModuleEnv [a]
-addItem fm mod x = plusModuleEnv_C add_item fm mod [x]
+addItem fm mod x = extendModuleEnv_C add_item fm mod [x]
 		 where
 		   add_item xs _ = x:xs
 \end{code}
@@ -1044,7 +1025,7 @@ findAndReadIface doc_str mod_name hi_boot_file
     ioToRnM (finder mod_name)		`thenRn` \ maybe_found ->
 
     case maybe_found of
-      Just (mod,locn)
+      Right (Just (mod,locn))
 	| hi_boot_file -> readIface mod (hi_file locn ++ "-hi-boot")
 	| otherwise    -> readIface mod (hi_file locn)
 	
@@ -1129,7 +1110,7 @@ warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
           <+> quotes (ppr mod_name)
 
-hiModuleNameMismatchWarn :: Module -> ModuleName  -> Message
+hiModuleNameMismatchWarn :: Module -> Module  -> Message
 hiModuleNameMismatchWarn requested_mod read_mod = 
     hsep [ ptext SLIT("Something is amiss; requested module name")
 	 , ppr (moduleName requested_mod)

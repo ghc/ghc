@@ -429,7 +429,8 @@ builtinRules
     ]
 
 
--- unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)  =  unpackFoldrCString# "foobaz" c n
+-- The rule is this:
+-- 	unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)  =  unpackFoldrCString# "foobaz" c n
 
 match_append_lit_str [Type ty1,
 		      Lit (MachStr s1),

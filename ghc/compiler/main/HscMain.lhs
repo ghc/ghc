@@ -21,6 +21,7 @@ import SrcLoc		( mkSrcLoc )
 import Rename		( renameModule )
 
 import PrelInfo		( wiredInThings )
+import PrelRules	( builtinRules )
 import MkIface		( writeIface )
 import TcModule		( TcResults(..), typecheckModule )
 import Desugar		( deSugar )
@@ -254,7 +255,7 @@ initPersistentCompilerState :: PersistentCompilerState
 initPersistentCompilerState 
   = PCS { pcs_PST   = initPackageDetails,
 	  pcs_insts = emptyInstEnv,
-	  pcs_rules = emptyRuleEnv,
+	  pcs_rules = initRules,
 	  pcs_PRS   = initPersistentRenamerState }
 
 initPackageDetails :: PackageSymbolTable
@@ -273,4 +274,11 @@ initOrigNames = grab knownKeyNames `plusFM` grab (map getName wiredInThings)
 	      where
 		grab names   = foldl add emptyFM names
 		add env name = addToFM env (moduleName (nameModule name), nameOccName name) name
+
+
+initRules :: RuleEnv
+initRules = foldl add emptyVarEnv builtinRules
+	  where
+	    add env (name,rule) = extendNameEnv_C add1 env name [rule]
+	    add1 rules _	= rule : rules
 \end{code}

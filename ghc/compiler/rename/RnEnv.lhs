@@ -16,7 +16,7 @@ import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual,
 import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  ImportReason(..), GlobalRdrEnv, AvailEnv,
-			  AvailInfo, GenAvailInfo(..), RdrAvailInfo )
+			  AvailInfo, Avails, GenAvailInfo(..), RdrAvailInfo )
 import RnMonad
 import Name		( Name, NamedThing(..),
 			  getSrcLoc, 
@@ -582,16 +582,19 @@ availNames :: GenAvailInfo name -> [name]
 availNames (Avail n)      = [n]
 availNames (AvailTC n ns) = ns
 
+-------------------------------------
 addSysAvails :: AvailInfo -> [Name] -> AvailInfo
 addSysAvails avail          []  = avail
 addSysAvails (AvailTC n ns) sys = AvailTC n (sys ++ ns)
 
+-------------------------------------
 rdrAvailInfo :: AvailInfo -> RdrAvailInfo
 -- Used when building the avails we are going to put in an interface file
 -- We sort the components to reduce needless wobbling of interfaces
 rdrAvailInfo (Avail n)	    = Avail   (nameOccName n)
 rdrAvailInfo (AvailTC n ns) = AvailTC (nameOccName n) (sortLt (<) (map nameOccName ns))
 
+-------------------------------------
 filterAvail :: RdrNameIE	-- Wanted
 	    -> AvailInfo	-- Available
 	    -> Maybe AvailInfo	-- Resulting available; 
@@ -627,6 +630,21 @@ filterAvail (IEThingAll _) avail@(AvailTC _ _)   = Just avail
 
 filterAvail ie avail = Nothing
 
+-------------------------------------
+sortAvails :: Avails -> Avails
+sortAvails avails = sortLt lt avails
+  where
+    a1 `lt` a2 = mod1 < mod2 ||
+	         (mod1 == mod2 && occ1 < occ2)
+	       where
+		 name1 = availName a1
+		 name2 = availName a2
+		 mod1  = nameModule name1
+		 mod2  = nameModule name2
+		 occ1  = nameOccName name1
+		 occ2  = nameOccName name2
+				
+-------------------------------------
 pprAvail :: AvailInfo -> SDoc
 pprAvail (AvailTC n ns) = ppr n <> case filter (/= n) ns of
 					[]  -> empty
@@ -678,7 +696,7 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 %************************************************************************
 
 \begin{code}
-warnUnusedModules :: [Module] -> RnM d ()
+warnUnusedModules :: [ModuleName] -> RnM d ()
 warnUnusedModules mods
   = doptRn Opt_WarnUnusedImports `thenRn` \ warn ->
     if warn then mapRn_ (addWarnRn . unused_mod) mods
@@ -687,7 +705,7 @@ warnUnusedModules mods
     unused_mod m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
 			   text "is imported, but nothing from it is used",
 			 parens (ptext SLIT("except perhaps to re-export instances visible in") <+>
-				   quotes (ppr (moduleName m)))]
+				   quotes (ppr m))]
 
 warnUnusedImports :: [(Name,Provenance)] -> RnM d ()
 warnUnusedImports names

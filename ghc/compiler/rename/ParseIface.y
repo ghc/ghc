@@ -225,16 +225,16 @@ iface		: '__interface' package mod_name
 			pi_mod  = mkModule $3 $2,	-- Module itself
 			pi_vers = $4, 			-- Module version
 			pi_orphan  = $6,
-			pi_exports = $9,    	   	-- Exports
+			pi_exports = (fst $5, $9),    	-- Exports
 			pi_usages  = $10,		-- Usages
-			pi_fixity  = (fst $5,$11),	-- Fixies
+			pi_fixity  = $11,		-- Fixies
 			pi_insts   = $12,		-- Local instances
 			pi_decls   = $13,		-- Decls
 		 	pi_rules   = (snd $5,fst $14),	-- Rules 
 		 	pi_deprecs = snd $14		-- Deprecations 
 		   } }
 
--- Versions for fixities and rules (optional)
+-- Versions for exports and rules (optional)
 sub_versions :: { (Version,Version) }
 	: '[' version version ']'		{ ($2,$3) }
 	| {- empty -}				{ (initialVersion, initialVersion) }
