@@ -1,19 +1,22 @@
-For 1.0:
-
 * IDoc compatibility, as far as possible
 	- bird-tracks for code blocks
-
-* Do the unlitting/CPPing from Haddock itself
 
 * facilities for saving interfaces so that you can run Haddock against
   something that isn't the Prelude.
 
-* Allow '-- |' style comments for constructors
-
-* Documentation annotations for record fields
-
 -----------------------------------------------------------------------------
-Post 1.0:
+
+* Do the unlitting/CPPing from Haddock itself so we get the source file
+  links right.
+
+* Allow documentation annotations to explicitly name the entity they
+  refer to.
+
+* Add back-references from the definition to the uses of types/classes
+  (perhaps in the index?)
+
+* In the contents page, indicate portability/stability of each module
+  somehow.
 
 * remove extra whitespace from the generated HTML to save space
 
