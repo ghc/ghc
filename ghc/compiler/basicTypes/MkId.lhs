@@ -118,7 +118,7 @@ wiredInIds
     , rEC_CON_ERROR_ID
     , rEC_UPD_ERROR_ID
 
-	-- These two can't be defined in Haskell
+	-- These three can't be defined in Haskell
     , realWorldPrimId
     , unsafeCoerceId
     , getTagId
@@ -573,7 +573,8 @@ mkPrimOpId prim_op
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
 
-    rules = addRule emptyCoreRules id (primOpRule prim_op)
+    rules = maybe emptyCoreRules (addRule emptyCoreRules id)
+		(primOpRule prim_op)
 
 
 -- For each ccall we manufacture a separate CCallOpId, giving it
