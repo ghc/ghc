@@ -37,8 +37,8 @@ module MkId (
 
 
 import BasicTypes	( Arity, StrictnessMark(..), isMarkedUnboxed, isMarkedStrict )
-import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, betaTyVar, betaTy,
-			  intPrimTy, realWorldStatePrimTy, addrPrimTy
+import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, 
+			  realWorldStatePrimTy, addrPrimTy
 			)
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
@@ -58,7 +58,7 @@ import Class		( Class, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar, Var )
 import VarSet		( isEmptyVarSet )
 import Name		( mkFCallName, Name )
-import PrimOp		( PrimOp(DataToTagOp), primOpSig, mkPrimOpIdName )
+import PrimOp		( PrimOp, primOpSig, mkPrimOpIdName )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, 
 			  dataConFieldLabels, dataConRepArity, dataConTyCon,

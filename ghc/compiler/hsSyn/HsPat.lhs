@@ -30,10 +30,8 @@ import BasicTypes	( Boxity, tupleParens )
 -- others:
 import TysWiredIn	( nilDataCon, charDataCon, charTy )
 import Var		( TyVar )
-import DataCon		( DataCon, dataConTyCon )
-import Maybes		( maybeToBool )
+import DataCon		( DataCon )
 import Outputable	
-import TyCon		( maybeTyConSingleCon )
 import Type		( Type )
 \end{code}
 
