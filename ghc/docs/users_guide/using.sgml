@@ -1185,6 +1185,12 @@ f "2"    = 2
             be worth a few percent in execution speed.  Don't forget
             <option>-fvia-C</option>, lest you use the native-code
             generator and bypass GCC altogether!</para>
+
+	    <para><emphasis>Note: some versions of gcc are known to
+	    have code generation bugs with <option>-O2</option>.  Use
+	    this option at your own risk!  But we'd be keen to here
+	    any reports of whether (a) it works or (b) it improves
+	    performance at all.</emphasis></para>
 	  </listitem>
 	</varlistentry>
 
@@ -1215,8 +1221,8 @@ f "2"    = 2
       <para>We don't use a <option>-O*</option> flag for day-to-day
       work.  We use <option>-O</option> to get respectable speed;
       e.g., when we want to measure something.  When we want to go for
-      broke, we tend to use <option>-O -fvia-C -O2-for-C</option> (and
-      we go for lots of coffee breaks).</para>
+      broke, we tend to use <option>-O -fvia-C</option> (and we go for
+      lots of coffee breaks).</para>
 
       <para>The easiest way to see what <option>-O</option> (etc.)
       &ldquo;really mean&rdquo; is to run with <option>-v</option>,
