@@ -344,7 +344,7 @@ ifeq "$(IS_CBITS_LIB)" "YES"
 _cbits := _cbits
 STUBOBJS += $(HSC_C_OBJS)
 # Add _hsc.c files to the cbits library
-SRCS       += $(wildcard ../*_hsc.c)
+C_SRCS += $(wildcard ../*_hsc.c)
 # Make .hsc.h include files from the directory above visible
 SRC_CC_OPTS += -I..
 endif
@@ -378,7 +378,7 @@ endif # PACKAGE
 #----------------------------------------
 #	Libraries/archives
 #
-# Build $(LIBRARY) from $(LIBOJBS)+$(STUBOBJS)
+# Build $(LIBRARY) from $(LIBOBJS)+$(STUBOBJS)
 #
 # Inputs:
 #   $(LIBOBJS)
