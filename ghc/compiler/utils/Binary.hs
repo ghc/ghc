@@ -78,6 +78,7 @@ import PrelIOBase		( IOError(..), IOErrorType(..)
 				)
 import PrelReal			( Ratio(..) )
 import PrelIOBase	 	( IO(..) )
+import IOExts			( openFileEx, IOModeEx(..) )
 #else
 import Data.Array.IO
 import Data.Array
@@ -96,14 +97,13 @@ import GHC.Real			( Ratio(..) )
 import GHC.Exts
 import GHC.IOBase	 	( IO(..) )
 import GHC.Word			( Word8(..) )
-#endif
-
 #if __GLASGOW_HASKELL__ < 601
 -- openFileEx is available from the lang package, but we want to 
 -- be independent of hslibs libraries.
 import GHC.Handle		( openFileEx, IOModeEx(..) )
 #else
 import System.IO		( openBinaryFile )
+#endif
 #endif
 
 #if __GLASGOW_HASKELL__ < 601
