@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.127 2000/12/20 15:54:51 rrt Exp $
+# $Id: Makefile,v 1.128 2000/12/30 20:35:37 panne Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -96,10 +96,10 @@ SRC_HC_OPTS += -DILX
 endif
 endif
 
-# Only include GHCi if we're bootstrapping with at least version 409
+# Only include GHCi if we're bootstrapping with at least version 411
 ifeq "$(GhcWithInterpreter)" "YES"
-ghc_409_at_least = $(shell expr "$(GhcMinVersion)" \>= 9)
-ifeq "$(ghc_409_at_least)" "1"
+ghc_411_at_least = $(shell expr "$(GhcMinVersion)" \>= 11)
+ifeq "$(ghc_411_at_least)" "1"
 SRC_HC_OPTS += -DGHCI -optc-DGHCI
 DIRS += ghci
 endif
@@ -204,9 +204,16 @@ prelude/PrimOp_HC_OPTS 		= -H12m -no-recomp
 # because the NCG can't handle the 64-bit math in here
 prelude/PrelRules_HC_OPTS	= -fvia-C
 
-rename/ParseIface_HC_OPTS 	+= -K2M -Onot -H45m -fno-warn-incomplete-patterns
+rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
 
-parser/Parser_HC_OPTS 		+= -K2M -Onot -fno-warn-incomplete-patterns
+parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns
+
+# The latest GHC version doesn't have a -K option yet, and it doesn't
+# seem to be necessary anymore for the modules below.
+ifeq "$(ghc_411_at_least)" "0"
+rename/ParseIface_HC_OPTS 	+= -K2m
+parser/Parser_HC_OPTS 		+= -K2m
+endif
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
