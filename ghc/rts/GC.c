@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.150 2003/03/24 15:33:25 simonmar Exp $
+ * $Id: GC.c,v 1.151 2003/03/26 14:52:02 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -2016,7 +2016,8 @@ selector_loop:
     // So we use the block-descriptor test to find out if we're in
     // to-space.
     //
-    if (Bdescr((StgPtr)selectee)->flags & BF_EVACUATED) {
+    if (HEAP_ALLOCED(selectee) &&
+	Bdescr((StgPtr)selectee)->flags & BF_EVACUATED) {
 	goto bale_out;
     }
 
