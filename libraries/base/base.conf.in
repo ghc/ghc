@@ -15,18 +15,21 @@ Package {
                          , "$libdir/libraries/base/cbits" ],
 #endif
         hs_libraries      =
-#                           ifndef mingw32_TARGET_OS
+#                           if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
                             [ "HSbase" ],
 #                           else
                             /* This splitting is the subject of a totally 
-                               horrible hack, which glues HSstd1 and HSstd2 
-                               back into HSstd for the purposes of static linking.
+                               horrible hack, which glues HSbase{1,2,3}
+                               back into HSbaase for the purposes of static linking.
                                See DriverState.getPackageLibraries for details. */
-                            [ "HSbase1", "HSbase2" ],
+                            [ "HSbase1", "HSbase2", "HSbase3" ],
 #                           endif
 	extra_libraries   = [ "HSbase_cbits"
 #ifdef mingw32_TARGET_OS
                             , "wsock32", "msvcrt", "kernel32", "user32"
+#endif
+#ifdef mingw32_TARGET_OS
+			    , "kernel32", "user32"
 #endif
 			    ],
 #ifdef INSTALLING
