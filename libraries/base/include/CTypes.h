@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.6 2002/09/04 16:46:40 ross Exp $
+ * $Id: CTypes.h,v 1.7 2003/07/24 12:05:42 panne Exp $
  *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
@@ -18,8 +18,8 @@
 #define NUMERIC_TYPE(T,C,S,B) \
 newtype T = T B deriving (Eq, Ord) ; \
 INSTANCE_NUM(T) ; \
-INSTANCE_READ(T) ; \
-INSTANCE_SHOW(T) ; \
+INSTANCE_READ(T,B) ; \
+INSTANCE_SHOW(T,B) ; \
 INSTANCE_ENUM(T) ; \
 INSTANCE_STORABLE(T) ; \
 INSTANCE_TYPEABLE0(T,C,S) ;
@@ -43,11 +43,11 @@ INSTANCE_REALFLOAT(T)
 #define fakeMap map
 #endif
 
-#define INSTANCE_READ(T) \
+#define INSTANCE_READ(T,B) \
 instance Read T where { \
    readsPrec p s = fakeMap (\(x, t) -> (T x, t)) (readsPrec p s) }
 
-#define INSTANCE_SHOW(T) \
+#define INSTANCE_SHOW(T,B) \
 instance Show T where { \
    showsPrec p (T x) = showsPrec p x }
 
