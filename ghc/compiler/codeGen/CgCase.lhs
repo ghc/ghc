@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.30 1999/06/08 15:56:45 simonmar Exp $
+% $Id: CgCase.lhs,v 1.31 1999/06/09 14:27:38 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -864,8 +864,6 @@ restoreCurrentCostCentre Nothing = returnFC AbsCNop
 restoreCurrentCostCentre (Just slot)
  = getSpRelOffset slot				 `thenFC` \ sp_rel ->
    freeStackSlots [slot]			 `thenC`
-   (\info_down state@(MkCgState abs_c binds ((vsp, free, real, hw), heap_usage))
-	-> trace (show slot ++ "   " ++ show vsp ++ "   " ++ show free) $ state) `thenC`
    returnFC (CCallProfCCMacro SLIT("RESTORE_CCCS") [CVal sp_rel CostCentreRep])
     -- we use the RESTORE_CCCS macro, rather than just
     -- assigning into CurCostCentre, in case RESTORE_CCC
