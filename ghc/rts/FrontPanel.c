@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: FrontPanel.c,v 1.2 2000/11/01 11:57:29 simonmar Exp $
+ * $Id: FrontPanel.c,v 1.3 2001/01/19 11:06:20 simonmar Exp $
  *
  * (c) The GHC Team 2000
  *
@@ -634,7 +634,7 @@ residencyCensus( void )
 			break;
 			
 		    case CONSTR:
-			if (((StgClosure *)p)->header.info == &DEAD_WEAK_info) {
+			if (((StgClosure *)p)->header.info == &stg_DEAD_WEAK_info) {
 			    size = sizeofW(StgWeak);
 			    type = Other;
 			    break;
