@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.19 $
- * $Date: 1999/11/29 18:59:32 $
+ * $Revision: 1.20 $
+ * $Date: 1999/12/03 12:39:46 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -389,6 +389,23 @@ Text enZcodeThenFindText ( String s )
    return t;
 }
 
+
+Text textOf ( Cell c )
+{
+   Bool ok = 
+          (whatIs(c)==VARIDCELL
+           || whatIs(c)==CONIDCELL
+           || whatIs(c)==VAROPCELL
+           || whatIs(c)==CONOPCELL
+           || whatIs(c)==STRCELL
+           || whatIs(c)==DICTVAR
+          );
+   if (!ok) {
+      fprintf(stderr, "\ntextOf: bad tag %d\n",whatIs(c) );
+      internal("textOf: bad tag");
+   }
+   return snd(c);
+}
 
 /* --------------------------------------------------------------------------
  * Ext storage:
@@ -1239,7 +1256,7 @@ void* lookupOTabName ( Module m, char* nm )
 {
    int i;
    for (i = 0; i < module(m).usedoTab; i++) {
-      if (0)
+      if (1)
          fprintf ( stderr, 
                    "lookupOTabName: request %s, table has %s\n",
                    nm, module(m).oTab[i].nm );
@@ -2019,6 +2036,16 @@ Int  depth; {
                 print(fst(snd(c)),depth-1);
                 Putchar(',');
                 print(snd(snd(c)),depth-1);
+                Putchar(')');
+                break;
+        case DICTAP:
+                Printf("(DICTAP,");
+                print(snd(c),depth-1);
+                Putchar(')');
+                break;
+        case UNBOXEDTUP:
+                Printf("(UNBOXEDTUP,");
+                print(snd(c),depth-1);
                 Putchar(')');
                 break;
         default:

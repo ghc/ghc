@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.18 $
- * $Date: 1999/11/29 18:59:30 $
+ * $Revision: 1.19 $
+ * $Date: 1999/12/03 12:39:44 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1758,7 +1758,11 @@ Cell ty;				/* used in type expression, reading*/
 List us;				/* from left to right ignoring any */
 List ws;				/* listed in us.		   */
 List vs; {				/* ws = explicitly quantified vars */
+    if (isNull(ty)) return vs;
     switch (whatIs(ty)) {
+        case DICTAP    : return typeVarsIn(snd(snd(ty)),us,ws,vs);
+        case UNBOXEDTUP: return typeVarsIn(snd(ty),us,ws,vs);
+
 	case AP        : return typeVarsIn(snd(ty),us,ws,
 					   typeVarsIn(fst(ty),us,ws,vs));
 
@@ -1785,8 +1789,14 @@ List vs; {				/* ws = explicitly quantified vars */
 			     }
  			     return vs;
   			 }
+        case TUPLE:
+        case TYCON:
+        case CONIDCELL:
+        case QUALIDENT: return vs;
+
+        default: fprintf(stderr, " bad tag = %d\n", whatIs(ty));internal("typeVarsIn");
     }
-    return vs;
+    assert(0);
 }
 
 static List local maybeAppendVar(v,vs) /* append variable to list if not   */

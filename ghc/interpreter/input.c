@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/12/01 11:50:34 $
+ * $Revision: 1.16 $
+ * $Date: 1999/12/03 12:39:39 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -147,7 +147,7 @@ static Text textWildcard;
 static Text textModule,  textImport,    textInterface,  textInstImport;
 static Text textHiding,  textQualified, textAsMod;
 static Text textExport,  textDynamic,   textUUExport;
-static Text textUnsafe,  textUUAll;
+static Text textUnsafe,  textUUAll,     textUUUsage;
 
 Text   textCcall;                       /* ccall                           */
 Text   textStdcall;                     /* stdcall                         */
@@ -253,7 +253,7 @@ static Void local initCharTab() {       /* Initialize char decode table    */
  *
  * At the lowest level of input, characters are read one at a time, with the
  * current character held in c0 and the following (lookahead) character in
- * c1.  The corrdinates of c0 within the file are held in (column,row).
+ * c1.  The coordinates of c0 within the file are held in (column,row).
  * The input stream is advanced by one character using the skip() function.
  * ------------------------------------------------------------------------*/
 
@@ -1400,6 +1400,9 @@ static Int local yylex() {             /* Read next input token ...        */
      * Now try to identify token type:
      * --------------------------------------------------------------------*/
 
+    if (c0 == '(' && c1 == '#') { skip(); skip(); return UTL; };
+    if (c0 == '#' && c1 == ')') { skip(); skip(); return UTR; };
+
     switch (c0) {
         case EOF  : return 0;                   /* End of file/input       */
 
@@ -1522,6 +1525,7 @@ static Int local yylex() {             /* Read next input token ...        */
 	if (it==textDlet && !haskell98) lookAhead(DLET);
 #endif
         if (it==textUUAll)             return ALL;
+        if (it==textUUUsage)           return UUUSAGE;
         if (it==textRepeat && reading==KEYBOARD)
             return repeatLast();
 
@@ -1742,6 +1746,7 @@ Int what; {
                        textWildcard   = findText("_");
                        textAll        = findText("forall");
                        textUUAll      = findText("__forall");
+                       textUUUsage    = findText("__u");
                        varMinus       = mkVar(textMinus);
                        varPlus        = mkVar(textPlus);
                        varBang        = mkVar(textBang);

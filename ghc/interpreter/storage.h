@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.14 $
- * $Date: 1999/11/29 18:59:34 $
+ * $Revision: 1.15 $
+ * $Date: 1999/12/03 12:39:48 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -164,27 +164,6 @@ extern  Cell         whatIs    Args((Cell));
 #define EXTCOPY      22           /* Copy of an Ext:          snd :: Text  */
 #endif
 
-//#define textOf(c)       ((Text)(snd(c)))         /* c ::  (VAR|CON)(ID|OP) */
-
-#if 1
-static Text textOf( Cell c )
-{
-   Bool ok = 
-          (whatIs(c)==VARIDCELL
-           || whatIs(c)==CONIDCELL
-           || whatIs(c)==VAROPCELL
-           || whatIs(c)==CONOPCELL
-           || whatIs(c)==STRCELL
-           || whatIs(c)==DICTVAR
-          );
-   if (!ok) {
-fprintf(stderr, "\ntextOf -- tag %d\n",whatIs(c) );
-      assert(ok);
-   }
-   return snd(c);
-}
-#endif
-
 #define qmodOf(c)       (textOf(fst(snd(c))))    /* c ::  QUALIDENT        */
 #define qtextOf(c)      (textOf(snd(snd(c))))    /* c ::  QUALIDENT        */
 #define mkVar(t)        ap(VARIDCELL,t)
@@ -208,14 +187,15 @@ fprintf(stderr, "\ntextOf -- tag %d\n",whatIs(c) );
 #else
 #define isIP(p)		FALSE
 #endif
-extern  Bool            isVar       Args((Cell));
-extern  Bool            isCon       Args((Cell));
-extern  Bool            isQVar      Args((Cell));
-extern  Bool            isQCon      Args((Cell));
-extern  Bool            isQualIdent Args((Cell));
-extern  Bool            isIdent     Args((Cell));
 
-extern  String           stringNegate Args((String));
+extern  Bool            isVar        Args((Cell));
+extern  Bool            isCon        Args((Cell));
+extern  Bool            isQVar       Args((Cell));
+extern  Bool            isQCon       Args((Cell));
+extern  Bool            isQualIdent  Args((Cell));
+extern  Bool            isIdent      Args((Cell));
+extern  String          stringNegate Args((String));
+extern  Text            textOf       Args((Cell));
 
 #define isFloat(c)       (isPair(c) && fst(c)==FLOATCELL)
 #define stringToFloat(s) pair(FLOATCELL,findText(s))
@@ -226,7 +206,6 @@ extern  String           stringNegate Args((String));
 
 #define stringToBignum(s) pair(BIGCELL,findText(s))
 #define bignumToString(b) textToStr(snd(b))
-
 
 #if PTR_ON_HEAP
 #define isPtr(c)        (isPair(c) && fst(c)==PTRCELL)
@@ -311,10 +290,11 @@ extern  Ptr             cptrOf          Args((Cell));
 #define NEG          79           /* NEG        snd :: Exp                 */
 
 /* Used when parsing GHC interface files */
-#define DICTAP       80          /* DICTTYPE   snd :: (QClassId,[Type])   */
+#define DICTAP       80           /* DICTAP     snd :: (QClassId,[Type])   */
+#define UNBOXEDTUP   81           /* UNBOXEDTUP snd :: [Type]              */
 
 #if SIZEOF_INTP != SIZEOF_INT
-#define PTRCELL      81           /* C Heap Pointer snd :: (Int,Int)       */
+#define PTRCELL      82           /* C Heap Pointer snd :: (Int,Int)       */
 #endif
 
 #define STGVAR       92           /* STGVAR     snd :: (StgRhs,info)       */

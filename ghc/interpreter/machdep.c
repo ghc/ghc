@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/11/25 10:19:16 $
+ * $Revision: 1.15 $
+ * $Date: 1999/12/03 12:39:42 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -221,7 +221,7 @@ String f; {
     return (0 == access(f,4));
 #elif defined HAVE_SYS_STAT_H || defined HAVE_STAT_H
     struct stat scbuf;
-    //fprintf(stderr, "readable: %s\n", f );
+    /* fprintf(stderr, "readable: %s\n", f ); */
     return (  !stat(f,&scbuf) 
            && (scbuf.st_mode & S_IREAD) /* readable     */
            && (scbuf.st_mode & S_IFREG) /* regular file */
@@ -256,18 +256,21 @@ static Bool   local tryEndings    Args((String));
 # define SLASH                   '\\'
 # define isSLASH(c)              ((c)=='\\' || (c)=='/')
 # define PATHSEP                 ';'
+# define PATHSEP_STR             ";"
 # define DLL_ENDING              ".dll"
 #elif MAC_FILENAMES
 # define SLASH                   ':'
 # define isSLASH(c)              ((c)==SLASH)
 # define PATHSEP                 ';'
+# define PATHSEP_STR             ";"
 /* Mac PEF (Preferred Executable Format) file */
 # define DLL_ENDING              ".pef" 
 #else
 # define SLASH                   '/'
 # define isSLASH(c)              ((c)==SLASH)
 # define PATHSEP                 ':'
-# define DLL_ENDING              ".o"
+# define PATHSEP_STR             ":"
+# define DLL_ENDING              ".u_o"
 #endif
 
 static String local hugsdir() {     /* directory containing lib/Prelude.hs */
@@ -380,9 +383,9 @@ String s; {                     /* a pathname in some appropriate manner.  */
 }
 
 #if HSCRIPT
-static String endings[] = { "", ".hi", ".hs", ".lhs", ".hsx", ".hash", 0 };
+static String endings[] = { "", ".u_hi", ".hs", ".lhs", ".hsx", ".hash", 0 };
 #else
-static String endings[] = { "", ".hi", ".hs", ".lhs", 0 };
+static String endings[] = { "", ".u_hi", ".hs", ".lhs", 0 };
 #endif
 static char   searchBuf[FILENAME_MAX+1];
 static Int    searchPos;
@@ -660,23 +663,33 @@ Bool findFilesForModule (
    Int    nPath;
    Bool   literate;
    String peStart, peEnd;
-   String augdPath;       /* .:hugsPath:installDir/lib */
+   String augdPath;       /* .:hugsPath:installDir/GhcPrel:installDir/lib */
 
    *path = *sExt = NULL;
    *sAvail = *iAvail = *oAvail = FALSE;
    *sSize  = *iSize  = *oSize  = 0;
 
-   augdPath = malloc(4+3+strlen(installDir)+strlen(hugsPath));
+   augdPath = malloc( 2*(10+3+strlen(installDir)) 
+                      +strlen(hugsPath) +10/*paranoia*/);
    if (!augdPath)
       internal("moduleNameToFileNames: malloc failed(2)");
-   augdPath[0] = '.';
-   augdPath[1] = PATHSEP;
-   augdPath[2] = 0;
-   strcat ( augdPath, hugsPath );
-   augdPath[2+strlen(hugsPath)] = PATHSEP;
-   augdPath[3+strlen(hugsPath)] = 0;
-   strcat(augdPath,installDir);
-   strcat(augdPath,"lib");
+
+   augdPath[0] = 0;
+   strcat(augdPath, ".");
+   strcat(augdPath, PATHSEP_STR);
+
+   strcat(augdPath, hugsPath);
+   strcat(augdPath, PATHSEP_STR);
+
+   strcat(augdPath, installDir);
+   strcat(augdPath, "GhcPrel");
+   strcat(augdPath, PATHSEP_STR);
+
+   strcat(augdPath, installDir);
+   strcat(augdPath, "lib");
+   strcat(augdPath, PATHSEP_STR);
+
+   /* fprintf ( stderr, "augdpath = `%s'\n", augdPath ); */
 
    peEnd = augdPath-1;
    while (1) {
@@ -717,7 +730,7 @@ Bool findFilesForModule (
          getFileInfo(searchBuf, oTime, oSize);
       }
 
-      strcpy(searchBuf+nPath, ".hi");
+      strcpy(searchBuf+nPath, ".u_hi");
       if (readable(searchBuf)) {
          *iAvail = TRUE;
          getFileInfo(searchBuf, iTime, iSize);

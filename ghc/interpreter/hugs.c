@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.25 $
- * $Date: 1999/11/29 18:59:26 $
+ * $Revision: 1.26 $
+ * $Date: 1999/12/03 12:39:38 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -106,15 +106,16 @@ static Void   local browse	      Args((Void));
  * Local data areas:
  * ------------------------------------------------------------------------*/
 
-static Bool   printing     = FALSE;     /* TRUE => currently printing value*/
-static Bool   showStats    = FALSE;     /* TRUE => print stats after eval  */
-static Bool   listScripts  = TRUE;    /* TRUE => list scripts after loading*/
-static Bool   addType      = FALSE;     /* TRUE => print type with value   */
-static Bool   useDots      = RISCOS;    /* TRUE => use dots in progress    */
-static Bool   quiet        = FALSE;     /* TRUE => don't show progress     */
+static Bool   printing      = FALSE;    /* TRUE => currently printing value*/
+static Bool   showStats     = FALSE;    /* TRUE => print stats after eval  */
+static Bool   listScripts   = TRUE;   /* TRUE => list scripts after loading*/
+static Bool   addType       = FALSE;    /* TRUE => print type with value   */
+static Bool   useDots       = RISCOS;   /* TRUE => use dots in progress    */
+static Bool   quiet         = FALSE;    /* TRUE => don't show progress     */
 static Bool   lastWasObject = FALSE;
        Bool   preludeLoaded = FALSE;
        Bool   debugSC       = FALSE;
+       Bool   combined      = TRUE; //FALSE;
 
 typedef 
    struct { 
@@ -339,9 +340,15 @@ String argv[]; {
 #endif
 
     if (haskell98) {
-        Printf("Haskell 98 mode: Restart with command line option -98 to enable extensions\n\n");
+        Printf("Haskell 98 mode: Restart with command line option -98 to enable extensions\n");
     } else {
-        Printf("Hugs mode: Restart with command line option +98 for Haskell 98 mode\n\n");
+        Printf("Hugs mode: Restart with command line option +98 for Haskell 98 mode\n");
+    }
+
+    if (combined) {
+        Printf("Combined mode: Restart with command line -c for standalone mode\n\n" );
+    } else {
+        Printf("Standalone mode: Restart with command line +c for combined mode\n\n" );
     }
  
     everybody(INSTALL);
@@ -572,6 +579,15 @@ String s; {                             /* return FALSE if none found.     */
             case 'h' : setHeapSize(s+1);
                        return TRUE;
 
+            case 'c' : if (heapBuilt()) {
+                          FPrintf(stderr, 
+                                  "You can't enable/disable combined"
+                                  " operation inside Hugs\n" );
+                       } else {
+                          combined = state;
+                       }
+                       return TRUE;
+
             case 'D' : /* hack */
                 {
                     extern void setRtsFlags( int x );
@@ -610,7 +626,7 @@ String s; {
 #if USE_REGISTRY
             FPrintf(stderr,"Change to heap size will not take effect until you rerun Hugs\n");
 #else
-            FPrintf(stderr,"Cannot change heap size\n");
+            FPrintf(stderr,"You cannot change heap size from inside Hugs\n");
 #endif
         } else {
             heapSize = hpSize;
@@ -770,11 +786,6 @@ struct options toggle[] = {             /* List of command line toggles    */
     {'D', 1, "Debug: show generated G code",          &debugCode},
 #endif
     {'S', 1, "Debug: show generated SC code",         &debugSC},
-#if 0
-    {'f', 1, "Terminate evaluation on first error",   &failOnError},
-    {'u', 1, "Use \"show\" to display results",       &useShow},
-    {'i', 1, "Chase imports while loading modules",   &chaseImports}, 
-#endif
     {0,   0, 0,                                       0}
 };
 
@@ -871,9 +882,13 @@ static Void local makeStackEntry ( ScriptInfo* ent, String iname )
    /* 11 Oct 99: disable object loading in the interim.
       Will probably only reinstate when HEP becomes available.
    */
-   fromObj = sAvail
+   if (combined) {
+      fromObj = sAvail
                 ? (oAvail && iAvail && timeEarlier(sTime,oTime))
                 : TRUE;
+   } else {
+      fromObj = FALSE;
+   }
 
    /* ToDo: namesUpto overflow */
    ent->modName     = strCopy(iname);
@@ -893,12 +908,12 @@ static Void local makeStackEntry ( ScriptInfo* ent, String iname )
 static Void nukeEnding( String s )
 {
     Int l = strlen(s);
-    if (l > 2 && strncmp(s+l-2,".o"  ,3)==0) s[l-2] = 0; else
-    if (l > 3 && strncmp(s+l-3,".hi" ,3)==0) s[l-3] = 0; else
-    if (l > 3 && strncmp(s+l-3,".hs" ,3)==0) s[l-3] = 0; else
-    if (l > 4 && strncmp(s+l-4,".lhs",4)==0) s[l-4] = 0; else
-    if (l > 4 && strncmp(s+l-4,".dll",4)==0) s[l-4] = 0; else
-    if (l > 4 && strncmp(s+l-4,".DLL",4)==0) s[l-4] = 0;
+    if (l > 4 && strncmp(s+l-4,".u_o" ,4)==0) s[l-4] = 0; else
+    if (l > 5 && strncmp(s+l-5,".u_hi",5)==0) s[l-5] = 0; else
+    if (l > 3 && strncmp(s+l-3,".hs"  ,3)==0) s[l-3] = 0; else
+    if (l > 4 && strncmp(s+l-4,".lhs" ,4)==0) s[l-4] = 0; else
+    if (l > 4 && strncmp(s+l-4,".dll" ,4)==0) s[l-4] = 0; else
+    if (l > 4 && strncmp(s+l-4,".DLL" ,4)==0) s[l-4] = 0;
 }
 
 static Void local addStackEntry(s)     /* Add script to list of scripts    */
@@ -948,7 +963,7 @@ Int stacknum; {
    strcat(name, scriptInfo[stacknum].modName);
    if (scriptInfo[stacknum].fromSource)
       strcat(name, scriptInfo[stacknum].srcExt); else
-      strcat(name, ".hi");
+      strcat(name, ".u_hi");
 
    scriptFile = name;
 
@@ -1143,7 +1158,7 @@ Int n; {                                /* loading everything after and    */
         strcat(name, scriptInfo[n].modName);
         if (scriptInfo[n].fromSource)
            strcat(name, scriptInfo[n].srcExt); else
-           strcat(name, ".hi");  //ToDo: should be .o
+           strcat(name, ".u_hi");  //ToDo: should be .o
         getFileInfo(name,&timeStamp, &fileSize);
         if (timeChanged(timeStamp,scriptInfo[n].lastChange)) {
            dropScriptsFrom(n-1);

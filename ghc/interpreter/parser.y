@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.15 $
- * $Date: 1999/11/29 18:53:14 $
+ * $Revision: 1.16 $
+ * $Date: 1999/12/03 12:39:42 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -98,6 +98,7 @@ static Void   local noIP	 Args((String));
 %token TMODULE    IMPORT     HIDING     QUALIFIED  ASMOD
 %token EXPORT     UUEXPORT   INTERFACE  REQUIRES   UNSAFE     
 %token INSTIMPORT DYNAMIC    CCALL      STDKALL
+%token UTL        UTR        UUUSAGE
 
 %%
 /*- Top level script/module structure -------------------------------------*/
@@ -134,13 +135,17 @@ varid_or_conid
 opt_bang  : '!'                         {$$=gc1(NIL);}
           |                             {$$=gc0(NIL);}
           ;
+opt_COCO  : COCO                        {$$=gc1(NIL);}
+          |                             {$$=gc0(NIL);}
+          ;
+
 ifName    : CONID                       {openGHCIface(textOf($1)); 
                                          $$ = gc1(NIL);}
 checkVersion
           : NUMLIT                      {$$ = gc1(NIL); }
           ;
 ifDecl    
-          : IMPORT CONID NUMLIT opt_bang COCO version_list_junk
+          : IMPORT CONID NUMLIT opt_bang opt_COCO version_list_junk
                                         { addGHCImports(intOf($3),textOf($2),
                                                        $6);
                                           $$ = gc6(NIL); 
@@ -161,7 +166,7 @@ ifDecl
                                         {$$ = gc4(fixdecl($2,singleton($4),
                                                           NON_ASS,$3)); }
 
-          | TINSTANCE ifCtxInst ifInstHd '=' ifVar
+          | TINSTANCE ifCtxInst ifInstHdL '=' ifVar
                                         { addGHCInstance(intOf($1),$2,$3,
                                           textOf($5)); 
                                           $$ = gc5(NIL); }
@@ -178,7 +183,7 @@ ifDecl
                                         { addGHCNewType(intOf($2),
                                                         $3,$4,$5,$6);
                                           $$ = gc6(NIL); }
-          | NUMLIT TCLASS ifCtxDecl ifCon ifTyvar ifCmeths
+          | NUMLIT TCLASS ifCtxDecl ifCon ifKindedTyvar ifCmeths
                                         { addGHCClass(intOf($2),$3,$4,$5,$6);
                                           $$ = gc6(NIL); }
           | NUMLIT ifVar COCO ifType
@@ -222,11 +227,18 @@ ifCtxInst /* __forall [a b] {M.C1 a, M.C2 b} =>  */
           | ALL ifForall IMPLIES        {$$=gc3(NIL);}
           |                             {$$=gc0(NIL);}
           ;
-ifInstHd  /* { Class aType }    :: (ConId, Type) */
-          : '{' ifCon ifAType '}'       {$$=gc4(pair($2,$3));}
+ifInstHd /* { Class aType }    :: (ConId, Type) */
+          : '{' ifCon ifAType '}'       {$$=gc4(ap(DICTAP,pair($2,singleton($3))));}
           ;
 
-ifCtxDecl /* {M.C1 a, C2 b} :: [(QConId, VarId)] */ 
+ifInstHdL /* { C a1 } -> { C2 a2 } -> ... -> { Cn an }   :: [(ConId, Type)] */
+          /* Note: not constructing the list with fn($1,$3) */
+          : ifInstHd ARROW ifInstHdL    {$$=gc3(fn($1,$3));}
+          | ifInstHd                    {$$=gc1(NIL);}
+          ;
+
+
+ifCtxDecl /* {M.C1 a, C2 b} =>  :: [(QConId, VarId)] */ 
           :                             { $$ = gc0(NIL); }
           | '{' ifCtxDeclL '}' IMPLIES  { $$ = gc4($2);  }
           ;					
@@ -308,26 +320,45 @@ ifType    : ALL ifForall ifCtxDeclT IMPLIES ifType
           | ifBType ARROW ifType        { $$ = gc3(fn($1,$3)); }
           | ifBType                     { $$ = gc1($1); }
           ;					
-ifForall /* [(VarId,Kind)] */
+ifForall  /* [(VarId,Kind)] */
           : '[' ifKindedTyvarL ']'      { $$ = gc3($2); }
-          ;					
-ifTypes2  : ifType ',' ifType           { $$ = gc3(doubleton($1,$3)); }
-          | ifType ',' ifTypes2         { $$ = gc3(cons($1,$3));      }
           ;
+
+ifTypeL2  /* [Type], 2 or more */
+          : ifType ',' ifType           { $$ = gc3(doubleton($1,$3)); }
+          | ifType ',' ifTypeL2         { $$ = gc3(cons($1,$3));      }
+          ;
+
+ifTypeL   /* [Type], 0 or more */
+          : ifType ',' ifTypeL          { $$ = gc3(cons($1,$3)); }
+          | ifType                      { $$ = gc1(singleton($1)); }
+          |                             { $$ = gc0(NIL); }
+          ;
+
 ifBType   : ifAType                     { $$ = gc1($1);        } 
           | ifBType ifAType             { $$ = gc2(ap($1,$2)); }
+          | UUUSAGE ifUsage ifAType     { $$ = gc3($3); }
           ;
+
 ifAType   : ifQTCName                   { $$ = gc1($1); }
           | ifTyvar                     { $$ = gc1($1); }
           | '(' ')'                     { $$ = gc2(typeUnit); }
-          | '(' ifTypes2 ')'            { $$ = gc3(buildTuple($2)); }
+          | '(' ifTypeL2 ')'            { $$ = gc3(buildTuple($2)); }
           | '[' ifType ']'              { $$ = gc3(ap(typeList,$2));}
           | '{' ifQTCName ifATypes '}'  { $$ = gc4(ap(DICTAP,
                                                       pair($2,$3))); }
           | '(' ifType ')'              { $$ = gc3($2); }
+          | UTL ifTypeL UTR             { $$ = gc3(ap(UNBOXEDTUP,$2)); }
           ;
 ifATypes  :                             { $$ = gc0(NIL);         }
           | ifAType ifATypes            { $$ = gc2(cons($1,$2)); }
+          ;
+
+
+/*- KW's usage stuff --------------------------------------*/
+ifUsage   : '-'                         { $$ = gc1(NIL); }
+          | '!'                         { $$ = gc1(NIL); }
+          | ifVar                       { $$ = gc1(NIL); }
           ;
 
 

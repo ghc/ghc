@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/11/29 18:59:28 $
+ * $Revision: 1.8 $
+ * $Date: 1999/12/03 12:39:40 $
  * ------------------------------------------------------------------------*/
 
 /* ToDo:
@@ -34,8 +34,8 @@
 #include "Assembler.h"  /* for wrapping GHC objects */
 #include "dynamic.h"
 
-#define DEBUG_IFACE
-#define VERBOSITY TRUE
+// #define DEBUG_IFACE
+#define VERBOSE FALSE
 
 extern void print ( Cell, Int );
 
@@ -365,7 +365,7 @@ Module mod; {
    }
 
    // Last, but by no means least ...
-   resolveReferencesInObjectModule ( mod, FALSE );
+   resolveReferencesInObjectModule ( mod, TRUE );
 }
 
 Void openGHCIface(t)
@@ -376,7 +376,7 @@ Text t; {
     Module m = findModule(t);
     if (isNull(m)) {
         m = newModule(t);
-printf ( "new module %s\n", textToStr(t) );
+	//printf ( "new module %s\n", textToStr(t) );
     } else if (m != modulePrelude) {
         ERRMSG(0) "Module \"%s\" already loaded", textToStr(t)
         EEND;
@@ -404,7 +404,7 @@ printf ( "new module %s\n", textToStr(t) );
        ERRMSG(0) "Read of object file \"%s\" failed", nameObj
        EEND;
     }
-    if (!validateOImage(img,sizeObj,VERBOSITY)) {
+    if (!validateOImage(img,sizeObj,VERBOSE)) {
        ERRMSG(0) "Validation of object file \"%s\" failed", nameObj 
        EEND;
     }
@@ -412,7 +412,7 @@ printf ( "new module %s\n", textToStr(t) );
     assert(!module(m).oImage);
     module(m).oImage = img;
 
-    readSyms(m,VERBOSITY);
+    readSyms(m,VERBOSE);
 
     if (!cellIsMember(m, ghcModules))
        ghcModules = cons(m, ghcModules);
@@ -816,17 +816,17 @@ Cell constr; {  /* (ConId,Type)          */
     }
 }
 
-Void addGHCClass(line,ctxt,tc_name,tv,mems0)
+Void addGHCClass(line,ctxt,tc_name,kinded_tv,mems0)
 Int  line;
 List ctxt;       /* [(QConId, VarId)]     */ 
 Cell tc_name;    /* ConId                 */
-Text tv;         /* VarId                 */
+Text kinded_tv;  /* (VarId, Kind)         */
 List mems0; {    /* [(VarId, Type)]       */
     List mems;   /* [(VarId, Type)]       */
     List tvsInT; /* [VarId] and then [(VarId,Kind)] */
     List tvs;    /* [(VarId,Kind)]        */
     Text ct     = textOf(tc_name);
-    Pair newCtx = pair(tc_name, tv);
+    Pair newCtx = pair(tc_name, fst(kinded_tv));
 #   ifdef DEBUG_IFACE
     printf ( "\nbegin addGHCclass %s\n", textToStr(ct) );
 #   endif
@@ -850,9 +850,13 @@ List mems0; {    /* [(VarId, Type)]       */
 
         /* Kludge to map the single tyvar in the context to Offset 0.
            Need to do something better for multiparam type classes.
-        */
+
         cclass(nw).supers     = tvsToOffsets(line,ctxt,
                                              singleton(pair(tv,STAR)));
+        */
+        cclass(nw).supers     = tvsToOffsets(line,ctxt,
+                                             singleton(kinded_tv));
+
 
         for (mems=mems0; nonNull(mems); mems=tl(mems)) {
            Pair mem  = hd(mems);
@@ -946,7 +950,7 @@ static Void  local finishGHCClass(Class nw)
 Void addGHCInstance (line,ctxt0,cls,var)
 Int  line;
 List ctxt0;  /* [(QConId, Type)] */
-Pair cls;    /* (ConId, [Type])  */
+List cls;    /* [(ConId, Type)]  */
 Text var; {  /* Text */
     List tmp, tvs, ks;
     Inst in = newInst();
@@ -955,7 +959,9 @@ Text var; {  /* Text */
 #   endif
 
     /* Make tvs into a list of tyvars with bogus kinds. */
-    tvs = nubList(ifTyvarsIn(snd(cls)));
+    //print ( cls, 10 ); printf ( "\n");
+    tvs = nubList(ifTyvarsIn(cls));
+    //print ( tvs, 10 );
     ks = NIL;
     for (tmp = tvs; nonNull(tmp); tmp=tl(tmp)) {
        hd(tmp) = pair(hd(tmp),STAR);
@@ -1044,6 +1050,8 @@ List ktyvars; { /* [(VarId|Text,Kind)] */
                                tvsToOffsets(line,snd(snd(type)),ktyvars)));
       case DICTAP: /* bogus ?? */
          return ap(DICTAP, tvsToOffsets(line,snd(type),ktyvars));
+      case UNBOXEDTUP:  /* bogus?? */
+         return ap(UNBOXEDTUP, tvsToOffsets(line,snd(type),ktyvars));
       case VARIDCELL: /* Ha! some real work to do! */
        { Int i = 0;
          Text tv = textOf(type);
@@ -1066,6 +1074,16 @@ List ktyvars; { /* [(VarId|Text,Kind)] */
    return NIL; /* NOTREACHED */
 }
 
+/* ToDo: nuke this */
+static Text kludgeGHCPrelText ( Text m )
+{
+   return m;
+#if 0
+   if (strncmp(textToStr(m), "Prel", 4)==0)
+      return textPrelude; else return m;
+#endif
+}
+
 
 /* This is called from the finishGHC* functions.  It traverses a structure
    and converts conidcells, ie, type constructors parsed by the interface
@@ -1075,11 +1093,6 @@ List ktyvars; { /* [(VarId|Text,Kind)] */
    Tycons or Classes have been loaded into the symbol tables and can be
    looked up.
 */
-static Text kludgeGHCPrelText ( Text m )
-{
-   if (strncmp(textToStr(m), "Prel", 4)==0)
-      return textPrelude; else return m;
-}
 
 static Type local conidcellsToTycons(line,type)
 Int  line;
@@ -1141,6 +1154,8 @@ Type type; {
                                conidcellsToTycons(line,snd(snd(type)))));
       case DICTAP: /* bogus?? */
          return ap(DICTAP, conidcellsToTycons(line, snd(type)));
+      case UNBOXEDTUP:
+         return ap(UNBOXEDTUP, conidcellsToTycons(line, snd(type)));
       default: 
          fprintf(stderr, "conidcellsToTycons: unknown stuff %d\n", 
                  whatIs(type));
@@ -1267,7 +1282,7 @@ static Void local resolveReferencesInObjectModule_elf ( Module m,
    Elf32_Word* targ;
    // first find "the" symbol table
    // why is this commented out???
-   stab = findElfSection ( ehdrC, SHT_SYMTAB );
+   stab = (Elf32_Sym*) findElfSection ( ehdrC, SHT_SYMTAB );
 
    // also go find the string table
    strtab = findElfSection ( ehdrC, SHT_STRTAB );
@@ -1548,7 +1563,8 @@ static void readSyms_elf ( Module m, Bool verb )
               )
               &&
               ( ELF32_ST_TYPE(stab[j].st_info)==STT_FUNC ||
-                ELF32_ST_TYPE(stab[j].st_info)==STT_OBJECT )
+                ELF32_ST_TYPE(stab[j].st_info)==STT_OBJECT ||
+                ELF32_ST_TYPE(stab[j].st_info)==STT_NOTYPE)
 	      ) {
             char* nm = strtab + stab[j].st_name;
             char* ad = ehdrC 
@@ -1561,6 +1577,7 @@ static void readSyms_elf ( Module m, Bool verb )
                        ad, textToStr(module(m).text), nm );
             addOTabName ( m, nm, ad );
          }
+	 //else fprintf(stderr, "skipping `%s'\n", strtab + stab[j].st_name );
       }
 
    }
@@ -1616,16 +1633,22 @@ extern int stg_update_PAP;
 extern int __ap_2_upd_info;
 extern int MainRegTable;
 extern int Upd_frame_info;
+extern int CAF_BLACKHOLE_info;
+extern int IND_STATIC_info;
+extern int newCAF;
 
 OSym rtsTab[] 
    = { 
-       { "stg_gc_enter_1",    &stg_gc_enter_1  },
-       { "stg_chk_0",         &stg_chk_0       },
-       { "stg_chk_1",         &stg_chk_1       },
-       { "stg_update_PAP",    &stg_update_PAP  },
-       { "__ap_2_upd_info",   &__ap_2_upd_info },
-       { "MainRegTable",      &MainRegTable    },
-       { "Upd_frame_info",    &Upd_frame_info  },
+       { "stg_gc_enter_1",        &stg_gc_enter_1     },
+       { "stg_chk_0",             &stg_chk_0          },
+       { "stg_chk_1",             &stg_chk_1          },
+       { "stg_update_PAP",        &stg_update_PAP     },
+       { "__ap_2_upd_info",       &__ap_2_upd_info    },
+       { "MainRegTable",          &MainRegTable       },
+       { "Upd_frame_info",        &Upd_frame_info     },
+       { "CAF_BLACKHOLE_info",    &CAF_BLACKHOLE_info },
+       { "IND_STATIC_info",       &IND_STATIC_info    },
+       { "newCAF",                &newCAF             },
        {0,0} 
      };
 
@@ -1652,7 +1675,7 @@ void* lookupObjName ( char* nm )
    pp = strchr(nm2, '_');
    if (!pp) goto not_found;
    *pp = 0;
-   t = unZcodeThenFindText(nm2);
+   t = kludgeGHCPrelText( unZcodeThenFindText(nm2) );
    m = findModule(t);
    if (isNull(m)) goto not_found;
    a = lookupOTabName ( m, nm );
