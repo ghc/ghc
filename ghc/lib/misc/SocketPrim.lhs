@@ -176,8 +176,10 @@ data SockAddr		-- C Names
 	PortNumber	-- sin_port  (network byte order)
 	HostAddress	-- sin_addr  (ditto)
 #else
-  = SockAddrUnix        -- struct sockaddr_un
-        String          -- sun_path
+  = SockAddrInet	-- struct sockaddr_in
+	PortNumber	-- sin_port  (network byte order)
+	HostAddress	-- sin_addr  (ditto)
+
 #endif
     deriving Eq
 
@@ -617,7 +619,7 @@ unpackFamily family = (range (AF_UNSPEC, AF_IPX))!!family
  
 data Family = 
 	  AF_UNSPEC	-- unspecified
-	--NOT SUPPORTED: AF_UNIX	-- local to host (pipes, portals)
+	| AF_UNIX	-- local to host (pipes, portals)
 	| AF_INET	-- internetwork: UDP, TCP, etc
 	| AF_IMPLINK	-- arpanet imp addresses
 	| AF_PUP	-- pup protocols: e.g. BSP
