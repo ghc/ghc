@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.41 2005/02/15 11:24:51 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.42 2005/02/22 16:29:42 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -323,6 +323,7 @@ dep_opts =
    , (  "f", 			SepArg (writeIORef v_Dep_makefile) )
    , (  "w", 			NoArg (writeIORef v_Dep_warnings False) )
    , (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_pkg_deps True) )
+   , (  "-include-pkg-deps",  	NoArg (writeIORef v_Dep_include_pkg_deps True) )
    , (  "-exclude-module=",     Prefix (add v_Dep_exclude_mods . mkModule) )
    , (  "x",                    Prefix (add v_Dep_exclude_mods . mkModule) )
    ]

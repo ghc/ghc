@@ -922,7 +922,7 @@ M.o : X.hi-boot
 	locate any imported modules that come from packages.  The
 	package modules won't be included in the dependencies
 	generated, though (but see the
-	<option>&ndash;&ndash;include-prelude</option> option below).</para>
+	<option>&ndash;&ndash;include-pkg-deps</option> option below).</para>
 
 	<para>The dependency generation phase of GHC can take some
         additional options, which you may find useful.  For historical
@@ -1044,12 +1044,16 @@ ghc -M -optdep-f -optdep.depend ...
 	  </varlistentry>
 
 	  <varlistentry>
-	    <term><option>&ndash;&ndash;include-prelude</option></term>
+	    <term><option>&ndash;&ndash;include-pkg-deps</option></term>
 	    <listitem>
 	      <para>Regard modules imported from packages as unstable,
-              i.e., generate dependencies on the package modules used
+              i.e., generate dependencies on any imported package modules
               (including <literal>Prelude</literal>, and all other
-              standard Haskell libraries).  This option is normally
+              standard Haskell libraries).  Dependencies are not traced
+	      recursively into packages; dependencies are only generated for
+	      home-package modules on external-package modules directly imported
+	      by the home package module.
+	      This option is normally
               only used by the various system libraries.</para>
 	    </listitem>
 	  </varlistentry>
