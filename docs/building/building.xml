@@ -4424,7 +4424,11 @@ Run both executables (in the order given above) to install them.  I put them in 
 <listitem><para>
 Set the following environment variables
 <itemizedlist>
-  <listitem><para><literal>PATH</literal>: add <literal>c:/msys/1.0/bin</literal> to your path.  (Of course, the version number may differ.)
+   <listitem><para><literal>PATH</literal>: add <literal>c:/msys/1.0/bin</literal> and 
+ 		    <literal>c:/msys/1.0/local/bin</literal>
+ 		    to your path.  (Of course, the version number may differ.)
+ 		    MSYS mounts the former as both <literal>/bin</literal> and 
+ 		    <literal>/usr/bin</literal> and the latter as <literal>/usr/local/bin</literal>.
   </para></listitem>
 
   <listitem><para><literal>HOME</literal>: set to your home directory (e.g. <literal>c:/userid</literal>).
@@ -4695,7 +4699,7 @@ Make sure the installation directory is in your
 </listitem>
 
 	  <listitem>
-	    <para>Install Alex.  This can be done by building from the
+	    <para>Install an executable Alex.  This can be done by building from the
 	    source distribution in the same way as Happy.  Sources are
 	    available from <ulink
 	    url="http://www.haskell.org/alex">http://www.haskell.org/alex</ulink>.</para>
@@ -4708,7 +4712,13 @@ Just pick up a mingw bundle at
 <ulink url="http://www.mingw.org/">http://www.mingw.org/</ulink>.
 We install it in <filename>c:/mingw</filename>.
 </para>
-<para>Do <emphasis>not</emphasis> add any of the <emphasis>mingw</emphasis> binaries to your  path.
+
+<para><emphasis>On MSYS</emphasis>, add <literal>c:/mingw/bin</literal> to your PATH. MSYS does not provide <command>gcc</command>,
+<command>ld</command>, <command>ar</command>, and so on, because it just uses the MinGW ones.  So you need them
+in your path.
+</para>
+
+<para><emphasis>On Cygwin, do not</emphasis> add any of the <emphasis>mingw</emphasis> binaries to your  path.
 They are only going to get used by explicit access (via the --with-gcc flag you
 give to <command>configure</command> later).  If you do add them to your path
 you are likely to get into a mess because their names overlap with Cygwin binaries.
