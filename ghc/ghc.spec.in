@@ -26,7 +26,7 @@ URL: http://haskell.org/ghc/
 BuildRoot: /var/tmp/ghc-%{version}-%{release}-root
 Requires: gmp-devel
 Provides: haskell
-BuildRequires: happy >= 1.13, ghc >= 4.08, haddock, docbook-utils
+BuildRequires: happy >= 1.13, ghc >= 4.08, haddock, docbook-utils, jadetex, tetex-dvips
 
 %description
 Haskell is the standard purely functional programming language; the
