@@ -226,7 +226,7 @@ floatOp2  op name (MachFloat f1) (MachFloat f2)
 floatOp2  op name l1 l2 = Nothing
 
 floatOp2Z op name (MachFloat f1) (MachFloat f2)
-  | f1 /= 0   = Just (name, mkFloatVal (f1 `op` f2))
+  | f2 /= 0   = Just (name, mkFloatVal (f1 `op` f2))
 floatOp2Z op name l1 l2 = Nothing
 
 --------------------------
@@ -235,7 +235,7 @@ doubleOp2  op name (MachDouble f1) (MachDouble f2)
 doubleOp2 op name l1 l2 = Nothing
 
 doubleOp2Z op name (MachDouble f1) (MachDouble f2)
-  | f1 /= 0   = Just (name, mkDoubleVal (f1 `op` f2))
+  | f2 /= 0   = Just (name, mkDoubleVal (f1 `op` f2))
 doubleOp2Z op name l1 l2 = Nothing
 
 
