@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.97 2002/03/05 11:22:44 simonmar Exp $
+-- $Id: Main.hs,v 1.98 2002/03/12 16:40:57 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -108,7 +108,10 @@ main =
 	   case exception of
 		-- an IO exception probably isn't our fault, so don't panic
 		IOException _ ->  hPutStr stderr (show exception)
-		_other 	      ->  hPutStr stderr (show (Panic (show exception)))
+		AsyncException StackOverflow ->
+			hPutStrLn stderr "stack overflow: use +RTS -K<size> \ 
+					 \to increase it"
+		_other ->  hPutStr stderr (show (Panic (show exception)))
 	   exitWith (ExitFailure 1)
          ) $ do
 
@@ -191,7 +194,7 @@ main =
    dyn_flags <- getDynFlags
    let lang = case mode of 
 		 DoInteractive  -> HscInterpreted
-		 _other         -> hscLang dyn_flags
+		 _other         -> defaultHscLang
 
    setDynFlags (dyn_flags{ coreToDo = core_todo,
 			   stgToDo  = stg_todo,
