@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.3 1997/03/14 07:59:40 simonpj Exp $
+# $Id: Makefile,v 1.4 1997/03/20 22:31:03 sof Exp $
 
 TOP=..
 CURRENT_DIR=ghc/driver
@@ -22,7 +22,7 @@ DYN_LOADABLE_BITS = \
 SCRIPT_PROG = ghc
 SCRIPT_OBJS = ghc.prl
  
-INTERP	= $(PERL)
+INTERP=perl
 
 #
 # The driver needs to know the options and names for 
