@@ -292,6 +292,7 @@ isSpecial ITunsafe    	= True
 isSpecial ITwith      	= True
 isSpecial ITccallconv   = True
 isSpecial ITstdcallconv = True
+isSpecial _             = False
 
 -- IMPORTANT: Keep this in synch with ParseIface.y's var_fs production! (SUP)
 ghcExtensionKeywordsFM = listToUFM $
