@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * $Id: mkNativeHdr.c,v 1.5 2000/08/17 14:30:26 simonmar Exp $
+ * $Id: mkNativeHdr.c,v 1.6 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
@@ -35,6 +35,14 @@
 #define OFFSET_HpLim OFFSET(RegTable, RegTable.rHpLim)
 #define OFFSET_CurrentTSO OFFSET(RegTable, RegTable.rCurrentTSO)
 #define OFFSET_CurrentNursery OFFSET(RegTable, RegTable.rCurrentNursery)
+#define OFFSET_HpAlloc OFFSET(RegTable, RegTable.rHpAlloc)
+
+#define FUN_OFFSET(sym) ((StgPtr)&cap.f.sym - (StgPtr)&cap.r)
+
+#define OFFSET_stgChk0       FUN_OFFSET(stgChk0)
+#define OFFSET_stgChk1       FUN_OFFSET(stgChk1)
+#define OFFSET_stgGCEnter1   FUN_OFFSET(stgGCEnter1)
+#define OFFSET_stgUpdatePAP  FUN_OFFSET(stgUpdatePAP)
 
 #define TSO_SP       OFFSET(tso, tso.sp)
 #define TSO_SU       OFFSET(tso, tso.su)
@@ -44,6 +52,9 @@
 #define BDESCR_FREE  OFFSET(bd, bd.free)
 
 StgRegTable RegTable;
+
+Capability cap;
+
 StgTSO tso;
 bdescr bd;
 
@@ -80,6 +91,12 @@ main()
     printf("#define OFFSET_HpLim %d\n", OFFSET_HpLim);
     printf("#define OFFSET_CurrentTSO %d\n", OFFSET_CurrentTSO);
     printf("#define OFFSET_CurrentNursery %d\n", OFFSET_CurrentNursery);
+    printf("#define OFFSET_HpAlloc %d\n", OFFSET_HpAlloc);
+
+    printf("#define OFFSET_stgChk0 (%d)\n", OFFSET_stgChk0);
+    printf("#define OFFSET_stgChk1 (%d)\n", OFFSET_stgChk1);
+    printf("#define OFFSET_stgGCEnter1 (%d)\n", OFFSET_stgGCEnter1);
+    printf("#define OFFSET_stgUpdatePAP (%d)\n", OFFSET_stgUpdatePAP);
 
     printf("\n-- Storage Manager offsets for the Native Code Generator\n");
 

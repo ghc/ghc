@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStorage.h,v 1.10 2001/07/24 16:36:44 simonmar Exp $
+ * $Id: StgStorage.h,v 1.11 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -104,7 +104,7 @@ typedef struct _generation {
 
 #define OpenNursery(hp,hplim)				\
   (hp    = CurrentNursery->free-1,			\
-   hplim = CurrentNursery->start + BLOCK_SIZE_W - 1)
+   hplim = CurrentNursery->start + CurrentNursery->blocks*BLOCK_SIZE_W - 1)
   
 #define CloseNursery(hp)  (CurrentNursery->free = (P_)(hp)+1)
 

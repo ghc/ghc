@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.38 2001/07/24 06:31:35 ken Exp $
+ * $Id: StgMacros.h,v 1.39 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -132,7 +132,6 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define STK_CHK(headroom,ret,r,layout,tag_assts)		\
 	if (Sp - headroom < SpLim) {				\
-	    EXTFUN_RTS(stg_chk_##layout);		 	\
 	    tag_assts						\
 	    (r) = (P_)ret;					\
 	    JMP_(stg_chk_##layout);				\
@@ -141,7 +140,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 #define HP_CHK(headroom,ret,r,layout,tag_assts)			\
         DO_GRAN_ALLOCATE(headroom)                              \
 	if ((Hp += headroom) > HpLim) {				\
-	    EXTFUN_RTS(stg_chk_##layout);		 	\
+            HpAlloc = (headroom);				\
 	    tag_assts						\
 	    (r) = (P_)ret;                                     	\
 	    JMP_(stg_chk_##layout);			   	\
@@ -150,7 +149,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 #define HP_STK_CHK(stk_headroom,hp_headroom,ret,r,layout,tag_assts) \
         DO_GRAN_ALLOCATE(hp_headroom)                              \
 	if (Sp - stk_headroom < SpLim || (Hp += hp_headroom) > HpLim) {	\
-	    EXTFUN_RTS(stg_chk_##layout);		 	\
+            HpAlloc = (hp_headroom);				\
 	    tag_assts						\
 	    (r) = (P_)ret;	                               	\
 	    JMP_(stg_chk_##layout);			   	\
@@ -177,7 +176,6 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define STK_CHK_NP(headroom,ptrs,tag_assts)			\
 	if ((Sp - (headroom)) < SpLim) {			\
-	    EXTFUN_RTS(stg_gc_enter_##ptrs);			\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);				\
 	}
@@ -185,7 +183,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 #define HP_CHK_NP(headroom,ptrs,tag_assts)			\
         DO_GRAN_ALLOCATE(headroom)                              \
 	if ((Hp += (headroom)) > HpLim) {			\
-	    EXTFUN_RTS(stg_gc_enter_##ptrs);			\
+            HpAlloc = (headroom);				\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);				\
 	}
@@ -193,7 +191,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 #define HP_CHK_SEQ_NP(headroom,ptrs,tag_assts)			\
         DO_GRAN_ALLOCATE(headroom)                              \
 	if ((Hp += (headroom)) > HpLim) {			\
-	    EXTFUN_RTS(stg_gc_seq_##ptrs);			\
+            HpAlloc = (headroom);				\
             tag_assts						\
 	    JMP_(stg_gc_seq_##ptrs);				\
 	}
@@ -201,7 +199,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 #define HP_STK_CHK_NP(stk_headroom, hp_headroom, ptrs, tag_assts) \
         DO_GRAN_ALLOCATE(hp_headroom)                              \
 	if ((Sp - (stk_headroom)) < SpLim || (Hp += (hp_headroom)) > HpLim) { \
-	    EXTFUN_RTS(stg_gc_enter_##ptrs);		 	\
+            HpAlloc = (hp_headroom);				\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);			   	\
 	}
@@ -213,6 +211,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
         DO_GRAN_ALLOCATE(headroom)                              \
 	if ((Hp += (headroom)) > HpLim) {			\
 	    EXTFUN_RTS(lbl);					\
+            HpAlloc = (headroom);				\
             tag_assts						\
 	    JMP_(lbl);						\
 	}
@@ -294,7 +293,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define HP_CHK_GEN(headroom,liveness,reentry,tag_assts)	\
    if ((Hp += (headroom)) > HpLim ) {			\
-	EXTFUN_RTS(stg_gen_chk);				\
+        HpAlloc = (headroom);				\
         tag_assts					\
 	R9.w = (W_)LIVENESS_MASK(liveness);		\
         R10.w = (W_)reentry;				\
@@ -307,7 +306,6 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define STK_CHK_GEN(headroom,liveness,reentry,tag_assts)	\
    if ((Sp - (headroom)) < SpLim) {				\
-	EXTFUN_RTS(stg_gen_chk);					\
         tag_assts						\
 	R9.w = (W_)LIVENESS_MASK(liveness);			\
         R10.w = (W_)reentry;					\
@@ -316,7 +314,6 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define MAYBE_GC(liveness,reentry)		\
    if (doYouWantToGC()) {			\
-	EXTFUN_RTS(stg_gen_hp);			\
 	R9.w = (W_)LIVENESS_MASK(liveness);	\
         R10.w = (W_)reentry;			\
         JMP_(stg_gen_hp);			\
@@ -787,17 +784,20 @@ LoadThreadState (void)
  * Suspending/resuming threads for doing external C-calls (_ccall_GC).
  * These functions are defined in rts/Schedule.c.
  */
-StgInt        suspendThread ( StgRegTable *cap );
-StgRegTable * resumeThread  ( StgInt );
+StgInt       suspendThread ( Capability *cap );
+Capability * resumeThread  ( StgInt );
 
 #define SUSPEND_THREAD(token)			\
    SaveThreadState();				\
-   token = suspendThread(BaseReg);
+   token = suspendThread((Capability *)((void *)BaseReg - sizeof(StgFunTable)));
 
 #ifdef SMP
-#define RESUME_THREAD(token)  			\
-   BaseReg = resumeThread(token);		\
-   LoadThreadState();
+#define RESUME_THREAD(token)			\
+  { Capability c;				\
+    c = resumeThread(token);			\
+    BaseReg = &c.r;				\
+    LoadThreadState();				\
+  }
 #else
 #define RESUME_THREAD(token)			\
    (void)resumeThread(token);			\

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.9 2000/03/23 17:45:31 simonpj Exp $
+ * $Id: Regs.h,v 1.10 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -32,6 +32,13 @@ typedef struct StgSparkPool_ {
   StgClosure **tl;
 } StgSparkPool;
 
+typedef struct {
+  StgFunPtr      stgChk0;
+  StgFunPtr      stgChk1;
+  StgFunPtr      stgGCEnter1;
+  StgFunPtr      stgUpdatePAP;
+} StgFunTable;
+
 typedef struct StgRegTable_ {
   StgUnion 	  rR1;
   StgUnion   	  rR2;
@@ -41,8 +48,8 @@ typedef struct StgRegTable_ {
   StgUnion   	  rR6;
   StgUnion   	  rR7;
   StgUnion   	  rR8;
-  StgUnion   	  rR9;		/* used occasionally by heap/stack checks */
-  StgUnion   	  rR10;		/* used occasionally by heap/stack checks */
+  StgUnion   	  rR9;		// used occasionally by heap/stack checks
+  StgUnion   	  rR10;		// used occasionally by heap/stack checks
   StgFloat 	  rF1;
   StgFloat 	  rF2;
   StgFloat 	  rF3;
@@ -58,19 +65,31 @@ typedef struct StgRegTable_ {
   StgTSO         *rCurrentTSO;
   struct _bdescr *rNursery;
   struct _bdescr *rCurrentNursery;
+  StgWord         rHpAlloc;	// number of words being allocated in heap 
 #if defined(SMP) || defined(PAR)
-  StgSparkPool   rSparks;	/* per-task spark pool */
+  StgSparkPool   rSparks;	// per-task spark pool
 #endif
 #if defined(SMP)
-  struct StgRegTable_ *link;	/* per-task register tables are linked together */
+  struct StgRegTable_ *link;	// per-task register tables are linked together
 #endif
 } StgRegTable;
+
+
+/* A capability is a combination of a FunTable and a RegTable.  In STG
+ * code, BaseReg normally points to the RegTable portion of this
+ * structure, so that we can index both forwards and backwards to take
+ * advantage of shorter instruction forms on some archs (eg. x86).
+ */
+typedef struct {
+    StgFunTable f;
+    StgRegTable r;
+} Capability;
 
 /* No such thing as a MainRegTable under SMP - each thread must
  * have its own MainRegTable.
  */
 #ifndef SMP
-extern DLL_IMPORT_RTS StgRegTable  MainRegTable;
+extern DLL_IMPORT_RTS Capability  MainCapability;
 #endif
 
 #if IN_STG_CODE
@@ -113,6 +132,7 @@ extern DLL_IMPORT_RTS StgRegTable  MainRegTable;
 
 #define SAVE_CurrentTSO     (BaseReg->rCurrentTSO)
 #define SAVE_CurrentNursery (BaseReg->rCurrentNursery)
+#define SAVE_HpAlloc        (BaseReg->rHpAlloc)
 #if defined(SMP) || defined(PAR)
 #define SAVE_SparkHd 	    (BaseReg->rSparks.hd)
 #define SAVE_SparkTl        (BaseReg->rSparks.tl)
@@ -275,7 +295,7 @@ GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
 #ifdef SMP
 #error BaseReg must be in a register for SMP
 #endif
-#define BaseReg (&MainRegTable)
+#define BaseReg (&MainCapability.r)
 #endif
 
 #ifdef REG_Sp
@@ -320,6 +340,12 @@ GLOBAL_REG_DECL(bdescr *,CurrentNursery,REG_CurrentNursery)
 #define CurrentNursery (BaseReg->rCurrentNursery)
 #endif
 
+#ifdef REG_HpAlloc
+GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
+#else
+#define HpAlloc (BaseReg->rHpAlloc)
+#endif
+
 #ifdef REG_SparkHd
 GLOBAL_REG_DECL(bdescr *,SparkHd,REG_SparkHd)
 #else
@@ -343,6 +369,39 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
 #else
 #define SparkLim (BaseReg->rSparks.lim)
 #endif
+
+/* -----------------------------------------------------------------------------
+   Get absolute function pointers from the register table, to save
+   code space.  On x86, 
+
+       jmp  *-12(%ebx)
+
+   is shorter than
+   
+       jmp absolute_address
+
+   as long as the offset is within the range of a signed byte
+   (-128..+127).  So we pick some common absolute_addresses and put
+   them in the register table.  As a bonus, linking time should also
+   be reduced.
+
+   Other possible candidates in order of importance:
+      
+     stg_upd_frame_info
+     stg_CAF_BLACKHOLE_info
+     stg_IND_STATIC_info
+
+   anything else probably isn't worth the effort.
+
+   -------------------------------------------------------------------------- */
+
+
+#define FunReg ((StgFunTable *)((void *)BaseReg - sizeof(StgFunTable)))
+
+#define stg_chk_0          (FunReg->stgChk0)
+#define stg_chk_1          (FunReg->stgChk1)
+#define stg_gc_enter_1     (FunReg->stgGCEnter1)
+#define stg_update_PAP     (FunReg->stgUpdatePAP)
 
 /* -----------------------------------------------------------------------------
    For any registers which are denoted "caller-saves" by the C calling
@@ -551,6 +610,14 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
 #else
 #define CALLER_SAVE_CurrentNursery   	/* nothing */
 #define CALLER_RESTORE_CurrentNursery   /* nothing */
+#endif
+
+#ifdef CALLER_SAVES_HpAlloc
+#define CALLER_SAVE_HpAlloc   		SAVE_HpAlloc = HpAlloc;
+#define CALLER_RESTORE_HpAlloc		HpAlloc = SAVE_HpAlloc;
+#else
+#define CALLER_SAVE_HpAlloc   		/* nothing */
+#define CALLER_RESTORE_HpAlloc   	/* nothing */
 #endif
 
 #ifdef CALLER_SAVES_SparkHd

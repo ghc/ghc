@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.30 $
- * $Date: 2001/08/14 13:40:09 $
+ * $Revision: 1.31 $
+ * $Date: 2001/11/08 12:46:31 $
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
@@ -56,15 +56,15 @@
 #define BCO_ITBL(n)   itbls[n]
 
 #define LOAD_STACK_POINTERS          \
-    iSp = cap->rCurrentTSO->sp;      \
-    iSu = cap->rCurrentTSO->su;      \
+    iSp = cap->r.rCurrentTSO->sp;      \
+    iSu = cap->r.rCurrentTSO->su;      \
     /* We don't change this ... */   \
-    iSpLim = cap->rCurrentTSO->stack + RESERVED_STACK_WORDS;
+    iSpLim = cap->r.rCurrentTSO->stack + RESERVED_STACK_WORDS;
 
 
 #define SAVE_STACK_POINTERS          \
-    cap->rCurrentTSO->sp = iSp;      \
-    cap->rCurrentTSO->su = iSu;
+    cap->r.rCurrentTSO->sp = iSp;      \
+    cap->r.rCurrentTSO->su = iSu;
 
 #define RETURN(retcode)              \
    SAVE_STACK_POINTERS; return retcode;
@@ -196,10 +196,10 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 
 	     //	     checkSanity(1);
 	     //             iSp--; StackWord(0) = obj;
-	     //             checkStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
+	     //             checkStack(iSp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size,iSu);
 	     //             iSp++;
 
-             printStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
+             printStack(iSp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size,iSu);
              fprintf(stderr, "\n\n");
             );
 
@@ -373,7 +373,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
           /* Heap check */
           if (doYouWantToGC()) {
 	     iSp--; StackWord(0) = (W_)bco;
-             cap->rCurrentTSO->what_next = ThreadEnterInterp;
+             cap->r.rCurrentTSO->what_next = ThreadEnterInterp;
              RETURN(HeapOverflow);
           }
 
@@ -381,7 +381,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
           if (iSp - (INTERP_STACK_CHECK_THRESH+1) < iSpLim) {
              iSp--;
              StackWord(0) = (W_)obj;
-             cap->rCurrentTSO->what_next = ThreadEnterInterp;
+             cap->r.rCurrentTSO->what_next = ThreadEnterInterp;
              RETURN(StackOverflow);
           }
 
@@ -389,7 +389,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
           if (context_switch) {
              iSp--;
              StackWord(0) = (W_)obj;
-             cap->rCurrentTSO->what_next = ThreadEnterInterp;
+             cap->r.rCurrentTSO->what_next = ThreadEnterInterp;
              RETURN(ThreadYielding);
 	  }
  
@@ -404,7 +404,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
           IF_DEBUG(evaluator,
 		   //if (do_print_stack) {
 		   //fprintf(stderr, "\n-- BEGIN stack\n");
-		   //printStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
+		   //printStack(iSp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size,iSu);
 		   //fprintf(stderr, "-- END stack\n\n");
 		   //}
                    do_print_stack = 1;
@@ -416,7 +416,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                                 fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(iSp+i)));
                              fprintf(stderr,"\n");
                            }
-		    //if (do_print_stack) checkStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
+		    //if (do_print_stack) checkStack(iSp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size,iSu);
                   );
 
 #         ifdef INTERP_STATS
@@ -436,7 +436,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                 if (iSp - stk_words_reqd < iSpLim) {
                    iSp--;
                    StackWord(0) = (W_)obj;
-                   cap->rCurrentTSO->what_next = ThreadEnterInterp;
+                   cap->r.rCurrentTSO->what_next = ThreadEnterInterp;
                    RETURN(StackOverflow);
                 }
                 goto nextInsn;
@@ -480,7 +480,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                           fprintf(stderr,"\tBuilt "); 
                           printObj((StgClosure*)pap);
 		         );
-                 cap->rCurrentTSO->what_next = ThreadEnterGHC;
+                 cap->r.rCurrentTSO->what_next = ThreadEnterGHC;
                  RETURN(ThreadYielding);
               }
               case bci_PUSH_L: {
@@ -750,7 +750,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                      StgInfoTable* magic_itbl = BCO_ITBL(o_itoc_itbl);
                      if (magic_itbl != NULL) {
                         StackWord(0) = (W_)magic_itbl;
-                        cap->rCurrentTSO->what_next = ThreadRunGHC;
+                        cap->r.rCurrentTSO->what_next = ThreadRunGHC;
                         RETURN(ThreadYielding);
                      } else {
                         /* Special case -- returning a VoidRep to
@@ -759,7 +759,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                            tag and enter the itbl. */
 		        ASSERT(StackWord(0) == (W_)NULL);
 		        iSp ++;
-                        cap->rCurrentTSO->what_next = ThreadRunGHC;
+                        cap->r.rCurrentTSO->what_next = ThreadRunGHC;
                         RETURN(ThreadYielding);
                      }
                  }
@@ -819,7 +819,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                    printObj(obj);
                   );
           iSp--; StackWord(0) = (W_)obj;
-          cap->rCurrentTSO->what_next = ThreadEnterGHC;
+          cap->r.rCurrentTSO->what_next = ThreadEnterGHC;
           RETURN(ThreadYielding);
        }
     } /* switch on object kind */

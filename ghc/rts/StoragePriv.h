@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.18 2001/10/19 09:41:11 sewardj Exp $
+ * $Id: StoragePriv.h,v 1.19 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -40,7 +40,6 @@ extern StgPtr alloc_HpLim;
 
 extern bdescr *nursery;
 
-extern nat nursery_blocks;
 extern nat alloc_blocks;
 extern nat alloc_blocks_lim;
 
@@ -77,6 +76,7 @@ dbl_link_onto(bdescr *bd, bdescr **list)
 #ifdef DEBUG
 extern void memInventory(void);
 extern void checkSanity(void);
+extern nat  countBlocks(bdescr *);
 #endif
 
 /* 

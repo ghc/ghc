@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.17 2001/07/06 14:11:38 simonmar Exp $
+ * $Id: HeapStackCheck.hc,v 1.18 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -12,7 +12,6 @@
 #include "Storage.h"   	/* for CurrentTSO */
 #include "StgRun.h"	/* for StgReturn and register saving */
 #include "Schedule.h"   /* for context_switch */
-#include "HeapStackCheck.h"
 
 /* Stack/Heap Check Failure
  * ------------------------
@@ -51,7 +50,8 @@
 
 #define GC_GENERIC					\
   if (Hp > HpLim) {					\
-    if (ExtendNursery(Hp,HpLim)) {			\
+    Hp -= HpAlloc;					\
+    if (HpAlloc <= BLOCK_SIZE_W && ExtendNursery(Hp,HpLim)) {\
 	if (context_switch) {				\
 	    R1.i = ThreadYielding;			\
 	} else {					\
@@ -70,7 +70,8 @@
 
 #define GC_ENTER					\
   if (Hp > HpLim) {					\
-    if (ExtendNursery(Hp,HpLim)) {			\
+    Hp -= HpAlloc;					\
+    if (HpAlloc <= BLOCK_SIZE_W && ExtendNursery(Hp,HpLim)) {\
 	if (context_switch) {				\
 	    R1.i = ThreadYielding;			\
 	} else {					\
@@ -151,7 +152,7 @@ EXTFUN(stg_gc_entertop)
    There are canned sequences for 'n' pointer values in registers.
    -------------------------------------------------------------------------- */
 
-EXTFUN(stg_gc_enter_1)
+EXTFUN(__stg_gc_enter_1)
 {
   FB_
   Sp -= 1;
@@ -880,7 +881,7 @@ EXTFUN(stg_gc_ut_0_1)
 
 /*- 0 Regs -------------------------------------------------------------------*/
 
-EXTFUN(stg_chk_0)
+EXTFUN(__stg_chk_0)
 {
   FB_
   Sp -= 1;
@@ -891,7 +892,7 @@ EXTFUN(stg_chk_0)
 
 /*- 1 Reg --------------------------------------------------------------------*/
 
-EXTFUN(stg_chk_1)
+EXTFUN(__stg_chk_1)
 {
   FB_
   Sp -= 2;

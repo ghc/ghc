@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.68 2001/08/10 09:41:17 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.69 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -12,7 +12,6 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "StgMiscClosures.h"
-#include "HeapStackCheck.h"   /* for stg_gen_yield */
 #include "Storage.h"
 #include "StoragePriv.h"
 #include "Profiling.h"

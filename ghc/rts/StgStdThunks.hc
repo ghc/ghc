@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStdThunks.hc,v 1.16 2001/05/31 10:59:14 simonmar Exp $
+ * $Id: StgStdThunks.hc,v 1.17 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -10,7 +10,6 @@
 #include "Stg.h"
 #include "Rts.h"
 #include "StoragePriv.h"
-#include "HeapStackCheck.h"
 
 /* -----------------------------------------------------------------------------
    The code for a thunk that simply extracts a field from a
@@ -159,7 +158,7 @@ FN_(stg_ap_8_upd_entry);
  * in the compiler that means stg_ap_1 is generated occasionally (ToDo)
  */
 
-INFO_TABLE_SRT(stg_ap_1_upd_info,stg_ap_1_upd_entry,1,1,0,0,0,THUNK,,EF_,"stg_ap_1_upd_info","stg_ap_1_upd_info");
+INFO_TABLE_SRT(stg_ap_1_upd_info,stg_ap_1_upd_entry,1,1,0,0,0,THUNK_1_0,,EF_,"stg_ap_1_upd_info","stg_ap_1_upd_info");
 FN_(stg_ap_1_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame),1,);
@@ -172,7 +171,7 @@ FN_(stg_ap_1_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(stg_ap_2_upd_info,stg_ap_2_upd_entry,2,0,0,0,0,THUNK,,EF_,"stg_ap_2_upd_info","stg_ap_2_upd_info");
+INFO_TABLE_SRT(stg_ap_2_upd_info,stg_ap_2_upd_entry,2,0,0,0,0,THUNK_2_0,,EF_,"stg_ap_2_upd_info","stg_ap_2_upd_info");
 FN_(stg_ap_2_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+1,1,);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.83 2001/08/08 10:50:37 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.84 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -18,7 +18,6 @@
 #include "Storage.h"
 #include "BlockAlloc.h" /* tmp */
 #include "StablePriv.h"
-#include "HeapStackCheck.h"
 #include "StgRun.h"
 #include "Itimer.h"
 #include "Prelude.h"

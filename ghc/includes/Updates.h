@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.24 2001/03/22 03:51:09 hwloidl Exp $
+ * $Id: Updates.h,v 1.25 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -239,12 +239,12 @@ extern void newCAF(StgClosure*);
    Update-related prototypes
    -------------------------------------------------------------------------- */
 
+EXTFUN_RTS(__stg_update_PAP);
+
 DLL_IMPORT_RTS extern STGFUN(stg_upd_frame_entry);
 
 extern DLL_IMPORT_RTS const StgInfoTable stg_PAP_info;
 DLL_IMPORT_RTS STGFUN(stg_PAP_entry);
-
-EXTFUN_RTS(stg_update_PAP);
 
 extern DLL_IMPORT_RTS const StgInfoTable stg_AP_UPD_info;
 DLL_IMPORT_RTS STGFUN(stg_AP_UPD_entry);

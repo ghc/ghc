@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.34 2001/07/24 06:31:36 ken Exp $
+ * $Id: Updates.hc,v 1.35 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -11,7 +11,6 @@
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
-#include "HeapStackCheck.h"
 #include "Storage.h"
 #if defined(GRAN) || defined(PAR)
 # include "FetchMe.h"
@@ -230,7 +229,7 @@ STGFUN(stg_PAP_entry)
    This function is called whenever an argument satisfaction check fails.
    -------------------------------------------------------------------------- */
 
-EXTFUN(stg_update_PAP)
+EXTFUN(__stg_update_PAP)
 {
   nat Words, PapSize;
 #ifdef PROFILING

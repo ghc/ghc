@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.52 2001/10/18 14:41:01 simonmar Exp $
+ * $Id: Storage.c,v 1.53 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,10 +22,6 @@
 #include "Storage.h"
 #include "Schedule.h"
 #include "StoragePriv.h"
-
-#ifndef SMP
-nat nursery_blocks;		/* number of blocks in the nursery */
-#endif
 
 StgClosure    *caf_list         = NULL;
 
@@ -323,13 +319,12 @@ allocNurseries( void )
      */
   }
 #else /* SMP */
-  nursery_blocks    = RtsFlags.GcFlags.minAllocAreaSize;
-  g0s0->blocks      = allocNursery(NULL, nursery_blocks);
-  g0s0->n_blocks    = nursery_blocks;
+  g0s0->blocks      = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
+  g0s0->n_blocks    = RtsFlags.GcFlags.minAllocAreaSize;
   g0s0->to_blocks   = NULL;
   g0s0->n_to_blocks = 0;
-  MainRegTable.rNursery        = g0s0->blocks;
-  MainRegTable.rCurrentNursery = g0s0->blocks;
+  MainCapability.r.rNursery        = g0s0->blocks;
+  MainCapability.r.rCurrentNursery = g0s0->blocks;
   /* hp, hpLim, hp_bd, to_space etc. aren't used in G0S0 */
 #endif
 }
@@ -360,41 +355,49 @@ resetNurseries( void )
     ASSERT(bd->step == g0s0);
     IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
   }
-  MainRegTable.rNursery = g0s0->blocks;
-  MainRegTable.rCurrentNursery = g0s0->blocks;
+  MainCapability.r.rNursery = g0s0->blocks;
+  MainCapability.r.rCurrentNursery = g0s0->blocks;
 #endif
 }
 
 bdescr *
-allocNursery (bdescr *last_bd, nat blocks)
+allocNursery (bdescr *tail, nat blocks)
 {
   bdescr *bd;
   nat i;
 
-  /* Allocate a nursery */
+  // Allocate a nursery: we allocate fresh blocks one at a time and
+  // cons them on to the front of the list, not forgetting to update
+  // the back pointer on the tail of the list to point to the new block.
   for (i=0; i < blocks; i++) {
     bd = allocBlock();
-    bd->link = last_bd;
+    bd->link = tail;
+    // double-link the nursery: we might need to insert blocks
+    if (tail != NULL) {
+	tail->u.back = bd;
+    }
     bd->step = g0s0;
     bd->gen_no = 0;
     bd->flags = 0;
     bd->free = bd->start;
-    last_bd = bd;
+    tail = bd;
   }
-  return last_bd;
+  tail->u.back = NULL;
+  return tail;
 }
 
 void
 resizeNursery ( nat blocks )
 {
   bdescr *bd;
+  nat nursery_blocks;
 
 #ifdef SMP
   barf("resizeNursery: can't resize in SMP mode");
 #endif
 
+  nursery_blocks = g0s0->n_blocks;
   if (nursery_blocks == blocks) {
-    ASSERT(g0s0->n_blocks == blocks);
     return;
   }
 
@@ -409,15 +412,25 @@ resizeNursery ( nat blocks )
     
     IF_DEBUG(gc, fprintf(stderr, "Decreasing size of nursery to %d blocks\n", 
 			 blocks));
-    for (bd = g0s0->blocks; nursery_blocks > blocks; nursery_blocks--) {
-      next_bd = bd->link;
-      freeGroup(bd);
-      bd = next_bd;
+
+    bd = g0s0->blocks;
+    while (nursery_blocks > blocks) {
+	next_bd = bd->link;
+	next_bd->u.back = NULL;
+	nursery_blocks -= bd->blocks; // might be a large block
+	freeGroup(bd);
+	bd = next_bd;
     }
     g0s0->blocks = bd;
+    // might have gone just under, by freeing a large block, so make
+    // up the difference.
+    if (nursery_blocks < blocks) {
+	g0s0->blocks = allocNursery(g0s0->blocks, blocks-nursery_blocks);
+    }
   }
   
-  g0s0->n_blocks = nursery_blocks = blocks;
+  g0s0->n_blocks = blocks;
+  ASSERT(countBlocks(g0s0->blocks) == g0s0->n_blocks);
 }
 
 /* -----------------------------------------------------------------------------
@@ -642,9 +655,9 @@ calcAllocated( void )
   }
 
 #else /* !SMP */
-  bdescr *current_nursery = MainRegTable.rCurrentNursery;
+  bdescr *current_nursery = MainCapability.r.rCurrentNursery;
 
-  allocated = (nursery_blocks * BLOCK_SIZE_W) + allocated_bytes();
+  allocated = (g0s0->n_blocks * BLOCK_SIZE_W) + allocated_bytes();
   for ( bd = current_nursery->link; bd != NULL; bd = bd->link ) {
     allocated -= BLOCK_SIZE_W;
   }
@@ -790,7 +803,8 @@ memInventory(void)
   ASSERT(total_blocks + free_blocks == mblocks_allocated * BLOCKS_PER_MBLOCK);
 }
 
-static nat
+
+nat
 countBlocks(bdescr *bd)
 {
     nat n;
@@ -813,13 +827,13 @@ checkSanity( void )
 	
 	for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
 	    for (s = 0; s < generations[g].n_steps; s++) {
-		if (g == 0 && s == 0) { continue; }
-		checkHeap(generations[g].steps[s].blocks);
-		checkChain(generations[g].steps[s].large_objects);
 		ASSERT(countBlocks(generations[g].steps[s].blocks)
 		       == generations[g].steps[s].n_blocks);
 		ASSERT(countBlocks(generations[g].steps[s].large_objects)
 		       == generations[g].steps[s].n_large_blocks);
+		if (g == 0 && s == 0) { continue; }
+		checkHeap(generations[g].steps[s].blocks);
+		checkChain(generations[g].steps[s].large_objects);
 		if (g > 0) {
 		    checkMutableList(generations[g].mut_list, g);
 		    checkMutOnceList(generations[g].mut_once_list, g);

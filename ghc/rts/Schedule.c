@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.104 2001/10/31 10:34:29 simonmar Exp $
+ * $Id: Schedule.c,v 1.105 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -225,13 +225,10 @@ StgThreadID next_thread_id = 1;
  * Locks required: sched_mutex.
  */
 #ifdef SMP
-//@cindex free_capabilities
-//@cindex n_free_capabilities
 Capability *free_capabilities; /* Available capabilities for running threads */
 nat n_free_capabilities;       /* total number of available capabilities */
 #else
-//@cindex MainRegTable
-Capability MainRegTable;       /* for non-SMP, we have one global capability */
+Capability MainCapability;     /* for non-SMP, we have one global capability */
 #endif
 
 #if defined(GRAN)
@@ -460,7 +457,8 @@ schedule( void )
       }
     }
 
-#else
+#else // not SMP
+
 # if defined(PAR)
     /* in GUM do this only on the Main PE */
     if (IAmMainThread)
@@ -527,7 +525,7 @@ schedule( void )
 	  pthread_cond_signal(&thread_ready_cond);
       }
     }
-#endif /* SMP */
+#endif // SMP
 
     /* check for signals each time around the scheduler */
 #ifndef mingw32_TARGET_OS
@@ -902,6 +900,9 @@ schedule( void )
      */
     ASSERT(run_queue_hd != END_TSO_QUEUE);
     t = POP_RUN_QUEUE();
+
+    // Sanity check the thread we're about to run.  This can be
+    // expensive if there is lots of thread switching going on...
     IF_DEBUG(sanity,checkTSO(t));
 
 #endif
@@ -913,10 +914,10 @@ schedule( void )
     free_capabilities = cap->link;
     n_free_capabilities--;
 #else
-    cap = &MainRegTable;
+    cap = &MainCapability;
 #endif
 
-    cap->rCurrentTSO = t;
+    cap->r.rCurrentTSO = t;
     
     /* context switches are now initiated by the timer signal, unless
      * the user specified "context switch as often as possible", with
@@ -938,17 +939,17 @@ schedule( void )
     /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     /* Run the current thread 
      */
-    switch (cap->rCurrentTSO->what_next) {
+    switch (cap->r.rCurrentTSO->what_next) {
     case ThreadKilled:
     case ThreadComplete:
 	/* Thread already finished, return to scheduler. */
 	ret = ThreadFinished;
 	break;
     case ThreadEnterGHC:
-	ret = StgRun((StgFunPtr) stg_enterStackTop, cap);
+	ret = StgRun((StgFunPtr) stg_enterStackTop, &cap->r);
 	break;
     case ThreadRunGHC:
-	ret = StgRun((StgFunPtr) stg_returnToStackTop, cap);
+	ret = StgRun((StgFunPtr) stg_returnToStackTop, &cap->r);
 	break;
     case ThreadEnterInterp:
 	ret = interpretBCO(cap);
@@ -970,7 +971,7 @@ schedule( void )
 #elif !defined(GRAN) && !defined(PAR)
     IF_DEBUG(scheduler,fprintf(stderr,"scheduler: "););
 #endif
-    t = cap->rCurrentTSO;
+    t = cap->r.rCurrentTSO;
     
 #if defined(PAR)
     /* HACK 675: if the last thread didn't yield, make sure to print a 
@@ -983,14 +984,65 @@ schedule( void )
     switch (ret) {
     case HeapOverflow:
 #if defined(GRAN)
-      IF_DEBUG(gran, 
-	       DumpGranEvent(GR_DESCHEDULE, t));
+      IF_DEBUG(gran, DumpGranEvent(GR_DESCHEDULE, t));
       globalGranStats.tot_heapover++;
 #elif defined(PAR)
-      // IF_DEBUG(par, 
-      //DumpGranEvent(GR_DESCHEDULE, t);
       globalParStats.tot_heapover++;
 #endif
+
+      // did the task ask for a large block?
+      if (cap->r.rHpAlloc > BLOCK_SIZE_W) {
+	  // if so, get one and push it on the front of the nursery.
+	  bdescr *bd;
+	  nat blocks;
+	  
+	  blocks = (nat)BLOCK_ROUND_UP(cap->r.rHpAlloc * sizeof(W_)) / BLOCK_SIZE;
+
+	  IF_DEBUG(scheduler,belch("--<< thread %ld (%p; %s) stopped: requesting a large block (size %d)", 
+				   t->id, t,
+				   whatNext_strs[t->what_next], blocks));
+
+	  // don't do this if it would push us over the
+	  // alloc_blocks_lim limit; we'll GC first.
+	  if (alloc_blocks + blocks < alloc_blocks_lim) {
+
+	      alloc_blocks += blocks;
+	      bd = allocGroup( blocks );
+
+	      // link the new group into the list
+	      bd->link = cap->r.rCurrentNursery;
+	      bd->u.back = cap->r.rCurrentNursery->u.back;
+	      if (cap->r.rCurrentNursery->u.back != NULL) {
+		  cap->r.rCurrentNursery->u.back->link = bd;
+	      } else {
+		  ASSERT(g0s0->blocks == cap->r.rCurrentNursery &&
+			 g0s0->blocks == cap->r.rNursery);
+		  cap->r.rNursery = g0s0->blocks = bd;
+	      }		  
+	      cap->r.rCurrentNursery->u.back = bd;
+
+	      // initialise it as a nursery block
+	      bd->step = g0s0;
+	      bd->gen_no = 0;
+	      bd->flags = 0;
+	      bd->free = bd->start;
+
+	      // don't forget to update the block count in g0s0.
+	      g0s0->n_blocks += blocks;
+	      ASSERT(countBlocks(g0s0->blocks) == g0s0->n_blocks);
+
+	      // now update the nursery to point to the new block
+	      cap->r.rCurrentNursery = bd;
+
+	      // we might be unlucky and have another thread get on the
+	      // run queue before us and steal the large block, but in that
+	      // case the thread will just end up requesting another large
+	      // block.
+	      PUSH_ON_RUN_QUEUE(t);
+	      break;
+	  }
+      }
+
       /* make all the running tasks block on a condition variable,
        * maybe set context_switch and wait till they all pile in,
        * then have them wait on a GC condition variable.
@@ -1240,24 +1292,20 @@ schedule( void )
 	       G_CURR_THREADQ(0));
 #endif /* GRAN */
     }
+
 #if defined(GRAN)
   next_thread:
     IF_GRAN_DEBUG(unused,
 		  print_eventq(EventHd));
 
     event = get_next_event();
-
 #elif defined(PAR)
   next_thread:
     /* ToDo: wait for next message to arrive rather than busy wait */
-
-#else /* GRAN */
-  /* not any more
-  next_thread:
-    t = take_off_run_queue(END_TSO_QUEUE);
-  */
 #endif /* GRAN */
+
   } /* end of while(1) */
+
   IF_PAR_DEBUG(verbose,
 	       belch("== Leaving schedule() after having received Finish"));
 }
@@ -1315,14 +1363,14 @@ suspendThread( Capability *cap )
   ACQUIRE_LOCK(&sched_mutex);
 
   IF_DEBUG(scheduler,
-	   sched_belch("thread %d did a _ccall_gc", cap->rCurrentTSO->id));
+	   sched_belch("thread %d did a _ccall_gc", cap->r.rCurrentTSO->id));
 
-  threadPaused(cap->rCurrentTSO);
-  cap->rCurrentTSO->link = suspended_ccalling_threads;
-  suspended_ccalling_threads = cap->rCurrentTSO;
+  threadPaused(cap->r.rCurrentTSO);
+  cap->r.rCurrentTSO->link = suspended_ccalling_threads;
+  suspended_ccalling_threads = cap->r.rCurrentTSO;
 
   /* Use the thread ID as the token; it should be unique */
-  tok = cap->rCurrentTSO->id;
+  tok = cap->r.rCurrentTSO->id;
 
 #ifdef SMP
   cap->link = free_capabilities;
@@ -1366,10 +1414,10 @@ resumeThread( StgInt tok )
   free_capabilities = cap->link;
   n_free_capabilities--;
 #else  
-  cap = &MainRegTable;
+  cap = &MainCapability;
 #endif
 
-  cap->rCurrentTSO = tso;
+  cap->r.rCurrentTSO = tso;
 
   RELEASE_LOCK(&sched_mutex);
   return cap;
@@ -1738,7 +1786,15 @@ term_handler(int sig STG_UNUSED)
 }
 #endif
 
-//@cindex initScheduler
+static void
+initCapability( Capability *cap )
+{
+    cap->f.stgChk0         = (F_)__stg_chk_0;
+    cap->f.stgChk1         = (F_)__stg_chk_1;
+    cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
+    cap->f.stgUpdatePAP    = (F_)__stg_update_PAP;
+}
+
 void 
 initScheduler(void)
 {
@@ -1795,6 +1851,7 @@ initScheduler(void)
     prev = NULL;
     for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
       cap = stgMallocBytes(sizeof(Capability), "initScheduler:capabilities");
+      initCapability(cap);
       cap->link = prev;
       prev = cap;
     }
@@ -1803,6 +1860,8 @@ initScheduler(void)
   }
   IF_DEBUG(scheduler,fprintf(stderr,"scheduler: Allocated %d capabilities\n",
 			     n_free_capabilities););
+#else
+  initCapability(&MainCapability);
 #endif
 
 #if defined(SMP) || defined(PAR)

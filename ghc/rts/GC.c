@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.125 2001/10/19 09:41:11 sewardj Exp $
+ * $Id: GC.c,v 1.126 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -920,6 +920,11 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       }
       
       resizeNursery((nat)blocks);
+
+    } else {
+      // we might have added extra large blocks to the nursery, so
+      // resize back to minAllocAreaSize again.
+      resizeNursery(RtsFlags.GcFlags.minAllocAreaSize);
     }
   }
 
@@ -1466,6 +1471,9 @@ evacuate(StgClosure *q)
 loop:
   if (HEAP_ALLOCED(q)) {
     bd = Bdescr((P_)q);
+
+    // not a group head: find the group head
+    if (bd->blocks == 0) { bd = bd->link; }
 
     if (bd->gen_no > N) {
 	/* Can't evacuate this object, because it's in a generation

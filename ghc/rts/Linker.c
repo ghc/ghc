@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.72 2001/10/26 11:33:13 sewardj Exp $
+ * $Id: Linker.c,v 1.73 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -158,22 +158,22 @@ typedef struct _RtsSymbolVal {
       Sym(StgReturn)				\
       Sym(__stginit_PrelGHC)			\
       Sym(init_stack)				\
-      Sym(stg_chk_0)				\
-      Sym(stg_chk_1)				\
+      SymX(__stg_chk_0)				\
+      SymX(__stg_chk_1)				\
       Sym(stg_enterStackTop)			\
-      Sym(stg_gc_d1)				\
-      Sym(stg_gc_enter_1)			\
-      Sym(stg_gc_f1)				\
-      Sym(stg_gc_noregs)			\
-      Sym(stg_gc_seq_1)				\
-      Sym(stg_gc_unbx_r1)			\
-      Sym(stg_gc_unpt_r1)			\
-      Sym(stg_gc_ut_0_1)			\
-      Sym(stg_gc_ut_1_0)			\
-      Sym(stg_gen_chk)				\
-      Sym(stg_yield_to_interpreter)		\
+      SymX(stg_gc_d1)				\
+      SymX(__stg_gc_enter_1)			\
+      SymX(stg_gc_f1)				\
+      SymX(stg_gc_noregs)			\
+      SymX(stg_gc_seq_1)			\
+      SymX(stg_gc_unbx_r1)			\
+      SymX(stg_gc_unpt_r1)			\
+      SymX(stg_gc_ut_0_1)			\
+      SymX(stg_gc_ut_1_0)			\
+      SymX(stg_gen_chk)				\
+      SymX(stg_yield_to_interpreter)		\
       SymX(ErrorHdrHook)			\
-      SymX(MainRegTable)			\
+      SymX(MainCapability)			\
       SymX(MallocFailHook)			\
       SymX(NoRunnableThreadsHook)		\
       SymX(OnExitHook)				\
@@ -314,7 +314,7 @@ typedef struct _RtsSymbolVal {
       SymX(stg_sel_9_upd_info)			\
       SymX(stg_seq_frame_info)			\
       SymX(stg_upd_frame_info)			\
-      SymX(stg_update_PAP)			\
+      SymX(__stg_update_PAP)			\
       SymX(suspendThread)			\
       SymX(takeMVarzh_fast)			\
       SymX(timesIntegerzh_fast)			\

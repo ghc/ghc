@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.22 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: Schedule.h,v 1.23 2001/11/08 12:46:31 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -124,11 +124,6 @@ extern rtsBool interrupted;
 extern nat timestamp;
 extern nat ticks_since_timestamp;
 
-//@cindex Capability
-/* Capability type
- */
-typedef StgRegTable Capability;
-
 /* Free capability list.
  * Locks required: sched_mutex.
  */
@@ -136,7 +131,7 @@ typedef StgRegTable Capability;
 extern Capability *free_capabilities;
 extern nat n_free_capabilities;
 #else
-extern Capability MainRegTable;
+extern Capability MainCapability;
 #endif
 
 /* Thread queues.
