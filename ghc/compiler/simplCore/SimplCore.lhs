@@ -15,19 +15,22 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 			)
 import CoreLint		( beginPass, endPass )
 import CoreSyn
+import CoreFVs		( ruleSomeFreeVars )
+import HscTypes		( PackageRuleBase, HomeSymbolTable, ModDetails(..) )
 import CSE		( cseProgram )
-import Rules		( RuleBase, extendRuleBaseList, addRuleBaseFVs )
+import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds, extendRuleBaseList, addRuleBaseFVs )
+import Module		( moduleEnvElts )
 import CoreUnfold
-import PprCore		( pprCoreBindings, pprCoreRulePair )
+import PprCore		( pprCoreBindings, pprIdCoreRule )
 import OccurAnal	( occurAnalyseBinds )
-import CoreUtils	( exprIsTrivial, etaReduceExpr, coreBindsSize )
+import CoreUtils	( etaReduceExpr, coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
 import SimplUtils	( simplBinders )
 import SimplMonad
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( isDataConWrapId )
+import Id		( Id, isDataConWrapId, setIdNoDiscard )
 import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
@@ -65,12 +68,13 @@ core2core dflags pkg_rule_base hst core_todos binds rules
 	let (cp_us, ru_us) = splitUniqSupply us
 
 		-- COMPUTE THE RULE BASE TO USE
-	(rule_base, binds1, orphan_rules) <- prepareRules pkg_rule_base hst binds rules
+	(rule_base, binds1, orphan_rules)
+		<- prepareRules dflags pkg_rule_base hst ru_us binds rules
 
 
 		-- DO THE BUSINESS
 	(stats, processed_binds)
-            <- doCorePasses dflags (zeroSimplCount dflags) cp_us binds1 rule_base core_todos
+		<- doCorePasses dflags rule_base (zeroSimplCount dflags) cp_us binds1 core_todos
 
 	dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
 		  "Grand total simplifier statistics"
@@ -97,7 +101,7 @@ doCorePasses dflags rb stats us binds (to_do : to_dos)
   = do
 	let (us1, us2) = splitUniqSupply us
 
-	(stats1, binds1, mlrb1) <- doCorePass dflags rb us1 binds to_do
+	(stats1, binds1) <- doCorePass dflags rb us1 binds to_do
 
 	doCorePasses dflags rb (stats `plusSimplCount` stats1) us2 binds1 to_dos
 
@@ -121,7 +125,7 @@ doCorePass dfs rb us binds CoreDoSpecialising
    = _scc_ "Specialise"    noStats dfs (specProgram dfs us binds)
 doCorePass dfs rb us binds CoreDoCPResult	        
    = _scc_ "CPResult"      noStats dfs (cprAnalyse dfs binds)
-doCorePass dfs us binds CoreDoPrintCore	        
+doCorePass dfs rb us binds CoreDoPrintCore	        
    = _scc_ "PrintCore"     noStats dfs (printCore binds)
 doCorePass dfs rb us binds CoreDoUSPInf             
    = _scc_ "CoreUsageSPInf" noStats dfs (doUsageSPInf dfs us binds)
@@ -165,16 +169,16 @@ prepareRules dflags pkg_rule_base hst us binds rules
 		                          (mapSmpl simplRule rules)
 
 	; dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
-		        (vcat (map pprCoreRulePair better_rules))
+		        (vcat (map pprIdCoreRule better_rules))
 
-	; let (local_id_rules, orphan_rules) = partition (`elemVarSet` local_ids . fst) better_rules
+	; let (local_id_rules, orphan_rules) = partition ((`elemVarSet` local_ids) . fst) better_rules
               (binds1, local_rule_fvs)	     = addRulesToBinds binds local_id_rules
 	      imp_rule_base		     = foldl add_rules pkg_rule_base (moduleEnvElts hst)
 	      rule_base			     = extendRuleBaseList imp_rule_base orphan_rules
 	      final_rule_base		     = addRuleBaseFVs rule_base local_rule_fvs
 		-- The last step black-lists the free vars of local rules too
 
-	; return (rule_base, binds1, orphan_rules)
+	; return (final_rule_base, binds1, orphan_rules)
     }
   where
     sw_chkr any	     = SwBool False			-- A bit bogus
@@ -189,7 +193,7 @@ prepareRules dflags pkg_rule_base hst us binds rules
 	-- simpVar fails if it isn't right, and it might conceiveably matter
     local_ids = foldr (unionVarSet . mkVarSet . bindersOf) emptyVarSet binds
 
-addRulesToBinds :: [CoreBind] -> [(Id,CoreRule)] -> ([CoreBind], FreeVars)
+addRulesToBinds :: [CoreBind] -> [(Id,CoreRule)] -> ([CoreBind], IdSet)
 	-- A horrible function
 
 	-- Attach the rules for each locally-defined Id to that Id.
@@ -201,22 +205,22 @@ addRulesToBinds :: [CoreBind] -> [(Id,CoreRule)] -> ([CoreBind], FreeVars)
 	--	- It makes sure that, when we apply a rule, the free vars
 	--	  of the RHS are more likely to be in scope
 	--
-	-- The LHS and RHS Ids are marked 'no-discard'. 
+	-- Both the LHS and RHS Ids are marked 'no-discard'. 
 	-- This means that the binding won't be discarded EVEN if the binding
 	-- ends up being trivial (v = w) -- the simplifier would usually just 
 	-- substitute w for v throughout, but we don't apply the substitution to
 	-- the rules (maybe we should?), so this substitution would make the rule
 	-- bogus.
 
-addRulesToBinds binds imported_rule_base local_rules
+addRulesToBinds binds local_rules
   = (map zap_bind binds, rule_lhs_fvs)
   where
-    RuleBase rule_ids rule_lhs_fvs = extendRuleBaseList emptyRuleBase local_rules
-
-    imported_id_rule_ids = filterVarSet (not . isLocallyDefined) rule_ids
-
 	-- rule_fvs is the set of all variables mentioned in this module's rules
-    rule_fvs = foldVarSet (unionVarSet . idRuleVars) rule_lhs_fvs rule_ids
+    rule_fvs     = unionVarSets [ ruleSomeFreeVars    isId rule | (_,rule) <- local_rules ]
+
+    rule_base    = extendRuleBaseList emptyRuleBase local_rules
+    rule_lhs_fvs = ruleBaseFVs rule_base
+    rule_ids	 = ruleBaseIds rule_base
 
     zap_bind (NonRec b r) = NonRec (zap_bndr b) r
     zap_bind (Rec prs)    = Rec [(zap_bndr b, r) | (b,r) <- prs]
@@ -312,7 +316,7 @@ simplifyPgm :: DynFlags
 	    -> [CoreBind]		    -- Input
 	    -> IO (SimplCount, [CoreBind])  -- New bindings
 
-simplifyPgm dflags (RuleBase imported_rule_ids rule_lhs_fvs) 
+simplifyPgm dflags rule_base
 	    sw_chkr us binds
   = do {
 	beginPass dflags "Simplify";
@@ -335,9 +339,11 @@ simplifyPgm dflags (RuleBase imported_rule_ids rule_lhs_fvs)
 	return (counts_out, binds')
     }
   where
-    max_iterations = getSimplIntSwitch sw_chkr MaxSimplifierIterations
-    black_list_fn  = blackListed rule_lhs_fvs (intSwitchSet sw_chkr SimplInlinePhase)
-
+    max_iterations    = getSimplIntSwitch sw_chkr MaxSimplifierIterations
+    black_list_fn     = blackListed rule_lhs_fvs (intSwitchSet sw_chkr SimplInlinePhase)
+    imported_rule_ids = ruleBaseIds rule_base
+    rule_lhs_fvs      = ruleBaseFVs rule_base
+ 
     iteration us iteration_no counts binds
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.

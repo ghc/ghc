@@ -5,8 +5,10 @@
 
 \begin{code}
 module Rules (
-	RuleBase, emptyRuleBase, extendRuleBase, extendRuleBaseList, pprRuleBase,
-	addRuleBaseFVs,
+	RuleBase, emptyRuleBase, 
+	extendRuleBase, extendRuleBaseList, addRuleBaseFVs, 
+	ruleBaseIds, ruleBaseFVs,
+	pprRuleBase,
 
         lookupRule, addRule, addIdSpecialisations
     ) where
@@ -464,6 +466,9 @@ data RuleBase = RuleBase
 
 	-- This representation is a bit cute, and I wonder if we should
 	-- change it to use (IdEnv CoreRule) which seems a bit more natural
+
+ruleBaseIds (RuleBase ids _) = ids
+ruleBaseFVs (RuleBase _ fvs) = fvs
 
 emptyRuleBase = RuleBase emptyVarSet emptyVarSet
 

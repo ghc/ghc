@@ -55,13 +55,12 @@ import CoreUnfold	( isCompulsoryUnfolding )
 import CoreUtils	( exprOkForSpeculation )
 import PprCore		()	-- Instances
 import CostCentre	( CostCentreStack, subsumedCCS )
-import Name		( isLocallyDefined )
 import OccName		( UserFS )
 import VarEnv
 import VarSet
 import qualified Subst
 import Subst		( Subst, mkSubst, substEnv, 
-			  InScopeSet, mkInScopeSet, substInScope, isInScope
+			  InScopeSet, mkInScopeSet, substInScope
 			)
 import Type             ( Type, isUnLiftedType )
 import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,

@@ -270,7 +270,7 @@ fiExpr to_drop (_,AnnLet (AnnNonRec id rhs@(rhs_fvs, ann_rhs)) body)
 fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
   = fiExpr new_to_drop body
   where
-    (binders, rhss) = unzip bindings
+    rhss = map snd bindings
 
     rhss_fvs = map freeVarsOf rhss
     body_fvs = freeVarsOf body

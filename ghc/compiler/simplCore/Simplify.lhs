@@ -29,11 +29,11 @@ import Id		( Id, idType, idInfo, isDataConId,
 			  zapLamIdInfo, setOneShotLambda, 
 			)
 import IdInfo		( OccInfo(..), isDeadOcc, isLoopBreaker,
-			  ArityInfo, setArityInfo, unknownArity,
+			  setArityInfo, unknownArity,
 			  setUnfoldingInfo,
 			  occInfo
 			)
-import Demand		( Demand, isStrict )
+import Demand		( isStrict )
 import DataCon		( dataConNumInstArgs, dataConRepStrictness,
 			  dataConSig, dataConArgTys
 			)
@@ -44,16 +44,16 @@ import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons,
 			)
 import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsTrivial, exprIsConApp_maybe,
 			  exprType, coreAltsType, exprIsValue, idAppIsCheap,
-			  exprOkForSpeculation, etaReduceExpr,
+			  exprOkForSpeculation, 
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr
 			)
 import Rules		( lookupRule )
 import CostCentre	( currentCCS )
 import Type		( mkTyVarTys, isUnLiftedType, seqType,
-			  mkFunTy, splitFunTy, splitTyConApp_maybe, 
+			  mkFunTy, splitTyConApp_maybe, 
 			  funResultTy
 			)
-import Subst		( mkSubst, substTy, substExpr,
+import Subst		( mkSubst, substTy, 
 			  isInScope, lookupIdSubst, substIdInfo
 			)
 import TyCon		( isDataTyCon, tyConDataConsIfAvailable	)
@@ -564,7 +564,6 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
     old_info          = idInfo old_bndr
     occ_info          = occInfo old_info
     loop_breaker      = isLoopBreaker occ_info
-    trivial_rhs	      = exprIsTrivial new_rhs 
     must_keep_binding = black_listed || loop_breaker || isExportedId old_bndr
 
     finally_bind_it arity_info new_rhs

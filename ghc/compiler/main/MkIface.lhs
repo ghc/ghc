@@ -4,42 +4,43 @@
 \section[MkIface]{Print an interface for a module}
 
 \begin{code}
-module MkIface ( completeIface ) where
+module MkIface ( 
+	mkModDetails, mkModDetailsFromIface, completeIface
+  ) where
 
 #include "HsVersions.h"
 
 import HsSyn
-import HsCore		( HsIdInfo(..), toUfExpr, ifaceSigName )
+import HsCore		( HsIdInfo(..), UfExpr(..), toUfExpr, toUfBndr )
 import HsTypes		( toHsTyVars )
 import BasicTypes	( Fixity(..), NewOrData(..),
 			  Version, bumpVersion, isLoopBreaker
 			)
 import RnMonad
-import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedIfaceSig )
+import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
+import TcHsSyn		( TypecheckedRuleDecl )
 import HscTypes		( VersionInfo(..), IfaceDecls(..), ModIface(..), ModDetails(..),
-			  TyThing(..), DFunId )
+			  TyThing(..), DFunId, TypeEnv, isTyClThing
+			)
 
 import CmdLineOpts
 import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId, hasNoBinding,
-			  idSpecialisation
+			  idSpecialisation, idName, setIdInfo
 			)
 import Var		( isId )
 import VarSet
 import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStrictMarks )
-import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo(..), 
-			  CprInfo(..), CafInfo(..),
-			  inlinePragInfo, arityInfo, arityLowerBound,
-			  strictnessInfo, isBottomingStrictness,
-			  cafInfo, specInfo, cprInfo, 
-			  occInfo, isNeverInlinePrag,
-			  workerInfo, WorkerInfo(..)
+import IdInfo		-- Lots
+import CoreSyn		( CoreExpr, CoreBind, Bind(..), CoreRule(..), IdCoreRule, 
+			  isBuiltinRule, rulesRules, rulesRhsFreeVars, emptyCoreRules,
+			  bindersOfBinds
 			)
-import CoreSyn		( CoreExpr, CoreBind, Bind(..), isBuiltinRule, rulesRules, rulesRhsFreeVars )
 import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
-import CoreUnfold	( okToUnfoldInHiFile, mkTopUnfolding, neverUnfold )
-import Name		( isLocallyDefined, getName, nameModule,
+import CoreUnfold	( okToUnfoldInHiFile, mkTopUnfolding, neverUnfold, unfoldingTemplate, noUnfolding )
+import Name		( isLocallyDefined, getName, 
 			  Name, NamedThing(..),
-			  plusNameEnv, lookupNameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv_NF, nameEnvElts
+			  plusNameEnv, lookupNameEnv, emptyNameEnv, mkNameEnv,
+			  extendNameEnv, lookupNameEnv_NF, nameEnvElts
 			)
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize
@@ -47,13 +48,7 @@ import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 import Class		( classExtraBigSig, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
 import Type		( splitSigmaTy, tidyTopType, deNoteType )
-
-import Rules		( ProtoCoreRule(..) )
-
-import Bag		( bagToList )
-import UniqFM		( lookupUFM, listToUFM )
 import SrcLoc		( noSrcLoc )
-import Bag
 import Outputable
 
 import List		( partition )
@@ -67,27 +62,52 @@ import List		( partition )
 %************************************************************************
 
 \begin{code}
-completeModDetails :: ModDetails
-	  	   -> [CoreBind] -> [Id]	-- Final bindings, plus the top-level Ids from the
-						-- code generator; they have authoritative arity info
-		   -> [IdCoreRule]		-- Tidy orphan rules
-		   -> ModDetails
-completeModDetails mds tidy_binds stg_ids orphan_rules
-  = ModDetails { 
-
+mkModDetails :: TypeEnv -> [DFunId]	-- From typechecker
+	     -> [CoreBind] -> [Id]	-- Final bindings, plus the top-level Ids from the
+					-- code generator; they have authoritative arity info
+	     -> [IdCoreRule]		-- Tidy orphan rules
+	     -> ModDetails
+mkModDetails type_env dfun_ids tidy_binds stg_ids orphan_rules
+  = ModDetails { md_types = new_type_env,
+		 md_rules = rule_dcls,
+		 md_insts = dfun_ids }
   where
-    dfun_ids = md_insts mds
-    
+	-- The competed type environment is gotten from
+	-- 	a) keeping the types and classes
+	--	b) removing all Ids, and Ids with correct IdInfo
+	--		gotten from the bindings
+    new_type_env = mkNameEnv [(getName tycl, tycl) | tycl <- orig_type_env, isTyClThing tycl]
+			`plusNameEnv`
+		   mkNameEnv [(idName id, AnId id) | id <- final_ids]
+
+    orig_type_env = nameEnvElts type_env
+
     final_ids = bindsToIds (mkVarSet dfun_ids `unionVarSet` orphan_rule_ids)
 			   (mkVarSet stg_ids)
 			   tidy_binds
 
-     rule_dcls | opt_OmitInterfacePragmas = []
-	       | otherwise		  = getRules orphan_rules tidy_binds (mkVarSet final_ids)
+	-- The complete rules are gotten by combining
+	--	a) the orphan rules
+	--	b) rules embedded in the top-level Ids
+    rule_dcls | opt_OmitInterfacePragmas = []
+	      | otherwise		  = getRules orphan_rules tidy_binds (mkVarSet final_ids)
 
-     orphan_rule_ids = unionVarSets [ ruleSomeFreeVars interestingId rule 
-				    | (_, rule) <- tidy_orphan_rules]
+    orphan_rule_ids = unionVarSets [ ruleSomeFreeVars interestingId rule 
+				   | (_, rule) <- orphan_rules]
 
+
+-- This version is used when we are re-linking a module
+-- so we've only run the type checker on its previous interface 
+mkModDetailsFromIface :: TypeEnv -> [DFunId]	-- From typechecker
+		      -> [TypecheckedRuleDecl]
+		      -> ModDetails
+mkModDetailsFromIface type_env dfun_ids rules
+  = ModDetails { md_types = type_env,
+		 md_rules = rule_dcls,
+		 md_insts = dfun_ids }
+  where
+    rule_dcls = [(id,rule) | IfaceRuleOut id rule <- rules]
+	-- All the rules from an interface are of the IfaceRuleOut form
 
 completeIface :: Maybe ModIface		-- The old interface, if we have it
 	      -> ModIface		-- The new one, minus the decls and versions
@@ -109,9 +129,9 @@ completeIface maybe_old_iface new_iface mod_details
 			      dcl_insts = inst_dcls,
 			      dcl_rules = rule_dcls }
 
-     inst_dcls   = map ifaceInstance (mk_insts mds)
-     ty_cls_dcls = map ifaceTyCls (nameEnvElts (md_types details))
-     rule_dcls   = map ifaceRule (md_rules details)
+     inst_dcls   = map ifaceInstance (md_insts mod_details)
+     ty_cls_dcls = map ifaceTyCls (nameEnvElts (md_types mod_details))
+     rule_dcls   = map ifaceRule (md_rules mod_details)
 \end{code}
 
 
@@ -220,14 +240,14 @@ ifaceTyCls (AnId id)
 
 
     ------------  Worker  --------------
-    wkr_hsinfo = case workerInfo id_info of
+    wrkr_hsinfo = case workerInfo id_info of
 		    HasWorker work_id wrap_arity -> [HsWorker (getName work_id)]
 		    NoWorker			 -> []
 
     ------------  Unfolding  --------------
-    unfold_info = unfoldInfo id_info
-    inine_prag  = inlinePragInfo id_info
-    rhs		= unfoldingTempate unfold_info
+    unfold_info = unfoldingInfo id_info
+    inline_prag = inlinePragInfo id_info
+    rhs		= unfoldingTemplate unfold_info
     unfold_hsinfo | neverUnfold unfold_info = []
 		  | otherwise		    = [HsUnfold inline_prag (toUfExpr rhs)]
 \end{code}
@@ -293,7 +313,7 @@ bindsToIds needed_ids codegen_ids binds
 	-- exported, there's no need to emit anything
     need_id needed_set id = id `elemVarSet` needed_set || isUserExportedId id 
 
-    go needed [] decls emitted
+    go needed [] emitted
 	| not (isEmptyVarSet needed) = pprTrace "ifaceBinds: free vars:" 
 					  (sep (map ppr (varSetElems needed)))
 				       emitted
@@ -308,7 +328,7 @@ bindsToIds needed_ids codegen_ids binds
 	       binds
 	       (new_id:emitted)
 	| otherwise
-	= go needed binds decls emitted
+	= go needed binds emitted
 	where
 	  (new_id, extras) = mkFinalId codegen_ids False id rhs
 
@@ -317,7 +337,7 @@ bindsToIds needed_ids codegen_ids binds
 	-- have to look for a fixed point.  We don't want necessarily them all, 
 	-- because without -O we may only need the first one (if we don't emit
 	-- its unfolding)
-    go needed (Rec pairs : binds) decls emitted
+    go needed (Rec pairs : binds) emitted
 	= go needed' binds emitted' 
 	where
 	  (new_emitted, extras) = go_rec needed pairs
@@ -351,7 +371,6 @@ mkFinalId :: IdSet		-- The Ids with arity info from the code generator
 mkFinalId codegen_ids is_rec id rhs
   = (id `setIdInfo` new_idinfo, new_needed_ids)
   where
-    id_type     = idType id
     core_idinfo = idInfo id
     stg_idinfo  = case lookupVarSet codegen_ids id of
 			Just id' -> idInfo id'
@@ -361,7 +380,7 @@ mkFinalId codegen_ids is_rec id rhs
     new_idinfo | opt_OmitInterfacePragmas
 	       = vanillaIdInfo
  	       | otherwise		  
-	       = core_idinfo `setArityInfo` 	 stg_arity_info
+	       = core_idinfo `setArityInfo` 	 arity_info
 			     `setCafInfo`   	 cafInfo stg_idinfo
 			     `setUnfoldingInfo`	 unfold_info
 			     `setWorkerInfo`	 worker_info
@@ -370,8 +389,8 @@ mkFinalId codegen_ids is_rec id rhs
 	-- passed on separately through the modules IdCoreRules
 
     ------------  Arity  --------------
-    stg_arity_info = arityInfo stg_idinfo
-    stg_arity	   = arityLowerBound arity_info
+    arity_info = arityInfo stg_idinfo
+    stg_arity  = arityLowerBound arity_info
 
     ------------  Worker  --------------
 	-- We only treat a function as having a worker if
@@ -396,8 +415,8 @@ mkFinalId codegen_ids is_rec id rhs
 	-- compilation of this module it means "how many things can I apply
 	-- this to".
     worker_info = case workerInfo core_idinfo of
-		     HasWorker work_id wrap_arity 
-			| wrap_arity == stg_arity -> worker_info_in
+		     info@(HasWorker work_id wrap_arity)
+			| wrap_arity == stg_arity -> info
 			| otherwise	          -> pprTrace "ifaceId: arity change:" (ppr id) 
 						     NoWorker
 		     NoWorker		          -> NoWorker
@@ -508,14 +527,14 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
   = Nothing
 
   | otherwise		-- Add updated version numbers
-  = Just (final_iface, pp_tc_diffs $$ pp_sig_diffs)
+  = Just (final_iface, pp_tc_diffs)
 	
   where
     final_iface = new_iface { mi_version = new_version }
     new_version = VersionInfo { vers_module  = bumpVersion no_output_change (vers_module  old_version),
 				vers_exports = bumpVersion no_export_change (vers_exports old_version),
 				vers_rules   = bumpVersion no_rule_change   (vers_rules   old_version),
-				vers_decls   = sig_vers `plusNameEnv` tc_vers }
+				vers_decls   = tc_vers }
 
     no_output_change = no_tc_change && no_rule_change && no_export_change
     no_usage_change  = mi_usages old_iface == mi_usages new_iface
@@ -527,17 +546,19 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
 	-- Set the flag if anything changes. 
 	-- Assumes that the decls are sorted by hsDeclName.
     old_vers_decls = vers_decls old_version
-    (no_tc_change,  pp_tc_diffs,  tc_vers) = diffDecls old_vers_decls (dcl_tycl old_decls) (dcl_tycl new_decls)
+    (no_tc_change,  pp_tc_diffs,  tc_vers) = diffDecls old_vers_decls old_fixities new_fixities
+						       (dcl_tycl old_decls) (dcl_tycl new_decls)
 
 
 
 diffDecls :: NameEnv Version				-- Old version map
+	  -> NameEnv Fixity -> NameEnv Fixity		-- Old and new fixities
 	  -> [RenamedTyClDecl] -> [RenamedTyClDecl]	-- Old and new decls
 	  -> (Bool,		-- True <=> no change
 	      SDoc,		-- Record of differences
 	      NameEnv Version)	-- New version
 
-diffDecls old_vers old new
+diffDecls old_vers old_fixities new_fixities old new
   = diff True empty emptyNameEnv old new
   where
 	-- When seeing if two decls are the same, 
@@ -552,11 +573,11 @@ diffDecls old_vers old new
 	= case od_name `compare` nd_name of
 		LT -> diff False (pp $$ only_old od) new_vers ods      (nd:nds)
 		GT -> diff False (pp $$ only_new nd) new_vers (od:ods) nds
-		EQ | od `eq` nd -> diff ok_so_far pp 		         new_vers  ods nds
-		   | otherwise  -> diff False	   (pp $$ changed od nd) new_vers' ods nds
+		EQ | od `eq_tc` nd -> diff ok_so_far pp 		   new_vers  ods nds
+		   | otherwise     -> diff False     (pp $$ changed od nd) new_vers' ods nds
 	where
- 	  od_name = get_name od
- 	  nd_name = get_name nd
+ 	  od_name = tyClDeclName od
+ 	  nd_name = tyClDeclName nd
 	  new_vers' = extendNameEnv new_vers nd_name 
 				    (bumpVersion True (lookupNameEnv_NF old_vers od_name))
 

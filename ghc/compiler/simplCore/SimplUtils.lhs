@@ -23,29 +23,26 @@ import CmdLineOpts	( switchIsOn, SimplifierSwitch(..),
 			  opt_UF_UpdateInPlace
 			)
 import CoreSyn
-import CoreUnfold	( isValueUnfolding )
 import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExpandArity, bindNonRec )
 import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, substExpr )
-import Id		( Id, idType, isId, idName, 
-			  idOccInfo, idUnfolding, idStrictness,
+import Id		( idType, idName, 
+			  idUnfolding, idStrictness,
 			  mkId, idInfo
 			)
-import IdInfo		( StrictnessInfo(..), ArityInfo, atLeastArity, setOccInfo, vanillaIdInfo )
+import IdInfo		( StrictnessInfo(..), ArityInfo, atLeastArity, vanillaIdInfo )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( setNameUnique )
-import Demand		( Demand, isStrict, wwLazy, wwLazy )
+import Demand		( isStrict )
 import SimplMonad
-import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType, repType,
-			  splitTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys,
-			  isDictTy, isDataType, applyTy, splitFunTy, isUnLiftedType,
+import Type		( Type, mkForAllTys, seqType, repType,
+			  splitTyConApp_maybe, mkTyVarTys, splitFunTys, 
+			  isDictTy, isDataType, isUnLiftedType,
 			  splitRepFunTys
 			)
 import TyCon		( tyConDataConsIfAvailable )
 import DataCon		( dataConRepArity )
-import VarSet
-import VarEnv		( SubstEnv, SubstResult(..) )
+import VarEnv		( SubstEnv )
 import Util		( lengthExceeds )
-import BasicTypes	( Arity )
 import Outputable
 \end{code}
 

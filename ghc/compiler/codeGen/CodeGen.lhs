@@ -22,8 +22,7 @@ module CodeGen ( codeGen ) where
 import StgSyn
 import CgMonad
 import AbsCSyn
-import CLabel		( CLabel, mkSRTLabel, mkClosureLabel,
-                          mkModuleInitLabel, labelDynamic )
+import CLabel		( CLabel, mkSRTLabel, mkClosureLabel, mkModuleInitLabel )
 
 import PprAbsC		( dumpRealC )
 import AbsCUtils	( mkAbstractCs, flattenAbsC )
@@ -36,16 +35,13 @@ import CmdLineOpts	( DynFlags, DynFlag(..),
 			  opt_SccProfilingOn, opt_EnsureSplittableC )
 import CostCentre       ( CostCentre, CostCentreStack )
 import Id               ( Id, idName )
-import Module           ( Module, moduleString, moduleName, 
-			  ModuleName )
-import PrimRep		( getPrimRepSize, PrimRep(..) )
-import Type             ( Type )
+import Module           ( Module )
+import PrimRep		( PrimRep(..) )
 import TyCon            ( TyCon, isDataTyCon )
 import Class		( Class, classTyCon )
 import BasicTypes	( TopLevelFlag(..) )
 import UniqSupply	( mkSplitUniqSupply )
 import ErrUtils		( dumpIfSet_dyn )
-import Util
 import Panic		( assertPanic )
 \end{code}
 

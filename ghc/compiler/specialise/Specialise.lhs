@@ -9,22 +9,20 @@ module Specialise ( specProgram ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
-import Id		( Id, idName, idType, mkTemplateLocals, mkUserLocal,
-			  idSpecialisation, setIdNoDiscard, isExportedId,
-			  modifyIdInfo, idUnfolding
+import Id		( Id, idName, idType, mkUserLocal,
+			  idSpecialisation, modifyIdInfo
 			)
 import IdInfo		( zapSpecPragInfo )
 import VarSet
 import VarEnv
 
-import Type		( Type, mkTyVarTy, splitSigmaTy, splitFunTysN,
-			  tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, applyTys,
-			  mkForAllTys, boxedTypeKind
+import Type		( Type, mkTyVarTy, splitSigmaTy, 
+			  tyVarsOfTypes, tyVarsOfTheta, 
+			  mkForAllTys 
 			)
 import Subst		( Subst, mkSubst, substTy, mkSubst, substBndrs, extendSubstList, mkInScopeSet,
 			  substId, substAndCloneId, substAndCloneIds, lookupIdSubst, substInScope
 			) 
-import Var		( TyVar, mkSysTyVar, setVarUnique )
 import VarSet
 import VarEnv
 import CoreSyn
@@ -37,15 +35,15 @@ import Rules		( addIdSpecialisations, lookupRule )
 
 import UniqSupply	( UniqSupply,
 			  UniqSM, initUs_, thenUs, thenUs_, returnUs, getUniqueUs, 
-			  getUs, setUs, uniqFromSupply, splitUniqSupply, mapUs
+			  getUs, setUs, mapUs
 			)
 import Name		( nameOccName, mkSpecOcc, getSrcLoc )
 import FiniteMap
-import Maybes		( MaybeErr(..), catMaybes, maybeToBool )
+import Maybes		( catMaybes, maybeToBool )
 import ErrUtils		( dumpIfSet_dyn )
 import Bag
 import List		( partition )
-import Util		( zipEqual, zipWithEqual, mapAccumL )
+import Util		( zipEqual, zipWithEqual )
 import Outputable
 
 
@@ -1097,11 +1095,8 @@ lookupId env id = case lookupVarEnv env id of
 type SpecM a = UniqSM a
 
 thenSM    = thenUs
-thenSM_    = thenUs_
 returnSM  = returnUs
 getUniqSM = getUniqueUs
-getUniqSupplySM = getUs
-setUniqSupplySM = setUs
 mapSM     = mapUs
 initSM	  = initUs_
 
@@ -1148,10 +1143,6 @@ newIdSM old_id new_ty
 	new_id = mkUserLocal (mkSpecOcc (nameOccName name)) uniq new_ty (getSrcLoc name)
     in
     returnSM new_id
-
-newTyVarSM
-  = getUniqSM		`thenSM` \ uniq ->
-    returnSM (mkSysTyVar uniq boxedTypeKind)
 \end{code}
 
 

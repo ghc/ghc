@@ -16,7 +16,7 @@ module HscTypes (
 
 	VersionInfo(..), initialVersionInfo,
 
-	TyThing(..), groupTyThings,
+	TyThing(..), groupTyThings, isTyClThing,
 
 	TypeEnv, extendTypeEnv, lookupTypeEnv, 
 
@@ -214,6 +214,11 @@ emptyTypeEnv = emptyNameEnv
 data TyThing = AnId   Id
 	     | ATyCon TyCon
 	     | AClass Class
+
+isTyClThing :: TyThing -> Bool
+isTyClThing (ATyCon _) = True
+isTyClThing (AClass _) = True
+isTyClThing (AnId   _) = False
 
 instance NamedThing TyThing where
   getName (AnId id)   = getName id

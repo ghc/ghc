@@ -19,7 +19,7 @@ import UsageSPInf       ( doUsageSPInf )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
-import Id		( idType, idInfo, idName, idSpecialisation,
+import Id		( idType, idInfo, idName, 
 			  mkVanillaId, mkId, exportWithOrigOccName,
 			  idStrictness, setIdStrictness,
 			  idDemandInfo, setIdDemandInfo,
@@ -29,9 +29,9 @@ import IdInfo		( specInfo, setSpecInfo,
 			  workerInfo, setWorkerInfo, WorkerInfo(..)
 			)
 import Demand		( wwLazy )
-import Name		( getOccName, tidyTopName, mkLocalName, isLocallyDefined )
+import Name		( getOccName, tidyTopName, mkLocalName )
 import OccName		( initTidyOccEnv, tidyOccName )
-import Type		( tidyTopType, tidyType, tidyTypes, tidyTyVar, tidyTyVars )
+import Type		( tidyTopType, tidyType, tidyTyVar )
 import Module		( Module )
 import UniqSupply	( mkSplitUniqSupply )
 import Unique		( Uniquable(..) )
@@ -76,7 +76,7 @@ tidyCorePgm dflags module_name binds_in orphans_in
 
         binds_in1 <- if opt_UsageSPOn
                      then _scc_ "CoreUsageSPInf"
-                                doUsageSPInf dflags us binds_in rulebase_in
+                                doUsageSPInf dflags us binds_in 
                      else return binds_in
 
 	let (tidy_env1, binds_out)  = mapAccumL (tidyBind (Just module_name))

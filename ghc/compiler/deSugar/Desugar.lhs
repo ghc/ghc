@@ -13,6 +13,7 @@ import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..),
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
 import TcHsSyn		( TypecheckedRuleDecl )
 import TcModule		( TcResults(..) )
+import Id		( Id )
 import CoreSyn
 import PprCore		( pprIdCoreRule )
 import Subst		( substExpr, mkSubst, mkInScopeSet )

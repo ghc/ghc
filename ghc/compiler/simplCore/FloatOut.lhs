@@ -16,14 +16,12 @@ import CoreUtils	( mkSCC )
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import ErrUtils		( dumpIfSet_dyn )
 import CostCentre	( dupifyCC, CostCentre )
-import Id		( Id, idType )
+import Id		( Id )
 import VarEnv
 import CoreLint		( beginPass, endPass )
 import SetLevels	( setLevels,
 		 	  Level(..), tOP_LEVEL, ltMajLvl, ltLvl, isTopLvl
 			)
-import Type		( isUnLiftedType )
-import Var		( TyVar )
 import UniqSupply       ( UniqSupply )
 import List		( partition )
 import Outputable
