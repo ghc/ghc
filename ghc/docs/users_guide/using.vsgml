@@ -463,7 +463,10 @@ file</em> @A.hi@.  The interface file is not intended for human
 consumption, as you'll see if you take a look at one.  It's merely
 there to help the compiler compile other modules in the same program.
 
-NOTE: Having the name of the interface file follow the module name and
+NOTE: <em>The name of the interface file is derived from the name
+of the module, not from the name of the file containing the module</em>.
+This means that GHC knows what to look for when it sees <tt>import A</tt>
+in another module.  However, having the name of the interface file follow the module name and
 not the file name, means that working with tools such as @make(1)@
 become harder. @make@ implicitly assumes that any output files
 produced by processing a translation unit will have file names that
