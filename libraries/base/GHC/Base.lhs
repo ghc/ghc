@@ -64,7 +64,7 @@ GHC.ByteArr	Types: ByteArray, MutableByteArray
 Other Prelude modules are much easier with fewer complex dependencies.
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Base

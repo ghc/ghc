@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-implicit-prelude -#include "HsBase.h" #-}
+{-# OPTIONS_GHC -fno-implicit-prelude -#include "HsBase.h" #-}
 
 #undef DEBUG_DUMP
 #undef DEBUG

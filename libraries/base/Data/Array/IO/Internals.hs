@@ -1,4 +1,4 @@
-{-# OPTIONS -#include "HsBase.h" #-}
+{-# OPTIONS_GHC -#include "HsBase.h" #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Array.IO.Internal

@@ -1,4 +1,4 @@
-{-# OPTIONS -cpp -fffi #-}
+{-# OPTIONS_GHC -cpp -fffi #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Process

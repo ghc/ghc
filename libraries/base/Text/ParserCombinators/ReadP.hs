@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -fglasgow-exts -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Text.ParserCombinators.ReadP
