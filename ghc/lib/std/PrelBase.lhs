@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.46 2001/04/27 20:30:55 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.47 2001/04/28 04:44:05 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -438,14 +438,14 @@ instance Ord Char where
 -}
 
 chr :: Int -> Char
-chr (I# i) | i >=# 0# && i <=# 0x10FFFF# = C# (chr# i)
-           | otherwise                   = error "Prelude.chr: bad argument"
+chr (I# i#) | int2Word# i# `leWord#` int2Word# 0x10FFFF# = C# (chr# i#)
+            | otherwise                                  = error "Prelude.chr: bad argument"
 
 unsafeChr :: Int -> Char
-unsafeChr (I# i) =  C# (chr# i)
+unsafeChr (I# i#) = C# (chr# i#)
 
 ord :: Char -> Int
-ord (C# c) =  I# (ord# c)
+ord (C# c#) = I# (ord# c#)
 \end{code}
 
 String equality is used when desugaring pattern-matches against strings.
