@@ -19,21 +19,19 @@ module GHC.List (
 
    map, (++), filter, concat,
    head, last, tail, init, null, length, (!!), 
-   foldl, foldl1, scanl, scanl1, foldr, foldr1, scanr, scanr1,
+   foldl, scanl, scanl1, foldr, foldr1, scanr, scanr1,
    iterate, repeat, replicate, cycle,
    take, drop, splitAt, takeWhile, dropWhile, span, break,
    reverse, and, or,
    any, all, elem, notElem, lookup,
-   maximum, minimum, concatMap,
+   concatMap,
    zip, zip3, zipWith, zipWith3, unzip, unzip3,
-#ifdef USE_REPORT_PRELUDE
+   errorEmptyList,
 
-#else
-
+#ifndef USE_REPORT_PRELUDE
    -- non-standard, but hidden when creating the Prelude
    -- export list.
    takeUInt_append
-
 #endif
 
  ) where
@@ -167,13 +165,6 @@ foldl f z xs = lgo z xs
 	     where
 		lgo z []     =  z
 		lgo z (x:xs) = lgo (f z x) xs
-
--- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
--- and thus must be applied to non-empty lists.
-
-foldl1                  :: (a -> a -> a) -> [a] -> a
-foldl1 f (x:xs)         =  foldl f x xs
-foldl1 _ []             =  errorEmptyList "foldl1"
 
 -- | 'scanl' is similar to 'foldl', but returns a list of successive
 -- reduced values from the left:
@@ -477,25 +468,6 @@ lookup _key []          =  Nothing
 lookup  key ((x,y):xys)
     | key == x          =  Just y
     | otherwise         =  lookup key xys
-
-{-# SPECIALISE maximum :: [Int] -> Int #-}
-{-# SPECIALISE minimum :: [Int] -> Int #-}
-
--- | 'maximum' returns the maximum value from a list,
--- which must be non-empty, finite, and of an ordered type.
--- It is a special case of 'Data.List.maximumBy', which allows the
--- programmer to supply their own comparison function.
-maximum                 :: (Ord a) => [a] -> a
-maximum []              =  errorEmptyList "maximum"
-maximum xs              =  foldl1 max xs
-
--- | 'minimum' returns the minimum value from a list,
--- which must be non-empty, finite, and of an ordered type.
--- It is a special case of 'Data.List.minimumBy', which allows the
--- programmer to supply their own comparison function.
-minimum                 :: (Ord a) => [a] -> a
-minimum []              =  errorEmptyList "minimum"
-minimum xs              =  foldl1 min xs
 
 -- | Map a function over a list and concatenate the results.
 concatMap               :: (a -> [b]) -> [a] -> [b]

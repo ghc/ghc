@@ -454,6 +454,37 @@ insertBy cmp x ys@(y:ys')
      GT -> y : insertBy cmp x ys'
      _  -> x : ys
 
+-- | 'maximum' returns the maximum value from a list,
+-- which must be non-empty, finite, and of an ordered type.
+-- It is a special case of 'Data.List.maximumBy', which allows the
+-- programmer to supply their own comparison function.
+maximum                 :: (Ord a) => [a] -> a
+maximum []              =  errorEmptyList "maximum"
+maximum xs              =  foldl1 max xs
+
+{-# RULES "maximumInt" maximum = maximumInt #-}
+
+-- We can't make the overloaded version of maximum strict without
+-- changing its semantics (max might not be strict), but we can for
+-- the version specialised to 'Int'.
+maximumInt		:: [Int] -> Int
+maximumInt []           =  errorEmptyList "maximum"
+maximumInt xs           =  foldl1' max xs
+
+-- | 'minimum' returns the minimum value from a list,
+-- which must be non-empty, finite, and of an ordered type.
+-- It is a special case of 'Data.List.minimumBy', which allows the
+-- programmer to supply their own comparison function.
+minimum                 :: (Ord a) => [a] -> a
+minimum []              =  errorEmptyList "minimum"
+minimum xs              =  foldl1 min xs
+
+{-# RULES "minimumInt" minimum = minimumInt #-}
+
+minimumInt		:: [Int] -> Int
+minimumInt []           =  errorEmptyList "minimum"
+minimumInt xs           =  foldl1' min xs
+
 -- | The 'maximumBy' function takes a comparison function and a list
 -- and returns the greatest element of the list by the comparison function.
 -- The list must be finite and non-empty.
@@ -803,6 +834,17 @@ unfoldr f b  =
 foldl'           :: (a -> b -> a) -> a -> [b] -> a
 foldl' f a []     = a
 foldl' f a (x:xs) = let a' = f a x in a' `seq` foldl' f a' xs
+
+-- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
+-- and thus must be applied to non-empty lists.
+foldl1                  :: (a -> a -> a) -> [a] -> a
+foldl1 f (x:xs)         =  foldl f x xs
+foldl1 _ []             =  errorEmptyList "foldl1"
+
+-- | A strict version of 'foldl1'
+foldl1'                  :: (a -> a -> a) -> [a] -> a
+foldl1' f (x:xs)         =  foldl' f x xs
+foldl1' _ []             =  errorEmptyList "foldl1'"
 
 #ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
