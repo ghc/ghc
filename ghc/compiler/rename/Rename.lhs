@@ -509,9 +509,7 @@ rename ghci_mode this_module
 	-- introduced by the type checker.
 	dont_discard :: Name -> Bool
 	dont_discard | ghci_mode == Interactive = isExternalName
-		     | otherwise 		= (`elemNameSet` exported_names)
-
-	exported_names    = availsToNameSet export_avails
+		     | otherwise 		= (`elemNameSet` export_fvs)
 
 	mod_iface = ModIface {	mi_module   = this_module,
 			        mi_package  = opt_InPackage,
