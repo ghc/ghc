@@ -48,7 +48,7 @@ import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( emptyBag )
 import Outputable
-import Interpreter	( stgBindsToInterpSyn, UnlinkedIExpr, UnlinkedIBind, ItblEnv )
+import Interpreter
 import CmStaticInfo	( GhciMode(..) )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
@@ -413,17 +413,18 @@ hscExpr dflags hst hit pcs0 this_module expr
 		Just (print_unqual, rn_expr) -> do {
 
 		-- Typecheck it
-	maybe_tc_expr <- typecheckExpr dflags pcs1 hst print_unqual this_module rn_expr;
-	case maybe_tc_expr of
+	maybe_tc_return
+	   <- typecheckExpr dflags pcs1 hst print_unqual this_module rn_expr;
+	case maybe_tc_return of
 		Nothing -> return (pcs1, Nothing)
-		Just tc_expr -> do {
+		Just (pcs2, tc_expr) -> do {
 
 		-- Desugar it
-	ds_expr <- deSugarExpr dflags pcs1 hst this_module 
+	ds_expr <- deSugarExpr dflags pcs2 hst this_module
 			print_unqual tc_expr;
 	
 		-- Simplify it
-	simpl_expr <- simplifyExpr dflags pcs1 hst ds_expr;
+	simpl_expr <- simplifyExpr dflags pcs2 hst ds_expr;
 
 		-- Convert to STG
 	stg_expr <- coreToStgExpr dflags simpl_expr;
@@ -433,7 +434,7 @@ hscExpr dflags hst hit pcs0 this_module expr
 		-- Convert to InterpSyn
 	unlinked_iexpr <- stgExprToInterpSyn dflags stg_expr;
 
-	return (pcs1, Just unlinked_iexpr);
+	return (pcs2, Just unlinked_iexpr);
      }}}}
 
 hscParseExpr :: DynFlags -> String -> IO (Maybe RdrNameHsExpr)
