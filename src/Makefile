@@ -14,7 +14,7 @@ ifeq "$(BIN_DIST)"   "1"
 HADDOCKLIB=$$\"\"libdir/haddock
 HADDOCKBIN=$$\"\"libexecdir/$(HS_PROG)
 else
-HADDOCKLIB=$(libdir)/haddock
+HADDOCKLIB=$(libdir)
 HADDOCKBIN=$(libexecdir)/$(HS_PROG)
 endif # BIN_DIST
 else
