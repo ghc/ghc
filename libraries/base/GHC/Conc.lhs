@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Conc.lhs,v 1.3 2001/12/21 15:07:22 simonmar Exp $
+% $Id: Conc.lhs,v 1.4 2002/04/10 11:43:49 stolz Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -21,6 +21,8 @@ module GHC.Conc
 	, par  		-- :: a -> b -> b
 	, pseq 		-- :: a -> b -> b
 	, yield         -- :: IO ()
+	, labelThread	-- :: String -> IO ()
+	, forkProcess	-- :: IO Int
 
 	-- Waiting
 	, threadDelay	  	-- :: Int -> IO ()
@@ -47,6 +49,7 @@ import GHC.Err		( parError, seqError )
 import GHC.IOBase	( IO(..), MVar(..) )
 import GHC.Base		( Int(..) )
 import GHC.Exception    ( Exception(..), AsyncException(..) )
+import GHC.Pack		( packCString# )
 
 infixr 0 `par`, `pseq`
 \end{code}
@@ -80,6 +83,15 @@ myThreadId = IO $ \s ->
 yield :: IO ()
 yield = IO $ \s -> 
    case (yield# s) of s1 -> (# s1, () #)
+
+labelThread :: String -> IO ()
+labelThread str = IO $ \ s ->
+   let ps  = packCString# str
+       adr = byteArrayContents# ps in
+     case (labelThread# adr s) of s1 -> (# s1, () #)
+
+forkProcess :: IO Int
+forkProcess = IO $ \s -> case (forkProcess# s) of (# s1, id #) -> (# s1, (I# id) #)
 
 -- 	Nota Bene: 'pseq' used to be 'seq'
 --		   but 'seq' is now defined in PrelGHC
