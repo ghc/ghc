@@ -16,6 +16,10 @@ the resulting output with that specified in the file reader001.stderr.
 
 "make all" run all tests.
 
+If you want to set compilation options globally from the commandline,
+use `make EXTRA_HC_OPTS="-foo-option -blah', for global runstdtest options
+use EXTRA_RUNTEST_OPTS.
+
 -------------------------------------------------------------------------------
 			ADDING A NEW TEST
 -------------------------------------------------------------------------------
