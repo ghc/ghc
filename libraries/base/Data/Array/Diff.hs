@@ -77,7 +77,10 @@ import Data.Array.IO
 import Foreign.Ptr        ( Ptr, FunPtr )
 import Foreign.StablePtr  ( StablePtr )
 import Data.Int           ( Int8,  Int16,  Int32,  Int64 )
-import Data.Word          ( Word, Word8, Word16, Word32, Word64)
+#ifdef __GLASGOW_HASKELL__
+import Data.Word          ( Word )
+#endif
+import Data.Word          ( Word8, Word16, Word32, Word64 )
 
 import System.IO.Unsafe	  ( unsafePerformIO )
 import Control.Concurrent.MVar ( MVar, newMVar, takeMVar, putMVar, readMVar )
@@ -113,8 +116,10 @@ instance (Ix ix, Show ix) => Show (DiffUArray ix Char) where
 instance (Ix ix, Show ix) => Show (DiffUArray ix Int) where
   showsPrec = showsIArray
 
+#ifdef __GLASGOW_HASKELL__
 instance (Ix ix, Show ix) => Show (DiffUArray ix Word) where
   showsPrec = showsIArray
+#endif
 
 instance (Ix ix, Show ix) => Show (DiffUArray ix Float) where
   showsPrec = showsIArray
@@ -167,10 +172,12 @@ instance IArray (IOToDiffArray IOUArray) Int where
     unsafeAt      a i    = unsafePerformIO $ a `readDiffArray` i
     unsafeReplace a ies  = unsafePerformIO $ a `replaceDiffArray` ies
 
+#ifdef __GLASGOW_HASKELL__
 instance IArray (IOToDiffArray IOUArray) Word where
     unsafeArray   lu ies = unsafePerformIO $ newDiffArray lu ies
     unsafeAt      a i    = unsafePerformIO $ a `readDiffArray` i
     unsafeReplace a ies  = unsafePerformIO $ a `replaceDiffArray` ies
+#endif
 
 instance IArray (IOToDiffArray IOUArray) (Ptr a) where
     unsafeArray   lu ies = unsafePerformIO $ newDiffArray lu ies
