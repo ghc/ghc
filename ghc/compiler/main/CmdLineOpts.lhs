@@ -579,7 +579,7 @@ isStaticHscFlag f =
 	"fno-method-sharing",
         "fno-monomorphism-restriction",
 	"fomit-interface-pragmas",
-	"fkeep-stg-types",
+	"fruntime-types",
 	"fno-pre-inlining",
 	"fdo-eta-reduction",
 	"fdo-lambda-eta-expansion",

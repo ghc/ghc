@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.69 2001/05/24 15:10:19 dsyme Exp $
+-- $Id: DriverPipeline.hs,v 1.70 2001/05/25 12:09:43 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -974,15 +974,16 @@ compile ghci_mode summary source_unchanged have_object
    dyn_flags <- readIORef v_DynFlags
 
    let hsc_lang = hscLang dyn_flags
+       (basename, _) = splitFilename input_fn
+       
    output_fn <- case hsc_lang of
 		    HscAsm         -> newTempName (phaseInputExt As)
 		    HscC           -> newTempName (phaseInputExt HCc)
         	    HscJava        -> newTempName "java" -- ToDo
-		    HscILX         -> newTempName "ilx"	-- ToDo
+		    HscILX         -> return (basename ++ ".ilx") 	-- newTempName "ilx"	-- ToDo
 		    HscInterpreted -> return (error "no output file")
 
-   let (basename, _) = splitFilename input_fn
-       dyn_flags' = dyn_flags { hscOutName = output_fn,
+   let dyn_flags' = dyn_flags { hscOutName = output_fn,
 				hscStubCOutName = basename ++ "_stub.c",
 				hscStubHOutName = basename ++ "_stub.h" }
 
