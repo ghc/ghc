@@ -103,36 +103,36 @@ type Signal = CInt
 nullSignal :: Signal
 nullSignal = 0
 
-foreign import ccall "__hsposix_SIGABRT"   sigABRT   :: CInt
-foreign import ccall "__hsposix_SIGALRM"   sigALRM   :: CInt
-foreign import ccall "__hsposix_SIGBUS"    sigBUS    :: CInt
-foreign import ccall "__hsposix_SIGCHLD"   sigCHLD   :: CInt
-foreign import ccall "__hsposix_SIGCONT"   sigCONT   :: CInt
-foreign import ccall "__hsposix_SIGFPE"    sigFPE    :: CInt
-foreign import ccall "__hsposix_SIGHUP"    sigHUP    :: CInt
-foreign import ccall "__hsposix_SIGILL"    sigILL    :: CInt
-foreign import ccall "__hsposix_SIGINT"    sigINT    :: CInt
-foreign import ccall "__hsposix_SIGKILL"   sigKILL   :: CInt
-foreign import ccall "__hsposix_SIGPIPE"   sigPIPE   :: CInt
-foreign import ccall "__hsposix_SIGQUIT"   sigQUIT   :: CInt
-foreign import ccall "__hsposix_SIGSEGV"   sigSEGV   :: CInt
-foreign import ccall "__hsposix_SIGSTOP"   sigSTOP   :: CInt
-foreign import ccall "__hsposix_SIGTERM"   sigTERM   :: CInt
-foreign import ccall "__hsposix_SIGTSTP"   sigTSTP   :: CInt
-foreign import ccall "__hsposix_SIGTTIN"   sigTTIN   :: CInt
-foreign import ccall "__hsposix_SIGTTOU"   sigTTOU   :: CInt
-foreign import ccall "__hsposix_SIGUSR1"   sigUSR1   :: CInt
-foreign import ccall "__hsposix_SIGUSR2"   sigUSR2   :: CInt
+foreign import ccall unsafe "__hsposix_SIGABRT"   sigABRT   :: CInt
+foreign import ccall unsafe "__hsposix_SIGALRM"   sigALRM   :: CInt
+foreign import ccall unsafe "__hsposix_SIGBUS"    sigBUS    :: CInt
+foreign import ccall unsafe "__hsposix_SIGCHLD"   sigCHLD   :: CInt
+foreign import ccall unsafe "__hsposix_SIGCONT"   sigCONT   :: CInt
+foreign import ccall unsafe "__hsposix_SIGFPE"    sigFPE    :: CInt
+foreign import ccall unsafe "__hsposix_SIGHUP"    sigHUP    :: CInt
+foreign import ccall unsafe "__hsposix_SIGILL"    sigILL    :: CInt
+foreign import ccall unsafe "__hsposix_SIGINT"    sigINT    :: CInt
+foreign import ccall unsafe "__hsposix_SIGKILL"   sigKILL   :: CInt
+foreign import ccall unsafe "__hsposix_SIGPIPE"   sigPIPE   :: CInt
+foreign import ccall unsafe "__hsposix_SIGQUIT"   sigQUIT   :: CInt
+foreign import ccall unsafe "__hsposix_SIGSEGV"   sigSEGV   :: CInt
+foreign import ccall unsafe "__hsposix_SIGSTOP"   sigSTOP   :: CInt
+foreign import ccall unsafe "__hsposix_SIGTERM"   sigTERM   :: CInt
+foreign import ccall unsafe "__hsposix_SIGTSTP"   sigTSTP   :: CInt
+foreign import ccall unsafe "__hsposix_SIGTTIN"   sigTTIN   :: CInt
+foreign import ccall unsafe "__hsposix_SIGTTOU"   sigTTOU   :: CInt
+foreign import ccall unsafe "__hsposix_SIGUSR1"   sigUSR1   :: CInt
+foreign import ccall unsafe "__hsposix_SIGUSR2"   sigUSR2   :: CInt
 #if HAVE_SIGPOLL
-foreign import ccall "__hsposix_SIGPOLL"   sigPOLL   :: CInt
+foreign import ccall unsafe "__hsposix_SIGPOLL"   sigPOLL   :: CInt
 #endif
-foreign import ccall "__hsposix_SIGPROF"   sigPROF   :: CInt
-foreign import ccall "__hsposix_SIGSYS"    sigSYS    :: CInt
-foreign import ccall "__hsposix_SIGTRAP"   sigTRAP   :: CInt
-foreign import ccall "__hsposix_SIGURG"    sigURG    :: CInt
-foreign import ccall "__hsposix_SIGVTALRM" sigVTALRM :: CInt
-foreign import ccall "__hsposix_SIGXCPU"   sigXCPU   :: CInt
-foreign import ccall "__hsposix_SIGXFSZ"   sigXFSZ   :: CInt
+foreign import ccall unsafe "__hsposix_SIGPROF"   sigPROF   :: CInt
+foreign import ccall unsafe "__hsposix_SIGSYS"    sigSYS    :: CInt
+foreign import ccall unsafe "__hsposix_SIGTRAP"   sigTRAP   :: CInt
+foreign import ccall unsafe "__hsposix_SIGURG"    sigURG    :: CInt
+foreign import ccall unsafe "__hsposix_SIGVTALRM" sigVTALRM :: CInt
+foreign import ccall unsafe "__hsposix_SIGXCPU"   sigXCPU   :: CInt
+foreign import ccall unsafe "__hsposix_SIGXFSZ"   sigXFSZ   :: CInt
 
 internalAbort ::Signal
 internalAbort = sigABRT
