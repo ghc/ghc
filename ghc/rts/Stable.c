@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.13 2000/09/04 15:17:03 simonmar Exp $
+ * $Id: Stable.c,v 1.14 2001/07/13 13:41:42 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -66,7 +66,6 @@
   deRefStablePtr# :: StablePtr# a -> State# RealWorld -> 
         (# State# RealWorld, a #)
   \end{verbatim}
-  There is also a C procedure @FreeStablePtr@ which frees a stable pointer.
 
   There may be additional functions on the C side to allow evaluation,
   application, etc of a stable pointer.
