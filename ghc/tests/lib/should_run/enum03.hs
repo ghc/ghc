@@ -3,7 +3,6 @@ module Main(main) where
 
 import Exception
 import Word
-import Int( Num(fromInt), Integral(toInt) )
 
 main = do
   putStrLn "Testing Enum Word8:"
@@ -31,7 +30,7 @@ testEnumWord8 = do
   mayBomb   (printTest (pred (minBound::Word8))) 
 
      -- toEnum
-  printTest ((map (toEnum::Int->Word8) [1, toInt (minBound::Word8), toInt (maxBound::Word8)]))
+  printTest ((map (toEnum::Int->Word8) [1, fromIntegral (minBound::Word8)::Int, fromIntegral (maxBound::Word8)::Int]))
   mayBomb   (printTest ((toEnum (maxBound::Int))::Word8))
 
      -- fromEnum
@@ -89,7 +88,7 @@ testEnumWord16 = do
   mayBomb   (printTest (pred (minBound::Word16))) 
 
      -- toEnum
-  printTest ((map (toEnum::Int->Word16) [1, toInt (minBound::Word16), toInt (maxBound::Word16)]))
+  printTest ((map (toEnum::Int->Word16) [1, fromIntegral (minBound::Word16)::Int, fromIntegral (maxBound::Word16)::Int]))
   mayBomb   (printTest ((toEnum (maxBound::Int))::Word16))
 
 
@@ -148,11 +147,11 @@ testEnumWord32 = do
   mayBomb   (printTest (pred (minBound::Word32))) 
 
      -- toEnum
-  printTest ((map (toEnum::Int->Word32) [1, toInt (minBound::Word32), maxBound::Int]))
+  printTest ((map (toEnum::Int->Word32) [1, fromIntegral (minBound::Word32)::Int, maxBound::Int]))
   mayBomb   (printTest ((toEnum (maxBound::Int))::Word32))
 
      -- fromEnum
-  printTest ((map fromEnum [(1::Word32),minBound,fromInt (maxBound::Int)]))
+  printTest ((map fromEnum [(1::Word32),minBound,fromIntegral (maxBound::Int)]))
   mayBomb   (printTest (fromEnum (maxBound::Word32)))
 
      -- [x..] aka enumFrom
@@ -207,11 +206,11 @@ testEnumWord64 = do
   mayBomb   (printTest (pred (minBound::Word64))) 
 
      -- toEnum
-  printTest ((map (toEnum::Int->Word64) [1, toInt (minBound::Word64), maxBound::Int]))
+  printTest ((map (toEnum::Int->Word64) [1, fromIntegral (minBound::Word64)::Int, maxBound::Int]))
   mayBomb   (printTest ((toEnum (maxBound::Int))::Word64))
 
      -- fromEnum
-  printTest ((map fromEnum [(1::Word64),minBound,fromInt (maxBound::Int)]))
+  printTest ((map fromEnum [(1::Word64),minBound,fromIntegral (maxBound::Int)]))
   mayBomb   (printTest (fromEnum (maxBound::Word64)))
 
      -- [x..] aka enumFrom
