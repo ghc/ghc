@@ -31,7 +31,7 @@ module StgSyn (
 	StgOp(..),
 
 	-- SRTs
-	SRT(..), noSRT,
+	SRT(..), noSRT, nonEmptySRT,
 
 	-- utils
 	stgBindHasCafRefs,  stgRhsArity, getArgPrimRep, 
