@@ -13,8 +13,10 @@ import DsLoop		-- break match-ish and dsExpr-ish loops
 
 import HsSyn		( HsLit(..), OutPat(..), HsExpr(..),
 			  Match, HsBinds, Stmt, Qual, PolyType, ArithSeqInfo )
-import TcHsSyn		( TypecheckedHsExpr(..) )
-import CoreSyn		( CoreExpr(..) )
+import TcHsSyn		( TypecheckedHsExpr(..), TypecheckedHsBinds(..),
+			  TypecheckedPat(..)
+			)
+import CoreSyn		( CoreExpr(..), CoreBinding(..) )
 
 import DsMonad
 import DsUtils

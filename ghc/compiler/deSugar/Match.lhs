@@ -12,7 +12,7 @@ import Ubiq
 import DsLoop		-- here for paranoia-checking reasons
 			-- and to break dsExpr/dsBinds-ish loop
 
-import HsSyn
+import HsSyn		hiding ( collectBinders{-also from CoreSyn-} )
 import TcHsSyn		( TypecheckedPat(..), TypecheckedMatch(..),
 			  TypecheckedHsBinds(..), TypecheckedHsExpr(..)	)
 import DsHsSyn		( outPatType, collectTypedPatBinders )

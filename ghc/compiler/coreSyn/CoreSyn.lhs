@@ -259,9 +259,9 @@ mkCoLetNoUnboxed bind@(NonRec binder rhs) body
 mkCoLetsNoUnboxed []    expr = expr
 mkCoLetsNoUnboxed binds expr = foldr mkCoLetNoUnboxed expr binds
 
---mkCoLetrecNoUnboxed :: [(Id, CoreExpr)]	-- bindings
---  	            -> CoreExpr		-- body
---		    -> CoreExpr 		-- result
+mkCoLetrecNoUnboxed :: [(GenId (GenType a b), GenCoreExpr (GenId (GenType a b)) c d e)]
+		    -> GenCoreExpr (GenId (GenType a b)) c d e
+		    -> GenCoreExpr (GenId (GenType a b)) c d e
 
 mkCoLetrecNoUnboxed []    body = body
 mkCoLetrecNoUnboxed binds body

@@ -28,10 +28,11 @@ import RnMonad
 import ErrUtils		( addErrLoc, addShortErrLocLine )
 import Name		( isLocallyDefinedName, pprSym, Name, RdrName )
 import Pretty
-import UniqFM		( lookupUFM )
+import UniqFM		( lookupUFM, ufmToList{-ToDo:rm-} )
 import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
-			  UniqSet(..) )
+			  UniqSet(..)
+			)
 import Util		( Ord3(..), removeDups, panic )
 \end{code}
 
@@ -485,6 +486,7 @@ precParseExpr exp@(OpApp (NegApp e1 n) (HsVar op) e2)
 precParseExpr exp@(OpApp (OpApp e11 (HsVar op1) e12) (HsVar op) e2)
   = lookupFixity op		 `thenRn` \ (op_fix, op_prec) ->
     lookupFixity op1		 `thenRn` \ (op1_fix, op1_prec) ->
+    -- pprTrace "precParse:" (ppCat [ppr PprDebug op, ppInt op_prec, ppr PprDebug op1, ppInt op1_prec]) $
     case cmp op1_prec op_prec of
       LT_  -> rearrange
       EQ_  -> case (op1_fix, op_fix) of
@@ -534,6 +536,7 @@ data INFIX = INFIXL | INFIXR | INFIXN deriving Eq
 lookupFixity :: RnName -> RnM_Fixes s (INFIX, Int)
 lookupFixity op
   = getExtraRn `thenRn` \ fixity_fm ->
+    -- pprTrace "lookupFixity:" (ppAboves [ppCat [pprUnique u, ppr PprDebug i_f] | (u,i_f) <- ufmToList fixity_fm]) $
     case lookupUFM fixity_fm op of
       Nothing           -> returnRn (INFIXL, 9)
       Just (InfixL _ n) -> returnRn (INFIXL, n)

@@ -10,7 +10,7 @@ import Ubiq
 import DsLoop		-- break dsExpr-ish loop
 
 import HsSyn		( Qual(..), HsExpr, HsBinds )
-import TcHsSyn		( TypecheckedQual(..), TypecheckedHsExpr(..) )
+import TcHsSyn		( TypecheckedQual(..), TypecheckedHsExpr(..) , TypecheckedHsBinds(..) )
 import DsHsSyn		( outPatType )
 import CoreSyn
 

@@ -39,7 +39,10 @@ module CLabel (
 
 	needsCDecl, isReadOnly, isAsmTemp, externallyVisibleCLabel,
 
-	pprCLabel, pprCLabel_asm
+	pprCLabel
+#if ! OMIT_NATIVE_CODEGEN
+	, pprCLabel_asm
+#endif
 
 #ifdef GRAN
 	, isSlowEntryCCodeBlock
@@ -50,7 +53,9 @@ import Ubiq{-uitous-}
 import AbsCLoop		( CtrlReturnConvention(..),
 			  ctrlReturnConvAlg
 			)
+#if ! OMIT_NATIVE_CODEGEN
 import NcgLoop		( underscorePrefix, fmtAsmLbl )
+#endif
 
 import CStrings		( pp_cSEP )
 import Id		( externallyVisibleId, cmpId_withSpecDataCon,
@@ -314,7 +319,9 @@ duplicate declarations in generating C (see @labelSeenTE@ in
 
 \begin{code}
 -- specialised for PprAsm: saves lots of arg passing in NCG
+#if ! OMIT_NATIVE_CODEGEN
 pprCLabel_asm = pprCLabel (PprForAsm underscorePrefix fmtAsmLbl)
+#endif
 
 pprCLabel :: PprStyle -> CLabel -> Unpretty
 

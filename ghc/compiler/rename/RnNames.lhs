@@ -289,7 +289,7 @@ newGlobalName locn maybe_exp rdr
 	       Just exp -> exp
 	       Nothing  -> exp_fn n
 
-	n = mkTopLevName uniq orig locn exp (occ_fn n)
+	n = mkTopLevName uniq orig locn exp (occ_fn n) -- NB: two "n"s
     in
     addWarnIfRn (rdr == Unqual SLIT("negate")) (negateNameWarn (rdr, locn)) `thenRn_`
     addErrIfRn (isQual rdr) (qualNameErr "name in definition" (rdr, locn)) `thenRn_`
@@ -363,6 +363,9 @@ doImportDecls iface_cache g_info us src_imps
 		     then [{- no "import Prelude" -}]
 	             else [ImportDecl pRELUDE False Nothing Nothing prel_loc]
 
+    prel_imps -- WDP: Just guessing on this defn... ToDo
+      = [ imp | imp@(ImportDecl mod _ _ _ _) <- the_imps, fromPrelude mod ]
+
     prel_loc = mkBuiltinSrcLoc
 
     (uniq_imps, imp_dups) = removeDups cmp_mod the_imps
@@ -431,14 +434,15 @@ doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
 		>>= \ (ie_vals, ie_tcs, imp_flags, errs, warns) ->
 	accumulate (map (checkOrigIE iface_cache) chk_ies)
 		>>= \ chk_errs_warns ->
-	accumulate (map (getFixityDecl iface_cache) (bagToList ie_vals))
+	let
+	    final_vals = mapBag fst_occ b_vals `unionBags` mapBag pair_occ ie_vals
+	    final_tcs  = mapBag fst_occ b_tcs  `unionBags` mapBag pair_occ ie_tcs
+	in
+	accumulate (map (getFixityDecl iface_cache) (bagToList final_vals))
 		>>= \ fix_maybes_errs ->
 	let
 	    (chk_errs, chk_warns)  = unzip chk_errs_warns
 	    (fix_maybes, fix_errs) = unzip fix_maybes_errs
-
-	    final_vals = mapBag fst_occ b_vals `unionBags` mapBag pair_occ ie_vals
-	    final_tcs  = mapBag fst_occ b_tcs  `unionBags` mapBag pair_occ ie_tcs
 
 	    unquals    = if qual then emptyBag
 		         else mapBag pair_as (ie_vals `unionBags` ie_tcs)
@@ -511,16 +515,16 @@ getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
         (vals, tcs, ies_left) = do_builtin ies
 
 
-getOrigIEs (ParsedIface _ _ _ _ _ exps _ _ _ _ _ _) Nothing		-- import all
+getOrigIEs (ParsedIface _ _ _ _ _ _ exps _ _ _ _ _ _) Nothing		-- import all
   = (map mkAllIE (eltsFM exps), [], emptyBag)
 
-getOrigIEs (ParsedIface _ _ _ _ _ exps _ _ _ _ _ _) (Just (True, ies))	-- import hiding
+getOrigIEs (ParsedIface _ _ _ _ _ _ exps _ _ _ _ _ _) (Just (True, ies))	-- import hiding
   = (map mkAllIE (eltsFM exps_left), found_ies, errs)
   where
     (found_ies, errs) = lookupIEs exps ies
     exps_left = delListFromFM exps (map (getLocalName.ie_name.fst) found_ies)
 
-getOrigIEs (ParsedIface _ _ _ _ _ exps _ _ _ _ _ _) (Just (False, ies))	-- import these
+getOrigIEs (ParsedIface _ _ _ _ _ _ exps _ _ _ _ _ _) (Just (False, ies))	-- import these
   = (map fst found_ies, found_ies, errs)
   where
     (found_ies, errs) = lookupIEs exps ies
@@ -617,7 +621,7 @@ with_decl iface_cache n do_err do_decl
       Succeeded decl -> return (do_decl decl)
 
 
-getFixityDecl iface_cache rn
+getFixityDecl iface_cache (_,rn)
   = let
 	(mod, str) = moduleNamePair rn
     in
@@ -625,7 +629,7 @@ getFixityDecl iface_cache rn
     case maybe_iface of
       Failed err ->
 	return (Nothing, unitBag err)
-      Succeeded (ParsedIface _ _ _ _ _ _ _ fixes _ _ _ _) ->
+      Succeeded (ParsedIface _ _ _ _ _ _ _ _ fixes _ _ _ _) ->
 	case lookupFM fixes str of
 	  Nothing 	    -> return (Nothing, emptyBag)
 	  Just (InfixL _ i) -> return (Just (InfixL rn i), emptyBag)
@@ -761,7 +765,7 @@ newImportedName tycon_or_class locn maybe_exp maybe_imp rdr
 
 	    (imp_flag, imp_locs) = imp_fn n
 
-	    n = mkImportedName uniq rdr imp locn imp_locs exp (occ_fn n)
+	    n = mkImportedName uniq rdr imp locn imp_locs exp (occ_fn n) -- NB: two "n"s
 	in
 	returnRn n
 \end{code}

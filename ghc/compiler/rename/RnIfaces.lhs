@@ -37,8 +37,9 @@ import Bag		( emptyBag, unitBag, consBag, snocBag,
 			  unionBags, unionManyBags, isEmptyBag, bagToList )
 import CmdLineOpts	( opt_HiSuffix, opt_SysHiSuffix )
 import ErrUtils		( Error(..), Warning(..) )
-import FiniteMap	( emptyFM, lookupFM, addToFM, addToFM_C, plusFM, plusFM_C, eltsFM,
-			  fmToList, delListFromFM, sizeFM, keysFM{-ToDo:rm-}
+import FiniteMap	( emptyFM, lookupFM, addToFM, addToFM_C, plusFM, eltsFM,
+			  fmToList, delListFromFM, sizeFM, foldFM, unitFM,
+			  plusFM_C, keysFM{-ToDo:rm-}
 			)
 import Maybes		( maybeToBool )
 import Name		( moduleNamePair, origName, isRdrLexCon, RdrName(..) )
@@ -77,9 +78,9 @@ absolute-filename-for-that-interface.
 findHiFiles :: [FilePath] -> [FilePath] -> IO (FiniteMap Module FilePath)
 
 findHiFiles dirs sysdirs
-  = hPutStr stderr "  findHiFiles "	>>
+  = --hPutStr stderr "  findHiFiles "	>>
     do_dirs emptyFM (dirs ++ sysdirs)	>>= \ result ->
-    hPutStr stderr " done\n"		>>
+    --hPutStr stderr " done\n"		>>
     return result
   where
     do_dirs env [] = return env
@@ -88,7 +89,7 @@ findHiFiles dirs sysdirs
 	do_dirs new_env dirs
     -------
     do_dir env dir
-      = hPutStr stderr "D" >>
+      = --hPutStr stderr "D" >>
 	getDirectoryContents dir    >>= \ entries ->
 	do_entries env entries
       where
@@ -100,7 +101,7 @@ findHiFiles dirs sysdirs
 	do_entry env e
 	  = case (acceptable_hi (reverse e)) of
 	      Nothing  -> --trace ("Deemed uncool:"++e) $
-			  hPutStr stderr "." >>
+			  --hPutStr stderr "." >>
 			  return env
 	      Just mod ->
 		let
@@ -108,12 +109,12 @@ findHiFiles dirs sysdirs
 		in
 		case (lookupFM env pmod) of
 		  Nothing -> --trace ("Adding "++mod++" -> "++e) $
-			     hPutStr stderr "!" >>
+			     --hPutStr stderr "!" >>
 			     return (addToFM env pmod (dir ++ '/':e))
 			     -- ToDo: use DIR_SEP, not /
 
 		  Just xx -> ( if de_dot xx /= e then trace ("Already mapped!! "++mod++" -> "++xx++"; ignoring:"++e) else id) $
-			     hPutStr stderr "." >>
+			     --hPutStr stderr "." >>
 			     return env
     -------
     acceptable_hi rev_e -- looking at pathname *backwards*
@@ -194,7 +195,7 @@ cachedIface want_orig_iface iface_cache mod
   where
     want_iface iface orig_fm 
       | want_orig_iface
-      = case lookupFM orig_fm of
+      = case lookupFM orig_fm mod of
 	  Nothing         -> Failed (noOrigIfaceErr mod)
           Just orig_iface -> Succeeded orig_iface
       | otherwise
@@ -224,7 +225,7 @@ mergeIfaces (ParsedIface mod1 (_, files1) _ _ _ _ _ _ fixes1 tdefs1 vdefs1 idefs
   where
     dup_merge str ppr_dup dup1 dup2
       = pprTrace "mergeIfaces:"
-	   	 (ppCat [ppPStr mod, ppPStr mod1, ppStr ": dup", ppStr str, ppStr "decl",
+	   	 (ppCat [ppPStr mod1, ppPStr mod2, ppStr ": dup", ppStr str, ppStr "decl",
 			 ppr_dup dup1, ppr_dup dup2]) $
         dup2
 
@@ -312,14 +313,18 @@ readIface :: FilePath -> Module
 	      -> IO (MaybeErr ParsedIface Error)
 
 readIface file mod
-  = hPutStr stderr ("  reading "++file)	>>
+  = --hPutStr stderr ("  reading "++file)	>>
     readFile file		`thenPrimIO` \ read_result ->
     case read_result of
       Left  err      -> return (Failed (cannaeReadErr file err))
-      Right contents -> hPutStr stderr " parsing"   >>
+      Right contents -> --hPutStr stderr " parsing"   >>
 			let parsed = parseIface contents in
-			hPutStr stderr " done\n"    >>
-			return (Succeeded (init_merge mod parsed))
+			--hPutStr stderr " done\n"    >>
+			return (
+			case parsed of
+			  Failed _    -> parsed
+			  Succeeded p -> Succeeded (init_merge mod p)
+			)
   where
     init_merge this (ParsedIface mod _ v sv us vs exps insts fixes tdefs vdefs idefs prags)
       =	ParsedIface mod (False, unitBag this) v sv us vs exps insts fixes tdefs vdefs idefs prags
@@ -374,7 +379,7 @@ rnIfaces iface_cache imp_mods us
 
     -- finalize what we want to say we learned about the
     -- things we used
-    finalIfaceInfo iface_cache if_final_env if_instdecls {-all_imports_used imp_mods-} >>=
+    finalIfaceInfo iface_cache modname if_final_env if_instdecls {-all_imports_used imp_mods-} >>=
 	\ usage_stuff@(usage_info, version_info, instance_mods) ->
 
     return (HsModule modname iface_version exports imports fixities
@@ -779,6 +784,7 @@ rnIfaceInst (InstSig _ _ _ inst_decl) = rnInstDecl inst_decl
 \begin{code}
 finalIfaceInfo ::
 	   IfaceCache			-- iface cache
+	-> Module			-- this module's name
 	-> RnEnv
 	-> [RenamedInstDecl]
 --	-> [RnName]			-- all imported names required
@@ -787,14 +793,47 @@ finalIfaceInfo ::
 	       VersionsMap,		-- info about version numbers
 	       [Module])		-- special instance modules
 
-finalIfaceInfo iface_cache if_final_env@((qual, unqual, tc_qual, tc_unqual), stack) if_instdecls
+finalIfaceInfo iface_cache modname if_final_env@((qual, unqual, tc_qual, tc_unqual), stack) if_instdecls
   =
     pprTrace "usageIf:qual:"      (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM qual]) $
 --  pprTrace "usageIf:unqual:"    (ppCat (map ppPStr (keysFM unqual))) $
     pprTrace "usageIf:tc_qual:"   (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM tc_qual]) $
 --  pprTrace "usageIf:tc_unqual:" (ppCat (map ppPStr (keysFM tc_unqual))) $
+    let
+	val_stuff@(val_usages, val_versions)
+	  = foldFM process_item (emptyFM, emptyFM){-init-} qual
 
-    return (emptyFM, emptyFM, [])
+	(all_usages, all_versions)
+	  = foldFM process_item val_stuff{-keep going-} tc_qual
+    in
+    return (all_usages, all_versions, [])
+  where
+    process_item :: (FAST_STRING,Module) -> RnName -- RnEnv (QualNames) components
+		 -> (UsagesMap, VersionsMap)	   -- input
+		 -> (UsagesMap, VersionsMap)	   -- output
+
+    process_item (n,m) rn as_before@(usages, versions)
+      | irrelevant rn
+      = as_before
+      | m == modname -- this module => add to "versions"
+      =	(usages, addToFM versions n 1{-stub-})
+      | otherwise  -- from another module => add to "usages"
+      = (add_to_usages usages m n 1{-stub-}, versions)
+
+    irrelevant (RnConstr  _ _) = True	-- We don't report these in their
+    irrelevant (RnField   _ _) = True	-- own right in usages/etc.
+    irrelevant (RnClassOp _ _) = True
+    irrelevant _	       = False
+
+    add_to_usages usages m n version
+      = addToFM usages m (
+	    case (lookupFM usages m) of
+	      Nothing -> -- nothing for this module yet...
+		(1{-stub-}, unitFM n version)
+
+	      Just (mversion, mstuff) -> -- the "new" stuff will shadow the old
+		(mversion, addToFM mstuff n version)
+	)
 \end{code}
 
 

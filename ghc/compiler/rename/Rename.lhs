@@ -81,7 +81,7 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
     --				     ]}) $
 
     findHiFiles opt_HiDirList opt_SysHiDirList	    >>=	         \ hi_files ->
-    newVar (emptyFM, hi_files){-init iface cache-}  `thenPrimIO` \ iface_cache ->
+    newVar (emptyFM,emptyFM,hi_files){-init iface cache-}  `thenPrimIO` \ iface_cache ->
 
     fixIO ( \ ~(_, _, _, _, rec_occ_fm, rec_export_fn) ->
     let
@@ -196,7 +196,7 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
 
 \begin{code}
 {- TESTING:
-pprPIface (ParsedIface m v mv usgs lcm exm ims lfx ltdm lvdm lids ldp)
+pprPIface (ParsedIface m ?? v mv usgs lcm exm ims lfx ltdm lvdm lids ldp)
   = ppAboves [
 	ppCat [ppPStr SLIT("interface"), ppPStr m, ppInt v,
 	       case mv of { Nothing -> ppNil; Just n -> ppInt n }],

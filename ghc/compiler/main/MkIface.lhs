@@ -24,6 +24,7 @@ import Bag		( emptyBag, snocBag, bagToList )
 import Class		( GenClass(..){-instance NamedThing-}, GenClassOp(..) )
 import CmdLineOpts	( opt_ProduceHi )
 import FieldLabel	( FieldLabel{-instance NamedThing-} )
+import FiniteMap	( fmToList )
 import HsSyn
 import Id		( idType, dataConSig, dataConFieldLabels,
 			  dataConStrictMarks, StrictnessMark(..),
@@ -128,15 +129,34 @@ endIface (Just if_hdl)	= hPutStr if_hdl "\n" >> hClose if_hdl
 \begin{code}
 ifaceUsages Nothing{-no iface handle-} _ = return ()
 
-ifaceUsages (Just if_hdl) version_info
-  = hPutStr if_hdl "__usages__\nFoo 1" -- a stub, obviously
+ifaceUsages (Just if_hdl) usages
+  | null usages_list
+  = return ()
+  | otherwise
+  = hPutStr if_hdl "__usages__\n"   >>
+    hPutStr if_hdl (ppShow 10000 (ppAboves (map pp_uses usages_list)))
+  where
+    usages_list = fmToList usages
+
+    pp_uses (m, (mv, versions))
+      = ppBesides [ppPStr m, ppSP, ppInt mv, ppPStr SLIT(" :: "),
+	       pp_versions (fmToList versions), ppSemi]
 \end{code}
 
 \begin{code}
 ifaceVersions Nothing{-no iface handle-} _ = return ()
 
 ifaceVersions (Just if_hdl) version_info
-  = hPutStr if_hdl "\n__versions__\nFoo 1" -- a stub, obviously
+  | null version_list
+  = return ()
+  | otherwise
+  = hPutStr if_hdl "\n__versions__\n"	>>
+    hPutStr if_hdl (ppShow 10000 (pp_versions version_list))
+  where
+    version_list = fmToList version_info
+
+pp_versions nvs
+  = ppInterleave ppComma [ ppCat [ppPStr n, ppInt v] | (n,v) <- nvs ]
 \end{code}
 
 \begin{code}

@@ -14,7 +14,7 @@ import DsLoop		-- partly to get dsBinds, partly to chk dsExpr
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..),
 			  Match, Qual, HsBinds, Stmt, PolyType )
 import TcHsSyn		( TypecheckedHsExpr(..), TypecheckedHsBinds(..),
-			  TypecheckedRecordBinds(..)
+			  TypecheckedRecordBinds(..), TypecheckedPat(..)
 			)
 import CoreSyn
 
@@ -22,7 +22,8 @@ import DsMonad
 import DsCCall		( dsCCall )
 import DsListComp	( dsListComp )
 import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom,
-			  mkErrorAppDs, showForErr
+			  mkErrorAppDs, showForErr, EquationInfo,
+			  MatchResult
 			)
 import Match		( matchWrapper )
 
@@ -38,6 +39,7 @@ import Id		( mkTupleCon, idType, nullIdEnv, addOneToIdEnv,
 			)
 import Literal		( mkMachInt, Literal(..) )
 import MagicUFs		( MagicUnfoldingFun )
+import Name		( Name{--O only-} )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType )
 import PrelInfo		( mkTupleTy, unitTy, nilDataCon, consDataCon,

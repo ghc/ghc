@@ -16,9 +16,12 @@ import Ubiq
 import DsLoop		-- break dsExpr-ish loop
 
 import HsSyn		-- lots of things
+			hiding ( collectBinders{-also in CoreSyn-} )
 import CoreSyn		-- lots of things
 import TcHsSyn		( TypecheckedHsBinds(..), TypecheckedHsExpr(..),
-			  TypecheckedBind(..), TypecheckedMonoBinds(..) )
+			  TypecheckedBind(..), TypecheckedMonoBinds(..),
+			  TypecheckedPat(..)
+			)
 import DsHsSyn		( collectTypedBinders, collectTypedPatBinders )
 
 import DsMonad
@@ -39,7 +42,7 @@ import Type		( mkTyVarTys, mkForAllTys, splitSigmaTy,
 import TyVar		( tyVarSetToList, GenTyVar{-instance Eq-} )
 import Util		( isIn, panic, pprTrace{-ToDo:rm-} )
 import PprCore--ToDo:rm
-import PprType--ToDo:rm
+import PprType		( GenTyVar ) --ToDo:rm
 import Usage--ToDo:rm
 import Unique--ToDo:rm
 

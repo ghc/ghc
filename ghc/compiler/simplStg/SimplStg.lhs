@@ -53,8 +53,7 @@ stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
 	      [CostCentre]))	-- "extern" cost-centres
 
 stg2stg stg_todos module_name ppr_style us binds
-  = _scc_ "Stg2Stg"
-    case (splitUniqSupply us)	of { (us4now, us4later) ->
+  = case (splitUniqSupply us)	of { (us4now, us4later) ->
 
     (if do_verbose_stg2stg then
 	hPutStr stderr "VERBOSE STG-TO-STG:\n" >>

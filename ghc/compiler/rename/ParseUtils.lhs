@@ -228,7 +228,8 @@ mk_inst	ctxt clas mono_ty
 lexIface :: String -> [IfaceToken]
 
 lexIface str
-  = case str of
+  = _scc_ "Lexer"
+    case str of
       []    -> []
 
       -- whitespace and comments

@@ -89,8 +89,7 @@ core2core :: [CoreToDo]			-- spec of what core-to-core passes to do
 	      SpecialiseData)		--  specialisation data
 
 core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
-  = _scc_ "Core2Core"
-    if null core_todos then -- very rare, I suspect...
+  = if null core_todos then -- very rare, I suspect...
 	-- well, we still must do some renumbering
 	return (
 	(substCoreBindings nullIdEnv nullTyVarEnv binds us,

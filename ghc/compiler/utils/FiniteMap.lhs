@@ -48,10 +48,11 @@ module FiniteMap (
 	plusFM,
 	plusFM_C,
 	minusFM,
+	foldFM,
 
 	IF_NOT_GHC(intersectFM COMMA)
 	IF_NOT_GHC(intersectFM_C COMMA)
-	IF_NOT_GHC(mapFM COMMA foldFM COMMA filterFM COMMA)
+	IF_NOT_GHC(mapFM COMMA filterFM COMMA)
 
 	sizeFM, isEmptyFM, elemFM, lookupFM, lookupWithDefaultFM,
 

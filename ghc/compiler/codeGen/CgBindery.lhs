@@ -45,7 +45,9 @@ import Id		( idPrimRep, toplevelishId, isDataCon,
 			)
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined )
+#ifdef DEBUG
 import PprAbsC		( pprAmode )
+#endif
 import PprStyle		( PprStyle(..) )
 import StgSyn		( StgArg(..), StgLiveVars(..), GenStgArg(..) )
 import Unpretty		( uppShow )

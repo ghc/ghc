@@ -28,7 +28,7 @@ import RdrHsSyn
 import HsPragmas	( noGenPragmas, noClassOpPragmas )
 
 import SrcLoc		( mkSrcLoc2 )
-import Util		( panic, assertPanic )
+import Util		( mapAndUnzip, panic, assertPanic )
 \end{code}
 
 %************************************************************************
@@ -154,7 +154,7 @@ cvFunMonoBind :: SrcFile -> [RdrMatch] -> (RdrName {-VarName-}, Bool {-InfixDefn
 cvFunMonoBind sf matches
   = (head srcfuns, head infixdefs, cvMatches sf False matches)
   where
-    (srcfuns, infixdefs) = unzip (map get_mdef matches)
+    (srcfuns, infixdefs) = mapAndUnzip get_mdef matches
     -- ToDo: Check for consistent srcfun and infixdef
 
     get_mdef (RdrMatch_NoGuard _ sfun pat _ _) = get_pdef pat
