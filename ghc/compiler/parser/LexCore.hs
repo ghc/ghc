@@ -69,7 +69,7 @@ lexNum cont cs =
 		| isDigit c -> cont (TKrational r) rest'
 	        where ((r,rest'):_) = readFloat (digits ++ ('.':c:rest))
 		-- When reading a floating-point number, which is
-		-- a bit comlicated, use the Haskell 98 library function
+		-- a bit complicated, use the Haskell 98 library function
           (digits,rest) -> cont (TKinteger (sgn * (read digits))) rest
 
 lexName cont cstr cs = cont (cstr name) rest
