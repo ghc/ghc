@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.38 2001/08/31 11:42:44 sewardj Exp $
+ * $Id: RtsFlags.h,v 1.39 2001/11/25 16:57:38 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -88,8 +88,8 @@ struct COST_CENTRE_FLAGS {
 struct PROFILING_FLAGS {
     unsigned int	doHeapProfile;
 
-    nat                 profileFrequency;  /* how often do you want */
-                                           /* to sample (in ms) */
+    nat                 profileInterval;      /* delta between samples (in ms) */
+    nat                 profileIntervalTicks; /* delta between samples (in 'ticks') */
 
 
 # define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
@@ -97,6 +97,9 @@ struct PROFILING_FLAGS {
 # define HEAP_BY_MOD		2
 # define HEAP_BY_DESCR		4
 # define HEAP_BY_TYPE		5
+/* Flags for retainer and lag-drag-void profiling */
+# define HEAP_BY_RETAINER       6
+# define HEAP_BY_LDV            7
 
     rtsBool		showCCSOnException;
   
