@@ -798,10 +798,13 @@ oneLiner (p `Union` q)       = oneLiner p
 -- ---------------------------------------------------------------------------
 -- Displaying the best layout
 
-{-
-renderStyle Style{mode, lineLength, ribbonsPerLine} doc 
-  = fullRender mode lineLength ribbonsPerLine doc ""
--}
+renderStyle style doc 
+  = fullRender (mode style)
+               (lineLength style)
+	       (ribbonsPerLine style)
+	       string_txt
+	       ""
+	       doc
 
 render doc       = showDoc doc ""
 showDoc doc rest = fullRender PageMode 100 1.5 string_txt rest doc
