@@ -11,9 +11,11 @@ typedef int                           DH_MODULE;
 typedef char*                         DH_LPCSTR;
 
 __declspec(dllimport)
-extern DH_MODULE DH_LoadLibrary    ( DH_LPCSTR modname );
+extern __stdcall
+       DH_MODULE DH_LoadLibrary    ( DH_LPCSTR modname );
 __declspec(dllimport)
-extern void*     DH_GetProcAddress ( DH_CALLCONV  cconv, 
+extern __stdcall
+       void*     DH_GetProcAddress ( DH_CALLCONV  cconv, 
                                      DH_MODULE    hModule, 
                                      DH_LPCSTR    lpProcName );
 

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.75 $
- * $Date: 2000/05/26 10:14:33 $
+ * $Revision: 1.76 $
+ * $Date: 2000/06/23 09:41:11 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -143,6 +143,14 @@ static ConId currentModule_failed = NIL; /* Remember failed module from :r */
 extern void setRtsFlags ( int );
 
 static int diet_hep_initialised = 0;
+static FILE* dh_logfile;
+
+static 
+void printf_now ( void )
+{
+  time_t now = time(NULL);
+  printf("\n=== DietHEP event at %s",ctime(&now));
+}
 
 static
 void diet_hep_initialise ( void* cstackbase )
@@ -158,6 +166,14 @@ void diet_hep_initialise ( void* cstackbase )
     diet_hep_initialised = 1;
 
     CStackBase = cstackbase;
+
+    dh_logfile = freopen("diet_hep_logfile.txt","a",stdout);
+    assert(dh_logfile);
+
+    printf_now();
+    printf("===---===---=== DietHEP initialisation ===---===---===\n\n");
+    fflush(stdout);
+
     EnableOutput(1);
     setInstallDir ( "diet_hep" );
 
@@ -170,8 +186,8 @@ void diet_hep_initialise ( void* cstackbase )
     prelOK    = loadThePrelude();
 
     if (!prelOK) {
-       fprintf(stderr, "diet_hep_initialise: fatal error: "
-                       "can't load the Prelude.\n" );
+       printf("diet_hep_initialise: fatal error: "
+              "can't load the Prelude.\n" );
        exit(1);
     }    
 
@@ -229,20 +245,22 @@ void* DH_GetProcAddress_wrk ( DH_CALLCONV cconv,
 }
 
 /*----------- EXPORTS -------------*/
-__declspec(dllexport)
+ __attribute__((__stdcall__))
 DH_MODULE 
 DH_LoadLibrary ( DH_LPCSTR modname )
 {
    int xxx;
    DH_MODULE hdl;
    diet_hep_initialise ( &xxx );
+   printf_now();
+   printf("=== DH_LoadLibrary: request to load `%s'\n\n", modname );
+   fflush(stdout);
    hdl = DH_LoadLibrary_wrk ( modname );
-   printf ( "hdl = %d\n", hdl );
    return hdl;
 }
 
 
-__declspec(dllexport)
+ __attribute__((__stdcall__))
 void*
 DH_GetProcAddress ( DH_CALLCONV cconv,
                     DH_MODULE   hModule,
@@ -250,6 +268,9 @@ DH_GetProcAddress ( DH_CALLCONV cconv,
 {
    int xxx;
    diet_hep_initialise ( &xxx );
+   printf_now();
+   printf("=== DH_GetProcAddress: request for `%s'\n\n", lpProcName );
+   fflush(stdout);
    return DH_GetProcAddress_wrk ( cconv, hModule, lpProcName );
 }
 
@@ -929,13 +950,13 @@ static void ppMG ( void )
       u = hd(t);
       switch (whatIs(u)) {
          case GRP_NONREC:
-            FPrintf ( stderr, "  %s\n", textToStr(textOf(snd(u))));
+            Printf ( "  %s\n", textToStr(textOf(snd(u))));
             break;
          case GRP_REC:
-            FPrintf ( stderr, "  {" );
+            Printf ( "  {" );
             for (v = snd(u); nonNull(v); v=tl(v))
-               FPrintf ( stderr, "%s ", textToStr(textOf(hd(v))) );
-            FPrintf ( stderr, "}\n" );
+               Printf ( "%s ", textToStr(textOf(hd(v))) );
+            Printf ( "}\n" );
             break;
          default:
             internal("ppMG");

@@ -15,6 +15,10 @@ SplitObjs=NO            # essential
 
 Then you need to configure like this:
 
+  cd ghc
+  autoconf
+  cd ..
+  autoconf
   ./configure --host=i386-unknown-mingw32 --enable-win32-dlls
 
 Then
