@@ -69,9 +69,6 @@ predError inst_ty =
 -- |A 'Word' is an unsigned integral type, with the same size as 'Int'.
 data Word = W# Word# deriving (Eq, Ord)
 
-instance CCallable Word
-instance CReturnable Word
-
 instance Show Word where
     showsPrec p x = showsPrec p (toInteger x)
 
@@ -185,9 +182,6 @@ instance Bits Word where
 data Word8 = W8# Word# deriving (Eq, Ord)
 -- ^ 8-bit unsigned integer type
 
-instance CCallable Word8
-instance CReturnable Word8
-
 instance Show Word8 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
 
@@ -287,9 +281,6 @@ instance Bits Word8 where
 
 data Word16 = W16# Word# deriving (Eq, Ord)
 -- ^ 16-bit unsigned integer type
-
-instance CCallable Word16
-instance CReturnable Word16
 
 instance Show Word16 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -611,9 +602,6 @@ instance Bits Word32 where
 
 #endif
 
-instance CCallable Word32
-instance CReturnable Word32
-
 instance Show Word32 where
 #if WORD_SIZE_IN_BITS < 33
     showsPrec p x = showsPrec p (toInteger x)
@@ -867,9 +855,6 @@ instance Bits Word64 where
   #-}
 
 #endif
-
-instance CCallable Word64
-instance CReturnable Word64
 
 instance Show Word64 where
     showsPrec p x = showsPrec p (toInteger x)

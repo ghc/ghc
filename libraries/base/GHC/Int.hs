@@ -41,9 +41,6 @@ import GHC.Show
 data Int8 = I8# Int# deriving (Eq, Ord)
 -- ^ 8-bit signed integer type
 
-instance CCallable Int8
-instance CReturnable Int8
-
 instance Show Int8 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
 
@@ -149,9 +146,6 @@ instance Bits Int8 where
 
 data Int16 = I16# Int# deriving (Eq, Ord)
 -- ^ 16-bit signed integer type
-
-instance CCallable Int16
-instance CReturnable Int16
 
 instance Show Int16 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -505,9 +499,6 @@ instance Bits Int32 where
 
 #endif 
 
-instance CCallable Int32
-instance CReturnable Int32
-
 instance Real Int32 where
     toRational x = toInteger x % 1
 
@@ -778,9 +769,6 @@ instance Bits Int64 where
   #-}
 
 #endif
-
-instance CCallable Int64
-instance CReturnable Int64
 
 instance Real Int64 where
     toRational x = toInteger x % 1

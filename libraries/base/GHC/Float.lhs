@@ -103,12 +103,6 @@ data Float	= F# Float#
 
 -- | Double-precision floating point numbers.
 data Double	= D# Double#
-
-instance CCallable   Float
-instance CReturnable Float
-
-instance CCallable   Double
-instance CReturnable Double
 \end{code}
 
 

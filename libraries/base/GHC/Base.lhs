@@ -16,8 +16,6 @@ GHC.Prim		Has no implementation.  It defines built-in things, and
 		The source file is GHC.Prim.hi-boot, which is just
 		copied to make GHC.Prim.hi
 
-		Classes: CCallable, CReturnable
-
 GHC.Base	Classes: Eq, Ord, Functor, Monad
 		Types:   list, (), Int, Bool, Ordering, Char, String
 
@@ -684,25 +682,6 @@ until p f x | p x	=  x
 asTypeOf		:: a -> a -> a
 asTypeOf		=  const
 \end{code}
-
-%*********************************************************
-%*							*
-\subsection{CCallable instances}
-%*							*
-%*********************************************************
-
-Defined here to avoid orphans
-
-\begin{code}
-instance CCallable Char
-instance CReturnable Char
-
-instance CCallable   Int
-instance CReturnable Int
-
-instance CReturnable () -- Why, exactly?
-\end{code}
-
 
 %*********************************************************
 %*							*

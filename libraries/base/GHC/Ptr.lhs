@@ -60,9 +60,6 @@ alignPtr addr@(Ptr a) (I# i)
 minusPtr :: Ptr a -> Ptr b -> Int
 minusPtr (Ptr a1) (Ptr a2) = I# (minusAddr# a1 a2)
 
-instance CCallable   (Ptr a)
-instance CReturnable (Ptr a)
-
 ------------------------------------------------------------------------
 -- Function pointers for the default calling convention.
 
@@ -93,9 +90,5 @@ castFunPtrToPtr (FunPtr addr) = Ptr addr
 -- |Casts a 'Ptr' to a 'FunPtr'
 castPtrToFunPtr :: Ptr a -> FunPtr b
 castPtrToFunPtr (Ptr addr) = FunPtr addr
-
-instance CCallable   (FunPtr a)
-instance CReturnable (FunPtr a)
-
 \end{code}
 

@@ -32,9 +32,6 @@ import GHC.IOBase
 
 data StablePtr a = StablePtr (StablePtr# a)
 
-instance CCallable   (StablePtr a)
-instance CReturnable (StablePtr a)
-
 newStablePtr   :: a -> IO (StablePtr a)
 newStablePtr a = IO $ \ s ->
     case makeStablePtr# a s of (# s', sp #) -> (# s', StablePtr sp #)
