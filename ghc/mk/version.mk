@@ -30,8 +30,8 @@
 
 ProjectName       = The Glorious Glasgow Haskell Compilation System
 ProjectNameShort  = ghc
-ProjectVersion    = 4.06
-ProjectVersionInt = 406
+ProjectVersion    = 4.07
+ProjectVersionInt = 407
 
 #
 # Optionally, you can get the compiler driver to check the
