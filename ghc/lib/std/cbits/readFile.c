@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: readFile.c,v 1.9 1999/12/08 15:47:08 simonmar Exp $
+ * $Id: readFile.c,v 1.10 2000/01/18 12:42:12 simonmar Exp $
  *
  * hGetContents Runtime Support
  */
@@ -22,8 +22,7 @@
 /* Filling up a (block-buffered) buffer, that
    is completely empty. */
 StgInt
-readBlock(ptr)
-StgForeignPtr ptr;
+readBlock(StgForeignPtr ptr)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int count,rc=0;
@@ -107,10 +106,7 @@ StgForeignPtr ptr;
 
 /* Filling up a (block-buffered) buffer of length len */
 StgInt
-readChunk(ptr,buf,len)
-StgForeignPtr ptr;
-StgAddr buf;
-StgInt len;
+readChunk(StgForeignPtr ptr, StgAddr buf, StgInt len)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int count=0,rc=0, total_count;
@@ -179,6 +175,9 @@ StgInt len;
 	if ( count == 0 ) { /* EOF */
 	    break;
 	} else if ( count == -1 && errno == EAGAIN) {
+	    /* ToDo: partial/blocked reads??????  Looks like we don't recover
+	     * from this properly.
+	     */
 	    errno = 0;
 	    return FILEOBJ_BLOCKED_READ;
 	} else if ( count == -1 && errno != EINTR) {
@@ -192,6 +191,7 @@ StgInt len;
     }
 
     total_count += count;
+    /* ToDo: might point beyond the end of the buffer??? */
     fo->bufWPtr = total_count;
     fo->bufRPtr = 0;
     return total_count;
@@ -207,8 +207,7 @@ StgInt len;
 */
 
 StgInt
-readLine(ptr)
-StgForeignPtr ptr;
+readLine(StgForeignPtr ptr)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc=0, count;
@@ -270,8 +269,7 @@ StgForeignPtr ptr;
 }
 
 StgInt
-readChar(ptr)
-StgForeignPtr ptr;
+readChar(StgForeignPtr ptr)
 {
     IOFileObject* fo= (IOFileObject*)ptr;
     int count,rc=0;
