@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgLongLong.c,v 1.3 1999/02/05 16:02:58 simonm Exp $
+ * $Id: StgLongLong.c,v 1.4 1999/03/02 19:50:47 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -10,7 +10,7 @@
 
 
 /*
-Miscellaneous primitive operations on StgInt64 and StgNat64s.
+Miscellaneous primitive operations on StgInt64 and StgWord64s.
 
 Instead of going the normal (boring) route of making the list
 of primitive operations even longer to cope with operations
@@ -32,27 +32,27 @@ reason why.
 
 #ifdef SUPPORT_LONG_LONGS
 StgInt
-stg_gtWord64(StgNat64 l1, StgNat64 l2)
+stg_gtWord64(StgWord64 l1, StgWord64 l2)
 { return ( l1 > l2); }
 
 StgInt
-stg_geWord64(StgNat64 l1, StgNat64 l2)
+stg_geWord64(StgWord64 l1, StgWord64 l2)
 { return ( l1 >= l2); }
 
 StgInt
-stg_eqWord64(StgNat64 l1, StgNat64 l2)
+stg_eqWord64(StgWord64 l1, StgWord64 l2)
 { return ( l1 == l2); }
 
 StgInt
-stg_neWord64(StgNat64 l1, StgNat64 l2)
+stg_neWord64(StgWord64 l1, StgWord64 l2)
 { return ( l1 != l2); }
 
 StgInt
-stg_ltWord64(StgNat64 l1, StgNat64 l2)
+stg_ltWord64(StgWord64 l1, StgWord64 l2)
 { return ( l1 < l2); }
 
 StgInt
-stg_leWord64(StgNat64 l1, StgNat64 l2)
+stg_leWord64(StgWord64 l1, StgWord64 l2)
 { return ( l1 <= l2); }
 
 /* ------------------ */
@@ -83,12 +83,12 @@ stg_leInt64(StgInt64 l1, StgInt64 l2)
 
 /* Arithmetic operators */
 
-StgNat64
-stg_remWord64(StgNat64 a, StgNat64 b)
+StgWord64
+stg_remWord64(StgWord64 a, StgWord64 b)
 { return (a%b); }
 
-StgNat64
-stg_quotWord64(StgNat64 a, StgNat64 b)
+StgWord64
+stg_quotWord64(StgWord64 a, StgWord64 b)
 { return (a/b); }
 
 StgInt64
@@ -117,28 +117,28 @@ stg_timesInt64(StgInt64 a, StgInt64 b)
 
 /* Logical operators: */
 
-StgNat64
-stg_and64(StgNat64 a, StgNat64 b)
+StgWord64
+stg_and64(StgWord64 a, StgWord64 b)
 { return (a&b); }
 
-StgNat64
-stg_or64(StgNat64 a, StgNat64 b)
+StgWord64
+stg_or64(StgWord64 a, StgWord64 b)
 { return (a|b); }
 
-StgNat64
-stg_xor64(StgNat64 a, StgNat64 b)
+StgWord64
+stg_xor64(StgWord64 a, StgWord64 b)
 { return (a^b); }
 
-StgNat64
-stg_not64(StgNat64 a)
+StgWord64
+stg_not64(StgWord64 a)
 { return (~a); }
 
-StgNat64
-stg_shiftL64(StgNat64 a, StgInt b)
+StgWord64
+stg_shiftL64(StgWord64 a, StgInt b)
 { return (a << b); }
 
-StgNat64
-stg_shiftRL64(StgNat64 a, StgInt b)
+StgWord64
+stg_shiftRL64(StgWord64 a, StgInt b)
 { return (a >> b); }
 
 StgInt64
@@ -172,20 +172,20 @@ StgInt
 stg_int64ToInt(StgInt64 i)
 { return ( (StgInt)i ); }
 
-StgNat64
+StgWord64
 stg_int64ToWord64(StgInt64 i)
-{ return ( (StgNat64)i ); }
+{ return ( (StgWord64)i ); }
 
-StgNat64
+StgWord64
 stg_wordToWord64(StgWord w)
-{ return ( (StgNat64)w ); }
+{ return ( (StgWord64)w ); }
 
 StgWord
-stg_word64ToWord(StgNat64 w)
+stg_word64ToWord(StgWord64 w)
 { return ( (StgWord)w ); }
 
 StgInt64
-stg_word64ToInt64(StgNat64 w)
+stg_word64ToInt64(StgWord64 w)
 { return ( (StgInt64)w ); }
 
 #endif /* SUPPORT_LONG_LONGS */
