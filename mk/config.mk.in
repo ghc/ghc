@@ -110,11 +110,11 @@ exeext=@exeext@
 #		* ghc next
 #		then it's up to you
 
-ProjectsToBuild   = glafp-utils ghc
+ProjectsToBuild   = glafp-utils ghc hslibs
 #
 # Make a distinction between building and installing
 #
-ProjectsToInstall = glafp-utils ghc
+ProjectsToInstall = glafp-utils ghc hslibs
 
 #
 # Should the various project tests directories be built?
