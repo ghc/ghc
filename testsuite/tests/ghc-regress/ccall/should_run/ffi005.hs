@@ -6,7 +6,7 @@ import Foreign.C
 import Control.Exception
 import System.IO.Unsafe
 import Prelude hiding (read)
-import System.IO hiding (bracket)
+import System.IO (hFlush, stdout)
 
 main = do
 
