@@ -31,6 +31,7 @@ import TcEnv		( TcId, ValueEnv, TcTyThing(..), tcAddImportedIdInfo,
 			  tcExtendLocalValEnv
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
+import TcTyDecls	( mkNewTyConRep )
 import TcUnify		( unifyKinds )
 import TcMonad
 import TcMonoType	( kcHsType, tcHsTopType, tcExtendTopTyVarScope, 
@@ -59,7 +60,7 @@ import Type		( Type, ThetaType, ClassContext,
 			)
 import Var		( tyVarKind, TyVar )
 import VarSet		( mkVarSet, emptyVarSet )
-import TyCon		( mkAlgTyCon )
+import TyCon		( AlgTyConFlavour(..), mkClassTyCon )
 import Unique		( Unique, Uniquable(..) )
 import Util
 import Maybes		( seqMaybe )
@@ -173,8 +174,8 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 
 	dict_component_tys = sc_tys ++ op_tys
  	new_or_data = case dict_component_tys of
-			[_]   -> NewType
-			other -> DataType
+			[_]   -> NewTyCon (mkNewTyConRep tycon)
+			other -> DataTyCon
 
         dict_con = mkDataCon datacon_name
 			   [notMarkedStrict | _ <- dict_component_tys]
@@ -192,16 +193,13 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
                                                          ppr tycon_name)
                                       tycon_name
 
-	tycon = mkAlgTyCon tycon_name
-			    class_kind
-			    tyvars
-			    []			-- No context
-                            argvrcs
-			    [dict_con]		-- Constructors
-			    []			-- No derivings
-			    (Just clas)		-- Yes!  It's a dictionary 
-			    new_or_data
-			    NonRecursive
+	tycon = mkClassTyCon tycon_name
+			     class_kind
+			     tyvars
+                             argvrcs
+			     dict_con		-- Constructors
+			     clas 		-- Yes!  It's a dictionary 
+			     new_or_data
     in
     returnTc clas
 \end{code}

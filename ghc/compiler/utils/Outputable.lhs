@@ -346,7 +346,7 @@ printDoc mode hdl doc
 
 showDocWith :: Mode -> Doc -> String
 showDocWith mode doc
-  = fullRender PageMode 100 1.5 put "" doc
+  = fullRender mode 100 1.5 put "" doc
   where
     put (Chr c)   s  = c:s
     put (Str s1)  s2 = s1 ++ s2

@@ -7,7 +7,7 @@
 module TcTyDecls (
 	tcTyDecl, kcTyDecl, 
 	tcConDecl,
-	mkImplicitDataBinds
+	mkImplicitDataBinds, mkNewTyConRep
     ) where
 
 #include "HsVersions.h"
@@ -32,22 +32,24 @@ import TcUnify		( unifyKind )
 import Class		( Class )
 import DataCon		( DataCon, dataConSig, mkDataCon, isNullaryDataCon,
 			  dataConFieldLabels, dataConId, dataConWrapId,
-			  markedStrict, notMarkedStrict, markedUnboxed
+			  markedStrict, notMarkedStrict, markedUnboxed, dataConRepType
 			)
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
 import FieldLabel
 import Var		( Id, TyVar )
 import Name		( Name, isLocallyDefined, OccName, NamedThing(..), nameUnique )
 import Outputable
-import TyCon		( TyCon, ArgVrcs, mkSynTyCon, mkAlgTyCon, 
-			  isSynTyCon, tyConDataCons, isNewTyCon
+import TyCon		( TyCon, AlgTyConFlavour(..), ArgVrcs, mkSynTyCon, mkAlgTyCon, 
+			  tyConDataCons, tyConTyVars,
+			  isSynTyCon, isNewTyCon
 			)
-import Type		( getTyVar, tyVarsOfTypes,
+import Type		( getTyVar, tyVarsOfTypes, splitFunTy, applyTys,
 			  mkTyConApp, mkTyVarTys, mkForAllTys, mkFunTy,
-			  mkTyVarTy, splitForAllTys, isForAllTy,
+			  mkTyVarTy, splitForAllTys, isForAllTy, splitAlgTyConApp_maybe,
 			  mkArrowKind, mkArrowKinds, boxedTypeKind,
 			  isUnboxedType, Type, ThetaType, classesOfPreds
 			)
+import TysWiredIn	( unitTy )
 import Var		( tyVarKind )
 import VarSet		( intersectVarSet, isEmptyVarSet )
 import Util		( equivClasses )
@@ -137,10 +139,10 @@ tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_
 
     let
 	-- Construct the tycon
-	real_data_or_new = case data_or_new of
-				NewType -> NewType
-				DataType | all isNullaryDataCon data_cons -> EnumType
-					 | otherwise			  -> DataType
+	flavour = case data_or_new of
+			NewType -> NewTyCon (mkNewTyConRep tycon)
+			DataType | all isNullaryDataCon data_cons -> EnumTyCon
+				 | otherwise			  -> DataTyCon
 
         argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcTyDecl: argvrcs:" $ ppr tycon_name)
                                       tycon_name
@@ -148,8 +150,7 @@ tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_
 	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt' argvrcs
 			   data_cons
 			   derived_classes
-			   Nothing		-- Not a dictionary
-			   real_data_or_new is_rec
+			   flavour is_rec
     in
     returnTc tycon
   where
@@ -158,6 +159,27 @@ tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_
 
 	tc_deriv name = tcLookupTy name `thenTc` \ (_, _, AClass clas) ->
 			returnTc clas
+\end{code}
+
+\begin{code}
+mkNewTyConRep :: TyCon -> Type
+-- Find the representation type for this newtype TyCon
+-- The trick is to to deal correctly with recursive newtypes
+-- such as	newtype T = MkT T
+
+mkNewTyConRep tc
+  = mkForAllTys tvs (loop [] (mkTyConApp tc (mkTyVarTys tvs)))
+  where
+    tvs = tyConTyVars tc
+    loop tcs ty = case splitAlgTyConApp_maybe ty of {
+			Nothing -> ty ;
+			Just (tc, tys, data_cons) | not (isNewTyCon tc) -> ty
+						  | tc `elem` tcs	-> unitTy
+						  | otherwise		->
+
+		  case splitFunTy (applyTys (dataConRepType (head data_cons)) tys) of
+			(rep_ty, _) -> loop (tc:tcs) rep_ty
+		  }
 \end{code}
 
 

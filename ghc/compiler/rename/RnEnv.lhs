@@ -21,7 +21,7 @@ import HsTypes		( getTyVarName, replaceTyVarName )
 import RnMonad
 import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  ImportReason(..), getSrcLoc, 
-			  mkLocalName, mkImportedLocalName, mkGlobalName,
+			  mkLocalName, mkImportedLocalName, mkGlobalName, mkUnboundName,
 			  mkIPName, isSystemName,
 			  nameOccName, setNameModule, nameModule,
 			  pprOccName, isLocallyDefined, nameUnique, nameOccName,

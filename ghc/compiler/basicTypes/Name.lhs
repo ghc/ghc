@@ -14,6 +14,8 @@ module Name (
 	mkTopName, mkIPName,
 	mkDerivedName, mkGlobalName, mkKnownKeyGlobal,
 	mkWiredInIdName,   mkWiredInTyConName,
+	mkUnboundName, isUnboundName,
+
 	maybeWiredInIdName, maybeWiredInTyConName,
 	isWiredInName, hashName,
 
@@ -48,7 +50,7 @@ import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
-import Unique		( pprUnique, Unique, Uniquable(..), u2i )
+import Unique		( pprUnique, Unique, Uniquable(..), unboundKey, u2i )
 import Outputable
 import GlaExts
 \end{code}
@@ -170,6 +172,16 @@ mkDerivedName :: (OccName -> OccName)
 
 mkDerivedName f name uniq = name {n_uniq = uniq, n_occ = f (n_occ name)}
 
+-- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
+-- during compiler debugging.
+mkUnboundName :: RdrName -> Name
+mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name) noSrcLoc
+
+isUnboundName :: Name -> Bool
+isUnboundName name = getUnique name == unboundKey
+\end{code}
+
+\begin{code}
 -- When we renumber/rename things, we need to be
 -- able to change a Name's Unique to match the cached
 -- one in the thing it's the name of.  If you know what I mean.

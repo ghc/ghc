@@ -677,13 +677,14 @@ mkStgApp env fn args ty
 		      Just fn' -> fn'
 
 saturate :: Id -> [StgArg] -> Type -> ([StgArg] -> Type -> UniqSM StgExpr) -> UniqSM StgExpr
+	-- The type should be the type of (id args)
 saturate fn args ty thing_inside
   | excess_arity == 0	-- Saturated, so nothing to do
   = thing_inside args ty
 
   | otherwise	-- An unsaturated constructor or primop; eta expand it
-  = ASSERT2( excess_arity > 0 && excess_arity <= length extra_arg_tys, 
-	     ppr fn <+> ppr args <+> ppr excess_arity )
+  = ASSERT2( excess_arity > 0 && excess_arity <= length arg_tys, 
+	     ppr fn <+> ppr args <+> ppr excess_arity <+> parens (ppr ty) <+> ppr arg_tys )
     mapUs newStgVar extra_arg_tys 				`thenUs` \ arg_vars ->
     thing_inside (args ++ map StgVarArg arg_vars) final_res_ty  `thenUs` \ body ->
     returnUs (StgLam ty arg_vars body)

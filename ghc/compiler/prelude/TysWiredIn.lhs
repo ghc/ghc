@@ -86,7 +86,7 @@ import Module		( Module, mkPrelModule )
 import Name		( mkWiredInTyConName, mkWiredInIdName, mkSrcOccFS, mkWorkerOcc, dataName )
 import DataCon		( DataCon, StrictnessMark(..),  mkDataCon, dataConId )
 import Var		( TyVar, tyVarKind )
-import TyCon		( TyCon, ArgVrcs, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )
+import TyCon		( TyCon, AlgTyConFlavour(..), ArgVrcs, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )
 import BasicTypes	( Arity, NewOrData(..), RecFlag(..) )
 import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
 			  mkArrowKinds, boxedTypeKind, unboxedTypeKind,
@@ -104,13 +104,12 @@ alpha_tyvar	  = [alphaTyVar]
 alpha_ty	  = [alphaTy]
 alpha_beta_tyvars = [alphaTyVar, betaTyVar]
 
-pcRecDataTyCon, pcNonRecDataTyCon, pcNonRecNewTyCon
+pcRecDataTyCon, pcNonRecDataTyCon
 	:: Unique{-TyConKey-} -> Module -> FAST_STRING
 	-> [TyVar] -> ArgVrcs -> [DataCon] -> TyCon
 
-pcRecDataTyCon    = pcTyCon DataType Recursive
-pcNonRecDataTyCon = pcTyCon DataType NonRecursive
-pcNonRecNewTyCon  = pcTyCon NewType  NonRecursive
+pcRecDataTyCon    = pcTyCon DataTyCon Recursive
+pcNonRecDataTyCon = pcTyCon DataTyCon NonRecursive
 
 pcTyCon new_or_data is_rec key mod str tyvars argvrcs cons
   = tycon
@@ -121,7 +120,6 @@ pcTyCon new_or_data is_rec key mod str tyvars argvrcs cons
                 argvrcs
 		cons
 		[]		-- No derivings
-		Nothing		-- Not a dictionary
 		new_or_data
 		is_rec
 
@@ -156,6 +154,7 @@ pcDataCon wrap_key mod str tyvars context arg_tys tycon
     wrap_name = mkWiredInIdName wrap_key mod wrap_occ wrap_id
     wrap_id   = mkDataConWrapId data_con
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -521,7 +520,7 @@ primitive counterpart.
 \begin{code}
 boolTy = mkTyConTy boolTyCon
 
-boolTyCon = pcTyCon EnumType NonRecursive boolTyConKey 
+boolTyCon = pcTyCon EnumTyCon NonRecursive boolTyConKey 
 		    pREL_BASE SLIT("Bool") [] [] [falseDataCon, trueDataCon]
 
 falseDataCon = pcDataCon falseDataConKey pREL_BASE SLIT("False") [] [] [] boolTyCon

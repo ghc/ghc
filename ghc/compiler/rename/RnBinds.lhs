@@ -21,19 +21,19 @@ module RnBinds (
 import {-# SOURCE #-} RnSource ( rnHsSigType )
 
 import HsSyn
-import HsBinds		( sigsForMe )
+import HsBinds		( sigsForMe, cmpHsSig, sigName, hsSigDoc )
 import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
-import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupGlobalOccRn,
+import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupGlobalOccRn, lookupOccRn,
 			  warnUnusedLocalBinds, mapFvRn, 
 			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, addOneFV,
 			  unknownNameErr
 			)
 import CmdLineOpts	( opt_WarnMissingSigs )
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( OccName, Name, nameOccName )
+import Name		( OccName, Name, nameOccName, mkUnboundName, isUnboundName )
 import NameSet
 import RdrName		( RdrName, rdrNameOcc  )
 import BasicTypes	( RecFlag(..), TopLevelFlag(..) )
@@ -173,24 +173,18 @@ rnTopMonoBinds EmptyMonoBinds sigs
 
 rnTopMonoBinds mbinds sigs
  =  mapRn lookupBndrRn binder_rdr_names	`thenRn` \ binder_names ->
+    renameSigs (okBindSig (mkNameSet binder_names)) sigs `thenRn` \ (siglist, sig_fvs) ->
     let
-	binder_set    = mkNameSet binder_names
-	binder_occ_fm = listToFM [(nameOccName x,x) | x <- binder_names]
+	type_sig_vars	= [n | Sig n _ _ <- siglist]
+	un_sigd_binders | opt_WarnMissingSigs = binder_names `minusList` type_sig_vars
+			| otherwise	      = []
     in
-    renameSigs opt_WarnMissingSigs binder_set
-	       (lookupSigOccRn binder_occ_fm) sigs `thenRn` \ (siglist, sig_fvs) ->
+    mapRn_ (addWarnRn.missingSigWarn) un_sigd_binders	`thenRn_`
+
     rn_mono_binds siglist mbinds		   `thenRn` \ (final_binds, bind_fvs) ->
     returnRn (final_binds, bind_fvs `plusFV` sig_fvs)
   where
     binder_rdr_names = map fst (bagToList (collectMonoBinders mbinds))
-
--- the names appearing in the sigs have to be bound by 
--- this group's binders.
-lookupSigOccRn binder_occ_fm rdr_name
-  = case lookupFM binder_occ_fm (rdrNameOcc rdr_name) of
-	Nothing -> failWithRn (mkUnboundName rdr_name)
-			      (unknownNameErr rdr_name)
-	Just x  -> returnRn x
 \end{code}
 
 %************************************************************************
@@ -233,26 +227,15 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
     bindLocatedLocalsRn (text "a binding group") mbinders_w_srclocs
     $ \ new_mbinders ->
     let
-	binder_set    = mkNameSet new_mbinders
-	binder_occ_fm = listToFM [(nameOccName x,x) | x <- new_mbinders]
-
-	   -- Weed out the fixity declarations that do not
-	   -- apply to any of the binders in this group.
-	(sigs_for_me, fixes_not_for_me) = partition forLocalBind sigs
-
-	forLocalBind (FixSig sig@(FixitySig name _ _ )) =
-	    isJust (lookupFM binder_occ_fm (rdrNameOcc name))
-	forLocalBind _ = True
+	binder_set = mkNameSet new_mbinders
     in
 	-- Rename the signatures
-    renameSigs False binder_set
-	       (lookupSigOccRn binder_occ_fm) sigs_for_me   `thenRn` \ (siglist, sig_fvs) ->
+    renameSigs (okBindSig binder_set) sigs	`thenRn` \ (siglist, sig_fvs) ->
 
 	-- Report the fixity declarations in this group that 
 	-- don't refer to any of the group's binders.
 	-- Then install the fixity declarations that do apply here
 	-- Notice that they scope over thing_inside too
-    mapRn_ (unknownSigErr) fixes_not_for_me     `thenRn_`
     let
 	fixity_sigs = [(name,sig) | FixSig sig@(FixitySig name _ _) <- siglist ]
     in
@@ -483,32 +466,29 @@ At the moment we don't gather free-var info from the types in
 signatures.  We'd only need this if we wanted to report unused tyvars.
 
 \begin{code}
-renameSigs ::  Bool		-- True => warn if (required) type signatures are missing.
-	    -> NameSet		-- Set of names bound in this group
-	    -> (RdrName -> RnMS Name)
+renameSigs ::  (RenamedSig -> Bool)		-- OK-sig predicate
 	    -> [RdrNameSig]
-	    -> RnMS ([RenamedSig], FreeVars)	 -- List of Sig constructors
+	    -> RnMS ([RenamedSig], FreeVars)
 
-renameSigs sigs_required binders lookup_occ_nm sigs
+renameSigs ok_sig [] = returnRn ([], emptyFVs)	-- Common shortcut
+
+renameSigs ok_sig sigs
   =	 -- Rename the signatures
-    mapFvRn (renameSig lookup_occ_nm) sigs   	`thenRn` \ (sigs', fvs) ->
+    mapFvRn renameSig sigs   	`thenRn` \ (sigs', fvs) ->
 
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
-	--	     (c) optionally, bindings with no signature
     let
-	(goodies, dups) = removeDups cmp_sig (sigsForMe (not . isUnboundName) sigs')
-	not_this_group  = sigsForMe (not . (`elemNameSet` binders)) goodies
-	type_sig_vars	= [n | Sig n _ _     <- goodies]
-	un_sigd_binders | sigs_required = nameSetToList binders `minusList` type_sig_vars
-			| otherwise	= []
+	in_scope	 = filter is_in_scope sigs'
+	is_in_scope sig	 = case sigName sig of
+				Just n  -> not (isUnboundName n)
+				Nothing -> True
+	(not_dups, dups) = removeDups cmpHsSig in_scope
+	(goods, bads)	 = partition ok_sig not_dups
     in
-    mapRn_ dupSigDeclErr dups 				`thenRn_`
-    mapRn_ unknownSigErr not_this_group			`thenRn_`
-    mapRn_ (addWarnRn.missingSigWarn) un_sigd_binders	`thenRn_`
-    returnRn (sigs', fvs)	
-		-- bad ones and all:
-		-- we need bindings of *some* sort for every name
+    mapRn_ unknownSigErr bads			`thenRn_`
+    mapRn_ dupSigDeclErr dups			`thenRn_`
+    returnRn (goods, fvs)
 
 -- We use lookupOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:
@@ -519,43 +499,43 @@ renameSigs sigs_required binders lookup_occ_nm sigs
 -- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
 -- Doesn't seem worth much trouble to sort this.
 
-renameSig :: (RdrName -> RnMS Name) -> Sig RdrName -> RnMS (Sig Name, FreeVars)
+renameSig :: Sig RdrName -> RnMS (Sig Name, FreeVars)
 
-renameSig lookup_occ_nm (Sig v ty src_loc)
+renameSig (Sig v ty src_loc)
   = pushSrcLocRn src_loc $
-    lookup_occ_nm v				`thenRn` \ new_v ->
+    lookupOccRn v				`thenRn` \ new_v ->
     rnHsSigType (quotes (ppr v)) ty		`thenRn` \ (new_ty,fvs) ->
     returnRn (Sig new_v new_ty src_loc, fvs `addOneFV` new_v)
 
-renameSig _ (SpecInstSig ty src_loc)
+renameSig (SpecInstSig ty src_loc)
   = pushSrcLocRn src_loc $
     rnHsSigType (text "A SPECIALISE instance pragma") ty `thenRn` \ (new_ty, fvs) ->
     returnRn (SpecInstSig new_ty src_loc, fvs)
 
-renameSig lookup_occ_nm (SpecSig v ty src_loc)
+renameSig (SpecSig v ty src_loc)
   = pushSrcLocRn src_loc $
-    lookup_occ_nm v			`thenRn` \ new_v ->
+    lookupOccRn v			`thenRn` \ new_v ->
     rnHsSigType (quotes (ppr v)) ty	`thenRn` \ (new_ty,fvs) ->
     returnRn (SpecSig new_v new_ty src_loc, fvs `addOneFV` new_v)
 
-renameSig lookup_occ_nm (FixSig (FixitySig v fix src_loc))
+renameSig (FixSig (FixitySig v fix src_loc))
   = pushSrcLocRn src_loc $
-    lookup_occ_nm v		`thenRn` \ new_v ->
+    lookupOccRn v		`thenRn` \ new_v ->
     returnRn (FixSig (FixitySig new_v fix src_loc), unitFV new_v)
 
-renameSig lookup_occ_nm (DeprecSig (Deprecation ie txt) src_loc)
+renameSig (DeprecSig (Deprecation ie txt) src_loc)
   = pushSrcLocRn src_loc $
-    renameIE lookup_occ_nm ie	`thenRn` \ (new_ie, fvs) ->
+    renameIE lookupOccRn ie	`thenRn` \ (new_ie, fvs) ->
     returnRn (DeprecSig (Deprecation new_ie txt) src_loc, fvs)
 
-renameSig lookup_occ_nm (InlineSig v p src_loc)
+renameSig (InlineSig v p src_loc)
   = pushSrcLocRn src_loc $
-    lookup_occ_nm v		`thenRn` \ new_v ->
+    lookupOccRn v		`thenRn` \ new_v ->
     returnRn (InlineSig new_v p src_loc, unitFV new_v)
 
-renameSig lookup_occ_nm (NoInlineSig v p src_loc)
+renameSig (NoInlineSig v p src_loc)
   = pushSrcLocRn src_loc $
-    lookup_occ_nm v		`thenRn` \ new_v ->
+    lookupOccRn v		`thenRn` \ new_v ->
     returnRn (NoInlineSig new_v p src_loc, unitFV new_v)
 \end{code}
 
@@ -582,43 +562,6 @@ renameIE lookup_occ_nm (IEModuleContents m)
   = returnRn (IEModuleContents m, emptyFVs)
 \end{code}
 
-Checking for distinct signatures; oh, so boring
-
-
-\begin{code}
-cmp_sig :: RenamedSig -> RenamedSig -> Ordering
-cmp_sig (Sig n1 _ _)         (Sig n2 _ _)         = n1 `compare` n2
-cmp_sig (DeprecSig (Deprecation ie1 _) _)
-        (DeprecSig (Deprecation ie2 _) _)         = cmp_ie ie1 ie2
-cmp_sig (InlineSig n1 _ _)   (InlineSig n2 _ _)   = n1 `compare` n2
-cmp_sig (NoInlineSig n1 _ _) (NoInlineSig n2 _ _) = n1 `compare` n2
-cmp_sig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)  = cmpHsType compare ty1 ty2
-cmp_sig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _) 
-  = -- may have many specialisations for one value;
-    -- but not ones that are exactly the same...
-	thenCmp (n1 `compare` n2) (cmpHsType compare ty1 ty2)
-
-cmp_sig other_1 other_2					-- Tags *must* be different
-  | (sig_tag other_1) _LT_ (sig_tag other_2) = LT 
-  | otherwise				     = GT
-
-cmp_ie :: IE Name -> IE Name -> Ordering
-cmp_ie (IEVar            n1  ) (IEVar            n2  ) = n1 `compare` n2
-cmp_ie (IEThingAbs       n1  ) (IEThingAbs       n2  ) = n1 `compare` n2
-cmp_ie (IEThingAll       n1  ) (IEThingAll       n2  ) = n1 `compare` n2
--- Hmmm...
-cmp_ie (IEThingWith      n1 _) (IEThingWith      n2 _) = n1 `compare` n2
-cmp_ie (IEModuleContents _   ) (IEModuleContents _   ) = EQ
-
-sig_tag (Sig n1 _ _)    	   = (ILIT(1) :: FAST_INT)
-sig_tag (SpecSig n1 _ _)    	   = ILIT(2)
-sig_tag (InlineSig n1 _ _)  	   = ILIT(3)
-sig_tag (NoInlineSig n1 _ _)  	   = ILIT(4)
-sig_tag (SpecInstSig _ _)	   = ILIT(5)
-sig_tag (FixSig _)		   = ILIT(6)
-sig_tag (DeprecSig _ _)		   = ILIT(7)
-sig_tag _			   = panic# "tag(RnBinds)"
-\end{code}
 
 %************************************************************************
 %*									*
@@ -632,24 +575,14 @@ dupSigDeclErr (sig:sigs)
     addErrRn (sep [ptext SLIT("Duplicate") <+> ptext what_it_is <> colon,
 		   ppr sig])
   where
-    (what_it_is, loc) = sig_doc sig
+    (what_it_is, loc) = hsSigDoc sig
 
 unknownSigErr sig
   = pushSrcLocRn loc $
-    addErrRn (sep [ptext SLIT("Misplaced"),
-		   ptext what_it_is <> colon,
+    addErrRn (sep [ptext SLIT("Misplaced") <+> ptext what_it_is <> colon,
 		   ppr sig])
   where
-    (what_it_is, loc) = sig_doc sig
-
-sig_doc (Sig        _ _ loc) 	     = (SLIT("type signature"),loc)
-sig_doc (ClassOpSig _ _ _ _ loc)     = (SLIT("class-method type signature"), loc)
-sig_doc (SpecSig    _ _ loc) 	     = (SLIT("SPECIALISE pragma"),loc)
-sig_doc (InlineSig  _ _    loc)	     = (SLIT("INLINE pragma"),loc)
-sig_doc (NoInlineSig  _ _  loc)	     = (SLIT("NOINLINE pragma"),loc)
-sig_doc (SpecInstSig _ loc)	     = (SLIT("SPECIALISE instance pragma"),loc)
-sig_doc (FixSig (FixitySig _ _ loc)) = (SLIT("fixity declaration"), loc)
-sig_doc (DeprecSig _ loc)            = (SLIT("DEPRECATED pragma"), loc)
+    (what_it_is, loc) = hsSigDoc sig
 
 missingSigWarn var
   = sep [ptext SLIT("definition but no type signature for"), quotes (ppr var)]

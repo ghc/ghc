@@ -2,7 +2,8 @@ This module deals with printing C string literals
 
 \begin{code}
 module CStrings(
-	CLabelString, isCLabelString,
+	CLabelString, isCLabelString, pprCLabelString,
+
 	cSEP, pp_cSEP,
 
 	stringToC, charToC, pprFSInCStyle,
@@ -18,6 +19,8 @@ import Outputable
 
 \begin{code}
 type CLabelString = FAST_STRING		-- A C label, completely unencoded
+
+pprCLabelString lbl = ptext lbl
 
 isCLabelString :: CLabelString -> Bool	-- Checks to see if this is a valid C label
 isCLabelString lbl 

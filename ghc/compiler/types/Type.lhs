@@ -96,7 +96,7 @@ import NameSet
 import Class	( classTyCon, Class )
 import TyCon	( TyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
-		  isFunTyCon, isDataTyCon, isNewTyCon,
+		  isFunTyCon, isDataTyCon, isNewTyCon, newTyConRep,
 		  isAlgTyCon, isSynTyCon, tyConArity,
 	          tyConKind, tyConDataCons, getSynTyConDefn,
 		  tyConPrimRep, tyConClass_maybe
@@ -429,41 +429,17 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 repType looks through 
 	(a) for-alls, and
 	(b) newtypes
-in addition to synonyms.  It's useful in the back end where we're not
+	(c) synonyms
+It's useful in the back end where we're not
 interested in newtypes anymore.
 
 \begin{code}
 repType :: Type -> Type
-repType (NoteTy _ ty)     		  = repType ty
-repType (ForAllTy _ ty)   		  = repType ty
-repType (TyConApp tc tys) | isNewTyCon tc = repType (new_type_rep tc tys)
-repType other_ty	  		  = other_ty
-
-
-typePrimRep :: Type -> PrimRep
-typePrimRep ty = case splitTyConApp_maybe (repType ty) of
-		   Just (tc, ty_args) -> tyConPrimRep tc
-		   other	      -> PtrRep
-
-splitNewType_maybe :: Type -> Maybe Type
--- Find the representation of a newtype, if it is one
--- Looks through multiple levels of newtype
-splitNewType_maybe (NoteTy _ ty) 		     = splitNewType_maybe ty
-splitNewType_maybe (TyConApp tc tys) | isNewTyCon tc = case splitNewType_maybe rep_ty of
-								Just rep_ty' -> Just rep_ty'
-								Nothing	     -> Just rep_ty
-						     where
-						       rep_ty = new_type_rep tc tys
-
-splitNewType_maybe other 			     = Nothing						
-
-new_type_rep :: TyCon -> [Type] -> Type
--- The representation type for (T t1 .. tn), where T is a newtype 
--- Looks through one layer only
-new_type_rep tc tys 
-  = ASSERT( isNewTyCon tc )
-    case splitFunTy_maybe (applyTys (dataConRepType (head (tyConDataCons tc))) tys) of
-	Just (rep_ty, _) -> rep_ty
+repType (ForAllTy _ ty) = repType ty
+repType (NoteTy   _ ty) = repType ty
+repType ty	 	= case splitNewType_maybe ty of
+			    Just ty' -> repType ty'	-- Still re-apply repType in case of for-all
+			    Nothing  -> ty
 
 splitRepFunTys :: Type -> ([Type], Type)
 -- Like splitFunTys, but looks through newtypes and for-alls
@@ -471,6 +447,25 @@ splitRepFunTys ty = split [] (repType ty)
   where
     split args (FunTy arg res)  = split (arg:args) (repType res)
     split args ty               = (reverse args, ty)
+
+typePrimRep :: Type -> PrimRep
+typePrimRep ty = case repType ty of
+		   TyConApp tc _ -> tyConPrimRep tc
+		   FunTy _ _	 -> PtrRep
+		   AppTy _ _	 -> PtrRep	-- ??
+		   TyVarTy _	 -> PtrRep
+
+splitNewType_maybe :: Type -> Maybe Type
+-- Find the representation of a newtype, if it is one
+-- Looks through multiple levels of newtype, but does not look through for-alls
+splitNewType_maybe (NoteTy _ ty)     = splitNewType_maybe ty
+splitNewType_maybe (TyConApp tc tys) = case newTyConRep tc of
+					 Just rep_ty -> ASSERT( length tys == tyConArity tc )
+						-- The assert should hold because repType should
+						-- only be applied to *types* (of kind *)
+							Just (applyTys rep_ty tys)
+					 Nothing     -> Nothing
+splitNewType_maybe other 	     = Nothing						
 \end{code}
 
 

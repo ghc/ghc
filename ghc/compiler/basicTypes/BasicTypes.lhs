@@ -121,7 +121,6 @@ negatePrecedence = 6
 data NewOrData
   = NewType  	-- "newtype Blah ..."
   | DataType 	-- "data Blah ..."
-  | EnumType	-- Enumeration; all constructors are nullary
   deriving( Eq )	-- Needed because Demand derives Eq
 \end{code}
 

@@ -39,7 +39,7 @@ import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			)
 import Name		( Name, OccName, NamedThing(..),
 			  isLocallyDefinedName, nameModule, nameOccName,
-			  decode, mkLocalName
+			  decode, mkLocalName, mkUnboundName
 			)
 import Module		( Module, ModuleName, ModuleHiMap, SearchPath, WhereFrom,
 			  mkModuleHiMaps, moduleName, mkVanillaModule, mkSearchPath
@@ -430,14 +430,6 @@ emptyIfaces = Ifaces { iImpModInfo = emptyFM,
 		       iRules = emptyBag,
 		       iDeprecs = emptyNameEnv
 	      }
-
--- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
--- during compiler debugging.
-mkUnboundName :: RdrName -> Name
-mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name) noSrcLoc
-
-isUnboundName :: Name -> Bool
-isUnboundName name = getUnique name == unboundKey
 
 builtins :: FiniteMap (ModuleName,OccName) Name
 builtins = 

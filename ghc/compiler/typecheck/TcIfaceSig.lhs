@@ -31,7 +31,7 @@ import CoreUtils	( exprType )
 import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
-import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
+import PrimOp		( PrimOp(..) )
 
 import Id		( Id, mkId, mkVanillaId,
 			  isDataConWrapId_maybe

@@ -39,6 +39,7 @@ import TysWiredIn	( unitDataConId, stringTy,
 			  unboxedPairDataCon,
 			  mkUnboxedTupleTy, unboxedTupleCon
 			)
+import CStrings		( CLabelString )
 import Unique		( Unique )
 import VarSet		( varSetElems )
 import Outputable
@@ -80,7 +81,7 @@ follows:
 \end{verbatim}
 
 \begin{code}
-dsCCall :: FAST_STRING	-- C routine to invoke
+dsCCall :: CLabelString	-- C routine to invoke
 	-> [CoreExpr]	-- Arguments (desugared)
 	-> Bool		-- True <=> might cause Haskell GC
 	-> Bool		-- True <=> really a "_casm_"

@@ -38,7 +38,7 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_EmitCExternDecls, opt_GranMacros )
 import CostCentre	( pprCostCentreDecl, pprCostCentreStackDecl )
 
 import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
-import CStrings		( stringToC )
+import CStrings		( stringToC, pprCLabelString )
 import FiniteMap	( addToFM, emptyFM, lookupFM, FiniteMap )
 import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
@@ -328,7 +328,7 @@ pprAbsC stmt@(CCallTypedef is_tdef (CCall op_str is_asm may_gc cconv) results ar
      ccall_fun_ty = 
         case op_str of
 	  DynamicTarget u -> ptext SLIT("_ccall_fun_ty") <> ppr u
-	  StaticTarget x  -> ptext x
+	  StaticTarget x  -> pprCLabelString x
 
      ccall_res_ty = 
        case non_void_results of

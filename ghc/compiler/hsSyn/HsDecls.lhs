@@ -31,7 +31,7 @@ import Var		( TyVar )
 -- others:
 import PprType
 import {-# SOURCE #-} FunDeps ( pprFundeps )
-import CStrings		( CLabelString )
+import CStrings		( CLabelString, pprCLabelString )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Util
@@ -413,13 +413,11 @@ extNameStatic :: ExtName -> CLabelString
 extNameStatic (ExtName f _) = f
 extNameStatic Dynamic	    = panic "staticExtName: Dynamic - shouldn't ever happen."
 
-
 instance Outputable ExtName where
   ppr Dynamic	   = ptext SLIT("dynamic")
   ppr (ExtName nm mb_mod) = 
      case mb_mod of { Nothing -> empty; Just m -> doubleQuotes (ptext m) } <+> 
-     doubleQuotes (ptext nm)
-
+     doubleQuotes (pprCLabelString nm)
 \end{code}
 
 %************************************************************************

@@ -23,6 +23,7 @@ import PprType		( pprType, pprParendType )
 import Type		( Type )
 import Var		( TyVar, Id )
 import DataCon		( DataCon )
+import CStrings		( CLabelString, pprCLabelString )
 import SrcLoc		( SrcLoc )
 \end{code}
 
@@ -137,7 +138,7 @@ data HsExpr id pat
 		(HsExpr id pat)		-- (typechecked, of course)
 		(ArithSeqInfo id pat)
 
-  | HsCCall	FAST_STRING	-- call into the C world; string is
+  | HsCCall	CLabelString	-- call into the C world; string is
 		[HsExpr id pat]	-- the C function; exprs are the
 				-- arguments to pass.
 		Bool		-- True <=> might cause Haskell
@@ -337,8 +338,8 @@ ppr_expr (EAsPat v e) = ppr v <> char '@' <> pprParendExpr e
 
 ppr_expr (HsCCall fun args _ is_asm result_ty)
   = hang (if is_asm
-	  then ptext SLIT("_casm_ ``") <> ptext fun <> ptext SLIT("''")
-	  else ptext SLIT("_ccall_") <+> ptext fun)
+	  then ptext SLIT("_casm_ ``") <> pprCLabelString fun <> ptext SLIT("''")
+	  else ptext SLIT("_ccall_") <+> pprCLabelString fun)
        4 (sep (map pprParendExpr args))
 
 ppr_expr (HsSCC lbl expr)

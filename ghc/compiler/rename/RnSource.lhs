@@ -200,15 +200,13 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
     let
 	    -- First process the class op sigs, then the fixity sigs.
 	  (op_sigs, non_op_sigs) = partition isClassOpSig sigs
-	  (fix_sigs, non_sigs)   = partition isFixitySig  non_op_sigs
     in
     checkDupOrQualNames sig_doc sig_rdr_names_w_locs 	  `thenRn_` 
     mapFvRn (rn_op cname' clas_tyvar_names fds') op_sigs  `thenRn` \ (sigs', sig_fvs) ->
-    mapRn_  (unknownSigErr) non_sigs			  `thenRn_`
     let
      binders = mkNameSet [ nm | (ClassOpSig nm _ _ _ _) <- sigs' ]
     in
-    renameSigs False binders lookupOccRn fix_sigs	  `thenRn` \ (fixs', fix_fvs) ->
+    renameSigs (okClsDclSig binders) non_op_sigs	  `thenRn` \ (non_ops', fix_fvs) ->
 
 	-- Check the methods
     checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
@@ -221,7 +219,7 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
 	-- for instance decls.
 
     ASSERT(isNoClassPragmas pragmas)
-    returnRn (TyClD (ClassDecl context' cname' tyvars' fds' (fixs' ++ sigs') mbinds'
+    returnRn (TyClD (ClassDecl context' cname' tyvars' fds' (non_ops' ++ sigs') mbinds'
 			       NoClassPragmas tname' dname' dwname' snames' src_loc),
 	      sig_fvs	`plusFV`
 	      fix_fvs	`plusFV`
@@ -299,30 +297,13 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags dfun_rdr_name src_loc))
     )						`thenRn` \ (mbinds', meth_fvs) ->
     let 
 	binders = mkNameSet (map fst (bagToList (collectMonoBinders mbinds')))
-
-	-- Delete sigs (&report) sigs that aren't allowed inside an
-	-- instance decl:
-	--
-	--  + type signatures
-	--  + fixity decls
-	--
-	(ok_sigs, not_ok_idecl_sigs) = partition okInInstDecl uprags
-	
-	okInInstDecl (FixSig _)  = False
-	okInInstDecl (Sig _ _ _) = False
-	okInInstDecl _		 = True
-	
     in
-      -- You can't have fixity decls & type signatures
-      -- within an instance declaration.
-    mapRn_ unknownSigErr not_ok_idecl_sigs       `thenRn_`
-
 	-- Rename the prags and signatures.
 	-- Note that the type variables are not in scope here,
 	-- so that	instance Eq a => Eq (T a) where
 	--			{-# SPECIALISE instance Eq a => Eq (T [a]) #-}
 	-- works OK. 
-    renameSigs False binders lookupOccRn ok_sigs `thenRn` \ (new_uprags, prag_fvs) ->
+    renameSigs (okInstDclSig binders) uprags	`thenRn` \ (new_uprags, prag_fvs) ->
 
     getModeRn		`thenRn` \ mode ->
     (case mode of

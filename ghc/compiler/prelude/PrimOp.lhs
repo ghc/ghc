@@ -43,6 +43,7 @@ import Type		( Type, mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, mkTyVarTys,
 			)
 import Unique		( Unique, mkPrimOpIdUnique )
 import BasicTypes	( Arity )
+import CStrings		( CLabelString, pprCLabelString )
 import PrelMods		( pREL_GHC, pREL_GHC_Name )
 import Outputable
 import Util		( assoc, zipWithEqual )
@@ -2395,7 +2396,7 @@ data CCall
 		CallConv	-- calling convention to use.
 
 data CCallTarget
-  = StaticTarget  FAST_STRING   -- An "unboxed" ccall# to `fn'.
+  = StaticTarget  CLabelString  -- An "unboxed" ccall# to `fn'.
   | DynamicTarget Unique	-- First argument (an Addr#) is the function pointer
 				--   (unique is used to generate a 'typedef' to cast
 				--    the function pointer if compiling the ccall# down to
@@ -2432,5 +2433,5 @@ pprCCallOp (CCall fun is_casm may_gc cconv)
 
 	ppr_fun = case fun of
 		     DynamicTarget _ -> text "\"\""
-		     StaticTarget fn -> ptext fn
+		     StaticTarget fn -> pprCLabelString fn
 \end{code}

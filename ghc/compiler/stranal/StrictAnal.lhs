@@ -19,7 +19,6 @@ import Id		( idType, setIdStrictness, setInlinePragma,
 			)
 import IdInfo		( InlinePragInfo(..) )
 import CoreLint		( beginPass, endPass )
-import Type		( splitRepFunTys )
 import ErrUtils		( dumpIfSet )
 import SaAbsInt
 import SaLib
