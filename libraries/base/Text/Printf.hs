@@ -13,6 +13,8 @@
 -----------------------------------------------------------------------------
 
 module Text.Printf(printf, hPrintf) where
+
+import Prelude
 import Data.Array
 import Data.Char
 import Numeric(showEFloat, showFFloat, showGFloat)

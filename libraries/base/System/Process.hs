@@ -45,6 +45,8 @@ module System.Process (
 	terminateProcess,
  ) where
 
+import Prelude
+
 import System.Process.Internals
 
 import Foreign
