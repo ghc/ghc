@@ -237,9 +237,7 @@ BOOLEAN inpat;
   		gdrhs gdpat valrhs
   		lampats	cexps
 
-%type <umaybe>  maybeexports impas maybeimpspec deriving
-
-%type <ueither> impspec  
+%type <umaybe>  maybeexports impspec deriving
 
 %type <uliteral> lit_constant
 
@@ -254,7 +252,7 @@ BOOLEAN inpat;
 		VARID CONID VARSYM CONSYM 
   		var con varop conop op
 		vark varid varsym varsym_nominus
-	        tycon modid impmod ccallid
+	        tycon modid ccallid
 
 %type <uqid>	QVARID QCONID QVARSYM QCONSYM 
 		qvarid qconid qvarsym qconsym
@@ -284,7 +282,7 @@ BOOLEAN inpat;
 
 %type <uentid>	  export import
 
-%type <ulong>     commas impqual
+%type <ulong>     commas
 
 /**********************************************************************
 *                                                                     *
@@ -380,32 +378,20 @@ impdecls:  impdecl				{ $$ = $1; }
 	;
 
 
-impdecl	:  importkey impqual impmod impas maybeimpspec
-		{ 
-		  $$ = lsing(mkimport($3,$2,$4,$5,startlineno));
-	        }
+impdecl	:  importkey modid impspec
+		{ $$ = lsing(mkimport($2,0,mknothing(),$3,startlineno)); }
+	|  importkey QUALIFIED modid impspec
+		{ $$ = lsing(mkimport($3,1,mknothing(),$4,startlineno)); }
+	|  importkey QUALIFIED modid AS modid impspec
+		{ $$ = lsing(mkimport($3,1,mkjust($5),$6,startlineno)); }
 	;
 
-impmod  : modid					{ $$ = $1; }
-	;
-
-impqual :  /* noqual */				{ $$ = 0; }
-	|  QUALIFIED 				{ $$ = 1; }
-	;
-
-impas   :  /* noas */				{ $$ = mknothing(); }
-	|  AS modid				{ $$ = mkjust($2);  }
-	;
-
-maybeimpspec :	/* empty */			{ $$ = mknothing(); }
-	|  impspec				{ $$ = mkjust($1);  }
-	;
-
-impspec	:  OPAREN CPAREN			  { $$ = mkleft(Lnil); }
-	|  OPAREN import_list CPAREN		  { $$ = mkleft($2);   }
-	|  OPAREN import_list COMMA CPAREN	  { $$ = mkleft($2);   }
-	|  HIDING OPAREN import_list CPAREN	  { $$ = mkright($3);  }
-	|  HIDING OPAREN import_list COMMA CPAREN { $$ = mkright($3);  }
+impspec	:  /* empty */				  { $$ = mknothing(); }
+	|  OPAREN CPAREN			  { $$ = mkjust(mkleft(Lnil)); }
+	|  OPAREN import_list CPAREN		  { $$ = mkjust(mkleft($2));   }
+	|  OPAREN import_list COMMA CPAREN	  { $$ = mkjust(mkleft($2));   }
+	|  HIDING OPAREN import_list CPAREN	  { $$ = mkjust(mkright($3));  }
+	|  HIDING OPAREN import_list COMMA CPAREN { $$ = mkjust(mkright($3));  }
   	;
 
 import_list:

@@ -20,8 +20,8 @@ module RnMonad (
 	rnGetUnique, rnGetUniques,
 
 	newLocalNames,
-	lookupValue, lookupValueMaybe,
-	lookupTyCon, lookupClass, lookupClassOp,
+	lookupValue, lookupValueMaybe, lookupClassOp,
+	lookupTyCon, lookupClass, lookupTyConOrClass,
 	extendSS2, extendSS,
 
 	TyVarNamesEnv(..), mkTyVarNamesEnv, domTyVarNamesEnv,
@@ -371,6 +371,9 @@ lookupTyCon rdr
 lookupClass rdr
   = lookup_tc rdr isRnClass mkRnImplicitClass "class"
 
+lookupTyConOrClass rdr
+  = lookup_tc rdr (\ rn -> isRnTyCon rn || isRnClass rn)
+	      (panic "lookupTC:mk_implicit") "class or type constructor"
 
 lookup_tc rdr check mk_implicit err_str down@(RnDown _ _ locn (RnSource occ_var) env _ _)
   = case lookupTcRnEnv env rdr of

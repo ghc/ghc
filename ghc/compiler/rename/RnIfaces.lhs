@@ -7,6 +7,7 @@
 #include "HsVersions.h"
 
 module RnIfaces (
+	findHiFiles,
 	cacheInterface,
 	readInterface,
 	rnInterfaces,
@@ -40,11 +41,29 @@ import Util		( panic )
 
 \begin{code}
 type IfaceCache = MutableVar _RealWorld (FiniteMap Module ParsedIface,
-				         FiniteMap Module FAST_STRING)
+				         FiniteMap Module String)
 
 data ParsedIface = ParsedIface
+\end{code}
 
+*********************************************************
+*							*
+\subsection{Looking for interface files}
+*							*
+*********************************************************
 
+\begin{code}
+findHiFiles :: [String] -> PrimIO (FiniteMap Module String)
+findHiFiles dirs = returnPrimIO emptyFM
+\end{code}
+
+*********************************************************
+*							*
+\subsection{Reading interface files}
+*							*
+*********************************************************
+
+\begin{code}
 cacheInterface :: IfaceCache -> Module
 	       -> PrimIO (MaybeErr ParsedIface Error)
 
@@ -67,7 +86,7 @@ cacheInterface iface_var mod
 		returnPrimIO (Succeeded iface)
 
 
-readInterface :: FAST_STRING -> Module
+readInterface :: String -> Module
 	      -> PrimIO (MaybeErr ParsedIface Error)
 
 readInterface file mod = panic "readInterface"

@@ -53,8 +53,9 @@ getGlobalNames ::
 	-> UniqSupply
 	-> RdrNameHsModule
 	-> PrimIO (RnEnv,
-		   [Module],
-		   Bag RenamedFixityDecl,
+		   [Module],				-- directly imported modules
+		   Bag (Module,(RnName,ExportFlag)),	-- unqualified imports from module
+		   Bag RenamedFixityDecl,		-- imported fixity decls
 		   Bag Error,
 		   Bag Warning)
 
@@ -66,7 +67,7 @@ getGlobalNames iface_var info us
     of { ((src_vals, src_tcs), src_errs, src_warns) ->
 
     getImportedNames iface_var info us2 imports	`thenPrimIO`
-	\ (imp_vals, imp_tcs, imp_mods, imp_fixes, imp_errs, imp_warns) ->
+	\ (imp_vals, imp_tcs, imp_mods, unqual_imps, imp_fixes, imp_errs, imp_warns) ->
 
     let
         unqual_vals = mapBag (\rn -> (Unqual (getLocalName rn), rn)) src_vals
@@ -84,7 +85,7 @@ getGlobalNames iface_var info us
 	all_errs  = src_errs `unionBags` imp_errs `unionBags` listToBag dup_errs
 	all_warns = src_warns `unionBags` imp_warns
     in
-    returnPrimIO (all_env, bagToList imp_mods, imp_fixes, all_errs, all_warns)
+    returnPrimIO (all_env, bagToList imp_mods, unqual_imps, imp_fixes, all_errs, all_warns)
     }
   where
     (us1, us2) = splitUniqSupply us
@@ -266,18 +267,19 @@ newGlobalName locn maybe_exp rdr
 \begin{code}
 getImportedNames ::
 	   IfaceCache
-	-> GlobalNameInfo			-- builtin and knot name info
+	-> GlobalNameInfo				-- builtin and knot name info
 	-> UniqSupply
-	-> [RdrNameImportDecl]			-- import declarations
-	-> PrimIO (Bag (RdrName,RnName),	-- imported values in scope
-		   Bag (RdrName,RnName),	-- imported tycons/classes in scope
-		   Bag Module,			-- directly imported modules
-		   Bag RenamedFixityDecl,	-- fixity info for imported names
+	-> [RdrNameImportDecl]				-- import declarations
+	-> PrimIO (Bag (RdrName,RnName),		-- imported values in scope
+		   Bag (RdrName,RnName),		-- imported tycons/classes in scope
+		   Bag Module,				-- directly imported modules
+		   Bag (Module,(RnName,ExportFlag)),	-- unqualified imports from module
+		   Bag RenamedFixityDecl,		-- fixity info for imported names
 		   Bag Error,
 		   Bag Warning)
 
 getImportedNames iface_var info us imports 
-  = returnPrimIO (builtin_vals, builtin_tcs, emptyBag, emptyBag, emptyBag, emptyBag)
+  = returnPrimIO (builtin_vals, builtin_tcs, emptyBag, emptyBag, emptyBag, emptyBag, emptyBag)
   where
     -- For now jsut add the builtin names ...
     (b_names,_,_,_) = info

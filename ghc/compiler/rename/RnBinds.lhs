@@ -20,14 +20,14 @@ module RnBinds (
    ) where
 
 import Ubiq
-import RnLoop		-- break the RnPass4/RnExpr4/RnBinds4 loops
+import RnLoop		-- break the RnPass/RnExpr/RnBinds loops
 
 import HsSyn
 import HsPragmas	( isNoGenPragmas, noGenPragmas )
 import RdrHsSyn
 import RnHsSyn
 import RnMonad
-import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat, checkPrecInfixBind )
+import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat, checkPrecMatch )
 
 import CmdLineOpts	( opt_SigsRequired )
 import Digraph		( stronglyConnComp )
@@ -172,10 +172,10 @@ rnMethodBinds class_name (AndMonoBinds mb1 mb2)
 		       (rnMethodBinds class_name mb2)
 
 rnMethodBinds class_name (FunMonoBind occname inf matches locn)
-  = pushSrcLocRn locn				$
-    lookupClassOp class_name occname  		`thenRn` \ op_name ->
-    mapAndUnzipRn rnMatch matches		`thenRn` \ (new_matches, _) ->
---  checkPrecInfixBind inf op_name new_matches 	`thenRn_`
+  = pushSrcLocRn locn				   $
+    lookupClassOp class_name occname  		   `thenRn` \ op_name ->
+    mapAndUnzipRn rnMatch matches		   `thenRn` \ (new_matches, _) ->
+    mapRn (checkPrecMatch inf op_name) new_matches `thenRn_`
     returnRn (FunMonoBind op_name inf new_matches locn)
 
 rnMethodBinds class_name (PatMonoBind (VarPatIn occname) grhss_and_binds locn)
@@ -348,10 +348,10 @@ flattenMonoBinds uniq sigs (PatMonoBind pat grhss_and_binds locn)
     )
 
 flattenMonoBinds uniq sigs (FunMonoBind name inf matches locn)
-  = pushSrcLocRn locn				$
-    lookupValue name				`thenRn` \ name' ->
-    mapAndUnzipRn rnMatch matches		`thenRn` \ (new_matches, fv_lists) ->
---  checkPrecInfixBind inf name' new_matches	`thenRn_`
+  = pushSrcLocRn locn				 $
+    lookupValue name				 `thenRn` \ name' ->
+    mapAndUnzipRn rnMatch matches		 `thenRn` \ (new_matches, fv_lists) ->
+    mapRn (checkPrecMatch inf name') new_matches `thenRn_`
     let
 	fvs = unionManyUniqSets fv_lists
 

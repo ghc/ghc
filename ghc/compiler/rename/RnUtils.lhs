@@ -86,7 +86,7 @@ emptyRnEnv
 
 extendGlobalRnEnv ((qual, unqual, tc_qual, tc_unqual), stack) val_list tc_list
   = ASSERT(isEmptyFM stack)
-    (((qual', unqual', tc_qual, tc_unqual), stack), tc_dups `unionBags` dups)
+    (((qual', unqual', tc_qual', tc_unqual'), stack), tc_dups `unionBags` dups)
   where
     (qual', unqual', dups)          = extend_global qual unqual val_list
     (tc_qual', tc_unqual', tc_dups) = extend_global tc_qual tc_unqual tc_list

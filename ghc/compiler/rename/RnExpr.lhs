@@ -14,11 +14,11 @@ free variables.
 
 module RnExpr (
 	rnMatch, rnGRHSsAndBinds, rnPat,
-	checkPrecInfixBind
+	checkPrecMatch
    ) where
 
 import Ubiq
-import RnLoop		-- break the RnPass4/RnExpr4/RnBinds4 loops
+import RnLoop		-- break the RnPass/RnExpr/RnBinds loops
 
 import HsSyn
 import RdrHsSyn
@@ -498,13 +498,15 @@ lookupFixity op
 \end{code}
 
 \begin{code}
-checkPrecInfixBind :: Bool -> RnName -> [RenamedPat] -> RnM_Fixes s ()
+checkPrecMatch :: Bool -> RnName -> RenamedMatch -> RnM_Fixes s ()
 
-checkPrecInfixBind False fn pats
+checkPrecMatch False fn match
   = returnRn ()
-checkPrecInfixBind True op [p1,p2]
+checkPrecMatch True op (PatMatch p1 (PatMatch p2 (GRHSMatch _)))
   = checkPrec op p1 False	`thenRn_`
     checkPrec op p2 True
+checkPrecMatch True op _
+  = panic "checkPrecMatch"
 
 checkPrec op (ConOpPatIn _ op1 _) right
   = lookupFixity op	`thenRn` \ (op_fix, op_prec) ->
@@ -512,17 +514,15 @@ checkPrec op (ConOpPatIn _ op1 _) right
     getSrcLocRn 	`thenRn` \ src_loc ->
     let
 	inf_ok = op1_prec > op_prec || 
-	         op1_prec == op_prec &&
-		 (op1_fix == INFIXR && op_fix == INFIXR && right ||
-		  op1_fix == INFIXL && op_fix == INFIXL && not right)
+	         (op1_prec == op_prec &&
+		  (op1_fix == INFIXR && op_fix == INFIXR && right ||
+		   op1_fix == INFIXL && op_fix == INFIXL && not right))
 
 	info  = (op,op_fix,op_prec)
 	info1 = (op1,op1_fix,op1_prec)
 	(infol, infor) = if right then (info, info1) else (info1, info)
-
-	inf_err = precParseErr infol infor src_loc
     in
-    addErrIfRn (not inf_ok) inf_err
+    addErrIfRn (not inf_ok) (precParseErr infol infor src_loc)
 
 checkPrec op (NegPatIn _) right
   = lookupFixity op	`thenRn` \ (op_fix, op_prec) ->

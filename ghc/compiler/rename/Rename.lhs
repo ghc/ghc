@@ -19,7 +19,7 @@ import RnHsSyn		( RnName, RenamedHsModule(..), isRnTyCon, isRnClass )
 import RnMonad
 import RnNames		( getGlobalNames, GlobalNameInfo(..) )
 import RnSource		( rnSource )
-import RnIfaces		( rnInterfaces, finalIfaceInfo, VersionInfo(..), ParsedIface )
+import RnIfaces		( findHiFiles, rnInterfaces, finalIfaceInfo, VersionInfo(..), ParsedIface )
 import RnUtils		( extendGlobalRnEnv, emptyRnEnv, multipleOccWarn )
 import MainMonad
 
@@ -32,8 +32,7 @@ import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
 import UniqSupply	( splitUniqSupply )
 import Util		( panic, assertPanic )
 
-findHiFiles :: PrimIO (FiniteMap Module FAST_STRING)
-findHiFiles = returnPrimIO emptyFM
+opt_HiDirList = panic "opt_HiDirList"
 \end{code}
 
 \begin{code}
@@ -63,7 +62,7 @@ ToDo: Deal with instances (instance version, this module on instance list ???)
 \begin{code}
 renameModule b_names b_keys us
    	     input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
-  = findHiFiles			`thenPrimIO` \ hi_files ->
+  = findHiFiles opt_HiDirList	`thenPrimIO` \ hi_files ->
     newVar (emptyFM, hi_files)	`thenPrimIO` \ iface_var ->
 
     fixPrimIO ( \ ~(_, _, _, _, rec_occ_fm, rec_export_fn) ->
@@ -76,7 +75,7 @@ renameModule b_names b_keys us
 	global_name_info = (b_names, b_keys, rec_export_fn, rec_occ_fn)
     in
     getGlobalNames iface_var global_name_info us1 input
-		`thenPrimIO` \ (occ_env, imp_mods, imp_fixes, top_errs, top_warns) ->
+		`thenPrimIO` \ (occ_env, imp_mods, unqual_imps, imp_fixes, top_errs, top_warns) ->
 
     if not (isEmptyBag top_errs) then
 	returnPrimIO (rn_panic, rn_panic, top_errs, top_warns, emptyUFM, rn_panic)
@@ -84,7 +83,7 @@ renameModule b_names b_keys us
 
     -- No top-level name errors so rename source ...
     case initRn True mod occ_env us2
-		(rnSource imp_mods imp_fixes input) of {
+		(rnSource imp_mods unqual_imps imp_fixes input) of {
 	((rn_module, export_fn, src_occs), src_errs, src_warns) ->
 
     let

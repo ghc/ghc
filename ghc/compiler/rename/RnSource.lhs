@@ -9,7 +9,7 @@
 module RnSource ( rnSource, rnPolyType ) where
 
 import Ubiq
-import RnLoop		-- *check* the RnPass4/RnExpr4/RnBinds4 loop-breaking
+import RnLoop		-- *check* the RnPass/RnExpr/RnBinds loop-breaking
 
 import HsSyn
 import HsPragmas
@@ -18,20 +18,18 @@ import RnHsSyn
 import RnMonad
 import RnBinds		( rnTopBinds, rnMethodBinds )
 
-import Bag		( bagToList )
+import Bag		( emptyBag, unitBag, consBag, unionManyBags, listToBag, bagToList )
 import Class		( derivableClassKeys )
 import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
-import Name		( isLocallyDefined, isAvarid, getLocalName, ExportFlag(..), RdrName )
+import Name		( Name, isLocallyDefined, isAvarid, getLocalName, ExportFlag(..), RdrName )
 import Pretty
 import SrcLoc		( SrcLoc )
 import Unique		( Unique )
 import UniqFM		( addListToUFM, listToUFM )
 import UniqSet		( UniqSet(..) )
-import Util		( isn'tIn, panic, assertPanic )
+import Util		( isIn, isn'tIn, sortLt, panic, assertPanic )
 
-rnExports mods Nothing     = returnRn (\n -> ExportAll)
-rnExports mods (Just exps) = returnRn (\n -> ExportAll)
 \end{code}
 
 rnSource `renames' the source module and export list.
@@ -49,22 +47,24 @@ Checks the (..) etc constraints in the export list.
 
 
 \begin{code}
-rnSource :: [Module]				-- imported modules
+rnSource :: [Module]
+         -> Bag (Module,(RnName,ExportFlag))	-- unqualified imports from module
 	 -> Bag RenamedFixityDecl		-- fixity info for imported names
 	 -> RdrNameHsModule
 	 -> RnM s (RenamedHsModule,
 		   Name -> ExportFlag,		-- export info
 		   Bag (RnName, RdrName))	-- occurrence info
 
-rnSource imp_mods imp_fixes (HsModule mod version exports _ fixes
-	                       ty_decls specdata_sigs class_decls
-	                       inst_decls specinst_sigs defaults
-	                       binds _ src_loc)
+rnSource imp_mods unqual_imps imp_fixes
+	(HsModule mod version exports _ fixes
+	   ty_decls specdata_sigs class_decls
+	   inst_decls specinst_sigs defaults
+	   binds _ src_loc)
 
   = pushSrcLocRn src_loc $
 
-    rnExports (mod:imp_mods) exports	`thenRn` \ exported_fn ->
-    rnFixes fixes			`thenRn` \ src_fixes ->
+    rnExports (mod:imp_mods) unqual_imps exports	`thenRn` \ exported_fn ->
+    rnFixes fixes					`thenRn` \ src_fixes ->
     let
 	pair_name inf@(InfixL n _) = (n, inf)
 	pair_name inf@(InfixR n _) = (n, inf)
@@ -97,6 +97,108 @@ rnSource imp_mods imp_fixes (HsModule mod version exports _ fixes
   where
     trashed_exports = trace "rnSource:trashed_exports" Nothing
     trashed_imports = trace "rnSource:trashed_imports" []
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Export list}
+%*							*
+%*********************************************************
+
+\begin{code}
+rnExports :: [Module]
+	  -> Bag (Module,(RnName,ExportFlag))
+	  -> Maybe [RdrNameIE]
+	  -> RnM s (Name -> ExportFlag)
+
+rnExports mods unqual_imps Nothing
+  = returnRn (\n -> if isLocallyDefined n then ExportAll else NotExported)
+
+rnExports mods unqual_imps (Just exps)
+  = mapAndUnzipRn (rnIE mods) exps `thenRn` \ (mod_maybes, exp_bags) ->
+    let 
+        exp_mods  = catMaybes mod_maybes
+        exp_names = unionManyBags exp_bags
+
+	-- check for duplicate names
+	-- check for duplicate modules
+
+	-- check for duplicate local names
+	-- add in module contents checking for duplicate local names
+
+	-- build export flag lookup function
+	exp_fn n = if isLocallyDefined n then ExportAll else NotExported
+    in
+    returnRn exp_fn
+
+rnIE mods (IEVar name)
+  = lookupValue name	`thenRn` \ rn ->
+    checkIEVar rn	`thenRn` \ exps ->
+    returnRn (Nothing, exps)
+  where
+    checkIEVar (RnName n)         = returnRn (unitBag (n,ExportAbs))
+    checkIEVar (RnUnbound _)      = returnRn emptyBag
+    checkIEVar rn@(RnClassOp _ _) = getSrcLocRn `thenRn` \ src_loc ->
+			            failButContinueRn emptyBag (classOpExportErr rn src_loc)
+    checkIEVar rn                 = panic "checkIEVar"
+
+rnIE mods (IEThingAbs name)
+  = lookupTyConOrClass name	`thenRn` \ rn ->
+    checkIEAbs rn		`thenRn` \ exps ->
+    returnRn (Nothing, exps)
+  where
+    checkIEAbs (RnSyn n)     = returnRn (unitBag (n,ExportAbs))
+    checkIEAbs (RnData n _)  = returnRn (unitBag (n,ExportAbs))
+    checkIEAbs (RnClass n _) = returnRn (unitBag (n,ExportAbs))
+    checkIEAbs (RnUnbound _) = returnRn emptyBag
+    checkIEAbs rn            = panic "checkIEAbs"
+
+rnIE mods (IEThingAll name)
+  = lookupTyConOrClass name	`thenRn` \ rn ->
+    checkIEAll rn		`thenRn` \ exps ->
+    returnRn (Nothing, exps)
+  where
+    checkIEAll (RnData n cons) = returnRn (consBag (exp_all n) (listToBag (map exp_all cons)))
+    checkIEAll (RnClass n ops) = returnRn (consBag (exp_all n) (listToBag (map exp_all ops)))
+    checkIEAll (RnUnbound _)   = returnRn emptyBag
+    checkIEAll rn@(RnSyn _)    = getSrcLocRn `thenRn` \ src_loc ->
+			         warnAndContinueRn emptyBag (synAllExportErr rn src_loc)
+    checkIEAll rn              = panic "checkIEAll"
+
+    exp_all n = (n, ExportAll)
+
+rnIE mods (IEThingWith name names)
+  = lookupTyConOrClass name	`thenRn` \ rn ->
+    mapRn lookupValue names	`thenRn` \ rns ->
+    checkIEWith rn rns		`thenRn` \ exps ->
+    returnRn (Nothing, exps)
+  where
+    checkIEWith rn@(RnData n cons) rns
+		 | same_names cons rns = returnRn (consBag (exp_all n) (listToBag (map exp_all cons)))
+		 | otherwise 	       = rnWithErr "constructrs" rn cons rns 
+    checkIEWith rn@(RnClass n ops) rns
+		 | same_names ops rns  = returnRn (consBag (exp_all n) (listToBag (map exp_all ops)))
+		 | otherwise 	       = rnWithErr "class ops" rn ops rns
+    checkIEWith (RnUnbound _)      rns = returnRn emptyBag
+    checkIEWith rn@(RnSyn _)       rns = getSrcLocRn `thenRn` \ src_loc ->
+			                 failButContinueRn emptyBag (synAllExportErr rn src_loc)
+    checkIEWith rn                 rns = panic "checkIEWith"
+
+    exp_all n = (n, ExportAll)
+
+    same_names has rns
+      = all (not.isRnUnbound) rns &&
+	sortLt (<) (map uniqueOf has) == sortLt (<) (map uniqueOf rns)
+
+    rnWithErr str rn has rns
+      = getSrcLocRn `thenRn` \ src_loc ->
+	failButContinueRn emptyBag (withExportErr str rn has rns src_loc)
+
+rnIE mods (IEModuleContents mod)
+  | isIn "IEModule" mod mods = returnRn (Just mod, emptyBag)
+  | otherwise                = getSrcLocRn `thenRn` \ src_loc ->
+			       failButContinueRn (Nothing,emptyBag) (badModExportErr mod src_loc)
 \end{code}
 
 %*********************************************************
@@ -492,17 +594,34 @@ rnContext tv_env ctxt
 
 
 \begin{code}
+classOpExportErr op locn sty 
+  = ppHang (ppStr "Class operation can only be exported with class:")
+         4 (ppCat [ppr sty op, ppr sty locn])
+
+synAllExportErr syn locn sty
+  = ppHang (ppStr "Type synonym should be exported abstractly:")
+         4 (ppCat [ppr sty syn, ppr sty locn])
+
+withExportErr str rn has rns locn sty
+  = ppHang (ppBesides [ppStr "Inconsistent list of ", ppStr str, ppStr ": ", ppr sty locn])
+         4 (ppAbove (ppCat [ppStr "expected:", ppInterleave ppComma (map (ppr sty) has)])
+		    (ppCat [ppStr "found:   ", ppInterleave ppComma (map (ppr sty) rns)]))
+
+badModExportErr mod locn sty
+  = ppHang (ppStr "Unknown module in export list:")
+         4 (ppCat [ppStr "module", ppPStr mod, ppr sty locn])
+
 derivingNonStdClassErr clas locn sty
-  = ppHang (ppStr "Non-standard class in deriving")
+  = ppHang (ppStr "Non-standard class in deriving:")
          4 (ppCat [ppr sty clas, ppr sty locn])
 
 dupDefaultDeclErr defs sty
-  = ppHang (ppStr "Duplicate default declarations")
+  = ppHang (ppStr "Duplicate default declarations:")
          4 (ppAboves (map pp_def_loc defs))
   where
     pp_def_loc (DefaultDecl _ src_loc) = ppr sty src_loc
 
 undefinedFixityDeclErr decl sty
-  = ppHang (ppStr "Fixity declaration for unknown operator")
+  = ppHang (ppStr "Fixity declaration for unknown operator:")
 	 4 (ppr sty decl)
 \end{code}
