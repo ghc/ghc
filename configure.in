@@ -38,17 +38,6 @@ if test x"$srcdir" != 'x.' ; then
     exit 1
 fi
 
-#
-# Remove common automounter nonsense + convert from UNC to DOS style paths
-# (UNC awareness isn't quite there yet for cygwin32-beta18 and consituent tools.)
-#
-hardtop=`pwd`
-hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|' | sed 's|^//\(.\)/|\1:/|' `
-
-echo ''
-echo "*** The top of your build tree is: $hardtop"
-# subst of hardtop is done below after we've computed hardtop_plat.
-
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
 dnl--------------------------------------------------------------------
@@ -366,14 +355,26 @@ dnl AC_SUBST(TargetVendor_CPP)
 
 AC_SUBST(exeext)
 
-#
-# The native format for 'hardtop' (i.e., right kind of slashes on a Win32 box).
-# (but with b-slashes being escaped).
+dnl --------------------------------------------------------------
+dnl * Calculate absolute path to build tree
+dnl --------------------------------------------------------------
+
+AC_MSG_CHECKING(for path to top of build tree)
+
+hardtop=`pwd`
+
+dnl Remove common automounter nonsense
+dnl
+hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^//\(.\)/|\1:/|' `
+
+dnl Find 'hardtop_plat', the native format for 'hardtop' (i.e., right kind of \dnl slashes on a Win32 box, but with b-slashes being escaped).
+dnl
 case $HostPlatform in
   i386-unknown-mingw32 | i386-unknown-cygwin32)
-  	# get rid off /cygdrive/ prefix
-	hardtop=`echo ${hardtop} | sed -e 's%^/cygdrive/\(.\)/%\1:/%' `
-  	hardtop_plat=`cygpath -w ${hardtop} | sed -e 's@\\\\@\\\\\\\\@g' `
+  	# convert $hardtop to a path that mingw will understand too
+	cyghardtop=${hardtop}
+	hardtop=`cygpath -m ${cyghardtop}`
+  	hardtop_plat=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@\\\\\\\\@g'`
 	;;
   *)
   	hardtop_plat=${hardtop}
@@ -381,6 +382,8 @@ case $HostPlatform in
 esac
 AC_SUBST(hardtop)
 AC_SUBST(hardtop_plat)
+
+AC_MSG_RESULT(${hardtop})
 
 dnl --------------------------------------------------------------
 dnl * Project specific configuration options
