@@ -682,8 +682,13 @@ The following environment variables must be set:
 <Entry>System</Entry>
 <Entry><Para>
 Add <Filename>C:/cygnus/cygwin-b20/H-i586-cygwin32/bin</Filename>.
-<Command>bash</Command> needs this, and when it is invoked from <Filename>/bin</Filename> it can't
-find it. <Filename>c:/bin</Filename> and <Filename>c:/usr/local/bin</Filename> should also be added.
+<Command>bash</Command> needs this, and when it is invoked from
+<Filename>/bin</Filename> it can't find it. <Filename>c:/bin</Filename> and
+<Filename>c:/usr/local/bin</Filename> should also be added. These should all
+come <Emphasis>before</Emphasis> the Windows system directories (e.g.
+<Filename>WINNT\system32</Filename>). You might want to set them in your
+<Filename>.bashrc</Filename> rather than in the system-wide
+<Constant>PATH</Constant>.
 </Para></Entry>
 </Row>
 
