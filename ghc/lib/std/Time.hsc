@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.16 2001/07/13 11:48:52 rrt Exp $
+-- $Id: Time.hsc,v 1.17 2001/07/24 04:35:36 ken Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -209,8 +209,8 @@ noTimeDiff = TimeDiff 0 0 0 0 0 0 0
 getClockTime = do
   allocaBytes (#const sizeof(struct timeval)) $ \ p_timeval -> do
     throwErrnoIfMinus1_ "getClockTime" $ gettimeofday p_timeval nullPtr
-    sec  <- (#peek struct timeval,tv_sec)  p_timeval :: IO CLong
-    usec <- (#peek struct timeval,tv_usec) p_timeval :: IO CLong
+    sec  <- (#peek struct timeval,tv_sec)  p_timeval :: IO Int32
+    usec <- (#peek struct timeval,tv_usec) p_timeval :: IO Int32
     return (TOD (fromIntegral sec) ((fromIntegral usec) * 1000))
  
 #elif HAVE_FTIME
