@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.9 2001/06/29 16:58:06 sewardj Exp $
+ * $Id: MBlock.h,v 1.10 2001/07/26 03:26:28 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -40,8 +40,13 @@ extern void * getMBlocks(nat n);
 #define HEAP_BASE 0x50000000
 
 #elif osf3_TARGET_OS
-/* guess */
-#define HEAP_BASE 0x50000000
+/* ToDo: Perhaps by adjusting this value we can make linking without
+ * -static work (i.e., not generate a core-dumping executable)? */
+#if SIZEOF_VOID_P == 8
+#define HEAP_BASE 0x180000000L
+#else
+#error I have no idea where to begin the heap on a non-64-bit osf3 machine.
+#endif
 
 #elif hpux_TARGET_OS
 /* guess */
