@@ -30,7 +30,7 @@ module PrelInfo (
 	monadZeroClass_RDR, enumClass_RDR, evalClass_RDR, ordClass_RDR,
 	ioDataCon_RDR, ioOkDataCon_RDR,
 
-	main_NAME, allClass_NAME, ioTyCon_NAME,
+	main_NAME, allClass_NAME, ioTyCon_NAME, ioOkDataCon_NAME,
 
 	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, isNoDictClass,
 	isNumericClass, isStandardClass, isCcallishClass, isCreturnableClass
@@ -251,17 +251,17 @@ mkKnownKeyGlobal (Qual mod occ hif, uniq)
 
 allClass_NAME    = mkKnownKeyGlobal (allClass_RDR,   allClassKey)
 ioTyCon_NAME	 = mkKnownKeyGlobal (ioTyCon_RDR,    ioTyConKey)
+ioOkDataCon_NAME = mkKnownKeyGlobal (ioOkDataCon_RDR, ioOkDataConKey)
 main_NAME	 = mkKnownKeyGlobal (main_RDR,	     mainKey)
 
 knownKeyNames :: [Name]
 knownKeyNames
-  = [main_NAME, allClass_NAME, ioTyCon_NAME]
+  = [main_NAME, allClass_NAME, ioTyCon_NAME, ioOkDataCon_NAME]
     ++
     map mkKnownKeyGlobal
     [
 	-- Type constructors (synonyms especially)
-      (ioOkDataCon_RDR,    ioOkDataConKey)
-    , (orderingTyCon_RDR,  orderingTyConKey)
+      (orderingTyCon_RDR,  orderingTyConKey)
     , (rationalTyCon_RDR,  rationalTyConKey)
     , (ratioDataCon_RDR,   ratioDataConKey)
     , (ratioTyCon_RDR,     ratioTyConKey)
