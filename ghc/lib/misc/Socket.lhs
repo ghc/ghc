@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1995, 1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1995-98
 %
 % Last Modified: Fri Jul 21 15:53:32 1995
 % Darren J Moffat <moffatd@dcs.gla.ac.uk>
@@ -42,14 +42,14 @@ import IO
 %*                                                                         *
 %***************************************************************************
 
-Calling $connectTo$ creates a client side socket which is
+Calling @connectTo@ creates a client side socket which is
 connected to the given host and port.  The Protocol and socket type is
 derived from the given port identifier.  If a port number is given
-then the result is always an internet family $Stream$ socket. 
+then the result is always an internet family @Stream@ socket. 
 
-If the $PortID$ specifies a unix family socket and the $Hostname$
-differs from that returned by $getHostname$ then an error is
-raised. Alternatively an empty string may be given to $connectTo$
+If the @PortID@ specifies a unix family socket and the @Hostname@
+differs from that returned by @getHostname@ then an error is
+raised. Alternatively an empty string may be given to @connectTo@
 signalling that the current hostname applies.
 
 \begin{code}
@@ -97,7 +97,7 @@ connectTo _ (UnixSocket path) = do
 
 \end{code}
 
-The dual to the $connectTo$ call. This creates the server side
+The dual to the @connectTo@ call. This creates the server side
 socket which has been bound to the specified port.
 
 \begin{code}
