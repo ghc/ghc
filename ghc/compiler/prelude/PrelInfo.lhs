@@ -500,7 +500,7 @@ because the list of ambiguous dictionaries hasn't been simplified.
 
 \begin{code}
 isCcallishClass, isCreturnableClass, isNoDictClass, 
-isNumericClass, isStandardClass :: Class -> Bool
+  isNumericClass, isStandardClass :: Class -> Bool
 
 isNumericClass     clas = classKey clas `is_elem` numericClassKeys
 isStandardClass    clas = classKey clas `is_elem` standardClassKeys
