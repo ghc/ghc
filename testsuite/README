@@ -166,14 +166,17 @@ these steps:
 		There are several pre-defined functions which can be
 		used in this field:
 
-		normal               don't change any options from the defaults
-		expect_fail	     this test is an expected failure
-		skip		     skip this test
-		omit_ways(ways)      skip this test for certain ways
-		only_ways(ways)      do this test certain ways only
-		set_stdin(file)      use a different file for stdin
-		exit_code(n)	     expect an exit code of 'n' from the prog
-		extra_run_opts(opts) pass some extra opts to the prog
+		normal                don't change any options from the defaults
+		expect_fail	      this test is an expected failure
+		skip		      skip this test
+		expect_fail_for(ways) expect failure for certain ways 
+		omit_ways(ways)       skip this test for certain ways
+		only_ways(ways)       do this test certain ways only
+		expect_fail_if_platform(plat)
+				      expect failure on a certain platform
+		set_stdin(file)       use a different file for stdin
+		exit_code(n)	      expect an exit code of 'n' from the prog
+		extra_run_opts(opts)  pass some extra opts to the prog
 
 		you can compose two of these functions together by
 		saying compose(f,g).  For example, to expect an exit
