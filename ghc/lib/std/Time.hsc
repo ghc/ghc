@@ -1,6 +1,6 @@
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.20 2001/08/14 13:40:08 sewardj Exp $
+-- $Id: Time.hsc,v 1.21 2001/09/06 15:38:16 sewardj Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -206,8 +206,8 @@ noTimeDiff = TimeDiff 0 0 0 0 0 0 0
 getClockTime = do
   allocaBytes (#const sizeof(struct timeval)) $ \ p_timeval -> do
     throwErrnoIfMinus1_ "getClockTime" $ gettimeofday p_timeval nullPtr
-    sec  <- (#peek struct timeval,tv_sec)  p_timeval :: IO Int32
-    usec <- (#peek struct timeval,tv_usec) p_timeval :: IO Int32
+    sec  <- (#peek struct timeval,tv_sec)  p_timeval :: IO CTime
+    usec <- (#peek struct timeval,tv_usec) p_timeval :: IO CTime
     return (TOD (fromIntegral sec) ((fromIntegral usec) * 1000))
  
 #elif HAVE_FTIME
