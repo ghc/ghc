@@ -20,7 +20,7 @@ import HsPragmas	( DataPragmas, ClassPragmas,
 import HsTypes
 
 -- others:
-import Name		( pprOp, pprNonOp )
+import Name		( pprSym, pprNonSym )
 import Outputable	( interppSP, interpp'SP,
 			  Outputable(..){-instance * []-}
 			)
@@ -50,7 +50,7 @@ instance (NamedThing name, Outputable name)
     ppr sty (InfixN var prec)	= print_it sty ""  prec var
 
 print_it sty suff prec var
-  = ppBesides [ppStr "infix", ppStr suff, ppSP, ppInt prec, ppSP, pprOp sty var]
+  = ppBesides [ppStr "infix", ppStr suff, ppSP, ppInt prec, ppSP, pprSym sty var]
 \end{code}
 
 %************************************************************************
@@ -175,13 +175,13 @@ data BangType name
 instance (NamedThing name, Outputable name) => Outputable (ConDecl name) where
 
     ppr sty (ConDecl con tys _)
-      = ppCat [pprNonOp sty con, ppInterleave ppNil (map (ppr_bang sty) tys)]
+      = ppCat [pprNonSym sty con, ppInterleave ppNil (map (ppr_bang sty) tys)]
     ppr sty (ConOpDecl ty1 op ty2 _)
-      = ppCat [ppr_bang sty ty1, pprOp sty op, ppr_bang sty ty2]
+      = ppCat [ppr_bang sty ty1, pprSym sty op, ppr_bang sty ty2]
     ppr sty (NewConDecl con ty _)
-      = ppCat [pprNonOp sty con, pprParendMonoType sty ty]
+      = ppCat [pprNonSym sty con, pprParendMonoType sty ty]
     ppr sty (RecConDecl con fields _)
-      = ppCat [pprNonOp sty con, ppChar '{',
+      = ppCat [pprNonSym sty con, ppChar '{',
 	       ppInterleave pp'SP (map pp_field fields), ppChar '}']
       where
 	pp_field (n, ty) = ppCat [ppr sty n, ppPStr SLIT("::"), ppr_bang sty ty]

@@ -16,7 +16,7 @@ import Ubiq
 import CoreSyn
 
 import Bag
-import Kind		( Kind{-instance-} )
+import Kind		( isSubKindOf, Kind{-instance-} )
 import Literal		( literalType, Literal{-instance-} )
 import Id		( idType, isBottomingId,
 			  dataConArgTys, GenId{-instances-}
@@ -32,12 +32,12 @@ import PrimOp		( primOpType, PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc )
 import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,getForAllTy_maybe,
-			  isPrimType,getTypeKind,instantiateTy,
+			  isPrimType,typeKind,instantiateTy,
 			  mkForAllUsageTy,getForAllUsageTy,instantiateUsage,
 			  maybeAppDataTyCon, eqTy
 			)
 import TyCon		( isPrimTyCon, tyConFamilySize )
-import TyVar		( getTyVarKind, GenTyVar{-instances-} )
+import TyVar		( tyVarKind, GenTyVar{-instances-} )
 import UniqSet		( emptyUniqSet, mkUniqSet, intersectUniqSets,
 			  unionUniqSets, elementOfUniqSet, UniqSet(..)
 			)
@@ -274,10 +274,14 @@ lintCoreArg checkTyApp e ty a@(TyArg arg_ty)
     checkIfSpecDoneL (not (isPrimType arg_ty)) (mkSpecTyAppMsg a)
     `seqL`
     case (getForAllTy_maybe ty) of
-      Just (tyvar,body) | (getTyVarKind tyvar == getTypeKind arg_ty) ->
-	returnL(Just(instantiateTy [(tyvar,arg_ty)] body))
-	| pprTrace "lintCoreArg:kinds:" (ppCat [ppr PprDebug (getTyVarKind tyvar), ppr PprDebug (getTypeKind arg_ty)]) False -> panic "impossible"
-      _ -> addErrL (mkTyAppMsg ty arg_ty e) `seqL` returnL Nothing
+      Nothing -> addErrL (mkTyAppMsg SLIT("Illegal") ty arg_ty e) `seqL` returnL Nothing
+
+      Just (tyvar,body) ->
+	if (tyVarKind tyvar `isSubKindOf` typeKind arg_ty) then
+	    returnL(Just(instantiateTy [(tyvar,arg_ty)] body))
+	else
+	    pprTrace "lintCoreArg:kinds:" (ppCat [ppr PprDebug (tyVarKind tyvar), ppr PprDebug (typeKind arg_ty)]) $
+	    addErrL (mkTyAppMsg SLIT("Kinds not right in") ty arg_ty e) `seqL` returnL Nothing
 	
 lintCoreArg _ e ty (UsageArg u)
   = -- ToDo: Check that usage has no unbound usage variables
@@ -569,9 +573,9 @@ mkAppMsg fun arg expr sty
 	      ppHang (ppStr "Arg type:") 4 (ppr sty arg),
 	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
 
-mkTyAppMsg :: Type -> Type -> CoreExpr -> ErrMsg
-mkTyAppMsg ty arg expr sty
-  = ppAboves [ppStr "Illegal type application:",
+mkTyAppMsg :: FAST_STRING -> Type -> Type -> CoreExpr -> ErrMsg
+mkTyAppMsg msg ty arg expr sty
+  = ppAboves [ppCat [ppPStr msg, ppStr "type application:"],
 	      ppHang (ppStr "Exp type:")   4 (ppr sty ty),
 	      ppHang (ppStr "Arg type:")   4 (ppr sty arg),
 	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]

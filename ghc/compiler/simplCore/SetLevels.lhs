@@ -49,7 +49,7 @@ import UniqSupply	( thenUs, returnUs, mapUs, mapAndUnzipUs,
 import Usage		( UVar(..) )
 import Util		( mapAccumL, zipWithEqual, panic, assertPanic )
 
-isLeakFreeType = panic "SetLevels.isLeakFreeType (ToDo)"
+isLeakFreeType x y = False -- safe option; ToDo
 \end{code}
 
 %************************************************************************

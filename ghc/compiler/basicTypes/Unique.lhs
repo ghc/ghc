@@ -45,6 +45,7 @@ module Unique (
 	augmentIdKey,
 	binaryClassKey,
 	boolTyConKey,
+	boundedClassKey,
 	buildDataConKey,
 	buildIdKey,
 	byteArrayPrimTyConKey,
@@ -54,7 +55,7 @@ module Unique (
 	charPrimTyConKey,
 	charTyConKey,
 	consDataConKey,
-	dataClassKey,
+	evalClassKey,
 	doubleDataConKey,
 	doublePrimTyConKey,
 	doubleTyConKey,
@@ -417,7 +418,8 @@ monadZeroClassKey	= mkPreludeClassUnique 15
 binaryClassKey		= mkPreludeClassUnique 16
 cCallableClassKey	= mkPreludeClassUnique 17	
 cReturnableClassKey	= mkPreludeClassUnique 18
-dataClassKey		= mkPreludeClassUnique 19
+evalClassKey		= mkPreludeClassUnique 19
+boundedClassKey		= mkPreludeClassUnique 20
 \end{code}
 
 %************************************************************************
@@ -589,7 +591,3 @@ enumFromThenToClassOpKey= mkPreludeMiscIdUnique 43
 eqClassOpKey		= mkPreludeMiscIdUnique 44
 geClassOpKey		= mkPreludeMiscIdUnique 45
 \end{code}
-
-
-
-

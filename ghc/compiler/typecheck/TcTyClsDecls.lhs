@@ -87,7 +87,7 @@ Dealing with a group
 \begin{code}
 tcGroup :: InstanceMapper -> Bag Decl -> TcM s (TcEnv s, TcHsBinds s)
 tcGroup inst_mapper decls
-  = pprTrace "tcGroup: " (ppCat (map (fst.fmt_decl) (bagToList decls))) $
+  = --pprTrace "tcGroup: " (ppCat (map (fst.fmt_decl) (bagToList decls))) $
 
 	-- TIE THE KNOT
     fixTc ( \ ~(tycons,classes,_) ->

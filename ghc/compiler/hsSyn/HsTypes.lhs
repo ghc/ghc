@@ -163,7 +163,7 @@ ppr_mono_ty sty ctxt_prec (MonoDictTy clas ty)
 #ifdef COMPILING_GHC
 
 extractCtxtTyNames :: Eq name => Context  name -> [name]
-extractMonoTyNames :: Eq name => MonoType name -> [name]
+extractMonoTyNames :: Eq name => (name -> Bool) -> MonoType name -> [name]
 
 extractCtxtTyNames ctxt
   = foldr get [] ctxt
@@ -174,10 +174,15 @@ extractCtxtTyNames ctxt
 
     is_elem = isIn "extractCtxtTyNames"
 
-extractMonoTyNames ty
+extractMonoTyNames is_tyvar_name ty
   = get ty []
   where
-    get (MonoTyApp con tys) acc = foldr get acc tys
+    get (MonoTyApp con tys) acc = let
+				     rest = foldr get acc tys
+				  in
+				  if is_tyvar_name con && not (con `is_elem` rest)
+				  then con : rest
+				  else rest
     get (MonoListTy ty)	    acc = get ty acc
     get (MonoFunTy ty1 ty2) acc = get ty1 (get ty2 acc)
     get (MonoDictTy _ ty)   acc = get ty acc

@@ -40,6 +40,7 @@ import DsMonad
 
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PprStyle		( PprStyle(..) )
+import PprType		( pprType{-ToDo:rm-} )
 import PrelInfo		( stringTy, iRREFUT_PAT_ERROR_ID )
 import Pretty		( ppShow )
 import Id		( idType, dataConArgTys, mkTupleCon,
@@ -50,7 +51,7 @@ import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTys,
 			  isUnboxedType, applyTyCon, getAppDataTyCon
 			)
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet(..) )
-import Util		( panic, assertPanic )
+import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
 
 splitDictType = panic "DsUtils.splitDictType"
 \end{code}
@@ -129,6 +130,7 @@ mkCoPrimCaseMatchResult var alts
 mkCoAlgCaseMatchResult :: Id				-- Scrutinee
 		    -> [(DataCon, [Id], MatchResult)]	-- Alternatives
 		    -> DsM MatchResult
+
 mkCoAlgCaseMatchResult var alts
   =	    -- Find all the constructors in the type which aren't
 	    -- explicitly mentioned in the alternatives:
@@ -164,7 +166,7 @@ mkCoAlgCaseMatchResult var alts
 				      cxt1)
   where
     scrut_ty = idType var
-    (tycon, tycon_arg_tys, data_cons) = getAppDataTyCon scrut_ty
+    (tycon, tycon_arg_tys, data_cons) = pprTrace "CoAlgCase:" (pprType PprDebug scrut_ty) $ getAppDataTyCon scrut_ty
 
     un_mentioned_constructors
       = uniqSetToList (mkUniqSet data_cons `minusUniqSet` mkUniqSet [ con | (con, _, _) <- alts] )

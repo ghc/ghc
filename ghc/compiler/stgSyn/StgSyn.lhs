@@ -44,7 +44,7 @@ import Ubiq{-uitous-}
 import CostCentre	( showCostCentre )
 import Id		( idPrimRep, GenId{-instance NamedThing-} )
 import Literal		( literalPrimRep, isLitLitLit, Literal{-instance Outputable-} )
-import Name		( isExported, isOpLexeme )
+import Name		( isExported, isSymLexeme )
 import Outputable	( ifPprDebug, interppSP, interpp'SP,
 			  Outputable(..){-instance * Bool-}
 			)
@@ -652,7 +652,7 @@ pprStgExpr sty (StgCase expr lvs_whole lvs_rhss uniq alts)
 		   4 (ppBeside (ppr sty expr) ppSemi)
 	  where
 	    ppr_con sty con
-	      = if isOpLexeme con
+	      = if isSymLexeme con
 		then ppBesides [ppLparen, ppr sty con, ppRparen]
 		else ppr sty con
 

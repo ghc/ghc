@@ -16,7 +16,7 @@ module RnMonad (
 	setExtraRn, getExtraRn,
 	getModuleRn, pushSrcLocRn, getSrcLocRn,
 	getSourceRn, getOccurrenceUpRn,
-	getImplicitUpRn, ImplicitEnv(..),
+	getImplicitUpRn, ImplicitEnv(..), emptyImplicitEnv,
 	rnGetUnique, rnGetUniques,
 
 	newLocalNames,
@@ -25,7 +25,9 @@ module RnMonad (
 	extendSS2, extendSS,
 
 	TyVarNamesEnv(..), mkTyVarNamesEnv, domTyVarNamesEnv,
-	lookupTyVarName, nullTyVarNamesEnv, catTyVarNamesEnvs
+	lookupTyVarName, nullTyVarNamesEnv, catTyVarNamesEnvs,
+
+	fixIO
     ) where
 
 import Ubiq{-uitous-}
@@ -35,7 +37,8 @@ import SST
 import HsSyn		( FixityDecl )
 import RnHsSyn		( RnName, mkRnName, mkRnUnbound, mkRnImplicit,
 			  mkRnImplicitTyCon, mkRnImplicitClass, 
-			  isRnLocal, isRnWired, isRnTyCon, isRnClass, isRnClassOp,
+			  isRnLocal, isRnWired, isRnTyCon, isRnClass,
+			  isRnTyConOrClass, isRnClassOp,
 			  RenamedFixityDecl(..) )
 import RnUtils		( RnEnv(..), extendLocalRnEnv,
 			  lookupRnEnv, lookupTcRnEnv,
@@ -51,6 +54,7 @@ import Name		( Module(..), RdrName(..), isQual,
 			  Name, mkLocalName, mkImplicitName,
 			  getOccName
 			)
+import PrelInfo		( builtinNameInfo, BuiltinNames(..), BuiltinKeys(..) )
 import Pretty		( Pretty(..), PrettyRep )
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )
@@ -83,12 +87,14 @@ data RnMode s
  = RnSource (MutableVar s (Bag (RnName, RdrName)))
 	-- Renaming source; returning occurences
 
- | RnIface  (MutableVar s ImplicitEnv)
+ | RnIface  BuiltinNames BuiltinKeys
+	    (MutableVar s ImplicitEnv)
 	-- Renaming interface; creating and returning implicit names
-	-- One map for Values and one for TyCons/Classes.
+	-- ImplicitEnv: one map for Values and one for TyCons/Classes.
 
 type ImplicitEnv = (FiniteMap RdrName RnName, FiniteMap RdrName RnName)
-
+emptyImplicitEnv :: ImplicitEnv
+emptyImplicitEnv = (emptyFM, emptyFM)
 
 -- With a builtin polymorphic type for _runSST the type for
 -- initTc should use  RnM s r  instead of  RnM _RealWorld r 
@@ -103,14 +109,15 @@ initRn :: Bool		-- True => Source; False => Iface
 initRn source mod env us do_rn
   = _runSST (
 	newMutVarSST emptyBag			`thenSST` \ occ_var ->
-	newMutVarSST (emptyFM,emptyFM)		`thenSST` \ imp_var ->
+	newMutVarSST emptyImplicitEnv		`thenSST` \ imp_var ->
 	newMutVarSST us 			`thenSST` \ us_var ->
       	newMutVarSST (emptyBag,emptyBag)	`thenSST` \ errs_var ->
 	let
 	    mode = if source then
 		       RnSource occ_var
 	           else
-		       RnIface imp_var
+		       case builtinNameInfo of { (wiredin_fm, key_fm, _) ->
+		       RnIface wiredin_fm key_fm imp_var }
 
 	    rn_down = RnDown () mod mkUnknownSrcLoc mode env us_var errs_var
 	in
@@ -208,17 +215,17 @@ getSrcLocRn (RnDown _ _ locn _ _ _ _)
   = returnSST locn
 
 getSourceRn :: RnMonad x s Bool
-getSourceRn (RnDown _ _ _ (RnSource _) _ _ _) = returnSST True
-getSourceRn (RnDown _ _ _ (RnIface  _) _ _ _) = returnSST False
+getSourceRn (RnDown _ _ _ (RnSource _)    _ _ _) = returnSST True
+getSourceRn (RnDown _ _ _ (RnIface _ _ _) _ _ _) = returnSST False
 
 getOccurrenceUpRn :: RnMonad x s (Bag (RnName, RdrName))
 getOccurrenceUpRn (RnDown _ _ _ (RnSource occ_var) _ _ _)
   = readMutVarSST occ_var
-getOccurrenceUpRn (RnDown _ _ _ (RnIface _) _ _ _)
+getOccurrenceUpRn (RnDown _ _ _ (RnIface _ _ _) _ _ _)
   = panic "getOccurrenceUpRn:RnIface"
 
-getImplicitUpRn :: RnMonad x s (FiniteMap RdrName RnName, FiniteMap RdrName RnName)
-getImplicitUpRn (RnDown _ _ _ (RnIface imp_var) _ _ _)
+getImplicitUpRn :: RnMonad x s ImplicitEnv
+getImplicitUpRn (RnDown _ _ _ (RnIface _ _ imp_var) _ _ _)
   = readMutVarSST imp_var
 getImplicitUpRn (RnDown _ _ _(RnSource _) _ _ _)
   = panic "getImplicitUpRn:RnIface"
@@ -318,13 +325,13 @@ lookupValue rdr
   = lookup_val rdr (\ rn -> True) (unknownNameErr "value")
 
 lookupClassOp cls rdr
-  = lookup_val rdr (isRnClassOp cls) (badClassOpErr cls)
+  = lookup_val rdr (\ rn -> True){-WAS:(isRnClassOp cls)-} (badClassOpErr cls)
 
 
 lookup_val rdr check do_err down@(RnDown _ _ locn (RnSource occ_var) env _ _)
   = case lookupRnEnv env rdr of
 	Just name | check name -> succ name
-		  | otherwise   -> fail
+		  | otherwise  -> fail
 	Nothing                -> fail
 
   where
@@ -335,24 +342,38 @@ lookup_val rdr check do_err down@(RnDown _ _ locn (RnSource occ_var) env _ _)
 		    returnSST name
     fail = failButContinueRn (mkRnUnbound rdr) (do_err rdr locn) down
 
-lookup_val rdr check do_err down@(RnDown _ _ locn (RnIface imp_var) env us_var _)
+lookup_val rdr check do_err down@(RnDown _ _ locn (RnIface b_names b_key imp_var) env us_var _)
   = case lookupRnEnv env rdr of
 	Just name | check name -> returnSST name
 		  | otherwise  -> failButContinueRn (mkRnUnbound rdr) (do_err rdr locn) down
-	Nothing                -> lookup_or_create_implicit_val imp_var us_var rdr
+	Nothing                -> lookup_nonexisting_val b_names b_key imp_var us_var rdr
 
-lookup_or_create_implicit_val imp_var us_var rdr
-  = readMutVarSST imp_var `thenSST` \ (implicit_val_fm, implicit_tc_fm)->
+lookup_nonexisting_val (b_names,_) b_key imp_var us_var rdr
+  = case rdr of
+      Qual _ _ -> -- builtin things *don't* have Qual names
+		  lookup_or_create_implicit_val b_key imp_var us_var rdr
+
+      Unqual n -> case (lookupFM b_names n) of
+		    Nothing -> lookup_or_create_implicit_val b_key imp_var us_var rdr
+		    Just xx -> returnSST xx
+
+lookup_or_create_implicit_val b_key imp_var us_var rdr
+  = readMutVarSST imp_var `thenSST` \ (implicit_val_fm, implicit_tc_fm) ->
     case lookupFM implicit_val_fm rdr of
 	Just implicit -> returnSST implicit
 	Nothing ->
-	    get_unique us_var			`thenSST` \ uniq -> 
-	    let
-		implicit   = mkRnImplicit (mkImplicitName uniq rdr)
-		new_val_fm = addToFM implicit_val_fm rdr implicit
-	    in
-	    writeMutVarSST imp_var (new_val_fm, implicit_tc_fm) `thenSST_`
-	    returnSST implicit
+	  (case rdr of
+	     Qual _ _ -> get_unique us_var
+	     Unqual n -> case (lookupFM b_key n) of
+			   Just (u,_) -> returnSST u
+			   _	      -> get_unique us_var
+	  )					`thenSST` \ uniq -> 
+	  let
+	      implicit   = mkRnImplicit (mkImplicitName uniq rdr)
+	      new_val_fm = addToFM implicit_val_fm rdr implicit
+	  in
+	  writeMutVarSST imp_var (new_val_fm, implicit_tc_fm) `thenSST_`
+	  returnSST implicit
 
 
 lookupValueMaybe :: RdrName -> RnMonad x s (Maybe RnName)
@@ -372,7 +393,7 @@ lookupClass rdr
   = lookup_tc rdr isRnClass mkRnImplicitClass "class"
 
 lookupTyConOrClass rdr
-  = lookup_tc rdr (\ rn -> isRnTyCon rn || isRnClass rn)
+  = lookup_tc rdr isRnTyConOrClass
 	      (panic "lookupTC:mk_implicit") "class or type constructor"
 
 lookup_tc rdr check mk_implicit err_str down@(RnDown _ _ locn (RnSource occ_var) env _ _)
@@ -385,27 +406,41 @@ lookup_tc rdr check mk_implicit err_str down@(RnDown _ _ locn (RnSource occ_var)
 		returnSST name
     fail = failButContinueRn (mkRnUnbound rdr) (unknownNameErr err_str rdr locn) down
 
-lookup_tc rdr check mk_implicit err_str down@(RnDown _ _ locn (RnIface imp_var) env us_var _)
+lookup_tc rdr check mk_implicit err_str down@(RnDown _ _ locn (RnIface b_names b_key imp_var) env us_var _)
   = case lookupTcRnEnv env rdr of
 	Just name | check name -> returnSST name
 		  | otherwise  -> fail
-	Nothing -> lookup_or_create_implicit_tc check mk_implicit fail imp_var us_var rdr
+	Nothing -> lookup_nonexisting_tc check mk_implicit fail b_names b_key imp_var us_var rdr
   where
     fail = failButContinueRn (mkRnUnbound rdr) (unknownNameErr err_str rdr locn) down
 
-lookup_or_create_implicit_tc check mk_implicit fail imp_var us_var rdr
-  = readMutVarSST imp_var `thenSST` \ (implicit_val_fm, implicit_tc_fm)->
+lookup_nonexisting_tc check mk_implicit fail (_,b_names) b_key imp_var us_var rdr
+  = case rdr of
+      Qual _ _ -> -- builtin things *don't* have Qual names
+		  lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
+
+      Unqual n -> case (lookupFM b_names n) of
+		    Nothing -> lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
+		    Just xx -> returnSST xx
+
+lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
+  = readMutVarSST imp_var `thenSST` \ (implicit_val_fm, implicit_tc_fm) ->
     case lookupFM implicit_tc_fm rdr of
 	Just implicit | check implicit -> returnSST implicit
 		      | otherwise      -> fail
 	Nothing ->
-	    get_unique us_var			`thenSST` \ uniq -> 
-	    let
-		implicit  = mk_implicit (mkImplicitName uniq rdr)
-		new_tc_fm = addToFM implicit_tc_fm rdr implicit
-	    in
-	    writeMutVarSST imp_var (implicit_val_fm, new_tc_fm) `thenSST_`
-	    returnSST implicit
+	  (case rdr of
+	     Qual _ _ -> get_unique us_var
+	     Unqual n -> case (lookupFM b_key n) of
+			   Just (u,_) -> returnSST u
+			   _	      -> get_unique us_var
+	  )					`thenSST` \ uniq -> 
+	  let
+	      implicit  = mk_implicit (mkImplicitName uniq rdr)
+	      new_tc_fm = addToFM implicit_tc_fm rdr implicit
+	  in
+	  writeMutVarSST imp_var (implicit_val_fm, new_tc_fm) `thenSST_`
+	  returnSST implicit
 \end{code}
 
 
@@ -492,4 +527,14 @@ lookupTyVarName env occ
       Nothing   -> getSrcLocRn	`thenRn` \ loc ->
 		   failButContinueRn (mkRnUnbound occ)
 		       (unknownNameErr "type variable" occ loc)
+\end{code}
+
+
+\begin{code}
+fixIO :: (a -> IO a) -> IO a
+fixIO k s = let
+		result          = k loop s
+		(Right loop, _) = result
+	    in
+	    result
 \end{code}

@@ -207,6 +207,7 @@ derivableClassKeys
   = [ eqClassKey,
       showClassKey,
       ordClassKey,
+      boundedClassKey,
       enumClassKey,
       ixClassKey,
       readClassKey ]
@@ -216,7 +217,7 @@ cCallishClassKeys = [ cCallableClassKey, cReturnableClassKey ]
 standardClassKeys
   = derivableClassKeys ++ numericClassKeys ++ cCallishClassKeys
     --
-    -- We have to have "_CCallable" and "_CReturnable" in the standard
+    -- We have to have "CCallable" and "CReturnable" in the standard
     -- classes, so that if you go...
     --
     --	    _ccall_ foo ... 93{-numeric literal-} ...

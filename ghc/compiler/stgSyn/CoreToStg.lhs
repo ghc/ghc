@@ -41,7 +41,7 @@ import Type		( getAppDataTyCon )
 import UniqSupply	-- all of it, really
 import Util		( panic )
 
-isLeakFreeType = panic "CoreToStg.isLeakFreeType (ToDo)"
+isLeakFreeType x y = False -- safe option; ToDo
 \end{code}
 
 

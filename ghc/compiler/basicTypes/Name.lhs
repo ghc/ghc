@@ -12,9 +12,8 @@ module Name (
 	RdrName(..),
 	isUnqual,
 	isQual,
-	isConopRdr,
+	isRdrLexCon,
 	appendRdr,
-	rdrToOrig,
 	showRdr,
 	cmpRdr,
 
@@ -23,27 +22,30 @@ module Name (
 	mkLocalName, isLocalName, 
 	mkTopLevName, mkImportedName,
 	mkImplicitName,	isImplicitName,
-	mkBuiltinName,
+	mkBuiltinName, mkCompoundName,
 
 	mkFunTyConName, mkTupleDataConName, mkTupleTyConName,
+	mkTupNameStr,
 
 	NamedThing(..), -- class
 	ExportFlag(..), isExported,
 
 	nameUnique,
-	nameOrigName,
 	nameOccName,
 	nameExportFlag,
 	nameSrcLoc,
+	nameImportFlag,
 	isLocallyDefinedName,
 	isPreludeDefinedName,
 
-	getOrigName, getOccName, getExportFlag,
+	origName, moduleOf, nameOf, moduleNamePair,
+	getOccName, getExportFlag,
 	getSrcLoc, isLocallyDefined, isPreludeDefined,
-	getLocalName, getOrigNameRdr, ltLexical,
+	getLocalName, ltLexical,
 
-	isOpLexeme, pprOp, pprNonOp,
-	isConop, isAconop, isAvarid, isAvarop
+	isSymLexeme, pprSym, pprNonSym,
+	isLexCon, isLexVar, isLexId, isLexSym,
+	isLexConId, isLexConSym, isLexVarId, isLexVarSym
     ) where
 
 import Ubiq
@@ -51,13 +53,13 @@ import Ubiq
 import CStrings		( identToC, cSEP )
 import Outputable	( Outputable(..) )
 import PprStyle		( PprStyle(..), codeStyle )
-import PrelMods		( pRELUDE, pRELUDE_BUILTIN )
+import PrelMods		( pRELUDE, pRELUDE_BUILTIN, fromPrelude )
 import Pretty
 import SrcLoc		( mkBuiltinSrcLoc, mkUnknownSrcLoc )
 import Unique		( funTyConKey, mkTupleDataConUnique, mkTupleTyConUnique,
 			  pprUnique, Unique
 			)
-import Util		( thenCmp, _CMP_STRING_, nOfThem, panic )
+import Util		( thenCmp, _CMP_STRING_, nOfThem, panic, assertPanic )
 \end{code}
 
 %************************************************************************
@@ -69,8 +71,9 @@ import Util		( thenCmp, _CMP_STRING_, nOfThem, panic )
 \begin{code}
 type Module = FAST_STRING
 
-data RdrName  = Unqual FAST_STRING
-              | Qual Module FAST_STRING
+data RdrName
+  = Unqual FAST_STRING
+  | Qual   Module FAST_STRING
 
 isUnqual (Unqual _) = True
 isUnqual (Qual _ _) = False
@@ -78,14 +81,12 @@ isUnqual (Qual _ _) = False
 isQual (Unqual _) = False
 isQual (Qual _ _) = True
 
-isConopRdr (Unqual n) = isConop n
-isConopRdr (Qual m n) = isConop n
+isRdrLexCon (Unqual n) = isLexCon n
+isRdrLexCon (Qual m n) = isLexCon n
 
 appendRdr (Unqual n) str = Unqual (n _APPEND_ str)
-appendRdr (Qual m n) str = Qual m (n _APPEND_ str)
-
-rdrToOrig (Unqual n) = (pRELUDE, n)
-rdrToOrig (Qual m n) = (m, n)
+appendRdr (Qual m n) str = ASSERT(not (fromPrelude m))
+			   Qual m (n _APPEND_ str)
 
 cmpRdr (Unqual n1)  (Unqual n2)  = _CMP_STRING_ n1 n2
 cmpRdr (Unqual n1)  (Qual m2 n2) = LT_
@@ -152,7 +153,8 @@ data Name
 data Provenance
   = LocalDef SrcLoc       -- locally defined; give its source location
 
-  | Imported SrcLoc       -- imported; give the *original* source location
+  | Imported ExportFlag	  -- how it was imported
+	     SrcLoc       -- *original* source location
          --  [SrcLoc]     -- any import source location(s)
 
   | Implicit
@@ -163,7 +165,7 @@ data Provenance
 mkLocalName = Local
 
 mkTopLevName   u orig locn exp occs = Global u orig (LocalDef locn) exp occs
-mkImportedName u orig locn exp occs = Global u orig (Imported locn) exp occs
+mkImportedName u orig imp locn exp occs = Global u orig (Imported imp locn) exp occs
 
 mkImplicitName :: Unique -> RdrName -> Name
 mkImplicitName u o = Global u o Implicit NotExported []
@@ -171,19 +173,27 @@ mkImplicitName u o = Global u o Implicit NotExported []
 mkBuiltinName :: Unique -> Module -> FAST_STRING -> Name
 mkBuiltinName u m n = Global u (Unqual n) Builtin NotExported []
 
+mkCompoundName :: Unique -> [FAST_STRING] -> Name
+mkCompoundName u ns
+  = Global u (Unqual{-???-} (_CONCAT_ (dotify ns))) Builtin{--} NotExported []
+  where
+    dotify []  = []
+    dotify [n] = [n]
+    dotify (n:ns) = n : (map (_CONS_ '.') ns)
+
 mkFunTyConName
   = mkBuiltinName funTyConKey		       pRELUDE_BUILTIN SLIT("->")
 mkTupleDataConName arity
-  = mkBuiltinName (mkTupleDataConUnique arity) pRELUDE_BUILTIN (mk_tup_name arity)
+  = mkBuiltinName (mkTupleDataConUnique arity) pRELUDE_BUILTIN (mkTupNameStr arity)
 mkTupleTyConName   arity
-  = mkBuiltinName (mkTupleTyConUnique   arity) pRELUDE_BUILTIN (mk_tup_name arity)
+  = mkBuiltinName (mkTupleTyConUnique   arity) pRELUDE_BUILTIN (mkTupNameStr arity)
 
-mk_tup_name 0 = SLIT("()")
-mk_tup_name 1 = panic "Name.mk_tup_name: 1 ???"
-mk_tup_name 2 = SLIT("(,)")   -- not strictly necessary
-mk_tup_name 3 = SLIT("(,,)")  -- ditto
-mk_tup_name 4 = SLIT("(,,,)") -- ditto
-mk_tup_name n
+mkTupNameStr 0 = SLIT("()")
+mkTupNameStr 1 = panic "Name.mkTupNameStr: 1 ???"
+mkTupNameStr 2 = SLIT("(,)")   -- not strictly necessary
+mkTupNameStr 3 = SLIT("(,,)")  -- ditto
+mkTupNameStr 4 = SLIT("(,,,)") -- ditto
+mkTupNameStr n
   = _PK_ ("(" ++ nOfThem (n-1) ',' ++ ")")
 
 	-- ToDo: what about module ???
@@ -248,8 +258,12 @@ instance NamedThing Name where
 nameUnique (Local    u _ _)     = u
 nameUnique (Global   u _ _ _ _) = u
 
-nameOrigName (Local    _ n _)	     = (panic "NamedThing.Local.nameOrigName", n)
-nameOrigName (Global   _ orig _ _ _) = rdrToOrig orig
+nameOrigName (Local    _ n _)	     = Unqual n
+nameOrigName (Global   _ orig _ _ _) = orig
+
+nameModuleNamePair (Local    _ n _) = (panic "nameModuleNamePair", n)
+nameModuleNamePair (Global   _ (Unqual n) _ _ _) = (pRELUDE, n)
+nameModuleNamePair (Global   _ (Qual m n) _ _ _) = (m, n)
 
 nameOccName (Local    _ n _)	       = Unqual n
 nameOccName (Global   _ orig _ _ []  ) = orig
@@ -258,17 +272,23 @@ nameOccName (Global   _ orig _ _ occs) = head occs
 nameExportFlag (Local    _ _ _)	      = NotExported
 nameExportFlag (Global   _ _ _ exp _) = exp
 
-nameSrcLoc (Local  _ _ loc)	              = loc
-nameSrcLoc (Global _ _ (LocalDef loc) _ _) = loc
-nameSrcLoc (Global _ _ (Imported loc) _ _) = loc
-nameSrcLoc (Global _ _ Implicit       _ _) = mkUnknownSrcLoc
-nameSrcLoc (Global _ _ Builtin        _ _) = mkBuiltinSrcLoc
+nameSrcLoc (Local  _ _ loc)	             = loc
+nameSrcLoc (Global _ _ (LocalDef loc)   _ _) = loc
+nameSrcLoc (Global _ _ (Imported _ loc) _ _) = loc
+nameSrcLoc (Global _ _ Implicit         _ _) = mkUnknownSrcLoc
+nameSrcLoc (Global _ _ Builtin          _ _) = mkBuiltinSrcLoc
 
-isLocallyDefinedName (Local  _ _ _)	           = True
-isLocallyDefinedName (Global _ _ (LocalDef _) _ _) = True
-isLocallyDefinedName (Global _ _ (Imported _) _ _) = False
-isLocallyDefinedName (Global _ _ Implicit     _ _) = False
-isLocallyDefinedName (Global _ _ Builtin      _ _) = False
+nameImportFlag (Local _ _ _)                     = NotExported
+nameImportFlag (Global _ _ (LocalDef _)     _ _) = ExportAll
+nameImportFlag (Global _ _ (Imported exp _) _ _) = exp
+nameImportFlag (Global _ _ Implicit         _ _) = ExportAll
+nameImportFlag (Global _ _ Builtin          _ _) = ExportAll
+
+isLocallyDefinedName (Local  _ _ _)	             = True
+isLocallyDefinedName (Global _ _ (LocalDef _)   _ _) = True
+isLocallyDefinedName (Global _ _ (Imported _ _) _ _) = False
+isLocallyDefinedName (Global _ _ Implicit       _ _) = False
+isLocallyDefinedName (Global _ _ Builtin        _ _) = False
 
 isPreludeDefinedName (Local    _ n _)        = False
 isPreludeDefinedName (Global   _ orig _ _ _) = isUnqual orig
@@ -317,7 +337,7 @@ imported.
 \begin{code}
 data ExportFlag
   = ExportAll		-- export with all constructors/methods
-  | ExportAbs		-- export abstractly
+  | ExportAbs		-- export abstractly (tycons/classes only)
   | NotExported
 
 isExported a
@@ -344,28 +364,35 @@ class NamedThing a where
 \end{code}
 
 \begin{code}
-getOrigName	    :: NamedThing a => a -> (Module, FAST_STRING)
+origName	    :: NamedThing a => a -> RdrName
+moduleOf	    :: RdrName -> Module
+nameOf		    :: RdrName -> FAST_STRING
+moduleNamePair	    :: NamedThing a => a -> (Module, FAST_STRING)
+
 getOccName	    :: NamedThing a => a -> RdrName
+getLocalName	    :: NamedThing a => a -> FAST_STRING
 getExportFlag	    :: NamedThing a => a -> ExportFlag
 getSrcLoc	    :: NamedThing a => a -> SrcLoc
 isLocallyDefined    :: NamedThing a => a -> Bool
 isPreludeDefined    :: NamedThing a => a -> Bool
 
-getOrigName	    = nameOrigName 	   . getName
+-- ToDo: specialise for RdrNames?
+origName	    = nameOrigName 	   . getName
+moduleNamePair	    = nameModuleNamePair   . getName
+
+moduleOf (Unqual n) = pRELUDE
+moduleOf (Qual m n) = m
+
+nameOf (Unqual n)   = n
+nameOf (Qual m n)   = n
+
+getLocalName	    = nameOf . origName
+
 getOccName	    = nameOccName  	   . getName
 getExportFlag	    = nameExportFlag	   . getName
 getSrcLoc	    = nameSrcLoc	   . getName
 isLocallyDefined    = isLocallyDefinedName . getName
 isPreludeDefined    = isPreludeDefinedName . getName
-
-getLocalName :: (NamedThing a) => a -> FAST_STRING
-getLocalName = snd . getOrigName
-
-getOrigNameRdr :: (NamedThing a) => a -> RdrName
-getOrigNameRdr n | isPreludeDefined n = Unqual str
-		 | otherwise          = Qual mod str
-  where
-    (mod,str) = getOrigName n
 \end{code}
 
 @ltLexical@ is used for sorting things into lexicographical order, so
@@ -374,97 +401,103 @@ comparison.]
 
 \begin{code}
 a `ltLexical` b
-  = BIND isLocallyDefined a	_TO_ a_local ->
-    BIND isLocallyDefined b	_TO_ b_local ->
-    BIND getOrigName a		_TO_ (a_mod, a_name) ->
-    BIND getOrigName b		_TO_ (b_mod, b_name) ->
-    if a_local || b_local then
+  = case (moduleNamePair a)	of { (a_mod, a_name) ->
+    case (moduleNamePair b)	of { (b_mod, b_name) ->
+    if isLocallyDefined a || isLocallyDefined b then
        a_name < b_name	-- can't compare module names
     else
        case _CMP_STRING_ a_mod b_mod of
 	 LT_  -> True
 	 EQ_  -> a_name < b_name
 	 GT__ -> False
-    BEND BEND BEND BEND
+    }}
 
 #ifdef USE_ATTACK_PRAGMAS
 {-# SPECIALIZE ltLexical :: Class -> Class -> Bool #-}
-{-# SPECIALIZE ltLexical :: Id -> Id -> Bool #-}
+{-# SPECIALIZE ltLexical :: Id    -> Id    -> Bool #-}
 {-# SPECIALIZE ltLexical :: TyCon -> TyCon -> Bool #-}
 #endif
 \end{code}
 
 These functions test strings to see if they fit the lexical categories
-defined in the Haskell report.  Normally applied as in e.g. @isConop
-(getLocalName foo)@
+defined in the Haskell report.  Normally applied as in e.g. @isCon
+(getLocalName foo)@.
 
 \begin{code}
-isConop, isAconop, isAvarid, isAvarop :: FAST_STRING -> Bool
+isLexCon, isLexVar, isLexId, isLexSym, isLexConId, isLexConSym, isLexVarId, isLexVarSym :: FAST_STRING -> Bool
 
-isConop cs
+isLexCon cs = isLexConId  cs || isLexConSym cs
+isLexVar cs = isLexVarId  cs || isLexVarSym cs
+
+isLexId  cs = isLexConId  cs || isLexVarId  cs
+isLexSym cs = isLexConSym cs || isLexVarSym cs
+
+-------------
+
+isLexConId cs
   | _NULL_ cs	= False
-  | c == '_'	= isConop (_TAIL_ cs)		-- allow for leading _'s
-  | otherwise	= isUpper c || c == ':' 
-		  || c == '[' || c == '('	-- [] () and (,,) come is as Conop strings !!!
-		  || isUpperISO c
+  | c == '_'	= isLexConId (_TAIL_ cs)	-- allow for leading _'s
+  | otherwise	= isUpper c || isUpperISO c
   where					
     c = _HEAD_ cs
 
-isAconop cs
+isLexVarId cs
+  | _NULL_ cs	 = False
+  | c == '_'	 = isLexVarId (_TAIL_ cs)	-- allow for leading _'s
+  | otherwise    = isLower c || isLowerISO c
+  where
+    c = _HEAD_ cs
+
+isLexConSym cs
   | _NULL_ cs	= False
   | otherwise	= c == ':'
+	       || c == '('	-- (), (,), (,,), ...
+	       || cs == SLIT("->")
+	       || cs == SLIT("[]")
   where
     c = _HEAD_ cs
 
-isAvarid cs
-  | _NULL_ cs	 = False
-  | c == '_'	 = isAvarid (_TAIL_ cs)	-- allow for leading _'s
-  | isLower c	 = True
-  | isLowerISO c = True
-  | otherwise    = False
+isLexVarSym cs
+  | _NULL_ cs = False
+  | otherwise = isSymbolASCII c
+	     || isSymbolISO c
+	     || c == '('	-- (), (,), (,,), ...
+	     || cs == SLIT("[]")
   where
     c = _HEAD_ cs
 
-isAvarop cs
-  | _NULL_ cs	 		    = False
-  | isLower c    		    = False
-  | isUpper c    		    = False
-  | c `elem` "!#$%&*+./<=>?@\\^|~-" = True
-  | isSymbolISO c		    = True
-  | otherwise			    = False
-  where
-    c = _HEAD_ cs
-
-isSymbolISO c = ord c `elem` (0xd7 : 0xf7 : [0xa1 .. 0xbf])
-isUpperISO  c = 0xc0 <= oc && oc <= 0xde && oc /= 0xd7 where oc = ord c
-isLowerISO  c = 0xdf <= oc && oc <= 0xff && oc /= 0xf7 where oc = ord c
+-------------
+isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
+isSymbolISO   c = ord c `elem` (0xd7 : 0xf7 : [0xa1 .. 0xbf])
+isUpperISO    c = 0xc0 <= oc && oc <= 0xde && oc /= 0xd7 where oc = ord c
+isLowerISO    c = 0xdf <= oc && oc <= 0xff && oc /= 0xf7 where oc = ord c
 \end{code}
 
 And one ``higher-level'' interface to those:
 
 \begin{code}
-isOpLexeme :: NamedThing a => a -> Bool
+isSymLexeme :: NamedThing a => a -> Bool
 
-isOpLexeme v
-  = let str = snd (getOrigName v) in isAvarop str || isAconop str
+isSymLexeme v
+  = let str = nameOf (origName v) in isLexSym str
 
 -- print `vars`, (op) correctly
-pprOp, pprNonOp :: (NamedThing name, Outputable name) => PprStyle -> name -> Pretty
+pprSym, pprNonSym :: (NamedThing name, Outputable name) => PprStyle -> name -> Pretty
 
-pprOp sty var
-  = if isOpLexeme var
+pprSym sty var
+  = if isSymLexeme var
     then ppr sty var
     else ppBesides [ppChar '`', ppr sty var, ppChar '`']
 
-pprNonOp sty var
-  = if isOpLexeme var
+pprNonSym sty var
+  = if isSymLexeme var
     then ppBesides [ppLparen, ppr sty var, ppRparen]
     else ppr sty var
 
 #ifdef USE_ATTACK_PRAGMAS
-{-# SPECIALIZE isOpLexeme :: Id -> Bool #-}
-{-# SPECIALIZE pprNonOp :: PprStyle -> Id -> Pretty #-}
-{-# SPECIALIZE pprNonOp :: PprStyle -> TyCon -> Pretty #-}
-{-# SPECIALIZE pprOp :: PprStyle -> Id -> Pretty #-}
+{-# SPECIALIZE isSymLexeme :: Id -> Bool #-}
+{-# SPECIALIZE pprNonSym :: PprStyle -> Id -> Pretty #-}
+{-# SPECIALIZE pprNonSym :: PprStyle -> TyCon -> Pretty #-}
+{-# SPECIALIZE pprSym :: PprStyle -> Id -> Pretty #-}
 #endif
 \end{code}

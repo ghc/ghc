@@ -41,8 +41,6 @@ module SimplEnv (
 
 	InExpr(..),  InAlts(..),  InDefault(..),  InArg(..),
 	OutExpr(..), OutAlts(..), OutDefault(..), OutArg(..)
-
-	-- and to make the interface self-sufficient...
     ) where
 
 import Ubiq{-uitous-}
@@ -50,21 +48,24 @@ import Ubiq{-uitous-}
 import SmplLoop		-- breaks the MagicUFs / SimplEnv loop
 
 import BinderInfo	( BinderInfo{-instances-} )
+import CgCompInfo	( uNFOLDING_CREATION_THRESHOLD )
 import CmdLineOpts	( switchIsOn, intSwitchSet, SimplifierSwitch(..), SwitchResult )
 import CoreSyn
 import CoreUnfold	( UnfoldingDetails(..), mkGenForm, modifyUnfoldingDetails,
 			  calcUnfoldingGuidance, UnfoldingGuidance(..),
 			  mkFormSummary, FormSummary
 			)
+import CoreUtils	( manifestlyWHNF )
 import FiniteMap	-- lots of things
 import Id		( idType, getIdUnfolding, getIdStrictness,
 			  applyTypeEnvToId,
 			  nullIdEnv, growIdEnvList, rngIdEnv, lookupIdEnv,
 			  addOneToIdEnv, modifyIdEnv,
 			  IdEnv(..), IdSet(..), GenId )
-import IdInfo		( StrictnessInfo )
+import IdInfo		( bottomIsGuaranteed, StrictnessInfo )
 import Literal		( isNoRepLit, Literal{-instances-} )
 import Name		( isLocallyDefined )
+import OccurAnal	( occurAnalyseExpr )
 import Outputable	( Outputable(..){-instances-} )
 import PprCore		-- various instances
 import PprStyle		( PprStyle(..) )
@@ -76,23 +77,17 @@ import TyVar		( nullTyVarEnv, addOneToIdEnv, addOneToTyVarEnv,
 			  TyVarEnv(..), GenTyVar{-instance Eq-}
 			)
 import Unique		( Unique{-instance Outputable-} )
+import UniqFM		( addToUFM_Directly, lookupUFM_Directly, ufmToList )
 import UniqSet		-- lots of things
 import Usage		( UVar(..), GenUsage{-instances-} )
 import Util		( zipEqual, panic, assertPanic )
 
 type TypeEnv = TyVarEnv Type
-addToUFM_Directly = panic "addToUFM_Directly (SimplEnv)"
-bottomIsGuaranteed = panic "bottomIsGuaranteed (SimplEnv)"
 cmpType = panic "cmpType (SimplEnv)"
 exprSmallEnoughToDup = panic "exprSmallEnoughToDup (SimplEnv)"
-lookupDirectlyUFM = panic "lookupDirectlyUFM (SimplEnv)"
-manifestlyWHNF = panic "manifestlyWHNF (SimplEnv)"
-occurAnalyseExpr = panic "occurAnalyseExpr (SimplEnv)"
 oneSafeOcc = panic "oneSafeOcc (SimplEnv)"
 oneTextualOcc = panic "oneTextualOcc (SimplEnv)"
 simplIdWantsToBeINLINEd = panic "simplIdWantsToBeINLINEd (SimplEnv)"
-uNFOLDING_CREATION_THRESHOLD = panic "uNFOLDING_CREATION_THRESHOLD (SimplEnv)"
-ufmToList = panic "ufmToList (SimplEnv)"
 \end{code}
 
 %************************************************************************
@@ -730,7 +725,7 @@ extendUnfoldEnvGivenRhs env@(SimplEnv chkr encl_cc ty_env id_env unfold_env)
 
     modify :: (Unique, BinderInfo) -> IdEnv UnfoldItem -> IdEnv UnfoldItem
     modify (u, occ_info) env
-      = case (lookupDirectlyUFM env u) of
+      = case (lookupUFM_Directly env u) of
 	  Nothing -> env -- ToDo: can this happen?
 	  Just xx -> addToUFM_Directly env u (modifyItem ok_to_dup occ_info xx)
 

@@ -15,6 +15,8 @@ module SrcLoc (
 
 	mkSrcLoc, mkSrcLoc2,	-- the usual
 	mkUnknownSrcLoc,	-- "I'm sorry, I haven't a clue"
+	mkIfaceSrcLoc,		-- Unknown place in an interface
+				-- (this one can die eventually ToDo)
 	mkBuiltinSrcLoc,	-- something wired into the compiler
 	mkGeneratedSrcLoc,	-- code generated within the compiler
 	unpackSrcLoc
@@ -58,6 +60,7 @@ Things to make 'em:
 mkSrcLoc	    = SrcLoc
 mkSrcLoc2 x IBOX(y) = SrcLoc2 x y
 mkUnknownSrcLoc	    = SrcLoc SLIT("<unknown>") SLIT("<unknown>")
+mkIfaceSrcLoc	    = SrcLoc SLIT("<an interface file>") SLIT("<unknown>")
 mkBuiltinSrcLoc	    = SrcLoc SLIT("<built-into-the-compiler>") SLIT("<none>")
 mkGeneratedSrcLoc   = SrcLoc SLIT("<compiler-generated-code>") SLIT("<none>")
 

@@ -39,7 +39,7 @@ import Pretty
 import RnHsSyn		( isRnLocal, isRnClass, isRnTyCon,
 			  RnName{-instance NamedThing-}
 			)
-import Util		( zipWithEqual, panic )
+import Util		( zipWithEqual, panic, pprPanic{-ToDo:rm-} )
 \end{code}
 
 
@@ -85,12 +85,14 @@ tcMonoTypeKind (MonoTyApp name tys)
   = tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
     tcMonoTyApp kind (mkTyVarTy tyvar) tys
 
-tcMonoTypeKind (MonoTyApp name tys)
-  | isRnTyCon name 	-- Must be a type constructor
+  | otherwise {-isRnTyCon name-} 	-- Must be a type constructor
   = tcLookupTyCon name			`thenNF_Tc` \ (kind,maybe_arity,tycon) ->
     case maybe_arity of
 	Just arity -> tcSynApp name kind arity tycon tys	-- synonum
 	Nothing	   -> tcMonoTyApp kind (mkTyConTy tycon) tys	-- newtype or data
+
+--  | otherwise
+--  = pprPanic "tcMonoTypeKind:" (ppr PprDebug name)
 	
 -- for unfoldings only:
 tcMonoTypeKind (MonoForAllTy tyvars_w_kinds ty)
@@ -155,10 +157,10 @@ tcClassAssertion (class_name, tyvar_name)
     returnTc (clas, mkTyVarTy tyvar)
 \end{code}
 
-HACK warning: Someone discovered that @_CCallable@ and @_CReturnable@
+HACK warning: Someone discovered that @CCallable@ and @CReturnable@
 could be used in contexts such as:
 \begin{verbatim}
-foo :: _CCallable a => a -> PrimIO Int
+foo :: CCallable a => a -> PrimIO Int
 \end{verbatim}
 
 Doing this utterly wrecks the whole point of introducing these

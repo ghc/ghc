@@ -30,7 +30,6 @@ import Inst		( newDicts, InstOrigin(..), Inst )
 import TcMonoType	( tcMonoTypeKind, tcMonoType, tcContext )
 import TcType		( tcInstTyVars, tcInstType, tcInstId )
 import TcEnv		( tcLookupTyCon, tcLookupTyVar, tcLookupClass,
-			  tcLookupClassByKey,
 			  newLocalId, newLocalIds
 			)
 import TcMonad
@@ -51,12 +50,12 @@ import Name		( nameSrcLoc, isLocallyDefinedName, getSrcLoc,
 import Pretty
 import TyCon		( TyCon, NewOrData(..), mkSynTyCon, mkDataTyCon, isDataTyCon, 
 			  tyConDataCons )
-import Type		( getTypeKind, getTyVar, tyVarsOfTypes, eqTy,
+import Type		( typeKind, getTyVar, tyVarsOfTypes, eqTy,
 			  applyTyCon, mkTyVarTys, mkForAllTys, mkFunTy,
 			  splitFunTy, mkTyVarTy, getTyVar_maybe
 			)
-import TyVar		( getTyVarKind, elementOfTyVarSet, GenTyVar{-instance Eq-} )
-import Unique		( Unique {- instance Eq -}, dataClassKey )
+import TyVar		( tyVarKind, elementOfTyVarSet, GenTyVar{-instance Eq-} )
+import Unique		( Unique {- instance Eq -}, evalClassKey )
 import UniqSet		( emptyUniqSet, mkUniqSet, uniqSetToList, unionManyUniqSets, UniqSet(..) )
 import Util		( equivClasses, zipEqual, panic, assertPanic )
 \end{code}
@@ -91,8 +90,8 @@ tcTyDecl (TySynonym tycon_name tyvar_names rhs src_loc)
 	-- but the simplest thing to do seems to be to get the Kind by (lazily)
 	-- looking at the tyvars and rhs_ty.
 	result_kind, final_tycon_kind :: Kind 	-- NB not TcKind!
-	result_kind      = getTypeKind rhs_ty
-	final_tycon_kind = foldr (mkArrowKind . getTyVarKind) result_kind rec_tyvars
+	result_kind      = typeKind rhs_ty
+	final_tycon_kind = foldr (mkArrowKind . tyVarKind) result_kind rec_tyvars
 
 	-- Construct the tycon
 	tycon = mkSynTyCon (getName tycon_name)
@@ -138,7 +137,7 @@ tcTyDataOrNew data_or_new context tycon_name tyvar_names con_decls derivings pra
     let
 	-- Construct the tycon
 	final_tycon_kind :: Kind 		-- NB not TcKind!
-	final_tycon_kind = foldr (mkArrowKind . getTyVarKind) mkBoxedTypeKind rec_tyvars
+	final_tycon_kind = foldr (mkArrowKind . tyVarKind) mkBoxedTypeKind rec_tyvars
 
 	tycon = mkDataTyCon (getName tycon_name)
 			    final_tycon_kind
@@ -235,7 +234,7 @@ mkConstructor con_id
 		      -- to the Data class
 	              [getTyVar "mkConstructor" ty
 		      | (clas,ty) <- theta, 
-			uniqueOf clas == dataClassKey]
+			uniqueOf clas == evalClassKey]
 
 	check_data arg = case getTyVar_maybe (tcIdType arg) of
 			   Nothing    -> returnTc ()	-- Not a tyvar, so OK

@@ -41,7 +41,7 @@ import CoreUtils	( escErrorMsg )
 import Id		( mkSuperDictSelId, mkMethodSelId, mkDefaultMethodId,
 			  idType )
 import IdInfo		( noIdInfo )
-import Name		( isLocallyDefined, getOrigName, getLocalName )
+import Name		( isLocallyDefined, moduleNamePair, getLocalName )
 import PrelVals		( pAT_ERROR_ID )
 import PprStyle
 import Pretty
@@ -504,7 +504,7 @@ makeClassDeclDefaultMethodRhs clas method_ids tag
 		 HsApp (mkHsTyApp (HsVar (RealId pAT_ERROR_ID)) [tau])
 		     (HsLitOut (HsString (_PK_ error_msg)) stringTy))))
   where
-    (clas_mod, clas_name) = getOrigName clas
+    (clas_mod, clas_name) = moduleNamePair clas
 
     method_id = method_ids  !! (tag-1)
     class_op = (getClassOps clas) !! (tag-1)

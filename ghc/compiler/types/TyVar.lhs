@@ -4,7 +4,7 @@
 module TyVar (
 	GenTyVar(..), TyVar(..),
 	mkTyVar,
-	getTyVarKind,		-- TyVar -> Kind
+	tyVarKind,		-- TyVar -> Kind
 	cloneTyVar,
 
 	alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
@@ -66,8 +66,8 @@ mkTyVar name uniq kind = TyVar  uniq
 				(Just name)
 				usageOmega
 
-getTyVarKind :: GenTyVar flexi -> Kind
-getTyVarKind (TyVar _ kind _ _) = kind
+tyVarKind :: GenTyVar flexi -> Kind
+tyVarKind (TyVar _ kind _ _) = kind
 
 cloneTyVar :: GenTyVar flexi -> Unique -> GenTyVar flexi
 cloneTyVar (TyVar _ k n x) u = TyVar u k n x

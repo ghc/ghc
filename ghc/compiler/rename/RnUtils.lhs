@@ -12,6 +12,8 @@ module RnUtils (
 	emptyRnEnv, extendGlobalRnEnv, extendLocalRnEnv,
 	lookupRnEnv, lookupTcRnEnv,
 
+	lubExportFlag,
+
 	unknownNameErr,
 	badClassOpErr,
 	qualNameErr,
@@ -30,7 +32,7 @@ import ErrUtils		( addShortErrLocLine, addErrLoc )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM,
 			  lookupFM, addListToFM, addToFM )
 import Maybes		( maybeToBool )
-import Name		( RdrName(..), isQual, pprNonOp, getLocalName )
+import Name		( RdrName(..), isQual, pprNonSym, getLocalName, ExportFlag(..) )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import RnHsSyn		( RnName )
@@ -72,9 +74,9 @@ vaule Unqual Names.
 @lookupTcRnEnv@ looks up tycons/classes in the alternative global
 name space.
 
-@extendGlobalRnEnv@ adds global names to the RnEnv. It takes seperate
+@extendGlobalRnEnv@ adds global names to the RnEnv. It takes separate
 value and tycon/class name lists. It returns any duplicate names
-seperatle.
+seperately.
 
 @extendRnEnv@ adds new local names to the ScopeStack in an RnEnv.
 It optionally reports any shadowed names.
@@ -82,7 +84,6 @@ It optionally reports any shadowed names.
 \begin{code}
 emptyRnEnv
   = ((emptyFM, emptyFM, emptyFM, emptyFM), emptyFM)
-
 
 extendGlobalRnEnv ((qual, unqual, tc_qual, tc_unqual), stack) val_list tc_list
   = ASSERT(isEmptyFM stack)
@@ -150,6 +151,19 @@ lookupTcRnEnv ((_, _, tc_qual, tc_unqual), _) rdr
 
 *********************************************************
 *							*
+\subsection{Export Flag Functions}
+*							*
+*********************************************************
+
+\begin{code}
+lubExportFlag ExportAll ExportAll = ExportAll
+lubExportFlag ExportAll ExportAbs = ExportAll
+lubExportFlag ExportAbs ExportAll = ExportAll
+lubExportFlag ExportAbs ExportAbs = ExportAbs
+\end{code}
+
+*********************************************************
+*							*
 \subsection{Errors used in RnMonad}
 *							*
 *********************************************************
@@ -157,16 +171,16 @@ lookupTcRnEnv ((_, _, tc_qual, tc_unqual), _) rdr
 \begin{code}
 unknownNameErr descriptor name locn
   = addShortErrLocLine locn ( \ sty ->
-    ppBesides [ppStr "undefined ", ppStr descriptor, ppStr ": ", pprNonOp sty name] )
+    ppBesides [ppStr "undefined ", ppStr descriptor, ppStr ": ", pprNonSym sty name] )
 
 badClassOpErr clas op locn
   = addErrLoc locn "" ( \ sty ->
-    ppBesides [ppChar '`', pprNonOp sty op, ppStr "' is not an operation of class `",
+    ppBesides [ppChar '`', pprNonSym sty op, ppStr "' is not an operation of class `",
 	      ppr sty clas, ppStr "'"] )
 
 qualNameErr descriptor (name,locn)
   = addShortErrLocLine locn ( \ sty ->
-    ppBesides [ppStr "invalid use of qualified ", ppStr descriptor, ppStr ": ", pprNonOp sty name ] )
+    ppBesides [ppStr "invalid use of qualified ", ppStr descriptor, ppStr ": ", pprNonSym sty name ] )
 
 dupNamesErr descriptor ((name1,locn1) : dup_things) sty
   = ppAboves (item1 : map dup_item dup_things)
@@ -174,11 +188,11 @@ dupNamesErr descriptor ((name1,locn1) : dup_things) sty
     item1
       = ppBesides [ ppr PprForUser locn1,
 	    ppStr ": multiple declarations of a ", ppStr descriptor, ppStr ": ",
-	    pprNonOp sty name1 ]
+	    pprNonSym sty name1 ]
 
     dup_item (name, locn)
       = ppBesides [ ppr PprForUser locn,
-	    ppStr ": here was another declaration of `", pprNonOp sty name, ppStr "'" ]
+	    ppStr ": here was another declaration of `", pprNonSym sty name, ppStr "'" ]
 
 shadowedNameWarn locn shadow
   = addShortErrLocLine locn ( \ sty ->

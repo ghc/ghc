@@ -29,7 +29,7 @@ import TcKind	( TcKind, newKindVars, tcDefaultKind, kindToTcKind )
 import TcType	( TcType(..), TcMaybe, TcTyVar(..), TcTyVarSet(..),
 		  newTyVarTys, tcInstTyVars, tcInstType, zonkTcTyVars
 		)
-import TyVar	( mkTyVar, getTyVarKind, unionTyVarSets, emptyTyVarSet )
+import TyVar	( mkTyVar, tyVarKind, unionTyVarSets, emptyTyVarSet )
 import Type	( tyVarsOfTypes )
 import TyCon	( TyCon, Arity(..), tyConKind, synTyConArity )
 import Class	( Class(..), GenClass, getClassSig )
@@ -41,9 +41,9 @@ import PprStyle
 import Pretty
 import RnHsSyn		( RnName(..) )
 import Type		( splitForAllTy )
-import Unique		( Unique )
+import Unique		( pprUnique10, pprUnique{-ToDo:rm-} )
 import UniqFM	     
-import Util		( zipWithEqual, zipWith3Equal, zipLazy, panic, pprPanic )
+import Util		( zipWithEqual, zipWith3Equal, zipLazy, panic, pprPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 Data type declarations
@@ -151,7 +151,7 @@ Looking up in the environments.
 \begin{code}
 tcLookupTyVar name
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
-    returnNF_Tc (lookupWithDefaultUFM tve (panic "tcLookupTyVar") name)
+    returnNF_Tc (lookupWithDefaultUFM tve (pprPanic "tcLookupTyVar:" (ppr PprShowAll name)) name)
 
 
 tcLookupTyCon (WiredInTyCon tc)		-- wired in tycons
@@ -159,26 +159,28 @@ tcLookupTyCon (WiredInTyCon tc)		-- wired in tycons
 
 tcLookupTyCon name
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
-    returnNF_Tc (lookupWithDefaultUFM tce (panic "tcLookupTyCon") name)
+    returnNF_Tc (lookupWithDefaultUFM tce (pprPanic "tcLookupTyCon:" (ppr PprShowAll name)) name)
 
 tcLookupTyConByKey uniq
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let 
        (kind, arity, tycon) =  lookupWithDefaultUFM_Directly tce 
-					(pprPanic "tcLookupTyCon:" (ppr PprDebug uniq)) 
+					(pprPanic "tcLookupTyCon:" (pprUnique10 uniq)) 
 					uniq
     in
     returnNF_Tc tycon
 
 tcLookupClass name
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
-    returnNF_Tc (lookupWithDefaultUFM ce (panic "tcLookupClass") name)
+--  pprTrace "tcLookupClass:" (ppCat [ppStr "Uniq:", pprUnique10 (uniqueOf name), ppStr "; avail:", ppCat (map (pprUnique10 . fst) (ufmToList ce))]) $
+--  pprTrace "tcLookupClass:" (ppCat [ppStr "Uniq:", pprUnique (uniqueOf name), ppStr "; avail:", ppCat (map (pprUnique . fst) (ufmToList ce))]) $
+    returnNF_Tc (lookupWithDefaultUFM ce (pprPanic "tcLookupClass:" (ppr PprShowAll name)) name)
 
 tcLookupClassByKey uniq
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let
 	(kind, clas) = lookupWithDefaultUFM_Directly ce 
-				(pprPanic "tcLookupClas:" (ppr PprDebug uniq))
+				(pprPanic "tcLookupClassByKey:" (pprUnique10 uniq))
 				uniq
     in
     returnNF_Tc clas
@@ -261,7 +263,7 @@ tcLookupGlobalValueByKey uniq
     returnNF_Tc (lookupWithDefaultUFM_Directly gve def uniq)
   where
 #ifdef DEBUG
-    def = pprPanic "tcLookupGlobalValueByKey:" (ppr PprDebug uniq)
+    def = pprPanic "tcLookupGlobalValueByKey:" (pprUnique10 uniq)
 #else
     def = panic "tcLookupGlobalValueByKey"
 #endif

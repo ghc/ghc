@@ -8,7 +8,7 @@
 
 module MkIface ( mkInterface ) where
 
-import PrelInfo		( mkLiftTy, pRELUDE_CORE, pRELUDE_BUILTIN )
+import PrelInfo		( mkLiftTy, pRELUDE_BUILTIN )
 import HsSyn		( FixityDecl(..), RenamedFixityDecl(..), MonoBinds,
 			  RenamedMonoBinds(..), Name, RenamedPat(..), Sig
 			)
@@ -138,7 +138,7 @@ mkInterface modname export_list_fns inline_env tycon_specs
 	    else
 	       let
 		   eq_fn = if isTopLevId i -- can't trust uniqs
-			   then (\ x y -> getOrigName x == getOrigName y)
+			   then (\ x y -> origName x == origName y)
 			   else eqId
 	       in
 	       case [ x | x <- better_ids, x `eq_fn` i ] of
@@ -271,7 +271,7 @@ do_import_decls mod_name vals classes tycons
     print_a_decl (ielist@((m,_,_) : _))
       |  m == mod_name
       || (not compiling_the_prelude &&
-	  (m == pRELUDE_CORE || m == pRELUDE_BUILTIN))
+	  ({-OLD:m == pRELUDE_CORE ||-} m == pRELUDE_BUILTIN))
       = ppNil
 
       | otherwise
@@ -281,7 +281,7 @@ do_import_decls mod_name vals classes tycons
 		  ]
       where
 	isnt_tycon_ish :: FAST_STRING -> Bool
-	isnt_tycon_ish str = not (isConop str)
+	isnt_tycon_ish str = not (isLexCon str)
 
 	grab_non_Nothings :: [[Maybe FAST_STRING]] -> [FAST_STRING]
 
@@ -289,7 +289,7 @@ do_import_decls mod_name vals classes tycons
 
 	pp_str :: FAST_STRING -> Pretty
 	pp_str pstr
-	  = if isAvarop pstr then ppStr ("("++str++")") else ppPStr pstr
+	  = if isLexVarSym pstr then ppStr ("("++str++")") else ppPStr pstr
 	  where
 	    str = _UNPK_ pstr
 \end{code}
@@ -325,7 +325,7 @@ get_tycon_pair tycon
     (orig_mod, nm_to_print) }
 
 generic_pair thing
-  = case (getOrigName       thing) of { (orig_mod, orig_nm) ->
+  = case (moduleNamePair       thing) of { (orig_mod, orig_nm) ->
     case (getOccName thing) of { occur_name ->
     (orig_mod, orig_nm) }}
 \end{code}
@@ -412,10 +412,10 @@ do_value better_id_fn inline_env val
 		    ppPStr SLIT("::"), pprGenType sty val_ty])
 	    pp_id_info
 
--- sadly duplicates Outputable.pprNonOp (ToDo)
+-- sadly duplicates Name.pprNonSym (ToDo)
 
 ppr_non_op str
-  = if isAvarop str -- NOT NEEDED: || isAconop
+  = if isLexVarSym str -- NOT NEEDED: || isAconop
     then ppBesides [ppLparen, ppPStr str, ppRparen]
     else ppPStr str
 \end{code}
@@ -528,7 +528,7 @@ is_mentionable tc
   where
     from_PreludeCore_or_Builtin thing
       = let
-	    mod_name = fst (getOrigName thing)
+	    mod_name = fst (moduleNamePair thing)
 	in
 	mod_name == pRELUDE_CORE || mod_name == pRELUDE_BUILTIN
 

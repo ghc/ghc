@@ -26,7 +26,7 @@ import HsLoop		( HsExpr )
 -- others:
 import Id		( GenId, dataConSig )
 import Maybes		( maybeToBool )
-import Name		( pprOp, pprNonOp )
+import Name		( pprSym, pprNonSym )
 import Outputable	( interppSP, interpp'SP, ifPprShowAll )
 import PprStyle		( PprStyle(..) )
 import Pretty
@@ -115,7 +115,7 @@ instance (Outputable name, NamedThing name) => Outputable (InPat name) where
 pprInPat :: (Outputable name, NamedThing name) => PprStyle -> InPat name -> Pretty
 
 pprInPat sty (WildPatIn)	= ppStr "_"
-pprInPat sty (VarPatIn var)	= pprNonOp sty var
+pprInPat sty (VarPatIn var)	= pprNonSym sty var
 pprInPat sty (LitPatIn s)	= ppr sty s
 pprInPat sty (LazyPatIn pat)	= ppBeside (ppChar '~') (ppr sty pat)
 pprInPat sty (AsPatIn name pat)
@@ -131,7 +131,7 @@ pprInPat sty (ConPatIn c pats)
 pprInPat sty (ConOpPatIn pat1 op pat2)
  = ppBesides [ppLparen, ppr sty pat1, ppSP, ppr sty op, ppSP, ppr sty pat2, ppRparen]
 
-	-- ToDo: use pprOp to print op (but this involves fiddling various
+	-- ToDo: use pprSym to print op (but this involves fiddling various
 	-- contexts & I'm lazy...); *PatIns are *rarely* printed anyway... (WDP)
 
 pprInPat sty (NegPatIn pat)
@@ -168,7 +168,7 @@ instance (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar,
 
 \begin{code}
 pprOutPat sty (WildPat ty)	= ppChar '_'
-pprOutPat sty (VarPat var)	= pprNonOp sty var
+pprOutPat sty (VarPat var)	= pprNonSym sty var
 pprOutPat sty (LazyPat pat)	= ppBesides [ppChar '~', ppr sty pat]
 pprOutPat sty (AsPat name pat)
   = ppBesides [ppLparen, ppr sty name, ppChar '@', ppr sty pat, ppRparen]
@@ -183,7 +183,7 @@ pprOutPat sty (ConPat name ty pats)
     	 ifPprShowAll sty (pprConPatTy sty ty) ]
 
 pprOutPat sty (ConOpPat pat1 op pat2 ty)
-  = ppBesides [ppLparen, ppr sty pat1, ppSP, pprOp sty op, ppSP, ppr sty pat2, ppRparen]
+  = ppBesides [ppLparen, ppr sty pat1, ppSP, pprSym sty op, ppSP, ppr sty pat2, ppRparen]
 
 pprOutPat sty (ListPat ty pats)
   = ppBesides [ppLbrack, interpp'SP sty pats, ppRbrack]

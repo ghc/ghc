@@ -63,10 +63,12 @@ import CoreUtils	( escErrorMsg )
 import Id		( GenId, idType, isDefaultMethodId_maybe )
 import ListSetOps	( minusList )
 import Maybes 		( maybeToBool, expectJust )
-import Name		( getLocalName, getOrigName )
+import Name		( getLocalName, origName, nameOf )
 import PrelInfo		( pAT_ERROR_ID )
+import PrelMods		( pRELUDE )
 import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
-			  pprParendGenType )
+			  pprParendGenType
+			)
 import PprStyle
 import Pretty
 import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
@@ -558,13 +560,13 @@ makeInstanceDeclNoDefaultExpr origin meth_ids defm_ids inst_ty clas inst_mod tag
     error_msg = "%E" 	-- => No explicit method for \"
 	     	++ escErrorMsg error_str
 
-    mod_str = case inst_mod of { Nothing -> SLIT("Prelude"); Just m -> m }
+    mod_str = case inst_mod of { Nothing -> pRELUDE; Just m -> m }
 
     error_str = _UNPK_ mod_str ++ "." ++ _UNPK_ clas_name ++ "."
 	     	++ (ppShow 80 (ppr PprForUser inst_ty)) ++ "."
 	     	++ (ppShow 80 (ppr PprForUser clas_op))	++ "\""
 
-    (_, clas_name) = getOrigName clas
+    clas_name = nameOf (origName clas)
 \end{code}
 
 
@@ -778,7 +780,7 @@ tcSpecInstSig e ce tce inst_infos inst_mapper (SpecInstSig class_name ty src_loc
 	clas = lookupCE ce class_name -- Renamer ensures this can't fail
 
 	-- Make some new type variables, named as in the specialised instance type
-	ty_names 			  = extractMonoTyNames (==) ty
+	ty_names 			  = extractMonoTyNames ???is_tyvarish_name??? ty
 	(tmpl_e,inst_tmpls,inst_tmpl_tys) = mkTVE ty_names
     in
     babyTcMtoTcM (tcInstanceType ce tce tmpl_e True src_loc ty)
@@ -909,7 +911,7 @@ scrutiniseInstanceType from_here clas inst_tau
   = failTc (derivingWhenInstanceExistsErr clas inst_tycon)
 
   |	-- CCALL CHECK
-	-- A user declaration of a _CCallable/_CReturnable instance
+	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
     isCcallishClass clas
     && not opt_CompilingPrelude		-- which allows anything

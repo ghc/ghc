@@ -517,7 +517,7 @@ gen_Ix_binds tycon
     then enum_ixes
     else single_con_ixes
   where
-    tycon_str = _UNPK_ (snd (getOrigName tycon))
+    tycon_str = _UNPK_ (snd (moduleNamePair tycon))
 
     --------------------------------------------------------------
     enum_ixes = enum_range `AndMonoBinds`
@@ -655,7 +655,7 @@ gen_Read_binds fixities tycon
 	read_con data_con   -- note: "b" is the string being "read"
 	  = let
 		data_con_PN = Prel (WiredInId data_con)
-		data_con_str= snd  (getOrigName data_con)
+		data_con_str= snd  (moduleNamePair data_con)
 		as_needed   = take (dataConArity data_con) as_PNs
 		bs_needed   = take (dataConArity data_con) bs_PNs
 		con_expr    = foldl HsApp (HsVar data_con_PN) (map HsVar as_needed)
@@ -707,7 +707,7 @@ gen_Show_binds fixities tycon
 		nullary_con = dataConArity data_con == 0
 
 		show_con
-		  = let (mod, nm)   = getOrigName data_con
+		  = let (mod, nm)   = moduleNamePair data_con
 			space_maybe = if nullary_con then _NIL_ else SLIT(" ")
 		    in
 			HsApp (HsVar showString_PN) (HsLit (HsString (nm _APPEND_ space_maybe)))
@@ -1074,19 +1074,19 @@ d_Pat		= VarPatIn d_PN
 con2tag_PN, tag2con_PN, maxtag_PN :: TyCon -> RdrName
 
 con2tag_PN tycon
-  = let	(mod, nm) = getOrigName tycon
+  = let	(mod, nm) = moduleNamePair tycon
 	con2tag	  = SLIT("con2tag_") _APPEND_ nm _APPEND_ SLIT("#")
     in
     Imp mod con2tag [mod] con2tag
 
 tag2con_PN tycon
-  = let	(mod, nm) = getOrigName tycon
+  = let	(mod, nm) = moduleNamePair tycon
 	tag2con	  = SLIT("tag2con_") _APPEND_ nm _APPEND_ SLIT("#")
     in
     Imp mod tag2con [mod] tag2con
 
 maxtag_PN tycon
-  = let	(mod, nm) = getOrigName tycon
+  = let	(mod, nm) = moduleNamePair tycon
 	maxtag	  = SLIT("maxtag_") _APPEND_ nm _APPEND_ SLIT("#")
     in
     Imp mod maxtag [mod] maxtag
@@ -1095,19 +1095,19 @@ maxtag_PN tycon
 con2tag_FN, tag2con_FN, maxtag_FN :: TyCon -> RnName
 
 tag2con_FN tycon
-  = let	(mod, nm) = getOrigName tycon
+  = let	(mod, nm) = moduleNamePair tycon
 	tag2con	  = SLIT("tag2con_") _APPEND_ nm _APPEND_ SLIT("#")
     in
     mkFullName mod tag2con InventedInThisModule NotExported mkGeneratedSrcLoc
 
 maxtag_FN tycon
-  = let	(mod, nm) = getOrigName tycon
+  = let	(mod, nm) = moduleNamePair tycon
 	maxtag	  = SLIT("maxtag_") _APPEND_ nm _APPEND_ SLIT("#")
     in
     mkFullName mod maxtag InventedInThisModule NotExported mkGeneratedSrcLoc
 
 con2tag_FN tycon
-  = let	(mod, nm) = getOrigName tycon
+  = let	(mod, nm) = moduleNamePair tycon
 	con2tag	  = SLIT("con2tag_") _APPEND_ nm _APPEND_ SLIT("#")
     in
     mkFullName mod con2tag InventedInThisModule NotExported mkGeneratedSrcLoc

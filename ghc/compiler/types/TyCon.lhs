@@ -48,7 +48,6 @@ import TyLoop		( Type(..), GenType,
 import TyVar		( GenTyVar, alphaTyVars, alphaTyVar, betaTyVar )
 import Usage		( GenUsage, Usage(..) )
 import Kind		( Kind, mkBoxedTypeKind, mkArrowKind, resultKind, argKind )
-import PrelMods		( pRELUDE_BUILTIN )
 
 import Maybes
 import Name		( Name, RdrName(..), appendRdr, nameUnique,
@@ -161,14 +160,7 @@ tyConKind :: TyCon -> Kind
 tyConKind FunTyCon 			 = kind2
 tyConKind (DataTyCon _ _ kind _ _ _ _ _) = kind
 tyConKind (PrimTyCon _ _ kind)		 = kind
-
-tyConKind (SpecTyCon tc tys)
-  = spec (tyConKind tc) tys
-   where
-    spec kind []	      = kind
-    spec kind (Just _  : tys) = spec (resultKind kind) tys
-    spec kind (Nothing : tys) =
-      argKind kind `mkArrowKind` spec (resultKind kind) tys
+tyConKind (SynTyCon _ _ k _ _ _)	 = k
 
 tyConKind (TupleTyCon _ _ n)
   = mkArrow n
@@ -177,6 +169,14 @@ tyConKind (TupleTyCon _ _ n)
     mkArrow 1 = kind1
     mkArrow 2 = kind2
     mkArrow n = mkBoxedTypeKind `mkArrowKind` mkArrow (n-1)
+
+tyConKind (SpecTyCon tc tys)
+  = spec (tyConKind tc) tys
+   where
+    spec kind []	      = kind
+    spec kind (Just _  : tys) = spec (resultKind kind) tys
+    spec kind (Nothing : tys) =
+      argKind kind `mkArrowKind` spec (resultKind kind) tys
 \end{code}
 
 \begin{code}
@@ -297,11 +297,13 @@ instance Ord3 TyCon where
     where
       tag1 = tag_TyCon other_1
       tag2 = tag_TyCon other_2
+
       tag_TyCon FunTyCon    		    = ILIT(1)
       tag_TyCon (DataTyCon _ _ _ _ _ _ _ _) = ILIT(2)
       tag_TyCon (TupleTyCon _ _ _)	    = ILIT(3)
       tag_TyCon (PrimTyCon  _ _ _)	    = ILIT(4)
       tag_TyCon (SpecTyCon  _ _) 	    = ILIT(5)
+      tag_TyCon (SynTyCon _ _ _ _ _ _)	    = ILIT(6)
 
 instance Eq TyCon where
     a == b = case (a `cmp` b) of { EQ_ -> True;   _ -> False }
@@ -333,9 +335,9 @@ instance NamedThing TyCon where
     getName tc				= panic "TyCon.getName"
 
 {- LATER:
-    getName (SpecTyCon tc tys) = let (m,n) = getOrigName tc in
+    getName (SpecTyCon tc tys) = let (m,n) = moduleNamePair tc in
        			     (m, n _APPEND_ specMaybeTysSuffix tys)
-    getName	other_tc           = getOrigName (expectJust "tycon1" (getName other_tc))
+    getName	other_tc           = moduleNamePair (expectJust "tycon1" (getName other_tc))
     getName other			     = Nothing
 -}
 \end{code}

@@ -38,7 +38,7 @@ import Kind		( Kind(..) )
 import CStrings		( identToC )
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( maybeToBool )
-import Name		( isAvarop, isPreludeDefined, getOrigName,
+import Name		( isLexVarSym, isPreludeDefined, origName, moduleOf,
 			  Name{-instance Outputable-}
 			)
 import Outputable	( ifPprShowAll, interpp'SP )
@@ -173,7 +173,9 @@ ppr_ty sty env ctxt_prec (DictTy clas ty usage)
 
 -- Some help functions
 ppr_corner sty env ctxt_prec (TyConTy FunTyCon usage) arg_tys
-  = ASSERT(length arg_tys == 2)
+  | length arg_tys == 2
+  = (if length arg_tys /= 2 then pprTrace "ppr_corner:" (ppCat (map (ppr_ty sty env ctxt_prec) arg_tys)) else id) $
+    ASSERT(length arg_tys == 2)
     ppr_ty sty env ctxt_prec (FunTy ty1 ty2 usage)
   where
     (ty1:ty2:_) = arg_tys
@@ -317,13 +319,7 @@ pprTyCon sty (TupleTyCon _ name _)      = ppr sty name
 pprTyCon sty (PrimTyCon uniq name kind) = ppr sty name
 
 pprTyCon sty tycon@(DataTyCon uniq name kind tyvars ctxt cons derivings nd)
-  = case sty of
-      PprDebug   -> pp_tycon_and_uniq
-      PprShowAll -> pp_tycon_and_uniq
-      _	    	 -> pp_tycon
-  where
-    pp_tycon_and_uniq = ppBesides [pp_tycon, ppChar '.', pprUnique uniq]
-    pp_tycon 	      = ppr sty name
+  = ppr sty name
 
 pprTyCon sty (SpecTyCon tc ty_maybes)
   = ppBeside (pprTyCon sty tc)
@@ -364,7 +360,7 @@ ppr_class_op sty tyvars (ClassOp op_name i ty)
       _		    -> pp_user
   where
     pp_C    = ppPStr op_name
-    pp_user = if isAvarop op_name
+    pp_user = if isLexVarSym op_name
 	      then ppBesides [ppLparen, pp_C, ppRparen]
 	      else pp_C
 \end{code}
@@ -395,7 +391,7 @@ getTypeString ty
 	  Just (tycon,_) ->
 	    if isPreludeDefined tycon
 	    then true_bottom
-	    else (False, fst (getOrigName tycon))
+	    else (False, moduleOf (origName tycon))
 
     true_bottom = (True, panic "getTypeString")
 
@@ -507,7 +503,7 @@ pprTyCon sty@PprInterface this_tycon@(DataTyCon u n k vs ctxt cons derivings dat
 	  = let
 		(_, _, con_arg_tys, _) = dataConSig con
 	    in
-	    ppCat [pprNonOp PprForUser con, -- the data con's name...
+	    ppCat [pprNonSym PprForUser con, -- the data con's name...
 		   ppIntersperse ppSP (map (ppr_ty sty lookup_fn tYCON_PREC) con_arg_tys)]
 
     	ppr_next_con con = ppCat [ppChar '|', ppr_con con]

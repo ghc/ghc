@@ -26,9 +26,9 @@ One per \tr{import} declaration in a module.
 \begin{code}
 data ImportDecl name
   = ImportDecl	  Module			-- module name
-		  Bool				-- qualified?
+		  Bool				-- True => qualified
 		  (Maybe Module)		-- as Module
-		  (Maybe (Bool, [IE name]))	-- (hiding?, names)
+		  (Maybe (Bool, [IE name]))	-- (True => hiding, names)
 		  SrcLoc
 \end{code}
 
@@ -60,7 +60,7 @@ instance (Outputable name) => Outputable (ImportDecl name) where
 \begin{code}
 data IE name
   = IEVar		name
-  | IEThingAbs          name		-- Constructor/Type/Class (can't tell)
+  | IEThingAbs          name		-- Class/Type (can't tell)
   | IEThingAll          name		-- Class/Type plus all methods/constructors
   | IEThingWith		name [name]	-- Class/Type plus some methods/constructors
   | IEModuleContents    Module		-- (Export Only)

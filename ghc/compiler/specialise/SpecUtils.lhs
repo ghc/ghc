@@ -33,11 +33,12 @@ import Id		( idType, isDictFunId, isConstMethodId_maybe,
 			  GenId {-instance NamedThing -}
 			)
 import Maybes		( maybeToBool, catMaybes, firstJust )
-import Name		( isAvarop, pprNonOp, getOrigName )
+import Name		( isLexVarSym, pprNonSym, moduleNamePair )
 import PprStyle		( PprStyle(..) )
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
 			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar
 			)
+import PrelMods		( fromPrelude, pRELUDE )
 import Pretty		-- plenty of it
 import TyCon		( tyConTyVars, TyCon{-instance NamedThing-} )
 import Type		( splitSigmaTy, mkTyVarTy, mkForAllTys,
@@ -234,21 +235,18 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 
       | isDictFunId id || maybeToBool (isConstMethodId_maybe id)
       = let get_mod = getInstIdModule id
-	    use_mod = if from_prelude get_mod
-		      then SLIT("Prelude")
+	    use_mod = if fromPrelude get_mod
+		      then pRELUDE
 		      else get_mod
 	in (use_mod, _NIL_)
 
       | otherwise
-      = getOrigName id
+      = moduleNamePair id
 
     get_ty_data (ty, tys)
       = (mod_name, [(ty_name, ty, tys)])
       where
-	(mod_name,ty_name) = getOrigName ty
-
-    from_prelude mod
-      = SLIT("Prelude") == (_SUBSTR_ mod 0 6)
+	(mod_name,ty_name) = moduleNamePair ty
 
     module_names    = concat [keysFM idspecs_fm, keysFM tyspecs_fm]
     mods            = map head (equivClasses _CMP_STRING_ module_names)
@@ -259,7 +257,7 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 			    EQ_   -> ([_NIL_], tail mods)
 			    other -> ([], mods)
 
-    (prels, others) = partition from_prelude known
+    (prels, others) = partition fromPrelude known
     use_modules     = unks ++ prels ++ others
 
     pp_module_specs :: FAST_STRING -> Pretty
@@ -291,7 +289,7 @@ pp_tyspec :: PprStyle -> Pretty -> (FAST_STRING, TyCon, [Maybe Type]) -> Pretty
 pp_tyspec sty pp_mod (_, tycon, tys)
   = ppCat [pp_mod,
 	   ppStr "{-# SPECIALIZE", ppStr "data",
-	   pprNonOp PprForUser tycon, ppCat (map (pprParendGenType sty) spec_tys),
+	   pprNonSym PprForUser tycon, ppCat (map (pprParendGenType sty) spec_tys),
 	   ppStr "#-}", ppStr "{- Essential -}"
 	   ]
   where
@@ -315,7 +313,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   | is_const_method_id
   = let
 	Just (cls, clsty, clsop) = const_method_maybe
-    	(_, cls_str) = getOrigName cls
+    	(_, cls_str) = moduleNamePair cls
 	clsop_str    = getClassOpString clsop
     in
     ppCat [pp_mod,
@@ -329,7 +327,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   | is_default_method_id
   = let
 	Just (cls, clsop, _) = default_method_maybe
-    	(_, cls_str) = getOrigName cls
+    	(_, cls_str) = moduleNamePair cls
 	clsop_str    = getClassOpString clsop
     in
     ppCat [pp_mod,
@@ -343,7 +341,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   | otherwise
   = ppCat [pp_mod,
 	   ppStr "{-# SPECIALIZE",
-	   pprNonOp PprForUser id, ppStr "::",
+	   pprNonSym PprForUser id, ppStr "::",
 	   pprGenType sty spec_ty,
 	   ppStr "#-}", pp_essential ]
   where
@@ -356,7 +354,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
     default_method_maybe = isDefaultMethodId_maybe id
     is_default_method_id = maybeToBool default_method_maybe
 
-    pp_clsop str | isAvarop str
+    pp_clsop str | isLexVarSym str
     	         = ppBesides [ppLparen, ppPStr str, ppRparen]
     	         | otherwise
 		 = ppPStr str

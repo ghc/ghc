@@ -22,7 +22,7 @@ import HsTypes		( PolyType )
 
 --others:
 import Id		( DictVar(..), Id(..), GenId )
-import Name		( pprNonOp )
+import Name		( pprNonSym )
 import Outputable	( interpp'SP, ifnotPprForUser,
 			  Outputable(..){-instance * (,)-}
 			)
@@ -151,31 +151,31 @@ data Sig name
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (Sig name) where
     ppr sty (Sig var ty pragmas _)
-      = ppHang (ppCat [pprNonOp sty var, ppPStr SLIT("::")])
+      = ppHang (ppCat [pprNonSym sty var, ppPStr SLIT("::")])
 	     4 (ppHang (ppr sty ty)
 		     4 (ifnotPprForUser sty (ppr sty pragmas)))
 
     ppr sty (ClassOpSig var ty pragmas _)
-      = ppHang (ppCat [pprNonOp sty var, ppPStr SLIT("::")])
+      = ppHang (ppCat [pprNonSym sty var, ppPStr SLIT("::")])
 	     4 (ppHang (ppr sty ty)
 		     4 (ifnotPprForUser sty (ppr sty pragmas)))
 
     ppr sty (DeforestSig var _)
-      = ppHang (ppCat [ppStr "{-# DEFOREST", pprNonOp sty var])
+      = ppHang (ppCat [ppStr "{-# DEFOREST", pprNonSym sty var])
 		   4 (ppStr "#-}")
 
     ppr sty (SpecSig var ty using _)
-      = ppHang (ppCat [ppPStr SLIT("{-# SPECIALIZE"), pprNonOp sty var, ppPStr SLIT("::")])
+      = ppHang (ppCat [ppPStr SLIT("{-# SPECIALIZE"), pprNonSym sty var, ppPStr SLIT("::")])
 	     4 (ppCat [ppr sty ty, pp_using using, ppPStr SLIT("#-}")])
       where
 	pp_using Nothing   = ppNil
 	pp_using (Just me) = ppCat [ppChar '=', ppr sty me]
 
     ppr sty (InlineSig var _)
-      = ppCat [ppPStr SLIT("{-# INLINE"), pprNonOp sty var, ppPStr SLIT("#-}")]
+      = ppCat [ppPStr SLIT("{-# INLINE"), pprNonSym sty var, ppPStr SLIT("#-}")]
 
     ppr sty (MagicUnfoldingSig var str _)
-      = ppCat [ppPStr SLIT("{-# MAGIC_UNFOLDING"), pprNonOp sty var, ppPStr str, ppPStr SLIT("#-}")]
+      = ppCat [ppPStr SLIT("{-# MAGIC_UNFOLDING"), pprNonSym sty var, ppPStr str, ppPStr SLIT("#-}")]
 \end{code}
 
 %************************************************************************
@@ -264,11 +264,11 @@ instance (NamedThing id, Outputable id, Outputable pat,
       = ppHang (ppr sty pat) 4 (pprGRHSsAndBinds sty False grhss_n_binds)
 
     ppr sty (FunMonoBind fun inf matches locn)
-      = pprMatches sty (False, pprNonOp sty fun) matches
+      = pprMatches sty (False, pprNonSym sty fun) matches
       -- ToDo: print infix if appropriate
 
     ppr sty (VarMonoBind name expr)
-      = ppHang (ppCat [pprNonOp sty name, ppEquals]) 4 (ppr sty expr)
+      = ppHang (ppCat [pprNonSym sty name, ppEquals]) 4 (ppr sty expr)
 \end{code}
 
 %************************************************************************

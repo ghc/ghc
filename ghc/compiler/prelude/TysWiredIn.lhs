@@ -87,6 +87,13 @@ module TysWiredIn (
 
     ) where
 
+--ToDo:rm
+--import Pretty
+--import Util
+--import PprType
+--import PprStyle
+--import Kind
+
 import Ubiq
 import TyLoop		( mkDataCon, StrictnessMark(..) )
 
@@ -105,7 +112,7 @@ import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
 import Type		( mkTyConTy, applyTyCon, mkSynTy, mkSigmaTy,
 			  mkFunTys, maybeAppDataTyCon,
 			  GenType(..), ThetaType(..), TauType(..) )
-import TyVar		( getTyVarKind, alphaTyVar, betaTyVar )
+import TyVar		( tyVarKind, alphaTyVar, betaTyVar )
 import Unique
 import Util		( assoc, panic )
 
@@ -121,7 +128,7 @@ pcDataTyCon key mod str tyvars cons
 		tyvars [{-no context-}] cons [{-no derivings-}]
 		DataType
   where
-    tycon_kind = foldr (mkArrowKind . getTyVarKind) mkBoxedTypeKind tyvars
+    tycon_kind = foldr (mkArrowKind . tyVarKind) mkBoxedTypeKind tyvars
 
 pcDataCon :: Unique{-DataConKey-} -> Module -> FAST_STRING
 	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> SpecEnv -> Id
@@ -433,11 +440,14 @@ This is really just an ordinary synonym, except it is ABSTRACT.
 mkStateTransformerTy s a = mkSynTy stTyCon [s, a]
 
 stTyCon
-  = mkSynTyCon
+  = let
+	ty = mkFunTys [mkStateTy alphaTy] (mkTupleTy 2 [betaTy, mkStateTy alphaTy])
+    in
+    mkSynTyCon
      (mkBuiltinName stTyConKey gLASGOW_ST SLIT("_ST"))
-     (panic "TysWiredIn.stTyCon:Kind")
+     (mkBoxedTypeKind `mkArrowKind` (mkBoxedTypeKind `mkArrowKind` mkBoxedTypeKind))
      2 [alphaTyVar, betaTyVar]
-     (mkFunTys [mkStateTy alphaTy] (mkTupleTy 2 [betaTy, mkStateTy alphaTy]))
+     ty
 \end{code}
 
 %************************************************************************
@@ -452,10 +462,14 @@ stTyCon
 mkPrimIoTy a = mkSynTy primIoTyCon [a]
 
 primIoTyCon
-  = mkSynTyCon
+  = let
+	ty = mkStateTransformerTy realWorldTy alphaTy
+    in
+--  pprTrace "primIOTyCon:" (ppCat [pprType PprDebug ty, ppr PprDebug (typeKind ty)]) $
+    mkSynTyCon
      (mkBuiltinName primIoTyConKey pRELUDE_PRIMIO SLIT("PrimIO"))
-     (panic "TysWiredIn.primIoTyCon:Kind")
-     1 [alphaTyVar] (mkStateTransformerTy realWorldTy alphaTy)
+     (mkBoxedTypeKind `mkArrowKind` mkBoxedTypeKind)
+     1 [alphaTyVar] ty
 \end{code}
 
 %************************************************************************

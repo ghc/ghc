@@ -6,7 +6,7 @@
 \begin{code}
 #include "HsVersions.h"
 
-module RnSource ( rnSource, rnPolyType ) where
+module RnSource ( rnSource, rnTyDecl, rnClassDecl, rnInstDecl, rnPolyType ) where
 
 import Ubiq
 import RnLoop		-- *check* the RnPass/RnExpr/RnBinds loop-breaking
@@ -17,18 +17,23 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnBinds		( rnTopBinds, rnMethodBinds )
+import RnUtils		( lubExportFlag )
 
-import Bag		( emptyBag, unitBag, consBag, unionManyBags, listToBag, bagToList )
+import Bag		( emptyBag, unitBag, consBag, unionManyBags, unionBags, listToBag, bagToList )
 import Class		( derivableClassKeys )
+import FiniteMap	( emptyFM, lookupFM, addListToFM_C )
 import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
-import Name		( Name, isLocallyDefined, isAvarid, getLocalName, ExportFlag(..), RdrName )
+import Name		( Name, isLocallyDefined, isLexVarId, getLocalName, ExportFlag(..), 
+			  nameImportFlag, RdrName, pprNonSym )
+import Outputable -- ToDo:rm
+import PprStyle -- ToDo:rm 
 import Pretty
 import SrcLoc		( SrcLoc )
 import Unique		( Unique )
-import UniqFM		( addListToUFM, listToUFM )
+import UniqFM		( emptyUFM, addListToUFM, addListToUFM_C, listToUFM, lookupUFM, eltsUFM )
 import UniqSet		( UniqSet(..) )
-import Util		( isIn, isn'tIn, sortLt, panic, assertPanic )
+import Util		( isIn, isn'tIn, sortLt, removeDups, cmpPString, panic, assertPanic, pprTrace{-ToDo:rm-} )
 
 \end{code}
 
@@ -48,8 +53,8 @@ Checks the (..) etc constraints in the export list.
 
 \begin{code}
 rnSource :: [Module]
-         -> Bag (Module,(RnName,ExportFlag))	-- unqualified imports from module
-	 -> Bag RenamedFixityDecl		-- fixity info for imported names
+	 -> Bag (Module,RnName)		-- unqualified imports from module
+	 -> Bag RenamedFixityDecl	-- fixity info for imported names
 	 -> RdrNameHsModule
 	 -> RnM s (RenamedHsModule,
 		   Name -> ExportFlag,		-- export info
@@ -95,8 +100,8 @@ rnSource imp_mods unqual_imps imp_fixes
 	      occ_info
 	     )
   where
-    trashed_exports = trace "rnSource:trashed_exports" Nothing
-    trashed_imports = trace "rnSource:trashed_imports" []
+    trashed_exports = {-trace "rnSource:trashed_exports"-} Nothing
+    trashed_imports = {-trace "rnSource:trashed_imports"-} []
 \end{code}
 
 
@@ -108,7 +113,7 @@ rnSource imp_mods unqual_imps imp_fixes
 
 \begin{code}
 rnExports :: [Module]
-	  -> Bag (Module,(RnName,ExportFlag))
+	  -> Bag (Module,RnName)
 	  -> Maybe [RdrNameIE]
 	  -> RnM s (Name -> ExportFlag)
 
@@ -118,26 +123,54 @@ rnExports mods unqual_imps Nothing
 rnExports mods unqual_imps (Just exps)
   = mapAndUnzipRn (rnIE mods) exps `thenRn` \ (mod_maybes, exp_bags) ->
     let 
+        exp_names = bagToList (unionManyBags exp_bags)
         exp_mods  = catMaybes mod_maybes
-        exp_names = unionManyBags exp_bags
 
-	-- check for duplicate names
-	-- check for duplicate modules
+	-- Warn for duplicate names and modules
+	(uniq_exp_names, dup_names) = removeDups cmp_fst exp_names
+	(uniq_exp_mods,  dup_mods)  = removeDups cmpPString exp_mods
+	cmp_fst (x,_) (y,_) = x `cmp` y
 
-	-- check for duplicate local names
-	-- add in module contents checking for duplicate local names
+	-- Build finite map of exported names to export flag
+	exp_map0 = addListToUFM_C lub_expflag emptyUFM (map pair_fst uniq_exp_names)
+	exp_map1 = foldl add_mod_names exp_map0 uniq_exp_mods
 
-	-- build export flag lookup function
-	exp_fn n = if isLocallyDefined n then ExportAll else NotExported
+	mod_fm = addListToFM_C unionBags emptyFM
+		 [(mod, unitBag (getName rn, nameImportFlag (getName rn)))
+		  | (mod,rn) <- bagToList unqual_imps]
+
+        add_mod_names exp_map mod
+	  = case lookupFM mod_fm mod of
+	      Nothing        -> exp_map
+	      Just mod_names -> addListToUFM_C lub_expflag exp_map (map pair_fst (bagToList mod_names))
+
+	pair_fst p@(f,_) = (f,p)
+	lub_expflag (n, flag1) (_, flag2) = (n, lubExportFlag flag1 flag2)
+
+	-- Check for exporting of duplicate local names
+	exp_locals = [(getLocalName n, n) | (n,_) <- eltsUFM exp_map1]
+	(_, dup_locals) = removeDups cmp_local exp_locals
+	cmp_local (x,_) (y,_) = x `cmpPString` y
+
+
+	-- Build export flag function
+	exp_fn n = case lookupUFM exp_map1 n of
+		     Nothing       -> NotExported
+		     Just (_,flag) -> flag
     in
+    getSrcLocRn 						`thenRn` \ src_loc ->
+    mapRn (addWarnRn . dupNameExportWarn   src_loc) dup_names 	`thenRn_`
+    mapRn (addWarnRn . dupModuleExportWarn src_loc) dup_mods 	`thenRn_`
+    mapRn (addErrRn  . dupLocalsExportErr  src_loc) dup_locals 	`thenRn_`
     returnRn exp_fn
+
 
 rnIE mods (IEVar name)
   = lookupValue name	`thenRn` \ rn ->
     checkIEVar rn	`thenRn` \ exps ->
     returnRn (Nothing, exps)
   where
-    checkIEVar (RnName n)         = returnRn (unitBag (n,ExportAbs))
+    checkIEVar (RnName n)         = returnRn (unitBag (n,ExportAll))
     checkIEVar (RnUnbound _)      = returnRn emptyBag
     checkIEVar rn@(RnClassOp _ _) = getSrcLocRn `thenRn` \ src_loc ->
 			            failButContinueRn emptyBag (classOpExportErr rn src_loc)
@@ -157,6 +190,7 @@ rnIE mods (IEThingAbs name)
 rnIE mods (IEThingAll name)
   = lookupTyConOrClass name	`thenRn` \ rn ->
     checkIEAll rn		`thenRn` \ exps ->
+    checkImportAll rn           `thenRn_`
     returnRn (Nothing, exps)
   where
     checkIEAll (RnData n cons) = returnRn (consBag (exp_all n) (listToBag (map exp_all cons)))
@@ -172,6 +206,7 @@ rnIE mods (IEThingWith name names)
   = lookupTyConOrClass name	`thenRn` \ rn ->
     mapRn lookupValue names	`thenRn` \ rns ->
     checkIEWith rn rns		`thenRn` \ exps ->
+    checkImportAll rn    	`thenRn_`
     returnRn (Nothing, exps)
   where
     checkIEWith rn@(RnData n cons) rns
@@ -196,9 +231,18 @@ rnIE mods (IEThingWith name names)
 	failButContinueRn emptyBag (withExportErr str rn has rns src_loc)
 
 rnIE mods (IEModuleContents mod)
-  | isIn "IEModule" mod mods = returnRn (Just mod, emptyBag)
-  | otherwise                = getSrcLocRn `thenRn` \ src_loc ->
-			       failButContinueRn (Nothing,emptyBag) (badModExportErr mod src_loc)
+  | isIn "rnIE:IEModule" mod mods
+  = returnRn (Just mod, emptyBag)
+  | otherwise
+  = getSrcLocRn `thenRn` \ src_loc ->
+    failButContinueRn (Nothing,emptyBag) (badModExportErr mod src_loc)
+
+
+checkImportAll rn 
+  = case nameImportFlag (getName rn) of
+      ExportAll -> returnRn ()
+      exp	-> getSrcLocRn `thenRn` \ src_loc ->
+		   addErrRn (importAllErr rn src_loc)
 \end{code}
 
 %*********************************************************
@@ -312,9 +356,9 @@ rnConDecls tv_env con_decls
 \end{code}
 
 %*********************************************************
-%*							*
+%*							 *
 \subsection{SPECIALIZE data pragmas}
-%*							*
+%*							 *
 %*********************************************************
 
 \begin{code}
@@ -324,12 +368,14 @@ rnSpecDataSig :: RdrNameSpecDataSig
 rnSpecDataSig (SpecDataSig tycon ty src_loc)
   = pushSrcLocRn src_loc $
     let
-	tyvars = extractMonoTyNames ty
+	tyvars = extractMonoTyNames is_tyvar_name ty
     in
     mkTyVarNamesEnv src_loc tyvars     	`thenRn` \ (tv_env,_) ->
     lookupTyCon tycon			`thenRn` \ tycon' ->
     rnMonoType tv_env ty		`thenRn` \ ty' ->
     returnRn (SpecDataSig tycon' ty' src_loc)
+
+is_tyvar_name n = isLexVarId (getLocalName n)
 \end{code}
 
 %*********************************************************
@@ -444,7 +490,7 @@ rnSpecInstSig :: RdrNameSpecInstSig
 rnSpecInstSig (SpecInstSig clas ty src_loc)
   = pushSrcLocRn src_loc $
     let
-	tyvars = extractMonoTyNames ty
+	tyvars = extractMonoTyNames is_tyvar_name ty
     in
     mkTyVarNamesEnv src_loc tyvars     	`thenRn` \ (tv_env,_) ->
     lookupClass clas			`thenRn` \ new_clas ->
@@ -518,17 +564,13 @@ rnPolyType :: TyVarNamesEnv
 rnPolyType tv_env (HsForAllTy tvs ctxt ty)
   = rn_poly_help tv_env tvs ctxt ty
 
-rnPolyType tv_env poly_ty@(HsPreForAllTy ctxt ty)
+rnPolyType tv_env (HsPreForAllTy ctxt ty)
   = rn_poly_help tv_env forall_tyvars ctxt ty
   where
-    mentioned_tyvars = extract_poly_ty_names poly_ty
-    forall_tyvars    = mentioned_tyvars `minusList` domTyVarNamesEnv tv_env
-
-------------
-extract_poly_ty_names (HsPreForAllTy ctxt ty)
-  = extractCtxtTyNames ctxt
-    `unionLists`
-    extractMonoTyNames ty
+    mentioned_tyvars = extractCtxtTyNames ctxt `unionLists` extractMonoTyNames is_tyvar_name ty
+    forall_tyvars    = --pprTrace "mentioned:" (ppCat (map (ppr PprShowAll) mentioned_tyvars)) $
+		       --pprTrace "from_ty:" (ppCat (map (ppr PprShowAll) (extractMonoTyNames is_tyvar_name ty))) $
+		       mentioned_tyvars `minusList` domTyVarNamesEnv tv_env
 
 ------------
 rn_poly_help :: TyVarNamesEnv
@@ -538,12 +580,17 @@ rn_poly_help :: TyVarNamesEnv
 	     -> RnM_Fixes s RenamedPolyType
 
 rn_poly_help tv_env tyvars ctxt ty
-  = getSrcLocRn 				`thenRn` \ src_loc ->
+  = --pprTrace "rnPolyType:" (ppCat [ppCat (map (ppr PprShowAll . snd) tv_env),
+    --				   ppStr ";tvs=", ppCat (map (ppr PprShowAll) tyvars),
+    --				   ppStr ";ctxt=", ppCat (map (ppr PprShowAll) ctxt),
+    --				   ppStr ";ty=", ppr PprShowAll ty]
+    --			   ) $
+    getSrcLocRn 				`thenRn` \ src_loc ->
     mkTyVarNamesEnv src_loc tyvars	 	`thenRn` \ (tv_env1, new_tyvars) ->
     let
 	tv_env2 = catTyVarNamesEnvs tv_env1 tv_env
     in
-    rnContext tv_env2 ctxt			`thenRn` \ new_ctxt ->
+    rnContext tv_env2 ctxt	`thenRn` \ new_ctxt ->
     rnMonoType tv_env2 ty	`thenRn` \ new_ty ->
     returnRn (HsForAllTy new_tyvars new_ctxt new_ty)
 \end{code}
@@ -571,11 +618,11 @@ rnMonoType  tv_env (MonoTupleTy tys)
 
 rnMonoType tv_env (MonoTyApp name tys)
   = let
-	lookup_fn = if isAvarid (getLocalName name) 
+	lookup_fn = if isLexVarId (getLocalName name) 
 		    then lookupTyVarName tv_env
   	            else lookupTyCon
     in
-    lookup_fn name					`thenRn` \ name' ->
+    lookup_fn name			`thenRn` \ name' ->
     mapRn (rnMonoType tv_env) tys	`thenRn` \ tys' ->
     returnRn (MonoTyApp name' tys')
 \end{code}
@@ -594,6 +641,18 @@ rnContext tv_env ctxt
 
 
 \begin{code}
+dupNameExportWarn locn names@((n,_):_) sty
+  = ppHang (ppCat [pprNonSym sty n, ppStr "exported", ppInt (length names), ppStr "times:"])
+	 4 (ppr sty locn)
+
+dupModuleExportWarn locn mods@(mod:_) sty
+  = ppHang (ppCat [ppStr "module", ppPStr mod, ppStr "appears", ppInt (length mods), ppStr "times in export list:"])
+	 4 (ppr sty locn)
+
+dupLocalsExportErr locn locals@((str,_):_) sty
+  = ppHang (ppBesides [ppStr "Exported names have same local name `", ppPStr str, ppStr "': ", ppr sty locn])
+	 4 (ppInterleave ppSP (map (pprNonSym sty . snd) locals))
+
 classOpExportErr op locn sty 
   = ppHang (ppStr "Class operation can only be exported with class:")
          4 (ppCat [ppr sty op, ppr sty locn])
@@ -606,6 +665,10 @@ withExportErr str rn has rns locn sty
   = ppHang (ppBesides [ppStr "Inconsistent list of ", ppStr str, ppStr ": ", ppr sty locn])
          4 (ppAbove (ppCat [ppStr "expected:", ppInterleave ppComma (map (ppr sty) has)])
 		    (ppCat [ppStr "found:   ", ppInterleave ppComma (map (ppr sty) rns)]))
+
+importAllErr rn locn sty
+  = ppHang (ppCat [pprNonSym sty rn, ppStr "exported concretely but only imported abstractly"])
+         4 (ppr sty locn)
 
 badModExportErr mod locn sty
   = ppHang (ppStr "Unknown module in export list:")

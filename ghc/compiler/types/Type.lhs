@@ -31,10 +31,8 @@ module Type (
 
 	isTauTy,
 
-	tyVarsOfType, tyVarsOfTypes, getTypeKind
-
-
-) where
+	tyVarsOfType, tyVarsOfTypes, typeKind
+    ) where
 
 import Ubiq
 import IdLoop	 -- for paranoia checking
@@ -49,9 +47,9 @@ import PrelLoop  -- for paranoia checking
 -- friends:
 import Class	( getClassSig, getClassOpLocalType, GenClass{-instances-} )
 import Kind	( mkBoxedTypeKind, resultKind )
-import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon, isPrimTyCon, isDataTyCon, tyConArity,
+import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon, isPrimTyCon, isDataTyCon, isSynTyCon, tyConArity,
 		  tyConKind, tyConDataCons, getSynTyConDefn, TyCon )
-import TyVar	( getTyVarKind, GenTyVar{-instances-}, GenTyVarSet(..),
+import TyVar	( tyVarKind, GenTyVar{-instances-}, GenTyVarSet(..),
 		  emptyTyVarSet, unionTyVarSets, minusTyVarSet,
 		  unitTyVarSet, nullTyVarEnv, lookupTyVarEnv,
 		  addOneToTyVarEnv, TyVarEnv(..) )
@@ -80,7 +78,7 @@ data GenType tyvar uvar	-- Parameterised over type and usage variables
 	(GenType tyvar uvar)
 
   | TyConTy 	-- Constants of a specified kind
-	TyCon 
+	TyCon 	-- Must *not* be a SynTyCon
 	(GenUsage uvar)	-- Usage gives uvar of the full application,
 			-- iff the full application is of kind Type
 			-- c.f. the Usage field in TyVars
@@ -146,7 +144,7 @@ expandTy (DictTy clas ty u)
 
 		-- A tuple of 'em
 		-- Note: length of all_arg_tys can be 0 if the class is
-		--       _CCallable, _CReturnable (and anything else
+		--       CCallable, CReturnable (and anything else
 		--       *really weird* that the user writes).
   where
     (tyvar, super_classes, ops) = getClassSig clas
@@ -227,10 +225,14 @@ splitFunTy t = go t []
 
 \begin{code}
 -- NB applyTyCon puts in usageOmega, for now at least
-mkTyConTy tycon = TyConTy tycon usageOmega
+mkTyConTy tycon
+  = ASSERT(not (isSynTyCon tycon))
+    TyConTy tycon usageOmega
 
 applyTyCon :: TyCon -> [GenType t u] -> GenType t u
-applyTyCon tycon tys = foldl AppTy (TyConTy tycon usageOmega) tys
+applyTyCon tycon tys
+  = ASSERT (not (isSynTyCon tycon))
+    foldl AppTy (TyConTy tycon usageOmega) tys
 
 getTyCon_maybe :: GenType t u -> Maybe TyCon
 getTyCon_maybe (TyConTy tycon _) = Just tycon
@@ -240,7 +242,8 @@ getTyCon_maybe other_ty		 = Nothing
 
 \begin{code}
 mkSynTy syn_tycon tys
-  = SynTy syn_tycon tys (instantiateTauTy (zipEqual tyvars tys) body)
+  = ASSERT(isSynTyCon syn_tycon)
+    SynTy syn_tycon tys (instantiateTauTy (zipEqual tyvars tys) body)
   where
     (tyvars, body) = getSynTyConDefn syn_tycon
 \end{code}
@@ -405,15 +408,15 @@ mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkRhoTy theta tau)
 Finding the kind of a type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-getTypeKind :: GenType (GenTyVar any) u -> Kind
-getTypeKind (TyVarTy tyvar) 		= getTyVarKind tyvar
-getTypeKind (TyConTy tycon usage)	= tyConKind tycon
-getTypeKind (SynTy _ _ ty)		= getTypeKind ty
-getTypeKind (FunTy fun arg _)		= mkBoxedTypeKind
-getTypeKind (DictTy clas arg _)	 	= mkBoxedTypeKind
-getTypeKind (AppTy fun arg)		= resultKind (getTypeKind fun)
-getTypeKind (ForAllTy _ _)		= mkBoxedTypeKind
-getTypeKind (ForAllUsageTy _ _ _)	= mkBoxedTypeKind
+typeKind :: GenType (GenTyVar any) u -> Kind
+typeKind (TyVarTy tyvar) 	= tyVarKind tyvar
+typeKind (TyConTy tycon usage)	= tyConKind tycon
+typeKind (SynTy _ _ ty)		= typeKind ty
+typeKind (FunTy fun arg _)	= mkBoxedTypeKind
+typeKind (DictTy clas arg _)	= mkBoxedTypeKind
+typeKind (AppTy fun arg)	= resultKind (typeKind fun)
+typeKind (ForAllTy _ _)		= mkBoxedTypeKind
+typeKind (ForAllUsageTy _ _ _)	= mkBoxedTypeKind
 \end{code}
 
 

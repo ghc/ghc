@@ -8,15 +8,25 @@
 
 module Rename ( renameModule ) where
 
-import PreludeGlaST	( thenPrimIO, returnPrimIO, fixPrimIO, newVar, MutableVar(..) )
+import PreludeGlaST	( thenPrimIO, newVar, MutableVar(..) )
 
 import Ubiq
 
 import HsSyn
 import RdrHsSyn		( RdrNameHsModule(..), RdrNameImportDecl(..) )
-import RnHsSyn		( RnName, RenamedHsModule(..), isRnTyCon, isRnClass )
+import RnHsSyn		( RnName, RenamedHsModule(..), isRnTyConOrClass, isRnWired )
 
-import ParseIface	( ParsedIface )
+--ToDo:rm: all for debugging only
+import Maybes
+import Name
+import Outputable
+import RnIfaces
+import PprStyle
+import Pretty
+import FiniteMap
+import Util (pprPanic, pprTrace)
+
+import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..) )
 import RnMonad
 import RnNames		( getGlobalNames, GlobalNameInfo(..) )
 import RnSource		( rnSource )
@@ -24,12 +34,14 @@ import RnIfaces		( findHiFiles, rnIfaces, finalIfaceInfo, VersionInfo(..) )
 import RnUtils		( extendGlobalRnEnv, emptyRnEnv, multipleOccWarn )
 import MainMonad
 
-import Bag		( isEmptyBag, unionBags, bagToList, listToBag )
+import Bag		( isEmptyBag, unionBags, unionManyBags, bagToList, listToBag )
 import CmdLineOpts	( opt_HiDirList, opt_SysHiDirList )
 import ErrUtils		( Error(..), Warning(..) )
-import FiniteMap	( emptyFM, eltsFM )
-import Name		( getOrigNameRdr, isLocallyDefined, Name, RdrName(..) )
+import FiniteMap	( emptyFM, eltsFM, fmToList, lookupFM{-ToDo:rm-} )
+import Maybes		( catMaybes )
+import Name		( isLocallyDefined, mkBuiltinName, Name, RdrName(..) )
 import PrelInfo		( BuiltinNames(..), BuiltinKeys(..) )
+import PrelMods		( pRELUDE )
 import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
 import UniqSupply	( splitUniqSupply )
 import Util		( panic, assertPanic )
@@ -41,18 +53,15 @@ renameModule :: BuiltinNames
 	     -> UniqSupply
 	     -> RdrNameHsModule
 
-	     -> MainIO
-		(
-		 RenamedHsModule,  -- output, after renaming
-		 [Module],	   -- imported modules; for profiling
+	     -> IO (RenamedHsModule, 	-- output, after renaming
+		    [Module],	   	-- imported modules; for profiling
 
-	         VersionInfo,      -- version info; for usage
-		 [Module],	   -- instance modules; for iface
+	            VersionInfo,      	-- version info; for usage
+		    [Module],	   	-- instance modules; for iface
 
-		 Bag Error,
-		 Bag Warning
-		)
-\end{code}
+		    Bag Error,
+		    Bag Warning)
+\end{code} 
 
 ToDo: May want to arrange to return old interface for this module!
 ToDo: Return OrigName RnEnv to rename derivings etc with.
@@ -63,10 +72,16 @@ ToDo: Deal with instances (instance version, this module on instance list ???)
 renameModule b_names b_keys us
    	     input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
 
-  = findHiFiles opt_HiDirList opt_SysHiDirList	`thenMn`     \ hi_files ->
-    newVar (emptyFM, hi_files)			`thenPrimIO` \ iface_var ->
+  = pprTrace "builtins:\n" (case b_names of { (builtin_ids, builtin_tcs) ->
+			    ppAboves [ ppCat (map ppPStr (keysFM builtin_ids))
+				     , ppCat (map ppPStr (keysFM builtin_tcs))
+				     , ppCat (map ppPStr (keysFM b_keys))
+				     ]}) $
 
-    fixPrimIO ( \ ~(_, _, _, _, rec_occ_fm, rec_export_fn) ->
+    findHiFiles opt_HiDirList opt_SysHiDirList	    >>=	         \ hi_files ->
+    newVar (emptyFM, hi_files){-init iface cache-}  `thenPrimIO` \ iface_cache ->
+
+    fixIO ( \ ~(_, _, _, _, rec_occ_fm, rec_export_fn) ->
     let
 	rec_occ_fn :: Name -> [RdrName]
 	rec_occ_fn n = case lookupUFM rec_occ_fm n of
@@ -75,17 +90,19 @@ renameModule b_names b_keys us
 
 	global_name_info = (b_names, b_keys, rec_export_fn, rec_occ_fn)
     in
-    getGlobalNames iface_var global_name_info us1 input
-		`thenPrimIO` \ (occ_env, imp_mods, unqual_imps, imp_fixes, top_errs, top_warns) ->
+    getGlobalNames iface_cache global_name_info us1 input >>=
+	\ (occ_env, imp_mods, unqual_imps, imp_fixes, top_errs, top_warns) ->
 
     if not (isEmptyBag top_errs) then
-	returnPrimIO (rn_panic, rn_panic, top_errs, top_warns, emptyUFM, rn_panic)
+	return (rn_panic, rn_panic, top_errs, top_warns, emptyUFM, rn_panic)
     else
 
     -- No top-level name errors so rename source ...
     case initRn True mod occ_env us2
 		(rnSource imp_mods unqual_imps imp_fixes input) of {
 	((rn_module, export_fn, src_occs), src_errs, src_warns) ->
+
+    --pprTrace "renameModule:" (ppCat (map (ppr PprDebug . fst) (bagToList src_occs))) $
 
     let
 	occ_fm :: UniqFM (RnName, [RdrName])
@@ -104,48 +121,135 @@ renameModule b_names b_keys us
 	multiple_occs (rn, (o1:o2:_)) = True
 	multiple_occs _               = False
     in
-    returnPrimIO (rn_module, imp_mods,
-		  top_errs  `unionBags` src_errs,
-		  top_warns `unionBags` src_warns `unionBags` listToBag occ_warns,
-		  occ_fm, export_fn)
+    return (rn_module, imp_mods,
+	    top_errs  `unionBags` src_errs,
+	    top_warns `unionBags` src_warns `unionBags` listToBag occ_warns,
+	    occ_fm, export_fn)
 
-    }) `thenPrimIO` \ (rn_module, imp_mods, errs_so_far, warns_so_far, occ_fm, _) ->
+    }) >>= \ (rn_module, imp_mods, errs_so_far, warns_so_far, occ_fm, _) ->
 
     if not (isEmptyBag errs_so_far) then
-	returnMn (rn_panic, rn_panic, rn_panic, rn_panic,
-		  errs_so_far, warns_so_far)
+	return (rn_panic, rn_panic, rn_panic, rn_panic, errs_so_far, warns_so_far)
     else
 
     -- No errors renaming source so rename the interfaces ...
     let
-        imports_used = [ rn | (rn,_) <- eltsUFM occ_fm, not (isLocallyDefined rn) ]
-	(import_tcs, import_vals) = partition (\ rn -> isRnTyCon rn || isRnClass rn) imports_used
+	-- split up all names that occurred in the source; between
+	-- those that are defined therein and those merely mentioned.
+	-- We also divide by tycon/class and value names (as usual).
 
-	(orig_env, orig_dups) = extendGlobalRnEnv emptyRnEnv (map pair_orig import_vals)
-						             (map pair_orig import_tcs)
-        pair_orig rn = (getOrigNameRdr rn, rn)
+	occ_rns = [ rn | (rn,_) <- eltsUFM occ_fm ]
+	-- all occurrence names, from this module and imported
 
-	-- ToDo: Do we need top-level names from this module in orig_env ???
+	(defined_here, defined_elsewhere)
+	  = partition isLocallyDefined occ_rns
+
+	(_, imports_used) = partition isRnWired defined_elsewhere
+
+	(def_tcs, def_vals) = partition isRnTyConOrClass defined_here
+	(occ_tcs, occ_vals) = partition isRnTyConOrClass occ_rns
+			-- the occ stuff includes *all* occurrences,
+			-- including those for which we have definitions
+
+	(orig_def_env, orig_def_dups)
+	  = extendGlobalRnEnv emptyRnEnv (map pair_orig def_vals)
+					 (map pair_orig def_tcs)
+	(orig_occ_env, orig_occ_dups)
+	  = extendGlobalRnEnv emptyRnEnv (map pair_orig occ_vals)
+					 (map pair_orig occ_tcs)
+
+        pair_orig rn = (origName rn, rn)
+
+	must_haves  -- everything in the BuiltinKey table; as we *may* need these
+		    -- later, we'd better bring their definitions in
+	  = catMaybes [ mk_key_name str name_fn u | (str, (u, name_fn)) <- fmToList b_keys ]
+	  where
+	    mk_key_name str name_fn u
+	      = -- this is emphatically *not* the Right Way to do this... (WDP 96/04)
+		if (str == SLIT("main") || str == SLIT("mainPrimIO")) then
+		    Nothing
+		else
+		    Just (name_fn (mkBuiltinName u pRELUDE str))
     in
-    ASSERT (isEmptyBag orig_dups)
-    rnIfaces iface_var orig_env us3 rn_module imports_used
-		`thenPrimIO` \ (rn_module_with_imports,
-				(implicit_val_fm, implicit_tc_fm),
-				iface_errs, iface_warns) ->
+    ASSERT (isEmptyBag orig_occ_dups)
+    ASSERT (isEmptyBag orig_def_dups)
+
+    rnIfaces iface_cache us3 orig_def_env orig_occ_env rn_module (imports_used ++ must_haves) >>=
+	\ (rn_module_with_imports, (implicit_val_fm, implicit_tc_fm), iface_errs, iface_warns) ->
+
     let
-        all_imports_used = imports_used ++ eltsFM implicit_tc_fm ++ eltsFM implicit_val_fm
+        all_imports_used = bagToList (unionManyBags [listToBag imports_used,
+						     listToBag (eltsFM implicit_tc_fm),
+						     listToBag (eltsFM implicit_val_fm)])
     in
-    finalIfaceInfo iface_var all_imports_used imp_mods
-		`thenPrimIO` \ (version_info, instance_mods) ->
+    finalIfaceInfo iface_cache all_imports_used imp_mods >>=
+	\ (version_info, instance_mods) ->
 
-    returnMn (rn_module_with_imports, imp_mods, 
-	      version_info, instance_mods, 
-	      errs_so_far  `unionBags` iface_errs,
-	      warns_so_far `unionBags` iface_warns)
-
+    return (rn_module_with_imports, imp_mods, version_info, instance_mods, 
+	    errs_so_far  `unionBags` iface_errs, warns_so_far `unionBags` iface_warns)
   where
     rn_panic = panic "renameModule: aborted with errors"
 
     (us1, us') = splitUniqSupply us
     (us2, us3) = splitUniqSupply us'
+\end{code}
+
+\begin{code}
+pprPIface (ParsedIface m v mv lcm exm ims lfx ltdm lvdm lids ldp)
+  = ppAboves [
+	ppCat [ppPStr SLIT("interface"), ppPStr m, ppInt v,
+	       case mv of { Nothing -> ppNil; Just n -> ppInt n }],
+
+	ppPStr SLIT("__versions__"),
+	ppAboves [ ppCat[ppPStr n, ppInt v] | (n,v) <- fmToList lcm ],
+
+	ppPStr SLIT("__exports__"),
+	ppAboves [ ppBesides[ppPStr n, ppSP, ppr PprDebug rn,
+			     case ex of {ExportAll -> ppStr "(..)"; _ -> ppNil}]
+		 | (n,(rn,ex)) <- fmToList exm ],
+
+	pp_ims (bagToList ims),
+	pp_fixities lfx,
+	pp_decls ltdm lvdm,
+	pp_insts (bagToList lids),
+	pp_pragmas ldp
+    ]
+  where
+    pp_ims [] = ppNil
+    pp_ims ms = ppAbove (ppPStr SLIT("__instance_modules__"))
+			(ppCat (map ppPStr ms))
+
+    pp_fixities fx
+      | isEmptyFM fx = ppNil
+      | otherwise = ppAboves (ppPStr SLIT("__fixities__")
+		   : [ ppr PprDebug fix | (n, fix) <- fmToList fx])
+
+    pp_decls tds vds = ppAboves (ppPStr SLIT("__declarations__")
+			      : [ pprRdrIfaceDecl d | (n, d) <- fmToList tds ++ fmToList vds])
+
+    pp_insts [] = ppNil
+    pp_insts is = ppAboves (ppPStr SLIT("__instances__")
+			      : [ pprRdrInstDecl i | i <- is])
+
+    pp_pragmas ps | isEmptyFM ps = ppNil
+		  | otherwise = panic "Rename.pp_pragmas"
+
+pprRdrIfaceDecl (TypeSig tc _ decl)
+  = ppBesides [ppStr "tycon=", ppr PprDebug tc, ppStr "; ", ppr PprDebug decl]
+
+pprRdrIfaceDecl (NewTypeSig tc dc _ decl)
+  = ppBesides [ppStr "tycon=", ppr PprDebug tc, ppStr "; datacon=", ppr PprDebug dc, ppStr "; ", ppr PprDebug decl]
+
+pprRdrIfaceDecl (DataSig tc dcs _ decl)
+  = ppBesides [ppStr "tycon=", ppr PprDebug tc, ppStr "; datacons=", ppr PprDebug dcs, ppStr "; ", ppr PprDebug decl]
+
+pprRdrIfaceDecl (ClassSig c ops _ decl)
+  = ppBesides [ppStr "class=", ppr PprDebug c, ppStr "; ops=", ppr PprDebug ops, ppStr "; ", ppr PprDebug decl]
+
+pprRdrIfaceDecl (ValSig f _ ty)
+  = ppBesides [ppr PprDebug f, ppStr " :: ", ppr PprDebug ty]
+
+pprRdrInstDecl (InstSig c t _ decl)
+  = ppBesides [ppStr "class=", ppr PprDebug c, ppStr " type=", ppr PprDebug t, ppStr "; ",
+		ppr PprDebug decl]
 \end{code}

@@ -118,6 +118,7 @@ specialise/SpecEnv.lhs
 rename/ParseIface.hs
 
 #define RENAMERSRCS_LHS \
+rename/ParseUtils.lhs \
 rename/RnHsSyn.lhs \
 rename/RnMonad.lhs \
 rename/Rename.lhs \
@@ -506,8 +507,9 @@ types/TyLoop.hi : types/TyLoop.lhi
 	$(GHC_UNLIT) types/TyLoop.lhi types/TyLoop.hi
 
 rename/ParseIface.hs : rename/ParseIface.y
-	$(RM) rename/ParseIface.hs
-	happy -g rename/ParseIface.y
+	$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
+	happy -i rename/ParseIface.hinfo rename/ParseIface.y
+	@chmod 444 rename/ParseIface.hs
 
 compile(absCSyn/AbsCUtils,lhs,)
 compile(absCSyn/CStrings,lhs,)
@@ -622,6 +624,7 @@ compile(reader/ReadPrefix,lhs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -Iparser '-#inclu
 compile(reader/RdrHsSyn,lhs,)
 
 compile(rename/ParseIface,hs,)
+compile(rename/ParseUtils,lhs,)
 compile(rename/RnHsSyn,lhs,)
 compile(rename/RnMonad,lhs,)
 compile(rename/Rename,lhs,)

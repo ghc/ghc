@@ -26,7 +26,7 @@ import RnHsSyn
 import RnMonad
 
 import ErrUtils		( addErrLoc )
-import Name		( isLocallyDefinedName, pprOp, Name, RdrName )
+import Name		( isLocallyDefinedName, pprSym, Name, RdrName )
 import Pretty
 import UniqFM		( lookupUFM )
 import UniqSet		( emptyUniqSet, unitUniqSet,
@@ -547,7 +547,7 @@ precParseErr op1 op2 src_loc
     ppBesides [ppStr "cannot mix ", pp_op sty op1, ppStr " and ", pp_op sty op2,
 	       ppStr " in the same infix expression"])
 
-pp_op sty (op, fix, prec) = ppBesides [pprOp sty op, ppLparen, pp_fix fix, ppSP, ppInt prec, ppRparen]
+pp_op sty (op, fix, prec) = ppBesides [pprSym sty op, ppLparen, pp_fix fix, ppSP, ppInt prec, ppRparen]
 pp_fix INFIXL = ppStr "infixl"
 pp_fix INFIXR = ppStr "infixr"
 pp_fix INFIXN = ppStr "infix"

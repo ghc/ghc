@@ -216,7 +216,6 @@ opt_SpecialiseOverloaded	= lookup  SLIT("-fspecialise-overloaded")
 opt_SpecialiseTrace		= lookup  SLIT("-ftrace-specialisation")
 opt_SpecialiseUnboxed		= lookup  SLIT("-fspecialise-unboxed")
 opt_StgDoLetNoEscapes		= lookup  SLIT("-flet-no-escape")
-opt_UseGetMentionedVars		= lookup  SLIT("-fuse-get-mentioned-vars")
 opt_Verbose			= lookup  SLIT("-v")
 opt_AsmTarget 			= lookup_str "-fasm="
 opt_SccGroup  			= lookup_str "-G="

@@ -23,8 +23,9 @@ import CmdLineOpts	( opt_CompilingPrelude )
 import ErrUtils		( addErrLoc )
 import FiniteMap	( elemFM, FiniteMap )
 import MainMonad	( writeMn, exitMn, MainIO(..) )
-import Name		( RdrName(..), isConopRdr )
+import Name		( RdrName(..), isRdrLexCon )
 import PprStyle		( PprStyle(..) )
+import PrelMods		( fromPrelude )
 import Pretty
 import SrcLoc		( SrcLoc )
 import Util		( nOfThem, pprError, panic )
@@ -64,6 +65,9 @@ wlkQid	:: U_qid -> UgnM RdrName
 wlkQid (U_noqual name)
   = returnUgn (Unqual name)
 wlkQid (U_aqual  mod name)
+  | fromPrelude mod
+  = returnUgn (Unqual name)
+  | otherwise
   = returnUgn (Qual mod name)
 wlkQid (U_gid n name)
   = returnUgn (Unqual name)
@@ -376,7 +380,7 @@ wlkPat pat
       U_ident nn ->			-- simple identifier
 	wlkQid nn	`thenUgn` \ n ->
 	returnUgn (
-	  if isConopRdr n
+	  if isRdrLexCon n
 	  then ConPatIn n []
 	  else VarPatIn n
 	)

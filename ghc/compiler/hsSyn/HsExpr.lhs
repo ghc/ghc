@@ -19,7 +19,7 @@ import HsTypes		( PolyType )
 
 -- others:
 import Id		( DictVar(..), GenId, Id(..) )
-import Name		( isOpLexeme, pprOp )
+import Name		( isSymLexeme, pprSym )
 import Outputable	( interppSP, interpp'SP, ifnotPprForUser )
 import PprType		( pprGenType, pprParendGenType, GenType{-instance-} )
 import Pretty
@@ -195,7 +195,7 @@ instance (NamedThing id, Outputable id, Outputable pat,
 
 \begin{code}
 pprExpr sty (HsVar v)
-  = (if (isOpLexeme v) then ppParens else id) (ppr sty v)
+  = (if (isSymLexeme v) then ppParens else id) (ppr sty v)
 
 pprExpr sty (HsLit    lit)   = ppr sty lit
 pprExpr sty (HsLitOut lit _) = ppr sty lit
@@ -222,7 +222,7 @@ pprExpr sty (OpApp e1 op e2)
       = ppHang (pprParendExpr sty op) 4 (ppSep [pp_e1, pp_e2])
 
     pp_infixly v
-      = ppSep [pp_e1, ppCat [pprOp sty v, pp_e2]]
+      = ppSep [pp_e1, ppCat [pprSym sty v, pp_e2]]
 
 pprExpr sty (NegApp e)
   = ppBeside (ppChar '-') (pprParendExpr sty e)
@@ -241,7 +241,7 @@ pprExpr sty (SectionL expr op)
 		       4 (ppCat [pp_expr, ppStr "_x )"])
     pp_infixly v
       = ppSep [ ppBeside ppLparen pp_expr,
-	    	ppBeside (pprOp sty v) ppRparen ]
+	    	ppBeside (pprSym sty v) ppRparen ]
 
 pprExpr sty (SectionR op expr)
   = case op of
@@ -253,7 +253,7 @@ pprExpr sty (SectionR op expr)
     pp_prefixly = ppHang (ppCat [ppStr "( \\ _x ->", ppr sty op, ppPStr SLIT("_x")])
 		       4 (ppBeside pp_expr ppRparen)
     pp_infixly v
-      = ppSep [ ppBeside ppLparen (pprOp sty v),
+      = ppSep [ ppBeside ppLparen (pprSym sty v),
 		ppBeside pp_expr  ppRparen ]
 
 pprExpr sty (HsCase expr matches _)

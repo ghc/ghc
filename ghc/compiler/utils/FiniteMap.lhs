@@ -56,6 +56,7 @@ module FiniteMap (
 	fmToList, keysFM, eltsFM{-used in GHCI-}
 
 #ifdef COMPILING_GHC
+	, bagToFM
 	, FiniteSet(..), emptySet, mkSet, isEmptySet
 	, elementOf, setToList, union, minusSet{-exported for GHCI-}
 #endif
@@ -73,6 +74,7 @@ import Ubiq{-uitous-}
 # ifdef DEBUG
 import Pretty
 # endif
+import Bag	( foldBag )
 #if ! OMIT_NATIVE_CODEGEN
 #define IF_NCG(a) a
 #else
@@ -98,9 +100,13 @@ import Pretty
 \begin{code}
 --	BUILDING
 emptyFM		:: FiniteMap key elt
-unitFM	:: key -> elt -> FiniteMap key elt
+unitFM		:: key -> elt -> FiniteMap key elt
 listToFM	:: (Ord key OUTPUTABLE_key) => [(key,elt)] -> FiniteMap key elt
 			-- In the case of duplicates, the last is taken
+#ifdef COMPILING_GHC
+bagToFM		:: (Ord key OUTPUTABLE_key) => Bag (key,elt) -> FiniteMap key elt
+			-- In the case of duplicates, who knows which is taken
+#endif
 
 --	ADDING AND DELETING
 		   -- Throws away any previous binding
@@ -203,7 +209,11 @@ emptyFM
 
 unitFM key elt = Branch key elt IF_GHC(1#,1) emptyFM emptyFM
 
-listToFM key_elt_pairs = addListToFM emptyFM key_elt_pairs
+listToFM = addListToFM emptyFM
+
+#ifdef COMPILING_GHC
+bagToFM = foldBag plusFM (\ (k,v) -> unitFM k v) emptyFM
+#endif
 \end{code}
 
 %************************************************************************

@@ -11,6 +11,7 @@ they are used somewhat later on in the compiler...)
 
 module RdrHsSyn (
 	RdrNameArithSeqInfo(..),
+	RdrNameBangType(..),
 	RdrNameBind(..),
 	RdrNameClassDecl(..),
 	RdrNameClassOpSig(..),
@@ -57,6 +58,7 @@ import Name		( ExportFlag(..) )
 
 \begin{code}
 type RdrNameArithSeqInfo	= ArithSeqInfo		Fake Fake RdrName RdrNamePat
+type RdrNameBangType		= BangType		RdrName
 type RdrNameBind		= Bind			Fake Fake RdrName RdrNamePat
 type RdrNameClassDecl		= ClassDecl		Fake Fake RdrName RdrNamePat
 type RdrNameClassOpSig		= Sig			RdrName

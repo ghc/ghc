@@ -103,16 +103,15 @@ import IdInfo
 import Maybes		( maybeToBool )
 import Name		( appendRdr, nameUnique, mkLocalName, isLocalName,
 			  isLocallyDefinedName, isPreludeDefinedName,
-			  nameOrigName, mkTupleDataConName,
-			  isAvarop, isAconop, getLocalName,
+			  mkTupleDataConName, mkCompoundName,
+			  isLexSym, getLocalName,
 			  isLocallyDefined, isPreludeDefined,
-			  getOrigName, getOccName,
+			  getOccName, moduleNamePair, origName, nameOf, 
 			  isExported, ExportFlag(..),
 			  RdrName(..), Name
 			)
 import FieldLabel	( fieldLabelName, FieldLabel{-instances-} )
 import PragmaInfo	( PragmaInfo(..) )
-import PrelMods		( pRELUDE_BUILTIN )
 import PprType		( getTypeString, typeMaybeString, specMaybeTysSuffix,
 			  GenType, GenTyVar
 			)
@@ -654,10 +653,10 @@ pprIdInUnfolding in_scopes v
 
     pp_full_name
       = let
-	    (m_str, n_str) = getOrigName v
+	    (m_str, n_str) = moduleNamePair v
 
 	    pp_n =
-	      if isAvarop n_str || isAconop n_str then
+	      if isLexSym n_str then
 		  ppBesides [ppLparen, ppPStr n_str, ppRparen]
 	      else
 		  ppPStr n_str
@@ -1009,10 +1008,10 @@ getIdNamePieces show_uniqs id
   get (Id u _ details _ _)
     = case details of
       DataConId n _ _ _ _ _ _ _ ->
-	case (nameOrigName n) of { (mod, name) ->
+	case (moduleNamePair n) of { (mod, name) ->
 	if isPreludeDefinedName n then [name] else [mod, name] }
 
-      TupleConId n _ -> [snd (nameOrigName n)]
+      TupleConId n _ -> [nameOf (origName n)]
 
       RecordSelId lbl -> panic "getIdNamePieces:RecordSelId"
 
@@ -1021,8 +1020,8 @@ getIdNamePieces show_uniqs id
       TopLevId   n -> get_fullname_pieces n
 
       SuperDictSelId c sc ->
-	case (getOrigName c)	of { (c_mod, c_name) ->
-	case (getOrigName sc)	of { (sc_mod, sc_name) ->
+	case (moduleNamePair c)	of { (c_mod, c_name) ->
+	case (moduleNamePair sc)	of { (sc_mod, sc_name) ->
 	let
 	    c_bits = if isPreludeDefined c
 		     then [c_name]
@@ -1035,7 +1034,7 @@ getIdNamePieces show_uniqs id
 	[SLIT("sdsel")] ++ c_bits ++ sc_bits  }}
 
       MethodSelId clas op ->
-	case (getOrigName clas)	of { (c_mod, c_name) ->
+	case (moduleNamePair clas)	of { (c_mod, c_name) ->
 	case (getClassOpString op)	of { op_name ->
 	if isPreludeDefined clas
 	then [op_name]
@@ -1043,14 +1042,14 @@ getIdNamePieces show_uniqs id
 	} }
 
       DefaultMethodId clas op _ ->
-	case (getOrigName clas)		of { (c_mod, c_name) ->
+	case (moduleNamePair clas)		of { (c_mod, c_name) ->
 	case (getClassOpString op)	of { op_name ->
 	if isPreludeDefined clas
 	then [SLIT("defm"), op_name]
 	else [SLIT("defm"), c_mod, c_name, op_name] }}
 
       DictFunId c ty _ _ ->
-	case (getOrigName c)	    of { (c_mod, c_name) ->
+	case (moduleNamePair c)	    of { (c_mod, c_name) ->
 	let
 	    c_bits = if isPreludeDefined c
 		     then [c_name]
@@ -1061,7 +1060,7 @@ getIdNamePieces show_uniqs id
 	[SLIT("dfun")] ++ c_bits ++ ty_bits }
 
       ConstMethodId c ty o _ _ ->
-	case (getOrigName c)	    of { (c_mod, c_name) ->
+	case (moduleNamePair c)	    of { (c_mod, c_name) ->
 	case (getTypeString ty)	    of { ty_bits ->
 	case (getClassOpString o)   of { o_name ->
 	case (if isPreludeDefined c
@@ -1091,7 +1090,7 @@ getIdNamePieces show_uniqs id
 
 get_fullname_pieces :: Name -> [FAST_STRING]
 get_fullname_pieces n
-  = BIND (nameOrigName n) _TO_ (mod, name) ->
+  = BIND (moduleNamePair n) _TO_ (mod, name) ->
     if isPreludeDefinedName n
     then [name]
     else [mod, name]
@@ -1810,20 +1809,14 @@ instance NamedThing (GenId ty) where
 	get (DataConId n _ _ _ _ _ _ _) = n
 	get (TupleConId n _)		= n
 	get (RecordSelId l)		= getName l
-	get (SuperDictSelId c sc)	= panic "Id.getName.SuperDictSelId"
-	get (MethodSelId c op)		= panic "Id.getName.MethodSelId"
-	get (DefaultMethodId c op _)	= panic "Id.getName.DefaultMethodId"
-	get (DictFunId c ty _ _)	= panic "Id.getName.DictFunId"
-	get (ConstMethodId c ty op _ _)	= panic "Id.getName.ConstMethodId"
-	get (SpecId i tys _)		= panic "Id.getName.SpecId"
-	get (WorkerId i)		= panic "Id.getName.WorkerId"
+	get _				= mkCompoundName u (getIdNamePieces False{-no Uniques-} this_id)
 
 {- LATER:
-	get (MethodSelId c op)	= case (getOrigName c) of -- ToDo; better ???
-				    (mod, _) -> (mod, getClassOpString op)
+	get (MethodSelId c op)	= case (moduleOf (origName c)) of -- ToDo; better ???
+				    mod -> (mod, getClassOpString op)
 
 	get (SpecId unspec ty_maybes _)
-	  = BIND getOrigName unspec	      _TO_ (mod, unspec_nm) ->
+	  = BIND moduleNamePair unspec	      _TO_ (mod, unspec_nm) ->
 	    BIND specMaybeTysSuffix ty_maybes _TO_ tys_suffix ->
 	    (mod,
 	     unspec_nm _APPEND_
@@ -1834,7 +1827,7 @@ instance NamedThing (GenId ty) where
 	    BEND BEND
 
 	get (WorkerId unwrkr)
-	  = BIND getOrigName unwrkr	_TO_ (mod, unwrkr_nm) ->
+	  = BIND moduleNamePair unwrkr	_TO_ (mod, unwrkr_nm) ->
 	    (mod,
 	     unwrkr_nm _APPEND_
 		(if not (toplevelishId unwrkr)

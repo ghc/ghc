@@ -11,7 +11,7 @@ module TcBinds ( tcBindsAndThen, tcPragmaSigs ) where
 import Ubiq
 
 import HsSyn		( HsBinds(..), Bind(..), Sig(..), MonoBinds(..), 
-			  HsExpr, Match, PolyType, InPat, OutPat,
+			  HsExpr, Match, PolyType, InPat, OutPat(..),
 			  GRHSsAndBinds, ArithSeqInfo, HsLit, Fake,
 			  collectBinders )
 import RnHsSyn		( RenamedHsBinds(..), RenamedBind(..), RenamedSig(..), 
@@ -36,14 +36,14 @@ import Kind		( mkBoxedTypeKind, mkTypeKind )
 import Id		( GenId, idType, mkUserId )
 import IdInfo		( noIdInfo )
 import Maybes		( assocMaybe, catMaybes, Maybe(..) )
-import Name		( pprNonOp )
+import Name		( pprNonSym )
 import PragmaInfo	( PragmaInfo(..) )
 import Pretty
 import RnHsSyn		( RnName )	-- instances
 import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy,
 			  mkSigmaTy, splitSigmaTy,
 			  splitRhoTy, mkForAllTy, splitForAllTy )
-import Util		( panic )
+import Util		( isIn, panic )
 \end{code}
 
 %************************************************************************
@@ -251,8 +251,9 @@ data SigInfo
 
 	-- Make poly_ids for all the binders that don't have type signatures
     let
+	tys_to_gen   = mkTyVarTys tyvars_to_gen
 	dicts_to_gen = map instToId (bagToList lie_to_gen)
-	dict_tys = map tcIdType dicts_to_gen
+	dict_tys     = map tcIdType dicts_to_gen
 
 	mk_poly binder local_id = mkUserId (getName binder) ty noPragmaInfo
 		       where
@@ -260,15 +261,10 @@ data SigInfo
 			       mkFunTys dict_tys $
 			       tcIdType local_id
 
-	tys_to_gen     = mkTyVarTys tyvars_to_gen
 	more_sig_infos = [ SigInfo binder (mk_poly binder local_id) 
 				   local_id tys_to_gen dicts_to_gen lie_to_gen
 			 | (binder, local_id) <- nosig_binders `zipEqual` nosig_local_ids
 			 ]
-
-	local_binds = [ (local_id, DictApp (mkHsTyApp (HsVar local_id) inst_tys) dicts)
-		      | SigInfo _ _ local_id inst_tys dicts <- more_sig_infos
-		      ]
 
 	all_sig_infos = sig_infos ++ more_sig_infos	-- Contains a "signature" for each binder
     in
@@ -276,15 +272,21 @@ data SigInfo
 
 	-- Now generalise the bindings
     let
-      find_sig lid = head [ (pid, tvs, ds, lie) 
+	-- local_binds is a bunch of bindings of the form
+	--	f_mono = f_poly tyvars dicts
+	-- one for each binder, f, that lacks a type signature.
+	-- This bunch of bindings is put at the top of the RHS of every
+	-- binding in the group, so as to bind all the f_monos.
+		
+	local_binds = [ (local_id, mkHsDictApp (mkHsTyApp (HsVar local_id) tys_to_gen) dicts_to_gen)
+		      | local_id <- nosig_local_ids
+		      ]
+
+        find_sig lid = head [ (pid, tvs, ds, lie) 
 		          | SigInfo _ pid lid' tvs ds lie, 
 			    lid==lid'
 			  ]
-	-- Do it again, but with increased free_tyvars/reduced_tyvars_to_gen:
-	-- We still need to do this simplification, because some dictionaries 
-	-- may gratuitously constrain some tyvars over which we *are* going 
-	-- to generalise. 
-	-- For example d::Eq (Foo a b), where Foo is instanced as above.
+
       gen_bind (bind, lie)
 	= tcSimplifyWithExtraGlobals tyvars_not_to_gen tyvars_to_gen avail lie
 				    `thenTc` \ (lie_free, dict_binds) ->
@@ -361,7 +363,7 @@ getImplicitStuffToGen is_restricted sig_ids binds_w_lies
      returnTc (constrained_tyvars, reduced_tyvars_to_gen, emptyLIE)
 
   where
-    sig_ids   = [sig_var | (TySigInfo sig_id _ _ _ _) <- ty_sigs]
+    sig_vars   = [sig_var | (TySigInfo sig_var _ _ _ _) <- ty_sigs]
 
     (tyvars_to_gen, lie) = foldBag (\(tv1,lie2) (tv2,lie2) -> (tv1 `unionTyVarSets` tv2,
 							       lie1 `plusLIE` lie2))
@@ -641,8 +643,42 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 \end{code}
 
 
-Error contexts and messages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+%************************************************************************
+%*									*
+\subsection[TcBinds-monomorphism]{The monomorphism restriction}
+%*									*
+%************************************************************************
+
+Not exported:
+
+\begin{code}
+isUnRestrictedGroup :: [TcIdBndr s]		-- Signatures given for these
+		    -> TcBind s
+		    -> Bool
+
+isUnRestrictedGroup sigs EmptyBind              = True
+isUnRestrictedGroup sigs (NonRecBind monobinds) = isUnResMono sigs monobinds
+isUnRestrictedGroup sigs (RecBind monobinds)    = isUnResMono sigs monobinds
+
+is_elem v vs = isIn "isUnResMono" v vs
+
+isUnResMono sigs (PatMonoBind (VarPat (TcId v)) _ _)	= v `is_elem` sigs
+isUnResMono sigs (PatMonoBind other      _ _)		= False
+isUnResMono sigs (VarMonoBind (TcId v) _)		= v `is_elem` sigs
+isUnResMono sigs (FunMonoBind _ _ _ _)			= True
+isUnResMono sigs (AndMonoBinds mb1 mb2)			= isUnResMono sigs mb1 &&
+							  isUnResMono sigs mb2
+isUnResMono sigs EmptyMonoBinds				= True
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[TcBinds-errors]{Error contexts and messages}
+%*									*
+%************************************************************************
+
+
 \begin{code}
 patMonoBindsCtxt bind sty
   = ppHang (ppPStr SLIT("In a pattern binding:")) 4 (ppr sty bind)
@@ -675,7 +711,7 @@ specGroundnessCtxt
 
 valSpecSigCtxt v ty sty
   = ppHang (ppPStr SLIT("In a SPECIALIZE pragma for a value:"))
-	 4 (ppSep [ppBeside (pprNonOp sty v) (ppPStr SLIT(" ::")),
+	 4 (ppSep [ppBeside (pprNonSym sty v) (ppPStr SLIT(" ::")),
 		  ppr sty ty])
 \end{code}
 

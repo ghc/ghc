@@ -22,7 +22,7 @@ import PprType		( GenType, GenTyVar, TyCon )
 import Pretty
 import TyCon		( TyCon )
 import TyVar		( GenTyVar )
-import Unique		( Unique )
+import Unique		( mkAlphaTyVarUnique, Unique )
 import Util		( panic, pprPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
@@ -30,7 +30,7 @@ import Util		( panic, pprPanic, pprTrace{-ToDo:rm-} )
 data RnName
   = WiredInId       Id
   | WiredInTyCon    TyCon
-  | RnName          Name        -- funtions/binders/tyvars
+  | RnName          Name        -- functions/binders/tyvars
   | RnSyn           Name        -- type synonym
   | RnData          Name [Name] -- data type   (with constrs)
   | RnConstr        Name  Name  -- constructor (with data type)
@@ -65,6 +65,15 @@ isRnClass (RnClass _ _)       = True
 isRnClass (RnImplicitClass _) = True
 isRnClass _                   = False
 
+-- a common need: isRnTyCon || isRnClass:
+isRnTyConOrClass (WiredInTyCon _)    = True
+isRnTyConOrClass (RnSyn _)    	     = True
+isRnTyConOrClass (RnData _ _) 	     = True
+isRnTyConOrClass (RnImplicitTyCon _) = True
+isRnTyConOrClass (RnClass _ _)       = True
+isRnTyConOrClass (RnImplicitClass _) = True
+isRnTyConOrClass _                   = False
+
 isRnClassOp cls (RnClassOp _ op_cls) = eqUniqsNamed cls op_cls
 isRnClassOp cls (RnImplicit _)	     = True	-- ho hummm ...
 isRnClassOp cls _		     = False
@@ -93,21 +102,23 @@ instance Uniquable RnName where
     uniqueOf = nameUnique . getName
 
 instance NamedThing RnName where
-    getName (WiredInId id)    = getName id
-    getName (WiredInTyCon tc) = getName tc
-    getName (RnName n)	      = n
-    getName (RnSyn n)	      = n
-    getName (RnData n _)      = n
-    getName (RnConstr n _)    = n
-    getName (RnClass n _)     = n
-    getName (RnClassOp n _)   = n
-    getName (RnImplicit n)    = n
-    getName (RnUnbound occ)   = pprTrace "getRnName:RnUnbound: " (ppr PprDebug occ)
-				(case occ of
-				   Unqual n -> mkLocalName bottom n bottom2
-				   Qual m n -> mkLocalName bottom n bottom2)
-			      where bottom = panic "getRnName: unique"
-				    bottom2 = panic "getRnName: srcloc"
+    getName (WiredInId id)      = getName id
+    getName (WiredInTyCon tc)   = getName tc
+    getName (RnName n)	        = n
+    getName (RnSyn n)	        = n
+    getName (RnData n _)        = n
+    getName (RnConstr n _)      = n
+    getName (RnClass n _)       = n
+    getName (RnClassOp n _)     = n
+    getName (RnImplicit n)      = n
+    getName (RnImplicitTyCon n) = n
+    getName (RnImplicitClass n) = n
+    getName (RnUnbound occ)     = pprTrace "getRnName:RnUnbound: " (ppr PprDebug occ)
+				  (case occ of
+				     Unqual n -> mkLocalName bottom n bottom2
+				     Qual m n -> mkLocalName bottom n bottom2)
+			        where bottom = mkAlphaTyVarUnique 0 -- anything; just something that will print
+				      bottom2 = panic "getRnName: srcloc"
 
 instance Outputable RnName where
 #ifdef DEBUG

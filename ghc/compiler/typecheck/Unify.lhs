@@ -15,9 +15,9 @@ import Ubiq
 
 -- friends: 
 import TcMonad
-import Type	( GenType(..), getTypeKind, mkFunTy, getFunTy_maybe )
+import Type	( GenType(..), typeKind, mkFunTy, getFunTy_maybe )
 import TyCon	( TyCon, mkFunTyCon )
-import TyVar	( GenTyVar(..), TyVar(..), getTyVarKind )
+import TyVar	( GenTyVar(..), TyVar(..), tyVarKind )
 import TcType	( TcType(..), TcMaybe(..), TcTauType(..), TcTyVar(..),
 		  newTyVarTy, tcReadTyVar, tcWriteTyVar, zonkTcType
 		)
@@ -245,7 +245,7 @@ uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1) maybe_ty1 ps_ty2 non_var_ty2
   = case maybe_ty1 of
 	DontBind -> failTc (unifyDontBindErr tv1 ps_ty2)
 
-	UnBound	 |  getTypeKind non_var_ty2 `isSubKindOf` kind1
+	UnBound	 |  typeKind non_var_ty2 `isSubKindOf` kind1
 		 -> occur_check non_var_ty2			`thenTc_`
 		    tcWriteTyVar tv1 ps_ty2			`thenNF_Tc_`
 		    returnTc ()
@@ -330,9 +330,9 @@ expectedFunErr ty sty
 
 unifyKindErr tyvar ty sty
   = ppHang (ppStr "Compiler bug: kind mis-match between")
-	 4 (ppSep [ppr sty tyvar, ppLparen, ppr sty (getTyVarKind tyvar), ppRparen,
+	 4 (ppSep [ppr sty tyvar, ppLparen, ppr sty (tyVarKind tyvar), ppRparen,
 		   ppStr "and", 
-		   ppr sty ty, ppLparen, ppr sty (getTypeKind ty), ppRparen])
+		   ppr sty ty, ppLparen, ppr sty (typeKind ty), ppRparen])
 
 unifyDontBindErr tyvar ty sty
   = ppHang (ppStr "Couldn't match the *signature/existential* type variable")

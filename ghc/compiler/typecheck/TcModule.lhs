@@ -44,7 +44,7 @@ import PrelInfo		( unitTy, mkPrimIoTy )
 import Pretty
 import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
 import TyCon		( TyCon )
-import Type		( applyTyCon )
+import Type		( mkSynTy )
 import Unify		( unifyTauTy )
 import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
 		          filterUFM, eltsUFM )
@@ -103,13 +103,13 @@ tcModule renamer_name_funs
 	fixTc ( \ ~(rec_inst_mapper, _, _, _, _, _) ->
 
 	     -- Type-check the type and class decls
-	    trace "tcTyAndClassDecls:"	$
+	    --trace "tcTyAndClassDecls:"	$
 	    tcTyAndClassDecls1 rec_inst_mapper ty_decls_bag cls_decls_bag
 					`thenTc` \ (env, record_binds) ->
 
 		-- Typecheck the instance decls, includes deriving
 	    tcSetEnv env (
-	    trace "tcInstDecls:"	$
+	    --trace "tcInstDecls:"	$
 	    tcInstDecls1 inst_decls_bag specinst_sigs
 			 mod_name renamer_name_funs fixities 
 	    )				`thenTc` \ (inst_info, deriv_binds, ddump_deriv) ->
@@ -142,7 +142,7 @@ tcModule renamer_name_funs
 
 	-- Value declarations next.
 	-- We also typecheck any extra binds that came out of the "deriving" process
-    trace "tcBinds:"			$
+    --trace "tcBinds:"			$
     tcBindsAndThen
 	(\ binds1 (binds2, thing) -> (binds1 `ThenBinds` binds2, thing))
 	(val_decls `ThenBinds` deriv_binds)
@@ -233,7 +233,7 @@ checkTopLevelIds mod final_env
 	
 	case (maybe_main, maybe_prim) of
 	  (Just main, Nothing) -> tcAddErrCtxt mainCtxt $
-		                  unifyTauTy (applyTyCon io_tc [unitTy])
+		                  unifyTauTy (mkSynTy io_tc [unitTy])
 					     (idType main)
 
 	  (Nothing, Just prim) -> tcAddErrCtxt primCtxt $
@@ -254,7 +254,5 @@ mainBothIdErr sty
   = ppStr "module Main contains definitions for both main and mainPrimIO"
 
 mainNoneIdErr sty
-  = panic "ToDo: sort out mainIdKey"
- -- ppStr "module Main does not contain a definition for main (or mainPrimIO)"
-
+  = ppStr "module Main does not contain a definition for main (or mainPrimIO)"
 \end{code}

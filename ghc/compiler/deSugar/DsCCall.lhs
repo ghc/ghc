@@ -107,7 +107,7 @@ unboxArg arg
 
   -- Primitive types
   -- ADR Question: can this ever be used?  None of the PrimTypes are
-  -- instances of the _CCallable class.
+  -- instances of the CCallable class.
   | isPrimType arg_ty
   = returnDs (arg, \body -> body)
 
@@ -131,7 +131,7 @@ unboxArg arg
     length data_con_arg_tys == 2 &&
     not (isPrimType data_con_arg_ty1) &&
     isPrimType data_con_arg_ty2
-    -- and, of course, it is an instance of _CCallable
+    -- and, of course, it is an instance of CCallable
 --  ( tycon == byteArrayTyCon ||
 --    tycon == mutableByteArrayTyCon )
   = newSysLocalsDs data_con_arg_tys		`thenDs` \ vars@[ixs_var, arr_cts_var] ->

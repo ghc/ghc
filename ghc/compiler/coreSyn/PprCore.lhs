@@ -32,7 +32,7 @@ import Id		( idType, getIdInfo, getIdStrictness,
 			)
 import IdInfo		( ppIdInfo, StrictnessInfo(..) )
 import Literal		( Literal{-instances-} )
-import Name		( isOpLexeme )
+import Name		( isSymLexeme )
 import Outputable	-- quite a few things
 import PprEnv
 import PprType		( GenType{-instances-}, GenTyVar{-instance-} )
@@ -309,7 +309,7 @@ ppr_alts pe (AlgAlts alts deflt)
 	     4 (ppr_expr pe expr)
       where
     	ppr_con con pp_con
-    	  = if isOpLexeme con then ppParens pp_con else pp_con
+    	  = if isSymLexeme con then ppParens pp_con else pp_con
 
 ppr_alts pe (PrimAlts alts deflt)
   = ppAboves [ ppAboves (map ppr_alt alts), ppr_default pe deflt ]

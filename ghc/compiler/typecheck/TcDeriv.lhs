@@ -564,7 +564,7 @@ gen_inst_info modname fixities deriver_name_funs
   where
     clas_key = getClassKey clas
     clas_Name
-      = let  (mod, nm) = getOrigName clas  in
+      = let  (mod, nm) = moduleNamePair clas  in
     	ClassName clas_key (mkPreludeCoreName mod nm) []
 \end{code}
 
