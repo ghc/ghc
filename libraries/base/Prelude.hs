@@ -179,7 +179,15 @@ infixr 0 $!
 -- -----------------------------------------------------------------------------
 -- Miscellaneous functions
 
+-- | Strict (call-by-value) application, defined in terms of 'seq'.
 ($!)    :: (a -> b) -> a -> b
 f $! x  = x `seq` f x
 #endif
 
+#ifdef __HADDOCK__
+-- | The value of @'seq' a b@ is bottom if @a@ is bottom, and otherwise
+-- equal to @b@.  'seq' is usually introduced to improve performance by
+-- avoiding unneeded laziness.
+seq :: a -> b -> b
+seq _ y = y
+#endif

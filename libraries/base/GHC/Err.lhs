@@ -52,12 +52,13 @@ import GHC.Exception
 %*********************************************************
 
 \begin{code}
--- error stops execution and displays an error message
+-- | 'error' stops execution and displays an error message.
 error :: String -> a
 error s = throw (ErrorCall s)
 
+-- | A special case of 'error'.
 -- It is expected that compilers will recognize this and insert error
--- messages which are more appropriate to the context in which undefined 
+-- messages which are more appropriate to the context in which 'undefined'
 -- appears. 
 
 undefined :: a
