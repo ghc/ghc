@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.16 2001/08/23 10:36:50 sewardj Exp $
+-- $Id: PrelHandle.hsc,v 1.17 2001/10/16 15:06:38 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -951,6 +951,10 @@ data HandlePosn = HandlePosn Handle HandlePosition
 
 instance Eq HandlePosn where
     (HandlePosn h1 p1) == (HandlePosn h2 p2) = p1==p2 && h1==h2
+
+instance Show HandlePosn where
+   showsPrec p (HandlePosn h pos) = 
+	showsPrec p h . showString " at position " . shows pos
 
   -- HandlePosition is the Haskell equivalent of POSIX' off_t.
   -- We represent it as an Integer on the Haskell side, but
