@@ -4,5 +4,7 @@ tcfail099.hs:9:
 	Quantified type variable `a' escapes
     When checking an existential match that binds
 	f :: a -> Int
-    and whose type is DS -> a -> Int
+    The pattern(s) have type(s): DS
+				 a
+    The body has type: Int
     In the definition of `call': call (C f) arg = f arg

@@ -1,2 +1,3 @@
 
-tcfail030.hs:3: No 'main' defined in module Main
+tcfail030.hs:3:
+    The main function `main' is not defined in module `Main'
