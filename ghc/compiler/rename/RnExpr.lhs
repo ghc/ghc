@@ -1159,7 +1159,7 @@ checkTH e what 	-- Raise an error in a stage-1 compiler
 	          nest 2 (ppr e)])
 #endif   
 
-parStmtErr = addErr (ptext SLIT("Illegal parallel list comprehension: use -fglagow-exts"))
+parStmtErr = addErr (ptext SLIT("Illegal parallel list comprehension: use -fglasgow-exts"))
 
 badIpBinds binds
   = hang (ptext SLIT("Implicit-parameter bindings illegal in a parallel list comprehension:")) 4
