@@ -1263,14 +1263,14 @@ void newArrZh_init PROTO((P_ result, I_ n, P_ init));
 %************************************************************************
 
 \begin{code}
-ED_(Prelude_Z91Z93_closure);
+ED_(PrelBase_Z91Z93_closure);
 
 #define newSynchVarZh(r, hp) 				\
 {							\
   ALLOC_PRIM(MUTUPLE_HS,3,0,MUTUPLE_HS+3) /* ticky ticky */; \
   CC_ALLOC(CCC,MUTUPLE_HS+3,ARR_K); /* cc prof */	\
   SET_SVAR_HDR(hp,EmptySVar_info,CCC);			\
-  SVAR_HEAD(hp) = SVAR_TAIL(hp) = SVAR_VALUE(hp) = Prelude_Z91Z93_closure;	\
+  SVAR_HEAD(hp) = SVAR_TAIL(hp) = SVAR_VALUE(hp) = PrelBase_Z91Z93_closure;	\
   r = hp;						\
 }
 \end{code}
@@ -1283,17 +1283,17 @@ void Yield PROTO((W_));
 #define takeMVarZh(r, liveness, node)    		\
 {							\
   while (INFO_PTR(node) != (W_) FullSVar_info) {	\
-    if (SVAR_HEAD(node) == Prelude_Z91Z93_closure) 	    	\
+    if (SVAR_HEAD(node) == PrelBase_Z91Z93_closure) 	    	\
       SVAR_HEAD(node) = CurrentTSO; 	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(SVAR_TAIL(node)) = CurrentTSO;	    	\
-    TSO_LINK(CurrentTSO) = (P_) Prelude_Z91Z93_closure;	    	\
+    TSO_LINK(CurrentTSO) = (P_) PrelBase_Z91Z93_closure;	    	\
     SVAR_TAIL(node) = CurrentTSO;   	    	    	\
     DO_YIELD(liveness << 1);				\
   } 	    	    	    	    	    	    	\
   SET_INFO_PTR(node, EmptySVar_info);			\
   r = SVAR_VALUE(node);	    	    	    	    	\
-  SVAR_VALUE(node) = Prelude_Z91Z93_closure;   	    	    	\
+  SVAR_VALUE(node) = PrelBase_Z91Z93_closure;   	    	    	\
 }
 
 #else
@@ -1308,7 +1308,7 @@ void Yield PROTO((W_));
   } 	    	    	    	    	    	    	\
   SET_INFO_PTR(node, EmptySVar_info);			\
   r = SVAR_VALUE(node);	    	    	    	    	\
-  SVAR_VALUE(node) = Prelude_Z91Z93_closure;   	    	    	\
+  SVAR_VALUE(node) = PrelBase_Z91Z93_closure;   	    	    	\
 }
 
 #endif
@@ -1336,18 +1336,18 @@ void Yield PROTO((W_));
   SET_INFO_PTR(node, FullSVar_info);			\
   SVAR_VALUE(node) = value; 	    	    	    	\
   tso = SVAR_HEAD(node);    	    	    	    	\
-  if (tso != (P_) Prelude_Z91Z93_closure) {    	    	    	\
+  if (tso != (P_) PrelBase_Z91Z93_closure) {    	    	    	\
     if (DO_QP_PROF) 	    	    	    	    	\
       STGCALL3(void,(void *, char *, P_, P_),QP_Event2,do_qp_prof > 1 ? "RA" : "RG",tso,CurrentTSO);	\
-    if (ThreadQueueHd == Prelude_Z91Z93_closure)   	    	\
+    if (ThreadQueueHd == PrelBase_Z91Z93_closure)   	    	\
       ThreadQueueHd = tso;    	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(ThreadQueueTl) = tso;  	    	\
     ThreadQueueTl = tso;	    	    	    	\
     SVAR_HEAD(node) = TSO_LINK(tso);  	    	    	\
-    TSO_LINK(tso) = (P_) Prelude_Z91Z93_closure; 	    	    	\
-    if(SVAR_HEAD(node) == (P_) Prelude_Z91Z93_closure)   	    	\
-      SVAR_TAIL(node) = (P_) Prelude_Z91Z93_closure;	    	\
+    TSO_LINK(tso) = (P_) PrelBase_Z91Z93_closure; 	    	    	\
+    if(SVAR_HEAD(node) == (P_) PrelBase_Z91Z93_closure)   	    	\
+      SVAR_TAIL(node) = (P_) PrelBase_Z91Z93_closure;	    	\
   } 	    	    	    	    	    	    	\
 }
 
@@ -1365,18 +1365,18 @@ void Yield PROTO((W_));
   SET_INFO_PTR(node, FullSVar_info);			\
   SVAR_VALUE(node) = value; 	    	    	    	\
   tso = SVAR_HEAD(node);    	    	    	    	\
-  if (tso != (P_) Prelude_Z91Z93_closure) {    	    	    	\
+  if (tso != (P_) PrelBase_Z91Z93_closure) {    	    	    	\
     if (DO_QP_PROF) 	    	    	    	    	\
       STGCALL3(void,(void *, char *, P_, P_),QP_Event2,do_qp_prof > 1 ? "RA" : "RG",tso,CurrentTSO);	\
-    if (RunnableThreadsHd == Prelude_Z91Z93_closure)   	    	\
+    if (RunnableThreadsHd == PrelBase_Z91Z93_closure)   	    	\
       RunnableThreadsHd = tso;    	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(RunnableThreadsTl) = tso;  	    	\
     RunnableThreadsTl = tso;	    	    	    	\
     SVAR_HEAD(node) = TSO_LINK(tso);  	    	    	\
-    TSO_LINK(tso) = (P_) Prelude_Z91Z93_closure; 	    	    	\
-    if(SVAR_HEAD(node) == (P_) Prelude_Z91Z93_closure)   	    	\
-      SVAR_TAIL(node) = (P_) Prelude_Z91Z93_closure;	    	\
+    TSO_LINK(tso) = (P_) PrelBase_Z91Z93_closure; 	    	    	\
+    if(SVAR_HEAD(node) == (P_) PrelBase_Z91Z93_closure)   	    	\
+      SVAR_TAIL(node) = (P_) PrelBase_Z91Z93_closure;	    	\
   } 	    	    	    	    	    	    	\
 }
 
@@ -1406,11 +1406,11 @@ void Yield PROTO((W_));
 #define readIVarZh(r, liveness, node)			\
 {							\
   if (INFO_PTR(node) != (W_) ImMutArrayOfPtrs_info) {	\
-    if (SVAR_HEAD(node) == Prelude_Z91Z93_closure) 	    	\
+    if (SVAR_HEAD(node) == PrelBase_Z91Z93_closure) 	    	\
       SVAR_HEAD(node) = CurrentTSO; 	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(SVAR_TAIL(node)) = CurrentTSO;	    	\
-    TSO_LINK(CurrentTSO) = (P_) Prelude_Z91Z93_closure;	    	\
+    TSO_LINK(CurrentTSO) = (P_) PrelBase_Z91Z93_closure;	    	\
     SVAR_TAIL(node) = CurrentTSO;   	    	    	\
     DO_YIELD(liveness << 1);				\
   } 	    	    	    	    	    	    	\
@@ -1453,12 +1453,12 @@ void Yield PROTO((W_));
     EXIT(EXIT_FAILURE);	    	    	    	    	\
   } 	    	    	    	    	    	    	\
   tso = SVAR_HEAD(node);    	    	    	    	\
-  if (tso != (P_) Prelude_Z91Z93_closure) {    	    	    	\
-    if (ThreadQueueHd == Prelude_Z91Z93_closure)   	    	\
+  if (tso != (P_) PrelBase_Z91Z93_closure) {    	    	    	\
+    if (ThreadQueueHd == PrelBase_Z91Z93_closure)   	    	\
       ThreadQueueHd = tso;    	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(ThreadQueueTl) = tso;  	    	\
-    while(TSO_LINK(tso) != Prelude_Z91Z93_closure) {   	    	\
+    while(TSO_LINK(tso) != PrelBase_Z91Z93_closure) {   	    	\
       if (DO_QP_PROF)	    	    	    	    	\
         STGCALL3(void,(void *, char *, P_, P_),QP_Event2,do_qp_prof > 1 ? "RA" : "RG",tso,CurrentTSO);	\
       tso = TSO_LINK(tso);  	    	    	    	\
@@ -1485,12 +1485,12 @@ void Yield PROTO((W_));
     EXIT(EXIT_FAILURE);	    	    	    	    	\
   } 	    	    	    	    	    	    	\
   tso = SVAR_HEAD(node);    	    	    	    	\
-  if (tso != (P_) Prelude_Z91Z93_closure) {    	    	    	\
-    if (RunnableThreadsHd == Prelude_Z91Z93_closure)   	    	\
+  if (tso != (P_) PrelBase_Z91Z93_closure) {    	    	    	\
+    if (RunnableThreadsHd == PrelBase_Z91Z93_closure)   	    	\
       RunnableThreadsHd = tso;    	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(RunnableThreadsTl) = tso;  	    	\
-    while(TSO_LINK(tso) != Prelude_Z91Z93_closure) {   	    	\
+    while(TSO_LINK(tso) != PrelBase_Z91Z93_closure) {   	    	\
       if (DO_QP_PROF)	    	    	    	    	\
         STGCALL3(void,(void *, char *, P_, P_),QP_Event2,do_qp_prof > 1 ? "RA" : "RG",tso,CurrentTSO);	\
       tso = TSO_LINK(tso);  	    	    	    	\
@@ -1540,12 +1540,12 @@ void Yield PROTO((W_));
 
 #define delayZh(liveness, us)				\
   {							\
-    if (WaitingThreadsTl == Prelude_Z91Z93_closure)		\
+    if (WaitingThreadsTl == PrelBase_Z91Z93_closure)		\
       WaitingThreadsHd = CurrentTSO;			\
     else						\
       TSO_LINK(WaitingThreadsTl) = CurrentTSO;		\
     WaitingThreadsTl = CurrentTSO;			\
-    TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;			\
+    TSO_LINK(CurrentTSO) = PrelBase_Z91Z93_closure;			\
     TSO_EVENT(CurrentTSO) = (W_) ((us) < 1 ? 1 : (us)); \
     DO_YIELD(liveness << 1);				\
   }
@@ -1567,12 +1567,12 @@ void Yield PROTO((W_));
 
 #define waitReadZh(liveness, fd)			\
   {							\
-    if (WaitingThreadsTl == Prelude_Z91Z93_closure)		\
+    if (WaitingThreadsTl == PrelBase_Z91Z93_closure)		\
       WaitingThreadsHd = CurrentTSO;			\
     else						\
       TSO_LINK(WaitingThreadsTl) = CurrentTSO;		\
     WaitingThreadsTl = CurrentTSO;			\
-    TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;			\
+    TSO_LINK(CurrentTSO) = PrelBase_Z91Z93_closure;			\
     TSO_EVENT(CurrentTSO) = (W_) (-(fd));		\
     DO_YIELD(liveness << 1);				\
   }
@@ -1598,12 +1598,12 @@ void Yield PROTO((W_));
 
 #define waitWriteZh(liveness, fd)			\
   {							\
-    if (WaitingThreadsTl == Prelude_Z91Z93_closure)		\
+    if (WaitingThreadsTl == PrelBase_Z91Z93_closure)		\
       WaitingThreadsHd = CurrentTSO;			\
     else						\
       TSO_LINK(WaitingThreadsTl) = CurrentTSO;		\
     WaitingThreadsTl = CurrentTSO;			\
-    TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;			\
+    TSO_LINK(CurrentTSO) = PrelBase_Z91Z93_closure;			\
     TSO_EVENT(CurrentTSO) = (W_) (-(fd+FD_SETSIZE));	\
     DO_YIELD(liveness << 1);				\
   }
@@ -1867,7 +1867,7 @@ Anything with tag >= 0 is in WHNF, so we discard it.
 \begin{code}
 #ifdef CONCURRENT
 
-ED_(Prelude_Z91Z93_closure);
+ED_(PrelBase_Z91Z93_closure);
 ED_(True_closure);
 
 #if defined(GRAN)
@@ -2093,12 +2093,12 @@ do {							 \
   ForeignObj_CLOSURE_LINK(result) = StorageMgrInfo.ForeignObjList; \
   StorageMgrInfo.ForeignObjList = result;			   \
 							\
-/*							\
-  printf("DEBUG: ForeignObj(0x%x) = <0x%x, 0x%x, 0x%x, 0x%x>\n",	\
+							\
+/*fprintf(stderr,"DEBUG: ForeignObj(0x%x) = <0x%x, 0x%x, 0x%x, 0x%x>\n",	\
       result,						\
       result[0],result[1],				\
-      result[2],result[3]);				\
-*/							\
+      result[2],result[3]);*/				\
+							\
   CHECK_ForeignObj_CLOSURE( result );			\
   VALIDATE_ForeignObjList( StorageMgrInfo.ForeignObjList ); \
 							\
