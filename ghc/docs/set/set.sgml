@@ -1,0 +1,19 @@
+<!DOCTYPE set PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
+<!ENTITY % ug-ent SYSTEM "../users_guide/ug-ent.sgml">
+<!ENTITY ug-book SYSTEM "../users_guide/ug-book.sgml">
+%ug-ent;
+<!ENTITY % hslibs-ent SYSTEM "../../../hslibs/doc/hslibs-ent.sgml">
+<!ENTITY hslibs-book  SYSTEM "../../../hslibs/doc/hslibs-book.sgml">
+%hslibs-ent;
+]>
+<Set>
+  
+<book>
+&ug-book;
+</book>
+
+<book>
+&hslibs-book;
+</book>
+
+</set>
