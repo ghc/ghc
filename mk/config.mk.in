@@ -38,6 +38,54 @@
 # included by boilerplate.mk (see boilerplate.mk for a list).
 
 
+#################################################################################
+#
+#		Project-wide platform variables
+#
+#################################################################################
+
+# A "platform" is the GNU cpu-type/manufacturer/operating-system target machine
+# specifier.  E.g. sparc-sun-solaris2
+
+HOSTPLATFORM			= @HostPlatform@
+TARGETPLATFORM			= @TargetPlatform@
+BUILDPLATFORM			= @HostPlatform@
+
+# Hack alert:
+# in one or two places, we need to get at the OS version (major and perhaps even minor),
+# HostOS_Full is the OS name reported by AC_CANONICAL_SYSTEM.
+#
+HostPlatform_CPP		= @HostPlatform_CPP@
+HostArch_CPP			= @HostArch_CPP@
+HostOS_CPP			= @HostOS_CPP@
+HostOS_Full			= @HostOS_Full@
+HostVendor_CPP	                = @HostVendor_CPP@
+
+#
+# ToDo: check if these can be purged now. -- sof
+#
+
+@HostPlatform_CPP@_HOST        = 1
+@HostPlatform_CPP@_TARGET      = 1
+@HostPlatform_CPP@_BUILD       = 1
+
+@HostArch_CPP@_HOST_ARCH       = 1
+@HostArch_CPP@_TARGET_ARCH	= 1
+@HostArch_CPP@_BUILD_ARCH      = 1
+
+@HostOS_CPP@_HOST_OS           = 1
+@HostOS_CPP@_TARGET_OS         = 1
+@HostOS_CPP@_BUILD_OS          = 1
+
+@HostVendor_CPP@_HOST_VENDOR    = 1
+@HostVendor_CPP@_TARGET_VENDOR  = 1
+@HostVendor_CPP@_BUILD_VENDOR   = 1
+
+# Leading underscores on symbol names in object files
+# Valid options: YES/NO
+#
+LeadingUnderscore=@LeadingUnderscore@
+
 
 #################################################################################
 #
@@ -153,7 +201,7 @@ GhcWithRegisterised=YES
 #
 # Target platforms supported:
 #   i386, alpha & sparc
-GhcWithNativeCodeGen=YES
+GhcWithNativeCodeGen=$(shell if (test x$(findstring $(HostArch_CPP),i386 alpha sparc) = x); then echo NO; else echo YES; fi)
 
 # Build the compiler with the deforester included?
 GhcWithDeforester=NO
@@ -369,54 +417,6 @@ endif
 #
 #	SRC_HC_OPTS += -O
 
-
-#################################################################################
-#
-#		Platform
-#
-#################################################################################
-
-# A "platform" is the GNU cpu-type/manufacturer/operating-system target machine
-# specifier.  E.g. sparc-sun-solaris2
-
-HOSTPLATFORM			= @HostPlatform@
-TARGETPLATFORM			= @TargetPlatform@
-BUILDPLATFORM			= @HostPlatform@
-
-# Hack alert:
-# in one or two places, we need to get at the OS version (major and perhaps even minor),
-# HostOS_Full is the OS name reported by AC_CANONICAL_SYSTEM.
-#
-HostPlatform_CPP		= @HostPlatform_CPP@
-HostArch_CPP			= @HostArch_CPP@
-HostOS_CPP			= @HostOS_CPP@
-HostOS_Full			= @HostOS_Full@
-HostVendor_CPP	                = @HostVendor_CPP@
-
-#
-# ToDo: check if these can be purged now. -- sof
-#
-
-@HostPlatform_CPP@_HOST        = 1
-@HostPlatform_CPP@_TARGET      = 1
-@HostPlatform_CPP@_BUILD       = 1
-
-@HostArch_CPP@_HOST_ARCH       = 1
-@HostArch_CPP@_TARGET_ARCH	= 1
-@HostArch_CPP@_BUILD_ARCH      = 1
-
-@HostOS_CPP@_HOST_OS           = 1
-@HostOS_CPP@_TARGET_OS         = 1
-@HostOS_CPP@_BUILD_OS          = 1
-
-@HostVendor_CPP@_HOST_VENDOR    = 1
-@HostVendor_CPP@_TARGET_VENDOR  = 1
-@HostVendor_CPP@_BUILD_VENDOR   = 1
-
-# Leading underscores on symbol names in object files
-# Valid options: YES/NO
-#
-LeadingUnderscore=@LeadingUnderscore@
 
 #################################################################################
 #
