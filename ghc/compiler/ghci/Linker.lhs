@@ -117,6 +117,9 @@ emptyPLS = PersistentLinkerState { closure_env = emptyNameEnv,
 
 -- Packages that don't need loading, because the compiler 
 -- shares them with the interpreted program.
+--
+-- The linker's symbol table is populated with RTS symbols using an
+-- explicit list.  See rts/Linker.c for details.
 init_pkgs_loaded = [ FSLIT("rts") ]
 \end{code}
 
