@@ -51,8 +51,21 @@ TD.decl {
   padding: 2px;
   background-color: #f0f0f0; 
   font-family: monospace;
-  white-space: nowrap;
   vertical-align: top;
+  }
+
+/* 
+  arg is just like decl, except that wrapping is not allowed.  It is
+  used for function and constructor arguments which have a text box
+  to the right, where if wrapping is allowed the text box squashes up
+  the declaration by wrapping it.
+*/
+TD.arg { 
+  padding: 2px;
+  background-color: #f0f0f0; 
+  font-family: monospace;
+  vertical-align: top;
+  white-space: nowrap;
   }
 
 TD.recfield { padding-left: 20px }
@@ -75,6 +88,11 @@ TD.rdoc  {
 TD.body  { 
   padding-left: 10px
   }
+
+TD.pkg {
+  width: 100%;
+  padding-left: 10px
+}
 
 TD.indexentry {
   vertical-align: top;

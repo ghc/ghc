@@ -6,7 +6,7 @@
 
 module HaddockHtml ( 
 	ppHtml, copyHtmlBits, 
-	ppHtmlIndex, ppHtmlContents
+	ppHtmlIndex, ppHtmlContents, foo
   ) where
 
 import Prelude hiding (div)
@@ -33,6 +33,8 @@ import Network.URI ( escapeString, unreserved )
 
 import Html
 import qualified Html
+
+foo = 42
 
 -- -----------------------------------------------------------------------------
 -- Files we need to copy from our $libdir
@@ -610,18 +612,18 @@ ppHsConstrHdr tvs ctxt
 
 ppSideBySideConstr :: HsConDecl -> HtmlTable
 ppSideBySideConstr (HsConDecl _ nm tvs ctxt typeList doc) =
-  declBox (hsep ((ppHsConstrHdr tvs ctxt +++ 
+  argBox (hsep ((ppHsConstrHdr tvs ctxt +++ 
 		ppHsBinder False nm) : map ppHsBangType typeList)) <->
   maybeRDocBox doc
 ppSideBySideConstr (HsRecDecl _ nm tvs ctxt fields doc) =
-  declBox (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm) <->
+  argBox (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm) <->
   maybeRDocBox doc </>
   (tda [theclass "body"] << spacedTable1 <<
      aboves (map ppSideBySideField fields))
 
 ppSideBySideField :: HsFieldDecl -> HtmlTable
 ppSideBySideField (HsFieldDecl ns ty doc) =
-  declBox (hsep (punctuate comma (map (ppHsBinder False) ns))
+  argBox (hsep (punctuate comma (map (ppHsBinder False) ns))
 	   <+> dcolon <+> ppHsBangType ty) <->
   maybeRDocBox doc
 
@@ -790,26 +792,26 @@ ppFunSig summary nm ty0 doc
 
 	do_args :: Html -> HsType -> HtmlTable
 	do_args leader (HsForAllType (Just tvs) ctxt ty)
-	  = (declBox (
+	  = (argBox (
 		leader <+> 
 		hsep (keyword "forall" : map ppHsName tvs ++ [toHtml "."]) <+>
 		ppHsIPContext ctxt)
 	      <-> rdocBox noHtml) </> 
 	    do_args darrow ty
 	do_args leader (HsForAllType Nothing ctxt ty)
-	  = (declBox (leader <+> ppHsIPContext ctxt)
+	  = (argBox (leader <+> ppHsIPContext ctxt)
 		<-> rdocBox noHtml) </> 
 	    do_args darrow ty
 	do_args leader (HsTyFun (HsTyDoc ty doc0) r)
-	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc0))
+	  = (argBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc0))
             </> do_args arrow r
 	do_args leader (HsTyFun ty r)
-	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox noHtml) </>
+	  = (argBox (leader <+> ppHsBType ty) <-> rdocBox noHtml) </>
 	    do_args arrow r
 	do_args leader (HsTyDoc ty doc0)
-	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc0))
+	  = (argBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc0))
 	do_args leader ty
-	  = declBox (leader <+> ppHsBType ty) <-> rdocBox (noHtml)
+	  = argBox (leader <+> ppHsBType ty) <-> rdocBox (noHtml)
 
 -- ----------------------------------------------------------------------------
 -- Types and contexts
@@ -1034,6 +1036,12 @@ text   = strAttr "TEXT"
 -- a box for displaying code
 declBox :: Html -> HtmlTable
 declBox html = tda [theclass "decl"] << html
+
+-- a box for displaying an 'argument' (some code which has text to the
+-- right of it).  Wrapping is not allowed in these boxes, whereas it is
+-- in a declBox.
+argBox :: Html -> HtmlTable
+argBox html = tda [theclass "arg"] << html
 
 -- a box for displaying documentation, 
 -- indented and with a little padding at the top
