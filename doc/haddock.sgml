@@ -853,9 +853,9 @@ module A where
     <section>
       <title>Markup</title>
 
-      <para>Haddock understands certain textual queues inside
+      <para>Haddock understands certain textual cues inside
       documentation annotations that tell it how to render the
-      documentation.  The queues (or <quote>markup</quote>) have been
+      documentation.  The cues (or <quote>markup</quote>) have been
       designed to be simple and mnemonic in ASCII so that the
       programmer doesn't have to deal with heavyweight annotations
       when editing documentation comments.</para>
