@@ -23,3 +23,10 @@ test('driver060', normal, run_command_ignore_output, ['$MAKE test060'])
 test('driver061', normal, run_command_ignore_output, ['$MAKE test061'])
 test('driver062', normal, run_command_ignore_output, ['$MAKE test062'])
 test('driver063', normal, run_command, ['$MAKE -s --no-print-directory test063'])
+clean(['B/C.hi', 'B/C.o', 'B/C.ooo', 'B/C.xhi',
+       'd1/P/Q.o', 'd2/R/S.o', 'd1/P/Q.hi', 'd2/R/S.hi',
+       'A.ooo', 'A.xhi', 'Hello.hi', 'Hello.o', 'hello'])
+
+if default_testopts.cleanup != '':
+    os.spawnlp(os.P_WAIT, 'rm', 'rm', '-rf', in_testdir('obj'))
+    os.spawnlp(os.P_WAIT, 'rm', 'rm', '-rf', in_testdir('hi'))

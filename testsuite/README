@@ -177,6 +177,7 @@ these steps:
 		set_stdin(file)       use a different file for stdin
 		exit_code(n)	      expect an exit code of 'n' from the prog
 		extra_run_opts(opts)  pass some extra opts to the prog
+		no_clean              don't clean up after this test
 
 		you can compose two of these functions together by
 		saying compose(f,g).  For example, to expect an exit

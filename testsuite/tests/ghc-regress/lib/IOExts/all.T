@@ -19,3 +19,4 @@ test('trace001', omit_ways(['opt','optasm','optextcore']), compile_and_run, ['']
 test('hGetBuf001', normal, compile_and_run, [''])
 test('hPutBuf001', normal, compile_and_run, [''])
 test('hPutBuf002', normal, compile_and_run, [''])
+clean(['hPutBuf002.out'])

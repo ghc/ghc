@@ -15,6 +15,7 @@ test('fed001', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 # Omit GHCi for these two, as they use foreign export
 test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
 test('ffi002', omit_ways(['ghci']), compile_and_run, ['ffi002_c.c -no-hs-main'])
+clean(['ffi002_c.o'])
 
 if config.platform == 'alpha-dec-osf3':
 	f = skip

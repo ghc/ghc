@@ -10,3 +10,4 @@ def set_opts( opts ):
 
 test('okeefe_neural', set_opts, multimod_compile_and_run, \
 	['Main', '-package lang +RTS -M64m -RTS'])
+clean(['Main.hi'])

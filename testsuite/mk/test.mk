@@ -67,6 +67,7 @@ RUNTEST_OPTS +=  \
 	-e config.compiler_always_flags.append"(\"$(EXTRA_HC_OPTS)\")" \
 	-e config.platform=\"$(TARGETPLATFORM)\" \
 	-e config.wordsize=\"$(WORDSIZE)\" \
+	-e default_testopts.cleanup=\"$(CLEANUP)\" \
 	$(EXTRA_RUNTEST_OPTS)
 
 TESTS	     = 

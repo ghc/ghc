@@ -4,5 +4,6 @@ def f( opts ):
 
 setTestOpts(f)
 
-test('Cpr001_imp', normal, compile, [''])
+test('Cpr001_imp', no_clean, compile, [''])
 test('Cpr001', normal, compile, [''])
+clean(['Cpr001_imp.hi', 'Cpr001_imp.o', 'Cpr001_imp.comp.stderr'])

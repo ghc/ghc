@@ -8,6 +8,7 @@ import string
 import re
 import traceback
 import copy
+import glob
 
 from string import join
 from testutil import *
@@ -134,6 +135,10 @@ class TestOptions:
        # expected exit code
        self.exit_code = 0
 
+       # should we clean up after ourselves?
+       self.cleanup = ''
+
+
 
 # The default set of options
 global default_testopts
@@ -243,6 +248,9 @@ def extra_run_opts( val ):
 def _extra_run_opts( opts, v ):
     opts.extra_run_opts = v
 
+def no_clean( opts ):
+    opts.cleanup = '';
+
 # ----
 # Function for composing two opt-fns together
 
@@ -291,6 +299,24 @@ def test( name, setup, func, args ):
     for way in ways:
         do_test( name, way, setup, func, args )
 
+    clean(map (lambda suff: name + suff,
+              ['', '.genscript', '.run.stderr', '.run.stdout',
+               '.comp.stderr', '.comp.stdout',
+               '.interp.stderr', '.interp.stdout',
+               '.hi', '.o', '.prof', '.hc', '_stub.h', '_stub.c',
+                '_stub.o']))
+
+def clean(names):
+    clean_full_paths(map (lambda name: in_testdir(name), names))
+
+def clean_o_hi():
+    clean_full_paths(glob.glob(in_testdir('*.o')) + glob.glob(in_testdir('*.hi')))
+
+def clean_full_paths(names):
+    if testopts.cleanup != '':
+        for name in names:
+            if os.access(name, os.F_OK) :
+                os.remove(name)
 
 def do_test(name, way, setup, func, args):
     full_name = name + '(' + way + ')'

@@ -172,14 +172,16 @@ test('tc169', normal, compile, [''])
 # which we do by steam here, with a pair of tests.  Make sure
 # we run one way only, so we can be sure to have the right kind
 # of interface file for the second part of the test.
-test('Tc170_Aux', only_ways(['opt']), compile, [''])
+test('Tc170_Aux', compose(no_clean, only_ways(['opt'])), compile, [''])
 test('tc170', only_ways(['opt']), compile, [''])
+clean(['Tc170_Aux.comp.stderr', 'Tc170_Aux.hi', 'Tc170_Aux.o'])
 
 test('tc171', normal, compile, [''])
 test('tc172', normal, compile, [''])
 
 # The point about this test is that it compiles Tc173a and Tc173b *separately*
 test('tc173', normal, run_command_ignore_output, ['make tc173'])
+clean(['Tc173a.hi', 'Tc173a.o', 'Tc173b.hi', 'Tc173b.o'])
 
 test('tc174', normal, compile, [''])
 test('tc175', expect_fail, compile, [''])

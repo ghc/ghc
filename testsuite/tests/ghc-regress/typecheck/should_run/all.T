@@ -29,6 +29,7 @@ test('tcrun022', normal, compile_and_run, ['-O -fglasgow-exts'])
 test('tcrun023', normal, compile_and_run, ['-O'])
 test('tcrun024', normal, compile_and_run, ['-O'])
 test('tcrun025', normal, multimod_compile_and_run, ['tcrun025',''])
+clean(['TcRun025_B.hi', 'TcRun025_B.o'])
 test('tcrun026', normal, compile_and_run, [''])
 test('tcrun027', normal, compile_and_run, [''])
 # Doesn't work with External Core due to datatype with no constructors

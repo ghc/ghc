@@ -21,6 +21,7 @@ test('TH_reifyType2', normal, compile, [''])
 test('TH_spliceDecl1', normal, compile, ['-v0'])
 test('TH_spliceDecl2', normal, compile, ['-v0'])
 test('TH_spliceDecl3', normal, multimod_compile, ['TH_spliceDecl3', '-v0'])
+clean(['TH_spliceDecl3_Lib.hi', 'TH_spliceDecl3_Lib.o'])
 
 test('TH_spliceE1', normal, compile_and_run, [''])
 test('TH_spliceExpr1', normal, compile, ['-v0'])
