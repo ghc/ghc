@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.21 2000/03/23 17:45:17 simonpj Exp $
+% $Id: Costs.lhs,v 1.22 2000/04/10 13:59:17 simonmar Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ import Panic		( trace )
 
 -- --------------------------------------------------------------------------
 data CostRes = Cost (Int, Int, Int, Int, Int)
-	       deriving (Text)
+	       deriving (Show)
 
 nullCosts    = Cost (0, 0, 0, 0, 0) :: CostRes
 initHdrCosts = Cost (2, 0, 0, 1, 0) :: CostRes
