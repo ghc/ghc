@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.3 1999/06/02 15:50:25 simonmar Exp $
+$Id: Parser.y,v 1.4 1999/06/02 16:05:56 simonmar Exp $
 
 Haskell grammar.
 
@@ -34,7 +34,7 @@ import GlaExts
 
 {-
 -----------------------------------------------------------------------------
-Conflicts: 13 shift/reduce
+Conflicts: 14 shift/reduce
 
 8 for abiguity in 'if x then y else z + 1'
 	(shift parses as 'if x then y else (z + 1)', as per longest-parse rule)
@@ -51,6 +51,10 @@ Conflicts: 13 shift/reduce
 	it's always treated as a quantifier, hence the above is disallowed.
 	This saves explicitly defining a grammar for the rule lhs that
 	doesn't include 'forall'.
+
+1 for ambiguity in 'x @ Rec{..}'.  
+	Only sensible parse is 'x @ (Rec{..})', which is what resolving
+	to shift gives us.
 
 -----------------------------------------------------------------------------
 -}
@@ -662,7 +666,7 @@ aexp1	:: { RdrNameHsExpr }
 	| '[' list ']'                  { $2 }
 	| '(' infixexp qop ')'		{ SectionL $2 $3  }
 	| '(' qopm infixexp ')'		{ SectionR $2 $3 }
-	| qvar '@' aexp1		{ EAsPat $1 $3 }
+	| qvar '@' aexp			{ EAsPat $1 $3 }
 	| '_'				{ EWildPat }
 	| '~' aexp1			{ ELazyPat $2 }
 
