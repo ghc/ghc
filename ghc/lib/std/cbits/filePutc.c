@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: filePutc.c,v 1.3 1998/12/02 13:27:29 simonm Exp $
+ * $Id: filePutc.c,v 1.4 1999/01/12 10:53:02 sewardj Exp $
  *
  * hPutChar Runtime Support
  */
@@ -70,7 +70,7 @@ StgChar c;
       return rc;
     }
 
-    if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady(ptr,0) != 1 )
+    if ( fo->flags & FILEOBJ_NONBLOCKING_IO )
       return FILEOBJ_BLOCKED_WRITE;
 
     /* Unbuffered, write the character directly. */
