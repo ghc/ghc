@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.52 2001/02/13 17:13:39 sewardj Exp $
+-- $Id: Main.hs,v 1.53 2001/02/14 11:36:07 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -334,12 +334,12 @@ beginInteractive :: [String] -> IO ()
 beginInteractive = throwDyn (OtherError "not built for interactive use")
 #else
 beginInteractive fileish_args
-  = do let is_libraryish nm
+  = do minus_ls <- readIORef v_Cmdline_libraries
+       let is_libraryish nm
               = let nmr = map toLower (reverse nm)
-                    in take 2 nmr == "o." ||
-                       take 3 nmr == "os." ||
-                       take 4 nmr == "lld."
-           libs = filter is_libraryish fileish_args
+                    in take 2 nmr == "o."
+           libs = map Left (filter is_libraryish fileish_args)
+                  ++ map Right minus_ls
            mods = filter (not.is_libraryish) fileish_args
            mod = case mods of
 	            []    -> Nothing

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.50 2001/02/14 11:03:59 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.51 2001/02/14 11:36:07 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -108,7 +108,7 @@ helpText = "\
 \                         (eg. -v2, -fglasgow-exts, etc.)\n\ 
 \"
 
-interactiveUI :: CmState -> Maybe FilePath -> [String] -> IO ()
+interactiveUI :: CmState -> Maybe FilePath -> [LibrarySpec] -> IO ()
 interactiveUI cmstate mod cmdline_libs = do
    hFlush stdout
    hSetBuffering stdout NoBuffering
@@ -671,14 +671,26 @@ ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
 -----------------------------------------------------------------------------
 -- package loader
 
-linkPackages :: [String] -> [Package] -> IO ()
-linkPackages cmdline_libs pkgs
-   = do mapM preloadLib cmdline_libs
-        mapM_ linkPackage pkgs
+-- Left: full path name of a .o file, including trailing .o
+-- Right: "unadorned" name of a .DLL/.so
+--        e.g.    On unix     "qt"  denotes "libqt.so"
+--                On WinDoze  "burble"  denotes "burble.DLL"
+--        addDLL is platform-specific and adds the lib/.so/.DLL
+--        prefixes plaform-dependently; we don't do that here.
+type LibrarySpec
+   = Either FilePath String
+
+showLS (Left nm)  = "(static) " ++ nm
+showLS (Right nm) = "(dynamic) " ++ nm
+
+linkPackages :: [LibrarySpec] -> [Package] -> IO ()
+linkPackages cmdline_lib_specs pkgs
+   = do mapM_ linkPackage pkgs
+        mapM_ preloadLib cmdline_lib_specs
      where
-        preloadLib orig_name
-           = do putStr ("Loading object " ++ orig_name ++ " ... ")
-                case classify orig_name of
+        preloadLib lib_spec
+           = do putStr ("Loading object " ++ showLS lib_spec ++ " ... ")
+                case lib_spec of
                    Left static_ish
                       -> do b <- doesFileExist static_ish
                             if    not b
@@ -695,24 +707,6 @@ linkPackages cmdline_libs pkgs
                                      croak
 
         croak = throwDyn (OtherError "user specified .o/.so/.DLL could not be loaded.")
-
-        classify a_lib
-           = let a_libr = reverse a_lib
-             in  
-             case map toLower a_libr of
-                ('o':'.':_) 
-                   -> Left a_lib
-                ('o':'s':'.':_) 
-                   -> (Right . zap_leading_lib
-                             . reverse . drop 3 . reverse) a_lib
-                ('l':'l':'d':'.':_) 
-                   -> (Right . reverse . drop 4 . reverse) a_lib
-                other 
-                   -> -- Main.beginInteractive should not have let this through
-                      pprPanic "linkPackages" (text (show a_lib))
-                      
-        zap_leading_lib str
-           = if take 3 str == "lib" then drop 3 str else str
 
 
 linkPackage :: Package -> IO ()
@@ -737,7 +731,7 @@ linkPackage pkg
         isRight (Right _) = True
         isRight (Left _)  = False
 
-loadClassified :: Either FilePath String -> IO ()
+loadClassified :: LibrarySpec -> IO ()
 loadClassified (Left obj_absolute_filename)
    = do loadObj obj_absolute_filename
 loadClassified (Right dll_unadorned)
@@ -748,7 +742,7 @@ loadClassified (Right dll_unadorned)
                  throwDyn (OtherError ("can't find .o or .so/.DLL for: " 
                                        ++ dll_unadorned ++ " (" ++ str ++ ")" ))
 
-locateOneObj :: [FilePath] -> String -> IO (Either FilePath String)
+locateOneObj :: [FilePath] -> String -> IO LibrarySpec
 locateOneObj []     obj 
    = return (Right obj) -- we assume
 locateOneObj (d:ds) obj 
