@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.33 2001/12/12 14:31:42 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.34 2001/12/12 15:01:25 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -617,8 +617,8 @@ aggregateCensusInfo( void )
 	    drag_total += censuses[t].drag_total;
 	    censuses[t].void_total = void_total;
 	    censuses[t].drag_total = drag_total;
-	    ASSERT( censuses[t].void_total < censuses[t].not_used );
-	    ASSERT( censuses[t].drag_total < censuses[t].used );
+	    ASSERT( censuses[t].void_total <= censuses[t].not_used );
+	    ASSERT( censuses[t].drag_total <= censuses[t].used );
 	}
 	
 	return;
