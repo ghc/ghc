@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.36 1999/12/08 14:21:52 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.37 2000/01/06 11:57:50 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -8,8 +8,6 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
-
-#ifdef COMPILER
 
 #include "RtsFlags.h"
 #include "StgStartup.h"
@@ -1008,5 +1006,4 @@ FN_(delayzh_fast)
   FE_
 }
 
-#endif /* COMPILER */
 
