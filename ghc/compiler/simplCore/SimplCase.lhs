@@ -1,4 +1,4 @@
-%
+`%
 % (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[SimplCase]{Simplification of `case' expression}
@@ -18,10 +18,11 @@ import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
 import CoreUnfold	( Unfolding, SimpleUnfolding )
 import CoreUtils	( coreAltsType, nonErrorRHSs, maybeErrorApp,
-			  unTagBindersAlts
+			  unTagBindersAlts, unTagBinders, coreExprType
 			)
 import Id		( idType, isDataCon, getIdDemandInfo,
-			  SYN_IE(DataCon), GenId{-instance Eq-}
+			  SYN_IE(DataCon), GenId{-instance Eq-},
+			  SYN_IE(Id)
 			)
 import IdInfo		( willBeDemanded, DemandInfo )
 import Literal		( isNoRepLit, Literal{-instance Eq-} )
@@ -34,7 +35,8 @@ import Type		( isPrimType, getAppDataTyConExpandingDicts, mkFunTy, mkFunTys, eqT
 import TysPrim		( voidTy )
 import Unique		( Unique{-instance Eq-} )
 import Usage		( GenUsage{-instance Eq-} )
-import Util		( isIn, isSingleton, zipEqual, panic, assertPanic )
+import Util		( SYN_IE(Eager), runEager, appEager,
+			  isIn, isSingleton, zipEqual, panic, assertPanic )
 \end{code}
 
 Float let out of case.
@@ -44,7 +46,7 @@ simplCase :: SimplEnv
 	  -> InExpr	-- Scrutinee
 	  -> InAlts	-- Alternatives
 	  -> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
-	  -> OutType				-- Type of result expression
+	  -> OutType					-- Type of result expression
 	  -> SmplM OutExpr
 
 simplCase env (Let bind body) alts rhs_c result_ty
@@ -109,7 +111,7 @@ simplCase env (Case inner_scrut inner_alts) outer_alts rhs_c result_ty
     else
 	bindLargeAlts env outer_alts rhs_c result_ty	`thenSmpl` \ (extra_bindings, outer_alts') ->
 	let
-	   rhs_c' = \env rhs -> simplExpr env rhs []
+	   rhs_c' = \env rhs -> simplExpr env rhs [] result_ty
 	in
 	simplCase env inner_scrut inner_alts
 		  (\env rhs -> simplCase env rhs outer_alts' rhs_c' result_ty)
@@ -129,10 +131,9 @@ simplCase env scrut alts rhs_c result_ty
   | maybeToBool maybe_error_app
   = 	-- Look for an application of an error id
     tick CaseOfError 	`thenSmpl_`
-    rhs_c env retyped_error_app
+    returnSmpl retyped_error_app
   where
-    alts_ty 	    	   = coreAltsType (unTagBindersAlts alts)
-    maybe_error_app 	   = maybeErrorApp scrut (Just alts_ty)
+    maybe_error_app 	   = maybeErrorApp scrut (Just result_ty)
     Just retyped_error_app = maybe_error_app
 \end{code}
 
@@ -140,9 +141,18 @@ Finally the default case
 
 \begin{code}
 simplCase env other_scrut alts rhs_c result_ty
-  = 	-- Float the let outside the case scrutinee
-    simplExpr env other_scrut []	`thenSmpl` \ scrut' ->
+  = simplTy env scrut_ty			`appEager` \ scrut_ty' ->
+    simplExpr env' other_scrut [] scrut_ty	`thenSmpl` \ scrut' ->
     completeCase env scrut' alts rhs_c
+  where
+	-- When simplifying the scrutinee of a complete case that
+	-- has no default alternative
+    env' = case alts of
+		AlgAlts _ NoDefault  -> setCaseScrutinee env
+		PrimAlts _ NoDefault -> setCaseScrutinee env
+		other		     -> env
+
+    scrut_ty = coreExprType (unTagBinders other_scrut)
 \end{code}
 
 
@@ -355,7 +365,7 @@ completeCase env scrut alts rhs_c
 	-- the scrutinee.  Remember that the rhs is as yet unsimplified.
     rhs1_is_scrutinee = case (scrut, rhs1) of
 			  (Var scrut_var, Var rhs_var)
-				-> case lookupId env rhs_var of
+				-> case (runEager $ lookupId env rhs_var) of
 				    VarArg rhs_var' -> rhs_var' == scrut_var
 				    other	    -> False
 			  other -> False
@@ -440,14 +450,16 @@ bindLargeRhs env args rhs_ty rhs_c
 		App (Var prim_rhs_fun_id) (VarArg voidId))
 
   | otherwise
-  = 	-- Make the new binding Id.  NB: it's an OutId
-    newId rhs_fun_ty 		`thenSmpl` \ rhs_fun_id ->
-
-	-- Generate its rhs
+  =	-- Generate the rhs
     cloneIds env used_args	`thenSmpl` \ used_args' ->
     let
 	new_env = extendIdEnvWithClones env used_args used_args'
+	rhs_fun_ty :: OutType
+	rhs_fun_ty = mkFunTys (map idType used_args') rhs_ty
     in
+
+	-- Make the new binding Id.  NB: it's an OutId
+    newId rhs_fun_ty 		`thenSmpl` \ rhs_fun_id ->
     rhs_c new_env		`thenSmpl` \ rhs' ->
     let
 	final_rhs = mkValLam used_args' rhs'
@@ -459,8 +471,6 @@ bindLargeRhs env args rhs_ty rhs_c
 	-- it's processed the OutId won't be found in the environment, so it
 	-- will be left unmodified.
   where
-    rhs_fun_ty :: OutType
-    rhs_fun_ty = mkFunTys [simplTy env (idType id) | (id,_) <- used_args] rhs_ty
 
     used_args      = [arg | arg@(_,usage) <- args, not (dead usage)]
     used_arg_atoms = [VarArg arg_id | (arg_id,_) <- used_args]
@@ -505,8 +515,7 @@ simplAlts env scrut (AlgAlts alts deflt) rhs_c
 	    new_env = case scrut of
 		       Var v -> extendEnvGivenNewRhs env1 v (Con con args)
 			     where
-				(_, ty_args, _) = --trace "SimplCase.getAppData..." $
-						  getAppDataTyConExpandingDicts (idType v)
+				(_, ty_args, _) = getAppDataTyConExpandingDicts (idType v)
 				args = map TyArg ty_args ++ map VarArg con_args'
 
 		       other -> env1

@@ -27,7 +27,7 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), switchIsOn,
 import CoreLint		( lintCoreBindings )
 import CoreSyn
 import CoreUtils	( coreExprType )
-import SimplUtils	( etaCoreExpr )
+import SimplUtils	( etaCoreExpr, typeOkForCase )
 import CoreUnfold
 import Literal		( Literal(..), literalType, mkMachInt )
 import ErrUtils		( ghcExit )
@@ -35,19 +35,20 @@ import FiniteMap	( FiniteMap )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FoldrBuildWW	( mkFoldrBuildWW )
-import Id		( mkSysLocal, setIdVisibility,
+import Id		( mkSysLocal, setIdVisibility, mkIdWithNewName, getIdDemandInfo, idType,
 			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
- 			  lookupIdEnv, SYN_IE(IdEnv),
-			  GenId{-instance Outputable-}
+ 			  lookupIdEnv, SYN_IE(IdEnv), omitIfaceSigForId,
+			  GenId{-instance Outputable-}, SYN_IE(Id)
 			)
-import Name		( isExported, isLocallyDefined )
+import IdInfo		( willBeDemanded, DemandInfo )
+import Name		( isExported, isLocallyDefined, SYN_IE(Module), NamedThing(..) )
 import TyCon		( TyCon )
 import PrimOp		( PrimOp(..) )
 import PrelVals		( unpackCStringId, unpackCString2Id,
 			  integerZeroId, integerPlusOneId,
 			  integerPlusTwoId, integerMinusOneId
 			)
-import Type		( maybeAppDataTyCon, getAppDataTyConExpandingDicts, maybeAppSpecDataTyConExpandingDicts )
+import Type		( maybeAppDataTyCon, isPrimType, SYN_IE(Type) )
 import TysWiredIn	( stringTy )
 import LiberateCase	( liberateCase )
 import MagicUFs		( MagicUnfoldingFun )
@@ -55,7 +56,7 @@ import Outputable	( Outputable(..){-instance * (,) -} )
 import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
-import Pretty		( ppShow, ppAboves, ppAbove, ppCat )
+import Pretty		( Doc, vcat, ($$), hsep )
 import SAT		( doStaticArgs )
 import SimplMonad	( zeroSimplCount, showSimplCount, SimplCount )
 import SimplPgm		( simplifyPgm )
@@ -64,7 +65,8 @@ import SpecUtils	( pprSpecErrs )
 import StrictAnal	( saWwTopBinds )
 import TyVar		( nullTyVarEnv, GenTyVar{-instance Eq-} )
 import Unique		( integerTyConKey, ratioTyConKey, Unique{-instance Eq-} )
-import UniqSupply	( splitUniqSupply, getUnique )
+import UniqFM           ( Uniquable(..) )
+import UniqSupply	( splitUniqSupply, getUnique, UniqSupply )
 import Util		( mapAccumL, assertPanic, panic{-ToDo:rm-}, pprTrace, pprPanic )
 import SrcLoc		( noSrcLoc )
 import Constants	( tARGET_MIN_INT, tARGET_MAX_INT )
@@ -207,7 +209,7 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 		   -- if we got errors, we die straight away
 		   (if not spec_noerrs ||
 		       (opt_ShowImportSpecs && not (isEmptyBag spec_warn)) then
-			hPutStr stderr (ppShow 1000 {-pprCols-}
+			hPutStr stderr (show
 			    (pprSpecErrs module_name spec_errs spec_warn spec_tyerrs))
 			>> hPutStr stderr "\n"
 		    else
@@ -250,8 +252,8 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	 then
 	    hPutStr stderr ("\n*** "++what++":\n")
 		>>
-	    hPutStr stderr (ppShow 1000
-		(ppAboves (map (pprCoreBinding ppr_style) binds2)))
+	    hPutStr stderr (show
+		(vcat (map (pprCoreBinding ppr_style) binds2)))
 		>>
 	    hPutStr stderr "\n"
 	 else
@@ -324,6 +326,9 @@ Several tasks are done by @tidyCorePgm@
 	nuke them if possible.   (In general the simplifier does eta expansion not
 	eta reduction, up to this point.)
 
+8.	Do let-to-case.  See notes in Simplify.lhs for why we defer let-to-case
+	for multi-constructor types.
+
 
 Eliminate indirections
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -383,15 +388,48 @@ tidyCorePgm mod us binds_in
     (indirection_env, reduced_binds) = mapAccumL try_bind nullIdEnv binds_in
 
     try_bind :: IdEnv Id -> CoreBinding -> (IdEnv Id, Maybe CoreBinding)
-    try_bind env_so_far
-	     (NonRec exported_binder (Var local_id))
+    try_bind env_so_far (NonRec exported_binder rhs)
 	| isExported exported_binder &&		-- Only if this is exported
-	  isLocallyDefined local_id &&		-- Only if this one is defined in this
-	  not (isExported local_id) &&		-- 	module, so that we *can* change its
+	  maybeToBool maybe_rhs_id &&		-- 	and the RHS is a simple Id
+
+	  isLocallyDefined rhs_id &&		-- Only if this one is defined in this
+	  					-- 	module, so that we *can* change its
 					  	-- 	binding to be the exported thing!
-	  not (maybeToBool (lookupIdEnv env_so_far local_id))
+
+	  not (isExported rhs_id) &&		-- Only if this one is not itself exported,
+						--	since the transformation will nuke it
+
+	  not (omitIfaceSigForId rhs_id) &&	-- Don't do the transformation if rhs_id is
+						-- 	something like a constructor, whose 
+						--	definition is implicitly exported and 
+						-- 	which must not vanish.
+		-- To illustrate the preceding check consider
+		--	data T = MkT Int
+		--	mkT = MkT
+		--	f x = MkT (x+1)
+		-- Here, we'll make a local, non-exported, defn for MkT, and without the
+		-- above condition we'll transform it to:
+		--	mkT = \x. MkT [x]
+		--	f = \y. mkT (y+1)
+		-- This is bad because mkT will get the IdDetails of MkT, and won't
+		-- be exported.  Also the code generator won't make a definition for
+		-- the MkT constructor.
+		-- Slightly gruesome, this.
+
+	  not (maybeToBool (lookupIdEnv env_so_far rhs_id))
 						-- Only if not already substituted for
-	= (addOneToIdEnv env_so_far local_id exported_binder, Nothing)
+
+	= (addOneToIdEnv env_so_far rhs_id new_rhs_id, Nothing)
+	where
+	   maybe_rhs_id = case etaCoreExpr rhs of
+				Var rhs_id -> Just rhs_id
+				other	   -> Nothing
+	   Just rhs_id  = maybe_rhs_id
+	   new_rhs_id   = mkIdWithNewName rhs_id (getName exported_binder)
+				-- NB: we keep the Pragmas and IdInfo for the old rhs_id!
+				-- This is important; it might be marked "no-inline" by
+				-- the occurrence analyser (because it's recursive), and
+				-- we must not lose that information.
 
     try_bind env_so_far bind
 	= (env_so_far, Just bind)
@@ -469,6 +507,14 @@ tidyCoreExpr (Lam bndr body)
   = tidyCoreExpr body		`thenTM` \ body' ->
     returnTM (Lam bndr body')
 
+	-- Try for let-to-case (see notes in Simplify.lhs for why
+	-- some let-to-case stuff is deferred to now).
+tidyCoreExpr (Let (NonRec bndr rhs) body)
+  | willBeDemanded (getIdDemandInfo bndr) && 
+    typeOkForCase (idType bndr)
+  = ASSERT( not (isPrimType (idType bndr)) )
+    tidyCoreExpr (Case rhs (AlgAlts [] (BindDefault bndr body)))
+
 tidyCoreExpr (Let bind body)
   = tidyCoreBinding bind	`thenTM` \ bind' ->
     tidyCoreExprEta body	`thenTM` \ body' ->
@@ -491,7 +537,7 @@ tidyCoreExpr (Case scrut@(Prim op args) (PrimAlts _ (BindDefault binder rhs)))
 
 -- Eliminate polymorphic case, for which we can't generate code just yet
 tidyCoreExpr (Case scrut (AlgAlts [] (BindDefault deflt_bndr rhs)))
-  | not (maybeToBool (maybeAppSpecDataTyConExpandingDicts (coreExprType scrut)))
+  | not (typeOkForCase (idType deflt_bndr))
   = pprTrace "Warning: discarding polymorphic case:" (ppr PprDebug scrut) $
     case scrut of
 	Var v -> extendEnvTM deflt_bndr v (tidyCoreExpr rhs)
