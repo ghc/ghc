@@ -163,8 +163,7 @@ newPkgCache pkgs = do
     		pkg_name = _PK_ (name pkg)
     	    let addDir fm dir = do
     		    contents <- getDirectoryContents' dir
-		    let clean_contents = filter isUsefulFile contents
-    		    return (addListToFM fm (zip clean_contents 
+    		    return (addListToFM fm (zip contents 
     					       (repeat (pkg_name,dir))))
     	    foldM addDir fm dirs
     
