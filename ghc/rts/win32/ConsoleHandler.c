@@ -83,7 +83,6 @@ void initDefaultHandlers(void)
     if ( !SetConsoleCtrlHandler(shutdown_handler, TRUE) ) {
 	prog_belch("warning: failed to install default console handler");
     }
-
 }
 
 
@@ -221,8 +220,11 @@ stg_InstallConsoleEvent(int action, StgStablePtr *handler)
 	break;
     case STG_SIG_HAN:
 	console_handler = (StgInt)*handler;
-	if ( !SetConsoleCtrlHandler(generic_handler, TRUE) ) {
+	if ( previous_hdlr < 0 ) {
+	  /* Only install generic_handler() once */
+	  if ( !SetConsoleCtrlHandler(generic_handler, TRUE) ) {
 	    prog_belch("warning: unable to install console event handler");
+	  }
 	}
 	break;
     }
