@@ -256,12 +256,8 @@ uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1)
 	(_, UnBound) |  kind1 `hasMoreBoxityInfo` kind2
 		     -> tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
 
--- TEMPORARY FIX
---	(DontBind,DontBind) 
---		     -> failTc (unifyDontBindErr tv1 ps_ty2)
-
--- TEMPORARILY allow two type-sig variables to be bound together.
--- See notes in tcCheckSigVars
+-- Allow two type-sig variables to be bound together.
+-- They may be from the same binding group, so it may be OK.
 	(DontBind,DontBind) |  kind2 `hasMoreBoxityInfo` kind1
 		            -> tcWriteTyVar tv1 ps_ty2		`thenNF_Tc_` returnTc ()
 	
