@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.42 2001/06/12 17:07:23 simonmar Exp $
+-- $Id: DriverState.hs,v 1.43 2001/06/13 10:23:23 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -346,12 +346,12 @@ addPackage package
 getPackageImportPath   :: IO [String]
 getPackageImportPath = do
   ps <- getPackageInfo
-  munge_paths (concatMap import_dirs ps)
+  return (nub (filter (not.null) (concatMap import_dirs ps)))
 
 getPackageIncludePath   :: IO [String]
 getPackageIncludePath = do
   ps <- getPackageInfo
-  munge_paths (concatMap include_dirs ps)
+  return (nub (filter (not.null) (concatMap include_dirs ps)))
 
 	-- includes are in reverse dependency order (i.e. rts first)
 getPackageCIncludes   :: IO [String]
@@ -362,7 +362,7 @@ getPackageCIncludes = do
 getPackageLibraryPath  :: IO [String]
 getPackageLibraryPath = do
   ps <- getPackageInfo
-  munge_paths (concatMap library_dirs ps)
+  return (nub (filter (not.null) (concatMap library_dirs ps)))
 
 getPackageLibraries    :: IO [String]
 getPackageLibraries = do
@@ -405,13 +405,6 @@ lookupPkg nm ps
    = case [p | p <- ps, name p == nm] of
         []    -> Nothing
         (p:_) -> Just p
-
-munge_paths ps = do
-  topdir <- readIORef v_TopDir
-  return (nub (filter (not.null) (map (munge_path topdir) ps)))
- where munge_path topdir p 
-	  | Just p' <- my_prefix_match "$libdir" p = topdir ++ p'
-	  | otherwise = p
 
 -----------------------------------------------------------------------------
 -- Ways

@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.67 2001/05/31 11:32:25 simonmar Exp $
+-- $Id: Main.hs,v 1.68 2001/06/13 10:23:23 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -167,7 +167,7 @@ main =
 	Left err -> throwDyn (InstallationError (showSDoc err));
 	Right pkg_details -> do
 
-   writeIORef v_Package_details pkg_details
+   writeIORef v_Package_details (mungePackagePaths top_dir pkg_details)
 
 	-- find the phase to stop after (i.e. -E, -C, -c, -S flags)
    (flags2, mode, stop_flag) <- getGhcMode argv'
@@ -317,8 +317,10 @@ main =
    when (mode == DoLink) (doLink o_files)
    when (mode == DoMkDLL) (doMkDLL o_files)
   }
-	-- grab the last -B option on the command line, and
-	-- set topDir to its value.
+
+
+-- grab the last -B option on the command line, and
+-- set topDir to its value.
 setTopDir :: [String] -> IO [String]
 setTopDir args = do
   let (minusbs, others) = partition (prefixMatch "-B") args
@@ -326,6 +328,23 @@ setTopDir args = do
     []   -> throwDyn (InstallationError ("missing -B<dir> option"))
     some -> writeIORef v_TopDir (drop 2 (last some)))
   return others
+
+
+-- replace the string "$libdir" at the beginning of a path with the
+-- current TOPDIR (obtained from the -B option if present, or the
+-- wired-in libdir otherwise).
+mungePackagePaths top_dir ps = map munge_pkg ps
+ where 
+  munge_pkg p = p{ import_dirs  = munge_paths (import_dirs p),
+		   include_dirs = munge_paths (include_dirs p),
+    		   library_dirs = munge_paths (library_dirs p) }
+
+  munge_paths = map munge_path
+
+  munge_path p 
+	  | Just p' <- my_prefix_match "$libdir" p = top_dir ++ p'
+	  | otherwise = trace ("not: " ++ p) p
+
 
 beginMake :: [String] -> IO ()
 beginMake fileish_args
