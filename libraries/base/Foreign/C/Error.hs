@@ -116,7 +116,7 @@ import System.IO.Unsafe		( unsafePerformIO )
 #endif
 
 #ifdef __HUGS__
-{-# CBITS errno.c #-}
+{-# CBITS PrelIOUtils.c #-}
 #endif
 
 
