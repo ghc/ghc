@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.18 2001/12/13 00:59:57 sof Exp $
+-- $Id: Main.hs,v 1.19 2001/12/30 19:51:33 sof Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -35,7 +35,7 @@ main = do
 data Flag 
   = Config FilePath
   | Input FilePath
-  | List | Add | Remove String | Show String 
+  | List | Add | Update | Remove String | Show String 
   | Field String | AutoGHCiLibs
 
 isAction (Config _)     = False
@@ -53,6 +53,8 @@ flags = [
  	"List the currently installed packages",
   Option ['a'] ["add-package"] (NoArg Add)
  	"Add a new package",
+  Option ['u'] ["update-package"] (NoArg Update)
+ 	"Update package with new configuration",
   Option ['i'] ["input-file"] (ReqArg Input "FILE")
 	"Read new package info from specified file",
   Option ['s'] ["show-package"] (ReqArg Show "NAME")
@@ -108,7 +110,8 @@ runit clis = do
 
   case [ c | c <- clis, isAction c ] of
     [ List ]     -> listPackages details
-    [ Add  ]     -> addPackage details conf_file input_file auto_ghci_libs 
+    [ Add  ]     -> addPackage details conf_file input_file auto_ghci_libs False{-add-}
+    [ Update ]   -> addPackage details conf_file input_file auto_ghci_libs True{-update-}
     [ Remove p ] -> removePackage details conf_file p
     [ Show p ]   -> showPackage details conf_file p fields
     _            -> die (usageInfo usageHeader flags)
@@ -129,8 +132,8 @@ showPackage details pkgconf pkg_name fields =
 				(map (vcat . map text) (map ($pkg) fields))))
     _     -> die "showPackage: internal error"
 
-addPackage :: [PackageConfig] -> FilePath -> FilePath -> Bool -> IO ()
-addPackage details pkgconf inputFile auto_ghci_libs = do
+addPackage :: [PackageConfig] -> FilePath -> FilePath -> Bool -> Bool -> IO ()
+addPackage details pkgconf inputFile auto_ghci_libs updatePkg = do
   checkConfigAccess pkgconf
   s <-
     case inputFile of
@@ -143,20 +146,20 @@ addPackage details pkgconf inputFile auto_ghci_libs = do
   let new_pkg = read s :: PackageConfig
   eval_catch new_pkg (\_ -> die "parse error in package info")
   hPutStrLn stdout "done."
-  checkPackageConfig new_pkg details auto_ghci_libs
+  new_details <- validatePackageConfig new_pkg details auto_ghci_libs updatePkg
   savePackageConfig pkgconf
   maybeRestoreOldConfig pkgconf $
-    writeNewConfig pkgconf (details ++ [new_pkg])
+    writeNewConfig pkgconf new_details
 
 removePackage :: [PackageConfig] -> FilePath -> String -> IO ()
-removePackage details pkgconf pkg = do  
+removePackage details pkgconf pkgName = do  
   checkConfigAccess pkgconf
-  if (pkg `notElem` map name details)
-	then die ("package `" ++ pkg ++ "' not installed")
+  if (pkgName `notElem` map name details)
+	then die ("package `" ++ pkgName ++ "' not installed")
 	else do
   savePackageConfig pkgconf
   maybeRestoreOldConfig pkgconf $
-    writeNewConfig pkgconf (filter ((/= pkg) . name) details)
+    writeNewConfig pkgconf (filter ((/= pkgName) . name) details)
 
 checkConfigAccess :: FilePath -> IO ()
 checkConfigAccess pkgconf = do
@@ -194,7 +197,7 @@ savePackageConfig conf_file = do
   when doesExist (removeFile oldFile `catch` (const $ return ()))
   catch (renameFile conf_file oldFile)
   	(\ err -> do
-		hPutStrLn stderr (unwords [ "Unable to rename"
+		hPutStrLn stderr (unwords [ "Unable to rename "
 					  , show conf_file
 					  , " to "
 					  , show oldFile
@@ -206,9 +209,13 @@ savePackageConfig conf_file = do
 -- Sanity-check a new package config, and automatically build GHCi libs
 -- if requested.
 
-checkPackageConfig :: PackageConfig -> [PackageConfig] -> Bool -> IO ()
-checkPackageConfig pkg pkgs auto_ghci_libs = do
-  if (name pkg `elem` map name pkgs)
+validatePackageConfig :: PackageConfig 
+		      -> [PackageConfig]
+		      -> Bool
+		      -> Bool
+		      -> IO [PackageConfig]
+validatePackageConfig pkg pkgs auto_ghci_libs updatePkg = do
+  if (not updatePkg && (name pkg `elem` map name pkgs))
 	then die ("package `" ++ name pkg ++ "' is already installed")
 	else do
   mapM_	(checkDep pkgs) (package_deps pkg)
@@ -220,6 +227,10 @@ checkPackageConfig pkg pkgs auto_ghci_libs = do
   -- ToDo: check these somehow?
   --	extra_libraries :: [String],
   --	c_includes      :: [String],
+  let existing_pkgs
+       | updatePkg = filter ((/=(name pkg)).name) pkgs  
+       | otherwise = pkgs
+  return (existing_pkgs ++ [pkg])
 
 checkDir d = do
   b <- doesDirectoryExist d
