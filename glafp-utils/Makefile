@@ -14,6 +14,6 @@ include $(TOP)/mk/boilerplate.mk
 #
 # ToDo: remove msub for good
 #
-SUBDIRS = mkdependC lndir ltx mkdirhier runstdtest sgmlverb
+SUBDIRS = mkdependC lndir ltx mkdirhier runstdtest sgmlverb docbook
 
 include $(TOP)/mk/target.mk
