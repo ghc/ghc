@@ -116,12 +116,10 @@ dsFImport nm ty may_not_gc ext_name cconv =
 	 (ioOkDataCon, ioDataCon, result_ty) = getIoOkDataCon io_res_ty
     in
     boxResult ioOkDataCon result_ty	`thenDs` \ (final_result_ty, res_wrapper) ->
+    (case ext_name of
+       Dynamic       -> getUniqueDs `thenDs` \ u -> returnDs (Right u)
+       ExtName fs _  -> returnDs (Left fs)) `thenDs` \ label ->
     let
-	label =
-	 case ext_name of
-	   Dynamic      -> Nothing
-	   ExtName fs _ -> Just fs
-
 	the_ccall_op = CCallOp label False (not may_not_gc) cconv
 			       (map coreExprType final_args)
 			       final_result_ty
@@ -348,7 +346,7 @@ dsFExportDynamic i ty ext_name cconv =
 		       Var stbl, 
 		       Lit (MachLitLit (_PK_ fe_nm) AddrRep)]
 
-       label	    = Just SLIT("createAdjustor")
+       label	    = Left SLIT("createAdjustor")
        the_ccall_op = CCallOp label False False{-won't GC-} cCallConv
 			      (map coreExprType ccall_args)
 			      stateAndAddrPrimTy

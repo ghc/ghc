@@ -32,6 +32,9 @@ import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply, UniqSupply )
 import Util		( assocDefaultUsing, panic )
+import CmdLineOpts      ( opt_ProduceC )
+import Maybes		( maybeToBool )
+import PrimOp		( PrimOp(..) )
 
 infixr 9 `thenFlt`
 \end{code}
@@ -443,6 +446,14 @@ flatAbsC (CSwitch discrim alts deflt)
 flatAbsC stmt@(CInitHdr a b cc u)
   = flatAmode cc	`thenFlt` \ (new_cc, tops) ->
     returnFlt (CInitHdr a b new_cc u, tops)
+
+flatAbsC stmt@(COpStmt results td@(CCallOp (Right _) _ _ _ _ _) args liveness_mask vol_regs)
+  | maybeToBool opt_ProduceC
+  = flatAmodes results		`thenFlt` \ (results_here, tops1) ->
+    flatAmodes args		`thenFlt` \ (args_here,    tops2) ->
+    let tdef = CCallTypedef td results args in
+    returnFlt (COpStmt results_here td args_here liveness_mask vol_regs,
+	       mkAbsCStmts tdef (mkAbsCStmts tops1 tops2))
 
 flatAbsC stmt@(COpStmt results op args liveness_mask vol_regs)
   = flatAmodes results		`thenFlt` \ (results_here, tops1) ->

@@ -356,7 +356,7 @@ tcCorePrim (UfOtherOp op)
 tcCorePrim (UfCCallOp str casm gc arg_tys res_ty)
   = mapTc tcHsType arg_tys	`thenTc` \ arg_tys' ->
     tcHsType res_ty		`thenTc` \ res_ty' ->
-    returnTc (CCallOp (Just str) casm gc cCallConv arg_tys' res_ty')
+    returnTc (CCallOp (Left str) casm gc cCallConv arg_tys' res_ty')
 \end{code}
 
 \begin{code}

@@ -150,6 +150,17 @@ stored in a mixed type location.)
   | CCallProfCtrMacro	FAST_STRING	[CAddrMode]
   | CCallProfCCMacro	FAST_STRING	[CAddrMode]
 
+    {- The presence of this constructor is a makeshift solution;
+       it being used to work around a gcc-related problem of
+       handling typedefs within statement blocks (or, rather,
+       the inability to do so.)
+       
+       The AbstractC flattener takes care of lifting out these
+       typedefs if needs be (i.e., when generating .hc code and
+       compiling 'foreign import dynamic's)
+    -}
+  | CCallTypedef        PrimOp{-CCallOp-} [CAddrMode] [CAddrMode]
+
   -- *** the next three [or so...] are DATA (those above are CODE) ***
 
   | CStaticClosure

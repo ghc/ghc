@@ -445,7 +445,7 @@ primCode [lhs] SeqOp [a]
 --    trace "SeqOp" $ 
     returnUs (\xs -> assign : xs)
 
-primCode lhs (CCallOp (Just fn) is_asm may_gc cconv arg_tys result_ty) rhs
+primCode lhs (CCallOp (Left fn) is_asm may_gc cconv arg_tys result_ty) rhs
   | is_asm = error "ERROR: Native code generator can't handle casm"
   | may_gc = error "ERROR: Native code generator can't handle _ccall_GC_\n"
   | otherwise

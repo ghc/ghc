@@ -96,7 +96,7 @@ dsCCall label args may_gc is_asm io_result_ty
     boxResult ioOkDataCon result_ty `thenDs` \ (final_result_ty, res_wrapper) ->
 
     let
-	the_ccall_op = CCallOp (Just label) is_asm may_gc cCallConv
+	the_ccall_op = CCallOp (Left label) is_asm may_gc cCallConv
 			       (map coreExprType final_args)
 			       final_result_ty
     in

@@ -30,6 +30,8 @@ import UniqSupply	( UniqSupply, UniqSM,
 			  returnUs, thenUs, initUs,
 			  mapUs, getUnique
 			)
+import PrimOp	        ( PrimOp(..) )
+			
 import Outputable	( panic )
 
 isLeakFreeType x y = False -- safe option; ToDo
@@ -241,10 +243,17 @@ coreExprToStg env (Con con args)
     returnUs (StgCon con stg_atoms bOGUS_LVs)
 
 coreExprToStg env (Prim op args)
-  = let
+  = mkPrimOpUnique op `thenUs` \ op' ->
+    let
 	(types, stg_atoms) = coreArgsToStg env args
     in
-    returnUs (StgPrim op stg_atoms bOGUS_LVs)
+    returnUs (StgPrim op' stg_atoms bOGUS_LVs)
+   where
+    mkPrimOpUnique (CCallOp (Right _) a b c d e) =
+       getUnique `thenUs` \ u ->
+       returnUs (CCallOp (Right u) a b c d e)
+    mkPrimOpUnique op = returnUs op
+
 \end{code}
 
 %************************************************************************

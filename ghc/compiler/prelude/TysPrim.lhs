@@ -87,6 +87,9 @@ getPrimRepInfo FloatRep      = ("Float",  floatPrimTy,  floatPrimTyCon)
 getPrimRepInfo DoubleRep     = ("Double", doublePrimTy, doublePrimTyCon)
 getPrimRepInfo Int64Rep      = ("Int64",  int64PrimTy,  int64PrimTyCon)
 getPrimRepInfo Word64Rep     = ("Word64", word64PrimTy, word64PrimTyCon)
+getPrimRepInfo StablePtrRep  = ("StablePtr", mkStablePtrPrimTy alphaTy, stablePtrPrimTyCon)
+getPrimRepInfo ForeignObjRep = ("ForeignObj", foreignObjPrimTy, foreignObjPrimTyCon)
+
 \end{code}
 
 %************************************************************************

@@ -233,6 +233,39 @@ pprAbsC stmt@(CCallProfCtrMacro op as) _
 pprAbsC stmt@(CCallProfCCMacro op as) _
   = hcat [ptext op, lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi]
+pprAbsC stmt@(CCallTypedef op@(CCallOp op_str is_asm may_gc cconv _ _) results args) _
+  =  hsep [ ptext SLIT("typedef")
+	  , ccall_res_ty
+	  , fun_nm
+	  , parens (hsep (punctuate comma ccall_decl_ty_args))
+	  ] <> semi
+    where
+     fun_nm       = parens (text (callConvAttribute cconv) <+> char '*' <> ccall_fun_ty)
+
+     ccall_fun_ty = 
+        case op_str of
+	  Right u -> ptext SLIT("_ccall_fun_ty") <> ppr u
+
+     ccall_res_ty = 
+       case non_void_results of
+          []       -> ptext SLIT("void")
+	  [amode]  -> text (showPrimRep (getAmodeRep amode))
+	  _	   -> panic "pprAbsC{CCallTypedef}: ccall_res_ty"
+
+     ccall_decl_ty_args = tail ccall_arg_tys
+     ccall_arg_tys      = map (text.showPrimRep.getAmodeRep) non_void_args
+
+      -- the first argument will be the "I/O world" token (a VoidRep)
+      -- all others should be non-void
+     non_void_args =
+	let nvas = tail args
+	in ASSERT (all non_void nvas) nvas
+
+      -- there will usually be two results: a (void) state which we
+      -- should ignore and a (possibly void) result.
+     non_void_results =
+	let nvrs = grab_non_void_amodes results
+	in ASSERT (length nvrs <= 1) nvrs
 
 pprAbsC (CCodeBlock label abs_C) _
   = ASSERT( maybeToBool(nonemptyAbsC abs_C) )
@@ -604,10 +637,10 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv _ _) args results liveness_mask 
     else
     vcat [
       char '{',
-      declare_fun_extern,   -- declare expected function type.
       declare_local_vars,   -- local var for *result*
       vcat local_arg_decls,
       pp_save_context,
+        declare_fun_extern,   -- declare expected function type.
         process_casm local_vars pp_non_void_args casm_str,
       pp_restore_context,
       assign_results,
@@ -673,7 +706,7 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv _ _) args results liveness_mask 
 
     -}
     declare_fun_extern
-      | is_asm	|| not opt_EmitCExternDecls = empty
+      | is_dynamic || is_asm || not opt_EmitCExternDecls = empty
       | otherwise			    =
          hsep [ typedef_or_extern
 	      , ccall_res_ty
@@ -702,13 +735,20 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv _ _) args results liveness_mask 
 	  [amode]  -> text (showPrimRep (getAmodeRep amode))
 	  _	   -> panic "pprCCall: ccall_res_ty"
 
-    ccall_fun_ty = ptext SLIT("_ccall_fun_ty")
+    ccall_fun_ty = 
+       ptext SLIT("_ccall_fun_ty") <>
+       case op_str of
+         Right u -> ppr u
+	 _       -> empty
 
     (declare_local_vars, local_vars, assign_results)
       = ppr_casm_results non_void_results pp_liveness
 
-    (Just asm_str) = op_str
-    is_dynamic = not (maybeToBool op_str)
+    (Left asm_str) = op_str
+    is_dynamic = 
+       case op_str of
+         Left _ -> False
+	 _      -> True
 
     casm_str = if is_asm then _UNPK_ asm_str else ccall_str
 

@@ -169,8 +169,11 @@ data PrimOp
 
 A special ``trap-door'' to use in making calls direct to C functions:
 \begin{code}
-    | CCallOp	(Maybe FAST_STRING) -- Nothing => first argument (an Addr#) is the function pointer
-				    -- Just fn => An "unboxed" ccall# to `fn'.
+    | CCallOp	(Either 
+		    FAST_STRING    -- Left fn => An "unboxed" ccall# to `fn'.
+		    Unique)        -- Right u => first argument (an Addr#) is the function pointer
+				   --   (unique is used to 
+				    
 
 		Bool		    -- True <=> really a "casm"
 		Bool		    -- True <=> might invoke Haskell GC
@@ -402,90 +405,98 @@ tagOf_PrimOp (NewByteArrayOp WordRep)	      = ILIT(126)
 tagOf_PrimOp (NewByteArrayOp AddrRep)	      = ILIT(127)
 tagOf_PrimOp (NewByteArrayOp FloatRep)	      = ILIT(128)
 tagOf_PrimOp (NewByteArrayOp DoubleRep)       = ILIT(129)
-tagOf_PrimOp SameMutableArrayOp		      = ILIT(130)
-tagOf_PrimOp SameMutableByteArrayOp	      = ILIT(131)
-tagOf_PrimOp ReadArrayOp		      = ILIT(132)
-tagOf_PrimOp WriteArrayOp		      = ILIT(133)
-tagOf_PrimOp IndexArrayOp		      = ILIT(134)
-tagOf_PrimOp (ReadByteArrayOp CharRep)	      = ILIT(135)
-tagOf_PrimOp (ReadByteArrayOp IntRep)	      = ILIT(136)
-tagOf_PrimOp (ReadByteArrayOp WordRep)	      = ILIT(137)
-tagOf_PrimOp (ReadByteArrayOp AddrRep)	      = ILIT(138)
-tagOf_PrimOp (ReadByteArrayOp FloatRep)       = ILIT(139)
-tagOf_PrimOp (ReadByteArrayOp DoubleRep)      = ILIT(140)
-tagOf_PrimOp (ReadByteArrayOp Int64Rep)	      = ILIT(141)
-tagOf_PrimOp (ReadByteArrayOp Word64Rep)      = ILIT(142)
-tagOf_PrimOp (WriteByteArrayOp CharRep)       = ILIT(143)
-tagOf_PrimOp (WriteByteArrayOp AddrRep)       = ILIT(144)
-tagOf_PrimOp (WriteByteArrayOp IntRep)        = ILIT(145)
-tagOf_PrimOp (WriteByteArrayOp WordRep)       = ILIT(146)
-tagOf_PrimOp (WriteByteArrayOp FloatRep)      = ILIT(147)
-tagOf_PrimOp (WriteByteArrayOp DoubleRep)     = ILIT(148)
-tagOf_PrimOp (WriteByteArrayOp Int64Rep)      = ILIT(149)
-tagOf_PrimOp (WriteByteArrayOp Word64Rep)     = ILIT(150)
-tagOf_PrimOp (IndexByteArrayOp CharRep)       = ILIT(151)
-tagOf_PrimOp (IndexByteArrayOp IntRep)	      = ILIT(152)
-tagOf_PrimOp (IndexByteArrayOp WordRep)	      = ILIT(153)
-tagOf_PrimOp (IndexByteArrayOp AddrRep)       = ILIT(154)
-tagOf_PrimOp (IndexByteArrayOp FloatRep)      = ILIT(155)
-tagOf_PrimOp (IndexByteArrayOp DoubleRep)     = ILIT(156)
-tagOf_PrimOp (IndexByteArrayOp Int64Rep)      = ILIT(157)
-tagOf_PrimOp (IndexByteArrayOp Word64Rep)     = ILIT(158)
-tagOf_PrimOp (IndexOffAddrOp CharRep)	      = ILIT(159)
-tagOf_PrimOp (IndexOffAddrOp IntRep)	      = ILIT(160)
-tagOf_PrimOp (IndexOffAddrOp WordRep)	      = ILIT(161)
-tagOf_PrimOp (IndexOffAddrOp AddrRep)	      = ILIT(162)
-tagOf_PrimOp (IndexOffAddrOp FloatRep)	      = ILIT(163)
-tagOf_PrimOp (IndexOffAddrOp DoubleRep)       = ILIT(164)
-tagOf_PrimOp (IndexOffAddrOp Int64Rep)	      = ILIT(165)
-tagOf_PrimOp (IndexOffAddrOp Word64Rep)	      = ILIT(166)
-tagOf_PrimOp (IndexOffForeignObjOp CharRep)   = ILIT(167)
-tagOf_PrimOp (IndexOffForeignObjOp IntRep)    = ILIT(168)
-tagOf_PrimOp (IndexOffForeignObjOp WordRep)   = ILIT(169)
-tagOf_PrimOp (IndexOffForeignObjOp AddrRep)   = ILIT(170)
-tagOf_PrimOp (IndexOffForeignObjOp FloatRep)  = ILIT(171)
-tagOf_PrimOp (IndexOffForeignObjOp DoubleRep) = ILIT(172)
-tagOf_PrimOp (IndexOffForeignObjOp Int64Rep)  = ILIT(173)
-tagOf_PrimOp (IndexOffForeignObjOp Word64Rep) = ILIT(174)
-tagOf_PrimOp (WriteOffAddrOp CharRep)         = ILIT(175)
-tagOf_PrimOp (WriteOffAddrOp IntRep)          = ILIT(176)
-tagOf_PrimOp (WriteOffAddrOp WordRep)         = ILIT(177)
-tagOf_PrimOp (WriteOffAddrOp AddrRep)         = ILIT(178)
-tagOf_PrimOp (WriteOffAddrOp FloatRep)        = ILIT(179)
-tagOf_PrimOp (WriteOffAddrOp DoubleRep)       = ILIT(180)
-tagOf_PrimOp (WriteOffAddrOp Int64Rep)        = ILIT(181)
-tagOf_PrimOp (WriteOffAddrOp Word64Rep)       = ILIT(182)
-tagOf_PrimOp UnsafeFreezeArrayOp	      = ILIT(183)
-tagOf_PrimOp UnsafeFreezeByteArrayOp	      = ILIT(184)
-tagOf_PrimOp SizeofByteArrayOp		      = ILIT(185)
-tagOf_PrimOp SizeofMutableByteArrayOp	      = ILIT(186)
-tagOf_PrimOp NewSynchVarOp		      = ILIT(187)
-tagOf_PrimOp TakeMVarOp		    	      = ILIT(188)
-tagOf_PrimOp PutMVarOp		    	      = ILIT(189)
-tagOf_PrimOp ReadIVarOp		    	      = ILIT(190)
-tagOf_PrimOp WriteIVarOp		      = ILIT(191)
-tagOf_PrimOp MakeForeignObjOp		      = ILIT(192)
-tagOf_PrimOp WriteForeignObjOp		      = ILIT(193)
-tagOf_PrimOp MakeStablePtrOp		      = ILIT(194)
-tagOf_PrimOp DeRefStablePtrOp		      = ILIT(195)
-tagOf_PrimOp (CCallOp _ _ _ _ _ _)	      = ILIT(196)
-tagOf_PrimOp ErrorIOPrimOp		      = ILIT(197)
-tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(198)
-tagOf_PrimOp SeqOp			      = ILIT(199)
-tagOf_PrimOp ParOp			      = ILIT(200)
-tagOf_PrimOp ForkOp			      = ILIT(201)
-tagOf_PrimOp DelayOp			      = ILIT(202)
-tagOf_PrimOp WaitReadOp			      = ILIT(203)
-tagOf_PrimOp WaitWriteOp		      = ILIT(204)
-tagOf_PrimOp ParGlobalOp		      = ILIT(205)
-tagOf_PrimOp ParLocalOp			      = ILIT(206)
-tagOf_PrimOp ParAtOp			      = ILIT(207)
-tagOf_PrimOp ParAtAbsOp			      = ILIT(208)
-tagOf_PrimOp ParAtRelOp			      = ILIT(209)
-tagOf_PrimOp ParAtForNowOp		      = ILIT(210)
-tagOf_PrimOp CopyableOp			      = ILIT(211)
-tagOf_PrimOp NoFollowOp			      = ILIT(212)
-tagOf_PrimOp SameMVarOp			      = ILIT(213)
+tagOf_PrimOp (NewByteArrayOp StablePtrRep)    = ILIT(130)
+tagOf_PrimOp SameMutableArrayOp		      = ILIT(131)
+tagOf_PrimOp SameMutableByteArrayOp	      = ILIT(132)
+tagOf_PrimOp ReadArrayOp		      = ILIT(133)
+tagOf_PrimOp WriteArrayOp		      = ILIT(134)
+tagOf_PrimOp IndexArrayOp		      = ILIT(135)
+tagOf_PrimOp (ReadByteArrayOp CharRep)	      = ILIT(136)
+tagOf_PrimOp (ReadByteArrayOp IntRep)	      = ILIT(137)
+tagOf_PrimOp (ReadByteArrayOp WordRep)	      = ILIT(138)
+tagOf_PrimOp (ReadByteArrayOp AddrRep)	      = ILIT(139)
+tagOf_PrimOp (ReadByteArrayOp FloatRep)       = ILIT(140)
+tagOf_PrimOp (ReadByteArrayOp DoubleRep)      = ILIT(141)
+tagOf_PrimOp (ReadByteArrayOp StablePtrRep)   = ILIT(142)
+tagOf_PrimOp (ReadByteArrayOp Int64Rep)	      = ILIT(143)
+tagOf_PrimOp (ReadByteArrayOp Word64Rep)      = ILIT(144)
+tagOf_PrimOp (WriteByteArrayOp CharRep)       = ILIT(145)
+tagOf_PrimOp (WriteByteArrayOp AddrRep)       = ILIT(146)
+tagOf_PrimOp (WriteByteArrayOp IntRep)        = ILIT(147)
+tagOf_PrimOp (WriteByteArrayOp WordRep)       = ILIT(148)
+tagOf_PrimOp (WriteByteArrayOp FloatRep)      = ILIT(149)
+tagOf_PrimOp (WriteByteArrayOp DoubleRep)     = ILIT(150)
+tagOf_PrimOp (WriteByteArrayOp StablePtrRep)  = ILIT(151)
+tagOf_PrimOp (WriteByteArrayOp Int64Rep)      = ILIT(152)
+tagOf_PrimOp (WriteByteArrayOp Word64Rep)     = ILIT(153)
+tagOf_PrimOp (IndexByteArrayOp CharRep)       = ILIT(154)
+tagOf_PrimOp (IndexByteArrayOp IntRep)	      = ILIT(155)
+tagOf_PrimOp (IndexByteArrayOp WordRep)	      = ILIT(156)
+tagOf_PrimOp (IndexByteArrayOp AddrRep)       = ILIT(157)
+tagOf_PrimOp (IndexByteArrayOp FloatRep)      = ILIT(158)
+tagOf_PrimOp (IndexByteArrayOp DoubleRep)     = ILIT(159)
+tagOf_PrimOp (IndexByteArrayOp StablePtrRep)  = ILIT(160)
+tagOf_PrimOp (IndexByteArrayOp Int64Rep)      = ILIT(161)
+tagOf_PrimOp (IndexByteArrayOp Word64Rep)     = ILIT(162)
+tagOf_PrimOp (IndexOffAddrOp CharRep)	      = ILIT(163)
+tagOf_PrimOp (IndexOffAddrOp IntRep)	      = ILIT(164)
+tagOf_PrimOp (IndexOffAddrOp WordRep)	      = ILIT(165)
+tagOf_PrimOp (IndexOffAddrOp AddrRep)	      = ILIT(166)
+tagOf_PrimOp (IndexOffAddrOp FloatRep)	      = ILIT(167)
+tagOf_PrimOp (IndexOffAddrOp DoubleRep)       = ILIT(168)
+tagOf_PrimOp (IndexOffAddrOp StablePtrRep)    = ILIT(169)
+tagOf_PrimOp (IndexOffAddrOp Int64Rep)	      = ILIT(170)
+tagOf_PrimOp (IndexOffAddrOp Word64Rep)	      = ILIT(171)
+tagOf_PrimOp (IndexOffForeignObjOp CharRep)   = ILIT(172)
+tagOf_PrimOp (IndexOffForeignObjOp IntRep)    = ILIT(173)
+tagOf_PrimOp (IndexOffForeignObjOp WordRep)   = ILIT(174)
+tagOf_PrimOp (IndexOffForeignObjOp AddrRep)   = ILIT(175)
+tagOf_PrimOp (IndexOffForeignObjOp FloatRep)  = ILIT(176)
+tagOf_PrimOp (IndexOffForeignObjOp DoubleRep) = ILIT(177)
+tagOf_PrimOp (IndexOffForeignObjOp StablePtrRep) = ILIT(178)
+tagOf_PrimOp (IndexOffForeignObjOp Int64Rep)  = ILIT(179)
+tagOf_PrimOp (IndexOffForeignObjOp Word64Rep) = ILIT(180)
+tagOf_PrimOp (WriteOffAddrOp CharRep)         = ILIT(181)
+tagOf_PrimOp (WriteOffAddrOp IntRep)          = ILIT(182)
+tagOf_PrimOp (WriteOffAddrOp WordRep)         = ILIT(183)
+tagOf_PrimOp (WriteOffAddrOp AddrRep)         = ILIT(184)
+tagOf_PrimOp (WriteOffAddrOp FloatRep)        = ILIT(185)
+tagOf_PrimOp (WriteOffAddrOp DoubleRep)       = ILIT(186)
+tagOf_PrimOp (WriteOffAddrOp StablePtrRep)    = ILIT(187)
+tagOf_PrimOp (WriteOffAddrOp ForeignObjRep)   = ILIT(188)
+tagOf_PrimOp (WriteOffAddrOp Int64Rep)        = ILIT(189)
+tagOf_PrimOp (WriteOffAddrOp Word64Rep)       = ILIT(190)
+tagOf_PrimOp UnsafeFreezeArrayOp	      = ILIT(191)
+tagOf_PrimOp UnsafeFreezeByteArrayOp	      = ILIT(192)
+tagOf_PrimOp SizeofByteArrayOp		      = ILIT(193)
+tagOf_PrimOp SizeofMutableByteArrayOp	      = ILIT(194)
+tagOf_PrimOp NewSynchVarOp		      = ILIT(195)
+tagOf_PrimOp TakeMVarOp		    	      = ILIT(196)
+tagOf_PrimOp PutMVarOp		    	      = ILIT(197)
+tagOf_PrimOp ReadIVarOp		    	      = ILIT(198)
+tagOf_PrimOp WriteIVarOp		      = ILIT(199)
+tagOf_PrimOp MakeForeignObjOp		      = ILIT(200)
+tagOf_PrimOp WriteForeignObjOp		      = ILIT(201)
+tagOf_PrimOp MakeStablePtrOp		      = ILIT(202)
+tagOf_PrimOp DeRefStablePtrOp		      = ILIT(203)
+tagOf_PrimOp (CCallOp _ _ _ _ _ _)	      = ILIT(204)
+tagOf_PrimOp ErrorIOPrimOp		      = ILIT(205)
+tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(206)
+tagOf_PrimOp SeqOp			      = ILIT(207)
+tagOf_PrimOp ParOp			      = ILIT(208)
+tagOf_PrimOp ForkOp			      = ILIT(209)
+tagOf_PrimOp DelayOp			      = ILIT(210)
+tagOf_PrimOp WaitReadOp			      = ILIT(211)
+tagOf_PrimOp WaitWriteOp		      = ILIT(212)
+tagOf_PrimOp ParGlobalOp		      = ILIT(213)
+tagOf_PrimOp ParLocalOp			      = ILIT(214)
+tagOf_PrimOp ParAtOp			      = ILIT(215)
+tagOf_PrimOp ParAtAbsOp			      = ILIT(216)
+tagOf_PrimOp ParAtRelOp			      = ILIT(217)
+tagOf_PrimOp ParAtForNowOp		      = ILIT(218)
+tagOf_PrimOp CopyableOp			      = ILIT(219)
+tagOf_PrimOp NoFollowOp			      = ILIT(220)
+tagOf_PrimOp SameMVarOp			      = ILIT(221)
 
 tagOf_PrimOp _ = panic# "tagOf_PrimOp: pattern-match"
 
@@ -625,6 +636,7 @@ allThePrimOps
 	NewByteArrayOp AddrRep,
 	NewByteArrayOp FloatRep,
 	NewByteArrayOp DoubleRep,
+	NewByteArrayOp StablePtrRep,
 	SameMutableArrayOp,
 	SameMutableByteArrayOp,
 	ReadArrayOp,
@@ -636,6 +648,7 @@ allThePrimOps
 	ReadByteArrayOp AddrRep,
 	ReadByteArrayOp FloatRep,
 	ReadByteArrayOp DoubleRep,
+	ReadByteArrayOp StablePtrRep,
 	ReadByteArrayOp Int64Rep,
 	ReadByteArrayOp Word64Rep,
 	WriteByteArrayOp CharRep,
@@ -644,6 +657,7 @@ allThePrimOps
 	WriteByteArrayOp AddrRep,
 	WriteByteArrayOp FloatRep,
 	WriteByteArrayOp DoubleRep,
+	WriteByteArrayOp StablePtrRep,
 	WriteByteArrayOp Int64Rep,
 	WriteByteArrayOp Word64Rep,
 	IndexByteArrayOp CharRep,
@@ -652,6 +666,7 @@ allThePrimOps
 	IndexByteArrayOp AddrRep,
 	IndexByteArrayOp FloatRep,
 	IndexByteArrayOp DoubleRep,
+	IndexByteArrayOp StablePtrRep,
 	IndexByteArrayOp Int64Rep,
 	IndexByteArrayOp Word64Rep,
 	IndexOffAddrOp CharRep,
@@ -660,6 +675,7 @@ allThePrimOps
 	IndexOffAddrOp AddrRep,
 	IndexOffAddrOp FloatRep,
 	IndexOffAddrOp DoubleRep,
+	IndexOffAddrOp StablePtrRep,
 	IndexOffAddrOp Int64Rep,
 	IndexOffAddrOp Word64Rep,
 	IndexOffForeignObjOp CharRep,
@@ -668,6 +684,7 @@ allThePrimOps
 	IndexOffForeignObjOp WordRep,
 	IndexOffForeignObjOp FloatRep,
 	IndexOffForeignObjOp DoubleRep,
+	IndexOffForeignObjOp StablePtrRep,
 	IndexOffForeignObjOp Int64Rep,
 	IndexOffForeignObjOp Word64Rep,
 	WriteOffAddrOp CharRep,
@@ -676,6 +693,8 @@ allThePrimOps
 	WriteOffAddrOp AddrRep,
 	WriteOffAddrOp FloatRep,
 	WriteOffAddrOp DoubleRep,
+	WriteOffAddrOp StablePtrRep,
+	WriteOffAddrOp ForeignObjRep,
 	WriteOffAddrOp Int64Rep,
 	WriteOffAddrOp Word64Rep,
 	UnsafeFreezeArrayOp,
@@ -1121,18 +1140,23 @@ primOpInfo (ReadByteArrayOp kind)
 	(str, _, prim_tycon) = getPrimRepInfo kind
 
 	op_str	       = _PK_ ("read" ++ str ++ "Array#")
-	relevant_tycon = assoc "primOpInfo" tbl kind
+	relevant_tycon = (assoc "primOpInfo{ReadByteArrayOp}" tbl kind)
+
+        (tycon_args, tvs)
+	  | kind == StablePtrRep = ([s, betaTy], [s_tv, betaTyVar])
+	  | otherwise	         = ([s], [s_tv])
     in
-    AlgResult op_str [s_tv]
+    AlgResult op_str tvs
 	[mkMutableByteArrayPrimTy s, intPrimTy, mkStatePrimTy s]
-	relevant_tycon [s]
+	relevant_tycon tycon_args
   where
-    tbl = [ (CharRep,	 stateAndCharPrimTyCon),
-	    (IntRep,	 stateAndIntPrimTyCon),
-	    (WordRep,	 stateAndWordPrimTyCon),
-	    (AddrRep,	 stateAndAddrPrimTyCon),
-	    (FloatRep,	 stateAndFloatPrimTyCon),
-	    (DoubleRep, stateAndDoublePrimTyCon) ]
+    tbl = [ (CharRep,	   stateAndCharPrimTyCon),
+	    (IntRep,	   stateAndIntPrimTyCon),
+	    (WordRep,	   stateAndWordPrimTyCon),
+	    (AddrRep,	   stateAndAddrPrimTyCon),
+	    (FloatRep,	   stateAndFloatPrimTyCon),
+	    (StablePtrRep, stateAndStablePtrPrimTyCon),
+	    (DoubleRep,    stateAndDoublePrimTyCon) ]
 
   -- How come there's no Word byte arrays? ADR
 
@@ -1142,33 +1166,50 @@ primOpInfo (WriteByteArrayOp kind)
 
 	(str, prim_ty, _) = getPrimRepInfo kind
 	op_str = _PK_ ("write" ++ str ++ "Array#")
+
+        (the_prim_ty, tvs)
+	  | kind == StablePtrRep = (mkStablePtrPrimTy betaTy, [s_tv, betaTyVar])
+	  | otherwise		 = (prim_ty, [s_tv])
+
     in
     -- NB: *Prim*Result --
-    PrimResult op_str [s_tv]
-	[mkMutableByteArrayPrimTy s, intPrimTy, prim_ty, mkStatePrimTy s]
+    PrimResult op_str tvs
+	[mkMutableByteArrayPrimTy s, intPrimTy, the_prim_ty, mkStatePrimTy s]
 	statePrimTyCon VoidRep [s]
 
 primOpInfo (IndexByteArrayOp kind)
   = let
 	(str, _, prim_tycon) = getPrimRepInfo kind
 	op_str = _PK_ ("index" ++ str ++ "Array#")
+
+        (prim_tycon_args, tvs)
+	  | kind == StablePtrRep = ([alphaTy], [alphaTyVar])
+	  | otherwise	         = ([],[])
     in
     -- NB: *Prim*Result --
-    PrimResult op_str [] [byteArrayPrimTy, intPrimTy] prim_tycon kind []
+    PrimResult op_str tvs [byteArrayPrimTy, intPrimTy] prim_tycon kind prim_tycon_args
 
 primOpInfo (IndexOffAddrOp kind)
   = let
 	(str, _, prim_tycon) = getPrimRepInfo kind
 	op_str = _PK_ ("index" ++ str ++ "OffAddr#")
+
+        (prim_tycon_args, tvs)
+	  | kind == StablePtrRep = ([alphaTy], [alphaTyVar])
+	  | otherwise	         = ([], [])
     in
-    PrimResult op_str [] [addrPrimTy, intPrimTy] prim_tycon kind []
+    PrimResult op_str tvs [addrPrimTy, intPrimTy] prim_tycon kind prim_tycon_args
 
 primOpInfo (IndexOffForeignObjOp kind)
   = let
 	(str, _, prim_tycon) = getPrimRepInfo kind
 	op_str = _PK_ ("index" ++ str ++ "OffForeignObj#")
+
+        (prim_tycon_args, tvs)
+	  | kind == StablePtrRep = ([alphaTy], [alphaTyVar])
+	  | otherwise	         = ([], [])
     in
-    PrimResult op_str [] [foreignObjPrimTy, intPrimTy] prim_tycon kind []
+    PrimResult op_str tvs [foreignObjPrimTy, intPrimTy] prim_tycon kind prim_tycon_args
 
 primOpInfo (WriteOffAddrOp kind)
   = let
@@ -1964,8 +2005,8 @@ pprPrimOp (CCallOp fun is_casm may_gc cconv arg_tys res_ty)
 
 	ppr_fun =
 	 case fun of
-	   Nothing -> ptext SLIT("<dynamic>")
-	   Just fn -> ptext fn
+	   Right _ -> ptext SLIT("<dynamic>")
+	   Left fn -> ptext fn
 	 
     in
     hcat [ ifPprDebug callconv
