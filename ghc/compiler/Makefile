@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.150 2001/03/27 16:32:46 rrt Exp $
+# $Id: Makefile,v 1.151 2001/04/03 12:55:01 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -299,7 +299,7 @@ all :: ghc-inplace
 ghc-inplace : $(HS_PROG)
 	@$(RM) $@
 	echo '#!/bin/sh' >>$@
-	echo exec $(FPTOOLS_TOP_ABS)/ghc/compiler/$(HS_PROG) -B$(FPTOOLS_TOP_ABS) '"$$@"' >>$@
+	echo exec $(FPTOOLS_TOP_ABS_UNIX)/ghc/compiler/$(HS_PROG) -B$(FPTOOLS_TOP_ABS) '"$$@"' >>$@
 	chmod 755 $@
 
 CLEAN_FILES += ghc-inplace
