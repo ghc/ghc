@@ -42,7 +42,8 @@ import DataCon		( isNullaryDataCon, dataConTag,
 			  dataConFieldLabels )
 import Name		( getOccString, getOccName, getSrcLoc, occNameString, 
 			  occNameUserString, nameRdrName, varName,
-			  OccName, Name, NamedThing(..), NameSpace
+			  OccName, Name, NamedThing(..), NameSpace,
+			  isDataSymOcc, isSymOcc
 			)
 
 import PrimOp		( PrimOp(..) )
@@ -61,6 +62,7 @@ import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool, assocMaybe )
 import Constants
 import List		( partition, intersperse )
+import Char		( isAlpha )
 \end{code}
 
 %************************************************************************
@@ -799,9 +801,9 @@ gen_Read_binds fixities tycon
 	   labels       = dataConFieldLabels data_con
 	   lab_fields   = length labels
 	   dc_nm	= getName data_con
-	   is_infix     = isInfixOccName data_con_str
+	   is_infix     = isDataSymOcc (getOccName dc_nm)
 
-  	   as_needed   = take con_arity as_RDRs
+  	   as_needed    = take con_arity as_RDRs
 	   bs_needed   
 	     | is_infix        = take (1 + con_arity) bs_RDRs
 	     | lab_fields == 0 = take con_arity bs_RDRs
@@ -830,10 +832,22 @@ gen_Read_binds fixities tycon
 		  (HsApp (HsVar lex_RDR) draw_from)
 		  tycon_loc
   
-	   read_label f = [str_qual nm, str_qual "="] 
+	   str_qual_paren str res draw_from =
+               BindStmt
+		  (TuplePatIn [LitPatIn (mkHsString str), VarPatIn res] True)
+		  (HsApp (readParen_Expr true_Expr (HsVar lex_RDR)) draw_from)
+		  tycon_loc
+  
+	   read_label f = [rd_lab, str_qual "="] 
 			    -- There might be spaces between the label and '='
 		where
-		  nm = occNameUserString (getOccName (fieldLabelName f))
+		  rd_lab
+		   | is_op	= str_qual_paren nm
+		   | otherwise  = str_qual nm
+
+		  occ_nm  = getOccName (fieldLabelName f)
+		  is_op   = isSymOcc occ_nm
+		  nm      = occNameUserString occ_nm
 
 	   field_quals
 	      | is_infix  =
@@ -936,22 +950,22 @@ gen_Show_binds fixs_assoc tycon
              labels       = dataConFieldLabels data_con
 	     lab_fields   = length labels
 
-             dc_occ_nm    = occNameUserString (getOccName data_con)
-	     dc_nm	  = getName data_con
+	     dc_nm	    = getName data_con
+	     dc_occ_nm	    = getOccName data_con
+             dc_occ_nm_str  = occNameUserString dc_occ_nm
 
-	     is_infix     = isInfixOccName dc_occ_nm
+	     is_infix     = isDataSymOcc dc_occ_nm
 
 
 	     show_con
-	       | is_infix  = mk_showString_app (' ':dc_occ_nm)
-	       | otherwise =
-	         let 
+	       | is_infix  = mk_showString_app (' ':dc_occ_nm_str)
+	       | otherwise = mk_showString_app (dc_occ_nm_str ++ space_ocurly_maybe)
+		 where
 	          space_ocurly_maybe
                     | nullary_con     = ""
 		    | lab_fields == 0 = " "
 		    | otherwise       = "{"
-		 in
-		 mk_showString_app (dc_occ_nm ++ space_ocurly_maybe)
+		 
 
 	     show_all con fs@(x:xs)
 		| is_infix  = x:con:xs
@@ -965,9 +979,16 @@ gen_Show_binds fixs_assoc tycon
 
 	     show_thingies = show_all show_con real_show_thingies_with_labs
                 
-	     show_label l  = mk_showString_app (nm ++ "=")
+	     show_label l = mk_showString_app (the_name ++ "=")
 		 where
-		   nm = occNameUserString (getOccName (fieldLabelName l))
+		   occ_nm   = getOccName (fieldLabelName l)
+		    -- legal, but rare.
+		   is_op    = isSymOcc occ_nm
+		   the_name 
+		     | is_op     = '(':nm ++ ")"
+		     | otherwise = nm
+
+		   nm       = occNameUserString occ_nm
 		
 
              mk_showString_app str = HsApp (HsVar showString_RDR)
@@ -1029,13 +1050,8 @@ isLRAssoc fixs_assoc nm =
      case assocMaybe fixs_assoc nm of
        Just (Fixity _ InfixL) -> (True, False)
        Just (Fixity _ InfixR) -> (False, True)
-       _		      -> (False, False)
-
-isInfixOccName :: String -> Bool
-isInfixOccName str = 
-   case str of
-     (':':_) -> True
-     _       -> False
+       Just (Fixity _ _)      -> (False, False)
+       _		      -> (True, False)
 
 \end{code}
 
