@@ -5,18 +5,18 @@ test('read003', normal, compile, [''])
 test('read004', normal, compile, [''])
 test('read005', normal, compile, [''])
 
-# these two are really a multi-module test, order is important
-test('read006', normal, compile, [''])
-test('read007', normal, compile, [''])
+# Missing:
+# test('read006', normal, compile, [''])
+# test('read007', normal, compile, [''])
 
 test('read008', normal, compile, [''])
 test('read009', normal, compile, [''])
 test('read010', normal, compile, [''])
 test('read011', normal, compile, [''])
 
-# these two are really a multi-module test, order is important
-test('read012', omit_ways(['optasm']), compile, ['-fvia-C -funfold-casms-in-hi-file -fglasgow-exts'])
-test('read013', normal, compile, ['-fglasgow-exts'])
+# Missing:
+# test('read012', normal, compile, [''])
+# test('read013', normal, compile, [''])
 
 test('read014', normal, compile, ['-Wall'])
 test('read015', normal, compile, [''])
