@@ -225,11 +225,11 @@ trySlurp handle sz_i chunk =
 
 	tAB_SIZE = 8#
 
-	slurpFile :: Int# -> Int# -> Addr -> Int# -> Int# -> IO Int
+	slurpFile :: Int# -> Int# -> Addr -> Int# -> Int# -> IO (Addr, Int)
 	slurpFile c off chunk chunk_sz max_off = slurp c off
 	 where
 
-	  slurp :: Int# -> Int# -> IO Int
+	  slurp :: Int# -> Int# -> IO (Addr, Int)
 	  slurp c off | off >=# max_off = do
 		let new_sz = chunk_sz *# 2#
 	     	chunk' <- reAllocMem chunk (I# new_sz)
@@ -239,7 +239,7 @@ trySlurp handle sz_i chunk =
     		if intc == ((-1)::Int)
      		  then do errtype <- getErrType
 			  if errtype == (ERR_EOF :: Int)
-			    then return (I# off)
+			    then return (chunk, I# off)
 			    else constructErrorAndFail "slurpFile"
      		  else case chr intc of
 			 '\t' -> tabIt c off
@@ -248,7 +248,7 @@ trySlurp handle sz_i chunk =
 					    | otherwise  = c +# 1#
 				     slurp c' (off +# 1#)
 
-	  tabIt :: Int# -> Int# -> IO Int
+	  tabIt :: Int# -> Int# -> IO (Addr, Int)
 	  -- can't run out of buffer in here, because we reserved an
 	  -- extra tAB_SIZE bytes at the end earlier.
 	  tabIt c off = do
@@ -262,11 +262,11 @@ trySlurp handle sz_i chunk =
 
 	-- allow space for a full tab at the end of the buffer
 	-- (that's what the max_off thing is for)
-  rc <- slurpFile 0# 0# chunk chunk_sz (chunk_sz -# tAB_SIZE)
+  (chunk', rc) <- slurpFile 0# 0# chunk chunk_sz (chunk_sz -# tAB_SIZE)
   writeHandle handle handle_
   if rc < (0::Int)
 	then constructErrorAndFail "slurpFile"
-	else return (chunk, rc)
+	else return (chunk', rc)
 
 
 reAllocMem :: Addr -> Int -> IO Addr
