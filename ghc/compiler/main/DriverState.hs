@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.78 2002/05/28 21:52:06 sof Exp $
+-- $Id: DriverState.hs,v 1.79 2002/06/04 19:17:57 sof Exp $
 --
 -- Settings for the driver
 --
@@ -511,11 +511,11 @@ getPackageLibraries = do
   where
      -- This is a totally horrible (temporary) hack, for Win32.  Problem is
      -- that package.conf for Win32 says that the main prelude lib is 
-     -- split into HSbase1 and HSbase2, which is needed due to limitations in
-     -- the PEi386 file format, to make GHCi work.  However, we still only
-     -- have HSbase.a for static linking, not HSbase1.a and HSbase2.a.  
+     -- split into HSbase1, HSbase2 and HSbase3, which is needed due to a bug
+     -- in the GNU linker (PEi386 backend). However, we still only
+     -- have HSbase.a for static linking, not HSbase{1,2,3}.a
      -- getPackageLibraries is called to find the .a's to add to the static
-     -- link line.  On Win32, this hACK detects HSbase1 and HSbase2 and 
+     -- link line.  On Win32, this hACK detects HSbase{1,2,3} and 
      -- replaces them with HSbase, so static linking still works.
      -- Libraries needed for dynamic (GHCi) linking are discovered via
      -- different route (in InteractiveUI.linkPackage).
@@ -524,10 +524,10 @@ getPackageLibraries = do
      -- JRS 04 Sept 01: Same appalling hack for HSwin32[1,2]
      -- KAA 29 Mar  02: Same appalling hack for HSobjectio[1,2,3,4]
      hACK libs
-#      ifndef mingw32_TARGET_OS
+#      if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
        = libs
 #      else
-       = if   "HSbase1" `elem` libs && "HSbase2" `elem` libs
+       = if   "HSbase1" `elem` libs && "HSbase2" `elem` libs && "HSbase3" `elem` libs
          then "HSbase" : filter (not.(isPrefixOf "HSbase")) libs
          else
          if   "HSwin321" `elem` libs && "HSwin322" `elem` libs
