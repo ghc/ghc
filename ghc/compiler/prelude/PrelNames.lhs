@@ -244,7 +244,6 @@ pREL_TUP_Name     = mkModuleName "Data.Tuple"
 pREL_PACK_Name    = mkModuleName "GHC.Pack"
 pREL_CONC_Name    = mkModuleName "GHC.Conc"
 pREL_IO_BASE_Name = mkModuleName "GHC.IOBase"
-pREL_IO_Name	  = mkModuleName "GHC.IO"
 pREL_ST_Name	  = mkModuleName "GHC.ST"
 pREL_ARR_Name     = mkModuleName "GHC.Arr"
 pREL_BYTEARR_Name = mkModuleName "PrelByteArr"
@@ -257,6 +256,7 @@ pREL_ERR_Name     = mkModuleName "GHC.Err"
 pREL_REAL_Name    = mkModuleName "GHC.Real"
 pREL_FLOAT_Name   = mkModuleName "GHC.Float"
 pREL_TOP_HANDLER_Name = mkModuleName "GHC.TopHandler"
+sYSTEM_IO_Name	  = mkModuleName "System.IO"
 
 mAIN_Name	  = mkModuleName "Main"
 pREL_INT_Name	  = mkModuleName "GHC.Int"
@@ -532,7 +532,7 @@ returnIOName	  = varQual  pREL_IO_BASE_Name SLIT("returnIO") returnIOIdKey
 failIOName	  = varQual  pREL_IO_BASE_Name SLIT("failIO") failIOIdKey
 
 -- IO things
-printName	  = varQual pREL_IO_Name SLIT("print") printIdKey
+printName	  = varQual sYSTEM_IO_Name SLIT("print") printIdKey
 
 -- Int, Word, and Addr things
 int8TyConName     = tcQual pREL_INT_Name  SLIT("Int8") int8TyConKey
