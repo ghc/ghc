@@ -14,10 +14,10 @@ module OneOfEverything (
 	module OneOfEverything
     ) where
 
-import qualified OneA 
-import OneB		( fB )
-import OneC hiding	( fC )
-import OneC hiding	( fC )
+import qualified Prelude
+import IO		( putStr )
+import System hiding	( getArgs )
+import Monad hiding	( filter )
 
 -- HsDecls stuff
 
