@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.45 2001/08/08 11:27:17 simonmar Exp $
+ * $Id: Storage.c,v 1.46 2001/08/08 14:14:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -162,7 +162,10 @@ initStorage( void )
     generations[g].steps[s].to = &generations[g+1].steps[0];
   }
   
-  /* The oldest generation has one step. */
+  /* The oldest generation has one step and it is compacted. */
+  if (RtsFlags.GcFlags.compact) {
+      oldest_gen->steps[0].is_compacted = 1;
+  }
   oldest_gen->steps[0].to = &oldest_gen->steps[0];
 
   /* generation 0 is special: that's the nursery */

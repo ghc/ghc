@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.36 2001/08/07 10:11:05 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.37 2001/08/08 14:14:09 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,7 +35,7 @@ struct GC_FLAGS {
     nat     steps;
     rtsBool squeezeUpdFrames;
 
-    rtsBool compact;
+    rtsBool compact;		/* True <=> "compact all the time" */
     double  compactThreshold;
 
     rtsBool ringBell;

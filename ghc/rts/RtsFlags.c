@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.45 2001/08/07 10:37:04 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.46 2001/08/08 14:14:08 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -237,7 +237,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.steps              = 2;
     RtsFlags.GcFlags.squeezeUpdFrames	= rtsTrue;
 #endif
-    RtsFlags.GcFlags.compact            = rtsTrue;
+    RtsFlags.GcFlags.compact            = rtsFalse;
     RtsFlags.GcFlags.compactThreshold   = 30.0;
 #ifdef RTS_GTK_FRONTPANEL
     RtsFlags.GcFlags.frontpanel         = rtsFalse;
@@ -391,7 +391,7 @@ usage_text[] = {
 "  -T<n>    Number of steps in younger generations (default: 2)",
 "  -c<n>    Auto-enable compaction of the oldest generation when live data is",
 "           at least <n>% of the maximum heap size set with -M (default: 30%)",
-"  -c       Disable compaction",
+"  -c       Enable compaction for all major collections",
 "",
 "  -t<file> One-line GC statistics  (default file: <program>.stat)",
 "  -s<file> Summary  GC statistics  (with -Sstderr going to stderr)",
@@ -654,11 +654,10 @@ error = rtsTrue;
 
 	      case 'c':
 		  if (rts_argv[arg][2] != '\0') {
-		      RtsFlags.GcFlags.compact = rtsTrue;
 		      RtsFlags.GcFlags.compactThreshold =
 			  atof(rts_argv[arg]+2);
 		  } else {
-		      RtsFlags.GcFlags.compact = rtsFalse;
+		      RtsFlags.GcFlags.compact = rtsTrue;
 		  }
 		  break;
 

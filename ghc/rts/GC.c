@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.117 2001/08/08 13:45:02 simonmar Exp $
+ * $Id: GC.c,v 1.118 2001/08/08 14:14:08 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -735,14 +735,28 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 		     RtsFlags.GcFlags.minOldGenSize);
 
       // minimum size for generation zero
-      min_alloc = (RtsFlags.GcFlags.pcFreeHeap * max) / 200;
+      min_alloc = stg_max((RtsFlags.GcFlags.pcFreeHeap * max) / 200,
+			  RtsFlags.GcFlags.minAllocAreaSize);
+
+      // Auto-enable compaction when the residency reaches a
+      // certain percentage of the maximum heap size (default: 30%).
+      if (RtsFlags.GcFlags.compact ||
+	  (max > 0 &&
+	   oldest_gen->steps[0].n_blocks > 
+	   (RtsFlags.GcFlags.compactThreshold * max) / 100)) {
+	  oldest_gen->steps[0].is_compacted = 1;
+//	  fprintf(stderr,"compaction: on\n", live);
+      } else {
+	  oldest_gen->steps[0].is_compacted = 0;
+//	  fprintf(stderr,"compaction: off\n", live);
+      }
 
       // if we're going to go over the maximum heap size, reduce the
       // size of the generations accordingly.  The calculation is
       // different if compaction is turned on, because we don't need
       // to double the space required to collect the old generation.
       if (max != 0) {
-	  if (RtsFlags.GcFlags.compact) {
+	  if (oldest_gen->steps[0].is_compacted) {
 	      if ( (size + (size - 1) * (gens - 2) * 2) + min_alloc > max ) {
 		  size = (max - min_alloc) / ((gens - 1) * 2 - 1);
 	      }
@@ -764,19 +778,6 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
       for (g = 0; g < gens; g++) {
 	  generations[g].max_blocks = size;
-      }
-
-      // Auto-enable compaction when the residency reaches a
-      // certain percentage of the maximum heap size (default: 30%).
-      if (RtsFlags.GcFlags.compact &&
-	  max > 0 && 
-	  oldest_gen->steps[0].n_blocks > 
-	    (RtsFlags.GcFlags.compactThreshold * max) / 100) {
-	  oldest_gen->steps[0].is_compacted = 1;
-//	  fprintf(stderr,"compaction: on\n", live);
-      } else {
-	  oldest_gen->steps[0].is_compacted = 0;
-//	  fprintf(stderr,"compaction: off\n", live);
       }
   }
 
