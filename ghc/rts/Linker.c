@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.71 2001/10/22 22:55:31 sof Exp $
+ * $Id: Linker.c,v 1.72 2001/10/26 11:33:13 sewardj Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -575,6 +575,42 @@ lookupLocalSymbol( ObjectCode* oc, char *lbl )
 	return val;
     }
 }
+
+
+/* -----------------------------------------------------------------------------
+ * Debugging aid: look in GHCi's object symbol tables for symbols
+ * within DELTA bytes of the specified address, and show their names.
+ */
+#ifdef DEBUG
+void ghci_enquire ( char* addr );
+
+void ghci_enquire ( char* addr )
+{
+   int   i;
+   char* sym;
+   char* a;
+   const int DELTA = 64;
+   ObjectCode* oc;
+   for (oc = objects; oc; oc = oc->next) {
+      for (i = 0; i < oc->n_symbols; i++) {
+         sym = oc->symbols[i];
+         if (sym == NULL) continue;
+         /* fprintf(stderr, "enquire %p %p\n", sym, oc->lochash); */
+         a = NULL;
+         if (oc->lochash != NULL)
+            a = lookupStrHashTable(oc->lochash, sym);
+         if (a == NULL)
+            a = lookupStrHashTable(symhash, sym);
+         if (a == NULL) {
+            /* fprintf(stderr, "ghci_enquire: can't find %s\n", sym); */
+         } 
+         else if (addr-DELTA <= a && a <= addr+DELTA) {
+            fprintf(stderr, "%p + %3d  ==  `%s'\n", addr, a - addr, sym);
+         }
+      }
+   }
+}
+#endif
 
 
 /* -----------------------------------------------------------------------------
