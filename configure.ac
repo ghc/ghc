@@ -1041,45 +1041,6 @@ fi
 FP_CHECK_ALIGNMENT(unsigned short)
 FP_CHECK_ALIGNMENT(void *)
 
-dnl ** map standard C types and ISO types to Haskell types
-FPTOOLS_CHECK_HTYPE(char)
-FPTOOLS_CHECK_HTYPE(signed char)
-FPTOOLS_CHECK_HTYPE(unsigned char)
-FPTOOLS_CHECK_HTYPE(short)
-FPTOOLS_CHECK_HTYPE(unsigned short)
-FPTOOLS_CHECK_HTYPE(int)
-FPTOOLS_CHECK_HTYPE(unsigned int)
-FPTOOLS_CHECK_HTYPE(long)
-FPTOOLS_CHECK_HTYPE(unsigned long)
-if test "$ac_cv_type_long_long" = yes; then
-FPTOOLS_CHECK_HTYPE(long long)
-FPTOOLS_CHECK_HTYPE(unsigned long long)
-fi
-FPTOOLS_CHECK_HTYPE(float)
-FPTOOLS_CHECK_HTYPE(double)
-FPTOOLS_CHECK_HTYPE(ptrdiff_t)
-FPTOOLS_CHECK_HTYPE(size_t)
-FPTOOLS_CHECK_HTYPE(wchar_t)
-dnl Int32 is a HACK for non-ISO C compilers
-FPTOOLS_CHECK_HTYPE(sig_atomic_t, Int32)
-FPTOOLS_CHECK_HTYPE(clock_t)
-FPTOOLS_CHECK_HTYPE(time_t)
-FPTOOLS_CHECK_HTYPE(dev_t, Word32)
-FPTOOLS_CHECK_HTYPE(ino_t)
-FPTOOLS_CHECK_HTYPE(mode_t)
-FPTOOLS_CHECK_HTYPE(off_t)
-FPTOOLS_CHECK_HTYPE(pid_t)
-FPTOOLS_CHECK_HTYPE(gid_t)
-FPTOOLS_CHECK_HTYPE(uid_t)
-FPTOOLS_CHECK_HTYPE(cc_t)
-FPTOOLS_CHECK_HTYPE(speed_t)
-FPTOOLS_CHECK_HTYPE(tcflag_t)
-FPTOOLS_CHECK_HTYPE(blkcnt_t)
-FPTOOLS_CHECK_HTYPE(nlink_t)
-FPTOOLS_CHECK_HTYPE(ssize_t)
-FPTOOLS_CHECK_HTYPE(rlim_t)
-FPTOOLS_CHECK_HTYPE(wint_t)
-
 dnl ** Map OpenGL data types to Haskell types
 if test $GhcLibsWithOpenGL = YES ; then
 FPTOOLS_CHECK_HTYPE(GLboolean)
