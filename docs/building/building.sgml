@@ -50,11 +50,12 @@ as suggested:
 <Term><IndexTerm><Primary>Binary distribution</Primary></IndexTerm>Binary distribution.</Term>
 <ListItem>
 <para>
-If your only purpose is to install some of the <Literal>fptools</Literal> suite then the easiest thing to do is to get a binary distribution. In the
-binary distribution everything is pre-compiled for your particular
-machine architecture and operating system, so all you should have to
-do is install the binaries and libraries in suitable places. The user guide
-describes how to do this.
+If your only purpose is to install some of the
+<Literal>fptools</Literal> suite then the easiest thing to do is to
+get a binary distribution. In the binary distribution everything is
+pre-compiled for your particular machine architecture and operating
+system, so all you should have to do is install the binaries and
+libraries in suitable places. The user guide describes how to do this.
 </para>
 
 <para>
@@ -154,7 +155,7 @@ of this manual in detail.</para>
 </Sect1>
 
 <Sect1 id="sec-build-checks">
-<Title>Things to check before you start typing</Title>
+<Title>Things to check before you start</Title>
 
 <para>
 Here's a list of things to check before you get started.
@@ -339,7 +340,7 @@ Works registerised.  No native-code generator.
 <IndexTerm><Primary>i386-*-linux</Primary></IndexTerm>
 <ListItem>
 
-<para>GHC works registerised, has a native code generator.  You
+<para>GHC works registerised and has a native code generator.  You
 <Emphasis>must</Emphasis> have GCC 2.7.x or later.  NOTE about
 <literal>glibc</literal> versions: GHC binaries built on a system
 running <literal>glibc 2.0</literal> won't work on a system running
@@ -958,13 +959,27 @@ You set the configuration using a three-step process.
 		  
 		<varlistentry>
 		  <term><literal>--with-hc=<parameter>path</parameter></literal></term>
-		  <indexterm><primary><literal>--with-hhc</literal></primary>
+		  <indexterm><primary><literal>--with-hc</literal></primary>
 		  </indexterm>
 		  <listitem>
 		    <para>Specifies the path to any installed Haskell
 		    compiler.  This compiler will be used for
 		    compiling generic Haskell code.  The default is to
 		    use <literal>ghc</literal>.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term><literal>--with-gcc=<parameter>path</parameter></literal></term>
+		  <indexterm><primary><literal>--with-gcc</literal></primary>
+		  </indexterm>
+		  <listitem>
+		    <para>Specifies the path to the installed
+		    GCC. This compiler will be used to compile all C
+		    files, <emphasis>except</emphasis> any generated
+		    by the installed Haskell compiler, which will have
+		    its own idea of which C compiler (if any) to use.
+		    The default is to use <literal>gcc</literal>.</para>
 		  </listitem>
 		</varlistentry>
 	      </variablelist>
