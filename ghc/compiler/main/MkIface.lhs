@@ -570,7 +570,7 @@ pprFixities fixity_map decls
 -- Disgusting to print these two together, but that's 
 -- the way the interface parser currently expects them.
 pprRulesAndDeprecs [] NoDeprecs = empty
-pprRules rules deprecs
+pprRulesAndDeprecs rules deprecs
   = ptext SLIT("{-##") <+> (pp_rules rules $$ pp_deprecs deprecs) <+> ptext SLIT("##-}")
   where
     pp_rules []    = empty
