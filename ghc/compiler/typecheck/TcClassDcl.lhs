@@ -24,16 +24,16 @@ import RnHsSyn		( RenamedTyClDecl,
 			)
 import TcHsSyn		( TcMonoBinds )
 
-import Inst		( InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, 
-			  newDicts, newMethod )
+import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, 
+			  instToId, newDicts, newMethod )
 import TcEnv		( TcId, TcEnv, RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
 import TcMonoType	( tcHsRecType, tcRecClassContext, checkSigTyVars, checkAmbiguity, sigCtxt, mkTcSig )
-import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
-import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcSigTyVars )
+import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
+import TcType		( TcType, TcTyVar, tcInstTyVars )
 import TcMonad
 import Generics		( mkGenericRhs, validGenericMethodType )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
@@ -435,32 +435,30 @@ tcDefMeth clas tyvars binds_in prags op_item@(_, DefMeth dm_id)
     let
         theta = [(mkClassPred clas inst_tys)]
     in
-    newDicts origin theta 		`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
+    newDicts origin theta 		`thenNF_Tc` \ [this_dict] ->
 
     tcExtendTyVarEnvForMeths tyvars clas_tyvars (
         tcMethodBind clas origin clas_tyvars inst_tys theta
 	             binds_in prags False op_item
-    )					`thenTc` \ (defm_bind, insts_needed, (_, local_dm_id)) ->
+    )					`thenTc` \ (defm_bind, insts_needed, local_dm_inst) ->
     
     tcAddErrCtxt (defltMethCtxt clas) $
     
-        -- tcMethodBind has checked that the class_tyvars havn't
-        -- been unified with each other or another type, but we must
-        -- still zonk them before passing them to tcSimplifyAndCheck
-    zonkTcSigTyVars clas_tyvars		`thenNF_Tc` \ clas_tyvars' ->
-    
         -- Check the context
-    tcSimplifyAndCheck
+    tcSimplifyCheck
         (ptext SLIT("class") <+> ppr clas)
-        (mkVarSet clas_tyvars')
-        this_dict
-        insts_needed			`thenTc` \ (const_lie, dict_binds) ->
+	clas_tyvars
+        [this_dict]
+        insts_needed				`thenTc` \ (const_lie, dict_binds) ->
+
+	-- Simplification can do unification
+    checkSigTyVars clas_tyvars emptyVarSet	`thenTc` \ clas_tyvars' ->
     
     let
         full_bind = AbsBinds
     		    clas_tyvars'
-    		    [this_dict_id]
-    		    [(clas_tyvars', dm_id, local_dm_id)]
+    		    [instToId this_dict]
+    		    [(clas_tyvars', dm_id, instToId local_dm_inst)]
     		    emptyNameSet	-- No inlines (yet)
     		    (dict_binds `andMonoBinds` defm_bind)
     in
@@ -498,18 +496,20 @@ tcMethodBind
 	-> [RenamedSig]		-- Pramgas (just for this one)
 	-> Bool			-- True <=> This method is from an instance declaration
 	-> ClassOpItem		-- The method selector and default-method Id
-	-> TcM (TcMonoBinds, LIE, (LIE, TcId))
+	-> TcM (TcMonoBinds, LIE, Inst)
 
 tcMethodBind clas origin inst_tyvars inst_tys inst_theta
 	     meth_binds prags is_inst_decl (sel_id, dm_info)
   = tcGetSrcLoc 			`thenNF_Tc` \ loc -> 
-    newMethod origin sel_id inst_tys	`thenNF_Tc` \ meth@(_, meth_id) ->
-    mkTcSig meth_id loc			`thenNF_Tc` \ sig_info -> 
+    newMethod origin sel_id inst_tys	`thenNF_Tc` \ meth ->
     let
+	meth_id	   = instToId meth
 	meth_name  = idName meth_id
 	sig_msg    = ptext SLIT("When checking the expected type for class method") <+> ppr sel_id
 	meth_prags = find_prags (idName sel_id) meth_name prags
     in
+    mkTcSig meth_id loc			`thenNF_Tc` \ sig_info -> 
+
 	-- Figure out what method binding to use
 	-- If the user suppplied one, use it, else construct a default one
     (case find_bind (idName sel_id) meth_name meth_binds of

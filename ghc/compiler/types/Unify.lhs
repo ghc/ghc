@@ -7,14 +7,14 @@ This module contains a unifier and a matcher, both of which
 use an explicit substitution
 
 \begin{code}
-module Unify ( unifyTysX, unifyTyListsX,
-	       match, matchTy, matchTys
+module Unify ( unifyTysX, unifyTyListsX, allDistinctTyVars,
+	       match, matchTy, matchTys,
   ) where 
 
 #include "HsVersions.h"
 
 import TypeRep	( Type(..) )	 -- friend
-import Type	( typeKind, tyVarsOfType, splitAppTy_maybe,
+import Type	( typeKind, tyVarsOfType, splitAppTy_maybe, getTyVar_maybe,
                   splitUTy, isUTy, deNoteType
 		)
 
@@ -31,6 +31,37 @@ import VarEnv	( TyVarSubstEnv, emptySubstEnv, lookupSubstEnv, extendSubstEnv,
 
 import Outputable
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Unification with an explicit substitution}
+%*									*
+%************************************************************************
+
+(allDistinctTyVars tys tvs) = True 
+	iff 
+all the types tys are type variables, 
+distinct from each other and from tvs.
+
+This is useful when checking that unification hasn't unified signature
+type variables.  For example, if the type sig is
+	f :: forall a b. a -> b -> b
+we want to check that 'a' and 'b' havn't 
+	(a) been unified with a non-tyvar type
+	(b) been unified with each other (all distinct)
+	(c) been unified with a variable free in the environment
+
+\begin{code}
+allDistinctTyVars :: [Type] -> TyVarSet -> Bool
+
+allDistinctTyVars []       acc
+  = True
+allDistinctTyVars (ty:tys) acc 
+  = case getTyVar_maybe ty of
+	Nothing 		      -> False 	-- (a)
+	Just tv | tv `elemVarSet` acc -> False	-- (b) or (c)
+		| otherwise           -> allDistinctTyVars tys (acc `extendVarSet` tv)
+\end{code}    
 
 %************************************************************************
 %*									*

@@ -33,10 +33,10 @@ import TcType		( TcKind, TcTyVar, TcThetaType, TcTauType,
 			  newKindVar, tcInstSigVar,
 			  zonkKindEnv, zonkTcType, zonkTcTyVars, zonkTcTyVar
 			)
-import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr,
-			  instFunDeps, instFunDepsOfTheta )
-import FunDeps		( oclose )
+import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToId )
+import FunDeps		( grow )
 import TcUnify		( unifyKind, unifyOpenTypeKind )
+import Unify		( allDistinctTyVars )
 import Type		( Type, Kind, PredType(..), ThetaType, SigmaType, TauType,
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
                           zipFunTys, hoistForAllTys,
@@ -60,7 +60,6 @@ import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind )
 import Class		( ClassContext, classArity, classTyCon )
 import Name		( Name )
 import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
-import UniqFM		( elemUFM )
 import BasicTypes	( Boxity(..), RecFlag(..), isRec )
 import SrcLoc		( SrcLoc )
 import Util		( mapAccumL, isSingleton )
@@ -558,11 +557,10 @@ checkAmbiguity wimp_out is_source_polytype forall_tyvars theta tau
   where
     sigma_ty	      = mkSigmaTy forall_tyvars theta tau
     tau_vars	      = tyVarsOfType tau
-    fds		      = instFunDepsOfTheta theta
-    extended_tau_vars = oclose fds tau_vars
+    extended_tau_vars = grow theta tau_vars
 
     is_ambig ct_var   = (ct_var `elem` forall_tyvars) &&
-		        not (ct_var `elemUFM` extended_tau_vars)
+		        not (ct_var `elemVarSet` extended_tau_vars)
     is_free ct_var    = not (ct_var `elem` forall_tyvars)
     
     check_pred pred = checkTc (not any_ambig)              (ambigErr pred sigma_ty) `thenTc_`
@@ -682,9 +680,8 @@ mkTcSig poly_id src_loc
 		tyvar_tys'
 		theta' tau'			`thenNF_Tc` \ inst ->
 	-- We make a Method even if it's not overloaded; no harm
-   instFunDeps SignatureOrigin theta'		`thenNF_Tc` \ fds ->
 	
-   returnNF_Tc (TySigInfo name poly_id tyvars' theta' tau' (instToIdBndr inst) (inst : fds) src_loc)
+   returnNF_Tc (TySigInfo name poly_id tyvars' theta' tau' (instToId inst) [inst] src_loc)
   where
     name = idName poly_id
 \end{code}
@@ -756,29 +753,22 @@ give a helpful message in checkSigTyVars.
 \begin{code}
 checkSigTyVars :: [TcTyVar]		-- Universally-quantified type variables in the signature
 	       -> TcTyVarSet		-- Tyvars that are free in the type signature
-					-- These should *already* be in the global-var set, and are
-					-- used here only to improve the error message
-	       -> TcM [TcTyVar]	-- Zonked signature type variables
+					--	Not necessarily zonked
+					-- 	These should *already* be in the free-in-env set, 
+					-- 	and are used here only to improve the error message
+	       -> TcM [TcTyVar]		-- Zonked signature type variables
 
 checkSigTyVars [] free = returnTc []
-
 checkSigTyVars sig_tyvars free_tyvars
   = zonkTcTyVars sig_tyvars		`thenNF_Tc` \ sig_tys ->
     tcGetGlobalTyVars			`thenNF_Tc` \ globals ->
 
-    checkTcM (all_ok sig_tys globals)
+    checkTcM (allDistinctTyVars sig_tys globals)
 	     (complain sig_tys globals)	`thenTc_`
 
     returnTc (map (getTyVar "checkSigTyVars") sig_tys)
 
   where
-    all_ok []       acc = True
-    all_ok (ty:tys) acc = case getTyVar_maybe ty of
-			    Nothing 		          -> False	-- Point (a)
-			    Just tv | tv `elemVarSet` acc -> False	-- Point (b) or (c)
-				    | otherwise           -> all_ok tys (acc `extendVarSet` tv)
-    
-
     complain sig_tys globals
       = -- For the in-scope ones, zonk them and construct a map
 	-- from the zonked tyvar to the in-scope one
@@ -974,7 +964,8 @@ wrongThingErr expected thing name
 ambigErr pred ty
   = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),
 	 nest 4 (ptext SLIT("for the type:") <+> ppr ty),
-	 nest 4 (ptext SLIT("Each forall'd type variable mentioned by the constraint must appear after the =>"))]
+	 nest 4 (ptext SLIT("At least one of the forall'd type variables mentioned by the constraint") $$
+		 ptext SLIT("must be reachable from the type after the =>"))]
 
 freeErr pred ty
   = sep [ptext SLIT("The constraint") <+> quotes (pprPred pred) <+>

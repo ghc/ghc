@@ -26,7 +26,7 @@ module TcHsSyn (
 	mkHsTyLam, mkHsDictLam, mkHsLet,
 
 	-- re-exported from TcEnv
-	TcId, tcInstId,
+	TcId, 
 
 	zonkTopBinds, zonkId, zonkIdOcc, zonkExpr,
 	zonkForeignExports, zonkRules
@@ -41,7 +41,7 @@ import HsSyn	-- oodles of it
 import Id	( idName, idType, isLocalId, setIdType, isIP, Id )
 import DataCon	( dataConWrapId )	
 import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv,
-		  TcEnv, TcId, tcInstId
+		  TcEnv, TcId
 		)
 
 import TcMonad

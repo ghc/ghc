@@ -20,24 +20,21 @@ import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
 import TcHsSyn		( TcMonoBinds, TcId, zonkId, mkHsLet )
 
 import TcMonad
-import Inst		( LIE, emptyLIE, mkLIE, plusLIE, InstOrigin(..),
-			  newDicts, tyVarsOfInst, instToId,
-			  getAllFunDepsOfLIE, getIPsOfLIE, zonkFunDeps
+import Inst		( LIE, emptyLIE, mkLIE, plusLIE, lieToList, InstOrigin(..),
+			  newDicts, tyVarsOfInsts, instToId
 			)
 import TcEnv		( tcExtendLocalValEnv,
 			  newSpecPragmaId, newLocalId,
-			  tcLookupTyCon, 
-			  tcGetGlobalTyVars, tcExtendGlobalTyVars
+			  tcGetGlobalTyVars
 			)
-import TcSimplify	( tcSimplify, tcSimplifyAndCheck, tcSimplifyToDicts )
-import TcImprove	( tcImprove )
+import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyToDicts )
 import TcMonoType	( tcHsSigType, checkSigTyVars,
 			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt
 			)
 import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcType		( TcThetaType, newTyVarTy, newTyVar, 
-			  zonkTcTypes, zonkTcThetaType, zonkTcTyVarToTyVar
+import TcType		( newTyVarTy, newTyVar, zonkTcTyVarsAndFV,
+			  zonkTcTyVarToTyVar
 			)
 import TcUnify		( unifyTauTy, unifyTauTyLists )
 
@@ -47,20 +44,18 @@ import Var		( idType, idName )
 import IdInfo		( InlinePragInfo(..) )
 import Name		( Name, getOccName, getSrcLoc )
 import NameSet
-import Type		( mkTyVarTy, tyVarsOfTypes, mkTyConApp,
-			  mkForAllTys, mkFunTys, 
+import Type		( mkTyVarTy, 
+			  mkForAllTys, mkFunTys, tyVarsOfType, 
 			  mkPredTy, mkForAllTy, isUnLiftedType, 
 			  unliftedTypeKind, liftedTypeKind, openTypeKind
 			)
-import FunDeps		( oclose )
 import Var		( tyVarKind )
 import VarSet
 import Bag
 import Util		( isIn )
 import Maybes		( maybeToBool )
-import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNotTopLevel )
+import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNonRec, isNotTopLevel )
 import FiniteMap	( listToFM, lookupFM )
-import PrelNames	( ioTyConName, mainKey, hasKey )
 import Outputable
 \end{code}
 
@@ -183,32 +178,6 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 		   )
 \end{code}
 
-An aside.  The original version of @tcBindsAndThen@ which lacks a
-combiner function, appears below.  Though it is perfectly well
-behaved, it cannot be typed by Haskell, because the recursive call is
-at a different type to the definition itself.  There aren't too many
-examples of this, which is why I thought it worth preserving! [SLPJ]
-
-\begin{pseudocode}
-% tcBindsAndThen
-% 	:: RenamedHsBinds
-% 	-> TcM (thing, LIE, thing_ty))
-% 	-> TcM ((TcHsBinds, thing), LIE, thing_ty)
-% 
-% tcBindsAndThen EmptyBinds do_next
-%   = do_next 		`thenTc` \ (thing, lie, thing_ty) ->
-%     returnTc ((EmptyBinds, thing), lie, thing_ty)
-% 
-% tcBindsAndThen (ThenBinds binds1 binds2) do_next
-%   = tcBindsAndThen binds1 (tcBindsAndThen binds2 do_next)
-% 	`thenTc` \ ((binds1', (binds2', thing')), lie1, thing_ty) ->
-% 
-%     returnTc ((binds1' `ThenBinds` binds2', thing'), lie1, thing_ty)
-% 
-% tcBindsAndThen (MonoBind bind sigs is_rec) do_next
-%   = tcBindAndThen bind sigs do_next
-\end{pseudocode}
-
 
 %************************************************************************
 %*									*
@@ -250,132 +219,43 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 			    Nothing -> mkVanillaId name forall_a_a          	-- No signature
 	in
 	returnTc (EmptyMonoBinds, emptyLIE, poly_ids)
-    ) $
+    )						$
 
 	-- TYPECHECK THE BINDINGS
     tcMonoBinds mbind tc_ty_sigs is_rec		`thenTc` \ (mbind', lie_req, binder_names, mono_ids) ->
-
-	-- CHECK THAT THE SIGNATURES MATCH
-	-- (must do this before getTyVarsToGen)
-    checkSigMatch top_lvl binder_names mono_ids tc_ty_sigs	`thenTc` \ maybe_sig_theta ->	
-
-	-- IMPROVE the LIE
-	-- Force any unifications dictated by functional dependencies.
-	-- Because unification may happen, it's important that this step
-	-- come before:
-	--   - computing vars over which to quantify
-	--   - zonking the generalized type vars
-    let lie_avail = case maybe_sig_theta of
-		      Nothing	   -> emptyLIE
-		      Just (_, la) -> la
-	lie_avail_req = lie_avail `plusLIE` lie_req in
-    tcImprove lie_avail_req				`thenTc_`
-
-	-- COMPUTE VARIABLES OVER WHICH TO QUANTIFY, namely tyvars_to_gen
-	-- The tyvars_not_to_gen are free in the environment, and hence
-	-- candidates for generalisation, but sometimes the monomorphism
-	-- restriction means we can't generalise them nevertheless
     let
-	mono_id_tys = map idType mono_ids
-    in
-    getTyVarsToGen is_unrestricted mono_id_tys lie_req	`thenNF_Tc` \ (tyvars_not_to_gen, tyvars_to_gen) ->
-
-	-- Finally, zonk the generalised type variables to real TyVars
-	-- This commits any unbound kind variables to lifted kind
-	-- I'm a little worried that such a kind variable might be
-	-- free in the environment, but I don't think it's possible for
-	-- this to happen when the type variable is not free in the envt
-	-- (which it isn't).		SLPJ Nov 98
-    mapTc zonkTcTyVarToTyVar (varSetElems tyvars_to_gen)	`thenTc` \ real_tyvars_to_gen_list ->
-    let
-	real_tyvars_to_gen = mkVarSet real_tyvars_to_gen_list
-		-- It's important that the final list 
-		-- (real_tyvars_to_gen and real_tyvars_to_gen_list) is fully
-		-- zonked, *including boxity*, because they'll be included in the forall types of
-		-- the polymorphic Ids, and instances of these Ids will be generated from them.
-		-- 
-		-- Also NB that tcSimplify takes zonked tyvars as its arg, hence we pass
-		-- real_tyvars_to_gen
+	tau_tvs = varSetElems (foldr (unionVarSet . tyVarsOfType . idType) emptyVarSet mono_ids)
     in
 
-	-- SIMPLIFY THE LIE
-    tcExtendGlobalTyVars tyvars_not_to_gen (
-	let ips = getIPsOfLIE lie_avail_req in
-	if null real_tyvars_to_gen_list && (null ips || not is_unrestricted) then
-		-- No polymorphism, and no IPs, so no need to simplify context
-	    returnTc (lie_req, EmptyMonoBinds, [])
-	else
-	case maybe_sig_theta of
-	  Nothing ->
-		-- No signatures, so just simplify the lie
-		-- NB: no signatures => no polymorphic recursion, so no
-		-- need to use lie_avail (which will be empty anyway)
-	    tcSimplify (text "tcBinds1" <+> ppr binder_names)
-		       real_tyvars_to_gen lie_req	`thenTc` \ (lie_free, dict_binds, lie_bound) ->
-	    returnTc (lie_free, dict_binds, map instToId (bagToList lie_bound))
-
-	  Just (sig_theta, lie_avail) ->
-		-- There are signatures, and their context is sig_theta
-		-- Furthermore, lie_avail is an LIE containing the 'method insts'
-		-- for the things bound here
-
-	    zonkTcThetaType sig_theta			`thenNF_Tc` \ sig_theta' ->
-	    newDicts SignatureOrigin sig_theta'		`thenNF_Tc` \ (dicts_sig, dict_ids) ->
-		-- It's important that sig_theta is zonked, because
-		-- dict_id is later used to form the type of the polymorphic thing,
-		-- and forall-types must be zonked so far as their bound variables
-		-- are concerned
-
-	    let
-		-- The "givens" is the stuff available.  We get that from
-		-- the context of the type signature, BUT ALSO the lie_avail
-		-- so that polymorphic recursion works right (see comments at end of fn)
-		givens = dicts_sig `plusLIE` lie_avail
-	    in
-
-		-- Check that the needed dicts can be expressed in
-		-- terms of the signature ones
-	    tcAddErrCtxt  (bindSigsCtxt tysig_names) $
-	    tcSimplifyAndCheck
-		(ptext SLIT("type signature for") <+> pprQuotedList binder_names)
-	    	real_tyvars_to_gen givens lie_req	`thenTc` \ (lie_free, dict_binds) ->
-
-	    returnTc (lie_free, dict_binds, dict_ids)
-
-    )						`thenTc` \ (lie_free, dict_binds, dicts_bound) ->
-
-	-- GET THE FINAL MONO_ID_TYS
-    zonkTcTypes mono_id_tys			`thenNF_Tc` \ zonked_mono_id_types ->
+	-- GENERALISE
+    generalise binder_names mbind tau_tvs lie_req tc_ty_sigs
+				`thenTc` \ (tc_tyvars_to_gen, lie_free, dict_binds, dict_ids) ->
 
 
-	-- CHECK FOR BOGUS UNPOINTED BINDINGS
-    (if any isUnLiftedType zonked_mono_id_types then
-		-- Unlifted bindings must be non-recursive,
-		-- not top level, and non-polymorphic
-	checkTc (isNotTopLevel top_lvl)
-		(unliftedBindErr "Top-level" mbind)		`thenTc_`
-	checkTc (case is_rec of {Recursive -> False; NonRecursive -> True})
-		(unliftedBindErr "Recursive" mbind)		`thenTc_`
-	checkTc (null real_tyvars_to_gen_list)
-		(unliftedBindErr "Polymorphic" mbind)
-     else
-	returnTc ()
-    )							`thenTc_`
+	-- ZONK THE GENERALISED TYPE VARIABLES TO REAL TyVars
+	-- This commits any unbound kind variables to boxed kind, by unification
+	-- It's important that the final quanfified type variables
+	-- are fully zonked, *including boxity*, because they'll be 
+	-- included in the forall types of the polymorphic Ids.
+	-- At calls of these Ids we'll instantiate fresh type variables from
+	-- them, and we use their boxity then.
+    mapNF_Tc zonkTcTyVarToTyVar tc_tyvars_to_gen	`thenNF_Tc` \ real_tyvars_to_gen ->
 
-    ASSERT( not (any ((== unliftedTypeKind) . tyVarKind) real_tyvars_to_gen_list) )
-		-- The instCantBeGeneralised stuff in tcSimplify should have
-		-- already raised an error if we're trying to generalise an 
-		-- unlifted tyvar (NB: unlifted tyvars are always introduced 
-		-- along with a class constraint) and it's better done there 
-		-- because we have more precise origin information.
-		-- That's why we just use an ASSERT here.
+	-- ZONK THE Ids
+	-- It's important that the dict Ids are zonked, including the boxity set
+	-- in the previous step, because they are later used to form the type of 
+	-- the polymorphic thing, and forall-types must be zonked so far as 
+	-- their bound variables are concerned
+    mapNF_Tc zonkId dict_ids				`thenNF_Tc` \ zonked_dict_ids ->
+    mapNF_Tc zonkId mono_ids				`thenNF_Tc` \ zonked_mono_ids ->
 
+	-- CHECK FOR BOGUS UNLIFTED BINDINGS
+    checkUnliftedBinds top_lvl is_rec real_tyvars_to_gen mbind zonked_mono_ids	`thenTc_`
 
-    	 -- BUILD THE POLYMORPHIC RESULT IDs
-    mapNF_Tc zonkId mono_ids		`thenNF_Tc` \ zonked_mono_ids ->
+	-- BUILD THE POLYMORPHIC RESULT IDs
     let
 	exports  = zipWith mk_export binder_names zonked_mono_ids
-	dict_tys = map idType dicts_bound
+	dict_tys = map idType zonked_dict_ids
 
 	inlines    = mkNameSet [name | InlineSig name _ loc <- inline_sigs]
         no_inlines = listToFM ([(name, IMustNotBeINLINEd False phase) | NoInlineSig name phase loc <- inline_sigs] ++
@@ -395,53 +275,76 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 		case maybeSig tc_ty_sigs binder_name of
 		  Just (TySigInfo _ sig_poly_id sig_tyvars _ _ _ _ _) -> 
 			(sig_tyvars, sig_poly_id)
-		  Nothing -> (real_tyvars_to_gen_list, new_poly_id)
+		  Nothing -> (real_tyvars_to_gen, new_poly_id)
 
 	    new_poly_id = mkVanillaId binder_name poly_ty
-	    poly_ty = mkForAllTys real_tyvars_to_gen_list 
+	    poly_ty = mkForAllTys real_tyvars_to_gen
 			$ mkFunTys dict_tys 
-			$ idType (zonked_mono_id)
+			$ idType zonked_mono_id
 		-- It's important to build a fully-zonked poly_ty, because
 		-- we'll slurp out its free type variables when extending the
 		-- local environment (tcExtendLocalValEnv); if it's not zonked
 		-- it appears to have free tyvars that aren't actually free 
 		-- at all.
-	
-	pat_binders :: [Name]
-	pat_binders = collectMonoBinders (justPatBindings mbind EmptyMonoBinds)
     in
-	-- CHECK FOR UNLIFTED BINDERS IN PATTERN BINDINGS
-    mapTc (\id -> checkTc (not (idName id `elem` pat_binders
-				&& isUnLiftedType (idType id)))
-			  (unliftedPatBindErr id)) zonked_mono_ids
-				`thenTc_`
 
 	 -- BUILD RESULTS
     returnTc (
-	 -- pprTrace "binding.." (ppr ((dicts_bound, dict_binds), exports, [idType poly_id | (_, poly_id, _) <- exports])) $
-	 AbsBinds real_tyvars_to_gen_list
-		  dicts_bound
-		  exports
-		  inlines
-		  (dict_binds `andMonoBinds` mbind'),
-	 lie_free,
-	 [poly_id | (_, poly_id, _) <- exports]
+	-- pprTrace "binding.." (ppr ((zonked_dict_ids, dict_binds), 
+	--				exports, [idType poly_id | (_, poly_id, _) <- exports])) $
+	AbsBinds real_tyvars_to_gen
+		 zonked_dict_ids
+		 exports
+		 inlines
+		 (dict_binds `andMonoBinds` mbind'),
+	lie_free,
+	[poly_id | (_, poly_id, _) <- exports]
     )
-  where
-    tysig_names     = [name | (TySigInfo name _ _ _ _ _ _ _) <- tc_ty_sigs]
-    is_unrestricted | opt_NoMonomorphismRestriction = True
-		    | otherwise			    = isUnRestrictedGroup tysig_names mbind
-
-justPatBindings bind@(PatMonoBind _ _ _) binds = bind `andMonoBinds` binds
-justPatBindings (AndMonoBinds b1 b2) binds = 
-	justPatBindings b1 (justPatBindings b2 binds) 
-justPatBindings other_bind binds = binds
 
 attachNoInlinePrag no_inlines bndr
   = case lookupFM no_inlines (idName bndr) of
 	Just prag -> bndr `setInlinePragma` prag
 	Nothing   -> bndr
+
+checkUnliftedBinds top_lvl is_rec real_tyvars_to_gen mbind zonked_mono_ids
+  = ASSERT( not (any ((== unliftedTypeKind) . tyVarKind) real_tyvars_to_gen) )
+		-- The instCantBeGeneralised stuff in tcSimplify should have
+		-- already raised an error if we're trying to generalise an 
+		-- unboxed tyvar (NB: unboxed tyvars are always introduced 
+		-- along with a class constraint) and it's better done there 
+		-- because we have more precise origin information.
+		-- That's why we just use an ASSERT here.
+
+	-- Check that pattern-bound variables are not unlifted
+    (if or [ (idName id `elem` pat_binders) && isUnLiftedType (idType id) 
+	   | id <- zonked_mono_ids ] then
+	addErrTc (unliftedBindErr "Pattern" mbind)
+     else
+	returnTc ()
+    )								`thenTc_`
+
+	-- Unlifted bindings must be non-recursive,
+	-- not top level, non-polymorphic, and not pattern bound
+    if any (isUnLiftedType . idType) zonked_mono_ids then
+	checkTc (isNotTopLevel top_lvl)
+		(unliftedBindErr "Top-level" mbind)		`thenTc_`
+	checkTc (isNonRec is_rec)
+		(unliftedBindErr "Recursive" mbind)		`thenTc_`
+	checkTc (null real_tyvars_to_gen)
+		(unliftedBindErr "Polymorphic" mbind)
+     else
+	returnTc ()
+
+  where
+    pat_binders :: [Name]
+    pat_binders = collectMonoBinders (justPatBindings mbind EmptyMonoBinds)
+
+    justPatBindings bind@(PatMonoBind _ _ _) binds = bind `andMonoBinds` binds
+    justPatBindings (AndMonoBinds b1 b2) binds = 
+	    justPatBindings b1 (justPatBindings b2 binds) 
+    justPatBindings other_bind binds = binds
 \end{code}
+
 
 Polymorphic recursion
 ~~~~~~~~~~~~~~~~~~~~~
@@ -505,6 +408,104 @@ is doing.
 %*									*
 %************************************************************************
 
+\begin{code}
+generalise binder_names mbind tau_tvs lie_req sigs
+
+-----------------------
+  | is_unrestricted && null sigs
+  =	-- INFERENCE CASE: Unrestricted group, no type signatures
+    tcSimplifyInfer (ptext SLIT("bindings for") <+> pprBinders binder_names)
+		    tau_tvs lie_req
+
+-----------------------
+  | is_unrestricted 
+  = 	-- CHECKING CASE: Unrestricted group, there are type signatures
+	-- Check signature contexts are empty 
+    checkSigsCtxts sigs				`thenTc` \ (sig_avails, sig_dicts) ->
+
+	-- Check that the needed dicts can be
+	-- expressed in terms of the signature ones
+    tcSimplifyInferCheck check_doc tau_tvs sig_avails lie_req	`thenTc` \ (forall_tvs, lie_free, dict_binds) ->
+	
+   	-- Check that signature type variables are OK
+    checkSigsTyVars sigs					`thenTc_`
+
+    returnTc (forall_tvs, lie_free, dict_binds, sig_dicts)
+
+-----------------------
+  | otherwise		-- RESTRICTED CASE: Restricted group
+  =	-- Check signature contexts are empty 
+    (if null sigs then
+	returnTc ()
+     else
+	checkSigsCtxts sigs	`thenTc` \ (_, sig_dicts) ->
+	checkTc (null sig_dicts)
+		(restrictedBindCtxtErr binder_names)
+    )							`thenTc_`
+
+	-- Identify constrained tyvars
+    tcGetGlobalTyVars				`thenNF_Tc` \ gbl_tvs ->
+    zonkTcTyVarsAndFV tau_tvs			`thenNF_Tc` \ tau_tvs' ->
+    zonkTcTyVarsAndFV lie_tvs		 	`thenNF_Tc` \ lie_tvs' ->
+    let
+	forall_tvs = tau_tvs' `minusVarSet` (lie_tvs' `unionVarSet` gbl_tvs)
+		-- Don't bother to oclose the gbl_tvs; this is a rare case
+    in
+    returnTc (varSetElems forall_tvs, lie_req, EmptyMonoBinds, [])
+
+  where
+    tysig_names     = [name | (TySigInfo name _ _ _ _ _ _ _) <- sigs]
+    is_unrestricted | opt_NoMonomorphismRestriction = True
+		    | otherwise			    = isUnRestrictedGroup tysig_names mbind
+    lie_tvs = varSetElems (tyVarsOfInsts (lieToList lie_req))
+    check_doc = case tysig_names of
+		   [n]   -> ptext SLIT("type signature for")    <+> quotes (ppr n)
+		   other -> ptext SLIT("type signature(s) for") <+> pprBinders tysig_names
+
+
+	-- CHECK THAT ALL THE SIGNATURE CONTEXTS ARE UNIFIABLE
+	-- The type signatures on a mutually-recursive group of definitions
+	-- must all have the same context (or none).
+	--
+	-- We unify them because, with polymorphic recursion, their types
+	-- might not otherwise be related.  This is a rather subtle issue.
+	-- ToDo: amplify
+	--
+	-- We return a representative 
+checkSigsCtxts sigs@(TySigInfo _ id1 sig_tvs theta1 _ _ _ _ : other_sigs)
+  = mapTc_ check_one other_sigs		`thenTc_` 
+    if null theta1 then
+	returnTc ([], [])		-- Non-overloaded type signatures
+    else
+    newDicts SignatureOrigin theta1	`thenNF_Tc` \ sig_dicts ->
+    let
+	-- The "sig_avails" is the stuff available.  We get that from
+	-- the context of the type signature, BUT ALSO the lie_avail
+	-- so that polymorphic recursion works right (see comments at end of fn)
+	sig_avails = sig_dicts ++ sig_meths
+    in
+    returnTc (sig_avails, map instToId sig_dicts)
+  where
+    sig1_dict_tys = map mkPredTy theta1
+    n_sig1_theta  = length theta1
+    sig_meths 	  = concat [insts | TySigInfo _ _ _ _ _ _ insts _ <- sigs]
+
+    check_one sig@(TySigInfo _ id _ theta _ _ _ src_loc)
+       = tcAddSrcLoc src_loc					$
+	 tcAddErrCtxt (sigContextsCtxt id1 id)			$
+	 checkTc (length theta == n_sig1_theta) sigContextsErr	`thenTc_`
+	 unifyTauTyLists sig1_dict_tys (map mkPredTy theta)
+
+checkSigsTyVars sigs = mapTc_ check_one sigs
+  where
+    check_one (TySigInfo _ id sig_tyvars sig_theta sig_tau _ _ src_loc)
+      = tcAddSrcLoc src_loc							$
+	tcAddErrCtxtM (sigCtxt (sig_msg id) sig_tyvars sig_theta sig_tau)	$
+	checkSigTyVars sig_tyvars (idFreeTyVars id)
+
+    sig_msg id = ptext SLIT("When checking the type signature for") <+> quotes (ppr id)
+\end{code}
+
 @getTyVarsToGen@ decides what type variables to generalise over.
 
 For a "restricted group" -- see the monomorphism restriction
@@ -533,6 +534,8 @@ generalise.  We must be careful about doing this:
 	Another, more common, example is when there's a Method inst in
 	the LIE, whose type might very well involve non-overloaded
 	type variables.
+  [NOTE: Jan 2001: I don't understand the problem here so I'm doing 
+	the simple thing instead]
 
  (b) On the other hand, we mustn't generalise tyvars which are constrained,
 	because we are going to pass on out the unmodified LIE, with those
@@ -541,43 +544,6 @@ generalise.  We must be careful about doing this:
 So we are careful, and do a complete simplification just to find the
 constrained tyvars. We don't use any of the results, except to
 find which tyvars are constrained.
-
-\begin{code}
-getTyVarsToGen is_unrestricted mono_id_tys lie
-  = tcGetGlobalTyVars			`thenNF_Tc` \ free_tyvars ->
-    zonkTcTypes mono_id_tys		`thenNF_Tc` \ zonked_mono_id_tys ->
-    let
-	body_tyvars = tyVarsOfTypes zonked_mono_id_tys `minusVarSet` free_tyvars
-	fds	    = getAllFunDepsOfLIE lie
-    in
-    if is_unrestricted
-    then
-	  -- We need to augment the type variables that appear explicitly in
-	  -- the type by those that are determined by the functional dependencies.
-	  -- e.g. suppose our type is	C a b => a -> a
-	  --	with the fun-dep  a->b
-	  -- Then we should generalise over b too; otherwise it will be
-	  -- reported as ambiguous.
-	zonkFunDeps fds		`thenNF_Tc` \ fds' ->
-	let 
-	    extended_tyvars = oclose fds' body_tyvars
- 	in
-	returnNF_Tc (emptyVarSet, extended_tyvars)
-    else
-	-- This recover and discard-errs is to avoid duplicate error
-	-- messages; this, after all, is an "extra" call to tcSimplify
-	recoverNF_Tc (returnNF_Tc (emptyVarSet, body_tyvars))		$
-	discardErrsTc							$
-
-	tcSimplify (text "getTVG") body_tyvars lie    `thenTc` \ (_, _, constrained_dicts) ->
-	let
-	  -- ASSERT: dicts_sig is already zonked!
-	    constrained_tyvars    = foldrBag (unionVarSet . tyVarsOfInst) emptyVarSet constrained_dicts
-	    reduced_tyvars_to_gen = body_tyvars `minusVarSet` constrained_tyvars
-        in
-        returnTc (constrained_tyvars, reduced_tyvars_to_gen)
-\end{code}
-
 
 \begin{code}
 isUnRestrictedGroup :: [Name]		-- Signatures given for these
@@ -615,7 +581,7 @@ tcMonoBinds :: RenamedMonoBinds
 	    -> TcM (TcMonoBinds, 
 		      LIE,		-- LIE required
 		      [Name],		-- Bound names
-		      [TcId])	-- Corresponding monomorphic bound things
+		      [TcId])		-- Corresponding monomorphic bound things
 
 tcMonoBinds mbinds tc_ty_sigs is_rec
   = tc_mb_pats mbinds		`thenTc` \ (complete_it, lie_req_pat, tvs, ids, lie_avail) ->
@@ -653,15 +619,20 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
     returnTc (mbinds', lie_req_pat `plusLIE` lie_req_rhss, names, mono_ids)
   where
 
-	-- This function is used when dealing with a LHS binder; we make a monomorphic
-	-- version of the Id.  We check for type signatures
+	-- This function is used when dealing with a LHS binder; 
+	-- we make a monomorphic version of the Id.  
+	-- We check for a type signature; if there is one, we use the mono_id
+	-- from the signature.  This is how we make sure the tau part of the
+	-- signature actually maatches the type of the LHS; then tc_mb_pats
+	-- ensures the LHS and RHS have the same type
+	
     tc_pat_bndr name pat_ty
 	= case maybeSig tc_ty_sigs name of
 	    Nothing
 		-> newLocalId (getOccName name) pat_ty (getSrcLoc name)
 
 	    Just (TySigInfo _ _ _ _ _ mono_id _ _)
-		-> tcAddSrcLoc (getSrcLoc name)				$
+		-> tcAddSrcLoc (getSrcLoc name)		$
 		   unifyTauTy (idType mono_id) pat_ty 	`thenTc_`
 		   returnTc mono_id
 
@@ -727,103 +698,6 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		NonRecursive -> openTypeKind 	-- Non-recursive, so we permit unlifted types
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Signatures}
-%*									*
-%************************************************************************
-
-@checkSigMatch@ does the next step in checking signature matching.
-The tau-type part has already been unified.  What we do here is to
-check that this unification has not over-constrained the (polymorphic)
-type variables of the original signature type.
-
-The error message here is somewhat unsatisfactory, but it'll do for
-now (ToDo).
-
-\begin{code}
-checkSigMatch :: TopLevelFlag -> [Name] -> [TcId] -> [TcSigInfo] -> TcM (Maybe (TcThetaType, LIE))
-checkSigMatch top_lvl binder_names mono_ids sigs
-  | main_bound_here
-  =	-- First unify the main_id with IO t, for any old t
-    tcSetErrCtxt mainTyCheckCtxt (
-	tcLookupTyCon ioTyConName		`thenTc`    \ ioTyCon ->
-	newTyVarTy liftedTypeKind		`thenNF_Tc` \ t_tv ->
-	unifyTauTy ((mkTyConApp ioTyCon [t_tv]))
-		   (idType main_mono_id)
-    )						`thenTc_`
-
-	-- Now check the signatures
-	-- Must do this after the unification with IO t, 
-	-- in case of a silly signature like
-	-- 	main :: forall a. a
-	-- The unification to IO t will bind the type variable 'a',
-	-- which is just waht check_one_sig looks for
-    mapTc check_one_sig sigs			`thenTc_`
-    mapTc check_main_ctxt sigs			`thenTc_` 
-    returnTc (Just ([], emptyLIE))
-
-  | not (null sigs)
-  = mapTc check_one_sig sigs			`thenTc_`
-    mapTc check_one_ctxt all_sigs_but_first	`thenTc_`
-    returnTc (Just (theta1, sig_lie))
-
-  | otherwise
-  = returnTc Nothing		-- No constraints from type sigs
-
-  where
-    (TySigInfo _ id1 _ theta1 _ _ _ _ : all_sigs_but_first) = sigs
-
-    sig1_dict_tys	= mk_dict_tys theta1
-    n_sig1_dict_tys	= length sig1_dict_tys
-    sig_lie 		= mkLIE (concat [insts | TySigInfo _ _ _ _ _ _ insts _ <- sigs])
-
-    maybe_main        = find_main top_lvl binder_names mono_ids
-    main_bound_here   = maybeToBool maybe_main
-    Just main_mono_id = maybe_main
-		      
-   	-- CHECK THAT THE SIGNATURE TYVARS AND TAU_TYPES ARE OK
-	-- Doesn't affect substitution
-    check_one_sig (TySigInfo _ id sig_tyvars sig_theta sig_tau _ _ src_loc)
-      = tcAddSrcLoc src_loc					$
-	tcAddErrCtxtM (sigCtxt (sig_msg id) sig_tyvars sig_theta sig_tau)	$
-	checkSigTyVars sig_tyvars (idFreeTyVars id)
-
-
-	-- CHECK THAT ALL THE SIGNATURE CONTEXTS ARE UNIFIABLE
-	-- The type signatures on a mutually-recursive group of definitions
-	-- must all have the same context (or none).
-	--
-	-- We unify them because, with polymorphic recursion, their types
-	-- might not otherwise be related.  This is a rather subtle issue.
-	-- ToDo: amplify
-    check_one_ctxt sig@(TySigInfo _ id _ theta _ _ _ src_loc)
-       = tcAddSrcLoc src_loc	$
-	 tcAddErrCtxt (sigContextsCtxt id1 id) $
-	 checkTc (length this_sig_dict_tys == n_sig1_dict_tys)
-				sigContextsErr 		`thenTc_`
-	 unifyTauTyLists sig1_dict_tys this_sig_dict_tys
-      where
-	 this_sig_dict_tys = mk_dict_tys theta
-
-	-- CHECK THAT FOR A GROUP INVOLVING Main.main, all 
-	-- the signature contexts are empty (what a bore)
-    check_main_ctxt sig@(TySigInfo _ id _ theta _ _ _ src_loc)
-	= tcAddSrcLoc src_loc	$
-	  checkTc (null theta) (mainContextsErr id)
-
-    mk_dict_tys theta = map mkPredTy theta
-
-    sig_msg id = ptext SLIT("When checking the type signature for") <+> quotes (ppr id)
-
-	-- Search for Main.main in the binder_names, return corresponding mono_id
-    find_main NotTopLevel binder_names mono_ids = Nothing
-    find_main TopLevel    binder_names mono_ids = go binder_names mono_ids
-    go [] [] = Nothing
-    go (n:ns) (m:ms) | n `hasKey` mainKey = Just m
-		     | otherwise          = go ns ms
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -881,7 +755,7 @@ tcSpecSigs (SpecSig name poly_ty src_loc : sigs)
     tcExpr (HsVar name) sig_ty			`thenTc` \ (spec_expr, spec_lie) ->
 
 	-- Squeeze out any Methods (see comments with tcSimplifyToDicts)
-    tcSimplifyToDicts spec_lie			`thenTc` \ (spec_lie1, spec_binds) ->
+    tcSimplifyToDicts spec_lie			`thenTc` \ (spec_dicts, spec_binds) ->
 
     	-- Just specialise "f" by building a SpecPragmaId binding
 	-- It is the thing that makes sure we don't prematurely 
@@ -891,7 +765,7 @@ tcSpecSigs (SpecSig name poly_ty src_loc : sigs)
 	-- Do the rest and combine
     tcSpecSigs sigs			`thenTc` \ (binds_rest, lie_rest) ->
     returnTc (binds_rest `andMonoBinds` VarMonoBind spec_id (mkHsLet spec_binds spec_expr),
-	      lie_rest   `plusLIE`      spec_lie1)
+	      lie_rest   `plusLIE`      mkLIE spec_dicts)
 
 tcSpecSigs (other_sig : sigs) = tcSpecSigs sigs
 tcSpecSigs []		      = returnTc (EmptyMonoBinds, emptyLIE)
@@ -915,41 +789,31 @@ valSpecSigCtxt v ty
 	 nest 4 (ppr v <+> dcolon <+> ppr ty)]
 
 -----------------------------------------------
-unliftedPatBindErr id
-  = ptext SLIT("variable in a lazy pattern binding has unlifted type: ")
-	 <+> quotes (ppr id)
-
------------------------------------------------
-bindSigsCtxt ids
-  = ptext SLIT("When checking the type signature(s) for") <+> pprQuotedList ids
-
------------------------------------------------
-sigContextsErr
-  = ptext SLIT("Mismatched contexts")
+sigContextsErr = ptext SLIT("Mismatched contexts")
 
 sigContextsCtxt s1 s2
   = hang (hsep [ptext SLIT("When matching the contexts of the signatures for"), 
 		quotes (ppr s1), ptext SLIT("and"), quotes (ppr s2)])
 	 4 (ptext SLIT("(the signature contexts in a mutually recursive group should all be identical)"))
 
-mainContextsErr id
-  | id `hasKey` mainKey = ptext SLIT("Main.main cannot be overloaded")
-  | otherwise
-  = quotes (ppr id) <+> ptext SLIT("cannot be overloaded") <> char ',' <> -- sigh; workaround for cpp's inability to deal
-    ptext SLIT("because it is mutually recursive with Main.main")         -- with commas inside SLIT strings.
-
-mainTyCheckCtxt
-  = hsep [ptext SLIT("When checking that"), quotes (ptext SLIT("main")),
-	  ptext SLIT("has the required type")]
-
 -----------------------------------------------
 unliftedBindErr flavour mbind
   = hang (text flavour <+> ptext SLIT("bindings for unlifted types aren't allowed:"))
 	 4 (ppr mbind)
 
+-----------------------------------------------
 existentialExplode mbinds
   = hang (vcat [text "My brain just exploded.",
 	        text "I can't handle pattern bindings for existentially-quantified constructors.",
 		text "In the binding group"])
 	4 (ppr mbinds)
+
+-----------------------------------------------
+restrictedBindCtxtErr binder_names
+  = hang (ptext SLIT("Illegal overloaded type signature(s)"))
+       4 (vcat [ptext SLIT("in a binding group for") <+> pprBinders binder_names,
+		ptext SLIT("that falls under the monomorphism restriction")])
+
+-- Used in error messages
+pprBinders bndrs = braces (pprWithCommas ppr bndrs)
 \end{code}

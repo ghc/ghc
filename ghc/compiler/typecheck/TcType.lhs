@@ -13,7 +13,7 @@ module TcType (
   newTyVarTys,		-- Int -> Kind -> NF_TcM [TcType]
 
   -----------------------------------------
-  TcType, TcTauType, TcThetaType, TcRhoType,
+  TcType, TcTauType, TcThetaType, TcRhoType, TcClassContext,
 
 	-- Find the type to which a type variable is bound
   tcPutTyVar,		-- :: TcTyVar -> TcType -> NF_TcM TcType
@@ -22,16 +22,16 @@ module TcType (
 
   tcSplitRhoTy,
 
-  tcInstTyVars,
+  tcInstTyVar, tcInstTyVars,
   tcInstSigVar,
-  tcInstTcType,
+  tcInstType,
 
   --------------------------------
   TcKind,
   newKindVar, newKindVars, newBoxityVar,
 
   --------------------------------
-  zonkTcTyVar, zonkTcTyVars, zonkTcSigTyVars,
+  zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkTcSigTyVars,
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
 
   zonkTcTypeToType, zonkTcTyVarToTyVar, zonkKindEnv
@@ -48,7 +48,7 @@ import Type		( PredType(..),
 			  splitPredTy_maybe, splitForAllTys, 
 			  isTyVarTy, mkTyVarTy, mkTyVarTys, 
 			  openTypeKind, liftedTypeKind, 
-			  superKind, superBoxity, 
+			  superKind, superBoxity, tyVarsOfTypes,
 			  defaultKind, liftedBoxity
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
@@ -180,16 +180,17 @@ tcInstSigVar tyvar	-- Very similar to tcInstTyVar
     tcNewSigTyVar name kind
 \end{code}
 
-@tcInstTcType@ instantiates the outer-level for-alls of a TcType with
-fresh type variables, returning them and the instantiated body of the for-all.
+@tcInstType@ instantiates the outer-level for-alls of a TcType with
+fresh type variables, splits off the dictionary part, and returns the results.
 
 \begin{code}
-tcInstTcType :: TcType -> NF_TcM ([TcTyVar], TcType)
-tcInstTcType ty
+tcInstType :: TcType -> NF_TcM ([TcTyVar], TcThetaType, TcType)
+tcInstType ty
   = case splitForAllTys ty of
-	([], _)       -> returnNF_Tc ([], ty)	-- Nothing to do
-	(tyvars, rho) -> tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', _, tenv)  ->
-			 returnNF_Tc (tyvars', substTy tenv rho)
+	([],     _)   -> returnNF_Tc ([], [], ty) 	 -- Nothing to do
+	(tyvars, rho) -> tcInstTyVars tyvars			`thenNF_Tc` \ (tyvars', _, tenv)  ->
+			 tcSplitRhoTy (substTy tenv rho)	`thenNF_Tc` \ (theta, tau) ->
+			 returnNF_Tc (tyvars', theta, tau)
 \end{code}
 
 
@@ -208,9 +209,16 @@ tcGetTyVar :: TcTyVar -> NF_TcM (Maybe TcType)
 Putting is easy:
 
 \begin{code}
-tcPutTyVar tyvar ty = UASSERT2( not (isUTy ty), ppr tyvar <+> ppr ty )
-                      tcWriteMutTyVar tyvar (Just ty)	`thenNF_Tc_`
-		      returnNF_Tc ty
+tcPutTyVar tyvar ty 
+  | not (isMutTyVar tyvar)
+  = pprTrace "tcPutTyVar" (ppr tyvar) $
+    returnNF_Tc ty
+
+  | otherwise
+  = ASSERT( isMutTyVar tyvar )
+    UASSERT2( not (isUTy ty), ppr tyvar <+> ppr ty )
+    tcWriteMutTyVar tyvar (Just ty)	`thenNF_Tc_`
+    returnNF_Tc ty
 \end{code}
 
 Getting is more interesting.  The easy thing to do is just to read, thus:
@@ -227,6 +235,11 @@ We return Nothing iff the original box was unbound.
 
 \begin{code}
 tcGetTyVar tyvar
+  | not (isMutTyVar tyvar)
+  = pprTrace "tcGetTyVar" (ppr tyvar) $
+    returnNF_Tc (Just (mkTyVarTy tyvar))
+
+  | otherwise
   = ASSERT2( isMutTyVar tyvar, ppr tyvar )
     tcReadMutTyVar tyvar				`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
@@ -265,6 +278,10 @@ short_out other_ty = returnNF_Tc other_ty
 \begin{code}
 zonkTcTyVars :: [TcTyVar] -> NF_TcM [TcType]
 zonkTcTyVars tyvars = mapNF_Tc zonkTcTyVar tyvars
+
+zonkTcTyVarsAndFV :: [TcTyVar] -> NF_TcM TcTyVarSet
+zonkTcTyVarsAndFV tyvars = mapNF_Tc zonkTcTyVar tyvars	`thenNF_Tc` \ tys ->
+			   returnNF_Tc (tyVarsOfTypes tys)
 
 zonkTcTyVar :: TcTyVar -> NF_TcM TcType
 zonkTcTyVar tyvar = zonkTyVar (\ tv -> returnNF_Tc (TyVarTy tv)) tyvar

@@ -7,7 +7,73 @@
 * Do we want to record a package name in a .hi file?
   Does pi_mod have a ModuleName or a Module?
 
-* Does teh finder
+	------------------------------------
+	   Mainly FunDeps (23 Jan 01)
+	------------------------------------
+
+This commit re-engineers the handling of functional dependencies.
+A functional dependency is no longer an Inst; instead, the necessary
+dependencies are snaffled out of their Class when necessary.
+
+As part of this exercise I found that I had to re-work how to do generalisation
+in a binding group.  There is rather exhaustive documentation on the new Plan
+at the top of TcSimplify.
+
+	******************
+	WARNING: I have compiled all the libraries with this new compiler
+		 and all looks well, but I have not run many programs.
+		 Things may break.  Let me know if so.
+	******************
+
+The main changes are these:
+
+1.  typecheck/TcBinds and TcSimplify have a lot of changes due to the 
+    new generalisation and context reduction story.  There are extensive
+    comments at the start of TcSimplify
+
+2.  typecheck/TcImprove is removed altogether.  Instead, improvement is 
+    interleaved with context reduction (until a fixpoint is reached).
+    All this is done in TcSimplify.
+
+3.  types/FunDeps has new exports
+	* 'improve' does improvement, returning a list of equations
+	* 'grow' and 'oclose' close a list of type variables wrt a set of
+	  PredTypes, but in slightly different ways.  Comments in file.
+
+4.  I improved the way in which we check that main::IO t.  It's tidier now.
+
+In addition
+
+*   typecheck/TcMatches: 
+	a) Tidy up, introducing a common function tcCheckExistentialPat
+
+	b) Improve the typechecking of parallel list comprehensions,
+	   which wasn't quite right before.  (see comments with tcStmts)
+
+	WARNING: (b) is untested!  Jeff, you might want to check.
+
+*   Numerous other incidental changes in the typechecker
+
+*   Manuel found that rules don't fire well when you have partial applications
+    from overloading.  For example, we may get
+
+	f a (d::Ord a) = let m_g = g a d
+			 in
+			 \y :: a -> ...(m_g (h y))...
+
+    The 'method' m_g doesn't get inlined because (g a d) might be a redex.
+    Yet a rule that looks like 
+		g a d (h y) = ...
+    won't fire because that doesn't show up.  One way out would be to make
+    the rule matcher a bit less paranoid about duplicating work, but instead
+    I've added a flag
+			-fno-method-sharing
+    which controls whether we generate things like m_g in the first place.
+    It's not clear that they are a win in the first place.
+
+    The flag is actually consulted in Inst.tcInstId
+
+
 
 	------------------------------------
 	   Mainly PredTypes (28 Sept 00)

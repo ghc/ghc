@@ -2,7 +2,7 @@
 module TcMonad(
 	TcType, 
 	TcTauType, TcPredType, TcThetaType, TcRhoType,
-	TcTyVar, TcTyVarSet,
+	TcTyVar, TcTyVarSet, TcClassContext,
 	TcKind,
 
 	TcM, NF_TcM, TcDown, TcEnv, 
@@ -54,7 +54,7 @@ import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, War
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
-import Class		( Class )
+import Class		( Class, ClassContext )
 import Name		( Name )
 import Var		( Id, TyVar, newMutTyVar, newSigTyVar, readMutTyVar, writeMutTyVar )
 import VarEnv		( TidyEnv, emptyTidyEnv )
@@ -93,11 +93,12 @@ type TcType = Type 		-- A TcType can have mutable type variables
 	-- a cannot occur inside a MutTyVar in T; that is,
 	-- T is "flattened" before quantifying over a
 
-type TcPredType  = PredType
-type TcThetaType = ThetaType
-type TcRhoType   = RhoType
-type TcTauType   = TauType
-type TcKind      = TcType
+type TcClassContext = ClassContext
+type TcPredType     = PredType
+type TcThetaType    = ThetaType
+type TcRhoType      = RhoType
+type TcTauType      = TauType
+type TcKind         = TcType
 \end{code}
 
 
@@ -658,6 +659,9 @@ type InstLoc = (InstOrigin, SrcLoc, ErrCtxt)
 data InstOrigin
   = OccurrenceOf Id		-- Occurrence of an overloaded identifier
 
+  | IPOcc Name			-- Occurrence of an implicit parameter
+  | IPBind Name			-- Binding site of an implicit parameter
+
   | RecordUpdOrigin
 
   | DataDeclOrigin		-- Typechecking a data declaration
@@ -709,6 +713,10 @@ pprInstLoc (orig, locn, ctxt)
   where
     pp_orig (OccurrenceOf id)
       	= hsep [ptext SLIT("use of"), quotes (ppr id)]
+    pp_orig (IPOcc name)
+      	= hsep [ptext SLIT("use of implicit parameter"), quotes (char '?' <> ppr name)]
+    pp_orig (IPBind name)
+      	= hsep [ptext SLIT("binding for implicit parameter"), quotes (char '?' <> ppr name)]
     pp_orig (LiteralOrigin lit)
 	= hsep [ptext SLIT("the literal"), quotes (ppr lit)]
     pp_orig (PatOrigin pat)

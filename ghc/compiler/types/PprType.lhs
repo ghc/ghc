@@ -7,7 +7,7 @@
 module PprType(
 	pprKind, pprParendKind,
 	pprType, pprParendType,
-	pprConstraint, pprPred, pprTheta,
+	pprPred, pprTheta, pprClassPred,
 	pprTyVarBndr, pprTyVarBndrs,
 
 	-- Junk
@@ -26,18 +26,17 @@ import Type		( PredType(..), ThetaType,
                           predRepTy, isUTyVar
 			)
 import Var		( TyVar, tyVarKind )
+import Class		( Class )
 import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, tupleTyConBoxity,
 			  maybeTyConSingleCon, isEnumerationTyCon, 
 			  tyConArity, tyConName
 			)
-import Class		( Class )
 
 -- others:
 import CmdLineOpts	( opt_PprStyle_RawTypes )
 import Maybes		( maybeToBool )
 import Name		( getOccString, getOccName )
 import Outputable
-import PprEnv
 import Unique		( Uniquable(..) )
 import BasicTypes	( tupleParens )
 import PrelNames		-- quite a few *Keys
@@ -56,20 +55,20 @@ works just by setting the initial context precedence very high.
 
 \begin{code}
 pprType, pprParendType :: Type -> SDoc
-pprType       ty = ppr_ty pprTyEnv tOP_PREC   ty
-pprParendType ty = ppr_ty pprTyEnv tYCON_PREC ty
+pprType       ty = ppr_ty tOP_PREC   ty
+pprParendType ty = ppr_ty tYCON_PREC ty
 
 pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
 
 pprPred :: PredType -> SDoc
-pprPred (Class clas tys) = pprConstraint clas tys
+pprPred (Class clas tys) = pprClassPred clas tys
 pprPred (IParam n ty)    = hsep [ptext SLIT("?") <> ppr n,
 				 ptext SLIT("::"), ppr ty]
 
-pprConstraint :: Class -> [Type] -> SDoc
-pprConstraint clas tys = ppr clas <+> hsep (map pprParendType tys)
+pprClassPred :: Class -> [Type] -> SDoc
+pprClassPred clas tys = ppr clas <+> hsep (map pprParendType tys)
 
 pprTheta :: ThetaType -> SDoc
 pprTheta theta = parens (hsep (punctuate comma (map pprPred theta)))
@@ -110,11 +109,11 @@ maybeParen ctxt_prec inner_prec pretty
 \end{code}
 
 \begin{code}
-ppr_ty :: PprEnv TyVar -> Int -> Type -> SDoc
-ppr_ty env ctxt_prec (TyVarTy tyvar)
-  = pTyVarO env tyvar
+ppr_ty :: Int -> Type -> SDoc
+ppr_ty ctxt_prec (TyVarTy tyvar)
+  = ppr tyvar
 
-ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
+ppr_ty ctxt_prec ty@(TyConApp tycon tys)
   	-- KIND CASE; it's of the form (Type x)
   | tycon `hasKey` typeConKey && n_tys == 1
   = 	-- For kinds, print (Type x) as just x if x is a 
@@ -137,13 +136,13 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
 
 	-- LIST CASE
   | tycon `hasKey` listTyConKey && n_tys == 1
-  = brackets (ppr_ty env tOP_PREC ty1)
+  = brackets (ppr_ty tOP_PREC ty1)
 
 	-- DICTIONARY CASE, prints {C a}
 	-- This means that instance decls come out looking right in interfaces
 	-- and that in turn means they get "gated" correctly when being slurped in
   | maybeToBool maybe_pred
-  = braces (ppr_pred env pred)
+  = braces (pprPred pred)
 
 	-- NO-ARGUMENT CASE (=> no parens)
   | null tys
@@ -158,70 +157,58 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
     (ty1:_)    = tys
     Just pred  = maybe_pred
     maybe_pred = splitPredTy_maybe ty	-- Checks class and arity
-    tys_w_commas = sep (punctuate comma (map (ppr_ty env tOP_PREC) tys))
-    tys_w_spaces = sep (map (ppr_ty env tYCON_PREC) tys)
+    tys_w_commas = sep (punctuate comma (map (ppr_ty tOP_PREC) tys))
+    tys_w_spaces = sep (map (ppr_ty tYCON_PREC) tys)
   
 
 
-ppr_ty env ctxt_prec ty@(ForAllTy _ _)
+ppr_ty ctxt_prec ty@(ForAllTy _ _)
   = getPprStyle $ \ sty -> 
     maybeParen ctxt_prec fUN_PREC $
     sep [ ptext SLIT("forall") <+> pp_tyvars sty <> ptext SLIT("."), 
 	  ppr_theta theta,
-	  ppr_ty env tOP_PREC tau
+	  ppr_ty tOP_PREC tau
     ]
  where		
     (tyvars, rho) = splitForAllTys ty
     (theta, tau)  = splitRhoTy rho
     
-    pp_tyvars sty = hsep (map (pBndr env LambdaBind) some_tyvars)
+    pp_tyvars sty = hsep (map pprTyVarBndr some_tyvars)
       where
         some_tyvars | userStyle sty && not opt_PprStyle_RawTypes
                     = filter (not . isUTyVar) tyvars  -- hide uvars from user
                     | otherwise
                     = tyvars
     
-    ppr_theta []	= empty
-    ppr_theta theta     = parens (hsep (punctuate comma (map (ppr_pred env) theta))) 
-			  <+> ptext SLIT("=>")
+    ppr_theta []     = empty
+    ppr_theta theta  = pprTheta theta <+> ptext SLIT("=>")
 
 
-ppr_ty env ctxt_prec (FunTy ty1 ty2)
+ppr_ty ctxt_prec (FunTy ty1 ty2)
   -- we don't want to lose usage annotations or synonyms,
   -- so we mustn't use splitFunTys here.
   = maybeParen ctxt_prec fUN_PREC $
-    sep [ ppr_ty env fUN_PREC ty1
-        , ptext SLIT("->") <+> ppr_ty env tOP_PREC ty2
+    sep [ ppr_ty fUN_PREC ty1
+        , ptext SLIT("->") <+> ppr_ty tOP_PREC ty2
         ]
 
-ppr_ty env ctxt_prec (AppTy ty1 ty2)
+ppr_ty ctxt_prec (AppTy ty1 ty2)
   = maybeParen ctxt_prec tYCON_PREC $
-    ppr_ty env fUN_PREC ty1 <+> ppr_ty env tYCON_PREC ty2
+    ppr_ty fUN_PREC ty1 <+> ppr_ty tYCON_PREC ty2
 
-ppr_ty env ctxt_prec (UsageTy u ty)
+ppr_ty ctxt_prec (UsageTy u ty)
   = maybeParen ctxt_prec tYCON_PREC $
-    ptext SLIT("__u") <+> ppr_ty env tYCON_PREC u
-                      <+> ppr_ty env tYCON_PREC ty
+    ptext SLIT("__u") <+> ppr_ty tYCON_PREC u
+                      <+> ppr_ty tYCON_PREC ty
     -- fUN_PREC would be logical for u, but it yields a reduce/reduce conflict with AppTy
 
-ppr_ty env ctxt_prec (NoteTy (SynNote ty) expansion)
-  = ppr_ty env ctxt_prec ty
---  = ppr_ty env ctxt_prec expansion -- if we don't want to see syntys
+ppr_ty ctxt_prec (NoteTy (SynNote ty) expansion)
+  = ppr_ty ctxt_prec ty
+--  = ppr_ty ctxt_prec expansion -- if we don't want to see syntys
 
-ppr_ty env ctxt_prec (NoteTy (FTVNote _) ty) = ppr_ty env ctxt_prec ty
+ppr_ty ctxt_prec (NoteTy (FTVNote _) ty) = ppr_ty ctxt_prec ty
 
-ppr_ty env ctxt_prec (PredTy p) = braces (ppr_pred env p)
-
-ppr_pred env (Class clas tys) = ppr clas <+>
-				hsep (map (ppr_ty env tYCON_PREC) tys)
-ppr_pred env (IParam n ty)    = hsep [char '?' <> ppr n, text "::",
-				      ppr_ty env tYCON_PREC ty]
-\end{code}
-
-\begin{code}
-pprTyEnv = initPprEnv b (Just ppr) b (Just (\site -> pprTyVarBndr)) b
-  where
-    b = panic "PprType:init_ppr_env"
+ppr_ty ctxt_prec (PredTy p) = braces (pprPred p)
 \end{code}
 
 
@@ -235,6 +222,7 @@ We print type-variable binders with their kinds in interface files,
 and when in debug mode.
 
 \begin{code}
+pprTyVarBndr :: TyVar -> SDoc
 pprTyVarBndr tyvar
   = getPprStyle $ \ sty ->
     if (ifaceStyle sty  && kind /= liftedTypeKind) || debugStyle sty then

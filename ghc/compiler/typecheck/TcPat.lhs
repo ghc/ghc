@@ -4,7 +4,7 @@
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
-module TcPat ( tcPat, tcPatBndr_NoSigs, simpleHsLitTy, badFieldCon, polyPatSig ) where
+module TcPat ( tcPat, tcMonoPatBndr, simpleHsLitTy, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
 
@@ -14,12 +14,13 @@ import TcHsSyn		( TcPat, TcId )
 
 import TcMonad
 import Inst		( InstOrigin(..),
-			  emptyLIE, plusLIE, LIE,
+			  emptyLIE, plusLIE, LIE, mkLIE, unitLIE, instToId,
 			  newMethod, newOverloadedLit, newDicts, newClassDicts
 			)
-import Name		( Name, getOccName, getSrcLoc )
+import Id		( mkVanillaId )
+import Name		( Name )
 import FieldLabel	( fieldLabelName )
-import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, newLocalId )
+import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId )
 import TcType 		( TcType, TcTyVar, tcInstTyVars, newTyVarTy )
 import TcMonoType	( tcHsSigType )
 import TcUnify 		( unifyTauTy, unifyListTy, unifyTupleTy	)
@@ -48,14 +49,10 @@ import Outputable
 %************************************************************************
 
 \begin{code}
--- This is the right function to pass to tcPat when there are no signatures
-tcPatBndr_NoSigs binder_name pat_ty
-  =  	-- Need to make a new, monomorphic, Id
-	-- The binder_name is already being used for the polymorphic Id
-     newLocalId (getOccName binder_name) pat_ty loc	`thenNF_Tc` \ bndr_id ->
-     returnTc bndr_id
- where
-   loc = getSrcLoc binder_name
+-- This is the right function to pass to tcPat when 
+-- we're looking at a lambda-bound pattern, 
+-- so there's no polymorphic guy to worry about
+tcMonoPatBndr binder_name pat_ty = returnTc (mkVanillaId binder_name pat_ty)
 \end{code}
 
 
@@ -264,8 +261,8 @@ tcPat tc_bndr (LitPatIn lit@(HsLitLit s _)) pat_ty
 	-- cf tcExpr on LitLits
   = tcLookupClass cCallableClassName		`thenNF_Tc` \ cCallableClass ->
     newDicts (LitLitOrigin (_UNPK_ s))
-	     [mkClassPred cCallableClass [pat_ty]]	`thenNF_Tc` \ (dicts, _) ->
-    returnTc (LitPat (HsLitLit s pat_ty) pat_ty, dicts, emptyBag, emptyBag, emptyLIE)
+	     [mkClassPred cCallableClass [pat_ty]]	`thenNF_Tc` \ dicts ->
+    returnTc (LitPat (HsLitLit s pat_ty) pat_ty, mkLIE dicts, emptyBag, emptyBag, emptyLIE)
 
 tcPat tc_bndr pat@(LitPatIn lit@(HsString _)) pat_ty
   = unifyTauTy pat_ty stringTy			`thenTc_` 
@@ -280,10 +277,10 @@ tcPat tc_bndr (LitPatIn simple_lit) pat_ty
 tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
   = newOverloadedLit (PatOrigin pat) over_lit pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
     tcLookupGlobalId eqName				`thenNF_Tc` \ eq_sel_id ->
-    newMethod origin eq_sel_id [pat_ty]			`thenNF_Tc` \ (lie2, eq_id) ->
+    newMethod origin eq_sel_id [pat_ty]			`thenNF_Tc` \ eq ->
 
-    returnTc (NPat lit' pat_ty (HsApp (HsVar eq_id) over_lit_expr),
-	      lie1 `plusLIE` lie2,
+    returnTc (NPat lit' pat_ty (HsApp (HsVar (instToId eq)) over_lit_expr),
+	      lie1 `plusLIE` unitLIE eq,
 	      emptyBag, emptyBag, emptyLIE)
   where
     origin = PatOrigin pat
@@ -304,13 +301,13 @@ tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus) pat_ty
     tcLookupGlobalId minus			`thenNF_Tc` \ minus_sel_id ->
     tcLookupGlobalId geName			`thenNF_Tc` \ ge_sel_id ->
     newOverloadedLit origin lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie1) ->
-    newMethod origin ge_sel_id    [pat_ty]	`thenNF_Tc` \ (lie2, ge_id) ->
-    newMethod origin minus_sel_id [pat_ty]	`thenNF_Tc` \ (lie3, minus_id) ->
+    newMethod origin ge_sel_id    [pat_ty]	`thenNF_Tc` \ ge ->
+    newMethod origin minus_sel_id [pat_ty]	`thenNF_Tc` \ minus ->
 
     returnTc (NPlusKPat bndr_id i pat_ty
-			(SectionR (HsVar ge_id) over_lit_expr)
-			(SectionR (HsVar minus_id) over_lit_expr),
-	      lie1 `plusLIE` lie2 `plusLIE` lie3,
+			(SectionR (HsVar (instToId ge)) over_lit_expr)
+			(SectionR (HsVar (instToId minus)) over_lit_expr),
+	      lie1 `plusLIE` mkLIE [ge,minus],
 	      emptyBag, unitBag (name, bndr_id), emptyLIE)
   where
     origin = PatOrigin pat
@@ -381,12 +378,12 @@ tcConstructor pat con_name pat_ty
 	ex_tvs'   = take n_ex_tvs all_tvs'
 	result_ty = mkTyConApp tycon (drop n_ex_tvs ty_args')
     in
-    newClassDicts (PatOrigin pat) ex_theta'	`thenNF_Tc` \ (lie_avail, dicts) ->
+    newClassDicts (PatOrigin pat) ex_theta'	`thenNF_Tc` \ dicts ->
 
 	-- Check overall type matches
     unifyTauTy pat_ty result_ty		`thenTc_`
 
-    returnTc (data_con, ex_tvs', dicts, lie_avail, arg_tys')
+    returnTc (data_con, ex_tvs', map instToId dicts, mkLIE dicts, arg_tys')
 \end{code}	      
 
 ------------------------------------------------------

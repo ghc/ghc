@@ -10,7 +10,7 @@ module Class (
 
 	mkClass, classTyVars, classArity,
 	classKey, className, classSelIds, classTyCon,
-	classBigSig, classExtraBigSig, classTvsFds
+	classBigSig, classExtraBigSig, classTvsFds, classSCTheta
     ) where
 
 #include "HsVersions.h"

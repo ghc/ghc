@@ -54,6 +54,7 @@ module CmdLineOpts (
 	opt_NoMonomorphismRestriction,
 
 	-- optimisation opts
+	opt_NoMethodSharing,
 	opt_DoSemiTagging,
 	opt_FoldrBuildOn,
 	opt_LiberateCaseThreshold,
@@ -437,6 +438,7 @@ opt_Parallel			= lookUp  SLIT("-fparallel")
 opt_SMP				= lookUp  SLIT("-fsmp")
 
 -- optimisation opts
+opt_NoMethodSharing		= lookUp  SLIT("-fno-method-sharing")
 opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)

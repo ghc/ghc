@@ -12,28 +12,27 @@ import {-# SOURCE #-}	TcExpr( tcExpr )
 
 import HsSyn		( HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			  MonoBinds(..), StmtCtxt(..), Stmt(..),
-			  pprMatch, getMatchLoc, consLetStmt,
-			  mkMonoBind, collectSigTysFromPats
+			  pprMatch, getMatchLoc, 
+			  mkMonoBind, nullMonoBinds, collectSigTysFromPats
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt )
-import TcHsSyn		( TcMatch, TcGRHSs, TcStmt )
+import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds )
 
 import TcMonad
 import TcMonoType	( kcHsSigType, tcTyVars, checkSigTyVars, tcHsSigType, sigPatCtxt )
-import Inst		( LIE, plusLIE, emptyLIE, plusLIEs )
-import TcEnv		( TcId, tcExtendTyVarEnv, tcExtendLocalValEnv, tcExtendGlobalTyVars )
-import TcPat		( tcPat, tcPatBndr_NoSigs, polyPatSig )
+import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
+import TcEnv		( TcId, tcLookupLocalIds, tcExtendTyVarEnv, tcExtendLocalValEnv, tcExtendGlobalTyVars )
+import TcPat		( tcPat, tcMonoPatBndr, polyPatSig )
 import TcType		( TcType, newTyVarTy )
 import TcBinds		( tcBindsAndThen )
-import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
-import TcUnify		( unifyFunTy, unifyTauTy, unifyListTy )
+import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
+import TcUnify		( unifyFunTy, unifyTauTy )
 import Name		( Name )
-import TysWiredIn	( boolTy )
-
+import TysWiredIn	( boolTy, mkListTy )
+import Id		( idType )
 import BasicTypes	( RecFlag(..) )
-import Type		( tyVarsOfType, isTauTy, mkArrowKind, mkAppTy, mkFunTy,
-			  liftedTypeKind, openTypeKind )
-import SrcLoc		( SrcLoc )
+import Type		( tyVarsOfType, isTauTy,  mkFunTy,
+			  liftedTypeKind, openTypeKind, splitSigmaTy )
 import VarSet
 import Var		( Id )
 import Bag
@@ -167,7 +166,6 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
         let
 	  xve2       = bagToList pat_bndrs
 	  pat_ids    = map snd xve2
-	  ex_tv_list = bagToList ex_tvs
         in
 
 	-- STEP 2: Check that the remaining "expected type" is not a rank-2 type
@@ -191,26 +189,15 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	))					`thenTc` \ (grhss', lie_req2) ->
 
 	-- STEP 5: Check for existentially bound type variables
-	tcExtendGlobalTyVars (tyVarsOfType rhs_ty)	(
-	    tcAddErrCtxtM (sigPatCtxt ex_tv_list pat_ids)	$
-	    checkSigTyVars ex_tv_list emptyVarSet		`thenTc` \ zonked_ex_tvs ->
-	    tcSimplifyAndCheck 
-		(text ("the existential context of a data constructor"))
-		(mkVarSet zonked_ex_tvs)
-		lie_avail (lie_req1 `plusLIE` lie_req2)
-	)							`thenTc` \ (lie_req', ex_binds) ->
-
-    	-- STEP 6 In case there are any polymorpic, overloaded binders in the pattern
-	-- (which can happen in the case of rank-2 type signatures, or data constructors
-	-- with polymorphic arguments), we must do a bindInstsOfLocalFns here
-	bindInstsOfLocalFuns lie_req' pat_ids	 	`thenTc` \ (lie_req'', inst_binds) ->
+	tcCheckExistentialPat pat_ids ex_tvs lie_avail 
+			      (lie_req1 `plusLIE` lie_req2) 
+			      rhs_ty 		`thenTc` \ (lie_req', ex_binds) ->
 
 	-- Phew!  All done.
 	let
-            grhss'' = glue_on Recursive ex_binds $
-		      glue_on Recursive inst_binds grhss'
+            match' = Match [] pats' Nothing (glue_on Recursive ex_binds grhss')
 	in
-	returnTc (pat_ids, (Match [] pats' Nothing grhss'', lie_req''))
+	returnTc (pat_ids, (match', lie_req'))
 
 	-- glue_on just avoids stupid dross
 glue_on _ EmptyMonoBinds grhss = grhss		-- The common case
@@ -229,10 +216,47 @@ tcGRHSs (GRHSs grhss binds _) expected_ty ctxt
 	  returnTc (GRHSs grhss' EmptyBinds (Just expected_ty), plusLIEs lies)
 
     tc_grhs (GRHS guarded locn)
-	= tcAddSrcLoc locn				$
-	  tcStmts ctxt (\ty -> ty) expected_ty locn guarded
-					    `thenTc` \ ((guarded', _), lie) ->
+	= tcAddSrcLoc locn					$
+	  tcStmts ctxt (\ty -> ty, expected_ty) guarded		`thenTc` \ (guarded', lie) ->
 	  returnTc (GRHS guarded' locn, lie)
+
+
+tcCheckExistentialPat :: [TcId]		-- Ids bound by this pattern
+		      -> Bag TcTyVar	-- Existentially quantified tyvars bound by pattern
+		      -> LIE		--   and context
+		      -> LIE		-- Required context
+		      -> TcType		--   and result type; vars in here must not escape
+		      -> TcM (LIE, TcDictBinds)	-- LIE to float out and dict bindings
+tcCheckExistentialPat ids ex_tvs lie_avail lie_req result_ty
+  | isEmptyBag ex_tvs && all not_overloaded ids
+	-- Short cut for case when there are no existentials
+	-- and no polymorphic overloaded variables
+	--  e.g. f :: (forall a. Ord a => a -> a) -> Int -> Int
+	--	 f op x = ....
+	--  Here we must discharge op Methods
+  = ASSERT( isEmptyLIE lie_avail )
+    returnTc (lie_req, EmptyMonoBinds)
+
+  | otherwise
+  = tcExtendGlobalTyVars (tyVarsOfType result_ty)		$
+    tcAddErrCtxtM (sigPatCtxt tv_list ids)			$
+
+    	-- In case there are any polymorpic, overloaded binders in the pattern
+	-- (which can happen in the case of rank-2 type signatures, or data constructors
+	-- with polymorphic arguments), we must do a bindInstsOfLocalFns here
+    bindInstsOfLocalFuns lie_req ids	 			`thenTc` \ (lie1, inst_binds) ->
+
+	-- Deal with overloaded functions bound by the pattern
+    tcSimplifyCheck doc tv_list
+		    (lieToList lie_avail) lie1		`thenTc` \ (lie2, dict_binds) ->
+    checkSigTyVars tv_list emptyVarSet				`thenTc_` 
+
+    returnTc (lie2, dict_binds `AndMonoBinds` inst_binds)
+  where
+    doc     = text ("the existential context of a data constructor")
+    tv_list = bagToList ex_tvs
+    not_overloaded id = case splitSigmaTy (idType id) of
+			  (_, theta, _) -> null theta
 \end{code}
 
 
@@ -248,7 +272,7 @@ tcMatchPats [] expected_ty
 
 tcMatchPats (pat:pats) expected_ty
   = unifyFunTy expected_ty		`thenTc` \ (arg_ty, rest_ty) ->
-    tcPat tcPatBndr_NoSigs pat arg_ty	`thenTc` \ (pat', lie_req, pat_tvs, pat_ids, lie_avail) ->
+    tcPat tcMonoPatBndr pat arg_ty	`thenTc` \ (pat', lie_req, pat_tvs, pat_ids, lie_avail) ->
     tcMatchPats pats rest_ty		`thenTc` \ (rhs_ty, pats', lie_reqs, pats_tvs, pats_ids, lie_avails) ->
     returnTc (	rhs_ty, 
 		pat':pats',
@@ -266,76 +290,59 @@ tcMatchPats (pat:pats) expected_ty
 %*									*
 %************************************************************************
 
+Typechecking statements is rendered a bit tricky by parallel list comprehensions:
+
+	[ (g x, h x) | ... ; let g v = ...
+		     | ... ; let h v = ... ]
+
+It's possible that g,h are overloaded, so we need to feed the LIE from the
+(g x, h x) up through both lots of bindings (so we get the bindInstsOfLocalFuns).
+Similarly if we had an existential pattern match:
+
+	data T = forall a. Show a => C a
+
+	[ (show x, show y) | ... ; C x <- ...
+			   | ... ; C y <- ... ]
+
+Then we need the LIE from (show x, show y) to be simplified against
+the bindings for x and y.  
+
+It's difficult to do this in parallel, so we rely on the renamer to 
+ensure that g,h and x,y don't duplicate, and simply grow the environment.
+So the binders of the first parallel group will be in scope in the second
+group.  But that's fine; there's no shadowing to worry about.
 
 \begin{code}
-tcParStep src_loc stmts
-  = newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind) `thenTc` \ m ->
-    newTyVarTy liftedTypeKind				 `thenTc` \ elt_ty ->
-    unifyListTy (mkAppTy m elt_ty)			 `thenTc_`
+tcStmts do_or_lc m_ty stmts
+  = tcStmtsAndThen (:) do_or_lc m_ty stmts (returnTc ([], emptyLIE))
 
-    tcStmts ListComp (mkAppTy m) elt_ty src_loc stmts	 `thenTc` \ ((stmts', val_env), stmts_lie) ->
-    returnTc (stmts', val_env, stmts_lie)
-
-tcStmts :: StmtCtxt
-        -> (TcType -> TcType)		-- m, the relationship type of pat and rhs in pat <- rhs
-	-> TcType			-- elt_ty, where type of the comprehension is (m elt_ty)
-	-> SrcLoc
+tcStmtsAndThen
+	:: (TcStmt -> thing -> thing)	-- Combiner
+	-> StmtCtxt
+        -> (TcType -> TcType, TcType)	-- m, the relationship type of pat and rhs in pat <- rhs
+					-- elt_ty, where type of the comprehension is (m elt_ty)
         -> [RenamedStmt]
-        -> TcM (([TcStmt], [(Name, TcId)]), LIE)
+	-> TcM (thing, LIE)
+        -> TcM (thing, LIE)
 
-tcStmts do_or_lc m elt_ty loc (ParStmtOut bndrstmtss : stmts)
-  = let stmtss = map snd bndrstmtss in
-    mapAndUnzip3Tc (tcParStep loc) stmtss	`thenTc` \ (stmtss', val_envs, lies) ->
-    let outstmts = zip (map (map snd) val_envs) stmtss'
-	lie = plusLIEs lies
-	new_val_env = concat val_envs
-    in
-    tcExtendLocalValEnv new_val_env (
-	tcStmts do_or_lc m elt_ty loc stmts)	`thenTc` \ ((stmts', rest_val_env), stmts_lie) ->
-    returnTc ((ParStmtOut outstmts : stmts', rest_val_env ++ new_val_env), lie `plusLIE` stmts_lie)
+	-- Base case
+tcStmtsAndThen combine do_or_lc m_ty [] do_next
+  = do_next
 
-tcStmts do_or_lc m elt_ty loc (stmt@(ReturnStmt exp) : stmts)
-  = ASSERT( null stmts )
-    tcSetErrCtxt (stmtCtxt do_or_lc stmt) 	$
-    tcExpr exp elt_ty				`thenTc`    \ (exp', exp_lie) ->
-    returnTc (([ReturnStmt exp'], []), exp_lie)
+	-- LetStmt
+tcStmtsAndThen combine do_or_lc m_ty (LetStmt binds : stmts) do_next
+  = tcBindsAndThen		-- No error context, but a binding group is
+  	(glue_binds combine)	-- rather a large thing for an error context anyway
+  	binds
+  	(tcStmtsAndThen combine do_or_lc m_ty stmts do_next)
 
-	-- ExprStmt at the end
-tcStmts do_or_lc m elt_ty loc [stmt@(ExprStmt exp src_loc)]
-  = tcSetErrCtxt (stmtCtxt do_or_lc stmt) 	$
-    tcExpr exp (m elt_ty)			`thenTc`    \ (exp', exp_lie) ->
-    returnTc (([ExprStmt exp' src_loc], []), exp_lie)
-
-	-- ExprStmt not at the end
-tcStmts do_or_lc m elt_ty loc (stmt@(ExprStmt exp src_loc) : stmts)
-  = ASSERT( isDoStmt do_or_lc )
-    tcAddSrcLoc src_loc 		(
-	tcSetErrCtxt (stmtCtxt do_or_lc stmt)	$
-	    -- exp has type (m tau) for some tau (doesn't matter what)
-  	newTyVarTy openTypeKind		`thenNF_Tc` \ any_ty ->
-  	tcExpr exp (m any_ty)
-    )					`thenTc` \ (exp', exp_lie) ->
-    tcStmts do_or_lc m elt_ty loc stmts	`thenTc` \ ((stmts', rest_val_env), stmts_lie) ->
-    returnTc ((ExprStmt exp' src_loc : stmts', rest_val_env),
-  	      exp_lie `plusLIE` stmts_lie)
-
-tcStmts do_or_lc m elt_ty loc (stmt@(GuardStmt exp src_loc) : stmts)
-  = ASSERT( not (isDoStmt do_or_lc) )
-    tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
-	tcAddSrcLoc src_loc 		$
-  	tcExpr exp boolTy
-    )					`thenTc` \ (exp', exp_lie) ->
-    tcStmts do_or_lc m elt_ty loc stmts	`thenTc` \ ((stmts', rest_val_env), stmts_lie) ->
-    -- ZZ is this right?
-    returnTc ((GuardStmt exp' src_loc : stmts', rest_val_env),
-  	      exp_lie `plusLIE` stmts_lie)
-
-tcStmts do_or_lc m elt_ty loc (stmt@(BindStmt pat exp src_loc) : stmts)
+	-- BindStmt
+tcStmtsAndThen combine do_or_lc m_ty@(m,elt_ty) (stmt@(BindStmt pat exp src_loc) : stmts) do_next
   = tcAddSrcLoc src_loc		(
 	tcSetErrCtxt (stmtCtxt do_or_lc stmt)	$
-    	newTyVarTy liftedTypeKind		`thenNF_Tc` \ pat_ty ->
-  	tcPat tcPatBndr_NoSigs pat pat_ty	`thenTc` \ (pat', pat_lie, pat_tvs, pat_ids, avail) ->  
-      	tcExpr exp (m pat_ty)			`thenTc` \ (exp', exp_lie) ->
+    	newTyVarTy liftedTypeKind	`thenNF_Tc` \ pat_ty ->
+  	tcPat tcMonoPatBndr pat pat_ty	`thenTc` \ (pat', pat_lie, pat_tvs, pat_ids, avail) ->  
+      	tcExpr exp (m pat_ty)		`thenTc` \ (exp', exp_lie) ->
   	returnTc (pat', exp',
 		  pat_lie `plusLIE` exp_lie,
 		  pat_tvs, pat_ids, avail)
@@ -343,46 +350,87 @@ tcStmts do_or_lc m elt_ty loc (stmt@(BindStmt pat exp src_loc) : stmts)
     let
 	new_val_env = bagToList pat_bndrs
 	pat_ids     = map snd new_val_env
-	pat_tv_list = bagToList pat_tvs
     in
 
 	-- Do the rest; we don't need to add the pat_tvs to the envt
 	-- because they all appear in the pat_ids's types
     tcExtendLocalValEnv new_val_env (
-       tcStmts do_or_lc m elt_ty loc stmts
-    )						`thenTc` \ ((stmts', rest_val_env), stmts_lie) ->
-
+       tcStmtsAndThen combine do_or_lc m_ty stmts do_next
+    )						`thenTc` \ (thing, stmts_lie) ->
 
 	-- Reinstate context for existential checks
-    tcSetErrCtxt (stmtCtxt do_or_lc stmt)		$
-    tcExtendGlobalTyVars (tyVarsOfType (m elt_ty))	$
-    tcAddErrCtxtM (sigPatCtxt pat_tv_list pat_ids)	$
+    tcSetErrCtxt (stmtCtxt do_or_lc stmt) 		$
+    tcCheckExistentialPat pat_ids pat_tvs lie_avail
+			  stmts_lie (m elt_ty) 		`thenTc` \ (final_lie, dict_binds) ->
 
-    checkSigTyVars pat_tv_list emptyVarSet		`thenTc` \ zonked_pat_tvs ->
-
-    tcSimplifyAndCheck 
-	(text ("the existential context of a data constructor"))
-	(mkVarSet zonked_pat_tvs)
-	lie_avail stmts_lie			`thenTc` \ (final_lie, dict_binds) ->
-
-    -- ZZ we have to be sure that concating the val_env lists preserves
-    -- shadowing properly...
-    returnTc ((BindStmt pat' exp' src_loc : 
-	         consLetStmt (mkMonoBind dict_binds [] Recursive) stmts',
-  	       rest_val_env ++ new_val_env),
+    returnTc (combine (BindStmt pat' exp' src_loc)
+		      (glue_binds combine Recursive dict_binds thing),
 	      lie_req `plusLIE` final_lie)
 
-tcStmts do_or_lc m elt_ty loc (LetStmt binds : stmts)
-     = tcBindsAndThen		-- No error context, but a binding group is
-  	combine			-- rather a large thing for an error context anyway
-  	binds
-  	(tcStmts do_or_lc m elt_ty loc stmts) `thenTc` \ ((stmts', rest_val_env), lie) ->
-       -- ZZ fix val_env
-       returnTc ((stmts', rest_val_env), lie)
-     where
-      	combine is_rec binds' (stmts', val_env) = (consLetStmt (mkMonoBind binds' [] is_rec) stmts', undefined)
 
-tcStmts do_or_lc m elt_ty loc [] = returnTc (([], []), emptyLIE)
+	-- ParStmt
+tcStmtsAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s : stmts) do_next
+  = loop bndr_stmts_s		`thenTc` \ ((pairs', thing), lie) ->
+    returnTc (combine (ParStmtOut pairs') thing, lie)
+  where
+    loop []
+      = tcStmtsAndThen combine do_or_lc m_ty stmts do_next	`thenTc` \ (thing, stmts_lie) ->
+	returnTc (([], thing), stmts_lie)
+
+    loop ((bndrs,stmts) : pairs)
+      = tcStmtsAndThen 
+		combine_par ListComp (mkListTy, not_required) stmts
+		(tcLookupLocalIds bndrs	`thenNF_Tc` \ bndrs' ->
+		 loop pairs		`thenTc` \ ((pairs', thing), lie) ->
+		 returnTc (([], (bndrs', pairs', thing)), lie))	`thenTc` \ ((stmts', (bndrs', pairs', thing)), lie) ->
+
+	returnTc ( ((bndrs',stmts') : pairs', thing), lie)
+
+    combine_par stmt (stmts, thing) = (stmt:stmts, thing)
+    not_required = panic "tcStmtsAndThen: elt_ty"
+
+	-- The simple-statment case
+tcStmtsAndThen combine do_or_lc m_ty (stmt:stmts) do_next
+  = tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
+	tcSimpleStmt do_or_lc m_ty stmt (null stmts)
+    )							`thenTc` \ (stmt', stmt_lie) ->
+
+    tcStmtsAndThen combine do_or_lc m_ty stmts do_next	`thenTc` \ (thing, stmts_lie) ->
+
+    returnTc (combine stmt' thing,
+	      stmt_lie `plusLIE` stmts_lie)
+
+
+------------------------------
+	-- ReturnStmt
+tcSimpleStmt do_or_lc (_,elt_ty) (ReturnStmt exp) is_last_stmt 
+  = ASSERT( is_last_stmt )
+    tcExpr exp elt_ty				`thenTc`    \ (exp', exp_lie) ->
+    returnTc (ReturnStmt exp', exp_lie)
+
+	-- ExprStmt
+tcSimpleStmt do_or_lc (m, elt_ty) (ExprStmt exp src_loc) is_last_stmt
+  = tcAddSrcLoc src_loc 		$
+    (if is_last_stmt then	-- do { ... ; wuggle }    	wuggle : m elt_ty
+	returnNF_Tc elt_ty	
+     else			-- do { ... ; wuggle ; .... } 	wuggle : m any_ty
+	ASSERT( isDoStmt do_or_lc )
+  	newTyVarTy openTypeKind	
+    )				`thenNF_Tc` \ arg_ty ->
+    tcExpr exp (m arg_ty)	`thenTc`    \ (exp', exp_lie) ->
+    returnTc (ExprStmt exp' src_loc, exp_lie)
+
+	-- GuardStmt
+tcSimpleStmt do_or_lc m_ty (GuardStmt exp src_loc) is_last_stmt
+  = ASSERT( not (isDoStmt do_or_lc) )
+    tcAddSrcLoc src_loc 		$
+    tcExpr exp boolTy			`thenTc` \ (exp', exp_lie) ->
+    returnTc (GuardStmt exp' src_loc, exp_lie)
+
+------------------------------
+glue_binds combine is_rec binds thing 
+  | nullMonoBinds binds = thing
+  | otherwise		= combine (LetStmt (mkMonoBind binds [] is_rec)) thing
 
 isDoStmt DoStmt = True
 isDoStmt other  = False

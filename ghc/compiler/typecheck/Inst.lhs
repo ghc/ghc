@@ -11,32 +11,29 @@ module Inst (
 	Inst, 
 	pprInst, pprInsts, pprInstsInFull, tidyInst, tidyInsts,
 
-	newDictFromOld, newDicts, newClassDicts, newDictsAtLoc,
+	newDictsFromOld, newDicts, newClassDicts,
 	newMethod, newMethodWithGivenTy, newOverloadedLit,
-	newIPDict, instOverloadedFun,
-	instantiateFdClassTys, instFunDeps, instFunDepsOfTheta,
-	newFunDepFromDict,
+	newIPDict, tcInstId,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, instLoc, getDictClassTys,
-	getDictPred_maybe, getMethodTheta_maybe,
-	getFunDeps, getFunDepsOfLIE,
-	getIPs, getIPsOfLIE,
-	getAllFunDeps, getAllFunDepsOfLIE,
+	getIPs,
+	predsOfInsts,
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
-	isDict, isClassDict, isMethod,
-	isTyVarDict, isStdClassTyVarDict, isMethodFor, notFunDep,
+	isDict, isClassDict, isMethod, instMentionsIPs,
+	isTyVarDict, isStdClassTyVarDict, isMethodFor, 
 	instBindingRequired, instCanBeGeneralised,
 
-	zonkInst, zonkInsts, zonkFunDeps, zonkTvFunDeps,
-	instToId, instToIdBndr, ipToId,
+	zonkInst, zonkInsts, 
+	instToId, 
 
 	InstOrigin(..), InstLoc, pprInstLoc
     ) where
 
 #include "HsVersions.h"
 
+import CmdLineOpts ( opt_NoMethodSharing )
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..) )
 import RnHsSyn	( RenamedHsOverLit )
 import TcHsSyn	( TcExpr, TcId, 
@@ -44,27 +41,27 @@ import TcHsSyn	( TcExpr, TcId,
 		)
 import TcMonad
 import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupGlobalId )
-import InstEnv ( InstLookupResult(..), lookupInstEnv )
-import TcType	( TcThetaType,
+import InstEnv	( InstLookupResult(..), lookupInstEnv )
+import TcType	( TcThetaType, TcClassContext,
 		  TcType, TcTauType, TcTyVarSet,
-		  zonkTcTyVars, zonkTcType, zonkTcTypes, 
-		  zonkTcThetaType
+		  zonkTcType, zonkTcTypes, 
+		  zonkTcThetaType, tcInstTyVar, tcInstType
 		)
 import CoreFVs	( idFreeTyVars )
-import Class	( Class, FunDep )
-import FunDeps	( instantiateFdClassTys )
-import Id	( Id, idType, mkUserLocal, mkSysLocal )
+import Class	( Class )
+import Id	( Id, idType, mkUserLocal, mkSysLocal, mkVanillaId )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
-import Name	( mkDictOcc, mkMethodOcc, mkIPOcc, getOccName, nameUnique )
+import Name	( mkDictOcc, mkMethodOcc, getOccName, mkLocalName )
+import NameSet	( NameSet )
 import PprType	( pprPred )	
 import Type	( Type, PredType(..), 
-		  isTyVarTy, mkDictTy, mkPredTy,
+		  isTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  splitForAllTys, splitSigmaTy, funArgTy,
 		  splitMethodTy, splitRhoTy, classesOfPreds,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
-		  tidyOpenType, tidyOpenTypes
+		  tidyOpenType, tidyOpenTypes, predMentionsIPs
 		)
-import Subst	( emptyInScopeSet, mkSubst, mkInScopeSet,
+import Subst	( emptyInScopeSet, mkSubst, 
 		  substTy, substClasses, mkTyVarSubst, mkTopTyVarSubst
 		)
 import Literal	( inIntRange )
@@ -73,10 +70,9 @@ import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
 import TysWiredIn ( isIntTy,
 		    floatDataCon, isFloatTy,
 		    doubleDataCon, isDoubleTy,
-		    isIntegerTy, voidTy
+		    isIntegerTy
 		  ) 
-import PrelNames( Unique, hasKey, fromIntName, fromIntegerClassOpKey )
-import Maybe	( catMaybes )
+import PrelNames( hasKey, fromIntName, fromIntegerClassOpKey )
 import Util	( thenCmp, zipWithEqual, mapAccumL )
 import Bag
 import Outputable
@@ -131,12 +127,12 @@ type Int, represented by
 \begin{code}
 data Inst
   = Dict
-	Unique
+	Id
 	TcPredType
 	InstLoc
 
   | Method
-	Unique
+	Id
 
 	TcId	-- The overloaded function
 			-- This function will be a global, local, or ClassOpId;
@@ -160,15 +156,9 @@ data Inst
 	--	type of (f tys dicts(from theta)) = tau
 
   | LitInst
-	Unique
+	Id
 	RenamedHsOverLit	-- The literal from the occurrence site
 	TcType			-- The type at which the literal is used
-	InstLoc
-
-  | FunDep
-	Unique
-	Class		-- the class from which this arises
-	[FunDep TcType]
 	InstLoc
 \end{code}
 
@@ -195,11 +185,7 @@ cmpInst (Method _ id1 tys1 _ _ _) (Method _ id2 tys2 _ _ _) = (id1 `compare` id2
 cmpInst (Method _ _ _ _ _ _)      other			    = LT
 
 cmpInst (LitInst _ lit1 ty1 _)	  (LitInst _ lit2 ty2 _)    = (lit1 `compare` lit2) `thenCmp` (ty1 `compare` ty2)
-cmpInst (LitInst _ _ _ _)	  (FunDep _ _ _ _)	    = LT
 cmpInst (LitInst _ _ _ _)	  other 		    = GT
-
-cmpInst (FunDep _ clas1 fds1 _)   (FunDep _ clas2 fds2 _)   = (clas1 `compare` clas2) `thenCmp` (fds1 `compare` fds2)
-cmpInst (FunDep _ _ _ _)	  other			    = GT
 
 -- and they can only have HsInt or HsFracs in them.
 \end{code}
@@ -208,56 +194,41 @@ cmpInst (FunDep _ _ _ _)	  other			    = GT
 Selection
 ~~~~~~~~~
 \begin{code}
-instLoc (Dict   u pred      loc) = loc
-instLoc (Method u _ _ _ _   loc) = loc
-instLoc (LitInst u lit ty   loc) = loc
-instLoc (FunDep _ _ _	    loc) = loc
+instToId :: Inst -> TcId
+instToId (Dict id _ _)	       = id
+instToId (Method id _ _ _ _ _) = id
+instToId (LitInst id _ _ _)    = id
 
-getDictPred_maybe (Dict _ p _) = Just p
-getDictPred_maybe _	       = Nothing
+instLoc (Dict _ _         loc) = loc
+instLoc (Method _ _ _ _ _ loc) = loc
+instLoc (LitInst _ _ _    loc) = loc
 
-getMethodTheta_maybe (Method _ _ _ theta _ _) = Just theta
-getMethodTheta_maybe _			      = Nothing
+getDictClassTys (Dict _ (Class clas tys) _) = (clas, tys)
 
-getDictClassTys (Dict u (Class clas tys) _) = (clas, tys)
+predsOfInsts :: [Inst] -> [PredType]
+predsOfInsts insts = concatMap predsOfInst insts
 
-getFunDeps (FunDep _ clas fds _) = Just (clas, fds)
-getFunDeps _ = Nothing
+predsOfInst (Dict _ pred _)          = [pred]
+predsOfInst (Method _ _ _ theta _ _) = theta
+predsOfInst (LitInst _ _ _ _)	     = []
+	-- The last case is is really a big cheat
+	-- LitInsts to give rise to a (Num a) or (Fractional a) predicate
+	-- But Num and Fractional have only one parameter and no functional
+	-- dependencies, so I think no caller of predsOfInst will care.
 
-getFunDepsOfLIE lie = catMaybes (map getFunDeps (lieToList lie))
+ipsOfPreds theta = [(n,ty) | IParam n ty <- theta]
 
-getIPsOfPred (IParam n ty) = [(n, ty)]
-getIPsOfPred _             = []
-getIPsOfTheta theta = concatMap getIPsOfPred theta
-
-getIPs (Dict u (IParam n ty) loc) = [(n, ty)]
-getIPs (Method u id _ theta t loc) = getIPsOfTheta theta
-getIPs _ = []
-
-getIPsOfLIE lie = concatMap getIPs (lieToList lie)
-
-getAllFunDeps (FunDep _ clas fds _) = fds
-getAllFunDeps inst = map (\(n,ty) -> ([], [ty])) (getIPs inst)
-
-getAllFunDepsOfLIE lie = concat (map getAllFunDeps (lieToList lie))
+getIPs inst = ipsOfPreds (predsOfInst inst)
 
 tyVarsOfInst :: Inst -> TcTyVarSet
+tyVarsOfInst (LitInst _ _ ty _)      = tyVarsOfType  ty
 tyVarsOfInst (Dict _ pred _)         = tyVarsOfPred pred
 tyVarsOfInst (Method _ id tys _ _ _) = tyVarsOfTypes tys `unionVarSet` idFreeTyVars id
 					 -- The id might have free type variables; in the case of
 					 -- locally-overloaded class methods, for example
-tyVarsOfInst (LitInst _ _ ty _)      = tyVarsOfType  ty
-tyVarsOfInst (FunDep _ _ fds _)
-  = foldr unionVarSet emptyVarSet (map tyVarsOfFd fds)
-  where tyVarsOfFd (ts1, ts2) =
-	    tyVarsOfTypes ts1 `unionVarSet` tyVarsOfTypes ts2
 
-tyVarsOfInsts insts
-  = foldr unionVarSet emptyVarSet (map tyVarsOfInst insts)
-
-tyVarsOfLIE lie
-  = foldr unionVarSet emptyVarSet (map tyVarsOfInst insts)
-  where insts = lieToList lie
+tyVarsOfInsts insts = foldr (unionVarSet . tyVarsOfInst) emptyVarSet insts
+tyVarsOfLIE   lie   = tyVarsOfInsts (lieToList lie)
 \end{code}
 
 Predicates
@@ -279,6 +250,13 @@ isMethodFor :: TcIdSet -> Inst -> Bool
 isMethodFor ids (Method uniq id tys _ _ loc) = id `elemVarSet` ids
 isMethodFor ids inst			     = False
 
+instMentionsIPs :: Inst -> NameSet -> Bool
+  -- True if the Inst mentions any of the implicit
+  -- parameters in the supplied set of names
+instMentionsIPs (Dict _ pred _)          ip_names = pred `predMentionsIPs` ip_names
+instMentionsIPs (Method _ _ _ theta _ _) ip_names = any (`predMentionsIPs` ip_names) theta
+instMentionsIPs other			 ip_names = False
+
 isTyVarDict :: Inst -> Bool
 isTyVarDict (Dict _ (Class _ tys) _) = all isTyVarTy tys
 isTyVarDict other		     = False
@@ -287,10 +265,6 @@ isStdClassTyVarDict (Dict _ (Class clas [ty]) _)
   = isStandardClass clas && isTyVarTy ty
 isStdClassTyVarDict other
   = False
-
-notFunDep :: Inst -> Bool
-notFunDep (FunDep _ _ _ _) = False
-notFunDep other		   = True
 \end{code}
 
 Two predicates which deal with the case where class constraints don't
@@ -310,99 +284,147 @@ instCanBeGeneralised other		       = True
 \end{code}
 
 
-Construction
-~~~~~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{Building dictionaries}
+%*									*
+%************************************************************************
 
 \begin{code}
 newDicts :: InstOrigin
 	 -> TcThetaType
-	 -> NF_TcM (LIE, [TcId])
+	 -> NF_TcM [Inst]
 newDicts orig theta
   = tcGetInstLoc orig		`thenNF_Tc` \ loc ->
-    newDictsAtLoc loc theta	`thenNF_Tc` \ (dicts, ids) ->
-    returnNF_Tc (listToBag dicts, ids)
+    newDictsAtLoc loc theta
 
 newClassDicts :: InstOrigin
-	      -> [(Class,[TcType])]
-	      -> NF_TcM (LIE, [TcId])
-newClassDicts orig theta
-  = newDicts orig (map (uncurry Class) theta)
+	      -> TcClassContext
+	      -> NF_TcM [Inst]
+newClassDicts orig theta = newDicts orig (map (uncurry Class) theta)
+
+newDictsFromOld :: Inst -> TcClassContext -> NF_TcM [Inst]
+newDictsFromOld (Dict _ _ loc) theta = newDictsAtLoc loc (map (uncurry Class) theta)
 
 -- Local function, similar to newDicts, 
 -- but with slightly different interface
 newDictsAtLoc :: InstLoc
  	      -> TcThetaType
-	      -> NF_TcM ([Inst], [TcId])
-newDictsAtLoc loc theta =
- tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
- let
-  mk_dict u pred = Dict u pred loc
-  dicts = zipWithEqual "newDictsAtLoc" mk_dict new_uniqs theta
- in
- returnNF_Tc (dicts, map instToId dicts)
+	      -> NF_TcM [Inst]
+newDictsAtLoc inst_loc@(_,loc,_) theta
+  = tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
+    returnNF_Tc (zipWithEqual "newDictsAtLoc" mk_dict new_uniqs theta)
+  where
+    mk_dict uniq pred = Dict (mkVanillaId (mk_dict_name uniq pred) (mkPredTy pred)) pred inst_loc
 
-newDictFromOld :: Inst -> Class -> [TcType] -> NF_TcM Inst
-newDictFromOld (Dict _ _ loc) clas tys
-  = tcGetUnique	      `thenNF_Tc` \ uniq ->
-    returnNF_Tc (Dict uniq (Class clas tys) loc)
+    mk_dict_name uniq (Class cls tys)  = mkLocalName uniq (mkDictOcc (getOccName cls)) loc
+    mk_dict_name uniq (IParam name ty) = name
+
+newIPDict orig name ty
+  = tcGetInstLoc orig			`thenNF_Tc` \ inst_loc ->
+    returnNF_Tc (Dict (mkVanillaId name ty) (IParam name ty) inst_loc)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Building methods (calls of overloaded functions)}
+%*									*
+%************************************************************************
+
+tcInstId instantiates an occurrence of an Id.
+The instantiate_it loop runs round instantiating the Id.
+It has to be a loop because we are now prepared to entertain
+types like
+	f:: forall a. Eq a => forall b. Baz b => tau
+We want to instantiate this to
+	f2::tau		{f2 = f1 b (Baz b), f1 = f a (Eq a)}
+
+The -fno-method-sharing flag controls what happens so far as the LIE
+is concerned.  The default case is that for an overloaded function we 
+generate a "method" Id, and add the Method Inst to the LIE.  So you get
+something like
+	f :: Num a => a -> a
+	f = /\a (d:Num a) -> let m = (+) a d in \ (x:a) -> m x x
+If you specify -fno-method-sharing, the dictionary application 
+isn't shared, so we get
+	f :: Num a => a -> a
+	f = /\a (d:Num a) (x:a) -> (+) a d x x
+This gets a bit less sharing, but
+	a) it's better for RULEs involving overloaded functions
+	b) perhaps fewer separated lambdas
+
+
+\begin{code}
+tcInstId :: Id -> NF_TcM (TcExpr, LIE, TcType)
+tcInstId fun
+  | opt_NoMethodSharing  = loop_noshare (HsVar fun) (idType fun)
+  | otherwise		 = loop_share fun
+  where
+    orig = OccurrenceOf fun
+    loop_noshare fun fun_ty
+      = tcInstType fun_ty		`thenNF_Tc` \ (tyvars, theta, tau) ->
+	let 
+	    ty_app = mkHsTyApp fun (mkTyVarTys tyvars)
+	in
+        if null theta then 		-- Is it overloaded?
+	    returnNF_Tc (ty_app, emptyLIE, tau)
+	else
+	    newDicts orig theta						`thenNF_Tc` \ dicts ->
+	    loop_noshare (mkHsDictApp ty_app (map instToId dicts)) tau	`thenNF_Tc` \ (expr, lie, final_tau) ->
+	    returnNF_Tc (expr, mkLIE dicts `plusLIE` lie, final_tau)
+
+    loop_share fun
+      = tcInstType (idType fun)		`thenNF_Tc` \ (tyvars, theta, tau) ->
+	let 
+	    arg_tys = mkTyVarTys tyvars
+	in
+        if null theta then	 	-- Is it overloaded?
+	    returnNF_Tc (mkHsTyApp (HsVar fun) arg_tys, emptyLIE, tau)
+	else
+		-- Yes, it's overloaded
+	    newMethodWithGivenTy orig fun arg_tys theta tau	`thenNF_Tc` \ meth ->
+	    loop_share (instToId meth) 				`thenNF_Tc` \ (expr, lie, final_tau) ->
+	    returnNF_Tc (expr, unitLIE meth `plusLIE` lie, final_tau)
 
 
 newMethod :: InstOrigin
 	  -> TcId
 	  -> [TcType]
-	  -> NF_TcM (LIE, TcId)
+	  -> NF_TcM Inst
 newMethod orig id tys
   =   	-- Get the Id type and instantiate it at the specified types
     let
 	(tyvars, rho) = splitForAllTys (idType id)
 	rho_ty	      = substTy (mkTyVarSubst tyvars tys) rho
-	(pred, tau)  = splitMethodTy rho_ty
+	(pred, tau)   = splitMethodTy rho_ty
     in
-    newMethodWithGivenTy orig id tys [pred] tau	`thenNF_Tc` \ meth_inst ->
-    returnNF_Tc (unitLIE meth_inst, instToId meth_inst)
-
-instOverloadedFun orig v arg_tys theta tau
--- This is where we introduce new functional dependencies into the LIE
-  = newMethodWithGivenTy orig v arg_tys theta tau	`thenNF_Tc` \ inst ->
-    instFunDeps orig theta				`thenNF_Tc` \ fds ->
-    returnNF_Tc (instToId inst, mkLIE (inst : fds))
-
-instFunDeps orig theta
-  = tcGetUnique		`thenNF_Tc` \ uniq ->
-    tcGetInstLoc orig	`thenNF_Tc` \ loc ->
-    let ifd (Class clas tys) =
-	    let fds = instantiateFdClassTys clas tys in
-	    if null fds then Nothing else Just (FunDep uniq clas fds loc)
-	ifd _ = Nothing
-    in returnNF_Tc (catMaybes (map ifd theta))
-
-instFunDepsOfTheta theta
-  = let ifd (Class clas tys) = instantiateFdClassTys clas tys
-	ifd (IParam n ty)    = [([], [ty])]
-    in concat (map ifd theta)
+    newMethodWithGivenTy orig id tys [pred] tau
 
 newMethodWithGivenTy orig id tys theta tau
   = tcGetInstLoc orig	`thenNF_Tc` \ loc ->
-    newMethodWith id tys theta tau loc
+    newMethodWith loc id tys theta tau
 
-newMethodWith id tys theta tau loc
+newMethodWith inst_loc@(_,loc,_) id tys theta tau
   = tcGetUnique		`thenNF_Tc` \ new_uniq ->
-    returnNF_Tc (Method new_uniq id tys theta tau loc)
+    let
+	meth_id	= mkUserLocal (mkMethodOcc (getOccName id)) new_uniq tau loc
+    in
+    returnNF_Tc (Method meth_id id tys theta tau inst_loc)
 
 newMethodAtLoc :: InstLoc
 	       -> Id -> [TcType]
 	       -> NF_TcM (Inst, TcId)
-newMethodAtLoc loc real_id tys		-- Local function, similar to newMethod but with 
-					-- slightly different interface
+newMethodAtLoc inst_loc real_id tys
+	-- This actually builds the Inst
   =   	-- Get the Id type and instantiate it at the specified types
-    tcGetUnique					`thenNF_Tc` \ new_uniq ->
     let
 	(tyvars,rho) = splitForAllTys (idType real_id)
 	rho_ty	      = ASSERT( length tyvars == length tys )
 			substTy (mkTopTyVarSubst tyvars tys) rho
 	(theta, tau)  = splitRhoTy rho_ty
-	meth_inst     = Method new_uniq real_id tys theta tau loc
     in
+    newMethodWith inst_loc real_id tys theta tau	`thenNF_Tc` \ meth_inst ->
     returnNF_Tc (meth_inst, instToId meth_inst)
 \end{code}
 
@@ -431,59 +453,21 @@ newOverloadedLit orig lit ty		-- The general case
   = tcGetInstLoc orig		`thenNF_Tc` \ loc ->
     tcGetUnique			`thenNF_Tc` \ new_uniq ->
     let
-	lit_inst = LitInst new_uniq lit ty loc
+	lit_inst = LitInst lit_id lit ty loc
+	lit_id   = mkSysLocal SLIT("lit") new_uniq ty
     in
     returnNF_Tc (HsVar (instToId lit_inst), unitLIE lit_inst)
 \end{code}
 
-\begin{code}
-newFunDepFromDict dict
-  | isClassDict dict
-  = tcGetUnique		`thenNF_Tc` \ uniq ->
-    let (clas, tys) = getDictClassTys dict
-	fds = instantiateFdClassTys clas tys
-	inst = FunDep uniq clas fds (instLoc dict)
-    in
-	if null fds then returnNF_Tc Nothing else returnNF_Tc (Just inst)
-  | otherwise
-  = returnNF_Tc Nothing
-\end{code}
 
-\begin{code}
-newIPDict name ty loc
-  = tcGetUnique		`thenNF_Tc` \ new_uniq ->
-    let d = Dict new_uniq (IParam name ty) loc in
-    returnNF_Tc d
-\end{code}
+%************************************************************************
+%*									*
+\subsection{Zonking}
+%*									*
+%************************************************************************
 
-\begin{code}
-instToId :: Inst -> TcId
-instToId inst = instToIdBndr inst
-
-instToIdBndr :: Inst -> TcId
-instToIdBndr (Dict u (Class clas tys) (_,loc,_))
-  = mkUserLocal (mkDictOcc (getOccName clas)) u (mkDictTy clas tys) loc
-instToIdBndr (Dict u (IParam n ty) (_,loc,_))
-  = ipToId n ty loc
-
-instToIdBndr (Method u id tys theta tau (_,loc,_))
-  = mkUserLocal (mkMethodOcc (getOccName id)) u tau loc
-
-instToIdBndr (LitInst u list ty loc)
-  = mkSysLocal SLIT("lit") u ty
-
-instToIdBndr (FunDep u clas fds _)
-  = mkSysLocal SLIT("FunDep") u voidTy
-
-ipToId n ty loc
-  = mkUserLocal (mkIPOcc (getOccName n)) (nameUnique n) (mkPredTy (IParam n ty)) loc
-\end{code}
-
-
-Zonking
-~~~~~~~
 Zonking makes sure that the instance types are fully zonked,
-but doesn't do the same for the Id in a Method.  There's no
+but doesn't do the same for any of the Ids in an Inst.  There's no
 need, and it's a lot of extra work.
 
 \begin{code}
@@ -496,11 +480,11 @@ zonkPred (IParam n ty)
     returnNF_Tc (IParam n new_ty)
 
 zonkInst :: Inst -> NF_TcM Inst
-zonkInst (Dict u pred loc)
+zonkInst (Dict id pred loc)
   = zonkPred pred			`thenNF_Tc` \ new_pred ->
-    returnNF_Tc (Dict u new_pred loc)
+    returnNF_Tc (Dict id new_pred loc)
 
-zonkInst (Method u id tys theta tau loc) 
+zonkInst (Method m id tys theta tau loc) 
   = zonkId id			`thenNF_Tc` \ new_id ->
 	-- Essential to zonk the id in case it's a local variable
 	-- Can't use zonkIdOcc because the id might itself be
@@ -509,36 +493,22 @@ zonkInst (Method u id tys theta tau loc)
     zonkTcTypes tys		`thenNF_Tc` \ new_tys ->
     zonkTcThetaType theta	`thenNF_Tc` \ new_theta ->
     zonkTcType tau		`thenNF_Tc` \ new_tau ->
-    returnNF_Tc (Method u new_id new_tys new_theta new_tau loc)
+    returnNF_Tc (Method m new_id new_tys new_theta new_tau loc)
 
-zonkInst (LitInst u lit ty loc)
+zonkInst (LitInst id lit ty loc)
   = zonkTcType ty			`thenNF_Tc` \ new_ty ->
-    returnNF_Tc (LitInst u lit new_ty loc)
-
-zonkInst (FunDep u clas fds loc)
-  = zonkFunDeps fds			`thenNF_Tc` \ fds' ->
-    returnNF_Tc (FunDep u clas fds' loc)
+    returnNF_Tc (LitInst id lit new_ty loc)
 
 zonkInsts insts = mapNF_Tc zonkInst insts
-
-zonkFunDeps fds = mapNF_Tc zonkFd fds
-  where
-  zonkFd (ts1, ts2)
-    = zonkTcTypes ts1			`thenNF_Tc` \ ts1' ->
-      zonkTcTypes ts2			`thenNF_Tc` \ ts2' ->
-      returnNF_Tc (ts1', ts2')
-
-zonkTvFunDeps fds = mapNF_Tc zonkFd fds
-  where
-  zonkFd (tvs1, tvs2)
-    = zonkTcTyVars tvs1			`thenNF_Tc` \ tvs1' ->
-      zonkTcTyVars tvs2			`thenNF_Tc` \ tvs2' ->
-      returnNF_Tc (tvs1', tvs2')
 \end{code}
 
 
-Printing
-~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{Printing}
+%*									*
+%************************************************************************
+
 ToDo: improve these pretty-printing things.  The ``origin'' is really only
 relevant in error messages.
 
@@ -558,9 +528,6 @@ pprInst m@(Method u id tys theta tau loc)
 	  ptext SLIT("tau"), ppr tau
 	  show_uniq u,
 	  ppr (instToId m) -}]
-
-pprInst (FunDep _ clas fds loc)
-  = hsep [ppr clas, ppr fds]
 
 tidyPred :: TidyEnv -> TcPredType -> (TidyEnv, TcPredType)
 tidyPred env (Class clas tys)
@@ -589,10 +556,6 @@ tidyInst env (Method u id tys theta tau loc)
   where
     (env', tys') = tidyOpenTypes env tys
 
--- this case shouldn't arise... (we never print fundeps)
-tidyInst env fd@(FunDep _ clas fds loc)
-  = (env, fd)
-
 tidyInsts env insts = mapAccumL tidyInst env insts
 
 show_uniq u = ifPprDebug (text "{-" <> ppr u <> text "-}")
@@ -601,7 +564,7 @@ show_uniq u = ifPprDebug (text "{-" <> ppr u <> text "-}")
 
 %************************************************************************
 %*									*
-\subsection[InstEnv-types]{Type declarations}
+\subsection{Looking up Insts}
 %*									*
 %************************************************************************
 
@@ -622,33 +585,37 @@ lookupInst dict@(Dict _ (Class clas tys) loc)
 
       FoundInst tenv dfun_id
 	-> let
-		subst	      = mkSubst (mkInScopeSet (tyVarsOfTypes tys)) tenv
 		(tyvars, rho) = splitForAllTys (idType dfun_id)
-		ty_args	      = map subst_tv tyvars
+		mk_ty_arg tv  = case lookupSubstEnv tenv tv of
+				   Just (DoneTy ty) -> returnNF_Tc ty
+				   Nothing 	    -> tcInstTyVar tv 	`thenNF_Tc` \ tc_tv ->
+						       returnTc (mkTyVarTy tc_tv)
+	   in
+	   mapNF_Tc mk_ty_arg tyvars	`thenNF_Tc` \ ty_args ->
+	   let
+		subst	      = mkTyVarSubst tyvars ty_args
 		dfun_rho      = substTy subst rho
 		(theta, _)    = splitRhoTy dfun_rho
 		ty_app        = mkHsTyApp (HsVar dfun_id) ty_args
-		subst_tv tv   = case lookupSubstEnv tenv tv of
-				   Just (DoneTy ty)  -> ty
-					-- tenv should bind all the tyvars
 	   in
 	   if null theta then
 		returnNF_Tc (SimpleInst ty_app)
 	   else
-	   newDictsAtLoc loc theta	`thenNF_Tc` \ (dicts, dict_ids) ->
+	   newDictsAtLoc loc theta	`thenNF_Tc` \ dicts ->
 	   let 
-		rhs = mkHsDictApp ty_app dict_ids
+		rhs = mkHsDictApp ty_app (map instToId dicts)
 	   in
 	   returnNF_Tc (GenInst dicts rhs)
 
       other	-> returnNF_Tc NoInstance
+
 lookupInst dict@(Dict _ _ loc) = returnNF_Tc NoInstance
 
 -- Methods
 
 lookupInst inst@(Method _ id tys theta _ loc)
-  = newDictsAtLoc loc theta		`thenNF_Tc` \ (dicts, dict_ids) ->
-    returnNF_Tc (GenInst dicts (mkHsDictApp (mkHsTyApp (HsVar id) tys) dict_ids))
+  = newDictsAtLoc loc theta		`thenNF_Tc` \ dicts ->
+    returnNF_Tc (GenInst dicts (mkHsDictApp (mkHsTyApp (HsVar id) tys) (map instToId dicts)))
 
 -- Literals
 
@@ -700,11 +667,6 @@ lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
     float_lit      = mkHsConApp floatDataCon [] [floatprim_lit]
     doubleprim_lit = HsLit (HsDoublePrim f)
     double_lit     = mkHsConApp doubleDataCon [] [doubleprim_lit]
-
--- there are no `instances' of functional dependencies or implicit params
-
-lookupInst _  = returnNF_Tc NoInstance
-
 \end{code}
 
 There is a second, simpler interface, when you want an instance of a

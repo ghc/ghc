@@ -14,19 +14,18 @@ import RnHsSyn		( RenamedRuleDecl )
 import HscTypes		( PackageRuleBase )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
-import TcSimplify	( tcSimplifyToDicts, tcSimplifyAndCheck )
-import TcType		( zonkTcTypes, zonkTcTyVarToTyVar, newTyVarTy )
+import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
+import TcType		( zonkTcTyVarToTyVar, newTyVarTy )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( kcHsSigType, tcHsSigType, tcTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )
-import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv, tcGetGlobalTyVars, isLocalThing )
+import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv, isLocalThing )
 import Rules		( extendRuleBase )
 import Inst		( LIE, plusLIEs, instToId )
-import Id		( idType, idName, mkVanillaId )
+import Id		( idName, mkVanillaId )
 import Module		( Module )
 import VarSet
-import Type		( tyVarsOfTypes, openTypeKind )
-import Bag		( bagToList )
+import Type		( tyVarsOfType, openTypeKind )
 import List		( partition )
 import Outputable
 \end{code}
@@ -87,12 +86,12 @@ tcSourceRule (HsRule name sig_tvs vars lhs rhs src_loc)
     )						`thenTc` \ (sig_tyvars, ids, lhs', rhs', lhs_lie, rhs_lie) ->
 
 		-- Check that LHS has no overloading at all
-    tcSimplifyToDicts lhs_lie				`thenTc` \ (lhs_dicts, lhs_binds) ->
-    checkSigTyVars sig_tyvars emptyVarSet		`thenTc_`
+    tcSimplifyToDicts lhs_lie			`thenTc` \ (lhs_dicts, lhs_binds) ->
+    checkSigTyVars sig_tyvars emptyVarSet	`thenTc_`
 
 	-- Gather the template variables and tyvars
     let
-	tpl_ids = map instToId (bagToList lhs_dicts) ++ ids
+	tpl_ids = map instToId lhs_dicts ++ ids
 
 	-- IMPORTANT!  We *quantify* over any dicts that appear in the LHS
 	-- Reason: 
@@ -106,22 +105,13 @@ tcSourceRule (HsRule name sig_tvs vars lhs rhs src_loc)
 	--	   See the 'lhs_dicts' in tcSimplifyAndCheck for the RHS
     in
 
-	-- Gather type variables to quantify over
-	-- and turn them into real TyVars (just as in TcBinds.tcBindWithSigs)
-    zonkTcTypes (rule_ty : map idType tpl_ids)	`thenNF_Tc` \ zonked_tys ->
-    tcGetGlobalTyVars				`thenNF_Tc` \ free_tyvars ->
-    let
-	poly_tyvars = tyVarsOfTypes zonked_tys `minusVarSet` free_tyvars
-	-- There can be tyvars free in the environment, if there are
-	-- monomorphic overloaded top-level bindings.  Sigh.
-    in
-    mapTc zonkTcTyVarToTyVar (varSetElems poly_tyvars)	`thenTc` \ tvs ->
-
 	-- RHS can be a bit more lenient.  In particular,
 	-- we let constant dictionaries etc float outwards
-    tcSimplifyAndCheck (text "tcRule") (mkVarSet tvs)
-		       lhs_dicts rhs_lie		`thenTc` \ (lie', rhs_binds) ->
+    tcSimplifyInferCheck (text "tcRule")
+			 (varSetElems (tyVarsOfType rule_ty))
+			 lhs_dicts rhs_lie	`thenTc` \ (forall_tvs', lie', rhs_binds) ->
 
+    mapTc zonkTcTyVarToTyVar forall_tvs'		`thenTc` \ tvs ->
     returnTc (lie', HsRule	name tvs
 				(map RuleBndr tpl_ids)	-- yuk
 				(mkHsLet lhs_binds lhs')

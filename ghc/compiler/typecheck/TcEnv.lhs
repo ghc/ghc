@@ -19,15 +19,15 @@ module TcEnv(
 	tcLookupGlobal_maybe, tcLookupGlobal, 
 
 	-- Local environment
-	tcExtendKindEnv, 
+	tcExtendKindEnv,  tcLookupLocalIds,
 	tcExtendTyVarEnv, tcExtendTyVarEnvForMeths, 
-	tcExtendLocalValEnv, tcLookup,
+	tcExtendLocalValEnv, tcLookup, tcLookup_maybe, 
 
 	-- Global type variables
 	tcGetGlobalTyVars, tcExtendGlobalTyVars,
 
 	-- Random useful things
-	RecTcEnv, tcAddImportedIdInfo, tcLookupRecId, tcLookupRecId_maybe, tcInstId,
+	RecTcEnv, tcAddImportedIdInfo, tcLookupRecId, tcLookupRecId_maybe, 
 
 	-- New Ids
 	newLocalId, newSpecPragmaId,
@@ -41,8 +41,8 @@ module TcEnv(
 
 import RnHsSyn		( RenamedMonoBinds, RenamedSig )
 import TcMonad
-import TcType		( TcKind,  TcType, TcTyVar, TcTyVarSet, TcThetaType,
-			  tcInstTyVars, zonkTcTyVars,
+import TcType		( TcKind,  TcType, TcTyVar, TcTyVarSet, 
+			  zonkTcTyVarsAndFV
 			)
 import Id		( idName, mkUserLocal, isDataConWrapId_maybe )
 import IdInfo		( constantIdInfo )
@@ -51,13 +51,11 @@ import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
 import VarSet
 import Type		( Type,
 			  tyVarsOfTypes, splitDFunTy,
-			  splitForAllTys, splitRhoTy,
 			  getDFunTyKey, tyConAppTyCon
 			)
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class, ClassOpItem, ClassContext )
-import Subst		( substTy )
 import Name		( Name, OccName, NamedThing(..), 
 			  nameOccName, getSrcLoc, mkLocalName,
 			  isLocalName, nameModule_maybe
@@ -223,33 +221,6 @@ tcLookupRecId env name = case lookup_global env name of
 
 %************************************************************************
 %*									*
-\subsection{Random useful functions}
-%*									*
-%************************************************************************
-
-
-\begin{code}
--- A useful function that takes an occurrence of a global thing
--- and instantiates its type with fresh type variables
-tcInstId :: Id
-	 -> NF_TcM ([TcTyVar], 	-- It's instantiated type
-		      TcThetaType,	--
-		      TcType)		--
-tcInstId id
-  = let
-      (tyvars, rho) = splitForAllTys (idType id)
-    in
-    tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
-    let
-	rho'	       = substTy tenv rho
-	(theta', tau') = splitRhoTy rho' 
-    in
-    returnNF_Tc (tyvars', theta', tau')
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Making new Ids}
 %*									*
 %************************************************************************
@@ -339,8 +310,8 @@ tcLookupGlobalId :: Name -> NF_TcM Id
 tcLookupGlobalId name
   = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_id ->
     case maybe_id of
-	Just (AnId clas) -> returnNF_Tc clas
-	other		 -> notFound "tcLookupGlobalId" name
+	Just (AnId id) -> returnNF_Tc id
+	other	       -> notFound "tcLookupGlobalId" name
 	
 tcLookupDataCon :: Name -> TcM DataCon
 tcLookupDataCon con_name
@@ -363,6 +334,15 @@ tcLookupTyCon name
     case maybe_tc of
 	Just (ATyCon tc) -> returnNF_Tc tc
 	other		 -> notFound "tcLookupTyCon" name
+
+tcLookupLocalIds :: [Name] -> NF_TcM [TcId]
+tcLookupLocalIds ns
+  = tcGetEnv 		`thenNF_Tc` \ env ->
+    returnNF_Tc (map (lookup (tcLEnv env)) ns)
+  where
+    lookup lenv name = case lookupNameEnv lenv name of
+			Just (ATcId id) -> id
+			other		-> pprPanic "tcLookupLocalIds" (ppr name)
 \end{code}
 
 
@@ -472,13 +452,10 @@ the environment.
 tcGetGlobalTyVars :: NF_TcM TcTyVarSet
 tcGetGlobalTyVars
   = tcGetEnv 					`thenNF_Tc` \ (TcEnv {tcTyVars = gtv_var}) ->
-    tcReadMutVar gtv_var			`thenNF_Tc` \ global_tvs ->
-    zonkTcTyVars (varSetElems global_tvs)	`thenNF_Tc` \ global_tys' ->
-    let
-	global_tvs' = (tyVarsOfTypes global_tys')
-    in
-    tcWriteMutVar gtv_var global_tvs'		`thenNF_Tc_` 
-    returnNF_Tc global_tvs'
+    tcReadMutVar gtv_var			`thenNF_Tc` \ gbl_tvs ->
+    zonkTcTyVarsAndFV (varSetElems gbl_tvs)	`thenNF_Tc` \ gbl_tvs' ->
+    tcWriteMutVar gtv_var gbl_tvs'		`thenNF_Tc_` 
+    returnNF_Tc gbl_tvs'
 \end{code}
 
 

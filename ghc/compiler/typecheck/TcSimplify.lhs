@@ -3,122 +3,14 @@
 %
 \section[TcSimplify]{TcSimplify}
 
-Notes:
-
-Inference (local definitions)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the inst constrains a local type variable, then
-  [ReduceMe] if it's a literal or method inst, reduce it
-
-  [DontReduce] otherwise see whether the inst is just a constant
-    if succeed, use it
-    if not, add original to context
-  This check gets rid of constant dictionaries without
-  losing sharing.
-
-If the inst does not constrain a local type variable then
-  [Free] then throw it out as free.
-
-Inference (top level definitions)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the inst does not constrain a local type variable, then
-  [FreeIfTautological] try for tautology; 
-      if so, throw it out as free
-	 (discarding result of tautology check)
-      if not, make original inst part of the context 
-	 (eliminating superclasses as usual)
-
-If the inst constrains a local type variable, then
-   as for inference (local defns)
-
-
-Checking (local defns)
-~~~~~~~~
-If the inst constrains a local type variable then 
-  [ReduceMe] reduce (signal error on failure)
-
-If the inst does not constrain a local type variable then
-  [Free] throw it out as free.
-
-Checking (top level)
-~~~~~~~~~~~~~~~~~~~~
-If the inst constrains a local type variable then
-   as for checking (local defns)
-
-If the inst does not constrain a local type variable then
-   as for checking (local defns)
-
-
-
-Checking once per module
-~~~~~~~~~~~~~~~~~~~~~~~~~
-For dicts of the form (C a), where C is a std class
-  and "a" is a type variable,
-  [DontReduce] add to context
-
-otherwise [ReduceMe] always reduce
-
-[NB: we may generate one Tree [Int] dict per module, so 
-     sharing is not complete.]
-
-Sort out ambiguity at the end.
-
-Principal types
-~~~~~~~~~~~~~~~
-class C a where
-  op :: a -> a
-
-f x = let g y = op (y::Int) in True
-
-Here the principal type of f is (forall a. a->a)
-but we'll produce the non-principal type
-    f :: forall a. C Int => a -> a
-
-
-Ambiguity
-~~~~~~~~~
-Consider this:
-
-	instance C (T a) Int  where ...
-	instance C (T a) Bool where ...
-
-and suppose we infer a context
-
-	    C (T x) y
-
-from some expression, where x and y are type varibles,
-and x is ambiguous, and y is being quantified over.
-Should we complain, or should we generate the type
-
-       forall x y. C (T x) y => <type not involving x>
-
-The idea is that at the call of the function we might
-know that y is Int (say), so the "x" isn't really ambiguous.
-Notice that we have to add "x" to the type variables over
-which we generalise.
-
-Something similar can happen even if C constrains only ambiguous
-variables.  Suppose we infer the context 
-
-       C [x]
-
-where x is ambiguous.  Then we could infer the type
-
-       forall x. C [x] => <type not involving x>
-
-in the hope that at the call site there was an instance
-decl such as
-
-       instance Num a => C [a] where ...
-
-and hence the default mechanism would resolve the "a".
 
 
 \begin{code}
 module TcSimplify (
-	tcSimplify, tcSimplifyAndCheck, tcSimplifyToDicts, 
-	tcSimplifyTop, tcSimplifyThetas, tcSimplifyCheckThetas,
-	bindInstsOfLocalFuns, partitionPredsOfLIE
+	tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyCheck, 
+	tcSimplifyToDicts, tcSimplifyIPs, tcSimplifyTop, 
+	tcSimplifyThetas, tcSimplifyCheckThetas,
+	bindInstsOfLocalFuns
     ) where
 
 #include "HsVersions.h"
@@ -130,33 +22,36 @@ import TcHsSyn		( TcExpr, TcId,
 
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
-			  tyVarsOfInst, 
-			  isDict, isClassDict, isMethod, notFunDep,
+			  tyVarsOfInst, predsOfInsts, 
+			  isDict, isClassDict, 
 			  isStdClassTyVarDict, isMethodFor,
-			  instToId, instBindingRequired, instCanBeGeneralised,
-			  newDictFromOld, newFunDepFromDict,
+			  instToId, tyVarsOfInsts,
+			  instBindingRequired, instCanBeGeneralised,
+			  newDictsFromOld, instMentionsIPs,
 			  getDictClassTys, getIPs, isTyVarDict,
-			  getDictPred_maybe, getMethodTheta_maybe,
 			  instLoc, pprInst, zonkInst, tidyInst, tidyInsts,
 			  Inst, LIE, pprInsts, pprInstsInFull,
-			  mkLIE, emptyLIE, unitLIE, consLIE, plusLIE,
+			  mkLIE, 
 			  lieToList 
 			)
 import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv )
-import InstEnv		( lookupInstEnv, InstLookupResult(..) )
+import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
 
-import TcType		( TcTyVarSet )
+import TcType		( zonkTcTyVarsAndFV )
 import TcUnify		( unifyTauTy )
 import Id		( idType )
+import Name		( Name )
+import NameSet		( mkNameSet )
 import Class		( Class, classBigSig )
+import FunDeps		( oclose, grow, improve )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
 
 import Type		( Type, ClassContext,
-			  mkTyVarTy, getTyVar,
+			  mkTyVarTy, getTyVar, 
 			  isTyVarTy, splitSigmaTy, tyVarsOfTypes
 			)
 import Subst		( mkTopTyVarSubst, substClasses )
-import PprType		( pprConstraint )
+import PprType		( pprClassPred )
 import TysWiredIn	( unitTy )
 import VarSet
 import FiniteMap
@@ -164,141 +59,507 @@ import Outputable
 import ListSetOps	( equivClasses )
 import Util		( zipEqual, mapAccumL )
 import List		( partition )
-import Maybe		( fromJust )
-import Maybes		( maybeToBool )
 import CmdLineOpts
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection[tcSimplify-main]{Main entry function}
+\subsection{NOTES}
 %*									*
 %************************************************************************
 
-The main wrapper is @tcSimplify@.  It just calls @tcSimpl@, but with
-the ``don't-squash-consts'' flag set depending on top-level ness.  For
-top level defns we *do* squash constants, so that they stay local to a
-single defn.  This makes things which are inlined more likely to be
-exportable, because their constants are "inside".  Later passes will
-float them out if poss, after inlinings are sorted out.
+	--------------------------------------	
+		Notes on quantification
+	--------------------------------------	
+
+Suppose we are about to do a generalisation step.
+We have in our hand
+
+	G	the environment
+	T	the type of the RHS
+	C	the constraints fromm that RHS
+
+The game is to figure out
+
+	Q	the set of type variables over which to quantify
+	Ct	the constraints we will *not* quantify over
+	Cq	the constraints we will quantify over
+
+So we're going to infer the type
+
+	forall Q. Cq => T
+
+and float the constraints Ct further outwards.  
+
+Here are the things that *must* be true:
+
+ (A)	Q intersect fv(G) = EMPTY			limits how big Q can be
+ (B)	Q superset fv(Cq union T) \ oclose(fv(G),C)	limits how small Q can be
+
+(A) says we can't quantify over a variable that's free in the
+environment.  (B) says we must quantify over all the truly free
+variables in T, else we won't get a sufficiently general type.  We do
+not *need* to quantify over any variable that is fixed by the free
+vars of the environment G.
+
+	BETWEEN THESE TWO BOUNDS, ANY Q WILL DO!
+
+Example:	class H x y | x->y where ...
+
+	fv(G) = {a}	C = {H a b, H c d}
+			T = c -> b
+
+	(A)  Q intersect {a} is empty
+	(B)  Q superset {a,b,c,d} \ oclose({a}, C) = {a,b,c,d} \ {a,b} = {c,d}
+
+	So Q can be {c,d}, {b,c,d}
+
+Other things being equal, however, we'd like to quantify over as few
+variables as possible: smaller types, fewer type applications, more
+constraints can get into Ct instead of Cq.
+
+
+-----------------------------------------
+We will make use of
+
+  fv(T)	 	the free type vars of T
+
+  oclose(vs,C)	The result of extending the set of tyvars vs
+		using the functional dependencies from C
+
+  grow(vs,C)	The result of extend the set of tyvars vs
+		using all conceivable links from C.  
+
+		E.g. vs = {a}, C = {H [a] b, K (b,Int) c, Eq e}
+		Then grow(vs,C) = {a,b,c}
+
+		Note that grow(vs,C) `superset` grow(vs,simplify(C))
+		That is, simplfication can only shrink the result of grow.
+
+Notice that 
+   oclose is conservative one way:      v `elem` oclose(vs,C) => v is definitely fixed by vs
+   grow is conservative the other way:  if v might be fixed by vs => v `elem` grow(vs,C)
+
+
+-----------------------------------------
+
+Choosing Q
+~~~~~~~~~~
+Here's a good way to choose Q:
+
+	Q = grow( fv(T), C ) \ oclose( fv(G), C )
+
+That is, quantify over all variable that that MIGHT be fixed by the
+call site (which influences T), but which aren't DEFINITELY fixed by
+G.  This choice definitely quantifies over enough type variables,
+albeit perhaps too many.
+
+Why grow( fv(T), C ) rather than fv(T)?  Consider
+
+	class H x y | x->y where ...
+	
+	T = c->c
+	C = (H c d)
+
+  If we used fv(T) = {c} we'd get the type
+
+	forall c. H c d => c -> b
+
+  And then if the fn was called at several different c's, each of 
+  which fixed d differently, we'd get a unification error, because
+  d isn't quantified.  Solution: quantify d.  So we must quantify
+  everything that might be influenced by c.
+
+Why not oclose( fv(T), C )?  Because we might not be able to see
+all the functional dependencies yet:
+
+	class H x y | x->y where ...
+	instance H x y => Eq (T x y) where ...
+
+	T = c->c
+	C = (Eq (T c d))
+
+  Now oclose(fv(T),C) = {c}, because the functional dependency isn't
+  apparent yet, and that's wrong.  We must really quantify over d too.
+
+
+There really isn't any point in quantifying over any more than
+grow( fv(T), C ), because the call sites can't possibly influence
+any other type variables.
+
+
+
+	--------------------------------------	
+		Notes on ambiguity  
+	--------------------------------------	
+
+It's very hard to be certain when a type is ambiguous.  Consider
+
+	class K x
+	class H x y | x -> y
+	instance H x y => K (x,y)
+
+Is this type ambiguous?
+	forall a b. (K (a,b), Eq b) => a -> a
+
+Looks like it!  But if we simplify (K (a,b)) we get (H a b) and
+now we see that a fixes b.  So we can't tell about ambiguity for sure
+without doing a full simplification.  And even that isn't possible if
+the context has some free vars that may get unified.  Urgle!
+
+Here's another example: is this ambiguous?
+	forall a b. Eq (T b) => a -> a
+Not if there's an insance decl (with no context)
+	instance Eq (T b) where ...
+
+You may say of this example that we should use the instance decl right
+away, but you can't always do that:
+
+	class J a b where ...
+	instance J Int b where ...
+
+	f :: forall a b. J a b => a -> a
+
+(Notice: no functional dependency in J's class decl.)
+Here f's type is perfectly fine, provided f is only called at Int.
+It's premature to complain when meeting f's signature, or even
+when inferring a type for f.
+
+
+
+However, we don't *need* to report ambiguity right away.  It'll always
+show up at the call site.... and eventually at main, which needs special
+treatment.  Nevertheless, reporting ambiguity promptly is an excellent thing.
+
+So heres the plan.  We WARN about probable ambiguity if
+
+	fv(Cq) is not a subset of  oclose(fv(T) union fv(G), C)
+
+(all tested before quantification).
+That is, all the type variables in Cq must be fixed by the the variables
+in the environment, or by the variables in the type.  
+
+Notice that we union before calling oclose.  Here's an example:
+
+	class J a b c | a,b -> c
+	fv(G) = {a}
+
+Is this ambiguous?
+	forall b,c. (J a b c) => b -> b
+
+Only if we union {a} from G with {b} from T before using oclose,
+do we see that c is fixed.  
+
+It's a bit vague exactly which C we should use for this oclose call.  If we 
+don't fix enough variables we might complain when we shouldn't (see
+the above nasty example).  Nothing will be perfect.  That's why we can
+only issue a warning.
+
+
+Can we ever be *certain* about ambiguity?  Yes: if there's a constraint
+
+	c in C such that fv(c) intersect (fv(G) union fv(T)) = EMPTY
+
+then c is a "bubble"; there's no way it can ever improve, and it's 
+certainly ambiguous.  UNLESS it is a constant (sigh).  And what about
+the nasty example?
+
+	class K x
+	class H x y | x -> y
+	instance H x y => K (x,y)
+
+Is this type ambiguous?
+	forall a b. (K (a,b), Eq b) => a -> a
+
+Urk.  The (Eq b) looks "definitely ambiguous" but it isn't.  What we are after
+is a "bubble" that's a set of constraints
+
+	Cq = Ca union Cq'  st  fv(Ca) intersect (fv(Cq') union fv(T) union fv(G)) = EMPTY
+
+Hence another idea.  To decide Q start with fv(T) and grow it
+by transitive closure in Cq (no functional dependencies involved).
+Now partition Cq using Q, leaving the definitely-ambiguous and probably-ok.
+The definitely-ambigous can then float out, and get smashed at top level
+(which squashes out the constants, like Eq (T a) above)
+
+
+	--------------------------------------	
+		Notes on implicit parameters
+	--------------------------------------	
+
+Consider
+
+	f x = ...?y...
+
+Then we get an LIE like (?y::Int).  Doesn't constrain a type variable,
+but we must nevertheless infer a type like
+
+	f :: (?y::Int) => Int -> Int
+
+so that f is passed the value of y at the call site.  Is this legal?
+	
+	f :: Int -> Int
+	f x = x + ?y
+
+Should f be overloaded on "?y" ?  Or does the type signature say that it
+shouldn't be?  Our position is that it should be illegal.  Otherwise
+you can change the *dynamic* semantics by adding a type signature:
+
+	(let f x = x + ?y	-- f :: (?y::Int) => Int -> Int
+ 	 in (f 3, f 3 with ?y=5))  with ?y = 6
+
+		returns (3+6, 3+5)
+vs
+	(let f :: Int -> Int 
+	    f x = x + ?y
+	 in (f 3, f 3 with ?y=5))  with ?y = 6
+
+		returns (3+6, 3+6)
+
+URK!  Let's not do this. So this is illegal:
+
+	f :: Int -> Int
+	f x = x + ?y
+
+BOTTOM LINE: you *must* quantify over implicit parameters.
+
+
+	--------------------------------------	
+		Notes on principal types
+	--------------------------------------	
+
+    class C a where
+      op :: a -> a
+    
+    f x = let g y = op (y::Int) in True
+
+Here the principal type of f is (forall a. a->a)
+but we'll produce the non-principal type
+    f :: forall a. C Int => a -> a
+
+	
+%************************************************************************
+%*									*
+\subsection{tcSimplifyInfer}
+%*									*
+%************************************************************************
+
+tcSimplify is called when we *inferring* a type.  Here's the overall game plan:
+
+    1. Compute Q = grow( fvs(T), C )
+    
+    2. Partition C based on Q into Ct and Cq.  Notice that ambiguous 
+       predicates will end up in Ct; we deal with them at the top level
+    
+    3. Try improvement, using functional dependencies
+    
+    4. If Step 3 did any unification, repeat from step 1
+       (Unification can change the result of 'grow'.)
+
+Note: we don't reduce dictionaries in step 2.  For example, if we have
+Eq (a,b), we don't simplify to (Eq a, Eq b).  So Q won't be different 
+after step 2.  However note that we may therefore quantify over more
+type variables than we absolutely have to.
+
+For the guts, we need a loop, that alternates context reduction and
+improvement with unification.  E.g. Suppose we have
+
+	class C x y | x->y where ...
+    
+and tcSimplify is called with:
+	(C Int a, C Int b)
+Then improvement unifies a with b, giving
+	(C Int a, C Int a)
+
+If we need to unify anything, we rattle round the whole thing all over
+again. 
+
 
 \begin{code}
-tcSimplify
+tcSimplifyInfer
 	:: SDoc 
-	-> TcTyVarSet			-- ``Local''  type variables
-					-- ASSERT: this tyvar set is already zonked
-	-> LIE				-- Wanted
-	-> TcM (LIE,			-- Free
-		  TcDictBinds,		-- Bindings
-		  LIE)			-- Remaining wanteds; no dups
-
-tcSimplify str local_tvs wanted_lie
-{- this is just an optimization, and interferes with implicit params,
-   disable it for now.  same goes for tcSimplifyAndCheck
-  | isEmptyVarSet local_tvs
-  = returnTc (wanted_lie, EmptyMonoBinds, emptyLIE)
-
-  | otherwise
--}
-  = reduceContext str try_me [] wanteds		`thenTc` \ (binds, frees, irreds) ->
-
-	-- Check for non-generalisable insts
-    let
-	cant_generalise = filter (not . instCanBeGeneralised) irreds
-    in
-    checkTc (null cant_generalise)
-	    (genCantGenErr cant_generalise)	`thenTc_`
-
-	-- Check for ambiguous insts.
-	-- You might think these can't happen (I did) because an ambiguous
-	-- inst like (Eq a) will get tossed out with "frees", and eventually
-	-- dealt with by tcSimplifyTop.
-	-- But we can get stuck with 
-	--	C a b
-	-- where "a" is one of the local_tvs, but "b" is unconstrained.
-	-- Then we must yell about the ambiguous b
-	-- But we must only do so if "b" really is unconstrained; so
-	-- we must grab the global tyvars to answer that question
-    tcGetGlobalTyVars				`thenNF_Tc` \ global_tvs ->
-    let
-	avail_tvs	    = local_tvs `unionVarSet` global_tvs
-	(irreds', bad_guys) = partition (isEmptyVarSet . ambig_tv_fn) irreds
-	ambig_tv_fn dict    = tyVarsOfInst dict `minusVarSet` avail_tvs
-    in
-    addAmbigErrs ambig_tv_fn bad_guys	`thenNF_Tc_`
-
-
-	-- Finished
-    returnTc (mkLIE frees, binds, mkLIE irreds')
-  where
-    wanteds = lieToList wanted_lie
-
-    try_me inst 
-      -- Does not constrain a local tyvar
-      | isEmptyVarSet (tyVarsOfInst inst `intersectVarSet` local_tvs)
-        && null (getIPs inst)
-      = -- if is_top_level then
-	--   FreeIfTautological		  -- Special case for inference on 
-	--				  -- top-level defns
-	-- else
-	Free
-
-      -- We're infering (not checking) the type, and 
-      -- the inst constrains a local type variable
-      | isClassDict inst = DontReduceUnlessConstant	-- Dicts
-      | otherwise	 = ReduceMe AddToIrreds		-- Lits and Methods
+	-> [TcTyVar]		-- fv(T); type vars 
+	-> LIE			-- Wanted
+	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
+		LIE,		-- Free
+		TcDictBinds,	-- Bindings
+		[TcId])		-- Dict Ids that must be bound here (zonked)
 \end{code}
 
-@tcSimplifyAndCheck@ is similar to the above, except that it checks
-that there is an empty wanted-set at the end.  It may still return
-some of constant insts, which have to be resolved finally at the end.
 
 \begin{code}
-tcSimplifyAndCheck
+tcSimplifyInfer doc tau_tvs wanted_lie
+  = inferLoop doc tau_tvs (lieToList wanted_lie)	`thenTc` \ (qtvs, frees, binds, irreds) ->
+
+	-- Check for non-generalisable insts
+    mapTc_ addCantGenErr (filter (not . instCanBeGeneralised) irreds)	`thenTc_`
+
+    returnTc (qtvs, mkLIE frees, binds, map instToId irreds)
+
+inferLoop doc tau_tvs wanteds
+  =   	-- Step 1
+    zonkTcTyVarsAndFV tau_tvs		`thenNF_Tc` \ tau_tvs' ->
+    mapNF_Tc zonkInst wanteds		`thenNF_Tc` \ wanteds' ->
+    tcGetGlobalTyVars			`thenNF_Tc` \ gbl_tvs ->
+    let
+ 	preds = predsOfInsts wanteds'
+	qtvs  = grow preds tau_tvs' `minusVarSet` oclose preds gbl_tvs
+	
+	try_me inst 	
+	  | isFree qtvs inst  = Free
+	  | isClassDict inst  = DontReduceUnlessConstant	-- Dicts
+	  | otherwise	      = ReduceMe AddToIrreds		-- Lits and Methods
+    in
+		-- Step 2
+    reduceContext doc try_me [] wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
+	
+		-- Step 3
+    if no_improvement then
+	    returnTc (varSetElems qtvs, frees, binds, irreds)
+    else
+	    inferLoop doc tau_tvs wanteds
+\end{code}	
+
+\begin{code}
+isFree qtvs inst
+  =  not (tyVarsOfInst inst `intersectsVarSet` qtvs)	-- Constrains no quantified vars
+  && null (getIPs inst)					-- And no implicit parameter involved
+							-- (see "Notes on implicit parameters")
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{tcSimplifyCheck}
+%*									*
+%************************************************************************
+
+@tcSimplifyCheck@ is used when we know exactly the set of variables
+we are going to quantify over.
+
+\begin{code}
+tcSimplifyCheck
 	 :: SDoc 
-	 -> TcTyVarSet		-- ``Local''  type variables
-				-- ASSERT: this tyvar set is already zonked
-	 -> LIE			-- Given; constrain only local tyvars
+	 -> [TcTyVar]		-- Quantify over these
+	 -> [Inst]		-- Given
 	 -> LIE			-- Wanted
 	 -> TcM (LIE,		-- Free
-		   TcDictBinds)	-- Bindings
+		 TcDictBinds)	-- Bindings
 
-tcSimplifyAndCheck str local_tvs given_lie wanted_lie
-{-
-  | isEmptyVarSet local_tvs
-	-- This can happen quite legitimately; for example in
-	-- 	instance Num Int where ...
-  = returnTc (wanted_lie, EmptyMonoBinds)
-
-  | otherwise
--}
-  = reduceContext str try_me givens wanteds	`thenTc` \ (binds, frees, irreds) ->
+tcSimplifyCheck doc qtvs givens wanted_lie
+  = checkLoop doc qtvs givens (lieToList wanted_lie)	`thenTc` \ (frees, binds, irreds) ->
 
 	-- Complain about any irreducible ones
-    mapNF_Tc complain irreds	`thenNF_Tc_`
+    complainCheck doc givens irreds		`thenNF_Tc_`
 
 	-- Done
     returnTc (mkLIE frees, binds)
+
+checkLoop doc qtvs givens wanteds
+  =   	-- Step 1
+    zonkTcTyVarsAndFV qtvs		`thenNF_Tc` \ qtvs' ->
+    mapNF_Tc zonkInst givens		`thenNF_Tc` \ givens' ->
+    mapNF_Tc zonkInst wanteds		`thenNF_Tc` \ wanteds' ->
+    let
+	      -- When checking against a given signature we always reduce
+	      -- until we find a match against something given, or can't reduce
+	try_me inst | isFree qtvs' inst  = Free
+		    | otherwise          = ReduceMe AddToIrreds
+    in
+		-- Step 2
+    reduceContext doc try_me givens' wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
+	
+		-- Step 3
+    if no_improvement then
+	    returnTc (frees, binds, irreds)
+    else
+	    checkLoop doc qtvs givens wanteds
+
+complainCheck doc givens irreds
+  = mapNF_Tc zonkInst given_dicts			`thenNF_Tc` \ givens' ->
+    mapNF_Tc (addNoInstanceErr doc given_dicts) irreds	`thenNF_Tc_`
+    returnTc ()
   where
-    givens  = lieToList given_lie
-    wanteds = lieToList wanted_lie
-    given_dicts = filter isClassDict givens
-
-    try_me inst 
-      -- Does not constrain a local tyvar
-      | isEmptyVarSet (tyVarsOfInst inst `intersectVarSet` local_tvs)
-        && (not (isMethod inst) || null (getIPs inst))
-      = Free
-
-      -- When checking against a given signature we always reduce
-      -- until we find a match against something given, or can't reduce
-      | otherwise
-      = ReduceMe AddToIrreds
-
-    complain dict = mapNF_Tc zonkInst givens	`thenNF_Tc` \ givens ->
-		    addNoInstanceErr str given_dicts dict
+    given_dicts = filter isDict givens
+	-- Filter out methods, which are only added to 
+	-- the given set as an optimisation
 \end{code}
+
+
+
+%************************************************************************
+%*									*
+\subsection{tcSimplifyAndCheck}
+%*									*
+%************************************************************************
+
+@tcSimplifyInferCheck@ is used when we know the consraints we are to simplify
+against, but we don't know the type variables over which we are going to quantify.
+
+\begin{code}
+tcSimplifyInferCheck
+	 :: SDoc 
+	 -> [TcTyVar]		-- fv(T)
+	 -> [Inst]		-- Given
+	 -> LIE			-- Wanted
+	 -> TcM ([TcTyVar],	-- Variables over which to quantify
+		 LIE,		-- Free
+		 TcDictBinds)	-- Bindings
+
+tcSimplifyInferCheck doc tau_tvs givens wanted
+  = inferCheckLoop doc tau_tvs givens (lieToList wanted)	`thenTc` \ (qtvs, frees, binds, irreds) ->
+
+	-- Complain about any irreducible ones
+    complainCheck doc givens irreds		`thenNF_Tc_`
+
+	-- Done
+    returnTc (qtvs, mkLIE frees, binds)
+
+inferCheckLoop doc tau_tvs givens wanteds
+  =   	-- Step 1
+    zonkTcTyVarsAndFV tau_tvs		`thenNF_Tc` \ tau_tvs' ->
+    mapNF_Tc zonkInst givens		`thenNF_Tc` \ givens' ->
+    mapNF_Tc zonkInst wanteds		`thenNF_Tc` \ wanteds' ->
+    tcGetGlobalTyVars			`thenNF_Tc` \ gbl_tvs ->
+
+    let
+  	-- Figure out what we are going to generalise over
+	-- You might think it should just be the signature tyvars,
+	-- but in bizarre cases you can get extra ones
+	-- 	f :: forall a. Num a => a -> a
+	--	f x = fst (g (x, head [])) + 1
+	--	g a b = (b,a)
+	-- Here we infer g :: forall a b. a -> b -> (b,a)
+	-- We don't want g to be monomorphic in b just because
+	-- f isn't quantified over b.
+	qtvs    = (tau_tvs' `unionVarSet` tyVarsOfInsts givens') `minusVarSet` gbl_tvs
+			-- We could close gbl_tvs, but its not necessary for
+			-- soundness, and it'll only affect which tyvars, not which 
+			-- dictionaries, we quantify over
+
+	      -- When checking against a given signature we always reduce
+	      -- until we find a match against something given, or can't reduce
+	try_me inst | isFree qtvs inst  = Free
+		    | otherwise         = ReduceMe AddToIrreds
+    in
+		-- Step 2
+    reduceContext doc try_me givens' wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
+	
+		-- Step 3
+    if no_improvement then
+	    returnTc (varSetElems qtvs, frees, binds, irreds)
+    else
+	    inferCheckLoop doc tau_tvs givens wanteds
+\end{code}
+
+
+
+%************************************************************************
+%*									*
+\subsection{tcSimplifyToDicts}
+%*									*
+%************************************************************************
 
 On the LHS of transformation rules we only simplify methods and constants,
 getting dictionaries.  We want to keep all of them unsimplified, to serve
@@ -322,12 +583,16 @@ But that means that we must simplify the Method for f to (f Int dNumInt)!
 So tcSimplifyToDicts squeezes out all Methods.
 
 \begin{code}
-tcSimplifyToDicts :: LIE -> TcM (LIE, TcDictBinds)
+tcSimplifyToDicts :: LIE -> TcM ([Inst], TcDictBinds)
 tcSimplifyToDicts wanted_lie
-  = reduceContext (text "tcSimplifyToDicts") try_me [] wanteds	`thenTc` \ (binds, frees, irreds) ->
+  = simpleReduceLoop doc try_me wanteds		`thenTc` \ (frees, binds, irreds) ->
+	-- Since try_me doesn't look at types, we don't need to 
+	-- do any zonking, so it's safe to call reduceContext directly
     ASSERT( null frees )
-    returnTc (mkLIE irreds, binds)
+    returnTc (irreds, binds)
+
   where
+    doc = text "tcSimplifyToDicts"
     wanteds = lieToList wanted_lie
 
 	-- Reduce methods and lits only; stop as soon as we get a dictionary
@@ -335,47 +600,92 @@ tcSimplifyToDicts wanted_lie
 		| otherwise   = ReduceMe AddToIrreds
 \end{code}
 
-The following function partitions a LIE by a predicate defined
-over `Pred'icates (an unfortunate overloading of terminology!).
-This means it sometimes has to split up `Methods', in which case
-a binding is generated.
 
-It is used in `with' bindings to extract from the LIE the implicit
-parameters being bound.
+%************************************************************************
+%*									*
+\subsection{Filtering at a dynamic binding}
+%*									*
+%************************************************************************
+
+When we have
+	let ?x = R in B
+
+we must discharge all the ?x constraints from B.  We also do an improvement
+step; if we have ?x::t1 and ?x::t2 we must unify t1, t2.  No need to iterate, though.
 
 \begin{code}
-partitionPredsOfLIE pred lie
-  = foldlTc (partPreds pred) (emptyLIE, emptyLIE, EmptyMonoBinds) insts
-  where insts = lieToList lie
+tcSimplifyIPs :: [Name]		-- The implicit parameters bound here
+	      -> LIE
+	      -> TcM (LIE, TcDictBinds)
+tcSimplifyIPs ip_names wanted_lie
+  = simpleReduceLoop doc try_me wanteds	`thenTc` \ (frees, binds, irreds) ->
+	-- The irreducible ones should be a subset of the implicit
+	-- parameters we provided
+    ASSERT( all here_ip irreds )
+    returnTc (mkLIE frees, binds)
+    
+  where
+    doc	    = text "tcSimplifyIPs" <+> ppr ip_names
+    wanteds = lieToList wanted_lie
+    ip_set  = mkNameSet ip_names
+    here_ip ip = isDict ip && ip `instMentionsIPs` ip_set
 
--- warning: the term `pred' is overloaded here!
-partPreds pred (lie1, lie2, binds) inst
-  | maybeToBool maybe_pred
-  = if pred p then
-	returnTc (consLIE inst lie1, lie2, binds)
-    else
-	returnTc (lie1, consLIE inst lie2, binds)
-    where maybe_pred = getDictPred_maybe inst
-	  Just p = maybe_pred
+	-- Simplify any methods that mention the implicit parameter
+    try_me inst | inst `instMentionsIPs` ip_set = ReduceMe AddToIrreds
+		| otherwise		        = Free
+\end{code}
 
--- the assumption is that those satisfying `pred' are being extracted,
--- so we leave the method untouched when nothing satisfies `pred'
-partPreds pred (lie1, lie2, binds1) inst
-  | maybeToBool maybe_theta
-  = if any pred theta then
-	zonkInst inst				`thenTc` \ inst' ->
-	tcSimplifyToDicts (unitLIE inst')	`thenTc` \ (lie3, binds2) ->
-	partitionPredsOfLIE pred lie3		`thenTc` \ (lie1', lie2', EmptyMonoBinds) ->
-	returnTc (lie1 `plusLIE` lie1',
-		  lie2 `plusLIE` lie2',
-		  binds1 `AndMonoBinds` binds2)
-    else
-	returnTc (lie1, consLIE inst lie2, binds1)
-    where maybe_theta = getMethodTheta_maybe inst
-	  Just theta = maybe_theta
 
-partPreds pred (lie1, lie2, binds) inst
-  = returnTc (lie1, consLIE inst lie2, binds)
+%************************************************************************
+%*									*
+\subsection[binds-for-local-funs]{@bindInstsOfLocalFuns@}
+%*									*
+%************************************************************************
+
+When doing a binding group, we may have @Insts@ of local functions.
+For example, we might have...
+\begin{verbatim}
+let f x = x + 1	    -- orig local function (overloaded)
+    f.1 = f Int	    -- two instances of f
+    f.2 = f Float
+ in
+    (f.1 5, f.2 6.7)
+\end{verbatim}
+The point is: we must drop the bindings for @f.1@ and @f.2@ here,
+where @f@ is in scope; those @Insts@ must certainly not be passed
+upwards towards the top-level.	If the @Insts@ were binding-ified up
+there, they would have unresolvable references to @f@.
+
+We pass in an @init_lie@ of @Insts@ and a list of locally-bound @Ids@.
+For each method @Inst@ in the @init_lie@ that mentions one of the
+@Ids@, we create a binding.  We return the remaining @Insts@ (in an
+@LIE@), as well as the @HsBinds@ generated.
+
+\begin{code}
+bindInstsOfLocalFuns ::	LIE -> [TcId] -> TcM (LIE, TcMonoBinds)
+
+bindInstsOfLocalFuns init_lie local_ids
+  | null overloaded_ids 
+	-- Common case
+  = returnTc (init_lie, EmptyMonoBinds)
+
+  | otherwise
+  = simpleReduceLoop doc try_me wanteds		`thenTc` \ (frees, binds, irreds) -> 
+    ASSERT( null irreds )
+    returnTc (mkLIE frees, binds)
+  where
+    doc		     = text "bindInsts" <+> ppr local_ids
+    wanteds	     = lieToList init_lie
+    overloaded_ids   = filter is_overloaded local_ids
+    is_overloaded id = case splitSigmaTy (idType id) of
+			  (_, theta, _) -> not (null theta)
+
+    overloaded_set = mkVarSet overloaded_ids	-- There can occasionally be a lot of them
+						-- so it's worth building a set, so that 
+						-- lookup (in isMethodFor) is faster
+
+    try_me inst | isMethodFor overloaded_set inst = ReduceMe AddToIrreds
+		| otherwise		          = Free
 \end{code}
 
 
@@ -399,16 +709,6 @@ data WhatToDo
 
  | Free			  -- Return as free
 
- | FreeIfTautological	  -- Return as free iff it's tautological; 
-			  -- if not, return as irreducible
-	-- The FreeIfTautological case is to allow the possibility
-	-- of generating functions with types like
-	--	f :: C Int => Int -> Int
-	-- Here, the C Int isn't a tautology presumably because Int
-	-- isn't an instance of C in this module; but perhaps it will
-	-- be at f's call site(s).  Haskell doesn't allow this at
-	-- present.
-
 data NoInstanceAction
   = Stop		-- Fail; no error message
 			-- (Only used when tautology checking.)
@@ -421,68 +721,78 @@ data NoInstanceAction
 
 
 \begin{code}
-type RedState s
-  = (Avails s,		-- What's available
-     [Inst],		-- Insts for which try_me returned Free
-     [Inst]		-- Insts for which try_me returned DontReduce
-    )
+type RedState = (Avails,	-- What's available
+		 [Inst])	-- Insts for which try_me returned Free
 
-type Avails s = FiniteMap Inst Avail
+type Avails = FiniteMap Inst Avail
 
 data Avail
-  = Avail
-	TcId		-- The "main Id"; that is, the Id for the Inst that 
-			-- caused this avail to be put into the finite map in the first place
-			-- It is this Id that is bound to the RHS.
+  = Irred		-- Used for irreducible dictionaries,
+			-- which are going to be lambda bound
 
-	RHS	        -- The RHS: an expression whose value is that Inst.
-			-- The main Id should be bound to this RHS
+  | BoundTo TcId	-- Used for dictionaries for which we have a binding
+			-- e.g. those "given" in a signature
 
-	[TcId]	-- Extra Ids that must all be bound to the main Id.
-			-- At the end we generate a list of bindings
-			--	 { i1 = main_id; i2 = main_id; i3 = main_id; ... }
-
-data RHS
-  = NoRhs		-- Used for irreducible dictionaries,
-			-- which are going to be lambda bound, or for those that are
-			-- suppplied as "given" when checking againgst a signature.
-			--
-			-- NoRhs is also used for Insts like (CCallable f)
+  | NoRhs 		-- Used for Insts like (CCallable f)
 			-- where no witness is required.
 
   | Rhs 		-- Used when there is a RHS 
-	TcExpr	 
-	Bool		-- True => the RHS simply selects a superclass dictionary
-			--	   from a subclass dictionary.
-			-- False => not so.  
-			-- This is useful info, because superclass selection
-			-- is cheaper than building the dictionary using its dfun,
-			-- and we can sometimes replace the latter with the former
-
-  | PassiveScSel	-- Used for as-yet-unactivated RHSs.  For example suppose we have
-			-- an (Ord t) dictionary; then we put an (Eq t) entry in
-			-- the finite map, with an PassiveScSel.  Then if the
-			-- the (Eq t) binding is ever *needed* we make it an Rhs
-	TcExpr
-	[Inst]	-- List of Insts that are free in the RHS.
-			-- If the main Id is subsequently needed, we toss this list into
-			-- the needed-inst pool so that we make sure their bindings
-			-- will actually be produced.
-			--
-			-- Invariant: these Insts are already in the finite mapping
-
+	TcExpr	 	-- The RHS
+	[Inst]		-- Insts free in the RHS; we need these too
 
 pprAvails avails = vcat (map pprAvail (eltsFM avails))
-
-pprAvail (Avail main_id rhs ids)
-  = ppr main_id <> colon <+> brackets (ppr ids) <+> pprRhs rhs
 
 instance Outputable Avail where
     ppr = pprAvail
 
-pprRhs NoRhs = text "<no rhs>"
-pprRhs (Rhs rhs b) = ppr rhs
-pprRhs (PassiveScSel rhs is) = text "passive" <+> ppr rhs
+pprAvail NoRhs	      = text "<no rhs>"
+pprAvail Irred	      = text "Irred"
+pprAvail (BoundTo x)  = text "Bound to" <+> ppr x
+pprAvail (Rhs rhs bs) = ppr rhs <+> braces (ppr bs)
+\end{code}
+
+Extracting the bindings from a bunch of Avails.
+The bindings do *not* come back sorted in dependency order.
+We assume that they'll be wrapped in a big Rec, so that the
+dependency analyser can sort them out later
+
+The loop startes
+\begin{code}
+bindsAndIrreds :: Avails
+	       -> [Inst]		-- Wanted
+	       -> (TcDictBinds, 	-- Bindings
+		   [Inst])		-- Irreducible ones
+
+bindsAndIrreds avails wanteds
+  = go avails EmptyMonoBinds [] wanteds
+  where
+    go avails binds irreds [] = (binds, irreds)
+
+    go avails binds irreds (w:ws)
+      = case lookupFM avails w of
+	  Nothing    -> -- Free guys come out here
+			-- (If we didn't do addFree we could use this as the
+			--  criterion for free-ness, and pick up the free ones here too)
+			go avails binds irreds ws
+
+	  Just NoRhs -> go avails binds irreds ws
+
+	  Just Irred -> go (addToFM avails w (BoundTo (instToId w))) binds (w:irreds) ws
+
+	  Just (BoundTo id) -> go avails new_binds irreds ws
+			    where
+				-- For implicit parameters, all occurrences share the same
+				-- Id, so there is no need for synonym bindings
+			       new_binds | new_id == id = binds
+					 | otherwise	= binds `AndMonoBinds` new_bind
+			       new_bind = VarMonoBind new_id (HsVar id)
+			       new_id   = instToId w
+
+	  Just (Rhs rhs ws') -> go avails' (binds `AndMonoBinds` new_bind) irreds (ws' ++ ws)
+			     where
+				id	 = instToId w
+				avails'  = addToFM avails w (BoundTo id)
+				new_bind = VarMonoBind id rhs
 \end{code}
 
 
@@ -492,72 +802,96 @@ pprRhs (PassiveScSel rhs is) = text "passive" <+> ppr rhs
 %*									*
 %************************************************************************
 
-The main entry point for context reduction is @reduceContext@:
+When the "what to do" predicate doesn't depend on the quantified type variables,
+matters are easier.  We don't need to do any zonking, unless the improvement step
+does something, in which case we zonk before iterating.
+
+The "given" set is always empty.
 
 \begin{code}
-reduceContext :: SDoc -> (Inst -> WhatToDo)
-	      -> [Inst]	-- Given
-	      -> [Inst]	-- Wanted
-	      -> TcM (TcDictBinds, 
-			[Inst],		-- Free
-			[Inst])		-- Irreducible
+simpleReduceLoop :: SDoc
+	 	 -> (Inst -> WhatToDo)		-- What to do, *not* based on the quantified type variables
+		 -> [Inst]			-- Wanted
+		 -> TcM ([Inst],		-- Free
+			 TcDictBinds,
+			 [Inst])		-- Irreducible
 
-reduceContext str try_me givens wanteds
-  =     -- Zonking first
-    mapNF_Tc zonkInst givens	`thenNF_Tc` \ givens ->
-    mapNF_Tc zonkInst wanteds	`thenNF_Tc` \ wanteds ->
-    -- JRL - process fundeps last.  We eliminate fundeps by seeing
-    -- what available classes generate them, so we need to process the
-    -- classes first. (would it be useful to make LIEs ordered in the first place?)
-    let (wantedOther, wantedFds) = partition notFunDep wanteds
-	wanteds'		 = wantedOther ++ wantedFds in
+simpleReduceLoop doc try_me wanteds
+  = mapNF_Tc zonkInst wanteds			`thenNF_Tc` \ wanteds' ->
+    reduceContext doc try_me [] wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
+    if no_improvement then
+	returnTc (frees, binds, irreds)
+    else
+	simpleReduceLoop doc try_me wanteds
+\end{code}	
 
-{-
-    pprTrace "reduceContext" (vcat [
+
+
+\begin{code}
+reduceContext :: SDoc
+	      -> (Inst -> WhatToDo)
+	      -> [Inst]			-- Given
+	      -> [Inst]			-- Wanted
+	      -> NF_TcM (Bool, 		-- True <=> improve step did no unification
+			 [Inst],	-- Free
+			 TcDictBinds,	-- Dictionary bindings
+			 [Inst])	-- Irreducible
+
+reduceContext doc try_me givens wanteds
+  =
+{-    traceTc (text "reduceContext" <+> (vcat [
 	     text "----------------------",
-	     str,
+	     doc,
 	     text "given" <+> ppr givens,
 	     text "wanted" <+> ppr wanteds,
 	     text "----------------------"
-	     ]) $
+	     ]))					`thenNF_Tc_`
+
 -}
         -- Build the Avail mapping from "givens"
-    foldlNF_Tc addGiven emptyFM givens			`thenNF_Tc` \ avails ->
+    foldlNF_Tc addGiven (emptyFM, []) givens		`thenNF_Tc` \ init_state ->
 
         -- Do the real work
-    reduceList (0,[]) try_me wanteds' (avails, [], [])	`thenNF_Tc` \ (avails, frees, irreds) ->
+    reduceList (0,[]) try_me wanteds init_state		`thenNF_Tc` \ state@(avails, frees) ->
 
-	-- Extract the bindings from avails
-    let
-       binds = foldFM add_bind EmptyMonoBinds avails
+	-- Do improvement, using everything in avails
+	-- In particular, avails includes all superclasses of everything
+    tcImprove avails					`thenTc` \ no_improvement ->
 
-       add_bind _ (Avail main_id rhs ids) binds
-         = foldr add_synonym (add_rhs_bind rhs binds) ids
-	 where
-	   add_rhs_bind (Rhs rhs _) binds = binds `AndMonoBinds` VarMonoBind main_id rhs 
-	   add_rhs_bind other       binds = binds
-
-	   -- Add the trivial {x = y} bindings
-	   -- The main Id can end up in the list when it's first added passively
-	   -- and then activated, so we have to filter it out.  A bit of a hack.
-	   add_synonym id binds
-	     | id /= main_id = binds `AndMonoBinds` VarMonoBind id (HsVar main_id)
-	     | otherwise     = binds
-    in
 {-
-    pprTrace ("reduceContext end") (vcat [
+    traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
-	     str,
+	     doc,
 	     text "given" <+> ppr givens,
 	     text "wanted" <+> ppr wanteds,
 	     text "----", 
 	     text "avails" <+> pprAvails avails,
 	     text "frees" <+> ppr frees,
-	     text "irreds" <+> ppr irreds,
+	     text "no_improvement =" <+> ppr no_improvement,
 	     text "----------------------"
-	     ]) $
+	     ])) 					`thenNF_Tc_`
 -}
-    returnNF_Tc (binds, frees, irreds)
+     let
+	(binds, irreds) = bindsAndIrreds avails wanteds
+     in
+     returnTc (no_improvement, frees, binds, irreds)
+
+tcImprove avails
+ =  tcGetInstEnv 				`thenTc` \ inst_env ->
+    let
+	preds = predsOfInsts (keysFM avails)
+		-- Avails has all the superclasses etc (good)
+		-- It also has all the intermediates of the deduction (good)
+		-- It does not have duplicates (good)
+		-- NB that (?x::t1) and (?x::t2) will be held separately in avails
+		--    so that improve will see them separate
+	eqns  = improve (classInstEnv inst_env) preds
+     in
+     if null eqns then
+	returnTc True
+     else
+        mapTc_ (\ (t1,t2) -> unifyTauTy t1 t2) eqns	`thenTc_`
+	returnTc False
 \end{code}
 
 The main context-reduction function is @reduce@.  Here's its game plan.
@@ -567,8 +901,8 @@ reduceList :: (Int,[Inst])		-- Stack (for err msgs)
 					-- along with its depth
        	   -> (Inst -> WhatToDo)
        	   -> [Inst]
-       	   -> RedState s
-       	   -> TcM (RedState s)
+       	   -> RedState
+       	   -> TcM RedState
 \end{code}
 
 @reduce@ is passed
@@ -607,123 +941,55 @@ reduceList (n,stack) try_me wanteds state
 		      go ws state'
 
     -- Base case: we're done!
-reduce stack try_me wanted state@(avails, frees, irreds)
+reduce stack try_me wanted state
     -- It's the same as an existing inst, or a superclass thereof
-  | wanted `elemFM` avails
-  = returnTc (activate avails wanted, frees, irreds)
+  | isAvailable state wanted
+  = returnTc state
 
   | otherwise
   = case try_me wanted of {
 
-    ReduceMe no_instance_action ->	-- It should be reduced
+      DontReduce -> addIrred state wanted
+
+    ; DontReduceUnlessConstant ->    -- It's irreducible (or at least should not be reduced)
+  				     -- First, see if the inst can be reduced to a constant in one step
+	try_simple addIrred
+
+    ; Free ->	-- It's free so just chuck it upstairs
+  		-- First, see if the inst can be reduced to a constant in one step
+	try_simple addFree
+
+    ; ReduceMe no_instance_action ->	-- It should be reduced
 	lookupInst wanted	      `thenNF_Tc` \ lookup_result ->
 	case lookup_result of
-	    GenInst wanteds' rhs -> use_instance wanteds' rhs
-	    SimpleInst rhs       -> use_instance []       rhs
+	    GenInst wanteds' rhs -> reduceList stack try_me wanteds' state	`thenTc` \ state' -> 
+				    addWanted state' wanted rhs wanteds'
+	    SimpleInst rhs       -> addWanted state wanted rhs []
 
 	    NoInstance ->    -- No such instance! 
 		    case no_instance_action of
 			Stop        -> failTc		
-			AddToIrreds -> add_to_irreds
-    ;
-    Free ->	-- It's free and this isn't a top-level binding, so just chuck it upstairs
-  		-- First, see if the inst can be reduced to a constant in one step
-	lookupInst wanted	  `thenNF_Tc` \ lookup_result ->
-	case lookup_result of
-	    SimpleInst rhs -> use_instance [] rhs
-	    other	   -> add_to_frees
+			AddToIrreds -> addIrred state wanted
 
-    
-    
-    ;
-    FreeIfTautological -> -- It's free and this is a top level binding, so
-			  -- check whether it's a tautology or not
-	tryTc_
-	  add_to_irreds	  -- If tautology trial fails, add to irreds
-
-	  -- If tautology succeeds, just add to frees
-	  (reduce stack try_me_taut wanted (avails, [], [])	`thenTc_`
-	   returnTc (avails, wanted:frees, irreds))
-
-
-    ;
-
-    DontReduce -> add_to_irreds
-    ;
-
-    DontReduceUnlessConstant ->    -- It's irreducible (or at least should not be reduced)
-        -- See if the inst can be reduced to a constant in one step
-	lookupInst wanted	  `thenNF_Tc` \ lookup_result ->
-	case lookup_result of
-	   SimpleInst rhs -> use_instance [] rhs
-	   other          -> add_to_irreds
     }
   where
-	-- The three main actions
-    add_to_frees  = let 
-			avails' = addFree avails wanted
-			-- Add the thing to the avails set so any identical Insts
-			-- will be commoned up with it right here
-		    in
-		    returnTc (avails', wanted:frees, irreds)
-
-    add_to_irreds = addGiven avails wanted		`thenNF_Tc` \ avails' ->
-		    returnTc (avails',  frees, wanted:irreds)
-
-    use_instance wanteds' rhs = addWanted avails wanted rhs	`thenNF_Tc` \ avails' ->
-			  	reduceList stack try_me wanteds' (avails', frees, irreds)
-
-
-    -- The try-me to use when trying to identify tautologies
-    -- It blunders on reducing as much as possible
-    try_me_taut inst = ReduceMe Stop	-- No error recovery
+    try_simple do_this_otherwise
+      = lookupInst wanted	  `thenNF_Tc` \ lookup_result ->
+	case lookup_result of
+	    SimpleInst rhs -> addWanted state wanted rhs []
+	    other	   -> do_this_otherwise state wanted
 \end{code}
 
 
 \begin{code}
-activate :: Avails s -> Inst -> Avails s
-	 -- Activate the binding for Inst, ensuring that a binding for the
-	 -- wanted Inst will be generated.
-	 -- (Activate its parent if necessary, recursively).
-	 -- Precondition: the Inst is in Avails already
+isAvailable :: RedState -> Inst -> Bool
+isAvailable (avails, _) wanted = wanted `elemFM` avails
+	-- NB: the Ord instance of Inst compares by the class/type info
+	-- *not* by unique.  So 
+	--	d1::C Int ==  d2::C Int
 
-activate avails wanted
-  | not (instBindingRequired wanted) 
-  = avails
-
-  | otherwise
-  = case lookupFM avails wanted of
-
-      Just (Avail main_id (PassiveScSel rhs insts) ids) ->
-	       foldl activate avails' insts	 -- Activate anything it needs
-	     where
-	       avails' = addToFM avails wanted avail'
-	       avail'  = Avail main_id (Rhs rhs True) (wanted_id : ids)	-- Activate it
-
-      Just (Avail main_id other_rhs ids) -> -- Just add to the synonyms list
-	       addToFM avails wanted (Avail main_id other_rhs (wanted_id : ids))
-
-      Nothing -> panic "activate"
-  where
-      wanted_id = instToId wanted
-    
-addWanted avails wanted rhs_expr
-  = ASSERT( not (wanted `elemFM` avails) )
-    addFunDeps (addToFM avails wanted avail) wanted
-	-- NB: we don't add the thing's superclasses too!
-	-- Why not?  Because addWanted is used when we've successfully used an
-	-- instance decl to reduce something; e.g.
-	--	d:Ord [a] = dfunOrd (d1:Eq [a]) (d2:Ord a)
-	-- Note that we pass the superclasses to the dfun, so they will be "wanted".
-	-- If we put the superclasses of "d" in avails, then we might end up
-	-- expressing "d1" in terms of "d", which would be a disaster.
-  where
-    avail = Avail (instToId wanted) rhs []
-
-    rhs | instBindingRequired wanted = Rhs rhs_expr False	-- Not superclass selection
-	| otherwise		     = NoRhs
-
-addFree :: Avails s -> Inst -> (Avails s)
+-------------------------
+addFree :: RedState -> Inst -> NF_TcM RedState
 	-- When an Inst is tossed upstairs as 'free' we nevertheless add it
 	-- to avails, so that any other equal Insts will be commoned up right
 	-- here rather than also being tossed upstairs.  This is really just
@@ -742,7 +1008,7 @@ addFree :: Avails s -> Inst -> (Avails s)
 	-- From an application (truncate f i) we get
 	--	t1 = truncate at f 
 	--	t2 = t1 at i
-	-- If we have also have a secon occurrence of truncate, we get
+	-- If we have also have a second occurrence of truncate, we get
 	--	t3 = truncate at f
 	--	t4 = t3 at i
 	-- When simplifying with i,f free, we might still notice that
@@ -750,79 +1016,267 @@ addFree :: Avails s -> Inst -> (Avails s)
 	--   will continue to float out!
 	-- Solution: never put methods in avail till they are captured
 	-- in which case addFree isn't used
-addFree avails free
-  | isDict free = addToFM avails free (Avail (instToId free) NoRhs [])
-  | otherwise   = avails
-
-addGiven :: Avails s -> Inst -> NF_TcM (Avails s)
-addGiven avails given
-  =	 -- ASSERT( not (given `elemFM` avails) )
-	 -- This assertion isn't necessarily true.  It's permitted
-	 -- to given a redundant context in a type signature (eg (Ord a, Eq a) => ...)
-	 -- and when typechecking instance decls we generate redundant "givens" too.
-    addAvail avails given avail
+	--
+	-- NB3: make sure that CCallable/CReturnable use NoRhs rather
+	--	than BoundTo, else we end up with bogus bindings.
+	--	c.f. instBindingRequired in addWanted
+addFree (avails, frees) free
+  | isDict free = returnNF_Tc (addToFM avails free avail, free:frees)
+  | otherwise   = returnNF_Tc (avails,			  free:frees)
   where
-    avail = Avail (instToId given) NoRhs []
+    avail | instBindingRequired free = BoundTo (instToId free)
+	  | otherwise		     = NoRhs
 
+addGiven :: RedState -> Inst -> NF_TcM RedState
+addGiven state given = add_avail state given (BoundTo (instToId given))
+
+addIrred :: RedState -> Inst -> NF_TcM RedState
+addIrred state irred = add_avail state irred Irred
+
+addWanted :: RedState -> Inst -> TcExpr -> [Inst] -> NF_TcM RedState
+addWanted state wanted rhs_expr wanteds
+  = ASSERT( not (isAvailable state wanted) )
+    add_avail state wanted avail
+  where 
+    avail | instBindingRequired wanted = Rhs rhs_expr wanteds
+	  | otherwise		       = ASSERT( null wanteds ) NoRhs
+
+add_avail :: RedState -> Inst -> Avail -> NF_TcM RedState
+add_avail (avails, frees) wanted avail
+  = addAvail avails wanted avail	`thenNF_Tc` \ avails' ->
+    returnNF_Tc (avails', frees)
+
+---------------------
+addAvail :: Avails -> Inst -> Avail -> NF_TcM Avails
 addAvail avails wanted avail
   = addSuperClasses (addToFM avails wanted avail) wanted
 
-addSuperClasses :: Avails s -> Inst -> NF_TcM (Avails s)
-		-- Add all the superclasses of the Inst to Avails
-		-- Invariant: the Inst is already in Avails.
+addSuperClasses :: Avails -> Inst -> NF_TcM Avails
+	-- Add all the superclasses of the Inst to Avails
+	-- Invariant: the Inst is already in Avails.
 
 addSuperClasses avails dict
   | not (isClassDict dict)
   = returnNF_Tc avails
 
   | otherwise	-- It is a dictionary
-  = foldlNF_Tc add_sc avails (zipEqual "addSuperClasses" sc_theta' sc_sels) `thenNF_Tc` \ avails' ->
-    addFunDeps avails' dict
+  = newDictsFromOld dict sc_theta'	`thenNF_Tc` \ sc_dicts ->
+    foldlNF_Tc add_sc avails (zipEqual "addSuperClasses" sc_dicts sc_sels)
   where
     (clas, tys) = getDictClassTys dict
     (tyvars, sc_theta, sc_sels, _) = classBigSig clas
     sc_theta' = substClasses (mkTopTyVarSubst tyvars tys) sc_theta
 
-    add_sc avails ((super_clas, super_tys), sc_sel)
-      = newDictFromOld dict super_clas super_tys	`thenNF_Tc` \ super_dict ->
-        let
-	   sc_sel_rhs = DictApp (TyApp (HsVar sc_sel) tys)
-				[instToId dict]
-	in
-        case lookupFM avails super_dict of
-
-	     Just (Avail main_id (Rhs rhs False {- not sc selection -}) ids) ->
-		  -- Already there, but not as a superclass selector
-		  -- No need to look at its superclasses; since it's there
-		  --	already they must be already in avails
-		  -- However, we must remember to activate the dictionary
-		  -- from which it is (now) generated
-		  returnNF_Tc (activate avails' dict)
-		where
-	     	  avails' = addToFM avails super_dict avail
-		  avail   = Avail main_id (Rhs sc_sel_rhs True) ids	-- Superclass selection
-	
-	     Just (Avail _ _ _) -> returnNF_Tc avails
-		  -- Already there; no need to do anything
-
-	     Nothing ->
-		  -- Not there at all, so add it, and its superclasses
-		  addAvail avails super_dict avail
-		where
-		  avail   = Avail (instToId super_dict) 
-				  (PassiveScSel sc_sel_rhs [dict])
-				  []
-
-addFunDeps :: Avails s -> Inst -> NF_TcM (Avails s)
-	   -- Add in the functional dependencies generated by the inst
-addFunDeps avails inst
-  = newFunDepFromDict inst	`thenNF_Tc` \ fdInst_maybe ->
-    case fdInst_maybe of
-      Nothing -> returnNF_Tc avails
-      Just fdInst ->
-	let fdAvail = Avail (instToId (fromJust fdInst_maybe)) NoRhs [] in
-        addAvail avails fdInst fdAvail
+    add_sc avails (sc_dict, sc_sel)	-- Add it, and its superclasses
+      = case lookupFM avails sc_dict of
+	  Just (BoundTo _) -> returnNF_Tc avails	-- See Note [SUPER] below
+	  other		   -> addAvail avails sc_dict avail
+      where
+	sc_sel_rhs = DictApp (TyApp (HsVar sc_sel) tys) [instToId dict]
+	avail      = Rhs sc_sel_rhs [dict]
 \end{code}
+
+Note [SUPER].  We have to be careful here.  If we are *given* d1:Ord a,
+and want to deduce (d2:C [a]) where
+
+	class Ord a => C a where
+	instance Ord a => C [a] where ...
+
+Then we'll use the instance decl to deduce C [a] and then add the 
+superclasses of C [a] to avails.  But we must not overwrite the binding
+for d1:Ord a (which is given) with a superclass selection or we'll just
+build a loop!  Hence looking for BoundTo.  Crudely, BoundTo is cheaper
+than a selection.
+
+
+%************************************************************************
+%*									*
+\section{tcSimplifyTop: defaulting}
+%*									*
+%************************************************************************
+
+
+If a dictionary constrains a type variable which is
+	* not mentioned in the environment
+	* and not mentioned in the type of the expression
+then it is ambiguous. No further information will arise to instantiate
+the type variable; nor will it be generalised and turned into an extra
+parameter to a function.
+
+It is an error for this to occur, except that Haskell provided for
+certain rules to be applied in the special case of numeric types.
+Specifically, if
+	* at least one of its classes is a numeric class, and
+	* all of its classes are numeric or standard
+then the type variable can be defaulted to the first type in the
+default-type list which is an instance of all the offending classes.
+
+So here is the function which does the work.  It takes the ambiguous
+dictionaries and either resolves them (producing bindings) or
+complains.  It works by splitting the dictionary list by type
+variable, and using @disambigOne@ to do the real business.
+
+@tcSimplifyTop@ is called once per module to simplify all the constant
+and ambiguous Insts.
+
+We need to be careful of one case.  Suppose we have
+
+	instance Num a => Num (Foo a b) where ...
+
+and @tcSimplifyTop@ is given a constraint (Num (Foo x y)).  Then it'll simplify
+to (Num x), and default x to Int.  But what about y??  
+
+It's OK: the final zonking stage should zap y to (), which is fine.
+
+
+\begin{code}
+tcSimplifyTop :: LIE -> TcM TcDictBinds
+tcSimplifyTop wanted_lie
+  = simpleReduceLoop (text "tcSimplTop") try_me wanteds	`thenTc` \ (frees, binds, irreds) ->
+    ASSERT( null frees )
+
+    let
+		-- All the non-std ones are definite errors
+	(stds, non_stds) = partition isStdClassTyVarDict irreds
+	
+		-- Group by type variable
+	std_groups = equivClasses cmp_by_tyvar stds
+
+		-- Pick the ones which its worth trying to disambiguate
+	(std_oks, std_bads) = partition worth_a_try std_groups
+
+		-- Have a try at disambiguation 
+		-- if the type variable isn't bound
+		-- up with one of the non-standard classes
+	worth_a_try group@(d:_) = not (non_std_tyvars `intersectsVarSet` tyVarsOfInst d)
+	non_std_tyvars		= unionVarSets (map tyVarsOfInst non_stds)
+
+		-- Collect together all the bad guys
+	bad_guys = non_stds ++ concat std_bads
+    in
+	-- Disambiguate the ones that look feasible
+    mapTc disambigGroup std_oks		`thenTc` \ binds_ambig ->
+
+	-- And complain about the ones that don't
+    addTopAmbigErrs bad_guys		`thenNF_Tc_`
+
+    returnTc (binds `andMonoBinds` andMonoBindList binds_ambig)
+  where
+    wanteds	= lieToList wanted_lie
+    try_me inst	= ReduceMe AddToIrreds
+
+    d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
+
+get_tv d   = case getDictClassTys d of
+		   (clas, [ty]) -> getTyVar "tcSimplifyTop" ty
+get_clas d = case getDictClassTys d of
+		   (clas, [ty]) -> clas
+\end{code}
+
+@disambigOne@ assumes that its arguments dictionaries constrain all
+the same type variable.
+
+ADR Comment 20/6/94: I've changed the @CReturnable@ case to default to
+@()@ instead of @Int@.  I reckon this is the Right Thing to do since
+the most common use of defaulting is code like:
+\begin{verbatim}
+	_ccall_ foo	`seqPrimIO` bar
+\end{verbatim}
+Since we're not using the result of @foo@, the result if (presumably)
+@void@.
+
+\begin{code}
+disambigGroup :: [Inst]	-- All standard classes of form (C a)
+	      -> TcM TcDictBinds
+
+disambigGroup dicts
+  |   any isNumericClass classes 	-- Guaranteed all standard classes
+	  -- see comment at the end of function for reasons as to 
+	  -- why the defaulting mechanism doesn't apply to groups that
+	  -- include CCallable or CReturnable dicts.
+   && not (any isCcallishClass classes)
+  = 	-- THE DICTS OBEY THE DEFAULTABLE CONSTRAINT
+	-- SO, TRY DEFAULT TYPES IN ORDER
+
+	-- Failure here is caused by there being no type in the
+	-- default list which can satisfy all the ambiguous classes.
+	-- For example, if Real a is reqd, but the only type in the
+	-- default list is Int.
+    tcGetDefaultTys			`thenNF_Tc` \ default_tys ->
+    let
+      try_default [] 	-- No defaults work, so fail
+	= failTc
+
+      try_default (default_ty : default_tys)
+	= tryTc_ (try_default default_tys) $	-- If default_ty fails, we try
+						-- default_tys instead
+	  tcSimplifyCheckThetas [] thetas	`thenTc` \ _ ->
+	  returnTc default_ty
+        where
+	  thetas = classes `zip` repeat [default_ty]
+    in
+	-- See if any default works, and if so bind the type variable to it
+	-- If not, add an AmbigErr
+    recoverTc (addAmbigErrs dicts `thenNF_Tc_` returnTc EmptyMonoBinds)	$
+
+    try_default default_tys		 	`thenTc` \ chosen_default_ty ->
+
+	-- Bind the type variable and reduce the context, for real this time
+    unifyTauTy chosen_default_ty (mkTyVarTy tyvar)	`thenTc_`
+    simpleReduceLoop (text "disambig" <+> ppr dicts)
+		     try_me dicts			`thenTc` \ (frees, binds, ambigs) ->
+    WARN( not (null frees && null ambigs), ppr frees $$ ppr ambigs )
+    warnDefault dicts chosen_default_ty			`thenTc_`
+    returnTc binds
+
+  | all isCreturnableClass classes
+  = 	-- Default CCall stuff to (); we don't even both to check that () is an 
+	-- instance of CReturnable, because we know it is.
+    unifyTauTy (mkTyVarTy tyvar) unitTy    `thenTc_`
+    returnTc EmptyMonoBinds
+    
+  | otherwise -- No defaults
+  = addAmbigErrs dicts	`thenNF_Tc_`
+    returnTc EmptyMonoBinds
+
+  where
+    try_me inst = ReduceMe AddToIrreds		-- This reduce should not fail
+    tyvar       = get_tv (head dicts)		-- Should be non-empty
+    classes     = map get_clas dicts
+\end{code}
+
+[Aside - why the defaulting mechanism is turned off when
+ dealing with arguments and results to ccalls.
+
+When typechecking _ccall_s, TcExpr ensures that the external
+function is only passed arguments (and in the other direction,
+results) of a restricted set of 'native' types. This is
+implemented via the help of the pseudo-type classes,
+@CReturnable@ (CR) and @CCallable@ (CC.)
+ 
+The interaction between the defaulting mechanism for numeric
+values and CC & CR can be a bit puzzling to the user at times.
+For example,
+
+    x <- _ccall_ f
+    if (x /= 0) then
+       _ccall_ g x
+     else
+       return ()
+
+What type has 'x' got here? That depends on the default list
+in operation, if it is equal to Haskell 98's default-default
+of (Integer, Double), 'x' has type Double, since Integer
+is not an instance of CR. If the default list is equal to
+Haskell 1.4's default-default of (Int, Double), 'x' has type
+Int. 
+
+To try to minimise the potential for surprises here, the
+defaulting mechanism is turned off in the presence of
+CCallable and CReturnable.
+
+]
+
 
 %************************************************************************
 %*									*
@@ -919,11 +1373,11 @@ reduce_simple_help stack givens wanted@(clas,tys)
   = lookupSimpleInst clas tys	`thenNF_Tc` \ maybe_theta ->
 
     case maybe_theta of
-      Nothing ->    returnNF_Tc (addIrred givens wanted)
+      Nothing ->    returnNF_Tc (addSimpleIrred givens wanted)
       Just theta -> reduce_simple stack (addNonIrred givens wanted) theta
 
-addIrred :: AvailsSimple -> (Class,[Type]) -> AvailsSimple
-addIrred givens ct@(clas,tys)
+addSimpleIrred :: AvailsSimple -> (Class,[Type]) -> AvailsSimple
+addSimpleIrred givens ct@(clas,tys)
   = addSCs (addToFM givens ct True) ct
 
 addNonIrred :: AvailsSimple -> (Class,[Type]) -> AvailsSimple
@@ -949,277 +1403,50 @@ addSCs givens ct@(clas,tys)
 			   
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection[binds-for-local-funs]{@bindInstsOfLocalFuns@}
-%*									*
-%************************************************************************
-
-When doing a binding group, we may have @Insts@ of local functions.
-For example, we might have...
-\begin{verbatim}
-let f x = x + 1	    -- orig local function (overloaded)
-    f.1 = f Int	    -- two instances of f
-    f.2 = f Float
- in
-    (f.1 5, f.2 6.7)
-\end{verbatim}
-The point is: we must drop the bindings for @f.1@ and @f.2@ here,
-where @f@ is in scope; those @Insts@ must certainly not be passed
-upwards towards the top-level.	If the @Insts@ were binding-ified up
-there, they would have unresolvable references to @f@.
-
-We pass in an @init_lie@ of @Insts@ and a list of locally-bound @Ids@.
-For each method @Inst@ in the @init_lie@ that mentions one of the
-@Ids@, we create a binding.  We return the remaining @Insts@ (in an
-@LIE@), as well as the @HsBinds@ generated.
-
-\begin{code}
-bindInstsOfLocalFuns ::	LIE -> [TcId] -> TcM (LIE, TcMonoBinds)
-
-bindInstsOfLocalFuns init_lie local_ids
-  | null overloaded_ids || null lie_for_here
-	-- Common case
-  = returnTc (init_lie, EmptyMonoBinds)
-
-  | otherwise
-  = reduceContext (text "bindInsts" <+> ppr local_ids)
-		  try_me [] lie_for_here	`thenTc` \ (binds, frees, irreds) ->
-    ASSERT( null irreds )
-    returnTc (mkLIE frees `plusLIE` mkLIE lie_not_for_here, binds)
-  where
-    overloaded_ids = filter is_overloaded local_ids
-    is_overloaded id = case splitSigmaTy (idType id) of
-			  (_, theta, _) -> not (null theta)
-
-    overloaded_set = mkVarSet overloaded_ids	-- There can occasionally be a lot of them
-						-- so it's worth building a set, so that 
-						-- lookup (in isMethodFor) is faster
-
-	-- No sense in repeatedly zonking lots of 
-	-- constant constraints so filter them out here
-    (lie_for_here, lie_not_for_here) = partition (isMethodFor overloaded_set)
-					 	 (lieToList init_lie)
-    try_me inst | isMethodFor overloaded_set inst = ReduceMe AddToIrreds
-		| otherwise		          = Free
-\end{code}
-
 
 %************************************************************************
 %*									*
-\section[Disambig]{Disambiguation of overloading}
+\section{Errors and contexts}
 %*									*
 %************************************************************************
 
-
-If a dictionary constrains a type variable which is
-\begin{itemize}
-\item
-not mentioned in the environment
-\item
-and not mentioned in the type of the expression
-\end{itemize}
-then it is ambiguous. No further information will arise to instantiate
-the type variable; nor will it be generalised and turned into an extra
-parameter to a function.
-
-It is an error for this to occur, except that Haskell provided for
-certain rules to be applied in the special case of numeric types.
-
-Specifically, if
-\begin{itemize}
-\item
-at least one of its classes is a numeric class, and
-\item
-all of its classes are numeric or standard
-\end{itemize}
-then the type variable can be defaulted to the first type in the
-default-type list which is an instance of all the offending classes.
-
-So here is the function which does the work.  It takes the ambiguous
-dictionaries and either resolves them (producing bindings) or
-complains.  It works by splitting the dictionary list by type
-variable, and using @disambigOne@ to do the real business.
-
-
-@tcSimplifyTop@ is called once per module to simplify
-all the constant and ambiguous Insts.
-
-\begin{code}
-tcSimplifyTop :: LIE -> TcM TcDictBinds
-tcSimplifyTop wanted_lie
-  = reduceContext (text "tcSimplTop") try_me [] wanteds	`thenTc` \ (binds1, frees, irreds) ->
-    ASSERT( null frees )
-
-    let
-		-- All the non-std ones are definite errors
-	(stds, non_stds) = partition isStdClassTyVarDict irreds
-	
-
-		-- Group by type variable
-	std_groups = equivClasses cmp_by_tyvar stds
-
-		-- Pick the ones which its worth trying to disambiguate
-	(std_oks, std_bads) = partition worth_a_try std_groups
-		-- Have a try at disambiguation 
-		-- if the type variable isn't bound
-		-- up with one of the non-standard classes
-	worth_a_try group@(d:_) = isEmptyVarSet (tyVarsOfInst d `intersectVarSet` non_std_tyvars)
-	non_std_tyvars		= unionVarSets (map tyVarsOfInst non_stds)
-
-		-- Collect together all the bad guys
-	bad_guys = non_stds ++ concat std_bads
-    in
-	-- Disambiguate the ones that look feasible
-    mapTc disambigGroup std_oks		`thenTc` \ binds_ambig ->
-
-	-- And complain about the ones that don't
-    mapNF_Tc complain bad_guys		`thenNF_Tc_`
-
-    returnTc (binds1 `andMonoBinds` andMonoBindList binds_ambig)
-  where
-    wanteds	= lieToList wanted_lie
-    try_me inst	= ReduceMe AddToIrreds
-
-    d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
-
-    complain d | not (null (getIPs d))		= addTopIPErr d
-	       | isEmptyVarSet (tyVarsOfInst d) = addTopInstanceErr d
-	       | otherwise			= addAmbigErr tyVarsOfInst d
-
-get_tv d   = case getDictClassTys d of
-		   (clas, [ty]) -> getTyVar "tcSimplifyTop" ty
-get_clas d = case getDictClassTys d of
-		   (clas, [ty]) -> clas
-\end{code}
-
-@disambigOne@ assumes that its arguments dictionaries constrain all
-the same type variable.
-
-ADR Comment 20/6/94: I've changed the @CReturnable@ case to default to
-@()@ instead of @Int@.  I reckon this is the Right Thing to do since
-the most common use of defaulting is code like:
-\begin{verbatim}
-	_ccall_ foo	`seqPrimIO` bar
-\end{verbatim}
-Since we're not using the result of @foo@, the result if (presumably)
-@void@.
-
-\begin{code}
-disambigGroup :: [Inst]	-- All standard classes of form (C a)
-	      -> TcM TcDictBinds
-
-disambigGroup dicts
-  |   any isNumericClass classes 	-- Guaranteed all standard classes
-	  -- see comment at the end of function for reasons as to 
-	  -- why the defaulting mechanism doesn't apply to groups that
-	  -- include CCallable or CReturnable dicts.
-   && not (any isCcallishClass classes)
-  = 	-- THE DICTS OBEY THE DEFAULTABLE CONSTRAINT
-	-- SO, TRY DEFAULT TYPES IN ORDER
-
-	-- Failure here is caused by there being no type in the
-	-- default list which can satisfy all the ambiguous classes.
-	-- For example, if Real a is reqd, but the only type in the
-	-- default list is Int.
-    tcGetDefaultTys			`thenNF_Tc` \ default_tys ->
-    let
-      try_default [] 	-- No defaults work, so fail
-	= failTc
-
-      try_default (default_ty : default_tys)
-	= tryTc_ (try_default default_tys) $	-- If default_ty fails, we try
-						-- default_tys instead
-	  tcSimplifyCheckThetas [] thetas	`thenTc` \ _ ->
-	  returnTc default_ty
-        where
-	  thetas = classes `zip` repeat [default_ty]
-    in
-	-- See if any default works, and if so bind the type variable to it
-	-- If not, add an AmbigErr
-    recoverTc (complain dicts `thenNF_Tc_` returnTc EmptyMonoBinds)	$
-
-    try_default default_tys		 	`thenTc` \ chosen_default_ty ->
-
-	-- Bind the type variable and reduce the context, for real this time
-    unifyTauTy chosen_default_ty (mkTyVarTy tyvar)	`thenTc_`
-    reduceContext (text "disambig" <+> ppr dicts)
-		  try_me [] dicts			`thenTc` \ (binds, frees, ambigs) ->
-    WARN( not (null frees && null ambigs), ppr frees $$ ppr ambigs )
-    warnDefault dicts chosen_default_ty			`thenTc_`
-    returnTc binds
-
-  | all isCreturnableClass classes
-  = 	-- Default CCall stuff to (); we don't even both to check that () is an 
-	-- instance of CReturnable, because we know it is.
-    unifyTauTy (mkTyVarTy tyvar) unitTy    `thenTc_`
-    returnTc EmptyMonoBinds
-    
-  | otherwise -- No defaults
-  = complain dicts	`thenNF_Tc_`
-    returnTc EmptyMonoBinds
-
-  where
-    complain    = addAmbigErrs tyVarsOfInst
-    try_me inst = ReduceMe AddToIrreds		-- This reduce should not fail
-    tyvar       = get_tv (head dicts)		-- Should be non-empty
-    classes     = map get_clas dicts
-\end{code}
-
-[Aside - why the defaulting mechanism is turned off when
- dealing with arguments and results to ccalls.
-
-When typechecking _ccall_s, TcExpr ensures that the external
-function is only passed arguments (and in the other direction,
-results) of a restricted set of 'native' types. This is
-implemented via the help of the pseudo-type classes,
-@CReturnable@ (CR) and @CCallable@ (CC.)
- 
-The interaction between the defaulting mechanism for numeric
-values and CC & CR can be a bit puzzling to the user at times.
-For example,
-
-    x <- _ccall_ f
-    if (x /= 0) then
-       _ccall_ g x
-     else
-       return ()
-
-What type has 'x' got here? That depends on the default list
-in operation, if it is equal to Haskell 98's default-default
-of (Integer, Double), 'x' has type Double, since Integer
-is not an instance of CR. If the default list is equal to
-Haskell 1.4's default-default of (Int, Double), 'x' has type
-Int. 
-
-To try to minimise the potential for surprises here, the
-defaulting mechanism is turned off in the presence of
-CCallable and CReturnable.
-
-]
-
-Errors and contexts
-~~~~~~~~~~~~~~~~~~~
 ToDo: for these error messages, should we note the location as coming
 from the insts, or just whatever seems to be around in the monad just
 now?
 
 \begin{code}
-genCantGenErr insts	-- Can't generalise these Insts
-  = sep [ptext SLIT("Cannot generalise these overloadings (in a _ccall_):"), 
-	 nest 4 (pprInstsInFull insts)
-	]
+addTopAmbigErrs dicts
+  = mapNF_Tc complain tidy_dicts
+  where
+    fixed_tvs = oclose (predsOfInsts tidy_dicts) emptyVarSet
+    (tidy_env, tidy_dicts) = tidyInsts emptyTidyEnv dicts
+    complain d | not (null (getIPs d))		      = addTopIPErr tidy_env d
+	       | tyVarsOfInst d `subVarSet` fixed_tvs = addTopInstanceErr tidy_env d
+	       | otherwise			      = addAmbigErr tidy_env d
 
-addAmbigErrs ambig_tv_fn dicts = mapNF_Tc (addAmbigErr ambig_tv_fn) dicts
+addTopIPErr tidy_env tidy_dict
+  = addInstErrTcM (instLoc tidy_dict) 
+	(tidy_env, 
+	 ptext SLIT("Unbound implicit parameter") <+> quotes (pprInst tidy_dict))
 
-addAmbigErr ambig_tv_fn dict
-  = addInstErrTcM (instLoc dict)
+-- Used for top-level irreducibles
+addTopInstanceErr tidy_env tidy_dict
+  = addInstErrTcM (instLoc tidy_dict) 
+	(tidy_env, 
+	 ptext SLIT("No instance for") <+> quotes (pprInst tidy_dict))
+
+addAmbigErrs dicts
+  = mapNF_Tc (addAmbigErr tidy_env) tidy_dicts
+  where
+    (tidy_env, tidy_dicts) = tidyInsts emptyTidyEnv dicts
+
+addAmbigErr tidy_env tidy_dict
+  = addInstErrTcM (instLoc tidy_dict)
 	(tidy_env,
 	 sep [text "Ambiguous type variable(s)" <+> pprQuotedList ambig_tvs,
 	      nest 4 (text "in the constraint" <+> quotes (pprInst tidy_dict))])
   where
-    ambig_tvs = varSetElems (ambig_tv_fn tidy_dict)
-    (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
+    ambig_tvs = varSetElems (tyVarsOfInst tidy_dict)
 
 warnDefault dicts default_ty
   = doptsTc Opt_WarnTypeDefaults  `thenTc` \ warn_flag ->
@@ -1244,27 +1471,12 @@ warnDefault dicts default_ty
 		  warnTc True (vcat [ptext SLIT("Defaulting the following constraint(s) to type") <+> quotes (ppr default_ty),
 				     pprInstsInFull dicts])
 
-addTopIPErr dict
-  = addInstErrTcM (instLoc dict) 
-	(tidy_env, 
-	 ptext SLIT("Unbound implicit parameter") <+> quotes (pprInst tidy_dict))
-  where
-    (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
-
--- Used for top-level irreducibles
-addTopInstanceErr dict
-  = addInstErrTcM (instLoc dict) 
-	(tidy_env, 
-	 ptext SLIT("No instance for") <+> quotes (pprInst tidy_dict))
-  where
-    (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
-
 -- The error message when we don't find a suitable instance
 -- is complicated by the fact that sometimes this is because
 -- there is no instance, and sometimes it's because there are
 -- too many instances (overlap).  See the comments in TcEnv.lhs
 -- with the InstEnv stuff.
-addNoInstanceErr str givens dict
+addNoInstanceErr what_doc givens dict
   = tcGetInstEnv	`thenNF_Tc` \ inst_env ->
     let
     	doc = vcat [sep [herald <+> quotes (pprInst tidy_dict),
@@ -1286,7 +1498,7 @@ addNoInstanceErr str givens dict
 			    quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst tidy_dict))))]
     
     	fix1 = sep [ptext SLIT("Add") <+> quotes (pprInst tidy_dict),
-		    ptext SLIT("to the") <+> str]
+		    ptext SLIT("to the") <+> what_doc]
     
     	fix2 | isTyVarDict dict || ambig_overlap
 	     = empty
@@ -1308,7 +1520,7 @@ addNoInstanceErr str givens dict
 
 -- Used for the ...Thetas variants; all top level
 addNoInstErr (c,ts)
-  = addErrTc (ptext SLIT("No instance for") <+> quotes (pprConstraint c ts))
+  = addErrTc (ptext SLIT("No instance for") <+> quotes (pprClassPred c ts))
 
 reduceDepthErr n stack
   = vcat [ptext SLIT("Context reduction stack overflow; size =") <+> int n,
@@ -1316,4 +1528,9 @@ reduceDepthErr n stack
 	  nest 4 (pprInstsInFull stack)]
 
 reduceDepthMsg n stack = nest 4 (pprInstsInFull stack)
+
+-----------------------------------------------
+addCantGenErr inst
+  = addErrTc (sep [ptext SLIT("Cannot generalise these overloadings (in a _ccall_):"), 
+		   nest 4 (ppr inst <+> pprInstLoc (instLoc inst))])
 \end{code}

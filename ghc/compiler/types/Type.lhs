@@ -43,7 +43,7 @@ module Type (
         isUsageKind, isUsage, isUTyVar,
 
 	-- Predicates and the like
-	mkDictTy, mkDictTys, mkPredTy, splitPredTy_maybe, 
+	mkDictTy, mkDictTys, mkPredTy, splitPredTy_maybe, predTyUnique,
 	splitDictTy, splitDictTy_maybe, isDictTy, predRepTy, splitDFunTy,
 
 	mkSynTy, deNoteType, 
@@ -55,7 +55,7 @@ module Type (
 
 	TauType, RhoType, SigmaType, PredType(..), ThetaType,
 	ClassPred, ClassContext, mkClassPred,
-	getClassTys_maybe, ipName_maybe, classesOfPreds,
+	getClassTys_maybe, predMentionsIPs, classesOfPreds,
 	isTauTy, mkRhoTy, splitRhoTy, splitMethodTy,
 	mkSigmaTy, isSigmaTy, splitSigmaTy,
 	getDFunTyKey,
@@ -96,7 +96,7 @@ import Var	( Var, TyVar, tyVarKind, tyVarName, setTyVarName )
 import VarEnv
 import VarSet
 
-import Name	( Name, NamedThing(..), OccName, mkLocalName, tidyOccName )
+import Name	( NamedThing(..), OccName, mkLocalName, tidyOccName )
 import NameSet
 import Class	( classTyCon, Class, ClassPred, ClassContext )
 import TyCon	( TyCon,
@@ -111,7 +111,7 @@ import TyCon	( TyCon,
 import Maybes		( maybeToBool )
 import SrcLoc		( noSrcLoc )
 import PrimRep		( PrimRep(..) )
-import Unique		( Uniquable(..) )
+import Unique		( Unique, Uniquable(..) )
 import Util		( mapAccumL, seqList, thenCmp )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
@@ -691,6 +691,10 @@ mkDictTys cxt = [mkDictTy cls tys | (cls,tys) <- cxt]
 mkPredTy :: PredType -> Type
 mkPredTy pred = PredTy pred
 
+predTyUnique :: PredType -> Unique
+predTyUnique (IParam n _)     = getUnique n
+predTyUnique (Class clas tys) = getUnique clas
+
 predRepTy :: PredType -> Type
 -- Convert a predicate to its "representation type";
 -- the type of evidence for that predicate, which is actually passed at runtime
@@ -735,9 +739,9 @@ getClassTys_maybe :: PredType -> Maybe ClassPred
 getClassTys_maybe (Class clas tys) = Just (clas, tys)
 getClassTys_maybe _		   = Nothing
 
-ipName_maybe :: PredType -> Maybe Name
-ipName_maybe (IParam n _) = Just n
-ipName_maybe _		  = Nothing
+predMentionsIPs :: PredType -> NameSet -> Bool
+predMentionsIPs (IParam n _) ns = n `elemNameSet` ns
+predMentionsIPs other	     ns = False
 
 classesOfPreds :: ThetaType -> ClassContext
 classesOfPreds theta = [(clas,tys) | Class clas tys <- theta]
@@ -1172,8 +1176,10 @@ instance Ord PredType where
   compare p1 p2 = cmpPred emptyVarEnv p1 p2
 
 cmpPred :: TyVarEnv TyVar -> PredType -> PredType -> Ordering
-cmpPred env (IParam n1 t)   (IParam n2 t2)  = n1 `compare` n2
-	-- Just compare the names!
+cmpPred env (IParam n1 ty1)   (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` (cmpTy env ty1 ty2)
+	-- Compare types as well as names for implicit parameters
+	-- This comparison is used exclusively (I think) for the
+	-- finite map built in TcSimplify
 cmpPred env (Class c1 tys1) (Class c2 tys2) = (c1 `compare` c2) `thenCmp` (cmpTys env tys1 tys2)
 cmpPred env (IParam _ _)    (Class _ _)     = LT
 cmpPred env (Class _ _)     (IParam _ _)    = GT
