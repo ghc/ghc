@@ -1121,6 +1121,16 @@ pprCondInstr name cond arg
 
 -- a clumsy hack for now, to handle possible double alignment problems
 
+-- even clumsier, to allow for RegReg regs that show when doing indexed
+-- reads (bytearrays).
+--
+pprInstr (LD DF (AddrRegReg g1 g2) reg)
+  = hcat [
+	ptext SLIT("\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1, char '\n',
+	pp_ld_lbracket, pprReg g1, pp_rbracket_comma, pprReg reg, char '\n',
+	pp_ld_lbracket, pprReg g1, ptext SLIT("+4]"), comma, pprReg (fPair reg)
+    ]
+
 pprInstr (LD DF addr reg) | maybeToBool off_addr
   = hcat [
 	pp_ld_lbracket,
@@ -1151,18 +1161,24 @@ pprInstr (LD size addr reg)
 
 -- The same clumsy hack as above
 
-pprInstr (ST DF reg addr) | maybeToBool off_addr
-  = hcat [
+pprInstr (ST DF reg (AddrRegReg g1 g2))
+ = hcat [
+	ptext SLIT("\tadd\t"),
+		      pprReg g1,comma,pprReg g2,comma,pprReg g1, char '\n',
+	ptext SLIT("\tst\t"),    
+	      pprReg reg, pp_comma_lbracket, pprReg g1,
+	ptext SLIT("]\n\tst\t"), 
+	      pprReg (fPair reg), pp_comma_lbracket, pprReg g1, ptext SLIT("+4]")
+    ]
+
+pprInstr (ST DF reg addr) | maybeToBool off_addr 
+ = hcat [
 	ptext SLIT("\tst\t"),
-	pprReg reg,
-	pp_comma_lbracket,
-	pprAddr addr,
+	pprReg reg, pp_comma_lbracket,	pprAddr addr,
 
 	ptext SLIT("]\n\tst\t"),
-	pprReg (fPair reg),
-	pp_comma_lbracket,
-	pprAddr addr2,
-	rbrack
+	pprReg (fPair reg), pp_comma_lbracket,
+	pprAddr addr2, rbrack
     ]
   where
     off_addr = addrOffset addr 4
