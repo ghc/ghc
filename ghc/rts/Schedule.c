@@ -3441,8 +3441,10 @@ printAllThreads(void)
 
   for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
     debugBelch("\tthread %d @ %p ", t->id, (void *)t);
+#if defined(DEBUG)
     label = lookupThreadLabel(t->id);
     if (label) debugBelch("[\"%s\"] ",(char *)label);
+#endif
     printThreadStatus(t);
     debugBelch("\n");
   }

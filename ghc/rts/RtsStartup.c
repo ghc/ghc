@@ -193,8 +193,10 @@ hs_init(int *argc, char **argv[])
     /* initialise the stable pointer table */
     initStablePtrTable();
 
+#if defined(DEBUG)
     /* initialise thread label table (tso->char*) */
     initThreadLabelTable();
+#endif
 
 #if defined(PROFILING) || defined(DEBUG)
     initProfiling1();

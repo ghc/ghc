@@ -13,6 +13,8 @@
 
 #include <stdlib.h>
 
+#if defined(DEBUG)
+/* to the end */
 static HashTable * threadLabels = NULL;
 
 void
@@ -45,3 +47,4 @@ removeThreadLabel(StgWord key)
     stgFree(old);
   }  
 }
+#endif /* DEBUG */
