@@ -560,7 +560,7 @@ getModificationTime name =
 withFileStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
 withFileStatus name f = do
     allocaBytes sizeof_stat $ \p ->
-      withCString name $ \s -> do
+      withCString (fileNameEndClean name) $ \s -> do
         throwErrnoIfMinus1Retry_ "withFileStatus" (c_stat s p)
 	f p
 
@@ -580,6 +580,16 @@ isDirectory :: Ptr CStat -> IO Bool
 isDirectory stat = do
   mode <- st_mode stat
   return (s_isdir mode)
+
+fileNameEndClean :: String -> String
+fileNameEndClean name = 
+  if i >= 0 && (ec == '\\' || ec == '/') then 
+     fileNameEndClean (take i name)
+   else
+     name
+  where
+      i  = (length name) - 1
+      ec = name !! i
 
 emptyCMode     :: CMode
 emptyCMode     = 0
