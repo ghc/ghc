@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.26 2000/04/13 23:03:12 sewardj Exp $
+ * $Id: Stg.h,v 1.27 2000/04/14 13:47:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,8 +13,12 @@
 #define STG_H
 
 #ifndef NON_POSIX_SOURCE
-#define _POSIX_SOURCE
+#define _POSIX_SOURCE   1
+#define _POSIX_C_SOURCE 199506L
+#define _ISOC9X_SOURCE
 #endif
+
+/* Let's be ISO C9X too... */
 
 /* If we include "Stg.h" directly, we're in STG code, and we therefore
  * get all the global register variables, macros etc. that go along
