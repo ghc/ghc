@@ -60,15 +60,6 @@ the form <tt/getXContents/, e.g., <tt/Channel.getChanContents/ and
 <tt/getHandleContents/, but you hopefully get the picture.)
 </itemize>
 
-<sect> <idx/LazyST/ <p>
-
-This library provides support for both <em/lazy/ and <em/strict/ state
-threads, as described in the PLDI '94 paper by John Launchbury and
-Simon Peyton Jones <cite id="LazyStateThreads">.  In addition to the
-monad <tt/ST/, it also provides mutable variables <tt/STRef/ and
-mutable arrays <tt/STArray/.  As the name suggests, the monad <tt/ST/
-instance is <em/lazy/.
-=======
 <sect> <idx/ST/ 
 <label id="sec:ST">
 <p>
@@ -158,6 +149,8 @@ instance is <em/lazy/.  The lazy ST monad tends to be more prone to
 space leaks than the strict version, so most programmers will use the
 former unless laziness is explicitly required.  <tt/LazyST/ provides
 two additional operations:
+
+<sect> <idx/LazyST/ <p>
 
 <tscreen> <verb>
 lazyToStrictST :: LazyST.ST s a -> ST.ST s a
@@ -707,6 +700,150 @@ The <tt/Ord/ instance for <tt/ThreadId/s provides an arbitrary total ordering
 which might be used to build an ordered binary tree, say.  
 
 </itemize>
+
+<sect> <idx/Dynamic/ 
+<label id="sec:Dynamic">
+<p>
+
+The <tt/Dynamic/ library provides cheap-and-cheerful dynamic types for
+Haskell. A dynamically typed value is one which carries type
+information with it at run-time, and is represented here by the
+abstract type <tt/Dynamic/. Values can be converted into <tt/Dynamic/
+ones, which can then be combined and manipulated by the program using
+the operations provided over the abstract, dynamic type. One of
+these operations allows you to convert a dynamically-typed value back
+into a value with the same (monomorphic) type it had before converting
+it into a dynamically-typed value.
+
+The <tt/Dynamic/ library is capable of dealing with monomorphic types
+only; no support for polymorphic dynamic values, but hopefully that
+can be added at a later stage.
+
+Examples where this library may come in handy (dynamic types, really -
+hopefully the library provided here will suffice) are: persistent
+programming, interpreters, distributed programming etc.
+
+The following operations are provided over the <tt/Dynamic/ type:
+
+<tscreen> <verb>
+data Dynamic -- abstract, instance of: Show --
+
+toDyn       :: Typeable a => a -> Dynamic
+fromDyn     :: Typeable a => Dynamic -> a -> a
+fromDynamic :: Typeable a => Dynamic -> Maybe a
+</verb></tscreen>
+
+<itemize>
+<item> <tt/toDyn/ converts a value into a dynamic one, provided
+<tt/toDyn/ knows the (concrete) type representation of the value.
+The <tt/Typeable/ type class is used to encode this, overloading a
+function that returns the type representation of a value. More on this
+below.
+<item> There's two ways of going from a dynamic value to one with
+a concrete type: <tt/fromDyn/, tries to convert the dynamic value into
+a value with the same type as its second argument. If this fails, the
+default second argument is just returned. <tt/fromDynamic/ returns a
+<tt/Maybe/ type instead, <tt/Nothing/ coming back if the conversion
+was not possible.
+</itemize>
+
+<sect1>  <idx/Representing types/ 
+<label id="sec:Dynamic:TypeRep">
+<p>
+
+Haskell types are represented as terms using the <tt/TypeRep/
+abstract type:
+
+<tscreen> <verb>
+data TypeRep  -- abstract, instance of: Eq, Show
+data TyCon    -- abstract, instance of: Eq, Show
+
+mkTyCon	 :: String  -> TyCon
+mkAppTy	 :: TyCon   -> [TypeRep] -> TypeRep
+mkFunTy  :: TypeRep -> TypeRep   -> TypeRep
+applyTy	 :: TypeRep -> TypeRep   -> Maybe TypeRep
+</verb></tscreen>
+
+<itemize>
+<item> <tt/mkAppTy/ applies a type constructor to a sequence of types,
+returning a type.
+<item> <tt/mkFunTy/ is a special case of <tt/mkAppTy/, applying
+the function type constructor to a pair of types.
+<item> <tt/applyTy/ applies a type to a function type. If possible,
+the result type is returned.
+<item> Type constructors are represented by the abstract type,
+<tt/TyCon/. 
+<item>
+Most importantly, <tt/TypeRep/s can be compared for equality.
+Type equality is used when converting a <tt/Dynamic/ value into a
+value of some specific type, comparing the type representation that
+the <tt/Dynamic/ value embeds with equality of the type representation
+of the type we're trying to convert the dynamically-typed value into.
+<item> 
+To allow comparisons between <tt/TypeRep/s to be implemented
+efficiently, the <em/abstract/ <tt/TyCon/ type is used, with
+the constructor function <tt/mkTyCon/ provided:
+
+<tscreen> <verb>
+mkTyCon :: String -> TyCon 
+</verb></tscreen>
+
+An implementation of the <tt/Dynamic/ interface guarantees the
+following,
+
+<tscreen> <verb>
+ mkTyCon "a" == mkTyCon "a"
+</verb></tscreen>
+
+A really efficient implementation is possible if we guarantee/demand
+that the strings are unique, and for a particular type constructor,
+the application <tt/mkTyCon/ to the string that represents the type
+constructor is never duplicated. [<bf/Q:/ <em>Would this constraint be
+unworkable in practice?</em>]
+<item>
+Both <tt/TyCon/ and <tt/TypeRep/ are instances of the <tt/Show/ type
+classes. To have tuple types be shown in infix form, the <tt/Show/
+instance guarantees that type constructors consisting of <tt/n/-commas,
+i.e., (<tt/mkTyCon ",,,,"/), is shown as an <tt/(n+1)/ tuple in infix
+form.
+</itemize>
+
+<sect1>  <idx/Representing types/ 
+<label id="sec:Dynamic:Typeable">
+<p>
+
+To ease the construction of <tt/Dynamic/ values, we
+introduce the following type class to help working with <tt/TypeRep/s:
+
+<tscreen><verb>
+class Typeable a where
+  typeOf :: a -> TypeRep
+</verb></tscreen>
+
+<itemize>
+<item> The <tt/typeOf/ function is overloaded to return the type
+representation associated with a type. 
+<item> <bf/Important:/ The argument to <tt/typeOf/ is only used to
+carry type information around so that overloading can be resolved.
+<tt/Typeable/ instances should never, ever look at this argument.
+<item> The <tt/Dynamic/ library provide <tt/Typeable/ instances 
+for all Prelude and Hugs/GHC extension library types.
+</itemize>
+
+<sect1>  <idx/Utility functions/ 
+<label id="sec:Dynamic:util">
+<p>
+
+Operations for applying a dynamic function type to a
+dynamically typed argument are commonly useful, and
+also provided:
+
+<tscreen> <verb>
+dynApply   :: Dynamic -> Dynamic -> Dynamic -- unsafe.
+dynApplyMb :: Dynamic -> Dynamic -> Maybe Dynamic
+</verb></tscreen>
+<!-- -- -->
+
 
 <sect> <idx/Pretty/
 <label id="sec:Pretty">
