@@ -65,32 +65,149 @@
     <para>The following sections also give some hints and tips on the
     use of the foreign function interface in GHC.</para>
 
-    <sect2 id="foreign-export-dynamic-ghc">
-      <title>Using <literal>foreign export dynamic</literal> with
-      GHC</title>
+    <sect2 id="foreign-export-ghc">
+      <title>Using <literal>foreign export</literal> with GHC</title>
 
       <indexterm><primary><literal>foreign export
-      dynamic</literal></primary><secondary>with GHC</secondary>
+      </literal></primary><secondary>with GHC</secondary>
       </indexterm>
 
       <para>When GHC compiles a module (say <filename>M.hs</filename>)
-      which uses <literal>foreign export dynamic</literal>, it
-      generates two additional files, <filename>M_stub.c</filename>
-      and <filename>M_stub.h</filename>.  GHC will automatically
-      compile <filename>M_stub.c</filename> to generate
+      which uses <literal>foreign export</literal> or <literal>foreign
+      export dynamic</literal>, it generates two
+      additional files, <filename>M_stub.c</filename> and
+      <filename>M_stub.h</filename>.  GHC will automatically compile
+      <filename>M_stub.c</filename> to generate
       <filename>M_stub.o</filename> at the same time.</para>
 
-      <para>The C file <filename>M_stub.c</filename> contains small
-      helper functions used by the code generated for the
-      <literal>foreign export dynamic</literal>, so it must be linked
-      in to the final program.  When linking the program, remember to
-      include <filename>M_stub.o</filename> in the final link command
-      line, or you'll get link errors for the missing function(s)
-      (this isn't necessary when building your program with
-      <literal>ghc --make</literal>, as GHC will automatically link in
-      the correct bits).</para>
-    </sect2>
+      <para>For a plain <literal>foreign export</literal>, the file
+      <filename>M_stub.h</filename> contains a C prototype for the
+      foreign exported function, and <filename>M_stub.c</filename>
+      contains its definition.  For example, if we compile the
+      following module:</para>
 
+<programlisting>
+module Foo where
+
+foreign export foo :: Int -> IO Int
+
+foo :: Int -> IO Int
+foo n = return (length (f n))
+
+f :: Int -> [Int]
+f 0 = []
+f n = n:(f (n-1))</programlisting>
+
+      <para>Then <filename>Foo_stub.h</filename> will contain
+      something like this:</para>
+
+<programlisting>
+#include "HsFFI.h"
+extern HsInt foo(HsInt a0);</programlisting>
+
+      <para>and <filename>Foo_stub.c</filename> contains the
+      compiler-generated definition of <literal>foo()</literal>.  To
+      invoke <literal>foo()</literal> from C, just <literal>#include
+      "Foo_stub.h"</literal> and call <literal>foo()</literal>.</para>
+
+      <sect3> 
+	<title>Using your own <literal>main()</literal></title>
+
+	<para>Normally, GHC's runtime system provides a
+	<literal>main()</literal>, which arranges to invoke
+	<literal>Main.main</literal> in the Haskell program.  However,
+	you might want to link some Haskell code into a program which
+	has a main function written in another languagem, say C.  In
+	order to do this, you have to initialize the Haskell runtime
+	system explicitly.</para>
+
+	<para>Let's take the example from above, and invoke it from a
+	standalone C program.  Here's the C code:</para>
+
+<programlisting>
+#include &lt;stdio.h&gt;
+#include "foo_stub.h"
+
+#include "RtsAPI.h"
+
+extern void __stginit_Foo ( void );
+
+int main(int argc, char *argv[])
+{
+  int i;
+
+  startupHaskell(argc, argv, __stginit_Foo);
+
+  for (i = 0; i < 5; i++) {
+    printf("%d\n", foo(2500));
+  }
+
+  shutdownHaskell();
+
+  return 0;
+}</programlisting>
+
+	<para>The call to <literal>startupHaskell()</literal>
+	initializes GHC's runtime system.  Do NOT try to invoke any
+	Haskell functions before calling
+	<literal>startupHaskell()</literal>: strange things will
+	undoubtedly happen.</para>
+
+	<para>We pass <literal>argc</literal> and
+	<literal>argv</literal> to <literal>startupHaskell()</literal>
+	so that it can separate out any arguments for the RTS
+	(i.e. those arguments between
+	<literal>+RTS...-RTS</literal>).</para>
+
+	<para>The third argument to <literal>startupHaskell()</literal>
+	is used for initializing the Haskell modules in the program.
+	It must be the name of the initialization function for the
+	"top" module in the program/library - in other words, the
+	module which directly or indirectly imports all the other
+	Haskell modules in the program.  In a standalone Haskell
+	program this would be module <literal>Main</literal>, but when
+	you are only using the Haskell code as a library it may not
+	be.  If your library doesn't have such a module, then it is
+	straightforward to create one, purely for this initialization
+	process.  The name of the initialization function for module
+	<replaceable>M</replaceable> is
+	<literal>__stginit_<replaceable>M</replaceable></literal>, and
+	it may be declared as an external function symbol as in the
+	code above.</para>
+
+	<para>After we've finished invoking our Haskell functions, we
+	can call <literal>shutdownHaskell()</literal>, which
+	terminates the RTS.  It runs any outstanding finalizers and
+	generates any profiling or stats output that might have been
+	requested.</para>
+
+	<para>The functions <literal>startupHaskell()</literal> and
+	<literal>shutdownHaskell()</literal> may be called only once
+	each, and only in that order.</para>
+      </sect3>
+
+      <sect3 id="foreign-export-dynamic-ghc">
+	<title>Using <literal>foreign export dynamic</literal> with
+	GHC</title>
+
+	<indexterm><primary><literal>foreign export
+	dynamic</literal></primary><secondary>with GHC</secondary>
+	</indexterm>
+
+	<para>When <literal>foreign export dynamic</literal> is used
+        in a Haskell module, The C stub file
+        <filename>M_stub.c</filename> generated by GHC contains small
+        helper functions used by the code generated for the
+        <literal>foreign export dynamic</literal>, so it must be
+        linked in to the final program.  When linking the program,
+        remember to include <filename>M_stub.o</filename> in the final
+        link command line, or you'll get link errors for the missing
+        function(s) (this isn't necessary when building your program
+        with <literal>ghc --make</literal>, as GHC will automatically
+        link in the correct bits).</para>
+      </sect3>
+    </sect2>
+    
     <sect2 id="glasgow-foreign-headers">
       <title>Using function headers</title>
 
