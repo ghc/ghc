@@ -104,7 +104,7 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|nextstep3|cygwin32)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|nextstep3|cygwin32|mingw32)$/ ) {
 				# NeXT added but not tested. CaS
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
@@ -393,6 +393,7 @@ sub mangle_asm {
     while (<INASM>) {
 	next if $T_STABBY && /^\.stab.*$TUS[@]?__stg_split_marker/o;
 	next if $T_STABBY && /^\.stab.*ghc.*c_ID/;
+	next if /^\t\.def.*endef$/;
 	next if /$TPREAPP(NO_)?APP/o; 
     	next if /^;/ && $TargetPlatform =~ /^hppa/;
 
