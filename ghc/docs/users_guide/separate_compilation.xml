@@ -136,7 +136,7 @@
       will not get confused.</para>
 
       <para>In batch compilation mode, the name of the object file can
-      also be overriden using the <option>-o</option> option, and the
+      also be overridden using the <option>-o</option> option, and the
       name of the interface file can be specified directly using the
       <option>-ohi</option> option.</para>
     </sect2>
@@ -597,7 +597,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
       it used when it last compiled the file.  If the source file's
       modification date is earlier than the <filename>.o</filename>
       file's date (i.e. the source hasn't changed since the file was
-      last compiled), and the reompilation checking is on, GHC will be
+      last compiled), and the recompilation checking is on, GHC will be
       clever.  It compares the version numbers on the things it needs
       this time with the version numbers on the things it needed last
       time (gleaned from the interface file of the module being
@@ -986,7 +986,7 @@ module A where
 </programlisting>
 	    In a <emphasis>source</emphasis> program
 	  this would declare TA to have no constructors (a GHC extension: see <xref linkend="nullary-types"/>),
-	  but in an hi-boot file it means "I don't know or care what the construtors are".
+	  but in an hi-boot file it means "I don't know or care what the constructors are".
 	    This is the most common form of data type declaration, because it's easy to get right.</para>
 	  <para>
 	  You <emphasis>can</emphasis> also write out the constructors but, if you do so, you must write

@@ -10,7 +10,7 @@
     </footnote>
   is GHC's interactive environment, in which Haskell expressions can
   be interactively evaluated and programs can be interpreted.  If
-  you're famililar with <ulink url="http://www.haskell.org/hugs/">Hugs</ulink><indexterm><primary>Hugs</primary>
+  you're familiar with <ulink url="http://www.haskell.org/hugs/">Hugs</ulink><indexterm><primary>Hugs</primary>
   </indexterm>, then you'll be right at home with GHCi.  However, GHCi
   also has support for interactively loading compiled code, as well as
   supporting all<footnote><para>except <literal>foreign export</literal>, at the moment</para>
@@ -668,7 +668,7 @@ Wed Mar 14 12:23:13 GMT 2001
     </sect2>
   </sect1>
 
-  <sect1 id="ghci-invokation">
+  <sect1 id="ghci-invocation">
     <title>Invoking GHCi</title>
     <indexterm><primary>invoking</primary><secondary>GHCi</secondary></indexterm>
     <indexterm><primary><option>&ndash;&ndash;interactive</option></primary></indexterm>
@@ -765,7 +765,7 @@ $ ghci -lm
 	</listitem>
 	<listitem>
 	  <para>the standard library search path for your system,
-	  which on some systems may be overriden by setting the
+	  which on some systems may be overridden by setting the
 	  <literal>LD_LIBRARY_PATH</literal> environment
 	  variable.</para>
 	</listitem>

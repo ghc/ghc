@@ -333,7 +333,7 @@ ghc &ndash;&ndash;make Main.hs
 	<listitem>
 	  <para>GHC doesn't have to be restarted for each compilation,
 	  which means it can cache information between compilations.
-	  Compiling a muli-module program with <literal>ghc
+	  Compiling a multi-module program with <literal>ghc
 	  &ndash;&ndash;make</literal> can be up to twice as fast as
 	  running <literal>ghc</literal> individually on each source
 	  file.</para>
@@ -358,7 +358,7 @@ ghc &ndash;&ndash;make Main.hs
       pragma (see <xref linkend="source-file-options"/>).</para>
 
       <para>If the program needs to be linked with additional objects
-      (say, some auxilliary C code), then the object files can be
+      (say, some auxiliary C code), then the object files can be
       given on the command line and GHC will include them when linking
       the executable.</para>
       
@@ -1710,7 +1710,7 @@ and maintaining internal tables of global addresses.
           only)</primary></indexterm> Means to pass the like-named
           option to GCC; it says to use the Version 8 SPARC
           instructions, notably integer multiply and divide.  The
-          similiar <option>-m*</option> GCC options for SPARC also
+          similar <option>-m*</option> GCC options for SPARC also
           work, actually.</para>
 	</listitem>
       </varlistentry>
@@ -1779,7 +1779,7 @@ statements or clauses.
 
 <para>GHC can also read in External Core files as source; just give the <literal>.hcr</literal> file on
 the command line, instead of the <literal>.hs</literal> or <literal>.lhs</literal> Haskell source.
-A current infelicity is that you need to give teh <literal>-fglasgow-exts</literal> flag too, because
+A current infelicity is that you need to give the <literal>-fglasgow-exts</literal> flag too, because
 ordinary Haskell 98, when translated to External Core, uses things like rank-2 types.</para>
 </sect1>
 

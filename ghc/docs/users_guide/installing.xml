@@ -633,7 +633,7 @@ the links in "Start/Programs/Glasgow Haskell Compiler" if you do this.)
 <para>
 It is OK to put GHC tree in a directory whose path involves spaces.  However,
 don't do this if you use want to use GHC with the Cygwin tools, 
-because Cygwin can get confused when this happpens.
+because Cygwin can get confused when this happens.
 We havn't quite got to the bottom of this, but so far as we know it's not 
 a problem with GHC itself.  Nevertheless, just to keep life simple we usually
 put GHC in a place with a space-free path.

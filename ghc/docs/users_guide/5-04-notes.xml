@@ -144,7 +144,7 @@
       <listitem>
 	<para>New commands: <literal>:browse</literal>, <literal>:set
 	args</literal>, <literal>:set prog</literal>, <literal>:show
-	binadings</literal>, and <literal>:show modules</literal> (see
+	bindings</literal>, and <literal>:show modules</literal> (see
 	<xref linkend="ghci-commands">).</para>
       </listitem>
       <listitem>

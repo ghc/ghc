@@ -120,7 +120,7 @@
                 <indexterm><primary><option>-ddump-simpl</option></primary></indexterm>
 	      </term>
 	      <listitem>
-		<para>simplifer output (Core-to-Core passes)</para>
+		<para>simplifier output (Core-to-Core passes)</para>
 	      </listitem>
 	    </varlistentry>
 
@@ -504,7 +504,7 @@ Main.skip2{-r1L6-} =
           fromInt.t4GS = (fromInt{-r3JX-} _4) d.Num.t4Gt
 
 --# The `+' class method (Unique: r3JH) selects the addition code
---# from a `Num' dictionary (now an explicit lamba'd argument).
+--# from a `Num' dictionary (now an explicit lambda'd argument).
 --# Because Core is 2nd-order lambda-calculus, type applications
 --# and lambdas (/\) are explicit.  So `+' is first applied to a
 --# type (`_4'), then to a dictionary, yielding the actual addition

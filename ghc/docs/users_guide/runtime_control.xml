@@ -80,7 +80,7 @@
 </screen>
 
     <para>RTS options taken from the <envar>GHCRTS</envar> environment
-    variable can be overriden by options given on the command
+    variable can be overridden by options given on the command
     line.</para>
 
   </sect2>

@@ -108,7 +108,7 @@ extern HsInt foo(HsInt a0);</programlisting>
 	<literal>main()</literal>, which arranges to invoke
 	<literal>Main.main</literal> in the Haskell program.  However,
 	you might want to link some Haskell code into a program which
-	has a main function written in another languagem, say C.  In
+	has a main function written in another language, say C.  In
 	order to do this, you have to initialize the Haskell runtime
 	system explicitly.</para>
 
@@ -280,7 +280,7 @@ declaration itself:
 </programlisting>
 When compiling this module, GHC will generate a C file that includes
 the specified <option>-&num;include</option>.  However, GHC
-<emphasis>disables</emphasis> cross-module inlinding for such foreign
+<emphasis>disables</emphasis> cross-module inlining for such foreign
 calls, because it doesn't transport the <option>-&num;include</option>
 information across module boundaries.  (There is no fundamental reason for this;
 it was just tiresome to implement.  The wrapper, which unboxes the arguments
@@ -327,7 +327,7 @@ to be inlined across modules, use the command-line and package-configuration
 	  <listitem>
 	    <para>Useful for short-term allocation when the allocation
 	    is intended to scope over a given <literal>IO</literal>
-	    compuatation.  This kind of allocation is commonly used
+	    computation.  This kind of allocation is commonly used
 	    when marshalling data to and from FFI functions.</para>
 
 	    <para>In GHC, <literal>alloca</literal> is implemented
@@ -366,7 +366,7 @@ to be inlined across modules, use the command-line and package-configuration
 	    <para>If all else fails, then you need to resort to
 	    <literal>Foreign.malloc</literal> and
 	    <literal>Foreign.free</literal>.  These are just wrappers
-	    around the C funcitons of the same name, and their
+	    around the C functions of the same name, and their
 	    efficiency will depend ultimately on the implementations
 	    of these functions in your platform's C library.  We
 	    usually find <literal>malloc</literal> and
@@ -376,14 +376,14 @@ to be inlined across modules, use the command-line and package-configuration
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>Foreign.Marhsal.Pool</literal></term>
+	  <term><literal>Foreign.Marshal.Pool</literal></term>
 	  <listitem>
 	    <para>Pools are currently implemented using
 	    <literal>malloc/free</literal>, so while they might be a
 	    more convenient way to structure your memory allocation
 	    than using one of the other forms of allocation, they
 	    won't be any more efficient.  We do plan to provide an
-	    improved-performance implementaiton of Pools in the
+	    improved-performance implementation of Pools in the
 	    future, however.</para>
 	  </listitem>
 	</varlistentry>

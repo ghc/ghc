@@ -6,7 +6,7 @@
   <para>This section describes other program(s) which we distribute,
   that help with the Great Haskell Programming Task.</para>
 
-<!-- comment: hasktags documentation losely based on that for hstags -->
+<!-- comment: hasktags documentation loosely based on that for hstags -->
 
 <sect1  id ="hasktags">
 	<title>Ctags and Etags for Haskell: <command>hasktags</command></title>
@@ -34,7 +34,7 @@ find -name \*.\*hs | xargs hasktags
 <para>This will find all haskell source files in the current directory and below, and create tags files indexing them in the current directory.</para>
 
 	<para><command>hasktags</command> is a simple program that uses simple
-	parsing rules to find definitions of functions, constructors, and types. It isn't guranteed to find everything, and will sometimes create false index entries, but it usually gets the job done fairly well. In particular, at present, functions are only indexed if a type signature is given for them.</para>
+	parsing rules to find definitions of functions, constructors, and types. It isn't guaranteed to find everything, and will sometimes create false index entries, but it usually gets the job done fairly well. In particular, at present, functions are only indexed if a type signature is given for them.</para>
 
 	<para>Before hasktags, there used to be <command>fptags</command> and <command>hstags</command>, which did essentially the same job, however neither of these seem to be maintained any more.</para>
 
@@ -547,7 +547,7 @@ tags:
       source. They are useful for making a <literal>#let</literal>-like
       macro whose expansion uses other <literal>#let</literal> macros.
       Plain <literal>#let</literal> prepends <literal>hsc_</literal>
-      to the macro name and wraps the defininition in a
+      to the macro name and wraps the definition in a
       <literal>printf</literal> call.</para>
 
     </sect2>

@@ -1149,7 +1149,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-no-hs-main</option></entry>
-	      <entry>Don't asssume this program contains <literal>main</literal></entry>
+	      <entry>Don't assume this program contains <literal>main</literal></entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>

@@ -258,7 +258,7 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
      {-# SCC "name" #-} &lt;expression&gt;
 </programlisting>
 
-      <para>where <literal>"name"</literal> is an aribrary string,
+      <para>where <literal>"name"</literal> is an arbitrary string,
       that will become the name of your cost centre as it appears
       in the profiling output, and
       <literal>&lt;expression&gt;</literal> is any Haskell
@@ -490,7 +490,7 @@ x = nfib 25
     over time.  This is useful for detecting the causes of
     <firstterm>space leaks</firstterm>, when your program holds on to
     more memory at run-time that it needs to.  Space leaks lead to
-    longer run-times due to heavy garbage collector ativity, and may
+    longer run-times due to heavy garbage collector activity, and may
     even cause the program to run out of memory altogether.</para>
 
     <para>To generate a heap profile from your program:</para>
@@ -809,7 +809,7 @@ x = nfib 25
 	<para>The definition of retainers is designed to reflect a
         common cause of space leaks: a large structure is retained by
         an unevaluated computation, and will be released once the
-        compuation is forced.  A good example is looking up a value in
+        computation is forced.  A good example is looking up a value in
         a finite map, where unless the lookup is forced in a timely
         manner the unevaluated lookup will cause the whole mapping to
         be retained.  These kind of space leaks can often be

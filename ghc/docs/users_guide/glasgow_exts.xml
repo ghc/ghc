@@ -619,7 +619,7 @@ clunky env var1 var1
 </programlisting>
 
 <para>
-The semantics should be clear enough.  The qualifers are matched in order. 
+The semantics should be clear enough.  The qualifiers are matched in order. 
 For a <literal>&lt;-</literal> qualifier, which I call a pattern guard, the
 right hand side is evaluated and matched against the pattern on the left. 
 If the match fails then the whole guard fails and the next equation is
@@ -957,7 +957,7 @@ like expressions.  More specifically:
 <title>Liberalised type synonyms</title>
 
 <para>
-Type synonmys are like macros at the type level, and
+Type synonyms are like macros at the type level, and
 GHC does validity checking on types <emphasis>only after expanding type synonyms</emphasis>.
 That means that GHC can be very much more liberal about type synonyms than Haskell 98:
 <itemizedlist>
@@ -1006,7 +1006,7 @@ You can apply a type synonym to a partially applied type synonym:
   
   foo :: Generic Id []
 </programlisting>
-After epxanding the synonym, <literal>foo</literal> has the legal (in GHC) type:
+After expanding the synonym, <literal>foo</literal> has the legal (in GHC) type:
 <programlisting>
   foo :: forall x. x -> [x]
 </programlisting>
@@ -1458,7 +1458,7 @@ be acyclic</emphasis>.  So these class declarations are OK:
 <para>
  <emphasis>All of the class type variables must be reachable (in the sense 
 mentioned in <xref linkend="type-restrictions"/>)
-from the free varibles of each method type
+from the free variables of each method type
 </emphasis>.  For example:
 
 
@@ -1589,7 +1589,7 @@ get any more information about <literal>tv</literal>.
 <para>
 Note
 that the reachability condition is weaker than saying that <literal>a</literal> is
-functionally dependendent on a type variable free in
+functionally dependent on a type variable free in
 <literal>type</literal> (see <xref
 linkend="functional-dependencies"/>).  The reason for this is there
 might be a "hidden" dependency, in a superclass perhaps.  So
@@ -1775,7 +1775,7 @@ GHC is also conservative about committing to an overlapping instance.  For examp
   f x = op x
 </programlisting>
 From the RHS of f we get the constraint <literal>C [b]</literal>.  But
-GHC does not commit to the second instance declaration, because in a paricular
+GHC does not commit to the second instance declaration, because in a particular
 call of f, b might be instantiate to Int, so the first instance declaration
 would be appropriate.  So GHC rejects the program.  If you add <option>-fallow-incoherent-instances</option>
 GHC will instead silently pick the second instance, without complaining about 
@@ -1947,7 +1947,7 @@ allowing these idioms interesting idioms.
 <sect2 id="implicit-parameters">
 <title>Implicit parameters</title>
 
-<para> Implicit paramters are implemented as described in 
+<para> Implicit parameters are implemented as described in 
 "Implicit parameters: dynamic scoping with static types", 
 J Lewis, MB Shields, E Meijer, J Launchbury,
 27th ACM Symposium on Principles of Programming Languages (POPL'00),
@@ -2118,7 +2118,7 @@ problem that monads seem over-kill for certain sorts of problem, notably:
 </para>
 <itemizedlist>
 <listitem> <para> distributing a supply of unique names </para> </listitem>
-<listitem> <para> distributing a suppply of random numbers </para> </listitem>
+<listitem> <para> distributing a supply of random numbers </para> </listitem>
 <listitem> <para> distributing an oracle (as in QuickCheck) </para> </listitem>
 </itemizedlist>
 
@@ -2405,7 +2405,7 @@ is implicitly added by Haskell.
 </para>
 <para>
 The functions <literal>f2</literal> and <literal>g2</literal> have rank-2 types;
-the <literal>forall</literal> is on the left of a function arrrow.  As <literal>g2</literal>
+the <literal>forall</literal> is on the left of a function arrow.  As <literal>g2</literal>
 shows, the polymorphic type on the left of the function arrow can be overloaded.
 </para>
 <para>
@@ -2578,7 +2578,7 @@ matching.
 <title>Type inference</title>
 
 <para>
-In general, type inference for arbitrary-rank types is undecideable.
+In general, type inference for arbitrary-rank types is undecidable.
 GHC uses an algorithm proposed by Odersky and Laufer ("Putting type annotations to work", POPL'96)
 to get a decidable algorithm by requiring some help from the programmer.
 We do not yet have a formal specification of "some help" but the rule is this:
@@ -2907,7 +2907,7 @@ A pattern type signature can occur in any pattern.  For example:
 <listitem>
 <para>
 A pattern type signature can be on an arbitrary sub-pattern, not
-ust on a variable:
+just on a variable:
 
 
 <programlisting>
@@ -3323,7 +3323,7 @@ These and many other examples are given in papers by Hongwei Xi, and Tim Sheard.
 <itemizedlist>
 <listitem><para>
   Data type declarations have a 'where' form, as exemplified above.  The type signature of
-each constructor is independent, and is implicitly univerally quantified as usual. Unlike a normal
+each constructor is independent, and is implicitly universally quantified as usual. Unlike a normal
 Haskell data type declaration, the type variable(s) in the "<literal>data Term a where</literal>" header 
 have no scope.  Indeed, one can write a kind signature instead:
 <programlisting>
@@ -4211,7 +4211,7 @@ Assertion failures can be caught, see the documentation for the
    {-# DEPRECATED f, C, T "Don't use these" #-}
 </programlisting>
 	  <para>When you compile any module that imports and uses any
-          of the specifed entities, GHC will print the specified
+          of the specified entities, GHC will print the specified
           message.</para>
 	</listitem>
       </itemizedlist>
@@ -4267,7 +4267,7 @@ key_function :: Int -> String -> (Bool, Double)
         The normal unfolding machinery will then be very keen to
         inline it.</para>
 
-	<para>Syntactially, an <literal>INLINE</literal> pragma for a
+	<para>Syntactically, an <literal>INLINE</literal> pragma for a
         function can be put anywhere its type signature could be
         put.</para>
 
@@ -4317,7 +4317,7 @@ key_function :: Int -> String -> (Bool, Double)
         number</emphasis>; the phase number decreases towards zero.
         If you use <option>-dverbose-core2core</option> you'll see the
         sequence of phase numbers for successive runs of the
-        simpifier.  In an INLINE pragma you can optionally specify a
+        simplifier.  In an INLINE pragma you can optionally specify a
         phase number, thus:</para>
 
 	<itemizedlist>
@@ -4562,7 +4562,7 @@ data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
 <sect1 id="rewrite-rules">
 <title>Rewrite rules
 
-<indexterm><primary>RULES pagma</primary></indexterm>
+<indexterm><primary>RULES pragma</primary></indexterm>
 <indexterm><primary>pragma, RULES</primary></indexterm>
 <indexterm><primary>rewrite rules</primary></indexterm></title>
 
@@ -4728,7 +4728,7 @@ same type.
 
 <para>
  GHC makes absolutely no attempt to verify that the LHS and RHS
-of a rule have the same meaning.  That is undecideable in general, and
+of a rule have the same meaning.  That is undecidable in general, and
 infeasible in most interesting cases.  The responsibility is entirely the programmer's!
 
 </para>
@@ -4760,7 +4760,7 @@ This rule will cause the compiler to go into an infinite loop.
 for matching a rule LHS with an expression.  It seeks a substitution
 which makes the LHS and expression syntactically equal modulo alpha
 conversion.  The pattern (rule), but not the expression, is eta-expanded if
-necessary.  (Eta-expanding the epression can lead to laziness bugs.)
+necessary.  (Eta-expanding the expression can lead to laziness bugs.)
 But not beta conversion (that's called higher-order matching).
 </para>
 
@@ -5126,7 +5126,7 @@ If you add <option>-dppr-debug</option> you get a more detailed listing.
 <listitem>
 
 <para>
- The defintion of (say) <function>build</function> in <filename>GHC/Base.lhs</filename> looks llike this:
+ The definition of (say) <function>build</function> in <filename>GHC/Base.lhs</filename> looks llike this:
 
 <programlisting>
         build   :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
@@ -5175,7 +5175,7 @@ program even if fusion doesn't happen.  More rules in <filename>GHC/List.lhs</fi
 f x = ({-# CORE "foo" #-} show) ({-# CORE "bar" #-} x)
 </programlisting>
 
-  Sematically, this is equivalent to:
+  Semantically, this is equivalent to:
 
 <programlisting>
 g x = show x
