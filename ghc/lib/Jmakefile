@@ -1,31 +1,6 @@
 /* This is the Jmakefile for the library stuff.
    This stuff is all written in (Glasgow-extended) Haskell.
 
-Things are organised into exactly one level of subdirs.
-
-At the moment, there are a few such subdirs:
-
-	glaExts		-- Glasgow I/O stuff
-	prelude		-- std prelude stuff
-
-We create one library, libHS.a, with all this stuff in it; note, we
-make 94 diff flavors of this one library.... sigh
-
-(We also build several more "normal" libraries here:
-
-	hbc	    -- support various HBC library thingies
-	ghc	    -- extra GHC-supported libraries
-	contrib	    -- contributed things, incl off the net
-	haskell-1.3 -- Haskell 1.3 libraries
-	...
-)
-
-You should probably read the "Prelude and what the compiler knows
-about it" document before wading in too deeply....
-
-For a particular dir/mFoo.hs src file, you'll see many
-dir/mFoo/mFoo__<number>.o object files.
-
 Everything here *must* be compiled w/ the Glasgow Haskell compiler.
 (Hence the use of $(GHC), rather than $(HC) [the latter is your "standard"
 Haskell compiler -- whatever you've configured]).
@@ -33,7 +8,6 @@ Haskell compiler -- whatever you've configured]).
 If you use EXTRA_HC_OPTS on the command line (which you shouldn't,
 strictly speaking), it will probably work -- it is pinned onto
 GHC_OPTS, just for fun.
-
 */
 
 /****************************************************************
@@ -69,39 +43,113 @@ EtagsNeededHere(tags)
 *								*
 ****************************************************************/
 
-/* The driver will give warnings if -split-objs,
-   but that's cool...
-*/
-GHC_OPTS=-iprelude:glaExts 		 \
-	 -dcore-lint 			 \
-	 -fshow-pragma-name-errs 	 \
-	 -fshow-import-specs 		 \
-	 -fomit-default-instance-methods \
-	 -cpp -fglasgow-exts -genSPECS 	 \
-	 -DUSE_FOLDR_BUILD -D__OVERLAPPING_INSTANCES__ \
+/* The driver will give warnings if -split-objs, but that's cool... */
+GHC_OPTS=-short -cpp 		\
+	 -dcore-lint 		\
+	 -irequired		\
+	 -fusing-ghc-internals	\
 	 HcMaxHeapFlag $(EXTRA_HC_OPTS)
 
-/* For building with unboxed stuff add:
-
-	-fspecialise-unboxed -genSPECSunboxed -D__UNBOXED_INSTANCES__ -D__UNBOXED_SPECS__
-
-   This is currently done using -user-way-b = -unboxed-specialisation
-*/
-
-/* For the "Prelude" bits: mostly we do not want it to pick
-    up interface information from anywhere except *here*.
-
-   -fomit-reexported-instances: we occasionally override
-	this (e.g., on PreludeHi.hs, to create Prelude.hi)
-*/
-PREL_OPTS=-prelude -fno-implicit-prelude -fomit-reexported-instances
+PREL_OPTS=/*???-fcompiling-ghc-internals -fno-implicit-prelude*/
 
 /* per-build options: shared with RTS */
 #define rts_or_lib(r,l) l
-#include "../mkworld/GHC_OPTS"
+/*later: #include "../mkworld/GHC_OPTS" */
 
 /* this is just friendliness to "hstags" */
 HSTAGS_OPTS=-fglasgow-exts
+
+/***************************************************************/
+
+#define SrcThingVars(blob)				@@\
+CAT2(blob,_HC_norm) = $(CAT2(blob,_HS):.hs=.hc)		@@\
+CAT2(blob,_HC_p)    = $(CAT2(blob,_HS):.hs=.p_hc)	@@\
+CAT2(blob,_HC_t)    = $(CAT2(blob,_HS):.hs=.t_hc)	@@\
+CAT2(blob,_HC_u)    = $(CAT2(blob,_HS):.hs=.u_hc)	@@\
+CAT2(blob,_HC_mc)   = $(CAT2(blob,_HS):.hs=.mc_hc)	@@\
+CAT2(blob,_HC_mr)   = $(CAT2(blob,_HS):.hs=.mr_hc)	@@\
+CAT2(blob,_HC_mt)   = $(CAT2(blob,_HS):.hs=.mt_hc)	@@\
+CAT2(blob,_HC_mp)   = $(CAT2(blob,_HS):.hs=.mp_hc)	@@\
+CAT2(blob,_HC_mg)   = $(CAT2(blob,_HS):.hs=.mg_hc)	@@\
+CAT2(blob,_HC_2s)   = $(CAT2(blob,_HS):.hs=.2s_hc)	@@\
+CAT2(blob,_HC_1s)   = $(CAT2(blob,_HS):.hs=.1s_hc)	@@\
+CAT2(blob,_HC_du)   = $(CAT2(blob,_HS):.hs=.du_hc)	@@\
+CAT2(blob,_HC_a)    = $(CAT2(blob,_HS):.hs=.a_hc)	@@\
+CAT2(blob,_HC_b)    = $(CAT2(blob,_HS):.hs=.b_hc)	@@\
+CAT2(blob,_HC_c)    = $(CAT2(blob,_HS):.hs=.c_hc)	@@\
+CAT2(blob,_HC_d)    = $(CAT2(blob,_HS):.hs=.d_hc)	@@\
+CAT2(blob,_HC_e)    = $(CAT2(blob,_HS):.hs=.e_hc)	@@\
+CAT2(blob,_HC_f)    = $(CAT2(blob,_HS):.hs=.f_hc)	@@\
+CAT2(blob,_HC_g)    = $(CAT2(blob,_HS):.hs=.g_hc)	@@\
+CAT2(blob,_HC_h)    = $(CAT2(blob,_HS):.hs=.h_hc)	@@\
+CAT2(blob,_HC_i)    = $(CAT2(blob,_HS):.hs=.i_hc)	@@\
+CAT2(blob,_HC_j)    = $(CAT2(blob,_HS):.hs=.j_hc)	@@\
+CAT2(blob,_HC_k)    = $(CAT2(blob,_HS):.hs=.k_hc)	@@\
+CAT2(blob,_HC_l)    = $(CAT2(blob,_HS):.hs=.l_hc)	@@\
+CAT2(blob,_HC_m)    = $(CAT2(blob,_HS):.hs=.m_hc)	@@\
+CAT2(blob,_HC_n)    = $(CAT2(blob,_HS):.hs=.n_hc)	@@\
+CAT2(blob,_HC_o)    = $(CAT2(blob,_HS):.hs=.o_hc)	@@\
+CAT2(blob,_HC_A)    = $(CAT2(blob,_HS):.hs=.A_hc)	@@\
+CAT2(blob,_HC_B)    = $(CAT2(blob,_HS):.hs=.B_hc)	@@\
+							@@\
+CAT2(blob,_DEP_norm) = $(CAT2(blob,_HC_norm):.hc=.o)	@@\
+CAT2(blob,_DEP_p)   = $(CAT2(blob,_HC_p):.p_hc=.p_o)	@@\
+CAT2(blob,_DEP_t)   = $(CAT2(blob,_HC_t):.t_hc=.t_o)	@@\
+CAT2(blob,_DEP_u)   = $(CAT2(blob,_HC_u):.u_hc=.u_o)	@@\
+CAT2(blob,_DEP_a)   = $(CAT2(blob,_HC_a):.a_hc=.a_o)	@@\
+CAT2(blob,_DEP_b)   = $(CAT2(blob,_HC_b):.b_hc=.b_o)	@@\
+CAT2(blob,_DEP_c)   = $(CAT2(blob,_HC_c):.c_hc=.c_o)	@@\
+CAT2(blob,_DEP_d)   = $(CAT2(blob,_HC_d):.d_hc=.d_o)	@@\
+CAT2(blob,_DEP_e)   = $(CAT2(blob,_HC_e):.e_hc=.e_o)	@@\
+CAT2(blob,_DEP_f)   = $(CAT2(blob,_HC_f):.f_hc=.f_o)	@@\
+CAT2(blob,_DEP_g)   = $(CAT2(blob,_HC_g):.g_hc=.g_o)	@@\
+CAT2(blob,_DEP_h)   = $(CAT2(blob,_HC_h):.h_hc=.h_o)	@@\
+CAT2(blob,_DEP_i)   = $(CAT2(blob,_HC_i):.i_hc=.i_o)	@@\
+CAT2(blob,_DEP_j)   = $(CAT2(blob,_HC_j):.j_hc=.j_o)	@@\
+CAT2(blob,_DEP_k)   = $(CAT2(blob,_HC_k):.k_hc=.k_o)	@@\
+CAT2(blob,_DEP_l)   = $(CAT2(blob,_HC_l):.l_hc=.l_o)	@@\
+CAT2(blob,_DEP_m)   = $(CAT2(blob,_HC_m):.m_hc=.m_o)	@@\
+CAT2(blob,_DEP_n)   = $(CAT2(blob,_HC_n):.n_hc=.n_o)	@@\
+CAT2(blob,_DEP_o)   = $(CAT2(blob,_HC_o):.o_hc=.o_o)	@@\
+CAT2(blob,_DEP_A)   = $(CAT2(blob,_HC_A):.A_hc=.A_o)	@@\
+CAT2(blob,_DEP_B)   = $(CAT2(blob,_HC_B):.B_hc=.B_o)	@@\
+CAT2(blob,_DEP_mc)  = $(CAT2(blob,_HC_mc):.mc_hc=.mc_o)	@@\
+CAT2(blob,_DEP_mr)  = $(CAT2(blob,_HC_mr):.mr_hc=.mr_o)	@@\
+CAT2(blob,_DEP_mt)  = $(CAT2(blob,_HC_mt):.mt_hc=.mt_o)	@@\
+CAT2(blob,_DEP_mp)  = $(CAT2(blob,_HC_mp):.mp_hc=.mp_o)	@@\
+CAT2(blob,_DEP_mg)  = $(CAT2(blob,_HC_mg):.mg_hc=.mg_o)	@@\
+CAT2(blob,_DEP_2s)  = $(CAT2(blob,_HC_2s):.2s_hc=.2s_o)	@@\
+CAT2(blob,_DEP_1s)  = $(CAT2(blob,_HC_1s):.1s_hc=.1s_o)	@@\
+CAT2(blob,_DEP_du)  = $(CAT2(blob,_HC_du):.du_hc=.du_o)	@@\
+							@@\
+CAT2(blob,_HIs_p)   = $(CAT2(blob,_HIs):.hi=.p_hi)	@@\
+CAT2(blob,_HIs_t)   = $(CAT2(blob,_HIs):.hi=.t_hi)	@@\
+CAT2(blob,_HIs_u)   = $(CAT2(blob,_HIs):.hi=.u_hi)	@@\
+CAT2(blob,_HIs_a)   = $(CAT2(blob,_HIs):.hi=.a_hi)	@@\
+CAT2(blob,_HIs_b)   = $(CAT2(blob,_HIs):.hi=.b_hi)	@@\
+CAT2(blob,_HIs_c)   = $(CAT2(blob,_HIs):.hi=.c_hi)	@@\
+CAT2(blob,_HIs_d)   = $(CAT2(blob,_HIs):.hi=.d_hi)	@@\
+CAT2(blob,_HIs_e)   = $(CAT2(blob,_HIs):.hi=.e_hi)	@@\
+CAT2(blob,_HIs_f)   = $(CAT2(blob,_HIs):.hi=.f_hi)	@@\
+CAT2(blob,_HIs_g)   = $(CAT2(blob,_HIs):.hi=.g_hi)	@@\
+CAT2(blob,_HIs_h)   = $(CAT2(blob,_HIs):.hi=.h_hi)	@@\
+CAT2(blob,_HIs_i)   = $(CAT2(blob,_HIs):.hi=.i_hi)	@@\
+CAT2(blob,_HIs_j)   = $(CAT2(blob,_HIs):.hi=.j_hi)	@@\
+CAT2(blob,_HIs_k)   = $(CAT2(blob,_HIs):.hi=.k_hi)	@@\
+CAT2(blob,_HIs_l)   = $(CAT2(blob,_HIs):.hi=.l_hi)	@@\
+CAT2(blob,_HIs_m)   = $(CAT2(blob,_HIs):.hi=.m_hi)	@@\
+CAT2(blob,_HIs_n)   = $(CAT2(blob,_HIs):.hi=.n_hi)	@@\
+CAT2(blob,_HIs_o)   = $(CAT2(blob,_HIs):.hi=.o_hi)	@@\
+CAT2(blob,_HIs_A)   = $(CAT2(blob,_HIs):.hi=.A_hi)	@@\
+CAT2(blob,_HIs_B)   = $(CAT2(blob,_HIs):.hi=.B_hi)	@@\
+CAT2(blob,_HIs_mc)  = $(CAT2(blob,_HIs):.hi=.mc_hi)	@@\
+CAT2(blob,_HIs_mr)  = $(CAT2(blob,_HIs):.hi=.mr_hi)	@@\
+CAT2(blob,_HIs_mt)  = $(CAT2(blob,_HIs):.hi=.mt_hi)	@@\
+CAT2(blob,_HIs_mp)  = $(CAT2(blob,_HIs):.hi=.mp_hi)	@@\
+CAT2(blob,_HIs_mg)  = $(CAT2(blob,_HIs):.hi=.mg_hi)	@@\
+CAT2(blob,_HIs_2s)  = $(CAT2(blob,_HIs):.hi=.2s_hi)	@@\
+CAT2(blob,_HIs_1s)  = $(CAT2(blob,_HIs):.hi=.1s_hi)	@@\
+CAT2(blob,_HIs_du)  = $(CAT2(blob,_HIs):.hi=.du_hi)
 
 /****************************************************************
 *								*
@@ -110,544 +158,38 @@ HSTAGS_OPTS=-fglasgow-exts
 *								*
 ****************************************************************/
 
-/* the actual source bits */
-BASIC_LHS = \
+BASIC_HS =			\
+prelude/Prelude.hs		\
+prelude/GHCbase.hs		\
+prelude/GHCps.hs		\
+prelude/GHCio.hs		\
+prelude/GHCmain.hs		\
+prelude/PreludeGlaST.hs		\
+				\
+required/Array.hs		\
+required/Char.hs		\
+required/Complex.hs		\
+required/Directory.hs		\
+required/IO.hs			\
+required/Ix.hs			\
+required/List.hs		\
+required/Maybe.hs		\
+required/Monad.hs		\
+required/Ratio.hs		\
+required/System.hs		\
 \
-glaExts/PreludeErrIO.lhs	\
-glaExts/PreludePrimIO.lhs	\
-glaExts/PreludeGlaST.lhs	\
-glaExts/PreludeDialogueIO.lhs	\
-glaExts/MainIO.lhs   		\
-glaExts/MainIO13.lhs		\
-glaExts/Stdio.lhs		\
-glaExts/ByteOps.lhs		\
-\
-prelude/PreludeIO.lhs		\
-prelude/PreludeIOError.lhs	\
-prelude/PreludeMonadicIO.lhs	\
-prelude/PreludeReadTextIO.lhs	\
-prelude/PreludeStdIO.lhs	\
-prelude/PreludeWriteTextIO.lhs	\
-\
-prelude/PS.lhs			\
-\
-prelude/Concurrent.lhs		\
-prelude/ChannelVar.lhs		\
-prelude/Channel.lhs		\
-prelude/Semaphore.lhs		\
-prelude/Merge.lhs		\
-prelude/SampleVar.lhs		\
-\
-prelude/Parallel.lhs		\
-\
-glaExts/PreludeGlaMisc.lhs	/* interface */
-
-BASIC_HS_PREL =			\
-prelude/TysBasic.hs		\
-prelude/TyArray.hs		\
-prelude/TyBool.hs		\
-prelude/TyComplex.hs		\
-prelude/TyIO.hs			\
-prelude/TyRatio.hs		\
-\
-prelude/IArray.hs		\
-prelude/IBool.hs		\
-prelude/IChar.hs		\
-prelude/IComplex.hs		\
-prelude/IDouble.hs		\
-prelude/IFloat.hs		\
-prelude/IInt.hs			\
-prelude/IInteger.hs		\
-prelude/IList.hs		\
-prelude/IRatio.hs		\
-prelude/ITup0.hs		\
-prelude/ITup2.hs		\
-prelude/ITup3.hs		\
-prelude/ITup4.hs		\
-prelude/ITup5.hs		\
-\
-prelude/Cls.hs			\
-\
-prelude/Builtin.hs		\
-prelude/Core.hs			\
-prelude/IO.hs			\
-prelude/List.hs			\
-prelude/Prel.hs			\
-prelude/Text.hs 		\
-prelude/FoldrBuild.hs		\
-\
-prelude/PrelCoreHi.hs /* interface */ \
-prelude/PreludeHi.hs  /* interface */ \
-\
-prelude/PrelCore13.hs /* interface */ \
-prelude/Prel13.hs     /* interface */
-
-#if MakeDoesNestedMacros != YES
-
-/* make is brain-dead: use the file created below (w/ a good make) */
-#include "Jmake.inc1"
-
-#else /* good make */
-
-print_file_lists : print_file_list1 print_file_list2 print_file_list3 print_file_list4 print_file_list5
-
-#define SrcThingVars(blob)			@@\
-CAT2(blob,_HC_norm) = $(CAT2(blob,_HS):.hs=.hc)	@@\
-CAT2(blob,_HC_p)    = $(CAT2(blob,_HS):.hs=_p.hc)	@@\
-CAT2(blob,_HC_t)    = $(CAT2(blob,_HS):.hs=_t.hc)	@@\
-CAT2(blob,_HC_u)    = $(CAT2(blob,_HS):.hs=_u.hc)	@@\
-CAT2(blob,_HC_mc)   = $(CAT2(blob,_HS):.hs=_mc.hc)	@@\
-CAT2(blob,_HC_mr)   = $(CAT2(blob,_HS):.hs=_mr.hc)	@@\
-CAT2(blob,_HC_mt)   = $(CAT2(blob,_HS):.hs=_mt.hc)	@@\
-CAT2(blob,_HC_mp)   = $(CAT2(blob,_HS):.hs=_mp.hc)	@@\
-CAT2(blob,_HC_mg)   = $(CAT2(blob,_HS):.hs=_mg.hc)	@@\
-CAT2(blob,_HC_2s)   = $(CAT2(blob,_HS):.hs=_2s.hc)	@@\
-CAT2(blob,_HC_1s)   = $(CAT2(blob,_HS):.hs=_1s.hc)	@@\
-CAT2(blob,_HC_du)   = $(CAT2(blob,_HS):.hs=_du.hc)	@@\
-CAT2(blob,_HC_a)    = $(CAT2(blob,_HS):.hs=_a.hc)	@@\
-CAT2(blob,_HC_b)    = $(CAT2(blob,_HS):.hs=_b.hc)	@@\
-CAT2(blob,_HC_c)    = $(CAT2(blob,_HS):.hs=_c.hc)	@@\
-CAT2(blob,_HC_d)    = $(CAT2(blob,_HS):.hs=_d.hc)	@@\
-CAT2(blob,_HC_e)    = $(CAT2(blob,_HS):.hs=_e.hc)	@@\
-CAT2(blob,_HC_f)    = $(CAT2(blob,_HS):.hs=_f.hc)	@@\
-CAT2(blob,_HC_g)    = $(CAT2(blob,_HS):.hs=_g.hc)	@@\
-CAT2(blob,_HC_h)    = $(CAT2(blob,_HS):.hs=_h.hc)	@@\
-CAT2(blob,_HC_i)    = $(CAT2(blob,_HS):.hs=_i.hc)	@@\
-CAT2(blob,_HC_j)    = $(CAT2(blob,_HS):.hs=_j.hc)	@@\
-CAT2(blob,_HC_k)    = $(CAT2(blob,_HS):.hs=_k.hc)	@@\
-CAT2(blob,_HC_l)    = $(CAT2(blob,_HS):.hs=_l.hc)	@@\
-CAT2(blob,_HC_m)    = $(CAT2(blob,_HS):.hs=_m.hc)	@@\
-CAT2(blob,_HC_n)    = $(CAT2(blob,_HS):.hs=_n.hc)	@@\
-CAT2(blob,_HC_o)    = $(CAT2(blob,_HS):.hs=_o.hc)	@@\
-CAT2(blob,_HC_A)    = $(CAT2(blob,_HS):.hs=_A.hc)	@@\
-CAT2(blob,_HC_B)    = $(CAT2(blob,_HS):.hs=_B.hc)	@@\
-							@@\
-CAT2(blob,_DEP_norm) = $(CAT2(blob,_HC_norm):.hc=.o)	@@\
-CAT2(blob,_DEP_p)   = $(CAT2(blob,_HC_p):.hc=.o)	@@\
-CAT2(blob,_DEP_t)   = $(CAT2(blob,_HC_t):.hc=.o)	@@\
-CAT2(blob,_DEP_u)   = $(CAT2(blob,_HC_u):.hc=.o)	@@\
-CAT2(blob,_DEP_mc)  = $(CAT2(blob,_HC_mc):.hc=.o)	@@\
-CAT2(blob,_DEP_mr)  = $(CAT2(blob,_HC_mr):.hc=.o)	@@\
-CAT2(blob,_DEP_mt)  = $(CAT2(blob,_HC_mt):.hc=.o)	@@\
-CAT2(blob,_DEP_mp)  = $(CAT2(blob,_HC_mp):.hc=.o)	@@\
-CAT2(blob,_DEP_mg)  = $(CAT2(blob,_HC_mg):.hc=.o)	@@\
-CAT2(blob,_DEP_2s)  = $(CAT2(blob,_HC_2s):.hc=.o)	@@\
-CAT2(blob,_DEP_1s)  = $(CAT2(blob,_HC_1s):.hc=.o)	@@\
-CAT2(blob,_DEP_du)  = $(CAT2(blob,_HC_du):.hc=.o)	@@\
-CAT2(blob,_DEP_a)   = $(CAT2(blob,_HC_a):.hc=.o)	@@\
-CAT2(blob,_DEP_b)   = $(CAT2(blob,_HC_b):.hc=.o)	@@\
-CAT2(blob,_DEP_c)   = $(CAT2(blob,_HC_c):.hc=.o)	@@\
-CAT2(blob,_DEP_d)   = $(CAT2(blob,_HC_d):.hc=.o)	@@\
-CAT2(blob,_DEP_e)   = $(CAT2(blob,_HC_e):.hc=.o)	@@\
-CAT2(blob,_DEP_f)   = $(CAT2(blob,_HC_f):.hc=.o)	@@\
-CAT2(blob,_DEP_g)   = $(CAT2(blob,_HC_g):.hc=.o)	@@\
-CAT2(blob,_DEP_h)   = $(CAT2(blob,_HC_h):.hc=.o)	@@\
-CAT2(blob,_DEP_i)   = $(CAT2(blob,_HC_i):.hc=.o)	@@\
-CAT2(blob,_DEP_j)   = $(CAT2(blob,_HC_j):.hc=.o)	@@\
-CAT2(blob,_DEP_k)   = $(CAT2(blob,_HC_k):.hc=.o)	@@\
-CAT2(blob,_DEP_l)   = $(CAT2(blob,_HC_l):.hc=.o)	@@\
-CAT2(blob,_DEP_m)   = $(CAT2(blob,_HC_m):.hc=.o)	@@\
-CAT2(blob,_DEP_n)   = $(CAT2(blob,_HC_n):.hc=.o)	@@\
-CAT2(blob,_DEP_o)   = $(CAT2(blob,_HC_o):.hc=.o)	@@\
-CAT2(blob,_DEP_A)   = $(CAT2(blob,_HC_A):.hc=.o)	@@\
-CAT2(blob,_DEP_B)   = $(CAT2(blob,_HC_B):.hc=.o)	@@\
-							@@\
-CAT2(blob,_HIs_p)   = $(CAT2(blob,_HIs):.hi=_p.hi)	@@\
-CAT2(blob,_HIs_t)   = $(CAT2(blob,_HIs):.hi=_t.hi)	@@\
-CAT2(blob,_HIs_u)   = $(CAT2(blob,_HIs):.hi=_u.hi)	@@\
-CAT2(blob,_HIs_mc)  = $(CAT2(blob,_HIs):.hi=_mc.hi)	@@\
-CAT2(blob,_HIs_mr)  = $(CAT2(blob,_HIs):.hi=_mr.hi)	@@\
-CAT2(blob,_HIs_mt)  = $(CAT2(blob,_HIs):.hi=_mt.hi)	@@\
-CAT2(blob,_HIs_mp)  = $(CAT2(blob,_HIs):.hi=_mp.hi)	@@\
-CAT2(blob,_HIs_mg)  = $(CAT2(blob,_HIs):.hi=_mg.hi)	@@\
-CAT2(blob,_HIs_2s)  = $(CAT2(blob,_HIs):.hi=_2s.hi)	@@\
-CAT2(blob,_HIs_1s)  = $(CAT2(blob,_HIs):.hi=_1s.hi)	@@\
-CAT2(blob,_HIs_du)  = $(CAT2(blob,_HIs):.hi=_du.hi)	@@\
-CAT2(blob,_HIs_a)   = $(CAT2(blob,_HIs):.hi=_a.hi)	@@\
-CAT2(blob,_HIs_b)   = $(CAT2(blob,_HIs):.hi=_b.hi)	@@\
-CAT2(blob,_HIs_c)   = $(CAT2(blob,_HIs):.hi=_c.hi)	@@\
-CAT2(blob,_HIs_d)   = $(CAT2(blob,_HIs):.hi=_d.hi)	@@\
-CAT2(blob,_HIs_e)   = $(CAT2(blob,_HIs):.hi=_e.hi)	@@\
-CAT2(blob,_HIs_f)   = $(CAT2(blob,_HIs):.hi=_f.hi)	@@\
-CAT2(blob,_HIs_g)   = $(CAT2(blob,_HIs):.hi=_g.hi)	@@\
-CAT2(blob,_HIs_h)   = $(CAT2(blob,_HIs):.hi=_h.hi)	@@\
-CAT2(blob,_HIs_i)   = $(CAT2(blob,_HIs):.hi=_i.hi)	@@\
-CAT2(blob,_HIs_j)   = $(CAT2(blob,_HIs):.hi=_j.hi)	@@\
-CAT2(blob,_HIs_k)   = $(CAT2(blob,_HIs):.hi=_k.hi)	@@\
-CAT2(blob,_HIs_l)   = $(CAT2(blob,_HIs):.hi=_l.hi)	@@\
-CAT2(blob,_HIs_m)   = $(CAT2(blob,_HIs):.hi=_m.hi)	@@\
-CAT2(blob,_HIs_n)   = $(CAT2(blob,_HIs):.hi=_n.hi)	@@\
-CAT2(blob,_HIs_o)   = $(CAT2(blob,_HIs):.hi=_o.hi)	@@\
-CAT2(blob,_HIs_A)   = $(CAT2(blob,_HIs):.hi=_A.hi)	@@\
-CAT2(blob,_HIs_B)   = $(CAT2(blob,_HIs):.hi=_B.hi)
+concurrent/Channel.hs		\
+concurrent/ChannelVar.hs	\
+concurrent/Merge.hs		\
+concurrent/Parallel.hs		\
+concurrent/SampleVar.hs		\
+concurrent/Semaphore.hs		\
+concurrent/Concurrent.hs
 
 
-#define PrintFileStuff(blob,outf) \
-	@echo 'IfGhcBuild_normal(' CAT2(blob,_HC_norm)  = $(CAT2(blob,_HC_norm))  ')' >> outf @@\
-	@echo 'IfGhcBuild_normal(' CAT2(blob,_DEP_norm) = $(CAT2(blob,_DEP_norm)) ')' >> outf @@\
-	@echo 'IfGhcBuild_p('  CAT2(blob,_HC_p)  = $(CAT2(blob,_HC_p))  ')' >> outf @@\
-	@echo 'IfGhcBuild_t('  CAT2(blob,_HC_t)  = $(CAT2(blob,_HC_t))  ')' >> outf @@\
-	@echo 'IfGhcBuild_u('  CAT2(blob,_HC_u)  = $(CAT2(blob,_HC_u))  ')' >> outf @@\
-	@echo 'IfGhcBuild_mc(' CAT2(blob,_HC_mc) = $(CAT2(blob,_HC_mc)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mr(' CAT2(blob,_HC_mr) = $(CAT2(blob,_HC_mr)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mt(' CAT2(blob,_HC_mt) = $(CAT2(blob,_HC_mt)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mp(' CAT2(blob,_HC_mp) = $(CAT2(blob,_HC_mp)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mg(' CAT2(blob,_HC_mg) = $(CAT2(blob,_HC_mg)) ')' >> outf @@\
-	@echo 'IfGhcBuild_2s(' CAT2(blob,_HC_2s) = $(CAT2(blob,_HC_2s)) ')' >> outf @@\
-	@echo 'IfGhcBuild_1s(' CAT2(blob,_HC_1s) = $(CAT2(blob,_HC_1s)) ')' >> outf @@\
-	@echo 'IfGhcBuild_du(' CAT2(blob,_HC_du) = $(CAT2(blob,_HC_du)) ')' >> outf @@\
-	@echo 'IfGhcBuild_a('  CAT2(blob,_HC_a)  = $(CAT2(blob,_HC_a))  ')' >> outf @@\
-	@echo 'IfGhcBuild_b('  CAT2(blob,_HC_b)  = $(CAT2(blob,_HC_b))  ')' >> outf @@\
-	@echo 'IfGhcBuild_c('  CAT2(blob,_HC_c)  = $(CAT2(blob,_HC_c))  ')' >> outf @@\
-	@echo 'IfGhcBuild_d('  CAT2(blob,_HC_d)  = $(CAT2(blob,_HC_d))  ')' >> outf @@\
-	@echo 'IfGhcBuild_e('  CAT2(blob,_HC_e)  = $(CAT2(blob,_HC_e))  ')' >> outf @@\
-	@echo 'IfGhcBuild_f('  CAT2(blob,_HC_f)  = $(CAT2(blob,_HC_f))  ')' >> outf @@\
-	@echo 'IfGhcBuild_g('  CAT2(blob,_HC_g)  = $(CAT2(blob,_HC_g))  ')' >> outf @@\
-	@echo 'IfGhcBuild_h('  CAT2(blob,_HC_h)  = $(CAT2(blob,_HC_h))  ')' >> outf @@\
-	@echo 'IfGhcBuild_i('  CAT2(blob,_HC_i)  = $(CAT2(blob,_HC_i))  ')' >> outf @@\
-	@echo 'IfGhcBuild_j('  CAT2(blob,_HC_j)  = $(CAT2(blob,_HC_j))  ')' >> outf @@\
-	@echo 'IfGhcBuild_k('  CAT2(blob,_HC_k)  = $(CAT2(blob,_HC_k))  ')' >> outf @@\
-	@echo 'IfGhcBuild_l('  CAT2(blob,_HC_l)  = $(CAT2(blob,_HC_l))  ')' >> outf @@\
-	@echo 'IfGhcBuild_m('  CAT2(blob,_HC_m)  = $(CAT2(blob,_HC_m))  ')' >> outf @@\
-	@echo 'IfGhcBuild_n('  CAT2(blob,_HC_n)  = $(CAT2(blob,_HC_n))  ')' >> outf @@\
-	@echo 'IfGhcBuild_o('  CAT2(blob,_HC_o)  = $(CAT2(blob,_HC_o))  ')' >> outf @@\
-	@echo 'IfGhcBuild_A('  CAT2(blob,_HC_A)  = $(CAT2(blob,_HC_A))  ')' >> outf @@\
-	@echo 'IfGhcBuild_B('  CAT2(blob,_HC_B)  = $(CAT2(blob,_HC_B))  ')' >> outf @@\
-	@echo 'IfGhcBuild_p('  CAT2(blob,_DEP_p)  = $(CAT2(blob,_DEP_p))  ')' >> outf @@\
-	@echo 'IfGhcBuild_t('  CAT2(blob,_DEP_t)  = $(CAT2(blob,_DEP_t))  ')' >> outf @@\
-	@echo 'IfGhcBuild_u('  CAT2(blob,_DEP_u)  = $(CAT2(blob,_DEP_u))  ')' >> outf @@\
-	@echo 'IfGhcBuild_mc(' CAT2(blob,_DEP_mc) = $(CAT2(blob,_DEP_mc)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mr(' CAT2(blob,_DEP_mr) = $(CAT2(blob,_DEP_mr)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mt(' CAT2(blob,_DEP_mt) = $(CAT2(blob,_DEP_mt)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mp(' CAT2(blob,_DEP_mp) = $(CAT2(blob,_DEP_mp)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mg(' CAT2(blob,_DEP_mg) = $(CAT2(blob,_DEP_mg)) ')' >> outf @@\
-	@echo 'IfGhcBuild_2s(' CAT2(blob,_DEP_2s) = $(CAT2(blob,_DEP_2s)) ')' >> outf @@\
-	@echo 'IfGhcBuild_1s(' CAT2(blob,_DEP_1s) = $(CAT2(blob,_DEP_1s)) ')' >> outf @@\
-	@echo 'IfGhcBuild_du(' CAT2(blob,_DEP_du) = $(CAT2(blob,_DEP_du)) ')' >> outf @@\
-	@echo 'IfGhcBuild_a('  CAT2(blob,_DEP_a)  = $(CAT2(blob,_DEP_a))  ')' >> outf @@\
-	@echo 'IfGhcBuild_b('  CAT2(blob,_DEP_b)  = $(CAT2(blob,_DEP_b))  ')' >> outf @@\
-	@echo 'IfGhcBuild_c('  CAT2(blob,_DEP_c)  = $(CAT2(blob,_DEP_c))  ')' >> outf @@\
-	@echo 'IfGhcBuild_d('  CAT2(blob,_DEP_d)  = $(CAT2(blob,_DEP_d))  ')' >> outf @@\
-	@echo 'IfGhcBuild_e('  CAT2(blob,_DEP_e)  = $(CAT2(blob,_DEP_e))  ')' >> outf @@\
-	@echo 'IfGhcBuild_f('  CAT2(blob,_DEP_f)  = $(CAT2(blob,_DEP_f))  ')' >> outf @@\
-	@echo 'IfGhcBuild_g('  CAT2(blob,_DEP_g)  = $(CAT2(blob,_DEP_g))  ')' >> outf @@\
-	@echo 'IfGhcBuild_h('  CAT2(blob,_DEP_h)  = $(CAT2(blob,_DEP_h))  ')' >> outf @@\
-	@echo 'IfGhcBuild_i('  CAT2(blob,_DEP_i)  = $(CAT2(blob,_DEP_i))  ')' >> outf @@\
-	@echo 'IfGhcBuild_j('  CAT2(blob,_DEP_j)  = $(CAT2(blob,_DEP_j))  ')' >> outf @@\
-	@echo 'IfGhcBuild_k('  CAT2(blob,_DEP_k)  = $(CAT2(blob,_DEP_k))  ')' >> outf @@\
-	@echo 'IfGhcBuild_l('  CAT2(blob,_DEP_l)  = $(CAT2(blob,_DEP_l))  ')' >> outf @@\
-	@echo 'IfGhcBuild_m('  CAT2(blob,_DEP_m)  = $(CAT2(blob,_DEP_m))  ')' >> outf @@\
-	@echo 'IfGhcBuild_n('  CAT2(blob,_DEP_n)  = $(CAT2(blob,_DEP_n))  ')' >> outf @@\
-	@echo 'IfGhcBuild_o('  CAT2(blob,_DEP_o)  = $(CAT2(blob,_DEP_o))  ')' >> outf @@\
-	@echo 'IfGhcBuild_A('  CAT2(blob,_DEP_A)  = $(CAT2(blob,_DEP_A))  ')' >> outf @@\
-	@echo 'IfGhcBuild_B('  CAT2(blob,_DEP_B)  = $(CAT2(blob,_DEP_B))  ')' >> outf @@\
-	@echo 'IfGhcBuild_p('  CAT2(blob,_HIs_p)  = $(CAT2(blob,_HIs_p))  ')' >> outf @@\
-	@echo 'IfGhcBuild_t('  CAT2(blob,_HIs_t)  = $(CAT2(blob,_HIs_t))  ')' >> outf @@\
-	@echo 'IfGhcBuild_u('  CAT2(blob,_HIs_u)  = $(CAT2(blob,_HIs_u))  ')' >> outf @@\
-	@echo 'IfGhcBuild_mc(' CAT2(blob,_HIs_mc) = $(CAT2(blob,_HIs_mc)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mr(' CAT2(blob,_HIs_mr) = $(CAT2(blob,_HIs_mr)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mt(' CAT2(blob,_HIs_mt) = $(CAT2(blob,_HIs_mt)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mp(' CAT2(blob,_HIs_mp) = $(CAT2(blob,_HIs_mp)) ')' >> outf @@\
-	@echo 'IfGhcBuild_mg(' CAT2(blob,_HIs_mg) = $(CAT2(blob,_HIs_mg)) ')' >> outf @@\
-	@echo 'IfGhcBuild_2s(' CAT2(blob,_HIs_2s) = $(CAT2(blob,_HIs_2s)) ')' >> outf @@\
-	@echo 'IfGhcBuild_1s(' CAT2(blob,_HIs_1s) = $(CAT2(blob,_HIs_1s)) ')' >> outf @@\
-	@echo 'IfGhcBuild_du(' CAT2(blob,_HIs_du) = $(CAT2(blob,_HIs_du)) ')' >> outf @@\
-	@echo 'IfGhcBuild_a('  CAT2(blob,_HIs_a)  = $(CAT2(blob,_HIs_a))  ')' >> outf @@\
-	@echo 'IfGhcBuild_b('  CAT2(blob,_HIs_b)  = $(CAT2(blob,_HIs_b))  ')' >> outf @@\
-	@echo 'IfGhcBuild_c('  CAT2(blob,_HIs_c)  = $(CAT2(blob,_HIs_c))  ')' >> outf @@\
-	@echo 'IfGhcBuild_d('  CAT2(blob,_HIs_d)  = $(CAT2(blob,_HIs_d))  ')' >> outf @@\
-	@echo 'IfGhcBuild_e('  CAT2(blob,_HIs_e)  = $(CAT2(blob,_HIs_e))  ')' >> outf @@\
-	@echo 'IfGhcBuild_f('  CAT2(blob,_HIs_f)  = $(CAT2(blob,_HIs_f))  ')' >> outf @@\
-	@echo 'IfGhcBuild_g('  CAT2(blob,_HIs_g)  = $(CAT2(blob,_HIs_g))  ')' >> outf @@\
-	@echo 'IfGhcBuild_h('  CAT2(blob,_HIs_h)  = $(CAT2(blob,_HIs_h))  ')' >> outf @@\
-	@echo 'IfGhcBuild_i('  CAT2(blob,_HIs_i)  = $(CAT2(blob,_HIs_i))  ')' >> outf @@\
-	@echo 'IfGhcBuild_j('  CAT2(blob,_HIs_j)  = $(CAT2(blob,_HIs_j))  ')' >> outf @@\
-	@echo 'IfGhcBuild_k('  CAT2(blob,_HIs_k)  = $(CAT2(blob,_HIs_k))  ')' >> outf @@\
-	@echo 'IfGhcBuild_l('  CAT2(blob,_HIs_l)  = $(CAT2(blob,_HIs_l))  ')' >> outf @@\
-	@echo 'IfGhcBuild_m('  CAT2(blob,_HIs_m)  = $(CAT2(blob,_HIs_m))  ')' >> outf @@\
-	@echo 'IfGhcBuild_n('  CAT2(blob,_HIs_n)  = $(CAT2(blob,_HIs_n))  ')' >> outf @@\
-	@echo 'IfGhcBuild_o('  CAT2(blob,_HIs_o)  = $(CAT2(blob,_HIs_o))  ')' >> outf @@\
-	@echo 'IfGhcBuild_A('  CAT2(blob,_HIs_A)  = $(CAT2(blob,_HIs_A))  ')' >> outf @@\
-	@echo 'IfGhcBuild_B('  CAT2(blob,_HIs_B)  = $(CAT2(blob,_HIs_B))  ')' >> outf
-
-BASIC_HS	= $(BASIC_LHS:.lhs=.hs) $(BASIC_HS_PREL)
 BASIC_OBJS_DIRS	= $(BASIC_HS:.hs=)
 
 SrcThingVars(BASIC)
-
-print_file_list1 :
-	$(RM) Jmake.inc1
-	@echo making Jmake.inc1 ...
-	@echo '/* Machine-generated file: do not edit! */' > Jmake.inc1
-	@echo BASIC_HS = $(BASIC_HS) >> Jmake.inc1
-	@echo BASIC_OBJS_DIRS = $(BASIC_OBJS_DIRS) >> Jmake.inc1
-	PrintFileStuff(BASIC,Jmake.inc1)
-
-#endif /* good make */
-
-/* ------------------------------------------*/
-/* same stuff, for Haskell 1.3 library */
-ONE3_LHS = 		\
-	haskell-1.3/LibSystem.lhs   \
-	haskell-1.3/LibCPUTime.lhs  \
-	haskell-1.3/LibDirectory.lhs \
-	haskell-1.3/LibTime.lhs	\
-	haskell-1.3/LibPosix.lhs \
-	haskell-1.3/LibPosixDB.lhs \
-	haskell-1.3/LibPosixErr.lhs \
-	haskell-1.3/LibPosixFiles.lhs \
-	haskell-1.3/LibPosixIO.lhs \
-	haskell-1.3/LibPosixProcEnv.lhs \
-	haskell-1.3/LibPosixProcPrim.lhs \
-	haskell-1.3/LibPosixTTY.lhs \
-	haskell-1.3/LibPosixUtil.lhs
-
-#if MakeDoesNestedMacros != YES
-/* make is brain-dead: use file produced below (w/ a good make) */
-#include "Jmake.inc2"
-
-#else /* good make */
-
-ONE3_HS	= $(ONE3_LHS:.lhs=.hs)
-ONE3_OBJS_DIRS	= $(ONE3_HS:.hs=)
-
-SrcThingVars(ONE3)
-
-print_file_list2 :
-	$(RM) Jmake.inc2
-	@echo making Jmake.inc2 ...
-	@echo '/* Machine-generated file: do not edit! */' > Jmake.inc2
-	@echo ONE3_HS = $(ONE3_HS) >> Jmake.inc2
-	@echo ONE3_OBJS_DIRS = $(ONE3_OBJS_DIRS) >> Jmake.inc2
-	PrintFileStuff(ONE3,Jmake.inc2)
-
-#endif /* good make */
-
-/* ------------------------------------------*/
-/* same stuff, for GHC utilities library */
-
-#if GhcWithReadline != YES
-# define __readline_lhs /*none*/
-# define __readline_hi  /*none*/
-#else
-# define __readline_lhs		\
-	ghc/Readline.lhs
-# define __readline_hi		\
-	ghc/Readline.hi
-#endif
-
-#if GhcWithSockets != YES
-# define __sockets_lhs /*none*/
-# define __sockets_hi  /*none*/
-#else
-# define __sockets_lhs		\
-	ghc/Socket.lhs		\
-	ghc/SocketPrim.lhs	\
-	ghc/BSD.lhs		\
-	ghc/CError.lhs
-# define __sockets_hi		\
-	ghc/Socket.hi		\
-	ghc/SocketPrim.hi	\
-	ghc/BSD.hi
-#endif
-
-GHCLIB_LHS =			\
-	ghc/Bag.lhs		\
-	ghc/BitSet.lhs		\
-	ghc/CharSeq.lhs		\
-	ghc/FiniteMap.lhs	\
-	ghc/ListSetOps.lhs	\
-	ghc/Maybes.lhs		\
-	ghc/PackedString.lhs	\
-	ghc/Regex.lhs		\
-	ghc/MatchPS.lhs		\
-	ghc/Pretty.lhs		\
-	ghc/Set.lhs		\
-	ghc/Util.lhs __readline_lhs __sockets_lhs
-
-#if MakeDoesNestedMacros != YES
-/* make is brain-dead: use the file produced below */
-#include "Jmake.inc3"
-
-#else /* good make */
-
-GHCLIB_HS	 = $(GHCLIB_LHS:.lhs=.hs)
-GHCLIB_OBJS_DIRS = $(GHCLIB_HS:.hs=)
-
-SrcThingVars(GHCLIB)
-
-print_file_list3 :
-	$(RM) Jmake.inc3
-	@echo making Jmake.inc3 ...
-	@echo '/* Machine-generated file: do not edit! */' > Jmake.inc3
-	@echo GHCLIB_HS = $(GHCLIB_HS) >> Jmake.inc3
-	@echo GHCLIB_OBJS_DIRS = $(GHCLIB_OBJS_DIRS) >> Jmake.inc3
-	PrintFileStuff(GHCLIB,Jmake.inc3)
-
-#endif /* good make */
-
-/* ------------------------------------------*/
-/* same stuff, for HBC-compatibility library */
-HBCLIB_HS = 		\
-	hbc/Algebra.hs	\
-	hbc/Hash.hs	\
-	hbc/ListUtil.hs	\
-	hbc/Miranda.hs	\
-	hbc/NameSupply.hs \
-	hbc/Number.hs	\
-	hbc/Parse.hs	\
-	hbc/Pretty.hs	\
-	hbc/Printf.hs	\
-	hbc/QSort.hs	\
-	hbc/Random.hs	\
-	hbc/SimpleLex.hs \
-	hbc/Time.hs	\
-	hbc/Trace.hs	\
-	hbc/Native.hs	\
-	hbc/Word.hs
-
-#if MakeDoesNestedMacros != YES
-/* make is brain-dead: use file produced below (w/ a good make) */
-#include "Jmake.inc4"
-
-#else /* good make */
-
-HBCLIB_OBJS_DIRS = $(HBCLIB_HS:.hs=)
-
-SrcThingVars(HBCLIB)
-
-print_file_list4 :
-	$(RM) Jmake.inc4
-	@echo making Jmake.inc4 ...
-	@echo '/* Machine-generated file: do not edit! */' > Jmake.inc4
-	@echo HBCLIB_HS = $(HBCLIB_HS) >> Jmake.inc4
-	@echo HBCLIB_OBJS_DIRS = $(HBCLIB_OBJS_DIRS) >> Jmake.inc4
-	PrintFileStuff(HBCLIB,Jmake.inc4)
-
-#endif /* good make */
-
-#if MakeDoesNestedMacros == YES
-
-/* ---- occasionally convenient make targets ---- */
-IfGhcBuild_normal(hcs :: $(BASIC_HC_norm) $(ONE3_HC_norm) $(GHCLIB_HC_norm) $(HBCLIB_HC_norm))
-IfGhcBuild_p(hcs_p   :: $(BASIC_HC_p)  $(ONE3_HC_p)  $(GHCLIB_HC_p)  $(HBCLIB_HC_p))
-IfGhcBuild_t(hcs_t   :: $(BASIC_HC_t)  $(ONE3_HC_t)  $(GHCLIB_HC_t)  $(HBCLIB_HC_t))
-IfGhcBuild_u(hcs_u   :: $(BASIC_HC_u)  $(ONE3_HC_u)  $(GHCLIB_HC_u)  $(HBCLIB_HC_u))
-IfGhcBuild_mc(hcs_mc :: $(BASIC_HC_mc) $(ONE3_HC_mc) $(GHCLIB_HC_mc) $(HBCLIB_HC_mc))
-IfGhcBuild_mr(hcs_mr :: $(BASIC_HC_mr) $(ONE3_HC_mr) $(GHCLIB_HC_mr) $(HBCLIB_HC_mr))
-IfGhcBuild_mt(hcs_mt :: $(BASIC_HC_mt) $(ONE3_HC_mt) $(GHCLIB_HC_mt) $(HBCLIB_HC_mt))
-IfGhcBuild_mp(hcs_mp :: $(BASIC_HC_mp) $(ONE3_HC_mp) $(GHCLIB_HC_mp) $(HBCLIB_HC_mp))
-IfGhcBuild_mg(hcs_mg :: $(BASIC_HC_mg) $(ONE3_HC_mg) $(GHCLIB_HC_mg) $(HBCLIB_HC_mg))
-IfGhcBuild_2s(hcs_2s :: $(BASIC_HC_2s) $(ONE3_HC_2s) $(GHCLIB_HC_2s) $(HBCLIB_HC_2s))
-IfGhcBuild_1s(hcs_1s :: $(BASIC_HC_1s) $(ONE3_HC_1s) $(GHCLIB_HC_1s) $(HBCLIB_HC_1s))
-IfGhcBuild_du(hcs_du :: $(BASIC_HC_du) $(ONE3_HC_du) $(GHCLIB_HC_du) $(HBCLIB_HC_du))
-IfGhcBuild_a(hcs_a   :: $(BASIC_HC_a)  $(ONE3_HC_a)  $(GHCLIB_HC_a)  $(HBCLIB_HC_a))
-IfGhcBuild_b(hcs_b   :: $(BASIC_HC_b)  $(ONE3_HC_b)  $(GHCLIB_HC_b)  $(HBCLIB_HC_b))
-IfGhcBuild_c(hcs_c   :: $(BASIC_HC_c)  $(ONE3_HC_c)  $(GHCLIB_HC_c)  $(HBCLIB_HC_c))
-IfGhcBuild_d(hcs_d   :: $(BASIC_HC_d)  $(ONE3_HC_d)  $(GHCLIB_HC_d)  $(HBCLIB_HC_d))
-IfGhcBuild_e(hcs_e   :: $(BASIC_HC_e)  $(ONE3_HC_e)  $(GHCLIB_HC_e)  $(HBCLIB_HC_e))
-IfGhcBuild_f(hcs_f   :: $(BASIC_HC_f)  $(ONE3_HC_f)  $(GHCLIB_HC_f)  $(HBCLIB_HC_f))
-IfGhcBuild_g(hcs_g   :: $(BASIC_HC_g)  $(ONE3_HC_g)  $(GHCLIB_HC_g)  $(HBCLIB_HC_g))
-IfGhcBuild_h(hcs_h   :: $(BASIC_HC_h)  $(ONE3_HC_h)  $(GHCLIB_HC_h)  $(HBCLIB_HC_h))
-IfGhcBuild_i(hcs_i   :: $(BASIC_HC_i)  $(ONE3_HC_i)  $(GHCLIB_HC_i)  $(HBCLIB_HC_i))
-IfGhcBuild_j(hcs_j   :: $(BASIC_HC_j)  $(ONE3_HC_j)  $(GHCLIB_HC_j)  $(HBCLIB_HC_j))
-IfGhcBuild_k(hcs_k   :: $(BASIC_HC_k)  $(ONE3_HC_k)  $(GHCLIB_HC_k)  $(HBCLIB_HC_k))
-IfGhcBuild_l(hcs_l   :: $(BASIC_HC_l)  $(ONE3_HC_l)  $(GHCLIB_HC_l)  $(HBCLIB_HC_l))
-IfGhcBuild_m(hcs_m   :: $(BASIC_HC_m)  $(ONE3_HC_m)  $(GHCLIB_HC_m)  $(HBCLIB_HC_m))
-IfGhcBuild_n(hcs_n   :: $(BASIC_HC_n)  $(ONE3_HC_n)  $(GHCLIB_HC_n)  $(HBCLIB_HC_n))
-IfGhcBuild_o(hcs_o   :: $(BASIC_HC_o)  $(ONE3_HC_o)  $(GHCLIB_HC_o)  $(HBCLIB_HC_o))
-IfGhcBuild_A(hcs_A   :: $(BASIC_HC_A)  $(ONE3_HC_A)  $(GHCLIB_HC_A)  $(HBCLIB_HC_A))
-IfGhcBuild_B(hcs_B   :: $(BASIC_HC_B)  $(ONE3_HC_B)  $(GHCLIB_HC_B)  $(HBCLIB_HC_B))
-
-IfGhcBuild_normal(libs:: libHS.a    libHS13.a    libHSghc.a    libHShbc.a)
-IfGhcBuild_p(libs_p   :: libHS_p.a  libHS13_p.a  libHSghc_p.a  libHShbc_p.a)
-IfGhcBuild_t(libs_t   :: libHS_t.a  libHS13_t.a  libHSghc_t.a  libHShbc_t.a)
-IfGhcBuild_t(libs_u   :: libHS_u.a  libHS13_u.a  libHSghc_u.a  libHShbc_u.a)
-IfGhcBuild_mc(libs_mc :: libHS_mc.a libHS13_mc.a libHSghc_mc.a libHShbc_mc.a)
-IfGhcBuild_mr(libs_mr :: libHS_mr.a libHS13_mr.a libHSghc_mr.a libHShbc_mr.a)
-IfGhcBuild_mt(libs_mt :: libHS_mt.a libHS13_mt.a libHSghc_mt.a libHShbc_mt.a)
-IfGhcBuild_mp(libs_mp :: libHS_mp.a libHS13_mp.a libHSghc_mp.a libHShbc_mp.a)
-IfGhcBuild_mg(libs_mg :: libHS_mg.a libHS13_mg.a libHSghc_mg.a libHShbc_mg.a)
-IfGhcBuild_2s(libs_2s :: libHS_2s.a libHS13_2s.a libHSghc_2s.a libHShbc_2s.a)
-IfGhcBuild_1s(libs_1s :: libHS_1s.a libHS13_1s.a libHSghc_1s.a libHShbc_1s.a)
-IfGhcBuild_du(libs_du :: libHS_du.a libHS13_du.a libHSghc_du.a libHShbc_du.a)
-IfGhcBuild_a(libs_a   :: libHS_a.a  libHS13_a.a  libHSghc_a.a  libHShbc_a.a)
-IfGhcBuild_b(libs_b   :: libHS_b.a  libHS13_b.a  libHSghc_b.a  libHShbc_b.a)
-IfGhcBuild_c(libs_c   :: libHS_c.a  libHS13_c.a  libHSghc_c.a  libHShbc_c.a)
-IfGhcBuild_d(libs_d   :: libHS_d.a  libHS13_d.a  libHSghc_d.a  libHShbc_d.a)
-IfGhcBuild_e(libs_e   :: libHS_e.a  libHS13_e.a  libHSghc_e.a  libHShbc_e.a)
-IfGhcBuild_f(libs_f   :: libHS_f.a  libHS13_f.a  libHSghc_f.a  libHShbc_f.a)
-IfGhcBuild_g(libs_g   :: libHS_g.a  libHS13_g.a  libHSghc_g.a  libHShbc_g.a)
-IfGhcBuild_h(libs_h   :: libHS_h.a  libHS13_h.a  libHSghc_h.a  libHShbc_h.a)
-IfGhcBuild_i(libs_i   :: libHS_i.a  libHS13_i.a  libHSghc_i.a  libHShbc_i.a)
-IfGhcBuild_j(libs_j   :: libHS_j.a  libHS13_j.a  libHSghc_j.a  libHShbc_j.a)
-IfGhcBuild_k(libs_k   :: libHS_k.a  libHS13_k.a  libHSghc_k.a  libHShbc_k.a)
-IfGhcBuild_l(libs_l   :: libHS_l.a  libHS13_l.a  libHSghc_l.a  libHShbc_l.a)
-IfGhcBuild_m(libs_m   :: libHS_m.a  libHS13_m.a  libHSghc_m.a  libHShbc_m.a)
-IfGhcBuild_n(libs_n   :: libHS_n.a  libHS13_n.a  libHSghc_n.a  libHShbc_n.a)
-IfGhcBuild_o(libs_o   :: libHS_o.a  libHS13_o.a  libHSghc_o.a  libHShbc_o.a)
-IfGhcBuild_A(libs_A   :: libHS_A.a  libHS13_A.a  libHSghc_A.a  libHShbc_A.a)
-IfGhcBuild_B(libs_B   :: libHS_B.a  libHS13_B.a  libHSghc_B.a  libHShbc_B.a)
-
-/* maybe for GNU make only? */
-.PHONY :: hcs hcs_p hcs_t hcs_mg hcs_mr hcs_mt hcs_mp hcs_mg hcs_a hcs_b hcs_c hcs_d hcs_e hcs_f hcs_g hcs_h hcs_i hcs_j hcs_k hcs_l hcs_m hcs_n hcs_o hcs_A hcs_B
-
-#endif /* reasonable make */
-
-GHCLIB_HIs = you-really-need-to-define-GHCLIB_HIs
-    /* use print_file_lists */
-
-/* lists of *.hi files, for installation; i.e., the user
-   will be able to say (e.g.,) "import PreludePrimIO" and it will work.
-   (but "import ITup5" will not)
-
-   PreludeNull_.hi is tickled by "hstags".
-*/
-BASIC_HIs   = prelude/Prelude.hi 		\
-	      prelude/PreludeCore.hi 		\
-	      prelude/Prel13.hi 		\
-	      prelude/PrelCore13.hi 		\
-	      prelude/PreludeNull_.hi		\
-    	      glaExts/PreludeGlaST.hi		\
-	      glaExts/PreludeGlaMisc.hi		\
-	      prelude/Concurrent.hi		\
-	      prelude/Parallel.hi
-
-GHCLIB_HIs  = ghc/Bag.hi			\
-	      ghc/BitSet.hi			\
-	      ghc/CharSeq.hi			\
-	      ghc/FiniteMap.hi			\
-	      ghc/ListSetOps.hi			\
-	      ghc/Maybes.hi			\
-	      ghc/PackedString.hi		\
-	      ghc/Regex.hi			\
-	      ghc/MatchPS.hi			\
-	      ghc/Pretty.hi			\
-	      ghc/Set.hi			\
-	      ghc/Util.hi
-
-ONE3_HIs    = haskell-1.3/LibSystem.hi		\
-	      haskell-1.3/LibCPUTime.hi		\
-	      haskell-1.3/LibDirectory.hi	\
-	      haskell-1.3/LibTime.hi		\
-	      haskell-1.3/LibPosix.hi
-
-HBCLIB_HIs    = hbc/Algebra.hi			\
-	      hbc/Hash.hi			\
-	      hbc/ListUtil.hi			\
-	      hbc/Miranda.hi			\
-	      hbc/Native.hi			\
-	      hbc/NameSupply.hi			\
-	      hbc/Number.hi			\
-	      hbc/Parse.hi			\
-	      hbc/Pretty.hi			\
-	      hbc/Printf.hi			\
-	      hbc/QSort.hi			\
-	      hbc/Random.hi			\
-	      hbc/SimpleLex.hi			\
-	      hbc/Time.hi			\
-	      hbc/Trace.hi			\
-	      hbc/Word.hi
 
 /************************************************************************
 *									*
@@ -660,7 +202,6 @@ HBCLIB_HIs    = hbc/Algebra.hi			\
 AllTarget(CAT3(lib,tag,.a))					@@\
 CAT3(lib,tag,.a):: objs_DEP					@@\
 	$(RM) $@						@@\
-	$(AR) $@ 						@@\
 	TMPDIR=$(TMPDIR); export TMPDIR;			\
 	find objs_DIR -name find_pat -print | xargs ar q $@	@@\
 	$(RANLIB) CAT3(lib,tag,.a)				@@\
@@ -682,262 +223,156 @@ install :: CAT3(lib,tag,.a)					@@\
 
 /* build/install all the diff libs for a particular build */
 
-#define BigHisTarget(targeti,basei,ghci,hbci,one3i)		@@\
+#define BigHisTarget(targeti,basei)				@@\
 targeti ::							@@\
 InstallTarget(targeti)						@@\
-InstallMultNonExecTargets(targeti,basei,$(INSTDATADIR_GHC)/imports) @@\
-InstallMultNonExecTargets(targeti,ghci, $(INSTDATADIR_GHC)/imports/ghc) @@\
-InstallMultNonExecTargets(targeti,hbci, $(INSTDATADIR_GHC)/imports/hbc) @@\
-InstallMultNonExecTargets(targeti,one3i,$(INSTDATADIR_GHC)/imports/haskell-1.3)
+InstallMultNonExecTargets(targeti,basei,$(INSTDATADIR_GHC)/imports)
 
-#define BigLibsTarget(tag,glob,base,ghc,hbc,one3)			@@\
-SpecialGhcLibraryTarget(libHS,tag,base,$(BASIC_OBJS_DIRS),glob)		@@\
-SpecialGhcLibInstallTarget(libHS,tag)					@@\
-SpecialGhcLibraryTarget(libHSghc,tag,ghc,$(GHCLIB_OBJS_DIRS),glob)	@@\
-SpecialGhcLibInstallTarget(libHSghc,tag)				@@\
-SpecialGhcLibraryTarget(libHShbc,tag,hbc,$(HBCLIB_OBJS_DIRS),glob)	@@\
-SpecialGhcLibInstallTarget(libHShbc,tag)				@@\
-SpecialGhcLibraryTarget(libHS13,tag,one3,$(ONE3_OBJS_DIRS),glob)	@@\
-SpecialGhcLibInstallTarget(libHS13,tag)
+#define BigLibsTarget(tag,glob,base)				@@\
+SpecialGhcLibraryTarget(libHS,tag,base,$(BASIC_OBJS_DIRS),glob)	@@\
+SpecialGhcLibInstallTarget(libHS,tag)
 
 /* build *everything* -- monster macro from hell */
-#define BigBuildTarget(tag,glob,targeti,base,basei,ghc,ghci,hbc,hbci,one3,one3i) \
-BigLibsTarget(tag,glob,base,ghc,hbc,one3)			@@\
-BigHisTarget(targeti,basei,ghci,hbci,one3i)
-
+#define BigBuildTarget(tag,glob,targeti,base,basei)		\
+BigLibsTarget(tag,glob,base)					@@\
+BigHisTarget(targeti,basei)
 
 /****************************************************************
 *								*
 * Creating and installing...					*
 *	libHS_<tag>.a		standard Prelude library	*
-*	libHShbc_<tag>.a	HBC-compatibility lib		*
-*	libHSghc_<tag>.a	GHC utilities lib		*
-*       libHS13_<tag>.a         Haskell 1.3 lib                 *
 *								*
 ****************************************************************/
 
 /* make sure install's target dir is there */
 #if DoInstallGHCSystem == YES
 MakeDirectories(install, $(INSTLIBDIR_GHC) 		\
-			 $(INSTDATADIR_GHC)/imports	\
-			 $(INSTDATADIR_GHC)/imports/ghc \
-			 $(INSTDATADIR_GHC)/imports/hbc \
-                         $(INSTDATADIR_GHC)/imports/haskell-1.3)
+			 $(INSTDATADIR_GHC)/imports)
 
 basic_his :: /* nothing */
 InstallTarget(basic_his)
 InstallMultNonExecTargets(basic_his, $(BASIC_HIs),  $(INSTDATADIR_GHC)/imports)
-InstallMultNonExecTargets(basic_his, $(HBCLIB_HIs), $(INSTDATADIR_GHC)/imports/hbc)
-InstallMultNonExecTargets(basic_his, $(ONE3_HIs),   $(INSTDATADIR_GHC)/imports/haskell-1.3)
-InstallMultNonExecTargets(basic_his, $(GHCLIB_HIs), $(INSTDATADIR_GHC)/imports/ghc)
 #endif /* installing */
 
-IfGhcBuild_normal(BigBuildTarget(,'*_.o',basic_his \
+IfGhcBuild_normal(BigBuildTarget(,'*.o',basic_his \
 , $(BASIC_DEP_norm),  $(BASIC_HIs)		\
-, $(GHCLIB_DEP_norm), $(GHCLIB_HIs)		\
-, $(HBCLIB_DEP_norm), $(HBCLIB_HIs)		\
-, $(ONE3_DEP_norm),   $(ONE3_HIs)		\
 ))
 
-IfGhcBuild_p(BigBuildTarget(_p,'*_p.o',his_p	\
+IfGhcBuild_p(BigBuildTarget(_p,'*.p_o',his_p	\
 , $(BASIC_DEP_p),  $(BASIC_HIs_p)		\
-, $(GHCLIB_DEP_p), $(GHCLIB_HIs_p)		\
-, $(HBCLIB_DEP_p), $(HBCLIB_HIs_p)		\
-, $(ONE3_DEP_p),   $(ONE3_HIs_p)		\
 ))
 
-IfGhcBuild_t(BigBuildTarget(_t,'*_t.o',his_t	\
+IfGhcBuild_t(BigBuildTarget(_t,'*.t_o',his_t	\
 , $(BASIC_DEP_t),  $(BASIC_HIs_t)		\
-, $(GHCLIB_DEP_t), $(GHCLIB_HIs_t)		\
-, $(HBCLIB_DEP_t), $(HBCLIB_HIs_t)		\
-, $(ONE3_DEP_t),   $(ONE3_HIs_t)		\
 ))
 
-IfGhcBuild_u(BigBuildTarget(,'*_u.o',his_u	\
+IfGhcBuild_u(BigBuildTarget(,'*.u_o',his_u	\
 , $(BASIC_DEP_u),  $(BASIC_HIs_u)		\
-, $(GHCLIB_DEP_u), $(GHCLIB_HIs_u)		\
-, $(HBCLIB_DEP_u), $(HBCLIB_HIs_u)		\
-, $(ONE3_DEP_u),   $(ONE3_HIs_u)		\
 ))
 
-IfGhcBuild_mc(BigBuildTarget(_mc,'*_mc.o',his_mc \
+IfGhcBuild_mc(BigBuildTarget(_mc,'*.mc_o',his_mc \
 , $(BASIC_DEP_mc),  $(BASIC_HIs_mc)		\
-, $(GHCLIB_DEP_mc), $(GHCLIB_HIs_mc)		\
-, $(HBCLIB_DEP_mc), $(HBCLIB_HIs_mc)		\
-, $(ONE3_DEP_mc),   $(ONE3_HIs_mc)		\
 ))
 
-IfGhcBuild_mr(BigBuildTarget(_mr,'*_mr.o',his_mr \
+IfGhcBuild_mr(BigBuildTarget(_mr,'*.mr_o',his_mr \
 , $(BASIC_DEP_mr),  $(BASIC_HIs_mr)		\
-, $(GHCLIB_DEP_mr), $(GHCLIB_HIs_mr)		\
-, $(HBCLIB_DEP_mr), $(HBCLIB_HIs_mr)		\
-, $(ONE3_DEP_mr),   $(ONE3_HIs_mr)		\
 ))
 
-IfGhcBuild_mt(BigBuildTarget(_mr,'*_mt.o',his_mt \
+IfGhcBuild_mt(BigBuildTarget(_mr,'*.mt_o',his_mt \
 , $(BASIC_DEP_mt),  $(BASIC_HIs_mt)		\
-, $(GHCLIB_DEP_mt), $(GHCLIB_HIs_mt)		\
-, $(HBCLIB_DEP_mt), $(HBCLIB_HIs_mt)		\
-, $(ONE3_DEP_mt),   $(ONE3_HIs_mt)		\
 ))
 
-IfGhcBuild_mp(BigBuildTarget(_mp,'*_mp.o',his_mp \
+IfGhcBuild_mp(BigBuildTarget(_mp,'*.mp_o',his_mp \
 , $(BASIC_DEP_mp),  $(BASIC_HIs_mp)		\
-, $(GHCLIB_DEP_mp), $(GHCLIB_HIs_mp)		\
-, $(HBCLIB_DEP_mp), $(HBCLIB_HIs_mp)		\
-, $(ONE3_DEP_mp),   $(ONE3_HIs_mp)		\
 ))
 
-IfGhcBuild_mg(BigBuildTarget(_mg,'*_mg.o',his_mg \
+IfGhcBuild_mg(BigBuildTarget(_mg,'*.mg_o',his_mg \
 , $(BASIC_DEP_mg),  $(BASIC_HIs_mg)		\
-, $(GHCLIB_DEP_mg), $(GHCLIB_HIs_mg)		\
-, $(HBCLIB_DEP_mg), $(HBCLIB_HIs_mg)		\
-, $(ONE3_DEP_mg),   $(ONE3_HIs_mg)		\
 ))
 
 /* these GC ones do not *really* need separate .hi files,
    but it really makes life easier to do it this way
 */
-IfGhcBuild_2s(BigBuildTarget(_2s,'*_2s.o',his_2s \
+IfGhcBuild_2s(BigBuildTarget(_2s,'*.2s_o',his_2s \
 , $(BASIC_DEP_2s),  $(BASIC_HIs_2s)		\
-, $(GHCLIB_DEP_2s), $(GHCLIB_HIs_2s)		\
-, $(HBCLIB_DEP_2s), $(HBCLIB_HIs_2s)		\
-, $(ONE3_DEP_2s),   $(ONE3_HIs_2s)		\
 ))
 
-IfGhcBuild_1s(BigBuildTarget(_1s,'*_1s.o',his_1s \
+IfGhcBuild_1s(BigBuildTarget(_1s,'*.1s_o',his_1s \
 , $(BASIC_DEP_1s),  $(BASIC_HIs_1s)		\
-, $(GHCLIB_DEP_1s), $(GHCLIB_HIs_1s)		\
-, $(HBCLIB_DEP_1s), $(HBCLIB_HIs_1s)		\
-, $(ONE3_DEP_1s),   $(ONE3_HIs_1s)		\
 ))
 
-IfGhcBuild_du(BigBuildTarget(_du,'*_du.o',his_du \
+IfGhcBuild_du(BigBuildTarget(_du,'*.du_o',his_du \
 , $(BASIC_DEP_du),  $(BASIC_HIs_du)		\
-, $(GHCLIB_DEP_du), $(GHCLIB_HIs_du)		\
-, $(HBCLIB_DEP_du), $(HBCLIB_HIs_du)		\
-, $(ONE3_DEP_du),   $(ONE3_HIs_du)		\
 ))
 
 /* user ways -- yeeps! */
 
-IfGhcBuild_a(BigBuildTarget(_a,'*_a.o',his_a	\
+IfGhcBuild_a(BigBuildTarget(_a,'*.a_o',his_a	\
 , $(BASIC_DEP_a),  $(BASIC_HIs_a)		\
-, $(GHCLIB_DEP_a), $(GHCLIB_HIs_a)		\
-, $(HBCLIB_DEP_a), $(HBCLIB_HIs_a)		\
-, $(ONE3_DEP_a),   $(ONE3_HIs_a)		\
 ))
 
-IfGhcBuild_b(BigBuildTarget(_b,'*_b.o',his_b	\
+IfGhcBuild_b(BigBuildTarget(_b,'*.b_o',his_b	\
 , $(BASIC_DEP_b),  $(BASIC_HIs_b)		\
-, $(GHCLIB_DEP_b), $(GHCLIB_HIs_b)		\
-, $(HBCLIB_DEP_b), $(HBCLIB_HIs_b)		\
-, $(ONE3_DEP_b),   $(ONE3_HIs_b)		\
 ))
 
-IfGhcBuild_c(BigBuildTarget(_c,'*_c.o',his_c	\
+IfGhcBuild_c(BigBuildTarget(_c,'*.c_o',his_c	\
 , $(BASIC_DEP_c),  $(BASIC_HIs_c)		\
-, $(GHCLIB_DEP_c), $(GHCLIB_HIs_c)		\
-, $(HBCLIB_DEP_c), $(HBCLIB_HIs_c)		\
-, $(ONE3_DEP_c),   $(ONE3_HIs_c)		\
 ))
 
-IfGhcBuild_d(BigBuildTarget(_d,'*_d.o',his_d	\
+IfGhcBuild_d(BigBuildTarget(_d,'*.d_o',his_d	\
 , $(BASIC_DEP_d),  $(BASIC_HIs_d)		\
-, $(GHCLIB_DEP_d), $(GHCLIB_HIs_d)		\
-, $(HBCLIB_DEP_d), $(HBCLIB_HIs_d)		\
-, $(ONE3_DEP_d),   $(ONE3_HIs_d)		\
 ))
 
-IfGhcBuild_e(BigBuildTarget(_e,'*_e.o',his_e	\
+IfGhcBuild_e(BigBuildTarget(_e,'*.e_o',his_e	\
 , $(BASIC_DEP_e),  $(BASIC_HIs_e)		\
-, $(GHCLIB_DEP_e), $(GHCLIB_HIs_e)		\
-, $(HBCLIB_DEP_e), $(HBCLIB_HIs_e)		\
-, $(ONE3_DEP_e),   $(ONE3_HIs_e)		\
 ))
 
-IfGhcBuild_f(BigBuildTarget(_f,'*_f.o',his_f	\
+IfGhcBuild_f(BigBuildTarget(_f,'*.f_o',his_f	\
 , $(BASIC_DEP_f),  $(BASIC_HIs_f)		\
-, $(GHCLIB_DEP_f), $(GHCLIB_HIs_f)		\
-, $(HBCLIB_DEP_f), $(HBCLIB_HIs_f)		\
-, $(ONE3_DEP_f),   $(ONE3_HIs_f)		\
 ))
 
-IfGhcBuild_g(BigBuildTarget(_g,'*_g.o',his_g	\
+IfGhcBuild_g(BigBuildTarget(_g,'*.g_o',his_g	\
 , $(BASIC_DEP_g),  $(BASIC_HIs_g)		\
-, $(GHCLIB_DEP_g), $(GHCLIB_HIs_g)		\
-, $(HBCLIB_DEP_g), $(HBCLIB_HIs_g)		\
-, $(ONE3_DEP_g),   $(ONE3_HIs_g)		\
 ))
 
-IfGhcBuild_h(BigBuildTarget(_h,'*_h.o',his_h	\
+IfGhcBuild_h(BigBuildTarget(_h,'*.h_o',his_h	\
 , $(BASIC_DEP_h),  $(BASIC_HIs_h)		\
-, $(GHCLIB_DEP_h), $(GHCLIB_HIs_h)		\
-, $(HBCLIB_DEP_h), $(HBCLIB_HIs_h)		\
-, $(ONE3_DEP_h),   $(ONE3_HIs_h)		\
 ))
 
-IfGhcBuild_i(BigBuildTarget(_i,'*_i.o',his_i	\
+IfGhcBuild_i(BigBuildTarget(_i,'*.i_o',his_i	\
 , $(BASIC_DEP_i),  $(BASIC_HIs_i)		\
-, $(GHCLIB_DEP_i), $(GHCLIB_HIs_i)		\
-, $(HBCLIB_DEP_i), $(HBCLIB_HIs_i)		\
-, $(ONE3_DEP_i),   $(ONE3_HIs_i)		\
 ))
 
-IfGhcBuild_j(BigBuildTarget(_j,'*_j.o',his_j	\
+IfGhcBuild_j(BigBuildTarget(_j,'*.j_o',his_j	\
 , $(BASIC_DEP_j),  $(BASIC_HIs_j)		\
-, $(GHCLIB_DEP_j), $(GHCLIB_HIs_j)		\
-, $(HBCLIB_DEP_j), $(HBCLIB_HIs_j)		\
-, $(ONE3_DEP_j),   $(ONE3_HIs_j)		\
 ))
 
-IfGhcBuild_k(BigBuildTarget(_k,'*_k.o',his_k	\
+IfGhcBuild_k(BigBuildTarget(_k,'*.k_o',his_k	\
 , $(BASIC_DEP_k),  $(BASIC_HIs_k)		\
-, $(GHCLIB_DEP_k), $(GHCLIB_HIs_k)		\
-, $(HBCLIB_DEP_k), $(HBCLIB_HIs_k)		\
-, $(ONE3_DEP_k),   $(ONE3_HIs_k)		\
 ))
 
-IfGhcBuild_l(BigBuildTarget(_l,'*_l.o',his_l	\
+IfGhcBuild_l(BigBuildTarget(_l,'*.l_o',his_l	\
 , $(BASIC_DEP_l),  $(BASIC_HIs_l)		\
-, $(GHCLIB_DEP_l), $(GHCLIB_HIs_l)		\
-, $(HBCLIB_DEP_l), $(HBCLIB_HIs_l)		\
-, $(ONE3_DEP_l),   $(ONE3_HIs_l)		\
 ))
 
-IfGhcBuild_m(BigBuildTarget(_m,'*_m.o',his_m	\
+IfGhcBuild_m(BigBuildTarget(_m,'*.m_o',his_m	\
 , $(BASIC_DEP_m),  $(BASIC_HIs_m)		\
-, $(GHCLIB_DEP_m), $(GHCLIB_HIs_m)		\
-, $(HBCLIB_DEP_m), $(HBCLIB_HIs_m)		\
-, $(ONE3_DEP_m),   $(ONE3_HIs_m)		\
 ))
 
-IfGhcBuild_n(BigBuildTarget(_n,'*_n.o',his_n	\
+IfGhcBuild_n(BigBuildTarget(_n,'*.n_o',his_n	\
 , $(BASIC_DEP_n),  $(BASIC_HIs_n)		\
-, $(GHCLIB_DEP_n), $(GHCLIB_HIs_n)		\
-, $(HBCLIB_DEP_n), $(HBCLIB_HIs_n)		\
-, $(ONE3_DEP_n),   $(ONE3_HIs_n)		\
 ))
 
-IfGhcBuild_o(BigBuildTarget(_o,'*_o.o',his_o	\
+IfGhcBuild_o(BigBuildTarget(_o,'*.o_o',his_o	\
 , $(BASIC_DEP_o),  $(BASIC_HIs_o)		\
-, $(GHCLIB_DEP_o), $(GHCLIB_HIs_o)		\
-, $(HBCLIB_DEP_o), $(HBCLIB_HIs_o)		\
-, $(ONE3_DEP_o),   $(ONE3_HIs_o)		\
 ))
 
-IfGhcBuild_A(BigBuildTarget(_A,'*_A.o',his_A	\
+IfGhcBuild_A(BigBuildTarget(_A,'*.A_o',his_A	\
 , $(BASIC_DEP_A),  $(BASIC_HIs_A)		\
-, $(GHCLIB_DEP_A), $(GHCLIB_HIs_A)		\
-, $(HBCLIB_DEP_A), $(HBCLIB_HIs_A)		\
-, $(ONE3_DEP_A),   $(ONE3_HIs_A)		\
 ))
 
-IfGhcBuild_B(BigBuildTarget(_B,'*_B.o',his_B	\
+IfGhcBuild_B(BigBuildTarget(_B,'*.B_o',his_B	\
 , $(BASIC_DEP_B),  $(BASIC_HIs_B)		\
-, $(GHCLIB_DEP_B), $(GHCLIB_HIs_B)		\
-, $(HBCLIB_DEP_B), $(HBCLIB_HIs_B)		\
-, $(ONE3_DEP_B),   $(ONE3_HIs_B)		\
 ))
 
 /****************************************************************
@@ -963,7 +398,7 @@ clean  ::							@@\
 #else /* normal case */
 #define CompilePreludishly__(file,isuf,way,flags)		@@\
 CAT3(file,way,.hc) : file.isuf					@@\
-	$(RM) CAT3(file,way,.hc)				@@\
+	: do not $(RM) CAT3(file,way,.hc)			@@\
 	$(GHC) -C $(GHCFLAGS) flags file.isuf -o CAT3(file,way,.hc) @@\
 clean ::							@@\
 	$(RM) CAT3(file,way,.hc)
@@ -987,172 +422,64 @@ ObjectifyPreludishly__(file,way,flags,osuf,find_pat)
 /* here we go: (NB: do not make .hc files for _u [unregisterized]) */
 
 #define CompilePreludishly(file,isuf,flags)			@@\
-IfGhcBuild_normal(DoHs(file,isuf,,flags $(GHC_OPTS_norm),'_.o',   '*_.o'))	\
-IfGhcBuild_p(DoHs(file,isuf,_p,   flags $(GHC_OPTS_p),   '_p.o',  '*_p.o'))	\
-IfGhcBuild_t(DoHs(file,isuf,_t,   flags $(GHC_OPTS_t),   '_t.o',  '*_t.o'))	\
-IfGhcBuild_mc(DoHs(file,isuf,_mc, flags $(GHC_OPTS_mc),  '_mc.o', '*_mc.o'))	\
-IfGhcBuild_mr(DoHs(file,isuf,_mr, flags $(GHC_OPTS_mr),  '_mr.o', '*_mr.o'))	\
-IfGhcBuild_mt(DoHs(file,isuf,_mt, flags $(GHC_OPTS_mt),  '_mt.o', '*_mt.o'))	\
-IfGhcBuild_mp(DoHs(file,isuf,_mp, flags $(GHC_OPTS_mp),  '_mp.o', '*_mp.o'))	\
-IfGhcBuild_mg(DoHs(file,isuf,_mg, flags $(GHC_OPTS_mg),  '_mg.o', '*_mg.o'))	\
-IfGhcBuild_2s(DoHs(file,isuf,_2s, flags $(GHC_OPTS_2s),  '_2s.o', '*_2s.o'))	\
-IfGhcBuild_1s(DoHs(file,isuf,_1s, flags $(GHC_OPTS_1s),  '_1s.o', '*_1s.o'))	\
-IfGhcBuild_du(DoHs(file,isuf,_du, flags $(GHC_OPTS_du),  '_du.o', '*_du.o'))	\
-IfGhcBuild_a(DoHs(file,isuf,_a,   flags $(GHC_OPTS_a),   '_a.o',  '*_a.o'))	\
-IfGhcBuild_b(DoHs(file,isuf,_b,   flags $(GHC_OPTS_b),   '_b.o',  '*_b.o'))	\
-IfGhcBuild_c(DoHs(file,isuf,_c,   flags $(GHC_OPTS_c),   '_c.o',  '*_c.o'))	\
-IfGhcBuild_d(DoHs(file,isuf,_d,   flags $(GHC_OPTS_d),   '_d.o',  '*_d.o'))	\
-IfGhcBuild_e(DoHs(file,isuf,_e,   flags $(GHC_OPTS_e),   '_e.o',  '*_e.o'))	\
-IfGhcBuild_f(DoHs(file,isuf,_f,   flags $(GHC_OPTS_f),   '_f.o',  '*_f.o'))	\
-IfGhcBuild_g(DoHs(file,isuf,_g,   flags $(GHC_OPTS_g),   '_g.o',  '*_g.o'))	\
-IfGhcBuild_h(DoHs(file,isuf,_h,   flags $(GHC_OPTS_h),   '_h.o',  '*_h.o'))	\
-IfGhcBuild_i(DoHs(file,isuf,_i,   flags $(GHC_OPTS_i),   '_i.o',  '*_i.o'))	\
-IfGhcBuild_j(DoHs(file,isuf,_j,   flags $(GHC_OPTS_j),   '_j.o',  '*_j.o'))	\
-IfGhcBuild_k(DoHs(file,isuf,_k,   flags $(GHC_OPTS_k),   '_k.o',  '*_k.o'))	\
-IfGhcBuild_l(DoHs(file,isuf,_l,   flags $(GHC_OPTS_l),   '_l.o',  '*_l.o'))	\
-IfGhcBuild_m(DoHs(file,isuf,_m,   flags $(GHC_OPTS_m),   '_m.o',  '*_m.o'))	\
-IfGhcBuild_n(DoHs(file,isuf,_n,   flags $(GHC_OPTS_n),   '_n.o',  '*_n.o'))	\
-IfGhcBuild_o(DoHs(file,isuf,_o,   flags $(GHC_OPTS_o),   '_o.o',  '*_o.o'))	\
-IfGhcBuild_A(DoHs(file,isuf,_A,   flags $(GHC_OPTS_A),   '_A.o',  '*_A.o'))	\
-IfGhcBuild_B(DoHs(file,isuf,_B,   flags $(GHC_OPTS_B),   '_B.o',  '*_B.o'))
+IfGhcBuild_normal(DoHs(file,isuf,,flags $(GHC_OPTS_norm),'o',   '*.o'))	\
+IfGhcBuild_p(DoHs(file,isuf,_p,   flags $(GHC_OPTS_p),   'p_o',  '*.p_o'))	\
+IfGhcBuild_t(DoHs(file,isuf,_t,   flags $(GHC_OPTS_t),   't_o',  '*.t_o'))	\
+IfGhcBuild_mc(DoHs(file,isuf,_mc, flags $(GHC_OPTS_mc),  'mc_o', '*.mc_o'))	\
+IfGhcBuild_mr(DoHs(file,isuf,_mr, flags $(GHC_OPTS_mr),  'mr_o', '*.mr_o'))	\
+IfGhcBuild_mt(DoHs(file,isuf,_mt, flags $(GHC_OPTS_mt),  'mt_o', '*.mt_o'))	\
+IfGhcBuild_mp(DoHs(file,isuf,_mp, flags $(GHC_OPTS_mp),  'mp_o', '*.mp_o'))	\
+IfGhcBuild_mg(DoHs(file,isuf,_mg, flags $(GHC_OPTS_mg),  'mg_o', '*.mg_o'))	\
+IfGhcBuild_2s(DoHs(file,isuf,_2s, flags $(GHC_OPTS_2s),  '2s_o', '*.2s_o'))	\
+IfGhcBuild_1s(DoHs(file,isuf,_1s, flags $(GHC_OPTS_1s),  '1s_o', '*.1s_o'))	\
+IfGhcBuild_du(DoHs(file,isuf,_du, flags $(GHC_OPTS_du),  'du_o', '*.du_o'))	\
+IfGhcBuild_a(DoHs(file,isuf,_a,   flags $(GHC_OPTS_a),   'a_o',  '*.a_o'))	\
+IfGhcBuild_b(DoHs(file,isuf,_b,   flags $(GHC_OPTS_b),   'b_o',  '*.b_o'))	\
+IfGhcBuild_c(DoHs(file,isuf,_c,   flags $(GHC_OPTS_c),   'c_o',  '*.c_o'))	\
+IfGhcBuild_d(DoHs(file,isuf,_d,   flags $(GHC_OPTS_d),   'd_o',  '*.d_o'))	\
+IfGhcBuild_e(DoHs(file,isuf,_e,   flags $(GHC_OPTS_e),   'e_o',  '*.e_o'))	\
+IfGhcBuild_f(DoHs(file,isuf,_f,   flags $(GHC_OPTS_f),   'f_o',  '*.f_o'))	\
+IfGhcBuild_g(DoHs(file,isuf,_g,   flags $(GHC_OPTS_g),   'g_o',  '*.g_o'))	\
+IfGhcBuild_h(DoHs(file,isuf,_h,   flags $(GHC_OPTS_h),   'h_o',  '*.h_o'))	\
+IfGhcBuild_i(DoHs(file,isuf,_i,   flags $(GHC_OPTS_i),   'i_o',  '*.i_o'))	\
+IfGhcBuild_j(DoHs(file,isuf,_j,   flags $(GHC_OPTS_j),   'j_o',  '*.j_o'))	\
+IfGhcBuild_k(DoHs(file,isuf,_k,   flags $(GHC_OPTS_k),   'k_o',  '*.k_o'))	\
+IfGhcBuild_l(DoHs(file,isuf,_l,   flags $(GHC_OPTS_l),   'l_o',  '*.l_o'))	\
+IfGhcBuild_m(DoHs(file,isuf,_m,   flags $(GHC_OPTS_m),   'm_o',  '*.m_o'))	\
+IfGhcBuild_n(DoHs(file,isuf,_n,   flags $(GHC_OPTS_n),   'n_o',  '*.n_o'))	\
+IfGhcBuild_o(DoHs(file,isuf,_o,   flags $(GHC_OPTS_o),   'o_o',  '*.o_o'))	\
+IfGhcBuild_A(DoHs(file,isuf,_A,   flags $(GHC_OPTS_A),   'A_o',  '*.A_o'))	\
+IfGhcBuild_B(DoHs(file,isuf,_B,   flags $(GHC_OPTS_B),   'B_o',  '*.B_o'))
 
 /* now use the macro: */
 
-CompilePreludishly(glaExts/PreludeGlaST,lhs,	$(PREL_OPTS) -split-objs ST -H16m -monly-4-regs -fno-omit-reexported-instances)
-CompilePreludishly(glaExts/PreludePrimIO,lhs, $(PREL_OPTS) -split-objs PreludePrimIO)
-CompilePreludishly(glaExts/PreludeErrIO,lhs,	$(PREL_OPTS) -split-objs ErrIO)
-CompilePreludishly(glaExts/PreludeDialogueIO,lhs,$(PREL_OPTS) -split-objs DialogueIO)
-CompilePreludishly(glaExts/MainIO,lhs,		$(PREL_OPTS) -split-objs MainIO)
-CompilePreludishly(glaExts/MainIO13,lhs,	$(PREL_OPTS) -split-objs MainIO13 -ohi glaExts/MainIO13.hi)
-CompilePreludishly(glaExts/Stdio,lhs,		$(PREL_OPTS) -split-objs Stdio)
-CompilePreludishly(glaExts/ByteOps,lhs,		$(PREL_OPTS) -split-objs ByteOps)
+CompilePreludishly(prelude/Prelude,hs,-iprelude -fglasgow-exts -fcompiling-ghc-internals Prelude -fno-implicit-prelude)
+CompilePreludishly(prelude/GHCbase,hs,-iprelude -fglasgow-exts -fcompiling-ghc-internals GHCbase)
+CompilePreludishly(prelude/GHCbase2,hs,-iprelude -fglasgow-exts -fcompiling-ghc-internals GHCbase2)
+CompilePreludishly(prelude/GHCps,hs,  -iprelude -fglasgow-exts)
+CompilePreludishly(prelude/GHCio,hs,  -iprelude -fglasgow-exts)
+CompilePreludishly(prelude/GHCmain,hs,-iprelude -fglasgow-exts)
+CompilePreludishly(prelude/PreludeGlaST,hs,-iprelude -fglasgow-exts)
 
-CompilePreludishly(prelude/Concurrent,lhs,	-fhaskell-1.3 -split-objs Concurrent -ohi prelude/Concurrent.hi)
-CompilePreludishly(prelude/ChannelVar,lhs,	-fhaskell-1.3 -split-objs ChannelVar -ohi prelude/ChannelVar.hi)
-/* NB: do not split objs for Channel, because of purely-local things */
-CompilePreludishly(prelude/Channel,lhs,		-fhaskell-1.3 -ohi prelude/Channel.hi)
-CompilePreludishly(prelude/Semaphore,lhs,	-fhaskell-1.3 -split-objs Semaphore -ohi prelude/Semaphore.hi)
-CompilePreludishly(prelude/Merge,lhs,		-fhaskell-1.3 -split-objs Merge -ohi prelude/Merge.hi)
-CompilePreludishly(prelude/SampleVar,lhs,	-fhaskell-1.3 -split-objs SampleVar -ohi prelude/SampleVar.hi)
+CompilePreludishly(required/Array,hs,-fglasgow-exts -iprelude)
+CompilePreludishly(required/Char,hs,)
+CompilePreludishly(required/Complex,hs,)
+CompilePreludishly(required/Directory,hs,-fglasgow-exts)
+CompilePreludishly(required/IO,hs,-fglasgow-exts)
+CompilePreludishly(required/Ix,hs,-fglasgow-exts)
+CompilePreludishly(required/List,hs,)
+CompilePreludishly(required/Maybe,hs,)
+CompilePreludishly(required/Monad,hs,)
+CompilePreludishly(required/Ratio,hs,)
+CompilePreludishly(required/System,hs,-fglasgow-exts)
 
-CompilePreludishly(prelude/Parallel,lhs,	-split-objs Parallel -ohi prelude/Parallel.hi)
-
-CompilePreludishly(prelude/TysBasic,hs,	$(PREL_OPTS) -split-objs TysBasic -fmin-builtin-names -nohi)
-CompilePreludishly(prelude/TyBool,hs,	$(PREL_OPTS) -split-objs TyBool -fhide-builtin-names -nohi)
-CompilePreludishly(prelude/TyArray,hs,	$(PREL_OPTS) -split-objs TyArray -ohi prelude/TyArray.hi)
-CompilePreludishly(prelude/TyComplex,hs,$(PREL_OPTS) -split-objs TyComplex -ohi prelude/TyComplex.hi)
-CompilePreludishly(prelude/TyIO,hs,	$(PREL_OPTS) -split-objs TyIO -fmin-builtin-names -ohi prelude/TyIO.hi)
-CompilePreludishly(prelude/TyRatio,hs,	$(PREL_OPTS) -split-objs TyRatio -fmin-builtin-names -nohi)
-
-CompilePreludishly(prelude/IArray,hs,	$(PREL_OPTS) -split-objs IArray -H18m -ohi prelude/IArray.hi)
-CompilePreludishly(prelude/IBool,hs,	$(PREL_OPTS) -split-objs IBool -ohi prelude/IBool.hi)
-CompilePreludishly(prelude/IChar,hs,	$(PREL_OPTS) -split-objs IChar -ohi prelude/IChar.hi)
-CompilePreludishly(prelude/IComplex,hs,	$(PREL_OPTS) -split-objs IComplex -H16m -ohi prelude/IComplex.hi)
-CompilePreludishly(prelude/IDouble,hs,	$(PREL_OPTS) -split-objs IDouble -ohi prelude/IDouble.hi)
-CompilePreludishly(prelude/IFloat,hs,	$(PREL_OPTS) -split-objs IFloat -ohi prelude/IFloat.hi)
-CompilePreludishly(prelude/IInt,hs,	$(PREL_OPTS) -split-objs IInt -ohi prelude/IInt.hi -monly-4-regs)
-CompilePreludishly(prelude/IInteger,hs,	$(PREL_OPTS) -split-objs IInteger -ohi prelude/IInteger.hi)
-CompilePreludishly(prelude/IList,hs,	$(PREL_OPTS) -split-objs IList -H12m -ohi prelude/IList.hi)
-CompilePreludishly(prelude/IRatio,hs,	$(PREL_OPTS) -split-objs IRatio -H16m -ohi prelude/IRatio.hi)
-CompilePreludishly(prelude/ITup0,hs,	$(PREL_OPTS) -split-objs ITup0 -ohi prelude/ITup0.hi)
-CompilePreludishly(prelude/ITup2,hs,	$(PREL_OPTS) -split-objs ITup2 -H40m -K2m -ohi prelude/ITup2.hi)
-CompilePreludishly(prelude/ITup3,hs,	$(PREL_OPTS) -split-objs ITup3 -ohi prelude/ITup3.hi)
-CompilePreludishly(prelude/ITup4,hs,	$(PREL_OPTS) -split-objs ITup4 -H16m -ohi prelude/ITup4.hi)
-CompilePreludishly(prelude/ITup5,hs,	$(PREL_OPTS) -split-objs ITup5 -H24m -ohi prelude/ITup5.hi)
-	
-CompilePreludishly(prelude/Cls,hs,	$(PREL_OPTS) -split-objs Cls -H24m -fmin-builtin-names -ohi prelude/Cls.hi)
-
-CompilePreludishly(prelude/Builtin,hs,	$(PREL_OPTS) -split-objs Builtin -ohi prelude/Builtin.hi)
-CompilePreludishly(prelude/Core,hs,	$(PREL_OPTS) -split-objs Core -H24m -ohi prelude/Core.hi)
-CompilePreludishly(prelude/IO,hs,	$(PREL_OPTS) -split-objs IO -ohi prelude/IO.hi)
-CompilePreludishly(prelude/List,hs,	$(PREL_OPTS) -split-objs List -H24m -ohi prelude/List.hi -fno-snapback-to-append)
-CompilePreludishly(prelude/PS,lhs,	$(PREL_OPTS) -split-objs PS -ohi prelude/PS.hi -monly-2-regs)
-CompilePreludishly(prelude/Prel,hs,	$(PREL_OPTS) -split-objs Prel -H14m -ohi prelude/Prel.hi -monly-2-regs)
-CompilePreludishly(prelude/Text,hs,	$(PREL_OPTS) -split-objs Text -H30m -ohi prelude/Text.hi -monly-4-regs)
-CompilePreludishly(prelude/FoldrBuild,hs, $(PREL_OPTS) -split-objs FoldrBuild -nohi)
-
-/* --- 1.3 I/O support --- */
-
-CompilePreludishly(prelude/PreludeIOError,lhs,	$(PREL_OPTS) -split-objs IOError -ohi prelude/PreludeIOError.hi -fno-omit-reexported-instances -fomit-derived-read '-#include"stgio.h"')
-CompilePreludishly(prelude/PreludeWriteTextIO,lhs,	$(PREL_OPTS) -split-objs WriteTextIO -ohi prelude/PreludeWriteTextIO.hi -fno-omit-reexported-instances '-#include"stgio.h"')
-CompilePreludishly(prelude/PreludeStdIO,lhs,	$(PREL_OPTS) -split-objs StdIO -ohi prelude/PreludeStdIO.hi -fno-omit-reexported-instances '-#include"stgio.h"' -H14m)
-CompilePreludishly(prelude/PreludeIO,lhs,	$(PREL_OPTS) -split-objs PIO -ohi prelude/PreludeIO.hi -fno-omit-reexported-instances '-#include"stgio.h"')
-CompilePreludishly(prelude/PreludeMonadicIO,lhs,	$(PREL_OPTS) -split-objs MonadicIO -ohi prelude/PreludeMonadicIO.hi -fno-omit-reexported-instances '-#include"stgio.h"')
-CompilePreludishly(prelude/PreludeReadTextIO,lhs,	$(PREL_OPTS) -split-objs ReadTextIO -ohi prelude/PreludeReadTextIO.hi -fno-omit-reexported-instances '-#include"stgio.h"')
-
-/* --- Haskell 1.3 libraries --- */
-
-CompilePreludishly(haskell-1.3/LibSystem,lhs,	  -fhaskell-1.3 -split-objs LibSystem '-#include"stgio.h"')
-CompilePreludishly(haskell-1.3/LibCPUTime,lhs,    -fhaskell-1.3 -split-objs LibCPUTime '-#include"stgio.h"')
-CompilePreludishly(haskell-1.3/LibDirectory,lhs,  -fhaskell-1.3 -split-objs LibDirectory '-#include"stgio.h"' -monly-3-regs)
-CompilePreludishly(haskell-1.3/LibTime,lhs,       -fhaskell-1.3 -split-objs LibTime '-#include"stgio.h"' '-#include"timezone.h"' -H12m -K2m -monly-3-regs)
-
-CompilePreludishly(haskell-1.3/LibPosix,lhs,      -fhaskell-1.3 -split-objs LibPosix '-#include"stgio.h"' '-#include"libposix.h"')
-CompilePreludishly(haskell-1.3/LibPosixDB,lhs,      -fhaskell-1.3 -split-objs LibPosixDB '-#include"stgio.h"' '-#include"libposix.h"')
-CompilePreludishly(haskell-1.3/LibPosixErr,lhs,      -fhaskell-1.3 -split-objs LibPosixErr -H12m '-#include"stgio.h"' '-#include"libposix.h"')
-CompilePreludishly(haskell-1.3/LibPosixFiles,lhs,      -fhaskell-1.3 -split-objs LibPosixFiles -H12m '-#include"stgio.h"' '-#include"libposix.h"')
-CompilePreludishly(haskell-1.3/LibPosixIO,lhs,      -fhaskell-1.3 -split-objs LibPosixIO -H12m '-#include"stgio.h"' '-#include"libposix.h"' -monly-4-regs)
-CompilePreludishly(haskell-1.3/LibPosixProcEnv,lhs,      -fhaskell-1.3 -split-objs LibPosixProcEnv -H12m '-#include"stgio.h"' '-#include"libposix.h"')
-CompilePreludishly(haskell-1.3/LibPosixProcPrim,lhs,      -fhaskell-1.3 -split-objs LibPosixProcPrim -H16m '-#include"stgio.h"' '-#include"libposix.h"')
-CompilePreludishly(haskell-1.3/LibPosixTTY,lhs,      -fhaskell-1.3 -split-objs LibPosixTTY -H12m '-#include"stgio.h"' '-#include"libposix.h"' -monly-2-regs)
-CompilePreludishly(haskell-1.3/LibPosixUtil,lhs,      -fhaskell-1.3 -split-objs LibPosixUtil '-#include"stgio.h"' '-#include"libposix.h"' -monly-3-regs)
-
-/* ------
-   the next six create our main "Prelude" interface files;
-   NOT to be used here.
-   ------
-*/
-CompilePreludishly(glaExts/PreludeGlaMisc,lhs,	$(PREL_OPTS) -split-objs GlaMisc -ohi glaExts/PreludeGlaMisc.hi -monly-4-regs)
-
-CompilePreludishly(prelude/PreludeHi,hs,$(PREL_OPTS) -split-objs Hi -ohi prelude/Prelude.hi -fno-omit-reexported-instances)
-CompilePreludishly(prelude/PrelCoreHi,hs,$(PREL_OPTS) -split-objs CoreHi -ohi prelude/PreludeCore.hi -fno-omit-reexported-instances)
-
-CompilePreludishly(prelude/Prel13,hs,$(PREL_OPTS) -iprelude:glaExts:haskell-1.3 -split-objs Hi13 -ohi prelude/Prel13.hi -fno-omit-reexported-instances)
-CompilePreludishly(prelude/PrelCore13,hs,$(PREL_OPTS) -iprelude:glaExts:haskell-1.3 -split-objs Core13 -ohi prelude/PrelCore13.hi -fno-omit-reexported-instances)
-
-/* --- GHC utilities library --- */
-
-CompilePreludishly(ghc/Bag,lhs,		)
-CompilePreludishly(ghc/BitSet,lhs,	-monly-4-regs)
-CompilePreludishly(ghc/CharSeq,lhs,	)
-CompilePreludishly(ghc/FiniteMap,lhs,	-ighc -fhaskell-1.3)
-CompilePreludishly(ghc/ListSetOps,lhs,	)
-CompilePreludishly(ghc/Maybes,lhs,	-fhaskell-1.3)
-CompilePreludishly(ghc/PackedString,lhs,)
-CompilePreludishly(ghc/Regex,lhs,	-fhaskell-1.3 '-#include"ghcRegex.h"' -monly-4-regs)
-CompilePreludishly(ghc/MatchPS,lhs,	-ighc -fhaskell-1.3)
-CompilePreludishly(ghc/Pretty,lhs,	-ighc -fhaskell-1.3)
-#if GhcWithReadline == YES
-CompilePreludishly(ghc/Readline,lhs,	-ighc -fhaskell-1.3 '-#include"ghcReadline.h"')
-#endif
-#if GhcWithSockets == YES
-CompilePreludishly(ghc/Socket,lhs,	-ighc -fhaskell-1.3)
-CompilePreludishly(ghc/SocketPrim,lhs,	-ighc -fhaskell-1.3 -H12m -K2m -optcO-DNON_POSIX_SOURCE '-#include"ghcSockets.h"')
-CompilePreludishly(ghc/BSD,lhs,		-ighc -fhaskell-1.3 -optcO-DNON_POSIX_SOURCE '-#include"ghcSockets.h"')
-CompilePreludishly(ghc/CError,lhs,	-ighc -fhaskell-1.3 -K2m -fomit-derived-read)
-#endif
-CompilePreludishly(ghc/Set,lhs,		-ighc -fhaskell-1.3)
-CompilePreludishly(ghc/Util,lhs,	-H12m -ighc -fhaskell-1.3)
-
-/* --- HBC-compatibility library --- */
-
-CompilePreludishly(hbc/Algebra,hs,)
-CompilePreludishly(hbc/Hash,hs,		)
-CompilePreludishly(hbc/ListUtil,hs,	-ihbc -fhaskell-1.3)
-CompilePreludishly(hbc/Miranda,hs,	-ihbc)
-CompilePreludishly(hbc/NameSupply,hs,	)
-CompilePreludishly(hbc/Native,hs,	-H12m -ihbc -fhaskell-1.3 -fno-omit-default-instance-methods)
-CompilePreludishly(hbc/Number,hs,	-H12m -K2m  -fno-omit-default-instance-methods)
-CompilePreludishly(hbc/Parse,hs,	-H12m -ihbc -fhaskell-1.3)
-CompilePreludishly(hbc/Polynomial,hs,	-ihbc) /* this code could not ever have worked */
-CompilePreludishly(hbc/Pretty,hs,	)
-CompilePreludishly(hbc/Printf,hs,	-H12m)
-CompilePreludishly(hbc/QSort,hs,	)
-CompilePreludishly(hbc/Random,hs,	-monly-4-regs)
-CompilePreludishly(hbc/SimpleLex,hs,	)
-CompilePreludishly(hbc/Time,hs,		-H12m)
-CompilePreludishly(hbc/Trace,hs,	-fglasgow-exts)
-CompilePreludishly(hbc/Word,hs,		-H12m -K2m -monly-4-regs)
+CompilePreludishly(concurrent/Channel,hs,)
+CompilePreludishly(concurrent/ChannelVar,hs,)
+CompilePreludishly(concurrent/Merge,hs,-iconcurrent)
+CompilePreludishly(concurrent/Parallel,hs,)
+CompilePreludishly(concurrent/SampleVar,hs,)
+CompilePreludishly(concurrent/Semaphore,hs,)
+CompilePreludishly(concurrent/Concurrent,hs,-iconcurrent)
 
 /****************************************************************
 *								*
@@ -1172,34 +499,12 @@ ClearTagsFile()
 HsTagsTarget( */[A-Z]*.*hs )
 HSTAGS_OPTS=-cpp -fglasgow-exts
 
-/* pretty horrible */
-
-/* we do the depend stuff in a semi-automated way:
-
-	make depend		# to create basic dependendencies
-	make print_file_lists	# to dup dependencies for various builds
-	make Makefile		# to slurp in dup'd dependencies
- */
-
-print_file_list5 :
-	$(RM) Jmake.inc5
-	@echo making Jmake.inc5 ...
-	@echo '/* Machine-generated file: do not edit! */' > Jmake.inc5
-	perl ./make_extra_deps >> Jmake.inc5
-
-/* now include the extra dependencies so generated */
-#include "Jmake.inc5"
-
-/* for unix-libs.lit */
-LitSuffixRule(.lhs,.hs)
-LitDocRootTarget(unix-libs,lit)
-
 /* should be *LAST* */
 #if HaskellCompilerType != HC_USE_HC_FILES
     /* otherwise, the dependencies jeopardize our .hc files --
 	which are all we have! */
 MAIN_INCLUDE_DIR = $(TOP_PWD)/$(CURRENT_DIR)/$(GHC_INCLUDES)
-MKDEPENDHS_OPTS= -o .hc -iprelude:glaExts:ghc:hbc:haskell-1.3 -I$(MAIN_INCLUDE_DIR) 
+MKDEPENDHS_OPTS= -o .hc -I$(MAIN_INCLUDE_DIR) 
 
-HaskellDependTarget( $(BASIC_LHS) $(BASIC_HS_PREL) $(HBCLIB_HS) $(GHCLIB_LHS) $(ONE3_LHS) )
+HaskellDependTarget( $(BASIC_HS_PREL) )
 #endif

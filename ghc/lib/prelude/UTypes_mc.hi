@@ -1,9 +1,0 @@
-interface PreludeBuiltin where
-
-import PreludeCore( String(..) )
-import PreludeRatio( Ratio, Rational(..) )
-
-data Bin
-type String = [Char]
-
-type Rational = Ratio Integer
