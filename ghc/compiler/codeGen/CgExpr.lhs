@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.44 2001/09/26 15:11:50 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.45 2001/10/17 14:24:52 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -318,21 +318,27 @@ mkRhsClosure	bndr cc	bi srt
 		  	 [(con, params, use_mask,
 			    (StgApp selectee [{-no args-}]))]
 		  	 StgNoDefault))
-  |  the_fv == scrutinee			-- Scrutinee is the only free variable
-  && maybeToBool maybe_offset			-- Selectee is a component of the tuple
+  |  the_fv == scrutinee		-- Scrutinee is the only free variable
+  && maybeToBool maybe_offset		-- Selectee is a component of the tuple
   && offset_into_int <= mAX_SPEC_SELECTEE_SIZE	-- Offset is small enough
-  = ASSERT(is_single_constructor)
+  = -- NOT TRUE: ASSERT(is_single_constructor)
+    -- The simplifier may have statically determined that the single alternative
+    -- is the only possible case and eliminated the others, even if there are
+    -- other constructors in the datatype.  It's still ok to make a selector
+    -- thunk in this case, because we *know* which constructor the scrutinee
+    -- will evaluate to.
     cgStdRhsClosure bndr cc bi [the_fv] [] body lf_info [StgVarArg the_fv]
   where
     lf_info 		  = mkSelectorLFInfo (idType bndr) offset_into_int 
 						(isUpdatable upd_flag)
-    (_, params_w_offsets) = layOutDynConstr bogus_name con idPrimRep params	-- Just want the layout
+    (_, params_w_offsets) = layOutDynConstr bogus_name con idPrimRep params
+				-- Just want the layout
     maybe_offset	  = assocMaybe params_w_offsets selectee
     Just the_offset 	  = maybe_offset
     offset_into_int       = the_offset - fixedHdrSize
-    is_single_constructor = maybeToBool (maybeTyConSingleCon tycon)
     bogus_name		  = panic "mkRhsClosure"
 \end{code}
+
 Ap thunks
 ~~~~~~~~~
 
