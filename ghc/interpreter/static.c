@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/10/19 12:05:27 $
+ * $Revision: 1.13 $
+ * $Date: 1999/10/26 17:27:45 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -3138,8 +3138,10 @@ static Void local checkDefaultDefns() { /* check that default types are    */
  * what "foreign export static" would mean in an interactive setting.
  * ------------------------------------------------------------------------*/
 
-Void foreignImport(line,extName,intName,type) /* Handle foreign imports    */
+Void foreignImport(line,callconv,extName,intName,type) 
+                                              /* Handle foreign imports    */
 Cell line;
+Text callconv;
 Pair extName;
 Cell intName;
 Cell type; {
@@ -3153,10 +3155,11 @@ Cell type; {
         ERRMSG(l) "Redeclaration of foreign \"%s\"", textToStr(t)
         EEND;
     }
-    name(n).line = l;
-    name(n).defn = extName;
-    name(n).type = type;
-    foreignImports = cons(n,foreignImports);
+    name(n).line     = l;
+    name(n).defn     = extName;
+    name(n).type     = type;
+    name(n).callconv = callconv;
+    foreignImports   = cons(n,foreignImports);
 }
 
 static Void local checkForeignImport(p)   /* Check foreign import          */
@@ -3173,8 +3176,10 @@ Name p; {
     implementForeignImport(p);
 }
 
-Void foreignExport(line,extName,intName,type)/* Handle foreign exports    */
+Void foreignExport(line,callconv,extName,intName,type)
+                                              /* Handle foreign exports    */
 Cell line;
+Text callconv;
 Cell extName;
 Cell intName;
 Cell type; {
@@ -3188,10 +3193,11 @@ Cell type; {
         ERRMSG(l) "Redeclaration of foreign \"%s\"", textToStr(t)
         EEND;
     }
-    name(n).line = l;
-    name(n).defn = NIL;  /* nothing to say */
-    name(n).type = type;
-    foreignExports = cons(n,foreignExports);
+    name(n).line     = l;
+    name(n).defn     = NIL;  /* nothing to say */
+    name(n).type     = type;
+    name(n).callconv = callconv;
+    foreignExports   = cons(n,foreignExports);
 }
 
 static Void local checkForeignExport(p)       /* Check foreign export      */

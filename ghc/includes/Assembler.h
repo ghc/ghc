@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.9 1999/10/19 11:41:35 sewardj Exp $
+ * $Id: Assembler.h,v 1.10 1999/10/26 17:27:35 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -243,8 +243,10 @@ extern void   asmEndMkPAP      ( AsmBCO bco, AsmVar v, AsmSp start );
  * C-call and H-call
  * ------------------------------------------------------------------------*/
 
-extern const AsmPrim ccall_Id;
-extern const AsmPrim ccall_IO;
+extern const AsmPrim ccall_ccall_Id;
+extern const AsmPrim ccall_ccall_IO;
+extern const AsmPrim ccall_stdcall_Id;
+extern const AsmPrim ccall_stdcall_IO;
 
 typedef struct {
   unsigned int  num_args;

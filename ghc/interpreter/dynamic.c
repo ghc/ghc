@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/22 10:00:19 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/26 17:27:39 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -52,6 +52,16 @@ String symbol; {
     return GetProcAddress(instance,symbol);
 }
 
+Bool stdcallAllowed ( void )
+{
+   return TRUE;
+}
+
+
+
+
+
+
 #elif HAVE_DLFCN_H /* eg LINUX, SOLARIS, ULTRIX */
 
 #include <stdio.h>
@@ -91,6 +101,16 @@ String symbol; {
     EEND;
 }
 
+Bool stdcallAllowed ( void )
+{
+   return FALSE;
+}
+
+
+
+
+
+
 #elif HAVE_DL_H /* eg HPUX */
 
 #include <dl.h>
@@ -107,6 +127,16 @@ String symbol; {
     return (0 == shl_findsym(&instance,symbol,TYPE_PROCEDURE,&r)) ? r : 0;
 }
 
+Bool stdcallAllowed ( void )
+{
+   return FALSE;
+}
+
+
+
+
+
+
 #else /* Dynamic loading not available */
 
 void* getDLLSymbol(dll,symbol)  /* load dll and lookup symbol */
@@ -118,6 +148,11 @@ String symbol; {
     ERRMSG(0) "This Hugs build does not support dynamic loading\n"
     EEND;
 #endif
+}
+
+Bool stdcallAllowed ( void )
+{
+   return FALSE;
 }
 
 #endif /* Dynamic loading not available */

@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.7 1999/10/15 11:02:59 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.8 1999/10/26 17:27:30 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -426,14 +426,16 @@ typedef enum
 #endif
 
     /* CCall! */
-    , i_ccall_Id
-    , i_ccall_IO
+    , i_ccall_ccall_Id
+    , i_ccall_ccall_IO
+    , i_ccall_stdcall_Id
+    , i_ccall_stdcall_IO
 
     /* If you add a new primop to this table, check you don't
      * overflow the 256 limit.  That is MAX_Primop2 <= 255.
      * Current value (30/10/98) = 0x42
      */
-    , MAX_Primop2 = i_ccall_IO
+    , MAX_Primop2 = i_ccall_stdcall_IO
 } Primop2;
 
 typedef unsigned int InstrPtr; /* offset of instruction within BCO */

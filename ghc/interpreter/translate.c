@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/19 11:01:24 $
+ * $Revision: 1.11 $
+ * $Date: 1999/10/26 17:27:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -529,7 +529,7 @@ List scs; {                             /* in incr order of strict comps.  */
     name(c).inlineMe = TRUE;
     name(c).stgSize = stgSize(stgVarBody(name(c).stgVar));
     stgGlobals = cons(pair(c,name(c).stgVar),stgGlobals); 
-    //printStg(stderr, name(c).stgVar); fprintf(stderr,"\n\n");
+    /* printStg(stderr, name(c).stgVar); fprintf(stderr,"\n\n"); */
 }
 
 /* --------------------------------------------------------------------------
@@ -570,6 +570,7 @@ static Cell foreignTy ( Bool outBound, Type t )
     else if (t == typeAddr)   return mkChar(ADDR_REP);
     else if (t == typeFloat)  return mkChar(FLOAT_REP);
     else if (t == typeDouble) return mkChar(DOUBLE_REP);
+    else if (t == typeStable) return mkChar(STABLE_REP);
 #ifdef PROVIDE_FOREIGN
     else if (t == typeForeign)return mkChar(FOREIGN_REP); 
          /* ToDo: argty only! */
@@ -705,7 +706,6 @@ static StgRhs unboxVars( String reps, List b_args, List u_args, StgExpr e )
     if (nonNull(b_args)) {
         StgVar b_arg = hd(b_args); /* boxed arg   */
         StgVar u_arg = hd(u_args); /* unboxed arg */
-        //StgRep k     = mkStgRep(*reps);
         Name   box   = repToBox(*reps);
         e = unboxVars(reps+1,tl(b_args),tl(u_args),e);
         if (isNull(box)) {
@@ -853,11 +853,25 @@ Void implementForeignImport ( Name n )
     descriptor = mkDescriptor(charListToString(argTys),
                               charListToString(resultTys));
     if (!descriptor) {
-       ERRMSG(0) "Can't allocate memory for call descriptor"
+       ERRMSG(name(n).line) "Can't allocate memory for call descriptor"
        EEND;
     }
 
-    name(n).primop = addState ? &ccall_IO : &ccall_Id;
+    /* ccall is the default convention, if it wasn't specified */
+    if (isNull(name(n).callconv)
+        || name(n).callconv == textCcall) {
+       name(n).primop = addState ? &ccall_ccall_IO : &ccall_ccall_Id;
+    } 
+    else if (name(n).callconv == textStdcall) {
+       if (!stdcallAllowed()) {
+          ERRMSG(name(n).line) "stdcall is not supported on this platform"
+          EEND;
+       }
+       name(n).primop = addState ? &ccall_stdcall_IO : &ccall_stdcall_Id;
+    }
+    else
+       internal ( "implementForeignImport: unknown calling convention");
+
     {
         Pair    extName = name(n).defn;
         void*   funPtr  = getDLLSymbol(textToStr(textOf(fst(extName))),
@@ -867,7 +881,7 @@ Void implementForeignImport ( Name n )
                                  descriptor->result_tys);
         StgVar v   = mkStgVar(rhs,NIL);
         if (funPtr == 0) {
-            ERRMSG(0) "Could not find foreign function \"%s\" in \"%s\"", 
+            ERRMSG(name(n).line) "Could not find foreign function \"%s\" in \"%s\"", 
                 textToStr(textOf(snd(extName))),
                 textToStr(textOf(fst(extName)))
             EEND;
@@ -886,7 +900,8 @@ Void implementForeignImport ( Name n )
  *
  * \ fun s0 ->
      let e1 = A# "...."
-     in  primMkAdjThunk fun s0 e1
+         e3 = C# 'c' -- (ccall), or 's' (stdcall)
+     in  primMkAdjThunk fun e1 e3 s0
 
    we require, and check that,
      fun :: prim_arg* -> IO prim_result
@@ -896,11 +911,12 @@ Void implementForeignExport ( Name n )
     Type t         = name(n).type;
     List argTys    = NIL;
     List resultTys = NIL;
+    Char cc_char;
 
     if (getHead(t)==typeArrow && argCount==2) {
        t = arg(fun(t));
     } else {
-        ERRMSG(0) "foreign export has illegal type" ETHEN
+        ERRMSG(name(n).line) "foreign export has illegal type" ETHEN
         ERRTEXT " \"" ETHEN ERRTYPE(t);
         ERRTEXT "\""
         EEND;        
@@ -918,7 +934,7 @@ Void implementForeignExport ( Name n )
         assert(length(resultTys) == 1);
         resultTys = hd(resultTys);
     } else {
-        ERRMSG(0) "foreign export doesn't return an IO type" ETHEN
+        ERRMSG(name(n).line) "foreign export doesn't return an IO type" ETHEN
         ERRTEXT " \"" ETHEN ERRTYPE(t);
         ERRTEXT "\""
         EEND;        
@@ -927,11 +943,27 @@ Void implementForeignExport ( Name n )
 
     mapOver(foreignInboundTy,argTys);
 
+    /* ccall is the default convention, if it wasn't specified */
+    if (isNull(name(n).callconv)
+        || name(n).callconv == textCcall) {
+        cc_char = 'c';
+    } 
+    else if (name(n).callconv == textStdcall) {
+       if (!stdcallAllowed()) {
+          ERRMSG(name(n).line) "stdcall is not supported on this platform"
+          EEND;
+       }
+       cc_char = 's';
+    }
+    else
+       internal ( "implementForeignExport: unknown calling convention");
+
+
     {
     List     tdList;
     Text     tdText;
     List     args;
-    StgVar   e1, e2, v;
+    StgVar   e1, e2, e3, v;
     StgExpr  fun;
 
     tdList = cons(mkChar(':'),argTys);
@@ -944,24 +976,27 @@ Void implementForeignExport ( Name n )
                 mkStgCon(nameMkA,singleton(ap(STRCELL,tdText))),
                 NIL
              );
-     e2    = mkStgVar(
+    e2     = mkStgVar(
                 mkStgApp(nameUnpackString,singleton(e1)),
                 NIL
              );
-
+    e3     = mkStgVar(
+                mkStgCon(nameMkC,singleton(mkChar(cc_char))),
+                NIL
+             );
     fun    = mkStgLambda(
                 args,
                 mkStgLet(
-                   doubleton(e1,e2),
+                   tripleton(e1,e2,e3),
                    mkStgApp(
                       nameCreateAdjThunk,
-                      tripleton(hd(args),e2,hd(tl(args)))
+                      cons(hd(args),cons(e2,cons(e3,cons(hd(tl(args)),NIL))))
                    )
                 )
              );
 
     v = mkStgVar(fun,NIL);
-    /* ppStg(v); */
+    ppStg(v);
 
     name(n).defn     = NIL;    
     name(n).stgVar   = v;

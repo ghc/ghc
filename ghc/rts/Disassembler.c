@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/10/15 11:03:01 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/26 17:27:31 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -369,10 +369,14 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             switch (op) {
             case i_INTERNAL_ERROR2:
                     return disNone(bco,pc,"INTERNAL_ERROR2");
-            case i_ccall_Id:
-                    return disNone(bco,pc,"ccall_Id");
-            case i_ccall_IO:
-                    return disNone(bco,pc,"ccall_IO");
+            case i_ccall_ccall_Id:
+                    return disNone(bco,pc,"ccall_ccall_Id");
+            case i_ccall_ccall_IO:
+                    return disNone(bco,pc,"ccall_ccall_IO");
+            case i_ccall_stdcall_Id:
+                    return disNone(bco,pc,"ccall_stdcall_Id");
+            case i_ccall_stdcall_IO:
+                    return disNone(bco,pc,"ccall_stdcall_IO");
             case i_raise:
                     return disNone(bco,pc,"primRaise");
             default:

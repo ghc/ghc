@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/15 11:02:58 $
+ * $Revision: 1.11 $
+ * $Date: 1999/10/26 17:27:28 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -1366,7 +1366,7 @@ const AsmPrim asmPrimOps[] = {
     , { "primFreeStablePtr",         "s", "",    MONAD_IO, i_PRIMOP2, i_freeStablePtr }
 
     /* foreign export dynamic support */
-    , { "primCreateAdjThunkARCH",    "sA", "A",  MONAD_IO, i_PRIMOP2, i_createAdjThunkARCH }
+    , { "primCreateAdjThunkARCH",    "sAC","A",  MONAD_IO, i_PRIMOP2, i_createAdjThunkARCH }
 
 #ifdef PROVIDE_PTREQUALITY
     , { "primReallyUnsafePtrEquality", "aa", "B",MONAD_Id, i_PRIMOP2, i_reallyUnsafePtrEquality }
@@ -1389,11 +1389,17 @@ const AsmPrim asmPrimOps[] = {
 
     /* Ccall is polyadic - so it's excluded from this table */
 
-    , { 0,0,0,0 }
+    , { 0,0,0,0,0,0 }
 };
 
-const AsmPrim ccall_Id = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_Id };
-const AsmPrim ccall_IO = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_IO };
+const AsmPrim ccall_ccall_Id
+   = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_ccall_Id };
+const AsmPrim ccall_ccall_IO
+   = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_ccall_IO };
+const AsmPrim ccall_stdcall_Id 
+   = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_stdcall_Id };
+const AsmPrim ccall_stdcall_IO 
+   = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_stdcall_IO };
 
 
 const AsmPrim* asmFindPrim( char* s )

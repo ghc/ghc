@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1999.
  *
  * $RCSfile: universal_call_c.S,v $
- * $Revision: 1.3 $
- * $Date: 1999/10/22 15:58:26 $
+ * $Revision: 1.4 $
+ * $Date: 1999/10/26 17:27:31 $
  * ------------------------------------------------------------------------*/
 	
 #include "config.h"
@@ -66,6 +66,7 @@
 #endif
 	
 #if i386_TARGET_ARCH
+
 .globl universal_call_c_x86_ccall
 universal_call_c_x86_ccall:
 	pushl %ebp
@@ -77,61 +78,135 @@ universal_call_c_x86_ccall:
 	movl 16(%ebp),%edi
 	movl 8(%ebp),%ebx
 	testl %ebx,%ebx
-	jle docall
+	jle cdocall
 	
-looptop:
+clooptop:
 	cmpb $105,(%ebx,%edi)	# 'i'
-	jne .L6
+	jne .Lc6
 	pushl (%esi,%ebx,8)
-	jmp looptest
-.L6:
+	jmp clooptest
+.Lc6:
 	cmpb $73,(%ebx,%edi)	# 'I'
-	jne .L8
+	jne .Lc8
 	pushl 4(%esi,%ebx,8)
 	pushl (%esi,%ebx,8)
-	jmp looptest
-.L8:
+	jmp clooptest
+.Lc8:
 	cmpb $102,(%ebx,%edi)	# 'f'
-	jne .L10
+	jne .Lc10
 	movl (%esi,%ebx,8),%eax
 	pushl %eax
-	jmp looptest
-.L10:
+	jmp clooptest
+.Lc10:
 	cmpb $70,(%ebx,%edi)	# 'F'
-	jne looptest
+	jne clooptest
 	movl 4(%esi,%ebx,8),%eax
 	movl (%esi,%ebx,8),%edx
 	pushl %eax
 	pushl %edx
-looptest:
+clooptest:
 	decl %ebx
         testl %ebx,%ebx
-	jg looptop
+	jg clooptop
 
-docall:	
+cdocall:	
 	call *20(%ebp)
 	
 	cmpb $102,(%edi)	# 'f'
-	je float32
+	je cfloat32
 	cmpb $70,(%edi)		# 'F'
-	je float64
-iorI:
+	je cfloat64
+ciorI:
 	movl %eax,0(%esi)
 	movl %edx,4(%esi)
-	jmp bye
-float32:
+	jmp cbye
+cfloat32:
 	fstps 0(%esi)
-	jmp bye
-float64:
+	jmp cbye
+cfloat64:
 	fstpl 0(%esi)
-	jmp bye	
-bye:
+	jmp cbye	
+cbye:
 	leal -12(%ebp),%esp
 	popl %ebx
 	popl %esi
 	popl %edi
 	leave
 	ret
+
+
+	
+# Almost identical to the above piece of code
+# see comments near end for differences 
+	
+.globl universal_call_c_x86_stdcall
+universal_call_c_x86_stdcall:
+	pushl %ebp
+	movl %esp,%ebp
+	pushl %edi
+	pushl %esi
+	pushl %ebx
+	movl 12(%ebp),%esi
+	movl 16(%ebp),%edi
+	movl 8(%ebp),%ebx
+	testl %ebx,%ebx
+	jle sdocall
+	
+slooptop:
+	cmpb $105,(%ebx,%edi)	# 'i'
+	jne .Ls6
+	pushl (%esi,%ebx,8)
+	jmp slooptest
+.Ls6:
+	cmpb $73,(%ebx,%edi)	# 'I'
+	jne .Ls8
+	pushl 4(%esi,%ebx,8)
+	pushl (%esi,%ebx,8)
+	jmp slooptest
+.Ls8:
+	cmpb $102,(%ebx,%edi)	# 'f'
+	jne .Ls10
+	movl (%esi,%ebx,8),%eax
+	pushl %eax
+	jmp slooptest
+.Ls10:
+	cmpb $70,(%ebx,%edi)	# 'F'
+	jne slooptest
+	movl 4(%esi,%ebx,8),%eax
+	movl (%esi,%ebx,8),%edx
+	pushl %eax
+	pushl %edx
+slooptest:
+	decl %ebx
+        testl %ebx,%ebx
+	jg slooptop
+
+sdocall:	
+	call *20(%ebp)
+	
+	cmpb $102,(%edi)	# 'f'
+	je sfloat32
+	cmpb $70,(%edi)		# 'F'
+	je sfloat64
+siorI:
+	movl %eax,0(%esi)
+	movl %edx,4(%esi)
+	jmp sbye
+sfloat32:
+	fstps 0(%esi)
+	jmp sbye
+sfloat64:
+	fstpl 0(%esi)
+	jmp sbye	
+sbye:
+	## don_t clear the args -- the callee does it
+	## leal -12(%ebp),%esp
+	popl %ebx
+	popl %esi
+	popl %edi
+	leave
+	ret $16       # but we have to clear our own!
+
 #endif /* i386_TARGET_ARCH */
 	
 #endif /* INTERPRETER */

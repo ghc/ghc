@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/15 23:52:00 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/26 17:27:39 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -135,6 +135,9 @@ static Text textModule,  textImport,    textInterface,  textInstImport;
 static Text textHiding,  textQualified, textAsMod;
 static Text textExport,  textDynamic,   textUUExport;
 static Text textUnsafe,  textUUAll;
+
+Text   textCcall;                       /* ccall                           */
+Text   textStdcall;                     /* stdcall                         */
 
 Text   textNum;                         /* Num                             */
 Text   textPrelude;                     /* Prelude                         */
@@ -1493,6 +1496,8 @@ static Int local yylex() {             /* Read next input token ...        */
         if (it==textImport)            return IMPORT;
         if (it==textExport)            return EXPORT;
         if (it==textDynamic)           return DYNAMIC;
+        if (it==textCcall)             return CCALL;
+        if (it==textStdcall)           return STDCALL;
         if (it==textUUExport)          return UUEXPORT;
         if (it==textHiding)            return HIDING;
         if (it==textQualified)         return QUALIFIED;
@@ -1709,6 +1714,8 @@ Int what; {
                        textInstImport = findText("__instimport");
                        textExport     = findText("export");
                        textDynamic    = findText("dynamic");
+                       textCcall      = findText("ccall");
+                       textStdcall    = findText("stdcall");
                        textUUExport   = findText("__export");
                        textImport     = findText("import");
                        textHiding     = findText("hiding");

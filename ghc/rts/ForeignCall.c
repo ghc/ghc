@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.9 1999/10/22 15:58:21 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.10 1999/10/26 17:27:30 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -153,16 +153,19 @@ CFunDescriptor* mkDescriptor( char* as, char* rs )
  * External  refs for the assembly routines.
  * ----------------------------------------------------------------*/
 
-extern void universal_call_c_x86_ccall  ( int, void*, char*, void* );
-static void universal_call_c_generic    ( int, void*, char*, void* );
-
+#if i386_TARGET_ARCH
+extern void universal_call_c_x86_stdcall  ( int, void*, char*, void* );
+extern void universal_call_c_x86_ccall    ( int, void*, char*, void* );
+#else
+static void universal_call_c_generic      ( int, void*, char*, void* );
+#endif
 
 /* ----------------------------------------------------------------*
  * This is a generic version of universal call that
  * only works for specific argument patterns.
  * 
  * It allows ports to work on the Hugs Prelude immediately,
- * even if univeral_call_c_arch_callingconvention is not available.
+ * even if universal_call_c_arch_callingconvention is not available.
  * ----------------------------------------------------------------*/
 
 static void universal_call_c_generic
@@ -221,7 +224,11 @@ static void universal_call_c_generic
  * This code attempts to be architecture neutral (viz, generic).
  * ----------------------------------------------------------------*/
 
-int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
+int ccall ( CFunDescriptor*  d, 
+            void             (*fun)(void), 
+            StgBCO**         bco,
+            char             cc
+          )
 {
    double         arg_vec [31];
    char           argd_vec[31];
@@ -306,9 +313,14 @@ int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
    PushPtr((StgPtr)(*bco));
    SaveThreadState();
 
-#if 1
-   universal_call_c_x86_ccall ( 
-      d->num_args, (void*)arg_vec, argd_vec, fun );
+#if i386_TARGET_ARCH
+   if (cc == 'c')
+      universal_call_c_x86_ccall ( 
+         d->num_args, (void*)arg_vec, argd_vec, fun );
+   else if (cc == 's')
+      universal_call_c_x86_stdcall ( 
+         d->num_args, (void*)arg_vec, argd_vec, fun );
+   else barf ( "ccall(i386): unknown calling convention" );
 #else
    universal_call_c_generic ( 
       d->num_args, (void*)arg_vec, argd_vec, fun );
@@ -367,13 +379,13 @@ extern void* getHugs_AsmObject_for ( char* s );
 
 
 /* ----------------------------------------------------------------*
- * The implementation for x86_ccall.
+ * The implementation for x86_ccall and x86_stdcall.
  * ----------------------------------------------------------------*/
 
 static 
 HaskellObj
-unpackArgsAndCallHaskell_x86_ccall_wrk ( StgStablePtr stableptr, 
-                                         char* tydesc, char* args)
+unpackArgsAndCallHaskell_x86_nocallconv_wrk ( StgStablePtr stableptr, 
+                                              char* tydesc, char* args)
 {
    /* Copy args out of the C stack frame in an architecture
       dependent fashion, under the direction of the type description
@@ -437,7 +449,8 @@ unpackArgsAndCallHaskell_x86_ccall_wrk ( StgStablePtr stableptr,
             break;
          default:
             barf(
-               "unpackArgsAndCallHaskell_x86_ccall: unexpected arg type rep");
+               "unpackArgsAndCallHaskell_x86_nocallconv: "
+               "unexpected arg type rep");
       }
       argp++;
    }
@@ -448,7 +461,7 @@ unpackArgsAndCallHaskell_x86_ccall_wrk ( StgStablePtr stableptr,
 
    sstat = rts_eval ( node, &nodeOut );
    if (sstat != Success)
-      barf ("unpackArgsAndCallHaskell_x86_ccall: eval failed");
+      barf ("unpackArgsAndCallHaskell_x86_nocallconv: eval failed");
 
    return nodeOut;
 }
@@ -456,11 +469,14 @@ unpackArgsAndCallHaskell_x86_ccall_wrk ( StgStablePtr stableptr,
 
 static 
 double
-unpackArgsAndCallHaskell_x86_ccall_DOUBLE ( StgStablePtr stableptr, 
-                                            char* tydesc, char* args)
+unpackArgsAndCallHaskell_x86_nocallconv_DOUBLE ( 
+      StgStablePtr stableptr, char* tydesc, char* args
+   )
 {
    HaskellObj nodeOut
-      = unpackArgsAndCallHaskell_x86_ccall_wrk ( stableptr, tydesc, args );
+      = unpackArgsAndCallHaskell_x86_nocallconv_wrk ( 
+           stableptr, tydesc, args 
+        );
    /* Return a double.  This return will go into %st(0), which 
       is unmodified by the adjustor thunk.
    */
@@ -471,11 +487,14 @@ unpackArgsAndCallHaskell_x86_ccall_DOUBLE ( StgStablePtr stableptr,
 
 static 
 float
-unpackArgsAndCallHaskell_x86_ccall_FLOAT ( StgStablePtr stableptr, 
-                                           char* tydesc, char* args)
+unpackArgsAndCallHaskell_x86_nocallconv_FLOAT ( 
+      StgStablePtr stableptr, char* tydesc, char* args
+   )
 {
    HaskellObj nodeOut
-      = unpackArgsAndCallHaskell_x86_ccall_wrk ( stableptr, tydesc, args );
+      = unpackArgsAndCallHaskell_x86_nocallconv_wrk ( 
+           stableptr, tydesc, args 
+        );
    /* Probably could be merged with the double case, since %st(0) is
       still the return register.
    */
@@ -486,11 +505,14 @@ unpackArgsAndCallHaskell_x86_ccall_FLOAT ( StgStablePtr stableptr,
 
 static 
 unsigned long
-unpackArgsAndCallHaskell_x86_ccall_INTISH ( StgStablePtr stableptr, 
-                                            char* tydesc, char* args)
+unpackArgsAndCallHaskell_x86_nocallconv_INTISH ( 
+      StgStablePtr stableptr, char* tydesc, char* args
+   )
 {
    HaskellObj nodeOut
-      = unpackArgsAndCallHaskell_x86_ccall_wrk ( stableptr, tydesc, args );
+      = unpackArgsAndCallHaskell_x86_nocallconv_wrk ( 
+           stableptr, tydesc, args 
+        );
    /* A complete hack.  We know that all these returns will be
       put into %eax (and %edx, if it is a 64-bit return), and
       the adjustor thunk will then itself return to the original
@@ -506,56 +528,108 @@ unpackArgsAndCallHaskell_x86_ccall_INTISH ( StgStablePtr stableptr,
       case STABLE_REP: return (unsigned long)rts_getStablePtr(nodeOut);
       default:
          barf(
-            "unpackArgsAndCallHaskell_x86_ccall: unexpected res type rep");
+            "unpackArgsAndCallHaskell_x86_nocallconv: "
+            "unexpected res type rep");
    }
 }
 
 
+/* This is a bit subtle, since it can deal with both stdcall
+   and ccall.  There are two call transitions to consider:
+
+   1.  The call to "here".  If it's a ccall, we can return
+       using 'ret 0' and let the caller remove the args.
+       If stdcall, we have to return with 'ret N', where
+       N is the size of the args passed.  N has to be 
+       determined by inspecting the type descriptor string
+       typestr.
+
+   2.  The call to unpackArgsAndCallHaskell_x86_anycallconv_*.
+       Whether these are done with stdcall or ccall depends on
+       the conventions applied by the compiler that translated
+       those procedures.  Fortunately, we can sidestep what it
+       did by saving esp (in ebx), pushing the three args,
+       calling unpack..., and restoring esp from ebx.  This
+       trick assumes that ebx is a callee-saves register, so
+       its value will be preserved across the unpack... call.
+*/
 static
-StgAddr createAdjThunk_x86_ccall ( StgStablePtr stableptr,
-                                   StgAddr      typestr )
+StgAddr createAdjThunk_x86 ( StgStablePtr stableptr,
+                             StgAddr      typestr,
+                             char         callconv )
 {
    unsigned char* codeblock;
    unsigned char* cp;
-   unsigned int ts = (unsigned int)typestr;
-   unsigned int sp = (unsigned int)stableptr;
-   unsigned int ch;
+   unsigned int   ch;
+   unsigned int   nwords;
+
+   unsigned char* argp = (unsigned char*)typestr;
+   unsigned int   ts   = (unsigned int)typestr;
+   unsigned int   sp   = (unsigned int)stableptr;
 
    if (((char*)typestr)[0] == DOUBLE_REP)
-      ch = (unsigned int)&unpackArgsAndCallHaskell_x86_ccall_DOUBLE;
+      ch = (unsigned int)
+              &unpackArgsAndCallHaskell_x86_nocallconv_DOUBLE;
    else if (((char*)typestr)[0] == FLOAT_REP)
-      ch = (unsigned int)&unpackArgsAndCallHaskell_x86_ccall_FLOAT;
+      ch = (unsigned int)
+              &unpackArgsAndCallHaskell_x86_nocallconv_FLOAT;
    else
-      ch = (unsigned int)&unpackArgsAndCallHaskell_x86_ccall_INTISH;
+      ch = (unsigned int)
+              &unpackArgsAndCallHaskell_x86_nocallconv_INTISH;
 
-   codeblock = malloc ( 1 + 0x22 );
-   if (!codeblock) {
-      fprintf ( stderr, 
-                "createAdjThunk_x86_ccall (foreign export dynamic):\n"
-                "\tfatal: can't alloc mem\n" );
-      exit(1);
+   codeblock = malloc ( 0x26 );
+   if (!codeblock)
+      barf ( "createAdjThunk_x86: can't malloc memory\n");
+
+   if (callconv == 's') {
+      nwords = 0;
+      if (*argp != ':') argp++;
+      ASSERT( *argp == ':' );
+      argp++;
+      while (*argp) {
+         switch (*argp) {
+            case CHAR_REP: case INT_REP: case WORD_REP: 
+            case ADDR_REP: case STABLE_REP: case FLOAT_REP:
+               nwords += 4; break;
+            case DOUBLE_REP:
+               nwords += 8; break;
+            default:
+               barf("createAdjThunk_x86: unexpected type descriptor");
+         }
+         argp++;
+      }
+   } else
+   if (callconv == 'c') {
+      nwords = 0;
+   } else {
+      barf ( "createAdjThunk_x86: unknown calling convention\n");
    }
+
    cp = codeblock;
-   /* Generate the following:
-      0000 53           pushl %ebx
+   /*
+      0000 53           pushl %ebx        # save caller's registers
       0001 51           pushl %ecx
       0002 56           pushl %esi
       0003 57           pushl %edi
       0004 55           pushl %ebp
       0005 89E0         movl %esp,%eax    # sp -> eax
       0007 83C018       addl $24,%eax     # move eax back over 5 saved regs + retaddr
-      000a 50           pushl %eax        # push arg-block addr
-      000b 6844332211   pushl $0x11223344 # push addr of type descr string
-      0010 6877665544   pushl $0x44556677 # push stableptr to closure
-      0015 E8BBAA9988   call 0x8899aabb   # SEE COMMENT BELOW
-      001a 83C40C       addl $12,%esp     # pop 3 args
-      001d 5D           popl %ebp
-      001e 5F           popl %edi
-      001f 5E           popl %esi
-      0020 59           popl %ecx
-      0021 5B           popl %ebx
-      0022 C3           ret
-    */
+      000a 89E3         movl %esp,%ebx    # remember sp before pushing args
+      000c 50           pushl %eax        # push arg-block addr
+      000d 6844332211   pushl $0x11223344 # push addr of type descr string
+      0012 6877665544   pushl $0x44556677 # push stableptr to closure
+      0017 E8BBAA9988   call 0x8899aabb   # SEE COMMENT BELOW
+                                          # return value is in %eax, or %eax:%edx, 
+                                          # or %st(0), so don't trash these regs 
+                                          # between here and 'ret'
+      001c 89DC         movl %ebx,%esp    # restore sp from remembered value
+      001e 5D           popl %ebp         # restore caller's registers
+      001f 5F           popl %edi
+      0020 5E           popl %esi
+      0021 59           popl %ecx
+      0022 5B           popl %ebx
+      0023 C27766       ret  $0x6677      # return, clearing args if stdcall
+   */
    *cp++ = 0x53;
    *cp++ = 0x51;
    *cp++ = 0x56;
@@ -563,6 +637,7 @@ StgAddr createAdjThunk_x86_ccall ( StgStablePtr stableptr,
    *cp++ = 0x55;
    *cp++ = 0x89; *cp++ = 0xE0;
    *cp++ = 0x83; *cp++ = 0xC0; *cp++ = 0x18;
+   *cp++ = 0x89; *cp++ = 0xE3;
    *cp++ = 0x50;
    *cp++ = 0x68; *cp++=ts;ts>>=8; *cp++=ts;ts>>=8; *cp++=ts;ts>>=8; *cp++=ts;
    *cp++ = 0x68; *cp++=sp;sp>>=8; *cp++=sp;sp>>=8; *cp++=sp;sp>>=8; *cp++=sp;
@@ -571,13 +646,13 @@ StgAddr createAdjThunk_x86_ccall ( StgStablePtr stableptr,
    ch = ch - ( ((unsigned int)cp) + 5);
    *cp++ = 0xE8; *cp++=ch;ch>>=8; *cp++=ch;ch>>=8; *cp++=ch;ch>>=8; *cp++=ch;
 
-   *cp++ = 0x83; *cp++ = 0xC4; *cp++ = 0x0C;
+   *cp++ = 0x89; *cp++ = 0xDC;
    *cp++ = 0x5D;
    *cp++ = 0x5F;
    *cp++ = 0x5E;
    *cp++ = 0x59;
    *cp++ = 0x5B;
-   *cp++ = 0xC3;
+   *cp++ = 0xC2; *cp++=nwords;nwords>>=8; *cp++=nwords;
 
    return codeblock;
 }
@@ -589,9 +664,16 @@ StgAddr createAdjThunk_x86_ccall ( StgStablePtr stableptr,
  * ----------------------------------------------------------------*/
 
 StgAddr createAdjThunk ( StgStablePtr stableptr,
-                         StgAddr      typestr )
+                         StgAddr      typestr,
+                         StgChar      callconv )
 {
-   return createAdjThunk_x86_ccall ( stableptr, typestr );
+   return 
+#if i386_TARGET_ARCH
+      createAdjThunk_x86 ( stableptr, typestr, callconv );
+#else
+      0;
+      #warn foreign export not implemented on this architecture
+#endif
 }
 
 

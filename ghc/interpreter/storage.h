@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/16 02:17:25 $
+ * $Revision: 1.11 $
+ * $Date: 1999/10/26 17:27:42 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -555,6 +555,7 @@ struct strName {
     Bool   inlineMe;      /* self-evident    */
     Bool   simplified;    /* TRUE => already simplified */
     Bool   isDBuilder;    /* TRUE => is a dictionary builder */
+    Text   callconv;      /* for foreign import/export */
     const void*  primop;  /* really StgPrim* */
     Name   nextNameHash;
 };

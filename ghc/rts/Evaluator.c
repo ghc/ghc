@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.21 $
- * $Date: 1999/10/22 15:58:22 $
+ * $Revision: 1.22 $
+ * $Date: 1999/10/26 17:27:25 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -2883,7 +2883,8 @@ static void* enterBCO_primop2 ( int primop2code,
             {
                 StgStablePtr stableptr = PopTaggedStablePtr();
                 StgAddr      typestr   = PopTaggedAddr();
-                StgAddr      adj_thunk = createAdjThunk(stableptr,typestr);
+                StgChar      callconv  = PopTaggedChar();
+                StgAddr      adj_thunk = createAdjThunk(stableptr,typestr,callconv);
                 PushTaggedAddr(adj_thunk);
                 break;
             }     
@@ -3036,13 +3037,18 @@ off the stack.
                 ASSERT(0);
                 break;
 #endif /* PROVIDE_CONCURRENT */
-        case i_ccall_Id:
-        case i_ccall_IO:
+        case i_ccall_ccall_Id:
+        case i_ccall_ccall_IO:
+        case i_ccall_stdcall_Id:
+        case i_ccall_stdcall_IO:
             {
                 int r;
                 CFunDescriptor* descriptor = PopTaggedAddr();
                 void (*funPtr)(void)       = PopTaggedAddr();
-                r = ccall(descriptor,funPtr,bco);
+                char cc = (primop2code == i_ccall_stdcall_Id ||
+                           primop2code == i_ccall_stdcall_IO)
+                          ? 's' : 'c';
+                r = ccall(descriptor,funPtr,bco,cc);
                 if (r == 0) break;
                 if (r == 1) 
                    return makeErrorCall(

@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.12 $
- * $Date: 1999/10/20 02:15:59 $
+ * $Revision: 1.13 $
+ * $Date: 1999/10/26 17:27:41 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -78,6 +78,9 @@ extern Name  namePrint;                 /* printing primitive              */
 extern Name  nameCreateAdjThunk;        /* f-x-dyn: create adjustor thunk  */
 extern Text  textPrelude;
 extern Text  textNum;                   /* used to process default decls   */
+extern Text  textCcall;                 /* used to process foreign import  */
+extern Text  textStdcall;               /*         ... and foreign export  */
+
 #if    NPLUSK
 extern Text  textPlus;                  /* Used to recognise n+k patterns  */
 #endif
@@ -474,10 +477,10 @@ extern Type typeException;
 extern Type typeIO;
 extern Type typeST;
 
-extern  Void   foreignImport    Args((Cell,Pair,Cell,Cell));
+extern  Void   foreignImport    Args((Cell,Text,Pair,Cell,Cell));
 extern List  foreignImports;            /* foreign import declarations     */
 extern  Void   implementForeignImport Args((Name));
-extern  Void   foreignExport   Args((Cell,Cell,Cell,Cell));
+extern  Void   foreignExport   Args((Cell,Text,Cell,Cell,Cell));
 extern List  foreignExports;            /* foreign export declarations     */
 extern  Void   implementForeignExport Args((Name));
 
