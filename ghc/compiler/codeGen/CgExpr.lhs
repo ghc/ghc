@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.15 1998/12/02 13:17:49 simonm Exp $
+% $Id: CgExpr.lhs,v 1.16 1998/12/03 17:23:30 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -18,6 +18,7 @@ import Constants	( mAX_SPEC_SELECTEE_SIZE, mAX_SPEC_AP_SIZE )
 import StgSyn
 import CgMonad
 import AbsCSyn
+import AbsCUtils	( mkAbstractCs )
 import CLabel		( mkClosureTblLabel )
 
 import SMRep		( fixedHdrSize )
@@ -423,12 +424,26 @@ Little helper for primitives that return unboxed tuples.
 \begin{code}
 primRetUnboxedTuple :: PrimOp -> [StgArg] -> Type -> Code
 primRetUnboxedTuple op args res_ty
-  = let Just (tc,ty_args) = splitAlgTyConAppThroughNewTypes res_ty
+  = getArgAmodes args  `thenFC` \ arg_amodes ->		
+    {-
+	put all the arguments in temporaries so they don't get stomped when
+     	we push the return address.
+    -}
+    let 
+	n_args 		  = length args
+	arg_uniqs         = map mkBuiltinUnique [0..n_args-1]
+	arg_reps          = map getArgPrimRep args
+	arg_temps         = zipWith CTemp arg_uniqs arg_reps
+    in
+    absC (mkAbstractCs (zipWith CAssign arg_temps arg_amodes)) `thenC`
+    {-
+ 	allocate some temporaries for the return values.
+    -}
+    let 
+	Just (tc,ty_args) = splitAlgTyConAppThroughNewTypes res_ty
 	prim_reps         = map typePrimRep ty_args
-	temp_uniqs        = map mkBuiltinUnique [0..length ty_args]
+	temp_uniqs        = map mkBuiltinUnique [n_args..n_args+length ty_args-1]
 	temp_amodes       = zipWith CTemp temp_uniqs prim_reps
     in
-    returnUnboxedTuple temp_amodes 
-	(getArgAmodes args  `thenFC` \ arg_amodes ->		
-	 absC (COpStmt temp_amodes op arg_amodes []))
+    returnUnboxedTuple temp_amodes (absC (COpStmt temp_amodes op arg_temps []))
 \end{code}
