@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.5 2000/10/17 13:22:10 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.6 2000/10/18 09:40:18 simonmar Exp $
 --
 -- Driver flags
 --
@@ -397,6 +397,10 @@ dynamic_flags = [
 
   ,  ( "fallow-undecidable-instances",
 		NoArg (setDynFlag Opt_AllowUndecidableInstances) )
+
+  ,  ( "fgenerics",  NoArg (setDynFlag Opt_Generics) )
+
+  ,  ( "freport-compile", NoArg (setDynFlag Opt_ReportCompile) )
  ]
 
 -----------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.27 2000/10/12 15:17:08 sewardj Exp $
+% $Id: CgRetConv.lhs,v 1.28 2000/10/18 09:40:17 simonmar Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -21,11 +21,11 @@ module CgRetConv (
 import AbsCSyn		-- quite a few things
 import Constants	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 			  mAX_Vanilla_REG, mAX_Float_REG,
-			  mAX_Double_REG, mAX_Long_REG
+			  mAX_Double_REG, mAX_Long_REG,
+			  mAX_Real_Vanilla_REG, mAX_Real_Float_REG,
+			  mAX_Real_Double_REG, mAX_Real_Long_REG
 			)
-import CmdLineOpts	( opt_UseVanillaRegs, opt_UseFloatRegs,
-			  opt_UseDoubleRegs, opt_UseLongRegs
-			)
+import CmdLineOpts	( opt_Unregisterised )
 import Maybes		( catMaybes )
 import PrimRep		( isFloatingRep, PrimRep(..), is64BitRep )
 import TyCon		( TyCon, tyConFamilySize )
@@ -185,11 +185,20 @@ We take these register supplies from the *real* registers, i.e. those
 that are guaranteed to map to machine registers.
 
 \begin{code}
+useVanillaRegs | opt_Unregisterised = 0
+	       | otherwise          = mAX_Real_Vanilla_REG
+useFloatRegs   | opt_Unregisterised = 0
+	       | otherwise          = mAX_Real_Float_REG
+useDoubleRegs  | opt_Unregisterised = 0
+	       | otherwise          = mAX_Real_Double_REG
+useLongRegs    | opt_Unregisterised = 0
+	       | otherwise          = mAX_Real_Long_REG
+
 vanillaRegNos, floatRegNos, doubleRegNos, longRegNos :: [Int]
-vanillaRegNos	 = regList opt_UseVanillaRegs
-floatRegNos	 = regList opt_UseFloatRegs
-doubleRegNos	 = regList opt_UseDoubleRegs
-longRegNos       = regList opt_UseLongRegs
+vanillaRegNos	 = regList useVanillaRegs
+floatRegNos	 = regList useFloatRegs
+doubleRegNos	 = regList useDoubleRegs
+longRegNos       = regList useLongRegs
 
 allVanillaRegNos, allFloatRegNos, allDoubleRegNos, allLongRegNos :: [Int]
 allVanillaRegNos = regList mAX_Vanilla_REG

@@ -40,7 +40,6 @@ module CmdLineOpts (
 	opt_AllStrict,
 	opt_DictsStrict,
         opt_MaxContextReductionDepth,
-	opt_Generics,
 	opt_IrrefutableTuples,
 	opt_NumbersStrict,
 	opt_Parallel,
@@ -87,16 +86,9 @@ module CmdLineOpts (
 	opt_OmitInterfacePragmas,
 	opt_NoPruneTyDecls,
 	opt_NoPruneDecls,
-	opt_ReportCompile,
 	opt_Static,
 	opt_Unregisterised,
-	opt_Verbose,
-
-	-- Code generation
-	opt_UseVanillaRegs,
-	opt_UseFloatRegs,
-	opt_UseDoubleRegs,
-	opt_UseLongRegs
+	opt_Verbose
     ) where
 
 #include "HsVersions.h"
@@ -276,6 +268,10 @@ data DynFlag
    | Opt_AllowOverlappingInstances
    | Opt_AllowUndecidableInstances
    | Opt_GlasgowExts
+   | Opt_Generics
+
+   -- misc
+   | Opt_ReportCompile
    deriving (Eq)
 
 data DynFlags = DynFlags {
@@ -380,7 +376,6 @@ opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
 -- language opts
 opt_AllStrict			= lookUp  SLIT("-fall-strict")
 opt_DictsStrict			= lookUp  SLIT("-fdicts-strict")
-opt_Generics			= lookUp  SLIT("-fgenerics")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
 opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
@@ -439,21 +434,11 @@ opt_UF_UpdateInPlace		= lookUp  SLIT("-funfolding-update-in-place")
 opt_UF_CheapOp  = ( 1 :: Int)	-- Only one instruction; and the args are charged for
 opt_UF_DearOp   = ( 4 :: Int)
 			
-opt_ReportCompile               = lookUp SLIT("-freport-compile")
 opt_NoPruneDecls		= lookUp SLIT("-fno-prune-decls")
 opt_NoPruneTyDecls		= lookUp SLIT("-fno-prune-tydecls")
 opt_Static			= lookUp SLIT("-static")
 opt_Unregisterised		= lookUp SLIT("-funregisterised")
 opt_Verbose			= lookUp SLIT("-v")
-
-opt_UseVanillaRegs | opt_Unregisterised = 0
-		   | otherwise          = mAX_Real_Vanilla_REG
-opt_UseFloatRegs   | opt_Unregisterised = 0
-		   | otherwise          = mAX_Real_Float_REG
-opt_UseDoubleRegs  | opt_Unregisterised = 0
-		   | otherwise          = mAX_Real_Double_REG
-opt_UseLongRegs    | opt_Unregisterised = 0
-		   | otherwise          = mAX_Real_Long_REG
 \end{code}
 
 %************************************************************************
