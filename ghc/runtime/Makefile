@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.5 1997/03/17 20:34:59 simonpj Exp $
+# $Id: Makefile,v 1.6 1997/03/20 11:44:07 sof Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -140,7 +140,9 @@ SRCS_RTS_LC = $(wildcard c-as-asm/*.lc) \
 SRCS_RTS_LHC = $(wildcard main/*.lhc c-as-asm/*.lhc storage/*.lhc gum/*.lhc)
 
 HEADER_FILES = $(SRCS_RTS_LH:.lh=.h)
+
 C_SRCS = $(SRCS_RTS_LC:.lc=.c) $(SRCS_RTS_LHC:.lhc=.hc) $(SRCS_CLIB_LC:.lc=.c) $(HEADER_FILES)
+
 
 #
 # Clean out header files when doing way `normal'
@@ -156,12 +158,13 @@ LIBRARY = libHSrts$(_way).a
 LIBOBJS = $(patsubst %.lc,%.$(way_)o,$(SRCS_RTS_LC)) \
           $(patsubst %.lhc,%.$(way_)o,$(SRCS_RTS_LHC))
 
-#
-# dependencies
-#
 SRC_HC_OPTS += -I$(GHC_INCLUDE_DIR) $(GCap) $(GC2s) $(GC1s) -O -optc-DIN_GHC_RTS=1 -I$(GHC_RUNTIME_DIR)/storage 
 
-SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR) $(GCap) $(GC2s) $(GC1s)
+#
+# Note: _have_ to drop the -optc prefix for the GC-type opts (e.g. -optc-DGCap), since
+# -o<foo> is interpreted by mkdependC as meaning use <foo> as suffix.
+#
+SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR) $(patsubst -optc%,%,$(GCap) $(GC2s) $(GC1s))
 
 #-----------------------------------------------------------------------------
 # file-specific options 
