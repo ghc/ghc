@@ -28,8 +28,7 @@ die :: String -> IO a
 die s = do officialMsg s; exitWith (ExitFailure 1)
 
 my_system s
-   = do putStrLn s
-        exit_code <- system s
+   = do exit_code <- system s
         --putStrLn (show exit_code)
         return exit_code
 
@@ -67,11 +66,12 @@ data Expr
    | EContents  Expr
    | EExists    Expr
    | EMacro     MacroName [Expr]
-   | ECond      Expr Expr (Maybe Expr)
+   | ECond      Expr Expr Expr
    | EOtherwise
    | EDefined   Var
    | EFFail     Expr
    | EPipe      Expr Expr	-- input to pipe, name of program
+   | ERun       Expr
      deriving Show
 
 freeVars :: Expr -> [Var]
@@ -89,7 +89,6 @@ data Stmt
    = SAssign    Var Expr
    | SPrint     Expr
    | SCond      Expr [Stmt] (Maybe [Stmt])
-   | SRun       Var Expr
    | SReturn    Expr
    | SMacro     MacroName [Expr]
    | SFFail     Expr

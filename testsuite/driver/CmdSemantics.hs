@@ -423,11 +423,6 @@ doStmt (SCond c t maybe_f)
      else case maybe_f of
              Nothing -> returnEV Nothing
              Just f  -> doStmts f
-doStmt (SRun var expr)
-   = evalExpr expr				`thenEV` \ cmd_to_run ->
-     systemEV cmd_to_run			`thenEV` \ exit_code ->
-     addLocalVarBind var (show exit_code)	`thenEV_`
-     returnEV Nothing
 
 doStmt (SFFail expr)
    = evalExpr expr				`thenEV` \ res ->
@@ -560,18 +555,20 @@ evalExpr (EDefined v)
      returnEV (fromBool (isJust maybe_v))
 evalExpr EOtherwise
    = returnEV (fromBool True)
-evalExpr (ECond c t maybe_f)
+evalExpr (ECond c t f)
    = evalExprToBool c				`thenEV` \ c_bool ->
      if   c_bool
      then evalExpr t
-     else case maybe_f of
-             Nothing -> returnEV ""
-             Just f  -> evalExpr f
+     else evalExpr f
 evalExpr (EVar v)
    = lookupVar v
 evalExpr (EFFail expr)
    = evalExpr expr				`thenEV` \ res ->
      failEV ("=== user-framework-fail: " ++ res)
+evalExpr (ERun expr)
+   = evalExpr expr				`thenEV` \ cmd_to_run ->
+     systemEV cmd_to_run			`thenEV` \ exit_code ->
+     returnEV (show exit_code)
 
 evalExpr (EMacro mnm args)
    = runMacro mnm args				`thenEV` \ maybe_v ->

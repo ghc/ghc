@@ -23,8 +23,12 @@ boot:
 	@echo "Make boot is not needed here"
 
 runtests: $(RUNTESTS_SRCS)
-	ghc-5.00.2 -W -fno-warn-unused-matches --make Main -o runtests -ibasicRxLib -package lang -package util -cpp
+	ghc -W -fno-warn-unused-matches --make Main -o runtests -ibasicRxLib -package lang -package util -cpp
 
 clean:
 	/bin/rm -f runtests *.o *.hi basicRxLib/*.o basicRxLib/*.hi
 
+HAPPY_OPTS = -gac
+
+%.hs : %.y
+	happy $(HAPPY_OPTS) -o $@ $<
