@@ -4,7 +4,7 @@
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
 \begin{code}
-module Main ( main ) where
+module HscMain ( hscMain ) where
 
 #include "HsVersions.h"
 
@@ -46,84 +46,43 @@ import BSD
 import IOExts		( unsafePerformIO )
 import NativeInfo       ( os, arch )
 #endif
-#ifdef GHCI
 import StgInterp	( runStgI )
-import CmStaticInfo	( Package(..) )  -- ToDo: maybe zap this?
-import CompManager
-import System		( getArgs ) -- tmp debugging hack; to be rm'd
-import Linker		( linkPrelude )
-#endif
 \end{code}
 
 \begin{code}
-#ifdef GHCI
-fptools = "/home/v-julsew/GHCI/fpt"
-main = stderr `seq` ghci_main
+hscMain
+  :: DynFlags	
+  -> ModSummary       -- summary, including source filename
+  -> Maybe ModIFace   -- old interface, if available
+  -> String	      -- file in which to put the output (.s or .c)
+  -> HomeSymbolTable		-- for home module ModDetails
+  -> PersistentCompilerState    -- IN: persistent compiler state
+  -> IO CompResult    -- NB. without the Linkable filled in; the
+		      -- driver sorts that out.
 
-ghci_main :: IO ()
-ghci_main
-   = do putStr "GHCI main\n"
-        args <- getArgs
-        if length args /= 2
-         then 
-          do putStrLn "usage: ghci <path> ModuleName"
-         else
-          do pci_txt <- readFile (fptools ++ "/ghc/driver/package.conf.inplace")
-             let raw_package_info = read pci_txt :: [Package]
-             cmstate <- emptyCmState (args!!0) raw_package_info
-             junk <- cmLoadModule cmstate (args!!1)
-             return ()
-
-#else
-main = stderr `seq`	-- Bug fix.  Sigh
- --  _scc_ "main" 
- doIt classifyOpts
-#endif
-\end{code}
-
-\begin{code}
-parseModule :: IO (ModuleName, RdrNameHsModule)
-parseModule = do
-    buf <- hGetStringBuffer True{-expand tabs-} (unpackFS src_filename)
-    case parse buf PState{ bol = 0#, atbol = 1#,
-		           context = [], glasgow_exts = glaexts,
-		           loc = mkSrcLoc src_filename 1 } of
-
-	PFailed err -> do
-		printErrs err
-		ghcExit 1
-		return (error "parseModule") -- just to get the types right
-
-	POk _ m@(HsModule mod _ _ _ _ _ _) -> 
-		return (mod, m)
-  where
-	glaexts | opt_GlasgowExts = 1#
-		| otherwise       = 0#
-\end{code}
-
-\begin{code}
-doIt :: ([CoreToDo], [StgToDo]) -> IO ()
-
-doIt (core_cmds, stg_cmds)
-  = doIfSet opt_Verbose 
-	(hPutStr stderr "Glasgow Haskell Compiler, Version " 	>>
- 	 hPutStr stderr compiler_version                    	>>
-	 hPutStr stderr ", for Haskell 98, compiled by GHC version " >>
-	 hPutStr stderr booter_version				>>
-	 hPutStr stderr "\n")					>>
-
-#ifdef GHCI
---    linkPrelude >>
-#endif
+hscMain flags core_cmds stg_cmds summary maybe_old_iface
+	output_filename mod_details pcs =
 
 	--------------------------  Reader  ----------------
     show_pass "Parser"	>>
     _scc_     "Parser"
-    parseModule		>>= \ (mod_name, rdr_module) ->
 
-    dumpIfSet opt_D_dump_parsed "Parser" (ppr rdr_module) >>
+    buf <- hGetStringBuffer True{-expand tabs-} src_filename
 
-    dumpIfSet opt_D_source_stats "Source Statistics"
+    let glaexts | opt_GlasgowExts = 1#
+		| otherwise       = 0#
+
+    case parse buf PState{ bol = 0#, atbol = 1#,
+		           context = [], glasgow_exts = glaexts,
+		           loc = mkSrcLoc src_filename 1 } of {
+
+	PFailed err -> return (CompErrs pcs err);
+
+	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) ->
+
+    dumpIfSet (dopt_D_dump_parsed flags) "Parser" (ppr rdr_module) >>
+
+    dumpIfSet (dopt_D_source_stats flags) "Source Statistics"
 	(ppSourceStats False rdr_module)	 	>>
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
@@ -247,7 +206,7 @@ doIt (core_cmds, stg_cmds)
 	--------------------------  Final report -------------------------------
     reportCompile mod_name (showSDoc (ppSourceStats True rdr_module)) >>
 
-#endif /* GHCI */
+#endif
 
 
     ghcExit 0

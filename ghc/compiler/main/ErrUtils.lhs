@@ -98,7 +98,7 @@ doIfSet flag action | flag      = action
 \end{code}
 
 \begin{code}
-dumpIfSet :: Bool -> String -> SDoc -> IO ()
+dumpIfSet :: DynFlags -> (DynFlags -> Bool) -> String -> SDoc -> IO ()
 dumpIfSet flag hdr doc
   | not flag  = return ()
   | otherwise = printDump dump

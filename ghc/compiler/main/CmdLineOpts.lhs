@@ -4,6 +4,7 @@
 \section[CmdLineOpts]{Things to do with command-line options}
 
 \begin{code}
+
 module CmdLineOpts (
 	CoreToDo(..),
 	SimplifierSwitch(..),
@@ -14,48 +15,51 @@ module CmdLineOpts (
 	intSwitchSet,
 	switchIsOn,
 
-	src_filename,
-
 	-- debugging opts
-	opt_D_dump_absC,
-	opt_D_dump_asm,
-	opt_D_dump_cpranal,
-	opt_D_dump_cse,
-	opt_D_dump_deriv,
-	opt_D_dump_ds,
-	opt_D_dump_flatC,
-	opt_D_dump_foreign,
-	opt_D_dump_hi_diffs,
-	opt_D_dump_inlinings,
-	opt_D_dump_occur_anal,
-	opt_D_dump_parsed,
-	opt_D_dump_realC,
-	opt_D_dump_rn,
-	opt_D_dump_rules,
-	opt_D_dump_simpl,
-	opt_D_dump_simpl_iterations,
-	opt_D_dump_simpl_stats,
-	opt_D_dump_spec,
-	opt_D_dump_stg,
-	opt_D_dump_stranal,
-	opt_D_dump_tc,
-	opt_D_dump_types,
-        opt_D_dump_usagesp,
-	opt_D_dump_worker_wrapper,
-	opt_D_show_passes,
-	opt_D_dump_rn_trace,
-	opt_D_dump_rn_stats,
-        opt_D_dump_stix,
-	opt_D_dump_minimal_imports,
-	opt_D_source_stats,
-	opt_D_verbose_core2core,
-	opt_D_verbose_stg2stg,
-	opt_DoCoreLinting,
-	opt_DoStgLinting,
-        opt_DoUSPLinting,
-	opt_PprStyle_Debug,
+	dopt_D_dump_absC,
+	dopt_D_dump_asm,
+	dopt_D_dump_cpranal,
+	dopt_D_dump_cse,
+	dopt_D_dump_deriv,
+	dopt_D_dump_ds,
+	dopt_D_dump_flatC,
+	dopt_D_dump_foreign,
+	dopt_D_dump_hi_diffs,
+	dopt_D_dump_inlinings,
+	dopt_D_dump_occur_anal,
+	dopt_D_dump_parsed,
+	dopt_D_dump_realC,
+	dopt_D_dump_rn,
+	dopt_D_dump_rules,
+	dopt_D_dump_simpl,
+	dopt_D_dump_simpl_iterations,
+	dopt_D_dump_simpl_stats,
+	dopt_D_dump_spec,
+	dopt_D_dump_stg,
+	dopt_D_dump_stranal,
+	dopt_D_dump_tc,
+	dopt_D_dump_types,
+        dopt_D_dump_usagesp,
+	dopt_D_dump_worker_wrapper,
+	dopt_D_show_passes,
+	dopt_D_dump_rn_trace,
+	dopt_D_dump_rn_stats,
+        dopt_D_dump_stix,
+	dopt_D_dump_minimal_imports,
+	dopt_D_source_stats,
+	dopt_D_verbose_core2core,
+	dopt_D_verbose_stg2stg,
+	dopt_DoCoreLinting,
+	dopt_DoStgLinting,
+        dopt_DoUSPLinting,
+
 	opt_PprStyle_NoPrags,
 	opt_PprUserLength,
+	opt_PprStyle_Debug,
+
+	-- other dynamic flags
+	dopt_CoreToDo,
+	dopt_StgToDo,
 
 	-- warning opts
 	opt_WarnDuplicateExports,
@@ -85,9 +89,9 @@ module CmdLineOpts (
 	opt_AllStrict,
 	opt_DictsStrict,
         opt_MaxContextReductionDepth,
-        opt_AllowOverlappingInstances,
- 	opt_AllowUndecidableInstances,
-	opt_GlasgowExts,
+        dopt_AllowOverlappingInstances,
+ 	dopt_AllowUndecidableInstances,
+	dopt_GlasgowExts,
 	opt_Generics,
 	opt_IrrefutableTuples,
 	opt_NumbersStrict,
@@ -95,7 +99,6 @@ module CmdLineOpts (
 	opt_SMP,
 
 	-- optimisation opts
-	opt_DoEtaReduction,
 	opt_DoSemiTagging,
 	opt_FoldrBuildOn,
 	opt_LiberateCaseThreshold,
@@ -126,8 +129,6 @@ module CmdLineOpts (
 	opt_EmitCExternDecls,
 	opt_EnsureSplittableC,
 	opt_GranMacros,
-	opt_HiMap,
-	opt_HiMapSep,
 	opt_HiVersion,
 	opt_HistorySize,
 	opt_IgnoreAsserts,
@@ -138,13 +139,9 @@ module CmdLineOpts (
 	opt_OmitInterfacePragmas,
 	opt_ProduceExportCStubs,
 	opt_ProduceExportHStubs,
-	opt_HiFile,
-	opt_HiDir,
-	opt_HiSuf,
 	opt_NoPruneTyDecls,
 	opt_NoPruneDecls,
 	opt_ReportCompile,
-	opt_SourceUnchanged,
 	opt_Static,
 	opt_Unregisterised,
 	opt_Verbose,
@@ -166,9 +163,8 @@ import GlaExts
 import Argv
 import Constants	-- Default values for some flags
 
-import FastString	( headFS )
-import Maybes		( firstJust, maybeToBool )
-import Panic		( panic, panic# )
+import Maybes		( firstJust )
+import Panic		( panic )
 
 #if __GLASGOW_HASKELL__ < 301
 import ArrBase	( Array(..) )
@@ -177,8 +173,31 @@ import PrelArr  ( Array(..) )
 #endif
 \end{code}
 
-A command-line {\em switch} is (generally) either on or off; e.g., the
-``verbose'' (-v) switch is either on or off.
+%************************************************************************
+%*									*
+\subsection{Command-line options}
+%*									*
+%************************************************************************
+
+The hsc command-line options are split into two categories:
+
+  - static flags
+  - dynamic flags
+
+Static flags are represented by top-level values of type Bool or Int,
+for example.  They therefore have the same value throughout the
+invocation of hsc.
+
+Dynamic flags are represented by a function:
+
+	checkDynFlag :: DynFlag -> SwitchResult
+
+which is passed into hsc by the compilation manager for every
+compilation.  Dynamic flags are those that change on a per-compilation
+basis, perhaps because they may be present in the OPTIONS pragma at
+the top of a module.
+
+Other flag-related blurb:
 
 A list of {\em ToDo}s is things to be done in a particular part of
 processing.  A (fictitious) example for the Core-to-Core simplifier
@@ -189,7 +208,6 @@ There are three ``to-do processing centers'' at the moment.  In the
 main loop (\tr{main/Main.lhs}), in the Core-to-Core processing loop
 (\tr{simplCore/SimplCore.lhs), and in the STG-to-STG processing loop
 (\tr{simplStg/SimplStg.lhs}).
-
 
 %************************************************************************
 %*									*
@@ -248,6 +266,120 @@ data SimplifierSwitch
 
 %************************************************************************
 %*									*
+\subsection{Dynamic command-line options}
+%*									*
+%************************************************************************
+
+\begin{code}
+data DynFlag
+
+   -- debugging flags
+   = Opt_D_dump_all
+   | Opt_D_dump_most
+   | Opt_D_dump_absC
+   | Opt_D_dump_asm
+   | Opt_D_dump_cpranal
+   | Opt_D_dump_deriv
+   | Opt_D_dump_ds
+   | Opt_D_dump_flatC
+   | Opt_D_dump_foreign
+   | Opt_D_dump_inlinings
+   | Opt_D_dump_occur_anal
+   | Opt_D_dump_parsed
+   | Opt_D_dump_realC
+   | Opt_D_dump_rn
+   | Opt_D_dump_simpl
+   | Opt_D_dump_simpl_iterations
+   | Opt_D_dump_spec
+   | Opt_D_dump_stg
+   | Opt_D_dump_stranal
+   | Opt_D_dump_tc
+   | Opt_D_dump_types
+   | Opt_D_dump_rules
+   | Opt_D_dump_usagesp
+   | Opt_D_dump_cse
+   | Opt_D_dump_worker_wrapper
+   | Opt_D_show_passes
+   | Opt_D_dump_rn_trace
+   | Opt_D_dump_rn_stats
+   | Opt_D_dump_stix
+   | Opt_D_dump_simpl_stats
+   | Opt_D_source_stats
+   | Opt_D_verbose_core2core
+   | Opt_D_verbose_stg2stg
+   | Opt_D_dump_hi_diffs
+   | Opt_D_dump_minimal_imports
+   | Opt_DoCoreLinting
+   | Opt_DoStgLinting
+   | Opt_DoUSPLinting
+
+   -- language opts
+   | Opt_AllowOverlappingInstances
+   | Opt_AllowUndecidableInstances
+   | Opt_GlasgowExts
+   deriving (Eq)
+
+newtype DynFlags = DynFlags (CoreToDo, StgToDo, [(DynFlag, SwitchResult)])
+
+boolOpt :: DynFlag -> DynFlags -> Bool
+boolOpt f (DynFlags (_, _, dflags))
+  = case lookup f dflags of
+	Nothing -> False
+	Just (SwBool b) -> b
+	_ -> panic "boolOpt"
+
+dopt_D_dump_all              = boolOpt Opt_D_dump_all
+dopt_D_dump_most             = boolOpt Opt_D_dump_most
+dopt_D_dump_absC             = boolOpt Opt_D_dump_absC
+dopt_D_dump_asm              = boolOpt Opt_D_dump_asm
+dopt_D_dump_cpranal          = boolOpt Opt_D_dump_cpranal
+dopt_D_dump_deriv            = boolOpt Opt_D_dump_deriv
+dopt_D_dump_ds               = boolOpt Opt_D_dump_ds
+dopt_D_dump_flatC            = boolOpt Opt_D_dump_flatC
+dopt_D_dump_foreign          = boolOpt Opt_D_dump_foreign
+dopt_D_dump_inlinings        = boolOpt Opt_D_dump_inlinings
+dopt_D_dump_occur_anal       = boolOpt Opt_D_dump_occur_anal
+dopt_D_dump_parsed           = boolOpt Opt_D_dump_parsed
+dopt_D_dump_realC            = boolOpt Opt_D_dump_realC
+dopt_D_dump_rn               = boolOpt Opt_D_dump_rn
+dopt_D_dump_simpl            = boolOpt Opt_D_dump_simpl
+dopt_D_dump_simpl_iterations = boolOpt Opt_D_dump_simpl_iterations
+dopt_D_dump_spec             = boolOpt Opt_D_dump_spec
+dopt_D_dump_stg              = boolOpt Opt_D_dump_stg
+dopt_D_dump_stranal          = boolOpt Opt_D_dump_stranal
+dopt_D_dump_tc               = boolOpt Opt_D_dump_tc
+dopt_D_dump_types            = boolOpt Opt_D_dump_types
+dopt_D_dump_rules            = boolOpt Opt_D_dump_rules
+dopt_D_dump_usagesp          = boolOpt Opt_D_dump_usagesp
+dopt_D_dump_cse              = boolOpt Opt_D_dump_cse
+dopt_D_dump_worker_wrapper   = boolOpt Opt_D_dump_worker_wrapper
+dopt_D_show_passes           = boolOpt Opt_D_show_passes
+dopt_D_dump_rn_trace         = boolOpt Opt_D_dump_rn_trace
+dopt_D_dump_rn_stats         = boolOpt Opt_D_dump_rn_stats
+dopt_D_dump_stix             = boolOpt Opt_D_dump_stix
+dopt_D_dump_simpl_stats      = boolOpt Opt_D_dump_simpl_stats
+dopt_D_source_stats          = boolOpt Opt_D_source_stats
+dopt_D_verbose_core2core     = boolOpt Opt_D_verbose_core2core
+dopt_D_verbose_stg2stg       = boolOpt Opt_D_verbose_stg2stg
+dopt_D_dump_hi_diffs         = boolOpt Opt_D_dump_hi_diffs
+dopt_D_dump_minimal_imports  = boolOpt Opt_D_dump_minimal_imports
+dopt_DoCoreLinting           = boolOpt Opt_DoCoreLinting
+dopt_DoStgLinting            = boolOpt Opt_DoStgLinting
+dopt_DoUSPLinting            = boolOpt Opt_DoUSPLinting
+
+dopt_AllowOverlappingInstances = boolOpt Opt_AllowOverlappingInstances
+dopt_AllowUndecidableInstances = boolOpt Opt_AllowUndecidableInstances
+dopt_GlasgowExts               = boolOpt Opt_GlasgowExts
+
+dopt_CoreToDo :: DynFlags -> CoreToDo
+dopt_CoreToDo (DynFlags (core_todo,_,_)) = core_todo
+
+dopt_StgToDo :: DynFlags -> StgToDo
+dopt_StgToDo (DynFlags (_,stg_todo,_)) = stg_todo
+\end{code}
+
+%************************************************************************
+%*									*
 \subsection{Classifying command-line options}
 %*									*
 %************************************************************************
@@ -298,56 +430,14 @@ unpacked_opts =
 -}
 \end{code}
 
-\begin{code}
-src_filename :: FAST_STRING
-src_filename = case argv of
-		  filename : rest | headFS filename /= '-' -> filename
-		  otherwise -> panic "no filename"
-\end{code}
+%************************************************************************
+%*									*
+\subsection{Static options}
+%*									*
+%************************************************************************
 
 \begin{code}
 -- debugging opts
-opt_D_dump_all   {- do not -}   = lookUp  SLIT("-ddump-all")
-opt_D_dump_most  {- export -}   = opt_D_dump_all  || lookUp  SLIT("-ddump-most")
-
-opt_D_dump_absC			= opt_D_dump_all  || lookUp  SLIT("-ddump-absC")
-opt_D_dump_asm			= opt_D_dump_all  || lookUp  SLIT("-ddump-asm")
-opt_D_dump_cpranal	        = opt_D_dump_most || lookUp  SLIT("-ddump-cpranal")
-opt_D_dump_deriv		= opt_D_dump_most || lookUp  SLIT("-ddump-deriv")
-opt_D_dump_ds			= opt_D_dump_most || lookUp  SLIT("-ddump-ds")
-opt_D_dump_flatC		= opt_D_dump_all  || lookUp  SLIT("-ddump-flatC")
-opt_D_dump_foreign		= opt_D_dump_most || lookUp  SLIT("-ddump-foreign-stubs")
-opt_D_dump_inlinings		= opt_D_dump_all  || lookUp  SLIT("-ddump-inlinings")
-opt_D_dump_occur_anal		= opt_D_dump_all  || lookUp  SLIT("-ddump-occur-anal")
-opt_D_dump_parsed		= opt_D_dump_most || lookUp  SLIT("-ddump-parsed")
-opt_D_dump_realC		= opt_D_dump_all  || lookUp  SLIT("-ddump-realC")
-opt_D_dump_rn			= opt_D_dump_most || lookUp  SLIT("-ddump-rn")
-opt_D_dump_simpl		= opt_D_dump_most || lookUp  SLIT("-ddump-simpl")
-opt_D_dump_simpl_iterations	= opt_D_dump_all  || lookUp  SLIT("-ddump-simpl-iterations")
-opt_D_dump_spec			= opt_D_dump_most || lookUp  SLIT("-ddump-spec")
-opt_D_dump_stg			= opt_D_dump_most || lookUp  SLIT("-ddump-stg")
-opt_D_dump_stranal		= opt_D_dump_most || lookUp  SLIT("-ddump-stranal")
-opt_D_dump_tc			= opt_D_dump_most || lookUp  SLIT("-ddump-tc")
-opt_D_dump_types		= opt_D_dump_most || lookUp  SLIT("-ddump-types")
-opt_D_dump_rules		= opt_D_dump_most || lookUp  SLIT("-ddump-rules")
-opt_D_dump_usagesp              = opt_D_dump_most || lookUp  SLIT("-ddump-usagesp")
-opt_D_dump_cse 	                = opt_D_dump_most || lookUp  SLIT("-ddump-cse")
-opt_D_dump_worker_wrapper	= opt_D_dump_most || lookUp  SLIT("-ddump-workwrap")
-opt_D_show_passes		= opt_D_dump_most || lookUp  SLIT("-dshow-passes")
-opt_D_dump_rn_trace		= opt_D_dump_all  || lookUp  SLIT("-ddump-rn-trace")
-opt_D_dump_rn_stats		= opt_D_dump_most || lookUp  SLIT("-ddump-rn-stats")
-opt_D_dump_stix 		= opt_D_dump_all  || lookUp  SLIT("-ddump-stix")
-opt_D_dump_simpl_stats		= opt_D_dump_most || lookUp  SLIT("-ddump-simpl-stats")
-opt_D_source_stats		= opt_D_dump_most || lookUp  SLIT("-dsource-stats")
-opt_D_verbose_core2core		= opt_D_dump_all  || lookUp  SLIT("-dverbose-simpl")
-opt_D_verbose_stg2stg		= opt_D_dump_all  || lookUp  SLIT("-dverbose-stg")
-opt_D_dump_hi_diffs		= opt_D_dump_all  || lookUp  SLIT("-ddump-hi-diffs")
-
-opt_D_dump_minimal_imports	= lookUp  SLIT("-ddump-minimal-imports")
-
-opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
-opt_DoStgLinting		= lookUp  SLIT("-dstg-lint")
-opt_DoUSPLinting		= lookUp  SLIT("-dusagesp-lint")
 opt_PprStyle_NoPrags		= lookUp  SLIT("-dppr-noprags")
 opt_PprStyle_Debug		= lookUp  SLIT("-dppr-debug")
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
@@ -379,9 +469,6 @@ opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
 -- language opts
 opt_AllStrict			= lookUp  SLIT("-fall-strict")
 opt_DictsStrict			= lookUp  SLIT("-fdicts-strict")
-opt_AllowOverlappingInstances   = lookUp  SLIT("-fallow-overlapping-instances")
-opt_AllowUndecidableInstances 	= lookUp  SLIT("-fallow-undecidable-instances")
-opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
 opt_Generics			= lookUp  SLIT("-fgenerics")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
@@ -390,7 +477,6 @@ opt_Parallel			= lookUp  SLIT("-fparallel")
 opt_SMP				= lookUp  SLIT("-fsmp")
 
 -- optimisation opts
-opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
 opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
@@ -411,8 +497,6 @@ opt_InPackage			= case lookup_str "-inpackage=" of
 opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
-opt_HiMap 			= lookup_str "-himap="       -- file saying where to look for .hi files
-opt_HiMapSep                    = lookup_def_char "-himap-sep=" ':'
 opt_HiVersion			= lookup_def_int "-fhi-version=" 0 -- what version we're compiling.
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 opt_IgnoreAsserts               = lookUp  SLIT("-fignore-asserts")
@@ -423,11 +507,6 @@ opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
 opt_ProduceExportCStubs		= lookup_str "-F="
 opt_ProduceExportHStubs		= lookup_str "-FH="
-
--- where to generate the .hi file
-opt_HiFile			= lookup_str "-hifile="
-opt_HiDir			= lookup_str "-hidir="
-opt_HiSuf			= lookup_str "-hisuf="
 
 -- Language for output: "C", "asm", "java", maybe more
 -- Nothing => don't output anything
@@ -464,7 +543,6 @@ opt_UF_DearOp   = ( 4 :: Int)
 opt_ReportCompile               = lookUp SLIT("-freport-compile")
 opt_NoPruneDecls		= lookUp SLIT("-fno-prune-decls")
 opt_NoPruneTyDecls		= lookUp SLIT("-fno-prune-tydecls")
-opt_SourceUnchanged		= lookUp SLIT("-fsource-unchanged")
 opt_Static			= lookUp SLIT("-static")
 opt_Unregisterised		= lookUp SLIT("-funregisterised")
 opt_Verbose			= lookUp SLIT("-v")
