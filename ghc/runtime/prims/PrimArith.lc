@@ -7,6 +7,23 @@
 \begin{code}
 /* basic definitions, just as if this were a module */
 
+/* 
+  Sigh, ieee-flpt.h (which we need here) uses
+  __GLASGOW_HASKELL__ in a place or two to check
+  whether it is being included in a Haskell source file
+  or not. This is no longer the case! __GLASGOW_HASKELL__
+  is also defined when compiling .c files (C code that
+  depend on the RTS API needs to know this).
+  
+  An unfortunate state of affairs, but since this is
+  the only place where the two uses of __GLASGOW_HASKELL__
+  clash, we hack around and undefine it before including
+  the header file.    -- sof 8/98
+*/
+#ifdef __GLASGOW_HASKELL__
+#undef __GLASGOW_HASKELL__
+#endif
+
 #include "rtsdefs.h"
 \end{code}
 
