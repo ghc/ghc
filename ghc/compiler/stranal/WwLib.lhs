@@ -12,7 +12,7 @@ module WwLib (
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( exprType, mkInlineMe )
+import CoreUtils	( exprType )
 import Id		( Id, idType, mkSysLocal, idDemandInfo, setIdDemandInfo,
 			  isOneShotLambda, setOneShotLambda,
                           mkWildId, setIdInfo
