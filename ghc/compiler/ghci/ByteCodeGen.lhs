@@ -510,11 +510,14 @@ schemeT d s p app
       -- Detect and extract relevant info for the tagToEnum kludge.
       maybe_is_tagToEnum_call
          = let extract_constr_Names ty
-                  = case splitTyConApp_maybe (repType ty) of
-                       (Just (tyc, [])) |  isDataTyCon tyc
-                                        -> map getName (tyConDataCons tyc)
-                       other -> panic "maybe_is_tagToEnum_call.extract_constr_Ids"
-           in 
+		 | Just (tyc, []) <- splitTyConApp_maybe (repType ty),
+		   isDataTyCon tyc
+		   = map (getName . dataConWorkId) (tyConDataCons tyc)
+		   -- NOTE: use the worker name, not the source name of
+		   -- the DataCon.  See DataCon.lhs for details.
+		 | otherwise
+		   = panic "maybe_is_tagToEnum_call.extract_constr_Ids"
+           in
            case app of
               (AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType t)) arg)
                  -> case isPrimOpId_maybe v of
