@@ -37,6 +37,10 @@ char gr_filename[STATS_FILENAME_MAXLEN];
 GlobalParStats globalParStats;
 #endif
 
+#if defined(PAR)
+ullong startTime = 0;
+#endif
+
 #if defined(PAR) && !defined(DEBUG)
 // HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACCCCCCCCCKKKKKKKKKKKK
 // Definitely the wrong place for info_type in !DEBUG (see Printer.c) -- HWL
