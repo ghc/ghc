@@ -56,7 +56,7 @@ import Panic		( progName, GhcException(..) )
 import Util		( global )
 import CmdLineOpts	( dynFlag, verbosity )
 
-import Exception	( throwDyn, catchAllIO )
+import Exception	( throwDyn, catch )
 import IO
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
@@ -641,7 +641,7 @@ removeTmpFiles verb fs
 	     ("Deleting: " ++ unwords fs)
 	     (mapM_ rm fs)
   where
-    rm f = removeFile f `catchAllIO` 
+    rm f = removeFile f `catch` 
 		(\_ignored -> 
 		    when (verb >= 2) $
 		      hPutStrLn stderr ("Warning: deleting non-existent " ++ f)
@@ -708,7 +708,7 @@ traceCmd phase_name cmd_line action
 	; unless n $ do {
 
 	   -- And run it!
-	; action `catchAllIO` handle_exn verb
+	; action `catch` handle_exn verb
 	}}
   where
     handle_exn verb exn = do { when (verb >= 2) (hPutStr   stderr "\n")
