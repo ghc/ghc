@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.93 2000/09/29 15:59:28 sewardj Exp $
+# $Id: Makefile,v 1.94 2000/10/10 13:13:17 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -23,6 +23,55 @@ else
 HS_PROG=hsc
 endif
 
+# -----------------------------------------------------------------------------
+# Create compiler configuration
+
+CONFIG_HS = main/Config.hs
+boot :: $(CONFIG_HS)
+
+$(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
+	@$(RM) -f $(CONFIG_HS)
+	@echo -n "Creating $(CONFIG_HS) ... "
+	@echo "module Config where" >>$(CONFIG_HS)
+	@echo "cProjectName          = \"$(ProjectName)\"" >> $(CONFIG_HS)
+	@echo "cProjectVersion       = \"$(ProjectVersion)\"" >> $(CONFIG_HS)
+	@echo "cProjectVersionInt    = \"$(ProjectVersionInt)\"" >> $(CONFIG_HS)
+	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
+	@echo "cHOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> $(CONFIG_HS)
+	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> $(CONFIG_HS)
+	@echo "cCURRENT_DIR          = \"$(CURRENT_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_LIB_DIR          = \"$(GHC_LIB_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_RUNTIME_DIR      = \"$(GHC_RUNTIME_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_UTILS_DIR        = \"$(GHC_UTILS_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_INCLUDE_DIR      = \"$(GHC_INCLUDE_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
+	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $(CONFIG_HS)
+	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> $(CONFIG_HS)
+	@echo "cGHC_UNLIT            = \"$(GHC_UNLIT)\"" >> $(CONFIG_HS)
+	@echo "cGHC_HSC              = \"$(GHC_HSC)\"" >> $(CONFIG_HS)
+	@echo "cGHC_MANGLER          = \"$(GHC_MANGLER)\"" >> $(CONFIG_HS)
+	@echo "cGHC_SPLIT            = \"$(GHC_SPLIT)\"" >> $(CONFIG_HS)
+	@echo "cGHC_STATS            = \"$(GHC_STATS)\"" >> $(CONFIG_HS)
+	@echo "cGHC_SYSMAN           = \"$(GHC_SYSMAN)\"" >> $(CONFIG_HS)
+	@echo "cEnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> $(CONFIG_HS)
+	@echo "cCP                   = \"$(CP)\"" >> $(CONFIG_HS)
+	@echo "cRM                   = \"$(RM)\"" >> $(CONFIG_HS)
+	@echo "cCONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> $(CONFIG_HS)
+	@echo "cHaveLibGmp           = \"$(HaveLibGmp)\"" >> $(CONFIG_HS)
+	@echo "cGhcWithRegisterised  = \"$(GhcWithRegisterised)\"" >> $(CONFIG_HS)
+	@echo "cUSER_WAY_NAMES       = \"$(USER_WAY_NAMES)\"" >> $(CONFIG_HS)
+	@echo "cUSER_WAY_OPTS        = \"$(USER_WAY_OPTS)\"" >> $(CONFIG_HS)
+	@echo "clibdir               = \"$(libdir)\"" >> $(CONFIG_HS)
+	@echo "clibexecdir           = \"$(libexecdir)\"" >> $(CONFIG_HS)
+	@echo "cdatadir              = \"$(datadir)\"" >> $(CONFIG_HS)
+	@echo "cbindir               = \"$(bindir)\"" >> $(CONFIG_HS)
+	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $(CONFIG_HS)
+	@echo "cFPTOOLS_TOP_ABS      = \"$(FPTOOLS_TOP_ABS)\"" >> $(CONFIG_HS)
+	@echo "cRAWCPP               = \"$(RAWCPP)\"" >> $(CONFIG_HS)
+	@echo done.
+
+CLEAN_FILES += $(CONFIG_HS)
 
 # -----------------------------------------------------------------------------
 #		Compilation history for Patrick
@@ -55,7 +104,7 @@ endif
 endif
 
 
-HS_SRCS = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs))
+HS_SRCS = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
 
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
 HS_SRCS += rename/ParseIface.hs parser/Parser.hs
@@ -109,9 +158,20 @@ empty:=
 space:= $(empty) $(empty)
 
 SRC_HC_OPTS += \
-  -cpp -fglasgow-exts -Rghc-timing \
-  -I. -IcodeGen -InativeGen -Iparser \
+  -cpp -fglasgow-exts \
+  -Rghc-timing -I. -IcodeGen -InativeGen -Iparser \
   -i$(subst $(space),:,$(DIRS)) 
+
+ghc_407_at_least = $(shell expr "$(GhcMinVersion)" \>= 7)
+ifeq "$(ghc_407_at_least)" "1"
+ifneq "$(mingw32_TARGET_OS)" "1"
+SRC_HC_OPTS += -package concurrent -package posix -package text
+else
+SRC_HC_OPTS += -package concurrent -package text
+endif
+else
+SRC_HC_OPTS += -syslib concurrent -syslib posix -syslib misc
+endif
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
 
