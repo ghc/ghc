@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.4 1999/01/07 15:42:33 simonm Exp $
+ * $Id: system.c,v 1.5 1999/03/01 08:57:57 sof Exp $
  *
  * system Runtime Support
  */
@@ -13,8 +13,10 @@
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_SYS_WAIT_H
-#include <sys/wait.h>
+#ifndef mingw32_TARGET_OS
+# ifdef HAVE_SYS_WAIT_H
+#  include <sys/wait.h>
+# endif
 #endif
 
 #ifdef HAVE_VFORK_H
@@ -29,6 +31,15 @@ StgInt
 systemCmd(cmd)
 StgByteArray cmd;
 {
+#if defined(mingw32_TARGET_OS)
+  if (system(cmd) < 0) {
+     cvtErrno();
+     stdErrno();
+     return -1;
+  }
+  sleep(1);
+  return 0;
+#else
 #if defined(cygwin32_TARGET_OS)
    /* The implementation of std. fork() has its problems
       under cygwin32-b18, so we fall back on using libc's
@@ -80,5 +91,6 @@ StgByteArray cmd;
 	ghc_errstr = "internal error (process neither exited nor signalled)";
     }
     return -1;
+#endif
 #endif
 }
