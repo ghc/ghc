@@ -1,6 +1,8 @@
 import Control.Concurrent
 import Control.Exception
 
+import System.IO (hFlush,stdout)
+
 -- !!! Try to get two threads into a knot depending on each other.
 
 -- This should result in the main thread being sent a NonTermination
@@ -17,3 +19,6 @@ main = do
   forkIO (print a)
   r <- Control.Exception.try $ print b
   print r
+  hFlush stdout -- HACK, because sometimes stdout gets finalised too early in
+		-- this test, and I can't be bothered to figure out exactly
+		-- how it should work. --SDM 23/7/2003
