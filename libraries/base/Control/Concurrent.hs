@@ -8,47 +8,40 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Concurrent.hs,v 1.1 2001/06/28 14:15:01 simonmar Exp $
+-- $Id: Concurrent.hs,v 1.2 2001/08/07 15:25:04 simonmar Exp $
 --
 -- A common interface to a collection of useful concurrency
 -- abstractions.
 --
 -----------------------------------------------------------------------------
 
-module Control.Concurrent
-	( module Control.Concurrent.Chan
-	, module Control.Concurrent.CVar
-	, module Control.Concurrent.MVar
-	, module Control.Concurrent.QSem
-	, module Control.Concurrent.QSemN
-	, module Control.Concurrent.SampleVar
+module Control.Concurrent (
+	module Control.Concurrent.Chan,
+	module Control.Concurrent.CVar,
+	module Control.Concurrent.MVar,
+	module Control.Concurrent.QSem,
+	module Control.Concurrent.QSemN,
+	module Control.Concurrent.SampleVar,
 
-#ifdef __HUGS__
-	, forkIO	-- :: IO () -> IO ()
-#elif defined(__GLASGOW_HASKELL__)
-        , ThreadId
+	forkIO,			-- :: IO () -> IO ()
+	yield,         		-- :: IO ()
+
+#ifdef __GLASGOW_HASKELL__
+        ThreadId,
 
 	-- Forking and suchlike
-	, myThreadId 	-- :: IO ThreadId
-	, killThread	-- :: ThreadId -> IO ()
-	, throwTo       -- :: ThreadId -> Exception -> IO ()
-#endif
-	, par  		-- :: a -> b -> b
-	, seq  		-- :: a -> b -> b
-#ifdef __GLASGOW_HASKELL__
-	, fork  	-- :: a -> b -> b
-#endif
-	, yield         -- :: IO ()
+	myThreadId, 		-- :: IO ThreadId
+	killThread,		-- :: ThreadId -> IO ()
+	throwTo,		-- :: ThreadId -> Exception -> IO ()
 
-#ifdef __GLASGOW_HASKELL__
-	, threadDelay		-- :: Int -> IO ()
-	, threadWaitRead	-- :: Int -> IO ()
-	, threadWaitWrite	-- :: Int -> IO ()
+	threadDelay,		-- :: Int -> IO ()
+	threadWaitRead,		-- :: Int -> IO ()
+	threadWaitWrite,	-- :: Int -> IO ()
 #endif
 
 	 -- merging of streams
-	, mergeIO	-- :: [a]   -> [a] -> IO [a]
-	, nmergeIO	-- :: [[a]] -> IO [a]
+	mergeIO,		-- :: [a]   -> [a] -> IO [a]
+	nmergeIO		-- :: [[a]] -> IO [a]
     ) where
 
 import Prelude
@@ -59,13 +52,13 @@ import Control.Exception as Exception
 import GHC.Conc
 import GHC.TopHandler   ( reportStackOverflow, reportError )
 import GHC.IOBase	( IO(..) )
-import GHC.IOBase	( unsafePerformIO , unsafeInterleaveIO )
+import GHC.IOBase	( unsafeInterleaveIO )
 import GHC.Base		( fork# )
 import GHC.Prim		( Addr#, unsafeCoerce# )
 #endif
 
 #ifdef __HUGS__
-import IOExts ( unsafeInterleaveIO, unsafePerformIO )
+import IOExts ( unsafeInterleaveIO )
 import ConcBase
 #endif
 
@@ -75,10 +68,6 @@ import Control.Concurrent.Chan
 import Control.Concurrent.QSem
 import Control.Concurrent.QSemN
 import Control.Concurrent.SampleVar
-
-#ifdef __GLASGOW_HASKELL__
-infixr 0 `fork`
-#endif
 
 -- Thread Ids, specifically the instances of Eq and Ord for these things.
 -- The ThreadId type itself is defined in std/PrelConc.lhs.
@@ -126,10 +115,6 @@ real_handler ex =
 	AsyncException StackOverflow -> reportStackOverflow False
 	ErrorCall s -> reportError False s
 	other       -> reportError False (showsPrec 0 other "\n")
-
-{-# INLINE fork #-}
-fork :: a -> b -> b
-fork x y = unsafePerformIO (forkIO (x `seq` return ())) `seq` y
 
 #endif /* __GLASGOW_HASKELL__ */
 
