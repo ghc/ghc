@@ -54,10 +54,15 @@ module UniqFM (
 #endif
     ) where
 
-#if defined(COMPILING_GHC)
-IMPORT_DELOOPER( SpecLoop )
-#endif
 IMP_Ubiq()
+
+#if defined(COMPILING_GHC)
+# if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER( SpecLoop )
+# else
+import {-# SOURCE #-} Name
+# endif
+#endif
 
 import Unique		( Unique, u2i, mkUniqueGrimily )
 import Util
