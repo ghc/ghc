@@ -95,9 +95,9 @@ dsForeigns mod_name fos
   combine (acc_feb, acc_f, acc_h, acc_c, acc_header) 
 	  (ForeignExport id _ (CExport (CExportStatic ext_nm cconv)) depr loc)
     = dsFExport mod_name id (idType id) 
-		ext_nm cconv False                 `thenDs` \(feb, b, h, c) ->
+		ext_nm cconv False                 `thenDs` \(h, c) ->
       warnDepr depr loc				   `thenDs` \_              ->
-      returnDs (feb:acc_feb, b:acc_f, h $$ acc_h, c $$ acc_c, acc_header)
+      returnDs (acc_feb, acc_f, h $$ acc_h, c $$ acc_c, acc_header)
 
   warnDepr False _   = returnDs ()
   warnDepr True  loc = dsWarn (addShortWarnLocLine loc msg)
@@ -241,112 +241,46 @@ dsFExport :: Module
 	  -> Bool		-- True => foreign export dynamic
 				-- 	   so invoke IO action that's hanging off 
 				-- 	   the first argument's stable pointer
-	  -> DsM ( Id		-- The foreign-exported Id
-		 , Binding
-		 , SDoc
-		 , SDoc
+	  -> DsM ( SDoc		-- contents of Module_stub.h
+		 , SDoc		-- contents of Module_stub.c
 		 )
+
 dsFExport mod_name fn_id ty ext_name cconv isDyn
-  = 	-- BUILD THE returnIO WRAPPER, if necessary
+   = 
+     let
+        (tvs,sans_foralls)		= tcSplitForAllTys ty
+        (fe_arg_tys', orig_res_ty)	= tcSplitFunTys sans_foralls
+	-- We must use tcSplits here, because we want to see 
+	-- the (IO t) in the corner of the type!
+        fe_arg_tys | isDyn     = tail fe_arg_tys'
+                   | otherwise = fe_arg_tys'
+     in
 	-- Look at the result type of the exported function, orig_res_ty
-	-- If it's IO t, return		(\x.x,	        IO t, t)
-	-- If it's plain t, return	(\x.returnIO x, IO t, t)
+	-- If it's IO t, return		(t, True)
+	-- If it's plain t, return	(t, False)
      (case tcSplitTyConApp_maybe orig_res_ty of
 	-- We must use tcSplit here so that we see the (IO t) in
 	-- the type.  [IO t is transparent to plain splitTyConApp.]
 
 	Just (ioTyCon, [res_ty])
 	      -> ASSERT( ioTyCon `hasKey` ioTyConKey )
-			-- The function already returns IO t
-		 returnDs (\body -> body, orig_res_ty, res_ty)
+		 -- The function already returns IO t
+		 returnDs (res_ty, True)
 
-	other -> 	-- The function returns t, so wrap the call in returnIO
-		 dsLookupGlobalValue returnIOName	`thenDs` \ retIOId ->
-	         returnDs (\body -> mkApps (Var retIOId) [Type orig_res_ty, body],
-		           tcFunResultTy (applyTy (idType retIOId) orig_res_ty), 
-				-- We don't have ioTyCon conveniently to hand
-			   orig_res_ty)
-
-     )		`thenDs` \ (return_io_wrapper, 	-- Either identity or returnIO
-			    io_res_ty, 		-- IO t
-			    res_ty) ->		-- t
-
-
-	-- BUILD THE deRefStablePtr WRAPPER, if necessary
-     (if isDyn then 
-        newSysLocalDs stbl_ptr_ty			`thenDs` \ stbl_ptr ->
-	newSysLocalDs stbl_ptr_to_ty			`thenDs` \ stbl_value ->
-	dsLookupGlobalValue deRefStablePtrName		`thenDs` \ deRefStablePtrId ->
-        dsLookupGlobalValue bindIOName			`thenDs` \ bindIOId ->
-	let
-	 the_deref_app = mkApps (Var deRefStablePtrId)
-				[ Type stbl_ptr_to_ty, Var stbl_ptr ]
-
-	 stbl_app cont = mkApps (Var bindIOId)
-				[ Type stbl_ptr_to_ty
-				, Type res_ty
-				, the_deref_app
-				, mkLams [stbl_value] cont]
-        in
-	returnDs (stbl_value, stbl_app, stbl_ptr)
-      else
-        returnDs (fn_id, 
-	          \ body -> body,
-		  panic "stbl_ptr"  -- should never be touched.
-		  ))			`thenDs` \ (i, getFun_wrapper, stbl_ptr) ->
-
-
-	-- BUILD THE HELPER
-     getModuleDs			`thenDs` \ mod -> 
-     getUniqueDs			`thenDs` \ uniq ->
-     getSrcLocDs			`thenDs` \ src_loc ->
-     newSysLocalsDs fe_arg_tys		`thenDs` \ fe_args ->
+	other -> -- The function returns t
+	         returnDs (orig_res_ty, False)
+     )
+					`thenDs` \ (res_ty,		-- t
+						    is_IO_res_ty) ->	-- Bool
+     getModuleDs
+					`thenDs` \ mod -> 
      let
-        wrapper_args | isDyn      = stbl_ptr:fe_args
-		     | otherwise  = fe_args
-
-        wrapper_arg_tys | isDyn      = stbl_ptr_ty:fe_arg_tys
-		        | otherwise  = fe_arg_tys
-
-	helper_ty =  mkForAllTys tvs $
-		     mkFunTys wrapper_arg_tys io_res_ty
-
-	f_helper_glob = mkVanillaGlobal helper_name helper_ty vanillaIdInfo
-		      where
-			name	            = idName fn_id
-			mod	
-			 | isLocalName name = mod_name
-			 | otherwise        = nameModule name
-
-			occ	            = mkForeignExportOcc (nameOccName name)
-			helper_name         = mkGlobalName uniq mod occ src_loc
-
-      	the_app = getFun_wrapper (return_io_wrapper (mkVarApps (Var i) (tvs ++ fe_args)))
-      	the_body = mkLams (tvs ++ wrapper_args) the_app
-  
-      	(h_stub, c_stub) = fexportEntry (moduleUserString mod)
-      				      	ext_name 
-                                        (if isDyn then Nothing else Just f_helper_glob)
-                                      	fe_arg_tys res_ty cconv
+      	(h_stub, c_stub) 
+           = mkFExportCBits (moduleUserString mod) ext_name 
+                            (if isDyn then Nothing else Just fn_id)
+                            fe_arg_tys res_ty is_IO_res_ty cconv
      in
-     returnDs (f_helper_glob, (f_helper_glob, the_body), h_stub, c_stub)
-
-  where
-   (tvs,sans_foralls)		= tcSplitForAllTys ty
-   (fe_arg_tys', orig_res_ty)	= tcSplitFunTys sans_foralls
-	-- We must use tcSplits here, because we want to see 
-	-- the (IO t) in the corner of the type!
-
-   fe_arg_tys | isDyn	  = tail fe_arg_tys'
-	      | otherwise = fe_arg_tys'
-
-   stbl_ptr_ty | isDyn     = head fe_arg_tys'
-	       | otherwise = error "stbl_ptr_ty"
-
-   (_, stbl_ptr_ty')		= tcSplitForAllTys stbl_ptr_ty
-   (_, stbl_ptr_to_ty)		= tcSplitAppTy stbl_ptr_ty'
-	-- Again, stable pointers are just newtypes, 
-	-- so we must see them!  Hence tcSplit*
+     returnDs (h_stub, c_stub)
 \end{code}
 
 @foreign export dynamic@ lets you dress up Haskell IO actions
@@ -382,7 +316,7 @@ dsFExportDynamic mod_name id cconv
         -- hack: need to get at the name of the C stub we're about to generate.
        fe_nm	   = _PK_ (moduleUserString mod_name ++ "_" ++ toCName fe_id)
      in
-     dsFExport mod_name id export_ty fe_nm cconv True  	`thenDs` \ ({-feb-}_, {-fe-}_, h_code, c_code) ->
+     dsFExport mod_name id export_ty fe_nm cconv True  	`thenDs` \ (h_code, c_code) ->
      newSysLocalDs arg_ty				`thenDs` \ cback ->
      dsLookupGlobalValue newStablePtrName		`thenDs` \ newStablePtrId ->
      let
@@ -427,7 +361,7 @@ dsFExportDynamic mod_name id cconv
 		-- Never inline the f.e.d. function, because the litlit
 		-- might not be in scope in other modules.
      in
-     returnDs ([fed] {-[fed, fe]-}, h_code, c_code)
+     returnDs ([fed], h_code, c_code)
 
  where
   ty			= idType id
@@ -452,14 +386,16 @@ The C stub constructs the application of the exported Haskell function
 using the hugs/ghc rts invocation API.
 
 \begin{code}
-fexportEntry :: String
-	     -> FAST_STRING
-	     -> Maybe Id 	-- Just==static, Nothing==dynamic
-	     -> [Type] 
-	     -> Type 
-	     -> CCallConv 
-	     -> (SDoc, SDoc)
-fexportEntry mod_nm c_nm maybe_target arg_htys res_hty cc = (header_bits, c_bits)
+mkFExportCBits :: String
+	       -> FAST_STRING
+	       -> Maybe Id 	-- Just==static, Nothing==dynamic
+	       -> [Type] 
+	       -> Type 
+               -> Bool		-- True <=> returns an IO type
+	       -> CCallConv 
+	       -> (SDoc, SDoc)
+mkFExportCBits mod_nm c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
+ = (header_bits, c_bits)
  where
   -- Create up types and names for the real args
   arg_cnames, arg_ctys :: [SDoc]
@@ -526,6 +462,7 @@ fexportEntry mod_nm c_nm maybe_target arg_htys res_hty cc = (header_bits, c_bits
 
   -- finally, the whole darn thing
   c_bits =
+    space $$
     extern_decl $$
     fun_proto  $$
     vcat 
@@ -533,7 +470,7 @@ fexportEntry mod_nm c_nm maybe_target arg_htys res_hty cc = (header_bits, c_bits
      ,   text "SchedulerStatus rc;"
      ,   declareResult
 	  -- create the application + perform it.
-     ,   text "rc=rts_evalIO" 
+     ,   text (if is_IO_res_ty then "rc=rts_evalIO" else "rc=rts_eval")
          <> parens (expr_to_run <+> comma <> text "&ret")
          <> semi
      ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (ptext c_nm)

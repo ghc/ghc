@@ -413,7 +413,7 @@ tcModule pcs hst (RnResult { rr_decls = decls, rr_mod = this_mod,
         traceTc (text "Tc7")			`thenNF_Tc_`
 	tcInstDecls2 inst_info			`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
         traceTc (text "Tc8")			`thenNF_Tc_`
-	tcForeignExports decls			`thenTc`    \ (lie_fodecls,   foe_binds, foe_decls) ->
+	tcForeignExports this_mod decls		`thenTc`    \ (lie_fodecls,   foe_binds, foe_decls) ->
         traceTc (text "Tc9")			`thenNF_Tc_`
 	tcSourceRules src_rule_decls		`thenNF_Tc` \ (lie_rules,     src_rules) ->
 	
@@ -764,7 +764,8 @@ printTcDump dflags unqual (Just (_, results))
           else return ()
 
        dumpIfSet_dyn dflags Opt_D_dump_tc    
-                     "Typechecked" (ppr (tc_binds results))
+	-- foreign x-d's have undefined's in their types; hence can't show the tc_fords
+                     "Typechecked" (ppr (tc_binds results) {- $$ ppr (tc_fords results)-})
 
 	  
 printIfaceDump dflags Nothing = return ()

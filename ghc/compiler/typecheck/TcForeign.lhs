@@ -33,9 +33,12 @@ import TcExpr		( tcExpr )
 import Inst		( emptyLIE, LIE, plusLIE )
 
 import ErrUtils		( Message )
-import Id		( Id, mkLocalId )
+import Id		( Id, mkLocalId, setIdLocalExported )
 import PrimRep		( getPrimRepSize, isFloatingRep )
+import Module		( Module )
 import Type		( typePrimRep )
+import OccName		( mkForeignExportOcc )
+import Name		( Name(..), NamedThing(..), mkGlobalName )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  tcSplitForAllTys, 
 			  isFFIArgumentTy, isFFIImportResultTy, 
@@ -89,6 +92,8 @@ tcFImport fo@(ForeignImport nm hs_ty imp_decl isDeprec src_loc)
 	id		  = mkLocalId nm sig_ty
    in
    tcCheckFIType sig_ty arg_tys res_ty imp_decl		`thenNF_Tc_` 
+   -- can't use sig_ty here because it :: Type and we need HsType Id
+   -- hence the undefined
    returnTc (id, ForeignImport id undefined imp_decl isDeprec src_loc)
 \end{code}
 
@@ -190,17 +195,18 @@ checkFEDArgs arg_tys = returnNF_Tc ()
 %************************************************************************
 
 \begin{code}
-tcForeignExports :: [RenamedHsDecl] -> TcM (LIE, TcMonoBinds, [TcForeignExportDecl])
-tcForeignExports decls = 
+tcForeignExports :: Module -> [RenamedHsDecl] 
+    		 -> TcM (LIE, TcMonoBinds, [TcForeignExportDecl])
+tcForeignExports mod decls = 
    foldlTc combine (emptyLIE, EmptyMonoBinds, [])
      [foreign_decl | ForD foreign_decl <- decls, isForeignExport foreign_decl]
   where
    combine (lie, binds, fs) fe = 
-       tcFExport fe `thenTc ` \ (a_lie, b, f) ->
+       tcFExport mod fe `thenTc ` \ (a_lie, b, f) ->
        returnTc (lie `plusLIE` a_lie, b `AndMonoBinds` binds, f:fs)
 
-tcFExport :: RenamedForeignDecl -> TcM (LIE, TcMonoBinds, TcForeignExportDecl)
-tcFExport fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
+tcFExport :: Module -> RenamedForeignDecl -> TcM (LIE, TcMonoBinds, TcForeignExportDecl)
+tcFExport mod fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
    tcAddSrcLoc src_loc			$
    tcAddErrCtxt (foreignDeclCtxt fo)	$
 
@@ -213,9 +219,11 @@ tcFExport fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
 	  -- constrained than its declared/inferred type. Hence the need
 	  -- to create a local binding which will call the exported function
 	  -- at a particular type (and, maybe, overloading).
-   newLocalName nm			`thenNF_Tc` \ id_name ->
+
+   tcGetUnique				`thenNF_Tc` \ uniq ->
    let
-	id   = mkLocalId id_name sig_ty
+        gnm  = mkGlobalName uniq mod (mkForeignExportOcc (getOccName nm)) src_loc
+	id   = setIdLocalExported (mkLocalId gnm sig_ty)
 	bind = VarMonoBind id rhs
    in
    returnTc (lie, bind, ForeignExport id undefined spec isDeprec src_loc)
