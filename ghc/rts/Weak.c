@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.24 2002/06/13 11:41:15 simonmar Exp $
+ * $Id: Weak.c,v 1.25 2002/06/19 12:01:28 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -70,9 +70,14 @@ scheduleFinalizers(StgWeak *list)
     nat n;
 
     // count number of finalizers, and kill all the weak pointers first...
-    for (n = 0, w = list; w; w = w->link) { 
-	if (w->header.info != &stg_DEAD_WEAK_info &&
-	    w->finalizer != &stg_NO_FINALIZER_closure) {
+    n = 0;
+    for (w = list; w; w = w->link) { 
+
+	// Better not be a DEAD_WEAK at this stage; the garbage
+	// collector removes DEAD_WEAKs from the weak pointer list.
+	ASSERT(w->header.info != &stg_DEAD_WEAK_info);
+
+	if (w->finalizer != &stg_NO_FINALIZER_closure) {
 	    n++;
 	}
 
@@ -88,6 +93,7 @@ scheduleFinalizers(StgWeak *list)
 	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }
 	
+    // No finalizers to run?
     if (n == 0) return;
 
     IF_DEBUG(weak,fprintf(stderr,"weak: batching %d finalizers\n", n));
@@ -96,9 +102,9 @@ scheduleFinalizers(StgWeak *list)
     SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
     arr->ptrs = n;
 
-    for (n = 0, w = list; w; w = w->link) {
-	if (w->header.info != &stg_DEAD_WEAK_info &&
-	    w->finalizer != &stg_NO_FINALIZER_closure) {
+    n = 0;
+    for (w = list; w; w = w->link) {
+	if (w->finalizer != &stg_NO_FINALIZER_closure) {
 	    arr->payload[n] = w->finalizer;
 	    n++;
 	}
