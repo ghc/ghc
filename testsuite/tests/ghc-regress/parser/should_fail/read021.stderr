@@ -1,2 +1,3 @@
 
-read021.hs:1: No 'main' defined in module Main
+read021.hs:1:
+    The main function `main' is not defined in module `Main'
