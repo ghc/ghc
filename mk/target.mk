@@ -304,7 +304,7 @@ SRC_HC_OPTS += -split-objs
 ifeq "$(ArSupportsInput)" ""
 define BUILD_LIB
 $(RM) $@ $@.tmp
-(echo $(STUBOBJS) $(C_OBJS); $(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o') | xargs $(AR) $@
+(echo $(STUBOBJS) $(C_OBJS); $(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o') -print | xargs $(AR) $@
 $(RANLIB) $@
 endef
 else
@@ -312,7 +312,7 @@ define BUILD_LIB
 $(RM) $@ $@.tmp
 echo $(STUBOBJS) > $@.list
 echo $(C_OBJS) >> $@.list
-$(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o' >> $@.list
+$(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o' -print >> $@.list
 $(AR) $(AR_OPTS) $@ $(ArSupportsInput) $@.list
 $(RM) $@.list
 $(RANLIB) $@
@@ -323,7 +323,7 @@ endif
 
 HC_SPLIT_PRE = \
     $(RM) $@; if [ ! -d $(basename $@)_split ]; then mkdir $(basename $@)_split; else \
-    $(FIND) $(basename $@)_split -name '*.$(way_)o' | xargs $(RM) __rm_food; fi
+    $(FIND) $(basename $@)_split -name '*.$(way_)o' -print | xargs $(RM) __rm_food; fi
 ifeq "$(GhcWithInterpreter)" "YES"
 HC_SPLIT_POST = (cd $(dir $@) && $(LD) -r $(LD_X) -o $(notdir $@) $(basename $(notdir $@))_split/*.$(way_)o)
 else
