@@ -103,10 +103,24 @@ module PrimPrel (
     seq, ($!)
 	-- Now we have the extra (non standard) thing.
 
+	, AsyncException(..)
+	, ArithException(..)
+	, Dynamic(..)
+	, Exception(..)
 	, IORef
 	, PrimArray
+	, PrimMutableArray
+	, RealWorld
+	, ST
+	, STRef
+	, TyCon(..)
+	, TypeRep(..)
+	, assert
 	, copy_String_to_cstring
+	, ioToST
+	, ioToST
 	, newIORef
+	, newSTRef
 	, nh_close
 	, nh_errno
 	, nh_exitwith 
@@ -132,13 +146,26 @@ module PrimPrel (
 	, primIntToChar
 	, primNewArray
 	, primReadArray
+	, primReallyUnsafePtrEquality
+	, primSizeArray
+	, primSizeMutableArray
+	, primUnsafeCoerce
 	, primUnsafeFreezeArray
 	, primWriteArray
 	, primWriteCharOffAddr
 	, readIORef
+	, readSTRef
 	, runST
+	, stToIO
+	, throw
+	, unST
+	, unsafeInterleaveIO
+	, unsafeInterleaveST
+	, unsafePerformIO
 	, unsafePerformIO
 	, writeIORef
+	, writeSTRef
+        , catchException 
     ) where
 
 -- Standard value bindings {Prelude} ----------------------------------------
