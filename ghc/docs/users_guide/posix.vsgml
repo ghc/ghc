@@ -291,8 +291,19 @@ be written by hand.  Care must be taken to ensure that the search path
 is extracted from the original environment, and not from the
 environment to be passed on to the new image.
 
+NOTE: In general, sharing open files between parent and child
+processes is potential bug farm, and should be avoided unless you
+really depend on this `feature' of POSIX' @fork()@ semantics. Using
+Haskell, there's the extra complication that arguments to
+@executeFile@ might come from files that are read lazily (using
+@hGetContents@, or some such.) If this is the case, then for your own
+sanity, please ensure that the arguments to @executeFile@ have been
+fully evaluated before calling @forkProcess@ (followed by
+@executeFile@.) Consider yourself warned :-)
+
 A successful @executeFile@ overlays the current process image with 
 a new one, so it only returns on failure.
+
 <tscreen><verb>
 runProcess :: FilePath                    -- Command
            -> [String]                    -- Arguments
