@@ -520,8 +520,8 @@ stat_exit(I_ alloc)
 	if (time - GC_tot_time == 0.0)
 		ullong_format_string((ullong)0, temp, rtsTrue/*commas*/);
 	else
-		ullong_format_string((ullong)
-			(time - GC_tot_time)), temp, rtsTrue/*commas*/);
+		ullong_format_string((ullong)(time - GC_tot_time),
+			 temp, rtsTrue/*commas*/);
 
 	fprintf(sf, "  Alloc rate    %s bytes per MUT second\n\n", temp);
 
