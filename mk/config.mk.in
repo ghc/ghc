@@ -110,7 +110,12 @@ exeext=@exeext@
 #		* ghc next
 #		then it's up to you
 
+ifeq "$(GhcWithHscBuiltViaC)" "YES"
+# need hslibs/lang first if we're bootstrapping
+ProjectsToBuild   = glafp-utils hslibs ghc
+else
 ProjectsToBuild   = glafp-utils ghc hslibs
+endif
 #
 # Make a distinction between building and installing
 #
