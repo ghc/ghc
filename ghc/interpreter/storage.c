@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/15 21:40:57 $
+ * $Revision: 1.11 $
+ * $Date: 1999/10/16 02:17:32 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -134,6 +134,28 @@ Bool inventedText(t)                    /* Signal TRUE if text has been    */
 Text t; {                               /* generated internally            */
     return (t<0 || t>=NUM_TEXT);
 }
+
+#define MAX_FIXLIT 100
+Text fixLitText(t)                /* fix literal text that might include \ */
+Text t; {
+    String   s = textToStr(t);
+    char     p[MAX_FIXLIT];
+    Int      i;
+    for(i = 0;i < MAX_FIXLIT-2 && *s;s++) {
+      p[i++] = *s;
+      if (*s == '\\') {
+	p[i++] = '\\';
+      } 
+    }
+    if (i < MAX_FIXLIT-2) {
+      p[i] = 0;
+    } else {
+	ERRMSG(0) "storage space exhausted for internal literal string"
+	EEND;
+    }
+    return (findText(p));
+}
+#undef MAX_FIXLIT
 
 static Int local hash(s)                /* Simple hash function on strings */
 String s; {
@@ -692,7 +714,6 @@ Text t; {
     cclass(classHw).supers    = NIL;
     cclass(classHw).dsels     = NIL;
     cclass(classHw).members   = NIL;
-    cclass(classHw).dbuild    = NIL;
     cclass(classHw).defaults  = NIL;
     cclass(classHw).instances = NIL;
     classes=cons(classHw,classes);

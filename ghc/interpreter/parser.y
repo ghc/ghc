@@ -11,8 +11,8 @@
  * in the distribution for details.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/15 23:52:01 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/16 02:17:29 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -641,7 +641,7 @@ unsafe_flag: /* empty */         {$$ = gc0(NIL);}
 
 /*- Class declarations: ---------------------------------------------------*/
 
-topDecl   : TCLASS crule wherePart      {classDefn(intOf($1),$2,$3); sp-=3;}
+topDecl   : TCLASS crule wherePart      {classDefn(intOf($1),$2,$3,NIL); sp-=3;}
           | TINSTANCE irule wherePart   {instDefn(intOf($1),$2,$3);  sp-=3;}
           | DEFAULT '(' dtypes ')'      {defaultDefn(intOf($1),$3);  sp-=4;}
           | TCLASS error                {syntaxError("class declaration");}

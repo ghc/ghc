@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/15 23:52:00 $
+ * $Revision: 1.11 $
+ * $Date: 1999/10/16 02:17:30 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -141,6 +141,7 @@ extern List  defaultDefns;              /* default definitions (if any)    */
 extern Int   defaultLine;               /* line in which default defs occur*/
 extern List  evalDefaults;              /* defaults for evaluator          */
 extern Cell  inputExpr;                 /* evaluator input expression      */
+extern Cell  inputContext;		/* evaluator input expression      */
 extern Addr  inputCode;                 /* Code for compiled input expr    */
 
 extern Int   whnfArgs;                  /* number of args of term in whnf  */
@@ -165,6 +166,10 @@ extern String preprocessor;             /* preprocessor command            */
 
 #if DEBUG_CODE
 extern Bool  debugCode;                 /* TRUE => print G-code to screen  */
+#endif
+#if DEBUG_SHOWSC
+extern Bool  debugSC;			/* TRUE => print SC to screen  */
+extern Void  printSc Args((FILE*, Text, Int, Cell));
 #endif
 extern Bool  kindExpert;                /* TRUE => display kind errors in  */
                                         /*         full detail             */
@@ -222,13 +227,17 @@ extern  Void   clearTypeIns     Args((Void));
 extern  Type   fullExpand       Args((Type));
 extern  Bool   isAmbiguous      Args((Type));
 extern  Void   ambigError       Args((Int,String,Cell,Type));
-extern  Void   classDefn        Args((Int,Cell,Cell));
+extern  Void   classDefn	Args((Int,Cell,List,List));
 extern  Void   instDefn         Args((Int,Cell,Cell));
 extern  Void   addTupInst       Args((Class,Int));
 #if TREX
 extern  Inst   addRecShowInst   Args((Class,Ext));
 extern  Inst   addRecEqInst     Args((Class,Ext));
 #endif
+extern  List   oclose		Args((List,List));
+extern  List   zonkTyvarsIn	Args((Type,List));
+extern  Type   zonkTyvar	Args((Int));
+extern  Type   zonkType		Args((Type,Int));
 extern  Void   primDefn         Args((Cell,List,Cell));
 extern  Void   defaultDefn      Args((Int,List));
 extern  Void   checkExp         Args((Void));
@@ -289,6 +298,8 @@ extern  Void   gcScanning       Args((Void));
 extern  Void   gcRecovered      Args((Int));
 extern  Void   gcCStack         Args((Void));
 extern  Void   needPrims        Args((Int)); 
+extern  List   calcFunDepsPreds Args((List));
+extern  Inst   findInstFor      Args((Cell,Int));
 
 extern Type primType( Int /*AsmMonad*/ monad, String a_kinds, String r_kinds );
 #define aVar            mkOffset(0)     /* Simple skeleton for type var    */
@@ -502,8 +513,6 @@ extern Void optimiseTopBinds  Args((List));
 extern List cfunSfuns;                  /* List of (Cfun,[SelectorVar])    */
 
 extern Void  interface        Args((Int));
-
-extern List typeVarsIn        Args((Cell,List,List));
 
 extern Void getFileSize       Args((String, Long *));
 

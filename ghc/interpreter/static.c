@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/15 21:40:55 $
+ * $Revision: 1.11 $
+ * $Date: 1999/10/16 02:17:30 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -53,12 +53,11 @@ static List   local visitSyn            Args((List,Tycon,List));
 static Type   local instantiateSyn      Args((Type,Type));
 
 static Void   local checkClassDefn      Args((Class));
-static Void   local depPredExp          Args((Int,List,Cell));
+static Cell   local depPredExp		Args((Int,List,Cell));
 static Void   local checkMems           Args((Class,List,Cell));
 static Void   local addMembers          Args((Class));
 static Name   local newMember           Args((Int,Int,Cell,Type,Class));
 static Name   local newDSel             Args((Class,Int));
-static Name   local newDBuild           Args((Class));
 static Text   local generateText        Args((String,Class));
 static Int    local visitClass          Args((Class));
 
@@ -66,14 +65,18 @@ static List   local classBindings       Args((String,Class,List));
 static Name   local memberName          Args((Class,Text));
 static List   local numInsert           Args((Int,Cell,List));
 
+static List   local typeVarsIn		Args((Cell,List,List,List));
 static List   local maybeAppendVar      Args((Cell,List));
 
 static Type   local checkSigType        Args((Int,String,Cell,Type));
+static Void   local checkOptQuantVars	Args((Int,List,List));
 static Type   local depTopType          Args((Int,List,Type));
 static Type   local depCompType         Args((Int,List,Type));
 static Type   local depTypeExp          Args((Int,List,Type));
 static Type   local depTypeVar          Args((Int,List,Text));
 static List   local checkQuantVars      Args((Int,List,List,Cell));
+static List   local otvars		Args((Cell,List));
+static Bool   local osubset		Args((List,List));
 static Void   local kindConstr          Args((Int,Int,Int,Constr));
 static Kind   local kindAtom            Args((Int,Constr));
 static Void   local kindPred            Args((Int,Int,Int,Cell));
@@ -96,8 +99,10 @@ static Void   local deriveContexts      Args((List));
 static Void   local initDerInst         Args((Inst));
 static Void   local calcInstPreds       Args((Inst));
 static Void   local maybeAddPred        Args((Cell,Int,Int,List));
+static List   local calcFunDeps		Args((List));
 static Cell   local copyAdj             Args((Cell,Int,Int));
 static Void   local tidyDerInst         Args((Inst));
+static List   local otvarsZonk		Args((Cell,List,Int));
 
 static Void   local addDerivImp         Args((Inst));
 
@@ -163,6 +168,10 @@ static Cell   local depQVar             Args((Int,Cell));
 static Void   local depConFlds          Args((Int,Cell,Bool));
 static Void   local depUpdFlds          Args((Int,Cell));
 static List   local depFields           Args((Int,Cell,List,Bool));
+#if IPARAM
+static Void   local depWith		Args((Int,Cell));
+static List   local depDwFlds		Args((Int,Cell,List));
+#endif
 #if TREX
 static Cell   local depRecord           Args((Int,Cell));
 #endif
@@ -173,6 +182,8 @@ static List   local bscc                Args((List));
 static Void   local addRSsigdecls       Args((Pair));
 static Void   local allNoPrevDef        Args((Cell));
 static Void   local noPrevDef           Args((Int,Cell));
+static Bool   local odiff		Args((List,List));
+ 
 static Void   local duplicateErrorAux   Args((Int,Module,Text,String));
 #define duplicateError(l,m,t,k) duplicateErrorAux(l,m,t,k)
 static Void   local checkTypeIn         Args((Pair));
@@ -665,7 +676,7 @@ Cell e; {
             EEND;
         }
     }
-    return 0; /* NOTREACHED */
+    return exports; /* NOTUSED */
 }
 
 static List local checkExports(exports)
@@ -837,10 +848,10 @@ Cell  cd; {                             /* definitions (w or w/o deriving) */
     for (i=0; i<tycon(t).arity; ++i)    /* build representation for tycon  */
         lhs = ap(lhs,mkOffset(i));      /* applied to full comp. of args   */
 
-    if (whatIs(cs)==QUAL) {             /* allow for possible context      */
+    if (isQualType(cs)) {		/* allow for possible context	   */
         ctxt = fst(snd(cs));
         cs   = snd(snd(cs));
-        map2Proc(depPredExp,line,tyvars,ctxt);
+	map2Over(depPredExp,line,tyvars,ctxt);
         h98CheckCtxt(line,"context",TRUE,ctxt,NIL);
     }
 
@@ -866,17 +877,17 @@ Cell  cd; {                             /* definitions (w or w/o deriving) */
             sig = checkQuantVars(line,evs,sig,con);
         }
 
-        if (whatIs(con)==QUAL) {        /* Local predicates                */
+	if (isQualType(con)) {		/* Local predicates		   */
             List us;
             lps     = fst(snd(con));
-            for (us = typeVarsIn(lps,NIL,NIL); nonNull(us); us=tl(us))
+	    for (us = typeVarsIn(lps,NIL,NIL,NIL); nonNull(us); us=tl(us))
                 if (!varIsMember(textOf(hd(us)),evs)) {
                     ERRMSG(line)
                         "Variable \"%s\" in constraint is not locally bound",
                         textToStr(textOf(hd(us)))
                     EEND;
                 }
-            map2Proc(depPredExp,line,sig,lps);
+	    map2Over(depPredExp,line,sig,lps);
             con     = snd(snd(con));
             arity   = length(lps);
         }
@@ -927,10 +938,10 @@ Cell  cd; {                             /* definitions (w or w/o deriving) */
             Type ty  = fun(con);
             Type cmp = arg(con);
             fun(con) = typeArrow;
-            if (isPolyType(cmp)) {
+	    if (isPolyOrQualType(cmp)) {
                 if (nonNull(derivs)) {
                     ERRMSG(line) "Cannot derive instances for types" ETHEN
-                    ERRTEXT      " with polymorphic components"
+		    ERRTEXT      " with polymorphic or qualified components"
                     EEND;
                 }
                 if (nr2==0)
@@ -1202,32 +1213,34 @@ Type env; {                             /* values for OFFSET type vars     */
  *   stages of static analysis.
  * ------------------------------------------------------------------------*/
 
-Void classDefn(line,head,ms)           /* process new class definition     */
-Int  line;                             /* definition line number           */
-Cell head;                             /* class header :: ([Supers],Class) */
-List ms; {                             /* class definition body            */
+Void classDefn(line,head,ms,fds)       /* process new class definition	   */
+Int  line;			       /* definition line number	   */
+Cell head;			       /* class header :: ([Supers],Class) */
+List ms;			       /* class definition body		   */
+List fds; {			       /* functional dependencies	   */
     Text ct    = textOf(getHead(snd(head)));
     Int  arity = argCount;
 
     if (nonNull(findClass(ct))) {
-        ERRMSG(line) "Repeated definition of class \"%s\"",
-                     textToStr(ct)
-        EEND;
+	ERRMSG(line) "Repeated definition of class \"%s\"",
+		     textToStr(ct)
+	EEND;
     } else if (nonNull(findTycon(ct))) {
-        ERRMSG(line) "\"%s\" used as both class and type constructor",
-                     textToStr(ct)
-        EEND;
+	ERRMSG(line) "\"%s\" used as both class and type constructor",
+		     textToStr(ct)
+	EEND;
     } else {
-        Class nw           = newClass(ct);
-        cclass(nw).line    = line;
-        cclass(nw).arity   = arity;
-        cclass(nw).head    = snd(head);
-        cclass(nw).supers  = fst(head);
-        cclass(nw).members = ms;
-        cclass(nw).level   = 0;
-        classDefns         = cons(nw,classDefns);
-        if (arity!=1)
-            h98DoesntSupport(line,"multiple parameter classes");
+	Class nw	   = newClass(ct);
+	cclass(nw).line    = line;
+	cclass(nw).arity   = arity;
+	cclass(nw).head    = snd(head);
+	cclass(nw).supers  = fst(head);
+	cclass(nw).members = ms;
+	cclass(nw).level   = 0;
+	cclass(nw).fds	   = fds;
+	classDefns	   = cons(nw,classDefns);
+	if (arity!=1)
+	    h98DoesntSupport(line,"multiple parameter classes");
     }
 }
 
@@ -1277,14 +1290,62 @@ Class c; {
         tyvars = cons(arg(temp),tyvars);
     }
 
-    for (temp=cclass(c).head; args>0; temp=fun(temp), args--) {
-        arg(temp) = mkOffset(args);
-    }
-    arg(temp) = mkOffset(0);
-    fun(temp) = c;
+    for (fs=cclass(c).fds; nonNull(fs); fs=tl(fs)) {
+	Pair fd = hd(fs);
+	List vs = snd(fd);
 
-    tcDeps              = NIL;          /* find dependents                 */
-    map2Proc(depPredExp,cclass(c).line,tyvars,cclass(c).supers);
+	/* Check for trivial dependency
+	 */
+	if (isNull(snd(fd))) {
+	    ERRMSG(cclass(c).line) "Functional dependency is trivial"
+	    EEND;
+	}
+
+	/* Check for duplicated vars on right hand side, and for vars on
+	 * right that also appear on the left:
+	 */
+	for (vs=snd(fd); nonNull(vs); vs=tl(vs)) {
+	    if (varIsMember(textOf(hd(vs)),fst(fd))) {
+		ERRMSG(cclass(c).line)
+		    "Trivial dependency for variable \"%s\"",
+		    textToStr(textOf(hd(vs)))
+		EEND;
+	    }
+	    if (varIsMember(textOf(hd(vs)),tl(vs))) {
+		ERRMSG(cclass(c).line)
+		    "Repeated variable \"%s\" in functional dependency",
+		    textToStr(textOf(hd(vs)))
+		EEND;
+	    }
+	    hd(vs) = depTypeVar(cclass(c).line,tyvars,textOf(hd(vs)));
+	}
+
+	/* Check for duplicated vars on left hand side:
+	 */
+	for (vs=fst(fd); nonNull(vs); vs=tl(vs)) {
+	    if (varIsMember(textOf(hd(vs)),tl(vs))) {
+		ERRMSG(cclass(c).line)
+		    "Repeated variable \"%s\" in functional dependency",
+		    textToStr(textOf(hd(vs)))
+		EEND;
+	    }
+	    hd(vs) = depTypeVar(cclass(c).line,tyvars,textOf(hd(vs)));
+	}
+    }
+
+    if (cclass(c).arity==0) {
+	cclass(c).head = c;
+    } else {
+	Int args = cclass(c).arity - 1;
+	for (temp=cclass(c).head; args>0; temp=fun(temp), args--) {
+	    arg(temp) = mkOffset(args);
+	}
+	arg(temp) = mkOffset(0);
+	fun(temp) = c;
+    }
+
+    tcDeps	        = NIL;		/* find dependents		   */
+    map2Over(depPredExp,cclass(c).line,tyvars,cclass(c).supers);
     h98CheckCtxt(cclass(c).line,"class definition",FALSE,cclass(c).supers,NIL);
     cclass(c).numSupers = length(cclass(c).supers);
     cclass(c).defaults  = extractBindings(cclass(c).members);   /* defaults*/
@@ -1297,20 +1358,24 @@ Class c; {
     tcDeps              = NIL;
 }
 
-static Void local depPredExp(line,tyvars,pred)
+static Cell local depPredExp(line,tyvars,pred)
 Int  line;
 List tyvars;
 Cell pred; {
-    Int  args = 1;                      /* parser guarantees >=1 args      */
-    Cell h    = fun(pred);
+    Int  args = 0;
+    Cell prev = NIL;
+    Cell h    = pred;
     for (; isAp(h); args++) {
-        arg(pred) = depTypeExp(line,tyvars,arg(pred));
-        pred      = h;
-        h         = fun(pred);
+	arg(h) = depTypeExp(line,tyvars,arg(h));
+	prev   = h;
+	h      = fun(h);
     }
-    arg(pred) = depTypeExp(line,tyvars,arg(pred));
-    if (args!=1)
-        h98DoesntSupport(line,"multiple parameter classes");
+
+    if (args==0) {
+	h98DoesntSupport(line,"tag classes");
+    } else if (args!=1) {
+	h98DoesntSupport(line,"multiple parameter classes");
+    }
 
     if (isQCon(h)) {                    /* standard class constraint       */
         Class c = findQualClass(h);
@@ -1318,7 +1383,11 @@ Cell pred; {
             ERRMSG(line) "Undefined class \"%s\"", identToStr(h)
             EEND;
         }
-        fun(pred) = c;
+	if (isNull(prev)) {
+	    pred = c;
+	} else {
+	    fun(prev) = c;
+	}
         if (args!=cclass(c).arity) {
             ERRMSG(line) "Wrong number of arguments for class \"%s\"",
                         textToStr(cclass(c).text)
@@ -1336,9 +1405,14 @@ Cell pred; {
         }
     }
 #endif
-    else {                              /* check for other kinds of pred   */
-        internal("depPredExp");         /* ... but there aren't any!       */
+    else 
+#if IPARAM
+         if (whatIs(h) != IPCELL)
+#endif
+    {
+	internal("depPredExp");
     }
+    return pred;
 }
 
 static Void local checkMems(c,tyvars,m) /* check member function details   */
@@ -1350,11 +1424,20 @@ Cell  m; {
     Type t    = thd3(m);
     List sig  = NIL;
     List tvs  = NIL;
+    List xtvs = NIL;
 
-    tyvars    = typeVarsIn(t,NIL,tyvars);/* Look for extra type vars.      */
+    if (isPolyType(t)) {
+	xtvs = fst(snd(t));
+	t    = monotypeOf(t);
+    }
+  
 
-    if (whatIs(t)==QUAL) {              /* Overloaded member signatures?   */
-        map2Proc(depPredExp,line,tyvars,fst(snd(t)));
+    tyvars    = typeVarsIn(t,NIL,xtvs,tyvars);
+					/* Look for extra type vars.	   */
+    checkOptQuantVars(line,xtvs,tyvars);
+
+    if (isQualType(t)) {		/* Overloaded member signatures?   */
+	map2Over(depPredExp,line,tyvars,fst(snd(t)));
     } else {
         t = ap(QUAL,pair(NIL,t));
     }
@@ -1365,7 +1448,9 @@ Cell  m; {
     for (tvs=tyvars; nonNull(tvs); tvs=tl(tvs)){/* Quantify                */
         sig = ap(NIL,sig);
     }
-    t       = mkPolyType(sig,t);
+    if (nonNull(sig)) {
+  	t = mkPolyType(sig,t);
+    }
     thd3(m) = t;                                /* Save type               */
     take(cclass(c).arity,tyvars);               /* Delete extra type vars  */
 
@@ -1429,9 +1514,10 @@ Class c; {                              /* and other parts of class struct.*/
 
     if (mno==1) {                       /* Single entry dicts use newtype  */
         name(cclass(c).dcon).defn = nameId;
-        name(hd(cclass(c).members)).number = mfunNo(0);
+	if (nonNull(cclass(c).members)) {
+	    name(hd(cclass(c).members)).number = mfunNo(0);
+	}
     }
-    cclass(c).dbuild     = newDBuild(c);
     cclass(c).defaults   = classBindings("class",c,cclass(c).defaults);
 }
 
@@ -1471,14 +1557,6 @@ Int   no; {
     name(s).arity    = 1;
     name(s).number   = DFUNNAME;
     return s;
-}
-
-static Name local newDBuild(c)          /* Make definition for builder     */
-Class c; {
-    Name b           = newName(generateText("class.%s",c),c);
-    name(b).line     = cclass(c).line;
-    name(b).arity    = cclass(c).numSupers+1;
-    return b;
 }
 
 #define MAX_GEN  128
@@ -1588,39 +1666,38 @@ List xs; {
  * occur in the type expression when read from left to right.
  * ------------------------------------------------------------------------*/
 
-List typeVarsIn(ty,us,vs)               /* Calculate list of type variables*/
-Cell ty;                                /* used in type expression, reading*/
-List us;                                /* from left to right ignoring any */
-List vs; {                              /* listed in us.                   */
+static List local typeVarsIn(ty,us,ws,vs)/*Calculate list of type variables*/
+Cell ty;				/* used in type expression, reading*/
+List us;				/* from left to right ignoring any */
+List ws;				/* listed in us.		   */
+List vs; {				/* ws = explicitly quantified vars */
     switch (whatIs(ty)) {
-        case AP        : return typeVarsIn(snd(ty),us,
-                                           typeVarsIn(fst(ty),us,vs));
+	case AP        : return typeVarsIn(snd(ty),us,ws,
+					   typeVarsIn(fst(ty),us,ws,vs));
 
-        case VARIDCELL :
-        case VAROPCELL : if (nonNull(findBtyvs(textOf(ty)))
-                             || varIsMember(textOf(ty),us)) {
-                             return vs;
-                         } else {
-                             return maybeAppendVar(ty,vs);
-                         }
+	case VARIDCELL :
+	case VAROPCELL : if ((nonNull(findBtyvs(textOf(ty)))
+			      && !varIsMember(textOf(ty),ws))
+			     || varIsMember(textOf(ty),us)) {
+			     return vs;
+			 } else {
+			     return maybeAppendVar(ty,vs);
+			 }
 
-        case POLYTYPE  : return typeVarsIn(monotypeOf(ty),polySigOf(ty),vs);
+	case POLYTYPE  : return typeVarsIn(monotypeOf(ty),polySigOf(ty),ws,vs);
 
-        case QUAL      : {   List qs = fst(snd(ty));
-                             for (; nonNull(qs); qs=tl(qs)) {
-                                 vs = typeVarsIn(hd(qs),us,vs);
-                             }
-                             return typeVarsIn(snd(snd(ty)),us,vs);
-                         }
+	case QUAL      : {   vs = typeVarsIn(fst(snd(ty)),us,ws,vs);
+			     return typeVarsIn(snd(snd(ty)),us,ws,vs);
+			 }
 
-        case BANG      : return typeVarsIn(snd(ty),us,vs);
+	case BANG      : return typeVarsIn(snd(ty),us,ws,vs);
 
-        case LABC      : {   List fs = snd(snd(ty));
-                             for (; nonNull(fs); fs=tl(fs)) {
-                                vs = typeVarsIn(snd(hd(fs)),us,vs);
-                             }
-                             return vs;
-                         }
+	case LABC      : {   List fs = snd(snd(ty));
+			     for (; nonNull(fs); fs=tl(fs)) {
+				vs = typeVarsIn(snd(hd(fs)),us,ws,vs);
+			     }
+ 			     return vs;
+  			 }
     }
     return vs;
 }
@@ -1661,13 +1738,21 @@ Int    line;                            /* Check validity of type expr in  */
 String where;                           /* explicit type signature         */
 Cell   e;
 Type   type; {
-    List tvs  = typeVarsIn(type,NIL,NIL);
-    Int  n    = length(tvs);
-    List sunk = unkindTypes;
+    List tvs  = NIL;
+    List sunk = NIL;
+    List xtvs = NIL;
 
-    if (whatIs(type)==QUAL) {
-        map2Proc(depPredExp,line,tvs,fst(snd(type)));
-        snd(snd(type)) = depTopType(line,tvs,snd(snd(type)));
+    if (isPolyType(type)) {
+	xtvs = fst(snd(type));
+	type = monotypeOf(type);
+    }
+    tvs  = typeVarsIn(type,NIL,xtvs,NIL);
+    sunk = unkindTypes;
+    checkOptQuantVars(line,xtvs,tvs);
+
+    if (isQualType(type)) {
+	map2Over(depPredExp,line,tvs,fst(snd(type)));
+	snd(snd(type)) = depTopType(line,tvs,snd(snd(type)));
 
         if (isAmbiguous(type)) {
             ambigError(line,where,e,type);
@@ -1676,8 +1761,8 @@ Type   type; {
         type = depTopType(line,tvs,type);
     }
 
-    if (n>0) {
-        if (n>=NUM_OFFSETS) {
+    if (nonNull(tvs)) {
+	if (length(tvs)>=NUM_OFFSETS) {
             ERRMSG(line) "Too many type variables in %s\n", where
             EEND;
         } else {
@@ -1698,6 +1783,34 @@ Type   type; {
     return type;
 }
 
+static Void local checkOptQuantVars(line,xtvs,tvs)
+Int  line;
+List xtvs;				/* Explicitly quantified vars	   */
+List tvs; {				/* Implicitly quantified vars	   */
+    if (nonNull(xtvs)) {
+	List vs = tvs;
+	for (; nonNull(vs); vs=tl(vs)) {
+	    if (!varIsMember(textOf(hd(vs)),xtvs)) {
+		ERRMSG(line) "Quantifier does not mention type variable \"%s\"",
+			     textToStr(textOf(hd(vs)))
+		EEND;
+	    }
+	}
+	for (vs=xtvs; nonNull(vs); vs=tl(vs)) {
+	    if (!varIsMember(textOf(hd(vs)),tvs)) {
+		ERRMSG(line) "Quantified type variable \"%s\" is not used",
+			     textToStr(textOf(hd(vs)))
+		EEND;
+	    }
+	    if (varIsMember(textOf(hd(vs)),tl(vs))) {
+		ERRMSG(line) "Quantified type variable \"%s\" is repeated",
+			     textToStr(textOf(hd(vs)))
+		EEND;
+	    }
+	}
+    }
+}
+
 static Type local depTopType(l,tvs,t)   /* Check top-level of type sig     */
 Int  l;
 List tvs;
@@ -1708,7 +1821,7 @@ Type t; {
     Int  i    = 1;
     for (; getHead(t1)==typeArrow && argCount==2; ++i) {
         arg(fun(t1)) = depCompType(l,tvs,arg(fun(t1)));
-        if (isPolyType(arg(fun(t1)))) {
+	if (isPolyOrQualType(arg(fun(t1)))) {
             nr2 = i;
         }
         prev = t1;
@@ -1729,32 +1842,28 @@ static Type local depCompType(l,tvs,t)  /* Check component type for constr */
 Int  l;
 List tvs;
 Type t; {
-    if (isPolyType(t)) {
-        Int  ntvs = length(tvs);
-        List nfr  = NIL;
-        if (isPolyType(t)) {
-            List vs  = fst(snd(t));
-            t        = monotypeOf(t);
-            tvs      = checkQuantVars(l,vs,tvs,t);
-            nfr      = replicate(length(vs),NIL);
-        }
-        if (whatIs(t)==QUAL) {
-            map2Proc(depPredExp,l,tvs,fst(snd(t)));
-            snd(snd(t)) = depTypeExp(l,tvs,snd(snd(t)));
-            if (isAmbiguous(t)) {
-                ambigError(l,"type component",NIL,t);
-            }
-        } else {
-            t = depTypeExp(l,tvs,t);
-        }
-        if (isNull(nfr)) {
-            return t;
-        }
-        take(ntvs,tvs);
-        return mkPolyType(nfr,t);
-    } else {
-        return depTypeExp(l,tvs,t);
+  Int  ntvs = length(tvs);
+  List nfr  = NIL;
+  if (isPolyType(t)) {
+    List vs  = fst(snd(t));
+    t        = monotypeOf(t);
+    tvs      = checkQuantVars(l,vs,tvs,t);
+    nfr      = replicate(length(vs),NIL);
+  }
+  if (isQualType(t)) {
+    map2Over(depPredExp,l,tvs,fst(snd(t)));
+    snd(snd(t)) = depTypeExp(l,tvs,snd(snd(t)));
+    if (isAmbiguous(t)) {
+      ambigError(l,"type component",NIL,t);
     }
+  } else {
+    t = depTypeExp(l,tvs,t);
+  }
+  if (isNull(nfr)) {
+    return t;
+  }
+  take(ntvs,tvs);
+  return mkPolyType(nfr,t);
 }
 
 static Type local depTypeExp(line,tyvars,type)
@@ -1802,20 +1911,24 @@ static Type local depTypeVar(line,tyvars,tv)
 Int  line;
 List tyvars;
 Text tv; {
-    Int  offset = 0;
-    Cell vt     = findBtyvs(tv);
+    Int offset = 0;
+    Int found  = (-1);
 
-    if (nonNull(vt)) {
-        return fst(vt);
+    for (; nonNull(tyvars); offset++) {
+	if (tv==textOf(hd(tyvars))) {
+	    found = offset;
+	}
+	tyvars = tl(tyvars);
     }
-    for (; nonNull(tyvars) && tv!=textOf(hd(tyvars)); offset++) {
-        tyvars = tl(tyvars);
+    if (found<0) {
+	Cell vt = findBtyvs(tv);
+	if (nonNull(vt)) {
+	    return fst(vt);
+	}
+	ERRMSG(line) "Undefined type variable \"%s\"", textToStr(tv)
+	EEND;
     }
-    if (isNull(tyvars)) {
-        ERRMSG(line) "Undefined type variable \"%s\"", textToStr(tv)
-        EEND;
-    }
-    return mkOffset(offset);
+    return mkOffset(found);
 }
 
 static List local checkQuantVars(line,vs,tvs,body)
@@ -1824,7 +1937,7 @@ List vs;                                /* variables to quantify over      */
 List tvs;                               /* variables already in scope      */
 Cell body; {                            /* type/constr for scope of vars   */
     if (nonNull(vs)) {
-        List bvs = typeVarsIn(body,NIL,NIL);
+	List bvs = typeVarsIn(body,NIL,NIL,NIL);
         List us  = vs;
         for (; nonNull(us); us=tl(us)) {
             Text u = textOf(hd(us));
@@ -1833,11 +1946,13 @@ Cell body; {                            /* type/constr for scope of vars   */
                              textToStr(u)
                 EEND;
             }
+#if 0
             if (varIsMember(u,tvs)) {
                 ERRMSG(line) "Local quantifier for %s hides an outer use",
                              textToStr(u)
                 EEND;
             }
+#endif
             if (!varIsMember(u,bvs)) {
                 ERRMSG(line) "Locally quantified variable %s is not used",
                              textToStr(u)
@@ -1878,20 +1993,152 @@ List vs; {
     }
 }
 
-Bool isAmbiguous(type)                  /* Determine whether type is       */
-Type type; {                            /* ambiguous                       */
-    if (isPolyType(type)) {
-        type = monotypeOf(type);
+List zonkTyvarsIn(t,vs)
+Type t;
+List vs; {
+    switch (whatIs(t)) {
+	case AP	      : return zonkTyvarsIn(fun(t),
+			         zonkTyvarsIn(arg(t),vs));
+
+	case INTCELL  : if (cellIsMember(t,vs))
+			    return vs;
+			else
+			    return cons(t,vs);
+
+	case OFFSET   : internal("zonkTyvarsIn");
+
+	default	      : return vs;
     }
-    if (whatIs(type)==QUAL) {           /* only qualified types can be     */
-        List tvps = offsetTyvarsIn(fst(snd(type)),NIL); /* ambiguous       */
-        List tvts = offsetTyvarsIn(snd(snd(type)),NIL);
-        while (nonNull(tvps) && cellIsMember(hd(tvps),tvts)) {
-            tvps = tl(tvps);
-        }
-        return nonNull(tvps);
+}
+
+static List local otvars(pi,os)		/* os is a list of offsets that	   */
+Cell pi;				/* refer to the arguments of pi;   */
+List os; {				/* find list of offsets in those   */
+    List us = NIL;			/* positions			   */
+    for (; nonNull(os); os=tl(os)) {
+	us = offsetTyvarsIn(nthArg(offsetOf(hd(os)),pi),us);
+    }
+    return us;
+}
+
+static List local otvarsZonk(pi,os,o)	/* same as above, but zonks	   */
+Cell pi;
+List os; {
+    List us = NIL;
+    List vs = NIL;
+    for (; nonNull(os); os=tl(os)) {
+        Type t = zonkType(nthArg(offsetOf(hd(os)),pi),o);
+	us = zonkTyvarsIn(t,us);
+    }
+    return us;
+}
+
+static Bool local odiff(us,vs)
+List us, vs; {
+    while (nonNull(us) && cellIsMember(hd(us),vs)) {
+	us = tl(us);
+    }
+    return us;
+}
+
+static Bool local osubset(us,vs)	/* Determine whether us is subset  */
+List us, vs; {				/* of vs			   */
+    while (nonNull(us) && cellIsMember(hd(us),vs)) {
+	us = tl(us);
+    }
+    return isNull(us);
+}
+
+List oclose(fds,vs)	/* Compute closure of vs wrt to fds*/
+List fds;
+List vs; {
+    Bool changed = TRUE;
+    while (changed) {
+	List fds1 = NIL;
+	changed = FALSE;
+        while (nonNull(fds)) {
+	    Cell fd   = hd(fds);
+	    List next = tl(fds);
+	    if (osubset(fst(fd),vs)) {	/* Test if fd applies		   */
+		List os = snd(fd);
+		for (; nonNull(os); os=tl(os)) {
+		    if (!cellIsMember(hd(os),vs)) {
+			vs      = cons(hd(os),vs);
+			changed = TRUE;
+		    }
+		}
+	    } else {			/* Didn't apply this time, so keep */
+		tl(fds) = fds1;
+		fds1    = fds;
+	    }
+	    fds = next;
+	}
+	fds = fds1;
+    }
+    return vs;
+}
+
+Bool isAmbiguous(type)			/* Determine whether type is	   */
+Type type; {				/* ambiguous 			   */
+    if (isPolyType(type)) {
+	type = monotypeOf(type);
+    }
+    if (isQualType(type)) {		/* only qualified types can be	   */
+	List ps   = fst(snd(type));	/* ambiguous			   */
+	List tvps = offsetTyvarsIn(ps,NIL);
+	List tvts = offsetTyvarsIn(snd(snd(type)),NIL);
+    	List fds  = calcFunDeps(ps);
+
+	tvts = oclose(fds,tvts);	/* Close tvts under fds		   */
+	return !osubset(tvps,tvts);
     }
     return FALSE;
+}
+
+List calcFunDeps(ps)
+List ps; {
+    List fds  = NIL;
+    for (; nonNull(ps); ps=tl(ps)) {/* Calc functional dependencies	   */
+	Cell pi = hd(ps);
+	Cell c  = getHead(pi);
+	if (isClass(c)) {
+	    List fs = cclass(c).fds;
+	    for (; nonNull(fs); fs=tl(fs)) {
+		fds = cons(pair(otvars(pi,fst(hd(fs))),
+				otvars(pi,snd(hd(fs)))),fds);
+	    }
+	}
+#if IPARAM
+	else if (isIP(c)) {
+	    fds = cons(pair(NIL,offsetTyvarsIn(arg(pi),NIL)),fds);
+	}
+#endif
+    }
+    return fds;
+}
+
+List calcFunDepsPreds(ps)
+List ps; {
+    List fds  = NIL;
+    for (; nonNull(ps); ps=tl(ps)) {/* Calc functional dependencies	   */
+	Cell pi3 = hd(ps);
+	Cell pi = fst3(pi3);
+	Cell c  = getHead(pi);
+	Int o = intOf(snd3(pi3));
+	if (isClass(c)) {
+	    List fs = cclass(c).fds;
+	    for (; nonNull(fs); fs=tl(fs)) {
+		fds = cons(pair(otvarsZonk(pi,fst(hd(fs)),o),
+				otvarsZonk(pi,snd(hd(fs)),o)),fds);
+	    }
+	}
+#if IPARAM
+	else if (isIP(c)) {
+	    fds = cons(pair(NIL,zonkTyvarsIn(arg(pi),NIL)),fds);
+	}
+#endif
+    }
+    return fds;
 }
 
 Void ambigError(line,where,e,type)      /* produce error message for       */
@@ -2032,10 +2279,17 @@ Int  alpha;
 Int  m;
 Cell pi; {
 #if TREX
-    if (isExt(fun(pi))) {
+    if (isAp(pi) && isExt(fun(pi))) {
         static String lackspred = "lacks predicate";
         checkKind(l,alpha,m,arg(pi),NIL,lackspred,ROW,0);
         return;
+    }
+#endif
+#if IPARAM
+    if (isAp(pi) && whatIs(fun(pi)) == IPCELL) {
+	static String ippred = "iparam predicate";
+	checkKind(l,alpha,m,arg(pi),NIL,ippred,STAR,0);
+	return;
     }
 #endif
     {   static String predicate = "class constraint";
@@ -2116,10 +2370,10 @@ Cell c; {
         Int n    = cclass(c).arity;
         Int beta = newKindvars(n);
         cclass(c).kinds = NIL;
-        do {
+	while (n>0) {
             n--;
             cclass(c).kinds = pair(mkInt(beta+n),cclass(c).kinds);
-        } while (n>0);
+        }
     }
 }
 
@@ -2134,7 +2388,7 @@ Cell c; {                               /* is well-kinded                  */
         switch (whatIs(tycon(c).what)) {
             case NEWTYPE     :
             case DATATYPE    : {   List cs = tycon(c).defn;
-                                   if (whatIs(cs)==QUAL) {
+				   if (isQualType(cs)) {
                                        map3Proc(kindPred,line,beta,m,
                                                                 fst(snd(cs)));
                                        tycon(c).defn = cs = snd(snd(cs));
@@ -2230,7 +2484,9 @@ Name nameListMonad = NIL;               /* builder function for List Monad */
 static Void local checkInstDefn(in)     /* Validate instance declaration   */
 Inst in; {
     Int  line   = inst(in).line;
-    List tyvars = typeVarsIn(inst(in).head,NIL,NIL);
+    List tyvars = typeVarsIn(inst(in).head,NIL,NIL,NIL);
+    List tvps = NIL, tvts = NIL;
+    List fds = NIL;
 
     if (haskell98) {                    /* Check for `simple' type         */
         List tvs = NIL;
@@ -2255,7 +2511,10 @@ Inst in; {
         }
     }
 
-    depPredExp(line,tyvars,inst(in).head);
+    /* add in the tyvars from the `specifics' so that we don't
+       prematurely complain about undefined tyvars */
+    tyvars = typeVarsIn(inst(in).specifics,NIL,NIL,tyvars);
+    inst(in).head = depPredExp(line,tyvars,inst(in).head);
 
     if (haskell98) {
         Type h = getHead(arg(inst(in).head));
@@ -2265,7 +2524,20 @@ Inst in; {
         }
     }
 
-    map2Proc(depPredExp,line,tyvars,inst(in).specifics);
+    map2Over(depPredExp,line,tyvars,inst(in).specifics);
+
+    /* OK, now we start over, and test for ambiguity */
+    tvts = offsetTyvarsIn(inst(in).head,NIL);
+    tvps = offsetTyvarsIn(inst(in).specifics,NIL);
+    fds  = calcFunDeps(inst(in).specifics);
+    tvts = oclose(fds,tvts);
+    tvts = odiff(tvps,tvts);
+    if (!isNull(tvts)) {
+	ERRMSG(line) "Undefined type variable \"%s\"",
+	  textToStr(textOf(nth(offsetOf(hd(tvts)),tyvars)))
+	EEND;
+    }
+
     h98CheckCtxt(line,"instance definition",FALSE,inst(in).specifics,NIL);
     inst(in).numSpecifics = length(inst(in).specifics);
     inst(in).c            = getHead(inst(in).head);
@@ -2302,6 +2574,48 @@ Inst in; {
     List  ins  = cclass(c).instances;
     List  prev = NIL;
 
+    if (nonNull(cclass(c).fds)) {	/* Check for conflicts with fds	   */
+	List ins1 = cclass(c).instances;
+	for (; nonNull(ins1); ins1=tl(ins1)) {
+	    List fds = cclass(c).fds;
+	    substitution(RESET);
+	    for (; nonNull(fds); fds=tl(fds)) {
+		Int  alpha = newKindedVars(inst(in).kinds);
+		Int  beta  = newKindedVars(inst(hd(ins1)).kinds);
+		List as    = fst(hd(fds));
+		Bool same  = TRUE;
+		for (; same && nonNull(as); as=tl(as)) {
+		    Int n = offsetOf(hd(as));
+		    same &= unify(nthArg(n,inst(in).head),alpha,
+				  nthArg(n,inst(hd(ins1)).head),beta);
+		}
+		if (isNull(as) && same) {
+		    for (as=snd(hd(fds)); same && nonNull(as); as=tl(as)) {
+			Int n = offsetOf(hd(as));
+			same &= sameType(nthArg(n,inst(in).head),alpha,
+					 nthArg(n,inst(hd(ins1)).head),beta);
+		    }
+		    if (!same) {
+			ERRMSG(inst(in).line)
+			   "Instances are not consistent with dependencies"
+			ETHEN
+			ERRTEXT "\n*** This instance    : "
+			ETHEN ERRPRED(inst(in).head);
+			ERRTEXT "\n*** Conflicts with   : "
+			ETHEN ERRPRED(inst(hd(ins)).head);
+			ERRTEXT "\n*** For class        : "
+			ETHEN ERRPRED(cclass(c).head);
+			ERRTEXT "\n*** Under dependency : "
+			ETHEN ERRFD(hd(fds));
+			ERRTEXT "\n"
+			EEND;
+		    }
+		}
+	    }
+	}
+    }
+
+
     substitution(RESET);
     while (nonNull(ins)) {              /* Look for overlap w/ other insts */
         Int alpha = newKindedVars(inst(in).kinds);
@@ -2320,6 +2634,11 @@ Inst in; {
                     continue;
                 }
             }
+#if MULTI_INST
+	    if (multiInstRes && nonNull(inst(in).specifics)) {
+		break;
+	    } else {
+#endif
             ERRMSG(inst(in).line) "Overlapping instances for class \"%s\"",
                                   textToStr(cclass(c).text)
             ETHEN
@@ -2331,6 +2650,9 @@ Inst in; {
             ERRTEXT "\n"
             EEND;
         }
+#if MULTI_INST
+	    }
+#endif
         prev = ins;                     /* No overlap detected, so move on */
         ins  = tl(ins);                 /* to next instance                */
     }
@@ -2399,10 +2721,10 @@ List  p;                                /* context p, component types ts   */
 List  ts;                               /* and named class ct              */
 Cell  ct; {
     Int   line = tycon(t).line;
-    Class c    = findClass(textOf(ct));
+    Class c    = findQualClass(ct);
     if (isNull(c)) {
         ERRMSG(line) "Unknown class \"%s\" in derived instance",
-                     textToStr(textOf(ct))
+ 		     identToStr(ct)
         EEND;
     }
     addDerInst(line,c,p,dupList(ts),t,tycon(t).arity);
@@ -2561,6 +2883,7 @@ Inst in; {                              /* of the context for a derived    */
     List ps     = snd(snd(inst(in).specifics));
     List spcs   = fst(snd(inst(in).specifics));
     Int  beta   = inst(in).numSpecifics;
+    Int  its    = 1;
 
 #ifdef DEBUG_DERIVING
     Printf("calcInstPreds: ");
@@ -2571,6 +2894,20 @@ Inst in; {                              /* of the context for a derived    */
     while (nonNull(ps)) {
         Cell p = hd(ps);
         ps     = tl(ps);
+	if (its++ >= cutoff) {
+	    Cell bpi = inst(in).head;
+	    Cell pi  = copyPred(fun(p),intOf(snd(p)));
+	    ERRMSG(inst(in).line) "\n*** Cannot derive " ETHEN ERRPRED(bpi);
+	    ERRTEXT " after %d iterations.", its-1   ETHEN
+	    ERRTEXT
+		"\n*** This may indicate that the problem is undecidable.  However,\n"
+	    ETHEN ERRTEXT
+		"*** you may still try to increase the cutoff limit using the -c\n"
+	    ETHEN ERRTEXT
+		"*** option and then try again.  (The current setting is -c%d)\n",
+		cutoff
+	    EEND;
+	}
         if (isInt(fst(p))) {                    /* Delayed substitution?   */
             List qs = snd(p);
             for (; nonNull(hd(qs)); qs=tl(qs)) {
@@ -3071,14 +3408,14 @@ Int    l;
 String wh;
 Cell   e;
 Type   t; {
-    List tvs = typeVarsIn(t,NIL,NIL);
+    List tvs = typeVarsIn(t,NIL,NIL,NIL);
     h98DoesntSupport(l,"pattern type annotations");
     for (; nonNull(tvs); tvs=tl(tvs)) {
         Int beta    = newKindvars(1);
         hd(btyvars) = cons(pair(hd(tvs),mkInt(beta)), hd(btyvars));
     }
     t = checkSigType(l,"pattern type",e,t);
-    if (isPolyType(t) || whatIs(t)==QUAL || whatIs(t)==RANK2) {
+    if (isPolyOrQualType(t) || whatIs(t)==RANK2) {
         ERRMSG(l) "Illegal syntax in %s type annotation", wh
         EEND;
     }
@@ -4068,6 +4405,10 @@ Cell e; {
                           break;
 #endif
 
+#if IPARAM
+	case IPVAR	:
+#endif
+
         case NAME       :
         case TUPLE      :
         case STRCELL    :
@@ -4113,6 +4454,11 @@ Cell e; {
 
         case UPDFLDS    : depUpdFlds(line,e);
                           break;
+
+#if IPARAM
+	case WITHEXP	: depWith(line,e);
+			  break;
+#endif
 
         case ASPAT      : ERRMSG(line) "Illegal `@' in expression"
                           EEND;
@@ -4280,7 +4626,7 @@ Bool isP; {
         if (isPolyType(t)) {            /* Find tycon that c belongs to    */
             t = monotypeOf(t);
         }
-        if (whatIs(t)==QUAL) {
+ 	if (isQualType(t)) {
             t = snd(snd(t));
         }
         if (whatIs(t)==CDICTS) {
@@ -4413,6 +4759,27 @@ Bool isP; {
     return cs;
 }
 
+#if IPARAM
+static Void local depWith(line,e)	/* check with using fields	   */
+Int  line;
+Cell e; {
+    fst(snd(e)) = depExpr(line,fst(snd(e)));
+    snd(snd(e)) = depDwFlds(line,e,snd(snd(e)));
+}
+
+static List local depDwFlds(l,e,fs)/* check field binding list	   */
+Int  l;
+Cell e;
+List fs;
+{
+    Cell c = fs;
+    for (; nonNull(c); c=tl(c)) {	/* for each field binding	   */
+	snd(hd(c)) = depExpr(l,snd(hd(c)));
+    }
+    return fs;
+}
+#endif
+
 #if TREX
 static Cell local depRecord(line,e)     /* find dependents of record and   */
 Int  line;                              /* sort fields into approp. order  */
@@ -4492,6 +4859,21 @@ Void checkExp() {                       /* Top level static check on Expr  */
     staticAnalysis(RESET);
 }
 
+Void checkContext() {			/* Top level static check on Expr  */
+    List vs, qs;
+
+    staticAnalysis(RESET);
+    clearScope();			/* Analyse expression in the scope */
+    withinScope(NIL);			/* of no local bindings		   */
+    qs = inputContext;
+    for (vs = NIL; nonNull(qs); qs=tl(qs)) {
+	vs = typeVarsIn(hd(qs),NIL,NIL,vs);
+    }
+    map2Proc(depPredExp,0,vs,inputContext);
+    leaveScope();
+    staticAnalysis(RESET);
+}
+
 Void checkDefns() {                     /* Top level static analysis       */
     Module thisModule = lastModule();
     staticAnalysis(RESET);
@@ -4528,14 +4910,13 @@ Void checkDefns() {                     /* Top level static analysis       */
     mapProc(checkInstDefn,instDefns);
 
     setCurrModule(thisModule);
+    mapProc(addRSsigdecls,typeInDefns);	/* add sigdecls for RESTRICTSYN	   */
+    valDefns   = eqnsToBindings(valDefns,tyconDefns,classDefns,/*primDefns*/NIL);
+    mapProc(allNoPrevDef,valDefns);	/* check against previous defns	   */
     mapProc(addDerivImp,derivedInsts);  /* Add impls for derived instances */
     deriveContexts(derivedInsts);       /* Calculate derived inst contexts */
     instDefns  = appendOnto(instDefns,derivedInsts);
     checkDefaultDefns();                /* validate default definitions    */
-
-    mapProc(addRSsigdecls,typeInDefns); /* add sigdecls for RESTRICTSYN    */
-    valDefns   = eqnsToBindings(valDefns,tyconDefns,classDefns, NIL/*primDefns*/ );
-    tyconDefns = NIL;
 
     mapProc(allNoPrevDef,valDefns);     /* check against previous defns    */
 
@@ -4566,6 +4947,9 @@ Void checkDefns() {                     /* Top level static analysis       */
 
     staticAnalysis(RESET);
 }
+
+
+
 
 static Void local addRSsigdecls(pr)     /* add sigdecls from TYPE ... IN ..*/
 Pair pr; {
@@ -4687,7 +5071,7 @@ Type   t; {
         Type ty = t;
         if (isPolyType(t))
             t = monotypeOf(t);
-        if (whatIs(t)==QUAL) {
+	if (isQualType(t)) {
             Cell pi = h98Context(TRUE,fst(snd(t)));
             if (nonNull(pi)) {
                 ERRMSG(line) "Illegal Haskell 98 class constraint in %s",wh

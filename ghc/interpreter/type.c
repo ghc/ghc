@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/15 21:41:01 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/16 02:17:26 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -68,6 +68,7 @@ static Cell   local typeExpr          Args((Int,Cell));
 
 static Cell   local typeAp            Args((Int,Cell));
 static Type   local typeExpected      Args((Int,String,Cell,Type,Int,Int,Bool));
+static Type   local typeExpected2     Args((Int,String,Cell,Type,Int,Int));
 static Void   local typeAlt           Args((String,Cell,Cell,Type,Int,Int));
 static Int    local funcType          Args((Int));
 static Void   local typeCase          Args((Int,Int,Cell));
@@ -76,6 +77,9 @@ static Cell   local typeMonadComp     Args((Int,Cell));
 static Void   local typeDo            Args((Int,Cell));
 static Void   local typeConFlds       Args((Int,Cell));
 static Void   local typeUpdFlds       Args((Int,Cell));
+#if IPARAM
+static Cell   local typeWith	      Args((Int,Cell));
+#endif
 static Cell   local typeFreshPat      Args((Int,Cell));
 
 static Void   local typeBindings      Args((List));
@@ -395,6 +399,7 @@ Int  m; {
             tyvar(intOf(fst(hd(sks))))->offs = UNUSED_GENERIC;
             sks = tl(sks);
         } while (nonNull(sks));
+ 	normPreds(l);
         sps   = elimPredsUsing(hd(localEvs),sps);
         preds = revOnto(preds,sps);
     }
@@ -495,6 +500,13 @@ Type   inft, expt; {
                                        typeError(l,e,in,where,t,o);
 #define check(l,e,in,where,t,o)    e=typeExpr(l,e); shouldBe(l,e,in,where,t,o)
 #define inferType(t,o)             typeIs=t; typeOff=o
+#if IPARAM
+#define spTypeExpr(l,e)			svPreds = preds; preds = NIL; e = typeExpr(l,e); preds = revOnto(preds,svPreds);
+#define spCheck(l,e,in,where,t,o)	svPreds = preds; preds = NIL; check(l,e,in,where,t,o); preds = revOnto(preds,svPreds);
+#else
+#define spTypeExpr(l,e)			e = typeExpr(l,e);
+#define spCheck(l,e,in,where,t,o)	check(l,e,in,where,t,o);
+#endif
 
 static Void local cantEstablish(line,wh,e,t,ps)
 Int    line;                            /* Complain when declared preds    */
@@ -540,12 +552,16 @@ Cell e; {
     static int number = 0;
     Cell retv;
     int  mynumber = number++;
+    List ps;
+    STACK_CHECK
     Printf("%d) to check: ",mynumber);
     printExp(stdout,e);
     Putchar('\n');
     retv = mytypeExpr(l,e);
     Printf("%d) result: ",mynumber);
     printType(stdout,debugType(typeIs,typeOff));
+    Printf("\n%d) preds: ",mynumber);
+    printContext(stdout,debugContext(preds));
     Putchar('\n');
     return retv;
 }
@@ -561,6 +577,9 @@ Cell e; {
     static String aspat   = "as (@) pattern";
     static String typeSig = "type annotation";
     static String lambda  = "lambda expression";
+#if IPARAM
+    List svPreds;
+#endif
 
     switch (whatIs(e)) {
 
@@ -569,7 +588,11 @@ Cell e; {
         case AP         :
         case NAME       :
         case VAROPCELL  :
-        case VARIDCELL  : return typeAp(l,e);
+	case VARIDCELL	:
+#if IPARAM
+	case IPVAR	:
+#endif
+	  		  return typeAp(l,e);
 
         case TUPLE      : typeTuple(e);
                           break;
@@ -626,10 +649,14 @@ Cell e; {
         case UPDFLDS    : typeUpdFlds(l,e);
                           break;
 
+#if IPARAM
+	case WITHEXP	: return typeWith(l,e);
+#endif
+
         case COND       : {   Int beta = newTyvars(1);
                               check(l,fst3(snd(e)),e,cond,typeBool,0);
-                              check(l,snd3(snd(e)),e,cond,aVar,beta);
-                              check(l,thd3(snd(e)),e,cond,aVar,beta);
+ 			      spCheck(l,snd3(snd(e)),e,cond,aVar,beta);
+ 			      spCheck(l,thd3(snd(e)),e,cond,aVar,beta);
                               tyvarType(beta);
                           }
                           break;
@@ -637,7 +664,7 @@ Cell e; {
         case LETREC     : enterBindings();
                           enterSkolVars();
                           mapProc(typeBindings,fst(snd(e)));
-                          snd(snd(e)) = typeExpr(l,snd(snd(e)));
+ 			  spTypeExpr(l,snd(snd(e)));
                           leaveBindings();
                           leaveSkolVars(l,typeIs,typeOff,0);
                           break;
@@ -645,7 +672,7 @@ Cell e; {
         case FINLIST    : {   Int  beta = newTyvars(1);
                               List xs;
                               for (xs=snd(e); nonNull(xs); xs=tl(xs)) {
-                                 check(l,hd(xs),e,list,aVar,beta);
+				 spCheck(l,hd(xs),e,list,aVar,beta);
                               }
                               inferType(listof,beta);
                           }
@@ -725,6 +752,9 @@ Cell e; {                               /* requires polymorphism, qualified*/
     Cell p = NIL;
     Cell a = e;
     Int  i;
+#if IPARAM
+    List svPreds;
+#endif
 
     switch (whatIs(h)) {
         case NAME      : typeIs = name(h).type;
@@ -750,6 +780,17 @@ Cell e; {                               /* requires polymorphism, qualified*/
                              }
                          }
                          break;
+
+#if IPARAM
+	case IPVAR    :	{   Text t    = textOf(h);
+			    Int alpha = newTyvars(1);
+			    Cell ip   = pair(ap(IPCELL,t),aVar);
+			    Cell ev   = assumeEvid(ip,alpha);
+			    typeIs    = mkInt(alpha);
+			    h	      = ap(h,ev);
+			}
+			break;
+#endif
 
         default        : h = typeExpr(l,h);
                          break;
@@ -821,7 +862,7 @@ Cell e; {                               /* requires polymorphism, qualified*/
 
         for (as=getArgs(as); nonNull(as); as=tl(as), body=arg(body)) {
             Type expect = dropRank1(arg(fun(body)),alpha,m);
-            if (isPolyType(expect)) {
+ 	    if (isPolyOrQualType(expect)) {
                 if (tcMode==EXPRESSION)         /* poly/qual type in expr  */
                     hd(as) = typeExpected(l,app,hd(as),expect,alpha,m,TRUE);
                 else if (hd(as)!=WILDCARD) {    /* Pattern binding/match   */
@@ -856,7 +897,7 @@ Cell e; {                               /* requires polymorphism, qualified*/
                 }
             }
             else {                              /* Not a poly/qual type    */
-                check(l,hd(as),e,app,expect,alpha);
+		spCheck(l,hd(as),e,app,expect,alpha);
             }
             h = ap(h,hd(as));                   /* Save checked argument   */
         }
@@ -868,7 +909,7 @@ Cell e; {                               /* requires polymorphism, qualified*/
         Int beta = funcType(n);         /* check h::t1->t2->...->tn->rn+1  */
         shouldBe(l,h,e,app,aVar,beta);
         for (i=n; i>0; --i) {           /* check e_i::t_i for each i       */
-            check(l,arg(a),e,app,aVar,beta+2*i-1);
+ 	    spCheck(l,arg(a),e,app,aVar,beta+2*i-1);
             p = a;
             a = fun(a);
         }
@@ -906,6 +947,7 @@ Bool   addEvid; {                       /* TRUE => add \ev -> ...          */
 
     preds = NIL;
     check(l,e,NIL,wh,t,o);
+    improve(l,ps,preds);
 
     clearMarks();
     mapProc(markAssumList,defnBounds);
@@ -913,9 +955,20 @@ Bool   addEvid; {                       /* TRUE => add \ev -> ...          */
     mapProc(markPred,savePreds);
     markBtyvs();
 
-    for (i=0; i<n; i++)
-        markTyvar(alpha+i);
+    if (n > 0) {		  /* mark alpha thru alpha+n-1, plus any   */
+				  /* type vars that are functionally	   */
+	List us = NIL, vs = NIL;  /* dependent on them			   */
+	List fds = calcFunDepsPreds(preds);
+	for (i=0; i<n; i++) {
+	    Type t1 = zonkTyvar(alpha+i);
+	    us = zonkTyvarsIn(t1,us);
+	}
+	vs = oclose(fds,us);
+	for (; nonNull(vs); vs=tl(vs))
+	    markTyvar(intOf(hd(vs)));
+    }
 
+    normPreds(l);
     savePreds = elimPredsUsing(ps,savePreds);
     if (nonNull(preds) && resolveDefs(genvarType(t,o,NIL)))
         savePreds = elimPredsUsing(ps,savePreds);
@@ -972,7 +1025,7 @@ Int    m; {
 
     while (getHead(t)==typeArrow && argCount==2 && nonNull(ps)) {
         Type ta = arg(fun(t));
-        if (isPolyType(ta)) {
+	if (isPolyOrQualType(ta)) {
             if (hd(ps)!=WILDCARD) {
                 if (!isVar(hd(ps))) {
                    ERRMSG(l) "Argument " ETHEN ERREXPR(hd(ps));
@@ -1063,6 +1116,7 @@ List qs; {
     static String boolQual = "boolean qualifier";
     static String genQual  = "generator";
 
+    STACK_CHECK
     if (isNull(qs))                     /* no qualifiers left              */
         fst(e) = typeExpr(l,fst(e));
     else {
@@ -1112,6 +1166,7 @@ Cell e; {
     tyvar(beta)->kind = starToStar;
 #if !MONAD_COMPS
     bindTv(beta,typeList,0);
+     m = nameListMonad;
 #endif
 
     typeComp(l,mon,snd(e),snd(snd(e)));
@@ -1160,7 +1215,7 @@ Cell e; {
         for (i=sfunPos(fst(hd(fs)),c); --i>0; t=arg(t))
             ;
         t = dropRank1(arg(fun(t)),to,tf);
-        if (isPolyType(t))
+	if (isPolyOrQualType(t))
             snd(hd(fs)) = typeExpected(l,conExpr,snd(hd(fs)),t,to,tf,TRUE);
         else {
             check(l,snd(hd(fs)),e,conExpr,t,to);
@@ -1266,6 +1321,59 @@ Cell e; {                               /* bizarre manner for the benefit  */
     /* (typeIs,typeOff) still carry the result type when we exit the loop  */
 }
 
+#if IPARAM
+static Cell local typeWith(line,e)	/* Type check a with		   */
+Int  line;
+Cell e; {
+    static String update = "with";
+    List fs    = snd(snd(e));		/* List of field specifications	   */
+    List ts    = NIL;			/* List of types for fields	   */
+    Int  n     = length(fs);
+    Int  alpha = newTyvars(2+n);
+    Int  i;
+    List fs1;
+    Cell tIs;
+    Cell tOff;
+    List dpreds = NIL, dp;
+    Cell bs = NIL;
+
+    /* Type check expression to be updated				   */
+    fst(snd(e)) = typeExpr(line,fst(snd(e)));
+    bindTv(alpha,typeIs,typeOff);
+    tIs = typeIs;
+    tOff = typeOff;
+    /* elim duplicate uses of imp params */
+    preds = scSimplify(preds);
+    /* extract preds that we're going to bind */
+    for (fs1=fs; nonNull(fs1); fs1=tl(fs1)) {
+        Text t = textOf(fst(hd(fs1)));
+	Cell p = findIPEvid(t);
+	dpreds = cons(p, dpreds);
+	if (nonNull(p)) {
+	    removeIPEvid(t);
+	} else {
+	    /* maybe give a warning message here... */
+	}
+    }
+    dpreds = rev(dpreds);
+
+    /* Calculate type and translation for each expr in the field list	   */
+    for (fs1=fs, dp=dpreds, i=alpha+2; nonNull(fs1); fs1=tl(fs1), dp=tl(dp), i++) {
+	static String with = "with";
+        Cell ev = hd(dp);
+	snd(hd(fs1)) = typeExpr(line,snd(hd(fs1)));
+	bindTv(i,typeIs,typeOff);
+	if (nonNull(ev)) {
+	    shouldBe(line,fst(hd(fs1)),e,with,snd(fst3(ev)),intOf(snd3(ev)));
+	    bs = cons(cons(pair(thd3(ev), cons(triple(NIL, mkInt(line), snd(hd(fs1))), NIL)), NIL), bs);
+	}
+    }
+    typeIs = tIs;
+    typeOff = tOff;
+    return (ap(LETREC,pair(bs,fst(snd(e)))));
+}
+#endif
+
 static Cell local typeFreshPat(l,p)    /* find type of pattern, assigning  */
 Int  l;                                /* fresh type variables to each var */
 Cell p; {                              /* bound in the pattern             */
@@ -1330,6 +1438,7 @@ List bs; {
     preds = NIL;                        /* Type check the bindings         */
     mapProc(restrictedBindAss,bs);
     mapProc(typeBind,bs);
+    improve(line,NIL,preds);
     normPreds(line);
     elimTauts();
     preds = revOnto(preds,savePreds);
@@ -1496,6 +1605,7 @@ List bs; {
 
         preds = NIL;
         mapProc(typeBind,hd(imps));
+	improve(line,NIL,preds);
 
         clearMarks();
         mapProc(markAssumList,tl(defnBounds));
@@ -1548,6 +1658,7 @@ List bs; {
         enterPendingBtyvs();
         for (; nonNull(alts); alts=tl(alts))
             typeAlt(extbind,fst(b),hd(alts),t,o,m);
+	improve(line,ps,preds);
         leavePendingBtyvs();
 
         if (nonNull(ps))                /* Add dict params, if necessary   */
@@ -1559,14 +1670,16 @@ List bs; {
         mapProc(markPred,savePreds);
         markBtyvs();
 
+	normPreds(line);
         savePreds = elimPredsUsing(ps,savePreds);
         if (nonNull(preds)) {
             List vs = NIL;
             Int  i  = 0;
             for (; i<m; ++i)
                 vs = cons(mkInt(o+i),vs);
-            if (resolveDefs(vs))
+ 	    if (resolveDefs(vs)) {
                 savePreds = elimPredsUsing(ps,savePreds);
+	    }
             if (nonNull(preds)) {
                 clearMarks();
                 reducePreds();
@@ -1622,111 +1735,104 @@ Cell v; {                              /* parameters given by qs           */
  * ------------------------------------------------------------------------*/
 
 static Void local typeClassDefn(c)      /* Type check implementations of   */
-Class c; {                              /* defaults for class c            */
+Class c; {				/* defaults for class c		   */
 
     /* ----------------------------------------------------------------------
-     * Generate code for default dictionary builder function:
-     *
-     *   class.C sc1 ... scn d = let v1 ... = ...
-     *                               vm ... = ...
-     *                           in Make.C sc1 ... scn v1 ... vm
-     *
-     * where sci are superclass dictionary parameters, vj are implementations
-     * for member functions, either taken from defaults, or using "error" to
-     * produce a suitable error message.  (Additional line number values must
-     * be added at appropriate places but, for clarity, these are not shown
-     * above.)
+     * Generate code for default dictionary builder functions:
      * --------------------------------------------------------------------*/
 
     Int  beta   = newKindedVars(cclass(c).kinds);
-    List params = makePredAss(cclass(c).supers,beta);
-    Cell body   = cclass(c).dcon;
-    Cell pat    = body;
+    Cell d      = inventDictVar();
+    List dparam = singleton(triple(cclass(c).head,mkInt(beta),d));
     List mems   = cclass(c).members;
     List defs   = cclass(c).defaults;
     List dsels  = cclass(c).dsels;
-    Cell d      = inventDictVar();
-    List args   = NIL;
-    List locs   = NIL;
-    Cell l      = mkInt(cclass(c).line);
-    List ps;
+    Cell pat    = cclass(c).dcon;
+    Cell args   = NIL;
+    Int  width  = cclass(c).numSupers + cclass(c).numMembers;
+    char buf[FILENAME_MAX+1];
+    Int  i      = 0;
+    Int  j      = 0;
 
-    for (ps=params; nonNull(ps); ps=tl(ps)) {
-        Cell v = thd3(hd(ps));
-        body   = ap(body,v);
-        pat    = ap(pat,inventVar());
-        args   = cons(v,args);
+    if (isNull(defs) && nonNull(mems)) {
+        defs = cclass(c).defaults = cons(NIL,NIL);
     }
-    args   = revOnto(args,singleton(d));
-    params = appendOnto(params,
-                        singleton(triple(cclass(c).head,mkInt(beta),d)));
 
     for (; nonNull(mems); mems=tl(mems)) {
-        Cell v   = inventVar();         /* Pick a name for component       */
-        Cell imp = NIL;
+	static String deftext = "default_";
+	String s	      = textToStr(name(hd(mems)).text);
+	Name   n;
+	for (; i<FILENAME_MAX && deftext[i]!='\0'; i++) {
+	    buf[i] = deftext[i];
+	}
+	for(; (i+j)<FILENAME_MAX && s[j]!='\0'; j++) {
+	    buf[i+j] = s[j];
+	}
+	buf[i+j] = '\0';
+	n = newName(findText(buf),c);
 
-        if (nonNull(defs)) {            /* Look for default implementation */
-            imp  = hd(defs);
-            defs = tl(defs);
-        }
+	if (isNull(hd(defs))) {		/* No default definition	   */
+	    static String header = "Undefined member: ";
+	    for (i=0; i<FILENAME_MAX && header[i]!='\0'; i++)
+		buf[i] = header[i];
+	    for (j=0; (i+j)<FILENAME_MAX && s[j]!='\0'; j++)
+		buf[i+j] = s[j];
+	    buf[i+j] = '\0';
+	    name(n).line  = cclass(c).line;
+	    name(n).arity = 1;
+	    name(n).defn  = singleton(pair(singleton(d),
+					   ap(mkInt(cclass(c).line),
+					      ap(nameError,
+						 mkStr(fixLitText(
+							findText(buf)))))));
+	} else {			/* User supplied default defn	   */
+	    List alts = snd(hd(defs));
+	    Int  line = rhsLine(snd(hd(alts)));
 
-        if (isNull(imp)) {              /* Generate undefined member msg   */
-            static String header = "Undefined member: ";
-            String name = textToStr(name(hd(mems)).text);
-            char   msg[FILENAME_MAX+1];
-            Int    i;
-            Int    j;
+	    typeMember("default member binding",
+		       hd(mems),
+		       alts,
+		       dparam,
+		       cclass(c).head,
+		       beta);
 
-            for (i=0; i<FILENAME_MAX && header[i]!='\0'; i++)
-                msg[i] = header[i];
-            for (j=0; (i+j)<FILENAME_MAX && name[j]!='\0'; j++)
-                msg[i+j] = name[j];
-            msg[i+j] = '\0';
+	    name(n).line  = line;
+	    name(n).arity = 1+length(fst(hd(alts)));
+	    name(n).defn  = alts;
 
-            imp = pair(v,singleton(pair(NIL,ap(l,ap(nameError,
-                                                    mkStr(findText(msg)))))));
-        }
-        else {                          /* Use default implementation      */
-            fst(imp) = v;
-            typeMember("default member binding",
-                       hd(mems),
-                       snd(imp),
-                       params,
-                       cclass(c).head,
-                       beta);
-        }
+	    for (; nonNull(alts); alts=tl(alts)) {
+		fst(hd(alts)) = cons(d,fst(hd(alts)));
+	    }
+	}
 
-        locs = cons(imp,locs);
-        body = ap(body,v);
-        pat  = ap(pat,v);
+        hd(defs) = n;
+	genDefns = cons(n,genDefns);
+	if (isNull(tl(defs)) && nonNull(tl(mems))) {
+	    tl(defs) = cons(NIL,NIL);
+	}
+	defs     = tl(defs);
     }
-    body     = ap(l,body);
-    if (nonNull(locs))
-        body = ap(LETREC,pair(singleton(locs),body));
-    name(cclass(c).dbuild).defn
-             = singleton(pair(args,body));
-
-    name(cclass(c).dbuild).inlineMe = TRUE;
-    genDefns = cons(cclass(c).dbuild,genDefns);
-    cclass(c).defaults = NIL;
 
     /* ----------------------------------------------------------------------
      * Generate code for superclass and member function selectors:
      * --------------------------------------------------------------------*/
 
-    args = getArgs(pat);
-    pat  = singleton(pat);
-    for (; nonNull(dsels); dsels=tl(dsels)) {
-        name(hd(dsels)).defn = singleton(pair(pat,ap(l,hd(args))));
+    for (i=0; i<width; i++) {
+	pat = ap(pat,inventVar());
+    }
+    pat = singleton(pat);
+    for (i=0; nonNull(dsels); dsels=tl(dsels)) {
+	name(hd(dsels)).defn = singleton(pair(pat,
+					      ap(mkInt(cclass(c).line),
+						 nthArg(i++,hd(pat)))));
         name(hd(dsels)).inlineMe = TRUE;
-        args                 = tl(args);
-        genDefns             = cons(hd(dsels),genDefns);
+	genDefns	     = cons(hd(dsels),genDefns);
     }
     for (mems=cclass(c).members; nonNull(mems); mems=tl(mems)) {
-        name(hd(mems)).defn = singleton(pair(pat,ap(mkInt(name(hd(mems)).line),
-                                                    hd(args))));
-        args                = tl(args);
-        genDefns            = cons(hd(mems),genDefns);
+	name(hd(mems)).defn  = singleton(pair(pat,
+					      ap(mkInt(name(hd(mems)).line),
+						 nthArg(i++,hd(pat)))));
+	genDefns	     = cons(hd(mems),genDefns);
     }
 }
 
@@ -1741,16 +1847,16 @@ Inst in; {                              /* member functions for instance in*/
      *                                  .
      *                                  .
      *                              scm = ...
-     *                              d   = f (class.C sc1 ... scm d)
-     *           omit if the   /    f (Make.C sc1' ... scm' v1' ... vk')
-     *          instance decl {         = let vj ... = ...
-     *           has no imps   \          in Make.C sc1' ... scm' ... vj ...
+     *				    vj ... = ...
+     *				    d      = Make.C sc1 ... scm v1 ... vk
      *                          in d
      *
-     * where sci are superclass dictionaries, d and f are new names, vj
+     * where sci are superclass dictionaries, d is a new name, vj
      * is a newly generated name corresponding to the implementation of a
      * member function.  (Additional line number values must be added at
      * appropriate places but, for clarity, these are not shown above.)
+     * If no implementation of a particular vj is available, then we use
+     * the default implementation, partially applied to d.
      * --------------------------------------------------------------------*/
 
     Int  alpha   = newKindedVars(cclass(inst(in).c).kinds);
@@ -1763,7 +1869,9 @@ Inst in; {                              /* member functions for instance in*/
 
     List imps    = inst(in).implements;
     Cell l       = mkInt(inst(in).line);
-    Cell dictDef = cclass(inst(in).c).dbuild;
+    Cell dictDef = cclass(inst(in).c).dcon;
+    List mems    = cclass(inst(in).c).members;
+    List defs    = cclass(inst(in).c).defaults;
     List args    = NIL;
     List locs    = NIL;
     List ps;
@@ -1795,62 +1903,33 @@ Inst in; {                              /* member functions for instance in*/
         locs    = cons(pair(thd3(pi),singleton(pair(NIL,ap(l,ev)))),locs);
         dictDef = ap(dictDef,thd3(pi));
     }
-    dictDef = ap(dictDef,d);
 
-    if (isNull(imps))                           /* No implementations      */
-        locs = cons(pair(d,singleton(pair(NIL,ap(l,dictDef)))),locs);
-    else {                                      /* Implementations supplied*/
-        List mems  = cclass(inst(in).c).members;
-        Cell f     = inventVar();
-        Cell pat   = cclass(inst(in).c).dcon;
-        Cell res   = pat;
-        List locs1 = NIL;
-
-        locs       = cons(pair(d,singleton(pair(NIL,ap(l,ap(f,dictDef))))),
-                          locs);
-
-        for (ps=supers; nonNull(ps); ps=tl(ps)){/* Add param for each sc   */
-            Cell v = inventVar();
-            pat    = ap(pat,v);
-            res    = ap(res,v);
-        }
-
-        for (; nonNull(mems); mems=tl(mems)) {  /* For each member:        */
-            Cell v   = inventVar();
-            Cell imp = NIL;
-
-            if (nonNull(imps)) {                /* Look for implementation */
-                imp  = hd(imps);
-                imps = tl(imps);
-            }
-
-            if (isNull(imp)) {                  /* If none, f will copy    */
-                pat = ap(pat,v);                /* its argument unchanged  */
-                res = ap(res,v);
-            }
-            else {                              /* Otherwise, add the impl */
-                pat      = ap(pat,WILDCARD);    /* to f as a local defn    */
-                res      = ap(res,v);
-                typeMember("instance member binding",
-                           hd(mems),
-                           snd(imp),
-                           evids,
-                           inst(in).head,
-                           beta);
-                locs1    = cons(pair(v,snd(imp)),locs1);
-            }
-        }
-        res = ap(l,res);
-        if (nonNull(locs1))                     /* Build the body of f     */
-            res = ap(LETREC,pair(singleton(locs1),res));
-        pat  = singleton(pat);                  /* And the arglist for f   */
-        locs = cons(pair(f,singleton(pair(pat,res))),locs);
+    for (; nonNull(defs); defs=tl(defs)) {
+	Cell imp = NIL;
+	if (nonNull(imps)) {
+	    imp  = hd(imps);
+	    imps = tl(imps);
+	}
+	if (isNull(imp)) {
+	    dictDef = ap(dictDef,ap(hd(defs),d));
+	} else {
+	    Cell v  = inventVar();
+	    dictDef = ap(dictDef,v);
+	    typeMember("instance member binding",
+		       hd(mems),
+		       snd(imp),
+		       evids,
+		       inst(in).head,
+		       beta);
+	    locs     = cons(pair(v,snd(imp)),locs);
+	}
+	mems = tl(mems);
     }
-    d = ap(l,d);
+    locs = cons(pair(d,singleton(pair(NIL,ap(l,dictDef)))),locs);
 
-    name(inst(in).builder).defn                 /* Register builder imp    */
-             = singleton(pair(args,ap(LETREC,pair(singleton(locs),d))));
-
+    name(inst(in).builder).defn			/* Register builder imp	   */
+	     = singleton(pair(args,ap(LETREC,pair(singleton(locs),
+						  ap(l,d)))));
     name(inst(in).builder).inlineMe   = TRUE;
     name(inst(in).builder).isDBuilder = TRUE;
     genDefns = cons(inst(in).builder,genDefns);
@@ -1905,11 +1984,13 @@ Int    beta; {
         typeAlt(wh,mem,hd(alts),t,o,m);
         qualify(tl(ps),hd(alts));       /* Add any extra dict params       */
     }
+    improve(line,evids,preds);
     leavePendingBtyvs();
 
     evids = appendOnto(dupList(tl(ps)), /* Build full complement of dicts  */
                        evids);
     clearMarks();
+    normPreds(line);
     qs = elimPredsUsing(evids,NIL);
     if (nonNull(preds) && resolveDefs(genvarType(t,o,NIL)))
         qs = elimPredsUsing(evids,qs);
@@ -1933,8 +2014,10 @@ Int    beta; {
 #endif
     if (!sameSchemes(t,rt))
         tooGeneral(line,mem,rt,t);
-    if (nonNull(preds))
-        cantEstablish(line,wh,mem,t,ps);
+    if (nonNull(preds)) {
+	preds = scSimplify(preds);
+	cantEstablish(line,wh,mem,t,ps);
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -2026,6 +2109,7 @@ Cell gded; {                           /*             ex :: (var,beta)     */
 
 Cell rhsExpr(rhs)                      /* find first expression on a rhs   */
 Cell rhs; {
+    STACK_CHECK
     switch (whatIs(rhs)) {
         case GUARDED : return snd(snd(hd(snd(rhs))));
         case LETREC  : return rhsExpr(snd(snd(rhs)));
@@ -2036,6 +2120,7 @@ Cell rhs; {
 
 Int rhsLine(rhs)                       /* find line number associated with */
 Cell rhs; {                            /* a right hand side                */
+    STACK_CHECK
     switch (whatIs(rhs)) {
         case GUARDED : return intOf(fst(hd(snd(rhs))));
         case LETREC  : return rhsLine(snd(snd(rhs)));
@@ -2143,7 +2228,7 @@ Type t; {                               /* with qualifying preds qs        */
 
 static Bool local equalTypes(t1,t2)    /* Compare simple types for equality*/
 Type t1, t2; {
-
+    STACK_CHECK
 et: if (whatIs(t1)!=whatIs(t2))
         return FALSE;
 
@@ -2187,6 +2272,7 @@ Bool useDefs; {                         /* using defaults if reqd          */
     type      = typeIs;
     beta      = typeOff;
     clearMarks();
+    improve(0,NIL,preds);
     normPreds(0);
     elimTauts();
     preds     = scSimplify(preds);
@@ -2606,14 +2692,14 @@ Void typeChecker(what)
 Int what; {
     switch (what) {
         case RESET   : tcMode       = EXPRESSION;
++ 		       daSccs	    = NIL;
                        preds        = NIL;
                        pendingBtyvs = NIL;
                        daSccs       = NIL;
                        emptyAssumption();
                        break;
 
-        case MARK    : mark(daSccs);
-                       mark(defnBounds);
+        case MARK    : mark(defnBounds);
                        mark(varsBounds);
                        mark(depends);
                        mark(pendingBtyvs);
@@ -2621,6 +2707,7 @@ Int what; {
                        mark(localEvs);
                        mark(savedPs);
                        mark(dummyVar);
+		       mark(daSccs);
                        mark(preds);
                        mark(stdDefaults);
                        mark(arrow);

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: errors.h,v $
- * $Revision: 1.4 $
- * $Date: 1999/10/15 21:41:05 $
+ * $Revision: 1.5 $
+ * $Date: 1999/10/16 02:17:28 $
  * ------------------------------------------------------------------------*/
 
 extern Void internal     Args((String)) HUGS_noreturn;
@@ -36,6 +36,7 @@ extern Void fatal        Args((String)) HUGS_noreturn;
 #define ERRPRED(pi)      Hilite(); printPred(errorStream,pi); Lolite()
 #define ERRKIND(k)       Hilite(); printKind(errorStream,k); Lolite()
 #define ERRKINDS(ks)     Hilite(); printKinds(errorStream,ks); Lolite()
+#define ERRFD(fd)	 Hilite(); printFD(errorStream,fd); Lolite()
 
 extern Void errHead      Args((Int));              /* in main.c            */
 extern Void errFail      Args((Void)) HUGS_noreturn;
@@ -51,5 +52,6 @@ extern Void printContext Args((FILE *,List));
 extern Void printPred    Args((FILE *,Cell));
 extern Void printKind    Args((FILE *,Kind));
 extern Void printKinds   Args((FILE *,Kinds));
+extern Void printFD	 Args((FILE *,Pair));
 
 /*-------------------------------------------------------------------------*/

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/15 21:40:58 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/16 02:17:25 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -63,6 +63,7 @@ extern  Bool         inventedText       Args((Text));
  * qualified or unqualified.
  */
 extern  String       identToStr         Args((Cell));
+extern	Text	     fixLitText	 	Args((Text));
 extern  Syntax       identSyntax        Args((Cell));
 extern  Syntax       defaultSyntax      Args((Text));
 
@@ -133,7 +134,7 @@ extern  Cell         whatIs    Args((Cell));
  * ------------------------------------------------------------------------*/
 
 #define TAGMIN       1            /* Box and constructor cell tag values   */
-#define BCSTAG       20           /* Box=TAGMIN..BCSTAG-1                  */
+#define BCSTAG       30           /* Box=TAGMIN..BCSTAG-1                  */
 #define isTag(c)     (TAGMIN<=(c) && (c)<SPECMIN) /* Tag cell values       */
 #define isBoxTag(c)  (TAGMIN<=(c) && (c)<BCSTAG)  /* Box cell tag values   */
 #define isConTag(c)  (BCSTAG<=(c) && (c)<SPECMIN) /* Constr cell tag values*/
@@ -151,10 +152,14 @@ extern  Cell         whatIs    Args((Cell));
 #define BIGCELL      16           /* Integer literal:         snd :: Text  */
 #if PTR_ON_HEAP
 #define PTRCELL      17           /* C Heap Pointer           snd :: Ptr   */
-#define CPTRCELL     18           /* Native code pointer      snd :: Ptr   */
+#if IPARAM
+#define IPCELL       19		  /* Imp Param Cell:	      snd :: Text  */
+#define IPVAR	     20		  /* ?x:		      snd :: Text  */
+#endif
+#define CPTRCELL     21           /* Native code pointer      snd :: Ptr   */
 #endif
 #if TREX
-#define EXTCOPY      19           /* Copy of an Ext:          snd :: Text  */
+#define EXTCOPY      22           /* Copy of an Ext:          snd :: Text  */
 #endif
 
 //#define textOf(c)       ((Text)(snd(c)))         /* c ::  (VAR|CON)(ID|OP) */
@@ -193,6 +198,14 @@ fprintf(stderr, "\ntextOf -- tag %d\n",whatIs(c) );
 #define mkDictVar(t)    ap(DICTVAR,t)
 #define inventDictVar() mkDictVar(inventDictText())
 #define mkStr(t)        ap(STRCELL,t)
+#if IPARAM
+#define mkIParam(c)	ap(IPCELL,snd(c))
+#define isIP(p)		(whatIs(p) == IPCELL)
+#define ipMatch(pi, t)	(isIP(fun(pi)) && textOf(fun(pi)) == t)
+#define ipVar(pi)	textOf(fun(pi))
+#else
+#define isIP(p)		FALSE
+#endif
 extern  Bool            isVar       Args((Cell));
 extern  Bool            isCon       Args((Cell));
 extern  Bool            isQVar      Args((Cell));
@@ -231,70 +244,75 @@ extern  Ptr             cptrOf          Args((Cell));
  * element is a special cell will be treated as an application node.
  * ------------------------------------------------------------------------*/
 
-#define LETREC       20           /* LETREC     snd :: ([Decl],Exp)        */
-#define COND         21           /* COND       snd :: (Exp,Exp,Exp)       */
-#define LAMBDA       22           /* LAMBDA     snd :: Alt                 */
-#define FINLIST      23           /* FINLIST    snd :: [Exp]               */
-#define DOCOMP       24           /* DOCOMP     snd :: (Exp,[Qual])        */
-#define BANG         25           /* BANG       snd :: Type                */
-#define COMP         26           /* COMP       snd :: (Exp,[Qual])        */
-#define ASPAT        27           /* ASPAT      snd :: (Var,Exp)           */
-#define ESIGN        28           /* ESIGN      snd :: (Exp,Type)          */
-#define RSIGN        29           /* RSIGN      snd :: (Rhs,Type)          */
-#define CASE         30           /* CASE       snd :: (Exp,[Alt])         */
-#define NUMCASE      31           /* NUMCASE    snd :: (Exp,Disc,Rhs)      */
-#define FATBAR       32           /* FATBAR     snd :: (Exp,Exp)           */
-#define LAZYPAT      33           /* LAZYPAT    snd :: Exp                 */
-#define DERIVE       35           /* DERIVE     snd :: Cell                */
+#define LETREC       30           /* LETREC     snd :: ([Decl],Exp)        */
+#define COND         31           /* COND       snd :: (Exp,Exp,Exp)       */
+#define LAMBDA       32           /* LAMBDA     snd :: Alt                 */
+#define FINLIST      33           /* FINLIST    snd :: [Exp]               */
+#define DOCOMP       34           /* DOCOMP     snd :: (Exp,[Qual])        */
+#define BANG         35           /* BANG       snd :: Type                */
+#define COMP         36           /* COMP       snd :: (Exp,[Qual])        */
+#define ASPAT        37           /* ASPAT      snd :: (Var,Exp)           */
+#define ESIGN        38           /* ESIGN      snd :: (Exp,Type)          */
+#define RSIGN        39           /* RSIGN      snd :: (Rhs,Type)          */
+#define CASE         40           /* CASE       snd :: (Exp,[Alt])         */
+#define NUMCASE      41           /* NUMCASE    snd :: (Exp,Disc,Rhs)      */
+#define FATBAR       42           /* FATBAR     snd :: (Exp,Exp)           */
+#define LAZYPAT      43           /* LAZYPAT    snd :: Exp                 */
+#define DERIVE       45           /* DERIVE     snd :: Cell                */
 #if BREAK_FLOATS
-#define FLOATCELL    36           /* FLOATCELL  snd :: (Int,Int)           */
+#define FLOATCELL    46           /* FLOATCELL  snd :: (Int,Int)           */
 #endif
 
-#define BOOLQUAL     39           /* BOOLQUAL   snd :: Exp                 */
-#define QWHERE       40           /* QWHERE     snd :: [Decl]              */
-#define FROMQUAL     41           /* FROMQUAL   snd :: (Exp,Exp)           */
-#define DOQUAL       42           /* DOQUAL     snd :: Exp                 */
-#define MONADCOMP    43           /* MONADCOMP  snd :: ((m,m0),(Exp,[Qual])*/
+#define BOOLQUAL     49           /* BOOLQUAL   snd :: Exp                 */
+#define QWHERE       50           /* QWHERE     snd :: [Decl]              */
+#define FROMQUAL     51           /* FROMQUAL   snd :: (Exp,Exp)           */
+#define DOQUAL       52           /* DOQUAL     snd :: Exp                 */
+#define MONADCOMP    53           /* MONADCOMP  snd :: ((m,m0),(Exp,[Qual])*/
 
-#define GUARDED      44           /* GUARDED    snd :: [guarded exprs]     */
+#define GUARDED      54           /* GUARDED    snd :: [guarded exprs]     */
 
-#define ARRAY        45           /* Array      snd :: (Bounds,[Values])   */
-#define MUTVAR       46           /* Mutvar     snd :: Cell                */
+#define ARRAY        55           /* Array      snd :: (Bounds,[Values])   */
+#define MUTVAR       56           /* Mutvar     snd :: Cell                */
 #if INTERNAL_PRIMS
-#define HUGSOBJECT   47           /* HUGSOBJECT snd :: Cell                */
+#define HUGSOBJECT   57           /* HUGSOBJECT snd :: Cell                */
 #endif
 
-#define POLYTYPE     50           /* POLYTYPE   snd :: (Kind,Type)         */
-#define QUAL         51           /* QUAL       snd :: ([Classes],Type)    */
-#define RANK2        52           /* RANK2      snd :: (Int,Type)          */
-#define EXIST        53           /* EXIST      snd :: (Int,Type)          */
-#define POLYREC      54           /* POLYREC    snd :: (Int,Type)          */
-#define BIGLAM       55           /* BIGLAM     snd :: (vars,patterns)     */
-#define CDICTS       56           /* CDICTS     snd :: ([Pred],Type)       */
+#if IPARAM
+#define WITHEXP      58 	  /* WITHEXP    snd :: [(Var,Exp)]	   */
+#endif
 
-#define LABC         60           /* LABC       snd :: (con,[(Vars,Type)]) */
-#define CONFLDS      61           /* CONFLDS    snd :: (con,[Field])       */
-#define UPDFLDS      62           /* UPDFLDS    snd :: (Exp,[con],[Field]) */
+
+#define POLYTYPE     60           /* POLYTYPE   snd :: (Kind,Type)         */
+#define QUAL         61           /* QUAL       snd :: ([Classes],Type)    */
+#define RANK2        62           /* RANK2      snd :: (Int,Type)          */
+#define EXIST        63           /* EXIST      snd :: (Int,Type)          */
+#define POLYREC      64           /* POLYREC    snd :: (Int,Type)          */
+#define BIGLAM       65           /* BIGLAM     snd :: (vars,patterns)     */
+#define CDICTS       66           /* CDICTS     snd :: ([Pred],Type)       */
+
+#define LABC         67           /* LABC       snd :: (con,[(Vars,Type)]) */
+#define CONFLDS      68           /* CONFLDS    snd :: (con,[Field])       */
+#define UPDFLDS      69           /* UPDFLDS    snd :: (Exp,[con],[Field]) */
 #if TREX
-#define RECORD       63           /* RECORD     snd :: [Val]               */
-#define EXTCASE      64           /* EXTCASE    snd :: (Exp,Disc,Rhs)      */
-#define RECSEL       65           /* RECSEL     snd :: Ext                 */
+#define RECORD       70           /* RECORD     snd :: [Val]               */
+#define EXTCASE      71           /* EXTCASE    snd :: (Exp,Disc,Rhs)      */
+#define RECSEL       72           /* RECSEL     snd :: Ext                 */
 #endif
-#define IMPDEPS      68           /* IMPDEPS    snd :: [Binding]           */
+#define IMPDEPS      73           /* IMPDEPS    snd :: [Binding]           */
 
-#define QUALIDENT    70           /* Qualified identifier  snd :: (Id,Id)  */
-#define HIDDEN       71           /* hiding import list    snd :: [Entity] */
-#define MODULEENT    72           /* module in export list snd :: con      */
+#define QUALIDENT    74           /* Qualified identifier  snd :: (Id,Id)  */
+#define HIDDEN       75           /* hiding import list    snd :: [Entity] */
+#define MODULEENT    76           /* module in export list snd :: con      */
 
-#define INFIX        80           /* INFIX      snd :: (see tidyInfix)     */
-#define ONLY         81           /* ONLY       snd :: Exp                 */
-#define NEG          82           /* NEG        snd :: Exp                 */
+#define INFIX        77           /* INFIX      snd :: (see tidyInfix)     */
+#define ONLY         78           /* ONLY       snd :: Exp                 */
+#define NEG          79           /* NEG        snd :: Exp                 */
 
 /* Used when parsing GHC interface files */
-#define DICTAP       85           /* DICTTYPE   snd :: (QClassId,[Type])   */
+#define DICTAP       80          /* DICTTYPE   snd :: (QClassId,[Type])   */
 
 #if SIZEOF_INTP != SIZEOF_INT
-#define PTRCELL      90           /* C Heap Pointer snd :: (Int,Int)       */
+#define PTRCELL      81           /* C Heap Pointer snd :: (Int,Int)       */
 #endif
 
 #define STGVAR       92           /* STGVAR     snd :: (StgRhs,info)       */
@@ -506,8 +524,10 @@ extern Tycon findQualTycon Args((Cell));
 extern Tycon addPrimTycon Args((Text,Kind,Int,Cell,Cell));
 
 #define isSynonym(h)    (isTycon(h) && tycon(h).what==SYNONYM)
+#define isQualType(t)	(isPair(t) && fst(t)==QUAL)
 #define mkPolyType(n,t) pair(POLYTYPE,pair(n,t))
 #define isPolyType(t)   (isPair(t) && fst(t)==POLYTYPE)
+#define isPolyOrQualType(t) (isPair(t) && (fst(t)==POLYTYPE || fst(t)==QUAL))
 #define polySigOf(t)    fst(snd(t))
 #define monotypeOf(t)   snd(snd(t))
 
@@ -620,6 +640,7 @@ struct strClass {
     Int    level;                       /* Level in class hierarchy        */
     Int    arity;                       /* Number of arguments             */
     Kinds  kinds;                       /* Kinds of constructors in class  */
+    List   fds;				/* Functional Dependencies	   */
     Cell   head;                        /* Head of class                   */
     Name   dcon;                        /* Dictionary constructor function */
     List   supers;                      /* :: [Pred]                       */
@@ -627,7 +648,6 @@ struct strClass {
     List   dsels;                       /* Superclass dictionary selectors */
     List   members;                     /* :: [Name]                       */
     Int    numMembers;                  /* length(members)                 */
-    Name   dbuild;                      /* Default dictionary builder      */
     List   defaults;                    /* :: [Name]                       */
     List   instances;                   /* :: [Inst]                       */
 };
@@ -794,6 +814,15 @@ extern  StackPtr sp;
 #define toparg(x)    top()=ap(top(),(x))
 
 extern  Void hugsStackOverflow Args((Void));
+
+#if SYMANTEC_C
+#include <Memory.h>
+#define STACK_HEADROOM 16384
+#define STACK_CHECK if (StackSpace() <= STACK_HEADROOM) \
+		      internal("Macintosh function parameter stack overflow.");
+#else
+#define STACK_CHECK
+#endif
 
 /* --------------------------------------------------------------------------
  * Script file control:

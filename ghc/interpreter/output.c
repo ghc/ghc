@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/10/15 21:40:53 $
+ * $Revision: 1.7 $
+ * $Date: 1999/10/16 02:17:28 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -933,4 +933,24 @@ Kinds ks; {
     putKinds(ks);
 }
 
+Void printFD(fp,fd)			/* print functional dependency	   */
+FILE* fp;
+Pair  fd; {
+    List us;
+    outputStream = fp;
+    for (us=fst(fd); nonNull(us); us=tl(us)) {
+        putTyVar(offsetOf(hd(us)));
+	if (nonNull(tl(us))) {
+	    putChr(' ');
+	}
+    }
+    putStr(" -> ");
+    for (us=snd(fd); nonNull(us); us=tl(us)) {
+	putTyVar(offsetOf(hd(us)));
+	if (nonNull(tl(us))) {
+	    putChr(' ');
+	}
+    }
+}
+  
 /*-------------------------------------------------------------------------*/

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: subst.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/10/15 21:40:59 $
+ * $Revision: 1.7 $
+ * $Date: 1999/10/16 02:17:27 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -49,6 +49,11 @@ static Type local makeTupleType         Args((Int));
 static Kind local makeSimpleKind        Args((Int));
 static Kind local makeVarKind           Args((Int));
 static Void local expandSyn1            Args((Tycon, Type *, Int *));
+static List local listTyvar		Args((Int,List));
+static List local listTyvars		Args((Type,Int,List));
+static Cell local dupTyvar		Args((Int,List));
+static Cell local dupTyvars		Args((Cell,Int,List));
+static Pair local copyNoMark		Args((Cell,Int));
 static Type local dropRank1Body         Args((Type,Int,Int));
 static Type local liftRank1Body         Args((Type,Int));
 
@@ -59,6 +64,14 @@ static Bool local inserter              Args((Type,Int,Type,Int));
 static Int  local remover               Args((Text,Type,Int));
 static Int  local tailVar               Args((Type,Int));
 #endif
+
+static Bool local pairImprove		Args((Int,Class,Cell,Int,Cell,Int));
+static Bool local instImprove		Args((Int,Cell,Int));
+static Bool local improveAgainst	Args((Int,List,Cell,Int));
+#if IPARAM
+static Bool local ipImprove		Args((Int,Cell,Int,Cell,Int));
+#endif
+
 static Bool local kvarToVarBind         Args((Tyvar *,Tyvar *));
 static Bool local kvarToTypeBind        Args((Tyvar *,Type,Int));
 
@@ -215,7 +228,7 @@ Type type; {
                 typeFree++;
         }
 
-        if (whatIs(typeIs)==QUAL) {    /* Qualified type?                  */
+	if (isQualType(typeIs)) {    /* Qualified type?			   */
             predsAre = fst(snd(typeIs));
             typeIs   = snd(snd(typeIs));
         }
@@ -443,6 +456,7 @@ Int vn; {                               /* given type variable             */
 Void markType(t,o)                      /* mark fixed vars in type (t,o)   */
 Type t;
 Int  o; {
+    STACK_CHECK
     switch (whatIs(t)) {
         case POLYTYPE  :
         case QUAL      :
@@ -514,6 +528,7 @@ Int vn; {                               /* type bound to given type var    */
 Type copyType(t,o)                      /* calculate most general form of  */
 Type t;                                 /* type expression (t,o)           */
 Int  o; {
+    STACK_CHECK
     switch (whatIs(t)) {
         case AP        : {   Type l = copyType(fst(t),o);/* ensure correct */
                              Type r = copyType(snd(t),o);/* eval. order    */
@@ -539,6 +554,32 @@ Int  o; {
         return pi;
 }
 
+Type zonkTyvar(vn)	/* flatten type by chasing all references	   */
+Int vn; {		/* and collapsing OFFSETS to absolute indexes	   */
+    Tyvar *tyv = tyvar(vn);
+
+    if (tyv->bound)
+	return zonkType(tyv->bound,tyv->offs);
+    else
+	return mkInt(vn);
+}
+
+Type zonkType(t,o)	/* flatten type by chasing all references	   */
+Type t;			/* and collapsing OFFSETS to absolute indexes	   */
+Int  o; {
+    STACK_CHECK
+    switch (whatIs(t)) {
+	case AP        : {   Type l = zonkType(fst(t),o);/* ensure correct */
+			     Type r = zonkType(snd(t),o);/* eval. order    */
+			     return ap(l,r);
+			 }
+	case OFFSET    : return zonkTyvar(o+offsetOf(t));
+	case INTCELL   : return zonkTyvar(intOf(t));
+    }
+
+    return t;
+}
+
 #ifdef DEBUG_TYPES
 Type debugTyvar(vn)                     /* expand type structure in full   */
 Int vn; {                               /* detail                          */
@@ -552,6 +593,7 @@ Int vn; {                               /* detail                          */
 Type debugType(t,o)
 Type t;
 Int  o; {
+    STACK_CHECK
     switch (whatIs(t)) {
         case AP        : {   Type l = debugType(fst(t),o);
                              Type r = debugType(snd(t),o);
@@ -564,6 +606,25 @@ Int  o; {
     }
 
     return t;
+}
+List debugContext(ps)
+List ps; {
+    Cell p;
+    List qs = NIL;
+    for (; nonNull(ps); ps=tl(ps)) {
+        p = debugPred(fst3(hd(ps)),intOf(snd3(hd(ps))));
+	qs = cons(p,qs);
+    }
+    return rev(qs);
+}
+
+Cell debugPred(pi,o)
+Cell pi;
+Int  o; {
+    if (isAp(pi)) {
+	return pair(debugPred(fun(pi),o),debugType(arg(pi),o));
+    }
+    return pi;
 }
 #endif /*DEBUG_TYPES*/
 
@@ -587,6 +648,80 @@ Int  o; {
         case INTCELL : return copyKindvar(intOf(k));
     }
     return k;
+}
+
+/* --------------------------------------------------------------------------
+ * Copy type expression from substitution without marking:
+ * ------------------------------------------------------------------------*/
+
+static List local listTyvar(vn,ns)
+Int  vn;
+List ns; {
+    Tyvar *tyv = tyvar(vn);
+
+    if (isBound(tyv)) {
+	return listTyvars(tyv->bound,tyv->offs,ns);
+    } else if (!intIsMember(vn,ns)) {
+	ns = cons(mkInt(vn),ns);
+    }
+    return ns;
+}
+
+static List local listTyvars(t,o,ns)
+Cell t;
+Int  o;
+List ns; {
+    switch (whatIs(t)) {
+	case AP        : return listTyvars(fst(t),o,
+				 listTyvars(snd(t),o,
+				  ns));
+	case OFFSET    : return listTyvar(o+offsetOf(t),ns);
+	case INTCELL   : return listTyvar(intOf(t),ns);
+	default        : break;
+    }
+    return ns;
+}
+
+static Cell local dupTyvar(vn,ns)
+Int  vn;
+List ns; {
+    Tyvar *tyv = tyvar(vn);
+
+    if (isBound(tyv)) {
+	return dupTyvars(tyv->bound,tyv->offs,ns);
+    } else {
+	Int i = 0;
+	for (; nonNull(ns) && vn!=intOf(hd(ns)); ns=tl(ns)) {
+	    i++;
+	}
+	return mkOffset(i);
+    }
+}
+
+static Cell local dupTyvars(t,o,ns)
+Cell t;
+Int  o;
+List ns; {
+    switch (whatIs(t)) {
+	case AP        : {   Type l = dupTyvars(fst(t),o,ns);
+			     Type r = dupTyvars(snd(t),o,ns);
+			     return ap(l,r);
+			 }
+	case OFFSET    : return dupTyvar(o+offsetOf(t),ns);
+	case INTCELL   : return dupTyvar(intOf(t),ns);
+    }
+    return t;
+}
+
+static Cell local copyNoMark(t,o)	/* Copy a type or predicate without*/
+Cell t;					/* changing marks		   */
+Int  o; {
+    List ns     = listTyvars(t,o,NIL);
+    Cell result = pair(ns,dupTyvars(t,o,ns));
+    for (; nonNull(ns); ns=tl(ns)) {
+	hd(ns) = tyvar(intOf(hd(ns)))->kind;
+    }
+    return result;
 }
 
 /* --------------------------------------------------------------------------
@@ -808,6 +943,7 @@ Type  t;
 Int   o; {
     Tyvar *tyv;
 
+    STACK_CHECK
     for (;;) {
         deRef(tyv,t,o);
         if (tyv)                        /* type variable                   */
@@ -901,6 +1037,7 @@ Type t1,t2;                             /* unify (t1,o1) with (t2,o2)      */
 Int  o1,o2; {
     Tyvar *tyv1, *tyv2;
 
+    STACK_CHECK
     deRef(tyv1,t1,o1);
     deRef(tyv2,t2,o2);
 
@@ -1111,7 +1248,7 @@ Int  o; {
 Bool typeMatches(type,mt)               /* test if type matches monotype mt*/
     Type type, mt; {                    /* imported from STG Hugs          */
     Bool result;
-    if (isPolyType(type) || whatIs(type)==QUAL)
+     if (isPolyOrQualType(type))
         return FALSE;
     emptySubstitution();
     noBind();
@@ -1201,6 +1338,11 @@ Int  o; {
     for (; isAp(pi1); pi1=fun(pi1), pi=fun(pi))
         if (!unify(arg(pi1),o1,arg(pi),o))
             return FALSE;
+#if IPARAM
+    if (isIP(pi1) && isIP(pi))
+	return textOf(pi1)==textOf(pi);
+    else
+#endif
     return pi1==pi;
 }
 
@@ -1214,6 +1356,7 @@ Cell  pi;                               /* (pi,o), or otherwise NIL.  If a */
 Int   o; {                              /* match is found, then tyvars from*/
     Class c = getHead(pi);              /* typeOff have been initialized to*/
     List  ins;                          /* allow direct use of specifics.  */
+    Cell  kspi = NIL;
 
     if (!isClass(c))
         return NIL;
@@ -1225,8 +1368,21 @@ Int   o; {                              /* match is found, then tyvars from*/
             typeOff = beta;
             return in;
         }
-        else
-            numTyvars = beta;
+	else {
+	    numTyvars = beta;
+	    if (allowOverlap) {
+		Int alpha = newKindedVars(inst(in).kinds);
+		if (isNull(kspi)) {
+		    kspi = copyNoMark(pi,o);
+		}
+		beta = newKindedVars(fst(kspi));
+		if (matchPred(inst(in).head,alpha,snd(kspi),beta)) {
+		    numTyvars = alpha;
+		    return NIL;
+		}
+		numTyvars = alpha;
+	    }
+	}
     }
     unrestrictBind();
 
@@ -1259,6 +1415,209 @@ Int   o; {                              /* match is found, then tyvars from*/
 #endif
 
     return NIL;
+}
+
+#if MULTI_INST
+Cell findInstsFor(pi,o)			/* Find matching instance for pred */
+Cell  pi;				/* (pi,o), or otherwise NIL.  If a */
+Int   o; {				/* match is found, then tyvars from*/
+    Class c = getHead(pi);		/* typeOff have been initialized to*/
+    List  ins;				/* allow direct use of specifics.  */
+    List  res = NIL;
+
+    if (!isClass(c))
+	return NIL;
+
+    for (ins=cclass(c).instances; nonNull(ins); ins=tl(ins)) {
+	Inst in   = hd(ins);
+	Int  beta = newKindedVars(inst(in).kinds);
+	if (matchPred(pi,o,inst(in).head,beta)) {
+	    res = cons (pair (beta, in), res);
+	    continue;
+	}
+	else
+	    numTyvars = beta;
+    }
+    if (res == NIL) {
+	unrestrictBind();
+    }
+
+    return rev(res);
+}
+#endif
+
+/* --------------------------------------------------------------------------
+ * Improvement:
+ * ------------------------------------------------------------------------*/
+
+Void improve(line,sps,ps)		/* Improve a list of predicates    */
+Int  line;
+List sps;
+List ps; {
+    Bool improved;
+    List ps1;
+    do {
+	improved = FALSE;
+	for (ps1=ps; nonNull(ps1); ps1=tl(ps1)) {
+	    Cell pi = fst3(hd(ps1));
+	    Int  o  = intOf(snd3(hd(ps1)));
+	    Cell c  = getHead(pi);
+	    if ((isClass(c) && nonNull(cclass(c).fds)) || isIP(c)) {
+		improved |= improveAgainst(line,sps,pi,o);
+		if (!isIP(c))
+		    improved |= instImprove(line,pi,o);
+		improved |= improveAgainst(line,tl(ps1),pi,o);
+	    }
+	}
+    } while (improved);
+}
+
+Bool improveAgainst(line,ps,pi,o)
+Int line;
+List ps;
+Cell pi;
+Int o; {
+    Bool improved = FALSE;
+    Cell h = getHead(pi);
+    for (; nonNull(ps); ps=tl(ps)) {
+	Cell pr = hd(ps);
+	Cell pi1 = fst3(pr);
+	Int o1 = intOf(snd3(pr));
+	Cell h1 = getHead(pi1);
+	if (isClass(h1) && h==h1)
+	    improved |= pairImprove(line,h,pi,o,pi1,o1);
+#if IPARAM
+	else if (isIP(h1) && textOf(h1) == textOf(h))
+	    improved |= ipImprove(line,pi,o,pi1,o1);
+#endif
+    }
+    return improved;
+}
+
+#if IPARAM
+Bool ipImprove(line,pi,o,pi1,o1)
+Int line;
+Cell pi;
+Int o;
+Cell pi1;
+Int o1; {
+    Type t  = arg(pi);
+    Type t1 = arg(pi1);
+    if (!sameType(t,o,t1,o1)) {
+	if (!unify(t,o,t1,o1)) {
+	    ERRMSG(line) "Mismatching uses of implicit parameter\n"
+	    ETHEN
+	    ERRTEXT "\n***  "
+	    ETHEN ERRPRED(copyPred(pi1,o1));
+	    ERRTEXT "\n***  "
+	    ETHEN ERRPRED(copyPred(pi,o));
+	    ERRTEXT "\n"
+	    EEND;
+	}
+	return TRUE;
+    }
+    return FALSE;
+}
+#endif
+
+Bool pairImprove(line,c,pi1,o1,pi,o)	/* Look for improvement of (pi1,o1)*/
+Int   line;				/* against (pi,o), assuming that   */
+Class c;				/* both pi and pi1 are for class c */
+Cell  pi1;
+Int   o1;
+Cell  pi;
+Int   o; {
+    Bool improved = FALSE;
+    List fds      = cclass(c).fds;
+    for (; nonNull(fds); fds=tl(fds)) {
+	List as   = fst(hd(fds));
+	Bool same = TRUE;
+	for (; same && nonNull(as); as=tl(as)) {
+	    Int n = offsetOf(hd(as));
+	    same &= sameType(nthArg(n,pi1),o1,nthArg(n,pi),o);
+	}
+	if (isNull(as) && same) {
+	    for (as=snd(hd(fds)); same && nonNull(as); as=tl(as)) {
+		Int  n  = offsetOf(hd(as));
+		Type t1 = nthArg(n,pi1);
+		Type t  = nthArg(n,pi);
+		if (!sameType(t1,o1,t,o)) {
+		    same &= unify(t1,o1,t,o);
+		    improved = TRUE;
+		}
+	    }
+	    if (!same) {
+		ERRMSG(line)
+		  "Constraints are not consistent with functional dependency"
+		ETHEN
+		ERRTEXT "\n*** Constraint       : "
+		ETHEN ERRPRED(copyPred(pi1,o1));
+		ERRTEXT "\n*** And constraint   : "
+		ETHEN ERRPRED(copyPred(pi,o));
+		ERRTEXT "\n*** For class        : "
+		ETHEN ERRPRED(cclass(c).head);
+		ERRTEXT "\n*** Break dependency : "
+		ETHEN ERRFD(hd(fds));
+		ERRTEXT "\n"
+		EEND;
+	    }
+	}
+    }
+    return improved;
+}
+
+Bool instImprove(line,pi,o)		/* Look for improvement of (pi,o)  */
+Int  line;				/* returning TRUE if an improvement*/
+Cell pi;				/* was made, and FALSE otherwise   */
+Int  o; {
+    Bool improved = FALSE;
+    Cell c        = getHead(pi);
+    if (isClass(c) && nonNull(cclass(c).fds)) {
+	List ins = cclass(c).instances;
+	for (; nonNull(ins); ins=tl(ins)) {
+	    Cell in   = hd(ins);
+	    List fds  = cclass(c).fds;
+	    for (; nonNull(fds); fds=tl(fds)) {
+		Int  beta = newKindedVars(inst(in).kinds);
+		Bool same = TRUE;
+		List as   = fst(hd(fds));
+		for (; same && nonNull(as); as=tl(as)) {
+		    Int n = offsetOf(hd(as));
+		    same &= matchType(nthArg(n,pi),o,
+				      nthArg(n,inst(in).head),beta);
+		}
+		if (isNull(as) && same) {
+		    for (as=snd(hd(fds)); same && nonNull(as); as=tl(as)) {
+			Int  n  = offsetOf(hd(as));
+			Type tp = nthArg(n,pi);
+			Type ti = nthArg(n,inst(in).head);
+			if (!matchType(tp,o,ti,beta)) {
+			    same &= unify(tp,o,ti,beta);
+			    improved = TRUE;
+			}
+		    }
+		    if (!same) {
+			ERRMSG(line)
+			  "Constraint is not consistent with declared instance"
+			ETHEN
+			ERRTEXT "\n*** Constraint       : "
+			ETHEN ERRPRED(copyPred(pi,o));
+			ERRTEXT "\n*** Instance         : "
+			ETHEN ERRPRED(inst(in).head);
+			ERRTEXT "\n*** For class        : "
+			ETHEN ERRPRED(cclass(c).head);
+			ERRTEXT "\n*** Under dependency : "
+			ETHEN ERRFD(hd(fds));
+			ERRTEXT "\n"
+			EEND;
+		    }
+		} else {
+		    numTyvars = beta;
+		}
+	    }
+	}
+    }
+    return improved;
 }
 
 /* --------------------------------------------------------------------------
@@ -1327,8 +1686,8 @@ Type s1; {
     for (; nr2>0; nr2--) {              /* Deal with rank 2 arguments      */
         Type t  = arg(fun(s));
         Type t1 = arg(fun(s1));
-        b       = isPolyType(t);
-        b1      = isPolyType(t1);
+	b       = isPolyOrQualType(t);
+	b1      = isPolyOrQualType(t1);
         if (b || b1) {
             if (b && b1) {
                 t  = dropRank1(t,o,m);
@@ -1340,20 +1699,40 @@ Type s1; {
                 return FALSE;
         }
         else {
-            noBind();
-            b = unify(t,o,t1,o);
-            unrestrictBind();
-            if (!b)
+ 	    if (!sameType(t,o,t1,o)) {
                 return FALSE;
+	    }
         }
+
         s  = arg(s);
         s1 = arg(s1);
     }
 
-    noBind();                           /* Ensure body types are the same  */
-    b = unify(s,o,s1,o);
+    return sameType(s,o,s1,o);		/* Ensure body types are the same  */
+}
+
+Bool sameType(t1,o1,t,o)		/* Test to see if types are	   */
+Type t1;				/* the same, with no binding of	   */
+Int  o1;				/* the variables in either one.	   */
+Cell t;					/* Assumes types are kind correct  */
+Int  o; {				/* with the same kind.		   */
+    Bool result;
+    noBind();
+    result = unify(t1,o1,t,o);
     unrestrictBind();
-    return b;
+    return result;
+}
+
+Bool matchType(t1,o1,t,o)		/* One way match type (t1,o1)	   */
+Type t1;				/* against (t,o), allowing only	   */
+Int  o1;				/* vars in 2nd type to be bound.   */
+Type t;					/* Assumes types are kind correct  */
+Int  o; {				/* and that no vars have been	   */
+    Bool result;			/* alloc'd since o.		   */
+    bindOnlyAbove(o);
+    result = unify(t1,o1,t,o);
+    unrestrictBind();
+    return result;
 }
 
 /* --------------------------------------------------------------------------
