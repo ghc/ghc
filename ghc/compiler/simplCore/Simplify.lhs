@@ -544,7 +544,7 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
     thing_inside
 
   | Note coercion@(Coerce _ inner_ty) inner_rhs <- new_rhs,
-    not trivial_rhs
+    not trivial_rhs && not (isUnLiftedType inner_ty)
 	-- x = coerce t e  ==>  c = e; x = inline_me (coerce t c)
 	-- Now x can get inlined, which moves the coercion
 	-- to the usage site.  This is a bit like worker/wrapper stuff,
@@ -557,6 +557,16 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
 	--	case (coerce Int x) of ...
 	-- will inline x.  
 	-- Also the full-blown w/w thing isn't set up for non-functions
+	--
+	-- The (not (isUnLiftedType inner_ty)) avoids the nasty case of
+	--	x::Int = coerce Int Int# (foo y)
+	-- ==>
+	--	v::Int# = foo y
+	--	x::Int  = coerce Int Int# v
+	-- which would be bogus because then v will be evaluated strictly.
+	-- How can this arise?  Via 
+	--	x::Int = case (foo y) of { ... }
+	-- followed by case elimination.
 	--
 	-- The inline_me note is so that the simplifier doesn't 
 	-- just substitute c back inside x's rhs!  (Typically, x will
