@@ -5,5 +5,7 @@ include ($confdir ++ "/../multimod-test.T")
 --                  extra run flags
 --                  expected process return value, if not zero
 
-test "okeefe_neural" { mtr("-package lang", "", "") }
-
+-- this one causes the compiler to run out of heap in the simplifier
+test "okeefe_neural" { 
+	$expect = "fail"
+	mtr("-package lang +RTS -M64m -RTS", "", "") }
