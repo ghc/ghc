@@ -1,11 +1,11 @@
-Changes made since 2.08:
+Changes made since 2.09:
 
 \begin{itemize}
 
-\item export some missing operations from ST/LazyST
+\item export some missing operations from @ST@/@LazyST@.
 
 \item remove wired-in @runST@ from the compiler, move @runST@ from
-@STBase@ to @Unsafe@ and give it a type signature.  Fix a bug in the
+@STBase@ to @UnsafeST@ and give it a type signature.  Fix a bug in the
 compiler to do with universal quantification so this actually works.
 
 \item fix cut-n-paste-o in @PosixUtils.lhs@.
