@@ -169,7 +169,7 @@ ioeGetErrorString     :: IOError -> String
 ioeGetFileName        :: IOError -> Maybe FilePath
 
 ioeGetErrorType (IOException ioe) = ioe_type ioe
-ioeGetErrorType _ = error "System.IO.Error.ioeGetHandle: not an IO error"
+ioeGetErrorType _ = error "System.IO.Error.ioeGetErrorType: not an IO error"
 
 ioeGetHandle (IOException ioe) = ioe_handle ioe
 ioeGetHandle _ = error "System.IO.Error.ioeGetHandle: not an IO error"
