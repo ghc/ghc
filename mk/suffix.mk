@@ -31,20 +31,18 @@ endif
 # Haskell Suffix Rules
 
 HASKELL_SPLIT_PRE= \
- if [ ! -d $(basename $@) ]; then mkdir $(basename $@) ; else exit 0; fi; \
+ $(RM) $@ ; if [ ! -d $(basename $@) ]; then mkdir $(basename $@) ; else exit 0; fi; \
  find $(basename $@) -name '*.$(way_)o' -print | xargs $(RM) __rm_food;
 HASKELL_SPLIT_POST= touch $@
 HASKELL_PRE_COMPILE=$(patsubst %,$(HASKELL_SPLIT_PRE),$(filter -split-objs,$(HC_OPTS)))
 HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(HC_OPTS)))
 
 %.$(way_)o : %.hs
-	$(RM) $@
 	$(HASKELL_PRE_COMPILE)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
 	$(HASKELL_POST_COMPILE)
 			 
 %.$(way_)o : %.lhs	 
-	$(RM) $@
 	$(HASKELL_PRE_COMPILE)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
 	$(HASKELL_POST_COMPILE)
@@ -54,7 +52,6 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 	$(HC) $(HC_OPTS) -C $< -o $@
 			 
 %.$(way_)o : %.$(way_)hc 
-	$(RM) $@
 	$(HASKELL_PRE_COMPILE)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
 	$(HASKELL_POST_COMPILE)
