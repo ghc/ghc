@@ -24,7 +24,7 @@ infixr 5  ++, :
 infix  4  ==, /=, <, <=, >=, >
 infixr 3  &&
 infixr 2  ||
-infixr 1  >>, >>=
+infixl 1  >>, >>=
 infixr 0  $
 \end{code}
 
