@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/10/20 02:16:02 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/28 22:37:27 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -640,6 +640,7 @@ Int  fr; {
     Bool useParens = len!=1;
 #endif
     if (useParens)
+        putChr('(');
     for (; nonNull(ps); ps=tl(ps)) {
         putPred(hd(ps),fr);
         if (--c > 0) {
