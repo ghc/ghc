@@ -46,6 +46,10 @@ you will screw up the layout where they are used in case expressions!
 # define _runST STbase.runST
 # define failWith fail
 # define MkST ST
+# define STATE_TOK(x)  (S# x)
+# define ST_RET(x,y)   (x,y)
+# define unsafePerformST(x)  unsafePerformPrimIO (x)
+# define ST_TO_PrimIO(x) x
 # define MkIOError(h,errt,msg) (errt msg)
 # define Text Show
 # define IMP_FASTSTRING()
@@ -79,14 +83,30 @@ you will screw up the layout where they are used in case expressions!
 # define _writeHandle IOHandle.writeHandle
 # define _newHandle   IOHandle.newdHandle
 # define MkST ST
+# if __GLASGOW_HASKELL__ >= 209
+#  define STATE_TOK(x)    x
+#  define ST_RET(x,y)     STret (y) (x)
+#  define unsafePerformST(x)  runST (x)
+#  define ST_TO_PrimIO(x) (stToIO (x))
+# else
+#  define STATE_TOK(x)  (S# x)
+#  define ST_RET(x,y)   (x,y)
+#  define unsafePerformST(x) unsafePerformPrimIO(x)
+#  define ST_TO_PrimIO(x) x
+# endif
 # define failWith fail
 # define MkIOError(h,errt,msg) (IOError (Just h) errt msg)
 # define CCALL_THEN thenIO_Prim
 # define _filePtr IOHandle.filePtr
 # define Text Show
 # define IMP_FASTSTRING() import FastString
-# define IMP_Ubiq() import GlaExts ; import FastString
-# define CHK_Ubiq() import GlaExts ; import FastString
+# if __GLASGOW_HASKELL__ >= 209
+#  define IMP_Ubiq() import GlaExts ; import Addr(Addr(..)); import FastString
+#  define CHK_Ubiq() import GlaExts ; import Addr(Addr(..)); import FastString
+# else
+#  define IMP_Ubiq() import GlaExts ; import FastString
+#  define CHK_Ubiq() import GlaExts ; import FastString
+# endif
 # define minInt (minBound::Int)
 # define maxInt (maxBound::Int)
 #else
@@ -177,8 +197,10 @@ you will screw up the layout where they are used in case expressions!
 #  define FAST_STRING	FastString {-_PackedString -}
 #  if __GLASGOW_HASKELL__ < 200
 #    define SLIT(x)	(mkFastCharString (A# (x#)))
-#  else
+#  elif __GLASGOW_HASKELL__ < 209
 #    define SLIT(x)	(mkFastCharString (GlaExts.A# (x#)))
+#  else
+#    define SLIT(x)	(mkFastCharString (Addr.A# (x#)))
 #  endif
 #  define _CMP_STRING_	cmpPString
 	/* cmpPString defined in utils/Util.lhs */
