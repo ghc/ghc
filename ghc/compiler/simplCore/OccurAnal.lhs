@@ -246,7 +246,7 @@ occAnalBind env (NonRec binder rhs) body_usage
 
   where
     (final_body_usage, tagged_binder) = tagBinder body_usage binder
-    (rhs_usage, rhs')		      = occAnalRhs env binder rhs
+    (rhs_usage, rhs')		      = occAnalRhs env tagged_binder rhs
 \end{code}
 
 Dropping dead code for recursive bindings is done in a very simple way:
@@ -502,26 +502,34 @@ ToDo: try using the occurrence info for the inline'd binder.
 \begin{code}
 occAnalRhs :: OccEnv
 	   -> Id -> CoreExpr	-- Binder and rhs
+				-- For non-recs the binder is alrady tagged
+				-- with occurrence info
 	   -> (UsageDetails, CoreExpr)
 
 occAnalRhs env id rhs
   = (final_usage, rhs')
   where
-    (rhs_usage, rhs') = occAnal (rhsCtxt env) rhs
-	-- Note that we use an rhsCtxt.  This tells the occ anal that it's
-	-- looking at an RHS, which has an effect in occAnalApp
+    (rhs_usage, rhs') = occAnal ctxt rhs
+    ctxt | certainly_inline id = env
+	 | otherwise	       = rhsCtxt env
+	-- Note that we generally use an rhsCtxt.  This tells the occ anal n
+	-- that it's looking at an RHS, which has an effect in occAnalApp
 	--
 	-- But there's a problem.  Consider
 	--	x1 = a0 : []
 	--	x2 = a1 : x1
 	--	x3 = a2 : x2
-	--	g  = f x2
+	--	g  = f x3
 	-- First time round, it looks as if x1 and x2 occur as an arg of a 
 	-- let-bound constructor ==> give them a many-occurrence.
 	-- But then x3 is inlined (unconditionally as it happens) and
 	-- next time round, x2 will be, and the next time round x1 will be
 	-- Result: multiple simplifier iterations.  Sigh.  
-	-- Possible solution: use rhsCtxt for things that occur just once...
+	-- Crude solution: use rhsCtxt for things that occur just once...
+
+    certainly_inline id = case idOccInfo id of
+			    OneOcc in_lam one_br -> not in_lam && one_br
+			    other		 -> False
 
 	-- [March 98] A new wrinkle is that if the binder has specialisations inside
 	-- it then we count the specialised Ids as "extra rhs's".  That way
@@ -533,6 +541,7 @@ occAnalRhs env id rhs
     add v u = addOneOcc u v NoOccInfo		-- Give a non-committal binder info
 						-- (i.e manyOcc) because many copies
 						-- of the specialised thing can appear
+
 \end{code}
 
 Expressions
