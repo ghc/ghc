@@ -133,9 +133,9 @@ tcSourceRule (HsRule name sig_tvs vars lhs rhs src_loc)
   where
     sig_tys = [t | RuleBndrSig _ t <- vars]
 
-    new_id (RuleBndr var) 	   = newTyVarTy openTypeKind		`thenNF_Tc` \ ty ->
+    new_id (RuleBndr var) 	   = newTyVarTy openTypeKind			`thenNF_Tc` \ ty ->
 		          	     returnNF_Tc (mkLocalId var ty)
-    new_id (RuleBndrSig var rn_ty) = tcHsSigType PatSigCtxt rn_ty	`thenTc` \ ty ->
+    new_id (RuleBndrSig var rn_ty) = tcHsSigType (RuleSigCtxt var) rn_ty	`thenTc` \ ty ->
 				     returnNF_Tc (mkLocalId var ty)
 
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 

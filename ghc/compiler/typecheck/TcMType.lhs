@@ -546,15 +546,17 @@ data UserTypeCtxt
   | ResSigCtxt		-- Result type sig
 			-- 	f x :: t = ....
   | ForSigCtxt Name	-- Foreign inport or export signature
+  | RuleSigCtxt Name 	-- Signature on a forall'd variable in a RULE
 
-pprUserTypeCtxt (FunSigCtxt n) = ptext SLIT("the type signature for") <+> quotes (ppr n)
-pprUserTypeCtxt ExprSigCtxt    = ptext SLIT("an expression type signature")
-pprUserTypeCtxt (ConArgCtxt c) = ptext SLIT("the type of constructor") <+> quotes (ppr c)
-pprUserTypeCtxt (TySynCtxt c)  = ptext SLIT("the RHS of a type synonym declaration") <+> quotes (ppr c)
-pprUserTypeCtxt GenPatCtxt     = ptext SLIT("the type pattern of a generic definition")
-pprUserTypeCtxt PatSigCtxt     = ptext SLIT("a pattern type signature")
-pprUserTypeCtxt ResSigCtxt     = ptext SLIT("a result type signature")
-pprUserTypeCtxt (ForSigCtxt n) = ptext SLIT("the foreign signature for") <+> quotes (ppr n)
+pprUserTypeCtxt (FunSigCtxt n) 	= ptext SLIT("the type signature for") <+> quotes (ppr n)
+pprUserTypeCtxt ExprSigCtxt    	= ptext SLIT("an expression type signature")
+pprUserTypeCtxt (ConArgCtxt c) 	= ptext SLIT("the type of constructor") <+> quotes (ppr c)
+pprUserTypeCtxt (TySynCtxt c)  	= ptext SLIT("the RHS of a type synonym declaration") <+> quotes (ppr c)
+pprUserTypeCtxt GenPatCtxt     	= ptext SLIT("the type pattern of a generic definition")
+pprUserTypeCtxt PatSigCtxt     	= ptext SLIT("a pattern type signature")
+pprUserTypeCtxt ResSigCtxt     	= ptext SLIT("a result type signature")
+pprUserTypeCtxt (ForSigCtxt n) 	= ptext SLIT("the foreign signature for") <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt n) = ptext SLIT("the type signature on") <+> quotes (ppr n)
 \end{code}
 
 \begin{code}
@@ -575,6 +577,7 @@ checkValidType ctxt ty
 		 TySynCtxt _  | gla_exts  -> 1
 			      | otherwise -> 0
 		 ForSigCtxt _		  -> 1
+		 RuleSigCtxt _		  -> 1
 
 	actual_kind = typeKind ty
 
@@ -666,9 +669,18 @@ check_tau_type rank ubx_tup_ok (NoteTy note ty)
   = check_note note `thenTc_` check_tau_type rank ubx_tup_ok ty
 
 check_tau_type rank ubx_tup_ok ty@(TyConApp tc tys)
-  = mapTc_ check_arg_type tys						`thenTc_`
-    checkTc (not (isSynTyCon tc)	  || syn_arity_ok) arity_msg	`thenTc_`
-    checkTc (not (isUnboxedTupleTyCon tc) || ubx_tup_ok)   ubx_tup_msg
+  | isSynTyCon tc
+  = checkTc syn_arity_ok arity_msg	`thenTc_`
+    mapTc_ check_arg_type tys
+    
+  | isUnboxedTupleTyCon tc
+  = checkTc ubx_tup_ok ubx_tup_msg	`thenTc_`
+    mapTc_ (check_tau_type 0 True) tys		-- Args are allowed to be unlifted, or
+						-- more unboxed tuples, so can't use check_arg_ty
+
+  | otherwise
+  = mapTc_ check_arg_type tys
+
   where
     syn_arity_ok = tc_arity <= n_args
 		-- It's OK to have an *over-applied* type synonym
