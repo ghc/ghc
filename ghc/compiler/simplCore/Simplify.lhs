@@ -1238,6 +1238,10 @@ rebuildCase env scrut case_bndr alts cont
 			[]    -> alts
 			other -> [alt | alt@(con,_,_) <- alts, 
 					not (con `elem` impossible_cons)]
+
+	-- handled_cons are handled either by the context, 
+	-- or by an alternative in this case
+	handled_cons = impossible_cons ++ [con | (con,_,_) <- better_alts]
     in
 
 	-- Deal with the case binder, and prepare the continuation;
@@ -1249,11 +1253,11 @@ rebuildCase env scrut case_bndr alts cont
     simplCaseBinder env scrut case_bndr 		`thenSmpl` \ (alt_env, case_bndr', zap_occ_info) ->
 
 	-- Deal with the case alternatives
-    simplAlts alt_env zap_occ_info impossible_cons
+    simplAlts alt_env zap_occ_info handled_cons
 	      case_bndr' better_alts cont'		`thenSmpl` \ alts' ->
 
 	-- Put the case back together
-    mkCase scrut case_bndr' alts'			`thenSmpl` \ case_expr ->
+    mkCase scrut handled_cons case_bndr' alts'		`thenSmpl` \ case_expr ->
 
 	-- Notice that rebuildDone returns the in-scope set from env, not alt_env
 	-- The case binder *not* scope over the whole returned case-expression
@@ -1358,19 +1362,15 @@ simplCaseBinder env other_scrut case_bndr
 simplAlts :: SimplEnv 
 	  -> (InId -> InId)		-- Occ-info zapper
 	  -> [AltCon]			-- Alternatives the scrutinee can't be
+					-- in the default case
 	  -> OutId			-- Case binder
 	  -> [InAlt] -> SimplCont
 	  -> SimplM [OutAlt]		-- Includes the continuation
 
-simplAlts env zap_occ_info impossible_cons case_bndr' alts cont'
+simplAlts env zap_occ_info handled_cons case_bndr' alts cont'
   = mapSmpl simpl_alt alts
   where
     inst_tys' = tyConAppArgs (idType case_bndr')
-
-	-- handled_cons is all the constructors that are dealt
-	-- with, either by being impossible, or by there being an alternative
-    (con_alts,_) = findDefault alts
-    handled_cons = impossible_cons ++ [con | (con,_,_) <- con_alts]
 
     simpl_alt (DEFAULT, _, rhs)
 	= let

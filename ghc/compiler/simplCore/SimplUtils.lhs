@@ -791,10 +791,10 @@ tryRhsTyLam env tyvars body 		-- Only does something if there's a let
 mkCase puts a case expression back together, trying various transformations first.
 
 \begin{code}
-mkCase :: OutExpr -> OutId -> [OutAlt] -> SimplM OutExpr
+mkCase :: OutExpr -> [AltCon] -> OutId -> [OutAlt] -> SimplM OutExpr
 
-mkCase scrut case_bndr alts
-  = mkAlts scrut case_bndr alts	`thenSmpl` \ better_alts ->
+mkCase scrut handled_cons case_bndr alts
+  = mkAlts scrut handled_cons case_bndr alts	`thenSmpl` \ better_alts ->
     mkCase1 scrut case_bndr better_alts
 \end{code}
 
@@ -869,7 +869,7 @@ and similarly in cascade for all the join points!
 --------------------------------------------------
 --	1. Merge identical branches
 --------------------------------------------------
-mkAlts scrut case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
+mkAlts scrut handled_cons case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
   | all isDeadBinder bndrs1,			-- Remember the default 
     length filtered_alts < length con_alts	-- alternative comes first
   = tick (AltMerge case_bndr)			`thenSmpl_`
@@ -884,7 +884,7 @@ mkAlts scrut case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
 --	2. Fill in missing constructor
 --------------------------------------------------
 
-mkAlts scrut case_bndr alts
+mkAlts scrut handled_cons case_bndr alts
   | (alts_no_deflt, Just rhs) <- findDefault alts,
 			-- There is a DEFAULT case
 
@@ -894,7 +894,8 @@ mkAlts scrut case_bndr alts
 				-- 	case x of { DEFAULT -> e }
 				-- and we don't want to fill in a default for them!
 
-    [missing_con] <- filter is_missing (tyConDataConsIfAvailable tycon)
+    [missing_con] <- [con | con <- tyConDataConsIfAvailable tycon,
+			    not (con `elem` handled_data_cons)]
 			-- There is just one missing constructor!
 
   = tick (FillInCaseDefault case_bndr)	`thenSmpl_`
@@ -910,18 +911,13 @@ mkAlts scrut case_bndr alts
     in
     returnSmpl better_alts
   where
-    impossible_cons   = case scrut of
-			    Var v -> otherCons (idUnfolding v)
-			    other -> []
-    handled_data_cons = [data_con | DataAlt data_con         <- impossible_cons] ++
-			[data_con | (DataAlt data_con, _, _) <- alts]
-    is_missing con    = not (con `elem` handled_data_cons)
+    handled_data_cons = [data_con | DataAlt data_con <- handled_cons]
 
 --------------------------------------------------
 --	3.  Merge nested cases
 --------------------------------------------------
 
-mkAlts scrut outer_bndr outer_alts
+mkAlts scrut handled_cons outer_bndr outer_alts
   | opt_SimplCaseMerge,
     (outer_alts_without_deflt, maybe_outer_deflt)   <- findDefault outer_alts,
     Just (Case (Var scrut_var) inner_bndr inner_alts) <- maybe_outer_deflt,
@@ -965,7 +961,7 @@ mkAlts scrut outer_bndr outer_alts
 --	Catch-all
 --------------------------------------------------
 
-mkAlts scrut case_bndr other_alts = returnSmpl other_alts
+mkAlts scrut handled_cons case_bndr other_alts = returnSmpl other_alts
 \end{code}
 
 
