@@ -2494,27 +2494,182 @@ sub add_Hsc_flags {
 }
 \end{code}
 
+To add another system library, you'll need to augment the
+Supported_syslibs variable with name and info on your addition
+to the syslib family. The info bit consist of the following:
+
+   - interface file directory
+       see the misc or posix entry for how to distinguish
+       between using installed and build tree directories.
+       
+   - directory location of archives
+       
+   - location of (way-independent) C support libs.
+       not all libraries need this - if you don't, just
+       give the empty string.
+   - list of syslibs you depend on.
+
+   - additional ghc command line flags that should be used.
+   - additional C compiler command line flags that should be used.
+   - link 
+
+
 \begin{code}
+
+# Hash to keep track of 
+%Syslibs_added = ();
+
 sub add_syslib {
     local($syslib) = @_;
-    
-    # The Win32 lib sources live in hslibs/
-    if ( $syslib eq 'win32' && ! $INSTALLING ) {
-         unshift(@SysImport_dir, "$TopPwd/hslibs/$syslib/src");
-         push(@SysLibrary_dir, "$TopPwd/hslibs/$syslib/src");
-    } else {
-       unshift(@SysImport_dir,
-	       $INSTALLING ? "$InstLibDirGhc/imports/$syslib"
-		           : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib");
 
-       push(@SysLibrary_dir,
-	       $INSTALLING ? ("$InstLibDirGhc")
-                           : ("$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib",
-			      "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib/cbits"));
+    # Lifting this out of this sub brings it out of scope - why??
+    %Supported_syslibs =
+     ( exts,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/exts"
+	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/exts"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/exts"
+	  )
+	, '' # no cbits
+	, '' # Syslib dependencies
+	, '' # extra ghc opts
+	, '' # extra cc opts
+	, '' # extra ld opts
+	],
+
+       misc,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/misc"
+	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/misc"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/misc"
+	  )
+	, # where to find the cbits archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/misc/cbits"
+	  )
+	, 'exts' # Syslib dependencies
+	, ''     # extra ghc opts
+	, ''     # extra cc opts
+	, ( $TargetPlatform =~ /-solaris2$/  ? '-lnsl -lsocket' : '')
+	],
+       hbc,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/hbc"
+	       : "$TopPwd/CONTRIB/libraries/hbc/src"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/CONTRIB/libraries/src/hbc"
+	  )
+	, # where to find the cbits archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/CONTRIB/libraries/hbc/cbits"
+	  )
+	, 'exts' # Syslib dependencies
+	, ''     # extra ghc opts
+	, ''     # extra cc opts
+	, ''
+	],
+       posix,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/posix"
+	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/posix"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/posix"
+	  )
+	, # where to find the cbits archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/posix/cbits"
+	  )
+	, 'misc' # Syslib dependencies
+	, ''     # extra ghc opts
+	, ''     # extra cc opts
+	, ''     # extra ld opts
+	],
+       concurrent,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/concurrent"
+	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/concurrent"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/concurrent"
+	  )
+	, '' # where to find the cbits archive to use when linking
+	, '' # Syslib dependencies
+	, '' # extra ghc opts
+	, '' # extra cc opts
+	, '' # extra ld opts
+	],
+       win32,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/win32"
+	       : "$TopPwd/hslibs/win32/src"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/win32/src"
+	  )
+	, ''
+	, 'exts' # Syslib dependencies
+	, ''     # extra ghc opts
+	, ''     # extra cc opts
+	, '-luser32 -lgdi32'     # extra ld opts
+	]
+    );
+
+    # check if it's supported..
+    
+    if ( !exists $Supported_syslibs{$syslib} ) {
+       print STDERR "$Pgm: no such system library (-syslib): $syslib\n";
+       $Status++;
+       return;
     }
+
+    return if ( exists $Syslibs_added{$syslib} );
+    	
+    $Syslibs_added{$syslib} = 1;
+
+    local ($hi_dir, $lib_dir, $lib_cbits_dir,
+    	   $syslib_deps, $syslib_ghc_opts,
+	   $syslib_cc_opts, $syslib_ld_opts) = @{ $Supported_syslibs{$syslib} };
+
+
+    unshift(@SysImport_dir, $hi_dir);
+    push(@SysLibrary_dir, $lib_dir);
+    push(@SysLibrary_dir, $lib_cbits_dir) if ( $lib_cbits_dir ne '');
+
     push(@SysLibrary, "-lHS$syslib");
-    push(@SysLibrary, "-lHS${syslib}_cbits")
-          unless $syslib =~ /^(contrib|exts|concurrent|win32)$/; #HACK! have no cbits
+    push(@SysLibrary, "-lHS${syslib}_cbits") if ( $lib_cbits_dir ne '');
+    push(@SysLibrary, $syslib_ld_opts) if ($syslib_ld_opts ne '');   
+
+    # Add on any extra dependencies.
+    foreach $lib (split(' ',$syslib_deps)) {
+      &add_syslib($lib);
+    }
 }
 \end{code}
 
@@ -2862,28 +3017,7 @@ arg: while($_ = $Args[0]) {
     /^-l(.*)/	    && do { push(@UserLibrary,'-l'.&grab_arg_arg(*Args,'-l', $1)); next arg; };
 
     /^-syslib(.*)/  && do { local($syslib) = &grab_arg_arg(*Args,'-syslib',$1);
-			    print STDERR "$Pgm: no such system library (-syslib): $syslib\n",
-			      $Status++ unless $syslib =~ /^(exts|misc|posix|concurrent|win32)$/;
-
-			    #
-			    # The posix library is a `special' in that it relies on
-			    # the ghc system library (packed strings). Wielding our
-			    # sledgehammer, the problem is solved by silently including
-			    # the ghc system library as well.
-			    # (ToDo: `nub' -syslib list)
-			    #
 			    &add_syslib($syslib);
-			    if ( $syslib eq 'posix' ) {
-				&add_syslib('misc');
-			    } elsif ( $syslib eq 'misc' && 
-				      $TargetPlatform =~ /-solaris2$/ ) {
-				# needed for Berkeley socket/nwork stuff.
-				push(@SysLibrary, '-lnsl -lsocket');
-			    } elsif ( $syslib eq 'win32' && 
-				      $TargetPlatform =~ /-cygwin32$/ ) {
-				# need to get at UI/Graphics functionality.
-				push(@SysLibrary, '-luser32 -lgdi32');
-			    }
 			    next arg; };
 
     #=======================================================================
@@ -2970,8 +3104,6 @@ arg: while($_ = $Args[0]) {
 		&& do { push(@HsC_flags, $_);
 			push(@HsP_flags, '-N');
 
-#			push(@HsC_flags, '-fshow-import-specs');
-		
 			# -fglasgow-exts implies -syslib exts
 			&add_syslib('exts');
 
