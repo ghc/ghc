@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.65 2000/10/09 09:19:16 simonmar Exp $
+-- $Id: Main.hs,v 1.66 2000/10/11 10:17:32 rrt Exp $
 --
 -- GHC Driver program
 --
@@ -1131,8 +1131,10 @@ main =
    argv'  <- setTopDir argv
 
 	-- check whether TMPDIR is set in the environment
+#ifndef mingw32_TARGET_OS
    IO.try (do dir <- getEnv "TMPDIR" -- fails if not set
 	      writeIORef tmpdir dir)
+#endif
 
 	-- read the package configuration
    conf_file <- readIORef package_config
