@@ -81,7 +81,6 @@ import GHC.TopHandler   ( reportStackOverflow, reportError )
 import GHC.IOBase	( IO(..) )
 import GHC.IOBase	( unsafeInterleaveIO )
 import GHC.Base
-import GHC.Ptr
 #endif
 
 #ifdef __HUGS__
@@ -148,12 +147,10 @@ functions blocks only the thread making the call.
 -- cmp_thread in the RTS.
 
 #ifdef __GLASGOW_HASKELL__
-type StgTSO = Ptr ()
+id2TSO :: ThreadId -> ThreadId#
+id2TSO (ThreadId t) = t
 
-id2TSO :: ThreadId -> StgTSO
-id2TSO (ThreadId t) = unsafeCoerce# t
-
-foreign import ccall unsafe "cmp_thread" cmp_thread :: StgTSO -> StgTSO -> Int
+foreign import ccall unsafe "cmp_thread" cmp_thread :: ThreadId# -> ThreadId# -> Int
 -- Returns -1, 0, 1
 
 cmpThread :: ThreadId -> ThreadId -> Ordering
@@ -172,7 +169,7 @@ instance Eq ThreadId where
 instance Ord ThreadId where
    compare = cmpThread
 
-foreign import ccall unsafe "rts_getThreadId" getThreadId :: StgTSO -> Int
+foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> Int
 
 instance Show ThreadId where
    showsPrec d t = 
