@@ -417,7 +417,7 @@ standard <Filename>.hi</Filename>/<Filename>.o</Filename> suffixes; add <Option>
 	    <primary><literal>-keep-tmp-files</literal></primary>
 	  </indexterm>
 	  <indexterm>
-	    <primary>temporary files<primary>
+	    <primary>temporary files</primary>
 	    <secondary>keeping</secondary>
 	  </indexterm>
 	  <listitem>
