@@ -37,12 +37,19 @@ Notice how the "%1" argument is quoted (or not).
 
 <sect1>
 <title>
-Avoiding the console window</title>
+Interacting with the terminal</title>
 
 <para>By default GHC builds applications that open a console window when they start.
 If you want to build a GUI-only application, with no console window, use the flag
 <literal>-optl-mwindows</literal> in the link step.
 </para>
+
+<para>For some reason, Mingw ships with the <literal>readline</literal> library,
+but not with the <literal>readline</literal> headers. As a result, GHC (like Hugs) does not
+use <literal>readline</literal> for interactive input on Windows.
+You can get a close simulation by using an emacs shell buffer!
+</para>
+
 </sect1>
 
 <sect1>
