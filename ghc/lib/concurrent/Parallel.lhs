@@ -13,6 +13,9 @@ module Parallel (par, seq -- re-exported
 import ConcBase	( par )
 
 #if defined(__GRANSIM__)
+import PrelBase
+import GHCerr   ( parError )
+import GHC      ( parGlobal#, parLocal#, parAt#, parAtForNow# )
 
 {-# INLINE parGlobal #-}
 parGlobal   :: Int -> Int -> Int -> Int -> a -> b -> b
