@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.9 2000/07/17 15:27:15 rrt Exp $
+ * $Id: system.c,v 1.10 2001/02/19 16:18:38 rrt Exp $
  *
  * system Runtime Support
  */
@@ -31,6 +31,9 @@
 # ifdef HAVE_SYS_WAIT_H
 #  include <sys/wait.h>
 # endif
+#else
+  #include <windows.h> /* for Sleep */
+#endif
 #endif
 
 #ifdef HAVE_VFORK_H
@@ -44,19 +47,17 @@
 StgInt
 systemCmd(StgByteArray cmd)
 {
-#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
-   /* The implementation of std. fork() has its problems
-      under cygwin32-b18, so we fall back on using libc's
-      system() instead. (It in turn has problems, as it
-      does not wait until the sub shell has finished before
-      returning. Using sleep() works around that.)
-  */
+#if defined(mingw32_TARGET_OS)
+   /* There's no fork() under Windows, so we fall back on using libc's
+      system() instead. (It in turn has problems, as it does not wait
+      until the sub shell has finished before returning. Using Sleep()
+      works around that.) */
   if (system(cmd) < 0) {
      cvtErrno();
      stdErrno();
      return -1;
   }
-  sleep(1);
+  Sleep(1000);
   return 0;
 #else
     int pid;
