@@ -34,6 +34,12 @@
 * derived instance support isn't quite right (doing it properly is 
   hard, though).
 
+* Referring to something that has a defn but no typesignature doesn't elicit
+  a useful message.
+
+* Trying to re-export something from another package doesn't work (unless
+  it's the whole module).  We should give a warning or something.
+
 -----------------------------------------------------------------------------
 -- features
 
