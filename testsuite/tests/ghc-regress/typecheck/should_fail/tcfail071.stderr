@@ -1,6 +1,7 @@
 
 tcfail071.hs:8:0:
-    Mis-match between the contexts of the signatures for
+    Contexts differ in length
+    When matching the contexts of the signatures for
       f :: forall d. (Ord d) => d -> d
       g :: forall e. e -> e
     The signature contexts in a mutually recursive group should all be identical

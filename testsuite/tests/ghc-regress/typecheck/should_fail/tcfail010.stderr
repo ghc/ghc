@@ -1,8 +1,8 @@
 
 tcfail010.hs:3:17:
-    Ambiguous type variable `a' in the constraint:
-      `Num [a]' arising from the literal `2' at tcfail010.hs:3:17
-    Possible cause: the monomorphism restriction applied to the following:
-      q :: [a] -> [a] (bound at tcfail010.hs:3:0)
-    Probable fix: give these definition(s) an explicit type signature
-		  or use -fno-monomorphism-restriction
+    No instance for (Num [a])
+      arising from the literal `2' at tcfail010.hs:3:17
+    Probable fix: add an instance declaration for (Num [a])
+    In the second argument of `(+)', namely `2'
+    In a lambda abstraction: \ (y : z) -> z + 2
+    In the definition of `q': q = \ (y : z) -> z + 2

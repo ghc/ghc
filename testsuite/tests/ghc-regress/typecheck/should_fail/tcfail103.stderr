@@ -1,9 +1,8 @@
 
 tcfail103.hs:15:0:
     Inferred type is less polymorphic than expected
-      Quantified type variable `t' escapes
-      It is mentioned in the environment:
-	s = t bound at: tcfail103.hs:15:7
+      Quantified type variable `t' is mentioned in the environment:
+	Scoped type variable `s' = t (bound at: tcfail103.hs:15:7)
     When trying to generalise the type inferred for `f'
       Signature type:     forall t. ST t Int
       Type to generalise: ST t Int

@@ -1,9 +1,7 @@
 
 tcfail008.hs:3:6:
-    Ambiguous type variable `a' in the constraints:
-      `Num [a]' arising from the literal `2' at tcfail008.hs:3:6
-      `Num a' arising from the literal `1' at tcfail008.hs:3:4
-    Possible cause: the monomorphism restriction applied to the following:
-      o :: [a] (bound at tcfail008.hs:3:0)
-    Probable fix: give these definition(s) an explicit type signature
-		  or use -fno-monomorphism-restriction
+    No instance for (Num [a])
+      arising from the literal `2' at tcfail008.hs:3:6
+    Probable fix: add an instance declaration for (Num [a])
+    In the second argument of `(:)', namely `2'
+    In the definition of `o': o = 1 : 2
