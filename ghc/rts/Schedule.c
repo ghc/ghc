@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.69 2000/04/26 09:44:28 simonmar Exp $
+ * $Id: Schedule.c,v 1.70 2000/05/08 15:57:01 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -231,6 +231,8 @@ static StgTSO * createThread_     ( nat size, rtsBool have_lock, StgInt pri );
 #else
 static StgTSO * createThread_     ( nat size, rtsBool have_lock );
 #endif
+
+static void     detectBlackHoles  ( void );
 
 #ifdef DEBUG
 static void sched_belch(char *s, ...);
@@ -520,32 +522,47 @@ schedule( void )
     }
 #endif
 
-    /* Detect deadlock: when we have no threads to run, there are
-     * no threads waiting on I/O or sleeping, and all the other
-     * tasks are waiting for work, we must have a deadlock.  Inform
-     * all the main threads.
+    /* 
+     * Detect deadlock: when we have no threads to run, there are no
+     * threads waiting on I/O or sleeping, and all the other tasks are
+     * waiting for work, we must have a deadlock of some description.
+     *
+     * We first try to find threads blocked on themselves (ie. black
+     * holes), and generate NonTermination exceptions where necessary.
+     *
+     * If no threads are black holed, we have a deadlock situation, so
+     * inform all the main threads.
      */
 #ifdef SMP
     if (blocked_queue_hd == END_TSO_QUEUE
 	&& run_queue_hd == END_TSO_QUEUE
-	&& (n_free_capabilities == RtsFlags.ParFlags.nNodes)
-	) {
-      StgMainThread *m;
-      for (m = main_threads; m != NULL; m = m->link) {
-	  m->ret = NULL;
-	  m->stat = Deadlock;
-	  pthread_cond_broadcast(&m->wakeup);
-      }
-      main_threads = NULL;
+	&& (n_free_capabilities == RtsFlags.ParFlags.nNodes))
+    {
+	IF_DEBUG(scheduler, sched_belch("deadlocked, checking for black holes..."));
+	detectBlackHoles();
+	if (run_queue_hd == END_TSO_QUEUE) {
+	    StgMainThread *m;
+	    for (m = main_threads; m != NULL; m = m->link) {
+		m->ret = NULL;
+		m->stat = Deadlock;
+		pthread_cond_broadcast(&m->wakeup);
+	    }
+	    main_threads = NULL;
+	}
     }
 #else /* ! SMP */
     if (blocked_queue_hd == END_TSO_QUEUE
- 	&& run_queue_hd == END_TSO_QUEUE) {
-	StgMainThread *m = main_threads;
-	m->ret = NULL;
-	m->stat = Deadlock;
-	main_threads = m->link;
-	return;
+	&& run_queue_hd == END_TSO_QUEUE)
+    {
+	IF_DEBUG(scheduler, sched_belch("deadlocked, checking for black holes..."));
+	detectBlackHoles();
+	if (run_queue_hd == END_TSO_QUEUE) {
+	    StgMainThread *m = main_threads;
+	    m->ret = NULL;
+	    m->stat = Deadlock;
+	    main_threads = m->link;
+	    return;
+	}
     }
 #endif
 
@@ -2732,6 +2749,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
       sp[0] = (W_)ap;
       tso->sp = sp;
       tso->what_next = ThreadEnterGHC;
+      IF_DEBUG(sanity, checkTSO(tso));
       return;
     }
 
@@ -2884,6 +2902,61 @@ resurrectThreads( StgTSO *threads )
       barf("resurrectThreads: thread blocked in a strange way");
     }
   }
+}
+
+/* -----------------------------------------------------------------------------
+ * Blackhole detection: if we reach a deadlock, test whether any
+ * threads are blocked on themselves.  Any threads which are found to
+ * be self-blocked get sent a NonTermination exception.
+ *
+ * This is only done in a deadlock situation in order to avoid
+ * performance overhead in the normal case.
+ * -------------------------------------------------------------------------- */
+
+static void
+detectBlackHoles( void )
+{
+    StgTSO *t = all_threads;
+    StgUpdateFrame *frame;
+    StgClosure *blocked_on;
+
+    for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
+
+	if (t->why_blocked != BlockedOnBlackHole) {
+	    continue;
+	}
+
+	blocked_on = t->block_info.closure;
+
+	for (frame = t->su; ; frame = frame->link) {
+	    switch (get_itbl(frame)->type) {
+
+	    case UPDATE_FRAME:
+		if (frame->updatee == blocked_on) {
+		    /* We are blocking on one of our own computations, so
+		     * send this thread the NonTermination exception.  
+		     */
+		    IF_DEBUG(scheduler, 
+			     sched_belch("thread %d is blocked on itself", t->id));
+		    raiseAsync(t, (StgClosure *)NonTermination_closure);
+		    goto done;
+		}
+		else {
+		    continue;
+		}
+
+	    case CATCH_FRAME:
+	    case SEQ_FRAME:
+		continue;
+		
+	    case STOP_FRAME:
+		break;
+	    }
+	    break;
+	}
+
+    done:
+    }   
 }
 
 //@node Debugging Routines, Index, Exception Handling Routines, Main scheduling code
