@@ -527,7 +527,7 @@ AC_PROG_CPP
 
 case $HostOS_CPP in
 cygwin32|mingw32)
-   STD_CC_OPTS="-O -mno-cygwin $CC_MWIN32_FLAG"
+   STD_CC_OPTS="-mno-cygwin $CC_MWIN32_FLAG"
    CPP="$CPP $STD_CC_OPTS"
    CFLAGS="$STD_CC_OPTS $CFLAGS"
    CPPFLAGS="$STD_CC_OPTS $CPPFLAGS"
