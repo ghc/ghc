@@ -28,6 +28,10 @@ module Data.Dynamic
 	fromDyn,	-- :: Typeable a => Dynamic -> a -> a
 	fromDynamic,	-- :: Typeable a => Dynamic -> Maybe a
 	
+	-- * Applying functions of dynamic type
+	dynApply,
+	dynApp,
+
 	-- * Concrete Type Representations
 	
 	-- | This section is useful if you need to define your own
