@@ -410,11 +410,11 @@ PruneSparks(STG_NO_ARGS)
 
 	      /* HACK! This clause should actually never happen  HWL */
 	      if ( (SPARK_NODE(spark) == NULL) || 
-	           (SPARK_NODE(spark) == Prelude_Z91Z93_closure) ) {
+	           (SPARK_NODE(spark) == PrelBase_Z91Z93_closure) ) {
 #  if defined(GRAN_CHECK) && defined(GRAN)
 	          if ( RTSflags.GcFlags.giveStats && 
 		       (RTSflags.GranFlags.debug & 0x40) ) 
-		    fprintf(RTSflags.GcFlags.statsFile,"PruneSparks: Warning: spark @ 0x%lx points to NULL or Prelude_Z91Z93_closure\n", spark);
+		    fprintf(RTSflags.GcFlags.statsFile,"PruneSparks: Warning: spark @ 0x%lx points to NULL or PrelBase_Z91Z93_closure\n", spark);
 #  endif
 		  /* prune it below */
 		}
@@ -434,7 +434,7 @@ PruneSparks(STG_NO_ARGS)
 	  if(RTSflags.GranFlags.granSimStats_Sparks)
 	      /* DumpRawGranEvent(CURRENT_PROC,SP_PRUNED,(W_) spark); */
 	      DumpRawGranEvent(CurrentProc,0,SP_PRUNED,
-			       Prelude_Z91Z93_closure,SPARK_NODE(spark),0);
+			       PrelBase_Z91Z93_closure,SPARK_NODE(spark),0);
 
 	  DisposeSpark(spark);
 	  prunedSparks++;
@@ -554,11 +554,11 @@ PruneSparks(STG_NO_ARGS)
 		
 	/* HACK! This clause should actually never happen  HWL */
 	if ( (SPARK_NODE(spark) == NULL) || 
-	     (SPARK_NODE(spark) == Prelude_Z91Z93_closure) ) {
+	     (SPARK_NODE(spark) == PrelBase_Z91Z93_closure) ) {
 #  if defined(GRAN_CHECK) && defined(GRAN)
 	    if ( RTSflags.GcFlags.giveStats && 
 		 (RTSflags.GranFlags.debug & 0x40) ) 
-		fprintf(RTSflags.GcFlags.statsFile,"PruneSparks: Warning: spark @ 0x%lx points to NULL or Prelude_Z91Z93_closure\n", spark);
+		fprintf(RTSflags.GcFlags.statsFile,"PruneSparks: Warning: spark @ 0x%lx points to NULL or PrelBase_Z91Z93_closure\n", spark);
 #  endif
 	    /* prune it below */
 	} else if (SHOULD_SPARK(SPARK_NODE(spark))) {
@@ -593,9 +593,9 @@ PruneSparks(STG_NO_ARGS)
         /* By now we know that the spark has to be pruned */
 	if(RTSflags.GranFlags.granSimStats_Sparks)
 	    DumpRawGranEvent(CurrentProc,0,SP_PRUNED,
-			     Prelude_Z91Z93_closure,SPARK_NODE(spark),0);
+			     PrelBase_Z91Z93_closure,SPARK_NODE(spark),0);
 	    
-	SPARK_NODE(spark) = Prelude_Z91Z93_closure;
+	SPARK_NODE(spark) = PrelBase_Z91Z93_closure;
 	curr_spark[proc][pool] = SPARK_NEXT(spark);
 	prunedSparks[proc][pool]++;
 	DisposeSpark(spark);
@@ -614,9 +614,9 @@ PruneSparks(STG_NO_ARGS)
 	if ( spark != NULL ) {
 	  if(RTSflags.GranFlags.granSimStats_Sparks)
 	    DumpRawGranEvent(CurrentProc,0,SP_PRUNED,
-			     Prelude_Z91Z93_closure,SPARK_NODE(spark),0);
+			     PrelBase_Z91Z93_closure,SPARK_NODE(spark),0);
 	    
-	  SPARK_NODE(spark) = Prelude_Z91Z93_closure;
+	  SPARK_NODE(spark) = PrelBase_Z91Z93_closure;
 	  curr_spark[proc][pool] = SPARK_NEXT(spark);
 	
 	  prunedSparks[proc][pool]++;
@@ -681,7 +681,7 @@ PruneSparks(STG_NO_ARGS)
 	    /* ToDo: Fix log entries for pruned sparks in GUM */
 	        if(RTSflags.GranFlags.granSimStats_Sparks)
 		  /* DumpSparkGranEvent(SP_PRUNED, threadId++);*/
-		  DumpGranEvent(SP_PRUNED,Prelude_Z91Z93_closure);
+		  DumpGranEvent(SP_PRUNED,PrelBase_Z91Z93_closure);
 		                          ^^^^^^^^^^^ should be a TSO
 #  endif
 	    }
@@ -729,19 +729,19 @@ rtsBool do_full_collection;
        Will & Phil 95/10
     */
 
-    for(stack = AvailableStack; stack != Prelude_Z91Z93_closure; stack = next) {
+    for(stack = AvailableStack; stack != PrelBase_Z91Z93_closure; stack = next) {
 	next = STKO_LINK(stack);
 	FREEZE_MUT_HDR(stack, ImMutArrayOfPtrs_info);
 	MUTUPLE_CLOSURE_SIZE(stack) = MUTUPLE_VHS;
     }
 
-    for(tso = AvailableTSO; tso != Prelude_Z91Z93_closure; tso = next) {
+    for(tso = AvailableTSO; tso != PrelBase_Z91Z93_closure; tso = next) {
 	next = TSO_LINK(tso);
 	FREEZE_MUT_HDR(tso, ImMutArrayOfPtrs_info);
 	MUTUPLE_CLOSURE_SIZE(tso) = MUTUPLE_VHS;
     }
 
-    AvailableStack = AvailableTSO = Prelude_Z91Z93_closure;
+    AvailableStack = AvailableTSO = PrelBase_Z91Z93_closure;
 
     PruneSparks();
 
