@@ -43,8 +43,10 @@ ifneq "$(way)" ""
 SRC_HC_OPTS += -hisuf $(way_)hi
 endif
 
-Int_HC_OPTS          += -H14m -fno-prune-tydecls -monly-3-regs
-Word_HC_OPTS         += -H12m -monly-3-regs
+# KSW 1998-12: had to increase some of the heap sizes by 2m to 6m for USP
+
+Int_HC_OPTS          += -H20m -fno-prune-tydecls -monly-3-regs
+Word_HC_OPTS         += -H20m -monly-3-regs
 Foreign_HC_OPTS      += -fno-prune-tydecls
 NativeInfo_HC_OPTS   += -fno-prune-tydecls
 Dynamic_HC_OPTS	     += $(MAGIC_HSCPP_OPTS)

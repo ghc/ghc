@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.9 1999/03/18 17:57:20 simonm Exp $
+ * $Id: Updates.h,v 1.10 1999/05/11 16:47:42 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -26,12 +26,21 @@
  * preferably don't use this macro inline in compiled code.
  */
 
-#define UPD_IND(updclosure, heapptr)                            \
+#ifdef TICKY_TICKY
+# define UPD_IND(updclosure, heapptr) UPD_PERM_IND(updclosure,heapptr)
+#else
+# define UPD_IND(updclosure, heapptr) UPD_REAL_IND(updclosure,heapptr)
+#endif
+
+/* UPD_IND actually does a PERM_IND if TICKY_TICKY is on;
+   if you *really* need an IND use UPD_REAL_IND
+ */
+#define UPD_REAL_IND(updclosure, heapptr)                       \
         AWAKEN_BQ(updclosure);                                  \
 	updateWithIndirection((StgClosure *)updclosure,         \
 			      (StgClosure *)heapptr);
 
-#ifdef PROFILING
+#if defined(PROFILING) || defined(TICKY_TICKY)
 #define UPD_PERM_IND(updclosure, heapptr)                       \
         AWAKEN_BQ(updclosure);                                  \
 	updateWithPermIndirection((StgClosure *)updclosure,     \
@@ -68,7 +77,7 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable Upd_frame_info;
 #define PUSH_UPD_FRAME(target, Sp_offset)			\
 	{							\
 		StgUpdateFrame *__frame;			\
-		TICK_UPDF_PUSHED();  			        \
+		TICK_UPDF_PUSHED(target, GET_INFO((StgClosure*)target));		        \
 		__frame = stgCast(StgUpdateFrame*,Sp + (Sp_offset)) - 1; \
 		SET_INFO(__frame,stgCast(StgInfoTable*,&Upd_frame_info));   \
 		__frame->link = Su;				\

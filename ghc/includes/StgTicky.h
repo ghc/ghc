@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.3 1999/02/05 16:02:30 simonm Exp $
+ * $Id: StgTicky.h,v 1.4 1999/05/11 16:47:42 keithw Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -41,8 +41,13 @@
 	ALLOC_FUN_gds += (g);	ALLOC_FUN_slp += (s);	\
 	TICK_ALLOC_HISTO(FUN,_HS,g,s)
 
-#define TICK_ALLOC_THK(g,s) 				\
-     	ALLOC_THK_ctr++;	ALLOC_THK_adm += _HS;	\
+#define TICK_ALLOC_UP_THK(g,s)                          \
+     	ALLOC_UP_THK_ctr++;	ALLOC_THK_adm += _HS;	\
+	ALLOC_THK_gds += (g);	ALLOC_THK_slp += (s);	\
+	TICK_ALLOC_HISTO(THK,_HS,g,s)
+
+#define TICK_ALLOC_SE_THK(g,s)                          \
+     	ALLOC_SE_THK_ctr++;	ALLOC_THK_adm += _HS;	\
 	ALLOC_THK_gds += (g);	ALLOC_THK_slp += (s);	\
 	TICK_ALLOC_HISTO(THK,_HS,g,s)
 
@@ -125,9 +130,11 @@
 
 #define TICK_ENT_CON(n)		ENT_CON_ctr++	      /* enter constructor */
 #define TICK_ENT_IND(n)		ENT_IND_ctr++	      /* enter indirection */
+#define TICK_ENT_PERM_IND(n)    ENT_PERM_IND_ctr++    /* enter permanent indirection */
 #define TICK_ENT_PAP(n)		ENT_PAP_ctr++	      /* enter PAP */
 #define TICK_ENT_AP_UPD(n) 	ENT_AP_UPD_ctr++      /* enter AP_UPD */
 #define TICK_ENT_BH()		ENT_BH_ctr++          /* enter BLACKHOLE */
+
 
 /* -----------------------------------------------------------------------------
    Returns
@@ -185,7 +192,8 @@
    -------------------------------------------------------------------------- */
 
 #define TICK_UPDF_OMITTED()	UPDF_OMITTED_ctr++
-#define TICK_UPDF_PUSHED()	UPDF_PUSHED_ctr++
+#define TICK_UPDF_PUSHED(tgt,inf)	UPDF_PUSHED_ctr++ \
+/*                              ; fprintf(stderr,"UPDF_PUSHED:%p:%p\n",tgt,inf) */
 #define TICK_SEQF_PUSHED()      SEQF_PUSHED_ctr++
 #define TICK_CATCHF_PUSHED()    CATCHF_PUSHED_ctr++
 #define TICK_UPDF_RCC_PUSHED()	UPDF_RCC_PUSHED_ctr++
@@ -230,7 +238,22 @@
 /* For the generational collector: 
  */
 #define TICK_UPD_NEW_IND()		UPD_NEW_IND_ctr++
+#define TICK_UPD_NEW_PERM_IND(tgt)	UPD_NEW_PERM_IND_ctr++ \
+/*                                      ; fprintf(stderr,"UPD_NEW_PERM:%p\n",tgt) */
 #define TICK_UPD_OLD_IND()		UPD_OLD_IND_ctr++			
+#define TICK_UPD_OLD_PERM_IND()		UPD_OLD_PERM_IND_ctr++			
+
+/* Count blackholes:
+ */
+#define TICK_UPD_BH_UPDATABLE()         UPD_BH_UPDATABLE_ctr++
+#define TICK_UPD_BH_SINGLE_ENTRY()      UPD_BH_SINGLE_ENTRY_ctr++
+#define TICK_UPD_CAF_BH_UPDATABLE(s)                          \
+     UPD_CAF_BH_UPDATABLE_ctr++                               \
+/*   ; fprintf(stderr,"TICK_UPD_CAF_BH_UPDATABLE(%s)\n",s) */
+#define TICK_UPD_CAF_BH_SINGLE_ENTRY(s)                       \
+     UPD_CAF_BH_SINGLE_ENTRY_ctr++                            \
+/*   ; fprintf(stderr,"TICK_UPD_CAF_BH_SINGLE_ENTRY(%s)\n",s) */
+
 
 /* -----------------------------------------------------------------------------
    Garbage collection counters
@@ -283,7 +306,8 @@ EXTERN unsigned long ALLOC_FUN_hst[5]
 #endif
 ;
 
-EXTERN unsigned long ALLOC_THK_ctr INIT(0);
+EXTERN unsigned long ALLOC_UP_THK_ctr INIT(0);
+EXTERN unsigned long ALLOC_SE_THK_ctr INIT(0);
 EXTERN unsigned long ALLOC_THK_adm INIT(0);
 EXTERN unsigned long ALLOC_THK_gds INIT(0);
 EXTERN unsigned long ALLOC_THK_slp INIT(0);
@@ -391,6 +415,7 @@ EXTERN unsigned long ENT_FUN_STD_ctr INIT(0);
 EXTERN unsigned long ENT_FUN_DIRECT_ctr INIT(0);
 EXTERN unsigned long ENT_CON_ctr INIT(0);
 EXTERN unsigned long ENT_IND_ctr INIT(0);
+EXTERN unsigned long ENT_PERM_IND_ctr INIT(0);
 EXTERN unsigned long ENT_PAP_ctr INIT(0);
 EXTERN unsigned long ENT_AP_UPD_ctr INIT(0);
 EXTERN unsigned long ENT_BH_ctr INIT(0);
@@ -458,7 +483,14 @@ EXTERN unsigned long UPD_PAP_IN_NEW_hst[9]
 ;
 
 EXTERN unsigned long UPD_NEW_IND_ctr INIT(0);
+EXTERN unsigned long UPD_NEW_PERM_IND_ctr INIT(0);
 EXTERN unsigned long UPD_OLD_IND_ctr INIT(0);
+EXTERN unsigned long UPD_OLD_PERM_IND_ctr INIT(0);
+
+EXTERN unsigned long UPD_BH_UPDATABLE_ctr INIT(0);
+EXTERN unsigned long UPD_BH_SINGLE_ENTRY_ctr INIT(0);
+EXTERN unsigned long UPD_CAF_BH_UPDATABLE_ctr INIT(0);
+EXTERN unsigned long UPD_CAF_BH_SINGLE_ENTRY_ctr INIT(0);
 
 EXTERN unsigned long GC_SEL_ABANDONED_ctr INIT(0);
 EXTERN unsigned long GC_SEL_MINOR_ctr INIT(0);
@@ -480,7 +512,8 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 #define TICK_ALLOC_HEAP(words)
 
 #define TICK_ALLOC_FUN(g,s)
-#define TICK_ALLOC_THK(g,s)
+#define TICK_ALLOC_UP_THK(g,s)
+#define TICK_ALLOC_SE_THK(g,s)
 #define TICK_ALLOC_CON(g,s)
 #define TICK_ALLOC_TUP(g,s)
 #define TICK_ALLOC_BH(g,s)
@@ -500,6 +533,7 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 				
 #define TICK_ENT_CON(n)
 #define TICK_ENT_IND(n)
+#define TICK_ENT_PERM_IND(n)
 #define TICK_ENT_PAP(n)
 #define TICK_ENT_AP_UPD(n)
 #define TICK_ENT_BH()
@@ -513,7 +547,7 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 #define TICK_VEC_RETURN(n)
 
 #define TICK_UPDF_OMITTED()
-#define TICK_UPDF_PUSHED()
+#define TICK_UPDF_PUSHED(tgt,inf)
 #define TICK_SEQF_PUSHED()
 #define TICK_CATCHF_PUSHED()
 #define TICK_UPDF_RCC_PUSHED()
@@ -526,7 +560,14 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 #define TICK_UPD_PAP_IN_PLACE()
 
 #define TICK_UPD_NEW_IND()
+#define TICK_UPD_NEW_PERM_IND(tgt)
 #define TICK_UPD_OLD_IND()
+#define TICK_UPD_OLD_PERM_IND()
+
+#define TICK_UPD_BH_UPDATABLE()
+#define TICK_UPD_BH_SINGLE_ENTRY()
+#define TICK_UPD_CAF_BH_UPDATABLE()
+#define TICK_UPD_CAF_BH_SINGLE_ENTRY()
 
 #define TICK_GC_SEL_ABANDONED()
 #define TICK_GC_SEL_MINOR()

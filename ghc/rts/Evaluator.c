@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/04/28 12:59:51 $
+ * $Revision: 1.16 $
+ * $Date: 1999/05/11 16:47:50 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1276,7 +1276,9 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             goto enterLoop;
         }
     case BLACKHOLE:
+    case SE_BLACKHOLE:
     case CAF_BLACKHOLE:
+    case SE_CAF_BLACKHOLE:
         {
 	    /*was StgBlackHole* */
             StgBlockingQueue* bh = (StgBlockingQueue*)obj;
@@ -1303,8 +1305,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                 xPushWord(payloadWord(ap,i));
             }
             obj = ap->fun;
-#ifndef LAZY_BLACKHOLING
-#error no no no
+#ifdef EAGER_BLACKHOLING
             {
                 /* superfluous - but makes debugging easier */
                 StgBlackHole* bh = stgCast(StgBlackHole*,ap);
@@ -1313,7 +1314,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                 IF_DEBUG(gccafs,fprintf(stderr,"Eagerly blackholed AP_UPD %p in evaluator\n",bh));
                 /*printObj(bh); */
             }
-#endif /* LAZY_BLACKHOLING */
+#endif /* EAGER_BLACKHOLING */
             goto enterLoop;
         }
     case PAP:
@@ -1604,11 +1605,13 @@ static inline void PopUpdateFrame( StgClosure* obj )
              printObj(obj);
              fprintf(stderr,"Sp = %p\tSu = %p\n\n", Sp, Su);
              );
-#ifndef LAZY_BLACKHOLING
+#ifdef EAGER_BLACKHOLING
     ASSERT(get_itbl(Su->updatee)->type == BLACKHOLE
+           || get_itbl(Su->updatee)->type == SE_BLACKHOLE
            || get_itbl(Su->updatee)->type == CAF_BLACKHOLE
+           || get_itbl(Su->updatee)->type == SE_CAF_BLACKHOLE
            );
-#endif /* LAZY_BLACKHOLING */
+#endif /* EAGER_BLACKHOLING */
     UPD_IND(Su->updatee,obj);
     Sp = stgCast(StgStackPtr,Su) + sizeofW(StgUpdateFrame);
     Su = Su->link;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.9 1999/04/28 12:42:45 sewardj Exp $
+ * $Id: StgMacros.h,v 1.10 1999/05/11 16:47:41 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -321,7 +321,6 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 #define R6_PTR	  1<<5
 #define R7_PTR	  1<<6
 #define R8_PTR	  1<<7
-
 #define HP_CHK_GEN(headroom,liveness,reentry,tag_assts)	\
    if ((Hp += (headroom)) > HpLim ) {			\
 	EF_(stg_gen_chk);				\
@@ -417,9 +416,17 @@ EDI_(stg_gen_chk_info);
 /* set the tag register (if we have one) */
 #define SET_TAG(t)  /* nothing */
 
-/* don't do eager blackholing for now */
-#define UPD_BH_UPDATABLE(thunk)  /* nothing */
-#define UPD_BH_SINGLE_ENTRY(thunk)  /* nothing */
+#ifdef EAGER_BLACKHOLING
+#  define UPD_BH_UPDATABLE(thunk)                        \
+        TICK_UPD_BH_UPDATABLE();                         \
+        SET_INFO((StgClosure *)thunk,&BLACKHOLE_info)
+#  define UPD_BH_SINGLE_ENTRY(thunk)                     \
+        TICK_UPD_BH_SINGLE_ENTRY();                      \
+        SET_INFO((StgClosure *)thunk,&SE_BLACKHOLE_info)
+#else /* !EAGER_BLACKHOLING */
+#  define UPD_BH_UPDATABLE(thunk)    /* nothing */
+#  define UPD_BH_SINGLE_ENTRY(thunk) /* nothing */
+#endif /* EAGER_BLACKHOLING */
 
 /* -----------------------------------------------------------------------------
    Moving Floats and Doubles

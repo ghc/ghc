@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.5 1999/03/05 12:43:26 kw217 Exp $
+ * $Id: Ticky.c,v 1.6 1999/05/11 16:47:59 keithw Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -31,7 +31,7 @@ PrintTickyInfo(void)
 {
   unsigned long i;
   unsigned long tot_allocs = /* total number of things allocated */
-	ALLOC_FUN_ctr + ALLOC_THK_ctr + ALLOC_CON_ctr + ALLOC_TUP_ctr +
+	ALLOC_FUN_ctr + ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr + ALLOC_CON_ctr + ALLOC_TUP_ctr +
     	ALLOC_TSO_ctr +
 #ifdef PAR
 	ALLOC_FMBQ_ctr + ALLOC_FME_ctr + ALLOC_BF_ctr +
@@ -68,7 +68,7 @@ PrintTickyInfo(void)
 
   unsigned long tot_enters =
 	ENT_CON_ctr + ENT_FUN_DIRECT_ctr +
-	ENT_IND_ctr + ENT_PAP_ctr + ENT_THK_ctr;
+	ENT_IND_ctr + ENT_PERM_IND_ctr + ENT_PAP_ctr + ENT_THK_ctr;
   unsigned long jump_direct_enters =
 	tot_enters - ENT_VIA_NODE_ctr;
   unsigned long bypass_enters =
@@ -85,8 +85,8 @@ PrintTickyInfo(void)
 
   unsigned long tot_updates = UPD_EXISTING_ctr + UPD_SQUEEZED_ctr + pap_updates;
 
-  unsigned long tot_new_updates   = UPD_NEW_IND_ctr;
-  unsigned long tot_old_updates   = UPD_OLD_IND_ctr;
+  unsigned long tot_new_updates   = UPD_NEW_IND_ctr + UPD_NEW_PERM_IND_ctr;
+  unsigned long tot_old_updates   = UPD_OLD_IND_ctr + UPD_OLD_PERM_IND_ctr;
   unsigned long tot_gengc_updates = tot_new_updates + tot_old_updates;
 
   FILE *tf = RtsFlags.TickyFlags.tickyFile;
@@ -109,10 +109,14 @@ PrintTickyInfo(void)
       fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(FUN));
 
   fprintf(tf,"\n%7ld (%5.1f%%) thunks",
-	ALLOC_THK_ctr,
-	PC(INTAVG(ALLOC_THK_ctr, tot_allocs)));
-  if (ALLOC_THK_ctr != 0)
+	ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr,
+	PC(INTAVG(ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr, tot_allocs)));
+
+#define ALLOC_THK_ctr (ALLOC_UP_THK_ctr + ALLOC_SE_THK_ctr)
+  /* hack to make ALLOC_HISTO_MAGIC still work for THK */
+  if ((ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr) != 0)
       fprintf(tf,"\t\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(THK));
+#undef ALLOC_THK_ctr
 
   fprintf(tf,"\n%7ld (%5.1f%%) data values",
 	ALLOC_CON_ctr,
@@ -190,9 +194,12 @@ PrintTickyInfo(void)
   fprintf(tf,"%7ld (%5.1f%%) partial applications\n",
 	ENT_PAP_ctr,
 	PC(INTAVG(ENT_PAP_ctr,tot_enters)));
-  fprintf(tf,"%7ld (%5.1f%%) indirections\n",
+  fprintf(tf,"%7ld (%5.1f%%) normal indirections\n",
 	ENT_IND_ctr,
 	PC(INTAVG(ENT_IND_ctr,tot_enters)));
+  fprintf(tf,"%7ld (%5.1f%%) permanent indirections\n",
+	ENT_PERM_IND_ctr,
+	PC(INTAVG(ENT_PERM_IND_ctr,tot_enters)));
 
   fprintf(tf,"\nRETURNS: %ld\n", tot_returns);
   fprintf(tf,"%7ld (%5.1f%%) from entering a new constructor\n\t\t  [the rest from entering an existing constructor]\n",
@@ -278,6 +285,9 @@ PrintTickyInfo(void)
 
 #define PR_CTR(ctr) \
   do { fprintf(tf,"%7ld " #ctr "\n", ctr); } while(0)
+/* COND_PR_CTR takes a boolean; if false then msg is the printname rather than ctr */
+#define COND_PR_CTR(ctr,b,msg) \
+    if (b) { fprintf(tf,"%7ld " #ctr "\n", ctr); } else { fprintf(tf,"%7ld " msg "\n", ctr); }
 #define PR_HST(hst,i) \
   do { fprintf(tf,"%7ld " #hst "_" #i "\n", hst[i]); } while(0)
 
@@ -293,7 +303,8 @@ PrintTickyInfo(void)
   PR_HST(ALLOC_FUN_hst,2);
   PR_HST(ALLOC_FUN_hst,3);
   PR_HST(ALLOC_FUN_hst,4);
-  PR_CTR(ALLOC_THK_ctr);
+  PR_CTR(ALLOC_UP_THK_ctr);
+  PR_CTR(ALLOC_SE_THK_ctr);
   PR_CTR(ALLOC_THK_adm);
   PR_CTR(ALLOC_THK_gds);
   PR_CTR(ALLOC_THK_slp);
@@ -393,6 +404,22 @@ PrintTickyInfo(void)
   PR_CTR(ENT_FUN_STD_ctr);
   PR_CTR(ENT_FUN_DIRECT_ctr);
   PR_CTR(ENT_IND_ctr);
+
+/* The counters ENT_PERM_IND and UPD_{NEW,OLD}_PERM_IND are not dumped
+ * at the end of execution unless update squeezing is turned off (+RTS
+ * -Z =RtsFlags.GcFlags.squeezeUpdFrames), as they will be wrong
+ * otherwise.  Why?  Because for each update frame squeezed out, we
+ * count an UPD_NEW_PERM_IND *at GC time* (i.e., too early).  And
+ * further, when we enter the closure that has been updated, we count
+ * the ENT_PERM_IND, but we then enter the PERM_IND that was built for
+ * the next update frame below, and so on down the chain until we
+ * finally reach the value.  Thus we count many new ENT_PERM_INDs too
+ * early.  
+ * 
+ * This of course refers to the -ticky version that uses PERM_INDs to
+ * determine the number of closures entered 0/1/>1.  KSW 1999-04.  */
+  COND_PR_CTR(ENT_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue,"E!NT_PERM_IND_ctr requires +RTS -Z");
+
   PR_CTR(ENT_PAP_ctr);
   PR_CTR(ENT_AP_UPD_ctr);
   PR_CTR(ENT_BH_ctr);
@@ -469,6 +496,11 @@ PrintTickyInfo(void)
   PR_CTR(UPD_PAP_IN_NEW_ctr);
   PR_CTR(UPD_PAP_IN_PLACE_ctr);
 
+  PR_CTR(UPD_BH_UPDATABLE_ctr);
+  PR_CTR(UPD_BH_SINGLE_ENTRY_ctr);
+  PR_CTR(UPD_CAF_BH_UPDATABLE_ctr);
+  PR_CTR(UPD_CAF_BH_SINGLE_ENTRY_ctr);
+
   PR_HST(UPD_CON_IN_NEW_hst,0);
   PR_HST(UPD_CON_IN_NEW_hst,1);
   PR_HST(UPD_CON_IN_NEW_hst,2);
@@ -489,7 +521,11 @@ PrintTickyInfo(void)
   PR_HST(UPD_PAP_IN_NEW_hst,8);
 
   PR_CTR(UPD_NEW_IND_ctr);
+  /* see comment on ENT_PERM_IND_ctr */
+  COND_PR_CTR(UPD_NEW_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue,"U!PD_NEW_PERM_IND_ctr requires +RTS -Z");
   PR_CTR(UPD_OLD_IND_ctr);
+  /* see comment on ENT_PERM_IND_ctr */
+  COND_PR_CTR(UPD_OLD_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue,"U!PD_OLD_PERM_IND_ctr requires +RTS -Z");
 
   PR_CTR(GC_SEL_ABANDONED_ctr);
   PR_CTR(GC_SEL_MINOR_ctr);

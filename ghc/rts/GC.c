@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.58 1999/05/04 10:19:14 sof Exp $
+ * $Id: GC.c,v 1.59 1999/05/11 16:47:53 keithw Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1189,6 +1189,8 @@ loop:
     return copy(q,sizeW_fromITBL(info),step);
 
   case CAF_BLACKHOLE:
+  case SE_CAF_BLACKHOLE:
+  case SE_BLACKHOLE:
   case BLACKHOLE:
     return copyPart(q,BLACKHOLE_sizeW(),sizeofW(StgHeader),step);
 
@@ -1271,6 +1273,8 @@ loop:
 	/* aargh - do recursively???? */
       case CAF_UNENTERED:
       case CAF_BLACKHOLE:
+      case SE_CAF_BLACKHOLE:
+      case SE_BLACKHOLE:
       case BLACKHOLE:
       case BLACKHOLE_BQ:
 	/* not evaluated yet */
@@ -1722,6 +1726,8 @@ scavenge(step *step)
       break;
 
     case CAF_BLACKHOLE:
+    case SE_CAF_BLACKHOLE:
+    case SE_BLACKHOLE:
     case BLACKHOLE:
 	p += BLACKHOLE_sizeW();
 	break;
@@ -1919,6 +1925,8 @@ scavenge_one(StgClosure *p)
     }
 
   case CAF_BLACKHOLE:
+  case SE_CAF_BLACKHOLE:
+  case SE_BLACKHOLE:
   case BLACKHOLE:
       break;
 
@@ -2402,6 +2410,8 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	    recordMutable((StgMutClosure *)to);
 	    continue;
 	  default:
+            /* will never be SE_{,CAF_}BLACKHOLE, since we
+               don't push an update frame for single-entry thunks.  KSW 1999-01. */
 	    barf("scavenge_stack: UPDATE_FRAME updatee");
 	  }
 	}
@@ -2734,6 +2744,9 @@ threadLazyBlackHole(StgTSO *tso)
 
       if (bh->header.info != &BLACKHOLE_BQ_info &&
 	  bh->header.info != &CAF_BLACKHOLE_info) {
+#if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
+        fprintf(stderr,"Unexpected lazy BHing required at 0x%04x\n",(int)bh);
+#endif
 	SET_INFO(bh,&BLACKHOLE_info);
       }
 
@@ -2857,7 +2870,12 @@ threadSqueezeStack(StgTSO *tso)
        * slower --SDM
        */
 #if 0 /* do it properly... */
-      if (GET_INFO(updatee_bypass) == BLACKHOLE_BQ_info) {
+#  if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
+#    error Unimplemented lazy BH warning.  (KSW 1999-01)
+#  endif
+      if (GET_INFO(updatee_bypass) == BLACKHOLE_BQ_info
+	  || GET_INFO(updatee_bypass) == CAF_BLACKHOLE_info
+	  ) {
 	/* Sigh.  It has one.  Don't lose those threads! */
 	  if (GET_INFO(updatee_keep) == BLACKHOLE_BQ_info) {
 	  /* Urgh.  Two queues.  Merge them. */
@@ -2882,6 +2900,9 @@ threadSqueezeStack(StgTSO *tso)
 #endif
 
       TICK_UPD_SQUEEZED();
+      /* wasn't there something about update squeezing and ticky to be sorted out?
+       * oh yes: we aren't counting each enter properly in this case.  See the log somewhere.
+       * KSW 1999-04-21 */
       UPD_IND(updatee_bypass, updatee_keep); /* this wakes the threads up */
       
       sp = (P_)frame - 1;	/* sp = stuff to slide */
@@ -2897,6 +2918,9 @@ threadSqueezeStack(StgTSO *tso)
 	StgBlockingQueue *bh = (StgBlockingQueue *)frame->updatee;
 	if (bh->header.info != &BLACKHOLE_BQ_info &&
 	    bh->header.info != &CAF_BLACKHOLE_info) {
+#if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
+          fprintf(stderr,"Unexpected lazy BHing required at 0x%04x\n",(int)bh);
+#endif
 	  SET_INFO(bh,&BLACKHOLE_info);
 	}
       }

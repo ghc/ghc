@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.14 1999/05/04 08:50:43 sof Exp $
+ * $Id: ClosureMacros.h,v 1.15 1999/05/11 16:47:39 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -265,9 +265,9 @@ static __inline__ StgWord tso_sizeW ( StgTSO *tso )
 #define SET_STATIC_PAR_HDR(stuff)
 #endif
 
-#ifdef TICKY
-#define SET_TICKY_HDR(c,stuff)		(c)->header.ticky.updated = stuff
-#define SET_STATIC_TICKY_HDR(stuff)	ticky : { updated : stuff }
+#ifdef TICKY_TICKY
+#define SET_TICKY_HDR(c,stuff)		/* old: (c)->header.ticky.updated = stuff */
+#define SET_STATIC_TICKY_HDR(stuff)	/* old: ticky : { updated : stuff } */
 #else
 #define SET_TICKY_HDR(c,stuff)
 #define SET_STATIC_TICKY_HDR(stuff)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.6 1999/03/16 13:20:10 simonm Exp $
+ * $Id: TSO.h,v 1.7 1999/05/11 16:47:42 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -27,13 +27,13 @@ typedef struct {
 } StgTSOParInfo;
 #endif /* PAR */
 
-#if defined(TICKY)
+#if defined(TICKY_TICKY)
 typedef struct {
 } StgTSOTickyInfo;
-#else /* !TICKY */
+#else /* !TICKY_TICKY */
 typedef struct {
 } StgTSOTickyInfo;
-#endif /* TICKY */
+#endif /* TICKY_TICKY */
 
 typedef enum {
     tso_state_runnable,

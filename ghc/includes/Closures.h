@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.12 1999/03/25 13:01:44 simonm Exp $
+ * $Id: Closures.h,v 1.13 1999/05/11 16:47:40 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -70,19 +70,19 @@ typedef struct {
    info tables to be @_Evacuate_1@ and @_Scavenge_1_0@.
    -------------------------------------------------------------------------- */
 
-#ifdef TICKY
+#ifdef TICKY_TICKY
 
 typedef struct {
-  W_ updated;
+  /* old: W_ updated; */
 } StgTickyHeader;
 
-#else /* !TICKY */
+#else /* !TICKY_TICKY */
 
 typedef struct {
 	/* empty */
 } StgTickyHeader;
 
-#endif /* TICKY */
+#endif /* TICKY_TICKY */
 
 /* -----------------------------------------------------------------------------
    The full fixed-size closure header
@@ -99,7 +99,7 @@ typedef struct {
 #ifdef GRAN
 	StgGranHeader         par;
 #endif
-#ifdef TICKY
+#ifdef TICKY_TICKY
 	StgTickyHeader        ticky;
 #endif
 } StgHeader;

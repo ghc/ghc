@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.15 1999/04/23 09:47:33 simonm Exp $
+ * $Id: Updates.hc,v 1.16 1999/05/11 16:48:00 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,7 @@
 
 #include "Rts.h"
 #include "RtsUtils.h"
+#include "RtsFlags.h"
 #include "HeapStackCheck.h"
 #include "Storage.h"
 #include "ProfRts.h"
@@ -321,7 +322,7 @@ EXTFUN(stg_update_PAP)
        * either the new PAP or Node.
        */
       
-      Updatee = Su->updatee;
+      Updatee = Su->updatee; 
 
 #if defined(PROFILING)
       if (Words != 0) {

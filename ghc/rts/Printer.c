@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.12 1999/05/04 10:19:17 sof Exp $
+ * $Id: Printer.c,v 1.13 1999/05/11 16:47:54 keithw Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -177,6 +177,14 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,"CAF_BH("); 
             printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
             fprintf(stderr,")\n"); 
+            break;
+
+    case SE_BLACKHOLE:
+            fprintf(stderr,"SE_BH\n"); 
+            break;
+
+    case SE_CAF_BLACKHOLE:
+            fprintf(stderr,"SE_CAF_BH\n"); 
             break;
 
     case BLACKHOLE:

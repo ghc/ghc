@@ -54,21 +54,26 @@ PrelArrExtra_HC_OPTS     += -monly-2-regs
 Directory_HC_OPTS   	 += -monly-3-regs 
 Time_HC_OPTS        	 += -monly-3-regs
 
+# argh, adding USP seems to require extra heap... an extra 2 to 6MB,
+# in fact, on each of these.  (KSW 1998-12)
+
 # Far too much heap is needed to compile PrelNumExtra with -O at the
 # moment, but there you go..
-PrelNumExtra_HC_OPTS     += -H30m -K2m
+PrelNumExtra_HC_OPTS     += -H34m -K2m
 
 PrelPack_HC_OPTS	 += -K4m
-PrelBase_HC_OPTS         += -H10m
-PrelRead_HC_OPTS         += -H16m
-PrelTup_HC_OPTS          += -H12m
+PrelBase_HC_OPTS         += -H12m
+PrelRead_HC_OPTS         += -H20m
+PrelTup_HC_OPTS          += -H12m -K2m
 PrelNum_HC_OPTS		 += -H12m -K4m
 PrelArr_HC_OPTS          += -H8m
-PrelHandle_HC_OPTS       += -H14m
-Time_HC_OPTS             += -H18m
+PrelHandle_HC_OPTS       += -H20m
+Time_HC_OPTS             += -H24m -K2m
 Complex_HC_OPTS          += -H10m
 IO_HC_OPTS	         += -H12m
 PrelMain_HC_OPTS	 += -fno-prune-tydecls # avoids an apparent bug; ToDo
+List_HC_OPTS             += -H8m
+Directory_HC_OPTS        += -H8m
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation

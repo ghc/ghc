@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.8 1999/03/18 17:57:23 simonm Exp $
+ * $Id: Storage.h,v 1.9 1999/05/11 16:47:59 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -81,15 +81,17 @@ extern StgClosure *MarkRoot(StgClosure *p);
 /* -----------------------------------------------------------------------------
    Generational garbage collection support
 
-   RecordMutable(StgPtr p)       Informs the garbage collector that a
+   recordMutable(StgPtr p)       Informs the garbage collector that a
 				 previously immutable object has
 				 become (permanently) mutable.  Used
 				 by thawArray and similar.
 
-   UpdateWithIndirection(p1,p2)  Updates the object at p1 with an
+   updateWithIndirection(p1,p2)  Updates the object at p1 with an
 				 indirection pointing to p2.  This is
 				 normally called for objects in an old
 				 generation (>0) when they are updated.
+
+   updateWithPermIndirection(p1,p2)  As above but uses a permanent indir.
 
    -------------------------------------------------------------------------- */
 
@@ -138,7 +140,7 @@ updateWithIndirection(StgClosure *p1, StgClosure *p2)
   }
 }
 
-#ifdef PROFILING
+#if defined(TICKY_TICKY) || defined(PROFILING)
 static inline void
 updateWithPermIndirection(StgClosure *p1, StgClosure *p2) 
 {
@@ -148,13 +150,13 @@ updateWithPermIndirection(StgClosure *p1, StgClosure *p2)
   if (bd->gen->no == 0) {
     SET_INFO(p1,&IND_PERM_info);
     ((StgInd *)p1)->indirectee = p2;
-    TICK_UPD_NEW_IND();
+    TICK_UPD_NEW_PERM_IND(p1);
   } else {
     SET_INFO(p1,&IND_OLDGEN_PERM_info);
     ((StgIndOldGen *)p1)->indirectee = p2;
     ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;
     bd->gen->mut_once_list = (StgMutClosure *)p1;
-    TICK_UPD_OLD_IND();
+    TICK_UPD_OLD_PERM_IND();
   }
 }
 #endif

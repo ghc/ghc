@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.5 1998/12/02 13:26:49 simonm Exp $
+# $Id: Makefile,v 1.6 1999/05/11 16:47:46 keithw Exp $
 #
 # Makefile for POSIX library
 #
@@ -54,6 +54,10 @@ PosixProcEnv_HC_OPTS  ='-\#include"cbits/libposix.h"'
 PosixProcPrim_HC_OPTS ='-\#include"cbits/libposix.h"'
 PosixTTY_HC_OPTS      ='-\#include"cbits/libposix.h"' -monly-2-regs
 Posix_HC_OPTS         ='-\#include"cbits/libposix.h"'
+
+# KSW 1998-12: had to increase some of the heap sizes by 2m for USP
+PosixProcPrim_HC_OPTS += -H8m
+PosixFiles_HC_OPTS    += -H8m
 
 # sigh.
 ../misc/PackedString_HC_OPTS += -H8m

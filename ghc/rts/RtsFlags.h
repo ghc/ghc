@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.12 1999/03/25 13:14:08 simonm Exp $
+ * $Id: RtsFlags.h,v 1.13 1999/05/11 16:47:56 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -220,8 +220,6 @@ struct GRAN_FLAGS {
 struct TICKY_FLAGS {
     rtsBool showTickyStats;
     FILE   *tickyFile;
-
-    /* see also: doUpdEntryCounts in AllFlags */
 };
 #endif /* TICKY_TICKY */
 

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.10 1999/03/15 16:30:24 simonm Exp $
+ * $Id: ClosureTypes.h,v 1.11 1999/05/11 16:47:40 keithw Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -62,18 +62,20 @@
 #define SEQ_FRAME	        46
 #define BLACKHOLE	        47
 #define BLACKHOLE_BQ	        48
-#define MVAR		        49
-#define ARR_WORDS	        50
-#define MUT_ARR_PTRS	        51
-#define MUT_ARR_PTRS_FROZEN     52
-#define MUT_VAR		        53
-#define WEAK		        54
-#define FOREIGN		        55
-#define STABLE_NAME	        56
-#define TSO		        57
-#define BLOCKED_FETCH	        58
-#define FETCH_ME                59
-#define EVACUATED               60
-#define N_CLOSURE_TYPES         61
+#define SE_BLACKHOLE		49
+#define SE_CAF_BLACKHOLE	50
+#define MVAR		        51
+#define ARR_WORDS	        52
+#define MUT_ARR_PTRS	        53
+#define MUT_ARR_PTRS_FROZEN     54
+#define MUT_VAR		        55
+#define WEAK		        56
+#define FOREIGN		        57
+#define STABLE_NAME	        58
+#define TSO		        59
+#define BLOCKED_FETCH	        60
+#define FETCH_ME                61
+#define EVACUATED               62
+#define N_CLOSURE_TYPES         63
 
 #endif CLOSURETYPES_H

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.20 1999/04/27 10:59:31 sewardj Exp $
+ * $Id: Schedule.c,v 1.21 1999/05/11 16:47:57 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -755,7 +755,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
        * handler in this frame.
        */
       ap = (StgAP_UPD *)allocate(sizeofW(StgPAP) + 1);
-      TICK_ALLOC_THK(2,0);
+      TICK_ALLOC_UPD_PAP(2,0);
       SET_HDR(ap,&PAP_info,cf->header.prof.ccs);
 	      
       ap->n_args = 1;
@@ -779,7 +779,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
      * fun field.
      */
     ap = (StgAP_UPD *)allocate(AP_sizeW(words));
-    TICK_ALLOC_THK(words+1,0);
+    TICK_ALLOC_UP_THK(words+1,0);
     
     ASSERT(words >= 0);
     
@@ -826,7 +826,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	
 	/* now build o = FUN(catch,ap,handler) */
 	o = (StgClosure *)allocate(sizeofW(StgClosure)+2);
-	TICK_ALLOC_THK(2,0);
+	TICK_ALLOC_SE_THK(2,0);
 	SET_HDR(o,&catch_info,su->header.prof.ccs /* ToDo */);
 	o->payload[0] = (StgClosure *)ap;
 	o->payload[1] = cf->handler;
@@ -852,7 +852,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	
 	/* now build o = FUN(seq,ap) */
 	o = (StgClosure *)allocate(sizeofW(StgClosure)+1);
-	TICK_ALLOC_THK(1,0);
+	TICK_ALLOC_SE_THK(1,0);
 	SET_HDR(o,&seq_info,su->header.prof.ccs /* ToDo */);
 	payloadCPtr(o,0) = (StgClosure *)ap;
 	

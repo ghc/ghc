@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ClosureFlags.c,v 1.1 1999/03/15 16:30:27 simonm Exp $
+ * $Id: ClosureFlags.c,v 1.2 1999/05/11 16:47:49 keithw Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -67,6 +67,8 @@ StgWord16 closure_flags[] = {
 /* SEQ_FRAME 	   	*/ (     _BTM                            ),
 /* BLACKHOLE		*/ ( 	      _NS|              _UPT     ),
 /* BLACKHOLE_BQ	   	*/ ( 	      _NS|         _MUT|_UPT     ),
+/* SE_BLACKHOLE		*/ ( 	      _NS|              _UPT     ),
+/* SE_CAF_BLACKHOLE	*/ ( 	      _NS|              _UPT     ),
 /* MVAR		   	*/ (_HNF|     _NS|         _MUT|_UPT     ),
 /* ARR_WORDS		*/ (_HNF|     _NS|              _UPT     ),
 /* MUT_ARR_PTRS	   	*/ (_HNF|     _NS|         _MUT|_UPT     ),

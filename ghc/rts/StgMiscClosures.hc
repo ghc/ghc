@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.21 1999/05/04 10:19:19 sof Exp $
+ * $Id: StgMiscClosures.hc,v 1.22 1999/05/11 16:47:58 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -55,15 +55,38 @@ STGFUN(IND_PERM_entry)
     FB_
     /* Don't add INDs to granularity cost */
 
-    /* Dont: TICK_ENT_IND(Node); for ticky-ticky; this ind is here only to help profi
-ling */
+    /* Dont: TICK_ENT_IND(Node); for ticky-ticky; this ind is here only to help profiling */
+
+#if defined(TICKY_TICKY) && !defined(PROFILING)
+    /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, rather than being extra  */
+    TICK_ENT_PERM_IND(R1.p); /* tick */
+#endif
 
     /* Enter PAP cost centre -- lexical scoping only */
     ENTER_CCS_PAP_CL(R1.cl);
 
+    /* For ticky-ticky, change the perm_ind to a normal ind on first
+     * entry, so the number of ent_perm_inds is the number of *thunks*
+     * entered again, not the number of subsequent entries.
+     *
+     * Since this screws up cost centres, we die if profiling and
+     * ticky_ticky are on at the same time.  KSW 1999-01.
+     */
+
+#ifdef TICKY_TICKY
+#  ifdef PROFILING
+#    error Profiling and ticky-ticky do not mix at present!
+#  endif  /* PROFILING */
+    SET_INFO((StgInd*)R1.p,&IND_info);
+#endif /* TICKY_TICKY */
+
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
 
     /* Dont: TICK_ENT_VIA_NODE(); for ticky-ticky; as above */
+
+#if defined(TICKY_TICKY) && !defined(PROFILING)
+    TICK_ENT_VIA_NODE();
+#endif
 
     JMP_(*R1.p);
     FE_
@@ -85,13 +108,23 @@ INFO_TABLE(IND_OLDGEN_PERM_info,IND_OLDGEN_PERM_entry,1,1,IND_OLDGEN_PERM,const,
 STGFUN(IND_OLDGEN_PERM_entry)
 {
     FB_
-    TICK_ENT_IND(Node);	/* tick */
-  
-    /* Dont: TICK_ENT_IND(Node); for ticky-ticky; this ind is here only to help profi
-ling */
+    /* Dont: TICK_ENT_IND(Node); for ticky-ticky; this ind is here only to help profiling */
 
+#if defined(TICKY_TICKY) && !defined(PROFILING)
+    /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, rather than being extra  */
+    TICK_ENT_PERM_IND(R1.p); /* tick */
+#endif
+  
     /* Enter PAP cost centre -- lexical scoping only */
     ENTER_CCS_PAP_CL(R1.cl);
+
+    /* see comment in IND_PERM */
+#ifdef TICKY_TICKY
+#  ifdef PROFILING
+#    error Profiling and ticky-ticky do not mix at present!
+#  endif  /* PROFILING */
+    SET_INFO((StgInd*)R1.p,&IND_OLDGEN_info);
+#endif /* TICKY_TICKY */
 
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
@@ -196,6 +229,30 @@ STGFUN(CAF_BLACKHOLE_entry)
     BLOCK_NP(1);
   FE_
 }
+
+#ifdef TICKY_TICKY
+INFO_TABLE(SE_BLACKHOLE_info, SE_BLACKHOLE_entry,0,2,SE_BLACKHOLE,const,EF_,0,0);
+STGFUN(SE_BLACKHOLE_entry)
+{
+  FB_
+    STGCALL1(fflush,stdout);						
+    STGCALL3(fprintf,stderr,"SE_BLACKHOLE at %p entered!\n",R1.p);
+    STGCALL1(raiseError, errorHandler);
+    stg_exit(EXIT_FAILURE); /* not executed */
+  FE_
+}
+
+INFO_TABLE(SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,const,EF_,0,0);
+STGFUN(SE_CAF_BLACKHOLE_entry)
+{
+  FB_
+    STGCALL1(fflush,stdout);						
+    STGCALL3(fprintf,stderr,"SE_CAF_BLACKHOLE at %p entered!\n",R1.p);
+    STGCALL1(raiseError, errorHandler);
+    stg_exit(EXIT_FAILURE); /* not executed */
+  FE_
+}
+#endif
 
 /* -----------------------------------------------------------------------------
    The code for a BCO returns to the scheduler

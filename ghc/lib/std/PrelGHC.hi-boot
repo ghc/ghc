@@ -1,5 +1,5 @@
 ---------------------------------------------------------------------------
--- 				GHC.hi
+-- 				PrelGHC.hi-boot
 -- 
 -- 	This hand-written interface file allows you to bring into scope the 
 --	primitive operations and types that GHC knows about.

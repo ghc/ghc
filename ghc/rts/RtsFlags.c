@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.12 1999/03/25 13:14:07 simonm Exp $
+ * $Id: RtsFlags.c,v 1.13 1999/05/11 16:47:55 keithw Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -193,8 +193,8 @@ void initRtsFlagsDefaults(void)
 #endif
 
 #ifdef TICKY_TICKY
-    RtsFlags.TickyFlags.showTickyStats	= rtsFalse;
-    RtsFlags.TickyFlags.tickyFile	= NULL;
+    RtsFlags.TickyFlags.showTickyStats	 = rtsFalse;
+    RtsFlags.TickyFlags.tickyFile	 = NULL;
 #endif
 }
 

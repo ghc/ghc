@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.13 1999/05/05 10:48:06 sof Exp $
+# $Id: Makefile,v 1.14 1999/05/11 16:47:46 keithw Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -58,10 +58,15 @@ endif
 #
 # Specific flags
 #
-BSD_HC_OPTS          += -I../std/cbits -optc-DNON_POSIX_SOURCE
+
+# KSW 1998-12: had to increase some of the heap sizes by 2m for USP
+
+BSD_HC_OPTS          += -I../std/cbits -H8m -optc-DNON_POSIX_SOURCE
 Socket_HC_OPTS       += -I../std/cbits -optc-DNON_POSIX_SOURCE
-SocketPrim_HC_OPTS   += -I../std/cbits -H10m -optc-DNON_POSIX_SOURCE
+SocketPrim_HC_OPTS   += -I../std/cbits -H12m -optc-DNON_POSIX_SOURCE
 PackedString_HC_OPTS += -H12m
+Native_HC_OPTS       += -H8m
+Pretty_HC_OPTS       += -H8m
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
