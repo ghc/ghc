@@ -62,8 +62,8 @@ import Module		( ModuleName )
 import Util		( sortLt )
 import ErrUtils		( dumpIfSet_dyn )
 
-import Monad		( when, mplus )
-import Maybe		( maybeToList )
+import Monad		( when )
+import Maybe		( catMaybes )
 import IO		( IOMode(..), openFile, hClose )
 \end{code}
 
@@ -264,13 +264,12 @@ ifaceTyThing (AnId id) = iface_sig
     arity_info = arityInfo id_info
     caf_info   = cgCafInfo cg_info
 
-    hs_idinfo | opt_OmitInterfacePragmas = []
- 	      | otherwise		 = maybeToList $
-		      				   arity_hsinfo  `mplus`
-		      				   caf_hsinfo    `mplus`
-						   strict_hsinfo `mplus`
-						   wrkr_hsinfo   `mplus`
-						   unfold_hsinfo 
+    hs_idinfo | opt_OmitInterfacePragmas
+	      = []
+ 	      | otherwise
+  	      = catMaybes [arity_hsinfo,  caf_hsinfo,
+			   strict_hsinfo, wrkr_hsinfo,
+			   unfold_hsinfo] 
 
     ------------  Arity  --------------
     arity_hsinfo | arity_info == 0 = Nothing
