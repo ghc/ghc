@@ -13,8 +13,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.15 $
- * $Date: 1999/12/07 11:55:25 $
+ * $Revision: 1.16 $
+ * $Date: 2000/01/06 11:57:11 $
  * ------------------------------------------------------------------------*/
 
 
@@ -98,7 +98,7 @@
 #define LARGE_HUGS   1
 
 #define NUM_SYNTAX         100
-#define NUM_TUPLES         20
+#define NUM_TUPLES         37
 #define NUM_OFFSETS        1024
 #define NUM_CHARS          256
 #if TREX
