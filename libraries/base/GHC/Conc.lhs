@@ -395,18 +395,13 @@ addMVarFinalizer (MVar m) finalizer =
 -- in which they're used doesn't cause problems on a Win32 platform though.)
 
 asyncRead :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
-asyncRead  (I# fd) (I# isSock) (I# len) (Ptr buf) = do
-  (l, rc) <- IO (\s -> case asyncRead# fd isSock len buf s  of 
-	                 (# s, len#, err# #) -> (# s, (I# len#, I# err#) #))
-    -- special handling for Ctrl+C-aborted 'standard input' reads;
-    -- see rts/win32/ConsoleHandler.c for details.
-  if (l == 0 && rc == -2)
-   then asyncRead (I# fd) (I# isSock) (I# len) (Ptr buf)
-   else return (l,rc)
+asyncRead  (I# fd) (I# isSock) (I# len) (Ptr buf) =
+  IO $ \s -> case asyncRead# fd isSock len buf s of 
+  	       (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
 
 asyncWrite :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
-asyncWrite  (I# fd) (I# isSock) (I# len) (Ptr buf) = 
-  IO $ \s -> case asyncWrite# fd isSock len buf s  of 
+asyncWrite  (I# fd) (I# isSock) (I# len) (Ptr buf) =
+  IO $ \s -> case asyncWrite# fd isSock len buf s of 
   	       (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
 
 asyncDoProc :: FunPtr (Ptr a -> IO Int) -> Ptr a -> IO Int
