@@ -200,7 +200,7 @@ sub process_asm_block_sparc {
     $str =~ s/^\.stabs "(ghc\d+\.c)"/.stabs "$ifile_root.hc"/g; # HACK HACK
 
     # remove/record any literal constants defined here
-    while ( $str =~ /(\t\.align .\n\.?(LC\d+):\n(\t\.asci[iz].*\n)+)/ ) {
+    while ( $str =~ /(\t\.align .\n\.?(L?LC\d+):\n(\t\.asci[iz].*\n)+)/ ) {
 	local($label) = $2;
 	local($body)  = $1;
 
@@ -209,7 +209,7 @@ sub process_asm_block_sparc {
 
 	$LocalConstant{$label} = $body;
 	
-	$str =~ s/\t\.align .\n\.?LC\d+:\n(\t\.asci[iz].*\n)+//;
+	$str =~ s/\t\.align .\n\.?LL?C\d+:\n(\t\.asci[iz].*\n)+//;
     }
 
     # inject definitions for any local constants now used herein
