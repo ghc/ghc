@@ -133,3 +133,4 @@ test "tc126" { myvtc("") }
 test "tc127" { myvtc("") }
 test "tc128" { myvtc("") }
 test "tc129" { myvtc("") }
+test "tc130" { myvtc("") }

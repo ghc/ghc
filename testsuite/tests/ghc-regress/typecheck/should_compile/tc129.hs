@@ -1,3 +1,5 @@
+{-# OPTIONS -fglasgow-exts #-}
+
 -- !!! Test inheritance of implicit parameters.
 -- GHC 5.00.2 fails this test
 
@@ -11,5 +13,6 @@ data R = R {f :: Int}
 foo :: (?x :: Int) => R -> R
 foo r = r {f = ?x}
 
+baz :: (?x :: Int) => Int
 baz = (?x +1) :: Int
 
