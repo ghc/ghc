@@ -1,0 +1,4 @@
+
+rnfail040.hs:3:
+    The export item `module M'
+    creates conflicting exports for `Data.List.nub' and `Rnfail040_A.nub'
