@@ -437,8 +437,8 @@ regUsage instr = case instr of
     usageM (OpReg reg)    = mkRU [reg] [reg]
     usageM (OpAddr ea)    = mkRU (use_EA ea) []
 
-    --callClobberedRegs = [ eax, ecx, edx ] -- according to gcc, anyway.
-    callClobberedRegs = [eax,fake0,fake1,fake2,fake3,fake4,fake5]
+    -- caller-saves registers
+    callClobberedRegs = [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
 
     -- Registers defd when an operand is written.
     def_W (OpReg reg)  = [reg]

@@ -205,7 +205,7 @@ bh_info, ind_static_info, ind_info :: StixTree
 bh_info   	= sStLitLbl SLIT("BLACKHOLE_info")
 ind_static_info	= sStLitLbl SLIT("IND_STATIC_info")
 ind_info  	= sStLitLbl SLIT("IND_info")
-upd_frame_info	= sStLitLbl SLIT("Upd_frame_info")
+upd_frame_info	= sStLitLbl SLIT("upd_frame_info")
 seq_frame_info	= sStLitLbl SLIT("seq_frame_info")
 
 -- Some common call trees

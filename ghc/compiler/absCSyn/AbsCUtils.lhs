@@ -133,6 +133,8 @@ magicIdPrimRep Hp		    = PtrRep
 magicIdPrimRep HpLim		    = PtrRep
 magicIdPrimRep CurCostCentre	    = CostCentreRep
 magicIdPrimRep VoidReg		    = VoidRep
+magicIdPrimRep CurrentTSO	    = ThreadIdRep
+magicIdPrimRep CurrentNursery	    = PtrRep
 \end{code}
 
 %************************************************************************

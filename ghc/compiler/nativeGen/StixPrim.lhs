@@ -14,17 +14,18 @@ import StixInteger
 
 import AbsCSyn 		hiding ( spRel )
 import AbsCUtils	( getAmodeRep, mixedTypeLocn )
-import Constants	( uF_UPDATEE )
 import SMRep		( fixedHdrSize )
 import Literal		( Literal(..), word2IntLit )
 import CallConv		( cCallConv )
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import PrimRep		( PrimRep(..), isFloatingRep )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
-import Constants	( mIN_INTLIKE )
+import Constants	( mIN_INTLIKE, uF_UPDATEE, bLOCK_SIZE )
 import Outputable
 
-import Char	       	( ord )
+import Char	       	( ord, isAlphaNum )
+
+#include "NCG.h"
 \end{code}
 
 The main honcho here is primCode, which handles the guts of COpStmts.
@@ -242,14 +243,17 @@ primCode lhs (CCallOp (CCall (StaticTarget fn) is_asm may_gc cconv)) rhs
   | is_asm = error "ERROR: Native code generator can't handle casm"
   | not may_gc = returnUs (\xs -> ccall : xs)
   | otherwise =
+	save_thread_state	`thenUs` \ save ->
+	load_thread_state	`thenUs` \ load -> 
 	getUniqueUs		`thenUs` \ uniq -> 
 	let
-	   id = StReg (StixTemp uniq IntRep)
+	   id  = StReg (StixTemp uniq IntRep)
+
     	   suspend = StAssign IntRep id 
 			(StCall SLIT("suspendThread") cconv IntRep [stgBaseReg])
 	   resume  = StCall SLIT("resumeThread") cconv VoidRep [id]
 	in
-	returnUs (\xs -> suspend : ccall : resume : xs)
+	returnUs (\xs -> save (suspend : ccall : resume : load xs))
 
   where
     args = map amodeCodeForCCall rhs
@@ -459,12 +463,11 @@ amodeToStix (CMacroExpr _ macro [arg])
 
 litLitToStix :: String -> StixTree
 litLitToStix nm
-   = case nm of
-        "stdout" -> stixFor_stdout
-        "stderr" -> stixFor_stderr
-        "stdin"  -> stixFor_stdin
-        other    -> error ("\nlitLitToStix: can't handle `" ++ nm ++ "'\n" 
+  | all is_id nm = StLitLbl (text nm)
+  | otherwise    = error ("\nlitLitToStix: can't handle `" ++ nm ++ "'\n" 
                            ++ "suggested workaround: use flag -fvia-C\n")
+
+  where is_id c = isAlphaNum c || c == '_'
 \end{code}
 
 Sizes of the CharLike and IntLike closures that are arranged as arrays
@@ -494,4 +497,63 @@ mutArrPtrsFrozen_info = sStLitLbl SLIT("MUT_ARR_PTRS_FROZEN_info")
 
 charLikeSize = (fixedHdrSize + 1) * (fromInteger (sizeOf PtrRep))
 intLikeSize  = (fixedHdrSize + 1) * (fromInteger (sizeOf PtrRep))
+\end{code}
+
+
+\begin{code}
+save_thread_state 
+   = getUniqueUs   `thenUs` \tso_uq -> 
+     let tso = StReg (StixTemp tso_uq ThreadIdRep) in
+     returnUs (\xs ->
+	StAssign ThreadIdRep tso stgCurrentTSO :
+	StAssign PtrRep
+	   (StInd PtrRep (StPrim IntAddOp 
+		[tso, StInt (toInteger (TSO_SP*BYTES_PER_WORD))]))
+	   stgSp :
+	StAssign PtrRep 
+	   (StInd PtrRep (StPrim IntAddOp 
+		[tso, StInt (toInteger (TSO_SU*BYTES_PER_WORD))]))
+	   stgSu :
+	StAssign PtrRep 
+	   (StInd PtrRep (StPrim IntAddOp 
+		[tso, StInt (toInteger (TSO_SPLIM*BYTES_PER_WORD))]))
+	   stgSpLim :
+	StAssign PtrRep
+	   (StInd PtrRep (StPrim IntAddOp
+		[stgCurrentNursery, 
+		 StInt (toInteger (BDESCR_FREE * BYTES_PER_WORD))]))
+	   (StPrim IntAddOp [stgHp, StInt (toInteger (1 * BYTES_PER_WORD))]) :
+	xs
+     )
+
+load_thread_state 
+   = getUniqueUs   `thenUs` \tso_uq -> 
+     let tso = StReg (StixTemp tso_uq ThreadIdRep) in
+     returnUs (\xs ->
+	StAssign ThreadIdRep tso stgCurrentTSO :
+	StAssign PtrRep stgSp
+	   (StInd PtrRep (StPrim IntAddOp 
+		[tso, StInt (toInteger (TSO_SP*BYTES_PER_WORD))])) :
+	StAssign PtrRep stgSu
+	   (StInd PtrRep (StPrim IntAddOp 
+		[tso, StInt (toInteger (TSO_SU*BYTES_PER_WORD))])) :
+	StAssign PtrRep stgSpLim
+	   (StInd PtrRep (StPrim IntAddOp 
+		[tso, StInt (toInteger (TSO_SPLIM*BYTES_PER_WORD))])) :
+	StAssign PtrRep stgHp
+	   (StPrim IntSubOp [
+	      StInd PtrRep (StPrim IntAddOp
+		[stgCurrentNursery, 
+		 StInt (toInteger (BDESCR_FREE * BYTES_PER_WORD))]),
+	      StInt (toInteger (1 * BYTES_PER_WORD))
+	    ]) :
+	StAssign PtrRep stgHpLim
+	   (StPrim IntAddOp [
+	      StInd PtrRep (StPrim IntAddOp
+		[stgCurrentNursery, 
+		 StInt (toInteger (BDESCR_START * BYTES_PER_WORD))]),
+	      StInt (toInteger (bLOCK_SIZE - (1 * BYTES_PER_WORD)))
+	    ]) :
+	xs
+     )
 \end{code}

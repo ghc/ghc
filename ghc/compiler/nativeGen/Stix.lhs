@@ -9,7 +9,8 @@ module Stix (
         stixCountTempUses, stixSubst,
 
 	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, 
-        stgHp, stgHpLim, stgTagReg, stgR9, stgR10,
+        stgHp, stgHpLim, stgTagReg, stgR9, stgR10, 
+	stgCurrentTSO, stgCurrentNursery,
 
 	fixedHS, arrWordsHS, arrPtrsHS,
 
@@ -227,6 +228,8 @@ stgSu 		    = StReg (StixMagicId Su)
 stgSpLim	    = StReg (StixMagicId SpLim)
 stgHp		    = StReg (StixMagicId Hp)
 stgHpLim	    = StReg (StixMagicId HpLim)
+stgCurrentTSO	    = StReg (StixMagicId CurrentTSO)
+stgCurrentNursery   = StReg (StixMagicId CurrentNursery)
 stgR9               = StReg (StixMagicId (VanillaReg WordRep ILIT(9)))
 stgR10              = StReg (StixMagicId (VanillaReg WordRep ILIT(10)))
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.33 2000/04/13 11:56:35 simonpj Exp $
+% $Id: CLabel.lhs,v 1.34 2000/05/15 15:03:36 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -418,7 +418,7 @@ pprCLbl (CaseLabel u CaseBitmap)
 
 pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("stg_error_entry")
 
-pprCLbl (RtsLabel RtsUpdInfo) = ptext SLIT("Upd_frame_info")
+pprCLbl (RtsLabel RtsUpdInfo) = ptext SLIT("upd_frame_info")
 
 pprCLbl (RtsLabel RtsTopTickyCtr) = ptext SLIT("top_ct")
 

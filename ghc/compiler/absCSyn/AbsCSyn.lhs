@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.29 2000/03/23 17:45:17 simonpj Exp $
+% $Id: AbsCSyn.lhs,v 1.30 2000/05/15 15:03:36 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -472,6 +472,9 @@ data MagicId
   | LongReg	        -- long int registers (64-bit, really)
 	PrimRep	        -- Int64Rep or Word64Rep
 	FAST_INT	-- its number (1 .. mAX_Long_REG)
+
+  | CurrentTSO		-- pointer to current thread's TSO
+  | CurrentNursery	-- pointer to allocation area
 
 
 node 	= VanillaReg PtrRep     ILIT(1) -- A convenient alias for Node

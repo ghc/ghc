@@ -584,6 +584,8 @@ baseRegOffset (LongReg _ ILIT(2))    = OFFSET_Lng2
 #endif
 baseRegOffset Hp		     = OFFSET_Hp
 baseRegOffset HpLim		     = OFFSET_HpLim
+baseRegOffset CurrentTSO	     = OFFSET_CurrentTSO
+baseRegOffset CurrentNursery	     = OFFSET_CurrentNursery
 #ifdef DEBUG
 baseRegOffset BaseReg		     = panic "baseRegOffset:BaseReg"
 baseRegOffset CurCostCentre	     = panic "baseRegOffset:CurCostCentre"
@@ -656,6 +658,12 @@ callerSaves Hp				= True
 #endif
 #ifdef CALLER_SAVES_HpLim
 callerSaves HpLim			= True
+#endif
+#ifdef CALLER_SAVES_CurrentTSO
+callerSaves CurrentTSO			= True
+#endif
+#ifdef CALLER_SAVES_CurrentNursery
+callerSaves CurrentNursery		= True
 #endif
 callerSaves _				= False
 \end{code}
@@ -734,6 +742,12 @@ magicIdRegMaybe Hp		   	= Just (FixedReg ILIT(REG_Hp))
 #endif	    				
 #ifdef REG_HpLim      			
 magicIdRegMaybe HpLim		   	= Just (FixedReg ILIT(REG_HpLim))
+#endif	    				
+#ifdef REG_CurrentTSO      			
+magicIdRegMaybe CurrentTSO	   	= Just (FixedReg ILIT(REG_CurrentTSO))
+#endif	    				
+#ifdef REG_CurrentNursery      			
+magicIdRegMaybe CurrentNursery	   	= Just (FixedReg ILIT(REG_CurrentNursery))
 #endif	    				
 magicIdRegMaybe _		   	= Nothing
 \end{code}
