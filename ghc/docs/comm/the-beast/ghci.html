@@ -1,0 +1,135 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+    <title>The GHC Commentary - GHCi</title>
+  </head>
+
+  <body BGCOLOR="FFFFFF">
+    <h1>The GHC Commentary - GHCi</h1>
+
+    This isn't a coherent description of how GHCi works, sorry.  What
+    it is (currently) is a dumping ground for various bits of info
+    pertaining to GHCi, which ought to be recorded somewhere.
+
+    <h2>Debugging the interpreter</h2>
+
+    The usual symptom is that some expression / program crashes when
+    running on the interpreter (commonly), or gets wierd results
+    (rarely).  Unfortunately, finding out what the problem really is
+    has proven to be extremely difficult.  In retrospect it may be
+    argued a design error that GHC's implementation of the STG
+    execution mechanism provides only the weakest of support for
+    automated internal consistency checks.  This renders it hard to
+    debug and, essentially, unverifiable.
+    <p>
+    Execution failures in the interactive system can be due to
+    problems with the bytecode interpreter, problems with the bytecode
+    generator, or problems elsewhere.  From the bugs seen so far, 
+    the bytecode generator is often the culprit, with the interpreter
+    usually being correct.
+    <p>
+    Here are some tips for tracking down interactive nonsense:
+    <ul>
+      <li>Find the smallest source fragment which causes the problem.
+      <p>
+      <li>Using an RTS compiled with <code>-DDEBUG</code> (nb, that
+          means the RTS from the previous stage!), run with <code>+RTS
+          -D2</code> to get a listing in great detail from the
+          interpreter.  Note that the listing is so voluminous that
+          this is impractical unless you have been diligent in
+          the previous step.
+      <p>
+      <li>At least in principle, using the trace and a bit of GDB
+          poking around at the time of death, you can figure out what
+          the problem is.  In practice you quickly get depressed at
+          the hopelessness of ever making sense of the mass of
+          details.  Well, I do, anyway.
+      <p>
+      <li><code>+RTS -D2</code> tries hard to print useful
+          descriptions of what's on the stack, and often succeeds.
+          However, it has no way to map addresses to names in
+          code/data loaded by our runtime linker.  So the C function
+          <code>ghci_enquire</code> is provided.  Given an address, it
+          searches the loaded symbol tables for symbols close to that
+          address.  You can run it from inside GDB:
+      <pre>
+      (gdb) p ghci_enquire ( 0x50a406f0 )
+      0x50a406f0 + -48  ==  `PrelBase_Czh_con_info'
+      0x50a406f0 + -12  ==  `PrelBase_Izh_static_info'
+      0x50a406f0 + -48  ==  `PrelBase_Czh_con_entry'
+      0x50a406f0 + -24  ==  `PrelBase_Izh_con_info'
+      0x50a406f0 +  16  ==  `PrelBase_ZC_con_entry'
+      0x50a406f0 +   0  ==  `PrelBase_ZMZN_static_entry'
+      0x50a406f0 + -36  ==  `PrelBase_Czh_static_entry'
+      0x50a406f0 + -24  ==  `PrelBase_Izh_con_entry'
+      0x50a406f0 +  64  ==  `PrelBase_EQ_static_info'
+      0x50a406f0 +   0  ==  `PrelBase_ZMZN_static_info'
+      0x50a406f0 +  48  ==  `PrelBase_LT_static_entry'
+      $1 = void
+      </pre>
+         In this case the enquired-about address is
+         <code>PrelBase_ZMZN_static_entry</code>.  If no symbols are
+         close to the given addr, nothing is printed.  Not a great
+         mechanism, but better than nothing.
+      <p>
+      <li>We have had various problems in the past due to the bytecode
+          generator (<code>compiler/ghci/ByteCodeGen.lhs</code>) being
+          confused about the true set of free variables of an
+          expression.  The compilation scheme for <code>let</code>s
+          applies the BCO for the RHS of the let to its free
+          variables, so if the free-var annotation is wrong or
+          misleading, you end up with code which has wrong stack
+          offsets, which is usually fatal.
+      <p>
+      <li>The baseline behaviour of the interpreter is to interpret
+          BCOs, and hand all other closures back to the scheduler for
+          evaluation.  However, this causes a huge number of expensive
+          context switches, so the interpreter knows how to enter the
+          most common non-BCO closure types by itself.
+          <p>
+          These optimisations complicate the interpreter.
+          If you think you have an interpreter problem, re-enable the
+          define <code>REFERENCE_INTERPRETER</code> in
+          <code>ghc/rts/Interpreter.c</code>.  All optimisations are
+          thereby disabled, giving the baseline
+          I-only-know-how-to-enter-BCOs behaviour.
+      <p>
+      <li>Following the traces is often problematic because execution
+          hops back and forth between the interpreter, which is
+          traced, and compiled code, which you can't see.
+          Particularly annoying is when the stack looks OK in the
+          interpreter, then compiled code runs for a while, and later
+          we arrive back in the interpreter, with the stack corrupted,
+          and usually in a completely different place from where we
+          left off.
+          <p>
+          If this is biting you baaaad, it may be worth copying
+          sources for the compiled functions causing the problem, into
+          your interpreted module, in the hope that you stay in the
+          interpreter more of the time.  Of course this doesn't work
+          very well if you've defined
+          <code>REFERENCE_INTERPRETER</code> in
+          <code>ghc/rts/Interpreter.c</code>.
+      <p>
+      <li>There are various commented-out pieces of code in
+          <code>Interpreter.c</code> which can be used to get the
+          stack sanity-checked after every entry, and even after after
+          every bytecode instruction executed.  Note that some
+          bytecodes (<code>PUSH_UBX</code>) leave the stack in
+          an unwalkable state, so the <code>do_print_stack</code>
+          local variable is used to suppress the stack walk after
+          them.
+    </ul>
+
+
+    <h2>Entering and returning between interpreted and compiled code</h2>
+
+
+    <p><small>
+<!-- hhmts start -->
+Last modified: Fri Feb  1 16:14:11 GMT 2002
+<!-- hhmts end -->
+    </small>
+  </body>
+</html>
