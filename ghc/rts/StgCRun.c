@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.31 2002/03/26 10:35:20 simonmar Exp $
+ * $Id: StgCRun.c,v 1.32 2002/04/18 19:12:43 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -54,6 +54,7 @@
 #ifdef alpha_TARGET_ARCH
 #define alpha_EXTRA_CAREFUL
 register long   fake_ra __asm__("$26");
+register long   fake_gp __asm__("$29");
 #ifdef alpha_EXTRA_CAREFUL
 register long   fake_s6 __asm__("$15");
 register double fake_f8 __asm__("$f8");
@@ -268,6 +269,7 @@ StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg)
 {
     register long   real_ra __asm__("$26"); volatile long   save_ra;
+    register long   real_gp __asm__("$29"); volatile long   save_gp;
 
     register long   real_s0 __asm__("$9" ); volatile long   save_s0;
     register long   real_s1 __asm__("$10"); volatile long   save_s1;
@@ -295,6 +297,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
     StgThreadReturnCode ret;
 
     save_ra = real_ra;
+    save_gp = real_gp;
 
     save_s0 = real_s0;
     save_s1 = real_s1;
@@ -351,6 +354,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 #endif
 
     real_ra = save_ra;
+    real_gp = save_gp;
 
     return ret;
 }
