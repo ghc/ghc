@@ -69,7 +69,7 @@ module CmdLineOpts (
 	opt_OmitInterfacePragmas,
 	opt_PprStyle_All,
 	opt_PprStyle_Debug,
-	opt_PprStyle_User,
+	opt_PprStyle_User,		-- ToDo: rm
 	opt_PprUserLength,
 	opt_ProduceC,
 	opt_ProduceHi,
@@ -116,12 +116,11 @@ import ArrBase
 import PrelBase (Lift(..))
 #endif
 #endif
-import Argv
 
 CHK_Ubiq() -- debugging consistency check
 
+import Argv
 import Constants	-- Default values for some flags
-
 import Maybes		( assocMaybe, firstJust, maybeToBool )
 import Util		( startsWith, panic, panic#, assertPanic )
 \end{code}
