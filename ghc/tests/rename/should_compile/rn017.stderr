@@ -1,3 +1,0 @@
-ghc: module version changed to 1; reason: no old .hi file
-__export Rn017 Wibble{MkWibble} Wobble a b c;
-__export Test FOO{op} Foo{MkFoo} f;
