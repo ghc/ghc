@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.5 2001/03/27 11:37:39 simonmar Exp $
+# $Id: bootstrap.mk,v 1.6 2001/03/27 12:59:18 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -69,7 +69,7 @@ HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/util		\
    -L$(FPTOOLS_TOP_ABS)/hslibs/util/cbits	\
-   -L$(FPTOOLS_TOP_ABS) hslibs/text		\
+   -L$(FPTOOLS_TOP_ABS)/hslibs/text		\
    -u "PrelBase_Izh_static_info"		\
    -u "PrelBase_Czh_static_info"		\
    -u "PrelFloat_Fzh_static_info"		\
