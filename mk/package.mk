@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.3 2002/02/13 10:45:28 simonmar Exp $
+# $Id: package.mk,v 1.4 2002/02/13 15:48:03 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -58,46 +58,6 @@ all :: $(LIBRARY)
 # %.o : %.lhs
 # 	$(GHC_INPLACE) $(HC_OPTS) --make $<
 
-#--------------------------------------------------------------
-# Building dynamically-linkable libraries for GHCi
-#
-# Build $(GHCI_LIBRARY) from $(OBJS)
-#
-# Why?  GHCi can only link .o files (at the moment), not .a files
-# so we have to build libFoo.o as well as libFoo.a
-#
-# Furthermore, GHCi currently never loads 
-# profiling libraries (or other non-std ways)
-#
-# Inputs:
-#   $(GHCI_LIBRARY)
-#
-# Outputs:
-#   Rule to build $(GHCI_LIBRARY)
-
-ifeq "$(way)" ""
-ifeq "$(GhcWithInterpreter)" "YES"
-
-GHCI_LIBRARY = HS$(PACKAGE)$(_cbits)$(_way).o
-
-INSTALL_LIBS += $(GHCI_LIBRARY)
-CLEAN_FILES  += $(GHCI_LIBRARY)
-
-all :: $(GHCI_LIBRARY)
-
-ifneq "$(DONT_WANT_STD_GHCI_LIB_RULE)" "YES"
-# If you don't want to build GHCI_LIBRARY the 'standard' way,
-# set DONT_WANT_STD_GHCI_LIB_RULE to YES. The Prelude and
-# hslibs/Win32 uses this 'feature', which will go away soon
-# when we can use a "fixed" ld.
-#
-$(GHCI_LIBRARY) : $(LIBOBJS)
-	$(LD) -r $(LD_X) -o $@ $(LIBOBJS)
-
-endif # DONT_WANT_STD_GHCI_LIB_RULE
-endif # GhcWithInterpreter
-endif # way
-
 # -----------------------------------------------------------------------------
 # Installation; need to install .hi files as well as libraries
 #
@@ -118,3 +78,40 @@ SRC_MKDEPENDC_OPTS += $(patsubst %,-I%,$(ALL_DIRS)) -I$(GHC_INCLUDE_DIR)
 
 endif # $(PACKAGE) /= ""
 
+#--------------------------------------------------------------
+# Building dynamically-linkable libraries for GHCi
+#
+# Build $(GHCI_LIBRARY) whenever we build $(LIBRARY)
+#
+# Why?  GHCi can only link .o files (at the moment), not .a files
+# so we have to build libFoo.o as well as libFoo.a
+#
+# Furthermore, GHCi currently never loads 
+# profiling libraries (or other non-std ways)
+
+ifneq "$(LIBRARY)" ""
+
+ifeq "$(way)" ""
+ifeq "$(GhcWithInterpreter)" "YES"
+
+GHCI_LIBRARY = $(patsubst lib%.a,%.o,$(LIBRARY))
+
+INSTALL_LIBS += $(GHCI_LIBRARY)
+CLEAN_FILES  += $(GHCI_LIBRARY)
+
+all :: $(GHCI_LIBRARY)
+
+ifneq "$(DONT_WANT_STD_GHCI_LIB_RULE)" "YES"
+# If you don't want to build GHCI_LIBRARY the 'standard' way,
+# set DONT_WANT_STD_GHCI_LIB_RULE to YES. The Prelude and
+# hslibs/Win32 uses this 'feature', which will go away soon
+# when we can use a "fixed" ld.
+#
+$(GHCI_LIBRARY) : $(LIBOBJS)
+	$(LD) -r $(LD_X) -o $@ $(LIBOBJS)
+
+endif # DONT_WANT_STD_GHCI_LIB_RULE
+endif # GhcWithInterpreter
+endif # way
+
+endif # $(LIBRARY) /= ""
