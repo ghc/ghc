@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.66 2005/01/06 14:55:02 malcolm Exp $
+-- $Id: Main.hs,v 1.67 2005/01/24 00:36:03 ross Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -11,7 +11,7 @@
 --
 -- See the documentation in the Users' Guide for more details.
 
-#if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114
+#if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114 || __HUGS__
 import System.Console.GetOpt
 #else
 import GetOpt
@@ -24,7 +24,7 @@ import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit
 import List          (intersperse, isSuffixOf)
 import IO            (hPutStr, hPutStrLn, stderr)
 
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && !__HUGS__
 import Foreign
 #if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114
 import Foreign.C.String
@@ -112,12 +112,16 @@ main = do
 
 	-- If there is no Template flag explicitly specified, try
 	-- to find one by looking near the executable.  This only
-	-- works on Win32 (getExecDir). On Unix, there's a wrapper 
+	-- works on Win32 or Hugs (getExecDir). On Unix, there's a wrapper 
 	-- script which specifies an explicit template flag.
     flags_w_tpl <- if any template_flag flags then
 			return flags
 		   else	
+#ifdef __HUGS__
+			do mb_path <- getExecDir "/Main.hs"
+#else
 			do mb_path <- getExecDir "/bin/hsc2hs.exe"
+#endif
 			   add_opt <-
 			    case mb_path of
 			      Nothing   -> return id
@@ -529,6 +533,17 @@ output flags name toks = do
             fixChar c | isAlphaNum c = toUpper c
                       | otherwise    = '_'
 
+#ifdef __HUGS__
+    compiler <- case [c | Compiler c <- flags] of
+        []  -> return "gcc"
+        [c] -> return c
+        _   -> onlyOne "compiler"
+    
+    linker <- case [l | Linker l <- flags] of
+        []  -> return compiler
+        [l] -> return l
+        _   -> onlyOne "linker"
+#else
         -- Try locating GHC..on Win32, look in the vicinity of hsc2hs.
 	-- Returns a native-format path
         locateGhc def = do
@@ -561,6 +576,7 @@ output flags name toks = do
         []  -> locateGhc compiler
         [l] -> return l
         _   -> onlyOne "linker"
+#endif
 
     writeFile cProgName $
         concatMap outFlagHeaderCProg flags++
@@ -838,21 +854,29 @@ showCString = concatMap showCChar
 --	Cut and pasted from ghc/compiler/SysTools
 -- Convert paths foo/baz to foo\baz on Windows
 
-dosifyPath :: String -> String
+dosifyPath, unDosifyPath :: String -> String
 #if defined(mingw32_HOST_OS)
 dosifyPath xs = subst '/' '\\' xs
-
-unDosifyPath :: String -> String
 unDosifyPath xs = subst '\\' '/' xs
 
 subst :: Eq a => a -> a -> [a] -> [a]
 subst a b ls = map (\ x -> if x == a then b else x) ls
+#else
+dosifyPath xs = xs
+unDosifyPath xs = xs
+#endif
 
 getExecDir :: String -> IO (Maybe String)
 -- (getExecDir cmd) returns the directory in which the current
 --	  	    executable, which should be called 'cmd', is running
 -- So if the full path is /a/b/c/d/e, and you pass "d/e" as cmd,
 -- you'll get "/a/b/c" back as the result
+#ifdef __HUGS__
+getExecDir cmd
+  = do
+	s <- getProgName
+	return (Just (reverse (drop (length cmd) (reverse (unDosifyPath s)))))
+#elif defined(mingw32_HOST_OS)
 getExecDir cmd
   = allocaArray len $ \buf -> do
 	ret <- getModuleFileName nullPtr buf len
@@ -867,8 +891,5 @@ foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 
 #else
-dosifyPath xs = xs
-
-getExecDir :: String -> IO (Maybe String) 
 getExecDir _ = return Nothing
 #endif
