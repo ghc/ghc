@@ -82,6 +82,24 @@ thread itself.  This means the thread itself can't be garbage
 collected until you drop the <tt/ThreadId/.  This misfeature will
 hopefully be corrected at a later date.
 
+<sect1> Scheduling
+<p>
+
+GHC uses <em>preemptive multitasking</em>: context switches can occur
+at any time.  At present, Hugs uses <em>cooperative multitasking</em>:
+context switches only occur when you use one of the primitives defined
+in this module.  This means that programs such as:
+
+<tscreen><verb>
+main = forkIO (write 'a') >> write 'b'
+ where write c = putChar c >> write c
+</verb></tscreen>
+
+will print either <tt/aaaaaaaaaaaaaa.../ or <tt/bbbbbbbbbbbb.../,
+instead of some random interleaving of <tt/a/s and <tt/b/s.
+In practice, cooperative multitasking is sufficient for writing simple
+graphical user interfaces.
+
 The <tt>yield</tt> action forces a context-switch to any other
 currently runnable threads (if any), and is occasionally useful when
 implementing concurrency abstractions:
@@ -89,6 +107,39 @@ implementing concurrency abstractions:
 <tscreen><verb>
 yield :: IO ()
 </verb></tscreen>
+
+<sect2> <idx/Thread Waiting/
+<p>
+
+Finally, there are operations to delay a concurrent thread, and to
+make one wait:<nidx>delay a concurrent thread</nidx>
+<nidx>wait for a file descriptor</nidx>
+
+<tscreen><verb>
+threadDelay     :: Int -> IO () -- delay rescheduling for N microseconds
+threadWaitRead  :: Int -> IO () -- wait for input on specified file descriptor
+threadWaitWrite :: Int -> IO () -- (read and write, respectively).
+</verb></tscreen>
+
+The <tt/threadDelay/ operation will cause the current thread to
+suspend for a given number of microseconds.  Note that the resolution
+used by the Haskell runtime system's internal timer together with the
+fact that the thread may take some time to be rescheduled after the
+time has expired, means that the accuracy is more like 1/50 second.
+
+<tt/threadWaitRead/ and <tt/threadWaitWrite/ can be used to block a
+thread until I/O is available on a given file descriptor.  These
+primitives are used by the I/O subsystem to ensure that a thread
+waiting on I/O doesn't hang the entire system.
+
+<sect2> <idx/Blocking/
+<p>
+Calling a foreign C procedure (such as <tt/getchar/) that blocks
+waiting for input will block <em>all</em> threads, in both
+GHC and Hugs.  The GHC I/O system uses non-blocking I/O internally to implement
+thread-friendly I/O, so calling standard Haskell I/O functions blocks
+only the thead making the call.
+
 
 <sect1> <idx/Concurrency abstractions/
 <label id="sec:Concurrency-abstractions">
@@ -137,7 +188,7 @@ time a thread gets to inspect the result and act upon it, other
 threads may have accessed the <tt/MVar/ and changed the 'filled-in'
 status of the variable. 
 
-The same proviso applies to <tt/isEmptyChan/.
+The same proviso applies to <tt/isEmptyChan/ (next sub-section).
 
 These two predicates are currently only supported by GHC.
 
@@ -200,6 +251,9 @@ mergeIO  :: [a]   -> [a] -> IO [a]
 nmergeIO :: [[a]] -> IO [a]
 </verb></tscreen>
 
+These actions fork one thread for each input list that concurrently
+evaluates that list; the results are merged into a single output list.
+
 Note: Hugs does not provide the functions <tt/mergeIO/ or
 <tt/nmergeIO/ since these require preemptive multitasking.
 
@@ -230,32 +284,7 @@ readSample     :: SampleVar a -> IO a
 writeSample    :: SampleVar a -> a -> IO ()
 </verb></tscreen>
 
-<sect2> <idx/Thread Waiting/
-<label id="sec:Channels">
-<p>
-
-Finally, there are operations to delay a concurrent thread, and to
-make one wait:<nidx>delay a concurrent thread</nidx>
-<nidx>wait for a file descriptor</nidx>
-
-<tscreen><verb>
-threadDelay     :: Int -> IO () -- delay rescheduling for N microseconds
-threadWaitRead  :: Int -> IO () -- wait for input on specified file descriptor
-threadWaitWrite :: Int -> IO () -- (read and write, respectively).
-</verb></tscreen>
-
-The <tt/threadDelay/ operation will cause the current thread to
-suspend for a given number of microseconds.  Note that the resolution
-used by the Haskell runtime system's internal timer together with the
-fact that the thread may take some time to be rescheduled after the
-time has expired, means that the accuracy is more like 1/50 second.
-
-<tt/threadWaitRead/ and <tt/threadWaitWrite/ can be used to block a
-thread until I/O is available on a given file descriptor.  These
-primitives are used by the I/O subsystem to ensure that a thread
-waiting on I/O doesn't hang the entire system.
-
-<sect2> The <tt/Concurrent/ library interface
+<sect1> The <tt/Concurrent/ library interface
 <p>
 
 The full interface for the <tt/Concurrent/ library is given below for
@@ -320,30 +349,6 @@ threadDelay      :: Int -> IO ()
 threadWaitRead   :: Int -> IO ()
 threadWaitWrite  :: Int -> IO ()
 </verb></tscreen>
-
-<sect1> Pre-emptive vs. Cooperative multitasking
-<p>
-
-GHC uses preemptive multitasking: Context switches can occur at any
-time, except if you call a C function (like <tt/getchar/) that blocks
-waiting for input.  Haskell I/O is unaffected by blocking operations
-(the GHC I/O system uses non-blocking I/O internally to implement
-thread-friendly I/O).
-
-Hugs uses cooperative multitasking: Context switches only occur when
-you use one of the primitives defined in this module.  This means that
-programs such as:
-
-<tscreen><verb>
-main = forkIO (write 'a') >> write 'b'
- where write c = putChar c >> write c
-</verb></tscreen>
-
-will print either <tt/aaaaaaaaaaaaaa.../ or <tt/bbbbbbbbbbbb.../,
-instead of some random interleaving of <tt/a/s and <tt/b/s.
-
-In practice, cooperative multitasking is sufficient for writing simple
-graphical user interfaces.
 
 <sect1> GHC-specific concurrency issues
 <p>
