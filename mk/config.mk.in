@@ -709,7 +709,7 @@ WAY_t_HC_OPTS= -ticky
 
 # Way `u':
 WAY_u_NAME=unregisterized (using portable C only)
-WAY_u_HC_OPTS=
+WAY_u_HC_OPTS=-unreg
 
 # Way `mp': 
 WAY_mp_NAME=parallel
