@@ -205,6 +205,9 @@ data Token
   | ITcloseQuote		-- |]
   | ITidEscape   FastString	-- $x
   | ITparenEscape		-- $( 
+  | ITreifyType
+  | ITreifyDecl
+  | ITreifyFixity
 
   | ITunknown String		-- Used when the lexer can't make sense of it
   | ITeof			-- end of file token
@@ -302,6 +305,9 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "stdcall",    ITstdcallconv,	 bit ffiBit),
 	( "ccall",      ITccallconv,	 bit ffiBit),
 	( "dotnet",     ITdotnet,	 bit ffiBit),
+	( "reifyDecl",  ITreifyDecl,	 bit glaExtsBit),
+	( "reifyType",  ITreifyType,	 bit glaExtsBit),
+	( "reifyFixity",ITreifyFixity,	 bit glaExtsBit),
         ("_ccall_",	ITccall (False, False, PlayRisky),
 					 bit glaExtsBit),
         ("_ccall_GC_",	ITccall (False, False, PlaySafe False),

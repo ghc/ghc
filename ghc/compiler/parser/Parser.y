@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.109 2002/10/11 08:48:13 simonpj Exp $
+$Id: Parser.y,v 1.110 2002/10/11 14:46:04 simonpj Exp $
 
 Haskell grammar.
 
@@ -236,8 +236,11 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
 '[t|'           { ITopenTypQuote  }      
 '[d|'           { ITopenDecQuote  }      
 '|]'            { ITcloseQuote    }
-ID_SPLICE       { ITidEscape $$   }           -- $x
-'$('	        { ITparenEscape   }           -- $( exp )
+ID_SPLICE       { ITidEscape $$   }     -- $x
+'$('	        { ITparenEscape   }     -- $( exp )
+REIFY_TYPE	{ ITreifyType }	
+REIFY_DECL	{ ITreifyDecl }	
+REIFY_FIXITY	{ ITreifyFixity }
 
 %monad { P } { thenP } { returnP }
 %lexer { lexer } { ITeof }
@@ -951,6 +954,7 @@ exp10 :: { RdrNameHsExpr }
 							then HsSCC $1 $2
 							else HsPar $2 }
 
+	| reifyexp				{ HsReify $1 }
 	| fexp					{ $1 }
 
 scc_annot :: { FastString }
@@ -964,6 +968,12 @@ ccallid :: { FastString }
 fexp 	:: { RdrNameHsExpr }
 	: fexp aexp				{ (HsApp $1 $2) }
   	| aexp					{ $1 }
+
+reifyexp :: { HsReify RdrName }
+	: REIFY_DECL gtycon  			{ Reify ReifyDecl $2 }
+	| REIFY_DECL qvar			{ Reify ReifyDecl $2 }
+	| REIFY_TYPE qcname			{ Reify ReifyType $2 }
+	| REIFY_FIXITY qcname			{ Reify ReifyFixity $2 }
 
 aexps0 	:: { [RdrNameHsExpr] }
 	: aexps					{ reverse $1 }

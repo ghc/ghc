@@ -9,6 +9,8 @@ module Type (
 	Type, PredType, ThetaType,
 	Kind, TyVarSubst, 
 
+	TyThing(..), isTyClThing,
+
 	superKind, superBoxity,				-- KX and BX respectively
 	liftedBoxity, unliftedBoxity, 			-- :: BX
 	openKindCon, 					-- :: KX
@@ -85,12 +87,12 @@ import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 import {-# SOURCE #-}   Subst  ( substTyWith )
 
 -- friends:
-import Var	( TyVar, tyVarKind, tyVarName, setTyVarName )
+import Var	( Id, TyVar, tyVarKind, tyVarName, setTyVarName )
 import VarEnv
 import VarSet
 
 import Name	( NamedThing(..), mkInternalName, tidyOccName )
-import Class	( classTyCon )
+import Class	( Class, classTyCon )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isNewTyCon, newTyConRep,
@@ -108,6 +110,29 @@ import Util		( mapAccumL, seqList, lengthIs )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 import Maybe		( isJust )
+\end{code}
+
+
+%************************************************************************
+%*									*
+			TyThing
+%*									*
+%************************************************************************
+
+\begin{code}
+data TyThing = AnId   Id
+	     | ATyCon TyCon
+	     | AClass Class
+
+isTyClThing :: TyThing -> Bool
+isTyClThing (ATyCon _) = True
+isTyClThing (AClass _) = True
+isTyClThing (AnId   _) = False
+
+instance NamedThing TyThing where
+  getName (AnId id)   = getName id
+  getName (ATyCon tc) = getName tc
+  getName (AClass cl) = getName cl
 \end{code}
 
 

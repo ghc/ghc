@@ -235,7 +235,6 @@ rnExpr (HsBracket br_body loc)
     returnM (HsBracket body' loc, fvs_e `addOneFV` qTyConName)
 	-- We use the Q tycon as a proxy to haul in all the smart
 	-- constructors; see the hack in RnIfaces
-#endif
 
 rnExpr (HsSplice n e loc)
   = addSrcLoc loc			$
@@ -243,6 +242,14 @@ rnExpr (HsSplice n e loc)
     newLocalsRn [(n,loc)]		`thenM` \ [n'] ->
     rnExpr e 				`thenM` \ (e', fvs_e) ->
     returnM (HsSplice n' e' loc, fvs_e)    
+
+rnExpr (HsReify (Reify flavour name))
+  = checkGHCI (thErr "reify")		`thenM_`
+    lookupGlobalOccRn name		`thenM` \ name' ->
+	-- For now, we can only reify top-level things
+    returnM (HsReify (Reify flavour name'), mkFVs [name', qTyConName])
+	-- The qTyCon brutally pulls in all the meta stuff
+#endif
 
 rnExpr section@(SectionL expr op)
   = rnExpr expr	 				`thenM` \ (expr', fvs_expr) ->

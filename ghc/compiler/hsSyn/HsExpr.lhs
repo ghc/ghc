@@ -19,7 +19,7 @@ import HsImpExp		( isOperator, pprHsVar )
 -- others:
 import ForeignCall	( Safety )
 import PprType		( pprParendType )
-import Type		( Type )
+import Type		( Type, TyThing )
 import Var		( TyVar, Id )
 import Name		( Name )
 import DataCon		( DataCon )
@@ -173,6 +173,8 @@ data HsExpr id
   | HsSplice id (HsExpr id) SrcLoc	-- $z  or $(f 4)
 					-- The id is just a unique name to 
 					-- identify this splice point
+
+  | HsReify (HsReify id)		-- reifyType t, reifyDecl i, reifyFixity
 \end{code}
 
 
@@ -392,6 +394,7 @@ ppr_expr (HsType id) = ppr id
 ppr_expr (HsSplice n e _)    = char '$' <> brackets (ppr n) <> pprParendExpr e
 ppr_expr (HsBracket b _)     = pprHsBracket b
 ppr_expr (HsBracketOut e ps) = ppr e $$ ptext SLIT("where") <+> ppr ps
+ppr_expr (HsReify r)	     = ppr r
 
 -- add parallel array brackets around a document
 --
@@ -690,6 +693,20 @@ pprHsBracket (TypBr t) = thBrackets (char 't') (ppr t)
 
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+> 
 			     pp_body <+> ptext SLIT("|]")
+
+data HsReify id = Reify    ReifyFlavour id	-- Pre typechecking
+		| ReifyOut ReifyFlavour TyThing	-- Post typechecking
+
+data ReifyFlavour = ReifyDecl | ReifyType | ReifyFixity
+
+instance Outputable id => Outputable (HsReify id) where
+   ppr (Reify flavour id) = ppr flavour <+> ppr id
+   ppr (ReifyOut flavour thing) = ppr flavour <+> ppr thing
+
+instance Outputable ReifyFlavour where
+   ppr ReifyDecl   = ptext SLIT("reifyDecl")
+   ppr ReifyType   = ptext SLIT("reifyType")
+   ppr ReifyFixity = ptext SLIT("reifyFixity")
 \end{code}
 
 %************************************************************************

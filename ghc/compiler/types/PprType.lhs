@@ -19,7 +19,7 @@ module PprType(
 -- friends:
 -- (PprType can see all the representations it's trying to print)
 import TypeRep		( Type(..), TyNote(..), Kind  ) -- friend
-import Type		( SourceType(..) )
+import Type		( SourceType(..), TyThing(..) )
 import TcType		( ThetaType, PredType,
 			  tcSplitSigmaTy, isPredTy, isDictTy,
 			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe
@@ -88,6 +88,11 @@ instance Outputable name => Outputable (IPName name) where
 
 instance Outputable name => OutputableBndr (IPName name) where
     pprBndr _ n = ppr n	-- Simple for now
+
+instance Outputable TyThing where
+  ppr (AnId   id) = ptext SLIT("AnId")   <+> ppr id
+  ppr (ATyCon tc) = ptext SLIT("ATyCon") <+> ppr tc
+  ppr (AClass cl) = ptext SLIT("AClass") <+> ppr cl
 \end{code}
 
 

@@ -15,11 +15,11 @@ import {-# SOURCE #-} RnHiFiles	( loadInterface )
 
 import CmdLineOpts	( DynFlag(..) )
 
-import HsSyn		( HsDecl(..), IE(..), ieName, ImportDecl(..),
+import HsSyn		( IE(..), ieName, ImportDecl(..),
 			  ForeignDecl(..), HsGroup(..),
 			  collectLocatedHsBinders, tyClDeclNames 
 			)
-import RdrHsSyn		( RdrNameIE, RdrNameImportDecl, RdrNameHsDecl )
+import RdrHsSyn		( RdrNameIE, RdrNameImportDecl )
 import RnEnv
 import TcRnMonad
 

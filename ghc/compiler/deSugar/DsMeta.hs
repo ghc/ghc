@@ -11,9 +11,10 @@
 -----------------------------------------------------------------------------
 
 
-module DsMeta( dsBracket, 
+module DsMeta( dsBracket, dsReify,
 	       templateHaskellNames, qTyConName, 
-	       liftName, exprTyConName, declTyConName ) where
+	       liftName, exprTyConName, declTyConName,
+	       decTyConName, typTyConName ) where
 
 #include "HsVersions.h"
 
@@ -30,23 +31,26 @@ import HsSyn  	  ( Pat(..), HsExpr(..), Stmt(..), HsLit(..), HsOverLit(..),
                     HsStmtContext(ListComp,DoExpr), ArithSeqInfo(..),
 		    HsBinds(..), MonoBinds(..), HsConDetails(..),
 		    TyClDecl(..), HsGroup(..),
+		    HsReify(..), ReifyFlavour(..), 
 		    HsType(..), HsContext(..), HsPred(..), HsTyOp(..),
 	 	    HsTyVarBndr(..), Sig(..), ForeignDecl(..),
 		    InstDecl(..), ConDecl(..), BangType(..),
 		    PendingSplice, splitHsInstDeclTy,
 		    placeHolderType, tyClDeclNames,
 		    collectHsBinders, collectPatBinders, collectPatsBinders,
-		    hsTyVarName, hsConArgs, getBangType
+		    hsTyVarName, hsConArgs, getBangType,
+		    toHsType
 		  )
 
 import PrelNames  ( mETA_META_Name, varQual, tcQual )
+import MkIface	  ( ifaceTyThing )
 import Name       ( Name, nameOccName, nameModule )
 import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
 import Module	  ( moduleUserString )
-import Id         ( Id )
+import Id         ( Id, idType )
 import NameEnv
 import NameSet
-import Type       ( Type, mkGenTyConApp )
+import Type       ( Type, TyThing(..), mkGenTyConApp )
 import TyCon	  ( DataConDetails(..) )
 import TysWiredIn ( stringTy )
 import CoreSyn
@@ -75,6 +79,22 @@ dsBracket brack splices
     do_brack (PatBr p)  = do { MkC p1  <- repP p      ; return p1 }
     do_brack (TypBr t)  = do { MkC t1  <- repTy t     ; return t1 }
     do_brack (DecBr ds) = do { MkC ds1 <- repTopDs ds ; return ds1 }
+
+-----------------------------------------------------------------------------
+dsReify :: HsReify Id -> DsM CoreExpr
+-- Returns a CoreExpr of type 	reifyType --> M.Typ
+--				reifyDecl --> M.Dec
+--				reifyFixty --> M.Fix
+dsReify (ReifyOut ReifyType (AnId id))
+  = do { MkC e <- repTy (toHsType (idType id)) ;
+	 return e }
+
+dsReify r@(ReifyOut ReifyDecl thing)
+  = do { mb_d <- repTyClD (ifaceTyThing thing) ;
+	 case mb_d of
+	   Just (MkC d) -> return d 
+	   Nothing	-> pprPanic "dsReify" (ppr r)
+	}
 
 {- -------------- Examples --------------------
 
@@ -929,7 +949,8 @@ templateHaskellNames
 		constrName,
 		exprTyConName, declTyConName, pattTyConName, mtchTyConName, 
 		clseTyConName, stmtTyConName, consTyConName, typeTyConName,
-		qTyConName, expTyConName, matTyConName, clsTyConName ]
+		qTyConName, expTyConName, matTyConName, clsTyConName,
+		decTyConName, typTyConName ]
 
 
 
@@ -1012,6 +1033,8 @@ typeTyConName  = tcQual  mETA_META_Name FSLIT("Type")  	       typeTyConKey
 
 qTyConName     = tcQual  mETA_META_Name FSLIT("Q")  	       qTyConKey
 expTyConName   = tcQual  mETA_META_Name FSLIT("Exp")  	       expTyConKey
+decTyConName   = tcQual  mETA_META_Name FSLIT("Dec")  	       decTyConKey
+typTyConName   = tcQual  mETA_META_Name FSLIT("Typ")  	       typTyConKey
 matTyConName   = tcQual  mETA_META_Name FSLIT("Mat")  	       matTyConKey
 clsTyConName   = tcQual  mETA_META_Name FSLIT("Cls")  	       clsTyConKey
 
@@ -1030,6 +1053,9 @@ clseTyConKey = mkPreludeTyConUnique 108
 stmtTyConKey = mkPreludeTyConUnique 109
 consTyConKey = mkPreludeTyConUnique 110
 typeTyConKey = mkPreludeTyConUnique 111
+typTyConKey  = mkPreludeTyConUnique 112
+decTyConKey  = mkPreludeTyConUnique 113
+
 
 
 -- 	IdUniques available: 200-299

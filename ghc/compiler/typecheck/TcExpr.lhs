@@ -10,12 +10,13 @@ module TcExpr ( tcExpr, tcExpr_id, tcMonoExpr ) where
 
 #ifdef GHCI 	/* Only if bootstrapped */
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
-import TcEnv		( bracketOK )
+import HsSyn		( HsReify(..), ReifyFlavour(..) )
+import TcEnv		( bracketOK, tcMetaTy )
 import TcSimplify	( tcSimplifyBracket )
-import DsMeta		( liftName )
+import qualified DsMeta
 #endif
 
-import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
+import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..),
 			  mkMonoBind, recBindFields
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
@@ -32,7 +33,7 @@ import Inst		( InstOrigin(..),
 			)
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookupClass, tcLookupGlobal_maybe, tcLookupIdLvl,
-			  tcLookupTyCon, tcLookupDataCon, tcLookupId,
+			  tcLookupTyCon, tcLookupDataCon, tcLookupId, tcLookupGlobal,
 			  wellStaged, metaLevel
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts )
@@ -647,6 +648,23 @@ tcMonoExpr (HsBracket brack loc) res_ty
     readMutVar pending_splices		`thenM` \ pendings ->
     returnM (HsBracketOut brack pendings)
     }
+
+tcMonoExpr (HsReify (Reify flavour name)) res_ty
+  = addErrCtxt (ptext SLIT("At the reification of") <+> ppr name)	$
+    tcLookupGlobal name		`thenM` \ thing ->
+	-- For now, we can only reify top-level things
+	-- The complication for non-top-level things is just that 
+	-- they might be a TcId, and need zonking etc.
+
+    tcMetaTy  tycon_name	`thenM` \ reify_ty ->
+    unifyTauTy res_ty reify_ty	`thenM_`
+
+    returnM (HsReify (ReifyOut flavour thing))
+  where
+    tycon_name = case flavour of
+		   ReifyDecl -> DsMeta.decTyConName
+		   ReifyType -> DsMeta.typTyConName
+		   ReifyFixity -> pprPanic "tcMonoExpr: cant do reifyFixity yet" (ppr name)
 #endif GHCI
 \end{code}
 
@@ -834,7 +852,7 @@ tcId name	-- Look up the Id and instantiate its type
 		    -- just going to flag an error for now
 
 	setLIEVar lie_var	(
-	newMethodFromName orig id_ty liftName	`thenM` \ lift ->
+	newMethodFromName orig id_ty DsMeta.liftName	`thenM` \ lift ->
 		-- Put the 'lift' constraint into the right LIE
 	
 	-- Update the pending splices

@@ -81,6 +81,7 @@ import CoreSyn		( CoreBind )
 import Id		( Id )
 import Class		( Class, classSelIds )
 import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataCons_maybe )
+import Type		( TyThing(..), isTyClThing )
 import DataCon		( dataConWorkId, dataConWrapId )
 import Packages		( PackageName, preludePackage )
 import CmdLineOpts	( DynFlags )
@@ -406,26 +407,6 @@ icPrintUnqual ictxt = unQualInScope (ic_rn_gbl_env ictxt)
 %************************************************************************
 
 \begin{code}
-data TyThing = AnId   Id
-	     | ATyCon TyCon
-	     | AClass Class
-
-isTyClThing :: TyThing -> Bool
-isTyClThing (ATyCon _) = True
-isTyClThing (AClass _) = True
-isTyClThing (AnId   _) = False
-
-instance NamedThing TyThing where
-  getName (AnId id)   = getName id
-  getName (ATyCon tc) = getName tc
-  getName (AClass cl) = getName cl
-
-instance Outputable TyThing where
-  ppr (AnId   id) = ptext SLIT("AnId")   <+> ppr id
-  ppr (ATyCon tc) = ptext SLIT("ATyCon") <+> ppr tc
-  ppr (AClass cl) = ptext SLIT("AClass") <+> ppr cl
-
-
 typeEnvElts    :: TypeEnv -> [TyThing]
 typeEnvClasses :: TypeEnv -> [Class]
 typeEnvTyCons  :: TypeEnv -> [TyCon]

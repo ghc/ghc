@@ -20,7 +20,7 @@ import DsMonad
 
 #ifdef GHCI
 	-- Template Haskell stuff iff bootstrapped
-import DsMeta		( dsBracket )
+import DsMeta		( dsBracket, dsReify )
 #endif
 
 import HsSyn		( failureFreePat,
@@ -550,6 +550,7 @@ Here is where we desugar the Template Haskell brackets and escapes
 
 #ifdef GHCI	/* Only if bootstrapping */
 dsExpr (HsBracketOut x ps) = dsBracket x ps
+dsExpr (HsReify r)	   = dsReify r
 dsExpr (HsSplice n e _)    = pprPanic "dsExpr:splice" (ppr e)
 #endif
 

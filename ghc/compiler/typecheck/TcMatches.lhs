@@ -34,7 +34,7 @@ import TcType		( TcType, TcTyVar, tyVarsOfType, tidyOpenTypes, tidyOpenType,
 			  mkArrowKind, mkAppTy )
 import TcBinds		( tcBindsAndThen )
 import TcUnify		( unifyPArrTy,subFunTy, unifyListTy, unifyTauTy,
-			  checkSigTyVarsWrt, tcSubExp, isIdCoercion, (<$>), unifyTauTyLists )
+			  checkSigTyVarsWrt, tcSubExp, isIdCoercion, (<$>) )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import Name		( Name )
 import PrelNames	( monadNames, mfixName )
