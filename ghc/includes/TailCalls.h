@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.19 2005/03/08 08:59:58 simonmar Exp $
+ * $Id: TailCalls.h,v 1.20 2005/03/08 09:01:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -83,8 +83,7 @@ extern void __DISCARD__(void);
   }
 
   without the dummy function call, gcc throws away the assignment to R1
-  (gcc 3.4.3) gcc bug #
-
+  (gcc 3.4.3) gcc bug #20359.
 */
 
 #define JMP_(cont)			\
