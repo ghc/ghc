@@ -17,7 +17,7 @@ SCRIPT_SUBST_VARS=\
  ProjectVersionInt
 
 ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS += libdir TMPDIR
+SCRIPT_SUBST_VARS += libdir libexecdir TMPDIR
 endif
 
 #
@@ -58,8 +58,6 @@ install ::
 	@$(RM) $(SCRIPT_PROG)
 	@$(MAKE) $(MFLAGS) INSTALLING=1 $(SCRIPT_PROG)
 
-
-CLEAN_FILES += $(SCRIPT_PROG)
 include $(TOP)/mk/target.mk
 
 

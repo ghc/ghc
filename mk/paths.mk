@@ -157,8 +157,8 @@ TAGS_C_SRCS=$(C_SRCS)
 #
 #
 MOSTLY_CLEAN_FILES     += $(HS_OBJS) $(C_OBJS)
-CLEAN_FILES            += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(PROG) \
-			  $(LIBRARY) $(HS_IFACES) $(HS_HCS) \
+CLEAN_FILES            += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) 
+			  $(PROG) $(LIBRARY) $(HS_IFACES) $(HS_HCS) \
 			  a.out
 
 MAINTAINER_CLEAN_FILES += .depend $(BOOT_SRCS)

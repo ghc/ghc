@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.9 1998/02/04 20:56:24 sof Exp $
+# $Id: Makefile,v 1.10 1999/10/04 14:03:50 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -21,7 +21,6 @@ SCRIPT_SUBST_VARS=TMPDIR
 endif
 
 INTERP=perl
-CLEAN_FILES += $(SCRIPT_PROG)
 
 #
 # The stat2resid script is configured with a different

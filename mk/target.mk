@@ -452,17 +452,17 @@ all :: $(SCRIPT_LINK)
 
 #
 # Don't want to overwrite $(SCRIPT_LINK)s that aren't symbolic
-# links. Testing for symbol links is problematic to do in
+# links. Testing for symbolic links is problematic to do in
 # a portable fashion using a /bin/sh test, so we simply rely
 # on perl.
 #
 $(SCRIPT_LINK) : $(SCRIPT_PROG)
 	@if ( $(PERL) -e '$$fn="$(SCRIPT_LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
-	   echo "Creating a symbol link from $(SCRIPT_PROG) to $(SCRIPT_LINK)"; \
+	   echo "Creating a symbolic link from $(SCRIPT_PROG) to $(SCRIPT_LINK)"; \
 	   $(RM) $(SCRIPT_LINK); \
 	   $(LN_S) $(SCRIPT_PROG) $(SCRIPT_LINK); \
 	 else \
-	   echo "Creating a symbol link from $(SCRIPT_PROG) to $(SCRIPT_LINK) failed: \`$(SCRIPT_LINK)' already exists"; \
+	   echo "Creating a symbolic link from $(SCRIPT_PROG) to $(SCRIPT_LINK) failed: \`$(SCRIPT_LINK)' already exists"; \
 	   echo "Perhaps remove \`$(SCRIPT_LINK)' manually?"; \
 	   exit 1; \
 	 fi;
@@ -538,88 +538,25 @@ endif
 ifneq "$(INSTALL_SCRIPTS)" ""
 install:: $(INSTALL_SCRIPTS)
 	@$(INSTALL_DIR) $(bindir)
-ifeq "$(INTERP)" "perl"
-ifneq "$(BIN_DIST)" "1"
-	@for i in $(INSTALL_SCRIPTS); do \
-	   $(RM) $$i.tmp; \
-	   echo "#! $(PERL)" > $$i.tmp ; \
-	   echo '$$'"bindir='$(bindir)';"                            >> $$i.tmp ; \
-	   echo '$$'"libdir='$(libdir)';"                            >> $$i.tmp ; \
-	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
-	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
-	   cat  $$i                                                >> $$i.tmp ; \
-	   echo $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i.tmp $(bindir)/$$i ;    \
-	   $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i.tmp $(bindir)/$$i ; \
-	   $(RM) $$i.tmp; \
-	done
-else
-	for i in $(INSTALL_SCRIPTS); do \
-		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(bindir)/$$i; \
-	done
-endif
-else
 	for i in $(INSTALL_SCRIPTS); do \
 		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(bindir); \
 	done
-endif
 endif
 
 ifneq "$(INSTALL_LIB_SCRIPTS)" ""
 install:: $(INSTALL_LIB_SCRIPTS)
 	@$(INSTALL_DIR) $(libdir)
-ifeq "$(INTERP)" "perl"
-ifneq "$(BIN_DIST)" "1"
-	@for i in $(INSTALL_LIB_SCRIPTS); do \
-	   $(RM) $$i.tmp; \
-	   echo "#! $(PERL)" > $$i.tmp ; \
-	   echo '$$'"bindir='$(bindir)';"                            >> $$i.tmp ; \
-	   echo '$$'"libdir='$(libdir)';"                            >> $$i.tmp ; \
-	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
-	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
-	   cat  $$i                                                >> $$i.tmp ; \
-	   echo $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libdir)/$$i ;    \
-	   $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i.tmp $(libdir)/$$i ; \
-	   $(RM) $$i.tmp; \
-	done
-else
-	for i in $(INSTALL_LIB_SCRIPTS); do \
-		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libdir)/$$i ; \
-	done
-endif
-else
 	for i in $(INSTALL_LIB_SCRIPTS); do \
 		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libdir); \
 	done
-endif
 endif
 
 ifneq "$(INSTALL_LIBEXEC_SCRIPTS)" ""
 install:: $(INSTALL_LIBEXEC_SCRIPTS)
 	@$(INSTALL_DIR) $(libexecdir)
-ifeq "$(INTERP)" "perl"
-ifneq "$(BIN_DIST)" "1"
-	@for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
-	   $(RM) $$i.tmp; \
-	   echo "#! $(PERL)" > $$i.tmp ; \
-	   echo '$$'"bindir='$(bindir)';"                            >> $$i.tmp ; \
-	   echo '$$'"libdir='$(libdir)';"                            >> $$i.tmp ; \
-	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
-	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
-	   cat  $$i                                                >> $$i.tmp ; \
-	   echo $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libexecdir) ;    \
-	   $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i.tmp $(libexecdir)/$$i ; \
-	   $(RM) $$i.tmp; \
-	done
-else
 	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
 		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libexecdir); \
 	done
-endif
-else
-	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
-		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libexecdir); \
-	done
-endif
 endif
 
 ifneq "$(INSTALL_LIBS)" ""
@@ -1075,7 +1012,6 @@ endif	# if way
 # its tracks should any of the sub-makes fail. By my reckoning, 
 #  "cmd || exit $?" should be equivalent to "cmd"
 
-ifeq "$(way)" ""
 ifneq "$(SUBDIRS)" ""
 
 all docs runtests boot TAGS clean veryclean maintainer-clean install info ::
@@ -1106,7 +1042,6 @@ dist ::
 	  $(MAKE) -C $$i $(MFLAGS) $@ SRC_DIST_DIR=$(SRC_DIST_DIR)/$$i; \
 	  if [ $$? -eq 0 ] ;  then true; else exit $$x_on_err; fi; \
 	done
-endif
 endif
 
 # The default dist rule:

@@ -27,8 +27,6 @@ install ::
 	@$(MAKE) $(MFLAGS) INSTALLING=1 $(SCRIPT_PROG)
 
 
-CLEAN_FILES += $(SCRIPT_PROG)
-
 include $(TOP)/mk/target.mk
 
 
