@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.120 2003/05/19 15:39:18 simonpj Exp $
+-- $Id: Main.hs,v 1.121 2003/05/21 02:48:56 igloo Exp $
 --
 -- GHC Driver program
 --
@@ -208,7 +208,8 @@ main =
 
 	---------------- Do the business -----------
    case mode of
-	DoMake 	       -> doMake srcs
+	DoMake 	       -> do { saveDynFlags ;
+			       doMake srcs }
 	DoMkDependHS   -> do { beginMkDependHS ; 
 			       compileFiles mode srcs; 
 			       endMkDependHS }
