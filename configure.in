@@ -537,6 +537,8 @@ AC_STRUCT_ST_BLKSIZE
 
 dnl ** what are the sizes of various types
 dnl    (these must come before GHC_CHECK_ALIGNMENT)
+AC_CHECK_SIZEOF(char,        1)
+AC_CHECK_SIZEOF(int,         4)
 AC_CHECK_SIZEOF(unsigned int,4)
 AC_CHECK_SIZEOF(float,       4)
 AC_CHECK_SIZEOF(double,      8)
@@ -544,6 +546,9 @@ AC_CHECK_SIZEOF(long,        4)
 AC_CHECK_SIZEOF(void *,      4)
 
 dnl ** what are alignment constraints on various types
+FPTOOLS_CHECK_ALIGNMENT(char)
+FPTOOLS_CHECK_ALIGNMENT(int)
+FPTOOLS_CHECK_ALIGNMENT(void *)
 FPTOOLS_CHECK_ALIGNMENT(unsigned int) dnl redundant but harmless
 FPTOOLS_CHECK_ALIGNMENT(long)
 FPTOOLS_CHECK_ALIGNMENT(float)

@@ -66,16 +66,25 @@
    byte first (like Motorola and SPARC, unlike Intel and VAX).  */
 #undef WORDS_BIGENDIAN
 
-/* Define to alignment constraint on doubles or on unsigned int - whichever is the greater */
+/* Define to alignment constraint on characters */
+#undef ALIGNMENT_CHAR
+
+/* Define to alignment constraint on ints */
+#undef ALIGNMENT_INT
+
+/* Define to alignment constraint on void pointers */
+#undef ALIGNMENT_VOID_P
+
+/* Define to alignment constraint on doubles */
 #undef ALIGNMENT_DOUBLE
 
-/* Define to alignment constraint on floats or on unsigned int - whichever is the greater */
+/* Define to alignment constraint on floats */
 #undef ALIGNMENT_FLOAT
 
-/* Define to alignment constraint on doubles or on unsigned int - whichever is the greater */
+/* Define to alignment constraint on doubles */
 #undef ALIGNMENT_LONG
 
-/* Define to alignment constraint on unsigned int - whichever is the greater */
+/* Define to alignment constraint on unsigned int */
 #undef ALIGNMENT_UNSIGNED_INT
 
 /* Define if code lives before data in memory */
@@ -133,6 +142,12 @@
  * (Otherwise, they're assumed to have type int (*)(void).)
  */
 #define VOID_INT_SIGNALS 0
+
+/* The number of bytes in a char.  */
+#undef SIZEOF_CHAR
+
+/* The number of bytes in a int.  */
+#undef SIZEOF_INT
 
 /* The number of bytes in a double.  */
 #undef SIZEOF_DOUBLE
