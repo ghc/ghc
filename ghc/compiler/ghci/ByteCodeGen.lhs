@@ -30,7 +30,7 @@ import CoreFVs		( freeVars )
 import Type		( typePrimRep, isUnLiftedType, splitTyConApp_maybe, 
 			  isTyVarTy )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon, 
-                          isUnboxedTupleCon, isNullaryDataCon,
+                          isUnboxedTupleCon, isNullaryDataCon, dataConWorkId,
 			  dataConRepArity )
 import TyCon		( tyConFamilySize, isDataTyCon, tyConDataCons,
 			  isFunTyCon, isUnboxedTupleTyCon )
@@ -242,9 +242,9 @@ schemeTopBind (id, rhs)
   | Just data_con <- isDataConWorkId_maybe id,
     isNullaryDataCon data_con
   = 	-- Special case for the worker of a nullary data con.
-	-- It'll look like this:	$wNil = /\a -> $wNil a
+	-- It'll look like this:	Nil = /\a -> Nil a
 	-- If we feed it into schemeR, we'll get 
-	--	$wNil = $wNil
+	--	Nil = Nil
 	-- because mkConAppCode treats nullary constructor applications
 	-- by just re-using the single top-level definition.  So
 	-- for the worker itself, we must allocate it directly.
@@ -569,7 +569,7 @@ mkConAppCode :: Int -> Sequel -> BCEnv
 
 mkConAppCode orig_d s p con []	-- Nullary constructor
   = ASSERT( isNullaryDataCon con )
-    returnBc (unitOL (PUSH_G (getName con)))
+    returnBc (unitOL (PUSH_G (getName (dataConWorkId con))))
 	-- Instead of doing a PACK, which would allocate a fresh
 	-- copy of this constructor, use the single shared version.
 
