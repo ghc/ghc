@@ -126,7 +126,7 @@ config-pkgs ::
 	@for i in $(PACKAGE_PRL_SCRIPTS); do \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
-	   test -f bin/$(platform)/$(package)-$(version)/$$i && $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; \
+	   if [ -f bin/$(platform)/$(package)-$(version)/$$i ]; then $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; fi; \
 	   echo "#! $(PERL)"  		        		> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"bindir='$(bindir)';"                        >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"libdir='$(real_libdir)';"                   >> bin/$(platform)/$(package)-$(version)/$$i ; \
@@ -141,7 +141,7 @@ config-pkgs ::
 	@for i in $(PACKAGE_LIB_PRL_SCRIPTS); do \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) lib/$(platform)/$(package)-$(version)/$$i.bak; \
-	   test -f lib/$(platform)/$(package)-$(version)/$$i && $(MV) lib/$(platform)/$(package)-$(version)/$$i lib/$(platform)/$(package)-$(version)/$$i.bak; \
+	   if [ -f lib/$(platform)/$(package)-$(version)/$$i ]; then $(MV) lib/$(platform)/$(package)-$(version)/$$i lib/$(platform)/$(package)-$(version)/$$i.bak; fi; \
 	   echo "#! $(PERL)"                      > lib/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"bindir='$(bindir)';"          >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"libdir='$(real_libdir)';"     >> lib/$(platform)/$(package)-$(version)/$$i ; \
@@ -156,7 +156,7 @@ config-pkgs ::
 	@for i in $(PACKAGE_SH_SCRIPTS); do \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
-	   test -f bin/$(platform)/$(package)-$(version)/$$i && $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; \
+	   if [ -f bin/$(platform)/$(package)-$(version)/$$i ]; then $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; fi; \
 	   echo "#! $(SH)"                      > bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo "bindir='$(bindir)'"          >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo "libdir='$(real_libdir)'"     >> bin/$(platform)/$(package)-$(version)/$$i ; \
