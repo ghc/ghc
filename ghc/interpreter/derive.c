@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:06 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:06:50 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -19,61 +19,6 @@
 #include "Assembler.h"
 #include "link.h"
 
-#if 0
-static Cell varTrue;
-static Cell varFalse;
-#if DERIVE_ORD
-static Cell varCompAux;                /* auxiliary function for compares */
-static Cell varCompare;
-static Cell varEQ;
-#endif
-#if DERIVE_IX
-static Cell varRangeSize;              /* calculate size of index range   */
-static Cell varInRange;
-static Cell varRange;
-static Cell varIndex;
-static Cell varMult; 
-static Cell qvarPlus;
-static Cell varMap;
-static Cell qvarMinus;
-static Cell varError;
-#endif
-#if DERIVE_ENUM
-static Cell varToEnum;
-static Cell varFromEnum; 
-static Cell varEnumFromTo;    
-static Cell varEnumFromThenTo;  
-#endif
-#if DERIVE_BOUNDED
-static Cell varMinBound;
-static Cell varMaxBound;
-#endif
-#if DERIVE_SHOW
-       Cell conCons;
-static Cell varShowField;              /* display single field            */
-static Cell varShowParen;              /* wrap with parens                */
-static Cell varCompose;                /* function composition            */
-static Cell varShowsPrec;
-static Cell varLe;
-#endif                                 
-#if DERIVE_READ                        
-static Cell varReadField;              /* read single field               */
-static Cell varReadParen;              /* unwrap from parens              */
-static Cell varLex;                    /* lexer                           */
-static Cell varReadsPrec;
-static Cell varGt;
-#endif                                 
-#if DERIVE_SHOW || DERIVE_READ         
-static Cell varAppend;                 /* list append                     */
-#endif                                 
-#if DERIVE_EQ || DERIVE_IX             
-static Cell varAnd;                    /* built-in logical connectives    */
-#endif
-#if DERIVE_EQ || DERIVE_ORD            
-static Cell varEq;
-#endif
-#endif /* 0 */
-
 List cfunSfuns;                        /* List of (Cfun,[SelectorVar])    */
 
 /* --------------------------------------------------------------------------
@@ -83,14 +28,8 @@ List cfunSfuns;                        /* List of (Cfun,[SelectorVar])    */
 static List  local getDiVars            Args((Int));
 static Cell  local mkBind               Args((String,List));
 static Cell  local mkVarAlts            Args((Int,Cell));
-
-#if DERIVE_EQ || DERIVE_ORD
 static List  local makeDPats2           Args((Cell,Int));
-#endif
-#if DERIVE_ORD || DERIVE_ENUM || DERIVE_IX || DERIVE_BOUNDED
 static Bool  local isEnumType           Args((Tycon));
-#endif
-
 static Pair   local mkAltEq             Args((Int,List));
 static Pair   local mkAltOrd            Args((Int,List));
 static Cell   local prodRange           Args((Int,List,Cell,Cell,Cell));
@@ -105,7 +44,6 @@ static Cell   local mkReadInfix         Args((Cell));
 static Cell   local mkReadTuple         Args((Cell));
 static Cell   local mkReadRecord        Args((Cell,List));
 static List   local mkBndBinds          Args((Int,Cell,Int));
-
 
 
 /* --------------------------------------------------------------------------
@@ -135,7 +73,6 @@ Cell r; {
     return singleton(pair(NIL,pair(mkInt(line),r)));
 }
 
-#if DERIVE_EQ || DERIVE_ORD
 static List local makeDPats2(h,n)       /* generate pattern list           */
 Cell h;                                 /* by putting two new patterns with*/
 Int  n; {                               /* head h and new var components   */
@@ -156,9 +93,7 @@ Int  n; {                               /* head h and new var components   */
     }
     return cons(p,vs);
 }
-#endif
 
-#if DERIVE_ORD || DERIVE_ENUM || DERIVE_IX || DERIVE_BOUNDED
 static Bool local isEnumType(t) /* Determine whether t is an enumeration   */
 Tycon t; {                      /* type (i.e. all constructors arity == 0) */
     if (isTycon(t) && (tycon(t).what==DATATYPE || tycon(t).what==NEWTYPE)) {
@@ -173,7 +108,7 @@ Tycon t; {                      /* type (i.e. all constructors arity == 0) */
     }
     return FALSE;
 }
-#endif
+
 
 /* --------------------------------------------------------------------------
  * Given a datatype:   data T a b = A a b | B Int | C  deriving (Eq, Ord)
@@ -192,8 +127,6 @@ Tycon t; {                      /* type (i.e. all constructors arity == 0) */
  * In each case, the last line is only needed if there are multiple
  * constructors in the datatype definition.
  * ------------------------------------------------------------------------*/
-
-#if DERIVE_EQ
 
 static Pair  local mkAltEq              Args((Int,List));
 
@@ -233,9 +166,7 @@ List pats; {                            /* arguments                       */
     }
     return pair(pats,pair(mkInt(line),e));
 }
-#endif /* DERIVE_EQ */
 
-#if DERIVE_ORD
 
 static Pair  local mkAltOrd             Args((Int,List));
 
@@ -296,14 +227,12 @@ List pats; {                            /* arguments                       */
 
     return pair(pats,pair(mkInt(line),e));
 }
-#endif /* DERIVE_ORD */
 
 
 /* --------------------------------------------------------------------------
  * Deriving Ix and Enum:
  * ------------------------------------------------------------------------*/
 
-#if DERIVE_ENUM
 List deriveEnum(t)              /* Construct definition of enumeration     */
 Tycon t; {
     Int  l     = tycon(t).line;
@@ -336,9 +265,8 @@ Tycon t; {
            /* default instance of enumFromThenTo is good */
            NIL))));
 }
-#endif /* DERIVE_ENUM */
 
-#if DERIVE_IX
+
 static List  local mkIxBindsEnum        Args((Tycon));
 static List  local mkIxBinds            Args((Int,Cell,Int));
 static Cell  local prodRange            Args((Int,List,Cell,Cell,Cell));
@@ -489,7 +417,6 @@ Cell ls, us, is; {
     e = singleton(pair(pats,pair(mkInt(line),e)));
     return mkBind("inRange",e);
 }
-#endif /* DERIVE_IX */
 
 
 /* --------------------------------------------------------------------------
@@ -920,8 +847,6 @@ List fs; {
  * Deriving Bounded:
  * ------------------------------------------------------------------------*/
 
-#if DERIVE_BOUNDED
-
 List deriveBounded(t)             /* construct definition of bounds        */
 Tycon t; {
     if (isEnumType(t)) {
@@ -960,8 +885,6 @@ Int  n; {
             cons(mkBind("maxBound",mkVarAlts(line,maxB)),
              NIL));
 }
-#endif /* DERIVE_BOUNDED */
-
 
 
 /* --------------------------------------------------------------------------
@@ -998,6 +921,7 @@ Tycon t; {
         name(nm).arity  = 1;
         name(nm).stgVar = mkStgVar(mkStgLambda(singleton(v),mkStgCase(v,alts)),
                                    NIL);
+        name(nm).stgSize = stgSize(stgVarBody(name(nm).stgVar));
         tycon(t).conToTag = nm;
         /* hack to make it print out */
         stgGlobals = cons(pair(nm,name(nm).stgVar),stgGlobals); 
@@ -1008,7 +932,6 @@ Tycon t; {
 Void implementTagToCon(t)
 Tycon t; {
     if (isNull(tycon(t).tagToCon)) {
-        String etxt;
         String tyconname;
         List   cs;
         Name   nm;
@@ -1019,6 +942,7 @@ Tycon t; {
         StgVar bind2;
         StgVar bind3;
         List   alts;
+        char   etxt[200];
 
         assert(nameMkA);
         assert(nameUnpackString);
@@ -1027,8 +951,9 @@ Tycon t; {
                               || tycon(t).what==NEWTYPE));
 
         tyconname  = textToStr(tycon(t).text);
-        etxt       = malloc(100+strlen(tyconname));
-        assert(etxt);
+        if (strlen(tyconname) > 100) 
+           internal("implementTagToCon: tycon name too long");
+
         sprintf(etxt, 
                 "out-of-range arg for `toEnum' "
                 "in derived `instance Enum %s'", 
@@ -1076,10 +1001,10 @@ Tycon t; {
                                     mkStgPrimCase(v2,alts))))),
                             NIL
                           );
+        name(nm).stgSize = stgSize(stgVarBody(name(nm).stgVar));
         tycon(t).tagToCon = nm;
         /* hack to make it print out */
         stgGlobals = cons(pair(nm,name(nm).stgVar),stgGlobals); 
-        if (etxt) free(etxt);
     }
 }
 
@@ -1090,131 +1015,18 @@ Tycon t; {
 
 Void deriveControl(what)
 Int what; {
-    Text textPrelude = findText("Prelude");
     switch (what) {
         case INSTALL :
-#if 0
-                varTrue           = mkQVar(textPrelude,findText("True"));
-                varFalse          = mkQVar(textPrelude,findText("False"));
-#if DERIVE_ORD
-                varCompAux        = mkQVar(textPrelude,findText("primCompAux"));
-                varCompare        = mkQVar(textPrelude,findText("compare"));
-                varEQ             = mkQVar(textPrelude,findText("EQ"));
-#endif
-#if DERIVE_IX   
-                varRangeSize      = mkQVar(textPrelude,findText("rangeSize"));
-                varInRange        = mkQVar(textPrelude,findText("inRange"));
-                varRange          = mkQVar(textPrelude,findText("range"));
-                varIndex          = mkQVar(textPrelude,findText("index"));
-                varMult           = mkQVar(textPrelude,findText("*"));
-                qvarPlus          = mkQVar(textPrelude,findText("+"));
-                varMap            = mkQVar(textPrelude,findText("map"));
-                qvarMinus         = mkQVar(textPrelude,findText("-"));
-                varError          = mkQVar(textPrelude,findText("error"));
-#endif
-#if DERIVE_ENUM
-                varToEnum         = mkQVar(textPrelude,findText("toEnum"));
-                varFromEnum       = mkQVar(textPrelude,findText("fromEnum"));  
-                varEnumFromTo     = mkQVar(textPrelude,findText("enumFromTo"));
-                varEnumFromThenTo = mkQVar(textPrelude,findText("enumFromThenTo"));
-#endif
-#if DERIVE_BOUNDED
-                varMinBound       = mkQVar(textPrelude,findText("minBound"));
-                varMaxBound       = mkQVar(textPrelude,findText("maxBound"));
-#endif
-#if DERIVE_SHOW 
-                conCons           = mkQCon(textPrelude,findText(":"));
-                varShowField      = mkQVar(textPrelude,findText("primShowField"));
-                varShowParen      = mkQVar(textPrelude,findText("showParen"));
-                varCompose        = mkQVar(textPrelude,findText("."));
-                varShowsPrec      = mkQVar(textPrelude,findText("showsPrec"));
-                varLe             = mkQVar(textPrelude,findText("<="));
-#endif          
-#if DERIVE_READ
-                varReadField      = mkQVar(textPrelude,findText("primReadField"));
-                varReadParen      = mkQVar(textPrelude,findText("readParen"));
-                varLex            = mkQVar(textPrelude,findText("lex"));
-                varReadsPrec      = mkQVar(textPrelude,findText("readsPrec"));
-                varGt             = mkQVar(textPrelude,findText(">"));
-#endif
-#if DERIVE_SHOW || DERIVE_READ         
-                varAppend         = mkQVar(textPrelude,findText("++"));
-#endif                                 
-#if DERIVE_EQ || DERIVE_IX             
-                varAnd            = mkQVar(textPrelude,findText("&&"));
-#endif
-#if DERIVE_EQ || DERIVE_ORD            
-                varEq             = mkQVar(textPrelude,findText("=="));
-#endif
-#endif /* 0 */
                 /* deliberate fall through */
         case RESET   : 
                 diVars      = NIL;
                 diNum       = 0;
-#if DERIVE_SHOW | DERIVE_READ
                 cfunSfuns   = NIL;
-#endif
                 break;
 
         case MARK    : 
                 mark(diVars);
-#if DERIVE_SHOW | DERIVE_READ
                 mark(cfunSfuns);
-#endif
-#if 0
-                mark(varTrue);        
-                mark(varFalse);        
-#if DERIVE_ORD
-                mark(varCompAux);        
-                mark(varCompare);        
-                mark(varEQ);        
-#endif                            
-#if DERIVE_IX                     
-                mark(varRangeSize);      
-                mark(varInRange);        
-                mark(varRange);          
-                mark(varIndex);          
-                mark(varMult);           
-                mark(qvarPlus);           
-                mark(varMap);           
-                mark(qvarMinus);           
-                mark(varError);           
-#endif                            
-#if DERIVE_ENUM                   
-                mark(varToEnum); 
-                mark(varFromEnum);   
-                mark(varEnumFromTo);     
-                mark(varEnumFromThenTo);   
-#endif                            
-#if DERIVE_BOUNDED                
-                mark(varMinBound);       
-                mark(varMaxBound);       
-#endif                            
-#if DERIVE_SHOW                   
-                mark(conCons);
-                mark(varShowField);      
-                mark(varShowParen);      
-                mark(varCompose);        
-                mark(varShowsPrec);      
-                mark(varLe);             
-#endif                            
-#if DERIVE_READ                   
-                mark(varReadField);      
-                mark(varReadParen);      
-                mark(varLex);            
-                mark(varReadsPrec);      
-                mark(varGt);             
-#endif                            
-#if DERIVE_SHOW || DERIVE_READ    
-                mark(varAppend);         
-#endif                            
-#if DERIVE_EQ || DERIVE_IX        
-                mark(varAnd);            
-#endif                            
-#if DERIVE_EQ || DERIVE_ORD       
-                mark(varEq);             
-#endif
-#endif /* 0 */
                 break;
     }
 }

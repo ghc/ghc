@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:16 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:07:09 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -560,9 +560,7 @@ Cell e; {
     static String aspat   = "as (@) pattern";
     static String typeSig = "type annotation";
     static String lambda  = "lambda expression";
-    //printf("\n\n+++++++++++++++++++++++++++++++\n");
-    //print(e,1000);
-    //printf("\n\n");
+
     switch (whatIs(e)) {
 
         /* The following cases can occur in either pattern or expr. mode   */
@@ -575,16 +573,13 @@ Cell e; {
         case TUPLE      : typeTuple(e);
                           break;
 
-#if BIGNUMS
-        case POSNUM     :
-        case ZERONUM    :
-        case NEGNUM     : {   Int alpha = newTyvars(1);
-                              inferType(aVar,alpha);
+        case BIGCELL    : {   Int alpha = newTyvars(1);
+	                      inferType(aVar,alpha);
                               return ap(ap(nameFromInteger,
                                            assumeEvid(predNum,alpha)),
                                            e);
                           }
-#endif
+
         case INTCELL    : {   Int alpha = newTyvars(1);
                               inferType(aVar,alpha);
                               return ap(ap(nameFromInt,
@@ -1659,7 +1654,7 @@ Class c; {                              /* defaults for class c            */
     List locs   = NIL;
     Cell l      = mkInt(cclass(c).line);
     List ps;
-//printf("\ntypeClassDefn %s\n", textToStr(cclass(c).text));
+
     for (ps=params; nonNull(ps); ps=tl(ps)) {
         Cell v = thd3(hd(ps));
         body   = ap(body,v);
@@ -1673,7 +1668,7 @@ Class c; {                              /* defaults for class c            */
     for (; nonNull(mems); mems=tl(mems)) {
         Cell v   = inventVar();         /* Pick a name for component       */
         Cell imp = NIL;
-//printf("   defaulti %s\n", textToStr(name(hd(mems)).text));
+
         if (nonNull(defs)) {            /* Look for default implementation */
             imp  = hd(defs);
             defs = tl(defs);
@@ -1714,6 +1709,8 @@ Class c; {                              /* defaults for class c            */
         body = ap(LETREC,pair(singleton(locs),body));
     name(cclass(c).dbuild).defn
              = singleton(pair(args,body));
+    //--------- Default
+    name(cclass(c).dbuild).inlineMe = TRUE;
     genDefns = cons(cclass(c).dbuild,genDefns);
     cclass(c).defaults = NIL;
 
@@ -1725,6 +1722,7 @@ Class c; {                              /* defaults for class c            */
     pat  = singleton(pat);
     for (; nonNull(dsels); dsels=tl(dsels)) {
         name(hd(dsels)).defn = singleton(pair(pat,ap(l,hd(args))));
+        name(hd(dsels)).inlineMe = TRUE;
         args                 = tl(args);
         genDefns             = cons(hd(dsels),genDefns);
     }
@@ -1734,7 +1732,6 @@ Class c; {                              /* defaults for class c            */
         args                = tl(args);
         genDefns            = cons(hd(mems),genDefns);
     }
-//printf("done\n" );
 }
 
 static Void local typeInstDefn(in)      /* Type check implementations of   */
@@ -1857,6 +1854,9 @@ Inst in; {                              /* member functions for instance in*/
 
     name(inst(in).builder).defn                 /* Register builder imp    */
              = singleton(pair(args,ap(LETREC,pair(singleton(locs),d))));
+    //--------- Actual
+    name(inst(in).builder).inlineMe   = TRUE;
+    name(inst(in).builder).isDBuilder = TRUE;
     genDefns = cons(inst(in).builder,genDefns);
 }
 
@@ -1939,7 +1939,6 @@ Int    beta; {
         tooGeneral(line,mem,rt,t);
     if (nonNull(preds))
         cantEstablish(line,wh,mem,t,ps);
-//printf("done\n" );
 }
 
 /* --------------------------------------------------------------------------
@@ -2411,11 +2410,11 @@ Name s; {                               /* particular selector, s.         */
 static Type local basicType Args((Char));
 
 
-static Type stateVar = BOGUS(600); //NIL;
-static Type alphaVar = BOGUS(601); //NIL;
-static Type betaVar  = BOGUS(602); //NIL;
-static Type gammaVar = BOGUS(603); //NIL;
-static Int  nextVar  = BOGUS(604); //0;
+static Type stateVar = NIL;
+static Type alphaVar = NIL;
+static Type betaVar  = NIL;
+static Type gammaVar = NIL;
+static Int  nextVar  = 0;
 
 static Void clearTyVars( void )
 {
@@ -2465,33 +2464,21 @@ Char k; {
             return typeChar;
     case INT_REP:
             return typeInt;
-#ifdef PROVIDE_INT64
-    case INT64_REP:
-            return typeInt64;
-#endif
-#ifdef PROVIDE_INTEGER
     case INTEGER_REP:
             return typeInteger;
-#endif
-#ifdef PROVIDE_ADDR
     case ADDR_REP:
             return typeAddr;
-#endif
-#ifdef PROVIDE_WORD
     case WORD_REP:
             return typeWord;
-#endif
     case FLOAT_REP:
             return typeFloat;
     case DOUBLE_REP:
             return typeDouble;
-#ifdef PROVIDE_ARRAY
     case ARR_REP:     return ap(typePrimArray,mkAlphaVar());            
     case BARR_REP:    return typePrimByteArray;
     case REF_REP:     return ap2(typeRef,mkStateVar(),mkAlphaVar());                  
     case MUTARR_REP:  return ap2(typePrimMutableArray,mkStateVar(),mkAlphaVar());     
     case MUTBARR_REP: return ap(typePrimMutableByteArray,mkStateVar()); 
-#endif
 #ifdef PROVIDE_STABLE
     case STABLE_REP:
             return ap(typeStable,mkAlphaVar());
@@ -2633,10 +2620,12 @@ Int what; {
         case RESET   : tcMode       = EXPRESSION;
                        preds        = NIL;
                        pendingBtyvs = NIL;
+                       daSccs       = NIL;
                        emptyAssumption();
                        break;
 
-        case MARK    : mark(defnBounds);
+        case MARK    : mark(daSccs);
+                       mark(defnBounds);
                        mark(varsBounds);
                        mark(depends);
                        mark(pendingBtyvs);
@@ -2655,17 +2644,12 @@ Int what; {
                        mark(predIntegral);
                        mark(starToStar);
                        mark(predMonad);
-#if IO_MONAD
-                       mark(typeProgIO);
-#endif
                        break;
 
         case INSTALL : typeChecker(RESET);
                        dummyVar     = inventVar();
 
-#if !IGNORE_MODULES
                        setCurrModule(modulePrelude);
-#endif
 
                        starToStar   = simpleKind(1);
 
@@ -2694,6 +2678,9 @@ Int what; {
                                                               fn(aVar,
                                                               fn(listof,
                                                                  listof))));
+                       name(nameNil).parent =
+                       name(nameCons).parent = typeList;
+
                        name(nameCons).syntax
                                     = mkSyntax(RIGHT_ASS,5);
 
@@ -2714,16 +2701,6 @@ Int what; {
                        addPrimCfun(findText("Rec"),      0,0,typeUnit);
                        addPrimCfun(findText("EmptyRow"), 0,0,typeUnit);
                        addPrimCfun(findText("EmptyRec"), 0,0,typeUnit);
-#endif
-#if IO_MONAD
-                       nameUserErr  = addPrimCfun(inventText(),1,1,NIL);
-                       nameNameErr  = addPrimCfun(inventText(),1,2,NIL);
-                       nameSearchErr= addPrimCfun(inventText(),1,3,NIL);
-#if IO_HANDLES
-                       nameIllegal  = addPrimCfun(inventText(),0,4,NIL);
-                       nameWriteErr = addPrimCfun(inventText(),1,5,NIL);
-                       nameEOFErr   = addPrimCfun(inventText(),1,6,NIL);
-#endif
 #endif
                        break;
     }

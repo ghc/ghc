@@ -7,8 +7,8 @@
  * in the distribution for details.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:05 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:06:50 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -73,27 +73,7 @@ extern Class classMonad;                /* Monads                          */
 extern Name  nameReturn,  nameBind;     /* for translating monad comps     */
 extern Name  nameMFail;
 extern Name  nameListMonad;             /* builder function for List Monad */
-
-#if EVAL_INSTANCES
-extern Name  nameStrict,  nameSeq;      /* Members of class Eval           */
-extern Name  nameIStrict, nameISeq;     /* ... and their implementations   */
-#endif
-
 extern Name  namePrint;                 /* printing primitive              */
-
-#if    IO_MONAD
-extern Type   typeProgIO;               /* For the IO monad, IO ()         */
-extern Name   nameIORun;                /* IO monad executor               */
-extern Name   namePutStr;               /* Prelude.putStr                  */
-extern Name   nameUserErr;              /* primitives required for IOError */
-extern Name   nameNameErr,  nameSearchErr;
-#endif
-
-#if IO_HANDLES
-extern Name   nameWriteErr, nameIllegal;/* primitives required for IOError */
-extern Name   nameEOFErr;
-#endif
-
 extern Text  textPrelude;
 extern Text  textNum;                   /* used to process default decls   */
 #if    NPLUSK
@@ -134,9 +114,6 @@ extern Class classShow;
 extern Class classRead;
 extern Class classIx;
 extern Class classEnum;
-#if EVAL_INSTANCES
-extern Class classEval;
-#endif
 extern Class classBounded;
 
 extern Class classReal;                 /* `numeric' classes               */
@@ -168,7 +145,6 @@ extern Int   whnfArgs;                  /* number of args of term in whnf  */
 extern Cell  whnfHead;                  /* head of term in whnf            */
 extern Int   whnfInt;                   /* integer value of term in whnf   */
 extern Float whnfFloat;                 /* float value of term in whnf     */
-/*ToDo?? extern Long  numReductions;*/             /* number of reductions used       */
 extern Long  numCells;                  /* number of cells allocated       */
 extern Int   numGcs;                    /* number of garbage collections   */
 extern Bool  broken;                    /* indicates interrupt received    */
@@ -177,8 +153,7 @@ extern Bool  preludeLoaded;             /* TRUE => prelude has been loaded */
 extern Bool  gcMessages;                /* TRUE => print GC messages       */
 extern Bool  literateScripts;           /* TRUE => default lit scripts     */
 extern Bool  literateErrors;            /* TRUE => report errs in lit scrs */
-/*ToDo?? extern Bool  failOnError;*/              /* TRUE => error produces immediate*/
-                                        /*         termination             */
+extern Bool  optimise;                  /* TRUE => simplify STG            */
 
 extern Int   cutoff;                    /* Constraint Cutoff depth         */
 
@@ -204,6 +179,7 @@ extern Void everybody Args((Int));
 #define INSTALL 3               /* install subsystem (executed once only)  */
 #define EXIT    4               /* Take action immediately before exit()   */
 #define BREAK   5               /* Take action after program break         */
+#define GCDONE  6               /* Restore subsystem invariantss after GC  */
 
 typedef long   Target;
 extern  Void   setGoal          Args((String, Target));
@@ -228,21 +204,15 @@ extern  String unlexChar        Args((Char,Char));
 extern  Void   printString      Args((String));
 
 extern  Void   substitution     Args((Int));
+extern  Void   optimiser        Args((Int));
 
 extern  Void   staticAnalysis   Args((Int));
-#if IGNORE_MODULES
-#define startModule(m)       doNothing()
-#define setExportList(l)     doNothing()
-#define setExports(l)        doNothing()
-#define addQualImport(m,as)  doNothing()
-#define addUnqualImport(m,l) doNothing()
-#else
 extern  Void   startModule      Args((Cell));
 extern  Void   setExportList    Args((List));
 extern  Void   setExports       Args((List));
 extern  Void   addQualImport    Args((Text,Text));
 extern  Void   addUnqualImport  Args((Text,List));
-#endif
+
 extern  Void   tyconDefn        Args((Int,Cell,Cell,Cell));
 extern  Void   setTypeIns       Args((List));
 extern  Void   clearTypeIns     Args((Void));
@@ -252,9 +222,6 @@ extern  Void   ambigError       Args((Int,String,Cell,Type));
 extern  Void   classDefn        Args((Int,Cell,Cell));
 extern  Void   instDefn         Args((Int,Cell,Cell));
 extern  Void   addTupInst       Args((Class,Int));
-#if EVAL_INSTANCES
-extern  Void   addEvalInst      Args((Int,Cell,Int,List));
-#endif
 #if TREX
 extern  Inst   addRecShowInst   Args((Class,Ext));
 extern  Inst   addRecEqInst     Args((Class,Ext));
@@ -304,40 +271,10 @@ extern  Void   eval             Args((Cell));
 extern  Cell   evalWithNoError  Args((Cell));
 extern  Void   evalFails        Args((StackPtr));
 
-#if BYTECODE_PRIMS
-extern Int     IntAt            Args((Addr));
-#if !BREAK_FLOATS
-extern Float   FloatAt          Args((Addr));
-#endif
-extern Cell    CellAt           Args((Addr));
-extern Text    TextAt           Args((Addr));
-extern Addr    AddrAt           Args((Addr));
-extern Int     InstrAt          Args((Addr));
-#endif /* BYTECODE_PRIMS */
-
 extern  Void   abandon          Args((String,Cell));
 extern  Void   outputString     Args((FILE *));
 extern  Void   dialogue         Args((Cell));
 #define consChar(c) ap(nameCons,mkChar(c))
-
-#if BIGNUMS
-extern  Bignum bigInt           Args((Int));
-extern  Bignum bigDouble        Args((double));
-extern  Bignum bigNeg           Args((Bignum));
-extern  Cell   bigToInt         Args((Bignum));
-extern  Cell   bigToFloat       Args((Bignum));
-extern  Bignum bigStr           Args((String));
-extern  Cell   bigOut           Args((Bignum,Cell,Bool));
-extern  Bignum bigShift         Args((Bignum,Int,Int));
-extern  Int    bigCmp           Args((Bignum,Bignum));
-#endif
-#if IO_MONAD
-extern Void   setHugsArgs       Args((Int,String[]));
-#endif
-
-#if PROFILING
-extern  String timeString       Args((Void));
-#endif
 
 extern  Int    shellEsc         Args((String));
 extern  Int    getTerminalWidth Args((Void));
@@ -557,4 +494,7 @@ extern Void unlexStrConst  Args((Text));
 extern Void unlexVar       Args((Text));
 extern List offsetTyvarsIn          Args((Type,List));
 
+extern Void optimiseTopBinds  Args((List));
 extern List cfunSfuns;                  /* List of (Cfun,[SelectorVar])    */
+
+#define SMALL_INLINE_SIZE 9

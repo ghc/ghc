@@ -9,8 +9,8 @@
  * in the distribution for details.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:50 $
+ * $Revision: 1.5 $
+ * $Date: 1999/04/27 10:06:57 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -189,15 +189,6 @@ Cell e; {
                               if (i<0 && d>=UMINUS_PREC) putChr(')');
                           }
                           break;
-
-#if BIGNUMS
-        case NEGNUM     :
-        case ZERONUM    :
-        case POSNUM     : xs = bigOut(e,NIL,d>=UMINUS_PREC);
-                          for (; nonNull(xs); xs=tl(xs))
-                              putChr(charOf(arg(hd(xs))));
-                          break;
-#endif
 
         case FLOATCELL  : {   Float f = floatOf(e);
                               if (f<0 && d>=UMINUS_PREC) putChr('(');
@@ -403,9 +394,6 @@ Cell e; {
 
         case NAME       : if (args==1 &&
                               ((h==nameFromInt     && isInt(arg(e)))    ||
-#if BIGNUMS
-                               (h==nameFromInteger && isBignum(arg(e))) ||
-#endif
                                (h==nameFromDouble  && isFloat(arg(e))))) {
                               put(d,arg(e));
                               return;

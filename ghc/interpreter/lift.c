@@ -10,8 +10,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: lift.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:47 $
+ * $Revision: 1.5 $
+ * $Date: 1999/04/27 10:06:54 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -25,12 +25,14 @@
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static List liftedBinds = NIL;
+static List liftedBinds    = NIL;
+static Bool makeInlineable = FALSE;
+static Int  inlineCounter  = 0;
 
 static StgExpr abstractExpr ( List vars, StgExpr e );
 static inline Bool isTopLevel( StgVar v );
 static List    filterFreeVars( List vs );
-static List    liftLetBinds ( List binds );
+static List    liftLetBinds ( List binds, Bool topLevel );
 static void    liftAlt      ( StgCaseAlt alt );
 static void    liftPrimAlt  ( StgPrimAlt alt );
 static void    liftExpr     ( StgExpr e );
@@ -47,6 +49,7 @@ static StgExpr abstractExpr( List vars, StgExpr e )
     for(; nonNull(vars); vars=tl(vars)) {
         StgVar var = hd(vars);
         StgVar arg = mkStgVar(NIL,NIL);
+        stgVarRep(arg) = stgVarRep(var);
         args = cons(arg,args);
         sub  = cons(pair(var,arg),sub);
     }
@@ -94,7 +97,7 @@ static List filterFreeVars( List vs )
     }
 }
 
-static List liftLetBinds( List binds )
+static List liftLetBinds( List binds, Bool topLevel )
 {
     List bs = NIL;
     for(; nonNull(binds); binds=tl(binds)) {
@@ -102,6 +105,15 @@ static List liftLetBinds( List binds )
         StgRhs rhs  = stgVarBody(bind);
         List   fvs  = filterFreeVars(stgVarInfo(bind));
         /* stgVarInfo(bind) = NIL; */ /* ToDo: discard fv list */
+
+        /* if starting on a new top-level inlineable bind, ensure that
+           the lifted-out binds get marked inlineable too
+        */
+        if (topLevel) {
+           Name n         = nameFromStgVar(bind);
+           makeInlineable = FALSE;
+           if (nonNull(n) && name(n).inlineMe==TRUE) makeInlineable = TRUE;
+        }
 
         switch (whatIs(rhs)) {
         case STGCON:
@@ -111,7 +123,7 @@ static List liftLetBinds( List binds )
                 if (isNull(fvs)) {
                     StgVar v = mkStgVar(rhs,NONE);
                     stgVarBody(bind) = mkStgLet(singleton(v),v);
-                    /* ppStg(v); */
+                    /* ppStg(v); */ /* check inlinable */
                     liftedBinds = cons(bind,liftedBinds);
                     break;
                 }
@@ -125,9 +137,19 @@ static List liftLetBinds( List binds )
                 liftExpr(rhs);
                 if (nonNull(fvs)) {
                     StgVar v = mkStgVar(abstractExpr(fvs,rhs),NONE);
-                    /* ppStg(v); */
                     liftedBinds = cons(v,liftedBinds);
-                    stgVarBody(bind) = makeStgApp(v, fvs);
+                    if (makeInlineable) {
+                       Name n;
+                       char s[16];
+                       sprintf(s,"lam%d",inlineCounter++);
+                       n = newName(findText(s),NIL);
+                       name(n).stgVar = v;
+                       name(n).simplified = TRUE; /* optimiser is upstream of lifter */
+                       if (makeInlineable) name(n).inlineMe = TRUE;
+                       stgVarBody(bind) = makeStgApp(n, fvs);
+                    } else {
+                       stgVarBody(bind) = makeStgApp(v, fvs);
+                    }
                 }
 #if LIFT_CONSTANTS
 #error lift constants
@@ -151,7 +173,9 @@ static List liftLetBinds( List binds )
 
 static void liftAlt( StgCaseAlt alt )
 {
-    liftExpr(stgCaseAltBody(alt));
+    if (isDefaultAlt(alt))
+       liftExpr(stgDefaultBody(alt)); else
+       liftExpr(stgCaseAltBody(alt));
 }
 
 static void liftPrimAlt( StgPrimAlt alt )
@@ -163,7 +187,7 @@ static void liftExpr( StgExpr e )
 {
     switch (whatIs(e)) {
     case LETREC:
-            stgLetBinds(e) = liftLetBinds(stgLetBinds(e));
+            stgLetBinds(e) = liftLetBinds(stgLetBinds(e),FALSE);
             liftExpr(stgLetBody(e));
             break;
     case LAMBDA:
@@ -189,17 +213,27 @@ static void liftExpr( StgExpr e )
     }
 }
 
+/* Lift a list of top-level binds. */
 List liftBinds( List binds )
 {
     List bs;
+
     for(bs=binds; nonNull(bs); bs=tl(bs)) {
         StgVar bind = hd(bs);
         freeVarsBind(NIL,bind);
         stgVarInfo(bind) = NONE; /* mark as top level */
     }
+
     liftedBinds = NIL;
-    binds = liftLetBinds(binds);
+    binds = liftLetBinds(binds,TRUE);
     binds = revOnto(liftedBinds,binds);
+
+    for (bs=binds; nonNull(bs); bs=tl(bs)) {
+       Name n = nameFromStgVar(hd(bs));
+       if (nonNull(n))
+          name(n).stgSize = stgSize(stgVarBody(name(n).stgVar));
+    }
+    
     liftedBinds = NIL;
     return binds;
 }

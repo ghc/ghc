@@ -12,8 +12,8 @@
  * in the distribution for details.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:49 $
+ * $Revision: 1.5 $
+ * $Date: 1999/04/27 10:06:55 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -624,18 +624,6 @@ String sub; {
 
 
 /* --------------------------------------------------------------------------
- * Get time/date stamp for inclusion in compiled files:
- * ------------------------------------------------------------------------*/
-
-#if PROFILING
-String timeString() {                   /* return time&date string         */
-    time_t clock;                       /* must end with '\n' character    */
-    time(&clock);
-    return(ctime(&clock));
-}
-#endif
-
-/* --------------------------------------------------------------------------
  * Garbage collection notification:
  * ------------------------------------------------------------------------*/
 
@@ -744,9 +732,16 @@ Void gcCStack() {                       /* Garbage collect elements off    */
         fatal("gcCStack");
 #endif
 
-#define StackGrowsDown  while (ptr<=CStackBase) markWithoutMove(*ptr++)
-#define StackGrowsUp    while (ptr>=CStackBase) markWithoutMove(*ptr--)
-#define GuessDirection  if (ptr>CStackBase) StackGrowsUp; else StackGrowsDown
+#define Blargh markWithoutMove(*ptr);
+#if 0
+               markWithoutMove((*ptr)/sizeof(Cell)); \
+               markWithoutMove(( (void*)(*ptr)-(void*)heapTopFst)/sizeof(Cell));  \
+               markWithoutMove(( (void*)(*ptr)-(void*)heapTopSnd)/sizeof(Cell))
+#endif
+
+#define StackGrowsDown  { while (ptr<=CStackBase) { Blargh; ptr++; }; }
+#define StackGrowsUp    { while (ptr>=CStackBase) { Blargh; ptr--; }; }
+#define GuessDirection  if (ptr>CStackBase) StackGrowsUp else StackGrowsDown
 
 #if STACK_DIRECTION > 0
     StackGrowsUp;

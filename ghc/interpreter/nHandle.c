@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <malloc.h>
+#include <stdlib.h>
 
 int nh_stdin ( void )
 {
@@ -18,6 +19,12 @@ int nh_stdout ( void )
 {
    errno = 0;
    return (int)stdout;
+}
+
+int nh_stderr ( void )
+{
+   errno = 0;
+   return (int)stderr;
 }
 
 int nh_open ( char* fname, int wr )
@@ -33,6 +40,12 @@ void nh_close ( FILE* f )
    errno = 0;
    fflush ( f );
    fclose ( f );
+}
+
+void nh_flush ( FILE* f )
+{
+   errno = 0;
+   fflush ( f );
 }
 
 void nh_write ( FILE* f, int c )
@@ -65,7 +78,30 @@ void nh_free ( int n )
    free ( (char*)n );
 }
 
-void nh_assign ( int p, int offset, int ch )
+void nh_store ( int p, int ch )
 {
-   ((char*)p)[offset] = (char)ch;
+   *(char*)p = (char)ch;
+}
+
+int nh_load ( int p )
+{
+   return (int)(*(char*)p);
+}
+
+int nh_getenv ( int p )
+{
+   return (int)getenv ( (const char *)p );
+}
+
+extern int prog_argc;
+extern char** prog_argv;
+
+int nh_argc ( void )
+{
+   return prog_argc;
+}
+
+int nh_argvb ( int argno, int offset )
+{
+   return (int)(prog_argv[argno][offset]);
 }

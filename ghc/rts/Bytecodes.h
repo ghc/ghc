@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.5 1999/03/09 14:51:24 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.6 1999/04/27 10:07:20 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -23,113 +23,86 @@
  *   overflowing.
  * ------------------------------------------------------------------------*/
 
-typedef enum
-    { i_INTERNAL_ERROR  /* Instruction 0 raises an internal error */
+#define INSTRLIST             \
+    Ins(i_INTERNAL_ERROR),    \
+    Ins(i_PANIC),             \
+    Ins(i_STK_CHECK),         \
+    Ins(i_ARG_CHECK),         \
+    Ins(i_ALLOC_AP),          \
+    Ins(i_ALLOC_PAP),         \
+    Ins(i_ALLOC_CONSTR),      \
+    Ins(i_MKAP),              \
+    Ins(i_MKAP_big),          \
+    Ins(i_MKPAP),             \
+    Ins(i_PACK),              \
+    Ins(i_PACK_big),          \
+    Ins(i_SLIDE),             \
+    Ins(i_SLIDE_big),         \
+    Ins(i_TEST),              \
+    Ins(i_UNPACK),            \
+    Ins(i_VAR),               \
+    Ins(i_VAR_big),           \
+    Ins(i_CONST),             \
+    Ins(i_CONST_big),         \
+    Ins(i_ENTER),             \
+    Ins(i_RETADDR),           \
+    Ins(i_RETADDR_big),       \
+    Ins(i_VOID),              \
+    Ins(i_VAR_INT),           \
+    Ins(i_VAR_INT_big),       \
+    Ins(i_CONST_INT),         \
+    Ins(i_CONST_INT_big),     \
+    Ins(i_PACK_INT),          \
+    Ins(i_UNPACK_INT),        \
+    Ins(i_TEST_INT),          \
+    Ins(i_CONST_INTEGER),     \
+    Ins(i_CONST_INTEGER_big), \
+    Ins(i_VAR_WORD),          \
+    Ins(i_VAR_WORD_big),      \
+    Ins(i_CONST_WORD),        \
+    Ins(i_PACK_WORD),         \
+    Ins(i_UNPACK_WORD),       \
+    Ins(i_VAR_ADDR),          \
+    Ins(i_VAR_ADDR_big),      \
+    Ins(i_CONST_ADDR),        \
+    Ins(i_CONST_ADDR_big),    \
+    Ins(i_PACK_ADDR),         \
+    Ins(i_UNPACK_ADDR),       \
+    Ins(i_VAR_CHAR),          \
+    Ins(i_VAR_CHAR_big),      \
+    Ins(i_CONST_CHAR),        \
+    Ins(i_CONST_CHAR_big),    \
+    Ins(i_PACK_CHAR),         \
+    Ins(i_UNPACK_CHAR),       \
+    Ins(i_VAR_FLOAT),         \
+    Ins(i_VAR_FLOAT_big),     \
+    Ins(i_CONST_FLOAT),       \
+    Ins(i_CONST_FLOAT_big),   \
+    Ins(i_PACK_FLOAT),        \
+    Ins(i_UNPACK_FLOAT),      \
+    Ins(i_VAR_DOUBLE),        \
+    Ins(i_VAR_DOUBLE_big),    \
+    Ins(i_CONST_DOUBLE),      \
+    Ins(i_CONST_DOUBLE_big),  \
+    Ins(i_PACK_DOUBLE),       \
+    Ins(i_UNPACK_DOUBLE),     \
+    Ins(i_VAR_STABLE),        \
+    Ins(i_PACK_STABLE),       \
+    Ins(i_UNPACK_STABLE),     \
+    Ins(i_PRIMOP1),           \
+    Ins(i_PRIMOP2),           \
+    Ins(i_RV),                \
+    Ins(i_RVE),               \
+    Ins(i_SE),                \
+    Ins(i_VV)
 
-    , i_PANIC           /* irrefutable pattern match failed! */
+#define BIGGEST_OPCODE ((int)(i_VV))
 
-    , i_STK_CHECK
+#define Ins(x) x
+typedef enum { INSTRLIST } Instr;
+#undef Ins
 
-    , i_ARG_CHECK
 
-    , i_ALLOC_AP
-    , i_ALLOC_PAP
-    , i_ALLOC_CONSTR
-    , i_MKAP
-    , i_MKAP_big
-    , i_MKPAP
-    , i_PACK
-
-    , i_SLIDE
-    , i_SLIDE_big
-
-    , i_TEST
-    , i_UNPACK
-
-    , i_VAR
-    , i_VAR_big
-    , i_CONST
-    , i_CONST_big
-    , i_ENTER
-
-    , i_RETADDR
-    , i_RETADDR_big
-
-    , i_VOID
-    , i_RETURN_GENERIC
-
-    , i_VAR_INT
-    , i_VAR_INT_big
-    , i_CONST_INT
-    , i_CONST_INT_big
-    , i_RETURN_INT
-    , i_PACK_INT
-    , i_UNPACK_INT
-    , i_TEST_INT
-
-#ifdef PROVIDE_INT64
-    , i_VAR_INT64
-    , i_CONST_INT64
-    , i_RETURN_INT64
-    , i_PACK_INT64
-    , i_UNPACK_INT64
-#endif
-#ifdef PROVIDE_INTEGER
-    , i_CONST_INTEGER
-    , i_CONST_INTEGER_big
-#endif
-#ifdef PROVIDE_WORD
-    , i_VAR_WORD
-    , i_CONST_WORD
-    , i_RETURN_WORD
-    , i_PACK_WORD
-    , i_UNPACK_WORD
-#endif
-#ifdef PROVIDE_ADDR
-    , i_VAR_ADDR
-    , i_VAR_ADDR_big
-    , i_CONST_ADDR
-    , i_CONST_ADDR_big
-    , i_RETURN_ADDR
-    , i_PACK_ADDR
-    , i_UNPACK_ADDR
-#endif
-    , i_VAR_CHAR
-    , i_VAR_CHAR_big
-    , i_CONST_CHAR
-    , i_CONST_CHAR_big
-    , i_RETURN_CHAR
-    , i_PACK_CHAR
-    , i_UNPACK_CHAR
-
-    , i_VAR_FLOAT
-    , i_VAR_FLOAT_big
-    , i_CONST_FLOAT
-    , i_CONST_FLOAT_big
-    , i_RETURN_FLOAT
-    , i_PACK_FLOAT
-    , i_UNPACK_FLOAT
-
-    , i_VAR_DOUBLE
-    , i_VAR_DOUBLE_big
-    , i_CONST_DOUBLE
-    , i_CONST_DOUBLE_big
-    , i_RETURN_DOUBLE
-    , i_PACK_DOUBLE
-    , i_UNPACK_DOUBLE
-
-#ifdef PROVIDE_STABLE
-    , i_VAR_STABLE
-    , i_RETURN_STABLE
-    , i_PACK_STABLE
-    , i_UNPACK_STABLE
-#endif
-
-    , i_PRIMOP1         /* Primop: next byte is an Primop1 */
-    , i_PRIMOP2         /* Primop: next byte is an Primop2 */
-
-    , MAX_Instr = i_PRIMOP2
-} Instr;
 
 typedef enum
     { i_INTERNAL_ERROR1  /* Instruction 0 raises an internal error */
@@ -171,42 +144,6 @@ typedef enum
     , i_shiftRAInt
     , i_shiftRLInt
 
-#ifdef PROVIDE_INT64
-    /* Int64# operations */
-    , i_gtInt64
-    , i_geInt64
-    , i_eqInt64
-    , i_neInt64
-    , i_ltInt64
-    , i_leInt64
-    , i_minInt64
-    , i_maxInt64
-    , i_plusInt64
-    , i_minusInt64
-    , i_timesInt64
-    , i_quotInt64
-    , i_remInt64
-    , i_quotRemInt64
-    , i_negateInt64
-    , i_andInt64
-    , i_orInt64
-    , i_xorInt64
-    , i_notInt64
-    , i_shiftLInt64
-    , i_shiftRAInt64
-    , i_shiftRLInt64
-    , i_int64ToInt 
-    , i_intToInt64 
-#ifdef PROVIDE_WORD
-    , i_int64ToWord 
-    , i_wordToInt64 
-#endif
-    , i_int64ToFloat 
-    , i_floatToInt64 
-    , i_int64ToDouble 
-    , i_doubleToInt64 
-#endif
-#ifdef PROVIDE_WORD
     /* Word# operations */
     , i_gtWord
     , i_geWord
@@ -232,8 +169,7 @@ typedef enum
     , i_shiftRLWord
     , i_intToWord
     , i_wordToInt
-#endif
-#ifdef PROVIDE_ADDR
+
     /* Addr# operations */
     , i_gtAddr
     , i_geAddr
@@ -247,15 +183,8 @@ typedef enum
     /* Stateless Addr operations */
     , i_indexCharOffAddr
     , i_indexIntOffAddr
-#ifdef PROVIDE_INT64
-    , i_indexInt64OffAddr
-#endif
-#ifdef PROVIDE_WORD
     , i_indexWordOffAddr
-#endif
-#ifdef PROVIDE_ADDR
     , i_indexAddrOffAddr
-#endif
     , i_indexFloatOffAddr
     , i_indexDoubleOffAddr
 #ifdef PROVIDE_STABLE
@@ -264,15 +193,8 @@ typedef enum
 
     , i_readCharOffAddr
     , i_readIntOffAddr
-#ifdef PROVIDE_INT64
-    , i_readInt64OffAddr
-#endif
-#ifdef PROVIDE_WORD
     , i_readWordOffAddr
-#endif
-#ifdef PROVIDE_ADDR
     , i_readAddrOffAddr
-#endif
     , i_readFloatOffAddr
     , i_readDoubleOffAddr
 #ifdef PROVIDE_STABLE
@@ -281,24 +203,14 @@ typedef enum
 
     , i_writeCharOffAddr
     , i_writeIntOffAddr
-#ifdef PROVIDE_INT64
-    , i_writeInt64OffAddr
-#endif
-#ifdef PROVIDE_WORD
     , i_writeWordOffAddr
-#endif
-#ifdef PROVIDE_ADDR
     , i_writeAddrOffAddr
-#endif
     , i_writeFloatOffAddr
     , i_writeDoubleOffAddr
 #ifdef PROVIDE_STABLE
     , i_writeStableOffAddr
 #endif
 
-#endif /* PROVIDE_ADDR */
-
-#ifdef PROVIDE_INTEGER
     /* Integer operations */
     , i_compareInteger
     , i_negateInteger
@@ -309,19 +221,12 @@ typedef enum
     , i_divModInteger
     , i_integerToInt
     , i_intToInteger
-#ifdef PROVIDE_INT64
-    , i_integerToInt64
-    , i_int64ToInteger
-#endif
-#ifdef PROVIDE_WORD
     , i_integerToWord
     , i_wordToInteger
-#endif
     , i_integerToFloat
     , i_floatToInteger
     , i_integerToDouble
     , i_doubleToInteger
-#endif
 
     /* Float# operations */
     , i_gtFloat
@@ -356,14 +261,8 @@ typedef enum
     , i_coshFloat
     , i_tanhFloat
     , i_powerFloat
-#ifdef PROVIDE_INT64
-    , i_decodeFloatz
-    , i_encodeFloatz
-#endif
-#ifdef PROVIDE_INTEGER
     , i_decodeFloatZ
     , i_encodeFloatZ
-#endif
     , i_isNaNFloat
     , i_isInfiniteFloat
     , i_isDenormalizedFloat
@@ -405,14 +304,8 @@ typedef enum
     , i_coshDouble
     , i_tanhDouble
     , i_powerDouble
-#ifdef PROVIDE_INT64
-    , i_decodeDoublez
-    , i_encodeDoublez
-#endif
-#ifdef PROVIDE_INTEGER
     , i_decodeDoubleZ
     , i_encodeDoubleZ
-#endif
     , i_isNaNDouble
     , i_isInfiniteDouble
     , i_isDenormalizedDouble
@@ -432,7 +325,6 @@ typedef enum
 
     , i_raise       
 
-#ifdef PROVIDE_ARRAY
     /* Ref operations */
     , i_newRef
     , i_writeRef
@@ -463,28 +355,17 @@ typedef enum
     , i_readIntArray
     , i_indexIntArray
 
-#ifdef PROVIDE_INT64
-    , i_writeInt64Array
-    , i_readInt64Array
-    , i_indexInt64Array
-#endif
-
     /* {write,read,index}IntegerArray not provided */
 
-#ifdef PROVIDE_WORD
     , i_writeWordArray
     , i_readWordArray
     , i_indexWordArray
-#endif
-#ifdef PROVIDE_ADDR
     , i_writeAddrArray
     , i_readAddrArray
     , i_indexAddrArray
-#endif
     , i_writeFloatArray
     , i_readFloatArray
     , i_indexFloatArray
-
     , i_writeDoubleArray
     , i_readDoubleArray
     , i_indexDoubleArray
@@ -496,8 +377,6 @@ typedef enum
 #endif
 
     /* {write,read,index}ForeignObjArray not provided */
-
-#endif /* PROVIDE_ARRAY */
 
 #ifdef PROVIDE_PTREQUALITY
     , i_reallyUnsafePtrEquality

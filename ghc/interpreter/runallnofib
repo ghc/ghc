@@ -1,0 +1,119 @@
+#!/bin/bash
+if ! [ -d nofibtmp ]
+then
+echo "runallnofib: Can't cd to nofibtmp"
+exit
+fi
+
+TROOT=/home/v-julsew/Mar09
+NROOT=$TROOT/fpO/nofib
+
+cd nofibtmp
+
+
+##------ imaginary ------##
+
+../runnofib imaginary exp3_8
+../runnofib imaginary gen_regexps
+../runnofib imaginary paraffins
+../runnofib imaginary primes
+../runnofib imaginary rfib
+../runnofib imaginary tak
+../runnofib imaginary wheel-sieve1
+../runnofib imaginary wheel-sieve2
+
+
+##------ spectral ------##
+
+../runnofib spectral ansi
+../runnofib spectral awards
+../runnofib spectral boyer
+../runnofib spectral boyer2
+../runnofib spectral calendar 1993
+../runnofib spectral cichelli
+../runnofib spectral circsim "+RTS -H150m -RTS 8 1000"
+../runnofib spectral clausify
+../runnofib spectral cse
+../runnofib spectral eliza
+
+cp $NROOT/spectral/expert/animals .
+../runnofib spectral expert
+rm animals
+
+##../runnofib spectral fibheaps    -- requires -fglasgow-exts
+
+../runnofib spectral fish
+../runnofib spectral fft2
+../runnofib spectral life
+../runnofib spectral knights 8 3
+../runnofib spectral mandel
+../runnofib spectral mandel2
+../runnofib spectral minimax
+../runnofib spectral multiplier
+../runnofib spectral pretty
+../runnofib spectral primetest
+../runnofib spectral rewrite
+../runnofib spectral scc
+../runnofib spectral simple
+../runnofib spectral sorting
+
+cp $NROOT/spectral/treejoin/27000.1 .
+cp $NROOT/spectral/treejoin/27000.2 .
+../runnofib spectral treejoin "+RTS -H200m -G4 -A1m -RTS 27000.1 27000.2"
+rm 27000.1 27000.2
+
+../runnofib spectral/hartel nucleic2
+
+##------ real ------##
+
+export ANNADIR=`pwd`
+cp $NROOT/real/anna/anna_table .
+../runnofib real anna
+rm anna_table
+
+../runnofib real bspt
+../runnofib real compress
+##../runnofib real compress2 -- requires -fglasgow-exts
+
+cp $NROOT/real/ebnf2ps/Times-Roman.afm .
+cp $NROOT/real/ebnf2ps/ebnf2ps.stdin .
+../runnofib real ebnf2ps "ebnf2ps.stdin apat"
+rm Times-Roman.afm ebnf2ps.stdin
+
+../runnofib real fem
+
+cp $NROOT/real/fluid/chan8.dat .
+../runnofib real fluid
+rm chan8.dat
+
+../runnofib real fulsom 7
+../runnofib real gamteb
+../runnofib real gg
+../runnofib real grep
+
+cp $NROOT/real/hidden/objects/four.plate .
+../runnofib real hidden four.plate
+rm four.plate
+
+##../runnofib real HMMS  -- a mess.  requires some effort to make it work
+../runnofib real hpg "-nt 8 -dt 6 -nv 15 -dv 8 -de 8"
+../runnofib real infer
+../runnofib real lift
+
+cp $NROOT/real/maillist/addresses .
+../runnofib real maillist
+rm addresses addresses.tex
+
+../runnofib real mkhprog "-a Int -b Float -c Foo -d Bar -e Double   -f String -g String -h Int -j Double -k Bool -n Basil -p Knob -q Wizzle   -r Wissle -s Wibble -t Widdle -A Int -B Float -C Foo -D Bar -E Double   -F String -G String -H Int -I Float -J Double -K Bool -L Bool -M Buzzle   -N Basil -P Knob -Q Wizzle -R Wissle -S Wibble -T Widdle"
+
+../runnofib real parser
+../runnofib real pic
+
+cp $NROOT/real/prolog/stdlib .
+../runnofib real prolog
+rm stdlib
+
+../runnofib real reptile
+../runnofib real rsa
+../runnofib real symalg
+../runnofib real veritas

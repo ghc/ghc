@@ -11,8 +11,8 @@
  * in the distribution for details.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/09 14:51:09 $
+ * $Revision: 1.5 $
+ * $Date: 1999/04/27 10:06:58 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -28,11 +28,7 @@
 #define only(t)                  ap(ONLY,t)
 #define letrec(bs,e)             (nonNull(bs) ? ap(LETREC,pair(bs,e)) : e)
 #define qualify(ps,t)            (nonNull(ps) ? ap(QUAL,pair(ps,t)) : t)
-#if IGNORE_MODULES
-#define exportSelf()             NIL
-#else
 #define exportSelf()             singleton(ap(MODULEENT,mkCon(module(currentModule).text)))
-#endif
 #define yyerror(s)               /* errors handled elsewhere */
 #define YYSTYPE                  Cell
 

@@ -9,8 +9,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:14 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:07:06 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -108,14 +108,6 @@ extern Int   cellsRecovered;            /* cells recovered by last gc      */
 
 #define fst(c)       heapTopFst[c]
 #define snd(c)       heapTopSnd[c]
-#if PROFILING
-extern   Heap        heapThd, heapTopThd;
-#define thd(c)       heapTopThd[c]
-extern   Name        producer;
-extern   Bool        profiling;
-extern   Int         profInterval;
-extern   Void        profilerLog     Args((String));
-#endif
 
 extern  Pair         pair            Args((Cell,Cell));
 extern  Void         garbageCollect  Args((Void));
@@ -195,6 +187,7 @@ extern  String           stringNegate Args((String));
 #define mkFloat(f)       (f)  /* ToDo: is this right? */
 #define floatNegate(f)   stringToFloat(stringNegate(floatToString(f)))
 
+#define stringToBignum(s) pair(BIGCELL,findText(s))
 #define bignumToString(b) textToStr(snd(b))
 
 
@@ -230,11 +223,6 @@ extern  Ptr             ptrOf           Args((Cell));
 #define DERIVE       35           /* DERIVE     snd :: Cell                */
 #if BREAK_FLOATS
 #define FLOATCELL    36           /* FLOATCELL  snd :: (Int,Int)           */
-#endif
-
-#if BIGNUMS
-#define POSNUM       37           /* POSNUM     snd :: [Int]               */
-#define NEGNUM       38           /* NEGNUM     snd :: [Int]               */
 #endif
 
 #define BOOLQUAL     39           /* BOOLQUAL   snd :: Exp                 */
@@ -286,6 +274,9 @@ extern  Ptr             ptrOf           Args((Cell));
 #define STGPRIM      94           /* STGPRIM    snd :: (PrimOp,[Arg])      */
 #define STGCON       95           /* STGCON     snd :: (StgCon,[Arg])      */
 #define PRIMCASE     96           /* PRIMCASE   snd :: (Expr,[PrimAlt])    */
+#define DEEFALT      97           /* DEEFALT    snd :: (Var,Expr)          */
+#define CASEALT      98           /* CASEALT    snd :: (Con,[Var],Expr)    */
+#define PRIMALT      99           /* PRIMALT    snd :: ([Var],Expr)        */
 /* Last constructor tag must be less than SPECMIN */
 
 /* --------------------------------------------------------------------------
@@ -304,10 +295,6 @@ extern  Ptr             ptrOf           Args((Cell));
 #define SKOLEM       105          /* Skolem constant                       */
 
 #define DOTDOT       106          /* ".." in import/export list            */
-
-#if BIGNUMS
-#define ZERONUM      108          /* The zero bignum (see POSNUM, NEGNUM)  */
-#endif
 
 #define NAME         110          /* whatIs code for isName                */
 #define TYCON        111          /* whatIs code for isTycon               */
@@ -380,9 +367,6 @@ extern Ext           mkExt Args((Text));
 
 #define MODMIN        (OFFMIN+NUM_OFFSETS)
 
-#if IGNORE_MODULES
-#define setCurrModule(m) doNothing()
-#else /* !IGNORE_MODULES */
 #define isModule(c)   (MODMIN<=(c) && (c)<TYCMIN)
 #define mkModule(n)   (MODMIN+(n))
 #define module(n)     tabModule[(n)-MODMIN]
@@ -421,7 +405,6 @@ extern Module findModid     Args((Cell));
 extern Void   setCurrModule Args((Module));
 
 #define isPrelude(m) (m==modulePrelude)
-#endif /* !IGNORE_MODULES */
 
 /* --------------------------------------------------------------------------
  * Type constructor names:
@@ -435,9 +418,7 @@ extern Void   setCurrModule Args((Module));
 struct strTycon {
     Text  text;
     Int   line;
-#if !IGNORE_MODULES
     Module mod;                         /* module that defines it          */
-#endif
     Int   arity;
     Kind  kind;                         /* kind (includes arity) of Tycon  */
     Cell  what;                         /* DATATYPE/SYNONYM/RESTRICTSYN... */
@@ -481,6 +462,10 @@ struct strName {
     Cell   type;
     Cell   defn;
     Cell   stgVar;        /* really StgVar   */
+    Int    stgSize;       /* == stgSize(stgVarBody(.stgVar)) */
+    Bool   inlineMe;      /* self-evident    */
+    Bool   simplified;    /* TRUE => already simplified */
+    Bool   isDBuilder;    /* TRUE => is a dictionary builder */
     const void*  primop;  /* really StgPrim* */
     Name   nextNameHash;
 };
@@ -525,6 +510,7 @@ extern Name   findQualName    Args((Cell));
 extern Name   addPrimCfun     Args((Text,Int,Int,Cell));
 extern Name   addPrimCfunREP  Args((Text,Int,Int,Int));
 extern Int    sfunPos         Args((Name,Name));
+extern Name   nameFromStgVar  Args((Cell));
 
 /* --------------------------------------------------------------------------
  * Type class values:
@@ -560,9 +546,7 @@ struct strInst {
 struct strClass {
     Text   text;                        /* Name of class                   */
     Int    line;                        /* Line where declaration begins   */
-#if !IGNORE_MODULES
     Module mod;                         /* module that declares it         */
-#endif
     Int    level;                       /* Level in class hierarchy        */
     Int    arity;                       /* Number of arguments             */
     Kinds  kinds;                       /* Kinds of constructors in class  */
@@ -598,7 +582,7 @@ extern Inst  findNextInst  Args((Tycon,Inst));
 #define MAXCHARVAL   (NUM_CHARS-1)
 #define isChar(c)    (CHARMIN<=(c) && (c)<INTMIN)
 #define charOf(c)    ((Char)(c-CHARMIN))
-#define mkChar(c)    ((Cell)(CHARMIN+((unsigned)((c)%NUM_CHARS))))
+#define mkChar(c)    ((Cell)(CHARMIN+(((unsigned)(c))%NUM_CHARS)))
 
 /* --------------------------------------------------------------------------
  * Small Integer values:
@@ -616,9 +600,6 @@ extern Inst  findNextInst  Args((Tycon,Inst));
 extern  Bool isInt    Args((Cell));
 extern  Int  intOf    Args((Cell));
 extern  Cell mkInt    Args((Int));
-#if BIGNUMS
-extern  Bool isBignum Args((Cell));
-#endif
 
 /* --------------------------------------------------------------------------
  * Implementation of triples:
@@ -761,75 +742,6 @@ extern Script      scriptThisClass  Args((Class));
 extern String      fileOfModule     Args((Module));
 extern Void        dropScriptsFrom  Args((Script));
 
-/* --------------------------------------------------------------------------
- * I/O Handles:
- * ------------------------------------------------------------------------*/
-
-#if IO_HANDLES
-#define HSTDIN          0       /* Numbers for standard handles            */
-#define HSTDOUT         1
-#define HSTDERR         2
-
-struct strHandle {              /* Handle description and status flags     */
-    Cell hcell;                 /* Heap representation of handle (or NIL)  */
-    FILE *hfp;                  /* Corresponding file pointer              */
-    Int  hmode;                 /* Current mode: see below                 */
-};
-
-#define HCLOSED         0000    /* no I/O permitted                        */
-#define HSEMICLOSED     0001    /* semiclosed reads only                   */
-#define HREAD           0002    /* set to enable reads from handle         */
-#define HWRITE          0004    /* set to enable writes to handle          */
-#define HAPPEND         0010    /* opened in append mode                   */
-
-extern Cell   openHandle Args((String,Int,Bool));
-extern struct strHandle  DECTABLE(handles);
-#endif
-
-/* --------------------------------------------------------------------------
- * Malloc Pointers
- * ------------------------------------------------------------------------*/
-
-#if GC_MALLOCPTRS
-struct strMallocPtr {           /* Malloc Ptr description                  */
-    Cell mpcell;                /* Back pointer to MPCELL                  */
-    Void *ptr;                  /* Pointer into C world                    */
-    Int  refCount;              /* Reference count                         */
-    Void (*cleanup) Args((Void *)); /* Code to free the C pointer          */
-};
-
-extern struct strMallocPtr       mallocPtrs[];
-extern Cell   mkMallocPtr        Args((Void *, Void (*)(Void *)));
-extern Void   freeMallocPtr      Args((Cell));
-extern Void   incMallocPtrRefCnt Args((Int, Int));
-
-#define mpOf(c)    snd(c)
-#define derefMP(c) (mallocPtrs[(Int)mpOf(c)].ptr)
-#endif /* GC_MALLOCPTRS */
-
-/* --------------------------------------------------------------------------
- * Weak Pointers
- * ------------------------------------------------------------------------*/
-
-#if GC_WEAKPTRS
-#define mkWeakPtr(c)    pair(WEAKCELL,pair(c,NIL))
-#define derefWeakPtr(c) fst(snd(c))
-#define nextWeakPtr(c) snd(snd(c))
-
-extern List finalizers;
-extern List liveWeakPtrs;
-
-#endif /* GC_WEAKPTRS */
-
-/* --------------------------------------------------------------------------
- * Stable pointers
- * ------------------------------------------------------------------------*/
-
-#if GC_STABLEPTRS
-extern  Int  mkStablePtr     Args((Cell));
-extern  Cell derefStablePtr  Args((Int));
-extern  Void freeStablePtr   Args((Int));
-#endif /* GC_STABLEPTRS */
 
 /* --------------------------------------------------------------------------
  * Plugins

@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:13 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:07:05 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -27,9 +27,7 @@
 
 static Int  local hash                  Args((String));
 static Int  local saveText              Args((Text));
-#if !IGNORE_MODULES
 static Module local findQualifier       Args((Text));
-#endif
 static Void local hashTycon             Args((Tycon));
 static List local insertTycon           Args((Tycon,List));
 static Void local hashName              Args((Name));
@@ -41,17 +39,8 @@ static Cell local markCell              Args((Cell));
 static Void local markSnd               Args((Cell));
 static Cell local lowLevelLastIn        Args((Cell));
 static Cell local lowLevelLastOut       Args((Cell));
-/* from STG */
        Module local moduleOfScript      Args((Script));
        Script local scriptThisFile      Args((Text));
-/* from 98 */
-#if IO_HANDLES
-static Void local freeHandle            Args((Int));
-#endif
-#if GC_STABLEPTRS
-static Void local resetStablePtrs       Args((Void));
-#endif
-/* end */
 
 /* --------------------------------------------------------------------------
  * Text storage:
@@ -277,10 +266,8 @@ Text t; {
     tycon(tyconHw).what          = NIL;
     tycon(tyconHw).conToTag      = NIL;
     tycon(tyconHw).tagToCon      = NIL;
-#if !IGNORE_MODULES
     tycon(tyconHw).mod           = currentModule;
     module(currentModule).tycons = cons(tyconHw,module(currentModule).tycons);
-#endif
     tycon(tyconHw).nextTyconHash = tyconHash[h];
     tyconHash[h]                 = tyconHw;
 
@@ -301,9 +288,7 @@ Tycon tc; {
     Tycon oldtc = findTycon(tycon(tc).text);
     if (isNull(oldtc)) {
         hashTycon(tc);
-#if !IGNORE_MODULES
         module(currentModule).tycons=cons(tc,module(currentModule).tycons);
-#endif
         return tc;
     } else
         return oldtc;
@@ -325,9 +310,6 @@ Cell id; {
         case CONOPCELL :
             return findTycon(textOf(id));
         case QUALIDENT : {
-#if IGNORE_MODULES
-            return findTycon(qtextOf(id));
-#else /* !IGNORE_MODULES */
             Text   t  = qtextOf(id);
             Module m  = findQualifier(qmodOf(id));
             List   es = NIL;
@@ -338,7 +320,6 @@ Cell id; {
                     return fst(e);
             }
             return NIL;
-#endif /* !IGNORE_MODULES */
         }
         default : internal("findQualTycon2");
     }
@@ -427,13 +408,16 @@ Cell parent; {
     name(nameHw).number       = EXECNAME;
     name(nameHw).defn         = NIL;
     name(nameHw).stgVar       = NIL;
+    name(nameHw).stgSize      = 0;
+    name(nameHw).inlineMe     = FALSE;
+    name(nameHw).simplified   = FALSE;
+    name(nameHw).isDBuilder   = FALSE;
     name(nameHw).type         = NIL;
     name(nameHw).primop       = 0;
     name(nameHw).mod          = currentModule;
     module(currentModule).names=cons(nameHw,module(currentModule).names);
     name(nameHw).nextNameHash = nameHash[h];
     nameHash[h]               = nameHw;
-assert ( name(nameHw).nextNameHash != nameHash[h] );
     return nameHw++;
 }
 
@@ -451,9 +435,7 @@ Name nm; {                              /* no clash is caused              */
     Name oldnm = findName(name(nm).text);
     if (isNull(oldnm)) {
         hashName(nm);
-#if !IGNORE_MODULES
         module(currentModule).names=cons(nm,module(currentModule).names);
-#endif
         return nm;
     } else
         return oldnm;
@@ -478,9 +460,6 @@ Cell id; {                         /* in name table                   */
         case CONOPCELL :
             return findName(textOf(id));
         case QUALIDENT : {
-#if IGNORE_MODULES
-            return findName(qtextOf(id));
-#else /* !IGNORE_MODULES */
             Text   t  = qtextOf(id);
             Module m  = findQualifier(qmodOf(id));
             List   es = NIL;
@@ -506,11 +485,19 @@ Cell id; {                         /* in name table                   */
                 }
             }
             return NIL;
-#endif /* !IGNORE_MODULES */
         }
         default : internal("findQualName2");
     }
     return 0; /* NOTREACHED */
+}
+
+
+Name nameFromStgVar ( StgVar v )
+{
+   Int n;
+   for (n = NAMEMIN; n < nameHw; n++)
+      if (name(n).stgVar == v) return n;
+   return NIL;
 }
 
 /* --------------------------------------------------------------------------
@@ -694,10 +681,8 @@ Text t; {
     cclass(classHw).defaults  = NIL;
     cclass(classHw).instances = NIL;
     classes=cons(classHw,classes);
-#if !IGNORE_MODULES
     cclass(classHw).mod       = currentModule;
     module(currentModule).classes=cons(classHw,module(currentModule).classes);
-#endif
     return classHw++;
 }
 
@@ -722,9 +707,7 @@ Class c; {                              /*  - if no clash caused           */
     Class oldc = findClass(cclass(c).text);
     if (isNull(oldc)) {
         classes=cons(c,classes);
-#if !IGNORE_MODULES
         module(currentModule).classes=cons(c,module(currentModule).classes);
-#endif
         return c;
     }
     else
@@ -736,9 +719,6 @@ Cell c; {                               /* class in class list             */
     if (!isQualIdent(c)) {
         return findClass(textOf(c));
     } else {
-#if IGNORE_MODULES
-        return findClass(qtextOf(c));
-#else /* !IGNORE_MODULES */
         Text   t  = qtextOf(c);
         Module m  = findQualifier(qmodOf(c));
         List   es = NIL;
@@ -749,7 +729,6 @@ Cell c; {                               /* class in class list             */
             if (isPair(e) && isClass(fst(e)) && cclass(fst(e)).text==t) 
                 return fst(e);
         }
-#endif
     }
     return NIL;
 }
@@ -874,7 +853,6 @@ Void hugsStackOverflow() {          /* Report stack overflow               */
  *
  * ------------------------------------------------------------------------*/
 
-#if !IGNORE_MODULES
 static  Module   moduleHw;              /* next unused Module              */
 struct  Module   DEFTABLE(tabModule,NUM_MODULE); /* Module storage         */
 Module  currentModule;                  /* Module currently being processed*/
@@ -950,7 +928,6 @@ Module m; {
         classes = module(m).classes;
     }
 }
-#endif /* !IGNORE_MODULES */
 
 /* --------------------------------------------------------------------------
  * Script file storage:
@@ -967,9 +944,7 @@ typedef struct {                       /* record of storage state prior to */
     Text  textHw;
     Text  nextNewText;
     Text  nextNewDText;
-#if !IGNORE_MODULES
     Module moduleHw;
-#endif
     Tycon tyconHw;
     Name  nameHw;
     Class classHw;
@@ -998,9 +973,7 @@ String f; {                             /* of status for later restoration  */
     }
 #ifdef DEBUG_SHOWUSE
     showUse("Text",   textHw,           NUM_TEXT);
-#if !IGNORE_MODULES
     showUse("Module", moduleHw-MODMIN,  NUM_MODULE);
-#endif
     showUse("Tycon",  tyconHw-TYCMIN,   NUM_TYCON);
     showUse("Name",   nameHw-NAMEMIN,   NUM_NAME);
     showUse("Class",  classHw-CLASSMIN, NUM_CLASSES);
@@ -1009,14 +982,11 @@ String f; {                             /* of status for later restoration  */
     showUse("Ext",    extHw-EXTMIN,     NUM_EXT);
 #endif
 #endif
-
     scripts[scriptHw].file         = findText( f ? f : "<nofile>" );
     scripts[scriptHw].textHw       = textHw;
     scripts[scriptHw].nextNewText  = nextNewText;
     scripts[scriptHw].nextNewDText = nextNewDText;
-#if !IGNORE_MODULES
     scripts[scriptHw].moduleHw     = moduleHw;
-#endif
     scripts[scriptHw].tyconHw      = tyconHw;
     scripts[scriptHw].nameHw       = nameHw;
     scripts[scriptHw].classHw      = classHw;
@@ -1031,7 +1001,6 @@ Bool isPreludeScript() {                /* Test whether this is the Prelude*/
     return (scriptHw==0);
 }
 
-#if !IGNORE_MODULES
 Bool moduleThisScript(m)                /* Test if given module is defined */
 Module m; {                             /* in current script file          */
     return scriptHw<1 || m>=scripts[scriptHw-1].moduleHw;
@@ -1040,7 +1009,6 @@ Module m; {                             /* in current script file          */
 Module lastModule() {              /* Return module in current script file */
     return (moduleHw>MODMIN ? moduleHw-1 : modulePrelude);
 }
-#endif /* !IGNORE_MODULES */
 
 #define scriptThis(nm,t,tag)            Script nm(x)                       \
                                         t x; {                             \
@@ -1061,7 +1029,6 @@ Script s; {
     return (s==0) ? modulePrelude : scripts[s-1].moduleHw;
 }
 
-#if !IGNORE_MODULES
 String fileOfModule(m)
 Module m; {
     Script s;
@@ -1075,7 +1042,6 @@ Module m; {
     }
     return 0;
 }
-#endif
 
 Script scriptThisFile(f)
 Text f; {
@@ -1098,9 +1064,7 @@ Script sno; {                           /* to reading script sno           */
         textHw       = scripts[sno].textHw;
         nextNewText  = scripts[sno].nextNewText;
         nextNewDText = scripts[sno].nextNewDText;
-#if !IGNORE_MODULES
         moduleHw     = scripts[sno].moduleHw;
-#endif
         tyconHw      = scripts[sno].tyconHw;
         nameHw       = scripts[sno].nameHw;
         classHw      = scripts[sno].classHw;
@@ -1112,7 +1076,7 @@ Script sno; {                           /* to reading script sno           */
         extHw        = scripts[sno].extHw;
 #endif
 
-#if 0  //zzzzzzzzzzzzzzzzz
+#if 0
         for (i=moduleHw; i >= scripts[sno].moduleHw; --i) {
             if (module(i).objectFile) {
                 printf("[bogus] closing objectFile for module %d\n",i);
@@ -1130,21 +1094,6 @@ Script sno; {                           /* to reading script sno           */
                 textHash[i][j] = NOTEXT;
         }
 
-#if IGNORE_MODULES
-        for (i=0; i<TYCONHSZ; ++i) {
-            Tycon tc = tyconHash[i];
-            while (nonNull(tc) && tc>=tyconHw)
-                tc = tycon(tc).nextTyconHash;
-            tyconHash[i] = tc;
-        }
-
-        for (i=0; i<NAMEHSZ; ++i) {
-            Name n = nameHash[i];
-            while (nonNull(n) && n>=nameHw)
-                n = name(n).nextNameHash;
-            nameHash[i] = n;
-        }
-#else /* !IGNORE_MODULES */
         currentModule=NIL;
         for (i=0; i<TYCONHSZ; ++i) {
             tyconHash[i] = NIL;
@@ -1152,7 +1101,6 @@ Script sno; {                           /* to reading script sno           */
         for (i=0; i<NAMEHSZ; ++i) {
             nameHash[i] = NIL;
         }
-#endif /* !IGNORE_MODULES */
 
         for (i=CLASSMIN; i<classHw; i++) {
             List ins = cclass(i).instances;
@@ -1194,27 +1142,12 @@ Heap    heapTopSnd;
 #endif
 Bool    consGC = TRUE;                  /* Set to FALSE to turn off gc from*/
                                         /* C stack; use with extreme care! */
-#if     PROFILING
-Heap    heapThd, heapTopThd;            /* to keep record of producers     */
-Int     sysCount;                       /* record unattached cells         */
-Name    producer;                       /* current producer, if any        */
-Bool    profiling = FALSE;              /* should profiling be performed   */
-Int     profInterval = MAXPOSINT;       /* interval between samples        */
-FILE    *profile = 0;                   /* pointer to profiler log, if any */
-#endif
 Long    numCells;
 Int     numGcs;                         /* number of garbage collections   */
 Int     cellsRecovered;                 /* number of cells recovered       */
 
 static  Cell freeList;                  /* free list of unused cells       */
 static  Cell lsave, rsave;              /* save components of pair         */
-
-#if GC_WEAKPTRS
-static List weakPtrs;                   /* list of weak ptrs               */
-                                        /* reconstructed during every GC   */
-List   finalizers = NIL;
-List   liveWeakPtrs = NIL;
-#endif
 
 #if GC_STATISTICS
 
@@ -1273,9 +1206,6 @@ Cell l, r; {                            /* heap, garbage collecting first  */
     freeList = snd(freeList);
     fst(c)   = l;
     snd(c)   = r;
-#if PROFILING
-    thd(c)   = producer;
-#endif
     numCells++;
     return c;
 }
@@ -1369,135 +1299,20 @@ Void garbageCollect()     {             /* Run garbage collector ...       */
     Int      recovered;
 
     jmp_buf  regs;                      /* save registers on stack         */
-printf("\n\n$$$$$$$$$$$ GARBAGE COLLECTION; aborting\n\n");
-exit(1);
     setjmp(regs);
 
     gcStarted();
     for (i=0; i<marksSize; ++i)         /* initialise mark set to empty    */
         marks[i] = 0;
-#if GC_WEAKPTRS
-    weakPtrs = NIL;                     /* clear list of weak pointers     */
-#endif
+
     everybody(MARK);                    /* Mark all components of system   */
 
-#if IO_HANDLES
-    for (i=0; i<NUM_HANDLES; ++i)       /* release any unused handles      */
-        if (nonNull(handles[i].hcell)) {
-            register place = placeInSet(handles[i].hcell);
-            register mask  = maskInSet(handles[i].hcell);
-            if ((marks[place]&mask)==0)
-                freeHandle(i);
-        }
-#endif
-#if GC_MALLOCPTRS
-    for (i=0; i<NUM_MALLOCPTRS; ++i)    /* release any unused mallocptrs   */
-        if (isPair(mallocPtrs[i].mpcell)) {
-            register place = placeInSet(mallocPtrs[i].mpcell);
-            register mask  = maskInSet(mallocPtrs[i].mpcell);
-            if ((marks[place]&mask)==0)
-                incMallocPtrRefCnt(i,-1);
-        }
-#endif /* GC_MALLOCPTRS */
-#if GC_WEAKPTRS
-    /* After GC completes, we scan the list of weak pointers that are
-     * still live and zap their contents unless the contents are still
-     * live (by some other means).
-     * Note that this means the contents must itself be heap allocated.
-     * This means it can't be a nullary constructor or an Int or a Name
-     * or lots of other things - hope this doesn't bite too hard.
-     */
-    for (; nonNull(weakPtrs); weakPtrs=nextWeakPtr(weakPtrs)) {
-        Cell ptr = derefWeakPtr(weakPtrs);
-        if (isGenPair(ptr)) {
-            Int  place = placeInSet(ptr);
-            Int  mask  = maskInSet(ptr);
-            if ((marks[place]&mask)==0) {
-                /* printf("Zapping weak pointer %d\n", ptr); */
-                derefWeakPtr(weakPtrs) = NIL;
-            } else {
-                /* printf("Keeping weak pointer %d\n", ptr); */
-            }
-        } else if (nonNull(ptr)) {
-            printf("Weak ptr contains object which isn't heap allocated %d\n", ptr);
-        }
-    }
-
-    if (nonNull(liveWeakPtrs) || nonNull(finalizers)) {
-        Bool anyMarked;                 /* Weak pointers with finalizers   */
-        List wps;
-        List newFins = NIL;
-
-        /* Step 1: iterate until we've found out what is reachable         */
-        do {
-            anyMarked = FALSE;
-            for (wps=liveWeakPtrs; nonNull(wps); wps=tl(wps)) {
-                Cell wp = hd(wps);
-                Cell k  = fst(snd(wp));
-                if (isNull(k)) {
-                    internal("bad weak ptr");
-                }
-                if (isMarked(k)) {
-                    Cell vf = snd(snd(wp));
-                    if (!isMarked(fst(vf)) || !isMarked(snd(vf))) {
-                        mark(fst(vf));
-                        mark(snd(vf));
-                        anyMarked = TRUE;
-                    }
-                }
-            }
-        } while (anyMarked);
-
-        /* Step 2: Now we know which weak pointers will die, so we can     */
-        /* remove them from the live set and gather their finalizers.  But */
-        /* note that we mustn't mark *anything* at this stage or we will   */
-        /* corrupt our view of what's alive, and what's dead.              */
-        wps = NIL;
-        while (nonNull(liveWeakPtrs)) {
-            Cell wp = hd(liveWeakPtrs);
-            List nx = tl(liveWeakPtrs);
-            Cell k  = fst(snd(wp));
-            if (!isMarked(k)) {                 /* If the key is dead, then*/
-                Cell vf      = snd(snd(wp));    /* stomp on weak pointer   */
-                fst(vf)      = snd(vf);
-                snd(vf)      = newFins;
-                newFins      = vf;              /* reuse because we can't  */
-                fst(snd(wp)) = NIL;             /* reallocate here ...     */
-                snd(snd(wp)) = NIL;
-                snd(wp)      = NIL;
-                liveWeakPtrs = nx;
-            } else {
-                tl(liveWeakPtrs) = wps;         /* Otherwise, weak pointer */
-                wps              = liveWeakPtrs;/* survives to face another*/
-                liveWeakPtrs     = nx;          /* garbage collection      */
-            }
-        }
-
-        /* Step 3: Now we've identified the live cells and the newly       */
-        /* scheduled finalizers, but we had better make sure that they are */
-        /* all marked now, including any internal structure, to ensure that*/
-        /* they make it to the other side of gc.                           */
-        for (liveWeakPtrs=wps; nonNull(wps); wps=tl(wps)) {
-            mark(snd(hd(wps)));
-        }
-        mark(liveWeakPtrs);
-        mark(newFins);
-        finalizers = revOnto(newFins,finalizers);
-    }
-
-#endif /* GC_WEAKPTRS */
     gcScanning();                       /* scan mark set                   */
     mask      = 1;
     place     = 0;
     recovered = 0;
     j         = 0;
-#if PROFILING
-    if (profile) {
-        sysCount = 0;
-        for (i=NAMEMIN; i<nameHw; i++)
-            name(i).count = 0;
-    }
-#endif
+
     freeList = NIL;
     for (i=1; i<=heapSize; i++) {
         if ((marks[place] & mask) == 0) {
@@ -1506,12 +1321,6 @@ exit(1);
             freeList = -i;
             recovered++;
         }
-#if PROFILING
-        else if (nonNull(thd(-i)))
-            name(thd(-i)).count++;
-        else
-            sysCount++;
-#endif
         mask <<= 1;
         if (++j == bitsPerWord) {
             place++;
@@ -1523,48 +1332,7 @@ exit(1);
     gcRecovered(recovered);
     breakOn(breakStat);                 /* restore break trapping if nec.  */
 
-#if PROFILING
-    if (profile) {
-        fprintf(profile,"BEGIN_SAMPLE %ld.00\n",numReductions);
-/* For the time being, we won't include the system count in the output:
-        if (sysCount>0)
-            fprintf(profile,"  SYSTEM %d\n",sysCount);
-*/
-        /* Accumulate costs in top level objects */
-        for (i=NAMEMIN; i<nameHw; i++) {
-            Name cc = i;
-            /* Use of "while" instead of "if" is pure paranoia - ADR */
-            while (isName(name(cc).parent)) 
-                cc = name(cc).parent;
-            if (i != cc) {
-                name(cc).count += name(i).count;
-                name(i).count = 0;
-            }
-        }
-        for (i=NAMEMIN; i<nameHw; i++)
-            if (name(i).count>0) 
-                if (isPair(name(i).parent)) {
-                    Pair p = name(i).parent;
-                    Cell f = fst(p);
-                    fprintf(profile,"  ");
-                    if (isClass(f))
-                        fprintf(profile,"%s",textToStr(cclass(f).text));
-                    else {
-                        fprintf(profile,"%s_",textToStr(cclass(inst(f).c).text));
-                        /* Will hp2ps accept the spaces produced by this? */
-                        printPred(profile,inst(f).head);
-                    }
-                    fprintf(profile,"_%s %d\n",
-                            textToStr(name(snd(p)).text),
-                            name(i).count);
-                } else {
-                    fprintf(profile,"  %s %d\n",
-                            textToStr(name(i).text),
-                            name(i).count);
-                }
-        fprintf(profile,"END_SAMPLE %ld.00\n",numReductions);
-    }
-#endif
+    everybody(GCDONE);
 
     /* can only return if freeList is nonempty on return. */
     if (recovered<minRecovery || isNull(freeList)) {
@@ -1573,22 +1341,6 @@ exit(1);
     }
     cellsRecovered = recovered;
 }
-
-#if PROFILING
-Void profilerLog(s)                     /* turn heap profiling on, saving log*/
-String s; {                             /* in specified file                 */
-    if ((profile=fopen(s,"w")) != NULL) {
-        fprintf(profile,"JOB \"Hugs Heap Profile\"\n");
-        fprintf(profile,"DATE \"%s\"\n",timeString());
-        fprintf(profile,"SAMPLE_UNIT \"reductions\"\n");
-        fprintf(profile,"VALUE_UNIT \"cells\"\n");
-    }
-    else {
-        ERRMSG(0) "Cannot open profile log file \"%s\"", s
-        EEND;
-    }
-}
-#endif
 
 /* --------------------------------------------------------------------------
  * Code for saving last expression entered:
@@ -1973,7 +1725,8 @@ Cell c; {
 
 Int intOf(c)                           /* find integer value of cell?      */
 Cell c; {
-    assert(isInt(c));
+  if (!isInt(c)) {
+    assert(isInt(c)); }
     return isPair(c) ? (Int)(snd(c)) : (Int)(c-INTZERO);
 }
 
@@ -1983,13 +1736,6 @@ Int n; {
            ? INTZERO+n
            : pair(INTCELL,n);
 }
-
-#if BIGNUMS
-Bool isBignum(c)                       /* cell holds bignum value?         */
-Cell c; {
-    return c==ZERONUM || (isPair(c) && (fst(c)==POSNUM || fst(c)==NEGNUM));
-}
-#endif
 
 #if SIZEOF_INTP == SIZEOF_INT
 typedef union {Int i; Ptr p;} IntOrPtr;
@@ -2117,27 +1863,6 @@ List xs, ys; {                         /* list xs onto list ys...          */
     }
     return ys;
 }
-
-#if 0
-List delete(xs,y)                      /* Delete first use of y from xs    */
-List xs;
-Cell y; {
-    if (isNull(xs)) {
-        return xs;
-    } else if (hs(xs) == y) {
-        return tl(xs);
-    } else {
-        tl(xs) = delete(tl(xs),y);
-        return xs;
-    }
-}
-
-List minus(xs,ys)                      /* Delete members of ys from xs     */
-List xs, ys; {
-    mapAccum(delete,xs,ys);
-    return xs;
-}
-#endif
 
 Cell varIsMember(t,xs)                 /* Test if variable is a member of  */
 Text t;                                /* given list of variables          */
@@ -2333,172 +2058,6 @@ List args; {
     return f;
 }
 
-/* --------------------------------------------------------------------------
- * Handle operations:
- * ------------------------------------------------------------------------*/
-
-#if IO_HANDLES
-struct strHandle DEFTABLE(handles,NUM_HANDLES);
-
-Cell openHandle(s,hmode,binary)         /* open handle to file named s in  */
-String s;                               /* the specified hmode             */
-Int    hmode; 
-Bool   binary; {
-    Int i;
-
-    for (i=0; i<NUM_HANDLES && nonNull(handles[i].hcell); ++i)
-        ;                                       /* Search for unused handle*/
-    if (i>=NUM_HANDLES) {                       /* If at first we don't    */
-        garbageCollect();                       /* succeed, garbage collect*/
-        for (i=0; i<NUM_HANDLES && nonNull(handles[i].hcell); ++i)
-            ;                                   /* and try again ...       */
-    }
-    if (i>=NUM_HANDLES) {                       /* ... before we give up   */
-        ERRMSG(0) "Too many handles open; cannot open \"%s\"", s
-        EEND;
-    }
-    else {                                      /* prepare to open file    */
-        String stmode;
-        if (binary) {
-            stmode = (hmode&HAPPEND) ? "ab+" :
-                     (hmode&HWRITE)  ? "wb+" :
-                     (hmode&HREAD)   ? "rb" : (String)0;
-        } else {
-            stmode = (hmode&HAPPEND) ? "a+"  :
-                     (hmode&HWRITE)  ? "w+"  :
-                     (hmode&HREAD)   ? "r"  : (String)0;
-        }
-        if (stmode && (handles[i].hfp=fopen(s,stmode))) {
-            handles[i].hmode = hmode;
-            return (handles[i].hcell = ap(HANDCELL,i));
-        }
-    }
-    return NIL;
-}
-
-static Void local freeHandle(n)         /* release handle storage when no  */
-Int n; {                                /* heap references to it remain    */
-    if (0<=n && n<NUM_HANDLES && nonNull(handles[n].hcell)) {
-        if (n>HSTDERR && handles[n].hmode!=HCLOSED && handles[n].hfp) {
-            fclose(handles[n].hfp);
-            handles[n].hfp = 0;
-        }
-        fst(handles[n].hcell) = snd(handles[n].hcell) = NIL;
-        handles[n].hcell      = NIL;
-    }
-}
-#endif
-
-#if GC_MALLOCPTRS
-/* --------------------------------------------------------------------------
- * Malloc Ptrs:
- * ------------------------------------------------------------------------*/
-
-struct strMallocPtr mallocPtrs[NUM_MALLOCPTRS];
-
-/* It might GC (because it uses a table not a list) which will trash any
- * unstable pointers.  
- * (It happens that we never use it with unstable pointers.)
- */
-Cell mkMallocPtr(ptr,cleanup)            /* create a new malloc pointer    */
-Ptr ptr;
-Void (*cleanup) Args((Ptr)); {
-    Int i;
-    for (i=0; i<NUM_MALLOCPTRS && mallocPtrs[i].refCount!=0; ++i)
-        ;                                       /* Search for unused entry */
-    if (i>=NUM_MALLOCPTRS) {                    /* If at first we don't    */
-        garbageCollect();                       /* succeed, garbage collect*/
-        for (i=0; i<NUM_MALLOCPTRS && mallocPtrs[i].refCount!=0; ++i)
-            ;                                   /* and try again ...       */
-    }
-    if (i>=NUM_MALLOCPTRS) {                    /* ... before we give up   */
-        ERRMSG(0) "Too many ForeignObjs open"
-        EEND;
-    }
-    mallocPtrs[i].ptr      = ptr;
-    mallocPtrs[i].cleanup  = cleanup;
-    mallocPtrs[i].refCount = 1;
-    return (mallocPtrs[i].mpcell = ap(MPCELL,i));
-}
-
-Void incMallocPtrRefCnt(n,i)             /* change ref count of MallocPtr */
-Int n;
-Int i; {        
-    if (!(0<=n && n<NUM_MALLOCPTRS && mallocPtrs[n].refCount > 0))
-        internal("freeMallocPtr");
-    mallocPtrs[n].refCount += i;
-    if (mallocPtrs[n].refCount <= 0) {
-        mallocPtrs[n].cleanup(mallocPtrs[n].ptr);
-
-        mallocPtrs[n].ptr      = 0;
-        mallocPtrs[n].cleanup  = 0;
-        mallocPtrs[n].refCount = 0;
-        mallocPtrs[n].mpcell   = NIL;
-    }
-}
-#endif /* GC_MALLOCPTRS */
-
-/* --------------------------------------------------------------------------
- * Stable pointers
- * This is a mechanism that allows the C world to manipulate pointers into the
- * Haskell heap without having to worry that the garbage collector is going
- * to delete it or move it around.
- * The implementation and interface is based on my implementation in
- * GHC - but, at least for now, is simplified by using a fixed size
- * table of stable pointers.
- * ------------------------------------------------------------------------*/
-
-#if GC_STABLEPTRS
-
-/* Each entry in the stable pointer table is either a heap pointer
- * or is not currently allocated.
- * Unallocated entries are threaded together into a freelist.
- * The last entry in the list contains the Cell 0; all other values
- * contain a Cell whose value is the next free stable ptr in the list.
- * It follows that stable pointers are strictly positive (>0).
- */
-static Cell stablePtrTable[NUM_STABLEPTRS];
-static Int  sptFreeList;
-#define SPT(sp) stablePtrTable[(sp)-1]
-
-static Void local resetStablePtrs() {
-    Int i;
-    /* It would be easier to build the free list in the other direction
-     * but, when debugging, it's way easier to understand if the first
-     * pointer allocated is "1".
-     */
-    for(i=1; i < NUM_STABLEPTRS; ++i)
-        SPT(i) = i+1;
-    SPT(NUM_STABLEPTRS) = 0;
-    sptFreeList = 1;
-}
-
-Int mkStablePtr(c)                  /* Create a stable pointer            */
-Cell c; {
-    Int i = sptFreeList;
-    if (i == 0)
-        return 0;
-    sptFreeList = SPT(i);
-    SPT(i) = c;
-    return i;
-}
-
-Cell derefStablePtr(p)              /* Dereference a stable pointer       */
-Int p; {
-    if (!(1 <= p && p <= NUM_STABLEPTRS)) {
-        internal("derefStablePtr");
-    }
-    return SPT(p);
-}
-
-Void freeStablePtr(i)               /* Free a stable pointer             */
-Int i; {
-    SPT(i) = sptFreeList;
-    sptFreeList = i;
-}
-
-#undef SPT
-#endif /* GC_STABLEPTRS */
 
 /* --------------------------------------------------------------------------
  * plugin support
@@ -2615,31 +2174,6 @@ Int what; {
                         */
                        heapTopFst = heapFst + heapSize;
                        heapTopSnd = heapSnd + heapSize;
-#if PROFILING
-                       heapTopThd = heapThd + heapSize;
-                       if (profile) {
-                           garbageCollect();
-                           fclose(profile);
-#if HAVE_HP2PS
-                           system("hp2ps profile.hp");
-#endif
-                           profile = 0;
-                       }
-#endif
-#if IO_HANDLES
-                       handles[HSTDIN].hmode  = HREAD;
-                       handles[HSTDOUT].hmode = HAPPEND;
-                       handles[HSTDERR].hmode = HAPPEND;
-#endif
-#if GC_MALLOCPTRS
-                       for (i=0; i<NUM_MALLOCPTRS; i++)
-                           mallocPtrs[i].mpcell = NIL;
-#endif
-#if !HSCRIPT
-#if GC_STABLEPTRS
-                       resetStablePtrs();
-#endif
-#endif
                        consGC = TRUE;
                        lsave  = NIL;
                        rsave  = NIL;
@@ -2657,7 +2191,6 @@ Int what; {
                        }
                        end("Names", nameHw-NAMEMIN);
 
-#if !IGNORE_MODULES
                        start();
                        for (i=MODMIN; i<moduleHw; ++i) {
                            mark(module(i).tycons);
@@ -2667,7 +2200,6 @@ Int what; {
                            mark(module(i).qualImports);
                        }
                        end("Modules", moduleHw-MODMIN);
-#endif
 
                        start();
                        for (i=TYCMIN; i<tyconHw; ++i) {
@@ -2709,24 +2241,6 @@ Int what; {
                        mark(lsave);
                        mark(rsave);
                        end("Last expression", 3);
-#if IO_HANDLES
-                       start();
-                       mark(handles[HSTDIN].hcell);
-                       mark(handles[HSTDOUT].hcell);
-                       mark(handles[HSTDERR].hcell);
-                       end("Standard handles", 3);
-#endif
-
-#if GC_STABLEPTRS
-                       start();
-                       for (i=0; i<NUM_STABLEPTRS; ++i)
-                           mark(stablePtrTable[i]);
-                       end("Stable pointers", NUM_STABLEPTRS);
-#endif
-
-#if GC_WEAKPTRS
-                       mark(finalizers);
-#endif
 
                        if (consGC) {
                            start();
@@ -2747,17 +2261,6 @@ Int what; {
 
                        heapTopFst = heapFst + heapSize;
                        heapTopSnd = heapSnd + heapSize;
-#if PROFILING
-                       heapThd = heapAlloc(heapSize);
-                       if (heapThd==(Heap)0) {
-                           ERRMSG(0) "Cannot allocate profiler storage space"
-                           EEND;
-                       }
-                       heapTopThd   = heapThd + heapSize;
-                       profile      = 0;
-                       if (0 == profInterval)
-                           profInterval = heapSize / DEF_PROFINTDIV;
-#endif
                        for (i=1; i<heapSize; ++i) {
                            fst(-i) = FREECELL;
                            snd(-i) = -(i+1);
@@ -2788,18 +2291,6 @@ Int what; {
 #endif
                        clearStack();
 
-#if IO_HANDLES
-                       TABALLOC(handles,   struct strHandle, NUM_HANDLES)
-                       for (i=0; i<NUM_HANDLES; i++)
-                           handles[i].hcell = NIL;
-                       handles[HSTDIN].hcell  = ap(HANDCELL,HSTDIN);
-                       handles[HSTDIN].hfp    = stdin;
-                       handles[HSTDOUT].hcell = ap(HANDCELL,HSTDOUT);
-                       handles[HSTDOUT].hfp   = stdout;
-                       handles[HSTDERR].hcell = ap(HANDCELL,HSTDERR);
-                       handles[HSTDERR].hfp   = stderr;
-#endif
-
                        textHw        = 0;
                        nextNewText   = NUM_TEXT;
                        nextNewDText  = (-1);
@@ -2809,23 +2300,11 @@ Int what; {
                            textHash[i][0] = NOTEXT;
 
 
-#if !IGNORE_MODULES
                        moduleHw = MODMIN;
-#endif
 
                        tyconHw  = TYCMIN;
                        for (i=0; i<TYCONHSZ; ++i)
                            tyconHash[i] = NIL;
-
-#if GC_WEAKPTRS
-                       finalizers   = NIL;
-                       liveWeakPtrs = NIL;
-#endif
-
-#if GC_STABLEPTRS
-                       resetStablePtrs();
-#endif
-
 #if TREX
                        extHw    = EXTMIN;
 #endif

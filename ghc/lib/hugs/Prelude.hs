@@ -102,7 +102,17 @@ module Prelude (
     asTypeOf, error, undefined,
     seq, ($!)
 
-    ,primCompAux
+    ,trace
+    -- Arrrggghhh!!! Help! Help! Help!
+    -- What?!  Prelude.hs doesn't even _define_ most of these things!
+    ,primCompAux,PrimArray,primRunST,primNewArray,primWriteArray
+    ,primUnsafeFreezeArray,primIndexArray,primGetRawArgs,primGetEnv
+    ,nh_stdin,nh_stdout,nh_stderr,copy_String_to_cstring,nh_open
+    ,nh_free,nh_close,nh_errno,nh_flush,nh_read,primIntToChar
+    ,unsafeInterleaveIO,nh_write,primCharToInt
+
+    -- ToDo: rm -- these are only for debugging
+    ,primPlusInt,primEqChar,primRunIO
   ) where
 
 -- Standard value bindings {Prelude} ----------------------------------------
@@ -696,7 +706,7 @@ instance Integral Int where
 
 instance Integral Integer where
     quotRem       = primQuotRemInteger 
-    divMod        = primDivModInteger 
+    --divMod        = primDivModInteger 
     toInteger     = id
     toInt         = primIntegerToInt
 
@@ -738,7 +748,7 @@ numericEnumFrom n            = n : (numericEnumFrom $! (n+1))
 numericEnumFromThen n m      = iterate ((m-n)+) n
 numericEnumFromTo n m        = takeWhile (<= m) (numericEnumFrom n)
 numericEnumFromThenTo n n' m = takeWhile p (numericEnumFromThen n n')
-                               where p | n' > n    = (<= m)
+                               where p | n' >= n   = (<= m)
 				       | otherwise = (>= m)
 
 instance Read Int where
@@ -754,6 +764,7 @@ instance Read Integer where
 
 instance Show Integer where
     showsPrec   = showSigned showInt
+
 
 -- Standard Floating types --------------------------------------------------
 
@@ -922,16 +933,14 @@ instance Read Float where
     readsPrec p = readSigned readFloat
 
 instance Show Float where
-    showsPrec p = showFloat
-                  --error "should call showFloat"
+    showsPrec p = showSigned showFloat p
 
 instance Read Double where
     readsPrec p = readSigned readFloat
 
--- Note that showFloat in Numeric isn't used here
 instance Show Double where
-    showsPrec p = showFloat
-                  --error "should call showFloat"
+    showsPrec p = showSigned showFloat p
+
 
 -- Some standard functions --------------------------------------------------
 
@@ -1446,11 +1455,20 @@ readInt radix isDig digToInt s =
 
 -- showInt is used for positive numbers only
 showInt    :: Integral a => a -> ShowS
-showInt n r | n < 0 = error "Numeric.showInt: can't show negative numbers"
-            | otherwise =
-              let (n',d) = quotRem n 10
-		  r'     = toEnum (fromEnum '0' + fromIntegral d) : r
-	      in  if n' == 0 then r' else showInt n' r'
+showInt n r 
+   | n < 0 
+   = error "Numeric.showInt: can't show negative numbers"
+   | otherwise 
+{-
+   = let (n',d) = quotRem n 10
+         r'     = toEnum (fromEnum '0' + fromIntegral d) : r
+     in  if n' == 0 then r' else showInt n' r'
+-}
+   = case quotRem n 10 of { (n',d) ->
+     let r' = toEnum (fromEnum '0' + fromIntegral d) : r
+     in  if n' == 0 then r' else showInt n' r'
+     }
+
 
 readSigned:: Real a => ReadS a -> ReadS a
 readSigned readPos = readParen False read'
@@ -1501,9 +1519,6 @@ primPmFlt n x     = fromDouble n == x
 -- ToDo: make the message more informative.
 primPmFail       :: a
 primPmFail        = error "Pattern Match Failure"
-primPmFailBUG    :: a
-primPmFailBUG     = error ("\nSTG-Hugs: detected a bug in translation to STG code.\n" ++
-                           "**Please** report to v-julsew@microsoft.com.  Thx!\n")
 
 -- used in desugaring Foreign functions
 primMkIO :: (RealWorld -> (a,RealWorld)) -> IO a
@@ -1555,10 +1570,11 @@ userError :: String -> IOError
 userError s = primRaise (ErrorCall s)
 
 catch :: IO a -> (IOError -> IO a) -> IO a
-catch x eh = primCatch x (eh.exception2ioerror)
-             where
-                exception2ioerror (IOExcept s) = IOError s
-                exception2ioerror other        = IOError (show other)
+catch m k 
+  = ST (\s -> unST m s `primCatch` \ err -> unST (k (e2ioe err)) s)
+    where
+       e2ioe (IOExcept s) = IOError s
+       e2ioe other        = IOError (show other)
 
 putChar :: Char -> IO ()
 putChar c = nh_stdout >>= \h -> nh_write h (primCharToInt c)
@@ -1597,7 +1613,7 @@ interact f = getContents >>= (putStr . f)
 
 readFile :: FilePath -> IO String
 readFile fname
-   = fileopen_sendname fname       >>= \ptr ->
+   = copy_String_to_cstring fname  >>= \ptr ->
      nh_open ptr 0                 >>= \h ->
      nh_free ptr                   >>
      nh_errno                      >>= \errno ->
@@ -1607,7 +1623,7 @@ readFile fname
 
 writeFile :: FilePath -> String -> IO ()
 writeFile fname contents
-   = fileopen_sendname fname       >>= \ptr ->
+   = copy_String_to_cstring fname  >>= \ptr ->
      nh_open ptr 1                 >>= \h ->
      nh_free ptr                   >>
      nh_errno                      >>= \errno ->
@@ -1618,7 +1634,7 @@ writeFile fname contents
 
 appendFile :: FilePath -> String -> IO ()
 appendFile fname contents
-   = fileopen_sendname fname       >>= \ptr ->
+   = copy_String_to_cstring fname  >>= \ptr ->
      nh_open ptr 2                 >>= \h ->
      nh_free ptr                   >>
      nh_errno                      >>= \errno ->
@@ -1653,27 +1669,47 @@ instance Show Exception where
 
 data IOResult  = IOResult  deriving (Show)
 
-type FILE_STAR = Int
+type FILE_STAR = Int   -- FILE *
+type Ptr       = Int   -- char *
 
 foreign import stdcall "nHandle.so" "nh_stdin"  nh_stdin  :: IO FILE_STAR
 foreign import stdcall "nHandle.so" "nh_stdout" nh_stdout :: IO FILE_STAR
+foreign import stdcall "nHandle.so" "nh_stderr" nh_stderr :: IO FILE_STAR
 foreign import stdcall "nHandle.so" "nh_write"  nh_write  :: FILE_STAR -> Int -> IO ()
 foreign import stdcall "nHandle.so" "nh_read"   nh_read   :: FILE_STAR -> IO Int
 foreign import stdcall "nHandle.so" "nh_open"   nh_open   :: Int -> Int -> IO FILE_STAR
+foreign import stdcall "nHandle.so" "nh_flush"  nh_flush  :: FILE_STAR -> IO ()
 foreign import stdcall "nHandle.so" "nh_close"  nh_close  :: FILE_STAR -> IO ()
 foreign import stdcall "nHandle.so" "nh_errno"  nh_errno  :: IO Int
 
-foreign import stdcall "nHandle.so" "nh_malloc" nh_malloc :: Int -> IO Int
-foreign import stdcall "nHandle.so" "nh_free"   nh_free   :: Int -> IO ()
-foreign import stdcall "nHandle.so" "nh_assign" nh_assign :: Int -> Int -> Int -> IO Int
+foreign import stdcall "nHandle.so" "nh_malloc" nh_malloc :: Int -> IO Ptr
+foreign import stdcall "nHandle.so" "nh_free"   nh_free   :: Ptr -> IO ()
+foreign import stdcall "nHandle.so" "nh_store"  nh_store  :: Ptr -> Int -> IO ()
+foreign import stdcall "nHandle.so" "nh_load"   nh_load   :: Ptr -> IO Int
 
-fileopen_sendname :: String -> IO Int
-fileopen_sendname fname
-   = nh_malloc (1 + length fname) >>= \ptr -> 
-     let loop i []     = nh_assign ptr i 0 >> return ptr
-         loop i (c:cs) = nh_assign ptr i (primCharToInt c) >> loop (i+1) cs
+foreign import stdcall "nHandle.so" "nh_argc"   nh_argc   :: IO Int
+foreign import stdcall "nHandle.so" "nh_argvb"  nh_argvb  :: Int -> Int -> IO Int
+foreign import stdcall "nHandle.so" "nh_getenv" nh_getenv :: Ptr -> IO Ptr
+
+copy_String_to_cstring :: String -> IO Ptr
+copy_String_to_cstring s
+   = nh_malloc (1 + length s) >>= \ptr0 -> 
+     let loop ptr []     = nh_store ptr 0 >> return ptr0
+         loop ptr (c:cs) = --trace ("Out `" ++ [c] ++ "'") (
+                           nh_store ptr (primCharToInt c) >> loop (ptr+1) cs
+                           --)
      in
-         loop 0 fname
+         loop ptr0 s
+
+copy_cstring_to_String :: Ptr -> IO String
+copy_cstring_to_String ptr
+   = nh_load ptr >>= \ci ->
+     if   ci == 0 
+     then return []
+     else copy_cstring_to_String (ptr+1) >>= \cs -> 
+          --trace ("In " ++ show ci) (
+          return ((primIntToChar ci) : cs)
+          --)
 
 readfromhandle :: FILE_STAR -> IO String
 readfromhandle h
@@ -1694,6 +1730,31 @@ writetohandle fname h (c:cs)
    = nh_write h (primCharToInt c) >> 
      writetohandle fname h cs
 
+primGetRawArgs :: IO [String]
+primGetRawArgs
+   = nh_argc >>= \argc ->
+     accumulate (map (get_one_arg 0) [0 .. argc-1])
+     where
+        get_one_arg :: Int -> Int -> IO String
+        get_one_arg offset argno
+           = nh_argvb argno offset >>= \cb ->
+             if   cb == 0 
+             then return [] 
+             else get_one_arg (offset+1) argno >>= \s -> 
+                  return ((primIntToChar cb):s)
+
+primGetEnv :: String -> IO String
+primGetEnv v
+   = copy_String_to_cstring v     >>= \ptr ->
+     nh_getenv ptr                >>= \ptr2 ->
+     nh_free ptr                  >>
+     if   ptr2 == 0
+     then return []
+     else
+     copy_cstring_to_String ptr2  >>= \result ->
+     return result
+
+
 ------------------------------------------------------------------------------
 -- ST, IO --------------------------------------------------------------------
 ------------------------------------------------------------------------------
@@ -1704,12 +1765,12 @@ data RealWorld
 type IO a = ST RealWorld a
 
 
---runST :: (forall s. ST s a) -> a
-runST :: ST RealWorld a -> a
-runST m = fst (unST m theWorld)
+--primRunST :: (forall s. ST s a) -> a
+primRunST :: ST RealWorld a -> a
+primRunST m = fst (unST m theWorld)
    where
       theWorld :: RealWorld
-      theWorld = error "runST: entered the RealWorld"
+      theWorld = error "primRunST: entered the RealWorld"
 
 unST (ST a) = a
 
@@ -1730,11 +1791,11 @@ primRunIO m
         realWorld = error "panic: Hugs entered the real world"
         protect :: () -> ()
         protect comp 
-           = primCatch comp (\e -> fst (unST (putStr (show e)) realWorld))
+           = primCatch comp (\e -> fst (unST (putStr (show e ++ "\n")) realWorld))
 
 trace :: String -> a -> a
 trace s x
-   = (runST (putStr ("trace: " ++ s ++ "\n"))) `seq` x
+   = (primRunST (putStr ("trace: " ++ s ++ "\n"))) `seq` x
 
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST m = ST (\ s -> (fst (unST m s), s))
@@ -1744,7 +1805,7 @@ unsafeInterleaveIO = unsafeInterleaveST
 
 
 ------------------------------------------------------------------------------
--- Addr, ForeignObj, Prim*Array ----------------------------------------------
+-- Word, Addr, ForeignObj, Prim*Array ----------------------------------------
 ------------------------------------------------------------------------------
 
 data Addr
@@ -1762,9 +1823,22 @@ instance Ord Addr where
   (>)             = primGtAddr
 
 
-data ForeignObj
-makeForeignObj :: Addr -> IO ForeignObj
-makeForeignObj = primMakeForeignObj
+data Word
+
+instance Eq Word where 
+  (==)            = primEqWord
+  (/=)            = primNeWord
+                  
+instance Ord Word where 
+  (<)             = primLtWord
+  (<=)            = primLeWord
+  (>=)            = primGeWord
+  (>)             = primGtWord
+
+
+--data ForeignObj
+--makeForeignObj :: Addr -> IO ForeignObj
+--makeForeignObj = primMakeForeignObj
 
 
 data PrimArray              a -- immutable arrays with Int indices
@@ -1773,6 +1847,7 @@ data PrimByteArray
 data Ref                  s a -- mutable variables
 data PrimMutableArray     s a -- mutable arrays with Int indices
 data PrimMutableByteArray s
+
 
 
 ------------------------------------------------------------------------------
@@ -1971,7 +2046,7 @@ formatRealFloat fmt decs x = s
         doFmt fmt (is, e) =
             let ds = map intToDigit is
             in  case fmt of
-                FFGeneric -> 
+                FFGeneric ->
                     doFmt (if e < 0 || e > 7 then FFExponent else FFFixed)
                           (is, e)
                 FFExponent ->
@@ -2060,9 +2135,16 @@ floatToDigits base x =
                    (f*2, b^(-e)*2, 1, 1)
         k = 
             let k0 =
-
-                     0
-
+                    if b == 2 && base == 10 then
+                         -- logBase 10 2 is slightly bigger than 3/10 so
+                         -- the following will err on the low side.  Ignoring
+                         -- the fraction will make it err even more.
+                         -- Haskell promises that p-1 <= logBase b f < p.
+                         (p - 1 + e0) * 3 `div` 10
+                    else
+                         ceiling ((log (fromInteger (f+1)) +
+                                  fromInt e * log (fromInteger b)) /
+                                   log (fromInteger base))
                 fixup n =
                     if n >= 0 then
                         if r + mUp <= expt base n * s then n else fixup (n+1)
@@ -2088,6 +2170,23 @@ floatToDigits base x =
                 in  gen [] (r * bk) s (mUp * bk) (mDn * bk)
     in  (map toInt (reverse rds), k)
 
+{-
 -- Exponentiation with(out) a cache for the most common numbers.
 expt :: Integer -> Int -> Integer
 expt base n = base^n
+-}
+
+
+-- Exponentiation with a cache for the most common numbers.
+minExpt = 0::Int
+maxExpt = 1100::Int
+expt :: Integer -> Int -> Integer
+expt base n =
+    if base == 2 && n >= minExpt && n <= maxExpt then
+        expts !! (n-minExpt)
+    else
+        base^n
+
+expts :: [Integer]
+expts = [2^n | n <- [minExpt .. maxExpt]]
+

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: backend.h,v $
- * $Revision: 1.3 $
- * $Date: 1999/03/09 14:51:04 $
+ * $Revision: 1.4 $
+ * $Date: 1999/04/27 10:06:47 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -38,10 +38,10 @@
  *            | Name                       -- let-bound (effectively)
  *                                         -- always unboxed (PTR_REP)
  *
- *   Alt     -> (Pat,Expr)
- *   Pat     -> Var               -- bound to a constructor, a tuple or unbound
- *   PrimAlt -> ([PrimPat],Expr)
- *   PrimPat -> Var               -- bound to int or unbound
+ *   Alt     -> DEEFALT (Var,Expr)         -- var bound to NIL
+ *            | CASEALT (Con,[Var],Expr)   -- vars bound to NIL; 
+ *                                         -- Con is Name or TUPLE
+ *   PrimAlt -> PRIMALT ([Var],Expr)       -- vars bound to NIL or int
  * 
  * We use pointer equality to distinguish variables.
  * The info field of a Var is used as follows in various phases:
@@ -50,66 +50,64 @@
  * Freevar analysis: list of free vars after
  * Lambda lifting:   freevar list or UNIT on input, discarded after
  * Code generation:  unused
+ * Optimisation:     number of uses (sort-of) of let-bound variable
  * ------------------------------------------------------------------------*/
 
 typedef Cell   StgRhs;
 typedef Cell   StgExpr;
 typedef Cell   StgAtom;
 typedef Cell   StgVar;       /* Could be a Name or an STGVAR */
-typedef Pair   StgCaseAlt;
-typedef StgVar StgPat;
+typedef Cell   StgCaseAlt;
+typedef Cell   StgPrimAlt;
 typedef Cell   StgDiscr;
-typedef Pair   StgPrimAlt;
-typedef StgVar StgPrimPat;
 typedef Cell   StgRep;  /* PTR_REP | .. DOUBLE_REP */
 
-#define mkStgLet(binds,body) ap(LETREC,pair(binds,body))
-#define stgLetBinds(e)       fst(snd(e))
-#define stgLetBody(e)        snd(snd(e))
+#define mkStgLet(binds,body)       ap(LETREC,pair(binds,body))
+#define stgLetBinds(e)             fst(snd(e))
+#define stgLetBody(e)              snd(snd(e))
 
 #define mkStgPrimVar(rhs,rep,info) ap(STGVAR,triple(rhs,rep,info))
 #define stgVarBody(e)              fst3(snd(e))
 #define stgVarRep(e)               snd3(snd(e))
 #define stgVarInfo(e)              thd3(snd(e))
 
-#define mkStgCase(scrut,alts) ap(CASE,pair(scrut,alts))
-#define stgCaseScrut(e)       fst(snd(e))
-#define stgCaseAlts(e)        snd(snd(e))
+#define mkStgCase(scrut,alts)      ap(CASE,pair(scrut,alts))
+#define stgCaseScrut(e)            fst(snd(e))
+#define stgCaseAlts(e)             snd(snd(e))
 
-#define mkStgCaseAlt(discr,vs,e) pair(mkStgVar(mkStgCon(discr,vs),NIL),e)
-#define stgCaseAltPat(alt)       fst(alt)
-#define stgCaseAltBody(alt)      snd(alt)
+#define mkStgCaseAlt(con,vs,e)     ap(CASEALT,triple(con,vs,e))
+#define stgCaseAltCon(alt)         fst3(snd(alt))
+#define stgCaseAltVars(alt)        snd3(snd(alt))
+#define stgCaseAltBody(alt)        thd3(snd(alt))
 
-#define stgPatDiscr(pat)         stgConCon(stgVarBody(pat))
-#define stgPatVars(pat)          stgConArgs(stgVarBody(pat))
+#define mkStgDefault(v,e)          ap(DEEFALT,pair(v,e))
+#define stgDefaultVar(alt)         fst(snd(alt))
+#define stgDefaultBody(alt)        snd(snd(alt))
+#define isDefaultAlt(alt)          (fst(alt)==DEEFALT)
 
-#define isDefaultPat(pat)        (isNull(stgVarBody(pat)))
-#define isStgDefault(alt)        (isDefaultPat(stgCaseAltPat(alt)))
-#define mkStgDefault(v,e)        pair(v,e)
+#define mkStgPrimCase(scrut,alts)  ap(PRIMCASE,pair(scrut,alts))
+#define stgPrimCaseScrut(e)        fst(snd(e))
+#define stgPrimCaseAlts(e)         snd(snd(e))
 
-#define mkStgPrimCase(scrut,alts) ap(PRIMCASE,pair(scrut,alts))
-#define stgPrimCaseScrut(e) fst(snd(e))
-#define stgPrimCaseAlts(e)  snd(snd(e))
+#define mkStgPrimAlt(vs,body)      ap(PRIMALT,pair(vs,body))
+#define stgPrimAltVars(alt)        fst(snd(alt))
+#define stgPrimAltBody(alt)        snd(snd(alt))
 
-#define mkStgPrimAlt(vs,body)    pair(vs,body)
-#define stgPrimAltPats(alt)      fst(alt)
-#define stgPrimAltBody(alt)      snd(alt)
+#define mkStgApp(fun,args)         ap(STGAPP,pair(fun,args))
+#define stgAppFun(e)               fst(snd(e))
+#define stgAppArgs(e)              snd(snd(e))
 
-#define mkStgApp(fun,args) ap(STGAPP,pair(fun,args))
-#define stgAppFun(e)       fst(snd(e))
-#define stgAppArgs(e)      snd(snd(e))
+#define mkStgPrim(op,args)         ap(STGPRIM,pair(op,args))
+#define stgPrimOp(e)               fst(snd(e))
+#define stgPrimArgs(e)             snd(snd(e))
 
-#define mkStgPrim(op,args) ap(STGPRIM,pair(op,args))
-#define stgPrimOp(e)       fst(snd(e))
-#define stgPrimArgs(e)     snd(snd(e))
+#define mkStgCon(con,args)         ap(STGCON,pair(con,args))
+#define stgConCon(e)               fst(snd(e))
+#define stgConArgs(e)              snd(snd(e))
 
-#define mkStgCon(con,args) ap(STGCON,pair(con,args))
-#define stgConCon(e)       fst(snd(e))
-#define stgConArgs(e)      snd(snd(e))
-
-#define mkStgLambda(args,body) ap(LAMBDA,pair(args,body))
-#define stgLambdaArgs(e)       fst(snd(e))
-#define stgLambdaBody(e)       snd(snd(e))
+#define mkStgLambda(args,body)     ap(LAMBDA,pair(args,body))
+#define stgLambdaArgs(e)           fst(snd(e))
+#define stgLambdaBody(e)           snd(snd(e))
 
 extern int stgConTag  ( StgDiscr d );
 extern void* stgConInfo ( StgDiscr d );
@@ -126,8 +124,9 @@ extern StgExpr makeStgLet    ( List binds, StgExpr body );
 extern StgExpr makeStgIf     ( StgExpr cond, StgExpr e1, StgExpr e2 );
 extern Bool    isStgVar      ( StgRhs rhs );
 extern Bool    isAtomic      ( StgRhs rhs );
-
 extern StgVar  mkStgVar      ( StgRhs rhs, Cell info );
+
+extern Int     stgSize       ( StgExpr e );
 
 #define mkStgRep(c) mkChar(c)
 
@@ -179,7 +178,16 @@ extern Void ppStgVars    ( List vs );
 extern List liftBinds( List binds );
 extern Void liftControl ( Int what );
 
-extern StgExpr    substExpr ( List sub, StgExpr e );
+extern StgExpr substExpr ( List sub, StgExpr e );
+extern StgExpr zubstExpr ( List sub, StgExpr e );
+
 extern List freeVarsBind Args((List, StgVar));
 extern Void optimiseBind Args((StgVar));
 
+#ifdef CRUDE_PROFILING
+extern void cp_init ( void );
+extern void cp_enter ( Cell /*StgVar*/ );
+extern void cp_bill_words ( int );
+extern void cp_bill_insns ( int );
+extern void cp_show ( void );
+#endif

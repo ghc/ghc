@@ -12,15 +12,8 @@ extern Name nameRunIO;
 
 extern Name nameMkC;
 extern Name nameMkI;
-#ifdef PROVIDE_INT64
-extern Name nameMkInt64;
-#endif
-#ifdef PROVIDE_WORD
 extern Name nameMkW;
-#endif
-#ifdef PROVIDE_ADDR
 extern Name nameMkA;
-#endif
 extern Name nameMkF;
 extern Name nameMkD;
 #ifdef PROVIDE_STABLE
@@ -31,16 +24,12 @@ extern Name nameMkStable;
  * unpointed values pointed and require no special treatment
  * by the code generator.
  */
-#ifdef PROVIDE_INTEGER
 extern Name nameMkInteger;
-#endif
-#ifdef PROVIDE_ARRAY
 extern Name nameMkPrimArray;            
 extern Name nameMkPrimByteArray;
 extern Name nameMkRef;                  
 extern Name nameMkPrimMutableArray;     
 extern Name nameMkPrimMutableByteArray; 
-#endif
 #ifdef PROVIDE_FOREIGN
 extern Name nameMkForeign;   
 #endif
@@ -59,25 +48,14 @@ extern Name nameMkMVar;
  */
 extern Type typeChar;
 extern Type typeInt;
-#ifdef PROVIDE_INT64
-extern Type typeInt64;
-#endif
-#ifdef PROVIDE_INTEGER
 extern Type typeInteger;
-#endif
-#ifdef PROVIDE_WORD
 extern Type typeWord;
-#endif
-#ifdef PROVIDE_ADDR
 extern Type typeAddr;
-#endif
-#ifdef PROVIDE_ARRAY
 extern Type typePrimArray;            
 extern Type typePrimByteArray;
 extern Type typeRef;                  
 extern Type typePrimMutableArray;     
 extern Type typePrimMutableByteArray; 
-#endif
 extern Type typeFloat;
 extern Type typeDouble;
 #ifdef PROVIDE_STABLE
@@ -103,17 +81,6 @@ extern Type typeST;
 extern Type typeIO;
 extern Type typeException;
 
-/* copied out of K&R2, Appendix A */
-#define cat(x,y) x ## y
-#define xcat(x,y) cat(x,y)
-
-#ifdef BIGNUMTYPE
-#define typeBignum   xcat(type,BIGNUMTYPE)
-#define nameMkBignum xcat(nameMk,BIGNUMTYPE)
-#else
-#warning BIGNUMTYPE undefined
-#endif
-
 /* used while desugaring */
 extern Name nameId;
 extern Name nameOtherwise;
@@ -128,7 +95,6 @@ extern Name nameSel;
 /* used in translation */
 extern Name nameEq;     
 extern Name namePMFail;
-extern Name namePMFailBUG;
 extern Name nameEqChar;
 extern Name nameEqInt;
 extern Name nameEqInteger;

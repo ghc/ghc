@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.5 1999/03/01 14:47:09 sewardj Exp $
+ * $Id: Assembler.h,v 1.6 1999/04/27 10:07:22 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -84,18 +84,9 @@ typedef enum {
   /* The following can be passed to C */
   CHAR_REP    = 'C',     
   INT_REP     = 'I',      
-#ifdef PROVIDE_INT64
-  INT64_REP   = 'z', 
-#endif
-#ifdef PROVIDE_INTEGER
   INTEGER_REP = 'Z',  
-#endif
-#ifdef PROVIDE_WORD
   WORD_REP    = 'W',     
-#endif
-#ifdef PROVIDE_ADDR
   ADDR_REP    = 'A',     
-#endif
   FLOAT_REP   = 'F',    
   DOUBLE_REP  = 'D',   
 #ifdef PROVIDE_STABLE
@@ -107,10 +98,8 @@ typedef enum {
 #ifdef PROVIDE_WEAK
   WEAK_REP    = 'w',   /* Weak a      */
 #endif
-#ifdef PROVIDE_ARRAY
   BARR_REP     = 'x',  /* PrimByteArray          a */
   MUTBARR_REP  = 'm',  /* PrimMutableByteArray s a */
-#endif
 
   /* The following can't be passed to C */
   PTR_REP      = 'P',      
@@ -121,11 +110,9 @@ typedef enum {
   IO_REP       = 'i',  /* IO a	                   */
   HANDLER_REP  = 'H',  /* Exception -> IO a	   */
   ERROR_REP    = 'E',  /* Exception		   */
-#ifdef PROVIDE_ARRAY		
   ARR_REP      = 'X',  /* PrimArray              a */
   REF_REP      = 'R',  /* Ref                  s a */
   MUTARR_REP   = 'M',  /* PrimMutableArray     s a */
-#endif
 #ifdef PROVIDE_CONCURRENT
   THREADID_REP = 'T',  /* ThreadId                 */
   MVAR_REP     = 'r',  /* MVar a                   */
@@ -164,6 +151,8 @@ extern int        asmObjectHasClosure( AsmObject obj );
 extern AsmClosure asmClosureOfObject ( AsmObject obj );
 extern void       asmMarkObject      ( AsmObject obj );
 
+extern int        asmRepSizeW        ( AsmRep rep );
+
 /* --------------------------------------------------------------------------
  * Generating instruction streams
  * ------------------------------------------------------------------------*/
@@ -194,21 +183,12 @@ extern void   asmReturnUnboxed ( AsmBCO bco, AsmRep rep );
 
 /* push unboxed Ints, Floats, etc */
 extern void   asmConstInt      ( AsmBCO bco, AsmInt     x );
-#ifdef PROVIDE_ADDR
 extern void   asmConstAddr     ( AsmBCO bco, AsmAddr    x );
-#endif
-#ifdef PROVIDE_WORD
 extern void   asmConstWord     ( AsmBCO bco, AsmWord    x );
-#endif
 extern void   asmConstChar     ( AsmBCO bco, AsmChar    x );
 extern void   asmConstFloat    ( AsmBCO bco, AsmFloat   x );
 extern void   asmConstDouble   ( AsmBCO bco, AsmDouble  x );
-#ifdef PROVIDE_INT64
-extern void   asmConstInt64    ( AsmBCO bco, AsmInt64   x );
-#endif
-#ifdef PROVIDE_INTEGER
 extern void   asmConstInteger  ( AsmBCO bco, AsmString  x );
-#endif
              
 /* Which monad (if any) does the primop live in? */
 typedef enum {

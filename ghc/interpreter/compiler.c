@@ -10,8 +10,8 @@
  * in the distribution for details.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:05 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:06:48 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -81,6 +81,8 @@ static Bool local eqExtDiscr            Args((Cell,Cell));
 static Void local compileGlobalFunction Args((Pair));
 static Void local compileGenFunction    Args((Name));
 static Name local compileSelFunction    Args((Pair));
+static List local addStgVar             Args((List,Pair));
+
 
 /* --------------------------------------------------------------------------
  * Translation:    Convert input expressions into a less complex language
@@ -101,12 +103,6 @@ Cell e; {
 
                           if (fst(e)==nameId || fst(e)==nameInd)
                               return translate(snd(e));
-#if EVAL_INSTANCES
-                          if (fst(e)==nameStrict)
-                              return nameIStrict;
-                          if (fst(e)==nameSeq)
-                              return nameISeq;
-#endif
                           if (isName(fst(e)) &&
                               isMfun(fst(e)) &&
                               mfunOf(fst(e))==0)
@@ -115,11 +111,6 @@ Cell e; {
                           snd(e) = translate(snd(e));
                           return e;
 
-#if BIGNUMS
-        case POSNUM     :
-        case ZERONUM    :
-        case NEGNUM     : return e;
-#endif
         case NAME       : if (e==nameOtherwise)
                               return nameTrue;
                           if (isCfun(e)) {
@@ -142,6 +133,7 @@ Cell e; {
         case INTCELL    :
         case FLOATCELL  :
         case STRCELL    :
+        case BIGCELL    :
         case CHARCELL   : return e;
 
         case FINLIST    : mapOver(translate,snd(e));
@@ -927,11 +919,6 @@ Cell e;  {                             /* e  = expr to transform           */
 
         case AP       : return pmcPair(co,sc,e);
 
-#if BIGNUMS
-        case POSNUM   :
-        case ZERONUM  :
-        case NEGNUM   :
-#endif
 #if NPLUSK
         case ADDPAT   :
 #endif
@@ -942,6 +929,7 @@ Cell e;  {                             /* e  = expr to transform           */
         case NAME     :
         case CHARCELL :
         case INTCELL  :
+        case BIGCELL  :
         case FLOATCELL:
         case STRCELL  : break;
 
@@ -1302,11 +1290,12 @@ tidyHd: switch (whatIs(p=hd(maPats(ma)))) {
                              return FALSE;
 
             case STRCELL   : {   String s = textToStr(textOf(p));
-                                 for (p=NIL; *s!='\0'; ++s)
+                                 for (p=NIL; *s!='\0'; ++s) {
                                      if (*s!='\\' || *++s=='\\')
                                          p = ap(consChar(*s),p);
                                      else
                                          p = ap(consChar('\0'),p);
+                                 }
                                  hd(maPats(ma)) = revOnto(p,nameNil);
                              }
                              return FALSE;
@@ -1411,10 +1400,6 @@ Cell d1, d2; {                          /* descriptors have same value     */
         return isInt(arg(d2)) && intOf(arg(d1))==intOf(arg(d2));
     if (isFloat(arg(d1)))
         return isFloat(arg(d2)) && floatOf(arg(d1))==floatOf(arg(d2));
-#if BIGNUMS
-    if (isBignum(arg(d1)))
-        return isBignum(arg(d2)) && bigCmp(arg(d1),arg(d2))==0;
-#endif
     internal("eqNumDiscr");
     return FALSE;/*NOTREACHED*/
 }
@@ -1452,7 +1437,7 @@ List binds; {
 
 static List addGlobals( List binds )
 {
-    /* stgGlobals = pieces of code generated for selectors, tuples, etc */
+    /* stgGlobals = list of top-level STG binds */
     for(;nonNull(stgGlobals);stgGlobals=tl(stgGlobals)) {
         StgVar bind = snd(hd(stgGlobals));
         if (nonNull(stgVarBody(bind))) {
@@ -1462,6 +1447,15 @@ static List addGlobals( List binds )
     return binds;
 }
 
+typedef void (*sighandler_t)(int);
+void eval_ctrlbrk ( int dunnowhat )
+{
+   interruptStgRts();
+   /* reinstall the signal handler so that further interrupts which
+      happen before the thread can return to the scheduler, lead back
+      here rather than invoking the previous break handler. */
+   signal(SIGINT, eval_ctrlbrk);
+}
 
 Void evalExp() {                    /* compile and run input expression    */
     /* ToDo: this name (and other names generated during pattern match?)
@@ -1473,7 +1467,7 @@ Void evalExp() {                    /* compile and run input expression    */
     name(n).stgVar = v;
     compiler(RESET);
     e = pmcTerm(0,NIL,translate(inputExpr));
-    stgDefn(n,0,e); //ppStg(name(n).stgVar);
+    stgDefn(n,0,e);
     inputExpr = NIL;
     stgCGBinds(addGlobals(singleton(v)));
     
@@ -1481,10 +1475,19 @@ Void evalExp() {                    /* compile and run input expression    */
 
     /* Re-initialise the scheduler - ToDo: do I need this? */
     initScheduler();
+#ifdef CRUDE_PROFILING
+    cp_init();
+#endif
+
     /* ToDo: don't really initScheduler every time.  fix */
     {
-        HaskellObj result; /* ignored */
-        SchedulerStatus status = rts_eval_(closureOfVar(v),10000,&result);
+        HaskellObj      result; /* ignored */
+        sighandler_t    old_ctrlbrk;
+        SchedulerStatus status;
+        old_ctrlbrk    = signal(SIGINT, eval_ctrlbrk);
+        assert(old_ctrlbrk != SIG_ERR);
+        status         = rts_eval_(closureOfVar(v),10000,&result);
+        signal(SIGINT,old_ctrlbrk);
         switch (status) {
         case Deadlock:
         case AllBlocked: /* I don't understand the distinction - ADR */
@@ -1500,6 +1503,7 @@ Void evalExp() {                    /* compile and run input expression    */
                 RevertCAFs();
                 break;
         case Success:
+	        RevertCAFs();
                 break;
         default:
                 internal("evalExp: Unrecognised SchedulerStatus");
@@ -1507,16 +1511,19 @@ Void evalExp() {                    /* compile and run input expression    */
         fflush(stdout);
         fflush(stderr);
     }
+#ifdef CRUDE_PROFILING
+    cp_show();
+#endif
+
 }
 
-static List local addStgVar( List binds, Pair bind ); /* todo */
 
 static List local addStgVar( List binds, Pair bind )
 {
     StgVar nv = mkStgVar(NIL,NIL);
     Text   t  = textOf(fst(bind));
     Name   n  = findName(t);
-    //printf ( "addStgVar %s\n", textToStr(t));
+
     if (isNull(n)) {                   /* Lookup global name - the only way*/
         n = newName(t,NIL);            /* this (should be able to happen)  */
     }                                  /* is with new global var introduced*/
@@ -1561,7 +1568,7 @@ Void compileDefns() {                  /* compile script definitions       */
         }
     }
 
-    setGoal("Compiling",t);
+    setGoal("Translating",t);
     /* do valDefns before everything else so that all stgVar's get added. */
     for (; nonNull(valDefns); valDefns=tl(valDefns)) {
         hd(valDefns) = transBinds(hd(valDefns));
@@ -1578,13 +1585,17 @@ Void compileDefns() {                  /* compile script definitions       */
         soFar(i++);
     }
 
-    /* binds=revOnto(binds,NIL); *//* ToDo: maintain compilation order?? */
     binds = addGlobals(binds);
+    done();
 #if USE_HUGS_OPTIMIZER
-#error optimiser
-    if (lastModule() != modulePrelude)
-       mapProc(optimiseTopBind,binds);
+    if (optimise) {
+       t = length(binds);
+       setGoal("Simplifying",t);
+       optimiseTopBinds(binds);
+       done();
+    }
 #endif
+    setGoal("Generating code",t);
     stgCGBinds(binds);
 
     done();
@@ -1596,20 +1607,6 @@ Pair bind; {
     List defs  = snd(bind);
     Int  arity = length(fst(hd(defs)));
     assert(isName(n));
-
-    //{ Cell cc;
-    //  printf ( "compileGlobalFunction %s\n", textToStr(name(n).text));
-    //  cc = defs;
-    //  while (nonNull(cc)) {
-    //     printExp(stdout, fst(hd(cc)));
-    //     printf ( "\n   = " );
-    //     printExp(stdout, snd(hd(cc)));
-    //     printf( "\n" );
-    //     cc = tl(cc);
-    //  }
-    //  printf ( "\n\n\n" );
-    //}
-
     compiler(RESET);
     stgDefn(n,arity,match(arity,altsMatch(1,arity,NIL,defs)));
 }
@@ -1618,20 +1615,6 @@ static Void local compileGenFunction(n) /* Produce code for internally     */
 Name n; {                               /* generated function              */
     List defs  = name(n).defn;
     Int  arity = length(fst(hd(defs)));
-
-    //{ Cell cc;
-    //  printf ( "compileGenFunction %s\n", textToStr(name(n).text));
-    //  cc = defs;
-    //  while (nonNull(cc)) {
-    //     printExp(stdout, fst(hd(cc)));
-    //     printf ( "\n   = " );
-    //     printExp(stdout, snd(hd(cc)));
-    //     printf( "\n" );
-    //     cc = tl(cc);
-    //  }
-    //  printf ( "\n\n\n" );
-    //}
-
     compiler(RESET);
     currentName = n;
     mapProc(transAlt,defs);

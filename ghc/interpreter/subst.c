@@ -9,8 +9,8 @@
  * in the distribution for details.
  *
  * $RCSfile: subst.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:56 $
+ * $Revision: 1.5 $
+ * $Date: 1999/04/27 10:07:07 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1121,25 +1121,6 @@ Bool typeMatches(type,mt)               /* test if type matches monotype mt*/
 }
 
 
-#if IO_MONAD
-Bool isProgType(ks,type)                /* Test if type is of the form     */
-List ks;                                /* IO t for some t.                */
-Type type; {
-    Bool result;
-    Int  alpha;
-    Int  beta;
-    if (isPolyType(type) || whatIs(type)==QUAL)
-        return FALSE;
-    emptySubstitution();
-    alpha  = newKindedVars(ks);
-    beta   = newTyvars(1);
-    bindOnlyAbove(beta);
-    result = unify(type,alpha,typeProgIO,beta);
-    unrestrictBind();
-    emptySubstitution();
-    return result;
-}
-#endif
 
 /* --------------------------------------------------------------------------
  * Matching predicates:

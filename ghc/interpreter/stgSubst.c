@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: stgSubst.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:40 $
+ * $Revision: 1.4 $
+ * $Date: 1999/04/27 10:07:04 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -66,7 +66,9 @@ static Void substBind( List sub, StgVar bind )
 
 static Void substAlt( List sub, StgCaseAlt alt )
 {
-    stgCaseAltBody(alt) = substExpr(sub,stgCaseAltBody(alt));
+    if (isDefaultAlt(alt))
+       stgDefaultBody(alt) = substExpr(sub,stgDefaultBody(alt)); else
+       stgCaseAltBody(alt) = substExpr(sub,stgCaseAltBody(alt));
 }
 
 static Void substPrimAlt( List sub, StgPrimAlt alt )
@@ -99,6 +101,9 @@ StgExpr substExpr( List sub, StgExpr e )
             stgAppFun(e) = substVar(sub,stgAppFun(e));
             map1Over(substAtom,sub,stgAppArgs(e));
             break;
+    case STGCON:
+            map1Over(substAtom,sub,stgConArgs(e));
+            break;
     case STGVAR:
     case NAME:
             return substVar(sub,e);
@@ -107,5 +112,65 @@ StgExpr substExpr( List sub, StgExpr e )
     }
     return e;
 }
+
+
+/* A substitution engine more suitable for the optimiser.
+   Doesn't make so many assumptions about what is an atom.
+*/
+StgExpr zubstExpr( List sub, StgExpr e )
+{
+    List bs;
+    switch (whatIs(e)) {
+    case LETREC:
+            for (bs=stgLetBinds(e); nonNull(bs); bs=tl(bs))
+               stgVarBody(hd(bs)) = zubstExpr(sub,stgVarBody(hd(bs)));
+            stgLetBody(e) = zubstExpr(sub,stgLetBody(e));
+            break;
+    case LAMBDA:
+            stgLambdaBody(e) = zubstExpr(sub,stgLambdaBody(e));
+            break;
+    case CASE:
+            stgCaseScrut(e) = zubstExpr(sub,stgCaseScrut(e));
+            map1Proc(zubstExpr,sub,stgCaseAlts(e));
+            break;
+    case PRIMCASE:
+            stgPrimCaseScrut(e) = zubstExpr(sub,stgPrimCaseScrut(e));
+            map1Proc(zubstExpr,sub,stgPrimCaseAlts(e));
+            break;
+    case CASEALT:
+            stgCaseAltBody(e) = zubstExpr(sub,stgCaseAltBody(e));
+            break;
+    case DEEFALT:
+            stgDefaultBody(e) = zubstExpr(sub,stgDefaultBody(e));
+            break;
+    case PRIMALT:
+            stgPrimAltBody(e) = zubstExpr(sub,stgPrimAltBody(e));
+            break;
+    case STGPRIM:
+            map1Over(zubstExpr,sub,stgPrimArgs(e));
+            break;
+    case STGAPP:
+            stgAppFun(e) = zubstExpr(sub,stgAppFun(e));
+            map1Over(zubstExpr,sub,stgAppArgs(e));
+            break;
+    case STGCON:
+            map1Over(zubstExpr,sub,stgConArgs(e));
+            break;
+    case STGVAR:
+            return substVar(sub,e);
+    case NAME:
+    case INTCELL:
+    case STRCELL:
+    case PTRCELL:
+    case CHARCELL:
+    case FLOATCELL:
+            break;
+    default:
+            internal("zubstExpr");
+    }
+    return e;
+}
+
+
 
 /*-------------------------------------------------------------------------*/

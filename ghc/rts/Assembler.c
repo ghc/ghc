@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/03/09 14:51:19 $
+ * $Revision: 1.8 $
+ * $Date: 1999/04/27 10:07:15 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -76,15 +76,6 @@ typedef struct {
  * Queues (of instructions, ptrs, nonptrs)
  * ------------------------------------------------------------------------*/
 
-/* ToDo: while debugging, we use a chunk size of 1 to stress-test the code
- * this should be fine-tuned using statistics on common sizes
- */
-
-#define InstrsChunkSize  40
-#define PtrsChunkSize    10
-#define RefsChunkSize    10
-#define NonPtrsChunkSize 10
-
 #define Queue Instrs
 #define Type  StgWord8
 #include "QueueTemplate.h"
@@ -146,15 +137,17 @@ struct AsmCAF_ {
 struct AsmBCO_ {
     struct AsmObject_ object;  /* must be first in struct */
 
-    int /*StgExpr*/  stgexpr;    
     Instrs   is;          
     NonPtrs  nps;
+
+    int /*StgExpr*/  stgexpr;    
 
     /* abstract machine ("executed" during compilation) */
     AsmSp    sp;          /* stack ptr */
     AsmSp    max_sp;
     StgWord  hp;          /* heap ptr  */
     StgWord  max_hp;
+    Instr    lastOpc;
 };
 
 static void asmResolveRef( AsmObject obj, AsmNat i, AsmClosure reference )
@@ -199,13 +192,6 @@ static void asmResolveRef( AsmObject obj, AsmNat i, AsmClosure reference )
             barf("asmResolveRef");
     }
     obj->num_unresolved -= 1;
-
-    if (obj->num_unresolved == 0) {
-        /* todo: free the queues */
-
-        /* we don't print until all ptrs are resolved */
-        IF_DEBUG(codegen,printObj(obj->closure);printf("\n\n"));
-    }
 }
 
 static void asmAddRef( AsmObject referent, AsmObject referer, AsmNat i )
@@ -237,19 +223,13 @@ static void asmEndObject( AsmObject obj, StgClosure* c )
     obj->closure = c;
     mapQueue(Ptrs,    AsmObject, obj->ptrs, asmAddRef(x,obj,i));
     mapQueue(Refs,    AsmRef,    obj->refs, asmResolveRef(x.ref,x.i,c));
-#if 0
+
     if (obj->num_unresolved == 0) {
-        /* todo: free the queues */
+        freePtrs(&obj->ptrs);
+        freeRefs(&obj->refs);
         /* we don't print until all ptrs are resolved */
-        IF_DEBUG(codegen,
-                 if (obj->num_unresolved > 0) 
-                    fprintf(stderr, "{{%d unresolved}} ", obj->num_unresolved);
-                )
         IF_DEBUG(codegen,printObj(obj->closure));
     }
-    //printf( "unresolved %d\n", obj->num_unresolved);
-    //printObj(obj->closure);
-#endif
 }
 
 int asmObjectHasClosure ( AsmObject obj )
@@ -364,6 +344,7 @@ void asmEndCAF( AsmCAF caf, AsmBCO body )
     o->body  = NULL;
     o->value = stgCast(StgClosure*,0xdeadbeef);
     o->link  = stgCast(StgCAF*,0xdeadbeef);
+    o->mut_link = NULL;
     asmAddPtr(&caf->object,&body->object);
     asmEndObject(&caf->object,c);
 }
@@ -381,6 +362,7 @@ AsmBCO asmBeginBCO( int /*StgExpr*/ e )
     bco->stgexpr = e;
     bco->max_sp = bco->sp = 0;
     bco->max_hp = bco->hp = 0;
+    bco->lastOpc = i_INTERNAL_ERROR;
     return bco;
 }
 
@@ -388,11 +370,7 @@ void asmEndBCO( AsmBCO bco )
 {
     nat p  = bco->object.ptrs.len;
     nat np = bco->nps.len;
-#if 0
-    nat is = bco->is.len + 4;  /* 4 for stack and heap checks */
-#else
-    nat is = bco->is.len + 2;  /* 4 for stack check */
-#endif
+    nat is = bco->is.len + 2;  /* 2 for stack check */
 
     StgClosure* c = asmAlloc(BCO_sizeW(p,np,is));
     StgBCO*     o = stgCast(StgBCO*,c);
@@ -409,13 +387,11 @@ void asmEndBCO( AsmBCO bco )
         bco->max_hp = stg_max(bco->hp,bco->max_hp);
         bcoInstr(o,j++) = i_STK_CHECK;
         bcoInstr(o,j++) = bco->max_sp;
-#if 0
-        bcoInstr(o,j++) = i_HP_CHECK;
-        bcoInstr(o,j++) = bco->max_hp;
-#endif
         mapQueue(Instrs,  StgWord8,   bco->is,   bcoInstr(o,j++) = x);
         ASSERT(j == is);
     }
+    freeInstrs(&bco->is);
+    freeNonPtrs(&bco->nps);
     asmEndObject(&bco->object,c);
 }
 
@@ -423,23 +399,37 @@ void asmEndBCO( AsmBCO bco )
  * 
  * ------------------------------------------------------------------------*/
 
+static void asmInstrOp ( AsmBCO bco, StgWord i )
+{
+    ASSERT(i <= BIGGEST_OPCODE); /* must be a valid opcode */
+    bco->lastOpc = i;
+    insertInstrs(&(bco->is),i);
+}
+
 static void asmInstr8 ( AsmBCO bco, StgWord i )
 {
-    if (i >= 256) {
-       fprintf(stderr, "too big (256)\n");
-    }
+  if (i >= 256) {
     ASSERT(i < 256); /* must be a byte */
+  }
     insertInstrs(&(bco->is),i);
 }
 
 static void asmInstr16 ( AsmBCO bco, StgWord i )
 {
-    if (i >= 65536) {
-       fprintf(stderr, "too big (65536)\n");
-    }
-    ASSERT(i < 65536); /* must be a byte */
+    ASSERT(i < 65536); /* must be a short */
     insertInstrs(&(bco->is),i / 256);
     insertInstrs(&(bco->is),i % 256);
+}
+
+static Instr asmInstrBack ( AsmBCO bco, StgWord n )
+{
+   return bco->is.elems[bco->is.len - n];
+}
+
+static void asmInstrRecede ( AsmBCO bco, StgWord n )
+{
+   if (bco->is.len < n) barf("asmInstrRecede");
+   bco->is.len -= n;
 }
 
 static void asmPtr( AsmBCO bco, AsmObject x )
@@ -470,24 +460,15 @@ static StgWord repSizeW( AsmRep rep )
 
     case BOOL_REP:
     case INT_REP:     return sizeofW(StgWord) + sizeofW(StgInt);
-#ifdef PROVIDE_INT64
-    case INT64_REP:   return sizeofW(StgWord) + sizeofW(StgInt64);
-#endif
-#ifdef PROVIDE_WORD
     case WORD_REP:    return sizeofW(StgWord) + sizeofW(StgWord);
-#endif
-#ifdef PROVIDE_ADDR
     case ADDR_REP:    return sizeofW(StgWord) + sizeofW(StgAddr);
-#endif
     case FLOAT_REP:   return sizeofW(StgWord) + sizeofW(StgFloat);
     case DOUBLE_REP:  return sizeofW(StgWord) + sizeofW(StgDouble);
 #ifdef PROVIDE_STABLE
     case STABLE_REP:  return sizeofW(StgWord) + sizeofW(StgWord);
 #endif
 
-#ifdef PROVIDE_INTEGER
     case INTEGER_REP: 
-#endif
 #ifdef PROVIDE_WEAK
     case WEAK_REP: 
 #endif
@@ -499,13 +480,11 @@ static StgWord repSizeW( AsmRep rep )
     case GAMMA_REP:    /* c			   */ 
     case HANDLER_REP:  /* IOError -> IO a	   */ 
     case ERROR_REP:    /* IOError		   */ 
-#ifdef PROVIDE_ARRAY		
     case ARR_REP    :  /* PrimArray              a */ 
     case BARR_REP   :  /* PrimByteArray          a */ 
     case REF_REP    :  /* Ref                  s a */ 
     case MUTARR_REP :  /* PrimMutableArray     s a */ 
     case MUTBARR_REP:  /* PrimMutableByteArray s a */ 
-#endif
 #ifdef PROVIDE_CONCURRENT
     case THREADID_REP: /* ThreadId                 */ 
     case MVAR_REP:     /* MVar a                   */ 
@@ -517,228 +496,242 @@ static StgWord repSizeW( AsmRep rep )
     }
 }
 
+
+int asmRepSizeW ( AsmRep rep )
+{
+   return repSizeW ( rep );
+}
+
+
 /* --------------------------------------------------------------------------
- * Instruction emission
+ * Instruction emission.  All instructions should be routed through here
+ * so that the peephole optimiser gets to see what's happening.
  * ------------------------------------------------------------------------*/
 
-static void emit_i0 ( AsmBCO bco, Instr opcode )
+static void emiti_ ( AsmBCO bco, Instr opcode )
 {
-   asmInstr8(bco,opcode);
+   StgInt x, y;
+   if (bco->lastOpc == i_SLIDE && opcode == i_ENTER) {
+      /* SLIDE x y ; ENTER   ===>  SE x y */
+      x = asmInstrBack(bco,2);
+      y = asmInstrBack(bco,1); 
+      asmInstrRecede(bco,3);
+      asmInstrOp(bco,i_SE); asmInstr8(bco,x); asmInstr8(bco,y);
+   }
+   else
+   if (bco->lastOpc == i_RV && opcode == i_ENTER) {
+      /* RV x y ; ENTER ===> RVE x (y-2)
+         Because RETADDR pushes 2 words on the stack, y must be at least 2. */
+      x = asmInstrBack(bco,2);
+      y = asmInstrBack(bco,1);
+      if (y < 2) barf("emiti_: RVE: impossible y value");
+      asmInstrRecede(bco,3);
+      asmInstrOp(bco, i_RVE); asmInstr8(bco,x); asmInstr8(bco,y-2);
+   }
+   else {
+      asmInstrOp(bco,opcode);
+   }
 }
 
-static void emit_i1 ( AsmBCO bco, Instr opcode, int arg1 )
+static void emiti_8 ( AsmBCO bco, Instr opcode, int arg1 )
 {
-   asmInstr8(bco,opcode);
-   asmInstr8(bco,arg1);
+   StgInt x;
+   if (bco->lastOpc == i_VAR && opcode == i_VAR) {
+      /* VAR x ; VAR y ===>  VV x y */
+      x = asmInstrBack(bco,1);
+      asmInstrRecede(bco,2);
+      asmInstrOp(bco,i_VV); asmInstr8(bco,x); asmInstr8(bco,arg1);
+   } 
+   else 
+   if (bco->lastOpc == i_RETADDR && opcode == i_VAR) {
+      /* RETADDR x ; VAR y ===> RV x y */
+      x = asmInstrBack(bco,1);
+      asmInstrRecede(bco,2);
+      asmInstrOp(bco, i_RV); asmInstr8(bco,x); asmInstr8(bco,arg1);
+   }
+   else {
+      asmInstrOp(bco,opcode);
+      asmInstr8(bco,arg1);
+   }
 }
 
-static void emit_i2 ( AsmBCO bco, Instr opcode, int arg1, int arg2 )
+static void emiti_16 ( AsmBCO bco, Instr opcode, int arg1 )
 {
-   asmInstr8(bco,opcode);
+   asmInstrOp(bco,opcode);
+   asmInstr16(bco,arg1);
+}
+
+static void emiti_8_8 ( AsmBCO bco, Instr opcode, int arg1, int arg2 )
+{
+   asmInstrOp(bco,opcode);
    asmInstr8(bco,arg1);
    asmInstr8(bco,arg2);
 }
 
+static void emiti_8_16 ( AsmBCO bco, Instr opcode, int arg1, int arg2 )
+{
+   asmInstrOp(bco,opcode);
+   asmInstr8(bco,arg1);
+   asmInstr16(bco,arg2);
+}
+
+static void emiti_16_16 ( AsmBCO bco, Instr opcode, int arg1, int arg2 )
+{
+   asmInstrOp(bco,opcode);
+   asmInstr16(bco,arg1);
+   asmInstr16(bco,arg2);
+}
+
+
+/* --------------------------------------------------------------------------
+ * Wrappers around the above fns
+ * ------------------------------------------------------------------------*/
+
 static void emit_i_VAR_INT ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_VAR_INT);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_VAR_INT_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_VAR_INT,    arg1); else
+      emiti_16(bco,i_VAR_INT_big,arg1);
 }
 
-#ifdef PROVIDE_ADDR
+static void emit_i_VAR_WORD ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256)
+      emiti_8 (bco,i_VAR_WORD,    arg1); else
+      emiti_16(bco,i_VAR_WORD_big,arg1);
+}
+
 static void emit_i_VAR_ADDR ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_VAR_ADDR);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_VAR_ADDR_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_VAR_ADDR,    arg1); else
+      emiti_16(bco,i_VAR_ADDR_big,arg1);
 }
-#endif
 
 static void emit_i_VAR_CHAR ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_VAR_CHAR);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_VAR_CHAR_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_VAR_CHAR,    arg1); else
+      emiti_16(bco,i_VAR_CHAR_big,arg1);
 }
 
 static void emit_i_VAR_FLOAT ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_VAR_FLOAT);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_VAR_FLOAT_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_VAR_FLOAT,    arg1); else
+      emiti_16(bco,i_VAR_FLOAT_big,arg1);
 }
 
 static void emit_i_VAR_DOUBLE ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_VAR_DOUBLE);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_VAR_DOUBLE_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_VAR_DOUBLE,    arg1); else
+      emiti_16(bco,i_VAR_DOUBLE_big,arg1);
 }
 
 static void emit_i_VAR ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_VAR);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_VAR_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_VAR,    arg1); else
+      emiti_16(bco,i_VAR_big,arg1);
+}
+
+static void emit_i_PACK ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256)
+      emiti_8 (bco,i_PACK,    arg1); else
+      emiti_16(bco,i_PACK_big,arg1);
 }
 
 static void emit_i_SLIDE ( AsmBCO bco, int arg1, int arg2 )
 {
    ASSERT(arg1 >= 0);
    ASSERT(arg2 >= 0);
-   if (arg1 < 256 && arg2 < 256) {
-      asmInstr8(bco,i_SLIDE);
-      asmInstr8(bco,arg1);
-      asmInstr8(bco,arg2);
-   } else {
-      asmInstr8(bco,i_SLIDE_big);
-      asmInstr16(bco,arg1);
-      asmInstr16(bco,arg2);
-   }
+   if (arg1 < 256 && arg2 < 256)
+      emiti_8_8  (bco,i_SLIDE,    arg1,arg2); else
+      emiti_16_16(bco,i_SLIDE_big,arg1,arg2);
 }
 
 static void emit_i_MKAP ( AsmBCO bco, int arg1, int arg2 )
 {
    ASSERT(arg1 >= 0);
    ASSERT(arg2 >= 0);
-   if (arg1 < 256 && arg2 < 256) {
-      asmInstr8(bco,i_MKAP);
-      asmInstr8(bco,arg1);
-      asmInstr8(bco,arg2);
-   } else {
-      asmInstr8(bco,i_MKAP_big);
-      asmInstr16(bco,arg1);
-      asmInstr16(bco,arg2);
-   }
+   if (arg1 < 256 && arg2 < 256)
+      emiti_8_8  (bco,i_MKAP,    arg1,arg2); else
+      emiti_16_16(bco,i_MKAP_big,arg1,arg2);
 }
+
 
 static void emit_i_CONST_INT ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_CONST_INT);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_CONST_INT_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_CONST_INT,    arg1); else
+      emiti_16(bco,i_CONST_INT_big,arg1);
 }
 
-#ifdef PROVIDE_INTEGER
 static void emit_i_CONST_INTEGER ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_CONST_INTEGER);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_CONST_INTEGER_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_CONST_INTEGER,    arg1); else
+      emiti_16(bco,i_CONST_INTEGER_big,arg1);
 }
-#endif
 
 static void emit_i_CONST_ADDR ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_CONST_ADDR);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_CONST_ADDR_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_CONST_ADDR,    arg1); else
+      emiti_16(bco,i_CONST_ADDR_big,arg1);
 }
 
 static void emit_i_CONST_CHAR ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_CONST_CHAR);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_CONST_CHAR_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_CONST_CHAR,    arg1); else
+      emiti_16(bco,i_CONST_CHAR_big,arg1);
 }
 
 static void emit_i_CONST_FLOAT ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_CONST_FLOAT);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_CONST_FLOAT_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_CONST_FLOAT,    arg1); else
+      emiti_16(bco,i_CONST_FLOAT_big,arg1);
 }
 
 static void emit_i_CONST_DOUBLE ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_CONST_DOUBLE);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_CONST_DOUBLE_big);
-      asmInstr16(bco,arg1);
-   }
-}
-
-static void emit_i_RETADDR ( AsmBCO bco, int arg1 )
-{
-   ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_RETADDR);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_RETADDR_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_CONST_DOUBLE,    arg1); else
+      emiti_16(bco,i_CONST_DOUBLE_big,arg1);
 }
 
 static void emit_i_CONST ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
-   if (arg1 < 256) {
-      asmInstr8(bco,i_CONST);
-      asmInstr8(bco,arg1);
-   } else {
-      asmInstr8(bco,i_CONST_big);
-      asmInstr16(bco,arg1);
-   }
+   if (arg1 < 256)
+      emiti_8 (bco,i_CONST,    arg1); else
+      emiti_16(bco,i_CONST_big,arg1);
+}
+
+static void emit_i_RETADDR ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256)
+      emiti_8 (bco,i_RETADDR,    arg1); else
+      emiti_16(bco,i_RETADDR_big,arg1);
 }
 
 
@@ -756,7 +749,7 @@ void   asmEndArgCheck   ( AsmBCO bco, AsmSp last_arg )
 {
     nat args = bco->sp - last_arg;
     if (args != 0) { /* optimisation */
-        emit_i1(bco,i_ARG_CHECK,args);
+        emiti_8(bco,i_ARG_CHECK,args);
         grabHpNonUpd(bco,PAP_sizeW(args-1));
         resetHp(bco,0);
     }
@@ -777,7 +770,7 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
     int offset;
 
     if (rep == VOID_REP) {
-        emit_i0(bco,i_VOID);
+        emiti_(bco,i_VOID);
         bco->sp += repSizeW(rep);
         return;
     }
@@ -788,21 +781,12 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
     case INT_REP:
             emit_i_VAR_INT(bco,offset);
             break;
-#ifdef PROVIDE_INT64
-    case INT64_REP:
-            emit_i_VAR_INT64(bco,offset);
-            break;
-#endif
-#ifdef PROVIDE_WORD
     case WORD_REP:
             emit_i_VAR_WORD(bco,offset);
             break;
-#endif
-#ifdef PROVIDE_ADDR
     case ADDR_REP:
             emit_i_VAR_ADDR(bco,offset);
             break;
-#endif
     case CHAR_REP:
             emit_i_VAR_CHAR(bco,offset);
             break;
@@ -818,9 +802,7 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
             break;
 #endif
 
-#ifdef PROVIDE_INTEGER
     case INTEGER_REP:
-#endif
 #ifdef PROVIDE_WEAK
     case WEAK_REP: 
 #endif
@@ -832,13 +814,11 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
     case GAMMA_REP:    /* c			   */ 
     case HANDLER_REP:  /* IOError -> IO a	   */
     case ERROR_REP:    /* IOError		   */
-#ifdef PROVIDE_ARRAY		
     case ARR_REP    :  /* PrimArray              a */
     case BARR_REP   :  /* PrimByteArray          a */
     case REF_REP    :  /* Ref                  s a */
     case MUTARR_REP :  /* PrimMutableArray     s a */
     case MUTBARR_REP:  /* PrimMutableByteArray s a */
-#endif
 #ifdef PROVIDE_CONCURRENT
     case THREADID_REP: /* ThreadId	           */
     case MVAR_REP:     /* MVar a	           */
@@ -870,7 +850,7 @@ void asmEndEnter( AsmBCO bco, AsmSp sp1, AsmSp sp2 )
         emit_i_SLIDE(bco,x,y);
         bco->sp -= sp1 - sp2;
     }
-    emit_i0(bco,i_ENTER);
+    emiti_(bco,i_ENTER);
 }
 
 /* --------------------------------------------------------------------------
@@ -881,42 +861,32 @@ AsmVar asmBox( AsmBCO bco, AsmRep rep )
 {
     switch (rep) {
     case CHAR_REP:
-            emit_i0(bco,i_PACK_CHAR);
+            emiti_(bco,i_PACK_CHAR);
             grabHpNonUpd(bco,Czh_sizeW);
             break;
     case INT_REP:
-            emit_i0(bco,i_PACK_INT);
+            emiti_(bco,i_PACK_INT);
             grabHpNonUpd(bco,Izh_sizeW);
             break;
-#ifdef PROVIDE_INT64
-    case INT64_REP:
-            emit_i0(bco,i_PACK_INT64);
-            grabHpNonUpd(bco,I64zh_sizeW);
-            break;
-#endif
-#ifdef PROVIDE_WORD
     case WORD_REP:
-            emit_i0(bco,i_PACK_WORD);
+            emiti_(bco,i_PACK_WORD);
             grabHpNonUpd(bco,Wzh_sizeW);
             break;
-#endif
-#ifdef PROVIDE_ADDR
     case ADDR_REP:
-            emit_i0(bco,i_PACK_ADDR);
+            emiti_(bco,i_PACK_ADDR);
             grabHpNonUpd(bco,Azh_sizeW);
             break;
-#endif
     case FLOAT_REP:
-            emit_i0(bco,i_PACK_FLOAT);
+            emiti_(bco,i_PACK_FLOAT);
             grabHpNonUpd(bco,Fzh_sizeW);
             break;
     case DOUBLE_REP:
-            emit_i0(bco,i_PACK_DOUBLE);
+            emiti_(bco,i_PACK_DOUBLE);
             grabHpNonUpd(bco,Dzh_sizeW);
             break;
 #ifdef PROVIDE_STABLE
     case STABLE_REP:
-            emit_i0(bco,i_PACK_STABLE);
+            emiti_(bco,i_PACK_STABLE);
             grabHpNonUpd(bco,Stablezh_sizeW);
             break;
 #endif
@@ -938,35 +908,26 @@ AsmVar asmUnbox( AsmBCO bco, AsmRep rep )
 {
     switch (rep) {
     case INT_REP:
-            emit_i0(bco,i_UNPACK_INT);
+            emiti_(bco,i_UNPACK_INT);
             break;
-#ifdef PROVIDE_INT64
-    case INT64_REP:
-            emit_i0(bco,i_UNPACK_INT64);
-            break;
-#endif
-#ifdef PROVIDE_WORD
     case WORD_REP:
-            emit_i0(bco,i_UNPACK_WORD);
+            emiti_(bco,i_UNPACK_WORD);
             break;
-#endif
-#ifdef PROVIDE_ADDR
     case ADDR_REP:
-            emit_i0(bco,i_UNPACK_ADDR);
+            emiti_(bco,i_UNPACK_ADDR);
             break;
-#endif
     case CHAR_REP:
-            emit_i0(bco,i_UNPACK_CHAR);
+            emiti_(bco,i_UNPACK_CHAR);
             break;
     case FLOAT_REP:
-            emit_i0(bco,i_UNPACK_FLOAT);
+            emiti_(bco,i_UNPACK_FLOAT);
             break;
     case DOUBLE_REP:
-            emit_i0(bco,i_UNPACK_DOUBLE);
+            emiti_(bco,i_UNPACK_DOUBLE);
             break;
 #ifdef PROVIDE_STABLE
     case STABLE_REP:
-            emit_i0(bco,i_UNPACK_STABLE);
+            emiti_(bco,i_UNPACK_STABLE);
             break;
 #endif
     default:
@@ -977,71 +938,6 @@ AsmVar asmUnbox( AsmBCO bco, AsmRep rep )
     return bco->sp;
 }
 
-/* --------------------------------------------------------------------------
- * Return unboxed Ints, Floats, etc
- * ------------------------------------------------------------------------*/
-
-void asmReturnUnboxed( AsmBCO bco, AsmRep rep )
-{
-    switch (rep) {
-    case CHAR_REP:
-            emit_i0(bco,i_RETURN_CHAR);
-            break;
-    case INT_REP:
-            emit_i0(bco,i_RETURN_INT);
-            break;
-#ifdef PROVIDE_INT64
-    case INT64_REP:
-            emit_i0(bco,i_RETURN_INT64);
-            break;
-#endif
-#ifdef PROVIDE_WORD
-    case WORD_REP:
-            emit_i0(bco,i_RETURN_WORD);
-            break;
-#endif
-#ifdef PROVIDE_ADDR
-    case ADDR_REP:
-            emit_i0(bco,i_RETURN_ADDR);
-            break;
-#endif
-    case FLOAT_REP:
-            emit_i0(bco,i_RETURN_FLOAT);
-            break;
-    case DOUBLE_REP:
-            emit_i0(bco,i_RETURN_DOUBLE);
-            break;
-#ifdef PROVIDE_STABLE
-    case STABLE_REP:
-            emit_i0(bco,i_RETURN_STABLE);
-            break;
-#endif
-#ifdef PROVIDE_INTEGER
-    case INTEGER_REP: 
-#endif
-#ifdef PROVIDE_WEAK
-    case WEAK_REP: 
-#endif
-#ifdef PROVIDE_FOREIGN
-    case FOREIGN_REP: 
-#endif
-#ifdef PROVIDE_ARRAY
-    case ARR_REP    :  /* PrimArray              a */
-    case BARR_REP   :  /* PrimByteArray          a */
-    case REF_REP    :  /* Ref                  s a */
-    case MUTARR_REP :  /* PrimMutableArray     s a */
-    case MUTBARR_REP:  /* PrimMutableByteArray s a */
-#endif
-#ifdef PROVIDE_CONCURRENT
-    case THREADID_REP: /* ThreadId                 */ 
-    case MVAR_REP:     /* MVar a                   */ 
-#endif
-            emit_i0(bco,i_RETURN_GENERIC);
-            break;
-    default:
-            barf("asmReturnUnboxed %d",rep);
-    }
-}
 
 /* --------------------------------------------------------------------------
  * Push unboxed Ints, Floats, etc
@@ -1054,41 +950,26 @@ void asmConstInt( AsmBCO bco, AsmInt x )
     bco->sp += repSizeW(INT_REP);
 }
 
-#ifdef PROVIDE_INT64
-void asmConstInt64( AsmBCO bco, AsmInt64 x )
-{
-    emit_i_CONST_INT64(bco,bco->nps.len);
-    asmWords(bco,AsmInt64,x);
-    bco->sp += repSizeW(INT64_REP);
-}
-#endif
-
-#ifdef PROVIDE_INTEGER
 void asmConstInteger( AsmBCO bco, AsmString x )
 {
     emit_i_CONST_INTEGER(bco,bco->nps.len);
     asmWords(bco,AsmString,x);
     bco->sp += repSizeW(INTEGER_REP);
 }
-#endif
 
-#ifdef PROVIDE_ADDR
 void asmConstAddr( AsmBCO bco, AsmAddr x )
 {
     emit_i_CONST_ADDR(bco,bco->nps.len);
     asmWords(bco,AsmAddr,x);
     bco->sp += repSizeW(ADDR_REP);
 }
-#endif
 
-#ifdef PROVIDE_WORD
 void asmConstWord( AsmBCO bco, AsmWord x )
 {
-    emit_i_CONST_INT(bco->nps.len);
-    asmWords(bco,AsmWord,x);
+    emit_i_CONST_INT(bco,bco->nps.len);
+    asmWords(bco,AsmWord,(AsmInt)x);
     bco->sp += repSizeW(WORD_REP);
 }
-#endif
 
 void asmConstChar( AsmBCO bco, AsmChar x )
 {
@@ -1157,20 +1038,12 @@ AsmSp asmBeginAlt( AsmBCO bco )
 
 void asmEndAlt( AsmBCO bco, AsmSp  sp )
 {
-#if 0
-    /* This warning is now redundant since we no longer use the hp/max_hp
-     * information calculated by the assembler 
-     */
-#warning ToDo: adjust hp/max_hp in asmEndAlt
-#endif
     resetSp(bco,sp);
 }
 
 AsmPc asmTest( AsmBCO bco, AsmWord tag )
 {
-    asmInstr8(bco,i_TEST);
-    asmInstr8(bco,tag);
-    asmInstr16(bco,0);
+    emiti_8_16(bco,i_TEST,tag,0);
     return bco->is.len;
 }
 
@@ -1178,8 +1051,7 @@ AsmPc asmTestInt( AsmBCO bco, AsmVar v, AsmInt x )
 {
     asmVar(bco,v,INT_REP);
     asmConstInt(bco,x);
-    asmInstr8(bco,i_TEST_INT);
-    asmInstr16(bco,0);
+    emiti_16(bco,i_TEST_INT,0);
     bco->sp -= 2*repSizeW(INT_REP);
     return bco->is.len;
 }
@@ -1195,7 +1067,7 @@ void asmFixBranch( AsmBCO bco, AsmPc from )
 
 void asmPanic( AsmBCO bco )
 {
-    emit_i0(bco,i_PANIC); /* "irrefutable" pattern failed - oops! */
+    emiti_(bco,i_PANIC); /* "irrefutable" pattern failed - oops! */
 }
 
 /* --------------------------------------------------------------------------
@@ -1209,7 +1081,7 @@ AsmSp asmBeginPrim( AsmBCO bco )
 
 void   asmEndPrim( AsmBCO bco, const AsmPrim* prim, AsmSp base )
 {
-    emit_i1(bco,prim->prefix,prim->opcode);
+    emiti_8(bco,prim->prefix,prim->opcode);
     bco->sp = base;
 }
 
@@ -1255,45 +1127,6 @@ const AsmPrim asmPrimOps[] = {
     , { "primShiftRAInt",            "II", "I",  MONAD_Id, i_PRIMOP1, i_shiftRAInt }
     , { "primShiftRLInt",            "II", "I",  MONAD_Id, i_PRIMOP1, i_shiftRLInt }
 
-#ifdef PROVIDE_INT64
-    /* Int64# operations */
-    , { "primGtInt64",               "zz", "B",  MONAD_Id, i_PRIMOP1, i_gtInt64 }
-    , { "primGeInt64",               "zz", "B",  MONAD_Id, i_PRIMOP1, i_geInt64 }
-    , { "primEqInt64",               "zz", "B",  MONAD_Id, i_PRIMOP1, i_eqInt64 }
-    , { "primNeInt64",               "zz", "B",  MONAD_Id, i_PRIMOP1, i_neInt64 }
-    , { "primLtInt64",               "zz", "B",  MONAD_Id, i_PRIMOP1, i_ltInt64 }
-    , { "primLeInt64",               "zz", "B",  MONAD_Id, i_PRIMOP1, i_leInt64 }
-    , { "primMinInt64",              "",   "z",  MONAD_Id, i_PRIMOP1, i_minInt64 }
-    , { "primMaxInt64",              "",   "z",  MONAD_Id, i_PRIMOP1, i_maxInt64 }
-    , { "primPlusInt64",             "zz", "z",  MONAD_Id, i_PRIMOP1, i_plusInt64 }
-    , { "primMinusInt64",            "zz", "z",  MONAD_Id, i_PRIMOP1, i_minusInt64 }
-    , { "primTimesInt64",            "zz", "z",  MONAD_Id, i_PRIMOP1, i_timesInt64 }
-    , { "primQuotInt64",             "zz", "z",  MONAD_Id, i_PRIMOP1, i_quotInt64 }
-    , { "primRemInt64",              "zz", "z",  MONAD_Id, i_PRIMOP1, i_remInt64 }
-    , { "primQuotRemInt64",          "zz", "zz", MONAD_Id, i_PRIMOP1, i_quotRemInt64 }
-    , { "primNegateInt64",           "z",  "z",  MONAD_Id, i_PRIMOP1, i_negateInt64 }
-
-    , { "primAndInt64",               "zz", "z",  MONAD_Id, i_PRIMOP1, i_andInt64 }
-    , { "primOrInt64",                "zz", "z",  MONAD_Id, i_PRIMOP1, i_orInt64 }
-    , { "primXorInt64",               "zz", "z",  MONAD_Id, i_PRIMOP1, i_xorInt64 }
-    , { "primNotInt64",               "z",  "z",  MONAD_Id, i_PRIMOP1, i_notInt64 }
-    , { "primShiftLInt64",            "zW", "z",  MONAD_Id, i_PRIMOP1, i_shiftLInt64 }
-    , { "primShiftRAInt64",           "zW", "z",  MONAD_Id, i_PRIMOP1, i_shiftRAInt64 }
-    , { "primShiftRLInt64",           "zW", "z",  MONAD_Id, i_PRIMOP1, i_shiftRLInt64 }
-
-    , { "primInt64ToInt",            "z",  "I",  MONAD_Id, i_PRIMOP1, i_int64ToInt }
-    , { "primIntToInt64",            "I",  "z",  MONAD_Id, i_PRIMOP1, i_intToInt64 }
-#ifdef PROVIDE_WORD
-    , { "primInt64ToWord",           "z",  "W",  MONAD_Id, i_PRIMOP1, i_int64ToWord }
-    , { "primWordToInt64",           "W",  "z",  MONAD_Id, i_PRIMOP1, i_wordToInt64 }
-#endif
-    , { "primInt64ToFloat",          "z",  "F",  MONAD_Id, i_PRIMOP1, i_int64ToFloat }
-    , { "primFloatToInt64",          "F",  "z",  MONAD_Id, i_PRIMOP1, i_floatToInt64 }
-    , { "primInt64ToDouble",         "z",  "D",  MONAD_Id, i_PRIMOP1, i_int64ToDouble }
-    , { "primDoubleToInt64",         "D",  "z",  MONAD_Id, i_PRIMOP1, i_doubleToInt64 }
-#endif
-
-#ifdef PROVIDE_WORD
     /* Word# operations */
     , { "primGtWord",                "WW", "B",  MONAD_Id, i_PRIMOP1, i_gtWord }
     , { "primGeWord",                "WW", "B",  MONAD_Id, i_PRIMOP1, i_geWord }
@@ -1321,9 +1154,7 @@ const AsmPrim asmPrimOps[] = {
 
     , { "primIntToWord",             "I",  "W",  MONAD_Id, i_PRIMOP1, i_intToWord }
     , { "primWordToInt",             "W",  "I",  MONAD_Id, i_PRIMOP1, i_wordToInt }
-#endif
 
-#ifdef PROVIDE_ADDR
     /* Addr# operations */
     , { "primGtAddr",                "AA", "B",  MONAD_Id, i_PRIMOP1, i_gtAddr }
     , { "primGeAddr",                "AA", "B",  MONAD_Id, i_PRIMOP1, i_geAddr }
@@ -1336,12 +1167,7 @@ const AsmPrim asmPrimOps[] = {
 
     , { "primIndexCharOffAddr",      "AI", "C",  MONAD_Id, i_PRIMOP1, i_indexCharOffAddr }
     , { "primIndexIntOffAddr",       "AI", "I",  MONAD_Id, i_PRIMOP1, i_indexIntOffAddr }
-#ifdef PROVIDE_INT64
-    , { "primIndexInt64OffAddr",     "AI", "z",  MONAD_Id, i_PRIMOP1, i_indexInt64OffAddr }
-#endif
-#ifdef PROVIDE_WORD
     , { "primIndexWordOffAddr",      "AI", "W",  MONAD_Id, i_PRIMOP1, i_indexWordOffAddr }
-#endif
     , { "primIndexAddrOffAddr",      "AI", "A",  MONAD_Id, i_PRIMOP1, i_indexAddrOffAddr }
     , { "primIndexFloatOffAddr",     "AI", "F",  MONAD_Id, i_PRIMOP1, i_indexFloatOffAddr }
     , { "primIndexDoubleOffAddr",    "AI", "D",  MONAD_Id, i_PRIMOP1, i_indexDoubleOffAddr }
@@ -1352,12 +1178,7 @@ const AsmPrim asmPrimOps[] = {
     /* These ops really ought to be in the IO monad */
     , { "primReadCharOffAddr",       "AI", "C",  MONAD_ST, i_PRIMOP1, i_readCharOffAddr }
     , { "primReadIntOffAddr",        "AI", "I",  MONAD_ST, i_PRIMOP1, i_readIntOffAddr }
-#ifdef PROVIDE_INT64                 
-    , { "primReadInt64OffAddr",      "AI", "z",  MONAD_ST, i_PRIMOP1, i_readInt64OffAddr }
-#endif                               
-#ifdef PROVIDE_WORD
     , { "primReadWordOffAddr",       "AI", "W",  MONAD_ST, i_PRIMOP1, i_readWordOffAddr }
-#endif
     , { "primReadAddrOffAddr",       "AI", "A",  MONAD_ST, i_PRIMOP1, i_readAddrOffAddr }
     , { "primReadFloatOffAddr",      "AI", "F",  MONAD_ST, i_PRIMOP1, i_readFloatOffAddr }
     , { "primReadDoubleOffAddr",     "AI", "D",  MONAD_ST, i_PRIMOP1, i_readDoubleOffAddr }
@@ -1368,12 +1189,7 @@ const AsmPrim asmPrimOps[] = {
     /* These ops really ought to be in the IO monad */
     , { "primWriteCharOffAddr",      "AIC", "",  MONAD_ST, i_PRIMOP1, i_writeCharOffAddr }
     , { "primWriteIntOffAddr",       "AII", "",  MONAD_ST, i_PRIMOP1, i_writeIntOffAddr }
-#ifdef PROVIDE_INT64
-    , { "primWriteInt64OffAddr",     "AIz", "",  MONAD_ST, i_PRIMOP1, i_writeInt64OffAddr }
-#endif
-#ifdef PROVIDE_WORD
     , { "primWriteWordOffAddr",      "AIW", "",  MONAD_ST, i_PRIMOP1, i_writeWordOffAddr }
-#endif
     , { "primWriteAddrOffAddr",      "AIA", "",  MONAD_ST, i_PRIMOP1, i_writeAddrOffAddr }
     , { "primWriteFloatOffAddr",     "AIF", "",  MONAD_ST, i_PRIMOP1, i_writeFloatOffAddr }
     , { "primWriteDoubleOffAddr",    "AID", "",  MONAD_ST, i_PRIMOP1, i_writeDoubleOffAddr }
@@ -1381,9 +1197,6 @@ const AsmPrim asmPrimOps[] = {
     , { "primWriteStableOffAddr",    "AIs", "",  MONAD_ST, i_PRIMOP1, i_writeStableOffAddr }
 #endif
 
-#endif /* PROVIDE_ADDR */
-
-#ifdef PROVIDE_INTEGER
     /* Integer operations */
     , { "primCompareInteger",        "ZZ", "I",  MONAD_Id, i_PRIMOP1, i_compareInteger }
     , { "primNegateInteger",         "Z",  "Z",  MONAD_Id, i_PRIMOP1, i_negateInteger }
@@ -1394,19 +1207,12 @@ const AsmPrim asmPrimOps[] = {
     , { "primDivModInteger",         "ZZ", "ZZ", MONAD_Id, i_PRIMOP1, i_divModInteger }
     , { "primIntegerToInt",          "Z",  "I",  MONAD_Id, i_PRIMOP1, i_integerToInt }
     , { "primIntToInteger",          "I",  "Z",  MONAD_Id, i_PRIMOP1, i_intToInteger }
-#ifdef PROVIDE_INT64
-    , { "primIntegerToInt64",        "Z",  "z",  MONAD_Id, i_PRIMOP1, i_integerToInt64 }
-    , { "primInt64ToInteger",        "z",  "Z",  MONAD_Id, i_PRIMOP1, i_int64ToInteger }
-#endif
-#ifdef PROVIDE_WORD
     , { "primIntegerToWord",         "Z",  "W",  MONAD_Id, i_PRIMOP1, i_integerToWord }
     , { "primWordToInteger",         "W",  "Z",  MONAD_Id, i_PRIMOP1, i_wordToInteger }
-#endif
     , { "primIntegerToFloat",        "Z",  "F",  MONAD_Id, i_PRIMOP1, i_integerToFloat }
     , { "primFloatToInteger",        "F",  "Z",  MONAD_Id, i_PRIMOP1, i_floatToInteger }
     , { "primIntegerToDouble",       "Z",  "D",  MONAD_Id, i_PRIMOP1, i_integerToDouble }
     , { "primDoubleToInteger",       "D",  "Z",  MONAD_Id, i_PRIMOP1, i_doubleToInteger }
-#endif
 
     /* Float# operations */
     , { "primGtFloat",               "FF", "B",  MONAD_Id, i_PRIMOP1, i_gtFloat }
@@ -1441,14 +1247,8 @@ const AsmPrim asmPrimOps[] = {
     , { "primCoshFloat",             "F",  "F",  MONAD_Id, i_PRIMOP1, i_coshFloat }
     , { "primTanhFloat",             "F",  "F",  MONAD_Id, i_PRIMOP1, i_tanhFloat }
     , { "primPowerFloat",            "FF", "F",  MONAD_Id, i_PRIMOP1, i_powerFloat }
-#ifdef PROVIDE_INT64
-    , { "primDecodeFloatz",          "F",  "zI", MONAD_Id, i_PRIMOP1, i_decodeFloatz }
-    , { "primEncodeFloatz",          "zI", "F",  MONAD_Id, i_PRIMOP1, i_encodeFloatz }
-#endif
-#ifdef PROVIDE_INTEGER
     , { "primDecodeFloatZ",          "F",  "ZI", MONAD_Id, i_PRIMOP1, i_decodeFloatZ }
     , { "primEncodeFloatZ",          "ZI", "F",  MONAD_Id, i_PRIMOP1, i_encodeFloatZ }
-#endif
     , { "primIsNaNFloat",            "F",  "B",  MONAD_Id, i_PRIMOP1, i_isNaNFloat }
     , { "primIsInfiniteFloat",       "F",  "B",  MONAD_Id, i_PRIMOP1, i_isInfiniteFloat }
     , { "primIsDenormalizedFloat",   "F",  "B",  MONAD_Id, i_PRIMOP1, i_isDenormalizedFloat }
@@ -1490,29 +1290,14 @@ const AsmPrim asmPrimOps[] = {
     , { "primCoshDouble",            "D",  "D",  MONAD_Id, i_PRIMOP1, i_coshDouble }
     , { "primTanhDouble",            "D",  "D",  MONAD_Id, i_PRIMOP1, i_tanhDouble }
     , { "primPowerDouble",           "DD", "D",  MONAD_Id, i_PRIMOP1, i_powerDouble }
-#ifdef PROVIDE_INT64
-    , { "primDecodeDoublez",         "D",  "zI", MONAD_Id, i_PRIMOP1, i_decodeDoublez }
-    , { "primEncodeDoublez",         "zI",  "D", MONAD_Id, i_PRIMOP1, i_encodeDoublez }
-#endif
-#ifdef PROVIDE_INTEGER
     , { "primDecodeDoubleZ",         "D",  "ZI", MONAD_Id, i_PRIMOP1, i_decodeDoubleZ }
     , { "primEncodeDoubleZ",         "ZI",  "D", MONAD_Id, i_PRIMOP1, i_encodeDoubleZ }
-#endif
     , { "primIsNaNDouble",           "D",  "B",  MONAD_Id, i_PRIMOP1, i_isNaNDouble }
     , { "primIsInfiniteDouble",      "D",  "B",  MONAD_Id, i_PRIMOP1, i_isInfiniteDouble }
     , { "primIsDenormalizedDouble",  "D",  "B",  MONAD_Id, i_PRIMOP1, i_isDenormalizedDouble }
     , { "primIsNegativeZeroDouble",  "D",  "B",  MONAD_Id, i_PRIMOP1, i_isNegativeZeroDouble }
     , { "primIsIEEEDouble",          "",   "B",  MONAD_Id, i_PRIMOP1, i_isIEEEDouble }
 
-
-    /* Polymorphic force :: a -> (# #) */
-      /* , { "primForce",                 "a",  "",   MONAD_Id, i_PRIMOP2, i_force } */
-
-    /* Error operations - not in IO monad! */
-      //, { "primRaise",                 "E",  "a",  MONAD_Id, i_PRIMOP2, i_raise }
-      //, { "primCatch'",                "aH", "a",  MONAD_Id, i_PRIMOP2, i_catch }
-
-#ifdef PROVIDE_ARRAY
     /* Ref operations */
     , { "primNewRef",                "a",  "R",  MONAD_ST, i_PRIMOP2, i_newRef }
     , { "primWriteRef",              "Ra", "",   MONAD_ST, i_PRIMOP2, i_writeRef }
@@ -1543,28 +1328,17 @@ const AsmPrim asmPrimOps[] = {
     , { "primReadIntArray",          "mI",  "I", MONAD_ST, i_PRIMOP2, i_readIntArray }
     , { "primIndexIntArray",         "xI",  "I", MONAD_Id, i_PRIMOP2, i_indexIntArray }
 
-#ifdef PROVIDE_INT64
-    , { "primWriteInt64Array",       "mIz", "",  MONAD_ST, i_PRIMOP2, i_writeInt64Array }
-    , { "primReadInt64Array",        "mI",  "z", MONAD_ST, i_PRIMOP2, i_readInt64Array }
-    , { "primIndexInt64Array",       "xI",  "z", MONAD_Id, i_PRIMOP2, i_indexInt64Array }
-#endif
-
     /* {new,write,read,index}IntegerArray not provided */
 
-#ifdef PROVIDE_WORD
     , { "primWriteWordArray",        "mIW", "",  MONAD_ST, i_PRIMOP2, i_writeWordArray }
     , { "primReadWordArray",         "mI",  "W", MONAD_ST, i_PRIMOP2, i_readWordArray }
     , { "primIndexWordArray",        "xI",  "W", MONAD_Id, i_PRIMOP2, i_indexWordArray }
-#endif                                 
-#ifdef PROVIDE_ADDR                    
     , { "primWriteAddrArray",        "mIA", "",  MONAD_ST, i_PRIMOP2, i_writeAddrArray }
     , { "primReadAddrArray",         "mI",  "A", MONAD_ST, i_PRIMOP2, i_readAddrArray }
     , { "primIndexAddrArray",        "xI",  "A", MONAD_Id, i_PRIMOP2, i_indexAddrArray }
-#endif                                
     , { "primWriteFloatArray",       "mIF", "",  MONAD_ST, i_PRIMOP2, i_writeFloatArray }
     , { "primReadFloatArray",        "mI",  "F", MONAD_ST, i_PRIMOP2, i_readFloatArray }
     , { "primIndexFloatArray",       "xI",  "F", MONAD_Id, i_PRIMOP2, i_indexFloatArray }
-                                     
     , { "primWriteDoubleArray" ,     "mID", "",  MONAD_ST, i_PRIMOP2, i_writeDoubleArray }
     , { "primReadDoubleArray",       "mI",  "D", MONAD_ST, i_PRIMOP2, i_readDoubleArray }
     , { "primIndexDoubleArray",      "xI",  "D", MONAD_Id, i_PRIMOP2, i_indexDoubleArray }
@@ -1577,7 +1351,6 @@ const AsmPrim asmPrimOps[] = {
 
     /* {new,write,read,index}ForeignObjArray not provided */
 
-#endif PROVIDE_ARRAY
 
 #ifdef PROVIDE_FOREIGN
     /* ForeignObj# operations */
@@ -1651,10 +1424,10 @@ const AsmPrim* asmFindPrimop( AsmInstr prefix, AsmInstr op )
 AsmBCO asm_BCO_catch ( void )
 {
    AsmBCO bco = asmBeginBCO(0 /*NIL*/);
-   emit_i1(bco,i_ARG_CHECK,2);
-   emit_i1(bco,i_PRIMOP1,i_pushcatchframe);
+   emiti_8(bco,i_ARG_CHECK,2);
+   emiti_8(bco,i_PRIMOP1,i_pushcatchframe);
    bco->sp += (1-2)*sizeofW(StgPtr) + sizeofW(StgCatchFrame);
-   emit_i0(bco,i_ENTER);
+   emiti_(bco,i_ENTER);
    asmEndBCO(bco);
    return bco;
 }
@@ -1662,8 +1435,8 @@ AsmBCO asm_BCO_catch ( void )
 AsmBCO asm_BCO_raise ( void )
 {
    AsmBCO bco = asmBeginBCO(0 /*NIL*/);
-   emit_i1(bco,i_ARG_CHECK,1);
-   emit_i1(bco,i_PRIMOP2,i_raise);
+   emiti_8(bco,i_ARG_CHECK,1);
+   emiti_8(bco,i_PRIMOP2,i_raise);
    asmEndBCO(bco);
    return bco;
 }
@@ -1673,21 +1446,21 @@ AsmBCO asm_BCO_seq ( void )
    AsmBCO eval, cont;
 
    cont = asmBeginBCO(0 /*NIL*/);
-   emit_i1(cont,i_ARG_CHECK,2);
+   emiti_8(cont,i_ARG_CHECK,2);
    emit_i_VAR(cont,1);
    emit_i_SLIDE(cont,1,2);
-   emit_i0(cont,i_ENTER);
+   emiti_(cont,i_ENTER);
    cont->sp += 3*sizeofW(StgPtr);
    asmEndBCO(cont);
 
    eval = asmBeginBCO(0 /*NIL*/);
-   emit_i1(eval,i_ARG_CHECK,2);
+   emiti_8(eval,i_ARG_CHECK,2);
    emit_i_RETADDR(eval,eval->object.ptrs.len);
    asmPtr(eval,&(cont->object));
    emit_i_VAR(eval,2);
    emit_i_SLIDE(eval,3,1);
-   emit_i1(eval,i_PRIMOP1,i_pushseqframe);
-   emit_i0(eval,i_ENTER);
+   emiti_8(eval,i_PRIMOP1,i_pushseqframe);
+   emiti_(eval,i_ENTER);
    eval->sp += sizeofW(StgSeqFrame) + 4*sizeofW(StgPtr);
    asmEndBCO(eval);
 
@@ -1701,7 +1474,7 @@ AsmBCO asm_BCO_seq ( void )
 AsmVar asmAllocCONSTR   ( AsmBCO bco, AsmInfo info )
 {
     ASSERT( sizeW_fromITBL(info) >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
-    emit_i1(bco,i_ALLOC_CONSTR,bco->nps.len);
+    emiti_8(bco,i_ALLOC_CONSTR,bco->nps.len);
     asmWords(bco,AsmInfo,info);
     bco->sp += sizeofW(StgClosurePtr);
     grabHpNonUpd(bco,sizeW_fromITBL(info));
@@ -1720,7 +1493,7 @@ void asmEndPack( AsmBCO bco, AsmVar v, AsmSp start, AsmInfo info )
     assert(start >= v);
     /* only reason to include info is for this assertion */
     assert(info->layout.payload.ptrs == size);
-    emit_i1(bco,i_PACK,bco->sp - v);
+    emit_i_PACK(bco, bco->sp - v);
     bco->sp = start;
 }
 
@@ -1731,12 +1504,12 @@ void asmBeginUnpack( AsmBCO bco )
 
 void asmEndUnpack( AsmBCO bco )
 {
-    emit_i0(bco,i_UNPACK);
+    emiti_(bco,i_UNPACK);
 }
 
 AsmVar asmAllocAP( AsmBCO bco, AsmNat words )
 {
-    emit_i1(bco,i_ALLOC_AP,words);
+    emiti_8(bco,i_ALLOC_AP,words);
     bco->sp += sizeofW(StgPtr);
     grabHpUpd(bco,AP_sizeW(words));
     return bco->sp;
@@ -1756,7 +1529,7 @@ void asmEndMkAP( AsmBCO bco, AsmVar v, AsmSp start )
 
 AsmVar asmAllocPAP( AsmBCO bco, AsmNat size )
 {
-    emit_i1(bco,i_ALLOC_PAP,size);
+    emiti_8(bco,i_ALLOC_PAP,size);
     bco->sp += sizeofW(StgPtr);
     return bco->sp;
 }
@@ -1768,7 +1541,7 @@ AsmSp asmBeginMkPAP( AsmBCO bco )
 
 void asmEndMkPAP( AsmBCO bco, AsmVar v, AsmSp start )
 {
-    emit_i2(bco,i_MKPAP,bco->sp-v,bco->sp-start-1);
+    emiti_8_8(bco,i_MKPAP,bco->sp-v,bco->sp-start-1);
             /* -1 because fun isn't counted */
     bco->sp = start;
 }
@@ -1798,7 +1571,6 @@ AsmInfo asmMkInfo( AsmNat tag, AsmNat ptrs )
     info->layout.payload.nptrs = nptrs;
     info->srt_len = tag;
     info->type    = CONSTR;
-    info->flags   = FLAGS_CONSTR;
 #ifdef USE_MINIINTERPRETER
     info->entry   = stgCast(StgFunPtr,&Hugs_CONSTR_entry);
 #else

@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:10 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:07:01 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -25,7 +25,6 @@
  * ------------------------------------------------------------------------*/
 
 static Void   local kindError           Args((Int,Constr,Constr,String,Kind,Int));
-#if !IGNORE_MODULES
 static Void   local checkQualImport     Args((Pair));
 static Void   local checkUnqualImport   Args((Triple));
 
@@ -43,7 +42,6 @@ static Void   local importName          Args((Module,Name));
 static Void   local importTycon         Args((Module,Tycon));
 static Void   local importClass         Args((Module,Class));
 static List   local checkExports        Args((List));
-#endif
 
 static Void   local checkTyconDefn      Args((Tycon));
 static Void   local depConstrs          Args((Tycon,List,Cell));
@@ -51,11 +49,6 @@ static List   local addSels             Args((Int,Name,List,List));
 static List   local selectCtxt          Args((List,List));
 static Void   local checkSynonyms       Args((List));
 static List   local visitSyn            Args((List,Tycon,List));
-#if EVAL_INSTANCES
-static Void   local deriveEval          Args((List));
-static List   local calcEvalContexts    Args((Tycon,List,List));
-static Void   local checkBanged         Args((Name,Kinds,List,Type));
-#endif
 static Type   local instantiateSyn      Args((Type,Type));
 
 static Void   local checkClassDefn      Args((Class));
@@ -180,13 +173,8 @@ static List   local bscc                Args((List));
 static Void   local addRSsigdecls       Args((Pair));
 static Void   local allNoPrevDef        Args((Cell));
 static Void   local noPrevDef           Args((Int,Cell));
-#if IGNORE_MODULES
-static Void   local duplicateErrorAux   Args((Int,Text,String));
-#define duplicateError(l,m,t,k) duplicateErrorAux(l,t,k)
-#else
 static Void   local duplicateErrorAux   Args((Int,Module,Text,String));
 #define duplicateError(l,m,t,k) duplicateErrorAux(l,m,t,k)
-#endif
 static Void   local checkTypeIn         Args((Pair));
 
 /* --------------------------------------------------------------------------
@@ -265,7 +253,6 @@ Kind   extKind;                         /* Kind of extension, *->row->row  */
 String reloadModule;
 #endif
 
-#if !IGNORE_MODULES
 Void startModule(nm)                             /* switch to a new module */
 Cell nm; {
     Module m;
@@ -377,7 +364,8 @@ Cell   entity; { /* Entry from import list */
                             if (DOTDOT == snd(entity)) {
                                 imports=dupOnto(tycon(f).defn,imports);
                             } else {
-                                imports=checkSubentities(imports,snd(entity),tycon(f).defn,"constructor of type",t);
+                                imports=checkSubentities(imports,snd(entity),tycon(f).defn,
+                                                         "constructor of type",t);
                             }
                             break;
                         default:;
@@ -392,7 +380,8 @@ Cell   entity; { /* Entry from import list */
                         if (DOTDOT == snd(entity)) {
                             return dupOnto(cclass(f).members,imports);
                         } else {
-                            return checkSubentities(imports,snd(entity),cclass(f).members,"member of class",t);
+                            return checkSubentities(imports,snd(entity),cclass(f).members,
+                                   "member of class",t);
                         }
                     }
                 }
@@ -634,14 +623,16 @@ Cell e; {
             switch (tycon(nm).what) {
             case SYNONYM:
                 if (DOTDOT!=parts) {
-                    ERRMSG(0) "Explicit constructor list given for type synonym \"%s\" in export list of module \"%s\"",
+                    ERRMSG(0) "Explicit constructor list given for type synonym"
+                              " \"%s\" in export list of module \"%s\"",
                               identToStr(ident),
                               textToStr(mt)
                     EEND;
                 }
                 return cons(pair(nm,DOTDOT),exports);
             case RESTRICTSYN:   
-                ERRMSG(0) "Transparent export of restricted type synonym \"%s\" in export list of module \"%s\"",
+                ERRMSG(0) "Transparent export of restricted type synonym"
+                          " \"%s\" in export list of module \"%s\"",
                           identToStr(ident),
                           textToStr(mt)
                 EEND;
@@ -692,7 +683,7 @@ List exports; {
 #endif
     return es;
 }
-#endif
+
 
 /* --------------------------------------------------------------------------
  * Static analysis of type declarations:
@@ -1152,158 +1143,6 @@ List  syns; {
     return removeCell(t,syns);
 }
 
-#if EVAL_INSTANCES
-/* --------------------------------------------------------------------------
- * The following code is used in calculating contexts for the automatically
- * derived Eval instances for newtype and restricted type synonyms.  This is
- * ugly code, resulting from an ugly feature in the language, and I hope that
- * the feature, and hence the code, will be removed in the not too distant
- * future.
- * ------------------------------------------------------------------------*/
-
-static Void local deriveEval(tcs)       /* Derive instances of Eval        */
-List tcs; {
-    List ts1 = tcs;
-    List ts  = NIL;
-    for (; nonNull(ts1); ts1=tl(ts1)) { /* Build list of rsyns and newtypes*/
-        Tycon t = hd(ts1);              /* and derive instances for data   */
-        switch (whatIs(tycon(t).what)) {
-            case DATATYPE    : addEvalInst(tycon(t).line,t,tycon(t).arity,NIL);
-                               break;
-            case NEWTYPE     :
-            case RESTRICTSYN : ts = cons(t,ts);
-                               break;
-        }
-    }
-    emptySubstitution();                /* then derive other instances     */
-    while (nonNull(ts)) {
-        ts = calcEvalContexts(hd(ts),tl(ts),NIL);
-    }
-    emptySubstitution();
-
-    for (; nonNull(tcs); tcs=tl(tcs)) { /* Check any banged components     */
-        Tycon t = hd(tcs);
-        if (whatIs(tycon(t).what)==DATATYPE) {
-            List cs = tycon(t).defn;
-            for (; hasCfun(cs); cs=tl(cs)) {
-                Name c = hd(cs);
-                if (isPair(name(c).defn)) {
-                    Type  t    = name(c).type;
-                    List  scs  = fst(name(c).defn);
-                    Kinds ks   = NIL;
-                    List  ctxt = NIL;
-                    Int   n    = 1;
-                    if (isPolyType(t)) {
-                        ks = polySigOf(t);
-                        t  = monotypeOf(t);
-                    }
-                    if (whatIs(t)==QUAL) {
-                        ctxt = fst(snd(t));
-                        t    = snd(snd(t));
-                    }
-                    for (; nonNull(scs); scs=tl(scs)) {
-                        Int i = intOf(hd(scs));
-                        for (; n<i; n++) {
-                                t = arg(t);
-                        }
-                        checkBanged(c,ks,ctxt,arg(fun(t)));
-                    }
-                }
-            }
-        }
-    }
-}
-
-static List local calcEvalContexts(tc,ts,ps)
-Tycon tc;                               /* Worker code for deriveEval      */
-List  ts;                               /* ts = not visited, ps = visiting */
-List  ps; {
-    Cell ctxt = NIL;
-    Int  o    = newKindedVars(tycon(tc).kind);
-    Type t    = tycon(tc).defn;
-    Int  i;
-
-    if (whatIs(tycon(tc).what)==NEWTYPE) {
-        t = name(hd(t)).type;
-        if (isPolyType(t)) {
-            t = monotypeOf(t);
-        }
-        if (whatIs(t)==QUAL) {
-            t = snd(snd(t));
-        }
-        if (whatIs(t)==EXIST) {         /* No instance if existentials used*/
-            return ts;
-        }
-        if (whatIs(t)==RANK2) {         /* No instance if arg is poly/qual */
-            return ts;
-        }
-        t = arg(fun(t));
-    }
-
-    clearMarks();                       /* Make sure generics are marked   */
-    for (i=0; i<tycon(tc).arity; i++) { /* in the correct order.           */
-        copyTyvar(o+i);
-    }
-
-    for (;;) {
-        Type h = getDerefHead(t,o);
-        if (isSynonym(h) && argCount>=tycon(h).arity) {
-            expandSyn(h,argCount,&t,&o);
-        } else if (isOffset(h)) {               /* Stop if var at head     */
-            ctxt = singleton(ap(classEval,copyType(t,o)));
-            break;
-        } else if (isTuple(h)                   /* Check for tuples ...    */
-                   || h==tc                     /* ... direct recursion    */
-                   || cellIsMember(h,ps)        /* ... mutual recursion    */
-                   || tycon(h).what==DATATYPE) {/* ... or datatype.        */
-            break;                              /* => empty context        */
-        } else {
-            Cell pi = ap(classEval,t);
-            Inst in;
-
-            if (cellIsMember(h,ts)) {           /* Not yet visited?        */
-                ts = calcEvalContexts(h,removeCell(h,ts),cons(h,ts));
-            }
-<<<<<<<<<<<<<< variant A
->>>>>>>>>>>>>> variant B
-
-======= end of combination
-            if (nonNull(in=findInstFor(pi,o))) {/* Look for Eval instance  */
-                List qs = inst(in).specifics;
-                Int  o1 = typeOff;
-                if (isNull(qs)) {               /* No context there        */
-                    break;                      /* => empty context here   */
-                }
-                if (isNull(tl(qs)) && classEval==fun(hd(qs))) {
-                    t = arg(hd(qs));
-                    o = o1;
-                    continue;
-                }
-            }
-            return ts;                          /* No instance, so give up */
-        }
-    }
-    addEvalInst(tycon(tc).line,tc,tycon(tc).arity,ctxt);
-    return ts;
-}
-
-static Void local checkBanged(c,ks,ps,ty)
-Name  c;                                /* Check that banged component of c */
-Kinds ks;                               /* with type ty is an instance of   */
-List  ps;                               /* Eval under the predicates in ps. */
-Type  ty; {                             /* (All types using ks)             */
-    Cell pi = ap(classEval,ty);
-    if (isNull(provePred(ks,ps,pi))) {
-        ERRMSG(name(c).line) "Illegal datatype strictness annotation:" ETHEN
-        ERRTEXT "\n*** Constructor : "  ETHEN ERREXPR(c);
-        ERRTEXT "\n*** Context     : "  ETHEN ERRCONTEXT(ps);
-        ERRTEXT "\n*** Required    : "  ETHEN ERRPRED(pi);
-        ERRTEXT "\n"
-        EEND;
-    }
-}
-#endif
-
 /* --------------------------------------------------------------------------
  * Expanding out all type synonyms in a type expression:
  * ------------------------------------------------------------------------*/
@@ -1543,7 +1382,6 @@ Class c; {                              /* and other parts of class struct.*/
     List ns  = NIL;                     /* List of names                   */
     Int  mno;                           /* Member function number          */
 
-    //printf ( "\naddMembers: class = %s\n", textToStr ( cclass(c).text ) );
     for (mno=0; mno<cclass(c).numSupers; mno++) {
         ns = cons(newDSel(c,mno),ns);
     }
@@ -1613,13 +1451,11 @@ Class parent; {
         EEND;
     }
 
-    name(m).line   = l;
-    name(m).arity  = 1;
-    name(m).number = mfunNo(no);
-    name(m).type   = t;
-    //printf ( "   [%d %d] %s :: ", m, m-NAMEMIN, textToStr ( name(m).text ) );
-    //printType(stdout, t );
-    //printf ( "\n" );
+    name(m).line     = l;
+    name(m).arity    = 1;
+    name(m).number   = mfunNo(no);
+    name(m).type     = t;
+    name(m).inlineMe = TRUE;
     return m;
 }
 
@@ -1630,18 +1466,18 @@ Int   no; {
     char buf[16];
 
     sprintf(buf,"sc%d.%s",no,"%s");
-    s              = newName(generateText(buf,c),c);
-    name(s).line   = cclass(c).line;
-    name(s).arity  = 1;
-    name(s).number = DFUNNAME;
+    s                = newName(generateText(buf,c),c);
+    name(s).line     = cclass(c).line;
+    name(s).arity    = 1;
+    name(s).number   = DFUNNAME;
     return s;
 }
 
 static Name local newDBuild(c)          /* Make definition for builder     */
 Class c; {
-    Name b         = newName(generateText("class.%s",c),c);
-    name(b).line   = cclass(c).line;
-    name(b).arity  = cclass(c).numSupers+1;
+    Name b           = newName(generateText("class.%s",c),c);
+    name(b).line     = cclass(c).line;
+    name(b).arity    = cclass(c).numSupers+1;
     return b;
 }
 
@@ -2437,13 +2273,6 @@ Inst in; {
         ERRMSG(line) "Illegal predicate in instance declaration"
         EEND;
     }
-#if EVAL_INSTANCES
-    if (inst(in).c==classEval) {
-        ERRMSG(line) "Instances of class \"%s\" are generated automatically",
-                     textToStr(cclass(inst(in).c).text)
-        EEND;
-    }
-#endif
     kindInst(in,length(tyvars));
     insertInst(in);
 
@@ -2615,30 +2444,6 @@ Int   n; {
     cts = rev(cts);
     addDerInst(0,c,NIL,cts,mkTuple(n),n);
 }
-
-#if EVAL_INSTANCES
-Void addEvalInst(line,t,arity,ctxt)     /* Add dummy instance for Eval     */
-Int  line;
-Cell t;
-Int  arity;
-List ctxt; {
-    Inst in   = newInst();
-    Cell head = t;
-    Int  i;
-    for (i=0; i<arity; i++) {
-        head = ap(head,mkOffset(i));
-    }
-    inst(in).line         = line;
-    inst(in).c            = classEval;
-    inst(in).head         = ap(classEval,head);
-    inst(in).specifics    = ctxt;
-    inst(in).builder      = newInstImp(in);
-    inst(in).numSpecifics = length(ctxt);
-    kindInst(in,arity);
-    cclass(classEval).instances
-             = appendOnto(cclass(classEval).instances,singleton(in));
-}
-#endif
 
 #if TREX
 Inst addRecShowInst(c,e)                /* Generate instance for ShowRecRow*/
@@ -3158,11 +2963,6 @@ Cell p; {
         case CONIDCELL : 
         case CONOPCELL : return checkApPat(line,0,p);
 
-#if BIGNUMS
-        case ZERONUM   :
-        case POSNUM    :
-        case NEGNUM    :
-#endif
         case WILDCARD  :
         case STRCELL   :
         case CHARCELL  :
@@ -3907,12 +3707,6 @@ Cell e; {                               /* :: OpExp                        */
                                 if (nneg&1)             /* for literals    */
                                     arg(temp) = mkInt(-intOf(arg(temp)));
                             }
-#if BIGNUMS
-                            else if (isBignum(arg(temp))) {
-                                if (nneg&1)
-                                    arg(temp) = bigNeg(arg(temp));
-                            }
-#endif
                             else if (isFloat(arg(temp))) {
                                 if (nneg&1)
                                     arg(temp) = floatNegate(arg(temp));
@@ -4100,9 +3894,6 @@ List bs; {                              /* top level, reporting on progress*/
 
     mapProc(addDepField,bs);           /* add extra field for dependents   */
     for (xs=bs; nonNull(xs); xs=tl(xs)) {
-
-      //Printf("\n-----------------------------------------\n" ); print(hd(xs),1000); Printf("\n");
-
         emptySubstitution();
         depBinding(hd(xs));
         soFar((Target)(i++));
@@ -4333,16 +4124,12 @@ Cell e; {
                           break;
 #endif
 
-#if BIGNUMS
-        case ZERONUM    :
-        case POSNUM     :
-        case NEGNUM     :
-#endif
         case NAME       :
         case TUPLE      :
         case STRCELL    :
         case CHARCELL   :
         case FLOATCELL  :
+        case BIGCELL    :
         case INTCELL    : break;
 
         case COND       : depTriple(line,snd(e));
@@ -4496,11 +4283,9 @@ Cell e; {
         EEND;
     }
 
-#if !IGNORE_MODULES
     if (!moduleThisScript(name(n).mod)) {
         return n;
     }
-#endif
     /* Later phases of the system cannot cope if we resolve references
      * to unprocessed objects too early.  This is the main reason that
      * we cannot cope with recursive modules at the moment.
@@ -4516,11 +4301,9 @@ Cell e; {
         ERRMSG(line) "Undefined qualified variable \"%s\"", identToStr(e)
         EEND;
     }
-#if !IGNORE_MODULES
     if (name(n).mod != currentModule) {
         return n;
     }
-#endif
     if (fst(e) == VARIDCELL) {
         e = mkVar(qtextOf(e));
     } else {
@@ -4766,12 +4549,9 @@ Void checkExp() {                       /* Top level static check on Expr  */
 }
 
 Void checkDefns() {                     /* Top level static analysis       */
-#if !IGNORE_MODULES
     Module thisModule = lastModule();
-#endif
     staticAnalysis(RESET);
 
-#if !IGNORE_MODULES
     setCurrModule(thisModule);
 
     /* Resolve module references */
@@ -4790,7 +4570,6 @@ Void checkDefns() {                     /* Top level static analysis       */
                                             module(thisModule).qualImports);
     }
     mapProc(checkImportList, unqualImports);
-#endif
 
     linkPreludeTC();                    /* Get prelude tycons and classes  */
     mapProc(checkTyconDefn,tyconDefns); /* validate tycon definitions      */
@@ -4807,21 +4586,13 @@ Void checkDefns() {                     /* Top level static analysis       */
     setCurrModule(thisModule);
     mapProc(addDerivImp,derivedInsts);  /* Add impls for derived instances */
     deriveContexts(derivedInsts);       /* Calculate derived inst contexts */
-#if EVAL_INSTANCES
-    deriveEval(tyconDefns);             /* Derive instances of Eval        */
-#endif
     instDefns  = appendOnto(instDefns,derivedInsts);
     checkDefaultDefns();                /* validate default definitions    */
 
     mapProc(addRSsigdecls,typeInDefns); /* add sigdecls for RESTRICTSYN    */
-#if 0 /* from STG */
-    valDefns = eqnsToBindings(valDefns);/* translate value equations       */
-    map1Proc(opDefined,valDefns,opDefns);/*check all declared ops bound    */
-#else /* from 98 */
     valDefns   = eqnsToBindings(valDefns,tyconDefns,classDefns, NIL/*primDefns*/ );
     tyconDefns = NIL;
-    /* primDefns  = NIL; */
-#endif
+
     mapProc(allNoPrevDef,valDefns);     /* check against previous defns    */
 
     linkPreludeNames();
@@ -4831,13 +4602,11 @@ Void checkDefns() {                     /* Top level static analysis       */
     foreignImports = NIL;
     foreignExports = NIL;
 
-#if !IGNORE_MODULES
     /* Every top-level name has now been created - so we can build the     */
     /* export list.  Note that this has to happen before dependency        */
     /* analysis so that references to Prelude.foo will be resolved         */
     /* when compiling the prelude.                                         */
     module(thisModule).exports = checkExports(module(thisModule).exports);
-#endif
 
     mapProc(checkTypeIn,typeInDefns);   /* check restricted synonym defns  */
 
@@ -4889,16 +4658,6 @@ Cell v; {
     name(n).line = line;
 }
 
-#if IGNORE_MODULES
-static Void local duplicateErrorAux(line,t,kind) /* report duplicate defn */
-Int    line;
-Text   t;
-String kind; {
-    ERRMSG(line) "Definition of %s \"%s\" clashes with import", kind,
-                 textToStr(t)
-    EEND;
-}
-#else /* !IGNORE_MODULES */
 static Void local duplicateErrorAux(line,mod,t,kind)/* report duplicate defn */
 Int    line;
 Module mod;
@@ -4914,7 +4673,6 @@ String kind; {
         EEND;
     }
 }
-#endif /* !IGNORE_MODULES */
 
 static Void local checkTypeIn(cvs)      /* Check that vars in restricted   */
 Pair cvs; {                             /* synonym are defined             */

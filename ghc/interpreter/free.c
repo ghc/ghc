@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: free.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:29 $
+ * $Revision: 1.4 $
+ * $Date: 1999/04/27 10:06:52 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -72,17 +72,18 @@ List freeVarsBind( List acc, StgVar v )
 
 static List freeVarsAlt( List acc, StgCaseAlt alt )
 {
-    StgPat pat = stgCaseAltPat(alt);
-    acc = freeVarsExpr(acc,stgCaseAltBody(alt));
-    if (!isDefaultPat(pat)) {
-        acc = diffList(acc,stgPatVars(pat));
+    if (isDefaultAlt(alt)) {
+        acc = freeVarsExpr(acc,stgDefaultBody(alt));
+        return deleteCell(acc,stgDefaultVar(alt)); 
+    } else {
+        acc = freeVarsExpr(acc,stgCaseAltBody(alt));
+        return diffList(acc,stgCaseAltVars(alt));
     }
-    return deleteCell(acc,pat);
 }
 
 static List freeVarsPrimAlt( List acc, StgPrimAlt alt )
 {
-    List vs = stgPrimAltPats(alt);
+    List vs = stgPrimAltVars(alt);
     acc = freeVarsExpr(acc,stgPrimAltBody(alt));
     return diffList(acc,vs);
 }
@@ -115,6 +116,9 @@ static List freeVarsExpr( List acc, StgExpr e )
     case NAME:
             return acc;  /* Names are never free vars */
     default:
+printf("\n\n");
+ppStgExpr(e);
+printf("\n");
             internal("freeVarsExpr");
     }
 }

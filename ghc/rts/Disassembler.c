@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:23 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:07:19 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -41,7 +41,7 @@ static InstrPtr disNone      ( StgBCO *bco, InstrPtr pc, char* i )
 static InstrPtr disInt       ( StgBCO *bco, InstrPtr pc, char* i )
 {
     StgInt x = bcoInstr(bco,pc++);
-    ASSERT(pc < bco->n_instrs);
+    ASSERT(pc <= bco->n_instrs);
     fprintf(stderr,"%s %d",i,x);
     return pc;
 }
@@ -49,7 +49,7 @@ static InstrPtr disInt       ( StgBCO *bco, InstrPtr pc, char* i )
 static InstrPtr disInt16      ( StgBCO *bco, InstrPtr pc, char* i )
 {
     StgInt x = bcoInstr16(bco,pc); pc+=2;
-    ASSERT(pc < bco->n_instrs);
+    ASSERT(pc <= bco->n_instrs);
     fprintf(stderr,"%s %d",i,x);
     return pc;
 }
@@ -223,6 +223,14 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disInt(bco,pc,"PACK");
     case i_SLIDE:
             return disIntInt(bco,pc,"SLIDE");
+    case i_RV:
+            return disIntInt(bco,pc,"R_V");
+    case i_RVE:
+            return disIntInt(bco,pc,"R_V_E");
+    case i_VV:
+            return disIntInt(bco,pc,"V_V");
+    case i_SE:
+            return disIntInt(bco,pc,"S_E");
     case i_SLIDE_big:
             return disIntInt16(bco,pc,"SLIDE_big");
     case i_ENTER:
@@ -246,8 +254,6 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
 
     case i_VOID:
             return disNone(bco,pc,"VOID");
-    case i_RETURN_GENERIC:
-            return disNone(bco,pc,"RETURN_GENERIC");
 
     case i_VAR_INT:
             return disInt(bco,pc,"VAR_INT");
@@ -257,8 +263,6 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disConstInt(bco,pc,"CONST_INT");
     case i_CONST_INT_big:
             return disConstInt16(bco,pc,"CONST_INT_big");
-    case i_RETURN_INT:
-            return disNone(bco,pc,"RETURN_INT");
     case i_PACK_INT:
             return disNone(bco,pc,"PACK_INT");
     case i_UNPACK_INT:
@@ -266,37 +270,20 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
     case i_TEST_INT:
             return disPC(bco,pc,"TEST_INT");
 
-#ifdef PROVIDE_INT64
-    case i_VAR_INT64:
-            return disInt(bco,pc,"VAR_INT64");
-    case i_CONST_INT64:
-            return disConstInt(bco,pc,"CONST_INT64");
-    case i_RETURN_INT64:
-            return disNone(bco,pc,"RETURN_INT64");
-    case i_PACK_INT64:
-            return disNone(bco,pc,"PACK_INT64");
-    case i_UNPACK_INT64:
-            return disNone(bco,pc,"UNPACK_INT64");
-#endif
-#ifdef PROVIDE_INTEGER
     case i_CONST_INTEGER:
             return disConstAddr(bco,pc,"CONST_INTEGER");
     case i_CONST_INTEGER_big:
             return disConstAddr16(bco,pc,"CONST_INTEGER_big");
-#endif
-#ifdef PROVIDE_WORD
+
     case i_VAR_WORD:
             return disInt(bco,pc,"VAR_WORD");
     case i_CONST_WORD:
             return disConstInt(bco,pc,"CONST_WORD");
-    case i_RETURN_WORD:
-            return disNone(bco,pc,"RETURN_WORD");
     case i_PACK_WORD:
             return disNone(bco,pc,"PACK_WORD");
     case i_UNPACK_WORD:
             return disNone(bco,pc,"UNPACK_WORD");
-#endif
-#ifdef PROVIDE_ADDR
+
     case i_VAR_ADDR:
             return disInt(bco,pc,"VAR_ADDR");
     case i_VAR_ADDR_big:
@@ -305,13 +292,11 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disConstAddr(bco,pc,"CONST_ADDR");
     case i_CONST_ADDR_big:
             return disConstAddr16(bco,pc,"CONST_ADDR_big");
-    case i_RETURN_ADDR:
-            return disNone(bco,pc,"RETURN_ADDR");
     case i_PACK_ADDR:
             return disNone(bco,pc,"PACK_ADDR");
     case i_UNPACK_ADDR:
             return disNone(bco,pc,"UNPACK_ADDR");
-#endif
+
     case i_VAR_CHAR:
             return disInt(bco,pc,"VAR_CHAR");
     case i_VAR_CHAR_big:
@@ -320,8 +305,6 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disConstChar(bco,pc,"CONST_CHAR");
     case i_CONST_CHAR_big:
             return disConstChar16(bco,pc,"CONST_CHAR_big");
-    case i_RETURN_CHAR:
-            return disNone(bco,pc,"RETURN_CHAR");
     case i_PACK_CHAR:
             return disNone(bco,pc,"PACK_CHAR");
     case i_UNPACK_CHAR:
@@ -335,8 +318,6 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disConstFloat(bco,pc,"CONST_FLOAT");
     case i_CONST_FLOAT_big:
             return disConstFloat16(bco,pc,"CONST_FLOAT_big");
-    case i_RETURN_FLOAT:
-            return disNone(bco,pc,"RETURN_FLOAT");
     case i_PACK_FLOAT:
             return disNone(bco,pc,"PACK_FLOAT");
     case i_UNPACK_FLOAT:
@@ -350,8 +331,6 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disConstDouble(bco,pc,"CONST_DOUBLE");
     case i_CONST_DOUBLE_big:
             return disConstDouble16(bco,pc,"CONST_DOUBLE_big");
-    case i_RETURN_DOUBLE:
-            return disNone(bco,pc,"RETURN_DOUBLE");
     case i_PACK_DOUBLE:
             return disNone(bco,pc,"PACK_DOUBLE");
     case i_UNPACK_DOUBLE:
@@ -360,8 +339,6 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
 #ifdef PROVIDE_STABLE
     case i_VAR_STABLE:
             return disInt(bco,pc,"VAR_STABLE");
-    case i_RETURN_STABLE:
-            return disNone(bco,pc,"RETURN_STABLE");
     case i_PACK_STABLE:
             return disNone(bco,pc,"PACK_STABLE");
     case i_UNPACK_STABLE:

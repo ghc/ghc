@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:46 $
+ * $Revision: 1.5 $
+ * $Date: 1999/04/27 10:06:53 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -101,6 +101,10 @@ static Int  local yylex           Args((Void));
 static Int  local repeatLast      Args((Void));
 
 static Void local parseInput      Args((Int));
+
+static Bool local doesNotExceed   Args((String,Int,Int));
+static Int  local stringToInt     Args((String,Int));
+
 
 /* --------------------------------------------------------------------------
  * Text values for reserved words and special symbols:
@@ -667,47 +671,64 @@ static Text local readIdent() {        /* read identifier                  */
     return findText(tokenStr);
 }
 
+
+static Bool local doesNotExceed(s,radix,limit)
+String s;
+Int    radix;
+Int    limit; {
+    Int n = 0;
+    Int p = 0;
+    while (TRUE) {
+        if (s[p] == 0) return TRUE;
+        if (overflows(n,radix,s[p]-'0',limit)) return FALSE;
+        n = radix*n + (s[p]-'0');
+        p++;
+    }
+}
+
+static Int local stringToInt(s,radix)
+String s;
+Int    radix; {
+    Int n = 0;
+    Int p = 0;
+    while (TRUE) {
+        if (s[p] == 0) return n;
+        n = radix*n + (s[p]-'0');
+        p++;
+    }
+}
+
 static Cell local readRadixNumber(r)   /* Read literal in specified radix  */
 Int r; {                               /* from input of the form 0c{digs}  */
     Int d;                                                                 
+    startToken();
     skip();                            /* skip leading zero                */
-    if ((d=readHexDigit(c1))<0 || d>=r)/* Special case; no digits, lex as  */
-        return mkInt(0);               /* if it had been written "0 c..."  */
-    else {
-        Int  n = 0;
-#if BIGNUMS
-        Cell big = NIL;
-#endif
+    if ((d=readHexDigit(c1))<0 || d>=r) {
+        /* Special case; no digits, lex as  */
+        /* if it had been written "0 c..."  */
+        saveTokenChar('0');
+    } else {
         skip();
         do {
-#if BIGNUMS
-            if (nonNull(big))
-                big = bigShift(big,d,r);
-            else if (overflows(n,r,d,MAXPOSINT))
-                big = bigShift(bigInt(n),d,r);
-            else
-#else
-            if (overflows(n,r,d,MAXPOSINT)) {
-                ERRMSG(row) "Integer literal out of range"
-                EEND;
-            }
-            else
-#endif
-                n = r*n + d;
+            saveTokenChar('0'+readHexDigit(c0));
             skip();
             d = readHexDigit(c0);
         } while (d>=0 && d<r);
-#if BIGNUMS
-        return nonNull(big) ? big : mkInt(n);
-#else
-        return mkInt(n);
-#endif
+    }
+    endToken();
+
+    if (doesNotExceed(tokenStr,r,MAXPOSINT))
+        return mkInt(stringToInt(tokenStr,r));
+    else 
+    if (r == 10)
+        return stringToBignum(tokenStr);
+    else {
+        ERRMSG(row) "Hexadecimal or octal constant exceeds `Int' range"
+        EEND;
     }
 }
 
 static Cell local readNumber() {        /* read numeric constant           */
-    Int   n           = 0;
-    Bool  intTooLarge = FALSE;
 
     if (c0=='0') {
         if (c1=='x' || c1=='X')         /* Maybe a hexadecimal literal?    */
@@ -718,23 +739,15 @@ static Cell local readNumber() {        /* read numeric constant           */
 
     startToken();
     do {
-        if (overflows(n,10,(c0-'0'),MAXPOSINT))
-            intTooLarge = TRUE;
-        n  = 10*n  + (c0-'0');
         saveTokenChar(c0);
         skip();
     } while (isISO(c0) && isIn(c0,DIGIT));
 
     if (c0!='.' || !isISO(c1) || !isIn(c1,DIGIT)) {
         endToken();
-        if (!intTooLarge)
-            return mkInt(n);
-#if BIGNUMS
-        return bigStr(tokenStr);
-#else
-        ERRMSG(row) "Integer literal out of range"
-        EEND;
-#endif
+        if (doesNotExceed(tokenStr,10,MAXPOSINT))
+            return mkInt(stringToInt(tokenStr,10)); else
+            return stringToBignum(tokenStr);
     }
 
     saveTokenChar(c0);                  /* save decimal point              */
@@ -769,6 +782,12 @@ static Cell local readNumber() {        /* read numeric constant           */
     endToken();
     return mkFloat(stringToFloat(tokenStr));
 }
+
+
+
+
+
+
 
 static Cell local readChar() {         /* read character constant          */
     Cell charRead;

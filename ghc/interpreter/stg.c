@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:13 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:07:04 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -23,18 +23,6 @@
  * Utility functions
  * ------------------------------------------------------------------------*/
 
-int stgConTag( StgDiscr d )
-{
-    switch (whatIs(d)) {
-    case NAME:
-            return cfunOf(d);
-    case TUPLE: 
-            return 0;
-    default: 
-            internal("stgConTag");
-    }
-}
-
 void* stgConInfo( StgDiscr d )
 {
     switch (whatIs(d)) {
@@ -47,7 +35,6 @@ void* stgConInfo( StgDiscr d )
     }
 }
 
-/* ToDo: identical to stgConTag */
 int stgDiscrTag( StgDiscr d )
 {
     switch (whatIs(d)) {
@@ -119,7 +106,6 @@ StgExpr makeStgIf( StgExpr cond, StgExpr e1, StgExpr e2 )
 
 Bool isStgVar(e)
 StgRhs e; {
-  //printf("{%d %d %d} ", namePMFail, e, whatIs(e) );
     switch (whatIs(e)) {
     case STGVAR:
             return TRUE;
@@ -150,18 +136,9 @@ StgVar mkStgVar( StgRhs rhs, Cell info )
     return ap(STGVAR,triple(rhs,mkStgRep(PTR_REP),info));
 }
 
-/*-------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
  * STG pretty printer
- *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
- *
- * $RCSfile: stg.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:13 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -177,8 +154,9 @@ static Void local putStgAtoms     Args((List as));
 static Void local putStgBinds     Args((List));
 static Void local putStgExpr      Args((StgExpr));
 static Void local putStgRhs       Args((StgRhs));
-static Void local putStgPat       Args((StgPat));
-static Void local putStgPrimPat   Args((StgPrimPat));
+static Void local putStgPat       Args((StgCaseAlt));
+static Void local putStgPrimPat   Args((StgPrimAlt));
+
 
 
 /* --------------------------------------------------------------------------
@@ -199,15 +177,23 @@ Int n; {
  * ------------------------------------------------------------------------*/
 
 static Void putStgAlts    ( Int left, List alts );
-//static Void putStgPrimAlt ( Int left, List vs, StgExpr body );
 
 static Void local putStgVar(StgVar v) 
 {
     if (isName(v)) {
+        if (name(v).inlineMe) putStr("IL__");
         unlexVar(name(v).text);
     } else {
         putStr("id");
         putInt(-v);
+        putStr("<");
+        putChr(charOf(stgVarRep(v)));
+        putStr(">");
+        if (isInt(stgVarInfo(v))) {
+           putStr("(");
+           putInt(intOf(stgVarInfo(v)));
+           putStr(")");
+        }
     }
 }
 
@@ -249,6 +235,10 @@ static Void local putStgAtom( StgAtom a )
             putPtr(ptrOf(a));
             putChr('#');
             break;
+    case LETREC: case LAMBDA: case CASE: case PRIMCASE: 
+    case STGAPP: case STGPRIM: case STGCON:
+            putStgExpr(a);
+            break;
     default: 
             fprintf(stderr,"\nYoiks: "); printExp(stderr,a);
             internal("putStgAtom");
@@ -268,49 +258,44 @@ Void putStgAtoms( List as )
     putChr('}');
 }
 
-Void putStgPat( StgPat pat )
+Void putStgPat( StgCaseAlt alt )
 {
-    putStgVar(pat);
-    if (nonNull(stgVarBody(pat))) {
-        StgDiscr d  = stgConCon(stgVarBody(pat));
-        List     vs = stgConArgs(stgVarBody(pat));
-        putChr('@');
-        switch (whatIs(d)) {
-        case NAME:
-            { 
-                unlexVar(name(d).text);
-                for (; nonNull(vs); vs=tl(vs)) {
-                    putChr(' ');
-                    putStgVar(hd(vs));
-                }
-                break;
-            }
-        case TUPLE: 
-            { 
-                putChr('(');
-                putStgVar(hd(vs));
-                vs=tl(vs);
-                while (nonNull(vs)) {
-                    putChr(',');
-                    putStgVar(hd(vs));
-                    vs=tl(vs);
-                }
-                putChr(')');
-                break;
-            }
-        default: 
-                fprintf(stderr,"\nYoiks: "); printExp(stderr,d);
-                internal("putStgPat");
-        }
-    }
+   if (whatIs(alt)==DEEFALT) {
+      putStgVar(stgDefaultVar(alt));
+   }
+   else
+   if (whatIs(alt)==CASEALT) {
+      List vs = stgCaseAltVars(alt);
+      if (whatIs(stgCaseAltCon(alt))==TUPLE) {
+         putChr('(');
+         putStgVar(hd(vs));
+         vs=tl(vs);
+         while (nonNull(vs)) {
+            putChr(',');
+            putStgVar(hd(vs));
+            vs=tl(vs);
+         }
+         putChr(')');
+       } 
+       else
+       if (whatIs(stgCaseAltCon(alt))==NAME) {
+          unlexVar(name(stgCaseAltCon(alt)).text);
+          for (; nonNull(vs); vs=tl(vs)) {
+             putChr(' ');
+             putStgVar(hd(vs));
+          }
+       } 
+       else
+          internal("putStgPat(2)");
+   }
+   else
+      internal("putStgPat(1)");
 }
 
-Void putStgPrimPat( StgPrimPat pat )  
+Void putStgPrimPat( StgVar v )  
 {
-    putStgVar(pat);
-    if (nonNull(stgVarBody(pat))) {
-        StgExpr d  = stgVarBody(pat);
-        putChr('@');
+    if (nonNull(stgVarBody(v))) {
+        StgExpr d  = stgVarBody(v);
         switch (whatIs(d)) {
         case INTCELL:
             {
@@ -322,6 +307,8 @@ Void putStgPrimPat( StgPrimPat pat )
                 fprintf(stderr,"\nYoiks: "); printExp(stderr,d);
                 internal("putStgPrimPat");
         }
+    } else {
+       putStgVar(v);
     }
     putChr(' ');
 }
@@ -350,23 +337,27 @@ static Void putStgAlts( Int left, List alts )
   if (length(alts) == 1) {
         StgCaseAlt alt = hd(alts);
         putStr("{ ");
-        putStgPat(stgCaseAltPat(alt));
+        putStgPat(alt);
         putStr(" ->\n");
         pIndent(left);
-        putStgExpr(stgCaseAltBody(alt));
+        if (isDefaultAlt(alt))
+           putStgExpr(stgDefaultBody(alt)); else
+           putStgExpr(stgCaseAltBody(alt));
         putStr("}");
     } else {
         putStr("{\n");
         for (; nonNull(alts); alts=tl(alts)) {
             StgCaseAlt alt = hd(alts);
             pIndent(left+2);
-            putStgPat(stgCaseAltPat(alt));
+            putStgPat(alt);
 
-            //putStr(" -> ");
             putStr(" ->\n");
             pIndent(left+4);
 
-            putStgExpr(stgCaseAltBody(alt));
+            if (isDefaultAlt(alt))
+               putStgExpr(stgDefaultBody(alt)); else
+               putStgExpr(stgCaseAltBody(alt));
+
             putStr("\n");
         }
         pIndent(left);
@@ -379,7 +370,7 @@ static Void putStgPrimAlts( Int left, List alts )
     if (length(alts) == 1) {
         StgPrimAlt alt = hd(alts);
         putStr("{ ");
-        mapProc(putStgPrimPat,stgPrimAltPats(alt));
+        mapProc(putStgPrimPat,stgPrimAltVars(alt));
         putStr(" ->\n");
         pIndent(left);
         putStgExpr(stgPrimAltBody(alt));
@@ -389,7 +380,7 @@ static Void putStgPrimAlts( Int left, List alts )
         for (; nonNull(alts); alts=tl(alts)) {
             StgPrimAlt alt = hd(alts);
             pIndent(left+2);
-            mapProc(putStgPrimPat,stgPrimAltPats(alt));
+            mapProc(putStgPrimPat,stgPrimAltVars(alt));
             putStr(" -> ");
             putStgExpr(stgPrimAltBody(alt));
             putStr("\n");
@@ -401,11 +392,22 @@ static Void putStgPrimAlts( Int left, List alts )
 
 Void putStgExpr( StgExpr e )                        /* pretty print expr */
 {
+    if (isNull(e)) putStr("(putStgExpr:NIL)");else
+
     switch (whatIs(e)) {
     case LETREC: 
+        {
+            Int left = outColumn;
             putStgBinds(stgLetBinds(e));
+            if (whatIs(stgLetBody(e))==LETREC) { 
+               putStr("\n"); pIndent(left); 
+            } else
+            if (whatIs(stgLetBody(e))==CASE) { 
+               putStr("\n"); pIndent(left+2); 
+            }
             putStgExpr(stgLetBody(e));
             break;
+        }
     case LAMBDA:
         {   
             Int left = outColumn;
@@ -425,6 +427,15 @@ Void putStgExpr( StgExpr e )                        /* pretty print expr */
             putStgAlts(left,stgCaseAlts(e));
             break;
         }
+    case DEEFALT:
+    case CASEALT:
+            /* a hack; not for regular use */
+            putStgAlts(outColumn,singleton(e));
+            break;
+    case PRIMALT:
+            /* a hack; not for regular use */
+            putStgPrimAlts(outColumn,singleton(e));
+            break;
     case PRIMCASE:
         { 
             Int  left = outColumn;
@@ -442,18 +453,39 @@ Void putStgExpr( StgExpr e )                        /* pretty print expr */
             break;
         }
     case STGAPP: 
-            putStgVar(stgAppFun(e));
+            putStgExpr(stgAppFun(e));
             putStgAtoms(stgAppArgs(e));
+            break;
+    case STGCON:
+            putStgRhs(e);
             break;
     case STGVAR: 
     case NAME: 
             putStgVar(e);
             break;
+    case CHARCELL: 
+    case INTCELL: 
+    case BIGCELL: 
+    case FLOATCELL: 
+    case STRCELL: 
+    case PTRCELL: 
+            putStgAtom(e);
+            break;
+    case AP:
+            /* hope that it's really a list of StgExprs, so map putStgExpr
+               over it */
+            for (;nonNull(e);e=tl(e)) {
+               putStgExpr(hd(e));
+               putStr("\n");
+            }
+            break;
     default: 
-      //fprintf(stderr,"\nYoiks: "); printExp(stderr,e);
-      //internal("putStgExpr");
-      //ToDo: rm this appalling hack
-      fprintf(stderr, "   "); putStgAlts(3,e);
+            internal("putStgExpr");
+            /* Pretend it's a list of algebraic case alternatives.  Used for
+               printing the case-alt lists attached to BCOs which are return
+               continuations.  Very useful for debugging.  An appalling hack tho.
+            */
+            /* fprintf(stderr, "   "); putStgAlts(3,e); */
     }
 }
 
@@ -484,8 +516,8 @@ static void endStgPP( FILE* fp );
 static void beginStgPP( FILE* fp )
 {
     outputStream = fp;
-    //putChr('\n');
     outColumn = 0;
+    fflush(stderr); fflush(stdout);
 }
 
 static void endStgPP( FILE* fp )
@@ -495,10 +527,17 @@ static void endStgPP( FILE* fp )
 
 Void printStg(fp,b)              /* Pretty print sc defn on fp      */
 FILE  *fp;
-StgVar b; 
+StgVar b;
 {
+    Name   n;
     beginStgPP(fp);
-    putStgVar(b);
+    n = nameFromStgVar(b);
+    if (nonNull(n)) {
+       if (name(n).inlineMe) { putStr("INLINE\n"); pIndent(0); };
+       putStr(textToStr(name(n).text));
+    } else {
+       putStgVar(b);
+    }
     putStr(" = ");
     putStgRhs(stgVarBody(b));
     putStr("\n");
@@ -508,56 +547,44 @@ StgVar b;
 #if 1 /*DEBUG_PRINTER*/
 Void ppStg( StgVar v )
 {
-  if ( 1 /*debugCode*/ ) {
-        printStg(stdout,v);
-    }
+   printStg(stdout,v);
 }
 
 Void ppStgExpr( StgExpr e )
 {
-    if ( 1 /*debugCode*/ ) {
-        beginStgPP(stderr);
-        putStgExpr(e);
-        endStgPP(stdout);
-    }
+   beginStgPP(stdout);
+   putStgExpr(e);
+   endStgPP(stdout);
 }
 
 Void ppStgRhs( StgRhs rhs )
 {
-  if (1 /*debugCode*/ ) {
-        beginStgPP(stdout);
-        putStgRhs(rhs);
-        endStgPP(stdout);
-    }
+   beginStgPP(stdout);
+   putStgRhs(rhs);
+   endStgPP(stdout);
 }
 
 Void ppStgAlts( List alts )
 {
-  if (1 /*debugCode*/ ) {
-        beginStgPP(stdout);
-        putStgAlts(0,alts);
-        endStgPP(stdout);
-    }
+   beginStgPP(stdout);
+   putStgAlts(0,alts);
+   endStgPP(stdout);
 }
 
 extern Void ppStgPrimAlts( List alts )
 {
-    if (1 /*debugCode*/ ) {
-        beginStgPP(stdout);
-        putStgPrimAlts(0,alts);
-        endStgPP(stdout);
-    }
+   beginStgPP(stdout);
+   putStgPrimAlts(0,alts);
+   endStgPP(stdout);
 }
 
 extern Void ppStgVars( List vs )
 {
-    if (1 /*debugCode*/ ) {
-        beginStgPP(stdout);
-        printf("Vars: ");
-        putStgVars(vs);
-        printf("\n");
-        endStgPP(stdout);
-    }
+   beginStgPP(stdout);
+   printf("Vars: ");
+   putStgVars(vs);
+   printf("\n");
+   endStgPP(stdout);
 }
 #endif
 

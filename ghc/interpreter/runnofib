@@ -1,0 +1,51 @@
+#!/bin/bash
+
+TROOT=/home/v-julsew/Mar09
+
+STGHUGSFLAGS=-P$TROOT/fpO/ghc/interpreter/lib
+NROOT=$TROOT/fpO/nofib
+HUGZ=$TROOT/fpO/ghc/interpreter
+LD_LIBRARY_PATH=$HUGZ:$LD_LIBRARY_PATH
+HSCPP=$TROOT/fpO/ghc/utils/hscpp
+
+echo
+echo "==================== $1/$2 ===================="
+
+TMPFILE=`mktemp /tmp/nofibXXXXXX`
+if [ $? -ne 0 ]; then
+   echo "$0: Can't create temp file"
+   exit 1
+fi
+
+if [ -f $NROOT/$1/$2/$2.stdin ]
+then 
+echo "$HUGZ/hugs +Q $NROOT/$1/$2/Main*hs -- $3 $4 $5 $6 $7 $8 $9"
+echo "     < $NROOT/$1/$2/$2.stdin 2> /dev/null"
+echo "     > $TMPFILE"
+else
+echo "$HUGZ/hugs +Q $NROOT/$1/$2/Main*hs -- $3 $4 $5 $6 $7 $8 $9"
+echo "     < /dev/null 2> /dev/null"
+echo "     > $TMPFILE"
+fi
+
+if [ -f $NROOT/$1/$2/$2.stdin ]
+then 
+$HUGZ/hugs +Q $NROOT/$1/$2/Main*hs -- $3 $4 $5 $6 $7 $8 $9 < $NROOT/$1/$2/$2.stdin 2> /dev/null > $TMPFILE
+else
+$HUGZ/hugs +Q $NROOT/$1/$2/Main*hs -- $3 $4 $5 $6 $7 $8 $9 < /dev/null  2> /dev/null > $TMPFILE
+fi
+
+if [ $? -ne 0 ]; then
+   echo "=== FAIL (no execution)"
+   rm -f $TMPFILE
+   exit 0
+fi
+
+cmp -s $TMPFILE $NROOT/$1/$2/$2.stdout
+if [ $? -ne 0 ]; then
+   echo "=== FAIL (wrong results)"
+else
+   echo "=== Correct"
+fi
+
+rm -f $TMPFILE

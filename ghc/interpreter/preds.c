@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: preds.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:50 $
+ * $Revision: 1.5 $
+ * $Date: 1999/04/27 10:06:59 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -694,9 +694,6 @@ Int  vn; {                              /* variable vn can be resolved  */
                 aNumClass = TRUE;
             else if (c!=classEq    && c!=classOrd  && c!=classShow &&
                      c!=classRead  && c!=classIx   && c!=classEnum &&
-#if EVAL_INSTANCES
-                     c!=classEval  &&
-#endif
                      c!=classBounded)
                 return FALSE;
 

@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:07 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:06:52 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -52,12 +52,8 @@ static Void   local editor            Args((Void));
 static Void   local find              Args((Void));
 static Bool   local startEdit         Args((Int,String));
 static Void   local runEditor         Args((Void));
-#if IGNORE_MODULES
-#define findEvalModule() doNothing()
-#else
 static Void   local setModule         Args((Void));
 static Module local findEvalModule    Args((Void));
-#endif
 static Void   local evaluator         Args((Void));
 static Void   local stopAnyPrinting   Args((Void));
 static Void   local showtype          Args((Void));
@@ -108,6 +104,8 @@ static Bool   addType      = FALSE;     /* TRUE => print type with value   */
 static Bool   chaseImports = TRUE;      /* TRUE => chase imports on load   */
 static Bool   useDots      = RISCOS;    /* TRUE => use dots in progress    */
 static Bool   quiet        = FALSE;     /* TRUE => don't show progress     */
+       Bool   preludeLoaded = FALSE;
+       Bool   optimise      = TRUE;
 
 static String scriptName[NUM_SCRIPTS];  /* Script file names               */
 static Time   lastChange[NUM_SCRIPTS];  /* Time of last change to script   */
@@ -121,13 +119,13 @@ static Text   evalModule  = 0;          /* Name of module we eval exprs in */
 static String currProject = 0;          /* Name of current project file    */
 static Bool   projectLoaded = FALSE;    /* TRUE => project file loaded     */
 
+static Bool   autoMain   = FALSE;
 static String lastEdit   = 0;           /* Name of script to edit (if any) */
 static Int    lastEdLine = 0;           /* Editor line number (if possible)*/
 static String prompt     = 0;           /* Prompt string                   */
 static Int    hpSize     = DEFAULTHEAP; /* Desired heap size               */
        String hugsEdit   = 0;           /* String for editor command       */
        String hugsPath   = 0;           /* String for file search path     */
-Bool   preludeLoaded     = FALSE;
 
 #if REDIRECT_OUTPUT
 static Bool disableOutput = FALSE;      /* redirect output to buffer?      */
@@ -163,6 +161,13 @@ char *argv[]; {
 
     CStackBase = &argc;                 /* Save stack base for use in gc   */
 
+    /* If first arg is +Q or -Q, be entirely silent, and automatically run
+       main after loading scripts.  Useful for running the nofib suite.    */
+    if (argc > 1 && (strcmp(argv[1],"+Q") == 0 || strcmp(argv[1],"-Q")==0)) {
+       autoMain = TRUE;
+       hugsEnableOutput(0);
+    }
+
     Printf("__   __ __  __  ____   ___     _______________________________________________\n");
     Printf("||   || ||  || ||  || ||__     Hugs 98: The Nottingham and Yale Haskell system\n");
     Printf("||___|| ||__|| ||__||  __||    Copyright (c) 1994-1999\n");
@@ -194,7 +199,8 @@ static Void local initialize(argc,argv)/* Interpreter initialization       */
 Int    argc;
 String argv[]; {
     Script i;
-    String proj = 0;
+    String proj        = 0;
+    char argv_0_orig[1000];
 
     setLastEdit((String)0,0);
     lastEdit      = 0;
@@ -218,10 +224,12 @@ String argv[]; {
 #endif /* USE_REGISTRY */
     readOptions(fromEnv("STGHUGSFLAGS",""));
 
-   startupHaskell ( argc, argv );
+   strncpy(argv_0_orig,argv[0],1000);   /* startupHaskell mangles argv[0] */
+   startupHaskell (argc,argv);
    argc = prog_argc; argv = prog_argv;
 
    for (i=1; i<argc; ++i) {            /* process command line arguments  */
+        if (strcmp(argv[i], "--")==0) break;
         if (strcmp(argv[i],"+")==0 && i+1<argc) {
             if (proj) {
                 ERRMSG(0) "Multiple project filenames on command line"
@@ -236,7 +244,7 @@ String argv[]; {
     }
 
 #ifdef DEBUG
-    DEBUG_LoadSymbols(argv[0]);
+    DEBUG_LoadSymbols(argv_0_orig);
 #endif
 
     scriptName[0] = strCopy(findMPathname(NULL,STD_PRELUDE,hugsPath));
@@ -322,9 +330,6 @@ static Void local optionInfo() {        /* Print information about command */
 #if USE_PREPROCESSOR  && (defined(HAVE_POPEN) || defined(HAVE__POPEN))
     Printf(fmts,"Fstr","Set preprocessor filter to str");
 #endif
-#if PROFILING
-    Printf(fmts,"dnum","Gather profiling statistics every <num> reductions\n");
-#endif
 
     Printf("\nCurrent settings: ");
     togglesIn(TRUE);
@@ -348,9 +353,6 @@ ToDo
 #if USE_PREPROCESSOR  && (defined(HAVE_POPEN) || defined(HAVE__POPEN))
     Printf("\nPreprocessor    : -F");
     printString(preprocessor);
-#endif
-#if PROFILING
-    Printf("\nProfile interval: -d%d", profiling ? profInterval : 0);
 #endif
     Printf("\nCompatibility   : %s", haskell98 ? "Haskell 98"
                                                : "Hugs Extensions");
@@ -410,9 +412,6 @@ static String local optionsToStr() {          /* convert options to string */
 #if USE_PREPROCESSOR  && (defined(HAVE_POPEN) || defined(HAVE__POPEN))
     PUTStr('F',preprocessor);
 #endif
-#if PROFILING
-    PUTInt('d',profiling ? profInterval : 0);
-#endif
     PUTC('\0');
     return buffer;
 }
@@ -450,6 +449,8 @@ String s; {                             /* return FALSE if none found.     */
 
     while (*++s)
         switch (*s) {
+            case 'Q' : break;                           /* already handled */
+
             case 'p' : if (s[1]) {
                            if (prompt) free(prompt);
                            prompt = strCopy(s+1);
@@ -594,9 +595,8 @@ static struct cmd cmds[] = {
  {":reload", RELOAD}, {":gc",   COLLECT}, {":edit",    EDIT},
  {":quit",   QUIT},   {":set",  SET},     {":find",    FIND},
  {":names",  NAMES},  {":info", INFO},    {":project", PROJECT},
-#if !IGNORE_MODULES
+ {":dump",   DUMP},   {":ztats", STATS},
  {":module",SETMODULE}, 
-#endif
  {"",      EVAL},
  {0,0}
 };
@@ -611,9 +611,7 @@ static Void local menu() {
     Printf(":project <filename> use project file\n");
     Printf(":edit <filename>    edit file\n");
     Printf(":edit               edit last module\n");
-#if !IGNORE_MODULES
     Printf(":module <module>    set module for evaluating expressions\n");
-#endif
     Printf("<expr>              evaluate expression\n");
     Printf(":type <expr>        print type of expression\n");
     Printf(":?                  display this list of commands\n");
@@ -625,6 +623,10 @@ static Void local menu() {
     Printf(":!command           shell escape\n");
     Printf(":cd dir             change directory\n");
     Printf(":gc                 force garbage collection\n");
+    Printf(":dump <name>        print STG code for named fn\n");
+#ifdef CRUDE_PROFILING
+    Printf(":ztats <name>       print reduction stats\n");
+#endif
     Printf(":quit               exit Hugs interpreter\n");
 }
 
@@ -654,6 +656,7 @@ struct options toggle[] = {             /* List of command line toggles    */
     {'k', "Show kind errors in full",              &kindExpert},
     {'o', "Allow overlapping instances",           &allowOverlap},
     {'i', "Chase imports while loading modules",   &chaseImports},
+    {'O', "Optimise (improve?) generated code",    &optimise},
 #if DEBUG_CODE
     {'D', "Debug: show generated code",            &debugCode},
 #endif
@@ -975,7 +978,6 @@ Int    line; {
  * Read and evaluate an expression:
  * ------------------------------------------------------------------------*/
 
-#if !IGNORE_MODULES
 static Void local setModule(){/*set module in which to evaluate expressions*/
     String s = readFilename();
     if (!s) s = "";              /* :m clears the current module selection */
@@ -989,7 +991,6 @@ static Module local findEvalModule() { /*Module in which to eval expressions*/
         m = lastModule();
     return m;
 }
-#endif
 
 static Void local evaluator() {        /* evaluate expr and print value    */
     Type  type, bd;
@@ -1018,13 +1019,6 @@ static Void local evaluator() {        /* evaluate expr and print value    */
         EEND;
     }
   
-#if PROFILING
-    if (profiling)
-        profilerLog("profile.hp");
-    numReductions = 0;
-    garbageCollect();
-#endif
-
 #ifdef WANT_TIMER
     updateTimers();
 #endif
@@ -1043,9 +1037,6 @@ static Void local evaluator() {        /* evaluate expr and print value    */
             ERRTEXT   "\n"
             EEND;
         }
-        //inputExpr = ap2(namePrint,d,inputExpr);
-        //inputExpr = ap(nameRunIO,inputExpr);
-
         inputExpr = ap2(findName(findText("show")),d,inputExpr);
         inputExpr = ap(findName(findText("putStr")), inputExpr);
         inputExpr = ap(nameRunIO, inputExpr);
@@ -1075,7 +1066,6 @@ static Void local stopAnyPrinting() {  /* terminate printing of expression,*/
         Putchar('\n');
         if (showStats) {
 #define plural(v)   v, (v==1?"":"s")
-	  /* Printf("(%lu reduction%s, ",plural(numReductions)); */
             Printf("%lu cell%s",plural(numCells));
             if (numGcs>0)
                 Printf(", %u garbage collection%s",plural(numGcs));
@@ -1164,6 +1154,58 @@ Cell   c; {
     }
     return newVar;
 #endif
+}
+
+extern Name nameHw;
+
+static Void local dumpStg() {           /* print STG stuff                 */
+    String s;
+    Text   t;
+    Name   n;
+    Int    i;
+    Cell   v;                           /* really StgVar */
+    setCurrModule(findEvalModule());
+    startNewScript(0);
+    for (; (s=readFilename())!=0;) {
+        t = findText(s);
+        v = n = NIL;
+        /* find the name while ignoring module scopes */
+        for (i=NAMEMIN; i<nameHw; i++)
+           if (name(i).text == t) n = i;
+
+        /* perhaps it's an "idNNNNNN" thing? */
+        if (isNull(n) &&
+            strlen(s) >= 3 && 
+            s[0]=='i' && s[1]=='d' && isdigit(s[2])) {
+           v = 0;
+           i = 2;
+           while (isdigit(s[i])) {
+              v = v * 10 + (s[i]-'0');
+              i++;
+           }
+           v = -v;
+           n = nameFromStgVar(v);
+        }
+
+        if (isNull(n) && whatIs(v)==STGVAR) {
+           Printf ( "\n{- `%s' has no nametable entry -}\n", s );
+           Printf ( "{- stgSize of body is %d -}\n\n", stgSize(stgVarBody(v)));
+           printStg(stderr, v );
+        } else
+        if (isNull(n)) {
+           Printf ( "Unknown reference `%s'\n", s );
+        } else
+	if (!isName(n)) {
+           Printf ( "Not a Name: `%s'\n", s );
+        } else
+        if (isNull(name(n).stgVar)) {
+           Printf ( "Doesn't have a STG tree: %s\n", s );
+        } else {
+           printf ( "\n{- stgVar of `%s' is id%d -}\n", s, -name(n).stgVar);
+           Printf ( "{- stgSize of body is %d -}\n\n", stgSize(stgVarBody(name(n).stgVar)));
+           printStg(stderr, name(n).stgVar);
+        }
+    }
 }
 
 static Void local info() {              /* describe objects                */
@@ -1427,7 +1469,9 @@ String moduleName; {
         internal("Combined prompt and evaluation module name too long");
     }
 #endif
-    consoleInput(promptBuffer);
+    if (autoMain)
+       stringInput("main\0"); else
+       consoleInput(promptBuffer);
 }
 
 /* --------------------------------------------------------------------------
@@ -1440,6 +1484,11 @@ static Void local interpreter(argc,argv)/* main interpreter loop           */
 Int    argc;
 String argv[]; {
     Int errorNumber = setjmp(catch_error);
+
+    if (errorNumber && autoMain) {
+       fprintf(stderr, "hugs +Q: compilation failed -- can't run `main'\n" );
+       exit(1);
+    }
 
     breakOn(TRUE);                      /* enable break trapping           */
     if (numScripts==0) {                /* only succeeds on first time,    */
@@ -1478,11 +1527,9 @@ String argv[]; {
                           break;
             case PROJECT: project();
                           break;
-#if !IGNORE_MODULES
             case SETMODULE :
                           setModule();
                           break;
-#endif
             case EVAL   : evaluator();
                           break;
             case TYPEOF : showtype();
@@ -1495,12 +1542,19 @@ String argv[]; {
                           break;
             case SET    : set();
                           break;
+            case STATS:
+#ifdef CRUDE_PROFILING
+                          cp_show();
+#endif
+                          break;
             case SYSTEM : if (shellEsc(readLine()))
                               Printf("Warning: Shell escape terminated abnormally\n");
                           break;
             case CHGDIR : changeDir();
                           break;
             case INFO   : info();
+                          break;
+            case DUMP   : dumpStg();
                           break;
             case QUIT   : return;
             case COLLECT: consGC = FALSE;
@@ -1516,6 +1570,7 @@ String argv[]; {
         Printf("Elapsed time (ms): %ld (user), %ld (system)\n",
                millisecs(userElapsed), millisecs(systElapsed));
 #endif
+        if (autoMain) break;
     }
     breakOn(FALSE);
 }
@@ -1878,6 +1933,7 @@ Int what; {                     /* system to respond as appropriate ...    */
     typeChecker(what);
     compiler(what);   
     codegen(what);
+    optimiser(what);
 }
 
 /* --------------------------------------------------------------------------
@@ -1887,6 +1943,3 @@ Int what; {                     /* system to respond as appropriate ...    */
 #if HUGS_FOR_WINDOWS
 #include "winhugs.c"
 #endif
-
-/*-------------------------------------------------------------------------*/
-

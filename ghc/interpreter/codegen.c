@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/09 14:51:04 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 10:06:48 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -47,6 +47,8 @@ static AsmBCO cgLambda     ( StgExpr e );
 static AsmBCO cgRhs        ( StgRhs rhs );
 static void   beginTop     ( StgVar v );
 static void   endTop       ( StgVar v );
+
+static StgVar currentTop;
 
 /* --------------------------------------------------------------------------
  * 
@@ -105,11 +107,7 @@ static void cgBind( AsmBCO bco, StgVar v )
 static Void pushVar( AsmBCO bco, StgVar v )
 {
     Cell info = stgVarInfo(v);
-    //    if (!isStgVar(v)) {
-    //printf("\n\nprefail\n");
-    //print(v,1000);
-       assert(isStgVar(v));
-    //}
+    assert(isStgVar(v));
     if (isPtr(info)) {
         asmClosure(bco,ptrOf(info));
     } else if (isInt(info)) {
@@ -134,17 +132,9 @@ static Void pushAtom( AsmBCO bco, StgAtom e )
     case INTCELL: 
             asmConstInt(bco,intOf(e));
             break;
-#if BIGNUM_IS_INTEGER
     case BIGCELL:
             asmConstInteger(bco,bignumToString(e)); 
             break;
-#elif BIGNUM_IS_INT64
-    case BIGCELL:
-            asmConstInt64(bco,bignumOf(e)); 
-            break;
-#else
-#warning What is BIGNUM?
-#endif
     case FLOATCELL: 
 #if 0
             asmConstFloat(bco,e); /* ToDo: support both float and double! */
@@ -175,24 +165,26 @@ static Void pushAtom( AsmBCO bco, StgAtom e )
 
 static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
 {
-    AsmBCO bco = asmBeginContinuation(sp,alts);
+#ifdef CRUDE_PROFILING
+    AsmBCO bco = asmBeginContinuation(sp, currentTop + 1000000000);
+#else
+    AsmBCO bco = asmBeginContinuation(sp, alts);
+#endif
     /* ppStgAlts(alts); */
     for(; nonNull(alts); alts=tl(alts)) {
         StgCaseAlt alt  = hd(alts);
-        StgPat     pat  = stgCaseAltPat(alt);
-        StgExpr    body = stgCaseAltBody(alt);
-        if (isDefaultPat(pat)) {
-	    //AsmSp      begin = asmBeginAlt(bco);
-            cgBind(bco,pat);
-            cgExpr(bco,root,body);
+        if (isDefaultAlt(alt)) {
+            cgBind(bco,stgDefaultVar(alt));
+            cgExpr(bco,root,stgDefaultBody(alt));
             asmEndContinuation(bco);
             return bco; /* ignore any further alternatives */
         } else {
-            StgDiscr con = stgPatDiscr(pat);
-            List     vs  = stgPatVars(pat);
+            StgDiscr con   = stgCaseAltCon(alt);
+            List     vs    = stgCaseAltVars(alt);
             AsmSp    begin = asmBeginAlt(bco);
-            AsmPc    fix = asmTest(bco,stgDiscrTag(con)); /* ToDo: omit in single constructor types! */
-            cgBind(bco,pat);
+            AsmPc    fix   = asmTest(bco,stgDiscrTag(con)); 
+                     /* ToDo: omit in single constructor types! */
+	    asmBind(bco,PTR_REP); /* Adjust simulated sp to acct for return value */
             if (isBoxingCon(con)) {
                 setPos(hd(vs),asmUnbox(bco,boxingConRep(con)));
             } else {
@@ -200,7 +192,7 @@ static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
                 map1Proc(cgBind,bco,reverse(vs));
                 asmEndUnpack(bco);
             }
-            cgExpr(bco,root,body);
+            cgExpr(bco,root,stgCaseAltBody(alt));
             asmEndAlt(bco,begin);
             asmFixBranch(bco,fix);
         }
@@ -216,7 +208,7 @@ static void testPrimPats( AsmBCO bco, AsmSp root, List pats, StgExpr e )
     if (isNull(pats)) {
         cgExpr(bco,root,e);
     } else {
-        StgPrimPat pat = hd(pats);
+        StgVar pat = hd(pats);
         if (isInt(stgVarBody(pat))) {
             /* asmTestInt leaves stack unchanged - so no need to adjust it */
             AsmPc tst = asmTestInt(bco,getPos(pat),intOf(stgVarBody(pat)));
@@ -310,7 +302,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
 
                 for(; nonNull(alts); alts=tl(alts)) {
                     StgPrimAlt alt = hd(alts);
-                    List    pats = stgPrimAltPats(alt);
+                    List    pats = stgPrimAltVars(alt);
                     StgExpr body = stgPrimAltBody(alt);
                     AsmSp altBegin = asmBeginAlt(bco);
                     map1Proc(cgBind,bco,reverse(pats));
@@ -331,7 +323,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
 
                 for(; nonNull(alts); alts=tl(alts)) {
                     StgPrimAlt alt = hd(alts);
-                    List    pats = stgPrimAltPats(alt);
+                    List    pats = stgPrimAltVars(alt);
                     StgExpr body = stgPrimAltBody(alt);
                     AsmSp altBegin = asmBeginAlt(bco);
                     map1Proc(cgBind,bco,pats);
@@ -399,7 +391,9 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
     }
 }
 
-void* itblNames[1000];
+#define M_ITBLNAMES 35000
+
+void* itblNames[M_ITBLNAMES];
 int   nItblNames = 0;
 
 /* allocate space for top level variable
@@ -420,7 +414,8 @@ static Void alloc( AsmBCO bco, StgVar v )
             } else {
 
                 void* vv = stgConInfo(con);
-                assert (nItblNames < (1000-2));
+                if (!(nItblNames < (M_ITBLNAMES-2))) 
+                   internal("alloc -- M_ITBLNAMES too small");
                 if (isName(con)) {
                    itblNames[nItblNames++] = vv;
                    itblNames[nItblNames++] = textToStr(name(con).text);
@@ -438,9 +433,21 @@ static Void alloc( AsmBCO bco, StgVar v )
             }
             break;
         }
-    case STGAPP: 
-            setPos(v,asmAllocAP(bco,length(stgAppArgs(rhs))));
+    case STGAPP: {
+            Int  totSizeW = 0;
+            List bs       = stgAppArgs(rhs);
+            for (; nonNull(bs); bs=tl(bs)) {
+               if (isName(hd(bs))) {
+                  totSizeW += 1;
+               } else {
+                  ASSERT(whatIs(hd(bs))==STGVAR);
+                  totSizeW += asmRepSizeW( charOf(stgVarRep(hd(bs))) );
+               }
+            }
+            setPos(v,asmAllocAP(bco,totSizeW));
+            //ORIGINALLY:setPos(v,asmAllocAP(bco,length(stgAppArgs(rhs))));
             break;
+         }
     case LAMBDA: /* optimisation */
             setObj(v,cgLambda(rhs));
             break;
@@ -548,6 +555,7 @@ static void beginTop( StgVar v )
 {
     StgRhs rhs;
     assert(isStgVar(v));
+    currentTop = v;
     rhs = stgVarBody(v);
     switch (whatIs(rhs)) {
     case STGCON:
@@ -557,7 +565,11 @@ static void beginTop( StgVar v )
             break;
         }
     case LAMBDA:
+#ifdef CRUDE_PROFILING
+            setObj(v,asmBeginBCO(currentTop));
+#else
             setObj(v,asmBeginBCO(rhs));
+#endif
             break;
     default:
             setObj(v,asmBeginCAF());
@@ -568,7 +580,7 @@ static void beginTop( StgVar v )
 static void endTop( StgVar v )
 {
     StgRhs rhs = stgVarBody(v);
-    //ppStgRhs(rhs);
+    currentTop = v;
     switch (whatIs(rhs)) {
     case STGCON:
         {
@@ -656,18 +668,13 @@ Void cgBinds( List binds )
     }
 #endif
 
-    //mapProc(beginTop,binds);
     for (b=binds,i=0; nonNull(b); b=tl(b),i++) {
-      //printf("beginTop %d\n", i);
        beginTop(hd(b));
     }
 
-    //mapProc(endTop,binds);
     for (b=binds,i=0; nonNull(b); b=tl(b),i++) {
+      //printf("endTop %s\n", maybeName(hd(b)));
        endTop(hd(b));
-       //if (lastModule() != modulePrelude) {
-       //    printStg ( stdout, hd(b) ); printf("\n\n");
-       //}
     }
 
     //mapProc(zap,binds);

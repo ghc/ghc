@@ -8,8 +8,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/03/09 14:51:15 $
+ * $Revision: 1.7 $
+ * $Date: 1999/04/27 10:07:08 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -20,6 +20,7 @@
 #include "link.h"
 #include "dynamic.h"
 #include "Assembler.h"
+
 
 /* ---------------------------------------------------------------- */
 
@@ -96,7 +97,7 @@ StgExpr failExpr; {
     case INTCELL:
             return mkStgCon(nameMkI,singleton(e));
     case BIGCELL:
-            return mkStgCon(nameMkBignum,singleton(e));
+            return mkStgCon(nameMkInteger,singleton(e));
     case FLOATCELL:
             return mkStgCon(nameMkD,singleton(e));
     case STRCELL:
@@ -110,7 +111,7 @@ StgExpr failExpr; {
             return mkStgApp(nameUnpackString,singleton(e));
 #endif
     case AP:
-            return stgExpr(e,co,sc,namePMFailBUG);
+            return stgExpr(e,co,sc,namePMFail);
     case NIL:
             internal("stgRhs2");
     default:
@@ -226,13 +227,13 @@ StgExpr failExpr;
                 StgVar dIntegral    = NIL;
 
                 /* bind dictionary */
-                dIntegral = stgRhs(dictIntegral,co,sc,namePMFailBUG);
+                dIntegral = stgRhs(dictIntegral,co,sc,namePMFail);
                 if (!isAtomic(dIntegral)) { /* wasn't atomic */
                     dIntegral = mkStgVar(dIntegral,NIL);
                     binds = cons(dIntegral,binds);
                 }
                 /* box number */
-                n = mkStgVar(mkStgCon(nameMkBignum,singleton(n)),NIL);
+                n = mkStgVar(mkStgCon(nameMkInteger,singleton(n)),NIL);
                 binds = cons(n,binds);
 
                 /* coerce number to right type (using Integral dict) */
@@ -279,7 +280,7 @@ StgExpr failExpr;
                 //StgExpr m     = NIL;
                 Name   box
                     = h == nameFromInt     ? nameMkI
-                    : h == nameFromInteger ? nameMkBignum
+                    : h == nameFromInteger ? nameMkInteger
                     :                        nameMkD;
                 Name   testFun
                     = h == nameFromInt     ? namePmInt
@@ -295,7 +296,7 @@ StgExpr failExpr;
                     altsc = cons(pair(mkOffset(co+i),nv),altsc);
                 }
                 /* bind dictionary */
-                d = stgRhs(dict,co,sc,namePMFailBUG);
+                d = stgRhs(dict,co,sc,namePMFail);
                 if (!isAtomic(d)) { /* wasn't atomic */
                     d = mkStgVar(d,NIL);
                     binds = cons(d,binds);
@@ -394,9 +395,9 @@ StgExpr failExpr;
             for(bs = fst(fst(snd(e))); nonNull(bs); bs=tl(bs), vs=tl(vs)) {
                 Cell rhs = hd(bs);
                 Cell nv  = hd(vs);
-                stgVarBody(nv) = stgRhs(rhs,co,sc,namePMFailBUG);
+                stgVarBody(nv) = stgRhs(rhs,co,sc,namePMFail);
             }
-            return mkStgLet(binds,stgRhs(snd(snd(e)),co,sc,failExpr/*namePMFailBUG*/));
+            return mkStgLet(binds,stgRhs(snd(snd(e)),co,sc,failExpr/*namePMFail*/));
         }
     default: /* convert to an StgApp or StgVar plus some bindings */
         {   
@@ -435,7 +436,7 @@ StgExpr failExpr;
             
             /* Arguments must be StgAtoms */
             for(as=args; nonNull(as); as=tl(as)) {
-                StgRhs a = stgRhs(hd(as),co,sc,namePMFailBUG);
+                StgRhs a = stgRhs(hd(as),co,sc,namePMFail);
 #if 1 /* optional flattening of let bindings */
                 if (whatIs(a) == LETREC) {
                     binds = appendOnto(stgLetBinds(a),binds);
@@ -451,7 +452,7 @@ StgExpr failExpr;
             }
 
             /* Function must be StgVar or Name */
-            e = stgRhs(e,co,sc,namePMFailBUG);
+            e = stgRhs(e,co,sc,namePMFail);
             if (!isStgVar(e) && !isName(e)) {
                 e = mkStgVar(e,NIL);
                 binds = cons(e,binds);
@@ -483,14 +484,7 @@ Void stgDefn( Name n, Int arity, Cell e )
 {
     List vs = NIL;
     List sc = NIL;
-    Int i;
-#if 0
-    if (lastModule() != modulePrelude) {
-       fprintf(stderr, "\n===========================================\n" );
-       ppExp ( n,arity,e);
-       printf("\n\n"); fflush(stdout);
-    }
-#endif
+    Int i, s;
     for (i = 1; i <= arity; ++i) {
         Cell nv = mkStgVar(NIL,NIL);
         vs = cons(nv,vs);
@@ -498,20 +492,18 @@ Void stgDefn( Name n, Int arity, Cell e )
     }
     stgVarBody(name(n).stgVar) 
        = makeStgLambda(vs,stgExpr(e,arity,sc,namePMFail));
-#if 0
-    if (lastModule() != modulePrelude) {
-       ppStg(name(n).stgVar);
-       fprintf(stderr, "\n\n");
+    s = stgSize(stgVarBody(name(n).stgVar));
+    name(n).stgSize = s;
+    if (s <= SMALL_INLINE_SIZE && !name(n).inlineMe) {
+       name(n).inlineMe = TRUE;
     }
-    //printStg(stdout, name(n).stgVar);
-#endif
 }
 
 Void implementCfun(c,scs)               /* Build implementation for constr */
 Name c;                                 /* fun c.  scs lists integers (1..)*/
 List scs; {                             /* in incr order of strict comps.  */
     Int a = name(c).arity;
-    //fprintf ( stderr,"implementCfun %s\n", textToStr(name(c).text) );
+
     if (a > 0) {
         StgVar  vcurr, e1, v, vsi;
         List    args  = makeArgs(a);
@@ -532,6 +524,8 @@ List scs; {                             /* in incr order of strict comps.  */
         StgVar v = mkStgVar(mkStgCon(c,NIL),NIL);
         name(c).stgVar = v;
     }
+    name(c).inlineMe = TRUE;
+    name(c).stgSize = stgSize(stgVarBody(name(c).stgVar));
     stgGlobals = cons(pair(c,name(c).stgVar),stgGlobals); 
     //printStg(stderr, name(c).stgVar); fprintf(stderr,"\n\n");
 }
@@ -563,25 +557,15 @@ static Cell foreignResultTy( Type t )
 {
     if      (t == typeChar)   return mkChar(CHAR_REP);
     else if (t == typeInt)    return mkChar(INT_REP);
-#ifdef PROVIDE_INT64
-    else if (t == typeInt64)  return mkChar(INT64_REP);
-#endif
-#ifdef PROVIDE_INTEGER
     else if (t == typeInteger)return mkChar(INTEGER_REP);
-#endif
-#ifdef PROVIDE_WORD
     else if (t == typeWord)   return mkChar(WORD_REP);
-#endif
-#ifdef PROVIDE_ADDR
     else if (t == typeAddr)   return mkChar(ADDR_REP);
-#endif
     else if (t == typeFloat)  return mkChar(FLOAT_REP);
     else if (t == typeDouble) return mkChar(DOUBLE_REP);
 #ifdef PROVIDE_FOREIGN
     else if (t == typeForeign)return mkChar(FOREIGN_REP); 
          /* ToDo: argty only! */
 #endif
-#ifdef PROVIDE_ARRAY
     else if (t == typePrimByteArray) return mkChar(BARR_REP); 
          /* ToDo: argty only! */
     else if (whatIs(t) == AP) {
@@ -589,7 +573,6 @@ static Cell foreignResultTy( Type t )
         if (h == typePrimMutableByteArray) return mkChar(MUTBARR_REP); 
          /* ToDo: argty only! */
     }
-#endif
    /* ToDo: decent line numbers! */
    ERRMSG(0) "Illegal foreign type" ETHEN
    ERRTEXT " \"" ETHEN ERRTYPE(t);
@@ -607,27 +590,16 @@ static Name repToBox( char c )
     switch (c) {
     case CHAR_REP:    return nameMkC;
     case INT_REP:     return nameMkI;
-#ifdef PROVIDE_INT64
-    case INT64_REP:   return nameMkInt64;
-#endif
-#ifdef PROVIDE_INTEGER
     case INTEGER_REP: return nameMkInteger;
-#endif
-#ifdef PROVIDE_WORD
     case WORD_REP:    return nameMkW;
-#endif
-#ifdef PROVIDE_ADDR
     case ADDR_REP:    return nameMkA;
-#endif
     case FLOAT_REP:   return nameMkF;
     case DOUBLE_REP:  return nameMkD;
-#ifdef PROVIDE_ARRAY
     case ARR_REP:     return nameMkPrimArray;            
     case BARR_REP:    return nameMkPrimByteArray;
     case REF_REP:     return nameMkRef;                  
     case MUTARR_REP:  return nameMkPrimMutableArray;     
     case MUTBARR_REP: return nameMkPrimMutableByteArray; 
-#endif
 #ifdef PROVIDE_STABLE
     case STABLE_REP:  return nameMkStable;
 #endif
@@ -798,7 +770,9 @@ Name n; {
     const AsmPrim* p = name(n).primop;
     StgRhs   rhs = makeStgPrim(n,p->monad!=MONAD_Id,NIL,p->args,p->results);
     StgVar   v   = mkStgVar(rhs,NIL);
-    name(n).stgVar = v;
+    name(n).stgVar   = v;
+    name(n).stgSize  = stgSize(stgVarBody(v));
+    name(n).inlineMe = TRUE;
     stgGlobals=cons(pair(n,v),stgGlobals);  /* so it will get codegened */
 }
 
@@ -874,8 +848,10 @@ Void implementForeignImport( Name n )
             EEND;
         }
         //ppStg(v);
-        name(n).defn = NIL;
-        name(n).stgVar = v; 
+        name(n).defn     = NIL;
+        name(n).stgVar   = v;
+        name(n).stgSize  = stgSize(stgVarBody(v));
+        name(n).inlineMe = TRUE; 
         stgGlobals=cons(pair(n,v),stgGlobals);/*so it will get codegen'd */
     }
 }
@@ -885,6 +861,7 @@ Void implementForeignExport( Name n )
     internal("implementForeignExport: not implemented");
 }
 
+// ToDo: figure out how to set inlineMe for these (non-Name) things
 Void implementTuple(size)
 Int size; {
     if (size > 0) {

@@ -17,7 +17,7 @@ infixl 9  !, //
 data Array ix elt = Array (ix,ix) (PrimArray elt)
 
 array :: Ix a => (a,a) -> [(a,b)] -> Array a b
-array ixs@(ix_start, ix_end) ivs = runST (do
+array ixs@(ix_start, ix_end) ivs = primRunST (do
   { mut_arr <- primNewArray (rangeSize ixs) arrEleBottom
   ; mapM_ (\ (i,v) -> primWriteArray mut_arr (index ixs i) v) ivs 
   ; arr <- primUnsafeFreezeArray mut_arr

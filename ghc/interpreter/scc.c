@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: scc.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:36 $
+ * $Revision: 1.4 $
+ * $Date: 1999/04/27 10:07:01 $
  * ------------------------------------------------------------------------*/
 
 #ifndef SCC_C
@@ -74,20 +74,23 @@ Cell v; {
 #ifdef SCC
 static List local SCC(bs)               /* sort list with added dependency */
 List bs; {                              /* info into SCCs                  */
+    List tmp = NIL;
     clearStack();
     daSccs = NIL;                       /* clear current list of SCCs      */
 
     for (daCount=1; nonNull(bs); bs=tl(bs))      /* visit each binding     */
         if (!visited(hd(bs)))
             LOWLINK(hd(bs));
-
-    return rev(daSccs);                 /* reverse to obtain correct order */
+    tmp = rev(daSccs);
+    daSccs = NIL;
+    return tmp;                         /* reverse to obtain correct order */
 }
 #endif
 
 #ifdef SCC2                             /* Two argument version            */
 static List local SCC2(bs,cs)           /* sort lists with added dependency*/
 List bs, cs; {                          /* info into SCCs                  */
+    List tmp = NIL;
     clearStack();
     daSccs = NIL;                       /* clear current list of SCCs      */
 
@@ -97,8 +100,9 @@ List bs, cs; {                          /* info into SCCs                  */
     for (; nonNull(cs); cs=tl(cs))
         if (!visited(hd(cs)))
             LOWLINK(hd(cs));
-
-    return rev(daSccs);                 /* reverse to obtain correct order */
+    tmp = rev(daSccs);
+    daSccs = NIL;
+    return tmp;                         /* reverse to obtain correct order */
 }
 #endif
 

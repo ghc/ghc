@@ -13,8 +13,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:47:09 $
+ * $Revision: 1.5 $
+ * $Date: 1999/04/27 10:07:22 $
  * ------------------------------------------------------------------------*/
 
 
@@ -34,7 +34,7 @@
  * for HUGSFLAGS in the registry (Win32 only).  In all cases, use a 
  * string of the form -P"...".  
  */
-#define HUGSPATH ""
+#define HUGSPATH "."
 
 /* The directory name which is substituted for the string "{Hugs}"
  * in a path variable.  This normally points to where the Hugs libraries
@@ -104,7 +104,7 @@
 #define LARGE_HUGS   1
 
 #define NUM_SYNTAX         100
-#define NUM_TUPLES         /*100*/ 10
+#define NUM_TUPLES         /*100*/ 20
 #define NUM_OFFSETS        1024
 #define NUM_CHARS          256
 #if TREX
@@ -124,7 +124,7 @@
 
 #define MINIMUMHEAP        Pick(7500,   19000,      19000)
 #define MAXIMUMHEAP        Pick(32765,  0,          0)
-#define DEFAULTHEAP        Pick(28000,  50000,      1500000 /*300000*/ )
+#define DEFAULTHEAP        Pick(28000,  50000,      650000)
 
 #define NUM_SCRIPTS        Pick(64,     100,        100)
 #define NUM_MODULE         NUM_SCRIPTS
@@ -173,58 +173,40 @@
 /* Should quantifiers be displayed in error messages.
  * Warning: not consistently used.
  */
-#define DISPLAY_QUANTIFIERS 1
+#define DISPLAY_QUANTIFIERS 0
 
 /* Flags to determine which raw representations and operations are available
  * Notes:
- * o the INTEGER implementation is quite different from GHC's
- *   implementation so you usually don't PROVIDE_INTEGER if
- *   using GHC compiled code.
  * o if you turn everything on, you might end up with more then 256
  *   bytecodes: check the value of i_ccall (the lst bytecode) to check
- * o Addrs are used to represent literal Strings in Hugs - so you can't
- *   really turn them off.
- * o Either Int64 or Integer has to be provided so that we can
- *   define BIGNUMTYPE (below)
+ * (JRS), 22apr99: I don't think any of the #undef'd ones will work
+ * without attention.  However, standard Haskell 98 is supported 
+ * is supported without needing them.
  */
-
-#define	PROVIDE_INTEGER
-#undef	PROVIDE_INT64
-#undef	PROVIDE_WORD
-#define	PROVIDE_ADDR
 #undef  PROVIDE_STABLE
-#define PROVIDE_FOREIGN
+#undef  PROVIDE_FOREIGN
 #undef  PROVIDE_WEAK
-#define PROVIDE_ARRAY
 #undef  PROVIDE_CONCURRENT
 #undef  PROVIDE_PTREQUALITY
 #undef  PROVIDE_COERCE
 
-/* The following aren't options at the moment - but could be
- * #define PROVIDE_FLOAT
- * #define PROVIDE_DOUBLE
- */
 
-/* Flags to determine how Haskell types are mapped onto internal types.
- * Note that this has to be an injection: you can't have two names
- * for the same internal type.
- * Also, the settings have to be consistent with GHC if GHC is being used.
- */
+/* Set to 1 to use a non-GMP implementation of integer, in the
+   standalone Hugs.  Set to 0 in the combined GHC-Hugs system,
+   in which case GNU MP will be used.
+*/
+#define STANDALONE_INTEGER 1
 
-#define BIGNUM_IS_INTEGER 1
-#define BIGNUM_IS_INT64   0
+/* Enable a crude profiler which counts BCO entries, bytes allocated
+   and bytecode insns executed on a per-fn basis.  Used for assessing
+   the effect of the simplifier/optimiser.
+*/
+#undef CRUDE_PROFILING
 
-#if BIGNUM_IS_INT64
-#define BIGNUMTYPE Int64
-#elif BIGNUM_IS_INTEGER
-#define BIGNUMTYPE Integer
-#else
-#warning BIGNUMTYPE undefined
-#endif
 
 /* Is the default default (Int,Double) or (Integer,Double)?
  */
-#define DEFAULT_BIGNUM 0
+#define DEFAULT_BIGNUM 1
 
 /* Should lambda lifter lift constant expressions out to top level?
  * Experimental optimisation.
@@ -234,7 +216,7 @@
 /* Should we run optimizer on Hugs code?
  * Experimental optimisation.
  */
-#define USE_HUGS_OPTIMIZER 0
+#define USE_HUGS_OPTIMIZER 1
 
 /* Are things being used in an interactive setting or a batch setting?
  * In an interactive setting, System.exitWith should not call _exit
@@ -324,15 +306,6 @@
  * these flags.
  * ------------------------------------------------------------------------*/
 
-/* Define if you want to be able to derive instances of each class. */
-#define DERIVE_EQ      1
-#define DERIVE_ORD     1
-#define DERIVE_ENUM    1
-#define DERIVE_IX      1
-#define DERIVE_SHOW    1
-#define DERIVE_READ    1
-#define DERIVE_BOUNDED 1
-
 /* Define if single-element dictionaries are implemented by newtype.
  * Should be turned on.  Mostly used to make it easier to find which
  * bits of code implement this optimisation and as a way of documenting
@@ -350,9 +323,6 @@
 /* turn this off to avoid wrapping int and float literals in "fromInt"
  * or "fromFloat" */
 #define OVERLOADED_CONSTANTS 1
-
-/* turn this off to remove the ultramagical treatment of the Eval class */
-#define EVAL_INSTANCES 0
 
 /* Define to include support for (n+k) patterns. 
  * Warning: many people in the Haskell committee want to remove n+k patterns.
