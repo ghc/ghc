@@ -1,18 +1,3 @@
-<!DOCTYPE Article PUBLIC "-//OASIS//DTD DocBook V3.1//EN"> 
-
-<Article id="ffi">
-
-<ArtHeader>
-
-<Title>A Haskell foreign function interface</Title>
-<Author><OtherName>The GHC Team</OtherName></Author>
-<Address><Email>glasgow-haskell-&lcub;users,bugs&rcub;@dcs.gla.ac.uk</Email>
-</Address>
-<Edition>version 0.99</Edition>
-<PubDate>May 2000</PubDate>
-
-</ArtHeader>
-
 <Sect1 id="sec-intro">
 <Title>Introduction
 </Title>
@@ -1497,5 +1482,3 @@ in that section was contributed by Sven Panne.)
 </Para>
 
 </Sect1>
-
-</Article>
