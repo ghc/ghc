@@ -37,10 +37,13 @@ import Type		( Type, tyVarsOfType, eqType,
 import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), isNonRec )
 import CmdLineOpts
-import Maybe
-import Util             ( notNull )
 import Outputable
 
+#ifdef DEBUG
+import Util             ( notNull )
+#endif
+
+import Maybe
 import IO		( hPutStrLn, stderr )
 
 infixr 9 `thenL`, `seqL`
