@@ -10,7 +10,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Error.hs,v 1.2 2002/03/26 17:03:08 simonmar Exp $
+-- $Id: Error.hs,v 1.3 2002/03/27 17:55:26 simonmar Exp $
 --
 -- Standard IO Errors.
 --
@@ -152,12 +152,12 @@ isUserErrorType _ = False
 
 #ifdef __GLASGOW_HASKELL__
 ioeGetErrorType	      :: IOError -> IOErrorType
-ioeGetFileName        :: IOError -> Maybe FilePath
-ioeGetErrorString     :: IOError -> String
 ioeGetHandle          :: IOError -> Maybe Handle
+ioeGetErrorString     :: IOError -> String
+ioeGetFileName        :: IOError -> Maybe FilePath
 
 ioeGetErrorType (IOException ioe) = ioe_type ioe
-ioeGetHandle _ = error "System.IO.Error.ioeGetHandle: not an IO error"
+ioeGetErrorType _ = error "System.IO.Error.ioeGetHandle: not an IO error"
 
 ioeGetHandle (IOException ioe) = ioe_handle ioe
 ioeGetHandle _ = error "System.IO.Error.ioeGetHandle: not an IO error"
