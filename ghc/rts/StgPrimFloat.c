@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgPrimFloat.c,v 1.3 1999/02/05 16:02:59 simonm Exp $
+ * $Id: StgPrimFloat.c,v 1.4 1999/02/18 12:26:12 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -44,18 +44,19 @@
 #define __abs(a)		(( (a) >= 0 ) ? (a) : (-(a)))
 
 StgDouble
-__encodeDouble (MP_INT *s, I_ e) /* result = s * 2^e */
+__encodeDouble (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
 {
     StgDouble r;
+    W_ *arr = (W_ *)ba;
     I_ i;
 
     /* Convert MP_INT to a double; knows a lot about internal rep! */
-    i = __abs(s->_mp_size)-1;
+    i = __abs(size)-1;
     if (i < 0) {
       r = 0.0;
     } else {
-      for (r = s->_mp_d[i], i--; i >= 0; i--)
-	r = r * GMP_BASE + s->_mp_d[i];
+      for (r = arr[i], i--; i >= 0; i--)
+	r = r * GMP_BASE + arr[i];
     }
 
     /* Now raise to the exponent */
@@ -63,33 +64,73 @@ __encodeDouble (MP_INT *s, I_ e) /* result = s * 2^e */
 	r = ldexp(r, e);
 
     /* sign is encoded in the size */
-    if (s->_mp_size < 0)
+    if (size < 0)
 	r = -r;
 
     return r;
 }
 
+/* Special version for small Integers */
+StgDouble
+__int_encodeDouble (I_ j, I_ e)
+{
+  StgDouble r;
+  
+  r = (StgDouble)__abs(j);
+  
+  /* Now raise to the exponent */
+  if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
+    r = ldexp(r, e);
+  
+  /* sign is encoded in the size */
+  if (j < 0)
+    r = -r;
+  
+  return r;
+}
+
 #if ! FLOATS_AS_DOUBLES
 StgFloat
-__encodeFloat (MP_INT *s, I_ e) /* result = s * 2^e */
+__encodeFloat (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
 {
     StgFloat r;
+    W_ *arr = (W_ *)ba;
     I_ i;
 
     /* Convert MP_INT to a float; knows a lot about internal rep! */
-    for(r = 0.0, i = __abs(s->_mp_size)-1; i >= 0; i--)
-	r = (r * GMP_BASE) + s->_mp_d[i];
+    for(r = 0.0, i = __abs(size); i >= 0; i--)
+	r = (r * GMP_BASE) + arr[i];
 
     /* Now raise to the exponent */
     if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
 	r = ldexp(r, e);
 
     /* sign is encoded in the size */
-    if (s->_mp_size < 0)
+    if (size < 0)
 	r = -r;
 
     return r;
 }
+
+/* Special version for small Integers */
+StgFloat
+__int_encodeFloat (I_ j, I_ e)
+{
+  StgFloat r;
+  
+  r = (StgFloat)__abs(j);
+  
+  /* Now raise to the exponent */
+  if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
+    r = ldexp(r, e);
+  
+  /* sign is encoded in the size */
+  if (j < 0)
+    r = -r;
+  
+  return r;
+}
+
 #endif	/* FLOATS_AS_DOUBLES */
 
 /* This only supports IEEE floating point */

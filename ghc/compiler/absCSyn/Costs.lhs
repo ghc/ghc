@@ -349,8 +349,8 @@ floatOps =
     , DoubleAsinOp  , DoubleAcosOp  , DoubleAtanOp
     , DoubleSinhOp  , DoubleCoshOp  , DoubleTanhOp
     , DoublePowerOp
-    , FloatEncodeOp  , FloatDecodeOp
-    , DoubleEncodeOp , DoubleDecodeOp
+    , FloatDecodeOp
+    , DoubleDecodeOp
   ]
 
 gmpOps :: [PrimOp]

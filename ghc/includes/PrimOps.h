@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.19 1999/02/17 15:57:30 simonm Exp $
+ * $Id: PrimOps.h,v 1.20 1999/02/18 12:26:11 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -596,36 +596,9 @@ EF_(newArrayzh_fast);
 /* We only support IEEE floating point format */
 #include "ieee-flpt.h"
 
-#if FLOATS_AS_DOUBLES  /* i.e. 64-bit machines */
-#define encodeFloatzh(r, sa,da, expon)   encodeDoublezh(r, sa,da, expon)
-#else
-#define encodeFloatzh(r, sa,da, expon)				\
-{ MP_INT arg;							\
-  /* Does not allocate memory */				\
-								\
-  arg._mp_size	= sa;						\
-  arg._mp_alloc	= ((StgArrWords *)da)->words;			\
-  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));	\
-								\
-  r = RET_PRIM_STGCALL2(StgFloat, __encodeFloat,&arg,(expon));	\
-}
-#endif /* FLOATS_AS_DOUBLES */
-
-#define encodeDoublezh(r, sa,da, expon)					\
-{ MP_INT arg;								\
-  /* Does not allocate memory */					\
-									\
-  arg._mp_size	= sa;							\
-  arg._mp_alloc	= ((StgArrWords *)da)->words;				\
-  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));		\
-									\
-  r = RET_PRIM_STGCALL2(StgDouble, __encodeDouble,&arg,(expon));	\
-}
-
 /* The decode operations are out-of-line because they need to allocate
  * a byte array.
  */
- 
 #ifdef FLOATS_AS_DOUBLES
 #define decodeFloatzh_fast decodeDoublezh_fast
 #else
@@ -636,8 +609,12 @@ EF_(decodeDoublezh_fast);
 
 /* grimy low-level support functions defined in StgPrimFloat.c */
 
-extern StgDouble __encodeDouble (MP_INT *s, I_ e);
-extern StgFloat  __encodeFloat  (MP_INT *s, I_ e);
+extern StgDouble __encodeDouble (I_ size, StgByteArray arr, I_ e);
+extern StgDouble __int_encodeDouble (I_ j, I_ e);
+#ifndef FLOATS_AS_DOUBLES
+extern StgFloat  __encodeFloat (I_ size, StgByteArray arr, I_ e);
+extern StgFloat  __int_encodeFloat (I_ j, I_ e);
+#endif
 extern void      __decodeDouble (MP_INT *man, I_ *_exp, StgDouble dbl);
 extern void      __decodeFloat  (MP_INT *man, I_ *_exp, StgFloat flt);
 extern StgInt    isDoubleNaN(StgDouble d);

@@ -144,7 +144,6 @@ __export PrelGHC
   tanhFloatzh
   powerFloatzh
   decodeFloatzh
-  encodeFloatzh
   
   Doublezh
   zgzhzh
@@ -176,7 +175,6 @@ __export PrelGHC
   tanhDoublezh
   ztztzhzh
   decodeDoublezh
-  encodeDoublezh
   
   cmpIntegerzh
   cmpIntegerIntzh

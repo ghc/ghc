@@ -127,8 +127,8 @@ data PrimOp
     | IntegerToWord64Op | Word64ToIntegerOp
     -- ?? gcd, etc?
 
-    | FloatEncodeOp  | FloatDecodeOp
-    | DoubleEncodeOp | DoubleDecodeOp
+    | FloatDecodeOp
+    | DoubleDecodeOp
 
     -- primitive ops for primitive arrays
 
@@ -416,9 +416,7 @@ tagOf_PrimOp IntegerToInt64Op		      = ILIT(120)
 tagOf_PrimOp Int64ToIntegerOp		      = ILIT(121)
 tagOf_PrimOp IntegerToWord64Op		      = ILIT(122)
 tagOf_PrimOp Word64ToIntegerOp		      = ILIT(123)
-tagOf_PrimOp FloatEncodeOp		      = ILIT(124)
 tagOf_PrimOp FloatDecodeOp		      = ILIT(125)
-tagOf_PrimOp DoubleEncodeOp		      = ILIT(126)
 tagOf_PrimOp DoubleDecodeOp		      = ILIT(127)
 
 tagOf_PrimOp NewArrayOp			      = ILIT(128)
@@ -690,9 +688,7 @@ allThePrimOps
 	Int64ToIntegerOp,
 	IntegerToWord64Op,
 	Word64ToIntegerOp,
-	FloatEncodeOp,
 	FloatDecodeOp,
-	DoubleEncodeOp,
 	DoubleDecodeOp,
 	NewArrayOp,
 	NewByteArrayOp CharRep,
@@ -1057,8 +1053,7 @@ primOpInfo Addr2IntOp = mkGenPrimOp SLIT("addr2Int#") [] [addrPrimTy] intPrimTy
 %*									*
 %************************************************************************
 
-@encodeFloat#@ and @decodeFloat#@ are given w/ Integer-stuff (it's
-similar).
+@decodeFloat#@ is given w/ Integer-stuff (it's similar).
 
 \begin{code}
 primOpInfo FloatAddOp	= mkDyadic    SLIT("plusFloat#")	   floatPrimTy
@@ -1091,8 +1086,7 @@ primOpInfo FloatPowerOp	= mkDyadic    SLIT("powerFloat#")   floatPrimTy
 %*									*
 %************************************************************************
 
-@encodeDouble#@ and @decodeDouble#@ are given w/ Integer-stuff (it's
-similar).
+@decodeDouble#@ is given w/ Integer-stuff (it's similar).
 
 \begin{code}
 primOpInfo DoubleAddOp	= mkDyadic    SLIT("+##")   doublePrimTy
@@ -1176,16 +1170,10 @@ primOpInfo IntegerToWord64Op
   = mkGenPrimOp SLIT("integerToWord64#") [] one_Integer_ty word64PrimTy
 \end{code}
 
-Encoding and decoding of floating-point numbers is sorta
-Integer-related.
+Decoding of floating-point numbers is sorta Integer-related.  Encoding
+is done with plain ccalls now (see PrelNumExtra.lhs).
 
 \begin{code}
-primOpInfo FloatEncodeOp
-  = mkGenPrimOp SLIT("encodeFloat#") [] an_Integer_and_Int_tys floatPrimTy
-
-primOpInfo DoubleEncodeOp
-  = mkGenPrimOp SLIT("encodeDouble#") [] an_Integer_and_Int_tys doublePrimTy
-
 primOpInfo FloatDecodeOp
   = mkGenPrimOp SLIT("decodeFloat#") [] [floatPrimTy] 
 	(unboxedTriple [intPrimTy, intPrimTy, byteArrayPrimTy])
@@ -1971,7 +1959,6 @@ primOpNeedsWrapper FloatSinhOp	    	= True
 primOpNeedsWrapper FloatCoshOp	    	= True
 primOpNeedsWrapper FloatTanhOp	    	= True
 primOpNeedsWrapper FloatPowerOp	    	= True
-primOpNeedsWrapper FloatEncodeOp	= True
 
 primOpNeedsWrapper DoubleExpOp	    	= True
 primOpNeedsWrapper DoubleLogOp	    	= True
@@ -1986,7 +1973,6 @@ primOpNeedsWrapper DoubleSinhOp	    	= True
 primOpNeedsWrapper DoubleCoshOp	    	= True
 primOpNeedsWrapper DoubleTanhOp	    	= True
 primOpNeedsWrapper DoublePowerOp    	= True
-primOpNeedsWrapper DoubleEncodeOp    	= True
 
 primOpNeedsWrapper MakeStableNameOp	= True
 primOpNeedsWrapper DeRefStablePtrOp	= True

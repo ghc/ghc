@@ -137,6 +137,16 @@ instance  RealFrac Float  where
     floor x	= case properFraction x of
 		    (n,r) -> if r < 0.0 then n - 1 else n
 
+foreign import ccall "__encodeFloat" unsafe 
+	encodeFloat# :: Int# -> ByteArray# -> Int -> Float
+foreign import ccall "__int_encodeFloat" unsafe 
+	int_encodeFloat# :: Int# -> Int -> Float
+
+foreign import ccall "isFloatNaN" unsafe isFloatNaN :: Float -> Int
+foreign import ccall "isFloatInfinite" unsafe isFloatInfinite :: Float -> Int
+foreign import ccall "isFloatDenormalized" unsafe isFloatDenormalized :: Float -> Int
+foreign import ccall "isFloatNegativeZero" unsafe isFloatNegativeZero :: Float -> Int
+
 instance  RealFloat Float  where
     floatRadix _	=  FLT_RADIX	    -- from float.h
     floatDigits _	=  FLT_MANT_DIG	    -- ditto
@@ -146,9 +156,8 @@ instance  RealFloat Float  where
       = case decodeFloat# f#	of
 	  (# exp#, s#, d# #) -> (J# s# d#, I# exp#)
 
-    encodeFloat i@(S# _) j = encodeFloat (toBig i) j
-    encodeFloat (J# s# d#) (I# e#)
-      = case encodeFloat# s# d# e# of { flt# -> F# flt# }
+    encodeFloat (S# i) j     = int_encodeFloat# i j
+    encodeFloat (J# s# d#) e = encodeFloat# s# d# e
 
     exponent x		= case decodeFloat x of
 			    (m,n) -> if m == 0 then 0 else n + floatDigits x
@@ -158,15 +167,11 @@ instance  RealFloat Float  where
 
     scaleFloat k x	= case decodeFloat x of
 			    (m,n) -> encodeFloat m (n+k)
-    isNaN x = 
-      (0::Int) /= unsafePerformIO (_ccall_ isFloatNaN x) {- a _pure_function! -}
-    isInfinite x =
-      (0::Int) /= unsafePerformIO (_ccall_ isFloatInfinite x) {- ditto! -}
-    isDenormalized x =
-      (0::Int) /= unsafePerformIO (_ccall_ isFloatDenormalized x) -- ..
-    isNegativeZero x =
-      (0::Int) /= unsafePerformIO (_ccall_ isFloatNegativeZero x) -- ...
-    isIEEE _    = True
+    isNaN x          = 0 /= isFloatNaN x
+    isInfinite x     = 0 /= isFloatInfinite x
+    isDenormalized x = 0 /= isFloatDenormalized x
+    isNegativeZero x = 0 /= isFloatNegativeZero x
+    isIEEE _         = True
 \end{code}
 
 %*********************************************************
@@ -289,6 +294,16 @@ instance  RealFrac Double  where
     floor x	= case properFraction x of
 		    (n,r) -> if r < 0.0 then n - 1 else n
 
+foreign import ccall "__encodeDouble" unsafe 
+	encodeDouble# :: Int# -> ByteArray# -> Int -> Double
+foreign import ccall "__int_encodeDouble" unsafe 
+	int_encodeDouble# :: Int# -> Int -> Double
+
+foreign import ccall "isDoubleNaN" unsafe isDoubleNaN :: Double -> Int
+foreign import ccall "isDoubleInfinite" unsafe isDoubleInfinite :: Double -> Int
+foreign import ccall "isDoubleDenormalized" unsafe isDoubleDenormalized :: Double -> Int
+foreign import ccall "isDoubleNegativeZero" unsafe isDoubleNegativeZero :: Double -> Int
+
 instance  RealFloat Double  where
     floatRadix _	=  FLT_RADIX	    -- from float.h
     floatDigits _	=  DBL_MANT_DIG	    -- ditto
@@ -298,9 +313,8 @@ instance  RealFloat Double  where
       = case decodeDouble# x#	of
 	  (# exp#, s#, d# #) -> (J# s# d#, I# exp#)
 
-    encodeFloat i@(S# _) j = encodeFloat (toBig i) j
-    encodeFloat (J# s# d#) (I# e#)
-      = case encodeDouble# s# d# e# of { dbl# -> D# dbl# }
+    encodeFloat (S# i) j     = int_encodeDouble# i j
+    encodeFloat (J# s# d#) e = encodeDouble# s# d# e
 
     exponent x		= case decodeFloat x of
 			    (m,n) -> if m == 0 then 0 else n + floatDigits x
@@ -310,15 +324,12 @@ instance  RealFloat Double  where
 
     scaleFloat k x	= case decodeFloat x of
 			    (m,n) -> encodeFloat m (n+k)
-    isNaN x = 
-      (0::Int) /= unsafePerformIO (_ccall_ isDoubleNaN x) {- a _pure_function! -}
-    isInfinite x =
-      (0::Int) /= unsafePerformIO (_ccall_ isDoubleInfinite x) {- ditto -}
-    isDenormalized x =
-      (0::Int) /= unsafePerformIO (_ccall_ isDoubleDenormalized x) -- ..
-    isNegativeZero x =
-      (0::Int) /= unsafePerformIO (_ccall_ isDoubleNegativeZero x) -- ...
-    isIEEE _    = True
+
+    isNaN x 		= 0 /= isDoubleNaN x
+    isInfinite x 	= 0 /= isDoubleInfinite x
+    isDenormalized x 	= 0 /= isDoubleDenormalized x
+    isNegativeZero x 	= 0 /= isDoubleNegativeZero x
+    isIEEE _    	= True
 
 instance  Show Double  where
     showsPrec   x = showSigned showFloat x
@@ -592,9 +603,6 @@ instead of
 Lennart's code follows, and it works...
 
 \begin{pseudocode}
-{-# SPECIALISE fromRat :: 
-	Rational -> Double,
-	Rational -> Float #-}
 fromRat :: (RealFloat a) => Rational -> a
 fromRat x = x'
 	where x' = f e
@@ -624,6 +632,9 @@ fromRat x = x'
 Now, here's Lennart's code.
 
 \begin{code}
+{-# SPECIALISE fromRat :: 
+	Rational -> Double,
+	Rational -> Float #-}
 fromRat :: (RealFloat a) => Rational -> a
 fromRat x 
   | x == 0    =  encodeFloat 0 0 		-- Handle exceptional cases
