@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.35 2000/05/18 13:55:36 sewardj Exp $
+% $Id: CLabel.lhs,v 1.36 2000/05/22 17:05:57 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -60,6 +60,8 @@ module CLabel (
 
 	mkSelectorInfoLabel,
 	mkSelectorEntryLabel,
+
+	mkForeignLabel,
 
 	mkCC_Label, mkCCS_Label,
 	
@@ -126,6 +128,9 @@ data CLabel
   | ModuleInitLabel ModuleName
 
   | RtsLabel	    RtsLabelInfo
+
+  | ForeignLabel FAST_STRING Bool  -- a 'C' (or otherwise foreign) label
+				   -- Bool <=> is dynamic
 
   | CC_Label CostCentre
   | CCS_Label CostCentreStack
@@ -269,6 +274,11 @@ mkSelectorEntryLabel upd off	= RtsLabel (RtsSelectorEntry   upd off)
 mkApInfoTableLabel  upd off	= RtsLabel (RtsApInfoTbl upd off)
 mkApEntryLabel upd off		= RtsLabel (RtsApEntry   upd off)
 
+	-- Foreign labels
+
+mkForeignLabel :: FAST_STRING -> Bool -> CLabel
+mkForeignLabel str is_dynamic	= ForeignLabel str is_dynamic
+
 	-- Cost centres etc.
 
 mkCC_Label	cc		= CC_Label cc
@@ -303,6 +313,7 @@ needsCDecl (TyConLabel _)		= True
 needsCDecl (AsmTempLabel _)		= False
 needsCDecl (ModuleInitLabel _)		= False
 needsCDecl (RtsLabel _)			= False
+needsCDecl (ForeignLabel _ _)		= False
 needsCDecl (CC_Label _)			= False
 needsCDecl (CCS_Label _)		= False
 \end{code}
@@ -327,6 +338,7 @@ externallyVisibleCLabel (AsmTempLabel _)   = False
 externallyVisibleCLabel (ModuleInitLabel _)= True
 externallyVisibleCLabel (RtsLabel RtsModuleRegd) = False --hack
 externallyVisibleCLabel (RtsLabel _)	   = True
+externallyVisibleCLabel (ForeignLabel _ _) = True
 externallyVisibleCLabel (IdLabel id _)     = isExternallyVisibleName id
 externallyVisibleCLabel (CC_Label _)	   = False -- not strictly true
 externallyVisibleCLabel (CCS_Label _)	   = False -- not strictly true
@@ -373,6 +385,7 @@ labelDynamic lbl =
    IdLabel n k      -> isDllName n
    DataConLabel n k -> isDllName n
    TyConLabel tc    -> isDllName (getName tc)
+   ForeignLabel _ d -> d
    _ 		    -> False
 \end{code}
 
@@ -495,6 +508,9 @@ pprCLbl (RtsLabel (RtsPrimOp primop))
 
 pprCLbl (RtsLabel RtsModuleRegd)
   = ptext SLIT("module_registered")
+
+pprCLbl (ForeignLabel str _)
+  = ptext str
 
 pprCLbl (TyConLabel tc)
   = hcat [ppr tc, pp_cSEP, ptext SLIT("closure_tbl")]

@@ -23,7 +23,7 @@ import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Constants	( mIN_INTLIKE, uF_UPDATEE, bLOCK_SIZE )
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 			  mkTopClosureLabel, mkErrorIO_innardsLabel,
-			  mkMAP_FROZEN_infoLabel )
+			  mkMAP_FROZEN_infoLabel, mkForeignLabel )
 import Outputable
 
 import Char	       	( ord, isAlphaNum )
@@ -461,8 +461,11 @@ amodeToStix (CMacroExpr _ macro [arg])
          -> StInd PtrRep (StIndex PtrRep (amodeToStix arg) 
                                          (StInt (toInteger uF_UPDATEE)))
 litLitToStix nm
-  = error ("\nlitLitToStix: can't handle `" ++ nm ++ "'\n" 
-            ++ "suggested workaround: use flag -fvia-C\n")
+  | all is_id nm = StCLbl (mkForeignLabel (_PK_ nm) False{-ToDo: dynamic-})
+  | otherwise    = error ("\nlitLitToStix: can't handle `" ++ nm ++ "'\n" 
+                           ++ "suggested workaround: use flag -fvia-C\n")
+
+  where is_id c = isAlphaNum c || c == '_'
 \end{code}
 
 Sizes of the CharLike and IntLike closures that are arranged as arrays
