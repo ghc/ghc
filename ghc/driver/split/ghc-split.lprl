@@ -143,6 +143,10 @@ sub collectDyldStuff_powerpc { # Note: Darwin/PowerPC only
 	    $cur_section = $_;
 	    printf STDERR "section: $cur_section\n" if $Dump_asm_splitting_info;
 	    $cur_alignment = ''
+	} elsif ( /^\s*\.section\s+__TEXT,__symbol_stub1,symbol_stubs,pure_instructions,\d+/ ) {
+	    $cur_section = $_;
+	    printf STDERR "section: $cur_section\n" if $Dump_asm_splitting_info;
+	    $cur_alignment = ''
 	} elsif ( /^\s*\.align.*/ ) { 
 	    $cur_alignment = $_;
 	    printf STDERR "alignment: $cur_alignment\n" if $Dump_asm_splitting_info;
