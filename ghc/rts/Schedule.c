@@ -1441,9 +1441,9 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
     if (cap->r.rHpAlloc > BLOCK_SIZE) {
 	// if so, get one and push it on the front of the nursery.
 	bdescr *bd;
-	nat blocks;
+	lnat blocks;
 	
-	blocks = (nat)BLOCK_ROUND_UP(cap->r.rHpAlloc) / BLOCK_SIZE;
+	blocks = (lnat)BLOCK_ROUND_UP(cap->r.rHpAlloc) / BLOCK_SIZE;
 	
 	IF_DEBUG(scheduler,
 		 debugBelch("--<< thread %ld (%s) stopped: requesting a large block (size %d)\n", 
@@ -2783,7 +2783,8 @@ performGCWithRoots(void (*get_roots)(evac_fn))
 static StgTSO *
 threadStackOverflow(StgTSO *tso)
 {
-  nat new_stack_size, new_tso_size, stack_words;
+  nat new_stack_size, stack_words;
+  lnat new_tso_size;
   StgPtr new_sp;
   StgTSO *dest;
 
@@ -2807,7 +2808,7 @@ threadStackOverflow(StgTSO *tso)
    * Finally round up so the TSO ends up as a whole number of blocks.
    */
   new_stack_size = stg_min(tso->stack_size * 2, tso->max_stack_size);
-  new_tso_size   = (nat)BLOCK_ROUND_UP(new_stack_size * sizeof(W_) + 
+  new_tso_size   = (lnat)BLOCK_ROUND_UP(new_stack_size * sizeof(W_) + 
 				       TSO_STRUCT_SIZE)/sizeof(W_);
   new_tso_size = round_to_mblocks(new_tso_size);  /* Be MBLOCK-friendly */
   new_stack_size = new_tso_size - TSO_STRUCT_SIZEW;
@@ -3930,18 +3931,18 @@ printThreadBlockage(StgTSO *tso)
 {
   switch (tso->why_blocked) {
   case BlockedOnRead:
-    debugBelch("is blocked on read from fd %d", tso->block_info.fd);
+    debugBelch("is blocked on read from fd %ld", tso->block_info.fd);
     break;
   case BlockedOnWrite:
-    debugBelch("is blocked on write to fd %d", tso->block_info.fd);
+    debugBelch("is blocked on write to fd %ld", tso->block_info.fd);
     break;
 #if defined(mingw32_HOST_OS)
     case BlockedOnDoProc:
-    debugBelch("is blocked on proc (request: %d)", tso->block_info.async_result->reqID);
+    debugBelch("is blocked on proc (request: %ld)", tso->block_info.async_result->reqID);
     break;
 #endif
   case BlockedOnDelay:
-    debugBelch("is blocked until %d", tso->block_info.target);
+    debugBelch("is blocked until %ld", tso->block_info.target);
     break;
   case BlockedOnMVar:
     debugBelch("is blocked on an MVar");
