@@ -343,7 +343,7 @@ update (HashTable ref) key val = do
   segment <- myReadArray dir segment_index
   bucket <- myReadArray segment segment_offset
   let 
-    (deleted,bucket') = foldr filt (0,[]) bucket
+    (deleted,bucket') = foldr filt (0::Int32,[]) bucket
     filt pair@(k,v) (deleted,bucket)
 	| key `cmp` k = (deleted+1, bucket)
 	| otherwise   = (deleted,   pair:bucket)
