@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.42 2000/12/31 16:58:05 panne Exp $
+# $Id: Makefile,v 1.43 2001/01/26 14:40:18 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -61,11 +61,6 @@ WARNING_OPTS += -optc-Wbad-function-cast
 
 SRC_HC_OPTS += -I../includes -I. -Iparallel $(WARNING_OPTS) $(GhcRtsHcOpts) -optc-DCOMPILING_RTS
 SRC_CC_OPTS = $(GhcRtsCcOpts)
-
-ifeq "$(GhcWithInterpreter)" "YES"
-SRC_HC_OPTS += -optc-DGHCI
-SRC_CC_OPTS += -DGHCI
-endif
 
 ifneq "$(DLLized)" "YES"
 SRC_HC_OPTS += -static
