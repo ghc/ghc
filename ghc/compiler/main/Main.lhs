@@ -23,7 +23,7 @@ import MkIface		-- several functions
 import TcModule		( typecheckModule )
 import Desugar		( deSugar, pprDsWarnings
 #if __GLASGOW_HASKELL__ <= 200
-		          , DsMatchContext, DsWarnFlavour 
+		          , DsMatchContext 
 #endif
 			)
 import SimplCore	( core2core )

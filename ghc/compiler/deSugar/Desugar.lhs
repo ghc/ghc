@@ -9,8 +9,6 @@
 module Desugar ( deSugar, pprDsWarnings
 #if __GLASGOW_HASKELL__ < 200
 		, DsMatchContext
-	        , DsWarnFlavour -- fluff needed for closure, 
-				 -- removed when compiling with 1.4
 #endif
 	       ) where
 
