@@ -574,8 +574,8 @@ pprInstr (DATA s xs)
 #if powerpc_TARGET_ARCH
 	ppr_item B  x = [ptext SLIT("\t.byte\t") <> pprImm x]
 	ppr_item Bu  x = [ptext SLIT("\t.byte\t") <> pprImm x]
-	ppr_item H  x = [ptext SLIT("\t.byte\t") <> pprImm x]
-	ppr_item Hu  x = [ptext SLIT("\t.byte\t") <> pprImm x]
+	ppr_item H  x = [ptext SLIT("\t.short\t") <> pprImm x]
+	ppr_item Hu  x = [ptext SLIT("\t.short\t") <> pprImm x]
 	ppr_item W  x = [ptext SLIT("\t.long\t") <> pprImm x]
 	ppr_item F  (ImmFloat r)
            = let bs = floatToBytes (fromRational r)
