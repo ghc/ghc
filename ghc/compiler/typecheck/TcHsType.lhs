@@ -418,7 +418,9 @@ The type desugarer
 	* Zonks any kinds
 
 It cannot fail, and does no validity checking, except for 
-structural matters, such as spurious ! annotations.
+structural matters, such as
+	(a) spurious ! annotations.
+	(b) a class used as a type
 
 \begin{code}
 dsHsType :: LHsType Name -> TcM Type
@@ -499,9 +501,9 @@ ds_var_app :: Name -> [Type] -> TcM Type
 ds_var_app name arg_tys 
  = tcLookup name			`thenM` \ thing ->
     case thing of
-	ATyVar _ ty 	     -> returnM (mkAppTys ty arg_tys)
-	AGlobal (ATyCon tc)  -> returnM (mkGenTyConApp tc arg_tys)
-	other -> pprPanic "ds_app_type" (ppr name <+> ppr arg_tys)
+	ATyVar _ ty 	    -> returnM (mkAppTys ty arg_tys)
+	AGlobal (ATyCon tc) -> returnM (mkGenTyConApp tc arg_tys)
+	other		    -> wrongThingErr "type" thing name
 \end{code}
 
 
