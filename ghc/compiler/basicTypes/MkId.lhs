@@ -107,8 +107,8 @@ wiredInIds
 	-- 
 	-- [The interface file format now carry such information, but there's
 	-- no way yet of expressing at the definition site for these 
-	-- error-reporting
-	-- functions that they have an 'open' result type. -- sof 1/99]
+	-- error-reporting functions that they have an 'open' 
+	-- result type. -- sof 1/99]
 
       aBSENT_ERROR_ID
     , eRROR_ID
@@ -241,12 +241,19 @@ mkDataConWrapId data_con
 
     wrap_ty = mkForAllTys all_tyvars (mkFunTys all_arg_tys result_ty)
 
+    wrap_sig = mkStrictSig (mkTopDmdType arg_dmds res_info)
     res_info = strictSigResInfo (idNewStrictness work_id)
-    wrap_sig = mkStrictSig (mkTopDmdType (replicate arity topDmd) res_info)
+    arg_dmds = [Abs | d <- dict_args] ++ map mk_dmd strict_marks
+    mk_dmd str | isMarkedStrict str = Eval
+	       | otherwise	    = Lazy
 	-- The Cpr info can be important inside INLINE rhss, where the
 	-- wrapper constructor isn't inlined
-	-- But we are sloppy about the argument demands, because we expect 
-	-- to inline the constructor very vigorously.
+	-- And the argument strictness can be important too; we
+	-- may not inline a contructor when it is partially applied.
+	-- For example:
+	--	data W = C !Int !Int !Int
+	--	...(let w = C x in ...(w p q)...)...
+	-- we want to see that w is strict in its two arguments
 
     wrap_rhs | isNewTyCon tycon
 	     = ASSERT( null ex_tyvars && null ex_dict_args && length orig_arg_tys == 1 )
