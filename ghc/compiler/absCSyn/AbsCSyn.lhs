@@ -452,6 +452,10 @@ data MagicId
   | DoubleReg	-- double-precision floating-point registers
 	FAST_INT	-- its number (1 .. mAX_Double_REG)
 
+  | LongReg	        -- long int registers (64-bit, really)
+	PrimRep	        -- Int64Rep or Word64Rep
+	FAST_INT	-- its number (1 .. mAX_Long_REG)
+
   | TagReg	-- to return constructor tags; as almost all returns are vectored,
 		-- this is rarely used.
 
@@ -527,16 +531,18 @@ instance Eq MagicId where
 	tag CurCostCentre    = ILIT(14)
 	tag VoidReg	     = ILIT(15)
 
-	tag (VanillaReg _ i) = ILIT(15) _ADD_ i
-
-	tag (FloatReg i) = ILIT(15) _ADD_ maxv _ADD_ i
-	  where
-	    maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
-
-	tag (DoubleReg i) = ILIT(15) _ADD_ maxv _ADD_ maxf _ADD_ i
+	tag reg =
+          ILIT(15) _ADD_ (
+	  case reg of
+	    VanillaReg _ i -> i
+	    FloatReg i     -> maxv _ADD_ i
+	    DoubleReg i    -> maxv _ADD_ maxf _ADD_ i
+	    LongReg _ i    -> maxv _ADD_ maxf _ADD_ maxd _ADD_ i
+	  )
 	  where
 	    maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
 	    maxf = case mAX_Float_REG   of { IBOX(x) -> x }
+	    maxd = case mAX_Double_REG of { IBOX(x) -> x }
 \end{code}
 
 Returns True for any register that {\em potentially} dies across
