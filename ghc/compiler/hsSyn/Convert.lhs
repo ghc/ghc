@@ -217,11 +217,11 @@ cvt (RecUpdE e flds) = RecordUpd (cvtl e) (map (\(x,y) -> (noLoc (vName x), cvtl
 				 placeHolderType placeHolderType
 
 cvtHsDo do_or_lc stmts
-  = HsDo do_or_ld (init stmts') body void
+  = HsDo do_or_lc (init stmts') body void
   where
-    stmts' = cvtstmts ss
+    stmts' = cvtstmts stmts
     body = case last stmts' of
-		L _ (ExprStmt body _) -> body
+		L _ (ExprStmt body _ _) -> body
 
 cvtdecs :: [TH.Dec] -> [HsBindGroup RdrName]
 cvtdecs [] = []
@@ -283,7 +283,7 @@ cvtguard (GuardedB pairs) = map cvtpair pairs
 cvtguard (NormalB e) 	 = [noLoc (GRHS [] (cvtl e))]
 
 cvtpair :: (TH.Guard,TH.Exp) -> LGRHS RdrName
-cvtpair (NormalG x,y) = noLoc (GRHS [nlBindStmt truePat (cvtl x)]
+cvtpair (NormalG x,y) = noLoc (GRHS [noLoc $ mkBindStmt truePat (cvtl x)]
 				    (cvtl y))
 cvtpair (PatG x,y) = noLoc (GRHS (cvtstmts x) (cvtl y))
 
