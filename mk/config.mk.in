@@ -145,7 +145,7 @@ GhcProjectPatchLevel   = 0
 #
 HappyProjectName       = Happy
 HappyProjectNameShort  = happy
-HappyProjectVersion    = 1.4
+HappyProjectVersion    = 1.5
 HappyProjectPatchLevel = 0
 
 #
@@ -489,6 +489,7 @@ MKDEPENDC_PREFIX	= $(GLAFP_UTILS)/mkdependC/
 LTX_PREFIX		= $(GLAFP_UTILS)/ltx/
 RUNTEST_PREFIX		= $(GLAFP_UTILS)/runstdtest/
 VERBATIM_PREFIX		= $(GLAFP_UTILS)/verbatim/
+SGMLVERB_PREFIX		= $(GLAFP_UTILS)/sgmlverb/
 ETAGS_PREFIX		= $(GLAFP_UTILS)/etags/
 MSUB_PREFIX		= $(GLAFP_UTILS)/msub/
 LNDIR_PREFIX		= $(GLAFP_UTILS)/lndir/
@@ -645,6 +646,8 @@ LNDIR			= $(LNDIR_PREFIX)lndir
 MSUB			= $(MSUB_PREFIX)msub
 ETAGS			= $(ETAGS_PREFIX)etags
 VERBATIM		= $(VERBATIM_PREFIX)verbatim
+SGMLVERB		= $(SGMLVERB_PREFIX)sgmlverb
+SGML2LATEX		= sgml2latex
 RUNTEST			= $(RUNTEST_PREFIX)runstdtest
 HAPPY			= @HappyCmd@
 HAPPY_VERSION		= @HappyVersion@		
