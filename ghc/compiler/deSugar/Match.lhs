@@ -499,7 +499,9 @@ tidy1 v pat@(LitPat lit lit_ty) match_result
   = returnDs (ConPat charDataCon charTy [LitPat (mk_char lit) charPrimTy],
 	      match_result)
 
-  | otherwise = pprPanic "tidy1:LitPat:" (ppr pat)
+  | otherwise 
+  --= pprPanic "tidy1:LitPat:" (ppr pat)
+  = returnDs (pat, match_result)
   where
     mk_char (HsChar c)    = HsCharPrim c
 

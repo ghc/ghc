@@ -280,10 +280,32 @@ pprCols = (100 :: Int) -- could make configurable
 printDoc :: Mode -> Handle -> Doc -> IO ()
 printDoc mode hdl doc
   = fullRender mode pprCols 1.5 put done doc
+{-
+  = _readHandle hdl				    >>= \ htype ->
+    let fp = _filePtr htype in
+    fullRender mode pprCols 1.5 (put (fp::_Addr)) (done fp) doc
+-}
   where
-    put (Chr c)  next = hPutChar hdl c >> next 
-    put (Str s)  next = hPutStr  hdl s >> next 
-    put (PStr s) next = hPutFS   hdl s >> next 
+{-
+    put fp (Chr c)  next = _scc_ "hPutChar" ((_ccall_ stg_putc c (fp::_Addr))::PrimIO ()) `seqPrimIO` next 
+    put fp (Str s)  next = _scc_ "hPutStr"  (put_str fp s)          >> next 
+    put fp (PStr s) next = _scc_ "hPutFS"   (put_str fp (_UNPK_ s)) >> next 
+
+    put_str fp (c1@(C# _) : cs)
+      = _ccall_ stg_putc  c1 (fp::_Addr)	`seqPrimIO`
+	put_str fp cs
+    put_str fp [] = return ()
+-}
+    put (Chr c)  next = _scc_ "hPutChar" (hPutChar hdl c) >> next 
+    put (Str s)  next = _scc_ "hPutStr"  (hPutStr  hdl s) >> next 
+    put (PStr s) next = _scc_ "hPutFS"   (hPutFS   hdl s) >> next 
+
+{-
+    string_txt (Chr c)   s2 = c   :  s2
+    string_txt (Str s1)  s2 = s1  ++ s2
+    string_txt (PStr s1) s2 = _UNPK_ s1 ++ s2
+    done fp = ((_ccall_ stg_putc '\n' (fp::_Addr))::PrimIO ()) `seqPrimIO` return () --hPutChar hdl '\n'
+-}
 
     done = hPutChar hdl '\n'
 \end{code}

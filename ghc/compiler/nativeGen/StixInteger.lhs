@@ -389,6 +389,7 @@ mpData_mantissa = mpData mantissa
 Support for the Gnu GMP multi-precision package.
 
 \begin{code}
+-- size (in words) of __MP_INT
 mpIntSize = 3 :: Int
 
 mpAlloc, mpSize, mpData :: StixTree -> StixTree
@@ -406,6 +407,7 @@ mpSpace gmp res sizes
   = foldr sum (StPrim IntAddOp [fixed, hdrs]) sizes
   where
     sum x y = StPrim IntAddOp [StPrim IntAbsOp [x], y]
+    -- what's the magical 17 for?
     fixed = StInt (toInteger (17 * res + gmp * mpIntSize))
     hdrs = StPrim IntMulOp [dataHS, StInt (toInteger res)]
 \end{code}

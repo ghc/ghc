@@ -43,6 +43,7 @@ module Unique (
 	andandIdKey,
 	appendIdKey,
 	arrayPrimTyConKey,
+	assertIdKey,
 	augmentIdKey,
 	boolTyConKey,
 	boundedClassKey,
@@ -708,4 +709,5 @@ toEnumClassOpKey	= mkPreludeMiscIdUnique 68
 \begin{code}
 inlineIdKey		= mkPreludeMiscIdUnique 69
 coerceIdKey		= mkPreludeMiscIdUnique 70
+assertIdKey		= mkPreludeMiscIdUnique 71
 \end{code}

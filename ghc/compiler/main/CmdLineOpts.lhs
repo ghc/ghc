@@ -310,6 +310,7 @@ opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
 opt_MultiParamClasses		= opt_GlasgowExts
 opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
+opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
 opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")

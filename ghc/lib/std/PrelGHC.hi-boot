@@ -17,6 +17,9 @@ PrelGHC
   Void
 -- void CAF is defined in PrelBase
 
+-- Magical assert thingy
+  assert__
+
 -- I/O primitives
   RealWorld
   realWorld#

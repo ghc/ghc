@@ -477,6 +477,7 @@ hSetBuffering handle mode =
     isMarked (WriteHandle fp m b) = b
     isMarked (AppendHandle fp m b) = b
     isMarked (ReadWriteHandle fp m b) = b
+    isMarked _ = False
 
     bsize :: Int
     bsize = case mode of

@@ -7,6 +7,7 @@ module StixPrim ( primCode, amodeToStix, amodeToStix' ) where
 
 #include "HsVersions.h"
 
+import Char	       ( ord )
 import MachMisc
 import MachRegs
 
@@ -28,9 +29,6 @@ import StixInteger	{- everything -}
 import UniqSupply	( returnUs, thenUs, UniqSM )
 import Outputable
 
-#ifdef REALLY_HASKELL_1_3
-ord = fromEnum :: Char -> Int
-#endif
 \end{code}
 
 The main honcho here is primCode, which handles the guts of COpStmts.
@@ -406,6 +404,22 @@ primCode [lhs] MakeStablePtrOp args
 
 \begin{code}
 primCode res Word2IntegerOp args = panic "primCode:Word2IntegerOp"
+
+primCode [lhs] SeqOp [a]
+  = let
+     {-
+      The evaluation of seq#'s argument is done by `seqseqseq',
+      here we just set up the call to it (identical to how
+      DerefStablePtr does things.)
+     -}
+     lhs'   = amodeToStix lhs
+     a'     = amodeToStix a
+     pk     = getAmodeRep lhs  -- an IntRep
+     call   = StCall SLIT("SeqZhCode") pk [a']
+     assign = StAssign pk lhs' call
+    in
+--    trace "SeqOp" $ 
+    returnUs (\xs -> assign : xs)
 
 primCode lhs (CCallOp fn is_asm may_gc arg_tys result_ty) rhs
   | is_asm = error "ERROR: Native code generator can't handle casm"

@@ -964,6 +964,10 @@ dexp	:  MINUS kexp				{ $$ = mknegate($2); }
 	|  kexp
 	;
 
+/*
+  We need to factor out a leading let expression so we can set
+  inpat=TRUE when parsing (non let) expressions inside stmts and quals
+*/
 expLno 	: oexpLno DCOLON ctype			{ $$ = mkrestr($1,$3); }
 	| oexpLno
 	;
@@ -1172,7 +1176,7 @@ alts	:  alt					{ $$ = $1; }
 	|  alts SEMI alt			{ $$ = lconc($1,$3); }
 	;
 
-alt	:  pat { PREVPATT = $1; } altrest	{ $$ = lsing($3); PREVPATT = NULL; }
+alt	:  pat { PREVPATT = $1; } altrest	{ expORpat(LEGIT_PATT,$1); $$ = lsing($3); PREVPATT = NULL; }
 	|  /* empty */				{ $$ = Lnil; }
 	;
 
@@ -1577,6 +1581,16 @@ vccurly1:
 *  (This stuff is here in case we want to use Yacc macros and such.)  *
 *                                                                     *
 **********************************************************************/
+
+
+/*
+void
+checkinpat()
+{
+  if(!inpat)
+    hsperror("pattern syntax used in expression");
+}
+*/
 
 /* The parser calls "hsperror" when it sees a
    `report this and die' error.  It sets the stage

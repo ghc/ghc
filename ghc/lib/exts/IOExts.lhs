@@ -29,6 +29,9 @@ module IOExts
 	, openFileEx
 	, IOModeEx(..)
 
+--        , setEcho
+--	, getEcho
+
         , trace
         , performGC
 	
@@ -89,3 +92,9 @@ writeIOArray (IOArray arr) ix elt = stToIO (writeArray arr ix elt)
 freezeIOArray (IOArray arr) = stToIO (freezeArray arr)
 \end{code}
 
+begin{code}
+setEcho :: Handle -> Bool -> IO ()
+setEcho 
+
+getEcho :: Handle -> IO Bool
+end{code}

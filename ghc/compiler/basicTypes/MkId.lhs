@@ -258,15 +258,16 @@ mkRecordSelId field_label selector_ty
 	
     [data_id] = mkTemplateLocals [data_ty]
     alts      = map mk_maybe_alt data_cons
+    the_alts  = catMaybes alts
+
     sel_rhs   = mkTyLam tyvars $
 		mkValLam [data_id] $
 		Case (Var data_id) 
 		         -- if any of the constructors don't have the label, ...
 		     (if any (not . isJust) alts then
-		           AlgAlts (catMaybes alts) 
-			           (BindDefault data_id error_expr)
+		           AlgAlts the_alts(BindDefault data_id error_expr)
 		      else
-			   AlgAlts (catMaybes alts) NoDefault)
+			   AlgAlts the_alts NoDefault)
 
     mk_maybe_alt data_con 
 	  = case maybe_the_arg_id of

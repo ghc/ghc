@@ -60,7 +60,12 @@ call to a cost evaluation function @GRAN_EXEC@. For that,
 
 \begin{code}
 writeRealC :: Handle -> AbstractC -> IO ()
-writeRealC handle absC = printForC handle (pprAbsC absC (costs absC))
+--writeRealC handle absC = 
+-- _scc_ "writeRealC" 
+-- printDoc LeftMode handle (pprAbsC absC (costs absC))
+writeRealC handle absC = 
+ _scc_ "writeRealC" 
+ printForC handle (pprAbsC absC (costs absC))
 
 dumpRealC :: AbstractC -> SDoc
 dumpRealC absC = pprAbsC absC (costs absC)
@@ -77,19 +82,16 @@ emitMacro (Cost (i,b,l,s,f))
   = hcat [ ptext SLIT("GRAN_EXEC"), char '(',
                           int i, comma, int b, comma, int l, comma,
 	                  int s, comma, int f, pp_paren_semi ]
+
+pp_paren_semi = text ");"
 \end{code}
 
+New type: Now pprAbsC also takes the costs for evaluating the Abstract C
+code as an argument (that's needed when spitting out the GRAN_EXEC macro
+which must be done before the return i.e. inside absC code)   HWL
+
 \begin{code}
-pp_paren_semi = text ");"
-
--- ---------------------------------------------------------------------------
--- New type: Now pprAbsC also takes the costs for evaluating the Abstract C
--- code as an argument (that's needed when spitting out the GRAN_EXEC macro
--- which must be done before the return i.e. inside absC code)   HWL
--- ---------------------------------------------------------------------------
-
 pprAbsC :: AbstractC -> CostRes -> SDoc
-
 pprAbsC AbsCNop _ = empty
 pprAbsC (AbsCStmts s1 s2) c = ($$) (pprAbsC s1 c) (pprAbsC s2 c)
 
@@ -97,7 +99,6 @@ pprAbsC (CClosureUpdInfo info) c
   = pprAbsC info c
 
 pprAbsC (CAssign dest src) _ = pprAssign (getAmodeRep dest) dest src
-
 pprAbsC (CJump target) c
   = ($$) (hcat [emitMacro c {-WDP:, text "/* <--++  CJump */"-} ])
 	     (hcat [ text jmp_lit, pprAmode target, pp_paren_semi ])
@@ -199,9 +200,9 @@ pprAbsC stmt@(COpStmt results op args liveness_mask vol_regs) _
     case (ppr_vol_regs vol_regs) of { (pp_saves, pp_restores) ->
     if primOpNeedsWrapper op then
     	vcat [  pp_saves,
-    	    	    the_op,
-    	    	    pp_restores
-    	    	 ]
+    	    	the_op,
+    	    	pp_restores
+    	     ]
     else
     	the_op
     }
@@ -498,7 +499,6 @@ if_profiling pretty
   = if  opt_SccProfilingOn
     then pretty
     else char '0' -- leave it out!
-
 -- ---------------------------------------------------------------------------
 -- Changes for GrAnSim:
 --  draw costs for computation in head of if into both branches;
@@ -561,8 +561,8 @@ Some rough notes on generating code for @CCallOp@:
    (This happens after restoration of essential registers because we
    might need the @Base@ register to access all the others correctly.)
 
-{- Doesn't apply anymore with ForeignObj, structure create via primop.
-   makeForeignObj (ForeignObj is not CReturnable)
+{- Doesn't apply anymore with ForeignObj, structure created via the primop.
+   makeForeignObj (i.e., ForeignObj is not CReturnable)
 7) If returning Malloc Pointer, build a closure containing the
    appropriate value.
 -}
@@ -708,7 +708,7 @@ For l-values, the critical questions are:
 \begin{code}
 ppr_casm_results
 	:: [CAddrMode]	-- list of results (length <= 1)
-	-> SDoc	-- liveness mask
+	-> SDoc  	-- liveness mask
 	->
 	( SDoc,		-- declaration of any local vars
 	  [SDoc],	-- list of result vars (same length as results)
@@ -1138,6 +1138,7 @@ type CLabelSet = FiniteMap CLabel (){-any type will do-}
 emptyCLabelSet = emptyFM
 x `elementOfCLabelSet` labs
   = case (lookupFM labs x) of { Just _ -> True; Nothing -> False }
+
 addToCLabelSet set x = addToFM set x ()
 
 type TEenv = (UniqSet Unique, CLabelSet)

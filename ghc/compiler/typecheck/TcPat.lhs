@@ -36,7 +36,7 @@ import Type		( splitFunTys, splitRhoTy,
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
-import TysWiredIn	( charTy, stringTy, mkListTy, mkTupleTy )
+import TysWiredIn	( charTy, stringTy, mkListTy, mkTupleTy, intTy )
 import Unique		( Unique, eqClassOpKey, geClassOpKey, minusClassOpKey )
 import Util		( assertPanic, panic )
 import Outputable
@@ -295,7 +295,8 @@ tcPat (LitPatIn lit@(HsFrac f))
     origin = LiteralOrigin lit
 
 tcPat (LitPatIn lit@(HsLitLit s))
-  = error "tcPat: can't handle ``literal-literal'' patterns"
+--  = error "tcPat: can't handle ``literal-literal'' patterns"
+  = returnTc (LitPat lit intTy, emptyLIE, intTy)
 
 tcPat (NPlusKPatIn name lit@(HsInt i))
   = tcLookupLocalValueOK "tcPat1:n+k" name	`thenNF_Tc` \ local ->

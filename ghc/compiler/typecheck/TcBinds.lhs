@@ -284,7 +284,6 @@ tcBindWithSigs top_lvl binder_names mbind tc_ty_sigs is_rec prag_info_fn
 		-- 
 		-- Also NB that tcSimplify takes zonked tyvars as its arg, hence we pass
 		-- real_tyvars_to_gen
-		--
     in
 
 	-- SIMPLIFY THE LIE

@@ -24,6 +24,7 @@ import Stix		( StixTree )
 import Unique		( mkBuiltinUnique )
 import Util		( mapAccumB, panic )
 import GlaExts		( trace )
+import Outputable
 \end{code}
 
 This is the generic register allocator.
@@ -77,16 +78,18 @@ simpleRegAlloc
 simpleRegAlloc _ _ _ [] = Just []
 
 simpleRegAlloc free live env (instr:instrs)
-  = if null deadSrcs && maybeToBool newAlloc && maybeToBool instrs2 then
-	Just (instr3 : instrs3)
-    else
-	Nothing
+ | null deadSrcs        && 
+   maybeToBool newAlloc && 
+   maybeToBool instrs2 
+ = Just (instr3 : instrs3)
+ | otherwise
+ = Nothing
   where
     instr3 = patchRegs instr (lookup env2)
 
-    (srcs, dsts) = case regUsage instr of { RU s d -> (regSetToList s, regSetToList d) }
+    (srcs, dsts) = case regUsage instr of (RU s d) -> (regSetToList s, regSetToList d)
 
-    lookup env x = case lookupFM env x of {Just y -> y; Nothing -> x}
+    lookup env x = case lookupFM env x of Just y -> y; Nothing -> x
 
     deadSrcs = [r | r@(UnmappedReg _ _) <- srcs, lookup env r `not_elem` live]
     newDsts  = [r | r@(UnmappedReg _ _) <- dsts, r `not_elem` keysFM env]
@@ -108,14 +111,14 @@ simpleRegAlloc free live env (instr:instrs)
 
     allocateNewReg _ Nothing = Nothing
 
-    allocateNewReg d@(UnmappedReg _ pk) (Just (free, prs)) =
-	if null choices then Nothing
-	else Just (free2, prs2)
+    allocateNewReg d@(UnmappedReg _ pk) (Just (free, prs))
+      | null choices = Nothing
+      | otherwise    = Just (free2, prs2)
       where
 	choices = possibleMRegs pk free
-	reg = head choices
-	free2 = free `useMReg` (case reg of {IBOX(reg2) -> reg2} )
-	prs2 = ((d,  MappedReg (case reg of {IBOX(reg2) -> reg2})) : prs)
+	reg     = head choices
+	free2   = free `useMReg` (case reg of {IBOX(reg2) -> reg2} )
+	prs2    = ((d,  MappedReg (case reg of {IBOX(reg2) -> reg2})) : prs)
 \end{code}
 
 Here is the ``clever'' bit. First go backward (i.e. left), looking for
@@ -129,15 +132,20 @@ hairyRegAlloc
     -> [Instr]
     -> [Instr]
 
-hairyRegAlloc regs reserve_regs instrs
-  = case mapAccumB (doRegAlloc reserve_regs)
-	    (RH regs' 1 emptyFM) noFuture instrs
-    of (RH _ loc' _, _, instrs') ->
-	if loc' == 1 then instrs' else
-	case mapAccumB do_RegAlloc_Nil
-		(RH regs'' loc' emptyFM) noFuture (flattenOrdList (patchMem instrs'))
-	of ((RH _ loc'' _),_,instrs'') ->
-	    if loc'' == loc' then instrs'' else panic "runRegAllocate"
+hairyRegAlloc regs reserve_regs instrs =
+  case mapAccumB (doRegAlloc reserve_regs) (RH regs' 1 emptyFM) noFuture instrs of 
+   (RH _ mloc1 _, _, instrs')
+     | mloc1 == 1 -> instrs'
+     | otherwise  ->
+      let
+       instrs_patched' = patchMem instrs'
+       instrs_patched  = flattenOrdList instrs_patched'
+      in
+      case mapAccumB do_RegAlloc_Nil (RH regs'' mloc1 emptyFM) noFuture instrs_patched of
+	 ((RH _ mloc2 _),_,instrs'') 
+	    | mloc2 == mloc1 -> instrs'' 
+            | otherwise      -> instrs''
+	       --pprPanic "runRegAllocate" (ppr mloc2 <+> ppr mloc1)
   where
     regs'  = regs `useMRegs` reserve_regs
     regs'' = mkMRegsState reserve_regs
@@ -169,11 +177,12 @@ patchMem cs = foldr (mkSeqList . patchMem') mkEmptyList cs
 patchMem' :: Instr -> InstrList
 
 patchMem' instr
-  = if null memSrcs && null memDsts then mkUnitList instr
-    else mkSeqList
-	    (foldr mkParList mkEmptyList loadSrcs)
-	    (mkSeqList instr'
-		(foldr mkParList mkEmptyList spillDsts))
+ | null memSrcs && null memDsts = mkUnitList instr
+ | otherwise =
+    mkSeqList
+      (foldr mkParList mkEmptyList loadSrcs)
+      (mkSeqList instr'
+	         (foldr mkParList mkEmptyList spillDsts))
 
     where
 	(RU srcs dsts) = regUsage instr
@@ -221,18 +230,26 @@ getUsage (RF next_in_use future reg_conflicts) instr
 	       live_through = in_use `minusRegSet` dsts
 	       last_used = [ r | r <- regSetToList srcs,
 			     not (r `elementOfRegSet` (fstFL future) || r `elementOfRegSet` in_use)]
+
 	       in_use' = srcs `unionRegSets` live_through
-	       reg_conflicts' = case new_conflicts of
-		    [] -> reg_conflicts
-		    _ -> addListToFM reg_conflicts new_conflicts
-	       new_conflicts = if isEmptyRegSet live_dynamics then []
-			       else [ (r, merge_conflicts r)
-					| r <- extractMappedRegNos (regSetToList dsts) ]
-	       merge_conflicts reg = case lookupFM reg_conflicts reg of
-			    Nothing -> live_dynamics
-			    Just conflicts -> conflicts `unionRegSets` live_dynamics
-	       live_dynamics = mkRegSet
-			    [ r | r@(UnmappedReg _ _) <- regSetToList live_through ]
+
+	       reg_conflicts' = 
+	        case new_conflicts of
+		  [] -> reg_conflicts
+		  _  -> addListToFM reg_conflicts new_conflicts
+
+	       new_conflicts
+	        | isEmptyRegSet live_dynamics = []
+		| otherwise =
+		  [ (r, merge_conflicts r)
+		  | r <- extractMappedRegNos (regSetToList dsts) ]
+
+	       merge_conflicts reg = 
+	        case lookupFM reg_conflicts reg of
+		  Nothing        -> live_dynamics
+		  Just conflicts -> conflicts `unionRegSets` live_dynamics
+
+	       live_dynamics = mkRegSet [ r | r@(UnmappedReg _ _) <- regSetToList live_through ]
 
 doRegAlloc'
     :: [RegNo]
@@ -273,18 +290,23 @@ doRegAlloc' reserved (RH frs loc env) (RI in_use srcs dsts lastu conflicts) inst
 	    Nothing -> trace "Lost register; possibly a floating point type error in a _ccall_?" dyn
       dynToStatic other = other
 
-      allocateNewRegs
-	:: Reg -> (MRegsState, Int, [(Reg, Reg)]) -> (MRegsState, Int, [(Reg, Reg)])
+      allocateNewRegs :: Reg 
+                      -> (MRegsState, Int, [(Reg, Reg)]) 
+		      -> (MRegsState, Int, [(Reg, Reg)])
 
       allocateNewRegs d@(UnmappedReg _ pk) (fs, mem, lst) = (fs', mem', (d, f) : lst)
-	where (fs', f, mem') = case acceptable fs of
-		[] -> (fs, MemoryReg mem pk, mem + 1)
-		(IBOX(x2):_) -> (fs `useMReg` x2, MappedReg x2, mem)
+	where 
+	 (fs', f, mem') = 
+	   case acceptable fs of
+	    []           -> (fs, MemoryReg mem pk, mem + 1)
+	    (IBOX(x2):_) -> (fs `useMReg` x2, MappedReg x2, mem)
 
-	      acceptable regs = filter no_conflict (possibleMRegs pk regs)
-	      no_conflict reg = case lookupFM conflicts reg of
-		    Nothing -> True
-		    Just conflicts -> not (d `elementOfRegSet` conflicts)
+         acceptable regs = filter no_conflict (possibleMRegs pk regs)
+
+	 no_conflict reg = 
+	   case lookupFM conflicts reg of
+	     Nothing        -> True
+	     Just conflicts -> not (d `elementOfRegSet` conflicts)
 \end{code}
 
 We keep a local copy of the Prelude function \tr{notElem},

@@ -502,13 +502,14 @@ constraints.
 simplify_eqns :: [EquationInfo] -> [EquationInfo]
 simplify_eqns []                               = []
 simplify_eqns ((EqnInfo n ctx pats result):qs) = 
-    (EqnInfo n ctx(map simplify_pat pats) result) : 
-    simplify_eqns qs
+ (EqnInfo n ctx pats' result) : simplify_eqns qs
+ where
+  pats' = map simplify_pat pats
 
 simplify_pat :: TypecheckedPat -> TypecheckedPat  
-simplify_pat (WildPat gt ) = WildPat gt	
 
-simplify_pat (VarPat id)   = WildPat (idType id) 
+simplify_pat pat@(WildPat gt) = pat
+simplify_pat (VarPat id)      = WildPat (idType id) 
 
 simplify_pat (LazyPat p)   = simplify_pat p
 
@@ -535,11 +536,11 @@ simplify_pat (RecPat id ty idps) = ConPat id ty pats
                                    pats = map (\ (id,p,_)-> simplify_pat p) idps
 
 simplify_pat pat@(LitPat lit lit_ty) 
-  | isUnboxedType lit_ty = LitPat lit lit_ty
+  | isUnboxedType lit_ty = pat
 
   | lit_ty == charTy = ConPat charDataCon charTy [LitPat (mk_char lit) charPrimTy]
 
-  | otherwise = pprPanic "tidy1:LitPat:" (ppr pat)
+  | otherwise = pat --pprPanic "tidy1:LitPat:" (ppr pat)
   where
     mk_char (HsChar c)    = HsCharPrim c
 
@@ -554,12 +555,19 @@ simplify_pat (NPat lit lit_ty hsexpr) = better_pat
       | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
 
 		-- Convert the literal pattern "" to the constructor pattern [].
-      | null_str_lit lit       = ConPat nilDataCon    lit_ty [] 
+      | null_str_lit lit      = ConPat nilDataCon    lit_ty []
+      | one_str_lit lit       = ConPat consDataCon list_ty 
+                                   [ ConPat charDataCon   lit_ty [LitPat (mk_head_char lit) charPrimTy]
+				   , ConPat nilDataCon    lit_ty []]
 
       | otherwise	       = NPat lit lit_ty hsexpr
 
+    list_ty = mkListTy lit_ty
+
     mk_int    (HsInt i)      = HsIntPrim i
     mk_int    l@(HsLitLit s) = l
+
+    mk_head_char   (HsString s) = HsCharPrim (_HEAD_ s)
 
     mk_char   (HsChar c)     = HsCharPrim c
     mk_char   l@(HsLitLit s) = l
@@ -578,6 +586,9 @@ simplify_pat (NPat lit lit_ty hsexpr) = better_pat
 
     null_str_lit (HsString s) = _NULL_ s
     null_str_lit other_lit    = False
+
+    one_str_lit (HsString s) = _LENGTH_ s == (1::Int)
+    one_str_lit other_lit    = False
 
 simplify_pat (NPlusKPat	id hslit ty hsexpr1 hsexpr2) = --NPlusKPat id hslit ty hsexpr1 hsexpr2 
      WildPat ty

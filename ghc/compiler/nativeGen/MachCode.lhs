@@ -1083,6 +1083,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       FloatPowerOp  -> getRegister (StCall SLIT("pow") DoubleRep [promote x, promote y])
 		       where promote x = StPrim Float2DoubleOp [x]
       DoublePowerOp -> getRegister (StCall SLIT("pow") DoubleRep [x, y])
+--      _ -> panic "Prim op " ++ (showPrimOp primop) ++ " not handled!"
   where
     imul_div fn x y = getRegister (StCall fn IntRep [x, y])
 

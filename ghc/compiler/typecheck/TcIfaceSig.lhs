@@ -265,27 +265,6 @@ tcCoreExpr (UfNote note expr)
 tcCoreNote (UfSCC cc)   = returnTc (SCC cc)
 tcCoreNote UfInlineCall = returnTc InlineCall 
 \end{code}
-    returnTc (Note note' expr') 
-
-tcCoreExpr (UfLam bndr body)
-  = tcCoreLamBndr bndr 		$ \ bndr' ->
-    tcCoreExpr body		`thenTc` \ body' ->
-    returnTc (Lam bndr' body')
-
-tcCoreExpr (UfLet (UfNonRec bndr rhs) body)
-  = tcCoreExpr rhs		`thenTc` \ rhs' ->
-    tcCoreValBndr bndr 		$ \ bndr' ->
-    tcCoreExpr body		`thenTc` \ body' ->
-    returnTc (Let (NonRec bndr' rhs') body')
-
-tcCoreExpr (UfLet (UfRec pairs) body)
-  = tcCoreValBndrs bndrs	$ \ bndrs' ->
-    mapTc tcCoreExpr rhss	`thenTc` \ rhss' ->
-    tcCoreExpr body		`thenTc` \ body' ->
-    returnTc (Let (Rec (bndrs' `zip` rhss')) body')
-  where
-    (bndrs, rhss) = unzip pairs
-\end{code}
 
 \begin{code}
 tcCoreLamBndr (UfValBinder name ty) thing_inside

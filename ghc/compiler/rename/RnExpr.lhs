@@ -30,7 +30,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..) )
 import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 			  ccallableClass_RDR, creturnableClass_RDR, 
 			  monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
-			  ratioDataCon_RDR, negate_RDR, assert_RDR,
+			  ratioDataCon_RDR, negate_RDR, assertErr_RDR,
 			  ioDataCon_RDR, ioOkDataCon_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
@@ -248,7 +248,7 @@ free-var set iff if it's a LocallyDefined Name.
 rnExpr :: RdrNameHsExpr -> RnMS s (RenamedHsExpr, FreeVars)
 
 rnExpr (HsVar v)
-  = tryLookupOccRn v	`thenRn` \ res ->
+  = lookupOccRn v	`thenRn` \ name ->
     case res of
       Left (nm,err) 
         | opt_GlasgowExts && v == assertRdrName -> 
@@ -744,11 +744,8 @@ mkAssertExpr =
   returnRn (expr, name)
 
   where
-   mod = rdrNameModule assert_RDR
-   occ = rdrNameOcc assert_RDR
-
-assertRdrName :: RdrName
-assertRdrName = Unqual (VarOcc SLIT("assert"))
+   mod = rdrNameModule assertErr_RDR
+   occ = rdrNameOcc assertErr_RDR
 \end{code}
 
 %************************************************************************

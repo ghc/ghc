@@ -29,7 +29,7 @@ module PrelErr
 
        , error		           -- :: String -> a
        , ioError	           -- :: String -> a
-       , assert__		   -- :: String -> Bool -> a -> a
+       , assertError		   -- :: String -> Bool -> a -> a
        ) where
 
 --import Prelude
@@ -145,8 +145,8 @@ recConError 		 s = error (untangle s "Missing field in record construction:")
 recUpdError 		 s = error (untangle s "Record to doesn't contain field(s) to be updated")
 
 
-assert__ :: String -> Bool -> a -> a
-assert__ str pred v 
+assertError :: String -> Bool -> a -> a
+assertError str pred v 
   | pred      = v
   | otherwise = error (untangle str "Assertion failed")
 

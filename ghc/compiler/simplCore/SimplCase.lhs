@@ -1,4 +1,4 @@
-`%
+%
 % (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[SimplCase]{Simplification of `case' expression}
@@ -37,6 +37,7 @@ import TyCon		( isDataTyCon )
 import TysPrim		( voidTy )
 import Util		( Eager, runEager, appEager,
 			  isIn, isSingleton, zipEqual, panic, assertPanic )
+import Outputable
 \end{code}
 
 Float let out of case.
@@ -685,7 +686,7 @@ completeAlgCaseWithKnownCon
 	-> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
 	-> SmplM OutExpr
 
-completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
+completeAlgCaseWithKnownCon env con con_args a@(AlgAlts alts deflt) rhs_c
   = ASSERT(isDataCon con)
     search_alts alts
   where
@@ -709,7 +710,8 @@ completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
       = 	-- No matching alternative
 	case deflt of
 	  NoDefault 	 -> 	-- Blargh!
-	    panic "completeAlgCaseWithKnownCon: No matching alternative and no default"
+	    pprPanic "completeAlgCaseWithKnownCon: No matching alternative and no default"
+	             (ppr con <+> ppr con_args $$ ppr a)
 
 	  BindDefault binder@(_,occ_info) rhs ->	-- OK, there's a default case
 			-- let-bind the binder to the constructor

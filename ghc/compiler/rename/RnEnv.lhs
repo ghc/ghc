@@ -276,87 +276,37 @@ ifaceFlavour name = case getNameProvenance name of
 Looking up a name in the RnEnv.
 
 \begin{code}
-lookupRn :: RdrName
-	 -> Maybe Name		-- Result of environment lookup
-	 -> RnMS s Name
-lookupRn rdr_name (Just name)
-  = 	-- Found the name in the envt
-    returnRn name	-- In interface mode the only things in 
-			-- the environment are things in local (nested) scopes
-lookupRn rdr_name nm@Nothing
-  = tryLookupRn rdr_name nm `thenRn` \ name_or_error ->
-    case name_or_error of
-      Left (nm,err) -> failWithRn nm err
-      Right nm      -> returnRn nm
+lookupRn :: NameEnv -> RdrName -> RnMS s Name
+lookupRn name_env rdr_name
+  = case lookupFM name_env rdr_name of
 
-tryLookupRn :: RdrName
-	    -> Maybe Name		-- Result of environment lookup
-	    -> RnMS s (Either (Name, ErrMsg) Name)
-tryLookupRn rdr_name (Just name) 
-  = 	-- Found the name in the envt
-    returnRn (Right name) -- In interface mode the only things in 
-			  -- the environment are things in local (nested) scopes
+	-- Found it!
+	Just name -> returnRn name
 
--- lookup in environment, but don't flag an error if
--- name is not found.
-tryLookupRn rdr_name Nothing
-  =	-- We didn't find the name in the environment
-    getModeRn 		`thenRn` \ mode ->
-    case mode of {
-	SourceMode -> returnRn (Left ( mkUnboundName rdr_name
-				     , unknownNameErr rdr_name));
-		-- Source mode; lookup failure is an error
+	-- Not found
+	Nothing -> getModeRn	`thenRn` \ mode ->
+		   case mode of 
+			-- Not found when processing source code; so fail
+			SourceMode    -> failWithRn (mkUnboundName rdr_name)
+					            (unknownNameErr rdr_name)
+		
+			-- Not found when processing an imported declaration,
+			-- so we create a new name for the purpose
+			InterfaceMode _ -> 
+			    case rdr_name of
 
-        InterfaceMode _ _ ->
+				Qual mod_name occ hif -> newGlobalName mod_name occ hif
 
+				-- An Unqual is allowed; interface files contain 
+				-- unqualified names for locally-defined things, such as
+				-- constructors of a data type.
+				Unqual occ -> getModuleRn 	`thenRn ` \ mod_name ->
+					      newGlobalName mod_name occ HiFile
 
-	----------------------------------------------------
-	-- OK, so we're in interface mode
-	-- An Unqual is allowed; interface files contain 
-	-- unqualified names for locally-defined things, such as
-	-- constructors of a data type.
-	-- So, qualify the unqualified name with the 
-	-- module of the interface file, and try again
-    case rdr_name of 
-	Unqual occ       -> 
-	    getModuleRn		`thenRn` \ mod ->
-            newImportedGlobalName mod occ HiFile `thenRn` \ nm ->
-	    returnRn (Right nm)
-	Qual mod occ hif -> 
-	    newImportedGlobalName mod occ hif `thenRn` \ nm ->
-	    returnRn (Right nm)
-
-    }
 
 lookupBndrRn rdr_name
-  = lookupNameRn rdr_name		`thenRn` \ maybe_name ->
-    lookupRn rdr_name maybe_name	`thenRn` \ name ->
-
-    if isLocalName name then
-	returnRn name
-    else
-
-	----------------------------------------------------
-	-- OK, so we're at the binding site of a top-level defn
-	-- Check to see whether its an imported decl
-    getModeRn		`thenRn` \ mode ->
-    case mode of {
-	  SourceMode -> returnRn name ;
-
-	  InterfaceMode _ print_unqual_fn -> 
-
-	----------------------------------------------------
-	-- OK, the binding site of an *imported* defn
-	-- so we can make the provenance more informative
-    getSrcLocRn		`thenRn` \ src_loc ->
-    let
-	name' = case getNameProvenance name of
-		    NonLocalDef _ hif _ -> setNameProvenance name 
-						(NonLocalDef src_loc hif (print_unqual_fn name'))
-		    other		-> name
-    in
-    returnRn name'
-    }
+  = getNameEnv 			`thenRn` \ name_env ->
+    lookupRn name_env rdr_name
 
 -- Just like lookupRn except that we record the occurrence too
 -- Perhaps surprisingly, even wired-in names are recorded.
@@ -364,39 +314,18 @@ lookupBndrRn rdr_name
 -- deciding which instance declarations to import.
 lookupOccRn :: RdrName -> RnMS s Name
 lookupOccRn rdr_name
-  = tryLookupOccRn rdr_name `thenRn` \ name_or_error ->
-    case name_or_error of
-      Left (nm, err) -> failWithRn nm err
-      Right nm       -> returnRn nm
-
--- tryLookupOccRn is the fail-safe version of lookupOccRn, returning
--- back the error rather than immediately flagging it. It is only
--- directly used by RnExpr.rnExpr to catch and rewrite unbound
--- uses of `assert'.
-tryLookupOccRn :: RdrName -> RnMS s (Either (Name,ErrMsg) Name)
-tryLookupOccRn rdr_name
-  = lookupNameRn rdr_name		`thenRn` \ maybe_name ->
-    tryLookupRn rdr_name maybe_name	`thenRn` \ name_or_error ->
-    case name_or_error of
-     Left _     -> returnRn name_or_error
-     Right name -> 
-       let
-	name' = mungePrintUnqual rdr_name name
-       in
-       addOccurrenceName name' `thenRn_`
-       returnRn name_or_error
-
+  = getNameEnv 			`thenRn` \ name_env ->
+    lookupRn name_env rdr_name	`thenRn` \ name ->
+    addOccurrenceName name
 
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
--- environment only.  It's used for record field names only.
+-- environment.  It's used for record field names only.
 lookupGlobalOccRn :: RdrName -> RnMS s Name
 lookupGlobalOccRn rdr_name
-  = lookupGlobalNameRn rdr_name		`thenRn` \ maybe_name ->
-    lookupRn rdr_name maybe_name	`thenRn` \ name ->
-    let
-	name' = mungePrintUnqual rdr_name name
-    in
-    addOccurrenceName name'
+  = getGlobalNameEnv		`thenRn` \ name_env ->
+    lookupRn name_env rdr_name	`thenRn` \ name ->
+    addOccurrenceName name
+
 
 -- mungePrintUnqual is used to make *imported* *occurrences* print unqualified
 -- if they were mentioned unqualified in the source code.
@@ -619,7 +548,10 @@ filterAvail :: RdrNameIE	-- Wanted
 
 filterAvail ie@(IEThingWith want wants) avail@(AvailTC n ns)
   | sub_names_ok = AvailTC n (filter is_wanted ns)
-  | otherwise    = pprTrace "filterAvail" (hsep [ppr ie, pprAvail avail]) $
+  | otherwise    = 
+#ifdef DEBUG
+		   pprTrace "filterAvail" (hsep [ppr ie, pprAvail avail]) $
+#endif
 		   NotAvailable
   where
     is_wanted name = nameOccName name `elem` wanted_occs

@@ -431,13 +431,15 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		-- mention the constructor, which doesn't exist for CCallable, CReturnable
 		-- Hardly beautiful, but only three extra lines.
 	   HsApp (TyApp (HsVar (RealId eRROR_ID)) [tcIdType this_dict_id])
-		 (HsLit (HsString (_PK_ ("Compiler error: bad dictionary " ++ showSDoc (ppr clas)))))
+		 (HsLitOut (HsString msg) stringTy)
 
 	  | otherwise	-- The common case
 	  = foldl HsApp (TyApp (HsVar (RealId dict_constr)) inst_tys')
 			       (map HsVar (sc_dict_ids ++ meth_ids))
 		-- We don't produce a binding for the dict_constr; instead we
 		-- rely on the simplifier to unfold this saturated application
+	  where
+	    msg = _PK_ ("Compiler error: bad dictionary " ++ showSDoc (ppr clas))
 
 	dict_bind    = VarMonoBind this_dict_id dict_rhs
 	method_binds = andMonoBinds method_binds_s
@@ -491,7 +493,7 @@ tcInstMethodBind clas inst_tys inst_tyvars meth_binds prags (sel_id, maybe_dm_id
 
 	-- Warn if no method binding, only if -fwarn-missing-methods
     
-    warnTc (opt_WarnMissingMethods && 
+    warnTc (opt_WarnMissingMethods &&
 	    not (maybeToBool maybe_meth_bind) &&
 	    not (maybeToBool maybe_dm_id))	
 	(omittedMethodWarn sel_id clas)		`thenNF_Tc_`
@@ -532,143 +534,10 @@ tcInstMethodBind clas inst_tys inst_tyvars meth_binds prags (sel_id, maybe_dm_id
 
 %************************************************************************
 %*									*
-\subsection{Type-checking specialise instance pragmas}
+\subsection{Checking for a decent instance type}
 %*									*
 %************************************************************************
 
-\begin{code}
-{- LATER
-tcSpecInstSigs :: E -> CE -> TCE
-	       -> Bag InstInfo		-- inst decls seen (declared and derived)
-	       -> [RenamedSpecInstSig]	-- specialise instance upragmas
-	       -> TcM (Bag InstInfo)	-- new, overlapped, inst decls
-
-tcSpecInstSigs e ce tce inst_infos []
-  = returnTc emptyBag
-
-tcSpecInstSigs e ce tce inst_infos sigs
-  = buildInstanceEnvs inst_infos 	`thenTc`    \ inst_mapper ->
-    tc_inst_spec_sigs inst_mapper sigs	`thenNF_Tc` \ spec_inst_infos ->
-    returnTc spec_inst_infos
-  where
-    tc_inst_spec_sigs inst_mapper []
-      = returnNF_Tc emptyBag
-    tc_inst_spec_sigs inst_mapper (sig:sigs)
-      = tcSpecInstSig e ce tce inst_infos inst_mapper sig	`thenNF_Tc` \ info_sig ->
-	tc_inst_spec_sigs inst_mapper sigs			`thenNF_Tc` \ info_sigs ->
-	returnNF_Tc (info_sig `unionBags` info_sigs)
-
-tcSpecInstSig :: E -> CE -> TCE
-	      -> Bag InstInfo
-	      -> InstanceMapper
-	      -> RenamedSpecInstSig
-	      -> NF_TcM (Bag InstInfo)
-
-tcSpecInstSig e ce tce inst_infos inst_mapper (SpecInstSig class_name ty src_loc)
-  = recoverTc emptyBag			(
-    tcAddSrcLoc src_loc			(
-    let
-	clas = lookupCE ce class_name -- Renamer ensures this can't fail
-
-	-- Make some new type variables, named as in the specialised instance type
-	ty_names 			  = extractHsTyNames ???is_tyvarish_name??? ty
-	(tmpl_e,inst_tmpls,inst_tmpl_tys) = mkTVE ty_names
-    in
-    babyTcMtoTcM (tcInstanceType ce tce tmpl_e True src_loc ty)
-				`thenTc` \ inst_ty ->
-    let
-	maybe_tycon = case splitAlgTyConApp_maybe inst_ty of
-			 Just (tc,_,_) -> Just tc
-			 Nothing       -> Nothing
-
-	maybe_unspec_inst = lookup_unspec_inst clas maybe_tycon inst_infos
-    in
-	-- Check that we have a local instance declaration to specialise
-    checkMaybeTc maybe_unspec_inst
-	    (specInstUnspecInstNotFoundErr clas inst_ty src_loc)  `thenTc_`
-
-	-- Create tvs to substitute for tmpls while simplifying the context
-    copyTyVars inst_tmpls	`thenNF_Tc` \ (tv_e, inst_tvs, inst_tv_tys) ->
-    let
-	Just (InstInfo _ unspec_tyvars unspec_inst_ty unspec_theta
-		       _ _ binds _ uprag) = maybe_unspec_inst
-
-    	subst = case matchTy unspec_inst_ty inst_ty of
-		     Just subst -> subst
-		     Nothing    -> panic "tcSpecInstSig:matchTy"
-
-	subst_theta    = instantiateThetaTy subst unspec_theta
-	subst_tv_theta = instantiateThetaTy tv_e subst_theta
-
-	mk_spec_origin clas ty
-	  = InstanceSpecOrigin inst_mapper clas ty src_loc
-	-- I'm VERY SUSPICIOUS ABOUT THIS
-	-- the inst-mapper is in a knot at this point so it's no good
-	-- looking at it in tcSimplify...
-    in
-    tcSimplifyThetas mk_spec_origin subst_tv_theta
-				`thenTc` \ simpl_tv_theta ->
-    let
-	simpl_theta = [ (clas, tv_to_tmpl tv) | (clas, tv) <- simpl_tv_theta ]
-
-	tv_tmpl_map   = zipEqual "tcSpecInstSig" inst_tv_tys inst_tmpl_tys
-	tv_to_tmpl tv = assoc "tcSpecInstSig" tv_tmpl_map tv
-    in
-    mkInstanceRelatedIds clas inst_tmpls inst_ty simpl_theta uprag
-				`thenNF_Tc` \ (dfun_id, dfun_theta, const_meth_ids) ->
-
-    getSwitchCheckerTc		`thenNF_Tc` \ sw_chkr ->
-    (if sw_chkr SpecialiseTrace then
-	pprTrace "Specialised Instance: "
-	(vcat [hsep [if null simpl_theta then empty else ppr simpl_theta,
-			  if null simpl_theta then empty else ptext SLIT("=>"),
-			  ppr clas,
-			  pprParendType inst_ty],
-		   hsep [ptext SLIT("        derived from:"),
-			  if null unspec_theta then empty else ppr unspec_theta,
-			  if null unspec_theta then empty else ptext SLIT("=>"),
-			  ppr clas,
-			  pprParendType unspec_inst_ty]])
-    else id) (
-
-    returnTc (unitBag (InstInfo clas inst_tmpls inst_ty simpl_theta
-				dfun_theta dfun_id
-				binds src_loc uprag))
-    )))
-
-
-lookup_unspec_inst clas maybe_tycon inst_infos
-  = case filter (match_info match_inst_ty) (bagToList inst_infos) of
-	[]       -> Nothing
-	(info:_) -> Just info
-  where
-    match_info match_ty (InstInfo inst_clas _ inst_ty _ _ _ _ _ from_here _ _ _)
-      = from_here && clas == inst_clas &&
-	match_ty inst_ty && is_plain_instance inst_ty
-
-    match_inst_ty = case maybe_tycon of
-		      Just tycon -> match_tycon tycon
-		      Nothing    -> match_fun
-
-    match_tycon tycon inst_ty = case (splitAlgTyConApp_maybe inst_ty) of
-	  Just (inst_tc,_,_) -> tycon == inst_tc
-	  Nothing            -> False
-
-    match_fun inst_ty = isFunType inst_ty
-
-
-is_plain_instance inst_ty
-  = case (splitAlgTyConApp_maybe inst_ty) of
-      Just (_,tys,_) -> all isTyVarTemplateTy tys
-      Nothing	     -> case maybeUnpackFunTy inst_ty of
-			  Just (arg, res) -> isTyVarTemplateTy arg && isTyVarTemplateTy res
-			  Nothing	  -> error "TcInstDecls:is_plain_instance"
--}
-\end{code}
-
-
-Checking for a decent instance type
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @scrutiniseInstanceType@ checks the type {\em and} its syntactic constraints:
 it must normally look like: @instance Foo (Tycon a b c ...) ...@
 
