@@ -42,7 +42,6 @@ import Unique		( eqClassOpKey, geClassOpKey, minusClassOpKey,
 			)
 import BasicTypes	( isBoxed )
 import Bag
-import Util		( zipEqual )
 import Outputable
 \end{code}
 
@@ -213,7 +212,7 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
  	-- Check the constructor itself
     tcConstructor pat name pat_ty	`thenTc` \ (data_con, ex_tvs, dicts, lie_avail1, arg_tys) ->
     let
-	-- not zipEqual: if the constructor isn't really a record, then
+	-- Don't use zipEqual! If the constructor isn't really a record, then
 	-- dataConFieldLabels will be empty (and each field in the pattern
 	-- will generate an error below).
 	field_tys = zip (map fieldLabelName (dataConFieldLabels data_con))
