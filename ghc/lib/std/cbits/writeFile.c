@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: writeFile.c,v 1.6 1999/07/12 10:43:13 sof Exp $
+ * $Id: writeFile.c,v 1.7 1999/09/12 19:18:22 sof Exp $
  *
  * hPutStr Runtime Support
  */
@@ -47,7 +47,7 @@ StgInt bytes;
     int count, rc=0;
     IOFileObject* fo = (IOFileObject*)ptr;
 
-    char *p = (char *) fo->buf;
+    char *pBuf = (char *) fo->buf;
 
     /* Disallow short writes */
     if (bytes == 0  || fo->buf == NULL)
@@ -60,10 +60,10 @@ StgInt bytes;
 	       (
 #ifdef USE_WINSOCK
 	         fo->flags & FILEOBJ_WINSOCK ?
-		 send(fo->fd, fo->buf, bytes, 0) :
-		 write(fo->fd, fo->buf, bytes))) < bytes) {
+		 send(fo->fd,  pBuf, bytes, 0) :
+		 write(fo->fd, pBuf, bytes))) < bytes) {
 #else
-		 write(fo->fd, fo->buf, bytes))) < bytes) {
+		 write(fo->fd, pBuf, bytes))) < bytes) {
 #endif
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -71,7 +71,7 @@ StgInt bytes;
 	    return -1;
 	}
 	bytes -= count;
-	p += count;
+	pBuf  += count;
     }
     /* Signal that we've emptied the buffer */
     fo->bufWPtr=0;
@@ -88,7 +88,7 @@ StgInt  len;
     IOFileObject* fo = (IOFileObject*)ptr;
     int count;
     int rc = 0;
-    char *p = (char *) buf;
+    char *pBuf = (char *) buf;
 
     if (len == 0 )
 	return 0;
@@ -129,18 +129,18 @@ StgInt  len;
                (
 #ifdef USE_WINSOCK
 	         fo->flags & FILEOBJ_WINSOCK ?
-		 send(fo->fd,  (char*)buf, (int)len, 0) :
-		 write(fo->fd, (char*)buf, (int)len))) < len ) {
+		 send(fo->fd,  pBuf, (int)len, 0) :
+		 write(fo->fd, pBuf, (int)len))) < len ) {
 #else
-		 write(fo->fd, (char*)buf, (int)len))) < len ) {
+		 write(fo->fd, pBuf, (int)len))) < len ) {
 #endif
 	if (errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();
 	    return -1;
 	}
-	len -= count;
-	p += count;
+	len  -= count;
+	pBuf += count;
     }
 
     return 0;
