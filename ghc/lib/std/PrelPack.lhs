@@ -25,6 +25,7 @@ module PrelPack
 	unpackCString,     -- :: Addr -> [Char]
 	unpackNBytes,      -- :: Addr -> Int -> [Char]
 	unpackNBytesST,    -- :: Addr -> Int -> ST s [Char]
+	unpackNBytesAccST, -- :: Addr -> Int -> [Char] -> ST s [Char]
 	unpackCString#,    -- :: Addr# -> [Char]	 **
 	unpackNBytes#,     -- :: Addr# -> Int# -> [Char] **
 	unpackNBytesST#,   -- :: Addr# -> Int# -> ST s [Char]
@@ -86,28 +87,35 @@ unpackNBytes :: Addr -> Int -> [Char]
 unpackNBytes (A# addr) (I# l) = unpackNBytes# addr l
 
 unpackNBytesST :: Addr -> Int -> ST s [Char]
-unpackNBytesST (A# addr) (I# l) = unpackNBytesST# addr l
+unpackNBytesST (A# addr) (I# l) = unpackNBytesAccST# addr l []
+
+unpackNBytesAccST :: Addr -> Int -> [Char] -> ST s [Char]
+unpackNBytesAccST (A# addr) (I# l) rest = unpackNBytesAccST# addr l rest
 
 unpackNBytes#      :: Addr# -> Int#   -> [Char]
   -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
-unpackNBytes# addr len
-  = unpack 0#
+  -- It's strict!
+unpackNBytes# addr 0#   = []
+unpackNBytes# addr len# = unpack [] (len# -# 1#)
     where
-     unpack i
-      | i >=# len  = []
-      | otherwise  = C# ch : unpack (i +# 1#)
-      where
-	ch = indexCharOffAddr# addr i
+     unpack acc i#
+      | i# <# 0#  = acc
+      | otherwise = 
+	 case indexCharOffAddr# addr i# of
+	    ch -> unpack (C# ch : acc) (i# -# 1#)
 
 unpackNBytesST# :: Addr# -> Int# -> ST s [Char]
-unpackNBytesST# addr len
-  = unpack 0#
+unpackNBytesST# addr# l#   = unpackNBytesAccST# addr# l# []
+
+unpackNBytesAccST# :: Addr# -> Int# -> [Char] -> ST s [Char]
+unpackNBytesAccST# addr 0#   rest = return rest
+unpackNBytesAccST# addr len# rest = unpack rest (len# -# 1#)
   where
-    unpack i 
-      | i >=# len  = return []
+    unpack acc i# 
+      | i# <# 0#  = return acc
       | otherwise  = 
-	 case indexCharOffAddr# addr i of
-	  ch -> unpack (i +# 1#) >>= \ ls -> return (C# ch : ls)
+	 case indexCharOffAddr# addr i# of
+	  ch -> unpack (C# ch : acc) (i# -# 1#)
 
 \end{code}
 
@@ -148,14 +156,15 @@ unpackNBytesBA (ByteArray (l,u) bytes) i
         | otherwise = u-l+1
 
 unpackNBytesBA# :: ByteArray# -> Int# -> [Char]
-unpackNBytesBA# bytes nh 
- = unpack 0#
+unpackNBytesBA# bytes 0#   = []
+unpackNBytesBA# bytes len# = unpack [] (len# -# 1#)
    where
-    unpack i
-     | i >=# nh  = []
-     | otherwise = C# ch : unpack (i +# 1#)
-      where
-	ch = indexCharArray# bytes i
+    unpack acc i#
+     | i# <# 0#  = acc
+     | otherwise = 
+          case indexCharArray# bytes i# of
+	    ch -> unpack (C# ch : acc) (i# -# 1#)
+
 \end{code}
 
 
