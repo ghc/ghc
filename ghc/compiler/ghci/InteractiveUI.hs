@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.181 2005/01/12 09:46:06 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.182 2005/01/12 12:44:25 ross Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -62,8 +62,8 @@ import System.Cmd
 import System.CPUTime
 import System.Environment
 import System.Directory
-import System.IO as IO
-import System.IO.Error
+import System.IO
+import System.IO.Error as IO
 import Data.Char
 import Control.Monad as Monad
 import Foreign.StablePtr	( newStablePtr )
