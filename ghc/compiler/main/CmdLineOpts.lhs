@@ -75,7 +75,6 @@ module CmdLineOpts (
 	opt_SimplExcessPrecision,
 
 	-- Unfolding control
-	opt_UF_HiFileThreshold,
 	opt_UF_CreationThreshold,
 	opt_UF_UseThreshold,
 	opt_UF_FunAppDiscount,
@@ -489,7 +488,7 @@ opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
 {-
    The optional '-inpackage=P' flag tells what package
    we are compiling this module for.
-   The Prelude, for example is compiled with '-inpackage prelude'
+   The Prelude, for example is compiled with '-inpackage std'
 -}
 opt_InPackage			= case lookup_str "-inpackage=" of
 				    Just p  -> _PK_ p
@@ -517,7 +516,6 @@ opt_SimplCaseMerge		= lookUp  SLIT("-fcase-merge")
 opt_SimplExcessPrecision	= lookUp  SLIT("-fexcess-precision")
 
 -- Unfolding control
-opt_UF_HiFileThreshold		= lookup_def_int "-funfolding-interface-threshold" (45::Int)
 opt_UF_CreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  (45::Int)
 opt_UF_UseThreshold		= lookup_def_int "-funfolding-use-threshold"	   (8::Int)	-- Discounts can be big
 opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-- It's great to inline a fn
@@ -586,7 +584,6 @@ isStaticHscFlag f =
 	"fcontext-stack",
 	"fliberate-case-threshold",
 	"fhistory-size",
-	"funfolding-interface-threshold",
 	"funfolding-creation-threshold",
 	"funfolding-use-threshold",
 	"funfolding-fun-discount",
