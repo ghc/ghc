@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.160 2001/06/15 15:20:20 simonpj Exp $
+# $Id: Makefile,v 1.161 2001/06/22 13:31:29 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -114,6 +114,15 @@ endif
 # for explanatory comment as to what this does.
 ifeq "$(MinimalUnixDeps)" "YES"
 SRC_HC_OPTS += -DMINIMAL_UNIX_DEPS
+ghc_501_at_least = $(shell expr "$(GhcVersion)" \> 5.00)
+ifneq "$(ghc_501_at_least)" "1"
+boot ::
+	$(CP) ../lib/std/cbits/system.c main
+C_SRCS += main/system.c
+SRC_CC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
+SRC_MKDEPENDC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
+HS_OBJS += main/system.o
+endif
 endif
 
 HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
@@ -130,9 +139,13 @@ ifeq "$(BootingFromHc)" "YES"
 HCS	+= rename/ParseIface.hc parser/Parser.hc main/ParsePkgConf.hc
 endif
 
-HS_OBJS  = \
+HS_OBJS = \
   $(patsubst %.hc, %.o, $(HCS)) \
   parser/hschooks.o
+
+ifneq "$(ghc_501_at_least)" "1"
+HS_OBJS += main/system.o
+endif
 
 DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
 
