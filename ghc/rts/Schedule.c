@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.118 2002/02/06 01:29:27 sof Exp $
+ * $Id: Schedule.c,v 1.119 2002/02/07 06:33:20 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -185,7 +185,9 @@ StgTSO *sleeping_queue;		/* perhaps replace with a hash table? */
  */
 StgTSO *all_threads;
 
-/* Threads suspended in _ccall_GC.
+/* When a thread performs a safe C call (_ccall_GC, using old
+ * terminology), it gets put on the suspended_ccalling_threads
+ * list. Used by the garbage collector.
  */
 static StgTSO *suspended_ccalling_threads;
 
