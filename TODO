@@ -12,6 +12,8 @@
 * Allow documentation annotations to explicitly name the entity they
   refer to.
 
+* Allow {- -} style documentation comments in addition to --.
+
 * Add back-references from the definition to the uses of types/classes
   (perhaps in the index?)
 
