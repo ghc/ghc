@@ -71,29 +71,50 @@ import FastString	( FastString )
 
 \begin{code}
 newTopSrcBinder :: Module -> Maybe Name -> Located RdrName -> RnM Name
-newTopSrcBinder mod mb_parent (L loc rdr_name)
+newTopSrcBinder this_mod mb_parent (L loc rdr_name)
   | Just name <- isExact_maybe rdr_name
-  = returnM name
+	-- This is here to catch 
+	--   (a) Exact-name binders created by Template Haskell
+	--   (b) The PrelBase defn of (say) [] and similar, for which
+	--	 the parser reads the special syntax and returns an Exact RdrName
+	--
+  	-- We are at a binding site for the name, so check first that it 
+	-- the current module is the correct one; otherwise GHC can get
+	-- very confused indeed.  This test rejects code like
+	--	data T = (,) Int Int
+	-- unless we are in GHC.Tup
+  = do	checkErr (isInternalName name || this_mod_name == nameModuleName name)
+	         (badOrigBinding rdr_name)
+	returnM name
 
   | isOrig rdr_name
-  = ASSERT( rdr_mod == moduleName mod || rdr_mod == rOOT_MAIN_Name )
+  = do	checkErr (rdr_mod_name == this_mod_name || rdr_mod_name == rOOT_MAIN_Name)
+	         (badOrigBinding rdr_name)
 	-- When reading External Core we get Orig names as binders, 
 	-- but they should agree with the module gotten from the monad
 	--
-	-- Except for the ":Main.main = ..." definition inserted into 
-	-- the Main module
+	-- We can get built-in syntax showing up here too, sadly.  If you type
+	--	data T = (,,,)
+	-- the constructor is parsed as a type, and then RdrHsSyn.tyConToDataCon 
+	-- uses setRdrNameSpace to make it into a data constructors.  At that point
+	-- the nice Exact name for the TyCon gets swizzled to an Orig name.
+	-- Hence the badOrigBinding error message.
 	--
-	-- Because of this latter case, we take the module from the RdrName,
-	-- not from the environment.  In principle, it'd be fine to have an
-	-- arbitrary mixture of external core definitions in a single module,
+	-- Except for the ":Main.main = ..." definition inserted into 
+	-- the Main module; ugh!
+
+	-- Because of this latter case, we call newGlobalBinder with a module from 
+	-- the RdrName, not from the environment.  In principle, it'd be fine to 
+	-- have an arbitrary mixture of external core definitions in a single module,
 	-- (apart from module-initialisation issues, perhaps).
-    newGlobalBinder (mkHomeModule rdr_mod) (rdrNameOcc rdr_name) mb_parent 
-	(srcSpanStart loc) --TODO, should pass the whole span
+	newGlobalBinder (mkHomeModule rdr_mod_name) (rdrNameOcc rdr_name) mb_parent 
+	    	        (srcSpanStart loc) --TODO, should pass the whole span
 
   | otherwise
-  = newGlobalBinder mod (rdrNameOcc rdr_name) mb_parent (srcSpanStart loc)
+  = newGlobalBinder this_mod (rdrNameOcc rdr_name) mb_parent (srcSpanStart loc)
   where
-    rdr_mod = rdrNameModule rdr_name
+    this_mod_name = moduleName this_mod
+    rdr_mod_name  = rdrNameModule rdr_name
 \end{code}
 
 %*********************************************************
@@ -138,29 +159,15 @@ lookupTopBndrRn :: RdrName -> RnM Name
 
 lookupTopBndrRn rdr_name
   | Just name <- isExact_maybe rdr_name
-	-- This is here to catch 
-	--   (a) Exact-name binders created by Template Haskell
-	--   (b) The PrelBase defn of (say) [] and similar, for which
-	--	 the parser reads the special syntax and returns an Exact RdrName
-	--
-  	-- We are at a binding site for the name, so check first that it 
-	-- the current module is the correct one; otherwise GHC can get
-	-- very confused indeed.  This test rejects code like
-	--	data T = (,) Int Int
-	-- unless we are in GHC.Tup
-  = getModule				`thenM` \ mod -> 
-    checkErr (isInternalName name || moduleName mod == nameModuleName name)
-	     (badOrigBinding rdr_name)	`thenM_`
-    returnM name
+  = returnM name
 
   | isOrig rdr_name	
 	-- This deals with the case of derived bindings, where
 	-- we don't bother to call newTopSrcBinder first
 	-- We assume there is no "parent" name
-  = do
-	loc <- getSrcSpanM
-	newGlobalBinder (mkHomeModule (rdrNameModule rdr_name)) 
-		    (rdrNameOcc rdr_name) Nothing (srcSpanStart loc)
+  = do	{ loc <- getSrcSpanM
+	; newGlobalBinder (mkHomeModule (rdrNameModule rdr_name)) 
+		          (rdrNameOcc rdr_name) Nothing (srcSpanStart loc) }
 
   | otherwise
   = do	{ mb_gre <- lookupGreLocalRn rdr_name
