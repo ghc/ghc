@@ -17,15 +17,14 @@ import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..), HsBindGroup(..), 
 			  Sig(..), collectGroupBinders, tyClDeclNames 
 			)
-import RnEnv
-import IfaceEnv		( lookupOrig, newGlobalBinder )
+oimport RnEnv
+import IfaceEnv		( lookupAvail )
 import LoadIface	( loadSrcInterface )
 import TcRnMonad
 
 import FiniteMap
 import PrelNames	( pRELUDE, isUnboundName, main_RDR_Unqual )
-import Module		( Module, moduleUserString,
-			  unitModuleEnv, unitModuleEnv, 
+import Module		( Module, moduleUserString, unitModuleEnv, 
 			  lookupModuleEnv, moduleEnvElts, foldModuleEnv )
 import Name		( Name, nameSrcLoc, nameOccName, nameModule, isWiredInName,
 			  nameParent, nameParent_maybe, isExternalName,
@@ -49,7 +48,7 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 			  isLocalGRE, pprNameProvenance )
 import Outputable
 import Maybes		( isNothing, catMaybes, mapCatMaybes, seqMaybe, orElse )
-import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan,
+import SrcLoc		( Located(..), mkGeneralSrcSpan,
 			  unLoc, noLoc, srcLocSpan, combineSrcSpans, SrcSpan )
 import BasicTypes	( DeprecTxt )
 import ListSetOps	( removeDups )
@@ -252,34 +251,8 @@ exportsToAvails exports
   = foldlM do_one emptyNameSet exports
   where
     do_one acc (mod, exports)  = foldlM (do_avail mod) acc exports
-    do_avail mod acc (Avail n) = do { n' <- lookupOrig mod n; 
-				    ; return (addOneToNameSet acc n') }
-    do_avail mod acc (AvailTC p_occ occs) 
-	= do { p_name <- lookupOrig mod p_occ
-	     ; ns <- mappM (lookup_sub p_name) occs
-	     ; return (addListToNameSet acc ns) }
-	-- Remember that 'occs' is all the exported things, including
-	-- the parent.  It's possible to export just class ops without
-	-- the class, via C( op ). If the class was exported too we'd
-	-- have C( C, op )
-	where
-	   lookup_sub parent occ 
-		= newGlobalBinder mod occ mb_parent noSrcLoc
-		where
-		  mb_parent | occ == p_occ = Nothing
-			    | otherwise	   = Just parent
-
-	-- The use of newGlobalBinder here (rather than lookupOrig) 
-	-- ensures that the subordinate names record their parent; 
-	-- and that in turn ensures that the GlobalRdrEnv
-	-- has the correct parent for all the names in its range.
-	-- For imported things, we may only suck in the interface later, if ever.
-	-- Reason for all this:
-	--   Suppose module M exports type A.T, and constructor A.MkT
-	--   Then, we know that A.MkT is a subordinate name of A.T,
-	--   even though we aren't at the binding site of A.T
-	--   And it's important, because we may simply re-export A.T
-	--   without ever sucking in the declaration itself.
+    do_avail mod acc avail = do { ns <- lookupAvail mod avail
+				; return (addListToNameSet acc ns) }
 
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")

@@ -24,15 +24,13 @@ import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
 			  IfaceExpr(..), IfaceTyCon(..), IfaceIdInfo(..), 
 			  IfaceType(..), IfacePredType(..), IfaceExtName,
 			  mkIfaceExtName )
-import IfaceEnv		( newGlobalBinder, lookupIfaceExt, lookupIfaceTc,
-			  lookupOrig )
+import IfaceEnv		( newGlobalBinder, lookupIfaceExt, lookupIfaceTc, lookupAvail )
 import HscTypes		( ModIface(..), TyThing, emptyModIface, EpsStats(..),
 			  addEpsInStats, ExternalPackageState(..),
 			  PackageTypeEnv, emptyTypeEnv,  
 			  lookupIfaceByModule, emptyPackageIfaceTable,
 			  IsBootInterface, mkIfaceFixCache, Gated,
-			  implicitTyThings, addRulesToPool, addInstsToPool,
-			  availNames
+			  implicitTyThings, addRulesToPool, addInstsToPool
 			 )
 
 import BasicTypes	( Version, Fixity(..), FixityDirection(..),
@@ -120,9 +118,10 @@ loadHiBootInterface
 
     do	{ 	-- Load it (into the PTE), and return the exported names
 	  iface <- loadSrcInterface (mk_doc mod_nm) mod_nm True
-	; sequenceM [ lookupOrig mod_nm occ
-		    | (mod,avails) <- mi_exports iface, 
-		      avail <- avails, occ <- availNames avail]
+	; ns_s <-  sequenceM [ lookupAvail mod_nm avail
+		   	     | (mod,avails) <- mi_exports iface, 
+			       avail <- avails ]
+	; return (concat ns_s)
     }}}
   where
     mk_doc mod = ptext SLIT("Need the hi-boot interface for") <+> ppr mod

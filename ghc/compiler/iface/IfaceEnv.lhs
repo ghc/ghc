@@ -4,7 +4,7 @@
 module IfaceEnv (
 	newGlobalBinder, newIPName, newImplicitBinder, 
 	lookupIfaceTop, lookupIfaceExt,
-	lookupOrig, lookupIfaceTc,
+	lookupOrig, lookupAvail, lookupIfaceTc,
 	newIfaceName, newIfaceNames,
 	extendIfaceIdEnv, extendIfaceTyVarEnv,
 	tcIfaceLclId,     tcIfaceTyVar, 
@@ -18,7 +18,7 @@ module IfaceEnv (
 import TcRnMonad
 import IfaceType	( IfaceExtName(..), IfaceTyCon(..), ifaceTyConName )
 import TysWiredIn	( tupleTyCon, tupleCon )
-import HscTypes		( NameCache(..), HscEnv(..), OrigNameCache )
+import HscTypes		( NameCache(..), HscEnv(..), GenAvailInfo(..), OrigNameCache )
 import TyCon		( TyCon, tyConName )
 import DataCon		( dataConWorkId, dataConName )
 import Var		( TyVar, Id, varName )
@@ -60,6 +60,7 @@ newGlobalBinder :: Module -> OccName -> Maybe Name -> SrcLoc -> TcRnIf a b Name
 
 newGlobalBinder mod occ mb_parent loc
   = do	{ mod `seq` occ `seq` return ()	-- See notes with lookupOrig_help
+	; traceIf (text "newGlobalBinder" <+> ppr mod <+> ppr occ <+> ppr loc)
     	; name_supply <- getNameCache
 	; let (name_supply', name) = allocateGlobalBinder 
 					name_supply mod occ
@@ -74,12 +75,11 @@ allocateGlobalBinder
 allocateGlobalBinder name_supply mod occ mb_parent loc
   = case lookupOrigNameCache (nsNames name_supply) mod occ of
 	-- A hit in the cache!  We are at the binding site of the name.
-	-- This is the moment when we know the defining Module and SrcLoc
+	-- This is the moment when we know the defining parent and SrcLoc
 	-- of the Name, so we set these fields in the Name we return.
 	--
-	-- This is essential, to get the right Module in a Name.
-	-- Also: then (bogus) multiple bindings of the same Name
-	-- 		get different SrcLocs can can be reported as such.
+	-- Then (bogus) multiple bindings of the same Name
+	-- get different SrcLocs can can be reported as such.
 	--
 	-- Possible other reason: it might be in the cache because we
 	-- 	encountered an occurrence before the binding site for an
@@ -127,6 +127,35 @@ newImplicitBinder base_name mk_sys_occ
 		    Just parent_name  -> parent_name
 		    Nothing 	      -> base_name
 
+lookupAvail :: Module -> GenAvailInfo OccName -> TcRnIf a b [Name]
+-- Find all the names arising from an import
+-- Make sure the parent info is correct, even though we may not
+-- yet have read the interface for this module
+lookupAvail mod (Avail n) = do { n' <- lookupOrig mod n; 
+			       ; return [n'] }
+lookupAvail mod (AvailTC p_occ occs) 
+  = do { p_name <- lookupOrig mod p_occ
+       ; let lookup_sub occ | occ == p_occ = return p_name
+			    | otherwise	   = lookup_orig mod occ (Just p_name)
+       ; mappM lookup_sub occs }
+	-- Remember that 'occs' is all the exported things, including
+	-- the parent.  It's possible to export just class ops without
+	-- the class, via C( op ). If the class was exported too we'd
+	-- have C( C, op )
+
+	-- The use of lookupOrigSub here (rather than lookupOrig) 
+	-- ensures that the subordinate names record their parent; 
+	-- and that in turn ensures that the GlobalRdrEnv
+	-- has the correct parent for all the names in its range.
+	-- For imported things, we may only suck in the interface later, if ever.
+	-- Reason for all this:
+	--   Suppose module M exports type A.T, and constructor A.MkT
+	--   Then, we know that A.MkT is a subordinate name of A.T,
+	--   even though we aren't at the binding site of A.T
+	--   And it's important, because we may simply re-export A.T
+	--   without ever sucking in the declaration itself.
+
+
 lookupOrig :: Module -> OccName -> TcRnIf a b Name
 -- Even if we get a miss in the original-name cache, we 
 -- make a new External Name. 
@@ -134,8 +163,11 @@ lookupOrig :: Module -> OccName -> TcRnIf a b Name
 -- 	SrcLoc to noSrcLoc
 --	Parent no Nothing
 -- They'll be overwritten, in due course, by LoadIface.loadDecl.
+lookupOrig mod occ = lookup_orig mod occ Nothing
 
-lookupOrig mod occ 
+lookup_orig :: Module -> OccName ->  Maybe Name -> TcRnIf a b Name
+-- Used when we know the parent of the thing we are looking up
+lookup_orig mod occ mb_parent
   = do 	{ 	-- First ensure that mod and occ are evaluated
 		-- If not, chaos can ensue:
 		-- 	we read the name-cache
@@ -151,7 +183,7 @@ lookupOrig mod occ
 
 	{ let { (us', us1)      = splitUniqSupply (nsUniqs name_supply)
 	      ;	uniq   	  	= uniqFromSupply us1
-	      ;	name            = mkExternalName uniq mod occ Nothing noSrcLoc
+	      ;	name            = mkExternalName uniq mod occ mb_parent noSrcLoc
 	      ;	new_cache       = extend_name_cache (nsNames name_supply) mod occ name
 	      ;	new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
 	  }
