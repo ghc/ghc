@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.31 2000/12/04 12:31:22 simonmar Exp $
+ * $Id: Updates.hc,v 1.32 2001/03/02 14:26:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -430,7 +430,7 @@ STGFUN(stg_AP_UPD_entry)
   /* 
    * Check for stack overflow.
    */
-  STK_CHK(Words+sizeofW(StgUpdateFrame),stg_AP_UPD_entry,R2.p,1,);
+  STK_CHK_GEN(Words+sizeofW(StgUpdateFrame), R1_PTR, stg_AP_UPD_entry, );
 
   PUSH_UPD_FRAME(R1.p, 0);
   Sp -= sizeofW(StgUpdateFrame) + Words;
