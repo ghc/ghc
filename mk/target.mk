@@ -425,11 +425,11 @@ endif
 # For each of these variables that is defined, you
 # get one install rule
 #
-#	INSTALL_PROGS 	 install these executable programs in $(bindir)
-#	INSTALL_SCRIPTS	 install these executable scripts in $(bindir)
-#	INSTALL_LIBS	 install these platform-dependent libraries in $(libdir)
-#	INSTALL_LIBEXECS install these platform-dependent execs in $(libdir)
-#	INSTALL_DATAS	 install these platform-independent files in $(datadir)
+#	INSTALL_PROGS 	  executable programs in $(bindir)
+#	INSTALL_SCRIPTS	  executable scripts in $(bindir)
+#	INSTALL_LIBS	  platform-dependent libraries in $(libdir) (ranlib'ed)
+#	INSTALL_LIBEXECS  platform-dependent execs in $(libdir)
+#	INSTALL_DATAS	  platform-independent files in $(datadir)
 #
 # If the installation directory variable is undefined, the install rule simply
 # emits a suitable error message.
@@ -582,7 +582,14 @@ ifneq "$(INSTALL_LIBS)" ""
 install:: $(INSTALL_LIBS)
 	@$(INSTALL_DIR) $(libdir)
 	for i in $(INSTALL_LIBS); do \
-		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
+		case $$i in \
+		  *.a) \
+		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
+		    $(RANLIB) $(libdir)/`basename $$i` ; \
+		    break;; \
+		  *) \
+		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
+		esac; \
 	done
 endif
 
@@ -927,7 +934,8 @@ endif
 ifneq "$(HS_OBJS)" ""
 ifneq "$(filter -split-objs,$(HC_OPTS))" ""
 clean ::
-	find $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food;
+	find $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
+	rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS))
 endif
 endif
 
@@ -1020,12 +1028,12 @@ ifeq "$(way)" ""
 ifneq "$(SUBDIRS)" ""
 
 all docs runtests boot TAGS clean veryclean maintainer-clean install info ::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac;
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
 	@for i in $(SUBDIRS) ; do \
+	  case '${MFLAGS}' in *-[ik]*) set +e; break;; *) set -e;; esac; \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "==fptools== $(MAKE) $@;"; \
 	  echo " in $(shell pwd)/$$i"; \
@@ -1038,8 +1046,8 @@ all docs runtests boot TAGS clean veryclean maintainer-clean install info ::
 	@echo "------------------------------------------------------------------------"
 
 dist ::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
 	for i in $(SUBDIRS) ; do \
+	  case '${MFLAGS}' in *-[ik]*) set +e;; *) set -e;; esac; \
 	  $(MKDIRHIER_PREFIX)mkdirhier $(SRC_DIST_DIR)/$$i; \
 	  $(MAKE) -C $$i $(MFLAGS) $@ SRC_DIST_DIR=$(SRC_DIST_DIR)/$$i; \
 	done
@@ -1067,6 +1075,7 @@ all docs runtests TAGS clean veryclean maintainer-clean install ::
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
 	@for i in $(WAYS) ; do \
+	  case '${MFLAGS}' in *-[ik]*) set +e;; *) set -e;; esac; \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "==fptools== $(MAKE) way=$$i $@;"; \
 	  echo "PWD = $(shell pwd)"; \
