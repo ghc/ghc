@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelReal.lhs,v 1.9 2001/02/22 16:48:24 qrczak Exp $
+% $Id: PrelReal.lhs,v 1.10 2001/02/28 00:01:03 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -96,10 +96,6 @@ class  (Real a, Enum a) => Integral a  where
     n `mod` d		=  r  where (_,r) = divMod n d
     divMod n d 		=  if signum r == negate (signum d) then (q-1, r+d) else qr
 			   where qr@(q,r) = quotRem n d
-
-toInt :: Integral a => a -> Int
--- For backward compatibility
-toInt i = fromInteger (toInteger i)
 
 class  (Num a) => Fractional a  where
     (/)			:: a -> a -> a
@@ -267,6 +263,38 @@ instance  (Integral a)	=> Enum (Ratio a)  where
 
 %*********************************************************
 %*							*
+\subsection{Coercions}
+%*							*
+%*********************************************************
+
+\begin{code}
+fromIntegral :: (Integral a, Num b) => a -> b
+fromIntegral = fromInteger . toInteger
+
+{-# RULES
+"fromIntegral/Int->Int" fromIntegral = id :: Int -> Int
+    #-}
+
+realToFrac :: (Real a, Fractional b) => a -> b
+realToFrac = fromRational . toRational
+
+{-# RULES
+"realToFrac/Int->Int" realToFrac = id :: Int -> Int
+    #-}
+
+-- For backward compatibility
+{- DEPRECATED fromInt "use fromIntegral instead" -}
+fromInt :: Num a => Int -> a
+fromInt = fromIntegral
+
+-- For backward compatibility
+{- DEPRECATED toInt "use fromIntegral instead" -}
+toInt :: Integral a => a -> Int
+toInt = fromIntegral
+\end{code}
+
+%*********************************************************
+%*							*
 \subsection{Overloaded numeric functions}
 %*							*
 %*********************************************************
@@ -320,4 +348,15 @@ lcm x y		=  abs ((x `quot` (gcd x y)) * y)
 "gcd/Integer->Integer->Integer" gcd = gcdInteger
 "lcm/Integer->Integer->Integer" lcm = lcmInteger
  #-}
+
+integralEnumFrom :: (Integral a, Bounded a) => a -> [a]
+integralEnumFrom n = map fromInteger [toInteger n .. toInteger (maxBound `asTypeOf` n)]
+
+integralEnumFromThen :: (Integral a, Bounded a) => a -> a -> [a]
+integralEnumFromThen n1 n2 
+  | i_n2 >= i_n1  = map fromInteger [i_n1, i_n2 .. toInteger (maxBound `asTypeOf` n1)]
+  | otherwise     = map fromInteger [i_n1, i_n2 .. toInteger (minBound `asTypeOf` n1)]
+  where
+    i_n1 = toInteger n1
+    i_n2 = toInteger n2
 \end{code}

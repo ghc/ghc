@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.41 2001/02/23 14:44:43 simonmar Exp $
+% $Id: PrelBase.lhs,v 1.42 2001/02/28 00:01:03 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -75,10 +75,12 @@ Other Prelude modules are much easier with fewer complex dependencies.
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
+#include "MachDeps.h"
+
 module PrelBase
 	(
 	module PrelBase,
-	module PrelGHC,		-- Re-export PrelGHC, PrelErr & PrelNum, to avoid lots
+	module PrelGHC,		-- Re-export PrelGHC and PrelErr, to avoid lots
 	module PrelErr          -- of people having to import it explicitly
   ) 
 	where
@@ -142,34 +144,35 @@ unpackCStringUtf8# a = error "urk"
 
 \begin{code}
 class  Eq a  where
-    (==), (/=)		:: a -> a -> Bool
+    (==), (/=)		 :: a -> a -> Bool
 
-    (/=) x y            = not ((==) x y)
-    (==) x y		= not ((/=) x y)
+    x /= y		 = not (x == y)
+    x == y		 = not (x /= y)
 
 class  (Eq a) => Ord a  where
-    compare             :: a -> a -> Ordering
-    (<), (<=), (>=), (>):: a -> a -> Bool
-    max, min		:: a -> a -> a
+    compare		 :: a -> a -> Ordering
+    (<), (<=), (>), (>=) :: a -> a -> Bool
+    max, min		 :: a -> a -> a
 
--- An instance of Ord should define either compare or <=
--- Using compare can be more efficient for complex types.
+    -- An instance of Ord should define either 'compare' or '<='.
+    -- Using 'compare' can be more efficient for complex types.
+
     compare x y
-	    | x == y    = EQ
-	    | x <= y    = LT	-- NB: must be '<=' not '<' to validate the
-				-- above claim about the minimal things that can
-				-- be defined for an instance of Ord
-	    | otherwise = GT
+	| x == y    = EQ
+	| x <= y    = LT	-- NB: must be '<=' not '<' to validate the
+				-- above claim about the minimal things that
+				-- can be defined for an instance of Ord
+	| otherwise = GT
 
-    x <= y  = case compare x y of { GT -> False; _other -> True }
-    x <	 y  = case compare x y of { LT -> True;  _other -> False }
-    x >= y  = case compare x y of { LT -> False; _other -> True }
-    x >	 y  = case compare x y of { GT -> True;  _other -> False }
+    x <	 y = case compare x y of { LT -> True;  _other -> False }
+    x <= y = case compare x y of { GT -> False; _other -> True }
+    x >	 y = case compare x y of { GT -> True;  _other -> False }
+    x >= y = case compare x y of { LT -> False; _other -> True }
 
-	-- These two default methods use '>' rather than compare
+	-- These two default methods use '<=' rather than 'compare'
 	-- because the latter is often more expensive
-    max x y = if x > y then x else y
-    min x y = if x > y then y else x
+    max x y = if x <= y then y else x
+    min x y = if x <= y then x else y
 \end{code}
 
 %*********************************************************
@@ -208,11 +211,9 @@ instance (Eq a) => Eq [a]  where
 {-
     {-# SPECIALISE instance Eq [Char] #-}
 -}
-    []     == []     = True	
+    []     == []     = True
     (x:xs) == (y:ys) = x == y && xs == ys
-    _xs    == _ys    = False			
-
-    xs     /= ys     = if (xs == ys) then False else True
+    _xs    == _ys    = False
 
 instance (Ord a) => Ord [a] where
 {-
@@ -227,9 +228,9 @@ instance (Ord a) => Ord [a] where
     compare (_:_)  []     = GT
     compare []     (_:_)  = LT
     compare (x:xs) (y:ys) = case compare x y of
-                                 LT -> LT	
-			         GT -> GT		
-				 EQ -> compare xs ys
+				LT -> LT
+				GT -> GT
+				EQ -> compare xs ys
 
 instance Functor [] where
     fmap = map
@@ -474,23 +475,28 @@ zeroInt, oneInt, twoInt, maxInt, minInt :: Int
 zeroInt = I# 0#
 oneInt  = I# 1#
 twoInt  = I# 2#
-minInt  = I# (-2147483648#)	-- GHC <= 2.09 had this at -2147483647
-maxInt  = I# 2147483647#
+#if WORD_SIZE_IN_BYTES == 4
+minInt  = I# (-0x80000000#)
+maxInt  = I# 0x7FFFFFFF#
+#else
+minInt  = I# (-0x8000000000000000#)
+maxInt  = I# 0x7FFFFFFFFFFFFFFF#
+#endif
 
 instance Eq Int where
-    (==) x y = x `eqInt` y
-    (/=) x y = x `neInt` y
+    (==) = eqInt
+    (/=) = neInt
 
 instance Ord Int where
-    compare x y = compareInt x y 
+    compare = compareInt
 
-    (<)  x y = ltInt x y
-    (<=) x y = leInt x y
-    (>=) x y = geInt x y
-    (>)  x y = gtInt x y
+    (<)  = ltInt
+    (<=) = leInt
+    (>=) = geInt
+    (>)  = gtInt
 
 compareInt :: Int -> Int -> Ordering
-(I# x) `compareInt` (I# y)  = compareInt# x y
+(I# x) `compareInt` (I# y) = compareInt# x y
 
 compareInt# :: Int# -> Int# -> Ordering
 compareInt# x# y#
@@ -526,6 +532,7 @@ flip f x y		=  f y x
 
 -- right-associating infix application operator (useful in continuation-
 -- passing style)
+{-# INLINE ($) #-}
 ($)			:: (a -> b) -> a -> b
 f $ x			=  f x
 
@@ -579,6 +586,20 @@ data a :*: b = a :*: b
 %*							*
 %*********************************************************
 
+\begin{code}
+divInt#, modInt# :: Int# -> Int# -> Int#
+x# `divInt#` y#
+    | (x# ># 0#) && (y# <# 0#) = ((x# -# y#) -# 1#) `quotInt#` y#
+    | (x# <# 0#) && (y# ># 0#) = ((x# -# y#) +# 1#) `quotInt#` y#
+    | otherwise                = x# `quotInt#` y#
+x# `modInt#` y#
+    | (x# ># 0#) && (y# <# 0#) ||
+      (x# <# 0#) && (y# ># 0#)    = if r# /=# 0# then r# +# y# else 0#
+    | otherwise                   = r#
+    where
+    r# = x# `remInt#` y#
+\end{code}
+
 Definitions of the boxed PrimOps; these will be
 used in the case of partial applications, etc.
 
@@ -596,12 +617,14 @@ used in the case of partial applications, etc.
 {-# INLINE remInt #-}
 {-# INLINE negateInt #-}
 
-plusInt, minusInt, timesInt, quotInt, remInt, gcdInt :: Int -> Int -> Int
-plusInt	(I# x) (I# y) = I# (x +# y)
-minusInt(I# x) (I# y) = I# (x -# y)
-timesInt(I# x) (I# y) = I# (x *# y)
-quotInt	(I# x) (I# y) = I# (quotInt# x y)
-remInt	(I# x) (I# y) = I# (remInt#  x y)
+plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt, gcdInt :: Int -> Int -> Int
+(I# x) `plusInt`  (I# y) = I# (x +# y)
+(I# x) `minusInt` (I# y) = I# (x -# y)
+(I# x) `timesInt` (I# y) = I# (x *# y)
+(I# x) `quotInt`  (I# y) = I# (x `quotInt#` y)
+(I# x) `remInt`   (I# y) = I# (x `remInt#`  y)
+(I# x) `divInt`   (I# y) = I# (x `divInt#`  y)
+(I# x) `modInt`   (I# y) = I# (x `modInt#`  y)
 
 gcdInt (I# a) (I# b) = g a b
    where g 0# 0# = error "PrelBase.gcdInt: gcd 0 0 is undefined"
@@ -617,26 +640,18 @@ gcdInt (I# a) (I# b) = g a b
 negateInt :: Int -> Int
 negateInt (I# x) = I# (negateInt# x)
 
-divInt, modInt :: Int -> Int -> Int
-x `divInt` y 
-  | x > zeroInt && y < zeroInt = quotInt ((x `minusInt` y) `minusInt` oneInt) y
-  | x < zeroInt && y > zeroInt = quotInt ((x `minusInt` y) `plusInt`  oneInt) y
-  | otherwise	   = quotInt x y
-
-x `modInt` y 
-  | x > zeroInt && y < zeroInt || 
-    x < zeroInt && y > zeroInt  = if r/=zeroInt then r `plusInt` y else zeroInt
-  | otherwise	   		= r
-  where
-    r = remInt x y
-
 gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
-gtInt	(I# x) (I# y) = x ># y
-geInt	(I# x) (I# y) = x >=# y
-eqInt	(I# x) (I# y) = x ==# y
-neInt	(I# x) (I# y) = x /=# y
-ltInt	(I# x) (I# y) = x <# y
-leInt	(I# x) (I# y) = x <=# y
+(I# x) `gtInt` (I# y) = x >#  y
+(I# x) `geInt` (I# y) = x >=# y
+(I# x) `eqInt` (I# y) = x ==# y
+(I# x) `neInt` (I# y) = x /=# y
+(I# x) `ltInt` (I# y) = x <#  y
+(I# x) `leInt` (I# y) = x <=# y
+
+{-# RULES
+"int2Word2Int"  forall x#. int2Word# (word2Int# x#) = x#
+"word2Int2Word" forall x#. word2Int# (int2Word# x#) = x#
+    #-}
 \end{code}
 
 

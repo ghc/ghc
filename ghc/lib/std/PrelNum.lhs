@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.36 2001/02/22 16:48:24 qrczak Exp $
+% $Id: PrelNum.lhs,v 1.37 2001/02/28 00:01:03 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -49,20 +49,9 @@ class  (Eq a, Show a) => Num a  where
     x - y		= x + negate y
     negate x		= 0 - x
 
-fromInt :: Num a => Int -> a
--- For backward compatibility
-fromInt (I# i#) = fromInteger (S# i#)
-\end{code}
-
-A few small numeric functions
-
-\begin{code}
-subtract	:: (Num a) => a -> a -> a
 {-# INLINE subtract #-}
-subtract x y	=  y - x
-
-ord_0 :: Int
-ord_0 = ord '0'
+subtract :: (Num a) => a -> a -> a
+subtract x y = y - x
 \end{code}
 
 
@@ -74,17 +63,17 @@ ord_0 = ord '0'
 
 \begin{code}
 instance  Num Int  where
-    (+)	   x y =  plusInt x y
-    (-)	   x y =  minusInt x y
-    negate x   =  negateInt x
-    (*)	   x y =  timesInt x y
-    abs    n   = if n `geInt` 0 then n else (negateInt n)
+    (+)	   = plusInt
+    (-)	   = minusInt
+    negate = negateInt
+    (*)	   = timesInt
+    abs n  = if n `geInt` 0 then n else negateInt n
 
     signum n | n `ltInt` 0 = negateInt 1
 	     | n `eqInt` 0 = 0
 	     | otherwise   = 1
 
-    fromInteger n = integer2Int n
+    fromInteger = integer2Int
 \end{code}
 
 
@@ -436,24 +425,23 @@ dn_list x delta lim = go (x::Integer)
 %*********************************************************
 
 \begin{code}
-instance  Show Integer  where
-    showsPrec   x = showSignedInteger x
-    showList = showList__ (showsPrec 0) 
-
-showSignedInteger :: Int -> Integer -> ShowS
-showSignedInteger p n r
-  | n < 0 && p > 6 = '(':jtos n (')':r)
-  | otherwise      = jtos n r
+instance Show Integer where
+    showsPrec p n r
+        | n < 0 && p > 6 = '(' : jtos n (')' : r)
+        | otherwise      = jtos n r
+    showList = showList__ (showsPrec 0)
 
 jtos :: Integer -> String -> String
-jtos i rs
- | i < 0     = '-' : jtos' (-i) rs
- | otherwise = jtos' i rs
- where
-  jtos' :: Integer -> String -> String
-  jtos' n cs
-   | n < 10    = chr (fromInteger n + (ord_0::Int)) : cs
-   | otherwise = jtos' q (chr (integer2Int r + (ord_0::Int)) : cs)
+jtos n cs
+    | n < 0     = '-' : jtos' (-n) cs
+    | otherwise = jtos' n cs
     where
-     (q,r) = n `quotRemInteger` 10
+    jtos' :: Integer -> String -> String
+    jtos' n cs
+        | n < 10    = case unsafeChr (ord '0' + fromInteger n) of
+            c@(C# _) -> c:cs
+        | otherwise = case unsafeChr (ord '0' + fromInteger r) of
+            c@(C# _) -> jtos' q (c:cs)
+        where
+        (q,r) = n `quotRemInteger` 10
 \end{code}

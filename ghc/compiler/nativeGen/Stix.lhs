@@ -31,8 +31,8 @@ import Ratio		( Rational )
 import AbsCSyn		( node, tagreg, MagicId(..) )
 import CallConv		( CallConv, pprCallConv )
 import CLabel		( mkAsmTempLabel, CLabel, pprCLabel )
-import PrimRep          ( PrimRep(..), showPrimRep )
-import PrimOp           ( PrimOp, pprPrimOp )
+import PrimRep          ( PrimRep(..) )
+import PrimOp           ( PrimOp )
 import Unique           ( Unique )
 import SMRep		( fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply,
@@ -163,9 +163,9 @@ pprStixTree t
        StCLbl lbl       -> pprCLabel lbl
        StReg reg        -> ppStixReg reg
        StIndex k b o    -> paren (pprStixTree b <+> char '+' <> 
-                                  pprPrimRep k <+> pprStixTree o)
-       StInd k t        -> pprPrimRep k <> char '[' <> pprStixTree t <> char ']'
-       StAssign k d s   -> pprStixTree d <> text "  :=" <> pprPrimRep k 
+                                  ppr k <+> pprStixTree o)
+       StInd k t        -> ppr k <> char '[' <> pprStixTree t <> char ']'
+       StAssign k d s   -> pprStixTree d <> text "  :=" <> ppr k 
                                          <> text "  " <> pprStixTree s
        StLabel ll       -> pprCLabel ll <+> char ':'
        StFunBegin ll    -> char ' ' $$ paren (text "FunBegin" <+> pprCLabel ll)
@@ -174,17 +174,15 @@ pprStixTree t
        StFallThrough ll -> paren (text "FallThru" <+> pprCLabel ll)
        StCondJump l t   -> paren (text "JumpC" <+> pprCLabel l 
                                                <+> pprStixTree t)
-       StData k ds      -> paren (text "Data" <+> pprPrimRep k <+>
+       StData k ds      -> paren (text "Data" <+> ppr k <+>
                                   hsep (map pprStixTree ds))
-       StPrim op ts     -> paren (text "Prim" <+> pprPrimOp op <+> 
+       StPrim op ts     -> paren (text "Prim" <+> ppr op <+> 
                                   hsep (map pprStixTree ts))
        StCall nm cc k args
                         -> paren (text "Call" <+> ptext nm <+>
-                                  pprCallConv cc <+> pprPrimRep k <+> 
+                                  pprCallConv cc <+> ppr k <+> 
                                   hsep (map pprStixTree args))
        StScratchWord i  -> text "ScratchWord" <> paren (int i)
-
-pprPrimRep = text . showPrimRep
 \end{code}
 
 Stix registers can have two forms.  They {\em may} or {\em may not}
@@ -204,11 +202,11 @@ ppStixReg (StixTemp u pr)
 
 
 ppMId BaseReg              = text "BaseReg"
-ppMId (VanillaReg kind n)  = hcat [pprPrimRep kind, text "IntReg(", 
+ppMId (VanillaReg kind n)  = hcat [ppr kind, text "IntReg(", 
                                    int (iBox n), char ')']
 ppMId (FloatReg n)         = hcat [text "FltReg(", int (iBox n), char ')']
 ppMId (DoubleReg n)        = hcat [text "DblReg(", int (iBox n), char ')']
-ppMId (LongReg kind n)     = hcat [pprPrimRep kind, text "LongReg(", 
+ppMId (LongReg kind n)     = hcat [ppr kind, text "LongReg(", 
                                    int (iBox n), char ')']
 ppMId Sp                   = text "Sp"
 ppMId Su                   = text "Su"

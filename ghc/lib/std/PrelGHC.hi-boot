@@ -48,7 +48,7 @@ __export PrelGHC
   tryTakeMVarzh
   tryPutMVarzh
   isEmptyMVarzh
-  
+
   -- Parallel
   seqzh
   parzh
@@ -69,7 +69,7 @@ __export PrelGHC
   leCharzh
   ordzh
   chrzh
-  
+
   -- Int Type
   Intzh
   zgzh
@@ -91,7 +91,7 @@ __export PrelGHC
   addIntCzh
   subIntCzh
   mulIntCzh
-  
+
   Wordzh
   gtWordzh
   geWordzh
@@ -99,6 +99,9 @@ __export PrelGHC
   neWordzh
   ltWordzh
   leWordzh
+  plusWordzh
+  minusWordzh
+  timesWordzh
   quotWordzh
   remWordzh
   andzh
@@ -106,14 +109,19 @@ __export PrelGHC
   notzh
   xorzh
   shiftLzh
---  shiftRAzh
   shiftRLzh
   int2Wordzh
   word2Intzh
-  
-  Word64zh
 
   Int64zh
+  Word64zh
+
+  intToInt8zh
+  intToInt16zh
+  intToInt32zh
+  wordToWord8zh
+  wordToWord16zh
+  wordToWord32zh
 
   Addrzh
   gtAddrzh
@@ -153,7 +161,7 @@ __export PrelGHC
   tanhFloatzh
   powerFloatzh
   decodeFloatzh
-  
+
   Doublezh
   zgzhzh
   zgzezhzh
@@ -184,7 +192,7 @@ __export PrelGHC
   tanhDoublezh
   ztztzhzh
   decodeDoublezh
-  
+
   cmpIntegerzh
   cmpIntegerIntzh
   plusIntegerzh
@@ -215,20 +223,21 @@ __export PrelGHC
   ByteArrayzh
   MutableArrayzh
   MutableByteArrayzh
-  
+
   sameMutableArrayzh
   sameMutableByteArrayzh
-  
+
   newArrayzh
   newByteArrayzh
-  
+
   indexArrayzh
   indexCharArrayzh
+  indexWideCharArrayzh
   indexIntArrayzh
   indexWordArrayzh
+  indexAddrArrayzh
   indexFloatArrayzh
   indexDoubleArrayzh
-  indexAddrArrayzh
   indexStablePtrArrayzh
   indexInt8Arrayzh
   indexInt16Arrayzh
@@ -238,9 +247,45 @@ __export PrelGHC
   indexWord16Arrayzh
   indexWord32Arrayzh
   indexWord64Arrayzh
-  
---  indexOffAddrzh
+
+  readArrayzh
+  readCharArrayzh
+  readWideCharArrayzh
+  readIntArrayzh
+  readWordArrayzh
+  readAddrArrayzh
+  readFloatArrayzh
+  readDoubleArrayzh
+  readStablePtrArrayzh
+  readInt8Arrayzh
+  readInt16Arrayzh
+  readInt32Arrayzh
+  readInt64Arrayzh
+  readWord8Arrayzh
+  readWord16Arrayzh
+  readWord32Arrayzh
+  readWord64Arrayzh
+
+  writeArrayzh
+  writeCharArrayzh
+  writeWideCharArrayzh
+  writeIntArrayzh
+  writeWordArrayzh
+  writeAddrArrayzh
+  writeFloatArrayzh
+  writeDoubleArrayzh
+  writeStablePtrArrayzh
+  writeInt8Arrayzh
+  writeInt16Arrayzh
+  writeInt32Arrayzh
+  writeInt64Arrayzh
+  writeWord8Arrayzh
+  writeWord16Arrayzh
+  writeWord32Arrayzh
+  writeWord64Arrayzh
+
   indexCharOffAddrzh
+  indexWideCharOffAddrzh
   indexIntOffAddrzh
   indexWordOffAddrzh
   indexAddrOffAddrzh
@@ -255,8 +300,9 @@ __export PrelGHC
   indexWord16OffAddrzh
   indexWord32OffAddrzh
   indexWord64OffAddrzh
-  
+
   readCharOffAddrzh
+  readWideCharOffAddrzh
   readIntOffAddrzh
   readWordOffAddrzh
   readAddrOffAddrzh
@@ -273,6 +319,7 @@ __export PrelGHC
   readWord64OffAddrzh
 
   writeCharOffAddrzh
+  writeWideCharOffAddrzh
   writeIntOffAddrzh
   writeWordOffAddrzh
   writeAddrOffAddrzh
@@ -289,8 +336,8 @@ __export PrelGHC
   writeWord32OffAddrzh
   writeWord64OffAddrzh
 
---  indexOffForeignObjzh
   indexCharOffForeignObjzh
+  indexWideCharOffForeignObjzh
   indexIntOffForeignObjzh
   indexWordOffForeignObjzh
   indexAddrOffForeignObjzh
@@ -305,40 +352,6 @@ __export PrelGHC
   indexWord16OffForeignObjzh
   indexWord32OffForeignObjzh
   indexWord64OffForeignObjzh
-  
-  writeArrayzh
-  writeCharArrayzh
-  writeIntArrayzh
-  writeWordArrayzh
-  writeFloatArrayzh
-  writeDoubleArrayzh
-  writeAddrArrayzh
-  writeStablePtrArrayzh
-  writeInt8Arrayzh
-  writeInt16Arrayzh
-  writeInt32Arrayzh
-  writeInt64Arrayzh
-  writeWord8Arrayzh
-  writeWord16Arrayzh
-  writeWord32Arrayzh
-  writeWord64Arrayzh
-  
-  readArrayzh
-  readCharArrayzh
-  readIntArrayzh
-  readWordArrayzh
-  readFloatArrayzh
-  readDoubleArrayzh
-  readAddrArrayzh
-  readStablePtrArrayzh
-  readInt8Arrayzh
-  readInt16Arrayzh
-  readInt32Arrayzh
-  readInt64Arrayzh
-  readWord8Arrayzh
-  readWord16Arrayzh
-  readWord32Arrayzh
-  readWord64Arrayzh
 
   unsafeFreezzeArrayzh		-- Note zz in the middle
   unsafeFreezzeByteArrayzh	-- Ditto

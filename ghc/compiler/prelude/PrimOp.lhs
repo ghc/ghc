@@ -17,8 +17,6 @@ module PrimOp (
 
 	getPrimOpResultInfo,  PrimOpResultInfo(..),
 
-	pprPrimOp,
-
 	CCall(..), CCallTarget(..), ccallMayGC, ccallIsCasm, pprCCallOp,
 	isDynamicTarget, dynamicTarget, setCCallUnique
     ) where

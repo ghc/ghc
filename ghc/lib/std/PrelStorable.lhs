@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStorable.lhs,v 1.2 2001/02/05 11:49:20 chak Exp $
+% $Id: PrelStorable.lhs,v 1.3 2001/02/28 00:01:03 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -80,12 +80,6 @@ class Storable a where
 System-dependent, but rather obvious instances
 
 \begin{code}
-instance Storable Char where
-   sizeOf _          = sizeOf (undefined::Word32)
-   alignment _       = alignment (undefined::Word32)
-   peekElemOff p i   = liftM (chr . fromIntegral) $ peekElemOff (castPtr p::Ptr Word32) i
-   pokeElemOff p i x = pokeElemOff (castPtr p::Ptr Word32) i (fromIntegral (ord x))
-
 instance Storable Bool where
    sizeOf _          = sizeOf (undefined::CInt)
    alignment _       = alignment (undefined::CInt)
@@ -98,15 +92,21 @@ instance Storable (FunPtr a) where
    peekElemOff p i            = liftM FunPtr $ peekElemOff (castPtr p) i
    pokeElemOff p i (FunPtr x) = pokeElemOff (castPtr p) i x
 
-#define STORABLE(T,size,align,read,write)		\
-instance Storable (T) where {				\
-    sizeOf    _       = size;				\
-    alignment _       = align;				\
-    peekElemOff a i   = read a i;			\
-    pokeElemOff a i x = write a i x }
+#define STORABLE(T,size,align,read,write)	\
+instance Storable (T) where {			\
+    sizeOf    _ = size;				\
+    alignment _ = align;			\
+    peekElemOff = read;				\
+    pokeElemOff = write }
 
-STORABLE(Int,SIZEOF_INT,ALIGNMENT_INT,
+STORABLE(Char,SIZEOF_INT32,ALIGNMENT_INT32,
+	 readWideCharOffPtr,writeWideCharOffPtr)
+
+STORABLE(Int,SIZEOF_LONG,ALIGNMENT_LONG,
 	 readIntOffPtr,writeIntOffPtr)
+
+STORABLE(Word,SIZEOF_LONG,ALIGNMENT_LONG,
+	 readWordOffPtr,writeWordOffPtr)
 
 STORABLE((Ptr a),SIZEOF_VOID_P,ALIGNMENT_VOID_P,
 	 readPtrOffPtr,writePtrOffPtr)
@@ -178,128 +178,99 @@ Helper functions
 \begin{code}
 #ifdef __GLASGOW_HASKELL__
 
-readIntOffPtr         :: Ptr Int           -> Int -> IO Int
-readPtrOffPtr         :: Ptr (Ptr a)       -> Int -> IO (Ptr a)
-readFloatOffPtr       :: Ptr Float         -> Int -> IO Float
-readDoubleOffPtr      :: Ptr Double        -> Int -> IO Double
-readStablePtrOffPtr   :: Ptr (StablePtr a) -> Int -> IO (StablePtr a)
-readInt8OffPtr        :: Ptr Int8          -> Int -> IO Int8
-readInt16OffPtr       :: Ptr Int16         -> Int -> IO Int16
-readInt32OffPtr       :: Ptr Int32         -> Int -> IO Int32
-readInt64OffPtr       :: Ptr Int64         -> Int -> IO Int64
-readWord8OffPtr       :: Ptr Word8         -> Int -> IO Word8
-readWord16OffPtr      :: Ptr Word16        -> Int -> IO Word16
-readWord32OffPtr      :: Ptr Word32        -> Int -> IO Word32
-readWord64OffPtr      :: Ptr Word64        -> Int -> IO Word64
+readWideCharOffPtr  :: Ptr Char          -> Int -> IO Char
+readIntOffPtr       :: Ptr Int           -> Int -> IO Int
+readWordOffPtr      :: Ptr Word          -> Int -> IO Word
+readPtrOffPtr       :: Ptr (Ptr a)       -> Int -> IO (Ptr a)
+readFloatOffPtr     :: Ptr Float         -> Int -> IO Float
+readDoubleOffPtr    :: Ptr Double        -> Int -> IO Double
+readStablePtrOffPtr :: Ptr (StablePtr a) -> Int -> IO (StablePtr a)
+readInt8OffPtr      :: Ptr Int8          -> Int -> IO Int8
+readInt16OffPtr     :: Ptr Int16         -> Int -> IO Int16
+readInt32OffPtr     :: Ptr Int32         -> Int -> IO Int32
+readInt64OffPtr     :: Ptr Int64         -> Int -> IO Int64
+readWord8OffPtr     :: Ptr Word8         -> Int -> IO Word8
+readWord16OffPtr    :: Ptr Word16        -> Int -> IO Word16
+readWord32OffPtr    :: Ptr Word32        -> Int -> IO Word32
+readWord64OffPtr    :: Ptr Word64        -> Int -> IO Word64
 
+readWideCharOffPtr (Ptr a) (I# i)
+  = IO $ \s -> case readWideCharOffAddr# a i s  of (# s2, x #) -> (# s2, C# x #)
 readIntOffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readIntOffAddr# a i s        of { (# s,x #) -> (# s, I# x #) }
+  = IO $ \s -> case readIntOffAddr# a i s       of (# s2, x #) -> (# s2, I# x #)
+readWordOffPtr (Ptr a) (I# i)
+  = IO $ \s -> case readWordOffAddr# a i s      of (# s2, x #) -> (# s2, W# x #)
 readPtrOffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readAddrOffAddr# a i s       of { (# s,x #) -> (# s, Ptr x #) }
+  = IO $ \s -> case readAddrOffAddr# a i s      of (# s2, x #) -> (# s2, Ptr x #)
 readFloatOffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readFloatOffAddr# a i s      of { (# s,x #) -> (# s, F# x #) }
+  = IO $ \s -> case readFloatOffAddr# a i s     of (# s2, x #) -> (# s2, F# x #)
 readDoubleOffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readDoubleOffAddr# a i s     of { (# s,x #) -> (# s, D# x #) }
+  = IO $ \s -> case readDoubleOffAddr# a i s    of (# s2, x #) -> (# s2, D# x #)
 readStablePtrOffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readStablePtrOffAddr# a i s  of { (# s,x #) -> (# s, StablePtr x #) }
-
+  = IO $ \s -> case readStablePtrOffAddr# a i s of (# s2, x #) -> (# s2, StablePtr x #)
 readInt8OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readInt8OffAddr# a i s of (# s, w #) -> (# s, I8# w #)
-
+  = IO $ \s -> case readInt8OffAddr# a i s      of (# s2, x #) -> (# s2, I8# x #)
 readInt16OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readInt16OffAddr# a i s of (# s, w #) -> (# s, I16# w #)
-
+  = IO $ \s -> case readInt16OffAddr# a i s     of (# s2, x #) -> (# s2, I16# x #)
 readInt32OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readInt32OffAddr# a i s of (# s, w #) -> (# s, I32# w #)
-
-#if WORD_SIZE_IN_BYTES == 8
+  = IO $ \s -> case readInt32OffAddr# a i s     of (# s2, x #) -> (# s2, I32# x #)
 readInt64OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readIntOffAddr# a i s of (# s, w #) -> (# s, I64# w #)
-#else
-readInt64OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readInt64OffAddr# a i s of (# s, w #) -> (# s, I64# w #)
-#endif
-
-
-writeIntOffPtr        :: Ptr Int            -> Int -> Int          -> IO ()
-writePtrOffPtr        :: Ptr (Ptr a)        -> Int -> Ptr a        -> IO ()
-writeFloatOffPtr      :: Ptr Float          -> Int -> Float        -> IO ()
-writeDoubleOffPtr     :: Ptr Double         -> Int -> Double       -> IO ()
-writeStablePtrOffPtr  :: Ptr (StablePtr a)  -> Int -> StablePtr a  -> IO ()
-writeInt8OffPtr       :: Ptr Int8           -> Int -> Int8         -> IO ()
-writeInt16OffPtr      :: Ptr Int16          -> Int -> Int16        -> IO ()
-writeInt32OffPtr      :: Ptr Int32          -> Int -> Int32        -> IO ()
-writeInt64OffPtr      :: Ptr Int64          -> Int -> Int64        -> IO ()
-writeWord8OffPtr      :: Ptr Word8          -> Int -> Word8        -> IO ()
-writeWord16OffPtr     :: Ptr Word16         -> Int -> Word16       -> IO ()
-writeWord32OffPtr     :: Ptr Word32         -> Int -> Word32       -> IO ()
-writeWord64OffPtr     :: Ptr Word64         -> Int -> Word64       -> IO ()
-
-writeIntOffPtr (Ptr a#) (I# i#) (I# e#) = IO $ \ s# ->
-      case (writeIntOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
-
-writePtrOffPtr (Ptr a#) (I# i#) (Ptr e#) = IO $ \ s# ->
-      case (writeAddrOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
-
-writeFloatOffPtr (Ptr a#) (I# i#) (F# e#) = IO $ \ s# ->
-      case (writeFloatOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
-
-writeDoubleOffPtr (Ptr a#) (I# i#) (D# e#) = IO $ \ s# ->
-      case (writeDoubleOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
-
-writeStablePtrOffPtr (Ptr a#) (I# i#) (StablePtr e#) = IO $ \ s# ->
-      case (writeStablePtrOffAddr#  a# i# e# s#) of s2# -> (# s2# , () #)
-
-writeInt8OffPtr (Ptr a#) (I# i#) (I8# w#) = IO $ \ s# ->
-      case (writeInt8OffAddr# a# i# w# s#) of s2# -> (# s2#, () #)
-
-writeInt16OffPtr (Ptr a#) (I# i#) (I16# w#) = IO $ \ s# ->
-      case (writeInt16OffAddr# a# i# w# s#) of s2# -> (# s2#, () #)
-
-writeInt32OffPtr (Ptr a#) (I# i#) (I32# w#) = IO $ \ s# ->
-      case (writeInt32OffAddr# a# i# w# s#) of s2# -> (# s2#, () #)
-
-#if WORD_SIZE_IN_BYTES == 8
-writeInt64OffPtr (Ptr a#) (I# i#) (I64# w#) = IO $ \ s# ->
-      case (writeIntOffAddr#  a# i# w# s#) of s2# -> (# s2#, () #)
-#else
-writeInt64OffPtr (Ptr a#) (I# i#) (I64# w#) = IO $ \ s# ->
-      case (writeInt64OffAddr#  a# i# w# s#) of s2# -> (# s2#, () #)
-#endif
-
+  = IO $ \s -> case readInt64OffAddr# a i s     of (# s2, x #) -> (# s2, I64# x #)
 readWord8OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readWord8OffAddr# a i s of (# s, w #) -> (# s, W8# w #)
-
+  = IO $ \s -> case readWord8OffAddr# a i s     of (# s2, x #) -> (# s2, W8# x #)
 readWord16OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readWord16OffAddr# a i s of (# s, w #) -> (# s, W16# w #)
-
+  = IO $ \s -> case readWord16OffAddr# a i s    of (# s2, x #) -> (# s2, W16# x #)
 readWord32OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readWord32OffAddr# a i s of (# s, w #) -> (# s, W32# w #)
-
-#if WORD_SIZE_IN_BYTES == 8
+  = IO $ \s -> case readWord32OffAddr# a i s    of (# s2, x #) -> (# s2, W32# x #)
 readWord64OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readWordOffAddr# a i s of (# s, w #) -> (# s, W64# w #)
-#else
-readWord64OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readWord64OffAddr# a i s of (# s, w #) -> (# s, W64# w #)
-#endif
+  = IO $ \s -> case readWord64OffAddr# a i s    of (# s2, x #) -> (# s2, W64# x #)
 
-writeWord8OffPtr (Ptr a#) (I# i#) (W8# w#) = IO $ \ s# ->
-      case (writeWord8OffAddr# a# i# w# s#) of s2# -> (# s2#, () #)
+writeWideCharOffPtr  :: Ptr Char          -> Int -> Char        -> IO ()
+writeIntOffPtr       :: Ptr Int           -> Int -> Int         -> IO ()
+writeWordOffPtr      :: Ptr Word          -> Int -> Word        -> IO ()
+writePtrOffPtr       :: Ptr (Ptr a)       -> Int -> Ptr a       -> IO ()
+writeFloatOffPtr     :: Ptr Float         -> Int -> Float       -> IO ()
+writeDoubleOffPtr    :: Ptr Double        -> Int -> Double      -> IO ()
+writeStablePtrOffPtr :: Ptr (StablePtr a) -> Int -> StablePtr a -> IO ()
+writeInt8OffPtr      :: Ptr Int8          -> Int -> Int8        -> IO ()
+writeInt16OffPtr     :: Ptr Int16         -> Int -> Int16       -> IO ()
+writeInt32OffPtr     :: Ptr Int32         -> Int -> Int32       -> IO ()
+writeInt64OffPtr     :: Ptr Int64         -> Int -> Int64       -> IO ()
+writeWord8OffPtr     :: Ptr Word8         -> Int -> Word8       -> IO ()
+writeWord16OffPtr    :: Ptr Word16        -> Int -> Word16      -> IO ()
+writeWord32OffPtr    :: Ptr Word32        -> Int -> Word32      -> IO ()
+writeWord64OffPtr    :: Ptr Word64        -> Int -> Word64      -> IO ()
 
-writeWord16OffPtr (Ptr a#) (I# i#) (W16# w#) = IO $ \ s# ->
-      case (writeWord16OffAddr# a# i# w# s#) of s2# -> (# s2#, () #)
-
-writeWord32OffPtr (Ptr a#) (I# i#) (W32# w#) = IO $ \ s# ->
-      case (writeWord32OffAddr# a# i# w# s#) of s2# -> (# s2#, () #)
-
-#if WORD_SIZE_IN_BYTES == 8
-writeWord64OffPtr (Ptr a#) (I# i#) (W64# w#) = IO $ \ s# ->
-      case (writeWordOffAddr#  a# i# w# s#) of s2# -> (# s2#, () #)
-#else
-writeWord64OffPtr (Ptr a#) (I# i#) (W64# w#) = IO $ \ s# ->
-      case (writeWord64OffAddr#  a# i# w# s#) of s2# -> (# s2#, () #)
-#endif
+writeWideCharOffPtr (Ptr a) (I# i) (C# x)
+  = IO $ \s -> case writeWideCharOffAddr# a i x s  of s2 -> (# s2, () #)
+writeIntOffPtr (Ptr a) (I# i) (I# x)
+  = IO $ \s -> case writeIntOffAddr# a i x s       of s2 -> (# s2, () #)
+writeWordOffPtr (Ptr a) (I# i) (W# x)
+  = IO $ \s -> case writeWordOffAddr# a i x s      of s2 -> (# s2, () #)
+writePtrOffPtr (Ptr a) (I# i) (Ptr x)
+  = IO $ \s -> case writeAddrOffAddr# a i x s      of s2 -> (# s2, () #)
+writeFloatOffPtr (Ptr a) (I# i) (F# x)
+  = IO $ \s -> case writeFloatOffAddr# a i x s     of s2 -> (# s2, () #)
+writeDoubleOffPtr (Ptr a) (I# i) (D# x)
+  = IO $ \s -> case writeDoubleOffAddr# a i x s    of s2 -> (# s2, () #)
+writeStablePtrOffPtr (Ptr a) (I# i) (StablePtr x)
+  = IO $ \s -> case writeStablePtrOffAddr# a i x s of s2 -> (# s2 , () #)
+writeInt8OffPtr (Ptr a) (I# i) (I8# x)
+  = IO $ \s -> case writeInt8OffAddr# a i x s      of s2 -> (# s2, () #)
+writeInt16OffPtr (Ptr a) (I# i) (I16# x)
+  = IO $ \s -> case writeInt16OffAddr# a i x s     of s2 -> (# s2, () #)
+writeInt32OffPtr (Ptr a) (I# i) (I32# x)
+  = IO $ \s -> case writeInt32OffAddr# a i x s     of s2 -> (# s2, () #)
+writeInt64OffPtr (Ptr a) (I# i) (I64# x)
+  = IO $ \s -> case writeInt64OffAddr# a i x s     of s2 -> (# s2, () #)
+writeWord8OffPtr (Ptr a) (I# i) (W8# x)
+  = IO $ \s -> case writeWord8OffAddr# a i x s     of s2 -> (# s2, () #)
+writeWord16OffPtr (Ptr a) (I# i) (W16# x)
+  = IO $ \s -> case writeWord16OffAddr# a i x s    of s2 -> (# s2, () #)
+writeWord32OffPtr (Ptr a) (I# i) (W32# x)
+  = IO $ \s -> case writeWord32OffAddr# a i x s    of s2 -> (# s2, () #)
+writeWord64OffPtr (Ptr a) (I# i) (W64# x)
+  = IO $ \s -> case writeWord64OffAddr# a i x s    of s2 -> (# s2, () #)
 
 #endif /* __GLASGOW_HASKELL__ */
 \end{code}

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Prelude.lhs,v 1.24 2001/02/22 16:48:24 qrczak Exp $
+% $Id: Prelude.lhs,v 1.25 2001/02/28 00:01:03 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -178,57 +178,4 @@ mapM f as       =  sequence (map f as)
 mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
 {-# INLINE mapM_ #-}
 mapM_ f as      =  sequence_ (map f as)
-\end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Coercions}
-%*							*
-%*********************************************************
-
-\begin{code}
-{-# RULES
-"fromIntegral/Int->Int"                     fromIntegral   = id :: Int     -> Int
-"fromIntegral/Integer->Integer"             fromIntegral   = id :: Integer -> Integer
-"fromIntegral/Int->Integer"                 fromIntegral   = int2Integer
-"fromIntegral/Integer->Int"                 fromIntegral   = integer2Int
-"fromIntegral/Int->Rational"     forall n . fromIntegral n = int2Integer n :% 1
-"fromIntegral/Integer->Rational" forall n . fromIntegral n = n :% (1 :: Integer)
-"fromIntegral/Int->Float"                   fromIntegral   = int2Float
-"fromIntegral/Int->Double"                  fromIntegral   = int2Double
-"fromIntegral/Integer->Float"    forall n . fromIntegral n = encodeFloat n 0 :: Float
-"fromIntegral/Integer->Double"   forall n . fromIntegral n = encodeFloat n 0 :: Double
- #-}
-fromIntegral	:: (Integral a, Num b) => a -> b
-fromIntegral	=  fromInteger . toInteger
-
-{-# RULES
-"realToFrac/Float->Double"      realToFrac = floatToDouble
-"realToFrac/Double->Float"      realToFrac = doubleToFloat
-"realToFrac/Float->Float"       realToFrac = id      :: Float    -> Float
-"realToFrac/Double->Double"     realToFrac = id      :: Double   -> Double
-"realToFrac/Rational->Rational" realToFrac = id      :: Rational -> Rational
-"realToFrac/Float->Rational"    realToFrac = rf2rat  :: Float    -> Rational
-"realToFrac/Double->Rational"   realToFrac = rf2rat  :: Double   -> Rational
-"realToFrac/Rational->Float"    realToFrac = fromRat :: Rational -> Float
-"realToFrac/Rational->Double"   realToFrac = fromRat :: Rational -> Double
- #-}
-realToFrac	:: (Real a, Fractional b) => a -> b
-realToFrac	=  fromRational . toRational
-
-doubleToFloat :: Double -> Float
-doubleToFloat (D# d) = F# (double2Float# d)
-
-floatToDouble :: Float -> Double
-floatToDouble (F# f) = D# (float2Double# f)
-
-{-# SPECIALIZE rf2rat ::
-    Float  -> Rational,
-    Double -> Rational
- #-}
-rf2rat :: RealFloat a => a -> Rational
-rf2rat x = if n >= 0 then (m * (b ^ n)) :% 1 else m :% (b ^ (-n))
-   where (m,n) = decodeFloat x
-         b     = floatRadix  x
 \end{code}

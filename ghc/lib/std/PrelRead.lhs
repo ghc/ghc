@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelRead.lhs,v 1.17 2001/02/22 13:17:59 simonpj Exp $
+% $Id: PrelRead.lhs,v 1.18 2001/02/28 00:01:03 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -520,26 +520,27 @@ include lexing common prefixes such as '0x' or '0o' etc.
 		ReadS Int,
 		ReadS Integer #-}
 readDec :: (Integral a) => ReadS a
-readDec = readInt 10 isDigit (\d -> ord d - ord_0)
+readDec = readInt 10 isDigit (\d -> ord d - ord '0')
 
 {-# SPECIALISE readOct :: 
 		ReadS Int,
 		ReadS Integer #-}
 readOct :: (Integral a) => ReadS a
-readOct = readInt 8 isOctDigit (\d -> ord d - ord_0)
+readOct = readInt 8 isOctDigit (\d -> ord d - ord '0')
 
 {-# SPECIALISE readHex :: 
 		ReadS Int,
 		ReadS Integer #-}
 readHex :: (Integral a) => ReadS a
 readHex = readInt 16 isHexDigit hex
-	    where hex d = ord d - (if isDigit d then ord_0
+	    where hex d = ord d - (if isDigit d then ord '0'
 				   else ord (if isUpper d then 'A' else 'a') - 10)
 
 readInt :: (Integral a) => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
 readInt radix isDig digToInt s = do
     (ds,r) <- nonnull isDig s
-    return (foldl1 (\n d -> n * radix + d) (map (fromInteger . int2Integer . digToInt) ds), r)
+    return (foldl1 (\n d -> n * radix + d)
+                   (map (fromInteger . toInteger . digToInt) ds), r)
 
 {-# SPECIALISE readSigned ::
 		ReadS Int     -> ReadS Int,

@@ -175,8 +175,8 @@ stmtToInstrs stmt = case stmt of
 	getData (StString s)     = panic "MachCode.stmtToInstrs: unlifted StString"
 	-- the linker can handle simple arithmetic...
 	getData (StIndex rep (StCLbl lbl) (StInt off)) =
-		returnNat (nilOL, 
-                           ImmIndex lbl (fromInteger (off * sizeOf rep)))
+		returnNat (nilOL,
+                           ImmIndex lbl (fromInteger off * sizeOf rep))
 
     -- Top-level lifted-out string.  The segment will already have been set
     -- (see liftStrings above).
@@ -227,7 +227,7 @@ mangleIndexTree :: StixTree -> StixTree
 mangleIndexTree (StIndex pk base (StInt i))
   = StPrim IntAddOp [base, off]
   where
-    off = StInt (i * sizeOf pk)
+    off = StInt (i * toInteger (sizeOf pk))
 
 mangleIndexTree (StIndex pk base off)
   = StPrim IntAddOp [
@@ -237,7 +237,7 @@ mangleIndexTree (StIndex pk base off)
       ]
   where
     shift :: PrimRep -> Int
-    shift rep = case (fromInteger (sizeOf rep) :: Int) of
+    shift rep = case sizeOf rep of
                    1 -> 0
                    2 -> 1
                    4 -> 2
@@ -252,7 +252,7 @@ maybeImm :: StixTree -> Maybe Imm
 maybeImm (StCLbl l)       
    = Just (ImmCLbl l)
 maybeImm (StIndex rep (StCLbl l) (StInt off)) 
-   = Just (ImmIndex l (fromInteger (off * sizeOf rep)))
+   = Just (ImmIndex l (fromInteger off * sizeOf rep))
 maybeImm (StInt i)
   | i >= toInteger minInt && i <= toInteger maxInt
   = Just (ImmInt (fromInteger i))
@@ -479,6 +479,9 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       IntQuotOp -> trivialCode (DIV Q False) x y
       IntRemOp  -> trivialCode (REM Q False) x y
 
+      WordAddOp  -> trivialCode (ADD Q False) x y
+      WordSubOp  -> trivialCode (SUB Q False) x y
+      WordMulOp  -> trivialCode (MUL Q False) x y
       WordQuotOp -> trivialCode (DIV Q True) x y
       WordRemOp  -> trivialCode (REM Q True) x y
 
@@ -668,6 +671,13 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       Double2IntOp -> coerceFP2Int x
       Int2DoubleOp -> coerceInt2FP DoubleRep x
 
+      IntToInt8Op    -> extendIntCode Int8Rep   IntRep  x
+      IntToInt16Op   -> extendIntCode Int16Rep  IntRep  x
+      IntToInt32Op   -> getRegister x
+      WordToWord8Op  -> extendIntCode Word8Rep  WordRep x
+      WordToWord16Op -> extendIntCode Word16Rep WordRep x
+      WordToWord32Op -> getRegister x
+
       other_op ->
 	getRegister (StCall fn cCallConv DoubleRep [x])
        where
@@ -743,11 +753,15 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       DoubleLtOp -> condFltReg LTT x y
       DoubleLeOp -> condFltReg LE x y
 
-      IntAddOp  -> add_code  L x y
-      IntSubOp  -> sub_code  L x y
+      IntAddOp  -> add_code L x y
+      IntSubOp  -> sub_code L x y
       IntQuotOp -> trivialCode (IQUOT L) Nothing x y
       IntRemOp  -> trivialCode (IREM L) Nothing x y
       IntMulOp  -> let op = IMUL L in trivialCode op (Just op) x y
+
+      WordAddOp  -> add_code L x y
+      WordSubOp  -> sub_code L x y
+      WordMulOp  -> let op = IMUL L in trivialCode op (Just op) x y
 
       FloatAddOp -> trivialFCode  FloatRep  GADD x y
       FloatSubOp -> trivialFCode  FloatRep  GSUB x y
@@ -922,9 +936,14 @@ getRegister (StInd pk mem)
     	code__2 dst = code `snocOL`
 		      if   pk == DoubleRep || pk == FloatRep
 		      then GLD size src dst
-		      else case size of
-                             L  -> MOV L     (OpAddr src) (OpReg dst)
-                             BU -> MOVZxL BU (OpAddr src) (OpReg dst)
+		      else (case size of
+                               B  -> MOVSxL B
+                               Bu -> MOVZxL Bu
+                               W  -> MOVSxL W
+                               Wu -> MOVZxL Wu
+                               L  -> MOV L
+                               Lu -> MOV L)
+                               (OpAddr src) (OpReg dst)
     in
     	returnNat (Any pk code__2)
 
@@ -1103,9 +1122,13 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       IntSubOp -> trivialCode (SUB False False) x y
 
 	-- ToDo: teach about V8+ SPARC mul/div instructions
-      IntMulOp    -> imul_div SLIT(".umul") x y
-      IntQuotOp   -> imul_div SLIT(".div")  x y
-      IntRemOp    -> imul_div SLIT(".rem")  x y
+      IntMulOp  -> imul_div SLIT(".umul") x y
+      IntQuotOp -> imul_div SLIT(".div")  x y
+      IntRemOp  -> imul_div SLIT(".rem")  x y
+
+      WordAddOp -> trivialCode (ADD False False) x y
+      WordSubOp -> trivialCode (SUB False False) x y
+      WordMulOp -> imul_div SLIT(".umul") x y
 
       FloatAddOp  -> trivialFCode FloatRep  FADD x y
       FloatSubOp  -> trivialFCode FloatRep  FSUB x y
@@ -1123,9 +1146,9 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       SllOp -> trivialCode SLL x y
       SrlOp -> trivialCode SRL x y
 
-      ISllOp -> trivialCode SLL x y  --was: panic "SparcGen:isll"
-      ISraOp -> trivialCode SRA x y  --was: panic "SparcGen:isra"
-      ISrlOp -> trivialCode SRL x y  --was: panic "SparcGen:isrl"
+      ISllOp -> trivialCode SLL x y
+      ISraOp -> trivialCode SRA x y
+      ISrlOp -> trivialCode SRL x y
 
       FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep 
                                            [promote x, promote y])
@@ -1805,7 +1828,13 @@ assignIntCode pk dst (StInd pks src)
     	c_dst = registerCode reg_dst tmp  -- should be empty
     	r_dst = registerName reg_dst tmp
     	szs   = primRepToSize pks
-        opc   = case szs of L -> MOV L ; BU -> MOVZxL BU
+        opc   = case szs of
+            B  -> MOVSxL B
+            Bu -> MOVZxL Bu
+            W  -> MOVSxL W
+            Wu -> MOVZxL Wu
+            L  -> MOV L
+            Lu -> MOV L
 
     	code  | isNilOL c_dst
               = c_addr `snocOL`
@@ -3235,6 +3264,20 @@ coerceFP2Int x
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
+extendIntCode :: PrimRep -> PrimRep -> StixTree -> NatM Register
+extendIntCode pks pkd x
+  = coerceIntCode pks x		`thenNat` \ register ->
+    getNewRegNCG pks		`thenNat` \ reg ->
+    let
+    	code = registerCode register reg
+    	src  = registerName register reg
+        opc  = case pkd of IntRep -> MOVSxL ; WordRep -> MOVZxL
+        sz   = primRepToSize pks
+        code__2 dst = code `snocOL` opc sz (OpReg src) (OpReg dst)
+    in
+    returnNat (Any pkd code__2)
+
+------------
 coerceInt2FP pk x
   = getRegister x		`thenNat` \ register ->
     getNewRegNCG IntRep		`thenNat` \ reg ->

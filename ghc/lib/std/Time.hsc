@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.9 2001/01/30 10:59:04 simonmar Exp $
+-- $Id: Time.hsc,v 1.10 2001/02/28 00:01:03 qrczak Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -271,7 +271,10 @@ addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
 	       (TOD c_sec c_psec) = 
 	let
-	  sec_diff = fromInt sec + 60 * fromInt min + 3600 * fromInt hour + 24 * 3600 * fromInt day
+	  sec_diff = toInteger sec +
+                     60 * toInteger min +
+                     3600 * toInteger hour +
+                     24 * 3600 * toInteger day
 	  cal      = toUTCTime (TOD (c_sec + sec_diff) (c_psec + psec))
                                                        -- FIXME! ^^^^
           new_mon  = fromEnum (ctMonth cal) + r_mon 

@@ -10,17 +10,19 @@ main = test
 
 test :: IO ()
 test = do
-   testIntlikeNoBits "Int"    (0::Int)     
-   testIntlike "Int8"   (0::Int8)     
-   testIntlike "Int16"  (0::Int16)    
-   testIntlike "Int32"  (0::Int32)    
-   testIntlike "Word8"  (0::Word8)    
-   testIntlike "Word16" (0::Word16)   
-   testIntlike "Word32" (0::Word32)   
+   testIntlike "Int"    (0::Int)
+   testIntlike "Int8"   (0::Int8)
+   testIntlike "Int16"  (0::Int16)
+   testIntlike "Int32"  (0::Int32)
+   testIntlike "Int64"  (0::Int64)
+   testIntlike "Word8"  (0::Word8)
+   testIntlike "Word16" (0::Word16)
+   testIntlike "Word32" (0::Word32)
+   testIntlike "Word64" (0::Word64)
    testInteger
 
-testIntlikeNoBits :: (Bounded a, Integral a, Ix a, Read a) => String -> a -> IO ()
-testIntlikeNoBits name zero = do
+testIntlike :: (Bounded a, Integral a, Ix a, Read a, Bits a) => String -> a -> IO ()
+testIntlike name zero = do
   putStrLn $ "--------------------------------"
   putStrLn $ "--Testing " ++ name
   putStrLn $ "--------------------------------"
@@ -33,6 +35,7 @@ testIntlikeNoBits name zero = do
   testReal     zero
   testIntegral zero
   testConversions zero
+  testBits     zero True
 
 testInteger  = do
   let zero = 0 :: Integer
@@ -47,12 +50,6 @@ testInteger  = do
   testReal     zero
   testIntegral zero
   testBits     zero False
-
-testIntlike :: (Bounded a, Integral a, Ix a, Read a, Bits a) => String -> a -> IO ()
-testIntlike name zero = do
-  testIntlikeNoBits name zero
-  testBits     zero True
-
 
 -- In all these tests, zero is a dummy element used to get
 -- the overloading to work
@@ -83,8 +80,9 @@ testConversions zero = do
   putStr "Word64  : " >> print (map fromIntegral numbers :: [Word64])
   where numbers = [minBound, 0, maxBound] `asTypeOf` [zero]
 
-samples :: (Num a, Enum a) => a -> ([a], [a])
-samples zero = ([-3 .. -1]++[0 .. 3], [-3 .. -1]++[1 .. 3])
+samples :: (Num a) => a -> ([a], [a])
+samples zero = (map fromInteger ([-3 .. -1]++[0 .. 3]),
+                map fromInteger ([-3 .. -1]++[1 .. 3]))
   
 table1 :: (Show a, Show b) => String -> (a -> b) -> [a] -> IO ()
 table1 nm f xs = do

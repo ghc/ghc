@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.72 2001/02/14 12:59:34 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.73 2001/02/28 00:01:04 qrczak Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -530,12 +530,12 @@ FN_(int64ToIntegerzh_fast)
    if ( val < 0LL ) {
      neg = 1;
      val = -val;
-   } 
+   }
 
    hi = (W_)((LW_)val / 0x100000000ULL);
 
    if ( words_needed == 2 )  { 
-      s = 2; 
+      s = 2;
       Hp[-1] = (W_)val;
       Hp[0] = hi;
    } else if ( val != 0 ) {

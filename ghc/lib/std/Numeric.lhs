@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Numeric.lhs,v 1.12 2001/02/22 16:48:24 qrczak Exp $
+% $Id: Numeric.lhs,v 1.13 2001/02/28 00:01:03 qrczak Exp $
 %
 % (c) The University of Glasgow, 1997-2000
 %
@@ -41,13 +41,12 @@ import Char
 #ifndef __HUGS__
 	-- GHC imports
 import Prelude		-- For dependencies
-import PrelBase		( Char(..) )
+import PrelBase		( Char(..), unsafeChr )
 import PrelRead		-- Lots of things
 import PrelReal		( showSigned )
 import PrelFloat	( fromRat, FFFormat(..), 
 			  formatRealFloat, floatToDigits, showFloat
 			)
-import PrelNum		( ord_0 )
 #else
 	-- Hugs imports
 import Array
@@ -59,18 +58,17 @@ import Array
 
 \begin{code}
 showInt :: Integral a => a -> ShowS
-showInt i rs
-  | i < 0     = error "Numeric.showInt: can't show negative numbers"
-  | otherwise = go i rs
+showInt n cs
+    | n < 0     = error "Numeric.showInt: can't show negative numbers"
+    | otherwise = go n cs
     where
-     go n r = 
-      case quotRem n 10 of                 { (n', d) ->
-      case chr (ord_0 + fromIntegral d) of { C# c# -> -- stricter than necessary
-      let
-	r' = C# c# : r
-      in
-      if n' == 0 then r' else go n' r'
-      }}
+    go n cs
+        | n < 10    = case unsafeChr (ord '0' + fromIntegral n) of
+            c@(C# _) -> c:cs
+        | otherwise = case unsafeChr (ord '0' + fromIntegral r) of
+            c@(C# _) -> go q (c:cs)
+        where
+        (q,r) = n `quotRem` 10
 \end{code}
 
 Controlling the format and precision of floats. The code that

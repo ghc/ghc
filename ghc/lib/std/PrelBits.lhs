@@ -8,6 +8,8 @@ See library document for details on the semantics of the
 individual operations.
 
 \begin{code}
+#include "MachDeps.h"
+
 module PrelBits where
 
 import Prelude		-- To generate the dependency
@@ -28,28 +30,53 @@ infixl 5 .|.
 #endif
 
 class Num a => Bits a where
-  (.&.), (.|.), xor :: a -> a -> a
-  complement        :: a -> a
-  shift             :: a -> Int -> a
-  rotate            :: a -> Int -> a
-  bit               :: Int -> a
-  setBit            :: a -> Int -> a
-  clearBit          :: a -> Int -> a
-  complementBit     :: a -> Int -> a
-  testBit           :: a -> Int -> Bool
-  bitSize           :: a -> Int
-  isSigned          :: a -> Bool
+    (.&.), (.|.), xor :: a -> a -> a
+    complement        :: a -> a
+    shift             :: a -> Int -> a
+    rotate            :: a -> Int -> a
+    bit               :: Int -> a
+    setBit            :: a -> Int -> a
+    clearBit          :: a -> Int -> a
+    complementBit     :: a -> Int -> a
+    testBit           :: a -> Int -> Bool
+    bitSize           :: a -> Int
+    isSigned          :: a -> Bool
 
-  bit i             = shift 0x1 i
-  setBit x i        = x .|. bit i
-  clearBit x i      = x .&. complement (bit i)
-  complementBit x i = x `xor` bit i
-  testBit x i       = (x .&. bit i) /= 0
+    bit i               = 1 `shift` i
+    x `setBit` i        = x .|. bit i
+    x `clearBit` i      = x .&. complement (bit i)
+    x `complementBit` i = x `xor` bit i
+    x `testBit` i       = (x .&. bit i) /= 0
 
 shiftL, shiftR   :: Bits a => a -> Int -> a
 rotateL, rotateR :: Bits a => a -> Int -> a
-shiftL  a i = shift  a i
-shiftR  a i = shift  a (-i)
-rotateL a i = rotate a i
-rotateR a i = rotate a (-i)
+x `shiftL`  i = x `shift`  i
+x `shiftR`  i = x `shift`  (-i)
+x `rotateL` i = x `rotate` i
+x `rotateR` i = x `rotate` (-i)
+
+instance Bits Int where
+    (I# x#) .&.   (I# y#)  = I# (word2Int# (int2Word# x# `and#` int2Word# y#))
+    (I# x#) .|.   (I# y#)  = I# (word2Int# (int2Word# x# `or#`  int2Word# y#))
+    (I# x#) `xor` (I# y#)  = I# (word2Int# (int2Word# x# `xor#` int2Word# y#))
+    complement (I# x#)     = I# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
+    (I# x#) `shift` (I# i#)
+        | i# >=# 0#            = I# (x# `iShiftL#` i#)
+        | otherwise            = I# (x# `iShiftRA#` negateInt# i#)
+    (I# x#) `rotate` (I# i#) =
+#if WORD_SIZE_IN_BYTES == 4
+        I# (word2Int# ((x'# `shiftL#` i'#) `or#`
+                       (x'# `shiftRL#` (32# -# i'#))))
+        where
+        x'# = int2Word# x#
+        i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
+#else
+        I# (word2Int# ((x'# `shiftL#` i'#) `or#`
+                       (x'# `shiftRL#` (64# -# i'#))))
+        where
+        x'# = int2Word# x#
+        i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
+#endif
+    bitSize  _                 = WORD_SIZE_IN_BYTES * 8
+    isSigned _                 = True
 \end{code}

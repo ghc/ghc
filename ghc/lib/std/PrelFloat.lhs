@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelFloat.lhs,v 1.10 2001/02/22 13:17:58 simonpj Exp $
+% $Id: PrelFloat.lhs,v 1.11 2001/02/28 00:01:03 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -612,7 +612,7 @@ floatToDigits base x =
      let bk = expt base (-k) in
      gen [] (r * bk) s (mUp * bk) (mDn * bk)
  in
- (map toInt (reverse rds), k)
+ (map fromIntegral (reverse rds), k)
 
 \end{code}
 
@@ -873,4 +873,21 @@ foreign import ccall "isDoubleNaN" unsafe isDoubleNaN :: Double -> Int
 foreign import ccall "isDoubleInfinite" unsafe isDoubleInfinite :: Double -> Int
 foreign import ccall "isDoubleDenormalized" unsafe isDoubleDenormalized :: Double -> Int
 foreign import ccall "isDoubleNegativeZero" unsafe isDoubleNegativeZero :: Double -> Int
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Coercion rules}
+%*							*
+%*********************************************************
+
+\begin{code}
+{-# RULES
+"fromIntegral/Int->Float"   fromIntegral = int2Float
+"fromIntegral/Int->Double"  fromIntegral = int2Double
+"realToFrac/Float->Float"   realToFrac   = id :: Float -> Float
+"realToFrac/Float->Double"  realToFrac   = float2Double
+"realToFrac/Double->Float"  realToFrac   = double2Float
+"realToFrac/Double->Double" realToFrac   = id :: Double -> Double
+    #-}
 \end{code}

@@ -97,13 +97,11 @@ eXTRA_STK_ARGS_HERE
 Size of a @PrimRep@, in bytes.
 
 \begin{code}
-sizeOf :: PrimRep -> Integer{-in bytes-}
-    -- the result is an Integer only because it's more convenient
-
-sizeOf pr = case (primRepToSize pr) of
-  IF_ARCH_alpha({B -> 1; BU -> 1; {-W -> 2; WU -> 2;-} L -> 4; {-SF -> 4;-} _ -> 8},)
-  IF_ARCH_sparc({B -> 1; BU -> 1; W -> 4; F -> 4; DF -> 8},)
-  IF_ARCH_i386( {B -> 1; BU -> 1; L -> 4; F -> 4; DF -> 8 },)
+sizeOf :: PrimRep -> Int{-in bytes-}
+sizeOf pr = case primRepToSize pr of
+  IF_ARCH_alpha({B->1; Bu->1; {-W->2; Wu->2;-} L->4; {-SF->4;-} Q->8; TF->8},)
+  IF_ARCH_i386 ({B->1; Bu->1; W->2; Wu->2; L->4; Lu->4; F->4; DF->8; F80->10},)
+  IF_ARCH_sparc({B->1; Bu->1; W->4; F->4; DF->8},)
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -237,9 +235,9 @@ data Cond
 data Size
 #if alpha_TARGET_ARCH
     = B	    -- byte
-    | BU
+    | Bu
 --  | W	    -- word (2 bytes): UNUSED
---  | WU    -- : UNUSED
+--  | Wu    -- : UNUSED
     | L	    -- longword (4 bytes)
     | Q	    -- quadword (8 bytes)
 --  | FF    -- VAX F-style floating pt: UNUSED
@@ -249,46 +247,55 @@ data Size
     | TF    -- IEEE double-precision floating pt
 #endif
 #if i386_TARGET_ARCH
-    = B	    -- byte (signed, JRS:??lower??)
-    | BU    -- byte, unsigned
-    | L     -- word32
+    = B	    -- byte (signed)
+    | Bu    -- byte (unsigned)
+    | W     -- word (signed)
+    | Wu    -- word (unsigned)
+    | L     -- longword (signed)
+    | Lu    -- longword (unsigned)
     | F	    -- IEEE single-precision floating pt
     | DF    -- IEEE single-precision floating pt
     | F80   -- Intel 80-bit internal FP format; only used for spilling
 #endif
 #if sparc_TARGET_ARCH
     = B     -- byte (signed)
-    | BU    -- byte (unsigned)
-    | W	    -- word, 4 bytes
+    | Bu    -- byte (unsigned)
+    | W	    -- word (4 bytes)
     | F	    -- IEEE single-precision floating pt
     | DF    -- IEEE single-precision floating pt
 #endif
 
 primRepToSize :: PrimRep -> Size
 
-primRepToSize PtrRep	    = IF_ARCH_alpha( Q,  IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize CodePtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize DataPtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize RetRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize CostCentreRep = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize CharRep	    = IF_ARCH_alpha( L,  IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
+primRepToSize PtrRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize CodePtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize DataPtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize RetRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize CostCentreRep = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize CharRep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 
-primRepToSize Int8Rep	    = IF_ARCH_alpha( B,  IF_ARCH_i386( B, IF_ARCH_sparc( B ,)))
-primRepToSize Word8Rep	    = IF_ARCH_alpha( BU, IF_ARCH_i386( BU, IF_ARCH_sparc( BU,)))
+primRepToSize Int8Rep	    = IF_ARCH_alpha(B,  IF_ARCH_i386(B,  IF_ARCH_sparc(B,  )))
+primRepToSize Int16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(W,  IF_ARCH_sparc(err,)))
+    where err = panic "primRepToSize Int16Rep"
+primRepToSize Int32Rep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize Word8Rep	    = IF_ARCH_alpha(Bu, IF_ARCH_i386(Bu, IF_ARCH_sparc(Bu, )))
+primRepToSize Word16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(Wu, IF_ARCH_sparc(err,)))
+    where err = panic "primRepToSize Word16Rep"
+primRepToSize Word32Rep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(Lu, IF_ARCH_sparc(W,  )))
 
-primRepToSize IntRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize WordRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize AddrRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize FloatRep	    = IF_ARCH_alpha( TF, IF_ARCH_i386( F, IF_ARCH_sparc( F ,)))
-primRepToSize DoubleRep	    = IF_ARCH_alpha( TF, IF_ARCH_i386( DF,IF_ARCH_sparc( DF,)))
-primRepToSize ArrayRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize ByteArrayRep  = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize PrimPtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize WeakPtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize ForeignObjRep = IF_ARCH_alpha( Q,  IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize BCORep        = IF_ARCH_alpha( Q,  IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize StablePtrRep  = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize ThreadIdRep   = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
+primRepToSize IntRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize WordRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize AddrRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize FloatRep	    = IF_ARCH_alpha(TF, IF_ARCH_i386(F,  IF_ARCH_sparc(F,  )))
+primRepToSize DoubleRep	    = IF_ARCH_alpha(TF, IF_ARCH_i386(DF, IF_ARCH_sparc(DF, )))
+primRepToSize ArrayRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize ByteArrayRep  = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize PrimPtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize WeakPtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize ForeignObjRep = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize BCORep        = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize StablePtrRep  = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize ThreadIdRep   = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 -- SUP: Wrong!!! Only for testing the rest of the NCG
 primRepToSize Word64Rep     = trace "primRepToSize: Word64Rep not handled" B
 primRepToSize Int64Rep      = trace "primRepToSize: Int64Rep not handled"  B

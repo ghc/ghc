@@ -18,9 +18,6 @@ module PrimRep
       , getPrimRepSize
       , getPrimRepSizeInBytes
       , retPrimRepSize
-      , showPrimRep
-      , primRepString
-      , showPrimRepToUser
       ) where
 
 #include "HsVersions.h"
@@ -46,30 +43,21 @@ data PrimRep
   | CostCentreRep	-- Pointer to a cost centre
 
   | CharRep		-- Machine characters
-  | IntRep		--	   integers (same size as ptr on this arch)
-  | WordRep		--	   ditto (but *unsigned*)
-  | AddrRep		--	   addresses ("C pointers")
+  | IntRep		--	   signed   integers (same size as ptr on this arch)
+  | WordRep		--	   unsigned integers (same size as ptr on this arch)
+  | AddrRep		--	   addresses (C pointers)
   | FloatRep		--	   floats
   | DoubleRep		--	   doubles
-  | Word64Rep	        --    guaranteed to be 64 bits (no more, no less.)
-  | Int64Rep	        --    guaranteed to be 64 bits (no more, no less.)
 
-    -- These are not expected to appear in the front end.  They are
-    -- only here to help the native code generator, and should appear
-    -- nowhere else.
-  | Int8Rep             --         8  bit signed   integers
-  | Word8Rep            --         8  bit unsigned integers
+  | Int8Rep             --          8 bit signed   integers
   | Int16Rep            --         16 bit signed   integers
-  | Word16Rep           --         16 bit unsigned integers
   | Int32Rep            --         32 bit signed   integers
+  | Int64Rep	        --         64 bit signed   integers
+  | Word8Rep            --          8 bit unsigned integers
+  | Word16Rep           --         16 bit unsigned integers
   | Word32Rep           --         32 bit unsigned integers
-  
-  -- Perhaps all sized integers and words should be primitive types.
-  
-  -- Word8Rep is currently used to simulate some old CharRep usages
-  -- when Char changed size from 8 to 31 bits. It does not correspond
-  -- to a Haskell unboxed type, in particular it's not used by Word8.
-  
+  | Word64Rep	        --         64 bit unsigned integers
+
   | WeakPtrRep
   | ForeignObjRep	
   | BCORep
@@ -157,33 +145,27 @@ See codeGen/CgCon:cgTopRhsCon.
 
 \begin{code}
 isFloatingRep :: PrimRep -> Bool
-
 isFloatingRep DoubleRep = True
 isFloatingRep FloatRep  = True
-isFloatingRep other     = False
-
+isFloatingRep _         = False
 \end{code}
 
 \begin{code}
 is64BitRep :: PrimRep -> Bool
-
 is64BitRep Int64Rep  = True
 is64BitRep Word64Rep = True
-is64BitRep other     = False
-
+is64BitRep _         = False
 \end{code}
-
-
 
 \begin{code}
 getPrimRepSize :: PrimRep -> Int
+getPrimRepSize DoubleRep = dOUBLE_SIZE -- "words", of course
+getPrimRepSize Word64Rep = wORD64_SIZE
+getPrimRepSize Int64Rep  = iNT64_SIZE
+getPrimRepSize VoidRep   = 0
+getPrimRepSize _         = 1
 
-getPrimRepSize DoubleRep  = dOUBLE_SIZE	-- "words", of course
-getPrimRepSize Word64Rep  = wORD64_SIZE
-getPrimRepSize Int64Rep   = iNT64_SIZE
-getPrimRepSize VoidRep	  = 0
-getPrimRepSize other	  = 1
-
+retPrimRepSize :: Int
 retPrimRepSize = getPrimRepSize RetRep
 
 -- sizes in bytes.
@@ -191,29 +173,27 @@ retPrimRepSize = getPrimRepSize RetRep
 -- we have to push onto the stack when calling external
 -- entry points (e.g., stdcalling on win32)
 getPrimRepSizeInBytes :: PrimRep -> Int
-getPrimRepSizeInBytes pr =
- case pr of
-    Int8Rep        ->    1
-    Word8Rep       ->    1
-    Int16Rep       ->    2
-    Word16Rep      ->    2
-    Int32Rep       ->    4
-    Word32Rep      ->    4
-
-    CharRep        ->    4
-    IntRep         ->    wORD_SIZE
-    AddrRep        ->    wORD_SIZE
-    FloatRep       ->    wORD_SIZE
-    DoubleRep      ->    dOUBLE_SIZE * wORD_SIZE
-    Word64Rep      ->    wORD64_SIZE * wORD_SIZE
-    Int64Rep       ->    iNT64_SIZE * wORD_SIZE
-    WeakPtrRep     ->    wORD_SIZE
-    ForeignObjRep  ->    wORD_SIZE
-    StablePtrRep   ->    wORD_SIZE
-    StableNameRep  ->    wORD_SIZE
-    ArrayRep       ->    wORD_SIZE
-    ByteArrayRep   ->    wORD_SIZE
-    _		   ->    panic "getPrimRepSize: ouch - this wasn't supposed to happen!"
+getPrimRepSizeInBytes CharRep       = 4
+getPrimRepSizeInBytes IntRep        = wORD_SIZE
+getPrimRepSizeInBytes WordRep       = wORD_SIZE
+getPrimRepSizeInBytes AddrRep       = wORD_SIZE
+getPrimRepSizeInBytes FloatRep      = wORD_SIZE
+getPrimRepSizeInBytes DoubleRep     = dOUBLE_SIZE * wORD_SIZE
+getPrimRepSizeInBytes Int8Rep       = 1
+getPrimRepSizeInBytes Int16Rep      = 2
+getPrimRepSizeInBytes Int32Rep      = 4
+getPrimRepSizeInBytes Int64Rep      = 8
+getPrimRepSizeInBytes Word8Rep      = 1
+getPrimRepSizeInBytes Word16Rep     = 2
+getPrimRepSizeInBytes Word32Rep     = 4
+getPrimRepSizeInBytes Word64Rep     = 8
+getPrimRepSizeInBytes WeakPtrRep    = wORD_SIZE
+getPrimRepSizeInBytes ForeignObjRep = wORD_SIZE
+getPrimRepSizeInBytes StablePtrRep  = wORD_SIZE
+getPrimRepSizeInBytes StableNameRep = wORD_SIZE
+getPrimRepSizeInBytes ArrayRep      = wORD_SIZE
+getPrimRepSizeInBytes ByteArrayRep  = wORD_SIZE
+getPrimRepSizeInBytes _             = panic "getPrimRepSize: ouch - this wasn't supposed to happen!"
 
 \end{code}
 
@@ -228,8 +208,6 @@ instance Outputable PrimRep where
     ppr kind = text (showPrimRep kind)
 
 showPrimRep  :: PrimRep -> String
-showPrimRepToUser :: PrimRep -> String
-
 showPrimRep PtrRep	   = "P_"	-- short for StgPtr
 showPrimRep CodePtrRep     = "P_"	-- DEATH to StgFunPtr! (94/02/22 WDP)
 showPrimRep DataPtrRep     = "D_"
@@ -259,23 +237,6 @@ showPrimRep WeakPtrRep     = "P_"
 showPrimRep ForeignObjRep  = "StgAddr"
 showPrimRep VoidRep	   = "!!VOID_KIND!!"
 showPrimRep BCORep         = "P_"  	-- not sure -- JRS 000708
-
-primRepString CharRep   	= "Char"
-primRepString Int8Rep   	= "Char" -- To have names like newCharArray#
-primRepString IntRep    	= "Int"
-primRepString WordRep   	= "Word"
-primRepString Int64Rep  	= "Int64"
-primRepString Word64Rep 	= "Word64"
-primRepString AddrRep   	= "Addr"
-primRepString FloatRep  	= "Float"
-primRepString DoubleRep 	= "Double"
-primRepString WeakPtrRep 	= "Weak"
-primRepString ForeignObjRep  	= "ForeignObj"
-primRepString StablePtrRep  	= "StablePtr"
-primRepString StableNameRep  	= "StableName"
-primRepString other     	= pprPanic "primRepString" (ppr other)
-
-showPrimRepToUser pr = primRepString pr
 \end{code}
 
 Foreign Objects and Arrays are treated specially by the code for

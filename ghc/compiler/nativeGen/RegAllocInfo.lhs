@@ -154,9 +154,9 @@ interesting (RealReg i)      = isFastTrue (freeReg i)
 
 regUsage instr = case instr of
     LD B reg addr	-> usage (regAddr addr, [reg, t9])
-    LD BU reg addr	-> usage (regAddr addr, [reg, t9])
+    LD Bu reg addr	-> usage (regAddr addr, [reg, t9])
 --  LD W reg addr	-> usage (regAddr addr, [reg, t9]) : UNUSED
---  LD WU reg addr	-> usage (regAddr addr, [reg, t9]) : UNUSED
+--  LD Wu reg addr	-> usage (regAddr addr, [reg, t9]) : UNUSED
     LD sz reg addr	-> usage (regAddr addr, [reg])
     LDA reg addr	-> usage (regAddr addr, [reg])
     LDAH reg addr	-> usage (regAddr addr, [reg])

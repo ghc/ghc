@@ -36,7 +36,7 @@ import Maybe		( isJust )
 For x86, the way we print a register name depends
 on which bit of it we care about.  Yurgh.
 \begin{code}
-pprUserReg:: Reg -> SDoc
+pprUserReg :: Reg -> SDoc
 pprUserReg = pprReg IF_ARCH_i386(L,)
 
 
@@ -89,22 +89,37 @@ pprReg IF_ARCH_i386(s,) r
 #endif
 #if i386_TARGET_ARCH
     ppr_reg_no :: Size -> Int -> SDoc
-    ppr_reg_no B i= ptext
+    ppr_reg_no B  = ppr_reg_byte
+    ppr_reg_no Bu = ppr_reg_byte
+    ppr_reg_no W  = ppr_reg_word
+    ppr_reg_no Wu = ppr_reg_word
+    ppr_reg_no _  = ppr_reg_long
+
+    ppr_reg_byte i = ptext
       (case i of {
-	 0 -> SLIT("%al");   1 -> SLIT("%bl");
-	 2 -> SLIT("%cl");   3 -> SLIT("%dl");
+	 0 -> SLIT("%al");     1 -> SLIT("%bl");
+	 2 -> SLIT("%cl");     3 -> SLIT("%dl");
 	_  -> SLIT("very naughty I386 byte register")
       })
 
-    ppr_reg_no _ i = ptext
+    ppr_reg_word i = ptext
       (case i of {
-	 0 -> SLIT("%eax");   1 -> SLIT("%ebx");
-	 2 -> SLIT("%ecx");   3 -> SLIT("%edx");
-	 4 -> SLIT("%esi");   5 -> SLIT("%edi");
-	 6 -> SLIT("%ebp");   7 -> SLIT("%esp");
-	 8 -> SLIT("%fake0");   9 -> SLIT("%fake1");
-	10 -> SLIT("%fake2");  11 -> SLIT("%fake3");
-	12 -> SLIT("%fake4");  13 -> SLIT("%fake5");
+	 0 -> SLIT("%ax");     1 -> SLIT("%bx");
+	 2 -> SLIT("%cx");     3 -> SLIT("%dx");
+	 4 -> SLIT("%si");     5 -> SLIT("%di");
+	 6 -> SLIT("%bp");     7 -> SLIT("%sp");
+	_  -> SLIT("very naughty I386 word register")
+      })
+
+    ppr_reg_long i = ptext
+      (case i of {
+	 0 -> SLIT("%eax");    1 -> SLIT("%ebx");
+	 2 -> SLIT("%ecx");    3 -> SLIT("%edx");
+	 4 -> SLIT("%esi");    5 -> SLIT("%edi");
+	 6 -> SLIT("%ebp");    7 -> SLIT("%esp");
+	 8 -> SLIT("%fake0");  9 -> SLIT("%fake1");
+	10 -> SLIT("%fake2"); 11 -> SLIT("%fake3");
+	12 -> SLIT("%fake4"); 13 -> SLIT("%fake5");
 	_  -> SLIT("very naughty I386 register")
       })
 #endif
@@ -161,9 +176,9 @@ pprSize :: Size -> SDoc
 pprSize x = ptext (case x of
 #if alpha_TARGET_ARCH
 	 B  -> SLIT("b")
-	 BU -> SLIT("bu")
+	 Bu -> SLIT("bu")
 --	 W  -> SLIT("w") UNUSED
---	 WU -> SLIT("wu") UNUSED
+--	 Wu -> SLIT("wu") UNUSED
 	 L  -> SLIT("l")
 	 Q  -> SLIT("q")
 --	 FF -> SLIT("f") UNUSED
@@ -173,15 +188,19 @@ pprSize x = ptext (case x of
 	 TF -> SLIT("t")
 #endif
 #if i386_TARGET_ARCH
-	BU  -> SLIT("b")
+	B   -> SLIT("b")
+	Bu  -> SLIT("b")
+	W   -> SLIT("w")
+	Wu  -> SLIT("w")
 	L   -> SLIT("l")
+	Lu  -> SLIT("l")
 	F   -> SLIT("s")
 	DF  -> SLIT("l")
 	F80 -> SLIT("t")
 #endif
 #if sparc_TARGET_ARCH
 	B   -> SLIT("sb")
-	BU  -> SLIT("ub")
+	Bu  -> SLIT("ub")
 	W   -> SLIT("")
 	F   -> SLIT("")
 	DF  -> SLIT("d")
@@ -189,7 +208,7 @@ pprSize x = ptext (case x of
 pprStSize :: Size -> SDoc
 pprStSize x = ptext (case x of
 	B   -> SLIT("b")
-	BU  -> SLIT("b")
+	Bu  -> SLIT("b")
 	W   -> SLIT("")
 	F   -> SLIT("")
 	DF  -> SLIT("d")

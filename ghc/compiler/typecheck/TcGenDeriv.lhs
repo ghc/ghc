@@ -323,7 +323,7 @@ gen_Ord_binds tycon
 	    (if maybeToBool (maybeTyConSingleCon tycon) then
 
 --		cmp_eq_Expr ltTag_Expr eqTag_Expr gtTag_Expr a_Expr b_Expr
--- Wierd.  Was: case (cmp a b) of { LT -> LT; EQ -> EQ; GT -> GT }
+-- Weird.  Was: case (cmp a b) of { LT -> LT; EQ -> EQ; GT -> GT }
 
 		cmp_eq_Expr a_Expr b_Expr
 	     else

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Random.lhs,v 1.23 2001/02/22 16:48:24 qrczak Exp $
+% $Id: Random.lhs,v 1.24 2001/02/28 00:01:03 qrczak Exp $
 %
 % (c) The University of Glasgow, 1995-2000
 %
@@ -37,7 +37,6 @@ import PrelShow		( showSignedInt, showSpace )
 import PrelRead		( readDec )
 import PrelIOBase	( unsafePerformIO, stToIO )
 import PrelArr		( STRef, newSTRef, readSTRef, writeSTRef )
-import PrelFloat	( float2Double, double2Float )
 import Time		( getClockTime, ClockTime(..) )
 #else
 import PrelPrim		( IORef
@@ -175,17 +174,9 @@ instance Random Double where
   random g       = randomR (0::Double,1) g
   
 -- hah, so you thought you were saving cycles by using Float?
-
-#ifdef __HUGS__
 instance Random Float where
   random g        = randomIvalDouble (0::Double,1) realToFrac g
   randomR (a,b) g = randomIvalDouble (realToFrac a, realToFrac b) realToFrac g
-#else
-instance Random Float where
-  randomR (a,b) g = randomIvalDouble (float2Double a, float2Double b) double2Float g
-  random g        = randomIvalDouble (0::Double,1) double2Float g
-#endif
-
 \end{code}
 
 

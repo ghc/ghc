@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelShow.lhs,v 1.12 2000/09/14 13:46:42 simonpj Exp $
+% $Id: PrelShow.lhs,v 1.13 2001/02/28 00:01:03 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -107,8 +107,8 @@ instance  Show Char  where
 		-- The sticking point is the recursive call to (showl xs), which
 		-- it can't figure out would be ok with arity 2.
 
-instance  Show Int  where
-    showsPrec p n = showSignedInt p n
+instance Show Int where
+    showsPrec = showSignedInt
 
 instance Show a => Show (Maybe a) where
     showsPrec _p Nothing s = showString "Nothing" s
@@ -219,9 +219,9 @@ protectEsc p f		   = f . cont
 
 intToDigit :: Int -> Char
 intToDigit (I# i)
- | i >=# 0#  && i <=#  9# =  unsafeChr (ord '0' `plusInt` I# i)
- | i >=# 10# && i <=# 15# =  unsafeChr (ord 'a' `plusInt` I# i `minusInt` I# 10#)
- | otherwise		  =  error ("Char.intToDigit: not a digit " ++ show (I# i))
+    | i >=# 0#  && i <=#  9# =  unsafeChr (ord '0' `plusInt` I# i)
+    | i >=# 10# && i <=# 15# =  unsafeChr (ord 'a' `minusInt` I# 10# `plusInt` I# i)
+    | otherwise		  =  error ("Char.intToDigit: not a digit " ++ show (I# i))
 
 \end{code}
 
@@ -230,22 +230,24 @@ Code specific for Ints.
 \begin{code}
 showSignedInt :: Int -> Int -> ShowS
 showSignedInt (I# p) (I# n) r
-  | n <# 0# && p ># 6# = '(':itos n (')':r)
-  | otherwise	       = itos n r
+    | n <# 0# && p ># 6# = '(' : itos n (')' : r)
+    | otherwise          = itos n r
 
 itos :: Int# -> String -> String
-itos n r
-  | n >=# 0#		= itos' n r
-  | negateInt# n <# 0#  = -- n is minInt, a difficult number
-	    itos (n `quotInt#` 10#) (itos' (negateInt# (n `remInt#` 10#)) r)
-  | otherwise = '-':itos' (negateInt# n) r
- where
-   itos' :: Int# -> String -> String
-	-- x >= 0
-   itos' x cs 
-     | x <# 10#  = C# (chr# (x +# ord# '0'#)) : cs
-     | otherwise = itos' (x `quotInt#` 10#) 
-		         (C# (chr# (x `remInt#` 10# +# ord# '0'#)) : cs)
+itos n# cs
+    | n# <# 0# = let
+        n'# = negateInt# n#
+        in if n'# <# 0# -- minInt?
+            then '-' : itos' (negateInt# (n'# `quotInt#` 10#))
+                             (itos' (negateInt# (n'# `remInt#` 10#)) cs)
+            else '-' : itos' n'# cs
+    | otherwise = itos' n# cs
+    where
+    itos' :: Int# -> String -> String
+    itos' n# cs
+        | n# <# 10#  = C# (chr# (ord# '0'# +# n#)) : cs
+        | otherwise = itos' (n# `quotInt#` 10#)
+                            (C# (chr# (ord# '0'# +# (n# `remInt#` 10#))) : cs)
 \end{code}
 
 %*********************************************************

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.17 2001/02/15 17:22:15 sewardj Exp $
+-- $Id: primops.txt,v 1.18 2001/02/28 00:01:02 qrczak Exp $
 --
 -- Primitive Operations
 --
@@ -449,39 +449,47 @@ primop   IntegerComplementOp  "complementInteger#" GenPrimOp
 --- Word#                                                            ---
 ------------------------------------------------------------------------
 
-primop   WordQuotOp   "quotWord#" Dyadic  Word# -> Word# -> Word#
-primop   WordRemOp   "remWord#" Dyadic          Word# -> Word# -> Word#
-
-primop   AndOp   "and#"  Dyadic      
-   Word# -> Word# -> Word#
+primop   WordAddOp   "plusWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
-primop   OrOp   "or#"          Dyadic      
-   Word# -> Word# -> Word#
+primop   WordSubOp   "minusWord#"   Dyadic   Word# -> Word# -> Word#
+
+primop   WordMulOp   "timesWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
-primop   XorOp   "xor#"  Dyadic      
-   Word# -> Word# -> Word#
+primop   WordQuotOp   "quotWord#"   Dyadic   Word# -> Word# -> Word#
+   with can_fail = True
+
+primop   WordRemOp   "remWord#"   Dyadic   Word# -> Word# -> Word#
+   with can_fail = True
+
+primop   AndOp   "and#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
-primop   NotOp   "not#"  Monadic        Word# -> Word#
+primop   OrOp   "or#"   Dyadic   Word# -> Word# -> Word#
+   with commutable = True
 
-primop   SllOp   "shiftL#" GenPrimOp  Word# -> Int# -> Word#
-primop   SrlOp   "shiftRL#" GenPrimOp Word# -> Int# -> Word#
+primop   XorOp   "xor#"   Dyadic   Word# -> Word# -> Word#
+   with commutable = True
 
+primop   NotOp   "not#"   Monadic   Word# -> Word#
 
-primop   Word2IntOp "word2Int#" GenPrimOp Word# -> Int#
+primop   SllOp   "shiftL#"   GenPrimOp   Word# -> Int# -> Word#
 
-primop   Word2IntegerOp   "word2Integer#" GenPrimOp 
+primop   SrlOp   "shiftRL#"   GenPrimOp   Word# -> Int# -> Word#
+
+primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
+
+primop   Word2IntegerOp   "word2Integer#"   GenPrimOp 
    Word# -> (# Int#, ByteArr# #)
    with out_of_line = True
 
-primop   WordGtOp  "gtWord#"   Compare   Word# -> Word# -> Bool
-primop   WordGeOp  "geWord#"   Compare   Word# -> Word# -> Bool
-primop   WordEqOp  "eqWord#"   Compare   Word# -> Word# -> Bool
-primop   WordNeOp  "neWord#"   Compare   Word# -> Word# -> Bool
-primop   WordLtOp  "ltWord#"   Compare   Word# -> Word# -> Bool
-primop   WordLeOp  "leWord#"   Compare   Word# -> Word# -> Bool
+primop   WordGtOp   "gtWord#"   Compare   Word# -> Word# -> Bool
+primop   WordGeOp   "geWord#"   Compare   Word# -> Word# -> Bool
+primop   WordEqOp   "eqWord#"   Compare   Word# -> Word# -> Bool
+primop   WordNeOp   "neWord#"   Compare   Word# -> Word# -> Bool
+primop   WordLtOp   "ltWord#"   Compare   Word# -> Word# -> Bool
+primop   WordLeOp   "leWord#"   Compare   Word# -> Word# -> Bool
 
 ------------------------------------------------------------------------
 --- Word64#                                                          ---
@@ -491,17 +499,86 @@ primop   Word64ToIntegerOp   "word64ToInteger#" GenPrimOp
    Word64# -> (# Int#, ByteArr# #)
    with out_of_line = True
 
+------------------------------------------------------------------------
+--- Explicitly sized Int# and Word#                                  ---
+------------------------------------------------------------------------
+
+primop   IntToInt8Op       "intToInt8#"       Monadic   Int# -> Int#
+primop   IntToInt16Op      "intToInt16#"      Monadic   Int# -> Int#
+primop   IntToInt32Op      "intToInt32#"      Monadic   Int# -> Int#
+primop   WordToWord8Op     "wordToWord8#"     Monadic   Word# -> Word#
+primop   WordToWord16Op    "wordToWord16#"    Monadic   Word# -> Word#
+primop   WordToWord32Op    "wordToWord32#"    Monadic   Word# -> Word#
 
 ------------------------------------------------------------------------
 --- Arrays                                                           ---
 ------------------------------------------------------------------------
+
+primop  NewArrayOp "newArray#" GenPrimOp
+   Int# -> a -> State# s -> (# State# s, MutArr# s a #)
+   with
+   strictness  = { \ arity -> StrictnessInfo [wwPrim, wwLazy, wwPrim] False }
+   usage       = { mangle NewArrayOp [mkP, mkM, mkP] mkM }
+   out_of_line = True
 
 primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutByteArr# s #)
    with out_of_line = True
 
 
+primop IndexByteArrayOp_Char "indexCharArray#" GenPrimOp
+   ByteArr# -> Int# -> Char#
+
+primop IndexByteArrayOp_WideChar "indexWideCharArray#" GenPrimOp
+   ByteArr# -> Int# -> Char#
+
+primop IndexByteArrayOp_Int "indexIntArray#" GenPrimOp
+   ByteArr# -> Int# -> Int#
+
+primop IndexByteArrayOp_Word "indexWordArray#" GenPrimOp
+   ByteArr# -> Int# -> Word#
+
+primop IndexByteArrayOp_Addr "indexAddrArray#" GenPrimOp
+   ByteArr# -> Int# -> Addr#
+
+primop IndexByteArrayOp_Float "indexFloatArray#" GenPrimOp
+   ByteArr# -> Int# -> Float#
+
+primop IndexByteArrayOp_Double "indexDoubleArray#" GenPrimOp
+   ByteArr# -> Int# -> Double#
+
+primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
+   ByteArr# -> Int# -> StablePtr# a
+
+primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
+   ByteArr# -> Int# -> Int#
+
+primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
+   ByteArr# -> Int# -> Int#
+
+primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
+   ByteArr# -> Int# -> Int#
+
+primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
+   ByteArr# -> Int# -> Int64#
+
+primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
+   ByteArr# -> Int# -> Word#
+
+primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
+   ByteArr# -> Int# -> Word#
+
+primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
+   ByteArr# -> Int# -> Word#
+
+primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
+   ByteArr# -> Int# -> Word64#
+
+
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
+   MutByteArr# s -> Int# -> State# s -> (# State# s, Char# #)
+
+primop  ReadByteArrayOp_WideChar "readWideCharArray#" GenPrimOp
    MutByteArr# s -> Int# -> State# s -> (# State# s, Char# #)
 
 primop  ReadByteArrayOp_Int "readIntArray#" GenPrimOp
@@ -552,6 +629,10 @@ primop  WriteByteArrayOp_Char "writeCharArray#" GenPrimOp
    MutByteArr# s -> Int# -> Char# -> State# s -> State# s
    with has_side_effects = True
 
+primop  WriteByteArrayOp_WideChar "writeWideCharArray#" GenPrimOp
+   MutByteArr# s -> Int# -> Char# -> State# s -> State# s
+   with has_side_effects = True
+
 primop  WriteByteArrayOp_Int "writeIntArray#" GenPrimOp
    MutByteArr# s -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
@@ -580,28 +661,28 @@ primop  WriteByteArrayOp_Int8 "writeInt8Array#" GenPrimOp
    MutByteArr# s -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
 
-primop  WriteByteArrayOp_Word8 "writeWord8Array#" GenPrimOp
-   MutByteArr# s -> Int# -> Word# -> State# s -> State# s
-   with has_side_effects = True
-
 primop  WriteByteArrayOp_Int16 "writeInt16Array#" GenPrimOp
    MutByteArr# s -> Int# -> Int# -> State# s -> State# s
-   with has_side_effects = True
-
-primop  WriteByteArrayOp_Word16 "writeWord16Array#" GenPrimOp
-   MutByteArr# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Int32 "writeInt32Array#" GenPrimOp
    MutByteArr# s -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
 
-primop  WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
+primop  WriteByteArrayOp_Int64 "writeInt64Array#" GenPrimOp
+   MutByteArr# s -> Int# -> Int64# -> State# s -> State# s
+   with has_side_effects = True
+
+primop  WriteByteArrayOp_Word8 "writeWord8Array#" GenPrimOp
    MutByteArr# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
-primop  WriteByteArrayOp_Int64 "writeInt64Array#" GenPrimOp
-   MutByteArr# s -> Int# -> Int64# -> State# s -> State# s
+primop  WriteByteArrayOp_Word16 "writeWord16Array#" GenPrimOp
+   MutByteArr# s -> Int# -> Word# -> State# s -> State# s
+   with has_side_effects = True
+
+primop  WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
+   MutByteArr# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
@@ -609,53 +690,10 @@ primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
    with has_side_effects = True
 
 
-primop IndexByteArrayOp_Char "indexCharArray#" GenPrimOp
-   ByteArr# -> Int# -> Char#
-
-primop IndexByteArrayOp_Int "indexIntArray#" GenPrimOp
-   ByteArr# -> Int# -> Int#
-
-primop IndexByteArrayOp_Word "indexWordArray#" GenPrimOp
-   ByteArr# -> Int# -> Word#
-
-primop IndexByteArrayOp_Addr "indexAddrArray#" GenPrimOp
-   ByteArr# -> Int# -> Addr#
-
-primop IndexByteArrayOp_Float "indexFloatArray#" GenPrimOp
-   ByteArr# -> Int# -> Float#
-
-primop IndexByteArrayOp_Double "indexDoubleArray#" GenPrimOp
-   ByteArr# -> Int# -> Double#
-
-primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
-   ByteArr# -> Int# -> StablePtr# a
-
-primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
-   ByteArr# -> Int# -> Int#
-
-primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
-   ByteArr# -> Int# -> Word#
-
-primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
-   ByteArr# -> Int# -> Int#
-
-primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
-   ByteArr# -> Int# -> Word#
-
-primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
-   ByteArr# -> Int# -> Int#
-
-primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
-   ByteArr# -> Int# -> Word#
-
-primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
-   ByteArr# -> Int# -> Int64#
-
-primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
-   ByteArr# -> Int# -> Word64#
-
-
 primop IndexOffAddrOp_Char "indexCharOffAddr#" GenPrimOp
+   Addr# -> Int# -> Char#
+
+primop IndexOffAddrOp_WideChar "indexWideCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char#
 
 primop IndexOffAddrOp_Int "indexIntOffAddr#" GenPrimOp
@@ -679,29 +717,32 @@ primop IndexOffAddrOp_StablePtr "indexStablePtrOffAddr#" GenPrimOp
 primop IndexOffAddrOp_Int8 "indexInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> Int#
 
-primop IndexOffAddrOp_Word8 "indexWord8OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word#
-
 primop IndexOffAddrOp_Int16 "indexInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> Int#
-
-primop IndexOffAddrOp_Word16 "indexWord16OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word#
 
 primop IndexOffAddrOp_Int32 "indexInt32OffAddr#" GenPrimOp
    Addr# -> Int# -> Int#
 
-primop IndexOffAddrOp_Word32 "indexWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word#
-
 primop IndexOffAddrOp_Int64 "indexInt64OffAddr#" GenPrimOp
    Addr# -> Int# -> Int64#
+
+primop IndexOffAddrOp_Word8 "indexWord8OffAddr#" GenPrimOp
+   Addr# -> Int# -> Word#
+
+primop IndexOffAddrOp_Word16 "indexWord16OffAddr#" GenPrimOp
+   Addr# -> Int# -> Word#
+
+primop IndexOffAddrOp_Word32 "indexWord32OffAddr#" GenPrimOp
+   Addr# -> Int# -> Word#
 
 primop IndexOffAddrOp_Word64 "indexWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> Word64#
 
 
 primop IndexOffForeignObjOp_Char "indexCharOffForeignObj#" GenPrimOp
+   ForeignObj# -> Int# -> Char#
+
+primop IndexOffForeignObjOp_WideChar "indexWideCharOffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Char#
 
 primop IndexOffForeignObjOp_Int "indexIntOffForeignObj#" GenPrimOp
@@ -725,23 +766,23 @@ primop IndexOffForeignObjOp_StablePtr "indexStablePtrOffForeignObj#" GenPrimOp
 primop IndexOffForeignObjOp_Int8 "indexInt8OffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Int#
 
-primop IndexOffForeignObjOp_Word8 "indexWord8OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Word#
-
 primop IndexOffForeignObjOp_Int16 "indexInt16OffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Int#
-
-primop IndexOffForeignObjOp_Word16 "indexWord16OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Word#
 
 primop IndexOffForeignObjOp_Int32 "indexInt32OffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Int#
 
-primop IndexOffForeignObjOp_Word32 "indexWord32OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Word#
-
 primop IndexOffForeignObjOp_Int64 "indexInt64OffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Int64#
+
+primop IndexOffForeignObjOp_Word8 "indexWord8OffForeignObj#" GenPrimOp
+   ForeignObj# -> Int# -> Word#
+
+primop IndexOffForeignObjOp_Word16 "indexWord16OffForeignObj#" GenPrimOp
+   ForeignObj# -> Int# -> Word#
+
+primop IndexOffForeignObjOp_Word32 "indexWord32OffForeignObj#" GenPrimOp
+   ForeignObj# -> Int# -> Word#
 
 primop IndexOffForeignObjOp_Word64 "indexWord64OffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Word64#
@@ -749,6 +790,9 @@ primop IndexOffForeignObjOp_Word64 "indexWord64OffForeignObj#" GenPrimOp
 
 
 primop ReadOffAddrOp_Char "readCharOffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Char# #)
+
+primop ReadOffAddrOp_WideChar "readWideCharOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Char# #)
 
 primop ReadOffAddrOp_Int "readIntOffAddr#" GenPrimOp
@@ -772,29 +816,33 @@ primop ReadOffAddrOp_StablePtr "readStablePtrOffAddr#" GenPrimOp
 primop ReadOffAddrOp_Int8 "readInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
 
-primop ReadOffAddrOp_Word8 "readWord8OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Word# #)
-
 primop ReadOffAddrOp_Int16 "readInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
-
-primop ReadOffAddrOp_Word16 "readWord16OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Word# #)
 
 primop ReadOffAddrOp_Int32 "readInt32OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
 
-primop ReadOffAddrOp_Word32 "readWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Word# #)
-
 primop ReadOffAddrOp_Int64 "readInt64OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int64# #)
+
+primop ReadOffAddrOp_Word8 "readWord8OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Word# #)
+
+primop ReadOffAddrOp_Word16 "readWord16OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Word# #)
+
+primop ReadOffAddrOp_Word32 "readWord32OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Word# #)
 
 primop ReadOffAddrOp_Word64 "readWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word64# #)
 
 
 primop  WriteOffAddrOp_Char "writeCharOffAddr#" GenPrimOp
+   Addr# -> Int# -> Char# -> State# s -> State# s
+   with has_side_effects = True
+
+primop  WriteOffAddrOp_WideChar "writeWideCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char# -> State# s -> State# s
    with has_side_effects = True
 
@@ -810,6 +858,10 @@ primop  WriteOffAddrOp_Addr "writeAddrOffAddr#" GenPrimOp
    Addr# -> Int# -> Addr# -> State# s -> State# s
    with has_side_effects = True
 
+primop  WriteOffAddrOp_ForeignObj "writeForeignObjOffAddr#" GenPrimOp
+   Addr# -> Int# -> ForeignObj# -> State# s -> State# s
+   with has_side_effects = True
+
 primop  WriteOffAddrOp_Float "writeFloatOffAddr#" GenPrimOp
    Addr# -> Int# -> Float# -> State# s -> State# s
    with has_side_effects = True
@@ -822,36 +874,32 @@ primop  WriteOffAddrOp_StablePtr "writeStablePtrOffAddr#" GenPrimOp
    Addr# -> Int# -> StablePtr# a -> State# s -> State# s
    with has_side_effects = True
 
-primop  WriteOffAddrOp_ForeignObj "writeForeignObjOffAddr#" GenPrimOp
-   Addr# -> Int# -> ForeignObj# -> State# s -> State# s
-   with has_side_effects = True
-
 primop  WriteOffAddrOp_Int8 "writeInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> Int# -> State# s -> State# s
-   with has_side_effects = True
-
-primop  WriteOffAddrOp_Word8 "writeWord8OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteOffAddrOp_Int16 "writeInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
 
-primop  WriteOffAddrOp_Word16 "writeWord16OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word# -> State# s -> State# s
-   with has_side_effects = True
-
 primop  WriteOffAddrOp_Int32 "writeInt32OffAddr#" GenPrimOp
    Addr# -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
 
-primop  WriteOffAddrOp_Word32 "writeWord32OffAddr#" GenPrimOp
+primop  WriteOffAddrOp_Int64 "writeInt64OffAddr#" GenPrimOp
+   Addr# -> Int# -> Int64# -> State# s -> State# s
+   with has_side_effects = True
+
+primop  WriteOffAddrOp_Word8 "writeWord8OffAddr#" GenPrimOp
    Addr# -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
-primop  WriteOffAddrOp_Int64 "writeInt64OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int64# -> State# s -> State# s
+primop  WriteOffAddrOp_Word16 "writeWord16OffAddr#" GenPrimOp
+   Addr# -> Int# -> Word# -> State# s -> State# s
+   with has_side_effects = True
+
+primop  WriteOffAddrOp_Word32 "writeWord32OffAddr#" GenPrimOp
+   Addr# -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
@@ -859,13 +907,6 @@ primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
    with has_side_effects = True
 
 
-
-primop  NewArrayOp "newArray#" GenPrimOp
-   Int# -> a -> State# s -> (# State# s, MutArr# s a #)
-   with
-   strictness  = { \ arity -> StrictnessInfo [wwPrim, wwLazy, wwPrim] False }
-   usage       = { mangle NewArrayOp [mkP, mkM, mkP] mkM }
-   out_of_line = True
 
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
    MutArr# s a -> MutArr# s a -> Bool

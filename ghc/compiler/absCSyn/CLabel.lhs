@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.44 2000/12/04 12:31:19 simonmar Exp $
+% $Id: CLabel.lhs,v 1.45 2001/02/28 00:01:01 qrczak Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -89,7 +89,7 @@ import Module		( moduleName, moduleNameFS,
 import Name		( Name, getName, isDllName, isExternallyVisibleName )
 import TyCon		( TyCon )
 import Unique		( pprUnique, Unique )
-import PrimOp		( PrimOp, pprPrimOp )
+import PrimOp		( PrimOp )
 import CostCentre	( CostCentre, CostCentreStack )
 import Outputable
 \end{code}
@@ -508,7 +508,7 @@ pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
 	]
 
 pprCLbl (RtsLabel (RtsPrimOp primop)) 
-  = pprPrimOp primop <> ptext SLIT("_fast")
+  = ppr primop <> ptext SLIT("_fast")
 
 pprCLbl (RtsLabel RtsModuleRegd)
   = ptext SLIT("module_registered")

@@ -183,75 +183,123 @@ primCode [] WriteForeignObjOp [obj, v]
 
 -- NB: indexing in "pk" units, *not* in bytes (WDP 95/09)
 primCode ls IndexByteArrayOp_Char      rs = primCode_ReadByteArrayOp Word8Rep     ls rs
+primCode ls IndexByteArrayOp_WideChar  rs = primCode_ReadByteArrayOp CharRep      ls rs
 primCode ls IndexByteArrayOp_Int       rs = primCode_ReadByteArrayOp IntRep       ls rs
 primCode ls IndexByteArrayOp_Word      rs = primCode_ReadByteArrayOp WordRep      ls rs
 primCode ls IndexByteArrayOp_Addr      rs = primCode_ReadByteArrayOp AddrRep      ls rs
 primCode ls IndexByteArrayOp_Float     rs = primCode_ReadByteArrayOp FloatRep     ls rs
 primCode ls IndexByteArrayOp_Double    rs = primCode_ReadByteArrayOp DoubleRep    ls rs
 primCode ls IndexByteArrayOp_StablePtr rs = primCode_ReadByteArrayOp StablePtrRep ls rs
+primCode ls IndexByteArrayOp_Int8      rs = primCode_ReadByteArrayOp Int8Rep      ls rs
+primCode ls IndexByteArrayOp_Int16     rs = primCode_ReadByteArrayOp Int16Rep     ls rs
+primCode ls IndexByteArrayOp_Int32     rs = primCode_ReadByteArrayOp Int32Rep     ls rs
 primCode ls IndexByteArrayOp_Int64     rs = primCode_ReadByteArrayOp Int64Rep     ls rs
+primCode ls IndexByteArrayOp_Word8     rs = primCode_ReadByteArrayOp Word8Rep     ls rs
+primCode ls IndexByteArrayOp_Word16    rs = primCode_ReadByteArrayOp Word16Rep    ls rs
+primCode ls IndexByteArrayOp_Word32    rs = primCode_ReadByteArrayOp Word32Rep    ls rs
 primCode ls IndexByteArrayOp_Word64    rs = primCode_ReadByteArrayOp Word64Rep    ls rs
 
 primCode ls ReadByteArrayOp_Char      rs = primCode_ReadByteArrayOp Word8Rep     ls rs
+primCode ls ReadByteArrayOp_WideChar  rs = primCode_ReadByteArrayOp CharRep      ls rs
 primCode ls ReadByteArrayOp_Int       rs = primCode_ReadByteArrayOp IntRep       ls rs
 primCode ls ReadByteArrayOp_Word      rs = primCode_ReadByteArrayOp WordRep      ls rs
 primCode ls ReadByteArrayOp_Addr      rs = primCode_ReadByteArrayOp AddrRep      ls rs
 primCode ls ReadByteArrayOp_Float     rs = primCode_ReadByteArrayOp FloatRep     ls rs
 primCode ls ReadByteArrayOp_Double    rs = primCode_ReadByteArrayOp DoubleRep    ls rs
 primCode ls ReadByteArrayOp_StablePtr rs = primCode_ReadByteArrayOp StablePtrRep ls rs
+primCode ls ReadByteArrayOp_Int8      rs = primCode_ReadByteArrayOp Int8Rep      ls rs
+primCode ls ReadByteArrayOp_Int16     rs = primCode_ReadByteArrayOp Int16Rep     ls rs
+primCode ls ReadByteArrayOp_Int32     rs = primCode_ReadByteArrayOp Int32Rep     ls rs
 primCode ls ReadByteArrayOp_Int64     rs = primCode_ReadByteArrayOp Int64Rep     ls rs
+primCode ls ReadByteArrayOp_Word8     rs = primCode_ReadByteArrayOp Word8Rep     ls rs
+primCode ls ReadByteArrayOp_Word16    rs = primCode_ReadByteArrayOp Word16Rep    ls rs
+primCode ls ReadByteArrayOp_Word32    rs = primCode_ReadByteArrayOp Word32Rep    ls rs
 primCode ls ReadByteArrayOp_Word64    rs = primCode_ReadByteArrayOp Word64Rep    ls rs
 
-primCode ls ReadOffAddrOp_Char      rs = primCode_IndexOffAddrOp Word8Rep     ls rs
-primCode ls ReadOffAddrOp_Int       rs = primCode_IndexOffAddrOp IntRep       ls rs
-primCode ls ReadOffAddrOp_Word      rs = primCode_IndexOffAddrOp WordRep      ls rs
-primCode ls ReadOffAddrOp_Addr      rs = primCode_IndexOffAddrOp AddrRep      ls rs
-primCode ls ReadOffAddrOp_Float     rs = primCode_IndexOffAddrOp FloatRep     ls rs
-primCode ls ReadOffAddrOp_Double    rs = primCode_IndexOffAddrOp DoubleRep    ls rs
-primCode ls ReadOffAddrOp_StablePtr rs = primCode_IndexOffAddrOp StablePtrRep ls rs
-primCode ls ReadOffAddrOp_Int64     rs = primCode_IndexOffAddrOp Int64Rep     ls rs
-primCode ls ReadOffAddrOp_Word64    rs = primCode_IndexOffAddrOp Word64Rep    ls rs
-
-primCode ls IndexOffAddrOp_Char      rs = primCode_IndexOffAddrOp Word8Rep     ls rs
-primCode ls IndexOffAddrOp_Int       rs = primCode_IndexOffAddrOp IntRep       ls rs
-primCode ls IndexOffAddrOp_Word      rs = primCode_IndexOffAddrOp WordRep      ls rs
-primCode ls IndexOffAddrOp_Addr      rs = primCode_IndexOffAddrOp AddrRep      ls rs
-primCode ls IndexOffAddrOp_Float     rs = primCode_IndexOffAddrOp FloatRep     ls rs
-primCode ls IndexOffAddrOp_Double    rs = primCode_IndexOffAddrOp DoubleRep    ls rs
-primCode ls IndexOffAddrOp_StablePtr rs = primCode_IndexOffAddrOp StablePtrRep ls rs
-primCode ls IndexOffAddrOp_Int64     rs = primCode_IndexOffAddrOp Int64Rep     ls rs
-primCode ls IndexOffAddrOp_Word64    rs = primCode_IndexOffAddrOp Word64Rep    ls rs
-
-primCode ls IndexOffForeignObjOp_Char      rs = primCode_IndexOffForeignObjOp Word8Rep     ls rs
-primCode ls IndexOffForeignObjOp_Int       rs = primCode_IndexOffForeignObjOp IntRep       ls rs
-primCode ls IndexOffForeignObjOp_Word      rs = primCode_IndexOffForeignObjOp WordRep      ls rs
-primCode ls IndexOffForeignObjOp_Addr      rs = primCode_IndexOffForeignObjOp AddrRep      ls rs
-primCode ls IndexOffForeignObjOp_Float     rs = primCode_IndexOffForeignObjOp FloatRep     ls rs
-primCode ls IndexOffForeignObjOp_Double    rs = primCode_IndexOffForeignObjOp DoubleRep    ls rs
-primCode ls IndexOffForeignObjOp_StablePtr rs = primCode_IndexOffForeignObjOp StablePtrRep ls rs
-primCode ls IndexOffForeignObjOp_Int64     rs = primCode_IndexOffForeignObjOp Int64Rep     ls rs
-primCode ls IndexOffForeignObjOp_Word64    rs = primCode_IndexOffForeignObjOp Word64Rep    ls rs
-
-primCode ls WriteOffAddrOp_Word8     rs = primCode_WriteOffAddrOp Word8Rep     ls rs
-primCode ls WriteOffAddrOp_Char      rs = primCode_WriteOffAddrOp Word8Rep     ls rs
-primCode ls WriteOffAddrOp_Int       rs = primCode_WriteOffAddrOp IntRep       ls rs
-primCode ls WriteOffAddrOp_Word      rs = primCode_WriteOffAddrOp WordRep      ls rs
-primCode ls WriteOffAddrOp_Addr      rs = primCode_WriteOffAddrOp AddrRep      ls rs
-primCode ls WriteOffAddrOp_Float     rs = primCode_WriteOffAddrOp FloatRep     ls rs
-primCode ls WriteOffAddrOp_Double    rs = primCode_WriteOffAddrOp DoubleRep    ls rs
-primCode ls WriteOffAddrOp_StablePtr rs = primCode_WriteOffAddrOp StablePtrRep ls rs
-primCode ls WriteOffAddrOp_Int64     rs = primCode_WriteOffAddrOp Int64Rep     ls rs
-primCode ls WriteOffAddrOp_Word64    rs = primCode_WriteOffAddrOp Word64Rep    ls rs
-
 primCode ls WriteByteArrayOp_Char      rs = primCode_WriteByteArrayOp Word8Rep     ls rs
+primCode ls WriteByteArrayOp_WideChar  rs = primCode_WriteByteArrayOp CharRep      ls rs
 primCode ls WriteByteArrayOp_Int       rs = primCode_WriteByteArrayOp IntRep       ls rs
 primCode ls WriteByteArrayOp_Word      rs = primCode_WriteByteArrayOp WordRep      ls rs
 primCode ls WriteByteArrayOp_Addr      rs = primCode_WriteByteArrayOp AddrRep      ls rs
 primCode ls WriteByteArrayOp_Float     rs = primCode_WriteByteArrayOp FloatRep     ls rs
 primCode ls WriteByteArrayOp_Double    rs = primCode_WriteByteArrayOp DoubleRep    ls rs
 primCode ls WriteByteArrayOp_StablePtr rs = primCode_WriteByteArrayOp StablePtrRep ls rs
+primCode ls WriteByteArrayOp_Int8      rs = primCode_WriteByteArrayOp Int8Rep      ls rs
+primCode ls WriteByteArrayOp_Int16     rs = primCode_WriteByteArrayOp Int16Rep     ls rs
+primCode ls WriteByteArrayOp_Int32     rs = primCode_WriteByteArrayOp Int32Rep     ls rs
 primCode ls WriteByteArrayOp_Int64     rs = primCode_WriteByteArrayOp Int64Rep     ls rs
+primCode ls WriteByteArrayOp_Word8     rs = primCode_WriteByteArrayOp Word8Rep     ls rs
+primCode ls WriteByteArrayOp_Word16    rs = primCode_WriteByteArrayOp Word16Rep    ls rs
+primCode ls WriteByteArrayOp_Word32    rs = primCode_WriteByteArrayOp Word32Rep    ls rs
 primCode ls WriteByteArrayOp_Word64    rs = primCode_WriteByteArrayOp Word64Rep    ls rs
+
+primCode ls IndexOffAddrOp_Char      rs = primCode_IndexOffAddrOp Word8Rep     ls rs
+primCode ls IndexOffAddrOp_WideChar  rs = primCode_IndexOffAddrOp CharRep      ls rs
+primCode ls IndexOffAddrOp_Int       rs = primCode_IndexOffAddrOp IntRep       ls rs
+primCode ls IndexOffAddrOp_Word      rs = primCode_IndexOffAddrOp WordRep      ls rs
+primCode ls IndexOffAddrOp_Addr      rs = primCode_IndexOffAddrOp AddrRep      ls rs
+primCode ls IndexOffAddrOp_Float     rs = primCode_IndexOffAddrOp FloatRep     ls rs
+primCode ls IndexOffAddrOp_Double    rs = primCode_IndexOffAddrOp DoubleRep    ls rs
+primCode ls IndexOffAddrOp_StablePtr rs = primCode_IndexOffAddrOp StablePtrRep ls rs
+primCode ls IndexOffAddrOp_Int8      rs = primCode_IndexOffAddrOp Int8Rep      ls rs
+primCode ls IndexOffAddrOp_Int16     rs = primCode_IndexOffAddrOp Int16Rep     ls rs
+primCode ls IndexOffAddrOp_Int32     rs = primCode_IndexOffAddrOp Int32Rep     ls rs
+primCode ls IndexOffAddrOp_Int64     rs = primCode_IndexOffAddrOp Int64Rep     ls rs
+primCode ls IndexOffAddrOp_Word8     rs = primCode_IndexOffAddrOp Word8Rep     ls rs
+primCode ls IndexOffAddrOp_Word16    rs = primCode_IndexOffAddrOp Word16Rep    ls rs
+primCode ls IndexOffAddrOp_Word32    rs = primCode_IndexOffAddrOp Word32Rep    ls rs
+primCode ls IndexOffAddrOp_Word64    rs = primCode_IndexOffAddrOp Word64Rep    ls rs
+
+primCode ls IndexOffForeignObjOp_Char      rs = primCode_IndexOffForeignObjOp Word8Rep     ls rs
+primCode ls IndexOffForeignObjOp_WideChar  rs = primCode_IndexOffForeignObjOp CharRep      ls rs
+primCode ls IndexOffForeignObjOp_Int       rs = primCode_IndexOffForeignObjOp IntRep       ls rs
+primCode ls IndexOffForeignObjOp_Word      rs = primCode_IndexOffForeignObjOp WordRep      ls rs
+primCode ls IndexOffForeignObjOp_Addr      rs = primCode_IndexOffForeignObjOp AddrRep      ls rs
+primCode ls IndexOffForeignObjOp_Float     rs = primCode_IndexOffForeignObjOp FloatRep     ls rs
+primCode ls IndexOffForeignObjOp_Double    rs = primCode_IndexOffForeignObjOp DoubleRep    ls rs
+primCode ls IndexOffForeignObjOp_StablePtr rs = primCode_IndexOffForeignObjOp StablePtrRep ls rs
+primCode ls IndexOffForeignObjOp_Int8      rs = primCode_IndexOffForeignObjOp Int8Rep      ls rs
+primCode ls IndexOffForeignObjOp_Int16     rs = primCode_IndexOffForeignObjOp Int16Rep     ls rs
+primCode ls IndexOffForeignObjOp_Int32     rs = primCode_IndexOffForeignObjOp Int32Rep     ls rs
+primCode ls IndexOffForeignObjOp_Int64     rs = primCode_IndexOffForeignObjOp Int64Rep     ls rs
+primCode ls IndexOffForeignObjOp_Word8     rs = primCode_IndexOffForeignObjOp Word8Rep     ls rs
+primCode ls IndexOffForeignObjOp_Word16    rs = primCode_IndexOffForeignObjOp Word16Rep    ls rs
+primCode ls IndexOffForeignObjOp_Word32    rs = primCode_IndexOffForeignObjOp Word32Rep    ls rs
+primCode ls IndexOffForeignObjOp_Word64    rs = primCode_IndexOffForeignObjOp Word64Rep    ls rs
+
+primCode ls ReadOffAddrOp_Char      rs = primCode_IndexOffAddrOp Word8Rep     ls rs
+primCode ls ReadOffAddrOp_WideChar  rs = primCode_IndexOffAddrOp CharRep      ls rs
+primCode ls ReadOffAddrOp_Int       rs = primCode_IndexOffAddrOp IntRep       ls rs
+primCode ls ReadOffAddrOp_Word      rs = primCode_IndexOffAddrOp WordRep      ls rs
+primCode ls ReadOffAddrOp_Addr      rs = primCode_IndexOffAddrOp AddrRep      ls rs
+primCode ls ReadOffAddrOp_Float     rs = primCode_IndexOffAddrOp FloatRep     ls rs
+primCode ls ReadOffAddrOp_Double    rs = primCode_IndexOffAddrOp DoubleRep    ls rs
+primCode ls ReadOffAddrOp_StablePtr rs = primCode_IndexOffAddrOp StablePtrRep ls rs
+primCode ls ReadOffAddrOp_Int8      rs = primCode_IndexOffAddrOp Int8Rep      ls rs
+primCode ls ReadOffAddrOp_Int16     rs = primCode_IndexOffAddrOp Int16Rep     ls rs
+primCode ls ReadOffAddrOp_Int32     rs = primCode_IndexOffAddrOp Int32Rep     ls rs
+primCode ls ReadOffAddrOp_Int64     rs = primCode_IndexOffAddrOp Int64Rep     ls rs
+primCode ls ReadOffAddrOp_Word8     rs = primCode_IndexOffAddrOp Word8Rep     ls rs
+primCode ls ReadOffAddrOp_Word16    rs = primCode_IndexOffAddrOp Word16Rep    ls rs
+primCode ls ReadOffAddrOp_Word32    rs = primCode_IndexOffAddrOp Word32Rep    ls rs
+primCode ls ReadOffAddrOp_Word64    rs = primCode_IndexOffAddrOp Word64Rep    ls rs
+
+primCode ls WriteOffAddrOp_Char      rs = primCode_WriteOffAddrOp Word8Rep     ls rs
+primCode ls WriteOffAddrOp_WideChar  rs = primCode_WriteOffAddrOp CharRep      ls rs
+primCode ls WriteOffAddrOp_Int       rs = primCode_WriteOffAddrOp IntRep       ls rs
+primCode ls WriteOffAddrOp_Word      rs = primCode_WriteOffAddrOp WordRep      ls rs
+primCode ls WriteOffAddrOp_Addr      rs = primCode_WriteOffAddrOp AddrRep      ls rs
+primCode ls WriteOffAddrOp_Float     rs = primCode_WriteOffAddrOp FloatRep     ls rs
+primCode ls WriteOffAddrOp_Double    rs = primCode_WriteOffAddrOp DoubleRep    ls rs
+primCode ls WriteOffAddrOp_StablePtr rs = primCode_WriteOffAddrOp StablePtrRep ls rs
+primCode ls WriteOffAddrOp_Int8      rs = primCode_WriteOffAddrOp Int8Rep      ls rs
+primCode ls WriteOffAddrOp_Int16     rs = primCode_WriteOffAddrOp Int16Rep     ls rs
+primCode ls WriteOffAddrOp_Int32     rs = primCode_WriteOffAddrOp Int32Rep     ls rs
+primCode ls WriteOffAddrOp_Int64     rs = primCode_WriteOffAddrOp Int64Rep     ls rs
+primCode ls WriteOffAddrOp_Word8     rs = primCode_WriteOffAddrOp Word8Rep     ls rs
+primCode ls WriteOffAddrOp_Word16    rs = primCode_WriteOffAddrOp Word16Rep    ls rs
+primCode ls WriteOffAddrOp_Word32    rs = primCode_WriteOffAddrOp Word32Rep    ls rs
+primCode ls WriteOffAddrOp_Word64    rs = primCode_WriteOffAddrOp Word64Rep    ls rs
 
 \end{code}
 
@@ -573,8 +621,8 @@ cHARLIKE_closure = StCLbl mkCharlikeClosureLabel
 mutArrPtrsFrozen_info = StCLbl mkMAP_FROZEN_infoLabel
 
 -- these are the sizes of charLike and intLike closures, in _bytes_.
-charLikeSize = (fixedHdrSize + 1) * (fromInteger (sizeOf PtrRep))
-intLikeSize  = (fixedHdrSize + 1) * (fromInteger (sizeOf PtrRep))
+charLikeSize = (fixedHdrSize + 1) * (sizeOf PtrRep)
+intLikeSize  = (fixedHdrSize + 1) * (sizeOf PtrRep)
 \end{code}
 
 

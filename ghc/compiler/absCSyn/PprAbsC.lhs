@@ -45,9 +45,9 @@ import TyCon		( tyConDataCons )
 import Name		( NamedThing(..) )
 import DataCon		( dataConWrapId )
 import Maybes		( maybeToBool, catMaybes )
-import PrimOp		( primOpNeedsWrapper, pprPrimOp, pprCCallOp, 
+import PrimOp		( primOpNeedsWrapper, pprCCallOp, 
 			  PrimOp(..), CCall(..), CCallTarget(..), isDynamicTarget )
-import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize, showPrimRep )
+import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize )
 import SMRep		( pprSMRep )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
@@ -239,7 +239,7 @@ pprAbsC stmt@(COpStmt results op args vol_regs) _
     	the_op
   where
     ppr_op_call results args
-      = hcat [ pprPrimOp op, lparen,
+      = hcat [ ppr op, lparen,
 	hcat (punctuate comma (map ppr_op_result results)),
 	if null results || null args then empty else comma,
 	hcat (punctuate comma (map pprAmode args)),
@@ -333,14 +333,14 @@ pprAbsC stmt@(CCallTypedef is_tdef (CCall op_str is_asm may_gc cconv) results ar
      ccall_res_ty = 
        case non_void_results of
           []       -> ptext SLIT("void")
-	  [amode]  -> text (showPrimRep (getAmodeRep amode))
+	  [amode]  -> ppr (getAmodeRep amode)
 	  _	   -> panic "pprAbsC{CCallTypedef}: ccall_res_ty"
 
      ccall_decl_ty_args 
        | is_tdef   = tail ccall_arg_tys
        | otherwise = ccall_arg_tys
 
-     ccall_arg_tys      = map (text.showPrimRep.getAmodeRep) non_void_args
+     ccall_arg_tys      = map (ppr . getAmodeRep) non_void_args
 
       -- the first argument will be the "I/O world" token (a VoidRep)
       -- all others should be non-void
