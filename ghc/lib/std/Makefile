@@ -134,10 +134,15 @@ override datadir:=$(libdir)/imports/std
 # Files to install from here
 # 
 INSTALL_LIBS  += $(LIBRARY)
-ifeq "$(EnableWin32DLLs)" "YES"
+ifeq "$(way)" "dll"
 INSTALL_PROGS += $(DLL_NAME)
-INSTALL_LIBS  += $(patsubst %.a, %_imp.a, $(LIBRARY)) PrelMain.dll_o
+INSTALL_LIBS  += $(patsubst %.a, $(LIBRARY)) PrelMain.dll_o
+else
+INSTALL_LIBS  += $(patsubst %_imp.a, $(LIBRARY))
 endif
 INSTALL_DATAS += $(HS_IFACES) PrelGHC.$(way_)hi
+ifeq "$(way)" "dll"
+INSTALL_DATAS := $(filter-out PrelHugs.$(way_)hi,$(INSTALL_DATAS))
+endif
 
 include $(TOP)/mk/target.mk
