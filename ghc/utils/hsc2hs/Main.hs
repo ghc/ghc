@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.5 2001/01/04 13:18:14 simonmar Exp $
+-- $Id: Main.hs,v 1.6 2001/01/04 19:43:07 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -19,8 +19,12 @@ import Monad     (liftM, liftM2, when)
 import Char      (ord, intToDigit, isSpace, isAlphaNum, toUpper)
 import List      (intersperse)
 
+version :: String
+version = "0.64"
+
 data Flag
     = Help
+    | Version
     | Template String
     | Compiler String
     | Linker   String
@@ -43,16 +47,21 @@ options = [
                                                "DIR")  "passed to the C compiler",
     Option ""  ["lflag"]    (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
     Option ""  ["include"]  (ReqArg include    "FILE") "as if placed in the source",
-    Option ""  ["help"]     (NoArg  Help)              "display this help and exit"]
+    Option ""  ["help"]     (NoArg  Help)              "display this help and exit",
+    Option ""  ["version"]  (NoArg  Version)           "output version information and exit"]
 
 main :: IO ()
 main = do
     prog <- getProgName
-    let header = "Usage: "++prog++" [OPTIONS...] INPUT.hsc [...]"
+    let header = "Usage: "++prog++" [OPTIONS] INPUT.hsc [...]"
     args <- getArgs
     case getOpt Permute options args of
-        (flags, _, _) | any isHelp flags -> putStrLn (usageInfo header options)
-            where isHelp Help = True; isHelp _ = False
+        (flags, _, _)
+            | any isHelp    flags -> putStrLn (usageInfo header options)
+            | any isVersion flags -> putStrLn ("hsc2hs-"++version)
+            where
+            isHelp    Help    = True; isHelp    _ = False
+            isVersion Version = True; isVersion _ = False
         (_,     [],    [])   -> putStrLn (prog++": No input files")
         (flags, files, [])   -> mapM_ (processFile flags) files
         (_,     _,     errs) -> do
@@ -193,7 +202,7 @@ output flags name toks = let
         \#include <Rts.h>\n\
         \#endif\n\
         \#include <HsFFI.h>\n"++
-        concat ["#include "++name++"\n" | Include name <- flags]++
+        concat ["#include "++n++"\n" | Include n <- flags]++
         concatMap outTokenH specials++
         "#endif\n"
     
