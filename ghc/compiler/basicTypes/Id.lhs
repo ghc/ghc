@@ -91,8 +91,7 @@ import IdInfo
 import Demand		( Demand, isStrict, wwLazy )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
-			  isWiredInName, isUserExportedName,
-			  getOccName, isIPOcc
+			  isUserExportedName, getOccName, isIPOcc
 			) 
 import OccName		( UserFS )
 import PrimRep		( PrimRep )
@@ -278,9 +277,6 @@ in some other interface unfolding.
 \begin{code}
 omitIfaceSigForId :: Id -> Bool
 omitIfaceSigForId id
-  | isWiredInName (idName id)
-  = True
-
   | otherwise
   = case idFlavour id of
 	RecordSelId _   -> True	-- Includes dictionary selectors

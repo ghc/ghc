@@ -5,9 +5,9 @@ The Name/Var/Type group is a bit complicated. Here's the deal
 Things in brackets are what the module *uses*.
 A 'loop' indicates a use from a module compiled later
 
-	PrelNames
-then
 	Name, PrimRep, FieldLabel (loop Type.Type)
+then
+	PrelNames
 then
 	Var (Name, loop CoreSyn.CoreExpr, loop IdInfo.IdInfo, 
 	     loop Type.GenType, loop Type.Kind)

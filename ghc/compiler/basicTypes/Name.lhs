@@ -12,15 +12,12 @@ module Name (
 	Name,					-- Abstract
 	mkLocalName, mkImportedLocalName, mkSysLocalName, mkCCallName,
 	mkTopName, mkIPName,
-	mkDerivedName, mkGlobalName, mkKnownKeyGlobal,
-	mkWiredInIdName, mkWiredInTyConName,
+	mkDerivedName, mkGlobalName, mkKnownKeyGlobal, mkWiredInName,
 
-	maybeWiredInIdName, maybeWiredInTyConName,
-	isWiredInName, hashName,
-
-	nameUnique, setNameUnique, setNameProvenance, getNameProvenance, setNameImportReason,
-	tidyTopName, 
-	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModule, toRdrName,
+	nameUnique, setNameUnique, setNameProvenance, getNameProvenance, 
+	setNameImportReason, tidyTopName, 
+	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModule, 
+	toRdrName, hashName,
 
 	isUserExportedName, isUserImportedName, isUserImportedExplicitlyName, 
 	maybeUserImportedFrom,
@@ -49,22 +46,21 @@ module Name (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Var   ( Id )
-import {-# SOURCE #-} TyCon ( TyCon )
-
 import OccName		-- All of it
-import Module		( Module, moduleName, pprModule, mkVanillaModule, isLocalModule )
-import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
-import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
+import Module		( Module, moduleName, pprModule, mkVanillaModule, 
+			  isLocalModule )
+import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, 
+			  rdrNameModule )
+import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, 
+			  opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
 import SrcLoc		( noSrcLoc, SrcLoc )
-import Unique		( Unique, Uniquable(..), u2i, hasKey, pprUnique )
+import Unique		( Unique, Uniquable(..), u2i, pprUnique )
 import Maybes		( expectJust )
 import FastTypes
 import UniqFM
 import Outputable
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -83,8 +79,6 @@ data Name = Name {
 data NameSort
   = Local
   | Global Module
-  | WiredInId Module Id
-  | WiredInTyCon Module TyCon
 \end{code}
 
 Things with a @Global@ name are given C static labels, so they finally
@@ -107,9 +101,9 @@ mkLocalName uniq occ loc = Name { n_uniq = uniq, n_sort = Local, n_occ = occ,
 
 mkImportedLocalName :: Unique -> OccName -> SrcLoc -> Name
 	-- Just the same as mkLocalName, except the provenance is different
-	-- Reason: this flags the name as one that came in from an interface file.
-	-- This is useful when trying to decide which of two type variables
-	-- should 'win' when unifying them.
+	-- Reason: this flags the name as one that came in from an interface 
+	-- file. This is useful when trying to decide which of two type
+	-- variables should 'win' when unifying them.
 	-- NB: this is only for non-top-level names, so we use ImplicitImport
 mkImportedLocalName uniq occ loc = Name { n_uniq = uniq, n_sort = Local, n_occ = occ, 
 					  n_prov = NonLocalDef ImplicitImport True }
@@ -125,6 +119,9 @@ mkKnownKeyGlobal rdr_name uniq
   = mkGlobalName uniq (mkVanillaModule (rdrNameModule rdr_name))
 		      (rdrNameOcc rdr_name)
 		      systemProvenance
+
+mkWiredInName :: Module -> OccName -> Unique -> Name
+mkWiredInName mod occ uniq = mkGlobalName uniq mod occ systemProvenance
 
 mkSysLocalName :: Unique -> UserFS -> Name
 mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = Local, 
@@ -159,18 +156,6 @@ mkIPName uniq occ
 	   -- ZZ is this an appropriate provinence?
 	   n_prov = SystemProv }
 
-------------------------- Wired in names -------------------------
-
-mkWiredInIdName :: Unique -> Module -> OccName -> Id -> Name
-mkWiredInIdName uniq mod occ id = Name { n_uniq = uniq, n_sort = WiredInId mod id,
-					 n_occ = occ, n_prov = SystemProv }
-
-mkWiredInTyConName :: Unique -> Module -> OccName -> TyCon -> Name
-mkWiredInTyConName uniq mod occ tycon
-  = Name { n_uniq = uniq, n_sort = WiredInTyCon mod tycon,
-	   n_occ = occ, n_prov = SystemProv }
-
-
 ---------------------------------------------------------------------
 mkDerivedName :: (OccName -> OccName)
 	      -> Name		-- Base name
@@ -196,8 +181,6 @@ setNameModule :: Name -> Module -> Name
 setNameModule name mod = name {n_sort = set (n_sort name)}
 		       where
 			 set (Global _)             = Global mod
-			 set (WiredInId _ id)       = WiredInId mod id
-			 set (WiredInTyCon _ tycon) = WiredInTyCon mod tycon
 \end{code}
 
 
@@ -395,7 +378,6 @@ nameModule		:: Name -> Module
 nameSrcLoc		:: Name -> SrcLoc
 isLocallyDefinedName	:: Name -> Bool
 isUserExportedName	:: Name -> Bool
-isWiredInName		:: Name -> Bool
 isLocalName		:: Name -> Bool
 isGlobalName		:: Name -> Bool
 isExternallyVisibleName :: Name -> Bool
@@ -414,8 +396,6 @@ nameModule name =
     x     -> nameSortModule x
 
 nameSortModule (Global       mod)   = mod
-nameSortModule (WiredInId    mod _) = mod
-nameSortModule (WiredInTyCon mod _) = mod
 
 nameRdrName :: Name -> RdrName
 -- Makes a qualified name for top-level (Global) names, whether locally defined or not
@@ -457,23 +437,6 @@ provSrcLoc other				= noSrcLoc
 isLocallyDefinedName (Name {n_sort = Local})        = True	-- Local (might have SystemProv)
 isLocallyDefinedName (Name {n_prov = LocalDef _ _}) = True	-- Global, but defined here
 isLocallyDefinedName other		            = False	-- Other
-
--- Things the compiler "knows about" are in some sense
--- "imported".  When we are compiling the module where
--- the entities are defined, we need to be able to pick
--- them out, often in combination with isLocallyDefined.
-isWiredInName (Name {n_sort = WiredInTyCon _ _}) = True
-isWiredInName (Name {n_sort = WiredInId    _ _}) = True
-isWiredInName _				         = False
-
-maybeWiredInIdName :: Name -> Maybe Id
-maybeWiredInIdName (Name {n_sort = WiredInId _ id}) = Just id
-maybeWiredInIdName other			    = Nothing
-
-maybeWiredInTyConName :: Name -> Maybe TyCon
-maybeWiredInTyConName (Name {n_sort = WiredInTyCon _ tc}) = Just tc
-maybeWiredInTyConName other			          = Nothing
-
 
 isLocalName (Name {n_sort = Local}) = True
 isLocalName _ 		            = False
@@ -621,15 +584,20 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ, n_prov = prov})
 
     pp_mod_dot sty
       = case prov of
-    	   SystemProv	  			     -> pp_qual mod user_sty
-		-- Hack alert!  Omit the qualifier on SystemProv things in user style
-                -- I claim such SystemProv things will also be WiredIn things.
-		-- We can't get the omit flag right
-		-- on wired in tycons etc (sigh) so we just leave it out in user style, 
-		-- and hope that leaving it out isn't too consfusing.
-		-- (e.g. if the programmer hides Bool and  redefines it.  If so, use -dppr-debug.)
+    	   SystemProv -> pp_qual mod user_sty
+		-- ToDo (SDM): the following comment is out of date - do
+	        -- we need to do anything different now that WiredInNames
+		-- don't exist any more?
 
-    	   LocalDef _ _				     -> pp_qual mod (user_sty || iface_sty)
+		-- Hack alert!  Omit the qualifier on SystemProv things in 
+		-- user style.  I claim such SystemProv things will also be 
+		-- WiredIn things. We can't get the omit flag right
+		-- on wired in tycons etc (sigh) so we just leave it out in 
+		-- user style, and hope that leaving it out isn't too 
+		-- consfusing. (e.g. if the programmer hides Bool and  
+		-- redefines it.  If so, use -dppr-debug.)
+
+    	   LocalDef _ _ -> pp_qual mod (user_sty || iface_sty)
 
     	   NonLocalDef (UserImport imp_mod _ _) omit 
 		| user_sty			     -> pp_qual imp_mod omit

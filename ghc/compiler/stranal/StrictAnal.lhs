@@ -390,9 +390,9 @@ addDemandInfoToCaseBndr dmd str_env abs_env alts binder
 
 \begin{code}
 data SaStats
-  = SaStats FAST_INT FAST_INT	-- total/marked-demanded lambda-bound
-	    FAST_INT FAST_INT	-- total/marked-demanded case-bound
-	    FAST_INT FAST_INT	-- total/marked-demanded let-bound
+  = SaStats FastInt FastInt	-- total/marked-demanded lambda-bound
+	    FastInt FastInt	-- total/marked-demanded case-bound
+	    FastInt FastInt	-- total/marked-demanded let-bound
 				-- (excl. top-level; excl. letrecs)
 
 nullSaStats = SaStats ILIT(0) ILIT(0) ILIT(0) ILIT(0) ILIT(0) ILIT(0)
@@ -424,15 +424,15 @@ returnSa x stats = (x, stats)
 
 tickLambda var (SaStats tlam dlam tc dc tlet dlet)
   = case (tick_demanded var (0,0)) of { (IBOX(tot), IBOX(demanded)) ->
-    ((), SaStats (tlam _ADD_ tot) (dlam _ADD_ demanded) tc dc tlet dlet) }
+    ((), SaStats (tlam +# tot) (dlam +# demanded) tc dc tlet dlet) }
 
 tickCases vars (SaStats tlam dlam tc dc tlet dlet)
   = case (foldr tick_demanded (0,0) vars) of { (IBOX(tot), IBOX(demanded)) ->
-    ((), SaStats tlam dlam (tc _ADD_ tot) (dc _ADD_ demanded) tlet dlet) }
+    ((), SaStats tlam dlam (tc +# tot) (dc +# demanded) tlet dlet) }
 
 tickLet var (SaStats tlam dlam tc dc tlet dlet)
   = case (tick_demanded var (0,0))        of { (IBOX(tot),IBOX(demanded)) ->
-    ((), SaStats tlam dlam tc dc (tlet _ADD_ tot) (dlet _ADD_ demanded)) }
+    ((), SaStats tlam dlam tc dc (tlet +# tot) (dlet +# demanded)) }
 
 tick_demanded var (tot, demanded)
   | isTyVar var = (tot, demanded)

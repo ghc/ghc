@@ -30,9 +30,9 @@ import TysPrim
 import TysWiredIn
 
 import Demand		( wwLazy, wwPrim, wwStrict, StrictnessInfo(..) )
-import Var		( TyVar, Id )
+import Var		( TyVar )
 import CallConv		( CallConv, pprCallConv )
-import Name		( Name, mkWiredInIdName )
+import Name		( Name, mkWiredInName )
 import RdrName		( RdrName, mkRdrQual )
 import OccName		( OccName, pprOccName, mkVarOcc )
 import TyCon		( TyCon, tyConArity )
@@ -47,7 +47,7 @@ import CStrings		( CLabelString, pprCLabelString )
 import PrelNames	( pREL_GHC, pREL_GHC_Name )
 import Outputable
 import Util		( zipWithEqual )
-import GlaExts		( Int(..), Int#, (==#) )
+import FastTypes
 \end{code}
 
 %************************************************************************
@@ -70,7 +70,7 @@ Used for the Ord instance
 
 \begin{code}
 primOpTag :: PrimOp -> Int
-primOpTag op = IBOX( tagOf_PrimOp op )
+primOpTag op = iBox (tagOf_PrimOp op)
 
 -- supplies   
 -- tagOf_PrimOp :: PrimOp -> FastInt
@@ -437,16 +437,12 @@ primOpType op
       GenPrimOp occ tyvars arg_tys res_ty -> 
 	mkForAllTys tyvars (mkFunTys arg_tys res_ty)
 
-mkPrimOpIdName :: PrimOp -> Id -> Name
+mkPrimOpIdName :: PrimOp -> Name
 	-- Make the name for the PrimOp's Id
 	-- We have to pass in the Id itself because it's a WiredInId
 	-- and hence recursive
-mkPrimOpIdName op id
-  = mkWiredInIdName key pREL_GHC occ_name id
-  where
-    occ_name = primOpOcc op
-    key	     = mkPrimOpIdUnique (primOpTag op)
-
+mkPrimOpIdName op
+  = mkWiredInName pREL_GHC (primOpOcc op) (mkPrimOpIdUnique (primOpTag op))
 
 primOpRdrName :: PrimOp -> RdrName 
 primOpRdrName op = mkRdrQual pREL_GHC_Name (primOpOcc op)

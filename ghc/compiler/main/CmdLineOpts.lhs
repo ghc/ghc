@@ -701,9 +701,12 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 #endif
     }
   where
-    mk_assoc_elem k@(MaxSimplifierIterations lvl) = (_IBOX(tagOf_SimplSwitch k), SwInt lvl)
-    mk_assoc_elem k@(SimplInlinePhase n)          = (_IBOX(tagOf_SimplSwitch k), SwInt n)
-    mk_assoc_elem k 				  = (_IBOX(tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
+    mk_assoc_elem k@(MaxSimplifierIterations lvl) 
+	= (iBox (tagOf_SimplSwitch k), SwInt lvl)
+    mk_assoc_elem k@(SimplInlinePhase n)
+	= (iBox (tagOf_SimplSwitch k), SwInt n)
+    mk_assoc_elem k
+	= (iBox (tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
 
     -- cannot have duplicates if we are going to use the array thing
     rm_dups switches_so_far switch

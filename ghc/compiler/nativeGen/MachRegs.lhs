@@ -894,91 +894,91 @@ allArgRegs = panic "MachRegs.allArgRegs(x86): should not be used!"
 \end{code}
 
 \begin{code}
-freeReg :: FAST_INT -> FAST_BOOL
+freeReg :: FastInt -> FastBool
 
 #if alpha_TARGET_ARCH
-freeReg ILIT(26) = _FALSE_  -- return address (ra)
-freeReg ILIT(28) = _FALSE_  -- reserved for the assembler (at)
-freeReg ILIT(29) = _FALSE_  -- global pointer (gp)
-freeReg ILIT(30) = _FALSE_  -- stack pointer (sp)
-freeReg ILIT(31) = _FALSE_  -- always zero (zeroh)
-freeReg ILIT(63) = _FALSE_  -- always zero (f31)
+freeReg ILIT(26) = fastBool False  -- return address (ra)
+freeReg ILIT(28) = fastBool False  -- reserved for the assembler (at)
+freeReg ILIT(29) = fastBool False  -- global pointer (gp)
+freeReg ILIT(30) = fastBool False  -- stack pointer (sp)
+freeReg ILIT(31) = fastBool False  -- always zero (zeroh)
+freeReg ILIT(63) = fastBool False  -- always zero (f31)
 #endif
 
 #if i386_TARGET_ARCH
-freeReg ILIT(esp) = _FALSE_  --	%esp is the C stack pointer
+freeReg ILIT(esp) = fastBool False  --	%esp is the C stack pointer
 #endif
 
 #if sparc_TARGET_ARCH
-freeReg ILIT(g0) = _FALSE_  --	%g0 is always 0.
-freeReg ILIT(g5) = _FALSE_  --	%g5 is reserved (ABI).
-freeReg ILIT(g6) = _FALSE_  --	%g6 is reserved (ABI).
-freeReg ILIT(g7) = _FALSE_  --	%g7 is reserved (ABI).
-freeReg ILIT(i6) = _FALSE_  --	%i6 is our frame pointer.
-freeReg ILIT(o6) = _FALSE_  --	%o6 is our stack pointer.
-freeReg ILIT(f0) = _FALSE_  --  %f0/%f1 are the C fp return registers.
-freeReg ILIT(f1) = _FALSE_
+freeReg ILIT(g0) = fastBool False  --	%g0 is always 0.
+freeReg ILIT(g5) = fastBool False  --	%g5 is reserved (ABI).
+freeReg ILIT(g6) = fastBool False  --	%g6 is reserved (ABI).
+freeReg ILIT(g7) = fastBool False  --	%g7 is reserved (ABI).
+freeReg ILIT(i6) = fastBool False  --	%i6 is our frame pointer.
+freeReg ILIT(o6) = fastBool False  --	%o6 is our stack pointer.
+freeReg ILIT(f0) = fastBool False  --  %f0/%f1 are the C fp return registers.
+freeReg ILIT(f1) = fastBool False
 #endif
 
 #ifdef REG_Base
-freeReg ILIT(REG_Base) = _FALSE_
+freeReg ILIT(REG_Base) = fastBool False
 #endif
 #ifdef REG_R1
-freeReg ILIT(REG_R1)   = _FALSE_
+freeReg ILIT(REG_R1)   = fastBool False
 #endif	
 #ifdef REG_R2  
-freeReg ILIT(REG_R2)   = _FALSE_
+freeReg ILIT(REG_R2)   = fastBool False
 #endif	
 #ifdef REG_R3  
-freeReg ILIT(REG_R3)   = _FALSE_
+freeReg ILIT(REG_R3)   = fastBool False
 #endif	
 #ifdef REG_R4  
-freeReg ILIT(REG_R4)   = _FALSE_
+freeReg ILIT(REG_R4)   = fastBool False
 #endif	
 #ifdef REG_R5  
-freeReg ILIT(REG_R5)   = _FALSE_
+freeReg ILIT(REG_R5)   = fastBool False
 #endif	
 #ifdef REG_R6  
-freeReg ILIT(REG_R6)   = _FALSE_
+freeReg ILIT(REG_R6)   = fastBool False
 #endif	
 #ifdef REG_R7  
-freeReg ILIT(REG_R7)   = _FALSE_
+freeReg ILIT(REG_R7)   = fastBool False
 #endif	
 #ifdef REG_R8  
-freeReg ILIT(REG_R8)   = _FALSE_
+freeReg ILIT(REG_R8)   = fastBool False
 #endif
 #ifdef REG_F1
-freeReg ILIT(REG_F1) = _FALSE_
+freeReg ILIT(REG_F1) = fastBool False
 #endif
 #ifdef REG_F2
-freeReg ILIT(REG_F2) = _FALSE_
+freeReg ILIT(REG_F2) = fastBool False
 #endif
 #ifdef REG_F3
-freeReg ILIT(REG_F3) = _FALSE_
+freeReg ILIT(REG_F3) = fastBool False
 #endif
 #ifdef REG_F4
-freeReg ILIT(REG_F4) = _FALSE_
+freeReg ILIT(REG_F4) = fastBool False
 #endif
 #ifdef REG_D1
-freeReg ILIT(REG_D1) = _FALSE_
+freeReg ILIT(REG_D1) = fastBool False
 #endif
 #ifdef REG_D2
-freeReg ILIT(REG_D2) = _FALSE_
+freeReg ILIT(REG_D2) = fastBool False
 #endif
 #ifdef REG_Sp 
-freeReg ILIT(REG_Sp)   = _FALSE_
+freeReg ILIT(REG_Sp)   = fastBool False
 #endif 
 #ifdef REG_Su
-freeReg ILIT(REG_Su)   = _FALSE_
+freeReg ILIT(REG_Su)   = fastBool False
 #endif 
 #ifdef REG_SpLim 
-freeReg ILIT(REG_SpLim) = _FALSE_
+freeReg ILIT(REG_SpLim) = fastBool False
 #endif 
 #ifdef REG_Hp 
-freeReg ILIT(REG_Hp)   = _FALSE_
+freeReg ILIT(REG_Hp)   = fastBool False
 #endif
 #ifdef REG_HpLim
-freeReg ILIT(REG_HpLim) = _FALSE_
+freeReg ILIT(REG_HpLim) = fastBool False
 #endif
-freeReg n               = _TRUE_
+freeReg n               = fastBool True
 \end{code}

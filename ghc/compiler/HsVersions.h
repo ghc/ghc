@@ -43,57 +43,6 @@ name = global (value) :: IORef (ty); \
 # define MkIOError(h,errt,msg) (errt msg)
 #endif
 
-#if defined(__GLASGOW_HASKELL__)
-
--- Import the beggars
-import GlaExts
-	( Int(..), Int#, (+#), (-#), (*#), 
-	  quotInt#, negateInt#, (==#), (<#), (<=#), (>=#), (>#)
-	)
-
-#define FAST_INT Int#
-#define ILIT(x) (x#)
-#define IBOX(x) (I# (x))
-#define _ADD_ +#
-#define _SUB_ -#
-#define _MUL_ *#
-#define _QUOT_ `quotInt#`
-#define _NEG_ negateInt#
-#define _EQ_ ==#
-#define _LT_ <#
-#define _LE_ <=#
-#define _GE_ >=#
-#define _GT_ >#
-
-#define FAST_BOOL Int#
-#define _TRUE_ 1#
-#define _FALSE_ 0#
-#define _IS_TRUE_(x) ((x) _EQ_ 1#)
-
-#else {- ! __GLASGOW_HASKELL__ -}
-
-#define FAST_INT Int
-#define ILIT(x) (x)
-#define IBOX(x) (x)
-#define _ADD_ +
-#define _SUB_ -
-#define _MUL_ *
-#define _DIV_ `div`
-#define _QUOT_ `quot`
-#define _NEG_ -
-#define _EQ_ ==
-#define _LT_ <
-#define _LE_ <=
-#define _GE_ >=
-#define _GT_ >
-
-#define FAST_BOOL Bool
-#define _TRUE_ True
-#define _FALSE_ False
-#define _IS_TRUE_(x) (x)
-
-#endif  {- ! __GLASGOW_HASKELL__ -}
-
 #if __GLASGOW_HASKELL__ >= 23
 
 -- This #ifndef lets us switch off the "import FastString"

@@ -28,7 +28,7 @@ import VarEnv
 import VarSet
 
 import Name	( Name, Provenance(..), ExportFlag(..),
-		  mkWiredInTyConName, mkGlobalName, mkKindOccFS, tcName,
+		  mkGlobalName, mkKindOccFS, tcName,
 		)
 import OccName	( mkOccFS, tcName )
 import TyCon	( TyCon, KindCon,
@@ -38,8 +38,8 @@ import Class	( Class )
 
 -- others
 import SrcLoc		( mkBuiltinSrcLoc )
-import PrelNames	( pREL_GHC, kindConKey, boxityConKey, boxedConKey, unboxedConKey, 
-			  typeConKey, anyBoxConKey, funTyConKey
+import PrelNames	( pREL_GHC, kindConKey, boxityConKey, boxedConKey, 
+			  unboxedConKey, typeConKey, anyBoxConKey, funTyConName
 			)
 \end{code}
 
@@ -298,7 +298,6 @@ mkArrowKinds arg_kinds result_kind = foldr mkArrowKind result_kind arg_kinds
 We define a few wired-in type constructors here to avoid module knots
 
 \begin{code}
-funTyConName = mkWiredInTyConName funTyConKey pREL_GHC (mkOccFS tcName SLIT("(->)")) funTyCon
 funTyCon = mkFunTyCon funTyConName (mkArrowKinds [boxedTypeKind, boxedTypeKind] boxedTypeKind)
 \end{code}
 
