@@ -7,7 +7,7 @@ $res = simple_compile_Main()
 
 pass when 
    $tool contains "ghc"
-   && contents("comp.stdout") contains "Could not deduce"
+   && contents("comp.stdout") contains "parse error"
 
 pass when 
    $tool contains "nhc"
