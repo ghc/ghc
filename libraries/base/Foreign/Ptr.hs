@@ -67,6 +67,9 @@ import NHC.FFI
   )
 #endif
 
+#ifdef __HUGS__
+import Hugs.Ptr
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 #include "MachDeps.h"
