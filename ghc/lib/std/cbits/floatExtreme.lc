@@ -6,6 +6,10 @@ Stubs to check for extremities of (IEEE) floats,
 the tests have been (artfully) lifted from the hbc-0.9999.3 (lib/fltcode.c)
 source.
 
+All tests return non-zero values to indicate success.
+
+(SOF 95/98 - Bugfixed and tidied up.)
+
 ToDo:
   - avoid hard-wiring the fact that on an
     Alpha we repr. a StgFloat as a double.
@@ -27,6 +31,16 @@ ToDo:
 
 #ifdef IEEE_FLOATING_POINT
 
+/*
+ 
+ To recap, here's the representation of a double precision
+ IEEE floating point number:
+
+ sign         63           sign bit (0==positive, 1==negative)
+ exponent     62-52        exponent (biased by 1023)
+ fraction     51-0         fraction (bits to right of binary point)
+*/
+
 StgInt
 isDoubleNaN(d)
 StgDouble d;
@@ -36,13 +50,23 @@ StgDouble d;
     int r;
 
     u.d = d;
+ 
+    /* Spelt out for clarity */
     hx = u.i[H];
     lx = u.i[L];
+    return ( ( (hx & 0x7ff00000) == 0x7ff00000 ) && /* Is the exponent all ones? */
+    	     ( (hx & 0xfffff )   != 0 ||            /* and the mantissa non-zero? */
+	       ((unsigned int)lx != 0) )
+	   );
+
+/* Old definition:
     hx &= 0x7fffffff;
-    hx |= (unsigned int)(lx|(-lx))>>31;        
+    hx |= (unsigned int)(lx|(-lx))>>31;
     hx = 0x7ff00000 - hx;
     r = (int)((unsigned int)(hx))>>31;
     return (r);
+*/
+
 }
 
 StgInt
@@ -50,15 +74,17 @@ isDoubleInfinite(d)
 StgDouble d;
 {
     union { double d; int i[2]; } u;
-    int hx,lx;
+    int high,low;
 
     u.d = d;
-    hx = u.i[H];
-    lx = u.i[L];
-    hx &= 0x7fffffff;
-    hx ^= 0x7ff00000;
-    hx |= lx;
-    return (hx == 0);
+    high = u.i[H];
+    low  = u.i[L];
+
+    /* Inf iff exponent is all ones, mantissa all zeros */
+    high &= 0x7fffffff; /* mask out sign bit */
+    high ^= 0x7ff00000; /* flip the exponent bits */
+    high |= low;         
+    return (high == 0);
 }
 
 StgInt
@@ -66,12 +92,27 @@ isDoubleDenormalized(d)
 StgDouble d;
 {
     union { double d; int i[2]; } u;
-    int high, iexp;
+    int high, low, iexp;
 
     u.d = d;
+
+    /* A (single/double/quad) precision floating point number
+       is denormalised iff:
+        - exponent is zero
+	- mantissa is non-zero.
+        - (don't care about setting of sign bit.)
+
+    */
+
     high = u.i[H];
-    iexp = high & (0x7ff << 20);
-    return (iexp == 0);
+    low  = u.i[L];
+    iexp = high & (0x7ff << 20);           /* Get at the exponent */
+
+    return (  (iexp == 0)    && 	   /* exponent all zero?  */
+    	     ( (high & 0xfffff )  != 0 ||  /* and the mantissa non-zero? */
+	       ((unsigned int)low != 0) )
+	   );
+
 }
 
 StgInt
@@ -82,27 +123,62 @@ StgDouble d;
     int high, iexp;
 
     u.d = d;
+    /* sign (bit 63) set (only) => negative zero */
     return (u.i[H] == 0x80000000 && u.i[L] == 0);
 }
 
 /* Same tests, this time for StgFloats. */
 
+/*
+ 
+ To recap, here's the representation of a single precision
+ IEEE floating point number:
+
+ sign         31           sign bit (0 == positive, 1 == negative)
+ exponent     30-23        exponent (biased by 127)
+ fraction     22-0         fraction (bits to right of binary point)
+*/
+
+
 StgInt
 isFloatNaN(f) 
 StgFloat f;
 {
-#if !defined(alpha_TARGET_OS)
+#if defined(alpha_TARGET_OS)
     /* StgFloat = double on alphas */
     return (isDoubleNaN(f));
 #else
-    union { StgFloat f; int i; } u;
     int r;
+    union { StgFloat f; int i; } u;
     u.f = f;
 
-    u.i &= 0x7fffffff;
-    u.i = 0x7f800000 - u.i;
-    r = (int)(((unsigned int)(u.i))>>31);
+   /* Floating point NaN iff exponent is all ones, mantissa is
+      non-zero (but see below.) */
+
+    u.i &= 0x7fffffff;        /* mask out sign bit */
+    u.i  = 0x7f800000 - u.i;  /* <0 if exponent is max and mantissa non-zero. */
+    r = (int)(((unsigned int)(u.i))>>31);  /* Get at the sign.. */
     return (r);
+
+   /* In case we should ever want to distinguish.. */
+#if 0 && WE_JUST_WANT_QUIET_NAN
+    int iexp;
+    iexp  = u.i & (0xff << 23);         /* Get at the exponent part.. */
+    /* Quiet NaN */
+    return ( ( iexp == (int)0x7f800000 ) &&  /* exponent all ones. */
+             (u.i & (0x80 << 22) )           /* MSB of mantissa is set */
+	   ); 
+#endif
+#if 0 && WE_WANT_SIGNALLING_NAN
+    /* Signalling/trapping NaN */
+    int iexp;
+    iexp  = u.i & (0xff << 23);               /* Get at the exponent part.. */
+    return ( ( iexp == (int)0x7f800000 ) &&   /* ..it's all ones. */
+             ((u.i & (0x80 << 22)) == 0) &&   /* MSB of mantissa is clear */
+	     ((u.i & 0x7fffff) != 0) 	      /* rest of mantissa is non-zero */
+	   ); 
+#endif
+
 #endif
 }
 
@@ -110,16 +186,18 @@ StgInt
 isFloatInfinite(f) 
 StgFloat f;
 {
-#if !defined(alpha_TARGET_OS)
+#if defined(alpha_TARGET_OS)
     /* StgFloat = double on alphas */
     return (isDoubleInfinite(f));
 #else
-    int ix;
     union { StgFloat f; int i; } u;
     u.f = f;
+  
+    /* A float is Inf iff exponent is max (all ones),
+       and mantissa is min(all zeros.) */
 
-    u.i &= 0x7fffffff;
-    u.i ^= 0x7f800000;
+    u.i &= 0x7fffffff;    /* mask out sign bit    */
+    u.i ^= 0x7f800000;    /* invert exponent bits */
     return (u.i == 0);
 #endif
 }
@@ -128,16 +206,24 @@ StgInt
 isFloatDenormalized(f) 
 StgFloat f;
 {
-#if !defined(alpha_TARGET_OS)
+#if defined(alpha_TARGET_OS)
     /* StgFloat = double on alphas */
     return (isDoubleDenormalized(f));
 #else
-    int iexp;
+    int iexp, imant;
     union { StgFloat f; int i; } u;
     u.f = f;
 
-    iexp = u.i & (0xff << 23);
-    return (iexp == 0);
+    iexp  = u.i & (0xff << 23); /* Get at the exponent part */
+    imant = u.i & 0x3fffff;     /* ditto, mantissa */
+    /* A (single/double/quad) precision floating point number
+       is denormalised iff:
+        - exponent is zero
+	- mantissa is non-zero.
+        - (don't care about setting of sign bit.)
+
+    */
+    return ( (iexp == 0) &&  (imant != 0 ) );
 #endif
 }
 
@@ -145,13 +231,14 @@ StgInt
 isFloatNegativeZero(f) 
 StgFloat f;
 {
-#if !defined(alpha_TARGET_OS)
+#if defined(alpha_TARGET_OS)
     /* StgFloat = double on alphas */
     return (isDoubleNegativeZero(f));
 #else
     union { StgFloat f; int i; } u;
     u.f = f;
 
+    /* sign (bit 31) set (only) => negative zero */
     return (u.i  == (int)0x80000000);
 #endif
 }
