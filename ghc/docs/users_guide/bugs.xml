@@ -46,7 +46,27 @@
       <sect3 id="infelicities-syntax">
 	<title>Context-free syntax</title>
 	
-      <itemizedlist>
+	<itemizedlist>
+	  <listitem>
+	    <para>GHC is a little less strict about the layout rule when used
+	      in <literal>do</literal> expressions.  Specifically, the
+	      restriction that "a nested context must be indented further to
+	      the right than the enclosing context" is relaxed to allow the
+	      nested context to be at the same level as the enclosing context,
+	      if the enclosing context is a <literal>do</literal>
+	      expression.</para>
+
+	    <para>For example, the following code is accepted by GHC:
+
+<programlisting>
+main = do args &lt;- getArgs
+	  if null args then return [] else do
+          ps &lt;- mapM process args
+          mapM print ps</programlisting>
+
+	      </para>
+	  </listitem>
+
 	<listitem>
 	  <para>GHC doesn't do fixity resolution in expressions during
 	  parsing.  For example, according to the Haskell report, the
