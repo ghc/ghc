@@ -49,7 +49,7 @@ mkdependHS-specific options (not between --'s):
                 don't generate any dependencies on modules therein.
     -Xdirs      same as --exclude-directory
     --include-prelude
-		Regard prelude library as unstable, i.e., generate dependencies
+		Regard prelude libraries as unstable, i.e., generate dependencies
 		on prelude modules. This option is normally only used by the
                 various system libraries. If a -syslib option is used, dependencies
                 will also be generated on the library's interfaces.
