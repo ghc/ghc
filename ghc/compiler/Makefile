@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.142 2001/03/13 15:37:50 simonmar Exp $
+# $Id: Makefile,v 1.143 2001/03/14 21:22:48 sebc Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -152,6 +152,7 @@ HC=$(GHC)
 # Use GHC for compiling C bits
 #
 CC = $(HC)
+CC_OPTS := $(addprefix -optc, $(CC_OPTS))
 
 # magic from GNU make manual to convert a list of values
 # into a colon-separated list
