@@ -8,6 +8,7 @@ SUBDIRS = cbits include
 ALL_DIRS = \
 	Control \
 	Control/Concurrent \
+	Control/Parallel \
 	Control/Monad \
 	Control/Monad/ST \
 	Data \
