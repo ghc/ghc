@@ -5,8 +5,6 @@
 \____/\/ /_/\____/|_|      Type :? for help.
 
 Loading package std ... linking ... done.
-*** WARNING: . is writable by someone else, IGNORING!
-*** WARNING: ./.ghci is writable by someone else, IGNORING!
 Prelude> :unset +s +t
 Prelude> -- tests for :def, :undef
 Prelude> let void m = m >> return ""
@@ -18,10 +16,10 @@ Prelude> let echo s = return (":! echo " ++ map Char.toUpper s)
 hello, world!
 Prelude> :echo hello, world!
 Prelude> :def echo echo
+hello, world!
 command `echo' is already defined
 Prelude> :undef echo
 Prelude> :def echo echo
 Prelude> :echo hello, world!
 HELLO, WORLD!
 Prelude> Leaving GHCi.
-hello, world!

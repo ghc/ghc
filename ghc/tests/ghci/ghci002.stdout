@@ -5,8 +5,6 @@
 \____/\/ /_/\____/|_|      Type :? for help.
 
 Loading package std ... linking ... done.
-*** WARNING: . is writable by someone else, IGNORING!
-*** WARNING: ./.ghci is writable by someone else, IGNORING!
 Prelude> -- bug: we used to throw away the instance accidentally here
 Prelude> :m PrelBase
 PrelBase> 1 == (2 :: Int)
