@@ -1109,7 +1109,9 @@ hscNextPhase hsc_lang = do
 		HscC -> HCc
 		HscAsm | split -> SplitMangle
 		       | otherwise -> As
-		HscNothing -> HCc
+		HscNothing     -> HCc  -- dummy (no output will be generated)
+		HscInterpreted -> HCc  -- "" ""
+		_other         -> HCc  -- "" ""
 	)
 
 hscMaybeAdjustLang :: HscLang -> IO HscLang
