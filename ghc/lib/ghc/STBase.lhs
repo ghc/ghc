@@ -54,7 +54,7 @@ returnST = return
 thenST   = (>>=)
 seqST	 = (>>)
 
-unsafeInterleaveST :: ST s a -> ST s a    -- ToDo: put in state-interface.tex
+unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST (ST m) = ST $ \ s ->
     let
 	(r, new_s) = m s
@@ -95,9 +95,13 @@ fixPrimIO = fixST
 
 {-# GENERATE_SPECS unsafePerformPrimIO a #-}
 unsafePerformPrimIO	:: PrimIO a -> a
-unsafeInterleavePrimIO	:: PrimIO a -> PrimIO a
+	-- We give a fresh definition here.  There are no
+	-- magical universal types kicking around.
+unsafePerformPrimIO (ST m)
+  = case m (S# realWorld#) of
+      (r,_) -> r
 
-unsafePerformPrimIO	= runST
+unsafeInterleavePrimIO	:: PrimIO a -> PrimIO a
 unsafeInterleavePrimIO	= unsafeInterleaveST
 
 -- the following functions are now there for backward compatibility mostly:
