@@ -23,3 +23,4 @@ test "arith015" { vtr("", "", "") }
 test "num009" { vtr("", "", "") }
 test "num010" { vtr("", "", "") }
 test "num011" { vtr("", "", "") }
+test "arith016" { vtr("-fglasgow-exts", "", "") }
