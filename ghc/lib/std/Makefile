@@ -54,10 +54,15 @@ PrelHandle_HC_OPTS   += -fno-ignore-asserts
 PrelIO_HC_OPTS       += -fno-ignore-asserts
 
 # Special options
-PrelStorable_HC_OPTS = -monly-3-regs
+# TODO: remove -H80M when the strictness analyser is working again.
+PrelStorable_HC_OPTS = -monly-3-regs -H80M
 PrelCError_HC_OPTS   = +RTS -K4m -RTS
-PrelInt_HC_OPTS      = -monly-3-regs
-PrelWord_HC_OPTS     = -monly-3-regs
+PrelInt_HC_OPTS      = -H80M # -monly-3-regs
+PrelWord_HC_OPTS     = -H80M # -monly-3-regs
+PrelFloat_HC_OPTS    = -H80M
+PrelRead_HC_OPTS     = -H80M
+PrelHandle_HC_OPTS   = -H80M
+Time_HC_OPTS         = -H80M
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
