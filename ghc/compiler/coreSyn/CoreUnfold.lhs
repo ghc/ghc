@@ -32,10 +32,15 @@ module CoreUnfold (
     ) where
 
 IMP_Ubiq()
+#if defined (__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking;
 		 -- and also to get mkMagicUnfoldingFun
 IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
 IMPORT_DELOOPER(SmplLoop)
+#else
+import {-# SOURCE #-} MagicUFs
+import {-# SOURCE #-} Id ( Id )
+#endif
 
 import Bag		( emptyBag, unitBag, unionBags, Bag )
 
@@ -224,13 +229,15 @@ simple variables and constants, and type applications.
 exprIsTrivial (Var v) 		= True
 exprIsTrivial (Lit lit)         = not (isNoRepLit lit)
 exprIsTrivial (App e (TyArg _)) = exprIsTrivial e
+exprIsTrivial (Coerce _ _ e)    = exprIsTrivial e
 exprIsTrivial other		= False
 \end{code}
 
 \begin{code}
-exprSmallEnoughToDup (Con _ _)   = True	-- Could check # of args
-exprSmallEnoughToDup (Prim op _) = not (fragilePrimOp op) -- Could check # of args
-exprSmallEnoughToDup (Lit lit)   = not (isNoRepLit lit)
+exprSmallEnoughToDup (Con _ _)      = True	-- Could check # of args
+exprSmallEnoughToDup (Prim op _)    = not (fragilePrimOp op) -- Could check # of args
+exprSmallEnoughToDup (Lit lit)      = not (isNoRepLit lit)
+exprSmallEnoughToDup (Coerce _ _ e) = exprSmallEnoughToDup e
 exprSmallEnoughToDup expr
   = case (collectArgs expr) of { (fun, _, _, vargs) ->
     case fun of
