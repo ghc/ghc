@@ -44,7 +44,7 @@ import System.IO
 #ifdef __HUGS__
 import Hugs.Prelude (IOException(..), IOErrorType(..))
 
-{-# CBITS PrelIOUtils.c #-}
+{-# CBITS PrelIOUtils.c dirUtils.c #-}
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -437,6 +437,19 @@ foreign import ccall unsafe "HsBase.h _setmode"
 --   else
 --      printf( "'stdin' successfully changed to binary mode\n" );
 #endif
+
+-- traversing directories
+foreign import ccall unsafe "dirUtils.h __hscore_readdir"
+  readdir  :: Ptr CDir -> Ptr (Ptr CDirent) -> IO CInt
+ 
+foreign import ccall unsafe "HsBase.h __hscore_free_dirent"
+  freeDirEnt  :: Ptr CDirent -> IO ()
+ 
+foreign import ccall unsafe "HsBase.h __hscore_end_of_dir"
+  end_of_dir :: CInt
+ 
+foreign import ccall unsafe "HsBase.h __hscore_d_name"
+  d_name :: Ptr CDirent -> IO CString
 
 -- POSIX flags only:
 foreign import ccall unsafe "HsBase.h __hscore_o_rdonly" o_RDONLY :: CInt

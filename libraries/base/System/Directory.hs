@@ -618,18 +618,6 @@ unionCMode     = (+)
 foreign import ccall unsafe "__hscore_path_max"
   path_max :: Int
 
-foreign import ccall unsafe "__hscore_readdir"
-  readdir  :: Ptr CDir -> Ptr (Ptr CDirent) -> IO CInt
-
-foreign import ccall unsafe "__hscore_free_dirent"
-  freeDirEnt  :: Ptr CDirent -> IO ()
-
-foreign import ccall unsafe "__hscore_end_of_dir"
-  end_of_dir :: CInt
-
-foreign import ccall unsafe "__hscore_d_name"
-  d_name :: Ptr CDirent -> IO CString
-
 foreign import ccall unsafe "__hscore_R_OK" r_OK :: CMode
 foreign import ccall unsafe "__hscore_W_OK" w_OK :: CMode
 foreign import ccall unsafe "__hscore_X_OK" x_OK :: CMode
