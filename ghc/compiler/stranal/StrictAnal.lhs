@@ -9,12 +9,11 @@ Semantique analyser) was written by Andy Gill.
 \begin{code}
 #include "HsVersions.h"
 
-module StrictAnal ( saWwTopBinds, saTopBinds ) where
+module StrictAnal ( saWwTopBinds ) where
 
 IMP_Ubiq(){-uitous-}
 
-import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict,
-			  opt_D_dump_stranal, opt_D_simplifier_stats
+import CmdLineOpts	( opt_D_dump_stranal, opt_D_simplifier_stats
 			)
 import CoreSyn
 import Id		( idType, addIdStrictness, isWrapperId,
@@ -25,7 +24,7 @@ import IdInfo		( mkStrictnessInfo, mkBottomStrictnessInfo,
 			  mkDemandInfo, willBeDemanded, DemandInfo
 			)
 import PprCore		( pprCoreBinding, pprBigCoreBinder )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
 import Pretty		( Doc, hcat, ptext, int, char, vcat )
 import SaAbsInt
@@ -90,15 +89,14 @@ saWwTopBinds :: UniqSupply
 
 saWwTopBinds us binds
   = let
-	strflags = (opt_AllStrict, opt_NumbersStrict)
 
 	-- mark each binder with its strictness
 #ifndef OMIT_STRANAL_STATS
 	(binds_w_strictness, sa_stats)
-	  = sa_top_binds strflags binds nullSaStats
+	  = saTopBinds binds nullSaStats
 #else
 	binds_w_strictness
-	  = sa_top_binds strflags binds
+	  = saTopBindsBinds binds
 #endif
     in
     -- possibly show what we decided about strictness...
@@ -153,19 +151,11 @@ environment which maps @Id@s to their abstract values (i.e., an
 @AbsValEnv@ maps an @Id@ to its @AbsVal@).
 
 \begin{code}
-saTopBinds   :: StrAnalFlags -> [CoreBinding] -> [CoreBinding]     -- exported
-sa_top_binds :: StrAnalFlags -> [CoreBinding] -> SaM [CoreBinding] -- not exported
+saTopBinds :: [CoreBinding] -> SaM [CoreBinding] -- not exported
 
-saTopBinds strflags binds
-#ifndef OMIT_STRANAL_STATS
-  = fst (sa_top_binds strflags binds nullSaStats)
-#else
-  = sa_top_binds strflags binds
-#endif
-
-sa_top_binds strflags binds
+saTopBinds binds
   = let
-	starting_abs_env = nullAbsValEnv strflags
+	starting_abs_env = nullAbsValEnv
     in
     do_it starting_abs_env starting_abs_env binds
   where
@@ -189,8 +179,6 @@ saTopBind :: StrictEnv -> AbsenceEnv
 saTopBind str_env abs_env (NonRec binder rhs)
   = saExpr str_env abs_env rhs 	`thenSa` \ new_rhs ->
     let
-	strflags = getStrAnalFlags str_env
-
 	str_rhs = absEval StrAnal rhs str_env
 	abs_rhs = absEval AbsAnal rhs abs_env
 
@@ -201,7 +189,6 @@ saTopBind str_env abs_env (NonRec binder rhs)
 
 	new_binder
 	  = addStrictnessInfoToId
-		strflags
 		widened_str_rhs widened_abs_rhs
 		binder
 		rhs
@@ -215,14 +202,13 @@ saTopBind str_env abs_env (NonRec binder rhs)
 
 saTopBind str_env abs_env (Rec pairs)
   = let
-	strflags    = getStrAnalFlags str_env
 	(binders,rhss) = unzip pairs
 	str_rhss    = fixpoint StrAnal binders rhss str_env
 	abs_rhss    = fixpoint AbsAnal binders rhss abs_env
 		      -- fixpoint returns widened values
       	new_str_env = growAbsValEnvList str_env (binders `zip` str_rhss)
       	new_abs_env = growAbsValEnvList abs_env (binders `zip` abs_rhss)
-	new_binders = zipWith4Equal "saTopBind" (addStrictnessInfoToId strflags)
+	new_binders = zipWith4Equal "saTopBind" addStrictnessInfoToId
 				    str_rhss abs_rhss binders rhss
     in
     mapSa (saExpr new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
@@ -301,8 +287,6 @@ saExpr str_env abs_env (Let (NonRec binder rhs) body)
   =	-- Analyse the RHS in the environment at hand
     saExpr str_env abs_env rhs  `thenSa` \ new_rhs  ->
     let
-	strflags = getStrAnalFlags str_env
-
 	-- Bind this binder to the abstract value of the RHS; analyse
 	-- the body of the `let' in the extended environment.
       	str_rhs_val  	= absEval StrAnal rhs str_env
@@ -318,7 +302,7 @@ saExpr str_env abs_env (Let (NonRec binder rhs) body)
 
 	-- Now determine the strictness of this binder; use that info
 	-- to record DemandInfo/StrictnessInfo in the binder.
-	new_binder = addStrictnessInfoToId strflags
+	new_binder = addStrictnessInfoToId
 			widened_str_rhs widened_abs_rhs
 			(addDemandInfoToId str_env abs_env body binder)
 			rhs
@@ -329,7 +313,6 @@ saExpr str_env abs_env (Let (NonRec binder rhs) body)
 
 saExpr str_env abs_env (Let (Rec pairs) body)
   = let
-	strflags       = getStrAnalFlags str_env
 	(binders,rhss) = unzip pairs
 	str_vals       = fixpoint StrAnal binders rhss str_env
 	abs_vals       = fixpoint AbsAnal binders rhss abs_env
@@ -352,7 +335,7 @@ saExpr str_env abs_env (Let (Rec pairs) body)
 --		   deciding that y is absent, which is plain wrong!
 --		It's much easier simply not to do this.
 
-	improved_binders = zipWith4Equal "saExpr" (addStrictnessInfoToId strflags)
+	improved_binders = zipWith4Equal "saExpr" addStrictnessInfoToId
 				         str_vals abs_vals binders rhss
 
 	whiter_than_white_binders = launder improved_binders
@@ -396,14 +379,13 @@ tell how many args could safely be grabbed.
 
 \begin{code}
 addStrictnessInfoToId
-	:: StrAnalFlags
-	-> AbsVal 		-- Abstract strictness value
+	:: AbsVal 		-- Abstract strictness value
 	-> AbsVal		-- Ditto absence
 	-> Id 			-- The id
 	-> CoreExpr	-- Its RHS
 	-> Id			-- Augmented with strictness
 
-addStrictnessInfoToId strflags str_val abs_val binder body
+addStrictnessInfoToId str_val abs_val binder body
 
   | isBot str_val
   = binder `addIdStrictness` mkBottomStrictnessInfo
@@ -415,7 +397,7 @@ addStrictnessInfoToId strflags str_val abs_val binder body
 				      mkStrictnessInfo strictness Nothing
 		where
 		    tys        = map idType lambda_bounds
-		    strictness = findStrictness strflags tys str_val abs_val
+		    strictness = findStrictness tys str_val abs_val
 \end{code}
 
 \begin{code}
