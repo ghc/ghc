@@ -32,7 +32,7 @@ import TcRnMonad		( thenM, returnM, mapAndUnzipM )
 import HscTypes		( DFunId )
 
 import BasicTypes	( NewOrData(..) )
-import Class		( className, classKey, classTyVars, classSCTheta, Class )
+import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
 import Subst		( mkTyVarSubst, substTheta )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
@@ -459,6 +459,9 @@ makeDerivEqns tycl_decls
 	can_derive_via_isomorphism
 	   =  not (clas `hasKey` readClassKey)	-- Never derive Read,Show this way
 	   && not (clas `hasKey` showClassKey)
+	   && length tys + 1 == classArity clas	-- Well kinded;
+						-- eg not: newtype T ... deriving( ST )
+						--	because ST needs *2* type params
 	   && n_tyvars_to_keep >= 0		-- Well kinded; 
 						-- eg not: newtype T = T Int deriving( Monad )
 	   && n_args_to_keep   >= 0		-- Well kinded: 
@@ -478,9 +481,8 @@ makeDerivEqns tycl_decls
 
 	cant_derive_err = derivingThingErr clas tys tycon tyvars_to_keep
 				(vcat [ptext SLIT("too hard for cunning newtype deriving"),
-					ppr n_tyvars_to_keep,
-					ppr n_args_to_keep,
-					ppr eta_ok,
+				       ptext SLIT("debug info:") <+> ppr n_tyvars_to_keep <+>
+					ppr n_args_to_keep <+> ppr eta_ok <+>
 					ppr (isRecursiveTyCon tycon)
 				      ])
 
@@ -489,7 +491,7 @@ makeDerivEqns tycl_decls
     ------------------------------------------------------------------
     chk_out :: Class -> TyCon -> [TcType] -> Maybe SDoc
     chk_out clas tycon tys
-	| notNull tys						        = Just non_std_why
+	| notNull tys						        = Just ty_args_why
 	| not (getUnique clas `elem` derivableClassKeys)		= Just non_std_why
 	| clas `hasKey` enumClassKey    && not is_enumeration 	        = Just nullary_why
 	| clas `hasKey` boundedClassKey && not is_enumeration_or_single = Just single_nullary_why
@@ -503,11 +505,14 @@ makeDerivEqns tycl_decls
 	    is_single_con  = maybeToBool (maybeTyConSingleCon tycon)
 	    is_enumeration_or_single = is_enumeration || is_single_con
 
-    single_nullary_why = ptext SLIT("one constructor data type or type with all nullary constructors expected")
-    nullary_why        = ptext SLIT("data type with all nullary constructors expected")
-    no_cons_why	       = ptext SLIT("type has no data constructors")
-    non_std_why	       = ptext SLIT("not a derivable class")
-    existential_why    = ptext SLIT("it has existentially-quantified constructor(s)")
+	    single_nullary_why = ptext SLIT("one constructor data type or type with all nullary constructors expected")
+	    nullary_why        = quotes (ppr tycon) <+> ptext SLIT("has non-nullary constructors")
+	    no_cons_why	       = quotes (ppr tycon) <+> ptext SLIT("has no data constructors")
+	    ty_args_why	       = quotes (ppr pred) <+> ptext SLIT("is not a class")
+   	    non_std_why	       = quotes (ppr clas) <+> ptext SLIT("is not a derivable class")
+	    existential_why    = quotes (ppr tycon) <+> ptext SLIT("has existentially-quantified constructor(s)")
+
+	    pred = mkClassPred clas tys
 
 new_dfun_name clas tycon 	-- Just a simple wrapper
   = newDFunName clas [mkTyConApp tycon []] (getSrcLoc tycon)
