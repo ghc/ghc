@@ -322,7 +322,13 @@ lookup_inst_env env key_cls key_tys key_all_tvs
 	  Nothing 
 		-- Does not match, so next check whether the things unify
 		-- [see notes about overlapping instances above]
-	   -> case tcUnifyTys bind_fn tpl key_tys of
+	   -> ASSERT2( not (tyVarsOfTypes key_tys `intersectsVarSet` tpl_tyvars),
+		       (ppr key_cls <+> ppr key_tys <+> ppr key_all_tvs) $$
+		       (ppr dfun_id <+> ppr tpl_tyvars <+> ppr tpl)
+		      )
+		-- Unification will break badly if the variables overlap
+		-- They shouldn't because we allocate separate uniques for them
+	      case tcUnifyTys bind_fn tpl key_tys of
 	        Just _   -> find rest ms (dfun_id:us)
 	        Nothing  -> find rest ms us
 
