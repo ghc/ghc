@@ -1,12 +1,11 @@
 # -*-makefile-*-
 # @configure_input@
+
 # -----------------------------------------------------------------------------
-#
-# GHC project configuration
-#
-# This file can only be included from the top of
-# an fptools/ build tree, since the version.mk 'include'
-# reaches in and grabs the project-specific settings.
+# GHC binary distribution configuration
+
+# These settings are used by the top-level Makefile when building
+# binary distributions.
 
 # what to include in a binary distribution
 GhcMainDir = ghc
@@ -23,10 +22,11 @@ GhcBinDistLibPrlScripts = ghc-asm ghc-split
 GhcBinDistBins = hp2ps ghcprof
 GhcBinDistLinks = ghc ghci ghc-pkg
 
+# -----------------------------------------------------------------------------
+# GHC-specific configuration settings
+
 # Set to YES if $(GHC) has the readline package installed
 GhcHasReadline	= @GhcHasReadline@
 
 # GTK+
 GTK_CONFIG = @GTK_CONFIG@
-
-include $(GhcMainDir)/mk/version.mk

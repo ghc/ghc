@@ -29,7 +29,8 @@ ifneq "$(Project)" ""
 		ProjectDirectory=$(Project)
 	endif
    endif
-   include $(shell echo $(ProjectDirectory) | tr A-Z a-z)/mk/config.mk
+   -include $(shell echo $(ProjectDirectory) | tr A-Z a-z)/mk/config.mk
+   -include $(shell echo $(ProjectDirectory) | tr A-Z a-z)/mk/version.mk
 endif
 
 # -----------------------------------------------------------------------------
