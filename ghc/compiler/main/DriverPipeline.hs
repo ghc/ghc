@@ -401,12 +401,9 @@ run_phase Cpp basename suff input_fn output_fn
 
 -------------------------------------------------------------------------------
 -- HsPp phase 
-run_phase HsPp basename suff input_fn output_fn
-  = do src_opts <- getOptionsFromSource input_fn
-       unhandled_flags <- processArgs dynamic_flags src_opts []
-       checkProcessArgsResult unhandled_flags basename suff
 
-       let orig_fn = basename ++ '.':suff
+run_phase HsPp basename suff input_fn output_fn
+  = do let orig_fn = basename ++ '.':suff
        do_pp   <- dynFlag ppFlag
        if not do_pp then
            -- no need to preprocess, just pass input file along
