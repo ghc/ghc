@@ -36,7 +36,7 @@ import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TysWiredIn	( stringTy )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( dataConFieldLabels, dataConSourceArity )
-import PrelNames	( eqStringName, eqName, geName, minusName, cCallableClassName )
+import PrelNames	( eqStringName, eqName, geName, negateName, minusName, cCallableClassName )
 import BasicTypes	( isBoxed )
 import Bag
 import Outputable
@@ -314,9 +314,8 @@ tcPat tc_bndr pat@(NPatIn over_lit mb_neg) pat_ty
 	Nothing  -> returnNF_Tc (pos_lit_expr, emptyLIE)	-- Positive literal
 	Just neg -> 	-- Negative literal
 			-- The 'negate' is re-mappable syntax
-		    tcLookupId neg				`thenNF_Tc` \ neg_sel_id ->
- 		    newMethod origin neg_sel_id [pat_ty]	`thenNF_Tc` \ neg ->
-		    returnNF_Tc (HsApp (HsVar (instToId neg)) pos_lit_expr, unitLIE neg)
+		    tcSyntaxName origin pat_ty negateName neg	`thenTc` \ (neg_expr, neg_lie, _) ->
+		    returnNF_Tc (HsApp neg_expr pos_lit_expr, neg_lie)
     )								`thenNF_Tc` \ (lit_expr, lie2) ->
 
     returnTc (NPat lit' pat_ty (HsApp (HsVar (instToId eq)) lit_expr),

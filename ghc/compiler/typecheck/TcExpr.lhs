@@ -172,6 +172,7 @@ tcMonoExpr (HsPar expr)    res_ty = tcMonoExpr expr res_ty
 
 tcMonoExpr (NegApp expr neg_name) res_ty
   = tcMonoExpr (HsApp (HsVar neg_name) expr) res_ty
+	-- ToDo: use tcSyntaxName
 
 tcMonoExpr (HsLam match) res_ty
   = tcMatchLambda match res_ty 		`thenTc` \ (match',lie) ->
