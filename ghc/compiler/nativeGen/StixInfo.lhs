@@ -3,10 +3,17 @@
 %
 
 \begin{code}
-module StixInfo ( genCodeInfoTable, genBitmapInfoTable ) where
+module StixInfo (
+
+	genCodeInfoTable, genBitmapInfoTable,
+
+	bitmapToIntegers, bitmapIsSmall, livenessIsSmall
+
+    ) where
 
 #include "HsVersions.h"
 #include "../includes/config.h"
+#include "NCG.h"
 
 import AbsCSyn		( AbstractC(..), Liveness(..) )
 import CLabel		( CLabel )
@@ -20,7 +27,7 @@ import PrimRep		( PrimRep(..) )
 import SMRep		( getSMRepClosureTypeInt )
 import Stix		-- all of it
 import UniqSupply	( returnUs, UniqSM )
-import BitSet		( intBS )
+import BitSet		( BitSet, intBS )
 import Maybes		( maybeToBool )
 
 import Bits
@@ -122,8 +129,11 @@ genBitmapInfoTable liveness srt closure_type include_srt
 		]
 
 	layout_info = case liveness of
-			LvSmall mask -> StInt (toInteger (intBS mask))
-			LvLarge lbl  -> StCLbl lbl
+		      Liveness lbl mask ->
+			case bitmapToIntegers mask of
+			[ ] -> StInt 0
+			[i] -> StInt i
+			_   -> StCLbl lbl
 
 	type_info :: Word32
 #ifdef WORDS_BIGENDIAN
@@ -140,4 +150,28 @@ genBitmapInfoTable liveness srt closure_type include_srt
 		(lbl, SRT off len) -> 
 			(StIndex DataPtrRep (StCLbl lbl) 
 				(StInt (toInteger off)), len)
+
+bitmapToIntegers :: [BitSet] -> [Integer]
+bitmapToIntegers = bundle . map (toInteger . intBS)
+  where
+#if BYTES_PER_WORD == 4
+    bundle = id
+#else
+    bundle [] = []
+    bundle is = case splitAt (BYTES_PER_WORD/4) is of
+                (these, those) ->
+		    ( foldr1 (\x y -> x + 4294967296 * y)
+			     [x `mod` 4294967296 | x <- these]
+		    : bundle those
+		    )
+#endif
+
+bitmapIsSmall :: [BitSet] -> Bool
+bitmapIsSmall bitmap
+  = case bitmapToIntegers bitmap of
+    _:_:_ -> False
+    _     -> True
+
+livenessIsSmall :: Liveness -> Bool
+livenessIsSmall (Liveness _ mask) = bitmapIsSmall mask
 \end{code}

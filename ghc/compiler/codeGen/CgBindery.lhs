@@ -425,8 +425,6 @@ rebindToStack name offset
 %*									*
 %************************************************************************
 
-ToDo: remove the dependency on 32-bit words.
-
 There are four kinds of things on the stack:
 
 	- pointer variables (bound in the environment)
@@ -499,11 +497,9 @@ listToLivenessMask slots =
    where (this,rest) = span (<32) slots
 
 livenessToAbsC :: Unique -> LivenessMask -> FCode Liveness
-livenessToAbsC uniq []    = returnFC (LvSmall emptyBS)
-livenessToAbsC uniq [one] = returnFC (LvSmall one)
-livenessToAbsC uniq many  = 
-  	absC (CBitmap lbl many) `thenC`
-  	returnFC (LvLarge lbl)
+livenessToAbsC uniq mask  = 
+  	absC (CBitmap lbl mask) `thenC`
+  	returnFC (Liveness lbl mask)
   where lbl = mkBitmapLabel uniq
 \end{code}
 

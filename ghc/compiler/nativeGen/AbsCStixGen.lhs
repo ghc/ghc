@@ -34,7 +34,8 @@ import Maybes	    	( maybeToBool )
 import StgSyn		( StgOp(..) )
 import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
 import PrimRep	    	( isFloatingRep, PrimRep(..) )
-import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable )
+import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable,
+			  livenessIsSmall, bitmapToIntegers )
 import StixMacro	( macroCode, checkCode )
 import StixPrim		( primCode, foreignCallCode, amodeToStix, amodeToStix' )
 import Outputable       ( pprPanic, ppr )
@@ -43,7 +44,6 @@ import Util		( naturalMergeSortLe )
 import Panic		( panic )
 import TyCon		( tyConDataCons )
 import DataCon		( dataConWrapId )
-import BitSet 		( intBS )
 import Name             ( NamedThing(..) )
 import CmdLineOpts	( opt_Static, opt_EnsureSplittableC )
 import Outputable	( assertPanic )
@@ -106,9 +106,7 @@ Here we handle top-level things, like @CCodeBlock@s and
   where 
 	lbl_info = mkReturnInfoLabel uniq
 	lbl_ret  = mkReturnPtLabel uniq
- 	closure_type = case liveness of
-			 LvSmall _ -> rET_SMALL
-			 LvLarge _ -> rET_BIG
+ 	closure_type = if livenessIsSmall liveness then rET_SMALL else rET_BIG
 
  gentopcode stmt@(CClosureInfoAndCode cl_info slow Nothing _)
 
@@ -151,11 +149,13 @@ Here we handle top-level things, like @CCodeBlock@s and
           = StCLbl label
 
  gentopcode stmt@(CBitmap lbl mask)
-  = returnUs [ StSegment TextSegment 
-	     , StLabel lbl 
-	     , StData WordRep (StInt (toInteger (length mask)) : 
-				map  (StInt . toInteger . intBS) mask)
-	     ]
+  = returnUs $ case bitmapToIntegers mask of
+	       mask'@(_:_:_) ->
+		 [ StSegment TextSegment 
+		 , StLabel lbl 
+		 , StData WordRep (map StInt (toInteger (length mask') : mask'))
+		 ]
+	       _ -> []
 
  gentopcode stmt@(CClosureTbl tycon)
   = returnUs [ StSegment TextSegment
@@ -200,9 +200,7 @@ Here we handle top-level things, like @CCodeBlock@s and
     returnUs (\xs -> vectbl : itbl xs)
   where
     vectbl = StData PtrRep (reverse (map a2stix amodes))
-    closure_type = case liveness of
-		    LvSmall _ -> rET_VEC_SMALL
-		    LvLarge _ -> rET_VEC_BIG
+    closure_type = if livenessIsSmall liveness then rET_VEC_SMALL else rET_VEC_BIG
 
 \end{code}
 

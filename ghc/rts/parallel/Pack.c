@@ -1,6 +1,6 @@
 /* 
    Time-stamp: <Wed Mar 21 2001 16:32:47 Stardate: [-30]6363.44 hwloidl>
-   $Id: Pack.c,v 1.7 2001/05/28 07:13:54 sof Exp $
+   $Id: Pack.c,v 1.8 2001/07/24 05:04:59 ken Exp $
 
    Graph packing and unpacking code for sending it to another processor
    and retrieving the original graph structure from the packet.
@@ -1339,7 +1339,7 @@ PackPAP(StgPAP *pap) {
   nat n, i, j, pack_start;
   StgPtr p, q;
   const StgInfoTable* info;
-  StgWord32 bitmap;
+  StgWord bitmap;
   /* debugging only */
   StgPtr end;
   nat size, ptrs, nonptrs, vhs;
@@ -1615,7 +1615,7 @@ PackPAP(StgPAP *pap) {
 
 	for (j=0; j<large_bitmap->size; j++) {
 	  bitmap = large_bitmap->bitmap[j];
-	  q = p + sizeof(W_) * 8;
+	  q = p + BITS_IN(W_);
 	  while (bitmap != 0) {
 	    if ((bitmap & 1) == 0) {
 	      Pack((StgWord)(ARGTAG_MAX+1));
@@ -2873,7 +2873,7 @@ UnpackPAP(StgWord ***bufptrP, StgClosure *graph)
   nat n, i, j, packed_size = 0;
   StgPtr p, q, end, payload_start, p_FMs;
   const StgInfoTable* info;
-  StgWord32 bitmap;
+  StgWord bitmap;
   StgWord **bufptr = *bufptrP;
 #if defined(DEBUG)
   nat FMs_in_PAP=0;
@@ -3092,7 +3092,7 @@ UnpackPAP(StgWord ***bufptrP, StgClosure *graph)
 
 	for (j=0; j<large_bitmap->size; j++) {
 	  bitmap = large_bitmap->bitmap[j];
-	  q = p + sizeof(W_) * 8;
+	  q = p + BITS_IN(W_);
 	  while (bitmap != 0) {
 	    if ((bitmap & 1) == 0) {
 	      *p++ = (StgWord)UnpackFetchMe(&bufptr, (StgClosure**)&p_FMs);

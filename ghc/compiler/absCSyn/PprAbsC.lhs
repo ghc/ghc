@@ -54,7 +54,7 @@ import UniqSet		( emptyUniqSet, elementOfUniqSet,
 			  addOneToUniqSet, UniqSet
 			)
 import StgSyn		( SRT(..), StgOp(..) )
-import BitSet		( intBS )
+import BitSet		( BitSet, intBS )
 import Outputable
 import GlaExts
 import Util		( nOfThem )
@@ -258,14 +258,11 @@ pprAbsC stmt@(CSRT lbl closures) c
   }
 
 pprAbsC stmt@(CBitmap lbl mask) c
-  = vcat [
-	hcat [ ptext SLIT("BITMAP"), lparen, 
-			pprCLabel lbl, comma,
-	       		int (length mask), 
-	       rparen ],
-        hcat (punctuate comma (map (int.intBS) mask)),
-	ptext SLIT("}};")
-    ]
+  = pp_bitmap_switch mask semi $
+    hcat [ ptext SLIT("BITMAP"), lparen,
+           pprCLabel lbl, comma,
+           int (length mask), comma,
+           pp_bitmap mask, rparen ]
 
 pprAbsC (CSimultaneous abs_c) c
   = hcat [ptext SLIT("{{"), pprAbsC abs_c c, ptext SLIT("}}")]
@@ -520,7 +517,7 @@ pprAbsC stmt@(CRetDirect uniq code srt liveness) _
 	  pprCLabel entry_lbl, 		comma,
           pp_liveness liveness,		comma,	  -- bitmap
 	  pp_srt_info srt,			  -- SRT
-	  ptext type_str,		comma,	  -- closure type
+	  closure_type,			comma,	  -- closure type
 	  ppLocalness info_lbl, 	comma,	  -- info table storage class
 	  ppLocalnessMacro True{-include dyn-} entry_lbl, 	comma,    -- entry pt storage class
 	  int 0, comma,
@@ -529,15 +526,15 @@ pprAbsC stmt@(CRetDirect uniq code srt liveness) _
       pp_code
     ]
   where
-     info_lbl  = mkReturnInfoLabel uniq
-     entry_lbl = mkReturnPtLabel uniq
+     info_lbl     = mkReturnInfoLabel uniq
+     entry_lbl    = mkReturnPtLabel uniq
 
-     pp_code   = let stuff = CCodeBlock entry_lbl code in
-	         pprAbsC stuff (costs stuff)
+     pp_code      = let stuff = CCodeBlock entry_lbl code in
+	            pprAbsC stuff (costs stuff)
 
-     type_str = case liveness of
-		   LvSmall _ -> SLIT("RET_SMALL")
-		   LvLarge _ -> SLIT("RET_BIG")
+     closure_type = pp_liveness_switch liveness
+		       (ptext SLIT("RET_SMALL"))
+		       (ptext SLIT("RET_BIG"))
 
 pprAbsC stmt@(CRetVector lbl amodes srt liveness) _
   = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
@@ -549,7 +546,7 @@ pprAbsC stmt@(CRetVector lbl amodes srt liveness) _
 	  pprCLabel lbl, comma,
 	  pp_liveness liveness, comma,	-- bitmap liveness mask
 	  pp_srt_info srt,		-- SRT
-	  ptext type_str, comma,
+	  closure_type, comma,
 	  ppLocalness lbl, comma
 	],
 	nest 2 (sep (punctuate comma (map ppr_item amodes))),
@@ -561,9 +558,9 @@ pprAbsC stmt@(CRetVector lbl amodes srt liveness) _
     ppr_item item = (<>) (text "(F_) ") (ppr_amode item)
     size = length amodes
 
-    type_str = case liveness of
-		   LvSmall _ -> SLIT("RET_VEC_SMALL")
-		   LvLarge _ -> SLIT("RET_VEC_BIG")
+    closure_type = pp_liveness_switch liveness
+		      (ptext SLIT("RET_VEC_SMALL"))
+		      (ptext SLIT("RET_VEC_BIG"))
 
 
 pprAbsC stmt@(CModuleInitBlock lbl code) _
@@ -1187,15 +1184,37 @@ cCheckMacroText	HP_CHK_GEN		= SLIT("HP_CHK_GEN")
 %************************************************************************
 
 \begin{code}
+pp_bitmap_switch :: [BitSet] -> SDoc -> SDoc -> SDoc
+pp_bitmap_switch ([   ]) small large = small
+pp_bitmap_switch ([_  ]) small large = small
+pp_bitmap_switch ([_,_]) small large = hcat
+    [ptext SLIT("BITMAP_SWITCH64"), lparen, small, comma, large, rparen]
+pp_bitmap_switch (_    ) small large = large
+
+pp_liveness_switch :: Liveness -> SDoc -> SDoc -> SDoc
+pp_liveness_switch (Liveness lbl mask) = pp_bitmap_switch mask
+
+pp_bitset :: BitSet -> SDoc
+pp_bitset s
+    | i < -1    = int (i + 1) <> text "-1"
+    | otherwise = int i
+    where i = intBS s
+
+pp_bitmap :: [BitSet] -> SDoc
+pp_bitmap [] = int 0
+pp_bitmap ss = hcat (punctuate delayed_comma (bundle ss)) where
+  delayed_comma         = hcat [space, ptext SLIT("COMMA"), space]
+  bundle []         = []
+  bundle [s]        = [hcat bitmap32]
+     where bitmap32 = [ptext SLIT("BITMAP32"), lparen,
+                       pp_bitset s, rparen]
+  bundle (s1:s2:ss) = hcat bitmap64 : bundle ss
+     where bitmap64 = [ptext SLIT("BITMAP64"), lparen,
+                       pp_bitset s1, comma, pp_bitset s2, rparen]
+
 pp_liveness :: Liveness -> SDoc
-pp_liveness lv = 
-   case lv of
-	LvLarge lbl  -> char '&' <> pprCLabel lbl
-	LvSmall mask	-- Avoid gcc bug when printing minInt
-	   | bitmap_int == minInt -> int (bitmap_int+1) <> text "-1"
-	   | otherwise		  -> int bitmap_int
-         where
-	   bitmap_int = intBS mask
+pp_liveness (Liveness lbl mask)
+ = pp_bitmap_switch mask (pp_bitmap mask) (char '&' <> pprCLabel lbl)
 \end{code}
 
 %************************************************************************

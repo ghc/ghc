@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.104 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: GC.c,v 1.105 2001/07/24 05:04:58 ken Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -3049,7 +3049,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 {
   StgPtr q;
   const StgInfoTable* info;
-  StgWord32 bitmap;
+  StgWord bitmap;
 
   //IF_DEBUG(sanity, belch("  scavenging stack between %p and %p", p, stack_end));
 
@@ -3196,7 +3196,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
       scavenge_srt(info);
       continue;
 
-      // large bitmap (> 32 entries) 
+      // large bitmap (> 32 entries, or > 64 on a 64-bit machine) 
     case RET_BIG:
     case RET_VEC_BIG:
       {
@@ -3209,7 +3209,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 
 	for (i=0; i<large_bitmap->size; i++) {
 	  bitmap = large_bitmap->bitmap[i];
-	  q = p + sizeof(W_) * 8;
+	  q = p + BITS_IN(W_);
 	  while (bitmap != 0) {
 	    if ((bitmap & 1) == 0) {
 	      (StgClosure *)*p = evacuate((StgClosure *)*p);

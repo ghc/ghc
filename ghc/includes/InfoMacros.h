@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.15 2001/07/23 23:14:58 ken Exp $
+ * $Id: InfoMacros.h,v 1.16 2001/07/24 05:04:58 ken Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -617,8 +617,19 @@ typedef vec_info_8 StgPolyInfoTable;
 #define SRT(lbl) \
   static const StgSRT lbl = {
 
-#define BITMAP(lbl,size) \
-  static const StgLargeBitmap lbl = { size, {
+#define BITMAP(lbl,size,contents) \
+  static const StgLargeBitmap lbl = { size, { contents } };
+
+#if SIZEOF_VOID_P == 8
+#define BITMAP_SWITCH64(small, large)	small
+#define BITMAP64(first, second)		\
+  (((StgWord32)(first)) | ((StgWord)(StgWord32)(second) << 32))
+#else
+#define BITMAP_SWITCH64(small, large)	large
+#define BITMAP64(first, second)		first, second
+#endif
+#define BITMAP32(x)			((StgWord32)(x))
+#define COMMA				,
 
 /* DLL_SRT_ENTRY is used on the Win32 side when filling initialising
    an entry in an SRT table with a reference to a closure that's

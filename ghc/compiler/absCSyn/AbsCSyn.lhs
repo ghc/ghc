@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.36 2001/05/22 13:43:14 simonpj Exp $
+% $Id: AbsCSyn.lhs,v 1.37 2001/07/24 05:04:58 ken Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -177,7 +177,8 @@ stored in a mixed type location.)
   | CSRT CLabel [CLabel]  	-- SRT declarations: basically an array of 
 				-- pointers to static closures.
   
-  | CBitmap CLabel LivenessMask	-- A larger-than-32-bits bitmap.
+  | CBitmap CLabel LivenessMask	-- A bitmap to be emitted if and only if
+				-- it is larger than a target machine word.
 
   | CClosureInfoAndCode
 	ClosureInfo		-- Explains placement and layout of closure
@@ -412,11 +413,18 @@ We represent liveness bitmaps as a BitSet (whose internal
 representation really is a bitmap).  These are pinned onto case return
 vectors to indicate the state of the stack for the garbage collector.
 
+In the compiled program, liveness bitmaps that fit inside a single
+word (StgWord) are stored as a single word, while larger bitmaps are
+stored as a pointer to an array of words.  When we compile via C
+(especially when we bootstrap via HC files), we generate identical C
+code regardless of whether words are 32- or 64-bit on the target
+machine, by postponing the decision of how to store each liveness
+bitmap to C compilation time (or rather, C preprocessing time).
+
 \begin{code}
 type LivenessMask = [BitSet]
 
-data Liveness = LvSmall BitSet
-              | LvLarge CLabel
+data Liveness = Liveness CLabel LivenessMask
 \end{code}
 
 %************************************************************************

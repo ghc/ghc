@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.28 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: Sanity.c,v 1.29 2001/07/24 05:04:59 ken Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -59,7 +59,7 @@
 
 static StgOffset checkStackClosure   ( StgClosure* c );
 static StgOffset checkStackObject    ( StgPtr sp );
-static StgOffset checkSmallBitmap    ( StgPtr payload, StgWord32 bitmap );
+static StgOffset checkSmallBitmap    ( StgPtr payload, StgWord bitmap );
 static StgOffset checkLargeBitmap    ( StgPtr payload, StgLargeBitmap* );
 static void      checkClosureShallow ( StgClosure* p );
 
@@ -68,7 +68,7 @@ static void      checkClosureShallow ( StgClosure* p );
    -------------------------------------------------------------------------- */
 
 static StgOffset 
-checkSmallBitmap( StgPtr payload, StgWord32 bitmap )
+checkSmallBitmap( StgPtr payload, StgWord bitmap )
 {
     StgOffset i;
 
@@ -84,12 +84,12 @@ checkSmallBitmap( StgPtr payload, StgWord32 bitmap )
 static StgOffset 
 checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap )
 {
-    StgWord32 bmp;
+    StgWord bmp;
     StgOffset i;
 
     i = 0;
     for (bmp=0; bmp<large_bitmap->size; bmp++) {
-	StgWord32 bitmap = large_bitmap->bitmap[bmp];
+	StgWord bitmap = large_bitmap->bitmap[bmp];
 	for(; bitmap != 0; ++i, bitmap >>= 1 ) {
 	    if ((bitmap & 1) == 0) {
 		checkClosure((StgClosure *)payload[i]);
