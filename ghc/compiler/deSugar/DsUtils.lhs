@@ -12,7 +12,7 @@ module DsUtils (
 
 	tidyLitPat, tidyNPat,
 
-	mkDsLet, mkDsLets,
+	mkDsLet,
 
 	cantFailMatchResult, extractMatchResult,
 	combineMatchResults, 
@@ -26,7 +26,7 @@ module DsUtils (
 
 	mkSelectorBinds, mkTupleExpr, mkTupleSelector, 
 	mkTupleType, mkTupleCase, mkBigCoreTup,
-	mkCoreTup, mkCoreSel, mkCoreTupTy,
+	mkCoreTup, mkCoreTupTy,
 	
 	dsReboundNames, lookupReboundName,
 
