@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: timezone.c,v 1.2 1998/12/02 13:28:00 simonm Exp $
+ * $Id: timezone.c,v 1.3 1999/09/12 14:23:52 sof Exp $
  *
  * Timezone Runtime Support
  */
@@ -31,3 +31,15 @@ StgInt sizeof_word      ( void ) { return (sizeof(unsigned int)); }
 StgInt sizeof_struct_tm	( void ) { return (sizeof(struct tm)); }
 StgInt sizeof_time_t    ( void ) { return (sizeof(time_t)); }
 
+char*
+get_ZONE (StgAddr x)
+{
+#ifdef cygwin32_TARGET_OS
+  /* 
+   * tzname[] isn't properly initialised under cygwin B20.1 
+   * unless tzset() is called, so better do it here.
+   */
+  tzset();
+#endif
+  return (ZONE(x));
+}
