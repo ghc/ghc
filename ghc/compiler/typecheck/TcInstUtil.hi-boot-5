@@ -1,4 +1,0 @@
-__interface TcInstUtil 1 0 where
-__export TcInstUtil emptyInstEnv ;
-1 emptyInstEnv :: HscTypes.InstEnv ;
-
