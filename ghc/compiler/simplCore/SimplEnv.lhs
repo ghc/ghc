@@ -72,9 +72,8 @@ import Literal		( isNoRepLit, Literal{-instances-} )
 import Maybes		( maybeToBool, expectJust )
 import Name		( isLocallyDefined )
 import OccurAnal	( occurAnalyseExpr )
-import Outputable	( Outputable(..){-instances-} )
+import Outputable	( PprStyle(..), Outputable(..){-instances-} )
 import PprCore		-- various instances
-import PprStyle		( PprStyle(..) )
 import PprType		( GenType, GenTyVar )
 import Pretty
 import Type		( eqTy, applyTypeEnvToTy, SYN_IE(Type) )
@@ -184,19 +183,50 @@ getSimplIntSwitch chkr switch
   = expectJust "getSimplIntSwitch" (intSwitchSet chkr switch)
 
 	-- Crude, but simple
-switchOffInlining :: SimplEnv -> SimplEnv
-switchOffInlining (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
-  = SimplEnv chkr' encl_cc ty_env in_id_env out_id_env con_apps
-  where
-    chkr' EssentialUnfoldingsOnly = SwBool True
-    chkr' other			  = chkr other
-
 setCaseScrutinee :: SimplEnv -> SimplEnv
 setCaseScrutinee (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
   = SimplEnv chkr' encl_cc ty_env in_id_env out_id_env con_apps
   where
     chkr' SimplCaseScrutinee = SwBool True
     chkr' other		     = chkr other
+\end{code}
+
+@switchOffInlining@ is used to prepare the environment for simplifying
+the RHS of an Id that's marked with an INLINE pragma.  It is going to
+be inlined wherever they are used, and then all the inlining will take
+effect.  Meanwhile, there isn't much point in doing anything to the
+as-yet-un-INLINEd rhs.  Furthremore, it's very important to switch off
+inlining!  because
+	(a) not doing so will inline a worker straight back into its wrapper!
+
+and 	(b) Consider the following example 
+	     	let f = \pq -> BIG
+	     	in
+	     	let g = \y -> f y y
+		    {-# INLINE g #-}
+	     	in ...g...g...g...g...g...
+
+	Now, if that's the ONLY occurrence of f, it will be inlined inside g,
+	and thence copied multiple times when g is inlined.
+
+	Andy disagrees! Example:
+		all xs = foldr (&&) True xs
+		any p = all . map p  {-# INLINE any #-}
+	
+	Problem: any won't get deforested, and so if it's exported and
+	the importer doesn't use the inlining, (eg passes it as an arg)
+	then we won't get deforestation at all.
+	We havn't solved this problem yet!
+
+We prepare the envt by simply discarding the out_id_env, which has
+all the unfolding info. At one point we did it by modifying the chkr so
+that it said "EssentialUnfoldingsOnly", but that prevented legitmate, and important,
+simplifications happening in the body of the RHS.
+
+\begin{code}
+switchOffInlining :: SimplEnv -> SimplEnv
+switchOffInlining (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
+  = SimplEnv chkr encl_cc ty_env in_id_env nullIdEnv nullConApps
 \end{code}
 
 %************************************************************************
