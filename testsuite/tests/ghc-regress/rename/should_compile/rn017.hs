@@ -1,7 +1,7 @@
 -- !! Rexporting
 module Test ( module Test , module Rn017 ) where
 
-import {-# SOURCE #-} Rn017
+import {-# SOURCE #-} RnAux017
 
 f x = x
 
