@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: IOBase.lhs,v 1.2 2001/07/03 14:13:32 simonmar Exp $
+% $Id: IOBase.lhs,v 1.3 2001/09/13 11:38:54 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -503,16 +503,26 @@ instance Eq IOException where
     e1==e2 && str1==str2 && h1==h2 && loc1==loc2 && fn1==fn2
 
 data IOErrorType
-  = AlreadyExists        | HardwareFault
-  | IllegalOperation     | InappropriateType
-  | Interrupted          | InvalidArgument
-  | NoSuchThing          | OtherError
-  | PermissionDenied     | ProtocolError
-  | ResourceBusy         | ResourceExhausted
-  | ResourceVanished     | SystemError
-  | TimeExpired          | UnsatisfiedConstraints
-  | UnsupportedOperation
+  -- Haskell 98:
+  = AlreadyExists
   | EOF
+  | IllegalOperation
+  | NoSuchThing
+  | PermissionDenied
+  | ResourceBusy
+  | ResourceExhausted
+  -- GHC only:
+  | UnsatisfiedConstraints
+  | SystemError
+  | ProtocolError
+  | OtherError
+  | InvalidArgument
+  | InappropriateType
+  | HardwareFault
+  | UnsupportedOperation
+  | TimeExpired
+  | ResourceVanished
+  | Interrupted
 #if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
   | ComError Int           -- HRESULT
 #endif
@@ -543,8 +553,6 @@ instance Show IOErrorType where
 #if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
       ComError _	-> "COM error"
 #endif
-
-
 
 userError       :: String  -> IOError
 userError str	=  UserError str
