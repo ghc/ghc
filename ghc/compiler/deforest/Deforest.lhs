@@ -22,7 +22,7 @@
 
 > import CmdLineOpts	( GlobalSwitch, SwitchResult )
 > import CoreSyn
-> import Id		( getIdInfo, Id )
+> import Id		( Id )
 > import IdInfo
 > import Outputable
 > import SimplEnv	( SYN_IE(SwitchChecker) )
