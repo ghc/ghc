@@ -119,8 +119,9 @@ floatPrimTyConKey = mkPreludeTyConUnique 11</pre>
       on the suffix <code>_RDR</code> and are of type <code>RdrName</code> (an
       example, is <code>times_RDR</code>, which represents the lexeme
       <code>*</code>).  The names are used in locations where they pass
-      through the renamer anyway (e.g., code generated from deriving clauses),
-      which will take care of adding uniqueness information.
+      through the renamer anyway (e.g., special constructors encountered by
+      the parser, such as [], and code generated from deriving clauses), which
+      will take care of adding uniqueness information.
     <p>
       The module
       <a href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/PrelInfo.lhs"><code>PrelInfo</code></a>
@@ -131,7 +132,7 @@ floatPrimTyConKey = mkPreludeTyConUnique 11</pre>
 
     <p><small>
 <!-- hhmts start -->
-Last modified: Mon Nov 26 19:29:33 EST 2001
+Last modified: Tue Dec 11 17:54:07 EST 2001
 <!-- hhmts end -->
     </small>
   </body>
