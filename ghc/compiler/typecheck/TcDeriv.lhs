@@ -21,7 +21,6 @@ import HsSyn		( HsDecl, FixityDecl, Fixity, InstDecl,
 import HsPragmas	( InstancePragmas(..) )
 import RdrHsSyn		( RdrName, SYN_IE(RdrNameMonoBinds) )
 import RnHsSyn		( SYN_IE(RenamedHsBinds), SYN_IE(RenamedMonoBinds), SYN_IE(RenamedFixityDecl) )
-import TcHsSyn		( TcIdOcc )
 
 import TcMonad
 import Inst		( SYN_IE(InstanceMapper) )
@@ -31,6 +30,7 @@ import TcKind		( TcKind )
 import TcGenDeriv	-- Deriv stuff
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcSimplify	( tcSimplifyThetas )
+import TcType		( TcIdOcc )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( newDfunName, bindLocatedLocalsRn )

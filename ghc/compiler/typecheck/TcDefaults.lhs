@@ -14,7 +14,6 @@ import HsSyn		( HsDecl(..), TyDecl, ClassDecl, InstDecl, HsBinds,
 			  DefaultDecl(..), HsType, IfaceSig,
 			  HsExpr, HsLit, ArithSeqInfo, Fake, InPat)
 import RnHsSyn		( RenamedHsDecl(..), RenamedDefaultDecl(..) )
-import TcHsSyn		( TcIdOcc )
 
 import TcMonad
 import Inst		( InstOrigin(..) )
@@ -22,6 +21,7 @@ import TcEnv		( tcLookupClassByKey )
 import SpecEnv		( SpecEnv )
 import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyCheckThetas )
+import TcType		( TcIdOcc )
 
 import TysWiredIn	( intTy, doubleTy, unitTy )
 import Type             ( SYN_IE(Type) )

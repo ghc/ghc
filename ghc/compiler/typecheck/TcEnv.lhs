@@ -31,9 +31,9 @@ IMPORT_DELOOPER(TcMLoop)  -- for paranoia checking
 import HsTypes	( HsTyVar(..) )
 import Id	( SYN_IE(Id), GenId, idType, mkUserLocal, mkUserId, replaceIdInfo, getIdInfo )
 import PragmaInfo ( PragmaInfo(..) )
-import TcHsSyn	( SYN_IE(TcIdBndr), TcIdOcc(..) )
 import TcKind	( TcKind, newKindVars, newKindVar, tcDefaultKind, kindToTcKind, Kind )
-import TcType	( SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar), SYN_IE(TcTyVarSet),
+import TcType	( SYN_IE(TcIdBndr), TcIdOcc(..),
+		  SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar), SYN_IE(TcTyVarSet),
 		  newTyVarTys, tcInstTyVars, zonkTcTyVars
 		)
 import TyVar	( unionTyVarSets, emptyTyVarSet, tyVarSetToList, SYN_IE(TyVar) )

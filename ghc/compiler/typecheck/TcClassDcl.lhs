@@ -22,7 +22,7 @@ import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
 			  RenamedClassOpSig(..), SYN_IE(RenamedMonoBinds),
 			  RenamedGenPragmas(..), RenamedContext(..), SYN_IE(RenamedHsDecl)
 			)
-import TcHsSyn		( TcIdOcc(..), SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds), SYN_IE(TcExpr),
+import TcHsSyn		( SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds), SYN_IE(TcExpr),
 			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, tcIdType )
 
 import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), emptyLIE, plusLIE, newDicts, newMethod )
@@ -33,7 +33,7 @@ import TcKind		( unifyKind, TcKind )
 import TcMonad
 import TcMonoType	( tcHsType, tcContext )
 import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), tcInstType, tcInstSigTyVars, 
+import TcType		( TcIdOcc(..), SYN_IE(TcType), SYN_IE(TcTyVar), tcInstType, tcInstSigTyVars, 
 			  tcInstSigType, tcInstSigTcType )
 import PragmaInfo	( PragmaInfo(..) )
 
