@@ -37,7 +37,12 @@ void *alloca();
 
 #include "gmp-mparam.h"
 
-#ifdef __STDC__
+/* 
+ Cosmetic, but when running mkdependC on this under linux-2.x,
+ we're warned about redefinition of signed (done in sys/cdefs.h).
+ To avoid this wibble, we've weakened the #if below.
+ */
+#if  defined(__STDC__) || defined(__linux__)
 void *malloc (size_t);
 void *realloc (void *, size_t);
 void free (void *);
