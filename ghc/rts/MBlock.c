@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.42 2002/12/11 15:36:42 simonmar Exp $
+ * $Id: MBlock.c,v 1.43 2003/03/20 15:43:31 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -127,7 +127,8 @@ my_mmap (void *addr, int size)
 
     if (ret == (void *)-1) {
 	if (errno == ENOMEM) {
-	    barf("out of memory (requested %d bytes)", size);
+	    prog_belch("out of memory (requested %d bytes)", size);
+	    stg_exit(EXIT_FAILURE);
 	} else {
 	    barf("getMBlock: mmap failed");
 	}
