@@ -150,7 +150,7 @@ package_details installing
 #                           ifdef mingw32_TARGET_OS
                             [ "wsock32", "msvcrt" ]
 #                           else
-                            [ "m" ]   -- libm, that is
+                            [ ]
 #                           endif
                             ,
         include_dirs   = if installing
