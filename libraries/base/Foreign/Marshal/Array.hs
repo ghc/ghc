@@ -146,16 +146,28 @@ peekArray0 marker ptr  = loop 0
 
 -- |Write the list elements consecutive into memory
 --
-pokeArray          :: Storable a => Ptr a -> [a] -> IO ()
-pokeArray ptr vals  = zipWithM_ (pokeElemOff ptr) [0..] vals
+pokeArray :: Storable a => Ptr a -> [a] -> IO ()
+#ifndef __GLASGOW_HASKELL__
+pokeArray ptrs vals =  zipWithM_ (pokeElemOff ptr) [0..] vals
+#else
+pokeArray ptr vals = go vals 0#
+  where go [] n#         = return ()
+	go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
+#endif
 
 -- |Write the list elements consecutive into memory and terminate them with the
 -- given marker element
 --
-pokeArray0		   :: Storable a => a -> Ptr a -> [a] -> IO ()
+pokeArray0 :: Storable a => a -> Ptr a -> [a] -> IO ()
+#ifndef __GLASGOW_HASKELL__
 pokeArray0 marker ptr vals  = do
   pokeArray ptr vals
   pokeElemOff ptr (length vals) marker
+#else
+pokeArray0 marker ptr vals = go vals 0#
+  where go [] n#         = pokeElemOff ptr (I# n#) marker
+	go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
+#endif
 
 
 -- combined allocation and marshalling
