@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.1 1998/01/30 17:02:18 simonm Exp $
+% $Id: glasgow_exts.vsgml,v 1.2 1998/07/20 16:16:34 sof Exp $
 %
 % GHC Language Extensions.
 %
@@ -274,6 +274,27 @@ format: @%r@ is replaced with the ``result,'' @%0@--@%n-1@ are
 replaced with the 1st--nth arguments.  As you can see above, it is an
 easy way to do simple C~casting.  Everything said about @_ccall_@ goes
 for @_casm_@ as well.
+
+The use of @_casm_@ in your code does pose a problem to the compiler
+when it comes to generating an interface file for a freshly compiled
+module. Included in an interface file is the unfolding (if any) of a
+declaration. However, if a declaration's unfolding happens to contain
+a @_casm_@, its unfolding will <em/not/ be emitted into the interface
+file even if it qualifies by all the other criteria. The reason why
+the compiler prevents this from happening is that unfolding @_casm_@s
+into an interface file unduly constrains how code that import your
+module have to be compiled. If an imported declaration is unfolded and
+it contains a @_casm_@, you now have to be using a compiler backend
+capable of dealing with it (i.e., the C compiler backend). If you are
+using the C compiler backend, the unfolded @_casm_@ may still cause you
+problems since the C code snippet it contains may mention CPP symbols
+that were in scope when compiling the original module are not when
+compiling the importing module.
+
+If you're willing to put up with the drawbacks of doing cross-module
+inlining of C code (GHC - A Better C Compiler :-), the option
+@-funfold-casms-in-hi-file@ will turn off the default behaviour.
+<nidx>-funfold-casms-in-hi-file option</nidx>
 
 %************************************************************************
 %*                                                                      *
