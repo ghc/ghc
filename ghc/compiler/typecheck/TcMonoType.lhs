@@ -5,12 +5,12 @@
 
 \begin{code}
 module TcMonoType ( tcHsType, tcHsSigType, tcHsBoxedSigType, 
-		    tcContext, tcClassContext, tcHsTyVar, 
+		    tcContext, tcClassContext,
 
 			-- Kind checking
 		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
 		    kcHsType, kcHsSigType, kcHsBoxedSigType, kcHsContext,
-		    kcTyVarScope, 
+		    kcTyVarScope, newSigTyVars, mkImmutTyVars,
 
 		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig,
 		    checkSigTyVars, sigCtxt, sigPatCtxt
@@ -69,12 +69,73 @@ import Outputable
 
 %************************************************************************
 %*									*
-\subsection{Checking types}
+\subsection{Kind checking}
 %*									*
 %************************************************************************
 
-\begin{code}
+Kind checking
+~~~~~~~~~~~~~
+When we come across the binding site for some type variables, we
+proceed in two stages
 
+1. Figure out what kind each tyvar has
+
+2. Create suitably-kinded tyvars, 
+   extend the envt, 
+   and typecheck the body
+
+To do step 1, we proceed thus:
+
+1a. Bind each type variable to a kind variable
+1b. Apply the kind checker
+1c. Zonk the resulting kinds
+
+The kind checker is passed to kcTyVarScope as an argument.  
+
+For example, when we find
+	(forall a m. m a -> m a)
+we bind a,m to kind varibles and kind-check (m a -> m a).  This
+makes a get kind *, and m get kind *->*.  Now we typecheck (m a -> m a)
+in an environment that binds a and m suitably.
+
+The kind checker passed to kcTyVarScope needs to look at enough to
+establish the kind of the tyvar:
+  * For a group of type and class decls, it's just the group, not
+	the rest of the program
+  * For a tyvar bound in a pattern type signature, its the types
+	mentioned in the other type signatures in that bunch of patterns
+  * For a tyvar bound in a RULE, it's the type signatures on other
+	universally quantified variables in the rule
+
+Note that this may occasionally give surprising results.  For example:
+
+	data T a b = MkT (a b)
+
+Here we deduce			a::*->*, b::*.
+But equally valid would be
+				a::(*->*)-> *, b::*->*
+
+\begin{code}
+kcTyVarScope :: [HsTyVarBndr Name] 
+	     -> TcM s a				-- The kind checker
+	     -> TcM s [(Name,Kind)]
+	-- Do a kind check to find out the kinds of the type variables
+	-- Then return a bunch of name-kind pairs, from which to 
+	-- construct the type variables.  We don't return the tyvars
+	-- themselves because sometimes we want mutable ones and 
+	-- sometimes we want immutable ones.
+
+kcTyVarScope [] kind_check = returnTc []
+	-- A useful short cut for a common case!
+  
+kcTyVarScope tv_names kind_check 
+  = kcHsTyVars tv_names 				`thenNF_Tc` \ tv_names_w_kinds ->
+    tcExtendKindEnv tv_names_w_kinds kind_check		`thenTc_`
+    zonkKindEnv tv_names_w_kinds
+\end{code}
+    
+
+\begin{code}
 kcHsTyVar  :: HsTyVarBndr name   -> NF_TcM s (name, TcKind)
 kcHsTyVars :: [HsTyVarBndr name] -> NF_TcM s [(name, TcKind)]
 
@@ -189,24 +250,6 @@ kcHsPred pred@(HsPClass cls tys)
     unifyKind kind (mkArrowKinds arg_kinds boxedTypeKind)
 \end{code}
 
-\begin{code}
-kcTyVarScope :: [HsTyVarBndr Name] 
-	     -> TcM s a				-- The kind checker
-	     -> TcM s [TyVar]
-	-- Do a kind check to find out the kinds of the type variables
-	-- Then return the type variables
-
-kcTyVarScope [] kind_check = returnTc []
-	-- A useful short cut for a common case!
-  
-kcTyVarScope tv_names kind_check 
-  = kcHsTyVars tv_names 				`thenNF_Tc` \ tv_names_w_kinds ->
-    tcExtendKindEnv tv_names_w_kinds kind_check		`thenTc_`
-    zonkKindEnv tv_names_w_kinds			`thenNF_Tc` \ zonked_pairs ->
-    returnTc (map mk_tyvar zonked_pairs)
-\end{code}
-    
-
 %************************************************************************
 %*									*
 \subsection{Checking types}
@@ -287,13 +330,14 @@ tcHsType (HsUsgForAllTy uv_name ty)
     tcHsType ty                     `thenTc` \ tc_ty ->
     returnTc (mkUsForAllTy uv tc_ty)
 
-tcHsType full_ty@(HsForAllTy (Just tv_names) context ty)
-  = let
-	kind_check = kcHsContext context `thenTc_` kcHsType ty
+tcHsType full_ty@(HsForAllTy (Just tv_names) ctxt ty)
+  = kcTyVarScope tv_names 
+		 (kcHsContext ctxt `thenTc_` kcHsType ty)  `thenTc` \ tv_kinds ->
+    let
+	forall_tyvars = mkImmutTyVars tv_kinds
     in
-    kcTyVarScope tv_names kind_check 	`thenTc` \ forall_tyvars ->
     tcExtendTyVarEnv forall_tyvars	$
-    tcContext context			`thenTc` \ theta ->
+    tcContext ctxt			`thenTc` \ theta ->
     tcHsType ty				`thenTc` \ tau ->
     let
 	-- Check for ambiguity
@@ -387,7 +431,7 @@ tc_fun_type (HsTyVar name) arg_tys
 			--	data Tree a b = ...
 			--	type Foo a = Tree [a]
 			--	f :: Foo a b -> ...
-		    err_msg = arityErr "type synonym" name arity n_args
+		    err_msg = arityErr "Type synonym" name arity n_args
 		    n_args  = length arg_tys
 
 	other -> failWithTc (wrongThingErr "type constructor" thing name)
@@ -438,24 +482,19 @@ tcClassAssertion ccall_ok assn@(HsPIParam name ty)
 %************************************************************************
 
 \begin{code}
-mk_tyvar (tv_bndr, kind) = mkTyVar tv_bndr kind
+mkImmutTyVars :: [(Name,Kind)] -> [TyVar]
+newSigTyVars  :: [(Name,Kind)] -> NF_TcM s [TcTyVar]
+
+mkImmutTyVars pairs = [mkTyVar name kind | (name, kind) <- pairs]
+newSigTyVars  pairs = listNF_Tc [tcNewSigTyVar name kind | (name,kind) <- pairs]
 
 mkTyClTyVars :: Kind 			-- Kind of the tycon or class
 	     -> [HsTyVarBndr Name]
 	     -> [TyVar]
 mkTyClTyVars kind tyvar_names
-  = map mk_tyvar tyvars_w_kinds
+  = mkImmutTyVars tyvars_w_kinds
   where
     (tyvars_w_kinds, _) = zipFunTys (hsTyVarNames tyvar_names) kind
-
-tcHsTyVar :: HsTyVarBndr Name -> NF_TcM s TcTyVar
-tcHsTyVar (UserTyVar name)       = newKindVar		`thenNF_Tc` \ kind ->
-			           tcNewMutTyVar name kind
-	-- NB: mutable kind => mutable tyvar, so that zonking can bind
-	-- the tyvar to its immutable form
-
-tcHsTyVar (IfaceTyVar name kind) = returnNF_Tc (mkTyVar name kind)
-
 \end{code}
 
 

@@ -14,9 +14,9 @@ import RnHsSyn		( RenamedHsDecl )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyAndCheck )
-import TcType		( zonkTcTypes, newTyVarTy )
+import TcType		( zonkTcTypes, zonkTcTyVarToTyVar, newTyVarTy )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
-import TcMonoType	( tcHsSigType, tcHsTyVar, checkSigTyVars )
+import TcMonoType	( kcTyVarScope, kcHsSigType, tcHsSigType, newSigTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )
 import TcEnv		( tcExtendLocalValEnv, newLocalId,
 			  tcExtendTyVarEnv
@@ -55,11 +55,13 @@ tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
 
 	-- Deal with the tyvars mentioned in signatures
 	-- Yuk to the UserTyVar
-    mapNF_Tc (tcHsTyVar . UserTyVar) sig_tvs 		`thenNF_Tc` \ sig_tyvars ->
+    kcTyVarScope (map UserTyVar sig_tvs)
+		 (mapTc_ kcHsSigType sig_tys)	`thenTc` \ sig_tv_kinds ->
+    newSigTyVars sig_tv_kinds			`thenNF_Tc` \ sig_tyvars ->
     tcExtendTyVarEnv sig_tyvars 		(	
 
 		-- Ditto forall'd variables
-	mapNF_Tc new_id vars				`thenNF_Tc` \ ids ->
+	mapNF_Tc new_id vars					`thenNF_Tc` \ ids ->
 	tcExtendLocalValEnv [(idName id, id) | id <- ids]	$
 	
 		-- Now LHS and RHS
@@ -90,22 +92,23 @@ tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
     in
 
 	-- Gather type variables to quantify over
-    zonkTcTypes (rule_ty : map idType tpl_ids)		`thenNF_Tc` \ zonked_tys ->
-    let
-	tpl_tvs = tyVarsOfTypes zonked_tys
-    in
+	-- and turn them into real TyVars (just as in TcBinds.tcBindWithSigs)
+    zonkTcTypes (rule_ty : map idType tpl_ids)				`thenNF_Tc` \ zonked_tys ->
+    mapTc zonkTcTyVarToTyVar (varSetElems (tyVarsOfTypes zonked_tys))	`thenTc` \ tvs ->
 
 	-- RHS can be a bit more lenient.  In particular,
 	-- we let constant dictionaries etc float outwards
-    tcSimplifyAndCheck (text "tcRule") tpl_tvs 
+    tcSimplifyAndCheck (text "tcRule") (mkVarSet tvs)
 		       lhs_dicts rhs_lie		`thenTc` \ (lie', rhs_binds) ->
 
-    returnTc (lie', HsRule	name (varSetElems tpl_tvs)
+    returnTc (lie', HsRule	name tvs
 				(map RuleBndr tpl_ids)	-- yuk
 				(mkHsLet lhs_binds lhs')
 				(mkHsLet rhs_binds rhs')
 				src_loc)
   where
+    sig_tys = [t | RuleBndrSig _ t <- vars]
+
     new_id (RuleBndr var) 	   = newTyVarTy openTypeKind	`thenNF_Tc` \ ty ->
 		          	     returnNF_Tc (mkVanillaId var ty)
     new_id (RuleBndrSig var rn_ty) = tcHsSigType rn_ty	`thenTc` \ ty ->

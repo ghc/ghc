@@ -325,8 +325,10 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
     checkTcM (not (isSigTyVar tv1))
 	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
 
-    WARN( not (typeKind non_var_ty2 `hasMoreBoxityInfo` tyVarKind tv1), (ppr tv1 <+> ppr (tyVarKind tv1)) $$
-									(ppr non_var_ty2 <+> ppr (typeKind non_var_ty2)) )
+    warnTc (not (typeKind non_var_ty2 `hasMoreBoxityInfo` tyVarKind tv1))
+	   ((ppr tv1 <+> ppr (tyVarKind tv1)) $$ 
+	     (ppr non_var_ty2 <+> ppr (typeKind non_var_ty2)))		`thenNF_Tc_` 
+
     tcPutTyVar tv1 non_var_ty2				`thenNF_Tc_`
 	-- This used to say "ps_ty2" instead of "non_var_ty2"
 

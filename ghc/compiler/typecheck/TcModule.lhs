@@ -147,7 +147,7 @@ tcModule rn_name_supply fixities
 		 -- Type-check the type and class decls
 	tcTyAndClassDecls unf_env decls	`thenTc` \ env ->
     
-		    -- Typecheck the instance decls, includes deriving
+		 -- Typecheck the instance decls, includes deriving
 	tcSetEnv env $
 
 	tcInstDecls1 unf_env decls 

@@ -21,7 +21,7 @@ import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonoType	( tcHsSigType, tcHsBoxedSigType, kcTyVarScope, tcClassContext,
-			  kcHsContext, kcHsSigType
+			  kcHsContext, kcHsSigType, mkImmutTyVars
 			)
 import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcLookupValueByKey, TyThing(..), TyThingDetails(..) )
 import TcMonad
@@ -141,7 +141,10 @@ tcConDecl :: TyCon -> [TyVar] -> ClassContext -> RenamedConDecl -> TcM s DataCon
 
 tcConDecl tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
   = tcAddSrcLoc src_loc					$
-    kcTyVarScope ex_tvs (kcConDetails ex_ctxt details)	`thenTc` \ ex_tyvars -> 
+    kcTyVarScope ex_tvs (kcConDetails ex_ctxt details)	`thenTc` \ ex_tv_kinds ->
+    let
+	ex_tyvars = mkImmutTyVars ex_tv_kinds
+    in
     tcExtendTyVarEnv ex_tyvars				$
     tcClassContext ex_ctxt				`thenTc` \ ex_theta ->
     case details of

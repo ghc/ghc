@@ -19,7 +19,7 @@ import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt )
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt )
 
 import TcMonad
-import TcMonoType	( kcHsSigType, kcTyVarScope, checkSigTyVars, tcHsTyVar, tcHsSigType, sigPatCtxt )
+import TcMonoType	( kcHsSigType, kcTyVarScope, newSigTyVars, checkSigTyVars, tcHsSigType, sigPatCtxt )
 import Inst		( Inst, LIE, plusLIE, emptyLIE, plusLIEs )
 import TcEnv		( tcExtendTyVarEnv, tcExtendLocalValEnv, tcExtendGlobalTyVars, tcGetGlobalTyVars )
 import TcPat		( tcPat, tcPatBndr_NoSigs, polyPatSig )
@@ -141,10 +141,9 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	newTyVarTy openTypeKind		`thenNF_Tc` \ tyvar_ty ->
 
 	-- Extend the tyvar env and check the match itself
-	kcTyVarScope sig_tvs (mapTc_ kcHsSigType sig_tys)	`thenTc` \ sig_tyvars ->
-	tcExtendTyVarEnv sig_tyvars (
-		tc_match tyvar_ty	
-	)				`thenTc` \ (pat_ids, match_and_lie) ->
+	kcTyVarScope sig_tvs (mapTc_ kcHsSigType sig_tys)	`thenTc` \ sig_tv_kinds ->
+	newSigTyVars sig_tv_kinds				`thenNF_Tc` \ sig_tyvars ->
+	tcExtendTyVarEnv sig_tyvars (tc_match tyvar_ty)		`thenTc` \ (pat_ids, match_and_lie) ->
 
 	-- Check that the scoped type variables from the patterns
 	-- have not been constrained
