@@ -1,7 +1,7 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1997
+% (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
 %
-% Author: Juan J. Quintela    <quintela@dc.fi.udc.es>
+% Author: Juan J. Quintela    <quintela@krilin.dc.fi.udc.es>
 
 \begin{code}
 
@@ -54,7 +54,8 @@ import TysWiredIn	( nilDataCon, consDataCon,
 			  floatTy, floatDataCon, 
                           doubleTy, doubleDataCon, 
                           addrTy, addrDataCon,
-                          wordTy, wordDataCon
+                          wordTy, wordDataCon,
+			  stringTy
 			)
 import TyCon            ( tyConDataCons )
 import UniqSet
@@ -64,51 +65,67 @@ import Outputable
 #include "HsVersions.h"
 \end{code}
 
-This module perfoms checks about if one list of equations are:
+This module performs checks about if one list of equations are:
 	- Overlapped
 	- Non exhaustive
 
 To discover that we go through the list of equations in a tree-like fashion.
 
-If you like theory, a similar algoritm is described in:
-	Two Tecniques for Compiling Lazy Pattern Matching
+If you like theory, a similar algorithm is described in:
+	Two Techniques for Compiling Lazy Pattern Matching
 	Luc Maranguet
 	INRIA Rocquencourt (RR-2385, 1994)
 
-The algorithm is based in the first Technique, but there are somo diferences:
+The algorithm is based in the first Technique, but there are some differences:
 	- We don't generate code
-	- We have constructors and literals (not only literals as in the article)
-	- We don't use directions, we must select the columns from left-to-right
+	- We have constructors and literals (not only literals as in the 
+	  article)
+	- We don't use directions, we must select the columns from 
+	  left-to-right
 
-(By the wat the second technique is really similar to the one used in MAtch.lhs to generate code)
-
+(By the way the second technique is really similar to the one used in 
+ Match.lhs to generate code)
 
 This function takes the equations of a pattern and returns:
   - The patterns that are not recognized
   - The equations that are not overlapped
 
-It symplify the patterns and then call check' (the same semantics),and it needs to 
-reconstruct the patterns again ....
+It simplify the patterns and then call check' (the same semantics),and it 
+needs to reconstruct the patterns again ....
 
 The problem appear with things like:
   f [x,y]   = ....
   f (x:xs)  = .....
 
-We want to put the two patterns with the same syntax, (prefix form) and then all the 
-constructors are equal:
+We want to put the two patterns with the same syntax, (prefix form) and 
+then all the constructors are equal:
   f (: x (: y []))   = ....
   f (: x xs)         = .....
 
-(more about that in symplify_eqns)
+(more about that in simplify_eqns)
 
-We would preffer to have a WarningPat of type String, but Strings and the 
+We would prefer to have a WarningPat of type String, but Strings and the 
 Pretty Printer are not friends.
- 
+
+We use InPat in WarningPat instead of OutPat because we need to print the 
+warning messages in the same way they are introduced, i.e. if the user 
+wrote:
+	f [x,y] = ..
+
+He don't want a warning message written:
+        
+        f (: x (: y [])) ........
+
+Then we need to use InPats.
+
+     Juan Quintela 5 JUL 1998
+	  User-friendliness and compiler writers are no friends.
+   
 \begin{code}
 
 newtype BoxedString = BS String
 
-type WarningPat = InPat BoxedString --Name --String 
+type WarningPat = InPat BoxedString 
 type ExhaustivePat = ([WarningPat], [(BoxedString, [HsLit])])
 
 
@@ -117,31 +134,85 @@ instance Outputable BoxedString where
 
 
 check :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
-check qs = check' (simplify_eqns qs)
+check qs = (untidy_warns, incomplete)
+      where
+	(warns, incomplete) = check' (simplify_eqns qs)
+	untidy_warns = map untidy_exhaustive warns 
 
+untidy_exhaustive :: ExhaustivePat -> ExhaustivePat
+untidy_exhaustive ([pat], messages) = 
+		  ([untidy_no_pars pat], map untidy_message messages)
+untidy_exhaustive (pats, messages) = 
+		  (map untidy_pars pats, map untidy_message messages)
+
+untidy_message :: (BoxedString, [HsLit]) -> (BoxedString, [HsLit])
+untidy_message (string, lits) = (string, map untidy_lit lits)
+\end{code}
+
+The function @untidy@ does the reverse work of the @simplify_pat@ funcion.
+
+\begin{code}
+
+type NeedPars = Bool 
+
+untidy_no_pars :: WarningPat -> WarningPat
+untidy_no_pars p = untidy False p
+
+untidy_pars :: WarningPat -> WarningPat
+untidy_pars p = untidy True p
+
+untidy :: NeedPars -> WarningPat -> WarningPat
+untidy _ p@WildPatIn = p
+untidy _ p@(VarPatIn name) = p
+untidy _ (LitPatIn lit) = LitPatIn (untidy_lit lit)
+untidy _ p@(ConPatIn name []) = p
+untidy b (ConPatIn name pats)  = 
+       pars b (ConPatIn name (map untidy_pars pats)) 
+untidy b (ConOpPatIn pat1 name fixity pat2) = 
+       pars b (ConOpPatIn (untidy_pars pat1) name fixity (untidy_pars pat2)) 
+untidy _ (ListPatIn pats)  = ListPatIn (map untidy_no_pars pats) 
+untidy _ (TuplePatIn pats) = TuplePatIn (map untidy_no_pars pats)
+
+untidy _ (LazyPatIn pat)        = panic "Check.untidy: LazyPatIn"
+untidy _ (AsPatIn name pat)     = panic "Check.untidy: AsPatIn"
+untidy _ (NPlusKPatIn name lit) = panic "Check.untidy: NPlusKPatIn"
+untidy _ (NegPatIn ipat)        = panic "Check.untidy: NegPatIn"
+untidy _ (ParPatIn pat)         = panic "Check.untidy: ParPatIn"
+untidy _ (RecPatIn name fields) = panic "Check.untidy: RecPatIn"
+--		    [(name, InPat name, Bool)]	-- True <=> source used punning
+
+pars :: NeedPars -> WarningPat -> WarningPat
+pars True p = ParPatIn p
+pars _    p = p
+
+untidy_lit :: HsLit -> HsLit
+untidy_lit (HsCharPrim c) = HsChar c
+--untidy_lit (HsStringPrim s) = HsString s
+untidy_lit lit = lit
 \end{code}
 
 This equation is the same that check, the only difference is that the
-boring work is done, that woprk needs to be done only once, this is
-the reason top have two funtions, check is the external interface,
+boring work is done, that work needs to be done only once, this is
+the reason top have two functions, check is the external interface,
 check' is called recursively.
 
 There are several cases:
 
 \begin{item} 
-\item There are no equations: Everything is okey. 
+\item There are no equations: Everything is OK. 
 \item There are only one equation, that can fail, and all the patterns are
       variables. Then that equation is used and the same equation is 
-      nonexhaustive.
-\item All the patterns are variables, and the match can fail,therr are more equations 
-      then the results is the result of the rest of equations and this equation is used also.
+      non-exhaustive.
+\item All the patterns are variables, and the match can fail, there are 
+      more equations then the results is the result of the rest of equations 
+      and this equation is used also.
 
-\item The general case, if all the patterns are variables (here the match can't fail) 
-      then the result is that this equation is used and this equation doesn't generate 
-      non-exustive cases.
+\item The general case, if all the patterns are variables (here the match 
+      can't fail) then the result is that this equation is used and this 
+      equation doesn't generate non-exhaustive cases.
 
-\item In the general case, there can exist literals ,constructors or only vars in the 
-      first column, we actuate in consecuence.
+\item In the general case, there can exist literals ,constructors or only 
+      vars in the first column, we actuate in consequence.
 
 \end{item}
 
@@ -175,8 +246,9 @@ check' qs@((EqnInfo n ctx ps result):_)
     only_vars    = and (map is_var qs) 
 \end{code}
 
-Here begins the code to deal with literals, we need to split the matrix in diferent matrix 
-begining by each literal and a last matrix with the rest of values.
+Here begins the code to deal with literals, we need to split the matrix
+in different matrix beginning by each literal and a last matrix with the 
+rest of values.
 
 \begin{code}
 split_by_literals :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
@@ -185,8 +257,8 @@ split_by_literals qs = process_literals used_lits qs
              used_lits = get_used_lits qs
 \end{code}
 
-process_explicit_literals is a funtion taht process each literal that appears in
-the column of the matrix. 
+process_explicit_literals is a function that process each literal that appears 
+in the column of the matrix. 
 
 \begin{code}
 process_explicit_literals :: [HsLit] -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
@@ -198,8 +270,9 @@ process_explicit_literals lits qs = (concat pats, unionManyUniqSets indexs)
 \end{code}
 
 
-Process_literals calls process_explicit_literals to deal with the literals taht apears in 
-the matrix and deal also sith ther rest of the cases. It must be one Variable to be complete.
+Process_literals calls process_explicit_literals to deal with the literals 
+that appears in the matrix and deal also with the rest of the cases. It 
+must be one Variable to be complete.
 
 \begin{code}
 
@@ -215,8 +288,8 @@ process_literals used_lits qs
        indexs_default  = unionUniqSets indexs' indexs
 \end{code}
 
-Here we have selected the literal and we will select all the equations that begins for that 
-literal and create a new matrix.
+Here we have selected the literal and we will select all the equations that 
+begins for that literal and create a new matrix.
 
 \begin{code}
 construct_literal_matrix :: HsLit -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
@@ -237,7 +310,8 @@ remove_first_column_lit lit qs =
 
 \end{code}
 
-This function splits the equations @qs@ in groups that deal with the same constructor 
+This function splits the equations @qs@ in groups that deal with the 
+same constructor 
 
 \begin{code}
 
@@ -251,22 +325,24 @@ split_by_constructor qs | length unused_cons /= 0 = need_default_case used_cons 
 
 \end{code}
 
-The first column of the patterns matrix only have vars, then there is nothing to do.
+The first column of the patterns matrix only have vars, then there is 
+nothing to do.
 
 \begin{code}
 first_column_only_vars :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
-first_column_only_vars qs = (map (\ (xs,ys) -> (WildPatIn:xs,ys)) pats,indexs)
+first_column_only_vars qs = (map (\ (xs,ys) -> (new_wild_pat:xs,ys)) pats,indexs)
                           where
                             (pats,indexs) = check' (map remove_var qs)
        
 \end{code}
 
-This equation takes a matrix of patterns and split the equations by constructor, using all
-the constructors that appears in the first column of the pattern matching.
+This equation takes a matrix of patterns and split the equations by 
+constructor, using all the constructors that appears in the first column 
+of the pattern matching.
 
-We can need a default clause or not ...., it depends if we used all the constructors or not
-explicitily. The reasoning is similar to process_literals, the difference is that here
-the default case is not allways needed.
+We can need a default clause or not ...., it depends if we used all the 
+constructors or not explicitly. The reasoning is similar to process_literals,
+the difference is that here the default case is not always needed.
 
 \begin{code}
 no_need_default_case :: [TypecheckedPat] -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
@@ -297,10 +373,10 @@ construct_matrix con qs =
     (pats,indexs) = (check' (remove_first_column con qs)) 
 \end{code}
 
-Here remove first column is more difficult that with literals due to the fact that 
-constructors can have arguments.
+Here remove first column is more difficult that with literals due to the fact 
+that constructors can have arguments.
 
-for instance, the matrix
+For instance, the matrix
 
  (: x xs) y
  z        y
@@ -323,15 +399,15 @@ remove_first_column (ConPat con _ con_pats) qs =
                 EqnInfo n ctx (ps'++ps)           result 
      shift_var (EqnInfo n ctx (WildPat _     :ps) result) = 
                 EqnInfo n ctx (new_wilds ++   ps) result
-     shift_var _                                          = panic "Check.Shift_var:No done"
+     shift_var _                                          = panic "Check.shift_var: Not implemented"
 
 make_row_vars :: [HsLit] -> EquationInfo -> ExhaustivePat
 make_row_vars used_lits (EqnInfo _ _ pats _ ) = 
-   (VarPatIn new_var:take (length (tail pats)) (repeat WildPatIn),[(new_var,used_lits)])
+   (VarPatIn new_var:take (length (tail pats)) (repeat new_wild_pat),[(new_var,used_lits)])
   where new_var = BS "#x"   
 
 make_row_vars_for_constructor :: EquationInfo -> [WarningPat]
-make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = take (length (tail pats)) (repeat WildPatIn)
+make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = take (length (tail pats)) (repeat new_wild_pat)
 
 compare_cons :: TypecheckedPat -> TypecheckedPat -> Bool
 compare_cons (ConPat id1 _ _) (ConPat id2 _ _) = id1 == id2  
@@ -351,13 +427,18 @@ remove_dups' (x:xs) | x `elem` xs = remove_dups' xs
 
 
 get_used_lits :: [EquationInfo] -> [HsLit]
-get_used_lits qs = remove_dups' (get_used_lits' qs)
+get_used_lits qs = remove_dups' all_literals
+	         where
+	           all_literals = get_used_lits' qs
 
 get_used_lits' :: [EquationInfo] -> [HsLit]
-get_used_lits' []                                      = []
-get_used_lits' ((EqnInfo _ _ ((LitPat lit _):_) _):qs) = lit : get_used_lits qs
-get_used_lits' ((EqnInfo _ _ ((NPat lit _ _):_) _):qs) = lit : get_used_lits qs
-get_used_lits' (q:qs)                                  =       get_used_lits qs
+get_used_lits' [] = []
+get_used_lits' ((EqnInfo _ _ ((LitPat lit _):_) _):qs) = 
+	       lit : get_used_lits qs
+get_used_lits' ((EqnInfo _ _ ((NPat lit _ _):_) _):qs) = 
+	       lit : get_used_lits qs
+get_used_lits' (q:qs)                                  =       
+	       get_used_lits qs
 
 get_unused_cons :: [TypecheckedPat] -> [Id]
 get_unused_cons used_cons = unused_cons
@@ -410,36 +491,38 @@ is_var_lit lit (EqnInfo _ _ ((NPat lit' _ _):_) _) | lit == lit' = True
 is_var_lit lit _                                                 = False
 \end{code}
 
-The difference beteewn make_con and make_whole_con is that make_wole_con creates a new
-constructor with all their arguments, and make_Con takes a list of argumntes, creates
-the contructor geting thir argumnts from the list. See where are used for details.
+The difference between make_con and make_whole_con is that make_whole_con 
+creates a new constructor with all their arguments, and make_con takes a 
+list of arguments, creates the constructor getting their arguments from the 
+list. See where are used for details.
 
-We need to reconstruct the patterns (make the constructors infix and similar) at the 
-same time that we create the constructors.
+We need to reconstruct the patterns (make the constructors infix and 
+similar) at the same time that we create the constructors.
 
 You can tell tuple constructors using
 
         Id.isTupleCon
 
-You can see if one contructur is infix with this clearer code :-))))))))))
+You can see if one constructor is infix with this clearer code :-))))))))))
 
         Lex.isLexConSym (Name.occNameString (Name.getOccName con))
 
        Rather clumsy but it works. (Simon Peyton Jones)
 
 
-We con't mind the nilDataCon because it doesn't change the way to print the messsage, 
-we are searching only for things like: [1,2,3], not x:xs .... 
+We don't mind the nilDataCon because it doesn't change the way to print the 
+message, we are searching only for things like: [1,2,3], not x:xs .... 
 
 
-In recontruct_pat we want to "undo" the work taht we have done in simplify_pat
+In reconstruct_pat we want to "undo" the work that we have done in simplify_pat
 In particular:
 	((,) x y)  returns to be (x, y)
         ((:) x xs) returns to be (x:xs)
         (x:(...:[]) returns to be [x,...]
 
-The dificult case is the third one becouse we need to follow all the contructors until the []
-to know taht we need to use the second case, not the second.
+The difficult case is the third one because we need to follow all the 
+constructors until the [] to know that we need to use the second case, 
+not the second.
 
 \begin{code}
 
@@ -460,7 +543,7 @@ make_list _ _              = panic "Check.make_list: Invalid argument"
 make_con :: TypecheckedPat -> ExhaustivePat -> ExhaustivePat           
 make_con (ConPat id ty pats) (p:q:ps, constraints) 
      | return_list id q = (make_list p q : ps, constraints)
-     | isInfixCon id = (ParPatIn (ConOpPatIn p name fixity q) : ps, constraints) 
+     | isInfixCon id = ((ConOpPatIn p name fixity q) : ps, constraints) 
     where name   = BS (getOccString id)
           fixity = panic "Check.make_con: Guessing fixity"
 make_con (ConPat id ty pats) (ps,constraints) 
@@ -468,25 +551,18 @@ make_con (ConPat id ty pats) (ps,constraints)
       | otherwise     = (ConPatIn name pats_con : rest_pats, constraints)
     where num_args  = length pats
           name      = BS (getOccString id)
-          pats_con  = map paren_conpat_arg (take num_args ps)
+          pats_con  = take num_args ps
           rest_pats = drop num_args ps
 	  
--- if needed, wrap a ParPatIn around a ConPatIn arg
--- (for prettier printing.)
-paren_conpat_arg p@(ConPatIn _ []) = p
-paren_conpat_arg p@(ConPatIn _ _)  = ParPatIn p
-paren_conpat_arg p@(ConOpPatIn _ _ _ _) = ParPatIn p
-paren_conpat_arg p = p
-
 
 make_whole_con :: Id -> WarningPat
-make_whole_con con | isInfixCon con = ParPatIn(ConOpPatIn new_wild_pat name fixity new_wild_pat)
+make_whole_con con | isInfixCon con = ConOpPatIn new_wild_pat name fixity new_wild_pat
                    | otherwise      = ConPatIn name pats
                 where 
                   fixity = panic "Check.make_whole_con: Guessing fixity"
                   name   = BS (getOccString con)
                   arity  = get_int_arity con 
-                  pats   = map paren_conpat_arg (take arity (repeat new_wild_pat))
+                  pats   = take arity (repeat new_wild_pat)
 
 
 new_wild_pat :: WarningPat
@@ -496,13 +572,13 @@ get_int_arity :: Id -> Int
 get_int_arity id = arity_to_int (getIdArity id)
     where
       arity_to_int (ArityExactly n) = n
-      arity_to_int _                = panic "getIntArity: Unknown arity"      
+      arity_to_int _                = panic "Check.getIntArity: Unknown arity"      
 
 \end{code}
 
 This equation makes the same thing that tidy in Match.lhs, the
-diference is that here we can do all the tidy in one place and in the
-Match tidy it must be done one column each time due to bookeping 
+difference is that here we can do all the tidy in one place and in the
+Match tidy it must be done one column each time due to bookkeeping 
 constraints.
 
 \begin{code}
@@ -539,6 +615,10 @@ simplify_pat (TuplePat ps) = ConPat (tupleCon arity)
                            where
                               arity = length ps
 
+simplify_pat (RecPat id ty [])   = ConPat id ty [wild_pat]
+			         where
+				   wild_pat = WildPat gt
+		                   gt = panic "Check.symplify_pat: gessing gt"
 simplify_pat (RecPat id ty idps) = ConPat id ty pats
                                  where
                                    pats = map (\ (id,p,_)-> simplify_pat p) idps
@@ -548,7 +628,7 @@ simplify_pat pat@(LitPat lit lit_ty)
 
   | lit_ty == charTy = ConPat charDataCon charTy [LitPat (mk_char lit) charPrimTy]
 
-  | otherwise = pprPanic "tidy1:LitPat:" (ppr pat)
+  | otherwise = pprPanic "Check.simplify_pat: LitPat:" (ppr pat)
   where
     mk_char (HsChar c)    = HsCharPrim c
 
@@ -562,12 +642,14 @@ simplify_pat (NPat lit lit_ty hsexpr) = better_pat
       | lit_ty == floatTy  = ConPat floatDataCon  lit_ty [LitPat (mk_float lit)  floatPrimTy]
       | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
 
-		-- Convert the literal pattern "" to the constructor pattern [].
+	-- Convert the literal pattern "" to the constructor pattern [].
       | null_str_lit lit      = ConPat nilDataCon    lit_ty []
-      | one_str_lit lit       = ConPat consDataCon list_ty 
-                                   [ ConPat charDataCon   lit_ty [LitPat (mk_head_char lit) charPrimTy]
-				   , ConPat nilDataCon    lit_ty []]
 
+      | lit_ty == stringTy = 
+            foldr (\ x -> \y -> ConPat consDataCon list_ty [x, y])
+	                        (ConPat nilDataCon  list_ty [])
+	                        (mk_string lit)
+				   
       | otherwise	       = NPat lit lit_ty hsexpr
 
     list_ty = mkListTy lit_ty
@@ -575,7 +657,11 @@ simplify_pat (NPat lit lit_ty hsexpr) = better_pat
     mk_int    (HsInt i)      = HsIntPrim i
     mk_int    l@(HsLitLit s) = l
 
-    mk_head_char   (HsString s) = HsCharPrim (_HEAD_ s)
+    mk_head_char (HsString s) = HsCharPrim (_HEAD_ s)
+    mk_string    (HsString s) = 
+       map (\ c -> ConPat charDataCon charTy 
+		         [LitPat (HsCharPrim c) charPrimTy]) 
+           (_UNPK_ s)
 
     mk_char   (HsChar c)     = HsCharPrim c
     mk_char   l@(HsLitLit s) = l
@@ -598,9 +684,9 @@ simplify_pat (NPat lit lit_ty hsexpr) = better_pat
     one_str_lit (HsString s) = _LENGTH_ s == (1::Int)
     one_str_lit other_lit    = False
 
-simplify_pat (NPlusKPat	id hslit ty hsexpr1 hsexpr2) = --NPlusKPat id hslit ty hsexpr1 hsexpr2 
+simplify_pat (NPlusKPat	id hslit ty hsexpr1 hsexpr2) = 
      WildPat ty
-   where ty = panic "Check.simplify_pat: Never used"
+   where ty = panic "Check.simplify_pat: Gessing ty"
 
 simplify_pat (DictPat dicts methods) = 
     case num_of_d_and_ms of
