@@ -26,7 +26,7 @@ module Inst (
 	instBindingRequired, instCanBeGeneralised,
 
 	zonkInst, zonkInsts,
-	instToId, 
+	instToId, instName,
 
 	InstOrigin(..), InstLoc, pprInstLoc
     ) where
@@ -48,9 +48,9 @@ import TcType	( TcThetaType,
 		)
 import CoreFVs	( idFreeTyVars )
 import Class	( Class )
-import Id	( Id, idType, mkUserLocal, mkSysLocal, mkLocalId )
+import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
-import Name	( mkMethodOcc, getOccName )
+import Name	( Name, mkMethodOcc, getOccName )
 import NameSet	( NameSet )
 import PprType	( pprPred )	
 import Type	( Type, PredType(..), ThetaType,
@@ -195,6 +195,9 @@ cmpInst (LitInst _ _ _ _)	  other 		    = GT
 Selection
 ~~~~~~~~~
 \begin{code}
+instName :: Inst -> Name
+instName inst = idName (instToId inst)
+
 instToId :: Inst -> TcId
 instToId (Dict id _ _)	       = id
 instToId (Method id _ _ _ _ _) = id
@@ -312,6 +315,8 @@ newDictsAtLoc inst_loc@(_,loc,_) theta
   where
     mk_dict uniq pred = Dict (mkLocalId (mkPredName uniq loc pred) (mkPredTy pred)) pred inst_loc
 
+-- For implicit parameters, since there is only one in scope
+-- at any time, we use the name of the implicit parameter itself
 newIPDict orig name ty
   = tcGetInstLoc orig			`thenNF_Tc` \ inst_loc ->
     returnNF_Tc (Dict (mkLocalId name (mkPredTy pred)) pred inst_loc)

@@ -629,7 +629,10 @@ Implicit Parameter bindings.
 tcMonoExpr (HsWith expr binds) res_ty
   = tcMonoExpr expr res_ty			`thenTc` \ (expr', expr_lie) ->
     mapAndUnzipTc tcIPBind binds		`thenTc` \ (pairs, bind_lies) ->
-    tcSimplifyIPs (map fst binds) expr_lie	`thenTc` \ (expr_lie', dict_binds) ->
+
+	-- If the binding binds ?x = E, we  must now 
+	-- discharge any ?x constraints in expr_lie
+    tcSimplifyIPs (map fst pairs) expr_lie	`thenTc` \ (expr_lie', dict_binds) ->
     let
 	binds' = [(instToId ip, rhs) | (ip,rhs) <- pairs]
 	expr'' = HsLet (mkMonoBind dict_binds [] Recursive) expr'

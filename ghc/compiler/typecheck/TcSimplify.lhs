@@ -25,7 +25,7 @@ import TcHsSyn		( TcExpr, TcId,
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  tyVarsOfInst, predsOfInsts, predsOfInst,
-			  isDict, isClassDict, 
+			  isDict, isClassDict, instName,
 			  isStdClassTyVarDict, isMethodFor,
 			  instToId, tyVarsOfInsts,
 			  instBindingRequired, instCanBeGeneralised,
@@ -234,7 +234,7 @@ However, we don't *need* to report ambiguity right away.  It'll always
 show up at the call site.... and eventually at main, which needs special
 treatment.  Nevertheless, reporting ambiguity promptly is an excellent thing.
 
-So heres the plan.  We WARN about probable ambiguity if
+So here's the plan.  We WARN about probable ambiguity if
 
 	fv(Cq) is not a subset of  oclose(fv(T) union fv(G), C)
 
@@ -282,7 +282,7 @@ is a "bubble" that's a set of constraints
 Hence another idea.  To decide Q start with fv(T) and grow it
 by transitive closure in Cq (no functional dependencies involved).
 Now partition Cq using Q, leaving the definitely-ambiguous and probably-ok.
-The definitely-ambigous can then float out, and get smashed at top level
+The definitely-ambiguous can then float out, and get smashed at top level
 (which squashes out the constants, like Eq (T a) above)
 
 
@@ -685,28 +685,45 @@ When we have
 	let ?x = R in B
 
 we must discharge all the ?x constraints from B.  We also do an improvement
-step; if we have ?x::t1 and ?x::t2 we must unify t1, t2.  No need to iterate, though.
+step; if we have ?x::t1 and ?x::t2 we must unify t1, t2.  
+
+Actually, the constraints from B might improve the types in ?x. For example
+
+	f :: (?x::Int) => Char -> Char
+	let ?x = 3 in f 'c'
+
+then the constraint (?x::Int) arising from the call to f will 
+force the binding for ?x to be of type Int.
 
 \begin{code}
-tcSimplifyIPs :: [Name]		-- The implicit parameters bound here
+tcSimplifyIPs :: [Inst]		-- The implicit parameters bound here
 	      -> LIE
 	      -> TcM (LIE, TcDictBinds)
-tcSimplifyIPs ip_names wanted_lie
-  = simpleReduceLoop doc try_me wanteds	`thenTc` \ (frees, binds, irreds) ->
-	-- The irreducible ones should be a subset of the implicit
-	-- parameters we provided
-    ASSERT( all here_ip irreds )
+tcSimplifyIPs given_ips wanted_lie
+  = simpl_loop given_ips wanteds	`thenTc` \ (frees, binds) ->
     returnTc (mkLIE frees, binds)
-    
   where
-    doc	    = text "tcSimplifyIPs" <+> ppr ip_names
-    wanteds = lieToList wanted_lie
-    ip_set  = mkNameSet ip_names
-    here_ip ip = isDict ip && ip `instMentionsIPs` ip_set
-
+    doc	     = text "tcSimplifyIPs" <+> ppr ip_names
+    wanteds  = lieToList wanted_lie
+    ip_names = map instName given_ips
+    ip_set   = mkNameSet ip_names
+  
 	-- Simplify any methods that mention the implicit parameter
     try_me inst | inst `instMentionsIPs` ip_set = ReduceMe
 		| otherwise		        = Free
+
+    simpl_loop givens wanteds
+      = mapNF_Tc zonkInst givens		`thenNF_Tc` \ givens' ->
+        mapNF_Tc zonkInst wanteds		`thenNF_Tc` \ wanteds' ->
+  
+        reduceContext doc try_me givens' wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
+
+        if no_improvement then
+	    ASSERT( null irreds )
+	    returnTc (frees, binds)
+	else
+	    simpl_loop givens' (irreds ++ frees)	`thenTc` \ (frees1, binds1) ->
+	    returnTc (frees1, binds `AndMonoBinds` binds1)
 \end{code}
 
 
