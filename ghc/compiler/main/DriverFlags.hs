@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.56 2001/05/31 11:32:25 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.57 2001/06/13 15:50:25 rrt Exp $
 --
 -- Driver flags
 --
@@ -22,7 +22,7 @@ module DriverFlags (
 
 import DriverState
 import DriverUtil
-import TmpFiles 	( v_TmpDir, kludgedSystem )
+import TmpFiles 	( v_TmpDir )
 import CmdLineOpts
 import Config
 import Util
@@ -543,7 +543,7 @@ runSomething phase_name cmd
    unless n $ do 
 
    -- and run it!
-   exit_code <- kludgedSystem cmd phase_name
+   exit_code <- system cmd
 
    if exit_code /= ExitSuccess
 	then throwDyn (PhaseFailed phase_name exit_code)

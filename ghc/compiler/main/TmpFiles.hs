@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.21 2001/05/29 17:53:59 sof Exp $
+-- $Id: TmpFiles.hs,v 1.22 2001/06/13 15:50:25 rrt Exp $
 --
 -- Temporary file management
 --
@@ -15,8 +15,7 @@ module TmpFiles (
    newTempName,		 -- :: Suffix -> IO FilePath
    addFilesToClean,	 -- :: [FilePath] -> IO ()
    removeTmpFiles,	 -- :: Int -> [FilePath] -> IO ()
-   v_TmpDir,
-   kludgedSystem
+   v_TmpDir
  ) where
 
 -- main
@@ -88,37 +87,12 @@ removeTmpFiles verb fs = do
 	   (do  when verbose (hPutStrLn stderr ("Removing: " ++ f))
 		if '*' `elem` f 
 #if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-		  then kludgedSystem (unwords [cRM, dosifyPath f]) "Cleaning temp files" >> return ()
+		  then system (unwords [cRM, dosifyPath f]) >> return ()
 #else
-		  then kludgedSystem (unwords [cRM, f]) "Cleaning temp files" >> return ()
+		  then system (unwords [cRM, f]) >> return ()
 #endif
 		  else removeFile f)
 	    `catchAllIO`
 	   (\_ -> when verbose (hPutStrLn stderr 
 				("Warning: can't remove tmp file " ++ f)))
   mapM_ blowAway fs
-
-
--- system that works feasibly under Windows (i.e. passes the command line to sh,
--- because system() under Windows doesn't look at SHELL, and always uses CMD.EXE)
-kludgedSystem cmd phase_name
- = do
-#if !defined(mingw32_TARGET_OS) || defined(MINIMAL_UNIX_DEPS)
-    -- in the case where we do want to use an MSDOS command shell, we assume
-    -- that files and paths have been converted to a form that's
-    -- understandable to the command we're invoking.
-   exit_code <- system cmd `catchAllIO` 
-		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
-#else
-   pid <- myGetProcessID
-   tmp_dir <- readIORef v_TmpDir
-   let tmp = tmp_dir++"/sh"++show pid
-   h <- openFile tmp WriteMode
-   hPutStrLn h cmd
-   hClose h
-   exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
-		   (\_ -> removeFile tmp >>
-                          throwDyn (PhaseFailed phase_name (ExitFailure 1)))
-   removeFile tmp
-#endif
-   return exit_code
