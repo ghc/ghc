@@ -191,5 +191,10 @@ collectQualBinders quals
     collect (GeneratorQual pat _) = collectPatBinders pat
     collect (FilterQual expr)	  = []
     collect (LetQual    binds)	  = collectTopLevelBinders binds
+
+fixDeclName :: FixityDecl name -> name
+fixDeclName (InfixL name i) = name
+fixDeclName (InfixR name i) = name
+fixDeclName (InfixN name i) = name
 \end{code}
 

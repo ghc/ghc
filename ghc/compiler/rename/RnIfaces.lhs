@@ -33,16 +33,15 @@ import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..),
 			  VersionsMap(..), UsagesMap(..)
 			)
 
-import Bag		( emptyBag, consBag, snocBag, unionBags, unionManyBags, isEmptyBag, bagToList )
+import Bag		( emptyBag, unitBag, consBag, snocBag,
+			  unionBags, unionManyBags, isEmptyBag, bagToList )
 import CmdLineOpts	( opt_HiSuffix, opt_SysHiSuffix )
 import ErrUtils		( Error(..), Warning(..) )
-import FiniteMap	( emptyFM, lookupFM, addToFM, addToFM_C, plusFM, eltsFM,
+import FiniteMap	( emptyFM, lookupFM, addToFM, addToFM_C, plusFM, plusFM_C, eltsFM,
 			  fmToList, delListFromFM, sizeFM, keysFM{-ToDo:rm-}
 			)
 import Maybes		( maybeToBool )
-import Name		( moduleNamePair, origName, isRdrLexCon,
-			  RdrName(..){-instance NamedThing-}
-			)
+import Name		( moduleNamePair, origName, isRdrLexCon, RdrName(..) )
 import PprStyle		-- ToDo:rm
 import Outputable	-- ToDo:rm
 import PrelInfo		( builtinNameInfo )
@@ -59,8 +58,11 @@ type ModuleToIfaceContents = FiniteMap Module ParsedIface
 type ModuleToIfaceFilePath = FiniteMap Module FilePath
 
 type IfaceCache
-  = MutableVar _RealWorld (ModuleToIfaceContents,
-			   ModuleToIfaceFilePath)
+  = MutableVar _RealWorld
+	(ModuleToIfaceContents,	-- interfaces for individual interface files
+	 ModuleToIfaceContents, -- merged interfaces based on module name
+				-- used for extracting info about original names
+	 ModuleToIfaceFilePath)
 \end{code}
 
 *********************************************************
@@ -145,16 +147,35 @@ Return cached info about a Module's interface; otherwise,
 read the interface (using our @ModuleToIfaceFilePath@ map
 to decide where to look).
 
+Note: we have two notions of interface
+ * the interface for a particular file name
+ * the (combined) interface for a particular module name
+
+The idea is that two source files may declare a module
+with the same name with the declarations being merged.
+
+This allows us to have file PreludeList.hs producing
+PreludeList.hi but defining part of module Prelude.
+When PreludeList is imported its contents will be
+added to Prelude. In this way all the original names 
+for a particular module will be available the imported
+decls are renamed.
+
+ToDo: Check duplicate definitons are the same.
+ToDo: Check/Merge duplicate pragmas.
+
+
 \begin{code}
-cachedIface :: IfaceCache
+cachedIface :: Bool		-- True  => want merged interface for original name
+	    -> IfaceCache	-- False => want file interface only
 	    -> Module
 	    -> IO (MaybeErr ParsedIface Error)
 
-cachedIface iface_cache mod
-  = readVar iface_cache `thenPrimIO` \ (iface_fm, file_fm) ->
+cachedIface want_orig_iface iface_cache mod
+  = readVar iface_cache `thenPrimIO` \ (iface_fm, orig_fm, file_fm) ->
 
     case (lookupFM iface_fm mod) of
-      Just iface -> return (Succeeded iface)
+      Just iface -> return (want_iface iface orig_fm)
       Nothing    ->
       	case (lookupFM file_fm mod) of
 	  Nothing   -> return (Failed (noIfaceErr mod))
@@ -166,9 +187,52 @@ cachedIface iface_cache mod
 	      Succeeded iface ->
 		let
 		    iface_fm' = addToFM iface_fm mod iface
+		    orig_fm'  = addToFM_C mergeIfaces orig_fm (iface_mod iface) iface
 		in
-		writeVar iface_cache (iface_fm', file_fm) `seqPrimIO`
-		return (Succeeded iface)
+		writeVar iface_cache (iface_fm', orig_fm', file_fm) `seqPrimIO`
+		return (want_iface iface orig_fm')
+  where
+    want_iface iface orig_fm 
+      | want_orig_iface
+      = case lookupFM orig_fm of
+	  Nothing         -> Failed (noOrigIfaceErr mod)
+          Just orig_iface -> Succeeded orig_iface
+      | otherwise
+      = Succeeded iface
+
+    iface_mod (ParsedIface mod _ _ _ _ _ _ _ _ _ _ _ _) = mod
+
+----------
+mergeIfaces (ParsedIface mod1 (_, files1) _ _ _ _ _ _ fixes1 tdefs1 vdefs1 idefs1 prags1)
+	    (ParsedIface mod2 (_, files2) _ _ _ _ _ _ fixes2 tdefs2 vdefs2 idefs2 prags2)
+  = pprTrace "mergeIfaces:" (ppCat [ppStr "import", ppCat (map ppPStr (bagToList files2)),
+				    ppStr "merged with", ppPStr mod1]) $
+    ASSERT(mod1 == mod2)
+    ParsedIface mod1
+	(True, unionBags files1 files2)
+	(panic "mergeIface: module version numbers")
+	(panic "mergeIface: source version numbers")	-- Version numbers etc must be extracted from
+	(panic "mergeIface: usage version numbers")	-- the merged file interfaces named above
+	(panic "mergeIface: decl version numbers")
+	(panic "mergeIface: exports")
+	(panic "mergeIface: instance modules")
+ 	(plusFM_C (dup_merge "fixity"      (ppr PprDebug . fixDeclName)) fixes1 fixes2)
+	(plusFM_C (dup_merge "tycon/class" (ppr PprDebug . idecl_nm))    tdefs1 tdefs2)
+	(plusFM_C (dup_merge "value"       (ppr PprDebug . idecl_nm))    vdefs1 vdefs2)
+	(unionBags idefs1 idefs2)
+	(plusFM_C (dup_merge "pragma"      ppStr)			 prags1 prags2)
+  where
+    dup_merge str ppr_dup dup1 dup2
+      = pprTrace "mergeIfaces:"
+	   	 (ppCat [ppPStr mod, ppPStr mod1, ppStr ": dup", ppStr str, ppStr "decl",
+			 ppr_dup dup1, ppr_dup dup2]) $
+        dup2
+
+    idecl_nm (TypeSig    n _ _)     = n
+    idecl_nm (NewTypeSig n _ _ _)   = n
+    idecl_nm (DataSig    n _ _ _ _) = n
+    idecl_nm (ClassSig   n _ _ _)   = n
+    idecl_nm (ValSig     n _ _)	    = n
 
 ----------
 cachedDecl :: IfaceCache
@@ -176,14 +240,11 @@ cachedDecl :: IfaceCache
 	   -> RdrName
 	   -> IO (MaybeErr RdrIfaceDecl Error)
 
--- ToDo: this is where the check for Prelude.map being
---       located in PreludeList.map should be done ...
-
 cachedDecl iface_cache class_or_tycon orig 
-  = cachedIface iface_cache mod 	>>= \ maybe_iface ->
+  = cachedIface True iface_cache mod 	>>= \ maybe_iface ->
     case maybe_iface of
       Failed err -> return (Failed err)
-      Succeeded (ParsedIface _ _ _ _ _ exps _ _ tdefs vdefs _ _) -> 
+      Succeeded (ParsedIface _ _ _ _ _ _ exps _ _ tdefs vdefs _ _) -> 
 	case (lookupFM (if class_or_tycon then tdefs else vdefs) str) of
 	  Just decl -> return (Succeeded decl)
 	  Nothing   -> return (Failed (noDeclInIfaceErr mod str))
@@ -258,7 +319,10 @@ readIface file mod
       Right contents -> hPutStr stderr " parsing"   >>
 			let parsed = parseIface contents in
 			hPutStr stderr " done\n"    >>
-			return parsed
+			return (Succeeded (init_merge mod parsed))
+  where
+    init_merge this (ParsedIface mod _ v sv us vs exps insts fixes tdefs vdefs idefs prags)
+      =	ParsedIface mod (False, unitBag this) v sv us vs exps insts fixes tdefs vdefs idefs prags
 \end{code}
 
 
@@ -387,19 +451,26 @@ rnIfaces iface_cache imp_mods us
 		     -- pprTrace "do_decls:done:" (ppr PprDebug n) $
 		     do_decls ns down to_return
 
-	  Nothing -> -- OK, see what the cache has for us...
+	  Nothing
+	   | fst (moduleNamePair n) == modname ->
+		     -- avoid looking in interface for the module being compiled
+		     -- pprTrace "do_decls:this module error:" (ppr PprDebug n) $
+		     do_decls ns down (add_err (thisModImplicitErr modname n) to_return)
 
-	    cachedDeclByType iface_cache n >>= \ maybe_ans ->
-	    case maybe_ans of
-	      Failed err -> -- add the error, but keep going:
-			    -- pprTrace "do_decls:cache error:" (ppr PprDebug n) $
-			    do_decls ns down (add_err err to_return)
+	   | otherwise ->
+		     -- OK, see what the cache has for us...
 
-	      Succeeded iface_decl -> -- something needing renaming!
-		let
+	     cachedDeclByType iface_cache n >>= \ maybe_ans ->
+	     case maybe_ans of
+	       Failed err -> -- add the error, but keep going:
+			     -- pprTrace "do_decls:cache error:" (ppr PprDebug n) $
+			     do_decls ns down (add_err err to_return)
+
+	       Succeeded iface_decl -> -- something needing renaming!
+		 let
 		    (us1, us2) = splitUniqSupply (uniqsupply down)
-		in
-		case (initRn False{-iface-} modname (occenv down) us1 (
+		 in
+		 case (initRn False{-iface-} modname (occenv down) us1 (
 			setExtraRn emptyUFM{-no fixities-} $
 			rnIfaceDecl iface_decl)) of {
 		  ((if_decl, if_defd, if_implicits), if_errs, if_warns) ->
@@ -420,7 +491,7 @@ rnIfaces iface_cache imp_mods us
 			       add_implicits if_implicits	$
 			        add_errs     if_errs		$
 			         add_warns   if_warns to_return)
-	        }
+	         }
 
 -----------
 type Go_Down   = (RnEnv,	-- stuff we already have defns for;
@@ -575,19 +646,19 @@ sub (val_ment, tc_ment) (val_defds, tc_defds)
 \begin{code}
 cacheInstModules :: IfaceCache -> [Module] -> IO (Bag Error)
 cacheInstModules iface_cache imp_mods
-  = readVar iface_cache		`thenPrimIO` \ (iface_fm, _) ->
+  = readVar iface_cache		`thenPrimIO` \ (iface_fm, _, _) ->
     let
 	imp_ifaces      = [ iface | Just iface <- map (lookupFM iface_fm) imp_mods ]
 	(imp_imods, _)  = removeDups cmpPString (bagToList (unionManyBags (map get_ims imp_ifaces)))
-        get_ims (ParsedIface _ _ _ _ _ _ ims _ _ _ _ _) = ims
+        get_ims (ParsedIface _ _ _ _ _ _ _ ims _ _ _ _ _) = ims
     in
-    accumulate (map (cachedIface iface_cache) imp_imods) >>= \ err_or_ifaces ->
+    accumulate (map (cachedIface False iface_cache) imp_imods) >>= \ err_or_ifaces ->
 
     -- Sanity Check:
     -- Assert that instance modules given by direct imports contains
     -- instance modules extracted from all visited modules
 
-    readVar iface_cache		`thenPrimIO` \ (all_iface_fm, _) ->
+    readVar iface_cache		`thenPrimIO` \ (all_iface_fm, _, _) ->
     let
 	all_ifaces     = eltsFM all_iface_fm
 	(all_imods, _) = removeDups cmpPString (bagToList (unionManyBags (map get_ims (all_ifaces))))
@@ -623,9 +694,9 @@ rnIfaceInstStuff iface_cache modname us occ_env done_inst_env to_return
   = -- all the instance decls we might even want to consider
     -- are in the ParsedIfaces that are in our cache
 
-    readVar iface_cache	`thenPrimIO` \ (iface_fm, _) ->
+    readVar iface_cache	`thenPrimIO` \ (_, orig_iface_fm, _) ->
     let
-	all_ifaces	  = eltsFM iface_fm
+	all_ifaces	  = eltsFM orig_iface_fm
 	all_insts	  = unionManyBags (map get_insts all_ifaces)
 	interesting_insts = filter want_inst (bagToList all_insts)
 
@@ -659,7 +730,7 @@ rnIfaceInstStuff iface_cache modname us occ_env done_inst_env to_return
 		eltsFM (fst if_implicits) ++ eltsFM (snd if_implicits))
     }
   where
-    get_insts (ParsedIface _ _ _ _ _ _ _ _ _ _ insts _) = insts
+    get_insts (ParsedIface _ _ _ _ _ _ _ _ _ _ _ insts _) = insts
 
     add_done_inst (InstSig clas tycon _ _) inst_env
       = addToFM_C (+) inst_env (tycon,clas) 1
@@ -728,8 +799,14 @@ finalIfaceInfo iface_cache if_final_env@((qual, unqual, tc_qual, tc_unqual), sta
 
 
 \begin{code}
+thisModImplicitErr mod n sty
+  = ppCat [ppPStr SLIT("Implicit import of"), ppr sty n, ppPStr SLIT("when compiling"), ppPStr mod]
+
 noIfaceErr mod sty
   = ppCat [ppPStr SLIT("Could not find interface for:"), ppPStr mod]
+
+noOrigIfaceErr mod sty
+  = ppCat [ppPStr SLIT("Could not find original interface for:"), ppPStr mod]
 
 noDeclInIfaceErr mod str sty
   = ppBesides [ppPStr SLIT("Could not find interface declaration of: "),

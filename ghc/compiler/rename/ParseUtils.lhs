@@ -47,18 +47,19 @@ type PragmaStuff = String
 
 data ParsedIface
   = ParsedIface
-      Module		-- Module name
-      Version		-- Module version number
-      (Maybe Version)	-- Source version number
-      UsagesMap		-- Used when compiling this module
-      VersionsMap	-- Version numbers of things from this module
-      ExportsMap	-- Exported names
-      (Bag Module)	-- Special instance modules
-      FixitiesMap	-- fixities of local things
-      LocalTyDefsMap	-- Local TyCon/Class names defined
-      LocalValDefsMap	-- Local value names defined
-      (Bag RdrIfaceInst)-- Local instance declarations
-      LocalPragmasMap	-- Pragmas for local names
+      Module		 -- Module name
+      (Bool, Bag Module) -- From a merging of these modules; True => merging occured
+      Version		 -- Module version number
+      (Maybe Version)	 -- Source version number
+      UsagesMap		 -- Used when compiling this module
+      VersionsMap	 -- Version numbers of things from this module
+      ExportsMap	 -- Exported names
+      (Bag Module)	 -- Special instance modules
+      FixitiesMap	 -- fixities of local things
+      LocalTyDefsMap	 -- Local TyCon/Class names defined
+      LocalValDefsMap	 -- Local value names defined
+      (Bag RdrIfaceInst) -- Local instance declarations
+      LocalPragmasMap	 -- Pragmas for local names
 
 -----------------------------------------------------------------
 

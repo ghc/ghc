@@ -19,7 +19,7 @@ import Name		( ExportFlag(..), mkTupNameStr,
 import Outputable	-- ToDo:rm
 import PprStyle		( PprStyle(..) ) -- ToDo: rm debugging
 import SrcLoc		( mkIfaceSrcLoc )
-import Util		( pprPanic{-ToDo:rm-} )
+import Util		( panic, pprPanic{-ToDo:rm-} )
 
 -----------------------------------------------------------------
 
@@ -84,7 +84,7 @@ iface		: INTERFACE CONID INTEGER
 		  exports_part inst_modules_part
 		  fixities_part decls_part instances_part pragmas_part
 		  { case $9 of { (tm, vm) ->
-		    ParsedIface $2 (fromInteger $3) Nothing{-src version-}
+		    ParsedIface $2 (panic "merge modules") (fromInteger $3) Nothing{-src version-}
 			$4  -- usages
 			$5  -- local versions
 			$6  -- exports map

@@ -123,7 +123,7 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
 	multiple_occs (rn, (o1:o2:_)) = True
 	multiple_occs _               = False
     in
-    return (rn_module, imp_mods,
+    return (rn_module, imp_mods, 
 	    top_errs  `unionBags` src_errs,
 	    top_warns `unionBags` src_warns `unionBags` listToBag occ_warns,
 	    occ_fm, export_fn)

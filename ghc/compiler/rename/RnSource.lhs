@@ -27,8 +27,8 @@ import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( Name, isLocallyDefined, isLexVarId, getLocalName, ExportFlag(..), 
 			  nameImportFlag, RdrName, pprNonSym )
-import Outputable -- ToDo:rm
-import PprStyle -- ToDo:rm 
+import Outputable	-- ToDo:rm
+import PprStyle 	-- ToDo:rm 
 import PrelInfo		( consDataCon )
 import Pretty
 import SrcLoc		( SrcLoc )
@@ -53,7 +53,7 @@ Checks the (..) etc constraints in the export list.
 
 
 \begin{code}
-rnSource :: [Module]
+rnSource :: [Module]			-- imported modules
 	 -> Bag (Module,RnName)		-- unqualified imports from module
 	 -> Bag RenamedFixityDecl	-- fixity info for imported names
 	 -> RdrNameHsModule
@@ -75,7 +75,7 @@ rnSource imp_mods unqual_imps imp_fixes
 	all_fixes     = src_fixes ++ bagToList imp_fixes
 	all_fixes_fm  = listToUFM (map pair_name all_fixes)
 
-	pair_name inf = (nameFixDecl inf, inf)
+	pair_name inf = (fixDeclName inf, inf)
     in
     setExtraRn all_fixes_fm $
 
@@ -544,7 +544,7 @@ rnFixes fixities
   = getSrcLocRn	`thenRn` \ src_loc ->
     let
         (_, dup_fixes) = removeDups cmp_fix fixities
-	cmp_fix fix1 fix2 = nameFixDecl fix1 `cmp` nameFixDecl fix2
+	cmp_fix fix1 fix2 = fixDeclName fix1 `cmp` fixDeclName fix2
 
         rn_fixity fix@(InfixL name i)
       	  = rn_fixity_pieces InfixL name i fix
@@ -563,10 +563,6 @@ rnFixes fixities
     mapRn (addErrRn . dupFixityDeclErr src_loc) dup_fixes `thenRn_`
     mapRn rn_fixity fixities				  `thenRn` \ fixes_maybe ->
     returnRn (catMaybes fixes_maybe)
-
-nameFixDecl (InfixL name i) = name
-nameFixDecl (InfixR name i) = name
-nameFixDecl (InfixN name i) = name
 \end{code}
 
 %*********************************************************
@@ -692,15 +688,15 @@ importAllErr rn locn
 
 badModExportErr mod locn
   = addShortErrLocLine locn (\ sty ->
-    ppCat [ ppStr "unknown module in export list:", ppPStr mod])
-
-dupModExportWarn locn mods@(mod:_)
-  = addShortErrLocLine locn (\ sty ->
-    ppCat [ppStr "module", ppPStr mod, ppStr "appears", ppInt (length mods), ppStr "times in export list"])
+    ppCat [ ppStr "unknown module in export list: module", ppPStr mod])
 
 emptyModExportWarn locn mod
   = addShortErrLocLine locn (\ sty ->
     ppCat [ppStr "module", ppPStr mod, ppStr "has no unqualified imports to export"])
+
+dupModExportWarn locn mods@(mod:_)
+  = addShortErrLocLine locn (\ sty ->
+    ppCat [ppStr "module", ppPStr mod, ppStr "appears", ppInt (length mods), ppStr "times in export list"])
 
 derivingNonStdClassErr clas locn
   = addShortErrLocLine locn (\ sty ->

@@ -336,41 +336,44 @@ doImportDecls iface_cache g_info us src_imps
 
 	    i_info = (g_info, emptyFM, emptyFM, rec_imp_fn)
 	in
+	-- cache the imported modules
+	-- this ensures that all directly imported modules
+	-- will have their original name iface in scope
+	accumulate (map (cachedIface False iface_cache) imp_mods) >>
+
+	-- process the imports
 	doImports iface_cache i_info us all_imps
+
     ) >>= \ (vals, tcs, unquals, fixes, errs, warns, _) ->
 
     return (vals, tcs, imp_mods, unquals, fixes,
 	    errs, imp_warns `unionBags` warns)
   where
-    (src_qprels, ok_imps) = partition qual_prel src_imps
-    the_imps = ok_imps ++ prel_imp
-    all_imps = the_imps ++ qprel_imp
+    the_imps = implicit_prel ++ src_imps
+    all_imps = implicit_qprel ++ the_imps
 
-    qual_prel (ImportDecl mod qual imp_as _ _)
-      = fromPrelude mod && qual && not (maybeToBool imp_as)
+    implicit_qprel = if opt_NoImplicitPrelude
+		     then [{- no "import qualified Prelude" -}]
+		     else [ImportDecl pRELUDE True Nothing Nothing prel_loc]
 
-    explicit_prelude_import
-      = null [() | (ImportDecl mod qual _ _ _) <- ok_imps, fromPrelude mod]
+    explicit_prelude_imp = not (null [ () | (ImportDecl mod qual _ _ _) <- src_imps,
+				            mod == pRELUDE ])
 
-    qprel_imp = if opt_NoImplicitPrelude
-		then [{-the flag really means it: *NO* implicit "import Prelude" -}]
-		else [ImportDecl pRELUDE True Nothing Nothing prel_loc]
-
-    prel_imp  = if not explicit_prelude_import || opt_NoImplicitPrelude
-		then
-		   [{- no "import Prelude" -}]
-	        else
-	           [ImportDecl pRELUDE False Nothing Nothing prel_loc]
+    implicit_prel  = if explicit_prelude_imp || opt_NoImplicitPrelude
+		     then [{- no "import Prelude" -}]
+	             else [ImportDecl pRELUDE False Nothing Nothing prel_loc]
 
     prel_loc = mkBuiltinSrcLoc
 
     (uniq_imps, imp_dups) = removeDups cmp_mod the_imps
     cmp_mod (ImportDecl m1 _ _ _ _) (ImportDecl m2 _ _ _ _) = cmpPString m1 m2
 
+    qprel_imps = [ imp | imp@(ImportDecl mod True Nothing _ _) <- prel_imps ]
+
     imp_mods  = [ mod | ImportDecl mod _ _ _ _ <- uniq_imps ]
     imp_warns = listToBag (map dupImportWarn imp_dups)
     		`unionBags`
-		listToBag (map qualPreludeImportWarn src_qprels)
+		listToBag (map qualPreludeImportWarn qprel_imps)
 
 
 doImports iface_cache i_info us []
@@ -414,7 +417,7 @@ doImport :: IfaceCache
 		Bag (RnName,(ExportFlag,Bag SrcLoc)))	-- import flags and src locs
 
 doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
-  = cachedIface iface_cache mod 	>>= \ maybe_iface ->
+  = cachedIface False iface_cache mod 	>>= \ maybe_iface ->
     case maybe_iface of
       Failed err ->
 	return (emptyBag, emptyBag, emptyBag, emptyBag,
@@ -618,7 +621,7 @@ getFixityDecl iface_cache rn
   = let
 	(mod, str) = moduleNamePair rn
     in
-    cachedIface iface_cache mod	>>= \ maybe_iface ->
+    cachedIface True iface_cache mod	>>= \ maybe_iface ->
     case maybe_iface of
       Failed err ->
 	return (Nothing, unitBag err)
