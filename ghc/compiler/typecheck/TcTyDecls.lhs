@@ -20,7 +20,7 @@ import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
 import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 import BasicTypes	( NewOrData(..) )
 
-import TcMonoType	( tcHsType, tcHsConSigType, tcHsBoxedSigType, kcTyVarScope, tcClassContext,
+import TcMonoType	( tcHsType, tcHsSigType, tcHsBoxedSigType, kcTyVarScope, tcClassContext,
 			  kcHsContext, kcHsSigType, mkImmutTyVars
 			)
 import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcLookupValueByKey, TyThing(..), TyThingDetails(..) )
@@ -154,7 +154,7 @@ tcConDecl new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt de
 	RecCon fields	   -> tc_rec_con ex_tyvars ex_theta fields
   where
     tc_sig_type = case new_or_data of
-		    DataType -> tcHsConSigType
+		    DataType -> tcHsSigType
 		    NewType  -> tcHsBoxedSigType
 	    -- Can't allow an unboxed type here, because we're effectively
 	    -- going to remove the constructor while coercing it to a boxed type.

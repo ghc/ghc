@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcMonoType ( tcHsType, tcHsSigType, tcHsBoxedSigType, 
-		    tcHsConSigType, tcContext, tcClassContext,
+		    tcContext, tcClassContext,
 
 			-- Kind checking
 		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
@@ -188,13 +188,14 @@ kcHsType (HsTupleTy (HsTupCon _ Boxed) tys)
   = mapTc kcBoxedType tys	`thenTc_` 
     returnTc boxedTypeKind
 
-kcHsType (HsTupleTy (HsTupCon _ Unboxed) tys)
-  = mapTc kcTypeType tys	`thenTc_` 
-    returnTc unboxedTypeKind
+kcHsType ty@(HsTupleTy (HsTupCon _ Unboxed) tys)
+  = failWithTc (unboxedTupleErr ty)
+	-- Unboxed tuples are illegal everywhere except
+	-- just after a function arrow (see kcFunResType)
 
 kcHsType (HsFunTy ty1 ty2)
   = kcTypeType ty1	`thenTc_`
-    kcTypeType ty2	`thenTc_`
+    kcFunResType ty2	`thenTc_`
     returnTc boxedTypeKind
 
 kcHsType (HsPredTy pred)
@@ -219,17 +220,27 @@ kcHsType (HsForAllTy (Just tv_names) context ty)
   = kcHsTyVars tv_names			`thenNF_Tc` \ kind_env ->
     tcExtendKindEnv kind_env		$
     kcHsContext context		`thenTc_`
-    kcHsType ty			`thenTc` \ kind ->
  
-		-- Context behaves like a function type
-		-- This matters.  Return-unboxed-tuple analysis can
-		-- give overloaded functions like
-		--	f :: forall a. Num a => (# a->a, a->a #)
-		-- And we want these to get through the type checker
-    returnTc (if null context then
-		 kind
-	      else
-		  boxedTypeKind)
+	-- Context behaves like a function type
+	-- This matters.  Return-unboxed-tuple analysis can
+	-- give overloaded functions like
+	--	f :: forall a. Num a => (# a->a, a->a #)
+	-- And we want these to get through the type checker
+    if null context then
+	kcHsType ty
+    else
+	kcFunResType ty		`thenTc_`
+	returnTc boxedTypeKind
+
+kcFunResType :: RenamedHsType -> TcM s TcKind
+-- The only place an unboxed tuple type is allowed
+-- is at the right hand end of an arrow
+kcFunResType (HsTupleTy (HsTupCon _ Unboxed) tys)
+  = mapTc kcTypeType tys	`thenTc_` 
+    returnTc unboxedTypeKind
+
+kcFunResType ty = kcHsType ty
+
 
 ---------------------------
 kcHsContext ctxt = mapTc_ kcHsPred ctxt
@@ -281,14 +292,6 @@ tcHsBoxedSigType ty
   = kcBoxedType ty	`thenTc_`
     tcHsType ty		`thenTc` \ ty' ->
     returnTc (hoistForAllTys ty')
-
-tcHsConSigType :: RenamedHsType -> TcM s Type
--- Used for constructor arguments, which must not
--- be unboxed tuples
-tcHsConSigType ty
-   = kcTypeType ty	`thenTc_`
-     tcHsArgType ty	`thenTc` \ ty' ->
-     returnTc (hoistForAllTys ty')
 \end{code}
 
 
@@ -296,17 +299,6 @@ tcHsType, the main work horse
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-tcHsArgType :: RenamedHsType -> TcM s TcType
--- Used the for function and constructor arguments, 
--- which are not allowed to be unboxed tuples
--- This is a bit ad hoc; we don't have a separate kind
--- for unboxed tuples
-tcHsArgType ty
-  = tcHsType ty				`thenTc` \ tau_ty ->
-    checkTc (not (isUnboxedTupleType tau_ty))
-	    (unboxedTupleErr ty)	`thenTc_`
-    returnTc tau_ty
-
 tcHsType :: RenamedHsType -> TcM s Type
 tcHsType ty@(HsTyVar name)
   = tc_app ty []
@@ -320,7 +312,7 @@ tcHsType (HsTupleTy (HsTupCon _ boxity) tys)
     returnTc (mkTupleTy boxity (length tys) tau_tys)
 
 tcHsType (HsFunTy ty1 ty2)
-  = tcHsArgType ty1	`thenTc` \ tau_ty1 ->
+  = tcHsType ty1	`thenTc` \ tau_ty1 ->
     tcHsType ty2	`thenTc` \ tau_ty2 ->
     returnTc (mkFunTy tau_ty1 tau_ty2)
 
@@ -352,7 +344,7 @@ tcHsType (HsUsgForAllTy uv_name ty)
 
 tcHsType full_ty@(HsForAllTy (Just tv_names) ctxt ty)
   = kcTyVarScope tv_names 
-		 (kcHsContext ctxt `thenTc_` kcHsType ty)  `thenTc` \ tv_kinds ->
+		 (kcHsContext ctxt `thenTc_` kcFunResType ty)  `thenTc` \ tv_kinds ->
     let
 	forall_tyvars = mkImmutTyVars tv_kinds
     in

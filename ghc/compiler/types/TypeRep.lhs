@@ -202,7 +202,7 @@ boxity :: BX = *	-- Boxed
 There's a little subtyping at the kind level:  
 	forall b. Type b <: OpenKind
 
-That is, a type of kind (Type b) OK in a context requiring an AnyBox.
+That is, a type of kind (Type b) is OK in a context requiring an OpenKind
 
 OpenKind, written '?', is used as the kind for certain type variables,
 in two situations:

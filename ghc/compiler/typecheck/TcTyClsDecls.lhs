@@ -128,7 +128,7 @@ tcGroup unf_env scc
 	    rec_details = mkNameEnv rec_details_list
 
 	    tyclss, all_tyclss :: [(Name, TyThing)]
-	    tyclss      = map (buildTyConOrClass is_rec kind_env rec_vrcs rec_details) decls
+	    tyclss = map (buildTyConOrClass is_rec kind_env rec_vrcs rec_details) decls
 
 		-- Add the tycons that come from the classes
 		-- We want them in the environment because 
@@ -145,7 +145,7 @@ tcGroup unf_env scc
 	mapTc (tcTyClDecl1 unf_env) decls	`thenTc` \ tycls_details ->
 	tcGetEnv				`thenNF_Tc` \ env -> 
 	returnTc (tycls_details, env)
-    )								`thenTc` \ (_, env) ->
+    )						`thenTc` \ (_, env) ->
     returnTc env
   where
     is_rec = case scc of
