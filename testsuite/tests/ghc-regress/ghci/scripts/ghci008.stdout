@@ -1,0 +1,33 @@
+-- + is a method in class Num
+infixl 6 +
+(+) :: forall a. (Num a) => a -> a -> a
+-- + is a method in class Num
+infixl 6 +
+(+) :: forall a. (Num a) => a -> a -> a
+-- Data.Complex.:+ is a data constructor
+infix 6 Data.Complex.:+
+(Data.Complex.:+) :: forall a. (RealFloat a) =>
+		     a -> a -> Data.Complex.Complex a
+-- Data.Complex.:+ is a data constructor
+infix 6 Data.Complex.:+
+(Data.Complex.:+) :: forall a. (RealFloat a) =>
+		     a -> a -> Data.Complex.Complex a
+-- RealFloat is a class
+class (RealFrac a, Floating a) => RealFloat a where {
+    floatRadix :: a -> Integer;
+    floatDigits :: a -> Int;
+    floatRange :: a -> (Int, Int);
+    decodeFloat :: a -> (Integer, Int);
+    encodeFloat :: Integer -> Int -> a;
+    exponent :: a -> Int {- has default method -};
+    significand :: a -> a {- has default method -};
+    scaleFloat :: Int -> a -> a {- has default method -};
+    isInfinite :: a -> Bool;
+    isDenormalized :: a -> Bool;
+    isNegativeZero :: a -> Bool;
+    isIEEE :: a -> Bool;
+    isNaN :: a -> Bool;
+    atan2 :: a -> a -> a {- has default method -};
+    }
+-- Data.List.isPrefixOf is a variable
+Data.List.isPrefixOf :: forall a. (Eq a) => [a] -> [a] -> Bool
