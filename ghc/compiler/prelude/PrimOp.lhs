@@ -2380,9 +2380,6 @@ pprPrimOp other_op
 \end{code}
 
 
-\end{code}
-
-
 %************************************************************************
 %*									*
 \subsubsection{CCalls}
