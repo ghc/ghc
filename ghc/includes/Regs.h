@@ -159,12 +159,10 @@ extern DLL_IMPORT_RTS Capability  MainCapability;
 #define SAVE_CurrentTSO     (BaseReg->rCurrentTSO)
 #define SAVE_CurrentNursery (BaseReg->rCurrentNursery)
 #define SAVE_HpAlloc        (BaseReg->rHpAlloc)
-#if defined(SMP) || defined(PAR)
 #define SAVE_SparkHd 	    (BaseReg->rSparks.hd)
 #define SAVE_SparkTl        (BaseReg->rSparks.tl)
 #define SAVE_SparkBase      (BaseReg->rSparks.base)
 #define SAVE_SparkLim 	    (BaseReg->rSparks.lim)
-#endif
 
 /* We sometimes need to save registers across a C-call, eg. if they
  * are clobbered in the standard calling convention.  We define the
@@ -205,105 +203,109 @@ extern DLL_IMPORT_RTS Capability  MainCapability;
  * again for no good reason (on register-poor architectures).
  */
 
+/* define NO_REGS to omit register declarations - used in RTS C code
+ * that needs all the STG definitions but not the global register 
+ * settings.
+ */
 #define GLOBAL_REG_DECL(type,name,reg) register type name REG(reg);
 
-#ifdef REG_R1
+#if defined(REG_R1) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgUnion,R1,REG_R1)
 #else
-#define R1 (BaseReg->rR1)
+# define R1 (BaseReg->rR1)
 #endif
 
-#ifdef REG_R2
+#if defined(REG_R2) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgUnion,R2,REG_R2)
 #else
-#define R2 (BaseReg->rR2)
+# define R2 (BaseReg->rR2)
 #endif
 
-#ifdef REG_R3
+#if defined(REG_R3) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgUnion,R3,REG_R3)
 #else
 # define R3 (BaseReg->rR3)
 #endif
 
-#ifdef REG_R4
+#if defined(REG_R4) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgUnion,R4,REG_R4)
 #else
 # define R4 (BaseReg->rR4)
 #endif
 
-#ifdef REG_R5
+#if defined(REG_R5) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgUnion,R5,REG_R5)
 #else
 # define R5 (BaseReg->rR5)
 #endif
 
-#ifdef REG_R6
+#if defined(REG_R6) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgUnion,R6,REG_R6)
 #else
 # define R6 (BaseReg->rR6)
 #endif
 
-#ifdef REG_R7
+#if defined(REG_R7) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgUnion,R7,REG_R7)
 #else
 # define R7 (BaseReg->rR7)
 #endif
 
-#ifdef REG_R8
+#if defined(REG_R8) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgUnion,R8,REG_R8)
 #else
 # define R8 (BaseReg->rR8)
 #endif
 
-#ifdef REG_R9
+#if defined(REG_R9) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgUnion,R9,REG_R9)
 #else
 # define R9 (BaseReg->rR9)
 #endif
 
-#ifdef REG_R10
+#if defined(REG_R10) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgUnion,R10,REG_R10)
 #else
 # define R10 (BaseReg->rR10)
 #endif
 
-#ifdef REG_F1
+#if defined(REG_F1) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgFloat,F1,REG_F1)
 #else
 #define F1 (BaseReg->rF1)
 #endif
 
-#ifdef REG_F2
+#if defined(REG_F2) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgFloat,F2,REG_F2)
 #else
 #define F2 (BaseReg->rF2)
 #endif
 
-#ifdef REG_F3
+#if defined(REG_F3) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgFloat,F3,REG_F3)
 #else
 #define F3 (BaseReg->rF3)
 #endif
 
-#ifdef REG_F4
+#if defined(REG_F4) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgFloat,F4,REG_F4)
 #else
 #define F4 (BaseReg->rF4)
 #endif
 
-#ifdef REG_D1
+#if defined(REG_D1) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgDouble,D1,REG_D1)
 #else
 #define D1 (BaseReg->rD1)
 #endif
 
-#ifdef REG_D2
+#if defined(REG_D2) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgDouble,D2,REG_D2)
 #else
 #define D2 (BaseReg->rD2)
 #endif
 
-#ifdef REG_L1
+#if defined(REG_L1) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgWord64,L1,REG_L1)
 #else
 #define L1 (BaseReg->rL1)
@@ -315,7 +317,7 @@ GLOBAL_REG_DECL(StgWord64,L1,REG_L1)
  * concurrent Haskell, MainRegTable otherwise).
  */
 
-#ifdef REG_Base
+#if defined(REG_Base) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
 #else
 #ifdef SMP
@@ -324,67 +326,67 @@ GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
 #define BaseReg (&((Capability *)MainCapability)[0].r)
 #endif
 
-#ifdef REG_Sp
+#if defined(REG_Sp) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(P_,Sp,REG_Sp)
 #else
 #define Sp (BaseReg->rSp)
 #endif
 
-#ifdef REG_SpLim
+#if defined(REG_SpLim) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(P_,SpLim,REG_SpLim)
 #else
 #define SpLim (BaseReg->rSpLim)
 #endif
 
-#ifdef REG_Hp
+#if defined(REG_Hp) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(P_,Hp,REG_Hp)
 #else
 #define Hp (BaseReg->rHp)
 #endif
 
-#ifdef REG_HpLim
+#if defined(REG_HpLim) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(P_,HpLim,REG_HpLim)
 #else
 #define HpLim (BaseReg->rHpLim)
 #endif
 
-#ifdef REG_CurrentTSO
+#if defined(REG_CurrentTSO) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(struct _StgTSO *,CurrentTSO,REG_CurrentTSO)
 #else
 #define CurrentTSO (BaseReg->rCurrentTSO)
 #endif
 
-#ifdef REG_CurrentNursery
+#if defined(REG_CurrentNursery) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(bdescr *,CurrentNursery,REG_CurrentNursery)
 #else
 #define CurrentNursery (BaseReg->rCurrentNursery)
 #endif
 
-#ifdef REG_HpAlloc
+#if defined(REG_HpAlloc) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
 #else
 #define HpAlloc (BaseReg->rHpAlloc)
 #endif
 
-#ifdef REG_SparkHd
+#if defined(REG_SparkHd) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(bdescr *,SparkHd,REG_SparkHd)
 #else
 #define SparkHd (BaseReg->rSparks.hd)
 #endif
 
-#ifdef REG_SparkTl
+#if defined(REG_SparkTl) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(bdescr *,SparkTl,REG_SparkTl)
 #else
 #define SparkTl (BaseReg->rSparks.tl)
 #endif
 
-#ifdef REG_SparkBase
+#if defined(REG_SparkBase) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(bdescr *,SparkBase,REG_SparkBase)
 #else
 #define SparkBase (BaseReg->rSparks.base)
 #endif
 
-#ifdef REG_SparkLim
+#if defined(REG_SparkLim) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
 #else
 #define SparkLim (BaseReg->rSparks.lim)
