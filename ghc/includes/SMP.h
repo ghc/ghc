@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: SMP.h,v 1.2 2001/02/08 14:36:21 simonmar Exp $
+ * $Id: SMP.h,v 1.3 2001/02/09 13:09:17 simonmar Exp $
  *
  * (c) The GHC Team, 1999
  *
@@ -20,9 +20,7 @@
 
 #if defined(SMP)
 
-#if    defined(INTERPRETER) \
-     || defined(PROFILING)  \
-     || defined(TICKY_TICKY)
+#if  defined(PROFILING)  || defined(TICKY_TICKY)
 #error Build options incompatible with SMP.
 #endif
 

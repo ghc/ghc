@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.34 2001/01/29 17:23:41 simonmar Exp $
+ * $Id: Printer.c,v 1.35 2001/02/09 13:09:16 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -45,24 +45,11 @@ static void    printZcoded   ( const char *raw );
  * Printer
  * ------------------------------------------------------------------------*/
 
-#ifdef INTERPRETER
-char* lookupHugsItblName ( void* itbl );
-#endif
-
 void printPtr( StgPtr p )
 {
-#ifdef INTERPRETER
-    char* str;
-#endif
     const char *raw;
     if (lookupGHCName( p, &raw )) {
         printZcoded(raw);
-#ifdef INTERPRETER
-    } else if ((raw = lookupHugsName(p)) != 0) {
-        fprintf(stderr, "%s", raw);
-    } else if ((str = lookupHugsItblName(p)) != 0) {
-        fprintf(stderr, "%p=%s", p, str);
-#endif
     } else {
         fprintf(stderr, "%p", p);
     }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.25 2001/01/29 17:23:41 simonmar Exp $
+ * $Id: Sanity.c,v 1.26 2001/02/09 13:09:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -219,9 +219,7 @@ checkClosure( StgClosure* p )
 {
     const StgInfoTable *info;
 
-#ifndef INTERPRETER    
     ASSERT(LOOKS_LIKE_GHC_INFO(p->header.info));
-#endif
 
     /* Is it a static closure (i.e. in the data segment)? */
     if (LOOKS_LIKE_STATIC(p)) {

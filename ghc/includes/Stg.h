@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.34 2000/12/04 12:31:20 simonmar Exp $
+ * $Id: Stg.h,v 1.35 2001/02/09 13:09:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -37,9 +37,6 @@
 
 /* Configuration */
 #include "config.h"
-#ifdef __HUGS__ /* vile hack till the GHC folks come on board */
-#include "options.h"
-#endif
 
 /* Some macros to handle DLLing (Win32 only at the moment). */
 #include "StgDLL.h"
@@ -65,10 +62,8 @@
 #  define LAZY_BLACKHOLING
 #endif
 
-/* ToDo: Set this flag properly: COMPILER and INTERPRETER should not be mutually exclusive. */
-#ifndef INTERPRETER
+/* ToDo: remove */
 #define COMPILER 1
-#endif
 
 /* TABLES_NEXT_TO_CODE says whether to assume that info tables are
  * assumed to reside just before the code for a function.

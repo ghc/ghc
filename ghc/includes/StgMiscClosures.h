@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.33 2001/01/29 17:23:41 simonmar Exp $
+ * $Id: StgMiscClosures.h,v 1.34 2001/02/09 13:09:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -130,14 +130,6 @@ extern DLL_IMPORT_RTS const StgInfoTable stg_END_MUT_LIST_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_catch_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_seq_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_dummy_ret_info;
-
-#ifdef INTERPRETER
-
-EXTFUN(Hugs_CONSTR_entry);
-
-extern const vec_info_8 stg_ret_bco_info;
-
-#endif /* INTERPRETER */
 
 /* closures */
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.13 2000/04/26 13:50:27 simonmar Exp $
+ * $Id: StgStartup.hc,v 1.14 2001/02/09 13:09:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -138,8 +138,6 @@ STGFUN(stg_enterStackTop)
    we currently disable module initialisation for Hugs.
    -------------------------------------------------------------------------- */
 
-#ifndef INTERPRETER 
-
 extern F_ *init_stack;
 
 STGFUN(stg_init_ret)
@@ -165,5 +163,3 @@ STGFUN(stg_init)
 
 START_MOD_INIT(__init_PrelGHC);
 END_MOD_INIT();
-
-#endif /* !INTERPRETER */

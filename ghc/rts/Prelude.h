@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.13 2001/01/11 17:25:56 simonmar Exp $
+ * $Id: Prelude.h,v 1.14 2001/02/09 13:09:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -14,7 +14,6 @@
  * modules these names are defined in.
  */
 
-#ifndef INTERPRETER
 extern DLL_IMPORT const StgClosure PrelBase_True_closure;
 extern DLL_IMPORT const StgClosure PrelBase_False_closure;
 extern DLL_IMPORT const StgClosure PrelPack_unpackCString_closure;
@@ -105,78 +104,5 @@ extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 #define Ptr_con_info              (&PrelPtr_Ptr_con_info)
 #define StablePtr_static_info     (&PrelStable_StablePtr_static_info)
 #define StablePtr_con_info        (&PrelStable_StablePtr_con_info)
-
-#else /* INTERPRETER */
-
-/* We need indirections to the Prelude stuff, because we can't link
- * these symbols statically.
- */
-extern const StgClosure *ind_True_closure;
-extern const StgClosure *ind_False_closure;
-extern const StgClosure *ind_unpackCString_closure;
-extern const StgClosure *ind_runFinalizerBatch_closure;
-
-extern const StgClosure *ind_stackOverflow_closure;
-extern const StgClosure *ind_heapOverflow_closure;
-extern const StgClosure *ind_PutFullMVar_closure;
-extern const StgClosure *ind_BlockedOnDeadMVar_closure;
-extern const StgClosure *ind_NonTermination_closure;
-
-extern const StgInfoTable *ind_Czh_static_info;
-extern const StgInfoTable *ind_Izh_static_info;
-extern const StgInfoTable *ind_Fzh_static_info;
-extern const StgInfoTable *ind_Dzh_static_info;
-extern const StgInfoTable *ind_Azh_static_info;
-extern const StgInfoTable *ind_Wzh_static_info;
-extern const StgInfoTable *ind_Czh_con_info;
-extern const StgInfoTable *ind_Izh_con_info;
-extern const StgInfoTable *ind_Fzh_con_info;
-extern const StgInfoTable *ind_Dzh_con_info;
-extern const StgInfoTable *ind_Azh_con_info;
-extern const StgInfoTable *ind_Wzh_con_info;
-extern const StgInfoTable *ind_I64zh_con_info;
-extern const StgInfoTable *ind_W64zh_con_info;
-extern const StgInfoTable *ind_StablePtr_static_info;
-extern const StgInfoTable *ind_StablePtr_con_info;
-
-#define True_closure           ind_True_closure
-#define False_closure          ind_False_closure
-#define unpackCString_closure  ind_unpackCString_closure
-#define runFinalizerBatch_closure ind_runFinalizerBatch_closure
-
-#define stackOverflow_closure  ind_stackOverflow_closure
-#define heapOverflow_closure   ind_heapOverflow_closure
-#define PutFullMVar_closure    ind_PutFullMVar_closure
-#define BlockedOnDeadMVar_closure ind_BlockedOnDeadMVar_closure
-#define NonTermination_closure ind_NonTermination_closure
-
-#define Czh_static_info        ind_Czh_static_info
-#define Izh_static_info        ind_Izh_static_info
-#define Fzh_static_info        ind_Fzh_static_info
-#define Dzh_static_info        ind_Dzh_static_info
-#define Azh_static_info        ind_Azh_static_info
-#define Wzh_static_info        ind_Wzh_static_info
-#define Czh_con_info           ind_Czh_con_info
-#define Izh_con_info           ind_Izh_con_info
-#define Fzh_con_info           ind_Fzh_con_info
-#define Dzh_con_info           ind_Dzh_con_info
-#define Azh_con_info           ind_Azh_con_info
-#define Wzh_con_info           ind_Wzh_con_info
-#define W64zh_con_info         ind_W64zh_con_info
-#define I64zh_con_info         ind_I64zh_con_info
-#define StablePtr_static_info  ind_StablePtr_static_info
-#define StablePtr_con_info     ind_StablePtr_con_info
-
-#ifdef XMLAMBDA
-/* The Inj constructor. Not present in combined mode or compiled code. */
-
-extern const StgInfoTable *ind_Inj_con_info;
-#define Inj_con_info           ind_Inj_con_info
-
-#endif
-
-#endif
-
-void fixupRTStoPreludeRefs( void*(*)(char*) );
 
 #endif /* PRELUDE_H */

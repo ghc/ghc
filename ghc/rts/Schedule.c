@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.88 2001/01/31 11:04:29 simonmar Exp $
+ * $Id: Schedule.c,v 1.89 2001/02/09 13:09:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1614,11 +1614,6 @@ initScheduler(void)
   RtsFlags.ConcFlags.ctxtSwitchTicks =
       RtsFlags.ConcFlags.ctxtSwitchTime / TICK_MILLISECS;
 
-#ifdef INTERPRETER
-  ecafList = END_ECAF_LIST;
-  clearECafTable();
-#endif
-
   /* Install the SIGHUP handler */
 #ifdef SMP
   {
@@ -2076,13 +2071,8 @@ threadStackOverflow(StgTSO *tso)
 	     printStackChunk(tso->sp, stg_min(tso->stack+tso->stack_size, 
 					      tso->sp+64)));
 
-#ifdef INTERPRETER
-    fprintf(stderr, "fatal: stack overflow in Hugs; aborting\n" );
-    exit(1);
-#else
     /* Send this thread the StackOverflow exception */
     raiseAsync(tso, (StgClosure *)stackOverflow_closure);
-#endif
     return tso;
   }
 

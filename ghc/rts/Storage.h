@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.27 2001/02/09 10:33:22 sewardj Exp $
+ * $Id: Storage.h,v 1.28 2001/02/09 13:09:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -248,21 +248,6 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
    The CAF table - used to let us revert CAFs
    -------------------------------------------------------------------------- */
 
-#if defined(INTERPRETER)
-typedef struct StgCAFTabEntry_ {
-    StgClosure*   closure;
-    StgInfoTable* origItbl;
-} StgCAFTabEntry;
-
-extern void addToECafTable ( StgClosure* closure, StgInfoTable* origItbl );
-extern void clearECafTable ( void );
-
-extern StgCAF*         ecafList;
-extern StgCAFTabEntry* ecafTable;
-extern StgInt          usedECafTable;
-extern StgInt          sizeECafTable;
-#endif
-
 #if defined(DEBUG)
 void printMutOnceList(generation *gen);
 void printMutableList(generation *gen);
@@ -351,7 +336,7 @@ void printMutableList(generation *gen);
 extern void* TEXT_SECTION_END_MARKER_DECL;
 extern void* DATA_SECTION_END_MARKER_DECL;
 
-#if defined(INTERPRETER) || defined(GHCI)
+#if defined(GHCI)
 /* Take into account code sections in dynamically loaded object files. */
 #define IS_CODE_PTR(p) (  ((P_)(p) < (P_)&TEXT_SECTION_END_MARKER) \
                        || is_dynamically_loaded_code_or_rodata_ptr((char *)p) )
@@ -465,7 +450,7 @@ extern int is_heap_alloced(const void* x);
    LOOKS_LIKE_STATIC() 
        - distinguishes between static and heap allocated data.
  */
-#if defined(ENABLE_WIN32_DLL_SUPPORT) && !defined(INTERPRETER)
+#if defined(ENABLE_WIN32_DLL_SUPPORT)
             /* definitely do not enable for mingw DietHEP */
 #define LOOKS_LIKE_STATIC(r) (!(HEAP_ALLOCED(r)))
 
@@ -495,15 +480,7 @@ extern int is_heap_alloced(const void* x);
    infotables for constructors on the (writable) C heap.
    -------------------------------------------------------------------------- */
 
-#ifdef INTERPRETER
-#  ifdef USE_MINIINTERPRETER
-     /* yoiks: one of the dreaded pointer equality tests */
-#    define IS_HUGS_CONSTR_INFO(info) \
-            (((StgInfoTable *)(info))->entry == (StgFunPtr)&Hugs_CONSTR_entry)
-#  else
-#    define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
-#  endif
-#elif GHCI
+#ifdef GHCI
    /* not accurate by any means, but stops the assertions failing... */
 #  define IS_HUGS_CONSTR_INFO(info)  IS_USER_PTR(info)
 #else

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.22 2001/01/29 17:23:41 simonmar Exp $
+ * $Id: Updates.h,v 1.23 2001/02/09 13:09:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -238,10 +238,6 @@ extern void newCAF(StgClosure*);
     ((StgInd *)cafptr)->indirectee   = (StgClosure *)(bhptr);		\
     SET_INFO((StgInd *)cafptr,(const StgInfoTable*)&stg_IND_STATIC_info);\
   }
-
-#ifdef INTERPRETER
-extern void newCAF_made_by_Hugs(StgCAF*);
-#endif
 
 /* -----------------------------------------------------------------------------
    Update-related prototypes

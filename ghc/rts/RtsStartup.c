@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.47 2001/02/09 12:09:33 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.48 2001/02/09 13:09:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -165,9 +165,7 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 #endif
 
     /* run the per-module initialisation code */
-#if !defined(INTERPRETER)
     initModules(init_root);
-#endif
 
 #if defined(PROFILING) || defined(DEBUG)
     initProfiling2();
@@ -192,14 +190,6 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
     init_default_handlers();
 #endif
  
-#if !defined(INTERPRETER)
-    /* Initialise pointers from the RTS to the prelude.  
-       Only for compiled code -- the interpreter
-       will call this itself later, so don't do so now.
-    */
-    fixupRTStoPreludeRefs(NULL);
-#endif
-
 #ifdef RTS_GTK_FRONTPANEL
     if (RtsFlags.GcFlags.frontpanel) {
 	initFrontPanel();
@@ -242,7 +232,6 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 F_ *init_stack = NULL;
 nat init_sp = 0;
 
-#ifndef INTERPRETER
 static void
 initModules ( void (*init_root)(void) )
 {
@@ -263,7 +252,6 @@ initModules ( void (*init_root)(void) )
     cap.rSp = (P_)(init_stack + init_sp);
     StgRun((StgFunPtr)stg_init, &cap);
 }
-#endif /* !INTERPRETER */
 
 /* -----------------------------------------------------------------------------
  * Shutting down the RTS - two ways of doing this, one which
