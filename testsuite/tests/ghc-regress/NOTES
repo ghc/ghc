@@ -24,3 +24,7 @@ specialise/
 simpleCore/should_compile
    simpl006 has extra bits
 
+deSugar/should_compile
+   cvh-ds-unboxed/ not done
+
+
