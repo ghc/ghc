@@ -1,6 +1,6 @@
 
 include ($confdir ++ "/../std-macros.T")
-expect unknown	-- should this compile or not?
+expect pass
 
 pretest_cleanup()
 
