@@ -275,6 +275,10 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      ++ ret
      )
 
+#else /* i386_TARGET_ARCH */
+
+mkMarshalCode_wrk = undefined
+
 #endif /* i386_TARGET_ARCH */
 
 \end{code}
