@@ -2264,6 +2264,14 @@ sub run_something {
     local($signal_num)  = $? & 127;
     local($dumped_core) = $? & 128;
 
+    if ($signal_num != 0) {
+	print STDERR "$tidy_name received signal $signal_num";
+	if ($dumped_core != 0) {
+	 	print STDERR " (core dumped)";
+	}
+	print STDERR "\n";
+    }
+
     if ($return_val != 0) {
         if ($Using_dump_file) {
 	    print STDERR "Compilation Errors dumped in $Specific_dump_file\n";
@@ -2271,13 +2279,6 @@ sub run_something {
 	&tidy_up_and_die($return_val, '');
     }
 
-    if ($signal_num != 0) {
-	print STDERR "Phase $tidy_name received signal $signal_num";
-	if ($dumped_core != 0) {
-	 	print STDERR " (core dumped)";
-	}
-	print STDERR "\n";
-    }
     $Using_dump_file = 0;
 }
 \end{code}
