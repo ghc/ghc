@@ -142,6 +142,7 @@ repTopDs group
 
 groupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
 			hs_fords = foreign_decls })
+-- Collect the binders of a Group
   = collectHsBinders val_decls ++
     [n | d <- tycl_decls, (n,_) <- tyClDeclNames d] ++
     [n | ForeignImport n _ _ _ _ <- foreign_decls]
@@ -362,7 +363,6 @@ repE (HsLet bs e) = do { (ss,ds) <- repBinds bs
 repE (ExplicitList ty es)     = do { xs <- repEs es; repListExp xs } 
 repE (ExplicitTuple es boxed) = do { xs <- repEs es; repTup xs }
 
-repE (HsWith _ _ _) 	    = panic "No with for implicit parameters yet"
 repE (ExplicitPArr ty es)   = panic "No parallel arrays yet"
 repE (RecordConOut _ _ _)   = panic "No record construction yet"
 repE (RecordUpdOut _ _ _ _) = panic "No record update yet"
@@ -479,6 +479,8 @@ rep_binds (MonoBind bs sigs _)
  = do { core1 <- rep_monobind bs
       ;	core2 <- rep_sigs sigs
       ;	return (core1 ++ core2) }
+rep_binds (IPBinds _ _)
+  = panic "DsMeta:repBinds: can't do implicit parameters"
 
 rep_monobind :: MonoBinds Name -> DsM [Core M.Decl]
 rep_monobind EmptyMonoBinds     = return []

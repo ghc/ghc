@@ -88,6 +88,13 @@ dsLet (ThenBinds b1 b2) body
   = dsLet b2 body 	`thenDs` \ body' ->
     dsLet b1 body'
   
+dsLet (IPBinds binds is_with) body
+  = foldlDs dsIPBind body binds
+  where
+    dsIPBind body (n, e)
+        = dsExpr e	`thenDs` \ e' ->
+	  returnDs (Let (NonRec (ipNameName n) e') body)
+
 -- Special case for bindings which bind unlifted variables
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.
@@ -258,14 +265,6 @@ dsExpr (HsCase discrim matches src_loc)
 dsExpr (HsLet binds body)
   = dsExpr body		`thenDs` \ body' ->
     dsLet binds body'
-
-dsExpr (HsWith expr binds is_with)
-  = dsExpr expr		`thenDs` \ expr' ->
-    foldlDs dsIPBind expr' binds
-    where
-      dsIPBind body (n, e)
-        = dsExpr e	`thenDs` \ e' ->
-	  returnDs (Let (NonRec (ipNameName n) e') body)
 
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
 -- because the interpretation of `stmts' depends on what sort of thing it is.

@@ -33,7 +33,7 @@ import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupSysBndr,
 			  bindCoreLocalRn, bindCoreLocalsRn, bindLocalNames,
 			  checkDupOrQualNames, checkDupNames, mapFvRn,
 			  lookupTopSrcBndr_maybe, lookupTopSrcBndr,
-			  dataTcOccs, unknownNameErr
+			  dataTcOccs, newIPName, unknownNameErr
 			)
 import TcRnMonad
 
@@ -258,18 +258,41 @@ rnTopBinds (MonoBind bind sigs _) = rnTopMonoBinds bind sigs
 
 rnBinds    :: RdrNameHsBinds -> RnM (RenamedHsBinds, FreeVars)
 -- This version assumes that the binders are already in scope
+-- It's used only in 'mdo'
 rnBinds EmptyBinds	       = returnM (EmptyBinds, emptyFVs)
 rnBinds (MonoBind bind sigs _) = rnMonoBinds bind sigs
-  -- The parser doesn't produce other forms
+rnBinds b@(IPBinds bind _)     = addErr (badIpBinds b)	`thenM_` 
+			         returnM (EmptyBinds, emptyFVs)
 
 rnBindsAndThen	:: RdrNameHsBinds 
 		-> (RenamedHsBinds -> RnM (result, FreeVars))
 		-> RnM (result, FreeVars)
 -- This version (a) assumes that the binding vars are not already in scope
 --		(b) removes the binders from the free vars of the thing inside
-rnBindsAndThen EmptyBinds	      thing_inside = thing_inside EmptyBinds
-rnBindsAndThen (MonoBind bind sigs _) thing_inside = rnMonoBindsAndThen bind sigs thing_inside
-  -- The parser doesn't produce other forms
+-- The parser doesn't produce ThenBinds
+rnBindsAndThen EmptyBinds	       thing_inside = thing_inside EmptyBinds
+rnBindsAndThen (MonoBind bind sigs _)  thing_inside = rnMonoBindsAndThen bind sigs thing_inside
+rnBindsAndThen (IPBinds binds is_with) thing_inside
+  = warnIf is_with withWarning			`thenM_`
+    rnIPBinds binds				`thenM` \ (binds',fvBinds) ->
+    thing_inside (IPBinds binds' is_with)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection{@rnIPBinds@s: in implicit parameter bindings}		*
+%*									*
+%************************************************************************
+
+\begin{code}
+rnIPBinds [] = returnM ([], emptyFVs)
+rnIPBinds ((n, expr) : binds)
+  = newIPName n			`thenM` \ name ->
+    rnExpr expr			`thenM` \ (expr',fvExpr) ->
+    rnIPBinds binds		`thenM` \ (binds',fvBinds) ->
+    returnM ((name, expr') : binds', fvExpr `plusFV` fvBinds)
+
 \end{code}
 
 
@@ -945,4 +968,15 @@ badRuleVar name var
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),
 	 nest 4 (ptext SLIT("(-fglasgow-exts permits this)"))]
+
+withWarning
+  = sep [quotes (ptext SLIT("with")),
+	 ptext SLIT("is deprecated, use"),
+	 quotes (ptext SLIT("let")),
+	 ptext SLIT("instead")]
+
+badIpBinds binds
+  = hang (ptext SLIT("Implicit-parameter bindings illegal in 'mdo':")) 4
+	 (ppr binds)
 \end{code}
+

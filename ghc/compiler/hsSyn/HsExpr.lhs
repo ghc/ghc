@@ -83,14 +83,9 @@ data HsExpr id
   | HsLet	(HsBinds id)	-- let(rec)
 		(HsExpr  id)
 
-  | HsWith	(HsExpr id)	-- implicit parameter binding
-  		[(IPName id, HsExpr id)]
-		Bool		-- True <=> this was a 'with' binding
-				--  (tmp, until 'with' is removed)
-
   | HsDo	(HsStmtContext Name)	-- The parameterisation is unimportant
 					-- because in this context we never use
-					-- the FunRhs variant
+					-- the PatGuard or ParStmt variant
 		[Stmt id]	-- "do":one or more stmts
 		[id]		-- Ids for [return,fail,>>=,>>]
 				--	Brutal but simple
@@ -311,10 +306,6 @@ ppr_expr (HsLet binds expr)
   = sep [hang (ptext SLIT("let")) 2 (pprBinds binds),
 	 hang (ptext SLIT("in"))  2 (ppr expr)]
 
-ppr_expr (HsWith expr binds is_with)
-  = sep [hang (ptext SLIT("let")) 2 (pp_ipbinds binds),
-	 hang (ptext SLIT("in"))  2 (ppr expr)]
-
 ppr_expr (HsDo do_or_list_comp stmts _ _ _) = pprDo do_or_list_comp stmts
 
 ppr_expr (ExplicitList _ exprs)
@@ -445,12 +436,6 @@ pp_rbinds thing rbinds
     pp_rbind (v, e) = hsep [pprBndr LetBind v, char '=', ppr e]
 \end{code}
 
-\begin{code}
-pp_ipbinds :: OutputableBndr id => [(IPName id, HsExpr id)] -> SDoc
-pp_ipbinds pairs = hsep (punctuate semi (map pp_item pairs))
-		 where
-		   pp_item (id,rhs) = pprBndr LetBind id <+> equals <+> ppr_expr rhs
-\end{code}
 
 
 %************************************************************************
@@ -764,6 +749,7 @@ data HsStmtContext id
   | MDoExpr				-- Recursive do-expression
   | PArrComp				-- Parallel array comprehension
   | PatGuard (HsMatchContext id)	-- Pattern guard for specified thing
+  | ParStmtCtxt (HsStmtContext id)	-- A branch of a parallel stmt 
 \end{code}
 
 \begin{code}
@@ -796,6 +782,7 @@ pprMatchRhsContext PatBindRhs	= ptext SLIT("the right-hand side of a pattern bin
 pprMatchRhsContext LambdaExpr	= ptext SLIT("the body of a lambda")
 pprMatchRhsContext RecUpd	= panic "pprMatchRhsContext"
 
+pprStmtContext (ParStmtCtxt c) = sep [ptext SLIT("a parallel branch of"), pprStmtContext c]
 pprStmtContext (PatGuard ctxt) = ptext SLIT("a pattern guard for") $$ pprMatchContext ctxt
 pprStmtContext DoExpr          = ptext SLIT("a 'do' expression")
 pprStmtContext MDoExpr         = ptext SLIT("an 'mdo' expression")
@@ -810,14 +797,15 @@ pprStmtResultContext other	     = ptext SLIT("the result of") <+> pprStmtContext
 
 
 -- Used to generate the string for a *runtime* error message
-matchContextErrString (FunRhs fun)    	      = "function " ++ showSDoc (ppr fun)
-matchContextErrString CaseAlt	      	      = "case"
-matchContextErrString PatBindRhs      	      = "pattern binding"
-matchContextErrString RecUpd	      	      = "record update"
-matchContextErrString LambdaExpr      	      = "lambda"
-matchContextErrString (StmtCtxt (PatGuard _)) = "pattern gaurd"
-matchContextErrString (StmtCtxt DoExpr)       = "'do' expression"
-matchContextErrString (StmtCtxt MDoExpr)      = "'mdo' expression"
-matchContextErrString (StmtCtxt ListComp)     = "list comprehension"
-matchContextErrString (StmtCtxt PArrComp)     = "array comprehension"
+matchContextErrString (FunRhs fun)    	      	 = "function " ++ showSDoc (ppr fun)
+matchContextErrString CaseAlt	      	      	 = "case"
+matchContextErrString PatBindRhs      	      	 = "pattern binding"
+matchContextErrString RecUpd	      	      	 = "record update"
+matchContextErrString LambdaExpr      	      	 = "lambda"
+matchContextErrString (StmtCtxt (ParStmtCtxt c)) = matchContextErrString (StmtCtxt c)
+matchContextErrString (StmtCtxt (PatGuard _)) 	 = "pattern guard"
+matchContextErrString (StmtCtxt DoExpr)       	 = "'do' expression"
+matchContextErrString (StmtCtxt MDoExpr)      	 = "'mdo' expression"
+matchContextErrString (StmtCtxt ListComp)     	 = "list comprehension"
+matchContextErrString (StmtCtxt PArrComp)     	 = "array comprehension"
 \end{code}

@@ -25,7 +25,7 @@ import PprCore		( {- instance Outputable (Expr a) -} )
 import Name		( Name )
 import PrelNames	( isUnboundName )
 import NameSet		( NameSet, elemNameSet, nameSetToList )
-import BasicTypes	( RecFlag(..), FixitySig(..), Activation(..) )
+import BasicTypes	( RecFlag(..), FixitySig(..), Activation(..), IPName )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Var		( TyVar )
@@ -49,13 +49,18 @@ Collections of bindings, created by dependency analysis and translation:
 \begin{code}
 data HsBinds id		-- binders and bindees
   = EmptyBinds
+  | ThenBinds	(HsBinds id) (HsBinds id)
 
-  | ThenBinds	(HsBinds id)
-		(HsBinds id)
+  | MonoBind 			-- A mutually recursive group
+	(MonoBinds id)
+	[Sig id]		-- Empty on typechecker output, Type Signatures
+	RecFlag
 
-  | MonoBind 	(MonoBinds id)
-		[Sig id]		-- Empty on typechecker output, Type Signatures
-		RecFlag
+  | IPBinds			-- Implcit parameters
+				-- Not allowed at top level
+	[(IPName id, HsExpr id)]
+	Bool		-- True <=> this was a 'with' binding
+			--  (tmp, until 'with' is removed)
 \end{code}
 
 \begin{code}
@@ -64,10 +69,11 @@ nullBinds :: HsBinds id -> Bool
 nullBinds EmptyBinds		= True
 nullBinds (ThenBinds b1 b2)	= nullBinds b1 && nullBinds b2
 nullBinds (MonoBind b _ _)	= nullMonoBinds b
+nullBinds (IPBinds b _)   	= null b
 
-mkMonoBind :: MonoBinds id -> [Sig id] -> RecFlag -> HsBinds id
-mkMonoBind EmptyMonoBinds _ _ = EmptyBinds
-mkMonoBind mbinds sigs is_rec = MonoBind mbinds sigs is_rec
+mkMonoBind :: RecFlag -> MonoBinds id -> HsBinds id
+mkMonoBind _      EmptyMonoBinds  = EmptyBinds
+mkMonoBind is_rec mbinds 	  = MonoBind mbinds [] is_rec
 \end{code}
 
 \begin{code}
@@ -77,6 +83,12 @@ instance (OutputableBndr id) => Outputable (HsBinds id) where
 ppr_binds EmptyBinds = empty
 ppr_binds (ThenBinds binds1 binds2)
     = ppr_binds binds1 $$ ppr_binds binds2
+
+ppr_binds (IPBinds binds is_with)
+  = sep (punctuate semi (map pp_item binds))
+  where
+    pp_item (id,rhs) = pprBndr LetBind id <+> equals <+> pprExpr rhs
+
 ppr_binds (MonoBind bind sigs is_rec)
      = vcat [ppr_isrec,
      	     vcat (map ppr sigs),

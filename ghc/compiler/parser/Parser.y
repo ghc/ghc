@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.110 2002/10/11 14:46:04 simonpj Exp $
+$Id: Parser.y,v 1.111 2002/10/23 14:30:01 simonpj Exp $
 
 Haskell grammar.
 
@@ -469,21 +469,23 @@ decls 	:: { [RdrBinding] }	-- Reversed
 	| {- empty -}			{ [] }
 
 
-wherebinds :: { RdrNameHsBinds }
-	: where				{ cvBinds $1 }
-
-where 	:: { [RdrBinding] }	-- Reversed
-	: 'where' decllist		{ $2 }
-	| {- empty -}			{ [] }
-
 decllist :: { [RdrBinding] }	-- Reversed
 	: '{'            decls '}'	{ $2 }
 	|     layout_on  decls close	{ $2 }
 
-letbinds :: { RdrNameHsExpr -> RdrNameHsExpr }
-	: decllist			{ HsLet (cvBinds $1) }
-	| '{'            dbinds '}'	{ \e -> HsWith e $2 False{-not with-} }
-	|     layout_on  dbinds close	{ \e -> HsWith e $2 False{-not with-} }
+where 	:: { [RdrBinding] }	-- Reversed
+				-- No implicit parameters
+	: 'where' decllist		{ $2 }
+	| {- empty -}			{ [] }
+
+binds 	::  { RdrNameHsBinds }	-- May have implicit parameters
+	: decllist			{ cvBinds $1 }
+	| '{'            dbinds '}'	{ IPBinds $2 False{-not with-} }
+	|     layout_on  dbinds close	{ IPBinds $2 False{-not with-} }
+
+wherebinds :: { RdrNameHsBinds }	-- May have implicit parameters
+	: 'where' binds			{ $2 }
+	| {- empty -}			{ EmptyBinds }
 
 
 
@@ -922,7 +924,7 @@ sigdecl :: { RdrBinding }
 
 exp   :: { RdrNameHsExpr }
 	: infixexp '::' sigtype		{ ExprWithTySig $1 $3 }
-	| infixexp 'with' dbinding	{ HsWith $1 $3 True{-not a let-} }
+	| infixexp 'with' dbinding	{ HsLet (IPBinds $3 True{-not a let-}) $1 }
 	| infixexp			{ $1 }
 
 infixexp :: { RdrNameHsExpr }
@@ -936,7 +938,7 @@ exp10 :: { RdrNameHsExpr }
 			   returnP (HsLam (Match ps $5 
 					    (GRHSs (unguardedRHS $8 $7) 
 						   EmptyBinds placeHolderType))) }
-  	| 'let' letbinds 'in' exp		{ $2 $4 }
+  	| 'let' binds 'in' exp			{ HsLet $2 $4 }
 	| 'if' srcloc exp 'then' exp 'else' exp { HsIf $3 $5 $7 $2 }
    	| 'case' srcloc exp 'of' altslist	{ HsCase $3 $5 $2 }
 	| '-' fexp				{ mkHsNegApp $2 }
@@ -1156,7 +1158,7 @@ stmt  :: { RdrNameStmt }
 	: srcloc infixexp '<-' exp	{% checkPattern $1 $2 `thenP` \p ->
 					   returnP (BindStmt p $4 $1) }
 	| srcloc exp			{ ExprStmt $2 placeHolderType $1 }
-  	| srcloc 'let' decllist		{ LetStmt (cvBinds $3) }
+  	| srcloc 'let' binds		{ LetStmt $3 }
 
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction

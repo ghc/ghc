@@ -1090,7 +1090,7 @@ mk_easy_FunMonoBind loc fun pats binds expr
   = FunMonoBind fun False{-not infix-} [mk_easy_Match loc pats binds expr] loc
 
 mk_easy_Match loc pats binds expr
-  = mk_match loc pats expr (mkMonoBind (andMonoBindList binds) [] Recursive)
+  = mk_match loc pats expr (mkMonoBind Recursive (andMonoBindList binds))
 	-- The renamer expects everything in its input to be a
 	-- "recursive" MonoBinds, and it is its job to sort things out
 	-- from there.

@@ -286,12 +286,6 @@ rnExpr (HsLet binds expr)
     rnExpr expr			 `thenM` \ (expr',fvExpr) ->
     returnM (HsLet binds' expr', fvExpr)
 
-rnExpr (HsWith expr binds is_with)
-  = warnIf is_with withWarning `thenM_`
-    rnExpr expr			`thenM` \ (expr',fvExpr) ->
-    rnIPBinds binds		`thenM` \ (binds',fvBinds) ->
-    returnM (HsWith expr' binds' is_with, fvExpr `plusFV` fvBinds)
-
 rnExpr e@(HsDo do_or_lc stmts _ _ src_loc)
   = addSrcLoc src_loc $
     rnStmts do_or_lc stmts		`thenM` \ (stmts', fvs) ->
@@ -442,22 +436,6 @@ rnRbinds str rbinds
 
 %************************************************************************
 %*									*
-\subsubsection{@rnIPBinds@s: in implicit parameter bindings}		*
-%*									*
-%************************************************************************
-
-\begin{code}
-rnIPBinds [] = returnM ([], emptyFVs)
-rnIPBinds ((n, expr) : binds)
-  = newIPName n			`thenM` \ name ->
-    rnExpr expr			`thenM` \ (expr',fvExpr) ->
-    rnIPBinds binds		`thenM` \ (binds',fvBinds) ->
-    returnM ((name, expr') : binds', fvExpr `plusFV` fvBinds)
-
-\end{code}
-
-%************************************************************************
-%*									*
 	Template Haskell brackets
 %*									*
 %************************************************************************
@@ -526,12 +504,18 @@ rnNormalStmts ctxt (BindStmt pat expr src_loc : stmts)
 					-- the rnPatsAndThen, but it does not matter
 
 rnNormalStmts ctxt (LetStmt binds : stmts)
-  = rnBindsAndThen binds		$ \ binds' ->
-    rnNormalStmts ctxt stmts		`thenM` \ (stmts', fvs) ->
-    returnM (LetStmt binds' : stmts', fvs)
+  = checkErr (ok ctxt binds) (badIpBinds binds)	`thenM_`
+    rnBindsAndThen binds			( \ binds' ->
+    rnNormalStmts ctxt stmts			`thenM` \ (stmts', fvs) ->
+    returnM (LetStmt binds' : stmts', fvs))
+  where
+	-- We do not allow implicit-parameter bindings in a parallel
+	-- list comprehension.  I'm not sure what it might mean.
+    ok (ParStmtCtxt _) (IPBinds _ _) = False	
+    ok _	       _	     = True
 
 rnNormalStmts ctxt (ParStmt stmtss : stmts)
-  = mapFvRn (rnNormalStmts ctxt) stmtss	`thenM` \ (stmtss', fv_stmtss) ->
+  = mapFvRn (rnNormalStmts (ParStmtCtxt ctxt)) stmtss	`thenM` \ (stmtss', fv_stmtss) ->
     let
 	bndrss = map collectStmtsBinders stmtss'
     in
@@ -934,10 +918,7 @@ thErr what
   = ptext SLIT("Template Haskell") <+> text what <+>  
     ptext SLIT("illegal in a stage-1 compiler") 
 
-
-withWarning
-  = sep [quotes (ptext SLIT("with")),
-	 ptext SLIT("is deprecated, use"),
-	 quotes (ptext SLIT("let")),
-	 ptext SLIT("instead")]
+badIpBinds binds
+  = hang (ptext SLIT("Implicit-parameter bindings illegal in a parallel list comprehension:")) 4
+	 (ppr binds)
 \end{code}

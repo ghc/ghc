@@ -20,7 +20,7 @@ import HsSyn		( HsExpr(..), HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, 
 			  RenamedPat, RenamedMatchContext )
-import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, 
+import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TcHsBinds, 
 			  TcMonoBinds, TcPat, TcStmt )
 
 import TcRnMonad
@@ -151,7 +151,7 @@ tcMatch xve1 ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
   = addSrcLoc (getMatchLoc match)		$	-- At one stage I removed this;
     addErrCtxt (matchCtxt ctxt match)		$	-- I'm not sure why, so I put it back
     tcMatchPats pats expected_ty tc_grhss	`thenM` \ (pats', grhss', ex_binds) ->
-    returnM (Match pats' Nothing (glue_on Recursive ex_binds grhss'))
+    returnM (Match pats' Nothing (glue_on ex_binds grhss'))
 
   where
     tc_grhss rhs_ty 
@@ -181,9 +181,9 @@ lift_grhss co_fn rhs_ty (GRHSs grhss binds ty)
     lift_stmt stmt	       = stmt
    
 -- glue_on just avoids stupid dross
-glue_on _ EmptyMonoBinds grhss = grhss		-- The common case
-glue_on is_rec mbinds (GRHSs grhss binds ty)
-  = GRHSs grhss (mkMonoBind mbinds [] is_rec `ThenBinds` binds) ty
+glue_on EmptyBinds grhss = grhss		-- The common case
+glue_on binds1 (GRHSs grhss binds2 ty)
+  = GRHSs grhss (binds1 `ThenBinds` binds2) ty
 
 
 tcGRHSs :: RenamedMatchContext -> RenamedGRHSs
@@ -216,7 +216,7 @@ tcGRHSs ctxt (GRHSs grhss binds _) expected_ty
 tcMatchPats
 	:: [RenamedPat] -> TcType
 	-> (TcType -> TcM a)
-	-> TcM ([TcPat], a, TcDictBinds)
+	-> TcM ([TcPat], a, TcHsBinds)
 -- Typecheck the patterns, extend the environment to bind the variables,
 -- do the thing inside, use any existentially-bound dictionaries to 
 -- discharge parts of the returning LIE, and deal with pattern type
@@ -246,7 +246,7 @@ tcMatchPats pats expected_ty thing_inside
 	-- 	f (C g) x = g x
 	-- Here, result_ty will be simply Int, but expected_ty is (a -> Int).
 
-    returnM (pats', result, ex_binds)
+    returnM (pats', result, mkMonoBind Recursive ex_binds)
 
 tc_match_pats [] expected_ty thing_inside
   = thing_inside expected_ty 	`thenM` \ answer ->
@@ -433,7 +433,7 @@ tcStmtAndThen combine do_or_lc m_ty@(m,elt_ty) stmt@(BindStmt pat exp src_loc) t
 	popErrCtxt thing_inside
     )							`thenM` \ ([pat'], thing, dict_binds) ->
     returnM (combine (BindStmt pat' exp' src_loc)
-		     (glue_binds combine Recursive dict_binds thing))
+		     (glue_binds combine dict_binds thing))
 
 	-- ParStmt
 tcStmtAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s) thing_inside
@@ -515,9 +515,8 @@ tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ResultStmt exp locn) t
 
 
 ------------------------------
-glue_binds combine is_rec binds thing 
-  | nullMonoBinds binds = thing
-  | otherwise		= combine (LetStmt (mkMonoBind binds [] is_rec)) thing
+glue_binds combine EmptyBinds  thing = thing
+glue_binds combine other_binds thing = combine (LetStmt other_binds) thing
 \end{code}
 
 

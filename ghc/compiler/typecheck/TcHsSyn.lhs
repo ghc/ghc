@@ -315,7 +315,20 @@ zonkBinds env (MonoBind bind sigs is_rec)
 	zonkMonoBinds env1 bind	`thenM` \ (new_bind, new_ids) ->
 	returnM (env1, new_bind, new_ids)
     )				`thenM` \ (env1, new_bind, _) ->
-   returnM (env1, mkMonoBind new_bind [] is_rec)
+   returnM (env1, mkMonoBind is_rec new_bind)
+
+zonkBinds env (IPBinds binds is_with)
+  = mappM zonk_ip_bind binds	`thenM` \ new_binds ->
+    let
+	env1 = extendZonkEnv env (map (ipNameName . fst) new_binds)
+    in
+    returnM (env1, IPBinds new_binds is_with)
+  where
+    zonk_ip_bind (n, e)
+	= mapIPNameTc (zonkIdBndr env) n	`thenM` \ n' ->
+	  zonkExpr env e			`thenM` \ e' ->
+	  returnM (n', e')
+
 
 ---------------------------------------------
 zonkMonoBinds :: ZonkEnv -> TcMonoBinds
@@ -496,19 +509,6 @@ zonkExpr env (HsLet binds expr)
   = zonkBinds env binds		`thenM` \ (new_env, new_binds) ->
     zonkExpr new_env expr	`thenM` \ new_expr ->
     returnM (HsLet new_binds new_expr)
-
-zonkExpr env (HsWith expr binds is_with)
-  = mappM zonk_ip_bind binds	`thenM` \ new_binds ->
-    let
-	env1 = extendZonkEnv env (map (ipNameName . fst) new_binds)
-    in
-    zonkExpr env1 expr		`thenM` \ new_expr ->
-    returnM (HsWith new_expr new_binds is_with)
-    where
-	zonk_ip_bind (n, e)
-	    = mapIPNameTc (zonkIdBndr env) n	`thenM` \ n' ->
-	      zonkExpr env e			`thenM` \ e' ->
-	      returnM (n', e')
 
 zonkExpr env (HsDo do_or_lc stmts ids ty src_loc)
   = zonkStmts env stmts 	`thenM` \ new_stmts ->

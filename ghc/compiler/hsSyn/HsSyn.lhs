@@ -118,6 +118,7 @@ it should return @[x, y, f, a, b]@ (remember, order important).
 
 \begin{code}
 collectLocatedHsBinders :: HsBinds name -> [(name,SrcLoc)]
+-- Used at top level only; so no need for an IPBinds case
 collectLocatedHsBinders EmptyBinds = []
 collectLocatedHsBinders (MonoBind b _ _) 
  = collectLocatedMonoBinders b
@@ -125,11 +126,11 @@ collectLocatedHsBinders (ThenBinds b1 b2)
  = collectLocatedHsBinders b1 ++ collectLocatedHsBinders b2
 
 collectHsBinders :: HsBinds name -> [name]
-collectHsBinders EmptyBinds = []
-collectHsBinders (MonoBind b _ _) 
- = collectMonoBinders b
-collectHsBinders (ThenBinds b1 b2)
- = collectHsBinders b1 ++ collectHsBinders b2
+collectHsBinders EmptyBinds 	   = []
+collectHsBinders (IPBinds _ _)	   = []		-- Implicit parameters don't create
+						-- ordinary bindings
+collectHsBinders (MonoBind b _ _)  = collectMonoBinders b
+collectHsBinders (ThenBinds b1 b2) = collectHsBinders b1 ++ collectHsBinders b2
 
 collectLocatedMonoBinders :: MonoBinds name -> [(name,SrcLoc)]
 collectLocatedMonoBinders binds
@@ -162,6 +163,7 @@ Get all the pattern type signatures out of a bunch of bindings
 \begin{code}
 collectSigTysFromHsBinds :: HsBinds name -> [HsType name]
 collectSigTysFromHsBinds EmptyBinds        = [] 
+collectSigTysFromHsBinds (IPBinds _ _)     = [] 
 collectSigTysFromHsBinds (MonoBind b _ _)  = collectSigTysFromMonoBinds b
 collectSigTysFromHsBinds (ThenBinds b1 b2) = collectSigTysFromHsBinds b1 ++
 					     collectSigTysFromHsBinds b2

@@ -10,22 +10,23 @@ module TcBinds ( tcBindsAndThen, tcTopBinds, tcMonoBinds,
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcMatches ( tcGRHSs, tcMatchesFun )
-import {-# SOURCE #-} TcExpr  ( tcExpr )
+import {-# SOURCE #-} TcExpr  ( tcExpr, tcMonoExpr )
 
 import CmdLineOpts	( DynFlag(Opt_NoMonomorphismRestriction) )
 import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), 
-			  Match(..), HsMatchContext(..), 
+			  Match(..), HsMatchContext(..), mkMonoBind,
 			  collectMonoBinders, andMonoBinds,
 			  collectSigTysFromMonoBinds
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
-import TcHsSyn		( TcMonoBinds, TcId, zonkId, mkHsLet )
+import TcHsSyn		( TcHsBinds, TcMonoBinds, TcId, zonkId, mkHsLet )
 
 import TcRnMonad
-import Inst		( InstOrigin(..), newDicts, instToId )
+import Inst		( InstOrigin(..), newDicts, newIPDict, instToId )
 import TcEnv		( tcExtendLocalValEnv, tcExtendLocalValEnv2, newLocalName )
 import TcUnify		( unifyTauTyLists, checkSigTyVarsWrt, sigCtxt )
-import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, tcSimplifyToDicts )
+import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, 
+			  tcSimplifyToDicts, tcSimplifyIPs )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), TcSigInfo(..), 
 			  tcTySig, maybeSig, tcSigPolyId, tcSigMonoId, tcAddScopedTyVars
 			)
@@ -93,11 +94,17 @@ tcTopBinds binds
     getLclEnv					`thenM` \ env ->
     returnM (EmptyMonoBinds, env)
   where
-    glue is_rec binds1 (binds2, thing) = (binds1 `AndMonoBinds` binds2, thing)
+	-- The top level bindings are flattened into a giant 
+	-- implicitly-mutually-recursive MonoBinds
+    glue binds1 (binds2, env) = (flatten binds1 `AndMonoBinds` binds2, env)
+    flatten EmptyBinds 	        = EmptyMonoBinds
+    flatten (b1 `ThenBinds` b2) = flatten b1 `AndMonoBinds` flatten b2
+    flatten (MonoBind b _ _)	= b
+	-- Can't have a IPBinds at top level
 
 
 tcBindsAndThen
-	:: (RecFlag -> TcMonoBinds -> thing -> thing)		-- Combinator
+	:: (TcHsBinds -> thing -> thing)		-- Combinator
 	-> RenamedHsBinds
 	-> TcM thing
 	-> TcM thing
@@ -113,6 +120,27 @@ tc_binds_and_then top_lvl combiner (ThenBinds b1 b2) do_next
   = tc_binds_and_then top_lvl combiner b1	$
     tc_binds_and_then top_lvl combiner b2	$
     do_next
+
+tc_binds_and_then top_lvl combiner (IPBinds binds is_with) do_next
+  = getLIE do_next			`thenM` \ (result, expr_lie) ->
+    mapAndUnzipM tc_ip_bind binds	`thenM` \ (avail_ips, binds') ->
+
+	-- If the binding binds ?x = E, we  must now 
+	-- discharge any ?x constraints in expr_lie
+    tcSimplifyIPs avail_ips expr_lie	`thenM` \ dict_binds ->
+
+    returnM (combiner (IPBinds binds' is_with) $
+	     combiner (mkMonoBind Recursive dict_binds) result)
+  where
+	-- I wonder if we should do these one at at time
+	-- Consider	?x = 4
+	--		?y = ?x + 1
+    tc_ip_bind (ip, expr)
+      = newTyVarTy openTypeKind		`thenM` \ ty ->
+  	getSrcLocM			`thenM` \ loc ->
+  	newIPDict (IPBind ip) ip ty	`thenM` \ (ip', ip_inst) ->
+  	tcMonoExpr expr ty		`thenM` \ expr' ->
+  	returnM (ip_inst, (ip', expr'))
 
 tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
   =   	-- BRING ANY SCOPED TYPE VARIABLES INTO SCOPE
@@ -149,7 +177,8 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 		-- leave them to the tcSimplifyTop, and quite a bit faster too
 	TopLevel
 		-> extendLIEs lie	`thenM_`
-		   returnM (combiner Recursive (poly_binds `andMonoBinds` prag_binds) thing)
+		   returnM (combiner (mkMonoBind Recursive (poly_binds `andMonoBinds` prag_binds)) 
+				     thing)
 
 	NotTopLevel
 		-> bindInstsOfLocalFuns lie poly_ids	`thenM` \ lie_binds ->
@@ -159,16 +188,16 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 			-- so that we desugar unlifted bindings correctly
 		   if isRec is_rec then
 		     returnM (
-			combiner Recursive (
+			combiner (mkMonoBind Recursive (
 				poly_binds `andMonoBinds`
 				lie_binds  `andMonoBinds`
-				prag_binds) thing
+				prag_binds)) thing
 		     )
 		   else
 		     returnM (
-			combiner NonRecursive poly_binds $
-			combiner NonRecursive prag_binds $
-			combiner Recursive lie_binds  $
+			combiner (mkMonoBind NonRecursive poly_binds) $
+			combiner (mkMonoBind NonRecursive prag_binds) $
+			combiner (mkMonoBind Recursive lie_binds)     $
 				-- NB: the binds returned by tcSimplify and bindInstsOfLocalFuns
 				-- aren't guaranteed in dependency order (though we could change
 				-- that); hence the Recursive marker.

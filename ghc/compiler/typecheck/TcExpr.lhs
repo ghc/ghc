@@ -19,9 +19,7 @@ import Name		( isExternalName )
 import qualified DsMeta
 #endif
 
-import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..),
-			  mkMonoBind, recBindFields
-			)
+import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), recBindFields )
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds, hsLitType, mkHsDictApp, mkHsTyApp, mkHsLet )
 import TcRnMonad
@@ -236,11 +234,9 @@ tcMonoExpr in_expr@(OpApp arg1 op fix arg2) res_ty
 \begin{code}
 tcMonoExpr (HsLet binds expr) res_ty
   = tcBindsAndThen
-	combiner
+	HsLet
 	binds 			-- Bindings to check
 	(tcMonoExpr expr res_ty)
-  where
-    combiner is_rec bind expr = HsLet (mkMonoBind bind [] is_rec) expr
 
 tcMonoExpr in_expr@(HsCase scrut matches src_loc) res_ty
   = addSrcLoc src_loc			$
@@ -662,33 +658,6 @@ tcMonoExpr (HsReify (Reify flavour name)) res_ty
 		   ReifyType -> DsMeta.typTyConName
 		   ReifyFixity -> pprPanic "tcMonoExpr: cant do reifyFixity yet" (ppr name)
 #endif GHCI
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Implicit Parameter bindings}
-%*									*
-%************************************************************************
-
-\begin{code}
-tcMonoExpr (HsWith expr binds is_with) res_ty
-  = getLIE (tcMonoExpr expr res_ty)	`thenM` \ (expr', expr_lie) ->
-    mapAndUnzipM tc_ip_bind binds	`thenM` \ (avail_ips, binds') ->
-
-	-- If the binding binds ?x = E, we  must now 
-	-- discharge any ?x constraints in expr_lie
-    tcSimplifyIPs avail_ips expr_lie	`thenM` \ dict_binds ->
-    let
-	expr'' = HsLet (mkMonoBind dict_binds [] Recursive) expr'
-    in
-    returnM (HsWith expr'' binds' is_with)
-  where
-    tc_ip_bind (ip, expr)
-      = newTyVarTy openTypeKind		`thenM` \ ty ->
-  	getSrcLocM			`thenM` \ loc ->
-  	newIPDict (IPBind ip) ip ty	`thenM` \ (ip', ip_inst) ->
-  	tcMonoExpr expr ty		`thenM` \ expr' ->
-  	returnM (ip_inst, (ip', expr'))
 \end{code}
 
 
