@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getClockTime.c,v 1.6 1999/09/30 12:38:44 sof Exp $
+ * $Id: getClockTime.c,v 1.7 1999/10/20 10:08:33 sof Exp $
  *
  * getClockTime Runtime Support
  */
@@ -9,24 +9,25 @@
 #include "Rts.h"
 #include "stgio.h"
 
-/* It seems morally wrong to skew this in favour of
-   using non-POSIX calls (gettimeofday(), ftime()..),
-   rather than time()....so, let's re-order it all
-   (and hope OS idiosyncracies won't get in the way
-   of using time(), the moral elite's favourite.)
+/* Note: skewing this code in favour of non-POSIX calls
+   such as gettimeofday() and getclock() rather than time(),
+   may seem strange/wrong. There's a good reason for it
+   though - the non-POSIX calls gives you better precision --
+   they return usecs (or nsecs) as well as seconds, which
+   the users of getClockTime() is interested in knowing.
  */
 
-#if defined(HAVE_TIME_H)
-# include <time.h>
+#if defined(HAVE_GETTIMEOFDAY)
+#  ifdef HAVE_SYS_TIME_H
+#   include <sys/time.h>
+#  endif
 #elif defined(HAVE_GETCLOCK)
 # ifdef HAVE_SYS_TIMERS_H
 #  define POSIX_4D9 1
 #  include <sys/timers.h>
 # endif
-#elif defined(HAVE_GETTIMEOFDAY)
-#  ifdef HAVE_SYS_TIME_H
-#   include <sys/time.h>
-#  endif
+#elif defined(HAVE_TIME_H)
+# include <time.h>
 #endif
 
 #ifdef HAVE_WINDOWS_H
@@ -50,15 +51,16 @@ getClockTime(StgByteArray sec, StgByteArray nsec)
   ((unsigned int *)sec)[0] = (unsigned int)t.time;
   ((unsigned int *)nsec)[0] = (unsigned int)t.millitm * 1000;
   return 0;
-#elif defined(HAVE_TIME_H)
-    time_t t;
-    if ((t = time(NULL)) == (time_t) -1) {
+#elif defined(HAVE_GETTIMEOFDAY)
+    struct timeval tp;
+ 
+    if (gettimeofday(&tp, NULL) != 0) {
 	cvtErrno();
 	stdErrno();
 	return -1;
     }
-    ((unsigned long int *)sec)[0] = t;
-    ((unsigned long int *)nsec)[0] = 0;
+    ((unsigned long int *)sec)[0] = tp.tv_sec;
+    ((unsigned long int *)nsec)[0] = tp.tv_usec * 1000;
     return 0;
 #elif defined(HAVE_GETCLOCK)
     struct timespec tp;
@@ -71,16 +73,15 @@ getClockTime(StgByteArray sec, StgByteArray nsec)
     ((unsigned long int *)sec)[0] = tp.tv_sec;
     ((unsigned long int *)nsec)[0] = tp.tv_nsec;
     return 0;
-#elif defined(HAVE_GETTIMEOFDAY)
-    struct timeval tp;
- 
-    if (gettimeofday(&tp, NULL) != 0) {
+#elif defined(HAVE_TIME_H)
+    time_t t;
+    if ((t = time(NULL)) == (time_t) -1) {
 	cvtErrno();
 	stdErrno();
 	return -1;
     }
-    ((unsigned long int *)sec)[0] = tp.tv_sec;
-    ((unsigned long int *)nsec)[0] = tp.tv_usec * 1000;
+    ((unsigned long int *)sec)[0] = t;
+    ((unsigned long int *)nsec)[0] = 0;
     return 0;
 #else
 #error "getClockTime: don't know how to get at the clock's time"
