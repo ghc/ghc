@@ -62,6 +62,7 @@ import HscTypes		( PersistentCompilerState(..), HomeSymbolTable,
 		          TyThing(..), implicitTyThingIds, 
 			  mkTypeEnv
 			)
+import IOExts
 \end{code}
 
 Outside-world interface:
@@ -152,19 +153,17 @@ typecheckExpr dflags wrap_io pcs hst unqual this_mod (expr, decls)
 	| wrap_io   = tryTc_ (tc_io_expr (HsApp (HsVar printName) e))	-- Recovery case
 			     (tc_io_expr e)				-- Main case
 	| otherwise = newTyVarTy openTypeKind	`thenTc` \ ty ->
-		      tcMonoExpr expr ty 	`thenTc` \ (expr', lie) ->
-		      returnTc (expr', lie, ty)
+		      tcMonoExpr e ty 		`thenTc` \ (e', lie) ->
+		      returnTc (e', lie, ty)
 		      
 	where
-		-- (tc_io_expr e) typechecks 'e' if that gives a result of IO t,
-		-- or 'print e' otherwise.  Either way the result is of type IO t
 	  tc_io_expr e = newTyVarTy openTypeKind	`thenTc` \ ty ->
 			 tcLookupTyCon ioTyConName	`thenNF_Tc` \ ioTyCon ->
 			 let
 			    res_ty = mkTyConApp ioTyCon [ty]
 			 in
-		 	 tcMonoExpr expr res_ty	`thenTc` \ (expr', lie) ->
-			 returnTc (expr', lie, res_ty)
+		 	 tcMonoExpr e res_ty	`thenTc` \ (e', lie) ->
+			 returnTc (e', lie, res_ty)
 
 ---------------
 typecheck :: DynFlags
