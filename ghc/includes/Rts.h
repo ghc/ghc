@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.26 2004/08/22 16:40:38 panne Exp $
+ * $Id: Rts.h,v 1.27 2004/09/06 11:10:34 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -154,6 +154,7 @@ void _stgAssert (char *, unsigned int);
 
 /* Runtime-system hooks */
 #include "Hooks.h"
+#include "RtsMessages.h"
 
 #include "ieee-flpt.h"
 

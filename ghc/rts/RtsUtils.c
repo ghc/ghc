@@ -10,10 +10,8 @@
 /* #include "PosixSource.h" */
 
 #include "Rts.h"
-#include "RtsTypes.h"
 #include "RtsAPI.h"
 #include "RtsFlags.h"
-#include "Hooks.h"
 #include "RtsUtils.h"
 #include "Ticky.h"
 
@@ -33,91 +31,6 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
-
-/* -----------------------------------------------------------------------------
-   General message generation functions
-
-   All messages should go through here.  We can't guarantee that
-   stdout/stderr will be available - e.g. in a Windows program there
-   is no console for generating messages, so they have to either go to
-   to the debug console, or pop up message boxes.
-   -------------------------------------------------------------------------- */
-
-RtsMsgFunction *fatalInternalMsgFn = stdioFatalInternalMsgFn;
-RtsMsgFunction *debugMsgFn         = stdioDebugMsgFn;
-RtsMsgFunction *errorMsgFn         = stdioErrorMsgFn;
-
-void
-barf(char *s, ...)
-{
-  va_list ap;
-  va_start(ap,s);
-  (*fatalInternalMsgFn)(s,ap);
-  stg_exit(EXIT_INTERNAL_ERROR);
-  va_end(ap);
-}
-
-void
-errorBelch(char *s, ...)
-{
-  va_list ap;
-  va_start(ap,s);
-  (*errorMsgFn)(s,ap);
-  va_end(ap);
-}
-
-void
-debugBelch(char *s, ...)
-{
-  va_list ap;
-  va_start(ap,s);
-  (*debugMsgFn)(s,ap);
-  va_end(ap);
-}
-
-void
-vdebugBelch(char *s, va_list ap)
-{
-  (*debugMsgFn)(s,ap);
-}
-
-/* -----------------------------------------------------------------------------
-   stdio versions of the message functions
-   -------------------------------------------------------------------------- */
-
-void 
-stdioFatalInternalMsgFn(char *s, va_list ap)
-{
-  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  if (prog_argv != NULL && prog_name != NULL) {
-    fprintf(stderr, "%s: internal error: ", prog_name);
-  } else {
-    fprintf(stderr, "internal error: ");
-  }
-  vfprintf(stderr, s, ap);
-  fprintf(stderr, "\n");
-  fprintf(stderr, "    Please report this as a bug to glasgow-haskell-bugs@haskell.org,\n    or http://www.sourceforge.net/projects/ghc/\n");
-  fflush(stderr);
-}
-
-void
-stdioErrorMsgFn(char *s, va_list ap)
-{
-  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  if (prog_argv != NULL && prog_name != NULL) {
-    fprintf(stderr, "%s: ", prog_name);
-  } 
-  vfprintf(stderr, s, ap);
-  fprintf(stderr, "\n");
-}
-
-void
-stdioDebugMsgFn(char *s, va_list ap)
-{
-  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  vfprintf(stderr, s, ap);
-  fflush(stderr);
-}
 
 /* -----------------------------------------------------------------------------
    Result-checking malloc wrappers.
