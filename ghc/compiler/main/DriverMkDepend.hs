@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.38 2005/01/27 14:38:29 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.39 2005/02/02 13:40:34 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -62,7 +62,7 @@ doMkDependHS dflags srcs
 	; let sorted = cmTopSort False mod_summaries
 
 		-- Print out the dependencies if wanted
-	; if verbosity dflags >= 3 then
+	; if verbosity dflags >= 2 then
 		hPutStrLn stderr (showSDoc (text "Module dependencies" $$ ppr sorted))
 	  else return ()
 		

@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.146 2005/02/02 13:27:07 simonpj Exp $
+-- $Id: Main.hs,v 1.147 2005/02/02 13:40:34 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -322,7 +322,7 @@ showBanners mode dflags static_opts = do
 	   hPutStr stderr ", for Haskell 98, compiled by GHC version "
 	   hPutStrLn stderr cBooterVersion
 
-   when (verb >= 3) $
+   when (verb >= 4) $
 	dumpPackages dflags
 
    when (verb >= 3) $
