@@ -1,5 +1,9 @@
-
 # pass $testdir so it knows where its home dir is
-test('galois_raytrace', omit_ways(['normal']), multimod_compile_and_run, \
+
+# Expect failure when running the optasm way, due to floating-point
+# differences.
+test('galois_raytrace', \
+	compose(omit_ways(['normal']), expect_fail_for(['optasm'])), \
+	multimod_compile_and_run, \
 	['Main', '-O -package lang -package text'])
 

@@ -1,3 +1,3 @@
-
-test('barton-mangler-bug', normal, multimod_compile_and_run, ['Main', ''])
-
+# Expect failure when running the optasm way, due to floating-point
+# differences.
+test('barton-mangler-bug', expect_fail_for(['optasm']), multimod_compile_and_run, ['Main', ''])
