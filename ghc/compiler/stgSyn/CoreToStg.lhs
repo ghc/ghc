@@ -20,13 +20,15 @@ import TyCon		( isAlgTyCon )
 import Literal
 import Id
 import Var		( Var, globalIdDetails, varType )
+#ifdef ILX
+import MkId		( unsafeCoerceId )
+#endif
 import IdInfo
 import DataCon
 import CostCentre	( noCCS )
 import VarSet
 import VarEnv
 import DataCon		( dataConWrapId )
-import IdInfo		( OccInfo(..) )
 import Maybes		( maybeToBool )
 import Name		( getOccName, isExternallyVisibleName, isDllName )
 import OccName		( occNameUserString )
@@ -355,6 +357,15 @@ coreToStgExpr expr@(Lam _ _)
 coreToStgExpr (Note (SCC cc) expr)
   = coreToStgExpr expr		`thenLne` ( \ (expr2, fvs, escs) ->
     returnLne (StgSCC cc expr2, fvs, escs) )
+
+#ifdef ILX
+-- For ILX, convert (__coerce__ to_ty from_ty e) 
+--	    into    (coerce to_ty from_ty e)
+-- where coerce is real function
+coreToStgExpr (Note (Coerce to_ty from_ty) expr)
+  = coreToStgExpr (mkApps (Var unsafeCoerceId) 
+			  [Type from_ty, Type to_ty, expr])
+#endif
 
 coreToStgExpr (Note other_note expr)
   = coreToStgExpr expr
