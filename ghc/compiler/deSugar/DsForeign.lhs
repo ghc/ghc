@@ -194,7 +194,7 @@ dsFExport :: Id
 		 , SDoc
 		 , SDoc
 		 )
-dsFExport i ty mod_name ext_name cconv isDyn
+dsFExport fn_id ty mod_name ext_name cconv isDyn
   = 	-- BUILD THE returnIO WRAPPER, if necessary
 	-- Look at the result type of the exported function, orig_res_ty
 	-- If it's IO t, return		(\x.x,	        IO t, t)
@@ -236,7 +236,7 @@ dsFExport i ty mod_name ext_name cconv isDyn
         in
 	returnDs (stbl_value, stbl_app, stbl_ptr)
       else
-        returnDs (i, 
+        returnDs (fn_id, 
 	          \ body -> body,
 		  panic "stbl_ptr"  -- should never be touched.
 		  ))			`thenDs` \ (i, getFun_wrapper, stbl_ptr) ->
@@ -259,7 +259,7 @@ dsFExport i ty mod_name ext_name cconv isDyn
 
 	f_helper_glob = mkVanillaId helper_name helper_ty
 		      where
-			name	            = idName i
+			name	            = idName fn_id
 			mod	
 			 | isLocalName name = mod_name
 			 | otherwise        = nameModule name
