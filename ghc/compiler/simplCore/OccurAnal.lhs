@@ -38,7 +38,6 @@ import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( Unique )
 import UniqFM		( keysUFM )  
 import Util		( zipWithEqual, mapAndUnzip )
-import FastTypes
 import Outputable
 \end{code}
 
