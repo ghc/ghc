@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.50 2000/04/11 20:44:19 panne Exp $
+ * $Id: PrimOps.hc,v 1.51 2000/04/12 17:11:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -885,6 +885,47 @@ FN_(takeMVarzh_fast)
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(val);
+  FE_
+}
+
+FN_(takeMaybeMVarzh_fast)
+{
+  StgMVar *mvar;
+  StgClosure *val;
+  const StgInfoTable *info;
+
+  FB_
+  /* args: R1 = MVar closure */
+
+  mvar = (StgMVar *)R1.p;
+
+#ifdef SMP
+  info = LOCK_CLOSURE(mvar);
+#else
+  info = GET_INFO(mvar);
+#endif
+
+  if (info == &EMPTY_MVAR_info) {
+
+#ifdef SMP
+    /* unlock the MVar */
+    mvar->header.info = &EMPTY_MVAR_info;
+#endif
+
+    /* HACK: we need a pointer to pass back, so we abuse NO_FINALIZER_closure */
+    RET_NP(0, &NO_FINALIZER_closure);
+  }
+
+  val = mvar->value;
+  mvar->value = (StgClosure *)&END_TSO_QUEUE_closure;
+
+  /* do this last... we might have locked the MVar in the SMP case,
+   * and writing the info pointer will unlock it.
+   */
+  SET_INFO(mvar,&EMPTY_MVAR_info);
+
+  TICK_RET_UNBOXED_TUP(1);
+  RET_NP(1,val);
   FE_
 }
 
