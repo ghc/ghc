@@ -29,4 +29,7 @@ compiler to do with universal quantification so this actually works.
 binary distribution.  GHC binary distributions no longer contain
 Happy.  
 
+\item add some suffix rules for SGML, we can use SGML-Tools for
+documentation now.
+
 \end{itemize}
