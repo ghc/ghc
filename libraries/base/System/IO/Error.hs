@@ -271,7 +271,7 @@ annotateIOError (IOError ohdl errTy _ str opath) loc hdl path =
     xs      `mplus` _  = xs
 #endif /* __GLASGOW_HASKELL__ || __HUGS__ */
 
-#ifdef 0 /*__NHC__*/
+#if 0 /*__NHC__*/
 annotateIOError (IOError msg file hdl code) msg' file' hdl' =
     IOError (msg++'\n':msg') (file`mplus`file') (hdl`mplus`hdl') code
 annotateIOError (EOFError msg hdl) msg' file' hdl' =

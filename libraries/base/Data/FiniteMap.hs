@@ -787,4 +787,4 @@ instance (Ord key, Ord elt) => Ord (FiniteMap key elt) where
     IF_NCG(COMMA   (elt -> elt -> elt) -> FiniteMap Reg elt -> FiniteMap Reg elt -> FiniteMap Reg elt)
     #-}
 
-#endif {- compiling for GHC -}
+#endif /* compiling for GHC */
