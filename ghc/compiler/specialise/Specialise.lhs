@@ -26,7 +26,7 @@ import Type		( Type, mkTyVarTy, splitSigmaTy, instantiateTy, isDictTy,
 			  tyVarsOfType, tyVarsOfTypes, applyTys, mkForAllTys
 			)
 import TyCon		( TyCon )
-import TyVar		( TyVar, mkTyVar,
+import TyVar		( TyVar, mkTyVar, mkSysTyVar,
 			  TyVarSet, mkTyVarSet, isEmptyTyVarSet, intersectTyVarSets,
 			   	    elementOfTyVarSet, unionTyVarSets, emptyTyVarSet,
 				    minusTyVarSet,
@@ -45,7 +45,7 @@ import UniqSupply	( UniqSupply,
 			)
 import Unique		( mkAlphaTyVarUnique )
 import FiniteMap
-import Maybes		( MaybeErr(..), maybeToBool )
+import Maybes		( MaybeErr(..), maybeToBool, catMaybes )
 import Bag
 import List		( partition )
 import Util		( zipEqual )
@@ -793,10 +793,6 @@ specDefn calls (fn, rhs)
     (tyvars, theta, tau) = splitSigmaTy fn_type
     n_tyvars		 = length tyvars
     n_dicts		 = length theta
-    mk_spec_tys call_ts  = zipWith mk_spec_ty call_ts tyVarTemplates
-                         where
-                           mk_spec_ty (Just ty) _     = ty
-                           mk_spec_ty Nothing   tyvar = mkTyVarTy tyvar
 
     (rhs_tyvars, rhs_ids, rhs_body) = collectBinders rhs
     rhs_dicts = take n_dicts rhs_ids
@@ -826,8 +822,14 @@ specDefn calls (fn, rhs)
 		-- 	f1 = /\ b d -> (..rhs of f..) t1 b t3 d d1 d2
 		-- and the type of this binder
         let
-           spec_tyvars = [tyvar | (tyvar, Nothing) <- tyVarTemplates `zip` call_ts]
-	   spec_tys    = mk_spec_tys call_ts
+	  mk_spec_ty Nothing   = newTyVarSM   `thenSM` \ tyvar ->
+			         returnSM (Just tyvar, mkTyVarTy tyvar)
+	  mk_spec_ty (Just ty) = returnSM (Nothing,    ty)
+        in
+        mapSM mk_spec_ty call_ts   `thenSM` \ stuff ->
+        let
+	   (maybe_spec_tyvars, spec_tys) = unzip stuff
+           spec_tyvars = catMaybes maybe_spec_tyvars
 	   spec_rhs    = mkTyLam spec_tyvars $
                          mkGenApp rhs (map TyArg spec_tys ++ map VarArg call_ds)
   	   spec_id_ty  = mkForAllTys spec_tyvars (instantiateTy ty_env tau)
@@ -1150,6 +1152,10 @@ newIdSM old_id new_ty
 			  new_ty
 			  (getSrcLoc old_id)
     )
+
+newTyVarSM
+  = getUnique		`thenSM` \ uniq ->
+    returnSM (mkSysTyVar uniq mkBoxedTypeKind)
 \end{code}
 
 
