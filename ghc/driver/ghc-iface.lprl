@@ -12,7 +12,7 @@
 %HiHasBeenRead = ('old', 0,  'new', 0);
 %ModuleVersion = ('old', 0,  'new', 0);
 
-
+%HiSections = ();
 
 sub postprocessHiFile {
     local($hsc_hi,		# The iface info produced by hsc.
@@ -51,7 +51,19 @@ sub postprocessHiFile {
     # if we produced an interface file "no matter what",
     # print what we got on stderr (ToDo: honor -ohi flag)
     if ( $HiOnStdout ) {
-        system("$Cat $new_hi 1>&2"); # if $Verbose;
+        if ( $HiWith ne '' ) {
+	    # output some of the sections
+	    local($hi_after)  = "$Tmp_prefix.hi-now";
+
+	    foreach $hi ( split(' ',$HiWith) ) { 
+	    	$HiSection{$hi} = 1; 
+	    }
+	    &hiSectionsOnly($new_hi, $hi_after);
+
+	    system("$Cat $hi_after 1>&2 ; $Rm $hi_after; ");
+	} else {
+            system("$Cat $new_hi 1>&2");
+	}
     } else {
 	&run_something("$Cmp -s $hifile_target $new_hi || ( $Rm $hifile_target && $Cp $new_hi $hifile_target )",
 	   "Replace .$HiSuffix file, if changed");
@@ -79,6 +91,27 @@ sub deUsagifyHi {
 	while ($_ ne '') {
 	    print NEWHIF $_;
 	    $_ = <OLDHIF>;
+	}
+    }
+
+    close(OLDHIF) || &tidy_up_and_die(1,"Failed reading from $ifile\n");
+    close(NEWHIF) || &tidy_up_and_die(1,"Failed writing to $ofile\n");
+}
+
+sub hiSectionsOnly {
+    local($ifile,$ofile) = @_;
+
+    open(OLDHIF, "< $ifile") || &tidy_up_and_die(1,"Can't open $ifile (read)\n");
+    open(NEWHIF, "> $ofile") || &tidy_up_and_die(1,"Can't open $ofile (write)\n");
+
+    # read up to _usages_ line
+    $_ = <OLDHIF>;
+    while ($_ ne '' ) {
+	if ( /^_(.*)_/ && $HiSection{$1} )  {
+       	     do { print NEWHIF $_;
+       	          $_ = <OLDHIF>;} until ($_ eq '' || /^_/ );
+        } else {
+          $_ = <OLDHIF>;
 	}
     }
 
@@ -338,13 +371,6 @@ sub printNewItemVersion {
 	print $hifile  $OldVersion{"$item"}, " ";
     }
     return;
-}
-\end{code}
-
-\begin{code}
-sub findHiChanges {
-    local($hsc_hi,	        # The iface info produced by hsc.
-	  $hifile_target) = @_; # Pre-existing .hi filename (if it exists)
 }
 \end{code}
 
