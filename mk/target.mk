@@ -1059,9 +1059,9 @@ ifneq "$(WAYS)" ""
 ifeq "$(way)" ""
 
 # NB: the targets exclude 
-#	boot info TAGS
+#	boot info TAGS runtests
 # since these are way-independent
-all docs runtests TAGS clean veryclean maintainer-clean install ::
+all docs TAGS clean veryclean maintainer-clean install ::
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Recursively making \`$@' for ways: $(WAYS) ..."
 	@echo "PWD = $(shell pwd)"
