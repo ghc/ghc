@@ -83,8 +83,8 @@ writeRealAsm :: Handle -> AbstractC -> UniqSupply -> IO ()
 writeRealAsm handle absC us
   = _scc_ "writeRealAsm" (printDoc LeftMode handle (runNCG absC us))
 
-dumpRealAsm :: AbstractC -> UniqSupply -> String
-dumpRealAsm absC us = show (runNCG absC us)
+dumpRealAsm :: AbstractC -> UniqSupply -> Doc
+dumpRealAsm = runNCG
 
 runNCG absC
   = genCodeAbstractC absC	`thenUs` \ treelists ->
