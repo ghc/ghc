@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.37 2002/07/29 09:57:17 simonmar Exp $
+# $Id: Makefile,v 1.38 2002/09/06 14:34:15 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -26,6 +26,7 @@ ALL_DIRS = \
 	System/Console \
 	System/Mem \
 	System/IO \
+	System/Posix \
 	Text \
 	Text/Html \
 	Text/PrettyPrint \
@@ -38,7 +39,7 @@ ALL_DIRS = \
 PACKAGE = base
 
 SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude
-SRC_HSC2HS_OPTS += -Iinclude
+SRC_HSC2HS_OPTS += -Iinclude -I$(FPTOOLS_TOP)/ghc/includes
 
 # Make sure we can get hold of regex.h
 ifneq "$(HavePosixRegex)" "YES"

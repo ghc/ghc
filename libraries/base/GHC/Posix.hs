@@ -23,6 +23,7 @@ module GHC.Posix where
 #include "config.h"
 
 import Control.Monad
+import System.Posix.Types
 
 import Foreign
 import Foreign.C
@@ -52,24 +53,6 @@ type CTm	= ()
 type CTms	= ()
 type CUtimbuf   = ()
 type CUtsname   = ()
-
-type CDev    = HTYPE_DEV_T
-type CIno    = HTYPE_INO_T
-type CMode   = HTYPE_MODE_T
-type COff    = HTYPE_OFF_T
-type CPid    = HTYPE_PID_T
-
-#ifdef mingw32_TARGET_OS
-type CSsize  = HTYPE_SIZE_T
-#else
-type CGid    = HTYPE_GID_T
-type CNlink  = HTYPE_NLINK_T
-type CSsize  = HTYPE_SSIZE_T
-type CUid    = HTYPE_UID_T
-type CCc     = HTYPE_CC_T
-type CSpeed  = HTYPE_SPEED_T
-type CTcflag = HTYPE_TCFLAG_T
-#endif
 
 -- ---------------------------------------------------------------------------
 -- stat()-related stuff
@@ -230,6 +213,7 @@ tcSetAttr fd options p_tios = do
      throwErrnoIfMinus1Retry_ "tcSetAttr" $
 	 c_tcsetattr (fromIntegral fd) options p_tios
      c_sigprocmask const_sig_setmask p_old_sigset nullPtr
+     return ()
 
 #else
 
@@ -379,11 +363,11 @@ foreign import ccall unsafe "fcntl"
 foreign import ccall unsafe "fork"
    c_fork :: IO CPid 
 
+foreign import ccall unsafe "getpid"
+   c_getpid :: IO CPid
+
 foreign import ccall unsafe "fpathconf"
    c_fpathconf :: CInt -> CInt -> IO CLong
-
-foreign import ccall unsafe "__hscore_sigemptyset"
-   c_sigemptyset :: Ptr CSigset -> IO ()
 
 foreign import ccall unsafe "link"
    c_link :: CString -> CString -> IO CInt
@@ -397,11 +381,14 @@ foreign import ccall unsafe "pathconf"
 foreign import ccall unsafe "pipe"
    c_pipe :: Ptr CInt -> IO CInt
 
+foreign import ccall unsafe "__hscore_sigemptyset"
+   c_sigemptyset :: Ptr CSigset -> IO CInt
+
 foreign import ccall unsafe "__hscore_sigaddset"
    c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
 
 foreign import ccall unsafe "sigprocmask"
-   c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO ()
+   c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
 
 foreign import ccall unsafe "tcgetattr"
    c_tcgetattr :: CInt -> Ptr CTermios -> IO CInt

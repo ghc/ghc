@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.12 2002/08/30 14:54:58 simonpj Exp $
+ * $Id: HsBase.h,v 1.13 2002/09/06 14:34:15 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -183,12 +183,6 @@ StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ 
 #define INLINE extern inline
 #endif
 
-#if !defined(mingw32_TARGET_OS)
-INLINE int
-__hscore_sigaddset( sigset_t * set, int s )
-{ return sigaddset(set,s); }
-#endif
-
 INLINE int __hscore_s_isreg(m)  { return S_ISREG(m);  }
 INLINE int __hscore_s_isdir(m)  { return S_ISDIR(m);  }
 INLINE int __hscore_s_isfifo(m) { return S_ISFIFO(m); }
@@ -199,9 +193,25 @@ INLINE int __hscore_s_issock(m) { return S_ISSOCK(m); }
 #endif
 
 #ifndef mingw32_TARGET_OS
-INLINE void
+INLINE int
 __hscore_sigemptyset( sigset_t *set )
-{ sigemptyset(set); }
+{ return sigemptyset(set); }
+
+INLINE int
+__hscore_sigfillset( sigset_t *set )
+{ return sigfillset(set); }
+
+INLINE int
+__hscore_sigaddset( sigset_t * set, int s )
+{ return sigaddset(set,s); }
+
+INLINE int
+__hscore_sigdelset( sigset_t * set, int s )
+{ return sigdelset(set,s); }
+
+INLINE int
+__hscore_sigismember( sigset_t * set, int s )
+{ return sigismember(set,s); }
 #endif
 
 INLINE void *
@@ -586,6 +596,41 @@ __hscore_f_setfl( void )
 }
 
 INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
+
+#ifndef mingw32_TARGET_OS
+INLINE int __hsposix_SIGABRT()   { return SIGABRT; }
+INLINE int __hsposix_SIGALRM()   { return SIGALRM; }
+INLINE int __hsposix_SIGBUS()    { return SIGBUS; }
+INLINE int __hsposix_SIGCHLD()   { return SIGCHLD; }
+INLINE int __hsposix_SIGCONT()   { return SIGCONT; }
+INLINE int __hsposix_SIGFPE()    { return SIGFPE; }
+INLINE int __hsposix_SIGHUP()    { return SIGHUP; }
+INLINE int __hsposix_SIGILL()    { return SIGILL; }
+INLINE int __hsposix_SIGINT()    { return SIGINT; }
+INLINE int __hsposix_SIGKILL()   { return SIGKILL; }
+INLINE int __hsposix_SIGPIPE()   { return SIGPIPE; }
+INLINE int __hsposix_SIGQUIT()   { return SIGQUIT; }
+INLINE int __hsposix_SIGSEGV()   { return SIGSEGV; }
+INLINE int __hsposix_SIGSTOP()   { return SIGSTOP; }
+INLINE int __hsposix_SIGTERM()   { return SIGTERM; }
+INLINE int __hsposix_SIGTSTP()   { return SIGTSTP; }
+INLINE int __hsposix_SIGTTIN()   { return SIGTTIN; }
+INLINE int __hsposix_SIGTTOU()   { return SIGTTOU; }
+INLINE int __hsposix_SIGUSR1()   { return SIGUSR1; }
+INLINE int __hsposix_SIGUSR2()   { return SIGUSR2; }
+INLINE int __hsposix_SIGPOLL()   { return SIGPOLL; }
+INLINE int __hsposix_SIGPROF()   { return SIGPROF; }
+INLINE int __hsposix_SIGSYS()    { return SIGSYS; }
+INLINE int __hsposix_SIGTRAP()   { return SIGTRAP; }
+INLINE int __hsposix_SIGURG()    { return SIGURG; }
+INLINE int __hsposix_SIGVTALRM() { return SIGVTALRM; }
+INLINE int __hsposix_SIGXCPU()   { return SIGXCPU; }
+INLINE int __hsposix_SIGXFSZ()   { return SIGXFSZ; }
+
+INLINE int __hsposix_SIG_BLOCK()   { return SIG_BLOCK; }
+INLINE int __hsposix_SIG_UNBLOCK() { return SIG_SETMASK; }
+INLINE int __hsposix_SIG_SETMASK() { return SIG_UNBLOCK; }
+#endif // mingw32_TARGET_OS
 
 #endif
 
