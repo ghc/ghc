@@ -68,6 +68,7 @@ module System.Directory
 import System.Environment      ( getEnv )
 import System.FilePath
 import System.IO.Error
+import Control.Monad           ( when, unless )
 
 #ifdef __NHC__
 import Directory
@@ -82,7 +83,6 @@ import Hugs.Directory
 import Prelude
 
 import Control.Exception       ( bracket )
-import Control.Monad           ( when, unless )
 import System.Posix.Types
 import System.Posix.Internals
 import System.Time             ( ClockTime(..) )
@@ -240,6 +240,7 @@ createDirectory path = do
     withCString path $ \s -> do
       throwErrnoIfMinus1Retry_ "createDirectory" $
 	mkdir s 0o777
+#endif
 
 -- | @'createDirectoryIfMissing' parents dir@ creates a new directory 
 -- @dir@ if it doesn\'t exist. If the first argument is 'True'
@@ -255,6 +256,7 @@ createDirectoryIfMissing parents file = do
     (_,  True,  _) -> mapM_ (createDirectoryIfMissing False) (tail (pathParents file))
     (_, False,  _) -> createDirectory file
 
+#if __GLASGOW_HASKELL__
 {- | @'removeDirectory' dir@ removes an existing directory /dir/.  The
 implementation may specify additional constraints which must be
 satisfied before a directory can be removed (e.g. the directory has to
@@ -301,6 +303,7 @@ removeDirectory path = do
   modifyIOError (`ioeSetFileName` path) $
     withCString path $ \s ->
        throwErrnoIfMinus1Retry_ "removeDirectory" (c_rmdir s)
+#endif
 
 -- | @'removeDirectoryRecursive' dir@  removes an existing directory /dir/
 -- together with its content and all subdirectories. Be careful, 
@@ -320,6 +323,7 @@ removeDirectoryRecursive startLoc = do
                               removeDirectoryRecursive f
                 Right _ -> return ()
 
+#if __GLASGOW_HASKELL__
 {- |'removeFile' /file/ removes the directory entry for an existing file
 /file/, where /file/ is not itself a directory. The
 implementation may specify additional constraints which must be
