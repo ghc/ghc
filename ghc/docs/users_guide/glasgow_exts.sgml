@@ -1318,63 +1318,8 @@ For example, this is OK:
   instance Stateful (ST s) (MutVar s) where ...
 </programlisting>
 
-
-The "at least one not a type variable" restriction is to ensure that
-context reduction terminates: each reduction step removes one type
-constructor.  For example, the following would make the type checker
-loop if it wasn't excluded:
-
-
-<programlisting>
-  instance C a => C a where ...
-</programlisting>
-
-
-There are two situations in which the rule is a bit of a pain. First,
-if one allows overlapping instance declarations then it's quite
-convenient to have a "default instance" declaration that applies if
-something more specific does not:
-
-
-<programlisting>
-  instance C a where
-    op = ... -- Default
-</programlisting>
-
-
-Second, sometimes you might want to use the following to get the
-effect of a "class synonym":
-
-
-<programlisting>
-  class (C1 a, C2 a, C3 a) => C a where { }
-
-  instance (C1 a, C2 a, C3 a) => C a where { }
-</programlisting>
-
-
-This allows you to write shorter signatures:
-
-
-<programlisting>
-  f :: C a => ...
-</programlisting>
-
-
-instead of
-
-
-<programlisting>
-  f :: (C1 a, C2 a, C3 a) => ...
-</programlisting>
-
-
-I'm on the lookout for a simple rule that preserves decidability while
-allowing these idioms.  The experimental flag
-<option>-fallow-undecidable-instances</option><indexterm><primary>-fallow-undecidable-instances
-option</primary></indexterm> lifts this restriction, allowing all the types in an
-instance head to be type variables.
-
+See <xref linkend="undecidable-instances"> for an experimental
+extension to lift this restriction.
 </para>
 </listitem>
 <listitem>
@@ -1436,16 +1381,10 @@ instance C Int b => Foo b where ...
 </programlisting>
 
 
-is not OK.  Again, the intent here is to make sure that context
-reduction terminates.
+is not OK.  See <xref linkend="undecidable-instances"> for an experimental
+extension to lift this restriction.
 
-Voluminous correspondence on the Haskell mailing list has convinced me
-that it's worth experimenting with a more liberal rule.  If you use
-the flag <option>-fallow-undecidable-instances</option> can use arbitrary
-types in an instance context.  Termination is ensured by having a
-fixed-depth recursion stack.  If you exceed the stack depth you get a
-sort of backtrace, and the opportunity to increase the stack depth
-with <option>-fcontext-stack</option><emphasis>N</emphasis>.
+
 
 </para>
 </listitem>
@@ -1456,6 +1395,80 @@ with <option>-fcontext-stack</option><emphasis>N</emphasis>.
 
 </sect3>
 
+</sect2>
+
+<sect2 id="undecidable-instances">
+<title>Undecidable instances</title>
+
+<para>The rules for instance declarations state that:
+<itemizedlist>
+<listitem><para>At least one of the types in the <emphasis>head</emphasis> of
+an instance declaration <emphasis>must not</emphasis> be a type variable.
+</para></listitem>
+<listitem><para>All of the types in the <emphasis>context</emphasis> of
+an instance declaration <emphasis>must</emphasis> be type variables.
+</para></listitem>
+</itemizedlist>
+These restrictions ensure that 
+context reduction terminates: each reduction step removes one type
+constructor.  For example, the following would make the type checker
+loop if it wasn't excluded:
+<programlisting>
+  instance C a => C a where ...
+</programlisting>
+There are two situations in which the rule is a bit of a pain. First,
+if one allows overlapping instance declarations then it's quite
+convenient to have a "default instance" declaration that applies if
+something more specific does not:
+
+
+<programlisting>
+  instance C a where
+    op = ... -- Default
+</programlisting>
+
+
+Second, sometimes you might want to use the following to get the
+effect of a "class synonym":
+
+
+<programlisting>
+  class (C1 a, C2 a, C3 a) => C a where { }
+
+  instance (C1 a, C2 a, C3 a) => C a where { }
+</programlisting>
+
+
+This allows you to write shorter signatures:
+
+
+<programlisting>
+  f :: C a => ...
+</programlisting>
+
+
+instead of
+
+
+<programlisting>
+  f :: (C1 a, C2 a, C3 a) => ...
+</programlisting>
+
+
+Voluminous correspondence on the Haskell mailing list has convinced me
+that it's worth experimenting with more liberal rules.  If you use
+the experimental flag <option>-fallow-undecidable-instances</option>
+<indexterm><primary>-fallow-undecidable-instances
+option</primary></indexterm>, you can use arbitrary
+types in both an instance context and instance head.  Termination is ensured by having a
+fixed-depth recursion stack.  If you exceed the stack depth you get a
+sort of backtrace, and the opportunity to increase the stack depth
+with <option>-fcontext-stack</option><emphasis>N</emphasis>.
+</para>
+<para>
+I'm on the lookout for a less brutal solution: a simple rule that preserves decidability while
+allowing these idioms interesting idioms.  
+</para>
 </sect2>
 
 <sect2 id="implicit-parameters">
