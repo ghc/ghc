@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.59 2003/11/14 14:28:08 stolz Exp $
+ * $Id: Stg.h,v 1.60 2003/12/28 13:09:43 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -275,12 +275,13 @@ extern void stackOverflow(void);
 #include "DNInvoke.h"
 #endif
 
-/* Creating and destroying an adjustor thunk.
-   I cannot make myself create a separate .h file
-   for these two (sof.) 
+/* Creating and destroying an adjustor thunk and initialising the whole
+   adjustor thunk machinery. I cannot make myself create a separate .h file
+   for these three (sof.) 
    
 */
-extern void* createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
-extern void  freeHaskellFunctionPtr(void* ptr);
+extern void*   createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
+extern void    freeHaskellFunctionPtr(void* ptr);
+extern rtsBool initAdjustor(void);
 
 #endif /* STG_H */
