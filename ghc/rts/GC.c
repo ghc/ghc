@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.4 1999/01/06 12:15:35 simonm Exp $
+ * $Id: GC.c,v 1.5 1999/01/06 12:27:47 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -1185,6 +1185,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
     case RET_BIG:
     case RET_VEC_BIG:
       {
+	StgPtr q;
 	StgLargeBitmap *large_bitmap;
 	nat i;
 
@@ -1193,12 +1194,19 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 
 	for (i=0; i<large_bitmap->size; i++) {
 	  bitmap = large_bitmap->bitmap[i];
+	  q = p + sizeof(W_) * 8;
 	  while (bitmap != 0) {
 	    if ((bitmap & 1) == 0) {
 	      (StgClosure *)*p = evacuate((StgClosure *)*p);
 	    }
 	    p++;
 	    bitmap = bitmap >> 1;
+	  }
+	  if (i+1 < large_bitmap->size) {
+	    while (p < q) {
+	      (StgClosure *)*p = evacuate((StgClosure *)*p);
+	      p++;
+	    }
 	  }
 	}
 
@@ -1210,7 +1218,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
       barf("scavenge_stack: weird activation record found on stack.\n");
     }
   }
-}    
+}
 
 /*-----------------------------------------------------------------------------
   scavenge the large object list.
