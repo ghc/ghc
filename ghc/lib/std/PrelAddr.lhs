@@ -30,7 +30,8 @@ data Word = W# Word# 	deriving (Eq, Ord)
 instance Show Addr where
    showsPrec p (A# a) = showsPrec p (I# (addr2Int# a))
 
-nullAddr = ``NULL'' :: Addr
+nullAddr :: Addr
+nullAddr = ``NULL''
 
 plusAddr :: Addr -> Int -> Addr
 plusAddr (A# addr) (I# off) = A# (int2Addr# (addr2Int# addr +# off))

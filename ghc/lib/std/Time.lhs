@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1995-97
+% (c) The GRASP/AQUA Project, Glasgow University, 1995-99
 %
 \section[Time]{Haskell 1.4 Time of Day Library}
 
@@ -11,27 +11,28 @@ its use of Coordinated Universal Time (UTC).
 \begin{code}
 {-# OPTIONS -#include "cbits/timezone.h" -#include "cbits/stgio.h"  #-}
 module Time 
-       (
-        Month(..),
-	Day(..),
+     (
+        Month(..)
+     ,  Day(..)
 
-	ClockTime(..), -- non-standard, lib. report gives this as abstract
-	getClockTime, 
+     ,  ClockTime(..) -- non-standard, lib. report gives this as abstract
+     ,	getClockTime
 
-        TimeDiff(TimeDiff),
-	diffClockTimes,
-	addToClockTime,
-	timeDiffToString, -- non-standard
-	formatTimeDiff,   -- non-standard
+     ,  TimeDiff(..)
+     ,  diffClockTimes
+     ,  addToClockTime
 
-        CalendarTime(CalendarTime),
-	toCalendarTime,	
-	toUTCTime, 
-	toClockTime,
-        calendarTimeToString, 
-	formatCalendarTime
+     ,  timeDiffToString  -- non-standard
+     ,  formatTimeDiff    -- non-standard
 
-       ) where
+     ,  CalendarTime(..)
+     ,	toCalendarTime
+     ,  toUTCTime
+     ,  toClockTime
+     ,  calendarTimeToString
+     ,  formatCalendarTime
+
+     ) where
 
 #ifdef __HUGS__
 import PreludeBuiltin
@@ -61,7 +62,7 @@ data Month
  deriving (Eq, Ord, Enum, Bounded, Ix, Read, Show)
 
 data Day 
- = Sunday  | Monday | Tuesday | Wednesday
+ = Sunday   | Monday | Tuesday | Wednesday
  | Thursday | Friday | Saturday
  deriving (Eq, Ord, Enum, Bounded, Ix, Read, Show)
 
@@ -94,7 +95,7 @@ we use the C library routines based on 32 bit integers.
 instance Show ClockTime
 #else
 instance Show ClockTime where
-    showsPrec p (TOD sec@(J# a# s# d#) nsec) = 
+    showsPrec _ (TOD (J# _ s# d#) _nsec) = 
       showString $ unsafePerformIO $ do
 	    buf <- allocChars 38 -- exactly enough for error message
 	    str <- _ccall_ showTime (I# s#) d# buf
@@ -198,7 +199,7 @@ getClockTime = do
     i1 <- malloc1
     i2 <- malloc1
     rc <- _ccall_ getClockTime i1 i2
-    if rc == 0 
+    if rc == (0 ::Int)
 	then do
 	    sec  <- cvtUnsigned i1
 	    nsec <- cvtUnsigned i2
@@ -241,7 +242,7 @@ addToClockTime (TimeDiff year mon day hour min sec psec)
 	       (TOD c_sec c_psec) = unsafePerformIO $ do
     res <- allocWords sizeof_int64
     rc <- prim_toClockSec year mon day hour min sec 0 res 
-    if rc /= 0
+    if rc /= (0::Int)
      then do
             diff_sec <- primReadInt64Array res 0
 	    let diff_psec = psec
@@ -253,9 +254,9 @@ addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
 	       (TOD c_sec c_psec) = unsafePerformIO $ do
     res <- allocWords (``sizeof(time_t)'')
-    ptr <- _ccall_ toClockSec year mon day hour min sec 0 res 
+    ptr <- _ccall_ toClockSec year mon day hour min sec (0::Int) res 
     let (A# ptr#) = ptr
-    if ptr /= (``0''::Addr)
+    if ptr /= nullAddr
      then let
 	    diff_sec  = (int2Integer (indexIntOffAddr# ptr# 0#))
 	    diff_psec = psec
@@ -343,7 +344,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
         unsafePerformIO ( do
 	    res <- allocWords sizeof_int64
 	    rc <- prim_toClockSec year mon mday hour min sec isDst res
-            if rc /= 0
+            if rc /= (0::Int)
              then do
                tm <- primReadInt64Array res 0
                return (TOD tm psec)
@@ -353,12 +354,12 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
      isDst = if isdst then (1::Int) else 0
 #else
 toCalendarTime :: ClockTime -> IO CalendarTime
-toCalendarTime (TOD sec@(J# a# s# d#) psec) = do
+toCalendarTime (TOD (J# _ s# d#) psec) = do
     res    <- allocWords (``sizeof(struct tm)''::Int)
     zoneNm <- allocChars 32
     _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
     tm     <- _ccall_ toLocalTime (I# s#) d# res
-    if tm == (``NULL''::Addr) 
+    if tm == nullAddr
      then constructErrorAndFail "Time.toCalendarTime: out of range"
      else do
        sec   <-  _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm
@@ -374,15 +375,15 @@ toCalendarTime (TOD sec@(J# a# s# d#) psec) = do
        tz    <-  _ccall_ GMTOFF tm
        let tzname = unpackCString zone
        return (CalendarTime (1900+year) mon mday hour min sec psec 
-            		    (toEnum wday) yday tzname tz (isdst /= 0))
+            		    (toEnum wday) yday tzname tz (isdst /= (0::Int)))
 
 toUTCTime :: ClockTime -> CalendarTime
-toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformIO $ do
+toUTCTime  (TOD (J# _ s# d#) psec) = unsafePerformIO $ do
        res    <- allocWords (``sizeof(struct tm)''::Int)
        zoneNm <- allocChars 32
        _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
        tm     <-  _ccall_ toUTCTime (I# s#) d# res
-       if tm == (``NULL''::Addr) 
+       if tm == nullAddr
 	then error "Time.toUTCTime: out of range"
         else do
 	    sec   <- _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm
@@ -397,7 +398,7 @@ toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformIO $ do
             		  (toEnum wday) yday "UTC" 0 False)
 
 toClockTime :: CalendarTime -> ClockTime
-toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz isdst) =
+toClockTime (CalendarTime year mon mday hour min sec psec _wday _yday _tzname tz isdst) =
     if psec < 0 || psec > 999999999999 then
         error "Time.toClockTime: picoseconds out of range"
     else if tz < -43200 || tz > 43200 then
@@ -407,7 +408,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
 	    res <- allocWords (``sizeof(time_t)'')
 	    ptr <- _ccall_ toClockSec year mon mday hour min sec isDst res
             let (A# ptr#) = ptr
-            if ptr /= ``NULL''
+            if ptr /= nullAddr
              then return (TOD (int2Integer (indexIntOffAddr# ptr# 0#)) psec)
 	     else error "Time.toClockTime: can't perform conversion"
         )
@@ -456,60 +457,61 @@ calendarTimeToString  :: CalendarTime -> String
 calendarTimeToString  =  formatCalendarTime defaultTimeLocale "%c"
 
 formatCalendarTime :: TimeLocale -> String -> CalendarTime -> String
-formatCalendarTime l fmt ct@(CalendarTime year mon day hour min sec sdec 
-                                           wday yday tzname _ _) =
+formatCalendarTime l fmt (CalendarTime year mon day hour min sec _
+                                       wday yday tzname _ _) =
         doFmt fmt
   where doFmt ('%':c:cs) = decode c ++ doFmt cs
         doFmt (c:cs) = c : doFmt cs
         doFmt "" = ""
 
-        decode 'A' = fst (wDays l  !! fromEnum wday)
-        decode 'a' = snd (wDays l  !! fromEnum wday)
-        decode 'B' = fst (months l !! fromEnum mon)
-        decode 'b' = snd (months l !! fromEnum mon)
-        decode 'h' = snd (months l !! fromEnum mon)
-        decode 'C' = show2 (year `quot` 100)
-        decode 'c' = doFmt (dateTimeFmt l)
+        decode 'A' = fst (wDays l  !! fromEnum wday) -- day of the week, full name
+        decode 'a' = snd (wDays l  !! fromEnum wday) -- day of the week, abbrev.
+        decode 'B' = fst (months l !! fromEnum mon)  -- month, full name
+        decode 'b' = snd (months l !! fromEnum mon)  -- month, abbrev
+        decode 'h' = snd (months l !! fromEnum mon)  -- ditto
+        decode 'C' = show2 (year `quot` 100)         -- century
+        decode 'c' = doFmt (dateTimeFmt l)           -- locale's data and time format.
         decode 'D' = doFmt "%m/%d/%y"
-        decode 'd' = show2 day
-        decode 'e' = show2' day
-        decode 'H' = show2 hour
-        decode 'I' = show2 (to12 hour)
-        decode 'j' = show3 yday
-        decode 'k' = show2' hour
-        decode 'l' = show2' (to12 hour)
-        decode 'M' = show2 min
-        decode 'm' = show2 (fromEnum mon+1)
+        decode 'd' = show2 day                       -- day of the month
+        decode 'e' = show2' day                      -- ditto, padded
+        decode 'H' = show2 hour                      -- hours, 24-hour clock, padded
+        decode 'I' = show2 (to12 hour)               -- hours, 12-hour clock
+        decode 'j' = show3 yday                      -- day of the year
+        decode 'k' = show2' hour                     -- hours, 24-hour clock, no padding
+        decode 'l' = show2' (to12 hour)              -- hours, 12-hour clock, no padding
+        decode 'M' = show2 min                       -- minutes
+        decode 'm' = show2 (fromEnum mon+1)          -- numeric month
         decode 'n' = "\n"
-        decode 'p' = (if hour < 12 then fst else snd) (amPm l)
+        decode 'p' = (if hour < 12 then fst else snd) (amPm l) -- am or pm
         decode 'R' = doFmt "%H:%M"
         decode 'r' = doFmt (time12Fmt l)
         decode 'T' = doFmt "%H:%M:%S"
         decode 't' = "\t"
-        decode 'S' = show2 sec
-        decode 's' = show2 sec -- Implementation-dependent, sez the lib doc..
-        decode 'U' = show2 ((yday + 7 - fromEnum wday) `div` 7)
-        decode 'u' = show (let n = fromEnum wday in 
+        decode 'S' = show2 sec			     -- seconds
+        decode 's' = show2 sec			     -- number of secs since Epoch. (ToDo.)
+        decode 'U' = show2 ((yday + 7 - fromEnum wday) `div` 7) -- week number, starting on Sunday.
+        decode 'u' = show (let n = fromEnum wday in  -- numeric day of the week (1=Monday, 7=Sunday)
                            if n == 0 then 7 else n)
-        decode 'V' = 
-            let (week, days) = 
+        decode 'V' =                                 -- week number (as per ISO-8601.)
+            let (week, days) =                       -- [yep, I've always wanted to be able to display that too.]
                    (yday + 7 - if fromEnum wday > 0 then 
                                fromEnum wday - 1 else 6) `divMod` 7
             in  show2 (if days >= 4 then
                           week+1 
                        else if week == 0 then 53 else week)
 
-        decode 'W' = 
+        decode 'W' =				     -- week number, weeks starting on monday
             show2 ((yday + 7 - if fromEnum wday > 0 then 
                                fromEnum wday - 1 else 6) `div` 7)
-        decode 'w' = show (fromEnum wday)
-        decode 'X' = doFmt (timeFmt l)
-        decode 'x' = doFmt (dateFmt l)
-        decode 'Y' = show year
-        decode 'y' = show2 (year `rem` 100)
-        decode 'Z' = tzname
+        decode 'w' = show (fromEnum wday)            -- numeric day of the week, weeks starting on Sunday.
+        decode 'X' = doFmt (timeFmt l)               -- locale's preferred way of printing time.
+        decode 'x' = doFmt (dateFmt l)               -- locale's preferred way of printing dates.
+        decode 'Y' = show year                       -- year, including century.
+        decode 'y' = show2 (year `rem` 100)          -- year, within century.
+        decode 'Z' = tzname                          -- timezone name
         decode '%' = "%"
         decode c   = [c]
+
 
 show2, show2', show3 :: Int -> String
 show2 x = [intToDigit (x `quot` 10), intToDigit (x `rem` 10)]
@@ -518,15 +520,18 @@ show2' x = if x < 10 then [ ' ', intToDigit x] else show2 x
 
 show3 x = intToDigit (x `quot` 100) : show2 (x `rem` 100)
 
-to12 h = let h' = h `mod` 12 in if h == 0 then 12 else h
+to12 :: Int -> Int
+to12 h = let h' = h `mod` 12 in if h' == 0 then 12 else h'
 \end{code}
+
+Useful extensions for formatting TimeDiffs.
 
 \begin{code}
 timeDiffToString :: TimeDiff -> String
 timeDiffToString = formatTimeDiff defaultTimeLocale "%c"
 
 formatTimeDiff :: TimeLocale -> String -> TimeDiff -> String
-formatTimeDiff l fmt ct@(TimeDiff year month day hour min sec psec)
+formatTimeDiff l fmt (TimeDiff year month day hour min sec _)
  = doFmt fmt
   where 
    doFmt ""         = ""

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1999
 %
 
 \section[Ix]{Module @Ix@}
@@ -9,8 +9,24 @@
 
 module Ix 
     (
-	Ix(range, index, inRange),
-	rangeSize
+	Ix
+	  ( range	-- :: (Ix a) => (a,a) -> [a]
+	  , index       -- :: (Ix a) => (a,a) -> a   -> Int
+	  , inRange     -- :: (Ix a) => (a,a) -> a   -> Bool
+	  )
+    ,	rangeSize       -- :: (Ix a) => (a,a) -> Int
+    -- Ix instances:
+    --
+    --  Ix Char
+    --  Ix Int
+    --  Ix Integer
+    --  Ix Bool
+    --  Ix Ordering
+    --  Ix ()
+    --  (Ix a, Ix b) => Ix (a, b)
+    --  ...
+
+    -- Implementation checked wrt. Haskell 98 lib report, 1/99.
     ) where
 
 import {-# SOURCE #-} PrelErr ( error )
@@ -25,7 +41,7 @@ import PrelBase
 %*********************************************************
 
 \begin{code}
-class  (Show a, Ord a) => Ix a  where
+class  ({-Show a,-} Ord a) => Ix a  where
     range		:: (a,a) -> [a]
     index		:: (a,a) -> a -> Int
     inRange		:: (a,a) -> a -> Bool
@@ -41,50 +57,41 @@ class  (Show a, Ord a) => Ix a  where
 \begin{code}
 instance  Ix Char  where
     range (c,c')	=  [c..c']
-    index b@(c,c') ci
+    index b@(c,_) ci
 	| inRange b ci	=  fromEnum ci - fromEnum c
-	| otherwise	=  indexCharError ci b
-    inRange (c,c') ci	=  fromEnum c <= i && i <= fromEnum c'
-			   where i = fromEnum ci
+	| otherwise	=  indexError ci b "Char"
+    inRange (m,n) i	=  m <= i && i <= n
 
 instance  Ix Int  where
     range (m,n)		=  [m..n]
-    index b@(m,n) i
+    index b@(m,_) i
 	| inRange b i	=  i - m
-	| otherwise	=  indexIntError i b
+	| otherwise	=  indexError i b "Int"
     inRange (m,n) i	=  m <= i && i <= n
 
 -- abstract these errors from the relevant index functions so that
 -- the guts of the function will be small enough to inline.
 
-{-# NOINLINE indexCharError #-}
-indexCharError :: Char -> (Char,Char) -> a
-indexCharError ci b 
-  = error (showString "Ix{Char}.index: Index " .
-	   showParen True (showsPrec 0 ci) .
+{-# NOINLINE indexError #-}
+indexError :: Show a => a -> (a,a) -> String -> b
+indexError i rng tp
+  = error (showString "Ix{" . showString tp . showString "}.index: Index " .
+           showParen True (showsPrec 0 i) .
 	   showString " out of range " $
- 	   showParen True (showsPrec 0 b) "")
-
-{-# NOINLINE indexIntError #-}
-indexIntError :: Int -> (Int,Int) -> a
-indexIntError i b
-  = error (showString "Ix{Int}.index: Index " .
-   	   showParen True (showsPrec 0 i) .
-           showString " out of range " $
-	   showParen True (showsPrec 0 b) "")
+	   showParen True (showsPrec 0 rng) "")
 
 -- Integer instance is in PrelNum
 
 ----------------------------------------------------------------------
 instance Ix Bool where -- as derived
     range   (l,u)   = map toEnum [fromEnum l .. fromEnum u]
-    index   (l,u) i = fromEnum i - fromEnum l
+    index   (l,_) i = fromEnum i - fromEnum l
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------
 instance Ix Ordering where -- as derived
     range   (l,u)   = map toEnum [fromEnum l .. fromEnum u]
-    index   (l,u) i = fromEnum i - fromEnum l
+    index   (l,_) i = fromEnum i - fromEnum l
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------

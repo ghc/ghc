@@ -26,7 +26,7 @@ too many people got bitten by space leaks when it was lazy.
 newtype ST s a = ST (State# s -> (# State# s, a #))
 
 instance Functor (ST s) where
-    map f (ST m) = ST $ \ s ->
+    fmap f (ST m) = ST $ \ s ->
       case (m s) of { (# new_s, r #) ->
       (# new_s, f r #) }
 
@@ -55,7 +55,7 @@ fixST k = ST $ \ s ->
     let ans       = liftST (k r) s
 	STret _ r = ans
     in
-    case ans of STret s' r -> (# s', r #)
+    case ans of STret s' x -> (# s', x #)
 
 {-# NOINLINE unsafeInterleaveST #-}
 unsafeInterleaveST :: ST s a -> ST s a
@@ -67,7 +67,7 @@ unsafeInterleaveST (ST m) = ST ( \ s ->
   )
 
 instance  Show (ST s a)  where
-    showsPrec p f  = showString "<<ST action>>"
+    showsPrec _ _  = showString "<<ST action>>"
     showList	   = showList__ (showsPrec 0)
 \end{code}
 

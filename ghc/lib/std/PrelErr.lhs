@@ -28,6 +28,7 @@ module PrelErr
 
        , error		           -- :: String -> a
        , assertError		   -- :: String -> Bool -> a -> a
+       
        ) where
 
 import PrelBase
@@ -48,11 +49,11 @@ import PrelForeign  ( StablePtr, deRefStablePtr )
 --	 Need to define a "build" to avoid undefined symbol
 -- in this module to avoid .hi proliferation.
 
-build   = error "GHCbase.build"
-augment = error "GHCbase.augment"
 --{-# GENERATE_SPECS build a #-}
 --build 		:: ((a -> [a] -> [a]) -> [a] -> [a]) -> [a]
 --build g 	= g (:) []
+--build   = error "GHCbase.build"
+--augment = error "GHCbase.augment"
 \end{code}
 
 %*********************************************************
@@ -176,6 +177,7 @@ It prints
 	location message details
 
 \begin{code}
+untangle :: String -> String -> String
 untangle coded message
   =  location
   ++ ": " 
@@ -184,10 +186,10 @@ untangle coded message
   ++ "\n"
   where
     (location, details)
-      = case (span not_bar coded) of { (location, rest) ->
+      = case (span not_bar coded) of { (loc, rest) ->
 	case rest of
-	  ('|':details) -> (location, ' ' : details)
-	  _	        -> (location, "")
+	  ('|':det) -> (loc, ' ' : det)
+	  _	    -> (loc, "")
 	}
     not_bar c = c /= '|'
 \end{code}

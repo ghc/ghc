@@ -24,7 +24,7 @@ import PrelAddr
 import PrelIOBase
 import PrelST
 #endif
-import IO		( fail )
+import IO		( ioError )
 import Ratio
 
 #ifdef __HUGS__
@@ -64,8 +64,9 @@ getCPUTime = do
 		 fromIntegral x2 * 1000000000 + fromIntegral  x3)
 	       * 1000)
       else
-	fail (IOError Nothing UnsupportedOperation "getCPUTime"
-		"can't get CPU time")
+	ioError (IOError Nothing UnsupportedOperation 
+			 "getCPUTime"
+			 "can't get CPU time")
 
 #else
 
@@ -80,8 +81,9 @@ getCPUTime =
 		 fromIntegral (I# (indexIntArray# frozen# 2#)) * 1000000000 + 
                  fromIntegral (I# (indexIntArray# frozen# 3#))) * 1000)
     else
-	fail (IOError Nothing UnsupportedOperation "getCPUTime"
-		"can't get CPU time")
+	ioError (IOError Nothing UnsupportedOperation 
+			 "getCPUTime"
+		         "can't get CPU time")
 
 #endif
 

@@ -1,37 +1,73 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1999
 %
 \section[Monad]{Module @Monad@}
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-module Monad (
-    Functor(..), 
-    Monad(..), MonadZero(..), MonadPlus(..),
+module Monad 
+    ( MonadPlus (   -- class context: Monad
+	  mzero     -- :: (MonadPlus m) => m a
+	, mplus     -- :: (MonadPlus m) => m a -> m a -> m a
+	)
+    , join          -- :: (Monad m) => m (m a) -> m a
+    , guard	    -- :: (Monad m) => Bool -> m ()
+    , when          -- :: (Monad m) => Bool -> m () -> m ()
+    , unless        -- :: (Monad m) => Bool -> m () -> m ()
+    , ap	    -- :: (Monad m) => (m (a -> b)) -> (m a) -> m b
+    , msum	    -- :: (MonadPlus m) => [m a] -> m a
+    , filterM	    -- :: (Monad m) => (a -> m Bool) -> [m a] -> m [a]
+    , mapAndUnzipM  -- :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
+    , zipWithM      -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+    , zipWithM_     -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
+    , foldM	    -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a 
+    
+    , liftM	    -- :: (Monad m) => (a -> b) -> (m a -> m b)
+    , liftM2	    -- :: (Monad m) => (a -> b -> c) -> (m a -> m b -> m c)
+    , liftM3        -- :: ...
+    , liftM4        -- :: ...
+    , liftM5        -- :: ...
 
-    -- Prelude monad functions
-    accumulate, sequence, 
-    mapM, mapM_, guard, filter, concat, applyM,
+    , Monad((>>=), (>>), return, fail)
+    , Functor(fmap)
 
-    -- Standard Monad interface:
-    join,           -- :: (Monad m) => m (m a) -> m a
-    mapAndUnzipM,   -- :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
-    zipWithM,       -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
-    zipWithM_,	    -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
-    foldM,          -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a 
-    when,           -- :: (Monad m) => Bool -> m () -> m ()
-    unless,         -- :: (Monad m) => Bool -> m () -> m ()
-    ap,             -- :: (Monad m) => (m (a -> b)) -> (m a) -> m b
-    liftM, liftM2,  
-    liftM3, liftM4, 
-    liftM5
-  ) where
+    , mapM	    -- :: (Monad m) => (a -> m b) -> [a] -> m [b]
+    , mapM_	    -- :: (Monad m) => (a -> m b) -> [a] -> m ()
+    , sequence	    -- :: (Monad m) => [m a] -> m [a]
+    , sequence_     -- :: (Monad m) => [m a] -> m ()
+    , (=<<)         -- :: (Monad m) => (a -> m b) -> m a -> m b
+    ) where
 
 import PrelList
 import PrelTup
 import PrelBase
+import PrelMaybe ( Maybe(..) )
 \end{code}
+
+%*********************************************************
+%*							*
+\subsection{Monadic classes: @MonadPlus@}
+%*							*
+%*********************************************************
+
+
+\begin{code}
+class Monad m => MonadPlus m where
+  mzero :: m a
+  mplus :: m a -> m a -> m a
+
+instance MonadPlus [] where
+   mzero = []
+   mplus = (++)
+
+instance MonadPlus Maybe where
+   mzero = Nothing
+
+   Nothing `mplus` ys  = ys
+   xs      `mplus` _ys = xs
+\end{code}
+
 
 %*********************************************************
 %*							*
@@ -40,37 +76,41 @@ import PrelBase
 %*********************************************************
 
 \begin{code}
-accumulate      :: Monad m => [m a] -> m [a] 
-accumulate []     = return []
-accumulate (m:ms) = do { x <- m; xs <- accumulate ms; return (x:xs) }
+sequence       :: Monad m => [m a] -> m [a] 
+sequence []     = return []
+sequence (m:ms) = do { x <- m; xs <- sequence ms; return (x:xs) }
 
-sequence        :: Monad m => [m a] -> m () 
-sequence        =  foldr (>>) (return ())
+sequence_        :: Monad m => [m a] -> m () 
+sequence_        =  foldr (>>) (return ())
 
 mapM            :: Monad m => (a -> m b) -> [a] -> m [b]
-mapM f as       =  accumulate (map f as)
+mapM f as       =  sequence (map f as)
 
 mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
-mapM_ f as      =  sequence (map f as)
+mapM_ f as      =  sequence_ (map f as)
 
-guard           :: MonadZero m => Bool -> m ()
-guard p         =  if p then return () else zero
+guard           :: MonadPlus m => Bool -> m ()
+guard pred
+ | pred      = return ()
+ | otherwise = mzero
 
 -- This subsumes the list-based filter function.
 
-{-# SPECIALISE filter :: (a -> Bool) -> [a] -> [a] #-}
-filter          :: MonadZero m => (a -> Bool) -> m a -> m a
-filter p        =  applyM (\x -> if p x then return x else zero)
+filterM		:: (Monad m) => ( a -> m Bool ) -> [a] -> m [a]
+filterM _predM []     = return []
+filterM  predM (x:xs) = do
+   flg <- predM x
+   ys  <- filterM predM xs
+   return (if flg then x:ys else ys)
 
 -- This subsumes the list-based concat function.
 
-{-# SPECIALISE concat :: [[a]] -> [a] #-}
-concat          :: MonadPlus m => [m a] -> m a
-concat          =  foldr (++) zero
+msum        :: MonadPlus m => [m a] -> m a
+msum        =  foldr mplus mzero
  
-{-# SPECIALISE applyM :: (a -> [b]) -> [a] -> [b] #-}
-applyM          :: Monad m => (a -> m b) -> m a -> m b
-applyM f x      =  x >>= f
+{-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
+(=<<)           :: Monad m => (a -> m b) -> m a -> m b
+f =<< x		= x >>= f
 \end{code}
 
 
@@ -85,16 +125,16 @@ join             :: (Monad m) => m (m a) -> m a
 join x           = x >>= id
 
 mapAndUnzipM     :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
-mapAndUnzipM f xs = accumulate (map f xs) >>= return . unzip
+mapAndUnzipM f xs = sequence (map f xs) >>= return . unzip
 
 zipWithM         :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
-zipWithM f xs ys = accumulate (zipWith f xs ys)
+zipWithM f xs ys = sequence (zipWith f xs ys)
 
 zipWithM_ :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
-zipWithM_ f xs ys = sequence (zipWith f xs ys)
+zipWithM_ f xs ys = sequence_ (zipWith f xs ys)
 
 foldM            :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
-foldM f a []     = return a
+foldM _ a []     = return a
 foldM f a (x:xs) = f a x >>= \fax -> foldM f fax xs
 
 unless 		 :: (Monad m) => Bool -> m () -> m ()

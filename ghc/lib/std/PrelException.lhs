@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.3 1999/01/07 16:39:06 simonm Exp $
+% $Id: PrelException.lhs,v 1.4 1999/01/14 18:12:57 sof Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -25,7 +25,7 @@ Exception datatype and operations.
 
 \begin{code}
 data Exception
-  = IOException 	IOError		-- IO exceptions (from 'fail')
+  = IOException 	IOError		-- IO exceptions (from 'ioError')
   | ArithException  	ArithException	-- Arithmetic exceptions
   | ErrorCall		String		-- Calls to 'error'
   | NoMethodError       String		-- A non-existent method was invoked
@@ -75,7 +75,8 @@ instance Show Exception where
   showsPrec _ (RecConError err)	         = showString err
   showsPrec _ (RecUpdError err)	         = showString err
   showsPrec _ (AssertionFailed err)      = showString err
-  showsPrec _ (DynException err)         = showString "unknown exception"
+  showsPrec _ (AsyncException e)	 = shows e
+  showsPrec _ (DynException _err)        = showString "unknown exception"
 
 -- Primitives:
 
@@ -103,7 +104,7 @@ catchException :: IO a -> (Exception -> IO a) -> IO a
 catchException m k =  ST (\s -> unST m s `primCatch'` \ err -> unST (k err) s)
 #else
 catchException m k =  IO $ \s -> case catch# (liftIO m s) (\exs -> liftIO (k exs) s)
-			  of STret s r -> (# s, r #)
+			  of STret s1 r -> (# s1, r #)
 #endif
 
 catch           :: IO a -> (IOError -> IO a) -> IO a 
@@ -116,7 +117,7 @@ Why is this stuff here?  To avoid recursive module dependencies of
 course.
 
 \begin{code}
-fail            :: IOError -> IO a 
-fail err	=  throw (IOException err)
+ioError         :: IOError -> IO a 
+ioError err	=  throw (IOException err)
 \end{code}
 

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1995-97
+% (c) The GRASP/AQUA Project, Glasgow University, 1995-99
 %
 \section[Time]{Haskell 1.4 Locale Library}
 

@@ -33,10 +33,10 @@ class  (Real a, Enum a) => Integral a  where
     toInteger		:: a -> Integer
     toInt		:: a -> Int -- partain: Glasgow extension
 
-    n `quot` d		=  q  where (q,r) = quotRem n d
-    n `rem` d		=  r  where (q,r) = quotRem n d
-    n `div` d		=  q  where (q,r) = divMod n d
-    n `mod` d		=  r  where (q,r) = divMod n d
+    n `quot` d		=  q  where (q,_) = quotRem n d
+    n `rem` d		=  r  where (_,r) = quotRem n d
+    n `div` d		=  q  where (q,_) = divMod n d
+    n `mod` d		=  r  where (_,r) = divMod n d
     divMod n d 		=  if signum r == negate (signum d) then (q-1, r+d) else qr
 			   where qr@(q,r) = quotRem n d
 
@@ -46,6 +46,7 @@ class  (Num a) => Fractional a  where
     fromRational	:: Rational -> a
 
     recip x		=  1 / x
+    x / y		= x * recip y
 
 class  (Fractional a) => Floating a  where
     pi			:: a
@@ -93,6 +94,8 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     scaleFloat		:: Int -> a -> a
     isNaN, isInfinite, isDenormalized, isNegativeZero, isIEEE
                         :: a -> Bool
+    atan2	        :: a -> a -> a
+
 
     exponent x		=  if m == 0 then 0 else n + floatDigits x
 			   where (m,n) = decodeFloat x
@@ -102,6 +105,20 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 
     scaleFloat k x	=  encodeFloat m (n+k)
 			   where (m,n) = decodeFloat x
+			   
+    atan2 y x
+      | x > 0            =  atan (y/x)
+      | x == 0 && y > 0  =  pi/2
+      | x <  0 && y > 0  =  pi + atan (y/x) 
+      |(x <= 0 && y < 0)            ||
+       (x <  0 && isNegativeZero y) ||
+       (isNegativeZero x && isNegativeZero y)
+                         = -atan2 (-y) x
+      | y == 0 && (x < 0 || isNegativeZero x)
+                          =  pi    -- must be after the previous test on zero y
+      | x==0 && y==0      =  y     -- must be after the other double zero tests
+      | otherwise         =  x + y -- x or y is a NaN, return a NaN (via +)
+
 \end{code}
 
 %*********************************************************
@@ -121,10 +138,10 @@ instance  Integral Int	where
     -- Following chks for zero divisor are non-standard (WDP)
     a `quot` b	=  if b /= 0
 		   then a `quotInt` b
-		   else error "Integral.Int.quot{PreludeCore}: divide by 0\n"
+		   else error "Prelude.Integral{Int}.quot: divide by 0\n"
     a `rem` b	=  if b /= 0
 		   then a `remInt` b
-		   else error "Integral.Int.rem{PreludeCore}: divide by 0\n"
+		   else error "Prelude.Integral{Int}.rem: divide by 0\n"
 
     x `div` y = if x > 0 && y < 0	then quotInt (x-y-1) y
 		else if x < 0 && y > 0	then quotInt (x-y+1) y
@@ -186,7 +203,7 @@ instance  Num Integer  where
       = case minusInteger# a1 s1 d1 a2 s2 d2 of (# a, s, d #) -> J# a s d
 
     negate (J# a s d) 
-      = case negateInteger# a s d of (# a, s, d #) -> J# a s d
+      = case negateInteger# a s d of (# a1, s1, d1 #) -> J# a1 s1 d1
 
     (*) (J# a1 s1 d1) (J# a2 s2 d2)
       = case timesInteger# a1 s1 d1 a2 s2 d2 of (# a, s, d #) -> J# a s d
@@ -200,7 +217,7 @@ instance  Num Integer  where
 	else case negateInteger# a1 s1 d1 of (# a, s, d #) -> J# a s d
 	}
 
-    signum n@(J# a1 s1 d1)
+    signum (J# a1 s1 d1)
       = case 0 of { J# a2 s2 d2 ->
 	let
 	    cmp = cmpInteger# a1 s1 d1 a2 s2 d2
@@ -237,24 +254,26 @@ instance  Integral Integer where
     -- you get slightly better code if you let the compiler
     -- see them right here:
     n `quot` d	=  if d /= 0 then q else 
-		     error "Integral.Integer.quot{PreludeCore}: divide by 0\n"  
-		   where (q,r) = quotRem n d
+		     error "Prelude.Integral{Integer}.quot: divide by 0\n"  
+		   where (q,_) = quotRem n d
     n `rem` d	=  if d /= 0 then r else 
-		     error "Integral.Integer.quot{PreludeCore}: divide by 0\n"  
-		   where (q,r) = quotRem n d
-    n `div` d	=  q  where (q,r) = divMod n d
-    n `mod` d	=  r  where (q,r) = divMod n d
+		     error "Prelude.Integral{Integer}.rem: divide by 0\n"  
+		   where (_,r) = quotRem n d
+    n `div` d	=  q  where (q,_) = divMod n d
+    n `mod` d	=  r  where (_,r) = divMod n d
 
     divMod n d 	=  case (quotRem n d) of { qr@(q,r) ->
 		   if signum r == negate (signum d) then (q - 1, r+d) else qr }
 		   -- Case-ified by WDP 94/10
 
 instance  Enum Integer  where
+    succ x		 = x + 1
+    pred x		 = x - 1
     toEnum n		 =  toInteger n
     fromEnum n		 =  toInt n
     enumFrom n           =  n : enumFrom (n + 1)
     enumFromThen m n     =  en' m (n - m)
-	                    where en' m n = m : en' (m + n) n
+	                    where en' a b = a : en' (a + b) b
     enumFromTo n m       =  takeWhile (<= m) (enumFrom n)
     enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
 				      (enumFromThen n m)
@@ -263,34 +282,40 @@ instance  Show Integer  where
     showsPrec   x = showSignedInteger x
     showList = showList__ (showsPrec 0) 
 
+
 instance  Ix Integer  where
     range (m,n)		=  [m..n]
-    index b@(m,n) i
+    index b@(m,_) i
 	| inRange b i	=  fromInteger (i - m)
-	| otherwise	=  error "Integer.index: Index out of range."
+	| otherwise	=  indexIntegerError i b
     inRange (m,n) i	=  m <= i && i <= n
+
+-- Sigh, really want to use helper function in Ix, but
+-- module deps. are too painful.
+{-# NOINLINE indexIntegerError #-}
+indexIntegerError :: Integer -> (Integer,Integer) -> a
+indexIntegerError i rng
+  = error (showString "Ix{Integer}.index: Index " .
+           showParen True (showsPrec 0 i) .
+	   showString " out of range " $
+	   showParen True (showsPrec 0 rng) "")
 
 showSignedInteger :: Int -> Integer -> ShowS
 showSignedInteger p n r
-  = -- from HBC version; support code follows
-    if n < 0 && p > 6 then '(':jtos n++(')':r) else jtos n ++ r
+  | n < 0 && p > 6 = '(':jtos n (')':r)
+  | otherwise      = jtos n r
 
-jtos :: Integer -> String
-jtos n 
-  = if n < 0 then
-        '-' : jtos' (-n) []
-    else 
-	jtos' n []
-
-jtos' :: Integer -> String -> String
-jtos' n cs
-  = if n < 10 then
-	chr (fromInteger (n + ord_0)) : cs
-    else 
-	jtos' q (chr (toInt r + (ord_0::Int)) : cs)
-  where
-    (q,r) = n `quotRem` 10
-
+jtos :: Integer -> String -> String
+jtos i rs
+ | i < 0     = '-' : jtos' (-i) rs
+ | otherwise = jtos' i rs
+ where
+  jtos' :: Integer -> String -> String
+  jtos' n cs
+   | n < 10    = chr (fromInteger n + (ord_0::Int)) : cs
+   | otherwise = jtos' q (chr (toInt r + (ord_0::Int)) : cs)
+    where
+     (q,r) = n `quotRem` 10
 \end{code}
 
 %*********************************************************
@@ -313,7 +338,8 @@ It normalises a ratio by dividing both numerator and denominator by
 their greatest common divisor.
 
 \begin{code}
-reduce x 0		=  error "{Ratio.%}: zero denominator"
+reduce ::  (Integral a) => a -> a -> Ratio a
+reduce _ 0		=  error "{Ratio.%}: zero denominator"
 reduce x y		=  (x `quot` d) :% (y `quot` d)
 			   where d = gcd x y
 \end{code}
@@ -321,9 +347,9 @@ reduce x y		=  (x `quot` d) :% (y `quot` d)
 \begin{code}
 x % y			=  reduce (x * signum y) (abs y)
 
-numerator (x:%y)	=  x
+numerator   (x :% _)	=  x
+denominator (_ :% y)	=  y
 
-denominator (x:%y)	=  y
 \end{code}
 
 %*********************************************************
@@ -343,8 +369,8 @@ odd		=  not . even
 gcd		:: (Integral a) => a -> a -> a
 gcd 0 0		=  error "Prelude.gcd: gcd 0 0 is undefined"
 gcd x y		=  gcd' (abs x) (abs y)
-		   where gcd' x 0  =  x
-			 gcd' x y  =  gcd' y (x `rem` y)
+		   where gcd' a 0  =  a
+			 gcd' a b  =  gcd' b (a `rem` b)
 
 {-# SPECIALISE lcm ::
 	Int -> Int -> Int,
@@ -359,12 +385,12 @@ lcm x y		=  abs ((x `quot` (gcd x y)) * y)
 	Integer -> Int -> Integer,
 	Int -> Int -> Int #-}
 (^)		:: (Num a, Integral b) => a -> b -> a
-x ^ 0		=  1
+_ ^ 0		=  1
 x ^ n | n > 0	=  f x (n-1) x
 		   where f _ 0 y = y
-		         f x n y = g x n  where
-			           g x n | even n  = g (x*x) (n `quot` 2)
-				         | otherwise = f x (n-1) (x*y)
+		         f a d y = g a d  where
+			           g b i | even i  = g (b*b) (i `quot` 2)
+				         | otherwise = f b (i-1) (b*y)
 _ ^ _		= error "Prelude.^: negative exponent"
 
 {- SPECIALISE (^^) ::
@@ -373,14 +399,5 @@ _ ^ _		= error "Prelude.^: negative exponent"
 (^^)		:: (Fractional a, Integral b) => a -> b -> a
 x ^^ n		=  if n >= 0 then x^n else recip (x^(negate n))
 
-atan2		:: (RealFloat a) => a -> a -> a
-atan2 y x	=  case (signum y, signum x) of
-			( 0, 1) ->  0
-			( 1, 0) ->  pi/2
-			( 0,-1) ->  pi
-			(-1, 0) ->  (negate pi)/2
-			( _, 1) ->  atan (y/x)
-			( _,-1) ->  atan (y/x) + pi
-			( 0, 0) ->  error "Prelude.atan2: atan2 of origin"
 \end{code}
 

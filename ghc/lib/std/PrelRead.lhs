@@ -23,7 +23,7 @@ import Monad
 
 -- needed for readIO.
 import PrelIOBase ( IO, userError )
-import PrelException ( fail )
+import PrelException ( ioError )
 \end{code}
 
 %*********************************************************
@@ -72,16 +72,16 @@ read s          =
    case read_s s of
 #ifndef NEW_READS_REP
       [x]     -> x
-      []      -> error "PreludeText.read: no parse"
-      _	      -> error "PreludeText.read: ambiguous parse"
+      []      -> error "Prelude.read: no parse"
+      _	      -> error "Prelude.read: ambiguous parse"
 #else
       Just x  -> x
-      Nothing -> error "PreludeText.read: no parse"
+      Nothing -> error "Prelude.read: no parse"
 #endif
  where
-  read_s s = do
-    (x,t)   <- reads s
-    ("","") <- lex t
+  read_s str = do
+    (x,str1) <- reads str
+    ("","")  <- lex str1
     return x
 
   -- raises an exception instead of an error
@@ -89,11 +89,11 @@ readIO          :: Read a => String -> IO a
 readIO s        =  case (do { (x,t) <- reads s ; ("","") <- lex t ; return x }) of
 #ifndef NEW_READS_REP
 			[x]    -> return x
-			[]     -> fail (userError "PreludeIO.readIO: no parse")
-			_      -> fail (userError "PreludeIO.readIO: ambiguous parse")
+			[]     -> ioError (userError "Prelude.readIO: no parse")
+			_      -> ioError (userError "Prelude.readIO: ambiguous parse")
 #else
                         Just x -> return x
-                        Nothing  -> fail (userError "PreludeIO.readIO: no parse")
+                        Nothing  -> ioError (userError "Prelude.readIO: no parse")
 #endif
 
 \end{code}
@@ -173,35 +173,53 @@ lex (c:s) | isSingle c = return ([c],s)
 		(nam,t) <- return (span isIdChar s)
 		return (c:nam, t)
           | isDigit c  = do
-		 (ds,s)  <- return (span isDigit s)
-		 (fe,t)  <- lexFracExp s
+	         let
+		  (pred, s', isDec) =
+		    case s of
+		      ('o':rs) -> (isOctDigit, rs, False)
+		      ('O':rs) -> (isOctDigit, rs, False)
+		      ('x':rs) -> (isHexDigit, rs, False)
+		      ('X':rs) -> (isHexDigit, rs, False)
+		      _	       -> (isDigit, s, True)
+
+		 (ds,s)  <- return (span pred s')
+		 (fe,t)  <- lexFracExp isDec s
 		 return (c:ds++fe,t)
-          | otherwise  = zero    -- bad character
+          | otherwise  = mzero    -- bad character
              where
               isSingle c =  c `elem` ",;()[]{}_`"
               isSym c    =  c `elem` "!@#$%&*+./<=>?\\^|:-~"
-              isIdChar c =  isAlphanum c || c `elem` "_'"
+              isIdChar c =  isAlphaNum c || c `elem` "_'"
 
-              lexFracExp ('.':cs)   = do
+              lexFracExp True ('.':cs)   = do
 			(ds,t) <- lex0Digits cs
 			(e,u)  <- lexExp t
 			return ('.':ds++e,u)
-              lexFracExp s          = return ("",s)
+              lexFracExp _ s        = return ("",s)
 
               lexExp (e:s) | e `elem` "eE" = 
 	          (do
 		    (c:t) <- return s
 		    guard (c `elem` "+-")
-		    (ds,u) <- lexDigits t
+		    (ds,u) <- lexDecDigits t
 		    return (e:c:ds,u))	    ++
 		  (do
-		    (ds,t) <- lexDigits s
+		    (ds,t) <- lexDecDigits s
 		    return (e:ds,t))
 
               lexExp s = return ("",s)
 
-lexDigits               :: ReadS String 
-lexDigits               =  nonnull isDigit
+lexDigits	     :: ReadS String
+lexDigits            = lexDecDigits
+
+lexDecDigits            :: ReadS String 
+lexDecDigits            =  nonnull isDigit
+
+lexOctDigits            :: ReadS String 
+lexOctDigits            =  nonnull isOctDigit
+
+lexHexDigits            :: ReadS String 
+lexHexDigits            =  nonnull isHexDigit
 
 -- 0 or more digits
 lex0Digits               :: ReadS String 
@@ -216,13 +234,26 @@ lexLitChar              :: ReadS String
 lexLitChar ('\\':s)     =  do
 	    (esc,t) <- lexEsc s
 	    return ('\\':esc, t)
-        where
-        lexEsc (c:s)     | c `elem` "abfnrtv\\\"'" = return ([c],s)
-        lexEsc s@(d:_)   | isDigit d               = lexDigits s
-        lexEsc _                                   = zero
+       where
+        lexEsc (c:s)       | c `elem` "abfnrtv\\\"'" = return ([c],s)
+        lexEsc s@(d:_)     | isDigit d               = lexDecDigits s
+        lexEsc ('o':d:s) | isDigit d                 = lexOctDigits (d:s)
+        lexEsc ('O':d:s) | isDigit d                 = lexOctDigits (d:s)
+        lexEsc ('x':d:s) | isDigit d                 = lexHexDigits (d:s)
+        lexEsc ('X':d:s) | isDigit d                 = lexHexDigits (d:s)
+	lexEsc ('^':c:s) | '@' <= c && c <= '_'    = [(['^',c],s)] -- cf. cntrl in 2.6 of H. report.
+	lexEsc s@(c:_)   | isUpper c		   = fromAsciiLab s
+        lexEsc _                                   = mzero
+
+        fromAsciiLab (x:y:z:ls) | isUpper y && (isUpper z || isDigit z) &&
+				   [x,y,z] `elem` asciiTab = return ([x,y,z], ls)
+        fromAsciiLab (x:y:ls)   | isUpper y &&
+				   [x,y]   `elem` asciiTab = return ([x,y], ls)
+        fromAsciiLab _					   = mzero
+				   
 
 lexLitChar (c:s)        =  return ([c],s)
-lexLitChar ""           =  zero
+lexLitChar ""           =  mzero
 \end{code}
 
 %*********************************************************
@@ -233,10 +264,10 @@ lexLitChar ""           =  zero
 
 \begin{code}
 instance  Read Char  where
-    readsPrec p      = readParen False
+    readsPrec _      = readParen False
     	    	    	    (\r -> do
 				('\'':s,t) <- lex r
-				(c,_)	   <- readLitChar s
+				(c,"\'")   <- readLitChar s
 				return (c,t))
 
     readList = readParen False (\r -> do
@@ -251,7 +282,7 @@ instance  Read Char  where
 			    return (c:cs,u)
 
 instance Read Bool where
-    readsPrec p = readParen False
+    readsPrec _ = readParen False
 			(\r ->
 			   lex r >>= \ lr ->
 			   (do { ("True", rest)  <- return lr ; return (True,  rest) }) ++
@@ -259,7 +290,7 @@ instance Read Bool where
 		
 
 instance Read Ordering where
-    readsPrec p = readParen False
+    readsPrec _ = readParen False
 			(\r -> 
 			   lex r >>= \ lr ->
 			   (do { ("LT", rest) <- return lr ; return (LT,  rest) }) ++
@@ -267,7 +298,7 @@ instance Read Ordering where
 			   (do { ("GT", rest) <- return lr ; return (GT, rest) }))
 
 instance Read a => Read (Maybe a) where
-    readsPrec p = readParen False
+    readsPrec _ = readParen False
 			(\r -> 
 			    lex r >>= \ lr ->
 			    (do { ("Nothing", rest) <- return lr ; return (Nothing, rest)}) ++
@@ -277,7 +308,7 @@ instance Read a => Read (Maybe a) where
 				return (Just x, rest2)))
 
 instance (Read a, Read b) => Read (Either a b) where
-    readsPrec p = readParen False
+    readsPrec _ = readParen False
 			(\r ->
 			    lex r >>= \ lr ->
 			    (do 
@@ -290,16 +321,16 @@ instance (Read a, Read b) => Read (Either a b) where
 				return (Right x, rest2)))
 
 instance  Read Int  where
-    readsPrec p x = readSigned readDec x
+    readsPrec _ x = readSigned readDec x
 
 instance  Read Integer  where
-    readsPrec p x = readSigned readDec x
+    readsPrec _ x = readSigned readDec x
 
 instance  Read Float  where
-    readsPrec p x = readSigned readFloat x
+    readsPrec _ x = readSigned readFloat x
 
 instance  Read Double  where
-    readsPrec p x = readSigned readFloat x
+    readsPrec _ x = readSigned readFloat x
 
 instance  (Integral a, Read a)  => Read (Ratio a)  where
     readsPrec p  =  readParen (p > ratio_prec)
@@ -310,17 +341,17 @@ instance  (Integral a, Read a)  => Read (Ratio a)  where
 				return (x%y,u))
 
 instance  (Read a) => Read [a]  where
-    readsPrec p         = readList
+    readsPrec _         = readList
 
 instance Read () where
-    readsPrec p    = readParen False
+    readsPrec _    = readParen False
                             (\r -> do
 				("(",s) <- lex r
 				(")",t) <- lex s
 				return ((),t))
 
 instance  (Read a, Read b) => Read (a,b)  where
-    readsPrec p = readParen False
+    readsPrec _ = readParen False
                             (\r -> do
 			        ("(",s) <- lex r
 			        (x,t)   <- readsPrec 0 s
@@ -330,7 +361,7 @@ instance  (Read a, Read b) => Read (a,b)  where
 				return ((x,y), w))
 
 instance (Read a, Read b, Read c) => Read (a, b, c) where
-    readsPrec p = readParen False
+    readsPrec _ = readParen False
                             (\a -> do
 			        ("(",b) <- lex a
 			        (x,c)   <- readsPrec 0 b
@@ -342,7 +373,7 @@ instance (Read a, Read b, Read c) => Read (a, b, c) where
 				return ((x,y,z), h))
 
 instance (Read a, Read b, Read c, Read d) => Read (a, b, c, d) where
-    readsPrec p = readParen False
+    readsPrec _ = readParen False
                             (\a -> do
 			        ("(",b) <- lex a
 			        (w,c)   <- readsPrec 0 b
@@ -356,7 +387,7 @@ instance (Read a, Read b, Read c, Read d) => Read (a, b, c, d) where
 				return ((w,x,y,z), i))
 
 instance (Read a, Read b, Read c, Read d, Read e) => Read (a, b, c, d, e) where
-    readsPrec p = readParen False
+    readsPrec _ = readParen False
                             (\a -> do
 			        ("(",b) <- lex a
 			        (v,c)   <- readsPrec 0 b
@@ -382,6 +413,7 @@ instance (Read a, Read b, Read c, Read d, Read e) => Read (a, b, c, d, e) where
 \begin{code}
 readLitChar 		:: ReadS Char
 
+readLitChar []		=  mzero
 readLitChar ('\\':s)	=  readEsc s
 	where
 	readEsc ('a':s)	 = return ('\a',s)
@@ -412,8 +444,8 @@ readLitChar ('\\':s)	=  readEsc s
 			   in case [(c,s') | (c, mne) <- table,
 					     ([],s') <- [match mne s]]
 			      of (pr:_) -> return pr
-				 []	-> zero
-	readEsc _	 = zero
+				 []	-> mzero
+	readEsc _	 = mzero
 
 readLitChar (c:s)	=  return (c,s)
 
@@ -505,7 +537,7 @@ readRational r =
       return (1/0,t) )
  where
      readFix r = do
-	(ds,s)  <- lexDigits r
+	(ds,s)  <- lexDecDigits r
 	(ds',t) <- lexDotDigits s
 	return (read (ds++ds'), length ds', t)
 

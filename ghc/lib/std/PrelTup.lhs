@@ -86,18 +86,18 @@ data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r 
 
 \begin{code}
 instance  (Show a, Show b) => Show (a,b)  where
-    showsPrec p (x,y) = showChar '(' . shows x . showChar ',' .
+    showsPrec _ (x,y) = showChar '(' . shows x . showChar ',' .
                                        shows y . showChar ')'
     showList	= showList__ (showsPrec 0) 
 
 instance (Show a, Show b, Show c) => Show (a, b, c) where
-    showsPrec p (x,y,z) = showChar '(' . showsPrec 0 x . showChar ',' .
+    showsPrec _ (x,y,z) = showChar '(' . showsPrec 0 x . showChar ',' .
 					 showsPrec 0 y . showChar ',' .
 					 showsPrec 0 z . showChar ')'
     showList	= showList__ (showsPrec 0) 
 
 instance (Show a, Show b, Show c, Show d) => Show (a, b, c, d) where
-    showsPrec p (w,x,y,z) = showChar '(' . showsPrec 0 w . showChar ',' .
+    showsPrec _ (w,x,y,z) = showChar '(' . showsPrec 0 w . showChar ',' .
 					   showsPrec 0 x . showChar ',' .
 					   showsPrec 0 y . showChar ',' .
 					   showsPrec 0 z . showChar ')'
@@ -105,7 +105,7 @@ instance (Show a, Show b, Show c, Show d) => Show (a, b, c, d) where
     showList	= showList__ (showsPrec 0) 
 
 instance (Show a, Show b, Show c, Show d, Show e) => Show (a, b, c, d, e) where
-    showsPrec p (v,w,x,y,z) = showChar '(' . showsPrec 0 v . showChar ',' .
+    showsPrec _ (v,w,x,y,z) = showChar '(' . showsPrec 0 v . showChar ',' .
 					     showsPrec 0 w . showChar ',' .
 					     showsPrec 0 x . showChar ',' .
 					     showsPrec 0 y . showChar ',' .
@@ -122,10 +122,10 @@ instance (Show a, Show b, Show c, Show d, Show e) => Show (a, b, c, d, e) where
 
 \begin{code}
 fst			:: (a,b) -> a
-fst (x,y)		=  x
+fst (x,_)		=  x
 
 snd			:: (a,b) -> b
-snd (x,y)		=  y
+snd (_,y)		=  y
 
 -- curry converts an uncurried function to a curried function;
 -- uncurry converts a curried function to a function on pairs.

@@ -19,7 +19,7 @@ import PrelArr		( newVar, readVar, writeVar, ByteArray )
 import PrelRead		( Read )
 import PrelList 	( span )
 import PrelIOBase
-import PrelException 	( Exception(..), throw, catch, fail, catchException )
+import PrelException 	( throw, ioError, catchException )
 import PrelMaybe	( Maybe(..) )
 import PrelAddr		( Addr, nullAddr )
 import PrelBounded      ()   -- get at Bounded Int instance.
@@ -31,7 +31,7 @@ import PrelConc
 import Ix
 
 #ifndef __PARALLEL_HASKELL__
-import PrelForeign  ( makeForeignObj, writeForeignObj )
+import PrelForeign  ( makeForeignObj )
 #endif
 
 #endif /* ndef(__HUGS__) */
@@ -167,20 +167,26 @@ two manage input or output from the Haskell program's standard input
 or output channel respectively.  The third manages output to the
 standard error channel. These handles are initially open.
 
+
 \begin{code}
 stdin, stdout, stderr :: Handle
 
 stdout = unsafePerformIO (do
-    rc <- CCALL(getLock) 1 1   -- ConcHask: SAFE, won't block
-    case rc of
+    rc <- CCALL(getLock) (1::Int) (1::Int)   -- ConcHask: SAFE, won't block
+    case (rc::Int) of
        0 -> newHandle (mkClosedHandle__)
        1 -> do
 #ifndef __CONCURRENT_HASKELL__
- 	    fo <- CCALL(openStdFile) 1 1{-flush on close-} 0{-writeable-}  -- ConcHask: SAFE, won't block
+ 	    fo <- CCALL(openStdFile) (1::Int) 
+				     (1::Int){-flush on close-}
+				     (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
 #else
- 	    fo <- CCALL(openStdFile) 1 (1{-flush on close-} {-+ 128 don't block on I/O-})
-					0{-writeable-}  -- ConcHask: SAFE, won't block
+ 	    fo <- CCALL(openStdFile) (1::Int)
+				     ((1{-flush on close-} {-+ 128 don't block on I/O-})::Int)
+				     (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
 #endif
+					    -- NOTE: turn off non-blocking I/O until 
+					    -- we've got proper support for threadWait{Read,Write}
 
 #ifndef __PARALLEL_HASKELL__
             fo <- makeForeignObj fo
@@ -202,15 +208,18 @@ stdout = unsafePerformIO (do
   )
 
 stdin = unsafePerformIO (do
-    rc <- CCALL(getLock) 0 0   -- ConcHask: SAFE, won't block
-    case rc of
+    rc <- CCALL(getLock) (0::Int) (0::Int)   -- ConcHask: SAFE, won't block
+    case (rc::Int) of
        0 -> newHandle (mkClosedHandle__)
        1 -> do
 #ifndef __CONCURRENT_HASKELL__
-	    fo <- CCALL(openStdFile) 0 0{-don't flush on close -} 1{-readable-}  -- ConcHask: SAFE, won't block
+	    fo <- CCALL(openStdFile) (0::Int)
+				     (0::Int){-don't flush on close -}
+				     (1::Int){-readable-}  -- ConcHask: SAFE, won't block
 #else
-	    fo <- CCALL(openStdFile) 0 (0{-flush on close-} {- + 128  don't block on I/O-})
-					1{-readable-}  -- ConcHask: SAFE, won't block
+	    fo <- CCALL(openStdFile) (0::Int)
+				     ((0{-flush on close-} {-+ 128 don't block on I/O-})::Int)
+				     (1::Int){-readable-}  -- ConcHask: SAFE, won't block
 #endif
 
 #ifndef __PARALLEL_HASKELL__
@@ -231,15 +240,18 @@ stdin = unsafePerformIO (do
 
 
 stderr = unsafePerformIO (do
-    rc <- CCALL(getLock) 2 1  -- ConcHask: SAFE, won't block
-    case rc of
+    rc <- CCALL(getLock) (2::Int) (1::Int){-writeable-}  -- ConcHask: SAFE, won't block
+    case (rc::Int) of
        0 -> newHandle (mkClosedHandle__)
        1 -> do
 #ifndef __CONCURRENT_HASKELL__
- 	    fo <- CCALL(openStdFile) 2 1{-flush on close-} 0{-writeable-} -- ConcHask: SAFE, won't block
+ 	    fo <- CCALL(openStdFile) (2::Int)
+				     (1::Int){-flush on close-}
+				     (0::Int){-writeable-} -- ConcHask: SAFE, won't block
 #else
- 	    fo <- CCALL(openStdFile) 2 (1{-flush on close-} {- + 128  don't block on I/O-})
-					0{-writeable-} -- ConcHask: SAFE, won't block
+ 	    fo <- CCALL(openStdFile) (2::Int)
+				     ((1{-flush on close-} {- + 128 don't block on I/O-})::Int)
+				     (0::Int){-writeable-} -- ConcHask: SAFE, won't block
 #endif
 
 #ifndef __PARALLEL_HASKELL__
@@ -273,7 +285,9 @@ openFile fp im = openFileEx fp (TextMode im)
 openFileEx :: FilePath -> IOModeEx -> IO Handle
 
 openFileEx f m = do
-    fo <- CCALL(openFile) (primPackString f) file_mode binary file_flags -- ConcHask: SAFE, won't block
+    fo <- CCALL(openFile) (primPackString f) (file_mode::Int) 
+					     (binary::Int)
+					     (file_flags::Int) -- ConcHask: SAFE, won't block
     if fo /= nullAddr then do
 #ifndef __PARALLEL_HASKELL__
 	fo  <- makeForeignObj fo
@@ -287,8 +301,8 @@ openFileEx f m = do
   where
     (imo, binary) =
       case m of
-        BinaryMode imo -> (imo, 1)
-	TextMode imo   -> (imo, 0)
+        BinaryMode bmo -> (bmo, 1)
+	TextMode tmo   -> (tmo, 0)
 
 #ifndef __CONCURRENT_HASKELL__
     file_flags = file_flags'
@@ -340,14 +354,14 @@ hClose :: Handle -> IO ()
 hClose handle =
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-	  fail ioError
+	  ioError theError
       ClosedHandle -> do
           writeHandle handle handle_
 	  ioe_closedHandle "hClose" handle 
       _ -> do
-          rc      <- CCALL(closeFile) (haFO__ handle_) 1{-flush if you can-}  -- ConcHask: SAFE, won't block
+          rc      <- CCALL(closeFile) (haFO__ handle_) (1::Int){-flush if you can-}  -- ConcHask: SAFE, won't block
           {- We explicitly close a file object so that we can be told
              if there were any errors. Note that after @hClose@
              has been performed, the ForeignObj embedded in the Handle
@@ -356,7 +370,7 @@ hClose handle =
              is finalised. (we overwrite the file ptr in the underlying
 	     FileObject with a NULL as part of closeFile())
 	  -}
-          if rc == 0 
+          if rc == (0::Int)
 	   then
 	      writeHandle handle (handle_{ haType__   = ClosedHandle,
 					   haFO__     = nullFile__ })
@@ -386,9 +400,9 @@ hFileSize :: Handle -> IO Integer
 hFileSize handle =
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-	  fail ioError
+	  ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
 	  ioe_closedHandle "hFileSize" handle
@@ -396,7 +410,7 @@ hFileSize handle =
 	  writeHandle handle handle_
 	  ioe_closedHandle "hFileSize" handle
 #ifdef __HUGS__
-      other -> do
+      _ -> do
           mem <- primNewByteArray sizeof_int64
           rc <- CCALL(fileSize_int64) (haFO__ handle_) mem  -- ConcHask: SAFE, won't block
           writeHandle handle handle_
@@ -406,7 +420,7 @@ hFileSize handle =
            else 
              constructErrorAndFail "hFileSize"
 #else
-      other ->
+      _ ->
           -- HACK!  We build a unique MP_INT of the right shape to hold
           -- a single unsigned word, and we let the C routine 
 	  -- change the data bits
@@ -418,7 +432,7 @@ hFileSize handle =
             result@(J# _ _ d#) -> do
                 rc <- CCALL(fileSize) (haFO__ handle_) d#  -- ConcHask: SAFE, won't block
                 writeHandle handle handle_
-                if rc == 0 then
+                if rc == (0::Int) then
 		   return result
                  else
 		   constructErrorAndFail "hFileSize"
@@ -484,16 +498,17 @@ hSetBuffering :: Handle -> BufferMode -> IO ()
 hSetBuffering handle mode =
     case mode of
       BlockBuffering (Just n) 
-        | n <= 0 -> fail (IOError (Just handle)
+        | n <= 0 -> ioError
+		         (IOError (Just handle)
 				  InvalidArgument
 			          "hSetBuffering"
 				  ("illegal buffer size " ++ showsPrec 9 n []))  -- 9 => should be parens'ified.
       _ ->
           withHandle handle $ \ handle_ -> do
           case haType__ handle_ of
-	     ErrorHandle ioError -> do
+	     ErrorHandle theError -> do
 	        writeHandle handle handle_
-	        fail ioError
+	        ioError theError
              ClosedHandle -> do
 		writeHandle handle handle_
 	        ioe_closedHandle "hSetBuffering" handle
@@ -620,7 +635,7 @@ hSeek handle mode offset =
     let fo = haFO__ handle_
     rc      <- mayBlock fo (CCALL(seekFile_int64) fo whence (primIntegerToInt64 offset))  -- ConcHask: UNSAFE, may block
 #else
-hSeek handle mode offset@(J# _ s# d#) =
+hSeek handle mode (J# _ s# d#) =
     wantSeekableHandle "hSeek" handle $ \ handle_ -> do
     let fo = haFO__ handle_
     rc      <- mayBlock fo (CCALL(seekFile) fo whence (I# s#) d#)  -- ConcHask: UNSAFE, may block
@@ -659,9 +674,9 @@ hIsOpen :: Handle -> IO Bool
 hIsOpen handle =
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-          fail ioError
+          ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
 	  return False
@@ -676,9 +691,9 @@ hIsClosed :: Handle -> IO Bool
 hIsClosed handle =
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-          fail ioError
+          ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
 	  return True
@@ -700,9 +715,9 @@ hIsReadable :: Handle -> IO Bool
 hIsReadable handle =
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-          fail ioError
+          ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
           ioe_closedHandle "hIsReadable" handle
@@ -721,9 +736,9 @@ hIsWritable :: Handle -> IO Bool
 hIsWritable handle =
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-          fail ioError
+          ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
           ioe_closedHandle "hIsWritable" handle
@@ -765,9 +780,9 @@ hGetBuffering :: Handle -> IO BufferMode
 hGetBuffering handle = 
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-          fail ioError
+          ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
           ioe_closedHandle "hGetBuffering" handle
@@ -787,9 +802,9 @@ hIsSeekable :: Handle -> IO Bool
 hIsSeekable handle =
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-          fail ioError
+          ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
           ioe_closedHandle "hIsSeekable" handle
@@ -799,10 +814,10 @@ hIsSeekable handle =
       AppendHandle -> do
 	  writeHandle handle handle_
 	  return False
-      other -> do
+      _ -> do
 	  rc <- CCALL(seekFileP) (haFO__ handle_)   -- ConcHask: SAFE, won't block
 	  writeHandle handle handle_
-	  case rc of
+	  case (rc::Int) of
             0 -> return False
             1 -> return True
             _ -> constructErrorAndFail "hIsSeekable"
@@ -827,16 +842,16 @@ hSetEcho handle on = do
      else
       withHandle handle $ \ handle_ -> do
       case haType__ handle_ of 
-         ErrorHandle ioError ->  do 
+         ErrorHandle theError ->  do 
             writeHandle handle handle_
-	    fail ioError
+	    ioError theError
          ClosedHandle	   ->  do
             writeHandle handle handle_
 	    ioe_closedHandle "hSetEcho" handle
-         other -> do
-            rc <- CCALL(setTerminalEcho) (haFO__ handle_) (if on then 1 else 0)  -- ConcHask: SAFE, won't block
+         _ -> do
+            rc <- CCALL(setTerminalEcho) (haFO__ handle_) ((if on then 1 else 0)::Int)  -- ConcHask: SAFE, won't block
 	    writeHandle handle handle_
-	    if rc /= -1
+	    if rc /= ((-1)::Int)
 	     then return ()
 	     else constructErrorAndFail "hSetEcho"
 
@@ -848,16 +863,16 @@ hGetEcho handle = do
      else
        withHandle handle $ \ handle_ -> do
        case haType__ handle_ of 
-         ErrorHandle ioError ->  do 
+         ErrorHandle theError ->  do 
             writeHandle handle handle_
-	    fail ioError
+	    ioError theError
          ClosedHandle	   ->  do
             writeHandle handle handle_
 	    ioe_closedHandle "hGetEcho" handle
-         other -> do
+         _ -> do
             rc <- CCALL(getTerminalEcho) (haFO__ handle_)  -- ConcHask: SAFE, won't block
 	    writeHandle handle handle_
-	    case rc of
+	    case (rc::Int) of
 	      1 -> return True
 	      0 -> return False
 	      _ -> constructErrorAndFail "hSetEcho"
@@ -866,16 +881,16 @@ hIsTerminalDevice :: Handle -> IO Bool
 hIsTerminalDevice handle = do
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-       ErrorHandle ioError ->  do 
+       ErrorHandle theError ->  do 
             writeHandle handle handle_
-	    fail ioError
+	    ioError theError
        ClosedHandle	   ->  do
             writeHandle handle handle_
 	    ioe_closedHandle "hIsTerminalDevice" handle
-       other -> do
+       _ -> do
           rc <- CCALL(isTerminalDevice) (haFO__ handle_)   -- ConcHask: SAFE, won't block
 	  writeHandle handle handle_
-	  case rc of
+	  case (rc::Int) of
 	    1 -> return True
 	    0 -> return False
 	    _ -> constructErrorAndFail "hIsTerminalDevice"
@@ -909,7 +924,7 @@ hUngetChar handle c =
     wantReadableHandle "hLookAhead" handle $ \ handle_ -> do
     rc      <- CCALL(ungetChar) (haFO__ handle_) c  -- ConcHask: SAFE, won't block
     writeHandle handle handle_
-    if rc == (-1)
+    if rc == ((-1)::Int)
      then constructErrorAndFail "hUngetChar"
      else return ()
 
@@ -926,7 +941,7 @@ slurpFile fname = do
   handle <- openFile fname ReadMode
   sz     <- hFileSize handle
   if sz > toInteger (maxBound::Int) then 
-    fail (userError "slurpFile: file too big")
+    ioError (userError "slurpFile: file too big")
    else do
      let sz_i = fromInteger sz
      chunk <- CCALL(allocMemory__) (sz_i::Int)
@@ -940,14 +955,14 @@ slurpFile fname = do
 	rc      <- mayBlock fo (CCALL(readChunk) fo chunk sz_i)    -- ConcHask: UNSAFE, may block.
         writeHandle handle handle_
 	hClose handle
-        if rc < 0
+        if rc < (0::Int)
 	 then constructErrorAndFail "slurpFile"
 	 else return (chunk, rc)
 
 #ifndef __HUGS__ /* Hugs' Prelude doesn't need this */
 hFillBufBA :: Handle -> ByteArray Int -> Int -> IO Int
 hFillBufBA handle buf sz
-  | sz <= 0 = fail (IOError (Just handle)
+  | sz <= 0 = ioError (IOError (Just handle)
 			    InvalidArgument
 		            "hFillBufBA"
 			    ("illegal buffer size " ++ showsPrec 9 sz []))  -- 9 => should be parens'ified.
@@ -960,14 +975,14 @@ hFillBufBA handle buf sz
     rc      <- mayBlock fo (CCALL(readChunk) fo buf sz)    -- ConcHask: UNSAFE, may block.
 #endif
     writeHandle handle handle_
-    if rc >= 0
+    if rc >= (0::Int)
      then return rc
      else constructErrorAndFail "hFillBufBA"
 #endif
 
 hFillBuf :: Handle -> Addr -> Int -> IO Int
 hFillBuf handle buf sz
-  | sz <= 0 = fail (IOError (Just handle)
+  | sz <= 0 = ioError (IOError (Just handle)
 			    InvalidArgument
 		            "hFillBuf"
 			    ("illegal buffer size " ++ showsPrec 9 sz []))  -- 9 => should be parens'ified.
@@ -992,18 +1007,18 @@ hPutBuf handle buf len =
     let fo  = haFO__ handle_
     rc      <- mayBlock fo (CCALL(writeBuf) fo buf len)  -- ConcHask: UNSAFE, may block.
     writeHandle handle handle_
-    if rc == 0
+    if rc == (0::Int)
      then return ()
      else constructErrorAndFail "hPutBuf"
 
-#ifndef __HUGS__ /* Another one Hugs doesn't provide */
+#ifndef __HUGS__ /* An_ one Hugs doesn't provide */
 hPutBufBA :: Handle -> ByteArray Int -> Int -> IO ()
 hPutBufBA handle buf len =
     wantWriteableHandle "hPutBufBA" handle $ \ handle_ -> do
     let fo = haFO__ handle_
     rc      <- mayBlock fo (CCALL(writeBufBA) fo buf len)  -- ConcHask: UNSAFE, may block.
     writeHandle handle handle_
-    if rc == 0
+    if rc == (0::Int)
      then return ()
      else constructErrorAndFail "hPutBuf"
 #endif
@@ -1017,9 +1032,9 @@ getHandleFd :: Handle -> IO Int
 getHandleFd handle = do
     withHandle handle $ \ handle_ -> do
     case (haType__ handle_) of
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-          fail ioError
+          ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
 	  ioe_closedHandle "getHandleFd" handle
@@ -1053,7 +1068,7 @@ ioeGetErrorString (IOError _ iot _ str) =
 
 ioeGetFileName (IOError _ _  _ str) = 
  case span (/=':') str of
-   (fs,[]) -> Nothing
+   (_,[])  -> Nothing
    (fs,_)  -> Just fs
 
 \end{code}
@@ -1066,9 +1081,9 @@ wantReadableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantReadableHandle fun handle act = 
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-          fail ioError
+          ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
 	  ioe_closedHandle fun handle
@@ -1077,11 +1092,11 @@ wantReadableHandle fun handle act =
 	  ioe_closedHandle fun handle
       AppendHandle -> do
 	  writeHandle handle handle_
-	  fail not_readable_error
+	  ioError not_readable_error
       WriteHandle -> do
 	  writeHandle handle handle_
-	  fail not_readable_error
-      other -> act handle_
+	  ioError not_readable_error
+      _ -> act handle_
   where
    not_readable_error = 
 	   IOError (Just handle) IllegalOperation fun	
@@ -1091,9 +1106,9 @@ wantWriteableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantWriteableHandle fun handle act = 
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-          fail ioError
+          ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
 	  ioe_closedHandle fun handle
@@ -1102,8 +1117,8 @@ wantWriteableHandle fun handle act =
 	  ioe_closedHandle fun handle
       ReadHandle -> do
 	  writeHandle handle handle_
-	  fail not_writeable_error
-      other -> act handle_
+	  ioError not_writeable_error
+      _ -> act handle_
   where
    not_writeable_error = 
 	   IOError (Just handle) IllegalOperation fun
@@ -1113,9 +1128,9 @@ wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantSeekableHandle fun handle act =
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle ioError -> do
+      ErrorHandle theError -> do
 	  writeHandle handle handle_
-          fail ioError
+          ioError theError
       ClosedHandle -> do
 	  writeHandle handle handle_
 	  ioe_closedHandle fun handle
@@ -1124,7 +1139,7 @@ wantSeekableHandle fun handle act =
 	  ioe_closedHandle fun handle
       AppendHandle -> do
 	  writeHandle handle handle_
-	  fail not_seekable_error
+	  ioError not_seekable_error
       _ -> act handle_
   where
    not_seekable_error = 
@@ -1139,7 +1154,7 @@ access to a closed file.
 
 \begin{code}
 ioe_closedHandle :: String -> Handle -> IO a
-ioe_closedHandle fun h = fail (IOError (Just h) IllegalOperation fun "handle is closed")
+ioe_closedHandle fun h = ioError (IOError (Just h) IllegalOperation fun "handle is closed")
 \end{code}
 
 Internal helper functions for Concurrent Haskell implementation
@@ -1180,7 +1195,8 @@ mayBlock fo act = do
 
 #endif
 
-#ifdef __HUGS__
+-- #ifdef __HUGS__
+#if 1
 threadDelay, threadWaitRead, threadWaitWrite :: Int -> IO ()
 
 -- Hugs does actually have the primops needed to implement these
@@ -1215,55 +1231,55 @@ type FILE_OBJ  = ForeignObj -- as passed into functions
 type FILE_OBJ  = Addr
 #endif
 
-foreign import stdcall "libHS_cbits.so" "setBuf"                prim_setBuf           :: FILE_OBJ -> Addr -> Int -> IO ()
-foreign import stdcall "libHS_cbits.so" "getBufSize"            prim_getBufSize       :: FILE_OBJ -> IO Int
-foreign import stdcall "libHS_cbits.so" "inputReady"            prim_inputReady       :: FILE_OBJ -> Int -> IO RC
-foreign import stdcall "libHS_cbits.so" "fileGetc"              prim_fileGetc         :: FILE_OBJ -> IO Int
-foreign import stdcall "libHS_cbits.so" "fileLookAhead"         prim_fileLookAhead    :: FILE_OBJ -> IO Int
-foreign import stdcall "libHS_cbits.so" "readBlock"             prim_readBlock        :: FILE_OBJ -> IO Int
-foreign import stdcall "libHS_cbits.so" "readLine"              prim_readLine         :: FILE_OBJ -> IO Int
-foreign import stdcall "libHS_cbits.so" "readChar"              prim_readChar         :: FILE_OBJ -> IO Int
-foreign import stdcall "libHS_cbits.so" "writeFileObject"       prim_writeFileObject  :: FILE_OBJ -> Int -> IO RC
-foreign import stdcall "libHS_cbits.so" "filePutc"              prim_filePutc         :: FILE_OBJ -> Char -> IO RC
-foreign import stdcall "libHS_cbits.so" "getBufStart"           prim_getBufStart      :: FILE_OBJ -> Int -> IO Addr
-foreign import stdcall "libHS_cbits.so" "getWriteableBuf"       prim_getWriteableBuf  :: FILE_OBJ -> IO Addr
-foreign import stdcall "libHS_cbits.so" "getBufWPtr"            prim_getBufWPtr       :: FILE_OBJ -> IO Int
-foreign import stdcall "libHS_cbits.so" "setBufWPtr"            prim_setBufWPtr       :: FILE_OBJ -> Int -> IO ()
-foreign import stdcall "libHS_cbits.so" "closeFile"             prim_closeFile        :: FILE_OBJ -> Flush -> IO RC
-foreign import stdcall "libHS_cbits.so" "fileEOF"               prim_fileEOF          :: FILE_OBJ -> IO RC
-foreign import stdcall "libHS_cbits.so" "setBuffering"     	  prim_setBuffering     :: FILE_OBJ -> Int -> IO RC
-foreign import stdcall "libHS_cbits.so" "flushFile"        	  prim_flushFile        :: FILE_OBJ -> IO RC
-foreign import stdcall "libHS_cbits.so" "getBufferMode"    	  prim_getBufferMode    :: FILE_OBJ -> IO RC
-foreign import stdcall "libHS_cbits.so" "seekFile_int64"   	  prim_seekFile_int64   :: FILE_OBJ -> Int -> Int64 -> IO RC
-foreign import stdcall "libHS_cbits.so" "seekFileP"        	  prim_seekFileP        :: FILE_OBJ -> IO RC
-foreign import stdcall "libHS_cbits.so" "setTerminalEcho"  	  prim_setTerminalEcho  :: FILE_OBJ -> Int -> IO RC
-foreign import stdcall "libHS_cbits.so" "getTerminalEcho"  	  prim_getTerminalEcho  :: FILE_OBJ -> IO RC
-foreign import stdcall "libHS_cbits.so" "isTerminalDevice"  	  prim_isTerminalDevice :: FILE_OBJ -> IO RC
-foreign import stdcall "libHS_cbits.so" "setConnectedTo"    	  prim_setConnectedTo   :: FILE_OBJ -> FILE_OBJ -> Int -> IO ()
-foreign import stdcall "libHS_cbits.so" "ungetChar"         	  prim_ungetChar        :: FILE_OBJ -> Char -> IO RC
-foreign import stdcall "libHS_cbits.so" "readChunk"         	  prim_readChunk        :: FILE_OBJ -> Addr          -> Int -> IO RC
-foreign import stdcall "libHS_cbits.so" "writeBuf"          	  prim_writeBuf         :: FILE_OBJ -> Addr -> Int -> IO RC
-foreign import stdcall "libHS_cbits.so" "getFileFd"         	  prim_getFileFd        :: FILE_OBJ -> IO FD
-foreign import stdcall "libHS_cbits.so" "fileSize_int64"    	  prim_fileSize_int64   :: FILE_OBJ -> Bytes -> IO RC
-foreign import stdcall "libHS_cbits.so" "getFilePosn"       	  prim_getFilePosn      :: FILE_OBJ -> IO Int
-foreign import stdcall "libHS_cbits.so" "setFilePosn"       	  prim_setFilePosn      :: FILE_OBJ -> Int -> IO Int
-foreign import stdcall "libHS_cbits.so" "getConnFileFd"         prim_getConnFileFd    :: FILE_OBJ -> IO FD
-foreign import stdcall "libHS_cbits.so" "allocMemory__"     	  prim_allocMemory__    :: Int -> IO Addr
-foreign import stdcall "libHS_cbits.so" "getLock"               prim_getLock          :: FD -> Exclusive -> IO RC
-foreign import stdcall "libHS_cbits.so" "openStdFile"           prim_openStdFile      :: FD -> OpenStdFlags -> Readable -> IO IOFileAddr
-foreign import stdcall "libHS_cbits.so" "openFile"              prim_openFile         :: CString -> How -> Binary -> OpenFlags -> IO IOFileAddr
-foreign import stdcall "libHS_cbits.so" "freeFileObject"        prim_freeFileObject    :: FILE_OBJ -> IO ()
-foreign import stdcall "libHS_cbits.so" "freeStdFileObject"     prim_freeStdFileObject :: FILE_OBJ -> IO ()
-foreign import stdcall "libHS_cbits.so" "const_BUFSIZ"          const_BUFSIZ          :: Int
+foreign import ccall "libHS_cbits.so" "setBuf"                unsafe prim_setBuf           :: FILE_OBJ -> Addr -> Int -> IO ()
+foreign import ccall "libHS_cbits.so" "getBufSize"            unsafe prim_getBufSize       :: FILE_OBJ -> IO Int
+foreign import ccall "libHS_cbits.so" "inputReady"            unsafe prim_inputReady       :: FILE_OBJ -> Int -> IO RC
+foreign import ccall "libHS_cbits.so" "fileGetc"              unsafe prim_fileGetc         :: FILE_OBJ -> IO Int
+foreign import ccall "libHS_cbits.so" "fileLookAhead"         unsafe prim_fileLookAhead    :: FILE_OBJ -> IO Int
+foreign import ccall "libHS_cbits.so" "readBlock"             unsafe prim_readBlock        :: FILE_OBJ -> IO Int
+foreign import ccall "libHS_cbits.so" "readLine"              unsafe prim_readLine         :: FILE_OBJ -> IO Int
+foreign import ccall "libHS_cbits.so" "readChar"              unsafe prim_readChar         :: FILE_OBJ -> IO Int
+foreign import ccall "libHS_cbits.so" "writeFileObject"       unsafe prim_writeFileObject  :: FILE_OBJ -> Int -> IO RC
+foreign import ccall "libHS_cbits.so" "filePutc"              unsafe prim_filePutc         :: FILE_OBJ -> Char -> IO RC
+foreign import ccall "libHS_cbits.so" "getBufStart"           unsafe prim_getBufStart      :: FILE_OBJ -> Int -> IO Addr
+foreign import ccall "libHS_cbits.so" "getWriteableBuf"       unsafe prim_getWriteableBuf  :: FILE_OBJ -> IO Addr
+foreign import ccall "libHS_cbits.so" "getBufWPtr"            unsafe prim_getBufWPtr       :: FILE_OBJ -> IO Int
+foreign import ccall "libHS_cbits.so" "setBufWPtr"            unsafe prim_setBufWPtr       :: FILE_OBJ -> Int -> IO ()
+foreign import ccall "libHS_cbits.so" "closeFile"             unsafe prim_closeFile        :: FILE_OBJ -> Flush -> IO RC
+foreign import ccall "libHS_cbits.so" "fileEOF"               unsafe prim_fileEOF          :: FILE_OBJ -> IO RC
+foreign import ccall "libHS_cbits.so" "setBuffering"          unsafe prim_setBuffering     :: FILE_OBJ -> Int -> IO RC
+foreign import ccall "libHS_cbits.so" "flushFile"             unsafe prim_flushFile        :: FILE_OBJ -> IO RC
+foreign import ccall "libHS_cbits.so" "getBufferMode"         unsafe prim_getBufferMode    :: FILE_OBJ -> IO RC
+foreign import ccall "libHS_cbits.so" "seekFile_int64"        unsafe prim_seekFile_int64   :: FILE_OBJ -> Int -> Int64 -> IO RC
+foreign import ccall "libHS_cbits.so" "seekFileP"             unsafe prim_seekFileP        :: FILE_OBJ -> IO RC
+foreign import ccall "libHS_cbits.so" "setTerminalEcho"       unsafe prim_setTerminalEcho  :: FILE_OBJ -> Int -> IO RC
+foreign import ccall "libHS_cbits.so" "getTerminalEcho"       unsafe prim_getTerminalEcho  :: FILE_OBJ -> IO RC
+foreign import ccall "libHS_cbits.so" "isTerminalDevice"      unsafe prim_isTerminalDevice :: FILE_OBJ -> IO RC
+foreign import ccall "libHS_cbits.so" "setConnectedTo"        unsafe prim_setConnectedTo   :: FILE_OBJ -> FILE_OBJ -> Int -> IO ()
+foreign import ccall "libHS_cbits.so" "ungetChar"             unsafe prim_ungetChar        :: FILE_OBJ -> Char -> IO RC
+foreign import ccall "libHS_cbits.so" "readChunk"             unsafe prim_readChunk        :: FILE_OBJ -> Addr          -> Int -> IO RC
+foreign import ccall "libHS_cbits.so" "writeBuf"              unsafe prim_writeBuf         :: FILE_OBJ -> Addr -> Int -> IO RC
+foreign import ccall "libHS_cbits.so" "getFileFd"             unsafe prim_getFileFd        :: FILE_OBJ -> IO FD
+foreign import ccall "libHS_cbits.so" "fileSize_int64"        unsafe prim_fileSize_int64   :: FILE_OBJ -> Bytes -> IO RC
+foreign import ccall "libHS_cbits.so" "getFilePosn"           unsafe prim_getFilePosn      :: FILE_OBJ -> IO Int
+foreign import ccall "libHS_cbits.so" "setFilePosn"           unsafe prim_setFilePosn      :: FILE_OBJ -> Int -> IO Int
+foreign import ccall "libHS_cbits.so" "getConnFileFd"         unsafe prim_getConnFileFd    :: FILE_OBJ -> IO FD
+foreign import ccall "libHS_cbits.so" "allocMemory__"         unsafe prim_allocMemory__    :: Int -> IO Addr
+foreign import ccall "libHS_cbits.so" "getLock"               unsafe prim_getLock          :: FD -> Exclusive -> IO RC
+foreign import ccall "libHS_cbits.so" "openStdFile"           unsafe prim_openStdFile      :: FD -> OpenStdFlags -> Readable -> IO IOFileAddr
+foreign import ccall "libHS_cbits.so" "openFile"              unsafe prim_openFile         :: CString -> How -> Binary -> OpenFlags -> IO IOFileAddr
+foreign import ccall "libHS_cbits.so" "freeFileObject"        unsafe prim_freeFileObject    :: FILE_OBJ -> IO ()
+foreign import ccall "libHS_cbits.so" "freeStdFileObject"     unsafe prim_freeStdFileObject :: FILE_OBJ -> IO ()
+foreign import ccall "libHS_cbits.so" "const_BUFSIZ"          unsafe const_BUFSIZ          :: Int
 
-foreign import stdcall "libHS_cbits.so" "setConnNonBlockingIOFlag__"   prim_setConnNonBlockingIOFlag__   :: FILE_OBJ -> IO ()
-foreign import stdcall "libHS_cbits.so" "clearConnNonBlockingIOFlag__" prim_clearConnNonBlockingIOFlag__ :: FILE_OBJ -> IO ()
-foreign import stdcall "libHS_cbits.so" "setNonBlockingIOFlag__"       prim_setNonBlockingIOFlag__       :: FILE_OBJ -> IO ()
-foreign import stdcall "libHS_cbits.so" "clearNonBlockingIOFlag__"     prim_clearNonBlockingIOFlag__     :: FILE_OBJ -> IO ()
+foreign import ccall "libHS_cbits.so" "setConnNonBlockingIOFlag__"   unsafe prim_setConnNonBlockingIOFlag__   :: FILE_OBJ -> IO ()
+foreign import ccall "libHS_cbits.so" "clearConnNonBlockingIOFlag__" unsafe prim_clearConnNonBlockingIOFlag__ :: FILE_OBJ -> IO ()
+foreign import ccall "libHS_cbits.so" "setNonBlockingIOFlag__"       unsafe prim_setNonBlockingIOFlag__       :: FILE_OBJ -> IO ()
+foreign import ccall "libHS_cbits.so" "clearNonBlockingIOFlag__"     unsafe prim_clearNonBlockingIOFlag__     :: FILE_OBJ -> IO ()
 
-foreign import stdcall "libHS_cbits.so" "getErrStr__"  prim_getErrStr__  :: IO Addr 
-foreign import stdcall "libHS_cbits.so" "getErrNo__"   prim_getErrNo__   :: IO Int  
-foreign import stdcall "libHS_cbits.so" "getErrType__" prim_getErrType__ :: IO Int  
+foreign import ccall "libHS_cbits.so" "getErrStr__"  unsafe prim_getErrStr__  :: IO Addr 
+foreign import ccall "libHS_cbits.so" "getErrNo__"   unsafe prim_getErrNo__   :: IO Int  
+foreign import ccall "libHS_cbits.so" "getErrType__" unsafe prim_getErrType__ :: IO Int  
 
 #endif
 \end{code}

@@ -9,59 +9,59 @@ module Prelude (
 
 	-- Everything from these modules
     module PrelList,
-    module PrelTup,
-
-	-- From PrelBase
-    (->),
-    Eq(..), 
-    Ord(..), Ordering(..), 
-    Bounded(..), 
-    Enum(..), succ, pred, 
-    Show(..), ShowS, shows, show, showChar, showString, showParen,
-    seq, strict,
-    Bool(..), (&&), (||), not, otherwise,
-    Char, String, Int, Integer, Float, Double, Void,
-    Maybe(..), maybe,
-    Either(..), either,
-    ()(..),		-- The unit type
-
+        -- Everything corresponding to the Report's PreludeText
+    ReadS, ShowS,
+    Read(readsPrec, readList),
+    Show(showsPrec, showList, show),
+    reads, shows, read, lex, 
+    showChar, showString, readParen, showParen,
     
-    id, const, (.), flip, ($), until, asTypeOf, undefined,
-
-	-- From Error
-    error,
-
-	-- From Monad
-    Functor(..), Monad(..), MonadZero(..), MonadPlus(..),
-    accumulate, sequence, mapM, mapM_, guard, filter, concat, applyM,
-
-	-- From PrelRead
-    ReadS, Read(readsPrec, readList),
-    reads, read, lex, readParen, 
-
-        -- From IO
-    IO, FilePath, IOError,
-    fail, userError, catch,
+        -- Everything corresponding to the Report's PreludeIO
+    FilePath, IOError,
+    ioError, userError, catch,
     putChar, putStr, putStrLn, print,
     getChar, getLine, getContents, interact,
     readFile, writeFile, appendFile, readIO, readLn,
 
-	-- From PrelNum
+    Bool(..),
+    Maybe(..),
+    Either(..),
+    Ordering(..), 
+    Char, String, Int, Integer, Float, Double, IO,
     Ratio, Rational, 
-    (%), numerator, denominator, approxRational,
-
+    []((:), []),
+    
+    module PrelTup,
+        -- Includes tuple types + fst, snd, curry, uncurry
+    ()(..),		-- The unit type
+    (->),		-- functions
+    
+    Eq(..),
+    Ord(..), 
+    Enum(..),
+    Bounded(..), 
     Num((+), (-), (*), negate, abs, signum, fromInteger, fromInt{-glaExt-}),
-    Real(toRational),
+    Real(..),
     Integral(quot, rem, div, mod, quotRem, divMod, toInteger, toInt{-partain-}),
-    Fractional((/), recip, fromRational),
-    Floating(pi, exp, log, sqrt, (**), logBase, sin, cos, tan,
-             asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh),
-    RealFrac(properFraction, truncate, round, ceiling, floor),
-    RealFloat(floatRadix, floatDigits, floatRange, decodeFloat,
-              encodeFloat, exponent, significand, scaleFloat, isNaN,
-              isInfinite, isDenormalized, isIEEE, isNegativeZero),
+    Fractional(..),
+    Floating(..),
+    RealFrac(..),
+    RealFloat(..),
+
+	-- From Monad
+    Monad(..),
+    Functor(..), 
+    mapM, mapM_, sequence, sequence_, (=<<),
+
+    maybe, either,
+    (&&), (||), not, otherwise,
     subtract, even, odd, gcd, lcm, (^), (^^), 
-    fromIntegral, fromRealFrac, atan2
+    fromIntegral, realToFrac,
+    --exported by PrelTup: fst, snd, curry, uncurry,
+    id, const, (.), flip, ($), until,
+    asTypeOf, error, undefined,
+    seq, ($!)
+
   ) where
 
 import PrelBase
@@ -79,11 +79,10 @@ import Maybe
 import PrelErr   ( error )
 import IO
 
--- These can't conveniently be defined in PrelBase because they use numbers,
--- or I/O, so here's a convenient place to do them.
+infixr 0 $!
 
-strict      :: (a -> b) -> a -> b
-strict f x  = x `seq` f x
+($!)    :: (a -> b) -> a -> b
+f $! x  = x `seq` f x
 
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which undefined 

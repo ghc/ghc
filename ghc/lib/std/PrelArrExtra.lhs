@@ -32,9 +32,9 @@ freezeFloatArray (MutableByteArray ixs arr#) = ST $ \ s# ->
 	    -> State# s			-- the Universe and everything
 	    -> (# State# s, ByteArray# #)
 
-    freeze arr# end# s#
-      = case (newFloatArray# end# s#)   of { (# s2#, newarr1# #) ->
-	case copy 0# arr# newarr1# s2#  of { (# s3#, newarr2# #) ->
+    freeze arr1# end# s#
+      = case (newFloatArray# end# s#)    of { (# s2#, newarr1# #) ->
+	case copy 0# arr1# newarr1# s2#  of { (# s3#, newarr2# #) ->
 	unsafeFreezeByteArray# newarr2# s3#
 	}}
       where
@@ -43,13 +43,13 @@ freezeFloatArray (MutableByteArray ixs arr#) = ST $ \ s# ->
 	     -> State# s
 	     -> (# State# s, MutableByteArray# s #)
 
-	copy cur# from# to# s#
+	copy cur# from# to# s1#
 	  | cur# ==# end#
-	    = (# s#, to# #)
+	    = (# s1#, to# #)
 	  | otherwise
-	    = case (readFloatArray#  from# cur#     s#)  of { (# s1#, ele #) ->
-	      case (writeFloatArray# to#   cur# ele s1#) of { s2# ->
-	      copy (cur# +# 1#) from# to# s2#
+	    = case (readFloatArray#  from# cur#     s1#)  of { (# s2#, ele #) ->
+	      case (writeFloatArray# to#   cur# ele s2#)  of { s3# ->
+	      copy (cur# +# 1#) from# to# s3#
 	      }}
 
 freezeDoubleArray (MutableByteArray ixs arr#) = ST $ \ s# ->
@@ -62,9 +62,9 @@ freezeDoubleArray (MutableByteArray ixs arr#) = ST $ \ s# ->
 	    -> State# s			-- the Universe and everything
 	    -> (# State# s, ByteArray# #)
 
-    freeze arr# n# s#
-      = case (newDoubleArray# n# s#)   	   of { (# s2#, newarr1# #) ->
-	case copy 0# n# arr# newarr1# s2#  of { (# s3#, newarr2# #) ->
+    freeze arr1# n# s1#
+      = case (newDoubleArray# n# s1#)  	   of { (# s2#, newarr1# #) ->
+	case copy 0# n# arr1# newarr1# s2# of { (# s3#, newarr2# #) ->
 	unsafeFreezeByteArray# newarr2# s3#
 	}}
       where
@@ -73,12 +73,12 @@ freezeDoubleArray (MutableByteArray ixs arr#) = ST $ \ s# ->
 	     -> State# s
 	     -> (# State# s, MutableByteArray# s #)
 
-	copy cur# end# from# to# s#
+	copy cur# end# from# to# st#
 	  | cur# ==# end#
-	    = (# s#, to# #)
+	    = (# st#, to# #)
 	  | otherwise
-	    = case (readDoubleArray#  from# cur#     s#)  of { (# s1#, ele #) ->
-	      case (writeDoubleArray# to#   cur# ele s1#) of { s2# ->
-	      copy (cur# +# 1#) end# from# to# s2#
+	    = case (readDoubleArray#  from# cur#     st#) of { (# s2#, ele #) ->
+	      case (writeDoubleArray# to#   cur# ele s2#) of { s3# ->
+	      copy (cur# +# 1#) end# from# to# s3#
 	      }}
 \end{code}

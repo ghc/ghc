@@ -21,10 +21,10 @@ import PrelNum
 import {-# SOURCE #-} PrelErr ( error )
 import PrelList
 import PrelMaybe
+import Maybe		( fromMaybe )
 
 import PrelArr		( Array, array, (!) )
 import PrelIOBase   	( unsafePerformIO )
-import Ix		( Ix(..) )
 import PrelCCall	()	-- we need the definitions of CCallable and 
 				-- CReturnable for the _ccall_s herein.
 \end{code}
@@ -165,7 +165,7 @@ instance  RealFloat Float  where
       (0::Int) /= unsafePerformIO (_ccall_ isFloatDenormalized x) -- ..
     isNegativeZero x =
       (0::Int) /= unsafePerformIO (_ccall_ isFloatNegativeZero x) -- ...
-    isIEEE x    = True
+    isIEEE _    = True
 \end{code}
 
 %*********************************************************
@@ -293,8 +293,8 @@ instance  RealFloat Double  where
     floatDigits _	=  DBL_MANT_DIG	    -- ditto
     floatRange _	=  (DBL_MIN_EXP, DBL_MAX_EXP) -- ditto
 
-    decodeFloat (D# d#)
-      = case decodeDouble# d#	of
+    decodeFloat (D# x#)
+      = case decodeDouble# x#	of
 	  (# exp#, a#, s#, d# #) -> (J# a# s# d#, I# exp#)
 
     encodeFloat (J# a# s# d#) (I# e#)
@@ -316,7 +316,7 @@ instance  RealFloat Double  where
       (0::Int) /= unsafePerformIO (_ccall_ isDoubleDenormalized x) -- ..
     isNegativeZero x =
       (0::Int) /= unsafePerformIO (_ccall_ isDoubleNegativeZero x) -- ...
-    isIEEE x    = True
+    isIEEE _    = True
 
 instance  Show Double  where
     showsPrec   x = showSigned showFloat x
@@ -344,7 +344,7 @@ instance  Show Double  where
 fromIntegral	:: (Integral a, Num b) => a -> b
 fromIntegral	=  fromInteger . toInteger
 
-{- SPECIALIZE fromRealFrac ::
+{- SPECIALIZE realToFrac ::
     Double	-> Rational, 
     Rational	-> Double,
     Float	-> Rational,
@@ -354,8 +354,8 @@ fromIntegral	=  fromInteger . toInteger
     Double	-> Float,
     Float	-> Float,
     Float	-> Double #-}
-fromRealFrac	:: (RealFrac a, Fractional b) => a -> b
-fromRealFrac	=  fromRational . toRational
+realToFrac	:: (Real a, Fractional b) => a -> b
+realToFrac	=  fromRational . toRational
 \end{code}
 
 %*********************************************************
@@ -379,6 +379,8 @@ for these (@numericEnumFromTo@ and @numericEnumFromThenTo@ below.)
 
 \begin{code}
 instance  Enum Float  where
+    succ x	   = x + 1
+    pred x	   = x - 1
     toEnum         =  fromIntegral
     fromEnum       =  fromInteger . truncate   -- may overflow
     enumFrom	   =  numericEnumFrom
@@ -386,6 +388,8 @@ instance  Enum Float  where
     enumFromThenTo =  numericEnumFromThenTo
 
 instance  Enum Double  where
+    succ x	   = x + 1
+    pred x	   = x - 1
     toEnum         =  fromIntegral
     fromEnum       =  fromInteger . truncate   -- may overflow
     enumFrom	   =  numericEnumFrom
@@ -414,7 +418,7 @@ the simplest rational between d'%r' and d%r.
 
 \begin{code}
 approxRational		:: (RealFrac a) => a -> a -> Rational
-approxRational x eps	=  simplest (x-eps) (x+eps)
+approxRational rat eps	=  simplest (rat-eps) (rat+eps)
 	where simplest x y | y < x	=  simplest y x
 			   | x == y	=  xr
 			   | x > 0	=  simplest' n d n' d'
@@ -450,7 +454,7 @@ instance  (Integral a)	=> Num (Ratio a)  where
     (x:%y) * (x':%y')	=  reduce (x * x') (y * y')
     negate (x:%y)	=  (-x) :% y
     abs (x:%y)		=  abs x :% y
-    signum (x:%y)	=  signum x :% 1
+    signum (x:%_)	=  signum x :% 1
     fromInteger x	=  fromInteger x :% 1
 
 instance  (Integral a)	=> Real (Ratio a)  where
@@ -466,6 +470,8 @@ instance  (Integral a)	=> RealFrac (Ratio a)  where
 			    where (q,r) = quotRem x y
 
 instance  (Integral a)	=> Enum (Ratio a)  where
+    succ x	        =  x + 1
+    pred x	        =  x - 1
     enumFrom		=  iterate ((+)1)
     enumFromThen n m	=  iterate ((+)(m-n)) n
     toEnum n            =  fromIntegral n :% 1
@@ -494,7 +500,8 @@ showRational n r =
 	let (r', e) = normalize r
 	in  prR n r' e
 
-startExpExp = 4 :: Int
+startExpExp :: Int
+startExpExp = 4
 
 -- make sure 1 <= r < 10
 normalize :: Rational -> (Rational, Int)
@@ -503,15 +510,26 @@ normalize r = if r < 1 then
 	      else
 		  norm startExpExp r 0
 	where norm :: Int -> Rational -> Int -> (Rational, Int)
-	      -- Invariant: r*10^e == original r
-	      norm 0  r e = (r, e)
-	      norm ee r e =
+	      -- Invariant: x*10^e == original r
+	      norm 0  x e = (x, e)
+	      norm ee x e =
 		let n = 10^ee
 		    tn = 10^n
-		in  if r >= tn then norm ee (r/tn) (e+n) else norm (ee-1) r e
+		in  if x >= tn then norm ee (x/tn) (e+n) else norm (ee-1) x e
 
+drop0 :: String -> String
 drop0 "" = ""
-drop0 (c:cs) = c : reverse (dropWhile (=='0') (reverse cs))
+drop0 (c:cs) = c : fromMaybe [] (dropTrailing0s cs) --WAS (yuck): reverse (dropWhile (=='0') (reverse cs))
+  where
+   dropTrailing0s []       = Nothing
+   dropTrailing0s ('0':xs) = 
+     case dropTrailing0s xs of
+       Nothing -> Nothing
+       Just ls -> Just ('0':ls)
+   dropTrailing0s (x:xs) = 
+     case dropTrailing0s xs of
+      Nothing -> Just [x]
+      Just ls -> Just (x:ls)
 
 prR :: Int -> Rational -> Int -> String
 prR n r e | r <  1  = prR n (r*10) (e-1)		-- final adjustment
@@ -580,11 +598,11 @@ fromRat x = x'
 Now, here's Lennart's code.
 
 \begin{code}
---fromRat :: (RealFloat a) => Rational -> a
-fromRat x = 
-    if x == 0 then encodeFloat 0 0 		-- Handle exceptional cases
-    else if x < 0 then - fromRat' (-x)		-- first.
-    else fromRat' x
+fromRat :: (RealFloat a) => Rational -> a
+fromRat x 
+  | x == 0    =  encodeFloat 0 0 		-- Handle exceptional cases
+  | x <  0    =  - fromRat' (-x)		-- first.
+  | otherwise =  fromRat' x
 
 -- Conversion process:
 -- Scale the rational number by the RealFloat base until
@@ -600,8 +618,8 @@ fromRat' x = r
         p = floatDigits r
 	(minExp0, _) = floatRange r
 	minExp = minExp0 - p		-- the real minimum exponent
-	xMin = toRational (expt b (p-1))
-	xMax = toRational (expt b p)
+	xMin   = toRational (expt b (p-1))
+	xMax   = toRational (expt b p)
 	p0 = (integerLogBase b (numerator x) - integerLogBase b (denominator x) - p) `max` minExp
 	f = if p0 < 0 then 1 % expt b (-p0) else expt b p0 % 1
 	(x', p') = scaleRat (toRational b) minExp xMin xMax p0 (x / f)
@@ -609,25 +627,24 @@ fromRat' x = r
 
 -- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
 scaleRat :: Rational -> Int -> Rational -> Rational -> Int -> Rational -> (Rational, Int)
-scaleRat b minExp xMin xMax p x =
-    if p <= minExp then
-        (x, p)
-    else if x >= xMax then
-        scaleRat b minExp xMin xMax (p+1) (x/b)
-    else if x < xMin  then
-        scaleRat b minExp xMin xMax (p-1) (x*b)
-    else
-        (x, p)
+scaleRat b minExp xMin xMax p x 
+ | p <= minExp = (x, p)
+ | x >= xMax   = scaleRat b minExp xMin xMax (p+1) (x/b)
+ | x < xMin    = scaleRat b minExp xMin xMax (p-1) (x*b)
+ | otherwise   = (x, p)
 
 -- Exponentiation with a cache for the most common numbers.
-minExpt = 0::Int
-maxExpt = 1100::Int
+minExpt, maxExpt :: Int
+minExpt = 0
+maxExpt = 1100
+
 expt :: Integer -> Int -> Integer
 expt base n =
     if base == 2 && n >= minExpt && n <= maxExpt then
         expts!n
     else
         base^n
+
 expts :: Array Int Integer
 expts = array (minExpt,maxExpt) [(n,2^n) | n <- [minExpt .. maxExpt]]
 
@@ -635,15 +652,18 @@ expts = array (minExpt,maxExpt) [(n,2^n) | n <- [minExpt .. maxExpt]]
 -- Simplest way would be just divide i by b until it's smaller then b, but that would
 -- be very slow!  We are just slightly more clever.
 integerLogBase :: Integer -> Integer -> Int
-integerLogBase b i =
-     if i < b then
-        0
-     else
+integerLogBase b i
+   | i < b     = 0
+   | otherwise = doDiv (i `div` (b^l)) l
+       where
 	-- Try squaring the base first to cut down the number of divisions.
-        let l = 2 * integerLogBase (b*b) i
-	    doDiv :: Integer -> Int -> Int
-	    doDiv i l = if i < b then l else doDiv (i `div` b) (l+1)
-	in  doDiv (i `div` (b^l)) l
+         l = 2 * integerLogBase (b*b) i
+
+	 doDiv :: Integer -> Int -> Int
+	 doDiv x y
+	    | x < b     = y
+	    | otherwise = doDiv (x `div` b) (y+1)
+
 \end{code}
 
 %*********************************************************
@@ -656,10 +676,11 @@ integerLogBase b i =
 --Exported from std library Numeric, defined here to
 --avoid mut. rec. between PrelNum and Numeric.
 showSigned :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
-showSigned showPos p x = if x < 0 then showParen (p > 6)
-						 (showChar '-' . showPos (-x))
-				  else showPos x
+showSigned showPos p x 
+   | x < 0     = showParen (p > 6) (showChar '-' . showPos (-x))
+   | otherwise = showPos x
 
+showFloat :: (RealFloat a) => a -> ShowS
 showFloat x  =  showString (formatRealFloat FFGeneric Nothing x)
 
 -- These are the format types.  This type is not exported.
@@ -667,33 +688,27 @@ showFloat x  =  showString (formatRealFloat FFGeneric Nothing x)
 data FFFormat = FFExponent | FFFixed | FFGeneric --no need: deriving (Eq, Ord, Show)
 
 formatRealFloat :: (RealFloat a) => FFFormat -> Maybe Int -> a -> String
-formatRealFloat fmt decs x = s
+formatRealFloat fmt decs x
+   | isNaN x		       = "NaN"
+   | isInfinite x && x < 0     = if x < 0 then "-Infinity" else "Infinity"
+   | x < 0 || isNegativeZero x = '-':doFmt fmt (floatToDigits (toInteger base) (-x))
+   | otherwise		       = doFmt fmt (floatToDigits (toInteger base) x)
  where 
   base = 10
-  s = if isNaN x 
-      then "NaN"
-      else 
-       if isInfinite x then
-          if x < 0 then "-Infinity" else "Infinity"
-       else
-          if x < 0 || isNegativeZero x then
-            '-':doFmt fmt (floatToDigits (toInteger base) (-x))
-          else
-	    doFmt fmt (floatToDigits (toInteger base) x)
 
-  doFmt fmt (is, e) =
+  doFmt format (is, e) =
     let ds = map intToDigit is in
-    case fmt of
+    case format of
      FFGeneric ->
-      doFmt (if e <0 || e > 7 then FFExponent else FFFixed)
+      doFmt (if e < 0 || e > 7 then FFExponent else FFFixed)
 	    (is,e)
      FFExponent ->
       case decs of
        Nothing ->
         let e' = if e==0 then 0 else e-1 in
 	(case ds of
-          [d]    -> d : ".0e"
-	  (d:ds) -> d : '.' : ds ++ "e") ++ show e'
+          [d]     -> d : ".0e"     ++ show e'
+	  (d:ds') -> d : '.' : ds' ++ "e") ++ show e'
        Just dec ->
         let dec' = max dec 1 in
         case is of
@@ -701,9 +716,9 @@ formatRealFloat fmt decs x = s
          _ ->
           let
 	   (ei,is') = roundTo base (dec'+1) is
-	   d:ds = map intToDigit (if ei > 0 then init is' else is')
+	   (d:ds') = map intToDigit (if ei > 0 then init is' else is')
           in
-	  d:'.':ds ++ 'e':show (e-1+ei)
+	  d:'.':ds' ++ 'e':show (e-1+ei)
      FFFixed ->
       let
        mk0 ls = case ls of { "" -> "0" ; _ -> ls}
@@ -711,13 +726,13 @@ formatRealFloat fmt decs x = s
       case decs of
        Nothing ->
          let
-	  f 0 s ds = mk0 (reverse s) ++ '.':mk0 ds
-	  f n s "" = f (n-1) ('0':s) ""
-	  f n s (d:ds) = f (n-1) (d:s) ds
+	  f 0 s    rs  = mk0 (reverse s) ++ '.':mk0 rs
+	  f n s    ""  = f (n-1) ('0':s) ""
+	  f n s (r:rs) = f (n-1) (r:s) rs
 	 in
 	 f e "" ds
        Just dec ->
-        let dec' = max dec 1 in
+        let dec' = max dec 0 in
 	if e >= 0 then
 	 let
 	  (ei,is') = roundTo base (dec' + e) is
@@ -727,30 +742,27 @@ formatRealFloat fmt decs x = s
 	else
 	 let
 	  (ei,is') = roundTo base dec' (replicate (-e) 0 ++ is)
-	  d:ds = map intToDigit (if ei > 0 then is' else 0:is')
+	  d:ds' = map intToDigit (if ei > 0 then is' else 0:is')
 	 in
-	 d : '.' : ds
+	 d : '.' : ds'
 	 
 
 roundTo :: Int -> Int -> [Int] -> (Int,[Int])
 roundTo base d is =
- let
-  v = f d is
- in
- case v of
-  (0,is) -> v
-  (1,is) -> (1, 1:is)
+  case f d is of
+    x@(0,_) -> x
+    (1,xs)  -> (1, 1:xs)
  where
   b2 = base `div` 2
 
-  f n [] = (0, replicate n 0)
-  f 0 (i:_) = (if i>=b2 then 1 else 0, [])
-  f d (i:is) =
-    let 
-     (c,ds) = f (d-1) is
-     i' = c + i
-    in
-    if i' == base then (1,0:ds) else (0,i':ds)
+  f n []     = (0, replicate n 0)
+  f 0 (x:_)  = (if x >= b2 then 1 else 0, [])
+  f n (i:xs)
+     | i' == base = (1,0:ds)
+     | otherwise  = (0,i':ds)
+      where
+       (c,ds) = f (n-1) xs
+       i'     = c + i
 
 --
 -- Based on "Printing Floating-Point Numbers Quickly and Accurately"
@@ -759,7 +771,8 @@ roundTo base d is =
 
 -- This function returns a list of digits (Ints in [0..base-1]) and an
 -- exponent.
---floatToDigits :: (RealFloat a) => Integer -> a -> ([Int], Int)
+
+floatToDigits :: (RealFloat a) => Integer -> a -> ([Int], Int)
 floatToDigits _ 0 = ([0], 0)
 floatToDigits base x =
  let 
@@ -797,7 +810,8 @@ floatToDigits base x =
      else
         ceiling ((log (fromInteger (f+1)) +
 	         fromInt e * log (fromInteger b)) /
-		  fromInt e * log (fromInteger b))
+		   log (fromInteger base))
+--WAS:		  fromInt e * log (fromInteger b))
 
     fixup n =
       if n >= 0 then
@@ -840,12 +854,16 @@ Definitions of the boxed PrimOps; these will be
 used in the case of partial applications, etc.
 
 \begin{code}
+plusFloat, minusFloat, timesFloat, divideFloat :: Float -> Float -> Float
 plusFloat   (F# x) (F# y) = F# (plusFloat# x y)
 minusFloat  (F# x) (F# y) = F# (minusFloat# x y)
 timesFloat  (F# x) (F# y) = F# (timesFloat# x y)
 divideFloat (F# x) (F# y) = F# (divideFloat# x y)
+
+negateFloat :: Float -> Float
 negateFloat (F# x)        = F# (negateFloat# x)
 
+gtFloat, geFloat, eqFloat, neFloat, ltFloat, leFloat :: Float -> Float -> Bool
 gtFloat	    (F# x) (F# y) = gtFloat# x y
 geFloat	    (F# x) (F# y) = geFloat# x y
 eqFloat	    (F# x) (F# y) = eqFloat# x y
@@ -853,9 +871,16 @@ neFloat	    (F# x) (F# y) = neFloat# x y
 ltFloat	    (F# x) (F# y) = ltFloat# x y
 leFloat	    (F# x) (F# y) = leFloat# x y
 
+float2Int :: Float -> Int
 float2Int   (F# x) = I# (float2Int# x)
+
+int2Float :: Int -> Float
 int2Float   (I# x) = F# (int2Float# x)
 
+expFloat, logFloat, sqrtFloat :: Float -> Float
+sinFloat, cosFloat, tanFloat  :: Float -> Float
+asinFloat, acosFloat, atanFloat  :: Float -> Float
+sinhFloat, coshFloat, tanhFloat  :: Float -> Float
 expFloat    (F# x) = F# (expFloat# x)
 logFloat    (F# x) = F# (logFloat# x)
 sqrtFloat   (F# x) = F# (sqrtFloat# x)
@@ -869,17 +894,22 @@ sinhFloat   (F# x) = F# (sinhFloat# x)
 coshFloat   (F# x) = F# (coshFloat# x)
 tanhFloat   (F# x) = F# (tanhFloat# x)
 
+powerFloat :: Float -> Float -> Float
 powerFloat  (F# x) (F# y) = F# (powerFloat# x y)
 
 -- definitions of the boxed PrimOps; these will be
 -- used in the case of partial applications, etc.
 
+plusDouble, minusDouble, timesDouble, divideDouble :: Double -> Double -> Double
 plusDouble   (D# x) (D# y) = D# (x +## y)
 minusDouble  (D# x) (D# y) = D# (x -## y)
 timesDouble  (D# x) (D# y) = D# (x *## y)
 divideDouble (D# x) (D# y) = D# (x /## y)
+
+negateDouble :: Double -> Double
 negateDouble (D# x)        = D# (negateDouble# x)
 
+gtDouble, geDouble, eqDouble, neDouble, leDouble, ltDouble :: Double -> Double -> Bool
 gtDouble    (D# x) (D# y) = x >## y
 geDouble    (D# x) (D# y) = x >=## y
 eqDouble    (D# x) (D# y) = x ==## y
@@ -887,11 +917,21 @@ neDouble    (D# x) (D# y) = x /=## y
 ltDouble    (D# x) (D# y) = x <## y
 leDouble    (D# x) (D# y) = x <=## y
 
+double2Int :: Double -> Int
 double2Int   (D# x) = I# (double2Int#   x)
+
+int2Double :: Int -> Double
 int2Double   (I# x) = D# (int2Double#   x)
+
+double2Float :: Double -> Float
 double2Float (D# x) = F# (double2Float# x)
+float2Double :: Float -> Double
 float2Double (F# x) = D# (float2Double# x)
 
+expDouble, logDouble, sqrtDouble :: Double -> Double
+sinDouble, cosDouble, tanDouble  :: Double -> Double
+asinDouble, acosDouble, atanDouble  :: Double -> Double
+sinhDouble, coshDouble, tanhDouble  :: Double -> Double
 expDouble    (D# x) = D# (expDouble# x)
 logDouble    (D# x) = D# (logDouble# x)
 sqrtDouble   (D# x) = D# (sqrtDouble# x)
@@ -905,5 +945,6 @@ sinhDouble   (D# x) = D# (sinhDouble# x)
 coshDouble   (D# x) = D# (coshDouble# x)
 tanhDouble   (D# x) = D# (tanhDouble# x)
 
+powerDouble :: Double -> Double -> Double
 powerDouble  (D# x) (D# y) = D# (x **## y)
 \end{code}

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.6 1998/12/02 13:27:03 simonm Exp $
+% $Id: PrelIOBase.lhs,v 1.7 1999/01/14 18:12:58 sof Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -20,12 +20,15 @@ import {-# SOURCE #-} PrelErr ( error )
 
 import PrelST
 import PrelBase
-import {-# SOURCE #-} PrelException ( fail )
+import {-# SOURCE #-} PrelException ( ioError )
 import PrelST	  ( ST(..), STret(..) )
 import PrelMaybe  ( Maybe(..) )
 import PrelAddr	  ( Addr(..), nullAddr )
 import PrelPack   ( unpackCString )
+
+#if !defined(__CONCURRENT_HASKELL__)
 import PrelArr	  ( MutableVar, readVar )
+#endif
 #endif
 
 #ifdef __HUGS__
@@ -60,10 +63,11 @@ implement IO exceptions.
 #ifndef __HUGS__
 newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
 
+unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
 unIO (IO a) = a
 
 instance  Functor IO where
-   map f x = x >>= (return . f)
+   fmap f x = x >>= (return . f)
 
 instance  Monad IO  where
     {-# INLINE return #-}
@@ -73,6 +77,7 @@ instance  Monad IO  where
     return x	= IO $ \ s -> (# s, x #)
 
     m >>= k     = bindIO m k
+    fail s	= error s -- not ioError?
 
     -- not required but worth having around
 fixIO 		:: (a -> IO a) -> IO a
@@ -181,7 +186,7 @@ data IOErrorType
   deriving (Eq)
 
 instance Show IOErrorType where
-  showsPrec d e =
+  showsPrec _ e =
     showString $
     case e of
       AlreadyExists	-> "already exists"
@@ -201,6 +206,7 @@ instance Show IOErrorType where
       TimeExpired       -> "timeout"
       UnsatisfiedConstraints -> "unsatisified constraints" -- ultra-precise!
       UserError _       -> "failed"
+      UnsupportedOperation -> "unsupported operation"
       EOF		-> "end of file"
 
 \end{code}
@@ -209,27 +215,35 @@ Predicates on IOError; little effort made on these so far...
 
 \begin{code}
 
+isAlreadyExistsError :: IOError -> Bool
 isAlreadyExistsError (IOError _ AlreadyExists _ _) = True
 isAlreadyExistsError _		                   = False
 
+isAlreadyInUseError :: IOError -> Bool
 isAlreadyInUseError (IOError _ ResourceBusy _ _) = True
 isAlreadyInUseError _		                 = False
 
+isFullError :: IOError -> Bool
 isFullError (IOError _ ResourceExhausted _ _) = True
 isFullError _			              = False
 
+isEOFError :: IOError -> Bool
 isEOFError (IOError _ EOF _ _) = True
 isEOFError _                   = False
 
+isIllegalOperation :: IOError -> Bool
 isIllegalOperation (IOError _ IllegalOperation _ _) = True
 isIllegalOperation _			            = False
 
+isPermissionError :: IOError -> Bool
 isPermissionError (IOError _ PermissionDenied _ _) = True
 isPermissionError _			           = False
 
+isDoesNotExistError :: IOError -> Bool
 isDoesNotExistError (IOError _ NoSuchThing _ _) = True
 isDoesNotExistError _                           = False
 
+isUserError :: IOError -> Bool
 isUserError (IOError _ (UserError _) _ _) = True
 isUserError _		                  = False
 \end{code}
@@ -274,12 +288,12 @@ used.
 constructErrorAndFail :: String -> IO a
 constructErrorAndFail call_site
   = constructError call_site >>= \ io_error ->
-    fail io_error
+    ioError io_error
 
 constructErrorAndFailWithInfo :: String -> String -> IO a
 constructErrorAndFailWithInfo call_site reason
   = constructErrorMsg call_site (Just reason) >>= \ io_error ->
-    fail io_error
+    ioError io_error
 
 \end{code}
 
@@ -306,7 +320,7 @@ constructErrorMsg call_site reason =
  CCALL(getErrStr__)             >>= \ str ->
  let
   iot =
-   case errtype of
+   case (errtype::Int) of
      ERR_ALREADYEXISTS	         -> AlreadyExists
      ERR_HARDWAREFAULT	         -> HardwareFault
      ERR_ILLEGALOPERATION	 -> IllegalOperation
@@ -482,7 +496,7 @@ mkBuffer__ fo sz_in_bytes = do
     _ -> do
      chunk <- CCALL(allocMemory__) sz_in_bytes
      if chunk == nullAddr
-      then fail (IOError Nothing ResourceExhausted "mkBuffer__" "not enough virtual memory")
+      then ioError (IOError Nothing ResourceExhausted "mkBuffer__" "not enough virtual memory")
       else return chunk
  CCALL(setBuf) fo chunk sz_in_bytes
 

@@ -15,6 +15,6 @@ import PrelBase
 data  Either a b  =  Left a | Right b	deriving (Eq, Ord, Show {- Read -} )
 
 either                  :: (a -> c) -> (b -> c) -> Either a b -> c
-either f g (Left x)     =  f x
-either f g (Right y)    =  g y
+either f _ (Left x)     =  f x
+either _ g (Right y)    =  g y
 \end{code}

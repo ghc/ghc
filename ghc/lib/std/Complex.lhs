@@ -1,16 +1,34 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1997
+% (c) The AQUA Project, Glasgow University, 1994-1999
 %
 
 \section[Complex]{Module @Complex@}
 
 \begin{code}
-module Complex (
-	Complex((:+)), 
+module Complex
+	( Complex((:+))
+	
+	, realPart	-- :: (RealFloat a) => Complex a -> a
+	, imagPart      -- :: (RealFloat a) => Complex a -> a
+	, conjugate     -- :: (RealFloat a) => Complex a -> Complex a
+	, mkPolar       -- :: (RealFloat a) => a -> a -> Complex a
+	, cis           -- :: (RealFloat a) => a -> Complex a
+	, polar         -- :: (RealFloat a) => Complex a -> (a,a)
+	, magnitude     -- :: (RealFloat a) => Complex a -> a
+	, phase         -- :: (RealFloat a) => Complex a -> a
+	
+	-- Complex instances:
+	--
+	--  (RealFloat a) => Eq         (Complex a)
+	--  (RealFloat a) => Read       (Complex a)
+	--  (RealFloat a) => Show       (Complex a)
+	--  (RealFloat a) => Num        (Complex a)
+	--  (RealFloat a) => Fractional (Complex a)
+	--  (RealFloat a) => Floating   (Complex a)
+	-- 
+        -- Implementation checked wrt. Haskell 98 lib report, 1/99.
 
-	realPart, imagPart, conjugate, mkPolar,
-	cis, polar, magnitude, phase
-    )  where
+        )  where
 
 import Prelude
 
@@ -24,7 +42,7 @@ infix  6  :+
 %*********************************************************
 
 \begin{code}
-data  (RealFloat a)     => Complex a = !a :+ !a  deriving (Eq,Read,Show)
+data  (RealFloat a)     => Complex a = !a :+ !a  deriving (Eq, Read, Show)
 \end{code}
 
 
@@ -36,8 +54,8 @@ data  (RealFloat a)     => Complex a = !a :+ !a  deriving (Eq,Read,Show)
 
 \begin{code}
 realPart, imagPart :: (RealFloat a) => Complex a -> a
-realPart (x:+y)	 =  x
-imagPart (x:+y)	 =  y
+realPart (x :+ _) =  x
+imagPart (_ :+ y) =  y
 
 conjugate	 :: (RealFloat a) => Complex a -> Complex a
 conjugate (x:+y) =  x :+ (-y)
@@ -51,14 +69,15 @@ cis theta	 =  cos theta :+ sin theta
 polar		 :: (RealFloat a) => Complex a -> (a,a)
 polar z		 =  (magnitude z, phase z)
 
-magnitude, phase :: (RealFloat a) => Complex a -> a
+magnitude :: (RealFloat a) => Complex a -> a
 magnitude (x:+y) =  scaleFloat k
 		     (sqrt ((scaleFloat mk x)^2 + (scaleFloat mk y)^2))
 		    where k  = max (exponent x) (exponent y)
 		          mk = - k
 
+phase :: (RealFloat a) => Complex a -> a
 phase (0 :+ 0)   = 0		-- SLPJ July 97 from John Peterson
-phase (x:+y)	 =  atan2 y x
+phase (x:+y)	 = atan2 y x
 \end{code}
 
 
@@ -118,7 +137,7 @@ instance  (RealFloat a) => Floating (Complex a)	where
 
     asin z@(x:+y)  =  y':+(-x')
                       where  (x':+y') = log (((-y):+x) + sqrt (1 - z*z))
-    acos z@(x:+y)  =  y'':+(-x'')
+    acos z         =  y'':+(-x'')
                       where (x'':+y'') = log (z + ((-y'):+x'))
                             (x':+y')   = sqrt (1 - z*z)
     atan z@(x:+y)  =  y':+(-x')

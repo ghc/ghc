@@ -17,20 +17,26 @@ module PrelConc (
 		-- Forking and suchlike
 	forkIO,	
 	killThread,
-	seq, par, fork,
-	{-threadDelay, threadWaitRead, threadWaitWrite, -}
+	par, fork, seq,
+	{-threadDelay, threadWaitRead, threadWaitWrite,-}
 
   		-- MVars
-	MVar, newMVar, newEmptyMVar, takeMVar, putMVar, readMVar, swapMVar
+	MVar
+     , newMVar
+     , newEmptyMVar
+     , takeMVar
+     , putMVar
+     , readMVar
+     , swapMVar
+       -- use with care (see comment.)
+     , isEmptyMVar
     ) where
 
 import PrelBase
-import {-# SOURCE #-} PrelErr ( parError )
+import PrelErr ( parError, seqError )
 import PrelST	  	( ST(..), STret(..), liftST )
-import PrelIOBase	( IO(..), MVar(..), liftIO, unsafePerformIO )
-import PrelErr		( parError )
+import PrelIOBase	( IO(..), MVar(..), unsafePerformIO )
 import PrelBase		( Int(..) )
-import PrelErr		( seqError )
 
 infixr 0 `par`, `fork`
 \end{code}
@@ -49,11 +55,11 @@ data ThreadId = ThreadId ThreadId#
 
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s -> 
-   case (fork# action s) of (# s, id #) -> (# s, ThreadId id #)
+   case (fork# action s) of (# s1, id #) -> (# s1, ThreadId id #)
 
 killThread :: ThreadId -> IO ()
 killThread (ThreadId id) = IO $ \ s ->
-   case (killThread# id s) of s -> (# s, () #)
+   case (killThread# id s) of s1 -> (# s1, () #)
 
 -- "seq" is defined a bit wierdly (see below)
 --
@@ -77,7 +83,7 @@ par, fork :: a -> b -> b
 #if defined(__PARALLEL_HASKELL__) || defined (__GRANSIM__)
 par  x y = case (par# x) of { 0# -> parError; _ -> y }
 #else
-par  x y = y
+par  _ y = y
 #endif
 
 fork x y = unsafePerformIO (forkIO (x `seq` return ())) `seq` y
@@ -140,6 +146,23 @@ swapMVar mvar new =
     takeMVar mvar	>>= \ old ->
     putMVar mvar new	>>
     return old
+
+{- 
+ Low-level op. for checking whether an MVar is filled-in or not.
+ Notice that the boolean value returned  is just a snapshot of
+ the state of the MVar. By the time you get to react on its result,
+ the MVar may have been filled (or emptied) - so be extremely
+ careful when using this operation.
+
+ If you can re-work your abstractions to avoid having to
+ depend on isEmptyMVar, then you're encouraged to do so,
+ i.e., consider yourself warned about the imprecision in
+ general of isEmptyMVar :-)
+-}
+isEmptyMVar :: MVar a -> IO Bool
+isEmptyMVar (MVar mv#) = IO $ \ s# -> 
+    case isEmptyMVar# mv# s# of
+        (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
 \end{code}
 
 
@@ -162,7 +185,7 @@ specified file descriptor is available for reading (just like select).
 @threadWaitWrite@ is similar, but for writing on a file descriptor.
 
 \begin{code}
-{- Not yet -- SDM
+{- Not yet -- SDM 
 threadDelay, threadWaitRead, threadWaitWrite :: Int -> IO ()
 
 threadDelay (I# x#) = IO $ \ s# ->

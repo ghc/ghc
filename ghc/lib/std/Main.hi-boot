@@ -8,4 +8,4 @@
  
 __interface Main 1 where
 __export Main main ;
-1 main :: PrelIOBase.IO PrelBase.();
+1 main :: __forall [a] => PrelIOBase.IO a;

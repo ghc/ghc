@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1999
 %
 
 \section[Array]{Module @Array@}
@@ -7,17 +7,39 @@
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-module  Array ( 
-    module Ix,			-- export all of Ix 
-    Array, 			-- Array type is abstract
+module  Array 
 
-    array, listArray, (!), bounds, indices, elems, assocs, 
-    accumArray, (//), accum, ixmap
-  ) where
+    ( 
+      module Ix			-- export all of Ix 
+    , Array 			-- Array type is abstract
+
+    , array	    -- :: (Ix a) => (a,a) -> [(a,b)] -> Array a b
+    , listArray     -- :: (Ix a) => (a,a) -> [b] -> Array a b
+    , (!)           -- :: (Ix a) => Array a b -> a -> b
+    , bounds        -- :: (Ix a) => Array a b -> (a,a)
+    , indices       -- :: (Ix a) => Array a b -> [a]
+    , elems         -- :: (Ix a) => Array a b -> [b]
+    , assocs        -- :: (Ix a) => Array a b -> [(a,b)]
+    , accumArray    -- :: (Ix a) => (b -> c -> b) -> b -> (a,a) -> [(a,c)] -> Array a b
+    , (//)          -- :: (Ix a) => Array a b -> [(a,b)] -> Array a b
+    , accum         -- :: (Ix a) => (b -> c -> b) -> Array a b -> [(a,c)] -> Array a b
+    , ixmap         -- :: (Ix a, Ix b) => (a,a) -> (a -> b) -> Array b c -> Array a b
+
+    -- Array instances:
+    --
+    --   Ix a => Functor (Array a)
+    --   (Ix a, Eq b)  => Eq   (Array a b)
+    --   (Ix a, Ord b) => Ord  (Array a b)
+    --   (Ix a, Show a, Show b) => Show (Array a b)
+    --   (Ix a, Read a, Read b) => Read (Array a b)
+    -- 
+
+    -- Implementation checked wrt. Haskell 98 lib report, 1/99.
+
+    ) where
 
 import Ix
 import PrelList
---import PrelRead
 import PrelArr		-- Most of the hard work is done here
 import PrelBase
 
@@ -42,7 +64,7 @@ infixl 9  !, //
 
 {-# SPECIALISE listArray :: (Int,Int) -> [b] -> Array Int b #-}
 listArray	      :: (Ix a) => (a,a) -> [b] -> Array a b
-listArray b vs	      =  array b (zipWith (\ a b -> (a,b)) (range b) vs)
+listArray b vs	      =  array b (zip (range b) vs)
 
 {-# SPECIALISE indices :: Array Int b -> [Int] #-}
 indices		      :: (Ix a) => Array a b -> [a]
@@ -74,7 +96,7 @@ ixmap b f a           =  array b [(i, a ! f i) | i <- range b]
 
 \begin{code}
 instance Ix a => Functor (Array a) where
-  map = amap
+  fmap = amap
 
 instance  (Ix a, Eq b)  => Eq (Array a b)  where
     a == a'  	        =  assocs a == assocs a'

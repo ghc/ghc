@@ -12,13 +12,14 @@ The List data type and its operations
 module PrelList (
    [] (..),
 
-   head, last, tail, init, null, length, (!!),
+   map, (++), filter, concat,
+   head, last, tail, init, null, length, (!!), 
    foldl, foldl1, scanl, scanl1, foldr, foldr1, scanr, scanr1,
    iterate, repeat, replicate, cycle,
    take, drop, splitAt, takeWhile, dropWhile, span, break,
    lines, words, unlines, unwords, reverse, and, or,
    any, all, elem, notElem, lookup,
-   sum, product, maximum, minimum, concatMap, 
+   sum, product, maximum, minimum, concatMap,
    zip, zip3, zipWith, zipWith3, unzip, unzip3
  ) where
 
@@ -59,8 +60,8 @@ last []                 =  errorEmptyList "last"
 -- eliminate repeated cases
 last []     		=  errorEmptyList "last"
 last (x:xs) 		=  last' x xs
-  where last' x []     = x
-	last' _ (x:xs) = last' x xs
+  where last' y []     = y
+	last' _ (y:ys) = last' y ys
 #endif
 
 init                    :: [a] -> [a]
@@ -72,8 +73,8 @@ init []                 =  errorEmptyList "init"
 -- eliminate repeated cases
 init []                 =  errorEmptyList "init"
 init (x:xs)             =  init' x xs
-  where init' x []     = []
-	init' x (y:xs) = x : init' y xs
+  where init' _ []     = []
+	init' y (z:zs) = y : init' z zs
 #endif
 
 null                    :: [a] -> Bool
@@ -95,6 +96,16 @@ length l                =  len l 0#
     len (_:xs) a# = len xs (a# +# 1#)
 #endif
 
+-- filter, applied to a predicate and a list, returns the list of those
+-- elements that satisfy the predicate; i.e.,
+-- filter p xs = [ x | x <- xs, p x]
+filter :: (a -> Bool) -> [a] -> [a]
+filter _pred []    = []
+filter pred (x:xs)
+  | pred x         = x : filter pred xs
+  | otherwise	   = filter pred xs
+
+
 -- foldl, applied to a binary operator, a starting value (typically the
 -- left-identity of the operator), and a list, reduces the list using
 -- the binary operator, from left to right:
@@ -108,7 +119,7 @@ length l                =  len l 0#
 --      scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
 
 foldl                   :: (a -> b -> a) -> a -> [b] -> a
-foldl f z []            =  z
+foldl _ z []            =  z
 foldl f z (x:xs)        =  foldl f (f z x) xs
 
 foldl1                  :: (a -> a -> a) -> [a] -> a
@@ -116,7 +127,7 @@ foldl1 f (x:xs)         =  foldl f x xs
 foldl1 _ []             =  errorEmptyList "foldl1"
 
 scanl                   :: (a -> b -> a) -> a -> [b] -> [a]
-scanl f q xs            =  q : (case xs of
+scanl f q ls            =  q : (case ls of
                                 []   -> []
                                 x:xs -> scanl f (f q x) xs)
 
@@ -128,17 +139,17 @@ scanl1 _ []             =  errorEmptyList "scanl1"
 -- above functions.
 
 foldr1                  :: (a -> a -> a) -> [a] -> a
-foldr1 f [x]            =  x
+foldr1 _ [x]            =  x
 foldr1 f (x:xs)         =  f x (foldr1 f xs)
 foldr1 _ []             =  errorEmptyList "foldr1"
 
 scanr                   :: (a -> b -> b) -> b -> [a] -> [b]
-scanr f q0 []           =  [q0]
+scanr _ q0 []           =  [q0]
 scanr f q0 (x:xs)       =  f x q : qs
                            where qs@(q:_) = scanr f q0 xs 
 
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
-scanr1 f  [x]           =  [x]
+scanr1 _  [x]           =  [x]
 scanr1 f  (x:xs)        =  f x q : qs
                            where qs@(q:_) = scanr1 f xs 
 scanr1 _ []             =  errorEmptyList "scanr1"
@@ -161,7 +172,8 @@ replicate n x           =  take n (repeat x)
 -- on infinite lists.
 
 cycle                   :: [a] -> [a]
-cycle xs                =  xs' where xs' = xs ++ xs'
+cycle []		= error "Prelude.cycle: empty list"
+cycle xs		= xs' where xs' = xs ++ xs'
 
 -- take n, applied to a list xs, returns the prefix of xs of length n,
 -- or xs itself if n > length xs.  drop n xs returns the suffix of xs
@@ -199,6 +211,7 @@ takeUInt n xs
   | n >=# 0#  =  take_unsafe_UInt n xs
   | otherwise =  errorNegativeIdx "take"
 
+take_unsafe_UInt :: Int# -> [b] -> [b]
 take_unsafe_UInt 0# _     = []
 take_unsafe_UInt m  ls    =
   case ls of
@@ -206,9 +219,9 @@ take_unsafe_UInt m  ls    =
     (x:xs) -> x : take_unsafe_UInt (m -# 1#) xs
 
 drop		:: Int -> [b] -> [b]
-drop (I# n#) xs
+drop (I# n#) ls
   | n# <# 0#	= errorNegativeIdx "drop"
-  | otherwise	= drop# n# xs
+  | otherwise	= drop# n# ls
     where
 	drop# :: Int# -> [a] -> [a]
 	drop# 0# xs      = xs
@@ -216,9 +229,9 @@ drop (I# n#) xs
 	drop# m# (_:xs)  = drop# (m# -# 1#) xs
 
 splitAt	:: Int -> [b] -> ([b], [b])
-splitAt (I# n#) xs
+splitAt (I# n#) ls
   | n# <# 0#	= errorNegativeIdx "splitAt"
-  | otherwise	= splitAt# n# xs
+  | otherwise	= splitAt# n# ls
     where
 	splitAt# :: Int# -> [a] -> ([a], [a])
 	splitAt# 0# xs	   = ([], xs)
@@ -230,7 +243,7 @@ splitAt (I# n#) xs
 #endif /* USE_REPORT_PRELUDE */
 
 span, break             :: (a -> Bool) -> [a] -> ([a],[a])
-span p xs@[]            =  (xs, xs)
+span _ xs@[]            =  (xs, xs)
 span p xs@(x:xs')
          | p x          =  let (ys,zs) = span p xs' in (x:ys,zs)
          | otherwise    =  ([],xs)
@@ -239,7 +252,7 @@ span p xs@(x:xs')
 break p                 =  span (not . p)
 #else
 -- HBC version (stolen)
-break p xs@[]		=  (xs, xs)
+break _ xs@[]		=  (xs, xs)
 break p xs@(x:xs')
 	   | p x	=  ([],xs)
 	   | otherwise	=  let (ys,zs) = break p xs' in (x:ys,zs)
@@ -278,9 +291,10 @@ any, all                :: (a -> Bool) -> [a] -> Bool
 any p                   =  or . map p
 all p                   =  and . map p
 #else
-any p []	= False
+any _ []	= False
 any p (x:xs)	= p x || any p xs
-all p []	=  True
+
+all _ []	=  True
 all p (x:xs)	=  p x && all p xs
 #endif
 
@@ -294,14 +308,14 @@ notElem x               =  all (/= x)
 elem _ []	= False
 elem x (y:ys)	= x==y || elem x ys
 
-notElem	x []	=  True
+notElem	_ []	=  True
 notElem x (y:ys)=  x /= y && notElem x ys
 #endif
 
 -- lookup key assocs looks up a key in an association list.
 lookup                  :: (Eq a) => a -> [(a,b)] -> Maybe b
-lookup key []           =  Nothing
-lookup key ((x,y):xys)
+lookup _key []          =  Nothing
+lookup  key ((x,y):xys)
     | key == x          =  Just y
     | otherwise         =  lookup key xys
 
@@ -336,6 +350,11 @@ minimum xs              =  foldl1 min xs
 
 concatMap               :: (a -> [b]) -> [a] -> [b]
 concatMap f             =  foldr ((++) . f) []
+
+concat :: [[a]] -> [a]
+concat []	    = []
+concat ([]:xss)     = concat xss
+concat ((y:ys):xss) = y: (ys ++ concat xss)
 \end{code}
 
 
@@ -444,11 +463,14 @@ Common up near identical calls to `error' to reduce the number
 constant strings created when compiled:
 
 \begin{code}
+errorEmptyList :: String -> a
 errorEmptyList fun =
   error (prel_list_str ++ fun ++ ": empty list")
 
+errorNegativeIdx :: String -> a
 errorNegativeIdx fun =
  error (prel_list_str ++ fun ++ ": negative index")
 
-prel_list_str = "PreludeList."
+prel_list_str :: String
+prel_list_str = "Prelude."
 \end{code}

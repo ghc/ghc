@@ -106,8 +106,8 @@ unpackNBytesAccST (A# addr) (I# l) rest = unpackNBytesAccST# addr l rest
 unpackNBytes#      :: Addr# -> Int#   -> [Char]
   -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
   -- It's strict!
-unpackNBytes# addr 0#   = []
-unpackNBytes# addr len# = unpack [] (len# -# 1#)
+unpackNBytes# _addr 0#   = []
+unpackNBytes#  addr len# = unpack [] (len# -# 1#)
     where
      unpack acc i#
       | i# <# 0#  = acc
@@ -119,8 +119,8 @@ unpackNBytesST# :: Addr# -> Int# -> ST s [Char]
 unpackNBytesST# addr# l#   = unpackNBytesAccST# addr# l# []
 
 unpackNBytesAccST# :: Addr# -> Int# -> [Char] -> ST s [Char]
-unpackNBytesAccST# addr 0#   rest = return rest
-unpackNBytesAccST# addr len# rest = unpack rest (len# -# 1#)
+unpackNBytesAccST# _addr 0#   rest = return rest
+unpackNBytesAccST#  addr len# rest = unpack rest (len# -# 1#)
   where
     unpack acc i# 
       | i# <# 0#  = return acc
@@ -167,8 +167,8 @@ unpackNBytesBA (ByteArray (l,u) bytes) i
         | otherwise = u-l+1
 
 unpackNBytesBA# :: ByteArray# -> Int# -> [Char]
-unpackNBytesBA# bytes 0#   = []
-unpackNBytesBA# bytes len# = unpack [] (len# -# 1#)
+unpackNBytesBA# _bytes 0#   = []
+unpackNBytesBA#  bytes len# = unpack [] (len# -# 1#)
    where
     unpack acc i#
      | i# <# 0#  = acc
@@ -200,7 +200,7 @@ packStringST str =
   packNBytesST len str
 
 packNBytesST :: Int -> [Char] -> ST s (ByteArray Int)
-packNBytesST len@(I# length#) str =
+packNBytesST (I# length#) str =
   {- 
    allocate an array that will hold the string
    (not forgetting the NUL byte at the end)

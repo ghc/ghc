@@ -63,6 +63,14 @@ module IO (
     -- Non-standard extension (but will hopefully become standard with 1.5) is
     -- to export the Prelude io functions via IO (in addition to exporting them
     -- from the prelude...for now.) 
+    IO,
+    FilePath,		       -- :: String
+    IOError,
+    ioError,		       -- :: IOError -> IO a
+    userError,		       -- :: String  -> IOError
+    catch,		       -- :: IO a    -> (IOError -> IO a) -> IO a
+    interact,		       -- :: (String -> String) -> IO ()
+
     putChar,		       -- :: Char   -> IO ()
     putStr,		       -- :: String -> IO () 
     putStrLn,		       -- :: String -> IO ()
@@ -70,19 +78,11 @@ module IO (
     getChar,		       -- :: IO Char
     getLine,		       -- :: IO String
     getContents,	       -- :: IO String
-    interact,		       -- :: (String -> String) -> IO ()
     readFile,		       -- :: FilePath -> IO String
     writeFile,		       -- :: FilePath -> String -> IO ()
     appendFile,		       -- :: FilePath -> String -> IO ()
     readIO,		       -- :: Read a => String -> IO a
     readLn,		       -- :: Read a => IO a
-    FilePath,		       -- :: String
-    fail,		       -- :: IOError -> IO a
-    catch,		       -- :: IO a    -> (IOError -> IO a) -> IO a
-    userError,		       -- :: String  -> IOError
-
-    IO,		-- non-standard, amazingly enough.
-    IOError,    -- ditto
 
     -- extensions
     hPutBuf,
@@ -114,7 +114,7 @@ import PrelEither	( Either(..) )
 import PrelAddr		( Addr(..), nullAddr )
 import PrelArr		( ByteArray )
 import PrelPack		( unpackNBytesAccST )
-import PrelException    ( fail, catch )
+import PrelException    ( ioError, catch )
 
 #ifndef __PARALLEL_HASKELL__
 import PrelForeign  ( ForeignObj )
@@ -159,7 +159,7 @@ instance Eq HandlePosn where
 -- Type declared in IOBase, instance here because it
 -- depends on PrelRead.(Read Maybe) instance.
 instance Read BufferMode where
-    readsPrec p = 
+    readsPrec _ = 
       readParen False
 	(\r ->	let lr = lex r
 		in
@@ -196,7 +196,7 @@ hWaitForInput handle msecs =
     wantReadableHandle "hWaitForInput" handle $ \ handle_ -> do
     rc       <- CCALL(inputReady) (haFO__ handle_) (msecs::Int)     -- ConcHask: SAFE, won't block
     writeHandle handle handle_
-    case rc of
+    case (rc::Int) of
       0 -> return False
       1 -> return True
       _ -> constructErrorAndFail "hWaitForInput"
@@ -212,7 +212,7 @@ hGetChar handle =
     let fo = haFO__ handle_
     intc     <- mayBlock fo (CCALL(fileGetc) fo)  -- ConcHask: UNSAFE, may block
     writeHandle handle handle_
-    if intc /= (-1)
+    if intc /= ((-1)::Int)
      then return (chr intc)
      else constructErrorAndFail "hGetChar"
 
@@ -290,13 +290,13 @@ lazyReadChar  :: Handle -> Addr -> IO String
 lazyReadBlock handle fo = do
    buf   <- CCALL(getBufStart) fo (0::Int)
    bytes <- mayBlock fo (CCALL(readBlock) fo) -- ConcHask: UNSAFE, may block.
-   case bytes of
+   case (bytes::Int) of
      -3 -> -- buffering has been turned off, use lazyReadChar instead
            lazyReadChar handle fo
      -2 -> return ""
      -1 -> -- an error occurred, close the handle
 	  withHandle handle $ \ handle_ -> do
-          CCALL(closeFile) (haFO__ handle_) 0{-don't bother flushing-}  -- ConcHask: SAFE, won't block.
+          CCALL(closeFile) (haFO__ handle_) (0::Int){-don't bother flushing-}  -- ConcHask: SAFE, won't block.
 	  writeHandle handle (handle_ { haType__    = ClosedHandle,
 					haFO__      = nullFile__ })
 	  return ""
@@ -306,13 +306,13 @@ lazyReadBlock handle fo = do
 
 lazyReadLine handle fo = do
      bytes <- mayBlock fo (CCALL(readLine) fo)   -- ConcHask: UNSAFE, may block.
-     case bytes of
+     case (bytes::Int) of
        -3 -> -- buffering has been turned off, use lazyReadChar instead
              lazyReadChar handle fo
        -2 -> return "" -- handle closed by someone else, stop reading.
        -1 -> -- an error occurred, close the handle
   	     withHandle handle $ \ handle_ -> do
-             CCALL(closeFile) (haFO__ handle_) 0{- don't bother flushing-}  -- ConcHask: SAFE, won't block
+             CCALL(closeFile) (haFO__ handle_) (0::Int){- don't bother flushing-}  -- ConcHask: SAFE, won't block
 	     writeHandle handle (handle_ { haType__    = ClosedHandle,
 					   haFO__      = nullFile__ })
 	     return ""
@@ -323,7 +323,7 @@ lazyReadLine handle fo = do
 
 lazyReadChar handle fo = do
     char <- mayBlock fo (CCALL(readChar) fo)   -- ConcHask: UNSAFE, may block.
-    case char of
+    case (char::Int) of
       -4 -> -- buffering is now block-buffered, use lazyReadBlock instead
 	    lazyReadBlock handle fo
 	    
@@ -332,7 +332,7 @@ lazyReadChar handle fo = do
       -2 -> return ""
       -1 -> -- error, silently close handle.
  	 withHandle handle $ \ handle_ -> do
-         CCALL(closeFile) (haFO__ handle_) 0{-don't bother flusing-}  -- ConcHask: SAFE, won't block
+         CCALL(closeFile) (haFO__ handle_) (0::Int){-don't bother flusing-}  -- ConcHask: SAFE, won't block
 	 writeHandle handle (handle_{ haType__  = ClosedHandle,
 				      haFO__    = nullFile__ })
 	 return ""
@@ -451,12 +451,12 @@ writeLines :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
 #else
 writeLines :: Addr -> Addr -> Int -> Int -> String -> IO ()
 #endif
-writeLines obj buf bf@(I# bufLen) (I# initPos#) s =
+writeLines obj buf (I# bufLen) (I# initPos#) s =
   let
    write_char :: Addr -> Int# -> Char# -> IO ()
-   write_char (A# buf) n# c# =
+   write_char (A# buf#) n# c# =
       IO $ \ s# ->
-      case (writeCharOffAddr# buf n# c# s#) of s2# -> (# s2#, () #)
+      case (writeCharOffAddr# buf# n# c# s#) of s2# -> (# s2#, () #)
 
    shoveString :: Int# -> [Char] -> IO ()
    shoveString n ls = 
@@ -545,12 +545,12 @@ writeBlocks :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
 #else
 writeBlocks :: Addr -> Addr -> Int -> Int -> String -> IO ()
 #endif
-writeBlocks obj buf bf@(I# bufLen) (I# initPos#) s =
+writeBlocks obj buf (I# bufLen) (I# initPos#) s =
   let
    write_char :: Addr -> Int# -> Char# -> IO ()
-   write_char (A# buf) n# c# =
+   write_char (A# buf#) n# c# =
       IO $ \ s# ->
-      case (writeCharOffAddr# buf n# c# s#) of s2# -> (# s2#, () #)
+      case (writeCharOffAddr# buf# n# c# s#) of s2# -> (# s2#, () #)
 
    shoveString :: Int# -> [Char] -> IO ()
    shoveString n ls = 
@@ -595,7 +595,7 @@ writeChars :: ForeignObj -> String -> IO ()
 #else
 writeChars :: Addr -> String -> IO ()
 #endif
-writeChars fo "" = return ()
+writeChars _fo ""    = return ()
 writeChars fo (c:cs) = do
   rc <- mayBlock fo (CCALL(filePutc) fo c)   -- ConcHask: UNSAFE, may block.
   if rc == 0 
@@ -649,7 +649,7 @@ bracket before after m = do
         after x
         case rs of
            Right r -> return r
-           Left  e -> fail e
+           Left  e -> ioError e
 
 -- variant of the above where middle computation doesn't want x
 bracket_        :: IO a -> (a -> IO b) -> IO c -> IO c
@@ -659,7 +659,7 @@ bracket_ before after m = do
          after x
          case rs of
             Right r -> return r
-            Left  e -> fail e
+            Left  e -> ioError e
 \end{code}
 
 %*********************************************************

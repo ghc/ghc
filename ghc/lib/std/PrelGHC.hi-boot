@@ -15,9 +15,6 @@ __export PrelGHC
   CCallable
   CReturnable
 
-  Void
--- void CAF is defined in PrelBase
-
 -- Magical assert thingy
   assert
 
@@ -40,6 +37,7 @@ __export PrelGHC
   newMVar#
   takeMVar#
   putMVar#
+  isEmptyMVar#
   
   -- Parallel
   seq#
@@ -73,7 +71,6 @@ __export PrelGHC
   +#
   -#
   *#
-  /#
   quotInt#
   remInt#
   negateInt#
@@ -95,7 +92,6 @@ __export PrelGHC
   not#
   xor#
   shiftL#
-  shiftRA#
   shiftRL#
   int2Word#
   word2Int#
