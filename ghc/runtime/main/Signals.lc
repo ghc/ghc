@@ -35,7 +35,7 @@ much pain.
 # define NON_POSIX_SOURCE
 #endif
 
-#if defined(osf1_TARGET_OS)
+#if defined(osf3_TARGET_OS) || defined(osf1_TARGET_OS)
     /* The include files for OSF1 do not normally define SA_SIGINFO */
 # define _OSF_SOURCE 1
 #endif
