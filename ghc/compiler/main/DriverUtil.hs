@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.50 2005/01/28 12:55:37 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.51 2005/01/28 14:27:00 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -60,7 +60,7 @@ getOptionsFromSource file
 		       | prefixMatch "{-# LINE" l -> look h   -- -}
 		       | Just opts <- matchOptions l
 		       	-> do rest <- look h
-                              return (words opts ++ rest)
+                              return (opts ++ rest)
 		       | otherwise -> return []
 
 -- detect {-# OPTIONS_GHC ... #-}.  For the time being, we accept OPTIONS
@@ -80,9 +80,12 @@ matchOptions s
 	  -> matchOptions2 s2
 	  | otherwise
 	  -> Just []  -- OPTIONS_anything is ignored, not treated as start of source
+    | Just s2 <- maybePrefixMatch "INCLUDE" s, not (is_ident (head s2)),
+      Just s3 <- maybePrefixMatch "}-#" (reverse s2)
+    = Just ["-#include", remove_spaces (reverse s3)]
     | otherwise = Nothing
   matchOptions2 s
-    | Just s3 <- maybePrefixMatch "}-#" (reverse s) = Just (reverse s3)
+    | Just s3 <- maybePrefixMatch "}-#" (reverse s) = Just (words (reverse s3))
     | otherwise = Nothing
 
 -----------------------------------------------------------------------------
