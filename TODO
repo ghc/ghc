@@ -8,6 +8,10 @@ For 1.0:
 * facilities for saving interfaces so that you can run Haddock against
   something that isn't the Prelude.
 
+* Allow '-- |' style comments for constructors
+
+* Documentation annotations for record fields
+
 -----------------------------------------------------------------------------
 Post 1.0:
 
