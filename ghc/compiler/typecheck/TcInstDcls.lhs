@@ -20,7 +20,7 @@ import HsSyn		( InstDecl(..), FixityDecl, Sig(..),
 			  SpecInstSig(..), HsBinds(..), Bind(..),
 			  MonoBinds(..), GRHSsAndBinds, Match, 
 			  InPat(..), OutPat(..), HsExpr(..), HsLit(..),
-			  Stmt, Qual, ArithSeqInfo, Fake,
+			  Stmt, Qualifier, ArithSeqInfo, Fake,
 			  PolyType(..), MonoType )
 import RnHsSyn		( RenamedHsBinds(..), RenamedMonoBinds(..),
 			  RenamedInstDecl(..), RenamedFixityDecl(..),
@@ -54,9 +54,10 @@ import Unify		( unifyTauTy, unifyTauTyLists )
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			  concatBag, foldBag, bagToList )
-import CmdLineOpts	( opt_GlasgowExts, opt_CompilingPrelude,
+import CmdLineOpts	( opt_GlasgowExts,
 			  opt_OmitDefaultInstanceMethods,
-			  opt_SpecialiseOverloaded )
+			  opt_SpecialiseOverloaded
+			)
 import Class		( GenClass, GenClassOp, 
 			  isCcallishClass, classBigSig,
 			  classOps, classOpLocalType,
@@ -232,8 +233,7 @@ tcInstDecl1 mod_name
     if (not from_here && (clas `derivedFor` inst_tycon)
 	              && all isTyVarTy arg_tys)
     then
-	if not opt_CompilingPrelude && maybeToBool inst_mod &&
-	   mod_name == expectJust "inst_mod" inst_mod
+	if mod_name == inst_mod
  	then
 		-- Imported instance came from this module;
 		-- discard and derive fresh instance
@@ -534,7 +534,7 @@ makeInstanceDeclNoDefaultExpr
 	-> [Id]
 	-> TcType s
 	-> Class
-	-> Maybe Module
+	-> Module
 	-> Int
 	-> NF_TcM s (TcExpr s)
 
@@ -555,13 +555,11 @@ makeInstanceDeclNoDefaultExpr origin meth_ids defm_ids inst_ty clas inst_mod tag
 
     Just (_, _, err_defm_ok) = isDefaultMethodId_maybe defm_id
 
-    mod_str = case inst_mod of { Nothing -> pRELUDE; Just m -> m }
-
-    error_msg = _UNPK_ mod_str ++ "." ++ _UNPK_ clas_name ++ "."
+    error_msg = _UNPK_ inst_mod ++ "." ++ _UNPK_ clas_name ++ "."
 	     	++ (ppShow 80 (ppr PprForUser inst_ty)) ++ "."
 	     	++ (ppShow 80 (ppr PprForUser clas_op))	++ "\""
 
-    clas_name = nameOf (origName clas)
+    clas_name = nameOf (origName "makeInstanceDeclNoDefaultExpr" clas)
 \end{code}
 
 
@@ -930,7 +928,6 @@ scrutiniseInstanceType from_here clas inst_tau
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
     isCcallishClass clas
---  && not opt_CompilingPrelude		-- which allows anything
     && not (maybeToBool (maybeBoxedPrimType inst_tau))
   = failTc (nonBoxedPrimCCallErr clas inst_tau)
 
@@ -961,9 +958,7 @@ derivingWhenInstanceImportedErr inst_mod clas tycon sty
   = ppHang (ppBesides [ppStr "Deriving class `", ppr sty clas, ppStr "' type `", ppr sty tycon, ppStr "'"])
          4 (ppBesides [ppStr "when an instance declared in module `", pp_mod, ppStr "' has been imported"])
   where
-    pp_mod = case inst_mod of
-	       Nothing -> ppPStr SLIT("the standard Prelude")
-	       Just  m -> ppBesides [ppStr "module `", ppPStr m, ppStr "'"]
+    pp_mod = ppBesides [ppStr "module `", ppPStr inst_mod, ppStr "'"]
 
 nonBoxedPrimCCallErr clas inst_ty sty
   = ppHang (ppStr "Instance isn't for a `boxed-primitive' type")

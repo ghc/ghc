@@ -55,7 +55,7 @@ import TcKind	( TcKind )
 import TcMonad	hiding ( rnMtoTcM )
 import Usage	( Usage(..), GenUsage, UVar(..), duffUsage )
 
-import TysWiredIn	( voidTy )
+import TysPrim		( voidTy )
 
 IMP_Ubiq()
 import Unique		( Unique )

@@ -16,13 +16,15 @@ IMP_Ubiq()
 import CoreSyn
 
 import Bag
-import Kind		( Kind{-instance-} )
+import Kind		( hasMoreBoxityInfo, Kind{-instance-} )
 import Literal		( literalType, Literal{-instance-} )
 import Id		( idType, isBottomingId,
-			  dataConArgTys, GenId{-instances-}
+			  dataConArgTys, GenId{-instances-},
+			  emptyIdSet, mkIdSet, intersectIdSets,
+			  unionIdSets, elementOfIdSet, IdSet(..)
 			)
 import Maybes		( catMaybes )
-import Name		( isLocallyDefined, getSrcLoc )
+import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-} )
 import Outputable	( Outputable(..){-instance * []-} )
 import PprCore
 import PprStyle		( PprStyle(..) )
@@ -41,9 +43,6 @@ import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,mkForAllTys,getForAllTy_maybe,
 			)
 import TyCon		( isPrimTyCon )
 import TyVar		( tyVarKind, GenTyVar{-instances-} )
-import UniqSet		( emptyUniqSet, mkUniqSet, intersectUniqSets,
-			  unionUniqSets, elementOfUniqSet, UniqSet(..)
-			)
 import Unique		( Unique )
 import Usage		( GenUsage )
 import Util		( zipEqual, pprTrace, pprPanic, assertPanic, panic )
@@ -188,8 +187,7 @@ lintCoreExpr (Var var) = checkInScope var `seqL` returnL (Just (idType var))
 lintCoreExpr (Lit lit) = returnL (Just (literalType lit))
 lintCoreExpr (SCC _ expr) = lintCoreExpr expr
 lintCoreExpr (Coerce _ ty expr)
-  = _trace "lintCoreExpr:Coerce" $
-    lintCoreExpr expr `seqL` returnL (Just ty)
+  = lintCoreExpr expr `seqL` returnL (Just ty)
 
 lintCoreExpr (Let binds body)
   = lintCoreBinding binds `thenL` \binders ->
@@ -294,9 +292,11 @@ lintCoreArg e ty a@(TyArg arg_ty)
 	    tyvar_kind = tyVarKind tyvar
 	    argty_kind = typeKind arg_ty
 	in
-	if tyvar_kind == argty_kind
--- SUSPICIOUS!	(tyvar_kind `isSubKindOf` argty_kind
---		 || argty_kind `isSubKindOf` tyvar_kind)
+	if argty_kind `hasMoreBoxityInfo` tyvar_kind
+		-- Arg type might be boxed for a function with an uncommitted
+		-- tyvar; notably this is used so that we can give
+		-- 	error :: forall a:*. String -> a
+		-- and then apply it to both boxed and unboxed types.
 	 then
 	    returnL(Just(instantiateTy [(tyvar,arg_ty)] body))
 	else
@@ -407,7 +407,7 @@ lintDeflt deflt@(BindDefault binder rhs) ty
 \begin{code}
 type LintM a = Bool		-- True <=> specialisation has been done
 	    -> [LintLocInfo] 	-- Locations
-	    -> UniqSet Id	-- Local vars in scope
+	    -> IdSet		-- Local vars in scope
 	    -> Bag ErrMsg	-- Error messages so far
 	    -> (a, Bag ErrMsg)	-- Result and error messages (if any)
 
@@ -444,7 +444,7 @@ pp_binder sty b = ppCat [ppr sty b, ppStr "::", ppr sty (idType b)]
 \begin{code}
 initL :: LintM a -> Bool -> Maybe ErrMsg
 initL m spec_done
-  = case (m spec_done [] emptyUniqSet emptyBag) of { (_, errs) ->
+  = case (m spec_done [] emptyIdSet emptyBag) of { (_, errs) ->
     if isEmptyBag errs then
 	Nothing
     else
@@ -529,24 +529,27 @@ addInScopeVars ids m spec loc scope errs
     -- For now, it's just a "trace"; we may make
     -- a real error out of it...
     let
-	new_set = mkUniqSet ids
+	new_set = mkIdSet ids
 
-	shadowed = scope `intersectUniqSets` new_set
+--	shadowed = scope `intersectIdSets` new_set
     in
 --  After adding -fliberate-case, Simon decided he likes shadowed
 --  names after all.  WDP 94/07
 --  (if isEmptyUniqSet shadowed
 --  then id
 --  else pprTrace "Shadowed vars:" (ppr PprDebug (uniqSetToList shadowed))) (
-    m spec loc (scope `unionUniqSets` new_set) errs
+    m spec loc (scope `unionIdSets` new_set) errs
 --  )
 \end{code}
 
 \begin{code}
 checkInScope :: Id -> LintM ()
 checkInScope id spec loc scope errs
-  = if isLocallyDefined id && not (id `elementOfUniqSet` scope) then
-      ((),addErr errs (\sty -> ppCat [ppr sty id,ppStr "is out of scope"]) loc)
+  = let
+	id_name = getName id
+    in
+    if isLocallyDefined id_name && not (id `elementOfIdSet` scope) then
+      ((),addErr errs (\sty -> ppCat [ppr sty id, ppStr "is out of scope"]) loc)
     else
       ((),errs)
 

@@ -53,7 +53,7 @@ import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine,
 import FiniteMap	( FiniteMap, emptyFM, lookupFM, addToFM, fmToList{-ToDo:rm-} )
 import Maybes		( assocMaybe )
 import Name		( Module(..), RdrName(..), isQual,
-			  Name, mkLocalName, mkImplicitName,
+			  OrigName(..), Name, mkLocalName, mkImplicitName,
 			  getOccName, pprNonSym
 			)
 import PrelInfo		( builtinNameInfo, BuiltinNames(..), BuiltinKeys(..) )
@@ -97,7 +97,7 @@ data RnMode s
 	-- Renaming interface; creating and returning implicit names
 	-- ImplicitEnv: one map for Values and one for TyCons/Classes.
 
-type ImplicitEnv = (FiniteMap RdrName RnName, FiniteMap RdrName RnName)
+type ImplicitEnv = (FiniteMap OrigName RnName, FiniteMap OrigName RnName)
 emptyImplicitEnv :: ImplicitEnv
 emptyImplicitEnv = (emptyFM, emptyFM)
 
@@ -368,28 +368,29 @@ lookup_val rdr lookup check do_err down@(RnDown _ _ locn (RnSource occ_var) env 
 
 lookup_val rdr lookup check do_err down@(RnDown _ _ locn (RnIface b_names b_key imp_var) env us_var _)
   = case lookup env rdr of
-	Just name -> returnSST name
-	Nothing   -> lookup_nonexisting_val b_names b_key imp_var us_var rdr
+      Just name -> returnSST name
+      Nothing   -> case rdr of
+		     Unqual n -> panic ("lookup_val:"++ _UNPK_ n)
+		     Qual m n ->
+		       lookup_nonexisting_val b_names b_key imp_var us_var (OrigName m n)
 
-lookup_nonexisting_val (b_names,_) b_key imp_var us_var rdr
-  = let str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
-    in case (lookupFM b_names str_mod) of
-	 Nothing -> lookup_or_create_implicit_val b_key imp_var us_var rdr
-	 Just xx -> returnSST xx
+lookup_nonexisting_val (b_names,_) b_key imp_var us_var orig
+  = case (lookupFM b_names orig) of
+      Just xx -> returnSST xx
+      Nothing -> lookup_or_create_implicit_val b_key imp_var us_var orig
 
-lookup_or_create_implicit_val b_key imp_var us_var rdr
+lookup_or_create_implicit_val b_key imp_var us_var orig
   = readMutVarSST imp_var `thenSST` \ (implicit_val_fm, implicit_tc_fm) ->
-    case lookupFM implicit_val_fm rdr of
+    case (lookupFM implicit_val_fm orig) of
 	Just implicit -> returnSST implicit
 	Nothing ->
-	  (let str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
-	   in case (lookupFM b_key str_mod) of
+	  (case (lookupFM b_key orig) of
 		Just (u,_) -> returnSST u
 		_          -> get_unique us_var
 	  )							`thenSST` \ uniq -> 
 	  let
-	      implicit   = mkRnImplicit (mkImplicitName uniq rdr)
-	      new_val_fm = addToFM implicit_val_fm rdr implicit
+	      implicit   = mkRnImplicit (mkImplicitName uniq orig)
+	      new_val_fm = addToFM implicit_val_fm orig implicit
 	  in
 	  writeMutVarSST imp_var (new_val_fm, implicit_tc_fm) 	`thenSST_`
 	  returnSST implicit
@@ -420,37 +421,33 @@ lookup_tc rdr check mk_implicit err_str down@(RnDown _ _ locn (RnSource occ_var)
 		returnSST name
     fail = failButContinueRn (mkRnUnbound rdr) (unknownNameErr err_str rdr locn) down
 
-lookup_tc rdr check mk_implicit err_str down@(RnDown _ _ locn (RnIface b_names b_key imp_var) env us_var _)
+lookup_tc rdr@(Qual m n) check mk_implicit err_str down@(RnDown _ _ locn (RnIface b_names b_key imp_var) env us_var _)
   = case lookupTcRnEnv env rdr of
 	Just name | check name -> returnSST name
 		  | otherwise  -> fail
-	Nothing -> lookup_nonexisting_tc check mk_implicit fail b_names b_key imp_var us_var rdr
+	Nothing -> lookup_nonexisting_tc check mk_implicit fail b_names b_key imp_var us_var (OrigName m n)
   where
     fail = failButContinueRn (mkRnUnbound rdr) (unknownNameErr err_str rdr locn) down
 
-lookup_nonexisting_tc check mk_implicit fail (_,b_names) b_key imp_var us_var rdr
-  = let
-	str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
-    in
-    --pprTrace "lookup:" (ppAboves [case str_mod of {(n,m)->ppCat [ppPStr n, ppPStr m]}, ppAboves [ ppCat [ppPStr n, ppPStr m] | ((n,m), _) <- fmToList b_names]]) $
-    case (lookupFM b_names str_mod) of
-      Nothing -> lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
+lookup_nonexisting_tc check mk_implicit fail (_,b_names) b_key imp_var us_var orig--@(OrigName m n)
+  = --pprTrace "lookup:" (ppAboves [case str_mod of {(n,m)->ppCat [ppPStr n, ppPStr m]}, ppAboves [ ppCat [ppPStr n, ppPStr m] | ((n,m), _) <- fmToList b_names]]) $
+    case (lookupFM b_names orig) of
       Just xx -> returnSST xx
+      Nothing -> lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var orig
 
-lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
+lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var orig
   = readMutVarSST imp_var `thenSST` \ (implicit_val_fm, implicit_tc_fm) ->
-    case lookupFM implicit_tc_fm rdr of
+    case (lookupFM implicit_tc_fm orig) of
 	Just implicit | check implicit -> returnSST implicit
 		      | otherwise      -> fail
 	Nothing ->
-	  (let str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
-	   in case (lookupFM b_key str_mod) of
+	  (case (lookupFM b_key orig) of
 		Just (u,_) -> returnSST u
 		_          -> get_unique us_var
 	  )							`thenSST` \ uniq -> 
 	  let
-	      implicit  = mk_implicit (mkImplicitName uniq rdr)
-	      new_tc_fm = addToFM implicit_tc_fm rdr implicit
+	      implicit  = mk_implicit (mkImplicitName uniq orig)
+	      new_tc_fm = addToFM implicit_tc_fm orig implicit
 	  in
 	  writeMutVarSST imp_var (implicit_val_fm, new_tc_fm) 	`thenSST_`
 	  returnSST implicit

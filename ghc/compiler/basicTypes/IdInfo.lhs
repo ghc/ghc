@@ -69,7 +69,7 @@ module IdInfo (
 
 IMP_Ubiq()
 
-IMPORT_DELOOPER(IdLoop)		-- IdInfo is a dependency-loop ranch, and
+IMPORT_DELOOPER(IdLoop)	-- IdInfo is a dependency-loop ranch, and
 			-- we break those loops by using IdLoop and
 			-- *not* importing much of anything else,
 			-- except from the very general "utils".
@@ -77,7 +77,6 @@ IMPORT_DELOOPER(IdLoop)		-- IdInfo is a dependency-loop ranch, and
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( firstJust )
 import MatchEnv		( nullMEnv, isEmptyMEnv, mEnvToList )
-import OccurAnal	( occurAnalyseGlobalExpr )
 import Outputable	( ifPprInterface, Outputable(..){-instances-} )
 import PprStyle		( PprStyle(..) )
 import Pretty

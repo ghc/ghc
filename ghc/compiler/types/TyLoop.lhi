@@ -17,7 +17,7 @@ import TyVar   ( GenTyVar, TyVar )
 import Type    ( GenType, Type )
 import Usage   ( GenUsage )
 import Class   ( Class, GenClass )
-import TysWiredIn ( voidTy )
+import TysPrim ( voidTy )
 
 data GenId    ty
 data GenType  tyvar uvar

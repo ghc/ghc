@@ -24,7 +24,6 @@ import TcMonad		hiding ( rnMtoTcM )
 import Inst		( InstanceMapper(..) )
 import TcClassDcl	( tcClassDecl1 )
 import TcEnv		( tcExtendTyConEnv, tcExtendClassEnv,
-			  tcExtendGlobalValEnv, 
 			  tcTyVarScope, tcGetEnv )
 import TcKind		( TcKind, newKindVars )
 import TcTyDecls	( tcTyDecl, mkDataBinds )

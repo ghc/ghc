@@ -11,7 +11,7 @@ module DsListComp ( dsListComp ) where
 IMP_Ubiq()
 IMPORT_DELOOPER(DsLoop)		-- break dsExpr-ish loop
 
-import HsSyn		( Qual(..), HsExpr, HsBinds )
+import HsSyn		( Qualifier(..), HsExpr, HsBinds )
 import TcHsSyn		( TypecheckedQual(..), TypecheckedHsExpr(..) , TypecheckedHsBinds(..) )
 import DsHsSyn		( outPatType )
 import CoreSyn
@@ -119,7 +119,7 @@ already desugared.  @dsListComp@ does the top TE rule mentioned above.
 deListComp :: CoreExpr -> [TypecheckedQual] -> CoreExpr -> DsM CoreExpr
 
 deListComp expr [] list		-- Figure 7.4, SLPJ, p 135, rule C above
-  = mkConDs consDataCon [coreExprType expr] [expr, list]
+  = mkConDs consDataCon [TyArg (coreExprType expr), VarArg expr, VarArg list]
 
 deListComp expr (FilterQual filt : quals) list	-- rule B above
   = dsExpr filt                `thenDs` \ core_filt ->
@@ -154,13 +154,13 @@ deListComp expr ((GeneratorQual pat list1):quals) core_list2 -- rule A' above
 	    else h'
     in
     -- the "fail" value ...
-    mkAppDs (Var h) [] [Var u3]  `thenDs` \ core_fail ->
+    mkAppDs (Var h) [VarArg (Var u3)]  `thenDs` \ core_fail ->
 
     deListComp expr quals core_fail `thenDs` \ rest_expr ->
 
     matchSimply (Var u2) pat res_ty rest_expr core_fail `thenDs` \ core_match ->
 
-    mkAppDs (Var h) [] [core_list1]  `thenDs` \ letrec_body ->
+    mkAppDs (Var h) [VarArg core_list1]  `thenDs` \ letrec_body ->
 
     returnDs (
       mkCoLetrecAny [
@@ -198,7 +198,7 @@ dfListComp :: CoreExpr 		-- the inside of the comp
 	   -> DsM CoreExpr
 
 dfListComp expr expr_ty c_ty c_id n_ty n_id []
-  = mkAppDs (Var c_id) [] [expr, Var n_id]
+  = mkAppDs (Var c_id) [VarArg expr, VarArg (Var n_id)]
 
 dfListComp expr expr_ty c_ty c_id n_ty n_id (FilterQual filt : quals)
   = dsExpr filt                			`thenDs` \ core_filt ->

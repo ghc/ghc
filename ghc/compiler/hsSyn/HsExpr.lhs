@@ -89,8 +89,8 @@ data HsExpr tyvar uvar id pat
 		id				-- id for zero, typed applied
 		SrcLoc
 
-  | ListComp	(HsExpr tyvar uvar id pat)	-- list comprehension
-		[Qual   tyvar uvar id pat]	-- at least one Qual(ifier)
+  | ListComp	(HsExpr    tyvar uvar id pat)	-- list comprehension
+		[Qualifier tyvar uvar id pat]	-- at least one Qualifier
 
   | ExplicitList		-- syntactic list
 		[HsExpr tyvar uvar id pat]
@@ -240,8 +240,8 @@ pprExpr sty (SectionL expr op)
   where
     pp_expr = pprParendExpr sty expr
 
-    pp_prefixly = ppHang (ppCat [ppStr "( \\ _x ->", ppr sty op])
-		       4 (ppCat [pp_expr, ppStr "_x )"])
+    pp_prefixly = ppHang (ppCat [ppStr "( \\ x_ ->", ppr sty op])
+		       4 (ppCat [pp_expr, ppStr "x_ )"])
     pp_infixly v
       = ppSep [ ppBeside ppLparen pp_expr,
 	    	ppBeside (pprSym sty v) ppRparen ]
@@ -253,7 +253,7 @@ pprExpr sty (SectionR op expr)
   where
     pp_expr = pprParendExpr sty expr
 
-    pp_prefixly = ppHang (ppCat [ppStr "( \\ _x ->", ppr sty op, ppPStr SLIT("_x")])
+    pp_prefixly = ppHang (ppCat [ppStr "( \\ x_ ->", ppr sty op, ppPStr SLIT("x_")])
 		       4 (ppBeside pp_expr ppRparen)
     pp_infixly v
       = ppSep [ ppBeside ppLparen (pprSym sty v),
@@ -477,7 +477,7 @@ pp_dotdot = ppPStr SLIT(" .. ")
 
 ``Qualifiers'' in list comprehensions:
 \begin{code}
-data Qual tyvar uvar id pat
+data Qualifier tyvar uvar id pat
   = GeneratorQual   pat
 		    (HsExpr  tyvar uvar id pat)
   | LetQual	    (HsBinds tyvar uvar id pat)
@@ -487,7 +487,7 @@ data Qual tyvar uvar id pat
 \begin{code}
 instance (NamedThing id, Outputable id, Outputable pat,
 	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		Outputable (Qual tyvar uvar id pat) where
+		Outputable (Qualifier tyvar uvar id pat) where
     ppr sty (GeneratorQual pat expr)
      = ppCat [ppr sty pat, ppStr "<-", ppr sty expr]
     ppr sty (LetQual binds)

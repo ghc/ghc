@@ -14,10 +14,11 @@ module TysPrim where
 IMP_Ubiq(){-uitous-}
 
 import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
-import Name		( mkBuiltinName )
-import PrelMods		( pRELUDE_BUILTIN )
+import Name		( mkPrimitiveName )
+import PrelMods		( gHC_BUILTINS )
 import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
 import TyCon		( mkPrimTyCon, mkDataTyCon, NewOrData(..) )
+import Type		( mkTyConTy )
 import TyVar		( GenTyVar(..), alphaTyVars )
 import Type		( applyTyCon, mkTyVarTys )
 import Usage		( usageOmega )
@@ -43,7 +44,7 @@ pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> PrimRep -> TyCon
 pcPrimTyCon key str arity primrep
   = mkPrimTyCon name (mk_kind arity) primrep
   where
-    name = mkBuiltinName key pRELUDE_BUILTIN str
+    name = mkPrimitiveName key (OrigName gHC_BUILTINS str)
 
     mk_kind 0 = mkUnboxedTypeKind
     mk_kind n = mkTypeKind `mkArrowKind` mk_kind (n-1)
@@ -121,13 +122,35 @@ realWorldTyCon
 	[{-no derivings-}]
 	DataType
   where
-    name = mkBuiltinName realWorldTyConKey pRELUDE_BUILTIN SLIT("_RealWorld")
+    name = mkPrimitiveName realWorldTyConKey (OrigName gHC_BUILTINS SLIT("RealWorld"))
 
 realWorldStatePrimTy = mkStatePrimTy realWorldTy
 \end{code}
 
 Note: the ``state-pairing'' types are not truly primitive, so they are
 defined in \tr{TysWiredIn.lhs}, not here.
+
+\begin{code}
+-- The Void type is represented as a data type with no constructors
+-- It's a built in type (i.e. there's no way to define it in Haskell;
+--	the nearest would be
+--
+--		data Void =		-- No constructors!
+--
+-- ) It's boxed; there is only one value of this
+-- type, namely "void", whose semantics is just bottom.
+voidTy = mkTyConTy voidTyCon
+
+voidTyCon
+  = mkDataTyCon name mkBoxedTypeKind 
+	[{-no tyvars-}]
+	[{-no context-}]
+	[{-no data cons!-}]
+	[{-no derivings-}]
+	DataType
+  where
+    name = mkPrimitiveName voidTyConKey (OrigName gHC_BUILTINS SLIT("Void"))
+\end{code}
 
 %************************************************************************
 %*									*

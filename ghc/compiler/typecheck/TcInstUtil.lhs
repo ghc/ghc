@@ -63,7 +63,7 @@ data InstInfo
       [Id]		-- Constant methods (either all or none)
       RenamedMonoBinds	-- Bindings, b
       Bool		-- True <=> local instance decl
-      (Maybe Module)	-- Name of module where this instance defined; Nothing => Prelude
+      Module		-- Name of module where this instance defined
       SrcLoc		-- Source location assoc'd with this instance's defn
       [RenamedSig]	-- User pragmas recorded for generating specialised instances
 \end{code}
@@ -77,7 +77,7 @@ data InstInfo
 \begin{code}
 mkInstanceRelatedIds :: Bool
 		     -> SrcLoc
-		     -> Maybe Module
+		     -> Module
                      -> RenamedInstancePragmas
 		     -> Class 
 		     -> [TyVar]

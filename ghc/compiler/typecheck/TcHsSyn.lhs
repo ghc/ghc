@@ -55,7 +55,7 @@ import PprType  ( GenType, GenTyVar ) 	-- instances
 import Type	( mkTyVarTy, tyVarsOfType )
 import TyVar	( GenTyVar {- instances -},
 		  TyVarEnv(..), growTyVarEnvList, emptyTyVarSet )
-import TysWiredIn	( voidTy )
+import TysPrim	( voidTy )
 import Unique	( Unique )		-- instances
 import UniqFM
 import PprStyle
@@ -86,7 +86,7 @@ type TcExpr s	     	= HsExpr (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcGRHSsAndBinds s	= GRHSsAndBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcGRHS s		= GRHS (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcMatch s		= Match (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcQual s		= Qual (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
+type TcQual s		= Qualifier (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcStmt s		= Stmt (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcArithSeqInfo s	= ArithSeqInfo (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcRecordBinds s	= HsRecordBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
@@ -98,7 +98,7 @@ type TypecheckedHsBinds		= HsBinds	TyVar UVar Id TypecheckedPat
 type TypecheckedBind		= Bind		TyVar UVar Id TypecheckedPat
 type TypecheckedHsExpr		= HsExpr	TyVar UVar Id TypecheckedPat
 type TypecheckedArithSeqInfo	= ArithSeqInfo	TyVar UVar Id TypecheckedPat
-type TypecheckedQual		= Qual		TyVar UVar Id TypecheckedPat
+type TypecheckedQual		= Qualifier	TyVar UVar Id TypecheckedPat
 type TypecheckedStmt		= Stmt		TyVar UVar Id TypecheckedPat
 type TypecheckedMatch		= Match		TyVar UVar Id TypecheckedPat
 type TypecheckedGRHSsAndBinds	= GRHSsAndBinds TyVar UVar Id TypecheckedPat

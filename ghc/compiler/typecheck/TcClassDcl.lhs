@@ -15,7 +15,7 @@ IMP_Ubiq()
 import HsSyn		( ClassDecl(..), HsBinds(..), Bind(..), MonoBinds(..),
 			  Match(..), GRHSsAndBinds(..), GRHS(..), HsExpr(..),
 			  HsLit(..), OutPat(..), Sig(..), PolyType(..), MonoType, 
-			  Stmt, Qual, ArithSeqInfo, InPat, Fake )
+			  Stmt, Qualifier, ArithSeqInfo, InPat, Fake )
 import HsPragmas	( ClassPragmas(..) )
 import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
 			  RenamedClassOpSig(..), RenamedMonoBinds(..),
@@ -43,7 +43,7 @@ import Class		( GenClass, mkClass, mkClassOp, classBigSig,
 import Id		( mkSuperDictSelId, mkMethodSelId, mkDefaultMethodId,
 			  idType )
 import IdInfo		( noIdInfo )
-import Name		( isLocallyDefined, moduleNamePair, getLocalName )
+import Name		( isLocallyDefined, origName, getLocalName )
 import PrelVals		( nO_DEFAULT_METHOD_ERROR_ID )
 import PprStyle
 import Pretty
@@ -615,7 +615,7 @@ makeClassDeclDefaultMethodRhs clas method_ids tag
 -}
 
   where
-    (clas_mod, clas_name) = moduleNamePair clas
+    (OrigName clas_mod clas_name) = origName "makeClassDeclDefaultMethodRhs" clas
 
     method_id = method_ids  !! (tag-1)
     class_op  = (classOps clas) !! (tag-1)

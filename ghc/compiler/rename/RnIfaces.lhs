@@ -7,17 +7,14 @@
 #include "HsVersions.h"
 
 module RnIfaces (
---	findHiFiles,
 	cachedIface,
 	cachedDecl,
-	readIface,
 	rnIfaces,
 	IfaceCache(..)
     ) where
 
 IMP_Ubiq()
 
-import LibDirectory
 import PreludeGlaST	( thenPrimIO, seqPrimIO, readVar, writeVar, MutableVar(..) )
 
 import HsSyn
@@ -41,11 +38,11 @@ import FiniteMap	( emptyFM, lookupFM, addToFM, addToFM_C, plusFM, eltsFM,
 			  plusFM_C, addListToFM, keysFM{-ToDo:rm-}
 			)
 import Maybes		( maybeToBool )
-import Name		( moduleNamePair, origName, isRdrLexCon, RdrName(..), Name{-instance NamedThing-} )
+import Name		( origName, moduleOf, nameOf, qualToOrigName, OrigName(..),
+			  isLexCon, RdrName(..), Name{-instance NamedThing-} )
 import PprStyle		-- ToDo:rm
 import Outputable	-- ToDo:rm
 import PrelInfo		( builtinNameInfo )
-import PrelMods		( pRELUDE )
 import Pretty
 import Maybes		( MaybeErr(..) )
 import UniqFM		( emptyUFM )
@@ -64,80 +61,6 @@ type IfaceCache
 	 ModuleToIfaceContents, -- merged interfaces based on module name
 				-- used for extracting info about original names
 	 ModuleToIfaceFilePath)
-\end{code}
-
-*********************************************************
-*							*
-\subsection{Looking for interface files}
-*							*
-*********************************************************
-
-Return a mapping from module-name to
-absolute-filename-for-that-interface.
-\begin{code}
-{- OLD:
-findHiFiles :: [FilePath] -> [FilePath] -> IO (FiniteMap Module FilePath)
-
-findHiFiles dirs sysdirs
-  = --hPutStr stderr "  findHiFiles "	>>
-    do_dirs emptyFM (dirs ++ sysdirs)	>>= \ result ->
-    --hPutStr stderr " done\n"		>>
-    return result
-  where
-    do_dirs env [] = return env
-    do_dirs env (dir:dirs)
-      = do_dir  env     dir	>>= \ new_env ->
-	do_dirs new_env dirs
-    -------
-    do_dir env dir
-      = --hPutStr stderr "D" >>
-	getDirectoryContents dir    >>= \ entries ->
-	do_entries env entries
-      where
-	do_entries env [] = return env
-	do_entries env (e:es)
-	  = do_entry   env     e    >>= \ new_env ->
-	    do_entries new_env es
-	-------
-	do_entry env e
-	  = case (acceptable_hi (reverse e)) of
-	      Nothing  -> --trace ("Deemed uncool:"++e) $
-			  --hPutStr stderr "." >>
-			  return env
-	      Just mod ->
-		let
-		      pmod = _PK_ mod
-		in
-		case (lookupFM env pmod) of
-		  Nothing -> --trace ("Adding "++mod++" -> "++e) $
-			     --hPutStr stderr "!" >>
-			     return (addToFM env pmod (dir ++ '/':e))
-			     -- ToDo: use DIR_SEP, not /
-
-		  Just xx -> ( if de_dot xx /= e then trace ("Already mapped!! "++mod++" -> "++xx++"; ignoring:"++e) else id) $
-			     --hPutStr stderr "." >>
-			     return env
-    -------
-    acceptable_hi rev_e -- looking at pathname *backwards*
-      = case (startsWith (reverse opt_HiSuffix) rev_e) of
-	  Nothing -> Nothing
-	  Just xs -> plausible_modname xs{-reversed-}
-
-    -------
-    de_dot ('.' : '/' : xs) = xs
-    de_dot xs		    = xs
-
-    -------
-    plausible_modname rev_e
-      = let
-	    cand = reverse (takeWhile is_modname_char rev_e)
-	in
-	if null cand || not (isUpper (head cand))
-	then Nothing
-	else Just cand
-      where
-	is_modname_char c = isAlphanum c || c == '_'
--}
 \end{code}
 
 *********************************************************
@@ -174,22 +97,22 @@ cachedIface :: Bool		-- True  => want merged interface for original name
 	    -> Module
 	    -> IO (MaybeErr ParsedIface Error)
 
-cachedIface want_orig_iface iface_cache mod
+cachedIface want_orig_iface iface_cache modname
   = readVar iface_cache `thenPrimIO` \ (iface_fm, orig_fm, file_fm) ->
 
-    case (lookupFM iface_fm mod) of
+    case (lookupFM iface_fm modname) of
       Just iface -> return (want_iface iface orig_fm)
       Nothing    ->
-      	case (lookupFM file_fm mod) of
-	  Nothing   -> return (Failed (noIfaceErr mod))
+      	case (lookupFM file_fm modname) of
+	  Nothing   -> return (Failed (noIfaceErr modname))
 	  Just file ->
-	    readIface file mod >>= \ read_iface ->
+	    readIface file modname >>= \ read_iface ->
 	    case read_iface of
 	      Failed err      -> -- pprTrace "module-file map:\n" (ppAboves [ppCat [ppPStr m, ppStr f] | (m,f) <- fmToList file_fm]) $
 				 return (Failed err)
 	      Succeeded iface ->
 		let
-		    iface_fm' = addToFM iface_fm mod iface
+		    iface_fm' = addToFM iface_fm modname iface
 		    orig_fm'  = addToFM_C mergeIfaces orig_fm (iface_mod iface) iface
 		in
 		writeVar iface_cache (iface_fm', orig_fm', file_fm) `seqPrimIO`
@@ -197,8 +120,8 @@ cachedIface want_orig_iface iface_cache mod
   where
     want_iface iface orig_fm 
       | want_orig_iface
-      = case lookupFM orig_fm mod of
-	  Nothing         -> Failed (noOrigIfaceErr mod)
+      = case lookupFM orig_fm modname of
+	  Nothing         -> Failed (noOrigIfaceErr modname)
           Just orig_iface -> Succeeded orig_iface
       | otherwise
       = Succeeded iface
@@ -240,11 +163,11 @@ mergeIfaces (ParsedIface mod1 (_, files1) _ _ _ _ _ _ fixes1 tdefs1 vdefs1 idefs
 ----------
 cachedDecl :: IfaceCache
 	   -> Bool	-- True <=> tycon or class name
-	   -> RdrName
+	   -> OrigName
 	   -> IO (MaybeErr RdrIfaceDecl Error)
 
-cachedDecl iface_cache class_or_tycon orig 
-  = -- pprTrace "cachedDecl:" (ppr PprDebug orig) $
+cachedDecl iface_cache class_or_tycon name@(OrigName mod str)
+  = -- pprTrace "cachedDecl:" (ppr PprDebug name) $
     cachedIface True iface_cache mod 	>>= \ maybe_iface ->
     case maybe_iface of
       Failed err -> --pprTrace "cachedDecl:fail:" (ppr PprDebug orig) $
@@ -253,8 +176,6 @@ cachedDecl iface_cache class_or_tycon orig
 	case (lookupFM (if class_or_tycon then tdefs else vdefs) str) of
 	  Just decl -> return (Succeeded decl)
 	  Nothing   -> return (Failed (noDeclInIfaceErr mod str))
-  where
-    (mod, str) = moduleNamePair orig
 
 ----------
 cachedDeclByType :: IfaceCache
@@ -265,7 +186,7 @@ cachedDeclByType iface_cache rn
     -- the idea is: check that, e.g., if we're given an
     -- RnClass, then we really get back a ClassDecl from
     -- the cache (not an RnData, or something silly)
-  = cachedDecl iface_cache (isRnTyConOrClass rn) (origName rn)  >>= \ maybe_decl ->
+  = cachedDecl iface_cache (isRnTyConOrClass rn) (origName "cachedDeclByType" rn)  >>= \ maybe_decl ->
     let
 	return_maybe_decl = return maybe_decl
 	return_failed msg = return (Failed msg)
@@ -313,10 +234,9 @@ cachedDeclByType iface_cache rn
 \end{code}
 
 \begin{code}
-readIface :: FilePath -> Module
-	      -> IO (MaybeErr ParsedIface Error)
+readIface :: FilePath -> Module -> IO (MaybeErr ParsedIface Error)
 
-readIface file mod
+readIface file modname
   = hPutStr stderr ("  reading "++file)	>>
     readFile file		`thenPrimIO` \ read_result ->
     case read_result of
@@ -327,7 +247,7 @@ readIface file mod
 			return (
 			case parsed of
 			  Failed _    -> parsed
-			  Succeeded p -> Succeeded (init_merge mod p)
+			  Succeeded p -> Succeeded (init_merge modname p)
 			)
   where
     init_merge this (ParsedIface mod _ v sv us vs exps insts fixes tdefs vdefs idefs prags)
@@ -399,7 +319,10 @@ rnIfaces iface_cache imp_mods us
 	    if_errs_warns)
   where
     decls_and_insts todo def_env occ_env to_return us
-      =	do_decls todo	     		 -- initial batch of names to process
+      =	let
+	    (us1,us2) = splitUniqSupply us
+	in
+	do_decls todo	     		 -- initial batch of names to process
 	 	 (def_env, occ_env, us1) -- init stuff down
 	 	 to_return		 -- acc results
 	   >>= \ (decls_return,
@@ -410,9 +333,8 @@ rnIfaces iface_cache imp_mods us
 
 	do_insts decls_def_env decls_occ_env emptyRnEnv emptyFM
 		 (add_errs errs decls_return) us2
-      where
-	(us1,us2) = splitUniqSupply us
 
+    --------
     do_insts def_env occ_env prev_env done_insts to_return us
       | size_tc_env occ_env == size_tc_env prev_env
       = return (to_return, occ_env)
@@ -460,7 +382,7 @@ rnIfaces iface_cache imp_mods us
 		     do_decls ns down to_return
 
 	  Nothing
-	   | fst (moduleNamePair n) == modname ->
+	   | moduleOf (origName "do_decls" n) == modname ->
 		     -- avoid looking in interface for the module being compiled
 		     --pprTrace "do_decls:this module error:" (ppr PprDebug n) $
 		     do_decls ns down (add_warn (thisModImplicitWarn modname n) to_return)
@@ -516,10 +438,9 @@ type Go_Down   = (RnEnv,	-- stuff we already have defns for;
 		 )
 
 lookup_defd (def_env, _, _) n
-  | isRnTyConOrClass n 
-  = lookupTcRnEnv def_env (origName n)
-  | otherwise 
-  = lookupRnEnv def_env (origName n)
+  = (if isRnTyConOrClass n then lookupTcRnEnv else lookupRnEnv) def_env
+	(case (origName "lookup_defd" n) of { OrigName m s -> Qual m s })
+	-- this is hack because we are reusing the RnEnv technology
 
 defenv	   (def_env, _, _) = def_env
 occenv	   (_, occ_env, _) = occ_env
@@ -532,8 +453,11 @@ add_occs (val_defds, tc_defds) (val_imps, tc_imps) (def_env, occ_env, us)
     (if isEmptyBag def_dups then \x->x else pprTrace "add_occs:" (ppCat [ppr PprDebug n | (n,_,_) <- bagToList def_dups])) $
 --  ASSERT(isEmptyBag def_dups)
     let
-	val_occs = val_defds ++ fmToList val_imps
-	tc_occs  = tc_defds  ++ fmToList tc_imps
+	de_orig imps = [ (Qual m n, v) | (OrigName m n, v) <- fmToList imps ]
+	-- again, this hackery because we are reusing the RnEnv technology
+
+	val_occs = val_defds ++ de_orig val_imps
+	tc_occs  = tc_defds  ++ de_orig tc_imps
     in
     case (extendGlobalRnEnv occ_env val_occs tc_occs)   of { (new_occ_env, occ_dups) ->
 
@@ -561,7 +485,7 @@ add_insts is ((tydecls, classdecls, instdecls, sigs), implicit, msgs)
   = ((tydecls, classdecls, is ++ instdecls, sigs), implicit, msgs)
 
 add_implicits (val_imps, tc_imps) (decls, (val_fm, tc_fm), msgs)
-  = (decls, (val_fm `plusFM` val_imps, tc_fm `plusFM`  tc_imps), msgs)
+  = (decls, (val_fm `plusFM` val_imps, tc_fm `plusFM` tc_imps), msgs)
 
 add_err  err (decls,implicit,(errs,warns)) = (decls,implicit,(errs `snocBag`   err,warns))
 add_errs ers (decls,implicit,(errs,warns)) = (decls,implicit,(errs `unionBags` ers,warns))
@@ -645,8 +569,8 @@ rnIfaceDecl (ValSig f src_loc ty)
 sub :: ImplicitEnv -> ([(RdrName,RnName)], [(RdrName,RnName)]) -> ImplicitEnv
 
 sub (val_ment, tc_ment) (val_defds, tc_defds)
-  = (delListFromFM val_ment (map fst val_defds),
-     delListFromFM tc_ment  (map fst tc_defds))
+  = (delListFromFM val_ment (map (qualToOrigName . fst) val_defds),
+     delListFromFM tc_ment  (map (qualToOrigName . fst) tc_defds))
 \end{code}
 
 % ------------------------------
@@ -687,7 +611,7 @@ cacheInstModules iface_cache imp_mods
 @rnIfaceInstStuff@: Deal with instance declarations from interface files.
 
 \begin{code}
-type InstanceEnv = FiniteMap (RdrName, RdrName) Int
+type InstanceEnv = FiniteMap (OrigName, OrigName) Int
 
 rnIfaceInstStuff
 	:: IfaceCache		-- all about ifaces we've read
@@ -727,8 +651,8 @@ rnIfaceInstStuff iface_cache modname us occ_env done_inst_env to_return
 
     case (initRn False{-iface-} modname occ_env us (
 	    setExtraRn emptyUFM{-no fixities-}	$
-	    mapRn rnIfaceInst interesting_insts `thenRn` \ insts ->
-	    getImplicitUpRn 			`thenRn` \ implicits ->
+	    mapRn (rnIfaceInst modname) interesting_insts `thenRn` \ insts ->
+	    getImplicitUpRn				  `thenRn` \ implicits ->
 	    returnRn (insts, implicits))) of {
       ((if_insts, if_implicits), if_errs, if_warns) ->
 
@@ -743,16 +667,21 @@ rnIfaceInstStuff iface_cache modname us occ_env done_inst_env to_return
   where
     get_insts (ParsedIface _ _ _ _ _ _ _ _ _ _ _ insts _) = insts
 
+    tycon_class clas tycon = (qualToOrigName clas, qualToOrigName tycon)
+
     add_done_inst (InstSig clas tycon _ _) inst_env
-      = addToFM_C (+) inst_env (tycon,clas) 1
+      = addToFM_C (+) inst_env (tycon_class clas tycon) 1
 
     is_done_inst (InstSig clas tycon _ _)
-      = maybeToBool (lookupFM done_inst_env (tycon,clas))
+      = maybeToBool (lookupFM done_inst_env (tycon_class clas tycon))
 
     add_imp_occs (val_imps, tc_imps) occ_env
-      = case extendGlobalRnEnv occ_env (fmToList val_imps) (fmToList tc_imps) of
+      = case (extendGlobalRnEnv occ_env (de_orig val_imps) (de_orig tc_imps)) of
      	  (ext_occ_env, occ_dups) -> ASSERT(isEmptyBag occ_dups)
 				     ext_occ_env
+      where
+	de_orig imps = [ (Qual m n, v) | (OrigName m n, v) <- fmToList imps ]
+	-- again, this hackery because we are reusing the RnEnv technology
 
     want_inst i@(InstSig clas tycon _ _)
       = -- it's a "good instance" (one to hang onto) if we have a
@@ -764,25 +693,26 @@ rnIfaceInstStuff iface_cache modname us occ_env done_inst_env to_return
 	  = case lookupTcRnEnv occ_env nm of
 	      Just  _ -> True
 	      Nothing -> -- maybe it's builtin
-		let str_mod = case nm of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
-	        in case (lookupFM b_tc_names str_mod) of
-		      Just  _ -> True
-		      Nothing -> maybeToBool (lookupFM b_keys str_mod)
+		let orig = qualToOrigName nm in
+		case (lookupFM b_tc_names orig) of
+		  Just  _ -> True
+		  Nothing -> maybeToBool (lookupFM b_keys orig)
 
     (b_tc_names, b_keys) -- pretty UGLY ...
       = case builtinNameInfo of ((_,builtin_tcs),b_keys,_) -> (builtin_tcs,b_keys)
-
+{-
     ppr_insts insts
       = ppAboves (map ppr_inst insts)
       where
 	ppr_inst (InstSig c t _ inst_decl)
 	  = ppCat [ppr PprDebug c, ppr PprDebug t, ppr PprDebug inst_decl]
+-}
 \end{code}
 
 \begin{code}
-rnIfaceInst :: RdrIfaceInst -> RnM_Fixes _RealWorld RenamedInstDecl
+rnIfaceInst :: Module -> RdrIfaceInst -> RnM_Fixes _RealWorld RenamedInstDecl
 
-rnIfaceInst (InstSig _ _ _ inst_decl) = rnInstDecl inst_decl
+rnIfaceInst mod (InstSig _ _ _ inst_decl) = rnInstDecl (inst_decl mod)
 \end{code}
 
 \begin{code}
@@ -867,7 +797,7 @@ finalIfaceInfo iface_cache modname if_final_env@((qual, unqual, tc_qual, tc_unqu
     irrelevant (RnConstr  _ _) = True	-- We don't report these in their
     irrelevant (RnField   _ _) = True	-- own right in usages/etc.
     irrelevant (RnClassOp _ _) = True
-    irrelevant (RnImplicit  n) = isRdrLexCon (origName n) -- really a RnConstr
+    irrelevant (RnImplicit  n) = isLexCon (nameOf (origName "irrelevant" n)) -- really a RnConstr
     irrelevant _	       = False
 
 \end{code}
@@ -875,7 +805,7 @@ finalIfaceInfo iface_cache modname if_final_env@((qual, unqual, tc_qual, tc_unqu
 
 \begin{code}
 thisModImplicitWarn mod n sty
-  = ppBesides [ppPStr SLIT("An interface has an implicit need of "), ppPStr mod, ppChar '.', ppr sty n, ppPStr SLIT("; assuming this module will provide it.")]
+  = ppBesides [ppPStr SLIT("An interface has an implicit need of "), ppr sty n, ppPStr SLIT("; assuming this module will provide it.")]
 
 noIfaceErr mod sty
   = ppCat [ppPStr SLIT("Could not find interface for:"), ppPStr mod]

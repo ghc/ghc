@@ -5,7 +5,7 @@
 
 Basically dependency analysis.
 
-Handles @Match@, @GRHSsAndBinds@, @HsExpr@, and @Qual@ datatypes.  In
+Handles @Match@, @GRHSsAndBinds@, @HsExpr@, and @Qualifier@ datatypes.  In
 general, all of these functions return a renamed thing, and a set of
 free variables.
 
@@ -369,7 +369,7 @@ rnRpats rpats
 
 %************************************************************************
 %*									*
-\subsubsection{@Qual@s: in list comprehensions}
+\subsubsection{@Qualifier@s: in list comprehensions}
 %*									*
 %************************************************************************
 

@@ -17,7 +17,7 @@ module Id {- (
 	mkSpecId, mkSameSpecCon,
 	selectIdInfoForSpecId,
 	mkTemplateLocals,
-	mkImported, mkPreludeId,
+	mkImported,
 	mkDataCon, mkTupleCon,
 	mkIdWithNewUniq,
 	mkMethodSelId, mkSuperDictSelId, mkDefaultMethodId,
@@ -105,11 +105,11 @@ import CStrings		( identToC, cSEP )
 import IdInfo
 import Maybes		( maybeToBool )
 import Name		( appendRdr, nameUnique, mkLocalName, isLocalName,
-			  isLocallyDefinedName, isPreludeDefinedName,
+			  isLocallyDefinedName,
 			  mkTupleDataConName, mkCompoundName, mkCompoundName2,
-			  isLexSym, isLexSpecialSym, getLocalName,
-			  isLocallyDefined, isPreludeDefined, changeUnique,
-			  getOccName, moduleNamePair, origName, nameOf, 
+			  isLexSym, isLexSpecialSym,
+			  isLocallyDefined, changeUnique,
+			  getOccName, origName, moduleOf,
 			  isExported, ExportFlag(..),
 			  RdrName(..), Name
 			)
@@ -183,8 +183,6 @@ data IdDetails
 
   | ImportedId			-- Global name (Imported or Implicit); Id imported from an interface
 
-  | PreludeId			-- Global name (Builtin);  Builtin prelude Ids
-
   | TopLevId			-- Global name (LocalDef); Top-level in the orig source pgm
 				-- (not moved there by transformations).
 
@@ -237,7 +235,7 @@ data IdDetails
 				-- The "a" is irrelevant.  As it is too painful to
 				-- actually do comparisons that way, we kindly supply
 				-- a Unique for that purpose.
-		(Maybe Module)	-- module where instance came from; Nothing => Prelude
+		Module		-- module where instance came from
 
 				-- see below
   | ConstMethodId		-- A method which depends only on the type of the
@@ -245,7 +243,7 @@ data IdDetails
 		Class		-- Uniquely identified by:
 		Type		-- (class, type, classop) triple
 		ClassOp
-		(Maybe Module)	-- module where instance came from; Nothing => Prelude
+		Module		-- module where instance came from
 
   | InstId			-- An instance of a dictionary, class operation,
 				-- or overloaded value (Local name)
@@ -356,9 +354,6 @@ the infinite family of tuples.
 \item[@ImportedId@:] These are values defined outside this module.
 {\em Everything} we want to know about them must be stored here (or in
 their @IdInfo@).
-
-%----------------------------------------------------------------------
-\item[@PreludeId@:] ToDo
 
 %----------------------------------------------------------------------
 \item[@TopLevId@:] These are values defined at the top-level in this
@@ -499,7 +494,6 @@ toplevelishId (Id _ _ _ details _ _)
     chk (TupleConId _)    	    = True
     chk (RecordSelId _)   	    = True
     chk ImportedId	    	    = True
-    chk PreludeId	    	    = True
     chk TopLevId	    	    = True	-- NB: see notes
     chk (SuperDictSelId _ _)	    = True
     chk (MethodSelId _ _)	    = True
@@ -521,7 +515,6 @@ idHasNoFreeTyVars (Id _ _ _ details _ info)
     chk (TupleConId _)    	  = True
     chk (RecordSelId _)   	  = True
     chk ImportedId	    	  = True
-    chk PreludeId	    	  = True
     chk TopLevId	    	  = True
     chk (SuperDictSelId _ _)	  = True
     chk (MethodSelId _ _)	  = True
@@ -608,7 +601,6 @@ pprIdInUnfolding in_scopes v
     	case v_details of
 	    -- these ones must have been exported by their original module
 	  ImportedId   -> pp_full_name
-	  PreludeId    -> pp_full_name
 
 	    -- these ones' exportedness checked later...
 	  TopLevId  -> pp_full_name
@@ -653,7 +645,7 @@ pprIdInUnfolding in_scopes v
 
     pp_full_name
       = let
-	    (m_str, n_str) = moduleNamePair v
+	    (OrigName m_str n_str) = origName "Id:ppr_Unfolding" v
 
 	    pp_n =
 	      if isLexSym n_str && not (isLexSpecialSym n_str) then
@@ -877,7 +869,7 @@ unlocaliseId mod (Id u name ty info (InstId no_ftvs))
 	-- type might be wrong, but it hardly matters
 	-- at this stage (just before printing C)  ToDo
   where
-    name = getLocalName name
+    name = nameOf (origName "Id.unlocaliseId" name)
     full_name = mkFullName mod name InventedInThisModule ExportAll mkGeneratedSrcLoc
 
 unlocaliseId mod other_id = Nothing
@@ -1038,42 +1030,41 @@ getInstIdModule other = panic "Id:getInstIdModule"
 
 \begin{code}
 mkSuperDictSelId u c sc ty info
-  = Id u n ty (SuperDictSelId c sc) NoPragmaInfo info
-  where
-    cname = getName c -- we get other info out of here
-
-    n = mkCompoundName u SLIT("sdsel") [origName cname, origName sc] cname
+  = mk_classy_id (SuperDictSelId c sc) SLIT("sdsel") (Left (origName "mkSuperDictSelId" sc)) u c ty info
 
 mkMethodSelId u rec_c op ty info
-  = Id u n ty (MethodSelId rec_c op) NoPragmaInfo info
-  where
-    cname = getName rec_c -- we get other info out of here
-
-    n = mkCompoundName u SLIT("meth") [origName cname, Unqual (classOpString op)] cname
+  = mk_classy_id (MethodSelId rec_c op) SLIT("meth") (Right (classOpString op)) u rec_c ty info
 
 mkDefaultMethodId u rec_c op gen ty info
-  = Id u n ty (DefaultMethodId rec_c op gen) NoPragmaInfo info
+  = mk_classy_id (DefaultMethodId rec_c op gen) SLIT("defm") (Right (classOpString op)) u rec_c ty info
+
+mk_classy_id details str op_str u rec_c ty info
+  = Id u n ty details NoPragmaInfo info
   where
     cname = getName rec_c -- we get other info out of here
+    cname_orig = origName "mk_classy_id" cname
+    cmod = moduleOf cname_orig
 
-    n = mkCompoundName u SLIT("defm") [origName cname, Unqual (classOpString op)] cname
+    n = mkCompoundName u cmod str [Left cname_orig, op_str] cname
 
 mkDictFunId u c ity full_ty from_here locn mod info
   = Id u n full_ty (DictFunId c ity mod) NoPragmaInfo info
   where
-    n = mkCompoundName2 u SLIT("dfun") [origName c] (getTypeString ity) from_here locn
+    n = mkCompoundName2 u mod SLIT("dfun") (Left (origName "mkDictFunId" c) : map Right (getTypeString ity)) from_here locn
 
 mkConstMethodId	u c op ity full_ty from_here locn mod info
   = Id u n full_ty (ConstMethodId c ity op mod) NoPragmaInfo info
   where
-    n = mkCompoundName2 u SLIT("const") [origName c, Unqual (classOpString op)] (getTypeString ity) from_here locn
+    n = mkCompoundName2 u mod SLIT("const") (Left (origName "mkConstMethodId" c) : Right (classOpString op) : map Right (getTypeString ity)) from_here locn
 
 mkWorkerId u unwrkr ty info
   = Id u n ty (WorkerId unwrkr) NoPragmaInfo info
   where
     unwrkr_name = getName unwrkr
+    unwrkr_orig = trace "mkWorkerId:origName:" $ origName "mkWorkerId" unwrkr_name
+    umod = moduleOf unwrkr_orig
 
-    n = mkCompoundName u SLIT("wrk") [origName unwrkr_name] unwrkr_name
+    n = mkCompoundName u umod SLIT("wrk") [Left unwrkr_orig] unwrkr_name
 
 mkInstId u ty name = Id u (changeUnique name u) ty (InstId (no_free_tvs ty)) NoPragmaInfo noIdInfo
 
@@ -1104,7 +1095,6 @@ getConstMethodId clas op ty
 
 \begin{code}
 mkImported  n ty info = Id (nameUnique n) n ty ImportedId NoPragmaInfo info
-mkPreludeId n ty info = Id (nameUnique n) n ty PreludeId  NoPragmaInfo info
 
 {-LATER:
 updateIdType :: Id -> Type -> Id
@@ -1642,23 +1632,6 @@ instance Outputable {-Id, i.e.:-}(GenId Type) where
 
 showId :: PprStyle -> Id -> String
 showId sty id = ppShow 80 (pprId sty id)
-
--- [used below]
--- for DictFuns (instances) and const methods (instance code bits we
--- can call directly): exported (a) if *either* the class or
--- ***OUTERMOST*** tycon [arbitrary...] is exported; or (b) *both*
--- class and tycon are from PreludeCore [non-std, but convenient]
--- *and* the thing was defined in this module.
-
-instance_export_flag :: Class -> Type -> Bool -> ExportFlag
-
-instance_export_flag clas inst_ty from_here
-  = panic "Id:instance_export_flag"
-{-LATER
-  = if instanceIsExported clas inst_ty from_here
-    then ExportAll
-    else NotExported
--}
 \end{code}
 
 Default printing code (not used for interfaces):
@@ -1677,53 +1650,6 @@ instance Uniquable (GenId ty) where
 
 instance NamedThing (GenId ty) where
     getName this_id@(Id u n _ details _ _) = n
-{- OLD:
-      = get details
-      where
-	get (LocalId      _)  	= n
-	get (SysLocalId   _)  	= n
-	get (SpecPragmaId _ _)	= n
-	get ImportedId		= n
-	get PreludeId		= n
-	get TopLevId		= n
-	get (InstId       n _)  	= n
-	get (DataConId _ _ _ _ _ _ _) = n
-	get (TupleConId _)		= n
-	get (RecordSelId l)		= getName l
-	get _				= mkCompoundName u (getIdNamePieces False{-no Uniques-} this_id)
--}
-{- LATER:
-	get (MethodSelId c op)	= case (moduleOf (origName c)) of -- ToDo; better ???
-				    mod -> (mod, classOpString op)
-
-	get (SpecId unspec ty_maybes _)
-	  = case moduleNamePair unspec	      of { (mod, unspec_nm) ->
-	    case specMaybeTysSuffix ty_maybes of { tys_suffix ->
-	    (mod,
-	     unspec_nm _APPEND_
-		(if not (toplevelishId unspec)
-		 then showUnique u
-		 else tys_suffix)
-	    ) }}
-
-	get (WorkerId unwrkr)
-	  = case moduleNamePair unwrkr	of { (mod, unwrkr_nm) ->
-	    (mod,
-	     unwrkr_nm _APPEND_
-		(if not (toplevelishId unwrkr)
-		 then showUnique u
-		 else SLIT(".wrk"))
-	    ) }
-
-	get other_details
-	    -- the remaining internally-generated flavours of
-	    -- Ids really do not have meaningful "original name" stuff,
-	    -- but we need to make up something (usually for debugging output)
-
-	  = case (getIdNamePieces True this_id)  of { (piece1:pieces) ->
-	    case [ _CONS_ '.' p | p <- pieces ]  of { dotted_pieces ->
-	    (_NIL_, _CONCAT_ (piece1 : dotted_pieces)) }}
--}
 \end{code}
 
 Note: The code generator doesn't carry a @UniqueSupply@, so it uses

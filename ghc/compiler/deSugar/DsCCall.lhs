@@ -87,9 +87,7 @@ dsCCall label args may_gc is_asm result_ty
 			       (map coreExprType final_args)
 			       final_result_ty
     in
-    mkPrimDs the_ccall_op
-	       [] -- ***NOTE*** no ty apps; the types are inside the_ccall_op.
-	       final_args	`thenDs` \ the_prim_app ->
+    mkPrimDs the_ccall_op (map VarArg final_args) `thenDs` \ the_prim_app ->
     let
 	the_body = foldr apply (res_wrapper the_prim_app) arg_wrappers
     in
@@ -115,7 +113,7 @@ unboxArg arg
   | arg_ty `eqTy` stringTy
   -- ToDo (ADR): - allow synonyms of Strings too?
   = newSysLocalDs byteArrayPrimTy		`thenDs` \ prim_arg ->
-    mkAppDs (Var packStringForCId) [] [arg]	`thenDs` \ pack_appn ->
+    mkAppDs (Var packStringForCId) [VarArg arg]	`thenDs` \ pack_appn ->
     returnDs (Var prim_arg,
 	      \body -> Case pack_appn (PrimAlts []
 						    (BindDefault prim_arg body))
@@ -189,15 +187,15 @@ boxResult result_ty
     not (null data_con_arg_tys) && null other_args_tys	&& 	-- Just one arg
     isPrimType the_prim_result_ty				-- of primitive type
   =
-    newSysLocalDs realWorldStatePrimTy				`thenDs` \ prim_state_id ->
-    newSysLocalDs the_prim_result_ty 				`thenDs` \ prim_result_id ->
+    newSysLocalDs realWorldStatePrimTy			`thenDs` \ prim_state_id ->
+    newSysLocalDs the_prim_result_ty 			`thenDs` \ prim_result_id ->
 
-    mkConDs stateDataCon [realWorldTy] [Var prim_state_id]	`thenDs` \ new_state ->
-    mkConDs the_data_con tycon_arg_tys [Var prim_result_id]	`thenDs` \ the_result ->
+    mkConDs stateDataCon [TyArg realWorldTy, VarArg (Var prim_state_id)]  `thenDs` \ new_state ->
+    mkConDs the_data_con (map TyArg tycon_arg_tys ++ [VarArg (Var prim_result_id)]) `thenDs` \ the_result ->
 
     mkConDs tuple_con_2
-	    [result_ty, realWorldStateTy]
-	    [the_result, new_state]				`thenDs` \ the_pair ->
+	    [TyArg result_ty, TyArg realWorldStateTy, VarArg the_result, VarArg new_state]
+							`thenDs` \ the_pair ->
     let
 	the_alt = (state_and_prim_datacon, [prim_state_id, prim_result_id], the_pair)
     in
@@ -210,13 +208,13 @@ boxResult result_ty
     (null other_data_cons) &&					-- Just one constr
     (null data_con_arg_tys)
   =
-    newSysLocalDs realWorldStatePrimTy				`thenDs` \ prim_state_id ->
+    newSysLocalDs realWorldStatePrimTy		`thenDs` \ prim_state_id ->
 
-    mkConDs stateDataCon [realWorldTy] [Var prim_state_id]	`thenDs` \ new_state ->
-
+    mkConDs stateDataCon [TyArg realWorldTy, VarArg (Var prim_state_id)]
+						`thenDs` \ new_state ->
     mkConDs tuple_con_2
-	    [result_ty, realWorldStateTy]
-	    [covar_tuple_con_0, new_state]	`thenDs` \ the_pair ->
+	    [TyArg result_ty, TyArg realWorldStateTy, VarArg covar_tuple_con_0, VarArg new_state]
+						`thenDs` \ the_pair ->
 
     let
 	the_alt  = (stateDataCon, [prim_state_id], the_pair)

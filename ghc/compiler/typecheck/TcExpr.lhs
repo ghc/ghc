@@ -10,7 +10,7 @@ module TcExpr ( tcExpr ) where
 
 IMP_Ubiq()
 
-import HsSyn		( HsExpr(..), Qual(..), Stmt(..),
+import HsSyn		( HsExpr(..), Qualifier(..), Stmt(..),
 			  HsBinds(..), Bind(..), MonoBinds(..), 
 			  ArithSeqInfo(..), HsLit(..), Sig, GRHSsAndBinds,
 			  Match, Fake, InPat, OutPat, PolyType,

@@ -34,7 +34,7 @@ import CmdLineOpts	( opt_HideBuiltinNames,
 import FiniteMap	( FiniteMap, emptyFM, listToFM )
 import Id		( mkTupleCon, GenId, Id(..) )
 import Maybes		( catMaybes )
-import Name		( moduleNamePair )
+import Name		( origName, OrigName(..) )
 import RnHsSyn		( RnName(..) )
 import TyCon		( tyConDataCons, mkFunTyCon, mkTupleTyCon, TyCon )
 import Type
@@ -55,11 +55,11 @@ We have two ``builtin name funs,'' one to look up @TyCons@ and
 \begin{code}
 builtinNameInfo :: ( BuiltinNames, BuiltinKeys, BuiltinIdInfos )
 
-type BuiltinNames   = (FiniteMap (FAST_STRING,Module) RnName, -- WiredIn Ids
-		       FiniteMap (FAST_STRING,Module) RnName) -- WiredIn TyCons
+type BuiltinNames   = (FiniteMap OrigName RnName, -- WiredIn Ids
+		       FiniteMap OrigName RnName) -- WiredIn TyCons
 			-- Two maps because "[]" is in both...
 
-type BuiltinKeys    = FiniteMap (FAST_STRING,Module) (Unique, Name -> RnName)
+type BuiltinKeys    = FiniteMap OrigName (Unique, Name -> RnName)
 						     -- Names with known uniques
 
 type BuiltinIdInfos = UniqFM IdInfo		     -- Info for known unique Ids
@@ -111,7 +111,6 @@ builtinNameInfo
 
 	    -- values
 	    map pcIdWiredInInfo wired_in_ids,
-	    map pcIdWiredInInfo parallel_ids,
 	    primop_ids
 	  ]
     assoc_tc_wired
@@ -214,6 +213,7 @@ data_tycons
     , stateAndSynchVarPrimTyCon
     , stateAndWordPrimTyCon
     , stateTyCon
+    , voidTyCon
     , wordTyCon
     ]
 \end{code}
@@ -222,52 +222,56 @@ The WiredIn Ids ...
 ToDo: Some of these should be moved to id_keys_infos!
 \begin{code}
 wired_in_ids
-  = [ eRROR_ID
-    , pAT_ERROR_ID	-- occurs in i/faces
-    , pAR_ERROR_ID	-- ditto
-    , tRACE_ID
- 
-    , runSTId
-    , seqId
-    , realWorldPrimId
-
-      -- foldr/build Ids have magic unfoldings
-    , buildId
+  = [ aBSENT_ERROR_ID
     , augmentId
+    , buildId
+    , copyableId
+    , eRROR_ID
     , foldlId
     , foldrId
+    , forkId
+    , iRREFUT_PAT_ERROR_ID
+    , integerMinusOneId
+    , integerPlusOneId
+    , integerPlusTwoId
+    , integerZeroId
+    , nON_EXHAUSTIVE_GUARDS_ERROR_ID
+    , nO_DEFAULT_METHOD_ERROR_ID
+    , nO_EXPLICIT_METHOD_ERROR_ID
+    , noFollowId
+    , pAR_ERROR_ID
+    , pAT_ERROR_ID
+    , packStringForCId
+    , parAtAbsId
+    , parAtForNowId
+    , parAtId
+    , parAtRelId
+    , parGlobalId
+    , parId
+    , parLocalId
+    , rEC_CON_ERROR_ID
+    , rEC_UPD_ERROR_ID
+    , realWorldPrimId
+    , runSTId
+    , seqId
+    , tRACE_ID
+    , tRACE_ID
+    , unpackCString2Id
     , unpackCStringAppendId
     , unpackCStringFoldrId
+    , unpackCStringId
+    , voidId
     ]
 
-parallel_ids
-  = if not opt_ForConcurrent then
-	[]
-    else
-        [ parId
-        , forkId
-	, copyableId
-	, noFollowId
-	, parAtAbsId
-	, parAtForNowId
-	, parAtId
-	, parAtRelId
-	, parGlobalId
-    	, parLocalId
-	]
+pcTyConWiredInInfo :: TyCon -> (OrigName, RnName)
+pcTyConWiredInInfo tc = (origName "pcTyConWiredInInfo" tc, WiredInTyCon tc)
 
-
-pcTyConWiredInInfo :: TyCon -> ((FAST_STRING,Module), RnName)
-pcTyConWiredInInfo tc = (swap (moduleNamePair tc), WiredInTyCon tc)
-
-pcDataConWiredInInfo :: TyCon -> [((FAST_STRING,Module), RnName)]
+pcDataConWiredInInfo :: TyCon -> [(OrigName, RnName)]
 pcDataConWiredInInfo tycon
-  = [ (swap (moduleNamePair con), WiredInId con) | con <- tyConDataCons tycon ]
+  = [ (origName "pcDataConWiredInInfo" con, WiredInId con) | con <- tyConDataCons tycon ]
 
-pcIdWiredInInfo :: Id -> ((FAST_STRING,Module), RnName)
-pcIdWiredInInfo id = (swap (moduleNamePair id), WiredInId id)
-
-swap (x,y) = (y,x)
+pcIdWiredInInfo :: Id -> (OrigName, RnName)
+pcIdWiredInInfo id = (origName "pcIdWiredInInfo" id, WiredInId id)
 \end{code}
 
 WiredIn primitive numeric operations ...
@@ -275,8 +279,8 @@ WiredIn primitive numeric operations ...
 primop_ids
   = map prim_fn allThePrimOps ++ map funny_fn funny_name_primops
   where
-    prim_fn  op     = case (primOpNameInfo op) of (s,n) -> ((s,pRELUDE),n)
-    funny_fn (op,s) = case (primOpNameInfo op) of (_,n) -> ((s,pRELUDE),n)
+    prim_fn  op     = case (primOpNameInfo op) of (s,n) -> ((OrigName gHC_BUILTINS s),n)
+    funny_fn (op,s) = case (primOpNameInfo op) of (_,n) -> ((OrigName gHC_BUILTINS s),n)
 
 funny_name_primops
   = [ (IntAddOp,      SLIT("+#"))
@@ -306,30 +310,30 @@ funny_name_primops
 Ids, Synonyms, Classes and ClassOps with builtin keys.
 For the Ids we may also have some builtin IdInfo.
 \begin{code}
-id_keys_infos :: [((FAST_STRING,Module), Unique, Maybe IdInfo)]
+id_keys_infos :: [(OrigName, Unique, Maybe IdInfo)]
 id_keys_infos
   = [ -- here so we can check the type of main/mainPrimIO
-      ((SLIT("main"),SLIT("Main")),	  mainIdKey,	   Nothing)
-    , ((SLIT("mainPrimIO"),SLIT("Main")), mainPrimIOIdKey, Nothing)
+      (OrigName SLIT("Main") SLIT("main"),	  mainIdKey,	  Nothing)
+    , (OrigName SLIT("Main") SLIT("mainPrimIO"), mainPrimIOIdKey, Nothing)
 
       -- here because we use them in derived instances
-    , ((SLIT("&&"), 	     pRELUDE),	andandIdKey,	Nothing)
-    , ((SLIT("."),  	     pRELUDE),	composeIdKey,	Nothing)
-    , ((SLIT("lex"), 	     pRELUDE),	lexIdKey,	Nothing)
-    , ((SLIT("not"), 	     pRELUDE),	notIdKey,	Nothing)
-    , ((SLIT("readParen"),   pRELUDE),	readParenIdKey,	Nothing)
-    , ((SLIT("showParen"),   pRELUDE),	showParenIdKey,	Nothing)
-    , ((SLIT("showString"),  pRELUDE),	showStringIdKey,Nothing)
-    , ((SLIT("__readList"),  pRELUDE),	ureadListIdKey,	Nothing)
-    , ((SLIT("__showList"),  pRELUDE),	ushowListIdKey,	Nothing)
-    , ((SLIT("__showSpace"), pRELUDE),	showSpaceIdKey,	Nothing)
+    , (OrigName pRELUDE SLIT("&&"),		andandIdKey,	Nothing)
+    , (OrigName pRELUDE SLIT("."),		composeIdKey,	Nothing)
+    , (OrigName pRELUDE SLIT("lex"),		lexIdKey,	Nothing)
+    , (OrigName pRELUDE SLIT("not"),		notIdKey,	Nothing)
+    , (OrigName pRELUDE SLIT("readParen"),	readParenIdKey,	Nothing)
+    , (OrigName pRELUDE SLIT("showParen"),	showParenIdKey,	Nothing)
+    , (OrigName pRELUDE SLIT("showString"),	showStringIdKey,Nothing)
+    , (OrigName gHC__   SLIT("readList__"),	ureadListIdKey,	Nothing)
+    , (OrigName gHC__   SLIT("showList__"),	ushowListIdKey,	Nothing)
+    , (OrigName gHC__   SLIT("showSpace"),	showSpaceIdKey,	Nothing)
     ]
 
 tysyn_keys
-  = [ ((SLIT("IO"),pRELUDE),       (iOTyConKey, RnImplicitTyCon))
-    , ((SLIT("Rational"),rATIO),   (rationalTyConKey, RnImplicitTyCon))
-    , ((SLIT("Ratio"),rATIO),      (ratioTyConKey, RnImplicitTyCon))
-    , ((SLIT("Ordering"),pRELUDE), (orderingTyConKey, RnImplicitTyCon))
+  = [ (OrigName gHC__   SLIT("IO"),       (iOTyConKey, RnImplicitTyCon))
+    , (OrigName pRELUDE SLIT("Ordering"), (orderingTyConKey, RnImplicitTyCon))
+    , (OrigName rATIO   SLIT("Rational"), (rationalTyConKey, RnImplicitTyCon))
+    , (OrigName rATIO   SLIT("Ratio"),    (ratioTyConKey, RnImplicitTyCon))
     ]
 
 -- this "class_keys" list *must* include:
@@ -338,41 +342,41 @@ tysyn_keys
 
 class_keys
   = [ (str_mod, (k, RnImplicitClass)) | (str_mod,k) <-
-    [ ((SLIT("Eq"),pRELUDE),		eqClassKey)		-- mentioned, derivable
-    , ((SLIT("Eval"),pRELUDE),		evalClassKey)		-- mentioned
-    , ((SLIT("Ord"),pRELUDE),		ordClassKey)		-- derivable
-    , ((SLIT("Num"),pRELUDE),		numClassKey)		-- mentioned, numeric
-    , ((SLIT("Real"),pRELUDE),		realClassKey)		-- numeric
-    , ((SLIT("Integral"),pRELUDE),	integralClassKey)	-- numeric
-    , ((SLIT("Fractional"),pRELUDE),	fractionalClassKey)	-- numeric
-    , ((SLIT("Floating"),pRELUDE),	floatingClassKey)	-- numeric
-    , ((SLIT("RealFrac"),pRELUDE),	realFracClassKey)	-- numeric
-    , ((SLIT("RealFloat"),pRELUDE),	realFloatClassKey)	-- numeric
-    , ((SLIT("Ix"),iX),			ixClassKey)		-- derivable (but it isn't Prelude.Ix; hmmm)
-    , ((SLIT("Bounded"),pRELUDE),	boundedClassKey)	-- derivable
-    , ((SLIT("Enum"),pRELUDE),		enumClassKey)		-- derivable
-    , ((SLIT("Show"),pRELUDE),		showClassKey)		-- derivable
-    , ((SLIT("Read"),pRELUDE),		readClassKey)		-- derivable
-    , ((SLIT("Monad"),pRELUDE),		monadClassKey)
-    , ((SLIT("MonadZero"),pRELUDE),	monadZeroClassKey)
-    , ((SLIT("MonadPlus"),pRELUDE),	monadPlusClassKey)
-    , ((SLIT("Functor"),pRELUDE),	functorClassKey)
-    , ((SLIT("_CCallable"),pRELUDE),	cCallableClassKey)	-- mentioned, ccallish
-    , ((SLIT("_CReturnable"),pRELUDE), 	cReturnableClassKey)	-- mentioned, ccallish
+    [ (OrigName pRELUDE SLIT("Eq"),		eqClassKey)		-- mentioned, derivable
+    , (OrigName pRELUDE SLIT("Eval"),		evalClassKey)		-- mentioned
+    , (OrigName pRELUDE SLIT("Ord"),		ordClassKey)		-- derivable
+    , (OrigName pRELUDE SLIT("Num"),		numClassKey)		-- mentioned, numeric
+    , (OrigName pRELUDE SLIT("Real"),		realClassKey)		-- numeric
+    , (OrigName pRELUDE SLIT("Integral"),	integralClassKey)	-- numeric
+    , (OrigName pRELUDE SLIT("Fractional"),	fractionalClassKey)	-- numeric
+    , (OrigName pRELUDE SLIT("Floating"),	floatingClassKey)	-- numeric
+    , (OrigName pRELUDE SLIT("RealFrac"),	realFracClassKey)	-- numeric
+    , (OrigName pRELUDE SLIT("RealFloat"),	realFloatClassKey)	-- numeric
+    , (OrigName iX	SLIT("Ix"),		ixClassKey)		-- derivable (but it isn't Prelude.Ix; hmmm)
+    , (OrigName pRELUDE SLIT("Bounded"),	boundedClassKey)	-- derivable
+    , (OrigName pRELUDE SLIT("Enum"),		enumClassKey)		-- derivable
+    , (OrigName pRELUDE SLIT("Show"),		showClassKey)		-- derivable
+    , (OrigName pRELUDE SLIT("Read"),		readClassKey)		-- derivable
+    , (OrigName pRELUDE SLIT("Monad"),		monadClassKey)
+    , (OrigName pRELUDE SLIT("MonadZero"),	monadZeroClassKey)
+    , (OrigName pRELUDE SLIT("MonadPlus"),	monadPlusClassKey)
+    , (OrigName pRELUDE SLIT("Functor"),	functorClassKey)
+    , (OrigName gHC__	SLIT("CCallable"),	cCallableClassKey)	-- mentioned, ccallish
+    , (OrigName gHC__   SLIT("CReturnable"), 	cReturnableClassKey)	-- mentioned, ccallish
     ]]
 
 class_op_keys
   = [ (str_mod, (k, RnImplicit)) | (str_mod,k) <-
-    [ ((SLIT("fromInt"),pRELUDE),	fromIntClassOpKey)
-    , ((SLIT("fromInteger"),pRELUDE),	fromIntegerClassOpKey)
-    , ((SLIT("fromRational"),pRELUDE),	fromRationalClassOpKey)
-    , ((SLIT("enumFrom"),pRELUDE),	enumFromClassOpKey)
-    , ((SLIT("enumFromThen"),pRELUDE),	enumFromThenClassOpKey)
-    , ((SLIT("enumFromTo"),pRELUDE),	enumFromToClassOpKey)
-    , ((SLIT("enumFromThenTo"),pRELUDE),enumFromThenToClassOpKey)
-    , ((SLIT("=="),pRELUDE),		eqClassOpKey)
-    , ((SLIT(">>="),pRELUDE),		thenMClassOpKey)
-    , ((SLIT("zero"),pRELUDE),		zeroClassOpKey)
+    [ (OrigName pRELUDE SLIT("fromInt"),	fromIntClassOpKey)
+    , (OrigName pRELUDE SLIT("fromInteger"),	fromIntegerClassOpKey)
+    , (OrigName pRELUDE SLIT("fromRational"),	fromRationalClassOpKey)
+    , (OrigName pRELUDE SLIT("enumFrom"),	enumFromClassOpKey)
+    , (OrigName pRELUDE SLIT("enumFromThen"),	enumFromThenClassOpKey)
+    , (OrigName pRELUDE SLIT("enumFromTo"),	enumFromToClassOpKey)
+    , (OrigName pRELUDE SLIT("enumFromThenTo"),enumFromThenToClassOpKey)
+    , (OrigName pRELUDE SLIT("=="),		eqClassOpKey)
+    , (OrigName pRELUDE SLIT(">>="),		thenMClassOpKey)
+    , (OrigName pRELUDE SLIT("zero"),		zeroClassOpKey)
     ]]
 \end{code}
 

@@ -31,7 +31,7 @@ module Inst (
 IMP_Ubiq()
 
 import HsSyn	( HsLit(..), HsExpr(..), HsBinds, 
-		  InPat, OutPat, Stmt, Qual, Match,
+		  InPat, OutPat, Stmt, Qualifier, Match,
 		  ArithSeqInfo, PolyType, Fake )
 import RnHsSyn	( RenamedArithSeqInfo(..), RenamedHsExpr(..) )
 import TcHsSyn	( TcIdOcc(..), TcExpr(..), TcIdBndr(..),

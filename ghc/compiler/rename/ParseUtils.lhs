@@ -20,11 +20,11 @@ import ErrUtils		( Error(..) )
 import FiniteMap	( unitFM, listToFM, lookupFM, plusFM, FiniteMap )
 import Maybes		( maybeToBool, MaybeErr(..) )
 import Name		( isLexConId, isLexVarId, isLexConSym,
-			  mkTupNameStr,
+			  mkTupNameStr, preludeQual, isRdrLexCon,
 			  RdrName(..){-instance Outputable:ToDo:rm-}
 			)
 import PprStyle		( PprStyle(..) ) -- ToDo: rm debugging
-import PrelMods		( fromPrelude )
+import PrelMods		( pRELUDE )
 import Pretty		( ppCat, ppPStr, ppInt, ppShow, ppStr )
 import SrcLoc		( mkIfaceSrcLoc )
 import Util		( startsWith, isIn, panic, assertPanic )
@@ -37,7 +37,7 @@ type UsagesMap	      = FiniteMap Module (Version, VersionsMap)
 			-- representing all the instances def'd in that module
 type VersionsMap      = FiniteMap FAST_STRING Version
 			-- Versions for things def'd in this module
-type ExportsMap       = FiniteMap FAST_STRING (RdrName, ExportFlag)
+type ExportsMap       = FiniteMap FAST_STRING (OrigName, ExportFlag)
 type FixitiesMap      = FiniteMap FAST_STRING RdrNameFixityDecl
 type LocalTyDefsMap   = FiniteMap FAST_STRING RdrIfaceDecl -- for TyCon/Class
 type LocalValDefsMap  = FiniteMap FAST_STRING RdrIfaceDecl -- for values incl DataCon
@@ -65,13 +65,14 @@ data ParsedIface
 
 data RdrIfaceDecl
   = TypeSig    RdrName           	   SrcLoc RdrNameTyDecl
-  | NewTypeSig RdrName RdrName	 	   SrcLoc RdrNameTyDecl
+  | NewTypeSig RdrName RdrName		   SrcLoc RdrNameTyDecl
   | DataSig    RdrName [RdrName] [RdrName] SrcLoc RdrNameTyDecl
   | ClassSig   RdrName [RdrName] 	   SrcLoc RdrNameClassDecl
   | ValSig     RdrName           	   SrcLoc RdrNamePolyType
 				 
 data RdrIfaceInst		 
-  = InstSig    RdrName RdrName   SrcLoc RdrNameInstDecl
+  = InstSig    RdrName RdrName  SrcLoc (Module -> RdrNameInstDecl)
+	-- InstDecl minus a Module name
 \end{code}
 
 \begin{code}
@@ -97,13 +98,14 @@ data IfaceToken
   | ITinfix
   | ITbang		-- magic symbols
   | ITvbar
-  | ITbquote
   | ITdcolon
   | ITcomma
   | ITdarrow
   | ITdotdot
   | ITequal
   | ITocurly
+  | ITdccurly
+  | ITdocurly
   | ITobrack
   | IToparen
   | ITrarrow
@@ -132,60 +134,56 @@ de_qual (Qual _ n) = n
 en_mono :: FAST_STRING -> RdrNameMonoType
 en_mono tv = MonoTyVar (Unqual tv)
 
+{-OLD:
 type2context (MonoTupleTy tys) = map type2class_assertion tys
 type2context other_ty	       = [ type2class_assertion other_ty ]
 
 type2class_assertion (MonoTyApp clas [MonoTyVar tyvar]) = (clas, tyvar)
 type2class_assertion _ = panic "type2class_assertion: bad format"
+-}
 
 -----------------------------------------------------------------
 mk_type	:: (RdrName, [FAST_STRING])
 	-> RdrNameMonoType
 	-> LocalTyDefsMap
 
-mk_type (qtycon, tyvars) ty
+mk_type (qtycon@(Qual mod tycon), tyvars) ty
   = let
-	tycon   = de_qual qtycon
 	qtyvars = map Unqual tyvars
     in
-    unitFM tycon (TypeSig qtycon mkIfaceSrcLoc (
-		  TySynonym qtycon qtyvars ty mkIfaceSrcLoc))
+    unitFM tycon (TypeSig qtycon mkIfaceSrcLoc $
+		  TySynonym qtycon qtyvars ty mkIfaceSrcLoc)
 
 mk_data	:: RdrNameContext
 	-> (RdrName, [FAST_STRING])
 	-> [(RdrName, RdrNameConDecl)]
 	-> (LocalTyDefsMap, LocalValDefsMap)
 
-mk_data ctxt (qtycon, tyvars) names_and_constrs
+mk_data ctxt (qtycon@(Qual mod tycon), tyvars) names_and_constrs
   = let
-	(qconnames, constrs) = unzip names_and_constrs
-	qfieldnames = [] -- ToDo ...
-	tycon      = de_qual qtycon
-	connames   = map de_qual qconnames
-	fieldnames = map de_qual qfieldnames
+	(qthingnames, constrs) = unzip names_and_constrs
+	(qconnames, qfieldnames) = partition isRdrLexCon qthingnames
+	thingnames = [ t | (Qual _ t) <- qthingnames]
 	qtyvars    = map Unqual tyvars
 	
-	decl = DataSig qtycon qconnames qfieldnames mkIfaceSrcLoc (
-		TyData ctxt qtycon qtyvars constrs Nothing noDataPragmas mkIfaceSrcLoc)
+	decl = DataSig qtycon qconnames qfieldnames mkIfaceSrcLoc $
+		TyData ctxt qtycon qtyvars constrs Nothing noDataPragmas mkIfaceSrcLoc
     in
-    (unitFM tycon decl, listToFM [(c,decl) | c <- connames]
-			`plusFM` 
-			listToFM [(f,decl) | f <- fieldnames])
+    (unitFM tycon decl, listToFM [(t,decl) | t <- thingnames])
 
 mk_new	:: RdrNameContext
 	-> (RdrName, [FAST_STRING])
 	-> (RdrName, RdrNameMonoType)
 	-> (LocalTyDefsMap, LocalValDefsMap)
 
-mk_new ctxt (qtycon, tyvars) (qconname, ty)
-  = let
-	tycon   = de_qual qtycon
-	conname = de_qual qconname
+mk_new ctxt (qtycon@(Qual mod1 tycon), tyvars) (qconname@(Qual mod2 conname), ty)
+  = ASSERT(mod1 == mod2)
+    let
 	qtyvars = map Unqual tyvars
 	constr  = NewConDecl qconname ty mkIfaceSrcLoc
 	
-	decl = NewTypeSig qtycon qconname mkIfaceSrcLoc (
-		TyNew ctxt qtycon qtyvars [constr] Nothing noDataPragmas mkIfaceSrcLoc)
+	decl = NewTypeSig qtycon qconname mkIfaceSrcLoc $
+		TyNew ctxt qtycon qtyvars [constr] Nothing noDataPragmas mkIfaceSrcLoc
     in
     (unitFM tycon decl, unitFM conname decl)
 
@@ -194,15 +192,14 @@ mk_class :: RdrNameContext
 	 -> [(FAST_STRING, RdrNameSig)]
 	 -> (LocalTyDefsMap, LocalValDefsMap)
 
-mk_class ctxt (qclas, tyvar) ops_and_sigs
+mk_class ctxt (qclas@(Qual mod clas), tyvar) ops_and_sigs
   = case (unzip ops_and_sigs) of { (opnames, sigs) ->
     let
-	qopnames = map Unqual opnames
-	clas	 = de_qual qclas
+	qopnames = map (Qual mod) opnames
 	op_sigs	 = map opify sigs
 
-	decl = ClassSig qclas qopnames mkIfaceSrcLoc (
-		ClassDecl ctxt qclas tyvar op_sigs EmptyMonoBinds noClassPragmas mkIfaceSrcLoc)
+	decl = ClassSig qclas qopnames mkIfaceSrcLoc $
+		ClassDecl ctxt qclas tyvar op_sigs EmptyMonoBinds noClassPragmas mkIfaceSrcLoc
     in
     (unitFM clas decl, listToFM [(o,decl) | o <- opnames]) }
   where
@@ -213,23 +210,23 @@ mk_inst	:: RdrNameContext
 	-> RdrNameMonoType  -- fish the tycon out yourself...
 	-> RdrIfaceInst
 
-mk_inst	ctxt clas mono_ty
-  = InstSig clas (tycon_name mono_ty) mkIfaceSrcLoc (
-	InstDecl clas (HsPreForAllTy ctxt mono_ty)
-	    EmptyMonoBinds False Nothing{-lying-} [{-sigs-}]
-	    noInstancePragmas mkIfaceSrcLoc)
+mk_inst	ctxt qclas@(Qual cmod cname) mono_ty
+  = InstSig qclas (tycon_name mono_ty) mkIfaceSrcLoc $ \ mod ->
+	InstDecl qclas (HsPreForAllTy ctxt mono_ty)
+	    EmptyMonoBinds False mod [{-sigs-}]
+	    noInstancePragmas mkIfaceSrcLoc
   where
     tycon_name (MonoTyApp tc _) = tc
-    tycon_name (MonoListTy   _) = Unqual SLIT("[]")
-    tycon_name (MonoFunTy  _ _) = Unqual SLIT("->")
-    tycon_name (MonoTupleTy ts) = Unqual (mkTupNameStr (length ts))
+    tycon_name (MonoListTy   _) = preludeQual SLIT("[]")
+    tycon_name (MonoFunTy  _ _) = preludeQual SLIT("->")
+    tycon_name (MonoTupleTy ts) = preludeQual (mkTupNameStr (length ts))
 
 -----------------------------------------------------------------
 lexIface :: String -> [IfaceToken]
 
-lexIface str
+lexIface input
   = _scc_ "Lexer"
-    case str of
+    case input of
       []    -> []
 
       -- whitespace and comments
@@ -240,21 +237,23 @@ lexIface str
       '{' : '-' : cs -> lex_nested_comment 1{-one seen-} cs
 
       '(' : '.' : '.' : ')' : cs -> ITdotdot	: lexIface cs
+      '{' : '{' 	    : cs -> ITdocurly	: lexIface cs
+      '}' : '}' 	    : cs -> ITdccurly	: lexIface cs
+      '{'		    : cs -> ITocurly	: lexIface cs
+      '}'		    : cs -> ITccurly	: lexIface cs
       '('		    : cs -> IToparen	: lexIface cs
       ')'		    : cs -> ITcparen	: lexIface cs
       '['		    : cs -> ITobrack	: lexIface cs
       ']'		    : cs -> ITcbrack	: lexIface cs
-      '{'		    : cs -> ITocurly	: lexIface cs
-      '}'		    : cs -> ITccurly	: lexIface cs
       ','		    : cs -> ITcomma	: lexIface cs
       ';'		    : cs -> ITsemi	: lexIface cs
-      '`'		    : cs -> ITbquote	: lexIface cs
       
-      '_' 		    : cs -> lex_name Nothing is_var_sym str
-      c : cs | isUpper c	 -> lex_word str -- don't know if "Module." on front or not
-	     | isDigit c 	 -> lex_num  str
-	     | isAlpha c	 -> lex_name Nothing is_var_sym str
-	     | is_sym_sym c	 -> lex_name Nothing is_sym_sym str
+      '_' : '_' : cs -> lex_keyword cs
+
+      c : cs | isUpper c	 -> lex_word input -- don't know if "Module." on front or not
+	     | isDigit c 	 -> lex_num  input
+	     | isAlpha c	 -> lex_name Nothing is_var_sym input
+	     | is_sym_sym c	 -> lex_name Nothing is_sym_sym input
 	     
       other -> error ("lexing:"++other)
   where
@@ -285,6 +284,7 @@ lexIface str
 
     is_var_sym1 '\'' = False
     is_var_sym1 '#'  = False
+    is_var_sym1 '_'  = False
     is_var_sym1 c    = is_var_sym c
 
     is_sym_sym c = c `elem` ":!#$%&*+./<=>?@\\^|-~" -- ToDo: add ISOgraphic
@@ -297,10 +297,9 @@ lexIface str
 	  Just (m,rest) -> lex_name (Just m) (in_the_club rest) rest
       where
 	in_the_club []    = panic "lex_word:in_the_club"
-	in_the_club (c:_) | isAlpha    c = is_var_sym
-			  | c == '_'     = is_var_sym
-			  | is_sym_sym c = is_sym_sym
-			  | otherwise    = panic ("lex_word:in_the_club="++[c])
+	in_the_club (x:_) | isAlpha    x = is_var_sym
+			  | is_sym_sym x = is_sym_sym
+			  | otherwise    = panic ("lex_word:in_the_club="++[x])
 
     module_dot (c:cs)
       = if not (isUpper c) || c == '\'' then
@@ -312,6 +311,13 @@ lexIface str
 	     (r:rs) | r == '.' -> Just (_PK_ (c:word), rs)
 	     _		       -> Nothing
 	   }
+
+    lex_keyword str
+      = case (span is_var_sym str)    of { (kw, rest) ->
+	case (lookupFM keywordsFM kw) of
+	  Nothing -> panic ("lex_keyword:"++str)
+	  Just xx -> xx : lexIface rest
+	}
 
     lex_name module_dot in_the_club str
       =	case (span in_the_club str)     of { (word, rest) ->
@@ -335,7 +341,7 @@ lexIface str
 		 categ n (ITconid  n) (ITvarid  n) (ITconsym  n) (ITvarsym  n)
 	       Just m ->
 		 let
-		     q = if fromPrelude m then Unqual n else Qual m n
+		     q = Qual m n
 		 in
 		 categ n (ITqconid q) (ITqvarid q) (ITqconsym q) (ITqvarsym q)
 
@@ -353,14 +359,14 @@ lexIface str
     keywordsFM = listToFM [
 	("interface",	 ITinterface)
 
-       ,("__usages__",		ITusages)
-       ,("__versions__",	ITversions)
-       ,("__exports__",		ITexports)
-       ,("__instance_modules__",ITinstance_modules)
-       ,("__instances__",	ITinstances)
-       ,("__fixities__",	ITfixities)
-       ,("__declarations__",	ITdeclarations)
-       ,("__pragmas__",		ITpragmas)
+       ,("usages__",		ITusages)
+       ,("versions__",		ITversions)
+       ,("exports__",		ITexports)
+       ,("instance_modules__",	ITinstance_modules)
+       ,("instances__",		ITinstances)
+       ,("fixities__",		ITfixities)
+       ,("declarations__",	ITdeclarations)
+       ,("pragmas__",		ITpragmas)
 
        ,("data",		ITdata)
        ,("type",		ITtype)

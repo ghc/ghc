@@ -34,11 +34,12 @@ import Digraph		( stronglyConnComp )
 import ErrUtils		( addErrLoc, addShortErrLocLine )
 import Name		( RdrName )
 import Maybes		( catMaybes )
+import PprStyle--ToDo:rm
 import Pretty
 import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
 			  unionUniqSets, unionManyUniqSets,
 			  elementOfUniqSet, uniqSetToList, UniqSet(..) )
-import Util		( thenCmp, isIn, removeDups, panic, panic#, assertPanic )
+import Util		( thenCmp, isIn, removeDups, panic, panic#, assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -261,7 +262,7 @@ rnMonoBinds mbinds siglist
 
 	 -- Do the SCC analysis
     let vertices = mkVertices mbinds_info
-	edges	= mkEdges vertices mbinds_info
+	edges	= mkEdges     mbinds_info
 
 	scc_result = stronglyConnComp (==) edges vertices
 
@@ -316,9 +317,9 @@ flattenMonoBinds :: Int				-- Next free vertex tag
 
 flattenMonoBinds uniq sigs EmptyMonoBinds = returnRn (uniq, [])
 
-flattenMonoBinds uniq sigs (AndMonoBinds mB1 mB2)
-  = flattenMonoBinds uniq sigs mB1	`thenRn` \ (uniq1, flat1) ->
-    flattenMonoBinds uniq1 sigs mB2	`thenRn` \ (uniq2, flat2) ->
+flattenMonoBinds uniq sigs (AndMonoBinds bs1 bs2)
+  = flattenMonoBinds uniq  sigs bs1	`thenRn` \ (uniq1, flat1) ->
+    flattenMonoBinds uniq1 sigs bs2	`thenRn` \ (uniq2, flat2) ->
     returnRn (uniq2, flat1 ++ flat2)
 
 flattenMonoBinds uniq sigs (PatMonoBind pat grhss_and_binds locn)
@@ -471,27 +472,28 @@ type FlatMonoBindsInfo
     ]
 
 mkVertices :: FlatMonoBindsInfo -> [VertexTag]
+mkEdges    :: FlatMonoBindsInfo -> [Edge]
+
 mkVertices info = [ vertex | (vertex,_,_,_,_) <- info]
 
-mkEdges :: [VertexTag] -> FlatMonoBindsInfo -> [Edge]
-
-mkEdges vertices flat_info
+mkEdges flat_info
  -- An edge (v,v') indicates that v depends on v'
- = [ (source_vertex, target_vertex)
-   | (source_vertex, _, used_names, _, _) <- flat_info,
-     target_name   <- uniqSetToList used_names,
-     target_vertex <- vertices_defining target_name flat_info
-   ]
-   where
-   -- If each name only has one binding in this group, then
-   -- vertices_defining will always return the empty list, or a
-   -- singleton.  The case when there is more than one binding (an
-   -- error) needs more thought.
+  = -- pprTrace "mkEdges:" (ppAboves [ppAboves[ppInt v, ppCat [ppr PprDebug d|d <- uniqSetToList defd], ppCat [ppr PprDebug u|u <- uniqSetToList used]] | (v,defd,used,_,_) <- flat_info]) $
+    [ (source_vertex, target_vertex)
+    | (source_vertex, _, used_names, _, _) <- flat_info,
+      target_name   <- uniqSetToList used_names,
+      target_vertex <- vertices_defining target_name flat_info
+    ]
+    where
+    -- If each name only has one binding in this group, then
+    -- vertices_defining will always return the empty list, or a
+    -- singleton.  The case when there is more than one binding (an
+    -- error) needs more thought.
 
-   vertices_defining name flat_info2
-    = [ vertex |  (vertex, names_defined, _, _, _) <- flat_info2,
-		name `elementOfUniqSet` names_defined
-      ]
+    vertices_defining name flat_info2
+     = [ vertex |  (vertex, names_defined, _, _, _) <- flat_info2,
+		 name `elementOfUniqSet` names_defined
+       ]
 \end{code}
 
 

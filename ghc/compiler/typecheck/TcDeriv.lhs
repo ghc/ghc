@@ -33,13 +33,12 @@ import RnBinds		( rnMethodBinds, rnTopBinds )
 
 import Bag		( emptyBag{-ToDo:rm-}, Bag, isEmptyBag, unionBags, listToBag )
 import Class		( classKey, needsDataDeclCtxtClassKeys, GenClass )
-import CmdLineOpts	( opt_CompilingPrelude )
 import ErrUtils		( pprBagOfErrors, addErrLoc, Error(..) )
 import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
 import Maybes		( maybeToBool, Maybe(..) )
-import Name		( moduleNamePair, isLocallyDefined, getSrcLoc,
+import Name		( isLocallyDefined, getSrcLoc,
 			  mkTopLevName, origName, mkImplicitName, ExportFlag(..),
-			  RdrName{-instance Outputable-}, Name{--O only-}
+			  RdrName(..), Name{--O only-}
 			)
 import Outputable	( Outputable(..){-instances e.g., (,)-} )
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
@@ -56,7 +55,7 @@ import Type		( GenType(..), TauType(..), mkTyVarTys, applyTyCon,
 			  mkSigmaTy, mkDictTy, isPrimType, instantiateTy,
 			  getAppDataTyCon, getAppTyCon
 			)
-import TysWiredIn	( voidTy )
+import TysPrim		( voidTy )
 import TyVar		( GenTyVar )
 import UniqFM		( emptyUFM )
 import Unique		-- Keys stuff
@@ -223,7 +222,7 @@ tcDeriving modname rn_env inst_decl_infos_in fixities
     gen_tag_n_con_binds rn_env nm_alist_etc
 				`thenTc` \ (extra_binds, deriver_rn_env) ->
 
-    mapTc (gen_inst_info maybe_mod fixities deriver_rn_env) new_inst_infos
+    mapTc (gen_inst_info modname fixities deriver_rn_env) new_inst_infos
 				`thenTc` \ really_new_inst_infos ->
     let
 	ddump_deriv = ddump_deriving really_new_inst_infos extra_binds
@@ -234,8 +233,6 @@ tcDeriving modname rn_env inst_decl_infos_in fixities
 	      extra_binds,
 	      ddump_deriv)
   where
-    maybe_mod = if opt_CompilingPrelude then Nothing else Just modname
-
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> (PprStyle -> Pretty)
 
     ddump_deriving inst_infos extra_binds sty
@@ -558,7 +555,7 @@ the renamer.  What a great hack!
 \end{itemize}
 
 \begin{code}
-gen_inst_info :: Maybe Module		-- Module name; Nothing => Prelude
+gen_inst_info :: Module			-- Module name
 	      -> [RenamedFixityDecl]	-- all known fixities;
 					-- may be needed for Text
 	      -> RnEnv			-- lookup stuff for names we may use
@@ -626,7 +623,7 @@ gen_inst_info modname fixities deriver_rn_env
 		       from_here modname locn [])
   where
     clas_key  = classKey clas
-    clas_Name = RnImplicitClass (mkImplicitName clas_key (origName clas))
+    clas_Name = RnImplicitClass (mkImplicitName clas_key (origName "gen_inst_info" clas))
 \end{code}
 
 %************************************************************************
@@ -660,7 +657,8 @@ gen_tag_n_con_binds rn_env nm_alist_etc
     in
     tcGetUniques (length names_to_add)	`thenNF_Tc` \ uniqs ->
     let
-	pairs_to_add = [ (pn, mkRnName (mkTopLevName u pn mkGeneratedSrcLoc ExportAll []))
+	pairs_to_add = [ case pn of { Qual pnm pnn ->
+			 (pn, mkRnName (mkTopLevName u (OrigName pnm pnn) mkGeneratedSrcLoc ExportAll [])) }
 		       | (pn,u) <- zipEqual "gen_tag..." names_to_add uniqs ]
 
 	deriver_rn_env

@@ -21,12 +21,13 @@ import RnUtils		( lookupGlobalRnEnv, lubExportFlag )
 
 import Bag		( emptyBag, unitBag, consBag, unionManyBags, unionBags, listToBag, bagToList )
 import Class		( derivableClassKeys )
+import CmdLineOpts	( opt_CompilingPrelude )
 import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine )
 import FiniteMap	( emptyFM, lookupFM, addListToFM_C )
 import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
-import Name		( Name, isLocallyDefined, isLexVarId, getLocalName, ExportFlag(..), 
-			  nameImportFlag, RdrName, pprNonSym )
+import Name		( isLocallyDefined, isLexVarId, getLocalName, ExportFlag(..), 
+			  nameImportFlag, RdrName, pprNonSym, Name )
 import Outputable	-- ToDo:rm
 import PprStyle 	-- ToDo:rm 
 import Pretty
@@ -589,7 +590,10 @@ rnFixes fixities
     	rn_fixity_pieces mk_fixity name i fix
       	  = getRnEnv `thenRn` \ env ->
 	      case lookupGlobalRnEnv env name of
-	  	Just res | isLocallyDefined res
+	  	Just res | isLocallyDefined res || opt_CompilingPrelude
+		  -- the opt_CompilingPrelude thing is a *HACK* to get (:)'s
+		  -- fixity decl to go through.  It has a builtin name, which
+		  -- doesn't respond to isLocallyDefined...  sigh.
 	  	  -> returnRn (Just (mk_fixity res i))
 	  	_ -> failButContinueRn Nothing (undefinedFixityDeclErr src_loc fix)
     in

@@ -250,7 +250,7 @@ manifestlyWHNF (Var _)	      = True
 manifestlyWHNF (Lit _)	      = True
 manifestlyWHNF (Con _ _)      = True
 manifestlyWHNF (SCC _ e)      = manifestlyWHNF e
-manifestlyWHNF (Coerce _ _ e) = _trace "manifestlyWHNF:Coerce" $ manifestlyWHNF e
+manifestlyWHNF (Coerce _ _ e) = manifestlyWHNF e
 manifestlyWHNF (Let _ e)      = False
 manifestlyWHNF (Case _ _)     = False
 
@@ -287,7 +287,7 @@ manifestlyBottom (Lit _)     	= False
 manifestlyBottom (Con  _ _)  	= False
 manifestlyBottom (Prim _ _)  	= False
 manifestlyBottom (SCC _ e)   	= manifestlyBottom e
-manifestlyBottom (Coerce _ _ e) = _trace "manifestlyBottom:Coerce" $ manifestlyBottom e
+manifestlyBottom (Coerce _ _ e) = manifestlyBottom e
 manifestlyBottom (Let _ e)	= manifestlyBottom e
 
   -- We do not assume \x.bottom == bottom:

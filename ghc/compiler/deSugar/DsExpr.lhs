@@ -13,7 +13,7 @@ IMPORT_DELOOPER(DsLoop)		-- partly to get dsBinds, partly to chk dsExpr
 
 import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
-			  Stmt(..), Match(..), Qual, HsBinds, PolyType,
+			  Stmt(..), Match(..), Qualifier, HsBinds, PolyType,
 			  GRHSsAndBinds
 			)
 import TcHsSyn		( TypecheckedHsExpr(..), TypecheckedHsBinds(..),
@@ -28,7 +28,7 @@ import DsHsSyn		( outPatType )
 import DsListComp	( dsListComp )
 import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom,
 			  mkErrorAppDs, showForErr, EquationInfo,
-			  MatchResult
+			  MatchResult, DsCoreArg(..)
 			)
 import Match		( matchWrapper )
 
@@ -54,7 +54,8 @@ import Type		( splitSigmaTy, splitFunTy, typePrimRep,
 			  getAppDataTyConExpandingDicts, getAppTyCon, applyTy,
 			  maybeBoxedPrimType
 			)
-import TysWiredIn	( mkTupleTy, voidTy, nilDataCon, consDataCon,
+import TysPrim		( voidTy )
+import TysWiredIn	( mkTupleTy, nilDataCon, consDataCon,
 			  charDataCon, charTy
 			)
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
@@ -111,7 +112,7 @@ dsExpr (HsLitOut (HsString s) _)
 	the_char = mkCon charDataCon [] [] [LitArg (MachChar (_HEAD_ s))]
 	the_nil  = mk_nil_con charTy
     in
-    mkConDs consDataCon [charTy] [the_char, the_nil]
+    mkConDs consDataCon [TyArg charTy, VarArg the_char, VarArg the_nil]
 
 -- "_" => build (\ c n -> c 'c' n)	-- LATER
 
@@ -219,7 +220,7 @@ will sort it out.
 dsExpr (SectionL expr op)
   = dsExpr op			`thenDs` \ core_op ->
     dsExpr expr			`thenDs` \ core_expr ->
-    dsExprToAtom core_expr	$ \ y_atom ->
+    dsExprToAtom (VarArg core_expr)	$ \ y_atom ->
 
     -- for the type of x, we need the type of op's 2nd argument
     let
@@ -235,7 +236,7 @@ dsExpr (SectionL expr op)
 dsExpr (SectionR op expr)
   = dsExpr op			`thenDs` \ core_op ->
     dsExpr expr			`thenDs` \ core_expr ->
-    dsExprToAtom core_expr	$ \ y_atom ->
+    dsExprToAtom (VarArg core_expr)	$ \ y_atom ->
 
     -- for the type of x, we need the type of op's 1st argument
     let
@@ -305,19 +306,18 @@ dsExpr (ExplicitListOut ty xs)
       (y:ys) ->
 	dsExpr y			    `thenDs` \ core_hd  ->
 	dsExpr (ExplicitListOut ty ys)  `thenDs` \ core_tl  ->
-	mkConDs consDataCon [ty] [core_hd, core_tl]
+	mkConDs consDataCon [TyArg ty, VarArg core_hd, VarArg core_tl]
 
 dsExpr (ExplicitTuple expr_list)
   = mapDs dsExpr expr_list	  `thenDs` \ core_exprs  ->
     mkConDs (mkTupleCon (length expr_list))
-	    (map coreExprType core_exprs)
-	    core_exprs
+	    (map (TyArg . coreExprType) core_exprs ++ map VarArg core_exprs)
 
 -- Two cases, one for ordinary constructors and one for newtype constructors
 dsExpr (HsCon con tys args)
   | isDataTyCon tycon			-- The usual datatype case
   = mapDs dsExpr args	`thenDs` \ args_exprs ->
-    mkConDs con tys args_exprs
+    mkConDs con (map TyArg tys ++ map VarArg args_exprs)
 
   | otherwise				-- The newtype case
   = ASSERT( isNewTyCon tycon )
@@ -333,26 +333,26 @@ dsExpr (HsCon con tys args)
 dsExpr (ArithSeqOut expr (From from))
   = dsExpr expr		  `thenDs` \ expr2 ->
     dsExpr from		  `thenDs` \ from2 ->
-    mkAppDs expr2 [] [from2]
+    mkAppDs expr2 [VarArg from2]
 
 dsExpr (ArithSeqOut expr (FromTo from two))
   = dsExpr expr		  `thenDs` \ expr2 ->
     dsExpr from		  `thenDs` \ from2 ->
     dsExpr two		  `thenDs` \ two2 ->
-    mkAppDs expr2 [] [from2, two2]
+    mkAppDs expr2 [VarArg from2, VarArg two2]
 
 dsExpr (ArithSeqOut expr (FromThen from thn))
   = dsExpr expr		  `thenDs` \ expr2 ->
     dsExpr from		  `thenDs` \ from2 ->
     dsExpr thn		  `thenDs` \ thn2 ->
-    mkAppDs expr2 [] [from2, thn2]
+    mkAppDs expr2 [VarArg from2, VarArg thn2]
 
 dsExpr (ArithSeqOut expr (FromThenTo from thn two))
   = dsExpr expr		  `thenDs` \ expr2 ->
     dsExpr from		  `thenDs` \ from2 ->
     dsExpr thn		  `thenDs` \ thn2 ->
     dsExpr two		  `thenDs` \ two2 ->
-    mkAppDs expr2 [] [from2, thn2, two2]
+    mkAppDs expr2 [VarArg from2, VarArg thn2, VarArg two2]
 \end{code}
 
 Record construction and update
@@ -387,7 +387,7 @@ dsExpr (RecordCon con_expr rbinds)
 	      []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showForErr lbl)
     in
     mapDs mk_arg (zipEqual "dsExpr:RecordCon" arg_tys (dataConFieldLabels con_id)) `thenDs` \ con_args ->
-    mkAppDs con_expr' [] con_args
+    mkAppDs con_expr' (map VarArg con_args)
   where
 	-- "con_expr'" is simply an application of the constructor Id
 	-- to types and (perhaps) dictionaries. This gets the constructor...
@@ -507,8 +507,7 @@ dsExpr (Dictionary dicts methods)
 
       _ ->	    -- tuple 'em up
 	   mkConDs (mkTupleCon num_of_d_and_ms)
-		   (map coreExprType core_d_and_ms)
-		   core_d_and_ms
+		   (map (TyArg . coreExprType) core_d_and_ms ++ map VarArg core_d_and_ms)
     )
   where
     dicts_and_methods	    = dicts ++ methods
@@ -562,8 +561,6 @@ We're doing all this so we can saturate constructors (as painlessly as
 possible).
 
 \begin{code}
-type DsCoreArg = GenCoreArg CoreExpr{-NB!-} TyVar UVar
-
 dsApp :: TypecheckedHsExpr	-- expr to desugar
       -> [DsCoreArg]		-- accumulated ty/val args: NB:
       -> DsM CoreExpr	-- final result
@@ -591,35 +588,20 @@ dsApp (TyApp expr tys) args
 dsApp (HsVar v) args
   = lookupEnvDs v	`thenDs` \ maybe_expr ->
     case maybe_expr of
-      Just expr -> apply_to_args expr args
+      Just expr -> mkAppDs expr args
 
       Nothing -> -- we're only saturating constructors and PrimOps
 	case getIdUnfolding v of
 	  GenForm _ the_unfolding EssentialUnfolding
 	    -> do_unfold nullTyVarEnv nullIdEnv (unTagBinders the_unfolding) args
 
-	  _ -> apply_to_args (Var v) args
+	  _ -> mkAppDs (Var v) args
 
 
 dsApp anything_else args
   = dsExpr anything_else	`thenDs` \ core_expr ->
-    apply_to_args core_expr args
-
--- a DsM version of mkGenApp:
-apply_to_args :: CoreExpr -> [DsCoreArg] -> DsM CoreExpr
-
-apply_to_args fun args
-  = let
-	(ty_args, val_args) = foldr sep ([],[]) args
-    in
-    mkAppDs fun ty_args val_args
-  where
-    sep a@(LitArg l)   (tys,vals) = (tys,    (Lit l):vals)
-    sep a@(VarArg e)   (tys,vals) = (tys,    e:vals)
-    sep a@(TyArg ty)   (tys,vals) = (ty:tys, vals)
-    sep a@(UsageArg _) _	  = panic "DsExpr:apply_to_args:UsageArg"
+    mkAppDs core_expr args
 \end{code}
-
 
 \begin{code}
 dsRbinds :: TypecheckedRecordBinds		-- The field bindings supplied
@@ -632,9 +614,9 @@ dsRbinds [] continue_with
   = continue_with []
 
 dsRbinds ((sel_id, rhs, pun_flag) : rbinds) continue_with
-  = dsExpr rhs		`thenDs` \ rhs' ->
-    dsExprToAtom rhs'	$ \ rhs_atom ->
-    dsRbinds rbinds	$ \ rbinds' ->
+  = dsExpr rhs		 `thenDs` \ rhs' ->
+    dsExprToAtom (VarArg rhs')	$ \ rhs_atom ->
+    dsRbinds rbinds		$ \ rbinds' ->
     continue_with ((sel_id, rhs_atom) : rbinds')
 \end{code}	
 
@@ -642,8 +624,8 @@ dsRbinds ((sel_id, rhs, pun_flag) : rbinds) continue_with
 do_unfold ty_env val_env (Lam (TyBinder tyvar) body) (TyArg ty : args)
   = do_unfold (addOneToTyVarEnv ty_env tyvar ty) val_env body args
 
-do_unfold ty_env val_env (Lam (ValBinder binder) body) (VarArg expr : args)
-  = dsExprToAtom expr  $ \ arg_atom ->
+do_unfold ty_env val_env (Lam (ValBinder binder) body) (arg@(VarArg expr) : args)
+  = dsExprToAtom arg  $ \ arg_atom ->
     do_unfold ty_env
 	      (addOneToIdEnv val_env binder (argToExpr arg_atom))
 	      body args
@@ -653,7 +635,7 @@ do_unfold ty_env val_env body args
     uniqSMtoDsM (substCoreExpr val_env ty_env body)	`thenDs` \ body' ->
 
 	-- Apply result to remaining arguments
-    apply_to_args body' args
+    mkAppDs body' args
 \end{code}
 
 Basically does the translation given in the Haskell~1.3 report:
@@ -670,7 +652,9 @@ dsDo then_id zero_id (stmt:stmts)
       ExprStmtOut expr locn a b -> 
 	do_expr expr locn		`thenDs` \ expr2 ->
 	ds_rest	    			`thenDs` \ rest  ->
-	dsApp (HsVar then_id) [TyArg a, TyArg b, VarArg expr2, VarArg rest]
+	newSysLocalDs a			`thenDs` \ ignored_result_id ->
+	dsApp (HsVar then_id) [TyArg a, TyArg b, VarArg expr2, 
+			       VarArg (mkValLam [ignored_result_id] rest)]
 
       LetStmt binds ->
         dsBinds binds	`thenDs` \ binds2 ->

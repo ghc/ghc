@@ -161,7 +161,6 @@ opt_AllStrict			= lookup  SLIT("-fall-strict")
 opt_AutoSccsOnAllToplevs	= lookup  SLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookup  SLIT("-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs	= lookup  SLIT("-fauto-sccs-on-individual-cafs")
-opt_CompilingPrelude		= lookup  SLIT("-fcompiling-prelude")
 opt_D_dump_absC			= lookup  SLIT("-ddump-absC")
 opt_D_dump_asm			= lookup  SLIT("-ddump-asm")
 opt_D_dump_deforest		= lookup  SLIT("-ddump-deforest")
@@ -216,6 +215,8 @@ opt_SpecialiseTrace		= lookup  SLIT("-ftrace-specialisation")
 opt_SpecialiseUnboxed		= lookup  SLIT("-fspecialise-unboxed")
 opt_StgDoLetNoEscapes		= lookup  SLIT("-flet-no-escape")
 opt_Verbose			= lookup  SLIT("-v")
+opt_CompilingPrelude		= maybeToBool maybe_CompilingPrelude
+maybe_CompilingPrelude		= lookup_str "-fcompiling-prelude="
 opt_SccGroup  			= lookup_str "-G="
 opt_ProduceC  			= lookup_str "-C="
 opt_ProduceS  			= lookup_str "-S="

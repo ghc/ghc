@@ -13,7 +13,7 @@ import HsPragmas	( noGenPragmas )
 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM )
-import Name		( ExportFlag(..), mkTupNameStr,
+import Name		( ExportFlag(..), mkTupNameStr, preludeQual,
 			  RdrName(..){-instance Outputable:ToDo:rm-}
 			)
 import Outputable	-- ToDo:rm
@@ -43,9 +43,9 @@ parseIface = parseIToks . lexIface
 	DECLARATIONS_PART   { ITdeclarations }
 	PRAGMAS_PART	    { ITpragmas }
 	BANG		    { ITbang }
-	BQUOTE		    { ITbquote }
 	CBRACK		    { ITcbrack }
 	CCURLY		    { ITccurly }
+	DCCURLY		    { ITdccurly }
 	CLASS		    { ITclass }
 	COMMA		    { ITcomma }
 	CPAREN		    { ITcparen }
@@ -61,6 +61,7 @@ parseIface = parseIToks . lexIface
 	NEWTYPE		    { ITnewtype }
 	OBRACK		    { ITobrack }
 	OCURLY		    { ITocurly }
+	DOCURLY		    { ITdocurly }
 	OPAREN		    { IToparen }
 	RARROW		    { ITrarrow }
 	SEMI		    { ITsemi }
@@ -123,7 +124,7 @@ name_version_pairs  :  name_version_pair
 			{ $1 `snocBag` $2 }
 
 name_version_pair   ::	{ (FAST_STRING, Int) }
-name_version_pair   :  iname INTEGER
+name_version_pair   :  name INTEGER
 			{ ($1, fromInteger $2)
 --------------------------------------------------------------------------
 			}
@@ -132,12 +133,12 @@ exports_part	:: { ExportsMap }
 exports_part	:  EXPORTS_PART export_items { bagToFM $2 }
 		|			     { emptyFM }
 
-export_items	:: { Bag (FAST_STRING, (RdrName, ExportFlag)) }
+export_items	:: { Bag (FAST_STRING, (OrigName, ExportFlag)) }
 export_items	:  export_item		    { unitBag $1 }
 		|  export_items export_item { $1 `snocBag` $2 }
 
-export_item	:: { (FAST_STRING, (RdrName, ExportFlag)) }
-export_item	:  qiname maybe_dotdot	    { (de_qual $1, ($1, $2)) }
+export_item	:: { (FAST_STRING, (OrigName, ExportFlag)) }
+export_item	:  CONID name maybe_dotdot { ($2, (OrigName $1 $2, $3)) }
 
 maybe_dotdot	:: { ExportFlag }
 maybe_dotdot	:  DOTDOT { ExportAll }
@@ -164,9 +165,9 @@ fixes		:  fix  	{ case $1 of (k,v) -> unitFM k v }
 		|  fixes fix	{ case $2 of (k,v) -> addToFM $1 k v }
 
 fix		:: { (FAST_STRING, RdrNameFixityDecl) }
-fix		:  INFIXL INTEGER qop SEMI { (de_qual $3, InfixL $3 (fromInteger $2)) }
-		|  INFIXR INTEGER qop SEMI { (de_qual $3, InfixR $3 (fromInteger $2)) }
-		|  INFIX  INTEGER qop SEMI { (de_qual $3, InfixN $3 (fromInteger $2))
+fix		:  INFIXL INTEGER qname SEMI { (de_qual $3, InfixL $3 (fromInteger $2)) }
+		|  INFIXR INTEGER qname SEMI { (de_qual $3, InfixR $3 (fromInteger $2)) }
+		|  INFIX  INTEGER qname SEMI { (de_qual $3, InfixN $3 (fromInteger $2))
 --------------------------------------------------------------------------
 				      }
 
@@ -217,8 +218,7 @@ decl		:: { (FAST_STRING, RdrNameSig) }
 decl		:  var DCOLON ctype SEMI { (de_qual $1, Sig $1 $3 noGenPragmas mkIfaceSrcLoc) }
 
 context		:: { RdrNameContext }
-context		:  OPAREN context_list CPAREN	{ reverse $2 }
-		|  class			{ [$1] }
+context		:  DOCURLY context_list DCCURLY	{ reverse $2 }
 
 context_list	:: { RdrNameContext{-reversed-} }
 context_list	:  class			{ [$1] }
@@ -228,8 +228,8 @@ class		:: { (RdrName, RdrName) }
 class		:  gtycon VARID			{ ($1, Unqual $2) }
 
 ctype		:: { RdrNamePolyType }
-ctype		: type DARROW type  { HsPreForAllTy (type2context $1) $3 }
-		| type		    { HsPreForAllTy []		      $1 }
+ctype		: context DARROW type  { HsPreForAllTy $1 $3 }
+		| type		       { HsPreForAllTy [] $1 }
 
 type		:: { RdrNameMonoType }
 type		:  btype		{ $1 }
@@ -248,9 +248,9 @@ btype		:  gtyconapp		{ case $1 of (tc, tys) -> MonoTyApp tc tys }
 					  case ty1 of {
 					    MonoTyVar tv    -> MonoTyApp tv tys;
 					    MonoTyApp tc ts -> MonoTyApp tc (ts++tys);
-					    MonoFunTy t1 t2 -> MonoTyApp (Unqual SLIT("->")) (t1:t2:tys);
-					    MonoListTy ty   -> MonoTyApp (Unqual SLIT("[]")) (ty:tys);
-					    MonoTupleTy ts  -> MonoTyApp (Unqual (mkTupNameStr (length ts)))
+					    MonoFunTy t1 t2 -> MonoTyApp (preludeQual SLIT("->")) (t1:t2:tys);
+					    MonoListTy ty   -> MonoTyApp (preludeQual SLIT("[]")) (ty:tys);
+					    MonoTupleTy ts  -> MonoTyApp (preludeQual (mkTupNameStr (length ts)))
 									 (ts++tys);
 					    _		    -> pprPanic "test:" (ppr PprDebug $1)
 					  }}
@@ -280,11 +280,10 @@ ntycon		:  VARID			  { MonoTyVar (Unqual $1) }
 
 gtycon		:: { RdrName }
 gtycon		:  QCONID		{ $1 }
-		|  CONID		{ Unqual $1 }
-		|  OPAREN RARROW CPAREN	{ Unqual SLIT("->") }
-		|  OBRACK CBRACK	{ Unqual SLIT("[]") }
-		|  OPAREN CPAREN	{ Unqual SLIT("()") }
-		|  OPAREN commas CPAREN	{ Unqual (mkTupNameStr $2) }
+		|  OPAREN RARROW CPAREN	{ preludeQual SLIT("->") }
+		|  OBRACK CBRACK	{ preludeQual SLIT("[]") }
+		|  OPAREN CPAREN	{ preludeQual SLIT("()") }
+		|  OPAREN commas CPAREN	{ preludeQual (mkTupNameStr $2) }
 
 commas		:: { Int }
 commas		:  COMMA		{ 2{-1 comma => arity 2-} }
@@ -305,10 +304,8 @@ constrs		:  constr		{ [$1] }
 constr		:: { (RdrName, RdrNameConDecl) }
 constr		:  btyconapp
 		   { case $1 of (con, tys) -> (con, ConDecl con tys mkIfaceSrcLoc) }
-		|  OPAREN QCONSYM CPAREN	 { ($2, ConDecl $2 [] mkIfaceSrcLoc) }
-		|  OPAREN QCONSYM CPAREN batypes { ($2, ConDecl $2 $4 mkIfaceSrcLoc) }
-		|  OPAREN CONSYM CPAREN		 { (Unqual $2, ConDecl (Unqual $2) [] mkIfaceSrcLoc) }
-		|  OPAREN CONSYM CPAREN batypes  { (Unqual $2, ConDecl (Unqual $2) $4 mkIfaceSrcLoc) }
+		|  QCONSYM	   { ($1, ConDecl $1 [] mkIfaceSrcLoc) }
+		|  QCONSYM batypes { ($1, ConDecl $1 $2 mkIfaceSrcLoc) }
 		|  gtycon OCURLY fields CCURLY
 		   { ($1, RecConDecl $1 $3 mkIfaceSrcLoc) }
 
@@ -340,37 +337,21 @@ constr1		:: { (RdrName, RdrNameMonoType) }
 constr1		:  gtycon atype	{ ($1, $2) }
 
 var		:: { RdrName }
-var		:  QVARID		 { $1 }
-		|  OPAREN QVARSYM CPAREN { $2 }
-		|  VARID		 { Unqual $1 }
-		|  OPAREN VARSYM CPAREN  { Unqual $2 }
+var		:  QVARID		{ $1 }
+		|  QVARSYM		{ $1 }
 
-op		:: { FAST_STRING }
-op		:  BQUOTE VARID BQUOTE	{ $2 }
-		|  BQUOTE CONID BQUOTE	{ $2 }
-		|  VARSYM		{ $1 }
-		|  CONSYM		{ $1 }
-
-qop		:: { RdrName }
-qop		:  BQUOTE QVARID BQUOTE	{ $2 }
-		|  BQUOTE QCONID BQUOTE	{ $2 }
+qname		:: { RdrName }
+qname		:  QVARID		{ $1 }
+		|  QCONID		{ $1 }
 		|  QVARSYM		{ $1 }
 		|  QCONSYM		{ $1 }
-		|  op			{ Unqual $1 }
 
-iname		:: { FAST_STRING }
-iname		:  VARID		{ $1 }
-		|  CONID		{ $1 }
-		|  OPAREN VARSYM CPAREN	{ $2 }
-		|  OPAREN BANG   CPAREN	{ SLIT("!"){-sigh, double-sigh-} }
-		|  OPAREN CONSYM CPAREN	{ $2 }
-
-qiname		:: { RdrName }
-qiname		:  QVARID		    { $1 }
-		|  QCONID		    { $1 }
-		|  OPAREN QVARSYM CPAREN    { $2 }
-		|  OPAREN QCONSYM CPAREN    { $2 }
-		|  iname		    { Unqual $1 }
+name		:: { FAST_STRING }
+name		:  VARID	{ $1 }
+		|  CONID	{ $1 }
+		|  VARSYM	{ $1 }
+		|  BANG  	{ SLIT("!"){-sigh, double-sigh-} }
+		|  CONSYM	{ $1 }
 
 instances_part	:: { Bag RdrIfaceInst }
 instances_part	:  INSTANCES_PART instdecls { $2 }

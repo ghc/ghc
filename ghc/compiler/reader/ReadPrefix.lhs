@@ -17,12 +17,11 @@ import HsPragmas	( noDataPragmas, noClassPragmas, noInstancePragmas )
 import RdrHsSyn
 import PrefixToHs
 
-import CmdLineOpts	( opt_CompilingPrelude )
 import ErrUtils		( addErrLoc, ghcExit )
 import FiniteMap	( elemFM, FiniteMap )
-import Name		( RdrName(..), isRdrLexConOrSpecial )
+import Name		( RdrName(..), isRdrLexConOrSpecial, preludeQual )
 import PprStyle		( PprStyle(..) )
-import PrelMods		( fromPrelude, pRELUDE )
+import PrelMods		( pRELUDE )
 import Pretty
 import SrcLoc		( SrcLoc )
 import Util		( nOfThem, pprError, panic )
@@ -62,12 +61,9 @@ wlkQid	:: U_qid -> UgnM RdrName
 wlkQid (U_noqual name)
   = returnUgn (Unqual name)
 wlkQid (U_aqual  mod name)
-  | fromPrelude mod
-  = returnUgn (Unqual name)
-  | otherwise
   = returnUgn (Qual mod name)
 wlkQid (U_gid n name)
-  = returnUgn (Unqual name)
+  = returnUgn (preludeQual name)
 
 cvFlag :: U_long -> Bool
 cvFlag 0 = False
@@ -307,10 +303,7 @@ wlkExpr expr
 	wlkExpr nexp	`thenUgn` \ expr ->
 	-- this is a hack
 	let
-	    neg = SLIT("negate")
-	    rdr = if opt_CompilingPrelude
-	    	  then Unqual neg
-		  else Qual   pRELUDE neg
+	    rdr = preludeQual SLIT("negate")
 	in
 	returnUgn (NegApp expr (HsVar rdr))
 
@@ -570,12 +563,9 @@ wlkBinding binding
 	    binds     = cvMonoBinds sf bs
 	    uprags    = concat (map cvInstDeclSig ss)
 	    ctxt_inst_ty = HsPreForAllTy ctxt inst_ty
-	    maybe_mod = if opt_CompilingPrelude
-			then Nothing
-		        else Just modname
 	in
 	returnUgn (RdrInstDecl
-          (InstDecl clas ctxt_inst_ty binds True maybe_mod uprags noInstancePragmas src_loc))
+          (InstDecl clas ctxt_inst_ty binds True modname uprags noInstancePragmas src_loc))
 
 	-- "default" declaration
       U_dbind dbindts srcline ->

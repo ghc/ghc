@@ -363,8 +363,6 @@ stmtMacroCosts macro modes =
     UPD_BH_SINGLE_ENTRY	  ->  Cost (3, 0, 0, 1, 0)	 {- SMupdate.lh	 -}
     PUSH_STD_UPD_FRAME	  ->  Cost (3, 0, 0, 4, 0)	 {- SMupdate.lh	 -}
     POP_STD_UPD_FRAME	  ->  Cost (1, 0, 3, 0, 0)	 {- SMupdate.lh	 -}
-    SET_ARITY		  ->  nullCosts		    {- StgMacros.lh  -}
-    CHK_ARITY		  ->  nullCosts		    {- StgMacros.lh  -}
     SET_TAG		  ->  nullCosts		    {- COptRegs.lh -}
     GRAN_FETCH			->  nullCosts	  {- GrAnSim bookkeeping -}
     GRAN_RESCHEDULE		->  nullCosts	  {- GrAnSim bookkeeping -}

@@ -258,13 +258,6 @@ macroCode POP_STD_UPD_FRAME args
     returnUs (\xs -> grabRet : grabSuB : grabSuA : updSpB : xs)
 \end{code}
 
-The @SET_ARITY@ and @CHK_ARITY@ macros are disabled for ``normal''
-compilation.
-\begin{code}
-macroCode SET_ARITY args = returnUs id
-macroCode CHK_ARITY args = returnUs id
-\end{code}
-
 This one only applies if we have a machine register devoted to TagReg.
 \begin{code}
 macroCode SET_TAG [tag]

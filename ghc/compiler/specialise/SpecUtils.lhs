@@ -33,12 +33,11 @@ import Id		( idType, isDictFunId, isConstMethodId_maybe,
 			  GenId {-instance NamedThing -}
 			)
 import Maybes		( maybeToBool, catMaybes, firstJust )
-import Name		( isLexVarSym, isLexSpecialSym, pprNonSym, moduleNamePair )
+import Name		( origName, isLexVarSym, isLexSpecialSym, pprNonSym )
 import PprStyle		( PprStyle(..) )
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
 			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar
 			)
-import PrelMods		( fromPrelude, pRELUDE )
 import Pretty		-- plenty of it
 import TyCon		( tyConTyVars, TyCon{-instance NamedThing-} )
 import Type		( splitSigmaTy, mkTyVarTy, mkForAllTys,
@@ -235,18 +234,16 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 
       | isDictFunId id || maybeToBool (isConstMethodId_maybe id)
       = let get_mod = getInstIdModule id
-	    use_mod = if fromPrelude get_mod
-		      then pRELUDE
-		      else get_mod
+	    use_mod = get_mod
 	in (use_mod, _NIL_)
 
       | otherwise
-      = moduleNamePair id
+      = case (origName "get_id_name" id) of { OrigName m n -> (m, n) }
 
     get_ty_data (ty, tys)
       = (mod_name, [(ty_name, ty, tys)])
       where
-	(mod_name,ty_name) = moduleNamePair ty
+	(OrigName mod_name ty_name) = origName "get_ty_data" ty
 
     module_names    = concat [keysFM idspecs_fm, keysFM tyspecs_fm]
     mods            = map head (equivClasses _CMP_STRING_ module_names)
@@ -257,8 +254,7 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 			    EQ_   -> ([_NIL_], tail mods)
 			    other -> ([], mods)
 
-    (prels, others) = partition fromPrelude known
-    use_modules     = unks ++ prels ++ others
+    use_modules     = unks ++ known
 
     pp_module_specs :: FAST_STRING -> Pretty
     pp_module_specs mod
@@ -313,7 +309,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   | is_const_method_id
   = let
 	Just (cls, clsty, clsop) = const_method_maybe
-    	(_, cls_str) = moduleNamePair cls
+    	(OrigName _ cls_str) = origName "pp_idspec" cls
 	clsop_str    = classOpString clsop
     in
     ppCat [pp_mod,
@@ -327,7 +323,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   | is_default_method_id
   = let
 	Just (cls, clsop, _) = default_method_maybe
-    	(_, cls_str) = moduleNamePair cls
+    	(OrigName _ cls_str) = origName "pp_idspec2" cls
 	clsop_str    = classOpString clsop
     in
     ppCat [pp_mod,

@@ -16,7 +16,7 @@ IMP_Ubiq(){-uitous-}
 
 import HsSyn		( TyDecl(..), ConDecl(..), BangType(..), HsExpr(..), 
 			  Match(..), GRHSsAndBinds(..), GRHS(..), OutPat(..), 
-			  HsBinds(..), HsLit, Stmt, Qual, ArithSeqInfo,
+			  HsBinds(..), HsLit, Stmt, Qualifier, ArithSeqInfo,
 			  PolyType, Fake, InPat,
 			  Bind(..), MonoBinds(..), Sig, 
 			  MonoType )

@@ -10,7 +10,7 @@ module PrelVals where
 
 IMP_Ubiq()
 IMPORT_DELOOPER(IdLoop)		( UnfoldingGuidance(..) )
-import Id		( Id(..), GenId, mkPreludeId, mkTemplateLocals )
+import Id		( Id(..), GenId, mkImported, mkUserId, mkTemplateLocals )
 IMPORT_DELOOPER(PrelLoop)
 
 -- friends:
@@ -19,11 +19,14 @@ import TysPrim
 import TysWiredIn
 
 -- others:
+import CmdLineOpts	( maybe_CompilingPrelude )
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
 import Literal		( mkMachInt )
+import PragmaInfo
 import PrimOp		( PrimOp(..) )
 import SpecEnv		( SpecEnv(..), nullSpecEnv )
+import Type		( mkTyVarTy )
 import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, gammaTyVar )
 import Unique		-- lots of *Keys
 import Util		( panic )
@@ -36,8 +39,25 @@ import Util		( panic )
 -- only used herein:
 pcMiscPrelId :: Unique{-IdKey-} -> FAST_STRING -> FAST_STRING -> Type -> IdInfo -> Id
 
-pcMiscPrelId key mod name ty info
- = mkPreludeId (mkBuiltinName key mod name) ty info
+pcMiscPrelId key m n ty info
+  = let
+	name = mkWiredInName key (OrigName m n)
+	imp  = mkImported name ty info -- the usual case...
+    in
+    imp
+    -- We lie and say the thing is imported; otherwise, we get into
+    -- a mess with dependency analysis; e.g., core2stg may heave in
+    -- random calls to GHCbase.unpackPS.  If GHCbase is the module
+    -- being compiled, then it's just a matter of luck if the definition
+    -- will be in "the right place" to be in scope.
+{- ???
+    case maybe_CompilingPrelude of
+      Nothing -> imp
+      Just modname ->
+	if modname == _UNPK_ m -- we are compiling the module where this thing is defined...
+	then mkUserId name ty NoPragmaInfo
+	else imp
+-}
 \end{code}
 
 %************************************************************************
@@ -48,15 +68,15 @@ pcMiscPrelId key mod name ty info
 
 GHC randomly injects these into the code.
 
-@patError#@ is just a version of @error@ for pattern-matching
+@patError@ is just a version of @error@ for pattern-matching
 failures.  It knows various ``codes'' which expand to longer
 strings---this saves space!
 
-@absent#@ is a thing we put in for ``absent'' arguments.  They jolly
+@absentErr@ is a thing we put in for ``absent'' arguments.  They jolly
 well shouldn't be yanked on, but if one is, then you will get a
-friendly message from @absent#@ (rather a totally random crash).
+friendly message from @absentErr@ (rather a totally random crash).
 
-@parError#@ is a special version of @error@ which the compiler does
+@parError@ is a special version of @error@ which the compiler does
 not know to be a bottoming Id.  It is used in the @_par_@ and @_seq_@
 templates, but we don't ever expect to generate code for it.
 
@@ -68,36 +88,36 @@ pc_bottoming_Id key mod name ty
 	-- these "bottom" out, no matter what their arguments
 
 eRROR_ID
-  = pc_bottoming_Id errorIdKey pRELUDE_BUILTIN SLIT("error") errorTy
+  = pc_bottoming_Id errorIdKey pRELUDE SLIT("error") errorTy
 
 generic_ERROR_ID u n
-  = pc_bottoming_Id u pRELUDE_BUILTIN n errorTy
+  = pc_bottoming_Id u gHC__ n errorTy
 
 pAT_ERROR_ID
-  = generic_ERROR_ID patErrorIdKey SLIT("patError#")
+  = generic_ERROR_ID patErrorIdKey SLIT("patError")
 rEC_CON_ERROR_ID
-  = generic_ERROR_ID recConErrorIdKey SLIT("recConError#")
+  = generic_ERROR_ID recConErrorIdKey SLIT("recConError")
 rEC_UPD_ERROR_ID
-  = generic_ERROR_ID recUpdErrorIdKey SLIT("recUpdError#")
+  = generic_ERROR_ID recUpdErrorIdKey SLIT("recUpdError")
 iRREFUT_PAT_ERROR_ID
-  = generic_ERROR_ID irrefutPatErrorIdKey SLIT("irrefutPatError#")
+  = generic_ERROR_ID irrefutPatErrorIdKey SLIT("irrefutPatError")
 nON_EXHAUSTIVE_GUARDS_ERROR_ID
-  = generic_ERROR_ID nonExhaustiveGuardsErrorIdKey SLIT("nonExhaustiveGuardsError#")
+  = generic_ERROR_ID nonExhaustiveGuardsErrorIdKey SLIT("nonExhaustiveGuardsError")
 nO_DEFAULT_METHOD_ERROR_ID
-  = generic_ERROR_ID noDefaultMethodErrorIdKey SLIT("noDefaultMethodError#")
+  = generic_ERROR_ID noDefaultMethodErrorIdKey SLIT("noDefaultMethodError")
 nO_EXPLICIT_METHOD_ERROR_ID
-  = generic_ERROR_ID nonExplicitMethodErrorIdKey SLIT("noExplicitMethodError#")
+  = generic_ERROR_ID nonExplicitMethodErrorIdKey SLIT("noExplicitMethodError")
 
 aBSENT_ERROR_ID
-  = pc_bottoming_Id absentErrorIdKey pRELUDE_BUILTIN SLIT("absent#")
+  = pc_bottoming_Id absentErrorIdKey gHC__ SLIT("absentErr")
 	(mkSigmaTy [alphaTyVar] [] alphaTy)
 
 pAR_ERROR_ID
-  = pcMiscPrelId parErrorIdKey pRELUDE_BUILTIN SLIT("parError#")
+  = pcMiscPrelId parErrorIdKey gHC__ SLIT("parError")
     (mkSigmaTy [alphaTyVar] [] alphaTy) noIdInfo
 
 errorTy  :: Type
-errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] alphaTy)
+errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] (mkTyVarTy openAlphaTyVar))
 \end{code}
 
 We want \tr{_trace} (NB: name not in user namespace) to be wired in
@@ -109,7 +129,7 @@ won't get an \tr{import} declaration in the interface file, so the
 importing-subsequently module needs to know it's magic.
 \begin{code}
 tRACE_ID
-  = pcMiscPrelId traceIdKey pRELUDE_BUILTIN SLIT("_trace") traceTy
+  = pcMiscPrelId traceIdKey gHC__ SLIT("trace") traceTy
 	(noIdInfo `addInfo` pcGenerateSpecs traceIdKey tRACE_ID noIdInfo traceTy)
   where
     traceTy = mkSigmaTy [alphaTyVar] [] (mkFunTys [mkListTy charTy, alphaTy] alphaTy)
@@ -123,33 +143,33 @@ tRACE_ID
 
 \begin{code}
 packStringForCId
-  = pcMiscPrelId packCStringIdKey{-ToDo:rename-} pRELUDE_PS SLIT("_packStringForC")
+  = pcMiscPrelId packCStringIdKey{-ToDo:rename-} gHC__ SLIT("packStringForC")
 	(mkFunTys [stringTy] byteArrayPrimTy) noIdInfo
 
 --------------------------------------------------------------------
 
 unpackCStringId
-  = pcMiscPrelId unpackCStringIdKey pRELUDE_BUILTIN SLIT("unpackPS#")
+  = pcMiscPrelId unpackCStringIdKey gHC__ SLIT("unpackPS")
 		 (mkFunTys [addrPrimTy{-a char *-}] stringTy) noIdInfo
 -- Andy says:
 --	(FunTy addrPrimTy{-a char *-} stringTy) (noIdInfo `addInfo` mkArityInfo 1)
 -- but I don't like wired-in IdInfos (WDP)
 
 unpackCString2Id -- for cases when a string has a NUL in it
-  = pcMiscPrelId unpackCString2IdKey pRELUDE_BUILTIN SLIT("unpackPS2#")
+  = pcMiscPrelId unpackCString2IdKey gHC__ SLIT("unpackPS2")
 		 (mkFunTys [addrPrimTy{-a char *-}, intPrimTy{-length-}] stringTy)
 		 noIdInfo
 
 --------------------------------------------------------------------
 unpackCStringAppendId
-  = pcMiscPrelId unpackCStringAppendIdKey pRELUDE_BUILTIN SLIT("unpackAppendPS#")
+  = pcMiscPrelId unpackCStringAppendIdKey gHC__ SLIT("unpackAppendPS")
 		(mkFunTys [addrPrimTy{-a "char *" pointer-},stringTy] stringTy)
 		((noIdInfo
 		 {-LATER:`addInfo_UF` mkMagicUnfolding unpackCStringAppendIdKey-})
 		 `addInfo` mkArityInfo 2)
 
 unpackCStringFoldrId
-  = pcMiscPrelId unpackCStringFoldrIdKey pRELUDE_BUILTIN SLIT("unpackFoldrPS#")
+  = pcMiscPrelId unpackCStringFoldrIdKey gHC__ SLIT("unpackFoldrPS")
 		(mkSigmaTy [alphaTyVar] []
 		(mkFunTys [addrPrimTy{-a "char *" pointer-},
 			   mkFunTys [charTy, alphaTy] alphaTy,
@@ -164,13 +184,13 @@ OK, this is Will's idea: we should have magic values for Integers 0,
 +1, +2, and -1 (go ahead, fire me):
 \begin{code}
 integerZeroId
-  = pcMiscPrelId integerZeroIdKey     pRELUDE SLIT("__integer0")  integerTy noIdInfo
+  = pcMiscPrelId integerZeroIdKey     gHC__ SLIT("integer_0")  integerTy noIdInfo
 integerPlusOneId
-  = pcMiscPrelId integerPlusOneIdKey  pRELUDE SLIT("__integer1")  integerTy noIdInfo
+  = pcMiscPrelId integerPlusOneIdKey  gHC__ SLIT("integer_1")  integerTy noIdInfo
 integerPlusTwoId
-  = pcMiscPrelId integerPlusTwoIdKey  pRELUDE SLIT("__integer2")  integerTy noIdInfo
+  = pcMiscPrelId integerPlusTwoIdKey  gHC__ SLIT("integer_2")  integerTy noIdInfo
 integerMinusOneId
-  = pcMiscPrelId integerMinusOneIdKey pRELUDE SLIT("__integerm1") integerTy noIdInfo
+  = pcMiscPrelId integerMinusOneIdKey gHC__ SLIT("integer_m1") integerTy noIdInfo
 \end{code}
 
 %************************************************************************
@@ -181,21 +201,21 @@ integerMinusOneId
 
 \begin{code}
 --------------------------------------------------------------------
--- seqId :: "_seq_", used w/ GRIP, etc., is really quite similar to
+-- seqId :: "seq", used w/ GRIP, etc., is really quite similar to
 -- dangerousEval
 {-
    OLDER:
-   _seq_ = /\ a b -> \ x y -> case x of { _ -> y }
+   seq = /\ a b -> \ x y -> case x of { _ -> y }
 
    OLD:
-   _seq_ = /\ a b -> \ x y -> case seq# x y of { _Lift y' -> y' }
+   seq = /\ a b -> \ x y -> case seq# x y of { _Lift y' -> y' }
 
    NEW (95/05):
-   _seq_ = /\ a b -> \ x::a y::b -> case seq# x of { 0# -> parError#; _ -> y; }
+   seq = /\ a b -> \ x::a y::b -> case seq# x of { 0# -> parError#; _ -> y; }
 
 -}
 
-seqId = pcMiscPrelId seqIdKey pRELUDE_BUILTIN SLIT("_seq_")
+seqId = pcMiscPrelId seqIdKey gHC__ SLIT("seq")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding seq_template))
@@ -215,7 +235,7 @@ seqId = pcMiscPrelId seqIdKey pRELUDE_BUILTIN SLIT("_seq_")
 		    (BindDefault z (Var y))))
 
 --------------------------------------------------------------------
--- parId :: "_par_", also used w/ GRIP, etc.
+-- parId :: "par", also used w/ GRIP, etc.
 {-
     OLDER:
 
@@ -223,14 +243,14 @@ seqId = pcMiscPrelId seqIdKey pRELUDE_BUILTIN SLIT("_seq_")
 
     OLD:
 
-    _par_ = /\ a b -> \ x y -> case par# x y of { _Lift y' -> y' }
+    par = /\ a b -> \ x y -> case par# x y of { _Lift y' -> y' }
 
     NEW (95/05):
 
-    _par_ = /\ a b -> \ x::a y::b -> case par# x of { 0# -> parError#; _ -> y; }
+    par = /\ a b -> \ x::a y::b -> case par# x of { 0# -> parError#; _ -> y; }
 
 -}
-parId = pcMiscPrelId parIdKey pRELUDE_BUILTIN SLIT("_par_")
+parId = pcMiscPrelId parIdKey gHC__ SLIT("par")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding par_template))
@@ -249,11 +269,11 @@ parId = pcMiscPrelId parIdKey pRELUDE_BUILTIN SLIT("_par_")
 		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
 		    (BindDefault z (Var y))))
 
--- forkId :: "_fork_", for *required* concurrent threads
+-- forkId :: "fork", for *required* concurrent threads
 {-
    _fork_ = /\ a b -> \ x::a y::b -> case fork# x of { 0# -> parError#; _ -> y; }
 -}
-forkId = pcMiscPrelId forkIdKey pRELUDE_BUILTIN SLIT("_fork_")
+forkId = pcMiscPrelId forkIdKey gHC__ SLIT("fork")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding fork_template))
@@ -276,7 +296,7 @@ forkId = pcMiscPrelId forkIdKey pRELUDE_BUILTIN SLIT("_fork_")
 
 GranSim ones:
 \begin{code}
-parLocalId = pcMiscPrelId parLocalIdKey pRELUDE_BUILTIN SLIT("_parLocal_")
+parLocalId = pcMiscPrelId parLocalIdKey gHC__ SLIT("parLocal")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parLocal_template))
@@ -300,7 +320,7 @@ parLocalId = pcMiscPrelId parLocalIdKey pRELUDE_BUILTIN SLIT("_parLocal_")
 		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
 		    (BindDefault z (Var y))))
 
-parGlobalId = pcMiscPrelId parGlobalIdKey pRELUDE_BUILTIN SLIT("_parGlobal_")
+parGlobalId = pcMiscPrelId parGlobalIdKey gHC__ SLIT("parGlobal")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parGlobal_template))
@@ -325,7 +345,7 @@ parGlobalId = pcMiscPrelId parGlobalIdKey pRELUDE_BUILTIN SLIT("_parGlobal_")
 		    (BindDefault z (Var y))))
 
 
-parAtId = pcMiscPrelId parAtIdKey pRELUDE_BUILTIN SLIT("_parAt_")
+parAtId = pcMiscPrelId parAtIdKey gHC__ SLIT("parAt")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy,
 		               alphaTy, betaTy, gammaTy] gammaTy))
@@ -351,7 +371,7 @@ parAtId = pcMiscPrelId parAtIdKey pRELUDE_BUILTIN SLIT("_parAt_")
 		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
 		    (BindDefault z (Var y))))
 
-parAtAbsId = pcMiscPrelId parAtAbsIdKey pRELUDE_BUILTIN SLIT("_parAtAbs_")
+parAtAbsId = pcMiscPrelId parAtAbsIdKey gHC__ SLIT("parAtAbs")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parAtAbs_template))
@@ -376,7 +396,7 @@ parAtAbsId = pcMiscPrelId parAtAbsIdKey pRELUDE_BUILTIN SLIT("_parAtAbs_")
 		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
 		    (BindDefault z (Var y))))
 
-parAtRelId = pcMiscPrelId parAtRelIdKey pRELUDE_BUILTIN SLIT("_parAtRel_")
+parAtRelId = pcMiscPrelId parAtRelIdKey gHC__ SLIT("parAtRel")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parAtRel_template))
@@ -401,7 +421,7 @@ parAtRelId = pcMiscPrelId parAtRelIdKey pRELUDE_BUILTIN SLIT("_parAtRel_")
 		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
 		    (BindDefault z (Var y))))
 
-parAtForNowId = pcMiscPrelId parAtForNowIdKey pRELUDE_BUILTIN SLIT("_parAtForNow_")
+parAtForNowId = pcMiscPrelId parAtForNowIdKey gHC__ SLIT("parAtForNow")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy,
 				alphaTy, betaTy, gammaTy] gammaTy))
@@ -430,7 +450,7 @@ parAtForNowId = pcMiscPrelId parAtForNowIdKey pRELUDE_BUILTIN SLIT("_parAtForNow
 -- copyable and noFollow are currently merely hooks: they are translated into
 -- calls to the macros COPYABLE and NOFOLLOW                            -- HWL 
 
-copyableId = pcMiscPrelId copyableIdKey pRELUDE_BUILTIN SLIT("_copyable_")
+copyableId = pcMiscPrelId copyableIdKey gHC__ SLIT("copyable")
 		  (mkSigmaTy [alphaTyVar] []
 		    alphaTy)
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding copyable_template))
@@ -445,7 +465,7 @@ copyableId = pcMiscPrelId copyableIdKey pRELUDE_BUILTIN SLIT("_copyable_")
     copyable_template
       = mkLam [alphaTyVar] [x] ( Prim CopyableOp [TyArg alphaTy, VarArg x] )
 
-noFollowId = pcMiscPrelId noFollowIdKey pRELUDE_BUILTIN SLIT("_noFollow_")
+noFollowId = pcMiscPrelId noFollowIdKey gHC__ SLIT("noFollow")
 		  (mkSigmaTy [alphaTyVar] []
 		    alphaTy)
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding noFollow_template))
@@ -481,16 +501,6 @@ lex		:: ReadS String
 
 %************************************************************************
 %*									*
-\subsection[PrelVals-void]{@void@: Magic value of type @Void@}
-%*									*
-%************************************************************************
-
-\begin{code}
-voidId = pcMiscPrelId voidIdKey pRELUDE_BUILTIN SLIT("_void") voidTy noIdInfo
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection[PrelVals-runST]{@_runST@: Magic start-state-transformer function}
 %*									*
 %************************************************************************
@@ -507,7 +517,7 @@ _runST a m = case m _RealWorld (S# _RealWorld realWorld#) of
 We unfold always, just for simplicity:
 \begin{code}
 runSTId
-  = pcMiscPrelId runSTIdKey pRELUDE_BUILTIN SLIT("_runST") run_ST_ty id_info
+  = pcMiscPrelId runSTIdKey gHC__ SLIT("runST") run_ST_ty id_info
   where
     s_tv = betaTyVar
     s	 = betaTy
@@ -577,9 +587,13 @@ All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
 nasty as-is, change it back to a literal (@Literal@).
 \begin{code}
 realWorldPrimId
-  = pcMiscPrelId realWorldPrimIdKey pRELUDE_BUILTIN SLIT("realWorld#")
+  = pcMiscPrelId realWorldPrimIdKey gHC_BUILTINS SLIT("realWorld#")
 	realWorldStatePrimTy
 	noIdInfo
+\end{code}
+
+\begin{code}
+voidId = pcMiscPrelId voidIdKey gHC_BUILTINS SLIT("void") voidTy noIdInfo
 \end{code}
 
 %************************************************************************
@@ -590,7 +604,7 @@ realWorldPrimId
 
 \begin{code}
 buildId
-  = pcMiscPrelId buildIdKey pRELUDE_BUILTIN SLIT("_build") buildTy
+  = pcMiscPrelId buildIdKey gHC__ SLIT("build") buildTy
 	((((noIdInfo
 		{-LATER:`addInfo_UF` mkMagicUnfolding buildIdKey-})
 		`addInfo` mkStrictnessInfo [WwStrict] Nothing)
@@ -635,7 +649,7 @@ mkBuild ty tv c n g expr
 
 \begin{code}
 augmentId
-  = pcMiscPrelId augmentIdKey pRELUDE_BUILTIN SLIT("_augment") augmentTy
+  = pcMiscPrelId augmentIdKey gHC__ SLIT("augment") augmentTy
 	(((noIdInfo
 		{-LATER:`addInfo_UF` mkMagicUnfolding augmentIdKey-})
 		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
@@ -652,7 +666,7 @@ augmentId
 \end{code}
 
 \begin{code}
-foldrId = pcMiscPrelId foldrIdKey pRELUDE_FB{-not "List"-} SLIT("foldr")
+foldrId = pcMiscPrelId foldrIdKey pRELUDE SLIT("foldr")
 		 foldrTy idInfo
   where
 	foldrTy =
@@ -666,7 +680,7 @@ foldrId = pcMiscPrelId foldrIdKey pRELUDE_FB{-not "List"-} SLIT("foldr")
 			`addInfo` mkUpdateInfo [2,2,1])
 			`addInfo` pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy)
 
-foldlId = pcMiscPrelId foldlIdKey pRELUDE_FB{-not "List"-} SLIT("foldl")
+foldlId = pcMiscPrelId foldlIdKey pRELUDE SLIT("foldl")
 		 foldlTy idInfo
   where
 	foldlTy =
@@ -693,7 +707,7 @@ foldlId = pcMiscPrelId foldlIdKey pRELUDE_FB{-not "List"-} SLIT("foldl")
 -- So you have to turn *off* unfolding of foldr inside FoldrBuild.hs inside
 -- the prelude.
 --
-
+{- OLD: doesn't apply with 1.3
 appendId
   = pcMiscPrelId appendIdKey pRELUDE_LIST SLIT("++") appendTy idInfo
   where
@@ -704,6 +718,7 @@ appendId
 		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
 		`addInfo` mkArityInfo 2)
 		`addInfo` mkUpdateInfo [1,2])
+-}
 \end{code}
 
 %************************************************************************

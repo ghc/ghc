@@ -18,6 +18,7 @@ module OccurAnal (
     ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(IdLoop)	-- paranoia
 
 import BinderInfo
 import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )

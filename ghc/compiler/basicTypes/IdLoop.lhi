@@ -18,6 +18,7 @@ import Id		( externallyVisibleId, isDataCon, isWorkerId, isWrapperId,
 import IdInfo		( IdInfo )
 import Literal		( Literal )
 import MagicUFs		( mkMagicUnfoldingFun, MagicUnfoldingFun )
+import OccurAnal	( occurAnalyseGlobalExpr )
 import Outputable	( Outputable(..) )
 import PprEnv		( NmbrEnv )
 import PprStyle		( PprStyle )
@@ -31,6 +32,7 @@ import Usage		( GenUsage )
 import Util		( Ord3(..) )
 import WwLib		( mAX_WORKER_ARGS )
 
+occurAnalyseGlobalExpr  :: GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique
 externallyVisibleId	:: Id	    -> Bool
 isDataCon		:: GenId ty -> Bool
 isWorkerId		:: GenId ty -> Bool

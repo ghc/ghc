@@ -43,8 +43,8 @@ import Usage		( GenUsage(..) )
 import CStrings		( identToC )
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( maybeToBool )
-import Name		( isLexVarSym, isLexSpecialSym, isPreludeDefined, origName, moduleOf,
-			  nameOrigName, nameOf, Name{-instance Outputable-}
+import Name		( isLexVarSym, isLexSpecialSym, origName, moduleOf,
+			  getLocalName, Name{-instance Outputable-}
 			)
 import Outputable	( ifPprShowAll, interpp'SP )
 import PprEnv
@@ -52,7 +52,7 @@ import PprStyle		( PprStyle(..), codeStyle, showUserishTypes )
 import Pretty
 import TysWiredIn	( listTyCon )
 import UniqFM		( addToUFM_Directly, lookupUFM_Directly, ufmToList{-ToDo:rm-} )
-import Unique		( pprUnique10, pprUnique, incrUnique )
+import Unique		( pprUnique10, pprUnique, incrUnique, listTyConKey )
 import Usage		( UVar(..), pprUVar )
 import Util
 \end{code}
@@ -147,8 +147,12 @@ ppr_ty sty env ctxt_prec ty@(FunTy (DictTy _ _ _) _ _)
   where
     (theta, body_ty) = splitRhoTy ty
 
-    ppr_theta [ct] = ppr_dict sty env tOP_PREC ct
-    ppr_theta cts  = ppParens (ppInterleave ppComma (map (ppr_dict sty env tOP_PREC) cts))
+    ppr_theta = case sty of { PprInterface -> ppr_theta_2 ; _ -> ppr_theta_1 }
+
+    ppr_theta_1 [ct] = ppr_dict sty env tOP_PREC ct
+    ppr_theta_1 cts  = ppParens (ppInterleave ppComma (map (ppr_dict sty env tOP_PREC) cts))
+
+    ppr_theta_2 cts  = ppBesides [ppStr "{{", ppInterleave ppComma (map (ppr_dict sty env tOP_PREC) cts), ppStr "}}"]
 
 ppr_ty sty env ctxt_prec (FunTy ty1 ty2 usage)
     -- We fiddle the precedences passed to left/right branches,
@@ -163,9 +167,11 @@ ppr_ty sty env ctxt_prec ty@(AppTy _ _)
   where
     (fun_ty, arg_tys) = splitAppTy ty
 
+{- OLD:
 ppr_ty PprInterface env ctxt_prec (SynTy tycon tys expansion)
   -- always expand types in an interface
   = ppr_ty PprInterface env ctxt_prec expansion
+-}
 
 ppr_ty sty env ctxt_prec (SynTy tycon tys expansion)
   = ppBeside
@@ -267,7 +273,7 @@ pprGenTyVar sty (TyVar uniq kind name usage)
   where
     pp_u    = pprUnique uniq
     pp_name = case name of
-		Just n  -> ppPStr (nameOf (nameOrigName n))
+		Just n  -> ppPStr (getLocalName n)
 		Nothing -> case kind of
 				TypeKind        -> ppChar 'o'
 				BoxedTypeKind   -> ppChar 't'
@@ -287,13 +293,25 @@ ToDo; all this is suspiciously like getOccName!
 showTyCon :: PprStyle -> TyCon -> String
 showTyCon sty tycon = ppShow 80 (pprTyCon sty tycon)
 
+maybe_code sty = if codeStyle sty then identToC else ppPStr
+
 pprTyCon :: PprStyle -> TyCon -> Pretty
 
-pprTyCon sty FunTyCon 		    = ppStr "(->)"
-pprTyCon sty (TupleTyCon _ name _)  = ppr sty name
 pprTyCon sty (PrimTyCon _ name _ _) = ppr sty name
 
+pprTyCon sty FunTyCon 		    = maybe_code sty SLIT("(->)")
+pprTyCon sty (TupleTyCon _ _ arity) = case arity of
+					0 -> maybe_code sty SLIT("()")
+					2 -> maybe_code sty SLIT("(,)")
+					3 -> maybe_code sty SLIT("(,,)")
+					4 -> maybe_code sty SLIT("(,,,)")
+					5 -> maybe_code sty SLIT("(,,,,)")
+					n -> maybe_code sty (_PK_ ( "(" ++ nOfThem (n-1) ',' ++ ")"))
+
 pprTyCon sty tycon@(DataTyCon uniq name kind tyvars ctxt cons derivings nd)
+  | uniq == listTyConKey
+  = maybe_code sty SLIT("[]")
+  | otherwise
   = ppr sty name
 
 pprTyCon sty (SpecTyCon tc ty_maybes)
@@ -352,23 +370,16 @@ ppr_class_op sty tyvars (ClassOp op_name i ty)
     -- vaguely close to what can be used in C identifier.
     -- Don't forget to include the module name!!!
 getTypeString :: Type -> [FAST_STRING]
-getTypeString ty
-  | is_prelude_ty = [string]
-  | otherwise     = [mod, string]
+getTypeString ty = [mod, string]
   where
     string = _PK_ (tidy (ppShow 1000 ppr_t))
     ppr_t  = pprGenType PprForC ty
 			-- PprForC expands type synonyms as it goes
 
-    (is_prelude_ty, mod)
+    mod
       = case (maybeAppTyCon ty) of
-	  Nothing -> true_bottom
-	  Just (tycon,_) ->
-	    if isPreludeDefined tycon
-	    then true_bottom
-	    else (False, moduleOf (origName tycon))
-
-    true_bottom = (True, panic "getTypeString")
+	  Nothing -> panic "getTypeString"
+	  Just (tycon,_) -> moduleOf (origName "getTypeString" tycon)
 
     --------------------------------------------------
     -- tidy: very ad-hoc

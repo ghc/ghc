@@ -40,7 +40,7 @@ import Id		( dataConTag, dataConRawArgTys,
 			  emptyIdSet,
 			  GenId{-instance NamedThing-}
 			)
-import Name		( getLocalName )
+import Name		( nameOf, origName )
 import PrelInfo		( maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, mkSpecTyCon )
@@ -209,7 +209,7 @@ genConInfo comp_info tycon data_con
 		      body_code))
 
     entry_addr = CLbl entry_label CodePtrRep
-    con_descr  = _UNPK_ (getLocalName data_con)
+    con_descr  = _UNPK_ (nameOf (origName "con_descr" data_con))
 
     closure_code        = CClosureInfoAndCode closure_info body Nothing
 					      stdUpd con_descr
@@ -337,7 +337,7 @@ genPhantomUpdInfo comp_info tycon data_con
 
 	    phantom_ci = layOutPhantomClosure data_con (mkConLFInfo data_con)
 
-	    con_descr = _UNPK_ (getLocalName data_con)
+	    con_descr = _UNPK_ (nameOf (origName "con_descr2" data_con))
 
 	    con_arity = dataConArity data_con
 

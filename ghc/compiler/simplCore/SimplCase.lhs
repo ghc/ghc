@@ -35,7 +35,7 @@ import SimplEnv
 import SimplMonad
 import SimplUtils	( mkValLamTryingEta )
 import Type		( isPrimType, maybeAppDataTyConExpandingDicts, mkFunTys, eqTy )
-import TysWiredIn	( voidTy )
+import TysPrim		( voidTy )
 import Unique		( Unique{-instance Eq-} )
 import Usage		( GenUsage{-instance Eq-} )
 import Util		( isIn, isSingleton, zipEqual, panic, assertPanic )

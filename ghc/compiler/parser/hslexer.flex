@@ -41,9 +41,6 @@
 #define _O      0x8
 #define _C 	0x10
 
-#define _isconstr(s) 	(CharTable[*s]&(_C))
-BOOLEAN isconstr PROTO((char *)); /* fwd decl */
-
 static unsigned char CharTable[NCHARS] = {
 /* nul */    	0,  	0,  	0,  	0,  	0,  	0,  	0,  	0,
 /* bs  */    	0,  	_S,  	_S,  	_S,  	_S,  	0,  	0,  	0,
@@ -80,6 +77,12 @@ static unsigned char CharTable[NCHARS] = {
 /*     */    	0,  	0,  	0,  	0,  	0,  	0,  	0,  	0,
 };
 
+BOOLEAN
+isconstr (char *s)
+{
+    return(CharTable[*s]&(_C));
+}
+
 /**********************************************************************
 *                                                                     *
 *                                                                     *
@@ -111,15 +114,15 @@ static BOOLEAN forgetindent = FALSE;	/* Don't bother applying indentation rules 
 
 static int nested_comments; 	/* For counting comment nesting depth */
 
-/* Hacky definition of yywrap: see flex doc.
+/* OLD: Hacky definition of yywrap: see flex doc.
 
    If we don't do this, then we'll have to get the default
    yywrap from the flex library, which is often something
    we are not good at locating.  This avoids that difficulty.
    (Besides which, this is the way old flexes (pre 2.4.x) did it.)
    WDP 94/09/05
-*/
 #define yywrap() 1
+*/
 
 /* Essential forward declarations */
 
@@ -193,26 +196,21 @@ static short indenttab[MAX_CONTEXTS] = {-1};
 #endif
 
 /* Each time we enter a new start state, we push it onto the state stack.
-   Note that the rules do not allow us to underflow or overflow the stack.
-   (At least, they shouldn't.)  The maximum expected depth is 4:
-   0: Code -> 1: String -> 2: StringEsc -> 3: Comment
 */
-static int StateStack[5];
-static int StateDepth = -1;
-
-#ifdef HSP_DEBUG
-#define PUSH_STATE(n)   do {\
-    fprintf(stderr,"Pushing %d (%d)\n", n, StateDepth + 1);\
-    StateStack[++StateDepth] = (n); BEGIN(n);} while(0)
-#define POP_STATE       do {--StateDepth;\
-    fprintf(stderr,"Popping %d (%d)\n", StateStack[StateDepth], StateDepth);\
-    BEGIN(StateStack[StateDepth]);} while(0)
-#else
-#define PUSH_STATE(n)   do {StateStack[++StateDepth] = (n); BEGIN(n);} while(0)
-#define POP_STATE       do {--StateDepth; BEGIN(StateStack[StateDepth]);} while(0)
-#endif
+#define PUSH_STATE(n)   yy_push_state(n)
+#define POP_STATE       yy_pop_state()
 
 %}
+/* Options:
+    8bit (8-bit input)
+    noyywrap (do not call yywrap on end of file; avoid use of -lfl)
+    never-interactive (to go a bit faster)
+    stack (use a start-condition stack)
+*/
+%option 8bit
+%option noyywrap
+%option never-interactive
+%option stack
 
 /* The start states are:
    Code -- normal Haskell code (principal lexer)
@@ -470,33 +468,23 @@ NL  	    	    	[\n\r]
 			    hsperror(errbuf);
 			 }
     	    	    	 hsnewid(yytext, yyleng);
-    	    	    	 RETURN(_isconstr(yytext) ? CONID : VARID);
-			}
-<Code,GlaExt,UserPragma>_+{Id} { 
-			 if (! nonstandardFlag) {
-			    char errbuf[ERR_BUF_SIZE];
-			    sprintf(errbuf, "Non-standard identifier (leading underscore): %s\n", yytext);
-			    hsperror(errbuf);
-			 }
-    	    	    	 hsnewid(yytext, yyleng);
     	    	    	 RETURN(isconstr(yytext) ? CONID : VARID);
-			 /* NB: ^^^^^^^^ : not the macro! */
 			}
 <Code,GlaExt,UserPragma>{Id}	{
     	    	         hsnewid(yytext, yyleng);
-			 RETURN(_isconstr(yytext) ? CONID : VARID);
+			 RETURN(isconstr(yytext) ? CONID : VARID);
 			}
 <Code,GlaExt,UserPragma>{SId}	{
     	    		 hsnewid(yytext, yyleng);
-			 RETURN(_isconstr(yytext) ? CONSYM : VARSYM);
+			 RETURN(isconstr(yytext) ? CONSYM : VARSYM);
 			}
 <Code,GlaExt,UserPragma>{Mod}"."{Id}	{
-			 BOOLEAN isconstr = hsnewqid(yytext, yyleng);
-			 RETURN(isconstr ? QCONID : QVARID);
+			 BOOLEAN is_constr = hsnewqid(yytext, yyleng);
+			 RETURN(is_constr ? QCONID : QVARID);
 			}
 <Code,GlaExt,UserPragma>{Mod}"."{SId}	{
-			 BOOLEAN isconstr = hsnewqid(yytext, yyleng);
-			 RETURN(isconstr ? QCONSYM : QVARSYM);
+			 BOOLEAN is_constr = hsnewqid(yytext, yyleng);
+			 RETURN(is_constr ? QCONSYM : QVARSYM);
 			}
 
 %{
@@ -511,7 +499,7 @@ NL  	    	    	[\n\r]
 
 <GlaExt,UserPragma>"`"{Id}"#`"	{	
     	    	    	 hsnewid(yytext + 1, yyleng - 2);
-			 RETURN(_isconstr(yytext+1) ? CONSYM : VARSYM);
+			 RETURN(isconstr(yytext+1) ? CONSYM : VARSYM);
 			}
 
 %{
@@ -1297,15 +1285,5 @@ hsnewqid(char *name, int length)
     *dot = '.';
     name[length] = save;
 
-    return _isconstr(dot+1);
-}
-
-BOOLEAN 
-isconstr(char *s) /* walks past leading underscores before using the macro */
-{
-    char *temp = s;
-
-    for ( ; temp != NULL && *temp == '_' ; temp++ );
-
-    return _isconstr(temp);
+    return isconstr(dot+1);
 }

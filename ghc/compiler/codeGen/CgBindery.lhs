@@ -44,7 +44,7 @@ import Id		( idPrimRep, toplevelishId, isDataCon,
 			  GenId{-instance NamedThing-}
 			)
 import Maybes		( catMaybes )
-import Name		( isLocallyDefined )
+import Name		( isLocallyDefined, oddlyImportedName, Name{-instance NamedThing-} )
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
 #endif
@@ -194,21 +194,22 @@ I {\em think} all looking-up is done through @getCAddrMode(s)@.
 \begin{code}
 getCAddrModeAndInfo :: Id -> FCode (CAddrMode, LambdaFormInfo)
 
-getCAddrModeAndInfo name
-  | not (isLocallyDefined name)
-  = returnFC (global_amode, mkLFImported name)
+getCAddrModeAndInfo id
+  | not (isLocallyDefined name) || oddlyImportedName name
+  = returnFC (global_amode, mkLFImported id)
 
-  | isDataCon name
-  = returnFC (global_amode, mkConLFInfo name)
+  | isDataCon id
+  = returnFC (global_amode, mkConLFInfo id)
 
   | otherwise = -- *might* be a nested defn: in any case, it's something whose
 		-- definition we will know about...
-    lookupBindC name `thenFC` \ (MkCgIdInfo _ volatile_loc stable_loc lf_info) ->
+    lookupBindC id `thenFC` \ (MkCgIdInfo _ volatile_loc stable_loc lf_info) ->
     idInfoPiecesToAmode kind volatile_loc stable_loc `thenFC` \ amode ->
     returnFC (amode, lf_info)
   where
-    global_amode = CLbl (mkClosureLabel name) kind
-    kind = idPrimRep name
+    name = getName id
+    global_amode = CLbl (mkClosureLabel id) kind
+    kind = idPrimRep id
 
 getCAddrMode :: Id -> FCode CAddrMode
 getCAddrMode name

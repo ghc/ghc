@@ -331,7 +331,7 @@ instance NamedThing TyCon where
     getName tc				= panic "TyCon.getName"
 
 {- LATER:
-    getName (SpecTyCon tc tys) = let (m,n) = moduleNamePair tc in
+    getName (SpecTyCon tc tys) = let (OrigName m n) = origName "????" tc in
        			     (m, n _APPEND_ specMaybeTysSuffix tys)
     getName	other_tc           = moduleNamePair (expectJust "tycon1" (getName other_tc))
     getName other			     = Nothing

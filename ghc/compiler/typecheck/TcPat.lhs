@@ -11,7 +11,7 @@ module TcPat ( tcPat ) where
 IMP_Ubiq(){-uitous-}
 
 import HsSyn		( InPat(..), OutPat(..), HsExpr(..), HsLit(..),
-			  Match, HsBinds, Qual, PolyType,
+			  Match, HsBinds, Qualifier, PolyType,
 			  ArithSeqInfo, Stmt, Fake )
 import RnHsSyn		( RenamedPat(..) )
 import TcHsSyn		( TcPat(..), TcIdOcc(..) )

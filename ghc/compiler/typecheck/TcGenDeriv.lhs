@@ -65,7 +65,7 @@ module TcGenDeriv (
 IMP_Ubiq()
 
 import HsSyn		( HsBinds(..), Bind(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
-			  GRHS(..), HsExpr(..), HsLit(..), InPat(..), Qual(..), Stmt,
+			  GRHS(..), HsExpr(..), HsLit(..), InPat(..), Qualifier(..), Stmt,
 			  ArithSeqInfo, Sig, PolyType, FixityDecl, Fake )
 import RdrHsSyn		( RdrNameMonoBinds(..), RdrNameHsExpr(..), RdrNamePat(..) )
 import RnHsSyn		( RenamedFixityDecl(..) )
@@ -76,8 +76,8 @@ import Id		( GenId, dataConArity, isNullaryDataCon, dataConTag,
 			  isDataCon, DataCon(..), ConTag(..) )
 import IdUtils		( primOpId )
 import Maybes		( maybeToBool )
-import Name		( moduleNamePair, origName, RdrName(..) )
-import PrelMods		( fromPrelude, pRELUDE, pRELUDE_BUILTIN, pRELUDE_LIST, pRELUDE_TEXT )
+import Name		( origName, preludeQual, nameOf, RdrName(..), OrigName(..) )
+import PrelMods		( pRELUDE, gHC__, iX )
 import PrelVals		( eRROR_ID )
 
 import PrimOp		( PrimOp(..) )
@@ -199,7 +199,7 @@ gen_Eq_binds tycon
 	    con1_pat = ConPatIn data_con_PN (map VarPatIn as_needed)
 	    con2_pat = ConPatIn data_con_PN (map VarPatIn bs_needed)
 
-	    data_con_PN = origName data_con
+	    data_con_PN = qual_orig_name data_con
 	    con_arity   = dataConArity data_con
 	    as_needed   = take con_arity as_PNs
 	    bs_needed   = take con_arity bs_PNs
@@ -359,7 +359,7 @@ gen_Ord_binds tycon
 	    con1_pat = ConPatIn data_con_PN (map VarPatIn as_needed)
 	    con2_pat = ConPatIn data_con_PN (map VarPatIn bs_needed)
 
-	    data_con_PN = origName data_con
+	    data_con_PN = qual_orig_name data_con
 	    con_arity   = dataConArity data_con
 	    as_needed   = take con_arity as_PNs
 	    bs_needed   = take con_arity bs_PNs
@@ -487,8 +487,8 @@ gen_Bounded_binds tycon
 
     data_con_1	  = head data_cons
     data_con_N	  = last data_cons
-    data_con_1_PN = origName data_con_1
-    data_con_N_PN = origName data_con_N
+    data_con_1_PN = qual_orig_name data_con_1
+    data_con_N_PN = qual_orig_name data_con_N
 
     ----- single-constructor-flavored: -------------
     arity	   = dataConArity data_con_1
@@ -565,7 +565,7 @@ gen_Ix_binds tycon
     then enum_ixes
     else single_con_ixes
   where
-    tycon_str = _UNPK_ (snd (moduleNamePair tycon))
+    tycon_str = _UNPK_ (nameOf (origName "gen_Ix_binds" tycon))
 
     --------------------------------------------------------------
     enum_ixes = enum_range `AndMonoBinds`
@@ -623,7 +623,7 @@ gen_Ix_binds tycon
 			 dc
 
     con_arity   = dataConArity data_con
-    data_con_PN = origName data_con
+    data_con_PN = qual_orig_name data_con
     con_pat  xs = ConPatIn data_con_PN (map VarPatIn xs)
     con_expr xs = mk_easy_App data_con_PN xs
 
@@ -697,8 +697,8 @@ gen_Read_binds fixities tycon
       where
 	read_con data_con   -- note: "b" is the string being "read"
 	  = let
-		data_con_PN = origName data_con
-		data_con_str= snd  (moduleNamePair data_con)
+		data_con_PN = qual_orig_name data_con
+		data_con_str= nameOf (origName "gen_Read_binds" data_con)
 		con_arity   = dataConArity data_con
 		as_needed   = take con_arity as_PNs
 		bs_needed   = take con_arity bs_PNs
@@ -756,14 +756,14 @@ gen_Show_binds fixities tycon
       where
 	pats_etc data_con
 	  = let
-		data_con_PN = origName data_con
+		data_con_PN = qual_orig_name data_con
 		con_arity   = dataConArity data_con
 		bs_needed   = take con_arity bs_PNs
 		con_pat     = ConPatIn data_con_PN (map VarPatIn bs_needed)
 		nullary_con = isNullaryDataCon data_con
 
 		show_con
-		  = let (mod, nm)   = moduleNamePair data_con
+		  = let (OrigName mod nm) = origName "gen_Show_binds" data_con
 			space_maybe = if nullary_con then _NIL_ else SLIT(" ")
 		    in
 			HsApp (HsVar showString_PN) (HsLit (HsString (nm _APPEND_ space_maybe)))
@@ -824,7 +824,7 @@ gen_tag_n_con_monobind (pn, tycon, GenCon2Tag)
 	([pat], HsLit (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG))))
       where
 	pat    = ConPatIn var_PN (nOfThem (dataConArity var) WildPatIn)
-	var_PN = origName var
+	var_PN = qual_orig_name var
 
 gen_tag_n_con_monobind (pn, tycon, GenTag2Con)
   = mk_FunMonoBind pn (map mk_stuff (tyConDataCons tycon))
@@ -836,7 +836,7 @@ gen_tag_n_con_monobind (pn, tycon, GenTag2Con)
 	([lit_pat], HsVar var_PN)
       where
 	lit_pat = ConPatIn mkInt_PN [LitPatIn (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG)))]
-	var_PN  = origName var
+	var_PN  = qual_orig_name var
 
 gen_tag_n_con_monobind (pn, tycon, GenMaxTag)
   = mk_easy_FunMonoBind pn [] [] (HsApp (HsVar mkInt_PN) (HsLit (HsIntPrim max_tag)))
@@ -1040,6 +1040,8 @@ parenify e	     = HsPar e
 \end{code}
 
 \begin{code}
+qual_orig_name n = case (origName "qual_orig_name" n) of { OrigName m n -> Qual m n }
+
 a_PN		= Unqual SLIT("a")
 b_PN		= Unqual SLIT("b")
 c_PN		= Unqual SLIT("c")
@@ -1049,42 +1051,40 @@ bh_PN		= Unqual SLIT("b#")
 ch_PN		= Unqual SLIT("c#")
 dh_PN		= Unqual SLIT("d#")
 cmp_eq_PN	= Unqual SLIT("cmp_eq")
-rangeSize_PN	= Unqual SLIT("rangeSize")
+rangeSize_PN	= Qual iX SLIT("rangeSize")
 
 as_PNs		= [ Unqual (_PK_ ("a"++show i)) | i <- [(1::Int) .. ] ]
 bs_PNs		= [ Unqual (_PK_ ("b"++show i)) | i <- [(1::Int) .. ] ]
 cs_PNs		= [ Unqual (_PK_ ("c"++show i)) | i <- [(1::Int) .. ] ]
 
-eq_PN		= prelude_method SLIT("Eq")  SLIT("==")
-ne_PN		= prelude_method SLIT("Eq")  SLIT("/=")
-le_PN		= prelude_method SLIT("Ord") SLIT("<=")
-lt_PN		= prelude_method SLIT("Ord") SLIT("<")
-ge_PN		= prelude_method SLIT("Ord") SLIT(">=")
-gt_PN		= prelude_method SLIT("Ord") SLIT(">")
-max_PN		= prelude_method SLIT("Ord") SLIT("max")
-min_PN		= prelude_method SLIT("Ord") SLIT("min")
-compare_PN	= prelude_method SLIT("Ord") SLIT("compare")
-minBound_PN	= prelude_method SLIT("Bounded") SLIT("minBound")
-maxBound_PN	= prelude_method SLIT("Bounded") SLIT("maxBound")
-ltTag_PN	= Unqual SLIT("LT")
-eqTag_PN	= Unqual SLIT("EQ")
-gtTag_PN	= Unqual SLIT("GT")
-enumFrom_PN	 = prelude_method SLIT("Enum") SLIT("enumFrom")
-enumFromTo_PN	 = prelude_method SLIT("Enum") SLIT("enumFromTo")
-enumFromThen_PN	 = prelude_method SLIT("Enum") SLIT("enumFromThen")
-enumFromThenTo_PN= prelude_method SLIT("Enum") SLIT("enumFromThenTo")
-range_PN	 = prelude_method SLIT("Ix")   SLIT("range")
-index_PN	 = prelude_method SLIT("Ix")   SLIT("index")
-inRange_PN	 = prelude_method SLIT("Ix")   SLIT("inRange")
-readsPrec_PN	 = prelude_method SLIT("Read") SLIT("readsPrec")
-readList_PN	 = prelude_method SLIT("Read") SLIT("readList")
-showsPrec_PN	 = prelude_method SLIT("Show") SLIT("showsPrec")
-showList_PN	 = prelude_method SLIT("Show") SLIT("showList")
-plus_PN		 = prelude_method SLIT("Num")  SLIT("+")
-times_PN	 = prelude_method SLIT("Num")  SLIT("*")
+eq_PN		 = preludeQual {-SLIT("Eq")-}  SLIT("==")
+ne_PN		 = preludeQual {-SLIT("Eq")-}  SLIT("/=")
+le_PN		 = preludeQual {-SLIT("Ord")-} SLIT("<=")
+lt_PN		 = preludeQual {-SLIT("Ord")-} SLIT("<")
+ge_PN		 = preludeQual {-SLIT("Ord")-} SLIT(">=")
+gt_PN		 = preludeQual {-SLIT("Ord")-} SLIT(">")
+max_PN		 = preludeQual {-SLIT("Ord")-} SLIT("max")
+min_PN		 = preludeQual {-SLIT("Ord")-} SLIT("min")
+compare_PN	 = preludeQual {-SLIT("Ord")-} SLIT("compare")
+minBound_PN	 = preludeQual {-SLIT("Bounded")-} SLIT("minBound")
+maxBound_PN	 = preludeQual {-SLIT("Bounded")-} SLIT("maxBound")
+enumFrom_PN	 = preludeQual {-SLIT("Enum")-} SLIT("enumFrom")
+enumFromTo_PN	 = preludeQual {-SLIT("Enum")-} SLIT("enumFromTo")
+enumFromThen_PN	 = preludeQual {-SLIT("Enum")-} SLIT("enumFromThen")
+enumFromThenTo_PN= preludeQual {-SLIT("Enum")-} SLIT("enumFromThenTo")
+range_PN	 = Qual iX   SLIT("range")
+index_PN	 = Qual iX   SLIT("index")
+inRange_PN	 = Qual iX   SLIT("inRange")
+readsPrec_PN	 = preludeQual {-SLIT("Read")-} SLIT("readsPrec")
+readList_PN	 = preludeQual {-SLIT("Read")-} SLIT("readList")
+showsPrec_PN	 = preludeQual {-SLIT("Show")-} SLIT("showsPrec")
+showList_PN	 = preludeQual {-SLIT("Show")-} SLIT("showList")
+plus_PN		 = preludeQual {-SLIT("Num")-}  SLIT("+")
+times_PN	 = preludeQual {-SLIT("Num")-}  SLIT("*")
+ltTag_PN	 = preludeQual SLIT("LT")
+eqTag_PN	 = preludeQual SLIT("EQ")
+gtTag_PN	 = preludeQual SLIT("GT")
 
-false_PN	= prelude_val pRELUDE SLIT("False")
-true_PN		= prelude_val pRELUDE SLIT("True")
 eqH_Char_PN	= prelude_primop CharEqOp
 ltH_Char_PN	= prelude_primop CharLtOp
 eqH_Word_PN	= prelude_primop WordEqOp
@@ -1100,24 +1100,25 @@ ltH_Int_PN	= prelude_primop IntLtOp
 geH_PN		= prelude_primop IntGeOp
 leH_PN		= prelude_primop IntLeOp
 minusH_PN	= prelude_primop IntSubOp
-and_PN		= prelude_val pRELUDE     SLIT("&&")
-not_PN		= prelude_val pRELUDE     SLIT("not")
-append_PN	= prelude_val pRELUDE_LIST SLIT("++")
-map_PN		= prelude_val pRELUDE_LIST SLIT("map")
-compose_PN	= prelude_val pRELUDE     SLIT(".")
-mkInt_PN	= prelude_val pRELUDE_BUILTIN SLIT("I#")
-error_PN	= prelude_val pRELUDE SLIT("error")
-showString_PN	= prelude_val pRELUDE_TEXT SLIT("showString")
-showParen_PN	= prelude_val pRELUDE_TEXT SLIT("showParen")
-readParen_PN	= prelude_val pRELUDE_TEXT SLIT("readParen")
-lex_PN		= prelude_val pRELUDE_TEXT SLIT("lex")
-showSpace_PN	= prelude_val pRELUDE_TEXT SLIT("__showSpace")
-_showList_PN    = prelude_val pRELUDE SLIT("__showList")
-_readList_PN    = prelude_val pRELUDE SLIT("__readList")
 
-prelude_val    m s = Unqual s
-prelude_method c o = Unqual o
-prelude_primop   o = origName (primOpId o)
+prelude_primop   o = case (origName "prelude_primop" (primOpId o)) of { OrigName m n -> Qual m n }
+
+false_PN	= preludeQual SLIT("False")
+true_PN		= preludeQual SLIT("True")
+and_PN		= preludeQual SLIT("&&")
+not_PN		= preludeQual SLIT("not")
+append_PN	= preludeQual SLIT("++")
+map_PN		= preludeQual SLIT("map")
+compose_PN	= preludeQual SLIT(".")
+mkInt_PN	= preludeQual SLIT("I#")
+error_PN	= preludeQual SLIT("error")
+showString_PN	= preludeQual SLIT("showString")
+showParen_PN	= preludeQual SLIT("showParen")
+readParen_PN	= preludeQual SLIT("readParen")
+lex_PN		= preludeQual SLIT("lex")
+showSpace_PN	= Qual gHC__  SLIT("showSpace")
+_showList_PN    = Qual gHC__  SLIT("showList__")
+_readList_PN    = Qual gHC__  SLIT("readList__")
 
 a_Expr		= HsVar a_PN
 b_Expr		= HsVar b_PN
@@ -1139,20 +1140,20 @@ d_Pat		= VarPatIn d_PN
 con2tag_PN, tag2con_PN, maxtag_PN :: TyCon -> RdrName
 
 con2tag_PN tycon
-  = let	(mod, nm) = moduleNamePair tycon
+  = let	(OrigName mod nm) = origName "con2tag_PN" tycon
 	con2tag	  = SLIT("con2tag_") _APPEND_ nm _APPEND_ SLIT("#")
     in
-    (if fromPrelude mod then Unqual else Qual mod) con2tag
+    Qual mod con2tag
 
 tag2con_PN tycon
-  = let	(mod, nm) = moduleNamePair tycon
+  = let	(OrigName mod nm) = origName "tag2con_PN" tycon
 	tag2con	  = SLIT("tag2con_") _APPEND_ nm _APPEND_ SLIT("#")
     in
-    (if fromPrelude mod then Unqual else Qual mod) tag2con
+    Qual mod tag2con
 
 maxtag_PN tycon
-  = let	(mod, nm) = moduleNamePair tycon
+  = let	(OrigName mod nm) = origName "maxtag_PN" tycon
 	maxtag	  = SLIT("maxtag_") _APPEND_ nm _APPEND_ SLIT("#")
     in
-    (if fromPrelude mod then Unqual else Qual mod) maxtag
+    Qual mod maxtag
 \end{code}

@@ -13,7 +13,7 @@ module DsUtils (
 
 	combineGRHSMatchResults,
 	combineMatchResults,
-	dsExprToAtom,
+	dsExprToAtom, DsCoreArg(..),
 	mkCoAlgCaseMatchResult,
 	mkAppDs, mkConDs, mkPrimDs, mkErrorAppDs,
 	mkCoLetsMatchResult,
@@ -31,7 +31,7 @@ IMP_Ubiq()
 IMPORT_DELOOPER(DsLoop)		( match, matchSimply )
 
 import HsSyn		( HsExpr(..), OutPat(..), HsLit(..),
-			  Match, HsBinds, Stmt, Qual, PolyType, ArithSeqInfo )
+			  Match, HsBinds, Stmt, Qualifier, PolyType, ArithSeqInfo )
 import TcHsSyn		( TypecheckedPat(..) )
 import DsHsSyn		( outPatType )
 import CoreSyn
@@ -50,7 +50,7 @@ import TyCon		( mkTupleTyCon, isNewTyCon, tyConDataCons )
 import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTys,
 			  mkTheta, isUnboxedType, applyTyCon, getAppTyCon
 			)
-import TysWiredIn	( voidTy )
+import TysPrim		( voidTy )
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet(..) )
 import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
 import PprCore{-ToDo:rm-}
@@ -240,15 +240,19 @@ combineGRHSMatchResults match_result1 match_result2
 %************************************************************************
 
 \begin{code}
-dsExprToAtom :: CoreExpr		    -- The argument expression
+dsExprToAtom :: DsCoreArg		    -- The argument expression
 	     -> (CoreArg -> DsM CoreExpr)   -- Something taking the argument *atom*,
 					    -- and delivering an expression E
 	     -> DsM CoreExpr		    -- Either E or let x=arg-expr in E
 
-dsExprToAtom (Var v) continue_with = continue_with (VarArg v)
-dsExprToAtom (Lit v) continue_with = continue_with (LitArg v)
+dsExprToAtom (UsageArg u) continue_with = continue_with (UsageArg u)
+dsExprToAtom (TyArg    t) continue_with = continue_with (TyArg    t)
+dsExprToAtom (LitArg   l) continue_with = continue_with (LitArg   l)
 
-dsExprToAtom arg_expr continue_with
+dsExprToAtom (VarArg (Var v)) continue_with = continue_with (VarArg v)
+dsExprToAtom (VarArg (Lit v)) continue_with = continue_with (LitArg v)
+
+dsExprToAtom (VarArg arg_expr) continue_with
   = let
 	ty = coreExprType arg_expr
     in
@@ -260,12 +264,11 @@ dsExprToAtom arg_expr continue_with
 	else Let (NonRec arg_id arg_expr) body
     )
 
-dsExprsToAtoms :: [CoreExpr]
+dsExprsToAtoms :: [DsCoreArg]
 	       -> ([CoreArg] -> DsM CoreExpr)
 	       -> DsM CoreExpr
 
-dsExprsToAtoms [] continue_with
-  = continue_with []
+dsExprsToAtoms [] continue_with = continue_with []
 
 dsExprsToAtoms (arg:args) continue_with
   = dsExprToAtom   arg 	$ \ arg_atom  ->
@@ -280,21 +283,23 @@ dsExprsToAtoms (arg:args) continue_with
 %************************************************************************
 
 \begin{code}
-mkAppDs  :: CoreExpr -> [Type] -> [CoreExpr] -> DsM CoreExpr
-mkConDs  :: Id       -> [Type] -> [CoreExpr] -> DsM CoreExpr
-mkPrimDs :: PrimOp   -> [Type] -> [CoreExpr] -> DsM CoreExpr
+type DsCoreArg = GenCoreArg CoreExpr{-NB!-} TyVar UVar
 
-mkAppDs fun tys arg_exprs 
-  = dsExprsToAtoms arg_exprs $ \ vals ->
-    returnDs (mkApp fun [] tys vals)
+mkAppDs  :: CoreExpr -> [DsCoreArg] -> DsM CoreExpr
+mkConDs  :: Id       -> [DsCoreArg] -> DsM CoreExpr
+mkPrimDs :: PrimOp   -> [DsCoreArg] -> DsM CoreExpr
 
-mkConDs con tys arg_exprs
-  = dsExprsToAtoms arg_exprs $ \ vals ->
-    returnDs (mkCon con [] tys vals)
+mkAppDs fun args
+  = dsExprsToAtoms args $ \ atoms ->
+    returnDs (mkGenApp fun atoms)
 
-mkPrimDs op tys arg_exprs
-  = dsExprsToAtoms arg_exprs $ \ vals ->
-    returnDs (mkPrim op [] tys vals)
+mkConDs con args
+  = dsExprsToAtoms args $ \ atoms ->
+    returnDs (Con  con atoms)
+
+mkPrimDs op args
+  = dsExprsToAtoms args $ \ atoms ->
+    returnDs (Prim op  atoms)
 \end{code}
 
 \begin{code}

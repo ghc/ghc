@@ -99,7 +99,7 @@ you will screw up the layout where they are used in case expressions!
 
 #endif  {- ! __GLASGOW_HASKELL__ -}
 
-#if __GLASGOW_HASKELL__ >= 23 && __GLASGOW_HASKELL__ < 200
+#if __GLASGOW_HASKELL__ >= 23
 #define USE_FAST_STRINGS 1
 #define FAST_STRING _PackedString
 #define SLIT(x)	    (_packCString (A# x#))

@@ -157,8 +157,8 @@ try_split_bind id expr =
 		-- right function to use ..
 	-- Now the bodies
 
-	c_id = mkSysLocal SLIT("_fbww") c_new_uq c_ty mkUnknownSrcLoc
-	n_id = mkSysLocal SLIT("_fbww") n_new_uq n_ty mkUnknownSrcLoc
+	c_id = mkSysLocal SLIT("fbww") c_new_uq c_ty mkUnknownSrcLoc
+	n_id = mkSysLocal SLIT("fbww") n_new_uq n_ty mkUnknownSrcLoc
 	worker_rhs
 	  = mkTyLam [] (big_args ++ [alphaTyVar]) (args++[c_id,n_id]) worker_body
 			

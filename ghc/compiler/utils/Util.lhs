@@ -211,6 +211,7 @@ startsWith, endsWith :: String -> String -> Maybe String
 startsWith []     str = Just str
 startsWith (c:cs) (s:ss)
   = if c /= s then Nothing else startsWith cs ss
+startWith  _	  []  = Nothing
 
 endsWith cs ss
   = case (startsWith (reverse cs) (reverse ss)) of

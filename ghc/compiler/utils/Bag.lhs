@@ -10,10 +10,10 @@ module Bag (
 	Bag,	-- abstract type
 
 	emptyBag, unitBag, unionBags, unionManyBags,
-	elemBag, mapBag,
+	mapBag, -- UNUSED: elemBag,
 	filterBag, partitionBag, concatBag, foldBag,
 	isEmptyBag, consBag, snocBag,
-	listToBag, bagToList, bagToList_append
+	listToBag, bagToList
     ) where
 
 #ifdef COMPILING_GHC
@@ -35,6 +35,7 @@ data Bag a
 emptyBag = EmptyBag
 unitBag  = UnitBag
 
+{- UNUSED:
 elemBag :: Eq a => a -> Bag a -> Bool
 
 elemBag x EmptyBag        = False
@@ -42,6 +43,7 @@ elemBag x (UnitBag y)     = x==y
 elemBag x (TwoBags b1 b2) = x `elemBag` b1 || x `elemBag` b2
 elemBag x (ListBag ys)    = any (x ==) ys
 elemBag x (ListOfBags bs) = any (x `elemBag`) bs
+-}
 
 unionManyBags [] = EmptyBag
 unionManyBags xs = ListOfBags xs
@@ -139,6 +141,7 @@ bagToList (ListBag vs) = vs
 bagToList b = bagToList_append b []
 
     -- (bagToList_append b xs) flattens b and puts xs on the end.
+    -- (not exported)
 bagToList_append EmptyBag 	 xs = xs
 bagToList_append (UnitBag x)	 xs = x:xs
 bagToList_append (TwoBags b1 b2) xs = bagToList_append b1 (bagToList_append b2 xs)

@@ -40,9 +40,8 @@ import CmdLineOpts	( opt_HiMap, opt_NoImplicitPrelude )
 import ErrUtils		( Error(..), Warning(..) )
 import FiniteMap	( emptyFM, eltsFM, fmToList, lookupFM{-ToDo:rm-} )
 import Maybes		( catMaybes )
-import Name		( isLocallyDefined, mkBuiltinName, Name, RdrName(..) )
+import Name		( isLocallyDefined, mkWiredInName, Name, RdrName(..) )
 import PrelInfo		( builtinNameInfo, BuiltinNames(..), BuiltinKeys(..) )
-import PrelMods		( pRELUDE )
 import Unique		( ixClassKey )
 import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
 import UniqSupply	( splitUniqSupply )
@@ -69,7 +68,7 @@ ToDo: May want to arrange to return old interface for this module!
 ToDo: Deal with instances (instance version, this module on instance list ???)
 
 \begin{code}
-renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
+renameModule us input@(HsModule modname _ _ imports _ _ _ _ _ _ _ _ _ _)
 
   = let
 	(b_names, b_keys, _) = builtinNameInfo
@@ -103,7 +102,7 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
     else
 
     -- No top-level name errors so rename source ...
-    case initRn True mod occ_env us2
+    case initRn True modname occ_env us2
 		(rnSource imp_mods unqual_imps imp_fixes input) of {
 	((rn_module, export_fn, src_occs), src_errs, src_warns) ->
 
@@ -158,20 +157,32 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
 		-- including those for which we have definitions
 
 	(orig_def_env, orig_def_dups)
-	  = extendGlobalRnEnv emptyRnEnv (map pair_orig def_vals)
-					 (map pair_orig def_tcs)
+	  = extendGlobalRnEnv emptyRnEnv (map pairify_rn def_vals)
+					 (map pairify_rn def_tcs)
 	(orig_occ_env, orig_occ_dups)
-	  = extendGlobalRnEnv emptyRnEnv (map pair_orig occ_vals)
-					 (map pair_orig occ_tcs)
+	  = extendGlobalRnEnv emptyRnEnv (map pairify_rn occ_vals)
+					 (map pairify_rn occ_tcs)
 
-        pair_orig rn = (origName rn, rn)
+	-- This stuff is pretty dodgy right now: I think original
+	-- names and occurrence names may be getting entangled
+	-- when they shouldn't be... WDP 96/06
+
+        pairify_rn rn -- ToDo: move to Name?
+	  = let
+		name = getName rn
+	    in
+	    (if isLocalName name
+	     then Unqual (getLocalName name)
+	     else case (origName "pairify_rn" name) of { OrigName m n ->
+		  Qual m n }
+	     , rn)
 
 	must_haves
 	  | opt_NoImplicitPrelude
 	  = [{-no Prelude.hi, no point looking-}]
 	  | otherwise
-	  = [ name_fn (mkBuiltinName u mod str) 
-	    | ((str, mod), (u, name_fn)) <- fmToList b_keys,
+	  = [ name_fn (mkWiredInName u orig)
+	    | (orig@(OrigName mod str), (u, name_fn)) <- fmToList b_keys,
 	      str `notElem` [ SLIT("main"), SLIT("mainPrimIO")] ]
     in
 --  ASSERT (isEmptyBag orig_occ_dups)
@@ -225,69 +236,4 @@ Warning message used herein:
 multipleOccWarn (name, occs) sty
   = ppBesides [ppStr "warning:multiple names used to refer to `", ppr sty name, ppStr "': ",
 	       ppInterleave ppComma (map (ppr sty) occs)]
-\end{code}
-
-\begin{code}
-{- TESTING:
-pprPIface (ParsedIface m ms v mv usgs lcm exm ims lfx ltdm lvdm lids ldp)
-  = ppAboves [
-	ppCat [ppPStr SLIT("interface"), ppPStr m, ppInt v,
-	       case mv of { Nothing -> ppNil; Just n -> ppInt n }],
-
-	ppPStr SLIT("__versions__"),
-	ppAboves [ ppCat[ppPStr n, ppInt v] | (n,v) <- fmToList lcm ],
-
-	ppPStr SLIT("__exports__"),
-	ppAboves [ ppBesides[ppPStr n, ppSP, ppr PprDebug rn,
-			     case ex of {ExportAll -> ppStr "(..)"; _ -> ppNil}]
-		 | (n,(rn,ex)) <- fmToList exm ],
-
-	pp_ims (bagToList ims),
-	pp_fixities lfx,
-	pp_decls ltdm lvdm,
-	pp_insts (bagToList lids),
-	pp_pragmas ldp
-    ]
-  where
-    pp_ims [] = ppNil
-    pp_ims ms = ppAbove (ppPStr SLIT("__instance_modules__"))
-			(ppCat (map ppPStr ms))
-
-    pp_fixities fx
-      | isEmptyFM fx = ppNil
-      | otherwise = ppAboves (ppPStr SLIT("__fixities__")
-		   : [ ppr PprDebug fix | (n, fix) <- fmToList fx])
-
-    pp_decls tds vds = ppAboves (ppPStr SLIT("__declarations__")
-			      : [ pprRdrIfaceDecl d | (n, d) <- fmToList tds ++ fmToList vds])
-
-    pp_insts [] = ppNil
-    pp_insts is = ppAboves (ppPStr SLIT("__instances__")
-			      : [ pprRdrInstDecl i | i <- is])
-
-    pp_pragmas ps | isEmptyFM ps = ppNil
-		  | otherwise = panic "Rename.pp_pragmas"
-
-pprRdrIfaceDecl (TypeSig tc _ decl)
-  = ppBesides [ppStr "tycon=", ppr PprDebug tc, ppStr "; ", ppr PprDebug decl]
-
-pprRdrIfaceDecl (NewTypeSig tc dc _ decl)
-  = ppBesides [ppStr "tycon=", ppr PprDebug tc, ppStr "; datacon=", ppr PprDebug dc,
-	       ppStr "; ", ppr PprDebug decl]
-
-pprRdrIfaceDecl (DataSig tc dcs dfs _ decl)
-  = ppBesides [ppStr "tycon=", ppr PprDebug tc, ppStr "; datacons=", ppr PprDebug dcs,
-	       ppStr "; fields=", ppr PprDebug dfs, ppStr "; ", ppr PprDebug decl]
-
-pprRdrIfaceDecl (ClassSig c ops _ decl)
-  = ppBesides [ppStr "class=", ppr PprDebug c, ppStr "; ops=", ppr PprDebug ops,
-	       ppStr "; ", ppr PprDebug decl]
-
-pprRdrIfaceDecl (ValSig f _ ty)
-  = ppBesides [ppr PprDebug f, ppStr " :: ", ppr PprDebug ty]
-
-pprRdrInstDecl (InstSig c t _ decl)
-  = ppBesides [ppStr "class=", ppr PprDebug c, ppStr " type=", ppr PprDebug t, ppStr "; ",
-		ppr PprDebug decl]
--}
 \end{code}

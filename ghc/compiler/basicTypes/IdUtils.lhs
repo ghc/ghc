@@ -13,10 +13,10 @@ IMPORT_DELOOPER(PrelLoop)		-- here for paranoia checking
 
 import CoreSyn
 import CoreUnfold	( UnfoldingGuidance(..) )
-import Id		( mkPreludeId, mkTemplateLocals )
+import Id		( mkImported, mkTemplateLocals )
 import IdInfo		-- quite a few things
-import Name		( mkBuiltinName )
-import PrelMods		( pRELUDE_BUILTIN )
+import Name		( mkPrimitiveName, OrigName(..) )
+import PrelMods		( gHC_BUILTINS )
 import PrimOp		( primOpInfo, tagOf_PrimOp, primOp_str,
 			  PrimOpInfo(..), PrimOpResultInfo(..) )
 import RnHsSyn		( RnName(..) )
@@ -35,33 +35,33 @@ primOpNameInfo op = (primOp_str  op, WiredInId (primOpId op))
 primOpId op
   = case (primOpInfo op) of
       Dyadic str ty ->
-	mk_prim_Id op pRELUDE_BUILTIN str [] [ty,ty] (dyadic_fun_ty ty) 2
+	mk_prim_Id op str [] [ty,ty] (dyadic_fun_ty ty) 2
 
       Monadic str ty ->
-	mk_prim_Id op pRELUDE_BUILTIN str [] [ty] (monadic_fun_ty ty) 1
+	mk_prim_Id op str [] [ty] (monadic_fun_ty ty) 1
 
       Compare str ty ->
-	mk_prim_Id op pRELUDE_BUILTIN str [] [ty,ty] (compare_fun_ty ty) 2
+	mk_prim_Id op str [] [ty,ty] (compare_fun_ty ty) 2
 
       Coercing str ty1 ty2 ->
-	mk_prim_Id op pRELUDE_BUILTIN str [] [ty1] (mkFunTys [ty1] ty2) 1
+	mk_prim_Id op str [] [ty1] (mkFunTys [ty1] ty2) 1
 
       PrimResult str tyvars arg_tys prim_tycon kind res_tys ->
-	mk_prim_Id op pRELUDE_BUILTIN str
+	mk_prim_Id op str
 	    tyvars
 	    arg_tys
 	    (mkForAllTys tyvars (mkFunTys arg_tys (applyTyCon prim_tycon res_tys)))
 	    (length arg_tys) -- arity
 
       AlgResult str tyvars arg_tys tycon res_tys ->
-	mk_prim_Id op pRELUDE_BUILTIN str
+	mk_prim_Id op str
 	    tyvars
 	    arg_tys
 	    (mkForAllTys tyvars (mkFunTys arg_tys (applyTyCon tycon res_tys)))
 	    (length arg_tys) -- arity
   where
-    mk_prim_Id prim_op mod name tyvar_tmpls arg_tys ty arity
-      = mkPreludeId (mkBuiltinName key mod name) ty
+    mk_prim_Id prim_op name tyvar_tmpls arg_tys ty arity
+      = mkImported (mkPrimitiveName key (OrigName gHC_BUILTINS name)) ty
 	   (noIdInfo `addInfo` (mkArityInfo arity)
 	          `addInfo_UF` (mkUnfolding EssentialUnfolding
 			         (mk_prim_unfold prim_op tyvar_tmpls arg_tys)))

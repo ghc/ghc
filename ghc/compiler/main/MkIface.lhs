@@ -30,17 +30,19 @@ import Id		( idType, dataConRawArgTys, dataConFieldLabels,
 			  dataConStrictMarks, StrictnessMark(..),
 			  GenId{-instance NamedThing/Outputable-}
 			)
-import Name		( nameOrigName, origName, nameOf,
+import Name		( origName, nameOf, moduleOf,
 			  exportFlagOn, nameExportFlag, ExportFlag(..),
-			  ltLexical, isExported, getExportFlag,
-			  isLexSym, isLocallyDefined,
+			  isExported, getExportFlag,
+			  isLexSym, isLocallyDefined, isWiredInName,
 			  RdrName(..){-instance Outputable-},
+			  OrigName(..){-instance Ord-},
 			  Name{-instance NamedThing-}
 			)
 import ParseUtils	( UsagesMap(..), VersionsMap(..) )
 import PprEnv		-- not sure how much...
 import PprStyle		( PprStyle(..) )
 import PprType		-- most of it (??)
+import PrelMods		( modulesWithBuiltins )
 import Pretty		( prettyToUn )
 import Unpretty		-- ditto
 import RnHsSyn		( RenamedHsModule(..), RnName{-instance NamedThing-} )
@@ -54,21 +56,8 @@ uppSemid   x = uppBeside (prettyToUn (ppr PprInterface x)) uppSemi -- micro util
 ppr_ty	  ty = prettyToUn (pprType PprInterface ty)
 ppr_tyvar tv = prettyToUn (ppr PprInterface tv)
 ppr_name   n
-  = let
-	on = origName n
-	s  = nameOf  on
-	pp = prettyToUn (ppr PprInterface on)
-    in
-    (if isLexSym s then uppParens else id) pp
-{-OLD:
-ppr_unq_name n
-  = let
-	on = origName n
-	s  = nameOf  on
-	pp = uppPStr  s
-    in
-    (if isLexSym s then uppParens else id) pp
--}
+  = case (origName "ppr_name" n) of { OrigName m s ->
+    uppBesides [uppPStr m, uppChar '.', uppPStr s] }
 \end{code}
 
 We have a function @startIface@ to open the output file and put
@@ -139,14 +128,19 @@ ifaceUsages (Just if_hdl) usages
   = hPutStr if_hdl "\n__usages__\n"   >>
     hPutStr if_hdl (uppShow 0 (uppAboves (map upp_uses usages_list)))
   where
-    usages_list = fmToList usages
+    usages_list = filter has_no_builtins (fmToList usages)
+
+    has_no_builtins (m, _)
+      = m `notElem` modulesWithBuiltins
+      -- Don't *have* to do this; save gratuitous spillage in
+      -- every interface.  Could be flag-controlled...
 
     upp_uses (m, (mv, versions))
       = uppBesides [uppPStr m, uppSP, uppInt mv, uppPStr SLIT(" :: "),
 	       upp_versions (fmToList versions), uppSemi]
 
     upp_versions nvs
-      = uppIntersperse uppSP [ uppCat [(if isLexSym n then uppParens else id) (uppPStr n), uppInt v] | (n,v) <- nvs ]
+      = uppIntersperse uppSP [ uppCat [uppPStr n, uppInt v] | (n,v) <- nvs ]
 \end{code}
 
 \begin{code}
@@ -158,11 +152,15 @@ ifaceVersions (Just if_hdl) version_info
   | otherwise
   = hPutStr if_hdl "\n__versions__\n"	>>
     hPutStr if_hdl (uppShow 0 (upp_versions version_list))
+    -- NB: when compiling Prelude.hs, this will spew out
+    -- stuff for [], (), (,), etc. [i.e., builtins], which
+    -- we'd rather it didn't.  The version-mangling in
+    -- the driver will ignore them.
   where
     version_list = fmToList version_info
 
     upp_versions nvs
-      = uppAboves [ (if isLexSym n then uppParens else id) (uppPStr n) | (n,v) <- nvs ]
+      = uppAboves [ uppPStr n | (n,v) <- nvs ]
 \end{code}
 
 \begin{code}
@@ -185,7 +183,7 @@ ifaceExportList Nothing{-no iface handle-} _ = return ()
 ifaceExportList (Just if_hdl)
 		(HsModule _ _ _ _ _ typedecls _ classdecls _ _ _ binds sigs _)
   = let
-	name_flag_pairs :: Bag (Name, ExportFlag)
+	name_flag_pairs :: Bag (OrigName, ExportFlag)
 	name_flag_pairs
 	  = foldr from_ty
 	   (foldr from_cls
@@ -212,10 +210,10 @@ ifaceExportList (Just if_hdl)
     from_binds bs acc = maybe_add_list acc (collectTopLevelBinders bs)
 
     --------------
-    maybe_add :: Bag (Name, ExportFlag) -> RnName -> Bag (Name, ExportFlag)
+    maybe_add :: Bag (OrigName, ExportFlag) -> RnName -> Bag (OrigName, ExportFlag)
 
     maybe_add acc rn
-      | exportFlagOn ef = acc `snocBag` (n, ef)
+      | exportFlagOn ef = acc `snocBag` (origName "maybe_add" n, ef)
       | otherwise       = acc
       where
 	n  = getName rn
@@ -226,11 +224,11 @@ ifaceExportList (Just if_hdl)
     maybe_add_list acc (n:ns) = maybe_add (maybe_add_list acc ns) n
 
     --------------
-    lexical_lt (n1,_) (n2,_) = nameOrigName n1 < nameOrigName n2
+    lexical_lt (n1,_) (n2,_) = n1 < n2
 
     --------------
-    upp_pair (n, ef)
-      = uppBeside (ppr_name n) (upp_export ef)
+    upp_pair (OrigName m n, ef)
+      = uppBesides [uppPStr m, uppSP, uppPStr n, uppSP, upp_export ef]
       where
 	upp_export ExportAll = uppPStr SLIT("(..)")
 	upp_export ExportAbs = uppNil
@@ -241,17 +239,20 @@ ifaceFixities Nothing{-no iface handle-} _ = return ()
 
 ifaceFixities (Just if_hdl) (HsModule _ _ _ _ fixities _ _ _ _ _ _ _ _ _)
   = let
-	local_fixities = filter from_here fixities
+	pp_fixities = foldr go [] fixities
     in
-    if null local_fixities then
+    if null pp_fixities then
 	return ()
     else 
 	hPutStr if_hdl "\n__fixities__\n" >>
-	hPutStr if_hdl (uppShow 0 (uppAboves (map uppSemid local_fixities)))
+	hPutStr if_hdl (uppShow 0 (uppAboves pp_fixities))
   where
-    from_here (InfixL v _) = isLocallyDefined v
-    from_here (InfixR v _) = isLocallyDefined v
-    from_here (InfixN v _) = isLocallyDefined v
+    go (InfixL v i) acc = (if isLocallyDefined v then (:) (print_fix "l" i v) else id) acc
+    go (InfixR v i) acc = (if isLocallyDefined v then (:) (print_fix "r" i v) else id) acc
+    go (InfixN v i) acc = (if isLocallyDefined v then (:) (print_fix ""  i v) else id) acc
+
+    print_fix suff prec var
+      = uppBesides [uppPStr SLIT("infix"), uppStr suff, uppSP, uppInt prec, uppSP, ppr_name var, uppSemi]
 \end{code}
 
 \begin{code}
@@ -262,9 +263,17 @@ ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
     ASSERT(all isLocallyDefined tycons)
     ASSERT(all isLocallyDefined classes)
     let
-	sorted_classes   = sortLt ltLexical classes
-	sorted_tycons	 = sortLt ltLexical tycons
-	sorted_vals	 = sortLt ltLexical vals
+	non_wired x = not (isWiredInName (getName x))
+
+	nonwired_classes = filter non_wired classes
+	nonwired_tycons  = filter non_wired tycons
+	nonwired_vals    = filter non_wired vals
+
+	lt_lexical a b = origName "lt_lexical" a < origName "lt_lexical" b
+
+	sorted_classes = sortLt lt_lexical nonwired_classes
+	sorted_tycons  = sortLt lt_lexical nonwired_tycons
+	sorted_vals    = sortLt lt_lexical nonwired_vals
     in
     if (null sorted_classes && null sorted_tycons && null sorted_vals) then
 	--  You could have a module with just instances in it
@@ -302,10 +311,10 @@ ifaceInstances (Just if_hdl) (_, _, _, insts)
 	    tycon1 = fst (getAppTyCon ty1)
 	    tycon2 = fst (getAppTyCon ty2)
 	in
-	case (origName clas1 `cmp` origName clas2) of
+	case (origName "lt_inst" clas1 `cmp` origName "lt_inst" clas2) of
 	  LT_ -> True
 	  GT_ -> False
-	  EQ_ -> origName tycon1 < origName tycon2
+	  EQ_ -> origName "lt_inst2" tycon1 < origName "lt_inst2" tycon2
 
     -------
     pp_inst (InstInfo clas tvs ty theta _ _ _ _ _ _ _ _)
@@ -330,25 +339,27 @@ ppr_class c
     case (initNmbr (nmbrClass c)) of { -- renumber it!
       Class _ n tyvar super_classes sdsels ops sels defms insts links ->
 
-	uppCat [uppPStr SLIT("class"), ppr_theta tyvar super_classes,
+	uppCat [uppPStr SLIT("class"), ppr_context tyvar super_classes,
 		ppr_name n, ppr_tyvar tyvar,
 		if null ops
 		then uppSemi
 		else uppCat [uppStr "where {", uppCat (map ppr_op ops), uppStr "};"]]
     }
   where
-    ppr_theta :: TyVar -> [Class] -> Unpretty
+    ppr_context :: TyVar -> [Class] -> Unpretty
 
-    ppr_theta tv []   = uppNil
-    ppr_theta tv [sc] = uppBeside (ppr_assert tv sc) (uppPStr SLIT(" =>"))
-    ppr_theta tv super_classes
-      = uppBesides [uppLparen,
+    ppr_context tv []   = uppNil
+--  ppr_context tv [sc] = uppBeside (ppr_assert tv sc) (uppPStr SLIT(" =>"))
+    ppr_context tv super_classes
+      = uppBesides [uppStr "{{",
 		    uppIntersperse upp'SP{-'-} (map (ppr_assert tv) super_classes),
-		    uppStr ") =>"]
+		    uppStr "}} =>"]
 
     ppr_assert tv (Class _ n _ _ _ _ _ _ _ _) = uppCat [ppr_name n, ppr_tyvar tv]
 
-    ppr_op (ClassOp o _ ty) = pp_sig (Unqual o) ty
+    clas_mod = moduleOf (origName "ppr_class" c)
+
+    ppr_op (ClassOp o _ ty) = pp_sig (Qual clas_mod o) ty
 \end{code}
 
 \begin{code}
@@ -396,11 +407,11 @@ ppr_tc this_tycon@(DataTyCon u n k tvs ctxt cons derivings data_or_new)
 		      NewType  -> uppPStr SLIT("newtype")
 
     ppr_context []      = uppNil
-    ppr_context [(c,t)] = uppCat [ppr_name c, ppr_ty t, uppPStr SLIT("=>")]
+--  ppr_context [(c,t)] = uppCat [ppr_name c, ppr_ty t, uppPStr SLIT("=>")]
     ppr_context cs
-      = uppBesides[uppLparen,
+      = uppBesides[uppStr "{{",
 		   uppInterleave uppComma [uppCat [ppr_name c, ppr_ty t] | (c,t) <- cs],
-		   uppRparen, uppPStr SLIT(" =>")]
+		   uppStr "}}", uppPStr SLIT(" =>")]
 
     pp_condecls
       = let

@@ -202,6 +202,7 @@ coreBindToStg env (NonRec binder rhs)
 		     else
 			[]				-- Discard it
     in
+    -- pprTrace "coreBindToStg:" (ppCat [ppr PprDebug binder, ppr PprDebug (isExported binder)]) $
     case stg_rhs of
       StgRhsClosure cc bi fvs upd [] (StgApp atom [] lvs) ->
 		-- Trivial RHS, so augment envt, and ditch the binding

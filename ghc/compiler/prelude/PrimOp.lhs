@@ -1638,12 +1638,12 @@ primOpNeedsWrapper other_op 	    	= False
 \begin{code}
 primOp_str op
   = case (primOpInfo op) of
-      Dyadic str _	       -> str
-      Monadic str _	       -> str
-      Compare str _	       -> str
-      Coercing str _ _	       -> str
+      Dyadic     str _	       -> str
+      Monadic    str _	       -> str
+      Compare    str _	       -> str
+      Coercing   str _ _       -> str
       PrimResult str _ _ _ _ _ -> str
-      AlgResult str _ _ _ _    -> str
+      AlgResult  str _ _ _ _   -> str
 \end{code}
 
 @primOpType@ duplicates some work of @primOpId@, but since we

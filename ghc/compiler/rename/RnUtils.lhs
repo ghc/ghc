@@ -21,6 +21,7 @@ module RnUtils (
 IMP_Ubiq(){-uitous-}
 
 import Bag		( Bag, emptyBag, snocBag, unionBags )
+import CmdLineOpts	( opt_CompilingPrelude )
 import ErrUtils		( addShortErrLocLine )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM,
 			  lookupFM, addListToFM, addToFM )
@@ -38,7 +39,7 @@ import Util		( assertPanic )
 *							*
 *********************************************************
 
-Seperate FiniteMaps are kept for lookup up Qual names,
+Separate FiniteMaps are kept for lookup up Qual names,
 Unqual names and Local names.
 
 \begin{code}
@@ -127,7 +128,10 @@ extendLocalRnEnv report_shadows (global, stack) new_local
 lookupRnEnv ((qual, unqual, _, _), stack) rdr
   = case rdr of 
       Unqual str   -> lookup stack str (lookup unqual str Nothing)
-      Qual mod str -> lookup qual (str,mod) Nothing
+      Qual mod str -> lookup qual (str,mod)
+			(if not opt_CompilingPrelude -- see below
+			 then Nothing
+			 else lookup unqual str Nothing)
   where
     lookup fm thing do_on_fail
       = case lookupFM fm thing of
@@ -137,12 +141,25 @@ lookupRnEnv ((qual, unqual, _, _), stack) rdr
 lookupGlobalRnEnv ((qual, unqual, _, _), _) rdr
   = case rdr of 
       Unqual str   -> lookupFM unqual str
-      Qual mod str -> lookupFM qual (str,mod)
+      Qual mod str -> case (lookupFM qual (str,mod)) of
+			Just xx -> Just xx
+			Nothing -> if not opt_CompilingPrelude then
+				      Nothing
+				   else -- "[]" may have turned into "Prelude.[]" and
+				        -- we are actually compiling "data [] a = ...";
+					-- maybe the right thing is to get "Prelude.[]"
+					-- into the "qual" table...
+				      lookupFM unqual str
 
 lookupTcRnEnv ((_, _, tc_qual, tc_unqual), _) rdr
   = case rdr of 
       Unqual str   -> lookupFM tc_unqual str
-      Qual mod str -> lookupFM tc_qual (str,mod)
+      Qual mod str -> case (lookupFM tc_qual (str,mod)) of -- as above
+			Just xx -> Just xx
+			Nothing -> if not opt_CompilingPrelude then
+				      Nothing
+				   else
+				      lookupFM tc_unqual str
 \end{code}
 
 *********************************************************

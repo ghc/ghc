@@ -218,8 +218,6 @@ data CStmtMacro
   | UPD_BH_SINGLE_ENTRY
   | PUSH_STD_UPD_FRAME
   | POP_STD_UPD_FRAME
-  | SET_ARITY
-  | CHK_ARITY
   | SET_TAG
   | GRAN_FETCH	    		-- for GrAnSim only  -- HWL
   | GRAN_RESCHEDULE   		-- for GrAnSim only  -- HWL
@@ -502,34 +500,34 @@ We need magical @Eq@ because @VanillaReg@s come in multiple flavors.
 
 \begin{code}
 instance Eq MagicId where
-    reg1 == reg2 = tagOf_MagicId reg1 _EQ_ tagOf_MagicId reg2
+    reg1 == reg2 = tag reg1 _EQ_ tag reg2
+     where
+	tag BaseReg	     = (ILIT(0) :: FAST_INT)
+	tag StkOReg	     = ILIT(1)
+	tag TagReg	     = ILIT(2)
+	tag RetReg	     = ILIT(3)
+	tag SpA		     = ILIT(4)
+	tag SuA		     = ILIT(5)
+	tag SpB		     = ILIT(6)
+	tag SuB		     = ILIT(7)
+	tag Hp		     = ILIT(8)
+	tag HpLim	     = ILIT(9)
+	tag LivenessReg	     = ILIT(10)
+	tag StdUpdRetVecReg  = ILIT(12)
+	tag StkStubReg	     = ILIT(13)
+	tag CurCostCentre    = ILIT(14)
+	tag VoidReg	     = ILIT(15)
 
-tagOf_MagicId BaseReg		= (ILIT(0) :: FAST_INT)
-tagOf_MagicId StkOReg		= ILIT(1)
-tagOf_MagicId TagReg		= ILIT(2)
-tagOf_MagicId RetReg		= ILIT(3)
-tagOf_MagicId SpA		= ILIT(4)
-tagOf_MagicId SuA		= ILIT(5)
-tagOf_MagicId SpB		= ILIT(6)
-tagOf_MagicId SuB		= ILIT(7)
-tagOf_MagicId Hp		= ILIT(8)
-tagOf_MagicId HpLim		= ILIT(9)
-tagOf_MagicId LivenessReg	= ILIT(10)
-tagOf_MagicId StdUpdRetVecReg	= ILIT(12)
-tagOf_MagicId StkStubReg	= ILIT(13)
-tagOf_MagicId CurCostCentre	= ILIT(14)
-tagOf_MagicId VoidReg		= ILIT(15)
+	tag (VanillaReg _ i) = ILIT(15) _ADD_ i
 
-tagOf_MagicId (VanillaReg _ i) = ILIT(15) _ADD_ i
+	tag (FloatReg i) = ILIT(15) _ADD_ maxv _ADD_ i
+	  where
+	    maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
 
-tagOf_MagicId (FloatReg i) = ILIT(15) _ADD_ maxv _ADD_ i
-  where
-    maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
-
-tagOf_MagicId (DoubleReg i) = ILIT(15) _ADD_ maxv _ADD_ maxf _ADD_ i
-  where
-    maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
-    maxf = case mAX_Float_REG   of { IBOX(x) -> x }
+	tag (DoubleReg i) = ILIT(15) _ADD_ maxv _ADD_ maxf _ADD_ i
+	  where
+	    maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
+	    maxf = case mAX_Float_REG   of { IBOX(x) -> x }
 \end{code}
 
 Returns True for any register that {\em potentially} dies across

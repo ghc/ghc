@@ -31,7 +31,7 @@ import Literal		( Literal )
 import MachRegs		( Reg )
 import Maybes		( MaybeErr )
 import MatchEnv 	( MatchEnv )
-import Name		( Module(..), RdrName, Name, ExportFlag, NamedThing(..) )
+import Name		( Module(..), OrigName, RdrName, Name, ExportFlag, NamedThing(..) )
 import Outputable	( Outputable(..) )
 import PprStyle		( PprStyle )
 import PragmaInfo	( PragmaInfo )
@@ -111,6 +111,7 @@ data Literal
 data MaybeErr a b
 data MatchEnv a b
 data Name
+data OrigName = OrigName _PackedString _PackedString
 data RdrName = Unqual _PackedString | Qual _PackedString _PackedString
 data Reg
 data OutPat a b c

@@ -87,7 +87,7 @@ import Id		( idType, idPrimRep, getIdArity,
 			)
 import IdInfo		( arityMaybe )
 import Maybes		( assocMaybe, maybeToBool )
-import Name		( isLocallyDefined, getLocalName )
+import Name		( isLocallyDefined, nameOf, origName )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
 import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
@@ -1320,8 +1320,8 @@ closureKind (MkClosureInfo _ lf _)
 
 closureTypeDescr :: ClosureInfo -> String
 closureTypeDescr (MkClosureInfo id lf _)
-  = if (isDataCon id) then			-- DataCon has function types
-	_UNPK_ (getLocalName (dataConTyCon id))	-- We want the TyCon not the ->
+  = if (isDataCon id) then			     -- DataCon has function types
+	_UNPK_ (nameOf (origName "closureTypeDescr" (dataConTyCon id))) -- We want the TyCon not the ->
     else
 	getTyDescription (idType id)
 \end{code}

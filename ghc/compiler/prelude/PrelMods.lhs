@@ -9,14 +9,10 @@ defined here so as to avod
 #include "HsVersions.h"
 
 module PrelMods (
-	pRELUDE, pRELUDE_BUILTIN,
-	pRELUDE_LIST, pRELUDE_TEXT,
-	pRELUDE_PRIMIO, pRELUDE_IO, pRELUDE_PS,
-	gLASGOW_ST, gLASGOW_MISC,
-	pRELUDE_FB,
+	gHC_BUILTINS, -- things that are really and truly primitive
+	pRELUDE, gHC__,
 	rATIO, iX,
-	
-	fromPrelude
+	modulesWithBuiltins
   ) where
 
 CHK_Ubiq() -- debugging consistency check
@@ -24,23 +20,12 @@ CHK_Ubiq() -- debugging consistency check
 
 
 \begin{code}
-gLASGOW_MISC	= SLIT("PreludeGlaMisc")
-gLASGOW_ST	= SLIT("PreludeGlaST")
-pRELUDE		= SLIT("Prelude")
-pRELUDE_BUILTIN = SLIT("PreludeBuiltin")
-pRELUDE_FB	= SLIT("PreludeFoldrBuild")
-pRELUDE_IO	= SLIT("PreludeIO")
-pRELUDE_LIST	= SLIT("PreludeList")
-pRELUDE_PRIMIO	= SLIT("PreludePrimIO")
-pRELUDE_PS	= SLIT("PreludePS")
-pRELUDE_TEXT	= SLIT("PreludeText")
+pRELUDE	     = SLIT("Prelude")
+gHC_BUILTINS = SLIT("GHCbuiltins") -- the truly-primitive things
+gHC__	     = SLIT("GHCbase")	   -- all GHC basics, add-ons, extras, everything
+				   -- (which can be defined in Haskell)
+rATIO	     = SLIT("Ratio")
+iX	     = SLIT("Ix")
 
-rATIO = SLIT("Ratio")
-iX = SLIT("Ix")
-
-fromPrelude :: FAST_STRING -> Bool
-fromPrelude s = (_SUBSTR_ s 0 6 == SLIT("Prelude"))
-  where
-    substr str beg end
-      = take (end - beg + 1) (drop beg str)
+modulesWithBuiltins = [ gHC_BUILTINS, gHC__, pRELUDE, rATIO, iX ]
 \end{code}

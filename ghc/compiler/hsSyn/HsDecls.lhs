@@ -247,8 +247,8 @@ data InstDecl tyvar uvar name pat
 				-- module being compiled; False <=> It is from
 				-- an imported interface.
 
-		(Maybe Module)	-- The name of the module where the instance decl
-				-- originally came from; Nothing => Prelude
+		Module		-- The name of the module where the instance decl
+				-- originally came from
 
 		[Sig name]		-- actually user-supplied pragmatic info
 		(InstancePragmas name)	-- interface-supplied pragmatic info
