@@ -21,6 +21,7 @@ inputReady(int fd, int msecs, int isSock)
     ( 1 ) {
 #else
     ( isSock ) {
+#endif
     int maxfd, ready;
     fd_set rfd;
     struct timeval tv;
@@ -43,7 +44,6 @@ inputReady(int fd, int msecs, int isSock)
 
     /* 1 => Input ready, 0 => not ready, -1 => error */
     return (ready);
-#endif
 #ifdef mingw32_TARGET_OS
     } else {
       DWORD rc;
