@@ -1,5 +1,5 @@
  
-tcfail029.hs:6: No instance for: `PrelBase.Ord Foo'
-    arising from use of `PrelBase.>' at tcfail029.hs:6
+tcfail029.hs:6: No instance for: `Ord Foo'
+    arising from use of `>' at tcfail029.hs:6
 
 Compilation had errors

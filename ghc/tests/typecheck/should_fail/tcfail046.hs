@@ -1,13 +1,7 @@
 --!! function types in deriving Eq things
 -- From a bug report by Dave Harrison <D.A.Harrison@newcastle.ac.uk>
 
-module Simulation(Process,
-		  Status,
-		  Pid,
-		  Time,
-		  Continuation,
-		  Message,
-		  MessList ) where
+module ShouldFail where
 
 type 	Process a = Pid -> Time -> Message a -> ( MessList a, 
 			     		   	  Continuation a)

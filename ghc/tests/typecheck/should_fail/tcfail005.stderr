@@ -1,8 +1,7 @@
  
-tcfail005.hs:3: Couldn't match the type
-		    `PrelTup.(,) taRt' against `PrelBase.[]'
-    Expected: `(taRt, taRv)'
-    Inferred: `[taRp]'
-    In a pattern binding: `(h PrelBase.: i) = (1, ('a'))'
+tcfail005.hs:3: Couldn't match the type `(,) taU7' against `[]'
+    Expected: `(taU7, taU9)'
+    Inferred: `[taU3]'
+    In a pattern binding: `(h : i) = (1, ('a'))'
 
 Compilation had errors

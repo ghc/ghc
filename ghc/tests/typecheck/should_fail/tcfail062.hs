@@ -1,6 +1,6 @@
 --!!! bug report from Satnam
 --
-module RubyAST
+module ShouldFail
 where
 
 type Module = (String,[Declaration])

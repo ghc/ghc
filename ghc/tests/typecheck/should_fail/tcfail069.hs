@@ -13,7 +13,7 @@ error recovery mechanism.
 
 -}
 
-module Too_Kuch( too_much ) where
+module ShouldFail where
 
 too_much :: [Int] -> [(Int,Int)] -> [(Int,[Int])] -> Bool
 too_much ds ((k,m):q1) s0

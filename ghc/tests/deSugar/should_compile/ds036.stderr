@@ -1,6 +1,0 @@
-ds036.hs:22: 
-    Warning: Possibly incomplete patterns
-	in the definition of function `brack''
-ds036.hs:44: 
-    Warning: Possibly incomplete patterns
-	in the definition of function `kh'

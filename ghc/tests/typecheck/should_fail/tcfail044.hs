@@ -1,6 +1,6 @@
 --!!! tcfail044: duplicated type variable in instance decls
 --
-module Main where
+module ShouldFail where
 
 instance (Eq a) => Eq (a->a)
  
@@ -19,4 +19,4 @@ ss = sin * sin
 cc = cos * cos
 tt = ss + cc
 
-main = putStr ((show (tt 0.4))++ "  "++(show (tt 1.652)))
+--main = putStr ((show (tt 0.4))++ "  "++(show (tt 1.652)))

@@ -1,24 +1,17 @@
  
 tcfail014.hs:5: Cannot construct the infinite type (occur check)
-		    `oaCu' = `oaCu -> oaCw'
-    Expected: `oaCu -> oaCw'
-    Inferred: `oaCu'
+		    `oaF6' = `oaF6 -> oaF8'
+    Expected: `oaF6 -> oaF8'
+    Inferred: `oaF6'
+    In the first argument of `z', namely `z'
     In an equation for function `h': `h z = z z'
     In an equation for function `g':
 	`g y
-	   = h PrelBase.+ 2
+	   = h + 2
 	   where
 	       h z = z z'
-    In an equation for function `f':
-	`f x
-	   = g PrelBase.+ 1
-	   where
-	       g y
-		 = h PrelBase.+ 2
-		 where
-		     h z = z z'
  
-tcfail014.hs:5: No instance for: `PrelBase.Num (taCQ -> taCS)'
-    arising from use of `PrelBase.+' at tcfail014.hs:5
+tcfail014.hs:5: No instance for: `Num (taFs -> taFu)'
+    arising from use of `+' at tcfail014.hs:5
 
 Compilation had errors

@@ -1,8 +1,7 @@
  
-tcfail009.hs:3: Couldn't match the type
-		    `PrelBase.Int' against `PrelBase.Integer'
-    Expected: `PrelBase.Integer'
-    Inferred: `PrelBase.Int'
-    In an expression with a type signature: `2 :: PrelBase.Integer'
+tcfail009.hs:3: Couldn't match the type `Int' against `Integer'
+    Expected: `Integer'
+    Inferred: `Int'
+    In an expression with a type signature: `2 :: Integer'
 
 Compilation had errors

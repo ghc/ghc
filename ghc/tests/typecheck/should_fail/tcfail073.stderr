@@ -1,16 +1,16 @@
  
 tcfail073.hs:3: Duplicate or overlapping instance declarations
-    for `PrelBase.Eq (a, b)' at tcfail073.hs:8 and <NoSrcLoc>
+    for `Eq (a, b)' at tcfail073.hs:8 and <NoSrcLoc>
  
 tcfail073.hs:3: Duplicate or overlapping instance declarations
-    for `PrelBase.Eq (a, b)' at tcfail073.hs:8 and <NoSrcLoc>
+    for `Eq (a, b)' at tcfail073.hs:8 and <NoSrcLoc>
  
 tcfail073.hs:3: Duplicate or overlapping instance declarations
-    for `PrelBase.Eq (a, b)' at tcfail073.hs:8 and <NoSrcLoc>
+    for `Eq (a, b)' at tcfail073.hs:8 and <NoSrcLoc>
  
-tcfail073.hs:8: Context `{PrelBase.Eq taR4}'
+tcfail073.hs:8: Context `{Eq taTH}'
 		    required by inferred type, but missing on a type signature
-		    `PrelBase.Eq taR4' arising from use of `PrelBase.==' at tcfail073.hs:8
+		    `Eq taTH' arising from use of `==' at tcfail073.hs:8
     When checking methods of an instance declaration
 
 Compilation had errors

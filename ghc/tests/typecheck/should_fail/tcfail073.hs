@@ -1,6 +1,6 @@
--- what error do you get if you redefined PreludeCore instances?
+-- what error do you get if you redefined Prelude instances?
 
-module Test where
+module ShouldFail where
 
 f x@(a,b) y@(c,d) = x == y
 

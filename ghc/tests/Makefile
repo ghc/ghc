@@ -6,7 +6,6 @@ SUBDIRS = \
 	codeGen \
 	deSugar \
 	deriving \
-	io \
 	printing \
 	reader \
 	rename \
@@ -14,7 +13,8 @@ SUBDIRS = \
 	stranal \
 	typecheck 
 
-#programs
+#	io \
+#	programs
 
 include $(TOP)/mk/target.mk
 

@@ -1,3 +1,0 @@
-ds038.hs:7: 
-    Warning: Possibly incomplete patterns
-	in the definition of function `takeList'

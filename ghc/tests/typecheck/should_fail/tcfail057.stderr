@@ -1,4 +1,4 @@
  
-tcfail057.hs:5: Class used as a type constructor: `PrelNum.RealFrac'
+tcfail057.hs:5: Class used as a type constructor: `RealFrac'
 
 Compilation had errors

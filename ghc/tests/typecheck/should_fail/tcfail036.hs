@@ -1,6 +1,6 @@
 --!!! prelude class name in an instance-tycon position
 --
-module M where
+module ShouldFail where
 
 data NUM = ONE | TWO
 instance Num NUM

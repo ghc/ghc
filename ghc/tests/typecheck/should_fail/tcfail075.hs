@@ -2,7 +2,7 @@
 
 {-# OPTIONS -fglasgow-exts #-}
 
-module Main where
+module ShouldFail where
 
 x = 1#
 

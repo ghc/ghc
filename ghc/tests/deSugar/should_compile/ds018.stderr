@@ -1,6 +1,0 @@
-ds018.hs:39: 
-    Warning: Possibly incomplete patterns
-	in the definition of function `fa'
-ds018.hs:41: 
-    Warning: Possibly incomplete patterns
-	in the definition of function `fb'

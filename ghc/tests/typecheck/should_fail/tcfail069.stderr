@@ -1,14 +1,12 @@
  
-tcfail069.hs:21: Couldn't match the type
-		     `PrelTup.(,) taCp' against `PrelBase.[]'
-    Expected: `[taCt]'
-    Inferred: `([PrelBase.Int], [PrelBase.Int])'
-    In a "case" branch: `PrelBase.[]' -> `IOBase.error "foo"'
-    In the case expression
-	`case (list1, (list2)) of PrelBase.[] -> IOBase.error "foo"'
+tcfail069.hs:21: Couldn't match the type `(,) taAJ' against `[]'
+    Expected: `[taAN]'
+    Inferred: `([Int], [Int])'
+    In a "case" branch: `[]' -> `error "foo"'
+    In the case expression `case (list1, (list2)) of [] -> error "foo"'
     In an equation for function `too_much':
-	`too_much ds ((k, m) PrelBase.: q1) s0
-		  = case (list1, (list2)) of PrelBase.[] -> IOBase.error "foo"
+	`too_much ds ((k, m) : q1) s0
+		  = case (list1, (list2)) of [] -> error "foo"
 		  where
 		      list2 = ds
 		      list1 = ds'

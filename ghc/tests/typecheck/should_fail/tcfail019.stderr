@@ -1,18 +1,18 @@
  
-tcfail019.hs:20: No instance for: `B [tali]'
-    arising from an instance declaration at tcfail019.hs:20
+tcfail019.hs:19: No instance for: `B [tamO]'
+    arising from an instance declaration at tcfail019.hs:19
     When checking methods of an instance declaration
  
-tcfail019.hs:20: No instance for: `C [tali]'
-    arising from an instance declaration at tcfail019.hs:20
+tcfail019.hs:19: No instance for: `C [tamO]'
+    arising from an instance declaration at tcfail019.hs:19
     When checking methods of an instance declaration
  
-tcfail019.hs:20: No instance for: `B [tali]'
-    arising from an instance declaration at tcfail019.hs:20
+tcfail019.hs:19: No instance for: `B [tamO]'
+    arising from an instance declaration at tcfail019.hs:19
     When checking superclass constraints of an instance declaration
  
-tcfail019.hs:20: No instance for: `C [tali]'
-    arising from an instance declaration at tcfail019.hs:20
+tcfail019.hs:19: No instance for: `C [tamO]'
+    arising from an instance declaration at tcfail019.hs:19
     When checking superclass constraints of an instance declaration
 
 Compilation had errors

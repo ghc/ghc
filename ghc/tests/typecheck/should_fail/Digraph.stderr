@@ -1,32 +1,28 @@
  
 Digraph.hs:19: A type signature is more polymorphic than the inferred type
-		   Can't for-all the type variable(s) `taW8'
-		   in the inferred type `[Edge taW8]'
+		   Can't for-all the type variable(s) `taYK'
+		   in the inferred type `[Edge taYK]'
     When checking signature for `reversed_edges'
     In an equation for function `stronglyConnComp':
 	`stronglyConnComp es vs
-			  = PrelTup.snd (span_tree (new_range reversed_edges)
-						   (PrelBase.[], (PrelBase.[]))
-						   (PrelTup.snd (dfs (new_range es)
-								     (PrelBase.[], (PrelBase.[]))
-								     vs)))
+			  = snd (span_tree (new_range reversed_edges)
+					   ([], ([]))
+					   (snd (dfs (new_range es) ([], ([])) vs)))
 			  where
-			      span_tree r (vs, ns) PrelBase.[] = (vs, (ns))
-			      span_tree r (vs, ns) (x PrelBase.: xs)
-					| x PrelList.elem vs = span_tree r (vs, (ns)) xs
-					| PrelBase.otherwise
-					= span_tree r (vs', ((x PrelBase.: ns') PrelBase.: ns)) xs
+			      span_tree r (vs, ns) [] = (vs, (ns))
+			      span_tree r (vs, ns) (x : xs)
+					| x elem vs = span_tree r (vs, (ns)) xs
+					| otherwise = span_tree r (vs', ((x : ns') : ns)) xs
 					where
-					    (vs', ns')
-						= dfs r (x PrelBase.: vs, (PrelBase.[])) (r x)
-			      new_range PrelBase.[] w = PrelBase.[]
-			      new_range ((x, y) PrelBase.: xys) w
-					= if x PrelBase.== w then
-					      (y PrelBase.: (new_range xys w))
+					    (vs', ns') = dfs r (x : vs, ([])) (r x)
+			      new_range [] w = []
+			      new_range ((x, y) : xys) w
+					= if x == w then
+					      (y : (new_range xys w))
 					  else
 					      (new_range xys w)
 			      swap (x, y) = (y, (x))
-			      reversed_edges :: _forall_ [v] (PrelBase.Eq v) => [Edge v]
-			      reversed_edges = PrelBase.map swap es'
+			      reversed_edges :: _forall_ [v] (Eq v) => [Edge v]
+			      reversed_edges = map swap es'
 
 Compilation had errors

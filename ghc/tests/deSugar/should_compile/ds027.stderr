@@ -1,6 +1,0 @@
-ds027.hs:9: 
-    Warning: Possibly incomplete patterns
-	in the definition of function `/='
-ds027.hs:8: 
-    Warning: Possibly incomplete patterns
-	in the definition of function `=='

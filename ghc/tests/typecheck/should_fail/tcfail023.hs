@@ -1,3 +1,6 @@
+module ShouldFail where
+
+--!!! Duplicate instances
 
 data B = C
 

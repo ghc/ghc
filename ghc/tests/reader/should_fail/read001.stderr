@@ -42,7 +42,7 @@ expr a b c d
 	   + ((9 *)))
 	  + ((* 8)))
 	 + (case x of
-	      []
+	      Prelude.[]
 	      | null x -> 99
 	      | otherwise -> 98
 	      | True -> 97

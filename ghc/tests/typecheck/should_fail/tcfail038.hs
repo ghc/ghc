@@ -1,6 +1,6 @@
 --!!! duplicate class-method declarations
 
-module M where
+module ShouldFail where
 
 data NUM = ONE | TWO
 instance Eq NUM where

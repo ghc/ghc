@@ -1,6 +1,6 @@
 --!!! bogus re-use of prelude class-method name (==)
 --
-module M where
+module ShouldFail where
 
 data NUM = ONE | TWO
 class EQ a where

@@ -1,6 +1,6 @@
 --!!! instances of functions
 --
-module M where
+module ShouldFail where
 
 data NUM = ONE | TWO
 

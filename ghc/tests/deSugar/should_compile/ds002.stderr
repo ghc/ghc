@@ -1,9 +1,0 @@
-ds002.hs:13: 
-    Warning: Possibly incomplete patterns
-	in the definition of function `g'
-ds002.hs:8: 
-    Warning: Pattern match(es) completely overlapped
-	in the definition of function `f'
-ds002.hs:9: 
-    Warning: Pattern match(es) completely overlapped
-	in the definition of function `f'

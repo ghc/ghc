@@ -1,6 +1,6 @@
 --!!! PreludeCore entities cannot be redefined at the top-level
 --
-module M where
+module ShouldFail where
 
 data NUM = ONE | TWO
 

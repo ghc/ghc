@@ -1,5 +1,5 @@
  
-tcfail003.hs:3: No instance for: `PrelBase.Num PrelBase.Char'
+tcfail003.hs:3: No instance for: `Num Char'
     arising from the literal 1 at tcfail003.hs:3
 
 Compilation had errors

@@ -1,3 +1,4 @@
+module ShouldFail where
 
 class A a where
  op1 :: a -> a

@@ -1,3 +1,5 @@
+module ShouldFail where
+
 --!!! weird class/instance examples off the haskell list
 --
 

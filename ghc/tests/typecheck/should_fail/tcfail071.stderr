@@ -1,15 +1,11 @@
  
 tcfail071.hs:10: Couldn't match the signature/existential type variable
-		     `taD0' with the type `taDe -> taDb -> taDb'
-    Expected: `taD0'
-    Inferred: `taDe -> taDb -> taDb'
-    In a pattern binding:
-	`p = PrelBase.foldr (f c) PrelBase.[] PrelBase.[]'
-    In an equation for function `g':
-	`g c
-	   = c
-	   where
-	       p = PrelBase.foldr (f c) PrelBase.[] PrelBase.[]'
+		     `taEm' with the type `taEz -> taEw -> taEw'
+    Expected: `taEm'
+    Inferred: `taEz -> taEw -> taEw'
+    In the first argument of `f', namely `c'
+    In the first argument of `foldr', namely `(f c)'
+    In a pattern binding: `p = foldr (f c) [] []'
  
 tcfail071.hs:8: Mismatched contexts
     When matching the contexts of the signatures for `f' and `g'

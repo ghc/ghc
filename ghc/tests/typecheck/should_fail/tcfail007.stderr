@@ -1,5 +1,5 @@
  
-tcfail007.hs:4: No instance for: `PrelBase.Num PrelBase.Bool'
-    arising from use of `PrelBase.+' at tcfail007.hs:4
+tcfail007.hs:4: No instance for: `Num Bool'
+    arising from use of `+' at tcfail007.hs:4
 
 Compilation had errors

@@ -5,12 +5,12 @@ bitRsh{-r3h,x-} =
 bitLsh{-r3i,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-AbsBinds [takI] [d.Bits_akH] []
+AbsBinds [tamf] [d.Bits_ame] []
 
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ Word 1
 _instance_modules_
-ArrBase IO PrelNum
+Addr ArrBase Foreign IO PrelNum
 _exports_
 Word Bits(bitRsh bitLsh);
 _fixities_

@@ -1,6 +1,6 @@
 --!!! instances with empty where parts: duplicate
 --
-module M where
+module ShouldFail where
 
 data NUM = ONE | TWO
 instance Num NUM

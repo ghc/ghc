@@ -1,68 +1,68 @@
  
-tcfail035.hs:9: No explicit method nor default method for `PrelBase.showsPrec'
-		in an instance declaration for `PrelBase.Show'
+tcfail035.hs:9: Warning: no explicit method nor default method for `showsPrec'
+		in an instance declaration for `Show'
  
-tcfail035.hs:8: No explicit method nor default method for `PrelBase.=='
-		in an instance declaration for `PrelBase.Eq'
+tcfail035.hs:8: Warning: no explicit method nor default method for `=='
+		in an instance declaration for `Eq'
  
-tcfail035.hs:7: No explicit method nor default method for `PrelBase.+'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:7: Warning: no explicit method nor default method for `+'
+		in an instance declaration for `Num'
  
-tcfail035.hs:7: No explicit method nor default method for `PrelBase.*'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:7: Warning: no explicit method nor default method for `*'
+		in an instance declaration for `Num'
  
-tcfail035.hs:7: No explicit method nor default method for `PrelBase.negate'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:7: Warning: no explicit method nor default method for `negate'
+		in an instance declaration for `Num'
  
-tcfail035.hs:7: No explicit method nor default method for `PrelBase.abs'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:7: Warning: no explicit method nor default method for `abs'
+		in an instance declaration for `Num'
  
-tcfail035.hs:7: No explicit method nor default method for `PrelBase.signum'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:7: Warning: no explicit method nor default method for `signum'
+		in an instance declaration for `Num'
  
-tcfail035.hs:7: No explicit method nor default method for `PrelBase.fromInteger'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:7: Warning: no explicit method nor default method for `fromInteger'
+		in an instance declaration for `Num'
  
-tcfail035.hs:6: No explicit method nor default method for `PrelBase.+'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:6: Warning: no explicit method nor default method for `+'
+		in an instance declaration for `Num'
  
-tcfail035.hs:6: No explicit method nor default method for `PrelBase.*'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:6: Warning: no explicit method nor default method for `*'
+		in an instance declaration for `Num'
  
-tcfail035.hs:6: No explicit method nor default method for `PrelBase.negate'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:6: Warning: no explicit method nor default method for `negate'
+		in an instance declaration for `Num'
  
-tcfail035.hs:6: No explicit method nor default method for `PrelBase.abs'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:6: Warning: no explicit method nor default method for `abs'
+		in an instance declaration for `Num'
  
-tcfail035.hs:6: No explicit method nor default method for `PrelBase.signum'
-		in an instance declaration for `PrelBase.Num'
+tcfail035.hs:6: Warning: no explicit method nor default method for `signum'
+		in an instance declaration for `Num'
  
-tcfail035.hs:6: No explicit method nor default method for `PrelBase.fromInteger'
-		in an instance declaration for `PrelBase.Num'
- 
-tcfail035.hs:3: Duplicate or overlapping instance declarations
-    for `PrelBase.Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+tcfail035.hs:6: Warning: no explicit method nor default method for `fromInteger'
+		in an instance declaration for `Num'
  
 tcfail035.hs:3: Duplicate or overlapping instance declarations
-    for `PrelBase.Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+    for `Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
  
 tcfail035.hs:3: Duplicate or overlapping instance declarations
-    for `PrelBase.Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+    for `Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
  
-tcfail035.hs:7: No instance for: `PrelBase.Eval NUM'
+tcfail035.hs:3: Duplicate or overlapping instance declarations
+    for `Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+ 
+tcfail035.hs:7: No instance for: `Eval NUM'
     arising from an instance declaration at tcfail035.hs:7
     When checking methods of an instance declaration
  
-tcfail035.hs:7: No instance for: `PrelBase.Eval NUM'
+tcfail035.hs:7: No instance for: `Eval NUM'
     arising from an instance declaration at tcfail035.hs:7
     When checking superclass constraints of an instance declaration
  
-tcfail035.hs:6: No instance for: `PrelBase.Eval NUM'
+tcfail035.hs:6: No instance for: `Eval NUM'
     arising from an instance declaration at tcfail035.hs:6
     When checking methods of an instance declaration
  
-tcfail035.hs:6: No instance for: `PrelBase.Eval NUM'
+tcfail035.hs:6: No instance for: `Eval NUM'
     arising from an instance declaration at tcfail035.hs:6
     When checking superclass constraints of an instance declaration
 

@@ -1,7 +1,7 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-ArrBase IO PrelNum
+Addr ArrBase Foreign IO PrelNum
 _usages_
 PrelBase 1 :: $d16 1 $d2 1 $d33 1 $d38 1 $d40 1 $d42 1 $d47 1 $d8 1 $m/= 1 not 1 Eq 1 Eval 1;
 PrelNum 1 :: $d18 1;

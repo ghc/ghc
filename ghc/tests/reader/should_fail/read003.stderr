@@ -11,15 +11,15 @@ module Read003 where
 
  
 read003.hs:8: Cannot construct the infinite type (occur check)
-		  `taGL' = `(taGL, taGO, taGR)'
-    Expected: `taGL'
-    Inferred: `(taGL, [taH0], taGR)'
+		  `taIl' = `(taIl, taIo, taIr)'
+    Expected: `taIl'
+    Inferred: `(taIl, [taIz], taIr)'
     In a pattern binding:
 	`~(a, b, c)
 	     | nullity b = a
 	     | nullity c = a
-	     | PrelBase.otherwise = a
+	     | otherwise = a
 	     where
-		 nullity = PrelList.null'
+		 nullity = null'
 
 Compilation had errors

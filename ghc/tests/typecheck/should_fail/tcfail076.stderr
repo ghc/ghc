@@ -1,11 +1,12 @@
  
-tcfail076.hs:21: A type signature is more polymorphic than the inferred type
-		     Can't for-all the type variable(s) `taCl'
-		     in the inferred type `(taCb -> aaCa taCl) -> aaCa taCl'
+tcfail076.hs:20: A type signature is more polymorphic than the inferred type
+		     Can't for-all the type variable(s) `taEJ'
+		     in the inferred type `(taEz -> aaEy taEJ) -> aaEy taEJ'
     In a polymorphic function argument `(\ cont' -> cont a)'
-    In an equation for function `callcc':
-	`callcc f
-		= KContT (\ cont
-			    -> unKContT (f (\ a -> KContT (\ cont' -> cont a))) cont)'
+    In the first argument of `KContT', namely `(\ cont' -> cont a)'
+    In the first argument of `f', namely
+	`(\ a -> KContT (\ cont' -> cont a))'
+    In the first argument of `unKContT', namely
+	`(f (\ a -> KContT (\ cont' -> cont a)))'
 
 Compilation had errors

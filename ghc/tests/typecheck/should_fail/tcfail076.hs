@@ -9,10 +9,9 @@ Needless to say that it uses some of GHC's arcane type extensions.
 
 {-# OPTIONS -fglasgow-exts #-}
 
-module Test			(  module Test  )
-where
+module ShouldFail where
 
-import GlaExts
+import GHC ( All )
 
 data ContT m a		=  KContT ((All res) => (a -> m res) -> m res)
 unKContT (KContT x)	=  x

@@ -1,7 +1,5 @@
 module ShouldSucceed where
 
-import GlaExts
-
 data SeqView t a              =  Null
                               |  Cons a (t a)
 

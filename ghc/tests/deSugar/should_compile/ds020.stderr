@@ -1,17 +1,2 @@
-ds020.hs:6: 
-    Warning: Pattern match(es) completely overlapped
-	in the definition of function `a'
-ds020.hs:9: 
-    Warning: Pattern match(es) completely overlapped
-	in the definition of function `b'
-ds020.hs:16: 
-    Warning: Pattern match(es) completely overlapped
-	in the definition of function `d'
-ds020.hs:17: 
-    Warning: Pattern match(es) completely overlapped
-	in the definition of function `d'
-ds020.hs:20: 
-    Warning: Pattern match(es) completely overlapped
-	in the definition of function `f'
 
 NOTE: Simplifier still going after 4 iterations; bailing out.

@@ -14,7 +14,7 @@
   local binds for:
 -}
 
-module Tmp( g ) where
+module ShouldFail where
 
 data AB p q = A
             | B p q

@@ -1,6 +1,0 @@
-ds019.hs:7: 
-    Warning: Pattern match(es) completely overlapped
-	in the definition of function `f'
-ds019.hs:8: 
-    Warning: Pattern match(es) completely overlapped
-	in the definition of function `f'

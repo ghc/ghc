@@ -1,3 +1,0 @@
-ds015.hs:9: 
-    Warning: Possibly incomplete patterns
-	in a lambda abstraction: `(x PrelBase.: xs) -> ...'

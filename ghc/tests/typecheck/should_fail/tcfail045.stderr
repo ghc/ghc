@@ -1,4 +1,9 @@
  
-tcfail045.hs:10: Type constructor or class not in scope: `PrimIO'
+tcfail045.hs:10: Unacceptable instance type for ccall-ish class
+		     class `CCallable' type `Socket'
+ 
+tcfail045.hs:13: No instance for: `CCallable Socket'
+    arising from an argument in the _ccall_ to foo, namely `x' at tcfail045.hs:13
+    When checking signature(s) for: `f'
 
 Compilation had errors

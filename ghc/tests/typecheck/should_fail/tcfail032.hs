@@ -9,7 +9,7 @@ It *is* an error, because x does not have the polytype
 becuase it is monomorphic, but the error message isn't very illuminating.
 -}
 
-module TcSig where
+module ShouldFail where
 
 f x = (x :: (Eq a) => a -> Int)
 

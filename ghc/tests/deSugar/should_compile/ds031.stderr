@@ -1,3 +1,0 @@
-ds031.hs:4: 
-    Warning: Possibly incomplete patterns
-	in the definition of function `foldPair'

@@ -1,8 +1,8 @@
  
 tcfail033.hs:4: Cannot construct the infinite type (occur check)
-		    `taGE' = `(taGE, taGH)'
-    Expected: `aaGJ taGE'
-    Inferred: `aaGJ (taGE, taGH)'
+		    `taIc' = `(taIc, taIf)'
+    Expected: `aaIh taIc'
+    Inferred: `aaIh (taIc, taIf)'
     In a pattern binding: `buglet = [x | (x, y) <- buglet]'
 
 Compilation had errors

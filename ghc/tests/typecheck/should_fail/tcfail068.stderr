@@ -1,43 +1,73 @@
  
-tcfail068.hs:4:
-    Conflicting definitions for: `Just'
-	Imported from Prelude at tcfail068.hs:4
-	Defined at tcfail068.hs:68
+tcfail068.hs:45: A type signature is more polymorphic than the inferred type
+		     Can't for-all the type variable(s) `ta16y'
+		     in the inferred type `ST ta16y (ta16r, IndTree ta16y ta16o)'
+    In a polymorphic function argument `(itrapstate' i k s)'
+    In the first argument of `runST', namely `(itrapstate' i k s)'
+    In an equation for function `itrapstate':
+	`itrapstate ((i, k), (j, l)) f c d s arr
+		    = runST (itrapstate' i k s)
+		    where
+			itrapstatesnd i k s
+				      = if i > j then
+					    return (s, (arr))
+					else
+					    ((readArray arr (i, (k)))
+					     >>= (\ val
+						    -> let (newstate, newval) = f (c (i, (k)) s) val
+						       in
+							 (writeArray arr (i, (k)) newval)
+							 >> (itrapstatesnd (i + 1) k (d newstate))))
+			itrapstate' i k s
+				    = if k > l then
+					  return (s, (arr))
+				      else
+					  ((itrapstatesnd i k s)
+					   >>= (\ (s, arr) -> itrapstate' i (k + 1) s))'
  
-tcfail068.hs:4:
-    Conflicting definitions for: `Nothing'
-	Imported from Prelude at tcfail068.hs:4
-	Defined at tcfail068.hs:70
+tcfail068.hs:32: A type signature is more polymorphic than the inferred type
+		     Can't for-all the type variable(s) `ta19A'
+		     in the inferred type `ST ta19A (IndTree ta19A ta19x)'
+    In a polymorphic function argument `(itrap' i k)'
+    In the first argument of `runST', namely `(itrap' i k)'
+    In an equation for function `itrap':
+	`itrap ((i, k), (j, l)) f arr
+	       = runST (itrap' i k)
+	       where
+		   itrapsnd i k
+			    = if i > j then
+				  return arr
+			      else
+				  ((readArray arr (i, (k)))
+				   >>= (\ val
+					  -> (writeArray arr (i, (k)) (f val))
+					     >> (itrapsnd (i + 1) k)))
+		   itrap' i k
+			  = if k > l then
+				return arr
+			    else
+				((itrapsnd i k) >> (itrap' i (k + 1)))'
  
-tcfail068.hs:4:
-    Conflicting definitions for: `Maybe'
-	Imported from Prelude at tcfail068.hs:4
-	Defined at tcfail068.hs:68
+tcfail068.hs:21: A type signature is more polymorphic than the inferred type
+		     Can't for-all the type variable(s) `ta1bT'
+		     in the inferred type `ST ta1bT (IndTree ta1bT ta1bE)'
+    In a polymorphic function argument `((readArray arr i)
+					 >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
+    In the first argument of `runST', namely
+	`((readArray arr i)
+	  >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
+    In an equation for function `itiap':
+	`itiap i f arr
+	       = runST ((readArray arr i)
+			>>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
  
-tcfail068.hs:19: Value not in scope: `returnStrictlyST'
- 
-tcfail068.hs:19: Value not in scope: `seqStrictlyST'
- 
-tcfail068.hs:21: Value not in scope: `thenStrictlyST'
- 
-tcfail068.hs:26: Value not in scope: `returnStrictlyST'
- 
-tcfail068.hs:26: Value not in scope: `seqStrictlyST'
- 
-tcfail068.hs:29: Value not in scope: `returnStrictlyST'
- 
-tcfail068.hs:30: Value not in scope: `seqStrictlyST'
- 
-tcfail068.hs:29: Value not in scope: `thenStrictlyST'
- 
-tcfail068.hs:38: Value not in scope: `returnStrictlyST'
- 
-tcfail068.hs:38: Value not in scope: `thenStrictlyST'
- 
-tcfail068.hs:41: Value not in scope: `returnStrictlyST'
- 
-tcfail068.hs:42: Value not in scope: `seqStrictlyST'
- 
-tcfail068.hs:41: Value not in scope: `thenStrictlyST'
+tcfail068.hs:14: A type signature is more polymorphic than the inferred type
+		     Can't for-all the type variable(s) `ta1cM'
+		     in the inferred type `ST ta1cM (IndTree ta1cM ta1cF)'
+    In a polymorphic function argument `(newArray ((1, (1)), (n)) x)'
+    In the first argument of `runST', namely
+	`(newArray ((1, (1)), (n)) x)'
+    In an equation for function `itgen':
+	`itgen n x = runST (newArray ((1, (1)), (n)) x)'
 
 Compilation had errors

@@ -1,7 +1,7 @@
 import IO -- 1.3
 
 import Directory
-import GlaExts (trace)
+import IOExts (trace)
 
 main =
     createDirectory "foo" >>

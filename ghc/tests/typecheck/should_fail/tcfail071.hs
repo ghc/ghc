@@ -1,6 +1,6 @@
 --!!! Mis-matched contexts in a mutually recursive group
 
-module Foo7( f ) where
+module ShouldFail where
 
 f :: (Ord c) => c -> c
 f c = g c

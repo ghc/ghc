@@ -1,9 +1,9 @@
  
-tcfail016.hs:9: Couldn't match the type
-		    `Expr' against `PrelTup.(,) taRG'
-    Expected: `AnnExpr taRG'
-    Inferred: `Expr taRG'
-    In an equation for function `g':
-	`g (App e1 e2) = (g e1) PrelBase.++ (g e2)'
+tcfail016.hs:9: Couldn't match the type `Expr' against `(,) taUk'
+    Expected: `AnnExpr taUk'
+    Inferred: `Expr taUk'
+    In the first argument of `g', namely `e1'
+    In the first argument of `++', namely `(g e1)'
+    In an equation for function `g': `g (App e1 e2) = (g e1) ++ (g e2)'
 
 Compilation had errors

@@ -1,4 +1,4 @@
-module SubRange where
+module ShouldFail where
 
 infixr 1 `rangeOf`
 

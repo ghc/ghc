@@ -1,4 +1,4 @@
  
-tcfail058.hs:6: Type constructor used as a class: `ArrBase.Array'
+tcfail058.hs:6: Type constructor used as a class: `Array'
 
 Compilation had errors

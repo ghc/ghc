@@ -1,11 +1,13 @@
 --!!! a bad _CCallable thing (from a bug from Satnam)
 --
-module ShouldSucceed where
+module ShouldFail where
 
 import Foreign
+import Addr
+import CCall
 
 data Socket = Socket# Addr
 instance CCallable Socket
 
-f :: Socket -> PrimIO ()
+f :: Socket -> IO ()
 f x = _ccall_ foo x

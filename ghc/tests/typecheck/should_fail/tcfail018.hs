@@ -1,5 +1,5 @@
 
 
-module ShouldSucc where
+module ShouldFail where
 
 (a:[]) = 1

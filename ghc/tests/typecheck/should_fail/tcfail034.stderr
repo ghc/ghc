@@ -1,7 +1,7 @@
  
-tcfail034.hs:13: Context `{PrelNum.Integral taU6}'
+tcfail034.hs:13: Context `{Integral taWK}'
 		     required by inferred type, but missing on a type signature
-		     `PrelNum.Integral taU6' arising from use of `PrelNum.mod' at tcfail034.hs:17
+		     `Integral taWK' arising from use of `mod' at tcfail034.hs:17
     When checking signature(s) for: `test'
 
 Compilation had errors

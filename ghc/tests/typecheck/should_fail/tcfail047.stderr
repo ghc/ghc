@@ -1,8 +1,6 @@
  
-tcfail047.hs:6: The type
+tcfail047.hs:7: The type
 		    `(a, (b, c))'
 		cannot be used as an instance type
- 
-tcfail047.hs:2: Module Main must include a definition for `Main.main'
 
 Compilation had errors

@@ -1,5 +1,4 @@
-
-module P where
+module ShouldFail where
 
 class A a where
  p1 :: a -> a

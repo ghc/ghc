@@ -1,9 +1,9 @@
 --!! Make sure that state threads don't escape
 --!! (example from Neil Ashton at York)
 --
-module IndTree(IndTree(..), itgen, itiap, itrap, itrapstate) where
+module ShouldFail where
 
-import GlaExts
+import MutableArray
 import ST
 
 type IndTree s t = MutableArray s (Int,Int) t
@@ -16,32 +16,32 @@ itgen n x =
 itiap :: Constructed a => (Int,Int) -> (a->a) -> IndTree s a -> IndTree s a
 itiap i f arr =
 	runST (
-	readArray arr i `thenStrictlyST` \val ->
-	writeArray arr i (f val) `seqStrictlyST`
-	returnStrictlyST arr)
+	readArray arr i >>= \val ->
+	writeArray arr i (f val) >>
+	return arr)
 
 itrap :: Constructed a => ((Int,Int),(Int,Int)) -> (a->a) -> IndTree s a -> IndTree s a
 itrap ((i,k),(j,l)) f arr = runST(itrap' i k)
 	where
-	itrap' i k = if k > l then returnStrictlyST arr
-		     else (itrapsnd i k `seqStrictlyST`
+	itrap' i k = if k > l then return arr
+		     else (itrapsnd i k >>
 			itrap' i (k+1))
-	itrapsnd i k = if i > j then returnStrictlyST arr
-                     else (readArray arr (i,k) `thenStrictlyST` \val ->
-		        writeArray arr (i,k) (f val) `seqStrictlyST`
+	itrapsnd i k = if i > j then return arr
+                     else (readArray arr (i,k) >>= \val ->
+		        writeArray arr (i,k) (f val) >>
 		        itrapsnd (i+1) k)
 
 itrapstate :: Constructed b => ((Int,Int),(Int,Int)) -> (a->b->(a,b)) -> ((Int,Int)->c->a) ->
 		(a->c) -> c -> IndTree s b -> (c, IndTree s b)
 itrapstate ((i,k),(j,l)) f c d s arr = runST(itrapstate' i k s)
 	where
-	itrapstate' i k s = if k > l then returnStrictlyST (s,arr)
-			    else (itrapstatesnd i k s `thenStrictlyST` \(s,arr) ->
+	itrapstate' i k s = if k > l then return (s,arr)
+			    else (itrapstatesnd i k s >>= \(s,arr) ->
 				itrapstate' i (k+1) s)
-	itrapstatesnd i k s = if i > j then returnStrictlyST (s,arr)
-                            else (readArray arr (i,k) `thenStrictlyST` \val ->
+	itrapstatesnd i k s = if i > j then return (s,arr)
+                            else (readArray arr (i,k) >>= \val ->
 		               let (newstate, newval) = f (c (i,k) s) val
-		               in writeArray arr (i,k) newval `seqStrictlyST`
+		               in writeArray arr (i,k) newval >>
 		               itrapstatesnd (i+1) k (d newstate))
 
 -- stuff from Auxiliary: copied here (partain)
@@ -64,8 +64,6 @@ nonempty (_:_) = True
 
 compose :: [a->a] -> a -> a
 compose = foldr (.) id
-
-data Maybe t = Just t | Nothing
 
 class Constructed a where
    normal :: a -> Bool

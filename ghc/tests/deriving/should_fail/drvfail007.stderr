@@ -1,10 +1,8 @@
  
-drvfail007.hs:2: No instance for: `PrelBase.Eq (PrelBase.Int
-						-> PrelBase.Int)'
+drvfail007.hs:2: No instance for: `Eq (Int -> Int)'
     When deriving classes for `Foo'
  
-drvfail007.hs:2: No instance for: `PrelBase.Eq (PrelBase.Int
-						-> PrelBase.Int)'
+drvfail007.hs:2: No instance for: `Eq (Int -> Int)'
     When deriving classes for `Foo'
 
 Compilation had errors
