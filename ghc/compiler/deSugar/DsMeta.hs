@@ -66,6 +66,7 @@ import TysWiredIn ( stringTy )
 import CoreSyn
 import CoreUtils  ( exprType )
 import SrcLoc	  ( noSrcLoc )
+import Maybes	  ( orElse )
 import Maybe	  ( catMaybes, fromMaybe )
 import Panic	  ( panic )
 import Unique	  ( mkPreludeTyConUnique, mkPreludeMiscIdUnique )
@@ -143,7 +144,7 @@ repTopDs group
 	--	do { t :: String <- genSym "T" ;
 	--	     return (Data t [] ...more t's... }
 	-- The other important reason is that the output must mention
-	-- only "T", not "Foo.T" where Foo is the current module
+	-- only "T", not "Foo:T" where Foo is the current module
 
 	
 	decls <- addBinds ss (do {
@@ -214,17 +215,22 @@ repTyClD (TySynonym { tcdName = tc, tcdTyVars = tvs, tcdSynRhs = ty })
  	return (Just dec) }
 
 repTyClD (ClassDecl { tcdCtxt = cxt, tcdName = cls, 
-		      tcdTyVars = tvs, tcdFDs = [], 
-		      tcdSigs = sigs, tcdMeths = Just binds }) =
-  do 
-    cls1 <- lookupOcc cls		-- See note [Binders and occurrences] 
-    dec  <- addTyVarBinds tvs $ \bndrs -> do
-	      cxt1   <- repContext cxt
-	      sigs1  <- rep_sigs sigs
-	      binds1 <- rep_monobind binds
-	      decls1 <- coreList declTyConName (sigs1 ++ binds1)
-	      repClass cxt1 cls1 (coreList' stringTy bndrs) decls1
-    return $ Just dec
+		      tcdTyVars = tvs, 
+		      tcdFDs = [], 	-- We don't understand functional dependencies
+		      tcdSigs = sigs, tcdMeths = mb_meth_binds })
+ = do { cls1 <- lookupOcc cls ;		-- See note [Binders and occurrences] 
+    	dec  <- addTyVarBinds tvs $ \bndrs -> do {
+ 		  cxt1   <- repContext cxt ;
+ 		  sigs1  <- rep_sigs sigs ;
+ 		  binds1 <- rep_monobind meth_binds ;
+ 		  decls1 <- coreList declTyConName (sigs1 ++ binds1) ;
+ 		  repClass cxt1 cls1 (coreList' stringTy bndrs) decls1 } ;
+    	return $ Just dec }
+ where
+	-- If the user quotes a class decl, it'll have default-method 
+	-- bindings; but if we (reifyDecl C) where C is a class, we
+	-- won't be given the default methods (a definite infelicity).
+   meth_binds = mb_meth_binds `orElse` EmptyMonoBinds
 
 -- Un-handled cases
 repTyClD d = do { addDsWarn (hang msg 4 (ppr d)) ;
@@ -293,7 +299,7 @@ rep_sig (ClassOpSig nm _ ty _) = rep_proto nm ty
 rep_sig (Sig nm ty _)	       = rep_proto nm ty
 rep_sig other		       = return []
 
-rep_proto nm ty = do { nm1 <- lookupBinder nm ; 
+rep_proto nm ty = do { nm1 <- lookupOcc nm ; 
 		       ty1 <- repTy ty ; 
 		       sig <- repProto nm1 ty1 ;
 		       return [sig] }

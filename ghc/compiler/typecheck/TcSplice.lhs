@@ -209,10 +209,8 @@ runMetaD :: TypecheckedHsExpr 	-- Of type Q [Dec]
 	 -> TcM [Meta.Dec]	-- Of type [Dec]
 runMetaD e = runMeta e
 
--- Warning: if Q is anything other than IO, we need to change this
 tcRunQ :: Meta.Q a -> TcM a
-tcRunQ (Meta.Q thing) = ioToTcRn thing
-
+tcRunQ thing = ioToTcRn (Meta.runQ thing)
 
 runMeta :: TypecheckedHsExpr 	-- Of type X
 	-> TcM t		-- Of type t

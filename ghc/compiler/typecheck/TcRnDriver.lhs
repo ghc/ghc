@@ -17,7 +17,7 @@ module TcRnDriver (
 
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
-import		      DsMeta   ( qTyConName )
+import		      DsMeta   ( templateHaskellNames )
 #endif
 
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
@@ -616,7 +616,7 @@ tcRnSrcDecls ds
 	(rn_splice_expr, fvs) <- initRn SourceMode $
 				 addSrcLoc splice_loc $
 				 rnExpr splice_expr ;
-	tcg_env <- importSupportingDecls (fvs `addOneFV` qTyConName) ;
+	tcg_env <- importSupportingDecls (fvs `plusFV` templateHaskellNames) ;
 	setGblEnv tcg_env $ do {
 
 	-- Execute the splice
