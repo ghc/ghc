@@ -394,7 +394,7 @@ freeForeigns(foList)
     P_ FOptr, temp;
     I_ FO_deaths = 0;
 
-    /* At this point, exitSSM() has been calledthe ForeignObjList is in an invalid state (since
+    /* At this point, exitSM() has been called, the ForeignObjList is in an invalid state (since
        some info ptrs will have been mangled) so we can't validate
        it. ADR */
 
@@ -408,7 +408,6 @@ freeForeigns(foList)
        while(IS_INDIRECTION(INFO_PTR(FOptr))) {
     	   FOptr = (P_) IND_CLOSURE_PTR(FOptr);
        }
-
        if ((P_) INFO_PTR(FOptr) == ForeignObj_info ) {
           TRACE_ForeignObj(FOptr);
           TRACE_FOdies(FOptr);
