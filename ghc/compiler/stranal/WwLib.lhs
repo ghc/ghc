@@ -25,7 +25,7 @@ import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( unboxedTupleCon, unboxedTupleTyCon )
 import Type		( isUnLiftedType, 
 			  splitForAllTys, splitFunTys,  isAlgType,
-			  splitAlgTyConApp_maybe, splitNewType_maybe,
+			  splitNewType_maybe,
 			  mkTyConApp, mkFunTys,
 			  Type
 			)

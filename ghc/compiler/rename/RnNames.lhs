@@ -64,7 +64,7 @@ getGlobalNames :: RdrNameHsModule
 	       -> RnMG (Maybe (ExportEnv, 
 			       GlobalRdrEnv,
 			       FixityEnv,	 -- Fixities for local decls only
-			       NameEnv AvailInfo -- Maps a name to its parent AvailInfo
+			       AvailEnv		 -- Maps a name to its parent AvailInfo
 						 -- Just for in-scope things only
 			       ))
 			-- Nothing => no need to recompile
@@ -547,7 +547,7 @@ type ExportAccum	-- The type of the accumulating parameter of
 			-- the main worker function in exportsFromAvail
      = ([ModuleName], 		-- 'module M's seen so far
 	ExportOccMap,		-- Tracks exported occurrence names
-	NameEnv AvailInfo)	-- The accumulated exported stuff, kept in an env
+	AvailEnv)		-- The accumulated exported stuff, kept in an env
 				--   so we can common-up related AvailInfos
 
 type ExportOccMap = FiniteMap OccName (Name, RdrNameIE)
@@ -578,7 +578,7 @@ exportsFromAvail this_mod (Just export_items)
 		 (mod_avail_env, entity_avail_env)
 	         global_name_env
   = foldlRn exports_from_item
-	    ([], emptyFM, emptyNameEnv) export_items	`thenRn` \ (_, _, export_avail_map) ->
+	    ([], emptyFM, emptyAvailEnv) export_items	`thenRn` \ (_, _, export_avail_map) ->
     let
 	export_avails :: [AvailInfo]
 	export_avails   = nameEnvElts export_avail_map
@@ -600,7 +600,7 @@ exportsFromAvail this_mod (Just export_items)
 		Just mod_avails -> foldlRn (check_occs ie) occs mod_avails
 			 	   `thenRn` \ occs' ->
 				   let
-					avails' = foldl add_avail avails mod_avails
+					avails' = foldl addAvail avails mod_avails
 				   in
 				   returnRn (mod:mods, occs', avails')
 
@@ -628,7 +628,7 @@ exportsFromAvail this_mod (Just export_items)
 
 	= warnCheckRn (ok_item ie avail) (dodgyExportWarn ie)	`thenRn_`
           check_occs ie occs export_avail			`thenRn` \ occs' ->
-	  returnRn (mods, occs', add_avail avails export_avail)
+	  returnRn (mods, occs', addAvail avails export_avail)
 
        where
 	  rdr_name	  = ieName ie
@@ -645,8 +645,6 @@ exportsFromAvail this_mod (Just export_items)
 		-- only export T abstractly.  The single [n]
 		-- in the AvailTC is the type or class itself
     ok_item _ _ = True
-
-add_avail avails avail = addToNameEnv_C plusAvail avails (availName avail) avail
 
 check_occs :: RdrNameIE -> ExportOccMap -> AvailInfo -> RnMG ExportOccMap
 check_occs ie occs avail 

@@ -56,7 +56,7 @@ import Literal		( isLitLitLit )
 import PrimOp		( PrimOp(..), primOpIsDupable, primOpOutOfLine, ccallIsCasm )
 import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), IdFlavour(..), CprInfo(..), insideLam, workerExists )
 import TyCon		( tyConFamilySize )
-import Type		( splitAlgTyConApp_maybe, splitFunTy_maybe, isUnLiftedType )
+import Type		( splitFunTy_maybe, isUnLiftedType )
 import Unique		( Unique, buildIdKey, augmentIdKey )
 import Maybes		( maybeToBool )
 import Bag

@@ -12,7 +12,7 @@ module DsForeign ( dsForeigns ) where
 
 import CoreSyn
 
-import DsCCall		( dsCCall, mkCCall, boxResult, unboxArg, wrapUnboxedValue )
+import DsCCall		( dsCCall, mkCCall, boxResult, unboxArg )
 import DsMonad
 import DsUtils
 
@@ -23,15 +23,15 @@ import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe, bindNonRec )
 import DataCon		( DataCon, dataConWrapId )
 import Id		( Id, idType, idName, mkWildId, mkVanillaId )
-import MkId		( mkCCallOpId, mkWorkerId )
+import MkId		( mkWorkerId )
 import Literal		( Literal(..) )
 import Module		( Module, moduleUserString )
 import Name		( mkGlobalName, nameModule, nameOccName, getOccString, 
 			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..), Provenance(..), ExportFlag(..)
 			)
-import PrelInfo		( deRefStablePtr_NAME, bindIO_NAME, makeStablePtr_NAME, realWorldPrimId )
-import Type		( splitAlgTyConApp_maybe,  unUsgTy,
+import PrelInfo		( deRefStablePtr_NAME, bindIO_NAME, makeStablePtr_NAME )
+import Type		( unUsgTy,
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkTyVarTy, mkFunTy, splitAppTy
@@ -45,10 +45,6 @@ import TysWiredIn	( unitTyCon, addrTy, stablePtrTyCon,
 import Unique
 import Maybes		( maybeToBool )
 import Outputable
-
-#if __GLASGOW_HASKELL__ >= 404
-import GlaExts		( fromInt )
-#endif
 \end{code}
 
 Desugaring of @foreign@ declarations is naturally split up into
@@ -133,21 +129,12 @@ dsFImport :: Id
 	  -> DsM [CoreBind]
 dsFImport fn_id ty may_not_gc ext_name cconv 
   = let
-	(tvs, arg_tys, mbIoDataCon, io_res_ty) = splitForeignTyDs ty
-	is_io_action 			       = maybeToBool mbIoDataCon
+	(tvs, fun_ty)        = splitForAllTys ty
+	(arg_tys, io_res_ty) = splitFunTys fun_ty
     in
     newSysLocalsDs arg_tys  			`thenDs` \ args ->
-    newSysLocalDs realWorldStatePrimTy		`thenDs` \ old_s ->
-    mapAndUnzipDs unboxArg (map Var args)	`thenDs` \ (unboxed_args, arg_wrappers) ->
-
-    (if not is_io_action then
-       newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_tok ->
-       wrapUnboxedValue io_res_ty		`thenDs` \ (ccall_result_ty, v, res_v) ->
-       returnDs ( ccall_result_ty
-                , \ prim_app -> Case prim_app  (mkWildId ccall_result_ty)
-				    [(DataAlt (unboxedTupleCon 2), [state_tok, v], res_v)])
-     else
-       boxResult io_res_ty)			`thenDs` \ (ccall_result_ty, res_wrapper) ->
+    mapAndUnzipDs unboxArg (map Var args)	`thenDs` \ (val_args, arg_wrappers) ->
+    boxResult io_res_ty				`thenDs` \ (ccall_result_ty, res_wrapper) ->
 
     (case ext_name of
        Dynamic       -> getUniqueDs `thenDs` \ u -> 
@@ -157,11 +144,7 @@ dsFImport fn_id ty may_not_gc ext_name cconv
     getUniqueDs						`thenDs` \ ccall_uniq ->
     getUniqueDs						`thenDs` \ work_uniq ->
     let
-	the_state_arg | is_io_action = old_s
-		      | otherwise    = realWorldPrimId
-
 	-- Build the worker
-	val_args      = Var the_state_arg : unboxed_args
 	work_arg_ids  = [v | Var v <- val_args]		-- All guaranteed to be vars
 	worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
 	the_ccall     = CCall lbl False (not may_not_gc) cconv
@@ -172,32 +155,12 @@ dsFImport fn_id ty may_not_gc ext_name cconv
 	-- Build the wrapper
 	work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
 	wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
-        io_app 	     = case mbIoDataCon of
-			   Nothing        -> wrapper_body
-			   Just ioDataCon -> mkApps (Var (dataConWrapId ioDataCon)) 
-						    [Type io_res_ty, Lam old_s wrapper_body]
-        wrap_rhs = mkInlineMe (mkLams (tvs ++ args) io_app)
+        wrap_rhs     = mkInlineMe (mkLams (tvs ++ args) wrapper_body)
     in
     returnDs [NonRec fn_id wrap_rhs, NonRec work_id work_rhs]
 \end{code}
 
-Given the type of a foreign import declaration, split it up into
-its constituent parts.
-
-\begin{code}
-splitForeignTyDs :: Type -> ([TyVar], [Type], Maybe DataCon, Type)
-splitForeignTyDs ty
-  = case splitAlgTyConApp_maybe res_ty of
-       Just (_,(io_res_ty:_),(ioCon:_)) ->   -- .... -> IO t
-	     (tvs, arg_tys, Just ioCon, io_res_ty)
-       _   ->				     -- .... -> t
-	     (tvs, arg_tys, Nothing, res_ty)
-  where
-   (arg_tys, res_ty)   = splitFunTys sans_foralls
-   (tvs, sans_foralls) = splitForAllTys ty
-\end{code}
-
-foreign labels 
+Foreign labels 
 
 \begin{code}
 dsFLabel :: Id -> ExtName -> DsM CoreBind

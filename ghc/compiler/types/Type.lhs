@@ -316,7 +316,7 @@ splitTyConApp_maybe other	      = Nothing
 
 splitAlgTyConApp_maybe :: Type -> Maybe (TyCon, [Type], [DataCon])
 splitAlgTyConApp_maybe (TyConApp tc tys) 
-  | isAlgTyCon tc &&
+  | isAlgTyCon tc && 
     tyConArity tc == length tys      = Just (tc, tys, tyConDataCons tc)
 splitAlgTyConApp_maybe (NoteTy _ ty) = splitAlgTyConApp_maybe ty
 splitAlgTyConApp_maybe other	     = Nothing

@@ -45,7 +45,7 @@ import Name		( mkLocalName, tidyOccName, tidyTopName,
 import TyCon		( TyCon, isDataTyCon )
 import PrelInfo		( unpackCStringId, unpackCString2Id, addr2IntegerId )
 import PrelRules	( builtinRules )
-import Type		( Type, splitAlgTyConApp_maybe, 
+import Type		( Type, 
 			  isUnLiftedType,
 			  tidyType, tidyTypes, tidyTopType, tidyTyVar, tidyTyVars,
 			  Type

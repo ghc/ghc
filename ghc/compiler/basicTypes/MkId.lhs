@@ -43,7 +43,7 @@ import Rules		( addRule )
 import Type		( Type, ClassContext, mkDictTy, mkTyConApp, mkTyVarTys,
 			  mkFunTys, mkFunTy, mkSigmaTy, classesToPreds,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType, tyVarsOfTypes,
-			  splitSigmaTy, splitFunTy_maybe, splitAlgTyConApp,
+			  splitSigmaTy, splitFunTy_maybe, 
 			  splitFunTys, splitForAllTys, unUsgTy,
 			  mkUsgTy, UsageAnn(..)
 			)

@@ -86,12 +86,14 @@ import Module		( Module, mkPrelModule )
 import Name		( mkWiredInTyConName, mkWiredInIdName, mkSrcOccFS, mkWorkerOcc, dataName )
 import DataCon		( DataCon, StrictnessMark(..),  mkDataCon, dataConId )
 import Var		( TyVar, tyVarKind )
-import TyCon		( TyCon, AlgTyConFlavour(..), ArgVrcs, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )
+import TyCon		( TyCon, AlgTyConFlavour(..), ArgVrcs, tyConDataCons,
+			  mkAlgTyCon, mkSynTyCon, mkTupleTyCon, isUnLiftedTyCon
+			)
 import BasicTypes	( Arity, NewOrData(..), RecFlag(..) )
 import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
 			  mkArrowKinds, boxedTypeKind, unboxedTypeKind,
-			  mkFunTy, mkFunTys, isUnLiftedType,
-			  splitTyConApp_maybe, splitAlgTyConApp_maybe,
+			  mkFunTy, mkFunTys,
+			  splitTyConApp_maybe, repType,
 			  TauType, ClassContext )
 import PrimRep		( PrimRep(..) )
 import Unique
@@ -198,10 +200,10 @@ mk_tuple arity = (tycon, tuple_con)
 	dc_uniq   = mkTupleDataConUnique arity
 	mod	  = mkPrelModule mod_name
 
-unitTyCon = tupleTyCon 0
-pairTyCon = tupleTyCon 2
+unitTyCon     = tupleTyCon 0
+unitDataConId = dataConId (head (tyConDataCons unitTyCon))
 
-unitDataConId = dataConId (tupleCon 0)
+pairTyCon = tupleTyCon 2
 \end{code}
 
 %************************************************************************
@@ -285,10 +287,7 @@ intTyCon = pcNonRecDataTyCon intTyConKey pREL_BASE SLIT("Int") [] [] [intDataCon
 intDataCon = pcDataCon intDataConKey pREL_BASE SLIT("I#") [] [] [intPrimTy] intTyCon
 
 isIntTy :: Type -> Bool
-isIntTy ty
-  = case (splitAlgTyConApp_maybe ty) of
-	Just (tycon, [], _) -> getUnique tycon == intTyConKey
-	_		    -> False
+isIntTy = isTyCon intTyConKey
 \end{code}
 
 \begin{code}
@@ -306,11 +305,7 @@ addrTyCon = pcNonRecDataTyCon addrTyConKey   pREL_ADDR SLIT("Addr") [] [] [addrD
 addrDataCon = pcDataCon addrDataConKey pREL_ADDR SLIT("A#") [] [] [addrPrimTy] addrTyCon
 
 isAddrTy :: Type -> Bool
-isAddrTy ty
-  = case (splitAlgTyConApp_maybe ty) of
-	Just (tycon, [], _) -> getUnique tycon == addrTyConKey
-	_		    -> False
-
+isAddrTy = isTyCon addrTyConKey
 \end{code}
 
 \begin{code}
@@ -320,21 +315,14 @@ floatTyCon = pcNonRecDataTyCon floatTyConKey pREL_FLOAT SLIT("Float") [] [] [flo
 floatDataCon = pcDataCon floatDataConKey pREL_FLOAT SLIT("F#") [] [] [floatPrimTy] floatTyCon
 
 isFloatTy :: Type -> Bool
-isFloatTy ty
-  = case (splitAlgTyConApp_maybe ty) of
-	Just (tycon, [], _) -> getUnique tycon == floatTyConKey
-	_		    -> False
-
+isFloatTy = isTyCon floatTyConKey
 \end{code}
 
 \begin{code}
 doubleTy = mkTyConTy doubleTyCon
 
 isDoubleTy :: Type -> Bool
-isDoubleTy ty
-  = case (splitAlgTyConApp_maybe ty) of
-	Just (tycon, [], _) -> getUnique tycon == doubleTyConKey
-	_		    -> False
+isDoubleTy = isTyCon doubleTyConKey
 
 doubleTyCon = pcNonRecDataTyCon doubleTyConKey pREL_FLOAT SLIT("Double") [] [] [doubleDataCon]
 doubleDataCon = pcDataCon doubleDataConKey pREL_FLOAT SLIT("D#") [] [] [doublePrimTy] doubleTyCon
@@ -358,6 +346,9 @@ foreignObjTyCon
     foreignObjDataCon
       = pcDataCon foreignObjDataConKey pREL_IO_BASE SLIT("ForeignObj")
 	    [] [] [foreignObjPrimTy] foreignObjTyCon
+
+isForeignObjTy :: Type -> Bool
+isForeignObjTy = isTyCon foreignObjTyConKey
 \end{code}
 
 %************************************************************************
@@ -381,10 +372,7 @@ largeIntegerDataCon = pcDataCon largeIntegerDataConKey pREL_NUM SLIT("J#")
 
 
 isIntegerTy :: Type -> Bool
-isIntegerTy ty
-  = case (splitAlgTyConApp_maybe ty) of
-	Just (tycon, [], _) -> getUnique tycon == integerTyConKey
-	_		    -> False
+isIntegerTy = isTyCon integerTyConKey
 \end{code}
 
 
@@ -400,74 +388,66 @@ being the )
 
 \begin{code}
 isFFIArgumentTy :: Bool -> Type -> Bool
-isFFIArgumentTy forASafeCall ty =
-  (opt_GlasgowExts && isUnLiftedType ty) ||
-  case (splitAlgTyConApp_maybe ty) of
-    Just (tycon, _, _) -> 
-    		let
-		 u = getUnique tycon
-		in
-		u `elem` primArgTyConKeys &&   -- it has a suitable prim type, and
-		(not forASafeCall || not ( u `elem` notSafeExternalTyCons)) -- it is safe to pass out.
-    _		       -> False
+-- Checks for valid argument type for a 'foreign import'
+isFFIArgumentTy is_safe ty = checkTyCon (legalOutgoingTyCon is_safe) ty
 
--- types that can be passed as arguments to "foreign" functions
-primArgTyConKeys 
-  = [ intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey
-    , wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey
-    , floatTyConKey, doubleTyConKey
-    , addrTyConKey, charTyConKey, foreignObjTyConKey
-    , stablePtrTyConKey
-    , byteArrayTyConKey, mutableByteArrayTyConKey
-    ]
-
--- types that can be passed from the outside world into Haskell.
--- excludes (mutable) byteArrays.
 isFFIExternalTy :: Type -> Bool
-isFFIExternalTy ty = 
-  (opt_GlasgowExts && isUnLiftedType ty) || --leave out for now: maybeToBool (maybeBoxedPrimType ty))) ||
-  case (splitAlgTyConApp_maybe ty) of
-    Just (tycon, _, _) -> 
-       let 
-        u_tycon = getUnique tycon
-       in  
-       (u_tycon `elem` primArgTyConKeys) &&
-       not (u_tycon `elem` notLegalExternalTyCons)
-    _		       -> False
-
+-- Types that are allowed as arguments of a 'foreign export'
+isFFIExternalTy ty = checkTyCon legalIncomingTyCon ty
 
 isFFIResultTy :: Type -> Bool
-isFFIResultTy ty =
-   not (isUnLiftedType ty) &&
-   case (splitAlgTyConApp_maybe ty) of
-    Just (tycon, _, _) -> 
-	let
-	 u_tycon = getUnique tycon
-	in
-	(u_tycon == getUnique unitTyCon) ||
-        ((u_tycon `elem` primArgTyConKeys) && 
-	 not (u_tycon `elem` notLegalExternalTyCons))
-    _		       -> False
+-- Types that are allowed as a result of a 'foreign import' or of a 'foreign export'
+-- Maybe we should distinguish between import and export, but 
+-- here we just choose the more restrictive 'incoming' predicate
+-- But we allow () as well
+isFFIResultTy ty = checkTyCon (\tc -> tc == unitTyCon || legalIncomingTyCon tc) ty
 
--- it's illegal to return foreign objects and (mutable)
+checkTyCon :: (TyCon -> Bool) -> Type -> Bool
+checkTyCon check_tc ty = case splitTyConApp_maybe (repType ty) of
+				Just (tycon, _) -> check_tc tycon
+				Nothing		-> False
+
+isTyCon :: Unique -> Type -> Bool
+isTyCon uniq ty = checkTyCon (\tc -> uniq == getUnique tc) ty
+\end{code}
+
+----------------------------------------------
+These chaps do the work; they are not exported
+----------------------------------------------
+
+\begin{code}
+legalIncomingTyCon :: TyCon -> Bool
+-- It's illegal to return foreign objects and (mutable)
 -- bytearrays from a _ccall_ / foreign declaration
 -- (or be passed them as arguments in foreign exported functions).
-notLegalExternalTyCons =
-  [ foreignObjTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey ]
+legalIncomingTyCon tc
+  | getUnique tc `elem` [ foreignObjTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey ] 
+  = False
+  | otherwise
+  = marshalableTyCon tc
 
--- it's really unsafe to pass out references to objects in the heap,
--- so for safe call-outs we simply disallow it.
-notSafeExternalTyCons =
-  [ byteArrayTyConKey, mutableByteArrayTyConKey ]
+legalOutgoingTyCon :: Bool -> TyCon -> Bool
+-- Checks validity of types going from Haskell -> external world
+-- The boolean is true for a 'safe' call (when we don't want to
+-- pass Haskell pointers to the world)
+legalOutgoingTyCon be_safe tc
+  | be_safe && getUnique tc `elem` [byteArrayTyConKey, mutableByteArrayTyConKey]
+  = False
+  | otherwise
+  = marshalableTyCon tc
 
-
-isForeignObjTy :: Type -> Bool
-isForeignObjTy ty =
-  case (splitAlgTyConApp_maybe ty) of
-    Just (tycon, _, _) -> (getUnique tycon) == foreignObjTyConKey
-    _		       -> False
-    
+marshalableTyCon tc
+  =  (opt_GlasgowExts && isUnLiftedTyCon tc)
+  || getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey
+			 , wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey
+			 , floatTyConKey, doubleTyConKey
+			 , addrTyConKey, charTyConKey, foreignObjTyConKey
+			 , stablePtrTyConKey
+			 , byteArrayTyConKey, mutableByteArrayTyConKey
+			 , boolTyConKey
+			 ]
 \end{code}
+
 
 %************************************************************************
 %*									*

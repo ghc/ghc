@@ -29,8 +29,6 @@ module TcHsSyn (
 	-- re-exported from TcEnv
 	TcId, tcInstId,
 
-	maybeBoxedPrimType,
-
 	zonkTopBinds, zonkId, zonkIdOcc,
 	zonkForeignExports, zonkRules
   ) where
@@ -51,7 +49,7 @@ import TcMonad
 import TcType	( TcType, TcTyVar,
 		  zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcTyVarBndr, zonkTcType
 		)
-import Type	( mkTyVarTy, splitAlgTyConApp_maybe, isUnLiftedType, Type )
+import Type	( mkTyVarTy, isUnLiftedType, Type )
 import Name	( isLocallyDefined )
 import Var	( TyVar )
 import VarEnv	( TyVarEnv, emptyVarEnv, extendVarEnvList )
@@ -132,27 +130,6 @@ idsToMonoBinds ids
   = andMonoBindList [ CoreMonoBind id (unfoldingTemplate (idUnfolding id))
 		    | id <- ids
 		    ]
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[BackSubst-HsBinds]{Running a substitution over @HsBinds@}
-%*									*
-%************************************************************************
-
-Some gruesome hackery for desugaring ccalls. It's here because if we put it
-in Type.lhs we get irritating loops, and it's only used by TcInstDcls.lhs and
-DsCCall.lhs.
-
-\begin{code}
-maybeBoxedPrimType :: Type -> Maybe (DataCon, Type)
-maybeBoxedPrimType ty
-  = case splitProductType_maybe ty of				-- Product data type
-      Just (tycon, tys_applied, data_con, [data_con_arg_ty]) 	-- constr has one arg
-         | isUnLiftedType data_con_arg_ty 			-- which is primitive
-	 -> Just (data_con, data_con_arg_ty)
-
-      other_cases -> Nothing
 \end{code}
 
 %************************************************************************

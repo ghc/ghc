@@ -14,9 +14,7 @@ import HsSyn		( HsDecl(..), InstDecl(..),
 			  andMonoBindList
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl )
-import TcHsSyn		( TcMonoBinds, mkHsConApp,
-			  maybeBoxedPrimType
-			)
+import TcHsSyn		( TcMonoBinds, mkHsConApp )
 
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, checkFromThisClass )
@@ -60,7 +58,7 @@ import Type		( Type, isUnLiftedType, mkTyVarTys,
 import Subst		( mkTopTyVarSubst, substClasses )
 import VarSet		( mkVarSet, varSetElems )
 import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
-import TysWiredIn	( stringTy )
+import TysWiredIn	( stringTy, isFFIArgumentTy, isFFIResultTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, Uniquable(..) )
 import Outputable
 \end{code}
@@ -491,18 +489,7 @@ scrutiniseInstanceConstraint (clas, tys)
   | otherwise	      	           = addErrTc (instConstraintErr clas tys)
 
 scrutiniseInstanceHead clas inst_taus
-  |	-- CCALL CHECK (a).... urgh!
-	-- To verify that a user declaration of a CCallable/CReturnable 
-	-- instance is OK, we must be able to see the constructor(s)
-	-- of the instance type (see next guard.)
-	--  
-        -- We flag this separately to give a more precise error msg.
-        --
-     (getUnique clas == cCallableClassKey || getUnique clas == cReturnableClassKey)
-  && is_alg_tycon_app && not constructors_visible
-  = addErrTc (invisibleDataConPrimCCallErr clas first_inst_tau)
-
-  |	-- CCALL CHECK (b) 
+  |	-- CCALL CHECK
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
     (getUnique clas == cCallableClassKey   && not (ccallable_type   first_inst_tau)) ||
@@ -558,32 +545,8 @@ scrutiniseInstanceHead clas inst_taus
 
     constructors_visible = not (null data_cons)
  
-
--- These conditions come directly from what the DsCCall is capable of.
--- Totally grotesque.  Green card should solve this.
-
-ccallable_type   ty = isUnLiftedType ty ||				-- Allow CCallable Int# etc
-                      maybeToBool (maybeBoxedPrimType ty) ||	-- Ditto Int etc
-		      ty == stringTy ||
-		      byte_arr_thing
-  where
-    byte_arr_thing = case splitProductType_maybe ty of
-			Just (tycon, ty_args, data_con, [data_con_arg_ty1, data_con_arg_ty2, data_con_arg_ty3]) ->
-				maybeToBool maybe_arg3_tycon &&
-				(arg3_tycon == byteArrayPrimTyCon ||
-				 arg3_tycon == mutableByteArrayPrimTyCon)
-			     where
-				maybe_arg3_tycon    = splitTyConApp_maybe data_con_arg_ty3
-				Just (arg3_tycon,_) = maybe_arg3_tycon
-
-			other -> False
-
-creturnable_type ty = maybeToBool (maybeBoxedPrimType ty) ||
-			-- Or, a data type with a single nullary constructor
-		      case (splitAlgTyConApp_maybe ty) of
-			Just (tycon, tys_applied, [data_con])
-				-> isNullaryDataCon data_con
-			other -> False
+ccallable_type   ty = isFFIArgumentTy False {- Not safe call -} ty
+creturnable_type ty = isFFIResultTy ty
 \end{code}
 
 \begin{code}
@@ -608,19 +571,6 @@ nonBoxedPrimCCallErr clas inst_ty
   = hang (ptext SLIT("Unacceptable instance type for ccall-ish class"))
 	 4 (hsep [ ptext SLIT("class"), ppr clas, ptext SLIT("type"),
     		        ppr inst_ty])
-
-{-
-  Declaring CCallable & CReturnable instances in a module different
-  from where the type was defined. Caused by importing data type
-  abstractly (either programmatically or by the renamer being over-eager
-  in its pruning.)
--}
-invisibleDataConPrimCCallErr clas inst_ty
-  = hang (hsep [ptext SLIT("Constructors for"), quotes (ppr inst_ty),
-		ptext SLIT("not visible when checking"),
-                quotes (ppr clas), ptext SLIT("instance")])
-        4 (hsep [text "(Try either importing", ppr inst_ty, 
-	         text "non-abstractly or compile using -fno-prune-tydecls ..)"])
 
 methodCtxt     = ptext SLIT("When checking the methods of an instance declaration")
 superClassCtxt = ptext SLIT("When checking the superclasses of an instance declaration")

@@ -173,20 +173,24 @@ nameEnvElts    :: NameEnv a -> [a]
 addToNameEnv_C :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
 addToNameEnv   :: NameEnv a -> Name -> a -> NameEnv a
 plusNameEnv    :: NameEnv a -> NameEnv a -> NameEnv a
+plusNameEnv_C  :: (a->a->a) -> NameEnv a -> NameEnv a -> NameEnv a
 extendNameEnv  :: NameEnv a -> [(Name,a)] -> NameEnv a
 lookupNameEnv  :: NameEnv a -> Name -> Maybe a
 delFromNameEnv :: NameEnv a -> Name -> NameEnv a
 elemNameEnv    :: Name -> NameEnv a -> Bool
+unitNameEnv    :: Name -> a -> NameEnv a
 
 emptyNameEnv   = emptyUFM
 nameEnvElts    = eltsUFM
 addToNameEnv_C = addToUFM_C
 addToNameEnv   = addToUFM
 plusNameEnv    = plusUFM
+plusNameEnv_C  = plusUFM_C
 extendNameEnv  = addListToUFM
 lookupNameEnv  = lookupUFM
 delFromNameEnv = delFromUFM
 elemNameEnv    = elemUFM
+unitNameEnv    = unitUFM
 
 --------------------------------
 type FixityEnv = NameEnv RenamedFixitySig
@@ -236,9 +240,8 @@ type ExportAvails = (FiniteMap ModuleName Avails,
 	-- Includes avails only from *unqualified* imports
 	-- (see 1.4 Report Section 5.1.1)
 
-	NameEnv AvailInfo)	-- Used to figure out all other export specifiers.
-				-- Maps a Name to the AvailInfo that contains it
-
+		     AvailEnv)	-- Used to figure out all other export specifiers.
+			
 
 data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 			| AvailTC name 	 -- The name of the type or class
@@ -247,6 +250,7 @@ data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 					 -- to be in scope, it must be in this list.
 					 -- Thus, typically: AvailTC Eq [Eq, ==, /=]
 
+type AvailEnv	  = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
 type AvailInfo    = GenAvailInfo Name
 type RdrAvailInfo = GenAvailInfo OccName
 \end{code}

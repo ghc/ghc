@@ -14,7 +14,7 @@ import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..),
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds, mkHsConApp,
-			  mkHsTyApp, mkHsLet, maybeBoxedPrimType
+			  mkHsTyApp, mkHsLet
 			)
 
 import TcMonad
@@ -390,8 +390,7 @@ tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
 	-- constraints on the argument and result types.
     mapNF_Tc new_arg_dict (zipEqual "tcMonoExpr:CCall" args arg_tys)	`thenNF_Tc` \ ccarg_dicts_s ->
     newClassDicts result_origin [(cReturnableClass, [result_ty])]	`thenNF_Tc` \ (ccres_dict, _) ->
-    returnTc (mkHsConApp ioDataCon [result_ty] [HsCCall lbl args' may_gc is_asm result_ty],
-		      -- do the wrapping in the newtype constructor here
+    returnTc (HsCCall lbl args' may_gc is_asm io_result_ty,
 	      foldr plusLIE ccres_dict ccarg_dicts_s `plusLIE` args_lie)
 \end{code}
 

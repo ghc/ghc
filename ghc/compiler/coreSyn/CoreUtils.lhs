@@ -159,9 +159,7 @@ mkInlineMe e | exprIsTrivial e = e
 
 
 \begin{code}
-mkCoerce :: Type -> Type -> Expr b -> Expr b
--- In (mkCoerce to_ty from_ty e), we require that from_ty = exprType e
--- But exprType is defined in CoreUtils, so we don't check the assertion
+mkCoerce :: Type -> Type -> CoreExpr -> CoreExpr
 
 mkCoerce to_ty from_ty (Note (Coerce to_ty2 from_ty2) expr)
   = ASSERT( from_ty == to_ty2 )
@@ -169,7 +167,8 @@ mkCoerce to_ty from_ty (Note (Coerce to_ty2 from_ty2) expr)
 
 mkCoerce to_ty from_ty expr
   | to_ty == from_ty = expr
-  | otherwise	     = Note (Coerce to_ty from_ty) expr
+  | otherwise	     = ASSERT( from_ty == exprType expr )
+		       Note (Coerce to_ty from_ty) expr
 \end{code}
 
 \begin{code}

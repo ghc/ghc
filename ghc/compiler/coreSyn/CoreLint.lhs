@@ -36,7 +36,6 @@ import Type		( Type, Kind, tyVarsOfType,
 			  splitFunTy_maybe, mkPiType, mkTyVarTy, unUsgTy,
 			  splitForAllTy_maybe, splitTyConApp_maybe,
 			  isUnLiftedType, typeKind, 
-			  splitAlgTyConApp_maybe,
 			  isUnboxedTupleType,
 			  hasMoreBoxityInfo
 			)

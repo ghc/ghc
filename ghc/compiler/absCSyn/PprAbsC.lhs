@@ -45,7 +45,8 @@ import TyCon		( tyConDataCons )
 import Name		( NamedThing(..) )
 import DataCon		( DataCon{-instance NamedThing-}, dataConWrapId )
 import Maybes		( maybeToBool, catMaybes )
-import PrimOp		( primOpNeedsWrapper, pprPrimOp, PrimOp(..), CCall(..), CCallTarget(..) )
+import PrimOp		( primOpNeedsWrapper, pprPrimOp, pprCCallOp, 
+			  PrimOp(..), CCall(..), CCallTarget(..) )
 import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize, showPrimRep )
 import SMRep		( pprSMRep )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
@@ -777,7 +778,7 @@ Amendment to the above: if we can GC, we have to:
   that the runtime check that PerformGC is being used sensibly will work.
 
 \begin{code}
-pprCCall (CCall op_str is_asm may_gc cconv) args results vol_regs
+pprCCall call@(CCall op_str is_asm may_gc cconv) args results vol_regs
   = vcat [
       char '{',
       declare_local_vars,   -- local var for *result*
@@ -797,10 +798,10 @@ pprCCall (CCall op_str is_asm may_gc cconv) args results vol_regs
 	| otherwise = (	pp_basic_saves $$ pp_saves,
 			pp_basic_restores $$ pp_restores)
 
-    non_void_args =
-	let nvas = tail args
-	in ASSERT (all non_void nvas) nvas
-    -- the first argument will be the "I/O world" token (a VoidRep)
+    non_void_args = let nvas = take (length args - 1) args
+	  	    in ASSERT2 ( all non_void nvas, pprCCallOp call <+> hsep (map pprAmode args) )
+		       nvas
+    -- the last argument will be the "I/O world" token (a VoidRep)
     -- all others should be non-void
 
     non_void_results =

@@ -44,6 +44,7 @@ module CmdLineOpts (
 	opt_D_dump_rn_trace,
 	opt_D_dump_rn_stats,
         opt_D_dump_stix,
+	opt_D_dump_minimal_imports,
 	opt_D_source_stats,
 	opt_D_verbose_core2core,
 	opt_D_verbose_stg2stg,
@@ -334,6 +335,7 @@ opt_D_dump_simpl_stats		= opt_D_dump_most || lookUp  SLIT("-ddump-simpl-stats")
 opt_D_source_stats		= opt_D_dump_most || lookUp  SLIT("-dsource-stats")
 opt_D_verbose_core2core		= opt_D_dump_all  || lookUp  SLIT("-dverbose-simpl")
 opt_D_verbose_stg2stg		= opt_D_dump_all  || lookUp  SLIT("-dverbose-stg")
+opt_D_dump_minimal_imports	= lookUp  SLIT("-ddump-minimal-imports")
 
 opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
 opt_DoStgLinting		= lookUp  SLIT("-dstg-lint")

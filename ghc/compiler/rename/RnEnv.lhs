@@ -590,7 +590,7 @@ mkExportAvails mod_name unqual_imp name_env avails
 
 plusExportAvails ::  ExportAvails ->  ExportAvails ->  ExportAvails
 plusExportAvails (m1, e1) (m2, e2)
-  = (plusFM_C (++) m1 m2, plusUFM_C plusAvail e1 e2)
+  = (plusFM_C (++) m1 m2, plusAvailEnv e1 e2)
 	-- ToDo: wasteful: we do this once for each constructor!
 \end{code}
 
@@ -599,11 +599,23 @@ plusExportAvails (m1, e1) (m2, e2)
 
 \begin{code}
 plusAvail (Avail n1)	   (Avail n2)	    = Avail n1
-plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n1 (nub (ns1 ++ ns2))
+plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n2 (nub (ns1 ++ ns2))
 -- Added SOF 4/97
 #ifdef DEBUG
 plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [pprAvail a1,pprAvail a2])
 #endif
+
+addAvail :: AvailEnv -> AvailInfo -> AvailEnv
+addAvail avails avail = addToNameEnv_C plusAvail avails (availName avail) avail
+
+emptyAvailEnv = emptyNameEnv
+unitAvailEnv :: AvailInfo -> AvailEnv
+unitAvailEnv a = unitNameEnv (availName a) a
+
+plusAvailEnv :: AvailEnv -> AvailEnv -> AvailEnv
+plusAvailEnv = plusNameEnv_C plusAvail
+
+availEnvElts = nameEnvElts
 
 addAvailToNameSet :: NameSet -> AvailInfo -> NameSet
 addAvailToNameSet names avail = addListToNameSet names (availNames avail)
@@ -658,20 +670,12 @@ filterAvail (IEThingAll _) avail@(AvailTC _ _)   = Just avail
 
 filterAvail ie avail = Nothing
 
+pprAvail :: AvailInfo -> SDoc
+pprAvail (AvailTC n ns) = ppr n <> case filter (/= n) ns of
+					[]  -> empty
+					ns' -> parens (hsep (punctuate comma (map ppr ns')))
 
--- In interfaces, pprAvail gets given the OccName of the "host" thing
-pprAvail avail = getPprStyle $ \ sty ->
-	         if ifaceStyle sty then
-		    ppr_avail (pprOccName . nameOccName) avail
-		 else
-		    ppr_avail ppr avail
-
-ppr_avail pp_name (AvailTC n ns) = hsep [
-				     pp_name n,
-				     parens  $ hsep $ punctuate comma $
-				     map pp_name ns
-				   ]
-ppr_avail pp_name (Avail n) = pp_name n
+pprAvail (Avail n) = ppr n
 \end{code}
 
 

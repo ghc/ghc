@@ -15,9 +15,7 @@ import HsSyn		( failureFreePat,
 			  mkSimpleMatch
 			)
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
-			  TypecheckedStmt,
-			  maybeBoxedPrimType
-
+			  TypecheckedStmt
 			)
 import CoreSyn
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
@@ -25,7 +23,7 @@ import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 import DsMonad
 import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsGRHSs		( dsGuarded )
-import DsCCall		( dsCCall )
+import DsCCall		( dsCCall, resultWrapper )
 import DsListComp	( dsListComp )
 import DsUtils		( mkErrorAppDs, mkDsLets, mkConsExpr, mkNilExpr )
 import Match		( matchWrapper, matchSimply )
@@ -164,29 +162,11 @@ dsExpr (HsLitOut (HsString str) _)
   = returnDs (mkStringLitFS str)
 
 dsExpr (HsLitOut (HsLitLit str) ty)
-  | isUnLiftedType ty
-  = returnDs (mkLit (MachLitLit str ty))
-  | otherwise
-  = case (maybeBoxedPrimType ty) of
-      Just (boxing_data_con, prim_ty) ->
-	    returnDs ( mkConApp boxing_data_con [mkLit (MachLitLit str prim_ty)] )
-      _ -> 
-	pprError "ERROR:"
-		 (vcat
-		   [ hcat [ text "Cannot see data constructor of ``literal-literal''s type: "
-		         , text "value:", quotes (quotes (ptext str))
-		         , text "; type: ", ppr ty
-		         ]
-		   , text "Try compiling with -fno-prune-tydecls."
-		   ])
-		  
+  = ASSERT( maybeToBool maybe_ty )
+    returnDs (wrap_fn (mkLit (MachLitLit str rep_ty)))
   where
-    (data_con, prim_ty)
-      = case (maybeBoxedPrimType ty) of
-	  Just (boxing_data_con, prim_ty) -> (boxing_data_con, prim_ty)
-	  Nothing
-	    -> pprPanic "ERROR: ``literal-literal'' not a single-constructor type: "
-			(hcat [ptext str, text "; type: ", ppr ty])
+    (maybe_ty, wrap_fn) = resultWrapper ty
+    Just rep_ty 	= maybe_ty
 
 dsExpr (HsLitOut (HsInt i) ty)
   = returnDs (mkIntegerLit i)

@@ -23,8 +23,9 @@ module Name (
 	tidyTopName, 
 	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModule,
 
-	isUserExportedName, isUserImportedName, isUserImportedExplicitlyName, nameSrcLoc,
-	isLocallyDefinedName, isDynName,
+	isUserExportedName, isUserImportedName, isUserImportedExplicitlyName, 
+	maybeUserImportedFrom,
+	nameSrcLoc, isLocallyDefinedName, isDynName,
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
 	
@@ -430,6 +431,9 @@ isUserImportedExplicitlyName other			           			 = False
 
 isUserImportedName (Name { n_prov = NonLocalDef (UserImport _ _ _) _ }) = True
 isUserImportedName other			           		= False
+
+maybeUserImportedFrom (Name { n_prov = NonLocalDef (UserImport m _ _) _ }) = Just m
+maybeUserImportedFrom other			           		   = Nothing
 
 isDynName :: Name -> Bool
 	-- Does this name come from a DLL?

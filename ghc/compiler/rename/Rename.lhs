@@ -14,22 +14,24 @@ import RnHsSyn		( RenamedHsModule, RenamedHsDecl,
 			  extractHsTyNames, extractHsCtxtTyNames
 			)
 
-import CmdLineOpts	( opt_HiMap, opt_D_dump_rn_trace,
+import CmdLineOpts	( opt_HiMap, opt_D_dump_rn_trace, opt_D_dump_minimal_imports,
 			  opt_D_dump_rn, opt_D_dump_rn_stats, opt_WarnDeprecations
 		        )
 import RnMonad
 import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnDecl )
-import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions,
+import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getInterfaceExports,
 			  getImportedRules, loadHomeInterface, getSlurped, removeContext
 			)
-import RnEnv		( availName, availsToNameSet, 
-			  warnUnusedImports, warnUnusedLocalBinds, lookupImplicitOccRn,
+import RnEnv		( availName, availsToNameSet, unitAvailEnv, availEnvElts, plusAvailEnv, 
+			  warnUnusedImports, warnUnusedLocalBinds, lookupImplicitOccRn, pprAvail,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs
 			)
-import Module           ( Module, ModuleName, mkSearchPath, mkThisModule )
+import Module           ( Module, ModuleName, WhereFrom(..),
+			  moduleNameUserString, mkSearchPath, moduleName, mkThisModule
+			)
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
-			  nameOccName, nameUnique, 
+			  nameOccName, nameUnique, nameModule, maybeUserImportedFrom,
 			  isUserImportedExplicitlyName, isUserImportedName,
 			  maybeWiredInTyConName, maybeWiredInIdName, isWiredInName
 			)
@@ -37,18 +39,19 @@ import OccName		( occNameFlavour, isValOcc )
 import Id		( idType )
 import TyCon		( isSynTyCon, getSynTyConDefn )
 import NameSet
-import PrelMods		( mAIN_Name, pREL_MAIN_Name )
+import PrelMods		( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name )
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon, boolTyCon )
 import PrelInfo		( ioTyCon_NAME, thinAirIdNames, fractionalClassKeys, derivingOccurrences )
 import Type		( namesOfType, funTyCon )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet, ghcExit )
 import BasicTypes	( NewOrData(..) )
 import Bag		( isEmptyBag, bagToList )
-import FiniteMap	( eltsFM )
+import FiniteMap	( FiniteMap, eltsFM, fmToList, emptyFM, addToFM_C )
 import UniqSupply	( UniqSupply )
 import UniqFM		( lookupUFM )
 import Maybes		( maybeToBool )
 import Outputable
+import IO		( openFile, IOMode(..) )
 \end{code}
 
 
@@ -144,7 +147,7 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
     getNameSupplyRn				`thenRn` \ name_supply ->
 
 	-- REPORT UNUSED NAMES
-    reportUnusedNames gbl_env global_avail_env
+    reportUnusedNames mod_name gbl_env global_avail_env
 		      export_env
 		      source_fvs			`thenRn_`
 
@@ -525,8 +528,8 @@ getInstDeclGates other				    = emptyFVs
 %*********************************************************
 
 \begin{code}
-reportUnusedNames :: GlobalRdrEnv -> NameEnv AvailInfo -> ExportEnv -> NameSet -> RnM d ()
-reportUnusedNames gbl_env avail_env (ExportEnv export_avails _ _) mentioned_names
+reportUnusedNames :: ModuleName -> GlobalRdrEnv -> AvailEnv -> ExportEnv -> NameSet -> RnMG ()
+reportUnusedNames mod_name gbl_env avail_env (ExportEnv export_avails _ _) mentioned_names
   = let
 	used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
 
@@ -569,13 +572,60 @@ reportUnusedNames gbl_env avail_env (ExportEnv export_avails _ _) mentioned_name
                                  | n <- nameSetToList mentioned_names,
                                    not (isLocallyDefined n),
                                    Just txt <- [lookupNameEnv deprec_env n] ]
+
+	minimal_imports :: FiniteMap Module AvailEnv
+	minimal_imports = foldNameSet add emptyFM really_used_names
+	add n acc = case maybeUserImportedFrom n of
+			Nothing -> acc
+			Just m  -> addToFM_C plusAvailEnv acc m
+					     (unitAvailEnv (mk_avail n))
+	mk_avail n = case lookupNameEnv avail_env n of
+			Just (AvailTC m _) | n==m      -> AvailTC n [n]
+					   | otherwise -> AvailTC m [n,m]
+			Just avail	   -> Avail n
+			Nothing		   -> pprPanic "mk_avail" (ppr n)
     in
     warnUnusedLocalBinds bad_locals				`thenRn_`
     warnUnusedImports bad_imps					`thenRn_`
+    printMinimalImports mod_name minimal_imports		`thenRn_`
     getIfacesRn							`thenRn` \ ifaces ->
     (if opt_WarnDeprecations
 	then mapRn_ warnDeprec (deprec_used (iDeprecs ifaces))
 	else returnRn ())
+
+-- ToDo: deal with original imports with 'qualified' and 'as M' clauses
+printMinimalImports mod_name imps
+  | not opt_D_dump_minimal_imports
+  = returnRn ()
+  | otherwise
+  = mapRn to_ies (fmToList imps)		`thenRn` \ mod_ies ->
+    ioToRnM (do { h <- openFile filename WriteMode ;
+		  printForUser h (vcat (map ppr_mod_ie mod_ies))
+	})					`thenRn_`
+    returnRn ()
+  where
+    filename = moduleNameUserString mod_name ++ ".imports"
+    ppr_mod_ie (mod_name, ies) 
+	| mod_name == pRELUDE_Name 
+	= empty
+	| otherwise
+	= ptext SLIT("import") <+> ppr mod_name <> 
+			    parens (fsep (punctuate comma (map ppr ies)))
+
+    to_ies (mod, avail_env) = mapRn to_ie (availEnvElts avail_env)	`thenRn` \ ies ->
+			      returnRn (moduleName mod, ies)
+
+    to_ie :: AvailInfo -> RnMG (IE Name)
+    to_ie (Avail n)       = returnRn (IEVar n)
+    to_ie (AvailTC n [m]) = ASSERT( n==m ) 
+			    returnRn (IEThingAbs n)
+    to_ie (AvailTC n ns)  = getInterfaceExports (moduleName (nameModule n)) 
+						ImportBySystem	 	`thenRn` \ (_, avails) ->
+			    case [ms | AvailTC m ms <- avails, m == n] of
+			      [ms] | all (`elem` ns) ms -> returnRn (IEThingAll n)
+				   | otherwise	        -> returnRn (IEThingWith n (filter (/= n) ns))
+			      other -> pprTrace "to_ie" (ppr n <+> ppr (nameModule n) <+> ppr other) $
+				       returnRn (IEVar n)
 
 warnDeprec :: (Name, DeprecTxt) -> RnM d ()
 warnDeprec (name, txt)
