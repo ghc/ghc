@@ -1,4 +1,4 @@
---!!! 500 defns, not chained together
+-- !!! 500 defns, not chained together
 module Main(main) where
 
 main = undefined

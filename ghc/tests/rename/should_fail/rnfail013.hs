@@ -1,4 +1,4 @@
---!!! Conflicting constructors from two data type decls
+-- !!! Conflicting constructors from two data type decls
 
 module Foo where
 

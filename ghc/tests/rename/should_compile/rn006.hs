@@ -1,6 +1,6 @@
---!!! rn006: two sets of mutually-recursive blobs:
---!!!  f, g, h are mut rec
---!!!  i, j, k are mut rec
+-- !!! rn006: two sets of mutually-recursive blobs:
+-- !!!  f, g, h are mut rec
+-- !!!  i, j, k are mut rec
 
 module Test where
 

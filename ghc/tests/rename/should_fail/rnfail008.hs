@@ -1,4 +1,4 @@
---!!! Class and instance decl
+-- !!! Class and instance decl
 
 module Test where
 

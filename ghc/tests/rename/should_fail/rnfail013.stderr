@@ -1,8 +1,9 @@
  
 rnfail013.hs:3:
-    Conflicting definitions for `MkT'
-	Defined at rnfail013.hs:9
-	Defined at rnfail013.hs:7
+    Multiple declarations of `MkT'
+	defined at rnfail013.hs:7
+	defined at rnfail013.hs:9
 
 
 Compilation had errors
+

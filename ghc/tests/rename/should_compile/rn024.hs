@@ -1,4 +1,4 @@
---!! This is fine in Haskell 1.4
+-- !! This is fine in Haskell 1.4
 --
 module Foo ( Baz(..) ) where 
 

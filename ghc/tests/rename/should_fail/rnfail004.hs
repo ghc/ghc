@@ -1,4 +1,4 @@
---!!! multiple definitions, but hidden in patterns
+-- !!! multiple definitions, but hidden in patterns
 module Foo where
 
 f x = x

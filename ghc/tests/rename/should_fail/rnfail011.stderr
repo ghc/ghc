@@ -1,8 +1,9 @@
  
 rnfail011.hs:2:
-    Conflicting definitions for `A'
-	Defined at rnfail011.hs:6
-	Defined at rnfail011.hs:2
+    Multiple declarations of `A'
+	defined at rnfail011.hs:2
+	defined at rnfail011.hs:6
 
 
 Compilation had errors
+

@@ -1,4 +1,4 @@
---!!! 500 defns chained together at the top-level
+-- !!! 500 defns chained together at the top-level
 module Main(main) where
 main = undefined
 a000 = a001

@@ -1,4 +1,4 @@
---!!! rn005: simplest case: a few non-recursive bindings
+-- !!! rn005: simplest case: a few non-recursive bindings
 
 module Test where
 

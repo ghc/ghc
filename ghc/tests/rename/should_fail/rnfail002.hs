@@ -1,5 +1,5 @@
---!!! rn001: super-simple set of bindings,
---!!!	incl wildcard pattern-bindings and *duplicates*
+-- !!! rn001: super-simple set of bindings,
+-- !!!	incl wildcard pattern-bindings and *duplicates*
 
 x = []
 y = []

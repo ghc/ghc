@@ -1,8 +1,9 @@
  
 rnfail010.hs:2:
-    Conflicting definitions for `f'
-	Defined at rnfail010.hs:6
-	Defined at rnfail010.hs:2
+    Multiple declarations of `f'
+	defined at rnfail010.hs:2
+	defined at rnfail010.hs:6
 
 
 Compilation had errors
+

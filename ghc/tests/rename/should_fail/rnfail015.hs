@@ -1,6 +1,6 @@
 module ShouldFail where
 
---!!! duplicate constructors in datatype
+-- !!! duplicate constructors in datatype
 -- (bug report from Alex Ferguson, c. 2.06)
 
 data Token

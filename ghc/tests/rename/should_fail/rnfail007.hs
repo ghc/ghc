@@ -1,4 +1,4 @@
---!!! Main module with no definition of main
+-- !!! Main module with no definition of main
 
 module Main where
 

@@ -1,9 +1,7 @@
-_interface_ Rn017 1 400
-_exports_
-Rn017 a b c Wibble{MkWibble} Wobble ;
-_declarations_
+__interface Rn017 1 0 where
+__export Rn017 a b c Wibble{MkWibble} Wobble ;
 1 data Wibble = MkWibble Wobble ;
 1 data Wobble ;
-1 a _:_ Int -> Int ;;
-1 b _:_ Int -> Int ;;
-1 c _:_ Int -> Int ;;
+1 a :: Int -> Int ;
+1 b :: Int -> Int ;
+1 c :: Int -> Int ;
