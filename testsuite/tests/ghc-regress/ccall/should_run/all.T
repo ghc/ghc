@@ -12,3 +12,5 @@ test "ffi001"   { vtr("-fglasgow-exts",        "", "") }
 -- separately.
 test "ffi002"   { skip when True
 		  vtr("ffi002.c -fglasgow-exts -no-hs-main", "", "") }
+
+test "ffi003"   { vtr("-fglasgow-exts", "", "") }
