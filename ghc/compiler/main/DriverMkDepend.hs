@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.31 2003/11/17 14:23:38 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.32 2004/06/24 09:41:11 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -23,7 +23,7 @@ import Module		( ModuleName, ModLocation(..),
 			  moduleNameUserString, isHomeModule )
 import Finder		( findModule, hiBootExt, hiBootVerExt,
 			  mkHomeModLocation )
-import Util             ( global )
+import Util             ( global, maybePrefixMatch )
 import Panic
 
 import DATA_IOREF	( IORef, readIORef, writeIORef )
@@ -165,9 +165,25 @@ doMkDependHSPhase basename suff input_fn
 			    escapeSpaces dep)
           genDep (dep, True  {- is an hi file -}) = do
 	     hisuf <- readIORef v_Hi_suf
-	     let dep_base = remove_suffix '.' dep
-	         deps = (dep_base ++ hisuf)
-		        : map (\suf -> dep_base ++ suf ++ '_':hisuf) extra_suffixes
+	     let 
+		-- In order to construct hi files with alternate suffixes, we
+		-- now have to find the "basename" of the hi file.  This is
+		-- difficult because we can't just split the hi filename
+		-- at the last dot - the hisuf might have dots in it.  So we
+		-- check whether the hi filename ends in hisuf, and if it does,
+		-- we strip off hisuf, otherwise we strip everything after the
+		-- last dot.
+		dep_base 
+		   | Just rest <- maybePrefixMatch rev_hisuf rev_dep
+		   = reverse rest
+		   | otherwise
+		   = remove_suffix '.' dep
+		  where
+			rev_hisuf = reverse hisuf
+			rev_dep   = reverse dep
+
+	        deps = dep : map (\suf -> dep_base ++ suf ++ '_':hisuf) 
+				extra_suffixes
 		  -- length objs should be == length deps
 	     sequence_ (zipWith (\o d -> hPutStrLn hdl (escapeSpaces o ++ " : " ++ escapeSpaces d)) objs deps)
 
