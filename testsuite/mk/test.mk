@@ -14,7 +14,7 @@
 #
 # -----------------------------------------------------------------------------
 
-# gastly hack, because the driver requires that $tool be an absolute path name.
+# ghastly hack, because the driver requires that $tool be an absolute path name.
 GHC_INPLACE_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/ghc-inplace
 
 RUNTESTS     = $(TOP)/driver/runtests
