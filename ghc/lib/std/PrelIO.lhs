@@ -366,7 +366,7 @@ swapBuffers handle_ buf sz = do
    setBuf fo buf sz
    return (handle_{ haBuffers__ = fo_buf : haBuffers__ handle_ })
 
------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- commitAndReleaseBuffer handle buf sz count flush
 -- 
 -- Write the contents of the buffer 'buf' ('sz' bytes long, containing
@@ -397,7 +397,7 @@ commitAndReleaseBuffer
 commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
       h_ <- takeMVar h
 
-	-- First deal with any possible exceptions by freeing the buffer.
+	-- First deal with any possible exceptions, by freeing the buffer.
 	-- Async exceptions are blocked, but there are still some interruptible
 	-- ops below.
 
@@ -420,21 +420,30 @@ commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
 
       let ok    h_ = putMVar h h_ >> return ()
 
-      if (flush || fo_bufSize - fo_wptr < count)  -- not enough room in handle buffer?
+	  -- enough room in handle buffer for the new data?
+      if (flush || fo_bufSize - fo_wptr - 1 < count)
+
+	  -- The -1 is to be sure that we never exactly fill up the
+	  -- buffer, which would require a flush.  So if copying the
+	  -- new data into the buffer would make the buffer full, we
+	  -- just flush the existing buffer and the new data immediately,
+	  -- rather than copying before flushing.
 
 	    then do rc <- mayBlock fo (flushFile fo)
 		    if (rc < 0) 
 			then constructErrorAndFail "commitAndReleaseBuffer"
 			else
-		     if (flush || sz /= fo_bufSize)
+		     if (flush || sz /= fo_bufSize || count == sz)
 			then do rc <- write_buf fo buf count
 		    		if (rc < 0)
 				    then constructErrorAndFail "commitAndReleaseBuffer"
 			      	    else do handle_ <- freeBuffer handle_ buf sz
 					    ok handle_
 
-			-- don't have to flush, and the new buffer is the
-			-- same size as the old one, so just swap them...
+			-- if:  (a) we don't have to flush, and
+			--      (b) size(new buffer) == size(old buffer), and
+			--      (c) new buffer is not full,
+			-- we can just just swap them over...
 			else do handle_ <- swapBuffers handle_ buf sz
 				setBufWPtr fo count
 				ok handle_
@@ -446,7 +455,7 @@ commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
 		    handle_ <- freeBuffer handle_ buf sz
 		    ok handle_
 
-------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- commitBuffer handle buf sz count flush
 -- 
 -- Flushes 'count' bytes from the buffer 'buf' (size 'sz') to 'handle'.
@@ -457,8 +466,14 @@ commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
 -- 	   - write out new buffer directly
 -- 
 -- else
--- 	   - if there's enough room in the handle buffer, then copy new buf into it
--- 	     else flush handle buffer, then copy new buffer into it
+-- 	   - if there's enough room in the handle buffer, 
+--	       then copy new buf into it
+-- 	       else flush handle buffer, then copy new buffer into it
+--
+-- Make sure that we maintain the invariant that the handle buffer is never
+-- left in a full state.  Several functions rely on this (eg. filePutc), so
+-- if we're about to exactly fill the buffer then we make sure we do a flush
+-- here (also see above in commitAndReleaseBuffer).
 
 commitBuffer
 	:: Handle			-- handle to commit to
@@ -477,13 +492,13 @@ commitBuffer handle buf sz count flush = do
       fo_bufSize <- getBufSize fo
 
       new_wptr <-                       -- not enough room in handle buffer?
-	(if flush || (fo_bufSize - fo_wptr < count)
+	(if flush || (fo_bufSize - fo_wptr - 1 < count)
 	    then do rc <- mayBlock fo (flushFile fo)
 		    if (rc < 0) then constructErrorAndFail "commitBuffer"
 				else return 0
 	    else return fo_wptr )
 
-      if (flush || fo_bufSize < count)	-- committed buffer too large?
+      if (flush || fo_bufSize - 1 < count)  -- committed buffer too large?
 
 	    then do rc <- write_buf fo buf count
 		    if (rc < 0) then constructErrorAndFail "commitBuffer"
@@ -500,8 +515,8 @@ write_buf fo buf count = do
 	then  write_buf fo buf (count - rc) -- partial write
 	else  return rc
 
--- a version of commitBuffer that will free the buffer if an exception is received.
--- DON'T use this if you intend to use the buffer again!
+-- a version of commitBuffer that will free the buffer if an exception is 
+-- received.  DON'T use this if you intend to use the buffer again!
 checkedCommitBuffer handle buf sz count flush 
   = catchException (commitBuffer handle buf sz count flush) 
 		   (\e -> do withHandle__ handle (\h_ -> freeBuffer h_ buf sz)
