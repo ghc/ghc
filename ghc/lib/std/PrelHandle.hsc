@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.1 2001/05/18 16:54:05 simonmar Exp $
+-- $Id: PrelHandle.hsc,v 1.2 2001/05/18 21:57:30 qrczak Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -921,7 +921,7 @@ hGetPosn handle =
     wantSeekableHandle "hGetPosn" handle $ \ handle_ -> do
 
 #if defined(_WIN32)
-	-- urgh, on Windows we have to worry about /n -> /r/n translation, 
+	-- urgh, on Windows we have to worry about \n -> \r\n translation, 
 	-- so we can't easily calculate the file position using the
 	-- current buffer size.  Just flush instead.
       flushBuffer handle_
