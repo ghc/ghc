@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.22 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Profiling.c,v 1.23 2001/10/18 13:46:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -593,7 +593,7 @@ report_per_cc_costs( void )
 	    );
 
     if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
-      fprintf(prof_file, "  %5ld %9ld", cc->time_ticks, cc->mem_alloc);
+      fprintf(prof_file, "  %5ld %9lld", cc->time_ticks, cc->mem_alloc);
     }
     fprintf(prof_file, "\n");
   }
@@ -700,7 +700,7 @@ reportCCS(CostCentreStack *ccs, nat indent)
     fprintf(prof_file, "%-*s%-*s %-10s", 
 	    indent, "", 24-indent, cc->label, cc->module);
 
-    fprintf(prof_file, "%8ld  %5.1f %5.1f    %5.1f %5.1f",
+    fprintf(prof_file, "%8lld  %5.1f %5.1f    %5.1f %5.1f",
 	    ccs->scc_count, 
 	    total_prof_ticks == 0 ? 0.0 : (ccs->time_ticks / (StgFloat) total_prof_ticks * 100),
 	    total_alloc == 0 ? 0.0 : (ccs->mem_alloc / (StgFloat) total_alloc * 100),
@@ -709,7 +709,7 @@ reportCCS(CostCentreStack *ccs, nat indent)
 	    );
 
     if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
-      fprintf(prof_file, "  %5ld %9ld", ccs->time_ticks, ccs->mem_alloc*sizeof(W_));
+      fprintf(prof_file, "  %5ld %9lld", ccs->time_ticks, ccs->mem_alloc*sizeof(W_));
 #if defined(PROFILING_DETAIL_COUNTS)
       fprintf(prof_file, "  %8ld %8ld %8ld %8ld %8ld %8ld %8ld",
 	      ccs->mem_allocs, ccs->thunk_count,
@@ -842,7 +842,7 @@ reportCCS_XML(CostCentreStack *ccs)
 
   cc = ccs->cc;
   
-  fprintf(prof_file, " 1 %d %lu %lu %lu", 
+  fprintf(prof_file, " 1 %d %llu %lu %llu", 
 	  ccs->ccsID, ccs->scc_count, ccs->time_ticks, ccs->mem_alloc);
 
   for (i = ccs->indexTable; i != 0; i = i->next) {

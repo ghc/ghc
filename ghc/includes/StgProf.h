@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.12 2001/10/18 13:19:49 simonmar Exp $
+ * $Id: StgProf.h,v 1.13 2001/10/18 13:46:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -20,7 +20,7 @@ typedef struct _CostCentre {
  
   /* used for accumulating costs at the end of the run... */
   unsigned long time_ticks;
-  unsigned long mem_alloc;
+  unsigned long long mem_alloc;
 
   char is_caf;
 
@@ -34,15 +34,15 @@ typedef struct _CostCentreStack {
   CostCentre *cc;
   struct _CostCentreStack *prevStack;
   struct _IndexTable *indexTable;
-  
-  unsigned long scc_count;
-    
+
+  unsigned long long scc_count;
+
   unsigned long time_ticks;
-  unsigned long mem_alloc;
+  unsigned long long mem_alloc;
   unsigned long mem_resid;
 
   unsigned long inherited_ticks;
-  unsigned long inherited_alloc;
+  unsigned long long inherited_alloc;
 
   CostCentre *root;
 } CostCentreStack;
