@@ -302,13 +302,13 @@ sub printNewItemVersion {
 
     } elsif ($idecl ne $Decl{"old:$item"})  {	# Old decl differs from new decl
 	local($odecl) = $Decl{"old:$item"};
-	if ($show_hi_diffs) {print STDERR "changed: $item\nOld: $odeclNew: $idecl";}
+	if ($show_hi_diffs) {print STDERR "changed: $item\nOld: $odecl", "New: $idecl";}
 	print $hifile  "--old: ", $OldVersion{"$item"}, " $odecl" 
 			if $Keep_HiDiffs;         # show old in interface file
 	print $hifile  "$mod_version ";		  # Use module version
 
     } else {					# Identical decls, so use old version number
-	if ($show_hi_diffs) {print STDERR "$item: unchanged\n";}
+	#if ($show_hi_diffs) {print STDERR "$item: unchanged\n";}
 	print $hifile  $OldVersion{"$item"}, " ";
     }
     return;
