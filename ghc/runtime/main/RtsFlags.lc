@@ -557,13 +557,8 @@ error = rtsTrue;
 			RTSflags.CcFlags.sortBy = rts_argv[arg][2];
 		    break;
 		  default:
-		    PAR_BUILD_ONLY(
-		    break; /* we do not care about sortBy for parallel */
-		    )
-		    PROFILING_BUILD_ONLY(
-		    fprintf(stderr, "Invalid profiling sort option %s\n", rts_argv[arg]);
-		    error = rtsTrue;
-		    )
+		    	RTSflags.CcFlags.sortBy = SORTCC_TIME;
+		    break;
 		}
 		) break;
 
@@ -691,7 +686,7 @@ error = rtsTrue;
 		      case 'd': /* closure descr select */
 			RTSflags.ProfFlags.descrSelector = left + 1;
 			break;
-		      case 't': /* closure type select */
+		      case 'y': /* closure type select */
 			RTSflags.ProfFlags.typeSelector = left + 1;
 			break;
 		      case 'k': /* closure kind select */
