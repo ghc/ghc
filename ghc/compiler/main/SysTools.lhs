@@ -754,7 +754,7 @@ foreign import ccall unsafe "rawSystem"
 -- a single string.  Command-line parsing is done by the executable
 -- itself.
 rawSystem cmd args = do
-  let cmdline = translate cmd ++ concat (map ((' ':) . translate) args)
+  let cmdline = {-translate-} cmd ++ concat (map ((' ':) . translate) args)
   withCString cmdline $ \pcmdline -> do
     status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmdline)
     case status of
