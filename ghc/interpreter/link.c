@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.43 $
- * $Date: 2000/02/14 11:13:11 $
+ * $Revision: 1.44 $
+ * $Date: 2000/02/24 12:34:19 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -759,5 +759,5 @@ assert(nonNull(namePMFail));
 }
 #undef pFun
 
-#include "fooble.c"
+//#include "fooble.c"
 /*-------------------------------------------------------------------------*/

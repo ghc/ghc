@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.31 $
- * $Date: 2000/02/14 11:13:11 $
+ * $Revision: 1.32 $
+ * $Date: 2000/02/24 12:34:18 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2570,8 +2570,8 @@ Type type; {
       Sym(shutdownHaskellAndExit)    \
 
 
-/* AJG Hack */
-#if 0
+/* AJG Hack; for the moment, make EXTERN_SYMS vanish on Win32 */
+#ifdef _WIN32
 #undef EXTERN_SYMS
 #define EXTERN_SYMS
 #endif
