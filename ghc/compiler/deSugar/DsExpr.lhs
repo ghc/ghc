@@ -665,7 +665,7 @@ dsRecStmt m_ty ds_meths stmts later_vars rec_vars rec_rets
 		 | otherwise = noLoc $ LazyPat (noLoc $ TuplePat (map nlVarPat vars) Boxed)
 
 	body = noLoc $ HsDo DoExpr (stmts ++ [return_stmt]) 
-			   [(n, nlHsVar id) | (n,id) <- ds_meths]	-- A bit of a hack
+			   [(n, HsVar id) | (n,id) <- ds_meths]	-- A bit of a hack
 			   (mkAppTy m_ty tup_ty)
 
   	Var return_id = lookupReboundName ds_meths returnMName

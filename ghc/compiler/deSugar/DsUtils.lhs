@@ -36,7 +36,7 @@ module DsUtils (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	Match ( matchSimply )
-import {-# SOURCE #-}	DsExpr( dsLExpr )
+import {-# SOURCE #-}	DsExpr( dsExpr )
 
 import HsSyn
 import TcHsSyn		( hsPatType )
@@ -95,9 +95,9 @@ dsReboundNames rebound_ids
   where
 	-- The cheapo special case can happen when we 
 	-- make an intermediate HsDo when desugaring a RecStmt
-    mk_bind (std_name, L _ (HsVar id)) = return ([], (std_name, id))
+    mk_bind (std_name, HsVar id) = return ([], (std_name, id))
     mk_bind (std_name, expr)
- 	 = dsLExpr expr				`thenDs` \ rhs ->
+ 	 = dsExpr expr				`thenDs` \ rhs ->
      	   newSysLocalDs (exprType rhs)		`thenDs` \ id ->
      	   return ([NonRec id rhs], (std_name, id))
 

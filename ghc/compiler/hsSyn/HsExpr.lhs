@@ -222,7 +222,7 @@ Table of bindings of names used in rebindable syntax.
 This gets filled in by the renamer.
 
 \begin{code}
-type ReboundNames id = [(Name, LHsExpr id)]
+type ReboundNames id = [(Name, HsExpr id)]
 -- * Before the renamer, this list is empty
 --
 -- * After the renamer, it takes the form [(std_name, HsVar actual_name)]

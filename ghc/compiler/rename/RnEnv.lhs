@@ -499,9 +499,9 @@ lookupSyntaxNames std_names
     	-- Get the similarly named thing from the local environment
     mappM (lookupOccRn . mkRdrUnqual . nameOccName) std_names 	`thenM` \ usr_names ->
 
-    returnM (std_names `zip` map nlHsVar usr_names, mkFVs usr_names)
+    returnM (std_names `zip` map HsVar usr_names, mkFVs usr_names)
   where
-    normal_case = returnM (std_names `zip` map nlHsVar std_names, emptyFVs)
+    normal_case = returnM (std_names `zip` map HsVar std_names, emptyFVs)
 \end{code}
 
 

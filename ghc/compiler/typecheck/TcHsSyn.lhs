@@ -566,7 +566,7 @@ zonkReboundNames :: ZonkEnv -> ReboundNames Id -> TcM (ReboundNames Id)
 zonkReboundNames env prs 
   = mapM zonk prs
   where
-    zonk (n, e) = zonkLExpr env e `thenM` \ new_e ->
+    zonk (n, e) = zonkExpr env e `thenM` \ new_e ->
 		  returnM (n, new_e)
 
 

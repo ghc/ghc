@@ -38,7 +38,7 @@ import DataCon		( DataCon, dataConFieldLabels, dataConSourceArity )
 import PrelNames	( eqStringName, eqName, geName, negateName, minusName, 
 			  integralClassName )
 import BasicTypes	( isBoxed )
-import SrcLoc		( Located(..), noLoc, unLoc )
+import SrcLoc		( Located(..), noLoc, unLoc, noLoc )
 import Bag
 import Outputable
 import FastString
@@ -274,8 +274,8 @@ tc_pat tc_bndr pat@(NPatIn over_lit mb_neg) pat_ty
 	Nothing  -> returnM pos_lit_expr	-- Positive literal
 	Just neg -> 	-- Negative literal
 			-- The 'negate' is re-mappable syntax
-	    tcSyntaxName origin pat_ty' (negateName, noLoc (HsVar neg))	`thenM` \ (_, neg_expr) ->
-	    returnM (mkHsApp neg_expr pos_lit_expr)
+	    tcSyntaxName origin pat_ty' (negateName, HsVar neg)	`thenM` \ (_, neg_expr) ->
+	    returnM (mkHsApp (noLoc neg_expr) pos_lit_expr)
     )								`thenM` \ lit_expr ->
 
     let
@@ -310,7 +310,7 @@ tc_pat tc_bndr pat@(NPlusKPatIn (L nm_loc name) lit@(HsIntegral i _) minus_name)
     newMethodFromName origin pat_ty' geName	 `thenM` \ ge ->
 
 	-- The '-' part is re-mappable syntax
-    tcSyntaxName origin pat_ty' (minusName, noLoc (HsVar minus_name))	`thenM` \ (_, minus_expr) ->
+    tcSyntaxName origin pat_ty' (minusName, HsVar minus_name)	`thenM` \ (_, minus_expr) ->
 
 	-- The Report says that n+k patterns must be in Integral
 	-- We may not want this when using re-mappable syntax, though (ToDo?)
@@ -319,8 +319,8 @@ tc_pat tc_bndr pat@(NPlusKPatIn (L nm_loc name) lit@(HsIntegral i _) minus_name)
     extendLIEs dicts					`thenM_`
     
     returnM (NPlusKPatOut (L nm_loc bndr_id) i 
-			   (SectionR (nlHsVar ge) over_lit_expr)
-			   (SectionR minus_expr over_lit_expr),
+			  (SectionR (nlHsVar ge) over_lit_expr)
+			  (SectionR (noLoc minus_expr) over_lit_expr),
 	      emptyBag, unitBag (name, bndr_id), [])
   where
     origin = PatOrigin pat

@@ -83,7 +83,7 @@ import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rationalTyConName )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
-import SrcLoc	( mkSrcSpan, noLoc, Located(..) )
+import SrcLoc	( mkSrcSpan, noLoc, unLoc, Located(..) )
 import CmdLineOpts( DynFlags, DynFlag( Opt_AllowUndecidableInstances ), dopt )
 import Maybes	( isJust )
 import Outputable
@@ -393,10 +393,10 @@ newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
 				-- Reason: tcSyntaxName does unification
 				-- which is very inconvenient in tcSimplify
 				-- ToDo: noLoc sadness
-  = tcSyntaxName orig expected_ty (fromIntegerName, noLoc (HsVar fi))	`thenM` \ (_,expr) ->
-    mkIntegerLit i							`thenM` \ integer_lit ->
-    returnM (mkHsApp expr integer_lit)
-
+  = tcSyntaxName orig expected_ty (fromIntegerName, HsVar fi)	`thenM` \ (_,expr) ->
+    mkIntegerLit i						`thenM` \ integer_lit ->
+    returnM (mkHsApp (noLoc expr) integer_lit)
+	-- The mkHsApp will get the loc from the literal
   | Just expr <- shortCutIntLit i expected_ty 
   = returnM expr
 
@@ -405,9 +405,10 @@ newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
 
 newOverloadedLit orig lit@(HsFractional r fr) expected_ty
   | fr /= fromRationalName	-- c.f. HsIntegral case
-  = tcSyntaxName orig expected_ty (fromRationalName, noLoc (HsVar fr))	`thenM` \ (_,expr) ->
-    mkRatLit r								`thenM` \ rat_lit ->
-    returnM (mkHsApp expr rat_lit)
+  = tcSyntaxName orig expected_ty (fromRationalName, HsVar fr)	`thenM` \ (_,expr) ->
+    mkRatLit r							`thenM` \ rat_lit ->
+    returnM (mkHsApp (noLoc expr) rat_lit)
+	-- The mkHsApp will get the loc from the literal
 
   | Just expr <- shortCutFracLit r expected_ty 
   = returnM expr
@@ -805,41 +806,42 @@ just use the expression inline.
 \begin{code}
 tcSyntaxName :: InstOrigin
 	     -> TcType			-- Type to instantiate it at
-	     -> (Name, LHsExpr Name)	-- (Standard name, user name)
-	     -> TcM (Name, LHsExpr TcId)	-- (Standard name, suitable expression)
+	     -> (Name, HsExpr Name)	-- (Standard name, user name)
+	     -> TcM (Name, HsExpr TcId)	-- (Standard name, suitable expression)
 
 -- NB: tcSyntaxName calls tcExpr, and hence can do unification.
 -- So we do not call it from lookupInst, which is called from tcSimplify
 
-tcSyntaxName orig ty (std_nm, L span (HsVar user_nm))
+tcSyntaxName orig ty (std_nm, HsVar user_nm)
   | std_nm == user_nm
-  = addSrcSpan span (tcStdSyntaxName orig ty std_nm)
+  = tcStdSyntaxName orig ty std_nm
 
 tcSyntaxName orig ty (std_nm, user_nm_expr)
   = tcLookupId std_nm		`thenM` \ std_id ->
     let	
 	-- C.f. newMethodAtLoc
 	([tv], _, tau)  = tcSplitSigmaTy (idType std_id)
- 	tau1		= substTyWith [tv] [ty] tau
+ 	sigma1		= substTyWith [tv] [ty] tau
 	-- Actually, the "tau-type" might be a sigma-type in the
 	-- case of locally-polymorphic methods.
     in
-    addErrCtxtM (syntaxNameCtxt user_nm_expr orig tau1)	$
+    addErrCtxtM (syntaxNameCtxt user_nm_expr orig sigma1)	$
 
 	-- Check that the user-supplied thing has the
-	-- same type as the standard one
-    tcCheckSigma user_nm_expr tau1		`thenM` \ expr ->
-    returnM (std_nm, expr)
+	-- same type as the standard one.  
+	-- Tiresome jiggling because tcCheckSigma takes a located expression
+    getSrcSpanM					`thenM` \ span -> 
+    tcCheckSigma (L span user_nm_expr) sigma1	`thenM` \ expr ->
+    returnM (std_nm, unLoc expr)
 
 tcStdSyntaxName :: InstOrigin
 	        -> TcType			-- Type to instantiate it at
 	        -> Name				-- Standard name
-	        -> TcM (Name, LHsExpr TcId)	-- (Standard name, suitable expression)
+	        -> TcM (Name, HsExpr TcId)	-- (Standard name, suitable expression)
 
 tcStdSyntaxName orig ty std_nm
   = newMethodFromName orig ty std_nm	`thenM` \ id ->
-    getSrcSpanM				`thenM` \ span -> 
-    returnM (std_nm, L span (HsVar id))
+    returnM (std_nm, HsVar id)
 
 syntaxNameCtxt name orig ty tidy_env
   = getInstLoc orig		`thenM` \ inst_loc ->
