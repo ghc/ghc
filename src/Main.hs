@@ -208,7 +208,7 @@ parseIfaceOption :: String -> (FilePath,FilePath)
 parseIfaceOption s = 
   case break (==',') s of
 	(fpath,',':file) -> (fpath,file)
-	(_, file)       -> ("", file)
+	(file, _)        -> ("", file)
 
 readIface :: FilePath -> IO [(Module,Interface)]
 readIface filename = do
