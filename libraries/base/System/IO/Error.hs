@@ -243,7 +243,7 @@ annotateIOError :: IOError
               -> Maybe Handle 
               -> Maybe FilePath 
               -> IOError 
-annotateIOError (IOError hdl errTy _ str path) loc ohdl opath = 
+annotateIOError (IOError ohdl errTy _ str opath) loc hdl path = 
   IOError (hdl `mplus` ohdl) errTy loc str (path `mplus` opath)
   where
     Nothing `mplus` ys = ys
