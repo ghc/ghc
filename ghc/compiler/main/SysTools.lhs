@@ -71,18 +71,14 @@ import Util		( global, notNull )
 import CmdLineOpts	( dynFlag, verbosity )
 
 import EXCEPTION	( throwDyn )
-#if __GLASGOW_HASKELL__ > 408
-import qualified EXCEPTION as Exception ( catch )
-#else
-import EXCEPTION        ( catchAllIO )
-#endif
-
 import DATA_IOREF	( IORef, readIORef, writeIORef )
 import DATA_INT
     
 import Monad		( when, unless )
 import System		( ExitCode(..), exitWith, getEnv, system )
-import IO
+import IO		( try, catch,
+			  openFile, hPutChar, hPutStrLn, hPutStr, hClose, hFlush, IOMode(..),
+			  stderr )
 import Directory	( doesFileExist, removeFile )
 
 #include "../includes/config.h"
@@ -110,9 +106,21 @@ import CString		( CString, peekCString )
 #if __GLASGOW_HASKELL__ > 504
 import System.Cmd       ( rawSystem )
 #else
-import SystemExts       ( rawSystem )
+
+	-- For Win32 and GHC <= 504
+	-- rawSystem is defined in this module
+	-- We just need an import
+#if __GLASGOW_HASKELL__ < 503
+import PrelIOBase( ioException, IOException(..), IOErrorType(InvalidArgument) )
+#else				
+import GHC.IOBase( ioException, IOException(..), IOErrorType(InvalidArgument) )
 #endif
-#else
+import CError   ( throwErrnoIfMinus1 )
+import CString	( withCString )
+#endif
+
+#else /* Not Win32 */
+
 import System		( system )
 #endif
 \end{code}
@@ -667,7 +675,7 @@ removeTmpFiles verb fs
 	     ("Deleting: " ++ unwords fs)
 	     (mapM_ rm fs)
   where
-    rm f = removeFile f `catch` 
+    rm f = removeFile f `IO.catch` 
 		(\_ignored -> 
 		    when (verb >= 2) $
 		      hPutStrLn stderr ("Warning: deleting non-existent " ++ f)
@@ -729,7 +737,7 @@ traceCmd phase_name cmd_line action
 	; unless n $ do {
 
 	   -- And run it!
-	; action `catch` handle_exn verb
+	; action `IO.catch` handle_exn verb
 	}}
   where
     handle_exn verb exn = do { when (verb >= 2) (hPutStr   stderr "\n")
@@ -867,4 +875,26 @@ quote s  = "\"" ++ s ++ "\""
 quote s = s
 #endif
 
+\end{code}
+
+This next blob is in System.Cmd after 5.04, but until then it needs
+to be here (for Win32 only).
+
+\begin{code}
+#if defined(mingw32_HOST_OS)
+#if __GLASGOW_HASKELL__ <= 504
+
+rawSystem :: String -> IO ExitCode
+rawSystem "" = ioException (IOError Nothing InvalidArgument "rawSystem" "null command" Nothing)
+rawSystem cmd =
+  withCString cmd $ \s -> do
+    status <- throwErrnoIfMinus1 "rawSystem" (primRawSystem s)
+    case status of
+        0  -> return ExitSuccess
+        n  -> return (ExitFailure n)
+
+foreign import ccall "rawSystemCmd" unsafe primRawSystem :: CString -> IO Int
+
+#endif
+#endif
 \end{code}
