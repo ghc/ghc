@@ -291,7 +291,7 @@ BINDIST_DOC_WAYS = html ps
 # BINDIST_DOC_WAYS =
 
 binary-dist ::
-ifneq "$(DOCBOOK_CATALOG)" ""
+ifneq "$(DIR_DOCBOOK_XSL)" ""
 	@for i in $(BIN_DIST_DIRS); do 		 	 	\
 	  if test -d "$$i"; then 			 	\
 	    $(MAKE) -C $$i $(MFLAGS) $(BINDIST_DOC_WAYS); 	\
