@@ -6,7 +6,6 @@ tcfail032.hs:14:
       x :: a -> Int (bound at tcfail032.hs:14)
     Signature type:     forall a. (Eq a) => a -> Int
     Type to generalise: a -> Int
-    When checking an expression type signature
     In an expression with a type signature:
 	  x :: forall a. (Eq a) => a -> Int
     In the definition of `f': (x :: forall a. (Eq a) => a -> Int)

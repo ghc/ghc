@@ -6,6 +6,5 @@ tcfail076.hs:18:
       cont :: a -> m res1 (bound at tcfail076.hs:18)
     Signature type:     forall res. (a1 -> m1 res) -> m1 res
     Type to generalise: (b -> m res1) -> m res1
-    When checking an expression type signature
     In the first argument of `KContT', namely `(\ cont' -> cont a)'
     In a lambda abstraction: KContT (\ cont' -> cont a)

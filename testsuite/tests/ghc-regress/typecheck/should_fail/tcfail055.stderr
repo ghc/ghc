@@ -1,7 +1,7 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail055.hs:3:
-    Couldn't match `Int' against `Float'
-	Expected type: Int
-	Inferred type: Float
+tcfail055.hs:3:
+    Couldn't match `Float' against `Int'
+	Expected type: Float
+	Inferred type: Int
     In an expression with a type signature: x + 1 :: Int
     In an expression with a type signature: (x + 1 :: Int) :: Float

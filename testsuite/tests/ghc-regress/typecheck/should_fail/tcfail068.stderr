@@ -6,7 +6,6 @@ tcfail068.hs:12:
       which is free in the signature
     Signature type:     forall s. ST s a
     Type to generalise: ST s1 (IndTree s1 a1)
-    When checking an expression type signature
     In the first argument of `runST', namely
 	`(newSTArray ((1, 1), n) x)'
     In the definition of `itgen': runST (newSTArray ((1, 1), n) x)
@@ -18,7 +17,6 @@ tcfail068.hs:17:
       arr :: IndTree s1 a (bound at tcfail068.hs:17)
     Signature type:     forall s. ST s a1
     Type to generalise: ST s1 (IndTree s1 a)
-    When checking an expression type signature
     In the first argument of `runST', namely
 	`((readSTArray arr i)
 	  >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))'
@@ -37,7 +35,6 @@ tcfail068.hs:23:
       arr :: IndTree s1 a (bound at tcfail068.hs:23)
     Signature type:     forall s. ST s a1
     Type to generalise: ST s1 (IndTree s1 a)
-    When checking an expression type signature
     In the first argument of `runST', namely `(itrap' i k)'
     In the definition of `itrap': runST (itrap' i k)
 
@@ -52,6 +49,5 @@ tcfail068.hs:35:
       arr :: IndTree s1 b (bound at tcfail068.hs:35)
     Signature type:     forall s. ST s a
     Type to generalise: ST s1 (c, IndTree s1 b)
-    When checking an expression type signature
     In the first argument of `runST', namely `(itrapstate' i k s)'
     In the definition of `itrapstate': runST (itrapstate' i k s)

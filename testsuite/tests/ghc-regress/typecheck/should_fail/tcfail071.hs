@@ -2,9 +2,9 @@
 
 module ShouldFail where
 
-f :: (Ord c) => c -> c
+f :: (Ord d) => d -> d
 f c = g c
 
-g :: c -> c
+g :: e -> e
 g c = c
   where p = foldr (f c) [] []
