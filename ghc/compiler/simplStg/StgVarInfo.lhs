@@ -175,7 +175,7 @@ varsRhs scope_fv_info (binder, StgRhsClosure cc _ srt _ upd args body)
 	rhs_fvs		= body_fvs  `minusFVBinders` args
 	rhs_escs	= body_escs `minusVarSet`   set_of_args
 	binder_info     = lookupFVInfo scope_fv_info binder
-	upd'  | null args && isPAP body2 = SingleEntry
+	upd'  | null args && isPAP body2 = ReEntrant
 	      | otherwise                = upd
     in
     returnLne (StgRhsClosure cc binder_info srt (getFVs rhs_fvs) upd' 
