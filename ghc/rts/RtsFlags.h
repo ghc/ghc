@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.4 1999/01/19 15:07:55 simonm Exp $
+ * $Id: RtsFlags.h,v 1.5 1999/01/23 17:52:21 sof Exp $
  *
  * Datatypes that holds the command-line flag settings.
  *
@@ -221,7 +221,7 @@ struct TICKY_FLAGS {
 
 struct RTS_FLAGS {
     struct GC_FLAGS	GcFlags;
-    struct DEBUG_FLAGS	DebugFlags; /* unused at present */
+    struct DEBUG_FLAGS	DebugFlags;
     struct CONCURRENT_FLAGS ConcFlags;
 
 #if defined(PROFILING) || defined(PAR)
