@@ -193,8 +193,8 @@ GhcUnregisterised=NO
 # (as well as a C backend)
 #
 # Target platforms supported:
-#   i386 & sparc
-ifneq "$(findstring $(HostArch_CPP), i386 sparc)" ""
+#   i386, sparc & powerpc
+ifneq "$(findstring $(HostArch_CPP), i386 sparc powerpc)" ""
 GhcWithNativeCodeGen=YES
 else
 GhcWithNativeCodeGen=NO
