@@ -335,4 +335,4 @@ endif
 
 % : %.pp
 	@$(RM) $@
-	$(CPP) $(RAWCPP_FLAGS) $(CPP_OPTS) -x c $< | $(SED) -e '/^#[^i]/d' > $@
+	$(CPP) $(RAWCPP_FLAGS) -P $(CPP_OPTS) -x c $< > $@
