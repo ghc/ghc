@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.108 2002/12/04 23:41:15 dons Exp $
+dnl $Id: aclocal.m4,v 1.109 2002/12/11 16:37:16 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -761,130 +761,12 @@ AC_DEFINE(HAVE_O_BINARY)
 fi
 ])
 
-dnl *** Which one comes first, .text or .data? ***
-dnl 
-AC_DEFUN(FPTOOLS_CODE_BEFORE_DATA,
-[AC_CACHE_CHECK([if code section appears before data], fptools_cv_code_bef_data,
-[AC_TRY_RUN([
-int f() { return 1; }
-int i;
-int main() { return ((char*)&f > (char*)&i); }
-
-],
-fptools_cv_code_bef_data=yes, fptools_cv_code_bef_data=no,false)])
-if test "$fptools_cv_code_bef_data" = yes; then
-  AC_DEFINE(CODE_BEFORE_DATA)
-fi
-])
-
 dnl *** Helper function **
 dnl 
 AC_DEFUN(FPTOOLS_IN_SCOPE,
 [AC_TRY_LINK([extern char* $1;],[return (int)&$2], $3=yes, $3=no)
 ])
 
-dnl *** What's the end-of-text-section marker called? ***
-dnl
-AC_DEFUN([FPTOOLS_END_TEXT_SECTION],
-[AC_CACHE_CHECK([for end of text section marker],
-                [fptools_cv_end_of_text],
-		[fptools_cv_end_of_text=""
-		 not_done=1
-		 for i in data_start _data_start etext _etext __etext; do
-		   FPTOOLS_IN_SCOPE($i,$i,fptools_end_of_text)
-		   if test "$fptools_end_of_text" = yes; then
-		     fptools_cv_end_of_text=$i
-		     not_done=0
-		     break
-		   fi
-		 done
-		 if test "$not_done" = 1; then
-		   FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_end_of_text)
-		   if test "$fptools_end_of_text" = yes; then
-		     fptools_cv_end_of_text="etext"
-		   fi
-		 fi])
-		 if test -n "$fptools_cv_end_of_text"; then
-		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER], $fptools_cv_end_of_text)
-		 else
-		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER], dunno_end_of_text)
-		 fi
- AC_CACHE_CHECK([for end of text section marker declaration],
-		[fptools_cv_end_of_text_decl],
-		[fptools_cv_end_of_text_decl=""
-		 not_done=1
-		 for i in data_start _data_start etext _etext __etext; do
-		   FPTOOLS_IN_SCOPE($i,$i,fptools_end_of_text_decl)
-		   if test "$fptools_end_of_text_decl" = yes; then
-		     fptools_cv_end_of_text_decl=$i
-		     not_done=0
-		     break
-		   fi
-		 done
-		 if test "$not_done" = 1; then
-		   FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_end_of_text_decl)
-		   if test "$fptools_end_of_text_decl" = yes; then
-		     fptools_cv_end_of_text_decl="etext asm(\"etext\")"
-		   fi
-		 fi])
-		 if test -n "$fptools_cv_end_of_text_decl"; then
-		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER_DECL], $fptools_cv_end_of_text_decl)
-		 else
-		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER_DECL], dunno_end_of_text_decl)
-		 fi
-])		   
- 
-dnl *** What's the end-of-data-section marker called? ***
-dnl
-AC_DEFUN([FPTOOLS_END_DATA_SECTION],
-[AC_CACHE_CHECK([for end of data section marker],
-                [fptools_cv_end_of_data],
-		[fptools_cv_end_of_data=""
-		 not_done=1
-		 for i in end _end __end; do
-		   FPTOOLS_IN_SCOPE($i,$i,fptools_end_of_data)
-		   if test "$fptools_end_of_data" = yes; then
-		     fptools_cv_end_of_data=$i
-		     not_done=0
-		     break
-		   fi
-		 done
-		 if test "$not_done" = 1; then
-		   FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_end_of_data)
-		   if test "$fptools_end_of_data" = yes; then
-		     fptools_cv_end_of_data="end"
-		   fi
-		 fi])
-		 if test -n "$fptools_cv_end_of_data"; then
-		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER], $fptools_cv_end_of_data)
-		 else
-		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER], dunno_end_of_data)
-		 fi
- AC_CACHE_CHECK([for end of data section marker declaration],
-		[fptools_cv_end_of_data_decl],
-		[fptools_cv_end_of_data_decl=""
-		 not_done=1
-		 for i in end _end __end; do
-		   FPTOOLS_IN_SCOPE($i,$i,fptools_end_of_data_decl)
-		   if test "$fptools_end_of_data_decl" = yes; then
-		     fptools_cv_end_of_data_decl=$i
-		     not_done=0
-		     break
-		   fi
-		 done
-		 if test "$not_done" = 1; then
-		   FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_end_of_data_decl)
-		   if test "$fptools_end_of_data_decl" = yes; then
-		     fptools_cv_end_of_data_decl="end asm(\"end\")"
-		   fi
-		 fi])
-		 if test -n "$fptools_cv_end_of_data_decl"; then
-		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER_DECL], $fptools_cv_end_of_data_decl)
-		 else
-		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER_DECL], dunno_end_of_data_decl)
-		 fi
-])		   
- 
 
 dnl Based on AC_TRY_LINK - run iftrue if links cleanly with no warning
 

@@ -1226,15 +1226,6 @@ errprint(if you are using 2.13 or earlier, you may get a (harmless) warning mess
 dnl ** check for leading underscores in symbol names
 FPTOOLS_UNDERSCORE
 
-dnl ** how is the end of text section signalled?
-FPTOOLS_END_TEXT_SECTION
-
-dnl ** how is the end of data section signalled?
-FPTOOLS_END_DATA_SECTION
-
-dnl ** code before data?
-FPTOOLS_CODE_BEFORE_DATA
-
 dnl ** check for ld, and whether ld has -x option
 AC_PATH_PROG(LdCmdRaw, ld)
 case $HostOS_CPP in
