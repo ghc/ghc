@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LdvProfile.c,v 1.3 2002/12/11 15:36:42 simonmar Exp $
+ * $Id: LdvProfile.c,v 1.4 2003/01/30 10:06:35 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -42,6 +42,10 @@ LDV_recordDead_FILL_SLOP_DYNAMIC( StgClosure *p )
 {
     StgInfoTable *info;
     nat nw, i;
+
+#if defined(__GNUC__) && __GNUC__ < 3 && defined(DEBUG)
+#error Please use gcc 3.0+ to compile this file with DEBUG; gcc < 3.0 miscompiles it
+#endif
 
     if (era > 0) {
 	info = get_itbl((p));
