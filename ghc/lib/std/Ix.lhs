@@ -41,7 +41,7 @@ import PrelBase
 %*********************************************************
 
 \begin{code}
-class  ({-Show a,-} Ord a) => Ix a  where
+class  (Ord a) => Ix a  where
     range		:: (a,a) -> [a]
     index		:: (a,a) -> a -> Int
     inRange		:: (a,a) -> a -> Bool
@@ -56,16 +56,16 @@ class  ({-Show a,-} Ord a) => Ix a  where
 
 \begin{code}
 instance  Ix Char  where
-    range (c,c')
-      | c <= c'  	=  [c..c']
+    range (m,n)
+      | m <= n  	=  [m..n]
       | otherwise       =  []
-    index b@(c,_) ci
-	| inRange b ci	=  fromEnum ci - fromEnum c
-	| otherwise	=  indexError ci b "Char"
+    index b@(m,_) i
+	| inRange b i	=  fromEnum i - fromEnum m
+	| otherwise	=  indexError i b "Char"
     inRange (m,n) i	=  m <= i && i <= n
 
 instance  Ix Int  where
-    range (m,n)		
+    range (m,n)
       | m <= n	        =  [m..n]
       | otherwise       =  []
     index b@(m,_) i

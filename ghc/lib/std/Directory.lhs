@@ -20,7 +20,12 @@ are relative to the current directory.
 {-# OPTIONS -#include <sys/stat.h> -#include <dirent.h> -#include "cbits/stgio.h" #-}
 module Directory 
    ( 
-      Permissions(Permissions,readable,writable,executable,searchable)
+      Permissions               -- abstract
+      
+    , readable                  -- :: Permissions -> Bool
+    , writable                  -- :: Permissions -> Bool
+    , executable                -- :: Permissions -> Bool
+    , searchable                -- :: Permissions -> Bool
 
     , createDirectory		-- :: FilePath -> IO ()
     , removeDirectory		-- :: FilePath -> IO ()

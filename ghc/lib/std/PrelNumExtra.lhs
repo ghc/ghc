@@ -394,6 +394,7 @@ instance  Enum Double  where
     toEnum         =  fromIntegral
     fromEnum       =  fromInteger . truncate   -- may overflow
     enumFrom	   =  numericEnumFrom
+    enumFromTo     =  numericEnumFromTo
     enumFromThen   =  numericEnumFromThen
     enumFromThenTo =  numericEnumFromThenTo
 

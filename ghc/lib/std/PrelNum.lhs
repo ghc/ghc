@@ -276,7 +276,7 @@ instance  Enum Integer  where
 	                    where en' a b = a : en' (a + b) b
     enumFromTo n m
       | n <= m           =  takeWhile (<= m) (enumFrom n)
-      | otherwise        =  takeWhile (>= m) (enumFromThen n (n-1))
+      | otherwise        =  []
     enumFromThenTo n m p =  takeWhile pred   (enumFromThen n m)
 	    where
 	     pred | m >= n    = (<= p)

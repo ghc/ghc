@@ -377,7 +377,7 @@ instance  Enum Char  where
     enumFrom   (C# c)	       = efttCh (ord# c)  1#   (># 255#)
     enumFromTo (C# c1) (C# c2) 
         | c1 `leChar#` c2 = efttCh (ord# c1) 1#               (># (ord# c2))
-        | otherwise       = efttCh (ord# c1) (negateInt# 1#)  (<# (ord# c2))
+        | otherwise       = []
 
     enumFromThen (C# c1) (C# c2)
 	| c1 `leChar#` c2 = efttCh (ord# c1) (ord# c2 -# ord# c1) (># 255#)
@@ -521,8 +521,8 @@ instance  Enum Int  where
     enumFrom     (I# c)	= efttInt True c 1# (\ _ -> False)
 
     enumFromTo   (I# c1) (I# c2) 
-        | c1 <# c2  = efttInt True  c1 1#              (># c2)
-	| otherwise = efttInt False c1 (negateInt# 1#) (<# c2)
+        | c1 <=# c2 = efttInt True  c1 1#              (># c2)
+	| otherwise = []
 
     enumFromThen (I# c1) (I# c2) 
         | c1 <# c2  = efttInt True  c1 (c2 -# c1) (\ _ -> False)

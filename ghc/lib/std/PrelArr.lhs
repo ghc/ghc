@@ -128,7 +128,7 @@ array ixs ivs =
 	case (new_array_thing s)		of { (# s#, arr@(MutableArray _ arr#) #) ->
 	let
 	 fill_in s1# [] = s1#
-	 fill_in s1# ((i,v):is) =
+	 fill_in s1# ((i,v) : is) =
 		case (index ixs i)	        of { I# n# ->
 		case writeArray# arr# n# v s1#  of { s2# -> 
 		fill_in s2# is }}

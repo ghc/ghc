@@ -29,7 +29,7 @@ module Prelude (
     Either(..),
     Ordering(..), 
     Char, String, Int, Integer, Float, Double, IO,
-    Ratio, Rational, 
+    Rational,
     []((:), []),
     
     module PrelTup,
