@@ -437,7 +437,9 @@ ifeq "$(DLL_NAME)" ""
 DLL_NAME = $(patsubst %.a, %.dll, $(subst lib,,$(LIBRARY)))
 endif
 
+ifneq "$(DLL_NAME)" ""
 DLL_NAME := $(DLL_PEN)/$(DLL_NAME)
+endif
 
 all :: $(DLL_NAME)
 
