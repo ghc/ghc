@@ -25,12 +25,18 @@ tooquick_threshold
 devs   = OptDeviations   `elem` flags
 nodevs = OptNoDeviations `elem` flags
 
+default_title = "NoFib Results"
+reportTitle = case [ t | OptTitle t <- flags ] of
+        []    -> default_title
+        (t:_) -> t
+
 data CLIFlags
   = OptASCIIOutput
   | OptHTMLOutput
   | OptIgnoreSmallTimes Float
   | OptDeviations
   | OptNoDeviations
+  | OptTitle String
   | OptHelp
   deriving Eq
 
@@ -48,5 +54,7 @@ argInfo =
 	"Display deviations (default)"
   , Option ['n'] ["nodeviations"] (NoArg OptNoDeviations)
 	"Hide deviations"
+  , Option ['t'] ["title"] (ReqArg OptTitle "title")
+	"Specify report title"
   ]
 

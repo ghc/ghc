@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.3 2000/03/02 11:39:45 keithw Exp $
+-- $Id: Main.hs,v 1.4 2000/07/05 15:42:19 keithw Exp $
 
 -- (c) Simon Marlow 1997-1999
 -----------------------------------------------------------------------------
@@ -113,8 +113,9 @@ time_ok t = t > tooquick_threshold
 -- HTML page generation
 
 htmlPage results args
-   =  header [] (theTitle [] (htmlStr "NoFib Results"))
+   =  header [] (theTitle [] (htmlStr reportTitle))
 	  +++ bar []
+          +++ h1 [] (htmlStr reportTitle)
 	  +++ gen_menu
 	  +++ bar []
 	  +++ body [] (gen_tables results args)
@@ -131,7 +132,7 @@ gen_tables results args =
   +++ foldr1 (+++) (map (htmlGenModTable results args) per_module_result_tab)
 
 htmlGenProgTable results args (SpecP title anc get_result get_status result_ok)
-  =   sectHeading title anc 
+  =   sectHeading title anc
   +++ font [size 1] (
          mkTable (htmlShowResults results args get_result get_status result_ok))
   +++ bar []
@@ -279,7 +280,9 @@ hexDig i | i > 10 = chr (i-10 + ord 'a')
 -- ASCII page generation
 
 asciiPage results args =
-  ( interleave "\n\n" (map (asciiGenProgTable results args) per_prog_result_tab)
+  ( str reportTitle
+  . str "\n\n"
+  . interleave "\n\n" (map (asciiGenProgTable results args) per_prog_result_tab)
   . str "\n"
   . interleave "\n\n" (map (asciiGenModTable results args)  per_module_result_tab)
   ) "\n"
