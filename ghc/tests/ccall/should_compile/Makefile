@@ -10,5 +10,6 @@ SRC_HC_OPTS += -dcore-lint -fglasgow-exts
 cc004_HC_OPTS = -fvia-C
 cc005_HC_OPTS = -fvia-C
 cc006_HC_OPTS = -fvia-C -fno-prune-tydecls
+cc010_HC_OPTS = -fvia-C
 
 include $(TOP)/mk/target.mk
