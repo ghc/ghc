@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.17 2001/10/10 23:17:14 sof Exp $
+-- $Id: Main.hs,v 1.18 2001/12/13 00:59:57 sof Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -28,15 +28,19 @@ main = do
   args <- getArgs
 
   case getOpt Permute flags args of
-	(clis,[],[]) -> runit clis
+	(clis@(_:_),[],[]) -> runit clis
 	(_,_,errors) -> die (concat errors ++ 
 			     usageInfo usageHeader flags)
 
-data Flag = Config String | List | Add | Remove String | Show String 
-		| Field String | AutoGHCiLibs
+data Flag 
+  = Config FilePath
+  | Input FilePath
+  | List | Add | Remove String | Show String 
+  | Field String | AutoGHCiLibs
 
 isAction (Config _)     = False
 isAction (Field _)      = False
+isAction (Input _)      = False
 isAction (AutoGHCiLibs) = False
 isAction _              = True
 
@@ -49,6 +53,8 @@ flags = [
  	"List the currently installed packages",
   Option ['a'] ["add-package"] (NoArg Add)
  	"Add a new package",
+  Option ['i'] ["input-file"] (ReqArg Input "FILE")
+	"Read new package info from specified file",
   Option ['s'] ["show-package"] (ReqArg Show "NAME")
  	"Show the configuration for package NAME",
   Option [] ["field"] (ReqArg Field "FIELD")
@@ -98,10 +104,11 @@ runit clis = do
 
   let auto_ghci_libs = any isAuto clis 
 	 where isAuto AutoGHCiLibs = True; isAuto _ = False
+      input_file = head ([ f | (Input f) <- clis] ++ ["-"])
 
   case [ c | c <- clis, isAction c ] of
     [ List ]     -> listPackages details
-    [ Add  ]     -> addPackage details conf_file auto_ghci_libs
+    [ Add  ]     -> addPackage details conf_file input_file auto_ghci_libs 
     [ Remove p ] -> removePackage details conf_file p
     [ Show p ]   -> showPackage details conf_file p fields
     _            -> die (usageInfo usageHeader flags)
@@ -122,11 +129,17 @@ showPackage details pkgconf pkg_name fields =
 				(map (vcat . map text) (map ($pkg) fields))))
     _     -> die "showPackage: internal error"
 
-addPackage :: [PackageConfig] -> FilePath -> Bool -> IO ()
-addPackage details pkgconf auto_ghci_libs = do
+addPackage :: [PackageConfig] -> FilePath -> FilePath -> Bool -> IO ()
+addPackage details pkgconf inputFile auto_ghci_libs = do
   checkConfigAccess pkgconf
-  hPutStr stdout "Reading package info from stdin... "
-  s <- getContents
+  s <-
+    case inputFile of
+      "-" -> do
+	hPutStr stdout "Reading package info from stdin... "
+        getContents
+      f   -> do
+        hPutStr stdout ("Reading package info from " ++ show f)
+	readFile f
   let new_pkg = read s :: PackageConfig
   eval_catch new_pkg (\_ -> die "parse error in package info")
   hPutStrLn stdout "done."
