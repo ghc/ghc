@@ -539,6 +539,8 @@ def interpreter_run( name, way, extra_hc_opts, compile_only ):
         # can separate GHCi's output from the program's.
         script.write(':! echo ' + delimiter)
         script.write(':! echo 1>&2 ' + delimiter)
+        # Set stdout to be line-buffered to match the compiled environment.
+        script.write('System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
         # wrapping in GHC.TopHandler.runIO ensures we get the same output
         # in the event of an exception as for the compiled program.
         script.write('GHC.TopHandler.runIO Main.main\n')
