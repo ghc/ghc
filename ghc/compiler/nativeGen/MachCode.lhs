@@ -2792,8 +2792,8 @@ trivialCode instr x y
 			  src1  = registerName register1 dst
 		      in code1 .
 			 if isFixed register1 && src1 /= dst
-			 then mkSeqInstrs [MOV L (OpReg src1) (OpReg dst),
-					   instr (OpImm imm__2) (OpReg dst)]
+			 then mkSeqInstrs [MOV L (OpImm imm__2) (OpReg dst),
+					   instr (OpReg src1) (OpReg dst)]
 			 else
 				mkSeqInstr (instr (OpImm imm__2) (OpReg src1))
     in
