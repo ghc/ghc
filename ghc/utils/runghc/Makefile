@@ -15,4 +15,20 @@ SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
 # we must also build with $(GhcHcOpts) here:
 SRC_HC_OPTS += $(GhcHcOpts)
 
+# This is horrible.  We ought to be able to omit the entire directory
+# from mkDependHS.
+SRC_MKDEPENDHS_OPTS += \
+	-optdep--exclude-module=Compat.RawSystem \
+	-optdep--exclude-module=Compat.Directory \
+	-optdep--exclude-module=Distribution.Compat.ReadP \
+	-optdep--exclude-module=Distribution.Extension \
+	-optdep--exclude-module=Distribution.GetOpt \
+	-optdep--exclude-module=Distribution.InstalledPackageInfo \
+	-optdep--exclude-module=Distribution.License \
+	-optdep--exclude-module=Distribution.Package \
+	-optdep--exclude-module=Distribution.ParseUtils \
+	-optdep--exclude-module=Distribution.Setup \
+	-optdep--exclude-module=Distribution.Version \
+	-optdep--exclude-module=System.Directory.Internals
+
 include $(TOP)/mk/target.mk
