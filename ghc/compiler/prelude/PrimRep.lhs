@@ -124,6 +124,7 @@ isFollowableRep ForeignObjRep = True	-- 	''
 isFollowableRep StableNameRep = True    --      ''
 isFollowableRep PrimPtrRep    = True    --      ''
 isFollowableRep ThreadIdRep   = True	-- pointer to a TSO
+isFollowableRep BCORep        = True
 
 isFollowableRep other	      = False
 
