@@ -4,30 +4,3 @@ drv003.hs:15: Warning: no explicit method nor default method for `=='
  
 drv003.hs:12: Warning: no explicit method nor default method for `=='
 	      in an instance declaration for `Eq'
-ghc: module version changed to 1; reason: no old .hi file
-_interface_ ShouldSucceed 1
-_instance_modules_
-Addr ArrBase Foreign IO PrelBounded PrelNum
-_usages_
-PrelBase 1 :: $d13 1 $d2 1 $d26 1 $d29 1 $d31 1 $d33 1 $d38 1 $d7 1 $m/= 1 && 1 not 1 Eq 1 Eval 1;
-PrelNum 1 :: $d18 1;
-_exports_
-ShouldSucceed Bar(MkBar) Foo(MkFoo) Ping T(C1 C2 C3);
-_instances_
-instance _forall_ [b] {Ping b} => {PrelBase.Eq (Bar b)} = $d1;
-instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Foo a)} = $d2;
-instance _forall_ [a b] {PrelBase.Eq a, Ping a, PrelBase.Eq b, Ping b} => {PrelBase.Eq (T a b)} = $d3;
-instance _forall_ [a] => {PrelBase.Eval (Bar a)} = $d4;
-instance _forall_ [a] => {PrelBase.Eval (Foo a)} = $d5;
-instance _forall_ [a b] => {PrelBase.Eval (T a b)} = $d6;
-_declarations_
-1 $d1 _:_ _forall_ [b] {Ping b} => {PrelBase.Eq (Bar b)} ;;
-1 $d2 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Foo a)} ;;
-1 $d3 _:_ _forall_ [a b] {PrelBase.Eq a, Ping a, PrelBase.Eq b, Ping b} => {PrelBase.Eq (T a b)} ;;
-1 $d4 _:_ _forall_ [a] => {PrelBase.Eval (Bar a)} ;;
-1 $d5 _:_ _forall_ [a] => {PrelBase.Eval (Foo a)} ;;
-1 $d6 _:_ _forall_ [a b] => {PrelBase.Eval (T a b)} ;;
-1 data Bar a = MkBar PrelBase.Int PrelBase.Int ;
-1 data Foo a = MkFoo PrelBase.Double a ;
-1 class Ping a ;
-1 data T a b = C1 (Foo a) (Bar b) |  C2 PrelBase.Int (T b a) |  C3 (T a a) ;
