@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.25 2000/04/19 12:42:48 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.26 2000/08/03 11:28:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -76,7 +76,6 @@ struct COST_CENTRE_FLAGS {
 # define COST_CENTRES_ALL	3
 # define COST_CENTRES_XML       4
 
-    int	    ctxtSwitchTicks; /* derived */
     int	    profilerTicks;   /* derived */
     int	    msecsPerTick;    /* derived */
 };
@@ -111,7 +110,8 @@ struct PROFILING_FLAGS {
 #endif /* DEBUG || PROFILING */
 
 struct CONCURRENT_FLAGS {
-  int ctxtSwitchTime; /* in milliseconds */
+    int ctxtSwitchTime;		/* in milliseconds */
+    int ctxtSwitchTicks;	/* derived */
 };
 
 #ifdef PAR

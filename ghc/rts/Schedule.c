@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.73 2000/07/17 15:15:40 rrt Exp $
+ * $Id: Schedule.c,v 1.74 2000/08/03 11:28:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -850,8 +850,16 @@ schedule( void )
     
     cap->rCurrentTSO = t;
     
-    /* context switches are now initiated by the timer signal */
-    context_switch = 0;
+    /* context switches are now initiated by the timer signal, unless
+     * the user specified "context switch as often as possible", with
+     * +RTS -C0
+     */
+    if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0
+	&& (run_queue_hd != END_TSO_QUEUE
+	    || blocked_queue_hd != END_TSO_QUEUE))
+	context_switch = 1;
+    else
+	context_switch = 0;
 
     RELEASE_LOCK(&sched_mutex);
 
@@ -1588,6 +1596,9 @@ initScheduler(void)
 
   context_switch = 0;
   interrupted    = 0;
+
+  RtsFlags.ConcFlags.ctxtSwitchTicks =
+      RtsFlags.ConcFlags.ctxtSwitchTime / TICK_MILLISECS;
 
 #ifdef INTERPRETER
   ecafList = END_ECAF_LIST;

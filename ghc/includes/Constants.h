@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.12 2000/07/26 13:27:54 simonmar Exp $
+ * $Id: Constants.h,v 1.13 2000/08/03 11:28:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -193,13 +193,6 @@
 #define INFO_IND_TAG		(-2)
 #define INFO_FIRST_TAG		0
 
-/* -----------------------------------------------------------------------------
-   Context switch timing constants.
-   -------------------------------------------------------------------------- */
-
-#define CS_MAX_FREQUENCY 100              /* context switches per second */
-#define CS_MIN_MILLISECS (1000/CS_MAX_FREQUENCY)/* milliseconds per slice */
- 
 /* -----------------------------------------------------------------------------
    How much C stack to reserve for local temporaries when in the STG
    world.  Used in StgRun.S and StgCRun.c.

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.15 2000/07/17 15:09:35 rrt Exp $
+ * $Id: Itimer.c,v 1.16 2000/08/03 11:28:35 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -23,6 +23,7 @@
 #endif
 
 #include "Rts.h"
+#include "RtsFlags.h"
 #include "Itimer.h"
 #include "Proftimer.h"
 #include "Schedule.h"
@@ -44,6 +45,9 @@
 #endif
  
 lnat total_ticks = 0;
+
+/* ticks left before next pre-emptive context switch */
+int ticks_to_ctxt_switch = 0;
 
 static
 void
@@ -79,7 +83,11 @@ handle_tick(int unused STG_UNUSED)
   /* For threadDelay etc., see Select.c */
   ticks_since_select++;
 
-  context_switch = 1;
+  ticks_to_ctxt_switch--;
+  if (ticks_to_ctxt_switch <= 0) {
+      ticks_to_ctxt_switch = RtsFlags.ConcFlags.ctxtSwitchTicks;
+      context_switch = 1;	/* schedule a context switch */
+  }
 }
 
 
@@ -133,6 +141,7 @@ initialize_virtual_timer(nat ms)
  		0,
  		TIME_PERIODIC);
 # endif
+
   return 0;
 }
  

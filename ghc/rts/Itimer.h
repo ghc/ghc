@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.h,v 1.5 2000/03/20 09:42:49 andy Exp $
+ * $Id: Itimer.h,v 1.6 2000/08/03 11:28:35 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -10,6 +10,11 @@
 # define TICK_FREQUENCY   50                      /* ticks per second */
 # define TICK_MILLISECS   (1000/TICK_FREQUENCY)   /* ms per tick */
 
+/* Context switch timing constants. Context switches happen after a
+ * whole number of ticks, the default being every tick.
+ */
+#define CS_MIN_MILLISECS TICK_MILLISECS       /* milliseconds per slice */
+ 
 extern rtsBool do_prof_ticks;	/* profiling ticks on/off */
 
 nat  initialize_virtual_timer  ( nat ms );

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.30 2000/04/19 12:42:48 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.31 2000/08/03 11:28:35 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -25,6 +25,7 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
+#include "Itimer.h"		/* CS_MIN_MILLISECS */
 #include "Profiling.h"
 
 #if defined(PROFILING) 
@@ -266,7 +267,6 @@ void initRtsFlagsDefaults(void)
 
 #if defined(GRAN)
     /* ToDo: check defaults for GranSim and GUM */
-    RtsFlags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
     RtsFlags.GcFlags.maxStkSize		= (1024 * 1024) / sizeof(W_);
     RtsFlags.GcFlags.initialStkSize	= 1024 / sizeof(W_);
 
@@ -402,7 +402,7 @@ usage_text[] = {
 #endif
 "  -C<secs>  Context-switch interval in seconds",
 "                (0 or no argument means switch as often as possible)",
-"                the default is .01 sec; resolution is .01 sec",
+"                the default is .02 sec; resolution is .02 sec",
 #if defined(SMP)
 "  -N<n>     Use <n> OS threads (default: 1)",
 #endif
@@ -742,7 +742,7 @@ error = rtsTrue;
 		    /* Convert to milliseconds */
 		    cst = (I_) ((atof(rts_argv[arg]+2) * 1000));
 		    cst = (cst / CS_MIN_MILLISECS) * CS_MIN_MILLISECS;
-		    if (cst < CS_MIN_MILLISECS)
+		    if (cst != 0 && cst < CS_MIN_MILLISECS)
 			cst = CS_MIN_MILLISECS;
 
 		    RtsFlags.ConcFlags.ctxtSwitchTime = cst;
