@@ -108,9 +108,10 @@ type LocalFindResult = MaybeErr [FilePath] FinderCacheEntry
 	-- return a more informative type; it's munged into
 	-- the external FindResult by 'cached'
 
-cached :: (DynFlags -> Module -> IO LocalFindResult)
+cached :: Bool
+       -> (DynFlags -> Module -> IO LocalFindResult)
        -> DynFlags -> Module -> Bool -> IO FindResult
-cached wrapped_fn dflags name explicit 
+cached home_allowed wrapped_fn dflags name explicit 
   = do	{ 	-- First try the cache
 	  mb_entry <- lookupFinderCache name
 	; case mb_entry of {
@@ -128,7 +129,9 @@ cached wrapped_fn dflags name explicit
 	-- We've found the module, so the remaining question is
 	-- whether it's visible or not
     found :: FinderCacheEntry -> FindResult
-    found (loc, Nothing)		= Found loc HomePackage
+    found (loc, Nothing)
+	| home_allowed  = Found loc HomePackage
+	| otherwise     = NotFound []
     found (loc, Just (pkg, exposed_mod))
 	| explicit && not exposed_mod   = ModuleHidden pkg_name
 	| explicit && not (exposed pkg) = PackageHidden pkg_name
@@ -145,10 +148,10 @@ addHomeModuleToFinder mod loc = addToFinderCache mod (loc, Nothing)
 
 
 findModule :: DynFlags -> Module -> Bool -> IO FindResult
-findModule = cached findModule' 
+findModule = cached True findModule' 
   
 findPackageModule :: DynFlags -> Module -> Bool -> IO FindResult
-findPackageModule = cached findPackageModule'
+findPackageModule = cached False findPackageModule'
 
 -- -----------------------------------------------------------------------------
 -- 	The internal workers
