@@ -9,7 +9,7 @@ module Inst (
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 
 	Inst, 
-	pprInst, pprInsts, pprInstsInFull, tidyInsts,
+	pprInst, pprInsts, pprInstsInFull, tidyInsts, tidyMoreInsts,
 
 	newDictsFromOld, newDicts, 
 	newMethod, newMethodWithGivenTy, newOverloadedLit,
@@ -99,7 +99,7 @@ zonkLIE :: LIE -> NF_TcM LIE
 zonkLIE lie = mapBagNF_Tc zonkInst lie
 
 pprInsts :: [Inst] -> SDoc
-pprInsts insts = parens (sep (punctuate comma (map pprInst insts)))
+pprInsts insts  = parens (sep (punctuate comma (map pprInst insts)))
 
 
 pprInstsInFull insts
@@ -532,13 +532,16 @@ tidyInst env (LitInst u lit ty loc) 	     = LitInst u lit (tidyType env ty) loc
 tidyInst env (Dict u pred loc)     	     = Dict u (tidyPred env pred) loc
 tidyInst env (Method u id tys theta tau loc) = Method u id (tidyTypes env tys) theta tau loc
 
-tidyInsts :: [Inst] -> (TidyEnv, [Inst])
+tidyMoreInsts :: TidyEnv -> [Inst] -> (TidyEnv, [Inst])
 -- This function doesn't assume that the tyvars are in scope
 -- so it works like tidyOpenType, returning a TidyEnv
-tidyInsts insts 
-  = (env, map (tidyInst env) insts)
+tidyMoreInsts env insts
+  = (env', map (tidyInst env') insts)
   where
-    env = tidyFreeTyVars emptyTidyEnv (tyVarsOfInsts insts)
+    env' = tidyFreeTyVars env (tyVarsOfInsts insts)
+
+tidyInsts :: [Inst] -> (TidyEnv, [Inst])
+tidyInsts insts = tidyMoreInsts emptyTidyEnv insts
 \end{code}
 
 
@@ -648,5 +651,3 @@ lookupSimpleInst clas tys
 
       other  -> returnNF_Tc Nothing
 \end{code}
-
-

@@ -31,7 +31,7 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  instBindingRequired, instCanBeGeneralised,
 			  newDictsFromOld, instMentionsIPs,
 			  getDictClassTys, isTyVarDict,
-			  instLoc, pprInst, zonkInst, tidyInsts,
+			  instLoc, pprInst, zonkInst, tidyInsts, tidyMoreInsts,
 			  Inst, LIE, pprInsts, pprInstsInFull,
 			  mkLIE, lieToList
 			)
@@ -685,15 +685,6 @@ tcSimplCheck doc is_free get_qtvs givens wanted_lie
     	else
  	    check_loop givens' (irreds ++ frees) 	`thenTc` \ (qtvs', frees1, binds1, irreds1) ->
  	    returnTc (qtvs', frees1, binds `AndMonoBinds` binds1, irreds1)
-
-complainCheck doc givens irreds
-  = mapNF_Tc zonkInst given_dicts			`thenNF_Tc` \ givens' ->
-    mapNF_Tc (addNoInstanceErr doc given_dicts) irreds	`thenNF_Tc_`
-    returnTc ()
-  where
-    given_dicts = filter isDict givens
-	-- Filter out methods, which are only added to
-	-- the given set as an optimisation
 \end{code}
 
 
@@ -1691,26 +1682,47 @@ from the insts, or just whatever seems to be around in the monad just
 now?
 
 \begin{code}
+groupInsts :: [Inst] -> [[Inst]]
+-- Group together insts with the same origin
+-- We want to report them together in error messages
+groupInsts [] 		= []
+groupInsts (inst:insts) = (inst:friends) : groupInsts others
+			where
+				-- (It may seem a bit crude to compare the error messages,
+				--  but it makes sure that we combine just what the user sees,
+				--  and it avoids need equality on InstLocs.)
+			  (friends, others) = partition is_friend insts
+			  loc_msg	    = showSDoc (pprInstLoc (instLoc inst))
+			  is_friend friend  = showSDoc (pprInstLoc (instLoc friend)) == loc_msg
+
+
 addTopAmbigErrs dicts
-  = mapNF_Tc complain tidy_dicts
+  = mapNF_Tc (addTopInstanceErrs tidy_env) (groupInsts no_insts)	`thenNF_Tc_`
+    mapNF_Tc (addTopIPErrs tidy_env)       (groupInsts bad_ips)		`thenNF_Tc_`
+    mapNF_Tc (addAmbigErr tidy_env)	   ambigs			`thenNF_Tc_`
+    returnNF_Tc ()
   where
     fixed_tvs = oclose (predsOfInsts tidy_dicts) emptyVarSet
     (tidy_env, tidy_dicts) = tidyInsts dicts
-    complain d | any isIPPred (predsOfInst d)	      = addTopIPErr tidy_env d
-	       | not (isTyVarDict d) ||
-	         tyVarsOfInst d `subVarSet` fixed_tvs = addTopInstanceErr tidy_env d
-	       | otherwise			      = addAmbigErr tidy_env d
+    (bad_ips, non_ips)     = partition is_ip tidy_dicts
+    (no_insts, ambigs)     = partition no_inst non_ips
+    is_ip d   = any isIPPred (predsOfInst d)
+    no_inst d = not (isTyVarDict d) || tyVarsOfInst d `subVarSet` fixed_tvs
 
-addTopIPErr tidy_env tidy_dict
-  = addInstErrTcM (instLoc tidy_dict)
+plural [x] = empty
+plural xs  = char 's'
+
+addTopIPErrs tidy_env tidy_dicts
+  = addInstErrTcM (instLoc (head tidy_dicts))
 	(tidy_env,
-	 ptext SLIT("Unbound implicit parameter") <+> quotes (pprInst tidy_dict))
+	 ptext SLIT("Unbound implicit parameter") <> plural tidy_dicts <+> pprInsts tidy_dicts)
 
 -- Used for top-level irreducibles
-addTopInstanceErr tidy_env tidy_dict
-  = addInstErrTcM (instLoc tidy_dict)
+addTopInstanceErrs tidy_env tidy_dicts
+  = addInstErrTcM (instLoc (head tidy_dicts))
 	(tidy_env,
-	 ptext SLIT("No instance for") <+> quotes (pprInst tidy_dict))
+	 ptext SLIT("No instance") <> plural tidy_dicts <+> 
+	 	ptext SLIT("for") <+> pprInsts tidy_dicts)
 
 addAmbigErrs dicts
   = mapNF_Tc (addAmbigErr tidy_env) tidy_dicts
@@ -1736,15 +1748,22 @@ warnDefault dicts default_ty
 				quotes (ppr default_ty),
 		      pprInstsInFull tidy_dicts]
 
--- The error message when we don't find a suitable instance
--- is complicated by the fact that sometimes this is because
--- there is no instance, and sometimes it's because there are
--- too many instances (overlap).  See the comments in TcEnv.lhs
--- with the InstEnv stuff.
-addNoInstanceErr what_doc givens dict
+complainCheck doc givens irreds
+  = mapNF_Tc zonkInst given_dicts			 	  `thenNF_Tc` \ givens' ->
+    mapNF_Tc (addNoInstanceErrs doc givens') (groupInsts irreds)  `thenNF_Tc_`
+    returnNF_Tc ()
+  where
+    given_dicts = filter isDict givens
+	-- Filter out methods, which are only added to
+	-- the given set as an optimisation
+
+addNoInstanceErrs what_doc givens dicts
   = tcGetInstEnv	`thenNF_Tc` \ inst_env ->
     let
-    	doc = vcat [sep [herald <+> quotes (pprInst tidy_dict),
+    	(tidy_env1, tidy_givens) = tidyInsts givens
+	(tidy_env2, tidy_dicts)  = tidyMoreInsts tidy_env1 dicts
+
+    	doc = vcat [sep [herald <+> pprInsts tidy_dicts,
 			 nest 4 $ ptext SLIT("from the context") <+> pprInsts tidy_givens],
 		    ambig_doc,
 		    ptext SLIT("Probable fix:"),
@@ -1755,35 +1774,43 @@ addNoInstanceErr what_doc givens dict
     	unambig_doc | ambig_overlap = ptext SLIT("unambiguously")
 		    | otherwise     = empty
 
+		-- The error message when we don't find a suitable instance
+		-- is complicated by the fact that sometimes this is because
+		-- there is no instance, and sometimes it's because there are
+		-- too many instances (overlap).  See the comments in TcEnv.lhs
+		-- with the InstEnv stuff.
+
     	ambig_doc
 	    | not ambig_overlap = empty
 	    | otherwise
 	    = vcat [ptext SLIT("The choice of (overlapping) instance declaration"),
 		    nest 4 (ptext SLIT("depends on the instantiation of") <+>
-			    quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst tidy_dict))))]
+			    quotes (pprWithCommas ppr (varSetElems (tyVarsOfInsts tidy_dicts))))]
 
-    	fix1 = sep [ptext SLIT("Add") <+> quotes (pprInst tidy_dict),
+    	fix1 = sep [ptext SLIT("Add") <+> pprInsts tidy_dicts,
 		    ptext SLIT("to the") <+> what_doc]
 
-    	fix2 | isTyVarDict dict
-	     || not (isClassDict dict)	-- Don't suggest adding instance declarations for implicit parameters
-	     || ambig_overlap
+    	fix2 | null instance_dicts 
 	     = empty
 	     | otherwise
-	     = ptext SLIT("Or add an instance declaration for") <+> quotes (pprInst tidy_dict)
+	     = ptext SLIT("Or add an instance declaration for") <+> pprInsts instance_dicts
 
-    	(tidy_env, tidy_dict:tidy_givens) = tidyInsts (dict:givens)
+	instance_dicts = [d | d <- tidy_dicts, isClassDict d, not (isTyVarDict d)]
+		-- Insts for which it is worth suggesting an adding an instance declaration
+		-- Exclude implicit parameters, and tyvar dicts
 
 	    -- Checks for the ambiguous case when we have overlapping instances
-    	ambig_overlap | isClassDict dict
-		      = case lookupInstEnv inst_env clas tys of
+	ambig_overlap = any ambig_overlap1 dicts
+    	ambig_overlap1 dict 
+		| isClassDict dict
+		= case lookupInstEnv inst_env clas tys of
 			    NoMatch ambig -> ambig
 			    other 	  -> False
-		      | otherwise = False
-		      where
-    			(clas,tys) = getDictClassTys dict
+		| otherwise = False
+		where
+    		  (clas,tys) = getDictClassTys dict
     in
-    addInstErrTcM (instLoc dict) (tidy_env, doc)
+    addInstErrTcM (instLoc (head dicts)) (tidy_env2, doc)
 
 -- Used for the ...Thetas variants; all top level
 addNoInstErr pred
