@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.4 2001/01/12 17:04:00 simonmar Exp $
+-- $Id: Time.hsc,v 1.5 2001/01/14 15:36:04 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -468,7 +468,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec
         -- result.
         -- 
         gmtoff <- gmtoff p_tm
-	let res = fromIntegral t + tz + fromIntegral gmtoff
+	let res = fromIntegral t + tz - fromIntegral gmtoff
 	return (TOD (fromIntegral res) 0)
 
 -- -----------------------------------------------------------------------------
