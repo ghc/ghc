@@ -35,9 +35,7 @@ module System.IO (
     hGetPosn,		       -- :: Handle -> IO HandlePosn
     hSetPosn,		       -- :: HandlePosn -> IO ()
     hSeek,		       -- :: Handle -> SeekMode -> Integer -> IO ()
-#ifndef __HUGS__
     hTell,		       -- :: Handle -> IO Integer
-#endif
     hWaitForInput,	       -- :: Handle -> Int -> IO Bool
     hReady,		       -- :: Handle -> IO Bool
     hGetChar,		       -- :: Handle -> IO Char
