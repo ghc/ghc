@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.7 2000/01/13 14:34:04 hwloidl Exp $
+ * $Id: RtsUtils.h,v 1.8 2000/03/16 17:23:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -16,9 +16,6 @@ extern void belch(char *s, ...);
 extern void prog_belch(char *s, ...);
 
 extern void _stgAssert (char *filename, unsigned int linenum);
-
-extern StgStablePtr errorHandler;
-extern void raiseError( StgStablePtr handler );
 
 extern void stackOverflow(void);
 extern void heapOverflow(void);
