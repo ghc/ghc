@@ -1,0 +1,6 @@
+
+tcfail105.hs:8:
+    All of the type variables in the constraint `Monad m' are already in scope
+	(at least one must be universally quantified here)
+    When checking the existential context of constructor `M'
+    In the data type declaration for `M'
