@@ -67,7 +67,7 @@ par, fork :: Eval a => a -> b -> b
 {-# INLINE par  #-}
 {-# INLINE fork #-}
 
-#ifdef __CONCURRENT_HASKELL__
+#if defined(__PARALLEL_HASKELL__) || defined (__GRANSIM__)
 par  x y = case (par#  x) of { 0# -> parError; _ -> y }
 fork x y = case (fork# x) of { 0# -> parError; _ -> y }
 #else

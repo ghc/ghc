@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 1997/05/27 05:58:46 sof Exp $
+# $Id: Makefile,v 1.8 1997/07/21 12:00:03 andre Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -237,7 +237,7 @@ endif
 
 gum/SysMan : gum/SysMan.mp_o gum/LLComms.mp_o main/Mallocs.o hooks/OutOfVM.o
 	$(RM) $@
-	$(HC) $(HC_OPTS) -o $@ gum/SysMan.mp_o gum/LLComms.mp_o main/Mallocs.o hooks/OutOfVM.o -L$$PVM_ROOT/lib/$$PVM_ARCH -lpvm3 -lgpvm3 $(__socket_libs)
+	gcc -o $@ gum/SysMan.mp_o gum/LLComms.mp_o main/Mallocs.o hooks/OutOfVM.o -L$$PVM_ROOT/lib/$$PVM_ARCH -lpvm3 -lgpvm3 $(__socket_libs)
 
 CLEAN_FILES  += gum/SysMan.mp_o gum/SysMan
 INSTALL_LIBS += gum/SysMan
