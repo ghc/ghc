@@ -46,6 +46,8 @@ module Util (
 
 	-- module names
 	looksLikeModuleName,
+	
+	toArgs
     ) where
 
 #include "../includes/config.h"
@@ -66,7 +68,7 @@ import qualified List	( elem, notElem )
 import List		( zipWith4 )
 #endif
 
-import Char		( isUpper, isAlphaNum )
+import Char		( isUpper, isAlphaNum, isSpace )
 
 infixr 9 `thenCmp`
 \end{code}
@@ -796,4 +798,29 @@ looksLikeModuleName (c:cs) = isUpper c && go cs
   where go [] = True
 	go ('.':cs) = looksLikeModuleName cs
 	go (c:cs)   = (isAlphaNum c || c == '_') && go cs
+\end{code}
+
+Akin to @Prelude.words@, but sensitive to dquoted entities treating
+them as single words.
+
+\begin{code}
+toArgs :: String -> [String]
+toArgs "" = []
+toArgs s  =
+  case break (\ ch -> isSpace ch || ch == '"') (dropWhile isSpace s) of -- "
+    (w,aft) ->
+       (\ ws -> if null w then ws else w : ws) $
+       case aft of
+	 []           -> []
+	 (x:xs)
+	   | x /= '"'  -> toArgs xs
+	   | otherwise ->
+             case lex aft of
+	       ((str,rs):_) -> stripQuotes str : toArgs rs
+	       _            -> [aft]
+ where
+    -- strip away dquotes; assume first and last chars contain quotes.
+   stripQuotes :: String -> String
+   stripQuotes ('"':xs)  = init xs
+   stripQuotes xs        = xs
 \end{code}

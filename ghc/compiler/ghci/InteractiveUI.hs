@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.143 2003/02/12 15:01:35 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.144 2003/02/13 01:50:04 sof Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -88,14 +88,14 @@ GLOBAL_VAR(commands, builtin_commands, [(String, String -> GHCi Bool)])
 
 builtin_commands :: [(String, String -> GHCi Bool)]
 builtin_commands = [
-  ("add",	keepGoing addModule),
+  ("add",	keepGoingPaths addModule),
   ("browse",    keepGoing browseCmd),
   ("cd",    	keepGoing changeDirectory),
   ("def",	keepGoing defineMacro),
   ("help",	keepGoing help),
   ("?",		keepGoing help),
   ("info",      keepGoing info),
-  ("load",	keepGoing loadModule),
+  ("load",	keepGoingPaths loadModule),
   ("module",	keepGoing setContext),
   ("reload",	keepGoing reloadModule),
   ("set",	keepGoing setCmd),
@@ -108,6 +108,9 @@ builtin_commands = [
 
 keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
 keepGoing a str = a str >> return False
+
+keepGoingPaths :: ([FilePath] -> GHCi ()) -> (String -> GHCi Bool)
+keepGoingPaths a str = a (toArgs str) >> return False
 
 shortHelpText = "use :? for help.\n"
 
@@ -227,7 +230,7 @@ runGHCi paths dflags = do
   -- perform a :load for files given on the GHCi command line
   when (not (null paths)) $
      ghciHandle showException $
-	loadModule (unwords paths)
+	loadModule paths
 
   -- enter the interactive loop
 #if defined(mingw32_TARGET_OS)
@@ -527,9 +530,8 @@ info s = do
   setCmState cms
   return ()
 
-addModule :: String -> GHCi ()
-addModule str = do
-  let files = words str
+addModule :: [FilePath] -> GHCi ()
+addModule files = do
   state <- getGHCiState
   dflags <- io (getDynFlags)
   io (revertCAFs)			-- always revert CAFs on load/add.
@@ -591,11 +593,11 @@ undefineMacro macro_name = do
   io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
 
 
-loadModule :: String -> GHCi ()
-loadModule str = timeIt (loadModule' str)
+loadModule :: [FilePath] -> GHCi ()
+loadModule fs = timeIt (loadModule' fs)
 
-loadModule' str = do
-  let files = words str
+loadModule' :: [FilePath] -> GHCi ()
+loadModule' files = do
   state <- getGHCiState
   dflags <- io getDynFlags
 
