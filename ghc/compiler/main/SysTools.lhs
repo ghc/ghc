@@ -55,20 +55,13 @@ import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
 import System		( system, ExitCode(..), exitWith )
-import CString
-import CTypes
-import Int
-import Ptr
-import MarshalAlloc
-import MarshalArray
-import Storable
     
 #include "../includes/config.h"
 
 #if !defined(mingw32_TARGET_OS)
 import qualified Posix
 #else
-import Addr
+import Win32Registry
 import List		( isPrefixOf )
 #endif
 
@@ -688,25 +681,11 @@ slash s1 s2 = s1 ++ ('/' : s2)
 -----------------------------------------------------------------------------
 -- Define	getExecDir     :: IO (Maybe String)
 
-#if defined(mingw32_TARGET_OS) && __GLASGOW_HASKELL__ >= 500
-foreign import stdcall "RegQueryValueExA" regQueryValue :: Addr -> CString -> Addr -> Addr -> Ptr CChar -> Ptr Int32 -> IO Int32
-foreign import stdcall "RegQueryValueExA" regQueryValueLen :: Addr -> CString -> Addr -> Addr -> Addr -> Ptr Int32 -> IO Int32
-foreign import stdcall "RegOpenKeyExA" regOpenKey :: Int32 -> CString -> Int32 -> Int32 -> Ptr Addr -> IO Int32
+#if defined(mingw32_TARGET_OS)
 getExecDir :: IO (Maybe String)
-getExecDir = do alloca $ \ p_len -> do
-		alloca $ \ p_hKey -> do
-		withCString "SOFTWARE\\University of Glasgow\\Glasgow Haskell Compiler\\ghc-5.01" $ \ name ->
-                    regOpenKey 0x80000002 {-HKEY_LOCAL_MACHINE-} name 0 1 {-KEY_QUERY_VALUE-} p_hKey
-                hKey <- peek p_hKey
-		withCString "InstallDir" $ \ key -> do
-		    regQueryValueLen hKey key nullAddr nullAddr nullAddr p_len
-		    len <- peek p_len
-		    buf <- mallocArray (fromIntegral len)
-		    ret <- regQueryValue hKey key nullAddr nullAddr buf p_len
-		    if ret /= 0 then return Nothing
-		       else do s <- peekCString buf
-			       destructArray (fromIntegral len) buf
-			       return (Just s)
+getExecDir = do hKey <- regOpenKey hKEY_LOCAL_MACHINE "SOFTWARE\\University of Glasgow\\Glasgow Haskell Compiler\\ghc-5.01"
+                s <- regQueryValue hKey (Just "InstallDir")
+		if s == "" then return Nothing else return (Just s)
 #else
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif
