@@ -325,9 +325,6 @@ getTopDir :: [String]
 
 getTopDir minusbs
   = do { top_dir <- get_proto
-       ; print top_dir
-       ; if "/ghc/compiler" `isSuffixOf` top_dir then print (remove_suffix top_dir) else print "not"
-
         -- Discover whether we're running in a build tree or in an installation,
 	-- by looking for the package configuration file.
        ; am_installed <- doesFileExist (top_dir `slash` "package.conf")
