@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.120 2002/04/18 11:27:59 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.121 2002/04/24 09:42:18 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -1063,7 +1063,7 @@ linkPackages dflags cmdline_lib_specs pkgs
 
 -- Packages that don't need loading, because the compiler shares them with
 -- the interpreted program.
-dont_load_these = [ "gmp", "rts" ]
+dont_load_these = [ "rts" ]
 
 -- Packages that are already linked into GHCi.  For mingw32, we only
 -- skip gmp and rts, since std and after need to load the msvcrt.dll
