@@ -64,10 +64,6 @@ import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool )
 import Constants
 import List		( partition, intersperse )
-
-#if __GLASGOW_HASKELL__ >= 404
-import GlaExts		( fromInt )
-#endif
 \end{code}
 
 %************************************************************************
@@ -1034,12 +1030,12 @@ getLRPrecs is_infix get_fixity nm = [lp, rp]
       | otherwise       = paren_con_prec + 1
 		  
 defaultPrecedence :: Integer
-defaultPrecedence = fromInt maxPrecedence
+defaultPrecedence = fromIntegral maxPrecedence
 
 getPrecedence :: FixityEnv -> Name -> Integer
 getPrecedence get_fixity nm 
    = case lookupFixity get_fixity nm of
-        Fixity x _ -> fromInt x
+        Fixity x _ -> fromIntegral x
 
 isLRAssoc :: FixityEnv -> Name -> (Bool, Bool)
 isLRAssoc get_fixity nm =
