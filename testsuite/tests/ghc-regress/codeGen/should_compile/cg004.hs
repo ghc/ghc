@@ -20,7 +20,9 @@ class ScopeOpers s where
 
 data Scope v = NewScope 
 
-instance ScopeOpers (Scope v)
+instance ScopeOpers (Scope v) where
+      emptyScope = error "emptyScope"
+      op = error "op"
 
 newtype SymbolTable v = SymbolTable [Scope v]
 
