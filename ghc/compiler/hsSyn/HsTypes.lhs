@@ -30,7 +30,7 @@ import Type		( Type, Kind, PredType(..), UsageAnn(..), ClassContext,
 			  getTyVar_maybe, splitSigmaTy, unUsgTy, boxedTypeKind
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
-import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity, tyConClass_maybe )
+import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity )
 import RdrName		( RdrName )
 import Name		( toRdrName )
 import OccName		( NameSpace )

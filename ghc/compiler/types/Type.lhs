@@ -98,7 +98,7 @@ import TyCon	( TyCon,
 		  isFunTyCon, isDataTyCon, isNewTyCon, newTyConRep,
 		  isAlgTyCon, isSynTyCon, tyConArity,
 	          tyConKind, tyConDataCons, getSynTyConDefn,
-		  tyConPrimRep, tyConClass_maybe
+		  tyConPrimRep
 		)
 
 -- others

@@ -34,7 +34,7 @@ module TyCon(
 	tyConTheta,
 	tyConPrimRep,
 	tyConArity,
-	tyConClass_maybe,
+	isClassTyCon,
 	getSynTyConDefn,
 
         maybeTyConSingleCon,
@@ -110,10 +110,7 @@ data TyCon
 	algTyConRec     :: RecFlag,		-- Tells whether the data type is part of 
 						-- a mutually-recursive group or not
 
-	algTyConClass_maybe :: Maybe Class	-- Nothing for ordinary types; 
-						-- Just c for the type constructor
-						-- for dictionaries of class c.
-
+	algTyConClass :: Bool		-- True if this tycon comes from a class declaration
     }
 
   | PrimTyCon {		-- Primitive types; cannot be defined in Haskell
@@ -232,7 +229,7 @@ mkAlgTyCon name kind tyvars theta argvrcs cons ncons derivs flavour rec
 	dataCons		= cons, 
 	noOfDataCons		= ncons,
 	algTyConDerivings	= derivs,
-	algTyConClass_maybe	= Nothing,
+	algTyConClass		= False,
 	algTyConFlavour 	= flavour,
 	algTyConRec		= rec
     }
@@ -249,7 +246,7 @@ mkClassTyCon name kind tyvars argvrcs con clas flavour
 	dataCons		= [con],
 	noOfDataCons		= 1,
 	algTyConDerivings	= [],
-	algTyConClass_maybe	= Just clas,
+	algTyConClass		= True,
 	algTyConFlavour		= flavour,
 	algTyConRec		= NonRecursive
     }
@@ -429,9 +426,9 @@ maybeTyConSingleCon tc = pprPanic "maybeTyConSingleCon: unexpected tycon " $
 \end{code}
 
 \begin{code}
-tyConClass_maybe :: TyCon -> Maybe Class
-tyConClass_maybe (AlgTyCon {algTyConClass_maybe = maybe_cls}) = maybe_cls
-tyConClass_maybe other_tycon			              = Nothing
+isClassTyCon :: TyCon -> Bool
+isClassTyCon (AlgTyCon {algTyConClass = is_class_tycon}) = is_class_tycon
+isClassTyCon other_tycon			         = False
 \end{code}
 
 

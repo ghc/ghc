@@ -199,9 +199,8 @@ checkPat e [] = case e of
 	ExplicitList es	   -> mapP (\e -> checkPat e []) es `thenP` \ps ->
 			      returnP (ListPatIn ps)
 
-	ExplicitTuple es Boxed -> mapP (\e -> checkPat e []) es `thenP` \ps ->
-			          returnP (TuplePatIn ps Boxed)
-		-- Unboxed tuples are illegal in patterns
+	ExplicitTuple es b -> mapP (\e -> checkPat e []) es `thenP` \ps ->
+			      returnP (TuplePatIn ps b)
 
 	RecordCon c fs     -> mapP checkPatField fs `thenP` \fs ->
 			      returnP (RecPatIn c fs)

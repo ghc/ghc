@@ -48,7 +48,7 @@ import Name		( nameOccName, isLocallyDefined, isGlobalName,
 			  toRdrName, nameEnvElts, 
 			)
 import OccName		( isSysOcc )
-import TyCon		( TyCon, tyConClass_maybe )
+import TyCon		( TyCon, isClassTyCon )
 import Class		( Class )
 import PrelNames	( mAIN_Name, mainKey )
 import UniqSupply       ( UniqSupply )
@@ -162,7 +162,7 @@ tcModule rn_name_supply fixities
 	    local_classes = filter isLocallyDefined classes
 	    local_tycons  = [ tc | tc <- tycons,
 				   isLocallyDefined tc,
-				   Nothing <- [tyConClass_maybe tc]
+				   not (isClassTyCon tc)
 			    ]
 				-- For local_tycons, filter out the ones derived from classes
 				-- Otherwise the latter show up in interface files
