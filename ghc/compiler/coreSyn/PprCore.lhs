@@ -275,9 +275,20 @@ ppr_expr pe (Note (SCC cc) expr)
   = sep [hsep [ptext SLIT("_scc_"), pSCC pe cc],
 	 ppr_parend_expr pe expr ]
 
+#ifdef DEBUG
+ppr_expr pe (Note (Coerce to_ty from_ty) expr)
+ = \ sty ->
+   if debugStyle sty && not (ifaceStyle sty) then
+      sep [hsep [ptext SLIT("_coerce_"), pTy pe to_ty, pTy pe from_ty],
+		  ppr_parend_expr pe expr] sty
+   else
+      sep [hsep [ptext SLIT("_coerce_"), pTy pe to_ty],
+	          ppr_parend_expr pe expr] sty
+#else
 ppr_expr pe (Note (Coerce to_ty from_ty) expr)
   = sep [hsep [ptext SLIT("_coerce_"), pTy pe to_ty],
 	 ppr_parend_expr pe expr]
+#endif
 
 ppr_expr pe (Note InlineCall expr)
   = ptext SLIT("_inline_") <+> ppr_parend_expr pe expr
