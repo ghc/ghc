@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.54 2000/07/11 21:25:37 michaelw Exp $
+dnl $Id: aclocal.m4,v 1.55 2000/07/13 09:17:57 michaelw Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -351,7 +351,6 @@ rm -fr conftest*
 ])
 
 dnl
-dnl FPTOOLS_GHC_VERSION
 dnl FPTOOLS_GHC_VERSION(version)
 dnl FPTOOLS_GHC_VERSION(major, minor [, patchlevel])
 dnl FPTOOLS_GHC_VERSION(version, major, minor, patchlevel)
@@ -366,7 +365,7 @@ ${GHC-ghc} --version > conftestghc 2>&1
   cat conftestghc >&AC_FD_CC
 dnl `Useless Use Of cat' award...
 changequote(<<, >>)dnl
-  FPTOOLS_CV_GHC_VERSION=`cat conftestghc | sed -n -e 's/.* version \([0-9.]\+\(, patchlevel [0-9]\+\)\?\)/\1/;t PL;b;:PL s/, patchlevel */./;p'`
+  FPTOOLS_CV_GHC_VERSION=`cat conftestghc | sed -n -e 's/, patchlevel *\([0-9]\)/.\1/;s/.* version \([0-9.]\+\).*/\1/p'`
 changequote([, ])dnl
   rm -fr conftest*
   if test "[$]FPTOOLS_CV_GHC_VERSION" = ""
@@ -399,8 +398,8 @@ ifelse($#, [1], [dnl
 [$2]="[$]FPTOOLS_CV_GHC_VERSION[_major]"
 [$3]="[$]FPTOOLS_CV_GHC_VERSION[_minor]"
 [$4]="[$]FPTOOLS_CV_GHC_VERSION[_pl]"
-], [AC_MSG_ERROR([wrong number of arguments to $0])])dnl
-undefine(FPTOOLS_CV_GHC_VERSION)dnl
+], [AC_MSG_ERROR([wrong number of arguments to [$0]])])dnl
+undefine([FPTOOLS_CV_GHC_VERSION])dnl
 ])dnl
 
 
