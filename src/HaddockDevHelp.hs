@@ -1,13 +1,12 @@
 module HaddockDevHelp(ppDevHelpFile) where
 
 import HsSyn hiding(Doc)
+import qualified Map
 
 #if __GLASGOW_HASKELL__ < 503
 import Pretty
-import FiniteMap
 #else
 import Text.PrettyPrint
-import Data.FiniteMap
 import Data.Char
 #endif
 
@@ -61,10 +60,10 @@ ppDevHelpFile odir doctitle maybe_package ifaces = do
 		-- reconstruct the module name
 
     index :: [(HsName, [Module])]
-    index = fmToList (foldr getIfaceIndex emptyFM ifaces)
+    index = Map.toAscList (foldr getIfaceIndex Map.empty ifaces)
 
     getIfaceIndex (mdl,iface) fm =
-		addListToFM_C (++) fm [(name, [mdl]) | (name, Qual mdl' _) <- fmToList (iface_env iface), mdl == mdl']
+		Map.unionWith (++) (Map.fromListWith (++) [(name, [mdl]) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']) fm
 	
     ppList [] = empty
     ppList ((name,refs):mdls)  =

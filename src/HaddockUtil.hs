@@ -30,6 +30,8 @@ import HaddockParse
 import HaddockTypes
 
 import HsSyn
+import Map ( Map )
+import qualified Map
 
 import List	( intersect, isSuffixOf, intersperse )
 import Maybe
@@ -40,11 +42,9 @@ import Monad
 import Char	( isAlpha, isSpace, toUpper, ord )
 
 #if __GLASGOW_HASKELL__ < 503
-import FiniteMap
 import IOExts
 import URI	( escapeString, unreserved )
 #else
-import Data.FiniteMap
 import Data.IORef
 import System.IO.Unsafe	 ( unsafePerformIO )
 import Network.URI ( escapeString, unreserved )
@@ -385,7 +385,7 @@ isPathSeparator ch =
 
 moduleHtmlFile :: String -> FilePath
 moduleHtmlFile mdl =
-  case lookupFM html_xrefs (Module mdl) of
+  case Map.lookup (Module mdl) html_xrefs of
     Nothing  -> mdl ++ ".html"
     Just fp0 -> pathJoin [fp0, mdl ++ ".html"]
 
@@ -460,11 +460,11 @@ escapeStr str = escapeString str unreserved
 -- being I'm going to use a write-once global variable.
 
 {-# NOINLINE html_xrefs_ref #-}
-html_xrefs_ref :: IORef (FiniteMap Module FilePath)
+html_xrefs_ref :: IORef (Map Module FilePath)
 html_xrefs_ref = unsafePerformIO (newIORef (error "module_map"))
 
 {-# NOINLINE html_xrefs #-}
-html_xrefs :: FiniteMap Module FilePath
+html_xrefs :: Map Module FilePath
 html_xrefs = unsafePerformIO (readIORef html_xrefs_ref)
 
 -----------------------------------------------------------------------------

@@ -12,18 +12,13 @@ module HaddockTypes (
   DocOption(..), InstHead,
  ) where
 
-#if __GLASGOW_HASKELL__ < 503
-import FiniteMap
-#else
-import Data.FiniteMap
-#endif
-
 import HsSyn
+import Map
 
 -- ---------------------------------------------------------------------------
 -- Describing a module interface
 
-type NameEnv   = FiniteMap HsName HsQName
+type NameEnv   = Map HsName HsQName
 
 data Interface 
   = Interface {
@@ -35,7 +30,7 @@ data Interface
 	iface_env :: NameEnv,
 		-- ^ environment mapping names to *original* names
 
-	iface_import_env :: FiniteMap HsQName HsQName,
+	iface_import_env :: Map HsQName HsQName,
 
 	iface_reexported :: NameEnv,
 		-- ^ For names exported by this module, but not
@@ -45,7 +40,7 @@ data Interface
 		-- location of documentation for the name in another
 		-- module.
 
-	iface_sub :: FiniteMap HsName [HsName],
+	iface_sub :: Map HsName [HsName],
 		-- ^ maps names to "subordinate" names 
 		-- (eg. tycon to constrs & fields, class to methods)
 
@@ -56,7 +51,7 @@ data Interface
 		-- ^ the exports used to construct the documentation
 		-- (with orig names, not import names)
 
-	iface_decls :: FiniteMap HsName HsDecl,
+	iface_decls :: Map HsName HsDecl,
 		-- ^ decls from this module (only)
 		-- restricted to only those bits exported.
 		-- the map key is the "main name" of the decl.
@@ -100,6 +95,6 @@ data ExportItem
   | ExportModule	-- a cross-reference to another module
 	Module
 
-type ModuleMap = FiniteMap Module Interface
+type ModuleMap = Map Module Interface
 
 type InstHead = (HsContext,HsAsst)

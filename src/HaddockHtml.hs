@@ -19,6 +19,8 @@ import HaddockHH
 import HaddockHH2
 import HaddockDevHelp
 import HsSyn
+import Map ( Map )
+import qualified Map
 
 import Maybe	( fromJust, isJust, mapMaybe )
 import List 	( sortBy )
@@ -31,12 +33,6 @@ import Control.Exception ( handle, bracket )
 
 import Binary    ( openBinaryFile )
 import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
-
-#if __GLASGOW_HASKELL__ < 503
-import FiniteMap
-#else
-import Data.FiniteMap
-#endif
 
 import Html
 import qualified Html
@@ -381,26 +377,26 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_ur
 
       index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]
 
-  index :: [(String, FiniteMap HsQName [(Module,Bool)])]
-  index = sortBy cmp (fmToList full_index)
+  index :: [(String, Map HsQName [(Module,Bool)])]
+  index = sortBy cmp (Map.toAscList full_index)
     where cmp (n1,_) (n2,_) = n1 `compare` n2
 
   -- for each name (a plain string), we have a number of original HsNames that
   -- it can refer to, and for each of those we have a list of modules
   -- that export that entity.  Each of the modules exports the entity
   -- in a visible or invisible way (hence the Bool).
-  full_index :: FiniteMap String (FiniteMap HsQName [(Module,Bool)])
-  full_index = addListToFM_C (plusFM_C (++)) emptyFM
+  full_index :: Map String (Map HsQName [(Module,Bool)])
+  full_index = Map.fromListWith (\l r -> Map.unionWith (++) r l)
 		(concat (map getIfaceIndex ifaces))
 
   getIfaceIndex (mdl,iface) = 
     [ (hsNameStr nm, 
-	listToFM [(orig, [(mdl, not (nm `elemFM` iface_reexported iface))])])
-    | (nm, orig) <- fmToList (iface_env iface) ]
+	Map.fromList [(orig, [(mdl, not (nm `Map.member` iface_reexported iface))])])
+    | (nm, orig) <- Map.toAscList (iface_env iface) ]
 
-  indexElt :: (String, FiniteMap HsQName [(Module,Bool)]) -> HtmlTable
+  indexElt :: (String, Map HsQName [(Module,Bool)]) -> HtmlTable
   indexElt (str, entities) = 
-     case fmToList entities of
+     case Map.toAscList entities of
 	[(nm,entries)] ->  
 	    tda [ theclass "indexentry" ] << toHtml str <-> 
 			indexLinks (unQual nm) entries

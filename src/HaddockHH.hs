@@ -4,17 +4,16 @@ import HsSyn hiding(Doc)
 
 #if __GLASGOW_HASKELL__ < 503
 import Pretty
-import FiniteMap
 #else
 import Text.PrettyPrint
-import Data.FiniteMap
-import Data.Char
+import Data.Char ( toUpper )
 #endif
 
 import Maybe	( fromMaybe )
 import HaddockModuleTree
 import HaddockUtil
 import HaddockTypes
+import qualified Map
 
 
 ppHHContents :: FilePath -> String -> Maybe String -> [ModuleTree] -> IO ()
@@ -98,10 +97,10 @@ ppHHIndex odir maybe_package ifaces = do
 	package = fromMaybe "pkg" maybe_package
   	
 	index :: [(HsName, [Module])]
-	index = fmToList (foldr getIfaceIndex emptyFM ifaces)
+	index = Map.toAscList (foldr getIfaceIndex Map.empty ifaces)
 
 	getIfaceIndex (mdl,iface) fm =
-		addListToFM_C (++) fm [(name, [mdl]) | (name, Qual mdl' _) <- fmToList (iface_env iface), mdl == mdl']
+		foldl (\m (k,e) -> Map.insertWith (++) k e m) fm [(name, [mdl]) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']
 	
 	ppList [] = empty
 	ppList ((name,refs):mdls)  =
@@ -166,7 +165,7 @@ ppHHProject odir doctitle maybe_package ifaces pkg_paths = do
             ppLibFile fname = text (toPath fname)
 
     chars :: [Char]
-    chars = keysFM (foldr getIfaceIndex emptyFM ifaces)
+    chars = map fst (Map.toAscList (foldr getIfaceIndex Map.empty ifaces))
 
     getIfaceIndex (mdl,iface) fm =
-        addListToFM fm [(toUpper (head (show name)),()) | (name, Qual mdl' _) <- fmToList (iface_env iface), mdl == mdl']
+        Map.union (Map.fromList [(toUpper (head (show name)),()) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']) fm

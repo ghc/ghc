@@ -15,12 +15,8 @@ module HaddockRename (
 
 import HaddockTypes
 import HsSyn
-
-#if __GLASGOW_HASKELL__ < 503
-import FiniteMap
-#else
-import Data.FiniteMap
-#endif
+import Map ( Map )
+import qualified Map
 
 import Monad
 
@@ -58,8 +54,8 @@ lookupRn and_then name = do
 	Nothing -> do outRn name; return (and_then name)
 	Just maps_to -> return (and_then maps_to)
 
-runRnFM :: FiniteMap HsQName HsQName -> RnM a -> (a,[HsQName])
-runRnFM env rn = unRn rn (lookupFM env)
+runRnFM :: Map HsQName HsQName -> RnM a -> (a,[HsQName])
+runRnFM env rn = unRn rn (flip Map.lookup env)
 
 runRn :: (n -> Maybe HsQName) -> GenRnM n a -> (a,[n])
 runRn lkp rn = unRn rn lkp
