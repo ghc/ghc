@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.44 2003/02/07 21:55:36 sof Exp $
+-- $Id: Main.hs,v 1.45 2003/02/11 04:32:06 sof Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -101,12 +101,17 @@ main = do
     flags_w_tpl <- if any template_flag flags then
 			return flags
 		   else	
-			do { mb_path <- getExecDir "/bin/hsc2hs.exe" ;
-			     case mb_path of
-				Nothing   -> return flags
-
-				Just path -> return (Template (path ++ "/template-hsc.h") : flags) }
-
+			do mb_path <- getExecDir "/bin/hsc2hs.exe"
+			   add_opt <-
+			    case mb_path of
+			      Nothing   -> return id
+			      Just path -> do
+				let templ = path ++ "/template-hsc.h"
+				flg <- doesFileExist templ
+				if flg 
+				 then return ((Template templ):)
+				 else return id
+		           return (add_opt flags) 
     case (files, errs) of
         (_, _)
             | any isHelp    flags_w_tpl -> putStrLn (usageInfo header options)
@@ -512,7 +517,7 @@ output flags name toks = do
         _   -> onlyOne "compiler"
     
     linker <- case [l | Linker l <- flags] of
-        []  -> locateGhc "ghc"
+        []  -> locateGhc compiler
         [l] -> return l
         _   -> onlyOne "linker"
 
