@@ -121,6 +121,28 @@ install ::
 	      fi; \
 	done
 
+# If installing on Windows with MinGW32, copy the gcc compiler, headers and libs
+# and the perl interpreter and dll into the GHC prefix directory.
+# Gcc and Perl source locations derived from configuration data.
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(WhatGccIsCalled)" ""
+install ::
+	-mkdir $(prefix)/gcc-lib
+	-mkdir $(prefix)/include
+	-mkdir $(prefix)/include/mingw
+	-cp -rp $(GccDir)../include/* $(prefix)/include/mingw
+	-cp -rp $(GccDir)../lib/gcc-lib/mingw32/$(GccVersion)/* $(prefix)/gcc-lib
+	-cp $(GccDir)../lib/*.* $(prefix)/gcc-lib
+	-cp $(GccDir)gcc.exe $(prefix)
+	-cp $(GccDir)as.exe $(prefix)/gcc-lib
+	-cp $(GccDir)ld.exe $(prefix)/gcc-lib
+	-cp $(GccDir)dllwrap.exe $(prefix)/gcc-lib
+	-cp $(GccDir)dlltool.exe $(prefix)/gcc-lib
+	-cp $(GhcDir)../perl.exe $(prefix)
+	-cp $(GhcDir)../perl56.dll $(prefix)
+endif
+endif
+
 install-docs ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(filter-out $(ProjectsDontInstall), $(SUBDIRS)); do \

@@ -569,6 +569,8 @@ fi
 ])
 HaveGcc=`echo $fptools_cv_have_gcc | sed 'y/yesno/YESNO/'`
 AC_SUBST(HaveGcc)
+GccVersion=`gcc --version | grep mingw | cut -f 3 -d ' '`
+AC_SUBST(GccVersion)
 ])
 
 dnl

@@ -713,6 +713,7 @@ HSC2HS_PREFIX		= $(FPTOOLS_TOP)/ghc/utils/hsc2hs/
 # (because the version numbers have to be calculated).
 
 GHC		= @WithGhc@
+GhcDir          = $(dir $(GHC))
 GhcVersion	= @GhcVersion@
 GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
@@ -752,11 +753,13 @@ GHC_STAGE3 	= $(FPTOOLS_TOP)/ghc/compiler/stage3/ghc-inplace
 HaveGcc 	= @HaveGcc@
 UseGcc  	= YES
 WhatGccIsCalled = @WhatGccIsCalled@
+GccVersion      = @GccVersion@
 ifeq "$(strip $(HaveGcc))" "YES"
 ifneq "$(strip $(UseGcc))"  "YES"
   CC	= cc
 else
   CC	= $(WhatGccIsCalled)
+  GccDir = $(dir $(WhatGccIsCalled))
 endif
 endif
 

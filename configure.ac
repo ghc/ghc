@@ -613,7 +613,12 @@ AC_ARG_WITH(gcc,
        fi
  fi;
  CC="$withval"],
-[WhatGccIsCalled="gcc"]
+[if test "x$HostPlatform" = "xi386-unknown-mingw32"
+    then
+    WhatGccIsCalled=`which gcc`
+    else
+    WhatGccIsCalled="gcc"
+ fi;]
 )
 AC_SUBST(WhatGccIsCalled)
 
