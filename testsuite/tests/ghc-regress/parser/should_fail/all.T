@@ -26,3 +26,4 @@ test "read020" { vtcf("") }
 -- because it doesn't contain a definition of Main.main.  GHC 5.02 crashed
 -- on this example.
 test "read021" { vtcf("") }
+test "read022" { vtcf("") }
