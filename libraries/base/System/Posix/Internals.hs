@@ -119,18 +119,6 @@ statGetType p_stat = do
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
 			"unknown file type" Nothing
 
--- It isn't clear whether ftruncate is POSIX or not (I've read several
--- manpages and they seem to conflict), so we truncate using open/2.
-fileTruncate :: FilePath -> IO ()
-fileTruncate file = do
-  let flags = o_WRONLY .|. o_TRUNC
-  withCString file $ \file_cstr -> do
-    fd <- fromIntegral `liftM`
-	    throwErrnoIfMinus1Retry "fileTruncate"
- 	        (c_open file_cstr (fromIntegral flags) 0o666)
-    c_close fd
-  return ()
-
 #if defined(mingw32_TARGET_OS) || defined(__MINGW32__)
 closeFd :: Bool -> CInt -> IO CInt
 closeFd isStream fd 

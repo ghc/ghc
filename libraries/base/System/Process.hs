@@ -279,7 +279,7 @@ fdToHandle pfd mode = do
   fd <- peek pfd
   openFd fd (Just Stream) 
      False{-not a socket-}
-     ("fd:" ++ show fd) mode True{-binary-} False{-no truncate-}
+     ("fd:" ++ show fd) mode True{-binary-}
 
 -- ----------------------------------------------------------------------------
 -- waitForProcess

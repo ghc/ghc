@@ -26,8 +26,11 @@ module GHC.Handle (
   fillReadBuffer, fillReadBufferWithoutBlocking,
   readRawBuffer, readRawBufferPtr,
   writeRawBuffer, writeRawBufferPtr,
+
+#ifndef mingw32_TARGET_OS
   unlockFile,
-  
+#endif
+
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
   stdin, stdout, stderr,
@@ -787,9 +790,6 @@ openFile' filepath mode binary =
 	    	  ReadWriteMode -> rw_flags    
 	    	  AppendMode    -> append_flags
 
-      truncate | WriteMode <- mode = True
-	       | otherwise	   = False
-
       binary_flags
 	  | binary    = o_BINARY
 	  | otherwise = 0
@@ -806,7 +806,7 @@ openFile' filepath mode binary =
 	      throwErrnoIfMinus1Retry "openFile"
  	        (c_open f (fromIntegral oflags) 0o666)
 
-    openFd fd Nothing False filepath mode binary truncate
+    openFd fd Nothing False filepath mode binary
 	`catchException` \e -> do c_close (fromIntegral fd); throw e
 	-- NB. don't forget to close the FD if openFd fails, otherwise
 	-- this FD leaks.
@@ -818,15 +818,15 @@ openFile' filepath mode binary =
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
 read_flags   = std_flags    .|. o_RDONLY 
-write_flags  = output_flags .|. o_WRONLY
+write_flags  = output_flags .|. o_WRONLY .|. o_TRUNC
 rw_flags     = output_flags .|. o_RDWR
 append_flags = write_flags  .|. o_APPEND
 
 -- ---------------------------------------------------------------------------
 -- openFd
 
-openFd :: FD -> Maybe FDType -> Bool -> FilePath -> IOMode -> Bool -> Bool -> IO Handle
-openFd fd mb_fd_type is_socket filepath mode binary truncate = do
+openFd :: FD -> Maybe FDType -> Bool -> FilePath -> IOMode -> Bool -> IO Handle
+openFd fd mb_fd_type is_socket filepath mode binary = do
     -- turn on non-blocking mode
     setNonBlockingFD fd
 
@@ -855,14 +855,12 @@ openFd fd mb_fd_type is_socket filepath mode binary truncate = do
 
 	-- regular files need to be locked
 	RegularFile -> do
+#ifndef mingw32_TARGET_OS
 	   r <- lockFile (fromIntegral fd) (fromBool write) 1{-exclusive-}
 	   when (r == -1)  $
 		ioException (IOError Nothing ResourceBusy "openFile"
 				   "file is locked" Nothing)
-
-	   -- truncate the file if necessary
-	   when truncate (fileTruncate filepath)
-
+#endif
 	   mkFileHandle fd is_socket filepath ha_type binary
 
 
@@ -870,13 +868,16 @@ fdToHandle :: FD -> IO Handle
 fdToHandle fd = do
    mode <- fdGetMode fd
    let fd_str = "<file descriptor: " ++ show fd ++ ">"
-   openFd fd Nothing False{-XXX!-} fd_str mode True{-bin mode-} False{-no truncate-}
+   openFd fd Nothing False{-XXX!-} fd_str mode True{-bin mode-}
 
+
+#ifndef mingw32_TARGET_OS
 foreign import ccall unsafe "lockFile"
   lockFile :: CInt -> CInt -> CInt -> IO CInt
 
 foreign import ccall unsafe "unlockFile"
   unlockFile :: CInt -> IO CInt
+#endif
 
 mkStdHandle :: FD -> FilePath -> HandleType -> IORef Buffer -> BufferMode
 	-> IO Handle
@@ -996,9 +997,11 @@ hClose_handle_ handle_ = do
     -- free the spare buffers
     writeIORef (haBuffers handle_) BufferListNil
   
+#ifndef mingw32_TARGET_OS
     -- unlock it
     unlockFile c_fd
-  
+#endif
+
     -- we must set the fd to -1, because the finalizer is going
     -- to run eventually and try to close/unlock it.
     return (handle_{ haFD        = -1, 

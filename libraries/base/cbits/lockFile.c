@@ -1,27 +1,16 @@
-/* 
+/*
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-2004
  *
- * $Id: lockFile.c,v 1.3 2004/06/02 12:35:11 simonmar Exp $
+ * $Id: lockFile.c,v 1.4 2005/01/01 23:59:59 krasimir Exp $
  *
  * stdin/stout/stderr Runtime Support
  */
 
+#ifndef mingw32_TARGET_OS
+
 #include "HsBase.h"
 #include "Rts.h"
 #include "../../ghc/rts/RtsUtils.h" // for barf()
-
-#ifdef mingw32_TARGET_OS
-   // The Win32 C runtime has a max of 2048 file descriptors (see
-   // _NHANDLE_ in the crt sources), but mingw defines FD_SETSIZE to
-   // 64.
-#  define NUM_FDS 2048
-#else
-#  ifndef FD_SETSIZE
-#    error No FD_SETSIZE defined!
-#  else
-#    define NUM_FDS FD_SETSIZE
-#  endif
-#endif
 
 typedef struct {
     dev_t device;
@@ -29,8 +18,8 @@ typedef struct {
     int fd;
 } Lock;
 
-static Lock readLock[NUM_FDS];
-static Lock writeLock[NUM_FDS];
+static Lock readLock[FD_SETSIZE];
+static Lock writeLock[FD_SETSIZE];
 
 static int readLocks = 0;
 static int writeLocks = 0;
@@ -41,34 +30,21 @@ lockFile(int fd, int for_writing, int exclusive)
     struct stat sb;
     int i;
 
-    if (fd > NUM_FDS) {
+    if (fd > FD_SETSIZE) {
 	barf("lockFile: fd out of range");
     }
 
     while (fstat(fd, &sb) < 0) {
-	if (errno != EINTR) {
-#ifndef _WIN32
+	if (errno != EINTR)
 	    return -1;
-#else
-	    /* fstat()ing socket fd's seems to fail with CRT's fstat(),
-	       so let's just silently return and hope for the best..
-	    */
-	    return 0;
-#endif
-	}
     }
 
     if (for_writing) {
       /* opening a file for writing, check to see whether
          we don't have any read locks on it already.. */
       for (i = 0; i < readLocks; i++) {
-	 if (readLock[i].inode == sb.st_ino && readLock[i].device == sb.st_dev) {
-#ifndef __MINGW32__
+	 if (readLock[i].inode == sb.st_ino && readLock[i].device == sb.st_dev)
 	    return -1;
-#else
-	    break;    
-#endif
-	 }	    
       }
       /* If we're determined that there is only a single
          writer to the file, check to see whether the file
@@ -77,11 +53,7 @@ lockFile(int fd, int for_writing, int exclusive)
       if (exclusive) {
 	for (i = 0; i < writeLocks; i++) {
 	  if (writeLock[i].inode == sb.st_ino && writeLock[i].device == sb.st_dev) {
-#ifndef __MINGW32__
 	     return -1;
-#else
-	     break;
-#endif
 	  }
         }
       }
@@ -91,17 +63,12 @@ lockFile(int fd, int for_writing, int exclusive)
       writeLock[i].inode = sb.st_ino;
       writeLock[i].fd = fd;
       return 0;
-    } else { 
+    } else {
       /* For reading, it's simpler - just check to see
          that there's no-one writing to the underlying file. */
       for (i = 0; i < writeLocks; i++) {
-	if (writeLock[i].inode == sb.st_ino && writeLock[i].device == sb.st_dev) {
-#ifndef __MINGW32__
+	if (writeLock[i].inode == sb.st_ino && writeLock[i].device == sb.st_dev)
 	     return -1;
-#else
-	     break;
-#endif
-        }
       }
       /* Fit in new entry, reusing an existing table entry, if possible. */
       for (i = 0; i < readLocks; i++) {
@@ -141,3 +108,5 @@ unlockFile(int fd)
      /* Signal that we did not find an entry */
     return 1;
 }
+
+#endif
