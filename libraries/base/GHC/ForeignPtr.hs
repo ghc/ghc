@@ -159,7 +159,8 @@ addForeignPtrConcFinalizer f@(MallocPtr fo r) finalizer = do
   if (null fs)
      then  IO $ \s -> 
 	       let p = unsafeForeignPtrToPtr f in
-	       case mkWeak# fo () (foreignPtrFinalizer r p) s of 
+	       case mkWeak# fo () (do foreignPtrFinalizer r p
+				      touchPinnedByteArray# fo) s of 
 		  (# s1, w #) -> (# s1, () #)
      else return ()
 
@@ -179,6 +180,9 @@ newForeignPtr_ (Ptr obj) =  do
   IO $ \ s# ->
     case mkForeignObj# obj s# of
       (# s1#, fo# #) -> (# s1#,  ForeignPtr fo# r #)
+
+touchPinnedByteArray# :: MutableByteArray# RealWorld -> IO ()
+touchPinnedByteArray# ba# = IO $ \s -> case touch# ba# s of s -> (# s, () #)
 
 touchForeignPtr :: ForeignPtr a -> IO ()
 -- ^This function ensures that the foreign object in
@@ -202,7 +206,7 @@ touchForeignPtr :: ForeignPtr a -> IO ()
 touchForeignPtr (ForeignPtr fo r)
    = IO $ \s -> case touch# fo s of s -> (# s, () #)
 touchForeignPtr (MallocPtr fo r)
-   = IO $ \s -> case touch# fo s of s -> (# s, () #)
+   = touchPinnedByteArray# fo
 
 unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- ^This function extracts the pointer component of a foreign
