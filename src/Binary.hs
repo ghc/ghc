@@ -66,19 +66,25 @@ import Exception
 import GlaExts hiding (ByteArray, newByteArray, freezeByteArray)
 import Array
 import IO
+#if __GLASGOW_HASKELL__ < 503
 import PrelIOBase	--	( IOError(..), IOErrorType(..) )
 import PrelReal		--	( Ratio(..) )
 import PrelIOBase	-- 	( IO(..) )
-import MArray (IOUArray)
+#else
+import System.IO.Error ( mkIOError, eofErrorType )
+import GHC.Real ( Ratio(..) )
+import GHC.IOBase ( IO(..) )
+#endif
 
 type BinArray = MutableByteArray RealWorld Int
 newArray_ bounds     = stToIO (newCharArray bounds)
 unsafeWrite arr ix e = stToIO (writeWord8Array arr ix e)
 unsafeRead  arr ix   = stToIO (readWord8Array arr ix)
 
-hPutArray h arr sz   = hPutBufBAFull h arr sz
-hGetArray h sz       = hGetBufBAFull h sz
+hPutArray h arr sz   = hPutBufBA h arr sz
+hGetArray h sz       = hGetBufBA h sz
 
+#if __GLASGOW_HASKELL__ < 503
 mkIOError :: IOErrorType -> String -> Maybe Handle -> Maybe FilePath -> Exception
 mkIOError t location maybe_hdl maybe_filename
   = IOException (IOError maybe_hdl t location ""
@@ -86,6 +92,7 @@ mkIOError t location maybe_hdl maybe_filename
   		)
 
 eofErrorType = EOF
+#endif
 
 #ifndef SIZEOF_HSINT
 #define SIZEOF_HSINT  INT_SIZE_IN_BYTES

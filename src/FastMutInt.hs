@@ -17,8 +17,13 @@ module FastMutInt(
 #endif
 
 
+#if __GLASGOW_HASKELL__ < 503
 import GlaExts
 import PrelIOBase
+#else
+import GHC.Base
+import GHC.IOBase
+#endif
 
 #if __GLASGOW_HASKELL__ < 411
 newByteArray# = newCharArray#
