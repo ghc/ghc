@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.17 1999/11/30 16:10:11 lewie Exp $
+$Id: Parser.y,v 1.18 1999/12/01 17:01:36 simonmar Exp $
 
 Haskell grammar.
 
@@ -743,12 +743,14 @@ altslist :: { [RdrNameMatch] }
 	: '{'            alts '}'	{ reverse $2 }
 	|     layout_on  alts  close	{ reverse $2 }
 
+alts    :: { [RdrNameMatch] }
+        : alts1				{ $1 }
+	| ';' alts			{ $2 }
 
-alts 	:: { [RdrNameMatch] }
-	: alts ';' alt			{ $3 : $1 }
-	| alts ';'			{ $1 }
+alts1 	:: { [RdrNameMatch] }
+	: alts1 ';' alt			{ $3 : $1 }
+	| alts1 ';'			{ $1 }
 	| alt				{ [$1] }
-	| {- empty -}			{ [] }
 
 alt 	:: { RdrNameMatch }
 	: infixexp opt_sig ralt wherebinds
