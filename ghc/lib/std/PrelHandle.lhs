@@ -1,4 +1,4 @@
-%
+
 % (c) The AQUA Project, Glasgow University, 1994-1996
 %
 
@@ -46,11 +46,12 @@ import PrelForeign  ( makeForeignObj, writeForeignObj )
 #define CCALL(fun) _ccall_ fun
 #define const_BUFSIZ ``BUFSIZ''
 #define primPackString
+#endif
+
 #ifndef __PARALLEL_HASKELL__
 #define FILE_OBJECT	    ForeignObj
 #else
 #define FILE_OBJECT	    Addr
-#endif
 #endif
 
 \end{code}
@@ -150,8 +151,8 @@ freeStdFileObject fo = CCALL(freeStdFileObject) fo
 freeFileObject :: ForeignObj -> IO ()
 freeFileObject fo = CCALL(freeFileObject) fo
 #else
-foreign import stdcall "./libHS_cbits.dll" "freeStdFileObject" freeStdFileObject :: ForeignObj -> IO ()
-foreign import stdcall "./libHS_cbits.dll" "freeFileObject" freeFileObject :: ForeignObj -> IO ()
+foreign import stdcall "libHS_cbits.so" "freeStdFileObject" freeStdFileObject :: ForeignObj -> IO ()
+foreign import stdcall "libHS_cbits.so" "freeFileObject" freeFileObject :: ForeignObj -> IO ()
 #endif
 \end{code}
 
