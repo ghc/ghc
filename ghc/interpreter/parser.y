@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.27 $
- * $Date: 2000/04/04 17:35:04 $
+ * $Revision: 1.28 $
+ * $Date: 2000/04/06 00:36:12 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -97,7 +97,6 @@ static Void   local noIP	 ( String );
 %token EXPORT     UUEXPORT   INTERFACE  REQUIRES   UNSAFE     
 %token INSTIMPORT DYNAMIC    CCALL      STDKALL
 %token UTL        UTR        UUUSAGE
-%token PRIVILEGED
 
 %%
 /*- Top level script/module structure -------------------------------------*/
@@ -516,10 +515,6 @@ impDecl   : IMPORT modid impspec        {$$=gc3(doubleton(
                                         {$$=gc4(singleton(
                                                ap(M_IMPORT_Q,zpair($3,$3))
                                             ));}
-          | IMPORT PRIVILEGED modid '(' imports ')'
-	                                {$$=gc6(singleton(
-                                               ap(M_IMPORT_UNQ,
-                                                  zpair($3,ap(STAR,$5)))));}
           | IMPORT error                {syntaxError("import declaration");}
           ;
 impspec   : /* empty */                 {$$ = gc0(DOTDOT);}
@@ -1199,7 +1194,6 @@ varid     : VARID                       {$$ = $1;}
           | HIDING                      {$$ = gc1(varHiding);}
           | QUALIFIED                   {$$ = gc1(varQualified);}
           | ASMOD                       {$$ = gc1(varAsMod);}
-          | PRIVILEGED                  {$$ = gc1(varPrivileged);}
           ;
 qconid    : QCONID                      {$$ = $1;}
           | CONID                       {$$ = $1;}
@@ -1268,7 +1262,6 @@ varid1    : VARID                       {$$ = gc1($1);}
           | HIDING                      {$$ = gc1(varHiding);}
           | QUALIFIED                   {$$ = gc1(varQualified);}
           | ASMOD                       {$$ = gc1(varAsMod);}
-          | PRIVILEGED                  {$$ = gc1(varPrivileged);}
           ;
 
 /*- Tricks to force insertion of leading and closing braces ---------------*/
@@ -1413,7 +1406,6 @@ static String local unexpected() {     /* find name for unexpected token   */
                          return buffer;
         case HIDING    : return "symbol \"hiding\"";
         case QUALIFIED : return "symbol \"qualified\"";
-	case PRIVILEGED : return "symbol \"privileged\"";
         case ASMOD     : return "symbol \"as\"";
         case NUMLIT    : return "numeric literal";
         case CHARLIT   : return "character literal";

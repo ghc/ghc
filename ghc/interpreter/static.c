@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.38 $
- * $Date: 2000/04/06 00:01:27 $
+ * $Revision: 1.39 $
+ * $Date: 2000/04/06 00:36:12 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -31,8 +31,8 @@ static List   local checkSubentities    ( List,List,List,String,Text );
 static List   local checkExportTycon    ( List,Text,Cell,Tycon );
 static List   local checkExportClass    ( List,Text,Cell,Class );
 static List   local checkExport         ( List,Text,Cell );
-static List   local checkImportEntity   ( List,Module,Bool,Cell );
-static List   local resolveImportList   ( Module,Cell,Bool );
+static List   local checkImportEntity   ( List,Module,Cell );
+static List   local resolveImportList   ( Module,Cell );
 static Void   local checkImportList     ( Pair );
 
 static Void   local importEntity        ( Module,Cell );
@@ -334,21 +334,14 @@ Text   textParent; {
     return imports;
 }
 
-static List local checkImportEntity(imports,exporter,priv,entity)
+static List local checkImportEntity(imports,exporter,entity)
 List   imports; /* Accumulated list of things to import */
 Module exporter;
-Bool priv;
 Cell entity; { /* Entry from import list */
     List oldImports = imports;
     Text t  = isIdent(entity) ? textOf(entity) : textOf(fst(entity));
     List es = NIL;
-    if (priv) {
-      es = module(exporter).names;
-      es = dupOnto(module(exporter).tycons,es);
-      es = dupOnto(module(exporter).classes,es);
-    } else {
-      es = module(exporter).exports; 
-    }
+    es = module(exporter).exports; 
 
     for(; nonNull(es); es=tl(es)) {
         Cell e = hd(es); /* :: Entity
@@ -398,18 +391,6 @@ Cell entity; { /* Entry from import list */
             if (isIdent(entity) && name(e).text == t) {
                 imports = cons(e,imports);
             }
-        } else if (isTycon(e) && priv) {
-	    if (tycon(e).text == t) {
-	        imports = cons(e,imports);
-		return dupOnto(tycon(e).defn,imports);
-	    }
-        } else if (isClass(e) && priv) {
-	    if (cclass(e).text == t) {
-	        imports = cons(e,imports);
-		return dupOnto(cclass(e).members,imports);
-	    }
-        } else if (whatIs(e) == TUPLE && priv) {
-	  // do nothing
         } else {
             internal("checkImportEntity3");
         }
@@ -423,10 +404,9 @@ Cell entity; { /* Entry from import list */
     return imports;
 }
 
-static List local resolveImportList(m,impList,priv)
+static List local resolveImportList(m,impList)
 Module m;  /* exporting module */
-Cell impList; 
-Bool priv; {
+Cell impList; {
     List imports = NIL;
     if (DOTDOT == impList) {
         List es = module(m).exports;
@@ -450,7 +430,7 @@ Bool priv; {
             }
         }
     } else {
-        map2Accum(checkImportEntity,imports,m,priv,impList);
+        map1Accum(checkImportEntity,imports,m,impList);
     }
     return imports;
 }
@@ -467,17 +447,10 @@ Pair importSpec; {
         /* Somewhat inefficient - but obviously correct:
          * imports = importsOf("module Foo") `setDifference` hidden;
          */
-        hidden  = resolveImportList(m, snd(impList),FALSE);
-        imports = resolveImportList(m, DOTDOT,FALSE);
-    } else if (isPair(impList) && STAR == fst(impList)) {
-	// Previously, I was forcing an import Prelude,
-	// but this precluded doing things like 
-	// import Prelude hiding ( catch) 
-	// so, for now, you need to put an explicit
-	// import Prelude if you use import privileged.
-      imports = resolveImportList(m, snd(impList),TRUE);
+        hidden  = resolveImportList(m, snd(impList));
+        imports = resolveImportList(m, DOTDOT);
     } else {
-        imports = resolveImportList(m, impList,FALSE);
+        imports = resolveImportList(m, impList);
     }
 
     for(; nonNull(imports); imports=tl(imports)) {
