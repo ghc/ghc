@@ -15,6 +15,7 @@ which are supported for them.
 module IOHandle where
 
 import ST
+import UnsafeST
 import STBase
 import ArrBase	( ByteArray(..) )
 import PrelRead	( Read )

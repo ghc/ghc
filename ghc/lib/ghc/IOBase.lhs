@@ -14,13 +14,15 @@ concretely; the @IO@ module itself exports abstractly.
 module IOBase where
 
 import STBase
+import UnsafeST
 import PrelTup
 import Foreign
 import PackedString	( unpackCString )
 import PrelBase
-import PrelRead
-import GHC
 import ArrBase	( ByteArray(..), MutableVar(..) )
+import PrelRead
+
+import GHC
 
 infixr 1 `thenIO_Prim`, `seqIO_Prim`
 \end{code}
@@ -140,6 +142,8 @@ errorIO (ST io)
       _ -> bottom
   where
     bottom = bottom -- Never evaluated
+
+--errorIO x = (waitRead#, errorIO#, makeForeignObj#, waitWrite#, (+#))
 
 -- error stops execution and displays an error message
 error :: String -> a

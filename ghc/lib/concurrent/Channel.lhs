@@ -30,6 +30,7 @@ import Prelude
 import IOBase	( IO(..) )		-- Suspicious!
 import ConcBase
 import STBase
+import UnsafeST ( unsafeInterleavePrimIO )
 \end{code}
 
 A channel is represented by two @MVar@s keeping track of the two ends

@@ -16,7 +16,7 @@ module Merge
 
 import Semaphore
 import ConcBase
-import STBase  ( unsafeInterleavePrimIO )
+import UnsafeST  ( unsafeInterleavePrimIO )
 import IOBase
 
 max_buff_size = 1

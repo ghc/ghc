@@ -25,7 +25,7 @@ import {-# SOURCE #-}	IOBase	( error )
 import PrelList
 
 import ArrBase	( Array, array, (!) )
-import STBase   ( unsafePerformPrimIO )
+import UnsafeST ( unsafePerformPrimIO )
 import Ix	( Ix(..) )
 import Foreign	()		-- This import tells the dependency analyser to compile Foreign first.
 				-- There's an implicit dependency on Foreign because the ccalls in
