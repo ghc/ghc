@@ -66,7 +66,7 @@ lexNum cont cs =
  where f sgn cs = 
          case span isDigit cs of
           (digits,'.':c:rest) 
-		| isDigit c -> cont (TKrational r) rest'
+		| isDigit c -> cont (TKrational (fromInteger sgn * r)) rest'
 	        where ((r,rest'):_) = readFloat (digits ++ ('.':c:rest))
 		-- When reading a floating-point number, which is
 		-- a bit complicated, use the Haskell 98 library function
