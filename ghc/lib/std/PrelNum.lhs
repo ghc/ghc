@@ -26,7 +26,7 @@ import PrelList
 import PrelMaybe
 
 import PrelArr		( Array, array, (!) )
-import PrelIOBase   	( unsafePerformIO )
+import PrelIOBase	( unsafePerformIO )
 import Ix		( Ix(..) )
 import PrelCCall	()	-- we need the definitions of CCallable and 
 				-- CReturnable for the _ccall_s herein.
@@ -135,19 +135,27 @@ even, odd	:: (Integral a) => a -> Bool
 even n		=  n `rem` 2 == 0
 odd		=  not . even
 
-{-# GENERATE_SPECS gcd a{Int#,Int,Integer} #-}
+{-# SPECIALISE gcd ::
+	Int -> Int -> Int,
+	Integer -> Integer -> Integer #-}
 gcd		:: (Integral a) => a -> a -> a
 gcd 0 0		=  error "Prelude.gcd: gcd 0 0 is undefined"
 gcd x y		=  gcd' (abs x) (abs y)
 		   where gcd' x 0  =  x
 			 gcd' x y  =  gcd' y (x `rem` y)
 
-{-# GENERATE_SPECS lcm a{Int#,Int,Integer} #-}
+{-# SPECIALISE lcm ::
+	Int -> Int -> Int,
+	Integer -> Integer -> Integer #-}
 lcm		:: (Integral a) => a -> a -> a
 lcm _ 0		=  0
 lcm 0 _		=  0
 lcm x y		=  abs ((x `quot` (gcd x y)) * y)
 
+{-# SPECIALISE (^) ::
+	Integer -> Integer -> Integer,
+	Integer -> Int -> Integer,
+	Int -> Int -> Int #-}
 (^)		:: (Num a, Integral b) => a -> b -> a
 x ^ 0		=  1
 x ^ n | n > 0	=  f x (n-1) x
@@ -157,12 +165,36 @@ x ^ n | n > 0	=  f x (n-1) x
 				         | otherwise = f x (n-1) (x*y)
 _ ^ _		= error "Prelude.^: negative exponent"
 
+{-# SPECIALISE (^^) ::
+	Double -> Int -> Double,
+	Rational -> Int -> Rational #-}
 (^^)		:: (Fractional a, Integral b) => a -> b -> a
 x ^^ n		=  if n >= 0 then x^n else recip (x^(negate n))
 
+{-# SPECIALIZE fromIntegral ::
+    Int		-> Rational,
+    Integer	-> Rational,
+    Int  	-> Int,
+    Int 	-> Integer,
+    Int		-> Float,
+    Int		-> Double,
+    Integer  	-> Int,
+    Integer 	-> Integer,
+    Integer	-> Float,
+    Integer	-> Double #-}
 fromIntegral	:: (Integral a, Num b) => a -> b
 fromIntegral	=  fromInteger . toInteger
 
+{-# SPECIALIZE fromRealFrac ::
+    Double	-> Rational, 
+    Rational	-> Double,
+    Float	-> Rational,
+    Rational	-> Float,
+    Rational	-> Rational,
+    Double	-> Double,
+    Double	-> Float,
+    Float	-> Float,
+    Float	-> Double #-}
 fromRealFrac	:: (RealFrac a, Fractional b) => a -> b
 fromRealFrac	=  fromRational . toRational
 
@@ -721,6 +753,8 @@ type  Rational		=  Ratio Integer
 \end{code}
 
 \begin{code}
+{-# SPECIALISE (%) :: Integer -> Integer -> Rational #-}
+
 (%)			:: (Integral a) => a -> a -> Ratio a
 numerator, denominator	:: (Integral a) => Ratio a -> a
 approxRational		:: (RealFrac a) => a -> a -> Rational
@@ -1122,6 +1156,10 @@ fromRat x = x'
 Now, here's Lennart's code.
 
 \begin{code}
+{-# SPECIALISE fromRat :: 
+	Rational -> Double,
+	Rational -> Float #-}
+
 --fromRat :: (RealFloat a) => Rational -> a
 fromRat x = 
     if x == 0 then encodeFloat 0 0 		-- Handle exceptional cases
