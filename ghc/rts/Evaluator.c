@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.37 $
- * $Date: 2000/03/13 10:30:25 $
+ * $Revision: 1.38 $
+ * $Date: 2000/03/13 10:39:11 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -2122,14 +2122,14 @@ static StgClosure* makeErrorCall ( const char* msg )
 
 StgPtr CreateByteArrayToHoldInteger ( int nbytes )
 {
-   StgInt  words     = (nbytes+sizeof(W_)-1)/sizeof(W_);
+   StgWord words     = (nbytes+sizeof(W_)-1)/sizeof(W_);
    StgWord size      = sizeofW(StgArrWords) + words;
    StgArrWords* arr  = (StgArrWords*)allocate(size);
    SET_HDR(arr,&ARR_WORDS_info,CCCS);
    arr->words = words;
-   ASSERT(nbytes <= arr->words * sizeof(W_));
+   ASSERT((W_)nbytes <= arr->words * sizeof(W_));
 #ifdef DEBUG
-   {nat i;
+   {StgWord i;
     for (i = 0; i < words; ++i) {
     arr->payload[i] = 0xdeadbeef;
    }}
@@ -2216,7 +2216,7 @@ void SloppifyIntegerEnd ( StgPtr arr0 )
 }
 
 
-void myStackCheck ( Capability* cap )
+static void myStackCheck ( Capability* cap )
 {
    /* fprintf(stderr, "myStackCheck\n"); */
    if (!(gSpLim <= gSp && gSp <= stgCast(StgPtr,gSu))) {
@@ -2968,7 +2968,7 @@ static void* enterBCO_primop2 ( int primop2code,
                     */
                     PushCPtr((StgClosure*)(*bco));
                     *return2 = ThreadBlocked;
-                    return (void*)(1+(NULL));
+                    return (void*)(1+(char*)(NULL));
 
                 } else {
                     PushCPtr(mvar->value);
