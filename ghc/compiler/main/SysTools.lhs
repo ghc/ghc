@@ -94,7 +94,9 @@ import GHC.IOBase
 # else
 import PrelIOBase -- this can be removed when SystemExts is used
 # endif
+# ifdef mingw32_TARGET_OS
 import SystemExts       ( rawSystem )
+# endif
 #else
 import CError           ( throwErrnoIfMinus1 ) -- as can this
 import System		( system )
