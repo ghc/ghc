@@ -283,9 +283,12 @@ floatExpr lvl (Note note@(SCC cc) expr)
 
 floatExpr lvl (Note InlineMe expr)	-- Other than SCCs
   = case floatExpr InlineCtxt expr of { (fs, floating_defns, expr') ->
-    WARN( not (null floating_defns),
-	  ppr expr $$ ppr floating_defns )	-- We do no floating out of Inlines
-    (fs, [], Note InlineMe expr') }	-- See notes in SetLevels
+	-- There can be some floating_defns, arising from
+	-- ordinary lets that were there all the time.  It seems
+	-- more efficient to test once here than to avoid putting
+	-- them into floating_defns (which would mean testing for
+	-- inlineCtxt  at every let)
+    (fs, [], Note InlineMe (install floating_defns expr')) }	-- See notes in SetLevels
 
 floatExpr lvl (Note note expr)	-- Other than SCCs
   = case (floatExpr lvl expr)    of { (fs, floating_defns, expr') ->
