@@ -291,7 +291,7 @@ EXPORTS
 	lookupHashTable @ 301 ; 
 	lookupStableName @ 302 ; 
 	main_threads @ 304 ; 
-	makeForeignObjzh_fast @ 305 ; 
+	mkForeignObjzh_fast @ 305 ; 
 	makeStableNamezh_fast @ 306 ; 
 	markStablePtrTable @ 307 ; 
 	mblocks_allocated @ 308 ; 

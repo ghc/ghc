@@ -185,7 +185,7 @@ data PrimOp
     | UnblockAsyncExceptionsOp
 
     -- foreign objects
-    | MakeForeignObjOp
+    | MkForeignObjOp
     | WriteForeignObjOp
 
     -- weak pointers
@@ -460,7 +460,7 @@ tagOf_PrimOp TakeMVarOp		    	      = ILIT(218)
 tagOf_PrimOp PutMVarOp		    	      = ILIT(219)
 tagOf_PrimOp SameMVarOp		    	      = ILIT(220)
 tagOf_PrimOp IsEmptyMVarOp	    	      = ILIT(221)
-tagOf_PrimOp MakeForeignObjOp		      = ILIT(222)
+tagOf_PrimOp MkForeignObjOp		      = ILIT(222)
 tagOf_PrimOp WriteForeignObjOp		      = ILIT(223)
 tagOf_PrimOp MkWeakOp			      = ILIT(224)
 tagOf_PrimOp DeRefWeakOp		      = ILIT(225)
@@ -750,7 +750,7 @@ allThePrimOps		-- Except CCall, which is really a family of primops
 	PutMVarOp,
 	SameMVarOp,
 	IsEmptyMVarOp,
-	MakeForeignObjOp,
+	MkForeignObjOp,
 	WriteForeignObjOp,
 	MkWeakOp,
 	DeRefWeakOp,
@@ -1600,8 +1600,8 @@ primOpInfo MyThreadIdOp
 %************************************************************************
 
 \begin{code}
-primOpInfo MakeForeignObjOp
-  = mkGenPrimOp SLIT("makeForeignObj#") [] 
+primOpInfo MkForeignObjOp
+  = mkGenPrimOp SLIT("mkForeignObj#") [] 
 	[addrPrimTy, realWorldStatePrimTy] 
 	(unboxedPair [realWorldStatePrimTy, foreignObjPrimTy])
 
@@ -1931,7 +1931,7 @@ primOpOutOfLine op
 	MkWeakOp		     -> True
 	FinalizeWeakOp		     -> True
 	MakeStableNameOp	     -> True
-	MakeForeignObjOp	     -> True
+	MkForeignObjOp		     -> True
 	NewMutVarOp		     -> True
 	NewMVarOp		     -> True
 	ForkOp			     -> True
@@ -2041,7 +2041,7 @@ primOpHasSideEffects KillThreadOp      = True
 primOpHasSideEffects YieldOp	       = True
 primOpHasSideEffects SeqOp	       = True
 
-primOpHasSideEffects MakeForeignObjOp  = True
+primOpHasSideEffects MkForeignObjOp    = True
 primOpHasSideEffects WriteForeignObjOp = True
 primOpHasSideEffects MkWeakOp  	       = True
 primOpHasSideEffects DeRefWeakOp       = True

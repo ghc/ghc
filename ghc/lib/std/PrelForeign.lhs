@@ -12,6 +12,8 @@ module PrelForeign (
 #ifndef __PARALLEL_HASKELL__
 	ForeignObj(..),
 	makeForeignObj,
+	-- SUP: deprecated
+	mkForeignObj,
 	writeForeignObj
 #endif
    ) where
@@ -21,6 +23,7 @@ import PrelST
 import PrelBase
 import PrelAddr
 import PrelGHC
+import PrelWeak	( addForeignFinalizer )
 \end{code}
 
 
@@ -30,19 +33,26 @@ import PrelGHC
 %*							*
 %*********************************************************
 
+mkForeignObj and writeForeignObj are the building blocks
+for makeForeignObj, they can probably be nuked in the future.
+
 \begin{code}
 #ifndef __PARALLEL_HASKELL__
 --instance CCallable ForeignObj
 --instance CCallable ForeignObj#
 
-makeForeignObj  :: Addr -> IO ForeignObj
-makeForeignObj (A# obj) = IO ( \ s# ->
-    case makeForeignObj# obj s# of
+makeForeignObj :: Addr -> IO () -> IO ForeignObj
+makeForeignObj addr finalizer = do
+   fObj <- mkForeignObj addr
+   addForeignFinalizer fObj finalizer
+   return fObj
+
+mkForeignObj  :: Addr -> IO ForeignObj
+mkForeignObj (A# obj) = IO ( \ s# ->
+    case mkForeignObj# obj s# of
       (# s1#, fo# #) -> (# s1#,  ForeignObj fo# #) )
 
---makeForeignObj  :: Addr        -> Addr       -> IO ForeignObj
-writeForeignObj :: ForeignObj  -> Addr       -> IO ()
-
+writeForeignObj :: ForeignObj -> Addr -> IO ()
 writeForeignObj (ForeignObj fo#) (A# datum#) = IO ( \ s# ->
     case writeForeignObj# fo# datum# s# of { s1# -> (# s1#, () #) } )
 #endif /* !__PARALLEL_HASKELL__ */

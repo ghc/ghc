@@ -129,7 +129,7 @@ file object reference.
 nullFile__ :: FILE_OBJECT
 nullFile__ = 
 #ifndef __PARALLEL_HASKELL__
-    unsafePerformIO (makeForeignObj nullAddr)
+    unsafePerformIO (makeForeignObj nullAddr (return ()))
 #else
     nullAddr
 #endif
@@ -160,9 +160,9 @@ mkErrorHandle__ ioe =
 
 \begin{code}
 foreign import "libHS_cbits" "freeStdFileObject" unsafe
-        freeStdFileObject :: FILE_OBJECT -> IO ()
+        freeStdFileObject :: Addr -> IO ()
 foreign import "libHS_cbits" "freeFileObject" unsafe
-        freeFileObject :: FILE_OBJECT -> IO ()
+        freeFileObject :: Addr -> IO ()
 
 \end{code}
 
@@ -190,8 +190,7 @@ stdout = unsafePerformIO (do
 			      (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
-            fo <- makeForeignObj fo
-	    addForeignFinalizer fo (freeStdFileObject fo)
+            fo <- makeForeignObj fo (freeStdFileObject fo)
 #endif
 
 #ifdef __HUGS__
@@ -217,8 +216,7 @@ stdin = unsafePerformIO (do
 			      (1::Int){-readable-}  -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
-            fo <- makeForeignObj fo
-	    addForeignFinalizer fo (freeStdFileObject fo)
+            fo <- makeForeignObj fo (freeStdFileObject fo)
 #endif
 	    (bm, bf_size) <- getBMode__ fo
 	    mkBuffer__ fo bf_size
@@ -242,8 +240,7 @@ stderr = unsafePerformIO (do
 			      (0::Int){-writeable-} -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
-            fo <- makeForeignObj fo
-	    addForeignFinalizer fo (freeStdFileObject fo)
+            fo <- makeForeignObj fo (freeStdFileObject fo)
 #endif
             hdl <- newHandle (Handle__ fo WriteHandle NoBuffering "stderr")
 	    -- when stderr and stdout are both connected to a terminal, ensure
@@ -283,8 +280,7 @@ openFileEx f m = do
 		       (binary::Int)     -- ConcHask: SAFE, won't block
     if fo /= nullAddr then do
 #ifndef __PARALLEL_HASKELL__
-	fo  <- makeForeignObj fo
-	addForeignFinalizer fo (freeFileObject fo)
+	fo  <- makeForeignObj fo (freeFileObject fo)
 #endif
 	(bm, bf_size)  <- getBMode__ fo
         mkBuffer__ fo bf_size

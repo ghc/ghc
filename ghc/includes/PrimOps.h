@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.49 2000/04/05 14:26:31 panne Exp $
+ * $Id: PrimOps.h,v 1.50 2000/04/11 20:44:18 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -857,7 +857,7 @@ EF_(finalizzeWeakzh_fast);
 
 #define ForeignObj_CLOSURE_DATA(c)  (((StgForeignObj *)c)->data)
 
-EF_(makeForeignObjzh_fast);
+EF_(mkForeignObjzh_fast);
 
 #define writeForeignObjzh(res,datum) \
    (ForeignObj_CLOSURE_DATA(res) = (P_)(datum))

@@ -12,8 +12,8 @@ module PrelWeak where
 import PrelGHC
 import PrelBase
 import PrelMaybe
-import PrelIOBase
-import PrelForeign
+-- NOTE: To break a cycle, ForeignObj is not in PrelForeign, but PrelIOBase!
+import PrelIOBase	( IO(..), ForeignObj(..) )
 
 #ifndef __PARALLEL_HASKELL__
 

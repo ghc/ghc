@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.17 2000/03/10 15:23:40 simonmar Exp $
+ * $Id: stgio.h,v 1.18 2000/04/11 20:44:18 panne Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -117,10 +117,9 @@ StgInt	flushReadBuffer (StgForeignPtr);
 void	flushConnectedBuf (StgForeignPtr);
 
 /* freeFile.c */
-void freeStdFile (StgForeignPtr);
-void freeFile (StgForeignPtr);
-void freeStdFileObject (StgForeignPtr);
-void freeFileObject (StgForeignPtr);
+void freeStdFile (StgAddr);
+void freeStdFileObject (StgAddr);
+void freeFileObject (StgAddr);
 
 StgAddr ref_freeStdFileObject (void);
 StgAddr ref_freeFileObject    (void);

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.46 $
- * $Date: 2000/04/03 15:24:21 $
+ * $Revision: 1.47 $
+ * $Date: 2000/04/11 20:44:19 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -2892,7 +2892,7 @@ static void* enterBCO_primop2 ( int primop2code,
 #endif
 #ifdef PROVIDE_FOREIGN
                 /* ForeignObj# operations */
-        case i_makeForeignObj:
+        case i_mkForeignObj:
             {
                 StgForeignObj *result 
                     = stgCast(StgForeignObj*,allocate(sizeofW(StgForeignObj)));

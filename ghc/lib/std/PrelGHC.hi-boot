@@ -323,7 +323,7 @@ __export PrelGHC
   finalizzeWeakzh
 
   ForeignObjzh
-  makeForeignObjzh
+  mkForeignObjzh
   writeForeignObjzh
 
   StablePtrzh

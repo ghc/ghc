@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.14 2000/03/20 04:26:24 andy Exp $
+ * $Id: Bytecodes.h,v 1.15 2000/04/11 20:44:19 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -390,7 +390,7 @@ typedef enum
 
 #ifdef PROVIDE_FOREIGN
     /* ForeignObj# operations */
-    , i_makeForeignObj
+    , i_mkForeignObj
 
     , indexCharOffForeignObj
     , indexIntOffForeignObj

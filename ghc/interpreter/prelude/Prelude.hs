@@ -1190,8 +1190,8 @@ data StablePtr a
 #ifdef PROVIDE_FOREIGN
 data ForeignObj
 
-makeForeignObj :: Addr -> IO ForeignObj
-makeForeignObj = primMakeForeignObj
+mkForeignObj :: Addr -> IO ForeignObj
+mkForeignObj = primMkForeignObj
 
 #endif
 #ifdef PROVIDE_WEAK

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.49 2000/03/21 11:33:12 rrt Exp $
+ * $Id: PrimOps.hc,v 1.50 2000/04/11 20:44:19 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -324,14 +324,14 @@ FN_(newMutVarzh_fast)
    -------------------------------------------------------------------------- */
 
 #ifndef PAR
-FN_(makeForeignObjzh_fast)
+FN_(mkForeignObjzh_fast)
 {
   /* R1.p = ptr to foreign object,
   */
   StgForeignObj *result;
   FB_
 
-  HP_CHK_GEN_TICKY(sizeofW(StgForeignObj), NO_PTRS, makeForeignObjzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgForeignObj), NO_PTRS, mkForeignObjzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader),
 		  sizeofW(StgForeignObj)-sizeofW(StgHeader), 0);
   CCS_ALLOC(CCCS,sizeofW(StgForeignObj)); /* ccs prof */

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.24 $
- * $Date: 2000/03/20 04:26:24 $
+ * $Revision: 1.25 $
+ * $Date: 2000/04/11 20:44:19 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -1372,7 +1372,7 @@ AsmPrim asmPrimOps[] = {
 
 #ifdef PROVIDE_FOREIGN
     /* ForeignObj# operations */
-    , { "primMakeForeignObj",        "A",  "f",  MONAD_IO, i_PRIMOP2, i_makeForeignObj }
+    , { "primMkForeignObj",          "A",  "f",  MONAD_IO, i_PRIMOP2, i_mkForeignObj }
 #endif
 #ifdef PROVIDE_WEAK
     /* WeakPair# operations */

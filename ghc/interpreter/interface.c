@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.51 $
- * $Date: 2000/04/11 16:49:20 $
+ * $Revision: 1.52 $
+ * $Date: 2000/04/11 20:44:18 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2543,7 +2543,7 @@ Type type; {
       Sym(int2Integerzh_fast)        \
       Sym(stg_gc_unbx_r1)            \
       Sym(ErrorHdrHook)              \
-      Sym(makeForeignObjzh_fast)     \
+      Sym(mkForeignObjzh_fast)       \
       Sym(__encodeDouble)            \
       Sym(decodeDoublezh_fast)       \
       Sym(isDoubleNaN)               \

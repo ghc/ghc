@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: freeFile.c,v 1.9 2000/03/28 08:49:56 simonmar Exp $
+ * $Id: freeFile.c,v 1.10 2000/04/11 20:44:18 panne Exp $
  *
  * Giving up files
  */
@@ -24,11 +24,11 @@
    before we *really* shut down (dumping stats etc.)
 */
 void
-freeStdFile(StgForeignPtr fp)
+freeStdFile(StgAddr fp)
 { return; }
 
 void
-freeStdFileObject(StgForeignPtr ptr)
+freeStdFileObject(StgAddr ptr)
 { 
   IOFileObject* fo = (IOFileObject*)ptr;
   int rc;
@@ -45,7 +45,7 @@ freeStdFileObject(StgForeignPtr ptr)
 }
 
 void
-freeFileObject(StgForeignPtr ptr)
+freeFileObject(StgAddr ptr)
 {
     /*
      * The finaliser for the file objects embedded in Handles. The RTS
