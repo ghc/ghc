@@ -388,10 +388,6 @@ ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 # Yes, include the interepreter, readline, and Template Haskell extensions
 SRC_HC_OPTS += -DGHCI -package template-haskell
 
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-SRC_HC_OPTS += -package unix
-endif
-
 ALL_DIRS += ghci
 
 # Enable readline if either:
@@ -419,10 +415,6 @@ else
 EXCLUDED_SRCS += deSugar/DsMeta.hs typecheck/TcSplice.lhs hsSyn/Convert.lhs
 
 endif # bootstrapped with interpreter
-
-ifeq "$(bootstrapped)" "YES"
-SRC_HC_OPTS += -package Cabal
-endif
 
 # -----------------------------------------------
 # mkdependC stuff
@@ -458,14 +450,17 @@ SRC_HC_OPTS += \
 # which needs it).
 SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
-# When bootstrapped, we don't make use of *any* packages
-# (except possibly readline if GHCi is enabled, see above)
-ifneq "$(bootstrapped)" "YES"
-ifneq "$(mingw32_HOST_OS)" "1"
-SRC_HC_OPTS += -package concurrent -package posix -package util
+# We need System.Posix (or Posix when ghc < 6.2)
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(bootstrapped) $(ghc_ge_601)" "NO NO"
+SRC_HC_OPTS += -package posix
 else
-SRC_HC_OPTS += -package concurrent -package util
+SRC_HC_OPTS += -package unix
 endif
+endif
+
+ifneq "$(findstring YES, $(bootstrapped) $(ghc_ge_603))" ""
+SRC_HC_OPTS += -package Cabal
 endif
 
 SRC_CC_OPTS += -Iparser -I. -O
