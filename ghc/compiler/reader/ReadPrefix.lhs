@@ -316,7 +316,7 @@ wlkExpr expr
       U_record con rbinds -> -- record construction
 	wlkDataId  con		`thenUgn` \ rcon     ->
 	wlkList rdRbind rbinds	`thenUgn` \ recbinds ->
-	returnUgn (RecordCon (HsVar rcon) recbinds)
+	returnUgn (RecordCon rcon recbinds)
 
       U_rupdate updexp updbinds -> -- record update
 	wlkExpr updexp		 `thenUgn` \ aexp ->
