@@ -73,7 +73,7 @@ $CacheProf = 'no';
 die "$Pgm: program to run not given as first argument\n" if $#ARGV < 0;
 $ToRun = $ARGV[0]; shift(@ARGV);
 # avoid picking up same-named thing from somewhere else on $PATH...
-$ToRun = "./$ToRun" if $ToRun !~ /^\//;
+$ToRun = "./$ToRun" if -e "./$ToRun";
 
 arg: while ($_ = $ARGV[0]) {
     shift(@ARGV);
