@@ -20,6 +20,8 @@ module TcType (
   tcReadTyVar,		-- :: TcTyVar s -> NF_TcM (TcMaybe s)
 
 
+  tcSplitForAllTy, tcSplitRhoTy,
+
   tcInstTyVars,
   tcInstSigTyVars, 
   tcInstType, tcInstSigType, tcInstTcType, tcInstSigTcType,
@@ -38,7 +40,7 @@ module TcType (
 -- friends:
 import Type	( SYN_IE(Type), SYN_IE(ThetaType), GenType(..),
 		  tyVarsOfTypes, getTyVar_maybe,
-		  splitForAllTy, splitRhoTy,
+		  splitForAllTy, splitRhoTy, isTyVarTy,
 		  mkForAllTys, instantiateTy
 		)
 import TyVar	( SYN_IE(TyVar), GenTyVar(..), SYN_IE(TyVarSet), SYN_IE(GenTyVarSet), 
@@ -48,8 +50,9 @@ import TyVar	( SYN_IE(TyVar), GenTyVar(..), SYN_IE(TyVarSet), SYN_IE(GenTyVarSet
 		)
 
 -- others:
-import Class	( GenClass )
-import Id	( idType )
+import Class	( GenClass, SYN_IE(Class) )
+import TyCon	( isFunTyCon )
+import Id	( idType, SYN_IE(Id) )
 import Kind	( Kind )
 import TcKind	( TcKind )
 import TcMonad
@@ -108,6 +111,41 @@ tcTyVarToTyVar :: TcTyVar s -> TyVar
 tcTyVarToTyVar (TyVar uniq kind name _) = TyVar uniq kind name duffUsage
 \end{code}
 
+Utility functions
+~~~~~~~~~~~~~~~~~
+These tcSplit functions are like their non-Tc analogues, but they
+follow through bound type variables.
+
+\begin{code}
+tcSplitForAllTy :: TcType s -> NF_TcM s ([TcTyVar s], TcType s)
+tcSplitForAllTy t 
+  = go t t []
+  where
+    go syn_t (ForAllTy tv t) tvs = go t t (tv:tvs)
+    go syn_t (SynTy _ _ t)   tvs = go syn_t t tvs
+    go syn_t (TyVarTy tv)    tvs = tcReadTyVar tv	`thenNF_Tc` \ maybe_ty ->
+				   case maybe_ty of
+					BoundTo ty | not (isTyVarTy ty) -> go syn_t ty tvs
+					other				-> returnNF_Tc (reverse tvs, syn_t)
+    go syn_t t	             tvs = returnNF_Tc (reverse tvs, syn_t)
+
+tcSplitRhoTy :: TcType s -> NF_TcM s ([(Class,TcType s)], TcType s)
+tcSplitRhoTy t
+  = go t t []
+ where
+    go syn_t (FunTy (DictTy c t _) r _) ts = go r r ((c,t):ts)
+    go syn_t (AppTy (AppTy (TyConTy tycon _) (DictTy c t _)) r) ts
+			      | isFunTyCon tycon
+			      = go r r ((c,t):ts)
+    go syn_t (SynTy _ _ t) ts = go syn_t t ts
+    go syn_t (TyVarTy tv)  ts = tcReadTyVar tv	`thenNF_Tc` \ maybe_ty ->
+				case maybe_ty of
+				  BoundTo ty | not (isTyVarTy ty) -> go syn_t ty ts
+				  other				  -> returnNF_Tc (reverse ts, syn_t)
+    go syn_t t		   ts = returnNF_Tc (reverse ts, syn_t)
+\end{code}
+
+
 Type instantiation
 ~~~~~~~~~~~~~~~~~~
 
@@ -163,22 +201,20 @@ instantiateTy which could take advantage of sharing some day.
 \begin{code}
 tcInstTcType :: TcType s -> NF_TcM s ([TcTyVar s], TcType s)
 tcInstTcType ty
-  = case tyvars of
+  = tcSplitForAllTy ty		`thenNF_Tc` \ (tyvars, rho) -> 
+    case tyvars of
 	[]    -> returnNF_Tc ([], ty)	-- Nothing to do
 	other -> tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', _, tenv)  ->
 		 returnNF_Tc (tyvars', instantiateTy tenv rho)
-  where
-    (tyvars, rho) = splitForAllTy ty
 
 tcInstSigTcType :: TcType s -> NF_TcM s ([TcTyVar s], TcType s)
 tcInstSigTcType ty
-  = case tyvars of
+  = tcSplitForAllTy ty		`thenNF_Tc` \ (tyvars, rho) ->
+    case tyvars of
 	[]    -> returnNF_Tc ([], ty)	-- Nothing to do
 	other -> tcInstSigTyVars tyvars		`thenNF_Tc` \ (tyvars', _, tenv)  ->
 		 returnNF_Tc (tyvars', instantiateTy tenv rho)
-  where
-    (tyvars, rho) = splitForAllTy ty
-
+    
 tcInstType :: [(GenTyVar flexi,TcType s)] 
 	   -> GenType (GenTyVar flexi) UVar 
 	   -> NF_TcM s (TcType s)
@@ -188,7 +224,7 @@ tcInstType tenv ty_to_inst
     bind_fn = inst_tyvar UnBound
     occ_fn env tyvar = case lookupTyVarEnv env tyvar of
 			 Just ty -> returnNF_Tc ty
-			 Nothing -> panic "tcInstType:1" --(ppAboves [ppr PprDebug ty_to_inst, 
+			 Nothing -> panic "tcInstType:1" --(vcat [ppr PprDebug ty_to_inst, 
 							--	      ppr PprDebug tyvar])
 
 tcInstSigType :: GenType (GenTyVar flexi) UVar -> NF_TcM s (TcType s)
@@ -198,7 +234,7 @@ tcInstSigType ty_to_inst
     bind_fn = inst_tyvar DontBind
     occ_fn env tyvar = case lookupTyVarEnv env tyvar of
 			 Just ty -> returnNF_Tc ty
-			 Nothing -> panic "tcInstType:2"-- (ppAboves [ppr PprDebug ty_to_inst, 
+			 Nothing -> panic "tcInstType:2"-- (vcat [ppr PprDebug ty_to_inst, 
 							--	      ppr PprDebug tyvar])
 
 zonkTcTyVarToTyVar :: TcTyVar s -> NF_TcM s TyVar
@@ -208,7 +244,7 @@ zonkTcTyVarToTyVar tv
 
       TyVarTy tv' ->    returnNF_Tc (tcTyVarToTyVar tv')
 
-      _ -> --pprTrace "zonkTcTyVarToTyVar:" (ppCat [ppr PprDebug tv, ppr PprDebug tv_ty]) $
+      _ -> --pprTrace "zonkTcTyVarToTyVar:" (hsep [ppr PprDebug tv, ppr PprDebug tv_ty]) $
 	   returnNF_Tc (tcTyVarToTyVar tv)
 
 
@@ -376,7 +412,7 @@ zonkTcType (ForAllTy tv ty)
     case tv_ty of	-- Should be a tyvar!
       TyVarTy tv' -> 
 		     returnNF_Tc (ForAllTy tv' ty')
-      _ -> --pprTrace "zonkTcType:ForAllTy:" (ppCat [ppr PprDebug tv, ppr PprDebug tv_ty]) $
+      _ -> --pprTrace "zonkTcType:ForAllTy:" (hsep [ppr PprDebug tv, ppr PprDebug tv_ty]) $
 	   
 	   returnNF_Tc (ForAllTy tv{-(tcTyVarToTyVar tv)-} ty')
 
