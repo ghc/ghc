@@ -317,14 +317,12 @@ by their ``canonical'' CPU/Manufacturer/OS triple.
 
 <VarListEntry>
 <Term>alpha-dec-{osf,linux,freebsd,openbsd,netbsd}:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>alpha-dec-osf</Primary></IndexTerm>
 <IndexTerm><Primary>alpha-dec-linux</Primary></IndexTerm>
 <IndexTerm><Primary>alpha-dec-freebsd</Primary></IndexTerm>
 <IndexTerm><Primary>alpha-dec-openbsd</Primary></IndexTerm>
 <IndexTerm><Primary>alpha-dec-netbsd</Primary></IndexTerm>
-</Para>
+<ListItem>
 
 <Para>
 Currently non-working.  The last working version (osf[1-3]) is GHC
@@ -338,8 +336,8 @@ either need Alpha support and/or can provide access to boxes.
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>sparc-sun-sunos4:</Term>
-<ListItem>
 <IndexTerm><Primary>sparc-sun-sunos4</Primary></IndexTerm>
+<ListItem>
 
 <Para>
 Probably works with minor tweaks, hasn't been tested for a while.
@@ -348,8 +346,8 @@ Probably works with minor tweaks, hasn't been tested for a while.
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>sparc-sun-solaris2:</Term>
-<ListItem>
 <IndexTerm><Primary>sparc-sun-solaris2</Primary></IndexTerm>
+<ListItem>
 
 <Para>
 Fully supported, including native-code generator.
@@ -358,8 +356,8 @@ Fully supported, including native-code generator.
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>hppa1.1-hp-hpux (HP-PA boxes running HPUX 9.x)</Term>
-<ListItem>
 <IndexTerm><Primary>hppa1.1-hp-hpux</Primary></IndexTerm>
+<ListItem>
 
 <Para>
 Works registerised.  No native-code generator.
@@ -367,9 +365,9 @@ Works registerised.  No native-code generator.
 
 </ListItem></VarListEntry>
 <VarListEntry>
-<Term>i386-unknown-linux (PCs running Linux&mdash;ELF format):</Term>
-<ListItem>
+<Term>i386-unknown-linux (PCs running Linux&mdash;ELF binary format):</Term>
 <IndexTerm><Primary>i386-*-linux</Primary></IndexTerm>
+<ListItem>
 
 <Para>
 GHC works registerised.  You <Emphasis>must</Emphasis> have GCC 2.7.x
@@ -384,12 +382,10 @@ versions, even if the shared library version hasn't changed.
 <VarListEntry>
 <Term>i386-unknown-{freebsd,netbsd,openbsd) (PCs running FreeBSD 2.2
 or higher, NetBSD, and possibly OpenBSD):</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>i386-unknown-freebsd</Primary></IndexTerm> 
 <IndexTerm><Primary>i386-unknown-netbsd</Primary></IndexTerm> 
 <IndexTerm><Primary>i386-unknown-openbsd</Primary></IndexTerm> 
-</Para>
+<ListItem>
 
 <Para>
 GHC works registerised.  These systems provide ready-built packages of
@@ -400,10 +396,8 @@ the package.
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>i386-unknown-cygwin32:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>i386-unknown-cygwin32</Primary></IndexTerm>
-</Para>
+<ListItem>
 
 <Para>
 Fully supported under Win9x/NT, including a native code
@@ -415,10 +409,8 @@ etc.).
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>mips-sgi-irix5:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>mips-sgi-irix[5-6]</Primary></IndexTerm>
-</Para>
+<ListItem>
 
 <Para>
 Port currently doesn't work, needs some minimal porting effort.  As
@@ -470,8 +462,11 @@ Unless you hear otherwise, the other tools work if GHC works.
 
 <Para>
 Here are the gory details about some utility programs you may need;
-<Command>perl</Command> and <Command>gcc</Command> are the only important ones. (PVM<IndexTerm><Primary>PVM</Primary></IndexTerm> is important
-if you're going for Parallel Haskell.)  The <Command>configure</Command><IndexTerm><Primary>configure</Primary></IndexTerm>
+<Command>perl</Command>, <Command>gcc</Command> and
+<command>happy</command> are the only important
+ones. (PVM<IndexTerm><Primary>PVM</Primary></IndexTerm> is important
+if you're going for Parallel Haskell.)  The
+<Command>configure</Command><IndexTerm><Primary>configure</Primary></IndexTerm>
 script will tell you if you are missing something.
 </Para>
 
@@ -480,13 +475,13 @@ script will tell you if you are missing something.
 
 <VarListEntry>
 <Term>Perl:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>pre-supposed: Perl</Primary></IndexTerm>
 <IndexTerm><Primary>Perl, pre-supposed</Primary></IndexTerm>
-<Emphasis>You have to have Perl to proceed!</Emphasis> Perl is a language quite good
-for doing shell-scripty tasks that involve lots of text processing.
-It is pretty easy to install.
+<ListItem>
+<Para>
+<Emphasis>You have to have Perl to proceed!</Emphasis> Perl is a
+language quite good for doing shell-scripty tasks that involve lots of
+text processing.  It is pretty easy to install.
 </Para>
 
 <Para>
@@ -508,11 +503,9 @@ systems.
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>GNU C (<Command>gcc</Command>):</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>pre-supposed: GCC (GNU C compiler)</Primary></IndexTerm>
 <IndexTerm><Primary>GCC (GNU C compiler), pre-supposed</Primary></IndexTerm>
-</Para>
+<ListItem>
 
 <Para>
 We recommend using GCC version 2.95.2 on all platforms.  Failing that,
@@ -530,14 +523,27 @@ please let us know, so we can report it and get things improved.
 </Para>
 </ListItem></VarListEntry>
 
+<varlistentry>
+<term>Happy:</term>
+<indexterm><primary>Happy</primary></indexterm>
+<listitem>
+<para>Happy is a parser generator tool for Haskell, and is used to
+generate GHC's parsers.  Happy is written in Haskell, and is a project
+in the CVS repository (<literal>fptools/happy</literal>).  It can be
+built from source, but bear in mind that you'll need GHC installed in
+order to build it.  To avoid the chicken/egg problem, install a binary
+distribtion of either Happy or GHC to get started.  Happy
+distributions are available from <ulink
+url="http://www.haskell.org/happy/">Happy's Web Page</ulink>.
+</para>
+</listitem>
+</varlistentry>
+
 <VarListEntry>
 <Term>Autoconf:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>pre-supposed: Autoconf</Primary></IndexTerm>
 <IndexTerm><Primary>Autoconf, pre-supposed</Primary></IndexTerm>
-</Para>
-
+<ListItem>
 <Para>
 GNU Autoconf is needed if you intend to build from the CVS sources, it
 is <Emphasis>not</Emphasis> needed if you just intend to build a
@@ -554,11 +560,10 @@ If you modify either of these files, you'll need Autoconf to rebuild
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term><Command>sed</Command></Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>pre-supposed: sed</Primary></IndexTerm>
 <IndexTerm><Primary>sed, pre-supposed</Primary></IndexTerm>
-
+<ListItem>
+<Para>
 You need a working <Command>sed</Command> if you are going to build
 from sources.  The build-configuration stuff needs it.  GNU sed
 version 2.0.4 is no good!  It has a bug in it that is tickled by the
@@ -586,11 +591,9 @@ particularly Glasgow-ish, but Occasionally Indispensable.  Like
 
 <VarListEntry>
 <Term>PVM version 3:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>pre-supposed: PVM3 (Parallel Virtual Machine)</Primary></IndexTerm>
 <IndexTerm><Primary>PVM3 (Parallel Virtual Machine), pre-supposed</Primary></IndexTerm>
-</Para>
+<ListItem>
 
 <Para>
 PVM is the Parallel Virtual Machine on which Parallel Haskell programs
@@ -613,9 +616,9 @@ the <Filename>Readme</Filename> instructions.
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term><Command>bash</Command>:</Term>
+<IndexTerm><Primary>bash, presupposed (Parallel Haskell only)</Primary></IndexTerm>
 <ListItem>
 <Para>
-<IndexTerm><Primary>bash, presupposed (Parallel Haskell only)</Primary></IndexTerm>
 Sadly, the <Command>gr2ps</Command> script, used to convert ``parallelism profiles''
 to PostScript, is written in Bash (GNU's Bourne Again shell).
 This bug will be fixed (someday).
@@ -640,11 +643,11 @@ documentation that comes with the <Literal>fptools</Literal> projects:
 
 <VarListEntry>
 <Term>DocBook:</Term>
+<IndexTerm><Primary>pre-supposed: DocBook</Primary></IndexTerm>
+<IndexTerm><Primary>DocBook, pre-supposed</Primary></IndexTerm>
 <ListItem>
 <Para>
-<IndexTerm><Primary>pre-supposed: DocBook</Primary></IndexTerm>
-<IndexTerm><Primary>DocBook, pre-supposed</Primary></IndexTerm> All
-our documentation is written in SGML, using the DocBook DTD and
+All our documentation is written in SGML, using the DocBook DTD and
 processed using the <ULink
 URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook
 tools</ULink>, which is the most shrink-wrapped SGML suite that we
@@ -655,10 +658,10 @@ DocBook source file (including this manual). N.B. The <Emphasis>Cygnus</Emphasis
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>TeX:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>pre-supposed: TeX</Primary></IndexTerm>
 <IndexTerm><Primary>TeX, pre-supposed</Primary></IndexTerm>
+<ListItem>
+<Para>
 A decent TeX distribution is required if you want to produce printable
 documentation.  We recomment teTeX, which includes just about
 everything you need.
@@ -673,16 +676,12 @@ everything you need.
 <Title>Other useful tools
 </Title>
 
-<Para>
 <VariableList>
-
 <VarListEntry>
 <Term>Flex:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>pre-supposed: flex</Primary></IndexTerm> 
 <IndexTerm><Primary>flex, pre-supposed</Primary></IndexTerm>
-</Para>
+<ListItem>
 
 <Para>
 This is a quite-a-bit-better-than-Lex lexer.  Used to build a couple
@@ -692,7 +691,6 @@ work; you should get the GNU version.
 </Para>
 </ListItem></VarListEntry>
 </VariableList>
-</Para>
 
 </Sect2>
 
@@ -896,6 +894,13 @@ Change directory to
 no arguments). This GNU program converts <Filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/configure.in</Filename>
 to a shell script called <Filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/configure</Filename>.
 </Para>
+
+<para>
+Some projects, including GHC, have their own configure script.  If
+there's an
+<Constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.in</Constant>,
+then you need to run <command>autoconf</command> in that directory too.
+</para>
 
 <Para>
 Both these steps are completely platform-independent; they just mean
@@ -1360,11 +1365,33 @@ Most <Filename>Makefile</Filename>s have targets other than these.  You can disc
 
 </Sect2>
 
+<sect2>
+<title>Using a project from the build tree</title>
+<para>
+If you want to build GHC (say) and just use it direct from the build
+tree without doing <literal>make install</literal> first, you can run
+the in-place driver script:
+<filename>ghc/driver/ghc-inplace</filename>.
+</para>
+
+<para> Do <emphasis>NOT</emphasis> use
+<filename>ghc/driver/ghc</filename>, or
+<filename>ghc/driver/ghc-4.xx</filename>, as these are the scripts
+intended for installation, and contain hard-wired paths to the
+installed libraries, rather than the libraries in the build tree.
+</para>
+
+<para>
+Happy can similarly be run from the build tree, using
+<filename>happy/src/happy-inplace</filename>.
+</para>
+</sect2>
+
 <Sect2>
-<Title>Fast Making
-<IndexTerm><Primary>fastmake</Primary></IndexTerm>
+<Title>Fast Making <IndexTerm><Primary>fastmake</Primary></IndexTerm>
 <IndexTerm><Primary>dependencies, omitting</Primary></IndexTerm>
-<IndexTerm><Primary>FAST, makefile variable</Primary></IndexTerm></Title>
+<IndexTerm><Primary>FAST, makefile
+variable</Primary></IndexTerm></Title>
 
 <Para>
 Sometimes the dependencies get in the way: if you've made a small
