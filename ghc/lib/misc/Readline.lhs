@@ -56,27 +56,25 @@ type RlCallbackFunction =
 
 readline :: String ->			-- Prompt String
 	    IO String			-- Returned line
-readline prompt = 
+readline prompt =  do
 --ToDo: Get the "Live register in _casm_GC_ " bug fixed
 --      this stops us passing the prompt string to readline directly :-(
---    _casm_GC_ ``%r = readline %0;'' prompt	`thenPrimIO` \ litstr ->
-
+--    litstr <- _casm_GC_ ``%r = readline(%0);'' prompt
     _casm_ ``rl_prompt_hack = (char*)realloc(rl_prompt_hack, %1);
 	     strcpy (rl_prompt_hack,%0);'' 
-		prompt	(length prompt)			`thenIO_Prim` \ () ->
-    _casm_GC_ ``%r = readline (rl_prompt_hack);''	`thenIO_Prim` \ litstr ->
-    if (litstr == ``NULL'') then 
-	fail (userError "Readline has read EOF")
-    else (
-	let str = unpackCString litstr in
-	_casm_ ``free %0;'' litstr  `thenIO_Prim` \ () ->
+		prompt	(length prompt)
+    litstr <- _casm_GC_ ``%r = readline (rl_prompt_hack);''
+    if (litstr == ``NULL'') 
+     then fail (userError "Readline has read EOF")
+     else do
+	let str = unpackCString litstr
+	_casm_ ``free(%0);'' litstr
 	return str
-    )
 
 
-addHistory :: String ->			-- String to enter in history
-	      IO ()
-addHistory str = primIOToIO (_ccall_ add_history str)
+addHistory :: String		-- String to enter in history
+           -> IO ()
+addHistory str = _ccall_ add_history str
 
 
 rlBindKey :: KeyCode ->			-- Key to Bind to
@@ -85,11 +83,9 @@ rlBindKey :: KeyCode ->			-- Key to Bind to
 rlBindKey key cback =
     if (0 > key) || (key > 255) then
 	fail (userError "Invalid ASCII Key Code, must be in range 0.255")
-    else 
-	addCbackEntry (key,cback)	    `thenIO_Prim` \ _ ->
-	_casm_ `` rl_bind_key((KeyCode)%0,&genericRlCback); ''
-	     key			    `thenIO_Prim` \ () ->
-	return ()
+    else  do
+	addCbackEntry (key,cback)
+	_casm_ `` rl_bind_key((KeyCode)%0,&genericRlCback); '' key
 
 \end{code}
 
@@ -107,11 +103,9 @@ rlAddDefun :: String ->			-- Function Name
 rlAddDefun name cback key =
     if (0 > key) || (key > 255) then
 	fail (userError "Invalid ASCII Key Code, must be in range 0..255")
-    else
-	addCbackEntry (key, cback)	    `thenIO_Prim` \ _ ->
-	_casm_ ``rl_add_defun (%0, &genericRlCback, (KeyCode)%1);''
-	name key			    `thenIO_Prim` \ () ->
-	return ()
+    else do
+	addCbackEntry (key, cback)
+	_casm_ ``rl_add_defun (%0, &genericRlCback, (KeyCode)%1);'' name key
 
 \end{code}
 
@@ -157,9 +151,9 @@ setCbackList ls =
     error "setCbackList: not available for Parallel Haskell"
 #endif
 
-addCbackEntry :: (KeyCode,RlCallbackFunction) -> PrimIO ()
-addCbackEntry entry =
-    getCbackList >>= \ ls ->
+addCbackEntry :: (KeyCode,RlCallbackFunction) -> IO ()
+addCbackEntry entry = do
+    ls <- getCbackList
     setCbackList (entry:ls)
 \end{code}
 
@@ -168,19 +162,17 @@ Haskell.
 
 \begin{code}
 
-invokeRlCback :: PrimIO ()
-invokeRlCback =
-    _casm_ `` %r=(KeyCode)current_kc; ''    >>= \ kc ->
-    _casm_ `` %r=(int)current_narg; ''	    >>= \ narg ->
-    getCbackList			    >>= \ ls ->
-    (case (dropWhile (\ (key,_) -> kc/=key) ls) of
-	[] -> -- no match
-	    returnPrimIO (-1)
-	((_,cback):_) ->
-	    ioToPrimIO (cback narg kc)
-    )					    >>= \ ret_val ->
-    _casm_ `` rl_return=(int)%0; '' ret_val >>= \ () ->
-    returnPrimIO ()
+invokeRlCback :: IO ()
+invokeRlCback = do
+    kc    <- _casm_ `` %r=(KeyCode)current_kc; ''
+    narg  <- _casm_ `` %r=(int)current_narg; ''
+    ls    <- getCbackList
+    ret_val <- 
+      (case (dropWhile (\ (key,_) -> kc/=key) ls) of
+	 [] -> return (-1)
+	 ((_,cback):_) -> cback narg kc
+      )
+    _casm_ `` rl_return=(int)%0; '' ret_val
 
 \end{code}
  
@@ -214,58 +206,57 @@ they be in the IO Monad, should they be Mutable Variables?
 \begin{code}
 
 rlGetLineBuffer :: IO String
-rlGetLineBuffer = 
-    _casm_ ``%r = rl_line_buffer;''	`thenIO_Prim` \ litstr ->
+rlGetLineBuffer = do
+    litstr <- _casm_ ``%r = rl_line_buffer;''
     return (unpackCString litstr)
 				
 rlSetLineBuffer :: String -> IO ()
-rlSetLineBuffer str = primIOToIO (_casm_ ``rl_line_buffer = %0;'' str)
+rlSetLineBuffer str = _casm_ ``rl_line_buffer = %0;'' str
 		
 
 rlGetPoint :: IO Int
-rlGetPoint = primIOToIO (_casm_ ``%r = rl_point;'')
+rlGetPoint = _casm_ ``%r = rl_point;''
 
 rlSetPoint :: Int -> IO ()
-rlSetPoint point = primIOToIO (_casm_ ``rl_point = %0;'' point)
+rlSetPoint point = _casm_ ``rl_point = %0;'' point
 	 
 rlGetEnd :: IO Int
-rlGetEnd = primIOToIO (_casm_ ``%r = rl_end;'')
+rlGetEnd = _casm_ ``%r = rl_end;''
 
 rlSetEnd :: Int -> IO ()
-rlSetEnd end = primIOToIO (_casm_ ``rl_end = %0;'' end)
+rlSetEnd end = _casm_ ``rl_end = %0;'' end
 
 rlGetMark :: IO Int
-rlGetMark = primIOToIO (_casm_ ``%r = rl_mark;'')
+rlGetMark = _casm_ ``%r = rl_mark;''
 
 rlSetMark :: Int -> IO ()
-rlSetMark mark = primIOToIO (_casm_ ``rl_mark = %0;'' mark)
+rlSetMark mark = _casm_ ``rl_mark = %0;'' mark
 
 rlSetDone :: Bool -> IO ()
-rlSetDone True  = primIOToIO (_casm_ ``rl_done = %0;'' 1)
-rlSetDone False = primIOToIO (_casm_ ``rl_done = %0;'' 0)
+rlSetDone True  = _casm_ ``rl_done = %0;'' 1
+rlSetDone False = _casm_ ``rl_done = %0;'' 0
 
 rlPendingInput :: KeyCode -> IO ()
 rlPendingInput key = primIOToIO (_casm_ ``rl_pending_input = %0;'' key)
 
 rlPrompt :: IO String
-rlPrompt = 
-    _casm_ ``%r = rl_readline_name;''	`thenIO_Prim` \ litstr ->
+rlPrompt = do
+    litstr <- _casm_ ``%r = rl_readline_name;''
     return (unpackCString litstr)
 
 rlTerminalName :: IO String
-rlTerminalName = 
-    _casm_ ``%r = rl_terminal_name;''	`thenIO_Prim` \ litstr ->
+rlTerminalName = do
+    litstr <- _casm_ ``%r = rl_terminal_name;''
     return (unpackCString litstr)
 
 
 rlGetReadlineName :: IO String
-rlGetReadlineName = 
-    _casm_ ``%r = rl_readline_name;''	`thenIO_Prim` \ litstr ->
+rlGetReadlineName = do
+    litstr <- _casm_ ``%r = rl_readline_name;''
     return (unpackCString litstr)
 
 rlSetReadlineName :: String -> IO ()
-rlSetReadlineName str = primIOToIO (
-    _casm_ ``rl_readline_name = %0;'' str)
+rlSetReadlineName str = _casm_ ``rl_readline_name = %0;'' str
 \end{code}
 
 \begin{verbatim}
@@ -307,9 +298,10 @@ rlOutStream = unsafePerformPrimIO (
 -- rlStartupHook :: RlCallBackFunction -> IO ()	     
 
 rlInitialize :: IO ()
-rlInitialize =
-    getProgName					    >>= \ pname ->
-    rlSetReadlineName pname			    >>
-    _casm_ ``rl_prompt_hack = (char*)malloc(1);''   `thenIO_Prim` \ () ->
-    primIOToIO (initRlCbacks)
+rlInitialize = do
+    pname <- getProgName
+    rlSetReadlineName pname
+    _casm_ ``rl_prompt_hack = (char*)malloc(1);''
+    initRlCbacks
+
 \end{code}
