@@ -182,6 +182,31 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 	fig2dev -L latex $< $@
 
 #-----------------------------------------------------------------------------
+# SGML suffix rules
+#
+# make sure these don't conflict with the literate rules!
+
+%.sgml : %.vsgml
+	@$(RM) $@
+	expand $*.verb | $(SGMLVERB) > $@
+
+%.dvi : %.sgml
+	@$(RM) $@
+	$(SGML2LATEX) -m --output=dvi $<
+
+%.html : %.sgml
+	@$(RM) $@
+	$(SGML2HTML) $<
+
+%.info : %.sgml
+	@$(RM) $@
+	$(SGML2INFO) $<
+
+%.txt : %.sgml
+	@$(RM) $@
+	$(SGML2TXT) $<
+
+#-----------------------------------------------------------------------------
 # Literate suffix rules
 
 # ToDo: somehow macroize this lot. (if only!)
