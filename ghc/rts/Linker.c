@@ -10,7 +10,9 @@
 #include "PosixSource.h"
 #endif
 
-//  Linux needs _GNU_SOURCE to get RTLD_DEFAULT from <dlfcn.h>.
+/* Linux needs _GNU_SOURCE to get RTLD_DEFAULT from <dlfcn.h> and 
+   MREMAP_MAYMOVE from <sys/mman.h>.
+ */
 #ifdef __linux__
 #define _GNU_SOURCE
 #endif
@@ -1307,21 +1309,51 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
 
 static int ocAllocateJumpIslands( ObjectCode* oc, int count, int first )
 {
+#ifdef USE_MMAP
+  int pagesize, n, m;
+#endif
   int aligned;
 
   if( count > 0 )
   {
-#ifdef USE_MMAP
-    #error ocAllocateJumpIslands doesnt want USE_MMAP to be defined
-#endif
     // round up to the nearest 4
     aligned = (oc->fileSize + 3) & ~3;
 
+#ifdef USE_MMAP
+    #ifndef linux_HOST_OS /* mremap is a linux extension */
+        #error ocAllocateJumpIslands doesnt want USE_MMAP to be defined
+    #endif
+
+    pagesize = getpagesize();
+    n = ROUND_UP( oc->fileSize, pagesize );
+    m = ROUND_UP( aligned + sizeof (ppcJumpIsland) * count, pagesize );
+
+    /* The effect of this mremap() call is only the ensure that we have
+     * a sufficient number of virtually contiguous pages.  As returned from
+     * mremap, the pages past the end of the file are not backed.  We give
+     * them a backing by using MAP_FIXED to map in anonymous pages.
+     */
+    if( (oc->image = mremap( oc->image, n, m, MREMAP_MAYMOVE )) == MAP_FAILED )
+    {
+      errorBelch( "Unable to mremap for Jump Islands\n" );
+      return 0;
+    }
+
+    if( mmap( oc->image + n, m - n, PROT_READ | PROT_WRITE | PROT_EXEC,
+              MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, 0, 0 ) == MAP_FAILED )
+    {
+      errorBelch( "Unable to mmap( MAP_FIXED ) for Jump Islands\n" );
+      return 0;
+    }
+
+#else
     oc->image = stgReallocBytes( oc->image,
-                                 aligned + sizeof( ppcJumpIsland ) * count,
+                                 aligned + sizeof (ppcJumpIsland) * count,
                                  "ocAllocateJumpIslands" );
-    oc->jump_islands = (ppcJumpIsland *) (((char *) oc->image) + aligned);
-    memset( oc->jump_islands, 0, sizeof( ppcJumpIsland ) * count );
+#endif /* USE_MMAP */
+
+    oc->jump_islands = (ppcJumpIsland *) (oc->image + aligned);
+    memset( oc->jump_islands, 0, sizeof (ppcJumpIsland) * count );
   }
   else
     oc->jump_islands = NULL;

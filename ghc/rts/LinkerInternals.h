@@ -65,7 +65,7 @@ typedef struct _ObjectCode {
     int        n_symbols;
 
     /* ptr to malloc'd lump of memory holding the obj file */
-    void*      image;
+    char*      image;
 
     /* The section-kind entries for this object module.  Linked
        list. */
