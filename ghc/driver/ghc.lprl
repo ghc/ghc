@@ -1502,13 +1502,15 @@ Now the Haskell compiler, C compiler, and assembler
 	&run_something("cp $hsc_out_h_stub $ofile_h_stub_target", 'Copy foreign export header file');
     }
 
-    #
-    # Bring the C stub protos into scope when compiling the .hc file.
-    #
-    push (@CcInjects, "#include \"${hsc_out_h_stub}\"\n");
-    # Hack - ensure that the stub .h file is included in the OPTIONS section
-    #	 if the .hc file is saved.
-    push (@File_options, "-#include \"${ofile_h_stub_target}\"\n");
+    if (-f $hsc_out_c_stub) {
+	#
+	# Bring the C stub protos into scope when compiling the .hc file.
+	#
+	push (@CcInjects, "#include \"${hsc_out_h_stub}\"\n");
+	# Hack - ensure that the stub .h file is included in the OPTIONS section
+	#	 if the .hc file is saved.
+	push (@File_options, "-#include \"${ofile_h_stub_target}\"\n");
+    }
 
     if ($do_cc) {
 	&runGcc    ($is_hc_file, $hsc_out, $cc_as_o);
