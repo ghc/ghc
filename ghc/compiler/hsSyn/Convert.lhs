@@ -54,12 +54,12 @@ mk_con con = L loc0 $ case con of
 		  (InfixCon (mk_arg st1) (mk_arg st2))
   where
     mk_arg (IsStrict, ty)  = noLoc $ HsBangTy HsStrict (cvtType ty)
-    mk_arg (NotStrict, ty) = noLoc $ HsBangTy HsNoBang (cvtType ty)
+    mk_arg (NotStrict, ty) = cvtType ty
 
     mk_id_arg (i, IsStrict, ty)
         = (noLoc (vName i), noLoc $ HsBangTy HsStrict (cvtType ty))
     mk_id_arg (i, NotStrict, ty)
-        = (noLoc (vName i), noLoc $ HsBangTy HsNoBang (cvtType ty))
+        = (noLoc (vName i), cvtType ty)
 
 mk_derivs [] = Nothing
 mk_derivs cs = Just [noLoc $ HsPredTy $ HsClassP (tconName c) [] | c <- cs]
