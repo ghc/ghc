@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: Posix.hsc,v 1.5 2002/01/02 14:40:11 simonmar Exp $
+-- $Id: Posix.hsc,v 1.6 2002/01/02 15:01:44 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -369,7 +369,7 @@ foreign import ccall "fcntl" unsafe
 foreign import ccall "fork" unsafe
    c_fork :: IO CPid 
 
-foreign import ccall "sigemptyset_wrap" unsafe
+foreign import ccall "__hscore_sigemptyset" unsafe
    c_sigemptyset :: Ptr CSigset -> IO ()
 
 foreign import ccall "sigaddset" unsafe
@@ -394,14 +394,14 @@ foreign import ccall "waitpid" unsafe
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
 #endif
 
-foreign import "s_isreg_wrap"  unsafe s_isreg  :: CMode -> Bool
-foreign import "s_ischr_wrap"  unsafe s_ischr  :: CMode -> Bool
-foreign import "s_isblk_wrap"  unsafe s_isblk  :: CMode -> Bool
-foreign import "s_isdir_wrap"  unsafe s_isdir  :: CMode -> Bool
-foreign import "s_isfifo_wrap" unsafe s_isfifo :: CMode -> Bool
+foreign import "__hscore_s_isreg"  unsafe s_isreg  :: CMode -> Bool
+foreign import "__hscore_s_ischr"  unsafe s_ischr  :: CMode -> Bool
+foreign import "__hscore_s_isblk"  unsafe s_isblk  :: CMode -> Bool
+foreign import "__hscore_s_isdir"  unsafe s_isdir  :: CMode -> Bool
+foreign import "__hscore_s_isfifo" unsafe s_isfifo :: CMode -> Bool
 
 #ifndef mingw32_TARGET_OS
-foreign import "s_issock_wrap" s_issock :: CMode -> Bool
+foreign import "__hscore_s_issock" s_issock :: CMode -> Bool
 #else
 s_issock :: CMode -> Bool
 s_issock cmode = False
