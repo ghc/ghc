@@ -956,7 +956,11 @@ untaggedIdSizeW = untaggedSizeW . typePrimRep . idType
 
 unboxedTupleException :: a
 unboxedTupleException 
-   = throwDyn (Panic "bytecode generator can't handle unboxed tuples")
+   = throwDyn 
+        (Panic 
+           ("Bytecode generator can't handle unboxed tuples.  Possibly due\n" ++
+            "\tto foreign import/export decls in source.  Workaround:\n" ++
+            "\tcompile this module to a .o file, then restart session."))
 
 \end{code}
 
