@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.213 2002/03/04 17:01:27 simonmar Exp $
+# $Id: Makefile,v 1.214 2002/03/26 21:59:41 sof Exp $
 
 TOP = ..
 
@@ -25,7 +25,7 @@ WAYS=$(GhcCompilerWays)
 # equivalent of `env' if it doesn't exist locally).
 #
 ifneq "$(way)" "dll"
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 HS_PROG=ghc$(_way)-$(ProjectVersion)
 else
 HS_PROG=ghc$(_way)
@@ -138,7 +138,7 @@ endif
 
 # Enable code that assumes a MSDOSish subshell. See mk/config.mk.in
 # for explanatory comment as to what this does.
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 ghc_501_at_least = $(shell if (test $(GhcVanonVersion) -ge 5010); then echo YES; else echo NO; fi)
 endif
 
@@ -187,7 +187,7 @@ SRC_HC_OPTS += \
 # which needs it).
 SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
-ifneq "$(mingw32_TARGET_OS)" "1"
+ifneq "$(mingw32_HOST_OS)" "1"
 SRC_HC_OPTS += -package concurrent -package posix -package util
 else
 SRC_HC_OPTS += -package concurrent -package util
@@ -226,7 +226,7 @@ rename/ParseIface_HC_OPTS 	+= -K2m
 parser/Parser_HC_OPTS 		+= -K2m
 endif
 
-ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
+ifeq "$(HOSTPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
 endif
 
@@ -263,7 +263,7 @@ main/SysTools_HC_OPTS		= -fno-cse
 # The #include is vital for the via-C route, else the C
 # compiler doesn't realise that the stcall foreign imports are indeed
 # stdcall, and doesn't generate the Foo@8 name for them
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 main/SysTools_HC_OPTS		+= '-\#include <windows.h>' '-\#include <process.h>'
 endif
 
@@ -356,7 +356,7 @@ CLEAN_FILES += ghc-inplace
 
 DESTDIR = $(INSTALL_LIBRARY_DIR_GHC)
 
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALL_LIBEXECS += $(HS_PROG)
 else
 INSTALL_PROGS += $(HS_PROG)
