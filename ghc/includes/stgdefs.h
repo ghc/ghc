@@ -215,16 +215,18 @@ void miniInterpret PROTO((StgFunPtr));
 void miniInterpret_debug PROTO(( StgFunPtr, void(*)(STG_NO_ARGS) ));
 void miniInterpretEnd(STG_NO_ARGS);
 
+/* UNUSED   -- SOF 9/97
 StgFunPtr evaluateMain(STG_NO_ARGS);
 StgFunPtr returnMain(STG_NO_ARGS);
 StgFunPtr impossible_jump_after_switch(STG_NO_ARGS);
+*/
 
 /* hooks: user might write some of their own */
 void ErrorHdrHook	PROTO((FILE *));
 void OutOfHeapHook	PROTO((W_, W_));
 void StackOverflowHook	PROTO((I_));
 #ifdef CONCURRENT
-void NoRunnableThreadsHook (STG_NO_ARGS);
+int NoRunnableThreadsHook (STG_NO_ARGS);
 #endif
 void MallocFailHook	PROTO((I_, char *));
 void PatErrorHdrHook	PROTO((FILE *));
