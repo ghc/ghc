@@ -9,5 +9,5 @@ data Person	=  Female {firstName, lastName :: String}
 isFemale (Female{})   =  True
 isFemale (Male{})     =  False
 
-main = print (isFemale (Female {firstName = "Jane"}))
+main = print (isFemale (Female {firstName = "Jane", lastName = "Smith"}))
 
