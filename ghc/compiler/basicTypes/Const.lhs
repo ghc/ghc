@@ -346,8 +346,12 @@ pprLit lit
 							<+> ppr range_max)])
 			-- in interface files, parenthesize raw negative ints.
 			-- this avoids problems like {-1} being interpreted
-			-- as a comment starter.
+			-- as a comment starter. -}
 		       | ifaceStyle sty && i < 0 -> parens (integer i)
+			-- avoid a problem whereby gcc interprets the constant
+			-- minInt as unsigned.
+		       | code_style && i == (toInteger (minBound :: Int))
+				-> parens (hcat [integer (i+1), text "-1"])
 		       | otherwise -> integer i
 
 		       where
