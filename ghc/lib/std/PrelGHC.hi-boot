@@ -250,7 +250,6 @@ __export PrelGHC
   readIntOffAddrzh
   readWordOffAddrzh
   readAddrOffAddrzh
-  readForeignObjOffAddrzh
   readFloatOffAddrzh
   readDoubleOffAddrzh
   readStablePtrOffAddrzh
