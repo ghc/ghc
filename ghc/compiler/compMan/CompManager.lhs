@@ -711,12 +711,16 @@ ppFilesFromSummaries summaries
   = [ fn | Just fn <- map toPpFile summaries ]
   where
    toPpFile sum
-     | hspp /= ml_hs_file loc = hspp
-     | otherwise              = Nothing
+     | not (isSameFilePath hspp hs) = hspp
+     | otherwise                    = Nothing
     where
       loc  = ms_location sum
       hspp = ml_hspp_file loc
-
+      hs   = ml_hs_file loc
+      
+       -- better make extra sure 'a' and 'b' are in canonical form 
+       -- before using this equality test.
+      isSameFilePath a b = a == b
 
 -----------------------------------------------------------------------------
 -- getValidLinkables
