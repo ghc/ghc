@@ -235,8 +235,8 @@ tupleCon Boxed   i = snd (boxedTupleArr   ! i)
 tupleCon Unboxed i = snd (unboxedTupleArr ! i)
 
 boxedTupleArr, unboxedTupleArr :: Array Int (TyCon,DataCon)
-boxedTupleArr   = array (0,mAX_TUPLE_SIZE) [(i,mk_tuple Boxed i)   | i <- [0..mAX_TUPLE_SIZE]]
-unboxedTupleArr = array (0,mAX_TUPLE_SIZE) [(i,mk_tuple Unboxed i) | i <- [0..mAX_TUPLE_SIZE]]
+boxedTupleArr   = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Boxed i | i <- [0..mAX_TUPLE_SIZE]]
+unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Unboxed i | i <- [0..mAX_TUPLE_SIZE]]
 
 mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
 mk_tuple boxity arity = (tycon, tuple_con)
