@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.98 2001/03/02 16:15:53 simonmar Exp $
+ * $Id: GC.c,v 1.99 2001/03/20 11:37:21 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1521,15 +1521,15 @@ loop:
     return q;
 
   case IND_STATIC:
-    /* a revertible CAF - it'll be on the CAF list, so don't do
-     * anything with it here (we'll scavenge it later).
+    /* If q->saved_info != NULL, then it's a revertible CAF - it'll be
+     * on the CAF list, so don't do anything with it here (we'll
+     * scavenge it later).
      */
-    if (((StgIndStatic *)q)->saved_info != NULL) {
-       return q;
-    }
-    if (major_gc && IND_STATIC_LINK((StgClosure *)q) == NULL) {
-       IND_STATIC_LINK((StgClosure *)q) = static_objects;
-       static_objects = (StgClosure *)q;
+    if (major_gc
+	  && ((StgIndStatic *)q)->saved_info == NULL
+ 	  && IND_STATIC_LINK((StgClosure *)q) == NULL) {
+	IND_STATIC_LINK((StgClosure *)q) = static_objects;
+	static_objects = (StgClosure *)q;
     }
     return q;
 
@@ -2664,7 +2664,7 @@ scavenge_static(void)
     case THUNK_STATIC:
     case FUN_STATIC:
       scavenge_srt(info);
-      /* fall through */
+      break;
       
     case CONSTR_STATIC:
       {	
