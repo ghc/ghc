@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.44 1998/08/14 12:13:06 sof Exp $
+# $Id: Makefile,v 1.45 1998/08/21 11:03:30 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -267,7 +267,7 @@ CLEAN_FILES += hsp
 
 SRC_LD_OPTS += -no-link-chk
 ifeq "$(GhcReportCompiles)" "YES"
-SRC_LD_OPTS += -syslib misc
+SRC_LD_OPTS += -syslib misc -syslib exts
 endif
 
 #-----------------------------------------------------------------------------
