@@ -192,3 +192,18 @@ test053:
 	test -f d2/R/S$(OBJSUFFIX)
 	test -f hi/P/Q.hi
 	test -f d1/P/Q$(OBJSUFFIX)
+
+# -----------------------------------------------------------------------------
+# Other tests
+
+# Test the -keep-hc-files works without --make
+test060:
+	@$(RM) A.hi A.o A.hc
+	$(TEST_HC) -c -keep-hc-files -fvia-C A.hs
+	test -f A.hc
+
+# Test the -keep-hc-files works with --make
+test061:
+	@$(RM) A.hi A.o A.hc
+	$(TEST_HC) --make -keep-hc-files -fvia-C A.hs
+	test -f A.hc

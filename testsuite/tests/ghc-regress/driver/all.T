@@ -18,3 +18,6 @@ test('driver043', normal, run_command_ignore_output, ['$MAKE test043'])
 test('driver051', normal, run_command_ignore_output, ['$MAKE test051'])
 test('driver052', normal, run_command_ignore_output, ['$MAKE test052'])
 test('driver053', normal, run_command_ignore_output, ['$MAKE test053'])
+
+test('driver060', normal, run_command_ignore_output, ['$MAKE test060'])
+test('driver061', normal, run_command_ignore_output, ['$MAKE test061'])
