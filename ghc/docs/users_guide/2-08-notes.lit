@@ -26,6 +26,8 @@ Here's a list of the changes made since GHC 2.07:
 
 \item added support for @unmapMiddleStackPage@ on cygwin32.
 
+\item fixed a divide-by-zero problem in the GC statistics code.
+
 \end{itemize}
 
 The following changes were made to Happy:
