@@ -3718,7 +3718,7 @@ Workaround: don't put weird things in string args to <command>cpp</command> macr
 </sect1>
 
 
-<sect1 id="winbuild"><title>Notes for building under Windows</title>
+<Sect1 id="winbuild"><Title>Notes for building under Windows</Title>
 
 <para>
 This section summarises how to get the utilities you need on your
@@ -3730,20 +3730,132 @@ guide) before continuing to read these notes.
 </para>
 
 
-<sect2><title>Before you start</title>
+<Sect2><Title>Installing and configuring Cygwin</Title>
 
+<para>You don't need Cygwin to <emphasis>use</emphasis> GHC, but you do need it to <emphasis>build</emphasis> GHC.</para>
+
+<para> Install Cygwin from <ulink url="http://www.cygwin.com/">http://www.cygwin.com/</ulink>.
+The installation process is straightforward; we install it in <Filename>c:/cygwin</Filename>.
+Both <command>cvs</command> and <command>ssh</command>
+come with Cygwin, but you'll need them, so make sure you select them when running
+the Cygwin installer.
+
+</para>
+<para> Now set the following user environment variables:
 <itemizedlist>
+
+<listitem><para> Add <filename>c:/cygwin/bin</filename> to your 
+<constant>PATH</constant></para></listitem>
+
 <listitem>
 <para>
-Make sure that the user environment variable
-<constant>MAKE_MODE</constant> is set to <literal>UNIX</literal>. If you
+Set <constant>MAKE_MODE</constant> to <Literal>UNIX</Literal>. If you
 don't do this you get very weird messages when you type
-<command>make</command>, such as:
+<Command>make</Command>, such as:
 <Screen>
 /c: /c: No such file or directory
 </Screen>
 </para>
 </listitem>
+
+<listitem><para> Set <constant>SHELL</constant> to
+<Filename>c:/cygwin/bin/sh</Filename>. When you invoke a shell in Emacs, this
+<constant>SHELL</constant> is what you get.
+</para></listitem>
+
+<listitem><para> Set <constant>HOME</constant> to point to your 
+home directory.  This is where, for example,
+<command>bash</command> will look for your <filename>.bashrc</filename>
+file.  Ditto <command>emacs</command> looking for <filename>.emacsrc</filename>
+</para></listitem>
+</itemizedlist>
+</para>
+
+<para>
+There are a few other things to do:
+<itemizedlist>
+<listitem>
+<para>
+Some script files used in the make system start with "<Command>#!/bin/perl</Command>",
+(and similarly for <Command>bash</Command>).  Notice the hardwired path!
+So you need to ensure that your <Filename>/bin</Filename> directory has the following
+binaries in it:
+<itemizedlist>
+<listitem> <para><Command>sh</Command></para></listitem>
+<listitem> <para><Command>perl</Command></para></listitem>
+<listitem> <para><Command>cat</Command></para></listitem>
+</itemizedlist>
+All these come in Cygwin's <Filename>bin</Filename> directory, which you probably have
+installed as <Filename>c:/cygwin/bin</Filename>.  By default Cygwin mounts "<Filename>/</Filename>" as
+<Filename>c:/cygwin</Filename>, so if you just take the defaults it'll all work ok.
+(You can discover where your Cygwin
+root directory <Filename>/</Filename> is by typing <Command>mount</Command>).
+Provided <Filename>/bin</Filename> points to the Cygwin <Filename>bin</Filename>
+directory, there's no need to copy anything.
+</para>
+</listitem>
+
+<listitem>
+<para>
+By default, cygwin provides the command shell <filename>ash</filename>
+as <filename>sh.exe</filename>. It has a couple of 'issues', so
+in your <filename>/bin</filename> directory, make sure that <filename>
+bash.exe</filename> is also provided as <filename>sh.exe</filename>
+(i.e. overwrite the old <filename>sh.exe</filename> with a copy of
+<filename>bash.exe</filename>).
+</para>
+</listitem>
+</itemizedlist>
+</para>
+
+<para>Finally, here are some things to be aware of when using Cygwin:
+<itemizedlist>
+<listitem> <para>Cygwin doesn't deal well with filenames that include
+spaces. "<filename>Program Files</filename>" and "<filename>Local files</filename>" are
+common gotchas.
+</para></listitem>
+
+<listitem> <para> Cygwin implements a symbolic link as a text file with some
+magical text in it.  So other programs that don't use Cygwin's
+I/O libraries won't recognise such files as symlinks.  
+In particular, programs compiled by GHC are meant to be runnable
+without having Cygwin, so they don't use the Cygwin library, so
+they don't recognise symlinks.
+</para></listitem>
+
+<listitem> <para>
+Win32 has a <command>find</command> command which is not the same as Cygwin's find.
+You will probably discover that the Win32 <command>find</command> appears in your <constant>PATH</constant>
+before the Cygwin one, because it's in the <emphasis>system</emphasis> <constant>PATH</constant> 
+environment variable, whereas you have probably modified the <emphasis>user</emphasis> <constant>PATH</constant> 
+variable.  You can always invoke <command>find</command> with an absolute path, or rename it.
+</para></listitem>
+</itemizedlist>
+</para>
+
+</Sect2>
+
+<Sect2><Title>Other things you need to install</Title>
+
+<para>You have to install the following other things to build GHC:
+<itemizedlist>
+<listitem>
+<para>
+Install an executable GHC, from <ulink url="http://www.haskell.org/ghc">http://www.haskell.org/ghc</ulink>.
+This is what you will use to compile GHC.  Add it in your
+<constant>PATH</constant>: the installer tells you the path element
+you need to add upon completion.
+</para>
+</listitem>
+
+<listitem>
+<para>
+Install an executable Happy, from <ulink url="http://www.haskell.org/happy">http://www.haskell.org/happy</ulink>.
+Happy is a parser generator used to compile the Haskell grammar.  Add it in your
+<constant>PATH</constant>.
+</para>
+</listitem>
+
 
 <listitem>
 <para>GHC uses the <emphasis>mingw</emphasis> C compiler to
@@ -3753,15 +3865,69 @@ We install it in <filename>c:/mingw</filename>.
 </para>
 </listitem>
 
+
 <listitem>
-<para>
-Install a version of GHC, and put it in your
-<constant>PATH</constant> (the installer tells you the path element
-you need to add upon completion.)
+<para> Finally, check out a copy of GHC sources from
+the CVS repository, following the instructions above (<xref linkend="cvs-access">).
 </para>
 </listitem>
-      </itemizedlist>
-    </sect2>
+</itemizedlist>
+</para>
+</sect2>
+
+<Sect2><Title>Building GHC</Title>
+
+<para>OK!  
+Now go read the documentation above on building from source (<xref linkend="sec-building-from-source">); 
+the bullets below only tell
+you about Windows-specific wrinkles.</para>
+<ItemizedList>
+<listitem>
+<para>
+Run <Command>autoconf</Command> both in <filename>fptools</filename>
+and in <filename>fptools/ghc</filename>.  If you omit the latter step you'll
+get an error when you run <filename>./configure</filename>:
+<Screen>
+...lots of stuff...
+creating mk/config.h
+mk/config.h is unchanged
+configuring in ghc
+running /bin/sh ./configure  --cache-file=.././config.cache --srcdir=.
+./configure: ./configure: No such file or directory
+configure: error: ./configure failed for ghc
+</Screen>
+</para>
+</listitem>
+
+<listitem>
+<para>
+You either need to add <filename>ghc</filename> to your
+<constant>PATH</constant> before you invoke
+<Command>configure</Command>, or use the <Command>configure</Command>
+option <option>--with-ghc=c:/ghc/ghc-some-version/bin/ghc</option>.
+</para>
+</listitem>
+
+<listitem>
+  <para> 
+    After <command>autoconf</command> run <command>./configure</command> in
+    <filename>fptools/</filename> thus:
+
+<Screen>
+  ./configure --host=i386-unknown-mingw32 --with-gcc=/mingw/bin/gcc
+</Screen>
+
+Both these options are important! It's possible to get into
+trouble using the wrong C compiler!
+</para>
+</listitem>
+
+<listitem><para> Do not attempt to build the documentation.
+It needs all kinds of wierd Jade stuff that we haven't worked out for
+Win32.</para></listitem>
+</ItemizedList>
+</Sect2>
+
 
 </sect1>
 
