@@ -1,3 +1,0 @@
-interface OneB where
-
-fB :: a -> a
