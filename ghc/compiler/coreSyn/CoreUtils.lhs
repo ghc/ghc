@@ -69,6 +69,7 @@ import Unique		( Unique )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
 import Util             ( equalLength, lengthAtLeast )
+import TysPrim		( statePrimTyCon )
 \end{code}
 
 
@@ -752,14 +753,13 @@ arityType (Var v)
 			-- use the idinfo here
 
 	-- Lambdas; increase arity
-arityType (Lam x e) | isId x    = AFun (isOneShotLambda x) (arityType e)
+arityType (Lam x e) | isId x    = AFun (isOneShotLambda x || isStateHack x) (arityType e)
 		    | otherwise	= arityType e
 
 	-- Applications; decrease arity
 arityType (App f (Type _)) = arityType f
 arityType (App f a)  	   = case arityType f of
-				AFun one_shot xs | one_shot	 -> xs
-						 | exprIsCheap a -> xs
+				AFun one_shot xs | exprIsCheap a -> xs
 				other				 -> ATop
 							   
 	-- Case/Let; keep arity if either the expression is cheap
@@ -775,6 +775,28 @@ arityType (Let b e) = case arityType e of
 					     | otherwise		      -> ATop
 
 arityType other = ATop
+
+isStateHack id = case splitTyConApp_maybe (idType id) of
+                     Just (tycon,_) | tycon == statePrimTyCon -> True
+                     other                                    -> False
+
+	-- The last clause is a gross hack.  It claims that 
+	-- every function over realWorldStatePrimTy is a one-shot
+	-- function.  This is pretty true in practice, and makes a big
+	-- difference.  For example, consider
+	--	a `thenST` \ r -> ...E...
+	-- The early full laziness pass, if it doesn't know that r is one-shot
+	-- will pull out E (let's say it doesn't mention r) to give
+	--	let lvl = E in a `thenST` \ r -> ...lvl...
+	-- When `thenST` gets inlined, we end up with
+	--	let lvl = E in \s -> case a s of (r, s') -> ...lvl...
+	-- and we don't re-inline E.
+	--
+	-- It would be better to spot that r was one-shot to start with, but
+	-- I don't want to rely on that.
+	--
+	-- Another good example is in fill_in in PrelPack.lhs.  We should be able to
+	-- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
 
 {- NOT NEEDED ANY MORE: etaExpand is cleverer
 ok_note InlineMe = False

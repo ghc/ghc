@@ -104,7 +104,6 @@ import Name	 	( Name, OccName,
 			) 
 import OccName		( EncodedFS, mkWorkerOcc )
 import PrimRep		( PrimRep )
-import TysPrim		( statePrimTyCon )
 import FieldLabel	( FieldLabel )
 import Maybes		( orElse )
 import SrcLoc		( SrcLoc )
@@ -464,31 +463,10 @@ idLBVarInfo :: Id -> LBVarInfo
 idLBVarInfo id = lbvarInfo (idInfo id)
 
 isOneShotLambda :: Id -> Bool
-isOneShotLambda id = analysis || hack
+isOneShotLambda id = analysis
   where analysis = case idLBVarInfo id of
                      LBVarInfo u    | u `eqUsage` usOnce      -> True
                      other                                    -> False
-        hack     = case splitTyConApp_maybe (idType id) of
-                     Just (tycon,_) | tycon == statePrimTyCon -> True
-                     other                                    -> False
-
-	-- The last clause is a gross hack.  It claims that 
-	-- every function over realWorldStatePrimTy is a one-shot
-	-- function.  This is pretty true in practice, and makes a big
-	-- difference.  For example, consider
-	--	a `thenST` \ r -> ...E...
-	-- The early full laziness pass, if it doesn't know that r is one-shot
-	-- will pull out E (let's say it doesn't mention r) to give
-	--	let lvl = E in a `thenST` \ r -> ...lvl...
-	-- When `thenST` gets inlined, we end up with
-	--	let lvl = E in \s -> case a s of (r, s') -> ...lvl...
-	-- and we don't re-inline E.
-	--
-	-- It would be better to spot that r was one-shot to start with, but
-	-- I don't want to rely on that.
-	--
-	-- Another good example is in fill_in in PrelPack.lhs.  We should be able to
-	-- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
 
 setOneShotLambda :: Id -> Id
 setOneShotLambda id = modifyIdInfo (`setLBVarInfo` LBVarInfo usOnce) id
