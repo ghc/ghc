@@ -18,7 +18,7 @@ import {-# SOURCE #-} SpecEnv ( SpecEnv )
 #endif
 
 import CoreSyn
-import CoreUnfold	( UnfoldingGuidance(..), Unfolding, mkUnfolding )
+import CoreUnfold	( UnfoldingGuidance(..), Unfolding )
 import Id		( mkPrimitiveId, mkTemplateLocals )
 import IdInfo		-- quite a few things
 import StdIdInfo
