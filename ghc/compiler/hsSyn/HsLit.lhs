@@ -41,21 +41,19 @@ data HsLit
 	-- before the typechecker it's just an error value
   deriving( Eq )
 
-data HsOverLit name	-- An overloaded literal
-  = HsIntegral	    Integer name	-- Integer-looking literals;
-					-- The names is "fromInteger"
-  | HsFractional    Rational name	-- Frac-looking literals
-					-- The name is "fromRational"
+data HsOverLit 		-- An overloaded literal
+  = HsIntegral	    Integer 		-- Integer-looking literals;
+  | HsFractional    Rational 		-- Frac-looking literals
 
-instance Eq (HsOverLit name) where
-  (HsIntegral i1 _)   == (HsIntegral i2 _)   = i1 == i2
-  (HsFractional f1 _) == (HsFractional f2 _) = f1 == f2
+instance Eq HsOverLit where
+  (HsIntegral i1)   == (HsIntegral i2)   = i1 == i2
+  (HsFractional f1) == (HsFractional f2) = f1 == f2
 
-instance Ord (HsOverLit name) where
-  compare (HsIntegral i1 _)   (HsIntegral i2 _)   = i1 `compare` i2
-  compare (HsIntegral _ _)    (HsFractional _ _)  = LT
-  compare (HsFractional f1 _) (HsFractional f2 _) = f1 `compare` f2
-  compare (HsFractional f1 _) (HsIntegral _ _)    = GT
+instance Ord HsOverLit where
+  compare (HsIntegral i1)   (HsIntegral i2)   = i1 `compare` i2
+  compare (HsIntegral _)    (HsFractional _)  = LT
+  compare (HsFractional f1) (HsFractional f2) = f1 `compare` f2
+  compare (HsFractional f1) (HsIntegral _)    = GT
 \end{code}
 
 \begin{code}
@@ -73,9 +71,9 @@ instance Outputable HsLit where
     ppr (HsIntPrim i)	 = integer i  <> char '#'
     ppr (HsLitLit s _)	 = hcat [text "``", ptext s, text "''"]
 
-instance Outputable (HsOverLit name) where
-  ppr (HsIntegral i _)   = integer i
-  ppr (HsFractional f _) = rational f
+instance Outputable HsOverLit where
+  ppr (HsIntegral i)   = integer i
+  ppr (HsFractional f) = rational f
 \end{code}
 
 

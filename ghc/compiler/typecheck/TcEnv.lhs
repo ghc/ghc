@@ -16,7 +16,7 @@ module TcEnv(
 	-- Global environment
 	tcExtendGlobalEnv, tcExtendGlobalValEnv, 
 	tcLookupTyCon, tcLookupClass, tcLookupGlobalId, tcLookupDataCon,
-	tcLookupGlobal_maybe, tcLookupGlobal, 
+	tcLookupGlobal_maybe, tcLookupGlobal, tcLookupSyntaxId, tcLookupSyntaxName,
 
 	-- Local environment
 	tcExtendKindEnv,  tcLookupLocalIds,
@@ -68,6 +68,7 @@ import InstEnv		( InstEnv, emptyInstEnv )
 import HscTypes		( lookupType, TyThing(..) )
 import Util		( zipEqual )
 import SrcLoc		( SrcLoc )
+import qualified PrelNames 
 import Outputable
 
 import IOExts		( newIORef )
@@ -85,6 +86,8 @@ type TcIdSet = IdSet
 
 data TcEnv
   = TcEnv {
+	tcSyntaxMap :: PrelNames.SyntaxMap,	-- The syntax map (usually the identity)
+
 	tcGST  	 :: Name -> Maybe TyThing,	-- The type environment at the moment we began this compilation
 
 	tcInsts	 :: InstEnv,		-- All instances (both imported and in this module)
@@ -138,10 +141,11 @@ data TcTyThing
 --	3. Then we zonk the kind variable.
 --	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
 
-initTcEnv :: HomeSymbolTable -> PackageTypeEnv -> IO TcEnv
-initTcEnv hst pte 
+initTcEnv :: PrelNames.SyntaxMap -> HomeSymbolTable -> PackageTypeEnv -> IO TcEnv
+initTcEnv syntax_map hst pte 
   = do { gtv_var <- newIORef emptyVarSet ;
-	 return (TcEnv { tcGST    = lookup,
+	 return (TcEnv { tcSyntaxMap = syntax_map,
+			 tcGST    = lookup,
 		      	 tcGEnv   = emptyNameEnv,
 		      	 tcInsts  = emptyInstEnv,
 		      	 tcLEnv   = emptyNameEnv,
@@ -343,6 +347,21 @@ tcLookupLocalIds ns
     lookup lenv name = case lookupNameEnv lenv name of
 			Just (ATcId id) -> id
 			other		-> pprPanic "tcLookupLocalIds" (ppr name)
+
+tcLookupSyntaxId :: Name -> NF_TcM Id
+-- Lookup a name like PrelNum.fromInt, and return the corresponding Id,
+-- after mapping through the SyntaxMap.  This may give us the Id for
+-- (say) MyPrelude.fromInt
+tcLookupSyntaxId name
+  = tcGetEnv 		`thenNF_Tc` \ env ->
+    returnNF_Tc (case lookup_global env (tcSyntaxMap env name) of
+			Just (AnId id) -> id
+			other  	       -> pprPanic "tcLookupSyntaxId" (ppr name))
+
+tcLookupSyntaxName :: Name -> NF_TcM Name
+tcLookupSyntaxName name
+  = tcGetEnv 		`thenNF_Tc` \ env ->
+    returnNF_Tc (tcSyntaxMap env name)
 \end{code}
 
 

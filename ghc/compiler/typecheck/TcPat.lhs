@@ -20,7 +20,7 @@ import Inst		( InstOrigin(..),
 import Id		( mkVanillaId )
 import Name		( Name )
 import FieldLabel	( fieldLabelName )
-import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId )
+import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, tcLookupSyntaxId )
 import TcType 		( TcType, TcTyVar, tcInstTyVars, newTyVarTy )
 import TcMonoType	( tcHsSigType )
 import TcUnify 		( unifyTauTy, unifyListTy, unifyTupleTy	)
@@ -35,7 +35,7 @@ import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
 import TysWiredIn	( charTy, stringTy, intTy, integerTy )
-import PrelNames	( eqStringName, eqName, geName, cCallableClassName )
+import PrelNames	( minusName, eqStringName, eqName, geName, cCallableClassName )
 import BasicTypes	( isBoxed )
 import Bag
 import Outputable
@@ -285,8 +285,8 @@ tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
   where
     origin = PatOrigin pat
     lit' = case over_lit of
-		HsIntegral i   _ -> HsInteger i
-		HsFractional f _ -> HsRat f pat_ty
+		HsIntegral i   -> HsInteger i
+		HsFractional f -> HsRat f pat_ty
 \end{code}
 
 %************************************************************************
@@ -296,9 +296,10 @@ tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
 %************************************************************************
 
 \begin{code}
-tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus) pat_ty
+tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i)) pat_ty
   = tc_bndr name pat_ty				`thenTc` \ bndr_id ->
-    tcLookupGlobalId minus			`thenNF_Tc` \ minus_sel_id ->
+	-- The '-' part is re-mappable syntax
+    tcLookupSyntaxId minusName			`thenNF_Tc` \ minus_sel_id ->
     tcLookupGlobalId geName			`thenNF_Tc` \ ge_sel_id ->
     newOverloadedLit origin lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie1) ->
     newMethod origin ge_sel_id    [pat_ty]	`thenNF_Tc` \ ge ->

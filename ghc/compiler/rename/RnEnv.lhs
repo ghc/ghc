@@ -12,27 +12,38 @@ import {-# SOURCE #-} RnHiFiles
 
 import HscTypes		( ModIface(..) )
 import HsSyn
+import RnHsSyn		( RenamedHsDecl )
 import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
 			  mkRdrUnqual, mkRdrQual, qualifyRdrName, lookupRdrEnv, foldRdrEnv
 			)
 import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
-			  ImportReason(..), GlobalRdrEnv, AvailEnv,
-			  AvailInfo, Avails, GenAvailInfo(..), NameSupply(..) )
+			  ImportReason(..), GlobalRdrEnv, GlobalRdrElt(..), AvailEnv,
+			  AvailInfo, Avails, GenAvailInfo(..), NameSupply(..), 
+			  Deprecations(..), lookupDeprec
+			)
 import RnMonad
 import Name		( Name,
 			  getSrcLoc, 
 			  mkLocalName, mkGlobalName,
 			  mkIPName, nameOccName, nameModule_maybe,
-			  setNameModuleAndLoc
+			  setNameModuleAndLoc, mkNameEnv
 			)
 import Name		( extendNameEnv_C, plusNameEnv_C, nameEnvElts )
 import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
 import Module		( ModuleName, moduleName, mkVanillaModule, 
-			  mkSysModuleNameFS, moduleNameFS,
-			  WhereFrom(..) )
+			  mkSysModuleNameFS, moduleNameFS, WhereFrom(..) )
+import TysWiredIn	( unitTyCon, intTyCon, boolTyCon )
+import Type		( funTyCon )
+import PrelNames	( mkUnboundName, syntaxList, SyntaxMap,	vanillaSyntaxMap,
+			  derivingOccurrences,
+			  mAIN_Name, pREL_MAIN_Name, 
+			  ioTyConName, printName,
+			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
+			  eqStringName
+			)
 import FiniteMap
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
@@ -40,7 +51,8 @@ import Outputable
 import ListSetOps	( removeDups, equivClasses )
 import Util		( sortLt )
 import List		( nub )
-import PrelNames	( mkUnboundName )
+import UniqFM		( lookupWithDefaultUFM )
+import Maybes		( orElse )
 import CmdLineOpts
 import FastString	( FastString )
 \end{code}
@@ -62,7 +74,6 @@ newTopBinder :: Module -> RdrName -> SrcLoc -> RnM d Name
 
 newTopBinder mod rdr_name loc
   = 	-- First check the cache
-    -- traceRn (text "newTopBinder" <+> ppr mod <+> ppr loc) `thenRn_`
 
     	-- There should never be a qualified name in a binding position (except in instance decls)
 	-- The parser doesn't check this because the same parser parses instance decls
@@ -92,7 +103,7 @@ newTopBinder mod rdr_name loc
 			new_cache = addToFM cache key new_name
 		     in
 		     setNameSupplyRn (name_supply {nsNames = new_cache})	`thenRn_`
-		     traceRn (text "newTopBinder: overwrite" <+> ppr new_name) `thenRn_`
+--		     traceRn (text "newTopBinder: overwrite" <+> ppr new_name) `thenRn_`
 		     returnRn new_name
 		     
 	-- Miss in the cache!
@@ -106,7 +117,7 @@ newTopBinder mod rdr_name loc
 			new_cache  = addToFM cache key new_name
 		   in
 		   setNameSupplyRn (name_supply {nsUniqs = us', nsNames = new_cache})	`thenRn_`
-		   traceRn (text "newTopBinder: new" <+> ppr new_name) `thenRn_`
+--		   traceRn (text "newTopBinder: new" <+> ppr new_name) `thenRn_`
 		   returnRn new_name
 
 
@@ -269,11 +280,13 @@ lookupSrcName global_env rdr_name
 
   | otherwise
   = case lookupRdrEnv global_env rdr_name of
-	Just [(name,_)]		-> returnRn name
-	Just stuff@((name,_):_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
-		       		   returnRn name
-	Nothing			-> failWithRn (mkUnboundName rdr_name)
-				   	      (unknownNameErr rdr_name)
+	Just [GRE name _ Nothing]	-> returnRn name
+	Just [GRE name _ (Just deprec)] -> warnDeprec name deprec	`thenRn_`
+					   returnRn name
+	Just stuff@(GRE name _ _ : _)	-> addNameClashErrRn rdr_name stuff	`thenRn_`
+			       		   returnRn name
+	Nothing				-> failWithRn (mkUnboundName rdr_name)
+				   		      (unknownNameErr rdr_name)
 
 lookupOrigName :: RdrName -> RnM d Name 
 lookupOrigName rdr_name
@@ -327,6 +340,108 @@ lookupSysBinder rdr_name
     getModuleRn				`thenRn` \ mod ->
     getSrcLocRn				`thenRn` \ loc ->
     newTopBinder mod rdr_name loc
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Implicit free vars and sugar names}
+%*							*
+%*********************************************************
+
+@addImplicitFVs@ forces the renamer to slurp in some things which aren't
+mentioned explicitly, but which might be needed by the type checker.
+
+\begin{code}
+addImplicitFVs :: GlobalRdrEnv
+	       -> Maybe (ModuleName, [RenamedHsDecl]) 	-- Nothing when compling an expression
+	       -> FreeVars				-- Free in the source
+	       -> RnMG (FreeVars, SyntaxMap)		-- Augmented source free vars
+
+addImplicitFVs gbl_env maybe_mod source_fvs
+  = 	-- Find out what re-bindable names to use for desugaring
+     rnSyntaxNames gbl_env source_fvs		`thenRn` \ (source_fvs1, sugar_map) ->
+
+	-- Find implicit FVs thade
+    extra_implicits maybe_mod		`thenRn` \ extra_fvs ->
+    
+    let
+	implicit_fvs = ubiquitousNames `plusFV` extra_fvs
+	slurp_fvs    = implicit_fvs `plusFV` source_fvs1
+		-- It's important to do the "plus" this way round, so that
+		-- when compiling the prelude, locally-defined (), Bool, etc
+		-- override the implicit ones. 
+    in
+    returnRn (slurp_fvs, sugar_map)
+
+  where
+    extra_implicits Nothing		-- Compiling an expression
+      = returnRn (unitFV printName)	-- print :: a -> IO () may be needed later
+
+    extra_implicits (Just (mod_name, decls))	-- Compiling a module
+      = lookupOrigNames deriv_occs		`thenRn` \ deriving_names ->
+	returnRn (deriving_names `plusFV` implicit_main)
+      where
+	-- Add occurrences for IO or PrimIO
+	implicit_main |  mod_name == mAIN_Name
+		      || mod_name == pREL_MAIN_Name = unitFV ioTyConName
+		      |  otherwise 		    = emptyFVs
+
+	deriv_occs = [occ | TyClD (TyData {tcdDerivs = Just deriv_classes}) <- decls,
+		   	    cls <- deriv_classes,
+			    occ <- lookupWithDefaultUFM derivingOccurrences [] cls ]
+
+-- ubiquitous_names are loaded regardless, because 
+-- they are needed in virtually every program
+ubiquitousNames 
+  = mkFVs [unpackCStringName, unpackCStringFoldrName, 
+	   unpackCStringUtf8Name, eqStringName]
+	-- Virtually every program has error messages in it somewhere
+
+  `plusFV`
+    mkFVs (map getName [unitTyCon, funTyCon, boolTyCon, intTyCon])
+	-- Add occurrences for Int, and (), because they
+	-- are the types to which ambigious type variables may be defaulted by
+	-- the type checker; so they won't always appear explicitly.
+	-- [The () one is a GHC extension for defaulting CCall results.]
+	-- ALSO: funTyCon, since it occurs implicitly everywhere!
+	--  	 (we don't want to be bothered with making funTyCon a
+	--	  free var at every function application!)
+	-- Double is dealt with separately in getGates
+\end{code}
+
+\begin{code}
+rnSyntaxNames :: GlobalRdrEnv -> FreeVars -> RnMG (FreeVars, SyntaxMap)
+-- Look up the re-bindable syntactic sugar names
+-- Any errors arising from these lookups may surprise the
+-- programmer, since they aren't explicitly mentioned, and
+-- the src line will be unhelpful (ToDo)
+
+rnSyntaxNames gbl_env source_fvs
+  = doptRn Opt_NoImplicitPrelude	`thenRn` \ no_prelude -> 
+    if not no_prelude then
+	returnRn (source_fvs, vanillaSyntaxMap)
+    else
+
+	-- There's a -fno-implicit-prelude flag,
+	-- so build the re-mapping function
+    let
+	reqd_syntax_list = filter is_reqd syntaxList
+	is_reqd (n,_)    = n `elemNameSet` source_fvs
+	lookup (n,rn)    = lookupSrcName gbl_env rn	`thenRn` \ rn' ->
+			   returnRn (n,rn')
+    in
+    mapRn lookup reqd_syntax_list	`thenRn` \ rn_syntax_list ->
+    let
+	-- Delete the proxies and add the actuals
+	proxies = map fst rn_syntax_list
+	actuals = map snd rn_syntax_list
+	new_source_fvs = (proxies `delFVs` source_fvs) `plusFV` mkFVs actuals
+
+	syntax_env   = mkNameEnv rn_syntax_list
+	syntax_map n = lookupNameEnv syntax_env n `orElse` n
+    in   
+    returnRn (new_source_fvs, syntax_map)
 \end{code}
 
 
@@ -535,9 +650,11 @@ mkGlobalRdrEnv :: ModuleName		-- Imported module (after doing the "as M" name ch
 	 				-- 	version is hidden)
 	       -> (Name -> Provenance)
 	       -> Avails		-- Whats imported and how
+	       -> Deprecations
 	       -> GlobalRdrEnv
 
-mkGlobalRdrEnv this_mod unqual_imp qual_imp hides mk_provenance avails
+mkGlobalRdrEnv this_mod unqual_imp qual_imp hides 
+	       mk_provenance avails deprecs
   = gbl_env2
   where
  	-- Make the name environment.  We're talking about a 
@@ -560,11 +677,11 @@ mkGlobalRdrEnv this_mod unqual_imp qual_imp hides mk_provenance avails
 	| qual_imp               = env1
 	| otherwise	         = env
 	where
-	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual this_mod occ) (name,prov)
-	  env2 = addOneToGlobalRdrEnv env  (mkRdrUnqual occ) 	    (name,prov)
-	  env3 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    (name,prov)
+	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual this_mod occ) elt
+	  env2 = addOneToGlobalRdrEnv env  (mkRdrUnqual occ) 	    elt
+	  env3 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    elt
 	  occ  = nameOccName name
-	  prov = mk_provenance name
+	  elt  = GRE name (mk_provenance name) (lookupDeprec deprecs name)
 
     del_avail env avail = foldl delOneFromGlobalRdrEnv env rdr_names
 			where
@@ -578,22 +695,24 @@ mkIfaceGlobalRdrEnv :: [(ModuleName,Avails)] -> GlobalRdrEnv
 mkIfaceGlobalRdrEnv m_avails
   = foldl add emptyRdrEnv m_avails
   where
-    add env (mod,avails) = plusGlobalRdrEnv env (mkGlobalRdrEnv mod True False [] (\n -> LocalDef) avails)
+    add env (mod,avails) = plusGlobalRdrEnv env (mkGlobalRdrEnv mod True False [] 
+								(\n -> LocalDef) avails NoDeprecs)
+		-- The NoDeprecs is a bit of a hack I suppose
 \end{code}
 
 \begin{code}
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusFM_C combine_globals env1 env2
 
-addOneToGlobalRdrEnv :: GlobalRdrEnv -> RdrName -> (Name,Provenance) -> GlobalRdrEnv
+addOneToGlobalRdrEnv :: GlobalRdrEnv -> RdrName -> GlobalRdrElt -> GlobalRdrEnv
 addOneToGlobalRdrEnv env rdr_name name = addToFM_C combine_globals env rdr_name [name]
 
 delOneFromGlobalRdrEnv :: GlobalRdrEnv -> RdrName -> GlobalRdrEnv 
 delOneFromGlobalRdrEnv env rdr_name = delFromFM env rdr_name
 
-combine_globals :: [(Name,Provenance)] 	-- Old
-		-> [(Name,Provenance)]	-- New
-		-> [(Name,Provenance)]
+combine_globals :: [GlobalRdrElt] 	-- Old
+		-> [GlobalRdrElt]	-- New
+		-> [GlobalRdrElt]
 combine_globals ns_old ns_new	-- ns_new is often short
   = foldr add ns_old ns_new
   where
@@ -603,11 +722,11 @@ combine_globals ns_old ns_new	-- ns_new is often short
     choose n m | n `beats` m = n
 	       | otherwise   = m
 
-    (n,pn) `beats` (m,pm) = n==m && pn `hasBetterProv` pm
+    (GRE n pn _) `beats` (GRE m pm _) = n==m && pn `hasBetterProv` pm
 
-    is_duplicate :: (Name,Provenance) -> (Name,Provenance) -> Bool
-    is_duplicate (n1,LocalDef) (n2,LocalDef) = False
-    is_duplicate (n1,_)        (n2,_)	     = n1 == n2
+    is_duplicate :: GlobalRdrElt -> GlobalRdrElt -> Bool
+    is_duplicate (GRE n1 LocalDef _) (GRE n2 LocalDef _) = False
+    is_duplicate (GRE n1 _        _) (GRE n2 _	      _) = n1 == n2
 \end{code}
 
 We treat two bindings of a locally-defined name as a duplicate,
@@ -635,8 +754,8 @@ unQualInScope env
   where
     unqual_names :: NameSet
     unqual_names = foldRdrEnv add emptyNameSet env
-    add rdr_name [(name,_)] unquals | isUnqual rdr_name = addOneToNameSet unquals name
-    add _        _          unquals		 	= unquals
+    add rdr_name [GRE name _ _] unquals | isUnqual rdr_name = addOneToNameSet unquals name
+    add _        _              unquals		 	    = unquals
 \end{code}
 
 
@@ -851,12 +970,7 @@ addNameClashErrRn rdr_name (np1:nps)
   where
     msg1 = ptext  SLIT("either") <+> mk_ref np1
     msgs = [ptext SLIT("    or") <+> mk_ref np | np <- nps]
-    mk_ref (name,prov) = quotes (ppr name) <> comma <+> pprNameProvenance name prov
-
-fixityClashErr (rdr_name, ((_,how_in_scope1), (_, how_in_scope2)))
-  = hang (hsep [ptext SLIT("Conflicting fixities for"), quotes (ppr rdr_name)])
-	4 (vcat [ppr how_in_scope1,
-		 ppr how_in_scope2])
+    mk_ref (GRE name prov _) = quotes (ppr name) <> comma <+> pprNameProvenance name prov
 
 shadowedNameWarn shadow
   = hsep [ptext SLIT("This binding for"), 
@@ -880,4 +994,12 @@ dupNamesErr descriptor ((name,loc) : dup_things)
     addErrRn ((ptext SLIT("Conflicting definitions for") <+> quotes (ppr name))
 	      $$ 
 	      (ptext SLIT("in") <+> descriptor))
+
+warnDeprec :: Name -> DeprecTxt -> RnM d ()
+warnDeprec name txt
+  = doptRn Opt_WarnDeprecations				`thenRn` \ warn_drs ->
+    if not warn_drs then returnRn () else
+    addWarnRn (sep [ text (occNameFlavour (nameOccName name)) <+> 
+		     quotes (ppr name) <+> text "is deprecated:", 
+		     nest 4 (ppr txt) ])
 \end{code}

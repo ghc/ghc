@@ -27,7 +27,7 @@ import TcBinds		( tcBindsAndThen )
 import TcEnv		( TcTyThing(..), 
 			  tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
 			  tcLookupTyCon, tcLookupDataCon, tcLookup,
-			  tcExtendGlobalTyVars
+			  tcExtendGlobalTyVars, tcLookupSyntaxName
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsSigType, checkSigTyVars, sigCtxt )
@@ -58,7 +58,7 @@ import TysWiredIn	( boolTy, mkListTy, listTyCon )
 import TcUnify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy )
 import PrelNames	( cCallableClassName, 
 			  cReturnableClassName, 
-			  enumFromName, enumFromThenName,
+			  enumFromName, enumFromThenName, negateName,
 			  enumFromToName, enumFromThenToName,
 			  thenMName, failMName, returnMName, ioTyConName
 			)
@@ -196,8 +196,9 @@ tcMonoExpr (HsLit lit)     res_ty = tcLit lit res_ty
 tcMonoExpr (HsOverLit lit) res_ty = newOverloadedLit (LiteralOrigin lit) lit res_ty
 tcMonoExpr (HsPar expr)    res_ty = tcMonoExpr expr res_ty
 
-tcMonoExpr (NegApp expr neg) res_ty
-  = tcMonoExpr (HsApp (HsVar neg) expr) res_ty
+tcMonoExpr (NegApp expr) res_ty
+  = tcLookupSyntaxName negateName	`thenNF_Tc` \ neg ->
+    tcMonoExpr (HsApp (HsVar neg) expr) res_ty
 
 tcMonoExpr (HsLam match) res_ty
   = tcMatchLambda match res_ty 		`thenTc` \ (match',lie) ->

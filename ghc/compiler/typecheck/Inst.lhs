@@ -35,12 +35,11 @@ module Inst (
 
 import CmdLineOpts ( opt_NoMethodSharing )
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..) )
-import RnHsSyn	( RenamedHsOverLit )
 import TcHsSyn	( TcExpr, TcId, 
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcMonad
-import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupGlobalId )
+import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupSyntaxId )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
 import TcType	( TcThetaType, TcClassContext,
 		  TcType, TcTauType, TcTyVarSet,
@@ -72,7 +71,7 @@ import TysWiredIn ( isIntTy,
 		    doubleDataCon, isDoubleTy,
 		    isIntegerTy
 		  ) 
-import PrelNames( hasKey, fromIntName, fromIntegerClassOpKey )
+import PrelNames( fromIntName, fromIntegerName, fromRationalName )
 import Util	( thenCmp, zipWithEqual, mapAccumL )
 import Bag
 import Outputable
@@ -157,8 +156,8 @@ data Inst
 
   | LitInst
 	Id
-	RenamedHsOverLit	-- The literal from the occurrence site
-	TcType			-- The type at which the literal is used
+	HsOverLit	-- The literal from the occurrence site
+	TcType		-- The type at which the literal is used
 	InstLoc
 \end{code}
 
@@ -435,10 +434,10 @@ cases (the rest are caught in lookupInst).
 
 \begin{code}
 newOverloadedLit :: InstOrigin
-		 -> RenamedHsOverLit
+		 -> HsOverLit
 		 -> TcType
 		 -> NF_TcM (TcExpr, LIE)
-newOverloadedLit orig (HsIntegral i _) ty
+newOverloadedLit orig (HsIntegral i) ty
   | isIntTy ty && inIntRange i		-- Short cut for Int
   = returnNF_Tc (int_lit, emptyLIE)
 
@@ -619,7 +618,7 @@ lookupInst inst@(Method _ id tys theta _ loc)
 
 -- Literals
 
-lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
+lookupInst inst@(LitInst u (HsIntegral i) ty loc)
   | isIntTy ty && in_int_range			-- Short cut for Int
   = returnNF_Tc (GenInst [] int_lit)
 	-- GenInst, not SimpleInst, because int_lit is actually a constructor application
@@ -628,16 +627,13 @@ lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
   = returnNF_Tc (GenInst [] integer_lit)
 
   | in_int_range 				-- It's overloaded but small enough to fit into an Int
-  && from_integer_name `hasKey` fromIntegerClassOpKey	-- And it's the built-in prelude fromInteger
-							-- (i.e. no funny business with user-defined
-							--  packages of numeric classes)
   =	-- So we can use the Prelude fromInt 
-    tcLookupGlobalId fromIntName		`thenNF_Tc` \ from_int ->
+    tcLookupSyntaxId fromIntName		`thenNF_Tc` \ from_int ->
     newMethodAtLoc loc from_int [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) int_lit))
 
   | otherwise   				-- Alas, it is overloaded and a big literal!
-  = tcLookupGlobalId from_integer_name		`thenNF_Tc` \ from_integer ->
+  = tcLookupSyntaxId fromIntegerName		`thenNF_Tc` \ from_integer ->
     newMethodAtLoc loc from_integer [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) integer_lit))
   where
@@ -649,12 +645,12 @@ lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
 -- *definitely* a float or a double, generate the real thing here.
 -- This is essential  (see nofib/spectral/nucleic).
 
-lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
+lookupInst inst@(LitInst u (HsFractional f) ty loc)
   | isFloatTy ty    = returnNF_Tc (GenInst [] float_lit)
   | isDoubleTy ty   = returnNF_Tc (GenInst [] double_lit)
 
   | otherwise 
-  = tcLookupGlobalId from_rat_name		`thenNF_Tc` \ from_rational ->
+  = tcLookupSyntaxId fromRationalName		`thenNF_Tc` \ from_rational ->
     newMethodAtLoc loc from_rational [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
     let
 	rational_ty  = funArgTy (idType method_id)

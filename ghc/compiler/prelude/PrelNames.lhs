@@ -22,6 +22,8 @@ module PrelNames (
 	knownKeyNames, 
         mkTupNameStr, mkTupConRdrName,
 
+	SyntaxMap, vanillaSyntaxMap, SyntaxList, syntaxList, 
+
 	------------------------------------------------------------
 	-- Goups of classes and types
 	needsDataDeclCtxtClassKeys, cCallishClassKeys, noDictClassKeys,
@@ -109,6 +111,7 @@ knownKeyNames
 	-- ClassOps 
 	fromIntName,
 	fromIntegerName,
+	negateName,
 	geName,
 	minusName,
 	enumFromName,
@@ -376,6 +379,7 @@ numClassName	  = clsQual pREL_NUM_Name SLIT("Num") numClassKey
 fromIntName	  = varQual pREL_NUM_Name SLIT("fromInt") fromIntClassOpKey
 fromIntegerName   = varQual pREL_NUM_Name SLIT("fromInteger") fromIntegerClassOpKey
 minusName	  = varQual pREL_NUM_Name SLIT("-") minusClassOpKey
+negateName	  = varQual pREL_NUM_Name SLIT("negate") negateClassOpKey
 plusIntegerName   = varQual pREL_NUM_Name SLIT("plusInteger") plusIntegerIdKey
 timesIntegerName  = varQual pREL_NUM_Name SLIT("timesInteger") timesIntegerIdKey
 integerTyConName  = tcQual  pREL_NUM_Name SLIT("Integer") integerTyConKey
@@ -814,6 +818,7 @@ enumFromToClassOpKey	      = mkPreludeMiscIdUnique 107
 enumFromThenToClassOpKey      = mkPreludeMiscIdUnique 108
 eqClassOpKey		      = mkPreludeMiscIdUnique 109
 geClassOpKey		      = mkPreludeMiscIdUnique 110
+negateClassOpKey	      = mkPreludeMiscIdUnique 111
 failMClassOpKey		      = mkPreludeMiscIdUnique 112
 thenMClassOpKey		      = mkPreludeMiscIdUnique 113 -- (>>=)
 	-- Just a place holder for  unbound variables  produced by the renamer:
@@ -868,6 +873,49 @@ cCallishTyKeys =
 	, word32TyConKey
 	, word64TyConKey
 	]
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Re-bindable desugaring names}
+%*									*
+%************************************************************************
+
+Haskell 98 says that when you say "3" you get the "fromInt" from the
+Standard Prelude, regardless of what is in scope.   However, to experiment
+with having a language that is less coupled to the standard prelude, we're
+trying a non-standard extension that instead gives you whatever "Prelude.fromInt"
+happens to be in scope.  Then you can
+	import Prelude ()
+	import MyPrelude as Prelude
+to get the desired effect.
+
+The SyntaxNames record gives all the names you can rebind in this way.
+This record of names needs to go through the renamer to map RdrNames to
+Names (i.e. look up the names in the in-scope environment), to suck in
+their type signatures from interface file(s).
+
+\begin{code}
+type SyntaxList = [(Name, RdrName)]
+  -- Maps a Name, which identifies the standard built-in thing
+  -- to a RdrName for the re-mapped version of the built-in thing
+
+syntaxList :: SyntaxList
+syntaxList =[ (fromIntName,		mkUnqual varName SLIT("fromInt"))
+	     , (fromIntegerName,	mkUnqual varName SLIT("fromInteger"))
+	     ,	(fromRationalName,	mkUnqual varName SLIT("fromRational"))
+	     ,	(negateName,		mkUnqual varName SLIT("negate"))
+	     ,	(minusName,		mkUnqual varName SLIT("-"))
+			-- For now that's all.  We may add booleans and lists later.
+	    ]
+
+
+type SyntaxMap = Name -> Name
+  -- Maps a standard built-in name, such as PrelNum.fromInt
+  -- to its re-mapped version, such as MyPrelude.fromInt
+
+vanillaSyntaxMap name = name
 \end{code}
 
 

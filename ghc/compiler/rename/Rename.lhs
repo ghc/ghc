@@ -23,45 +23,36 @@ import RnExpr		( rnExpr )
 import RnNames		( getGlobalNames, exportsFromAvail )
 import RnSource		( rnSourceDecls, rnTyClDecl, rnIfaceRuleDecl, rnInstDecl )
 import RnIfaces		( slurpImpDecls, mkImportInfo, recordLocalSlurps,
-			  getInterfaceExports, closeDecls,
+			  closeDecls,
 			  RecompileRequired, outOfDate, recompileRequired
 			)
 import RnHiFiles	( readIface, removeContext, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs,
 			  tryLoadInterface )
-import RnEnv		( availsToNameSet, availName, mkIfaceGlobalRdrEnv,
+import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, 
 			  plusAvailEnv, groupAvails, warnUnusedImports, 
 			  warnUnusedLocalBinds, warnUnusedModules, 
-			  lookupOrigNames, lookupSrcName, 
-			  newGlobalName, unQualInScope
+			  lookupSrcName, addImplicitFVs,
+			  newGlobalName, unQualInScope,, ubiquitousNames
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
 			  moduleEnvElts
 			)
-import Name		( Name, NamedThing(..), getSrcLoc,
+import Name		( Name, NamedThing(..), 
 			  nameIsLocalOrFrom, nameOccName, nameModule,
 			)
 import Name		( mkNameEnv, nameEnvElts, extendNameEnv )
 import RdrName		( foldRdrEnv, isQual )
-import OccName		( occNameFlavour )
 import NameSet
-import TysWiredIn	( unitTyCon, intTyCon, boolTyCon )
-import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
-			  ioTyConName, printName,
-			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
-			  eqStringName
-			)
-import PrelInfo		( derivingOccurrences )
-import Type		( funTyCon )
+import PrelNames	( SyntaxMap, pRELUDE_Name )
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass, 
 			  printErrorsAndWarnings, errorsFound )
 import Bag		( bagToList )
 import FiniteMap	( FiniteMap, fmToList, emptyFM, lookupFM, 
 			  addToFM_C, elemFM, addToFM
 			)
-import UniqFM		( lookupWithDefaultUFM )
 import Maybes		( maybeToBool, catMaybes )
 import Outputable
 import IO		( openFile, IOMode(..) )
@@ -69,10 +60,10 @@ import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable,
 			  ModIface(..), WhatsImported(..), 
 			  VersionInfo(..), ImportVersion, IsExported,
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  GlobalRdrEnv, pprGlobalRdrEnv,
+			  GlobalRdrEnv, GlobalRdrElt(..), pprGlobalRdrEnv,
 			  AvailEnv, GenAvailInfo(..), AvailInfo, Avails,
 			  Provenance(..), ImportReason(..), initialVersionInfo,
-			  Deprecations(..), lookupDeprec, lookupIface
+			  Deprecations(..) 
 			 )
 import CmStaticInfo	( GhciMode(..) )
 import List		( partition, nub )
@@ -92,7 +83,8 @@ renameModule :: DynFlags
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module -> RdrNameHsModule 
-	     -> IO (PersistentCompilerState, Maybe (PrintUnqualified, (IsExported, ModIface, [RenamedHsDecl])))
+	     -> IO (PersistentCompilerState, 
+		    Maybe (PrintUnqualified, (IsExported, ModIface, (SyntaxMap, [RenamedHsDecl]))))
 	-- Nothing => some error occurred in the renamer
 
 renameModule dflags hit hst pcs this_module rdr_module
@@ -107,7 +99,7 @@ renameExpr :: DynFlags
 	   -> PersistentCompilerState 
 	   -> Module -> RdrNameHsExpr
 	   -> IO ( PersistentCompilerState, 
-		   Maybe (PrintUnqualified, (RenamedHsExpr, [RenamedHsDecl]))
+		   Maybe (PrintUnqualified, (SyntaxMap, RenamedHsExpr, [RenamedHsDecl]))
                  )
 
 renameExpr dflags hit hst pcs this_module expr
@@ -136,16 +128,11 @@ renameExpr dflags hit hst pcs this_module expr
 		returnRn Nothing
 	  else
 
-	  let
-	    implicit_fvs = fvs `plusFV` string_names
-			       `plusFV` default_tycon_names
-			       `plusFV` unitFV printName
-					-- print :: a -> IO () may be needed later
- 	  in
-	  slurpImpDecls (fvs `plusFV` implicit_fvs)	`thenRn` \ decls ->
+	  addImplicitFVs rdr_env Nothing fvs		`thenRn` \ (slurp_fvs, syntax_map) ->
+	  slurpImpDecls slurp_fvs			`thenRn` \ decls ->
 
 	  doDump e decls  `thenRn_`
-	  returnRn (Just (print_unqual, (e, decls)))
+	  returnRn (Just (print_unqual, (syntax_map, e, decls)))
 	}
   where
      doc = text "context for compiling expression"
@@ -195,7 +182,8 @@ renameSource dflags hit hst old_pcs this_module thing_inside
 \end{code}
 
 \begin{code}
-rename :: Module -> RdrNameHsModule -> RnMG (Maybe (PrintUnqualified, (IsExported, ModIface, [RenamedHsDecl])))
+rename :: Module -> RdrNameHsModule 
+       -> RnMG (Maybe (PrintUnqualified, (IsExported, ModIface, (SyntaxMap, [RenamedHsDecl]))))
 rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec loc)
   = pushSrcLocRn loc		$
 
@@ -239,13 +227,8 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
     else
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
-    implicitFVs mod_name rn_local_decls 	`thenRn` \ implicit_fvs -> 
-    let
-	slurp_fvs = implicit_fvs `plusFV` source_fvs
-		-- It's important to do the "plus" this way round, so that
-		-- when compiling the prelude, locally-defined (), Bool, etc
-		-- override the implicit ones. 
-    in
+    addImplicitFVs gbl_env (Just (mod_name, rn_local_decls)) 
+		   source_fvs							`thenRn` \ (slurp_fvs, sugar_map) -> 
     traceRn (text "Source FVs:" <+> fsep (map ppr (nameSetToList slurp_fvs)))	`thenRn_`
     slurpImpDecls slurp_fvs		`thenRn` \ rn_imp_decls ->
 
@@ -290,45 +273,9 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 		      imports global_avail_env
 		      source_fvs export_avails rn_imp_decls 	`thenRn_`
 
-    returnRn (Just (print_unqualified, (is_exported, mod_iface, final_decls)))
+    returnRn (Just (print_unqualified, (is_exported, mod_iface, (sugar_map, final_decls))))
   where
     mod_name = moduleName this_module
-\end{code}
-
-@implicitFVs@ forces the renamer to slurp in some things which aren't
-mentioned explicitly, but which might be needed by the type checker.
-
-\begin{code}
-implicitFVs mod_name decls
-  = lookupOrigNames deriv_occs		`thenRn` \ deriving_names ->
-    returnRn (default_tycon_names  `plusFV`
-	      string_names	   `plusFV`
-	      deriving_names	   `plusFV`
-	      implicit_main)
-  where
-
-	-- Add occurrences for IO or PrimIO
-    implicit_main |  mod_name == mAIN_Name
-		  || mod_name == pREL_MAIN_Name = unitFV ioTyConName
-		  |  otherwise 		        = emptyFVs
-
-    deriv_occs = [occ | TyClD (TyData {tcdDerivs = Just deriv_classes}) <- decls,
-			cls <- deriv_classes,
-			occ <- lookupWithDefaultUFM derivingOccurrences [] cls ]
-
--- Virtually every program has error messages in it somewhere
-string_names = mkFVs [unpackCStringName, unpackCStringFoldrName, 
-		      unpackCStringUtf8Name, eqStringName]
-
--- Add occurrences for Int, and (), because they
--- are the types to which ambigious type variables may be defaulted by
--- the type checker; so they won't always appear explicitly.
--- [The () one is a GHC extension for defaulting CCall results.]
--- ALSO: funTyCon, since it occurs implicitly everywhere!
---  	 (we don't want to be bothered with making funTyCon a
---	  free var at every function application!)
--- Double is dealt with separately in getGates
-default_tycon_names = mkFVs (map getName [unitTyCon, funTyCon, boolTyCon, intTyCon])
 \end{code}
 
 \begin{code}
@@ -351,7 +298,7 @@ isOrphanDecl this_mod (RuleD (HsRule _ _ _ lhs _ _))
     check (HsLit _)   	  = False
     check (HsOverLit _)	  = False
     check (OpApp l o _ r) = check l && check o && check r
-    check (NegApp e _)    = check e
+    check (NegApp e)      = check e
     check (HsPar e)	  = check e
     check (SectionL e o)  = check e && check o
     check (SectionR o e)  = check e && check o
@@ -610,9 +557,9 @@ closeIfaceDecls dflags hit hst pcs
     rnDump [] closed_decls `thenRn_`
     returnRn closed_decls
   where
-    implicit_fvs = string_names	-- Data type decls with record selectors,
-				-- which may appear in the decls, need unpackCString
-				-- and friends. It's easier to just grab them right now.
+    implicit_fvs = ubiquitousNames	-- Data type decls with record selectors,
+					-- which may appear in the decls, need unpackCString
+					-- and friends. It's easier to just grab them right now.
 \end{code}
 
 %*********************************************************
@@ -634,14 +581,10 @@ reportUnusedNames my_mod_iface unqual imports avail_env
   = warnUnusedModules unused_imp_mods				`thenRn_`
     warnUnusedLocalBinds bad_locals				`thenRn_`
     warnUnusedImports bad_imp_names				`thenRn_`
-    printMinimalImports this_mod unqual minimal_imports		`thenRn_`
-    warnDeprecations this_mod export_avails my_deprecs 
-		     really_used_names
-
+    printMinimalImports this_mod unqual minimal_imports
   where
     this_mod   = mi_module my_mod_iface
     gbl_env    = mi_globals my_mod_iface
-    my_deprecs = mi_deprecs my_mod_iface
     
 	-- The export_fvs make the exported names look just as if they
 	-- occurred in the source program.  
@@ -669,21 +612,21 @@ reportUnusedNames my_mod_iface unqual imports avail_env
     
 	-- Collect the defined names from the in-scope environment
 	-- Look for the qualified ones only, else get duplicates
-    defined_names :: [(Name,Provenance)]
+    defined_names :: [GlobalRdrElt]
     defined_names = foldRdrEnv add [] gbl_env
     add rdr_name ns acc | isQual rdr_name = ns ++ acc
 			| otherwise	  = acc
 
-    defined_and_used, defined_but_not_used :: [(Name,Provenance)]
+    defined_and_used, defined_but_not_used :: [GlobalRdrElt]
     (defined_and_used, defined_but_not_used) = partition used defined_names
-    used (name,_)	  		     = name `elemNameSet` really_used_names
+    used (GRE name _ _)	  		     = name `elemNameSet` really_used_names
     
     -- Filter out the ones only defined implicitly
     bad_locals :: [Name]
-    bad_locals     = [n     | (n,LocalDef) <- defined_but_not_used]
+    bad_locals = [n | (GRE n LocalDef _) <- defined_but_not_used]
     
     bad_imp_names :: [(Name,Provenance)]
-    bad_imp_names  = [(n,p) | (n,p@(NonLocalDef (UserImport mod _ True))) <- defined_but_not_used,
+    bad_imp_names  = [(n,p) | GRE n p@(NonLocalDef (UserImport mod _ True)) _ <- defined_but_not_used,
   	  		      not (module_unused mod)]
     
     -- inst_mods are directly-imported modules that 
@@ -719,9 +662,9 @@ reportUnusedNames my_mod_iface unqual imports avail_env
 	-- We've carefully preserved the provenance so that we can
 	-- construct minimal imports that import the name by (one of)
 	-- the same route(s) as the programmer originally did.
-    add_name (n,NonLocalDef (UserImport m _ _)) acc = addToFM_C plusAvailEnv acc (moduleName m)
-					    			(unitAvailEnv (mk_avail n))
-    add_name (n,other_prov)			acc = acc
+    add_name (GRE n (NonLocalDef (UserImport m _ _)) _) acc = addToFM_C plusAvailEnv acc (moduleName m)
+						    			(unitAvailEnv (mk_avail n))
+    add_name (GRE n other_prov _)			acc = acc
 
     mk_avail n = case lookupNameEnv avail_env n of
     		Just (AvailTC m _) | n==m      -> AvailTC n [n]
@@ -747,46 +690,12 @@ reportUnusedNames my_mod_iface unqual imports avail_env
     module_unused :: Module -> Bool
     module_unused mod = moduleName mod `elem` unused_imp_mods
 
-warnDeprecations this_mod export_avails my_deprecs used_names
-  = doptRn Opt_WarnDeprecations				`thenRn` \ warn_drs ->
-    if not warn_drs then returnRn () else
-
-	-- The home modules for things in the export list
-	-- may not have been loaded yet; do it now, so 
-	-- that we can see their deprecations, if any
-    mapRn_ load_home export_mods		`thenRn_`
-
-    getIfacesRn					`thenRn` \ ifaces ->
-    getHomeIfaceTableRn				`thenRn` \ hit ->
-    let
-	pit     = iPIT ifaces
-	deprecs = [ (n,txt)
-                  | n <- nameSetToList used_names,
-		    not (nameIsLocalOrFrom this_mod n),
-                    Just txt <- [lookup_deprec hit pit n] ]
-	-- nameIsLocalOrFrom: don't complain about locally defined names
-	-- For a start, we may be exporting a deprecated thing
-	-- Also we may use a deprecated thing in the defn of another
-	-- deprecated things.  We may even use a deprecated thing in
-	-- the defn of a non-deprecated thing, when changing a module's 
-	-- interface
-    in			  
-    mapRn_ warnDeprec deprecs
-
-  where
-    export_mods = nub [ moduleName mod
-		      | avail <- export_avails,
-			let mod = nameModule (availName avail),
-			mod /= this_mod ]
-  
-    load_home m = loadInterface (text "Check deprecations for" <+> ppr m) m ImportBySystem
-
-    lookup_deprec hit pit n
-	= case lookupIface hit pit n of
-		Just iface -> lookupDeprec (mi_deprecs iface) n
-		Nothing    -> pprPanic "warnDeprecations:" (ppr n)
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
+printMinimalImports :: Module 	-- This module
+		    -> PrintUnqualified
+		    -> FiniteMap ModuleName AvailEnv	-- Minimal imports
+		    -> RnMG ()
 printMinimalImports this_mod unqual imps
   = doptRn Opt_D_dump_minimal_imports		`thenRn` \ dump_minimal ->
     if not dump_minimal then returnRn () else
@@ -809,12 +718,15 @@ printMinimalImports this_mod unqual imps
 			      returnRn (mod, ies)
 
     to_ie :: AvailInfo -> RnMG (IE Name)
+	-- The main trick here is that if we're importing all the constructors
+	-- we want to say "T(..)", but if we're importing only a subset we want
+	-- to say "T(A,B,C)".  So we have to find out what the module exports.
     to_ie (Avail n)       = returnRn (IEVar n)
     to_ie (AvailTC n [m]) = ASSERT( n==m ) 
 			    returnRn (IEThingAbs n)
     to_ie (AvailTC n ns)  
-	= getInterfaceExports n_mod ImportBySystem		`thenRn` \ (_, avails_by_module) ->
-	  case [xs | (m,as) <- avails_by_module,
+	= loadInterface (text "Compute minimal imports from" <+> ppr n_mod) n_mod ImportBySystem	`thenRn` \ iface ->
+	  case [xs | (m,as) <- mi_exports iface,
 		     m == n_mod,
 		     AvailTC x xs <- as, 
 		     x == n] of
@@ -894,14 +806,6 @@ getRnStats imported_decls ifaces
 %************************************************************************
 
 \begin{code}
-warnDeprec :: (Name, DeprecTxt) -> RnM d ()
-warnDeprec (name, txt)
-  = pushSrcLocRn (getSrcLoc name)	$
-    addWarnRn				$
-    sep [ text (occNameFlavour (nameOccName name)) <+> quotes (ppr name) <+>
-          text "is deprecated:", nest 4 (ppr txt) ]
-
-
 dupFixityDecl rdr_name loc1 loc2
   = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),
 	  ptext SLIT("at ") <+> ppr loc1,

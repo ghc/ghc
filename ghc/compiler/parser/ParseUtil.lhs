@@ -200,9 +200,9 @@ checkPat e [] = case e of
 			      in
 			      returnP (SigPatIn e t')
 
-	OpApp (HsVar n) (HsVar plus) _ (HsOverLit lit@(HsIntegral k _)) 
+	OpApp (HsVar n) (HsVar plus) _ (HsOverLit lit@(HsIntegral k)) 
 		  	   | plus == plus_RDR
-			   -> returnP (NPlusKPatIn n lit minus_RDR)
+			   -> returnP (NPlusKPatIn n lit)
 			   where
 			      plus_RDR = mkUnqual varName SLIT("+")	-- Hack
 

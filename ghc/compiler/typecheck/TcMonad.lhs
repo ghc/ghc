@@ -47,7 +47,8 @@ module TcMonad(
 
 import {-# SOURCE #-} TcEnv  ( TcEnv )
 
-import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr, RenamedHsOverLit )
+import HsSyn		( HsOverLit )
+import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
 import Type		( Type, Kind, PredType, ThetaType, RhoType, TauType,
 			)
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
@@ -269,7 +270,7 @@ forkNF_Tc m down@(TcDown { tc_us = u_var }) env
 \begin{code}
 traceTc :: SDoc -> NF_TcM ()
 traceTc doc (TcDown { tc_dflags=dflags }) env 
-  | dopt Opt_D_dump_rn_trace dflags = printDump doc
+  | dopt Opt_D_dump_tc_trace dflags = printDump doc
   | otherwise			    = return ()
 
 ioToTc :: IO a -> NF_TcM a
@@ -670,7 +671,7 @@ data InstOrigin
 
   | InstanceDeclOrigin		-- Typechecking an instance decl
 
-  | LiteralOrigin RenamedHsOverLit	-- Occurrence of a literal
+  | LiteralOrigin HsOverLit	-- Occurrence of a literal
 
   | PatOrigin RenamedPat
 
