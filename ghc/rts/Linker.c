@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.146 2004/03/22 11:06:18 simonmar Exp $
+ * $Id: Linker.c,v 1.147 2004/05/15 15:35:47 dons Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -59,10 +59,17 @@
 #include <sys/wait.h>
 #endif
 
-#if defined(ia64_TARGET_ARCH)
+#if defined(ia64_TARGET_ARCH) || defined(openbsd_TARGET_OS)
 #define USE_MMAP
 #include <fcntl.h>
 #include <sys/mman.h>
+
+#if defined(openbsd_TARGET_OS) 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#endif
+
 #endif
 
 #if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS) || defined(netbsd_TARGET_OS) || defined(openbsd_TARGET_OS)
@@ -675,6 +682,11 @@ static int linker_init_done = 0 ;
 static void *dl_prog_handle;
 #endif
 
+/* dlopen(NULL,..) doesn't work so we grab libc explicitly */
+#if defined(openbsd_TARGET_OS)
+static void *dl_libc_handle;
+#endif
+
 void
 initLinker( void )
 {
@@ -703,6 +715,9 @@ initLinker( void )
     dl_prog_handle = RTLD_DEFAULT;
 #   else
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
+#   if defined(openbsd_TARGET_OS)
+    dl_libc_handle = dlopen("libc.so", RTLD_LAZY);
+#   endif
 #   endif // RTLD_DEFAULT
 #   endif
 }
@@ -833,7 +848,12 @@ lookupSymbol( char *lbl )
 
     if (val == NULL) {
 #       if defined(OBJFORMAT_ELF)
+#	if defined(openbsd_TARGET_OS)
+	val = dlsym(dl_prog_handle, lbl);
+	return (val != NULL) ? val : dlsym(dl_libc_handle,lbl);
+#	else /* not openbsd */
 	return dlsym(dl_prog_handle, lbl);
+#	endif
 #       elif defined(OBJFORMAT_MACHO)
 	if(NSIsSymbolNameDefined(lbl)) {
 	    NSSymbol symbol = NSLookupAndBindSymbol(lbl);
@@ -1013,7 +1033,11 @@ loadObj( char *path )
 
    /* On many architectures malloc'd memory isn't executable, so we need to use mmap. */
 
+#if defined(openbsd_TARGET_OS)
+   fd = open(path, O_RDONLY, S_IRUSR);
+#else
    fd = open(path, O_RDONLY);
+#endif
    if (fd == -1)
       barf("loadObj: can't open `%s'", path);
 
