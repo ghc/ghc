@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.13 1999/01/19 15:07:53 simonm Exp $
+ * $Id: GC.c,v 1.14 1999/01/19 15:41:56 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -455,16 +455,15 @@ void GarbageCollect(void (*get_roots)(void))
 	 * between the maximum size of the oldest and youngest
 	 * generations.
 	 *
-	 * max_blocks = alloc_area_size +  
-	 *                 (oldgen_max_blocks - alloc_area_size) * G
-	 *                 -----------------------------------------
-	 *                              oldest_gen
+	 * max_blocks =    oldgen_max_blocks  * G
+	 *                 -----------------------
+	 *                       oldest_gen
 	 */
 	if (g != 0) {
 	  generations[g].max_blocks = 
-	    RtsFlags.GcFlags.minAllocAreaSize +
-	     (((oldest_gen->max_blocks - RtsFlags.GcFlags.minAllocAreaSize) * g)
-	       / (RtsFlags.GcFlags.generations-1));
+	    stg_max(RtsFlags.GcFlags.minOldGenSize,
+		    (oldest_gen->max_blocks * g) / 
+		    (RtsFlags.GcFlags.generations-1));
 	}
 
       /* for older generations... */
