@@ -24,7 +24,9 @@ module HsSyn (
 	EXP_MODULE(HsMatches) ,
 	EXP_MODULE(HsPat) ,
 	EXP_MODULE(HsTypes),
-	NewOrData(..)
+	Fixity, NewOrData,
+
+	collectTopBinders, collectMonoBinders
      ) where
 
 IMP_Ubiq()
@@ -47,13 +49,14 @@ import HsTypes
 import HsPragmas	( ClassPragmas, ClassOpPragmas,
 			  DataPragmas, GenPragmas, InstancePragmas )
 import HsCore
-import TyCon		( NewOrData(..) )
+import BasicTypes	( Fixity, SYN_IE(Version), NewOrData )
 
 -- others:
 import FiniteMap	( FiniteMap )
 import Outputable	( ifPprShowAll, ifnotPprForUser, interpp'SP, Outputable(..) )
 import Pretty
 import SrcLoc		( SrcLoc )
+import Bag
 #if __GLASGOW_HASKELL__ >= 202
 import Name
 #endif
@@ -112,3 +115,41 @@ instance (NamedThing name, Outputable name, Outputable pat,
 	pp_iface_version Nothing  = empty
 	pp_iface_version (Just n) = hsep [text "{-# INTERFACE", int n, text "#-}"]
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Collecting binders from @HsBinds@}
+%*									*
+%************************************************************************
+
+Get all the binders in some @MonoBinds@, IN THE ORDER OF APPEARANCE.
+
+These functions are here, rather than in HsBinds, to avoid a loop between HsPat and HsBinds.
+
+\begin{verbatim}
+...
+where
+  (x, y) = ...
+  f i j  = ...
+  [a, b] = ...
+\end{verbatim}
+it should return @[x, y, f, a, b]@ (remember, order important).
+
+\begin{code}
+collectTopBinders :: HsBinds tyvar uvar name (InPat name) -> Bag (name,SrcLoc)
+collectTopBinders EmptyBinds     = emptyBag
+collectTopBinders (MonoBind b _ _) = collectMonoBinders b
+collectTopBinders (ThenBinds b1 b2)
+ = collectTopBinders b1 `unionBags` collectTopBinders b2
+
+collectMonoBinders :: MonoBinds tyvar uvar name (InPat name) -> Bag (name,SrcLoc)
+collectMonoBinders EmptyMonoBinds		       = emptyBag
+collectMonoBinders (PatMonoBind pat grhss_w_binds loc) = listToBag (map (\v->(v,loc)) (collectPatBinders pat))
+collectMonoBinders (FunMonoBind f _ matches loc)       = unitBag (f,loc)
+collectMonoBinders (VarMonoBind v expr) 	       = error "collectMonoBinders"
+collectMonoBinders (CoreMonoBind v expr) 	       = error "collectMonoBinders"
+collectMonoBinders (AndMonoBinds bs1 bs2)
+ = collectMonoBinders bs1 `unionBags` collectMonoBinders bs2
+\end{code}
+
