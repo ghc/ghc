@@ -758,11 +758,8 @@ sub mangle_asm {
 		    print STDERR "$Pgm: unknown epilogue mangling? $TargetPlatform\n";
 		}
 
-		# --- Can't test for residual epilogue junk reliably because
-		# --- there might be some directives left over that we're going
-		# --- to move to the next chunk (see below).
-		# die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.\n]/
-		#    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
+		print "WARNING: Epilogue junk?: $e\n" if $e =~ /^\t\s*[^\.\s\n]/
+		   && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
 		# glue together what's left
 		$c = $r . $e;
