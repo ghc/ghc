@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.91 2002/03/02 17:51:22 sof Exp $
+ * $Id: PrimOps.h,v 1.92 2002/03/19 11:24:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -148,53 +148,6 @@ EXTFUN_RTS(complementIntegerzh_fast);
 /* Conversions */
 EXTFUN_RTS(int64ToIntegerzh_fast);
 EXTFUN_RTS(word64ToIntegerzh_fast);
-
-/* The rest are (way!) out of line, implemented in vanilla C. */
-I_ stg_gtWord64 (StgWord64, StgWord64);
-I_ stg_geWord64 (StgWord64, StgWord64);
-I_ stg_eqWord64 (StgWord64, StgWord64);
-I_ stg_neWord64 (StgWord64, StgWord64);
-I_ stg_ltWord64 (StgWord64, StgWord64);
-I_ stg_leWord64 (StgWord64, StgWord64);
-
-I_ stg_gtInt64 (StgInt64, StgInt64);
-I_ stg_geInt64 (StgInt64, StgInt64);
-I_ stg_eqInt64 (StgInt64, StgInt64);
-I_ stg_neInt64 (StgInt64, StgInt64);
-I_ stg_ltInt64 (StgInt64, StgInt64);
-I_ stg_leInt64 (StgInt64, StgInt64);
-
-LW_ stg_remWord64  (StgWord64, StgWord64);
-LW_ stg_quotWord64 (StgWord64, StgWord64);
-
-LI_ stg_remInt64    (StgInt64, StgInt64);
-LI_ stg_quotInt64   (StgInt64, StgInt64);
-LI_ stg_negateInt64 (StgInt64);
-LI_ stg_plusInt64   (StgInt64, StgInt64);
-LI_ stg_minusInt64  (StgInt64, StgInt64);
-LI_ stg_timesInt64  (StgInt64, StgInt64);
-
-LW_ stg_and64  (StgWord64, StgWord64);
-LW_ stg_or64   (StgWord64, StgWord64);
-LW_ stg_xor64  (StgWord64, StgWord64);
-LW_ stg_not64  (StgWord64);
-
-LW_ stg_uncheckedShiftL64   (StgWord64, StgInt);
-LW_ stg_uncheckedShiftRL64  (StgWord64, StgInt);
-LI_ stg_uncheckedIShiftL64  (StgInt64, StgInt);
-LI_ stg_uncheckedIShiftRL64 (StgInt64, StgInt);
-LI_ stg_uncheckedIShiftRA64 (StgInt64, StgInt);
-
-LI_ stg_intToInt64    (StgInt);
-I_  stg_int64ToInt    (StgInt64);
-LW_ stg_int64ToWord64 (StgInt64);
-
-LW_ stg_wordToWord64  (StgWord);
-W_  stg_word64ToWord  (StgWord64);
-LI_ stg_word64ToInt64 (StgWord64);
-
-LI_ stg_integerToInt64 (I_ sa, StgByteArray /* Really: mp_limb_t* */ da);
-LW_ stg_integerToWord64 (I_ sa, StgByteArray /* Really: mp_limb_t* */ da);
 
 #endif
 
