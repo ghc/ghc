@@ -20,5 +20,6 @@ extern void shutdownAsyncIO(void);
 extern int awaitRequests(rtsBool wait);
 
 extern void abandonRequestWait(void);
+extern void resetAbandonRequestWait(void);
 
 #endif /* __ASYNCHIO_H__ */

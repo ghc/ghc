@@ -9,6 +9,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include "Schedule.h"
+#include "Capability.h"
 #include "win32/AsyncIO.h"
 #include "win32/IOManager.h"
 
@@ -182,8 +183,13 @@ start:
 #endif
     EnterCriticalSection(&queue_lock);
     /* Nothing immediately available & we won't wait */
-    if ((!wait && completed_hw == 0) || 
-	(issued_reqs == 0 && completed_hw == 0)) {
+    if ((!wait && completed_hw == 0)
+#if 0
+	// If we just return when wait==rtsFalse, we'll go into a busy
+	// wait loop, so I disabled this condition --SDM 18/12/2003
+	(issued_reqs == 0 && completed_hw == 0)
+#endif
+	) {
 	LeaveCriticalSection(&queue_lock);
 	return 0;
     }
@@ -203,7 +209,7 @@ start:
 		return 0;
 	    }
 	} else {
-	    return 0; /* cannot happen */
+	    return 0;
 	}
 	goto start;
     } else {
@@ -277,11 +283,27 @@ start:
  * to complete (via awaitRequests().)
  */
 void
-abandonRequestWait()
+abandonRequestWait( void )
 {
     /* the event is auto-reset, but in case there's no thread
      * already waiting on the event, we want to return it to
      * a non-signalled state.
+     *
+     * Careful!  There is no synchronisation between
+     * abandonRequestWait and awaitRequest, which means that
+     * abandonRequestWait might be called just before a thread
+     * goes into a wait, and we miss the abandon signal.  So we
+     * must SetEvent() here rather than PulseEvent() to ensure
+     * that the event isn't lost.  We can re-optimise by resetting
+     * the event somewhere safe if we know the event has been
+     * properly serviced (see resetAbandon() below).  --SDM 18/12/2003
      */
-    PulseEvent(abandon_req_wait);
+    SetEvent(abandon_req_wait);
 }
+
+void
+resetAbandonRequestWait( void )
+{
+    ResetEvent(abandon_req_wait);
+}
+
