@@ -261,14 +261,11 @@ endif
 ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
 bootstrapped = YES
-compiling_with_4xx=NO
 else
 ifneq "$(findstring $(stage), 2 3)" ""
 bootstrapped = YES
-compiling_with_4xx = NO
 else
 bootstrapped = $(shell if (test $(GhcCanonVersion) -ge $(ProjectVersionInt) -a $(GhcPatchLevel) -ge $(ProjectPatchLevel)); then echo YES; else echo NO; fi)
-compiling_with_4xx = $(shell if (test $(GhcCanonVersion) -lt 500); then echo YES; else echo NO; fi)
 endif
 endif
 
@@ -404,11 +401,6 @@ basicTypes/SrcLoc_HC_OPTS	= -funbox-strict-fields
 
 ifeq "$(bootstrapped)" "YES"
 utils/Binary_HC_OPTS		= -funbox-strict-fields
-endif
-
-# 4.08.2's NCG can't cope with Binary
-ifeq "$(compiling_with_4xx)" "YES"
-utils/Binary_HC_OPTS		+= -fvia-C
 endif
 
 # ByteCodeItbls uses primops that the NCG doesn't support yet.
