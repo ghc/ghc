@@ -208,10 +208,12 @@ cmpOp cmp l1 l2
 
 --------------------------
 
-negOp (MachFloat f)  = Just (mkFloatVal (-f))
-negOp (MachDouble d) = Just (mkDoubleVal (-d))
-negOp (MachInt i)    = intResult (-i)
-negOp l		     = Nothing
+negOp (MachFloat 0.0) = Nothing  -- can't represent -0.0 as a Rational
+negOp (MachFloat f)   = Just (mkFloatVal (-f))
+negOp (MachDouble 0.0) = Nothing
+negOp (MachDouble d)   = Just (mkDoubleVal (-d))
+negOp (MachInt i)      = intResult (-i)
+negOp l		       = Nothing
 
 --------------------------
 intOp2 op (MachInt i1) (MachInt i2) = intResult (i1 `op` i2)
