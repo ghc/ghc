@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.25 2002/10/17 14:26:18 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.26 2002/11/08 12:52:51 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -189,13 +189,13 @@ findDependency is_source src imp = do
 		       boot_hi_file = replaceFilenameSuffix hi_file hiBootExt 
 		       boot_ver_hi_file = replaceFilenameSuffix hi_file hiBootVerExt 
 		   in do
-		   b <- doesFileExist boot_hi_file
+		   b <- doesFileExist boot_ver_hi_file
 		   if b 
-		     then return (Just (boot_hi_file, not is_source))
+		     then return (Just (boot_ver_hi_file, not is_source))
 		     else do
-		        b <- doesFileExist boot_ver_hi_file
+		        b <- doesFileExist boot_hi_file
 		   	if b 
-			   then return (Just (boot_ver_hi_file, not is_source))
+			   then return (Just (boot_hi_file, not is_source))
 		   	   else return (Just (hi_file, not is_source))
 
 	   Nothing -> throwDyn (ProgramError 
