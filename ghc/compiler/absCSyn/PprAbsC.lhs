@@ -418,16 +418,18 @@ pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
       where 
 	rep = getAmodeRep item
 
-    padding_wds =
-	if not (closureUpdReqd cl_info) then
-	    []
-    	else
-	    case max 0 (mIN_UPD_SIZE - length amodes) of { still_needed ->
-	    nOfThem still_needed (mkIntCLit 0) } -- a bunch of 0s
+    upd_reqd = closureUpdReqd cl_info
 
+    padding_wds
+	| not upd_reqd = []
+	| otherwise    = case max 0 (mIN_UPD_SIZE - length amodes) of { still_needed ->
+	    	         nOfThem still_needed (mkIntCLit 0) } -- a bunch of 0s
+
+	-- always have a static link field, it's used to save the closure's
+	-- info pointer when we're reverting CAFs (see comment in Storage.c)
     static_link_field
-	| staticClosureNeedsLink cl_info = [mkIntCLit 0]
-	| otherwise 			 = []
+	| upd_reqd || staticClosureNeedsLink cl_info = [mkIntCLit 0]
+	| otherwise 	     		             = []
 
 pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast cl_descr) _
   = vcat [
