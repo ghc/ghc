@@ -3,6 +3,7 @@ module Main(main) where
 
 import Exception
 import Word
+import Int
 
 main = do
   putStrLn "Testing Enum Word8:"
@@ -147,7 +148,7 @@ testEnumWord32 = do
   mayBomb   (printTest (pred (minBound::Word32))) 
 
      -- toEnum
-  printTest ((map (toEnum::Int->Word32) [1, fromIntegral (minBound::Word32)::Int, maxBound::Int]))
+  printTest ((map (toEnum::Int->Word32) [1, fromIntegral (minBound::Word32)::Int, fromIntegral (maxBound::Int32)::Int]))
   mayBomb   (printTest ((toEnum (maxBound::Int))::Word32))
 
      -- fromEnum
