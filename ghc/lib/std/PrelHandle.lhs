@@ -17,7 +17,7 @@ module PrelHandle where
 import PrelBase
 import PrelAddr		( Addr, nullAddr )
 import PrelArr		( newVar, readVar, writeVar )
-import PrelByteArr	( ByteArray(..) )
+import PrelByteArr	( ByteArray(..), MutableByteArray(..) )
 import PrelRead		( Read )
 import PrelList 	( span )
 import PrelIOBase
@@ -895,7 +895,7 @@ slurpFile fname = do
       else do
         rc <- withHandle_ handle ( \ handle_ -> do
           let fo = haFO__ handle_
-	  mayBlock fo (readChunk fo chunk sz_i)    -- ConcHask: UNSAFE, may block.
+	  mayBlock fo (readChunk fo chunk 0 sz_i)    -- ConcHask: UNSAFE, may block.
 	 )
 	hClose handle
         if rc < (0::Int)
@@ -903,14 +903,19 @@ slurpFile fname = do
 	 else return (chunk, rc)
 
 #ifndef __HUGS__ /* Hugs' Prelude doesn't need this */
-hFillBufBA :: Handle -> ByteArray Int -> Int -> IO Int
+hFillBufBA :: Handle -> MutableByteArray RealWorld a -> Int -> IO Int
 hFillBufBA handle buf sz
   | sz <= 0 = ioError (IOError (Just handle)
 			    InvalidArgument
 		            "hFillBufBA"
 			    ("illegal buffer size " ++ showsPrec 9 sz []))  -- 9 => should be parens'ified.
-  | otherwise = 
-    mayBlockRead "hFillBufBA" handle (\fo -> readChunkBA fo buf sz)
+  | otherwise = hFillBuf' sz 0
+  where
+  hFillBuf' sz len = do
+	r <- mayBlockRead "hFillBufBA" handle (\fo -> readChunkBA fo buf len sz)
+    	if r >= sz || r == 0  -- r == 0 indicates EOF
+	    then return (len+r)
+	    else hFillBuf' (sz-r) (len+r)
 #endif
 
 hFillBuf :: Handle -> Addr -> Int -> IO Int
@@ -918,9 +923,15 @@ hFillBuf handle buf sz
   | sz <= 0 = ioError (IOError (Just handle)
 			    InvalidArgument
 		            "hFillBuf"
-			    ("illegal buffer size " ++ showsPrec 9 sz []))  -- 9 => should be parens'ified.
-  | otherwise = 
-    mayBlockRead "hFillBuf" handle (\fo -> readChunk fo buf sz)
+			    ("illegal buffer size " ++ showsPrec 9 sz [])) 
+					-- 9 => should be parens'ified.
+  | otherwise = hFillBuf' sz 0
+  where
+  hFillBuf' sz len = do
+	r <- mayBlockRead "hFillBuf" handle (\fo -> readChunk fo buf len sz)
+    	if r >= sz || r == 0  -- r == 0 indicates EOF
+	    then return (len+r)
+	    else hFillBuf' (sz-r) (len+r)
 \end{code}
 
 The @hPutBuf hdl buf len@ action writes an already packed sequence of
@@ -928,23 +939,35 @@ bytes to the file/channel managed by @hdl@ - non-standard.
 
 \begin{code}
 hPutBuf :: Handle -> Addr -> Int -> IO ()
-hPutBuf handle buf len = 
-    wantWriteableHandle "hPutBuf" handle $ \ handle_ -> do
-    let fo  = haFO__ handle_
-    rc      <- mayBlock fo (writeBuf fo buf len)  -- ConcHask: UNSAFE, may block.
-    if rc == (0::Int)
-     then return ()
-     else constructErrorAndFail "hPutBuf"
+hPutBuf handle buf sz
+  | sz <= 0 = ioError (IOError (Just handle)
+			    InvalidArgument
+		            "hPutBuf"
+			    ("illegal buffer size " ++ showsPrec 9 sz [])) 
+					-- 9 => should be parens'ified.
+  | otherwise = hPutBuf' sz 0
+  where
+  hPutBuf' sz len = do
+	r <- mayBlockWrite "hPutBuf" handle (\fo -> writeBuf fo buf len sz)
+    	if r >= sz
+	    then return ()
+	    else hPutBuf' (sz-r) (len+r) -- <= sz indicates blocking
 
 #ifndef __HUGS__ /* An_ one Hugs doesn't provide */
-hPutBufBA :: Handle -> ByteArray Int -> Int -> IO ()
-hPutBufBA handle buf len =
-    wantWriteableHandle "hPutBufBA" handle $ \ handle_ -> do
-    let fo = haFO__ handle_
-    rc      <- mayBlock fo (writeBufBA fo buf len)  -- ConcHask: UNSAFE, may block.
-    if rc == (0::Int)
-     then return ()
-     else constructErrorAndFail "hPutBuf"
+hPutBufBA :: Handle -> MutableByteArray RealWorld a -> Int -> IO ()
+hPutBufBA handle buf sz
+  | sz <= 0 = ioError (IOError (Just handle)
+			    InvalidArgument
+		            "hPutBufBA"
+			    ("illegal buffer size " ++ showsPrec 9 sz [])) 
+					-- 9 => should be parens'ified.
+  | otherwise = hPutBuf' sz 0
+  where
+  hPutBuf' sz len = do
+	r <- mayBlockWrite "hPutBufBA" handle (\fo -> writeBufBA fo buf len sz)
+    	if r >= sz
+	    then return ()
+	    else hPutBuf' (sz-r) (len+r) -- <= sz indicates blocking
 #endif
 \end{code}
 
@@ -1169,6 +1192,34 @@ mayBlockRead fname handle fn = do
 	   threadWaitWrite fd
 	   mayBlockRead fname handle fn
 	NoBlock c -> return c
+
+mayBlockWrite :: String -> Handle -> (ForeignObj -> IO Int) -> IO Int
+mayBlockWrite fname handle fn = do
+    r <- wantWriteableHandle fname handle $ \ handle_ -> do
+	 let fo = haFO__ handle_
+         rc <- fn fo
+         case rc of
+           -5 -> do  -- (possibly blocking) read
+             fd <- getFileFd fo
+             return (BlockRead fd)
+  	   -6 -> do  -- (possibly blocking) write
+  	     fd <- getFileFd fo
+             return (BlockWrite fd)
+  	   -7 -> do  -- (possibly blocking) write on connected handle
+  	     fd <- getConnFileFd fo
+	     return (BlockWrite fd)
+           _ ->
+             if rc >= 0
+         	  then return (NoBlock rc)
+         	  else constructErrorAndFail fname
+    case r of
+	BlockRead fd -> do
+	   threadWaitRead fd
+	   mayBlockWrite fname handle fn
+	BlockWrite fd -> do
+	   threadWaitWrite fd
+	   mayBlockWrite fname handle fn
+	NoBlock c -> return c
 \end{code}
 
 Foreign import declarations of helper functions:
@@ -1238,14 +1289,14 @@ foreign import "libHS_cbits" "setConnectedTo" unsafe
 foreign import "libHS_cbits" "ungetChar" unsafe
            ungetChar        :: FILE_OBJECT -> Char -> IO Int{-ret code-}
 foreign import "libHS_cbits" "readChunk" unsafe
-           readChunk        :: FILE_OBJECT -> Addr -> Int -> IO Int{-ret code-}
+           readChunk        :: FILE_OBJECT -> Addr -> Int -> Int -> IO Int{-ret code-}
 foreign import "libHS_cbits" "readChunk" unsafe
-           readChunkBA      :: FILE_OBJECT -> ByteArray Int -> Int -> IO Int{-ret code-}
+           readChunkBA      :: FILE_OBJECT -> MutableByteArray s a -> Int -> Int -> IO Int{-ret code-}
 foreign import "libHS_cbits" "writeBuf" unsafe
-           writeBuf         :: FILE_OBJECT -> Addr -> Int -> IO Int{-ret code-}
+           writeBuf         :: FILE_OBJECT -> Addr -> Int -> Int -> IO Int{-ret code-}
 #ifndef __HUGS__
 foreign import "libHS_cbits" "writeBufBA" unsafe
-           writeBufBA       :: FILE_OBJECT -> ByteArray Int -> Int -> IO Int{-ret code-}
+           writeBufBA       :: FILE_OBJECT -> MutableByteArray s a -> Int -> Int -> IO Int{-ret code-}
 #endif
 foreign import "libHS_cbits" "getFileFd" unsafe
            getFileFd        :: FILE_OBJECT -> IO Int{-fd-}
