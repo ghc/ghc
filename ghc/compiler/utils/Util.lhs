@@ -12,7 +12,6 @@ module Util (
 	Eager, thenEager, returnEager, mapEager, appEager, runEager,
 
 	-- general list processing
-	IF_NOT_GHC(forall COMMA exists COMMA)
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipEqual,
 	mapAndUnzip, mapAndUnzip3,
@@ -95,18 +94,6 @@ mapEager f (x:xs) = f x			`thenEager` \ y ->
 %*									*
 %************************************************************************
 
-Quantifiers are not standard in Haskell. The following fill in the gap.
-
-\begin{code}
-forall :: (a -> Bool) -> [a] -> Bool
-forall pred []     = True
-forall pred (x:xs) = pred x && forall pred xs
-
-exists :: (a -> Bool) -> [a] -> Bool
-exists pred []     = False
-exists pred (x:xs) = pred x || exists pred xs
-\end{code}
-
 A paranoid @zip@ (and some @zipWith@ friends) that checks the lists
 are of equal length.  Alastair Reid thinks this should only happen if
 DEBUGging on; hey, why not?
@@ -187,7 +174,7 @@ mapAndUnzip3 f (x:xs)
 
 \begin{code}
 nOfThem :: Int -> a -> [a]
-nOfThem n thing = take n (repeat thing)
+nOfThem n thing = replicate n thing
 
 lengthExceeds :: [a] -> Int -> Bool
 
