@@ -48,7 +48,7 @@ i[[3456]]86-*-openbsd*)
 	TargetPlatform=i386-unknown-openbsd;;
 i[[3456]]86-*-solaris2*)
 	TargetPlatform=i386-unknown-solaris2;;
-i[[3456]]86-*-cygwin32*)
+i[[3456]]86-*-cygwin*)
 	exeext='.exe'
 	TargetPlatform=i386-unknown-cygwin32;;
 i[[3456]]86-*-mingw32*)
