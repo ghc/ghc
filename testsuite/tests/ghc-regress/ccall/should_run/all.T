@@ -9,8 +9,16 @@ def f( opts ):
 
 setTestOpts(f)
 
+# fed001, ffi006-ffi011 fail if
+#     barf("adjustor creation not supported on this platform");
+# in ghc/rts/Adjustor.c is reachable
+if re.search("^(ia64|powerpc|alpha|sparc|i386)-", config.platform):
+    adjustor_creation = normal
+else:
+    adjustor_creation = expect_fail
+
 # Doesn't work with External Core due to __labels
-test('fed001', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
+test('fed001', compose(adjustor_creation, expect_fail_for(['extcore','optextcore'])), compile_and_run, [''])
 
 # Omit GHCi for these two, as they use foreign export
 test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
@@ -31,16 +39,16 @@ test('ffi005', compose(skip, exit_code(3)), compile_and_run, [''])
 
 # ffi[006-009] don't work with External Core due to non-static-C foreign calls
 
-test('ffi006', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
-test('ffi007', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
-test('ffi008', compose(expect_fail_for(['extcore','optextcore']), exit_code(1)), compile_and_run, [''])
+test('ffi006', compose(adjustor_creation, expect_fail_for(['extcore','optextcore'])), compile_and_run, [''])
+test('ffi007', compose(adjustor_creation, expect_fail_for(['extcore','optextcore'])), compile_and_run, [''])
+test('ffi008', compose(adjustor_creation, compose(expect_fail_for(['extcore','optextcore']), exit_code(1))), compile_and_run, [''])
 
 # expect fail for way optasm, because the native code generator
 # doesn't do -ffloat-store and gets different answers when
 # optimisation is on.
-test('ffi009', expect_fail_for(['optasm','extcore', 'optextcore']), compile_and_run, [''])
+test('ffi009', compose(adjustor_creation, expect_fail_for(['optasm','extcore', 'optextcore'])), compile_and_run, [''])
 
 # Doesn't work with External Core due to __labels
-test('ffi010', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
+test('ffi010', compose(adjustor_creation, expect_fail_for(['extcore','optextcore'])), compile_and_run, [''])
 
-test('ffi011', normal, compile_and_run, [''])
+test('ffi011', adjustor_creation, compile_and_run, [''])
