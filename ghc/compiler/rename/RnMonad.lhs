@@ -40,11 +40,11 @@ import Name		( Name, OccName, NamedThing(..),
 			  decode, mkLocalName
 			)
 import Module		( Module, ModuleName, ModuleHiMap, SearchPath, WhereFrom,
-			  mkModuleHiMaps, moduleName
+			  mkModuleHiMaps, moduleName, mkVanillaModule, mkSearchPath
 			)
 import NameSet		
 import RdrName		( RdrName, dummyRdrVarName, rdrNameOcc )
-import CmdLineOpts	( opt_D_dump_rn_trace, opt_IgnoreIfacePragmas )
+import CmdLineOpts	( opt_D_dump_rn_trace, opt_IgnoreIfacePragmas, opt_HiMap )
 import PrelInfo		( builtinNames )
 import TysWiredIn	( boolTyCon )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
@@ -445,11 +445,12 @@ renameSourceCode mod_name name_supply m
 	-- only do any I/O if we need to read in a fixity declaration;
 	-- and that doesn't happen in pragmas etc
 
+        mkModuleHiMaps (mkSearchPath opt_HiMap) >>= \ himaps ->
 	newIORef name_supply		>>= \ names_var ->
 	newIORef (emptyBag,emptyBag)	>>= \ errs_var ->
     	let
 	    rn_down = RnDown { rn_loc = mkGeneratedSrcLoc, rn_ns = names_var,
-			       rn_errs = errs_var,
+			       rn_errs = errs_var, rn_hi_maps = himaps,
 			       rn_mod = mod_name }
 	    s_down = SDown { rn_mode = InterfaceMode,
 			       -- So that we can refer to PrelBase.True etc
@@ -725,4 +726,14 @@ setIfacesRn ifaces (RnDown {rn_ifaces = iface_var}) _
 getHiMaps :: RnM d (ModuleHiMap, ModuleHiMap)
 getHiMaps (RnDown {rn_hi_maps = himaps}) _ 
   = return himaps
+\end{code}
+
+\begin{code}
+lookupModuleRn :: ModuleName -> RnM d Module
+lookupModuleRn x = 
+  getHiMaps `thenRn` \ (himap, _) ->
+  case lookupFM himap x of
+    Nothing    -> returnRn (mkVanillaModule x)
+    Just (_,x) -> returnRn x
+
 \end{code}

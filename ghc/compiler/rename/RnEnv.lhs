@@ -63,7 +63,7 @@ newImportedGlobalName mod_name occ mod
     in
     case lookupFM cache key of
 	Just name -> returnRn name
-	Nothing   -> setNameSupplyRn (us', inst_ns, new_cache)		`thenRn_`
+	Nothing   -> setNameSupplyRn (us', inst_ns, new_cache)	`thenRn_`
 		     returnRn name
 		  where
 		     (us', us1) = splitUniqSupply us
@@ -90,7 +90,8 @@ newImportedBinder mod rdr_name
 -- Make an imported global name, checking first to see if it's in the cache
 mkImportedGlobalName :: ModuleName -> OccName -> RnM d Name
 mkImportedGlobalName mod_name occ
-  = newImportedGlobalName mod_name occ (mkVanillaModule mod_name)
+  = lookupModuleRn mod_name `thenRn` \ mod ->
+    newImportedGlobalName mod_name occ mod --(mkVanillaModule mod_name)
 	
 mkImportedGlobalFromRdrName rdr_name
   | isQual rdr_name
