@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.40 2003/05/14 09:14:00 simonmar Exp $
+ * $Id: Updates.hc,v 1.41 2003/07/28 15:57:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -56,9 +56,7 @@
 	  /* remove the update frame from the stack */			\
 	  Sp += sizeofW(StgUpdateFrame);				\
 									\
-	  /* Tick - it must be a con, all the paps are handled		\
-	   * in stg_upd_PAP and PAP_entry below				\
-	   */								\
+	  /* ToDo: it might be a PAP, so we should check... */		\
 	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(get_itbl(updatee)));	\
 									\
 	  UPD_SPEC_IND(updatee, ind_info, R1.cl, JMP_(ret));		\
