@@ -89,7 +89,7 @@ import qualified Linker
 import Linker		( HValue, extendLinkEnv )
 import NameEnv		( lookupNameEnv )
 import TcRnDriver	( mkExportEnv, getModuleContents )
-import RdrName		( GlobalRdrEnv, plusGlobalRdrEnv )
+import RdrName		( plusGlobalRdrEnv )
 import HscMain		( hscGetInfo, GetInfoResult, 
 			  hscStmt, hscTcExpr, hscKcType )
 import Type		( tidyType )
@@ -98,6 +98,7 @@ import GHC.Exts		( unsafeCoerce# )
 import IfaceSyn		( IfaceDecl )
 #endif
 
+import RdrName		( GlobalRdrEnv )
 import HsSyn		( HsModule, LHsBinds )
 import Type		( Kind, Type, dropForAlls )
 import Id		( Id, idType )
