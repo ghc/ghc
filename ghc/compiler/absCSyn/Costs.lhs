@@ -59,7 +59,7 @@ module Costs( costs,
 
 import AbsCSyn
 import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
-import GlaExts		( trace )
+import Util		( trace )
 
 -- --------------------------------------------------------------------------
 newtype CostRes = Cost (Int, Int, Int, Int, Int)
@@ -416,7 +416,7 @@ primOpCosts :: PrimOp -> CostRes
 
 -- Special cases
 
-primOpCosts (CCallOp _ _ _ _ _) = SAVE_COSTS + RESTORE_COSTS  	
+primOpCosts (CCallOp _ _ _ _ _ _) = SAVE_COSTS + RESTORE_COSTS  	
 	                          -- don't guess costs of ccall proper
                                   -- for exact costing use a GRAN_EXEC
                                   -- in the C code
