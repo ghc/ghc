@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.17 2003/06/09 13:17:40 matthewc Exp $
+ * $Id: RtsUtils.h,v 1.18 2003/09/26 12:11:18 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -39,3 +39,6 @@ ullong   msTime(void);
 #ifdef DEBUG
 extern void heapCheckFail( void );
 #endif
+
+extern void* __hscore_get_saved_termios(int fd);
+extern void __hscore_set_saved_termios(int fd, void* ts);
