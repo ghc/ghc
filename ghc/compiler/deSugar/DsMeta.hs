@@ -387,16 +387,15 @@ repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
 			       ; z <- repLetE ds e2
 			       ; wrapGenSyns expTyConName ss z }
 -- FIXME: I haven't got the types here right yet
-repE (HsDo ctxt sts _ ty loc) 
-  | isComprCtxt ctxt      = do { (ss,zs) <- repSts sts; 
-				 e       <- repDoE (nonEmptyCoreList zs);
-				 wrapGenSyns expTyConName ss e }
-  | otherwise             = 
-    panic "DsMeta.repE: Can't represent mdo and [: :] yet"
-  where
-    isComprCtxt ListComp = True
-    isComprCtxt DoExpr	 = True
-    isComprCtxt _	 = False
+repE (HsDo DoExpr sts _ ty loc) 
+ = do { (ss,zs) <- repSts sts; 
+        e       <- repDoE (nonEmptyCoreList zs);
+        wrapGenSyns expTyConName ss e }
+repE (HsDo ListComp sts _ ty loc) 
+ = do { (ss,zs) <- repSts sts; 
+        e       <- repComp (nonEmptyCoreList zs);
+        wrapGenSyns expTyConName ss e }
+repE (HsDo _ _ _ _ _) = panic "DsMeta.repE: Can't represent mdo and [: :] yet"
 repE (ExplicitList ty es) = do { xs <- repEs es; repListExp xs } 
 repE (ExplicitPArr ty es) = 
   panic "DsMeta.repE: No explicit parallel arrays yet"
@@ -953,16 +952,16 @@ repLiteral lit
   = do { lit_expr <- dsLit lit; rep2 lit_name [lit_expr] }
   where
     lit_name = case lit of
-		 HsInt _    -> intLName
-		 HsChar _   -> charLName
-		 HsString _ -> stringLName
-		 HsRat _ _  -> rationalLName
-		 other 	    -> uh_oh
+		 HsInteger _ -> integerLName
+		 HsChar _    -> charLName
+		 HsString _  -> stringLName
+		 HsRat _ _   -> rationalLName
+		 other 	     -> uh_oh
     uh_oh = pprPanic "DsMeta.repLiteral: trying to represent exotic literal"
 		    (ppr lit)
 
 repOverloadedLiteral :: HsOverLit -> DsM (Core M.Lit)
-repOverloadedLiteral (HsIntegral i _)   = repLiteral (HsInt i)
+repOverloadedLiteral (HsIntegral i _)   = repLiteral (HsInteger i)
 repOverloadedLiteral (HsFractional f _) = do { rat_ty <- lookupType rationalTyConName ;
 					       repLiteral (HsRat f rat_ty) }
 	-- The type Rational will be in the environment, becuase 
@@ -1031,7 +1030,7 @@ templateHaskellNames :: NameSet
 -- The names that are implicitly mentioned by ``bracket''
 -- Should stay in sync with the import list of DsMeta
 templateHaskellNames
-  = mkNameSet [ intLName,charLName, stringLName, rationalLName,
+  = mkNameSet [ integerLName,charLName, stringLName, rationalLName,
 		plitName, pvarName, ptupName, 
 		pconName, ptildeName, paspatName, pwildName, 
                 varName, conName, litName, appName, infixEName, lamName,
@@ -1063,7 +1062,7 @@ thModule = mkThPkgModule mETA_META_Name
 mk_known_key_name space str uniq 
   = mkKnownKeyExternalName thModule (mkOccFS space str) uniq 
 
-intLName       = varQual FSLIT("intL")          intLIdKey
+integerLName   = varQual FSLIT("integerL")      integerLIdKey
 charLName      = varQual FSLIT("charL")         charLIdKey
 stringLName    = varQual FSLIT("stringL")       stringLIdKey
 rationalLName  = varQual FSLIT("rationalL")     rationalLIdKey
@@ -1187,7 +1186,7 @@ valIdKey        = mkPreludeMiscIdUnique 209
 protoIdKey      = mkPreludeMiscIdUnique 210
 matchIdKey      = mkPreludeMiscIdUnique 211
 clauseIdKey     = mkPreludeMiscIdUnique 212
-intLIdKey       = mkPreludeMiscIdUnique 213
+integerLIdKey   = mkPreludeMiscIdUnique 213
 charLIdKey      = mkPreludeMiscIdUnique 214
 
 classDIdKey     = mkPreludeMiscIdUnique 215

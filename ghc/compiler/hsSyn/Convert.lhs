@@ -83,7 +83,14 @@ cvt_top (Proto nm typ) = SigD (Sig (vName nm) (cvtType typ) loc0)
 
 cvt_top (Foreign (Import callconv safety from nm typ))
  = ForD (ForeignImport (vName nm) (cvtType typ) fi False loc0)
-    where fi = CImport CCallConv (PlaySafe True) c_header nilFS cis
+    where fi = CImport callconv' safety' c_header nilFS cis
+          callconv' = case callconv of
+                          CCall -> CCallConv
+                          StdCall -> StdCallConv
+          safety' = case safety of
+                        Unsafe     -> PlayRisky
+                        Safe       -> PlaySafe False
+                        Threadsafe -> PlaySafe True
           (c_header', c_func') = break (== ' ') from
           c_header = mkFastString c_header'
           c_func = tail c_func'
@@ -183,9 +190,9 @@ cvtpair (x,y) = GRHS [BindStmt truePat (cvt x) loc0,
 		      ResultStmt (cvt y) loc0] loc0
 
 cvtOverLit :: Lit -> HsOverLit
-cvtOverLit (Int i)      = mkHsIntegral (fromInt i)
+cvtOverLit (Integer i)  = mkHsIntegral i
 cvtOverLit (Rational r) = mkHsFractional r
--- An Int is like an an (overloaded) '3' in a Haskell source program
+-- An Integer is like an an (overloaded) '3' in a Haskell source program
 -- Similarly 3.5 for fractionals
 
 cvtLit :: Lit -> HsLit
@@ -258,17 +265,15 @@ falsePat = ConPatIn (cName "False") (PrefixCon [])
 
 overloadedLit :: Lit -> Bool
 -- True for literals that Haskell treats as overloaded
-overloadedLit (Int l) = True
-overloadedLit l	      = False
+overloadedLit (Integer  l) = True
+overloadedLit (Rational l) = True
+overloadedLit l	           = False
 
 void :: Type.Type
 void = placeHolderType
 
 loc0 :: SrcLoc
 loc0 = generatedSrcLoc
-
-fromInt :: Int -> Integer
-fromInt x = toInteger x
 
 -- variable names
 vName :: String -> RdrName

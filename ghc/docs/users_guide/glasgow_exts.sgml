@@ -3225,21 +3225,25 @@ Tim Sheard is going to expand it.)
 		  </para>
 	      <para> A splice can occur in place of 
 		  <itemizedlist>
-		    <listitem><para> an expression;</para></listitem>
-		    <listitem><para> a list of top-level declarations;</para></listitem>
-		    <listitem><para> a pattern;</para></listitem>
-		    <listitem><para> a type;</para></listitem>
+		    <listitem><para> an expression; the spliced expression must have type <literal>Expr</literal></para></listitem>
+		    <listitem><para> a list of top-level declarations; ; the spliced expression must have type <literal>Q [Dec]</literal></para></listitem>
+		    <listitem><para> a type; the spliced expression must have type <literal>Type</literal>.</para></listitem>
 		    </itemizedlist>
+	   (Note that the syntax for a declaration splice uses "<literal>$</literal>" not "<literal>splice</literal>" as in
+	the paper. Also the type of the enclosed expression must be  <literal>Q [Dec]</literal>, not  <literal>[Q Dec]</literal>
+	as in the paper.)
 		</para></listitem>
 
 
 	      <listitem><para>
 		  A expression quotation is written in Oxford brackets, thus:
 		  <itemizedlist>
-		    <listitem><para> <literal>[| ... |]</literal>, where the "..." is an expression;</para></listitem>
-		    <listitem><para> <literal>[d| ... |]</literal>, where the "..." is a list of top-level declarations;</para></listitem>
-		    <listitem><para> <literal>[p| ... |]</literal>, where the "..." is a pattern;</para></listitem>
-		    <listitem><para> <literal>[t| ... |]</literal>, where the "..." is a type;</para></listitem>
+		    <listitem><para> <literal>[| ... |]</literal>, where the "..." is an expression; 
+                             the quotation has type <literal>Expr</literal>.</para></listitem>
+		    <listitem><para> <literal>[d| ... |]</literal>, where the "..." is a list of top-level declarations;
+                             the quotation has type <literal>Q [Dec]</literal>.</para></listitem>
+		    <listitem><para> <literal>[t| ... |]</literal>, where the "..." is a type; 
+                             the quotation has type <literal>Type</literal>.</para></listitem>
 		  </itemizedlist></para></listitem>
 
 	      <listitem><para>
