@@ -278,7 +278,7 @@ cmp_eq _ _ = EQ
 \end{verbatim}
 \end{itemize}
 
-If there is only one constructor in the Data Type we don't need the WildCard Patern. 
+If there is only one constructor in the Data Type we don't need the WildCard Pattern. 
 JJQC-30-Nov-1997
 
 \begin{code}
@@ -861,7 +861,7 @@ gen_Show_binds tycon
 		 | otherwise       = --Assumption: no of fields == no of labelled fields 
 				     --            (and in same order)
 		    concat $
-		    intersperse ([mk_showString_app (_CONS_ ',' _NIL_ )]) $ -- Using SLIT() is not cool here.
+		    intersperse ([mk_showString_app (_CONS_ ',' SLIT(" "))]) $ -- Using SLIT()s containing ,s spells trouble.
 		    zipWithEqual "gen_Show_binds"
 				 (\ a b -> [a,b])
 				 (map show_label labels) 
