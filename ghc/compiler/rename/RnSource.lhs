@@ -301,7 +301,10 @@ rnHsForeignDecl (ForeignExport name ty spec isDeprec src_loc)
     lookupOccRn name		        	`thenM` \ name' ->
     rnHsTypeFVs (fo_decl_msg name) ty  		`thenM` \ (ty', fvs) ->
     returnM (ForeignExport name' ty' spec isDeprec src_loc, 
-	      mkFVs [bindIOName, returnIOName] `plusFV` fvs)
+	      mkFVs [name', bindIOName, returnIOName] `plusFV` fvs )
+	-- NB: a foreign export is an *occurrence site* for name, so 
+	--     we add it to the free-variable list.  It might, for example,
+	--     be imported from another module
 
 fo_decl_msg name = ptext SLIT("In the foreign declaration for") <+> ppr name
 \end{code}
