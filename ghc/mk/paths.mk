@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.40 2002/04/01 13:57:10 simonpj Exp $
+# $Id: paths.mk,v 1.41 2002/08/09 21:28:09 sof Exp $
 #
 # ghc project specific make variables
 #
@@ -34,6 +34,9 @@ GHC_UTILS_DIR	 	= $(GHC_TOP)/$(GHC_UTILS_DIR_REL)
 GHC_DRIVER_DIR		= $(GHC_TOP)/$(GHC_DRIVER_DIR_REL)
 GHC_PKG_DIR		= $(GHC_TOP)/$(GHC_PKG_DIR_REL)
 GHC_GENPRIMOP_DIR	= $(GHC_TOP)/$(GHC_GENPRIMOP_DIR_REL)
+GHC_MANGLER_DIR         = $(GHC_TOP)/$(GHC_MANGLER_DIR_REL)
+GHC_SPLIT_DIR           = $(GHC_TOP)/$(GHC_SPLIT_DIR_REL)
+
 
 GHC_LIB_DIR	 	= $(FPTOOLS_TOP)/libraries
 
