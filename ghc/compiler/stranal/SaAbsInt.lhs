@@ -293,8 +293,12 @@ evalStrictness (WwUnpack _ demand_info) val
   = case val of
       AbsTop	   -> False
       AbsBot	   -> True
-      AbsProd vals -> or (zipWithEqual "evalStrictness" evalStrictness demand_info vals)
-      _	    	   -> pprTrace "evalStrictness?" empty False
+      AbsProd vals
+	   | length vals /= length demand_info -> pprTrace "TELL SIMON: evalStrictness" (ppr demand_info $$ ppr val)
+						  False
+	   | otherwise -> or (zipWithEqual "evalStrictness" evalStrictness demand_info vals)
+
+      _	    	       -> pprTrace "evalStrictness?" empty False
 
 evalStrictness WwPrim val
   = case val of
@@ -319,7 +323,7 @@ evalAbsence (WwUnpack _ demand_info) val
 	AbsTop	     -> False		-- No poison in here
 	AbsBot 	     -> True		-- Pure poison
 	AbsProd vals 
-	   | length vals /= length demand_info -> pprTrace "evalAbsence" (ppr demand_info $$ ppr val)
+	   | length vals /= length demand_info -> pprTrace "TELL SIMON: evalAbsence" (ppr demand_info $$ ppr val)
 						  True
 	   | otherwise -> or (zipWithEqual "evalAbsence" evalAbsence demand_info vals)
 	_	       -> panic "evalAbsence: other"
