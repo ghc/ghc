@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.26 2001/01/16 17:09:43 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.27 2001/01/18 10:51:53 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -286,8 +286,9 @@ typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
   = do st <- getGHCiState
        dflags <- io (getDynFlags)
-       (st, maybe_ty) <- io (cmGetExpr (cmstate st) dflags 
+       (new_cmstate, maybe_ty) <- io (cmGetExpr (cmstate st) dflags 
 				(current_module st) str False)
+       setGHCiState st{cmstate = new_cmstate}
        case maybe_ty of
 	 Nothing -> return ()
 	 Just (_, unqual, ty) -> io (printForUser stdout unqual (ppr ty)) 
