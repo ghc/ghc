@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.59 2001/01/16 12:41:05 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.60 2001/01/16 12:44:34 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
