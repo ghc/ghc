@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Html.hs,v 1.5 2004/03/25 16:00:37 simonmar Exp $
+-- $Id: Html.hs,v 1.6 2004/08/02 20:32:29 panne Exp $
 --
 -- An Html combinator library
 --
@@ -962,32 +962,16 @@ gui act = form ! [action act,method "POST"]
 -- The output is quite messy, because space matters in
 -- HTML, so we must not generate needless spaces.
 
-renderHtml :: (HTML html) => html -> Bool -> String
-renderHtml theHtml pretty =
+renderHtml :: (HTML html) => html -> String
+renderHtml theHtml =
       renderMessage ++ 
-         foldr (.) id (map (if pretty then renderHtml' 0 else unprettyHtml)
+         foldr (.) id (map unprettyHtml
                            (getHtmlElements (tag "HTML" << theHtml))) "\n"
 
 renderMessage :: String
 renderMessage =
       "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">\n" ++
       "<!--Rendered using the Haskell Html Library v0.2-->\n"
-
--- Warning: spaces matters in HTML. You are better using renderHtml.
--- This is intentually very inefficent to "encorage" this,
--- but the neater version in easier when debugging.
-
-renderHtml' :: Int -> HtmlElement -> ShowS
-renderHtml' _ (HtmlString str) = (++) str
-renderHtml' n (HtmlTag
-              { markupTag = name0,
-                markupContent = html,
-                markupAttrs = markupAttrs0 })
-      = if isNoHtml html && elem name0 validHtmlITags
-        then renderTag True name0 markupAttrs0 n
-        else (renderTag True name0 markupAttrs0 n
-             . foldr (.) id (map (renderHtml' (n+2)) (getHtmlElements html))
-             . renderTag False name0 [] n)
 
 unprettyHtml :: HtmlElement -> ShowS
 unprettyHtml (HtmlString str) = (++) str
