@@ -25,7 +25,7 @@ import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupValue, 
 			  tcLookupValueByKey, newLocalId, badCon
 			)
-import TcType 		( TcType, TcTyVar, tcInstTyVars )
+import TcType 		( TcType, TcTyVar, tcInstTyVars, newTyVarTy )
 import TcMonoType	( tcHsType )
 import TcUnify 		( unifyTauTy, unifyListTy,
 			  unifyTupleTy, unifyUnboxedTupleTy
@@ -35,7 +35,7 @@ import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( DataCon, dataConSig, dataConFieldLabels, dataConSourceArity )
 import Id		( Id, idType, isDataConId_maybe )
-import Type		( Type, isTauTy, mkTyConApp )
+import Type		( Type, isTauTy, mkTyConApp, boxedTypeKind )
 import Subst		( substTy, substTheta )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
@@ -237,25 +237,36 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
       = returnTc ([], emptyLIE, emptyBag, emptyBag, emptyLIE)
 
     tc_fields field_tys ((field_label, rhs_pat, pun_flag) : rpats)
-      | null matching_fields
-      = addErrTc (badFieldCon name field_label)		`thenNF_Tc_`
-	tc_fields field_tys rpats
+      =	tc_fields field_tys rpats	`thenTc` \ (rpats', lie_req1, tvs1, ids1, lie_avail1) ->
 
-      | otherwise
-      = ASSERT( null extras )
-	tc_fields field_tys rpats	`thenTc` \ (rpats', lie_req1, tvs1, ids1, lie_avail1) ->
+	(case [ty | (f,ty) <- field_tys, f == field_label] of
 
-	tcLookupValue field_label	`thenNF_Tc` \ sel_id ->
-	tcPat tc_bndr rhs_pat rhs_ty	`thenTc` \ (rhs_pat', lie_req2, tvs2, ids2, lie_avail2) ->
+		-- No matching field; chances are this field label comes from some
+		-- other record type (or maybe none).  As well as reporting an
+		-- error we still want to typecheck the pattern, principally to
+		-- make sure that all the variables it binds are put into the
+		-- environment, else the type checker crashes later:
+		--	f (R { foo = (a,b) }) = a+b
+		-- If foo isn't one of R's fields, we don't want to crash when
+		-- typechecking the "a+b".
+	   [] -> addErrTc (badFieldCon name field_label)	`thenNF_Tc_` 
+		 newTyVarTy boxedTypeKind			`thenNF_Tc_` 
+		 returnTc (error "Bogus selector Id", pat_ty)
+
+		-- The normal case, when the field comes from the right constructor
+	   (pat_ty : extras) -> 
+		ASSERT( null extras )
+		tcLookupValue field_label			`thenNF_Tc` \ sel_id ->
+		returnTc (sel_id, pat_ty)
+	)							`thenTc` \ (sel_id, pat_ty) ->
+
+	tcPat tc_bndr rhs_pat pat_ty	`thenTc` \ (rhs_pat', lie_req2, tvs2, ids2, lie_avail2) ->
 
 	returnTc ((sel_id, rhs_pat', pun_flag) : rpats',
 		  lie_req1 `plusLIE` lie_req2,
 		  tvs1 `unionBags` tvs2,
 		  ids1 `unionBags` ids2,
 		  lie_avail1 `plusLIE` lie_avail2)
-      where
- 	matching_fields   = [ty | (f,ty) <- field_tys, f == field_label]
-	(rhs_ty : extras) = matching_fields
 \end{code}
 
 %************************************************************************
