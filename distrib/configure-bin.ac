@@ -121,8 +121,7 @@ AC_PATH_PROG(SedCmd,sed)
 #
 dnl ** How to invoke cpp directly **
 #
-AC_PROG_CC
-FPTOOLS_HAVE_GCC
+FP_HAVE_GCC
 AC_PROG_CPP
 
 #

@@ -578,17 +578,15 @@ dnl use either is considered a Feature.
 dnl ** What command to use to compile compiler sources ?
 dnl --------------------------------------------------------------
 
-AC_ARG_WITH(ghc,
+AC_ARG_WITH([ghc],
 [AC_HELP_STRING([--with-ghc=ARG],
-	[Use ARG as the path to GHC  [default=autodetect]])],
-[ WithGhc="$withval" ],
-[ 
-  if test "$GHC" = ""; then
-    AC_PATH_PROG(GHC,ghc)
+  [Use ARG as the path to GHC  [default=autodetect]])],
+  [WithGhc="$withval"],
+  [if test "$GHC" = ""; then
+    AC_PATH_PROG([GHC], [ghc])
   fi
-  WithGhc=$GHC
-])
-AC_SUBST(WithGhc)
+  WithGhc="$GHC"])
+AC_SUBST([WithGhc])
 
 AC_ARG_WITH(hc,
 [AC_HELP_STRING([--with-hc=ARG],
@@ -819,9 +817,7 @@ dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
 dnl     If gcc, make sure it's at least 2.1
 dnl
-AC_PROG_CC
-FPTOOLS_HAVE_GCC
-FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR
+FP_HAVE_GCC
 
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP

@@ -490,52 +490,26 @@ fi
 rm -f conftest
 ])])
 
-dnl
-dnl Extra testing of the result AC_PROG_CC, testing the gcc version no.
-dnl *Must* be called after AC_PROG_CC
-dnl
-AC_DEFUN(FPTOOLS_HAVE_GCC,
-[AC_CACHE_CHECK([whether you have an ok gcc], fptools_cv_have_gcc,
-[if test -z "$GCC"; then
-    echo ''
-    echo "You would be better off with gcc"
-    echo "Perhaps it is already installed, but not in your PATH?"
-    fptools_cv_have_gcc='no'
-else
-changequote(, )dnl
-    gcc_version_str="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1\.\2/g' `"
-changequote([, ])dnl
-    fptools_cv_have_gcc='yes'
-    FP_COMPARE_VERSIONS([$gcc_version_str], [-lt], [2.0],
-        [fptools_cv_have_gcc='no'
-        echo ""
-	echo "your gcc version appears to be ..."
-        $CC --version
-        echo "gcc prior to 2.0 and have never worked with ghc."
-        echo "we recommend 2.95.3, although versions back to 2.7.2 should be ok."
-        AC_MSG_ERROR([gcc 1.X has never been supported])])
-fi
-])
-HaveGcc=`echo $fptools_cv_have_gcc | sed 'y/yesno/YESNO/'`
-AC_SUBST(HaveGcc)
-GccVersion=`gcc --version | grep mingw | cut -f 3 -d ' '`
-AC_SUBST(GccVersion)
-])
 
-dnl
-dnl Some OSs (Mandrake Linux, in particular) configure GCC with
-dnl -momit-leaf-frame-pointer on by default.  If this is the case, we
-dnl need to turn it off for mangling to work.  The test is currently a bit
-dnl crude, using only the version number of gcc.
-dnl
-AC_DEFUN([FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR],
-[AC_CACHE_CHECK([whether gcc needs -mno-omit-leaf-frame-pointer], [fptools_cv_gcc_needs_no_omit_lfptr],
-[FP_COMPARE_VERSIONS([$gcc_version_str], [-ge], [3.2],
-  [fptools_cv_gcc_needs_no_omit_lfptr=yes],
-  [fptools_cv_gcc_needs_no_omit_lfptr=no])])
-if test "$fptools_cv_gcc_needs_no_omit_lfptr" = "yes"; then
-   AC_DEFINE([HAVE_GCC_MNO_OMIT_LFPTR], [1], [Define to 1 if gcc supports -mno-omit-leaf-frame-pointer.])
-fi])# FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR
+# FP_HAVE_GCC
+# -----------
+# Extra testing of the result AC_PROG_CC, testing the gcc version no. Sets the
+# output variables HaveGcc and GccVersion.
+AC_DEFUN([FP_HAVE_GCC],
+[AC_REQUIRE([AC_PROG_CC])
+AC_CACHE_CHECK([whether your gcc is OK], [fp_cv_have_gcc],
+[if test -z "$GCC"; then
+  fp_cv_have_gcc='no'
+  AC_MSG_WARN([You would be better off with gcc, perhaps it is already installed, but not in your PATH?])
+else
+  fp_cv_have_gcc='yes'
+  gcc_version_str="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9]][[0-9]]*\)\.\([[0-9]][[0-9]]*\).*/\1\.\2/g' `"
+  FP_COMPARE_VERSIONS([$gcc_version_str], [-lt], [2.0],
+    [AC_MSG_ERROR([Need at least gcc version 2.0 (2.95.3 recommend)])])
+fi])
+AC_SUBST([HaveGcc], [`echo $fp_cv_have_gcc | sed 'y/yesno/YESNO/'`])
+AC_SUBST([GccVersion], [`gcc --version | grep mingw | cut -f 3 -d ' '`])
+])# FP_HAVE_GCC
 
 
 dnl Small feature test for perl version. Assumes PerlCmd
