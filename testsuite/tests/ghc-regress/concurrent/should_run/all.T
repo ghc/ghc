@@ -31,7 +31,7 @@ test "conc017" { myvtr("", "", "") }
 test "conc018" { myvtr("", "", "") }
 test "conc019" { myvtr("", "", "") }
 test "conc020" { myvtr("", "", "") }
-test "conc021" { $normalise_errmsg = True myvtr("", "", "254") }
+test "conc021" { $normalise_errmsg = True myvtr("", "", "1") }
 test "conc022" { myvtr("", "", "") }
 test "conc023" { myvtr("", "", "") }
 test "conc024" { myvtr("", "", "") }
