@@ -75,9 +75,11 @@ primOpRule op
 	-- Word operations
     primop_rule WordQuotOp  = twoLits (wordOp2Z   quot  op_name)
     primop_rule WordRemOp   = twoLits (wordOp2Z   rem   op_name)
+#if __GLASGOW_HASKELL__ >= 407
     primop_rule AndOp       = twoLits (wordBitOp2 (.&.) op_name)
     primop_rule OrOp        = twoLits (wordBitOp2 (.|.) op_name)
     primop_rule XorOp       = twoLits (wordBitOp2 xor   op_name)
+#endif
 
 	-- coercions
     primop_rule Word2IntOp 	= oneLit (litCoerce word2IntLit     op_name)
