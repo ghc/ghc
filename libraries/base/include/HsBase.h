@@ -11,14 +11,14 @@
 
 #include "ghcconfig.h"
 
-#include "HsBaseConfig.h"
-
-/* ultra-evil... */
+/* ultra-evil... must come before HsBaseConfig.h */
 #undef PACKAGE_BUGREPORT
 #undef PACKAGE_NAME
 #undef PACKAGE_STRING
 #undef PACKAGE_TARNAME
 #undef PACKAGE_VERSION
+
+#include "HsBaseConfig.h"
 
 #include "HsFFI.h"
 
