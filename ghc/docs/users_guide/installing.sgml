@@ -544,18 +544,11 @@ To run GHC comfortably, your machine should have at least
 <Sect2><Title>Installing GHC</Title>
 
 <Para>
-Download the latest GHC distribution (ghc-5.02 InstallShield installer, 24M)
+Download the latest GHC distribution (ghc-5.02 InstallShield installer, 27M)
 from <ULink
-URL="http://www.haskell.org/ghc/download.html">haskell.org</ULink>
+URL="http://www.haskell.org/ghc/download_ghc_502.html">haskell.org</ULink>
 It is packaged up using an installer that should be familiar-looking to
 Windows users.
-</Para>
-
-<Para>
-Note: GHC's support for file names containing
-spaces is not 100%, so make sure that you install ghc in a directory
-that has no embedded spaces (i.e., resist the temptation to put it
-in <Filename>/Program Files/</Filename>!)
 </Para>
 
 <Para>
