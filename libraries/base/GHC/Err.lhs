@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Err.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Err.lhs,v 1.2 2001/07/31 13:11:07 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -28,6 +28,7 @@ module GHC.Err
        , absentErr, parError       -- :: a
        , seqError                  -- :: a
 
+       , errorCString		   -- :: Addr# -> a	-- Arg is a ptr to C string 
        , error		           -- :: String -> a
        , assertError		   -- :: String -> Bool -> a -> a
        
@@ -49,6 +50,9 @@ import GHC.Exception
 -- error stops execution and displays an error message
 error :: String -> a
 error s = throw (ErrorCall s)
+
+errorCString :: Addr# -> a
+errorCString s = error (unpackCString s)
 
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which undefined 
