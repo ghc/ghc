@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.8 1999/03/30 11:26:24 sof Exp $
+% $Id: glasgow_exts.vsgml,v 1.9 1999/04/29 12:21:50 simonpj Exp $
 %
 % GHC Language Extensions.
 %
@@ -1197,6 +1197,26 @@ In the function <tt>h</tt> we use the record selectors <tt>return</tt>
 and <tt>bind</tt> to extract the polymorphic bind and return functions
 from the <tt>MonadT</tt> data structure, rather than using pattern
 matching.
+
+You cannot pattern-match against an argument that is polymorphic.
+For example:
+<tscreen><verb>
+	newtype TIM s a = TIM (ST s (Maybe a))
+
+	runTIM :: (forall s. TIM s a) -> Maybe a
+	runTIM (TIM m) = runST m
+</verb></tscreen>
+
+Here the pattern-match fails, because you can't pattern-match against
+an argument of type <tt>(forall s. TIM s a)</tt>.  Instead you 
+must bind the variable and pattern match in the right hand side:
+<tscreen><verb>
+	runTIM :: (forall s. TIM s a) -> Maybe a
+	runTIM tm = case tm of { TIM m -> runST m }
+</verb></tscreen>
+The <tt>tm</tt> on the right hand side is (invisibly) instantiated, like
+any polymorphic value at its occurrence site, and now you can pattern-match
+against it.
 
 <sect2>The partial-application restriction
 <p>
