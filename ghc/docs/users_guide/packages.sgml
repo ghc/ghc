@@ -80,6 +80,19 @@
 	  tell the compiler when it should make an inter-DLL call
 	  rather than an intra-DLL call (inter-DLL calls require an
 	  extra indirection).</para>
+
+	  <para>Versions of the Haskell libraries for use with GHCi
+	  may also be included: GHCi cannot load <literal>.a</literal>
+	  files directly, instead it will look for an object file
+	  called <filename>HSfoo.o</filename> (the object suffix
+	  varies between platforms, as usual) and load that.  An
+	  object file can be built from a <literal>.a</literal>
+	  archive as follows (using GNU <command>ld</command> on
+	  Unix):</para>
+
+<screen>
+ld -r --whole-archive -o HSfoo.o libHSfoo.a
+</screen>
 	</listitem>
 
 	<listitem>
@@ -266,6 +279,42 @@
 	    package, with the <literal>.a</literal> or
 	    <literal>.dll</literal> suffix omitted.  On Unix, the
 	    <literal>lib</literal> prefix is also omitted.</para>
+
+	    <para>For use with GHCi, each library should have an
+	    object file too.  The name of the object file does
+	    <emphasis>not</emphasis> have a <literal>lib</literal>
+	    prefix, and has the normal object suffix for your
+	    platform.</para>
+
+	    <para>For example, if we specify a Haskell library as
+	    <filename>HSfoo</filename> in the package spec, then the
+	    various flavours of library that GHC actually uses will be
+	    called:</para>
+	    <variablelist>
+	      <varlistentry>
+		<term><filename>libHSfoo.a</filename></term>
+		<listitem>
+		  <para>The name of the library on Unix
+		  systems.</para>
+		</listitem>
+	      </varlistentry>
+	      <varlistentry>
+		<term><filename>HSfoo.dll</filename></term>
+		<listitem>
+		  <para>The name of the dynamic library on Windows
+		  systems.</para>
+		</listitem>
+	      </varlistentry>
+	      <varlistentry>
+		<term><filename>HSfoo.o</filename></term>
+		<term><filename>HSfoo.obj</filename></term>
+		<listitem>
+		  <para>The object version of the library used by
+		  GHCi.</para>
+		</listitem>
+	      </varlistentry>
+	    </variablelist>
+
 	  </listitem>
 	</varlistentry>
 
