@@ -46,6 +46,7 @@ import DataCon		( dataConWrapId )
 import BitSet 		( intBS )
 import Name             ( NamedThing(..) )
 import CmdLineOpts	( opt_Static, opt_EnsureSplittableC )
+import Outputable	( assertPanic )
 \end{code}
 
 For each independent chunk of AbstractC code, we generate a list of
