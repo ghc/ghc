@@ -434,7 +434,7 @@ FPTOOLS_TOP_ABS_UNIX    = @hardtop@
 prefix			= @prefix@
 exec_prefix		= @exec_prefix@
 bindir			= @bindir@
-datadir			= @datadir@/$(ProjectNameShort)-$(ProjectVersion)
+datadir			= @datadir@
 
 #sysconfdir		= @datadir@
 #sharedstatedir		= @sharedstatedir@
@@ -446,6 +446,13 @@ mandir			= @mandir@
 
 #UNUSED:infodir		= @infodir@
 #UNUSED:srcdir          = @srcdir@
+
+#
+# override libdir and datadir to put project-specific stuff in
+# a subdirectory with the version number included.
+#
+libdir     := $(if $(ProjectNameShort), $(libdir), $(libdir))
+datadir    := $(if $(ProjectNameShort), $(datadir)/$(ProjectNameShort)-$(ProjectVersion), $(datadir))
 
 # 
 # Default values for most of the above are only set if
