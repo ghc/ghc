@@ -163,7 +163,7 @@ unpackCStringId
 -- but I don't like wired-in IdInfos (WDP)
 
 unpackCString2Id -- for cases when a string has a NUL in it
-  = pcMiscPrelId unpackCString2IdKey pACKED_STRING SLIT("unpackCString2#")
+  = pcMiscPrelId unpackCString2IdKey pACKED_STRING SLIT("unpackNBytes#")
 		 (mkFunTys [addrPrimTy{-a char *-}, intPrimTy{-length-}] stringTy)
 		 noIdInfo
 
