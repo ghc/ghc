@@ -889,7 +889,8 @@ module A where
 
 	<para>Displayed blocks of code are indicated by surrounding a
 	paragraph with <literal>@...@</literal> or by preceding each
-	line of a paragraph with <literal>&gt;</literal>.  For
+	line of a paragraph with <literal>&gt;</literal> (we often
+	call these &ldquo;bird tracks&rdquo;).  For
 	example:</para>
 
 <programlisting>
@@ -902,6 +903,12 @@ module A where
 -- >  g x = x * 42
 </programlisting>
       </section>
+
+      <para>There is an important difference between the two forms of
+      code block: in the bird-track form, the text to the right of the
+      &lsquo;<literal>></literal>&rsquo; is interpreted literally,
+      whereas the <literal>@...@</literal> form interprets markup as
+      normal inside the code block.</para>
 
       <section>
 	<title>Hyperlinked Identifiers</title>
@@ -934,6 +941,16 @@ module A where
 	<literal>T</literal> exported from module <literal>M</literal>
 	(without checking to see whether either <literal>M</literal>
 	or <literal>M.T</literal> exist).</para>
+
+	<para>To make life easier for documentation writers, a quoted
+	identifier is only interpreted as such if the quotes surround
+	a lexically valid Haskell identifier.  This means, for
+	example, that it normally isn't necessary to escape the single
+	quote when used as an apostrophe:</para>
+
+<programlisting>
+-- | I don't have to escape my apostrophes; great, isn't it?
+</programlisting>
 
 	<para>For compatibility with other systems, the following
 	alternative form of markup is accepted<footnote><para>
