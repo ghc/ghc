@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.27 2005/02/21 11:27:21 simonmar Exp $
+# $Id: Makefile,v 1.28 2005/03/02 09:48:16 simonmar Exp $
 #
 
 TOP = ..
@@ -121,7 +121,7 @@ mkGHCConstants.o : mkDerivedConstants.c
 GHCConstants.h : mkGHCConstants
 	./mkGHCConstants >$@
 
-CLEAN_FILES += mkDerivedConstantsHdr$(exeext) DerivedConstants.h
+CLEAN_FILES += mkGHCConstants$(exeext) GHCConstants.h
 
 # ---------------------------------------------------------------------------
 # boot setup:
