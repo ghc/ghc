@@ -143,7 +143,25 @@ endif
 #-----------------------------------------------------------------------------
 # C-related suffix rules
 
-ifeq "$(UseGhcForCc)" ""
+ifeq "$(UseGhcForCc)" "YES"
+
+%.$(way_)o : %.$(way_)s
+	@$(RM) $@
+	$(HC) $(GHC_CC_OPTS) -c $< -o $@
+
+%.$(way_)o : %.c
+	@$(RM) $@
+	$(HC) $(GHC_CC_OPTS) -c $< -o $@
+
+%.$(way_)o : %.S
+	@$(RM) $@
+	$(HC) $(GHC_CC_OPTS) -c $< -o $@
+
+%.$(way_)s : %.c
+	@$(RM) $@
+	$(HC) $(GHC_CC_OPTS) -c $< -o $@
+
+else
 
 %.$(way_)o : %.$(way_)s
 	@$(RM) $@
@@ -160,24 +178,6 @@ ifeq "$(UseGhcForCc)" ""
 %.$(way_)s : %.c
 	@$(RM) $@
 	$(CC) $(CC_OPTS) -S $< -o $@
-
-else
-
-%.$(way_)o : %.$(way_)s
-	@$(RM) $@
-	$(HC) $(GHC_CC_OPTS) -c $< -o $@
-
-%.$(way_)o : %.c
-	@$(RM) $@
-	$(HC) $(GHC_CC_OPTS) -c $< -o $@
-
-%.$(way_)o : %.S
-	@$(RM) $@
-	$(HC) $(GHC_CC_OPTS) -c $< -o $@
-
-%.$(way_)s : %.c
-	@$(RM) $@
-	$(HC) $(GHC_CC_OPTS) -c $< -o $@
 
 endif
 

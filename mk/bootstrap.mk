@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.18 2002/01/15 05:39:15 sof Exp $
+# $Id: bootstrap.mk,v 1.19 2002/05/14 08:25:46 matthewc Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -61,7 +61,7 @@ PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 
 HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) $(PLATFORM_CC_OPTS) $(CC_OPTS)
 
-SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/ghc/lib/std/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/util/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/text/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/hssource/cbits
+SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/libraries/base/include -I$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/util/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/text/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/hssource/cbits
 
 # -----------------------------------------------------------------------------
 # Linking: we have to give all the libraries explicitly.
@@ -75,9 +75,9 @@ endif
 
 HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/ghc/rts			\
-   -L$(FPTOOLS_TOP_ABS)/ghc/rts/gmp		\
-   -L$(FPTOOLS_TOP_ABS)/ghc/lib/std		\
-   -L$(FPTOOLS_TOP_ABS)/ghc/lib/std/cbits	\
+   -L$(FPTOOLS_TOP_ABS)/libraries/base		\
+   -L$(FPTOOLS_TOP_ABS)/libraries/base/cbits	\
+   -L$(FPTOOLS_TOP_ABS)/libraries/haskell98	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/lang		\
    -L$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/concurrent	\
@@ -121,7 +121,7 @@ HC_BOOT_LD_OPTS =				\
    -u "$(UNDERSCORE)PrelMain_mainIO_closure"			\
    -u "$(UNDERSCORE)__stginit_PrelMain"
 
-HC_BOOT_LIBS = -lHStext -lHStext_cbits -lHSutil -lHSposix -lHSposix_cbits -lHSconcurrent -lHSlang -lHSlang_cbits -lHSstd -lHSstd_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
+HC_BOOT_LIBS = -lHStext -lHStext_cbits -lHSutil -lHSposix -lHSposix_cbits -lHSconcurrent -lHSlang -lHSlang_cbits -lHShaskell98 -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
 
 ifeq "$(GhcLibsWithReadline)" "YES"
 HC_BOOT_LIBS += $(patsubst %, -l%, $(LibsReadline))
