@@ -1,8 +1,5 @@
 # Only compile with optimisation
-def f( opts ):
-  opts.only_ways = ['opt']
-
-setTestOpts(f)
+setTestOpts( only_ways(['opt']) )
 
 test('default', normal, compile, [''])
 test('fact', normal, compile, [''])
