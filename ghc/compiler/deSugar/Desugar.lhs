@@ -129,10 +129,10 @@ deSugar hsc_env pcs
     hpt      = hsc_HPT hsc_env
     lookup n = case lookupType hpt pte n of {
 		 Just v -> v ;
-		 other -> 
+		 other  -> 
 	       case lookupNameEnv type_env n of
 		 Just v -> v ;
-		 other	       -> pprPanic "Desugar: lookup:" (ppr n)
+		 other	-> pprPanic "Desugar: lookup:" (ppr n)
                }
 
 deSugarExpr :: HscEnv

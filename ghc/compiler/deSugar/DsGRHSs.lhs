@@ -18,8 +18,10 @@ import Type		( Type )
 
 import DsMonad
 import DsUtils
+import Unique		( Uniquable(..) )
 import PrelInfo		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
-import PrelNames	( otherwiseIdKey, trueDataConKey, hasKey )
+import TysWiredIn	( trueDataConId )
+import PrelNames	( otherwiseIdKey, hasKey )
 \end{code}
 
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.
@@ -85,7 +87,9 @@ matchGuard [ResultStmt expr locn] ctx
 	-- Turn an "otherwise" guard is a no-op
 matchGuard (ExprStmt (HsVar v) _ _ : stmts) ctx
   |  v `hasKey` otherwiseIdKey
-  || v `hasKey` trueDataConKey
+  || v `hasKey` getUnique trueDataConId	
+	-- trueDataConId doesn't have the same 
+	-- unique as trueDataCon
   = matchGuard stmts ctx
 
 matchGuard (ExprStmt expr _ locn : stmts) ctx

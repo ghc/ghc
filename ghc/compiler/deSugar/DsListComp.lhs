@@ -29,12 +29,12 @@ import Var              ( Id )
 import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type,
 			  splitTyConApp_maybe )
 import TysPrim		( alphaTyVar )
-import TysWiredIn	( nilDataCon, consDataCon, unitDataConId, unitTy,
+import TysWiredIn	( nilDataCon, consDataCon, trueDataConId, falseDataConId, 
+			  unitDataConId, unitTy,
 			  mkListTy, mkTupleTy )
 import Match		( matchSimply )
-import PrelNames	( trueDataConName, falseDataConName, foldrName,
-			  buildName, replicatePName, mapPName, filterPName,
-			  zipPName, crossPName, parrTyConName ) 
+import PrelNames	( foldrName, buildName, replicatePName, mapPName, 
+			  filterPName, zipPName, crossPName, parrTyConName ) 
 import PrelInfo		( pAT_ERROR_ID )
 import SrcLoc		( noSrcLoc )
 import Panic		( panic )
@@ -384,15 +384,13 @@ dePArrComp (ExprStmt b _ _ : qs) pa cea =
 --    <<[:e' | qs:]>> (pa, p) (crossP ea ef)
 --
 dePArrComp (BindStmt p e _ : qs) pa cea =
-  dsLookupGlobalId falseDataConName			  `thenDs` \falseId ->
-  dsLookupGlobalId trueDataConName			  `thenDs` \trueId ->
   dsLookupGlobalId filterPName			  `thenDs` \filterP ->
   dsLookupGlobalId crossPName			  `thenDs` \crossP  ->
-  dsExpr e						  `thenDs` \ce      ->
+  dsExpr e					  `thenDs` \ce      ->
   let ty'cea = parrElemType cea
       ty'ce  = parrElemType ce
-      false  = Var falseId
-      true   = Var trueId
+      false  = Var falseDataConId
+      true   = Var trueDataConId
   in
   newSysLocalDs ty'ce					  `thenDs` \v       ->
   matchSimply (Var v) (StmtCtxt PArrComp) p true false      `thenDs` \pred    ->
