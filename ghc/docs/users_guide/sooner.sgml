@@ -520,7 +520,7 @@ Decrease the &ldquo;go-for-it&rdquo; threshold for unfolding smallish
 expressions.  Give a
 <Option>-funfolding-use-threshold0</Option><IndexTerm><Primary>-funfolding-use-threshold0
 option</Primary></IndexTerm> option for the extreme case. (&ldquo;Only unfoldings with
-zero cost should proceed.&rdquo;)  Warning: except in certain specialiised
+zero cost should proceed.&rdquo;)  Warning: except in certain specialised
 cases (like Happy parsers) this is likely to actually
 <Emphasis>increase</Emphasis> the size of your program, because unfolding
 generally enables extra simplifying optimisations to be performed.
