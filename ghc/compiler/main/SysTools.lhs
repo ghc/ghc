@@ -61,7 +61,7 @@ import System		( system, ExitCode(..), exitWith )
 #if !defined(mingw32_TARGET_OS)
 import qualified Posix
 #else
-import Win32Registry
+import Win32DLL
 import List		( isPrefixOf )
 #endif
 
@@ -622,9 +622,9 @@ pgmPath :: String		-- Directory string in Unix format
 #if defined(mingw32_TARGET_OS)
 
 --------------------- Windows version ------------------
-unDosifyPath xs = xs
-
 dosifyPaths xs = map dosifyPath xs
+
+unDosifyPath xs = subst '\\' '/' xs
 
 pgmPath dir pgm = dosifyPath dir ++ '\\' : pgm
 
@@ -643,7 +643,7 @@ dosifyPath stuff
 
 --------------------- Unix version ---------------------
 dosifyPaths  ps = ps
-unDosifyPath xs = subst '\\' '/' xs
+unDosifyPath xs = xs
 pgmPath dir pgm = dir ++ '/' : pgm
 --------------------------------------------------------
 #endif
@@ -683,9 +683,9 @@ slash s1 s2 = s1 ++ ('/' : s2)
 
 #if defined(mingw32_TARGET_OS)
 getExecDir :: IO (Maybe String)
-getExecDir = do hKey <- regOpenKey hKEY_LOCAL_MACHINE "SOFTWARE\\University of Glasgow\\Glasgow Haskell Compiler\\ghc-5.01"
-                s <- regQueryValue hKey (Just "InstallDir")
-		if s == "" then return Nothing else return (Just s)
+getExecDir = do h <- getModuleHandle Nothing
+		n <- getModuleFileName h
+		return (Just (reverse (tail (dropWhile (not .isSlash) (reverse (unDosifyPath n))))))
 #else
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif
