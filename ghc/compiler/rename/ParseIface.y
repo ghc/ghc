@@ -81,12 +81,7 @@ import FastString	( tailFS )
  'case' 	{ ITcase }  			-- Haskell keywords
  'class' 	{ ITclass } 
  'data' 	{ ITdata } 
- 'default' 	{ ITdefault }
- 'deriving' 	{ ITderiving }
- 'do' 		{ ITdo }
- 'else' 	{ ITelse }
  'hiding' 	{ IThiding }
- 'if' 		{ ITif }
  'import' 	{ ITimport }
  'in' 		{ ITin }
  'infix' 	{ ITinfix }
@@ -94,11 +89,9 @@ import FastString	( tailFS )
  'infixr' 	{ ITinfixr }
  'instance' 	{ ITinstance }
  'let' 		{ ITlet }
- 'module' 	{ ITmodule }
  'newtype' 	{ ITnewtype }
  'of' 		{ ITof }
  'qualified' 	{ ITqualified }
- 'then' 	{ ITthen }
  'type' 	{ ITtype }
  'where' 	{ ITwhere }
 
@@ -114,24 +107,19 @@ import FastString	( tailFS )
 
  '__interface'	{ ITinterface }			-- interface keywords
  '__export'	{ IT__export }
- '__depends'	{ ITdepends }
  '__forall'	{ IT__forall }
  '__letrec'	{ ITletrec }
  '__coerce'	{ ITcoerce }
  '__inline_me'  { ITinlineMe }
  '__inline_call'{ ITinlineCall }
  '__DEFAULT'	{ ITdefaultbranch }
- '__bot'	{ ITbottom }
- '__integer'	{ ITinteger_lit }
  '__float'	{ ITfloat_lit }
  '__word'	{ ITword_lit }
  '__int64'	{ ITint64_lit }
  '__word64'	{ ITword64_lit }
- '__rational'	{ ITrational_lit }
  '__addr'	{ ITaddr_lit }
  '__label'	{ ITlabel_lit }
  '__litlit'	{ ITlit_lit }
- '__string'	{ ITstring_lit }
  '__ccall'	{ ITccall $$ }
  '__scc' 	{ ITscc }
  '__sccC'       { ITsccAllCafs }
@@ -144,15 +132,12 @@ import FastString	( tailFS )
  '__U'		{ ITunfold }
  '__S'		{ ITstrict $$ }
  '__R'		{ ITrules }
- '__M'		{ ITcprinfo }
  '__D'		{ ITdeprecated }
 
- '..'		{ ITdotdot }  			-- reserved symbols
  '::'		{ ITdcolon }
  '='		{ ITequal }
  '\\'		{ ITlam }
  '|'		{ ITvbar }
- '<-'		{ ITlarrow }
  '->'		{ ITrarrow }
  '@'		{ ITat }
  '~'		{ ITtilde }
@@ -162,8 +147,6 @@ import FastString	( tailFS )
 
  '{'		{ ITocurly } 			-- special symbols
  '}'		{ ITccurly }
- '{|'		{ ITocurlybar } 			-- special symbols
- '|}'		{ ITccurlybar } 			-- special symbols
  '['		{ ITobrack }
  ']'		{ ITcbrack }
  '[:'		{ ITopabrack }
@@ -179,11 +162,8 @@ import FastString	( tailFS )
  VARID   	{ ITvarid    $$ }		-- identifiers
  CONID   	{ ITconid    $$ }
  VARSYM  	{ ITvarsym   $$ }
- CONSYM  	{ ITconsym   $$ }
  QVARID  	{ ITqvarid   $$ }
  QCONID  	{ ITqconid   $$ }
- QVARSYM 	{ ITqvarsym  $$ }
- QCONSYM 	{ ITqconsym  $$ }
 
  IPDUPVARID   	{ ITdupipvarid   $$ }		-- GHC extension
  IPSPLITVARID  	{ ITsplitipvarid $$ }		-- GHC extension
@@ -195,8 +175,6 @@ import FastString	( tailFS )
  INTEGER	{ ITinteger  $$ }
  RATIONAL	{ ITrational $$ }
  CLITLIT	{ ITlitlit   $$ }
-
- UNKNOWN	{ ITunknown  $$ }
 %%
 
 iface		:: { ParsedIface }
@@ -357,12 +335,16 @@ decl    : src_loc qvar_name '::' type maybe_idinfo
 			{ TySynonym $3 $4 $6 $1 }
 	| src_loc 'foreign' 'type' qtc_name  		       
 			{ ForeignType $4 Nothing DNType $1 }
-	| src_loc 'data' opt_decl_context qtc_name tv_bndrs constrs 	       
-	       		{ mkTyData DataType $3 $4 $5 $6 (length $6) Nothing $1 }
-	| src_loc 'newtype' opt_decl_context qtc_name tv_bndrs newtype_constr
-			{ mkTyData NewType $3 $4 $5 $6 1 Nothing $1 }
-	| src_loc 'class' opt_decl_context qtc_name tv_bndrs fds csigs
-			{ mkClassDecl $3 $4 $5 $6 $7 Nothing $1 }
+	| src_loc 'data' tycl_hdr constrs 	       
+	       		{ mkTyData DataType $3 $4 (length $4) Nothing $1 }
+	| src_loc 'newtype' tycl_hdr newtype_constr
+			{ mkTyData NewType $3 $4 1 Nothing $1 }
+	| src_loc 'class' tycl_hdr fds csigs
+			{ mkClassDecl $3 $4 $5 Nothing $1 }
+
+tycl_hdr :: { (RdrNameContext, RdrName, [RdrNameHsTyVar]) }
+	: context '=>' qtc_name tv_bndrs	{ ($1, $3, $4) }
+	| qtc_name tv_bndrs			{ ([], $1, $2) }
 
 maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }
@@ -466,9 +448,6 @@ opt_version	:: { Version }
 opt_version	: version			{ $1 }
 		| {- empty -}			{ initialVersion }
 	
-opt_decl_context  :: { RdrNameContext }
-opt_decl_context  :  				{ [] }
-		  | context '=>'		{ $1 }
 
 ----------------------------------------------------------------------------
 
@@ -638,13 +617,6 @@ ipvar_name	:: { IPName RdrName }
 qvar_names1	:: { [RdrName] }
 qvar_names1	: qvar_name		{ [$1] }
 		| qvar_name qvar_names1	{ $1 : $2 }
-
-var_names	:: { [RdrName] }
-var_names	: 			{ [] }
-		| var_name var_names	{ $1 : $2 }
-
-var_names1	:: { [RdrName] }
-var_names1	: var_name var_names	{ $1 : $2 }
 
 ---------------------------------------------------
 
