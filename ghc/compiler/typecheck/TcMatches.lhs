@@ -302,7 +302,7 @@ tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req match_ty
 
     returnTc (lie2, dict_binds `AndMonoBinds` inst_binds)
   where
-    doc     = text ("the existential context of a data constructor")
+    doc     = text ("existential context of a data constructor")
     tv_list = bagToList ex_tvs
     not_overloaded id = not (isOverloadedTy (idType id))
 \end{code}
