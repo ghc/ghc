@@ -2,6 +2,7 @@
 
 module Main(main) where
 
+import Control.Monad.Fix
 import Data.Array.IO
 import Monad
 
