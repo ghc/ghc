@@ -34,7 +34,11 @@ import OccName		( occNameUserString)
 import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey )
 import Name		( Name )
 import Bits		( Bits(..) )
+#if __GLASGOW_HASKELL__ >= 500
+import Word		( Word )
+#else
 import Word		( Word64 )
+#endif
 import Outputable
 import CmdLineOpts      ( opt_SimplExcessPrecision )
 \end{code}
@@ -56,14 +60,19 @@ primOpRule op
     primop_rule DataToTagOp = dataToTagRule
 
 	-- Int operations
-    primop_rule IntAddOp    = twoLits (intOp2  (+)  op_name)
-    primop_rule IntSubOp    = twoLits (intOp2  (-)  op_name)
-    primop_rule IntMulOp    = twoLits (intOp2  (*)  op_name)
-    primop_rule IntQuotOp   = twoLits (intOp2Z quot op_name)
-    primop_rule IntRemOp    = twoLits (intOp2Z rem  op_name)
-    primop_rule IntNegOp    = oneLit  (negOp        op_name)
+    primop_rule IntAddOp    = twoLits (intOp2     (+)   op_name)
+    primop_rule IntSubOp    = twoLits (intOp2     (-)   op_name)
+    primop_rule IntMulOp    = twoLits (intOp2     (*)   op_name)
+    primop_rule IntQuotOp   = twoLits (intOp2Z    quot  op_name)
+    primop_rule IntRemOp    = twoLits (intOp2Z    rem   op_name)
+    primop_rule IntNegOp    = oneLit  (negOp            op_name)
 
 	-- Word operations
+#if __GLASGOW_HASKELL__ >= 500
+    primop_rule WordAddOp   = twoLits (wordOp2    (+)   op_name)
+    primop_rule WordSubOp   = twoLits (wordOp2    (-)   op_name)
+    primop_rule WordMulOp   = twoLits (wordOp2    (*)   op_name)
+#endif
     primop_rule WordQuotOp  = twoLits (wordOp2Z   quot  op_name)
     primop_rule WordRemOp   = twoLits (wordOp2Z   rem   op_name)
 #if __GLASGOW_HASKELL__ >= 407
@@ -186,11 +195,11 @@ cmpOp cmp name l1 l2
 
 negOp name (MachFloat f)  = Just (name, mkFloatVal (-f))
 negOp name (MachDouble d) = Just (name, mkDoubleVal (-d))
-negOp name l@(MachInt i)  = intResult name (-i)
+negOp name (MachInt i)    = intResult name (-i)
 negOp name l		  = Nothing
 
 --------------------------
-intOp2 op name l1@(MachInt i1) l2@(MachInt i2)
+intOp2 op name (MachInt i1) (MachInt i2)
   = intResult name (i1 `op` i2)
 intOp2 op name l1 l2 = Nothing		-- Could find LitLit
 
@@ -199,14 +208,25 @@ intOp2Z op name (MachInt i1) (MachInt i2)
 intOp2Z op name l1 l2 = Nothing		-- LitLit or zero dividend
 
 --------------------------
--- Integer is not an instance of Bits, so we operate on Word64
-wordBitOp2 op name l1@(MachWord w1) l2@(MachWord w2)
-  = Just (name, mkWordVal ((fromIntegral::Word64->Integer) (fromIntegral w1 `op` fromIntegral w2)))
-wordBitOp2 op name l1 l2 = Nothing		-- Could find LitLit
+#if __GLASGOW_HASKELL__ >= 500
+wordOp2 op name (MachWord w1) (MachWord w2)
+  = wordResult name (w1 `op` w2)
+wordOp2 op name l1 l2 = Nothing		-- Could find LitLit
+#endif
 
 wordOp2Z op name (MachWord w1) (MachWord w2)
   | w2 /= 0 = Just (name, mkWordVal (w1 `op` w2))
 wordOp2Z op name l1 l2 = Nothing	-- LitLit or zero dividend
+
+#if __GLASGOW_HASKELL__ >= 500
+wordBitOp2 op name l1@(MachWord w1) l2@(MachWord w2)
+  = Just (name, mkWordVal (w1 `op` w2))
+#else
+-- Integer is not an instance of Bits, so we operate on Word64
+wordBitOp2 op name l1@(MachWord w1) l2@(MachWord w2)
+  = Just (name, mkWordVal ((fromIntegral::Word64->Integer) (fromIntegral w1 `op` fromIntegral w2)))
+#endif
+wordBitOp2 op name l1 l2 = Nothing		-- Could find LitLit
 
 --------------------------
 floatOp2  op name (MachFloat f1) (MachFloat f2)
@@ -271,7 +291,13 @@ do_lit_eq is_eq name lit expr
 -- Int range, but not in a way suitable for cross-compiling... :-(
 intResult :: RuleName -> Integer -> Maybe (RuleName, CoreExpr)
 intResult name result
-  = Just (name, mkIntVal (toInteger ((fromInteger result)::Int)))
+  = Just (name, mkIntVal (toInteger (fromInteger result :: Int)))
+
+#if __GLASGOW_HASKELL__ >= 500
+wordResult :: RuleName -> Integer -> Maybe (RuleName, CoreExpr)
+wordResult name result
+  = Just (name, mkWordVal (toInteger (fromInteger result :: Word)))
+#endif
 \end{code}
 
 
