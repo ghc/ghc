@@ -95,7 +95,30 @@ mallocBytesRWX(int len)
 }
 
 #if defined(i386_HOST_ARCH)
-static unsigned char *obscure_ccall_ret_code;
+/* 
+  Now here's something obscure for you:
+
+  When generating an adjustor thunk that uses the C calling
+  convention, we have to make sure that the thunk kicks off
+  the process of jumping into Haskell with a tail jump. Why?
+  Because as a result of jumping in into Haskell we may end
+  up freeing the very adjustor thunk we came from using
+  freeHaskellFunctionPtr(). Hence, we better not return to
+  the adjustor code on our way  out, since it could by then
+  point to junk.
+  
+  The fix is readily at hand, just include the opcodes
+  for the C stack fixup code that we need to perform when
+  returning in some static piece of memory and arrange
+  to return to it before tail jumping from the adjustor thunk.
+*/
+__asm__ (
+   ".globl obscure_ccall_ret_code\n"
+   "obscure_ccall_ret_code:\n\t"
+   "addl $0x4, %esp\n\t"
+   "ret"
+  );
+extern void obscure_ccall_ret_code(void);
 #endif
 
 #if defined(alpha_HOST_ARCH)
@@ -906,30 +929,4 @@ freeHaskellFunctionPtr(void* ptr)
 void
 initAdjustor(void)
 {
-#if defined(i386_HOST_ARCH)
-  /* Now here's something obscure for you:
-
-  When generating an adjustor thunk that uses the C calling
-  convention, we have to make sure that the thunk kicks off
-  the process of jumping into Haskell with a tail jump. Why?
-  Because as a result of jumping in into Haskell we may end
-  up freeing the very adjustor thunk we came from using
-  freeHaskellFunctionPtr(). Hence, we better not return to
-  the adjustor code on our way  out, since it could by then
-  point to junk.
-
-  The fix is readily at hand, just include the opcodes
-  for the C stack fixup code that we need to perform when
-  returning in some static piece of memory and arrange
-  to return to it before tail jumping from the adjustor thunk.
-  */
-
-  obscure_ccall_ret_code = mallocBytesRWX(4);
-
-  obscure_ccall_ret_code[0x00] = (unsigned char)0x83;  /* addl $0x4, %esp */
-  obscure_ccall_ret_code[0x01] = (unsigned char)0xc4;
-  obscure_ccall_ret_code[0x02] = (unsigned char)0x04;
-
-  obscure_ccall_ret_code[0x03] = (unsigned char)0xc3;  /* ret */
-#endif
 }
