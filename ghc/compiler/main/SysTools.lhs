@@ -53,7 +53,7 @@ import IO
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
-import System		( system, ExitCode(..), exitWith )
+import System		( system, ExitCode(..), exitWith, getEnv )
     
 #include "../includes/config.h"
 
@@ -213,6 +213,14 @@ initSysTools minusB_args
 	      mangle_script
 		| am_installed = installed_bin cGHC_MANGLER
 		| otherwise    = inplace cGHC_MANGLER_DIR cGHC_MANGLER
+
+#ifndef mingw32_TARGET_OS
+	-- check whether TMPDIR is set in the environment
+	; IO.try (do dir <- getEnv "TMPDIR" -- fails if not set
+	      	     setTmpDir dir
+	      	     return ()
+                 )
+#endif
 
 	-- Check that the package config exists
 	; config_exists <- doesFileExist pkgconfig_path
