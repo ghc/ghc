@@ -189,11 +189,29 @@
 /* Define this if your time.h defines altzone */
 #undef HAVE_ALTZONE
 
-/* sizeof(int) */
-#undef SIZEOF_INT
+/* sizeof(unsigned int) */
+#undef SIZEOF_UNSIGNED_INT
 
 /* sizeof(long) */
 #undef SIZEOF_LONG
 
 /* sizeof(void *) */
 #undef SIZEOF_VOID_P
+
+/* sizeof(float) */
+#undef SIZEOF_FLOAT
+
+/* sizeof(double) */
+#undef SIZEOF_DOUBLE
+
+/* minimum alignment of unsigned int */
+#undef ALIGNMENT_UNSIGNED_INT
+
+/* minimum alignment of long */
+#undef ALIGNMENT_LONG
+
+/* minimum alignment of float */
+#undef ALIGNMENT_FLOAT
+
+/* minimum alignment of double */
+#undef ALIGNMENT_DOUBLE
