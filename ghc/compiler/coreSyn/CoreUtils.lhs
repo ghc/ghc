@@ -18,8 +18,7 @@ module CoreUtils (
 	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe, exprIsAtom,
-	idAppIsBottom, idAppIsCheap,
-
+	idAppIsBottom, idAppIsCheap, rhsIsNonUpd,
 
 	-- Arity and eta expansion
 	manifestArity, exprArity, 
@@ -33,9 +32,6 @@ module CoreUtils (
 
 	-- Equality
 	cheapEqExpr, eqExpr, applyTypeToArgs, applyTypeToArg,
-
-	-- CAF info
-	hasCafRefs, rhsIsNonUpd,
 
 	-- Cross-DLL references
 	isCrossDllConApp,
@@ -59,10 +55,9 @@ import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
 			  isOneShotLambda, isDataConWorkId_maybe, mkSysLocal,
-			  isDataConWorkId, isBottomingId, idCafInfo
+			  isDataConWorkId, isBottomingId
 			)
-import IdInfo		( GlobalIdDetails(..), megaSeqIdInfo,
-			  CafInfo(..), mayHaveCafRefs )
+import IdInfo		( GlobalIdDetails(..), megaSeqIdInfo )
 import NewDemand	( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			  splitFunTy,
@@ -80,7 +75,6 @@ import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
 import Util             ( equalLength, lengthAtLeast )
 import TysPrim		( statePrimTyCon )
-import FastTypes	hiding ( fastOr )
 \end{code}
 
 
@@ -1178,58 +1172,11 @@ isCrossDllArg (Lam v e)   = isCrossDllArg e
 
 %************************************************************************
 %*									*
-\subsection{Figuring out CafInfo for an expression}
+\subsection{Determining non-updatable right-hand-sides}
 %*									*
 %************************************************************************
 
-hasCafRefs decides whether a top-level closure can point into the dynamic heap.
-We mark such things as `MayHaveCafRefs' because this information is
-used to decide whether a particular closure needs to be referenced
-in an SRT or not.
-
-There are two reasons for setting MayHaveCafRefs:
-	a) The RHS is a CAF: a top-level updatable thunk.
-	b) The RHS refers to something that MayHaveCafRefs
-
-Possible improvement: In an effort to keep the number of CAFs (and 
-hence the size of the SRTs) down, we could also look at the expression and 
-decide whether it requires a small bounded amount of heap, so we can ignore 
-it as a CAF.  In these cases however, we would need to use an additional
-CAF list to keep track of non-collectable CAFs.  
-
 \begin{code}
-hasCafRefs  :: (Var -> Bool) -> Arity -> CoreExpr -> CafInfo
-hasCafRefs p arity expr 
-  | is_caf || mentions_cafs = MayHaveCafRefs
-  | otherwise 		    = NoCafRefs
- where
-  mentions_cafs = isFastTrue (cafRefs p expr)
-  is_caf = not (arity > 0 || rhsIsNonUpd expr)
-  -- NB. we pass in the arity of the expression, which is expected
-  -- to be calculated by exprArity.  This is because exprArity
-  -- knows how much eta expansion is going to be done by 
-  -- CorePrep later on, and we don't want to duplicate that
-  -- knowledge in rhsIsNonUpd below.
-
-cafRefs p (Var id)
-  | isId id && p id = fastBool (mayHaveCafRefs (idCafInfo id))
-  | otherwise       = fastBool False
-
-cafRefs p (Lit l) 	     = fastBool False
-cafRefs p (App f a) 	     = fastOr (cafRefs p f) (cafRefs p) a
-cafRefs p (Lam x e) 	     = cafRefs p e
-cafRefs p (Let b e) 	     = fastOr (cafRefss p (rhssOfBind b)) (cafRefs p) e
-cafRefs p (Case e bndr alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts alts)
-cafRefs p (Note n e) 	     = cafRefs p e
-cafRefs p (Type t) 	     = fastBool False
-
-cafRefss p [] 	  = fastBool False
-cafRefss p (e:es) = fastOr (cafRefs p e) (cafRefss p) es
-
--- hack for lazy-or over FastBool.
-fastOr a f x = fastBool (isFastTrue a || isFastTrue (f x))
-
-
 rhsIsNonUpd :: CoreExpr -> Bool
 -- True => Value-lambda, saturated constructor
 -- This is a bit like CoreUtils.exprIsValue, with the following differences:

@@ -21,7 +21,7 @@ import CoreUtils	( exprArity )
 import PprCore		( pprIdRules )
 import Id		( Id, mkUserLocal, idInfo, setIdInfo, idUnique,
 			  idType, idCoreRules )
-import IdInfo		( setArityInfo, noCafIdInfo,
+import IdInfo		( setArityInfo, vanillaIdInfo,
 			  newStrictnessInfo, setAllStrictnessInfo,
 			  newDemandInfo, setNewDemandInfo )
 import Type		( tidyType, tidyTyVarBndr )
@@ -149,11 +149,9 @@ tidyLetBndr env (id,rhs)
 	--
 	-- Similarly arity info for eta expansion in CorePrep
 	--
-	-- CafInfo is NoCafRefs, because this is not a top-level Id.
-	--
     final_id = new_id `setIdInfo` new_info
     idinfo   = idInfo id
-    new_info = noCafIdInfo -- NB. no CAF refs!
+    new_info = vanillaIdInfo
 		`setArityInfo`		exprArity rhs
 		`setAllStrictnessInfo`	newStrictnessInfo idinfo
 		`setNewDemandInfo`	newDemandInfo idinfo
@@ -173,12 +171,12 @@ tidyIdBndr env@(tidy_env, var_env) id
 	-- The SrcLoc isn't important now, 
 	-- though we could extract it from the Id
 	-- 
-	-- All nested Ids now have the same IdInfo, namely noCafIdInfo,
+	-- All nested Ids now have the same IdInfo, namely vanillaIdInfo,
 	-- which should save some space.
 	-- But note that tidyLetBndr puts some of it back.
         ty'          	  = tidyType env (idType id)
 	id'          	  = mkUserLocal occ' (idUnique id) ty' noSrcLoc
-				`setIdInfo` noCafIdInfo
+				`setIdInfo` vanillaIdInfo
 	var_env'	  = extendVarEnv var_env id id'
     in
      ((tidy_env', var_env'), id')

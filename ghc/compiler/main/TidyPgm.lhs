@@ -15,17 +15,17 @@ import CoreFVs		( ruleLhsFreeIds, ruleRhsFreeVars, exprSomeFreeVars )
 import CoreTidy		( tidyExpr, tidyVarOcc, tidyIdRules )
 import PprCore 		( pprIdRules )
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprArity, hasCafRefs )
+import CoreUtils	( exprArity, rhsIsNonUpd )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, idCoreRules, 
 			  isExportedId, mkVanillaGlobal, isLocalId, 
-			  isImplicitId, idArity, setIdInfo
+			  isImplicitId, idArity, setIdInfo, idCafInfo
 			) 
 import IdInfo		{- loads of stuff -}
 import NewDemand	( isBottomingSig, topSig )
-import BasicTypes	( isNeverActive )
+import BasicTypes	( Arity, isNeverActive )
 import Name		( getOccName, nameOccName, mkInternalName,
 		  	  localiseName, isExternalName, nameSrcLoc
 			)
@@ -47,6 +47,7 @@ import List		( partition )
 import Util		( mapAccumL )
 import Maybe		( isJust )
 import Outputable
+import FastTypes  hiding ( fastOr )
 \end{code}
 
 
@@ -418,7 +419,7 @@ tidyTopBind :: Module
 	    -> TopTidyEnv -> CoreBind
 	    -> (TopTidyEnv, CoreBind)
 
-tidyTopBind mod ext_ids top_tidy_env (NonRec bndr rhs)
+tidyTopBind mod ext_ids top_tidy_env@(_,_,subst1) (NonRec bndr rhs)
   = ((orig,occ,subst) , NonRec bndr' rhs')
   where
     ((orig,occ,subst), bndr')
@@ -426,9 +427,9 @@ tidyTopBind mod ext_ids top_tidy_env (NonRec bndr rhs)
 			 rec_tidy_env rhs rhs' top_tidy_env bndr
     rec_tidy_env = (occ,subst)
     rhs' = tidyExpr rec_tidy_env rhs
-    caf_info = hasCafRefs (const True) (idArity bndr') rhs'
+    caf_info = hasCafRefs subst1 (idArity bndr') rhs'
 
-tidyTopBind mod ext_ids top_tidy_env (Rec prs)
+tidyTopBind mod ext_ids top_tidy_env@(_,_,subst1) (Rec prs)
   = (final_env, Rec prs')
   where
     (final_env@(_,occ,subst), prs') = mapAccumL do_one top_tidy_env prs
@@ -445,10 +446,9 @@ tidyTopBind mod ext_ids top_tidy_env (Rec prs)
 
 	-- the CafInfo for a recursive group says whether *any* rhs in
 	-- the group may refer indirectly to a CAF (because then, they all do).
-    pred v = v `notElem` map fst prs'
     caf_info 
-	| or [ mayHaveCafRefs (hasCafRefs pred (idArity bndr) rhs)
-	     | (bndr,rhs) <- prs' ] = MayHaveCafRefs
+	| or [ mayHaveCafRefs (hasCafRefs subst1 (idArity bndr) rhs)
+	     | (bndr,rhs) <- prs ] = MayHaveCafRefs
 	| otherwise = NoCafRefs
 
 tidyTopBinder :: Module -> IdEnv Bool -> CafInfo
@@ -587,4 +587,63 @@ tidyWorker tidy_env (HasWorker work_id wrap_arity)
   = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
 tidyWorker tidy_env other
   = NoWorker
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Figuring out CafInfo for an expression}
+%*									*
+%************************************************************************
+
+hasCafRefs decides whether a top-level closure can point into the dynamic heap.
+We mark such things as `MayHaveCafRefs' because this information is
+used to decide whether a particular closure needs to be referenced
+in an SRT or not.
+
+There are two reasons for setting MayHaveCafRefs:
+	a) The RHS is a CAF: a top-level updatable thunk.
+	b) The RHS refers to something that MayHaveCafRefs
+
+Possible improvement: In an effort to keep the number of CAFs (and 
+hence the size of the SRTs) down, we could also look at the expression and 
+decide whether it requires a small bounded amount of heap, so we can ignore 
+it as a CAF.  In these cases however, we would need to use an additional
+CAF list to keep track of non-collectable CAFs.  
+
+\begin{code}
+hasCafRefs  :: VarEnv Var -> Arity -> CoreExpr -> CafInfo
+hasCafRefs p arity expr 
+  | is_caf || mentions_cafs = MayHaveCafRefs
+  | otherwise 		    = NoCafRefs
+ where
+  mentions_cafs = isFastTrue (cafRefs p expr)
+  is_caf = not (arity > 0 || rhsIsNonUpd expr)
+  -- NB. we pass in the arity of the expression, which is expected
+  -- to be calculated by exprArity.  This is because exprArity
+  -- knows how much eta expansion is going to be done by 
+  -- CorePrep later on, and we don't want to duplicate that
+  -- knowledge in rhsIsNonUpd below.
+
+cafRefs p (Var id)
+	-- imported Ids first:
+  | not (isLocalId id) = fastBool (mayHaveCafRefs (idCafInfo id))
+	-- now Ids local to this module:
+  | otherwise =
+     case lookupVarEnv p id of
+	Just id' -> fastBool (mayHaveCafRefs (idCafInfo id'))
+	Nothing  -> fastBool False
+
+cafRefs p (Lit l) 	     = fastBool False
+cafRefs p (App f a) 	     = fastOr (cafRefs p f) (cafRefs p) a
+cafRefs p (Lam x e) 	     = cafRefs p e
+cafRefs p (Let b e) 	     = fastOr (cafRefss p (rhssOfBind b)) (cafRefs p) e
+cafRefs p (Case e bndr alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts alts)
+cafRefs p (Note n e) 	     = cafRefs p e
+cafRefs p (Type t) 	     = fastBool False
+
+cafRefss p [] 	  = fastBool False
+cafRefss p (e:es) = fastOr (cafRefs p e) (cafRefss p) es
+
+-- hack for lazy-or over FastBool.
+fastOr a f x = fastBool (isFastTrue a || isFastTrue (f x))
 \end{code}

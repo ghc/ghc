@@ -209,7 +209,6 @@ coreTopBindToStg env body_fvs (Rec pairs)
     in
     ASSERT2(and [manifestArity rhs == stgRhsArity stg_rhs | (rhs,stg_rhs) <- rhss `zip` stg_rhss], ppr binders)
     ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
---    WARN(not (consistent caf_info bind), ppr binders <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
 #ifdef DEBUG
@@ -219,10 +218,12 @@ coreTopBindToStg env body_fvs (Rec pairs)
 -- floated out a binding, in which case it will be approximate.
 consistentCafInfo id bind
   | occNameFS (nameOccName (idName id)) == FSLIT("sat")
-  = id_marked_caffy || not binding_is_caffy
+  = safe
   | otherwise
-  = id_marked_caffy == binding_is_caffy
+  = WARN (not exact, ppr id) safe
   where
+	safe  = id_marked_caffy || not binding_is_caffy
+	exact = id_marked_caffy == binding_is_caffy
 	id_marked_caffy  = mayHaveCafRefs (idCafInfo id)
 	binding_is_caffy = stgBindHasCafRefs bind
 #endif
