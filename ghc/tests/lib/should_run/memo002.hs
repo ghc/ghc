@@ -1,9 +1,10 @@
-module Main
-where
+module Main where
 
-import Memo
-import System(getArgs)
+import Memo	( memo )
+import List	( genericLength, genericReplicate )
+import System	( getArgs )
 
+main :: IO ()
 main = do (arg:_) <- getArgs
 	  mapM_ printTriple [ (i,fib i,mfib i) | i <- [10..read arg] ]
   where printTriple (i,fi,mfi) = do print i
@@ -11,13 +12,17 @@ main = do (arg:_) <- getArgs
 				    print mfi
 				    putStrLn ""
 
+-- There is not much point in memoising Integers, so we use unary "numbers" instead
 mfib :: Integer -> Integer
-mfib = memo ufib
+mfib = genericLength . mfib' . flip genericReplicate ()
 
-ufib :: Integer -> Integer
-ufib 0 = 1
-ufib 1 = 1
-ufib n = mfib (n-1) + mfib (n-2)
+mfib' :: [()] -> [()]
+mfib' = memo ufib
+
+ufib :: [()] -> [()]
+ufib []              = [()]
+ufib [()]            = [()]
+ufib (():n1@(():n2)) = mfib' n1 ++ mfib' n2
 
 fib :: Integer -> Integer
 fib 0 = 1
