@@ -260,16 +260,16 @@ bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
 bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
   = checkDupOrQualNames doc_str rdr_names_w_loc	`thenRn_`
 
+    getModeRn 				`thenRn` \ mode ->
     getLocalNameEnv			`thenRn` \ name_env ->
-    (if opt_WarnNameShadowing
-     then
-	mapRn_ (check_shadow name_env) rdr_names_w_loc
-     else
-	returnRn ()
+
+	-- Warn about shadowing, but only in source modules
+    (case mode of
+	SourceMode | opt_WarnNameShadowing -> mapRn_ (check_shadow name_env) rdr_names_w_loc
+	other				   -> returnRn ()
     )					`thenRn_`
 	
     getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
-    getModeRn 			`thenRn` \ mode ->
     let
 	n	   = length rdr_names_w_loc
 	(us', us1) = splitUniqSupply us
