@@ -93,12 +93,7 @@ codeOutput dflags mod_name tycons core_binds stg_binds
 	}
 
 doOutput :: String -> (Handle -> IO ()) -> IO ()
-doOutput filenm io_action
-  = (do	handle <- openFile filenm WriteMode
-	io_action handle
-	hClose handle)
-    `catch` (\err -> pprPanic "Failed to open or write code output file" 
-			      (text filenm))
+doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 \end{code}
 
 
