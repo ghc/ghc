@@ -83,6 +83,12 @@ data ExportItem
 	HsDecl		-- a declaration (with doc annotations)
 	[InstHead]	-- instances relevant to this declaration
 
+  | ExportNoDecl	-- an exported entity for which we have no documentation
+			-- (perhaps becuase it resides in another package)
+	HsQName		-- the original name
+	HsQName		-- where to link to
+	[HsQName]	-- subordinate names
+
   | ExportGroup		-- a section heading
 	Int		-- section level (1, 2, 3, ... )
 	String		-- section "id" (for hyperlinks)

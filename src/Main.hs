@@ -400,6 +400,11 @@ mkInterface no_implicit_prelude verbose mod_map filename package
 
      -- build the import env, which maps original names to import names
      local_import_env = listToFM (zip qual_local_names qual_local_names)
+
+     -- find the names exported by this module that other modules should *not*
+     -- link to (and point them to where they should).
+     reexports = getReExports mdl mod_map orig_exports
+
      import_env = local_import_env `plusFM`
 		   buildImportEnv mod_map mdl exported_visible_names 
 			implicit_imps
@@ -432,10 +437,6 @@ mkInterface no_implicit_prelude verbose mod_map filename package
         = runRnFM import_env (renameExportItems pruned_export_list)
 
      name_env = listToFM [ (nameOfQName n, n) | n <- exported_names ]
-
-     -- find the names exported by this module that other modules should *not*
-     -- link to (and point them to where they should).
-     reexports = getReExports mdl mod_map orig_exports
 
   let
      (orig_module_doc, missing_names4)
@@ -600,7 +601,11 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
 	| Just decl <- findDecl t
 	= return [ ExportDecl t (restrictTo subs (extractDecl x mdl decl)) [] ]
 	| otherwise
-	= return []
+	= return [ ExportNoDecl t t (map (Qual mdl) subs) ]
+	-- can't find the decl (it might be from another package), but let's
+	-- list the entity anyway.  Later on, the renamer will change the
+	-- orig name into the import name, so we get a proper link to
+	-- the doc for this entity.
 	where 
 	      subs = 
 		case mb_subs of
@@ -782,7 +787,21 @@ exportedNames mdl mod_map local_names orig_env sub_map maybe_exps opts
 		| otherwise -> return []
 	    Nothing
 		-> return []  -- we already emitted a warning above
-    _ -> extract e
+
+    -- remaining cases: we have to catch names which are reexported from
+    -- here, but for which we have no documentation, perhaps because they
+    -- are from another package.  We have to do this by looking for
+    -- the declaration in the other module.
+    _ -> do xs <- extract e
+	    return (filter is_documented_here xs)
+
+  is_documented_here (UnQual _) = False
+  is_documented_here (Qual m n)
+    | m == mdl  = True -- well, it's not documented anywhere else!
+    | otherwise =
+	case lookupFM mod_map m of
+	  Nothing -> False
+	  Just iface -> isJust (lookupFM (iface_decls iface) n)
 
 exportModuleMissingErr this mdl 
   = ["Warning: in export list of " ++ show this
@@ -863,7 +882,9 @@ buildOrigEnv this_mdl verbose mod_map imp_decls
 -- module to the qualified name that we want to link to in the
 -- documentation.
 
-buildImportEnv :: ModuleMap -> Module -> [HsQName] -> [HsImportDecl]
+buildImportEnv :: ModuleMap -> Module
+        -> [HsQName]	   -- a list of names exported from here *with docs*
+	-> [HsImportDecl]  -- the import decls
 	-> FiniteMap HsQName HsQName
 buildImportEnv mod_map this_mod exported_names imp_decls
   = foldr plusFM emptyFM (map build imp_decls)
@@ -879,7 +900,7 @@ buildImportEnv mod_map this_mod exported_names imp_decls
 	      import_map (nm,qnm) = (qnm, maps_to)
  	       where 
 		maps_to
-		 -- we re-export it: just link to this module
+		 -- we re-export it, with docs
 		 | qnm `elem` exported_names = Qual this_mod nm
 		 -- re-exported from the other module, but not documented there:
 		 -- find the right place using the iface_reexported environment.

@@ -265,6 +265,10 @@ renameExportItems items = mapM rn items
 	   = do decl <- renameDecl decl0
 		mapM renameInstHead insts
 		return (ExportDecl x decl insts)
+	rn (ExportNoDecl x y subs)
+	   = do y' <- lookupRn id y
+	        subs' <- mapM (lookupRn id) subs
+		return (ExportNoDecl x y' subs')
 	rn (ExportDoc doc0)
 	   = do doc <- renameDoc doc0
 		return (ExportDoc doc)
