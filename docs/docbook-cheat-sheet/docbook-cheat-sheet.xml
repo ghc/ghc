@@ -61,7 +61,7 @@
       <varlistentry>
         <term>Comments</term>
         <listitem>
-          <para>Comments in SGML look like this: <sgmltag
+          <para>Comments in XML look like this: <sgmltag
           class="sgmlcomment">This is a comment</sgmltag>.</para>
         </listitem>
       </varlistentry>
@@ -175,7 +175,7 @@
   <sect1 id="docbook-tables">
     <title>Tables</title>
 
-    <para>Tables are quite complicated to write in SGML (as in HTML,
+    <para>Tables are quite complicated to write in DocBook XML (as in HTML,
     there are lots of fiddly tags), so here's an example you can
     cannibalise. In the spirit of the LaTeX short introduction I don't
     repeat all the markup verbatim; you have to look at the source for

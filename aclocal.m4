@@ -954,55 +954,6 @@ fi
 ])# FP_PROG_FO_PROCESSOR
 
 
-dnl ** Check which CATALOG file we have to use with DocBook SGML.
-dnl
-dnl FPTOOLS_DOCBOOK_CATALOG(VARIABLE, JADE, STYLESHEET, CATALOGS-TO-CHECK-FOR)
-dnl
-dnl If any of the catalogs given in CATALOGS-TO-CHECK-FOR works on this
-dnl platform, let VARIABLE refer to this catalog; otherwise, VARIABLE
-dnl is set to "no".  JADE is the jade executable and STYLESHEET
-dnl a DocBook style sheet.
-dnl
-AC_DEFUN(FPTOOLS_DOCBOOK_CATALOG,
-[AC_CACHE_CHECK([for DocBook CATALOG], fptools_cv_sgml_catalog,
-[
-cat > conftest.sgml << EOF
-<!DOCTYPE Article PUBLIC "-//OASIS//DTD DocBook V3.1//EN">
-<Article>
-<ArtHeader>
-<Title>Test</Title>
-<Author><OtherName>Test</OtherName></Author>
-<Address>Test</Address>
-<PubDate>Test</PubDate>
-</ArtHeader>
-<Sect1><Title>Test</Title>
-<Para>
-Test.
-</Para>
-</Sect1>
-</Article>
-EOF
-fptools_cv_sgml_catalog=no
-if test -z "$SGML_CATALOG_FILES" ; then
- for fptools_catalog in $4; do
-   ac_try="$2 -t rtf -d $3#print -c $fptools_catalog conftest.sgml"
-   if AC_TRY_EVAL(ac_try); then
-     fptools_cv_sgml_catalog=[$]fptools_catalog
-     break
-   fi
- done
-else
-# If the env var SGML_CATALOG_FILES is defined, assume things are cool.
-  fptools_cv_sgml_catalog="yes"
-fi
-])
-rm -rf conftest*
-if test $fptools_cv_sgml_catalog != "no"; then
-  $1=$fptools_cv_sgml_catalog
-fi
-])
-
-
 # FP_CHECK_WIN32
 # --------------
 # If Windows is the target platform (e.g. MinGW/MSYS or Cygwin with

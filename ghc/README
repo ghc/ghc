@@ -23,8 +23,8 @@ In a binary distribution, pre-formatted documentation can be found in
 the html and ps directories.  Pre-formatted HTML documentation is also
 available on the GHC web page.
 
-In a source distribution, the unformatted (SGML) documentation is in
-the following places:
+In a source distribution, the unformatted (DocBook XML) documentation
+is in the following places:
 
   * fptools/ghc/docs/users_guide  Users' Guide.
   * fptools/hslibs/doc/hslibs	  Library documentation.

@@ -11,7 +11,7 @@ include $(TOP)/mk/boilerplate.mk
 
 # We need to write mkdependC first (in that order), to be sure that
 # make depend will succeed in all the other directories.
-SUBDIRS = mkdependC mkdirhier runstdtest docbook
+SUBDIRS = mkdependC mkdirhier runstdtest
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SUBDIRS += lndir
 endif

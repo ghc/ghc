@@ -327,41 +327,6 @@ endif
 	fig2dev -L latex $< $@
 
 #-----------------------------------------------------------------------------
-# SGML suffix rules
-#
-%.dvi : %.sgml
-	@$(RM) $@
-	$(SGML2DVI) $(SGML2DVI_OPTS) $<
-
-%.ps : %.sgml
-	@$(RM) $@
-	$(SGML2PS) $(SGML2PS_OPTS) $<
-
-%.html : %.sgml
-	@$(RM) $@
-#	$(PERL) $(COLLATEINDEX) -N -o index.sgml
-#	$(JADE) -t sgml -V html-index -d $(SGMLSTYLESHEET) -c $(DOCBOOK_CATALOG) $<
-#	$(PERL) $(COLLATEINDEX) -N -o index.sgml
-	$(SGML2HTML) $(SGML2HTML_OPTS) $<
-# touch the .html file so that it is seen to be built
-	@touch $@
-
-%.html : %.tex
-	@$(RM) $@
-	$(HEVEA) $(HEVEA_OPTS) $(patsubst %.tex,%.hva,$<) $<
-	$(HEVEA) $(HEVEA_OPTS) $(patsubst %.tex,%.hva,$<) $<
-	$(HACHA) $(HACHA_OPTS) $(patsubst %.tex,%.html,$<)
-# Run HeVeA twice to resolve labels
-
-%.rtf : %.sgml
-	@$(RM) $@
-	$(SGML2RTF) $(SGML2RTF_OPTS) $<
-
-%.pdf : %.sgml
-	@$(RM) $@
-	$(SGML2PDF) $(SGML2PDF_OPTS) $<
-
-#-----------------------------------------------------------------------------
 # Literate suffix rules
 
 %.prl : %.lprl

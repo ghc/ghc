@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.35 2004/08/15 20:28:06 panne Exp $
+# 	$Id: opts.mk,v 1.36 2004/08/26 20:08:54 panne Exp $
 #
 #################################################################################
 
@@ -99,11 +99,6 @@ MKDEPENDHS_OPTS    = $(SRC_MKDEPENDHS_OPTS) $(WAY$(_way)_MKDEPENDHS_OPTS) \
                      $(EXTRA_MKDEPENDHS_OPTS)
 MKDEPENDLIT_OPTS   = $(SRC_MKDEPENDLIT_OPTS) $(WAY$(_way)_MKDEPENDLIT_OPTS) \
                      $(EXTRA_MKDEPENDLIT_OPTS)
-SGML2DVI_OPTS      = $(SRC_SGML2DVI_OPTS) $(WAY$(_way)_SGML2DVI_OPTS) $(EXTRA_SGML2DVI_OPTS)
-SGML2PS_OPTS       = $(SRC_SGML2PS_OPTS) $(WAY$(_way)_SGML2PS_OPTS) $(EXTRA_SGML2PS_OPTS)
-SGML2PDF_OPTS      = $(SRC_SGML2PDF_OPTS) $(WAY$(_way)_SGML2PDF_OPTS) $(EXTRA_SGML2PDF_OPTS)
-SGML2RTF_OPTS      = $(SRC_SGML2RTF_OPTS) $(WAY$(_way)_SGML2RTF_OPTS) $(EXTRA_SGML2RTF_OPTS)
-SGML2HTML_OPTS     = $(SRC_SGML2HTML_OPTS) $(WAY$(_way)_SGML2HTML_OPTS) $(EXTRA_SGML2HTML_OPTS)
 XSLTPROC_OPTS      = $(WAY$(_way)_XSLTPROC_OPTS) $(EXTRA_XSLTPROC_OPTS)
 FOP_OPTS           = $(WAY$(_way)_FOP_OPTS) $(EXTRA_FOP_OPTS)
 UNLIT_OPTS         = $(SRC_UNLIT_OPTS) $(WAY$(_way)_UNLIT_OPTS) $(EXTRA_UNLIT_OPTS)

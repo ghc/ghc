@@ -5,7 +5,7 @@ The recipe below is correct in theory, but unfortunately some bits
 don't work in practice. These are noted below.
 
 0. Build a stage 1 tree.
-1. Set "SGMLDocWays=html pdf" in stage 2's build.mk.
+1. Set "XMLDocWays=html pdf" in stage 2's build.mk.
 2. Build stage 2.
 3. Convert ANNOUNCE and LICENSE (if it has changed) to RTF (use Word),
 and put them in the WindowsInstaller directory.

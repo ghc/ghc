@@ -859,35 +859,6 @@ FP_CHECK_DOCBOOK_DTD
 FP_DIR_DOCBOOK_XSL([/usr/share/xml/docbook/stylesheet/nwalsh/current /usr/share/sgml/docbook/docbook-xsl-stylesheets* /usr/share/sgml/docbook/xsl-stylesheets* /opt/kde?/share/apps/ksgmltools2/docbook/xsl /usr/share/docbook-xsl /usr/share/sgml/docbkxsl])
 FP_PROG_FO_PROCESSOR
 
-dnl ** check for jade/openjade & determine a working catalog
-AC_PATH_PROGS(JadeCmd,openjade jade,jade)
-FPTOOLS_DOCBOOK_CATALOG(Catalog, $JadeCmd, docs/fptools-both.dsl, 
-                        /etc/sgml/catalog /etc/sgml.catalog /usr/share/sgml/CATALOG.docbkdsl /usr/local/share/sgml/catalog glafp-utils/docbook/CATALOG*)
-if test -z "$Catalog"; then
-  AC_MSG_RESULT([Warning: You will not be able to build the documentation.])
-fi
-case $Catalog in
-   yes) # assume it is provided by other means (e.g., SGML_CATALOG_FILES env var).
-        Catalog=
-   	;;
-   glafp*) 
-	case $HostOS_CPP in
-	   mingw32)
-	          if test "${OSTYPE}" == "msys"
-	            then
-	              Catalog=$hardtop/$Catalog
-	            else
-	              Catalog=`cygpath -w $hardtop/$Catalog`
-	          fi
-	      ;;
-	   *) Catalog=$hardtop/$Catalog
-	      ;;
-	esac
-   ;;
-esac   
-AC_SUBST(Catalog)
-
-
 dnl ** check for ghc-pkg command
 changequote(, )dnl
 ghc_pkg_guess=`echo $WithGhc | sed 's@ghc\([^/\\]*\)$@ghc-pkg\1@'`

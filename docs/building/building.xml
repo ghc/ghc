@@ -3345,9 +3345,8 @@ directive.
             <indexterm><primary>DocBook, pre-supposed</primary></indexterm>
           </term>
 	  <listitem>
-	    <para>Much of our documentation is written in SGML, using
-            the DocBook DTD.  Instructions on installing and
-            configuring the DocBook tools are below.</para>
+	    <para>Much of our documentation is written in DocBook XML, instructions
+            on installing and configuring the DocBook tools are below.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -3548,11 +3547,11 @@ $ make install</screen>
 
       <para>Because there are many different formats that the DocBook
       documentation can be generated in, you have to select which ones
-      you want by setting the <literal>SGMLDocWays</literal> variable
+      you want by setting the <literal>XMLDocWays</literal> variable
       to a list of them.  For example, in
       <filename>build.mk</filename> you might have a line:</para>
 
-<screen>SGMLDocWays = html ps</screen>
+<screen>XMLDocWays = html ps</screen>
 
       <para>This will cause the documentation to be built in the requested
       formats as part of the main build (the default is not to build
@@ -3572,9 +3571,9 @@ $ make install</screen>
       documentation, which goes into
       <literal>$(datadir)/html</literal>, to keep things tidy.</para>
 
-      <para>Note that unless you set <literal>$(SGMLDocWays)</literal>
+      <para>Note that unless you set <literal>$(XMLDocWays)</literal>
       to a list of formats, the <literal>install-docs</literal> target
-      won't do anything for SGML documentation.</para>
+      won't do anything for DocBook XML documentation.</para>
     </sect2>
 
   </sect1>
