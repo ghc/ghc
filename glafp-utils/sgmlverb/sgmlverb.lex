@@ -40,11 +40,15 @@ miranda			([0-9]+(\-([0-9]+)?)?)?>
 <VERB>\~		{ printf ("&tilde;"); }
 <VERB>\^		{ printf ("&circ;"); }
 
-<NORM>\<verb\>		{ printf ("<verb>"); PUSH NORM; BEGIN VERBENV; }
-<VERBENV>\<\/verb\>	{ printf ("</verb>"); POP; }
-<VERBENV>\&\&		{ printf ("&"); }
-<VERBENV>\&		{ printf ("&ero;"); }
-<VERBENV>\<\/		{ printf ("&etago;"); }
+<NORM>\<verb\>		 { printf ("<verb>"); PUSH NORM; BEGIN VERBENV; }
+<NORM>\<code\>		 { printf ("<code>"); PUSH NORM; BEGIN VERBENV; }
+<NORM>\\begin\{code\}	 { printf ("<code>"); PUSH NORM; BEGIN VERBENV; }
+<VERBENV>\<\/verb\>	 { printf ("</verb>"); POP; }
+<VERBENV>\<\/code\>	 { printf ("</code>"); POP; }
+<VERBENV>\<\\end\{code\} { printf ("</code>"); POP; }
+<VERBENV>\&\&		 { printf ("&"); }
+<VERBENV>\&		 { printf ("&ero;"); }
+<VERBENV>\<\/		 { printf ("&etago;"); }
 
 %%
 int
