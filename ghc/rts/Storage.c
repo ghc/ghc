@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.4 1999/01/19 15:07:56 simonm Exp $
+ * $Id: Storage.c,v 1.5 1999/01/19 17:06:05 simonm Exp $
  *
  * Storage manager front end
  *
@@ -39,7 +39,6 @@ step *g0s0;			/* generation 0, step 0, for convenience */
 /*
  * Forward references
  */
-static bdescr *allocNursery   (nat blocks);
 static void *stgAllocForGMP   (size_t size_in_bytes);
 static void *stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
 static void  stgDeallocForGMP (void *ptr, size_t size);
@@ -49,6 +48,7 @@ initStorage (void)
 {
   nat g, s;
   step *step;
+  generation *gen;
 
   initBlockAllocator();
   
@@ -57,50 +57,50 @@ initStorage (void)
 					     * sizeof(struct _generation),
 					     "initStorage: gens");
 
-  /* set up all generations */
+  /* Initialise all generations */
   for(g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    generations[g].no = g;
-    generations[g].mut_list = END_MUT_LIST;
-    generations[g].collections = 0;
-    generations[g].failed_promotions = 0;
+    gen = &generations[g];
+    gen->no = g;
+    gen->mut_list = END_MUT_LIST;
+    gen->collections = 0;
+    gen->failed_promotions = 0;
+    gen->max_blocks = RtsFlags.GcFlags.minOldGenSize;
   }
 
-  /* Oldest generation: one step */
-  g = RtsFlags.GcFlags.generations-1;
-  generations[g].n_steps = 1;
-  generations[g].steps = 
-    stgMallocBytes(1 * sizeof(struct _step), "initStorage: last step");
-  generations[g].max_blocks = RtsFlags.GcFlags.minOldGenSize;
-  step = &generations[g].steps[0];
-  step->no = 0;
-  step->gen = &generations[g];
-  step->blocks = NULL;
-  step->n_blocks = 0;
-  step->to = step;		/* destination is this step */
-  step->hp = NULL;
-  step->hpLim = NULL;
-  step->hp_bd = NULL;
-  
-  /* set up all except the oldest generation with 2 steps */
-  for(g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
-    generations[g].n_steps = 2;
-    generations[g].steps  = stgMallocBytes (2 * sizeof(struct _step),
-					    "initStorage: steps");
-    generations[g].max_blocks = RtsFlags.GcFlags.minOldGenSize;
+  /* A couple of convenience pointers */
+  g0 = &generations[0];
+  oldest_gen = &generations[RtsFlags.GcFlags.generations-1];
+
+  /* Allocate step structures in each generation */
+  if (RtsFlags.GcFlags.generations > 1) {
+    /* Only for multiple-generations */
+
+    /* Oldest generation: one step */
+    oldest_gen->n_steps = 1;
+    oldest_gen->steps = 
+      stgMallocBytes(1 * sizeof(struct _step), "initStorage: last step");
+
+    /* set up all except the oldest generation with 2 steps */
+    for(g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
+      generations[g].n_steps = 2;
+      generations[g].steps  = stgMallocBytes (2 * sizeof(struct _step),
+					      "initStorage: steps");
+    }
+    
+  } else {
+    /* single generation, i.e. a two-space collector */
+    g0->n_steps = 1;
+    g0->steps = stgMallocBytes (sizeof(struct _step), "initStorage: steps");
   }
 
-  for (g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
+  /* Initialise all steps */
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (s = 0; s < generations[g].n_steps; s++) {
       step = &generations[g].steps[s];
       step->no = s;
       step->blocks = NULL;
       step->n_blocks = 0;
       step->gen = &generations[g];
-      if ( s == 1 ) {
-	step->to = &generations[g+1].steps[0];
-      } else {
-	step->to = &generations[g].steps[s+1];
-      }
       step->hp = NULL;
       step->hpLim = NULL;
       step->hp_bd = NULL;
@@ -110,16 +110,29 @@ initStorage (void)
     }
   }
   
-  oldest_gen = &generations[RtsFlags.GcFlags.generations-1];
+  /* Set up the destination pointers in each younger gen. step */
+  for (g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
+    for (s = 0; s < generations[g].n_steps; s++) {
+      step = &generations[g].steps[s];
+      if ( s == 1 ) {
+	step->to = &generations[g+1].steps[0];
+      } else {
+	step->to = &generations[g].steps[s+1];
+      }
+    }
+  }
+  
+  /* The oldest generation has one step and its destination is the
+   * same step. */
+  oldest_gen->steps[0].to = &oldest_gen->steps[0];
 
   /* generation 0 is special: that's the nursery */
-  g0 = &generations[0];
   generations[0].max_blocks = 0;
 
   /* G0S0: the allocation area */
   step = &generations[0].steps[0];
   g0s0 = step;
-  step->blocks   = allocNursery(RtsFlags.GcFlags.minAllocAreaSize);
+  step->blocks   = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
   step->n_blocks = RtsFlags.GcFlags.minAllocAreaSize;
   nursery_blocks = RtsFlags.GcFlags.minAllocAreaSize;
   current_nursery = step->blocks;
@@ -142,13 +155,12 @@ initStorage (void)
   IF_DEBUG(gc, stat_describe_gens());
 }
 
-static bdescr *
-allocNursery (nat blocks)
+extern bdescr *
+allocNursery (bdescr *last_bd, nat blocks)
 {
-  bdescr *last_bd, *bd;
+  bdescr *bd;
   nat i;
 
-  last_bd = NULL;
   /* Allocate a nursery */
   for (i=0; i < blocks; i++) {
     bd = allocBlock();
@@ -200,8 +212,6 @@ recordMutable(StgMutClosure *p)
 void
 newCAF(StgClosure* caf)
 {
-  const StgInfoTable *info;
-
   /* Put this CAF on the mutable list for the old generation.
    * This is a HACK - the IND_STATIC closure doesn't really have
    * a mut_link field, but we pretend it has - in fact we re-use
@@ -213,10 +223,14 @@ newCAF(StgClosure* caf)
   oldest_gen->mut_list = (StgMutClosure *)caf;
 
 #ifdef DEBUG
-  info = get_itbl(caf);
-  ASSERT(info->type == IND_STATIC);
-  STATIC_LINK2(info,caf) = caf_list;
-  caf_list = caf;
+  { 
+    const StgInfoTable *info;
+    
+    info = get_itbl(caf);
+    ASSERT(info->type == IND_STATIC);
+    STATIC_LINK2(info,caf) = caf_list;
+    caf_list = caf;
+  }
 #endif
 }
 
@@ -352,10 +366,15 @@ memInventory(void)
   lnat total_blocks = 0, free_blocks = 0;
 
   /* count the blocks we current have */
+
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (s = 0; s < generations[g].n_steps; s++) {
       step = &generations[g].steps[s];
       total_blocks += step->n_blocks;
+      if (RtsFlags.GcFlags.generations == 1) {
+	/* two-space collector has a to-space too :-) */
+	total_blocks += g0s0->to_blocks;
+      }
       for (bd = step->large_objects; bd; bd = bd->link) {
 	total_blocks += bd->blocks;
 	/* hack for megablock groups: they have an extra block or two in

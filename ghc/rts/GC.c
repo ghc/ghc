@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.14 1999/01/19 15:41:56 simonm Exp $
+ * $Id: GC.c,v 1.15 1999/01/19 17:06:02 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -84,6 +84,10 @@ static rtsBool weak_done;	/* all done for this pass */
  */
 static rtsBool failed_to_evac;
 
+/* Old to-space (used for two-space collector only)
+ */
+bdescr *old_to_space;
+
 /* -----------------------------------------------------------------------------
    Static function declarations
    -------------------------------------------------------------------------- */
@@ -165,6 +169,7 @@ void GarbageCollect(void (*get_roots)(void))
 
   /* Figure out which generation to collect
    */
+  N = 0;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     if (generations[g].steps[0].n_blocks >= generations[g].max_blocks) {
       N = g;
@@ -188,6 +193,13 @@ void GarbageCollect(void (*get_roots)(void))
     zeroMutableList(generations[RtsFlags.GcFlags.generations-1].mut_list);
   }
 
+  /* Save the old to-space if we're doing a two-space collection
+   */
+  if (RtsFlags.GcFlags.generations == 1) {
+    old_to_space = g0s0->to_space;
+    g0s0->to_space = NULL;
+  }
+
   /* Initialise to-space in all the generations/steps that we're
    * collecting.
    */
@@ -195,8 +207,12 @@ void GarbageCollect(void (*get_roots)(void))
     generations[g].mut_list = END_MUT_LIST;
 
     for (s = 0; s < generations[g].n_steps; s++) {
+
       /* generation 0, step 0 doesn't need to-space */
-      if (g == 0 && s == 0) { continue; }
+      if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
+	continue; 
+      }
+
       /* Get a free block for to-space.  Extra blocks will be chained on
        * as necessary.
        */
@@ -384,20 +400,78 @@ void GarbageCollect(void (*get_roots)(void))
    * twice the amount of live data plus whatever space the other
    * generations need.
    */
-  if (major_gc) {
-    oldest_gen->max_blocks = 
-      stg_max(oldest_gen->steps[0].to_blocks * RtsFlags.GcFlags.oldGenFactor,
-	      RtsFlags.GcFlags.minOldGenSize);
-    if (oldest_gen->max_blocks > RtsFlags.GcFlags.maxHeapSize / 2) {
-      oldest_gen->max_blocks = RtsFlags.GcFlags.maxHeapSize / 2;
-      if (((int)oldest_gen->max_blocks - (int)oldest_gen->steps[0].to_blocks) < 
-	  (RtsFlags.GcFlags.pcFreeHeap *
-	   RtsFlags.GcFlags.maxHeapSize / 200)) {
-	heapOverflow();
+  if (RtsFlags.GcFlags.generations > 1) {
+    if (major_gc) {
+      oldest_gen->max_blocks = 
+	stg_max(oldest_gen->steps[0].to_blocks * RtsFlags.GcFlags.oldGenFactor,
+		RtsFlags.GcFlags.minOldGenSize);
+      if (oldest_gen->max_blocks > RtsFlags.GcFlags.maxHeapSize / 2) {
+	oldest_gen->max_blocks = RtsFlags.GcFlags.maxHeapSize / 2;
+	if (((int)oldest_gen->max_blocks - 
+	     (int)oldest_gen->steps[0].to_blocks) < 
+	    (RtsFlags.GcFlags.pcFreeHeap *
+	     RtsFlags.GcFlags.maxHeapSize / 200)) {
+	}
       }
     }
+  } else {
+    /* For a two-space collector, we need to resize the nursery. */
+
+    /* set up a new nursery.  Allocate a nursery size based on a
+     * function of the amount of live data (currently a factor of 2,
+     * should be configurable (ToDo)).  Use the blocks from the old
+     * nursery if possible, freeing up any left over blocks.
+     *
+     * If we get near the maximum heap size, then adjust our nursery
+     * size accordingly.  If the nursery is the same size as the live
+     * data (L), then we need 3L bytes.  We can reduce the size of the
+     * nursery to bring the required memory down near 2L bytes.
+     * 
+     * A normal 2-space collector would need 4L bytes to give the same
+     * performance we get from 3L bytes, reducing to the same
+     * performance at 2L bytes.  
+     */
+    nat blocks = g0s0->to_blocks;
+
+    if ( blocks * 4 > RtsFlags.GcFlags.maxHeapSize ) {
+      int adjusted_blocks;  /* signed on purpose */
+      int pc_free; 
+      
+      adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
+      IF_DEBUG(gc, fprintf(stderr, "Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %d\n", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
+      pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;
+      if (pc_free < RtsFlags.GcFlags.pcFreeHeap) /* might even be < 0 */ {
+	heapOverflow();
+      }
+      blocks = adjusted_blocks;
+      
+    } else {
+      blocks *= 2;
+      if (blocks < RtsFlags.GcFlags.minAllocAreaSize) {
+	blocks = RtsFlags.GcFlags.minAllocAreaSize;
+      }
+    }
+    
+    if (nursery_blocks < blocks) {
+      IF_DEBUG(gc, fprintf(stderr, "Increasing size of nursery to %d blocks\n", 
+			   blocks));
+      g0s0->blocks = allocNursery(g0s0->blocks, blocks-nursery_blocks);
+    } else {
+      bdescr *next_bd;
+      
+      IF_DEBUG(gc, fprintf(stderr, "Decreasing size of nursery to %d blocks\n", 
+			   blocks));
+      for (bd = g0s0->blocks; nursery_blocks > blocks; nursery_blocks--) {
+	next_bd = bd->link;
+	freeGroup(bd);
+	bd = next_bd;
+      }
+      g0s0->blocks = bd;
+    }
+
+    g0s0->n_blocks = nursery_blocks = blocks;
   }
-  
+
   /* run through all the generations/steps and tidy up 
    */
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -410,7 +484,7 @@ void GarbageCollect(void (*get_roots)(void))
       bdescr *next;
       step = &generations[g].steps[s];
 
-      if (!(g == 0 && s == 0)) {
+      if (!(g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1)) {
 	/* Tidy the end of the to-space chains */
 	step->hp_bd->free = step->hp;
 	step->hp_bd->link = NULL;
@@ -455,15 +529,16 @@ void GarbageCollect(void (*get_roots)(void))
 	 * between the maximum size of the oldest and youngest
 	 * generations.
 	 *
-	 * max_blocks =    oldgen_max_blocks  * G
-	 *                 -----------------------
-	 *                       oldest_gen
+	 * max_blocks = alloc_area_size +  
+	 *                 (oldgen_max_blocks - alloc_area_size) * G
+	 *                 -----------------------------------------
+	 *                              oldest_gen
 	 */
 	if (g != 0) {
 	  generations[g].max_blocks = 
-	    stg_max(RtsFlags.GcFlags.minOldGenSize,
-		    (oldest_gen->max_blocks * g) / 
-		    (RtsFlags.GcFlags.generations-1));
+	    RtsFlags.GcFlags.minAllocAreaSize +
+	     (((oldest_gen->max_blocks - RtsFlags.GcFlags.minAllocAreaSize) * g)
+	       / (RtsFlags.GcFlags.generations-1));
 	}
 
       /* for older generations... */
@@ -485,6 +560,34 @@ void GarbageCollect(void (*get_roots)(void))
     }
   }
   
+  /* Two-space collector:
+   * Free the old to-space, and estimate the amount of live data.
+   */
+  if (RtsFlags.GcFlags.generations == 1) {
+    if (old_to_space != NULL) {
+      freeChain(old_to_space);
+    }
+    live = g0s0->to_blocks * BLOCK_SIZE_W + 
+      ((lnat)g0s0->hp_bd->free - (lnat)g0s0->hp_bd->start) / sizeof(W_);
+
+  /* Generational collector:
+   * estimate the amount of live data.
+   */
+  } else {
+    live = 0;
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      for (s = 0; s < generations[g].n_steps; s++) {
+	/* approximate amount of live data (doesn't take into account slop
+	 * at end of each block).  ToDo: this more accurately.
+	 */
+	if (g == 0 && s == 0) { continue; }
+	step = &generations[g].steps[s];
+	live += step->n_blocks * BLOCK_SIZE_W + 
+	  ((lnat)step->hp_bd->free -(lnat)step->hp_bd->start) / sizeof(W_);
+      }
+    }
+  }
+
   /* revert dead CAFs and update enteredCAFs list */
   revertDeadCAFs();
   
@@ -507,19 +610,6 @@ void GarbageCollect(void (*get_roots)(void))
   }
   current_nursery = g0s0->blocks;
 
-  live = 0;
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    for (s = 0; s < generations[g].n_steps; s++) {
-      /* approximate amount of live data (doesn't take into account slop
-       * at end of each block).  ToDo: this more accurately.
-       */
-      if (g == 0 && s == 0) { continue; }
-      step = &generations[g].steps[s];
-      live += step->n_blocks * BLOCK_SIZE_W + 
-	((lnat)step->hp_bd->free -(lnat)step->hp_bd->start) / sizeof(W_);
-    }
-  }
-
   /* Free the small objects allocated via allocate(), since this will
    * all have been copied into G0S1 now.  
    */
@@ -535,21 +625,26 @@ void GarbageCollect(void (*get_roots)(void))
   
   /* check sanity after GC */
 #ifdef DEBUG
-  for (g = 0; g <= N; g++) {
-    for (s = 0; s < generations[g].n_steps; s++) {
-      if (g == 0 && s == 0) { continue; }
-      IF_DEBUG(sanity, checkHeap(generations[g].steps[s].blocks, NULL));
-      IF_DEBUG(sanity, checkChain(generations[g].steps[s].large_objects));
+  if (RtsFlags.GcFlags.generations == 1) {
+    IF_DEBUG(sanity, checkHeap(g0s0->to_space, NULL));
+    IF_DEBUG(sanity, checkChain(g0s0->large_objects));
+  } else {
+
+    for (g = 0; g <= N; g++) {
+      for (s = 0; s < generations[g].n_steps; s++) {
+	if (g == 0 && s == 0) { continue; }
+	IF_DEBUG(sanity, checkHeap(generations[g].steps[s].blocks, NULL));
+      }
     }
-  }
-  for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
-    for (s = 0; s < generations[g].n_steps; s++) {
-      IF_DEBUG(sanity, checkHeap(generations[g].steps[s].blocks,
-				 generations[g].steps[s].blocks->start));
-      IF_DEBUG(sanity, checkChain(generations[g].steps[s].large_objects));
+    for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
+      for (s = 0; s < generations[g].n_steps; s++) {
+	IF_DEBUG(sanity, checkHeap(generations[g].steps[s].blocks,
+				   generations[g].steps[s].blocks->start));
+	IF_DEBUG(sanity, checkChain(generations[g].steps[s].large_objects));
+      }
     }
+    IF_DEBUG(sanity, checkFreeListSanity());
   }
-  IF_DEBUG(sanity, checkFreeListSanity());
 #endif
 
   IF_DEBUG(gc, stat_describe_gens());

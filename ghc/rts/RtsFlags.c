@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.4 1999/01/19 15:07:55 simonm Exp $
+ * $Id: RtsFlags.c,v 1.5 1999/01/19 17:06:04 simonm Exp $
  *
  * Functions for parsing the argument list.
  *
@@ -481,7 +481,7 @@ error = rtsTrue;
 
 	      case 'G':
 		RtsFlags.GcFlags.generations = decode(rts_argv[arg]+2);
-		if (RtsFlags.GcFlags.generations <= 1) {
+		if (RtsFlags.GcFlags.generations < 1) {
 		  bad_option(rts_argv[arg]);
 		}
 		break;
