@@ -76,7 +76,7 @@ type Qual t = (Mname,t)
 
 type Id = String
 
-primMname = "PrelGHC"
+primMname = "GHC.Prim"
 
 tcArrow :: Qual Tcon
 tcArrow = (primMname, "ZLzmzgZR")
