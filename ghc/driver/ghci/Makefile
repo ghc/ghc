@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 2001/06/23 12:54:18 panne Exp $
+# $Id: Makefile,v 1.5 2001/06/27 13:42:32 chak Exp $
 #
 
 TOP=../..
@@ -13,10 +13,10 @@ INSTALLING=1
 
 ifeq "$(INSTALLING)" "1"
 ifeq "$(BIN_DIST)"   "1"
-GHCBIN=$$\"\"libexecdir/ghc-$(ProjectVersion)
+GHCBIN=$$\"\"libexecdir/bin/ghc-$(ProjectVersion)
 GHCLIB=$$\"\"libdir
 else
-GHCBIN=$(libexecdir)/ghc-$(ProjectVersion)
+GHCBIN=$(libexecdir)/bin/ghc-$(ProjectVersion)
 GHCLIB=$(libdir)
 endif # BIN_DIST
 else
