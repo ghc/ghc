@@ -1,0 +1,15 @@
+<sect1>Release notes for version~3-01---2/97
+<label id="release-3-01">
+<p>
+
+Changes made since 3.00:
+
+<itemize>
+
+<item> CharLike and IntLike closures fixed (should reduce allocation
+slightly).
+
+<item> Pattern binding desugaring improved to eliminate intermediate
+tuples in some cases.
+
+</itemize>
