@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.24 $
- * $Date: 2000/01/11 14:09:17 $
+ * $Revision: 1.25 $
+ * $Date: 2000/01/11 14:56:07 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1817,6 +1817,7 @@ static Void finishGHCClass ( Tycon cls_tyc )
        name(n).line   = cclass(nw).line;
        name(n).type   = ty;
        name(n).number = ctr++;
+       name(n).arity  = arityInclDictParams(name(n).type);
        hd(mems) = n;
     }
 }
