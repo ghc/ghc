@@ -1,7 +1,5 @@
 \begin{code}
-#if defined(COMPILING_GHC)
 # include "HsVersions.h"
-#endif
 
 module Digraph(
 

@@ -20,9 +20,6 @@ module BitSet (
 	BitSet,		-- abstract type
 	mkBS, listBS, emptyBS, unitBS,
 	unionBS, minusBS
-#if ! defined(COMPILING_GHC)
-	, elementBS, intersectBS, isEmptyBS
-#endif
     ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -60,7 +57,7 @@ unionBS (MkBS x#) (MkBS y#) = MkBS (x# `or#` y#)
 minusBS :: BitSet -> BitSet -> BitSet
 minusBS (MkBS x#) (MkBS y#) = MkBS (x# `and#` (not# y#))
 
-#if ! defined(COMPILING_GHC)
+#if 0
 -- not used in GHC
 isEmptyBS :: BitSet -> Bool
 isEmptyBS (MkBS s#)
@@ -106,7 +103,7 @@ unitBS x = MkBS (1 `ashInt` x)
 unionBS :: BitSet -> BitSet -> BitSet
 unionBS (MkBS x) (MkBS y) = MkBS (x `logiorInt` y)
 
-#if ! defined(COMPILING_GHC)
+#if 0
 -- not used in GHC
 isEmptyBS :: BitSet -> Bool
 isEmptyBS (MkBS s)
@@ -155,7 +152,7 @@ unitBS x = MkBS (1 `bitLsh` x)
 unionBS :: BitSet -> BitSet -> BitSet
 unionBS (MkBS x) (MkBS y) = MkBS (x `bitOr` y)
 
-#if ! defined(COMPILING_GHC)
+#if 0
 -- not used in GHC
 isEmptyBS :: BitSet -> Bool
 isEmptyBS (MkBS s)

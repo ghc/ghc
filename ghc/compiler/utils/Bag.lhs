@@ -4,32 +4,24 @@
 \section[Bags]{@Bag@: an unordered collection with duplicates}
 
 \begin{code}
-#ifdef COMPILING_GHC
 #include "HsVersions.h"
-#endif
 
 module Bag (
 	Bag,	-- abstract type
 
 	emptyBag, unitBag, unionBags, unionManyBags,
 	mapBag,
-#ifndef COMPILING_GHC
 	elemBag,
-#endif
 	filterBag, partitionBag, concatBag, foldBag, foldrBag,
 	isEmptyBag, consBag, snocBag,
 	listToBag, bagToList
     ) where
 
-#ifdef COMPILING_GHC
 IMP_Ubiq(){-uitous-}
 IMPORT_1_3(List(partition))
 
 import Outputable	--( interpp'SP )
 import Pretty
-#else
-import List(partition)
-#endif
 
 data Bag a
   = EmptyBag
@@ -42,7 +34,6 @@ data Bag a
 emptyBag = EmptyBag
 unitBag  = UnitBag
 
-#ifndef COMPILING_GHC
 elemBag :: Eq a => a -> Bag a -> Bool
 
 elemBag x EmptyBag        = False
@@ -50,7 +41,6 @@ elemBag x (UnitBag y)     = x==y
 elemBag x (TwoBags b1 b2) = x `elemBag` b1 || x `elemBag` b2
 elemBag x (ListBag ys)    = any (x ==) ys
 elemBag x (ListOfBags bs) = any (x `elemBag`) bs
-#endif
 
 unionManyBags [] = EmptyBag
 unionManyBags xs = ListOfBags xs
@@ -158,8 +148,6 @@ bagToList b = foldrBag (:) [] b
 \end{code}
 
 \begin{code}
-#ifdef COMPILING_GHC
-
 instance (Outputable a) => Outputable (Bag a) where
     ppr sty EmptyBag	    = ptext SLIT("emptyBag")
     ppr sty (UnitBag a)     = ppr sty a
@@ -167,5 +155,4 @@ instance (Outputable a) => Outputable (Bag a) where
     ppr sty (ListBag as)    = interpp'SP sty as
     ppr sty (ListOfBags bs) = brackets (interpp'SP sty bs)
 
-#endif {- COMPILING_GHC -}
 \end{code}
