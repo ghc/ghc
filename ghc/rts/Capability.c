@@ -412,7 +412,7 @@ void
 threadRunnable ( void )
 {
 #if defined(RTS_SUPPORTS_THREADS)
-    if ( !noCapabilities && ANY_WORK_TO_DO() && rts_n_waiting_tasks > 0 ) {
+    if ( !noCapabilities() && ANY_WORK_TO_DO() && rts_n_waiting_tasks > 0 ) {
 	signalCondition(&thread_ready_cond);
     }
     startSchedulerTaskIfNecessary();
