@@ -335,9 +335,16 @@ tcHsType (HsListTy ty)
   = tcHsArgType ty		`thenTc` \ tau_ty ->
     returnTc (mkListTy tau_ty)
 
-tcHsType (HsTupleTy (HsTupCon _ boxity) tys)
+tcHsType (HsTupleTy (HsTupCon _ Boxed) tys)
   = mapTc tcHsArgType tys	`thenTc` \ tau_tys ->
-    returnTc (mkTupleTy boxity (length tys) tau_tys)
+    returnTc (mkTupleTy Boxed (length tys) tau_tys)
+
+tcHsType (HsTupleTy (HsTupCon _ Unboxed) tys)
+  =	-- Unboxed tuples can have polymorphic args.
+	-- This happens in the workers for functions returning
+	-- product types with polymorphic components
+    mapTc tcHsType tys		`thenTc` \ tau_tys ->
+    returnTc (mkTupleTy Unboxed (length tys) tau_tys)
 
 tcHsType (HsFunTy ty1 ty2)
   = tcHsType ty1	`thenTc` \ tau_ty1 ->
