@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.11 1999/01/27 14:51:15 simonpj Exp $
+ * $Id: PrimOps.h,v 1.12 1999/01/29 09:32:37 simonm Exp $
  *
  * Macros for primitive operations in STG-ish C code.
  *
@@ -427,8 +427,8 @@ LI_ stg_word64ToInt64 (StgNat64);
 #define PTRS_ARR_CTS(a)		REAL_PTRS_ARR_CTS(a)
 #endif
 
-extern I_ genSymzh(void);
-extern I_ resetGenSymzh(void);
+extern I_ genSymZh(void);
+extern I_ resetGenSymZh(void);
 
 /*--- everything except new*Array is done inline: */
 
