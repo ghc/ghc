@@ -30,7 +30,7 @@ test('conc015', normal, compile_and_run, [''])
 test('conc016', normal, compile_and_run, [''])
 test('conc017', normal, compile_and_run, [''])
 test('conc018', normal, compile_and_run, [''])
-test('conc019', normal, compile_and_run, [''])
+test('conc019', extra_run_opts('+RTS -K4m -RTS'), compile_and_run, [''])
 test('conc020', normal, compile_and_run, [''])
 test('conc021', compose(omit_ways(['ghci']), exit_code(1)),
 	compile_and_run, [''])
