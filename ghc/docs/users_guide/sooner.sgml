@@ -230,7 +230,7 @@ register allocation, etc.</para>
 instead.  This may change in the future.</para>
 
 <Para>
-So, when we want very fast code, we use: <Option>-O -fvia-C -O2-for-C</Option>.
+So, when we want very fast code, we use: <Option>-O -fvia-C</Option>.
 </Para>
 </ListItem>
 </VarListEntry>
