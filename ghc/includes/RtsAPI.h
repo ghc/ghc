@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.33 2003/01/29 09:54:31 simonmar Exp $
+ * $Id: RtsAPI.h,v 1.34 2003/02/06 09:56:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -67,6 +67,7 @@ HaskellObj   rts_mkWord16     ( HsWord16 w );
 HaskellObj   rts_mkWord32     ( HsWord32 w );
 HaskellObj   rts_mkWord64     ( HsWord64 w );
 HaskellObj   rts_mkPtr        ( HsPtr    a );
+HaskellObj   rts_mkFunPtr     ( HsFunPtr a );
 HaskellObj   rts_mkFloat      ( HsFloat  f );
 HaskellObj   rts_mkDouble     ( HsDouble f );
 HaskellObj   rts_mkStablePtr  ( HsStablePtr s );
@@ -90,6 +91,7 @@ HsWord16     rts_getWord16    ( HaskellObj );
 HsWord32     rts_getWord32    ( HaskellObj );
 HsWord64     rts_getWord64    ( HaskellObj );
 HsPtr        rts_getPtr       ( HaskellObj );
+HsFunPtr     rts_getFunPtr    ( HaskellObj );
 HsFloat      rts_getFloat     ( HaskellObj );
 HsDouble     rts_getDouble    ( HaskellObj );
 HsStablePtr  rts_getStablePtr ( HaskellObj );

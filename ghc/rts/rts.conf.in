@@ -120,6 +120,7 @@ Package {
          , "-u", "GHCziFloat_Fzh_con_info"
          , "-u", "GHCziFloat_Dzh_con_info"
          , "-u", "GHCziPtr_Ptr_con_info"
+         , "-u", "GHCziPtr_FunPtr_con_info"
          , "-u", "GHCziStable_StablePtr_con_info"
          , "-u", "GHCziBase_False_closure"
          , "-u", "GHCziBase_True_closure"

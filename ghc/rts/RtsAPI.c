@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.40 2003/01/27 11:08:16 wolfgang Exp $
+ * $Id: RtsAPI.c,v 1.41 2003/02/06 09:56:10 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -166,6 +166,15 @@ rts_mkPtr (HsPtr a)
 {
   StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
   SET_HDR(p, Ptr_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)a;
+  return p;
+}
+
+HaskellObj
+rts_mkFunPtr (HsFunPtr a)
+{
+  StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
+  SET_HDR(p, FunPtr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)a;
   return p;
 }

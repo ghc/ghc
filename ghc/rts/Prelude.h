@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.21 2002/07/15 08:41:46 simonmar Exp $
+ * $Id: Prelude.h,v 1.22 2003/02/06 09:56:10 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -34,6 +34,7 @@ extern DLL_IMPORT const StgInfoTable GHCziFloat_Fzh_static_info;
 extern DLL_IMPORT const StgInfoTable GHCziFloat_Dzh_static_info;
 extern DLL_IMPORT const StgInfoTable Addr_Azh_static_info;
 extern DLL_IMPORT const StgInfoTable GHCziPtr_Ptr_static_info;
+extern DLL_IMPORT const StgInfoTable GHCziPtr_FunPtr_static_info;
 extern DLL_IMPORT const StgInfoTable GHCziInt_I8zh_static_info;
 extern DLL_IMPORT const StgInfoTable GHCziInt_I16zh_static_info;
 extern DLL_IMPORT const StgInfoTable GHCziInt_I32zh_static_info;
@@ -48,6 +49,7 @@ extern DLL_IMPORT const StgInfoTable GHCziBase_Izh_con_info;
 extern DLL_IMPORT const StgInfoTable GHCziFloat_Fzh_con_info;
 extern DLL_IMPORT const StgInfoTable GHCziFloat_Dzh_con_info;
 extern DLL_IMPORT const StgInfoTable GHCziPtr_Ptr_con_info;
+extern DLL_IMPORT const StgInfoTable GHCziPtr_FunPtr_con_info;
 extern DLL_IMPORT const StgInfoTable Addr_Azh_con_info;
 extern DLL_IMPORT const StgInfoTable GHCziWord_Wzh_con_info;
 extern DLL_IMPORT const StgInfoTable GHCziInt_I8zh_con_info;
@@ -90,6 +92,7 @@ extern DLL_IMPORT const StgInfoTable GHCziStable_StablePtr_con_info;
 #define W32zh_static_info         (&GHCziWord_W32zh_static_info)
 #define W64zh_static_info         (&GHCziWord_W64zh_static_info)
 #define Ptr_static_info           (&GHCziPtr_Ptr_static_info)
+#define FunPtr_static_info        (&GHCziPtr_FunPtr_static_info)
 #define Czh_con_info              (&GHCziBase_Czh_con_info)
 #define Izh_con_info              (&GHCziBase_Izh_con_info)
 #define Fzh_con_info              (&GHCziFloat_Fzh_con_info)
@@ -106,6 +109,7 @@ extern DLL_IMPORT const StgInfoTable GHCziStable_StablePtr_con_info;
 #define I64zh_con_info            (&GHCziInt_I64zh_con_info)
 #define I64zh_con_info            (&GHCziInt_I64zh_con_info)
 #define Ptr_con_info              (&GHCziPtr_Ptr_con_info)
+#define FunPtr_con_info           (&GHCziPtr_FunPtr_con_info)
 #define StablePtr_static_info     (&GHCziStable_StablePtr_static_info)
 #define StablePtr_con_info        (&GHCziStable_StablePtr_con_info)
 
