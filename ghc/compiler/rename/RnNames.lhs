@@ -346,7 +346,8 @@ fully fledged @Names@.
 qualifyImports :: ModuleName		-- Imported module
 	       -> Bool			-- True <=> want unqualified import
 	       -> Maybe ModuleName	-- Optional "as M" part 
-	       -> [AvailInfo]		-- What's to be hidden
+	       -> [AvailInfo]		-- What's to be hidden (but only the unqualified 
+					-- 	version is hidden)
 	       -> (Name -> Provenance)
 	       -> Avails		-- Whats imported and how
 	       -> RnMG (GlobalRdrEnv, ExportAvails)

@@ -198,32 +198,34 @@ getBangStrictness (Unpacked _) = markedUnboxed
 
 \begin{code}
 tcRecordSelectors is_rec unf_env tycon data_cons
-  = mapTc tc_group groups
+	-- Omit the check that the fields have consistent types if 
+	-- the group is recursive; TcTyClsDecls.tcGroup will repeat 
+	-- with NonRecursive once we have tied the knot
+  | isRec is_rec = returnTc sel_ids
+  | otherwise	 = mapTc check groups 	`thenTc_` 
+		   returnTc sel_ids
   where
-    fields = [ (con, field) | con   <- data_cons,
-			      field <- dataConFieldLabels con ]
+    fields = [ field | con   <- data_cons
+		     , field <- dataConFieldLabels con ]
 
 	-- groups is list of fields that share a common name
-    groups = equivClasses cmp_name fields
-    cmp_name (_, field1) (_, field2) 
-	= fieldLabelName field1 `compare` fieldLabelName field2
+    groups		   = equivClasses cmp_name fields
+    cmp_name field1 field2 = fieldLabelName field1 `compare` fieldLabelName field2
 
-    tc_group fields@((first_con, first_field_label) : other_fields)
+    sel_ids = [ mkRecordSelId tycon field unpack_id unpackUtf8_id
+	      | (field : _) <- groups ]
+
+    check fields@(first_field_label : other_fields)
 	-- These fields all have the same name, but are from
 	-- different constructors in the data type
 	= 	-- Check that all the fields in the group have the same type
-		-- Wimp out (omit check) if the group is recursive; 
-		-- TcTyClsDecls.tcGroup will repeat with NonRecursive once we
-		-- have tied the knot
 		-- NB: this check assumes that all the constructors of a given
 		-- data type use the same type variables
-	  checkTc (not (isRec is_rec) && all (== field_ty) other_tys)
-		  (fieldTypeMisMatch field_name)	`thenTc_`
-	  returnTc (mkRecordSelId tycon first_field_label unpack_id unpackUtf8_id)
+	  checkTc (all (== field_ty) other_tys) (fieldTypeMisMatch field_name)
 	where
 	    field_ty   = fieldLabelType first_field_label
 	    field_name = fieldLabelName first_field_label
-	    other_tys  = [fieldLabelType fl | (_, fl) <- other_fields]
+	    other_tys  = map fieldLabelType other_fields
 
     unpack_id     = tcLookupRecId unf_env unpackCStringName
     unpackUtf8_id = tcLookupRecId unf_env unpackCStringUtf8Name
@@ -240,7 +242,7 @@ tcRecordSelectors is_rec unf_env tycon data_cons
 
 \begin{code}
 fieldTypeMisMatch field_name
-  = sep [ptext SLIT("Declared types differ for field"), quotes (ppr field_name)]
+  = sep [ptext SLIT("Different constructors give different types for field"), quotes (ppr field_name)]
 
 exRecConErr name
   = ptext SLIT("Can't combine named fields with locally-quantified type variables")
