@@ -114,7 +114,6 @@ module CmdLineOpts (
 
 import GlaExts
 import IOExts	( IORef, readIORef, writeIORef )
-import BasicTypes	( CompilerPhase )
 import Constants	-- Default values for some flags
 import Util
 import FastTypes
@@ -185,7 +184,7 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoCPResult
   | CoreDoGlomBinds
   | CoreCSE
-  | CoreDoRuleCheck CompilerPhase String	-- Check for non-application of rules 
+  | CoreDoRuleCheck Int{-CompilerPhase-} String	-- Check for non-application of rules 
 						-- matching this string
 
   | CoreDoNothing 	 -- useful when building up lists of these things
