@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.59 $
- * $Date: 2000/11/07 13:30:41 $
+ * $Revision: 1.60 $
+ * $Date: 2000/11/20 11:15:41 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1561,7 +1561,6 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
             }
             obj = ap->fun;
 #ifdef EAGER_BLACKHOLING
-#warn  LAZY_BLACKHOLING is default for StgHugs
 #error Dont know if EAGER_BLACKHOLING works in StgHugs
             {
             /* superfluous - but makes debugging easier */
@@ -1878,7 +1877,6 @@ static inline void PopUpdateFrame ( StgClosure* obj )
              fprintf(stderr,"gSp = %p\tgSu = %p\n\n", gSp, gSu);
              );
 #ifdef EAGER_BLACKHOLING
-#warn  LAZY_BLACKHOLING is default for StgHugs
 #error Dont know if EAGER_BLACKHOLING works in StgHugs
     ASSERT(get_itbl(gSu->updatee)->type == BLACKHOLE
            || get_itbl(gSu->updatee)->type == SE_BLACKHOLE
