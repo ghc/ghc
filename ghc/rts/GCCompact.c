@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.16 2003/04/22 16:25:10 simonmar Exp $
+ * $Id: GCCompact.c,v 1.17 2003/10/22 11:11:59 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -317,8 +317,8 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    nat size;
 	    
 	    p++;
-	    thread(p);
 	    bco = (StgBCO *)*p;
+	    thread(p);
 	    p++;
 	    size = BCO_BITMAP_SIZE(bco);
 	    thread_large_bitmap(p, BCO_BITMAP(bco), size);
