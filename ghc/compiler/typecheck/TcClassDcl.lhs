@@ -122,7 +122,7 @@ tcClassDecl1 (ClassDecl {tcdCtxt = context, tcdName = class_name,
     in
     tcExtendTyVarEnv tyvars				$ 
 
-    checkDefaultBinds clas op_names def_methods	  `thenM` \ mb_dm_env ->
+    checkDefaultBinds clas op_names def_methods		`thenM` \ mb_dm_env ->
 	
 	-- CHECK THE CONTEXT
 	-- The renamer has already checked that the context mentions
@@ -150,9 +150,6 @@ tcClassDecl1 (ClassDecl {tcdCtxt = context, tcdName = class_name,
         sc_tys		   = mkPredTys sc_theta
 	dict_component_tys = sc_tys ++ op_tys
         sc_sel_ids	   = [mkDictSelId sc_name clas | sc_name <- sc_sel_names]
-	-- Slightly curiously, the dictionary selectors are treated as RecordSelectorIds,
-	-- so they are treated as implicit Ids, but we don't give labelled fields to 
-	-- the data constructors
     in
     tcMkDataCon datacon_name
 		[{- No strictness -}]
