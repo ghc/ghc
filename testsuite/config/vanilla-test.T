@@ -304,7 +304,11 @@ def vtr ( $extra_compile_args,
       = vanilla-run-test-actions ( $extra_compile_args, 
                                    $extra_run_args, 
                                    $allowable_nonzero_exit_code )
-   expect pass
+   if ($expect == "pass") then
+      expect pass
+   else
+      expect fail
+   fi
    pass when $test_passed
    fail when otherwise
 }
@@ -314,9 +318,13 @@ def vtr ( $extra_compile_args,
 
 def vtc ( $extra_compile_args )
 {
-   $test_passed 
-      = vanilla-compok-test-actions ( $extra_compile_args )
-   expect pass
+   $test_passed = vanilla-compok-test-actions ( $extra_compile_args )
+
+   if ($expect == "pass") then
+      expect pass
+   else
+      expect fail
+   fi
    pass when $test_passed
    fail when otherwise
 }
