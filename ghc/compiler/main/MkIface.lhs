@@ -498,11 +498,9 @@ ifaceTyCon tycon
 
     ppr_arg_ty (strict_mark, ty) = ppr_strict_mark strict_mark <> pprParendType ty
 
-    ppr_strict_mark NotMarkedStrict = empty
-    ppr_strict_mark MarkedStrict    = ptext SLIT("! ")
-				-- The extra space helps the lexical analyser that lexes
-				-- interface files; it doesn't make the rigid operator/identifier
-				-- distinction, so "!a" is a valid identifier so far as it is concerned
+    ppr_strict_mark NotMarkedStrict        = empty
+    ppr_strict_mark (MarkedUnboxed _ _)    = ptext SLIT("! ! ")
+    ppr_strict_mark MarkedStrict           = ptext SLIT("! ")
 
     ppr_field (strict_mark, field_label)
 	= hsep [ ppr (fieldLabelName field_label),

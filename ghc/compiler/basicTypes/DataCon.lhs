@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1998
 %
-\section[Literal]{@Literal@: Machine literals (unboxed, of course)}
+\section[DataCon]{@DataCon@: Data Constructors}
 
 \begin{code}
 module DataCon (
@@ -9,7 +9,7 @@ module DataCon (
 	ConTag, fIRST_TAG,
 	mkDataCon,
 	dataConType, dataConSig, dataConName, dataConTag,
-	dataConArgTys, dataConRawArgTys, dataConTyCon,
+	dataConOrigArgTys, dataConArgTys, dataConRawArgTys, dataConTyCon,
 	dataConFieldLabels, dataConStrictMarks, dataConSourceArity,
 	dataConNumFields, dataConNumInstArgs, dataConId,
 	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
@@ -22,18 +22,23 @@ import CmdLineOpts	( opt_DictsStrict )
 import TysPrim
 import Type		( Type, ThetaType, TauType,
 			  mkSigmaTy, mkFunTys, mkTyConApp, 
-			  mkTyVarTys, mkDictTy, substTy
+			  mkTyVarTys, mkDictTy, substTy,
+			  splitAlgTyConApp_maybe
 			)
+import PprType
 import TyCon		( TyCon, tyConDataCons, isDataTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon )
 import Class		( classTyCon )
-import Name		( Name, NamedThing(..), nameUnique )
+import Name		( Name, NamedThing(..), nameUnique, isLocallyDefinedName )
 import Var		( TyVar, Id )
 import VarEnv
 import FieldLabel	( FieldLabel )
 import BasicTypes	( StrictnessMark(..), Arity )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
+import CmdLineOpts	( opt_UnboxStrictFields )
+import UniqSet
+import Maybe
 import Util		( assoc )
 \end{code}
 
@@ -68,7 +73,7 @@ data DataCon
 	-- 	dcTheta    = [Eq a]
 	--	dcExTyVars = [b]
 	--	dcExTheta  = [Ord b]
-	--	dcArgTys   = [a,List b]
+	--	dcOrigArgTys   = [a,List b]
 	--	dcTyCon    = T
 
 	dcTyVars :: [TyVar], 		-- Type vars and context for the data type decl
@@ -77,16 +82,28 @@ data DataCon
 	dcExTyVars :: [TyVar], 		-- Ditto for the context of the constructor, 
 	dcExTheta  :: ThetaType,	-- the existentially quantified stuff
 					
-	dcArgTys :: [Type],		-- Argument types
+	dcOrigArgTys :: [Type],		-- Original argument types
+					-- (before unboxing and flattening of
+					--  strict fields)
+	dcRepArgTys :: [Type],		-- Constructor Argument types
 	dcTyCon  :: TyCon,		-- Result tycon 
 
 	-- Now the strictness annotations and field labels of the constructor
-	dcStricts :: [StrictnessMark],	-- Strict args, in the same order as the argument types;
-					-- length = dataConNumFields dataCon
+	dcUserStricts :: [StrictnessMark], 
+		-- Strictness annotations, as placed on the data type defn,
+		-- in the same order as the argument types;
+		-- length = dataConNumFields dataCon
 
-	dcFields  :: [FieldLabel],	-- Field labels for this constructor, in the
-					-- same order as the argument types; 
-					-- length = 0 (if not a record) or dataConSourceArity.
+	dcRealStricts :: [StrictnessMark],
+		-- Strictness annotations as deduced by the compiler.  May
+		-- include some MarkedUnboxed fields that are MarkedStrict
+		-- in dcUserStricts.
+		-- length = dataConNumFields dataCon
+
+	dcFields  :: [FieldLabel],
+		-- Field labels for this constructor, in the
+		-- same order as the argument types; 
+		-- length = 0 (if not a record) or dataConSourceArity.
 
 	-- Finally, the curried function that corresponds to the constructor
 	-- 	mkT :: forall a b. (Eq a, Ord b) => a -> [b] -> T a
@@ -154,32 +171,103 @@ mkDataCon :: Name
 	  -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataCon name arg_stricts fields tyvars theta ex_tyvars ex_theta arg_tys tycon id
-  = ASSERT(length arg_stricts == length arg_tys)
+mkDataCon name arg_stricts fields tyvars theta ex_tyvars ex_theta orig_arg_tys tycon id
+  = ASSERT(length arg_stricts == length orig_arg_tys)
 	-- The 'stricts' passed to mkDataCon are simply those for the
 	-- source-language arguments.  We add extra ones for the
 	-- dictionary arguments right here.
     con
   where
     con = MkData {dcName = name, dcUnique = nameUnique name,
-	  	  dcTyVars = tyvars, dcTheta = theta, dcArgTys = arg_tys,
+	  	  dcTyVars = tyvars, dcTheta = theta, 
+		  dcOrigArgTys = orig_arg_tys, 
+		  dcRepArgTys = rep_arg_tys,
 	     	  dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
-		  dcStricts = all_stricts, dcFields = fields,
-	     	  dcTag = tag, dcTyCon = tycon, dcType = ty,
+		  dcRealStricts = all_stricts, dcUserStricts = user_stricts,
+		  dcFields = fields, dcTag = tag, dcTyCon = tycon, dcType = ty,
 		  dcId = id}
 
-    all_stricts = (map mk_dict_strict_mark ex_theta) ++ arg_stricts
+    (real_arg_stricts, strict_arg_tyss) 
+	= unzip (zipWith (unbox_strict_arg_ty tycon) arg_stricts orig_arg_tys)
+    rep_arg_tys = concat strict_arg_tyss
+
+    all_stricts = (map mk_dict_strict_mark ex_theta) ++ real_arg_stricts
+    user_stricts = (map mk_dict_strict_mark ex_theta) ++ arg_stricts
 	-- Add a strictness flag for the existential dictionary arguments
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
     ty  = mkSigmaTy (tyvars ++ ex_tyvars) 
 	            ex_theta
-	            (mkFunTys arg_tys (mkTyConApp tycon (mkTyVarTys tyvars)))
+	            (mkFunTys rep_arg_tys 
+			(mkTyConApp tycon (mkTyVarTys tyvars)))
 
 mk_dict_strict_mark (clas,tys)
   | opt_DictsStrict &&
-    isDataTyCon (classTyCon clas) = MarkedStrict	-- Don't mark newtype things as strict!
+	-- Don't mark newtype things as strict!
+    isDataTyCon (classTyCon clas) = MarkedStrict
   | otherwise		          = NotMarkedStrict
+
+-- We attempt to unbox/unpack a strict field when either:
+--   (i)  The tycon is imported, and the field is marked '! !', or
+--   (ii) The tycon is defined in this module, the field is marked '!', 
+--	  and the -funbox-strict-fields flag is on.
+--
+-- This ensures that if we compile some modules with -funbox-strict-fields and
+-- some without, the compiler doesn't get confused about the constructor
+-- representations.
+
+unbox_strict_arg_ty :: TyCon -> StrictnessMark -> Type -> (StrictnessMark, [Type])
+unbox_strict_arg_ty tycon NotMarkedStrict ty 
+  = (NotMarkedStrict, [ty])
+unbox_strict_arg_ty tycon MarkedStrict ty 
+  | not opt_UnboxStrictFields
+  || not (isLocallyDefinedName (getName tycon)) = (MarkedStrict, [ty])
+unbox_strict_arg_ty tycon marked_unboxed ty
+  -- MarkedUnboxed || (MarkedStrict && opt_UnboxStrictFields && not imported)
+  = case splitAlgTyConApp_maybe ty of
+	Just (tycon,_,[])
+	   -> panic (showSDoc (hcat [
+			text "unbox_strict_arg_ty: constructors for ",
+			ppr tycon,
+			text " not available."
+		     ]))
+	Just (tycon,ty_args,[con]) 
+	   -> case maybe_unpack_fields emptyUniqSet 
+		     (zip (dataConOrigArgTys con ty_args) 
+			  (dcUserStricts con))
+	      of 
+		 Nothing  -> (MarkedStrict, [ty])
+	         Just tys -> (MarkedUnboxed con tys, tys)
+	_ -> (MarkedStrict, [ty])
+
+-- bail out if we encounter the same tycon twice.  This avoids problems like
+--
+--   data A = !B
+--   data B = !A
+--
+-- where no useful unpacking can be done.
+
+maybe_unpack_field :: UniqSet TyCon -> Type -> StrictnessMark -> Maybe [Type]
+maybe_unpack_field set ty NotMarkedStrict
+  = Just [ty]
+maybe_unpack_field set ty MarkedStrict | not opt_UnboxStrictFields
+  = Just [ty]
+maybe_unpack_field set ty strict
+  = case splitAlgTyConApp_maybe ty of
+	Just (tycon,ty_args,[con])
+	   | tycon `elementOfUniqSet` set -> Nothing
+	   | otherwise ->
+		let set' = addOneToUniqSet set tycon in
+		maybe_unpack_fields set' 
+		    (zip (dataConOrigArgTys con ty_args)
+			 (dcUserStricts con))
+	_ -> Just [ty]
+
+maybe_unpack_fields :: UniqSet TyCon -> [(Type,StrictnessMark)] -> Maybe [Type]
+maybe_unpack_fields set tys
+  | any isNothing unpacked_fields = Nothing
+  | otherwise = Just (concat (catMaybes unpacked_fields))
+  where unpacked_fields = map (\(ty,str) -> maybe_unpack_field set ty str) tys
 \end{code}
 
 
@@ -204,14 +292,14 @@ dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels = dcFields
 
 dataConStrictMarks :: DataCon -> [StrictnessMark]
-dataConStrictMarks = dcStricts
+dataConStrictMarks = dcRealStricts
 
 dataConRawArgTys :: DataCon -> [TauType] -- a function of convenience
-dataConRawArgTys = dcArgTys
+dataConRawArgTys = dcRepArgTys
 
 dataConSourceArity :: DataCon -> Arity
 	-- Source-level arity of the data constructor
-dataConSourceArity dc = length (dcArgTys dc)
+dataConSourceArity dc = length (dcOrigArgTys dc)
 
 dataConSig :: DataCon -> ([TyVar], ThetaType, 
 			  [TyVar], ThetaType, 
@@ -219,17 +307,22 @@ dataConSig :: DataCon -> ([TyVar], ThetaType,
 
 dataConSig (MkData {dcTyVars = tyvars, dcTheta = theta,
 		     dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
-		     dcArgTys = arg_tys, dcTyCon = tycon})
+		     dcOrigArgTys = arg_tys, dcTyCon = tycon})
   = (tyvars, theta, ex_tyvars, ex_theta, arg_tys, tycon)
 
-dataConArgTys :: DataCon 
+dataConArgTys, dataConOrigArgTys :: DataCon 
 	      -> [Type] 	-- Instantiated at these types
 				-- NB: these INCLUDE the existentially quantified arg types
 	      -> [Type]		-- Needs arguments of these types
 				-- NB: these INCLUDE the existentially quantified dict args
 				--     but EXCLUDE the data-decl context which is discarded
 
-dataConArgTys (MkData {dcArgTys = arg_tys, dcTyVars = tyvars, 
+dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars, 
+		       dcExTyVars = ex_tyvars, dcExTheta = ex_theta}) inst_tys
+ = map (substTy (zipVarEnv (tyvars ++ ex_tyvars) inst_tys)) 
+       ([mkDictTy cls tys | (cls,tys) <- ex_theta] ++ arg_tys)
+
+dataConOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars, 
 		       dcExTyVars = ex_tyvars, dcExTheta = ex_theta}) inst_tys
  = map (substTy (zipVarEnv (tyvars ++ ex_tyvars) inst_tys)) 
        ([mkDictTy cls tys | (cls,tys) <- ex_theta] ++ arg_tys)
@@ -246,7 +339,7 @@ dictionaries
 -- stored in the DataCon, and are matched in a case expression
 dataConNumInstArgs (MkData {dcTyVars = tyvars}) = length tyvars
 
-dataConNumFields (MkData {dcExTheta = theta, dcArgTys = arg_tys})
+dataConNumFields (MkData {dcExTheta = theta, dcRepArgTys = arg_tys})
   = length theta + length arg_tys
 
 isNullaryDataCon con

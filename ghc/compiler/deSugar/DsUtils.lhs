@@ -39,7 +39,8 @@ import PrelVals		( iRREFUT_PAT_ERROR_ID )
 import Id		( idType, Id, mkWildId )
 import Const		( Literal(..), Con(..) )
 import TyCon		( isNewTyCon, tyConDataCons )
-import DataCon		( DataCon )
+import DataCon		( DataCon, dataConStrictMarks, dataConArgTys )
+import BasicTypes	( StrictnessMark(..) )
 import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp,
 			  Type
 			)
@@ -216,7 +217,9 @@ mkCoAlgCaseMatchResult var match_alts
 
     mk_alt fail (con, args, MatchResult _ body_fn)
 	= body_fn fail		`thenDs` \ body ->
-	  returnDs (DataCon con, args, body)
+	  rebuildConArgs con args (dataConStrictMarks con) body 
+				`thenDs` \ (body', real_args) ->
+	  returnDs (DataCon con, real_args, body')
 
     mk_default fail | exhaustive_case = []
 		    | otherwise       = [(DEFAULT, [], fail)]
@@ -225,7 +228,32 @@ mkCoAlgCaseMatchResult var match_alts
         = mkUniqSet data_cons `minusUniqSet` mkUniqSet [ con | (con, _, _) <- match_alts]
     exhaustive_case = isEmptyUniqSet un_mentioned_constructors
 
+-- for each constructor we match on, we might need to re-pack some
+-- of the strict fields if they are unpacked in the constructor.
 
+rebuildConArgs
+  :: DataCon				-- the con we're matching on
+  -> [Id]				-- the source-level args
+  -> [StrictnessMark]			-- the strictness annotations (per-arg)
+  -> CoreExpr				-- the body
+  -> DsM (CoreExpr, [Id])
+
+rebuildConArgs con [] stricts body = returnDs (body, [])
+rebuildConArgs con (arg:args) (str:stricts) body
+  = rebuildConArgs con args stricts body `thenDs` \ (body', real_args) ->
+    case str of
+	MarkedUnboxed pack_con tys -> 
+	    let id_tys  = dataConArgTys pack_con ty_args in
+	    newSysLocalsDs id_tys `thenDs` \ unpacked_args ->
+	    returnDs (
+		 Let (NonRec arg (Con (DataCon pack_con) 
+				      (map Type ty_args ++
+				       map Var  unpacked_args))) body', 
+		 unpacked_args ++ real_args
+	    )
+	_ -> returnDs (body', arg:real_args)
+
+  where ty_args = case splitAlgTyConApp (idType arg) of { (_,args,_) -> args }
 \end{code}
 
 %************************************************************************

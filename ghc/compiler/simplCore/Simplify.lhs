@@ -1480,17 +1480,23 @@ simplAlts zap_occ_info scrut_cons case_bndr'' alts cont'
 	--	case x of { T a b -> T (a+1) b }
 	--
 	-- We really must record that b is already evaluated so that we don't
-	-- go and re-evaluated it when constructing the result.
+	-- go and re-evaluate it when constructing the result.
 
-    add_evals (DataCon dc) vs = stretchZipEqual add_eval vs (dataConStrictMarks dc)
+    add_evals (DataCon dc) vs = cat_evals vs (dataConStrictMarks dc)
     add_evals other_con    vs = vs
 
-    add_eval v m | isTyVar v = Nothing
-		 | otherwise = case m of
-				  MarkedStrict    -> Just (zap_occ_info v `setIdUnfolding` OtherCon [])
-				  NotMarkedStrict -> Just (zap_occ_info v)
+    cat_evals [] [] = []
+    cat_evals (v:vs) (str:strs) 
+	| isTyVar v = cat_evals vs (str:strs)
+	| otherwise = 
+	   case str of
+		MarkedStrict    -> 
+		  (zap_occ_info v `setIdUnfolding` OtherCon [])	
+			: cat_evals vs strs
+		MarkedUnboxed con _ -> 
+		  cat_evals (v:vs) (dataConStrictMarks con ++ strs)
+		NotMarkedStrict -> zap_occ_info v : cat_evals vs strs
 \end{code}
-
 
 
 

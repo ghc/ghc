@@ -9,7 +9,7 @@ module Id (
 
 	-- Simple construction
 	mkVanillaId, mkImportedId, mkSysLocal, mkUserLocal,
-	mkTemplateLocals, mkWildId, mkUserId,
+	mkTemplateLocals, mkTemplateLocal, mkWildId, mkUserId,
 
 	-- Taking an Id apart
 	idName, idType, idUnique, idInfo, idDetails,
@@ -131,6 +131,9 @@ mkTemplateLocals :: [Type] -> [Id]
 mkTemplateLocals tys = zipWith (mkSysLocal SLIT("tpl"))
 			       (getBuiltinUniques (length tys))
 			       tys
+
+mkTemplateLocal :: Int -> Type -> Id
+mkTemplateLocal i ty = mkSysLocal SLIT("tpl") (mkBuiltinUnique i) ty
 \end{code}
 
 

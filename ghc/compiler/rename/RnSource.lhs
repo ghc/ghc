@@ -428,8 +428,12 @@ rnBangTy doc (Banged ty)
     returnRn (Banged new_ty, fvs)
 
 rnBangTy doc (Unbanged ty)
-  = rnHsType doc ty `thenRn` \ (new_ty, fvs) ->
+  = rnHsType doc ty 		`thenRn` \ (new_ty, fvs) ->
     returnRn (Unbanged new_ty, fvs)
+
+rnBangTy doc (Unpacked ty)
+  = rnHsType doc ty 		`thenRn` \ (new_ty, fvs) ->
+    returnRn (Unpacked new_ty, fvs)
 
 -- This data decl will parse OK
 --	data T = a Int

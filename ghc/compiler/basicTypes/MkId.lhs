@@ -46,11 +46,11 @@ import Name		( mkDerivedName, mkWiredInIdName,
 			)
 import PrimOp		( PrimOp, primOpType, primOpOcc, primOpUniq )
 import DataCon		( DataCon, dataConStrictMarks, dataConFieldLabels, 
-			  dataConArgTys, dataConSig
+			  dataConArgTys, dataConSig, dataConRawArgTys
 			)
 import Id		( idType,
 			  mkUserLocal, mkVanillaId, mkTemplateLocals,
-			  setInlinePragma
+			  mkTemplateLocal, setInlinePragma
 			)
 import IdInfo		( noIdInfo,
 			  exactArity, setUnfoldingInfo, 
@@ -139,44 +139,68 @@ Notice that
 dataConInfo :: DataCon -> IdInfo
 
 dataConInfo data_con
-  = setInlinePragInfo IMustBeINLINEd $
-	    	-- Always inline constructors; we won't create a binding for them
-    setArityInfo (exactArity (length locals)) $
+  = setInlinePragInfo IMustBeINLINEd $ -- Always inline constructors
+    setArityInfo (exactArity (n_dicts + n_ex_dicts + n_id_args)) $
     setUnfoldingInfo unfolding $
     noIdInfo
   where
         unfolding = mkUnfolding con_rhs
 
-	(tyvars, theta, ex_tyvars, ex_theta, arg_tys, tycon) = dataConSig data_con
+	(tyvars, theta, ex_tyvars, ex_theta, orig_arg_tys, tycon) 
+	   = dataConSig data_con
+	rep_arg_tys = dataConRawArgTys data_con
 	all_tyvars   = tyvars ++ ex_tyvars
 
 	dict_tys     = [mkDictTy clas tys | (clas,tys) <- theta]
 	ex_dict_tys  = [mkDictTy clas tys | (clas,tys) <- ex_theta]
+
 	n_dicts	     = length dict_tys
+	n_ex_dicts   = length ex_dict_tys
+	n_id_args    = length orig_arg_tys
+ 	n_rep_args   = length rep_arg_tys
+
 	result_ty    = mkTyConApp tycon (mkTyVarTys tyvars)
 
-	locals        = mkTemplateLocals (dict_tys ++ ex_dict_tys ++ arg_tys)
-	data_args     = drop n_dicts locals
-	(data_arg1:_) = data_args		-- Used for newtype only
+	mkLocals i n tys   = (zipWith mkTemplateLocal [i..i+n-1] tys, i+n)
+	(dict_args, i1)    = mkLocals 1  n_dicts    dict_tys
+	(ex_dict_args,i2)  = mkLocals i1 n_ex_dicts ex_dict_tys
+	(id_args,i3)       = mkLocals i2 n_id_args  orig_arg_tys
+
+	(id_arg1:_) = id_args		-- Used for newtype only
 	strict_marks  = dataConStrictMarks data_con
-	strict_args   = [arg | (arg,MarkedStrict) <- data_args `zip` strict_marks]
-		-- NB: we can't call mkTemplateLocals twice, because it
-		-- always starts from the same unique.
 
-	con_app | isNewTyCon tycon 
-		= ASSERT( length arg_tys == 1)
-		  Note (Coerce result_ty (head arg_tys)) (Var data_arg1)
+	con_app i rep_ids
+                | isNewTyCon tycon 
+		= ASSERT( length orig_arg_tys == 1 )
+		  Note (Coerce result_ty (head orig_arg_tys)) (Var id_arg1)
  		| otherwise
-		= mkConApp data_con (map Type (mkTyVarTys all_tyvars) ++ map Var data_args)
+		= mkConApp data_con 
+			(map Type (mkTyVarTys all_tyvars) ++ 
+			 map Var (reverse rep_ids))
 
-	con_rhs = mkLams all_tyvars $ mkLams locals $
-		  foldr mk_case con_app strict_args
+	con_rhs = mkLams all_tyvars $ mkLams dict_args $ 
+		  mkLams ex_dict_args $ mkLams id_args $
+		  foldr mk_case con_app (zip id_args strict_marks) i3 []
 
-	mk_case arg body | isUnLiftedType (idType arg)
-			 = body			-- "!" on unboxed arg does nothing
-			 | otherwise
-			 = Case (Var arg) arg [(DEFAULT,[],body)]
-				-- This case shadows "arg" but that's fine
+	mk_case 
+	   :: (Id, StrictnessMark)	-- arg, strictness
+	   -> (Int -> [Id] -> CoreExpr) -- body
+	   -> Int			-- next rep arg id
+	   -> [Id]			-- rep args so far
+	   -> CoreExpr
+	mk_case (arg,strict) body i rep_args
+  	  = case strict of
+		NotMarkedStrict -> body i (arg:rep_args)
+		MarkedStrict 
+		   | isUnLiftedType (idType arg) -> body i (arg:rep_args)
+		   | otherwise ->
+			Case (Var arg) arg [(DEFAULT,[], body i (arg:rep_args))]
+
+		MarkedUnboxed con tys ->
+		   Case (Var arg) arg [(DataCon con, con_args,
+					body i' (reverse con_args++rep_args))]
+		   where n_tys = length tys
+			 (con_args,i') = mkLocals i (length tys) tys
 \end{code}
 
 

@@ -55,6 +55,7 @@ module CmdLineOpts (
 	opt_EmitCExternDecls,
 	opt_EnsureSplittableC,
 	opt_FoldrBuildOn,
+	opt_UnboxStrictFields,
 	opt_GlasgowExts,
 	opt_GranMacros,
 	opt_HiMap,
@@ -324,6 +325,7 @@ opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
 opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
+opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
 opt_HiMap 			= lookup_str "-himap="       -- file saying where to look for .hi files

@@ -302,6 +302,7 @@ get_con_details (RecCon nbtys)       = unionManyUniqSets (map (get_bty.snd) nbty
 ----------------------------------------------------
 get_bty (Banged ty)   = get_ty ty
 get_bty (Unbanged ty) = get_ty ty
+get_bty (Unpacked ty) = get_ty ty
 
 ----------------------------------------------------
 get_ty (MonoTyVar name)

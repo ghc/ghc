@@ -91,6 +91,7 @@ kcConDecl (ConDecl _ ex_tvs ex_ctxt details loc)
 
     kc_bty (Banged ty)   = tcHsType ty
     kc_bty (Unbanged ty) = tcHsType ty
+    kc_bty (Unpacked ty) = tcHsType ty
 
     kc_field (_, bty)    = kc_bty bty
 \end{code}
@@ -237,9 +238,12 @@ thinContext arg_tys ctxt
   
 get_strictness (Banged   _) = MarkedStrict
 get_strictness (Unbanged _) = NotMarkedStrict
+get_strictness (Unpacked _) = MarkedUnboxed bot bot
+	where bot = error "get_strictness"
 
 get_pty (Banged ty)   = ty
 get_pty (Unbanged ty) = ty
+get_pty (Unpacked ty) = ty
 \end{code}
 
 

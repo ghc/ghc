@@ -22,6 +22,8 @@ module BasicTypes(
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} DataCon ( DataCon )
+import {-# SOURCE #-} Type    ( Type )
 import Outputable
 \end{code}
 
@@ -101,9 +103,6 @@ data NewOrData
   deriving( Eq )	-- Needed because Demand derives Eq
 \end{code}
 
-The @RecFlag@ tells whether the thing is part of a recursive group or not.
-
-
 %************************************************************************
 %*									*
 \subsection[Top-level/local]{Top-level/not-top level flag}
@@ -116,10 +115,9 @@ data TopLevelFlag
   | NotTopLevel
 \end{code}
 
-
 %************************************************************************
 %*									*
-\subsection[Top-level/local]{Top-level/not-top level flag}
+\subsection[Recursive/Non-Recursive]{Recursive/Non-Recursive flag}
 %*									*
 %************************************************************************
 
@@ -136,5 +134,6 @@ data RecFlag = Recursive
 
 \begin{code}
 data StrictnessMark = MarkedStrict
+		    | MarkedUnboxed DataCon [Type]
 		    | NotMarkedStrict
 \end{code}

@@ -282,6 +282,7 @@ data ConDetails name
 data BangType name
   = Banged   (HsType name)	-- HsType: to allow Haskell extensions
   | Unbanged (HsType name)	-- (MonoType only needed for straight Haskell)
+  | Unpacked (HsType name)	-- Field is strict and to be unpacked if poss.
 \end{code}
 
 \begin{code}
@@ -312,6 +313,7 @@ ppr_con_details con (RecCon fields)
 
 ppr_bang (Banged   ty) = ptext SLIT("!") <> pprParendHsType ty
 ppr_bang (Unbanged ty) = pprParendHsType ty
+ppr_bang (Unpacked ty) = ptext SLIT("! !") <> pprParendHsType ty
 \end{code}
 
 

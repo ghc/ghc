@@ -348,6 +348,7 @@ batypes		:  					{ [] }
 batype		:: { RdrNameBangType }
 batype		:  atype				{ Unbanged $1 }
 		|  '!' atype				{ Banged   $2 }
+		|  '!' '!' atype			{ Unpacked $3 }
 
 fields1		:: { [([RdrName], RdrNameBangType)] }
 fields1		: field					{ [$1] }
@@ -356,6 +357,7 @@ fields1		: field					{ [$1] }
 field		:: { ([RdrName], RdrNameBangType) }
 field		:  var_names1 '::' type		{ ($1, Unbanged $3) }
 		|  var_names1 '::' '!' type    	{ ($1, Banged   $4) }
+		|  var_names1 '::' '!' '!' type	{ ($1, Unpacked $5) }
 --------------------------------------------------------------------------
 
 type		:: { RdrNameHsType }
