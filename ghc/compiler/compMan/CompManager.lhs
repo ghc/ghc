@@ -57,7 +57,7 @@ import Directory        ( getModificationTime, doesFileExist )
 import IO
 import Monad
 import List		( nub )
-import Maybe		( catMaybes, fromMaybe, maybeToList, isJust )
+import Maybe		( catMaybes, fromMaybe, isJust )
 \end{code}
 
 
@@ -362,7 +362,7 @@ getValidLinkable old_linkables summary
 	    	    _ -> Nothing      
 
        -- The most recent of the old UI linkable or whatever we could
-       -- find on disk.  Is returned as the linkable if compile
+       -- find on disk is returned as the linkable if compile
        -- doesn't think we need to recompile.        
        let linkable_list
                = case (maybe_old_linkable, maybe_disk_linkable) of
@@ -472,27 +472,16 @@ findPartiallyCompletedCycles modsDone theGraph
              else chewed_rest
 
 
--- Does this ModDetails export Main.main?
---exports_main :: ModDetails -> Bool
---exports_main md
---   = isJust (lookupNameEnv (md_types md) mainName)
-
-
 -- Add the given (LM-form) Linkables to the UI, overwriting previous
 -- versions if they exist.
 add_to_ui :: UnlinkedImage -> [Linkable] -> UnlinkedImage
 add_to_ui ui lis
-   = foldr add1 ui lis
+   = filter (not_in lis) ui ++ lis
      where
-        add1 :: Linkable -> UnlinkedImage -> UnlinkedImage
-        add1 li ui
-           = li : filter (\li2 -> not (for_same_module li li2)) ui
-
-        for_same_module :: Linkable -> Linkable -> Bool
-        for_same_module li1 li2 
-           = not (is_package_linkable li1)
-             && not (is_package_linkable li2)
-             && modname_of_linkable li1 == modname_of_linkable li2
+        not_in :: [Linkable] -> Linkable -> Bool
+        not_in lis li
+           = all (\l -> modname_of_linkable l /= mod) lis
+           where mod = modname_of_linkable li
                                   
 
 data CmThreaded  -- stuff threaded through individual module compilations
@@ -608,7 +597,6 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
 		      else
 			return ()
 
-		    when (verb == 1) $ hPutStrLn stderr ""
                     return (threaded2, Just old_linkable)
 
            -- Compilation really did happen, and succeeded.  A new
@@ -618,14 +606,12 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
                         hit2      = addToUFM hit1 mod_name new_iface
                         threaded2 = CmThreaded pcs2 hst2 hit2
 
-		    when (verb == 1) $ hPutStrLn stderr ""
 	            return (threaded2, Just new_linkable)
 
            -- Compilation failed.  compile may still have updated
            -- the PCS, tho.
            CompErrs pcs2
 	      -> do let threaded2 = CmThreaded pcs2 hst1 hit1
-		    when (verb == 1) $ hPutStrLn stderr ""
                     return (threaded2, Nothing)
 
 -- Remove unwanted modules from the top level envs (HST, HIT, UI).
