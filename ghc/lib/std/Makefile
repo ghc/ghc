@@ -45,20 +45,18 @@ HS_SRCS := $(HSC_HS) $(filter-out $(HSC_HS),$(HS_SRCS))
 # 	Setting the GHC compile options
 
 SRC_HC_OPTS += -recomp -cpp -fvia-C -fglasgow-exts $(GhcLibHcOpts) $(PACKAGE)
-ifneq "$(DLLized)" "YES"
-SRC_HC_OPTS += -static
-endif
 
 ifdef USE_REPORT_PRELUDE
 SRC_HC_OPTS += -DUSE_REPORT_PRELUDE=1
 endif
 
-#
 # Object and interface files have suffixes tagged with their ways
-#
 ifneq "$(way)" ""
 SRC_HC_OPTS += -hisuf $(way_)hi
 endif
+
+# Special options
+PrelStorable_HC_OPTS = -monly-3-regs
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
@@ -83,11 +81,8 @@ DLL_DESCRIPTION="GHC-compiled Haskell Prelude"
 
 ifeq "$(DLLized)" "YES"
 HS_SRCS := $(filter-out PrelMain.lhs PrelHugs.lhs, $(HS_SRCS))
-endif
-
 # PrelMain.dll_o isn't to be included in the final .a, 
 # but it needs to be generated
-ifeq "$(DLLized)" "YES"
 all :: PrelMain.dll_o
 endif
 
@@ -97,19 +92,6 @@ CLEAN_FILES +=  \
 	$(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
 	$(patsubst %.hsc, %.hs.c, $(HSC_SRCS)) \
 	$(patsubst %.hsc, %.hs.h, $(HSC_SRCS))
-
-#
-# If we're building the unregisterised way, it may well be for Hugs.
-# In that case, remember to bind the cbits objects into a single file
-# which hugs can load as an auxiliary object file when loading the Prelude.
-#
-ifeq "$(way)" "u"
-all :: libHSstd_cbits.u_o
-CLEAN_FILES += libHSstd_cbits.u_o
-libHSstd_cbits.u_o:
-	$(RM) libHSstd_cbits.u_o
-	ld -r -o libHSstd_cbits.u_o cbits/*.o
-endif
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries

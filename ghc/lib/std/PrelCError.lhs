@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCError.lhs,v 1.4 2001/01/16 06:02:29 qrczak Exp $
+% $Id: PrelCError.lhs,v 1.5 2001/01/26 17:51:54 rrt Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -7,7 +7,7 @@
 C-specific Marshalling support: Handling of C "errno" error codes
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude -#include "cbits/errno.h" #-}
 
 -- this is were we get the CCONST_XXX definitions from that configure
 -- calculated for us
@@ -134,6 +134,10 @@ data IOErrorType
 
 -- "errno" type
 -- ------------
+
+-- import of C function that gives address of errno
+--
+foreign import "ghcErrno" unsafe _errno :: Ptr CInt
 
 -- Haskell representation for "errno" values
 --
@@ -594,9 +598,4 @@ errnoToIOError loc errno@(Errno no) maybeHdl maybeName =
       | otherwise                 = (OtherError, 
 				     "unexpected error (error code: " 
 				     ++ show no ++")")
-
-foreign label "errno" _errno :: Ptr CInt
-  -- FIXME: this routine should eventually be provided by the Haskell runtime
-  --	    and guarantee that the "errno" of the last operation performed by
-  --	    the current thread is returned 
 \end{code}

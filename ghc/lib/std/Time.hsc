@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.7 2001/01/26 16:16:19 rrt Exp $
+-- $Id: Time.hsc,v 1.8 2001/01/26 17:51:54 rrt Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -346,6 +346,11 @@ gmtoff x    = (#peek struct tm,tm_gmtoff) x
 #  endif
 #  ifndef mingw32_TARGET_OS
 foreign label tzname :: Ptr (Ptr CChar)
+#  else
+foreign import "ghcTimezone" unsafe timezone :: Ptr CLong
+foreign import "ghcTzname" unsafe tzname :: Ptr (Ptr CChar)
+#   def inline long  *ghcTimezone(void) { return &_timezone; }
+#   def inline char **ghcTzname(void) { return _tzname; }
 #  endif
 zone x = do 
   dst <- (#peek struct tm,tm_isdst) x
@@ -625,5 +630,9 @@ foreign import unsafe gettimeofday :: Ptr CTimeVal -> Ptr () -> IO CInt
 
 #if HAVE_FTIME
 type CTimeB = ()
+#ifndef mingw32_TARGET_OS
 foreign import unsafe ftime :: Ptr CTimeB -> IO CInt
+#else
+foreign import unsafe ftime :: Ptr CTimeB -> IO ()
+#endif
 #endif
