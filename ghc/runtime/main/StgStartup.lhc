@@ -197,9 +197,9 @@ SET_STATIC_HDR(EmptySPTable_closure,EmptyStablePointerTable_info,CC_SUBSUMED,,ED
    the following symbols may be referenced in
    an object file, but never entered
 */
-P_ GHC_void_closure = (P_) 0xbadbadbaL;
-P_ GHC_ZcCCallable_static_info = (P_) 0xbadbadbaL;
-P_ GHC_ZcCReturnable_static_info = (P_) 0xbadbadbaL;
+P_ PrelGHC_void_closure = (P_) 0xbadbadbaL;
+P_ PrelGHC_ZcCCallable_static_info = (P_) 0xbadbadbaL;
+P_ PrelGHC_ZcCReturnable_static_info = (P_) 0xbadbadbaL;
 
 /* the IoWorld token to start the whole thing off */
 /* Question: this is just an amusing hex code isn't it
@@ -631,14 +631,7 @@ END_REGISTER_CCS()
 
 /* _regPrelude is above */
 
-START_REGISTER_PRELUDE(_regGHCbase);
-END_REGISTER_CCS()
-
-/* OLD: START_REGISTER_PRELUDE(_regGHCerr); */
-START_REGISTER_PRELUDE(_regGHC);
-END_REGISTER_CCS()
-
-START_REGISTER_PRELUDE(_regPreludeGlaST);
+START_REGISTER_PRELUDE(_regPrelGHC);
 END_REGISTER_CCS()
 
 #endif
