@@ -5,7 +5,7 @@ tcfail068.hs:12:
     It is reachable from the type variable(s) `a'
       which is free in the signature
     Signature type:     forall s. ST s a
-    Type to generalise: ST s1 (IndTree s1 a1)
+    Type to generalise: ST s1 (STArray s1 (Int, Int) a1)
     In the first argument of `runST', namely
 	`(newSTArray ((1, 1), n) x)'
     In the definition of `itgen': runST (newSTArray ((1, 1), n) x)
