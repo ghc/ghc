@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.45 1999/11/04 15:09:09 sewardj Exp $
+dnl $Id: aclocal.m4,v 1.46 1999/12/21 13:00:54 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -134,28 +134,37 @@ esac
 ])
 
 dnl
-dnl Check for Happy and version.
+dnl Check for Happy and version.  If we're building GHC, then we need
+dnl at least Happy version 1.6.  If there's no installed Happy, we look
+dnl for a happy source tree and point the build system at that instead.
+dnl
+dnl ToDo: when we reset HappyCmd to the source tree, autoconf doesn't
+dnl seems to insert it in the cache file.  sigh.
 dnl
 AC_DEFUN(FPTOOLS_HAPPY,
-[AC_PATH_PROG(HappyCmd,happy,,$PATH:${hardtop}/happy/src)
+[AC_PATH_PROG(HappyCmd,happy)
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 [if test x"$HappyCmd" != x; then
    fptools_cv_happy_version="`$HappyCmd -v |
 changequote(, )dnl
 			  grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'`" ;
-changequote([, ])dnl
+elif test -d $srcdir/happy; then
+   HappyCmd=$hardtop/happy/src/happy-inplace;
+   fptools_cv_happy_version=`grep '^ProjectVersion[ 	]*=' $srcdir/happy/mk/version.mk | sed 's/.*\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/g'`;
+   echo -n "using happy from the source tree... ";
 else
    fptools_cv_happy_version="";
 fi;
+changequote([, ])dnl
 if expr "$fptools_cv_happy_version" "<" 1.6 > /dev/null 2>&1; then
-   if test -d ghc; then
+   if test -d $srcdir/ghc; then
      echo
      echo "Happy version 1.6 or later is required to compile GHC."
      exit 1;
    fi
 fi;
 ])
-HappyVersion=$ac_cv_happy_version;
+HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
 ])
 
