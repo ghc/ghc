@@ -99,12 +99,14 @@ $Import_dirs = '.';
 # directories to considered stable.
 @Ignore_dirs = ();
 
+%ModuleIn = ();
+
 $Include_dirs = '-I.';
 $Makefile = '';
 @Src_files = ();
 $Include_prelude = 0;
 @Defines = ();
-$WarnOddOptions=1;
+$ProcessingOptions=0;
 
 # Delete temp. file if script is halted.
 sub quit_upon_signal { print STDERR "Deleting $Tmp_prefix.hs .. \n"; unlink "$Tmp_prefix.hs"; }
@@ -234,12 +236,14 @@ sub mangle_command_line_args {
 	    push(@Syslibs, 'exts');
 	} elsif ( /^-concurrent$/ ) {
 	    push(@Syslibs, 'concurrent');
+	} elsif (/^-#include(.*)/) {
+	    &grab_arg_arg(*Args,$_,'');
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
 		$Verbose++;
 	    } elsif ( /^-w$/ ) {
 		$Warnings     = 0;
-	    } elsif ( /^-f(.*)/ ) {
+	    } elsif ( /^-f(.*)/ && !$ProcessingOptions ) {
 		$Makefile	= &grab_arg_arg(*Args,'-f',$1);
 	    } elsif ( /^-o(.*)/ ) {
 		local($suff)	= &grab_arg_arg(*Args,'-o',$1);
@@ -266,7 +270,7 @@ sub mangle_command_line_args {
 		local($suff)	=  &grab_arg_arg(*Args,'-s',$1);
 		push(@File_suffix, $suff);
 	    } elsif ( /^-/ ) {
-		if ($WarnOddOptions) {
+		if (!$ProcessingOptions) {
 		   print STDERR "$Pgm: unknown option ignored: $_\n";
 		   $Status++;
 	        }
@@ -341,7 +345,6 @@ sub preprocess_import_dirs {
     # the @Import_dirs before we start processing.
     local($d, $thing);
     local($_);
-    %ModuleIn = ();
 
     foreach $d ( @Import_dirs ) {
         # Check to see if it can be ignored
@@ -416,7 +419,7 @@ sub slurp_file_for_imports {
     $options = &check_for_source_options($file_to_read);
     if ($options ne "") {
       @Old_Syslibs=@Syslibs;
-      $WarnOddOptions=0;
+      $ProcessingOptions=1;
       &mangle_command_line_args(split(/ /,$options));
       if (@Old_Syslibs ne @Syslibs) {
         $found_options=1;
@@ -457,7 +460,9 @@ sub slurp_file_for_imports {
 	&process_dependency($todo,$source,$modname);
     }
 
-    @Ignore_dirs = @Old_Ignore_dirs if ($found_options);
+    if ($found_options) {
+      @Ignore_dirs = @Old_Ignore_dirs;
+    }
 
     close(SRCFILE) || exit(1);
     # remove temporary file, if any.
