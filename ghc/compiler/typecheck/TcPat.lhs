@@ -385,15 +385,18 @@ tcConPat ctxt data_con tycon ty_args arg_pats thing_inside
 	      arg_tys' = substTys tenv arg_tys
 	      res_tys' = substTys tenv res_tys
 	; dicts <- newDicts (SigOrigin rigid_info) theta'
-	; tcInstStupidTheta data_con tv_tys'
 
 	-- Do type refinement!
 	; traceTc (text "tcGadtPat" <+> vcat [ppr data_con, ppr tvs', ppr arg_tys', ppr res_tys', 
 					      text "ty-args:" <+> ppr ty_args ])
 	; refineAlt ctxt data_con tvs' ty_args res_tys' $ do	
 
-	{ ((arg_pats', inner_tvs, res), lie_req) 
-		<- getLIE (tcConArgs ctxt data_con arg_pats arg_tys' thing_inside)
+	{ ((arg_pats', inner_tvs, res), lie_req) <- getLIE $
+		do { tcInstStupidTheta data_con tv_tys'
+			-- The stupid-theta mentions the newly-bound tyvars, so
+			-- it must live inside the getLIE, so that the
+			--  tcSimplifyCheck will apply the type refinement to it
+		   ; tcConArgs ctxt data_con arg_pats arg_tys' thing_inside }
 
 	; dict_binds <- tcSimplifyCheck doc tvs' dicts lie_req
 

@@ -522,9 +522,8 @@ zonkTyVar :: (TcTyVar -> TcM Type)		-- What to do for an unbound mutable variabl
           -> Bool                               -- Consult the type refinement?
  	  -> TcTyVar -> TcM TcType
 zonkTyVar unbound_var_fn rflag tyvar 
-  | not (isTcTyVar tyvar)	-- This can happen when
-				-- zonking a forall type, when the bound type variable
-				-- needn't be mutable
+  | not (isTcTyVar tyvar)	-- When zonking (forall a.  ...a...), the occurrences of 
+				-- the quantified variable a are TyVars not TcTyVars
   = returnM (TyVarTy tyvar)
 
   | otherwise

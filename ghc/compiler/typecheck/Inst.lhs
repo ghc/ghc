@@ -72,9 +72,10 @@ import Kind	( isSubKind )
 import HscTypes	( ExternalPackageState(..) )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon, dataConTyVars, dataConStupidTheta, dataConName )
-import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique )
+import Id	( Id, idName, idType, mkUserLocal, mkLocalId )
 import PrelInfo	( isStandardClass, isNoDictClass )
-import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, isHomePackageName, isInternalName )
+import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, isHomePackageName, 
+		  isInternalName, setNameUnique, mkSystemNameEncoded )
 import NameSet	( addOneToNameSet )
 import Literal	( inIntRange )
 import Var	( TyVar, tyVarKind )
@@ -98,9 +99,9 @@ instName :: Inst -> Name
 instName inst = idName (instToId inst)
 
 instToId :: Inst -> TcId
-instToId (Dict id _ _)	       = id
+instToId (LitInst nm _ ty _)   = mkLocalId nm ty
+instToId (Dict nm pred _)      = mkLocalId nm (mkPredTy pred)
 instToId (Method id _ _ _ _ _) = id
-instToId (LitInst id _ _ _)    = id
 
 instLoc (Dict _ _         loc) = loc
 instLoc (Method _ _ _ _ _ loc) = loc
@@ -222,8 +223,8 @@ newDicts orig theta
     newDictsAtLoc loc theta
 
 cloneDict :: Inst -> TcM Inst
-cloneDict (Dict id ty loc) = newUnique	`thenM` \ uniq ->
-			     returnM (Dict (setIdUnique id uniq) ty loc)
+cloneDict (Dict nm ty loc) = newUnique	`thenM` \ uniq ->
+			     returnM (Dict (setNameUnique nm uniq) ty loc)
 
 newDictsFromOld :: Inst -> TcThetaType -> TcM [Inst]
 newDictsFromOld (Dict _ _ loc) theta = newDictsAtLoc loc theta
@@ -237,7 +238,7 @@ newDictsAtLoc inst_loc theta
   = newUniqueSupply		`thenM` \ us ->
     returnM (zipWith mk_dict (uniqsFromSupply us) theta)
   where
-    mk_dict uniq pred = Dict (mkLocalId (mkPredName uniq loc pred) (mkPredTy pred))
+    mk_dict uniq pred = Dict (mkPredName uniq loc pred)
 			     pred inst_loc
     loc = instLocSrcLoc inst_loc
 
@@ -253,9 +254,9 @@ newIPDict orig ip_name ty
     let
 	pred = IParam ip_name ty
         name = mkPredName uniq (instLocSrcLoc inst_loc) pred 
-	id   = mkLocalId name (mkPredTy pred)
+	dict = Dict name pred inst_loc
     in
-    returnM (mapIPName (\n -> id) ip_name, Dict id pred inst_loc)
+    returnM (mapIPName (\n -> instToId dict) ip_name, dict)
 \end{code}
 
 
@@ -397,8 +398,10 @@ newLitInst orig lit expected_ty
   = getInstLoc orig		`thenM` \ loc ->
     newUnique			`thenM` \ new_uniq ->
     let
-	lit_inst = LitInst lit_id lit expected_ty loc
-	lit_id   = mkSysLocal FSLIT("lit") new_uniq expected_ty
+	lit_nm   = mkSystemNameEncoded new_uniq FSLIT("lit")
+		-- The "encoded" bit means that we don't need to z-encode
+		-- the string every time we call this!
+	lit_inst = LitInst lit_nm lit expected_ty loc
     in
     extendLIE lit_inst		`thenM_`
     returnM (L (instLocSrcSpan loc) (HsVar (instToId lit_inst)))
@@ -439,15 +442,13 @@ mkRatLit r
 %*									*
 %************************************************************************
 
-Zonking makes sure that the instance types are fully zonked,
-but doesn't do the same for any of the Ids in an Inst.  There's no
-need, and it's a lot of extra work.
+Zonking makes sure that the instance types are fully zonked.
 
 \begin{code}
 zonkInst :: Inst -> TcM Inst
-zonkInst (Dict id pred loc)
+zonkInst (Dict name pred loc)
   = zonkTcPredType pred			`thenM` \ new_pred ->
-    returnM (Dict id new_pred loc)
+    returnM (Dict name new_pred loc)
 
 zonkInst (Method m id tys theta tau loc) 
   = zonkId id			`thenM` \ new_id ->
@@ -460,9 +461,9 @@ zonkInst (Method m id tys theta tau loc)
     zonkTcType tau		`thenM` \ new_tau ->
     returnM (Method m new_id new_tys new_theta new_tau loc)
 
-zonkInst (LitInst id lit ty loc)
+zonkInst (LitInst nm lit ty loc)
   = zonkTcType ty			`thenM` \ new_ty ->
-    returnM (LitInst id lit new_ty loc)
+    returnM (LitInst nm lit new_ty loc)
 
 zonkInsts insts = mappM zonkInst insts
 \end{code}
@@ -498,8 +499,8 @@ pprInsts insts  = brackets (interpp'SP insts)
 
 pprInst, pprInstInFull :: Inst -> SDoc
 -- Debugging: print the evidence :: type
-pprInst (LitInst id lit ty loc) = ppr id <+> dcolon <+> ppr ty
-pprInst (Dict id pred loc)      = ppr id <+> dcolon <+> pprPred pred
+pprInst (LitInst nm lit ty loc) = ppr nm <+> dcolon <+> ppr ty
+pprInst (Dict nm pred loc)      = ppr nm <+> dcolon <+> pprPred pred
 
 pprInst m@(Method inst_id id tys theta tau loc)
   = ppr inst_id <+> dcolon <+> 
@@ -519,8 +520,8 @@ pprDFuns dfuns = vcat [ hang (ppr (getSrcLoc dfun) <> colon)
 	-- Print without the for-all, which the programmer doesn't write
 
 tidyInst :: TidyEnv -> Inst -> Inst
-tidyInst env (LitInst u lit ty loc) 	     = LitInst u lit (tidyType env ty) loc
-tidyInst env (Dict u pred loc)     	     = Dict u (tidyPred env pred) loc
+tidyInst env (LitInst nm lit ty loc) 	     = LitInst nm lit (tidyType env ty) loc
+tidyInst env (Dict nm pred loc)     	     = Dict nm (tidyPred env pred) loc
 tidyInst env (Method u id tys theta tau loc) = Method u id (tidyTypes env tys) theta tau loc
 
 tidyMoreInsts :: TidyEnv -> [Inst] -> (TidyEnv, [Inst])
@@ -647,7 +648,7 @@ lookupInst inst@(Method _ id tys theta _ loc)
 --  may have done some unification by now] 		
 
 
-lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
+lookupInst inst@(LitInst _nm (HsIntegral i from_integer_name) ty loc)
   | Just expr <- shortCutIntLit i ty
   = returnM (GenInst [] expr)	-- GenInst, not SimpleInst, because 
 					-- expr may be a constructor application
@@ -660,7 +661,7 @@ lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
 		     (mkHsApp (L (instLocSrcSpan loc)
 			   	 (HsVar (instToId method_inst))) integer_lit))
 
-lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
+lookupInst inst@(LitInst _nm (HsFractional f from_rat_name) ty loc)
   | Just expr <- shortCutFracLit f ty
   = returnM (GenInst [] expr)
 

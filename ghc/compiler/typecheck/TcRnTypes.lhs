@@ -633,7 +633,7 @@ type Int, represented by
 \begin{code}
 data Inst
   = Dict
-	Id
+	Name
 	TcPredType
 	InstLoc
 
@@ -668,7 +668,7 @@ data Inst
 	--   This only bites in the call to tcInstClassOp in TcClassDcl.mkMethodBind
 
   | LitInst
-	Id
+	Name
 	HsOverLit	-- The literal from the occurrence site
 			--	INVARIANT: never a rebindable-syntax literal
 			--	Reason: tcSyntaxName does unification, and we
