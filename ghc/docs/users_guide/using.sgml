@@ -1149,7 +1149,8 @@ nicely.
 
     </sect2>
 
-    <sect2><title>Dependency generation</title>
+    <sect2 id="sec-makefile-dependencies">
+      <title>Dependency generation</title>
       <indexterm><primary>dependencies in Makefiles</primary></indexterm>
       <indexterm><primary>Makefile dependencies</primary></indexterm>
 
