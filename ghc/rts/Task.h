@@ -2,8 +2,8 @@
  *
  * (c) The GHC Team 2001-
  *
- * Types + prototypes for functions in Task.cn
- * (RTS subsystem for handling OS tasks).
+ * Types + prototypes for functions in Task.c
+ * (RTS subsystem for handling tasks, agents thay may execute STG code).
  *
  * -------------------------------------------------------------------------*/
 #ifndef __TASK_H__
