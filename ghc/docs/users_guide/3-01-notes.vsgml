@@ -46,4 +46,43 @@ Changes made since 3.00:
        Assertions are a Glasgow extension, so -fglasgow-exts is
        needed to use them.
 
+<item> Library re-organisation: all libraries now live under ghc/lib,
+which has the following structure:
+
+<tscreen> <verb>
+	ghc/lib/std    		--  all prelude files 		(libHS.a)
+	ghc/lib/std/cbits
+
+	ghc/lib/exts		-- standard Hugs/GHC extensions (libHSexts.a)
+				-- available with '-fglasgow-exts'
+
+	ghc/lib/posix		-- POSIX library                (libHSposix.a)
+	ghc/lib/posix/cbits     -- available with '-syslib posix'
+
+	ghc/lib/misc		-- used to be hslibs/ghc	(libHSmisc.a)
+	ghc/lib/misc/cbits	-- available with '-syslib misc'
+
+	ghc/lib/concurrent	-- Concurrent libraries		(libHSconc.a)
+				-- available with '-concurrent'
+</verb> </tscreen>
+
+Also, several non-standard prelude modules had their names changed to begin
+with 'Prel' to reduce namespace pollution.
+
+<tscreen> <verb>
+	Addr      ==> PrelAddr     (Addr interface available in 'exts')
+	ArrBase   ==> PrelArr
+	CCall     ==> PrelCCall    (CCall interface available in 'exts')
+	ConcBase  ==> PrelConc
+	GHCerr    ==> PrelErr
+	Foreign   ==> PrelForeign  (Foreign interface available in 'exts')
+	GHC       ==> PrelGHC
+	IOHandle  ==> PrelHandle
+	IOBase    ==> PrelIOBase
+	GHCmain   ==> PrelMain
+	STBase    ==> PrelST
+	Unsafe    ==> PrelUnsafe
+	UnsafeST  ==> PrelUnsafeST
+</verb> </tscreen>
+
 </itemize>
