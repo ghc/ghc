@@ -262,6 +262,7 @@ GhcBinDistDirs = ghc hslibs
 GhcBinDistDocs = docs ghc/docs/users_guide ghc/docs/libraries
 GhcBinDistPrlScripts = ghc stat2resid hstags mkdependHS
 GhcBinDistLibPrlScripts = hscpp
+GhcBinDistBins = hp2ps
 
 #################################################################################
 #
