@@ -26,9 +26,11 @@ import PrelTup
 import PrelBase
 import GHC
 
+import Foreign  ( Addr, 
 #ifndef __PARALLEL_HASKELL__
-import Foreign  ( ForeignObj, Addr, makeForeignObj, writeForeignObj )
+                  ForeignObj, makeForeignObj, writeForeignObj 
 #endif
+		  )
 
 #if defined(__CONCURRENT_HASKELL__)
 import ConcBase
@@ -127,7 +129,7 @@ stdin = unsafePerformPrimIO (
        0 -> new_handle ClosedHandle
        1 -> 
 #ifndef __PARALLEL_HASKELL__
-            makeForeignObj (``stdin''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
+            makeForeignObj (``stdin''::Addr) (``&freeStdFile''::Addr) >>= \ fp ->
 	    new_handle (ReadHandle fp Nothing False)
 #else
 	    new_handle (ReadHandle ``stdin'' Nothing False)
@@ -146,7 +148,7 @@ stdout = unsafePerformPrimIO (
        0 -> new_handle ClosedHandle
        1 -> 
 #ifndef __PARALLEL_HASKELL__
-            makeForeignObj (``stdout''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
+            makeForeignObj (``stdout''::Addr) (``&freeStdFile''::Addr) >>= \ fp ->
 	    new_handle (WriteHandle fp Nothing False)
 #else
 	    new_handle (WriteHandle ``stdout'' Nothing False)
@@ -165,7 +167,7 @@ stderr = unsafePerformPrimIO (
        0 -> new_handle ClosedHandle
        1 -> 
 #ifndef __PARALLEL_HASKELL__
-            makeForeignObj (``stderr''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
+            makeForeignObj (``stderr''::Addr) (``&freeStdFile''::Addr) >>= \ fp ->
             new_handle (WriteHandle fp (Just NoBuffering) False)	
 #else
             new_handle (WriteHandle ``stderr'' (Just NoBuffering) False)	
