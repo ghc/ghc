@@ -61,7 +61,7 @@ TD.recfield { padding-left: 20px }
 TD.doc  { 
   padding-top: 2px;
   font-family: sans-serif;  
-  padding-left: 10px
+  padding-left: 10apx
   }
 
 TD.cbody  { 
@@ -114,3 +114,17 @@ TD.section4 {
   font-weight: bold;
   font-size: 100%
   }
+
+
+TD.infohead {
+  color: #ffffff;
+  font-weight: bold;
+  padding-right: 10px;
+  text-align: left;
+}
+
+TD.infoval {
+  color: #ffffff;
+  padding-right: 10px;
+  text-align: left;
+}

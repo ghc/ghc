@@ -129,19 +129,13 @@ moduleInfo iface
   | Nothing   <- iface_info iface = Html.emptyTable
   | Just info <- iface_info iface =
           tda [align "right"] <<
-             (table ! [width "300", border 0, cellspacing 0, cellpadding 0] << (
-        	  (tda [width "50%"] << font ! [color "#ffffff"] <<
-        		bold << toHtml "Portability") <->
-        	  (tda [width "50%"] << font ! [color "#ffffff"] <<
-        		toHtml (portability info)) </>
-        	  (tda [width "50%"] << font ! [color "#ffffff"] <<
-        		bold << toHtml "Stability") <->
-        	  (tda [width "50%"] << font ! [color "#ffffff"] <<
-        		toHtml (stability info)) </>
-        	  (tda [width "50%"] << font ! [color "#ffffff"] <<
-        		bold << toHtml "Maintainer") <->
-        	  (tda [width "50%"] << font ! [color "#ffffff"] <<
-        		toHtml (maintainer info))
+             (table ! [border 0, cellspacing 0, cellpadding 0] << (
+        	  (tda [theclass "infohead"] << toHtml "Portability") <->
+        	  (tda [theclass "infoval"] << toHtml (portability info)) </>
+        	  (tda [theclass "infohead"] << toHtml "Stability") <->
+        	  (tda [theclass "infoval"] << toHtml (stability info)) </>
+        	  (tda [theclass "infohead"] << toHtml "Maintainer") <->
+        	  (tda [theclass "infoval"] << toHtml (maintainer info))
               ))
 
 -- ---------------------------------------------------------------------------
