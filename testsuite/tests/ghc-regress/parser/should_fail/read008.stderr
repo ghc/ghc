@@ -1,2 +1,4 @@
 
-read008.hs:5:16: parse error on input `!'
+read008.hs:5:14:
+    Unexpected strictness annotation: ![a]
+    In the newtype declaration for `N'

@@ -1,5 +1,5 @@
 
-tcfail027.hs:7:0:
+tcfail027.hs:4:0:
     Cycle in class declarations (via superclasses):
-      tcfail027.hs:(7,0)-(8,18): class (A a) => B a
       tcfail027.hs:(4,0)-(5,13): class (B a) => A a
+      tcfail027.hs:(7,0)-(8,18): class (A a) => B a
