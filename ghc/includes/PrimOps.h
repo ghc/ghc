@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.104 2003/09/21 22:20:52 wolfgang Exp $
+ * $Id: PrimOps.h,v 1.105 2003/09/24 11:06:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -285,6 +285,7 @@ EXTFUN_RTS(isCurrentThreadBoundzh_fast);
 
 extern int cmp_thread(StgPtr tso1, StgPtr tso2);
 extern int rts_getThreadId(StgPtr tso);
+extern int forkOS_createThread ( HsStablePtr entry );
 
 /* -----------------------------------------------------------------------------
    Weak Pointer PrimOps.

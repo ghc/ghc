@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.130 2003/09/21 22:20:54 wolfgang Exp $
+ * $Id: Linker.c,v 1.131 2003/09/24 11:06:53 simonmar Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -370,6 +370,7 @@ typedef struct _RtsSymbolVal {
       SymX(divModIntegerzh_fast)		\
       SymX(forkzh_fast)				\
       SymX(forkProcesszh_fast)                  \
+      SymX(forkOS_createThread)			\
       SymX(freeHaskellFunctionPtr)		\
       SymX(freeStablePtr)		        \
       SymX(gcdIntegerzh_fast)			\

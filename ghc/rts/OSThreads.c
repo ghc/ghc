@@ -97,7 +97,31 @@ initMutex(Mutex* pMut)
   return;
 }
 
+static void *
+forkOS_createThreadWrapper ( void * entry )
+{
+    rts_lock();
+    rts_evalStableIO((HsStablePtr) entry, NULL);
+    rts_unlock();
+    return NULL;
+}
+
+int
+forkOS_createThread ( HsStablePtr entry )
+{
+    pthread_t tid;
+    int result = pthread_create(&tid, NULL,
+				forkOS_createThreadWrapper, (void*)entry);
+    if(!result)
+        pthread_detach(tid);
+    return result;
+}
+
 #elif defined(HAVE_WINDOWS_H)
+/* For reasons not yet clear, the entire contents of process.h is protected 
+ * by __STRICT_ANSI__ not being defined.
+ */
+#undef __STRICT_ANSI__
 #include <process.h>
 
 /* Win32 threads and synchronisation objects */
@@ -209,6 +233,36 @@ initMutex (Mutex* pMut)
   return;
 }
 
+static unsigned __stdcall
+forkOS_createThreadWrapper ( void * entry )
+{
+    rts_lock();
+    rts_evalStableIO((HsStablePtr) entry, NULL);
+    rts_unlock();
+    return 0;
+}
+
+int
+forkOS_createThread ( HsStablePtr entry )
+{
+    unsigned long pId;
+    return (_beginthreadex ( NULL,  /* default security attributes */
+			   0,
+			   forkOS_createThreadWrapper,
+			   (void*)entry,
+			   0,
+			   (unsigned*)&pId) == 0);
+}
+
 #endif /* defined(HAVE_PTHREAD_H) */
 
-#endif /* defined(RTS_SUPPORTS_THREADS) */
+#else /* !defined(RTS_SUPPORTS_THREADS) */
+
+int
+forkOS_createThread ( HsStablePtr entry )
+{
+    return -1;
+}
+
+#endif /* !defined(RTS_SUPPORTS_THREADS) */
+
