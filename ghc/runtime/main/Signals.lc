@@ -172,16 +172,37 @@ install_segv_handler(void)
 #endif
 }
 
-# else	/* Not SunOS 4, FreeBSD, or Linux(a.out) */
+# elif defined(irix6_TARGET_OS)
 
-#  if defined(irix_TARGET_OS)
-#    ifndef irix6_TARGET_OS /* will this do for irix-6.x ? ToDo: check. (SOF 5/97) */
-        /* certainly BOGUS (WDP 94/05) -- copied from /usr/include/sys/siginfo.h */
-#     define si_addr _data._fault._addr
-#    endif
-#  endif
+static void
+segv_handler(int sig, siginfo_t *sip, void *dummy)
+{
+    fflush(stdout);
+    if (sip == NULL) {
+	fprintf(stderr, "Segmentation fault caught, address unknown\n");
+    } else {
+	if (sip->si_addr >= (void *) stks_space
+	  && sip->si_addr < (void *) (stks_space + RTSflags.GcFlags.stksSize))
+	    StackOverflow();
+	fprintf(stderr, "Segmentation fault caught, address = %08lx\n", (W_) sip->si_addr);
+    }
+    abort();
+}
 
-#if defined(cygwin32_TARGET_OS)
+int
+install_segv_handler(STG_NO_ARGS)
+{
+    struct sigaction action;
+
+    action.sa_sigaction = segv_handler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = SA_SIGINFO;
+
+    return sigaction(SIGSEGV, &action, NULL);
+}
+
+# elif defined(cygwin32_TARGET_OS)
+
 /*
  The signal handlers in cygwin32 (beta14) are only passed the signal
  number, no sigcontext/siginfo is passed as event data..sigh. For
@@ -217,7 +238,12 @@ install_segv_handler()
 }
 
 
-#else /* !defined(cygwin32_TARGET_OS) */
+# else /* ! (cygwin32|irix6|sunos4|linux*|*bsd|aix) */
+
+#  if defined(irix_TARGET_OS)
+        /* certainly BOGUS (WDP 94/05) -- copied from /usr/include/sys/siginfo.h */
+#     define si_addr _data._fault._addr
+#  endif
 
 static void
 segv_handler(int sig, siginfo_t *sip)
@@ -248,9 +274,7 @@ install_segv_handler(STG_NO_ARGS)
     return sigaction(SIGSEGV, &action, NULL);
 }
 
-#endif /* not cygwin32_TARGET_OS */
-
-# endif    /* not SunOS 4 */
+# endif /* ! (cygwin32|irix6|sunos4|linux*|*bsd|aix) */
 
 #endif	/* STACK_CHECK_BY_PAGE_FAULT */
 
