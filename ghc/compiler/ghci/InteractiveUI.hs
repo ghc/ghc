@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.189 2005/02/23 12:44:17 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.190 2005/02/23 15:38:52 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -16,8 +16,10 @@ module InteractiveUI (
 
 import CompManager
 import HscTypes		( GhciMode(..) )
-import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..), IfaceConDecl(..), 
-		   	  IfaceInst(..), pprIfaceDeclHead, pprParendIfaceType, pprIfaceForAllPart )
+import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..),
+			  IfaceConDecl(..), IfaceType,
+		   	  IfaceInst(..), pprIfaceDeclHead, pprParendIfaceType,
+			  pprIfaceForAllPart, pprIfaceType )
 import FunDeps		( pprFundeps )
 import DriverFlags
 import DriverState
@@ -26,10 +28,9 @@ import Linker		( showLinkerState, linkPackages )
 import Util
 import Name		( Name, NamedThing(..) )
 import OccName		( OccName, isSymOcc, occNameUserString )
-import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..),
-			  failed )
+import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..) )
 import Outputable
-import CmdLineOpts	( DynFlags(..) )
+import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt )
 import Panic 		hiding ( showException )
 import Config
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
@@ -56,7 +57,6 @@ import Data.Dynamic
 import Numeric
 import Data.List
 import Data.Int		( Int64 )
-import Data.Maybe	( isJust )
 import System.Cmd
 import System.CPUTime
 import System.Environment
@@ -95,7 +95,7 @@ builtin_commands = [
   ("help",	keepGoing help),
   ("?",		keepGoing help),
   ("info",      keepGoing info),
-  ("load",	keepGoingPaths loadModule_),
+  ("load",	keepGoingPaths loadModule),
   ("module",	keepGoing setContext),
   ("reload",	keepGoing reloadModule),
   ("set",	keepGoing setCmd),
@@ -234,13 +234,9 @@ runGHCi paths dflags maybe_expr = do
   		  Right hdl -> fileLoop hdl False
 
   -- Perform a :load for files given on the GHCi command line
-  -- When in -e mode, if the load fails then we want to stop
-  -- immediately rather than going on to evaluate the expression.
-  when (not (null paths)) $ do
-     ok <- ghciHandle (\e -> do showException e; return Failed) $ 
-		loadModule paths
-     when (isJust maybe_expr && failed ok) $
-	io (exitWith (ExitFailure 1))
+  when (not (null paths)) $
+     ghciHandle showException $
+	loadModule paths
 
   -- if verbosity is greater than 0, or we are connected to a
   -- terminal, display the prompt in the interactive loop.
@@ -503,16 +499,18 @@ info :: String -> GHCi ()
 info "" = throwDyn (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info s  = do { let names = words s
 	     ; init_cms <- getCmState
-	     ; mapM_ (infoThing init_cms) names }
+	     ; dflags <- getDynFlags
+	     ; let exts = dopt Opt_GlasgowExts dflags
+	     ; mapM_ (infoThing exts init_cms) names }
   where
-    infoThing cms name
+    infoThing exts cms name
 	= do { stuff <- io (cmGetInfo cms name)
 	     ; io (putStrLn (showSDocForUser (cmGetPrintUnqual cms) $
-     		   vcat (intersperse (text "") (map showThing stuff)))) }
+     		   vcat (intersperse (text "") (map (showThing exts) stuff)))) }
 
-showThing :: GetInfoResult -> SDoc
-showThing  (wanted_str, (thing, fixity, src_loc, insts)) 
-    = vcat [ showWithLoc src_loc (showDecl want_name thing),
+showThing :: Bool -> GetInfoResult -> SDoc
+showThing exts (wanted_str, (thing, fixity, src_loc, insts)) 
+    = vcat [ showWithLoc src_loc (showDecl exts want_name thing),
 	     show_fixity fixity,
 	     vcat (map show_inst insts)]
   where
@@ -539,18 +537,18 @@ showWithLoc loc doc
 -- Now there is rather a lot of goop just to print declarations in a
 -- civilised way with "..." for the parts we are less interested in.
 
-showDecl :: (OccName -> Bool) -> IfaceDecl -> SDoc
-showDecl want_name (IfaceForeign {ifName = tc})
+showDecl :: Bool -> (OccName -> Bool) -> IfaceDecl -> SDoc
+showDecl exts want_name (IfaceForeign {ifName = tc})
   = ppr tc <+> ptext SLIT("is a foreign type")
 
-showDecl want_name (IfaceId {ifName = var, ifType = ty})
-  = ppr var <+> dcolon <+> ppr ty 
+showDecl exts want_name (IfaceId {ifName = var, ifType = ty})
+  = ppr var <+> dcolon <+> showType exts ty 
 
-showDecl want_name (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty})
+showDecl exts want_name (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty})
   = hang (ptext SLIT("type") <+> pprIfaceDeclHead [] tycon tyvars)
        2 (equals <+> ppr mono_ty)
 
-showDecl want_name (IfaceData {ifName = tycon, 
+showDecl exts want_name (IfaceData {ifName = tycon, 
 		     ifTyVars = tyvars, ifCons = condecls})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
        2 (add_bars (ppr_trim show_con cs))
@@ -597,15 +595,21 @@ showDecl want_name (IfaceData {ifName = tycon,
     ppr_str MarkedUnboxed   = ptext SLIT("!!")
     ppr_str NotMarkedStrict = empty
 
-showDecl want_name (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
+showDecl exts want_name (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
 		      ifFDs = fds, ifSigs = sigs})
   = hang (ptext SLIT("class") <+> pprIfaceDeclHead context clas tyvars
 		<+> pprFundeps fds <+> ptext SLIT("where"))
        2 (vcat (ppr_trim show_op sigs))
   where
     show_op (IfaceClassOp op dm ty) 
-	| want_name clas || want_name op = Just (ppr_bndr op <+> dcolon <+> ppr ty)
-	| otherwise			 = Nothing
+	| want_name clas || want_name op 
+	= Just (ppr_bndr op <+> dcolon <+> showType exts ty)
+	| otherwise
+	= Nothing
+
+showType :: Bool -> IfaceType -> SDoc
+showType True  ty = pprIfaceType ty -- -fglasgow-exts: print with the foralls
+showType False ty = ppr ty	    -- otherwise, print without the foralls
 
 ppr_trim :: (a -> Maybe SDoc) -> [a] -> [SDoc]
 ppr_trim show xs
@@ -692,13 +696,10 @@ undefineMacro macro_name = do
   io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
 
 
-loadModule :: [FilePath] -> GHCi SuccessFlag
+loadModule :: [FilePath] -> GHCi ()
 loadModule fs = timeIt (loadModule' fs)
 
-loadModule_ :: [FilePath] -> GHCi ()
-loadModule_ fs = do loadModule fs; return ()
-
-loadModule' :: [FilePath] -> GHCi SuccessFlag
+loadModule' :: [FilePath] -> GHCi ()
 loadModule' files = do
   state <- getGHCiState
 
@@ -720,7 +721,6 @@ loadModule' files = do
   setContextAfterLoad mods
   dflags <- getDynFlags
   modulesLoadedMsg ok mods dflags
-  return ok
 
 
 reloadModule :: String -> GHCi ()
@@ -812,8 +812,10 @@ browseModule m exports_only = do
 
   let unqual = cmGetPrintUnqual cms1 -- NOTE: cms1 with the new context
 
+  dflags <- getDynFlags
+  let exts = dopt Opt_GlasgowExts dflags
   io (putStrLn (showSDocForUser unqual (
-   	 vcat (map (showDecl (const True)) things)
+   	 vcat (map (showDecl exts (const True)) things)
       )))
 
 -----------------------------------------------------------------------------
