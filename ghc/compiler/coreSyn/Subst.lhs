@@ -56,6 +56,7 @@ import Id		( idType, idInfo, setIdInfo, setIdType,
 import IdInfo		( IdInfo, vanillaIdInfo,
 			  occInfo, isFragileOcc, setOccInfo, 
 			  specInfo, setSpecInfo, 
+			  setArityInfo, unknownArity,
 			  unfoldingInfo, setUnfoldingInfo,
 			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo,
                           lbvarInfo, LBVarInfo(..), setLBVarInfo, hasNoLBVarInfo
@@ -621,9 +622,13 @@ simplIdInfo :: Subst -> IdInfo -> IdInfo
   -- Used by the simplifier to compute new IdInfo for a let(rec) binder,
   -- subsequent to simplLetId having zapped its IdInfo
 simplIdInfo subst old_info
-  = case substIdInfo subst isFragileOcc old_info of 
+  = case substIdInfo subst isFragileOcc zapped_old_info of 
 	Just new_info -> new_info
 	Nothing       -> old_info
+  where
+    zapped_old_info = old_info `setArityInfo` unknownArity
+	-- Like unfolding, arity gets set later
+	-- Maybe we should do this in substIdInfo?
 \end{code}
 
 \begin{code}
