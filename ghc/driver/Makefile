@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 1997/03/20 22:31:03 sof Exp $
+# $Id: Makefile,v 1.5 1997/03/24 04:33:30 sof Exp $
 
 TOP=..
 CURRENT_DIR=ghc/driver
@@ -8,13 +8,12 @@ include $(TOP)/mk/boilerplate.mk
 #
 # The ways setup doesn't apply to the driver
 #
-WAYS=
+override WAYS=
 
 INSTALLING=0
 
 DYN_LOADABLE_BITS = \
 	ghc-asm.prl \
-	ghc-recomp.prl \
 	ghc-iface.prl \
 	ghc-consist.prl \
 	ghc-split.prl
@@ -46,7 +45,7 @@ SCRIPT_SUBST_VARS := \
   GHC_LIB_DIR GHC_RUNTIME_DIR GHC_UTILS_DIR GHC_INCLUDE_DIR \
   GHC_OPT_HILEV_ASM GhcWithNativeCodeGen LeadingUnderscore\
   GHC_UNLIT GHC_HSCPP GHC_HSC GHC_SYSMAN \
-  CP RM PERL CONTEXT_DIFF \
+  CP RM CONTEXT_DIFF \
   $(WAY_NAMES) $(WAY_OPTS)
 
 #
@@ -58,7 +57,7 @@ SCRIPT_SUBST_VARS := \
 ifeq "$(BIN_DIST)" "1"
 SCRIPT_PREFIX_FILES=prefix.txt
 else
-SCRIPT_SUBST_VARS += TOP_PWD INSTLIBDIR_GHC INSTDATADIR_GHC PERL
+SCRIPT_SUBST_VARS += libdir datadir bindir TOP_PWD
 endif
 
 all :: $(DYN_LOADABLE_BITS)
@@ -70,7 +69,7 @@ all :: $(DYN_LOADABLE_BITS)
 #
 # ToDo: allow different install name for driver?
 #
-INSTALL_PROGS += $(SCRIPT_PROG)
+INSTALL_SCRIPTS += $(SCRIPT_PROG)
 INSTALL_LIBS  += $(DYN_LOADABLE_BITS)
 
 #
@@ -108,7 +107,7 @@ install ::
 
 
 #
-# Option vars for the special ways
+# Option vars for the special ways (that the driver has special pleading for).
 #
 
 # Way p:

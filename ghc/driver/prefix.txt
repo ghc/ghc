@@ -1,12 +1,16 @@
 #
-# This is the driver script for the Glasgow Haskell Compiler.
+# This is the driver script for the Glasgow Haskell Compiler!
 #
 # To configure this script to run on your system, you have
 # to set the following three variables (if they have not already
 # been set above):
 #
-#$TOP_PWD='/local/fp/';
-#$INSTLIBDIR_GHC='/local/fp/bin/ghc-2.02';
-#$INSTDATADIR_GHC='/local/fp/lib/ghc-2.02/sparc-sun-sunos4';
-#$PERL='/usr/local/bin/perl';
+#$bindir='/usr/local/bin'; 
+#   -- where you have installed the binaries
+#$libdir='/local/fp/lib/sparc-sun-sunos4/ghc-2.02'; 
+#   -- where you have installed the prelude libraries for this release.
+#$datadir='/local/fp/share0/ghc-2.02';
+#   -- where you have installed the arch-independent miscellania (if any).
+#
+# We sincerly apologise for the gumpf that follows, please look away.
 #

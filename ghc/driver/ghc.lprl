@@ -103,7 +103,7 @@ PROJECTNAME PROJECTVERSION PROJECTPATCHLEVEL
 
 TOP_PWD
 
-INSTLIBDIR_GHC INSTDATADIR_GHC
+bindir libdir datadir
 
 CURRENT_DIR TMPDIR
 
@@ -129,41 +129,11 @@ select(STDERR); $| = 1; select(STDOUT); # no STDERR buffering, please.
 
 $TargetPlatform = $TARGETPLATFORM;
 
-#------------------------------------------------------------------------
-# If you are adjusting paths by hand for a binary GHC distribution,
-# de-commenting the line to set GLASGOW_HASKELL_ROOT should do.
-# Or you can leave it as is, and set the environment variable externally.
-#------------------------------------------------------------------------
-# $ENV{'GLASGOW_HASKELL_ROOT'} = '/some/absolute/path/name';
-
-if (! $ENV{'GLASGOW_HASKELL_ROOT'}) { # good -- death to environment variables
-    $TopPwd	    = ${TOP_PWD};
-    $InstLibDirGhc  = ${INSTLIBDIR_GHC};
-    $InstDataDirGhc = ${INSTDATADIR_GHC};
-} else {
-    $TopPwd = $ENV{'GLASGOW_HASKELL_ROOT'};
-
-    if (${INSTLIBDIR_GHC} =~ /.*(\/lib\/ghc\/\d\.\d\d\/[^-]+-[^-]+-[^-]+\/.*)/) {
-	$InstLibDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $1;
-    } else {
-	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $INSTLIBDIR_GHC.\n(Installation error)\n";
-	exit(1);
-    }
-
-    if (${INSTDATADIR_GHC} =~ /.*(\/lib\/ghc\/\d\.\d\d\/.*)/) {
-	$InstDataDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $2;
-    } else {
-	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $INSTDATADIR_GHC.\n(Installation error)\n";
-	exit(1);
-    }
-}
-
-if ( $INSTALLING ) {
-    $InstSysLibDir  = $InstDataDirGhc;
-    $InstSysLibDir  =~ s/\/ghc\//\/hslibs\//;
-} else {
-    $InstSysLibDir  = "$TopPwd/hslibs";
-}
+$TopPwd	        = "${TOP_PWD}";
+$InstBinDirGhc  = "${bindir}";
+$InstLibDirGhc  = "${libdir}";
+$InstDataDirGhc = "${datadir}";
+$InstSysLibDir  = ( $INSTALLING ) ? "${InstLibDirGhc}/hslibs" : "$TopPwd/hslibs";
 
 $Status  = 0; # just used for exit() status
 $Verbose = '';
@@ -427,7 +397,7 @@ require special handling.
 
 # where to look for interface files (system hi's, i.e., prelude and hslibs)
 @SysImport_dir	= ( $INSTALLING )
-		    ? ( "$InstDataDirGhc/imports" )
+		    ? ( "$InstLibDirGhc/imports" )
 		    : ( "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/required"
 		      , "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/ghc"
 		      , "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/glaExts"
@@ -459,7 +429,7 @@ $TopClosureFile # defaults to 1.2 one; will be mangled later
 
 # make depend for Haskell
 $MkDependHS
-	= ( $INSTALLING ) ? "$InstLibDirGhc/mkdependHS"
+	= ( $INSTALLING ) ? "$InstBinDirGhc/mkdependHS"
 			  : "$TopPwd/$CURRENT_DIR/$GHC_UTILS_DIR/mkdependHS/mkdependHS";
 # Fill in later
 @MkDependHS_flags = ( );
@@ -527,7 +497,8 @@ $PostprocessCcOutput = 0;
 $HaveNativeCodeGen = $GhcWithNativeCodeGen;
 $HscOut = '-C='; # '-C=' ==> .hc output; '-S=' ==> .s output; '-N=' ==> neither
 $HscOut = '-S='
-    if $HaveNativeCodeGen && $TargetPlatform =~ /^(i386|alpha|sparc)-/;
+    if $HaveNativeCodeGen && $TargetPlatform =~ /^(alpha|sparc)-/;
+# TEMP: disable x86  if $HaveNativeCodeGen && $TargetPlatform =~ /^(i386|alpha|sparc)-/;
 $ProduceHi   = '-hifile=';
 $HiOnStdout  = 0;
 $HiDiff_flag = '';
@@ -1256,7 +1227,7 @@ sub setupIncPaths {
       push (@Include_dir, "$TopPwd/${CURRENT_DIR}/${GHC_INCLUDE_DIR}");
   } else {
       push (@Include_dir, "$InstLibDirGhc/includes");
-      push (@Include_dir, "$InstDataDirGhc/includes");
+      push (@Include_dir, "$InstLibDirGhc/includes");
   }
 } # end of setupIncPaths
 \end{code}
@@ -1357,7 +1328,7 @@ if ($#Input_file < 0 && $#Link_file < 0) {
 
 Tell the world who we are, if they asked.
 \begin{code}
-print STDERR "${PROJECTNAME}, version ${PROJECTVERSION} ${PROJECTPATCHLEVEL}\n"
+print STDERR "${PROJECTNAME}, version ${PROJECTVERSION}, patchlevel ${PROJECTPATCHLEVEL}\n"
     if $Verbose;
 \end{code}
 
@@ -2515,7 +2486,7 @@ arg: while($_ = $Args[0]) {
     if (/^-\?$/ || /^--?help$/) { print $LongUsage; exit $Status; }
 
     #-----------version ----------------------------------------------------
-    /^--version$/   && do { print STDERR "${PROJECTNAME}, version ${PROJECTVERSION} ${PROJECTPATCHLEVEL}\n"; exit $Status; };
+    /^--version$/   && do { print STDERR "${PROJECTNAME}, version ${PROJECTVERSION}, patchlevel ${PROJECTPATCHLEVEL}\n"; exit $Status; };
 
     #---------- verbosity and such -----------------------------------------
     /^-v$/	    && do { $Verbose = '-v'; $Time = 'time'; next arg; };
@@ -2558,7 +2529,7 @@ arg: while($_ = $Args[0]) {
 	
     /^-c$/	    && do { $Do_lnkr = 0; next arg; };
     # stop after generating .o files
-	
+
     /^-link-chk$/    && do { $LinkChk = 1; next arg; };
     /^-no-link-chk$/ && do { $LinkChk = 0; next arg; };
     # don't do consistency-checking after a link
@@ -2733,7 +2704,7 @@ arg: while($_ = $Args[0]) {
 
 			    if ( ${INSTALLING} ) {
 				push(@SysLibrary_dir,
-					("$InstSysLibDir/$TargetPlatform"));
+					("$InstSysLibDir"));
 			    } else {
 				push(@SysLibrary_dir,
 					("$TopPwd/hslibs/$syslib"
