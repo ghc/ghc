@@ -481,7 +481,7 @@ primop-usage.hs-incl: prelude/primops.txt
 # ----------------------------------------------------------------------------
 #		Parsers/lexers
 
-SRC_HAPPY_OPTS += +RTS -K2m -H16m -RTS  $(GHC_HAPPY_OPTS)
+SRC_HAPPY_OPTS += +RTS -K2m -H16m -RTS
 
 #-----------------------------------------------------------------------------
 # 		Linking
