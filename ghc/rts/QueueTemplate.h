@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: QueueTemplate.h,v 1.5 1999/12/07 11:15:02 sewardj Exp $
+ * $Id: QueueTemplate.h,v 1.6 2000/04/14 15:08:14 sewardj Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -16,8 +16,8 @@
  *   static void freeQueue  ( Queue* q );
  *
  * $RCSfile: QueueTemplate.h,v $
- * $Revision: 1.5 $
- * $Date: 1999/12/07 11:15:02 $
+ * $Revision: 1.6 $
+ * $Date: 2000/04/14 15:08:14 $
  *
  * ------------------------------------------------------------------------*/
 
@@ -84,7 +84,7 @@ static void mycat2(insert,Queue)( Queue* q, Type x )
 }
 
 
-void mycat2(set,Queue)( Queue* q, nat i, Type x )
+static void mycat2(set,Queue)( Queue* q, nat i, Type x )
 {
     ASSERT(i < q->len);
     q->elems[i] = x;
