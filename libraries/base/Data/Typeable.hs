@@ -414,9 +414,28 @@ cache = unsafePerformIO $ do
 				ap_tbl = empty_ap_tbl })
 
 newKey :: IORef Key -> IO Key
+#ifdef __GLASGOW_HASKELL__
+newKey kloc = do i <- genSym; return (Key i)
+#else
 newKey kloc = do { k@(Key i) <- readIORef kloc ;
 		   writeIORef kloc (Key (i+1)) ;
 		   return k }
+#endif
+
+#ifdef __GLASGOW_HASKELL__
+-- In GHC we use the RTS's genSym function to get a new unique,
+-- because in GHCi we might have two copies of the Data.Typeable
+-- library running (one in the compiler and one in the running
+-- program), and we need to make sure they don't share any keys.  
+--
+-- This is really a hack.  A better solution would be to centralise the
+-- whole mutable state used by this module, i.e. both hashtables.  But
+-- the current solution solves the immediate problem, which is that
+-- dynamics generated in one world with one type were erroneously
+-- being recognised by the other world as having a different type.
+foreign import ccall unsafe "genSymZh"
+  genSym :: IO Int
+#endif
 
 mkTyConKey :: String -> Key
 mkTyConKey str 
