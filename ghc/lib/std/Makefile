@@ -44,7 +44,7 @@ HS_SRCS := $(HSC_HS) $(filter-out $(HSC_HS),$(HS_SRCS))
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
-SRC_HC_OPTS += -recomp -cpp -fvia-C -fglasgow-exts $(GhcLibHcOpts) $(PACKAGE)
+SRC_HC_OPTS += -cpp -fvia-C -fglasgow-exts $(GhcLibHcOpts) $(PACKAGE)
 
 ifdef USE_REPORT_PRELUDE
 SRC_HC_OPTS += -DUSE_REPORT_PRELUDE=1
