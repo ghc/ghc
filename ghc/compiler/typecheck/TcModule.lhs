@@ -33,7 +33,7 @@ import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import InstEnv	( InstInfo(..) )
+import InstEnv		( InstInfo(..) )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import TcTyDecls	( mkImplicitDataBinds )
@@ -86,10 +86,12 @@ typecheckModule
 	-> Module
 	-> PersistentCompilerState
 	-> HomeSymbolTable
+	-> HomeIfaceTable
+	-> PackageIfaceTable
 	-> RenamedHsModule
 	-> IO (Maybe (TcEnv, TcResults))
 
-typecheckModule dflags this_mod pcs hst (HsModule mod_name _ _ _ decls _ src_loc)
+typecheckModule dflags this_mod pcs hst hit pit (HsModule mod_name _ _ _ decls _ src_loc)
   = do env <- initTcEnv global_symbol_table
        (maybe_result, (errs,warns)) <- initTc dflags env src_loc tc_module
        printErrorsAndWarnings (errs,warns)
@@ -101,13 +103,21 @@ typecheckModule dflags this_mod pcs hst (HsModule mod_name _ _ _ decls _ src_loc
   where
     global_symbol_table = pcs_PST pcs `plusModuleEnv` hst
 
-    tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst this_mod decls unf_env)
+    tc_module = fixTc (\ ~(unf_env ,_) 
+		         -> tcModule pcs hst get_fixity this_mod decls unf_env)
+
+    get_fixity :: Name -> Maybe Fixity
+    get_fixity nm
+       = case lookupFixityEnv hit nm of
+            Just f  -> Just f
+            Nothing -> lookupFixityEnv pit nm
 \end{code}
 
 The internal monster:
 \begin{code}
 tcModule :: PersistentCompilerState
 	 -> HomeSymbolTable
+	 -> (Name -> Maybe Fixity)
 	 -> Module
 	 -> [RenamedHsDecl]
 	 -> TcEnv		-- The knot-tied environment
@@ -120,7 +130,7 @@ tcModule :: PersistentCompilerState
   -- unf_env is also used to get the pragama info
   -- for imported dfuns and default methods
 
-tcModule pcs hst this_mod decls unf_env
+tcModule pcs hst get_fixity this_mod decls unf_env
   = 		 -- Type-check the type and class decls
     tcTyAndClassDecls unf_env decls		`thenTc` \ env ->
     tcSetEnv env 				$
@@ -137,7 +147,7 @@ tcModule pcs hst this_mod decls unf_env
     in
     
     	-- Typecheck the instance decls, includes deriving
-    tcInstDecls1 pcs hst unf_env this_mod 
+    tcInstDecls1 pcs hst unf_env get_fixity this_mod 
 		 local_tycons decls		`thenTc` \ (pcs_with_insts, inst_env, inst_info, deriv_binds) ->
     tcSetInstEnv inst_env			$
     

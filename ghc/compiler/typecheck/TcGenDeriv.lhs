@@ -47,7 +47,6 @@ import Name		( getOccString, getOccName, getSrcLoc, occNameString,
 			  Name, NamedThing(..), 
 			  isDataSymOcc, isSymOcc
 			)
-import HscTypes		( GlobalSymbolTable, lookupFixityEnv )
 
 import PrelInfo		-- Lots of RdrNames
 import SrcLoc		( generatedSrcLoc, SrcLoc )
@@ -773,9 +772,9 @@ gen_Ix_binds tycon
 %************************************************************************
 
 \begin{code}
-gen_Read_binds :: GlobalSymbolTable -> TyCon -> RdrNameMonoBinds
+gen_Read_binds :: (Name -> Maybe Fixity) -> TyCon -> RdrNameMonoBinds
 
-gen_Read_binds gst tycon
+gen_Read_binds get_fixity tycon
   = reads_prec `AndMonoBinds` read_list
   where
     tycon_loc = getSrcLoc tycon
@@ -903,7 +902,7 @@ gen_Read_binds gst tycon
 						    then d_Expr 
 						    else HsVar (last bs_needed)] Boxed
 
-           [lp,rp] = getLRPrecs is_infix gst dc_nm
+           [lp,rp] = getLRPrecs is_infix get_fixity dc_nm
 
            quals
 	    | is_infix  = let (h:t) = field_quals in (h:con_qual:t)
@@ -916,7 +915,7 @@ gen_Read_binds gst tycon
 	    -}
 	   paren_prec_limit
 	     | not is_infix  = fromInt maxPrecedence
-	     | otherwise     = getFixity gst dc_nm
+	     | otherwise     = getFixity get_fixity dc_nm
 
 	   read_paren_arg   -- parens depend on precedence...
 	    | nullary_con  = false_Expr -- it's optional.
@@ -930,9 +929,9 @@ gen_Read_binds gst tycon
 %************************************************************************
 
 \begin{code}
-gen_Show_binds :: GlobalSymbolTable -> TyCon -> RdrNameMonoBinds
+gen_Show_binds :: (Name -> Maybe Fixity) -> TyCon -> RdrNameMonoBinds
 
-gen_Show_binds gst tycon
+gen_Show_binds get_fixity tycon
   = shows_prec `AndMonoBinds` show_list
   where
     tycon_loc = getSrcLoc tycon
@@ -1003,7 +1002,7 @@ gen_Show_binds gst tycon
              mk_showString_app str = HsApp (HsVar showString_RDR)
 					   (HsLit (mkHsString str))
 
-             prec_cons = getLRPrecs is_infix gst dc_nm
+             prec_cons = getLRPrecs is_infix get_fixity dc_nm
 
              real_show_thingies
 		| is_infix  = 
@@ -1029,20 +1028,20 @@ gen_Show_binds gst tycon
 	      -}  
 	     paren_prec_limit
 		| not is_infix = fromInt maxPrecedence + 1
-		| otherwise    = getFixity gst dc_nm + 1
+		| otherwise    = getFixity get_fixity dc_nm + 1
 
 \end{code}
 
 \begin{code}
-getLRPrecs :: Bool -> GlobalSymbolTable -> Name -> [Integer]
-getLRPrecs is_infix gst nm = [lp, rp]
+getLRPrecs :: Bool -> (Name -> Maybe Fixity) -> Name -> [Integer]
+getLRPrecs is_infix get_fixity nm = [lp, rp]
     where
      {-
 	Figuring out the fixities of the arguments to a constructor,
 	cf. Figures 16-18 in Haskell 1.1 report.
      -}
-     (con_left_assoc, con_right_assoc) = isLRAssoc gst nm
-     paren_con_prec = getFixity gst nm
+     (con_left_assoc, con_right_assoc) = isLRAssoc get_fixity nm
+     paren_con_prec = getFixity get_fixity nm
      maxPrec	    = fromInt maxPrecedence
 
      lp
@@ -1055,15 +1054,15 @@ getLRPrecs is_infix gst nm = [lp, rp]
       | con_right_assoc = paren_con_prec
       | otherwise       = paren_con_prec + 1
 		  
-getFixity :: GlobalSymbolTable -> Name -> Integer
-getFixity gst nm 
-   = case lookupFixityEnv gst nm of
+getFixity :: (Name -> Maybe Fixity) -> Name -> Integer
+getFixity get_fixity nm 
+   = case get_fixity nm of
         Just (Fixity x _) -> fromInt x
         other	          -> pprPanic "TcGenDeriv.getFixity" (ppr nm)
 
-isLRAssoc :: GlobalSymbolTable -> Name -> (Bool, Bool)
-isLRAssoc fixs_assoc nm =
-     case lookupFixityEnv fixs_assoc nm of
+isLRAssoc :: (Name -> Maybe Fixity) -> Name -> (Bool, Bool)
+isLRAssoc get_fixity nm =
+     case get_fixity nm of
        Just (Fixity _ InfixN) -> (False, False)
        Just (Fixity _ InfixR) -> (False, True)
        Just (Fixity _ InfixL) -> (True,  False)

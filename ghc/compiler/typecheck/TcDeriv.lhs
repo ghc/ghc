@@ -18,7 +18,7 @@ import CmdLineOpts	( DynFlag(..), DynFlags )
 import TcMonad
 import TcEnv		( TcEnv, tcSetInstEnv, getTcGST, newDFunName )
 import TcGenDeriv	-- Deriv stuff
-import InstEnv	( InstInfo(..), InstEnv, 
+import InstEnv		( InstInfo(..), InstEnv, 
 			  pprInstInfo, simpleDFunClassTyCon, extendInstEnv )
 import TcSimplify	( tcSimplifyThetas )
 
@@ -188,11 +188,12 @@ context to the instance decl.  The "offending classes" are
 tcDeriving  :: PersistentRenamerState
 	    -> Module			-- name of module under scrutiny
 	    -> InstEnv			-- What we already know about instances
+	    -> (Name -> Maybe Fixity)	-- used in deriving Show and Read
 	    -> [TyCon]			-- "local_tycons" ???
 	    -> TcM ([InstInfo],		-- The generated "instance decls".
 		    RenamedHsBinds)	-- Extra generated bindings
 
-tcDeriving prs mod inst_env_in local_tycons
+tcDeriving prs mod inst_env_in get_fixity local_tycons
   = recoverTc (returnTc ([], EmptyBinds)) $
 
   	-- Fish the "deriving"-related information out of the TcEnv
@@ -220,7 +221,7 @@ tcDeriving prs mod inst_env_in local_tycons
     let
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
-	method_binds_s   = map (gen_bind (getTcGST env)) new_dfuns
+	method_binds_s   = map (gen_bind get_fixity) new_dfuns
 	mbinders	 = collectLocatedMonoBinders extra_mbinds
 	
 	-- Rename to get RenamedBinds.
@@ -528,11 +529,11 @@ the renamer.  What a great hack!
 -- Generate the method bindings for the required instance
 -- (paired with class name, as we need that when generating dict
 --  names.)
-gen_bind :: GlobalSymbolTable -> DFunId -> RdrNameMonoBinds
-gen_bind fixities dfun
+gen_bind :: (Name -> Maybe Fixity) -> DFunId -> RdrNameMonoBinds
+gen_bind get_fixity dfun
   | not (isLocallyDefined tycon) = EmptyMonoBinds
-  | clas `hasKey` showClassKey   = gen_Show_binds fixities tycon
-  | clas `hasKey` readClassKey   = gen_Read_binds fixities tycon
+  | clas `hasKey` showClassKey   = gen_Show_binds get_fixity tycon
+  | clas `hasKey` readClassKey   = gen_Read_binds get_fixity tycon
   | otherwise
   = assoc "gen_bind:bad derived class"
 	   [(eqClassKey,      gen_Eq_binds)

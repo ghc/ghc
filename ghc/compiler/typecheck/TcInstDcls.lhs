@@ -33,7 +33,7 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
 			  tcAddImportedIdInfo, tcInstId, tcLookupClass,
 			  newDFunName, tcExtendTyVarEnv
 			)
-import InstEnv	( InstInfo(..), InstEnv, pprInstInfo, classDataCon, 
+import InstEnv		( InstInfo(..), InstEnv, pprInstInfo, classDataCon, 
  			  simpleInstInfoTyCon, simpleInstInfoTy, isLocalInst,
 			  extendInstEnv )
 import TcMonoType	( tcTyVars, tcHsSigType, tcHsType, kcHsSigType )
@@ -170,12 +170,13 @@ Gather up the instance declarations from their various sources
 tcInstDecls1 :: PersistentCompilerState
 	     -> HomeSymbolTable		-- Contains instances
 	     -> TcEnv 			-- Contains IdInfo for dfun ids
+	     -> (Name -> Maybe Fixity)	-- for deriving Show and Read
 	     -> Module			-- Module for deriving
 	     -> [TyCon]
 	     -> [RenamedHsDecl]
 	     -> TcM (PersistentCompilerState, InstEnv, [InstInfo], RenamedHsBinds)
 
-tcInstDecls1 pcs hst unf_env mod local_tycons decls
+tcInstDecls1 pcs hst unf_env get_fixity mod local_tycons decls
   = let
 	inst_decls = [inst_decl | InstD inst_decl <- decls]
 	clas_decls = [clas_decl | TyClD clas_decl <- decls, isClassDecl clas_decl]
@@ -211,7 +212,7 @@ tcInstDecls1 pcs hst unf_env mod local_tycons decls
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hecne inst_env4
-    tcDeriving (pcs_PRS pcs) mod inst_env4 local_tycons
+    tcDeriving (pcs_PRS pcs) mod inst_env4 get_fixity local_tycons
 					`thenTc` \ (deriv_inst_info, deriv_binds) ->
     addInstInfos inst_env4 deriv_inst_info			
 					`thenNF_Tc` \ final_inst_env ->

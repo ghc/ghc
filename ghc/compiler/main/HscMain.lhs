@@ -135,8 +135,10 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
 	--------------------------  Typechecking ----------------
     show_pass "TypeCheck" 				>>
     _scc_     "TypeCheck"
-    typecheckModule tc_uniqs rn_name_supply
-		    fixity_env rn_mod	        >>= \ maybe_tc_stuff ->
+    typecheckModule dflags mod pcs hst hit pit rn_mod
+    --                tc_uniqs rn_name_supply
+    --		    fixity_env rn_mod	        
+						>>= \ maybe_tc_stuff ->
     case maybe_tc_stuff of {
 	Nothing -> ghcExit 1;	-- Type checker failed
 
