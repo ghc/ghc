@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.17 2000/08/25 13:12:07 simonmar Exp $
+ * $Id: Itimer.c,v 1.18 2000/09/11 15:04:08 rrt Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -59,8 +59,7 @@ handle_tick(int unused STG_UNUSED);
 /* -----------------------------------------------------------------------------
    Tick handler
 
-   We use the ticker for two things: supporting threadDelay, and time
-   profiling.
+   We use the ticker for time profiling.
 
    SMP note: this signal could be delivered to *any* thread.  We have
    to ensure that it doesn't matter which thread actually runs the
@@ -243,6 +242,7 @@ unblock_vtalrm_signal(void)
 /* gettimeofday() takes around 1us on our 500MHz PIII.  Since we're
  * only calling it 50 times/s, it shouldn't have any great impact.
  */
+#if !defined(mingw32_TARGET_OS)
 unsigned int 
 getourtimeofday(void)
 {
@@ -251,3 +251,10 @@ getourtimeofday(void)
   return (tv.tv_sec * TICK_FREQUENCY +
 	  tv.tv_usec * TICK_FREQUENCY / 1000000);
 }
+#else
+unsigned int
+getourtimeofday(void)
+{
+  return (unsigned int)GetTickCount() * 1000;
+}
+#endif
