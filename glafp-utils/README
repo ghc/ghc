@@ -22,3 +22,6 @@ project-specific bits, try <project>/utils/<blah>.)
 
  sgmlverb	pre-processor for SGML that does essentially the same thing
 		as verbatim.
+
+ docbook	scripts to process DocBook files stolen from Cygnus DocBook
+ 		tools.
