@@ -652,7 +652,7 @@ openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =
   catch
     (openFile' fp m True)
-    (\e -> ioError (addFilePathToIOError "openFileEx" fp e))
+    (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
 
 openFile' filepath mode binary =
   withCString filepath $ \ f ->
