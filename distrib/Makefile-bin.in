@@ -44,10 +44,6 @@
 #  * psdir
 #     where to install the Postscript documentation files.
 #
-# Installing the documentation is not done as part of the `install' rule, but
-# via `install-docs' (or if you want to be selective: `install-html', `install-dvi'
-# and `install-info').
-#
 # For more complete instructions, consult the INSTALL file
 # that came with the bundle, and/or consult the installation
 # documentation in one of the document directories.
@@ -66,7 +62,7 @@ prefix      = @prefix@
 exec_prefix = @exec_prefix@
 
 # default
-htmldir     = $(datadir)
+htmldir     = $(datadir)/html
 psdir       = $(datadir)
 pdfdir      = $(datadir)
 
@@ -194,8 +190,12 @@ denounce:
 	@echo
 	@echo =======================================================================
 	@echo Installation of $(package)-$(version) was successful.
+	@echo
 	@echo To use, add $(bindir) to your PATH.
-	@if test -d html ; then \
+	@echo
+	@if test -f share/html/index.html; then \
+	   echo For documentation, see $(htmldir)/index.html ; \
+	elif test -d share/html ; then \
 	   echo Docs can be found in $(htmldir). ; \
 	else \
 	   echo "Warning: this binary distribution does NOT contain documentation!" ; \
@@ -252,8 +252,8 @@ show-install-setup:
 .PHONY: show-install-setup install-docs install-dirs-docs
 
 install-docs : install-dirs-docs
-	if test -d html ; then $(CP) -r html/* $(htmldir) ; fi
-	if test -f ps/*.ps ; then $(CP) ps/*.ps $(psdir) ; fi
+	if test -d share/html ; then $(CP) -r share/html/* $(htmldir) ; fi
+	if test -f share/*.ps ; then $(CP) share/*.ps $(psdir) ; fi
 
 install-dirs-docs:
 	$(INSTALL_DIR) $(htmldir) 
