@@ -4,6 +4,7 @@
 \section[PosixIO]{Haskell 1.3 POSIX Input/Output Primitives}
 
 \begin{code}
+{-# OPTIONS -#include "../std/cbits/stgio.h" #-}
 module PosixIO (
     FdOption(..),
     FileLock,
@@ -109,14 +110,17 @@ fdToHandle fd@(FD# fd#) =
 	else
 	  ("r",ReadHandle)
       in
-      _ccall_ fdopen fd ft >>= \ file_struct@(A# ptr#) ->
+      _ccall_ openFd fd ft >>= \ file_struct@(A# ptr#) ->
       if file_struct /= (``NULL''::Addr) then
 	 {-
 	   A distinction is made here between std{Input,Output,Error} Fds
 	   and all others. The standard descriptors have a finaliser
 	   that will not close the underlying fd, the others have one
-	   that will. Or rather, the closing of the standard descriptors is
-	   delayed until the process exits.
+	   that will. 
+
+	   Delaying the closing of the standard descriptors until the process
+	   exits is necessary since the RTS is likely to require these after
+	   (or as a result of) program termination.
 	 -}
 #ifndef __PARALLEL_HASKELL__
 	 (if fd == stdInput || fd == stdOutput || fd == stdError then
