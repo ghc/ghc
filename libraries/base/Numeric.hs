@@ -58,6 +58,7 @@ import qualified Text.Read.Lex as L
 #endif
 
 #ifdef __HUGS__
+import PrelImpl
 import Hugs.Numeric
 #endif
 

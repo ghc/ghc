@@ -51,6 +51,7 @@ import Foreign.Ptr
 #endif
 
 #ifdef __HUGS__
+import PrelImpl
 import Hugs.Storable
 #endif
 
