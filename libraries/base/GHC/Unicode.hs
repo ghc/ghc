@@ -195,6 +195,7 @@ isAlphaNum              :: Char -> Bool
 
 -- | Selects ASCII digits, i.e. @\'0\'@..@\'9\'@.
 isDigit                 :: Char -> Bool
+isDigit c		=  c >= '0' && c <= '9'
 
 -- | Selects ASCII octal digits, i.e. @\'0\'@..@\'7\'@.
 isOctDigit              :: Char -> Bool
@@ -216,6 +217,11 @@ toUpper                 :: Char -> Char
 -- equivalent is transformed.
 toLower                 :: Char -> Char
 
+-- | Convert a letter to the corresponding title-case letter, leaving any
+-- other character unchanged.  Any Unicode letter which has a lower-case
+-- equivalent is transformed.
+toTitle                 :: Char -> Char
+
 -- -----------------------------------------------------------------------------
 -- Implementation with the supplied auto-generated Unicode character properties
 -- table (default)
@@ -225,8 +231,8 @@ toLower                 :: Char -> Char
 -- Regardless of the O/S and Library, use the functions contained in WCsubst.c
 
 type WInt = HTYPE_WINT_T
+type CInt = HTYPE_INT
 
-isDigit    c = iswdigit (fromIntegral (ord c)) /= 0
 isAlpha    c = iswalpha (fromIntegral (ord c)) /= 0
 isAlphaNum c = iswalnum (fromIntegral (ord c)) /= 0
 --isSpace    c = iswspace (fromIntegral (ord c)) /= 0
@@ -295,7 +301,6 @@ isLower c		=  c >= 'a' && c <= 'z' ||
                            c >= '\xF8' && c <= '\xFF'
 
 isAlpha c		=  isLower c || isUpper c
-isDigit c		=  c >= '0' && c <= '9'
 isAlphaNum c		=  isAlpha c || isDigit c
 
 -- Case-changing operations

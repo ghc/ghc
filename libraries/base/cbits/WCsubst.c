@@ -3070,7 +3070,6 @@ unipred_s(u_iswspace,GENCAT_ZS)
 unipred(u_iswupper,(GENCAT_LU|GENCAT_LT))
 unipred(u_iswlower,GENCAT_LL)
 unipred(u_iswalpha,(GENCAT_LL|GENCAT_LU|GENCAT_LT|GENCAT_LM|GENCAT_LO))
-unipred(u_iswdigit,GENCAT_ND)
 
 unipred(u_iswalnum,(GENCAT_LT|GENCAT_LU|GENCAT_LL|GENCAT_LM|GENCAT_LO|
 		    GENCAT_MC|GENCAT_ME|GENCAT_MN|

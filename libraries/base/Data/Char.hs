@@ -23,14 +23,16 @@ module Data.Char
     -- | Unicode characters are divided into letters, numbers, marks,
     -- punctuation, symbols, separators (including spaces) and others
     -- (including control characters).
-    -- The full set of Unicode character attributes is not accessible
-    -- in this library.
     , isAscii, isLatin1, isControl, isSpace
     , isLower, isUpper,  isAlpha,   isAlphaNum, isPrint
-    , isDigit, isOctDigit, isHexDigit  -- :: Char -> Bool
+    , isDigit, isOctDigit, isHexDigit
+    , isAsciiUpper, isAsciiLower
+    , isLetter, isMark, isNumber, isPunctuation, isSymbol, isSeparator
+
+    , GeneralCategory(..), generalCategory
 
     -- * Case conversion
-    , toUpper, toLower  -- :: Char -> Char
+    , toUpper, toLower, toTitle  -- :: Char -> Char
 
     -- * Single digit characters
     , digitToInt        -- :: Char -> Int
