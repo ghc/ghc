@@ -19,6 +19,7 @@ module Foreign.ForeignPtr
         ( 
 	-- * Finalised data pointers
 	  ForeignPtr
+	, FinalizerPtr
         , newForeignPtr
         , addForeignPtrFinalizer
 	, withForeignPtr

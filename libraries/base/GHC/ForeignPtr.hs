@@ -16,6 +16,7 @@
 module GHC.ForeignPtr
   (
 	ForeignPtr(..),
+	FinalizerPtr,
 	newForeignPtr,
 	mallocForeignPtr,
 	mallocForeignPtrBytes,
@@ -71,15 +72,20 @@ instance Show (ForeignPtr a) where
 #include "Dynamic.h"
 INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 
-newForeignPtr :: Ptr a -> FunPtr (Ptr a -> IO ()) -> IO (ForeignPtr a)
+-- |A Finaliser is represented as a pointer to a foreign function that, at
+-- finalisation time, gets as an argument a plain pointer variant of the
+-- foreign pointer that the finalizer is associated with.
+-- 
+type FinalizerPtr a = FunPtr (Ptr a -> IO ())
+
+newForeignPtr :: Ptr a -> FinalizerPtr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign object by
--- associating a finaliser - a foreign function given by the @FunPtr@
--- - with the reference.  The finaliser will be executed after the
--- last reference to the foreign object is dropped.  Note that there
--- is no guarantee on how soon the finaliser is executed after the
--- last reference was dropped; this depends on the details of the
--- Haskell storage manager. The only guarantee is that the finaliser
--- runs before the program terminates.
+-- associating a finaliser with the reference.  The finaliser will be executed
+-- after the last reference to the foreign object is dropped.  Note that there
+-- is no guarantee on how soon the finaliser is executed after the last
+-- reference was dropped; this depends on the details of the Haskell storage
+-- manager. The only guarantee is that the finaliser runs before the program
+-- terminates.
 newForeignPtr p finalizer
   = do fObj <- mkForeignPtr p
        addForeignPtrFinalizer fObj finalizer
@@ -134,7 +140,7 @@ mallocForeignPtrBytes (I# size) = do
        (# s, MallocPtr mbarr# r #)
      }
 
-addForeignPtrFinalizer :: ForeignPtr a -> FunPtr (Ptr a -> IO ()) -> IO ()
+addForeignPtrFinalizer :: ForeignPtr a -> FinalizerPtr a -> IO ()
 -- ^This function adds a finaliser to the given foreign object.  The
 -- finalizer will run /before/ all other finalizers for the same
 -- object which have already been registered.
@@ -171,7 +177,7 @@ addForeignPtrConcFinalizer f@(MallocPtr fo r) finalizer = do
      else return ()
 
 foreign import ccall "dynamic" 
-  mkFinalizer :: FunPtr (Ptr a -> IO ()) -> Ptr a -> IO ()
+  mkFinalizer :: FinalizerPtr a -> Ptr a -> IO ()
 
 foreignPtrFinalizer :: IORef [IO ()] -> Ptr a -> IO ()
 foreignPtrFinalizer r p = do

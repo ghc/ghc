@@ -25,11 +25,12 @@ module Foreign.Marshal.Alloc (
   reallocBytes, -- ::		    Ptr a -> Int -> IO (Ptr a)
 
   free,         -- :: Ptr a -> IO ()
-  finalizerFree -- :: FunPtr (Ptr a -> IO ())
+  finalizerFree -- :: FinalizerPtr a
 ) where
 
 import Data.Maybe
 import Foreign.Ptr	 	( Ptr, nullPtr, FunPtr )
+import Foreign.ForeignPtr	( FinalizerPtr )
 import Foreign.C.Types	 	( CSize )
 import Foreign.Storable  	( Storable(sizeOf) )
 
@@ -150,5 +151,4 @@ foreign import ccall unsafe "stdlib.h free"    _free    :: Ptr a -> IO ()
 
 -- | A pointer to a foreign function equivalent to 'free', which may be used
 -- as a finalizer for storage allocated with 'malloc' or 'mallocBytes'.
-foreign import ccall unsafe "stdlib.h &free"
-			finalizerFree :: FunPtr (Ptr a -> IO ())
+foreign import ccall unsafe "stdlib.h &free" finalizerFree :: FinalizerPtr a
