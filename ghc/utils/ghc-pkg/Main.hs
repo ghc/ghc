@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.34 2003/05/30 13:32:20 simonmar Exp $
+-- $Id: Main.hs,v 1.35 2003/08/17 01:36:54 sof Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -382,7 +382,7 @@ expandEnvVars pkg force = do
 	   (nm,_:remainder) -> do
 	      nm'  <- lookupEnvVar nm
 	      str' <- expandString remainder
-	      return (nm' ++ str')
+	      return (xs ++ nm' ++ str')
 	   _ -> return str -- no closing '}'
        _ -> return str	   
 
