@@ -556,18 +556,16 @@ FPTOOLS_HAVE_GCC
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
 
-dnl ** does the C compiler support the following options?
-case $TargetOS_CPP in
-mingw32)  
-	  FPTOOLS_CC_FLAG(-mno-cygwin,CC_SUPPORTS_MNO_CYGWIN)
+dnl ** Without optimization some INLINE trickery fails for GHCi
+SRC_CC_OPTS="-O"
 
-	  EXTRA_CC_OPTS="$CC_SUPPORTS_MNO_CYGWIN"
-	  SRC_CC_OPTS="-O $EXTRA_CC_OPTS"
-	  CPPFLAGS="$EXTRA_CC_OPTS $CPPFLAGS"
-	  AC_SUBST(SRC_CC_OPTS)
-	  ;;
-*)    ;;
-esac
+dnl ** Try to add -mno-cygwin to the C compiler options for mingw32 targets
+if test x"$TargetOS_CPP" = x"mingw32"; then
+  FPTOOLS_CC_FLAG(-mno-cygwin,CC_SUPPORTS_MNO_CYGWIN)
+  SRC_CC_OPTS="$CC_SUPPORTS_MNO_CYGWIN $SRC_CC_OPTS"
+  CPPFLAGS="$CC_SUPPORTS_MNO_CYGWIN $CPPFLAGS"
+fi
+AC_SUBST(SRC_CC_OPTS)
 
 dnl ** figure out how to do context diffs
 FPTOOLS_PROG_DIFF
