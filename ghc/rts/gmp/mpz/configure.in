@@ -3,7 +3,6 @@
 # this directory.  For more information, look at ../configure.
 AC_INIT(Makefile.in)
 
-AC_CONFIG_SUBDIRS(tests)
 srctrigger=add_ui.c
 srcname="GNU Multi-Precision library/mpz"
 

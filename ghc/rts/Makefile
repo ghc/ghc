@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.26 2000/05/15 12:53:39 rrt Exp $
+# $Id: Makefile,v 1.27 2000/06/19 12:09:22 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -130,7 +130,6 @@ boot ::
 	if [ ! -f gmp/configure ] ; then ( cd gmp && autoconf ); fi;
 	if [ ! -f gmp/mpn/configure ] ; then ( cd gmp/mpn && autoconf ); fi;
 	if [ ! -f gmp/mpz/configure ] ; then ( cd gmp/mpz && autoconf ); fi;
-	if [ ! -f gmp/mpz/tests/configure ] ; then ( cd gmp/mpz/tests && autoconf ); fi;
 	cd gmp && ./configure --target=$(HOSTPLATFORM)
 # Slight cheatage here to past host as target, but x-compilation isn't supported by ghc.
 

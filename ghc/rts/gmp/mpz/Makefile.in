@@ -77,10 +77,9 @@ libmpz.a: Makefile $(MPZ_OBJS)
 
 clean mostlyclean:
 	rm -f *.o libmpz.a
-	-cd tests; $(MAKE) $@
+
 distclean maintainer-clean: clean
 	rm -f Makefile config.status
-	-cd tests; $(MAKE) $@
 
 Makefile: $(srcdir)/Makefile.in
 	$(SHELL) ./config.status
