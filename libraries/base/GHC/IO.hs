@@ -33,10 +33,10 @@ import Foreign.C
 import System.IO.Error
 import Data.Maybe
 import Control.Monad
+import System.Posix.Internals
 
 import GHC.Enum
 import GHC.Base
-import GHC.Posix
 import GHC.IOBase
 import GHC.Handle	-- much of the real stuff is in here
 import GHC.Real

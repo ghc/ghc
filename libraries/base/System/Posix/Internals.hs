@@ -1,8 +1,9 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -----------------------------------------------------------------------------
+-- #hide
 -- |
--- Module      :  GHC.Posix
+-- Module      :  System.Posix.Internals
 -- Copyright   :  (c) The University of Glasgow, 1992-2002
 -- License     :  see libraries/base/LICENSE
 -- 
@@ -18,7 +19,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Posix where
+module System.Posix.Internals where
 
 #include "config.h"
 
@@ -31,10 +32,18 @@ import Foreign.C
 import Data.Bits
 import Data.Maybe
 
+#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Num
 import GHC.Real
 import GHC.IOBase
+#else
+import System.IO
+#endif
+
+#ifdef __HUGS__
+import Hugs.Prelude (IOException(..), IOErrorType(..))
+#endif
 
 -- ---------------------------------------------------------------------------
 -- Types
@@ -53,6 +62,10 @@ type CTm	= ()
 type CTms	= ()
 type CUtimbuf   = ()
 type CUtsname   = ()
+
+#ifndef __GLASGOW_HASKELL__
+type FD = Int
+#endif
 
 -- ---------------------------------------------------------------------------
 -- stat()-related stuff
@@ -96,7 +109,7 @@ statGetType p_stat = do
         | s_isfifo c_mode || s_issock c_mode || s_ischr  c_mode
 			  	-> return Stream
 	| s_isreg c_mode	-> return RegularFile
-	| otherwise		-> ioException ioe_unknownfiletype
+	| otherwise		-> ioError ioe_unknownfiletype
     
 
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
@@ -120,7 +133,7 @@ closeFd isStream fd
   | isStream  = c_closesocket fd
   | otherwise = c_close fd
 
-foreign import stdcall unsafe "closesocket"
+foreign import stdcall unsafe "HsBase.h closesocket"
    c_closesocket :: CInt -> IO CInt
 #endif
 
@@ -252,13 +265,13 @@ getEcho fd = do
    then ioException (ioe_unk_error "getEcho" "failed to get echoing")
    else return (r == 1)
 
-foreign import ccall unsafe "consUtils.h set_console_buffering__"
+foreign import ccall unsafe "HsBase.h consUtils.h set_console_buffering__"
    set_console_buffering :: CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "consUtils.h set_console_echo__"
+foreign import ccall unsafe "HsBase.h consUtils.h set_console_echo__"
    set_console_echo :: CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "consUtils.h get_console_echo__"
+foreign import ccall unsafe "HsBase.h consUtils.h get_console_echo__"
    get_console_echo :: CInt -> IO CInt
 
 #endif
@@ -285,134 +298,134 @@ setNonBlockingFD fd = return ()
 -- -----------------------------------------------------------------------------
 -- foreign imports
 
-foreign import ccall unsafe "access"
+foreign import ccall unsafe "HsBase.h access"
    c_access :: CString -> CMode -> IO CInt
 
-foreign import ccall unsafe "chmod"
+foreign import ccall unsafe "HsBase.h chmod"
    c_chmod :: CString -> CMode -> IO CInt
 
-foreign import ccall unsafe "chdir"
+foreign import ccall unsafe "HsBase.h chdir"
    c_chdir :: CString -> IO CInt
 
-foreign import ccall unsafe "close"
+foreign import ccall unsafe "HsBase.h close"
    c_close :: CInt -> IO CInt
 
-foreign import ccall unsafe "closedir" 
+foreign import ccall unsafe "HsBase.h closedir" 
    c_closedir :: Ptr CDir -> IO CInt
 
-foreign import ccall unsafe "creat"
+foreign import ccall unsafe "HsBase.h creat"
    c_creat :: CString -> CMode -> IO CInt
 
-foreign import ccall unsafe "dup"
+foreign import ccall unsafe "HsBase.h dup"
    c_dup :: CInt -> IO CInt
 
-foreign import ccall unsafe "dup2"
+foreign import ccall unsafe "HsBase.h dup2"
    c_dup2 :: CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "fstat"
+foreign import ccall unsafe "HsBase.h fstat"
    c_fstat :: CInt -> Ptr CStat -> IO CInt
 
-foreign import ccall unsafe "getcwd"
+foreign import ccall unsafe "HsBase.h getcwd"
    c_getcwd   :: Ptr CChar -> CInt -> IO (Ptr CChar)
 
-foreign import ccall unsafe "isatty"
+foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
 
-foreign import ccall unsafe "lseek"
+foreign import ccall unsafe "HsBase.h lseek"
    c_lseek :: CInt -> COff -> CInt -> IO COff
 
-foreign import ccall unsafe "__hscore_lstat"
+foreign import ccall unsafe "HsBase.h __hscore_lstat"
    lstat :: CString -> Ptr CStat -> IO CInt
 
-foreign import ccall unsafe "open"
+foreign import ccall unsafe "HsBase.h open"
    c_open :: CString -> CInt -> CMode -> IO CInt
 
-foreign import ccall unsafe "opendir" 
+foreign import ccall unsafe "HsBase.h opendir" 
    c_opendir :: CString  -> IO (Ptr CDir)
 
-foreign import ccall unsafe "__hscore_mkdir"
+foreign import ccall unsafe "HsBase.h __hscore_mkdir"
    mkdir :: CString -> CInt -> IO CInt
 
-foreign import ccall unsafe "read" 
+foreign import ccall unsafe "HsBase.h read" 
    c_read :: CInt -> Ptr CChar -> CSize -> IO CSsize
 
-foreign import ccall unsafe "readdir" 
+foreign import ccall unsafe "HsBase.h readdir" 
    c_readdir :: Ptr CDir -> IO (Ptr CDirent)
 
-foreign import ccall unsafe "rename"
+foreign import ccall unsafe "HsBase.h rename"
    c_rename :: CString -> CString -> IO CInt
 		     
-foreign import ccall unsafe "rewinddir"
+foreign import ccall unsafe "HsBase.h rewinddir"
    c_rewinddir :: Ptr CDir -> IO ()
 
-foreign import ccall unsafe "rmdir"
+foreign import ccall unsafe "HsBase.h rmdir"
    c_rmdir :: CString -> IO CInt
 
-foreign import ccall unsafe "stat"
+foreign import ccall unsafe "HsBase.h stat"
    c_stat :: CString -> Ptr CStat -> IO CInt
 
-foreign import ccall unsafe "umask"
+foreign import ccall unsafe "HsBase.h umask"
    c_umask :: CMode -> IO CMode
 
-foreign import ccall unsafe "write" 
+foreign import ccall unsafe "HsBase.h write" 
    c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
 
-foreign import ccall unsafe "unlink"
+foreign import ccall unsafe "HsBase.h unlink"
    c_unlink :: CString -> IO CInt
 
 #ifndef mingw32_TARGET_OS
-foreign import ccall unsafe "fcntl"
+foreign import ccall unsafe "HsBase.h fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "fcntl"
+foreign import ccall unsafe "HsBase.h fcntl"
    c_fcntl_write :: CInt -> CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "fcntl"
+foreign import ccall unsafe "HsBase.h fcntl"
    c_fcntl_lock  :: CInt -> CInt -> Ptr CFLock -> IO CInt
 
-foreign import ccall unsafe "fork"
+foreign import ccall unsafe "HsBase.h fork"
    c_fork :: IO CPid 
 
-foreign import ccall unsafe "getpid"
+foreign import ccall unsafe "HsBase.h getpid"
    c_getpid :: IO CPid
 
-foreign import ccall unsafe "fpathconf"
+foreign import ccall unsafe "HsBase.h fpathconf"
    c_fpathconf :: CInt -> CInt -> IO CLong
 
-foreign import ccall unsafe "link"
+foreign import ccall unsafe "HsBase.h link"
    c_link :: CString -> CString -> IO CInt
 
-foreign import ccall unsafe "mkfifo"
+foreign import ccall unsafe "HsBase.h mkfifo"
    c_mkfifo :: CString -> CMode -> IO CInt
 
-foreign import ccall unsafe "pathconf"
+foreign import ccall unsafe "HsBase.h pathconf"
    c_pathconf :: CString -> CInt -> IO CLong
 
-foreign import ccall unsafe "pipe"
+foreign import ccall unsafe "HsBase.h pipe"
    c_pipe :: Ptr CInt -> IO CInt
 
-foreign import ccall unsafe "__hscore_sigemptyset"
+foreign import ccall unsafe "HsBase.h __hscore_sigemptyset"
    c_sigemptyset :: Ptr CSigset -> IO CInt
 
-foreign import ccall unsafe "__hscore_sigaddset"
+foreign import ccall unsafe "HsBase.h __hscore_sigaddset"
    c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
 
-foreign import ccall unsafe "sigprocmask"
+foreign import ccall unsafe "HsBase.h sigprocmask"
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
 
-foreign import ccall unsafe "tcgetattr"
+foreign import ccall unsafe "HsBase.h tcgetattr"
    c_tcgetattr :: CInt -> Ptr CTermios -> IO CInt
 
-foreign import ccall unsafe "tcsetattr"
+foreign import ccall unsafe "HsBase.h tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
 
-foreign import ccall unsafe "utime"
+foreign import ccall unsafe "HsBase.h utime"
    c_utime :: CString -> Ptr CUtimbuf -> IO CMode
 
-foreign import ccall unsafe "waitpid"
+foreign import ccall unsafe "HsBase.h waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
 #else
-foreign import ccall unsafe "_setmode"
+foreign import ccall unsafe "HsBase.h _setmode"
    c__setmode :: CInt -> CInt -> IO CInt
 
 --   /* Set "stdin" to have binary mode: */
@@ -424,52 +437,52 @@ foreign import ccall unsafe "_setmode"
 #endif
 
 -- POSIX flags only:
-foreign import ccall unsafe "__hscore_o_rdonly" o_RDONLY :: CInt
-foreign import ccall unsafe "__hscore_o_wronly" o_WRONLY :: CInt
-foreign import ccall unsafe "__hscore_o_rdwr"   o_RDWR   :: CInt
-foreign import ccall unsafe "__hscore_o_append" o_APPEND :: CInt
-foreign import ccall unsafe "__hscore_o_creat"  o_CREAT  :: CInt
-foreign import ccall unsafe "__hscore_o_excl"   o_EXCL   :: CInt
-foreign import ccall unsafe "__hscore_o_trunc"  o_TRUNC  :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_o_rdonly" o_RDONLY :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_o_wronly" o_WRONLY :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_o_rdwr"   o_RDWR   :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_o_append" o_APPEND :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_o_creat"  o_CREAT  :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_o_excl"   o_EXCL   :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_o_trunc"  o_TRUNC  :: CInt
 
 -- non-POSIX flags.
-foreign import ccall unsafe "__hscore_o_noctty"   o_NOCTTY   :: CInt
-foreign import ccall unsafe "__hscore_o_nonblock" o_NONBLOCK :: CInt
-foreign import ccall unsafe "__hscore_o_binary"   o_BINARY   :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_o_noctty"   o_NOCTTY   :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_o_nonblock" o_NONBLOCK :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_o_binary"   o_BINARY   :: CInt
 
-foreign import ccall unsafe "__hscore_s_isreg"  s_isreg  :: CMode -> Bool
-foreign import ccall unsafe "__hscore_s_ischr"  s_ischr  :: CMode -> Bool
-foreign import ccall unsafe "__hscore_s_isblk"  s_isblk  :: CMode -> Bool
-foreign import ccall unsafe "__hscore_s_isdir"  s_isdir  :: CMode -> Bool
-foreign import ccall unsafe "__hscore_s_isfifo" s_isfifo :: CMode -> Bool
+foreign import ccall unsafe "HsBase.h __hscore_s_isreg"  s_isreg  :: CMode -> Bool
+foreign import ccall unsafe "HsBase.h __hscore_s_ischr"  s_ischr  :: CMode -> Bool
+foreign import ccall unsafe "HsBase.h __hscore_s_isblk"  s_isblk  :: CMode -> Bool
+foreign import ccall unsafe "HsBase.h __hscore_s_isdir"  s_isdir  :: CMode -> Bool
+foreign import ccall unsafe "HsBase.h __hscore_s_isfifo" s_isfifo :: CMode -> Bool
 
-foreign import ccall unsafe "__hscore_sizeof_stat" sizeof_stat :: Int
-foreign import ccall unsafe "__hscore_st_mtime" st_mtime :: Ptr CStat -> IO CTime
-foreign import ccall unsafe "__hscore_st_size" st_size :: Ptr CStat -> IO COff
-foreign import ccall unsafe "__hscore_st_mode" st_mode :: Ptr CStat -> IO CMode
+foreign import ccall unsafe "HsBase.h __hscore_sizeof_stat" sizeof_stat :: Int
+foreign import ccall unsafe "HsBase.h __hscore_st_mtime" st_mtime :: Ptr CStat -> IO CTime
+foreign import ccall unsafe "HsBase.h __hscore_st_size" st_size :: Ptr CStat -> IO COff
+foreign import ccall unsafe "HsBase.h __hscore_st_mode" st_mode :: Ptr CStat -> IO CMode
 
-foreign import ccall unsafe "__hscore_echo"         const_echo :: CInt
-foreign import ccall unsafe "__hscore_tcsanow"      const_tcsanow :: CInt
-foreign import ccall unsafe "__hscore_icanon"       const_icanon :: CInt
-foreign import ccall unsafe "__hscore_vmin"         const_vmin   :: CInt
-foreign import ccall unsafe "__hscore_vtime"        const_vtime  :: CInt
-foreign import ccall unsafe "__hscore_sigttou"      const_sigttou :: CInt
-foreign import ccall unsafe "__hscore_sig_block"    const_sig_block :: CInt
-foreign import ccall unsafe "__hscore_sig_setmask"  const_sig_setmask :: CInt
-foreign import ccall unsafe "__hscore_f_getfl"      const_f_getfl :: CInt
-foreign import ccall unsafe "__hscore_f_setfl"      const_f_setfl :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_echo"         const_echo :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_tcsanow"      const_tcsanow :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_icanon"       const_icanon :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_vmin"         const_vmin   :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_vtime"        const_vtime  :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_sigttou"      const_sigttou :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_sig_block"    const_sig_block :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_sig_setmask"  const_sig_setmask :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_f_getfl"      const_f_getfl :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_f_setfl"      const_f_setfl :: CInt
 
 #ifndef mingw32_TARGET_OS
-foreign import ccall unsafe "__hscore_sizeof_termios"  sizeof_termios :: Int
-foreign import ccall unsafe "__hscore_sizeof_sigset_t" sizeof_sigset_t :: Int
+foreign import ccall unsafe "HsBase.h __hscore_sizeof_termios"  sizeof_termios :: Int
+foreign import ccall unsafe "HsBase.h __hscore_sizeof_sigset_t" sizeof_sigset_t :: Int
 
-foreign import ccall unsafe "__hscore_lflag" c_lflag :: Ptr CTermios -> IO CTcflag
-foreign import ccall unsafe "__hscore_poke_lflag" poke_c_lflag :: Ptr CTermios -> CTcflag -> IO ()
-foreign import ccall unsafe "__hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermios -> IO (Ptr Word8)
+foreign import ccall unsafe "HsBase.h __hscore_lflag" c_lflag :: Ptr CTermios -> IO CTcflag
+foreign import ccall unsafe "HsBase.h __hscore_poke_lflag" poke_c_lflag :: Ptr CTermios -> CTcflag -> IO ()
+foreign import ccall unsafe "HsBase.h __hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermios -> IO (Ptr Word8)
 #endif
 
 #ifndef mingw32_TARGET_OS
-foreign import ccall unsafe "__hscore_s_issock" s_issock :: CMode -> Bool
+foreign import ccall unsafe "HsBase.h __hscore_s_issock" s_issock :: CMode -> Bool
 #else
 s_issock :: CMode -> Bool
 s_issock cmode = False

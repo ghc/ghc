@@ -72,7 +72,7 @@ import Foreign
 import Foreign.C
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Posix
+import System.Posix.Internals
 import GHC.IOBase	( IOException(..), IOErrorType(..), ioException )
 #endif
 

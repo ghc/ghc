@@ -60,8 +60,8 @@ import Data.Maybe
 import Foreign
 import Foreign.C
 import System.IO.Error
+import System.Posix.Internals
 
-import GHC.Posix
 import GHC.Real
 
 import GHC.Arr

@@ -90,7 +90,7 @@ import Foreign
 import Foreign.C
 import System.IO.Unsafe
 import System.Posix.Types
-import GHC.Posix
+import System.Posix.Internals
 
 #ifndef mingw32_TARGET_OS
 -- WHOLE FILE...
