@@ -519,6 +519,9 @@ tcInstDecl2 (NewTypeDerived { iDFunId = dfun_id })
 	        (HsVar unsafeCoerceId `TyApp` [idType rep_dict_id, inst_head'])
 			  `HsApp` 
 		(HsVar rep_dict_id)
+	-- You might wonder why we have the 'coerce'.  It's because the
+	-- type equality mechanism isn't clever enough; see comments with Type.eqType.
+	-- So Lint complains if we don't have this. 
     in
     returnTc (emptyLIE, VarMonoBind dfun_id body)
 

@@ -18,7 +18,7 @@ import CmdLineOpts	( DynFlag(..), DynFlags )
 
 import TcMonad
 import TcEnv		( tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo,
-			  tcLookupClass, tcLookupTyCon
+			  tcLookupClass, tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
 import InstEnv		( InstEnv, simpleDFunClassTyCon, extendInstEnv )
@@ -43,7 +43,7 @@ import RdrName		( RdrName )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, newTyConRep,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
-			  isEnumerationTyCon, TyCon
+			  isEnumerationTyCon, TyCon, isRecursiveTyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, 
@@ -314,6 +314,8 @@ makeDerivEqns tycl_decls
       = tcLookupTyCon tycon_name		`thenNF_Tc` \ tycon ->
 	tcAddSrcLoc (getSrcLoc tycon)		$
         tcAddErrCtxt (derivCtxt tycon)		$
+	tcExtendTyVarEnv (tyConTyVars tycon)	$	-- Deriving preds may (now) mention
+							-- the type variables for the type constructor
         tcHsPred pred				`thenTc` \ pred' ->
 	case getClassPredTys_maybe pred' of
 	   Nothing 	    -> bale_out (malformedPredErr tycon pred)
@@ -347,19 +349,17 @@ makeDerivEqns tycl_decls
 	offensive_class = classKey clas `elem` needsDataDeclCtxtClassKeys
 
 
-    mk_eqn_help NewType tycon clas []
-      | clas `hasKey` readClassKey || clas `hasKey` showClassKey
-      = mk_eqn_help DataType tycon clas []	-- Use the generate-full-code mechanism for Read and Show
-
     mk_eqn_help NewType tycon clas tys
-      = doptsTc Opt_GlasgowExts			`thenTc` \ gla_exts ->
-	if not gla_exts then			-- Not glasgow-exts?
-	   mk_eqn_help DataType tycon clas tys	--   revert to ordinary mechanism
-        else if not can_derive then
-	   bale_out cant_derive_err
-	else
-	   new_dfun_name clas tycon  		`thenNF_Tc` \ dfun_name ->
+      =	doptsTc Opt_GlasgowExts			`thenTc` \ gla_exts ->
+        if can_derive_via_isomorphism && (gla_exts || standard_instance) then
+		-- Go ahead and use the isomorphism
+       	   new_dfun_name clas tycon  		`thenNF_Tc` \ dfun_name ->
 	   returnTc (Nothing, Just (NewTypeDerived (mk_dfun dfun_name)))
+	else
+	   if standard_instance then
+		mk_eqn_help DataType tycon clas []	-- Go via bale-out route
+	   else
+	   	bale_out cant_derive_err
       where
 	-- Here is the plan for newtype derivings.  We see
 	--	  newtype T a1...an = T (t ak...an) deriving (C1...Cm)
@@ -400,8 +400,14 @@ makeDerivEqns tycl_decls
 						  [ctxt_pred]
 
 	-- We can only do this newtype deriving thing if:
-	can_derive =  isJust maybe_rep_app 	-- The rep type is a type constructor app
-		   && (tyVarsOfTypes args_to_keep `subVarSet` mkVarSet tyvars_to_keep) 
+	standard_instance = null tys && classKey clas `elem` derivableClassKeys
+
+	can_derive_via_isomorphism
+	   =  not (clas `hasKey` readClassKey)	-- Never derive Read,Show this way
+	   && not (clas `hasKey` showClassKey)
+	   && not (isRecursiveTyCon tycon)	-- Newtype isn't recursive
+	   && isJust maybe_rep_app	 	-- The rep type is a type constructor app
+	   && (tyVarsOfTypes args_to_keep `subVarSet` mkVarSet tyvars_to_keep) 
 						-- and the tyvars are all in scope
 
 	cant_derive_err = derivingThingErr clas tys tycon tyvars_to_keep
@@ -427,11 +433,11 @@ makeDerivEqns tycl_decls
 	    is_single_con  = maybeToBool (maybeTyConSingleCon tycon)
 	    is_enumeration_or_single = is_enumeration || is_single_con
 
-	    single_nullary_why = SLIT("one constructor data type or type with all nullary constructors expected")
-	    nullary_why        = SLIT("data type with all nullary constructors expected")
-	    no_cons_why	       = SLIT("type has no data constructors")
-	    non_std_why	       = SLIT("not a derivable class")
-	    existential_why    = SLIT("it has existentially-quantified constructor(s)")
+    single_nullary_why = SLIT("one constructor data type or type with all nullary constructors expected")
+    nullary_why        = SLIT("data type with all nullary constructors expected")
+    no_cons_why	       = SLIT("type has no data constructors")
+    non_std_why	       = SLIT("not a derivable class")
+    existential_why    = SLIT("it has existentially-quantified constructor(s)")
 
 new_dfun_name clas tycon 	-- Just a simple wrapper
   = newDFunName clas [mkTyConApp tycon []] (getSrcLoc tycon)
