@@ -954,7 +954,8 @@ sigContextsCtxt s1 s2
 mainContextsErr id
   | getName id == main_NAME = ptext SLIT("Main.main cannot be overloaded")
   | otherwise
-  = quotes (ppr id) <+> ptext SLIT("cannot be overloaded, because it is mutually recursive with Main.main")
+  = quotes (ppr id) <+> ptext SLIT("cannot be overloaded") <> char ',' <> -- sigh; workaround for cpp's inability to deal
+    ptext SLIT("because it is mutually recursive with Main.main")         -- with commas inside SLIT strings.
 
 mainTyCheckCtxt
   = hsep [ptext SLIT("When checking that"), ppr main_NAME, ptext SLIT("has the required type")]
