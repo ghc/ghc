@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.13 2002/06/24 14:50:59 simonmar Exp $
+# $Id: package.mk,v 1.14 2002/07/01 15:16:33 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -159,6 +159,7 @@ $(HTML_DOC) : $(HS_PPS) $(HADDOCK_INPLACE)
 install-docs :: $(HTML_DOC)
 	@$(INSTALL_DIR) $(datadir)/html/$(PACKAGE)
 	@for i in $(HTML_DIR)/*; do \
+	   echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/$(PACKAGE); \
 	   $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/$(PACKAGE); \
 	done
 
