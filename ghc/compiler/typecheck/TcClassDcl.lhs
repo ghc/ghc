@@ -11,9 +11,9 @@ module TcClassDcl ( tcClassDecl1, tcClassDecls2,
 #include "HsVersions.h"
 
 import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..),
-			  HsExpr(..), HsLit(..), 
+			  HsExpr(..), HsLit(..), InPat(WildPatIn),
 			  mkSimpleMatch, andMonoBinds, andMonoBindList, 
-			  isClassOpSig, isPragSig,
+			  isClassOpSig, isPragSig, 
 			  getClassDeclSysNames, placeHolderType
 			)
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
@@ -35,7 +35,7 @@ import TcSimplify	( tcSimplifyCheck )
 import TcUnify		( checkSigTyVars, sigCtxt )
 import TcMType		( tcInstTyVars )
 import TcType		( Type, TyVarDetails(..), TcType, TcThetaType, TcTyVar, 
-			  mkTyVarTys, mkPredTys, mkClassPred, 
+			  mkTyVarTys, mkPredTys, mkClassPred, tcSplitSigmaTy, tcSplitFunTys,
 			  tcIsTyVarTy, tcSplitTyConApp_maybe
 			)
 import TcMonad
@@ -528,10 +528,30 @@ mkDefMethRhs origin clas inst_tys sel_id loc NoDefMeth
    	   (omittedMethodWarn sel_id)		`thenNF_Tc_`
     returnTc error_rhs
   where
-    error_rhs = HsApp (HsVar (getName nO_METHOD_BINDING_ERROR_ID)) 
-	    	      (HsLit (HsStringPrim (mkFastString (stringToUtf8 error_msg))))
+    error_rhs  = HsLam (mkSimpleMatch wild_pats simple_rhs placeHolderType loc)
+    simple_rhs = HsApp (HsVar (getName nO_METHOD_BINDING_ERROR_ID)) 
+	    	       (HsLit (HsStringPrim (mkFastString (stringToUtf8 error_msg))))
     error_msg = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
 
+	-- When the type is of form t1 -> t2 -> t3
+	-- make a default method like (\ _ _ -> noMethBind "blah")
+	-- rather than simply        (noMethBind "blah")
+	-- Reason: if t1 or t2 are higher-ranked types we get n
+	--	   silly ambiguity messages.
+	-- Example:	f :: (forall a. Eq a => a -> a) -> Int
+	--		f = error "urk"
+	-- Here, tcSub tries to force (error "urk") to have the right type,
+	-- thus:	f = \(x::forall a. Eq a => a->a) -> error "urk" (x t)
+	-- where 't' is fresh ty var.  This leads directly to "ambiguous t".
+	-- 
+	-- NB: technically this changes the meaning of the default-default
+	--     method slightly, because `seq` can see the lambdas.  Oh well.
+    (_,_,tau1)    = tcSplitSigmaTy (idType sel_id)
+    (_,_,tau2)    = tcSplitSigmaTy tau1
+	-- Need two splits because the  selector can have a type like
+	-- 	forall a. Foo a => forall b. Eq b => ...
+    (arg_tys, _) = tcSplitFunTys tau2
+    wild_pats	 = [WildPatIn | ty <- arg_tys]
 
 mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth 
   =  	-- A generic default method
