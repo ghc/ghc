@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.9 2002/05/15 13:03:02 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.10 2002/05/15 13:28:46 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -482,6 +482,7 @@ lexString cont s loc y x = loop "" s x y
             '\\':c:s | isSpace c -> stringGap e s (x+2) y
         	     | otherwise -> (escapeChar (c:s) `thenP` \(e',s,i) _ _ _ _ ->
         		             loop (e':e) s (x+i) y) s loc y x
+            '\"':'#':s  -> cont (PrimString (reverse e)) s loc y (x+2)
             '\"':s{-"-} -> cont (StringTok (reverse e)) s loc y (x+1)
             c:s		-> loop (c:e) s (x+1) y
             []          -> parseError "Improperly terminated string" s loc y x
