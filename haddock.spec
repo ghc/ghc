@@ -1,6 +1,6 @@
 # This is an RPM spec file that specifies how to package
 # haddock for Red Hat Linux and, possibly, similar systems.
-# It has been tested on Red Hat Linux 7.2.
+# It has been tested on Red Hat Linux 7.2 and SuSE Linux 9.1.
 #
 # If this file is part of a tarball, you can build RPMs directly from
 # the tarball by using the following command:
@@ -16,22 +16,21 @@
 # Haskell mode, update the version definition below to match the
 # version label of your release tarball.
 
-%define name haddock
+%define name    haddock
 %define version 0.6
 %define release 1
 
-Summary: Haddock documentation tool for annotated Haskell source code
-Name: %{name}
-Version: %{version}
-Release: %{release}
-License: BSD-like
-Group: Development/Tools
-Source: http://www.haskell.org/haddock/haddock-%{version}-src.tar.gz
-URL: http://www.haskell.org/haddock/
-Packager: Tom Moertel <tom-rpms@moertel.com>
-BuildRoot: %{_tmppath}/%{name}-%{version}-root
-Prefix: %{_prefix}
-#BuildRequires: ghc
+Name:           %{name}
+Version:        %{version}
+Release:        %{release}
+License:        BSD-like
+Group:          Development/Languages/Haskell
+URL:            http://www.haskell.org/haddock/
+Source:         http://www.haskell.org/haddock/haddock-%{version}-src.tar.gz
+Packager:       Tom Moertel <tom-rpms@moertel.com>
+BuildRoot:      %{_tmppath}/%{name}-%{version}-build
+Prefix:         %{_prefix}
+Summary:        A documentation tool for annotated Haskell source code
 
 %description
 Haddock is a tool for automatically generating documentation from
@@ -58,15 +57,13 @@ should all be ok).
 test -f configure || autoreconf
 ./configure --prefix=%{prefix}
 make
-(cd haddock/doc ; make dvi ps html ; gzip -f -9 *.dvi *.ps )
+( cd haddock/doc ; make dvi ps html ; gzip -f -9 *.dvi *.ps )
 
 %install
-rm -rf ${RPM_BUILD_ROOT}
 make prefix=${RPM_BUILD_ROOT}%{prefix} install
 
 %clean
 rm -rf ${RPM_BUILD_ROOT}
-# rm -rf ${RPM_BUILD_DIR}/haddock-%{version}
 
 %files
 %defattr(-,root,root)
@@ -74,28 +71,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %doc haddock/doc/haddock
 %doc haddock/doc/haddock.dvi.gz
 %doc haddock/doc/haddock.ps.gz
-%{prefix}/share/haddock-%{version}
-%{prefix}/lib/haddock-%{version}
 %{prefix}/bin/haddock
 %{prefix}/bin/haddock-%{version}
-
-%changelog
-
-* Sat Oct 11 2003 Sven Panne <sven.panne@aedion.de>
-- Include architecture-independent files in file list
-
-* Tue Aug 26 2003 Sven Panne <sven.panne@aedion.de>
-- Use autoreconf instead of autoconf
-
-* Mon Jul 28 2003 Sven Panne <sven.panne@aedion.de>
-- Updated to version 0.5
-- Automagically generate configure if it is not there
-
-* Tue Jul 23 2002 Simon Marlow <simonmar@microsoft.com>
-- Updated to version 0.4
-
-* Sun Jun 23 2002 Sven Panne <sven.panne@aedion.de>
-- Cleaned up build root handling and added more docs
-
-* Wed May 01 2002 Tom Moertel <tom-rpms@moertel.com>
-- Created spec file
+%{prefix}/lib/haddock-%{version}
+%{prefix}/share/haddock-%{version}
