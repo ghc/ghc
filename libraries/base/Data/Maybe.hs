@@ -128,7 +128,7 @@ listToMaybe           :: [a] -> Maybe a
 listToMaybe []        =  Nothing
 listToMaybe (a:_)     =  Just a
 
--- | The 'catMaybes' function takes a list of "Maybe's and returns
+-- | The 'catMaybes' function takes a list of 'Maybe's and returns
 -- a list of all the 'Just' values. 
 catMaybes              :: [Maybe a] -> [a]
 catMaybes ls = [x | Just x <- ls]
