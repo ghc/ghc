@@ -523,6 +523,7 @@ endif # GHCI_LIBRARY
 #
 
 ifeq "$(DLLized)" "YES"
+SRC_CC_OPTS += -DDLLized
 
 ifneq "$(PACKAGE)" ""
 
