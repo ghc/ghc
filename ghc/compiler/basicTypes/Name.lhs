@@ -231,10 +231,12 @@ getNameProvenance (Local _ _ _)              = LocalDef noSrcLoc NotExported
 
 \begin{code}
 -- make the Name globally visible regardless.
-mkNameVisible :: Module -> Unique -> Name -> Name
-mkNameVisible mod occ_uniq nm@(Global _ _ _ _) = nm
-mkNameVisible mod occ_uniq nm@(Local uniq occ _)
- = Global uniq mod occ (LocalDef noSrcLoc Exported)
+mkNameVisible :: Module -> Name -> Name
+mkNameVisible mod nm@(Global _ _ _ _)   = nm
+mkNameVisible mod nm@(Local uniq occ _) = Global uniq mod g_occ (LocalDef noSrcLoc Exported)
+  where
+    -- See mkTopName comment. A hack.
+    g_occ = varOcc (_PK_ (occNameString occ ++ show uniq))
 \end{code}
 
 

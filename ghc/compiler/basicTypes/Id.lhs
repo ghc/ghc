@@ -174,9 +174,8 @@ omitIfaceSigForId id
 \end{code}
 
 \begin{code}
-mkIdVisible :: Module -> Unique -> Id -> Id
-mkIdVisible mod u id 
-  = setIdName id (mkNameVisible mod u (idName id))
+mkIdVisible :: Module -> Id -> Id
+mkIdVisible mod id = setIdName id (mkNameVisible mod (idName id))
 \end{code}
 
 %************************************************************************
