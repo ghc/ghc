@@ -212,7 +212,8 @@ cmLoadModule cmstate1 rootname
 	-- If a module has a valid linkable, then it may be STABLE (see below),
 	-- and it is classified as SOURCE UNCHANGED for the purposes of calling
 	-- compile.
-	valid_linkables <- getValidLinkables ui1 mg2unsorted
+	valid_linkables <- getValidLinkables ui1 mg2unsorted_names 
+				mg2_with_srcimps
 
         -- Figure out a stable set of modules which can be retained
         -- the top level envs, to avoid upsweeping them.  Goes to a
@@ -347,34 +348,68 @@ cmLoadModule cmstate1 rootname
 -- getValidLinkables
 
 getValidLinkables
-	:: [Linkable]			-- old linkables
-	-> [ModSummary]			-- all modules in the program
-	-> IO [Linkable]		-- still-valid linkables 
+	:: [Linkable]		-- old linkables
+	-> [ModuleName]		-- all home modules
+	-> [SCC ModSummary]	-- all modules in the program, dependency order
+	-> IO [Linkable]	-- still-valid linkables 
 
-getValidLinkables old_linkables summaries
-  = do lis <- mapM (getValidLinkable old_linkables) summaries
-       return (concat lis)
+getValidLinkables old_linkables all_home_mods module_graph
+  = foldM (getValidLinkablesSCC old_linkables all_home_mods) [] module_graph
 
-getValidLinkable old_linkables summary
-  = do let mod_name = moduleName (ms_mod summary)
-       maybe_disk_linkable
-           <- case ml_obj_file (ms_location summary) of
-                 Nothing -> return Nothing
-                 Just obj_fn -> maybe_getFileLinkable mod_name obj_fn
+getValidLinkablesSCC old_linkables all_home_mods new_linkables scc0
+   = let 
+	  scc             = flattenSCC scc0
+          scc_names       = map name_of_summary scc
+	  home_module m   = m `elem` all_home_mods && m `notElem` scc_names
+          scc_allhomeimps = nub (filter home_module (concatMap ms_allimps scc))
 
-	-- find an old in-core linkable if we have one. (forget about
-	-- on-disk linkables for now, we'll check again whether there's
-	-- one here below, just in case a new one has popped up recently).
-       let old_linkable = findModuleLinkable_maybe old_linkables mod_name
-           maybe_old_linkable =
+	  has_object m = case findModuleLinkable_maybe new_linkables m of
+			    Nothing -> False
+			    Just l  -> isObjectLinkable l
+
+          objects_allowed = all has_object scc_allhomeimps
+     in do
+
+     these_linkables 
+	<- foldM (getValidLinkable old_linkables objects_allowed) [] scc
+
+	-- since an scc can contain only all objects or no objects at all,
+	-- we have to check whether we got all objects or not, and re-do
+	-- the linkable check if not.
+     adjusted_linkables 
+	<- if objects_allowed && not (all isObjectLinkable these_linkables)
+	      then foldM (getValidLinkable old_linkables False) [] scc
+	      else return these_linkables
+
+     return (adjusted_linkables ++ new_linkables)
+
+
+getValidLinkable :: [Linkable] -> Bool -> [Linkable] -> ModSummary 
+	-> IO [Linkable]
+getValidLinkable old_linkables objects_allowed new_linkables summary 
+   = do 
+	let mod_name = name_of_summary summary
+
+	maybe_disk_linkable
+           <- if (not objects_allowed)
+		then return Nothing
+		else case ml_obj_file (ms_location summary) of
+                 	Just obj_fn -> maybe_getFileLinkable mod_name obj_fn
+                 	Nothing -> return Nothing
+
+	 -- find an old in-core linkable if we have one. (forget about
+	 -- on-disk linkables for now, we'll check again whether there's
+	 -- one here below, just in case a new one has popped up recently).
+        let old_linkable = findModuleLinkable_maybe old_linkables mod_name
+            maybe_old_linkable =
 	 	case old_linkable of
 	    	    Just (LM _ _ ls) | all isInterpretable ls -> old_linkable
-	    	    _ -> Nothing      
+	    	    _ -> Nothing
 
-       -- The most recent of the old UI linkable or whatever we could
-       -- find on disk is returned as the linkable if compile
-       -- doesn't think we need to recompile.        
-       let linkable_list
+        -- The most recent of the old UI linkable or whatever we could
+        -- find on disk is returned as the linkable if compile
+        -- doesn't think we need to recompile.        
+        let linkable_list
                = case (maybe_old_linkable, maybe_disk_linkable) of
                     (Nothing, Nothing) -> []
                     (Nothing, Just di) -> [di]
@@ -383,17 +418,16 @@ getValidLinkable old_linkables summary
                        | linkableTime ui >= linkableTime di -> [ui]
                        | otherwise                          -> [di]
 
-       -- only linkables newer than the source code are valid
-       let maybe_src_date = ms_hs_date summary
+        -- only linkables newer than the source code are valid
+        let maybe_src_date = ms_hs_date summary
 
-	   valid_linkable_list
+	    valid_linkable_list
 	      = case maybe_src_date of
 		  Nothing -> panic "valid_linkable_list"
 		  Just src_date	
-		      -> filter (\li -> linkableTime li > src_date) linkable_list
+		     -> filter (\li -> linkableTime li > src_date) linkable_list
 
-       return valid_linkable_list
-
+        return (valid_linkable_list ++ new_linkables)
 
 
 maybe_getFileLinkable :: ModuleName -> FilePath -> IO (Maybe Linkable)
@@ -434,9 +468,7 @@ preUpsweep valid_lis old_lis all_home_mods stable (scc0:sccs)
             scc_names
                = map name_of_summary scc
             in_stable_or_scc m
-               = --trace (showSDoc (text "ISOS" <+> ppr m <+> ppr scc_names <+> ppr stable)) (
-                 m `elem` scc_names || m `elem` stable
-                 --)
+               = m `elem` scc_names || m `elem` stable
 
 	    -- now we check for valid linkables: each module in the SCC must 
 	    -- have a valid linkable (see getValidLinkables above), and the
@@ -744,14 +776,8 @@ downsweep rootNm old_summaries
 
         getSummary :: ModuleName -> IO ModSummary
         getSummary nm
-           -- | trace ("getSummary: "++ showSDoc (ppr nm)) True
            = do found <- findModule nm
 		case found of
-                   -- Be sure not to use the mod and location passed in to 
-                   -- summarise for any other purpose -- summarise may change
-                   -- the module names in them if name of module /= name of file,
-                   -- and put the changed versions in the returned summary.
-                   -- These will then conflict with the passed-in versions.
 		   Just (mod, location) -> do
 			let old_summary = findModInSummaries old_summaries mod
 			new_summary <- summarise mod location old_summary
@@ -844,12 +870,11 @@ summarise mod location old_summary
                  Nothing     -> return Nothing
                  Just src_fn -> maybe_getModificationTime src_fn
 
-	if mod_name == moduleName mod
-		then return ()
-		else throwDyn (OtherError 
-			(showSDoc (text "file name does not match module name: "
-			   <+> ppr (moduleName mod) <+> text "vs" 
-			   <+> ppr mod_name)))
+	when (mod_name /= moduleName mod) $
+		throwDyn (OtherError 
+		   (showSDoc (text "file name does not match module name: "
+			      <+> ppr (moduleName mod) <+> text "vs" 
+			      <+> ppr mod_name)))
 
         return (Just (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
                                  srcimps imps
