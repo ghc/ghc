@@ -44,13 +44,13 @@ module Type (
         mkUsForAllTy, mkUsForAllTys, splitUsForAllTys, substUsTy, 
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
-	isForAllTy, applyTy, applyTys, mkPiType, hoistForAllTys,
+	applyTy, applyTys, mkPiType, hoistForAllTys,
 
 	TauType, RhoType, SigmaType, PredType(..), ThetaType,
 	ClassPred, ClassContext, mkClassPred,
 	getClassTys_maybe, ipName_maybe, classesToPreds, classesOfPreds,
 	isTauTy, mkRhoTy, splitRhoTy,
-	mkSigmaTy, splitSigmaTy,
+	mkSigmaTy, isSigmaTy, splitSigmaTy,
 
 	-- Lifting and boxity
 	isUnLiftedType, isUnboxedType, isUnboxedTupleType, isAlgType, isDataType, isNewType,
@@ -241,14 +241,17 @@ splitFunTy (FunTy arg res) = (arg, res)
 splitFunTy (NoteTy _ ty)   = splitFunTy ty
 
 splitFunTy_maybe :: Type -> Maybe (Type, Type)
-splitFunTy_maybe (FunTy arg res) = Just (arg, res)
-splitFunTy_maybe (NoteTy _ ty)   = splitFunTy_maybe ty
-splitFunTy_maybe other	         = Nothing
+splitFunTy_maybe (FunTy arg res)	= Just (arg, res)
+splitFunTy_maybe (NoteTy (IPNote _) ty)	= Nothing
+splitFunTy_maybe (NoteTy _ ty)   	= splitFunTy_maybe ty
+splitFunTy_maybe other	         	= Nothing
 
 splitFunTys :: Type -> ([Type], Type)
 splitFunTys ty = split [] ty ty
   where
     split args orig_ty (FunTy arg res) = split (arg:args) res res
+    split args orig_ty (NoteTy (IPNote _) ty)
+				       = (reverse args, orig_ty)
     split args orig_ty (NoteTy _ ty)   = split args orig_ty ty
     split args orig_ty ty              = (reverse args, orig_ty)
 
@@ -304,10 +307,11 @@ mkTyConTy tycon = ASSERT( not (isSynTyCon tycon) )
 -- including functions are returned as Just ..
 
 splitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
-splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
-splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
-splitTyConApp_maybe (NoteTy _ ty)     = splitTyConApp_maybe ty
-splitTyConApp_maybe other	      = Nothing
+splitTyConApp_maybe (TyConApp tc tys)	   = Just (tc, tys)
+splitTyConApp_maybe (FunTy arg res)	   = Just (funTyCon, [arg,res])
+splitTyConApp_maybe (NoteTy (IPNote _) ty) = Nothing
+splitTyConApp_maybe (NoteTy _ ty)	   = splitTyConApp_maybe ty
+splitTyConApp_maybe other		   = Nothing
 
 -- splitAlgTyConApp_maybe looks for 
 --	*saturated* applications of *algebraic* data types
@@ -318,6 +322,8 @@ splitAlgTyConApp_maybe :: Type -> Maybe (TyCon, [Type], [DataCon])
 splitAlgTyConApp_maybe (TyConApp tc tys) 
   | isAlgTyCon tc && 
     tyConArity tc == length tys      = Just (tc, tys, tyConDataCons tc)
+splitAlgTyConApp_maybe (NoteTy (IPNote _) ty)
+				     = Nothing
 splitAlgTyConApp_maybe (NoteTy _ ty) = splitAlgTyConApp_maybe ty
 splitAlgTyConApp_maybe other	     = Nothing
 
@@ -448,6 +454,8 @@ typePrimRep ty = case repType ty of
 splitNewType_maybe :: Type -> Maybe Type
 -- Find the representation of a newtype, if it is one
 -- Looks through multiple levels of newtype, but does not look through for-alls
+splitNewType_maybe (NoteTy (IPNote _) ty)
+				     = Nothing
 splitNewType_maybe (NoteTy _ ty)     = splitNewType_maybe ty
 splitNewType_maybe (TyConApp tc tys) = case newTyConRep tc of
 					 Just rep_ty -> ASSERT( length tys == tyConArity tc )
@@ -590,14 +598,10 @@ splitForAllTy_maybe ty = case splitUsgTy_maybe ty of
 					        return (tyvar, NoteTy (UsgNote usg) ty'')
 			   Nothing        -> splitFAT_m ty
   where
-    splitFAT_m (NoteTy _ ty)       = splitFAT_m ty
-    splitFAT_m (ForAllTy tyvar ty) = Just(tyvar, ty)
-    splitFAT_m _		   = Nothing
-
-isForAllTy :: Type -> Bool
-isForAllTy (NoteTy _ ty)       = isForAllTy ty
-isForAllTy (ForAllTy tyvar ty) = True
-isForAllTy _		     = False
+    splitFAT_m (NoteTy (IPNote _) ty)	= Nothing
+    splitFAT_m (NoteTy _ ty)		= splitFAT_m ty
+    splitFAT_m (ForAllTy tyvar ty)	= Just(tyvar, ty)
+    splitFAT_m _			= Nothing
 
 splitForAllTys :: Type -> ([TyVar], Type)
 splitForAllTys ty = case splitUsgTy_maybe ty of
@@ -605,9 +609,10 @@ splitForAllTys ty = case splitUsgTy_maybe ty of
 					in  (tvs, NoteTy (UsgNote usg) ty'')
 		      Nothing        -> split ty ty []
    where
-     split orig_ty (ForAllTy tv ty) tvs = split ty ty (tv:tvs)
-     split orig_ty (NoteTy _ ty)    tvs = split orig_ty ty tvs
-     split orig_ty t	            tvs = (reverse tvs, orig_ty)
+     split orig_ty (ForAllTy tv ty)	  tvs = split ty ty (tv:tvs)
+     split orig_ty (NoteTy (IPNote _) ty) tvs = (reverse tvs, orig_ty)
+     split orig_ty (NoteTy _ ty)	  tvs = split orig_ty ty tvs
+     split orig_ty t			  tvs = (reverse tvs, orig_ty)
 \end{code}
 
 @mkPiType@ makes a (->) type or a forall type, depending on whether
@@ -719,12 +724,13 @@ classesOfPreds theta = concatMap cvt theta
 
 \begin{code}
 isTauTy :: Type -> Bool
-isTauTy (TyVarTy v)      = True
-isTauTy (TyConApp _ tys) = all isTauTy tys
-isTauTy (AppTy a b)    	 = isTauTy a && isTauTy b
-isTauTy (FunTy a b)  	 = isTauTy a && isTauTy b
-isTauTy (NoteTy _ ty)  	 = isTauTy ty
-isTauTy other	       	 = False
+isTauTy (TyVarTy v)		= True
+isTauTy (TyConApp _ tys)	= all isTauTy tys
+isTauTy (AppTy a b)		= isTauTy a && isTauTy b
+isTauTy (FunTy a b)		= isTauTy a && isTauTy b
+isTauTy (NoteTy (IPNote _) ty)	= False
+isTauTy (NoteTy _ ty)		= isTauTy ty
+isTauTy other			= False
 \end{code}
 
 \begin{code}
@@ -737,14 +743,26 @@ splitRhoTy ty = split ty ty []
   split orig_ty (FunTy arg res) ts = case splitPredTy_maybe arg of
 					Just p -> split res res (p:ts)
 					Nothing   -> (reverse ts, orig_ty)
-  split orig_ty (NoteTy _ ty) ts   = split orig_ty ty ts
-  split orig_ty ty ts		   = (reverse ts, orig_ty)
+  split orig_ty (NoteTy (IPNote _) ty)	ts = (reverse ts, orig_ty)
+  split orig_ty (NoteTy _ ty)		ts = split orig_ty ty ts
+  split orig_ty ty			ts = (reverse ts, orig_ty)
 \end{code}
 
 
 
 \begin{code}
 mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkRhoTy theta tau)
+
+isSigmaTy :: Type -> Bool
+isSigmaTy (FunTy a b)		= isPredTy a
+    where isPredTy (NoteTy (IPNote _) _) = True
+	  -- JRL could be a dict ty, but that would be polymorphic,
+	  -- and thus there would have been an outer ForAllTy
+	  isPredTy _			 = False
+isSigmaTy (NoteTy (IPNote _) _) = False
+isSigmaTy (NoteTy _ ty)		= isSigmaTy ty
+isSigmaTy (ForAllTy tyvar ty)	= True
+isSigmaTy _			= False
 
 splitSigmaTy :: Type -> ([TyVar], [PredType], Type)
 splitSigmaTy ty =
@@ -988,6 +1006,5 @@ seqNote :: TyNote -> ()
 seqNote (SynNote ty)  = seqType ty
 seqNote (FTVNote set) = sizeUniqSet set `seq` ()
 seqNote (UsgNote usg) = usg `seq` ()
-seqNote (IPNote nm)    = nm `seq` ()
+seqNote (IPNote nm)   = nm `seq` ()
 \end{code}
-

@@ -41,9 +41,6 @@ import Name		( nameOccName )
 import Type		( splitFunTys
 			, splitTyConApp_maybe
 			, splitForAllTys
-			, splitRhoTy
-			, isForAllTy
-			, mkForAllTys
 			)
 import PprType		( {- instance Outputable Type -} )
 import TysWiredIn	( isFFIArgumentTy, isFFIResultTy, 

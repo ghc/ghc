@@ -38,6 +38,7 @@ import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsSigType, checkSigTyVars, sigCtxt )
 import TcPat		( badFieldCon )
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck, partitionPredsOfLIE )
+import TcImprove	( tcImprove )
 import TcType		( TcType, TcTauType,
 			  tcInstTyVars,
 			  tcInstTcType, tcSplitRhoTy,
@@ -60,7 +61,7 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  mkTyConApp, splitSigmaTy, 
 			  splitRhoTy,
 			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
-			  isForAllTy, splitAlgTyConApp, splitAlgTyConApp_maybe,
+			  isSigmaTy, splitAlgTyConApp, splitAlgTyConApp_maybe,
 			  boxedTypeKind, mkArrowKind,
 			  tidyOpenType
 			)
@@ -99,12 +100,12 @@ tcExpr :: RenamedHsExpr			-- Expession to type check
 	-> TcType 			-- Expected type (could be a polytpye)
 	-> TcM s (TcExpr, LIE)
 
-tcExpr expr ty | isForAllTy ty = -- Polymorphic case
-				 tcPolyExpr expr ty 	`thenTc` \ (expr', lie, _, _, _) ->
+tcExpr expr ty | isSigmaTy ty = -- Polymorphic case
+				tcPolyExpr expr ty 	`thenTc` \ (expr', lie, _, _, _) ->
 				 returnTc (expr', lie)
 
-	       | otherwise     = -- Monomorphic case
-				 tcMonoExpr expr ty
+	       | otherwise    = -- Monomorphic case
+				tcMonoExpr expr ty
 \end{code}
 
 
@@ -153,6 +154,7 @@ tcPolyExpr arg expected_arg_ty
     checkSigTyVars sig_tyvars free_tyvars	`thenTc` \ zonked_sig_tyvars ->
 
     newDicts SignatureOrigin sig_theta		`thenNF_Tc` \ (sig_dicts, dict_ids) ->
+    tcImprove (sig_dicts `plusLIE` lie_arg)	`thenTc_`
 	-- ToDo: better origin
     tcSimplifyAndCheck 
 	(text "the type signature of an expression")
@@ -701,7 +703,7 @@ tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
  = tcSetErrCtxt (exprSigCtxt in_expr)	$
    tcHsSigType  poly_ty		`thenTc` \ sig_tc_ty ->
 
-   if not (isForAllTy sig_tc_ty) then
+   if not (isSigmaTy sig_tc_ty) then
 	-- Easy case
 	unifyTauTy sig_tc_ty res_ty	`thenTc_`
 	tcMonoExpr expr sig_tc_ty
@@ -731,7 +733,6 @@ tcMonoExpr (HsWith expr binds) res_ty
   = tcMonoExpr expr res_ty		`thenTc` \ (expr', lie) ->
     tcIPBinds binds			`thenTc` \ (binds', types, lie2) ->
     partitionPredsOfLIE isBound lie	`thenTc` \ (ips, lie', dict_binds) ->
-    pprTrace "tcMonoExpr With" (ppr (ips, lie', dict_binds)) $
     let expr'' = if nullMonoBinds dict_binds
 		 then expr'
 		 else HsLet (mkMonoBind (revBinds dict_binds) [] NonRecursive)

@@ -39,7 +39,7 @@ import VarSet
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( Name, NamedThing(..), getSrcLoc, isTvOcc, nameOccName )
 import Outputable
-import Maybes		( mapMaybe, expectJust )
+import Maybes		( mapMaybe, catMaybes, expectJust )
 import UniqSet		( UniqSet, emptyUniqSet,
 			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
@@ -272,7 +272,7 @@ Edges in Type/Class decls
 mk_cls_edges :: RenamedTyClDecl -> Maybe (RenamedTyClDecl, Unique, [Unique])
 
 mk_cls_edges decl@(ClassDecl ctxt name _ _ _ _ _ _ _ _ _ _)
-  = Just (decl, getUnique name, map (getUnique . get_clas) ctxt)
+  = Just (decl, getUnique name, map getUnique (catMaybes (map get_clas ctxt)))
 mk_cls_edges other_decl
   = Nothing
 
@@ -280,8 +280,8 @@ mk_cls_edges other_decl
 mk_edges :: RenamedTyClDecl -> (RenamedTyClDecl, Unique, [Unique])
 
 mk_edges decl@(TyData _ ctxt name _ condecls derivs _ _)
-  = (decl, getUnique name, uniqSetToList (get_ctxt ctxt `unionUniqSets` 
-					 get_cons condecls `unionUniqSets` 
+  = (decl, getUnique name, uniqSetToList (get_ctxt ctxt `unionUniqSets`
+					 get_cons condecls `unionUniqSets`
 					 get_deriv derivs))
 
 mk_edges decl@(TySynonym name _ rhs _)
@@ -293,8 +293,9 @@ mk_edges decl@(ClassDecl ctxt name _ _ sigs _ _ _ _ _ _ _)
 
 
 ----------------------------------------------------
-get_ctxt ctxt = unionManyUniqSets (map (set_name . get_clas) ctxt)
-get_clas (HsPClass clas _) = clas
+get_ctxt ctxt = unionManyUniqSets (map set_name (catMaybes (map get_clas ctxt)))
+get_clas (HsPClass clas _) = Just clas
+get_clas _                 = Nothing
 
 ----------------------------------------------------
 get_deriv Nothing     = emptyUniqSet

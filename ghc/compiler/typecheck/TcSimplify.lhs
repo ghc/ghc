@@ -255,8 +255,8 @@ tcSimplify str local_tvs wanted_lie
 
       -- We're infering (not checking) the type, and 
       -- the inst constrains a local type variable
-      | isDict inst  = DontReduceUnlessConstant	-- Dicts
-      | otherwise    = ReduceMe AddToIrreds	-- Lits and Methods
+      | isClassDict inst = DontReduceUnlessConstant	-- Dicts
+      | otherwise	 = ReduceMe AddToIrreds		-- Lits and Methods
 \end{code}
 
 @tcSimplifyAndCheck@ is similar to the above, except that it checks
@@ -292,13 +292,13 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
   where
     givens  = lieToList given_lie
     -- see comment on wanteds in tcSimplify
-    wanteds = filter notFunDep (lieToList wanted_lie)
+    -- JRL nope - it's too early to throw away fundeps here...
+    wanteds = {- filter notFunDep -} (lieToList wanted_lie)
     given_dicts = filter isClassDict givens
 
     try_me inst 
       -- Does not constrain a local tyvar
       | isEmptyVarSet (tyVarsOfInst inst `intersectVarSet` local_tvs)
-        && (isDict inst || null (getIPs inst))
       = Free
 
       -- When checking against a given signature we always reduce

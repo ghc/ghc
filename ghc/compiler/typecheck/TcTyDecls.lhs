@@ -45,7 +45,7 @@ import TyCon		( TyCon, AlgTyConFlavour(..), ArgVrcs, mkSynTyCon, mkAlgTyCon,
 			)
 import Type		( getTyVar, tyVarsOfTypes, splitFunTy, applyTys,
 			  mkTyConApp, mkTyVarTys, mkForAllTys, mkFunTy,
-			  mkTyVarTy, splitForAllTys, isForAllTy, splitAlgTyConApp_maybe,
+			  mkTyVarTy, splitAlgTyConApp_maybe,
 			  mkArrowKind, mkArrowKinds, boxedTypeKind,
 			  isUnboxedType, Type, ThetaType, classesOfPreds
 			)

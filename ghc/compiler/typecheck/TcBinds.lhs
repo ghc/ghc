@@ -259,7 +259,10 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	-- come before:
 	--   - computing vars over which to quantify
 	--   - zonking the generalized type vars
-    tcImprove lie_req `thenTc_`
+    let lie_avail = case maybe_sig_theta of
+		      Nothing	   -> emptyLIE
+		      Just (_, la) -> la in
+    tcImprove (lie_avail `plusLIE` lie_req)			`thenTc_`
 
 	-- COMPUTE VARIABLES OVER WHICH TO QUANTIFY, namely tyvars_to_gen
 	-- The tyvars_not_to_gen are free in the environment, and hence

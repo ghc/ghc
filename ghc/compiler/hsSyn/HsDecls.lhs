@@ -298,6 +298,9 @@ ppr_con_details con (RecCon fields)
 			 dcolon <+>
 			 ppr_bang ty
 
+instance Outputable name => Outputable (BangType name) where
+    ppr = ppr_bang
+
 ppr_bang (Banged   ty) = ptext SLIT("!") <> pprParendHsType ty
 ppr_bang (Unbanged ty) = pprParendHsType ty
 ppr_bang (Unpacked ty) = ptext SLIT("! !") <> pprParendHsType ty
