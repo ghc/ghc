@@ -3,4 +3,4 @@ _exports_
 MagicUFs MagicUnfoldingFun mkMagicUnfoldingFun;
 _declarations_
 1 data MagicUnfoldingFun;
-1 mkMagicUnfoldingFun _:_ Unique.Unique -> MagicUFs.MagicUnfoldingFun ;;
+1 mkMagicUnfoldingFun _:_ Unique.Unique -> MagicUnfoldingFun ;;
