@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1997
 %
 
 \section[Directory]{Module @Directory@}
@@ -19,9 +19,15 @@ are relative to the current directory.
 
 \begin{code}
 module Directory ( 
+--    Permissions(Permissions),
     createDirectory, removeDirectory, removeFile, 
     renameDirectory, renameFile, getDirectoryContents,
     getCurrentDirectory, setCurrentDirectory
+{-
+    ,doesFileExist, doesDirectoryExist,
+    getPermissions, setPermissions,
+    getModificationTime
+-}
   ) where
 
 import Prelude
@@ -51,39 +57,57 @@ setCurrentDirectory 	:: FilePath -> IO ()
 
 %*********************************************************
 %*							*
-\subsection{Signatures}
+\subsection{Permissions}
 %*							*
 %*********************************************************
 
-$createDirectory dir$ creates a new directory
-{\em dir} which is initially empty, or as near to empty as the
-operating system allows.
+The @Permissions@ type is used to record whether certain operations are permissible on a
+file/directory:
+
+\begin{code}
+data Permissions
+ = Permissions {
+    readable,   writeable, 
+    executable, searchable :: Bool 
+   } deriving (Eq, Ord, Read, Show)
+
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Implementation}
+%*							*
+%*********************************************************
+
+@createDirectory dir@ creates a new directory {\em dir} which is
+initially empty, or as near to empty as the operating system
+allows.
 
 The operation may fail with:
+
 \begin{itemize}
-\item $AlreadyExists$
-The operand refers to a directory that already exists.  
-[$EEXIST$]
-\item $HardwareFault$
-A physical I/O error has occurred.
-[$EIO$]
-\item $InvalidArgument$
-The operand is not a valid directory name.
-[$ENAMETOOLONG$, $ELOOP$]
-\item $NoSuchThing$
-There is no path to the directory. 
-[$ENOENT$, $ENOTDIR$]
-\item $PermissionDenied$
+\item @isPermissionError@ / @PermissionDenied@
 The process has insufficient privileges to perform the operation.
-[$EROFS$, $EACCES$]
-\item $ResourceExhausted$
+@[EROFS, EACCES]@
+\item @isAlreadyExistsError@ / @AlreadyExists@
+The operand refers to a directory that already exists.  
+@ [EEXIST]@
+\item @HardwareFault@
+A physical I/O error has occurred.
+@ [EIO]@
+\item @InvalidArgument@
+The operand is not a valid directory name.
+@[ENAMETOOLONG, ELOOP]@
+\item @NoSuchThing@
+There is no path to the directory. 
+@[ENOENT, ENOTDIR]@
+\item @ResourceExhausted@
 Insufficient resources (virtual memory, process file descriptors,
 physical disk space, etc.) are available to perform the operation.
-[$EDQUOT$, $ENOSPC$, $ENOMEM$, 
-$EMLINK$] 
-\item $InappropriateType$
+@[EDQUOT, ENOSPC, ENOMEM, EMLINK]@
+\item @InappropriateType@
 The path refers to an existing non-directory object.
-[$EEXIST$]
+@[EEXIST]@
 \end{itemize}
 
 \begin{code}
@@ -95,7 +119,7 @@ createDirectory path =
         constructErrorAndFail "createDirectory"
 \end{code}
 
-$removeDirectory dir$ removes an existing directory {\em dir}.  The
+@removeDirectory dir@ removes an existing directory {\em dir}.  The
 implementation may specify additional constraints which must be
 satisfied before a directory can be removed (e.g. the directory has to
 be empty, or may not be in use by other processes).  It is not legal
@@ -106,27 +130,27 @@ directory).
 
 The operation may fail with:
 \begin{itemize}
-\item $HardwareFault$
+\item @HardwareFault@
 A physical I/O error has occurred.
-[$EIO$]
-\item $InvalidArgument$
+[@EIO@]
+\item @InvalidArgument@
 The operand is not a valid directory name.
-[$ENAMETOOLONG$, $ELOOP$]
-\item $NoSuchThing$
+@[ENAMETOOLONG, ELOOP]@
+\item @isDoesNotExist@ / @NoSuchThing@
 The directory does not exist. 
-[$ENOENT$, $ENOTDIR$]
-\item $PermissionDenied$
+@[ENOENT, ENOTDIR]@
+\item @isPermissionError@ / @PermissionDenied@
 The process has insufficient privileges to perform the operation.
-[$EROFS$, $EACCES$, $EPERM$]
-\item $UnsatisfiedConstraints$
+@[EROFS, EACCES, EPERM]@
+\item @UnsatisfiedConstraints@
 Implementation-dependent constraints are not satisfied.  
-[$EBUSY$, $ENOTEMPTY$, $EEXIST$]
-\item $UnsupportedOperation$
+@[EBUSY, ENOTEMPTY, EEXIST]@
+\item @UnsupportedOperation@
 The implementation does not support removal in this situation.
-[$EINVAL$]
-\item $InappropriateType$
+@[EINVAL]@
+\item @InappropriateType@
 The operand refers to an existing non-directory object.
-[$ENOTDIR$]
+@[ENOTDIR]@
 \end{itemize}
 
 \begin{code}
@@ -138,7 +162,7 @@ removeDirectory path =
         constructErrorAndFail "removeDirectory"
 \end{code}
 
-$removeFile file$ removes the directory entry for an existing file
+@removeFile file@ removes the directory entry for an existing file
 {\em file}, where {\em file} is not itself a directory. The
 implementation may specify additional constraints which must be
 satisfied before a file can be removed (e.g. the file may not be in
@@ -146,24 +170,24 @@ use by other processes).
 
 The operation may fail with:
 \begin{itemize}
-\item $HardwareFault$
+\item @HardwareFault@
 A physical I/O error has occurred.
-[$EIO$]
-\item $InvalidArgument$
+@[EIO]@
+\item @InvalidArgument@
 The operand is not a valid file name.
-[$ENAMETOOLONG$, $ELOOP$]
-\item $NoSuchThing$
+@[ENAMETOOLONG, ELOOP]@
+\item @isDoesNotExist@ / @NoSuchThing@
 The file does not exist. 
-[$ENOENT$, $ENOTDIR$]
-\item $PermissionDenied$
+@[ENOENT, ENOTDIR]@
+\item @isPermissionError@ / @PermissionDenied@
 The process has insufficient privileges to perform the operation.
-[$EROFS$, $EACCES$, $EPERM$]
-\item $UnsatisfiedConstraints$
+@[EROFS, EACCES, EPERM]@
+\item @UnsatisfiedConstraints@
 Implementation-dependent constraints are not satisfied.  
-[$EBUSY$]
-\item $InappropriateType$
+@[EBUSY]@
+\item @InappropriateType@
 The operand refers to an existing directory.
-[$EPERM$, $EINVAL$]
+@[EPERM, EINVAL]@
 \end{itemize}
 
 \begin{code}
@@ -175,7 +199,7 @@ removeFile path =
         constructErrorAndFail "removeFile"
 \end{code}
 
-$renameDirectory old$ {\em new} changes the name of an existing
+@renameDirectory old@ {\em new} changes the name of an existing
 directory from {\em old} to {\em new}.  If the {\em new} directory
 already exists, it is atomically replaced by the {\em old} directory.
 If the {\em new} directory is neither the {\em old} directory nor an
@@ -187,31 +211,30 @@ must be documented.
 
 The operation may fail with:
 \begin{itemize}
-\item $HardwareFault$
+\item @HardwareFault@
 A physical I/O error has occurred.
-[$EIO$]
-\item $InvalidArgument$
+@[EIO]@
+\item @InvalidArgument@
 Either operand is not a valid directory name.
-[$ENAMETOOLONG$, $ELOOP$]
-\item $NoSuchThing$
+@[ENAMETOOLONG, ELOOP]@
+\item @isDoesNotExistError@ / @NoSuchThing@
 The original directory does not exist, or there is no path to the target.
-[$ENOENT$, $ENOTDIR$]
-\item $PermissionDenied$
+@[ENOENT, ENOTDIR]@
+\item @isPermissionError@ / @PermissionDenied@
 The process has insufficient privileges to perform the operation.
-[$EROFS$, $EACCES$, $EPERM$]
-\item $ResourceExhausted$
+@[EROFS, EACCES, EPERM]@
+\item @ResourceExhausted@
 Insufficient resources are available to perform the operation.  
-[$EDQUOT$, $ENOSPC$, $ENOMEM$, 
-$EMLINK$]
-\item $UnsatisfiedConstraints$
+@[EDQUOT, ENOSPC, ENOMEM, EMLINK]@
+\item @UnsatisfiedConstraints@
 Implementation-dependent constraints are not satisfied.
-[$EBUSY$, $ENOTEMPTY$, $EEXIST$]
-\item $UnsupportedOperation$
+@[EBUSY, ENOTEMPTY, EEXIST]@
+\item @UnsupportedOperation@
 The implementation does not support renaming in this situation.
-[$EINVAL$, $EXDEV$]
-\item $InappropriateType$
+@[EINVAL, EXDEV]@
+\item @InappropriateType@
 Either path refers to an existing non-directory object.
-[$ENOTDIR$, $EISDIR$]
+@[ENOTDIR, EISDIR]@
 \end{itemize}
 
 \begin{code}
@@ -223,7 +246,7 @@ renameDirectory opath npath =
         constructErrorAndFail "renameDirectory"
 \end{code}
 
-$renameFile old$ {\em new} changes the name of an existing file system
+@renameFile old@ {\em new} changes the name of an existing file system
 object from {\em old} to {\em new}.  If the {\em new} object already
 exists, it is atomically replaced by the {\em old} object.  Neither
 path may refer to an existing directory.  A conformant implementation
@@ -233,32 +256,30 @@ documented.
 
 The operation may fail with:
 \begin{itemize}
-\item $HardwareFault$
+\item @HardwareFault@
 A physical I/O error has occurred.
-[$EIO$]
-\item $InvalidArgument$
+@[EIO]@
+\item @InvalidArgument@
 Either operand is not a valid file name.
-[$ENAMETOOLONG$, $ELOOP$]
-\item $NoSuchThing$
+@[ENAMETOOLONG, ELOOP]@
+\item @isDoesNotExistError@ / @NoSuchThing@
 The original file does not exist, or there is no path to the target.
-[$ENOENT$, $ENOTDIR$]
-\item $PermissionDenied$
+@[ENOENT, ENOTDIR]@
+\item @isPermissionError@ / @PermissionDenied@
 The process has insufficient privileges to perform the operation.
-[$EROFS$, $EACCES$, $EPERM$]
-\item $ResourceExhausted$
+@[EROFS, EACCES, EPERM]@
+\item @ResourceExhausted@
 Insufficient resources are available to perform the operation.  
-[$EDQUOT$, $ENOSPC$, $ENOMEM$, 
-$EMLINK$]
-\item $UnsatisfiedConstraints$
+@[EDQUOT, ENOSPC, ENOMEM, EMLINK]@
+\item @UnsatisfiedConstraints@
 Implementation-dependent constraints are not satisfied.
-[$EBUSY$]
-\item $UnsupportedOperation$
+@[EBUSY]@
+\item @UnsupportedOperation@
 The implementation does not support renaming in this situation.
-[$EXDEV$]
-\item $InappropriateType$
+@[EXDEV]@
+\item @InappropriateType@
 Either path refers to an existing directory.
-[$ENOTDIR$, $EISDIR$, $EINVAL$, 
-$EEXIST$, $ENOTEMPTY$]
+@[ENOTDIR, EISDIR, EINVAL, EEXIST, ENOTEMPTY]@
 \end{itemize}
 
 \begin{code}
@@ -270,29 +291,29 @@ renameFile opath npath =
         constructErrorAndFail	"renameFile"
 \end{code}
 
-$getDirectoryContents dir$ returns a list of
-<i>all</i> entries in {\em dir}.
+@getDirectoryContents dir@ returns a list of {\em all} entries
+in {\em dir}. 
 
 The operation may fail with:
 \begin{itemize}
-\item $HardwareFault$
+\item @HardwareFault@
 A physical I/O error has occurred.
-[$EIO$]
-\item $InvalidArgument$
+@[EIO]@
+\item @InvalidArgument@
 The operand is not a valid directory name.
-[$ENAMETOOLONG$, $ELOOP$]
-\item $NoSuchThing$
+@[ENAMETOOLONG, ELOOP]@
+\item @isDoesNotExistError@ / @NoSuchThing@
 The directory does not exist.
-[$ENOENT$, $ENOTDIR$]
-\item $PermissionDenied$
+@[ENOENT, ENOTDIR]@
+\item @isPermissionError@ / @PermissionDenied@
 The process has insufficient privileges to perform the operation.
-[$EACCES$]
-\item $ResourceExhausted$
+@[EACCES]@
+\item @ResourceExhausted@
 Insufficient resources are available to perform the operation.
-[$EMFILE$, $ENFILE$]
-\item $InappropriateType$
+@[EMFILE, ENFILE]@
+\item @InappropriateType@
 The path refers to an existing non-directory object.
-[$ENOTDIR$]
+@[ENOTDIR]@
 \end{itemize}
 
 \begin{code}
@@ -319,23 +340,23 @@ getDirectoryContents path =
 \end{code}
 
 If the operating system has a notion of current directories,
-$getCurrentDirectory$ returns an absolute path to the
+@getCurrentDirectory@ returns an absolute path to the
 current directory of the calling process.
 
 The operation may fail with:
 \begin{itemize}
-\item $HardwareFault$
+\item @HardwareFault@
 A physical I/O error has occurred.
-[$EIO$]
-\item $NoSuchThing$
+@[EIO]@
+\item @isDoesNotExistError@ / @NoSuchThing@
 There is no path referring to the current directory.
-[$EPERM$, $ENOENT$, $ESTALE$...]
-\item $PermissionDenied$
+@[EPERM, ENOENT, ESTALE...]@
+\item @isPermissionError@ / @PermissionDenied@
 The process has insufficient privileges to perform the operation.
-[$EACCES$]
-\item $ResourceExhausted$
+@[EACCES]@
+\item @ResourceExhausted@
 Insufficient resources are available to perform the operation.
-\item $UnsupportedOperation$
+\item @UnsupportedOperation@
 The operating system has no notion of current directory.
 \end{itemize}
 
@@ -352,29 +373,29 @@ getCurrentDirectory =
 \end{code}
 
 If the operating system has a notion of current directories,
-$setCurrentDirectory dir$ changes the current
+@setCurrentDirectory dir@ changes the current
 directory of the calling process to {\em dir}.
 
 The operation may fail with:
 \begin{itemize}
-\item $HardwareFault$
+\item @HardwareFault@
 A physical I/O error has occurred.
-[$EIO$]
-\item $InvalidArgument$
+@[EIO]@
+\item @InvalidArgument@
 The operand is not a valid directory name.
-[$ENAMETOOLONG$, $ELOOP$]
-\item $NoSuchThing$
+@[ENAMETOOLONG, ELOOP]@
+\item @isDoesNotExistError@ / @NoSuchThing@
 The directory does not exist.
-[$ENOENT$, $ENOTDIR$]
-\item $PermissionDenied$
+@[ENOENT, ENOTDIR]@
+\item @isPermissionError@ / @PermissionDenied@
 The process has insufficient privileges to perform the operation.
-[$EACCES$]
-\item $UnsupportedOperation$
+@[EACCES]@
+\item @UnsupportedOperation@
 The operating system has no notion of current directory, or the
 current directory cannot be dynamically changed.
-\item $InappropriateType$
+\item @InappropriateType@
 The path refers to an existing non-directory object.
-[$ENOTDIR$]
+@[ENOTDIR]@
 \end{itemize}
 
 \begin{code}
@@ -387,3 +408,38 @@ setCurrentDirectory path =
 \end{code}
 
 
+
+\begin{code}
+{-
+doesFileExist :: FilePath -> IO Bool
+doesFileExist name =
+  psToByteArrayST name			    `thenIO_Prim` \ path ->
+  _ccall_ access path (``F_OK''::Int)	    `thenIO_Prim` \ rc ->
+  return (rc == 0)
+
+doesDirectoryExist :: FilePath -> IO Bool
+doesDirectoryExist name =  
+ (getFileStatus >>= isDirectory) `catch` (\ _ -> return False)
+
+getModificationTime :: FilePath -> IO Bool
+getModificationTime name =
+ getFileStatus >>= \ st ->
+ return (modificationTime st)
+
+getPermissions :: FilePath -> IO Permissions
+getPermissions name =
+  getFileStatus >>= \ st ->
+  let
+   fm = fileMode st
+   isect v = intersectFileMode v fm == v
+  in
+  return (
+    Permissions {
+      readable   = isect ownerReadMode,
+      writeable  = isect ownerWriteMode,
+      executable = not (isDirectory st)   && isect ownerExecuteMode,
+      searchable = not (isRegularFile st) && isect ownerExecuteMode
+    }
+  )
+-}
+\end{code}

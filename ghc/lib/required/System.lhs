@@ -12,9 +12,10 @@ module System (
 
 import Prelude
 import Foreign		( Addr )
-import IOBase		( IOError(..), thenIO_Prim, constructErrorAndFail )
+import IOBase		( IOError(..), IOErrorType(..), thenIO_Prim, constructErrorAndFail )
 import ArrBase		( indexAddrOffAddr )
 import PackedString	( unpackCString )
+
 \end{code}
 
 %*********************************************************
@@ -80,7 +81,7 @@ getEnv name =
     if litstring /= ``NULL'' then
 	return (unpackCString litstring)
     else
-	fail (NoSuchThing ("environment variable: " ++ name))
+	fail (IOError Nothing NoSuchThing ("environment variable: " ++ name))
 \end{code}
 
 Computation $system cmd$ returns the exit code
@@ -97,7 +98,7 @@ The implementation does not support system calls.
 \end{itemize}
 
 \begin{code}
-system "" = fail (InvalidArgument "null command")
+system "" = fail (IOError Nothing InvalidArgument "null command")
 system cmd = 
     _ccall_ systemCmd cmd	`thenIO_Prim` \ status ->
     case status of
@@ -114,13 +115,13 @@ Before it terminates, any open or semi-closed handles are first closed.
 \begin{code}
 exitWith ExitSuccess = 
     _ccall_ EXIT (0::Int)	`thenIO_Prim` \ () ->
-    fail (OtherError "exit should not return")
+    fail (IOError Nothing OtherError "exit should not return")
 
 exitWith (ExitFailure n) 
-  | n == 0 = fail (InvalidArgument "ExitFailure 0")
+  | n == 0 = fail (IOError Nothing InvalidArgument "ExitFailure 0")
   | otherwise = 
     _ccall_ EXIT n		`thenIO_Prim` \ () ->
-    fail (OtherError "exit should not return")
+    fail (IOError Nothing OtherError "exit should not return")
 \end{code}
 
 

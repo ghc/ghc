@@ -5,7 +5,7 @@
 \section[IO]{Module @IO@}
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 
 module IO (
     Handle, HandlePosn,
@@ -15,13 +15,19 @@ module IO (
     SeekMode(AbsoluteSeek,RelativeSeek,SeekFromEnd),
 
     stdin, stdout, stderr, 
-    openFile, hClose, hFileSize, hIsEOF, isEOF,
-    hSetBuffering, hGetBuffering, hFlush, hGetPosn, hSetPosn, hSeek, 
-    hIsOpen, hIsClosed, hIsReadable, hIsWritable, hIsSeekable, hReady, 
-    hGetChar, hLookAhead, hGetContents, hPutChar, hPutStr, hPrint,
 
-    isAlreadyExistsError, isAlreadyInUseError, isFullError, isEOFError,
+    openFile, hClose, 
+    hFileSize, hIsEOF, isEOF,
+    hSetBuffering, hGetBuffering, hFlush, 
+    hGetPosn, hSetPosn, hSeek, 
+    hReady, hGetChar, hLookAhead, hGetContents, 
+    hPutChar, hPutStr, hPutStrLn, hPrint,
+    hIsOpen, hIsClosed, hIsReadable, hIsWritable, hIsSeekable,
+
+    isAlreadyExistsError, isDoesNotExistError, isAlreadyInUseError, 
+    isFullError, isEOFError,
     isIllegalOperation, isPermissionError, isUserError, 
+    ioeGetErrorString, 
     ioeGetHandle, ioeGetFileName
   ) where
 
@@ -33,6 +39,7 @@ import IOHandle		-- much of the real stuff is in here
 import PackedString	( nilPS, packCBytesST, unpackPS )
 import PrelBase
 import GHC
+import Foreign          ( makeForeignObj )
 \end{code}
 
 %*********************************************************
@@ -59,11 +66,13 @@ hLookAhead            :: Handle -> IO Char
 hPrint                :: Show a => Handle -> a -> IO ()
 hPutChar              :: Handle -> Char -> IO ()
 hPutStr               :: Handle -> String -> IO ()
+hPutStrLn             :: Handle -> String -> IO ()
 hReady                :: Handle -> IO Bool 
 --IOHandle:hSeek                 :: Handle -> SeekMode -> Integer -> IO () 
 --IOHandle:hSetBuffering         :: Handle -> BufferMode -> IO ()
 --IOHandle:hSetPosn              :: HandlePosn -> IO () 
 -- ioeGetFileName        :: IOError -> Maybe FilePath
+-- ioeGetErrorString     :: IOError -> Maybe String
 -- ioeGetHandle          :: IOError -> Maybe Handle
 -- isAlreadyExistsError  :: IOError -> Bool
 -- isAlreadyInUseError   :: IOError -> Bool
@@ -96,16 +105,16 @@ hReady handle =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       AppendHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not open for reading")
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       WriteHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not open for reading")
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       other -> 
 	  _ccall_ inputReady (filePtr other)  	    `thenIO_Prim` \ rc ->
 	  writeHandle handle (markHandle htype)   >>
@@ -129,16 +138,16 @@ hGetChar handle =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       AppendHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not open for reading")
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       WriteHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not open for reading")
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       other -> 
 	  _ccall_ fileGetc (filePtr other)  	    `thenIO_Prim` \ intc ->
 	  writeHandle handle (markHandle htype)   >>
@@ -163,16 +172,16 @@ hLookAhead handle =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       AppendHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not open for reading")
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       WriteHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not open for reading")
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       other -> 
 	  _ccall_ fileLookAhead (filePtr other)    `thenIO_Prim` \ intc ->
 	  writeHandle handle (markHandle htype)   >>
@@ -204,16 +213,16 @@ hGetContents handle =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       AppendHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not open for reading")
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       WriteHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not open for reading")
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       other -> 
 	  {- 
              To avoid introducing an extra layer of buffering here,
@@ -250,7 +259,7 @@ hGetContents handle =
 	if buf /= ``NULL'' then
 	    return (buf, size)
 	else
-	    fail (ResourceExhausted "not enough virtual memory")
+	    fail (IOError Nothing ResourceExhausted "not enough virtual memory")
       where
         size = 
 	    case msize of
@@ -280,7 +289,8 @@ lazyReadBlock handle =
 	  then return nilPS
 	  else packCBytesST bytes buf)		    >>= \ some ->
           if bytes < 0 then
-	      ioToST (writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0)))
+	      makeForeignObj ``NULL'' ``&freeFile'' >>= \ null_fp ->
+	      ioToST (writeHandle handle (SemiClosedHandle null_fp (``NULL'', 0)))
 						    >>
               _ccall_ free buf			    >>= \ () ->
               _ccall_ closeFile fp	            >>
@@ -304,7 +314,8 @@ lazyReadLine handle =
 	  then return nilPS
 	  else packCBytesST bytes buf)		    >>= \ some ->
           if bytes < 0 then
-	      ioToST (writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0)))
+	      makeForeignObj ``NULL'' ``&freeFile'' >>= \ null_fp ->
+	      ioToST (writeHandle handle (SemiClosedHandle null_fp (``NULL'', 0)))
 						    >>
               _ccall_ free buf			    >>= \ () ->
               _ccall_ closeFile fp	            >>
@@ -325,7 +336,8 @@ lazyReadChar handle =
       SemiClosedHandle fp buf_info ->
 	  _ccall_ readChar fp			    >>= \ char ->
           if char == ``EOF'' then
-	      ioToST (writeHandle handle (SemiClosedHandle ``NULL'' buf_info))
+	      makeForeignObj ``NULL'' ``&freeFile'' >>= \ null_fp ->
+	      ioToST (writeHandle handle (SemiClosedHandle null_fp buf_info))
 						    >>
               _ccall_ closeFile fp	            >>
 	      returnPrimIO ""
@@ -358,13 +370,13 @@ hPutChar handle c =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       ReadHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not open for writing")
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for writing")
       other -> 
 	  _ccall_ filePutc (filePtr other) (ord c) `thenIO_Prim` \ rc ->
 	  writeHandle handle (markHandle htype)   >>
@@ -388,13 +400,13 @@ hPutStr handle str =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       ReadHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not open for writing")
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for writing")
       other -> 
           getBufferMode other			    `thenIO_Prim` \ other ->
           (case bufferMode other of
@@ -413,10 +425,10 @@ hPutStr handle str =
           else
               constructErrorAndFail "hPutStr"
   where
-    writeLines :: Addr -> String -> PrimIO Bool
+    writeLines :: ForeignObj -> String -> PrimIO Bool
     writeLines = writeChunks ``BUFSIZ'' True 
 
-    writeBlocks :: Addr -> Int -> String -> PrimIO Bool
+    writeBlocks :: ForeignObj -> Int -> String -> PrimIO Bool
     writeBlocks fp size s = writeChunks size False fp s
  
     {-
@@ -431,7 +443,7 @@ hPutStr handle str =
       a whole lot quicker. -- SOF 3/96
     -}
 
-    writeChunks :: Int -> Bool -> Addr -> String -> PrimIO Bool
+    writeChunks :: Int -> Bool -> ForeignObj -> String -> PrimIO Bool
 
     writeChunks (I# bufLen) chopOnNewLine fp s =
      newCharArray (0,I# bufLen) >>= \ arr@(MutableByteArray _ arr#) ->
@@ -466,7 +478,7 @@ hPutStr handle str =
      in
      shoveString 0# s
 
-    writeChars :: Addr -> String -> PrimIO Bool
+    writeChars :: ForeignObj -> String -> PrimIO Bool
     writeChars fp "" = returnPrimIO True
     writeChars fp (c:cs) =
 	_ccall_ filePutc fp (ord c) >>= \ rc ->
@@ -480,7 +492,20 @@ Computation $hPrint hdl t$ writes the string representation of {\em t}
 given by the $shows$ function to the file or channel managed by {\em
 hdl}.
 
+SOF 2/97: Seem to have disappeared in 1.4 libs.
+
 \begin{code}
 --hPrint :: Show a => Handle -> a -> IO ()
 hPrint hdl = hPutStr hdl . show
+\end{code}
+
+Derived action @hPutStrLn hdl str@ writes the string \tr{str} to
+the handle \tr{hdl}, adding a newline at the end.
+
+\begin{code}
+--hPutStrLn :: Handle -> String -> IO ()
+hPutStrLn hndl str = do
+ hPutStr  hndl str
+ hPutChar hndl '\n'
+
 \end{code}

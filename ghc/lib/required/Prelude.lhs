@@ -31,9 +31,6 @@ module Prelude (
     Functor(..), Monad(..), MonadZero(..), MonadPlus(..),
     accumulate, sequence, mapM, mapM_, guard, filter, concat, applyM,
 
-	-- From Maybe
-    maybe,
-
 	-- From PrelRead
     ReadS, Read(readsPrec, readList),
     reads, read, lex, readParen, 
@@ -67,6 +64,7 @@ import PrelTup
 import Monad
 import Maybe
 import IOBase	( error )
+import GHCerr
 
 -- These can't conveniently be defined in PrelBase because they use numbers,
 -- or I/O, so here's a convenient place to do them.

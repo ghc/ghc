@@ -1,21 +1,30 @@
 %
 % (c) The AQUA Project, Glasgow University, 1994-1996
 %
-
 \section[Monad]{Module @Monad@}
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
 module Monad (
-    Functor(..), Monad(..), MonadZero(..), MonadPlus(..),
+    Functor(..), 
+    Monad(..), MonadZero(..), MonadPlus(..),
 
-	-- Prelude monad functions
-    accumulate, sequence, mapM, mapM_, guard, filter, concat, applyM,
+    -- Prelude monad functions
+    accumulate, sequence, 
+    mapM, mapM_, guard, filter, concat, applyM,
 
-	-- Other monad functions
-    join, mapAndUnzipM, zipWithM, foldM, when, unless, ap, unless, when,
-    liftM, liftM2, liftM3, liftM4, liftM5
+    -- Standard Monad interface:
+    join,           -- :: (Monad m) => m (m a) -> m a
+    mapAndUnzipM,   -- :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
+    zipWithM,       -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+    foldM,          -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a 
+    when,           -- :: (Monad m) => Bool -> m () -> m ()
+    unless,         -- :: (Monad m) => Bool -> m () -> m ()
+    ap,             -- :: (Monad m) => (m (a -> b)) -> (m a) -> m b
+    liftM, liftM2,  
+    liftM3, liftM4, 
+    liftM5
   ) where
 
 import PrelList
@@ -87,6 +96,9 @@ unless p s 	 =  if p then return () else s
 when 		 :: (Monad m) => Bool -> m () -> m ()
 when p s	 =  if p then s else return ()
 
+ap :: (Monad m) => m (a->b) -> m a -> m b
+ap = liftM2 ($)
+
 liftM	:: (Monad m) => (a1 -> r) -> m a1 -> m r
 liftM2	:: (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
 liftM3	:: (Monad m) => (a1 -> a2 -> a3 -> r) -> m a1 -> m a2 -> m a3 -> m r
@@ -98,8 +110,5 @@ liftM2 f m1 m2 		= do { x1 <- m1; x2 <- m2; return (f x1 x2) }
 liftM3 f m1 m2 m3 	= do { x1 <- m1; x2 <- m2; x3 <- m3; return (f x1 x2 x3) }
 liftM4 f m1 m2 m3 m4	= do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; return (f x1 x2 x3 x4) }
 liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5; return (f x1 x2 x3 x4 x5) }
-
-ap :: (Monad m) => m (a->b) -> m a -> m b
-ap = liftM2 ($)
 
 \end{code}

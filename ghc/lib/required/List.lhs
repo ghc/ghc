@@ -6,21 +6,31 @@
 
 \begin{code}
 module List ( 
-    delete, deleteBy, (\\), deleteFirsts, deleteFirstsBy,
-    elemBy, notElemBy, lookupBy, maximumBy, minimumBy,
-    nub, nubBy, partition, sums, products, transpose,
+    elemIndex, elemIndices,
+    find, findIndex, findIndices,
+    nub, nubBy, delete, deleteBy, (\\), union, intersect,
+    intersperse, transpose, partition,
+    mapAccumL, mapAccumR,
+    sort, sortBy, insertBy,
+    maximumBy, minimumBy,
+    genericLength, genericTake, genericDrop,
+    genericSplitAt, genericIndex,
     zip4, zip5, zip6, zip7,
     zipWith4, zipWith5, zipWith6, zipWith7,
-    unzip4, unzip5, unzip6, unzip7,
-    genericLength, genericDrop, genericTake, genericSplitAt,
-    genericReplicate,
-    elemIndex, elemIndexBy, intersperse, group, groupBy,
-    mapAccumL, mapAccumR,
-    inits, tails, subsequences, permutations, 
-    union, intersect
+    unzip4, unzip5, unzip6, unzip7
+
+{- Disappeared from 1.4 libs - include still?
+    sums, products,
+    elemIndexBy, group, groupBy,
+    inits, tails, subsequences, permutations
+-}
+
   ) where
 
 import Prelude
+import Maybe (listToMaybe)
+
+infix 5 \\
 \end{code}
 
 %*********************************************************
@@ -30,6 +40,29 @@ import Prelude
 %*********************************************************
 
 \begin{code}
+elemIndex	:: Eq a => a -> [a] -> Maybe Int
+elemIndex x     = findIndex (x==)
+
+elemIndices     :: Eq a => a -> [a] -> [Int]
+elemIndices x   = findIndices (x==)
+
+find		:: (a -> Bool) -> [a] -> Maybe a
+find p          = listToMaybe . filter p
+
+findIndex       :: (a -> Bool) -> [a] -> Maybe Int
+findIndex p     = listToMaybe . findIndices p
+
+findIndices      :: (a -> Bool) -> [a] -> [Int]
+findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
+
+-- nub (meaning "essence") remove duplicate elements from its list argument.
+nub                     :: (Eq a) => [a] -> [a]
+nub                     =  nubBy (==)
+
+nubBy			:: (a -> a -> Bool) -> [a] -> [a]
+nubBy eq []             =  []
+nubBy eq (x:xs)         =  x : nubBy eq (filter (\ y -> not (eq x y)) xs)
+
 -- delete x removes the first occurrence of x from its list argument.
 delete                  :: (Eq a) => a -> [a] -> [a]
 delete                  =  deleteBy (==)
@@ -44,41 +77,25 @@ deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 (\\)			:: (Eq a) => [a] -> [a] -> [a]
 (\\)		        =  foldl (flip delete)
 
--- Alternate name for \\
-deleteFirsts		:: (Eq a) => [a] -> [a] -> [a]
-deleteFirsts 		= (\\)
+-- List union, remove the elements of first list from second.
+union :: (Eq a) => [a] -> [a] -> [a]
+union xs ys = xs ++ (ys \\ xs)
 
-deleteFirstsBy          :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
+intersect :: (Eq a) => [a] -> [a] -> [a]
+intersect xs ys = [ x | x <- xs, x `elem` ys]
 
--- elem, notElem, lookup, maximumBy and minimumBy are in PreludeList
-elemBy, notElemBy       :: (a -> a -> Bool) -> a -> [a] -> Bool
-elemBy eq _ []		=  False
-elemBy eq x (y:ys)	=  x `eq` y || elemBy eq x ys
+-- intersperse sep inserts sep between the elements of its list argument.
+-- e.g. intersperse ',' "abcde" == "a,b,c,d,e"
+intersperse		:: a -> [a] -> [a]
+intersperse sep []      = []
+intersperse sep [x]     = [x]
+intersperse sep (x:xs)  = x : sep : intersperse sep xs
 
-notElemBy eq x xs       =  not (elemBy eq x xs)
+transpose		:: [[a]] -> [[a]]
+transpose		=  foldr
+			     (\xs xss -> zipWith (:) xs (xss ++ repeat []))
+			     []
 
-lookupBy                :: (a -> a -> Bool) -> a -> [(a, b)] -> Maybe b
-lookupBy eq key []      =  Nothing
-lookupBy eq key ((x,y):xys)
-    | key `eq` x	=  Just y
-    | otherwise		=  lookupBy eq key xys
-
-maximumBy		:: (a -> a -> a) -> [a] -> a
-maximumBy max []	=  error "List.maximumBy: empty list"
-maximumBy max xs	=  foldl1 max xs
-
-minimumBy		:: (a -> a -> a) -> [a] -> a
-minimumBy min []	=  error "List.minimumBy: empty list"
-minimumBy min xs	=  foldl1 min xs
-
--- nub (meaning "essence") remove duplicate elements from its list argument.
-nub                     :: (Eq a) => [a] -> [a]
-nub                     =  nubBy (==)
-
-nubBy			:: (a -> a -> Bool) -> [a] -> [a]
-nubBy eq []             =  []
-nubBy eq (x:xs)         =  x : nubBy eq (filter (\ y -> not (eq x y)) xs)
 
 -- partition takes a predicate and a list and returns a pair of lists:
 -- those elements of the argument list that do and do not satisfy the
@@ -89,16 +106,71 @@ partition p xs		=  foldr select ([],[]) xs
 			   where select x (ts,fs) | p x       = (x:ts,fs)
                                                   | otherwise = (ts, x:fs)
 
--- sums and products give a list of running sums or products from
--- a list of numbers.  e.g., sums [1,2,3] == [0,1,3,6]
-sums, products		:: (Num a) => [a] -> [a]
-sums 			=  scanl (+) 0 
-products 		=  scanl (*) 1 
 
-transpose		:: [[a]] -> [[a]]
-transpose		=  foldr
-			     (\xs xss -> zipWith (:) xs (xss ++ repeat []))
-			     []
+                           
+
+mapAccumL 		:: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])
+mapAccumL f s []     	=  (s, [])
+mapAccumL f s (x:xs) 	=  (s'',y:ys)
+		           where (s', y ) = f s x
+			         (s'',ys) = mapAccumL f s' xs
+
+mapAccumR 		:: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])
+mapAccumR f s []     	=  (s, [])
+mapAccumR f s (x:xs)	=  (s'', y:ys)
+		           where (s'',y ) = f s' x
+			         (s', ys) = mapAccumR f s xs
+sort :: (Ord a) => [a] -> [a]
+sort = sortBy compare
+
+sortBy :: (a -> a -> Ordering) -> [a] -> [a]
+sortBy cmp = foldr (insertBy cmp) []
+
+insertBy :: (a -> a -> Ordering) -> a -> [a] -> [a]
+insertBy cmp x [] = [x]
+insertBy cmp x ys@(y:ys')
+ = case cmp x y of
+     GT -> y : insertBy cmp x ys'
+     _  -> x : ys
+
+maximumBy		:: (a -> a -> a) -> [a] -> a
+maximumBy max []	=  error "List.maximumBy: empty list"
+maximumBy max xs	=  foldl1 max xs
+
+minimumBy		:: (a -> a -> a) -> [a] -> a
+minimumBy min []	=  error "List.minimumBy: empty list"
+minimumBy min xs	=  foldl1 min xs
+
+genericLength           :: (Num i) => [b] -> i
+genericLength []        =  0
+genericLength (_:l)     =  1 + genericLength l
+
+genericTake		:: (Integral i) => i -> [a] -> [a]
+genericTake 0 _         =  []
+genericTake _ []        =  []
+genericTake n (x:xs) | n > 0  =  x : genericTake (n-1) xs
+genericTake _  _        =  error "List.genericTake: negative argument"
+
+genericDrop		:: (Integral i) => i -> [a] -> [a]
+genericDrop 0 xs        =  xs
+genericDrop _ []        =  []
+genericDrop n (_:xs) | n > 0  =  genericDrop (n-1) xs
+genericDrop _ _		=  error "List.genericDrop: negative argument"
+
+genericSplitAt          :: (Integral i) => i -> [b] -> ([b],[b])
+genericSplitAt 0 xs     =  ([],xs)
+genericSplitAt _ []     =  ([],[])
+genericSplitAt n (x:xs) | n > 0  =  (x:xs',xs'') where
+                               (xs',xs'') = genericSplitAt (n-1) xs
+genericSplitAt _ _      =  error "List.genericSplitAt: negative argument"
+
+
+genericIndex :: (Integral a) => [b] -> a -> b
+genericIndex (x:_)  0 = x
+genericIndex (_:xs) n 
+ | n > 0     = genericIndex xs (n-1)
+ | otherwise = error "List.genericIndex: negative argument."
+genericIndex _ _      = error "List.genericIndex: index too large."
 
 zip4			:: [a] -> [b] -> [c] -> [d] -> [(a,b,c,d)]
 zip4			=  zipWith4 (,,,)
@@ -157,36 +229,35 @@ unzip7		=  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
 				(a:as,b:bs,c:cs,d:ds,e:es,f:fs,g:gs))
 			 ([],[],[],[],[],[],[])
 
-genericLength           :: (Num i) => [b] -> i
-genericLength []        =  0
-genericLength (_:l)     =  1 + genericLength l
 
-genericDrop		:: (Integral i) => i -> [a] -> [a]
-genericDrop 0 xs        =  xs
-genericDrop _ []        =  []
-genericDrop n (_:xs) | n > 0  =  genericDrop (n-1) xs
-genericDrop _ _		=  error "List.genericDrop: negative argument"
 
-genericTake		:: (Integral i) => i -> [a] -> [a]
-genericTake 0 _         =  []
-genericTake _ []        =  []
-genericTake n (x:xs) | n > 0  =  x : genericTake (n-1) xs
-genericTake _  _        =  error "List.genericTake: negative argument"
+deleteFirstsBy          :: (a -> a -> Bool) -> [a] -> [a] -> [a]
+deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 
-genericSplitAt          :: (Integral i) => i -> [b] -> ([b],[b])
-genericSplitAt 0 xs     =  ([],xs)
-genericSplitAt _ []     =  ([],[])
-genericSplitAt n (x:xs) | n > 0  =  (x:xs',xs'') where
-                               (xs',xs'') = genericSplitAt (n-1) xs
-genericSplitAt _ _      =  error "List.genericSplitAt: negative argument"
+-- elem, notElem, lookup, maximumBy and minimumBy are in PreludeList
+elemBy, notElemBy       :: (a -> a -> Bool) -> a -> [a] -> Bool
+elemBy eq _ []		=  False
+elemBy eq x (y:ys)	=  x `eq` y || elemBy eq x ys
+
+notElemBy eq x xs       =  not (elemBy eq x xs)
+
+lookupBy                :: (a -> a -> Bool) -> a -> [(a, b)] -> Maybe b
+lookupBy eq key []      =  Nothing
+lookupBy eq key ((x,y):xys)
+    | key `eq` x	=  Just y
+    | otherwise		=  lookupBy eq key xys
+
+
+-- sums and products give a list of running sums or products from
+-- a list of numbers.  e.g., sums [1,2,3] == [0,1,3,6]
+sums, products		:: (Num a) => [a] -> [a]
+sums 			=  scanl (+) 0 
+products 		=  scanl (*) 1 
 
 genericReplicate	:: (Integral i) => i -> a -> [a]
 genericReplicate n x	=  genericTake n (repeat x)
 
--- l !! (elemIndex l x) == x  if x `elem` l
-elemIndex  		:: Eq a => [a] -> a -> Int
-elemIndex 		=  elemIndexBy (==)
-
+{-
 elemIndexBy 		:: (a -> a -> Bool) -> [a] -> a -> Int
 elemIndexBy eq [] x 	 = error "List.elemIndexBy: empty list"
 elemIndexBy eq (x:xs) x' = if x `eq` x' then 0 else 1 + elemIndexBy eq xs x'
@@ -201,26 +272,6 @@ groupBy 		:: (a -> a -> Bool) -> [a] -> [[a]]
 groupBy eq []		=  []
 groupBy eq (x:xs)	=  (x:ys) : groupBy eq zs
                            where (ys,zs) = span (eq x) xs
-                           
-
-mapAccumL 		:: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])
-mapAccumL f s []     	=  (s, [])
-mapAccumL f s (x:xs) 	=  (s'',y:ys)
-		           where (s', y ) = f s x
-			         (s'',ys) = mapAccumL f s' xs
-
-mapAccumR 		:: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])
-mapAccumR f s []     	=  (s, [])
-mapAccumR f s (x:xs)	=  (s'', y:ys)
-		           where (s'',y ) = f s' x
-			         (s', ys) = mapAccumR f s xs
-
--- intersperse sep inserts sep between the elements of its list argument.
--- e.g. intersperse ',' "abcde" == "a,b,c,d,e"
-intersperse             :: a -> [a] -> [a]
-intersperse sep []      =  []
-intersperse sep [x]     =  [x]
-intersperse sep (x:xs)  =  x : sep : intersperse sep xs
 
 -- inits xs returns the list of initial segments of xs, shortest first.
 -- e.g., inits "abc" == ["","a","ab","abc"]
@@ -248,10 +299,5 @@ permutations (x:xs)     =  [zs | ys <- permutations xs, zs <- interleave x ys ]
   where interleave          :: a -> [a] -> [[a]]
         interleave x []     =  [[x]]
         interleave x (y:ys) =  [x:y:ys] ++ map (y:) (interleave x ys)
-
-union 			:: (Eq a) => [a] -> [a] -> [a]
-union xs ys 		=  xs ++ (ys \\ xs)
-
-intersect 		:: (Eq a) => [a] -> [a] -> [a]
-intersect xs ys 	=  [x | x <- xs, x `elem` ys]
+-}
 \end{code}

@@ -9,10 +9,10 @@
 
 module  Array ( 
     module Ix,			-- export all of Ix 
-    Array, 			-- Array type abstractly
+    Array, 			-- Array type is abstract
 
     array, listArray, (!), bounds, indices, elems, assocs, 
-    accumArray, (//), accum, amap, ixmap
+    accumArray, (//), accum, ixmap
   ) where
 
 import Ix
@@ -73,6 +73,9 @@ ixmap b f a           =  array b [(i, a ! f i) | i <- range b]
 %*********************************************************
 
 \begin{code}
+instance Ix a => Functor (Array a) where
+  map = amap
+
 instance  (Ix a, Eq b)  => Eq (Array a b)  where
     a == a'  	        =  assocs a == assocs a'
     a /= a'  	        =  assocs a /= assocs a'
