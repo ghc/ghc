@@ -34,11 +34,11 @@
 # change between versions.  Rationale: calling conventions or other 
 # random .o-file stuff might change even if the .hi syntax doesn't
 
-ProjectName       = The Glorious Glasgow Haskell Compilation System
-ProjectNameShort  = ghc
-ProjectVersion    = @PACKAGE_VERSION@
+ProjectName       = @ProjectName@
+ProjectNameShort  = @ProjectNameShort@
+ProjectVersion    = @ProjectVersion@
 ProjectVersionInt = @ProjectVersionInt@
-ProjectPatchLevel = 0
+ProjectPatchLevel = @ProjectPatchLevel@
 
 # Interface file version (hi-boot files only)
 #
