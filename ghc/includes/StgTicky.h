@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.14 2002/12/18 01:13:37 mthomas Exp $
+ * $Id: StgTicky.h,v 1.15 2003/07/28 15:59:09 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -259,11 +259,13 @@ extern StgEntCounter *ticky_entry_ctrs;
    -----------------------  	--------------------------------------------
    TICK_UPD_SQUEEZED		Same as UPD_EXISTING but because
    				of stack-squeezing
+
    TICK_UPD_CON_IN_NEW		Allocating a new CON
    TICK_UPD_CON_IN_PLACE	Updating with a PAP in place
    TICK_UPD_PAP_IN_NEW		Allocating a new PAP
    TICK_UPD_PAP_IN_PLACE	Updating with a PAP in place
 
+   ToDo: the IN_PLACE versions are not relevant any more.
    -------------------------------------------------------------------------- */
 
 #define TICK_UPD_HISTO(categ,n) \
