@@ -127,6 +127,10 @@
 #include <shlobj.h>
 #endif
 
+#if HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+
 /* in inputReady.c */
 int inputReady(int fd, int msecs, int isSock);
 
@@ -712,6 +716,40 @@ INLINE int __hscore_stat(char *file, struct stat *buf) {
 INLINE int __hscore_fstat(int fd, struct stat *buf) {
 	return (fstat(fd,buf));
 }
+
+// select-related stuff
+
+#if !defined(mingw32_TARGET_OS)
+INLINE void hsFD_CLR(int fd, fd_set *fds) { FD_CLR(fd, fds); }
+INLINE int  hsFD_ISSET(int fd, fd_set *fds) { return FD_ISSET(fd, fds); }
+INLINE void hsFD_SET(int fd, fd_set *fds) { FD_SET(fd, fds); }
+INLINE int  sizeof_fd_set(void) { return sizeof(fd_set); }
+extern void hsFD_ZERO(fd_set *fds);
+#endif
+
+// gettimeofday()-related
+
+#if !defined(mingw32_TARGET_OS)
+#define TICK_FREQ  50
+
+INLINE HsInt sizeofTimeVal(void) { return sizeof(struct timeval); }
+
+INLINE HsInt getTicksOfDay(void)
+{  
+    struct timeval tv;
+    gettimeofday(&tv, (struct timezone *) NULL);
+    return (tv.tv_sec * TICK_FREQ +
+	    tv.tv_usec * TICK_FREQ / 1000000);
+}
+
+INLINE void setTimevalTicks(struct timeval *p, HsInt ticks)
+{
+    p->tv_sec  = ticks / TICK_FREQ;
+    p->tv_usec = (ticks % TICK_FREQ) * (1000000 / TICK_FREQ);
+}
+#endif // !defined(mingw32_TARGET_OS)
+
+// Directory-related
 
 #if defined(mingw32_TARGET_OS)
 
