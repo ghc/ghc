@@ -33,6 +33,7 @@ HS_OBJS = $(HS_SRCS:.lhs=.$(way_)o)
 LIBOBJS = $(HS_OBJS)
 HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) ghc/GHC.$(way_)hi
 
+
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
