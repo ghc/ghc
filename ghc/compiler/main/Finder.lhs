@@ -285,8 +285,8 @@ mkHomeModLocation mod_name src_filename = do
 	   let path = reverse (dropWhile (=='/') rest)
 	   mkHomeModLocationSearched mod_name path mod_basename extension
 	Nothing   -> do
-	  hPutStrLn stderr ("Warning: " ++ src_filename ++
-	  			 ": filename and module name do not match")
+	  -- hPutStrLn stderr ("Warning: " ++ src_filename ++
+	  --			 ": filename and module name do not match")
 	  let (dir,basename,ext) = splitFilename3 src_filename
 	  mkHomeModLocationSearched mod_name dir basename ext
 
