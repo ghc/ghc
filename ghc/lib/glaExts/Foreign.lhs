@@ -10,11 +10,11 @@
 module Foreign (
 	module Foreign,
 	ForeignObj(..),
-	Addr, Word
+	Addr(..), Word(..)
    ) where
 
 import STBase
-import ArrBase
+-- import ArrBase
 import PrelBase
 import GHC
 \end{code}
@@ -49,20 +49,17 @@ instance CCallable   Double
 instance CCallable   Double#
 instance CReturnable Double
 
+data Addr = A# Addr# 	deriving (Eq, Ord) -- Glasgow extension
+
 instance CCallable Addr
 instance CCallable Addr#
 instance CReturnable Addr
 
+data Word = W# Word# 	deriving (Eq, Ord) -- Glasgow extension
+
 instance CCallable Word
 instance CCallable Word#
 instance CReturnable Word
-
--- Is this right?
-instance CCallable (MutableByteArray s ix)
-instance CCallable (MutableByteArray# s)
-
-instance CCallable (ByteArray ix)
-instance CCallable ByteArray#
 
 instance CReturnable () -- Why, exactly?
 \end{code}
@@ -76,6 +73,8 @@ instance CReturnable () -- Why, exactly?
 
 \begin{code}
 --Defined in PrelBase: data ForeignObj = ForeignObj ForeignObj#
+data ForeignObj = ForeignObj ForeignObj#   -- another one
+
 instance CCallable ForeignObj
 instance CCallable ForeignObj#
 
