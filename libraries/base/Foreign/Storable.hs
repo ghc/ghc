@@ -1,4 +1,3 @@
-\begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
 -- |
@@ -10,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- The module "Storable" provides most elementary support for
+-- The module "Foreign.Storable" provides most elementary support for
 -- marshalling and is part of the language-independent portion of the
 -- Foreign Function Interface (FFI), and will normally be imported via
 -- the "Foreign" module.
@@ -28,9 +27,8 @@ module Foreign.Storable
 	     peek,           -- :: Ptr a             -> IO a
 	     poke)           -- :: Ptr a        -> a -> IO ()
         ) where
-\end{code}
 
-\begin{code}
+
 import Control.Monad		( liftM )
 import Foreign.Ptr
 import Foreign.C.Types
@@ -53,14 +51,7 @@ import GHC.Base
 #elif defined(__HUGS__)
 import HugsStorable
 #endif
-\end{code}
 
-Primitive marshaling
-
-Minimal complete definition: sizeOf, alignment, and one definition
-in each of the peek/poke families.
-
-\begin{code}
 {- |
 The member functions of this class facilitate writing values of
 primitive types to raw memory (which may have been allocated with the
@@ -165,18 +156,14 @@ class Storable a where
 
    peek ptr = peekElemOff ptr 0
    poke ptr = pokeElemOff ptr 0
-\end{code}
 
 #ifndef __GLASGOW_HASKELL__
-\begin{code}
 sizeOfPtr :: Storable a => Ptr a -> a -> Int
 sizeOfPtr px x = sizeOf x
-\end{code}
 #endif
 
-System-dependent, but rather obvious instances
+-- System-dependent, but rather obvious instances
 
-\begin{code}
 instance Storable Bool where
    sizeOf _          = sizeOf (undefined::CInt)
    alignment _       = alignment (undefined::CInt)
@@ -274,4 +261,3 @@ NSTORABLE(CWchar)
 NSTORABLE(CSigAtomic)
 NSTORABLE(CClock)
 NSTORABLE(CTime)
-\end{code}
