@@ -49,7 +49,8 @@ import GHC.IOBase
 import GHC.IO		( slurpFile )
 #endif
 
-import IO			( openFile, hFileSize, IOMode(ReadMode) )
+import IO			( openFile, hFileSize, IOMode(ReadMode),
+				  hClose )
 #if __GLASGOW_HASKELL__ >= 601
 import System.IO		( openBinaryFile )
 #else
@@ -103,6 +104,7 @@ hGetStringBuffer fname = do
    arr <- newArray_ (0,size_i-1)
    r <- if size_i == 0 then return 0 else hGetArray h arr size_i
 #endif
+   hClose h
    if (r /= size_i)
 	then ioError (userError "short read of file")
 	else do
