@@ -151,7 +151,7 @@
     <para>where currently the syntax is</para>
 
 <programlisting>
-   modid ->  conid 
+   modid   ->  conid 
    qconid  -> [modid .] conid  
 </programlisting>
 
@@ -368,7 +368,7 @@
       <itemizedlist>
 	<listitem>
 	  <para>A module defining a data type or type class
-          <replaceable>X</replaceable> has the itself the name
+          <replaceable>X</replaceable> has itself the name
           <replaceable>X</replaceable>, e.g.
           <literal>StablePtr</literal>.</para>
 	</listitem>
@@ -404,8 +404,8 @@
 	  would be named <literal>M.Internals</literal>. eg.</para>
 
 <programlisting>
-import Text.Html           -- The library
-import Text.Html.Internals -- The non-abstract library (for building other libs)
+import Text.HTML           -- The library
+import Text.HTML.Internals -- The non-abstract library
 </programlisting>
 	</listitem>
 
@@ -794,7 +794,7 @@ import Text.Html.Internals -- The non-abstract library (for building other libs)
       </itemizedlist>
 
       <para>Extensions which we'd like to be standard, but aren't
-      currently implemented by one or more of the our target
+      currently implemented by one or more of the target
       compilers:</para>
 
       <itemizedlist>
@@ -815,14 +815,14 @@ import Text.Html.Internals -- The non-abstract library (for building other libs)
 	</listitem>
 	<listitem>
 	  <para>Concurrent Haskell (pre-emptive multitasking
-	  optional).  Hugs implements this, but Nhc currently does
-	  not.</para>
+	  optional).  GHC and Hugs implement this, but Nhc currently
+	  does not.</para>
 	</listitem>
       </itemizedlist>
 
       <para>The following extensions are not likely to become part of
       the baseline, but are nevertheless used by one or more libraries
-      in the core set:</para>
+      in the core set (which are thus designated non-portable):</para>
 
       <itemizedlist>
 	<listitem>
@@ -987,7 +987,7 @@ import Text.Html.Internals -- The non-abstract library (for building other libs)
 -- Stability   :  experimental | provisional | stable
 -- Portability :  portable | non-portable (<replaceable>reason(s)</replaceable>)
 --
--- $Id: libraries.sgml,v 1.4 2001/07/05 13:52:49 simonmar Exp $
+-- $Id: libraries.sgml,v 1.5 2001/08/30 13:36:00 simonmar Exp $
 --
 -- <replaceable>Description</replaceable>
 -----------------------------------------------------------------------------
@@ -997,7 +997,7 @@ import Text.Html.Internals -- The non-abstract library (for building other libs)
 
       <variablelist>
 	<varlistentry>
-	  <term><literal>$Id: libraries.sgml,v 1.4 2001/07/05 13:52:49 simonmar Exp $</literal></term>
+	  <term><literal>$Id: libraries.sgml,v 1.5 2001/08/30 13:36:00 simonmar Exp $</literal></term>
 	  <listitem>
 	    <para>is optional, but usually included if the module is
 	    under CVS or RCS control.</para>
@@ -1315,11 +1315,11 @@ e.g. <literal>fromInteger</literal>.</para>
           encode an error condition and a normal result,
           <literal>Left</literal> is used for the former and
           <literal>Right</literal> for the latter, see
-          e.g. <literal>MonadEither</literal>.</para>
+          e.g. <literal>Control.Monad.Error</literal>.</para>
 	</listitem>
 
 	<listitem>
-	  <para> A module corresponding to a class
+	  <para>A module corresponding to a class
           (e.g. <literal>Bits</literal>) contains the class
           definition, perhaps some auxiliary functions, and all
           sensible instances for Prelude types, but nothing
@@ -1329,14 +1329,14 @@ e.g. <literal>fromInteger</literal>.</para>
 	</listitem>
 
 	<listitem>
-	  <para> Record-like C bit fields or structs have a
+	  <para>Record-like C bit fields or structs have a
           record-like interface, i.e. pure getting and setting of
           fields. (<emphasis>TODO</emphasis>: Clarify a little
           bit. Add examples.)</para>
 	</listitem>
 
 	<listitem>
-	  <para> Although the possibility of partial application
+	  <para>Although the possibility of partial application
           suggests the type 
 
 <literal><replaceable>attr</replaceable> -> <replaceable>object</replaceable> -> <replaceable>object</replaceable></literal> 
@@ -1406,7 +1406,7 @@ e.g. <literal>fromInteger</literal>.</para>
     Ix        -> Data.Ix
     Locale    -> System.Locale
     Monad     -> Data.Monad
-    Random    -> System.Radom
+    Random    -> System.Random
     Ratio     -> Data.Ratio
     Time      -> System.Time
 </screen>
