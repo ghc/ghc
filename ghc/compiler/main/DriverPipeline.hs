@@ -188,8 +188,8 @@ compile hsc_env mod_summary
 				extCoreName = basename ++ ".hcr" }
 
    -- -no-recomp should also work with --make
-   do_recomp <- readIORef v_Recomp
-   let source_unchanged' = source_unchanged && do_recomp
+   let do_recomp = recompFlag dyn_flags
+       source_unchanged' = source_unchanged && do_recomp
        hsc_env' = hsc_env { hsc_dflags = dyn_flags' }
 
    -- run the compiler
@@ -657,7 +657,7 @@ runPhase (Hsc src_flavour) todo dflags basename suff input_fn get_output_fn _may
   -- changed (which the compiler itself figures out).
   -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
-	do_recomp <- readIORef v_Recomp
+	let do_recomp = recompFlag dflags
 	source_unchanged <- 
           if not (do_recomp && case todo of { DoLink -> True; other -> False })
 	     then return False

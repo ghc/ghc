@@ -90,7 +90,7 @@ module CmdLineOpts (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} Packages (PackageState)
-import DriverPhases	( HscTarget(..), HscSource(..) )
+import DriverPhases	( HscTarget(..) )
 import Constants	-- Default values for some flags
 import Util
 import FastString	( FastString, mkFastString )
@@ -306,6 +306,7 @@ data DynFlags = DynFlags {
   ruleCheck		:: Maybe String,
   cppFlag    		:: Bool,	-- preprocess with cpp?
   ppFlag                :: Bool,        -- preprocess with a Haskell Pp?
+  recompFlag		:: Bool,	-- True <=> recompilation checker is on
   stolen_x86_regs	:: Int,		
   cmdlineHcIncludes	:: [String],	-- -#includes
   importPaths		:: [FilePath],
@@ -365,6 +366,7 @@ defaultDynFlags = DynFlags {
   ruleCheck		= Nothing,
   cppFlag		= False,
   ppFlag                = False,
+  recompFlag		= True,
   stolen_x86_regs	= 4,
   cmdlineHcIncludes	= [],
   importPaths		= ["."],

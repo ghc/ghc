@@ -189,15 +189,15 @@ static_flags =
 	-- -fno-code says to stop after Hsc but don't generate any code.
   ,  ( "fno-code"	, PassFlag (\f -> do setMode (StopBefore HCc) f
 				             setTarget HscNothing
-				             writeIORef v_Recomp False))
+				             setRecompFlag False))
 
 	------- GHCi -------------------------------------------------------
   ,  ( "ignore-dot-ghci", NoArg (writeIORef v_Read_DotGHCi False) )
   ,  ( "read-dot-ghci"  , NoArg (writeIORef v_Read_DotGHCi True) )
 
 	------- recompilation checker --------------------------------------
-  ,  ( "recomp"		, NoArg (writeIORef v_Recomp True) )
-  ,  ( "no-recomp"  	, NoArg (writeIORef v_Recomp False) )
+  ,  ( "recomp"		, NoArg (setRecompFlag True) )
+  ,  ( "no-recomp"  	, NoArg (setRecompFlag False) )
 
 	------- ways --------------------------------------------------------
   ,  ( "prof"		, NoArg (addNoDups v_Ways	WayProf) )
@@ -359,47 +359,47 @@ dynamic_flags = [
 	------ Debugging ----------------------------------------------------
   ,  ( "dstg-stats",	NoArg (writeIORef v_StgStats True) )
 
-  ,  ( "ddump-cmm",         	 NoArg (setDynFlag Opt_D_dump_cmm) )
-  ,  ( "ddump-asm",          	 NoArg (setDynFlag Opt_D_dump_asm) )
-  ,  ( "ddump-cpranal",      	 NoArg (setDynFlag Opt_D_dump_cpranal) )
-  ,  ( "ddump-deriv",        	 NoArg (setDynFlag Opt_D_dump_deriv) )
-  ,  ( "ddump-ds",           	 NoArg (setDynFlag Opt_D_dump_ds) )
-  ,  ( "ddump-flatC",        	 NoArg (setDynFlag Opt_D_dump_flatC) )
-  ,  ( "ddump-foreign",      	 NoArg (setDynFlag Opt_D_dump_foreign) )
-  ,  ( "ddump-inlinings",    	 NoArg (setDynFlag Opt_D_dump_inlinings) )
-  ,  ( "ddump-occur-anal",   	 NoArg (setDynFlag Opt_D_dump_occur_anal) )
-  ,  ( "ddump-parsed",       	 NoArg (setDynFlag Opt_D_dump_parsed) )
-  ,  ( "ddump-rn",           	 NoArg (setDynFlag Opt_D_dump_rn) )
-  ,  ( "ddump-simpl",        	 NoArg (setDynFlag Opt_D_dump_simpl) )
-  ,  ( "ddump-simpl-iterations", NoArg (setDynFlag Opt_D_dump_simpl_iterations) )
-  ,  ( "ddump-spec",         	 NoArg (setDynFlag Opt_D_dump_spec) )
-  ,  ( "ddump-prep",          	 NoArg (setDynFlag Opt_D_dump_prep) )
-  ,  ( "ddump-stg",          	 NoArg (setDynFlag Opt_D_dump_stg) )
-  ,  ( "ddump-stranal",      	 NoArg (setDynFlag Opt_D_dump_stranal) )
-  ,  ( "ddump-tc",           	 NoArg (setDynFlag Opt_D_dump_tc) )
-  ,  ( "ddump-types",        	 NoArg (setDynFlag Opt_D_dump_types) )
-  ,  ( "ddump-rules",        	 NoArg (setDynFlag Opt_D_dump_rules) )
-  ,  ( "ddump-cse",          	 NoArg (setDynFlag Opt_D_dump_cse) )
-  ,  ( "ddump-worker-wrapper",   NoArg (setDynFlag Opt_D_dump_worker_wrapper) )
-  ,  ( "dshow-passes",           NoArg (setVerbosity "2") )
-  ,  ( "ddump-rn-trace",         NoArg (setDynFlag Opt_D_dump_rn_trace) )
-  ,  ( "ddump-if-trace",         NoArg (setDynFlag Opt_D_dump_if_trace) )
-  ,  ( "ddump-tc-trace",         NoArg (setDynFlag Opt_D_dump_tc_trace) )
-  ,  ( "ddump-splices",          NoArg (setDynFlag Opt_D_dump_splices) )
-  ,  ( "ddump-rn-stats",         NoArg (setDynFlag Opt_D_dump_rn_stats) )
-  ,  ( "ddump-opt-cmm",          NoArg (setDynFlag Opt_D_dump_opt_cmm) )
-  ,  ( "ddump-simpl-stats",      NoArg (setDynFlag Opt_D_dump_simpl_stats) )
-  ,  ( "ddump-bcos",             NoArg (setDynFlag Opt_D_dump_BCOs) )
-  ,  ( "dsource-stats",          NoArg (setDynFlag Opt_D_source_stats) )
-  ,  ( "dverbose-core2core",     NoArg (setDynFlag Opt_D_verbose_core2core) )
-  ,  ( "dverbose-stg2stg",       NoArg (setDynFlag Opt_D_verbose_stg2stg) )
-  ,  ( "ddump-hi-diffs",         NoArg (setDynFlag Opt_D_dump_hi_diffs) )
-  ,  ( "ddump-hi",               NoArg (setDynFlag Opt_D_dump_hi) )
-  ,  ( "ddump-minimal-imports",  NoArg (setDynFlag Opt_D_dump_minimal_imports) )
-  ,  ( "ddump-vect",         	 NoArg (setDynFlag Opt_D_dump_vect) )
-  ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting) )
-  ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting) )
-  ,  ( "dcmm-lint",		 NoArg (setDynFlag Opt_DoCmmLinting) )
+  ,  ( "ddump-cmm",         	 setDumpFlag Opt_D_dump_cmm)
+  ,  ( "ddump-asm",          	 setDumpFlag Opt_D_dump_asm)
+  ,  ( "ddump-cpranal",      	 setDumpFlag Opt_D_dump_cpranal)
+  ,  ( "ddump-deriv",        	 setDumpFlag Opt_D_dump_deriv)
+  ,  ( "ddump-ds",           	 setDumpFlag Opt_D_dump_ds)
+  ,  ( "ddump-flatC",        	 setDumpFlag Opt_D_dump_flatC)
+  ,  ( "ddump-foreign",      	 setDumpFlag Opt_D_dump_foreign)
+  ,  ( "ddump-inlinings",    	 setDumpFlag Opt_D_dump_inlinings)
+  ,  ( "ddump-occur-anal",   	 setDumpFlag Opt_D_dump_occur_anal)
+  ,  ( "ddump-parsed",       	 setDumpFlag Opt_D_dump_parsed)
+  ,  ( "ddump-rn",           	 setDumpFlag Opt_D_dump_rn)
+  ,  ( "ddump-simpl",        	 setDumpFlag Opt_D_dump_simpl)
+  ,  ( "ddump-simpl-iterations", setDumpFlag Opt_D_dump_simpl_iterations)
+  ,  ( "ddump-spec",         	 setDumpFlag Opt_D_dump_spec)
+  ,  ( "ddump-prep",          	 setDumpFlag Opt_D_dump_prep)
+  ,  ( "ddump-stg",          	 setDumpFlag Opt_D_dump_stg)
+  ,  ( "ddump-stranal",      	 setDumpFlag Opt_D_dump_stranal)
+  ,  ( "ddump-tc",           	 setDumpFlag Opt_D_dump_tc)
+  ,  ( "ddump-types",        	 setDumpFlag Opt_D_dump_types)
+  ,  ( "ddump-rules",        	 setDumpFlag Opt_D_dump_rules)
+  ,  ( "ddump-cse",          	 setDumpFlag Opt_D_dump_cse)
+  ,  ( "ddump-worker-wrapper",   setDumpFlag Opt_D_dump_worker_wrapper)
+  ,  ( "ddump-rn-trace",         setDumpFlag Opt_D_dump_rn_trace)
+  ,  ( "ddump-if-trace",         setDumpFlag Opt_D_dump_if_trace)
+  ,  ( "ddump-tc-trace",         setDumpFlag Opt_D_dump_tc_trace)
+  ,  ( "ddump-splices",          setDumpFlag Opt_D_dump_splices)
+  ,  ( "ddump-rn-stats",         setDumpFlag Opt_D_dump_rn_stats)
+  ,  ( "ddump-opt-cmm",          setDumpFlag Opt_D_dump_opt_cmm)
+  ,  ( "ddump-simpl-stats",      setDumpFlag Opt_D_dump_simpl_stats)
+  ,  ( "ddump-bcos",             setDumpFlag Opt_D_dump_BCOs)
+  ,  ( "dsource-stats",          setDumpFlag Opt_D_source_stats)
+  ,  ( "dverbose-core2core",     setDumpFlag Opt_D_verbose_core2core)
+  ,  ( "dverbose-stg2stg",       setDumpFlag Opt_D_verbose_stg2stg)
+  ,  ( "ddump-hi-diffs",         setDumpFlag Opt_D_dump_hi_diffs)
+  ,  ( "ddump-hi",               setDumpFlag Opt_D_dump_hi)
+  ,  ( "ddump-minimal-imports",  setDumpFlag Opt_D_dump_minimal_imports)
+  ,  ( "ddump-vect",         	 setDumpFlag Opt_D_dump_vect)
+  ,  ( "dcore-lint",       	 setDumpFlag Opt_DoCoreLinting)
+  ,  ( "dstg-lint",        	 setDumpFlag Opt_DoStgLinting)
+  ,  ( "dcmm-lint",		 setDumpFlag Opt_DoCmmLinting)
+  ,  ( "dshow-passes",           NoArg (setRecompFlag False >> setVerbosity "2") )
 
 	------ Machine dependant (-m<blah>) stuff ---------------------------
 
@@ -513,6 +513,12 @@ setDynFlag, unSetDynFlag :: DynFlag -> IO ()
 setDynFlag f   = updDynFlags (\dfs -> dopt_set dfs f)
 unSetDynFlag f = updDynFlags (\dfs -> dopt_unset dfs f)
 
+setDumpFlag :: DynFlag -> OptKind
+setDumpFlag dump_flag 
+  = NoArg (setRecompFlag False >> setDynFlag dump_flag)
+	-- Whenver we -ddump, switch off the recompilation checker,
+	-- else you don't see the dump!
+
 addOpt_L a = updDynFlags (\s -> s{opt_L = a : opt_L s})
 addOpt_P a = updDynFlags (\s -> s{opt_P = a : opt_P s})
 addOpt_F a = updDynFlags (\s -> s{opt_F = a : opt_F s})
@@ -523,6 +529,9 @@ addOpt_m a = updDynFlags (\s -> s{opt_m = a : opt_m s})
 addOpt_I a = updDynFlags (\s -> s{opt_I = a : opt_I s})
 addOpt_i a = updDynFlags (\s -> s{opt_i = a : opt_i s})
 #endif
+
+setRecompFlag :: Bool -> IO ()
+setRecompFlag recomp = updDynFlags (\dfs -> dfs{ recompFlag = recomp })
 
 setVerbosity "" = updDynFlags (\dfs -> dfs{ verbosity = 3 })
 setVerbosity n 
