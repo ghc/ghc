@@ -20,6 +20,10 @@
 #include "Capability.h"
 #endif
 
+// Used to avoid calling abandonRequestWait() if we don't need to.
+// Protected by sched_mutex.
+static nat workerWaitingForRequests = 0;
+
 void
 awaitEvent(rtsBool wait)
 {
@@ -38,9 +42,11 @@ awaitEvent(rtsBool wait)
   do {
     /* Try to de-queue completed IO requests
      */
+    workerWaitingForRequests = 1;
     RELEASE_LOCK(&sched_mutex);
     ret = awaitRequests(wait);
     ACQUIRE_LOCK(&sched_mutex);
+    workerWaitingForRequests = 0;
     if (!ret) { 
       return; /* still hold the lock */
     }
@@ -64,7 +70,8 @@ awaitEvent(rtsBool wait)
 void
 wakeBlockedWorkerThread()
 {
-  abandonRequestWait();
+    if (workerWaitingForRequests) {
+	abandonRequestWait();
+    }
 }
 #endif
-
