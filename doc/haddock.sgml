@@ -21,7 +21,7 @@
 
   <!-- Table of contents -->
   <toc></toc>
-  
+
   <chapter id="introduction">
     <title>Introduction</title>
 
@@ -99,7 +99,7 @@
 
     <section id="obtaining">
       <title>Obtaining Haddock</title>
-      
+
       <para>Distributions (source & binary) of Haddock can be obtained
       from its <ulink url="http://www.haskell.org/haddock/">web
       site</ulink>.</para>
@@ -162,7 +162,7 @@
 
     <section>
       <title>Acknowledgements</title>
-      
+
       <para>Several documentation systems provided the inspiration for
       Haddock, most notably:</para>
 
@@ -223,7 +223,7 @@
     indentifiers it couldn't resolve.</para>
 
     <para>The modules should <emphasis>not</emphasis> be mutually
-    recursive, as Haddock don't like swimming in circles.</para> 
+    recursive, as Haddock don't like swimming in circles.</para>
 
     <para>The following options are available:</para>
 
@@ -368,29 +368,56 @@
 
       <varlistentry>
 	<term><option>-m</option></term>
-	<term><option>--ms-help</option></term>
-	<indexterm><primary><option>-m</option></primary></indexterm>
-	<indexterm><primary><option>--ms-help</option></primary>
+	<term><option>--html-help</option></term>
+	<indexterm><primary><option>--html-help</option></primary>
 	</indexterm>
 	<listitem>
 	  <para>(In HTML mode only) Produce extra contents and index
-	  files for the Microsoft HTML Help system.  The files created
-	  will be named <filename>index.hhc</filename> and
-	  <filename>index.hhk</filename> respectively.</para>
+	  files for given HTML Help system. Currently supported Help
+	  systems are Microsoft HTML Help 1.3 and 2.0 and GNOME DevHelp.
 
 	  <para>Using the Microsoft HTML Help system provides two
 	  advantages over plain HTML: the help viewer gives you a nice
 	  hierarchical folding contents pane on the left, and the
 	  documentation files are compressed and therefore much
-	  smaller (roughly a factor of 10).  The disadvantages are
-	  that the viewer is only available on Windows, and the help
-	  can't be viewed over the web.</para>
+	  smaller (roughly a factor of 10). The disadvantage is that
+	  the help can't be viewed over the web.</para>
 
 	  <para>In order to create a compiled Microsoft help file, you
 	  also need the Microsoft HTML Help compiler, which is
-	  available free from <ulink
-	  url="http://www.microsoft.com/">http://www.microsoft.com/</ulink>
+	  available free from
+	  <ulink url="http://www.microsoft.com/">http://www.microsoft.com/</ulink>
 	  (search for <quote>HTML Help compiler</quote>).</para>
+
+	  Viewers
+	  <variablelist>
+	  	 <varlistentry>
+	  	    <term>Microsoft HTML Help Viewer</term>
+	  	    <listitem>Distributed with Microsoft Windows</listitem>
+	  	 </varlistentry>
+	     <varlistentry>
+            <term><ulink url="http://xchm.sourceforge.net">xCHM</ulink></term>
+	  	    <listitem>a CHM viewer for UNIX (Linux, *BSD, Solaris), written by Razvan Cojocaru</listitem>
+	  	 </varlistentry>
+	     <varlistentry>
+            <term><ulink url="http://www.jouledata.com/MacProducts.html">JouleData Solutions' CHM Viewer</ulink></term>
+	  	    <listitem>a comercial 100% native Cocoa .chm file viewer for the Mac OS X platform</listitem>
+	  	 </varlistentry>
+	     <varlistentry>
+            <term><ulink url="http://gnochm.sourceforge.net">GnoCHM</ulink></term>
+	  	    <listitem>a CHM file viewer. It is designed to integrate nicely with Gnome.</listitem>
+	  	 </varlistentry>
+	  </variablelist>
+
+	  <para>The GNOME DevHelp also provides help viewer which looks like
+	  MSHelp viewer but the documentation files aren't compressed.
+	  The documentation can be viewed with any HTML browser but
+	  DevHelp gives you a nice hierarchical folding contents and
+	  keyword index panes on the left. The DevHelp expects to see
+	  *.devhelp file in the folder where the documentation is placed.
+	  The file contains all required information
+	  to build the contents and index panes.
+	  </para>
 	</listitem>
       </varlistentry>
 
@@ -574,7 +601,7 @@ $ haddock -h Foo.hs ...
     </section>
 
   </chapter>
-  
+
   <chapter id="markup">
     <title>Documentation and Markup</title>
 
@@ -640,7 +667,7 @@ square x = x * x
       <para>Some people like to write their documentation
       <emphasis>after</emphasis> the declaration; this is possible in
       Haddock too:</para>
-     
+
 <programlisting>
 square :: Int -> Int
 -- ^The 'square' function squares an integer.
@@ -651,7 +678,7 @@ square x = x * x
       &mdash; if you don't write the type signature for a function,
       then Haddock can't tell what its type is and it won't be
       included in the documentation.</para>
-      
+
       <para>Documentation annotations may span several lines; the
       annotation continues until the first non-comment line in the
       source file.  For example:</para>
@@ -675,24 +702,24 @@ square x = x * x
 square :: Int -> Int
 square x = x * x
 </programlisting>
-      
+
     </section>
     <section>
       <title>Documenting parts of a declaration</title>
-      
+
       <para>In addition to documenting the whole declaration, in some
       cases we can also document individual parts of the
       declaration.</para>
 
       <section>
 	<title>Class methods</title>
-	  
+
 	<para>Class methods are documented in the same way as top
 	level type signatures, by using either the
 	<quote><literal>--&nbsp;|</literal></quote> or
 	<quote><literal>--&nbsp;^</literal></quote>
 	annotations:</para>
-	  
+
 <programlisting>
 class C a where
    -- | This is the documentation for the 'f' method
@@ -710,9 +737,9 @@ class C a where
 <programlisting>
 data T a b
   -- | This is the documentation for the 'C1' constructor
-  = C1 a b 
+  = C1 a b
   -- | This is the documentation for the 'C2' constructor
-  | C2 a b 
+  | C2 a b
 </programlisting>
 
 	<para>or like this:</para>
@@ -727,14 +754,14 @@ data T a b
 	styles:</para>
 
 <programlisting>
-data R a b = 
+data R a b =
   C { -- | This is the documentation for the 'a' field
       a :: a,
       -- | This is the documentation for the 'b' field
       b :: b
     }
 
-data R a b = 
+data R a b =
   C { a :: a  -- ^ This is the documentation for the 'a' field
     , b :: b  -- ^ This is the documentation for the 'b' field
     }
@@ -748,7 +775,7 @@ data R a b =
 
       <section>
 	<title>Function arguments</title>
-	
+
 	<para>Individual arguments to a function may be documented
 	like this:</para>
 
@@ -775,10 +802,10 @@ module Foo where
 ...
 </programlisting>
     </section>
-    
+
     <section>
       <title>Controlling the documentation structure</title>
-	
+
       <para>Haddock produces interface documentation that lists only
       the entities actually exported by the module.  The documentation
       for a module will include <emphasis>all</emphasis> entities
@@ -849,7 +876,7 @@ module Foo (
 
       <section>
 	<title>Re-exporting an entire module</title>
-	
+
 	<para>Haskell allows you to re-export the entire contents of a
 	module (or at least, everything currently in scope that was
 	imported from a given module) by listing it in the export
@@ -859,7 +886,7 @@ module Foo (
 module A (
   module B,
   module C
- ) where	  
+ ) where
 </programlisting>
 
 	<para>What will the Haddock-generated documentation for this
@@ -876,7 +903,7 @@ module A (
 module A (
   module B,
   module C
- ) where	  
+ ) where
 
 import B hiding (f)
 import C (a, b)
@@ -896,10 +923,10 @@ import C (a, b)
 	is never cross-referenced; the contents are always expanded in
 	place in the re-exporting module.</para>
       </section>
-      
+
       <section>
 	<title>Omitting the export list</title>
-	
+
 	<para>If there is no export list in the module, how does
 	Haddock generate documentation?  Well, when the export list is
 	omitted, e.g.:</para>
@@ -937,7 +964,7 @@ module Foo (
  ) where
 </programlisting>
 	</listitem>
-	
+
 	<listitem>
 	  <para>If the documentation is large and placing it inline in
 	  the export list might bloat the export list and obscure the
@@ -954,7 +981,7 @@ module Foo (
    ...
  ) where
 
--- $doc 
+-- $doc
 -- Here is a large chunk of documentation which may be referred to by
 -- the name $doc.
 </programlisting>
@@ -968,8 +995,8 @@ module Foo (
     </section>
 
     <section>
-      <title>Hyperlinking and re-exported entities</title> 
-      
+      <title>Hyperlinking and re-exported entities</title>
+
       <para>When Haddock renders a type in the generated
       documentation, it hyperlinks all the type constructors and class
       names in that type to their respective definitions.  But for a
@@ -1038,7 +1065,7 @@ import B
 
     <section id="module-attributes">
       <title>Module Attributes</title>
-      
+
       <para>Certain attributes may be specified for each module which
       affects the way that Haddock generates documentation for that
       module.  Attributes are specified in a comma-separated list in a
@@ -1068,7 +1095,7 @@ module A where
 	    definitions.</para>
 	  </listitem>
 	</varlistentry>
-	
+
 	<varlistentry>
 	  <term><literal>prune</literal></term>
 	  <indexterm><primary><literal>hide</literal></primary></indexterm>
@@ -1077,7 +1104,7 @@ module A where
 	    annotations from the generated documentation.</para>
 	  </listitem>
 	</varlistentry>
-	
+
 	<varlistentry>
 	  <term><literal>ignore-exports</literal></term>
 	  <indexterm><primary><literal>hide</literal></primary></indexterm>
@@ -1103,7 +1130,7 @@ module A where
 
       <section>
 	<title>Paragraphs</title>
-	
+
 	<para>One or more blank lines separates two paragraphs in a
 	documentation comment.</para>
       </section>
@@ -1263,7 +1290,7 @@ module A where
 
       <section>
 	<title>Definition lists</title>
-	
+
 	<para>Definition lists are written as follows:</para>
 
 <programlisting>
@@ -1275,7 +1302,7 @@ module A where
 </programlisting>
 
 	<para>To produce output something like this:</para>
-	
+
 	<variablelist>
 	  <varlistentry>
 	    <term><literal>foo</literal></term>
@@ -1322,7 +1349,7 @@ module A where
 	<literal>#<replaceable>label</replaceable>#</literal>, where
 	<replaceable>label</replaceable> is the name of the anchor.
 	An anchor is invisible in the generated documentation.</para>
-	
+
 	<para>To link to an anchor from elsewhere, use the syntax
 	<literal>"<replaceable>module</replaceable>#<replaceable>label</replaceable>"</literal>
 	where <replaceable>module</replaceable> is the module name
