@@ -27,7 +27,6 @@ module SrcLoc {- (
 IMP_Ubiq()
 
 import Outputable
-import PprStyle		( PprStyle(..), userStyle )
 import Pretty
 
 \end{code}
