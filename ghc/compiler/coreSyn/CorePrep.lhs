@@ -10,7 +10,7 @@ module CorePrep (
 
 #include "HsVersions.h"
 
-import CoreUtils( exprIsTrivial, exprIsAtom, exprType, exprIsValue, etaExpand )
+import CoreUtils( exprIsAtom, exprType, exprIsValue, etaExpand )
 import CoreFVs	( exprFreeVars )
 import CoreLint	( endPass )
 import CoreSyn
@@ -172,6 +172,18 @@ corePrepArg env arg dem
 
 needs_binding | opt_KeepStgTypes = exprIsAtom
 	      | otherwise	 = exprIsTrivial
+
+-- version that doesn't consider an scc annotation to be trivial.
+exprIsTrivial (Var v)
+  | hasNoBinding v		       = idArity v == 0
+  | otherwise                          = True
+exprIsTrivial (Type _)	      	       = True
+exprIsTrivial (Lit lit)       	       = True
+exprIsTrivial (App e arg)     	       = isTypeArg arg && exprIsTrivial e
+exprIsTrivial (Note (SCC _) e) 	       = False
+exprIsTrivial (Note _ e)      	       = exprIsTrivial e
+exprIsTrivial (Lam b body) | isTyVar b = exprIsTrivial body
+exprIsTrivial other	      	       = False
 
 -- ---------------------------------------------------------------------------
 -- Dealing with expressions
