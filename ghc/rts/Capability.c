@@ -68,8 +68,8 @@ Condition thread_ready_cond = INIT_COND_VAR;
  * the number of tasks currently blocked waiting on thread_ready_cond.
  * (if > 0 => no need for a new task, just unblock an existing one).
  *
- * waitForWork() takes care of keeping it up-to-date; Task.startTask()
- * uses its current value.
+ * waitForWorkCapability() takes care of keeping it up-to-date;
+ * Task.startTask() uses its current value.
  */
 nat rts_n_waiting_tasks = 0;
 #endif

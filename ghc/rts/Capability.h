@@ -32,10 +32,14 @@ extern void initCapabilities(void);
 extern void grabCapability(Capability** pCap);
 extern void releaseCapability(Capability* cap);
 
-#if defined(RTS_SUPPORTS_THREADS)
-/* total number of available capabilities */
 extern nat rts_n_free_capabilities;  
-extern nat rts_n_waiting_workers;
+#if defined(RTS_SUPPORTS_THREADS)
+/* number of worker threads waiting to do good work within
+   the RTS. Used by Task.c (only) to determine whether or not
+   new worker threads needs to be created (when an external call
+   is made).
+ */
+extern nat rts_n_waiting_workers; /* used by Task.c to determine */
 
 extern void grabReturnCapability(Mutex* pMutex, Capability** pCap);
 extern void yieldToReturningWorker(Mutex* pMutex, Capability* cap);
