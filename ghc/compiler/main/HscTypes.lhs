@@ -112,6 +112,7 @@ data NameSupply
 \subsection{The result of compiling one module}
 %*									*
 %************************************************************************
+
 \begin{code}
 data CompResult
    = CompOK   ModDetails  -- new details (HST additions)
@@ -125,6 +126,26 @@ data CompResult
               [SDoc]                  -- errors
               [SDoc]                  -- warnings
 
+
+-- The driver sits between 'compile' and 'hscMain', translating calls
+-- to the former into calls to the latter, and results from the latter
+-- into results from the former.  It does things like preprocessing
+-- the .hs file if necessary, and compiling up the .stub_c files to
+-- generate Linkables.
+
+data HscResult
+   = HscOK   ModDetails  		-- new details (HomeSymbolTable additions)
+	     Maybe ModIFace		-- new iface (if any compilation was done)
+	     Maybe String  		-- generated stub_h
+	     Maybe String  		-- generated stub_c
+             PersistentCompilerState 	-- updated PCS
+             [SDoc]                  	-- warnings
+
+   | HscErrs PersistentCompilerState 	-- updated PCS
+             [SDoc]                  	-- errors
+             [SDoc]                  	-- warnings
+
+	
 
 -- These two are only here to avoid recursion between CmCompile and
 -- CompManager.  They really ought to be in the latter.

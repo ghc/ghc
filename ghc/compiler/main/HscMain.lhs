@@ -54,11 +54,10 @@ hscMain
   :: DynFlags	
   -> ModSummary       -- summary, including source filename
   -> Maybe ModIFace   -- old interface, if available
-  -> String	      -- file in which to put the output (.s or .c)
+  -> String	      -- file in which to put the output (.s, .hc, .java etc.)
   -> HomeSymbolTable		-- for home module ModDetails
   -> PersistentCompilerState    -- IN: persistent compiler state
-  -> IO CompResult    -- NB. without the Linkable filled in; the
-		      -- driver sorts that out.
+  -> IO HscResult
 
 hscMain flags core_cmds stg_cmds summary maybe_old_iface
 	output_filename mod_details pcs =

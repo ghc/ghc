@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.3 2000/10/11 15:26:18 simonmar Exp $
+-- $Id: DriverState.hs,v 1.4 2000/10/11 16:26:04 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -658,7 +658,6 @@ way_details =
 
 GLOBAL_VAR(pgm_L,   error "pgm_L", String)
 GLOBAL_VAR(pgm_P,   cRAWCPP,       String)
-GLOBAL_VAR(pgm_C,   error "pgm_L", String)
 GLOBAL_VAR(pgm_c,   cGCC,          String)
 GLOBAL_VAR(pgm_m,   error "pgm_m", String)
 GLOBAL_VAR(pgm_s,   error "pgm_s", String)

@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.4 2000/10/11 15:26:18 simonmar Exp $
+-- $Id: Main.hs,v 1.5 2000/10/11 16:26:04 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -132,13 +132,11 @@ main =
    if am_installed
 	then do writeIORef path_usage (installed "ghc-usage.txt")
 		writeIORef pgm_L (installed "unlit")
-		writeIORef pgm_C (installed "hsc")
 		writeIORef pgm_m (installed "ghc-asm")
 		writeIORef pgm_s (installed "ghc-split")
 
 	else do writeIORef path_usage (inplace (cGHC_DRIVER_DIR ++ "/ghc-usage.txt"))
 		writeIORef pgm_L (inplace cGHC_UNLIT)
-		writeIORef pgm_C (inplace cGHC_HSC)
 		writeIORef pgm_m (inplace cGHC_MANGLER)
 		writeIORef pgm_s (inplace cGHC_SPLIT)
 
@@ -208,7 +206,6 @@ main =
    o_files <- mapM compileFile src_pipelines
 
    when (mode == DoMkDependHS) endMkDependHS
-
    when (mode == DoLink) (doLink o_files)
 
 	-- grab the last -B option on the command line, and

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.1 2000/10/11 15:26:18 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.2 2000/10/11 16:26:04 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -440,9 +440,8 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
 -----------------------------------------------------------------------------
 -- Hsc phase
 
-{-
 run_phase Hsc	basename suff input_fn output_fn
-  = do  hsc <- readIORef pgm_C
+  = do
 	
   -- we add the current directory (i.e. the directory in which
   -- the .hs files resides) to the import path, since this is
@@ -452,24 +451,13 @@ run_phase Hsc	basename suff input_fn output_fn
 	paths <- readIORef include_paths
 	writeIORef include_paths (current_dir : paths)
 	
-  -- build the hsc command line
-	hsc_opts <- build_hsc_opts
-	
-	doing_hi <- readIORef produceHi
-	tmp_hi_file <- if doing_hi 	
-			  then newTempName "hi"
-			  else return ""
-	
-  -- tmp files for foreign export stub code
-	tmp_stub_h <- newTempName "stub_h"
-	tmp_stub_c <- newTempName "stub_c"
-	
   -- figure out where to put the .hi file
 	ohi    <- readIORef output_hi
 	hisuf  <- readIORef hi_suf
-	let hi_flags = case ohi of
-			   Nothing -> [ "-hidir="++current_dir, "-hisuf="++hisuf ]
-			   Just fn -> [ "-hifile="++fn ]
+	let hifile = case ohi of
+			   Nothing -> current_dir ++ {-ToDo: modname!!-}basename
+					++ hisuf
+			   Just fn -> fn
 
   -- figure out if the source has changed, for recompilation avoidance.
   -- only do this if we're eventually going to generate a .o file.
@@ -495,41 +483,55 @@ run_phase Hsc	basename suff input_fn output_fn
 				  then return "-fsource-unchanged"
 				  else return ""
 
-  -- run the compiler!
-	run_something "Haskell Compiler" 
-		 (unwords (hsc : input_fn : (
-		    hsc_opts
-		    ++ hi_flags
-		    ++ [ 
-			  source_unchanged,
-			  "-ofile="++output_fn, 
-			  "-F="++tmp_stub_c, 
-			  "-FH="++tmp_stub_h 
-		       ]
-		 )))
+   -- build a bogus ModSummary to pass to hscMain.
+	let summary = ModSummary {
+			ms_loc = SourceOnly (error "no mod") input_fn,
+			ms_ppsource = Just (loc, error "no fingerprint"),
+			ms_imports = error "no imports"
+		     }
 
-  -- check whether compilation was performed, bail out if not
-	b <- doesFileExist output_fn
-	if not b && not (null source_unchanged) -- sanity
-		then do run_something "Touching object file"
-			    ("touch " ++ o_file)
-			return False
-		else do -- carry on...
+  -- run the compiler!
+	result <- hscMain dyn_flags mod_summary 
+				Nothing{-no iface-}
+				output_fn emptyUFM emptyPCS
+
+	case result of {
+
+	    HscErrs pcs errs warns -> do
+		mapM (printSDoc PprForUser) warns
+		mapM (printSDoc PprForUser) errs
+		throwDyn (PhaseFailed "hsc" (ExitFailure 1));
+
+	    HscOk details maybe_iface maybe_stub_h maybe_stub_c pcs warns -> do
+
+	mapM (printSDoc PprForUser) warns
+
+   -- generate the interface file
+	case iface of
+	   Nothing -> -- compilation not required
+	     do run_something "Touching object file" ("touch " ++ o_file)
+		return False
+
+	   Just iface ->
 
   -- Deal with stubs
 	let stub_h = basename ++ "_stub.h"
 	let stub_c = basename ++ "_stub.c"
-	
-		-- copy .h_stub file into current dir if present
-	b <- doesFileExist tmp_stub_h
-	when b (do
+
+  -- copy the .stub_h file into the current dir if necessary
+	case maybe_stub_h of
+	   Nothing -> return ()
+	   Just tmp_stub_h -> do
 	      	run_something "Copy stub .h file"
 				("cp " ++ tmp_stub_h ++ ' ':stub_h)
 	
 			-- #include <..._stub.h> in .hc file
 		addCmdlineHCInclude tmp_stub_h	-- hack
 
-			-- copy the _stub.c file into the current dir
+  -- copy the .stub_c file into the current dir, and compile it, if necessary
+	case maybe_stub_c of
+	   Nothing -> return ()
+	   Just tmp_stub_c -> do  -- copy the _stub.c file into the current dir
 		run_something "Copy stub .c file" 
 		    (unwords [ 
 			"rm -f", stub_c, "&&",
@@ -542,9 +544,8 @@ run_phase Hsc	basename suff input_fn output_fn
 		runPipeline pipeline stub_c False{-no linking-} False{-no -o option-}
 
 		add ld_inputs (basename++"_stub.o")
-	 )
+
 	return True
--}
 
 -----------------------------------------------------------------------------
 -- Cc phase

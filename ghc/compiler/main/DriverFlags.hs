@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.2 2000/10/11 15:26:18 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.3 2000/10/11 16:26:04 simonmar Exp $
 --
 -- Driver flags
 --
@@ -298,15 +298,15 @@ static_flags =
 -----------------------------------------------------------------------------
 -- parse the dynamic arguments
 
-GLOBAL_VAR(dynFlags, error "no dynFlags", DynFlags)
+GLOBAL_VAR(v_DynFlags, error "no dynFlags", DynFlags)
 
 setDynFlag f = do
-   dfs <- readIORef dynFlags
-   writeIORef dynFlags dfs{ flags = f : flags dfs }
+   dfs <- readIORef v_DynFlags
+   writeIORef v_DynFlags dfs{ flags = f : flags dfs }
 
 unSetDynFlag f = do
-   dfs <- readIORef dynFlags
-   writeIORef dynFlags dfs{ flags = filter (/= f) (flags dfs) }
+   dfs <- readIORef v_DynFlags
+   writeIORef v_DynFlags dfs{ flags = filter (/= f) (flags dfs) }
 
 dynamic_flags = [
 
