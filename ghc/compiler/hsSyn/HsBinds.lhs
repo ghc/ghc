@@ -109,6 +109,10 @@ data MonoBinds id pat
 				-- and variables		f = \x -> e
 				-- Reason: the Match stuff lets us have an optional
 				--	   result type sig	f :: a->a = ...mentions a...
+				--
+				-- This also means that instance decls can only have
+				-- FunMonoBinds, so if you change this, you'll need to
+				-- change e.g. rnMethodBinds
 		    Bool		-- True => infix declaration
 		    [Match id pat]
 		    SrcLoc
