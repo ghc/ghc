@@ -6,7 +6,7 @@
 Buffers for scanning string input stored in external arrays.
 
 \begin{code}
-{-# OPTIONS -fno-prune-tydecls -#include "../lib/std/cbits/stgio.h" #-}
+{-# OPTIONS -fno-prune-tydecls #-}
 module StringBuffer
        (
         StringBuffer,
@@ -71,15 +71,17 @@ import Foreign
 import ST
 import Char		( chr )
 
+-- urk!
+#include "../lib/std/cbits/error.h"
+
 #if __GLASGOW_HASKELL__ >= 303
 import IO		( openFile, slurpFile )
 import PrelIOBase
 import PrelHandle
 import Addr
-#include "../lib/std/cbits/error.h"
--- urk!
 #else
 import IO		( openFile, hFileSize, hClose, IOMode(..) )
+import Addr
 #endif
 
 #if __GLASGOW_HASKELL__ < 301
@@ -88,7 +90,8 @@ import IOHandle		( readHandle, writeHandle, filePtr )
 import PackBase 	( unpackCStringBA )
 #else
 # if __GLASGOW_HASKELL__ <= 302
-import PrelIOBase	( IOError(..), IOErrorType(..) )
+import PrelIOBase	( Handle, IOError(..), IOErrorType(..), 
+			  constructErrorAndFail )
 import PrelHandle	( readHandle, writeHandle, filePtr )
 # endif
 import PrelPack		( unpackCStringBA )
@@ -121,18 +124,19 @@ instance Text StringBuffer where
 
 \begin{code}
 hGetStringBuffer :: Bool -> FilePath -> IO StringBuffer
-hGetStringBuffer expand_tabs fname =
-#if __GLASGOW_HASKELL__ >= 303
-    (if expand_tabs
-	then slurpFileExpandTabs fname
-    	else slurpFile fname)
-	  >>= \ (a , read) ->
-    let (A# a#) = a
-        (I# read#) = read
-    in
-    _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' a (I# (read# -# 1#)) >>= \ () ->
-    return (StringBuffer a# read# 0# 0#)
-#else
+hGetStringBuffer expand_tabs fname = do
+   (a, read) <- if expand_tabs 
+				then slurpFileExpandTabs fname 
+				else slurpFile fname
+
+   let (A# a#) = a;  (I# read#) = read
+
+         -- add sentinel '\NUL'
+   _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' (A# a#) (I# (read# -# 1#))
+   return (StringBuffer a# read# 0# 0#)
+
+#if __GLASGOW_HASKELL__ < 303
+slurpFile fname =
     openFile fname ReadMode >>= \ hndl ->
     hFileSize hndl          >>= \ len ->
     let len_i = fromInteger len in
@@ -155,10 +159,7 @@ hGetStringBuffer expand_tabs fname =
      if read# ==# 0# then -- EOF or some other error
         fail (userError ("hGetStringBuffer: failed to slurp in interface file "++fname))
      else
-        -- Add a sentinel NUL
-        _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' arr (I# (read# -# 1#)) >>= \ () ->
-        return (StringBuffer a# read# 0# 0#)
-
+	return (arr, I# read#)
 #endif
 
 unsafeWriteBuffer :: StringBuffer -> Int# -> Char# -> StringBuffer
@@ -180,7 +181,23 @@ We guess the size of the buffer required as 20% extra for
 expanded tabs, and enlarge it if necessary.
 
 \begin{code}
-slurpFileExpandTabs :: FilePath -> IO (Addr, Int)
+#if __GLASGOW_HASKELL__ < 303
+ioError = fail
+mayBlock fo thing = thing
+
+writeCharOffAddr :: Addr -> Int -> Char -> IO ()
+writeCharOffAddr addr off c
+  = _casm_ ``*((char *)%0+(int)%1)=(char)%2;'' addr off c
+#endif
+
+getErrType :: IO Int
+#if __GLASGOW_HASKELL__ < 303
+getErrType = _casm_ ``%r = ghc_errtype;''
+#else
+getErrType =  _ccall_ getErrType__
+#endif
+
+slurpFileExpandTabs :: FilePath -> IO (Addr,Int)
 slurpFileExpandTabs fname = do
   bracket (openFile fname ReadMode) (hClose) 
    (\ handle ->
@@ -196,10 +213,14 @@ slurpFileExpandTabs fname = do
 
 trySlurp :: Handle -> Int -> Addr -> IO (Addr, Int)
 trySlurp handle sz_i chunk =
+#if __GLASGOW_HASKELL__ >= 303
   wantReadableHandle "hGetChar" handle $ \ handle_ ->
-  let 
-	fo = haFO__ handle_
-
+  let fo = haFO__ handle_ in
+#else
+  readHandle handle        >>= \ handle_ ->
+  let fo = filePtr handle_ in
+#endif
+  let
 	(I# chunk_sz) = sz_i
 
 	tAB_SIZE = 8#
@@ -216,7 +237,7 @@ trySlurp handle sz_i chunk =
     	  slurp c off = do
     		intc <- mayBlock fo (_ccall_ fileGetc fo)
     		if intc == ((-1)::Int)
-     		  then do errtype <- _ccall_ getErrType__
+     		  then do errtype <- getErrType
 			  if errtype == (ERR_EOF :: Int)
 			    then return (I# off)
 			    else constructErrorAndFail "slurpFile"
@@ -252,15 +273,26 @@ reAllocMem :: Addr -> Int -> IO Addr
 reAllocMem ptr sz = do
    chunk <- _ccall_ realloc ptr sz
    if chunk == nullAddr 
-      then constructErrorAndFail "reAllocMem"
+#if __GLASGOW_HASKELL__ < 303
+      then fail (userError "reAllocMem")
+#else
+      then fail "reAllocMem"
+#endif
       else return chunk
 
 allocMem :: Int -> IO Addr
 allocMem sz = do
+#if __GLASGOW_HASKELL__ < 303
+   chunk <- _ccall_ malloc sz
+   if chunk == nullAddr 
+      then fail (userError "allocMem")
+      else return chunk
+#else
    chunk <- _ccall_ allocMemory__ sz
    if chunk == nullAddr 
       then constructErrorAndFail "allocMem"
       else return chunk
+#endif
 \end{code}
 
 Lookup
