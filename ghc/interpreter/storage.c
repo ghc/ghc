@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.44 $
- * $Date: 2000/02/24 14:05:55 $
+ * $Revision: 1.45 $
+ * $Date: 2000/02/24 17:26:12 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -768,7 +768,10 @@ void* getHugs_AsmObject_for ( char* s )
    Name   n = NIL;
    for (n = NAMEMIN; n < nameHw; n++)
       if (name(n).text == t) break;
-   if (n == nameHw) internal("getHugs_AsmObject_for(1)");
+   if (n == nameHw) {
+      fprintf ( stderr, "can't find `%s' in ...\n", s );
+      internal("getHugs_AsmObject_for(1)");
+   }
    v = name(n).stgVar;
    if (!isStgVar(v) || !isPtr(stgVarInfo(v)))
       internal("getHugs_AsmObject_for(2)");

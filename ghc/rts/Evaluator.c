@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.34 $
- * $Date: 2000/02/15 15:14:09 $
+ * $Revision: 1.35 $
+ * $Date: 2000/02/24 17:26:12 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1791,7 +1791,7 @@ static StgClosure* makeErrorCall ( const char* msg )
    HaskellObj error 
       = asmClosureOfObject(getHugs_AsmObject_for("error"));
    HaskellObj unpack
-      = asmClosureOfObject(getHugs_AsmObject_for("primUnpackString"));
+      = asmClosureOfObject(getHugs_AsmObject_for("hugsprimUnpackString"));
    HaskellObj thunk
       = rts_apply ( unpack, rts_mkAddr ( (void*)msg ) );
    thunk
