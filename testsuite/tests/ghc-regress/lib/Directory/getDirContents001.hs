@@ -5,6 +5,6 @@ main = do
     names <- getDirectoryContents "."
     putStrLn (unlines (sort (filter ok names)))
 
-ok name = "getDirectoryContents" `isPrefixOf` name 
+ok name = "getDirContents" `isPrefixOf` name 
 	  && not ("bak" `isSuffixOf` name)
 	  && not ("prof" `isSuffixOf` name)
