@@ -37,7 +37,7 @@ import HscTypes		( PersistentCompilerState( pcs_PRS ),
 			  NameSupply( nsNames ), OrigNameCache
 			)
 import UniqSupply
-import DataCon		( dataConName )
+import DataCon		( DataCon, dataConName )
 import Literal		( isLitLitLit )
 import FiniteMap	( lookupFM, addToFM )
 import Maybes		( maybeToBool, orElse )
@@ -607,8 +607,24 @@ fiddleCCall id
 %*									*
 %************************************************************************
 
+hasCafRefs decides whether a top-level closure can point into the dynamic heap.
+We mark such things as `MayHaveCafRefs' because this information is
+used to decide whether a particular closure needs to be referenced
+in an SRT or not.
+
+There are two reasons for setting MayHaveCafRefs:
+	a) The RHS is a CAF: a top-level updatable thunk.
+	b) The RHS refers to something that MayHaveCafRefs
+
+Possible improvement: In an effort to keep the number of CAFs (and 
+hence the size of the SRTs) down, we could also look at the expression and 
+decide whether it requires a small bounded amount of heap, so we can ignore 
+it as a CAF.  In these cases however, we would need to use an additional
+CAF list to keep track of non-collectable CAFs.  
+
 \begin{code}
 hasCafRefs  :: (Id -> Bool) -> CoreExpr -> CafInfo
+-- Only called for the RHS of top-level lets
 hasCafRefss :: (Id -> Bool) -> [CoreExpr] -> CafInfo
 	-- predicate returns True for a given Id if we look at this Id when
 	-- calculating the result.  Used to *avoid* looking at the CafInfo
@@ -644,22 +660,22 @@ cafRefs p (Type t) 	     = fastBool False
 cafRefss p [] 	  = fastBool False
 cafRefss p (e:es) = cafRefs p e `fastOr` cafRefss p es
 
--- Decide whether a closure looks like a CAF or not.  In an effort to
--- keep the number of CAFs (and hence the size of the SRTs) down, we
--- would also like to look at the expression and decide whether it
--- requires a small bounded amount of heap, so we can ignore it as a
--- CAF.  In these cases however, we would need to use an additional
--- CAF list to keep track of non-collectable CAFs.  
-
--- We mark real CAFs as `MayHaveCafRefs' because this information is
--- used to decide whether a particular closure needs to be referenced
--- in an SRT or not.
 
 isCAF :: CoreExpr -> Bool
+-- Only called for the RHS of top-level lets
 isCAF e = not (rhsIsNonUpd e)
   {- ToDo: check type for onceness, i.e. non-updatable thunks? -}
 
-rhsIsNonUpd :: CoreExpr -> Bool	-- True => Value-lambda, constructor, PAP
+rhsIsNonUpd :: CoreExpr -> Bool
+  -- True => Value-lambda, constructor, PAP
+  -- This is a bit like CoreUtils.exprIsValue, with the following differences:
+  -- 	a) scc "foo" (\x -> ...) is updatable (so we catch the right SCC)
+  --
+  --    b) (C x xs), where C is a contructors is updatable if the application is
+  --	   dynamic: see isDynConApp
+  -- 
+  --    c) don't look through unfolding of f in (f x).  I'm suspicious of this one
+
 rhsIsNonUpd (Lam b e)          = isId b || rhsIsNonUpd e
 rhsIsNonUpd (Note (SCC _) e)   = False
 rhsIsNonUpd (Note _ e)         = rhsIsNonUpd e
@@ -683,19 +699,22 @@ idAppIsNonUpd id n_val_args args
 	DataConId con | not (isDynConApp con args) -> True
 	other -> n_val_args < idArity id
 
+isDynConApp :: DataCon -> [CoreExpr] -> Bool
 isDynConApp con args = isDllName (dataConName con) || any isDynArg args
+-- Top-level constructor applications can usually be allocated 
+-- statically, but they can't if 
+-- 	a) the constructor, or any of the arguments, come from another DLL
+--	b) any of the arguments are LitLits
+-- (because we can't refer to static labels in other DLLs).
+-- If this happens we simply make the RHS into an updatable thunk, 
+-- and 'exectute' it rather than allocating it statically.
+-- All this should match the decision in (see CoreToStg.coreToStgRhs)
 
-	-- Does this argument refer to something in a different DLL,
-	-- or is a LitLit?  Constructor arguments which are in another
-	-- DLL or are LitLits aren't compiled into static constructors
-	-- (see CoreToStg), so we have to take that into account here.
+
 isDynArg :: CoreExpr -> Bool
 isDynArg (Var v)    = isDllName (idName v)
 isDynArg (Note _ e) = isDynArg e
 isDynArg (Lit lit)  = isLitLitLit lit
 isDynArg (App e _)  = isDynArg e	-- must be a type app
 isDynArg (Lam _ e)  = isDynArg e	-- must be a type lam
-
--- We consider partial applications to be non-updatable.  NOTE: this
--- must match how CoreToStg marks the closure.
 \end{code}
