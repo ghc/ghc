@@ -1,3 +1,24 @@
+Changes in version 0.3:
+  
+  * Documentation on individual function arguments is now implemented 
+  
+  * Links can be made to identifiers that aren't in scope, by using
+    the fully qualified name.
+
+  * Instances are collected and listed with the appropriate classes
+    and datatypes (not for derived instances yet).
+
+  * Single quotes are only interpreted specially when they surround a
+    legal Haskell identifier, otherwise they are treated literally.
+
+  * Bird-tracked text is now literal.  If you want marked-up text in
+    a code block, use the @...@ notation instead.
+
+  * Various changes to the layout, it generally looks nice now.
+
+  * Various bugs fixed.
+
+-----------------------------------------------------------------------------
 Changes in version 0.2:
 
   * The [...] markup for typewriter font has been changed to @...@.
