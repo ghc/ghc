@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.14 2001/03/22 03:51:09 hwloidl Exp $
+ * $Id: InfoMacros.h,v 1.15 2001/07/23 23:14:58 ken Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -135,24 +135,24 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
         entry_class(stg_RBH_##entry);					\
         entry_class(entry);						\
 	ED_RO_ StgInfoTable info;					\
-	info_class INFO_TBL_CONST StgInfoTable stg_RBH_##info = {		\
-		layout : { bitmap : (StgWord32)bitmap_ },		\
+	info_class INFO_TBL_CONST StgInfoTable stg_RBH_##info = {	\
+		layout : { bitmap : (StgWord)bitmap_ },			\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(RBH,srt_,srt_off_,srt_len_),			\
                 INCLUDE_RBH_INFO(info),					\
                 INIT_ENTRY(stg_RBH_##entry),				\
                 INIT_VECTOR						\
 	};								\
-        StgFunPtr stg_RBH_##entry (void) {                                  \
+        StgFunPtr stg_RBH_##entry (void) {                              \
           FB_                                                           \
-            JMP_(stg_RBH_entry);                                            \
+            JMP_(stg_RBH_entry);                                        \
           FE_                                                           \
         } ;                                                             \
 	info_class INFO_TBL_CONST StgInfoTable info = {			\
-		layout : { bitmap : (StgWord32)bitmap_ },		\
+		layout : { bitmap : (StgWord)bitmap_ },			\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
-                INCLUDE_RBH_INFO(stg_RBH_##info),				\
+                INCLUDE_RBH_INFO(stg_RBH_##info),			\
                 INIT_ENTRY(entry),					\
                 INIT_VECTOR						\
 	}
@@ -165,7 +165,7 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
 		      prof_descr, prof_type)				\
         entry_class(entry);						\
 	info_class INFO_TBL_CONST StgInfoTable info = {			\
-		layout : { bitmap : (StgWord32)bitmap_ },		\
+		layout : { bitmap : (StgWord)bitmap_ },			\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
                 INIT_ENTRY(entry),					\
@@ -337,7 +337,7 @@ typedef struct {
   	info_class INFO_TBL_CONST vec_info_2 info = {		\
 		{ alt_2, alt_1 },				\
 		i : {						\
-		   layout : { bitmap : (StgWord32)bitmap_ },	\
+		   layout : { bitmap : (StgWord)bitmap_ },	\
 		   SRT_INFO(type,srt_,srt_off_,srt_len_)	\
 		}						\
 	}
@@ -349,7 +349,7 @@ typedef struct {
   	info_class INFO_TBL_CONST vec_info_3 info = {		\
 		{ alt_3, alt_2, alt_1 },			\
 		i : {						\
-		   layout : { bitmap : (StgWord32)bitmap_ },	\
+		   layout : { bitmap : (StgWord)bitmap_ },	\
 		   SRT_INFO(type,srt_,srt_off_,srt_len_)	\
 		}						\
 	}
@@ -361,7 +361,7 @@ typedef struct {
   	info_class INFO_TBL_CONST vec_info_4 info = {		\
 		{ alt_4, alt_3, alt_2, alt_1 },			\
 		i : {						\
-		   layout : { bitmap : (StgWord32)bitmap_ },	\
+		   layout : { bitmap : (StgWord)bitmap_ },	\
 		   SRT_INFO(type,srt_,srt_off_,srt_len_)	\
 		}						\
 	}
@@ -375,7 +375,7 @@ typedef struct {
 		{ alt_5, alt_4, alt_3, alt_2, 			\
 		  alt_1 },					\
 		i : {						\
-		   layout : { bitmap : (StgWord32)bitmap_ },	\
+		   layout : { bitmap : (StgWord)bitmap_ },	\
 		   SRT_INFO(type,srt_,srt_off_,srt_len_)	\
 		}						\
 	}
@@ -389,7 +389,7 @@ typedef struct {
 		{ alt_6, alt_5, alt_4, alt_3,			\
 		  alt_2, alt_1 },				\
 		i : {						\
-		   layout : { bitmap : (StgWord32)bitmap_ },	\
+		   layout : { bitmap : (StgWord)bitmap_ },	\
 		   SRT_INFO(type,srt_,srt_off_,srt_len_)	\
 		}						\
 	}
@@ -403,7 +403,7 @@ typedef struct {
 		{ alt_7, alt_6, alt_5, alt_4, 			\
 		  alt_3, alt_2, alt_1 },			\
 		i : {						\
-		   layout : { bitmap : (StgWord32)bitmap_ },	\
+		   layout : { bitmap : (StgWord)bitmap_ },	\
 		   SRT_INFO(type,srt_,srt_off_,srt_len_)	\
 		}						\
 	}
@@ -417,7 +417,7 @@ typedef struct {
 		{ alt_8, alt_7, alt_6, alt_5, 			\
 		  alt_4, alt_3, alt_2, alt_1 },			\
 		i : {						\
-		   layout : { bitmap : (StgWord32)bitmap_ },	\
+		   layout : { bitmap : (StgWord)bitmap_ },	\
 		   SRT_INFO(type,srt_,srt_off_,srt_len_)	\
 		}						\
 	}
@@ -470,7 +470,7 @@ typedef struct {
 		   type, info_class,				\
 		   alt_1, alt_2)				\
 	info_class INFO_TBL_CONST vec_info_2 info = {		\
-		i : { layout : { bitmap : (StgWord32)bitmap_ },	\
+		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
 		      INIT_ENTRY(NULL),				\
 		},						\
@@ -482,7 +482,7 @@ typedef struct {
 		   alt_1, alt_2, alt_3				\
 		  )						\
 	info_class INFO_TBL_CONST vec_info_3 info = {		\
-		i : { layout : { bitmap : (StgWord32)bitmap_ },	\
+		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
 		      INIT_ENTRY(NULL),				\
 		},						\
@@ -494,7 +494,7 @@ typedef struct {
 		   alt_1, alt_2, alt_3, alt_4			\
 		  )						\
 	info_class INFO_TBL_CONST vec_info_4 info = {		\
-		i : { layout : { bitmap : (StgWord32)bitmap_ },	\
+		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
 		      INIT_ENTRY(NULL),				\
 		},						\
@@ -507,7 +507,7 @@ typedef struct {
 		   alt_5					\
 		  )						\
 	info_class INFO_TBL_CONST vec_info_5 info = {		\
-		i : { layout : { bitmap : (StgWord32)bitmap_ },	\
+		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
 		      INIT_ENTRY(NULL),				\
 		},						\
@@ -521,7 +521,7 @@ typedef struct {
 		   alt_5, alt_6					\
 		  )						\
 	info_class INFO_TBL_CONST vec_info_6 info = {		\
-		i : { layout : { bitmap : (StgWord32)bitmap_ },	\
+		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
 		      INIT_ENTRY(NULL),				\
 		},						\
@@ -535,7 +535,7 @@ typedef struct {
 		   alt_5, alt_6, alt_7				\
 		  )						\
 	info_class INFO_TBL_CONST vec_info_7 info = {		\
-		i : { layout : { bitmap : (StgWord32)bitmap_ },	\
+		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
 		      INIT_ENTRY(NULL),				\
 		},						\
@@ -549,7 +549,7 @@ typedef struct {
 		   alt_5, alt_6, alt_7, alt_8			\
 		  )						\
 	info_class INFO_TBL_CONST vec_info_8 info = {		\
-		i : { layout : { bitmap : (StgWord32)bitmap_ },	\
+		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
 		      INIT_ENTRY(NULL),				\
 		},						\
@@ -572,7 +572,7 @@ typedef vec_info_8 StgPolyInfoTable;
 			   type, info_class, entry_class	\
 			   )					\
   info_class INFO_TBL_CONST vec_info_8 nm##_info = {		\
-		i : { layout : { bitmap : (StgWord32)bitmap_ },	\
+		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
                       INIT_ENTRY(nm##_entry),			\
 		      INIT_VECTOR				\
@@ -606,7 +606,7 @@ typedef vec_info_8 StgPolyInfoTable;
 			(F_) nm##_0_entry			\
 		},						\
 		i : {						\
-		   layout : { bitmap : (StgWord32)bitmap_ },	\
+		   layout : { bitmap : (StgWord)bitmap_ },	\
 		   SRT_INFO(type,srt_,srt_off_,srt_len_),	\
                    INIT_ENTRY(nm##_entry)			\
 		}						\
