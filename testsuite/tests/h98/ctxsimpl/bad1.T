@@ -9,6 +9,8 @@ pass when
    $tool contains "ghc"
    && contents("bad1.comp.stdout") contains "Could not deduce"
 
--- put a pass clause here for NHC
+pass when 
+   $tool contains "nhc"
+   && contents("bad1.comp.stdout") contains "Couldn't simplify the context"
 
 fail when otherwise
