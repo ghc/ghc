@@ -40,6 +40,7 @@ module TyCon(
 
 CHK_Ubiq()	-- debugging consistency check
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(TyLoop) ( SYN_IE(Type), GenType,
 			  SYN_IE(Class), GenClass,
 			  SYN_IE(Id), GenId,
@@ -47,6 +48,13 @@ IMPORT_DELOOPER(TyLoop) ( SYN_IE(Type), GenType,
 			  tupleCon, isNullaryDataCon, idType
 			  --LATER: specMaybeTysSuffix
 			)
+#else
+import {-# SOURCE #-} Type  ( Type  )
+import {-# SOURCE #-} Class ( Class )
+import {-# SOURCE #-} Id    ( Id, isNullaryDataCon, idType )
+import {-# SOURCE #-} Type  ( splitSigmaTy, splitFunTy  )
+import {-# SOURCE #-} TysWiredIn ( tupleCon )
+#endif
 
 import BasicTypes	( SYN_IE(Arity), NewOrData(..) )
 import TyVar		( GenTyVar, alphaTyVars, alphaTyVar, betaTyVar, SYN_IE(TyVar) )
