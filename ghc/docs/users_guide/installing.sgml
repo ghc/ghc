@@ -834,9 +834,12 @@ OK, assuming that worked, you're all set. Go forth and write useful
 Haskell programs :-) If not, consult the installation FAQ (<XRef LinkEnd="winfaq">); if that still doesn't help then please report the problems you're experiencing (see <Xref LinkEnd="wrong">).
 </Para>
 
-<Para>
-Further information on using GHC under Windows can be found in <ULink URL="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's pages</ULink>. Note: ignore the installation instructions, which are rather out of date; the <Emphasis>Miscellaneous</Emphasis> section at the bottom of the page is of most interest, covering topics beyond the scope of this manual.
-</Para>
+<Para> Further information on using GHC under Windows can be found in <ULink
+URL="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's
+pages</ULink>. Note: ignore the installation instructions, which are rather
+out of date; the <Emphasis>Miscellaneous</Emphasis> section at the bottom of
+the page is of most interest, covering topics beyond the scope of this
+manual. </Para>
 
 </Sect2>
 
@@ -1027,8 +1030,7 @@ Instructions on installing and configuring the DocBook tools follow.
 <Sect2>
 <Title>Installing the DocBook tools from RPMs</Title>
 
-<Para>
-If you're using a system that can handle RedHat RPM packages, you can
+<Para> If you're using a system that can handle RedHat RPM packages, you can
 probably use the <ULink
 URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook
 tools</ULink>, which is the most shrink-wrapped SGML suite that we could
@@ -1037,8 +1039,11 @@ find. You need all the RPMs except for psgml (i.e.
 <Filename>jadetex</Filename>, <Filename>sgmlcommon</Filename> and
 <Filename>stylesheets</Filename>). Note that most of these RPMs are
 architecture neutral, so are likely to be found in a
-<Filename>noarch</Filename> directory. The SuSE RPMs also work; the RedHat ones <Emphasis>don't</Emphasis> at the moment.
-</Para>
+<Filename>noarch</Filename> directory. The SuSE RPMs also work; the RedHat
+ones <Emphasis>don't</Emphasis> at the moment, but they are easy to fix:
+just make a symlink from
+<Filename>/usr/lib/sgml/stylesheets/nwalsh-modular/lib/dblib.dsl</Filename> to
+<Filename>/usr/lib/sgml/lib/dblib.dsl</Filename>. </Para>
 
 </Sect2>
 
