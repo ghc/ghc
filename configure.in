@@ -488,6 +488,9 @@ AC_PATH_PROGS(TarCmd,gtar tar,tar)
 dnl ** check for gzip/compress
 AC_PATH_PROGS(CompressCmd,gzip compress,gzip)
 
+dnl ** check for jade/openjade
+AC_PATH_PROGS(JadeCmd,openjade jade,jade)
+
 compress_nm=`basename $CompressCmd`
 if test x"$compress_nm" = xgzip; then
   CompressCmd="$CompressCmd -d"

@@ -633,6 +633,8 @@ YACC			= @YaccCmd@
 #-----------------------------------------------------------------------------
 # SGML stuff
 
+JADE			= @JadeCmd@
+
 SGML2DVI		= $(DOCBOOK_PREFIX)db2dvi
 SGML2HTML		= $(DOCBOOK_PREFIX)db2html
 SGML2PS			= $(DOCBOOK_PREFIX)db2ps
