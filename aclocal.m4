@@ -879,235 +879,188 @@ if test $fptools_cv_sgml_catalog != "no"; then
 fi
 ])
 
-dnl ######################################################################
-dnl FPTOOLS_SEARCH_LIBS(INCLUDES, FUNCTION, SEARCH-LIBS [, ACTION-IF-FOUND
-dnl                     [, ACTION-IF-NOT-FOUND [, OTHER-LIBRARIES]]])
-dnl Search for a library defining FUNC, if it's not already available.
-dnl This is almost the same as AC_SEARCH_LIBS, but the INCLUDES can be
-dnl specified.
-dnl ######################################################################
 
-AC_DEFUN(FPTOOLS_SEARCH_LIBS,
-[AC_PREREQ([2.13])
-AC_CACHE_CHECK([for library containing $2], [ac_cv_search_$2],
-[ac_func_search_save_LIBS="$LIBS"
-ac_cv_search_$2="no"
-AC_TRY_LINK([$1], [$2()], [ac_cv_search_$2="none required"])
-test "$ac_cv_search_$2" = "no" && for i in $3; do
-LIBS="-l$i $6 $ac_func_search_save_LIBS"
-AC_TRY_LINK([$1], [$2()],
-[ac_cv_search_$2="-l$i"
-break])
-done
-LIBS="$ac_func_search_save_LIBS"])
-if test "$ac_cv_search_$2" != "no"; then
-  test "$ac_cv_search_$2" = "none required" || LIBS="$ac_cv_search_$2 $LIBS"
-  $4
-else :
-  $5
-fi])
-
-dnl ####################### -*- Mode: M4 -*- ###########################
-dnl Copyright (C) 98, 1999 Matthew D. Langston <langston@SLAC.Stanford.EDU>
-dnl
-dnl This file is free software; you can redistribute it and/or modify it
-dnl under the terms of the GNU General Public License as published by
-dnl the Free Software Foundation; either version 2 of the License, or
-dnl (at your option) any later version.
-dnl
-dnl This file is distributed in the hope that it will be useful, but
-dnl WITHOUT ANY WARRANTY; without even the implied warranty of
-dnl MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-dnl General Public License for more details.
-dnl
-dnl You should have received a copy of the GNU General Public License
-dnl along with this file; if not, write to:
-dnl
-dnl   Free Software Foundation, Inc.
-dnl   Suite 330
-dnl   59 Temple Place
-dnl   Boston, MA 02111-1307, USA.
-dnl ####################################################################
+# FP_CHECK_WIN32
+# --------------
+# If Windows is the target platform (e.g. MinGW/MSYS or Cygwin with
+# -mno-cygwin), the variable "is_win32" is set to "yes", otherwise (e.g. *nix
+# systems or plain Cygwin) it is set to "no".
+AC_DEFUN([FP_CHECK_WIN32],
+[AC_CACHE_CHECK([for Windows environment], [fp_cv_is_win32],
+  [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [
+#if !_WIN32
+   syntax error;
+#endif
+])], [fp_cv_is_win32=yes], [fp_cv_is_win32=no])])
+is_win32="$fp_cv_is_win32"[]dnl
+])# FP_CHECK_WIN32
 
 
-dnl @synopsis FPTOOLS_CHECK_LIBM
-dnl 
-dnl Search for math library (typically -lm).
-dnl
-dnl The variable LIBM (which is not an output variable by default) is
-dnl set to a value which is suitable for use in a Makefile (for example,
-dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
-dnl
-dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
+# FP_PATH_X
+# ---------
+# Same as AC_PATH_X, but works even for broken Cygwins which try to include the
+# non-existant <gl/mesa_wgl.h> header when -mno-cygwin is used.
+AC_DEFUN([FP_PATH_X],
+[AC_REQUIRE([FP_CHECK_WIN32])
+if test x"$is_win32" = xyes; then
+  no_x=yes
+else
+  AC_PATH_X
+fi
+])# FP_PATH_X
 
-# FPTOOLS_CHECK_LIBM - check for math library
-AC_DEFUN(FPTOOLS_CHECK_LIBM,
-[AC_REQUIRE([AC_CANONICAL_HOST])dnl
-LIBM=
-case "$host" in
-*-*-beos*)
-  # These system don't have libm
-  ;;
-*-ncr-sysv4.3*)
-  AC_CHECK_LIB(mw, _mwvalidcheckl, LIBM="-lmw")
-  AC_CHECK_LIB(m, main, LIBM="$LIBM -lm")
-  ;;
-*)
-  AC_CHECK_LIB(m, main, LIBM="-lm")
-  ;;
-esac
-])
 
-dnl ######################################################################
-dnl Note: Caching has been completely rewritten, but is still no perfect yet.
-dnl ######################################################################
+# FP_PATH_XTRA
+# ------------
+# Same as AC_PATH_XTRA, but works even for broken Cygwins which try to include
+# the non-existant <gl/mesa_wgl.h> header when -mno-cygwin is used.
+AC_DEFUN([FP_PATH_XTRA],
+[AC_REQUIRE([FP_CHECK_WIN32])
+if test x"$is_win32" = xyes; then
+  no_x=yes
+else
+  AC_PATH_XTRA
+fi
+])# FP_PATH_XTRA
 
-dnl ########################### -*- Mode: M4 -*- #######################
-dnl Copyright (C) 98, 1999 Matthew D. Langston <langston@SLAC.Stanford.EDU>
-dnl
-dnl This file is free software; you can redistribute it and/or modify it
-dnl under the terms of the GNU General Public License as published by
-dnl the Free Software Foundation; either version 2 of the License, or
-dnl (at your option) any later version.
-dnl
-dnl This file is distributed in the hope that it will be useful, but
-dnl WITHOUT ANY WARRANTY; without even the implied warranty of
-dnl MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-dnl General Public License for more details.
-dnl
-dnl You should have received a copy of the GNU General Public License
-dnl along with this file; if not, write to:
-dnl
-dnl   Free Software Foundation, Inc.
-dnl   Suite 330
-dnl   59 Temple Place
-dnl   Boston, MA 02111-1307, USA.
-dnl ####################################################################
 
-dnl @synopsis FPTOOLS_HAVE_OPENGL
-dnl 
-dnl Search for OpenGL.  We search first for Mesa (a GPL'ed version of
-dnl OpenGL) before a vendor's version of OpenGL if we were specifically
-dnl asked to with `--with-Mesa=yes' or `--with-Mesa'.
-dnl
-dnl The four "standard" OpenGL libraries are searched for: "-lGL",
-dnl "-lGLU", "-lGLX" (or "-lMesaGL", "-lMesaGLU" as the case may be) and
-dnl "-lglut".
-dnl
-dnl All of the libraries that are found (since "-lglut" or "-lGLX" might
-dnl be missing) are added to the shell output variable "GL_LIBS", along
-dnl with any other libraries that are necessary to successfully link an
-dnl OpenGL application (e.g. the X11 libraries).  Care has been taken to
-dnl make sure that all of the libraries in "GL_LIBS" are listed in the
-dnl proper order.
-dnl
-dnl Additionally, the shell output variable "GL_CFLAGS" is set to any
-dnl flags (e.g. "-I" flags) that are necessary to successfully compile
-dnl an OpenGL application.
-dnl
-dnl The following shell variable (which are not output variables) are
-dnl also set to either "yes" or "no" (depending on which libraries were
-dnl found) to help you determine exactly what was found.
-dnl
-dnl   have_GL
-dnl   have_GLU
-dnl   have_GLX
-dnl   have_glut
-dnl
-dnl A complete little toy "Automake `make distcheck'" package of how to
-dnl use this macro is available at:
-dnl
-dnl   ftp://ftp.slac.stanford.edu/users/langston/autoconf/ac_opengl-0.01.tar.gz
-dnl
-dnl Please note that as the ac_opengl macro and the toy example evolves,
-dnl the version number increases, so you may have to adjust the above
-dnl URL accordingly.
-dnl
-dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
+# FP_CHECK_GL_HELPER(LIBNAME, LIBS, INCLUDES, FUNCTION-BODY)
+# ----------------------------------------------------------
+# Try each library in LIBS to successfully link INCLUDES plus FUNCTION-BODY,
+# setting LIBNAME_CFLAGS and LIBNAME_LIBS to the corresponding values. Sets
+# no_LIBNAME to "yes" if no suitable library was found. (LIBNAME_CFLAGS0
+# contains the value of LIBNAME_CFLAGS without CPPFLAGS, and LIBNAME_LIBS0
+# contains the value of LIBNAME_LIBS without LDFLAGS, but these are only
+# used internally.)
+AC_DEFUN([FP_CHECK_GL_HELPER],
+[AC_CACHE_CHECK([for $1 library], [fp_cv_check_$1_lib],
+  [fp_cv_check_$1_lib="no"
+  fp_save_CPPFLAGS="$CPPFLAGS"
+  CPPFLAGS="$CPPFLAGS ${$1_CFLAGS}"
+  fp_save_LIBS="$LIBS"
+  for fp_try_lib in $2; do
+    # transform "-lfoo" to "foo.lib" when using cl
+    if test x"$CC" = xcl; then
+      fp_try_lib=`echo $fp_try_lib | sed -e 's/^-l//' -e 's/$/.lib/'`
+    fi
+    LIBS="$fp_try_lib ${$1_LIBS} $fp_save_LIBS"
+    AC_TRY_LINK([$3], [$4], [fp_cv_check_$1_lib="$fp_try_lib ${$1_LIBS}"; break])
+  done
+  LIBS="$fp_save_LIBS"
+  CPPFLAGS="$fp_save_CPPFLAGS"])
 
-AC_DEFUN(FPTOOLS_HAVE_OPENGL,
-[
-  AC_REQUIRE([AC_PROG_CC])
-  AC_REQUIRE([AC_PATH_X])
-  AC_REQUIRE([AC_PATH_XTRA])
-  AC_REQUIRE([FPTOOLS_CHECK_LIBM])
-
-dnl Check for Mesa first if we were asked to.
-  AC_ARG_ENABLE(Mesa,
-[  --enable-mesa
-	Prefer Mesa over a vendor's native OpenGL library (default=no)
-],
-                use_Mesa=$enableval,
-                use_Mesa=no)
-
-  if test x"$use_Mesa" = xyes; then
-     GL_search_list="MesaGL  GL  opengl32"
-    GLU_search_list="MesaGLU GLU glu32"
-    GLX_search_list="MesaGLX GLX"
+  if test x"$fp_cv_check_$1_lib" = xno; then
+    no_$1=yes
+    $1_CFLAGS=
+    $1_LIBS=
   else
-     GL_search_list="GL  opengl32 MesaGL"
-    GLU_search_list="GLU glu32    MesaGLU"
-    GLX_search_list="GLX          MesaGLX"
-  fi      
+    $1_CFLAGS0="${$1_CFLAGS}"
+    $1_CFLAGS="$CPPFLAGS ${$1_CFLAGS0}"
+    $1_LIBS0="$fp_cv_check_$1_lib"
+    $1_LIBS="$LDFLAGS ${$1_LIBS0}"
+  fi
+])# FP_CHECK_GL_HELPER
 
-  AC_LANG_SAVE
-  AC_LANG_C
 
-dnl If we are running under X11 then add in the appropriate libraries.
+# FP_CHECK_GL
+# -----------
+AC_DEFUN([FP_CHECK_GL],
+[AC_REQUIRE([FP_PATH_X])
+AC_REQUIRE([AC_CANONICAL_SYSTEM])
+
+AC_ARG_ENABLE([hopengl],
+  [AC_HELP_STRING([--enable-hopengl],
+    [build a Haskell binding for OpenGL (GL/GLU). On Mac OS X, use
+     --enable-hopengl=x11 to use X11 instead of the "native" libraries.
+     (default=no)])],
+  [enable_opengl=$enableval], [enable_opengl=no])
+
+if test x"$enable_opengl" = xno; then
+   no_GL=yes
+else
+  use_quartz_opengl=no
+  case $target_os in
+  darwin*)
+    if test x"$enable_opengl" != xx11; then
+      AC_DEFINE([USE_QUARTZ_OPENGL], [1],
+                [Define to 1 if native OpenGL should be used on Mac OS X])
+      use_quartz_opengl=yes
+    fi
+    ;;
+  esac
+
+  if test x"$use_quartz_opengl" != xyes; then
+    AC_CHECK_LIB([m], [main], [GL_LIBS="-lm $GL_LIBS"])
+
+    if test x"$no_x" != xyes; then
+      test -n "$x_includes" && GL_CFLAGS="-I$x_includes $GL_CFLAGS"
+      test -n "$x_libraries" && GL_LIBS="-L$x_libraries -lX11 $GL_LIBS"
+    fi
+
+    FP_CHECK_GL_HELPER([GL], [-lopengl32 -lGL], [@%:@include <GL/gl.h>], [glEnd()])
+  fi
+fi
+
+AC_SUBST([GL_CFLAGS])
+AC_SUBST([GL_LIBS])
+])# FP_CHECK_GL
+
+
+# FP_CHECK_GLU
+# ------------
+AC_DEFUN([FP_CHECK_GLU],
+[AC_REQUIRE([FP_CHECK_GL])dnl
+GLU_CFLAGS="$GL_CFLAGS0"
+GLU_LIBS="$GL_LIBS0"
+
+if test x"$enable_opengl" = xno; then
+   no_GLU=yes
+elif test x"$use_quartz_opengl" != xyes; then
+  FP_CHECK_GL_HELPER([GLU], [-lglu32 -lGLU], [@%:@include <GL/glu.h>], [gluNewQuadric()])
+fi
+
+AC_SUBST([GLU_CFLAGS])
+AC_SUBST([GLU_LIBS])
+])# FP_CHECK_GLU
+
+
+# FP_CHECK_GLUT
+# -------------
+AC_DEFUN([FP_CHECK_GLUT],
+[AC_REQUIRE([FP_CHECK_GLU])
+FP_PATH_XTRA
+
+if test x"$enable_opengl" = xno; then
+   no_GLUT=yes
+elif test x"$use_quartz_opengl" != xyes; then
+  GLUT_CFLAGS="$GLU_CFLAGS0"
+  GLUT_LIBS="$GLU_LIBS0"
+
   if test x"$no_x" != xyes; then
-dnl Add everything we need to compile and link X programs to GL_CFLAGS
-dnl and GL_X_LIBS/GLUT_X_LIBS.
-    GL_CFLAGS="$CPPFLAGS $X_CFLAGS"
-    GL_X_LIBS="$X_LIBS $X_PRE_LIBS -lXext -lX11 $X_EXTRA_LIBS $LIBM"
-    GLUT_X_LIBS="$X_LIBS $X_PRE_LIBS -lXmu -lXt -lXi -lXext -lX11 $X_EXTRA_LIBS $LIBM"
-  fi
-  GL_save_CPPFLAGS="$CPPFLAGS"
-  CPPFLAGS="$GL_CFLAGS"
-
-  GL_save_LIBS="$LIBS"
-  LIBS="$GL_X_LIBS"
-
-  FPTOOLS_SEARCH_LIBS([#include <GL/gl.h>],   glEnd,         $GL_search_list,  have_GL=yes,   have_GL=no)
-  FPTOOLS_SEARCH_LIBS([#include <GL/glu.h>],  gluNewQuadric, $GLU_search_list, have_GLU=yes,  have_GLU=no)
-  FPTOOLS_SEARCH_LIBS([#include <GL/glx.h>],  glXWaitX,      $GLX_search_list, have_GLX=yes,  have_GLX=no)
-
-  if test -n "$LIBS"; then
-    GL_LIBS="$LDFLAGS $LIBS"
-  else
-    GL_LIBS="$LDFLAGS"
-    GL_CFLAGS=
+    GLUT_LIBS="$X_PRE_LIBS -lXmu -lXi $X_EXTRA_LIBS $GLUT_LIBS"
   fi
 
-  dnl Keep the GL/GLU/GLX libs, but expand the rest to what GLUT needs.
-  dnl (Some systems, like OpenBSD, need the GL/GLU libs.)
-  LIBS=`echo "$LIBS" | sed "s@$GL_X_LIBS@$GLUT_X_LIBS@"`
+  AC_CHECK_HEADERS([windows.h GL/glut.h])
+  # Note 1: On Cygwin with X11, GL/GLU functions use the "normal" calling
+  # convention, but GLUT functions use stdcall. To get this right, it is
+  # necessary to include <windows.h> first.
+  # Note 2: MinGW/MSYS comes without a GLUT header, so we use Cygwin's one in
+  # that case.
+  FP_CHECK_GL_HELPER([GLUT], [-lglut32 -lglut], [
+#if HAVE_WINDOWS_H
+#include <windows.h>
+#endif
+#if HAVE_GL_GLUT_H
+#include <GL/glut.h>
+#else
+#include "glut_local.h"
+#endif
+    ], [glutMainLoop()])
+fi
 
-  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,  glut32 glut,      have_glut=yes, have_glut=no)
-
-  if test -n "$LIBS"; then
-    GLUT_LIBS="$LDFLAGS $LIBS"
-  fi
-
-  AC_CACHE_CHECK([OpenGL flags], mdl_cv_gl_cflags, [mdl_cv_gl_cflags="$GL_CFLAGS"])
-  GL_CFLAGS="$mdl_cv_gl_cflags"
-  AC_SUBST(GL_CFLAGS)
-  AC_CACHE_CHECK([OpenGL libs],  mdl_cv_gl_libs,   [mdl_cv_gl_libs="$GL_LIBS"])
-  GL_LIBS="$mdl_cv_gl_libs"
-  AC_SUBST(GL_LIBS)
-  AC_CACHE_CHECK([GLUT libs],  mdl_cv_glut_libs,   [mdl_cv_glut_libs="$GLUT_LIBS"])
-  GLUT_LIBS="$mdl_cv_glut_libs"
-  AC_SUBST(GLUT_LIBS)
-
-dnl Reset GL_X_LIBS/GLUT_X_LIBS regardless, since they were just temporary variables
-dnl and we don't want to be global namespace polluters.
-  GL_X_LIBS=
-  GLUT_X_LIBS=
-
-  LIBS="$GL_save_LIBS"
-  CPPFLAGS="$GL_save_CPPFLAGS"
-
-  AC_LANG_RESTORE
-])
+AC_SUBST([GLUT_CFLAGS])
+AC_SUBST([GLUT_LIBS])
+])# FP_CHECK_GLUT
 
 
 dnl @synopsis FP_EMPTY_STRUCTS

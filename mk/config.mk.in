@@ -394,8 +394,8 @@ GhcLibsWithObjectIO=@GhcLibsWithObjectIO@
 # Build the Haskell OpenGL binding?
 #
 GhcLibsWithOpenGL=@GhcLibsWithOpenGL@
-GL_CFLAGS=@GL_CFLAGS@
-GL_LIBS=@GL_LIBS@
+GLU_CFLAGS=@GLU_CFLAGS@
+GLU_LIBS=@GLU_LIBS@
 
 # Build the Haskell OpenAL binding?
 #

@@ -619,29 +619,6 @@ AC_ARG_ENABLE(objectio,
 )
 AC_SUBST(GhcLibsWithObjectIO)
 
-dnl ** Enable the building of the OpenGL/GLUT binding?
-dnl --------------------------------------------------------------
-AC_ARG_ENABLE(hopengl,
-[  --enable-hopengl
-        Build HOpenGL, a Haskell binding for OpenGL/GLUT.
-        On Mac OS X, use --enable-hopengl=x11 to use X11 instead
-        of the "native" libraries.
-],
-[GhcLibsWithOpenGL=YES; GhcLibsWithGLUT=YES],
-[GhcLibsWithOpenGL=NO;  GhcLibsWithGLUT=NO]
-)
-UseQuartzOpenGL=NO
-if test x"$TargetOS_CPP" = x"darwin"; then
-  if test x"$enable_hopengl" != x"x11"; then
-    AC_DEFINE([USE_QUARTZ_OPENGL], [1],
-              [Define to 1 if native OpenGL should be used on Mac OS X])
-    UseQuartzOpenGL=YES
-  fi
-fi
-
-AC_SUBST([GhcLibsWithOpenGL])
-AC_SUBST([GhcLibsWithGLUT])
-
 dnl ** Enable the building of the OpenAL binding?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE([openal],
@@ -884,13 +861,30 @@ AC_CHECK_HEADERS(dos.h conio.h io.h std.h)
 dnl ** check for Windows include files
 AC_CHECK_HEADERS(windows.h)
 
+dnl ** check for OpenGL/GLUT include paths and libraries
+FP_CHECK_GLUT
+
+if test x"$no_glu" = xyes; then
+  GhcLibsWithOpenGL=NO
+else
+  GhcLibsWithOpenGL=YES
+fi
+AC_SUBST([GhcLibsWithOpenGL])
+
+if test x"$no_glut" = xyes; then
+  GhcLibsWithGLUT=NO
+else
+  GhcLibsWithGLUT=YES
+fi
+AC_SUBST([GhcLibsWithGLUT])
+
 dnl ** check for OpenGL include files
 fp_save_cppflags="$CPPFLAGS"
 CPPFLAGS="$CPPFLAGS $X_CFLAGS"
-if test $UseQuartzOpenGL = YES ; then
-  AC_CHECK_HEADERS(OpenGL/gl.h)
+if test x"$use_quartz_opengl" = xyes; then
+  AC_CHECK_HEADERS([OpenGL/gl.h])
 else
-  AC_CHECK_HEADERS(GL/gl.h)
+  AC_CHECK_HEADERS([GL/gl.h])
 fi
 CPPFLAGS="$fp_save_cppflags"
 
@@ -1203,27 +1197,11 @@ else
 fi
 
 dnl ** check for math library
-FPTOOLS_CHECK_LIBM()
-AC_SUBST(LIBM)
+AC_CHECK_LIB([m], [main], [LIBM="-lm"], [LIBM=])
+AC_SUBST([LIBM])
 
 dnl ** check for X Window System
 AC_PATH_XTRA()
-
-dnl ** check for OpenGL/GLUT/GLX include paths and libraries
-if test $GhcLibsWithOpenGL = YES ; then
-  if test $UseQuartzOpenGL = YES ; then
-    dnl Take a shortcut for Mac OS X native OpenGL:
-    dnl It's in a non-standard location, but it's always there
-    GL_CFLAGS=
-	GL_LIBS=
-	GLUT_LIBS=
-	AC_SUBST(GL_CFLAGS)
-	AC_SUBST(GL_LIBS)
-	AC_SUBST(GLUT_LIBS)
-  else
-    FPTOOLS_HAVE_OPENGL
-  fi
-fi
 
 dnl ################################################################
 dnl Check for libraries
