@@ -1,6 +1,6 @@
 {-# OPTIONS -fglasgow-exts #-}
 
-module Main where
+module Main(main) where
 
 import Control.Arrow
 
@@ -80,8 +80,6 @@ counter = proc reset -> do
 		next <- delay 0 -< output+1
 	returnA -< output
 
-{-
-
 -- Some other basic circuits from the Hawk library.
 
 -- flush: when reset is True, return d for n ticks, otherwise copy value.
@@ -102,17 +100,20 @@ latch init = proc (value, reset) -> do
 		last <- delay init -< out
 	returnA -< out
 
--}
-
 -- Some tests using the counter
 
 test_input = [True, False, True, False, False, True, False, True]
+test_input2 = zip [1..] test_input
 
 -- A test of the resettable counter.
 
 main = do
 	print (runStreamMap counter test_input)
 	print (runAuto counter test_input)
+	print (runStreamMap (flush 2 0) test_input2)
+	print (runAuto (flush 2 0) test_input2)
+	print (runStreamMap (latch 0) test_input2)
+	print (runAuto (latch 0) test_input2)
 
 -- A step function (cf current in Lustre)
 
