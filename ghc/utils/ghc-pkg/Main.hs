@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.5 2001/03/25 11:08:42 panne Exp $
+-- $Id: Main.hs,v 1.6 2001/03/25 19:30:23 qrczak Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -18,10 +18,11 @@ import Directory
 import System
 import IO
 
--- HACK: The confusing cpp tricks below introduce a leading space. Note that
--- cpp's stringify operator # doesn't work because of the -traditional flag.
--- TEXT SUBSTITUTION IS EVIL. TEXT SUBSTITUTION IS EVIL. TEXT SUBSTITUTION...
-default_pkgconf = "\ 
+-- HACK: 'tail' below deletes a leading space introduced by a confusing
+-- cpp trick. Note that cpp's stringify operator # doesn't work
+-- because of the -traditional flag.  TEXT SUBSTITUTION IS EVIL.
+-- TEXT SUBSTITUTION IS EVIL. TEXT SUBSTITUTION...
+default_pkgconf = tail $ "\ 
    \ clibdir" ++ "/package.conf"
 
 main = do
@@ -52,7 +53,7 @@ flags = [
 runit clis = do
   conf_file <- 
      case [ f | Config f <- clis ] of
-        []  -> return (tail default_pkgconf)   -- HACK: Remove leading space
+        []  -> return default_pkgconf
         [f] -> return f
         _   -> die (usageInfo usageHeader flags)
 
