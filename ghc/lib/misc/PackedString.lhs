@@ -29,11 +29,8 @@ module PackedString (
 	unpackNBytesPS,  -- :: PackedString -> Int -> [Char]
 	unpackPSIO,      -- :: PackedString -> IO [Char]
 
-{-LATER:
 	hPutPS,      -- :: Handle -> PackedString -> IO ()
-        putPS,       -- :: FILE -> PackedString -> PrimIO () -- ToDo: more sensible type
-	getPS,       -- :: FILE -> Int -> PrimIO PackedString
--}
+
 	nilPS,       -- :: PackedString
 	consPS,      -- :: Char -> PackedString -> PackedString
 	headPS,      -- :: PackedString -> Char
@@ -92,6 +89,7 @@ import PrelArr  ( StateAndMutableByteArray#(..) , StateAndByteArray#(..) )
 import PrelST
 import ST
 import IOExts   ( unsafePerformIO )
+import IO
 
 import Ix
 import Char (isSpace)
@@ -368,6 +366,7 @@ unpackPS (CPS addr len)
 unpackNBytesPS :: PackedString -> Int -> [Char]
 unpackNBytesPS ps len@(I# l#)
  | len < 0	= error ("PackedString.unpackNBytesPS: negative length "++ show len)
+ | len == 0     = []
  | otherwise    =
     case ps of
       PS bytes len# has_null -> unpackPS (PS bytes (min# len# l#) has_null)
@@ -395,139 +394,18 @@ unpackPSIO (CPS addr len)
 Output a packed string via a handle:
 
 \begin{code}
-{- LATER:
 hPutPS :: Handle -> PackedString -> IO ()
-hPutPS handle ps = 
- let
-  len = 
-   case ps of
-    PS  _ len _ -> len
-    CPS _ len   -> len
- in
- if len ==# 0# then
-    return ()
- else
-    _readHandle handle				    >>= \ htype ->
-    case htype of 
-      _ErrorHandle ioError ->
-	  _writeHandle handle htype		    >>
-          failWith ioError
-      _ClosedHandle ->
-	  _writeHandle handle htype		    >>
-	  failWith (IllegalOperation "handle is closed")
-      _SemiClosedHandle _ _ ->
-	  _writeHandle handle htype		    >>
-	  failWith (IllegalOperation "handle is closed")
-      _ReadHandle _ _ _ ->
-	  _writeHandle handle htype		    >>
-	  failWith (IllegalOperation "handle is not open for writing")
-      other -> 
-          _getBufferMode other			    >>= \ other ->
-          (case _bufferMode other of
-            Just LineBuffering ->
-		writeLines (_filePtr other)
-            Just (BlockBuffering (Just size)) ->
-	        writeBlocks (_filePtr other) size
-            Just (BlockBuffering Nothing) ->
-	        writeBlocks (_filePtr other) ``BUFSIZ''
-            _ -> -- Nothing is treated pessimistically as NoBuffering
-	        writeChars (_filePtr other) 0#
-	  )    					    >>= \ success ->
-	    _writeHandle handle (_markHandle other) >>
-          if success then
-              return ()
-          else
-              _constructError "hPutStr"   	    >>= \ ioError ->
-	      failWith ioError
-
+hPutPS handle (CPS a# len#)    = hPutBuf    handle (A# a#) (I# len#)
+hPutPS handle (PS  ba# len# _) = hPutBufBA  handle (ByteArray bottom ba#) (I# len#)
   where
-    pslen = lengthPS# ps
-
-    writeLines :: Addr -> IO Bool
-    writeLines = writeChunks ``BUFSIZ'' True 
-
-    writeBlocks :: Addr -> Int -> IO Bool
-    writeBlocks fp size = writeChunks size False fp
- 
-     {-
-       The breaking up of output into lines along \n boundaries
-       works fine as long as there are newlines to split by.
-       Avoid the splitting up into lines altogether (doesn't work
-       for overly long lines like the stuff that showsPrec instances
-       normally return). Instead, we split them up into fixed size
-       chunks before blasting them off to the Real World.
-
-       Hacked to avoid multiple passes over the strings - unsightly, but
-       a whole lot quicker. -- SOF 3/96
-     -}
-
-    writeChunks :: Int -> Bool -> Addr -> IO Bool
-    writeChunks (I# bufLen) chopOnNewLine fp =
-     newCharArray (0,I# bufLen) >>= \ arr@(MutableByteArray _ arr#) ->
-     let
-      shoveString :: Int# -> Int# -> IO Bool
-      shoveString n i 
-       | i ==# pslen =   -- end of string
-	   if n ==# 0# then
-	      return True
-	   else
-             _ccall_ writeFile arr fp (I# n) >>= \rc ->
-             return (rc==0)
-       | otherwise =
-	   (\ (S# s#) ->
-              case writeCharArray# arr# n (indexPS# ps i) s# of
-	        s1# -> 
-		   {- Flushing lines - should we bother? -}
-		  (if n ==# bufLen then
-                     _ccall_ writeFile arr fp (I# (n +# 1#)) >>= \rc ->
-	             if rc == 0 then
-	                shoveString 0# (i +# 1#)
-	              else
-	                return False
-                   else
-                      shoveString (n +# 1#) (i +# 1#)) (S# s1#))
-     in
-     shoveString 0# 0#
-
-    writeChars :: Addr -> Int# -> IO Bool
-    writeChars fp i 
-      | i ==# pslen = return True
-      | otherwise  =
-	_ccall_ filePutc fp (ord (C# (indexPS# ps i)))  >>= \ rc ->
-        if rc == 0 then
-	    writeChars fp (i +# 1#)
-	else
-	    return False
-
----------------------------------------------
-
-putPS :: _FILE -> PackedString -> IO ()
-putPS file ps@(PS bytes len has_null)
-  | len ==# 0#
-  = return ()
-  | otherwise
-  = let
-	byte_array = ByteArray (0, I# (len -# 1#)) bytes
-    in
-    _ccall_ fwrite byte_array (1::Int){-size-} (I# len) file
-					>>= \ (I# written) ->
-    if written ==# len then
-	return ()
-    else
-	error "putPS: fwrite failed!\n"
-
-putPS file (CPS addr len)
-  | len ==# 0#
-  = return ()
-  | otherwise
-  = _ccall_ fputs (A# addr) file >>= \ (I# _){-force type-} ->
-    return ()
+    bottom = error "hPutPS"
 \end{code}
 
 The dual to @_putPS@, note that the size of the chunk specified
 is the upper bound of the size of the chunk returned.
 
 \begin{code}
+{-
 getPS :: _FILE -> Int -> IO PackedString
 getPS file len@(I# len#)
  | len# <=# 0# = return nilPS -- I'm being kind here.
@@ -629,18 +507,11 @@ nullPS :: PackedString -> Bool
 nullPS (PS  _ i _) = i ==# 0#
 nullPS (CPS _ i)   = i ==# 0#
 
-{- (ToDo: some non-lousy implementations...)
-
-    Old : _appendPS xs  ys = packString (unpackPS xs ++ unpackPS ys)
-
--}
 appendPS :: PackedString -> PackedString -> PackedString
 appendPS xs ys
   | nullPS xs = ys
   | nullPS ys = xs
   | otherwise  = concatPS [xs,ys]
-
-{- OLD: mapPS f xs = packString (map f (unpackPS xs)) -}
 
 mapPS :: (Char -> Char) -> PackedString -> PackedString {-or String?-}
 mapPS f xs = 
@@ -1114,14 +985,15 @@ unpackCStringIO addr
 unpackCStringLenIO :: Addr -> Int -> IO String
 unpackCStringLenIO addr l@(I# len#)
  | len# <# 0#  = fail (userError ("PackedString.unpackCStringLenIO: negative length (" ++ show l ++ ")"))
- | otherwise   = unpack len#
+ | len# ==# 0# = return ""
+ | otherwise   = unpack [] (len# -# 1#)
   where
-    unpack 0# = return []
-    unpack nh = do
+    unpack acc 0# = do
+       ch <- readCharOffAddr addr (I# 0#)
+       return (ch:acc)
+    unpack acc nh = do
        ch <- readCharOffAddr addr (I# nh)
-       ls <- unpack (nh -# 1#)
-       return (ch : ls)
-
+       unpack (ch:acc) (nh -# 1#)
 
 unpackCString2# addr len
   -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
