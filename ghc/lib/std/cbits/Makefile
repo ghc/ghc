@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.30 2001/07/05 13:01:16 rrt Exp $
+# $Id: Makefile,v 1.31 2001/07/13 13:40:26 rrt Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -8,8 +8,11 @@ IS_CBITS_LIB = YES
 
 SRC_CC_OPTS += -Wall -DCOMPILING_STDLIB
 
-ifeq "$(DLLized)" "YES"
-SRC_CC_OPTS += -dynamic
+ifeq "$(ILXized)" "YES"
+DLLized = YES
+C_SRCS += $(FPTOOLS_TOP)/ghc/rts/StgPrimFloat.c
+else
+C_SRCS := $(filter-out ilxstubs.c,$(C_SRCS))
 endif
 
 # -----------------------------------------------------------------------------
