@@ -10,7 +10,7 @@ module Class (
 	GenClass(..), SYN_IE(Class),
 
 	mkClass,
-	classKey, classOps, classSelIds,
+	classKey, classOps, classGlobalIds,
 	classSuperDictSelId, classOpId, classDefaultMethodId,
 	classSig, classBigSig, classInstEnv,
 	isSuperClassOf,
@@ -27,16 +27,27 @@ module Class (
 CHK_Ubiq() -- debugging consistency check
 
 IMPORT_DELOOPER(TyLoop)
+--IMPORT_DELOOPER(IdLoop)
 
-import TyCon		( TyCon )
-import TyVar		( SYN_IE(TyVar), GenTyVar )
-import Usage		( GenUsage, SYN_IE(Usage), SYN_IE(UVar) )
+
+--import TyVar
+--import Id
+--import Type
+#if __GLASGOW_HASKELL__ >= 202
+import Name
+#endif
+
+import TyCon		--( TyCon )
+import TyVar		--( SYN_IE(TyVar), GenTyVar )
+import Usage		--( GenUsage, SYN_IE(Usage), SYN_IE(UVar) )
 
 import MatchEnv		( MatchEnv )
 import Maybes		( assocMaybe )
 import Name		( changeUnique, Name, OccName, occNameString )
+import Outputable
 import Unique		-- Keys for built-in classes
-import Pretty		( SYN_IE(Pretty), ppCat, ppPStr )
+import UniqFM           ( SYN_IE(Uniquable))
+import Pretty		( Doc, hsep, ptext )
 import PprStyle		( PprStyle(..) )
 import SrcLoc		( SrcLoc )
 import Util
@@ -140,12 +151,14 @@ The rest of these functions are just simple selectors.
 \begin{code}
 classKey (Class key _ _ _ _ _ _ _ _ _) = key
 classOps (Class _ _ _ _ _ ops _ _ _ _) = ops
-classSelIds (Class _ _ _ _ _ _ sels _ _ _) = sels
+classGlobalIds (Class _ _ _ _ _ _ sels defm_ids _ _) = sels ++ defm_ids
 
 classOpId (Class _ _ _ _ _ ops op_ids _ _ _) op
   = op_ids !! (classOpTag op - 1)
-classDefaultMethodId (Class _ _ _ _ _ ops _ defm_ids _ _) op
-  = defm_ids !! (classOpTag op - 1)
+
+classDefaultMethodId (Class _ _ _ _ _ ops _ defm_ids _ _) idx
+  = defm_ids !! idx
+
 classSuperDictSelId (Class _ _ _ scs scsel_ids _ _ _ _ _) super_clas
   = assoc "classSuperDictSelId" (scs `zip` scsel_ids) super_clas
 
@@ -266,7 +279,7 @@ classOpTagByOccName clas op
   = case (classOpTagByOccName_maybe clas op) of
       Just tag -> tag
 #ifdef DEBUG
-      Nothing  -> pprPanic "classOpTagByOccName:" (ppCat (ppr PprDebug op : map (ppPStr . classOpString) (classOps clas)))
+      Nothing  -> pprPanic "classOpTagByOccName:" (hsep (ppr PprDebug op : map (ptext . classOpString) (classOps clas)))
 #endif
 
 classOpTagByOccName_maybe clas op
