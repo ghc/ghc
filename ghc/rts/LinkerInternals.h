@@ -1,21 +1,11 @@
 /* -----------------------------------------------------------------------------
- * $Id: LinkerInternals.h,v 1.2 2001/02/12 12:46:23 sewardj Exp $
+ * $Id: LinkerInternals.h,v 1.3 2001/02/28 10:03:42 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
  * RTS Object Linker
  *
  * ---------------------------------------------------------------------------*/
-
-/* A bucket in the symbol hash-table.  Primarily, maps symbol names to
- * absolute addresses.  All symbols from a given module are linked
- * together, so they can be freed at the same time.  There's also a
- * bucket link field for the hash table.
- */
-typedef struct _SymbolVal {
-    char   *lbl;
-    void   *addr;
-} SymbolVal;
 
 typedef enum { OBJECT_LOADED, OBJECT_RESOLVED } OStatus;
 
@@ -41,7 +31,11 @@ typedef struct _ObjectCode {
     int        fileSize;
     char*      formatName;            /* eg "ELF32", "DLL", "COFF", etc. */
 
-    SymbolVal  *symbols;
+    /* An array containing ptrs to all the symbol names copied from
+       this object into the global symbol hash table.  This is so that
+       we know which parts of the latter mapping to nuke when this
+       object is removed from the system. */
+    char**     symbols;
     int        n_symbols;
 
     /* ptr to malloc'd lump of memory holding the obj file */

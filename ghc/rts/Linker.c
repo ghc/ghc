@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.31 2001/02/14 13:56:50 simonmar Exp $
+ * $Id: Linker.c,v 1.32 2001/02/28 10:03:42 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -29,9 +29,9 @@
 #endif
 
 #if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS)
-#define OBJFORMAT_ELF
+#  define OBJFORMAT_ELF
 #elif defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
-/*  #define OBJFORMAT_PEi386 */
+#  define OBJFORMAT_PEi386
 #endif
 
 /* Hash table mapping symbol names to Symbol */
@@ -50,6 +50,12 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
 /* -----------------------------------------------------------------------------
  * Built-in symbols from the RTS
  */
+
+typedef struct _RtsSymbolVal {
+    char   *lbl;
+    void   *addr;
+} RtsSymbolVal;
+
 
 #define RTS_SYMBOLS				\
       SymX(MainRegTable)			\
@@ -253,7 +259,7 @@ RTS_SYMBOLS
                     (void*)(&(vvv)) },
 #define SymX(vvv) Sym(vvv)
 
-static SymbolVal rtsSyms[] = {
+static RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
       RTS_LONG_LONG_SYMS
       { 0, 0 } /* sentinel */
@@ -262,21 +268,24 @@ static SymbolVal rtsSyms[] = {
 /* -----------------------------------------------------------------------------
  * initialize the object linker
  */
+#if defined(OBJFORMAT_ELF)
 static void *dl_prog_handle;
+#endif
 
 void
 initLinker( void )
 {
-    SymbolVal *sym;
+    RtsSymbolVal *sym;
 
     symhash = allocStrHashTable();
 
     /* populate the symbol table with stuff from the RTS */
     for (sym = rtsSyms; sym->lbl != NULL; sym++) {
-	insertStrHashTable(symhash, sym->lbl, sym);
+	insertStrHashTable(symhash, sym->lbl, sym->addr);
     }
-
+#   if defined(OBJFORMAT_ELF)
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
+#   endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -321,14 +330,19 @@ addDLL ( char* dll_name )
 void *
 lookupSymbol( char *lbl )
 {
-    SymbolVal *val;
+    void *val;
     ASSERT(symhash != NULL);
     val = lookupStrHashTable(symhash, lbl);
 
     if (val == NULL) {
+#       if defined(OBJFORMAT_ELF)
 	return dlsym(dl_prog_handle, lbl);
+#       elif defined(OBJFORMAT_PEi386)
+        ASSERT(2+2 == 5);
+        return NULL;
+#       endif
     } else {
-	return val->addr;
+	return val;
     }
 }
 
@@ -336,13 +350,13 @@ static
 void *
 lookupLocalSymbol( ObjectCode* oc, char *lbl )
 {
-    SymbolVal *val;
+    void *val;
     val = lookupStrHashTable(oc->lochash, lbl);
 
     if (val == NULL) {
         return NULL;
     } else {
-	return val->addr;
+	return val;
     }
 }
 
@@ -452,7 +466,7 @@ resolveObjs( void )
 #           elif defined(OBJFORMAT_PEi386)
 	    r = ocResolve_PEi386 ( oc );
 #           else
-	    barf("link: not implemented on this platform");
+	    barf("resolveObjs: not implemented on this platform");
 #           endif
 	    if (!r) { return r; }
 	    oc->status = OBJECT_RESOLVED;
@@ -480,13 +494,13 @@ unloadObj( char *path )
 	     * object..
 	     */
 	    { 
-		SymbolVal *s;
-		for (s = oc->symbols; s < oc->symbols + oc->n_symbols; s++) {
-		    if (s->lbl != NULL) {
-			removeStrHashTable(symhash, s->lbl, NULL);
-		    }
-		}
-	    }
+                int i;
+                for (i = 0; i < oc->n_symbols; i++) {
+                   if (oc->symbols[i] != NULL) {
+                       removeStrHashTable(symhash, oc->symbols[i], NULL);
+                   }
+                }
+            }
 
 	    if (prev == NULL) {
 		objects = oc->next;
@@ -624,7 +638,7 @@ typedef
    are just plain wrong.  Sigh.
 */
 static UChar *
-myindex ( int scale, int index, void* base )
+myindex ( int scale, void* base, int index )
 {
    return
       ((UChar*)base) + scale * index;
@@ -685,11 +699,10 @@ cstring_from_COFF_symbol_name ( UChar* name, UChar* strtab )
    /* The annoying case: 8 bytes.  Copy into a temporary
       (which is never freed ...)
    */
-   newstr = malloc(9);
-   if (newstr) {
-      strncpy(newstr,name,8);
-      newstr[8] = 0;
-   }
+   newstr = stgMallocBytes(9, "cstring_from_COFF_symbol_name");
+   ASSERT(newstr);
+   strncpy(newstr,name,8);
+   newstr[8] = 0;
    return newstr;
 }
 
@@ -711,7 +724,7 @@ findPEi386SectionCalled ( ObjectCode* oc,  char* name )
       UChar* n2;
       COFF_section* section_i 
          = (COFF_section*)
-           myindex ( sizeof_COFF_section, i, sectab );
+           myindex ( sizeof_COFF_section, sectab, i );
       n1 = (UChar*) &(section_i->Name);
       n2 = name;
       if (n1[0]==n2[0] && n1[1]==n2[1] && n1[2]==n2[2] && 
@@ -727,14 +740,16 @@ findPEi386SectionCalled ( ObjectCode* oc,  char* name )
 static void
 zapTrailingAtSign ( UChar* sym )
 {
+#  define my_isdigit(c) ((c) >= '0' && (c) <= '9')
    int i, j;
    if (sym[0] == 0) return;
    i = 0; 
    while (sym[i] != 0) i++;
    i--;
    j = i;
-   while (j > 0 && isdigit(sym[j])) j--;
+   while (j > 0 && my_isdigit(sym[j])) j--;
    if (j > 0 && sym[j] == '@' && j != i) sym[j] = 0;
+#  undef my_isdigit
 }
 
 
@@ -761,28 +776,30 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
             + hdr->NumberOfSymbols * sizeof_COFF_symbol;
 
    if (hdr->Machine != 0x14c) {
-      oc->errMsg("Not x86 PEi386");
-      return FALSE;
+      belch("Not x86 PEi386");
+      return 0;
    }
    if (hdr->SizeOfOptionalHeader != 0) {
-      oc->errMsg("PEi386 with nonempty optional header");
-      return FALSE;
+      belch("PEi386 with nonempty optional header");
+      return 0;
    }
    if ( /* (hdr->Characteristics & IMAGE_FILE_RELOCS_STRIPPED) || */
         (hdr->Characteristics & IMAGE_FILE_EXECUTABLE_IMAGE) ||
         (hdr->Characteristics & IMAGE_FILE_DLL) ||
         (hdr->Characteristics & IMAGE_FILE_SYSTEM) ) {
-      oc->errMsg("Not a PEi386 object file");
-      return FALSE;
+      belch("Not a PEi386 object file");
+      return 0;
    }
    if ( (hdr->Characteristics & IMAGE_FILE_BYTES_REVERSED_HI) ||
         !(hdr->Characteristics & IMAGE_FILE_32BIT_MACHINE) ) {
-      oc->errMsg("Invalid PEi386 word size or endiannness");
-      return FALSE;
+      belch("Invalid PEi386 word size or endiannness");
+      return 0;
    }
 
-   if (!verb) return TRUE;
    /* No further verification after this point; only debug printing. */
+   i = 0;
+   IF_DEBUG(linker, i=1);
+   if (i == 0) return 1;
 
    fprintf ( stderr, 
              "sectab offset = %d\n", ((UChar*)sectab) - ((UChar*)hdr) );
@@ -810,7 +827,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    fprintf ( stderr, "\n" );
    fprintf ( stderr, "string table has size 0x%x\n", * (UInt32*)strtab );
    fprintf ( stderr, "---START of string table---\n");
-   for (i = 4; i < *(UInt32*)strtab; i++) {
+   for (i = 4; i < *(Int32*)strtab; i++) {
       if (strtab[i] == 0) 
          fprintf ( stderr, "\n"); else 
          fprintf( stderr, "%c", strtab[i] );
@@ -822,7 +839,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       COFF_reloc* reltab;
       COFF_section* sectab_i
          = (COFF_section*)
-           myindex ( sizeof_COFF_section, i, sectab );
+           myindex ( sizeof_COFF_section, sectab, i );
       fprintf ( stderr, 
                 "\n"
                 "section %d\n"
@@ -851,13 +868,13 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       for (j = 0; j < sectab_i->NumberOfRelocations; j++) {
          COFF_symbol* sym;
          COFF_reloc* rel = (COFF_reloc*)
-                           myindex ( sizeof_COFF_reloc, j, reltab );
+                           myindex ( sizeof_COFF_reloc, reltab, j );
          fprintf ( stderr, 
                    "        type 0x%-4x   vaddr 0x%-8x   name `",
                    (UInt32)rel->Type, 
                    rel->VirtualAddress );
          sym = (COFF_symbol*)
-               myindex ( sizeof_COFF_symbol, rel->SymbolTableIndex, symtab );
+               myindex ( sizeof_COFF_symbol, symtab, rel->SymbolTableIndex );
          printName ( sym->Name, strtab );
          fprintf ( stderr, "'\n" );
       }
@@ -869,9 +886,9 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    i = 0;
    while (1) {
       COFF_symbol* symtab_i;
-      if (i >= hdr->NumberOfSymbols) break;
+      if (i >= (Int32)(hdr->NumberOfSymbols)) break;
       symtab_i = (COFF_symbol*)
-                 myindex ( sizeof_COFF_symbol, i, symtab );
+                 myindex ( sizeof_COFF_symbol, symtab, i );
       fprintf ( stderr, 
                 "symbol %d\n"
                 "     name `",
@@ -897,7 +914,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
 
    fprintf ( stderr, "\n" );
 
-   return TRUE;
+   return 1;
 }
 
 
@@ -927,12 +944,20 @@ ocGetNames_PEi386 ( ObjectCode* oc )
             + hdr->NumberOfSymbols * sizeof_COFF_symbol;
 
    /* Copy exported symbols into the ObjectCode. */
+
+   oc->n_symbols = hdr->NumberOfSymbols;
+   oc->symbols   = stgMallocBytes(oc->n_symbols * sizeof(char*),
+                                  "ocGetNames_PEi386(oc->symbols)");
+   /* Call me paranoid; I don't care. */
+   for (i = 0; i < oc->n_symbols; i++) 
+      oc->symbols[i] = NULL;
+
    i = 0;
    while (1) {
       COFF_symbol* symtab_i;
-      if (i >= hdr->NumberOfSymbols) break;
+      if (i >= (Int32)(hdr->NumberOfSymbols)) break;
       symtab_i = (COFF_symbol*)
-                 myindex ( sizeof_COFF_symbol, i, symtab );
+                 myindex ( sizeof_COFF_symbol, symtab, i );
 
       if (symtab_i->StorageClass == IMAGE_SYM_CLASS_EXTERNAL &&
           symtab_i->SectionNumber != IMAGE_SYM_UNDEFINED) {
@@ -940,13 +965,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          /* This symbol is global and defined, viz, exported */
          COFF_section* sectabent;
 
-         sname = cstring_from_COFF_symbol_name ( 
-                    symtab_i->Name, strtab 
-                 );
-         if (!sname) {
-            oc->errMsg("Out of memory when copying PEi386 symbol");
-            return FALSE;
-         }
+         /* cstring_from_COFF_symbol_name always succeeds. */
+         sname = cstring_from_COFF_symbol_name ( symtab_i->Name, strtab );
 
          /* for IMAGE_SYMCLASS_EXTERNAL 
                 && !IMAGE_SYM_UNDEFINED,
@@ -955,23 +975,27 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          */
          sectabent = (COFF_section*)
                      myindex ( sizeof_COFF_section, 
-                               symtab_i->SectionNumber-1,
-                               sectab );
+                               sectab,
+                               symtab_i->SectionNumber-1 );
          addr = ((UChar*)(oc->image))
                 + (sectabent->PointerToRawData
                    + symtab_i->Value);
-         /* fprintf ( stderr, "addSymbol %p `%s'\n", addr,sname); */
-         if (!addSymbol(oc,sname,addr)) return FALSE;
+         IF_DEBUG(linker, belch("addSymbol %p `%s'\n", addr,sname);)
+         ASSERT(i >= 0 && i < oc->n_symbols);
+         oc->symbols[i] = sname;
+         insertStrHashTable(symhash, sname, addr);
       }
       i += symtab_i->NumberOfAuxSymbols;
       i++;
    }
 
-   oc->sections = stgMallocBytes( NumberOfSections * sizeof(Section), 
-				    "ocGetNamesPEi386" );
-
    /* Copy section information into the ObjectCode. */
-   for (i = 0; i < hdr->NumberOfSections; i++) {
+
+   oc->n_sections = hdr->NumberOfSections;
+   oc->sections = stgMallocBytes( oc->n_sections * sizeof(Section), 
+                                  "ocGetNamesPEi386" );
+
+   for (i = 0; i < oc->n_sections; i++) {
       UChar* start;
       UChar* end;
 
@@ -979,8 +1003,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          = SECTIONKIND_OTHER;
       COFF_section* sectab_i
          = (COFF_section*)
-           myindex ( sizeof_COFF_section, i, sectab );
-      /* fprintf ( stderr, "section name = %s\n", sectab_i->Name ); */
+           myindex ( sizeof_COFF_section, sectab, i );
+      IF_DEBUG(linker, belchf("section name = %s\n", sectab_i->Name ));
 
 #if 0
       /* I'm sure this is the Right Way to do it.  However, the 
@@ -1003,22 +1027,22 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       end   = start 
               + sectab_i->SizeOfRawData - 1;
 
-      if (kind != SECTIONKIND_OTHER) {
-         addSection ( oc, start, end, kind );
-      } else {
-         fprintf ( stderr, "unknown section name = `%s'\n", 
-                   sectab_i->Name);
-         oc->errMsg("Unknown PEi386 section name");
-         return FALSE;
+      if (kind == SECTIONKIND_OTHER) {
+         belch("Unknown PEi386 section name `%s'", sectab_i->Name);
+         return 0;
       }
+
+      oc->sections[i].start = start;
+      oc->sections[i].end   = end;
+      oc->sections[i].kind  = kind;
    }
 
-   return TRUE;   
+   return 1;   
 }
 
 
 static int
-ocResolve_PEi386 ( ObjectCode* oc, int verb )
+ocResolve_PEi386 ( ObjectCode* oc )
 {
    COFF_header*  hdr;
    COFF_section* sectab;
@@ -1030,7 +1054,10 @@ ocResolve_PEi386 ( ObjectCode* oc, int verb )
    UInt32*       pP;
 
    int i, j;
-   char symbol[1000]; // ToDo
+
+   /* ToDo: should be variable-sized?  But is at least safe in the
+      sense of buffer-overrun-proof. */
+   char symbol[1000];
    
    hdr = (COFF_header*)(oc->image);
    sectab = (COFF_section*) (
@@ -1048,7 +1075,7 @@ ocResolve_PEi386 ( ObjectCode* oc, int verb )
    for (i = 0; i < hdr->NumberOfSections; i++) {
       COFF_section* sectab_i
          = (COFF_section*)
-           myindex ( sizeof_COFF_section, i, sectab );
+           myindex ( sizeof_COFF_section, sectab, i );
       COFF_reloc* reltab
          = (COFF_reloc*) (
               ((UChar*)(oc->image)) + sectab_i->PointerToRelocations
@@ -1057,7 +1084,7 @@ ocResolve_PEi386 ( ObjectCode* oc, int verb )
          COFF_symbol* sym;
          COFF_reloc* reltab_j 
             = (COFF_reloc*)
-              myindex ( sizeof_COFF_reloc, j, reltab );
+              myindex ( sizeof_COFF_reloc, reltab, j );
 
          /* the location to patch */
          pP = (UInt32*)(
@@ -1070,39 +1097,39 @@ ocResolve_PEi386 ( ObjectCode* oc, int verb )
          /* the symbol to connect to */
          sym = (COFF_symbol*)
                myindex ( sizeof_COFF_symbol, 
-                         reltab_j->SymbolTableIndex, symtab );
-         if (verb) {
-            fprintf ( stderr, 
-                   "reloc sec %2d num %3d:  type 0x%-4x   "
-                   "vaddr 0x%-8x   name `",
-                   i, j,
-                   (UInt32)reltab_j->Type, 
-                   reltab_j->VirtualAddress );
-            printName ( sym->Name, strtab );
-            fprintf ( stderr, "'\n" );
-         }
+                         symtab, reltab_j->SymbolTableIndex );
+         IF_DEBUG(linker,
+                  fprintf ( stderr, 
+                            "reloc sec %2d num %3d:  type 0x%-4x   "
+                            "vaddr 0x%-8x   name `",
+                            i, j,
+                            (UInt32)reltab_j->Type, 
+                            reltab_j->VirtualAddress );
+                            printName ( sym->Name, strtab );
+                            fprintf ( stderr, "'\n" ));
 
          if (sym->StorageClass == IMAGE_SYM_CLASS_STATIC) {
             COFF_section* section_sym 
                = findPEi386SectionCalled ( oc, sym->Name );
             if (!section_sym) {
                fprintf ( stderr, "bad section = `%s'\n", sym->Name );
-               oc->errMsg("Can't find abovementioned PEi386 section");
-               return FALSE;
+               barf("Can't find abovementioned PEi386 section");
+               return 0;
             }
             S = ((UInt32)(oc->image))
                 + (section_sym->PointerToRawData
                    + sym->Value);
          } else {
-         copyName ( sym->Name, strtab, symbol, 1000 );
-         zapTrailingAtSign ( symbol );
-         S = (UInt32) ocLookupSym ( oc, symbol );
-         if (S == 0) 
-            S = (UInt32)(oc->clientLookup ( symbol ));
-         if (S == 0) {
-	     belch("%s: unresolvable reference to `%s'", oc->fileName, symbol);
-	     return FALSE;
-         }
+            copyName ( sym->Name, strtab, symbol, 1000 );
+            zapTrailingAtSign ( symbol );
+            (void*)S = lookupLocalSymbol( oc, symbol );
+            if ((void*)S == NULL)
+               (void*)S = lookupSymbol( symbol );
+            if (S == 0) {
+	        belch("ocResolve_PEi386: %s: unknown symbol `%s'", 
+                      oc->fileName, symbol);
+	        return 0;
+            }
          }
 
          switch (reltab_j->Type) {
@@ -1128,14 +1155,14 @@ ocResolve_PEi386 ( ObjectCode* oc, int verb )
                fprintf(stderr, 
                        "unhandled PEi386 relocation type %d\n",
                        reltab_j->Type);
-               oc->errMsg("unhandled PEi386 relocation type");
-               return FALSE;
+               barf("unhandled PEi386 relocation type");
+               return 0;
          }
 
       }
    }
    
-   return TRUE;
+   return 1;
 }
 
 #endif /* defined(OBJFORMAT_PEi386) */
@@ -1358,11 +1385,11 @@ ocGetNames_ELF ( ObjectCode* oc )
    }
 
    k = 0;
-   oc->sections = stgMallocBytes( ehdr->e_shnum * sizeof(Section), 
-				    "ocGetNames_ELF" );
    oc->n_sections = ehdr->e_shnum;
+   oc->sections = stgMallocBytes( oc->n_sections * sizeof(Section), 
+                                  "ocGetNames_ELF(oc->sections)" );
 
-   for (i = 0; i < ehdr->e_shnum; i++) {
+   for (i = 0; i < oc->n_sections; i++) {
 
       /* make a section entry for relevant sections */
       SectionKind kind = SECTIONKIND_OTHER;
@@ -1384,8 +1411,11 @@ ocGetNames_ELF ( ObjectCode* oc )
       /* copy stuff into this module's object symbol table */
       stab = (Elf32_Sym*) (ehdrC + shdr[i].sh_offset);
       nent = shdr[i].sh_size / sizeof(Elf32_Sym);
-      oc->symbols = malloc(nent * sizeof(SymbolVal));
+
       oc->n_symbols = nent;
+      oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*), 
+                                   "ocGetNames_ELF(oc->symbols)");
+
       for (j = 0; j < nent; j++) {
          if ( ( ELF32_ST_BIND(stab[j].st_info)==STB_GLOBAL
                 || ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL
@@ -1407,33 +1437,31 @@ ocGetNames_ELF ( ObjectCode* oc )
                        + stab[j].st_value;
             ASSERT(nm != NULL);
             ASSERT(ad != NULL);
-	    oc->symbols[j].lbl  = nm;
-	    oc->symbols[j].addr = ad;
+	    oc->symbols[j] = nm;
             if (ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL) {
                IF_DEBUG(linker,belch( "addOTabName(LOCL): %10p  %s %s",
                                       ad, oc->fileName, nm ));
-               insertStrHashTable(oc->lochash, nm, &(oc->symbols[j]));
+               insertStrHashTable(oc->lochash, nm, ad);
             } else {
                IF_DEBUG(linker,belch( "addOTabName(GLOB): %10p  %s %s",
                                       ad, oc->fileName, nm ));
-               insertStrHashTable(symhash, nm, &(oc->symbols[j]));
+               insertStrHashTable(symhash, nm, ad);
             }
          }
-	 else {
-	     IF_DEBUG(linker,belch( "skipping `%s'", 
-                                    strtab + stab[j].st_name ));
-	     /*
-	     fprintf(stderr, 
-		     "skipping   bind = %d,  type = %d,  shndx = %d   `%s'\n",
-		     (int)ELF32_ST_BIND(stab[j].st_info), 
-                     (int)ELF32_ST_TYPE(stab[j].st_info), 
-                     (int)stab[j].st_shndx,
-                     strtab + stab[j].st_name
-                    );
-	     */
-	     oc->symbols[j].lbl  = NULL;
-	     oc->symbols[j].addr = NULL;
-	 }
+         else {
+            IF_DEBUG(linker,belch( "skipping `%s'", 
+                                   strtab + stab[j].st_name ));
+            /*
+            fprintf(stderr, 
+                    "skipping   bind = %d,  type = %d,  shndx = %d   `%s'\n",
+                    (int)ELF32_ST_BIND(stab[j].st_info), 
+                    (int)ELF32_ST_TYPE(stab[j].st_info), 
+                    (int)stab[j].st_shndx,
+                    strtab + stab[j].st_name
+                   );
+            */
+            oc->symbols[j] = NULL;
+         }
       }
    }
 
@@ -1496,12 +1524,14 @@ static int do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
       IF_DEBUG(linker,belch( "Reloc: P = %p   S = %p   A = %p",
 			     (void*)P, (void*)S, (void*)A )); 
       switch (ELF32_R_TYPE(info)) {
-#ifdef i386_TARGET_ARCH
+#        ifdef i386_TARGET_ARCH
          case R_386_32:   *pP = S + A;     break;
          case R_386_PC32: *pP = S + A - P; break;
-#endif
+#        endif
          default: 
-            barf("do_Elf32_Rel_relocations: unhandled ELF relocation(Rel) type %d\n", ELF32_R_TYPE(info));
+            fprintf(stderr, "unhandled ELF relocation(Rel) type %d\n",
+                            ELF32_R_TYPE(info));
+            barf("do_Elf32_Rel_relocations: unhandled ELF relocation type");
             return 0;
       }
 
@@ -1563,7 +1593,7 @@ static int do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                (void*)S = lookupSymbol( symbol );
          }
          if (!S) {
-	   barf("ocResolve_ELF: %s: unknown symbol `%s'", 
+	   barf("do_Elf32_Rela_relocations: %s: unknown symbol `%s'", 
                    oc->fileName, symbol);
 	   /* 
 	   S = 0x11223344;
