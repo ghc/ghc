@@ -1,13 +1,14 @@
 /* --------------------------------------------------------------------------
  * Interpreter command structure
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
  *
  * $RCSfile: command.h,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:01 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:26 $
  * ------------------------------------------------------------------------*/
 
 typedef Int Command;
@@ -37,7 +38,6 @@ extern Command readCommand Args((struct cmd *, Char, Char));
 #define INFO    15
 #define COLLECT 16
 #define SETMODULE 17
-#define SHOWVERSION 18
-#define NOCMD   19
+#define NOCMD   18
 
 /*-------------------------------------------------------------------------*/

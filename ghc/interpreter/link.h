@@ -1,38 +1,8 @@
-/* -*- mode: hugs-c; -*- */
-extern  Void   linkPreludeTC    Args((Void));
-extern  Void   linkPreludeCM    Args((Void));
-extern  Void   linkPreludeNames Args((Void));
 
-extern Module modulePreludeHugs;
-
-/* --------------------------------------------------------------------------
- * Primitive constructor functions 
- * ------------------------------------------------------------------------*/
-
-extern Name  nameFalse, nameTrue;
-extern Name  nameNil,   nameCons;
-extern Name  nameUnit;
-
-extern Name  nameFromInt, nameFromDouble;/*coercion of numerics            */
-extern Name  nameFromInteger;
-extern Name  nameReturn,  nameBind;     /* for translating monad comps     */
-extern Name  nameZero;                  /* for monads with a zero          */
-#if EVAL_INSTANCES
-extern Name  nameStrict,  nameSeq;      /* Members of class Eval           */
-#endif
-
-extern Name  nameId;
-extern Name  nameRunIO;
-extern Name  namePrint;
+extern Cell conCons;
 
 extern Name nameForce;
-
-#if TREX
-extern Name  nameInsFld;                /* Field insertion routine         */
-extern Type  typeRec;                   /* Record formation                */
-extern Name  nameNoRec;                 /* The empty record                */
-extern Type  typeNoRow;                 /* The empty row                   */
-#endif
+extern Name nameRunIO;
 
 /* The following data constructors are used to box unboxed
  * arguments and are treated differently by the code generator.
@@ -82,10 +52,6 @@ extern Name nameMkWeak;
 extern Name nameMkThreadId;  
 extern Name nameMkMVar;  
 #endif
-
-extern Type typeArrow;                  /* Builtin type constructors       */
-
-#define fn(from,to)  ap2(typeArrow,from,to)     /* make type:  from -> to  */
 
 /* For every primitive type provided by the runtime system,
  * we construct a Haskell type using a declaration of the form:
@@ -149,34 +115,6 @@ extern Type typeException;
 #warning BIGNUMTYPE undefined
 #endif
 
-extern List  stdDefaults;               /* List of standard default types  */
-
-extern Class classEq;                   /* `standard' classes              */
-extern Class classOrd;
-extern Class classShow;
-extern Class classRead;
-extern Class classIx;
-extern Class classEnum;
-extern Class classBounded;
-#if EVAL_INSTANCES
-extern Class classEval;
-#endif
-
-extern Class classReal;                 /* `numeric' classes               */
-extern Class classIntegral;
-extern Class classRealFrac;
-extern Class classRealFloat;
-extern Class classFractional;
-extern Class classFloating;
-extern Class classNum;
-
-extern Class classMonad;                /* Monads and monads with a zero   */
-extern Class classMonad0;
-
-/* used in typechecker */
-extern Name nameError;
-extern Name nameInd;
-
 /* used while desugaring */
 extern Name nameId;
 extern Name nameOtherwise;
@@ -203,4 +141,11 @@ extern Name namePmSubtract;
 extern Name namePmFromInteger;
 extern Name nameMkIO;
 extern Name nameUnpackString;
+
+extern Type  arrow;                     /* mkOffset(0) -> mkOffset(1)      */
+extern Type  listof;                    /* [ mkOffset(0) ]                 */
+extern Cell  predNum;                   /* Num (mkOffset(0))               */
+extern Cell  predFractional;            /* Fractional (mkOffset(0))        */
+extern Cell  predIntegral;              /* Integral (mkOffset(0))          */
+extern Cell  predMonad;                 /* Monad (mkOffset(0))             */
 

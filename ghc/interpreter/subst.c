@@ -1,11 +1,16 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
- * subst.c:     Copyright (c) Mark P Jones 1991-1998.   All rights reserved.
- *              See NOTICE for details and conditions of use etc...
- *              Hugs version 1.3c, March 1998
- *
  * Provides an implementation for the `current substitution' used during
  * type and kind inference in both static analysis and type checking.
+ *
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
+ *
+ * $RCSfile: subst.c,v $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:42 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -51,6 +56,7 @@ static Bool local varToTypeBind         Args((Tyvar *,Type,Int));
 #if TREX
 static Bool local inserter              Args((Type,Int,Type,Int));
 static Int  local remover               Args((Text,Type,Int));
+static Int  local tailVar               Args((Type,Int));
 #endif
 static Bool local kvarToVarBind         Args((Tyvar *,Tyvar *));
 static Bool local kvarToTypeBind        Args((Tyvar *,Type,Int));
@@ -166,9 +172,9 @@ Int n; {                                /* all of kind STAR                */
         tyvars[numTyvars-n].bound = NIL;
         tyvars[numTyvars-n].kind  = STAR;
 #ifdef DEBUG_TYPES
-        printf("new type variable: _%d ::: ",numTyvars-n);
+        Printf("new type variable: _%d ::: ",numTyvars-n);
         printKind(stdout,tyvars[numTyvars-n].kind);
-        putchar('\n');
+        Putchar('\n');
 #endif
     }
     return beta;
@@ -183,9 +189,9 @@ Kind k; {                               /* specified kinds                 */
         tyvars[numTyvars].bound = NIL;
         tyvars[numTyvars].kind  = fst(k);
 #ifdef DEBUG_TYPES
-        printf("new type variable: _%d ::: ",numTyvars);
+        Printf("new type variable: _%d ::: ",numTyvars);
         printKind(stdout,tyvars[numTyvars].kind);
-        putchar('\n');
+        Putchar('\n');
 #endif
         numTyvars++;
     }
@@ -317,9 +323,9 @@ Int  o; {
     tyv->bound = t;
     tyv->offs  = o;
 #ifdef DEBUG_TYPES
-    printf("binding type variable: _%d to ",vn);
+    Printf("binding type variable: _%d to ",vn);
     printType(stdout,debugType(t,o));
-    putchar('\n');
+    Putchar('\n');
 #endif
 }
 
@@ -396,11 +402,20 @@ Int   *ao; {                            /* expansion returned in (*at,*ao) */
  * Marking fixed variables in type expressions:
  * ------------------------------------------------------------------------*/
 
-Void clearMarks() {                     /* set all unbound type vars to    */
+Void clearMarks() {                     /* Set all unbound type vars to    */
     Int i;                              /* unused generic variables        */
     for (i=0; i<numTyvars; ++i)
         if (!isBound(tyvar(i)))
             tyvar(i)->offs = UNUSED_GENERIC;
+    genericVars = NIL;
+    nextGeneric = 0;
+}
+
+Void markAllVars() {                    /* Set all unbound type vars to    */
+    Int i;                              /* be fixed vars                   */
+    for (i=0; i<numTyvars; ++i)
+        if (!isBound(tyvar(i)))
+            tyvar(i)->offs = FIXED_TYVAR;
     genericVars = NIL;
     nextGeneric = 0;
 }
@@ -428,8 +443,10 @@ Void markType(t,o)                      /* mark fixed vars in type (t,o)   */
 Type t;
 Int  o; {
     switch (whatIs(t)) {
+        case POLYTYPE  :
+        case QUAL      :
 #if TREX
-        case EXT       :st
+        case EXT       :
 #endif
         case TYCON     :
         case TUPLE     : return;
@@ -449,8 +466,6 @@ Int  o; {
                          return;
 
         case RANK2     : markType(snd(snd(t)),o);
-                         return;
-        case POLYTYPE  : /* No need to mark generic types */
                          return;
 
         default        : internal("markType");
@@ -474,8 +489,11 @@ Type copyTyvar(vn)                      /* calculate most general form of  */
 Int vn; {                               /* type bound to given type var    */
     Tyvar *tyv = tyvar(vn);
 
-    if (isBound(tyv))
+    if ((tyv->bound)==SKOLEM) {
+        return mkInt(vn);
+    } else if (tyv->bound) {
         return copyType(tyv->bound,tyv->offs);
+    }
 
     switch (tyv->offs) {
         case FIXED_TYVAR    : return mkInt(vn);
@@ -586,7 +604,7 @@ Int  n; {
             Type a = arg(fun(t));
             if (isPolyType(a))
                 a = dropRank1(a,alpha,n);
-            as = ap2(typeArrow,a,as);
+            as = fn(a,as);
             t  = arg(t);
         }
         t = ap(RANK2,pair(r,revOnto(as,t)));
@@ -659,7 +677,7 @@ Int  m; {
         for (i=intOf(r); i>0; i--) {
             Type a = arg(fun(t));
             a      = isPolyType(a) ? liftRank1Body(a,m) : copyType(a,alpha);
-            as     = ap2(typeArrow,a,as);
+            as     = fn(a,as);
             t      = arg(t);
         }
         t = ap(RANK2,pair(r,revOnto(as,copyType(t,alpha))));
@@ -738,7 +756,7 @@ Int  o; {
 #endif
     }
 #ifdef DEBUG_KINDS
-    printf("getKind c = %d, whatIs=%d\n",c,whatIs(c));
+    Printf("getKind c = %d, whatIs=%d\n",c,whatIs(c));
 #endif
     internal("getKind");
     return STAR;/* not reached */
@@ -842,7 +860,7 @@ Tyvar *tyv1, *tyv2; {
         tyv1->bound = aVar;
         tyv1->offs  = tyvNum(tyv2);
 #ifdef DEBUG_TYPES
-        printf("vv binding tyvar: _%d to _%d\n",tyvNum(tyv1),tyvNum(tyv2));
+        Printf("vv binding tyvar: _%d to _%d\n",tyvNum(tyv1),tyvNum(tyv2));
 #endif
     }
     return TRUE;
@@ -868,9 +886,9 @@ Int   o; {                              /* have synonym as outermost constr*/
         tyv->bound = t;
         tyv->offs  = o;
 #ifdef DEBUG_TYPES
-        printf("vt binding type variable: _%d to ",tyvNum(tyv));
+        Printf("vt binding type variable: _%d to ",tyvNum(tyv));
         printType(stdout,debugType(t,o));
-        putchar('\n');
+        Putchar('\n');
 #endif
         return TRUE;
     }
@@ -914,23 +932,27 @@ un: if (tyv1)
             Int  a2 = argCount;
 
 #ifdef DEBUG_TYPES
-            printf("tt unifying types: ");
+            Printf("tt unifying types: ");
             printType(stdout,debugType(t1,o1));
-            printf(" with ");
+            Printf(" with ");
             printType(stdout,debugType(t2,o2));
-            putchar('\n');
+            Putchar('\n');
 #endif
-
             if (isOffset(h1) || isInt(h1)) h1=NIL;  /* represent var by NIL*/
             if (isOffset(h2) || isInt(h2)) h2=NIL;
 
 #if TREX
             if (isExt(h1) || isExt(h2)) {
-                if (a1==2 && isExt(h1) && a2==2 && isExt(h2))
-                    return inserter(fun(t1),o1,t2,o2) &&
-                              unify(arg(t1),o1,aVar,
-                                 remover(extText(h1),t2,o2));
-                else {
+                if (a1==2 && isExt(h1) && a2==2 && isExt(h2)) {
+                    if (extText(h1)==extText(h2)) {
+                        return unify(arg(fun(t1)),o1,arg(fun(t2)),o2) &&
+                                unify(arg(t1),o1,arg(t2),o2);
+                    } else {
+                        return inserter(t1,o1,t2,o2) &&
+                                  unify(arg(t1),o1,aVar,
+                                     remover(extText(h1),t2,o2));
+                    }
+                } else {
                     unifyFails = "rows are not compatible";
                     return FALSE;
                 }
@@ -1001,23 +1023,35 @@ un: if (tyv1)
 }
 
 #if TREX
-static Bool local inserter(ins,o,r,or)  /* Insert field into row (r,or)    */
-Type ins;                               /* inserter (ins,o), where ins is  */
-Int  o;                                 /* an applic of an EXT to a type.  */
+static Bool local inserter(r1,o1,r,o)   /* Insert first field in (r1,o1)   */
+Type r1;                                /* into row (r,o), both of which   */
+Int  o1;                                /* are known to begin with an EXT  */
 Type r;
-Int  or; {
-    Text labt = extText(fun(ins));      /* Find the text of the label      */
+Int  o; {
+    Text labt = extText(fun(fun(r1)));  /* Find the text of the label      */
+#ifdef DEBUG_TYPES
+    Printf("inserting ");
+    printType(stdout,debugType(r1,o1));
+    Printf(" into ");
+    printType(stdout,debugType(r,o));
+    Putchar('\n');
+#endif
     for (;;) {
         Tyvar *tyv;
-        deRef(tyv,r,or);
+        deRef(tyv,r,o);
         if (tyv) {
-            Int beta = newTyvars(1);    /* Extend row with new field       */
+            Int beta;                   /* Test for common tail            */
+            if (tailVar(arg(r1),o1)==tyvNum(tyv)) {
+                unifyFails = "distinct rows have common tail";
+                return FALSE;
+            }
+            beta = newTyvars(1);        /* Extend row with new field       */
             tyvar(beta)->kind = ROW;
-            return varToTypeBind(tyv,ap(ins,mkInt(beta)),o);
+            return varToTypeBind(tyv,ap(fun(r1),mkInt(beta)),o1);
         }
         else if (isAp(r) && isAp(fun(r)) && isExt(fun(fun(r)))) {
             if (labt==extText(fun(fun(r))))/* Compare existing fields      */
-                return unify(arg(ins),o,extField(r),or);
+                return unify(arg(fun(r1)),o1,extField(r),o);
             r = extRow(r);              /* Or skip to next field           */
         }
         else {                          /* Nothing else will match         */
@@ -1034,6 +1068,11 @@ Int  o; {
     Tyvar *tyv;
     Int    beta       = newTyvars(1);
     tyvar(beta)->kind = ROW;
+#ifdef DEBUG_TYPES
+    Printf("removing %s from",textToStr(l));
+    printType(stdout,debugType(r,o));
+    Putchar('\n');
+#endif
     deRef(tyv,r,o);
     if (tyv || !isAp(r) || !isAp(fun(r)) || !isExt(fun(fun(r))))
         internal("remover");
@@ -1044,10 +1083,30 @@ Int  o; {
     bindTv(beta,r,o);
     return beta;
 }
+
+
+static Int local tailVar(r,o)           /* Find var at tail end of a row   */
+Type r;
+Int  o; {
+    for (;;) {
+        Tyvar *tyv;
+        deRef(tyv,r,o);
+        if (tyv) {
+            return tyvNum(tyv);
+        }
+        else if (isAp(r) && isAp(fun(r)) && isExt(fun(fun(r)))) {
+            r = extRow(r);
+        }
+        else {
+            return (-1);
+        }
+    }
+}
 #endif
 
+
 Bool typeMatches(type,mt)               /* test if type matches monotype mt*/
-Type type, mt; {
+    Type type, mt; {                    /* imported from STG Hugs          */
     Bool result;
     if (isPolyType(type) || whatIs(type)==QUAL)
         return FALSE;
@@ -1058,6 +1117,27 @@ Type type, mt; {
     emptySubstitution();
     return result;
 }
+
+
+#if IO_MONAD
+Bool isProgType(ks,type)                /* Test if type is of the form     */
+List ks;                                /* IO t for some t.                */
+Type type; {
+    Bool result;
+    Int  alpha;
+    Int  beta;
+    if (isPolyType(type) || whatIs(type)==QUAL)
+        return FALSE;
+    emptySubstitution();
+    alpha  = newKindedVars(ks);
+    beta   = newTyvars(1);
+    bindOnlyAbove(beta);
+    result = unify(type,alpha,typeProgIO,beta);
+    unrestrictBind();
+    emptySubstitution();
+    return result;
+}
+#endif
 
 /* --------------------------------------------------------------------------
  * Matching predicates:
@@ -1140,6 +1220,11 @@ Int  o; {
     return pi1==pi;
 }
 
+#if TREX
+static Cell trexShow = NIL;             /* Used to test for show on records*/
+static Cell trexEq   = NIL;             /* Used to test for eq on records  */
+#endif
+
 Inst findInstFor(pi,o)                  /* Find matching instance for pred */
 Cell  pi;                               /* (pi,o), or otherwise NIL.  If a */
 Int   o; {                              /* match is found, then tyvars from*/
@@ -1162,10 +1247,10 @@ Int   o; {                              /* match is found, then tyvars from*/
     unrestrictBind();
 
 #if TREX
-    {   Int showRow = strcmp(textToStr(cclass(c).text),"ShowRecRow");
-        Int eqRow   = strcmp(textToStr(cclass(c).text),"EqRecRow");
+    {   Bool wantShow   = (c==findQualClass(trexShow));
+        Bool wantEither = wantShow || (c==findQualClass(trexEq));
 
-        if (showRow==0 || eqRow==0) {           /* Generate instances of   */
+        if (wantEither) {                       /* Generate instances of   */
             Type  t = arg(pi);                  /* ShowRecRow and EqRecRow */
             Tyvar *tyv;                         /* on the fly              */
             Cell  e;
@@ -1179,8 +1264,7 @@ Int   o; {                              /* match is found, then tyvars from*/
                         break;
                     }
                 if (isNull(in))
-                    in = (showRow==0) ? addRecShowInst(c,e)
-                                      : addRecEqInst(c,e);
+                    in = (wantShow ? addRecShowInst(c,e) : addRecEqInst(c,e));
                 typeOff = newKindedVars(extKind);
                 bindTv(typeOff,arg(fun(t)),o);
                 bindTv(typeOff+1,arg(t),o);
@@ -1298,7 +1382,7 @@ Tyvar *tyv1, *tyv2; {                     /* for kind variable bindings    */
         tyv1->bound = aVar;
         tyv1->offs  = tyvNum(tyv2);
 #ifdef DEBUG_KINDS
-        printf("vv binding kvar: _%d to _%d\n",tyvNum(tyv1),tyvNum(tyv2));
+        Printf("vv binding kvar: _%d to _%d\n",tyvNum(tyv1),tyvNum(tyv2));
 #endif
     }
     return TRUE;
@@ -1312,9 +1396,9 @@ Int   o; {                              /* have synonym as outermost constr*/
         tyv->bound = t;
         tyv->offs  = o;
 #ifdef DEBUG_KINDS
-        printf("vt binding kind variable: _%d to ",tyvNum(tyv));
+        Printf("vt binding kind variable: _%d to ",tyvNum(tyv));
         printType(stdout,debugType(t,o));
-        putchar('\n');
+        Putchar('\n');
 #endif
         return TRUE;
     }
@@ -1340,11 +1424,11 @@ Int  o1,o2; {
             return kvarToTypeBind(kyv2,k1,o1);      /* k2 variable, k1 not */
         else {
 #ifdef DEBUG_KINDS
-            printf("unifying kinds: ");
+            Printf("unifying kinds: ");
             printType(stdout,debugType(k1,o1));
-            printf(" with ");
+            Printf(" with ");
             printType(stdout,debugType(k2,o2));
-            putchar('\n');
+            Putchar('\n');
 #endif
             if (k1==STAR && k2==STAR)               /* k1, k2 not vars     */
                 return TRUE;
@@ -1472,6 +1556,10 @@ Int what; {
                        mark(typeIs);
                        mark(predsAre);
                        mark(genericVars);
+#if TREX
+                       mark(trexShow);
+                       mark(trexEq);
+#endif
                        break;
 
         case INSTALL : substitution(RESET);
@@ -1481,6 +1569,12 @@ Int what; {
                            simpleKindCache[i] = NIL;
                            varKindCache[i]    = NIL;
                        }
+#if TREX
+                       trexShow = mkQCon(findText("Trex"),
+                                         findText("ShowRecRow"));
+                       trexEq   = mkQCon(findText("Trex"),
+                                         findText("EqRecRow"));
+#endif
                        break;
     }
 }

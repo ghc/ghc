@@ -1,35 +1,108 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
- * type.c:      Copyright (c) Mark P Jones 1991-1998.   All rights reserved.
- *              See NOTICE for details and conditions of use etc...
- *              Hugs version 1.3c, March 1998
- *
  * This is the Hugs type checker
+ *
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
+ *
+ * $RCSfile: type.c,v $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:44 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
+#include "backend.h"
 #include "connect.h"
-#include "input.h"
-#include "static.h"
-#include "hugs.h" /* for target   */
-#include "pat.h"  /* for failFree */
 #include "errors.h"
 #include "subst.h"
-#include "type.h"
-#include "link.h"
 #include "Assembler.h" /* for AsmCTypes */
 
 /*#define DEBUG_TYPES*/
 /*#define DEBUG_KINDS*/
 /*#define DEBUG_DEFAULTS*/
 /*#define DEBUG_SELS*/
-/*#define DEBUG_CODE*/
 /*#define DEBUG_DEPENDS*/
 /*#define DEBUG_DERIVING*/
+/*#define DEBUG_CODE*/
 
 Bool catchAmbigs       = FALSE;         /* TRUE => functions with ambig.   */
                                         /*         types produce error     */
+
+#if 1
+//ToDo: perhaps this should be somewhere else (link.c?)
+//all this stuff came with 98, and not STG
+Type typeArrow,   typeList;             /* Important primitive types       */
+Type typeUnit;
+
+Module modulePrelude;
+
+static Type typeInt,     typeDouble;
+static Type typeInteger, typeAddr;
+static Type typeString,  typeChar;
+static Type typeBool,    typeMaybe;
+static Type typeOrdering;
+
+Class classEq,    classOrd;             /* `standard' classes              */
+Class classIx,    classEnum;
+Class classShow,  classRead;
+#if EVAL_INSTANCES
+Class classEval;
+#endif
+Class classBounded;
+
+Class classReal,       classIntegral;   /* `numeric' classes               */
+Class classRealFrac,   classRealFloat;
+Class classFractional, classFloating;
+Class classNum;
+
+List stdDefaults;                       /* standard default values         */
+
+Name nameFromInt, nameFromDouble;       /* coercion of numerics            */
+Name nameFromInteger;
+Name nameEq,      nameCompare;          /* derivable names                 */
+Name nameLe;
+Name nameShowsPrec;
+Name nameReadsPrec;
+Name nameMinBnd,  nameMaxBnd;
+Name nameIndex,   nameInRange;
+Name nameRange;
+Name nameMult,    namePlus;
+Name nameTrue,    nameFalse;            /* primitive boolean constructors  */
+Name nameNil,     nameCons;             /* primitive list constructors     */
+Name nameJust,    nameNothing;          /* primitive Maybe constructors    */
+Name nameLeft,    nameRight;            /* primitive Either constructors   */
+Name nameUnit;                          /* primitive Unit type constructor */
+Name nameLT,      nameEQ;               /* Ordering constructors           */
+Name nameGT;
+Class classMonad;                       /* Monads                          */
+Name nameReturn,  nameBind;             /* for translating monad comps     */
+Name nameMFail;
+Name nameGt;                            /* for readsPrec                   */
+#if EVAL_INSTANCES
+Name nameStrict,  nameSeq;              /* Members of class Eval           */
+#endif
+
+#if    IO_MONAD
+Type   typeProgIO;                      /* For the IO monad, IO ()         */
+Name   nameUserErr;                     /* loosely coupled IOError cfuns   */
+Name   nameNameErr,  nameSearchErr;
+#endif
+#if    IO_HANDLES
+Name   nameWriteErr, nameIllegal;
+Name   nameEOFErr;
+#endif
+
+#if TREX
+Type  typeNoRow;                        /* Empty row                       */
+Type  typeRec;                          /* Record formation                */
+Name  nameNoRec;                        /* Empty record                    */
+#endif
+
+//end ToDo
+#endif
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -53,6 +126,8 @@ static Void   local enterPendingBtyvs Args((Void));
 static Void   local leavePendingBtyvs Args((Void));
 static Cell   local patBtyvs          Args((Cell));
 static Void   local doneBtyvs         Args((Int));
+static Void   local enterSkolVars     Args((Void));
+static Void   local leaveSkolVars     Args((Int,Type,Int,Int));
 
 static Void   local typeError         Args((Int,Cell,Cell,String,Type,Int));
 static Void   local reportTypeError   Args((Int,Cell,Cell,String,Type,Type));
@@ -67,8 +142,8 @@ static Void   local typeAlt           Args((String,Cell,Cell,Type,Int,Int));
 static Int    local funcType          Args((Int));
 static Void   local typeCase          Args((Int,Int,Cell));
 static Void   local typeComp          Args((Int,Type,Cell,List));
+static Cell   local typeMonadComp     Args((Int,Cell));
 static Void   local typeDo            Args((Int,Cell));
-static Cell   local compZero          Args((List,Int));
 static Void   local typeConFlds       Args((Int,Cell));
 static Void   local typeUpdFlds       Args((Int,Cell));
 static Cell   local typeFreshPat      Args((Int,Cell));
@@ -102,21 +177,26 @@ static Bool   local equalTypes        Args((Type,Type));
 static Void   local typeDefnGroup     Args((List));
 static Pair   local typeSel           Args((Name));
 
+static List   offsetTyvarsIn          Args((Type,List));
+static Type   conToTagType            Args((Tycon));
+static Type   tagToConType            Args((Tycon));
+
+
 /* --------------------------------------------------------------------------
  * Frequently used type skeletons:
  * ------------------------------------------------------------------------*/
 
-static Type  arrow;                     /* mkOffset(0) -> mkOffset(1)      */
+/* ToDo: move these to link.c and call them 'typeXXXX' */
+       Type  arrow;                     /* mkOffset(0) -> mkOffset(1)      */
 static Type  boundPair;                 /* (mkOffset(0),mkOffset(0))       */
-static Type  listof;                    /* [ mkOffset(0) ]                 */
+       Type  listof;                    /* [ mkOffset(0) ]                 */
 static Type  typeVarToVar;              /* mkOffset(0) -> mkOffset(0)      */
 
-static Cell  predNum;                   /* Num (mkOffset(0))               */
-static Cell  predFractional;            /* Fractional (mkOffset(0))        */
-static Cell  predIntegral;              /* Integral (mkOffset(0))          */
+       Cell  predNum;                   /* Num (mkOffset(0))               */
+       Cell  predFractional;            /* Fractional (mkOffset(0))        */
+       Cell  predIntegral;              /* Integral (mkOffset(0))          */
 static Kind  starToStar;                /* Type -> Type                    */
-static Cell  predMonad;                 /* Monad (mkOffset(0))             */
-static Cell  predMonad0;                /* Monad0 (mkOffset(0))            */
+       Cell  predMonad;                 /* Monad (mkOffset(0))             */
 
 /* --------------------------------------------------------------------------
  * Assumptions:
@@ -153,6 +233,8 @@ static List defnBounds;                 /*::[[(Var,Type)]] possibly ovrlded*/
 static List varsBounds;                 /*::[[(Var,Type)]] not overloaded  */
 static List depends;                    /*::[?[Var]] dependents/NODEPENDS  */
 static List skolVars;                   /*::[[Var]] skolem vars            */
+static List localEvs;                   /*::[[(Pred,offset,ev)]]           */
+static List savedPs;                    /*::[[(Pred,offset,ev)]]           */
 static Cell dummyVar;                   /* Used to put extra tvars into ass*/
 
 #define saveVarsAss()     List saveAssump = hd(varsBounds)
@@ -165,6 +247,8 @@ static Void local emptyAssumption() {   /* set empty type assumption       */
     varsBounds = NIL;
     depends    = NIL;
     skolVars   = NIL;
+    localEvs   = NIL;
+    savedPs    = NIL;
 }
 
 static Void local enterBindings() {    /* Add new level to assumption sets */
@@ -279,9 +363,9 @@ Cell v; {
     Int beta = newTyvars(1);
     addVarAssump(v,mkInt(beta));
 #ifdef DEBUG_TYPES
-    printf("variable, assume ");
+    Printf("variable, assume ");
     printExp(stdout,v);
-    printf(" :: _%d\n",beta);
+    Printf(" :: _%d\n",beta);
 #endif
     return beta;
 }
@@ -296,12 +380,18 @@ Type type; {
         ta = pair(POLYREC,pair(ta,type));
     hd(defnBounds) = cons(pair(v,ta), hd(defnBounds));
 #ifdef DEBUG_TYPES
-    printf("definition, assume ");
+    Printf("definition, assume ");
     printExp(stdout,v);
-    printf(" :: _%d\n",beta);
+    Printf(" :: _%d\n",beta);
 #endif
     bindTv(beta,typeIs,typeOff);       /* Bind beta to new type skeleton   */
 }
+
+/* --------------------------------------------------------------------------
+ * Predicates:
+ * ------------------------------------------------------------------------*/
+
+#include "preds.c"
 
 /* --------------------------------------------------------------------------
  * Bound and skolemized type variables:
@@ -360,7 +450,6 @@ Cell p; {
             snd(hd(bts))      = mkInt(beta);
         }
     }
-    skolVars = cons(NIL,skolVars);
     return p;
 }
 
@@ -370,23 +459,54 @@ Int l; {
         hd(pendingBtyvs) = cons(pair(mkInt(l),hd(btyvars)),hd(pendingBtyvs));
         hd(btyvars)      = NIL;
     }
+}
+
+static Void local enterSkolVars() {
+    skolVars = cons(NIL,skolVars);
+    localEvs = cons(NIL,localEvs);
+    savedPs  = cons(preds,savedPs);
+    preds    = NIL;
+}
+
+static Void local leaveSkolVars(l,t,o,m)
+Int  l;
+Type t;
+Int  o;
+Int  m; {
+    if (nonNull(hd(localEvs))) {        /* Check for local predicates      */
+        List sks = hd(skolVars);
+        List sps = NIL;
+        if (isNull(sks)) {
+            internal("leaveSkolVars");
+        }
+        markAllVars();                  /* Mark all variables in current   */
+        do {                            /* substitution, then unmark sks.  */
+            tyvar(intOf(fst(hd(sks))))->offs = UNUSED_GENERIC;
+            sks = tl(sks);
+        } while (nonNull(sks));
+        sps   = elimPredsUsing(hd(localEvs),sps);
+        preds = revOnto(preds,sps);
+    }
 
     if (nonNull(hd(skolVars))) {        /* Check that Skolem vars do not   */
         List vs;                        /* escape their scope              */
+        Int  i = 0;
 
         clearMarks();                   /* Look for occurences in the      */
-        markType(typeIs,typeOff);       /* result type                     */
+        for (; i<m; i++)                /* inferred type                   */
+            markTyvar(o+i);
+        markType(t,o);
 
         for (vs=hd(skolVars); nonNull(vs); vs=tl(vs)) {
             Int vn = intOf(fst(hd(vs)));
             if (tyvar(vn)->offs == FIXED_TYVAR) {
                 Cell tv = copyTyvar(vn);
-                Type t  = copyType(typeIs,typeOff);
-                ERRMSG(l) "Existentially quantified variable in result type"
+                Type ty = liftRank2(t,o,m);
+                ERRMSG(l) "Existentially quantified variable in inferred type"
                 ETHEN
-                ERRTEXT   "\nvariable     : " ETHEN ERRTYPE(tv);
-                ERRTEXT   "\nfrom pattern : " ETHEN ERREXPR(snd(hd(vs)));
-                ERRTEXT   "\nresult type  : " ETHEN ERRTYPE(t);
+                ERRTEXT   "\n*** Variable     : " ETHEN ERRTYPE(tv);
+                ERRTEXT   "\n*** From pattern : " ETHEN ERREXPR(snd(hd(vs)));
+                ERRTEXT   "\n*** Result type  : " ETHEN ERRTYPE(ty);
                 ERRTEXT   "\n"
                 EEND;
             }
@@ -399,21 +519,19 @@ Int l; {
         for (vs=hd(skolVars); nonNull(vs); vs=tl(vs)) {
             Int vn = intOf(fst(hd(vs)));
             if (tyvar(vn)->offs == FIXED_TYVAR) {
-                ERRMSG(l) "Existentially quantified variable from pattern "
+                ERRMSG(l)
+                  "Existentially quantified variable escapes from pattern "
                 ETHEN ERREXPR(snd(hd(vs)));
-                ERRTEXT   " appears in enclosing assumptions"   /*so there!*/
+                ERRTEXT "\n"
                 EEND;
             }
         }
     }
+    localEvs = tl(localEvs);
     skolVars = tl(skolVars);
+    preds    = revOnto(preds,hd(savedPs));
+    savedPs  = tl(savedPs);
 }
-
-/* --------------------------------------------------------------------------
- * Predicates:
- * ------------------------------------------------------------------------*/
-
-#include "preds.c"
 
 /* --------------------------------------------------------------------------
  * Type errors:
@@ -433,9 +551,9 @@ Int    o; {                           /* type inferred is (typeIs,typeOff) */
 { List vs = genericVars;
   for (; nonNull(vs); vs=tl(vs)) {
      Int v = intOf(hd(vs));
-     printf("%c :: ", ('a'+tyvar(v)->offs));
+     Printf("%c :: ", ('a'+tyvar(v)->offs));
      printKind(stdout,tyvar(v)->kind);
-     putchar('\n');
+     Putchar('\n');
   }
 }
 #endif
@@ -511,13 +629,13 @@ Cell e; {
     static int number = 0;
     Cell retv;
     int  mynumber = number++;
-    printf("%d) to check: ",mynumber);
+    Printf("%d) to check: ",mynumber);
     printExp(stdout,e);
-    putchar('\n');
+    Putchar('\n');
     retv = mytypeExpr(l,e);
-    printf("%d) result: ",mynumber);
+    Printf("%d) result: ",mynumber);
     printType(stdout,debugType(typeIs,typeOff));
-    putchar('\n');
+    Putchar('\n');
     return retv;
 }
 static Cell local mytypeExpr(l,e)       /* Determine type of expr/pattern  */
@@ -545,35 +663,29 @@ Cell e; {
         case TUPLE      : typeTuple(e);
                           break;
 
-#if OVERLOADED_CONSTANTS
-        case BIGCELL    : {   Int alpha = newTyvars(1);
+#if BIGNUMS
+        case POSNUM     :
+        case ZERONUM    :
+        case NEGNUM     : {   Int alpha = newTyvars(1);
                               inferType(aVar,alpha);
-                              return ap2(nameFromInteger,
-                                         assumeEvid(predNum,alpha),
-                                         e);
+                              return ap(ap(nameFromInteger,
+                                           assumeEvid(predNum,alpha)),
+                                           e);
                           }
-
+#endif
         case INTCELL    : {   Int alpha = newTyvars(1);
                               inferType(aVar,alpha);
-                              return ap2(nameFromInt,
-                                         assumeEvid(predNum,alpha),
-                                         e);
+                              return ap(ap(nameFromInt,
+                                           assumeEvid(predNum,alpha)),
+                                           e);
                           }
 
         case FLOATCELL  : {   Int alpha = newTyvars(1);
                               inferType(aVar,alpha);
-                              return ap2(nameFromDouble,
-                                         assumeEvid(predFractional,alpha),
-                                         e);
+                              return ap(ap(nameFromDouble,
+                                           assumeEvid(predFractional,alpha)),
+                                           e);
                           }
-#else
-        case BIGCELL    : inferType(typeBignum,0);
-                          break;
-        case INTCELL    : inferType(typeInt,0);
-                          break;
-        case FLOATCELL  : inferType(typeFloat,0);
-                          break;
-#endif
 
         case STRCELL    : inferType(typeString,0);
                           break;
@@ -592,10 +704,9 @@ Cell e; {
 #if TREX
         case EXT        : {   Int beta = newTyvars(2);
                               Cell pi  = ap(e,aVar);
-                              Type t   = fn(mkOffset(0),
-                                         fn(ap(typeRec,mkOffset(1)),
-                                            ap(typeRec,ap2(e,mkOffset(0),
-                                                           mkOffset(1)))));
+                              Type t   = fn(aVar,
+                                         fn(ap(typeRec,bVar),
+                                            ap(typeRec,ap(ap(e,aVar),bVar))));
                               tyvar(beta+1)->kind = ROW;
                               inferType(t,beta);
                               return ap(e,assumeEvid(pi,beta+1));
@@ -616,9 +727,11 @@ Cell e; {
                           break;
 
         case LETREC     : enterBindings();
+                          enterSkolVars();
                           mapProc(typeBindings,fst(snd(e)));
                           snd(snd(e)) = typeExpr(l,snd(snd(e)));
                           leaveBindings();
+                          leaveSkolVars(l,typeIs,typeOff,0);
                           break;
 
         case FINLIST    : {   Int  beta = newTyvars(1);
@@ -633,12 +746,7 @@ Cell e; {
         case DOCOMP     : typeDo(l,e);
                           break;
 
-        case COMP       : {   Int beta = newTyvars(1);
-                              typeComp(l,listof,snd(e),snd(snd(e)));
-                              bindTv(beta,typeIs,typeOff);
-                              inferType(listof,beta);
-                          }
-                          break;
+        case COMP       : return typeMonadComp(l,e);
 
         case CASE       : {    Int beta = newTyvars(2);    /* discr result */
                                check(l,fst(snd(e)),NIL,discr,aVar,beta);
@@ -659,8 +767,8 @@ Cell e; {
         case RECSEL     : {   Int beta = newTyvars(2);
                               Cell pi  = ap(snd(e),aVar);
                               Type t   = fn(ap(typeRec,
-                                               ap2(snd(e),mkOffset(0),
-                                                   mkOffset(1))),aVar);
+                                               ap(ap(snd(e),aVar),
+                                                            bVar)),aVar);
                               tyvar(beta+1)->kind = ROW;
                               inferType(t,beta);
                               return ap(e,assumeEvid(pi,beta+1));
@@ -744,19 +852,35 @@ Cell e; {                               /* requires polymorphism, qualified*/
 
     instantiate(typeIs);                /* Deal with polymorphism ...      */
     if (nonNull(predsAre)) {            /* ... and with qualified types.   */
-        Cell evs = NIL;
-        for (; nonNull(predsAre); predsAre=tl(predsAre))
+        List evs = NIL;
+        for (; nonNull(predsAre); predsAre=tl(predsAre)) {
             evs = cons(assumeEvid(hd(predsAre),typeOff),evs);
-        if (!isName(h) || !isCfun(h))
+        }
+        if (!isName(h) || !isCfun(h)) {
             h = applyToArgs(h,rev(evs));
+        }
+    }
+
+    if (whatIs(typeIs)==CDICTS) {       /* Deal with local dictionaries    */
+        List evs = makePredAss(fst(snd(typeIs)),typeOff);
+        List ps  = evs;
+        typeIs   = snd(snd(typeIs));
+        for (; nonNull(ps); ps=tl(ps)) {
+            h = ap(h,thd3(hd(ps)));
+        }
+        if (tcMode==EXPRESSION) {
+            preds = revOnto(evs,preds);
+        } else {
+            hd(localEvs) = revOnto(evs,hd(localEvs));
+        }
     }
 
     if (whatIs(typeIs)==EXIST) {        /* Deal with existential arguments */
         Int n  = intOf(fst(snd(typeIs)));
         typeIs = snd(snd(typeIs));
-        if (!isCfun(h) || n>typeFree)
+        if (!isCfun(getHead(h)) || n>typeFree) {
             internal("typeAp2");
-        else if (tcMode!=EXPRESSION) {
+        } else if (tcMode!=EXPRESSION) {
             Int alpha = typeOff + typeFree;
             for (; n>0; n--) {
                 bindTv(alpha-n,SKOLEM,0);
@@ -927,6 +1051,7 @@ Int    m; {
     Bool added = FALSE;
 
     saveVarsAss();
+    enterSkolVars();
     if (whatIs(t)==RANK2) {
         if (n<(nr2=intOf(fst(snd(t))))) {
             ERRMSG(l) "Definition requires at least %d parameters on lhs",
@@ -990,6 +1115,7 @@ Int    m; {
 
     restoreVarsAss();
     doneBtyvs(l);
+    leaveSkolVars(l,origt,o,m);
 }
 
 static Int local funcType(n)            /*return skeleton for function type*/
@@ -1009,7 +1135,7 @@ Cell c; {                              /*        rhs :: (var,beta+1)       */
     static String caseExpr = "case expression";
 
     saveVarsAss();
-
+    enterSkolVars();
     fst(c) = typeFreshPat(l,patBtyvs(fst(c)));
     shouldBe(l,fst(c),NIL,casePat,aVar,beta);
     snd(c) = typeRhs(snd(c));
@@ -1017,6 +1143,7 @@ Cell c; {                              /*        rhs :: (var,beta+1)       */
 
     restoreVarsAss();
     doneBtyvs(l);
+    leaveSkolVars(l,typeIs,typeOff,0);
 }
 
 static Void local typeComp(l,m,e,qs)    /* type check comprehension        */
@@ -1038,20 +1165,24 @@ List qs; {
                             break;
 
             case QWHERE   : enterBindings();
+                            enterSkolVars();
                             mapProc(typeBindings,snd(q));
                             typeComp(l,m,e,qs1);
                             leaveBindings();
+                            leaveSkolVars(l,typeIs,typeOff,0);
                             break;
 
             case FROMQUAL : {   Int beta = newTyvars(1);
                                 saveVarsAss();
                                 check(l,snd(snd(q)),NIL,genQual,m,beta);
+                                enterSkolVars();
                                 fst(snd(q))
                                     = typeFreshPat(l,patBtyvs(fst(snd(q))));
                                 shouldBe(l,fst(snd(q)),NIL,genQual,aVar,beta);
                                 typeComp(l,m,e,qs1);
                                 restoreVarsAss();
                                 doneBtyvs(l);
+                                leaveSkolVars(l,typeIs,typeOff,0);
                             }
                             break;
 
@@ -1060,6 +1191,24 @@ List qs; {
                             break;
         }
     }
+}
+
+static Cell local typeMonadComp(l,e)    /* type check monad comprehension  */
+Int  l;
+Cell e; {
+    Int  alpha        = newTyvars(1);
+    Int  beta         = newTyvars(1);
+    Cell mon          = ap(mkInt(beta),aVar);
+    Cell m            = assumeEvid(predMonad,beta);
+    tyvar(beta)->kind = starToStar;
+#if !MONAD_COMPS
+    bindTv(beta,typeList,0);
+#endif
+
+    typeComp(l,mon,snd(e),snd(snd(e)));
+    bindTv(alpha,typeIs,typeOff);
+    inferType(mon,alpha);
+    return ap(MONADCOMP,pair(m,snd(e)));
 }
 
 static Void local typeDo(l,e)           /* type check do-notation          */
@@ -1074,20 +1223,7 @@ Cell e; {
 
     typeComp(l,mon,snd(e),snd(snd(e)));
     shouldBe(l,fst(snd(e)),NIL,finGen,mon,alpha);
-    snd(e) = pair(pair(m,compZero(snd(snd(e)),beta)),snd(e));
-}
-
-static Cell local compZero(qs,beta)     /* return evidence for Monad0 beta */
-List qs;                                /* if needed for qualifiers qs     */
-Int  beta; {
-    for (; nonNull(qs); qs=tl(qs))
-        switch (whatIs(hd(qs))) {
-            case FROMQUAL : if (failFree(fst(snd(hd(qs)))))
-                                break;
-                            /* intentional fall-thru */
-            case BOOLQUAL : return assumeEvid(predMonad0,beta);
-        }
-    return NIL;
+    snd(e) = pair(m,snd(e));
 }
 
 static Void local typeConFlds(l,e)      /* Type check a construction       */
@@ -1330,23 +1466,24 @@ Cell b; {                               /* gp with restricted overloading  */
 
     if (isVar(fst(b))) {                /* function-binding?               */
         Cell t = fst(snd(b));
-        if (whatIs(t)==IMPDEPS)         /* Discard implicitly typed deps   */
+        if (whatIs(t)==IMPDEPS)  {      /* Discard implicitly typed deps   */
             fst(snd(b)) = t = NIL;      /* in a restricted binding group.  */
+        }
         fst(snd(b)) = localizeBtyvs(t);
         restrictedAss(rhsLine(snd(hd(snd(snd(b))))), fst(b), t);
-    }
-    else {                              /* pattern-binding?                */
+    } else {                            /* pattern-binding?                */
         List vs   = fst(b);
         List ts   = fst(snd(b));
         Int  line = rhsLine(snd(snd(snd(b))));
 
-        for (; nonNull(vs); vs=tl(vs))
+        for (; nonNull(vs); vs=tl(vs)) {
             if (nonNull(ts)) {
                 restrictedAss(line,hd(vs),hd(ts)=localizeBtyvs(hd(ts)));
                 ts = tl(ts);
-            }
-            else
+            } else {
                 restrictedAss(line,hd(vs),NIL);
+            }
+        }
     }
 }
 
@@ -1408,20 +1545,20 @@ List bs; {
             fst(snd(hd(bs1))) = NIL;    /* reset imps type fields          */
 
 #ifdef DEBUG_DEPENDS
-    printf("Binding group:");
+    Printf("Binding group:");
     for (bs1=imps; nonNull(bs1); bs1=tl(bs1)) {
-        printf(" [imp:");
+        Printf(" [imp:");
         for (bs=hd(bs1); nonNull(bs); bs=tl(bs))
-            printf(" %s",textToStr(textOf(fst(hd(bs)))));
-        printf("]");
+            Printf(" %s",textToStr(textOf(fst(hd(bs)))));
+        Printf("]");
     }
     if (nonNull(exps)) {
-        printf(" [exp:");
+        Printf(" [exp:");
         for (bs=exps; nonNull(bs); bs=tl(bs))
-            printf(" %s",textToStr(textOf(fst(hd(bs)))));
-        printf("]");
+            Printf(" %s",textToStr(textOf(fst(hd(bs)))));
+        Printf("]");
     }
-    printf("\n");
+    Printf("\n");
 #endif
 
     /* ----------------------------------------------------------------------
@@ -1458,8 +1595,9 @@ List bs; {
 
         normPreds(line);
         savePreds = elimOuterPreds(savePreds);
-        if (nonNull(preds) && resolveDefs(genvarAllAss(hd(defnBounds))))
+        if (nonNull(preds) && resolveDefs(genvarAllAss(hd(defnBounds)))) {
             savePreds = elimOuterPreds(savePreds);
+        }
 
         map1Proc(genBind,preds,hd(imps));
         if (nonNull(preds)) {
@@ -1467,6 +1605,8 @@ List bs; {
             map1Proc(qualifyBinding,preds,hd(imps));
         }
 
+        h98CheckType(line,"inferred type",
+                        fst(hd(hd(defnBounds))),snd(hd(hd(defnBounds))));
         hd(varsBounds) = revOnto(hd(defnBounds),hd(varsBounds));
     }
 
@@ -1528,8 +1668,10 @@ List bs; {
         resetGenerics();                /* Make sure we're general enough  */
         ps = copyPreds(ps);
         t  = generalize(ps,liftRank2(t,o,m));
+
         if (!sameSchemes(t,fst(snd(b))))
             tooGeneral(line,fst(b),fst(snd(b)),t);
+        h98CheckType(line,"inferred type",fst(b),t);
 
         if (nonNull(preds))             /* Check context was strong enough */
             cantEstablish(line,extbind,fst(b),t,ps);
@@ -1722,18 +1864,18 @@ Inst in; {                              /* member functions for instance in*/
 
     for (ps=supers; nonNull(ps); ps=tl(ps)) {   /* Superclass dictionaries */
         Cell pi = hd(ps);
-        Cell ev = scEntail(params,fst3(pi),intOf(snd3(pi)));
-        if (isNull(ev)) 
-            ev = inEntail(evids,fst3(pi),intOf(snd3(pi)));
+        Cell ev = scEntail(params,fst3(pi),intOf(snd3(pi)),0);
+        if (isNull(ev))
+            ev = inEntail(evids,fst3(pi),intOf(snd3(pi)),0);
         if (isNull(ev)) {
             clearMarks();
             ERRMSG(inst(in).line) "Cannot build superclass instance" ETHEN
             ERRTEXT "\n*** Instance            : " ETHEN
-                    ERRPRED(copyPred(inst(in).head,beta));
+                ERRPRED(copyPred(inst(in).head,beta));
             ERRTEXT "\n*** Context supplied    : " ETHEN
-                    ERRCONTEXT(copyPreds(params));
+                ERRCONTEXT(copyPreds(params));
             ERRTEXT "\n*** Required superclass : " ETHEN
-                    ERRPRED(copyPred(fst3(pi),intOf(snd3(pi))));
+                ERRPRED(copyPred(fst3(pi),intOf(snd3(pi))));
             ERRTEXT "\n"
             EEND;
         }
@@ -1814,13 +1956,13 @@ Int    beta; {
     Type rt;
 
 #ifdef DEBUG_TYPES
-    printf("Type check member: ");
+    Printf("Type check member: ");
     printExp(stdout,mem);
-    printf(" :: ");
+    Printf(" :: ");
     printType(stdout,name(mem).type);
-    printf("\nfor the instance: ");
+    Printf("\nfor the instance: ");
     printPred(stdout,head);
-    printf("\n");
+    Printf("\n");
 #endif
 
     instantiate(name(mem).type);        /* Find required type              */
@@ -1835,9 +1977,9 @@ Int    beta; {
     rt = generalize(qs,liftRank2(t,o,m));
 
 #ifdef DEBUG_TYPES
-    printf("Required type is: ");
+    Printf("Required type is: ");
     printType(stdout,rt);
-    printf("\n");
+    Printf("\n");
 #endif
 
     hd(defnBounds) = NIL;               /* Type check each alternative     */
@@ -1869,9 +2011,9 @@ Int    beta; {
     ps = copyPreds(ps);
     t  = generalize(ps,liftRank2(t,o,m));
 #ifdef DEBUG_TYPES
-    printf("Inferred type is: ");
+    Printf("Inferred type is: ");
     printType(stdout,t);
-    printf("\n");
+    Printf("\n");
 #endif
     if (!sameSchemes(t,rt))
         tooGeneral(line,mem,rt,t);
@@ -1905,10 +2047,14 @@ Cell b; {
         Int  l               = rhsLine(snd(pb));
 
         tcMode  = OLD_PATTERN;
+        enterPendingBtyvs();
+        fst(pb) = patBtyvs(fst(pb));
         check(l,fst(pb),NIL,lhsPat,aVar,beta);
         tcMode  = EXPRESSION;
         snd(pb) = typeRhs(snd(pb));
         shouldBe(l,rhsExpr(snd(pb)),NIL,rhs,aVar,beta);
+        doneBtyvs(l);
+        leavePendingBtyvs();
     }
 }
 
@@ -1930,10 +2076,19 @@ Cell e; {
                        break;
 
         case LETREC  : enterBindings();
+                       enterSkolVars();
                        mapProc(typeBindings,fst(snd(e)));
                        snd(snd(e)) = typeRhs(snd(snd(e)));
                        leaveBindings();
+                       leaveSkolVars(rhsLine(snd(snd(e))),typeIs,typeOff,0);
                        break;
+
+        case RSIGN   : fst(snd(e)) = typeRhs(fst(snd(e)));
+                       shouldBe(rhsLine(fst(snd(e))),
+                                rhsExpr(fst(snd(e))),NIL,
+                                "result type",
+                                snd(snd(e)),0);
+                       return fst(snd(e));
 
         default      : snd(e) = typeExpr(intOf(fst(e)),snd(e));
                        break;
@@ -1958,6 +2113,7 @@ Cell rhs; {
     switch (whatIs(rhs)) {
         case GUARDED : return snd(snd(hd(snd(rhs))));
         case LETREC  : return rhsExpr(snd(snd(rhs)));
+        case RSIGN   : return rhsExpr(fst(snd(rhs)));
         default      : return snd(rhs);
     }
 }
@@ -1967,6 +2123,7 @@ Cell rhs; {                            /* a right hand side                */
     switch (whatIs(rhs)) {
         case GUARDED : return intOf(fst(hd(snd(rhs))));
         case LETREC  : return rhsLine(snd(snd(rhs)));
+        case RSIGN   : return rhsLine(fst(snd(rhs)));
         default      : return intOf(fst(rhs));
     }
 }
@@ -2010,9 +2167,9 @@ Type dt; {
 
 #ifdef DEBUG_TYPES
     printExp(stdout,v);
-    printf(" :: ");
+    Printf(" :: ");
     printType(stdout,snd(ass));
-    printf("\n");
+    Printf("\n");
 #endif
 }
 
@@ -2058,11 +2215,11 @@ Type t; {                               /* with qualifying preds qs        */
         }
         t = mkPolyType(k,t);
 #ifdef DEBUG_KINDS
-    printf("Generalized type: ");
+    Printf("Generalized type: ");
     printType(stdout,t);
-    printf(" ::: ");
+    Printf(" ::: ");
     printKind(stdout,k);
-    printf("\n");
+    Printf("\n");
 #endif
     }
     return t;
@@ -2127,6 +2284,7 @@ Bool useDefs; {                         /* using defaults if reqd          */
     ctxt      = copyPreds(preds);
     type      = generalize(ctxt,copyType(type,beta));
     inputExpr = qualifyExpr(0,preds,inputExpr);
+    h98CheckType(0,"inferred type",inputExpr,type);
     typeChecker(RESET);
     emptySubstitution();
     return type;
@@ -2140,6 +2298,7 @@ Void typeCheckDefns() {                /* Type check top level bindings    */
 
     typeChecker(RESET);
     emptySubstitution();
+    enterSkolVars();
     enterBindings();
     setGoal("Type checking",t);
 
@@ -2191,6 +2350,14 @@ List bs; {                              /* (one top level scc)             */
         EEND;
     }
 
+    if (nonNull(hd(skolVars))) {
+        Cell b = hd(bs);
+        Name n = findName(isVar(fst(b)) ? textOf(fst(b)) : textOf(hd(fst(b))));
+        Int  l = nonNull(n) ? name(n).line : 0;
+        leaveSkolVars(l,typeUnit,0,0);
+        enterSkolVars();
+    }
+
     for (as=hd(varsBounds); nonNull(as); as=tl(as)) {
         Cell a = hd(as);                /* add infered types to environment*/
         Name n = findName(textOf(fst(a)));
@@ -2213,9 +2380,9 @@ Name s; {                               /* particular selector, s.         */
     Int  m;
 
 #ifdef DEBUG_SELS
-    printf("Selector %s, cns=",textToStr(name(s).text));
+    Printf("Selector %s, cns=",textToStr(name(s).text));
     printExp(stdout,cns);
-    putchar('\n');
+    Putchar('\n');
 #endif
 
     emptySubstitution();
@@ -2302,13 +2469,14 @@ Name s; {                               /* particular selector, s.         */
     map1Proc(qualify,preds,alts);
 
 #ifdef DEBUG_SELS
-    printf("Inferred arity = %d, type = ",name(s).arity);
+    Printf("Inferred arity = %d, type = ",name(s).arity);
     printType(stdout,name(s).type);
-    putchar('\n');
+    Putchar('\n');
 #endif
 
     return pair(s,alts);
 }
+
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -2320,7 +2488,7 @@ static Type local basicType Args((Char));
  * 
  * ------------------------------------------------------------------------*/
 
-List offsetTyvarsIn(t,vs)               /* add list of offset tyvars in t  */
+static List offsetTyvarsIn(t,vs)        /* add list of offset tyvars in t  */
 Type t;                                 /* to list vs                      */
 List vs; {
     switch (whatIs(t)) {
@@ -2347,6 +2515,7 @@ List vs; {
 static Type stateVar = NIL;
 static Type alphaVar = NIL;
 static Type betaVar  = NIL;
+static Type gammaVar = NIL;
 static Int  nextVar  = 0;
 
 static Void clearTyVars( void )
@@ -2354,6 +2523,7 @@ static Void clearTyVars( void )
     stateVar = NIL;
     alphaVar = NIL;
     betaVar  = NIL;
+    gammaVar = NIL;
     nextVar  = 0;
 }
 
@@ -2379,6 +2549,14 @@ static Type mkBetaVar( void )
         betaVar = mkOffset(nextVar++);
     }
     return betaVar;
+}
+
+static Type mkGammaVar( void )
+{
+    if (isNull(gammaVar)) {
+        gammaVar = mkOffset(nextVar++);
+    }
+    return gammaVar;
 }
 
 static Type local basicType(k)
@@ -2445,10 +2623,13 @@ Char k; {
             return mkAlphaVar();  /* polymorphic */
     case BETA_REP:
             return mkBetaVar();   /* polymorphic */
+    case GAMMA_REP:
+            return mkGammaVar();   /* polymorphic */
     default:
             printf("Kind: '%c'\n",k);
             internal("basicType");
     }
+    assert(0); return 0; /* NOTREACHED */
 }
 
 /* Generate type of primop based on list of arg types and result types:
@@ -2508,7 +2689,7 @@ Type primType( Int /*AsmMonad*/ monad, String a_kinds, String r_kinds )
 }    
 
 /* forall a1 .. am. TC a1 ... am -> Int */
-Type conToTagType(t)
+static Type conToTagType(t)
 Tycon t; {
     Type   ty  = t;
     List   tvars = NIL;
@@ -2526,7 +2707,7 @@ Tycon t; {
 }
 
 /* forall a1 .. am. Int -> TC a1 ... am */
-Type tagToConType(t)
+static Type tagToConType(t)
 Tycon t; {
     Type   ty  = t;
     List   tvars = NIL;
@@ -2547,17 +2728,6 @@ Tycon t; {
  * Type checker control:
  * ------------------------------------------------------------------------*/
 
-Void mkTypes()
-{
-    arrow          = fn(aVar,mkOffset(1));
-    listof         = ap(typeList,aVar);
-    predNum        = ap(classNum,aVar);
-    predFractional = ap(classFractional,aVar);
-    predIntegral   = ap(classIntegral,aVar);
-    predMonad      = ap(classMonad,aVar);
-    predMonad0     = ap(classMonad0,aVar);
-}
-
 Void typeChecker(what)
 Int what; {
     switch (what) {
@@ -2572,6 +2742,8 @@ Int what; {
                        mark(depends);
                        mark(pendingBtyvs);
                        mark(skolVars);
+                       mark(localEvs);
+                       mark(savedPs);
                        mark(dummyVar);
                        mark(preds);
                        mark(stdDefaults);
@@ -2584,13 +2756,77 @@ Int what; {
                        mark(predIntegral);
                        mark(starToStar);
                        mark(predMonad);
-                       mark(predMonad0);
+#if IO_MONAD
+                       mark(typeProgIO);
+#endif
                        break;
 
         case INSTALL : typeChecker(RESET);
                        dummyVar     = inventVar();
+
+#if !IGNORE_MODULES
+                       modulePrelude = newModule(textPrelude);
+                       setCurrModule(modulePrelude);
+#endif
+
                        starToStar   = simpleKind(1);
+
+                       typeUnit     = addPrimTycon(findText("()"),
+                                                   STAR,0,DATATYPE,NIL);
+                       typeArrow    = addPrimTycon(findText("(->)"),
+                                                   simpleKind(2),2,
+                                                   DATATYPE,NIL);
+                       typeList     = addPrimTycon(findText("[]"),
+                                                   starToStar,1,
+                                                   DATATYPE,NIL);
+
+                       arrow        = fn(aVar,bVar);
+                       listof       = ap(typeList,aVar);
+                       boundPair    = ap(ap(mkTuple(2),aVar),aVar);
+
+                       nameUnit     = addPrimCfun(findText("()"),0,0,typeUnit);
+                       tycon(typeUnit).defn
+                                    = singleton(nameUnit);
+
+                       nameNil      = addPrimCfun(findText("[]"),0,1,
+                                                   mkPolyType(starToStar,
+                                                              listof));
+                       nameCons     = addPrimCfun(findText(":"),2,2,
+                                                   mkPolyType(starToStar,
+                                                              fn(aVar,
+                                                              fn(listof,
+                                                                 listof))));
+                       name(nameCons).syntax
+                                    = mkSyntax(RIGHT_ASS,5);
+
+                       tycon(typeList).defn
+                                    = cons(nameNil,cons(nameCons,NIL));
+
                        typeVarToVar = fn(aVar,aVar);
+#if TREX
+                       typeNoRow    = addPrimTycon(findText("EmptyRow"),
+                                                   ROW,0,DATATYPE,NIL);
+                       typeRec      = addPrimTycon(findText("Rec"),
+                                                   pair(ROW,STAR),1,
+                                                   DATATYPE,NIL);
+                       nameNoRec    = addPrimCfun(findText("EmptyRec"),0,0,
+                                                        ap(typeRec,typeNoRow));
+#else
+                       /* bogus definitions to avoid changing the prelude */
+                       addPrimCfun(findText("Rec"),      0,0,typeUnit);
+                       addPrimCfun(findText("EmptyRow"), 0,0,typeUnit);
+                       addPrimCfun(findText("EmptyRec"), 0,0,typeUnit);
+#endif
+#if IO_MONAD
+                       nameUserErr  = addPrimCfun(inventText(),1,1,NIL);
+                       nameNameErr  = addPrimCfun(inventText(),1,2,NIL);
+                       nameSearchErr= addPrimCfun(inventText(),1,3,NIL);
+#if IO_HANDLES
+                       nameIllegal  = addPrimCfun(inventText(),0,4,NIL);
+                       nameWriteErr = addPrimCfun(inventText(),1,5,NIL);
+                       nameEOFErr   = addPrimCfun(inventText(),1,6,NIL);
+#endif
+#endif
                        break;
     }
 }

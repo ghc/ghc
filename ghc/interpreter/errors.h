@@ -1,18 +1,19 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Error handling support functions
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
  *
  * $RCSfile: errors.h,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:07 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:28 $
  * ------------------------------------------------------------------------*/
 
-extern Void internal   Args((String)) HUGS_noreturn;
-extern Void fatal      Args((String)) HUGS_noreturn;
+extern Void internal     Args((String)) HUGS_noreturn;
+extern Void fatal        Args((String)) HUGS_noreturn;
 
 #if HUGS_FOR_WINDOWS
 #define Hilite()         WinTextcolor(hWndText,RED);
@@ -41,6 +42,13 @@ extern Void errAbort     Args((Void));
 
 extern sigProto(breakHandler);
 
-#include "output.h"
+extern Bool breakOn      Args((Bool));             /* in machdep.c         */
+
+extern Void printExp     Args((FILE *,Cell));      /* in output.c          */
+extern Void printType    Args((FILE *,Cell));
+extern Void printContext Args((FILE *,List));
+extern Void printPred    Args((FILE *,Cell));
+extern Void printKind    Args((FILE *,Kind));
+extern Void printKinds   Args((FILE *,Kinds));
 
 /*-------------------------------------------------------------------------*/

@@ -1,33 +1,27 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Input functions, lexical analysis parsing etc...
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:12 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:30 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
+#include "backend.h"
 #include "connect.h"
-#include "charset.h"
-#include "input.h"
-#include "static.h"
-#include "interface.h"
 #include "command.h"
 #include "errors.h"
-#include "link.h"
-#include "hugs.h"    /* for target */
 #include <ctype.h>
 #if HAVE_GETDELIM_H
 #include "getdelim.h"
 #endif
-
-#include "machdep.h" /* for findPathname */
 
 #if HUGS_FOR_WINDOWS
 #undef IN
@@ -40,7 +34,6 @@
 List tyconDefns      = NIL;             /* type constructor definitions    */
 List typeInDefns     = NIL;             /* type synonym restrictions       */
 List valDefns        = NIL;             /* value definitions in script     */
-List opDefns         = NIL;             /* operator defns in script        */
 List classDefns      = NIL;             /* class defns in script           */
 List instDefns       = NIL;             /* instance defns in script        */
 List selDefns        = NIL;             /* list of selector lists          */
@@ -66,6 +59,7 @@ String preprocessor  = 0;
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
 
+static Void local initCharTab     Args((Void));
 static Void local fileInput       Args((String,Long));
 static Bool local literateMode    Args((String));
 static Bool local linecmp         Args((String,String));
@@ -122,40 +116,105 @@ static Text textBar,     textMinus,    textFrom,   textArrow,  textLazy;
 static Text textBang,    textDot,      textAll,    textImplies;
 static Text textWildcard;
 
-static Text textModule,  textImport,    textPrelude, textPreludeHugs;
+static Text textModule,  textImport;
 static Text textHiding,  textQualified, textAsMod;
 static Text textExport,  textInterface, textRequires, textUnsafe;
 
-#if    NPLUSK
+Text   textNum;                         /* Num                             */
+Text   textPrelude;                     /* Prelude                         */
 Text   textPlus;                        /* (+)                             */
-#endif
-Cell   conPrelude;                      /* Prelude                         */
 
 static Cell conMain;                    /* Main                            */
 static Cell varMain;                    /* main                            */
 
-static Cell conUnit;                    /* ()                              */
-static Cell conList;                    /* []                              */
-static Cell conNil;                     /* []                              */
-static Cell conPreludeUnit;             /* Prelude.()                      */
-static Cell conPreludeList;             /* Prelude.[]                      */
-static Cell conPreludeNil;              /* Prelude.[]                      */
-
 static Cell varMinus;                   /* (-)                             */
+static Cell varPlus;                    /* (+)                             */
 static Cell varBang;                    /* (!)                             */
 static Cell varDot;                     /* (.)                             */
 static Cell varHiding;                  /* hiding                          */
 static Cell varQualified;               /* qualified                       */
 static Cell varAsMod;                   /* as                              */
 
-static Cell varNegate;
-static Cell varFlip;        
-static Cell varEnumFrom;
-static Cell varEnumFromThen;
-static Cell varEnumFromTo;
-static Cell varEnumFromThenTo;
-
 static List imps;                       /* List of imports to be chased    */
+
+
+/* --------------------------------------------------------------------------
+ * Character set handling:
+ *
+ * Hugs follows Haskell 1.3 in assuming that input uses the ISO-8859-1
+ * character set.  The following code provides methods for classifying
+ * input characters according to the lexical structure specified by the
+ * report.  Hugs should still accept older programs because ASCII is
+ * essentially just a subset of the ISO character set.
+ *
+ * Notes: If you want to port Hugs to a machine that uses something
+ * substantially different from the ISO character set, then you will need
+ * to insert additional code to map between character sets.
+ *
+ * At some point, the following data structures may be exported in a .h
+ * file to allow the information contained here to be picked up in the
+ * implementation of LibChar is* primitives.
+ *
+ * Relies, implicitly but for this comment, on assumption that NUM_CHARS=256.
+ * ------------------------------------------------------------------------*/
+
+static  Bool            charTabBuilt;
+static  unsigned char   ctable[NUM_CHARS];
+#define isIn(c,x)       (ctable[(unsigned char)(c)]&(x))
+#define isISO(c)        (0<=(c) && (c)<NUM_CHARS)
+
+#define DIGIT           0x01
+#define SMALL           0x02
+#define LARGE           0x04
+#define SYMBOL          0x08
+#define IDAFTER         0x10
+#define SPACE           0x20
+#define PRINT           0x40
+
+static Void local initCharTab() {       /* Initialize char decode table    */
+#define setRange(x,f,t) {Int i=f;   while (i<=t) ctable[i++] |=x;}
+#define setChar(x,c)    ctable[c] |= (x)
+#define setChars(x,s)   {char *p=s; while (*p)   ctable[(Int)*p++]|=x;}
+#define setCopy(x,c)    {Int i;                         \
+                         for (i=0; i<NUM_CHARS; ++i)    \
+                             if (isIn(i,c))             \
+                                 ctable[i]|=x;          \
+                        }
+
+    setRange(DIGIT,     '0','9');       /* ASCII decimal digits            */
+
+    setRange(SMALL,     'a','z');       /* ASCII lower case letters        */
+    setRange(SMALL,     223,246);       /* ISO lower case letters          */
+    setRange(SMALL,     248,255);       /* (omits division symbol, 247)    */
+    setChar (SMALL,     '_');
+
+    setRange(LARGE,     'A','Z');       /* ASCII upper case letters        */
+    setRange(LARGE,     192,214);       /* ISO upper case letters          */
+    setRange(LARGE,     216,222);       /* (omits multiplication, 215)     */
+
+    setRange(SYMBOL,    161,191);       /* Symbol characters + ':'         */
+    setRange(SYMBOL,    215,215);
+    setChar (SYMBOL,    247);
+    setChars(SYMBOL,    ":!#$%&*+./<=>?@\\^|-~");
+
+    setChar (IDAFTER,   '\'');          /* Characters in identifier        */
+    setCopy (IDAFTER,   (DIGIT|SMALL|LARGE));
+
+    setChar (SPACE,     ' ');           /* ASCII space character           */
+    setChar (SPACE,     160);           /* ISO non breaking space          */
+    setRange(SPACE,     9,13);          /* special whitespace: \t\n\v\f\r  */
+
+    setChars(PRINT,     "(),;[]_`{}");  /* Special characters              */
+    setChars(PRINT,     " '\"");        /* Space and quotes                */
+    setCopy (PRINT,     (DIGIT|SMALL|LARGE|SYMBOL));
+
+    charTabBuilt = TRUE;
+#undef setRange
+#undef setChar
+#undef setChars
+#undef setCopy
+}
+
 
 /* --------------------------------------------------------------------------
  * Single character input routines:
@@ -186,11 +245,11 @@ static String nextStringChar;          /* next char in string buffer       */
 #if     USE_READLINE                   /* for command line editors         */
 static  String currentLine;            /* editline or GNU readline         */
 static  String nextChar;
-#define nextConsoleChar()   (unsigned char)(*nextChar=='\0' ? '\n' : *nextChar++)
-extern  Void add_history    Args((String));
-extern  String readline     Args((String));
+#define nextConsoleChar() (unsigned char)(*nextChar=='\0' ? '\n' : *nextChar++)
+extern  Void add_history  Args((String));
+extern  String readline   Args((String));
 #else
-#define nextConsoleChar()   getc(stdin)
+#define nextConsoleChar() getc(stdin)
 #endif
 
 static  Int litLines;                  /* count defn lines in lit script   */
@@ -266,12 +325,17 @@ String nm;                              /* named file (specified length is */
 Long   len; {                           /* used to set target for reading) */
 #if USE_PREPROCESSOR && (defined(HAVE_POPEN) || defined(HAVE__POPEN))
     if (preprocessor) {
-        char cmd[100];
-        strncpy(cmd,preprocessor,100);
-        strncat(cmd," ",100);
-        strncat(cmd,nm,100);
-        cmd[99] = '\0'; /* paranoia */
+        Int reallen = strlen(preprocessor) + 1 + strlen(nm) + 1;
+        char *cmd = malloc(reallen);
+        if (cmd == NULL) {
+            ERRMSG(0) "Unable to allocate memory for filter command."
+            EEND;
+        }
+        strcpy(cmd,preprocessor);
+        strcat(cmd," ");
+        strcat(cmd,nm);
         inputStream = popen(cmd,"r");
+        free(cmd);
     } else {
         inputStream = fopen(nm,"r");
     }
@@ -312,9 +376,11 @@ String s; {
     row          = 1;
 
     nextStringChar = s;
+    if (!charTabBuilt)
+        initCharTab();
 }
 
-static Bool local literateMode(nm)      /* select literate mode for file   */
+static Bool local literateMode(nm)      /* Select literate mode for file   */
 String nm; {
     char *dot = strrchr(nm,'.');        /* look for last dot in file name  */
     if (dot) {
@@ -325,12 +391,6 @@ String nm; {
             return TRUE;
     }
     return literateScripts;             /* otherwise, use the default      */
-}
-
-Bool isInterfaceFile(nm)                /* is nm an interface file?        */
-String nm; {
-    char *dot = strrchr(nm,'.');        /* look for last dot in file name  */
-    return (dot && filenamecmp(dot+1,"myhi")==0);
 }
 
 
@@ -508,7 +568,7 @@ static Void local newlineSkip() {      /* skip `\n' (supports lit scripts) */
                 litLines++;
                 return;
             }
-            while (c0==' ' || c0=='\t')/* maybe line is blank?             */
+            while (c0 != '\n' && isIn(c0,SPACE)) /* maybe line is blank?   */
                 skip();
             if (c0=='\n' || c0==EOF)
                 thisLineIs(BLANKLINE);
@@ -566,7 +626,7 @@ static Void local closeAnyInput() {    /* Close input stream, if open,     */
  * entry to the routine.
  * ------------------------------------------------------------------------*/
 
-#define MAX_TOKEN           500
+#define MAX_TOKEN           4000
 #define startToken()        tokPos = 0
 #define saveTokenChar(c)    if (tokPos<=MAX_TOKEN) saveChar(c); else ++tokPos
 #define saveChar(c)         tokenStr[tokPos++]=(char)(c)
@@ -610,29 +670,43 @@ static Text local readIdent() {        /* read identifier                  */
 static Cell local readRadixNumber(r)   /* Read literal in specified radix  */
 Int r; {                               /* from input of the form 0c{digs}  */
     Int d;                                                                 
-    startToken();
-    saveTokenChar(c0);
     skip();                            /* skip leading zero                */
-    if ((d=readHexDigit(c1))<0 || d>=r) {
-        /* Special case; no digits, lex as  */
-        /* if it had been written "0 c..."  */
-        saveTokenChar('0');
-    } else {
+    if ((d=readHexDigit(c1))<0 || d>=r)/* Special case; no digits, lex as  */
+        return mkInt(0);               /* if it had been written "0 c..."  */
+    else {
         Int  n = 0;
-        saveTokenChar(c0);
+#if BIGNUMS
+        Cell big = NIL;
+#endif
         skip();
         do {
-            saveTokenChar(c0);
+#if BIGNUMS
+            if (nonNull(big))
+                big = bigShift(big,d,r);
+            else if (overflows(n,r,d,MAXPOSINT))
+                big = bigShift(bigInt(n),d,r);
+            else
+#else
+            if (overflows(n,r,d,MAXPOSINT)) {
+                ERRMSG(row) "Integer literal out of range"
+                EEND;
+            }
+            else
+#endif
+                n = r*n + d;
             skip();
             d = readHexDigit(c0);
         } while (d>=0 && d<r);
+#if BIGNUMS
+        return nonNull(big) ? big : mkInt(n);
+#else
+        return mkInt(n);
+#endif
     }
-    endToken();
-    /* ToDo: return an INTCELL if small enough */
-    return stringToBignum(tokenStr);
 }
 
 static Cell local readNumber() {        /* read numeric constant           */
+    Int   n           = 0;
     Bool  intTooLarge = FALSE;
 
     if (c0=='0') {
@@ -644,14 +718,23 @@ static Cell local readNumber() {        /* read numeric constant           */
 
     startToken();
     do {
+        if (overflows(n,10,(c0-'0'),MAXPOSINT))
+            intTooLarge = TRUE;
+        n  = 10*n  + (c0-'0');
         saveTokenChar(c0);
         skip();
     } while (isISO(c0) && isIn(c0,DIGIT));
 
     if (c0!='.' || !isISO(c1) || !isIn(c1,DIGIT)) {
         endToken();
-        /* ToDo: return an INTCELL if small enough */
-        return stringToBignum(tokenStr);
+        if (!intTooLarge)
+            return mkInt(n);
+#if BIGNUMS
+        return bigStr(tokenStr);
+#else
+        ERRMSG(row) "Integer literal out of range"
+        EEND;
+#endif
     }
 
     saveTokenChar(c0);                  /* save decimal point              */
@@ -684,7 +767,12 @@ static Cell local readNumber() {        /* read numeric constant           */
     }
 
     endToken();
-    return stringToFloat(tokenStr);
+#ifndef HAVE_LIBM
+    ERRMSG(row) "No floating point numbers in this implementation"
+    EEND;
+#endif
+
+    return mkFloat(stringToFloat(tokenStr));
 }
 
 static Cell local readChar() {         /* read character constant          */
@@ -984,7 +1072,8 @@ String s; {                            /* escapes if any parts need them   */
     if (s) {                           
         String t = s;                  
         Char   c;                      
-        while ((c = *t)!=0 && isISO(c) && isIn(c,PRINT) && c!='"' && !isIn(c,SPACE)) {
+        while ((c = *t)!=0 && isISO(c)
+                           && isIn(c,PRINT) && c!='"' && !isIn(c,SPACE)) {
             t++;                       
         }
         if (*t) {                      
@@ -999,7 +1088,7 @@ String s; {                            /* escapes if any parts need them   */
 }                                      
                                        
 /* -------------------------------------------------------------------------
- * Handle special types of input for us in interpreter:
+ * Handle special types of input for use in interpreter:
  * -----------------------------------------------------------------------*/
                                        
 Command readCommand(cmds,start,sys)    /* read command at start of input   */
@@ -1056,8 +1145,9 @@ String readFilename() {                /* Read filename from input (if any)*/
             skip();
             while (c0!=EOF && c0!='\"') {
                 Cell c = readAChar(TRUE);
-                if (nonNull(c))
+                if (nonNull(c)) {
                     saveTokenChar(charOf(c));
+                }
             }
             if (c0=='"')
                 skip();
@@ -1211,10 +1301,11 @@ static Int local yylex() {             /* Read next input token ...        */
     push(yylval = mkInt(row));         /* default token value is line no.  */
     /* subsequent changes to yylval must also set top() to the same value  */
 
-    if (indentDepth>=0)                /* layout rule(s) active ?          */
+    if (indentDepth>=0) {              /* layout rule(s) active ?          */
         if (insertedToken)             /* avoid inserting multiple `;'s    */
             insertedToken = FALSE;     /* or putting `;' after `{'         */
-        else if (layout[indentDepth]!=HARD)
+        else
+        if (layout[indentDepth]!=HARD) {
             if (column<layout[indentDepth]) {
                 unOffside();
                 return '}';
@@ -1223,6 +1314,8 @@ static Int local yylex() {             /* Read next input token ...        */
                 insertedToken = TRUE;
                 return ';';
             }
+        }
+    }
 
     /* ----------------------------------------------------------------------
      * Now try to identify token type:
@@ -1260,8 +1353,8 @@ static Int local yylex() {             /* Read next input token ...        */
     }
 
 #if TREX
-    if (c0=='#' && isIn(c1,SMALL)) {    /* Look for record selector name   */
-        Text it;
+    if (c0=='#' && isIn(c1,SMALL) && !haskell98) {
+        Text it;                        /* Look for record selector name   */
         skip();
         it    = readIdent();
         top() = yylval = ap(RECSEL,mkExt(it));
@@ -1295,9 +1388,9 @@ static Int local yylex() {             /* Read next input token ...        */
         } else {
             top() = yylval = mkCon(it);
             return identType;
-        }                               /* We could easily keep a record of*/
-    }                                   /* the qualifying name here ...    */
-    if (isIn(c0,(SMALL|LARGE)) || c0 == '_') {
+        }
+    }
+    if (isIn(c0,(SMALL|LARGE))) {
         Text it = readIdent();
 
         if (it==textCase)              return CASEXP;
@@ -1310,7 +1403,7 @@ static Int local yylex() {             /* Read next input token ...        */
         if (it==textWhere)             lookAhead(WHERE);
         if (it==textLet)               lookAhead(LET);
         if (it==textIn)                return IN;
-        if (it==textInfix)             return INFIX;
+        if (it==textInfix)             return INFIXN;
         if (it==textInfixl)            return INFIXL;
         if (it==textInfixr)            return INFIXR;
         if (it==textForeign)           return FOREIGN;
@@ -1321,16 +1414,14 @@ static Int local yylex() {             /* Read next input token ...        */
         if (it==textDo)                lookAhead(DO);
         if (it==textClass)             return TCLASS;
         if (it==textInstance)          return TINSTANCE;
-        if (it==textModule)            return MODULETOK;
-        if (it==textInterface)         return INTERFACE;
-        if (it==textRequires)          return REQUIRES;
+        if (it==textModule)            return TMODULE;
         if (it==textImport)            return IMPORT;
         if (it==textExport)            return EXPORT;
         if (it==textHiding)            return HIDING;
         if (it==textQualified)         return QUALIFIED;
         if (it==textAsMod)             return ASMOD;
         if (it==textWildcard)          return '_';
-        if (it==textAll)	       return ALL;
+        if (it==textAll && !haskell98) return ALL;
         if (it==textRepeat && reading==KEYBOARD)
             return repeatLast();
 
@@ -1349,6 +1440,7 @@ static Int local yylex() {             /* Read next input token ...        */
         if (it==textBar)     return '|';
         if (it==textFrom)    return FROM;
         if (it==textMinus)   return '-';
+        if (it==textPlus)    return '+';
         if (it==textBang)    return '!';
         if (it==textDot)     return '.';
         if (it==textArrow)   return ARROW;
@@ -1379,6 +1471,19 @@ static Int local repeatLast() {         /* Obtain last expression entered  */
     return REPEAT;
 }
 
+Syntax defaultSyntax(t)                 /* Find default syntax of var named*/
+Text t; {                               /* by t ...                        */
+    String s = textToStr(t);
+    return isIn(s[0],SYMBOL) ? DEF_OPSYNTAX : APPLIC;
+}
+
+Syntax syntaxOf(n)                      /* Find syntax for name            */
+Name n; {
+    if (name(n).syntax==NO_SYNTAX)      /* Return default if no syntax set */
+        return defaultSyntax(name(n).text);
+    return name(n).syntax;
+}
+
 /* --------------------------------------------------------------------------
  * main entry points to parser/lexer:
  * ------------------------------------------------------------------------*/
@@ -1394,9 +1499,49 @@ Int startWith; {                       /* determining whether to read a    */
         EEND;                          /* in the parser...                 */
     }
     drop();
-    assert(stackEmpty());              /* stack should now be empty        */
+    if (!stackEmpty())                 /* stack should now be empty        */
+        internal("parseInput");
 }
 
+#ifdef HSCRIPT
+static String memPrefix = "@mem@";
+static Int lenMemPrefix = 5;   /* strlen(memPrefix)*/
+
+Void makeMemScript(mem,fname)
+String mem;
+String fname; {     
+   strcat(fname,memPrefix);
+   itoa((int)mem, fname+strlen(fname), 10); 
+}
+
+Bool isMemScript(fname)
+String fname; {
+   return (strstr(fname,memPrefix) != NULL);
+}
+
+String memScriptString(fname)
+String fname; { 
+    String p = strstr(fname,memPrefix);
+    if (p) {
+        return (String)atoi(p+lenMemPrefix);
+    } else {
+        return NULL;
+    }
+}
+
+Void parseScript(fname,len)             /* Read a script, possibly from mem */
+String fname;
+Long len; {
+    input(RESET);
+    if (isMemScript(fname)) {
+        char* s = memScriptString(fname);
+        stringInput(s);
+    } else {
+        fileInput(fname,len);
+    }
+    parseInput(SCRIPT);
+}
+#else
 Void parseScript(nm,len)               /* Read a script                    */
 String nm;
 Long   len; {                          /* Used to set a target for reading */
@@ -1404,14 +1549,7 @@ Long   len; {                          /* Used to set a target for reading */
     fileInput(nm,len);
     parseInput(SCRIPT);
 }
-
-Void parseInterface(nm,len)            /* Read a GHC interface file        */
-String nm;
-Long   len; {                          /* Used to set a target for reading */
-    input(RESET);
-    fileInput(nm,len);
-    parseInput(INTERFACE);
-}
+#endif
 
 Void parseExp() {                      /* Read an expression to evaluate   */
     parseInput(EXPR);
@@ -1454,26 +1592,24 @@ Int what; {
                        textLambda     = findText("\\");
                        textBar        = findText("|");
                        textMinus      = findText("-");
+                       textPlus       = findText("+");
                        textFrom       = findText("<-");
                        textArrow      = findText("->");
                        textLazy       = findText("~");
                        textBang       = findText("!");
                        textDot        = findText(".");
                        textImplies    = findText("=>");
-#if NPLUSK
-                       textPlus       = findText("+");
-#endif
+                       textPrelude    = findText("Prelude");
+                       textNum        = findText("Num");
                        textModule     = findText("module");
-                       textInterface  = findText("__interface");
-                       textRequires   = findText("__requires");
                        textImport     = findText("import");
-                       textExport     = findText("__export");
                        textHiding     = findText("hiding");
                        textQualified  = findText("qualified");
                        textAsMod      = findText("as");
                        textWildcard   = findText("_");
                        textAll        = findText("forall");
                        varMinus       = mkVar(textMinus);
+                       varPlus        = mkVar(textPlus);
                        varBang        = mkVar(textBang);
                        varDot         = mkVar(textDot);
                        varHiding      = mkVar(textHiding);
@@ -1481,22 +1617,6 @@ Int what; {
                        varAsMod       = mkVar(textAsMod);
                        conMain        = mkCon(findText("Main"));
                        varMain        = mkVar(findText("main"));
-                       textPrelude    = findText("Prelude");
-                       textPreludeHugs= findText("PreludeBuiltin");
-                       conPrelude     = mkCon(textPrelude);
-                       conNil         = mkCon(findText("[]"));
-                       conList        = mkCon(findText("[]"));
-                       conUnit        = mkCon(findText("()"));
-                       conPreludeNil  = mkQCon(textPreludeHugs,findText("[]"));
-                       conPreludeList = mkQCon(textPreludeHugs,findText("[]"));
-                       conPreludeUnit = mkQCon(textPreludeHugs,findText("()"));
-                       varNegate      = mkQVar(textPreludeHugs,findText("negate"));
-                       varFlip        = mkQVar(textPreludeHugs,findText("flip"));
-                       varEnumFrom        = mkQVar(textPreludeHugs,findText("enumFrom"));
-                       varEnumFromThen    = mkQVar(textPreludeHugs,findText("enumFromThen"));
-                       varEnumFromTo      = mkQVar(textPreludeHugs,findText("enumFromTo"));
-                       varEnumFromThenTo  = mkQVar(textPreludeHugs,findText("enumFromThenTo"));
-
                        evalDefaults   = NIL;
 
                        input(RESET);
@@ -1505,11 +1625,11 @@ Int what; {
         case RESET   : tyconDefns   = NIL;
                        typeInDefns  = NIL;
                        valDefns     = NIL;
-                       opDefns      = NIL;
                        classDefns   = NIL;
                        instDefns    = NIL;
                        selDefns     = NIL;
                        genDefns     = NIL;
+                       //primDefns    = NIL;
                        unqualImports= NIL;
                        foreignImports= NIL;
                        foreignExports= NIL;
@@ -1527,11 +1647,11 @@ Int what; {
         case MARK    : mark(tyconDefns);
                        mark(typeInDefns);
                        mark(valDefns);
-                       mark(opDefns);
                        mark(classDefns);
                        mark(instDefns);
                        mark(selDefns);
                        mark(genDefns);
+                       //mark(primDefns);
                        mark(unqualImports);
                        mark(foreignImports);
                        mark(foreignExports);
@@ -1539,26 +1659,14 @@ Int what; {
                        mark(evalDefaults);
                        mark(inputExpr);
                        mark(varMinus);
-                       mark(varNegate);      
-                       mark(varFlip);        
-                       mark(varEnumFrom);          
-                       mark(varEnumFromThen);    
-                       mark(varEnumFromTo);      
-                       mark(varEnumFromThenTo);  
+                       mark(varPlus);
                        mark(varBang);
                        mark(varDot);
                        mark(varHiding);
                        mark(varQualified);
                        mark(varAsMod);
                        mark(varMain);
-                       mark(conPrelude);
                        mark(conMain);
-                       mark(conNil);
-                       mark(conList);
-                       mark(conUnit);
-                       mark(conPreludeNil);
-                       mark(conPreludeList);
-                       mark(conPreludeUnit);
                        mark(imps);
                        break;
     }

@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.3 1999/01/14 18:08:26 sewardj Exp $                        #
+# $Id: Makefile,v 1.4 1999/02/03 17:08:25 sewardj Exp $                        #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -13,21 +13,26 @@ RTS_DIR = $(TOP)/ghc/rts
 # interpreter and relevant .a/.so files                                 #
 # --------------------------------------------------------------------- #
 
+YACC = bison -y
+%.c: %.y
+	-$(YACC) $<
+	mv y.tab.c $@
+
+
 HS_SRCS =
 
-C_SRCS = \
-  charset.c codegen.c compiler.c connect.c derive.c desugar.c \
-  dynamic.c free.c hugs.c input.c interface.c lift.c link.c \
-  machdep.c modules.c optimise.c output.c pat.c pmc.c pp.c static.c \
-  stg.c stgSubst.c storage.c subst.c translate.c type.c
+Y_SRCS = parser.y
+C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
+     translate.c codegen.c lift.c free.c stgSubst.c optimise.c output.c   \
+     hugs.c dynamic.c stg.c
 
-SRC_CC_OPTS = -g -I$(GHC_DIR)/includes -D__HUGS__ -Wall -Wno-unused
+SRC_CC_OPTS = -g -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -Wall -Wno-unused
 
 GHC_LIBS_NEEDED = $(TOP)/ghc/rts/libHSrts.a $(TOP)/ghc/rts/gmp/libgmp.a
 GHC_DYN_CBITS_DIR = $(TOP)/ghc/lib/std/cbits
 GHC_DYN_CBITS = $(GHC_DYN_CBITS_DIR)/libHS_cbits.so
 
-all :: $(GHC_LIBS_NEEDED) $(GHC_DYN_CBITS) hugs Prelude.hs
+all :: parser.c $(GHC_LIBS_NEEDED) $(GHC_DYN_CBITS) hugs Prelude.hs
 
 hugs: $(C_OBJS)
 	$(CC) -rdynamic -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lbfd -liberty -ldl -lm
@@ -40,7 +45,6 @@ $(TOP)/ghc/rts/libHSrts.a:
 	(cd $(TOP)/ghc/rts ; make clean ; make)
 $(TOP)/ghc/rts/gmp/libgmp.a:
 	(cd $(TOP)/ghc/rts/gmp ; make clean ; make)
-
 
 # --------------------------------------------------------------------- #
 # Prelude                                                               #
@@ -153,6 +157,7 @@ checkrun: all
 CLEAN_FILES += hugs libHS_cbits.so $(GHC_DYN_CBITS) $(GHC_DYN_CBITS_DIR)/*.o 
 CLEAN_FILES += $(TOP)/ghc/rts/libHSrts.a $(TOP)/ghc/rts/*.o
 CLEAN_FILES += $(TOP)/ghc/rts/gmp/libgmp.a  $(TOP)/ghc/rts/gmp/*.o $(TOP)/ghc/rts/gmp/*/*.o
+CLEAN_FILES += parser.c
 
 INSTALL_LIBEXECS = hugs
 

@@ -7,16 +7,14 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/01/13 16:47:27 $
+ * $Revision: 1.4 $
+ * $Date: 1999/02/03 17:08:31 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
+#include "backend.h"
 #include "connect.h"
-#include "static.h"
-#include "translate.h"
-#include "type.h"
 #include "errors.h"
 #include "Assembler.h" /* for asmPrimOps and AsmReps */
 
@@ -91,7 +89,7 @@ Class classFloating;
 Class classNum;
 
 Class classMonad;                       /* Monads and monads with a zero   */
-Class classMonad0;
+/*Class classMonad0;*/
 
 List stdDefaults;                       /* standard default values         */
 
@@ -137,6 +135,33 @@ Name nameError;
 Name nameInd;
 
 Name nameForce;
+
+Name nameAnd;
+Name nameHw;
+Name nameConCmp;
+Name nameCompAux;
+Name nameEnFrTh;
+Name nameEnFrTo;
+Name nameEnFrom;
+Name nameEnFrEn;
+Name nameEnToEn;
+Name nameEnInRng;
+Name nameEnIndex;
+Name nameEnRange;
+Name nameRangeSize;
+Name nameComp;
+Name nameShowField;
+Name nameApp;
+Name nameShowParen;
+Name nameReadParen;
+Name nameLex;
+Name nameReadField;
+Name nameFlip;
+Name nameFromTo;
+Name nameFromThen;
+Name nameFrom;
+Name nameFromThenTo;
+Name nameNegate;
 
 /* these names are required before we've had a chance to do the right thing */
 Name nameSel;
@@ -184,9 +209,11 @@ Name nameMkMVar;                        /* MVar#        -> MVar            */
  * 
  * ------------------------------------------------------------------------*/
 
-static Tycon linkTycon( String s );
-static Tycon linkClass( String s );
-static Name  linkName ( String s );
+static Tycon linkTycon ( String s );
+static Tycon linkClass ( String s );
+static Name  linkName  ( String s );
+static Void  mkTypes   ();
+
 
 static Tycon linkTycon( String s )
 {
@@ -222,7 +249,7 @@ static Name linkName( String s )
 static Name  predefinePrim ( String s );
 static Name  predefinePrim ( String s )
 {
-    Name nm = newName(findText(s)); 
+    Name nm = newName(findText(s),NIL); 
     name(nm).defn=PREDEFINED;
     return nm;
 }
@@ -297,7 +324,7 @@ Void linkPreludeTC() {                  /* Hook to tycons and classes in   */
         classFloating   = linkClass("Floating");
         classNum        = linkClass("Num");
         classMonad      = linkClass("Monad");
-        classMonad0     = linkClass("MonadZero");
+        /*classMonad0     = linkClass("MonadZero");*/
 
         stdDefaults     = NIL;
         stdDefaults     = cons(typeDouble,stdDefaults);
@@ -376,6 +403,17 @@ Void linkPreludeTC() {                  /* Hook to tycons and classes in   */
     }
 }
 
+static Void mkTypes()
+{
+    arrow          = fn(aVar,mkOffset(1));
+    listof         = ap(typeList,aVar);
+    predNum        = ap(classNum,aVar);
+    predFractional = ap(classFractional,aVar);
+    predIntegral   = ap(classIntegral,aVar);
+    predMonad      = ap(classMonad,aVar);
+    /*predMonad0     = ap(classMonad0,aVar);*/
+}
+
 Void linkPreludeCM() {                  /* Hook to cfuns and mfuns in      */
     static Bool initialised = FALSE;    /* prelude when first loaded       */
     if (!initialised) {
@@ -421,11 +459,13 @@ Void linkPreludeNames() {               /* Hook to names defined in Prelude */
             Text t = findText(asmPrimOps[i].name);
             Name n = findName(t);
             if (isNull(n)) {
-                n = newName(t);
+                n = newName(t,NIL);
             }
             name(n).line   = 0;
             name(n).defn   = NIL;
-            name(n).type   = primType(asmPrimOps[i].monad,asmPrimOps[i].args,asmPrimOps[i].results);
+            name(n).type   = primType(asmPrimOps[i].monad,
+                                      asmPrimOps[i].args,
+                                      asmPrimOps[i].results);
             name(n).arity  = strlen(asmPrimOps[i].args);
             name(n).primop = &(asmPrimOps[i]);
             implementPrim(n);
@@ -503,3 +543,189 @@ Int what; {
 }
 
 /*-------------------------------------------------------------------------*/
+
+
+#if 0
+--## this stuff from 98
+--## 
+--## 
+--## Void linkPreludeTC() {                  /* Hook to tycons and classes in   */
+--##     if (isNull(typeBool)) {             /* prelude when first loaded       */
+--##         Int i;
+--## 
+--##         typeBool     = findTycon(findText("Bool"));
+--##         typeChar     = findTycon(findText("Char"));
+--##         typeString   = findTycon(findText("String"));
+--##         typeInt      = findTycon(findText("Int"));
+--##         typeInteger  = findTycon(findText("Integer"));
+--##         typeDouble   = findTycon(findText("Double"));
+--##         typeAddr     = findTycon(findText("Addr"));
+--##         typeMaybe    = findTycon(findText("Maybe"));
+--##         typeOrdering = findTycon(findText("Ordering"));
+--##         if (isNull(typeBool) || isNull(typeChar)   || isNull(typeString)  ||
+--##             isNull(typeInt)  || isNull(typeDouble) || isNull(typeInteger) ||
+--##             isNull(typeAddr) || isNull(typeMaybe)  || isNull(typeOrdering)) {
+--##             ERRMSG(0) "Prelude does not define standard types"
+--##             EEND;
+--##         }
+--##         stdDefaults  = cons(typeInteger,cons(typeDouble,NIL));
+--## 
+--##         classEq      = findClass(findText("Eq"));
+--##         classOrd     = findClass(findText("Ord"));
+--##         classIx      = findClass(findText("Ix"));
+--##         classEnum    = findClass(findText("Enum"));
+--##         classShow    = findClass(findText("Show"));
+--##         classRead    = findClass(findText("Read"));
+--## #if EVAL_INSTANCES
+--##         classEval    = findClass(findText("Eval"));
+--## #endif
+--##         classBounded = findClass(findText("Bounded"));
+--##         if (isNull(classEq)   || isNull(classOrd) || isNull(classRead) ||
+--##             isNull(classShow) || isNull(classIx)  || isNull(classEnum) ||
+--## #if EVAL_INSTANCES
+--##             isNull(classEval) ||
+--## #endif
+--##             isNull(classBounded)) {
+--##             ERRMSG(0) "Prelude does not define standard classes"
+--##             EEND;
+--##         }
+--## 
+--##         classReal       = findClass(findText("Real"));
+--##         classIntegral   = findClass(findText("Integral"));
+--##         classRealFrac   = findClass(findText("RealFrac"));
+--##         classRealFloat  = findClass(findText("RealFloat"));
+--##         classFractional = findClass(findText("Fractional"));
+--##         classFloating   = findClass(findText("Floating"));
+--##         classNum        = findClass(findText("Num"));
+--##         if (isNull(classReal)       || isNull(classIntegral)  ||
+--##             isNull(classRealFrac)   || isNull(classRealFloat) ||
+--##             isNull(classFractional) || isNull(classFloating)  ||
+--##             isNull(classNum)) {
+--##             ERRMSG(0) "Prelude does not define numeric classes"
+--##             EEND;
+--##         }
+--##         predNum         = ap(classNum,aVar);
+--##         predFractional  = ap(classFractional,aVar);
+--##         predIntegral    = ap(classIntegral,aVar);
+--## 
+--##         classMonad  = findClass(findText("Monad"));
+--##         if (isNull(classMonad)) {
+--##             ERRMSG(0) "Prelude does not define Monad class"
+--##             EEND;
+--##         }
+--##         predMonad  = ap(classMonad,aVar);
+--## 
+--## #if IO_MONAD
+--##         {   Type typeIO = findTycon(findText("IO"));
+--##             if (isNull(typeIO)) {
+--##                 ERRMSG(0) "Prelude does not define IO monad constructor"
+--##                 EEND;
+--##             }
+--##             typeProgIO = ap(typeIO,aVar);
+--##         }
+--## #endif
+--## 
+--##         /* The following primitives are referred to in derived instances and
+--##          * hence require types; the following types are a little more general
+--##          * than we might like, but they are the closest we can get without a
+--##          * special datatype class.
+--##          */
+--##         name(nameConCmp).type
+--##             = mkPolyType(starToStar,fn(aVar,fn(aVar,typeOrdering)));
+--##         name(nameEnRange).type
+--##             = mkPolyType(starToStar,fn(boundPair,listof));
+--##         name(nameEnIndex).type
+--##             = mkPolyType(starToStar,fn(boundPair,fn(aVar,typeInt)));
+--##         name(nameEnInRng).type
+--##             = mkPolyType(starToStar,fn(boundPair,fn(aVar,typeBool)));
+--##         name(nameEnToEn).type
+--##             = mkPolyType(starToStar,fn(aVar,fn(typeInt,aVar)));
+--##         name(nameEnFrEn).type
+--##             = mkPolyType(starToStar,fn(aVar,typeInt));
+--##         name(nameEnFrom).type
+--##             = mkPolyType(starToStar,fn(aVar,listof));
+--##         name(nameEnFrTo).type
+--##             = name(nameEnFrTh).type
+--##             = mkPolyType(starToStar,fn(aVar,fn(aVar,listof)));
+--## 
+--## #if EVAL_INSTANCES
+--##         addEvalInst(0,typeArrow,2,NIL); /* Add Eval instances for builtins */
+--##         addEvalInst(0,typeList,1,NIL);
+--##         addEvalInst(0,typeUnit,0,NIL);
+--## #endif
+--##         for (i=2; i<=NUM_DTUPLES; i++) {/* Add derived instances of tuples */
+--## #if EVAL_INSTANCES
+--##             addEvalInst(0,mkTuple(i),i,NIL);
+--## #endif
+--##             addTupInst(classEq,i);
+--##             addTupInst(classOrd,i);
+--##             addTupInst(classShow,i);
+--##             addTupInst(classRead,i);
+--##             addTupInst(classIx,i);
+--##         }
+--##     }
+--## }
+--## 
+--## 
+--## static Void linkPreludeCM() {           /* Hook to cfuns and mfuns in      */
+--##     if (isNull(nameFalse)) {            /* prelude when first loaded       */
+--##         nameFalse   = findName(findText("False"));
+--##         nameTrue    = findName(findText("True"));
+--##         nameJust    = findName(findText("Just"));
+--##         nameNothing = findName(findText("Nothing"));
+--##         nameLeft    = findName(findText("Left"));
+--##         nameRight   = findName(findText("Right"));
+--##         nameLT      = findName(findText("LT"));
+--##         nameEQ      = findName(findText("EQ"));
+--##         nameGT      = findName(findText("GT"));
+--##         if (isNull(nameFalse) || isNull(nameTrue)    ||
+--##             isNull(nameJust)  || isNull(nameNothing) ||
+--##             isNull(nameLeft)  || isNull(nameRight)   ||
+--##             isNull(nameLT)    || isNull(nameEQ)      || isNull(nameGT)) {
+--##             ERRMSG(0) "Prelude does not define standard constructors"
+--##             EEND;
+--##         }
+--## 
+--##         nameFromInt     = findName(findText("fromInt"));
+--##         nameFromInteger = findName(findText("fromInteger"));
+--##         nameFromDouble  = findName(findText("fromDouble"));
+--##         nameEq          = findName(findText("=="));
+--##         nameCompare     = findName(findText("compare"));
+--##         nameLe          = findName(findText("<="));
+--##         nameGt          = findName(findText(">"));
+--##         nameShowsPrec   = findName(findText("showsPrec"));
+--##         nameReadsPrec   = findName(findText("readsPrec"));
+--##         nameIndex       = findName(findText("index"));
+--##         nameInRange     = findName(findText("inRange"));
+--##         nameRange       = findName(findText("range"));
+--##         nameMult        = findName(findText("*"));
+--##         namePlus        = findName(findText("+"));
+--##         nameMinBnd      = findName(findText("minBound"));
+--##         nameMaxBnd      = findName(findText("maxBound"));
+--## #if EVAL_INSTANCES
+--##         nameStrict      = findName(findText("strict"));
+--##         nameSeq         = findName(findText("seq"));
+--## #endif
+--##         nameReturn      = findName(findText("return"));
+--##         nameBind        = findName(findText(">>="));
+--##         nameMFail       = findName(findText("fail"));
+--##         if (isNull(nameFromInt)   || isNull(nameFromDouble)  ||
+--##             isNull(nameEq)        || isNull(nameCompare)     ||
+--##             isNull(nameLe)        || isNull(nameGt)          ||
+--##             isNull(nameShowsPrec) || isNull(nameReadsPrec)   ||
+--##             isNull(nameIndex)     || isNull(nameInRange)     ||
+--##             isNull(nameRange)     || isNull(nameMult)        ||
+--##             isNull(namePlus)      || isNull(nameFromInteger) ||
+--##             isNull(nameMinBnd)    || isNull(nameMaxBnd)      ||
+--## #if EVAL_INSTANCES
+--##             isNull(nameStrict)    || isNull(nameSeq)         ||
+--## #endif
+--##             isNull(nameReturn)    || isNull(nameBind)        ||
+--##             isNull(nameMFail)) {
+--##             ERRMSG(0) "Prelude does not define standard members"
+--##             EEND;
+--##         }
+--##     }
+--## }
+--## 
+#endif

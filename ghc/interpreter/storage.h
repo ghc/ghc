@@ -1,15 +1,16 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Defines storage datatypes: Text, Name, Module, Tycon, Cell, List, Pair,
  * Triple, ...
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:43 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:41 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -21,7 +22,7 @@
  * ------------------------------------------------------------------------*/
 
 typedef Int          Text;                       /* text string            */
-typedef Word         Syntax;                     /* syntax (assoc,preced)  */
+typedef Unsigned     Syntax;                     /* syntax (assoc,preced)  */
 typedef Int          Cell;                       /* general cell value     */
 typedef Cell far     *Heap;                      /* storage of heap        */
 typedef Cell         Pair;                       /* pair cell              */
@@ -39,7 +40,7 @@ typedef Cell         Class;                      /* type class             */
 typedef Cell         Inst;                       /* instance of type class */
 typedef Cell         Triple;                     /* triple of cell values  */
 typedef Cell         List;                       /* list of cells          */
-typedef Cell         Bignum;                     /* integer literal        */
+typedef Cell         Bignum;                     /* bignum integer         */
 typedef Cell         Float;                      /* floating pt literal    */
 #if TREX
 typedef Cell         Ext;                        /* extension label        */
@@ -72,16 +73,20 @@ extern  Syntax       defaultSyntax      Args((Text));
 #define MAX_PREC  9                    /* strongest binding operator       */
 #define FUN_PREC  (MAX_PREC+2)         /* binding of function symbols      */
 #define DEF_PREC  MAX_PREC
-#define APPLIC    00000                /* written applicatively            */
-#define LEFT_ASS  02000                /* left associative infix           */
-#define RIGHT_ASS 04000                /* right associative infix          */
-#define NON_ASS   06000                /* non associative infix            */
-#define DEF_ASS   NON_ASS
+#define APPLIC    0                    /* written applicatively            */
+#define LEFT_ASS  1                    /* left associative infix           */
+#define RIGHT_ASS 2                    /* right associative infix          */
+#define NON_ASS   3                    /* non associative infix            */
+#define DEF_ASS   LEFT_ASS
+
+#define UMINUS_PREC  6                  /* Change these settings at your   */
+#define UMINUS_ASSOC LEFT_ASS           /* own risk; they may not work!    */
 
 #define assocOf(x)      ((x)&NON_ASS)
-#define precOf(x)       ((x)&(~NON_ASS))
-#define mkSyntax(a,p)   ((a)|(p))
+#define precOf(x)       ((x)>>2)
+#define mkSyntax(a,p)   ((a)|((p)<<2))
 #define DEF_OPSYNTAX    mkSyntax(DEF_ASS,DEF_PREC)
+#define NO_SYNTAX       (-1)
 
 extern  Void   addSyntax  Args((Int,Text,Syntax));
 extern  Syntax syntaxOf   Args((Text));
@@ -103,6 +108,14 @@ extern Int   cellsRecovered;            /* cells recovered by last gc      */
 
 #define fst(c)       heapTopFst[c]
 #define snd(c)       heapTopSnd[c]
+#if PROFILING
+extern   Heap        heapThd, heapTopThd;
+#define thd(c)       heapTopThd[c]
+extern   Name        producer;
+extern   Bool        profiling;
+extern   Int         profInterval;
+extern   Void        profilerLog     Args((String));
+#endif
 
 extern  Pair         pair            Args((Cell,Cell));
 extern  Void         garbageCollect  Args((Void));
@@ -140,6 +153,7 @@ extern  Cell         whatIs    Args((Cell));
 #define CONOPCELL    8            /* Operator constructor:    snd :: Text  */
 #define STRCELL      9            /* String literal:          snd :: Text  */
 #define INTCELL      10           /* Int literal:             snd :: Int   */
+#define ADDPAT       11           /* (_+k) pattern discr:     snd :: Int   */
 #define FLOATCELL    15           /* Floating Pt literal:     snd :: Text  */
 #define BIGCELL      16           /* Integer literal:         snd :: Text  */
 #if PTR_ON_HEAP
@@ -172,10 +186,24 @@ extern  Bool            isQCon      Args((Cell));
 extern  Bool            isQualIdent Args((Cell));
 extern  Bool            isIdent     Args((Cell));
 
-extern  String           stringNegate Args((String));
+#if 0
+Originally ...
+#define isFloat(c)      (isPair(c) && fst(c)==FLOATCELL)
+extern  Cell            mkFloat         Args((FloatPro));
+extern  FloatPro        floatOf         Args((Cell));
+extern  String          floatToString   Args((FloatPro));
+extern  FloatPro        stringToFloat   Args((String));
+#else
+#define isFloat(c)       (isPair(c) && fst(c)==FLOATCELL)
+#define stringToFloat(s) pair(FLOATCELL,findText(s))
+#define floatToString(f) textToStr(snd(f))
+#define floatEq(f1,f2)   (snd(f1) == snd(f2))
+#define floatNegate(f)   stringToFloat(stringNegate(floatToString(f)))
+#define floatOf(f)       atof(floatToString(f))
+#endif
 
-#define intEq(x,y)       (intOf(x) == intOf(y))
-#define intNegate(x)     mkInt(-intOf(x))
+
+
 
 #define isFloat(c)       (isPair(c) && fst(c)==FLOATCELL)
 #define stringToFloat(s) pair(FLOATCELL,findText(s))
@@ -183,13 +211,10 @@ extern  String           stringNegate Args((String));
 #define floatEq(f1,f2)   (snd(f1) == snd(f2))
 #define floatNegate(f)   stringToFloat(stringNegate(floatToString(f)))
 #define floatOf(f)       atof(floatToString(f))
+#define mkFloat(f)       (f)  /* ToDo: is this right? */
 
-#define isBignum(c)       (isPair(c) && fst(c)==BIGCELL)
-#define stringToBignum(s) pair(BIGCELL,findText(s))
 #define bignumToString(b) textToStr(snd(b))
-#define bignumEq(b1,b2)   (snd(b1) == snd(b2))
-#define bignumNegate(b)   stringToBignum(stringNegate(bignumToString(b)))
-#define bignumOf(b)       atoi(bignumToString(b))   /* ToDo: overflow check */
+
 
 #if PTR_ON_HEAP
 #define isPtr(c)        (isPair(c) && fst(c)==PTRCELL)
@@ -215,58 +240,70 @@ extern  Ptr             ptrOf           Args((Cell));
 #define COMP         26           /* COMP       snd :: (Exp,[Qual])        */
 #define ASPAT        27           /* ASPAT      snd :: (Var,Exp)           */
 #define ESIGN        28           /* ESIGN      snd :: (Exp,Type)          */
-#define CASE         29           /* CASE       snd :: (Exp,[Alt])         */
-#define NUMCASE      30           /* NUMCASE    snd :: (Exp,Disc,Rhs)      */
-#define FATBAR       31           /* FATBAR     snd :: (Exp,Exp)           */
-#define LAZYPAT      32           /* LAZYPAT    snd :: Exp                 */
+#define RSIGN        29           /* RSIGN      snd :: (Rhs,Type)          */
+#define CASE         30           /* CASE       snd :: (Exp,[Alt])         */
+#define NUMCASE      31           /* NUMCASE    snd :: (Exp,Disc,Rhs)      */
+#define FATBAR       32           /* FATBAR     snd :: (Exp,Exp)           */
+#define LAZYPAT      33           /* LAZYPAT    snd :: Exp                 */
 #define DERIVE       35           /* DERIVE     snd :: Cell                */
-#if NPLUSK
-#define ADDPAT       36           /* (_+k) pattern discr: snd :: Cell      */
+#if BREAK_FLOATS
+#define FLOATCELL    36           /* FLOATCELL  snd :: (Int,Int)           */
+#endif
+
+#if BIGNUMS
+#define POSNUM       37           /* POSNUM     snd :: [Int]               */
+#define NEGNUM       38           /* NEGNUM     snd :: [Int]               */
 #endif
 
 #define BOOLQUAL     39           /* BOOLQUAL   snd :: Exp                 */
 #define QWHERE       40           /* QWHERE     snd :: [Decl]              */
 #define FROMQUAL     41           /* FROMQUAL   snd :: (Exp,Exp)           */
 #define DOQUAL       42           /* DOQUAL     snd :: Exp                 */
+#define MONADCOMP    43           /* MONADCOMP  snd :: ((m,m0),(Exp,[Qual])*/
 
 #define GUARDED      44           /* GUARDED    snd :: [guarded exprs]     */
 
-#define ARRAY        45           /* Array:     snd :: (Bounds,[Values])   */
-#define MUTVAR       46           /* Mutvar:    snd :: Cell                */
+#define ARRAY        45           /* Array      snd :: (Bounds,[Values])   */
+#define MUTVAR       46           /* Mutvar     snd :: Cell                */
+#if INTERNAL_PRIMS
+#define HUGSOBJECT   47           /* HUGSOBJECT snd :: Cell                */
+#endif
 
 #define POLYTYPE     50           /* POLYTYPE   snd :: (Kind,Type)         */
 #define QUAL         51           /* QUAL       snd :: ([Classes],Type)    */
 #define RANK2        52           /* RANK2      snd :: (Int,Type)          */
 #define EXIST        53           /* EXIST      snd :: (Int,Type)          */
-#define POLYREC      54           /* POLYREC:   snd :: (Int,Type)          */
-#define BIGLAM       55           /* BIGLAM:    snd :: (vars,patterns)     */
+#define POLYREC      54           /* POLYREC    snd :: (Int,Type)          */
+#define BIGLAM       55           /* BIGLAM     snd :: (vars,patterns)     */
+#define CDICTS       56           /* CDICTS     snd :: ([Pred],Type)       */
 
-#define LABC         60           /* LABC:      snd :: (con,[(Vars,Type)]) */
-#define CONFLDS      61           /* CONFLDS:   snd :: (con,[Field])       */
-#define UPDFLDS      62           /* UPDFLDS:   snd :: (Exp,[con],[Field]) */
+#define LABC         60           /* LABC       snd :: (con,[(Vars,Type)]) */
+#define CONFLDS      61           /* CONFLDS    snd :: (con,[Field])       */
+#define UPDFLDS      62           /* UPDFLDS    snd :: (Exp,[con],[Field]) */
 #if TREX
-#define RECORD       63           /* RECORD:    snd :: [Val]               */
-#define EXTCASE      64           /* EXTCASE:   snd :: (Exp,Disc,Rhs)      */
-#define RECSEL       65           /* RECSEL:    snd :: Ext                 */
+#define RECORD       63           /* RECORD     snd :: [Val]               */
+#define EXTCASE      64           /* EXTCASE    snd :: (Exp,Disc,Rhs)      */
+#define RECSEL       65           /* RECSEL     snd :: Ext                 */
 #endif
+#define IMPDEPS      68           /* IMPDEPS    snd :: [Binding]           */
 
 #define QUALIDENT    70           /* Qualified identifier  snd :: (Id,Id)  */
 #define HIDDEN       71           /* hiding import list    snd :: [Entity] */
 #define MODULEENT    72           /* module in export list snd :: con      */
 
-#define ONLY         75           /* ONLY:      snd :: Exp (used in parser)*/
-#define NEG          76           /* NEG:       snd :: Exp (used in parser)*/
+#define INFIX        80           /* INFIX      snd :: (see tidyInfix)     */
+#define ONLY         81           /* ONLY       snd :: Exp                 */
+#define NEG          82           /* NEG        snd :: Exp                 */
 
-#define IMPDEPS      78           /* IMPDEFS:   snd :: [Binding]           */
+#if SIZEOF_INTP != SIZEOF_INT
+#define PTRCELL      90           /* C Heap Pointer snd :: (Int,Int)       */
+#endif
 
-#define STGVAR       80           /* STGVAR     snd :: (StgRhs,info)       */
-#define STGAPP       81           /* STGAPP     snd :: (StgVar,[Arg])      */
-#define STGPRIM      82           /* STGPRIM    snd :: (PrimOp,[Arg])      */
-#define STGCON       83           /* STGCON     snd :: (StgCon,[Arg])      */
-#define PRIMCASE     84           /* PRIMCASE   snd :: (Expr,[PrimAlt])    */
-
-/* Used when parsing GHC interface files */
-#define DICTAP       85           /* DICTTYPE   snd :: (QClassId,[Type])   */
+#define STGVAR       92           /* STGVAR     snd :: (StgRhs,info)       */
+#define STGAPP       93           /* STGAPP     snd :: (StgVar,[Arg])      */
+#define STGPRIM      94           /* STGPRIM    snd :: (PrimOp,[Arg])      */
+#define STGCON       95           /* STGCON     snd :: (StgCon,[Arg])      */
+#define PRIMCASE     96           /* PRIMCASE   snd :: (Expr,[PrimAlt])    */
 
 /* Last constructor tag must be less than SPECMIN */
 
@@ -287,6 +324,10 @@ extern  Ptr             ptrOf           Args((Cell));
 
 #define DOTDOT       106          /* ".." in import/export list            */
 
+#if BIGNUMS
+#define ZERONUM      108          /* The zero bignum (see POSNUM, NEGNUM)  */
+#endif
+
 #define NAME         110          /* whatIs code for isName                */
 #define TYCON        111          /* whatIs code for isTycon               */
 #define CLASS        112          /* whatIs code for isClass               */
@@ -301,14 +342,17 @@ extern  Ptr             ptrOf           Args((Cell));
 #endif
 
 #define SIGDECL      120          /* Signature declaration                 */
-#define PREDEFINED   121          /* predefined name, not yet filled       */
+#define FIXDECL      121          /* Fixity declaration                    */
+#define FUNBIND      122          /* Function binding                      */
+#define PATBIND      123          /* Pattern binding                       */
 
-#define DATATYPE     130          /* datatype type constructor             */
-#define NEWTYPE      131          /* newtype type constructor              */
-#define SYNONYM      132          /* synonym type constructor              */
-#define RESTRICTSYN  133          /* synonym with restricted scope         */
+#define DATATYPE     130          /* Datatype type constructor             */
+#define NEWTYPE      131          /* Newtype type constructor              */
+#define SYNONYM      132          /* Synonym type constructor              */
+#define RESTRICTSYN  133          /* Synonym with restricted scope         */
 
-#define NODEPENDS    135          /* stop calculation of deps in type check*/
+#define NODEPENDS    135          /* Stop calculation of deps in type check*/
+#define PREDEFINED   136          /* Predefined name, not yet filled       */
 
 /* --------------------------------------------------------------------------
  * Tuple data/type constructors:
@@ -355,6 +399,9 @@ extern Ext           mkExt Args((Text));
 
 #define MODMIN        (OFFMIN+NUM_OFFSETS)
 
+#if IGNORE_MODULES
+#define setCurrModule(m) doNothing()
+#else /* !IGNORE_MODULES */
 #define isModule(c)   (MODMIN<=(c) && (c)<TYCMIN)
 #define mkModule(n)   (MODMIN+(n))
 #define module(n)     tabModule[(n)-MODMIN]
@@ -392,6 +439,9 @@ extern Module findModule    Args((Text));
 extern Module findModid     Args((Cell));
 extern Void   setCurrModule Args((Module));
 
+#define isPrelude(m) (m==modulePrelude)
+#endif /* !IGNORE_MODULES */
+
 /* --------------------------------------------------------------------------
  * Type constructor names:
  * ------------------------------------------------------------------------*/
@@ -404,13 +454,13 @@ extern Void   setCurrModule Args((Module));
 struct strTycon {
     Text  text;
     Int   line;
+#if !IGNORE_MODULES
     Module mod;                         /* module that defines it          */
+#endif
     Int   arity;
     Kind  kind;                         /* kind (includes arity) of Tycon  */
     Cell  what;                         /* DATATYPE/SYNONYM/RESTRICTSYN... */
     Cell  defn;
-    Name  conToTag;  /* used in derived code */
-    Name  tagToCon;
     Tycon nextTyconHash;
 };
 
@@ -420,7 +470,7 @@ extern Tycon newTycon     Args((Text));
 extern Tycon findTycon    Args((Text));
 extern Tycon addTycon     Args((Tycon));
 extern Tycon findQualTycon Args((Cell));
-extern Tycon addPrimTycon  Args((Text,Kind,Int,Cell,Cell));
+extern Tycon addPrimTycon Args((Text,Kind,Int,Cell,Cell));
 
 #define isSynonym(h)    (isTycon(h) && tycon(h).what==SYNONYM)
 #define mkPolyType(n,t) pair(POLYTYPE,pair(n,t))
@@ -441,6 +491,8 @@ struct strName {
     Text   text;
     Int    line;
     Module mod;                         /* module that defines it          */
+    Syntax syntax;
+    Cell   parent; 
     Int    arity;
     Int    number;
     Cell   type;
@@ -483,10 +535,10 @@ extern struct strName DECTABLE(tabName);
 #define mfunOf(n)       ((-1)-name(n).number)
 #define mfunNo(i)       ((-1)-(i))
 
-extern Name   newName      Args((Text));
+extern Name   newName      Args((Text,Cell));
 extern Name   findName     Args((Text));
 extern Name   addName      Args((Name));
-extern Name   findQualName Args((Int,Cell));
+extern Name   findQualName Args((Cell));
 extern Name   addPrimCfun  Args((Text,Int,Int,Int));
 extern Int    sfunPos      Args((Name,Name));
 
@@ -494,7 +546,7 @@ extern Int    sfunPos      Args((Name,Name));
  * Type class values:
  * ------------------------------------------------------------------------*/
 
-#define INSTMIN      (NAMEMIN+NUM_NAME)          /* instances              */
+#define INSTMIN      (NAMEMIN+NUM_NAME) /* instances                       */
 #define isInst(c)    (INSTMIN<=(c) && (c)<CLASSMIN)
 #define mkInst(n)    (INSTMIN+(n))
 #define instOf(c)    ((Int)((c)-INSTMIN))
@@ -522,22 +574,24 @@ struct strInst {
 #define cclass(n)    tabClass[(n)-CLASSMIN]
 
 struct strClass {
-    Text  text;                         /* Name of class                   */
-    Int   line;                         /* Line where declaration begins   */
-    Module mod;                         /* module that defines it          */
-    Int   level;                        /* Level in class hierarchy        */
-    Int   arity;                        /* Number of arguments             */
-    Kinds kinds;                        /* Kinds of constructors in class  */
-    Cell  head;                         /* Head of class                   */
-    Name  dcon;                         /* Dictionay constructor function  */
-    List  supers;                       /* :: [Pred]                       */
-    Int   numSupers;                    /* length(supers)                  */
-    List  dsels;                        /* Superclass dictionary selectors */
-    List  members;                      /* :: [Name]                       */
-    Int   numMembers;                   /* length(members)                 */
-    Name  dbuild;                       /* Default dictionary builder      */
-    List  defaults;                     /* :: [Name]                       */
-    List  instances;                    /* :: [Inst]                       */
+    Text   text;                        /* Name of class                   */
+    Int    line;                        /* Line where declaration begins   */
+#if !IGNORE_MODULES
+    Module mod;                         /* module that declares it         */
+#endif
+    Int    level;                       /* Level in class hierarchy        */
+    Int    arity;                       /* Number of arguments             */
+    Kinds  kinds;                       /* Kinds of constructors in class  */
+    Cell   head;                        /* Head of class                   */
+    Name   dcon;                        /* Dictionary constructor function */
+    List   supers;                      /* :: [Pred]                       */
+    Int    numSupers;                   /* length(supers)                  */
+    List   dsels;                       /* Superclass dictionary selectors */
+    List   members;                     /* :: [Name]                       */
+    Int    numMembers;                  /* length(members)                 */
+    Name   dbuild;                      /* Default dictionary builder      */
+    List   defaults;                    /* :: [Name]                       */
+    List   instances;                   /* :: [Inst]                       */
 };
 
 extern struct strClass    DECTABLE(tabClass);
@@ -567,15 +621,20 @@ extern Inst  findNextInst  Args((Tycon,Inst));
  * ------------------------------------------------------------------------*/
 
 #define INTMIN       (CHARMIN+NUM_CHARS)
-#define INTMAX       MAXPOSINT
+#define INTMAX       (MAXPOSINT)
 #define isSmall(c)   (INTMIN<=(c))
 #define INTZERO      (INTMIN/2 + INTMAX/2)
+#define MINSMALLINT  (INTMIN - INTZERO)
+#define MAXSMALLINT  (INTMAX - INTZERO)
 #define mkDigit(c)   ((Cell)((c)+INTMIN))
 #define digitOf(c)   ((Int)((c)-INTMIN))
 
 extern  Bool isInt    Args((Cell));
 extern  Int  intOf    Args((Cell));
 extern  Cell mkInt    Args((Int));
+#if BIGNUMS
+extern  Bool isBignum Args((Cell));
+#endif
 
 /* --------------------------------------------------------------------------
  * Implementation of triples:
@@ -601,26 +660,25 @@ extern  Cell mkInt    Args((Int));
 #define tl(c)        snd(c)
 
 extern  Int          length       Args((List));
-extern  List         appendOnto   Args((List,List)); /* destructive     */ 
-extern  List         revDupOnto   Args((List,List)); /* non-destructive */ 
-extern  List         dupListOnto  Args((List,List)); /* non-destructive */ 
-extern  List         revOnto      Args((List,List)); /* destructive     */ 
-#define reverse(xs)  revDupOnto((xs),NIL)            /* non-destructive */ 
-#define dupList(xs)  dupListOnto((xs),NIL)           /* non-destructive */ 
-#define rev(xs)      revOnto((xs),NIL)               /* destructive     */ 
+extern  List         appendOnto   Args((List,List));    /* destructive     */
+extern  List         dupOnto      Args((List,List));
+extern  List         dupList      Args((List));
+extern  List         revOnto      Args((List, List));   /* destructive     */
+#define rev(xs)      revOnto((xs),NIL)                  /* destructive     */
 extern  Cell         cellIsMember Args((Cell,List));
 extern  Cell         cellAssoc    Args((Cell,List));
 extern  Cell         cellRevAssoc Args((Cell,List));
 extern  Bool         eqList       Args((List,List));
 extern  Cell         varIsMember  Args((Text,List));
+extern  Name         nameIsMember Args((Text,List));
 extern  Cell         intIsMember  Args((Int,List));
-extern  List         replicate    Args((Int,Cell)); 
-extern  List         diffList     Args((List,List)); /* destructive     */
-extern  List         deleteCell   Args((List,Cell)); /* non-destructive */
-extern  List         take         Args((Int,List));  /* destructive     */
-extern  List         splitAt      Args((Int,List));  /* non-destructive */
+extern  List         replicate    Args((Int,Cell));
+extern  List         diffList     Args((List,List));    /* destructive     */
+extern  List         deleteCell   Args((List,Cell));    /* non-destructive */
+extern  List         take         Args((Int,List));     /* destructive     */
+extern  List         splitAt      Args((Int,List));     /* non-destructive */
 extern  Cell         nth          Args((Int,List));
-extern  List         removeCell   Args((Cell,List)); /* destructive     */
+extern  List         removeCell   Args((Cell,List));    /* destructive     */
 
 /* The following macros provide `inline expansion' of some common ways of
  * traversing, using and modifying lists:
@@ -629,20 +687,22 @@ extern  List         removeCell   Args((Cell,List)); /* destructive     */
  *      with identifiers used elsewhere.
  */
 
-#define mapBasic(_init,_step)     {List Zs=(_init);\
-                                   for(;nonNull(Zs);Zs=tl(Zs))  \
-                                   _step;}
-#define mapModify(_init,_step)    mapBasic(_init,hd(Zs)=_step)
+#define mapBasic(_init,_step)           {List Zs=(_init);\
+                                         for(;nonNull(Zs);Zs=tl(Zs))  \
+                                         _step;}
+#define mapModify(_init,_step)          mapBasic(_init,hd(Zs)=_step)
 
-#define mapProc(_f,_xs)           mapBasic(_xs,_f(hd(Zs)))
-#define map1Proc(_f,_a,_xs)       mapBasic(_xs,_f(_a,hd(Zs)))
-#define map2Proc(_f,_a,_b,_xs)    mapBasic(_xs,_f(_a,_b,hd(Zs)))
-#define map3Proc(_f,_a,_b,_c,_xs) mapBasic(_xs,_f(_a,_b,_c,hd(Zs)))
+#define mapProc(_f,_xs)                 mapBasic(_xs,_f(hd(Zs)))
+#define map1Proc(_f,_a,_xs)             mapBasic(_xs,_f(_a,hd(Zs)))
+#define map2Proc(_f,_a,_b,_xs)          mapBasic(_xs,_f(_a,_b,hd(Zs)))
+#define map3Proc(_f,_a,_b,_c,_xs)       mapBasic(_xs,_f(_a,_b,_c,hd(Zs)))
+#define map4Proc(_f,_a,_b,_c,_d,_xs)    mapBasic(_xs,_f(_a,_b,_c,_d,hd(Zs)))
 
-#define mapOver(_f,_xs)           mapModify(_xs,_f(hd(Zs)))
-#define map1Over(_f,_a,_xs)       mapModify(_xs,_f(_a,hd(Zs)))
-#define map2Over(_f,_a,_b,_xs)    mapModify(_xs,_f(_a,_b,hd(Zs)))
-#define map3Over(_f,_a,_b,_c,_xs) mapModify(_xs,_f(_a,_b,_c,hd(Zs)))
+#define mapOver(_f,_xs)                 mapModify(_xs,_f(hd(Zs)))
+#define map1Over(_f,_a,_xs)             mapModify(_xs,_f(_a,hd(Zs)))
+#define map2Over(_f,_a,_b,_xs)          mapModify(_xs,_f(_a,_b,hd(Zs)))
+#define map3Over(_f,_a,_b,_c,_xs)       mapModify(_xs,_f(_a,_b,_c,hd(Zs)))
+#define map4Over(_f,_a,_b,_c,_d,_xs)    mapModify(_xs,_f(_a,_b,_c,_d,hd(Zs)))
 
 /* This is just what you want for functions with accumulating parameters */
 #define mapAccum(_f,_acc,_xs)           mapBasic(_xs,_acc=_f(_acc,hd(Zs)))
@@ -655,8 +715,8 @@ extern  List         removeCell   Args((Cell,List)); /* destructive     */
  * ------------------------------------------------------------------------*/
 
 #define ap(f,x)      pair(f,x)
-#define ap1(f,x)     ap(f,x) 
-#define ap2(f,x,y)   ap(ap(f,x),y) 
+#define ap1(f,x)     ap(f,x)
+#define ap2(f,x,y)   ap(ap(f,x),y)
 #define ap3(f,x,y,z) ap(ap(ap(f,x),y),z)
 #define fun(c)       fst(c)
 #define arg(c)       snd(c)
@@ -692,6 +752,8 @@ extern  StackPtr sp;
 #define drop()       sp--
 #define top()        stack(sp)
 #define pushed(n)    stack(sp-(n))
+#define topfun(f)    top()=ap((f),top())
+#define toparg(x)    top()=ap(top(),(x))
 
 extern  Void hugsStackOverflow Args((Void));
 
@@ -701,7 +763,11 @@ extern  Void hugsStackOverflow Args((Void));
  * ------------------------------------------------------------------------*/
 
 extern Script      startNewScript   Args((String));
+extern Bool        moduleThisScript Args((Module));
+extern Module      moduleOfScript   Args((Script));
+extern Bool        isPreludeScript  Args((Void));
 extern Module      lastModule       Args((Void));
+extern Script      scriptThisFile   Args((Text));
 extern Script      scriptThisName   Args((Name));
 extern Script      scriptThisTycon  Args((Tycon));
 extern Script      scriptThisInst   Args((Inst));
@@ -710,12 +776,186 @@ extern String      fileOfModule     Args((Module));
 extern Void        dropScriptsFrom  Args((Script));
 
 /* --------------------------------------------------------------------------
+ * I/O Handles:
+ * ------------------------------------------------------------------------*/
+
+#if IO_HANDLES
+#define HSTDIN          0       /* Numbers for standard handles            */
+#define HSTDOUT         1
+#define HSTDERR         2
+
+struct strHandle {              /* Handle description and status flags     */
+    Cell hcell;                 /* Heap representation of handle (or NIL)  */
+    FILE *hfp;                  /* Corresponding file pointer              */
+    Int  hmode;                 /* Current mode: see below                 */
+};
+
+#define HCLOSED         0000    /* no I/O permitted                        */
+#define HSEMICLOSED     0001    /* semiclosed reads only                   */
+#define HREAD           0002    /* set to enable reads from handle         */
+#define HWRITE          0004    /* set to enable writes to handle          */
+#define HAPPEND         0010    /* opened in append mode                   */
+
+extern Cell   openHandle Args((String,Int,Bool));
+extern struct strHandle  DECTABLE(handles);
+#endif
+
+/* --------------------------------------------------------------------------
+ * Malloc Pointers
+ * ------------------------------------------------------------------------*/
+
+#if GC_MALLOCPTRS
+struct strMallocPtr {           /* Malloc Ptr description                  */
+    Cell mpcell;                /* Back pointer to MPCELL                  */
+    Void *ptr;                  /* Pointer into C world                    */
+    Int  refCount;              /* Reference count                         */
+    Void (*cleanup) Args((Void *)); /* Code to free the C pointer          */
+};
+
+extern struct strMallocPtr       mallocPtrs[];
+extern Cell   mkMallocPtr        Args((Void *, Void (*)(Void *)));
+extern Void   freeMallocPtr      Args((Cell));
+extern Void   incMallocPtrRefCnt Args((Int, Int));
+
+#define mpOf(c)    snd(c)
+#define derefMP(c) (mallocPtrs[(Int)mpOf(c)].ptr)
+#endif /* GC_MALLOCPTRS */
+
+/* --------------------------------------------------------------------------
+ * Weak Pointers
+ * ------------------------------------------------------------------------*/
+
+#if GC_WEAKPTRS
+#define mkWeakPtr(c)    pair(WEAKCELL,pair(c,NIL))
+#define derefWeakPtr(c) fst(snd(c))
+#define nextWeakPtr(c) snd(snd(c))
+
+extern List finalizers;
+extern List liveWeakPtrs;
+
+#endif /* GC_WEAKPTRS */
+
+/* --------------------------------------------------------------------------
+ * Stable pointers
+ * ------------------------------------------------------------------------*/
+
+#if GC_STABLEPTRS
+extern  Int  mkStablePtr     Args((Cell));
+extern  Cell derefStablePtr  Args((Int));
+extern  Void freeStablePtr   Args((Int));
+#endif /* GC_STABLEPTRS */
+
+/* --------------------------------------------------------------------------
+ * Plugins
+ * ------------------------------------------------------------------------*/
+
+#if PLUGINS
+/* This is an exact copy of the declaration found in GreenCard.h */
+
+typedef int     HugsStackPtr;
+typedef int     HugsStablePtr;
+typedef Pointer HugsForeign;
+
+typedef struct {
+
+  /* evaluate next argument */
+  int            (*getInt   )     Args(());  
+  unsigned int   (*getWord  )     Args(());
+  void*          (*getAddr  )     Args(());
+  float          (*getFloat )     Args(());
+  double         (*getDouble)     Args(());
+  char           (*getChar  )     Args(());
+  HugsForeign    (*getForeign)    Args(());
+  HugsStablePtr  (*getStablePtr)  Args(());
+
+  /* push part of result   */
+  void           (*putInt   )     Args((int));           
+  void           (*putWord  )     Args((unsigned int));
+  void           (*putAddr  )     Args((void*));
+  void           (*putFloat )     Args((double));
+  void           (*putDouble)     Args((double));
+  void           (*putChar  )     Args((char));
+  void           (*putForeign)    Args((HugsForeign, void (*)(HugsForeign)));
+  void           (*putStablePtr)  Args((HugsStablePtr));
+
+  /* return n values in IO monad or Id monad */
+  void           (*returnIO)      Args((HugsStackPtr, int));
+  void           (*returnId)      Args((HugsStackPtr, int));
+  int            (*runIO)         Args((int));
+
+  /* free a stable pointer */                            
+  void           (*freeStablePtr) Args((HugsStablePtr));
+
+  /* register the prim table */                          
+  void           (*registerPrims) Args((struct primInfo*));
+                           
+  /* garbage collect */
+  void           (*garbageCollect) Args(());
+
+} HugsAPI2;
+
+extern  HugsAPI2* hugsAPI2     Args((Void));
+typedef Void (*InitModuleFun2) Args((HugsAPI2*));
+
+typedef struct {
+  Name  nameTrue, nameFalse;
+  Name  nameNil,  nameCons;
+  Name  nameJust, nameNothing;
+  Name  nameLeft, nameRight;
+  Name  nameUnit;
+  Name  nameIORun;
+
+  Cell  (*makeInt)         Args((Int));
+                           
+  Cell  (*makeChar)        Args((Char));
+  Char  (*CharOf)          Args((Cell));
+                           
+  Cell  (*makeFloat)       Args((FloatPro));
+  Cell  (*makeTuple)       Args((Int));
+  Pair  (*pair)            Args((Cell,Cell));
+                           
+  Cell  (*mkMallocPtr)     Args((Void *, Void (*)(Void *)));
+  Void *(*derefMallocPtr)  Args((Cell));
+                           
+  Int   (*mkStablePtr)     Args((Cell));
+  Cell  (*derefStablePtr)  Args((Int));
+  Void  (*freeStablePtr)   Args((Int));
+                           
+  Void  (*eval)            Args((Cell));
+  Cell  (*evalWithNoError) Args((Cell));
+  Void  (*evalFails)       Args((StackPtr));
+  Int   *whnfArgs;         
+  Cell  *whnfHead;         
+  Int   *whnfInt;          
+  Float *whnfFloat;        
+                           
+  Void  (*garbageCollect)  Args(());
+  Void  (*stackOverflow)   Args(());
+  Void  (*internal)        Args((String)) HUGS_noreturn;
+
+  Void  (*registerPrims)   Args((struct primInfo*));
+  Name  (*addPrimCfun)     Args((Text,Int,Int,Cell));
+  Text  (*inventText)      Args(());
+
+  Cell *(*Fst)             Args((Cell));
+  Cell *(*Snd)             Args((Cell));
+
+  Cell  *cellStack;
+  StackPtr *sp;
+} HugsAPI1;
+
+extern  HugsAPI1* hugsAPI1     Args((Void));
+typedef Void (*InitModuleFun1) Args((HugsAPI1*));
+#endif /* PLUGINS */
+
+
+/* --------------------------------------------------------------------------
  * Misc:
  * ------------------------------------------------------------------------*/
 
-extern  Void   setLastExpr      Args((Cell));
-extern  Cell   getLastExpr      Args((Void));
+extern  Void   setLastExpr       Args((Cell));
+extern  Cell   getLastExpr       Args((Void));
 extern  List   addTyconsMatching Args((String,List));
-extern  List   addNamesMatching Args((String,List));
+extern  List   addNamesMatching  Args((String,List));
 
 /*-------------------------------------------------------------------------*/

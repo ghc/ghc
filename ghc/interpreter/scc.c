@@ -1,27 +1,28 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Strongly connected components algorithm for static.c.
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
  *
  * $RCSfile: scc.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:34 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:36 $
  * ------------------------------------------------------------------------*/
 
 #ifndef SCC_C
 #define SCC_C
-#define visited(d) (isInt(DEPENDS(d)))  /* binding already visited ?       */
+#define visited(d) (isInt(DEPENDS(d)))          /* binding already visited?*/
 
 static Cell daSccs = NIL;
 static Int  daCount;
 
 static Int local sccMin Args((Int,Int));
 
-static Int local sccMin(x,y)           /* calculate minimum of x,y (unless */
-Int x,y; {                             /* y is zero)                       */
+static Int local sccMin(x,y)            /* calculate minimum of x,y        */
+Int x, y; {                             /* (unless y is zero)              */
     return (x<=y || y==0) ? x : y;
 }
 #endif

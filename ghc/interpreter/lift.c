@@ -1,4 +1,4 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Lambda Lifter
  *
@@ -10,19 +10,16 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: lift.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:17 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:31 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
+#include "backend.h"
 #include "connect.h"
 #include "errors.h"
-#include "stg.h"
-#include "lift.h"
-#include "free.h"
-#include "stgSubst.h"
-/* #include "pp.h" */
+
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:

@@ -1,4 +1,4 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Code generator
  *
@@ -7,20 +7,18 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:21:59 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:25 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
+#include "backend.h"
 #include "connect.h"
 #include "errors.h"
-#include "stg.h"
 #include "Assembler.h"
-#include "lift.h"
 #include "link.h"
-#include "pp.h"
-#include "codegen.h"
+
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -193,7 +191,7 @@ static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
                 setPos(hd(vs),asmUnbox(bco,boxingConRep(con)));
             } else {
                 asmBeginUnpack(bco);
-                map1Proc(cgBind,bco,reverse(vs));
+                map1Proc(cgBind,bco,rev(vs));
                 asmEndUnpack(bco);
             }
             cgExpr(bco,root,body);
@@ -237,7 +235,7 @@ static AsmBCO cgLambda( StgExpr e )
     AsmBCO bco = asmBeginBCO();
 
     AsmSp root = asmBeginArgCheck(bco);
-    map1Proc(cgBind,bco,reverse(stgLambdaArgs(e)));
+    map1Proc(cgBind,bco,rev(stgLambdaArgs(e)));
     asmEndArgCheck(bco,root);
 
     /* ppStgExpr(e); */
@@ -296,7 +294,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
 
                 /* No need to use return address or to Slide */
                 AsmSp beginPrim = asmBeginPrim(bco);
-                map1Proc(pushAtom,bco,reverse(stgPrimArgs(scrut)));
+                map1Proc(pushAtom,bco,rev(stgPrimArgs(scrut)));
                 asmEndPrim(bco,(AsmPrim*)name(stgPrimOp(scrut)).primop,beginPrim);
 
                 for(; nonNull(alts); alts=tl(alts)) {
@@ -304,7 +302,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
                     List    pats = stgPrimAltPats(alt);
                     StgExpr body = stgPrimAltBody(alt);
                     AsmSp altBegin = asmBeginAlt(bco);
-                    map1Proc(cgBind,bco,reverse(pats));
+                    map1Proc(cgBind,bco,rev(pats));
                     testPrimPats(bco,root,pats,body);
                     asmEndAlt(bco,altBegin);
                 }
@@ -343,7 +341,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
     case STGAPP: /* Tail call */
         {
             AsmSp env = asmBeginEnter(bco);
-            map1Proc(pushAtom,bco,reverse(stgAppArgs(e)));
+            map1Proc(pushAtom,bco,rev(stgAppArgs(e)));
             pushAtom(bco,stgAppFun(e));
             asmEndEnter(bco,env,root);
             break;
@@ -378,7 +376,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
     case STGPRIM: /* Tail call again */
         {
             AsmSp beginPrim = asmBeginPrim(bco);
-            map1Proc(pushAtom,bco,reverse(stgPrimArgs(e)));
+            map1Proc(pushAtom,bco,rev(stgPrimArgs(e)));
             asmEndPrim(bco,(AsmPrim*)name(e).primop,beginPrim);
             /* map1Proc(cgBind,bco,rs_vars); */
             assert(0); /* asmReturn_retty(); */
@@ -435,7 +433,7 @@ static Void build( AsmBCO bco, StgVar v )
                 doNothing();  /* already done in alloc */
             } else {
                 AsmSp start = asmBeginPack(bco);
-                map1Proc(pushAtom,bco,reverse(args));
+                map1Proc(pushAtom,bco,rev(args));
                 asmEndPack(bco,getPos(v),start,stgConInfo(con));
             }
             return;
@@ -451,12 +449,12 @@ static Void build( AsmBCO bco, StgVar v )
                 && whatIs(stgVarBody(fun)) == LAMBDA 
                 && length(stgLambdaArgs(stgVarBody(fun))) > length(args)) {
                 AsmSp  start = asmBeginMkPAP(bco);
-                map1Proc(pushAtom,bco,reverse(args));
+                map1Proc(pushAtom,bco,rev(args));
                 pushAtom(bco,fun);
                 asmEndMkPAP(bco,getPos(v),start); /* optimisation */
             } else {
                 AsmSp  start = asmBeginMkAP(bco);
-                map1Proc(pushAtom,bco,reverse(args));
+                map1Proc(pushAtom,bco,rev(args));
                 pushAtom(bco,fun);
                 asmEndMkAP(bco,getPos(v),start);
             }
@@ -575,7 +573,7 @@ static void endTop( StgVar v )
             /* ToDo: merge this code with cgLambda */
             AsmBCO bco = (AsmBCO)getObj(v);
             AsmSp root = asmBeginArgCheck(bco);
-            map1Proc(cgBind,bco,reverse(stgLambdaArgs(rhs)));
+            map1Proc(cgBind,bco,rev(stgLambdaArgs(rhs)));
             asmEndArgCheck(bco,root);
             
             cgExpr(bco,root,stgLambdaBody(rhs));

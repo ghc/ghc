@@ -1,10 +1,15 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
- * preds.c:     Copyright (c) Mark P Jones 1991-1998.   All rights reserved.
- *              See NOTICE for details and conditions of use etc...
- *              Hugs version 1.3c, March 1998
+ * Part of the type checker dealing with predicates and entailment
  *
- * Part of type checker dealing with predicates and entailment.
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
+ *
+ * $RCSfile: preds.c,v $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:35 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -19,10 +24,11 @@ static Void   local qualifyBinding    Args((List,Cell));
 static Cell   local qualifyExpr       Args((Int,List,Cell));
 static Void   local overEvid          Args((Cell,Cell));
 
-static Cell   local scFind            Args((Cell,Cell,Int,Cell,Int));
-static Cell   local scEntail          Args((List,Cell,Int));
-static Cell   local entail            Args((List,Cell,Int));
-static Cell   local inEntail          Args((List,Cell,Int));
+static Void   local cutoffExceeded    Args((Cell,Int,Cell,Int,List));
+static Cell   local scFind            Args((Cell,Cell,Int,Cell,Int,Int));
+static Cell   local scEntail          Args((List,Cell,Int,Int));
+static Cell   local entail            Args((List,Cell,Int,Int));
+static Cell   local inEntail          Args((List,Cell,Int,Int));
 #if TREX
 static Cell   local lacksNorm         Args((Type,Int,Cell));
 #endif
@@ -167,12 +173,37 @@ Cell ev; {
  *
  * ------------------------------------------------------------------------*/
 
-static Cell local scFind(e,pi1,o1,pi,o) /* Use superclass entailment to    */
+Int cutoff = 16;                        /* Used to limit depth of recursion*/
+
+static Void local cutoffExceeded(pi,o,pi1,o1,ps)
+Cell pi, pi1;                           /* Display error msg when cutoff   */
+Int  o,  o1;
+List ps; {
+    clearMarks();
+    ERRMSG(0)
+        "\n*** The type checker has reached the cutoff limit while trying to\n"
+    ETHEN ERRTEXT
+        "*** determine whether:\n***     "     ETHEN ERRPRED(copyPred(pi,o));
+    ps = (isNull(pi1)) ? copyPreds(ps) : singleton(copyPred(pi1,o1));
+    ERRTEXT
+        "\n*** can be deduced from:\n***     " ETHEN ERRCONTEXT(ps);
+    ERRTEXT
+        "\n*** This may indicate that the problem is undecidable.  However,\n"
+    ETHEN ERRTEXT
+        "*** you may still try to increase the cutoff limit using the -c\n"
+    ETHEN ERRTEXT
+        "*** option and then try again.  (The current setting is -c%d)\n",
+        cutoff
+    EEND;
+}
+
+static Cell local scFind(e,pi1,o1,pi,o,d)/* Use superclass entailment to   */
 Cell e;                                 /* find evidence for (pi,o) using  */
 Cell pi1;                               /* the evidence e for (pi1,o1).    */
 Int  o1;
 Cell pi;
-Int  o; {
+Int  o;
+Int  d; {
     Class h1 = getHead(pi1);
     Class h  = getHead(pi);
 
@@ -185,8 +216,12 @@ Int  o; {
         List dsels = cclass(h1).dsels;
         if (!matchPred(pi1,o1,cclass(h1).head,beta))
             internal("scFind");
+
+        if (d++ >= cutoff)
+            cutoffExceeded(pi,o,pi1,o1,NIL);
+
         for (; nonNull(scs); scs=tl(scs), dsels=tl(dsels)) {
-            Cell ev = scFind(ap(hd(dsels),e),hd(scs),beta,pi,o);
+            Cell ev = scFind(ap(hd(dsels),e),hd(scs),beta,pi,o,d);
             if (nonNull(ev))
                 return ev;
         }
@@ -195,13 +230,14 @@ Int  o; {
     return NIL;
 }
 
-static Cell local scEntail(ps,pi,o)     /* Calc evidence for (pi,o) from ps*/
+static Cell local scEntail(ps,pi,o,d)   /* Calc evidence for (pi,o) from ps*/
 List ps;                                /* Using superclasses and equality.*/
 Cell pi;
-Int  o; {
+Int  o;
+Int  d; {
     for (; nonNull(ps); ps=tl(ps)) {
         Cell pi1 = hd(ps);
-        Cell ev  = scFind(thd3(pi1),fst3(pi1),intOf(snd3(pi1)),pi,o);
+        Cell ev  = scFind(thd3(pi1),fst3(pi1),intOf(snd3(pi1)),pi,o,d);
         if (nonNull(ev))
             return ev;
     }
@@ -256,18 +292,20 @@ Int  o; {
  * to cause any further concern, except in pathological cases.)
  * ------------------------------------------------------------------------*/
 
-static Cell local entail(ps,pi,o)       /* Calc evidence for (pi,o) from ps*/
+static Cell local entail(ps,pi,o,d)     /* Calc evidence for (pi,o) from ps*/
 List ps;                                /* Uses superclasses, equality,    */
 Cell pi;                                /* tautology, and construction     */
-Int  o; {
-    Cell ev = scEntail(ps,pi,o);
-    return nonNull(ev) ? ev : inEntail(ps,pi,o);
+Int  o;
+Int  d; {
+    Cell ev = scEntail(ps,pi,o,d);
+    return nonNull(ev) ? ev : inEntail(ps,pi,o,d);
 }
 
-static Cell local inEntail(ps,pi,o)     /* Calc evidence for (pi,o) from ps*/
+static Cell local inEntail(ps,pi,o,d)   /* Calc evidence for (pi,o) from ps*/
 List ps;                                /* using a top-level instance      */
 Cell pi;                                /* entailment                      */
-Int  o; {
+Int  o;
+Int  d; {
 #if TREX
     if (isAp(pi) && isExt(fun(pi))) {   /* Lacks predicates                */
         Cell e  = fun(pi);
@@ -295,18 +333,21 @@ Int  o; {
     else {
 #endif
     Inst in = findInstFor(pi,o);        /* Class predicates                */
+
     if (nonNull(in)) {
         Int  beta = typeOff;
-        Cell d    = inst(in).builder;
-        Cell ds   = inst(in).specifics;
-        for (; nonNull(ds); ds=tl(ds)) {
-            Cell ev = entail(ps,hd(ds),beta);
+        Cell e    = inst(in).builder;
+        Cell es   = inst(in).specifics;
+        if (d++ >= cutoff)
+            cutoffExceeded(pi,o,NIL,0,ps);
+        for (; nonNull(es); es=tl(es)) {
+            Cell ev = entail(ps,hd(es),beta,d);
             if (nonNull(ev))
-                d = ap(d,ev);
+                e = ap(e,ev);
             else
                 return NIL;
         }
-        return d;
+        return e;
     }
     return NIL;
 #if TREX
@@ -323,7 +364,7 @@ Cell  pi; {                             /* is tautological, and we can use */
     emptySubstitution();
     beta = newKindedVars(ks);           /* (ks provides kinds for any      */
     ps   = makePredAss(ps,beta);        /*  vars that appear in pi.)       */
-    ev   = entail(ps,pi,beta);
+    ev   = entail(ps,pi,beta,0);
     emptySubstitution();
     return ev;
 }
@@ -371,7 +412,7 @@ List qs; {                              /* returning equiv minimal subset  */
 
     while (0<n--) {
         Cell pi = hd(qs);
-        Cell ev = scEntail(tl(qs),fst3(pi),intOf(snd3(pi)));
+        Cell ev = scEntail(tl(qs),fst3(pi),intOf(snd3(pi)),0);
         if (nonNull(ev)) {
             overEvid(thd3(pi),ev);      /* Overwrite dict var with evidence*/
             qs      = tl(qs);           /* ... and discard predicate       */
@@ -396,20 +437,24 @@ Int  o; {                               /* superclass hierarchy            */
  * ------------------------------------------------------------------------*/
 
 static Void local elimTauts() {         /* Remove tautological constraints */
-    List ps = preds;                    /* from preds                      */
-    preds   = NIL;
-    while (nonNull(ps)) {
-        Cell pi = hd(ps);
-        Cell ev = entail(NIL,fst3(pi),intOf(snd3(pi)));
-        if (nonNull(ev)) {
-            overEvid(thd3(pi),ev);
-            ps = tl(ps);
-        }
-        else {
-            List tmp = tl(ps);
-            tl(ps)   = preds;
-            preds    = ps;
-            ps       = tmp;
+    if (haskell98) {                    /* from preds                      */
+        reducePreds();                  /* (or context reduce for Hask98)  */
+    } else {
+        List ps = preds;
+        preds   = NIL;
+        while (nonNull(ps)) {
+            Cell pi = hd(ps);
+            Cell ev = entail(NIL,fst3(pi),intOf(snd3(pi)),0);
+            if (nonNull(ev)) {
+                overEvid(thd3(pi),ev);
+                ps = tl(ps);
+            }
+            else {
+                List tmp = tl(ps);
+                tl(ps)   = preds;
+                preds    = ps;
+                ps           = tmp;
+            }
         }
     }
 }
@@ -474,7 +519,7 @@ List sps; {                             /* context ps.  sps = savePreds.   */
         Cell p  = preds;
         Cell pi = fst3(hd(p));
         Int  o  = intOf(snd3(hd(p)));
-        Cell ev = entail(ps,pi,o);
+        Cell ev = entail(ps,pi,o,0);
         preds   = tl(preds);
 
         if (nonNull(ev))                /* Discharge if ps ||- (pi,o)      */
@@ -582,11 +627,11 @@ List vs; {                              /* for variables vs subject to  */
     Bool defaulted = FALSE;
 
 #ifdef DEBUG_DEFAULTS
-    printf("Attempt to resolve variables ");
+    Printf("Attempt to resolve variables ");
     printExp(stdout,vs);
-    printf(" with context ");
+    Printf(" with context ");
     printContext(stdout,copyPreds(preds));
-    printf("\n");
+    Printf("\n");
 #endif
 
     resetGenerics();                    /* find type variables in ps    */
@@ -601,16 +646,16 @@ List vs; {                              /* for variables vs subject to  */
         Int vn = intOf(hd(pvs));
 
 #ifdef DEBUG_DEFAULTS
-        printf("is var %d included in ",vn);
+        Printf("is var %d included in ",vn);
         printExp(stdout,vs);
-        printf("?\n");
+        Printf("?\n");
 #endif
 
         if (!intIsMember(vn,vs))
             defaulted |= resolveVar(vn);
 #ifdef DEBUG_DEFAULTS
         else
-            printf("Yes, so no ambiguity!\n");
+            Printf("Yes, so no ambiguity!\n");
 #endif
     }
 
@@ -635,7 +680,7 @@ Int  vn; {                              /* variable vn can be resolved  */
      */
 
 #ifdef DEBUG_DEFAULTS
-    printf("Trying to default variable %d\n",vn);
+    Printf("Trying to default variable %d\n",vn);
 #endif
 
     for (; nonNull(ps); ps=tl(ps)) {
@@ -649,7 +694,7 @@ Int  vn; {                              /* variable vn can be resolved  */
             else if (c!=classEq    && c!=classOrd  && c!=classShow &&
                      c!=classRead  && c!=classIx   && c!=classEnum &&
 #if EVAL_INSTANCES
-                     c!=classEval &&
+                     c!=classEval  &&
 #endif
                      c!=classBounded)
                 return FALSE;
@@ -676,18 +721,18 @@ Int  vn; {                              /* variable vn can be resolved  */
     if (aNumClass) {
         List ds = defaultDefns;         /* N.B. guaranteed to be monotypes */
 #ifdef DEBUG_DEFAULTS
-        printf("Default conditions met, looking for type\n");
+        Printf("Default conditions met, looking for type\n");
 #endif
         for (; nonNull(ds); ds=tl(ds)) {
             List cs1 = cs;
-            while (nonNull(cs1) && nonNull(entail(NIL,ap(hd(cs1),hd(ds)),0)))
+            while (nonNull(cs1) && nonNull(entail(NIL,ap(hd(cs1),hd(ds)),0,0)))
                 cs1 = tl(cs1);
             if (isNull(cs1)) {
                 bindTv(vn,hd(ds),0);
 #ifdef DEBUG_DEFAULTS
-                printf("Default type for variable %d is ",vn);
+                Printf("Default type for variable %d is ",vn);
                 printType(stdout,hd(ds));
-                printf("\n");
+                Printf("\n");
 #endif
                 return TRUE;
             }
@@ -695,7 +740,7 @@ Int  vn; {                              /* variable vn can be resolved  */
     }
 
 #ifdef DEBUG_DEFAULTS
-    printf("No default permitted/found\n");
+    Printf("No default permitted/found\n");
 #endif
     return FALSE;
 }

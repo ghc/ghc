@@ -1,4 +1,4 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Optimiser
  *
@@ -7,16 +7,15 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: optimise.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:23 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:33 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
+#include "backend.h"
 #include "connect.h"
 #include "errors.h"
-#include "stg.h"
-#include "optimise.h"
 
 /* --------------------------------------------------------------------------
  * Local functions

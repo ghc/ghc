@@ -8,24 +8,18 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/01/13 16:47:26 $
+ * $Revision: 1.4 $
+ * $Date: 1999/02/03 17:08:44 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
+#include "backend.h"
 #include "connect.h"
 #include "errors.h"
-#include "stg.h"
-#include "compiler.h"
-#include "pmc.h"  /* for discrArity                 */
-#include "hugs.h" /* for debugCode                  */
-#include "type.h" /* for conToTagType, tagToConType */
 #include "link.h"
-#include "pp.h"
 #include "dynamic.h"
 #include "Assembler.h"
-#include "translate.h"
 
 /* ---------------------------------------------------------------- */
 
@@ -155,7 +149,7 @@ StgExpr failExpr;
         }
     case GUARDED:
         {   
-            List guards = reverse(snd(e));
+            List guards = rev(snd(e));
             e = failExpr;
             for(; nonNull(guards); guards=tl(guards)) {
                 Cell g   = hd(guards);
@@ -492,6 +486,8 @@ static StgExpr forceArgs( List is, List args, StgExpr e )
     return e;
 }
 
+#if 0
+ToDo: reinstate eventually
 /* \ v -> case v of { ...; Ci _ _ -> i; ... } */
 Void implementConToTag(t)
 Tycon t; {                    
@@ -592,6 +588,7 @@ Tycon t; {
         if (etxt) free(etxt);
     }
 }
+#endif
 
 Void implementCfun(c,scs)               /* Build implementation for constr */
 Name c;                                 /* fun c.  scs lists integers (1..)*/
@@ -826,7 +823,10 @@ String r_reps; {
 
     /* box results */
     if (strcmp(r_reps,"B") == 0) {
-        StgPrimAlt altF = mkStgPrimAlt(singleton(mkStgPrimVar(mkInt(0),mkStgRep(INT_REP),NIL)),
+        StgPrimAlt altF = mkStgPrimAlt(singleton(
+                                         mkStgPrimVar(mkInt(0),
+                                                      mkStgRep(INT_REP),NIL)
+                                       ),
                                        nameFalse);
         StgPrimAlt altT = mkStgPrimAlt(singleton(mkStgPrimVar(NIL,mkStgRep(INT_REP),NIL)),
                                        nameTrue);
@@ -839,7 +839,7 @@ String r_reps; {
     b_args = mkBoxedVars(a_reps);
     u_args = mkUnboxedVars(a_reps);
     if (addState) {
-        List actual_args = appendOnto(extra_args,dupListOnto(u_args,singleton(s0)));
+        List actual_args = appendOnto(extra_args,dupOnto(u_args,singleton(s0)));
         StgRhs rhs = makeStgLambda(singleton(s0),
                                    unboxVars(a_reps,b_args,u_args,
                                              mkStgPrimCase(mkStgPrim(op,actual_args),

@@ -1,28 +1,21 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Machine dependent code
  * RISCOS specific code provided by Bryan Scatergood, JBS
  * Macintosh specific code provided by Hans Aberg (haberg@matematik.su.se)
+ * HaskellScript code and recursive directory search provided by
+ *  Daan Leijen (leijen@fwi.uva.nl)
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:20 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:32 $
  * ------------------------------------------------------------------------*/
 
-#include "prelude.h"
-#include "storage.h"
-#include "connect.h"
-#include "hugs.h"  /* for fromEnv */
-#include "errors.h"
-#include "version.h"
-
-#include "machdep.h"
-
-#include <stdio.h>
 #ifdef HAVE_SIGNAL_H
 # include <signal.h>
 #endif
@@ -108,12 +101,48 @@ extern unsigned _stklen = 8000;         /* Allocate an 8k stack segment    */
 #endif
 
 /* --------------------------------------------------------------------------
+ * Prototypes for registry reading
+ * ------------------------------------------------------------------------*/
+
+#if USE_REGISTRY
+
+/* where have we hidden things in the registry? */
+#if HSCRIPT
+#define HScriptRoot ("SOFTWARE\\Haskell\\HaskellScript\\")
+#endif
+
+#define HugsRoot ("SOFTWARE\\Haskell\\Hugs\\" HUGS_VERSION "\\")
+#define ProjectRoot ("SOFTWARE\\Haskell\\Hugs\\Projects\\")
+
+static Bool   local createKey      Args((HKEY, String, PHKEY, REGSAM));
+static Bool   local queryValue     Args((HKEY, String, String, LPDWORD, LPBYTE, DWORD));
+static Bool   local setValue       Args((HKEY, String, String, DWORD, LPBYTE, DWORD));
+static String local readRegString  Args((HKEY, String, String, String));
+static Int    local readRegInt     Args((String,Int));
+static Bool   local writeRegString Args((String,String));
+static Bool   local writeRegInt    Args((String,Int));
+
+static String local readRegChildStrings Args((HKEY, String, String, Char, String));
+#endif /* USE_REGISTRY */
+
+/* --------------------------------------------------------------------------
  * Find information about a file:
  * ------------------------------------------------------------------------*/
 
+#if RISCOS
+typedef struct { unsigned hi, lo; } Time;
+#define timeChanged(now,thn)    (now.hi!=thn.hi || now.lo!=thn.lo)
+#define timeSet(var,tm)         var.hi = tm.hi; var.lo = tm.lo
+#else
+typedef time_t Time;
+#define timeChanged(now,thn)    (now!=thn)
+#define timeSet(var,tm)         var = tm
+#endif
+
+static Void local getFileInfo   Args((String, Time *, Long *));
 static Bool local readable      Args((String));
 
-Void getFileInfo(f,tm,sz)  /* find time stamp and size of file*/
+static Void local getFileInfo(f,tm,sz)  /* find time stamp and size of file*/
 String f;
 Time   *tm;
 Long   *sz; {
@@ -201,7 +230,11 @@ String f; {
  * ------------------------------------------------------------------------*/
 
 static String local hugsdir       Args((Void));
+#if HSCRIPT
+static String local hscriptDir    Args((Void));
+#endif
 static String local RealPath      Args((String));
+static int    local pathCmp       Args((String, String));
 static String local normPath      Args((String));
 static Void   local searchChr     Args((Int));
 static Void   local searchStr     Args((String));
@@ -226,7 +259,18 @@ static Bool   local tryEndings    Args((String));
 #endif
 
 static String local hugsdir() {     /* directory containing lib/Prelude.hs */
-#if HAVE_GETMODULEFILENAME && !DOS
+#if HSCRIPT
+    /* In HaskellScript (Win32 only), we lookup InstallDir in the registry. */
+    static char dir[FILENAME_MAX+1] = "";
+    if (dir[0] == '\0') { /* not initialised yet */
+        String s = readRegString(HKEY_LOCAL_MACHINE,HugsRoot,"InstallDir", 
+                                 HUGSDIR);
+        if (s) { 
+            strcpy(dir,s); 
+        }
+    }
+    return dir;
+#elif HAVE_GETMODULEFILENAME && !DOS
     /* On Windows, we can find the binary we're running and it's
      * conventional to put the libraries in the same place.
      */
@@ -251,7 +295,21 @@ static String local hugsdir() {     /* directory containing lib/Prelude.hs */
     return HUGSDIR;
 #endif
 }
-    
+
+#if HSCRIPT    
+static String local hscriptDir() {  /* directory containing ?? what Daan?  */
+    static char dir[FILENAME_MAX+1] = "";
+    if (dir[0] == '\0') { /* not initialised yet */
+        String s = readRegString(HKEY_LOCAL_MACHINE,HScriptRoot,"InstallDir","");
+        if (s) {
+            strcpy(dir,s);
+        }
+    }
+    return dir;
+}
+#endif
+
+
 static String local RealPath(s)         /* Find absolute pathname of file  */
 String s; {
 #if HAVE__FULLPATH  /* eg DOS */
@@ -267,7 +325,7 @@ String s; {
     return path;
 }
 
-int pathCmp(p1,p2)                    /* Compare paths after normalisation */
+static int local pathCmp(p1,p2)       /* Compare paths after normalisation */
 String p1;
 String p2; {
 #if HAVE__FULLPATH  /* eg DOS */
@@ -306,7 +364,11 @@ String s; {                     /* a pathname in some appropriate manner.  */
 #endif /* ! PATH_CANONICALIZATION */
 }
 
-static String endings[] = { "", ".myhi", ".hs", ".lhs", 0 };
+#if HSCRIPT
+static String endings[] = { "", ".hs", ".lhs", ".hsx", ".hash", 0 };
+#else
+static String endings[] = { "", ".hs", ".lhs", 0 };
+#endif
 static char   searchBuf[FILENAME_MAX+1];
 static Int    searchPos;
 
@@ -315,7 +377,7 @@ static Int    searchPos;
 static Void local searchChr(c)  /* Add single character to search buffer   */
 Int c; {
     if (searchPos<FILENAME_MAX) {
-        searchBuf[searchPos++] = c;
+        searchBuf[searchPos++] = (char)c;
         searchBuf[searchPos]   = '\0';
     }
 }
@@ -341,17 +403,123 @@ String s; {
     return FALSE;
 }
 
+
+
+#if SEARCH_DIR
+
+/* scandir, June 98 Daan Leijen
+   searches the base directory and its direct subdirectories for a file
+
+   input: searchbuf contains SLASH terminated base directory
+              argument s contains the (base) filename
+   output: TRUE: searchBuf contains the full filename
+                   FALSE: searchBuf is garbage, file not found
+*/
+          
+
+#ifdef HAVE_WINDOWS_H
+
+static Bool scanSubDirs(s)
+String s;
+{
+    struct _finddata_t findInfo;
+    long handle;
+    int  save;
+    
+    save = searchPos;
+    /* is it in the current directory ? */
+    if (tryEndings(s)) return TRUE;
+
+    searchReset(save);
+    searchStr("*");
+    
+    /* initiate the search */
+    handle = _findfirst( searchBuf, &findInfo );
+    if (handle==-1) { errno = 0; return FALSE; }
+    
+    /* search all subdirectories */
+    do {
+        /* if we have a valid sub directory */
+        if (((findInfo.attrib & _A_SUBDIR) == _A_SUBDIR) &&
+            (findInfo.name[0] != '.')) {
+            searchReset(save);
+            searchStr(findInfo.name);
+            searchChr(SLASH);
+            if (tryEndings(s)) {
+                return TRUE;
+            }
+        }
+    } while (_findnext( handle, &findInfo ) == 0);
+    
+    _findclose( handle );
+    return FALSE;
+}
+
+#elif defined(HAVE_FTW_H)
+
+#include <ftw.h>
+
+static char baseFile[FILENAME_MAX+1];
+static char basePath[FILENAME_MAX+1];
+static int  basePathLen;
+
+static int scanitem( const char* path, 
+                     const struct stat* statinfo, 
+                     int info )
+{
+    if (info == FTW_D) { /* is it a directory */
+        searchReset(0);
+        searchStr(path);
+        searchChr(SLASH);
+        if (tryEndings(baseFile)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static Bool scanSubDirs(s)
+String s;
+{
+    int r;
+    strcpy(baseFile,s);
+    strcpy(basePath,searchBuf);
+    basePathLen = strlen(basePath);
+
+    /* is it in the current directory ? */
+    if (tryEndings(s)) return TRUE;
+    
+    /* otherwise scan the subdirectories */
+    r = ftw( basePath, scanitem, 2 );
+    errno = 0;
+    return (r > 0);
+}
+
+#endif /* HAVE_WINDOWS_H || HAVE_FTW_H */
+#endif /* SEARCH_DIR */
+
 String findPathname(along,nm)   /* Look for a file along specified path    */
 String along;                   /* Return NULL if file does not exist      */ 
 String nm; {
-    String s = findMPathname(along,nm);
+    /* AC, 1/21/99: modified to search hugsPath first, then projectPath */
+    String s = findMPathname(along,nm,hugsPath);
+#if USE_REGISTRY
+#if 0
+ ToDo:
+    if (s==NULL) {
+        s = findMPathname(along,nm,projectPath);
+    }
+#endif /* 0 */
+#endif /* USE_REGISTRY */
     return s ? s : normPath(searchBuf);
 }
 
-String findMPathname(along,nm)  /* Look for a file along specified path    */
+/* AC, 1/21/99: modified to pass in path to search explicitly */
+String findMPathname(along,nm,path)/* Look for a file along specified path   */
 String along;                   /* If nonzero, a path prefix from along is */
-String nm; {                    /* used as the first prefix in the search. */
-    String pathpt = hugsPath;
+String nm;                      /* used as the first prefix in the search. */
+String path; {
+    String pathpt = path;
 
     searchReset(0);
     if (along) {                /* Was a path for an existing file given?  */
@@ -370,6 +538,7 @@ String nm; {                    /* used as the first prefix in the search. */
     if (pathpt && *pathpt) {    /* Otherwise, we look along the HUGSPATH   */
         Bool more = TRUE;
         do {
+            Bool recurse = FALSE;   /* DL: shall we recurse ? */
             searchReset(0);
             if (*pathpt) {
                 if (*pathpt!=PATHSEP) {
@@ -378,20 +547,37 @@ String nm; {                    /* used as the first prefix in the search. */
                         searchStr(hugsdir());
                         pathpt += 6;
                     }
-                    do
+#if HSCRIPT
+                    /* And another - we ought to generalise this stuff */
+                    else if (strncmp(pathpt,"{HScript}",9)==0) {
+                        searchStr(hscriptDir());
+                        pathpt += 9;
+                    }
+#endif
+                    do {
                         searchChr(*pathpt++);
-                    while (*pathpt && *pathpt!=PATHSEP);
-                    searchChr(SLASH);
+                    } while (*pathpt && *pathpt!=PATHSEP);
+                    recurse = (pathpt[-1] == SLASH);
+                    if (!recurse) {
+                        searchChr(SLASH);
+                    }
                 }
                 if (*pathpt==PATHSEP)
                     pathpt++;
                 else
                     more = FALSE;
-            }
-            else
+            } else {
                 more = FALSE;
-            if (tryEndings(nm))
+            }
+#if SEARCH_DIR
+            if (recurse ? scanSubDirs(nm) : tryEndings(nm)) {
                 return normPath(searchBuf);
+            }
+#else   
+            if (tryEndings(nm)) {
+                return normPath(searchBuf);
+            }
+#endif
         } while (more);
     }
 
@@ -404,7 +590,9 @@ String nm; {                    /* used as the first prefix in the search. */
  * eg substPath("a:b:c::d:e","x:y:z") = "a:b:c:x:y:z:d:e"
  * ------------------------------------------------------------------------*/
 
-String substPath(new,sub)              /* substitute sub path into new path*/
+static String local substPath Args((String,String));
+
+static String local substPath(new,sub) /* substitute sub path into new path*/
 String new;
 String sub; {
     Bool   substituted = FALSE;            /*   only allow one replacement */
@@ -434,33 +622,45 @@ String sub; {
 
 
 /* --------------------------------------------------------------------------
+ * Get time/date stamp for inclusion in compiled files:
+ * ------------------------------------------------------------------------*/
+
+#if PROFILING
+String timeString() {                   /* return time&date string         */
+    time_t clock;                       /* must end with '\n' character    */
+    time(&clock);
+    return(ctime(&clock));
+}
+#endif
+
+/* --------------------------------------------------------------------------
  * Garbage collection notification:
  * ------------------------------------------------------------------------*/
 
 Bool gcMessages = FALSE;                /* TRUE => print GC messages       */
 
-Void gcStarted() {                      /* notify garbage collector start  */
+Void gcStarted() {                      /* Notify garbage collector start  */
 #if HUGS_FOR_WINDOWS
     SaveCursor = SetCursor(GarbageCursor);
 #endif
     if (gcMessages) {
-        printf("{{Gc");
+        Printf("{{Gc");
         FlushStdout();
     }
 }
 
-Void gcScanning() {                     /* notify garbage collector scans  */
+Void gcScanning() {                     /* Notify garbage collector scans  */
     if (gcMessages) {
         Putchar(':');
         FlushStdout();
     }
 }
 
-Void gcRecovered(recovered)             /* notify garbage collection done  */
+Void gcRecovered(recovered)             /* Notify garbage collection done  */
 Int recovered; {
     if (gcMessages) {
-        printf("%d}}",recovered);
-        fflush(stdout);
+        Printf("%d}}",recovered);
+        FlushStdout();
     }
 #if HUGS_FOR_WINDOWS
     SetCursor(SaveCursor);
@@ -571,7 +771,7 @@ Void gcCStack() {                       /* Garbage collect elements off    */
 
 #if (HAVE_TERMIO_H | HAVE_SGTTY_H | HAVE_TERMIOS_H)
 
-/* This is believed to be redundant! ADR */
+/* grab the varargs prototype for ioctl */
 #if HAVE_SYS_IOCTL_H
 # include <sys/ioctl.h>
 #endif
@@ -735,8 +935,13 @@ Bool reqd; {                            /* or off otherwise, returning old */
         if (broken) {                   /* repond to break signal received */
             broken = FALSE;             /* whilst break trap disabled      */
             sigRaise(breakHandler);
+            /* not reached */
         }
+#if HANDLERS_CANT_LONGJMP
         ctrlbrk(ignoreBreak);
+#else
+        ctrlbrk(breakHandler);
+#endif
     } else {
         ctrlbrk(ignoreBreak);
     }
@@ -744,7 +949,9 @@ Bool reqd; {                            /* or off otherwise, returning old */
 }
 
 static sigHandler(ignoreBreak) {        /* record but don't respond to break*/
-    ctrlbrk(ignoreBreak);
+    ctrlbrk(ignoreBreak);         /* reinstall signal handler               */
+                                  /* redundant on BSD systems but essential */
+                                  /* on POSIX and other systems             */
     broken = TRUE;
     interruptStgRts();
     sigResume;
@@ -794,7 +1001,7 @@ static Void local installHandlers() { /* Install handlers for all fatal    */
  * Shell escapes:
  * ------------------------------------------------------------------------*/
 
-Bool startEdit(line,nm)                 /* Start editor on file name at    */
+static Bool local startEdit(line,nm)    /* Start editor on file name at    */
 Int    line;                            /* given line.  Both name and line */
 String nm; {                            /* or just line may be zero        */
     static char editorCmd[FILENAME_MAX+1];
@@ -977,15 +1184,16 @@ REGSAM  samDesired; {
            == ERROR_SUCCESS;
 }
 
-static Bool local queryValue(hKey, var, type, buf, bufSize)
+static Bool local queryValue(hKey, regPath, var, type, buf, bufSize)
 HKEY    hKey;
+String  regPath;
 String  var;
 LPDWORD type;
 LPBYTE  buf;
 DWORD   bufSize; {
     HKEY hRootKey;
 
-    if (!createKey(hKey, &hRootKey, KEY_READ)) {
+    if (!createKey(hKey, regPath, &hRootKey, KEY_READ)) {
         return FALSE;
     } else {
         LONG res = RegQueryValueEx(hRootKey, var, NULL, type, buf, &bufSize);
@@ -994,15 +1202,16 @@ DWORD   bufSize; {
     }
 }
 
-static Bool local setValue(hKey, var, type, buf, bufSize)
+static Bool local setValue(hKey, regPath, var, type, buf, bufSize)
 HKEY   hKey;
+String regPath;
 String var;
 DWORD  type;
 LPBYTE buf;
 DWORD  bufSize; {
     HKEY hRootKey;
 
-    if (!createKey(hKey, &hRootKey, KEY_WRITE)) {
+    if (!createKey(hKey, regPath, &hRootKey, KEY_WRITE)) {
         return FALSE;
     } else {
         LONG res = RegSetValueEx(hRootKey, var, 0, type, buf, bufSize);
@@ -1011,34 +1220,32 @@ DWORD  bufSize; {
     }
 }
 
-String readRegString(var,def)    /* read String from registry */
+static String local readRegString(key,regPath,var,def) /* read String from registry */
+HKEY   key;
+String regPath;
 String var; 
 String def; {
     static char  buf[300];
     DWORD type;
-
-    if (queryValue(HKEY_CURRENT_USER, var, &type, buf, sizeof(buf))
+    if (queryValue(key, regPath,var, &type, buf, sizeof(buf))
         && type == REG_SZ) {
         return (String)buf;
-    } else if (queryValue(HKEY_LOCAL_MACHINE, var, &type, buf, sizeof(buf))
-               && type == REG_SZ) {
-        return (String)buf;
     } else {
-        return NULL;
+        return def;
     }
 }
- 
-Int readRegInt(var, def)            /* read Int from registry */
+
+static Int local readRegInt(var, def)            /* read Int from registry */
 String var;
 Int    def; {
     DWORD buf;
     DWORD type;
 
-    if (queryValue(HKEY_CURRENT_USER, var, &type, 
+    if (queryValue(HKEY_CURRENT_USER, HugsRoot, var, &type, 
                    (LPBYTE)&buf, sizeof(buf))
         && type == REG_DWORD) {
         return (Int)buf;
-    } else if (queryValue(HKEY_LOCAL_MACHINE, var, &type, 
+    } else if (queryValue(HKEY_LOCAL_MACHINE, HugsRoot, var, &type, 
                           (LPBYTE)&buf, sizeof(buf))
                && type == REG_DWORD) {
         return (Int)buf;
@@ -1047,20 +1254,20 @@ Int    def; {
     }
 }
 
-Bool writeRegString(var,val)      /* write String to registry */
+static Bool local writeRegString(var,val)      /* write String to registry */
 String var;                        
 String val; {
     if (NULL == val) {
         val = "";
     }
-    return setValue(HKEY_CURRENT_USER, var, 
+    return setValue(HKEY_CURRENT_USER, HugsRoot, var, 
                     REG_SZ, (LPBYTE)val, lstrlen(val)+1);
 }
 
-Bool writeRegInt(var,val)         /* write String to registry */
+static Bool local writeRegInt(var,val)         /* write String to registry */
 String var;                        
 Int    val; {
-    return setValue(HKEY_CURRENT_USER, var, 
+    return setValue(HKEY_CURRENT_USER, HugsRoot, var, 
                     REG_DWORD, (LPBYTE)&val, sizeof(val));
 }
 

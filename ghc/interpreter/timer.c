@@ -1,4 +1,7 @@
-/* -*- mode: hugs-c; -*- */
+<<<<<<<<<<<<<< variant A
+
+>>>>>>>>>>>>>> variant B
+======= end of combination
 /* --------------------------------------------------------------------------
  * This file provides a simple mechanism for measuring elapsed time on Unix
  * machines (more precisely, on any machine with an rusage() function).
@@ -21,13 +24,14 @@
  * optimizations, means that there are much more significant overheads than
  * can be accounted for by small variations in Hugs code.
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
  *
  * $RCSfile: timer.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:46 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:43 $
  * ------------------------------------------------------------------------*/
 
 

@@ -1,4 +1,4 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Free variable analysis
  *
@@ -7,16 +7,16 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: free.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:08 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:29 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
+#include "backend.h"
 #include "connect.h"
 #include "errors.h"
-#include "stg.h"
-#include "free.h"
+
 
 /* --------------------------------------------------------------------------
  * Local functions

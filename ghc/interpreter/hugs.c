@@ -1,37 +1,36 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Command interpreter
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:09 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:29 $
  * ------------------------------------------------------------------------*/
 
-#include "prelude.h"
-#include "version.h"
-#include "storage.h"
-#include "command.h"
-#include "connect.h"
-#include "charset.h"
-#include "input.h"
-#include "type.h"
-#include "subst.h"  /* for typeMatches                        */
-#include "link.h"   /* for classShow, nameRunIO and namePrint */
-#include "static.h"
-#include "compiler.h"
-#include "interface.h"
-#include "hugs.h"
-#include "errors.h"
 #include <setjmp.h>
 #include <ctype.h>
-
 #include <stdio.h>
 
-#include "machdep.h"
+#include "prelude.h"
+#include "storage.h"
+#include "command.h"
+#include "backend.h"
+#include "connect.h"
+#include "errors.h"
+#include "version.h"
+#include "link.h"
+
+#include "Rts.h"
+#include "RtsAPI.h"
+#include "Schedule.h"
+
+
+Bool haskell98 = TRUE;                  /* TRUE => Haskell 98 compatibility*/
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -51,12 +50,20 @@ static Void   local readScripts       Args((Int));
 static Void   local whatScripts       Args((Void));
 static Void   local editor            Args((Void));
 static Void   local find              Args((Void));
+static Bool   local startEdit         Args((Int,String));
 static Void   local runEditor         Args((Void));
+#if IGNORE_MODULES
+#define findEvalModule() doNothing()
+#else
 static Void   local setModule         Args((Void));
 static Module local findEvalModule    Args((Void));
+#endif
 static Void   local evaluator         Args((Void));
+static Void   local stopAnyPrinting   Args((Void));
 static Void   local showtype          Args((Void));
+static String local objToStr          Args((Module, Cell));
 static Void   local info              Args((Void));
+static Void   local printSyntax       Args((Name));
 static Void   local showInst          Args((Inst));
 static Void   local describe          Args((Text));
 static Void   local listNames         Args((Void));
@@ -85,6 +92,7 @@ static String local strCopy           Args((String));
  * Machine dependent code for Hugs interpreter:
  * ------------------------------------------------------------------------*/
 
+#include "machdep.c"
 #ifdef WANT_TIMER
 #include "timer.c"
 #endif
@@ -93,8 +101,11 @@ static String local strCopy           Args((String));
  * Local data areas:
  * ------------------------------------------------------------------------*/
 
+static Bool   printing     = FALSE;     /* TRUE => currently printing value*/
+static Bool   showStats    = FALSE;     /* TRUE => print stats after eval  */
 static Bool   listScripts  = TRUE;      /* TRUE => list scripts after loading*/
-static Bool   addType	   = FALSE; 	/* TRUE => print type with value   */
+static Bool   addType      = FALSE;     /* TRUE => print type with value   */
+static Bool   useShow      = TRUE;      /* TRUE => use Text/show printer   */
 static Bool   chaseImports = TRUE;      /* TRUE => chase imports on load   */
 static Bool   useDots      = RISCOS;    /* TRUE => use dots in progress    */
 static Bool   quiet        = FALSE;     /* TRUE => don't show progress     */
@@ -154,39 +165,13 @@ char *argv[]; {
 
     CStackBase = &argc;                 /* Save stack base for use in gc   */
 
-    /* The startup banner now includes my name.  Hugs is provided free of  */
-    /* charge.  I ask however that you show your appreciation for the many */
-    /* hours of work involved by retaining my name in the banner.  Thanks! */
+    Printf("__   __ __  __  ____   ___     _______________________________________________\n");
+    Printf("||   || ||  || ||  || ||__     Hugs 98: The Nottingham and Yale Haskell system\n");
+    Printf("||___|| ||__|| ||__||  __||    Copyright (c) 1994-1999\n");
+    Printf("||---||         ___||          World Wide Web: http://haskell.org/hugs\n");
+    Printf("||   ||                        Report bugs to: hugs-bugs@haskell.org\n");
+    Printf("||   || Version: %s _______________________________________________\n\n",HUGS_VERSION);
 
-#if SMALL_BANNER
-    Printf("Hugs 1.4, %s release.\n", HUGS_VERSION);
-    Printf("Copyright (c) The University of Nottingham and Yale University, 1994-1998.\n");
-    Printf("Home page: http://haskell.org/hugs.  Bug reports: hugs-bugs@haskell.org.\n");
-#else
-#ifdef OLD_LOGO
-    Printf("      ___    ___   ___    ___   __________   __________                        \n");
-    Printf("     /  /   /  /  /  /   /  /  /  _______/  /  _______/         Hugs 1.4       \n");
-    Printf("    /  /___/  /  /  /   /  /  /  / _____   /  /______                          \n"); 
-    Printf("   /  ____   /  /  /   /  /  /  / /_   /  /______   /  The Nottingham and Yale\n");
-    Printf("  /  /   /  /  /  /___/  /  /  /___/  /  _______/  /    Haskell User's System \n");     
-    Printf(" /__/   /__/  /_________/  /_________/  /_________/         %s\n\n", HUGS_VERSION);
-    Printf("Copyright (c) The University of Nottingham and Yale University, 1994-1998.\n");
-    Printf("Home page: http://haskell.org/hugs.  Bug reports: hugs-bugs@haskell.org.\n");
-#else
-    /* There is now a new banner, designed to draw attention to the fact   */
-    /* that the version of Hugs being used is substantially different from */
-    /* previous releases (and to correct the mistaken view that Hugs is    */
-    /* written in capitals).  If you really prefer the old style banner,   */
-    /* you can still get it by compiling with -DOLD_LOGO.                  */
-
-    printf("  __   __ __  __  ____   ___     __________________________________________\n");
-    printf("  ||   || ||  || ||  || ||__     Hugs 1.4: The Haskell User's Gofer System\n");
-    printf("  ||___|| ||__|| ||__||  __||    (c) The University of Nottingham\n");
-    printf("  ||---||         ___||              and Yale University, 1994-1998.\n");
-    printf("  ||   ||                        Report bugs to hugs-bugs@haskell.org\n");
-    printf("  ||   ||     "HUGS_VERSION"      __________________________________________\n\n");
-#endif
-#endif
 #if SYMANTEC_C
     Printf("   Ported to Macintosh by Hans Aberg, compiled " __DATE__ ".\n\n");
 #endif
@@ -217,7 +202,6 @@ String argv[]; {
     scriptFile    = 0;
     numScripts    = 0;
     namesUpto     = 1;
-    initCharTab();
 
 #if HUGS_FOR_WINDOWS
     hugsEdit      = strCopy(fromEnv("EDITOR","c:\\windows\notepad.exe"));
@@ -226,11 +210,13 @@ String argv[]; {
 #else
     hugsEdit      = strCopy(fromEnv("EDITOR",NULL));
 #endif
-    hugsPath      = strCopy(HUGSPATH);
-    readOptions("-p\"%s> \" -r$$");
+    hugsPath      = strCopy(HUGSPATH); readOptions("-p\"%s> \" -r$$");
 #if USE_REGISTRY
-    readOptions(readRegString("Options",""));
-#endif
+    projectPath   = strCopy(readRegChildStrings(HKEY_LOCAL_MACHINE,ProjectRoot,
+                                                "HUGSPATH", PATHSEP, ""));
+    readOptions(readRegString(HKEY_LOCAL_MACHINE,HugsRoot,"Options",""));
+    readOptions(readRegString(HKEY_CURRENT_USER, HugsRoot,"Options",""));
+#endif /* USE_REGISTRY */
     readOptions(fromEnv("HUGSFLAGS",""));
 
     for (i=1; i<argc; ++i) {            /* process command line arguments  */
@@ -241,7 +227,8 @@ String argv[]; {
             } else {
                 proj = argv[++i];
             }
-        } else if (!processOption(argv[i])) {
+        } else if (argv[i] && argv[i][0]/* workaround for /bin/sh silliness*/
+                 && !processOption(argv[i])) {
             addScriptName(argv[i],TRUE);
         }
     }
@@ -254,13 +241,19 @@ String argv[]; {
     DEBUG_LoadSymbols(argv[0]);
 #endif
 
-    scriptName[0] = strCopy(findMPathname(NULL,STD_PRELUDE));
+    scriptName[0] = strCopy(findMPathname(NULL,STD_PRELUDE,hugsPath));
     if (!scriptName[0]) {
         Printf("Prelude not found on current path: \"%s\"\n",
                hugsPath ? hugsPath : "");
         fatal("Unable to load prelude");
     }
 
+    if (haskell98) {
+        Printf("Haskell 98 mode: Restart with command line option -98 to enable extensions\n\n");
+    } else {
+        Printf("Hugs mode: Restart with command line option +98 for Haskell 98 mode\n\n");
+    }
+ 
     everybody(INSTALL);
     evalModule = findText("");      /* evaluate wrt last module by default */
     if (proj) {
@@ -328,8 +321,12 @@ static Void local optionInfo() {        /* Print information about command */
     Printf(fmts,"rstr","Set repeat last expression string to str");
     Printf(fmts,"Pstr","Set search path for modules to str");
     Printf(fmts,"Estr","Use editor setting given by str");
+    Printf(fmts,"cnum","Set constraint cutoff limit");
 #if USE_PREPROCESSOR  && (defined(HAVE_POPEN) || defined(HAVE__POPEN))
     Printf(fmts,"Fstr","Set preprocessor filter to str");
+#endif
+#if PROFILING
+    Printf(fmts,"dnum","Gather profiling statistics every <num> reductions\n");
 #endif
 
     Printf("\nCurrent settings: ");
@@ -340,14 +337,26 @@ static Void local optionInfo() {        /* Print information about command */
     printString(prompt);
     Printf(" -r");
     printString(repeatStr);
+    Printf(" -c%d",cutoff);
     Printf("\nSearch path     : -P");
     printString(hugsPath);
+#if 0
+ToDo
+    if (projectPath!=NULL) {
+        Printf("\nProject Path    : %s",projectPath);
+    }
+#endif
     Printf("\nEditor setting  : -E");
     printString(hugsEdit);
 #if USE_PREPROCESSOR  && (defined(HAVE_POPEN) || defined(HAVE__POPEN))
     Printf("\nPreprocessor    : -F");
     printString(preprocessor);
 #endif
+#if PROFILING
+    Printf("\nProfile interval: -d%d", profiling ? profInterval : 0);
+#endif
+    Printf("\nCompatibility   : %s", haskell98 ? "Haskell 98"
+                                               : "Hugs Extensions");
     Putchar('\n');
 }
 
@@ -400,8 +409,12 @@ static String local optionsToStr() {          /* convert options to string */
     PUTStr('r',repeatStr);
     PUTStr('P',hugsPath);
     PUTStr('E',hugsEdit);
+    PUTInt('c',cutoff);  PUTC(' ');
 #if USE_PREPROCESSOR  && (defined(HAVE_POPEN) || defined(HAVE__POPEN))
     PUTStr('F',preprocessor);
+#endif
+#if PROFILING
+    PUTInt('d',profiling ? profInterval : 0);
 #endif
     PUTC('\0');
     return buffer;
@@ -479,7 +492,17 @@ String s; {                             /* return FALSE if none found.     */
                     return TRUE;
                 }
 
-            default  : toggleSet(*s,state);
+            default  : if (strcmp("98",s)==0) {
+                           if (heapBuilt() && ((state && !haskell98) ||
+                                               (!state && haskell98))) {
+                               FPrintf(stderr,"Haskell 98 compatibility cannot be changed while the interpreter is running\n");
+                           } else {
+                               haskell98 = state;
+                           }
+                           return TRUE;
+                       } else {
+                           toggleSet(*s,state);
+                       }
                        break;
         }
     return TRUE;
@@ -574,8 +597,9 @@ static struct cmd cmds[] = {
  {":reload", RELOAD}, {":gc",   COLLECT}, {":edit",    EDIT},
  {":quit",   QUIT},   {":set",  SET},     {":find",    FIND},
  {":names",  NAMES},  {":info", INFO},    {":project", PROJECT},
- {":module", SETMODULE}, 
- {":version", SHOWVERSION}, 
+#if !IGNORE_MODULES
+ {":module",SETMODULE}, 
+#endif
  {"",      EVAL},
  {0,0}
 };
@@ -590,10 +614,11 @@ static Void local menu() {
     Printf(":project <filename> use project file\n");
     Printf(":edit <filename>    edit file\n");
     Printf(":edit               edit last module\n");
+#if !IGNORE_MODULES
     Printf(":module <module>    set module for evaluating expressions\n");
+#endif
     Printf("<expr>              evaluate expression\n");
     Printf(":type <expr>        print type of expression\n");
-    Printf(":version            show Hugs version\n");
     Printf(":?                  display this list of commands\n");
     Printf(":set <options>      set command line options\n");
     Printf(":set                help on command line options\n");
@@ -619,8 +644,10 @@ static Void local forHelp() {
  * Setting of command line options:
  * ------------------------------------------------------------------------*/
 
-struct options toggle[] = {             /* List of command line toggles    */ 
-    {'t', "Print type after evaluation",	   &addType},
+struct options toggle[] = {             /* List of command line toggles    */
+    {'s', "Print no. reductions/cells after eval", &showStats},
+    {'t', "Print type after evaluation",           &addType},
+    /*ToDo??    {'f', "Terminate evaluation on first error",   &failOnError},*/
     {'g', "Print no. cells recovered after gc",    &gcMessages},
     {'l', "Literate modules as default",           &literateScripts},
     {'e', "Warn about errors in literate modules", &literateErrors},
@@ -722,9 +749,13 @@ Long   len; {                           /* length of script file           */
     Printf("Reading file \"%s\":\n",fname);
     setLastEdit(fname,0);
 
+#if 0
+ToDo: reinstate
     if (isInterfaceFile(fname)) {
         loadInterface(fname);
-    } else {
+    } else
+#else
+           {
         needsImports = FALSE;
         parseScript(fname,len);         /* process script file             */
         if (needsImports)
@@ -733,6 +764,7 @@ Long   len; {                           /* length of script file           */
         typeCheckDefns();
         compileDefns();
     }
+#endif
     scriptFile = 0;
     return TRUE;
 }
@@ -944,6 +976,7 @@ Int    line; {
  * Read and evaluate an expression:
  * ------------------------------------------------------------------------*/
 
+#if !IGNORE_MODULES
 static Void local setModule(){/*set module in which to evaluate expressions*/
     String s = readFilename();
     if (!s) s = "";              /* :m clears the current module selection */
@@ -953,15 +986,16 @@ static Void local setModule(){/*set module in which to evaluate expressions*/
 
 static Module local findEvalModule() { /*Module in which to eval expressions*/
     Module m = findModule(evalModule); 
-    if (isNull(m)) {
+    if (isNull(m))
         m = lastModule();
-    }
     return m;
 }
+#endif
 
 static Void local evaluator() {        /* evaluate expr and print value    */
     Type  type, bd;
-    Kinds ks = NIL;
+    Kinds ks   = NIL;
+    Cell  temp = NIL;
 
     setCurrModule(findEvalModule());
     scriptFile = 0;
@@ -980,13 +1014,18 @@ static Void local evaluator() {        /* evaluate expr and print value    */
 
     if (whatIs(bd)==QUAL) {
         ERRMSG(0) "Unresolved overloading" ETHEN
-        ERRTEXT   "\n*** type       : "    ETHEN ERRTYPE(type);
-        ERRTEXT   "\n*** expression : "    ETHEN ERREXPR(inputExpr);
+        ERRTEXT   "\n*** Type       : "    ETHEN ERRTYPE(type);
+        ERRTEXT   "\n*** Expression : "    ETHEN ERREXPR(inputExpr);
         ERRTEXT   "\n"
         EEND;
     }
-    
-    /* ToDo: restore the code to print types, use show, etc */
+  
+#if PROFILING
+    if (profiling)
+        profilerLog("profile.hp");
+    numReductions = 0;
+    garbageCollect();
+#endif
 
 #ifdef WANT_TIMER
     updateTimers();
@@ -1015,6 +1054,24 @@ static Void local evaluator() {        /* evaluate expr and print value    */
     }
 }
 
+static Void local stopAnyPrinting() {  /* terminate printing of expression,*/
+    if (printing) {                    /* after successful termination or  */
+        printing = FALSE;              /* runtime error (e.g. interrupt)   */
+        Putchar('\n');
+        if (showStats) {
+#define plural(v)   v, (v==1?"":"s")
+	  /* Printf("(%lu reduction%s, ",plural(numReductions)); */
+            Printf("%lu cell%s",plural(numCells));
+            if (numGcs>0)
+                Printf(", %u garbage collection%s",plural(numGcs));
+            Printf(")\n");
+#undef plural
+        }
+        FlushStdout();
+        garbageCollect();
+    }
+}
+
 /* --------------------------------------------------------------------------
  * Print type of input expression:
  * ------------------------------------------------------------------------*/
@@ -1040,47 +1097,55 @@ static Void local showtype() {         /* print type of expression (if any)*/
  * about an object.
  * ------------------------------------------------------------------------*/
 
-static String local objToStr Args((Module, Cell));
-
 static String local objToStr(m,c)
 Module m;
 Cell   c; {
-#if DISPLAY_QUANTIFIERS
+#if 1 || DISPLAY_QUANTIFIERS
     static char newVar[60];
     switch (whatIs(c)) {
-    case NAME  : if (m == name(c).mod) {
-                     sprintf(newVar,"%s",   textToStr(name(c).text));
-                 } else {
-                     sprintf(newVar,"%s.%s",textToStr(module(name(c).mod).text),
-                                            textToStr(name(c).text));
-                 }
-                 break;
-    case TYCON : if (m == tycon(c).mod) {
-                     sprintf(newVar,"%s",   textToStr(tycon(c).text));
-                 } else {
-                     sprintf(newVar,"%s.%s",textToStr(module(tycon(c).mod).text),
-                                            textToStr(tycon(c).text));
-                 }
-                 break;
-    case CLASS : if (m == cclass(c).mod) {
-                     sprintf(newVar,"%s",   textToStr(cclass(c).text));
-                 } else {
-                     sprintf(newVar,"%s.%s",textToStr(module(cclass(c).mod).text),
-                                            textToStr(cclass(c).text));
-                 }
-                 break;
-    default    : internal("objToStr");
+        case NAME  : if (m == name(c).mod) {
+                         sprintf(newVar,"%s", textToStr(name(c).text));
+                     } else {
+                         sprintf(newVar,"%s.%s",
+                                        textToStr(module(name(c).mod).text),
+                                        textToStr(name(c).text));
+                     }
+                     break;
+
+        case TYCON : if (m == tycon(c).mod) {
+                         sprintf(newVar,"%s", textToStr(tycon(c).text));
+                     } else {
+                         sprintf(newVar,"%s.%s",
+                                        textToStr(module(tycon(c).mod).text),
+                                        textToStr(tycon(c).text));
+                     }
+                     break;
+
+        case CLASS : if (m == cclass(c).mod) {
+                         sprintf(newVar,"%s", textToStr(cclass(c).text));
+                     } else {
+                         sprintf(newVar,"%s.%s",
+                                        textToStr(module(cclass(c).mod).text),
+                                        textToStr(cclass(c).text));
+                     }
+                     break;
+
+        default    : internal("objToStr");
     }
     return newVar;
 #else
     static char newVar[33];
     switch (whatIs(c)) {
-    case NAME  : sprintf(newVar,"%s",   textToStr(name(c).text));
-                 break;
-    case TYCON : sprintf(newVar,"%s",   textToStr(tycon(c).text));
-                 break;
-    case CLASS : sprintf(newVar,"%s",   textToStr(cclass(c).text));
-    default    : internal("objToStr");
+        case NAME  : sprintf(newVar,"%s", textToStr(name(c).text));
+                     break;
+
+        case TYCON : sprintf(newVar,"%s", textToStr(tycon(c).text));
+                     break;
+
+        case CLASS : sprintf(newVar,"%s", textToStr(cclass(c).text));
+                     break;
+
+        default    : internal("objToStr");
     }
     return newVar;
 #endif
@@ -1102,17 +1167,17 @@ static Void local info() {              /* describe objects                */
 
 static Void local describe(t)           /* describe an object              */
 Text t; {
-    Tycon tc = findTycon(t);
-    Class cl = findClass(t);
-    Name  nm = findName(t);
+    Tycon  tc  = findTycon(t);
+    Class  cl  = findClass(t);
+    Name   nm  = findName(t);
     Module mod = findEvalModule();
 
     if (nonNull(tc)) {                  /* as a type constructor           */
-        Type ty = tc;
+        Type t = tc;
         Int  i;
         Inst in;
         for (i=0; i<tycon(tc).arity; ++i) {
-            ty = ap(ty,mkOffset(i));
+            t = ap(t,mkOffset(i));
         }
         Printf("-- type constructor");
         if (kindExpert) {
@@ -1122,7 +1187,7 @@ Text t; {
         Putchar('\n');
         switch (tycon(tc).what) {
             case SYNONYM      : Printf("type ");
-                                printType(stdout,ty);
+                                printType(stdout,t);
                                 Printf(" = ");
                                 printType(stdout,tycon(tc).defn);
                                 break;
@@ -1134,9 +1199,11 @@ Text t; {
                                     } else {
                                         Printf("newtype ");
                                     }
-                                    printType(stdout,ty);
+                                    printType(stdout,t);
+                                    Putchar('\n');
+                                    mapProc(printSyntax,cs);
                                     if (hasCfun(cs)) {
-                                        Printf("\n\n-- constructors:");
+                                        Printf("\n-- constructors:");
                                     }
                                     for (; hasCfun(cs); cs=tl(cs)) {
                                         Putchar('\n');
@@ -1145,7 +1212,7 @@ Text t; {
                                         printType(stdout,name(hd(cs)).type);
                                     }
                                     if (nonNull(cs)) {
-                                        Printf("\n\n-- selectors:");
+                                        Printf("\n-- selectors:");
                                     }
                                     for (; nonNull(cs); cs=tl(cs)) {
                                         Putchar('\n');
@@ -1157,7 +1224,7 @@ Text t; {
                                 break;
 
             case RESTRICTSYN  : Printf("type ");
-                                printType(stdout,ty);
+                                printType(stdout,t);
                                 Printf(" = <restricted>");
                                 break;
         }
@@ -1176,28 +1243,30 @@ Text t; {
         List  ins = cclass(cl).instances;
         Kinds ks  = cclass(cl).kinds;
         if (nonNull(ks) && isNull(tl(ks)) && hd(ks)==STAR) {
-            printf("-- type class");
+            Printf("-- type class");
         } else {
-            printf("-- constructor class");
+            Printf("-- constructor class");
             if (kindExpert) {
-                printf(" with arity ");
+                Printf(" with arity ");
                 printKinds(stdout,ks);
             }
         }
-        printf("\nclass ");
+        Putchar('\n');
+        mapProc(printSyntax,cclass(cl).members);
+        Printf("class ");
         if (nonNull(cclass(cl).supers)) {
             printContext(stdout,cclass(cl).supers);
-            printf(" => ");
+            Printf(" => ");
         }
         printPred(stdout,cclass(cl).head);
         if (nonNull(cclass(cl).members)) {
             List ms = cclass(cl).members;
-            printf(" where");
+            Printf(" where");
             do {
                 Type t = monotypeOf(name(hd(ms)).type);
-                printf("\n  ");
+                Printf("\n  ");
                 printExp(stdout,hd(ms));
-                printf(" :: ");
+                Printf(" :: ");
                 if (isNull(tl(fst(snd(t))))) {
                     t = snd(snd(t));
                 } else {
@@ -1207,37 +1276,41 @@ Text t; {
                 ms = tl(ms);
             } while (nonNull(ms));
         }
-        putchar('\n');
+        Putchar('\n');
         if (nonNull(ins)) {
-            printf("\n-- instances:\n");
+            Printf("\n-- instances:\n");
             do {
                 showInst(hd(ins));
                 ins = tl(ins);
             } while (nonNull(ins));
         }
-        putchar('\n');
+        Putchar('\n');
     }
 
     if (nonNull(nm)) {                  /* as a function/name              */
+        printSyntax(nm);
         printExp(stdout,nm);
-        printf(" :: ");
+        Printf(" :: ");
         if (nonNull(name(nm).type)) {
             printType(stdout,name(nm).type);
         } else {
-            printf("<unknown type>");
+            Printf("<unknown type>");
         }
 
         if (isCfun(nm)) {
-            printf("  -- data constructor");
+            Printf("  -- data constructor");
         } else if (isMfun(nm)) {
-            printf("  -- class member");
+            Printf("  -- class member");
         } else if (isSfun(nm)) {
-            printf("  -- selector function");
+            Printf("  -- selector function");
         }
-        if (name(nm).primop) {
-            printf("   -- primitive");
+#if 0
+    ToDo: reinstate
+        if (name(nm).primDef) {
+            Printf("   -- primitive");
         }
-        printf("\n\n");
+#endif
+        Printf("\n\n");
     }
 
     if (isNull(tc) && isNull(cl) && isNull(nm)) {
@@ -1245,15 +1318,37 @@ Text t; {
     }
 }
 
+static Void local printSyntax(nm)
+Name nm; {
+    Syntax sy = syntaxOf(nm);
+    Text   t  = name(nm).text;
+    String s  = textToStr(t);
+    if (sy != defaultSyntax(t)) {
+        Printf("infix");
+        switch (assocOf(sy)) {
+            case LEFT_ASS  : Putchar('l'); break;
+            case RIGHT_ASS : Putchar('r'); break;
+            case NON_ASS   : break;
+        }
+        Printf(" %i ",precOf(sy));
+        if (isascii(*s) && isalpha(*s)) {
+            Printf("`%s`",s);
+        } else {
+            Printf("%s",s);
+        }
+        Putchar('\n');
+    }
+}
+
 static Void local showInst(in)          /* Display instance decl header    */
 Inst in; {
-    printf("instance ");
+    Printf("instance ");
     if (nonNull(inst(in).specifics)) {
         printContext(stdout,inst(in).specifics);
-        printf(" => ");
+        Printf(" => ");
     }
     printPred(stdout,inst(in).head);
-    putchar('\n');
+    Putchar('\n');
 }
 
 /* --------------------------------------------------------------------------
@@ -1367,12 +1462,11 @@ String argv[]; {
                           break;
             case PROJECT: project();
                           break;
+#if !IGNORE_MODULES
             case SETMODULE :
                           setModule();
                           break;
-            case SHOWVERSION :
-                          Printf("Hugs 1.4, %s release.\n", HUGS_VERSION);
-                          break;
+#endif
             case EVAL   : evaluator();
                           break;
             case TYPEOF : showtype();
@@ -1385,7 +1479,7 @@ String argv[]; {
                           break;
             case SET    : set();
                           break;
-            case SYSTEM : if (shellEsc(readLine())) 
+            case SYSTEM : if (shellEsc(readLine()))
                               Printf("Warning: Shell escape terminated abnormally\n");
                           break;
             case CHGDIR : changeDir();
@@ -1407,6 +1501,7 @@ String argv[]; {
                millisecs(userElapsed), millisecs(systElapsed));
 #endif
     }
+    breakOn(FALSE);
 }
 
 /* --------------------------------------------------------------------------
@@ -1487,6 +1582,7 @@ static Void local failed() {           /* Goal cannot be reached due to    */
 Void errHead(l)                        /* print start of error message     */
 Int l; {
     failed();                          /* failed to reach target ...       */
+    stopAnyPrinting();
     FPrintf(errorStream,"ERROR");
 
     if (scriptFile) {
@@ -1507,7 +1603,8 @@ Void errFail() {                        /* terminate error message and     */
 
 Void errAbort() {                       /* altern. form of error handling  */
     failed();                           /* used when suitable error message*/
-    errFail();                          /* has already been printed        */
+    stopAnyPrinting();                  /* has already been printed        */
+    errFail();
 }
 
 Void internal(msg)                      /* handle internal error           */
@@ -1518,6 +1615,7 @@ String msg; {
     MessageBox(hWndMain, buf, appName, MB_ICONHAND | MB_OK);
 #endif
     failed();
+    stopAnyPrinting();
     Printf("INTERNAL ERROR: %s\n",msg);
     FlushStdout();
     longjmp(catch_error,1);
@@ -1543,9 +1641,11 @@ sigHandler(breakHandler) {              /* respond to break interrupt      */
     Hilite();
     Printf("{Interrupted!}\n");
     Lolite();
-    breakOn(TRUE);
+    breakOn(TRUE);  /* reinstall signal handler - redundant on BSD systems */
+                    /* but essential on POSIX (and other?) systems         */
     everybody(BREAK);
     failed();
+    stopAnyPrinting();
     FlushStdout();
     clearerr(stdin);
     longjmp(catch_error,1);
@@ -1745,6 +1845,25 @@ FILE* fp; {
 }
     
 #endif /* REDIRECT_OUTPUT && !HUGS_FOR_WINDOWS */
+/* --------------------------------------------------------------------------
+ * Send message to each component of system:
+ * ------------------------------------------------------------------------*/
+
+Void everybody(what)            /* send command `what' to each component of*/
+Int what; {                     /* system to respond as appropriate ...    */
+    machdep(what);              /* The order of calling each component is  */
+    storage(what);              /* important for the INSTALL command       */
+    substitution(what);
+    input(what);
+    linkControl(what);
+    staticAnalysis(what);
+    deriveControl(what);
+    typeChecker(what);
+    translateControl(what);
+    compiler(what);   
+    codegen(what);
+}
+
 
 /* --------------------------------------------------------------------------
  * Hugs for Windows code (WinMain and related functions)

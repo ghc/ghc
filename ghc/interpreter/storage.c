@@ -1,25 +1,23 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Primitives for manipulating global data structures
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:41 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:40 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
+#include "backend.h"
 #include "connect.h"
-#include "charset.h"
 #include "errors.h"
-#include "link.h"    /* for nameCons         */
 #include <setjmp.h>
-
-#include "machdep.h" /* gc-related functions */
 
 /*#define DEBUG_SHOWUSE*/
 
@@ -29,7 +27,9 @@
 
 static Int  local hash                  Args((String));
 static Int  local saveText              Args((Text));
+#if !IGNORE_MODULES
 static Module local findQualifier       Args((Text));
+#endif
 static Void local hashTycon             Args((Tycon));
 static List local insertTycon           Args((Tycon,List));
 static Void local hashName              Args((Name));
@@ -39,11 +39,21 @@ static Bool local stringMatch           Args((String,String));
 static Bool local typeInvolves          Args((Type,Type));
 static Cell local markCell              Args((Cell));
 static Void local markSnd               Args((Cell));
+static Cell local indirectChain         Args((Cell));
+static Bool local isMarked              Args((Cell));
 static Cell local lowLevelLastIn        Args((Cell));
 static Cell local lowLevelLastOut       Args((Cell));
-static Module local moduleOfScript      Args((Script));
-static Script local scriptThisFile      Args((Text));
-
+/* from STG */
+       Module local moduleOfScript      Args((Script));
+       Script local scriptThisFile      Args((Text));
+/* from 98 */
+#if IO_HANDLES
+static Void local freeHandle            Args((Int));
+#endif
+#if GC_STABLEPTRS
+static Void local resetStablePtrs       Args((Void));
+#endif
+/* end */
 
 /* --------------------------------------------------------------------------
  * Text storage:
@@ -95,34 +105,33 @@ Text t; {
 
 String identToStr(v) /*find string corresp to given ident or qualified name*/
 Cell v; {
-    static char newVar[33];
-
-    assert(isPair(v));
+    if (!isPair(v)) {
+        internal("identToStr");
+    }
     switch (fst(v)) {
         case VARIDCELL  :
         case VAROPCELL  : 
         case CONIDCELL  :
         case CONOPCELL  : return text+textOf(v);
 
-        case QUALIDENT  : sprintf(newVar,"%s.%s",
-                                  text+qmodOf(v),text+qtextOf(v));
-                          return newVar;
+        case QUALIDENT  : {   Text pos = textHw;
+                              Text t   = qmodOf(v);
+                              while (pos+1 < savedText && text[t]!=0) {
+                                  text[pos++] = text[t++];
+                              }
+                              if (pos+1 < savedText) {
+                                  text[pos++] = '.';
+                              }
+                              t = qtextOf(v);
+                              while (pos+1 < savedText && text[t]!=0) {
+                                  text[pos++] = text[t++];
+                              }
+                              text[pos] = '\0';
+                              return text+textHw;
+                          }
     }
-    internal("identToStr 2");
-}
-
-Syntax identSyntax(v)           /* find syntax of ident or qualified ident */
-Cell v; {
-    assert(isPair(v));
-    switch (fst(v)) {
-        case VARIDCELL  :
-        case VAROPCELL  : 
-        case CONIDCELL  :
-        case CONOPCELL  : return syntaxOf(textOf(v));
-
-        case QUALIDENT  : return syntaxOf(qtextOf(v));
-    }
-    internal("identSyntax 2");
+    internal("identToStr2");
+    assert(0); return 0; /* NOTREACHED */
 }
 
 Text inventText()     {                 /* return new unused variable name */
@@ -210,61 +219,6 @@ Text t; {                               /* at top of text table            */
     return savedText;
 }
 
-/* --------------------------------------------------------------------------
- * Syntax storage:
- *
- * Operator declarations are stored in a table which associates Text values
- * with Syntax values.
- * ------------------------------------------------------------------------*/
-
-static Int syntaxHw;                   /* next unused syntax table entry   */
-static struct strSyntax {              /* table of Text <-> Syntax values  */
-    Text   text;
-    Syntax syntax;
-} DEFTABLE(tabSyntax,NUM_SYNTAX);
-
-Syntax defaultSyntax(t)                /* Find default syntax of var named */
-Text t; {                              /* by t ...                         */
-    String s = textToStr(t);
-    return isIn(s[0],SYMBOL) ? DEF_OPSYNTAX : APPLIC;
-}
-
-Syntax syntaxOf(t)                     /* look up syntax of operator symbol*/
-Text t; {
-    int i;
-
-    for (i=0; i<syntaxHw; ++i)
-        if (tabSyntax[i].text==t)
-            return tabSyntax[i].syntax;
-    return defaultSyntax(t);
-}
-
-Void addSyntax(line,t,sy)              /* add (t,sy) to syntax table       */
-Int    line;
-Text   t;
-Syntax sy; {
-    int i;
-
-    for (i=0; i<syntaxHw; ++i)
-        if (tabSyntax[i].text==t) {
-            /* There's no problem with multiple identical fixity declarations.
-             * - but note that it's not allowed by the Haskell report.  ADR
-             */
-            if (tabSyntax[i].syntax == sy) return;
-            ERRMSG(line) "Attempt to redefine syntax of operator \"%s\"",
-                         textToStr(t)
-            EEND;
-        }
-
-    if (syntaxHw>=NUM_SYNTAX) {
-        ERRMSG(line) "Too many fixity declarations"
-        EEND;
-    }
-
-    tabSyntax[syntaxHw].text   = t;
-    tabSyntax[syntaxHw].syntax = sy;
-    syntaxHw++;
-}
 
 /* --------------------------------------------------------------------------
  * Ext storage:
@@ -324,10 +278,10 @@ Text t; {
     tycon(tyconHw).kind          = NIL;
     tycon(tyconHw).defn          = NIL;
     tycon(tyconHw).what          = NIL;
-    tycon(tyconHw).conToTag      = NIL;
-    tycon(tyconHw).tagToCon      = NIL;
+#if !IGNORE_MODULES
     tycon(tyconHw).mod           = currentModule;
     module(currentModule).tycons = cons(tyconHw,module(currentModule).tycons);
+#endif
     tycon(tyconHw).nextTyconHash = tyconHash[h];
     tyconHash[h]                 = tyconHw;
 
@@ -348,7 +302,9 @@ Tycon tc; {
     Tycon oldtc = findTycon(tycon(tc).text);
     if (isNull(oldtc)) {
         hashTycon(tc);
+#if !IGNORE_MODULES
         module(currentModule).tycons=cons(tc,module(currentModule).tycons);
+#endif
         return tc;
     } else
         return oldtc;
@@ -364,41 +320,38 @@ Tycon tc; {
 
 Tycon findQualTycon(id) /*locate (possibly qualified) Tycon in tycon table */
 Cell id; {
-    assert(isPair(id));
+    if (!isPair(id)) internal("findQualTycon");
     switch (fst(id)) {
         case CONIDCELL :
         case CONOPCELL :
             return findTycon(textOf(id));
         case QUALIDENT : {
+#if IGNORE_MODULES
+            return findTycon(qtextOf(id));
+#else /* !IGNORE_MODULES */
             Text   t  = qtextOf(id);
             Module m  = findQualifier(qmodOf(id));
             List   es = NIL;
-            if (isNull(m)) 
-                return NIL;
-            if (m==currentModule) {
-                /* The Haskell report (rightly) forbids this.
-                 * We added it to let the Prelude refer to itself
-                 * without having to import itself.
-                 */
-                return findTycon(t);
-            }
+            if (isNull(m)) return NIL;
             for(es=module(m).exports; nonNull(es); es=tl(es)) {
                 Cell e = hd(es);
                 if (isPair(e) && isTycon(fst(e)) && tycon(fst(e)).text==t) 
                     return fst(e);
             }
             return NIL;
+#endif /* !IGNORE_MODULES */
         }
         default : internal("findQualTycon2");
     }
+    assert(0); return 0; /* NOTREACHED */
 }
 
 Tycon addPrimTycon(t,kind,ar,what,defn) /* add new primitive type constr   */
-Text   t;
-Kind   kind;
-Int    ar;
-Cell   what;
-Cell   defn; {
+Text t;
+Kind kind;
+Int  ar;
+Cell what;
+Cell defn; {
     Tycon tc        = newTycon(t);
     tycon(tc).line  = 0;
     tycon(tc).kind  = kind;
@@ -455,18 +408,23 @@ List   ts; {                            /* Null pattern matches every tycon*/
 
 #define NAMEHSZ  256                            /* Size of Name hash table */
 #define nHash(x) ((x)%NAMEHSZ)                  /* hash fn :: Text->Int    */
-/*static*/Name   nameHw;                      /* next unused name        */
+static  Name     nameHw;                        /* next unused name        */
 static  Name     DEFTABLE(nameHash,NAMEHSZ);    /* Hash table storage      */
 struct  strName  DEFTABLE(tabName,NUM_NAME);    /* Name table storage      */
 
-Name newName(t)                         /* add new name to name table      */
-Text t; {
+Name newName(t,parent)                  /* Add new name to name table      */
+Text t; 
+Cell parent; {
+    Int h = nHash(t);
+
     if (nameHw-NAMEMIN >= NUM_NAME) {
         ERRMSG(0) "Name storage space exhausted"
         EEND;
     }
     name(nameHw).text         = t;      /* clear new name record           */
     name(nameHw).line         = 0;
+    name(nameHw).syntax       = NO_SYNTAX;
+    name(nameHw).parent       = parent;
     name(nameHw).arity        = 0;
     name(nameHw).number       = EXECNAME;
     name(nameHw).defn         = NIL;
@@ -476,10 +434,12 @@ Text t; {
     name(nameHw).mod          = currentModule;
     hashName(nameHw);
     module(currentModule).names=cons(nameHw,module(currentModule).names);
+    name(nameHw).nextNameHash = nameHash[h];
+    nameHash[h]               = nameHw;
     return nameHw++;
 }
 
-Name findName(t)                        /* locate name in name table       */
+Name findName(t)                        /* Locate name in name table       */
 Text t; {
     Name n = nameHash[nHash(t)];
 
@@ -490,30 +450,31 @@ Text t; {
     return n;
 }
 
-Name addName(nm)      /* Insert Name in name table - if no clash is caused */
-Name nm; {
+Name addName(nm)                        /* Insert Name in name table - if  */
+Name nm; {                              /* no clash is caused              */
     Name oldnm = findName(name(nm).text);
     if (isNull(oldnm)) {
         hashName(nm);
+#if !IGNORE_MODULES
         module(currentModule).names=cons(nm,module(currentModule).names);
+#endif
         return nm;
-    } else {
+    } else
         return oldnm;
-    }
 }
 
-static Void local hashName(nm)          /* Insert Name into hash table       */
+static Void local hashName(nm)          /* Insert Name into hash table     */
 Name nm; {
-    Text t = name(nm).text;
-    Int  h = nHash(t);
+    Text t                = name(nm).text;
+    Int  h                = nHash(t);
     name(nm).nextNameHash = nameHash[h];
     nameHash[h]           = nm;
 }
 
-Name findQualName(line,id) /* locate (possibly qualified) name in name table */
-Int  line;
-Cell id; {
-    assert(isPair(id));
+Name findQualName(id)              /* Locate (possibly qualified) name*/
+Cell id; {                         /* in name table                   */
+    if (!isPair(id))
+        internal("findQualName");
     switch (fst(id)) {
         case VARIDCELL :
         case VAROPCELL :
@@ -521,6 +482,9 @@ Cell id; {
         case CONOPCELL :
             return findName(textOf(id));
         case QUALIDENT : {
+#if IGNORE_MODULES
+            return findName(qtextOf(id));
+#else /* !IGNORE_MODULES */
             Text   t  = qtextOf(id);
             Module m  = findQualifier(qmodOf(id));
             List   es = NIL;
@@ -540,8 +504,7 @@ Cell id; {
                     List subentities = NIL;
                     Cell c = fst(e);
                     if (isTycon(c)
-                        && (tycon(c).what == DATATYPE 
-                            || tycon(c).what == NEWTYPE))
+                        && (tycon(c).what==DATATYPE || tycon(c).what==NEWTYPE))
                         subentities = tycon(c).defn;
                     else if (isClass(c))
                         subentities = cclass(c).members;
@@ -553,9 +516,11 @@ Cell id; {
                 }
             }
             return NIL;
+#endif /* !IGNORE_MODULES */
         }
         default : internal("findQualName2");
     }
+    assert(0); return 0; /* NOTREACHED */
 }
 
 /* --------------------------------------------------------------------------
@@ -567,7 +532,7 @@ Text t;
 Int  arity;
 Int  no;
 Int  rep; { /* Really AsmRep */
-    Name n          = newName(t);
+    Name n          = newName(t,NIL);
     name(n).arity   = arity;
     name(n).number  = cfunNo(no);
     name(n).type    = NIL;
@@ -580,12 +545,11 @@ Name s;                                 /* selector s in constructor c.    */
 Name c; {
     List cns;
     cns = name(s).defn;
-    for (; nonNull(cns); cns=tl(cns)) {
+    for (; nonNull(cns); cns=tl(cns))
         if (fst(hd(cns))==c)
             return intOf(snd(hd(cns)));
-    }
     internal("sfunPos");
-    return 0;/*NOTREACHED*/
+    return 0;/* NOTREACHED */
 }
 
 static List local insertName(nm,ns)     /* insert name nm into sorted list */
@@ -613,6 +577,7 @@ List addNamesMatching(pat,ns)           /* Add names matching pattern pat  */
 String pat;                             /* to list of names ns             */
 List   ns; {                            /* Null pattern matches every name */
     Name nm;                            /* (Names with NIL type, or hidden */
+#if 1
     for (nm=NAMEMIN; nm<nameHw; ++nm)   /* or invented names are excluded) */
         if (!inventedText(name(nm).text) && nonNull(name(nm).type)) {
             String str = textToStr(name(nm).text);
@@ -620,6 +585,18 @@ List   ns; {                            /* Null pattern matches every name */
                 ns = insertName(nm,ns);
         }
     return ns;
+#else
+    List mns = module(currentModule).names;
+    for(; nonNull(mns); mns=tl(mns)) {
+        Name nm = hd(mns);
+        if (!inventedText(name(nm).text)) {
+            String str = textToStr(name(nm).text);
+            if (str[0]!='_' && (!pat || stringMatch(pat,str)))
+                ns = insertName(nm,ns);
+        }
+    }
+    return ns;
+#endif
 }
 
 /* --------------------------------------------------------------------------
@@ -691,9 +668,6 @@ String str; {
 static Class classHw;                  /* next unused class                */
 static List  classes;                  /* list of classes in current scope */
 static Inst  instHw;                   /* next unused instance record      */
-#if USE_DICTHW
-static Int   dictHw;                   /* next unused dictionary number    */
-#endif
 
 struct strClass DEFTABLE(tabClass,NUM_CLASSES); /* table of class records  */
 struct strInst far *tabInst;           /* (pointer to) table of instances  */
@@ -716,8 +690,10 @@ Text t; {
     cclass(classHw).defaults  = NIL;
     cclass(classHw).instances = NIL;
     classes=cons(classHw,classes);
+#if !IGNORE_MODULES
     cclass(classHw).mod       = currentModule;
     module(currentModule).classes=cons(classHw,module(currentModule).classes);
+#endif
     return classHw++;
 }
 
@@ -737,36 +713,44 @@ Text t; {
     return NIL;
 }
 
-Class addClass(c)        /* Insert Class in class list - if no clash caused */
-Class c; {
+Class addClass(c)                       /* Insert Class in class list      */
+Class c; {                              /*  - if no clash caused           */
     Class oldc = findClass(cclass(c).text);
     if (isNull(oldc)) {
         classes=cons(c,classes);
+#if !IGNORE_MODULES
         module(currentModule).classes=cons(c,module(currentModule).classes);
+#endif
         return c;
-    } else
+    }
+    else
         return oldc;
 }
 
-Class findQualClass(c) /* look for (possibly qualified) class in class list */
-Cell c; {
+Class findQualClass(c)                  /* Look for (possibly qualified)   */
+Cell c; {                               /* class in class list             */
     if (!isQualIdent(c)) {
         return findClass(textOf(c));
     } else {
-        Text   t = qtextOf(c);
-        Module m = findQualifier(qmodOf(c));
+#if IGNORE_MODULES
+        return findClass(qtextOf(c));
+#else /* !IGNORE_MODULES */
+        Text   t  = qtextOf(c);
+        Module m  = findQualifier(qmodOf(c));
         List   es = NIL;
-        if (isNull(m)) return NIL;
-        for(es=module(m).exports; nonNull(es); es=tl(es)) {
+        if (isNull(m))
+            return NIL;
+        for (es=module(m).exports; nonNull(es); es=tl(es)) {
             Cell e = hd(es);
             if (isPair(e) && isClass(fst(e)) && cclass(fst(e)).text==t) 
                 return fst(e);
         }
+#endif
     }
     return NIL;
 }
 
-Inst newInst() {                       /* add new instance to table        */
+Inst newInst() {                       /* Add new instance to table        */
     if (instHw-INSTMIN >= NUM_INSTS) {
         ERRMSG(0) "Instance storage space exhausted"
         EEND;
@@ -776,10 +760,21 @@ Inst newInst() {                       /* add new instance to table        */
     inst(instHw).specifics  = NIL;
     inst(instHw).implements = NIL;
     inst(instHw).builder    = NIL;
-    inst(instHw).mod        = currentModule;
+    /* from STG */ inst(instHw).mod        = currentModule;
 
     return instHw++;
 }
+
+#ifdef DEBUG_DICTS
+extern Void printInst Args((Inst));
+
+Void printInst(in)
+Inst in; {
+    Class cl = inst(in).c;
+    Printf("%s-", textToStr(cclass(cl).text));
+    printType(stdout,inst(in).t);
+}
+#endif /* DEBUG_DICTS */
 
 Inst findFirstInst(tc)                  /* look for 1st instance involving */
 Tycon tc; {                             /* the type constructor tc         */
@@ -816,10 +811,48 @@ Type tc; {
 Cell DEFTABLE(cellStack,NUM_STACK); /* Storage for cells on stack          */
 StackPtr sp;                        /* stack pointer                       */
 
+#if GIMME_STACK_DUMPS
+
+#define UPPER_DISP  5               /* # display entries on top of stack   */
+#define LOWER_DISP  5               /* # display entries on bottom of stack*/
+
+Void hugsStackOverflow() {          /* Report stack overflow               */
+    extern Int  rootsp;
+    extern Cell evalRoots[];
+
+    ERRMSG(0) "Control stack overflow" ETHEN
+    if (rootsp>=0) {
+        Int i;
+        if (rootsp>=UPPER_DISP+LOWER_DISP) {
+            for (i=0; i<UPPER_DISP; i++) {
+                ERRTEXT "\nwhile evaluating: " ETHEN
+                ERREXPR(evalRoots[rootsp-i]);
+            }
+            ERRTEXT "\n..." ETHEN
+            for (i=LOWER_DISP-1; i>=0; i--) {
+                ERRTEXT "\nwhile evaluating: " ETHEN
+                ERREXPR(evalRoots[i]);
+            }
+        }
+        else {
+            for (i=rootsp; i>=0; i--) {
+                ERRTEXT "\nwhile evaluating: " ETHEN
+                ERREXPR(evalRoots[i]);
+            }
+        }
+    }
+    ERRTEXT "\n"
+    EEND;
+}
+
+#else /* !GIMME_STACK_DUMPS */
+
 Void hugsStackOverflow() {          /* Report stack overflow               */
     ERRMSG(0) "Control stack overflow"
     EEND;
 }
+
+#endif /* !GIMME_STACK_DUMPS */
 
 /* --------------------------------------------------------------------------
  * Module storage:
@@ -838,6 +871,7 @@ Void hugsStackOverflow() {          /* Report stack overflow               */
  *
  * ------------------------------------------------------------------------*/
 
+#if !IGNORE_MODULES
 static  Module   moduleHw;              /* next unused Module              */
 struct  Module   DEFTABLE(tabModule,NUM_MODULE); /* Module storage         */
 Module  currentModule;                  /* Module currently being processed*/
@@ -867,9 +901,8 @@ Module findModule(t)                    /* locate Module in module table  */
 Text t; {
     Module m;
     for(m=MODMIN; m<moduleHw; ++m) {
-        if (module(m).text==t) {
+        if (module(m).text==t)
             return m;
-        }
     }
     return NIL;
 }
@@ -883,6 +916,7 @@ Cell c; {
         case CONIDCELL : return findModule(textOf(c));
         default        : internal("findModid");
     }
+    assert(0); return 0; /* NOTREACHED */
 }
 
 static local Module findQualifier(t)    /* locate Module in import list   */
@@ -896,10 +930,13 @@ Text t; {
         return modulePreludeHugs;
     }
     for (ms=module(currentModule).qualImports; nonNull(ms); ms=tl(ms)) {
-        if (textOf(fst(hd(ms)))==t) {
+        if (textOf(fst(hd(ms)))==t)
             return snd(hd(ms));
-        }
     }
+#if 1 /* mpj */
+    if (module(currentModule).text==t)
+        return currentModule;
+#endif
     return NIL;
 }
 
@@ -908,17 +945,16 @@ Module m; {
     Int i;
     if (m!=currentModule) {
         currentModule = m; /* This is the only assignment to currentModule */
-        for (i=0; i<TYCONHSZ; ++i) {
+        for (i=0; i<TYCONHSZ; ++i)
             tyconHash[i] = NIL;
-        }
         mapProc(hashTycon,module(m).tycons);
-        for (i=0; i<NAMEHSZ; ++i) {
+        for (i=0; i<NAMEHSZ; ++i)
             nameHash[i] = NIL;
-        }
         mapProc(hashName,module(m).names);
         classes = module(m).classes;
     }
 }
+#endif /* !IGNORE_MODULES */
 
 /* --------------------------------------------------------------------------
  * Script file storage:
@@ -935,15 +971,13 @@ typedef struct {                       /* record of storage state prior to */
     Text  textHw;
     Text  nextNewText;
     Text  nextNewDText;
-    Int   syntaxHw;
+#if !IGNORE_MODULES
     Module moduleHw;
+#endif
     Tycon tyconHw;
     Name  nameHw;
     Class classHw;
     Inst  instHw;
-#if USE_DICTHW
-    Int   dictHw;
-#endif
 #if TREX
     Ext   extHw;
 #endif
@@ -968,8 +1002,9 @@ String f; {                             /* of status for later restoration  */
     }
 #ifdef DEBUG_SHOWUSE
     showUse("Text",   textHw,           NUM_TEXT);
-    showUse("Syntax", syntaxHw,         NUM_SYNTAX);
+#if !IGNORE_MODULES
     showUse("Module", moduleHw-MODMIN,  NUM_MODULE);
+#endif
     showUse("Tycon",  tyconHw-TYCMIN,   NUM_TYCON);
     showUse("Name",   nameHw-NAMEMIN,   NUM_NAME);
     showUse("Class",  classHw-CLASSMIN, NUM_CLASSES);
@@ -983,20 +1018,33 @@ String f; {                             /* of status for later restoration  */
     scripts[scriptHw].textHw       = textHw;
     scripts[scriptHw].nextNewText  = nextNewText;
     scripts[scriptHw].nextNewDText = nextNewDText;
-    scripts[scriptHw].syntaxHw     = syntaxHw;
+#if !IGNORE_MODULES
     scripts[scriptHw].moduleHw     = moduleHw;
+#endif
     scripts[scriptHw].tyconHw      = tyconHw;
     scripts[scriptHw].nameHw       = nameHw;
     scripts[scriptHw].classHw      = classHw;
     scripts[scriptHw].instHw       = instHw;
-#if USE_DICTHW
-    scripts[scriptHw].dictHw       = dictHw;
-#endif
 #if TREX
     scripts[scriptHw].extHw        = extHw;
 #endif
     return scriptHw++;
 }
+
+Bool isPreludeScript() {                /* Test whether this is the Prelude*/
+    return (scriptHw==0);
+}
+
+#if !IGNORE_MODULES
+Bool moduleThisScript(m)                /* Test if given module is defined */
+Module m; {                             /* in current script file          */
+    return scriptHw<1 || m>=scripts[scriptHw-1].moduleHw;
+}
+
+Module lastModule() {              /* Return module in current script file */
+    return (moduleHw>MODMIN ? moduleHw-1 : modulePrelude);
+}
+#endif /* !IGNORE_MODULES */
 
 #define scriptThis(nm,t,tag)            Script nm(x)                       \
                                         t x; {                             \
@@ -1012,18 +1060,18 @@ scriptThis(scriptThisInst,Inst,instHw)
 scriptThis(scriptThisClass,Class,classHw)
 #undef scriptThis
 
-Module lastModule() {              /* Return module in current script file */
-    return (moduleHw-1);
-}
-
-static Module local moduleOfScript(s)
+Module moduleOfScript(s)
 Script s; {
-    return scripts[s-1].moduleHw;
+    return (s==0) ? modulePrelude : scripts[s-1].moduleHw;
 }
 
+#if !IGNORE_MODULES
 String fileOfModule(m)
 Module m; {
     Script s;
+    if (m == modulePrelude) {
+        return STD_PRELUDE;
+    }
     for(s=0; s<scriptHw; ++s) {
         if (scripts[s].moduleHw == m) {
             return textToStr(scripts[s].file);
@@ -1031,14 +1079,18 @@ Module m; {
     }
     return 0;
 }
+#endif
 
-static Script local scriptThisFile(f)
+Script scriptThisFile(f)
 Text f; {
     Script s;
     for (s=0; s < scriptHw; ++s) {
         if (scripts[s].file == f) {
             return s+1;
         }
+    }
+    if (f == findText(STD_PRELUDE)) {
+        return 0;
     }
     return (-1);
 }
@@ -1050,7 +1102,9 @@ Script sno; {                           /* to reading script sno           */
         textHw       = scripts[sno].textHw;
         nextNewText  = scripts[sno].nextNewText;
         nextNewDText = scripts[sno].nextNewDText;
-        syntaxHw     = scripts[sno].syntaxHw;
+#if !IGNORE_MODULES
+        moduleHw     = scripts[sno].moduleHw;
+#endif
         tyconHw      = scripts[sno].tyconHw;
         nameHw       = scripts[sno].nameHw;
         classHw      = scripts[sno].classHw;
@@ -1064,8 +1118,8 @@ Script sno; {                           /* to reading script sno           */
 
         for (i=moduleHw; i >= scripts[sno].moduleHw; --i) {
             if (module(i).objectFile) {
-                printf("closing objectFile for module %d\n",i);
-                dlclose(module(i).objectFile);
+                printf("[bogus] closing objectFile for module %d\n",i);
+                /*dlclose(module(i).objectFile);*/
             }
         }
         moduleHw = scripts[sno].moduleHw;
@@ -1079,6 +1133,21 @@ Script sno; {                           /* to reading script sno           */
                 textHash[i][j] = NOTEXT;
         }
 
+#if IGNORE_MODULES
+        for (i=0; i<TYCONHSZ; ++i) {
+            Tycon tc = tyconHash[i];
+            while (nonNull(tc) && tc>=tyconHw)
+                tc = tycon(tc).nextTyconHash;
+            tyconHash[i] = tc;
+        }
+
+        for (i=0; i<NAMEHSZ; ++i) {
+            Name n = nameHash[i];
+            while (nonNull(n) && n>=nameHw)
+                n = name(n).nextNameHash;
+            nameHash[i] = n;
+        }
+#else /* !IGNORE_MODULES */
         currentModule=NIL;
         for (i=0; i<TYCONHSZ; ++i) {
             tyconHash[i] = NIL;
@@ -1086,6 +1155,7 @@ Script sno; {                           /* to reading script sno           */
         for (i=0; i<NAMEHSZ; ++i) {
             nameHash[i] = NIL;
         }
+#endif /* !IGNORE_MODULES */
 
         for (i=CLASSMIN; i<classHw; i++) {
             List ins = cclass(i).instances;
@@ -1119,14 +1189,35 @@ Script sno; {                           /* to reading script sno           */
 Int     heapSize = DEFAULTHEAP;         /* number of cells in heap         */
 Heap    heapFst;                        /* array of fst component of pairs */
 Heap    heapSnd;                        /* array of snd component of pairs */
+#ifndef GLOBALfst
 Heap    heapTopFst;
+#endif
+#ifndef GLOBALsnd
 Heap    heapTopSnd;
+#endif
 Bool    consGC = TRUE;                  /* Set to FALSE to turn off gc from*/
                                         /* C stack; use with extreme care! */
+#if     PROFILING
+Heap    heapThd, heapTopThd;            /* to keep record of producers     */
+Int     sysCount;                       /* record unattached cells         */
+Name    producer;                       /* current producer, if any        */
+Bool    profiling = FALSE;              /* should profiling be performed   */
+Int     profInterval = MAXPOSINT;       /* interval between samples        */
+FILE    *profile = 0;                   /* pointer to profiler log, if any */
+#endif
+Long    numCells;
+Int     numGcs;                         /* number of garbage collections   */
 Int     cellsRecovered;                 /* number of cells recovered       */
 
 static  Cell freeList;                  /* free list of unused cells       */
 static  Cell lsave, rsave;              /* save components of pair         */
+
+#if GC_WEAKPTRS
+static List weakPtrs;                   /* list of weak ptrs               */
+                                        /* reconstructed during every GC   */
+List   finalizers = NIL;
+List   liveWeakPtrs = NIL;
+#endif
 
 #if GC_STATISTICS
 
@@ -1137,19 +1228,19 @@ static Int markCount, stackRoots;
 
 #define startGC()       \
     if (gcMessages) {   \
-        printf("\n");   \
+        Printf("\n");   \
         fflush(stdout); \
     }
 #define endGC()         \
     if (gcMessages) {   \
-        printf("\n");   \
+        Printf("\n");   \
         fflush(stdout); \
     }
 
 #define start()      markCount = 0
 #define end(thing,rs) \
     if (gcMessages) { \
-        printf("GC: %-18s: %4d cells, %4d roots.\n", thing, markCount, rs); \
+        Printf("GC: %-18s: %4d cells, %4d roots.\n", thing, markCount, rs); \
         fflush(stdout); \
     }
 #define recordMark() markCount++
@@ -1185,22 +1276,21 @@ Cell l, r; {                            /* heap, garbage collecting first  */
     freeList = snd(freeList);
     fst(c)   = l;
     snd(c)   = r;
+#if PROFILING
+    thd(c)   = producer;
+#endif
+    numCells++;
     return c;
 }
 
 Void overwrite(dst,src)                 /* overwrite dst cell with src cell*/
-Pair dst, src; {                        /* both *MUST* be pairs            */
-    assert(isPair(dst) && isPair(src));
-    fst(dst) = fst(src);
-    snd(dst) = snd(src);
-}
-
-Void overwrite2(dst,src1,src2)          /* overwrite dst cell with src cell*/
-Pair dst;
-Cell src1, src2; {
-    assert(isPair(dst));
-    fst(dst) = src1;
-    snd(dst) = src2;
+Cell dst, src; {                        /* both *MUST* be pairs            */
+    if (isPair(dst) && isPair(src)) {
+        fst(dst) = fst(src);
+        snd(dst) = snd(src);
+    }
+    else
+        internal("overwrite");
 }
 
 static Int *marks;
@@ -1215,8 +1305,8 @@ static Cell local markCell(c)           /* Traverse part of graph marking  */
 Cell c; {                               /* cells reachable from given root */
                                         /* markCell(c) is only called if c */
                                         /* is a pair                       */
-    {   register place = placeInSet(c);
-        register mask  = maskInSet(c);
+    {   register int place = placeInSet(c);
+        register int mask  = maskInSet(c);
         if (marks[place]&mask)
             return c;
         else {
@@ -1229,8 +1319,9 @@ Cell c; {                               /* cells reachable from given root */
         fst(c) = markCell(fst(c));
         markSnd(c);
     }
-    else if (isNull(fst(c)) || fst(c)>=BCSTAG)
+    else if (isNull(fst(c)) || fst(c)>=BCSTAG) {
         markSnd(c);
+    }
 
     return c;
 }
@@ -1244,8 +1335,8 @@ ma: t = c;                              /* Keep pointer to original pair   */
 mb: if (!isPair(c))
         return;
 
-    {   register place = placeInSet(c);
-        register mask  = maskInSet(c);
+    {   register int place = placeInSet(c);
+        register int mask  = maskInSet(c);
         if (marks[place]&mask)
             return;
         else {
@@ -1285,14 +1376,128 @@ Void garbageCollect()     {             /* Run garbage collector ...       */
     gcStarted();
     for (i=0; i<marksSize; ++i)         /* initialise mark set to empty    */
         marks[i] = 0;
-
+#if GC_WEAKPTRS
+    weakPtrs = NIL;                     /* clear list of weak pointers     */
+#endif
     everybody(MARK);                    /* Mark all components of system   */
 
+#if IO_HANDLES
+    for (i=0; i<NUM_HANDLES; ++i)       /* release any unused handles      */
+        if (nonNull(handles[i].hcell)) {
+            register place = placeInSet(handles[i].hcell);
+            register mask  = maskInSet(handles[i].hcell);
+            if ((marks[place]&mask)==0)
+                freeHandle(i);
+        }
+#endif
+#if GC_MALLOCPTRS
+    for (i=0; i<NUM_MALLOCPTRS; ++i)    /* release any unused mallocptrs   */
+        if (isPair(mallocPtrs[i].mpcell)) {
+            register place = placeInSet(mallocPtrs[i].mpcell);
+            register mask  = maskInSet(mallocPtrs[i].mpcell);
+            if ((marks[place]&mask)==0)
+                incMallocPtrRefCnt(i,-1);
+        }
+#endif /* GC_MALLOCPTRS */
+#if GC_WEAKPTRS
+    /* After GC completes, we scan the list of weak pointers that are
+     * still live and zap their contents unless the contents are still
+     * live (by some other means).
+     * Note that this means the contents must itself be heap allocated.
+     * This means it can't be a nullary constructor or an Int or a Name
+     * or lots of other things - hope this doesn't bite too hard.
+     */
+    for (; nonNull(weakPtrs); weakPtrs=nextWeakPtr(weakPtrs)) {
+        Cell ptr = derefWeakPtr(weakPtrs);
+        if (isGenPair(ptr)) {
+            Int  place = placeInSet(ptr);
+            Int  mask  = maskInSet(ptr);
+            if ((marks[place]&mask)==0) {
+                /* printf("Zapping weak pointer %d\n", ptr); */
+                derefWeakPtr(weakPtrs) = NIL;
+            } else {
+                /* printf("Keeping weak pointer %d\n", ptr); */
+            }
+        } else if (nonNull(ptr)) {
+            printf("Weak ptr contains object which isn't heap allocated %d\n", ptr);
+        }
+    }
+
+    if (nonNull(liveWeakPtrs) || nonNull(finalizers)) {
+        Bool anyMarked;                 /* Weak pointers with finalizers   */
+        List wps;
+        List newFins = NIL;
+
+        /* Step 1: iterate until we've found out what is reachable         */
+        do {
+            anyMarked = FALSE;
+            for (wps=liveWeakPtrs; nonNull(wps); wps=tl(wps)) {
+                Cell wp = hd(wps);
+                Cell k  = fst(snd(wp));
+                if (isNull(k)) {
+                    internal("bad weak ptr");
+                }
+                if (isMarked(k)) {
+                    Cell vf = snd(snd(wp));
+                    if (!isMarked(fst(vf)) || !isMarked(snd(vf))) {
+                        mark(fst(vf));
+                        mark(snd(vf));
+                        anyMarked = TRUE;
+                    }
+                }
+            }
+        } while (anyMarked);
+
+        /* Step 2: Now we know which weak pointers will die, so we can     */
+        /* remove them from the live set and gather their finalizers.  But */
+        /* note that we mustn't mark *anything* at this stage or we will   */
+        /* corrupt our view of what's alive, and what's dead.              */
+        wps = NIL;
+        while (nonNull(liveWeakPtrs)) {
+            Cell wp = hd(liveWeakPtrs);
+            List nx = tl(liveWeakPtrs);
+            Cell k  = fst(snd(wp));
+            if (!isMarked(k)) {                 /* If the key is dead, then*/
+                Cell vf      = snd(snd(wp));    /* stomp on weak pointer   */
+                fst(vf)      = snd(vf);
+                snd(vf)      = newFins;
+                newFins      = vf;              /* reuse because we can't  */
+                fst(snd(wp)) = NIL;             /* reallocate here ...     */
+                snd(snd(wp)) = NIL;
+                snd(wp)      = NIL;
+                liveWeakPtrs = nx;
+            } else {
+                tl(liveWeakPtrs) = wps;         /* Otherwise, weak pointer */
+                wps              = liveWeakPtrs;/* survives to face another*/
+                liveWeakPtrs     = nx;          /* garbage collection      */
+            }
+        }
+
+        /* Step 3: Now we've identified the live cells and the newly       */
+        /* scheduled finalizers, but we had better make sure that they are */
+        /* all marked now, including any internal structure, to ensure that*/
+        /* they make it to the other side of gc.                           */
+        for (liveWeakPtrs=wps; nonNull(wps); wps=tl(wps)) {
+            mark(snd(hd(wps)));
+        }
+        mark(liveWeakPtrs);
+        mark(newFins);
+        finalizers = revOnto(newFins,finalizers);
+    }
+
+#endif /* GC_WEAKPTRS */
     gcScanning();                       /* scan mark set                   */
     mask      = 1;
     place     = 0;
     recovered = 0;
     j         = 0;
+#if PROFILING
+    if (profile) {
+        sysCount = 0;
+        for (i=NAMEMIN; i<nameHw; i++)
+            name(i).count = 0;
+    }
+#endif
     freeList = NIL;
     for (i=1; i<=heapSize; i++) {
         if ((marks[place] & mask) == 0) {
@@ -1301,6 +1506,12 @@ Void garbageCollect()     {             /* Run garbage collector ...       */
             freeList = -i;
             recovered++;
         }
+#if PROFILING
+        else if (nonNull(thd(-i)))
+            name(thd(-i)).count++;
+        else
+            sysCount++;
+#endif
         mask <<= 1;
         if (++j == bitsPerWord) {
             place++;
@@ -1312,6 +1523,49 @@ Void garbageCollect()     {             /* Run garbage collector ...       */
     gcRecovered(recovered);
     breakOn(breakStat);                 /* restore break trapping if nec.  */
 
+#if PROFILING
+    if (profile) {
+        fprintf(profile,"BEGIN_SAMPLE %ld.00\n",numReductions);
+/* For the time being, we won't include the system count in the output:
+        if (sysCount>0)
+            fprintf(profile,"  SYSTEM %d\n",sysCount);
+*/
+        /* Accumulate costs in top level objects */
+        for (i=NAMEMIN; i<nameHw; i++) {
+            Name cc = i;
+            /* Use of "while" instead of "if" is pure paranoia - ADR */
+            while (isName(name(cc).parent)) 
+                cc = name(cc).parent;
+            if (i != cc) {
+                name(cc).count += name(i).count;
+                name(i).count = 0;
+            }
+        }
+        for (i=NAMEMIN; i<nameHw; i++)
+            if (name(i).count>0) 
+                if (isPair(name(i).parent)) {
+                    Pair p = name(i).parent;
+                    Cell f = fst(p);
+                    fprintf(profile,"  ");
+                    if (isClass(f))
+                        fprintf(profile,"%s",textToStr(cclass(f).text));
+                    else {
+                        fprintf(profile,"%s_",textToStr(cclass(inst(f).c).text));
+                        /* Will hp2ps accept the spaces produced by this? */
+                        printPred(profile,inst(f).head);
+                    }
+                    fprintf(profile,"_%s %d\n",
+                            textToStr(name(snd(p)).text),
+                            name(i).count);
+                } else {
+                    fprintf(profile,"  %s %d\n",
+                            textToStr(name(i).text),
+                            name(i).count);
+                }
+        fprintf(profile,"END_SAMPLE %ld.00\n",numReductions);
+    }
+#endif
+
     /* can only return if freeList is nonempty on return. */
     if (recovered<minRecovery || isNull(freeList)) {
         ERRMSG(0) "Garbage collection fails to reclaim sufficient space"
@@ -1319,6 +1573,22 @@ Void garbageCollect()     {             /* Run garbage collector ...       */
     }
     cellsRecovered = recovered;
 }
+
+#if PROFILING
+Void profilerLog(s)                     /* turn heap profiling on, saving log*/
+String s; {                             /* in specified file                 */
+    if ((profile=fopen(s,"w")) != NULL) {
+        fprintf(profile,"JOB \"Hugs Heap Profile\"\n");
+        fprintf(profile,"DATE \"%s\"\n",timeString());
+        fprintf(profile,"SAMPLE_UNIT \"reductions\"\n");
+        fprintf(profile,"VALUE_UNIT \"cells\"\n");
+    }
+    else {
+        ERRMSG(0) "Cannot open profile log file \"%s\"", s
+        EEND;
+    }
+}
+#endif
 
 /* --------------------------------------------------------------------------
  * Code for saving last expression entered:
@@ -1392,7 +1662,7 @@ Cell c; {                               /* except that Cells refering to   */
  * Miscellaneous operations on heap cells:
  * ------------------------------------------------------------------------*/
 
-/* profiling suggests that the number of calls to whatIs() is typically    */
+/* Profiling suggests that the number of calls to whatIs() is typically    */
 /* rather high.  The recoded version below attempts to improve the average */
 /* performance for whatIs() using a binary search for part of the analysis */
 
@@ -1413,14 +1683,17 @@ register Cell c; {
                                         else            return MODULE;
                     else                if (c>=OFFMIN)  return OFFSET;
 #if TREX
-                                        else if (c>=EXTMIN) return EXT;
+                                        else            return (c>=EXTMIN) ?
+                                                                EXT : TUPLE;
+#else
+                                        else            return TUPLE;
 #endif
-                                        else                return TUPLE;
 
 /*  if (isPair(c)) {
         register Cell fstc = fst(c);
         return isTag(fstc) ? fstc : AP;
     }
+    if (c>=INTMIN)   return INTCELL;
     if (c>=CHARMIN)  return CHARCELL;
     if (c>=CLASSMIN) return CLASS;
     if (c>=INSTMIN)  return INSTANCE;
@@ -1447,6 +1720,11 @@ Cell c;
 Int  depth; {
     if (0 == depth) {
         Printf("...");
+#if 0 /* Not in this version of Hugs */
+    } else if (isPair(c) && !isGenPair(c)) {
+        extern Void printEvalCell Args((Cell, Int));
+        printEvalCell(c,depth);
+#endif
     } else {
         Int tag = whatIs(c);
         switch (tag) {
@@ -1699,10 +1977,18 @@ Cell c; {
 
 Cell mkInt(n)                          /* make cell representing integer   */
 Int n; {
-    return isSmall(INTZERO+n) ? INTZERO+n : pair(INTCELL,n);
+    return (MINSMALLINT <= n && n <= MAXSMALLINT)
+           ? INTZERO+n
+           : pair(INTCELL,n);
 }
 
-#if PTR_ON_HEAP
+#if BIGNUMS
+Bool isBignum(c)                       /* cell holds bignum value?         */
+Cell c; {
+    return c==ZERONUM || (isPair(c) && (fst(c)==POSNUM || fst(c)==NEGNUM));
+}
+#endif
+
 #if SIZEOF_INTP == SIZEOF_INT
 typedef union {Int i; Ptr p;} IntOrPtr;
 Cell mkPtr(p)
@@ -1717,28 +2003,45 @@ Ptr ptrOf(c)
 Cell c;
 {
     IntOrPtr x;
-    assert(isPtr(c));
+    assert(fst(c) == PTRCELL);
     x.i = snd(c);
     return x.p;
 }
-#else
-/* For 8 byte addresses (used on the Alpha), we'll have to work harder */
-#error "PTR_ON_HEAP not supported on this architecture"
-#endif
-#endif
-
-String stringNegate( s )
-String s;
+#elif SIZEOF_INTP == 2*SIZEOF_INT
+typedef union {struct {Int i1; Int i2;} i; Ptr p;} IntOrPtr;
+Cell mkPtr(p)
+Ptr p;
 {
-    if (s[0] == '-') {
-        return &s[1];
-    } else {
-        static char t[100];
-        t[0] = '-';
-        strcpy(&t[1],s);  /* ToDo: use strncpy instead */
-        return t;
-    }
+    IntOrPtr x;
+    x.p = p;
+    return pair(PTRCELL,pair(mkInt(x.i.i1),mkInt(x.i.i2)));
 }
+
+Ptr ptrOf(c)
+Cell c;
+{
+    IntOrPtr x;
+    assert(fst(c) == PTRCELL);
+    x.i.i1 = intOf(fst(snd(c)));
+    x.i.i2 = intOf(snd(snd(c)));
+    return x.p;
+}
+#else
+#warning "type Addr not supported on this architecture - don't use it"
+Cell mkPtr(p)
+Ptr p;
+{
+    ERRMSG(0) "mkPtr: type Addr not supported on this architecture"
+    EEND;
+}
+
+Ptr ptrOf(c)
+Cell c;
+{
+    ERRMSG(0) "ptrOf: type Addr not supported on this architecture"
+    EEND;
+}
+#endif
 
 /* --------------------------------------------------------------------------
  * List operations:
@@ -1747,7 +2050,7 @@ String s;
 Int length(xs)                         /* calculate length of list xs      */
 List xs; {
     Int n = 0;
-    for (n=0; nonNull(xs); ++n)
+    for (; nonNull(xs); ++n)
         xs = tl(xs);
     return n;
 }
@@ -1765,19 +2068,20 @@ List xs, ys; {                         /* ys by modifying xs ...           */
     }
 }
 
-List revDupOnto(xs,ys)   /* non-destructively prepend xs backwards onto ys */
+List dupOnto(xs,ys)      /* non-destructively prepend xs backwards onto ys */
 List xs; 
 List ys; {
-    for( ; nonNull(xs); xs=tl(xs)) {
+    for (; nonNull(xs); xs=tl(xs))
         ys = cons(hd(xs),ys);
-    }
     return ys;
 }
 
-List dupListOnto(xs,ys)              /* Duplicate spine of list xs onto ys */
-List xs;
-List ys; {
-    return revOnto(revDupOnto(xs,NIL),ys);
+List dupList(xs)                       /* Duplicate spine of list xs       */
+List xs; {
+    List ys = NIL;
+    for (; nonNull(xs); xs=tl(xs))
+        ys = cons(hd(xs),ys);
+    return rev(ys);
 }
 
 List revOnto(xs,ys)                    /* Destructively reverse elements of*/
@@ -1793,15 +2097,26 @@ List xs, ys; {                         /* list xs onto list ys...          */
     return ys;
 }
 
-Bool eqList(as,bs)
-List as;
-List bs; {
-    while (nonNull(as) && nonNull(bs) && hd(as)==hd(bs)) {
-        as=tl(as);
-        bs=tl(bs);
+#if 0
+List delete(xs,y)                      /* Delete first use of y from xs    */
+List xs;
+Cell y; {
+    if (isNull(xs)) {
+        return xs;
+    } else if (hs(xs) == y) {
+        return tl(xs);
+    } else {
+        tl(xs) = delete(tl(xs),y);
+        return xs;
     }
-    return (isNull(as) && isNull(bs));
 }
+
+List minus(xs,ys)                      /* Delete members of ys from xs     */
+List xs, ys; {
+    mapAccum(delete,xs,ys);
+    return xs;
+}
+#endif
 
 Cell varIsMember(t,xs)                 /* Test if variable is a member of  */
 Text t;                                /* given list of variables          */
@@ -1809,6 +2124,15 @@ List xs; {
     for (; nonNull(xs); xs=tl(xs))
         if (t==textOf(hd(xs)))
             return hd(xs);
+    return NIL;
+}
+
+Name nameIsMember(t,ns)                 /* Test if name with text t is a   */
+Text t;                                 /* member of list of names xs      */
+List ns; {
+    for (; nonNull(ns); ns=tl(ns))
+        if (t==name(hd(ns)).text)
+            return hd(ns);
     return NIL;
 }
 
@@ -1848,27 +2172,26 @@ List xs; {
     return NIL;
 }
 
-List replicate(n,x)                    /* create list of n copies of x     */
+List replicate(n,x)                     /* create list of n copies of x    */
 Int n;
 Cell x; {
     List xs=NIL;
-    assert(n>=0);
-    while (0<n--) {
+    while (0<n--)
         xs = cons(x,xs);
-    }
     return xs;
 }
 
-List diffList(xs,ys)                   /* list difference: xs\ys           */
-List xs, ys; {                         /* result contains all elements of  */
-    List result = NIL;                 /* `xs' not appearing in `ys'       */
-    while (nonNull(xs)) {
-        List next = tl(xs);
-        if (!cellIsMember(hd(xs),ys)) {
-            tl(xs) = result;
-            result = xs;
+List diffList(from,take)               /* list difference: from\take       */
+List from, take; {                     /* result contains all elements of  */
+    List result = NIL;                 /* `from' not appearing in `take'   */
+
+    while (nonNull(from)) {
+        List next = tl(from);
+        if (!cellIsMember(hd(from),take)) {
+            tl(from) = result;
+            result   = from;
         }
-        xs = next;
+        from = next;
     }
     return rev(result);
 }
@@ -1891,7 +2214,6 @@ Int  n;                                 /* specified length                */
 List xs; {
     List ys = xs;
 
-    assert(n>=0);
     if (n==0)
         return NIL;
     while (1<n-- && nonNull(xs))
@@ -1901,10 +2223,9 @@ List xs; {
     return ys;
 }
 
-List splitAt(n,xs)                    /* drop n things from front of list */
+List splitAt(n,xs)                         /* drop n things from front of list*/
 Int  n;       
 List xs; {
-    assert(n>=0);
     for(; n>0; --n) {
         xs = tl(xs);
     }
@@ -1914,10 +2235,10 @@ List xs; {
 Cell nth(n,xs)                         /* extract n'th element of list    */
 Int  n;
 List xs; {
-    assert(n>=0);
     for(; n>0 && nonNull(xs); --n, xs=tl(xs)) {
     }
-    assert(nonNull(xs));
+    if (isNull(xs))
+        internal("nth");
     return hd(xs);
 }
 
@@ -1965,7 +2286,6 @@ Cell e; {                              /* application:                     */
 Cell nthArg(n,e)                       /* return nth arg in application    */
 Int  n;                                /* of function to m args (m>=n)     */
 Cell e; {                              /* nthArg n (f x0 x1 ... xm) = xn   */
-    assert(n>=0);
     for (n=numArgs(e)-n-1; n>0; n--)
         e = fun(e);
     return arg(e);
@@ -1991,6 +2311,254 @@ List args; {
     }
     return f;
 }
+
+/* --------------------------------------------------------------------------
+ * Handle operations:
+ * ------------------------------------------------------------------------*/
+
+#if IO_HANDLES
+struct strHandle DEFTABLE(handles,NUM_HANDLES);
+
+Cell openHandle(s,hmode,binary)         /* open handle to file named s in  */
+String s;                               /* the specified hmode             */
+Int    hmode; 
+Bool   binary; {
+    Int i;
+
+    for (i=0; i<NUM_HANDLES && nonNull(handles[i].hcell); ++i)
+        ;                                       /* Search for unused handle*/
+    if (i>=NUM_HANDLES) {                       /* If at first we don't    */
+        garbageCollect();                       /* succeed, garbage collect*/
+        for (i=0; i<NUM_HANDLES && nonNull(handles[i].hcell); ++i)
+            ;                                   /* and try again ...       */
+    }
+    if (i>=NUM_HANDLES) {                       /* ... before we give up   */
+        ERRMSG(0) "Too many handles open; cannot open \"%s\"", s
+        EEND;
+    }
+    else {                                      /* prepare to open file    */
+        String stmode;
+        if (binary) {
+            stmode = (hmode&HAPPEND) ? "ab+" :
+                     (hmode&HWRITE)  ? "wb+" :
+                     (hmode&HREAD)   ? "rb" : (String)0;
+        } else {
+            stmode = (hmode&HAPPEND) ? "a+"  :
+                     (hmode&HWRITE)  ? "w+"  :
+                     (hmode&HREAD)   ? "r"  : (String)0;
+        }
+        if (stmode && (handles[i].hfp=fopen(s,stmode))) {
+            handles[i].hmode = hmode;
+            return (handles[i].hcell = ap(HANDCELL,i));
+        }
+    }
+    return NIL;
+}
+
+static Void local freeHandle(n)         /* release handle storage when no  */
+Int n; {                                /* heap references to it remain    */
+    if (0<=n && n<NUM_HANDLES && nonNull(handles[n].hcell)) {
+        if (n>HSTDERR && handles[n].hmode!=HCLOSED && handles[n].hfp) {
+            fclose(handles[n].hfp);
+            handles[n].hfp = 0;
+        }
+        fst(handles[n].hcell) = snd(handles[n].hcell) = NIL;
+        handles[n].hcell      = NIL;
+    }
+}
+#endif
+
+#if GC_MALLOCPTRS
+/* --------------------------------------------------------------------------
+ * Malloc Ptrs:
+ * ------------------------------------------------------------------------*/
+
+struct strMallocPtr mallocPtrs[NUM_MALLOCPTRS];
+
+/* It might GC (because it uses a table not a list) which will trash any
+ * unstable pointers.  
+ * (It happens that we never use it with unstable pointers.)
+ */
+Cell mkMallocPtr(ptr,cleanup)            /* create a new malloc pointer    */
+Ptr ptr;
+Void (*cleanup) Args((Ptr)); {
+    Int i;
+    for (i=0; i<NUM_MALLOCPTRS && mallocPtrs[i].refCount!=0; ++i)
+        ;                                       /* Search for unused entry */
+    if (i>=NUM_MALLOCPTRS) {                    /* If at first we don't    */
+        garbageCollect();                       /* succeed, garbage collect*/
+        for (i=0; i<NUM_MALLOCPTRS && mallocPtrs[i].refCount!=0; ++i)
+            ;                                   /* and try again ...       */
+    }
+    if (i>=NUM_MALLOCPTRS) {                    /* ... before we give up   */
+        ERRMSG(0) "Too many ForeignObjs open"
+        EEND;
+    }
+    mallocPtrs[i].ptr      = ptr;
+    mallocPtrs[i].cleanup  = cleanup;
+    mallocPtrs[i].refCount = 1;
+    return (mallocPtrs[i].mpcell = ap(MPCELL,i));
+}
+
+Void incMallocPtrRefCnt(n,i)             /* change ref count of MallocPtr */
+Int n;
+Int i; {        
+    if (!(0<=n && n<NUM_MALLOCPTRS && mallocPtrs[n].refCount > 0))
+        internal("freeMallocPtr");
+    mallocPtrs[n].refCount += i;
+    if (mallocPtrs[n].refCount <= 0) {
+        mallocPtrs[n].cleanup(mallocPtrs[n].ptr);
+
+        mallocPtrs[n].ptr      = 0;
+        mallocPtrs[n].cleanup  = 0;
+        mallocPtrs[n].refCount = 0;
+        mallocPtrs[n].mpcell   = NIL;
+    }
+}
+#endif /* GC_MALLOCPTRS */
+
+/* --------------------------------------------------------------------------
+ * Stable pointers
+ * This is a mechanism that allows the C world to manipulate pointers into the
+ * Haskell heap without having to worry that the garbage collector is going
+ * to delete it or move it around.
+ * The implementation and interface is based on my implementation in
+ * GHC - but, at least for now, is simplified by using a fixed size
+ * table of stable pointers.
+ * ------------------------------------------------------------------------*/
+
+#if GC_STABLEPTRS
+
+/* Each entry in the stable pointer table is either a heap pointer
+ * or is not currently allocated.
+ * Unallocated entries are threaded together into a freelist.
+ * The last entry in the list contains the Cell 0; all other values
+ * contain a Cell whose value is the next free stable ptr in the list.
+ * It follows that stable pointers are strictly positive (>0).
+ */
+static Cell stablePtrTable[NUM_STABLEPTRS];
+static Int  sptFreeList;
+#define SPT(sp) stablePtrTable[(sp)-1]
+
+static Void local resetStablePtrs() {
+    Int i;
+    /* It would be easier to build the free list in the other direction
+     * but, when debugging, it's way easier to understand if the first
+     * pointer allocated is "1".
+     */
+    for(i=1; i < NUM_STABLEPTRS; ++i)
+        SPT(i) = i+1;
+    SPT(NUM_STABLEPTRS) = 0;
+    sptFreeList = 1;
+}
+
+Int mkStablePtr(c)                  /* Create a stable pointer            */
+Cell c; {
+    Int i = sptFreeList;
+    if (i == 0)
+        return 0;
+    sptFreeList = SPT(i);
+    SPT(i) = c;
+    return i;
+}
+
+Cell derefStablePtr(p)              /* Dereference a stable pointer       */
+Int p; {
+    if (!(1 <= p && p <= NUM_STABLEPTRS)) {
+        internal("derefStablePtr");
+    }
+    return SPT(p);
+}
+
+Void freeStablePtr(i)               /* Free a stable pointer             */
+Int i; {
+    SPT(i) = sptFreeList;
+    sptFreeList = i;
+}
+
+#undef SPT
+#endif /* GC_STABLEPTRS */
+
+/* --------------------------------------------------------------------------
+ * plugin support
+ * ------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * GreenCard entry points
+ *
+ * GreenCard generated code accesses Hugs data structures and functions 
+ * (only) via these functions (which are stored in the virtual function
+ * table hugsAPI1.
+ *-------------------------------------------------------------------------*/
+
+#if GREENCARD
+
+static Cell  makeTuple      Args((Int));
+static Cell  makeInt        Args((Int));
+static Cell  makeChar       Args((Char));
+static Char  CharOf         Args((Cell));
+static Cell  makeFloat      Args((FloatPro));
+static Void* derefMallocPtr Args((Cell));
+static Cell* Fst            Args((Cell));
+static Cell* Snd            Args((Cell));
+
+static Cell  makeTuple(n)      Int      n; { return mkTuple(n); }
+static Cell  makeInt(n)        Int      n; { return mkInt(n); }
+static Cell  makeChar(n)       Char     n; { return mkChar(n); }
+static Char  CharOf(n)         Cell     n; { return charOf(n); }
+static Cell  makeFloat(n)      FloatPro n; { return mkFloat(n); }
+static Void* derefMallocPtr(n) Cell     n; { return derefMP(n); }
+static Cell* Fst(n)            Cell     n; { return (Cell*)&fst(n); }
+static Cell* Snd(n)            Cell     n; { return (Cell*)&snd(n); }
+
+HugsAPI1* hugsAPI1() {
+    static HugsAPI1 api;
+    static Bool initialised = FALSE;
+    if (!initialised) {
+        api.nameTrue        = nameTrue;
+        api.nameFalse       = nameFalse;
+        api.nameNil         = nameNil;
+        api.nameCons        = nameCons;
+        api.nameJust        = nameJust;
+        api.nameNothing     = nameNothing;
+        api.nameLeft        = nameLeft;
+        api.nameRight       = nameRight;
+        api.nameUnit        = nameUnit;
+        api.nameIORun       = nameIORun;
+        api.makeInt         = makeInt;
+        api.makeChar        = makeChar;
+        api.CharOf          = CharOf;
+        api.makeFloat       = makeFloat;
+        api.makeTuple       = makeTuple;
+        api.pair            = pair;
+        api.mkMallocPtr     = mkMallocPtr;
+        api.derefMallocPtr  = derefMallocPtr;
+        api.mkStablePtr     = mkStablePtr;
+        api.derefStablePtr  = derefStablePtr;
+        api.freeStablePtr   = freeStablePtr;
+        api.eval            = eval;
+        api.evalWithNoError = evalWithNoError;
+        api.evalFails       = evalFails;
+        api.whnfArgs        = &whnfArgs;
+        api.whnfHead        = &whnfHead;
+        api.whnfInt         = &whnfInt;
+        api.whnfFloat       = &whnfFloat;
+        api.garbageCollect  = garbageCollect;
+        api.stackOverflow   = hugsStackOverflow;
+        api.internal        = internal;
+        api.registerPrims   = registerPrims;
+        api.addPrimCfun     = addPrimCfun;
+        api.inventText      = inventText;
+        api.Fst             = Fst;
+        api.Snd             = Snd;
+        api.cellStack       = cellStack;
+        api.sp              = &sp;
+    }
+    return &api;
+}
+
+#endif /* GREENCARD */
+
 
 /* --------------------------------------------------------------------------
  * storage control:
@@ -2019,6 +2587,38 @@ Int what; {
     switch (what) {
         case RESET   : clearStack();
 
+                       /* the next 2 statements are particularly important
+                        * if you are using GLOBALfst or GLOBALsnd since the
+                        * corresponding registers may be reset to their
+                        * uninitialised initial values by a longjump.
+                        */
+                       heapTopFst = heapFst + heapSize;
+                       heapTopSnd = heapSnd + heapSize;
+#if PROFILING
+                       heapTopThd = heapThd + heapSize;
+                       if (profile) {
+                           garbageCollect();
+                           fclose(profile);
+#if HAVE_HP2PS
+                           system("hp2ps profile.hp");
+#endif
+                           profile = 0;
+                       }
+#endif
+#if IO_HANDLES
+                       handles[HSTDIN].hmode  = HREAD;
+                       handles[HSTDOUT].hmode = HAPPEND;
+                       handles[HSTDERR].hmode = HAPPEND;
+#endif
+#if GC_MALLOCPTRS
+                       for (i=0; i<NUM_MALLOCPTRS; i++)
+                           mallocPtrs[i].mpcell = NIL;
+#endif
+#if !HSCRIPT
+#if GC_STABLEPTRS
+                       resetStablePtrs();
+#endif
+#endif
                        consGC = TRUE;
                        lsave  = NIL;
                        rsave  = NIL;
@@ -2029,12 +2629,14 @@ Int what; {
         case MARK    : 
                        start();
                        for (i=NAMEMIN; i<nameHw; ++i) {
+                           mark(name(i).parent);
                            mark(name(i).defn);
                            mark(name(i).stgVar);
                            mark(name(i).type);
                        }
                        end("Names", nameHw-NAMEMIN);
 
+#if !IGNORE_MODULES
                        start();
                        for (i=MODMIN; i<moduleHw; ++i) {
                            mark(module(i).tycons);
@@ -2044,6 +2646,7 @@ Int what; {
                            mark(module(i).qualImports);
                        }
                        end("Modules", moduleHw-MODMIN);
+#endif
 
                        start();
                        for (i=TYCMIN; i<tyconHw; ++i) {
@@ -2068,8 +2671,8 @@ Int what; {
 
                        start();
                        for (i=INSTMIN; i<instHw; ++i) {
-                           mark(inst(i).kinds);
                            mark(inst(i).head);
+                           mark(inst(i).kinds);
                            mark(inst(i).specifics);
                            mark(inst(i).implements);
                        }
@@ -2085,6 +2688,24 @@ Int what; {
                        mark(lsave);
                        mark(rsave);
                        end("Last expression", 3);
+#if IO_HANDLES
+                       start();
+                       mark(handles[HSTDIN].hcell);
+                       mark(handles[HSTDOUT].hcell);
+                       mark(handles[HSTDERR].hcell);
+                       end("Standard handles", 3);
+#endif
+
+#if GC_STABLEPTRS
+                       start();
+                       for (i=0; i<NUM_STABLEPTRS; ++i)
+                           mark(stablePtrTable[i]);
+                       end("Stable pointers", NUM_STABLEPTRS);
+#endif
+
+#if GC_WEAKPTRS
+                       mark(finalizers);
+#endif
 
                        if (consGC) {
                            start();
@@ -2105,12 +2726,24 @@ Int what; {
 
                        heapTopFst = heapFst + heapSize;
                        heapTopSnd = heapSnd + heapSize;
+#if PROFILING
+                       heapThd = heapAlloc(heapSize);
+                       if (heapThd==(Heap)0) {
+                           ERRMSG(0) "Cannot allocate profiler storage space"
+                           EEND;
+                       }
+                       heapTopThd   = heapThd + heapSize;
+                       profile      = 0;
+                       if (0 == profInterval)
+                           profInterval = heapSize / DEF_PROFINTDIV;
+#endif
                        for (i=1; i<heapSize; ++i) {
                            fst(-i) = FREECELL;
                            snd(-i) = -(i+1);
                        }
                        snd(-heapSize) = NIL;
                        freeList  = -1;
+                       numGcs    = 0;
                        consGC    = TRUE;
                        lsave     = NIL;
                        rsave     = NIL;
@@ -2122,7 +2755,6 @@ Int what; {
                        }
 
                        TABALLOC(text,      char,             NUM_TEXT)
-                       TABALLOC(tabSyntax, struct strSyntax, NUM_SYNTAX)
                        TABALLOC(tyconHash, Tycon,            TYCONHSZ)
                        TABALLOC(tabTycon,  struct strTycon,  NUM_TYCON)
                        TABALLOC(nameHash,  Name,             NAMEHSZ)
@@ -2135,6 +2767,18 @@ Int what; {
 #endif
                        clearStack();
 
+#if IO_HANDLES
+                       TABALLOC(handles,   struct strHandle, NUM_HANDLES)
+                       for (i=0; i<NUM_HANDLES; i++)
+                           handles[i].hcell = NIL;
+                       handles[HSTDIN].hcell  = ap(HANDCELL,HSTDIN);
+                       handles[HSTDIN].hfp    = stdin;
+                       handles[HSTDOUT].hcell = ap(HANDCELL,HSTDOUT);
+                       handles[HSTDOUT].hfp   = stdout;
+                       handles[HSTDERR].hcell = ap(HANDCELL,HSTDERR);
+                       handles[HSTDERR].hfp   = stderr;
+#endif
+
                        textHw        = 0;
                        nextNewText   = NUM_TEXT;
                        nextNewDText  = (-1);
@@ -2143,13 +2787,23 @@ Int what; {
                        for (i=0; i<TEXTHSZ; ++i)
                            textHash[i][0] = NOTEXT;
 
-                       syntaxHw = 0;
 
+#if !IGNORE_MODULES
                        moduleHw = MODMIN;
+#endif
 
                        tyconHw  = TYCMIN;
                        for (i=0; i<TYCONHSZ; ++i)
                            tyconHash[i] = NIL;
+
+#if GC_WEAKPTRS
+                       finalizers   = NIL;
+                       liveWeakPtrs = NIL;
+#endif
+
+#if GC_STABLEPTRS
+                       resetStablePtrs();
+#endif
 
 #if TREX
                        extHw    = EXTMIN;

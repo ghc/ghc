@@ -1,4 +1,4 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Basic data type definitions, prototypes and standard macros including
  * machine dependent variations...
@@ -8,8 +8,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: prelude.h,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:33 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:36 $
  * ------------------------------------------------------------------------*/
 
 #include "config.h"
@@ -228,14 +228,20 @@ extern  int     stricmp    Args((const char *, const char*));
 typedef unsigned Bool;
 #define TRUE     1
 #define FALSE    0
-typedef char    *String;
-typedef int      Int;
-typedef long     Long;
-typedef int      Char;
-typedef unsigned int Word; /* at least 32 bits */
-typedef void*    Ptr;
-typedef void*    Addr;
-typedef Word*    HpPtr;
+
+typedef char           *String;
+typedef int             Int;
+typedef long            Long;
+typedef int             Char;
+typedef unsigned int    Unsigned; /* at least 32 bits */
+typedef void*           Ptr;
+typedef void*           Addr;
+typedef void*           HpPtr;
+
+#define FloatImpType       double
+#define FloatPro           double
+#define FloatFMT           "%.9g"
+
 
 /* ToDo: this should probably go in dynamic.h - but then
  * storage.h has to include dynamic.h!

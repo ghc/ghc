@@ -1,4 +1,4 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Deriving
  *
@@ -7,16 +7,15 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:03 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:27 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
+#include "backend.h"
 #include "connect.h"
 #include "errors.h"
-#include "translate.h" /* for implementConTag */
-#include "derive.h"
 
 static Cell varTrue;
 static Cell varFalse;
@@ -47,7 +46,7 @@ static Cell varMinBound;
 static Cell varMaxBound;
 #endif
 #if DERIVE_SHOW
-static Cell conCons;
+       Cell conCons;
 static Cell varShowField;              /* display single field            */
 static Cell varShowParen;              /* wrap with parens                */
 static Cell varCompose;                /* function composition            */
@@ -88,12 +87,29 @@ static List  local makeDPats2           Args((Cell,Int));
 static Bool  local isEnumType           Args((Tycon));
 #endif
 
+static Pair   local mkAltEq             Args((Int,List));
+static Pair   local mkAltOrd            Args((Int,List));
+static Cell   local prodRange           Args((Int,List,Cell,Cell,Cell));
+static Cell   local prodIndex           Args((Int,List,Cell,Cell,Cell));
+static Cell   local prodInRange         Args((Int,List,Cell,Cell,Cell));
+static List   local mkIxBinds           Args((Int,Cell,Int));
+static Cell   local mkAltShow           Args((Int,Cell,Int));
+static Cell   local showsPrecRhs        Args((Cell,Cell,Int));
+static Cell   local mkReadCon           Args((Name,Cell,Cell));
+static Cell   local mkReadPrefix        Args((Cell));
+static Cell   local mkReadInfix         Args((Cell));
+static Cell   local mkReadTuple         Args((Cell));
+static Cell   local mkReadRecord        Args((Cell,List));
+static List   local mkBndBinds          Args((Int,Cell,Int));
+
+
+
 /* --------------------------------------------------------------------------
  * Deriving Utilities
  * ------------------------------------------------------------------------*/
 
-static List diVars = NIL;               /* Acts as a cache of invented vars*/
-static Int  diNum  = 0;
+List diVars = NIL;                      /* Acts as a cache of invented vars*/
+Int  diNum  = 0;
 
 static List local getDiVars(n)          /* get list of at least n vars for */
 Int n; {                                /* derived instance generation     */
@@ -115,7 +131,107 @@ Cell r; {
     return singleton(pair(NIL,pair(mkInt(line),r)));
 }
 
-#if DERIVE_EQ || DERIVE_ORD
+/* --------------------------------------------------------------------------
+ * Given a datatype:   data T a b = A a b | B Int | C  deriving (Eq, Ord)
+ * The derived definitions of equality and ordering are given by:
+ *
+ *   A a b == A x y  =  a==x && b==y
+ *   B a   == B x    =  a==x
+ *   C     == C      =  True
+ *   _     == _      =  False
+ *
+ *   compare (A a b) (A x y) =  primCompAux a x (compare b y)
+ *   compare (B a)   (B x)   =  compare a x
+ *   compare C       C       =  EQ
+ *   compare a       x       =  cmpConstr a x
+ *
+ * In each case, the last line is only needed if there are multiple
+ * constructors in the datatype definition.
+ * ------------------------------------------------------------------------*/
+
+#define ap2(f,x,y) ap(ap(f,x),y)
+
+List local deriveEq(t)                  /* generate binding for derived == */
+Type t; {                               /* for some TUPLE or DATATYPE t    */
+    List alts = NIL;
+    if (isTycon(t)) {                   /* deal with type constrs          */
+        List cs = tycon(t).defn;
+        for (; hasCfun(cs); cs=tl(cs)) {
+            alts = cons(mkAltEq(tycon(t).line,
+                                makeDPats2(hd(cs),userArity(hd(cs)))),
+                        alts);
+        }
+        if (cfunOf(hd(tycon(t).defn))!=0) {
+            alts = cons(pair(cons(WILDCARD,cons(WILDCARD,NIL)),
+                             pair(mkInt(tycon(t).line),nameFalse)),alts);
+        }
+        alts = rev(alts);
+    }
+    else {                              /* special case for tuples         */
+        alts = singleton(mkAltEq(0,makeDPats2(t,tupleOf(t))));
+    }
+    return singleton(mkBind("==",alts));
+}
+
+static Pair local mkAltEq(line,pats)    /* make alt for an equation for == */
+Int  line;                              /* using patterns in pats for lhs  */
+List pats; {                            /* arguments                       */
+    Cell p = hd(pats);
+    Cell q = hd(tl(pats));
+    Cell e = nameTrue;
+
+    if (isAp(p)) {
+        e = ap2(nameEq,arg(p),arg(q));
+        for (p=fun(p), q=fun(q); isAp(p); p=fun(p), q=fun(q)) {
+            e = ap2(nameAnd,ap2(nameEq,arg(p),arg(q)),e);
+        }
+    }
+    return pair(pats,pair(mkInt(line),e));
+}
+
+List deriveOrd(t)                       /* make binding for derived compare*/
+Type t; {                               /* for some TUPLE or DATATYPE t    */
+    List alts = NIL;
+    if (isEnumType(t)) {                /* special case for enumerations   */
+        alts = mkVarAlts(tycon(t).line,nameConCmp);
+    } else if (isTycon(t)) {            /* deal with type constrs          */
+        List cs = tycon(t).defn;
+        for (; hasCfun(cs); cs=tl(cs)) {
+            alts = cons(mkAltOrd(tycon(t).line,
+                                 makeDPats2(hd(cs),userArity(hd(cs)))),
+                        alts);
+        }
+        if (cfunOf(hd(tycon(t).defn))!=0) {
+            Cell u = inventVar();
+            Cell w = inventVar();
+            alts   = cons(pair(cons(u,singleton(w)),
+                               pair(mkInt(tycon(t).line),
+                                    ap2(nameConCmp,u,w))),alts);
+        }
+        alts = rev(alts);
+    } else {                            /* special case for tuples         */
+        alts = singleton(mkAltOrd(0,makeDPats2(t,tupleOf(t))));
+    }
+    return singleton(mkBind("compare",alts));
+}
+
+static Pair local mkAltOrd(line,pats)   /* make alt for eqn for compare    */
+Int  line;                              /* using patterns in pats for lhs  */
+List pats; {                            /* arguments                       */
+    Cell p = hd(pats);
+    Cell q = hd(tl(pats));
+    Cell e = nameEQ;
+
+    if (isAp(p)) {
+        e = ap2(nameCompare,arg(p),arg(q));
+        for (p=fun(p), q=fun(q); isAp(p); p=fun(p), q=fun(q)) {
+            e = ap(ap2(nameCompAux,arg(p),arg(q)),e);
+        }
+    }
+
+    return pair(pats,pair(mkInt(line),e));
+}
+
 static List local makeDPats2(h,n)       /* generate pattern list           */
 Cell h;                                 /* by putting two new patterns with*/
 Int  n; {                               /* head h and new var components   */
@@ -136,9 +252,47 @@ Int  n; {                               /* head h and new var components   */
     }
     return cons(p,vs);
 }
-#endif
 
-#if DERIVE_ORD || DERIVE_ENUM || DERIVE_IX || DERIVE_BOUNDED
+/* --------------------------------------------------------------------------
+ * Deriving Ix and Enum:
+ * ------------------------------------------------------------------------*/
+
+List deriveEnum(t)              /* Construct definition of enumeration     */
+Tycon t; {
+    Int l = tycon(t).line;
+
+    if (!isEnumType(t)) {
+        ERRMSG(l) "Can only derive instances of Enum for enumeration types"
+        EEND;
+    }
+
+    return cons(mkBind("toEnum",mkVarAlts(l,ap(nameEnToEn,hd(tycon(t).defn)))),
+            cons(mkBind("fromEnum",mkVarAlts(l,nameEnFrEn)),
+             cons(mkBind("enumFrom",mkVarAlts(l,nameEnFrom)),
+              cons(mkBind("enumFromTo",mkVarAlts(l,nameEnFrTo)),
+               cons(mkBind("enumFromThen",mkVarAlts(l,nameEnFrTh)),NIL)))));
+}
+
+List deriveIx(t)                /* Construct definition of indexing        */
+Tycon t; {
+    if (isEnumType(t)) {        /* Definitions for enumerations            */
+        return cons(mkBind("range",mkVarAlts(tycon(t).line,nameEnRange)),
+                cons(mkBind("index",mkVarAlts(tycon(t).line,nameEnIndex)),
+                 cons(mkBind("inRange",mkVarAlts(tycon(t).line,nameEnInRng)),
+                  NIL)));
+    } else if (isTuple(t)) {    /* Definitions for product types           */
+        return mkIxBinds(0,t,tupleOf(t));
+    } else if (isTycon(t) && cfunOf(hd(tycon(t).defn))==0) {
+        return mkIxBinds(tycon(t).line,
+                         hd(tycon(t).defn),
+                         userArity(hd(tycon(t).defn)));
+    }
+    ERRMSG(tycon(t).line)
+        "Can only derive instances of Ix for enumeration or product types"
+    EEND;
+    return NIL;/* NOTREACHED*/
+}
+
 static Bool local isEnumType(t) /* Determine whether t is an enumeration   */
 Tycon t; {                      /* type (i.e. all constructors arity == 0) */
     if (isTycon(t) && (tycon(t).what==DATATYPE || tycon(t).what==NEWTYPE)) {
@@ -148,219 +302,10 @@ Tycon t; {                      /* type (i.e. all constructors arity == 0) */
                 return FALSE;
             }
         }
+        /* ToDo: correct?  addCfunTable(t); */
         return TRUE;
     }
     return FALSE;
-}
-#endif
-
-/* --------------------------------------------------------------------------
- * Given a datatype:   data T a b = A a b | B Int | C  deriving (Eq, Ord)
- * The derived definitions of equality and ordering are given by:
- *
- *   A a b == A x y  =  a==x && b==y
- *   B a   == B x    =  a==x
- *   C     == C      =  True
- *   _     == _      =  False
- *
- *   compare (A a b) (A x y) =  primCompAux a x (compare b y)
- *   compare (B a)   (B x)   =  compare a x
- *   compare C       C       =  EQ
- *   compare a       x       =  cmpConstr a x
- *
- * In each case, the last line is only needed if there are multiple
- * constructors in the datatype definition.
- * ------------------------------------------------------------------------*/
-
-#if DERIVE_EQ
-
-static Pair  local mkAltEq              Args((Int,List));
-
-List deriveEq(t)                        /* generate binding for derived == */
-Type t; {                               /* for some TUPLE or DATATYPE t    */
-    List alts = NIL;
-    if (isTycon(t)) {                   /* deal with type constrs          */
-        List cs = tycon(t).defn;
-        for (; hasCfun(cs); cs=tl(cs)) {
-            alts = cons(mkAltEq(tycon(t).line,
-                                makeDPats2(hd(cs),name(hd(cs)).arity)),
-                        alts);
-        }
-        if (cfunOf(hd(tycon(t).defn))!=0) {
-            alts = cons(pair(cons(WILDCARD,cons(WILDCARD,NIL)),
-                             pair(mkInt(tycon(t).line),varFalse)),alts);
-        }
-        alts = rev(alts);
-    } else {                            /* special case for tuples         */
-        alts = singleton(mkAltEq(0,makeDPats2(t,tupleOf(t))));
-    }
-    return singleton(mkBind("==",alts));
-}
-
-static Pair local mkAltEq(line,pats)    /* make alt for an equation for == */
-Int  line;                              /* using patterns in pats for lhs  */
-List pats; {                            /* arguments                       */
-    Cell p = hd(pats);
-    Cell q = hd(tl(pats));
-    Cell e = varTrue;
-
-    if (isAp(p)) {
-        e = ap2(varEq,arg(p),arg(q));
-        for (p=fun(p), q=fun(q); isAp(p); p=fun(p), q=fun(q)) {
-            e = ap2(varAnd,ap2(varEq,arg(p),arg(q)),e);
-        }
-    }
-    return pair(pats,pair(mkInt(line),e));
-}
-#endif /* DERIVE_EQ */
-
-#if DERIVE_ORD
-
-static Pair  local mkAltOrd             Args((Int,List));
-
-List deriveOrd(t)                       /* make binding for derived compare*/
-Type t; {                               /* for some TUPLE or DATATYPE t    */
-    List alts = NIL;
-    if (isEnumType(t)) {                /* special case for enumerations   */
-        Cell u = inventVar();
-        Cell w = inventVar();
-        Cell rhs = NIL;
-        if (cfunOf(hd(tycon(t).defn))!=0) {
-            implementConToTag(t);
-            rhs = ap2(varCompare,
-                      ap(tycon(t).conToTag,u),
-                      ap(tycon(t).conToTag,w));
-        } else {
-            rhs = varEQ;
-        }
-        alts = singleton(pair(doubleton(u,w),pair(mkInt(tycon(t).line),rhs)));
-    } else if (isTycon(t)) {            /* deal with type constrs          */
-        List cs = tycon(t).defn;
-        for (; hasCfun(cs); cs=tl(cs)) {
-            alts = cons(mkAltOrd(tycon(t).line,
-                                 makeDPats2(hd(cs),name(hd(cs)).arity)),
-                        alts);
-        }
-        if (cfunOf(hd(tycon(t).defn))!=0) {
-            Cell u = inventVar();
-            Cell w = inventVar();
-            implementConToTag(t);
-            alts   = cons(pair(doubleton(u,w),
-                               pair(mkInt(tycon(t).line),
-                                    ap2(varCompare,
-                                        ap(tycon(t).conToTag,u),
-                                        ap(tycon(t).conToTag,w)))),
-                          alts);
-        }
-        alts = rev(alts);
-    } else {                            /* special case for tuples         */
-        alts = singleton(mkAltOrd(0,makeDPats2(t,tupleOf(t))));
-    }
-    return singleton(mkBind("compare",alts));
-}
-
-static Pair local mkAltOrd(line,pats)   /* make alt for eqn for compare    */
-Int  line;                              /* using patterns in pats for lhs  */
-List pats; {                            /* arguments                       */
-    Cell p = hd(pats);
-    Cell q = hd(tl(pats));
-    Cell e = varEQ;
-
-    if (isAp(p)) {
-        e = ap2(varCompare,arg(p),arg(q));
-        for (p=fun(p), q=fun(q); isAp(p); p=fun(p), q=fun(q)) {
-            e = ap3(varCompAux,arg(p),arg(q),e);
-        }
-    }
-
-    return pair(pats,pair(mkInt(line),e));
-}
-#endif /* DERIVE_ORD */
-
-/* --------------------------------------------------------------------------
- * Deriving Ix and Enum:
- * ------------------------------------------------------------------------*/
-
-#if DERIVE_ENUM
-List deriveEnum(t)              /* Construct definition of enumeration     */
-Tycon t; {
-    Int  l    = tycon(t).line;
-    Cell x    = inventVar();
-    Cell y    = inventVar();
-    Cell first = hd(tycon(t).defn);
-    Cell last = tycon(t).defn;
-
-    if (!isEnumType(t)) {
-        ERRMSG(l) "Can only derive instances of Enum for enumeration types"
-        EEND;
-    }
-    while (hasCfun(tl(last))) {
-        last = tl(last);
-    }
-    last = hd(last);
-    implementConToTag(t);
-    implementTagToCon(t);
-    return cons(mkBind("toEnum",      mkVarAlts(l,tycon(t).tagToCon)),
-           cons(mkBind("fromEnum",    mkVarAlts(l,tycon(t).conToTag)),
-           cons(mkBind("enumFrom",    singleton(pair(singleton(x),  pair(mkInt(l),ap2(varEnumFromTo,x,last))))),
-           /* default instance of enumFromTo is good */
-           cons(mkBind("enumFromThen",singleton(pair(doubleton(x,y),pair(mkInt(l),ap3(varEnumFromThenTo,x,y,ap(COND,triple(ap2(varLe,x,y),last,first))))))),
-           /* default instance of enumFromThenTo is good */
-           NIL))));
-}
-#endif /* DERIVE_ENUM */
-
-#if DERIVE_IX
-static List  local mkIxBindsEnum        Args((Tycon));
-static List  local mkIxBinds            Args((Int,Cell,Int));
-static Cell  local prodRange            Args((Int,List,Cell,Cell,Cell));
-static Cell  local prodIndex            Args((Int,List,Cell,Cell,Cell));
-static Cell  local prodInRange          Args((Int,List,Cell,Cell,Cell));
-
-List deriveIx(t)                /* Construct definition of indexing        */
-Tycon t; {
-    Int l = tycon(t).line;
-    if (isEnumType(t)) {        /* Definitions for enumerations            */
-        implementConToTag(t);
-        implementTagToCon(t);
-        return mkIxBindsEnum(t);
-    } else if (isTuple(t)) {    /* Definitions for product types           */
-        return mkIxBinds(0,t,tupleOf(t));
-    } else if (isTycon(t) && cfunOf(hd(tycon(t).defn))==0) {
-        return mkIxBinds(tycon(t).line,
-                         hd(tycon(t).defn),
-                         name(hd(tycon(t).defn)).arity);
-    }
-    ERRMSG(tycon(t).line)
-        "Can only derive instances of Ix for enumeration or product types"
-    EEND;
-    return NIL;/* NOTREACHED*/
-}
-
-/* instance  Ix T  where
- *     range (c1,c2)       =  map tagToCon [conToTag c1 .. conToTag c2]
- *     index b@(c1,c2) ci
- *	   | inRange b ci  =  conToTag ci - conToTag c1
- *	   | otherwise     =  error "Ix.index.T: Index out of range."
- *     inRange (c1,c2) ci  =  conToTag c1 <= i && i <= conToTag c2
- *			      where i = conToTag ci
- */
-static List local mkIxBindsEnum(t)
-Tycon t; {
-    Int l = tycon(t).line;
-    Name tagToCon = tycon(t).tagToCon;
-    Name conToTag = tycon(t).conToTag;
-    Cell b  = inventVar();
-    Cell c1 = inventVar();
-    Cell c2 = inventVar();
-    Cell ci = inventVar();
-    return cons(mkBind("range",  singleton(pair(singleton(ap2(mkTuple(2),c1,c2)), pair(mkInt(l),ap2(varMap,tagToCon,ap2(varEnumFromTo,ap(conToTag,c1),ap(conToTag,c2))))))),
-           cons(mkBind("index",  singleton(pair(doubleton(ap(ASPAT,pair(b,ap2(mkTuple(2),c1,c2))),ci), 
-                                                pair(mkInt(l),ap(COND,triple(ap2(varInRange,b,ci),
-                                                                             ap2(varMinus,ap(conToTag,ci),ap(conToTag,c1)),
-                                                                             ap(varError,mkStr(findText("Ix.index: Index out of range"))))))))),
-           cons(mkBind("inRange",singleton(pair(doubleton(ap2(mkTuple(2),c1,c2),ci), pair(mkInt(l),ap2(varAnd,ap2(varLe,ap(conToTag,c1),ap(conToTag,ci)),ap2(varLe,ap(conToTag,ci),ap(conToTag,c2))))))), /* ToDo: share conToTag ci */
-           NIL)));
 }
 
 static List local mkIxBinds(line,h,n)   /* build bindings for derived Ix on*/
@@ -384,9 +329,8 @@ Int  n; {
     pats = cons(pr,cons(is,NIL));       /* Build [(ls,us),is]              */
 
     return cons(prodRange(line,singleton(pr),ls,us,is),
-           cons(prodIndex(line,pats,ls,us,is),
-           cons(prodInRange(line,pats,ls,us,is),
-           NIL)));
+                cons(prodIndex(line,pats,ls,us,is),
+                     cons(prodInRange(line,pats,ls,us,is),NIL)));
 }
 
 static Cell local prodRange(line,pats,ls,us,is)
@@ -401,7 +345,7 @@ Cell ls, us, is; {
     List e   = NIL;
     for (; isAp(ls); ls=fun(ls), us=fun(us), is=fun(is)) {
         e = cons(ap(FROMQUAL,pair(arg(is),
-                                  ap(varRange,ap2(mkTuple(2),
+                                  ap(nameRange,ap2(mkTuple(2),
                                                    arg(ls),
                                                    arg(us))))),e);
     }
@@ -423,11 +367,11 @@ Cell ls, us, is; {
     List xs = NIL;
     Cell e  = NIL;
     for (; isAp(ls); ls=fun(ls), us=fun(us), is=fun(is)) {
-        xs = cons(ap2(varIndex,ap2(mkTuple(2),arg(ls),arg(us)),arg(is)),xs);
+        xs = cons(ap2(nameIndex,ap2(mkTuple(2),arg(ls),arg(us)),arg(is)),xs);
     }
     for (e=hd(xs); nonNull(xs=tl(xs));) {
         Cell x = hd(xs);
-        e = ap2(varPlus,x,ap2(varMult,ap(varRangeSize,arg(fun(x))),e));
+        e = ap2(namePlus,x,ap2(nameMult,ap(nameRangeSize,arg(fun(x))),e));
     }
     e = singleton(pair(pats,pair(mkInt(line),e)));
     return mkBind("index",e);
@@ -441,25 +385,19 @@ Cell ls, us, is; {
      * inRange (X a b c, X p q r) (X x y z)
      *          = inRange (a,p) x && inRange (b,q) y && inRange (c,r) z
      */
-    Cell e = ap2(varInRange,ap2(mkTuple(2),arg(ls),arg(us)),arg(is));
+    Cell e = ap2(nameInRange,ap2(mkTuple(2),arg(ls),arg(us)),arg(is));
     while (ls=fun(ls), us=fun(us), is=fun(is), isAp(ls)) {
-        e = ap2(varAnd,
-                ap2(varInRange,ap2(mkTuple(2),arg(ls),arg(us)),arg(is)),
+        e = ap2(nameAnd,
+                ap2(nameInRange,ap2(mkTuple(2),arg(ls),arg(us)),arg(is)),
                 e);
     }
     e = singleton(pair(pats,pair(mkInt(line),e)));
     return mkBind("inRange",e);
 }
-#endif /* DERIVE_IX */
 
 /* --------------------------------------------------------------------------
  * Deriving Show:
  * ------------------------------------------------------------------------*/
-
-#if DERIVE_SHOW
-
-static Cell  local mkAltShow            Args((Int,Cell,Int));
-static Cell  local showsPrecRhs         Args((Cell,Cell));
 
 List deriveShow(t)              /* Construct definition of text conversion */
 Tycon t; {
@@ -467,7 +405,7 @@ Tycon t; {
     if (isTycon(t)) {                   /* deal with type constrs          */
         List cs = tycon(t).defn;
         for (; hasCfun(cs); cs=tl(cs)) {
-            alts = cons(mkAltShow(tycon(t).line,hd(cs),name(hd(cs)).arity),
+            alts = cons(mkAltShow(tycon(t).line,hd(cs),userArity(hd(cs))),
                         alts);
         }
         alts = rev(alts);
@@ -484,26 +422,29 @@ Int  a; {
     List vs   = getDiVars(a+1);
     Cell d    = hd(vs);
     Cell pat  = h;
-    while (vs=tl(vs), 0<a--) {
+    List pats = NIL;
+    Int  i    = 0;
+    for (vs=tl(vs); i<a; i++) {
         pat = ap(pat,hd(vs));
+        vs  = tl(vs);
     }
-    return pair(doubleton(d,pat),
-                pair(mkInt(line),showsPrecRhs(d,pat)));
+    pats = cons(d,cons(pat,NIL));
+    return pair(pats,pair(mkInt(line),showsPrecRhs(d,pat,a)));
 }
 
-#define consChar(c) ap(conCons,mkChar(c))
-#define shows0   ap(varShowsPrec,mkInt(0))
-#define shows10  ap(varShowsPrec,mkInt(10))
-#define showsOP  ap(varCompose,consChar('('))
-#define showsOB  ap(varCompose,consChar('{'))
-#define showsCM  ap(varCompose,consChar(','))
-#define showsSP  ap(varCompose,consChar(' '))
-#define showsBQ  ap(varCompose,consChar('`'))
+#define shows0   ap(nameShowsPrec,mkInt(0))
+#define shows10  ap(nameShowsPrec,mkInt(10))
+#define showsOP  ap(nameComp,consChar('('))
+#define showsOB  ap(nameComp,consChar('{'))
+#define showsCM  ap(nameComp,consChar(','))
+#define showsSP  ap(nameComp,consChar(' '))
+#define showsBQ  ap(nameComp,consChar('`'))
 #define showsCP  consChar(')')
 #define showsCB  consChar('}')
 
-static Cell local showsPrecRhs(d,pat)   /* build a rhs for showsPrec for a */
-Cell d, pat; {                          /* given pattern, pat              */
+static Cell local showsPrecRhs(d,pat,a) /* build a rhs for showsPrec for a */
+Cell d, pat;                            /* given pattern, pat              */
+Int  a; {
     Cell h   = getHead(pat);
     List cfs = cfunSfuns;
 
@@ -518,10 +459,10 @@ Cell d, pat; {                          /* given pattern, pat              */
         Int  i   = tupleOf(h);
         Cell rhs = showsCP;
         for (; i>1; --i) {
-            rhs = ap(showsCM,ap2(varCompose,ap(shows0,arg(pat)),rhs));
+            rhs = ap(showsCM,ap2(nameComp,ap(shows0,arg(pat)),rhs));
             pat = fun(pat);
         }
-        return ap(showsOP,ap2(varCompose,ap(shows0,arg(pat)),rhs));
+        return ap(showsOP,ap2(nameComp,ap(shows0,arg(pat)),rhs));
     }
 
     for (; nonNull(cfs) && h!=fst(hd(cfs)); cfs=tl(cfs)) {
@@ -536,11 +477,11 @@ Cell d, pat; {                          /* given pattern, pat              */
          *      = showString lab . showChar '=' . shows val
          */
         Cell rhs     = showsCB;
-        List vs      = revDupOnto(snd(hd(cfs)),NIL);
+        List vs      = dupOnto(snd(hd(cfs)),NIL);
         if (isAp(pat)) {
             for (;;) {
-                rhs = ap2(varCompose,
-                          ap2(varShowField,
+                rhs = ap2(nameComp,
+                          ap2(nameShowField,
                               mkStr(textOf(hd(vs))),
                               arg(pat)),
                           rhs);
@@ -553,16 +494,17 @@ Cell d, pat; {                          /* given pattern, pat              */
                 }
             }
         }
-        rhs = ap2(varCompose,ap(varAppend,mkStr(name(h).text)),ap(showsOB,rhs));
+        rhs = ap2(nameComp,ap(nameApp,mkStr(name(h).text)),ap(showsOB,rhs));
         return rhs;
-    } else if (name(h).arity==0) {
+    }
+    else if (a==0) {
         /* To display a nullary constructor:
          *    showsPrec d Foo = showString "Foo"
          */
-        return ap(varAppend,mkStr(name(h).text));
+        return ap(nameApp,mkStr(name(h).text));
     } else {
-        Syntax s = syntaxOf(name(h).text);
-        if (name(h).arity==2 && assocOf(s)!=APPLIC) {
+        Syntax s = syntaxOf(h);
+        if (a==2 && assocOf(s)!=APPLIC) {
             /* For a binary constructor with prec p:
              * showsPrec d (a :* b) = showParen (d > p)
              *                          (showsPrec lp a . showChar ' ' .
@@ -572,21 +514,23 @@ Cell d, pat; {                          /* given pattern, pat              */
             Int  p   = precOf(s);
             Int  lp  = (assocOf(s)==LEFT_ASS)  ? p : (p+1);
             Int  rp  = (assocOf(s)==RIGHT_ASS) ? p : (p+1);
-            Cell rhs = ap(showsSP,ap2(varShowsPrec,mkInt(rp),arg(pat)));
+            Cell rhs = ap(showsSP,ap2(nameShowsPrec,mkInt(rp),arg(pat)));
             if (defaultSyntax(name(h).text)==APPLIC) {
                 rhs = ap(showsBQ,
-                         ap2(varCompose,
-                             ap(varAppend,mkStr(name(h).text)),
+                         ap2(nameComp,
+                             ap(nameApp,mkStr(name(h).text)),
                              ap(showsBQ,rhs)));
             } else {
-                rhs = ap2(varCompose,ap(varAppend,mkStr(name(h).text)),rhs);
+                rhs = ap2(nameComp,ap(nameApp,mkStr(name(h).text)),rhs);
             }
-            rhs = ap2(varCompose,
-                      ap2(varShowsPrec,mkInt(lp),arg(fun(pat))),
+
+            rhs = ap2(nameComp,
+                      ap2(nameShowsPrec,mkInt(lp),arg(fun(pat))),
                       ap(showsSP,rhs));
-            rhs = ap2(varShowParen,ap2(varLe,mkInt(p+1),d),rhs);
+            rhs = ap2(nameShowParen,ap2(nameLe,mkInt(p+1),d),rhs);
             return rhs;
-        } else {
+        }
+        else {
             /* To display a non-nullary constructor with applicative syntax:
              *    showsPrec d (Foo x y) = showParen (d>=10)
              *                             (showString "Foo" .
@@ -595,10 +539,10 @@ Cell d, pat; {                          /* given pattern, pat              */
              */
             Cell rhs = ap(showsSP,ap(shows10,arg(pat)));
             for (pat=fun(pat); isAp(pat); pat=fun(pat)) {
-                rhs = ap(showsSP,ap2(varCompose,ap(shows10,arg(pat)),rhs));
+                rhs = ap(showsSP,ap2(nameComp,ap(shows10,arg(pat)),rhs));
             }
-            rhs = ap2(varCompose,ap(varAppend,mkStr(name(h).text)),rhs);
-            rhs = ap2(varShowParen,ap2(varLe,mkInt(10),d),rhs);
+            rhs = ap2(nameComp,ap(nameApp,mkStr(name(h).text)),rhs);
+            rhs = ap2(nameShowParen,ap2(nameLe,mkInt(10),d),rhs);
             return rhs;
         }
     }
@@ -612,31 +556,20 @@ Cell d, pat; {                          /* given pattern, pat              */
 #undef  showsBQ
 #undef  showsCP
 #undef  showsCB
-#undef  consChar
-
-#endif /* DERIVE_SHOW */
 
 /* --------------------------------------------------------------------------
  * Deriving Read:
  * ------------------------------------------------------------------------*/
 
-#if DERIVE_READ
-
-static Cell  local mkReadCon            Args((Name,Cell,Cell));
-static Cell  local mkReadPrefix         Args((Cell));
-static Cell  local mkReadInfix          Args((Cell));
-static Cell  local mkReadTuple          Args((Cell));
-static Cell  local mkReadRecord         Args((Cell,List));
-
 #define Tuple2(f,s)      ap2(mkTuple(2),f,s)
-#define Lex(r)           ap(varLex,r)  
+#define Lex(r)           ap(nameLex,r)  
 #define ZFexp(h,q)       ap(FROMQUAL, pair(h,q))
-#define ReadsPrec(n,e)   ap2(varReadsPrec,n,e)
+#define ReadsPrec(n,e)   ap2(nameReadsPrec,n,e)
 #define Lambda(v,e)      ap(LAMBDA,pair(v, pair(mkInt(0),e)))
-#define ReadParen(a,b,c) ap3(varReadParen,a,b,c)
-#define ReadField(f,s)   ap2(varReadField,f,s)
-#define GT(l,r)          ap2(varGt,l,r)
-#define Append(a,b)      ap2(varAppend,a,b)      
+#define ReadParen(a,b,c) ap(ap2(nameReadParen,a,b),c)
+#define ReadField(f,s)   ap2(nameReadField,f,s)
+#define GT(l,r)          ap2(nameGt,l,r)
+#define Append(a,b)      ap2(nameApp,a,b)      
 
 /*  Construct the readsPrec function of the form:
  *
@@ -645,7 +578,7 @@ static Cell  local mkReadRecord         Args((Cell,List));
  *                    ...
  *                    (readParen (d>pn) (\r -> [ (Cn ...,s) | ... ]) r) ... ))
  */
-List deriveRead(t)               /* construct definition of text reader    */
+List deriveRead(t)              /* construct definition of text reader     */
 Cell t; {
     Cell alt  = NIL;
     Cell exp  = NIL;
@@ -657,16 +590,17 @@ Cell t; {
     if (isTycon(t)) {
         List cs = tycon(t).defn;
         List exps = NIL;
-        for(; hasCfun(cs); cs=tl(cs)) {
+        for (; hasCfun(cs); cs=tl(cs)) {
             exps = cons(mkReadCon(hd(cs),d,r),exps);
         }
         /* reverse concatenate list of subexpressions */
         exp = hd(exps);
-        for(exps=tl(exps); nonNull(exps); exps=tl(exps)) {
-            exp = ap2(varAppend,hd(exps),exp);
+        for (exps=tl(exps); nonNull(exps); exps=tl(exps)) {
+            exp = ap2(nameApp,hd(exps),exp);
         }
         line = tycon(t).line;
-    } else { /* Tuples */
+    }
+    else { /* Tuples */
         exp = ap(mkReadTuple(t),r);
     }
     /* printExp(stdout,exp); putc('\n',stdout); */
@@ -680,29 +614,30 @@ Cell t; {
  *
  * for a (non-tuple) constructor "con" of precedence "p".
  */
+
 static Cell local mkReadCon(con, d, r) /* generate reader for a constructor */
 Name con;
 Cell d;
 Cell r; {
     Cell exp = NIL;
     Int  p   = 0;
-    Syntax s = syntaxOf(name(con).text);
+    Syntax s = syntaxOf(con);
     List cfs = cfunSfuns;
     for (; nonNull(cfs) && con!=fst(hd(cfs)); cfs=tl(cfs)) {
     }
     if (nonNull(cfs)) {
         exp = mkReadRecord(con,snd(hd(cfs)));
-        p   = 9;
-    } else if (name(con).arity==2 && assocOf(s)!=APPLIC) {
+        return ReadParen(nameFalse, exp, r);
+    }
+
+    if (userArity(con)==2 && assocOf(s)!=APPLIC) {
         exp = mkReadInfix(con);
         p   = precOf(s);
     } else {
         exp = mkReadPrefix(con);
         p   = 9;
     }
-    return ReadParen(name(con).arity==0 ? varFalse : GT(d,mkInt(p)), 
-                     exp, 
-                     r);
+    return ReadParen(userArity(con)==0 ? nameFalse : GT(d,mkInt(p)), exp, r);
 }
 
 /* Given an n-ary prefix constructor, generate a single lambda
@@ -721,7 +656,7 @@ Cell r; {
  */
 static Cell local mkReadPrefix(con)    /* readsPrec for prefix constructor */
 Cell con; {
-    Int  arity  = name(con).arity;
+    Int  arity  = userArity(con);
     Cell cn     = mkStr(name(con).text);
     Cell r      = inventVar();
     Cell prev_s = inventVar();
@@ -758,7 +693,7 @@ Cell con; {
 static Cell local mkReadInfix( con )
 Cell con;
 {
-    Syntax s  = syntaxOf(name(con).text);
+    Syntax s  = syntaxOf(con);
     Int    p  = precOf(s); 
     Int    lp = assocOf(s)==LEFT_ASS  ? p : (p+1);
     Int    rp = assocOf(s)==RIGHT_ASS ? p : (p+1);
@@ -884,17 +819,13 @@ List fs; {
 #undef GT
 #undef Append
 
-#endif /* DERIVE_READ */
-
 /* --------------------------------------------------------------------------
  * Deriving Bounded:
  * ------------------------------------------------------------------------*/
 
 #if DERIVE_BOUNDED
 
-static List  local mkBndBinds           Args((Int,Cell,Int));
-
-List deriveBounded(t)               /* construct definition of bounds      */
+List deriveBounded(t)             /* construct definition of bounds        */
 Tycon t; {
     if (isEnumType(t)) {
         Cell last  = tycon(t).defn;
@@ -905,12 +836,12 @@ Tycon t; {
         return cons(mkBind("minBound",mkVarAlts(tycon(t).line,first)),
                 cons(mkBind("maxBound",mkVarAlts(tycon(t).line,hd(last))),
                  NIL));
-    } else if (isTuple(t)) {        /* Definitions for product types       */
+    } else if (isTuple(t)) {    /* Definitions for product types           */
         return mkBndBinds(0,t,tupleOf(t));
     } else if (isTycon(t) && cfunOf(hd(tycon(t).defn))==0) {
         return mkBndBinds(tycon(t).line,
                           hd(tycon(t).defn),
-                          name(hd(tycon(t).defn)).arity);
+                          userArity(hd(tycon(t).defn)));
     }
     ERRMSG(tycon(t).line)
      "Can only derive instances of Bounded for enumeration and product types"
@@ -925,18 +856,18 @@ Int  n; {
     Cell minB = h;
     Cell maxB = h;
     while (n-- > 0) {
-        minB = ap(minB,varMinBound);
-        maxB = ap(maxB,varMaxBound);
+        minB = ap(minB,nameMinBnd);
+        maxB = ap(maxB,nameMaxBnd);
     }
     return cons(mkBind("minBound",mkVarAlts(line,minB)),
-           cons(mkBind("maxBound",mkVarAlts(line,maxB)),
-           NIL));
+            cons(mkBind("maxBound",mkVarAlts(line,maxB)),
+             NIL));
 }
-
 #endif /* DERIVE_BOUNDED */
 
+
 /* --------------------------------------------------------------------------
- * Static Analysis control:
+ * Derivation control:
  * ------------------------------------------------------------------------*/
 
 Void deriveControl(what)

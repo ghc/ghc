@@ -1,10 +1,15 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
- * subst.h:     Copyright (c) Mark P Jones 1991-1998.   All rights reserved.
- *              See NOTICE for details and conditions of use etc...
- *              Hugs version 1.3c, March 1998
- *
  * Definitions for substitution data structure and operations.
+ *
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
+ *
+ * $RCSfile: subst.h,v $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:43 $
  * ------------------------------------------------------------------------*/
 
 typedef struct {                        /* Each type variable contains:    */
@@ -28,8 +33,8 @@ extern  List            btyvars;        /* explicitly scoped type vars     */
 #define tyvar(n)        (tyvars+(n))    /* nth type variable               */
 #define tyvNum(t)       ((t)-tyvars)    /* and the corresp. inverse funct. */
 #define isBound(t)      (((t)->bound) && ((t)->bound!=SKOLEM))
-#define aVar            mkOffset(0)     /* Simple skeleton for type var    */
-#define bVar            mkOffset(1)     /* Simple skeleton for type var    */
+#define aVar            mkOffset(0)     /* Simple skeletons for type vars  */
+#define bVar            mkOffset(1)
 #define enterBtyvs()    btyvars = cons(NIL,btyvars)
 #define leaveBtyvs()    btyvars = tl(btyvars)
 
@@ -62,6 +67,7 @@ extern Cell  getDerefHead       Args((Type,Int));
 extern Void  expandSyn          Args((Tycon, Int, Type *, Int *));
 
 extern Void  clearMarks         Args((Void));
+extern Void  markAllVars        Args((Void));
 extern Void  resetGenerics      Args((Void));
 extern Void  markTyvar          Args((Int));
 extern Void  markType           Args((Type,Int));
@@ -102,7 +108,5 @@ extern Bool  unifyPred          Args((Cell,Int,Cell,Int));
 extern Inst  findInstFor        Args((Cell,Int));
 
 extern Bool  sameSchemes        Args((Type,Type));
-
-extern Bool  typeMatches        Args((Type,Type));
 
 /*-------------------------------------------------------------------------*/

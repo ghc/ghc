@@ -1,4 +1,4 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Dynamic loading (of .dll or .so files) for Hugs
  *
@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:06 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:28 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -29,7 +29,7 @@ String fn; {
 void* lookupSymbol(file,symbol)
 ObjectFile file;
 String symbol; {
-    return dlsym(file,symbol)
+    return dlsym(file,symbol);
 }
 
 void* getDLLSymbol(dll,symbol)  /* load dll and lookup symbol */

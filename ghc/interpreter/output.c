@@ -1,24 +1,25 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Unparse expressions and types - for use in error messages, type checker
  * and for debugging.
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
+ * Haskell Group 1994-99, and is distributed as Open Source software
+ * under the Artistic License; see the file "Artistic" that is included
+ * in the distribution for details.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:24 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/03 17:08:33 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
 #include "connect.h"
-#include "input.h"  /* for textPlus */
 #include "errors.h"
-#include "link.h"
 #include <ctype.h>
+
+/*#define DEBUG_SHOWSC*/                /* Must also be set in compiler.c  */
 
 #define DEPTH_LIMIT     15
 
@@ -48,7 +49,7 @@ static Void local unlexCharConst Args((Cell));
 static Void local unlexStrConst  Args((Text));
 
 static Void local putSigType     Args((Cell));
-static Void local putContext     Args((List,Int));
+static Void local putContext     Args((List,List,Int));
 static Void local putPred        Args((Cell,Int));
 static Void local putType        Args((Cell,Int,Int));
 static Void local putTyVar       Args((Int));
@@ -63,6 +64,9 @@ static Void local putKinds       Args((Kinds));
  * ------------------------------------------------------------------------*/
 
 static FILE *outputStream;             /* current output stream            */
+#ifdef DEBUG_SHOWSC                                                    
+static Int  outColumn = 0;             /* current output column number     */
+#endif                                                                 
                                                                        
 #define OPEN(b)    if (b) putChr('(');                                 
 #define CLOSE(b)   if (b) putChr(')');                                 
@@ -70,12 +74,18 @@ static FILE *outputStream;             /* current output stream            */
 static Void local putChr(c)            /* print single character           */
 Int c; {                                                               
     Putc(c,outputStream);                                              
+#ifdef DEBUG_SHOWSC                                                    
+    outColumn++;                                                       
+#endif                                                                 
 }                                                                      
                                                                        
 static Void local putStr(s)            /* print string                     */
 String s; {                                                            
     for (; *s; s++) {                                                  
         Putc(*s,outputStream);                                         
+#ifdef DEBUG_SHOWSC                                                    
+        outColumn++;                                                   
+#endif                                                                 
     }                                                                  
 }                                                                      
                                                                        
@@ -175,16 +185,33 @@ Cell e; {
         case COMP       : putComp(fst(snd(e)),snd(snd(e)));
                           break;
 
+        case MONADCOMP  : putComp(fst(snd(snd(e))),snd(snd(snd(e))));
+                          break;
+
         case CHARCELL   : unlexCharConst(charOf(e));
                           break;
 
-        case INTCELL    : putInt(intOf(e));
+        case INTCELL    : {   Int i = intOf(e);
+                              if (i<0 && d>=UMINUS_PREC) putChr('(');
+                              putInt(i);
+                              if (i<0 && d>=UMINUS_PREC) putChr(')');
+                          }
                           break;
 
-        case BIGCELL    : putStr(bignumToString(e));
+#if BIGNUMS
+        case NEGNUM     :
+        case ZERONUM    :
+        case POSNUM     : xs = bigOut(e,NIL,d>=UMINUS_PREC);
+                          for (; nonNull(xs); xs=tl(xs))
+                              putChr(charOf(arg(hd(xs))));
                           break;
+#endif
 
-        case FLOATCELL  : putStr(floatToString(e));
+        case FLOATCELL  : {   Float f = floatOf(e);
+                              if (f<0 && d>=UMINUS_PREC) putChr('(');
+                              putStr(floatToString(f));
+                              if (f<0 && d>=UMINUS_PREC) putChr(')');
+                          }
                           break;
 
         case STRCELL    : unlexStrConst(textOf(e));
@@ -214,7 +241,7 @@ Cell e; {
 
         case LAMBDA     : xs = fst(snd(e));
                           if (whatIs(xs)==BIGLAM)
-                              xs = snd(snd(e));
+                              xs = snd(snd(xs));
                           while (nonNull(xs) && isDictVal(hd(xs)))
                               xs = tl(xs);
                           if (isNull(xs)) {
@@ -270,7 +297,7 @@ Cell e; {
     putDepth--;
 }
 
-static Void local putFlds(exp,fs)         /* Output exp using labelled fields*/
+static Void local putFlds(exp,fs)       /* Output exp using labelled fields*/
 Cell exp;
 List fs; {
     put(ALWAYS,exp);
@@ -288,7 +315,7 @@ List fs; {
                      isVar(e)  ? textOf(e)    : inventText();
 
             put(NEVER,f);
-            if (s!=t) {
+            if (haskell98 || s!=t) {
                 putStr(" = ");
                 put(NEVER,e);
             }
@@ -336,8 +363,8 @@ Cell e; {
 #if !DEBUG_CODE
     Cell h = getHead(e);
     switch (whatIs(h)) {
-        case DICTVAR  : return TRUE;
-        case NAME     : return isDfun(h);
+        case DICTVAR : return TRUE;
+        case NAME    : return isDfun(h);
     }
 #endif
     return FALSE;
@@ -370,8 +397,8 @@ Cell e; {
     switch (whatIs(h)) {
 #if NPLUSK
         case ADDPAT     : if (args==1)
-                              putInfix(d,textPlus,syntaxOf(textPlus),
-                                         arg(e),snd(h));
+                              putInfix(d,textPlus,syntaxOf(namePlus),
+                                         arg(e),mkInt(intValOf(fun(e))));
                           else
                               putStr("ADDPAT");
                           return;
@@ -384,19 +411,22 @@ Cell e; {
 
         case NAME       : if (args==1 &&
                               ((h==nameFromInt     && isInt(arg(e)))    ||
+#if BIGNUMS
                                (h==nameFromInteger && isBignum(arg(e))) ||
+#endif
                                (h==nameFromDouble  && isFloat(arg(e))))) {
                               put(d,arg(e));
                               return;
                           }
-                          sy = syntaxOf(t = name(h).text);
+                          t  = name(h).text;
+                          sy = syntaxOf(h);
                           break;
 
         case VARIDCELL  :
         case VAROPCELL  :
         case DICTVAR    :
         case CONIDCELL  :
-        case CONOPCELL  : sy = syntaxOf(t = textOf(h));
+        case CONOPCELL  : sy = defaultSyntax(t = textOf(h));
                           break;
 
 #if TREX
@@ -603,20 +633,29 @@ Cell t; {
     putType(t,NEVER,fr);                /* Finally, print rest of type ... */
 }
 
-static Void local putContext(qs,fr)     /* print context list              */
+static Void local putContext(ps,qs,fr)  /* print context list              */
+List ps;
 List qs;
 Int  fr; {
-    if (isNull(qs))
-        putStr("()");
-    else {
-        Int nq = length(qs);
-        if (nq!=1) putChr('(');
-        putPred(hd(qs),fr);
-        while (nonNull(qs=tl(qs))) {
+    Int len = length(ps) + length(qs);
+    Int c   = len;
+    if (len!=1) {
+        putChr('(');
+    }
+    for (; nonNull(ps); ps=tl(ps)) {
+        putPred(hd(ps),fr);
+        if (--c > 0) {
             putStr(", ");
-            putPred(hd(qs),fr);
         }
-        if (nq!=1) putChr(')');
+    }
+    for (; nonNull(qs); qs=tl(qs)) {
+        putPred(hd(qs),fr);
+        if (--c > 0) {
+            putStr(", ");
+        }
+    }
+    if (len!=1) {
+        putChr(')');
     }
 }
 
@@ -649,16 +688,16 @@ Cell t;
 Int  prec;
 Int  fr; {
     switch(whatIs(t)) {
-        case TYCON   : putStr(textToStr(tycon(t).text));
-                       break;
+        case TYCON     : putStr(textToStr(tycon(t).text));
+                         break;
 
-        case TUPLE   : {   Int n = tupleOf(t);
-                           putChr('(');
-                           while (--n > 0)
-                               putChr(',');
-                           putChr(')');
-                       }
-                       break;
+        case TUPLE     : {   Int n = tupleOf(t);
+                             putChr('(');
+                             while (--n > 0)
+                                 putChr(',');
+                             putChr(')');
+                         }
+                         break;
 
         case POLYTYPE  : {   Kinds ks = polySigOf(t);
                              OPEN(prec>=ARROW_PREC);
@@ -674,10 +713,17 @@ Int  fr; {
                          }
                          break;
 
+        case CDICTS    :
         case QUAL      : OPEN(prec>=ARROW_PREC);
-                         putContext(fst(snd(t)),fr);
-                         putStr(" => ");
-                         putType(snd(snd(t)),NEVER,fr);
+                         if (whatIs(snd(snd(t)))==CDICTS) {
+                             putContext(fst(snd(t)),fst(snd(snd(snd(t)))),fr);
+                             putStr(" => ");
+                             putType(snd(snd(snd(snd(t)))),NEVER,fr);
+                         } else {
+                             putContext(fst(snd(t)),NIL,fr);
+                             putStr(" => ");
+                             putType(snd(snd(t)),NEVER,fr);
+                         }
                          CLOSE(prec>=ARROW_PREC);
                          break;
 
@@ -685,61 +731,56 @@ Int  fr; {
         case RANK2     : putType(snd(snd(t)),prec,fr);
                          break;
 
-        case OFFSET  : putTyVar(offsetOf(t));
-                       break;
+        case OFFSET    : putTyVar(offsetOf(t));
+                         break;
 
         case VARIDCELL :
         case VAROPCELL : putChr('_');
                          unlexVar(textOf(t));
                          break;
 
-        case INTCELL : putChr('_');
-                       putInt(intOf(t));
-                       break;
+        case INTCELL   : putChr('_');
+                         putInt(intOf(t));
+                         break;
 
-/* #ifdef DEBUG_TYPES */
-        case STAR    : putChr('*');
-                       break;
-/* #endif */
+        case AP       : {   Cell typeHead = getHead(t);
+                            Bool brackets = (argCount!=0 && prec>=ALWAYS);
+                            Int  args    = argCount;
 
-        case AP      : {   Cell typeHead = getHead(t);
-                           Bool brackets = (argCount!=0 && prec>=ALWAYS);
-                           Int  args     = argCount;
-
-                           if (typeHead==typeList) {
-                               if (argCount==1) {
-                                   putChr('[');
-                                   putType(arg(t),NEVER,fr);
-                                   putChr(']');
-                                   return;
-                               }
-                           }
-                           else if (typeHead==typeArrow) {
-                               if (argCount==2) {
-                                   OPEN(prec>=ARROW_PREC);
-                                   putType(arg(fun(t)),ARROW_PREC,fr);
-                                   putStr(" -> ");
-                                   putType(arg(t),NEVER,fr);
-                                   CLOSE(prec>=ARROW_PREC);
-                                   return;
-                               }
-                               else if (argCount==1) {
-                                   putChr('(');
-                                   putType(arg(t),ARROW_PREC,fr);
-                                   putStr("->)");
-                                   return;
-                               }
-                           }
-                           else if (isTuple(typeHead)) {
-                               if (argCount==tupleOf(typeHead)) {
-                                   putChr('(');
-                                   putTupleType(t,fr);
-                                   putChr(')');
-                                   return;
-                               }
-                           }
+                            if (typeHead==typeList) {
+                                if (argCount==1) {
+                                    putChr('[');
+                                    putType(arg(t),NEVER,fr);
+                                    putChr(']');
+                                    return;
+                                }
+                            }
+                            else if (typeHead==typeArrow) {
+                                if (argCount==2) {
+                                    OPEN(prec>=ARROW_PREC);
+                                    putType(arg(fun(t)),ARROW_PREC,fr);
+                                    putStr(" -> ");
+                                    putType(arg(t),NEVER,fr);
+                                    CLOSE(prec>=ARROW_PREC);
+                                    return;
+                                }
+                                else if (argCount==1) {
+                                    putChr('(');
+                                    putType(arg(t),ARROW_PREC,fr);
+                                    putStr("->)");
+                                    return;
+                                }
+                            }
+                            else if (isTuple(typeHead)) {
+                                if (argCount==tupleOf(typeHead)) {
+                                    putChr('(');
+                                    putTupleType(t,fr);
+                                    putChr(')');
+                                    return;
+                                }
+                            }
 #if TREX
-                           else if (isExt(typeHead)) {
+                            else if (isExt(typeHead)) {
                                 if (args==2) {
                                     String punc = "(";
                                     do {
@@ -764,13 +805,13 @@ Int  fr; {
                                     args-=2;
                             }
 #endif
-                           OPEN(brackets);
-                           putApType(t,args,fr);
-                           CLOSE(brackets);
-                       }
-                       break;
+                            OPEN(brackets);
+                            putApType(t,args,fr);
+                            CLOSE(brackets);
+                        }
+                        break;
 
-        default      : putStr("(bad type)");
+        default       : putStr("(bad type)");
     }
 }
 
@@ -885,7 +926,7 @@ Void printContext(fp,qs)                /* print context on spec. stream   */
 FILE *fp;
 List qs; {
     outputStream = fp;
-    putContext(qs,0);
+    putContext(qs,NIL,0);
 }
 
 Void printPred(fp,pi)                   /* print predicate pi on stream    */
@@ -903,7 +944,7 @@ Kind k; {
 }
 
 Void printKinds(fp,ks)                  /* print list of kinds on stream   */
-FILE *fp;
+FILE  *fp;
 Kinds ks; {
     outputStream = fp;
     putKinds(ks);
