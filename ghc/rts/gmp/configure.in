@@ -21,7 +21,7 @@ dnl  the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 dnl  MA 02111-1307, USA.
 
 
-AC_REVISION($Revision: 1.6 $)dnl
+AC_REVISION($Revision: 1.7 $)dnl
 AC_PREREQ(2.14)dnl
 AC_INIT(gmp-impl.h)
 
@@ -195,6 +195,9 @@ case "$target" in
     gmp_cflags64_cc="-xtarget=native -xarch=v9 -xO4"
     ;;
   sparc64-*-linux*)
+    # Need to think more about the options passed here.  This isn't good for
+    # some sparc64 linux distros, since we end up not optimizing when all the
+    # options below fail.
     os_64bit=yes
     gmp_cflags64_gcc="$gmp_cflags64_gcc -m64 -mptr64 -Wa,-xarch=v9 -mcpu=v9"
     gmp_cflags_gcc="$gmp_cflags_gcc -m32"
@@ -439,14 +442,16 @@ case ${target} in
     path="arm"
     ;;
   [sparcv9*-*-solaris2.[789]* | sparc64*-*-solaris2.[789]* | ultrasparc*-*-solaris2.[789]*])
-    if test -n "$CC64"; then
-      path="sparc64"
-    else
-      path="sparc32/v9 sparc32/v8 sparc32"
+    if test -n "$CC64"
+      then path="sparc64"
+      else path="sparc32/v9 sparc32/v8 sparc32"
     fi
     ;;
   sparc64-*-linux*)
-    path="sparc64"
+    if test -n "$CC64"
+      then path="sparc64"
+      else path="sparc32/v9 sparc32/v8 sparc32"
+    fi
     ;;
   sparcv8*-*-* | microsparc*-*-*)
 	path="sparc32/v8 sparc32"
@@ -877,7 +882,7 @@ for tmp_fn in ${gmp_mpn_functions} ; do
           # that multi-function files get grepped here repeatedly
           gmp_ep=["`
             sed -n 's/^[ 	]*MULFUNC_PROLOGUE(\(.*\))/\1/p' $tmp_file ;
-            sed -n 's/^[ 	]*PROLOGUE(\(.*\))/\1/p' $tmp_file
+            sed -n 's/^[ 	]*PROLOGUE.*(\(.*\))/\1/p' $tmp_file
           `"]
           for gmp_tmp in $gmp_ep; do
             AC_DEFINE_UNQUOTED(HAVE_NATIVE_${gmp_tmp})

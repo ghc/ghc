@@ -828,6 +828,9 @@ DLL_IMPORT mp_limb_t mpn_submul_1 _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb
 #define mpn_submul_1c  __MPN(submul_1c)
 DLL_IMPORT mp_limb_t mpn_submul_1c _PROTO ((mp_ptr, mp_srcptr, mp_size_t, mp_limb_t, mp_limb_t));
 
+#define mpn_tdiv_qr  __MPN(tdiv_qr)
+DLL_IMPORT void mpn_tdiv_qr _PROTO ((mp_ptr, mp_ptr, mp_size_t, mp_srcptr, mp_size_t, mp_srcptr, mp_size_t));
+
 #if defined (__cplusplus)
 }
 #endif
@@ -1071,7 +1074,7 @@ enum
 /* Note: major version number is in mp.h too */
 #define __GNU_MP_VERSION 3
 #define __GNU_MP_VERSION_MINOR 1
-#define __GNU_MP_VERSION_PATCHLEVEL 0
+#define __GNU_MP_VERSION_PATCHLEVEL 1
 
 #define gmp_version __gmp_version
 extern __gmp_const char *gmp_version;
