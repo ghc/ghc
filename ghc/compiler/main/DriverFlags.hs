@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.31 2000/12/11 12:15:15 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.32 2000/12/11 12:30:58 rrt Exp $
 --
 -- Driver flags
 --
@@ -533,21 +533,9 @@ runSomething phase_name cmd
    unless n $ do 
 
    -- and run it!
-#ifndef mingw32_TARGET_OS
-   exit_code <- system cmd `catchAllIO` 
-		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
-#else
-   tmp <- newTempName "sh"
-   h <- openFile tmp WriteMode
-   hPutStrLn h cmd
-   hClose h
-   exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
-		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
-   removeFile tmp
-#endif
+   exit_code <- kludgedSystem cmd phase_name
 
    if exit_code /= ExitSuccess
 	then throwDyn (PhaseFailed phase_name exit_code)
 	else do when (verb >= 3) (putStr "\n")
 	        return ()
-

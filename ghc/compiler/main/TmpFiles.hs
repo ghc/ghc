@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.11 2000/12/07 08:20:46 simonpj Exp $
+-- $Id: TmpFiles.hs,v 1.12 2000/12/11 12:30:58 rrt Exp $
 --
 -- Temporary file management
 --
@@ -19,6 +19,7 @@ module TmpFiles (
 -- main
 import Config
 import Util
+import DriverUtil ( kludgedSystem )
 
 -- hslibs
 import Exception
@@ -51,7 +52,7 @@ cleanTempFiles verbose = do
 
   let blowAway f =
 	   (do  when verbose (hPutStrLn stderr ("Removing: " ++ f))
-		if '*' `elem` f then system ("rm -f " ++ f) >> return ()
+		if '*' `elem` f then kludgedSystem ("rm -f " ++ f) "Cleaning temp files" >> return ()
 			        else removeFile f)
 	    `catchAllIO`
 	   (\_ -> when verbose (hPutStrLn stderr 

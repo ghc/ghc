@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PackageMaintenance.hs,v 1.3 2000/10/26 16:21:02 sewardj Exp $
+-- $Id: PackageMaintenance.hs,v 1.4 2000/12/11 12:30:58 rrt Exp $
 --
 -- GHC Driver program
 --
@@ -78,7 +78,7 @@ maybeRestoreOldConfig conf_file io
         hPutStr stdout "\nWARNING: an error was encountered while the new \n\ 
         	       \configuration was being written.  Attempting to \n\ 
         	       \restore the old configuration... "
-        system ("cp " ++ conf_file ++ ".old " ++ conf_file)
+        kludgedSystem "Restoring old configuration" ("cp " ++ conf_file ++ ".old " ++ conf_file)
         hPutStrLn stdout "done."
 	throw e
     )
@@ -98,7 +98,7 @@ savePackageConfig conf_file = do
     -- mv rather than cp because we've already done an hGetContents
     -- on this file so we won't be able to open it for writing
     -- unless we move the old one out of the way...
-  system ("mv " ++ conf_file ++ " " ++ conf_file ++ ".old")
+  kludgedSystem "Saving package configuration" ("mv " ++ conf_file ++ " " ++ conf_file ++ ".old")
   hPutStrLn stdout "done."
 
 -----------------------------------------------------------------------------
