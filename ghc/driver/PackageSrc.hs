@@ -133,6 +133,10 @@ package_details installing
 #                           ifndef mingw32_TARGET_OS
                             [ "HSstd" ]
 #                           else
+                            -- This splitting is the subject of a totally 
+                            -- horrible hack, which glues HSstd1 and HSstd2 
+                            -- back into HSstd for the purposes of static linking.
+                            -- See DriverState.getPackageLibraries for details.
                             [ "HSstd1", "HSstd2" ]
 #                           endif
                             ,
