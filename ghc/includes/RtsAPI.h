@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.29 2002/07/16 10:58:16 simonmar Exp $
+ * $Id: RtsAPI.h,v 1.30 2002/09/05 08:58:55 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -61,9 +61,6 @@ HaskellObj   rts_mkString     ( char    *s );
 
 HaskellObj   rts_apply        ( HaskellObj, HaskellObj );
 
-/* DEPRECATED (use rts_mkPtr): */
-HaskellObj   rts_mkAddr       ( HsAddr   a );
-
 /* ----------------------------------------------------------------------------
    Deconstructing Haskell objects
    ------------------------------------------------------------------------- */
@@ -83,9 +80,6 @@ HsFloat      rts_getFloat     ( HaskellObj );
 HsDouble     rts_getDouble    ( HaskellObj );
 HsStablePtr  rts_getStablePtr ( HaskellObj );
 HsBool       rts_getBool      ( HaskellObj );
-
-/* DEPRECATED (use rts_getPtr): */
-HsAddr       rts_getAddr      ( HaskellObj );
 
 /* ----------------------------------------------------------------------------
    Evaluating Haskell expressions
