@@ -28,9 +28,6 @@ Package {
 #ifdef mingw32_TARGET_OS
                             , "wsock32", "msvcrt", "kernel32", "user32"
 #endif
-#ifdef mingw32_TARGET_OS
-			    , "kernel32", "user32"
-#endif
 			    ],
 #ifdef INSTALLING
         include_dirs   = [],
