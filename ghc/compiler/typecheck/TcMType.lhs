@@ -844,7 +844,7 @@ checkFreeness forall_tyvars theta
 freeErr pred
   = sep [ptext SLIT("All of the type variables in the constraint") <+> quotes (pprPred pred) <+>
 		   ptext SLIT("are already in scope"),
-	 nest 4 (ptext SLIT("At least one must be universally quantified here"))
+	 nest 4 (ptext SLIT("(at least one must be universally quantified here)"))
     ]
 \end{code}
 
@@ -1007,7 +1007,7 @@ fieldTypeMisMatch field_name
   = sep [ptext SLIT("Different constructors give different types for field"), quotes (ppr field_name)]
 
 existentialCtxt con = ptext SLIT("When checking the existential context of constructor") 
-		      <+> ppr con
+		      <+> quotes (ppr con)
 \end{code}
 
 
