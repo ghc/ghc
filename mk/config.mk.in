@@ -139,11 +139,15 @@ BootingFromHc = @BootingFromHc@
 # rather than registerised code, i.e., disable the mangler?
 BootingFromUnregisterisedHc = @BootingFromUnregisterisedHc@
 
-# build the libs first if we're bootstrapping from .hc files
+# Build Order: we build Happy, Haddock and Alex before GHC if they are
+# in this source tree, just in case our GHC build depends on these
+# local builds rather than installed versions of the tools.
+#
+# Build the libs first if we're bootstrapping from .hc files.
 ifeq "$(BootingFromHc)" "YES"
-AllProjects = glafp-utils libraries hslibs ghc greencard happy hdirect hood nofib haddock alex
+AllProjects = glafp-utils happy alex haddock libraries hslibs ghc greencard hdirect hood nofib
 else
-AllProjects = glafp-utils ghc libraries hslibs greencard happy hdirect hood nofib haddock alex
+AllProjects = glafp-utils happy alex haddock ghc libraries hslibs greencard hdirect hood nofib
 endif
 
 #
