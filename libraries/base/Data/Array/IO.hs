@@ -17,9 +17,9 @@ module Data.Array.IO (
    -- * @IO@ arrays with boxed elements
    IOArray,		-- instance of: Eq, Typeable
 
-#ifdef __GLASGOW_HASKELL__
    -- * @IO@ arrays with unboxed elements
    IOUArray,		-- instance of: Eq, Typeable
+#ifdef __GLASGOW_HASKELL__
    castIOUArray,	-- :: IOUArray i a -> IO (IOUArray i b)
 #endif
 
@@ -43,6 +43,7 @@ import Data.Dynamic
 
 #ifdef __HUGS__
 import Hugs.IOArray
+import Data.Array.Storable
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -71,6 +72,8 @@ instance MArray IOArray e IO where
     newArray    = newIOArray
     unsafeRead  = unsafeReadIOArray
     unsafeWrite = unsafeWriteIOArray
+
+type IOUArray = StorableArray
 #endif /* __HUGS__ */
 
 iOArrayTc :: TyCon
