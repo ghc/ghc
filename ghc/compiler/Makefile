@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.205 2002/01/30 14:05:01 simonmar Exp $
+# $Id: Makefile,v 1.206 2002/02/01 15:18:18 simonmar Exp $
 
 TOP = ..
 
@@ -50,6 +50,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cProjectName          = \"$(ProjectName)\"" >> $(CONFIG_HS)
 	@echo "cProjectVersion       = \"$(ProjectVersion)\"" >> $(CONFIG_HS)
 	@echo "cProjectVersionInt    = \"$(ProjectVersionInt)\"" >> $(CONFIG_HS)
+	@echo "cProjectPatchLevel    = \"$(ProjectPatchLevel)\"" >> $(CONFIG_HS)
 	@echo "cBooterVersion        = \"$(GhcVersion)\"" >> $(CONFIG_HS)
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
 	@echo "cHOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> $(CONFIG_HS)

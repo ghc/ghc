@@ -589,7 +589,7 @@ opt_InPackage			= case lookup_str "-inpackage=" of
 opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
-opt_HiVersion			= read cProjectVersionInt :: Int
+opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 opt_IgnoreAsserts               = lookUp  SLIT("-fignore-asserts")
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
