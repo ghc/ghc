@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.14 $
- * $Date: 2001/02/05 17:27:48 $
+ * $Revision: 1.15 $
+ * $Date: 2001/02/06 12:02:05 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -95,8 +95,8 @@ int it_slides;
 int it_insns;
 int it_BCO_entries;
 
-int it_ofreq[26];
-int it_oofreq[26][26];
+int it_ofreq[27];
+int it_oofreq[27][27];
 int it_lastopc;
 
 void interp_startup ( void )
@@ -107,9 +107,9 @@ void interp_startup ( void )
    for (i = 0; i < N_CLOSURE_TYPES; i++)
       it_unknown_entries[i] = 0;
    it_slides = it_insns = it_BCO_entries = 0;
-   for (i = 0; i < 26; i++) it_ofreq[i] = 0;
-   for (i = 0; i < 26; i++) 
-     for (j = 0; j < 26; j++)
+   for (i = 0; i < 27; i++) it_ofreq[i] = 0;
+   for (i = 0; i < 27; i++) 
+     for (j = 0; j < 27; j++)
         it_oofreq[i][j] = 0;
    it_lastopc = 0;
 }
@@ -131,14 +131,14 @@ void interp_shutdown ( void )
    }
    fprintf(stderr, "%d insns, %d slides, %d BCO_entries\n", 
                    it_insns, it_slides, it_BCO_entries);
-   for (i = 0; i < 26; i++) 
+   for (i = 0; i < 27; i++) 
       fprintf(stderr, "opcode %2d got %d\n", i, it_ofreq[i] );
 
    for (k = 1; k < 20; k++) {
       o_max = 0;
       i_max = j_max = 0;
-      for (i = 0; i < 26; i++) {
-         for (j = 0; j < 26; j++) {
+      for (i = 0; i < 27; i++) {
+         for (j = 0; j < 27; j++) {
 	    if (it_oofreq[i][j] > o_max) {
                o_max = it_oofreq[i][j];
 	       i_max = i; j_max = j;
@@ -369,12 +369,21 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
           register StgInfoTable** itbls = (StgInfoTable**)
                                              (&bco->itbls->payload[0]);
 
+          /* Heap check */
           if (doYouWantToGC()) {
 	     iSp--; StackWord(0) = (W_)bco;
-             cap->rCurrentTSO->what_next = ThreadEnterGHC;
+             cap->rCurrentTSO->what_next = ThreadEnterInterp;
              RETURN(HeapOverflow);
           }
 
+          /* "Standard" stack check */
+          if (iSp - (INTERP_STACK_CHECK_THRESH+1) < iSpLim) {
+             iSp--;
+             StackWord(0) = (W_)obj;
+             cap->rCurrentTSO->what_next = ThreadEnterInterp;
+             RETURN(StackOverflow);
+          }
+ 
 #         ifdef INTERP_STATS
           it_lastopc = 0; /* no opcode */
 #         endif
@@ -402,7 +411,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 
 #         ifdef INTERP_STATS
           it_insns++;
-          ASSERT( (int)instrs[bciPtr] >= 0 && (int)instrs[bciPtr] < 26 );
+          ASSERT( (int)instrs[bciPtr] >= 0 && (int)instrs[bciPtr] < 27 );
           it_ofreq[ (int)instrs[bciPtr] ] ++;
           it_oofreq[ it_lastopc ][ (int)instrs[bciPtr] ] ++;
           it_lastopc = (int)instrs[bciPtr];
@@ -410,6 +419,18 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 
           switch (BCO_NEXT) {
 
+              case bci_STKCHECK: {
+		/* An explicit stack check; we hope these will be
+                   rare. */
+                int stk_words_reqd = BCO_NEXT + 1;
+                if (iSp - stk_words_reqd < iSpLim) {
+                   iSp--;
+                   StackWord(0) = (W_)obj;
+                   cap->rCurrentTSO->what_next = ThreadEnterInterp;
+                   RETURN(StackOverflow);
+                }
+                goto nextInsn;
+              }
               case bci_ARGCHECK: {
                  int i;
                  StgPAP* pap;
