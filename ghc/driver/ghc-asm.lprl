@@ -126,6 +126,7 @@ sub init_TARGET_STUFF {
     $T_HDR_data	    = "\.data\n\t\.align 2\n";
     $T_HDR_consist  = "\.text\n";
     $T_HDR_closure  = "\.data\n\t\.align 2\n";
+    $T_HDR_closure  = "\.data\n\t\.align 2\n\t.long 0\n" if ( $TargetPlatform =~ /.*-mingw32$/ );
     $T_HDR_srt      = "\.data\n\t\.align 2\n";
     $T_HDR_info	    = "\.text\n\t\.align 2\n"; # NB: requires padding
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
