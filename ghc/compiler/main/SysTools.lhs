@@ -65,8 +65,8 @@ import Addr
 import qualified Posix
 #else
 import List		( isPrefixOf )
-#endif
 import MarshalArray
+#endif
 
 #include "HsVersions.h"
 
