@@ -38,7 +38,8 @@ BOOT_SRCS += PrelPrimopWrappers.hs
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
-SRC_HC_OPTS += -cpp -fglasgow-exts $(GhcLibHcOpts)
+# -fvia-C added because NCG still can't cope with some primops used in the standard library
+SRC_HC_OPTS += -fvia-C -cpp -fglasgow-exts $(GhcLibHcOpts)
 SRC_HSC2HS_OPTS += -Icbits
 
 ifdef USE_REPORT_PRELUDE
