@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.14 2000/04/11 16:49:20 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.15 2000/04/27 16:35:30 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -385,7 +385,7 @@ int ccall ( CFunDescriptor*  d,
 /* Make it possible for the evaluator to get hold of bytecode
    for a given function by name.  Useful but a hack.  Sigh.
  */
-extern void* getHugs_AsmObject_for ( char* s );
+extern void* /* StgClosure* */ getHugs_BCO_cptr_for ( char* s );
 extern int /*Bool*/ combined;
 
 /* ----------------------------------------------------------------*
@@ -469,7 +469,7 @@ unpackArgsAndCallHaskell_x86_nocallconv_wrk ( StgStablePtr stableptr,
       sstat = rts_evalIO ( node, &nodeOut );
    } else {
       node = rts_apply ( 
-                asmClosureOfObject(getHugs_AsmObject_for("primRunST")), 
+                getHugs_BCO_cptr_for("primRunST"), 
                 node );
       sstat = rts_eval ( node, &nodeOut );
    }

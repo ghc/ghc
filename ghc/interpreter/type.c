@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.34 $
- * $Date: 2000/04/06 14:23:55 $
+ * $Revision: 1.35 $
+ * $Date: 2000/04/27 16:35:30 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -18,6 +18,7 @@
 #include "connect.h"
 #include "errors.h"
 
+#include "Rts.h"       /* to make StgPtr visible in Assembler.h */
 #include "Assembler.h" /* for AsmCTypes */
 
 /*#define DEBUG_TYPES*/

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.39 $
- * $Date: 2000/04/25 17:43:49 $
+ * $Revision: 1.40 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -788,7 +788,6 @@ extern Command readCommand      ( struct cmd *, Char, Char );
  * Freevar analysis: list of free vars after
  * Lambda lifting:   freevar list or UNIT on input, discarded after
  * Code generation:  unused
- * Optimisation:     number of uses (sort-of) of let-bound variable
  * ------------------------------------------------------------------------*/
 
 typedef Cell   StgRhs;
@@ -886,16 +885,12 @@ extern  Name  implementRecShw        ( Text );
 extern  Name  implementRecEq         ( Text );
 #endif
 
-/* Association list storing globals assigned to dictionaries, tuples, etc */
-extern List stgGlobals;
-
-extern List    liftBinds        ( List binds );
+extern void    liftModule       ( Module );
 extern StgExpr substExpr        ( List sub, StgExpr e );
 extern List    freeVarsBind     ( List, StgVar );
 
 
-extern Void    cgBinds          ( StgRhs );
-extern void*   closureOfVar     ( StgVar );
+extern Void    cgModule         ( Module );
 extern char*   lookupHugsName   ( void* );
 
 

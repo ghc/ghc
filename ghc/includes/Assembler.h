@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.12 1999/11/29 18:59:23 sewardj Exp $
+ * $Id: Assembler.h,v 1.13 2000/04/27 16:35:29 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -37,33 +37,81 @@ typedef float           AsmFloat;       /* ToDo: not on Alphas! */
 typedef double          AsmDouble;
 typedef char*           AsmString;
 
+typedef int   AsmSp;   /* stack offset                  */
+typedef int   AsmPc;   /* program counter		*/
+typedef AsmSp AsmVar;  /* offset of a Var on the stack  */
+
 /* I want to #include this file into the file that defines the
  * functions but I don't want to expose the structures that
  * these types point to.
  * This hack is the best I could think of.  Surely there's a better way?
  */
 #ifdef INSIDE_ASSEMBLER_C
-typedef struct AsmObject_ *AsmObject;
-typedef struct AsmBCO_    *AsmBCO;
-typedef struct AsmCAF_    *AsmCAF;
-typedef struct AsmCon_    *AsmCon;
-typedef StgInfoTable      *AsmInfo;
-typedef StgClosure        *AsmClosure;
-typedef Instr              AsmInstr;
+/* these types are defined in Assembler.c */
+typedef 
+   enum { 
+     Asm_RefNoOp,    /* Pointer which needs no further messing with */
+     Asm_RefObject,   /* Reference to malloc'd AsmCAF/AsmBCO/AsmCon */
+     Asm_RefHugs,          /* Reference to Hugs name or tycon table */
+
+     Asm_NonPtrWord,                          /* A non-pointer word */
+     Asm_Insn8,                                /* One BCO insn byte */
+   }
+   Asm_Kind;
+
+typedef
+   struct {
+      Asm_Kind  kind;
+      StgWord   val;   /* StgWord is allegedly big enough to also hold
+                          a pointer, on all platforms */
+   }
+   Asm_Entity;
+
+
+   struct AsmObject_ {
+      unsigned int magic;
+      struct AsmObject_* next;
+      enum { Asm_BCO, Asm_CAF, Asm_Con } kind;
+      int           sizeEntities;
+      int           usedEntities;
+      Asm_Entity*   entities;
+      StgClosure*   closure;
+
+      int           n_refs;          /* number of ptr words  */
+      int           n_words;         /* number of words      */
+      int           n_insns;         /* number of insn BYTES */
+
+      /* AsmCon specifics */
+      StgInfoTable* itbl;
+
+      /* AsmBCO specifics */
+      int /*StgExpr*/ stgexpr;       /* stg tree for debugging */
+      AsmSp           sp;            /* simulated sp */
+      AsmSp           max_sp;        /* high-tide of sp */
+      Instr           lastOpc;       /* last opcode, for peephole opt */
+   };
+   /* AsmObject_ is only mentioned in Assembler.c; clients use
+      AsmObject/AsmBCO/AsmCAF/AsmCon. 
+   */
+
+typedef StgInfoTable*       AsmInfo;
+typedef struct AsmObject_*  AsmBCO;
+typedef struct AsmObject_*  AsmCAF;
+typedef struct AsmObject_*  AsmCon;
+typedef struct AsmObject_*  AsmObject;
+typedef Instr               AsmInstr;
 #else
 /* the types we export are totally opaque */
-typedef void              *AsmObject;
-typedef void              *AsmBCO;
-typedef void              *AsmCAF;
-typedef void              *AsmCon;
-typedef void              *AsmInfo;
-typedef void              *AsmClosure;
-typedef unsigned int       AsmInstr;
+typedef void*               AsmObject;
+typedef void*               AsmBCO;
+typedef void*               AsmCAF;
+typedef void*               AsmCon;
+typedef void*               AsmInfo;
+typedef void*               AsmClosure;
+typedef unsigned int        AsmInstr;
 #endif
 
-typedef int   AsmSp;   /* stack offset                  */
-typedef int   AsmPc;   /* program counter		*/
-typedef AsmSp AsmVar;  /* offset of a Var on the stack  */
+
 
 /* --------------------------------------------------------------------------
  * "Types" used within the assembler
@@ -120,6 +168,17 @@ typedef enum {
 } AsmRep;
 
 /* --------------------------------------------------------------------------
+ * Top-level control of the BCO generation + linking mechanism
+ * ------------------------------------------------------------------------*/
+
+extern void asmInitialise         ( void );
+extern void asmAllocateHeapSpace  ( void );
+extern void asmCopyAndLink        ( void );
+extern void asmShutdown           ( void );
+
+extern void* /* StgClosure* */ asmGetClosureOfObject ( AsmObject );
+
+/* --------------------------------------------------------------------------
  * Allocating (top level) heap objects
  * ------------------------------------------------------------------------*/
 
@@ -129,10 +188,8 @@ extern void       asmEndBCO          ( AsmBCO bco );
 extern AsmBCO     asmBeginContinuation ( AsmSp sp, int /*List*/ alts );
 extern void       asmEndContinuation   ( AsmBCO bco );
 
-extern AsmObject  asmMkObject        ( AsmClosure c );
-
 extern AsmCAF     asmBeginCAF        ( void );
-extern void       asmEndCAF          ( AsmCAF caf, AsmBCO body );
+extern void       asmEndCAF          ( AsmCAF caf );
 
 extern AsmInfo    asmMkInfo          ( AsmNat tag, AsmNat ptrs );
 extern AsmCon     asmBeginCon        ( AsmInfo info );
@@ -143,11 +200,6 @@ extern void       asmEndCon          ( AsmCon con );
  * in right to left order.
  */
 extern void       asmAddPtr          ( AsmObject obj, AsmObject arg );
-
-extern int        asmObjectHasClosure( AsmObject obj );
-extern AsmClosure asmClosureOfObject ( AsmObject obj );
-extern void       asmMarkObject      ( AsmObject obj );
-
 extern int        asmRepSizeW        ( AsmRep rep );
 
 /* --------------------------------------------------------------------------
@@ -212,23 +264,28 @@ extern void     asmEndPrim       ( AsmBCO bco, const AsmPrim* prim,
                                                AsmSp base );
 extern char*    asmGetPrimopName ( AsmPrim* p );
 
-extern AsmBCO asm_BCO_catch    ( void );
-extern AsmBCO asm_BCO_raise    ( void );
-extern AsmBCO asm_BCO_seq      ( void );
-extern AsmBCO asm_BCO_takeMVar ( void );
+extern void* /* StgBCO* */ asm_BCO_catch    ( void );
+extern void* /* StgBCO* */ asm_BCO_raise    ( void );
+extern void* /* StgBCO* */ asm_BCO_seq      ( void );
+extern void* /* StgBCO* */ asm_BCO_takeMVar ( void );
 
 
 /* --------------------------------------------------------------------------
  * Heap manipulation
  * ------------------------------------------------------------------------*/
 
-extern AsmVar asmClosure       ( AsmBCO bco, AsmObject p );
-extern AsmVar asmGHCClosure    ( AsmBCO bco, AsmObject p );
+extern AsmVar asmPushRefHugs   ( AsmBCO bco, int /*Name*/ n );
+extern AsmVar asmPushRefObject ( AsmBCO bco, AsmObject p );
+extern AsmVar asmPushRefNoOp   ( AsmBCO bco, StgPtr p );
+
+extern void   asmAddRefObject  ( AsmObject obj, AsmObject p );
+extern void   asmAddRefNoOp    ( AsmObject obj, StgPtr p );
 
 extern AsmVar asmAllocCONSTR   ( AsmBCO bco, AsmInfo info );
 
 extern AsmSp  asmBeginPack     ( AsmBCO bco );
-extern void   asmEndPack       ( AsmBCO bco, AsmVar v, AsmSp start, AsmInfo info );
+extern void   asmEndPack       ( AsmBCO bco, AsmVar v, AsmSp start, 
+                                                       AsmInfo info );
 
 extern void   asmBeginUnpack   ( AsmBCO bco );
 extern void   asmEndUnpack     ( AsmBCO bco );

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.56 $
- * $Date: 2000/04/25 17:43:49 $
+ * $Revision: 1.57 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -17,6 +17,7 @@
 #include "errors.h"
 #include "object.h"
 
+#include "Rts.h"       /* to make StgPtr visible in Assembler.h */
 #include "Assembler.h"  /* for wrapping GHC objects */
 
 /*#define DEBUG_IFACE*/
@@ -2485,7 +2486,7 @@ Type type; {
  * ------------------------------------------------------------------------*/
 
 #define EXTERN_SYMS_ALLPLATFORMS     \
-      Sym(MainRegTable)              \
+      SymX(MainRegTable)              \
       Sym(stg_gc_enter_1)            \
       Sym(stg_gc_noregs)             \
       Sym(stg_gc_seq_1)              \
@@ -2494,107 +2495,107 @@ Type type; {
       Sym(stg_chk_0)                 \
       Sym(stg_chk_1)                 \
       Sym(stg_gen_chk)               \
-      Sym(stg_exit)                  \
-      Sym(stg_update_PAP)            \
-      Sym(stg_error_entry)           \
-      Sym(__ap_2_upd_info)           \
-      Sym(__ap_3_upd_info)           \
-      Sym(__ap_4_upd_info)           \
-      Sym(__ap_5_upd_info)           \
-      Sym(__ap_6_upd_info)           \
-      Sym(__ap_7_upd_info)           \
-      Sym(__ap_8_upd_info)           \
-      Sym(__sel_0_upd_info)          \
-      Sym(__sel_1_upd_info)          \
-      Sym(__sel_2_upd_info)          \
-      Sym(__sel_3_upd_info)          \
-      Sym(__sel_4_upd_info)          \
-      Sym(__sel_5_upd_info)          \
-      Sym(__sel_6_upd_info)          \
-      Sym(__sel_7_upd_info)          \
-      Sym(__sel_8_upd_info)          \
-      Sym(__sel_9_upd_info)          \
-      Sym(__sel_10_upd_info)         \
-      Sym(__sel_11_upd_info)         \
-      Sym(__sel_12_upd_info)         \
-      Sym(Upd_frame_info)            \
-      Sym(seq_frame_info)            \
-      Sym(CAF_BLACKHOLE_info)        \
-      Sym(IND_STATIC_info)           \
-      Sym(EMPTY_MVAR_info)           \
-      Sym(MUT_ARR_PTRS_FROZEN_info)  \
-      Sym(newCAF)                    \
-      Sym(putMVarzh_fast)            \
-      Sym(newMVarzh_fast)            \
-      Sym(takeMVarzh_fast)           \
-      Sym(takeMaybeMVarzh_fast)      \
-      Sym(catchzh_fast)              \
-      Sym(raisezh_fast)              \
-      Sym(delayzh_fast)              \
-      Sym(yieldzh_fast)              \
-      Sym(killThreadzh_fast)         \
-      Sym(waitReadzh_fast)           \
-      Sym(waitWritezh_fast)          \
-      Sym(CHARLIKE_closure)          \
-      Sym(INTLIKE_closure)           \
-      Sym(suspendThread)             \
-      Sym(resumeThread)              \
+      SymX(stg_exit)                  \
+      SymX(stg_update_PAP)            \
+      SymX(stg_error_entry)           \
+      SymX(__ap_2_upd_info)           \
+      SymX(__ap_3_upd_info)           \
+      SymX(__ap_4_upd_info)           \
+      SymX(__ap_5_upd_info)           \
+      SymX(__ap_6_upd_info)           \
+      SymX(__ap_7_upd_info)           \
+      SymX(__ap_8_upd_info)           \
+      SymX(__sel_0_upd_info)          \
+      SymX(__sel_1_upd_info)          \
+      SymX(__sel_2_upd_info)          \
+      SymX(__sel_3_upd_info)          \
+      SymX(__sel_4_upd_info)          \
+      SymX(__sel_5_upd_info)          \
+      SymX(__sel_6_upd_info)          \
+      SymX(__sel_7_upd_info)          \
+      SymX(__sel_8_upd_info)          \
+      SymX(__sel_9_upd_info)          \
+      SymX(__sel_10_upd_info)         \
+      SymX(__sel_11_upd_info)         \
+      SymX(__sel_12_upd_info)         \
+      SymX(Upd_frame_info)            \
+      SymX(seq_frame_info)            \
+      SymX(CAF_BLACKHOLE_info)        \
+      SymX(IND_STATIC_info)           \
+      SymX(EMPTY_MVAR_info)           \
+      SymX(MUT_ARR_PTRS_FROZEN_info)  \
+      SymX(newCAF)                    \
+      SymX(putMVarzh_fast)            \
+      SymX(newMVarzh_fast)            \
+      SymX(takeMVarzh_fast)           \
+      SymX(takeMaybeMVarzh_fast)      \
+      SymX(catchzh_fast)              \
+      SymX(raisezh_fast)              \
+      SymX(delayzh_fast)              \
+      SymX(yieldzh_fast)              \
+      SymX(killThreadzh_fast)         \
+      SymX(waitReadzh_fast)           \
+      SymX(waitWritezh_fast)          \
+      SymX(CHARLIKE_closure)          \
+      SymX(INTLIKE_closure)           \
+      SymX(suspendThread)             \
+      SymX(resumeThread)              \
       Sym(stackOverflow)             \
-      Sym(int2Integerzh_fast)        \
+      SymX(int2Integerzh_fast)        \
       Sym(stg_gc_unbx_r1)            \
-      Sym(ErrorHdrHook)              \
-      Sym(mkForeignObjzh_fast)       \
-      Sym(__encodeDouble)            \
-      Sym(decodeDoublezh_fast)       \
-      Sym(isDoubleNaN)               \
-      Sym(isDoubleInfinite)          \
-      Sym(isDoubleDenormalized)      \
-      Sym(isDoubleNegativeZero)      \
-      Sym(__encodeFloat)             \
-      Sym(decodeFloatzh_fast)        \
-      Sym(isFloatNaN)                \
-      Sym(isFloatInfinite)           \
-      Sym(isFloatDenormalized)       \
-      Sym(isFloatNegativeZero)       \
-      Sym(__int_encodeFloat)         \
-      Sym(__int_encodeDouble)        \
-      Sym(mpz_cmp_si)                \
-      Sym(mpz_cmp)                   \
-      Sym(__mpn_gcd_1)               \
-      Sym(gcdIntegerzh_fast)         \
-      Sym(newArrayzh_fast)           \
-      Sym(unsafeThawArrayzh_fast)    \
-      Sym(newDoubleArrayzh_fast)     \
-      Sym(newFloatArrayzh_fast)      \
-      Sym(newAddrArrayzh_fast)       \
-      Sym(newWordArrayzh_fast)       \
-      Sym(newIntArrayzh_fast)        \
-      Sym(newCharArrayzh_fast)       \
-      Sym(newMutVarzh_fast)          \
-      Sym(quotRemIntegerzh_fast)     \
-      Sym(quotIntegerzh_fast)        \
-      Sym(remIntegerzh_fast)         \
-      Sym(divExactIntegerzh_fast)    \
-      Sym(divModIntegerzh_fast)      \
-      Sym(timesIntegerzh_fast)       \
-      Sym(minusIntegerzh_fast)       \
-      Sym(plusIntegerzh_fast)        \
-      Sym(addr2Integerzh_fast)       \
-      Sym(mkWeakzh_fast)             \
-      Sym(prog_argv)                 \
-      Sym(prog_argc)                 \
+      SymX(ErrorHdrHook)              \
+      SymX(mkForeignObjzh_fast)       \
+      SymX(__encodeDouble)            \
+      SymX(decodeDoublezh_fast)       \
+      SymX(isDoubleNaN)               \
+      SymX(isDoubleInfinite)          \
+      SymX(isDoubleDenormalized)      \
+      SymX(isDoubleNegativeZero)      \
+      SymX(__encodeFloat)             \
+      SymX(decodeFloatzh_fast)        \
+      SymX(isFloatNaN)                \
+      SymX(isFloatInfinite)           \
+      SymX(isFloatDenormalized)       \
+      SymX(isFloatNegativeZero)       \
+      SymX(__int_encodeFloat)         \
+      SymX(__int_encodeDouble)        \
+      SymX(mpz_cmp_si)                \
+      SymX(mpz_cmp)                   \
+      SymX(__mpn_gcd_1)               \
+      SymX(gcdIntegerzh_fast)         \
+      SymX(newArrayzh_fast)           \
+      SymX(unsafeThawArrayzh_fast)    \
+      SymX(newDoubleArrayzh_fast)     \
+      SymX(newFloatArrayzh_fast)      \
+      SymX(newAddrArrayzh_fast)       \
+      SymX(newWordArrayzh_fast)       \
+      SymX(newIntArrayzh_fast)        \
+      SymX(newCharArrayzh_fast)       \
+      SymX(newMutVarzh_fast)          \
+      SymX(quotRemIntegerzh_fast)     \
+      SymX(quotIntegerzh_fast)        \
+      SymX(remIntegerzh_fast)         \
+      SymX(divExactIntegerzh_fast)    \
+      SymX(divModIntegerzh_fast)      \
+      SymX(timesIntegerzh_fast)       \
+      SymX(minusIntegerzh_fast)       \
+      SymX(plusIntegerzh_fast)        \
+      SymX(addr2Integerzh_fast)       \
+      SymX(mkWeakzh_fast)             \
+      SymX(prog_argv)                 \
+      SymX(prog_argc)                 \
       Sym(resetNonBlockingFd)        \
-      Sym(getStablePtr)              \
-      Sym(stable_ptr_table)          \
+      SymX(getStablePtr)              \
+      SymX(stable_ptr_table)          \
       Sym(createAdjThunk)            \
-      Sym(shutdownHaskellAndExit)    \
+      SymX(shutdownHaskellAndExit)    \
       Sym(stg_enterStackTop)         \
-      Sym(CAF_UNENTERED_entry)       \
+      SymX(CAF_UNENTERED_entry)       \
       Sym(stg_yield_to_Hugs)         \
       Sym(StgReturn)                 \
       Sym(init_stack)                \
-      Sym(blockAsyncExceptionszh_fast)    \
-      Sym(unblockAsyncExceptionszh_fast)  \
+      SymX(blockAsyncExceptionszh_fast)    \
+      SymX(unblockAsyncExceptionszh_fast)  \
                                      \
       /* needed by libHS_cbits */    \
       SymX(malloc)                   \
@@ -2667,7 +2668,7 @@ Type type; {
 
 
 #define EXTERN_SYMS_linux            \
-      Sym(__errno_location)          \
+      SymX(__errno_location)          \
       Sym(__xstat)                   \
       Sym(__fxstat)                  \
       Sym(__lxstat)                  \
@@ -2713,9 +2714,9 @@ EXTERN_SYMS_THISPLATFORM
 
 
 #define Sym(vvv)  { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    &(vvv) },
+                    (void*)(&(vvv)) },
 #define SymX(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    &(vvv) },
+                    (void*)(&(vvv)) },
 OSym rtsTab[] 
    = { 
        EXTERN_SYMS_ALLPLATFORMS

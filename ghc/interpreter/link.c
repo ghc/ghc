@@ -9,16 +9,16 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.59 $
- * $Date: 2000/04/17 13:28:17 $
+ * $Revision: 1.60 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
 #include "storage.h"
 #include "connect.h"
 #include "errors.h"
-#include "Assembler.h"                  /* for asmPrimOps and AsmReps      */
 #include "Rts.h"                        /* to make Prelude.h palatable     */
+#include "Assembler.h"                  /* for asmPrimOps and AsmReps      */
 #include "Prelude.h"                    /* for fixupRTStoPreludeRefs       */
 
 
@@ -773,46 +773,36 @@ assert(nonNull(namePMFail));
                pFun(namePrimRaise,      "primRaise");
                pFun(namePrimTakeMVar,   "primTakeMVar");
                {
-                  StgVar vv = mkStgVar(NIL,NIL);
-                  Name n = namePrimSeq;
-                  name(n).line = 0;
-                  name(n).arity = 1;
-                  name(n).type = NIL;
-                  vv = mkStgVar(NIL,NIL);
-                  stgVarInfo(vv) = mkPtr ( asm_BCO_seq() );
-                  name(n).stgVar = vv;
-                  stgGlobals=cons(pair(n,vv),stgGlobals);
-                  namePrimSeq = n;
+                  Name n          = namePrimSeq;
+                  name(n).line    = 0;
+                  name(n).arity   = 1;
+                  name(n).type    = NIL;
+                  name(n).closure = mkCPtr ( asm_BCO_seq() );
+                  addToCodeList ( modulePrelPrim, n );
                }
                {
-                  StgVar vv = mkStgVar(NIL,NIL);
-                  Name n = namePrimCatch;
-                  name(n).line = 0;
-                  name(n).arity = 2;
-                  name(n).type = NIL;
-                  stgVarInfo(vv) = mkPtr ( asm_BCO_catch() );
-                  name(n).stgVar = vv;
-                  stgGlobals=cons(pair(n,vv),stgGlobals);
+                  Name n          = namePrimCatch;
+                  name(n).line    = 0;
+                  name(n).arity   = 2;
+                  name(n).type    = NIL;
+                  name(n).closure = mkCPtr ( asm_BCO_catch() );
+                  addToCodeList ( modulePrelPrim, n );
                }
                {
-                  StgVar vv = mkStgVar(NIL,NIL);
-                  Name n = namePrimRaise;
-                  name(n).line = 0;
-                  name(n).arity = 1;
-                  name(n).type = NIL;
-                  stgVarInfo(vv) = mkPtr ( asm_BCO_raise() );
-                  name(n).stgVar = vv;
-                  stgGlobals=cons(pair(n,vv),stgGlobals);
+                  Name n          = namePrimRaise;
+                  name(n).line    = 0;
+                  name(n).arity   = 1;
+                  name(n).type    = NIL;
+                  name(n).closure = mkCPtr ( asm_BCO_raise() );
+                  addToCodeList ( modulePrelPrim, n );
                }
                {
-                  StgVar vv = mkStgVar(NIL,NIL);
-                  Name n = namePrimTakeMVar;
-                  name(n).line = 0;
-                  name(n).arity = 2;
-                  name(n).type = NIL;
-                  stgVarInfo(vv) = mkPtr ( asm_BCO_takeMVar() );
-                  name(n).stgVar = vv;
-                  stgGlobals=cons(pair(n,vv),stgGlobals);
+                  Name n          = namePrimTakeMVar;
+                  name(n).line    = 0;
+                  name(n).arity   = 2;
+                  name(n).type    = NIL;
+                  name(n).closure = mkCPtr ( asm_BCO_takeMVar() );
+                  addToCodeList ( modulePrelPrim, n );
                }
 	   }
            break;
@@ -820,5 +810,4 @@ assert(nonNull(namePMFail));
 }
 #undef pFun
 
-//#include "fooble.c"
 /*-------------------------------------------------------------------------*/

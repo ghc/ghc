@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.49 $
- * $Date: 2000/04/25 17:47:42 $
+ * $Revision: 1.50 $
+ * $Date: 2000/04/27 16:35:30 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -71,8 +71,8 @@
 /* Make it possible for the evaluator to get hold of bytecode
    for a given function by name.  Useful but a hack.  Sigh.
  */
-extern void* getHugs_AsmObject_for ( char* s );
-extern int /*Bool*/ combined;
+extern void* /* StgClosure* */ getHugs_BCO_cptr_for ( char* s );
+extern int   /* Bool */ combined;
 
 /* --------------------------------------------------------------------------
  * Crude profiling stuff (mainly to assess effect of optimiser)
@@ -690,8 +690,12 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                                      xPopUpdateFrame(obj);
                                      break;
                                 case STOP_FRAME:
+                                     barf("STOP frame during pap update");
+#if 0
+				     cap->rCurrentTSO->what_next = ThreadComplete;
                                      SSS; PopStopFrame(obj); LLL;
                                      RETURN(ThreadFinished);
+#endif
                                 case SEQ_FRAME:
                                      SSS; PopSeqFrame(); LLL;
                                      ASSERT(xSp != (P_)xSu);
@@ -1478,7 +1482,9 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                                                 + cap->rCurrentTSO->stack_size,xSu);
                                  LLL;
                                  );
+                        cap->rCurrentTSO->what_next = ThreadComplete;
                         SSS; PopStopFrame(obj); LLL;
+                        xPushPtr((P_)obj);
                         RETURN(ThreadFinished);
                     }
                 case RET_BCO:
@@ -1787,7 +1793,7 @@ static inline StgClosure* raiseAnError ( StgClosure* exception )
      * thunks which are currently under evaluation.
      */
     HaskellObj primRaiseClosure
-       = asmClosureOfObject(getHugs_AsmObject_for("primRaise"));
+       = getHugs_BCO_cptr_for("primRaise");
     HaskellObj reraiseClosure
        = rts_apply ( primRaiseClosure, exception );
    
@@ -1828,9 +1834,9 @@ static StgClosure* makeErrorCall ( const char* msg )
       (thinks: probably not so, but anyway ...)
    */
    HaskellObj error 
-      = asmClosureOfObject(getHugs_AsmObject_for("error"));
+      = getHugs_BCO_cptr_for("error");
    HaskellObj unpack
-      = asmClosureOfObject(getHugs_AsmObject_for("hugsprimUnpackString"));
+      = getHugs_BCO_cptr_for("hugsprimUnpackString");
    HaskellObj thunk
       = rts_apply ( unpack, rts_mkAddr ( (void*)msg ) );
    thunk

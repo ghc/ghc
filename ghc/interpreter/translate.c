@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.33 $
- * $Date: 2000/04/06 15:05:30 $
+ * $Revision: 1.34 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -19,6 +19,7 @@
 #include "connect.h"
 #include "errors.h"
 
+#include "Rts.h"       /* to make StgPtr visible in Assembler.h */
 #include "Assembler.h"
 
 
@@ -32,10 +33,7 @@ static StgExpr    local stgExpr      ( Cell,Int,List,StgExpr );
 
 /* ---------------------------------------------------------------- */
 
-/* Association list storing globals assigned to                     */
-/* dictionaries, tuples, etc                                        */
-List stgGlobals = NIL;
-
+#if 0
 static StgVar local getSTGTupleVar ( Cell d )
 {
     Pair p = cellAssoc(d,stgGlobals);
@@ -47,6 +45,7 @@ static StgVar local getSTGTupleVar ( Cell d )
     assert(nonNull(p));
     return snd(p);
 }
+#endif
 
 /* ---------------------------------------------------------------- */
 
@@ -86,7 +85,8 @@ StgExpr failExpr; {
     case VAROPCELL:
             return stgText(textOf(e),sc);
     case TUPLE: 
-            return getSTGTupleVar(e);
+      /* return getSTGTupleVar(e); */
+         return e;
     case NAME:
             return e;
     /* Literals */
@@ -448,7 +448,7 @@ Void stgDefn( Name n, Int arity, Cell e )
         vs = cons(nv,vs);
         sc = cons(pair(mkOffset(i),nv),sc);
     }
-    stgVarBody(name(n).stgVar) 
+    stgVarBody(name(n).closure) 
        = makeStgLambda(vs,stgExpr(e,arity,sc,namePMFail));
 }
 
@@ -476,13 +476,13 @@ List scs; {                             /* in incr order of strict fields. */
         binds = rev(binds);
         e1    = mkStgLet(binds,vcurr);
         v     = mkStgVar(mkStgLambda(dupOnto(argsd,args),e1),NIL);
-        name(c).stgVar = v;
+        name(c).closure = v;
     } else {
         StgVar v = mkStgVar(mkStgCon(c,NIL),NIL);
-        name(c).stgVar = v;
+        name(c).closure = v;
     }
-    stgGlobals = cons(pair(c,name(c).stgVar),stgGlobals); 
-    /* printStg(stderr, name(c).stgVar); fprintf(stderr,"\n\n"); */
+    addToCodeList ( currentModule, c );
+    /* printStg(stderr, name(c).closure); fprintf(stderr,"\n\n"); */
 }
 
 /* --------------------------------------------------------------------------
@@ -745,8 +745,8 @@ Name n; {
     const AsmPrim* p = name(n).primop;
     StgRhs   rhs = makeStgPrim(n,p->monad!=MONAD_Id,NIL,p->args,p->results);
     StgVar   v   = mkStgVar(rhs,NIL);
-    name(n).stgVar   = v;
-    stgGlobals=cons(pair(n,v),stgGlobals);  /* so it will get codegened */
+    name(n).closure = v;
+    addToCodeList ( currentModule, n );
 }
 
 /* Generate wrapper code from (in,out) type lists.
@@ -847,7 +847,7 @@ Void implementForeignImport ( Name n )
 
         if (dynamic) {
            funPtr     = NULL;
-           extra_args = singleton(mkPtr(descriptor));
+           extra_args = singleton(mkAddr(descriptor));
            /* and we know that the first arg will be the function pointer */
         } else {
            extName = name(n).defn;
@@ -861,7 +861,7 @@ Void implementForeignImport ( Name n )
                    textToStr(textOf(fst(extName)))
                EEND;
            }
-           extra_args = doubleton(mkPtr(descriptor),mkPtr(funPtr));
+           extra_args = doubleton(mkAddr(descriptor),mkAddr(funPtr));
         }
 
         rhs              = makeStgPrim(n,addState,extra_args,
@@ -869,11 +869,11 @@ Void implementForeignImport ( Name n )
                                        descriptor->result_tys);
         v                = mkStgVar(rhs,NIL);
         name(n).defn     = NIL;
-        name(n).stgVar   = v;
-        stgGlobals       = cons(pair(n,v),stgGlobals);
+        name(n).closure  = v;
+        addToCodeList ( currentModule, n );
     }
 
-    /* At this point the descriptor contains a tags for all args,
+    /* At this point the descriptor contains a tag for each arg,
        because that makes makeStgPrim generate the correct unwrap
        code.  From now on, the descriptor is only used at the time
        the actual ccall is made.  So we need to zap the leading
@@ -987,23 +987,23 @@ Void implementForeignExport ( Name n )
     v = mkStgVar(fun,NIL);
 
     name(n).defn     = NIL;    
-    name(n).stgVar   = v;
-    stgGlobals       = cons(pair(n,v),stgGlobals);
+    name(n).closure  = v;
+    addToCodeList ( currentModule, n );
     }
 }
 
 Void implementTuple(size)
 Int size; {
     if (size > 0) {
-        Cell    t    = mkTuple(size);
-        List    args = makeArgs(size);
-        StgVar  tv   = mkStgVar(mkStgCon(t,args),NIL);
-        StgExpr e    = mkStgLet(singleton(tv),tv);
-        StgVar  v    = mkStgVar(mkStgLambda(args,e),NIL);
-        stgGlobals   = cons(pair(t,v),stgGlobals);   /* so we can see it */
+        Tycon   t        = mkTuple(size);
+        List    args     = makeArgs(size);
+        StgVar  tv       = mkStgVar(mkStgCon(t,args),NIL);
+        StgExpr e        = mkStgLet(singleton(tv),tv);
+        StgVar  v        = mkStgVar(mkStgLambda(args,e),NIL);
+        tycon(t).closure = v;
+        addToCodeList ( currentModule, t );
     } else {
-        StgVar  tv   = mkStgVar(mkStgCon(nameUnit,NIL),NIL);
-        stgGlobals   = cons(pair(nameUnit,tv),stgGlobals);      /* ditto */
+        addToCodeList ( currentModule, nameUnit );
     }        
 }
 
@@ -1017,10 +1017,8 @@ Int what; {
        case POSTPREL: break;
        case PREPREL:
        case RESET: 
-          stgGlobals=NIL;
           break;
        case MARK: 
-          mark(stgGlobals);
           break;
     }
 }

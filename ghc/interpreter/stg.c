@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.15 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.16 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -18,6 +18,7 @@
 #include "connect.h"
 #include "errors.h"
 
+#include "Rts.h"       /* to make StgPtr visible in Assembler.h */
 #include "Assembler.h" /* for AsmRep and primops */
 
 /* --------------------------------------------------------------------------
@@ -137,7 +138,7 @@ StgRhs e; {
     case BIGCELL:
     case FLOATCELL:
     case STRCELL:
-    case PTRCELL:
+    case ADDRCELL:
             return TRUE;
     default:
             return FALSE;
@@ -192,6 +193,10 @@ static Void putStgAlts    ( Int left, List alts );
 
 static Void local putStgVar(StgVar v) 
 {
+    if (isTuple(v)) {
+       putStr("Tuple");
+       putInt(tupleOf(v));
+    } else
     if (isName(v)) {
         unlexVar(name(v).text);
     } else {
@@ -242,8 +247,8 @@ static Void local putStgAtom( StgAtom a )
     case STRCELL: 
             unlexStrConst(textOf(a));
             break;
-    case PTRCELL: 
-            putPtr(ptrOf(a));
+    case ADDRCELL: 
+            putPtr(addrOf(a));
             putChr('#');
             break;
     case LETREC: case LAMBDA: case CASE: case PRIMCASE: 
@@ -403,7 +408,10 @@ static Void putStgPrimAlts( Int left, List alts )
 
 Void putStgExpr( StgExpr e )                        /* pretty print expr */
 {
-    if (isNull(e)) putStr("(putStgExpr:NIL)");else
+    if (isNull(e)) {
+       putStr("(putStgExpr:NIL)");
+       return;
+    }
 
     switch (whatIs(e)) {
     case LETREC: 
@@ -472,6 +480,7 @@ Void putStgExpr( StgExpr e )                        /* pretty print expr */
             break;
     case STGVAR: 
     case NAME: 
+    case TUPLE:
             putStgVar(e);
             break;
     case CHARCELL: 
@@ -479,7 +488,7 @@ Void putStgExpr( StgExpr e )                        /* pretty print expr */
     case BIGCELL: 
     case FLOATCELL: 
     case STRCELL: 
-    case PTRCELL: 
+    case ADDRCELL: 
             putStgAtom(e);
             break;
     case AP:
@@ -542,7 +551,7 @@ StgVar b;
 {
     Name   n;
     beginStgPP(fp);
-    n = nameFromStgVar(b);
+    n = NIL; /* nameFromStgVar(b); */
     if (nonNull(n)) {
        putStr(textToStr(name(n).text));
     } else {

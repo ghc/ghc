@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.72 $
- * $Date: 2000/04/25 17:43:50 $
+ * $Revision: 1.73 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -660,6 +660,7 @@ Tycon newTycon ( Text t )               /* add new tycon to tycon table    */
     tycon(tc).tagToCon           = NIL;
     tycon(tc).itbl               = NULL;
     tycon(tc).arity              = 0;
+    tycon(tc).closure            = NIL;
     module(currentModule).tycons = cons(tc,module(currentModule).tycons);
     tycon(tc).nextTyconHash      = tyconHash[RC_T(h)];
     tyconHash[RC_T(h)]                 = tc;
@@ -876,14 +877,14 @@ Name newName ( Text t, Cell parent )    /* Add new name to name table      */
     name(nm).number             = EXECNAME;
     name(nm).defn               = NIL;
     name(nm).hasStrict          = FALSE;
-    name(nm).stgVar             = NIL;
     name(nm).callconv           = NIL;
     name(nm).type               = NIL;
     name(nm).primop             = NULL;
     name(nm).itbl               = NULL;
+    name(nm).closure            = NIL;
     module(currentModule).names = cons(nm,module(currentModule).names);
     name(nm).nextNameHash       = nameHash[RC_N(h)];
-    nameHash[RC_N(h)]                 = nm;
+    nameHash[RC_N(h)]           = nm;
     return nm;
 }
 
@@ -964,33 +965,21 @@ Cell id; {                         /* in name table                   */
 }
 
 
-Name nameFromStgVar ( StgVar v )
+void* /* StgClosure* */ getHugs_BCO_cptr_for ( char* s )
 {
-   Int n;
-   for (n = NAME_BASE_ADDR;
-        n < NAME_BASE_ADDR+tabNameSz; n++)
-      if (tabName[n-NAME_BASE_ADDR].inUse)
-         if (name(n).stgVar == v) return n;
-   return NIL;
-}
-
-void* getHugs_AsmObject_for ( char* s )
-{
-   StgVar v;
    Text   t = findText(s);
    Name   n = NIL;
    for (n = NAME_BASE_ADDR; 
         n < NAME_BASE_ADDR+tabNameSz; n++)
-      if (tabName[n-NAME_BASE_ADDR].inUse)
-         if (name(n).text == t) break;
+      if (tabName[n-NAME_BASE_ADDR].inUse && name(n).text == t) 
+         break;
    if (n == NAME_BASE_ADDR+tabNameSz) {
       fprintf ( stderr, "can't find `%s' in ...\n", s );
-      internal("getHugs_AsmObject_for(1)");
+      internal("getHugs_BCO_cptr_for(1)");
    }
-   v = name(n).stgVar;
-   if (!isStgVar(v) || !isPtr(stgVarInfo(v)))
-      internal("getHugs_AsmObject_for(2)");
-   return ptrOf(stgVarInfo(v));
+   if (!isCPtr(name(n).closure))
+      internal("getHugs_BCO_cptr_for(2)");
+   return cptrOf(name(n).closure);
 }
 
 /* --------------------------------------------------------------------------
@@ -1331,6 +1320,7 @@ Inst newInst() {                       /* Add new instance to table        */
     inst(in).kinds             = NIL;
     inst(in).head              = NIL;
     inst(in).specifics         = NIL;
+    inst(in).numSpecifics      = 0;
     inst(in).implements        = NIL;
     inst(in).builder           = NIL;
     return in;
@@ -1610,6 +1600,7 @@ Module newModule ( Text t )             /* add new module to module table  */
     module(mod).classes          = NIL;
     module(mod).exports          = NIL;
     module(mod).qualImports      = NIL;
+    module(mod).codeList         = NIL;
     module(mod).fake             = FALSE;
 
     module(mod).tree             = NIL;
@@ -1669,7 +1660,8 @@ void nukeModule ( Module m )
              module(name(i).mod).mode == FM_SOURCE) {
             free(name(i).itbl);
          }
-         name(i).itbl = NULL;
+         name(i).itbl    = NULL;
+         name(i).closure = NIL;
          freeName(i);
       }
 
@@ -1784,6 +1776,47 @@ Module m; {
     hashSanity();
 }
 
+void addToCodeList   ( Module m, Cell c )
+{
+   assert(isName(c) || isTuple(c));
+   if (nonNull(getNameOrTupleClosure(c)))
+      module(m).codeList = cons ( c, module(m).codeList );
+   /* fprintf ( stderr, "addToCodeList %s %s\n",
+                textToStr(module(m).text), 
+                textToStr( isTuple(c) ? tycon(c).text : name(c).text ) );
+   */
+}
+
+Cell getNameOrTupleClosure ( Cell c )
+{
+   if (isName(c)) return name(c).closure; 
+   else if (isTuple(c)) return tycon(c).closure;
+   else internal("getNameOrTupleClosure");
+}
+
+void setNameOrTupleClosure ( Cell c, Cell closure )
+{
+   if (isName(c)) name(c).closure = closure;
+   else if (isTuple(c)) tycon(c).closure = closure;
+   else internal("setNameOrTupleClosure");
+}
+
+/* This function is used in ghc/rts/Assembler.c. */
+void* /* StgClosure* */ getNameOrTupleClosureCPtr ( Cell c )
+{
+   return cptrOf(getNameOrTupleClosure(c));
+}
+
+/* used in codegen.c */
+void setNameOrTupleClosureCPtr ( Cell c, void* /* StgClosure* */ cptr )
+{
+   if (isName(c)) name(c).closure = mkCPtr(cptr);
+   else if (isTuple(c)) tycon(c).closure = mkCPtr(cptr);
+   else internal("setNameOrTupleClosureCPtr");
+}
+
+
+
 Name jrsFindQualName ( Text mn, Text sn )
 {
    Module m;
@@ -1897,6 +1930,39 @@ OSectionKind lookupSection ( void* ad )
       }
    }
    return HUGS_SECTIONKIND_OTHER;
+}
+
+
+/* Called by the evaluator's GC to tell Hugs to mark stuff in the
+   run-time heap.
+*/
+void markHugsObjects( void )
+{
+    Name  nm;
+    Tycon tc;
+
+    for ( nm = NAME_BASE_ADDR; 
+          nm < NAME_BASE_ADDR+tabNameSz; ++nm ) {
+       if (tabName[nm-NAME_BASE_ADDR].inUse) {
+           Cell cl = name(nm).closure;
+           if (nonNull(cl)) {
+              assert(isCPtr(cl));
+              snd(cl) = MarkRoot ( snd(cl) );
+	   }
+       }
+    }
+
+    for ( tc = TYCON_BASE_ADDR; 
+          tc < TYCON_BASE_ADDR+tabTyconSz; ++tc ) {
+       if (tabTycon[tc-TYCON_BASE_ADDR].inUse) {
+           Cell cl = tycon(tc).closure;
+           if (nonNull(cl)) {
+              assert(isCPtr(cl));
+              snd(cl) = MarkRoot ( snd(cl) );
+	   }
+       }
+    }
+
 }
 
 
@@ -2281,8 +2347,17 @@ Void print ( Cell c, Int depth )
         case CHARCELL:
                 Printf("char('%c')", charOf(c));
                 break;
-        case PTRCELL: 
-                Printf("ptr(%p)",ptrOf(c));
+        case STRCELL:
+                Printf("strcell(\"%s\")",textToStr(snd(c)));
+                break;
+        case MPTRCELL: 
+                Printf("mptr(%p)",mptrOf(c));
+                break;
+        case CPTRCELL: 
+                Printf("cptr(%p)",cptrOf(c));
+                break;
+        case ADDRCELL: 
+                Printf("addr(%p)",addrOf(c));
                 break;
         case CLASS:
                 Printf("class(%d)", c-CCLASS_BASE_ADDR);
@@ -2567,19 +2642,36 @@ Int n; {
 
 typedef union {Int i; Ptr p;} IntOrPtr;
 
-Cell mkPtr(p)
+Cell mkAddr(p)
 Ptr p;
 {
     IntOrPtr x;
     x.p = p;
-    return pair(PTRCELL,x.i);
+    return pair(ADDRCELL,x.i);
 }
 
-Ptr ptrOf(c)
+Ptr addrOf(c)
 Cell c;
 {
     IntOrPtr x;
-    assert(fst(c) == PTRCELL);
+    assert(fst(c) == ADDRCELL);
+    x.i = snd(c);
+    return x.p;
+}
+
+Cell mkMPtr(p)
+Ptr p;
+{
+    IntOrPtr x;
+    x.p = p;
+    return pair(MPTRCELL,x.i);
+}
+
+Ptr mptrOf(c)
+Cell c;
+{
+    IntOrPtr x;
+    assert(fst(c) == MPTRCELL);
     x.i = snd(c);
     return x.p;
 }
@@ -3106,10 +3198,10 @@ void dumpName ( Int n )
    printf ( "  number: %d\n",     name(n).number );
    printf ( "    type: ");        print100(name(n).type);
    printf ( "    defn: %d\n",     name(n).defn );
-   printf ( "  stgVar: ");        print100(name(n).stgVar);
    printf ( "   cconv: %d\n",     name(n).callconv );
    printf ( "  primop: %p\n",     name(n).primop );
    printf ( "    itbl: %p\n",     name(n).itbl );
+   printf ( " closure: %d\n",     name(n).closure );
    printf ( "  nextNH: %d\n",     name(n).nextNameHash );
    printf ( "}\n" );
 }
@@ -3200,7 +3292,7 @@ Int what; {
                              mark(name(i).parent);
                              mark(name(i).type);
                              mark(name(i).defn);
-                             mark(name(i).stgVar);
+                             mark(name(i).closure);
                           }
                        }
                        end("Names", nameHw-NAMEMIN);
@@ -3214,6 +3306,7 @@ Int what; {
                              mark(module(i).classes);
                              mark(module(i).exports);
                              mark(module(i).qualImports);
+                             mark(module(i).codeList);
                              mark(module(i).tree);
                              mark(module(i).uses);
                              mark(module(i).objectExtraNames);
@@ -3231,6 +3324,7 @@ Int what; {
                              mark(tycon(i).kind);
                              mark(tycon(i).what);
                              mark(tycon(i).defn);
+                             mark(tycon(i).closure);
                           }
                        }
                        end("Type constructors", tyconHw-TYCMIN);

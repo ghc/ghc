@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.44 $
- * $Date: 2000/04/25 17:43:50 $
+ * $Revision: 1.45 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #define DEBUG_STORAGE               /* a moderate level of sanity checking */
@@ -60,7 +60,7 @@ typedef Cell         ConVarId;
  * -heapSize .. -1                                    cells in the heap
  * 0                                                  NIL
  *
- * TAG_NONPTR_MIN(100) .. TAG_NONPTR_MAX(115)         non pointer tags
+ * TAG_NONPTR_MIN(100) .. TAG_NONPTR_MAX(116)         non pointer tags
  * TAG_PTR_MIN(200)    .. TAG_PTR_MAX(298)            pointer tags
  * TAG_SPEC_MIN(400)   .. TAG_SPEC_MAX(431)           special tags
  * OFF_MIN(1,000)      .. OFF_MAX(1,999)              offsets
@@ -196,7 +196,7 @@ extern  Cell         whatIs    ( Cell );
  * ------------------------------------------------------------------------*/
 
 #define TAG_NONPTR_MIN 100
-#define TAG_NONPTR_MAX 115
+#define TAG_NONPTR_MAX 116
 
 #define FREECELL     100          /* Free list cell:          snd :: Cell  */
 #define VARIDCELL    101          /* Identifier variable:     snd :: Text  */
@@ -209,16 +209,17 @@ extern  Cell         whatIs    ( Cell );
 #define ADDPAT       108          /* (_+k) pattern discr:     snd :: Int   */
 #define FLOATCELL    109          /* Floating Pt literal:     snd :: Text  */
 #define BIGCELL      110          /* Integer literal:         snd :: Text  */
-#define PTRCELL      111          /* C Heap Pointer           snd :: Ptr   */
-#define CPTRCELL     112          /* Native code pointer      snd :: Ptr   */
+#define ADDRCELL     111          /* Address literal          snd :: Ptr   */
+#define MPTRCELL     112          /* C (malloc) Heap Pointer  snd :: Ptr   */
+#define CPTRCELL     113          /* Closure pointer          snd :: Ptr   */
 
 #if IPARAM
-#define IPCELL       113       	  /* Imp Param Cell:	      snd :: Text  */
-#define IPVAR	     114	  /* ?x:		      snd :: Text  */
+#define IPCELL       114       	  /* Imp Param Cell:	      snd :: Text  */
+#define IPVAR	     115	  /* ?x:		      snd :: Text  */
 #endif
 
 #if TREX
-#define EXTCOPY      115          /* Copy of an Ext:          snd :: Text  */
+#define EXTCOPY      116          /* Copy of an Ext:          snd :: Text  */
 #endif
 
 #define qmodOf(c)       (textOf(fst(snd(c))))    /* c ::  QUALIDENT        */
@@ -266,12 +267,15 @@ extern  Text            textOf       ( Cell );
 #define stringToBignum(s) pair(BIGCELL,findText(s))
 #define bignumToString(b) textToStr(snd(b))
 
-#define isPtr(c)        (isPair(c) && fst(c)==PTRCELL)
-extern  Cell            mkPtr           ( Ptr );
-extern  Ptr             ptrOf           ( Cell );
+#define isMPtr(c)       (isPair(c) && fst(c)==MPTRCELL)
+extern  Cell            mkMPtr          ( Ptr );
+extern  Ptr             mptrOf          ( Cell );
 #define isCPtr(c)       (isPair(c) && fst(c)==CPTRCELL)
 extern  Cell            mkCPtr          ( Ptr );
 extern  Ptr             cptrOf          ( Cell );
+#define isAddr(c)       (isPair(c) && fst(c)==ADDRCELL)
+extern  Cell            mkAddr          ( Ptr );
+extern  Ptr             addrOf          ( Cell );
 
 /* --------------------------------------------------------------------------
  * Tags for pointer cells.
@@ -594,6 +598,9 @@ struct strModule {
 
    List   qualImports; /* Qualified imports.                               */
 
+   List   codeList;    /* [ Name | StgTree ] before code generation,
+                          [ Name | CPtr ] afterwards                       */
+
    Bool   fake;        /* TRUE if module exists only via GHC primop        */
                        /* defn; usually FALSE                              */
 
@@ -628,6 +635,12 @@ extern Void         nukeModule      ( Module );
 extern Module       findModule      ( Text );
 extern Module       findModid       ( Cell );
 extern Void         setCurrModule   ( Module );
+extern void         addToCodeList   ( Module, Cell );
+extern void         setNameOrTupleClosure ( Cell c, Cell closure );
+extern Cell         getNameOrTupleClosure ( Cell c );
+extern void         setNameOrTupleClosureCPtr ( Cell c, 
+                                                void* /* StgClosure* */ cptr );
+
 
 extern void         addOTabName     ( Module,char*,void* );
 extern void*        lookupOTabName  ( Module,char* );
@@ -684,6 +697,11 @@ struct strTycon {
     Name   conToTag;                    /* used in derived code            */
     Name   tagToCon;
     void*  itbl;                       /* For tuples, the info tbl pointer */
+    Cell   closure;       /* Either StgTree, or (later) CPtr, which is the
+                             address in the evaluator's heap.  Only Tuples
+                             use the closure field; all other tycons which
+                             require actual code have associated name table 
+                                                                 entries.  */
     Tycon  nextTyconHash;
 };
 
@@ -743,10 +761,12 @@ struct strName {
     Cell   type;
     Cell   defn;
     Bool   hasStrict;          /* does constructor have strict components? */
-    Cell   stgVar;                                      /* really StgVar   */
     Text   callconv;                          /* for foreign import/export */
     void*  primop;                                      /* really StgPrim* */
     void*  itbl;                 /* For constructors, the info tbl pointer */
+    Cell   closure;       /* Either StgTree, or (later) Ptr, an AsmBCO/
+                             AsmCAF/AsmCon thing, or CPtr, which is the
+                             address in the evaluator's heap               */
     Name   nextNameHash;
 };
 
@@ -791,7 +811,6 @@ extern Name   findQualName    ( Cell );
 extern Name   addPrimCfun     ( Text,Int,Int,Cell );
 extern Name   addPrimCfunREP  ( Text,Int,Int,Int );
 extern Int    sfunPos         ( Name,Name );
-extern Name   nameFromStgVar  ( Cell );
 extern Name   jrsFindQualName ( Text,Text );
 
 extern Name findQualNameWithoutConsultingExportList ( QualId q );

@@ -9,14 +9,16 @@
  * included in the distribution.
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.14 $
- * $Date: 2000/03/23 14:54:20 $
+ * $Revision: 1.15 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
 #include "storage.h"
 #include "connect.h"
 #include "errors.h"
+
+#include "Rts.h"       /* to make StgPtr visible in Assembler.h */
 #include "Assembler.h"
 
 List cfunSfuns;                        /* List of (Cfun,[SelectorVar])    */
@@ -910,14 +912,13 @@ Tycon t; {
             alts = cons(mkStgCaseAlt(c,vs,tag),alts);
         }
 
-        name(nm).line   = tycon(t).line;
-        name(nm).type   = conToTagType(t);
-        name(nm).arity  = 1;
-        name(nm).stgVar = mkStgVar(mkStgLambda(singleton(v),mkStgCase(v,alts)),
-                                   NIL);
+        name(nm).line    = tycon(t).line;
+        name(nm).type    = conToTagType(t);
+        name(nm).arity   = 1;
+        name(nm).closure = mkStgVar(mkStgLambda(singleton(v),mkStgCase(v,alts)),
+                                    NIL);
         tycon(t).conToTag = nm;
-        /* hack to make it print out */
-        stgGlobals = cons(pair(nm,name(nm).stgVar),stgGlobals); 
+        addToCodeList ( currentModule, nm );
     }
 }
 
@@ -979,24 +980,23 @@ Tycon t; {
             alts = cons(mkStgPrimAlt(singleton(pat),c),alts);
         }
 
-        name(nm).line   = tycon(t).line;
-        name(nm).type   = tagToConType(t);
-        name(nm).arity  = 1;
-        name(nm).stgVar = mkStgVar(
-                            mkStgLambda(
-                              singleton(v1),
-                              mkStgCase(
-                                v1,
-                                singleton(
-                                  mkStgCaseAlt(
-                                    nameMkI,
-                                    singleton(v2),
-                                    mkStgPrimCase(v2,alts))))),
-                            NIL
-                          );
+        name(nm).line    = tycon(t).line;
+        name(nm).type    = tagToConType(t);
+        name(nm).arity   = 1;
+        name(nm).closure = mkStgVar(
+                             mkStgLambda(
+                               singleton(v1),
+                               mkStgCase(
+                                 v1,
+                                 singleton(
+                                   mkStgCaseAlt(
+                                     nameMkI,
+                                     singleton(v2),
+                                     mkStgPrimCase(v2,alts))))),
+                             NIL
+                           );
         tycon(t).tagToCon = nm;
-        /* hack to make it print out */
-        stgGlobals = cons(pair(nm,name(nm).stgVar),stgGlobals); 
+        addToCodeList ( currentModule, nm );
     }
 }
 

@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.29 $
- * $Date: 2000/04/21 18:09:30 $
+ * $Revision: 1.30 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1439,49 +1439,22 @@ Cell d1, d2; {                          /* discriminators have same label  */
 
 /*-------------------------------------------------------------------------*/
 
-
-
-/* --------------------------------------------------------------------------
- * STG stuff
- * ------------------------------------------------------------------------*/
-
-static Void local stgCGBinds( List );
-
-static Void local stgCGBinds(binds)
-List binds; {
-    cgBinds(binds);
-}
-
 /* --------------------------------------------------------------------------
  * Main entry points to compiler:
  * ------------------------------------------------------------------------*/
 
-static List addGlobals( List binds )
+Void evalExp ( void )             /* compile and run input expression    */
 {
-    /* stgGlobals = list of top-level STG binds */
-    for(;nonNull(stgGlobals);stgGlobals=tl(stgGlobals)) {
-        StgVar bind = snd(hd(stgGlobals));
-        if (nonNull(stgVarBody(bind))) {
-            binds = cons(bind,binds);
-        }
-    }
-    return binds;
-}
-
-
-Void evalExp ( void ) {             /* compile and run input expression    */
-    /* ToDo: this name (and other names generated during pattern match?)
-     * get inserted in the symbol table but never get removed.
-     */
-    Name n = newName(inventText(),NIL);
     Cell e;
-    StgVar v = mkStgVar(NIL,NIL);
-    name(n).stgVar = v;
+    Name n          = newName(inventText(),NIL);
+    StgVar v        = mkStgVar(NIL,NIL);
+    name(n).closure = v;
+    module(currentModule).codeList = singleton(n);
     compiler(RESET);
     e = pmcTerm(0,NIL,translate(inputExpr));
     stgDefn(n,0,e);
     inputExpr = NIL;
-    stgCGBinds(addGlobals(singleton(v)));
+    cgModule ( name(n).mod );
     
     /* Run thread (and any other runnable threads) */
 
@@ -1522,13 +1495,13 @@ Void evalExp ( void ) {             /* compile and run input expression    */
         Bool            doRevertCAFs = TRUE;  /* do not change -- comment above */
         HugsBreakAction brkOld = setBreakAction ( HugsRtsInterrupt ); 
         nukeModule_needs_major_gc = TRUE;
-        status              = rts_eval_(closureOfVar(v),10000,&result);
+        status              = rts_eval_(cptrOf(name(n).closure),10000,&result);
         setBreakAction ( brkOld );
         fflush (stderr); 
         fflush (stdout);
         switch (status) {
         case Deadlock:
-                printf("{Deadlock or Blackhole}");
+                printf("{Deadlock or Blackhole}"); fflush(stdout);
                 break;
         case Interrupted:
                 printf("{Interrupted}");
@@ -1571,44 +1544,26 @@ Void evalExp ( void ) {             /* compile and run input expression    */
 }
 
 
-static List local addStgVar( List binds, Pair bind )
-{
-    StgVar nv = mkStgVar(NIL,NIL);
-    Text   t  = textOf(fst(bind));
-    Name   n  = findName(t);
-
-    if (isNull(n)) {                   /* Lookup global name - the only way*/
-        n = newName(t,NIL);            /* this (should be able to happen)  */
-    }                                  /* is with new global var introduced*/
-                                       /* after type check; e.g. remPat1   */
-    name(n).stgVar = nv;
-    return cons(nv,binds);
-}
-
-
 Void compileDefns() {                  /* compile script definitions       */
     Target t = length(valDefns) + length(genDefns) + length(selDefns);
     Target i = 0;
-    List binds = NIL;
 
     {
         List vss;
         List vs;
-        for(vs=genDefns; nonNull(vs); vs=tl(vs)) {
-            Name   n  = hd(vs);
-            StgVar nv = mkStgVar(NIL,NIL);
-            assert(isName(n));
-            name(n).stgVar = nv;
-            binds = cons(nv,binds);
+        for (vs = genDefns; nonNull(vs); vs = tl(vs)) {
+            Name   n           = hd(vs);
+            StgVar nv          = mkStgVar(NIL,NIL);
+            name(n).closure    = nv;
+            addToCodeList ( currentModule, n );
         }
-        for(vss=selDefns; nonNull(vss); vss=tl(vss)) {
-            for(vs=hd(vss); nonNull(vs); vs=tl(vs)) {
-                Pair p = hd(vs);
-                Name n = fst(p);
-                StgVar nv = mkStgVar(NIL,NIL);
-                assert(isName(n));
-                name(n).stgVar = nv;
-                binds = cons(nv,binds);
+        for (vss = selDefns; nonNull(vss); vss = tl(vss)) {
+            for (vs = hd(vss); nonNull(vs); vs = tl(vs)) {
+                Pair p          = hd(vs);
+                Name n          = fst(p);
+                StgVar nv       = mkStgVar(NIL,NIL);
+                name(n).closure = nv;
+                addToCodeList ( currentModule, n );
             }
         }
     }
@@ -1616,9 +1571,16 @@ Void compileDefns() {                  /* compile script definitions       */
     setGoal("Translating",t);
     /* do valDefns before everything else so that all stgVar's get added. */
     for (; nonNull(valDefns); valDefns=tl(valDefns)) {
+        List qq;
         hd(valDefns) = transBinds(hd(valDefns));
-        mapAccum(addStgVar,binds,hd(valDefns));
-        mapProc(compileGlobalFunction,hd(valDefns));
+        for (qq = hd(valDefns); nonNull(qq); qq = tl(qq)) {
+           Name n          = findName ( textOf(fst(hd(qq))) );
+           StgVar nv       = mkStgVar(NIL,NIL);
+           assert(nonNull(n));
+           name(n).closure = nv;
+           addToCodeList ( currentModule, n );
+           compileGlobalFunction(hd(qq));
+        }
         soFar(i++);
     }
     for (; nonNull(genDefns); genDefns=tl(genDefns)) {
@@ -1630,10 +1592,9 @@ Void compileDefns() {                  /* compile script definitions       */
         soFar(i++);
     }
 
-    binds = addGlobals(binds);
     done();
     setGoal("Generating code",t);
-    stgCGBinds(binds);
+    cgModule ( currentModule );
 
     done();
 }
@@ -1652,9 +1613,7 @@ static Void local compileGenFunction(n) /* Produce code for internally     */
 Name n; {                               /* generated function              */
     List defs  = name(n).defn;
     Int  arity = length(fst(hd(defs)));
-#if 0
-    printf ( "compGenFn: " );print(defs,100);printf("\n");
-#endif
+
     compiler(RESET);
     currentName = n;
     mapProc(transAlt,defs);

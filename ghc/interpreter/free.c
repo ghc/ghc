@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: free.c,v $
- * $Revision: 1.11 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.12 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -118,6 +118,7 @@ static List freeVarsExpr( List acc, StgExpr e )
     case STGVAR:
             return freeVarsVar(acc, e);
     case NAME:
+    case TUPLE:
             return acc;  /* Names are never free vars */
     default:
             printf("\n");

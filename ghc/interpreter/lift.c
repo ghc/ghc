@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: lift.c,v $
- * $Revision: 1.13 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.14 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -27,16 +27,14 @@
  * ------------------------------------------------------------------------*/
 
 static List liftedBinds    = NIL;
-static Bool makeInlineable = FALSE;
-static Int  inlineCounter  = 0;
 
-static StgExpr abstractExpr ( List vars, StgExpr e );
-static inline Bool isTopLevel( StgVar v );
-static List    filterFreeVars( List vs );
-static List    liftLetBinds ( List binds, Bool topLevel );
-static void    liftAlt      ( StgCaseAlt alt );
-static void    liftPrimAlt  ( StgPrimAlt alt );
-static void    liftExpr     ( StgExpr e );
+static StgExpr abstractExpr   ( List vars, StgExpr e );
+static Bool    isTopLevel     ( StgVar v );
+static List    filterFreeVars ( List vs );
+static List    liftLetBinds   ( List binds, Bool topLevel );
+static void    liftAlt        ( StgCaseAlt alt );
+static void    liftPrimAlt    ( StgPrimAlt alt );
+static void    liftExpr       ( StgExpr e );
 
 /* --------------------------------------------------------------------------
  * Lambda lifter
@@ -59,7 +57,7 @@ static StgExpr abstractExpr( List vars, StgExpr e )
 
 /* ToDo: should be conservative estimate but isn't */
 /* Will a variable be floated out to top level - conservative estimate? */
-static inline Bool isTopLevel( StgVar v )
+static Bool isTopLevel( StgVar v )
 {
     if (isNull(stgVarBody(v))) {
         return FALSE; /* only let bound vars can be floated */
@@ -86,9 +84,11 @@ static List filterFreeVars( List vs )
     }
 }
 
+static Int nameCounter;
+
 static List liftLetBinds( List binds, Bool topLevel )
 {
-    List bs = NIL;
+    List bs          = NIL;
     for(; nonNull(binds); binds=tl(binds)) {
         StgVar bind = hd(binds);
         StgRhs rhs  = stgVarBody(bind);
@@ -105,16 +105,14 @@ static List liftLetBinds( List binds, Bool topLevel )
                 liftExpr(rhs);
                 if (nonNull(fvs)) {
                     StgVar v = mkStgVar(abstractExpr(fvs,rhs),NONE);
-                    liftedBinds = cons(v,liftedBinds);
-                    if (makeInlineable) {
+                    {
                        Name n;
                        char s[16];
-                       sprintf(s,"lam%d",inlineCounter++);
+                       sprintf(s,"(lift%d)",nameCounter++);
                        n = newName(findText(s),NIL);
-                       name(n).stgVar = v;
+                       name(n).closure = v;
                        stgVarBody(bind) = makeStgApp(n, fvs);
-                    } else {
-                       stgVarBody(bind) = makeStgApp(v, fvs);
+                       liftedBinds = cons(n,liftedBinds);
                     }
                 }
                 bs = cons(bind,bs);
@@ -160,36 +158,40 @@ static void liftExpr( StgExpr e )
             break;
     case STGVAR:
     case NAME:
+    case TUPLE:
             break;
     default:
             internal("liftExpr");
     }
 }
 
-/* Lift a list of top-level binds. */
-List liftBinds( List binds )
+/* Lift the list of top-level binds for a module. */
+void liftModule ( Module mod )
 {
-    List bs;
+    List binds = NIL;
+    List cl;
 
-    for(bs=binds; nonNull(bs); bs=tl(bs)) {
-        StgVar bind = hd(bs);
-
+    nameCounter = 0;
+    for (cl = module(mod).codeList; nonNull(cl); cl = tl(cl)) {
+        StgVar bind = getNameOrTupleClosure(hd(cl));
+        if (isCPtr(bind)) continue;
+        assert(nonNull(bind));
         if (debugSC) {
            if (currentModule != modulePrelude) {
               fprintf(stderr, "\n");
-              ppStg(hd(bs));
+              ppStg(bind);
               fprintf(stderr, "\n");
            }
         }
         freeVarsBind(NIL,bind);
         stgVarInfo(bind) = NONE; /* mark as top level */
+        binds = cons(bind,binds);
     }
 
     liftedBinds = NIL;
     binds       = liftLetBinds(binds,TRUE);
-    binds       = revOnto(liftedBinds,binds);
+    module(mod).codeList = revOnto(liftedBinds, module(mod).codeList);
     liftedBinds = NIL;
-    return binds;
 }
 
 /* --------------------------------------------------------------------------

@@ -81,7 +81,9 @@ ObjectCode*  ocNew ( void   (*errMsg)(char*),
    oc->sizesectionTab    = 0;
    oc->usedsectionTab    = 0;
    oc->next              = NULL;
-
+fprintf ( stderr, "ocNew: loading into %10p .. %10p (%d)\n", 
+          ((char*)(oc->oImage)),
+          ((char*)(oc->oImage)) + objFileSize - 1, objFileSize );
    return oc;
 }
                             

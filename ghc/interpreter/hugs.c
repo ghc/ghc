@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.68 $
- * $Date: 2000/04/25 17:43:49 $
+ * $Revision: 1.69 $
+ * $Date: 2000/04/27 16:35:29 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -1783,8 +1783,8 @@ static Void local evaluator() {        /* evaluate expr and print value    */
     } else {
         Cell d = provePred(ks,NIL,ap(classShow,bd));
         if (isNull(d)) {
-	    clearCurrentFile();
-	    printing = FALSE;
+           clearCurrentFile();
+           printing = FALSE;
            ERRMSG(0) "Cannot find \"show\" function for:" ETHEN
            ERRTEXT   "\n*** expression : "   ETHEN ERREXPR(inputExpr);
            ERRTEXT   "\n*** of type    : "   ETHEN ERRTYPE(type);
