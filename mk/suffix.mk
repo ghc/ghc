@@ -309,5 +309,5 @@ endif
 # Preprocessor suffix rule
 
 % : %.pp
-	rm -f $@
+	@$(RM) $@
 	$(CPP) $(CPP_OPTS) -x c $< | $(SED) -e '/^#/d' > $@
