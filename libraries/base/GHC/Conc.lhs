@@ -25,7 +25,8 @@ module GHC.Conc
 	, pseq 		-- :: a -> b -> b
 	, yield         -- :: IO ()
 	, labelThread	-- :: ThreadId -> String -> IO ()
-	, forkProcess	-- :: IO Int
+	, forkProcessPrim -- :: IO Int
+	, forkProcess	-- :: IO (Maybe Int)
 
 	-- Waiting
 	, threadDelay	  	-- :: Int -> IO ()
@@ -48,7 +49,8 @@ module GHC.Conc
 import Data.Maybe
 
 import GHC.Base
-import GHC.IOBase	( IO(..), MVar(..) )
+import GHC.IOBase	( IO(..), MVar(..), ioException, IOException(..), IOErrorType(..) )
+import GHC.Num		( fromInteger, negate )
 import GHC.Base		( Int(..) )
 import GHC.Exception    ( Exception(..), AsyncException(..) )
 import GHC.Pack		( packCString# )
@@ -123,14 +125,54 @@ yield :: IO ()
 yield = IO $ \s -> 
    case (yield# s) of s1 -> (# s1, () #)
 
+{- | 'labelThread' stores a string as identifier for this thread if
+you built a RTS with debugging support. This identifier will be used in
+the debugging output to make distinction of different threads easier
+(otherwise you only have the thread state object\'s address in the heap).
+
+Other applications like the graphical Concurrent Haskell Debugger
+(<http://www.informatik.uni-kiel.de/~fhu/chd/>) may choose to overload
+'labelThread' for their purposes as well.
+-}
+
 labelThread :: ThreadId -> String -> IO ()
 labelThread (ThreadId t) str = IO $ \ s ->
    let ps  = packCString# str
        adr = byteArrayContents# ps in
      case (labelThread# t adr s) of s1 -> (# s1, () #)
 
-forkProcess :: IO Int
-forkProcess = IO $ \s -> case (forkProcess# s) of (# s1, id #) -> (# s1, (I# id) #)
+{- | This function is a replacement for "Posix.forkProcess": This implementation
+/will stop all other Concurrent Haskell threads/ in the (heavyweight) forked copy.
+'forkProcessPrim' returns the pid of the child process to the parent, 0 to the child,
+and a value less than 0 in case of errors. See also: 'forkProcess'.
+
+Without this function, you need excessive and often impractical
+explicit synchronization using the regular Concurrent Haskell constructs to assure
+that only the desired thread is running after the fork().
+
+The stopped threads are /not/ garbage collected! This behaviour may change in
+future releases.
+-}
+
+forkProcessPrim :: IO Int
+forkProcessPrim = IO $ \s -> case (forkProcess# s) of (# s1, id #) -> (# s1, (I# id) #)
+
+{- | 'forkProcess' is a wrapper around 'forkProcessPrim' similar to the one found in
+"Posix.forkProcess" which returns a Maybe-type. The child receives @Nothing@, the
+parent @Just (pid::Int)@. In case of an error, an exception is thrown.
+-}
+
+forkProcess :: IO (Maybe Int)
+forkProcess = do
+  pid <- forkProcessPrim
+  case pid of
+    -1 -> ioException (IOError Nothing      -- stolen from hslibs/posix/PosixUtil
+			      SystemError
+			      "forkProcess"
+			      ""
+			      Nothing)
+    0  -> return Nothing
+    _  -> return (Just pid)
 
 -- 	Nota Bene: 'pseq' used to be 'seq'
 --		   but 'seq' is now defined in PrelGHC
