@@ -5,11 +5,11 @@
 
 \begin{code}
 module CmCompile ( cmCompile,
-                   ModDetails,       -- abstract
-                   ModIFace,         -- abstract
-                   PCS, emptyPCS,    -- abstract
-                   HST,              -- not abstract (CM needs to see it)
-                   HIT,              -- ditto
+                   ModDetails,         -- abstract
+                   ModIFace,           -- abstract
+                   PersistentCompilerState, emptyPCS,    -- abstract
+                   HomeSymbolTable,    -- not abstract (CM needs to see it)
+                   HomeInterfaceTable, -- ditto
                    CompResult(..)
                  )
 where
