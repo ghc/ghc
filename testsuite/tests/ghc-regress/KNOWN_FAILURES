@@ -4,12 +4,6 @@ Current known failures
 deSugar/should_compile/ds052
 		-- inaccuracy in non-exhaustive pattern warnings
 
-deSugar/should_compile/ds053
-		-- inaccuracy in unused binding warnings
-
-deSugar/should_compile/ds054
-		-- inaccuracy in unused binding warnings
-
 lib/IO/hReady001
 		-- IO.hReady doesn't detect the end of a file
 
@@ -22,15 +16,24 @@ lib/IOExts/hTell001, hTell002 [Windows]
 lib/net/net001 [Windows]
                 -- getProtocolByName seems not to be working on Windows
 
+lib/system/system001 [Windows]
+		-- probably a failure due to System.system using Cmd.exe?
+
+lib/should_run/enum04
+		-- enumFrom on basic numeric types should be strict
+		-- (possibly a bug in the Haskell Report: it specifies that
+		-- these ops should be strict in the section on Enum, but the
+ 		-- sample code in the Prelude doesn't agree, at least for
+		-- Float and Double).
+
 parser/should_fail/read002
 		-- we don't disallow certain characters in strings (eg. newline)
 
+parser/should_fail/read024
+		-- parser bug related to layout processing
+
 rename/should_fail/rnfail034
 		-- duplicated "in" in an error message
-
-rename/should_compile/rn038
-		-- hiding a non-exported identifer is now legal in the revised
-	 	-- Haskell 98 report.
 
 typecheck/should_fail/tcfail080
 		-- ambiguity test: ambiguity isn't detected early enough
@@ -40,9 +43,15 @@ typecheck/should_fail/tcfail080
 typecheck/should_run/tcrun007
 		-- tests for generics, which are currently broken in 5.02
 
-programs/jeff_bug
-		-- we don't know what the input should be
-
 programs/okeefe_neural
 		-- causes the compiler to run out of heap in the simplifier
 		-- (problem with large constant data structures?)
+
+-- These tests fail the 'optasm' way, due to inconsistent floating
+-- point results on x86.  The inconsistency is caused 
+
+numeric/should_run/arith008
+numeric/should_run/arith012
+programs/barton_mangler_bug
+programs/cholewo-eval
+programs/galois_raytrace
