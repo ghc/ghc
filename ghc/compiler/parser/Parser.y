@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.74 2001/09/26 15:12:35 simonpj Exp $
+$Id: Parser.y,v 1.75 2001/10/22 09:37:24 simonpj Exp $
 
 Haskell grammar.
 
@@ -607,7 +607,7 @@ varids0	:: { [RdrName] }
 
 newconstr :: { RdrNameConDecl }
 	: srcloc conid atype	{ mkConDecl $2 [] [] (VanillaCon [unbangedType $3]) $1 }
-	| srcloc conid '{' var '::' type '}'
+	| srcloc conid '{' var '::' ctype '}'
 				{ mkConDecl $2 [] [] (RecCon [([$4], unbangedType $6)]) $1 }
 
 constrs :: { [RdrNameConDecl] }
