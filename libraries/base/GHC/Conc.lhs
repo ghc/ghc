@@ -271,13 +271,19 @@ specified file descriptor is available for reading (just like select).
 @threadWaitWrite@ is similar, but for writing on a file descriptor.
 
 \begin{code}
--- |The 'threadDelay' operation will cause the current thread to
--- suspend for a given number of microseconds (GHC only).
+-- | Suspends the current thread for a given number of microseconds
+-- (GHC only).
 --
--- Note that the resolution
--- used by the Haskell runtime system\'s internal timer together with the
--- fact that the thread may take some time to be rescheduled after the
--- time has expired, means that the accuracy is more like 1\/50 second.
+-- Note that the resolution used by the Haskell runtime system's
+-- internal timer is 1\/50 second, and 'threadDelay' will round down
+-- its argument to the nearest multiple of this resolution.  In
+-- particular, to get the smallest non-zero delay, pass 20000 as the
+-- parameter to 'threadDelay'.
+--
+-- There is no guarantee that the thread will be rescheduled promptly
+-- when the delay has expired, but the thread will never continue to
+-- run /earlier/ than specified.
+--
 threadDelay :: Int -> IO ()
 
 -- | Block the current thread until data is available to read on the
