@@ -108,10 +108,7 @@ typecheckStmt dflags pcs hst ic_type_env unqual this_mod names (stmt, iface_decl
     tcSetDefaultTys defaultDefaultTys $
 
 	-- Typecheck the extra declarations
-    fixTc (\ ~(unf_env, _, _, _, _) ->
-	tcImports unf_env pcs hst get_fixity this_mod iface_decls
-    )			`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
-    ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
+    tcExtraDecls pcs hst get_fixity this_mod iface_decls `thenTc` \ (new_pcs, env) ->
 
     tcSetEnv env				$
     tcExtendGlobalTypeEnv ic_type_env		$
@@ -249,10 +246,7 @@ typecheckExpr dflags pcs hst ic_type_env unqual this_mod (expr, decls)
     tcSetDefaultTys defaultDefaultTys $
 
 	-- Typecheck the extra declarations
-    fixTc (\ ~(unf_env, _, _, _, _) ->
-	tcImports unf_env pcs hst get_fixity this_mod decls
-    )			`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
-    ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
+    tcExtraDecls pcs hst get_fixity this_mod decls `thenTc` \ (new_pcs, env) ->
 
 	-- Now typecheck the expression
     tcSetEnv env			$
@@ -306,13 +300,20 @@ typecheckExtraDecls
 
 typecheckExtraDecls  dflags pcs hst unqual this_mod decls
  = typecheck dflags pcs hst unqual $
-     fixTc (\ ~(unf_env, _, _, _, _) ->
-     	  tcImports unf_env pcs hst get_fixity this_mod decls
-     )	`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
-     ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
+     tcExtraDecls pcs hst get_fixity this_mod decls 
+	`thenTc` \ (new_pcs, env) ->
      returnTc new_pcs
  where
     get_fixity n = pprPanic "typecheckExpr" (ppr n)
+
+tcExtraDecls pcs hst get_fixity this_mod decls =
+     fixTc (\ ~(unf_env, _, _, _, _, _) ->
+     	  tcImports unf_env pcs hst get_fixity this_mod decls
+     )	`thenTc` \ (env, new_pcs, local_inst_info, local_inst_dfuns,
+		    deriv_binds, local_rules) ->
+     ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules
+	     && null local_inst_dfuns )
+     returnTc (new_pcs, env)
 \end{code}
 
 %************************************************************************
@@ -373,7 +374,7 @@ tcModule pcs hst get_fixity this_mod decls
 
 		-- Type-check the type and class decls, and all imported decls
 	tcImports unf_env pcs hst get_fixity this_mod decls	
-				`thenTc` \ (env, new_pcs, local_insts, deriv_binds, local_rules) ->
+	   `thenTc` \ (env, new_pcs, local_inst_info, local_inst_dfuns, deriv_binds, local_rules) ->
 
     	tcSetEnv env				$
 
@@ -397,7 +398,7 @@ tcModule pcs hst get_fixity this_mod decls
 	tcSetEnv env				$
 	tcClassDecls2 this_mod tycl_decls	`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds, dm_ids) ->
 	tcExtendGlobalValEnv dm_ids		$
-	tcInstDecls2  local_insts		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
+	tcInstDecls2  local_inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
 	tcForeignExports decls			`thenTc`    \ (lie_fodecls,   foe_binds, foe_decls) ->
 	tcSourceRules source_rules		`thenNF_Tc` \ (lie_rules,     more_local_rules) ->
 	
@@ -459,7 +460,7 @@ tcModule pcs hst get_fixity this_mod decls
 	returnTc (final_env,
 		  new_pcs,
 		  TcResults { tc_env     = local_type_env,
-			      tc_insts   = map iDFunId local_insts,
+			      tc_insts   = local_inst_dfuns,
 			      tc_binds   = all_binds', 
 			      tc_fords   = foi_decls ++ foe_decls',
 			      tc_rules   = all_local_rules
@@ -504,16 +505,16 @@ typecheckIface dflags pcs hst mod_iface decls
     get_fixity nm = lookupNameEnv fixity_env nm
 
     tcIfaceImports pcs hst get_fixity this_mod decls
-	= fixTc (\ ~(unf_env, _, _, _, _) ->
+	= fixTc (\ ~(unf_env, _, _, _, _, _) ->
 	      tcImports unf_env pcs hst get_fixity this_mod decls
-          )	`thenTc` \ (env, new_pcs, local_inst_info, 
+          )	`thenTc` \ (env, new_pcs, local_inst_info, local_inst_dfuns,
 			    deriv_binds, local_rules) ->
-	  ASSERT(nullBinds deriv_binds)
+	  ASSERT(nullBinds deriv_binds && null local_inst_info)
 	  let 
 	      local_things = filter (isLocalThing this_mod) (typeEnvElts (getTcGEnv env))
 
 	      mod_details = ModDetails { md_types = mkTypeEnv local_things,
-					 md_insts = map iDFunId local_inst_info,
+					 md_insts = local_inst_dfuns,
 					 md_rules = [(id,rule) | IfaceRuleOut id rule <- local_rules],
 					 md_binds = [] }
 			-- All the rules from an interface are of the IfaceRuleOut form
@@ -526,7 +527,7 @@ tcImports :: RecTcEnv
 	  -> (Name -> Maybe Fixity)
 	  -> Module
 	  -> [RenamedHsDecl]
-	  -> TcM (TcEnv, PersistentCompilerState, [InstInfo], 
+	  -> TcM (TcEnv, PersistentCompilerState, [InstInfo], [DFunId],
 			 RenamedHsBinds, [TypecheckedRuleDecl])
 
 -- tcImports is a slight mis-nomer.  
@@ -567,9 +568,8 @@ tcImports unf_env pcs hst get_fixity this_mod decls
 	-- Note that imported dictionary functions are already
 	-- in scope from the preceding tcInterfaceSigs
     traceTc (text "Tc3")	`thenNF_Tc_`
-    tcInstDecls1 (pcs_insts pcs) (pcs_PRS pcs) 
-    	     hst unf_env get_fixity this_mod 
-    	     decls			`thenTc` \ (new_pcs_insts, inst_env, local_insts, deriv_binds) ->
+    tcInstDecls1 (pcs_insts pcs) (pcs_PRS pcs) hst unf_env get_fixity this_mod decls 
+	   `thenTc` \ (new_pcs_insts, inst_env, local_inst_info, local_inst_dfuns, deriv_binds) ->
     tcSetInstEnv inst_env			$
     
     tcIfaceRules unf_env (pcs_rules pcs) this_mod iface_rules	`thenNF_Tc` \ (new_pcs_rules, local_rules) ->
@@ -596,7 +596,7 @@ tcImports unf_env pcs hst get_fixity this_mod decls
     		        pcs_rules = new_pcs_rules
       	          }
     in
-    returnTc (unf_env, new_pcs, local_insts, deriv_binds, local_rules)
+    returnTc (unf_env, new_pcs, local_inst_info, local_inst_dfuns, deriv_binds, local_rules)
   where
     tycl_decls  = [d | TyClD d <- decls]
     iface_rules = [d | RuleD d <- decls, isIfaceRuleDecl d]

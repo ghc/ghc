@@ -33,7 +33,7 @@ module TcEnv(
 	newLocalName, newDFunName,
 
 	-- Misc
-	isLocalThing, isHomePackageThing, tcSetEnv
+	isLocalThing, tcSetEnv
   ) where
 
 #include "HsVersions.h"
@@ -53,8 +53,7 @@ import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class, ClassOpItem )
 import Name		( Name, NamedThing(..), 
-			  getSrcLoc, mkLocalName, isLocalName, nameIsLocalOrFrom,
-			  isHomePackageName
+			  getSrcLoc, mkLocalName, isLocalName, nameIsLocalOrFrom
 			)
 import NameEnv		( NameEnv, lookupNameEnv, nameEnvElts, elemNameEnv,
 			  extendNameEnvList, emptyNameEnv, plusNameEnv )
@@ -254,9 +253,6 @@ newDFunName clas [] loc = pprPanic "newDFunName" (ppr clas <+> ppr loc)
 \begin{code}
 isLocalThing :: NamedThing a => Module -> a -> Bool
 isLocalThing mod thing = nameIsLocalOrFrom mod (getName thing)
-
-isHomePackageThing :: NamedThing a => a -> Bool
-isHomePackageThing thing = isHomePackageName (getName thing)
 \end{code}
 
 %************************************************************************

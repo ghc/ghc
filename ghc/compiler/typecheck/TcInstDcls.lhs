@@ -33,7 +33,7 @@ import TcType		( mkClassPred, mkTyVarTy, mkTyVarTys, tcSplitForAllTys,
 import Inst		( InstOrigin(..), newDicts, instToId,
 			  LIE, mkLIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( TcEnv, tcExtendGlobalValEnv, isHomePackageThing,
+import TcEnv		( TcEnv, tcExtendGlobalValEnv, isLocalThing,
 			  tcExtendTyVarEnvForMeths, tcLookupId, tcLookupClass,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, 
 			  simpleInstInfoTy, newDFunName
@@ -158,14 +158,19 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 Gather up the instance declarations from their various sources
 
 \begin{code}
-tcInstDecls1 :: PackageInstEnv
-	     -> PersistentRenamerState	
-	     -> HomeSymbolTable		-- Contains instances
-	     -> TcEnv 			-- Contains IdInfo for dfun ids
-	     -> (Name -> Maybe Fixity)	-- for deriving Show and Read
-	     -> Module			-- Module for deriving
-	     -> [RenamedHsDecl]
-	     -> TcM (PackageInstEnv, InstEnv, [InstInfo], RenamedHsBinds)
+tcInstDecls1
+   :: PackageInstEnv
+   -> PersistentRenamerState	
+   -> HomeSymbolTable		-- Contains instances
+   -> TcEnv 			-- Contains IdInfo for dfun ids
+   -> (Name -> Maybe Fixity)	-- for deriving Show and Read
+   -> Module			-- Module for deriving
+   -> [RenamedHsDecl]
+   -> TcM (PackageInstEnv,	-- cached package inst env
+	   InstEnv,		-- the full inst env
+	   [InstInfo],		-- instance decls to process
+	   [DFunId],		-- instances from this module, for its iface
+	   RenamedHsBinds)	-- derived instances
 
 tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
   = let
@@ -175,37 +180,37 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
 	(iface_inst_ds, local_inst_ds) = partition isIfaceInstDecl inst_decls
     in
    	-- (1) Do the ordinary instance declarations
-    mapNF_Tc tcLocalInstDecl1 local_inst_ds		`thenNF_Tc` \ local_inst_infos ->
-    mapNF_Tc tcImportedInstDecl1 iface_inst_ds		`thenNF_Tc` \ iface_dfuns ->
+    mapNF_Tc tcLocalInstDecl1 local_inst_ds   `thenNF_Tc` \ local_inst_infos ->
+    mapNF_Tc tcImportedInstDecl1 iface_inst_ds `thenNF_Tc` \ iface_dfuns ->
 
 	-- (2) Instances from generic class declarations
-    getGenericInstances clas_decls		`thenTc` \ generic_inst_info -> 
+    getGenericInstances clas_decls	      `thenTc` \ generic_inst_info -> 
 
 	-- Next, construct the instance environment so far, consisting of
-	--	a) cached non-home-package InstEnv (gotten from pcs)	inst_env0
-	--	b) imported instance decls (not in the home package)	inst_env1
-	--      c) imported instance decls (from this module)		inst_env2
-	--	c) other modules in this package (gotten from hst)	inst_env3
-	--	d) local instance decls					inst_env4
-	--	e) generic instances					inst_env5
+	--	a) cached non-home-package InstEnv (gotten from pcs) inst_env0
+	--	b) imported instance decls (not in the home package) inst_env1
+	--	c) other modules in this package (gotten from hst)   inst_env2
+	--      d) imported instance decls (from this module)	     inst_env3
+	--	e) local instance decls				     inst_env4
+	--	f) generic instances				     inst_env5
 	-- The result of (b) replaces the cached InstEnv in the PCS
 	--
-	-- Note that iface_dfuns may contain not only insts that we demand-loaded
-	-- from package interface files, but also instances from the current module
-	-- in the case where we are loading this module's interface file in GHCi,
-	-- so we partition the iface_dfuns into package instances and local instances
-	-- below so that we don't end up with home package instances in the PCS.
+	-- Note that iface_dfuns may contain not only insts that we
+	-- demand-loaded from interface files, but also instances from
+	-- the current module in the case where we are loading this
+	-- module's interface file in GHCi, so we partition the
+	-- iface_dfuns into non-local and local instances so that we
+	-- don't end up with home package instances in the PCS.
 	--
 	-- There can't be any instance declarations from the home
 	-- package other than from the current module (with the
 	-- compilation manager) because they are loaded explicitly by
-	-- the compilation manager.  The partition is really only
-	-- necessary when we're under control of the compilation
-	-- manager.
+	-- the compilation manager.
     let
 	local_inst_info = catMaybes local_inst_infos
-	(local_iface_dfuns, pkg_iface_dfuns) = partition isHomePackageThing iface_dfuns
-	hst_dfuns       = foldModuleEnv ((++) . md_insts) [] hst
+	(local_iface_dfuns, pkg_iface_dfuns)
+		= partition (isLocalThing this_mod) iface_dfuns
+	hst_dfuns = foldModuleEnv ((++) . md_insts) [] hst
     in 
 
 --    pprTrace "tcInstDecls" (vcat [ppr imported_dfuns, ppr hst_dfuns]) $
@@ -220,14 +225,16 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
 	--     note that we only do derivings for things in this module; 
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
-	-- needs to know about all the instances possible; hence inst_env4
-    tcDeriving prs this_mod inst_env4 get_fixity tycl_decls
-					`thenTc` \ (deriv_inst_info, deriv_binds) ->
-    addInstInfos inst_env4 deriv_inst_info		`thenNF_Tc` \ final_inst_env ->
+	-- needs to know about all the instances possible; hence inst_env5
+    tcDeriving prs this_mod inst_env5 get_fixity tycl_decls
+				`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    addInstInfos inst_env5 deriv_inst_info  `thenNF_Tc` \ final_inst_env ->
+    let inst_info = generic_inst_info ++ deriv_inst_info ++ local_inst_info in
 
     returnTc (inst_env1, 
 	      final_inst_env, 
-	      generic_inst_info ++ deriv_inst_info ++ local_inst_info,
+	      inst_info,
+	      local_iface_dfuns ++ map iDFunId inst_info,
 	      deriv_binds)
 
 addInstInfos :: InstEnv -> [InstInfo] -> NF_TcM InstEnv
