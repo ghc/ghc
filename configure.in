@@ -16,6 +16,9 @@ dnl
 # First off, a distrib sanity check..
 AC_INIT(mk/config.mk.in)
 
+dnl * We require autoconf version 2.53 due to the use of AC_SYS_LARGEFILE
+AC_PREREQ(2.52)
+
 dnl * Declare subdirectories that have a private configure script
 dnl
 dnl After the toplevel configuration is complete, the script will recurse into
@@ -1252,11 +1255,6 @@ AC_C_PROTOTYPES
 
 dnl ** are we big endian?
 AC_C_BIGENDIAN
-# Allay users' general fear of warnings of any kind.
-errprint(fptools configure script wizard sez: autoconf-2.50 or later should produce no warnings
-)
-errprint(if you are using 2.13 or earlier, you may get a (harmless) warning message.
-)
 
 dnl ** check for leading underscores in symbol names
 FPTOOLS_UNDERSCORE
