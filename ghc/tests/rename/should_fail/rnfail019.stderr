@@ -2,4 +2,4 @@
 rnfail019.hs:5:
     The operator `:' [infixr 5] of a section
 	must have lower precedence than the operand `(:)' [infixr 5]
-	In the section: `((x : y) :)'
+	in the section: `((x : y) :)'
