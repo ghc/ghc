@@ -6,11 +6,11 @@
  * Table of thread labels.
  *
  * ---------------------------------------------------------------------------*/
+#ifndef __THREADLABELS_H__
+#define __THREADLABELS_H__
 
 #include "Rts.h"
 #include "Hash.h"
-
-extern HashTable * threadLabels;
 
 void
 initThreadLabelTable(void);
@@ -23,3 +23,5 @@ lookupThreadLabel(StgWord key);
 
 void
 removeThreadLabel(StgWord key);
+
+#endif /* __THREADLABELS_H__ */
