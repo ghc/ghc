@@ -4279,25 +4279,24 @@ That is, just leave off the "where" clasuse.  Of course, you can put in the
 where clause and over-ride whichever methods you please.
 </Para>
 
-<Sect2> <Title> Using generics </Title>
-</Sect2>
-<Para>
-To use generics you need to
-<ItemizedList>
-<ListItem>
-<Para>
-Use the <Option>-fgenerics</Option> flag.
-</Para>
-</ListItem>
-<ListItem>
-<Para>
-Import the module <Literal>Generics</Literal> from the <Literal>lang</Literal> package.
-This import brings into scope the data types <Literal>Unit</Literal>, <Literal>:*:</Literal>, 
-and <Literal>:+:</Literal>.  (You don't need this import if you don't mention these
-types explicitly; for example, if you are simply giving instance declarations.)
-</Para>
-</ListItem>
-</ItemizedList>
+    <Sect2>
+      <Title> Using generics </Title>
+      <Para>To use generics you need to</para>
+      <ItemizedList>
+	<ListItem>
+	  <Para>Use the <Option>-fgenerics</Option> flag.</Para>
+	</ListItem>
+	<ListItem>
+	  <Para>Import the module <Literal>Generics</Literal> from the
+          <Literal>lang</Literal> package.  This import brings into
+          scope the data types <Literal>Unit</Literal>,
+          <Literal>:*:</Literal>, and <Literal>:+:</Literal>.  (You
+          don't need this import if you don't mention these types
+          explicitly; for example, if you are simply giving instance
+          declarations.)</Para>
+	</ListItem>
+      </ItemizedList>
+    </Sect2>
 
 <Sect2> <Title> Changes wrt the paper </Title>
 <Para>
