@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.46 2002/01/22 13:54:22 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.47 2002/01/29 17:12:53 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -460,6 +460,25 @@ instance Show Exception where
   showsPrec _ (NonTermination)           = showString "<<loop>>"
   showsPrec _ (Deadlock)                 = showString "<<deadlock>>"
   showsPrec _ (UserError err)            = showString err
+
+instance Eq Exception where
+  IOException e1      == IOException e2      = e1 == e2
+  ArithException e1   == ArithException e2   = e1 == e2
+  ArrayException e1   == ArrayException e2   = e1 == e2
+  ErrorCall e1        == ErrorCall e2	     = e1 == e2
+  ExitException	e1    == ExitException e2    = e1 == e2
+  NoMethodError e1    == NoMethodError e2    = e1 == e2
+  PatternMatchFail e1 == PatternMatchFail e2 = e1 == e2
+  RecSelError e1      == RecSelError e2      = e1 == e2
+  RecConError e1      == RecConError e2      = e1 == e2
+  RecUpdError e1      == RecUpdError e2      = e1 == e2
+  AssertionFailed e1  == AssertionFailed e2  = e1 == e2
+  DynException _      == DynException _      = False -- incomparable
+  AsyncException e1   == AsyncException e2   = e1 == e2
+  BlockedOnDeadMVar   == BlockedOnDeadMVar   = True
+  NonTermination      == NonTermination      = True
+  Deadlock            == Deadlock            = True
+  UserError e1        == UserError e2        = e1 == e2
 
 -- -----------------------------------------------------------------------------
 -- The ExitCode type
