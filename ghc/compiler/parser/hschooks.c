@@ -22,7 +22,7 @@ ErrorHdrHook (long fd)
 void
 PatErrorHdrHook (long fd)
 {
-    const char msg[]="\n*** Pattern-matching error within GHC!\n\nThis is a compiler bug; please report it to glasgow-haskell-bugs@dcs.gla.ac.uk.\n\nFail:";
+    const char msg[]="\n*** Pattern-matching error within GHC!\n\nThis is a compiler bug; please report it to glasgow-haskell-bugs@haskell.org.\n\nFail:";
     write(fd,msg,sizeof(msg)-1);
 }
 
@@ -53,7 +53,7 @@ ErrorHdrHook (FILE *where)
 void
 PatErrorHdrHook (FILE *where)
 {
-    fprintf(where, "\n*** Pattern-matching error within GHC!\n\nThis is a compiler bug; please report it to glasgow-haskell-bugs@dcs.gla.ac.uk.\n\nFail: ");
+    fprintf(where, "\n*** Pattern-matching error within GHC!\n\nThis is a compiler bug; please report it to glasgow-haskell-bugs@haskell.org.\n\nFail: ");
 }
 
 void

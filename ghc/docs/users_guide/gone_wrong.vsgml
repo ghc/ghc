@@ -218,8 +218,8 @@ exception (please report it if it does).
 
 Glasgow Haskell is a changing system so there are sure to be bugs in
 it.  Please report them to <htmlurl
-name="glasgow-haskell-bugs@@dcs.gla.ac.uk"
-url="mailto:glasgow-haskell-bugs@@dcs.gla.ac.uk">!  (However, please
+name="glasgow-haskell-bugs@@haskell.org"
+url="mailto:glasgow-haskell-bugs@@haskell.org">!  (However, please
 check the earlier part of this section to be sure it's not a known
 not-really-a problem.)
 

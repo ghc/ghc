@@ -21,7 +21,7 @@ panic :: String -> a
 panic x = error ("panic! (the `impossible' happened):\n\t"
 	      ++ x ++ "\n\n"
 	      ++ "Please report it as a compiler bug "
-	      ++ "to glasgow-haskell-bugs@dcs.gla.ac.uk.\n\n" )
+	      ++ "to glasgow-haskell-bugs@haskell.org.\n\n" )
 
 -- #-versions because panic can't return an unboxed int, and that's
 -- what TAG_ is with GHC at the moment.  Ugh. (Simon)

@@ -22,7 +22,7 @@
 
 <title>The Glasgow Haskell Compiler User's Guide, Version~4.03
 <author>The GHC Team, 
-Email: @glasgow-haskell-{bugs,users}-request@@dcs.gla.ac.uk@
+Email: @glasgow-haskell-{bugs,users}-request@@haskell.org@
 <toc>
 
 &intro

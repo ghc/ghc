@@ -81,14 +81,14 @@ Simon's projects' acronyms:
     AQUA  ('93-   ): Declarative systems architecture: a quantitative approach
 
 E-mail contacts:
-    glasgow-haskell-bugs@dcs.gla.ac.uk	    (bug reports mailing list)
-    glasgow-haskell-users@dcs.gla.ac.uk	    (users' mailing list)
+    glasgow-haskell-bugs@haskell.org	    (bug reports mailing list)
+    glasgow-haskell-users@haskell.org	    (users' mailing list)
 
-Send mail to majordomo@dcs.gla.ac.uk with 'help' in the body of the
+Send mail to majordomo@haskell.org with 'help' in the body of the
 message for information on joining/leaving either of these mailing
 lists.
 
-Anonymous FTP site: ftp://ftp.dcs.gla.ac.uk:pub/haskell/glasgow.
+Anonymous FTP site: ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow.
 Mostly mirrored by ftp.cs.chalmers.se and haskell.org (same
 directory).  Also: sunsite.doc.ic.ac.uk, in
 computing/programming/languages/haskell/glasgow/.

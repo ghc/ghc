@@ -46,12 +46,12 @@ available from the web page.
 ================
 
 We run mailing lists for GHC users and bug reports; to subscribe, send
-mail to majordomo@dcs.gla.ac.uk; the msg body should be:
+mail to majordomo@haskell.org; the msg body should be:
 
     subscribe glasgow-haskell-<which> Your Name <your-email@where.you.are>
 
-Please send bug reports about GHC to glasgow-haskell-bugs@dcs.gla.ac.uk ; GHC
-users hang out on glasgow-haskell-users@dcs.gla.ac.uk
+Please send bug reports about GHC to glasgow-haskell-bugs@haskell.org ; GHC
+users hang out on glasgow-haskell-users@haskell.org
 
 
 + On-line GHC-related resources

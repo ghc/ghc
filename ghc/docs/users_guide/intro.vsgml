@@ -162,7 +162,7 @@ On the World-Wide Web, there are several URLs of likely interest:
 
 <itemize>
 <item>  <url name="Haskell home page" url="http://haskell.org/">
-<item>  <url name="GHC home page" url="http://www.dcs.gla.ac.uk/fp/software/ghc/">
+<item>  <url name="GHC home page" url="http://research.microsoft.com/users/t-simonm/ghc/">
 <item>  <url name="Glasgow FP group page" url="http://www.dcs.gla.ac.uk/fp/">
 <item>  <url name="comp.lang.functional FAQ" url="http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html">
 </itemize>
@@ -175,8 +175,8 @@ join, as you feel is appropriate.
 <tag>glasgow-haskell-users:</tag>
 
 This list is for GHC users to chat among themselves.  Subscribe by
-sending mail to <htmlurl name="majordomo@@dcs.gla.ac.uk"
-url="mailto:majordomo@@dcs.gla.ac.uk">, with a message body (not
+sending mail to <htmlurl name="majordomo@@haskell.org"
+url="mailto:majordomo@@haskell.org">, with a message body (not
 header) like this:
 
 <tscreen><verb> 
@@ -186,12 +186,12 @@ subscribe glasgow-haskell-users MyName <m.y.self@@bigbucks.com>
 (The last bit is your all-important e-mail address, of course.)
 
 To communicate with your fellow users, send mail to <url
-name="glasgow-haskell-users@@dcs.gla.ac.uk"
-url="mailto:glasgow-haskell-users@@dcs.gla.ac.uk">.
+name="glasgow-haskell-users@@haskell.org"
+url="mailto:glasgow-haskell-users@@haskell.org">.
 
 To contact the list administrator, send mail to <htmlurl
-name="glasgow-haskell-users-request@@dcs.gla.ac.uk"
-url="mailto:glasgow-haskell-users-request@@dcs.gla.ac.uk">.  An archive
+name="glasgow-haskell-users-request@@haskell.org"
+url="mailto:glasgow-haskell-users-request@@haskell.org">.  An archive
 of the list is available on the Web: <url name="glasgow-haskell-users
 mailing list archive"
 url="http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-users">.
@@ -201,16 +201,16 @@ Send bug reports for GHC to this address!  The sad and lonely people
 who subscribe to this list will muse upon what's wrong and what you
 might do about it.
 
-Subscribe via <htmlurl name="majordomo@@dcs.gla.ac.uk"
-url="mailto:majordomo@@dcs.gla.ac.uk"> with:
+Subscribe via <htmlurl name="majordomo@@haskell.org"
+url="mailto:majordomo@@haskell.org"> with:
 
 <tscreen><verb>
 subscribe glasgow-haskell-bugs My Name <m.y.self@@hackers.r.us>
 </verb></tscreen>
 
 Again, you may contact the list administrator at <htmlurl
-name="glasgow-haskell-bugs-request@@dcs.gla.ac.uk"
-url="mailto:glasgow-haskell-bugs-request@@dcs.gla.ac.uk">.
+name="glasgow-haskell-bugs-request@@haskell.org"
+url="mailto:glasgow-haskell-bugs-request@@haskell.org">.
 And, yes, an archive of the list is available on the Web at: : <url
 name="glasgow-haskell-bugs mailing list archive"
 url="http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-bugs">

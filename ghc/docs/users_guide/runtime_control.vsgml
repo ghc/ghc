@@ -384,7 +384,7 @@ PatErrorHdrHook (FILE *where)
 {
     fprintf(where, "\n*** Pattern-matching error within GHC!\n\n
 	This is a compiler bug; please report it to
-	glasgow-haskell-bugs@dcs.gla.ac.uk.\n\nFail: ");
+	glasgow-haskell-bugs@haskell.org.\n\nFail: ");
 }
 
 void
