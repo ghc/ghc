@@ -187,9 +187,10 @@
       <para>Thanks to the following people for useful feedback,
       discussion, patches, packaging, and moral support: Simon Peyton
       Jones, Mark Shields, Manuel Chakravarty, Ross Patterson, Brett
-      Letner, Sven Panne, Hal Daume, George Russell, Oliver Braun, the
-      members of <email>haskelldoc@haskell.org</email>, and everyone
-      who contributed to the many libraries that Haddock makes use
+      Letner, Sven Panne, Hal Daume, George Russell, Oliver Braun,
+      Ashley Yakeley, Malcolm Wallace, Krasimir Angelov, the members
+      of <email>haskelldoc@haskell.org</email>, and everyone who
+      contributed to the many libraries that Haddock makes use
       of.</para>
     </section>
 
@@ -568,16 +569,6 @@ class C a where
    -- | This is the documentation for the 'g' method
    g :: Int -> a
 </programlisting>
-
-	<para>Note that in Haddock documentation annotations are
-	first-class syntactic objects that are subject to the same
-	layout rules as other syntactic objects; thus in the example
-	class declaration above the documentation annotations must
-	begin in the same column as the method signatures.  If you use
-	explicit layout, then don't forget the semi-colon after each
-	documentation comment (but don't put the semi-colon on the
-	same line as the documentation comment, because it will be
-	interpreted as part of the documentation!).</para>
       </section>
 
       <section>
