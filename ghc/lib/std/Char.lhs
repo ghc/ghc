@@ -33,7 +33,9 @@ module Char
     ) where
 
 import PrelBase
+import PrelShow
+import PrelEnum
+import PrelNum
 import PrelRead (readLitChar, lexLitChar, digitToInt)
-import {-# SOURCE #-} PrelErr   ( error )
-
+import PrelErr  ( error )
 \end{code}

@@ -201,7 +201,7 @@ nOfThem :: Int -> a -> [a]
 nOfThem = replicate -- deprecated.
 
 lengthExceeds :: [a] -> Int -> Bool
-
+-- (lengthExceeds xs n) is True if   length xs > n
 []	`lengthExceeds` n =  0 > n
 (x:xs)	`lengthExceeds` n = (1 > n) || (xs `lengthExceeds` (n - 1))
 
@@ -719,12 +719,6 @@ cmpString (x:xs) (y:ys) = if	  x == y then cmpString xs ys
 			  else		      GT_
 cmpString []     ys	= LT_
 cmpString xs     []	= GT_
-
-#ifdef COMPILING_GHC
-cmpString _ _ = panic# "cmpString"
-#else
-cmpString _ _ = error "cmpString"
-#endif
 \end{code}
 
 \begin{code}

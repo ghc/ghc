@@ -6,7 +6,7 @@
 ---------------------------------------------------------------------------
  
 __interface PrelException 1 0 where
-__export ! PrelException ioError catch;
+__export PrelException ioError catch;
 1 ioError :: __forall [a] => PrelIOBase.IOError -> PrelIOBase.IO a ;
 1 catch :: __forall [a] => PrelIOBase.IO a -> (PrelIOBase.IOError -> PrelIOBase.IO a) -> PrelIOBase.IO a ;  -- wish there could be more __o's here.  KSW 1999-04.
 

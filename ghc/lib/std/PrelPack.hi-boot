@@ -8,7 +8,7 @@
 ---------------------------------------------------------------------------
  
 __interface PrelPack 1 where
-__export ! PrelPack packCStringzh unpackCStringzh unpackNByteszh unpackAppendCStringzh unpackFoldrCStringzh ;
+__export PrelPack packCStringzh unpackCStringzh unpackNByteszh unpackAppendCStringzh unpackFoldrCStringzh ;
 
 1 packCStringzh :: [PrelBase.Char] -> PrelGHC.ByteArrayzh ;
 1 unpackCStringzh :: PrelGHC.Addrzh -> [PrelBase.Char] ;

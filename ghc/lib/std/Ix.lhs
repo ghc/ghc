@@ -32,6 +32,10 @@ module Ix
 import {-# SOURCE #-} PrelErr ( error )
 import PrelTup
 import PrelBase
+import PrelList( null )
+import PrelEnum
+import PrelShow
+import PrelNum
 \end{code}
 
 %*********************************************************
@@ -43,10 +47,14 @@ import PrelBase
 \begin{code}
 class  (Ord a) => Ix a  where
     range		:: (a,a) -> [a]
-    index		:: (a,a) -> a -> Int
+    index, unsafeIndex	:: (a,a) -> a -> Int
     inRange		:: (a,a) -> a -> Bool
-\end{code}
 
+	-- Must specify one of index, unsafeIndex
+    index b i | inRange b i = unsafeIndex b i
+	      | otherwise   = error "Error in array index"
+    unsafeIndex b i = index b i
+\end{code}
 
 %*********************************************************
 %*							*
@@ -55,43 +63,69 @@ class  (Ord a) => Ix a  where
 %*********************************************************
 
 \begin{code}
-instance  Ix Char  where
-    range (m,n)
-      | m <= n  	=  [m..n]
-      | otherwise       =  []
-    index b@(m,_) i
-	| inRange b i	=  fromEnum i - fromEnum m
-	| otherwise	=  indexError i b "Char"
-    inRange (m,n) i	=  m <= i && i <= n
-
-instance  Ix Int  where
-    range (m,n)
-      | m <= n	        =  [m..n]
-      | otherwise       =  []
-    index b@(m,_) i
-      | inRange b i	=  i - m
-      | otherwise	=  indexError i b "Int"
-    inRange (m,n) i	=  m <= i && i <= n
-
 -- abstract these errors from the relevant index functions so that
 -- the guts of the function will be small enough to inline.
 
 {-# NOINLINE indexError #-}
-indexError :: Show a => a -> (a,a) -> String -> b
-indexError i rng tp
+indexError :: Show a => (a,a) -> a -> String -> b
+indexError rng i tp
   = error (showString "Ix{" . showString tp . showString "}.index: Index " .
            showParen True (showsPrec 0 i) .
 	   showString " out of range " $
 	   showParen True (showsPrec 0 rng) "")
 
--- Integer instance is in PrelNum
+----------------------------------------------------------------------
+instance  Ix Char  where
+    range (m,n)
+      | m <= n  	=  [m..n]
+      | otherwise       =  []
+
+    unsafeIndex (m,n) i = fromEnum i - fromEnum m
+
+    index b i | inRange b i =  unsafeIndex b i
+	      | otherwise   =  indexError b i "Char"
+
+    inRange (m,n) i	=  m <= i && i <= n
+
+----------------------------------------------------------------------
+instance  Ix Int  where
+    range (m,n)
+      | m <= n	        =  [m..n]
+      | otherwise       =  []
+
+    unsafeIndex (m,n) i = i - m
+
+    index b i | inRange b i =  unsafeIndex b i
+	      | otherwise   =  indexError b i "Int"
+
+    inRange (m,n) i	=  m <= i && i <= n
+
+
+----------------------------------------------------------------------
+instance  Ix Integer  where
+    range (m,n)		
+      | m <= n          =  [m..n]
+      | otherwise       =  []
+
+    unsafeIndex (m,n) i   = fromInteger (i - m)
+
+    index b i | inRange b i =  unsafeIndex b i
+	      | otherwise   =  indexError b i "Integer"
+
+    inRange (m,n) i	=  m <= i && i <= n
+
 
 ----------------------------------------------------------------------
 instance Ix Bool where -- as derived
     range   (l,u) 
       | l <= u    = map toEnum [fromEnum l .. fromEnum u]
       | otherwise = []
-    index   (l,_) i = fromEnum i - fromEnum l
+
+    unsafeIndex (l,_) i = fromEnum i - fromEnum l
+
+    index b i | inRange b i =  unsafeIndex b i
+	      | otherwise   =  indexError b i "Bool"
+
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------
@@ -99,47 +133,62 @@ instance Ix Ordering where -- as derived
     range   (l,u)
       | l <= u    = map toEnum [fromEnum l .. fromEnum u]
       | otherwise = []
-    index   (l,_) i = fromEnum i - fromEnum l
+    unsafeIndex (l,_) i = fromEnum i - fromEnum l
+    index b i | inRange b i =  unsafeIndex b i
+	      | otherwise   =  indexError b i "Ordering"
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------
 instance Ix () where
     {-# INLINE range #-}
     range   ((), ())    = [()]
-    {-# INLINE index #-}
-    index   ((), ()) () = 0
+    {-# INLINE unsafeIndex #-}
+    unsafeIndex   ((), ()) () = 0
     {-# INLINE inRange #-}
     inRange ((), ()) () = True
+    {-# INLINE index #-}
+    index b i = unsafeIndex b i
+
 
 ----------------------------------------------------------------------
 instance (Ix a, Ix b) => Ix (a, b) where -- as derived
+    {-# SPECIALISE instance Ix (Int,Int) #-}
+
     {- INLINE range #-}
     range ((l1,l2),(u1,u2)) =
       [ (i1,i2) | i1 <- range (l1,u1), i2 <- range (l2,u2) ]
 
-    {- INLINE index #-}
-    index ((l1,l2),(u1,u2)) (i1,i2) =
-      index (l1,u1) i1 * rangeSize (l2,u2) + index (l2,u2) i2
+    {- INLINE unsafeIndex #-}
+    unsafeIndex ((l1,l2),(u1,u2)) (i1,i2) =
+      unsafeIndex (l1,u1) i1 * unsafeRangeSize (l2,u2) + unsafeIndex (l2,u2) i2
 
     {- INLINE inRange #-}
     inRange ((l1,l2),(u1,u2)) (i1,i2) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2
 
+    -- Default method for index
+
+----------------------------------------------------------------------
 instance  (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3)  where
+    {-# SPECIALISE instance Ix (Int,Int,Int) #-}
+
     range ((l1,l2,l3),(u1,u2,u3)) =
         [(i1,i2,i3) | i1 <- range (l1,u1),
                       i2 <- range (l2,u2),
                       i3 <- range (l3,u3)]
 
-    index ((l1,l2,l3),(u1,u2,u3)) (i1,i2,i3) =
-      index (l3,u3) i3 + rangeSize (l3,u3) * (
-      index (l2,u2) i2 + rangeSize (l2,u2) * (
-      index (l1,u1) i1))
+    unsafeIndex ((l1,l2,l3),(u1,u2,u3)) (i1,i2,i3) =
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1))
 
     inRange ((l1,l2,l3),(u1,u2,u3)) (i1,i2,i3) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
       inRange (l3,u3) i3
 
+    -- Default method for index
+
+----------------------------------------------------------------------
 instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
     range ((l1,l2,l3,l4),(u1,u2,u3,u4)) =
       [(i1,i2,i3,i4) | i1 <- range (l1,u1),
@@ -147,15 +196,17 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
                        i3 <- range (l3,u3),
                        i4 <- range (l4,u4)]
 
-    index ((l1,l2,l3,l4),(u1,u2,u3,u4)) (i1,i2,i3,i4) =
-      index (l4,u4) i4 + rangeSize (l4,u4) * (
-      index (l3,u3) i3 + rangeSize (l3,u3) * (
-      index (l2,u2) i2 + rangeSize (l2,u2) * (
-      index (l1,u1) i1)))
+    unsafeIndex ((l1,l2,l3,l4),(u1,u2,u3,u4)) (i1,i2,i3,i4) =
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1)))
 
     inRange ((l1,l2,l3,l4),(u1,u2,u3,u4)) (i1,i2,i3,i4) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
       inRange (l3,u3) i3 && inRange (l4,u4) i4
+
+    -- Default method for index
 
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
     range ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) =
@@ -165,17 +216,19 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
                           i4 <- range (l4,u4),
                           i5 <- range (l5,u5)]
 
-    index ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) (i1,i2,i3,i4,i5) =
-      index (l5,u5) i5 + rangeSize (l5,u5) * (
-      index (l4,u4) i4 + rangeSize (l4,u4) * (
-      index (l3,u3) i3 + rangeSize (l3,u3) * (
-      index (l2,u2) i2 + rangeSize (l2,u2) * (
-      index (l1,u1) i1))))
+    unsafeIndex ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) (i1,i2,i3,i4,i5) =
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1))))
 
     inRange ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) (i1,i2,i3,i4,i5) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
       inRange (l3,u3) i3 && inRange (l4,u4) i4 && 
       inRange (l5,u5) i5
+
+    -- Default method for index
 \end{code}
 
 %********************************************************
@@ -185,16 +238,27 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
 %********************************************************
 
 The @rangeSize@ operator returns the number of elements
-in the range for an @Ix@ pair:
+in the range for an @Ix@ pair.
 
 \begin{code}
-{-# SPECIALISE rangeSize :: (Int,Int) -> Int #-}
-rangeSize :: (Ix a) => (a,a) -> Int
-rangeSize b@(l,h)
- | l > h  || isnull (range b) = 0
- | otherwise		      = index b h + 1
- where
-  isnull [] = True
-  isnull _  = False
+{-# SPECIALISE unsafeRangeSize :: (Int,Int) -> Int #-}
+{-# SPECIALISE unsafeRangeSize :: ((Int,Int),(Int,Int)) -> Int #-}
+unsafeRangeSize :: (Ix a) => (a,a) -> Int
+unsafeRangeSize b@(l,h) = unsafeIndex b h + 1
 
+{-# SPECIALISE rangeSize :: (Int,Int) -> Int #-}
+{-# SPECIALISE rangeSize :: ((Int,Int),(Int,Int)) -> Int #-}
+rangeSize :: (Ix a) => (a,a) -> Int
+rangeSize b@(l,h) | inRange b h = unsafeIndex b h + 1
+		  | otherwise   = 0
+
+-- Note that the following is NOT right
+--	rangeSize (l,h) | l <= h    = index b h + 1
+--			| otherwise = 0
+--
+-- Because it might be the case that l<h, but the range
+-- is nevertheless empty.  Consider
+--	((1,2),(2,1))
+-- Here l<h, but the second index ranges from 2..1 and
+-- hence is empty
 \end{code}

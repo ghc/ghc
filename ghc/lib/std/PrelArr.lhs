@@ -119,34 +119,30 @@ bounds (Array b _)  = b
     case (indexArray# arr# n#) of
       (# v #) -> v
 
-#ifdef USE_FOLDR_BUILD
 {-# INLINE array #-}
-#endif
-array ixs ivs =
-   runST ( ST $ \ s ->
-	case (newArray ixs arrEleBottom)	of { ST new_array_thing ->
-	case (new_array_thing s)		of { (# s#, arr@(MutableArray _ arr#) #) ->
-	let
-	 fill_in s1# [] = s1#
-	 fill_in s1# ((i,v) : is) =
-		case (index ixs i)	        of { I# n# ->
-		case writeArray# arr# n# v s1#  of { s2# -> 
-		fill_in s2# is }}
-	in
+array ixs ivs 
+  = case rangeSize ixs				of { I# n ->
+    runST ( ST $ \ s1 -> 
+	case newArray# n arrEleBottom s1	of { (# s2, marr #) ->
+	foldr (fill ixs marr) (done ixs marr) ivs s2
+    })}
 
-	case (fill_in s# ivs)	 		of { s1# -> 
-	case (freezeArray arr)			of { ST freeze_array_thing ->
-	freeze_array_thing s1# }}}})
+fill :: Ix ix => (ix,ix)  -> MutableArray# s elt
+	      -> (ix,elt) -> STRep s a -> STRep s a
+{-# INLINE fill #-}
+fill ixs marr (i,v) next = \s1 -> case index ixs i	of { I# n ->
+				  case writeArray# marr n v s1	of { s2 ->
+				  next s2 }}
+
+done :: Ix ix => (ix,ix) -> MutableArray# s elt
+	      -> STRep s (Array ix elt)
+{-# INLINE done #-}
+done ixs marr = \s1 -> case unsafeFreezeArray# marr s1		of { (# s2, arr #) ->
+		       (# s2, Array ixs arr #) }
 
 arrEleBottom :: a
 arrEleBottom = error "(Array.!): undefined array element"
 
-fill_it_in :: Ix ix => MutableArray s ix elt -> [(ix, elt)] -> ST s ()
-fill_it_in arr lst
-  = foldr fill_one_in (return ()) lst
-  where  -- **** STRICT **** (but that's OK...)
-    fill_one_in (i, v) rst
-      = writeArray arr i v >> rst
 
 -----------------------------------------------------------------------
 -- these also go better with magic: (//), accum, accumArray
@@ -159,6 +155,13 @@ old_array // ivs
 	fill_it_in arr ivs
 	freezeArray arr
     )
+
+fill_it_in :: Ix ix => MutableArray s ix elt -> [(ix, elt)] -> ST s ()
+fill_it_in arr lst
+  = foldr fill_one_in (return ()) lst
+  where  -- **** STRICT **** (but that's OK...)
+    fill_one_in (i, v) rst
+      = writeArray arr i v >> rst
 
 zap_with_f :: Ix ix => (elt -> elt2 -> elt) -> MutableArray s ix elt -> [(ix,elt2)] -> ST s ()
 -- zap_with_f: reads an elem out first, then uses "f" on that and the new value

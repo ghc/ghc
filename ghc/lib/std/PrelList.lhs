@@ -17,9 +17,9 @@ module PrelList (
    foldl, foldl1, scanl, scanl1, foldr, foldr1, scanr, scanr1,
    iterate, repeat, replicate, cycle,
    take, drop, splitAt, takeWhile, dropWhile, span, break,
-   lines, words, unlines, unwords, reverse, and, or,
+   reverse, and, or,
    any, all, elem, notElem, lookup,
-   sum, product, maximum, minimum, concatMap,
+   maximum, minimum, concatMap,
    zip, zip3, zipWith, zipWith3, unzip, unzip3,
 
    -- non-standard, but hidden when creating the Prelude
@@ -33,6 +33,7 @@ import PrelTup
 import PrelMaybe
 import PrelBase
 
+infixl 9  !!
 infix  4 `elem`, `notElem`
 \end{code}
 
@@ -90,26 +91,32 @@ null (_:_)              =  False
 -- of the more general genericLength, the result type of which may be
 -- any kind of number.
 length                  :: [a] -> Int
-#ifdef USE_REPORT_PRELUDE
-length []               =  0
-length (_:l)            =  1 + length l
-#else
 length l                =  len l 0#
   where
     len :: [a] -> Int# -> Int
     len []     a# = I# a#
     len (_:xs) a# = len xs (a# +# 1#)
-#endif
 
 -- filter, applied to a predicate and a list, returns the list of those
 -- elements that satisfy the predicate; i.e.,
 -- filter p xs = [ x | x <- xs, p x]
 filter :: (a -> Bool) -> [a] -> [a]
-filter _pred []    = []
-filter pred (x:xs)
-  | pred x         = x : filter pred xs
-  | otherwise	   = filter pred xs
+{-# INLINE filter #-}
+filter p xs = build (\c n -> foldr (filterFB c p) n xs)
 
+filterFB c p x r | p x       = x `c` r
+		 | otherwise = r
+
+{-# RULES
+"filterFB"	forall c,p,q.	filterFB (filterFB c p) q = filterFB c (\x -> p x && q x)
+"filterList" 	forall p.	foldr (filterFB (:) p) [] = filterList p
+ #-}
+
+filterList :: (a -> Bool) -> [a] -> [a]
+filterList _pred []    = []
+filterList pred (x:xs)
+  | pred x         = x : filterList pred xs
+  | otherwise	   = filterList pred xs
 
 -- foldl, applied to a binary operator, a starting value (typically the
 -- left-identity of the operator), and a list, reduces the list using
@@ -180,6 +187,23 @@ cycle                   :: [a] -> [a]
 cycle []		= error "Prelude.cycle: empty list"
 cycle xs		= xs' where xs' = xs ++ xs'
 
+-- takeWhile, applied to a predicate p and a list xs, returns the longest
+-- prefix (possibly empty) of xs of elements that satisfy p.  dropWhile p xs
+-- returns the remaining suffix.  Span p xs is equivalent to 
+-- (takeWhile p xs, dropWhile p xs), while break p uses the negation of p.
+
+takeWhile               :: (a -> Bool) -> [a] -> [a]
+takeWhile _ []          =  []
+takeWhile p (x:xs) 
+            | p x       =  x : takeWhile p xs
+            | otherwise =  []
+
+dropWhile               :: (a -> Bool) -> [a] -> [a]
+dropWhile _ []          =  []
+dropWhile p xs@(x:xs')
+            | p x       =  dropWhile p xs'
+            | otherwise =  xs
+
 -- take n, applied to a list xs, returns the prefix of xs of length n,
 -- or xs itself if n > length xs.  drop n xs returns the suffix of xs
 -- after the first n elements, or [] if n > length xs.  splitAt n xs
@@ -196,6 +220,7 @@ drop 0 xs              =  xs
 drop _ []              =  []
 drop n (_:xs) | n > 0  =  drop (n-1) xs
 drop _     _           =  errorNegativeIdx "drop"
+
 
 splitAt                   :: Int -> [a] -> ([a],[a])
 splitAt 0 xs              =  ([],xs)
@@ -299,6 +324,13 @@ and []		=  True
 and (x:xs)	=  x && and xs
 or []		=  False
 or (x:xs)	=  x || or xs
+
+{-# RULES
+"and/build"	forall g::forall b.(Bool->b->b)->b->b . 
+		and (build g) = g (&&) True
+"or/build"	forall g::forall b.(Bool->b->b)->b->b . 
+		or (build g) = g (||) False
+ #-}
 #endif
 
 -- Applied to a predicate and a list, any determines if any element
@@ -313,6 +345,12 @@ any p (x:xs)	= p x || any p xs
 
 all _ []	=  True
 all p (x:xs)	=  p x && all p xs
+{-# RULES
+"any/build"	forall p, g::forall b.(a->b->b)->b->b . 
+		any p (build g) = g ((&&) . p) True
+"all/build"	forall p, g::forall b.(a->b->b)->b->b . 
+		all p (build g) = g ((||) . p) False
+ #-}
 #endif
 
 -- elem is the list membership predicate, usually written in infix form,
@@ -336,23 +374,6 @@ lookup  key ((x,y):xys)
     | key == x          =  Just y
     | otherwise         =  lookup key xys
 
--- sum and product compute the sum or product of a finite list of numbers.
-{-# SPECIALISE sum     :: [Int] -> Int #-}
-{-# SPECIALISE product :: [Int] -> Int #-}
-sum, product            :: (Num a) => [a] -> a
-#ifdef USE_REPORT_PRELUDE
-sum                     =  foldl (+) 0  
-product                 =  foldl (*) 1
-#else
-sum	l	= sum' l 0
-  where
-    sum' []     a = a
-    sum' (x:xs) a = sum' xs (a+x)
-product	l	= prod l 1
-  where
-    prod []     a = a
-    prod (x:xs) a = prod xs (a*x)
-#endif
 
 -- maximum and minimum return the maximum or minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
@@ -369,9 +390,33 @@ concatMap               :: (a -> [b]) -> [a] -> [b]
 concatMap f             =  foldr ((++) . f) []
 
 concat :: [[a]] -> [a]
-concat []	    = []
-concat ([]:xss)     = concat xss
-concat ((y:ys):xss) = y: (ys ++ concat xss)
+{-# INLINE concat #-}
+concat = foldr (++) []
+\end{code}
+
+
+\begin{code}
+-- List index (subscript) operator, 0-origin
+(!!)                    :: [a] -> Int -> a
+#ifdef USE_REPORT_PRELUDE
+(x:_)  !! 0             =  x
+(_:xs) !! n | n > 0     =  xs !! (n-1)
+(_:_)  !! _             =  error "Prelude.(!!): negative index"
+[]     !! _             =  error "Prelude.(!!): index too large"
+#else
+-- HBC version (stolen), then unboxified
+-- The semantics is not quite the same for error conditions
+-- in the more efficient version.
+--
+xs !! (I# n) | n <# 0#   =  error "Prelude.(!!): negative index\n"
+	     | otherwise =  sub xs n
+                         where
+			    sub :: [a] -> Int# -> a
+                            sub []     _ = error "Prelude.(!!): index too large\n"
+                            sub (y:ys) n = if n ==# 0#
+					   then y
+					   else sub ys (n -# 1#)
+#endif
 \end{code}
 
 
@@ -381,100 +426,105 @@ concat ((y:ys):xss) = y: (ys ++ concat xss)
 %*							*
 %*********************************************************
 
+\begin{code}
+foldr2 k z [] 	  ys	 = z
+foldr2 k z xs 	  []	 = z
+foldr2 k z (x:xs) (y:ys) = k x y (foldr2 k z xs ys)
+
+foldr2_left k z x r []     = z
+foldr2_left k z x r (y:ys) = k x y (r ys)
+
+foldr2_right k z y r []     = z
+foldr2_right k z y r (x:xs) = k x y (r xs)
+
+-- foldr2 k z xs ys = foldr (foldr2_left k z) z xs ys
+-- foldr2 k z xs ys = foldr (foldr2_right k z) z ys xs
+{-# RULES
+"foldr2/left"	forall k,z,ys,g::forall b.(a->b->b)->b->b . 
+		  foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys
+
+"foldr2/right"	forall k,z,xs,g::forall b.(a->b->b)->b->b . 
+		  foldr2 k z xs (build g) = g (foldr2_right k z) (\_ -> z) xs
+ #-}
+\end{code}
+
 zip takes two lists and returns a list of corresponding pairs.  If one
 input list is short, excess elements of the longer list are discarded.
 zip3 takes three lists and returns a list of triples.  Zips for larger
 tuples are in the List library
 
 \begin{code}
-zip                     :: [a] -> [b] -> [(a,b)]
--- Specification
--- zip =  zipWith (,)
-zip (a:as) (b:bs) = (a,b) : zip as bs
-zip _      _      = []
+----------------------------------------------
+zip :: [a] -> [b] -> [(a,b)]
+{-# INLINE zip #-}
+zip xs ys = build (\c n -> foldr2 (zipFB c) n xs ys)
 
-zip3                    :: [a] -> [b] -> [c] -> [(a,b,c)]
+zipFB c x y r = (x,y) `c` r
+
+
+zipList               :: [a] -> [b] -> [(a,b)]
+zipList (a:as) (b:bs) = (a,b) : zipList as bs
+zipList _      _      = []
+
+{-# RULES
+"zipList"	foldr2 (zipFB (:)) [] = zipList
+ #-}
+\end{code}
+
+\begin{code}
+----------------------------------------------
+zip3 :: [a] -> [b] -> [c] -> [(a,b,c)]
 -- Specification
 -- zip3 =  zipWith3 (,,)
 zip3 (a:as) (b:bs) (c:cs) = (a,b,c) : zip3 as bs cs
 zip3 _      _      _      = []
+\end{code}
+
 
 -- The zipWith family generalises the zip family by zipping with the
 -- function given as the first argument, instead of a tupling function.
 -- For example, zipWith (+) is applied to two lists to produce the list
 -- of corresponding sums.
 
-zipWith                 :: (a->b->c) -> [a]->[b]->[c]
-zipWith z (a:as) (b:bs) =  z a b : zipWith z as bs
-zipWith _ _ _           =  []
 
+\begin{code}
+----------------------------------------------
+zipWith :: (a->b->c) -> [a]->[b]->[c]
+{-# INLINE zipWith #-}
+zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
+
+zipWithFB c f x y r = (x `f` y) `c` r
+
+zipWithList                 :: (a->b->c) -> [a] -> [b] -> [c]
+zipWithList f (a:as) (b:bs) = f a b : zipWithList f as bs
+zipWithList f _      _      = []
+
+{-# RULES
+"zipWithList"	forall f. foldr2 (zipWithFB (:) f) [] = zipWithList f
+  #-}
+\end{code}
+
+\begin{code}
 zipWith3                :: (a->b->c->d) -> [a]->[b]->[c]->[d]
 zipWith3 z (a:as) (b:bs) (c:cs)
                         =  z a b c : zipWith3 z as bs cs
 zipWith3 _ _ _ _        =  []
 
-
 -- unzip transforms a list of pairs into a pair of lists.  
+unzip    :: [(a,b)] -> ([a],[b])
+unzip    =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
 
-unzip                   :: [(a,b)] -> ([a],[b])
-unzip                   =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
-
-unzip3                  :: [(a,b,c)] -> ([a],[b],[c])
-unzip3                  =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
-                                 ([],[],[])
+unzip3   :: [(a,b,c)] -> ([a],[b],[c])
+unzip3   =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
+                  ([],[],[])
 \end{code}
+
 
 %*********************************************************
 %*							*
-\subsection{Functions on strings}
+\subsection{Error code}
 %*							*
 %*********************************************************
-
-lines breaks a string up into a list of strings at newline characters.
-The resulting strings do not contain newlines.  Similary, words
-breaks a string up into a list of words, which were delimited by
-white space.  unlines and unwords are the inverse operations.
-unlines joins lines with terminating newlines, and unwords joins
-words with separating spaces.
-
-\begin{code}
-lines			:: String -> [String]
-lines ""		=  []
-lines s			=  let (l, s') = break (== '\n') s
-			   in  l : case s' of
-					[]     	-> []
-					(_:s'') -> lines s''
-
-words			:: String -> [String]
-words s			=  case dropWhile {-partain:Char.-}isSpace s of
-				"" -> []
-				s' -> w : words s''
-				      where (w, s'') = 
-                                             break {-partain:Char.-}isSpace s'
-
-unlines			:: [String] -> String
-#ifdef USE_REPORT_PRELUDE
-unlines			=  concatMap (++ "\n")
-#else
--- HBC version (stolen)
--- here's a more efficient version
-unlines [] = []
-unlines (l:ls) = l ++ '\n' : unlines ls
-#endif
-
-unwords			:: [String] -> String
-#ifdef USE_REPORT_PRELUDE
-unwords []		=  ""
-unwords ws		=  foldr1 (\w s -> w ++ ' ':s) ws
-#else
--- HBC version (stolen)
--- here's a more efficient version
-unwords []		=  ""
-unwords [w]		= w
-unwords (w:ws)		= w ++ ' ' : unwords ws
-#endif
-
-\end{code}
 
 Common up near identical calls to `error' to reduce the number
 constant strings created when compiled:

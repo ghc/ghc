@@ -56,7 +56,7 @@ data ThreadId = ThreadId ThreadId#
 -- But since ThreadId# is unlifted, the Weak type must use open
 -- type variables.
 
---forkIO has now been hoisted out into the concurrent library.
+--forkIO has now been hoisted out into the Concurrent library.
 
 killThread :: ThreadId -> IO ()
 killThread (ThreadId id) = IO $ \ s ->
@@ -97,7 +97,6 @@ par  x y = case (par# x) of { 0# -> parError; _ -> y }
 #else
 par  _ y = y
 #endif
-
 \end{code}
 
 %************************************************************************

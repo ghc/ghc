@@ -36,6 +36,7 @@ module Numeric
 
 import PrelBase
 import PrelMaybe
+import PrelShow
 import PrelArr
 import PrelNum
 import PrelNumExtra

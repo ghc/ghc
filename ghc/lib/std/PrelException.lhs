@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.6 1999/05/10 16:52:10 sof Exp $
+% $Id: PrelException.lhs,v 1.7 1999/05/18 14:59:16 simonpj Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -13,6 +13,7 @@ Exceptions and exception-handling functions.
 module PrelException where
 
 import PrelBase
+import PrelShow
 import PrelIOBase
 import PrelST 		( STret(..) )
 import PrelDynamic
@@ -121,6 +122,7 @@ catchNonIO m k	=  catchException m handler
   where handler (IOException err) = ioError err
 	handler other             = k other
 \end{code}
+
 
 Why is this stuff here?  To avoid recursive module dependencies of
 course.

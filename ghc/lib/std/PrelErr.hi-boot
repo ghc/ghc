@@ -8,5 +8,5 @@
 ---------------------------------------------------------------------------
 
 __interface PrelErr 2 0 where
-__export ! PrelErr error parError;
+__export PrelErr error parError;
 

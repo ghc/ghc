@@ -22,7 +22,10 @@ import PrelList 	( span )
 import PrelIOBase
 import PrelException
 import PrelMaybe	( Maybe(..) )
-import PrelBounded      ()   -- get at Bounded Int instance.
+import PrelEnum
+import PrelNum
+import PrelShow
+import PrelAddr		( Addr, nullAddr )
 import PrelNum		( toInteger, toBig )
 import PrelPack         ( packString )
 import PrelWeak		( addForeignFinalizer )

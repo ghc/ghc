@@ -34,7 +34,6 @@ module PrelErr
 import PrelBase
 import PrelList     ( span )
 import PrelException
-
 \end{code}
 
 %*********************************************************

@@ -108,9 +108,8 @@ import PrelHandle		-- much of the real stuff is in here
 import PrelRead         ( readParen, Read(..), reads, lex,
 			  readIO 
 			)
---import PrelNum		( toInteger )
-import PrelBounded      ()  -- Bounded Int instance.
-import PrelEither	( Either(..) )
+import PrelShow
+import PrelMaybe	( Either(..) )
 import PrelAddr		( Addr(..), nullAddr )
 import PrelArr		( ByteArray )
 import PrelPack		( unpackNBytesAccST )

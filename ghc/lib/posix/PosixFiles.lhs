@@ -77,7 +77,7 @@ import CString      ( packStringIO, allocChars,
 		    )
 import Addr
 import CCall
-import PrelBase
+import PrelBase	hiding( append )
 import ByteArray
 
 import PosixErr

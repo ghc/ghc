@@ -74,7 +74,7 @@ module PackedString (
     ) where
 
 import GlaExts
-import PrelBase ( showList__  ) -- ToDo: better
+import PrelShow ( showList__  ) -- ToDo: better
 import PrelPack
 	  (  new_ps_array
 	  ,  freeze_ps_array

@@ -9,12 +9,17 @@
 
 module PrelNum where
 
-import PrelBase
-import Ix
 import {-# SOURCE #-} PrelErr
+import PrelBase
+import PrelList
+import PrelEnum
+import PrelShow
 
 infixr 8  ^, ^^, **
 infixl 7  %, /, `quot`, `rem`, `div`, `mod`
+infixl 7  *
+infixl 6  +, -
+
 \end{code}
 
 %*********************************************************
@@ -24,6 +29,19 @@ infixl 7  %, /, `quot`, `rem`, `div`, `mod`
 %*********************************************************
 
 \begin{code}
+class  (Eq a, Show a) => Num a  where
+    (+), (-), (*)	:: a -> a -> a
+    negate		:: a -> a
+    abs, signum		:: a -> a
+    fromInteger		:: Integer -> a
+    fromInt		:: Int -> a -- partain: Glasgow extension
+
+    x - y		= x + negate y
+    negate x		= 0 - x
+    fromInt (I# i#)	= fromInteger (S# i#)
+					-- Go via the standard class-op if the
+					-- non-standard one ain't provided
+
 class  (Num a, Ord a) => Real a  where
     toRational		::  a -> Rational
 
@@ -128,6 +146,23 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 %*********************************************************
 
 \begin{code}
+instance  Num Int  where
+    (+)	   x y =  plusInt x y
+    (-)	   x y =  minusInt x y
+    negate x   =  negateInt x
+    (*)	   x y =  timesInt x y
+    abs    n   = if n `geInt` 0 then n else (negateInt n)
+
+    signum n | n `ltInt` 0 = negateInt 1
+	     | n `eqInt` 0 = 0
+	     | otherwise   = 1
+
+    fromInteger (S# i#) = I# i#
+    fromInteger (J# s# d#)
+      = case (integer2Int# s# d#) of { i# -> I# i# }
+
+    fromInt n		= n
+
 instance  Real Int  where
     toRational x	=  toInteger x % 1
 
@@ -334,26 +369,6 @@ instance  Show Integer  where
     showList = showList__ (showsPrec 0) 
 
 
-instance  Ix Integer  where
-    range (m,n)		
-      | m <= n          =  [m..n]
-      | otherwise       =  []
-
-    index b@(m,_) i
-	| inRange b i	=  fromInteger (i - m)
-	| otherwise	=  indexIntegerError i b
-    inRange (m,n) i	=  m <= i && i <= n
-
--- Sigh, really want to use helper function in Ix, but
--- module deps. are too painful.
-{-# NOINLINE indexIntegerError #-}
-indexIntegerError :: Integer -> (Integer,Integer) -> a
-indexIntegerError i rng
-  = error (showString "Ix{Integer}.index: Index " .
-           showParen True (showsPrec 0 i) .
-	   showString " out of range " $
-	   showParen True (showsPrec 0 rng) "")
-
 showSignedInteger :: Int -> Integer -> ShowS
 showSignedInteger p n r
   | n < 0 && p > 6 = '(':jtos n (')':r)
@@ -370,6 +385,9 @@ jtos i rs
    | otherwise = jtos' q (chr (toInt r + (ord_0::Int)) : cs)
     where
      (q,r) = n `quotRem` 10
+
+ord_0 :: Num a => a
+ord_0 = fromInt (ord '0')
 \end{code}
 
 %*********************************************************
@@ -413,6 +431,11 @@ denominator (_ :% y)	=  y
 %*********************************************************
 
 \begin{code}
+
+{-# SPECIALISE subtract :: Int -> Int -> Int #-}
+subtract	:: (Num a) => a -> a -> a
+subtract x y	=  y - x
+
 even, odd	:: (Integral a) => a -> Bool
 even n		=  n `rem` 2 == 0
 odd		=  not . even
@@ -452,6 +475,5 @@ _ ^ _		= error "Prelude.^: negative exponent"
 	Rational -> Int -> Rational #-}
 (^^)		:: (Fractional a, Integral b) => a -> b -> a
 x ^^ n		=  if n >= 0 then x^n else recip (x^(negate n))
-
 \end{code}
 

@@ -31,6 +31,7 @@ module Random
 import CPUTime (getCPUTime)
 import PrelST
 import PrelRead
+import PrelShow
 import PrelIOBase
 import PrelNumExtra ( float2Double, double2Float )
 import PrelBase

@@ -38,6 +38,7 @@ module Time
 import PreludeBuiltin
 #else
 import PrelBase
+import PrelShow
 import PrelIOBase
 import PrelHandle
 import PrelArr

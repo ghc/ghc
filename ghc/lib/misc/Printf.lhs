@@ -34,7 +34,7 @@ import PrintfPrims
 #if defined(__GLASGOW_HASKELL__)
 import GlaExts
 import PrelArr (Array(..), ByteArray(..))
-import PrelBase hiding (itos)
+import PrelBase
 #endif
 
 data UPrintf = UChar Char | UString String | UInt Int | UInteger Integer | UFloat Float | UDouble Double

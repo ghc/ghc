@@ -50,6 +50,9 @@ module GlaExts
         -- the representation of some basic types:
         Int(..),Addr(..),Word(..),Float(..),Double(..),Integer(..),Char(..),
 
+	-- Fusion
+	build, augment,
+
         -- misc bits
 	trace,
 

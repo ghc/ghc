@@ -51,6 +51,7 @@ import PrelBase
 import {-# SOURCE #-} PrelErr ( error )
 import PrelList ( length )
 import PrelST
+import PrelNum
 import PrelArr
 import PrelAddr
 

@@ -7,8 +7,10 @@ and Prelude.-> (as they are normally). -- SDM 8/10/97
 
 module Prelude (
 
-	-- Everything from these modules
-    module PrelList,
+	-- Everything corresponding to the Report's PreludeList
+    module PrelList, 
+    lines, words, unlines, unwords,
+    sum, product,
 
         -- Everything corresponding to the Report's PreludeText
     ReadS, ShowS,
@@ -68,12 +70,12 @@ module Prelude (
 import PrelBase
 import PrelList hiding ( takeUInt_append )
 import PrelRead
+import PrelEnum
 import PrelNum
 import PrelNumExtra
 import PrelTup
 import PrelMaybe
-import PrelEither
-import PrelBounded
+import PrelShow
 import PrelConc
 import Monad
 import Maybe
@@ -94,4 +96,25 @@ undefined               =  error "Prelude.undefined"
 \end{code}
 
 
+List sum and product are defined here because PrelList is too far
+down the compilation chain to "see" the Num class.
 
+\begin{code}
+-- sum and product compute the sum or product of a finite list of numbers.
+{-# SPECIALISE sum     :: [Int] -> Int #-}
+{-# SPECIALISE product :: [Int] -> Int #-}
+sum, product            :: (Num a) => [a] -> a
+#ifdef USE_REPORT_PRELUDE
+sum                     =  foldl (+) 0  
+product                 =  foldl (*) 1
+#else
+sum	l	= sum' l 0
+  where
+    sum' []     a = a
+    sum' (x:xs) a = sum' xs (a+x)
+product	l	= prod l 1
+  where
+    prod []     a = a
+    prod (x:xs) a = prod xs (a*x)
+#endif
+\end{code}

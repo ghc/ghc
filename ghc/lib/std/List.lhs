@@ -127,6 +127,7 @@ module List
    ) where
 
 import Prelude
+import PrelShow	( lines, words, unlines, unwords )
 import Maybe	( listToMaybe )
 import PrelBase	( Int(..), map, (++) )
 import PrelGHC	( (+#) )

@@ -11,13 +11,14 @@ Instances of the Read class.
 
 module PrelRead where
 
-import {-# SOURCE #-} PrelErr ( error )
+import PrelErr		( error )
+import PrelEnum		( Enum(..) )
 import PrelNum
 import PrelNumExtra
 import PrelList
 import PrelTup
 import PrelMaybe
-import PrelEither
+import PrelShow		-- isAlpha etc
 import PrelBase
 import Monad
 

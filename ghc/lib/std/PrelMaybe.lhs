@@ -11,8 +11,17 @@ The @Maybe@ type.
 module PrelMaybe where
 
 import PrelBase
+\end{code}
 
-data  Maybe a  =  Nothing | Just a	deriving (Eq, Ord, Show {- Read -})
+
+%*********************************************************
+%*							*
+\subsection{Standard numeric classes}
+%*							*
+%*********************************************************
+
+\begin{code}
+data  Maybe a  =  Nothing | Just a	deriving (Eq, Ord)
 
 maybe :: b -> (a -> b) -> Maybe a -> b
 maybe n _ Nothing  = n
@@ -31,7 +40,21 @@ instance  Monad Maybe  where
 
     return              = Just
     fail _		= Nothing
+\end{code}
 
+
+%*********************************************************
+%*							*
+\subsection{Standard numeric classes}
+%*							*
+%*********************************************************
+
+\begin{code}
+data  Either a b  =  Left a | Right b	deriving (Eq, Ord )
+
+either                  :: (a -> c) -> (b -> c) -> Either a b -> c
+either f _ (Left x)     =  f x
+either _ g (Right y)    =  g y
 \end{code}
 
 

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.9 1999/04/27 17:41:19 sof Exp $
+% $Id: PrelIOBase.lhs,v 1.10 1999/05/18 14:59:18 simonpj Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -25,6 +25,7 @@ import PrelST	  ( ST(..), STret(..) )
 import PrelMaybe  ( Maybe(..) )
 import PrelAddr	  ( Addr(..), nullAddr )
 import PrelPack   ( unpackCString )
+import PrelShow
 
 #if !defined(__CONCURRENT_HASKELL__)
 import PrelArr	  ( MutableVar, readVar )

@@ -21,4 +21,3 @@ mainIO :: IO ()		-- It must be of type (IO t) because that's what
 			-- make sure this type signature stays!
 mainIO = catchException Main.main (topHandler True)
 \end{code}
-

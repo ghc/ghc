@@ -23,10 +23,10 @@ import PrelBase
 %*********************************************************
 
 \begin{code}
-data (,) a b = (,) a b   deriving (Eq, Ord, Bounded)
-data (,,) a b c = (,,) a b c deriving (Eq, Ord, Bounded)
-data (,,,) a b c d = (,,,) a b c d deriving (Eq, Ord, Bounded)
-data (,,,,) a b c d e = (,,,,) a b c d e deriving (Eq, Ord, Bounded)
+data (,) a b = (,) a b   deriving (Eq, Ord)
+data (,,) a b c = (,,) a b c deriving (Eq, Ord)
+data (,,,) a b c d = (,,,) a b c d deriving (Eq, Ord)
+data (,,,,) a b c d e = (,,,,) a b c d e deriving (Eq, Ord)
 data (,,,,,) a b c d e f = (,,,,,) a b c d e f
 data (,,,,,,) a b c d e f g = (,,,,,,) a b c d e f g
 data (,,,,,,,) a b c d e f g h = (,,,,,,,) a b c d e f g h
@@ -80,37 +80,6 @@ data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s
  = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_
 data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_ k_
  = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_ k_
-\end{code}
-
-@Show@ instances for just the first few.
-
-\begin{code}
-instance  (Show a, Show b) => Show (a,b)  where
-    showsPrec _ (x,y) = showChar '(' . shows x . showChar ',' .
-                                       shows y . showChar ')'
-    showList	= showList__ (showsPrec 0) 
-
-instance (Show a, Show b, Show c) => Show (a, b, c) where
-    showsPrec _ (x,y,z) = showChar '(' . showsPrec 0 x . showChar ',' .
-					 showsPrec 0 y . showChar ',' .
-					 showsPrec 0 z . showChar ')'
-    showList	= showList__ (showsPrec 0) 
-
-instance (Show a, Show b, Show c, Show d) => Show (a, b, c, d) where
-    showsPrec _ (w,x,y,z) = showChar '(' . showsPrec 0 w . showChar ',' .
-					   showsPrec 0 x . showChar ',' .
-					   showsPrec 0 y . showChar ',' .
-					   showsPrec 0 z . showChar ')'
-
-    showList	= showList__ (showsPrec 0) 
-
-instance (Show a, Show b, Show c, Show d, Show e) => Show (a, b, c, d, e) where
-    showsPrec _ (v,w,x,y,z) = showChar '(' . showsPrec 0 v . showChar ',' .
-					     showsPrec 0 w . showChar ',' .
-					     showsPrec 0 x . showChar ',' .
-					     showsPrec 0 y . showChar ',' .
-					     showsPrec 0 z . showChar ')'
-    showList	= showList__ (showsPrec 0) 
 \end{code}
 
 

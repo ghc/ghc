@@ -31,7 +31,8 @@ import Char (ord, chr)
 import PreludeBuiltin
 ord_0 = ord '0'
 #else
-import PrelBase (ord_0, showList__)
+import PrelNum ( ord_0 )
+import PrelShow( showList__ )
 import GlaExts
 #endif
 \end{code}

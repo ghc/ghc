@@ -9,8 +9,10 @@
 module PrelST where
 
 import Monad
+import PrelShow
 import PrelBase
 import PrelGHC
+import PrelNum ()	-- So that we get the .hi file for system imports
 \end{code}
 
 %*********************************************************
@@ -23,7 +25,8 @@ The state-transformer monad proper.  By default the monad is strict;
 too many people got bitten by space leaks when it was lazy.
 
 \begin{code}
-newtype ST s a = ST (State# s -> (# State# s, a #))
+newtype ST s a = ST (STRep s a)
+type STRep s a = State# s -> (# State# s, a #)
 
 instance Functor (ST s) where
     fmap f (ST m) = ST $ \ s ->
@@ -104,10 +107,16 @@ f = let
 All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
 
 \begin{code}
-{-# NOINLINE runST #-}
+{-# INLINE runST #-}
+-- The INLINE prevents runSTRep getting inlined in *this* module
+-- so that it is still visible when runST is inlined in an importing
+-- module.  Regrettably delicate.  runST is behaving like a wrapper.
 runST :: (forall s. ST s a) -> a
-runST st = 
-  case st of
-	ST m -> case m realWorld# of
-      			(# _, r #) -> r
+runST st = runSTRep (case st of { ST st_rep -> st_rep })
+
+-- I'm letting runSTRep be inlined *after* full laziness
+-- 		SLPJ Apr 99
+runSTRep :: (forall s. STRep s a) -> a
+runSTRep st_rep = case st_rep realWorld# of
+	      		(# _, r #) -> r
 \end{code}

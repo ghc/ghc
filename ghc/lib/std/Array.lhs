@@ -40,6 +40,7 @@ module  Array
 
 import Ix
 import PrelList
+import PrelShow
 import PrelArr		-- Most of the hard work is done here
 import PrelBase
 

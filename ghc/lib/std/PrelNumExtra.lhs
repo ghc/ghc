@@ -17,8 +17,10 @@ module PrelNumExtra where
 
 import PrelBase
 import PrelGHC
+import PrelEnum
+import PrelShow
 import PrelNum
-import {-# SOURCE #-} PrelErr ( error )
+import PrelErr ( error )
 import PrelList
 import PrelMaybe
 import Maybe		( fromMaybe )
@@ -255,14 +257,6 @@ instance  RealFrac Double  where
     {-# SPECIALIZE round    :: Double -> Integer #-}
     {-# SPECIALIZE ceiling  :: Double -> Integer #-}
     {-# SPECIALIZE floor    :: Double -> Integer #-}
-
-#if defined(__UNBOXED_INSTANCES__)
-    {-# SPECIALIZE properFraction :: Double -> (Int#, Double) #-}
-    {-# SPECIALIZE truncate :: Double -> Int# #-}
-    {-# SPECIALIZE round    :: Double -> Int# #-}
-    {-# SPECIALIZE ceiling  :: Double -> Int# #-}
-    {-# SPECIALIZE floor    :: Double -> Int# #-}
-#endif
 
     properFraction x
       = case (decodeFloat x)      of { (m,n) ->
