@@ -5,9 +5,11 @@
 
 \begin{code}
 module SimplUtils (
-	simplBinder, simplBinders, simplRecBndrs, 
-	simplLetBndr, simplLamBndrs, 
-	newId, mkLam, prepareAlts, mkCase,
+	mkLam, prepareAlts, mkCase,
+
+	-- Inlining,
+	preInlineUnconditionally, postInlineUnconditionally, activeInline, activeRule,
+	inlineMode,
 
 	-- The continuation type
 	SimplCont(..), DupFlag(..), LetRhsFlag(..), 
@@ -20,7 +22,9 @@ module SimplUtils (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( SimplifierSwitch(..), opt_UF_UpdateInPlace,
+import SimplEnv
+import CmdLineOpts	( SimplifierSwitch(..), SimplifierMode(..), opt_UF_UpdateInPlace,
+			  opt_SimplNoPreInlining, opt_RulesOff,
 			  DynFlag(..), dopt )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
@@ -29,9 +33,9 @@ import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,
 			  findDefault, exprOkForSpeculation, exprIsValue
 			)
 import qualified Subst	( simplBndrs, simplBndr, simplLetId, simplLamBndr )
-import Id		( Id, idType, idInfo, isDataConWorkId,
-			  mkSysLocal, isDeadBinder, idNewDemandInfo,
-			  idUnfolding, idNewStrictness
+import Id		( Id, idType, idInfo, isDataConWorkId, idOccInfo,
+			  mkSysLocal, isDeadBinder, idNewDemandInfo, isExportedId,
+			  idUnfolding, idNewStrictness, idInlinePragma,
 			)
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
@@ -45,6 +49,8 @@ import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConTyVars, dataConArgTys, isVanillaDataCon )
 import Var		( tyVarKind, mkTyVar )
 import VarSet
+import BasicTypes	( TopLevelFlag(..), isTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
+			  Activation, isAlwaysActive, isActive )
 import Util		( lengthExceeds, mapAccumL )
 import Outputable
 \end{code}
@@ -421,65 +427,271 @@ canUpdateInPlace ty
 
 %************************************************************************
 %*									*
-\section{Dealing with a single binder}
+\subsection{Decisions about inlining}
 %*									*
 %************************************************************************
 
-These functions are in the monad only so that they can be made strict via seq.
+Inlining is controlled partly by the SimplifierMode switch.  This has two
+settings:
+
+	SimplGently	(a) Simplifying before specialiser/full laziness
+			(b) Simplifiying inside INLINE pragma
+			(c) Simplifying the LHS of a rule
+			(d) Simplifying a GHCi expression or Template 
+				Haskell splice
+
+	SimplPhase n	Used at all other times
+
+The key thing about SimplGently is that it does no call-site inlining.
+Before full laziness we must be careful not to inline wrappers,
+because doing so inhibits floating
+    e.g. ...(case f x of ...)...
+    ==> ...(case (case x of I# x# -> fw x#) of ...)...
+    ==> ...(case x of I# x# -> case fw x# of ...)...
+and now the redex (f x) isn't floatable any more.
+
+The no-inling thing is also important for Template Haskell.  You might be 
+compiling in one-shot mode with -O2; but when TH compiles a splice before
+running it, we don't want to use -O2.  Indeed, we don't want to inline
+anything, because the byte-code interpreter might get confused about 
+unboxed tuples and suchlike.
+
+INLINE pragmas
+~~~~~~~~~~~~~~
+SimplGently is also used as the mode to simplify inside an InlineMe note.
 
 \begin{code}
-simplBinders :: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
-simplBinders env bndrs
-  = let
-	(subst', bndrs') = Subst.simplBndrs (getSubst env) bndrs
-    in
-    seqBndrs bndrs'	`seq`
-    returnSmpl (setSubst env subst', bndrs')
-
-simplBinder :: SimplEnv -> InBinder -> SimplM (SimplEnv, OutBinder)
-simplBinder env bndr
-  = let
-	(subst', bndr') = Subst.simplBndr (getSubst env) bndr
-    in
-    seqBndr bndr'	`seq`
-    returnSmpl (setSubst env subst', bndr')
-
-
-simplLetBndr :: SimplEnv -> InBinder -> SimplM (SimplEnv, OutBinder)
-simplLetBndr env id
-  = let
-	(subst', id') = Subst.simplLetId (getSubst env) id
-    in
-    seqBndr id'		`seq`
-    returnSmpl (setSubst env subst', id')
-
-simplLamBndrs, simplRecBndrs 
-	:: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
-simplRecBndrs = simplBndrs Subst.simplLetId
-simplLamBndrs = simplBndrs Subst.simplLamBndr
-
-simplBndrs simpl_bndr env bndrs
-  = let
-	(subst', bndrs') = mapAccumL simpl_bndr (getSubst env) bndrs
-    in
-    seqBndrs bndrs'	`seq`
-    returnSmpl (setSubst env subst', bndrs')
-
-seqBndrs [] = ()
-seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs
-
-seqBndr b | isTyVar b = b `seq` ()
-	  | otherwise = seqType (idType b)	`seq`
-			idInfo b		`seq`
-			()
+inlineMode :: SimplifierMode
+inlineMode = SimplGently
 \end{code}
 
+It really is important to switch off inlinings inside such
+expressions.  Consider the following example 
+
+     	let f = \pq -> BIG
+     	in
+     	let g = \y -> f y y
+	    {-# INLINE g #-}
+     	in ...g...g...g...g...g...
+
+Now, if that's the ONLY occurrence of f, it will be inlined inside g,
+and thence copied multiple times when g is inlined.
+
+
+This function may be inlinined in other modules, so we
+don't want to remove (by inlining) calls to functions that have
+specialisations, or that may have transformation rules in an importing
+scope.
+
+E.g. 	{-# INLINE f #-}
+		f x = ...g...
+
+and suppose that g is strict *and* has specialisations.  If we inline
+g's wrapper, we deny f the chance of getting the specialised version
+of g when f is inlined at some call site (perhaps in some other
+module).
+
+It's also important not to inline a worker back into a wrapper.
+A wrapper looks like
+	wraper = inline_me (\x -> ...worker... )
+Normally, the inline_me prevents the worker getting inlined into
+the wrapper (initially, the worker's only call site!).  But,
+if the wrapper is sure to be called, the strictness analyser will
+mark it 'demanded', so when the RHS is simplified, it'll get an ArgOf
+continuation.  That's why the keep_inline predicate returns True for
+ArgOf continuations.  It shouldn't do any harm not to dissolve the
+inline-me note under these circumstances.
+
+Note that the result is that we do very little simplification
+inside an InlineMe.  
+
+	all xs = foldr (&&) True xs
+	any p = all . map p  {-# INLINE any #-}
+
+Problem: any won't get deforested, and so if it's exported and the
+importer doesn't use the inlining, (eg passes it as an arg) then we
+won't get deforestation at all.  We havn't solved this problem yet!
+
+
+preInlineUnconditionally
+~~~~~~~~~~~~~~~~~~~~~~~~
+@preInlineUnconditionally@ examines a bndr to see if it is used just
+once in a completely safe way, so that it is safe to discard the
+binding inline its RHS at the (unique) usage site, REGARDLESS of how
+big the RHS might be.  If this is the case we don't simplify the RHS
+first, but just inline it un-simplified.
+
+This is much better than first simplifying a perhaps-huge RHS and then
+inlining and re-simplifying it.  Indeed, it can be at least quadratically
+better.  Consider
+
+	x1 = e1
+	x2 = e2[x1]
+	x3 = e3[x2]
+	...etc...
+	xN = eN[xN-1]
+
+We may end up simplifying e1 N times, e2 N-1 times, e3 N-3 times etc.
+
+NB: we don't even look at the RHS to see if it's trivial
+We might have
+			x = y
+where x is used many times, but this is the unique occurrence of y.
+We should NOT inline x at all its uses, because then we'd do the same
+for y -- aargh!  So we must base this pre-rhs-simplification decision
+solely on x's occurrences, not on its rhs.
+
+Evne RHSs labelled InlineMe aren't caught here, because there might be
+no benefit from inlining at the call site.
+
+[Sept 01] Don't unconditionally inline a top-level thing, because that
+can simply make a static thing into something built dynamically.  E.g.
+	x = (a,b)
+	main = \s -> h x
+
+[Remember that we treat \s as a one-shot lambda.]  No point in
+inlining x unless there is something interesting about the call site.
+
+But watch out: if you aren't careful, some useful foldr/build fusion
+can be lost (most notably in spectral/hartel/parstof) because the
+foldr didn't see the build.  Doing the dynamic allocation isn't a big
+deal, in fact, but losing the fusion can be.  But the right thing here
+seems to be to do a callSiteInline based on the fact that there is
+something interesting about the call site (it's strict).  Hmm.  That
+seems a bit fragile.
+
+Conclusion: inline top level things gaily until Phase 0 (the last
+phase), at which point don't.
 
 \begin{code}
-newId :: EncodedFS -> Type -> SimplM Id
-newId fs ty = getUniqueSmpl 	`thenSmpl` \ uniq ->
-	      returnSmpl (mkSysLocal fs uniq ty)
+preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> Bool
+preInlineUnconditionally env top_lvl bndr
+  | isTopLevel top_lvl, SimplPhase 0 <- phase = False
+-- If we don't have this test, consider
+--	x = length [1,2,3]
+-- The full laziness pass carefully floats all the cons cells to
+-- top level, and preInlineUnconditionally floats them all back in.
+-- Result is (a) static allocation replaced by dynamic allocation
+--	     (b) many simplifier iterations because this tickles
+--		 a related problem; only one inlining per pass
+-- 
+-- On the other hand, I have seen cases where top-level fusion is
+-- lost if we don't inline top level thing (e.g. string constants)
+-- Hence the test for phase zero (which is the phase for all the final
+-- simplifications).  Until phase zero we take no special notice of
+-- top level things, but then we become more leery about inlining
+-- them.  
+
+  | not active 		   = False
+  | opt_SimplNoPreInlining = False
+  | otherwise = case idOccInfo bndr of
+		  IAmDead	     -> True	-- Happens in ((\x.1) v)
+	  	  OneOcc in_lam once -> not in_lam && once
+			-- Not inside a lambda, one occurrence ==> safe!
+		  other 	     -> False
+  where
+    phase = getMode env
+    active = case phase of
+		   SimplGently  -> isAlwaysActive prag
+		   SimplPhase n -> isActive n prag
+    prag = idInlinePragma bndr
 \end{code}
+
+postInlineUnconditionally
+~~~~~~~~~~~~~~~~~~~~~~~~~
+@postInlineUnconditionally@ decides whether to unconditionally inline
+a thing based on the form of its RHS; in particular if it has a
+trivial RHS.  If so, we can inline and discard the binding altogether.
+
+NB: a loop breaker has must_keep_binding = True and non-loop-breakers
+only have *forward* references Hence, it's safe to discard the binding
+	
+NOTE: This isn't our last opportunity to inline.  We're at the binding
+site right now, and we'll get another opportunity when we get to the
+ocurrence(s)
+
+Note that we do this unconditional inlining only for trival RHSs.
+Don't inline even WHNFs inside lambdas; doing so may simply increase
+allocation when the function is called. This isn't the last chance; see
+NOTE above.
+
+NB: Even inline pragmas (e.g. IMustBeINLINEd) are ignored here Why?
+Because we don't even want to inline them into the RHS of constructor
+arguments. See NOTE above
+
+NB: At one time even NOINLINE was ignored here: if the rhs is trivial
+it's best to inline it anyway.  We often get a=E; b=a from desugaring,
+with both a and b marked NOINLINE.  But that seems incompatible with
+our new view that inlining is like a RULE, so I'm sticking to the 'active'
+story for now.
+
+\begin{code}
+postInlineUnconditionally :: SimplEnv -> OutId -> OccInfo -> OutExpr -> Bool
+postInlineUnconditionally env bndr occ_info rhs 
+  =  exprIsTrivial rhs
+  && active
+  && not (isLoopBreaker occ_info)
+  && not (isExportedId bndr)
+	-- We used to have (isOneOcc occ_info) instead of
+	-- not (isLoopBreaker occ_info) && not (isExportedId bndr)
+	-- That was because a rather fragile use of rules got confused
+	-- if you inlined even a binding f=g  e.g. We used to have
+	--	map = mapList
+	-- But now a more precise use of phases has eliminated this problem,
+	-- so the is_active test will do the job.  I think.
+	--
+	-- OLD COMMENT: (delete soon)
+	-- Indeed, you might suppose that
+	-- there is nothing wrong with substituting for a trivial RHS, even
+	-- if it occurs many times.  But consider
+	--	x = y
+	--	h = _inline_me_ (...x...)
+	-- Here we do *not* want to have x inlined, even though the RHS is
+	-- trivial, becuase the contract for an INLINE pragma is "no inlining".
+	-- This is important in the rules for the Prelude 
+  where
+    active = case getMode env of
+		   SimplGently  -> isAlwaysActive prag
+		   SimplPhase n -> isActive n prag
+    prag = idInlinePragma bndr
+
+activeInline :: SimplEnv -> OutId -> OccInfo -> Bool
+activeInline env id occ
+  = case getMode env of
+      SimplGently -> isOneOcc occ && isAlwaysActive prag
+	-- No inlining at all when doing gentle stuff,
+	-- except for local things that occur once
+	-- The reason is that too little clean-up happens if you 
+	-- don't inline use-once things.   Also a bit of inlining is *good* for
+	-- full laziness; it can expose constant sub-expressions.
+	-- Example in spectral/mandel/Mandel.hs, where the mandelset 
+	-- function gets a useful let-float if you inline windowToViewport
+
+	-- NB: we used to have a second exception, for data con wrappers.
+	-- On the grounds that we use gentle mode for rule LHSs, and 
+	-- they match better when data con wrappers are inlined.
+	-- But that only really applies to the trivial wrappers (like (:)),
+	-- and they are now constructed as Compulsory unfoldings (in MkId)
+	-- so they'll happen anyway.
+
+      SimplPhase n -> isActive n prag
+  where
+    prag = idInlinePragma id
+
+activeRule :: SimplEnv -> Maybe (Activation -> Bool)
+-- Nothing => No rules at all
+activeRule env
+  | opt_RulesOff = Nothing
+  | otherwise
+  = case getMode env of
+	SimplGently  -> Just isAlwaysActive
+			-- Used to be Nothing (no rules in gentle mode)
+			-- Main motivation for changing is that I wanted
+			-- 	lift String ===> ...
+			-- to work in Template Haskell when simplifying
+			-- splices, so we get simpler code for literal strings
+	SimplPhase n -> Just (isActive n)
+\end{code}	
 
 
 %************************************************************************

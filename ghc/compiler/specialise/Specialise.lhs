@@ -14,10 +14,9 @@ import TcType		( Type, mkTyVarTy, tcSplitSigmaTy,
 			  tyVarsOfTypes, tyVarsOfTheta, isClassPred,
 			  tcCmpType, isUnLiftedType
 			)
-import Subst		( Subst, SubstResult(..), mkSubst, mkSubst, extendTvSubstList, 
-			  simplBndr, simplBndrs, substTy,
-			  substAndCloneId, substAndCloneIds, substAndCloneRecIds,
-			  substId, substInScope
+import CoreSubst	( Subst, mkEmptySubst, extendTvSubstList, lookupIdSubst,
+			  substBndr, substBndrs, substTy, substInScope,
+			  cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs
 			) 
 import Var		( zapSpecPragmaId )
 import VarSet
@@ -27,7 +26,7 @@ import CoreUtils	( applyTypeToArgs, mkPiTypes )
 import CoreFVs		( exprFreeVars, exprsFreeVars )
 import CoreTidy		( pprTidyIdRules )
 import CoreLint		( showPass, endPass )
-import Rules		( addIdSpecialisations, lookupRule )
+import Rules		( addIdSpecialisations, lookupRule, emptyRuleBase )
 
 import UniqSupply	( UniqSupply,
 			  UniqSM, initUs_, thenUs, returnUs, getUniqueUs, 
@@ -596,7 +595,7 @@ specProgram dflags us binds
 	-- accidentally re-use a unique that's already in use
 	-- Easiest thing is to do it all at once, as if all the top-level
 	-- decls were mutually recursive
-    top_subst	    = mkSubst (mkInScopeSet (mkVarSet (bindersOfBinds binds)))
+    top_subst	    = mkEmptySubst (mkInScopeSet (mkVarSet (bindersOfBinds binds)))
 
     go []	    = returnSM ([], emptyUDs)
     go (bind:binds) = go binds 				`thenSM` \ (binds', uds) ->
@@ -612,9 +611,7 @@ specProgram dflags us binds
 
 \begin{code}
 specVar :: Subst -> Id -> CoreExpr
-specVar subst v = case substId subst v of
-			DoneEx e   -> e
-			DoneId v _ -> Var v
+specVar subst v = lookupIdSubst subst v
 
 specExpr :: Subst -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 -- We carry a substitution down:
@@ -655,7 +652,7 @@ specExpr subst e@(Lam _ _)
     returnSM (mkLams bndrs' body'', filtered_uds)
   where
     (bndrs, body) = collectBinders e
-    (subst', bndrs') = simplBndrs subst bndrs
+    (subst', bndrs') = substBndrs subst bndrs
 	-- More efficient to collect a group of binders together all at once
 	-- and we don't want to split a lambda group with dumped bindings
 
@@ -664,7 +661,7 @@ specExpr subst (Case scrut case_bndr ty alts)
     mapAndCombineSM spec_alt alts	`thenSM` \ (alts', uds_alts) ->
     returnSM (Case scrut' case_bndr' (substTy subst ty) alts', uds_scrut `plusUDs` uds_alts)
   where
-    (subst_alt, case_bndr') = simplBndr subst case_bndr
+    (subst_alt, case_bndr') = substBndr subst case_bndr
 	-- No need to clone case binder; it can't float like a let(rec)
 
     spec_alt (con, args, rhs)
@@ -674,7 +671,7 @@ specExpr subst (Case scrut case_bndr ty alts)
 	  in
 	  returnSM ((con, args', rhs''), uds')
 	where
-	  (subst_rhs, args') = simplBndrs subst_alt args
+	  (subst_rhs, args') = substBndrs subst_alt args
 
 ---------------- Finally, let is the interesting case --------------------
 specExpr subst (Let bind body)
@@ -1013,7 +1010,7 @@ mkCallUDs subst f args
 	-- *don't* say what the value of the implicit param is!
   || not (spec_tys `lengthIs` n_tyvars)
   || not ( dicts   `lengthIs` n_dicts)
-  || maybeToBool (lookupRule (\act -> True) (substInScope subst) f args)
+  || maybeToBool (lookupRule (\act -> True) (substInScope subst) emptyRuleBase f args)
 	-- There's already a rule covering this call.  A typical case
 	-- is where there's an explicit user-provided rule.  Then
 	-- we don't want to create a specialised version 
@@ -1144,20 +1141,20 @@ cloneBindSM :: Subst -> CoreBind -> SpecM (Subst, Subst, CoreBind)
 cloneBindSM subst (NonRec bndr rhs)
   = getUs 	`thenUs` \ us ->
     let
-	(subst', bndr') = substAndCloneId subst us bndr
+	(subst', bndr') = cloneIdBndr subst us bndr
     in
     returnUs (subst, subst', NonRec bndr' rhs)
 
 cloneBindSM subst (Rec pairs)
   = getUs 	`thenUs` \ us ->
     let
-	(subst', bndrs') = substAndCloneRecIds subst us (map fst pairs)
+	(subst', bndrs') = cloneRecIdBndrs subst us (map fst pairs)
     in
     returnUs (subst', subst', Rec (bndrs' `zip` map snd pairs))
 
 cloneBinders subst bndrs
   = getUs 	`thenUs` \ us ->
-    returnUs (substAndCloneIds subst us bndrs)
+    returnUs (cloneIdBndrs subst us bndrs)
 
 newIdSM old_id new_ty
   = getUniqSM		`thenSM` \ uniq ->

@@ -58,8 +58,8 @@ import CoreSyn
 import CmdLineOpts	( FloatOutSwitches(..) )
 import CoreUtils	( exprType, exprIsTrivial, exprIsCheap, mkPiTypes )
 import CoreFVs		-- all of it
-import Subst		( Subst, SubstResult(..), emptySubst, extendInScope, extendIdSubst,
-			  substAndCloneId, substAndCloneRecIds )
+import CoreSubst	( Subst, emptySubst, extendInScope, extendIdSubst,
+			  cloneIdBndr, cloneRecIdBndrs )
 import Id		( Id, idType, mkSysLocalUnencoded, 
 			  isOneShotLambda, zapDemandIdInfo,
 			  idSpecialisation, idWorkerInfo, setIdInfo
@@ -682,7 +682,7 @@ extendLvlEnv (float_lams, lvl_env, subst, id_env) prs
 extendCaseBndrLvlEnv (float_lams, lvl_env, subst, id_env) (Var scrut_var) case_bndr lvl
   = (float_lams,
      extendVarEnv lvl_env case_bndr lvl,
-     extendIdSubst subst case_bndr (DoneEx (Var scrut_var)),
+     extendIdSubst subst case_bndr (Var scrut_var),
      extendVarEnv id_env case_bndr ([scrut_var], Var scrut_var))
      
 extendCaseBndrLvlEnv env scrut case_bndr lvl
@@ -695,7 +695,7 @@ extendPolyLvlEnv dest_lvl (float_lams, lvl_env, subst, id_env) abs_vars bndr_pai
      foldl add_id    id_env  bndr_pairs)
   where
      add_lvl   env (v,v') = extendVarEnv env v' dest_lvl
-     add_subst env (v,v') = extendIdSubst env v (DoneEx (mkVarApps (Var v') abs_vars))
+     add_subst env (v,v') = extendIdSubst env v (mkVarApps (Var v') abs_vars)
      add_id    env (v,v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
 extendCloneLvlEnv lvl (float_lams, lvl_env, _, id_env) new_subst bndr_pairs
@@ -819,7 +819,7 @@ cloneVar NotTopLevel env@(_,_,subst,_) v ctxt_lvl dest_lvl
   = ASSERT( isId v )
     getUs	`thenLvl` \ us ->
     let
-      (subst', v1) = substAndCloneId subst us v
+      (subst', v1) = cloneIdBndr subst us v
       v2	   = zap_demand ctxt_lvl dest_lvl v1
       env'	   = extendCloneLvlEnv dest_lvl env subst' [(v,v2)]
     in
@@ -832,7 +832,7 @@ cloneRecVars NotTopLevel env@(_,_,subst,_) vs ctxt_lvl dest_lvl
   = ASSERT( all isId vs )
     getUs 			`thenLvl` \ us ->
     let
-      (subst', vs1) = substAndCloneRecIds subst us vs
+      (subst', vs1) = cloneRecIdBndrs subst us vs
       vs2	    = map (zap_demand ctxt_lvl dest_lvl) vs1
       env'	    = extendCloneLvlEnv dest_lvl env subst' (vs `zip` vs2)
     in

@@ -21,7 +21,7 @@ import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( tcEqExprX )
 import Type		( Type )
 import CoreTidy		( pprTidyIdRules )
-import Id		( Id, idUnfolding, idSpecialisation, setIdSpecialisation ) 
+import Id		( Id, idUnfolding, isLocalId, idSpecialisation, setIdSpecialisation ) 
 import Var		( Var )
 import VarSet
 import VarEnv
@@ -404,11 +404,17 @@ addIdSpecialisations id rules
 %************************************************************************
 
 \begin{code}
-lookupRule :: (Activation -> Bool) -> InScopeSet
+lookupRule :: (Activation -> Bool) 
+	   -> InScopeSet
+	   -> RuleBase		-- Ids from other modules
 	   -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
-lookupRule is_active in_scope fn args
-  = case idSpecialisation fn of
+lookupRule is_active in_scope rules fn args
+  = case idSpecialisation fn' of
 	Rules rules _ -> matchRules is_active in_scope rules args
+  where
+    fn' | isLocalId fn					     = fn
+	| Just ext_fn <- lookupVarSet (ruleBaseIds rules) fn = ext_fn
+	| otherwise					     = fn
 \end{code}
 
 

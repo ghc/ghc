@@ -1174,7 +1174,8 @@ substTyVarBndr subst@(TvSubst in_scope env) old_var
 			--
 			-- The new_id isn't cloned, but it may have a different type
 			-- etc, so we must return it, not the old id
-  = (TvSubst (in_scope `extendInScopeSet` new_var) (delVarEnv env old_var),
+  = (TvSubst (in_scope `extendInScopeSet` new_var) 
+	     (delVarEnv env old_var),
      new_var)
 
   | otherwise	-- The new binder is in scope so
@@ -1182,7 +1183,8 @@ substTyVarBndr subst@(TvSubst in_scope env) old_var
 		-- Extending the substitution to do this renaming also
 		-- has the (correct) effect of discarding any existing
 		-- substitution for that variable
-  = (TvSubst (in_scope `extendInScopeSet` new_var) (extendVarEnv env old_var (TyVarTy new_var)),
+  = (TvSubst (in_scope `extendInScopeSet` new_var) 
+	     (extendVarEnv env old_var (TyVarTy new_var)),
      new_var)
   where
     new_var = uniqAway in_scope old_var

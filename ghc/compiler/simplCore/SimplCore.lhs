@@ -24,7 +24,7 @@ import PprCore		( pprCoreBindings, pprCoreExpr, pprIdRules )
 import OccurAnal	( occurAnalyseBinds, occurAnalyseGlobalExpr )
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
-import SimplUtils	( simplBinders )
+import SimplEnv		( SimplEnv, simplBinders, mkSimplEnv, setInScopeSet )
 import SimplMonad
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import CoreLint		( endPass )
@@ -98,14 +98,19 @@ simplifyExpr dflags expr
 
 	; us <-  mkSplitUniqSupply 's'
 
-	; let env	       = emptySimplEnv SimplGently []
-	      (expr', _counts) = initSmpl dflags us (simplExprGently env expr)
+	; let (expr', _counts) = initSmpl dflags us $
+				 simplExprGently gentleSimplEnv expr
 
 	; dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
 			(pprCoreExpr expr')
 
 	; return expr'
 	}
+
+gentleSimplEnv :: SimplEnv
+gentleSimplEnv = mkSimplEnv SimplGently 
+			    (panic "simplifyExpr: switches")
+			     emptyRuleBase
 
 doCorePasses :: HscEnv
              -> UniqSupply      -- uniques
@@ -216,7 +221,7 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	; let 	-- Simplify the local rules; boringly, we need to make an in-scope set
 		-- from the local binders, to avoid warnings from Simplify.simplVar
 	      local_ids        = mkInScopeSet (mkVarSet (bindersOfBinds binds))
-	      env	       = setInScopeSet (emptySimplEnv SimplGently []) local_ids 
+	      env	       = setInScopeSet gentleSimplEnv local_ids 
 	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)
 
 	      (orphan_rules, rules_for_locals) = partition isOrphanRule better_rules
@@ -413,8 +418,7 @@ simplifyPgm mode switches hsc_env us rule_base guts
 			  SimplGently  -> "gentle"
 			  SimplPhase n -> show n
 
-    simpl_env 	      = emptySimplEnv mode switches
-    sw_chkr	      = getSwitchChecker simpl_env
+    sw_chkr	      = isAmongSimpl switches
     max_iterations    = intSwitchSet sw_chkr MaxSimplifierIterations `orElse` 2
  
     do_iteration us rule_base iteration_no counts guts
@@ -455,8 +459,7 @@ simplifyPgm mode switches hsc_env us rule_base guts
 		-- miss the rules for Ids hidden inside imported inlinings
 	   new_rules <- loadImportedRules hsc_env guts ;
 	   let	{ rule_base' = extendRuleBaseList rule_base new_rules
-		; in_scope   = mkInScopeSet (ruleBaseIds rule_base')
-		; simpl_env' = setInScopeSet simpl_env in_scope } ;
+		; simpl_env  = mkSimplEnv mode sw_chkr rule_base' } ;
 			-- The new rule base Ids are used to initialise
 			-- the in-scope set.  That way, the simplifier will change any
 			-- occurrences of the imported id to the one in the imported_rule_ids
@@ -473,7 +476,7 @@ simplifyPgm mode switches hsc_env us rule_base guts
 		-- 	case t of {(_,counts') -> if counts'=0 then ... }
 		-- So the conditional didn't force counts', because the
 		-- selection got duplicated.  Sigh!
-	   case initSmpl dflags us1 (simplTopBinds simpl_env' tagged_binds) of {
+	   case initSmpl dflags us1 (simplTopBinds simpl_env tagged_binds) of {
 	  	(binds', counts') -> do {
 
 	   let	{ guts'      = guts { mg_binds = binds' }

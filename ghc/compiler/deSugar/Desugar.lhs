@@ -19,7 +19,7 @@ import Id		( Id, setIdExported, idName, idIsFrom, isLocalId )
 import Name		( Name, isExternalName )
 import CoreSyn
 import PprCore		( pprIdRules, pprCoreExpr )
-import Subst		( SubstResult(..), substExpr, mkSubst, extendIdSubstList )
+import CoreSubst	( substExpr, mkSubst )
 import DsMonad
 import DsExpr		( dsLExpr )
 import DsBinds		( dsHsBinds, AutoScc(..) )
@@ -282,10 +282,11 @@ ds_lhs all_vars lhs
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
     let
-	subst = extendIdSubstList (mkSubst all_vars) pairs
-	pairs = [(id, ContEx subst rhs) | (id,rhs) <- dict_binds']
+	subst = mkSubst all_vars emptyVarEnv (mkVarEnv id_pairs)
+	id_pairs = [(id, substExpr subst rhs) | (id,rhs) <- dict_binds']
 			-- Note recursion here... substitution won't terminate
 			-- if there is genuine recursion... which there isn't
+
 	body'' = substExpr subst body'
     in
 	

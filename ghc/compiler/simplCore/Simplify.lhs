@@ -12,12 +12,14 @@ import CmdLineOpts	( dopt, DynFlag(Opt_D_dump_inlinings),
 			  SimplifierSwitch(..)
 			)
 import SimplMonad
-import SimplUtils	( mkCase, mkLam, newId, prepareAlts,
-			  simplBinder, simplBinders, simplLamBndrs, simplRecBndrs, simplLetBndr,
+import SimplEnv	
+import SimplUtils	( mkCase, mkLam, prepareAlts,
 			  SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 			  mkRhsStop, mkBoringStop,  pushContArgs,
 			  contResultType, countArgs, contIsDupable, contIsRhsOrArg,
-			  getContArgs, interestingCallContext, interestingArg, isStrictType
+			  getContArgs, interestingCallContext, interestingArg, isStrictType,
+			  preInlineUnconditionally, postInlineUnconditionally, 
+			  inlineMode, activeInline, activeRule
 			)
 import Id		( Id, idType, idInfo, idArity, isDataConWorkId, 
 			  setIdUnfolding, isDeadBinder,
@@ -49,11 +51,9 @@ import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
 import Type		( TvSubstEnv, isUnLiftedType, seqType, tyConAppArgs, funArgTy,
-			  splitFunTy_maybe, splitFunTy, coreEqType, substTy, mkTyVarTys
+			  splitFunTy_maybe, splitFunTy, coreEqType, mkTyVarTys
 			)
 import VarEnv		( elemVarEnv )
-import Subst		( SubstResult(..), emptySubst, substExpr, 
-			  substId, simplIdInfo )
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, 
@@ -234,7 +234,7 @@ simplTopBinds env binds
 	-- so that if a transformation rule has unexpectedly brought
 	-- anything into scope, then we don't get a complaint about that.
 	-- It's rather as if the top-level binders were imported.
-    simplRecBndrs env (bindersOfBinds binds)	`thenSmpl` \ (env, bndrs') -> 
+    simplLetBndrs env (bindersOfBinds binds)	`thenSmpl` \ (env, bndrs') -> 
     simpl_binds env binds bndrs'		`thenSmpl` \ (floats, _) ->
     freeTick SimplifierDone			`thenSmpl_`
     returnSmpl (floatBinds floats)
@@ -301,7 +301,7 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
 simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
   | preInlineUnconditionally env NotTopLevel bndr
   = tick (PreInlineUnconditionally bndr)		`thenSmpl_`
-    thing_inside (extendIdSubst env bndr (ContEx (getSubst rhs_se) rhs))
+    thing_inside (extendIdSubst env bndr (mkContEx rhs_se rhs))
 
 
   | isStrictDmd (idNewDemandInfo bndr) || isStrictType (idType bndr)	-- A strict let
@@ -314,7 +314,7 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
     let
 	-- simplLetBndr doesn't deal with the IdInfo, so we must
 	-- do so here (c.f. simplLazyBind)
-	bndr2  = bndr1 `setIdInfo` simplIdInfo (getSubst env) (idInfo bndr)
+	bndr2  = bndr1 `setIdInfo` simplIdInfo env (idInfo bndr)
 	env2   = modifyInScope env1 bndr2 bndr2
     in
     completeNonRecX env2 True {- strict -} bndr bndr2 rhs1 thing_inside
@@ -361,7 +361,7 @@ simplNonRecX env bndr new_rhs thing_inside
 	-- Similarly, single occurrences can be inlined vigourously
 	-- e.g.  case (f x, g y) of (a,b) -> ....
 	-- If a,b occur once we can avoid constructing the let binding for them.
-  = thing_inside (extendIdSubst env bndr (ContEx emptySubst new_rhs))
+  = thing_inside (extendIdSubst env bndr (DoneEx new_rhs))
 
   | otherwise
   = simplBinder env bndr	`thenSmpl` \ (env, bndr') ->
@@ -423,7 +423,7 @@ simplRecOrTopPair :: SimplEnv
 simplRecOrTopPair env top_lvl bndr bndr' rhs
   | preInlineUnconditionally env top_lvl bndr  	-- Check for unconditional inline
   = tick (PreInlineUnconditionally bndr)	`thenSmpl_`
-    returnSmpl (emptyFloats env, extendIdSubst env bndr (ContEx (getSubst env) rhs))
+    returnSmpl (emptyFloats env, extendIdSubst env bndr (mkContEx env rhs))
 
   | otherwise
   = simplLazyBind env top_lvl Recursive bndr bndr' rhs env
@@ -486,7 +486,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
 	-- NB 4: does no harm for non-recursive bindings
 
-	bndr2  	  	  = bndr1 `setIdInfo` simplIdInfo (getSubst env) (idInfo bndr)
+	bndr2  	  	  = bndr1 `setIdInfo` simplIdInfo env (idInfo bndr)
 	env1	     	  = modifyInScope env bndr2 bndr2
 	rhs_env      	  = setInScope rhs_se env1
  	is_top_level	  = isTopLevel top_lvl
@@ -704,7 +704,7 @@ might do the same again.
 simplExpr :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 simplExpr env expr = simplExprC env expr (mkBoringStop expr_ty')
 		   where
-		     expr_ty' = substTy (getTvSubst env) (exprType expr)
+		     expr_ty' = substTy env (exprType expr)
 	-- The type in the Stop continuation, expr_ty', is usually not used
 	-- It's only needed when discarding continuations after finding
 	-- a function that returns bottom.
@@ -743,10 +743,10 @@ simplExprF env (Case scrut bndr case_ty alts) cont
     rebuild env case_expr' cont
   where
     case_cont = Select NoDup bndr alts env (mkBoringStop case_ty')
-    case_ty'  = substTy (getTvSubst env) case_ty	-- c.f. defn of simplExpr
+    case_ty'  = substTy env case_ty	-- c.f. defn of simplExpr
 
 simplExprF env (Let (Rec pairs) body) cont
-  = simplRecBndrs env (map fst pairs) 		`thenSmpl` \ (env, bndrs') -> 
+  = simplLetBndrs env (map fst pairs) 		`thenSmpl` \ (env, bndrs') -> 
 	-- NB: bndrs' don't have unfoldings or rules
 	-- We add them as we go down
 
@@ -766,7 +766,7 @@ simplType :: SimplEnv -> InType -> SimplM OutType
 simplType env ty
   = seqType new_ty   `seq`   returnSmpl new_ty
   where
-    new_ty = substTy (getTvSubst env) ty
+    new_ty = substTy env ty
 \end{code}
 
 
@@ -864,8 +864,8 @@ simplNote env (Coerce to from) body cont
 		-- But it isn't a common case.
 	  = let 
 		(t1,t2) = splitFunTy t1t2
-		new_arg = mkCoerce2 s1 t1 (substExpr subst arg)
-		subst   = getSubst (setInScope arg_se env)
+		new_arg = mkCoerce2 s1 t1 (substExpr arg_env arg)
+		arg_env = setInScope arg_se env
 	    in
 	    ApplyTo dup new_arg (zapSubstEnv env) (addCoerce t2 s2 cont)
 			
@@ -911,10 +911,10 @@ simplNote env (CoreNote s) e cont
 
 \begin{code}
 simplVar env var cont
-  = case substId (getSubst env) var of
-	DoneEx e	-> simplExprF (zapSubstEnv env) e cont
-	ContEx se e     -> simplExprF (setSubstEnv env se) e cont
-	DoneId var1 occ -> completeCall (zapSubstEnv env) var1 occ cont
+  = case substId env var of
+	DoneEx e	 -> simplExprF (zapSubstEnv env) e cont
+	ContEx tvs ids e -> simplExprF (setSubstEnv env tvs ids) e cont
+	DoneId var1 occ  -> completeCall (zapSubstEnv env) var1 occ cont
 		-- Note [zapSubstEnv]
 		-- The template is already simplified, so don't re-substitute.
 		-- This is VITAL.  Consider
@@ -966,9 +966,10 @@ completeCall env var occ_info cont
 
     let
 	in_scope   = getInScope env
+	rules	   = getRules env
 	maybe_rule = case activeRule env of
 			Nothing     -> Nothing	-- No rules apply
-			Just act_fn -> lookupRule act_fn in_scope var args 
+			Just act_fn -> lookupRule act_fn in_scope rules var args 
     in
     case maybe_rule of {
 	Just (rule_name, rule_rhs) -> 
@@ -1499,13 +1500,12 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
     simplBinders env tvs			`thenSmpl` \ (env1, tvs') ->
     let
 	pat_res_ty = dataConResTy con (mkTyVarTys tvs')
-	tv_subst   = getTvSubst env1
     in
-    case coreRefineTys tvs' tv_subst pat_res_ty (idType case_bndr') of {
+    case coreRefineTys tvs' (error "urk") pat_res_ty (idType case_bndr') of {
 	Nothing 	-- Dead code; for now, I'm just going to put in an
 			-- error case so I can see them
 	    ->	let rhs' = mkApps (Var eRROR_ID) 
-				[Type (substTy tv_subst (exprType rhs)),
+				[Type (substTy env (exprType rhs)),
 				 Lit (mkStringLit "Impossible alternative (GADT)")]
 		in 
 		simplBinders env1 ids		`thenSmpl` \ (env2, ids') -> 
@@ -1514,7 +1514,7 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
 	Just tv_subst_env -> 	-- The normal case
 
     let 
-	env2  = setTvSubstEnv env1 tv_subst_env
+	env2  = error "setTvSubstEnv" env1 tv_subst_env
 	-- Simplify the Ids in the refined environment, so their types
 	-- reflect the refinement.  Usually this doesn't matter, but it helps
 	-- in mkDupableAlt, when we want to float a lambda that uses these binders
@@ -1611,7 +1611,7 @@ knownCon env con args bndr alts cont
 		   bind_args env bs (drop n_drop_tys args)	$ \ env ->
 		   let
 			con_app  = mkConApp dc (take n_drop_tys args ++ con_args)
-			con_args = [substExpr (getSubst env) (varToCoreExpr b) | b <- bs]
+			con_args = [substExpr env (varToCoreExpr b) | b <- bs]
 					-- args are aready OutExprs, but bs are InIds
 		   in
 		   simplNonRecX env bndr con_app		$ \ env ->

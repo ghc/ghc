@@ -1,0 +1,717 @@
+%
+% (c) The AQUA Project, Glasgow University, 1993-1998
+%
+\section[SimplMonad]{The simplifier Monad}
+
+\begin{code}
+module SimplEnv (
+	InId, InBind, InExpr, InAlt, InArg, InType, InBinder,
+	OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBinder,
+
+	-- The simplifier mode
+	setMode, getMode, 
+
+	-- Switch checker
+	SwitchChecker, SwitchResult(..), getSwitchChecker, getSimplIntSwitch,
+	isAmongSimpl, intSwitchSet, switchIsOn,
+
+	setEnclosingCC, getEnclosingCC,
+
+	-- Environments
+	SimplEnv, mkSimplEnv, extendIdSubst, extendTvSubst, 
+	zapSubstEnv, setSubstEnv, 
+	getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
+	getRules,
+
+	SimplSR(..), mkContEx, substId, 
+
+	simplLetBndr, simplLetBndrs, simplLamBndr, simplLamBndrs, 
+ 	simplBinder, simplBinders, 
+	simplIdInfo, substExpr, substTy,
+
+	-- Floats
+	FloatsWith, FloatsWithExpr,
+  	Floats, emptyFloats, isEmptyFloats, unitFloat, addFloats, flattenFloats,
+	allLifted, wrapFloats, floatBinds,
+	addAuxiliaryBind,
+    ) where
+
+#include "HsVersions.h"
+
+import SimplMonad	
+import Rules		( RuleBase, emptyRuleBase )
+import Id		( Id, idType, idOccInfo, idInlinePragma, idUnfolding, setIdUnfolding )
+import IdInfo		( IdInfo, vanillaIdInfo, occInfo, setOccInfo, specInfo, setSpecInfo,
+			  arityInfo, setArityInfo, workerInfo, setWorkerInfo, 
+			  unfoldingInfo, setUnfoldingInfo, 
+			  unknownArity, workerExists
+			    )
+import CoreSyn
+import CoreUtils	( needsCaseBinding, exprIsTrivial )
+import PprCore		()	-- Instances
+import CostCentre	( CostCentreStack, subsumedCCS )
+import Var	
+import VarEnv
+import VarSet		( isEmptyVarSet )
+import OrdList
+
+import qualified CoreSubst	( Subst, mkSubst, substExpr, substRules, substWorker )
+import qualified Type		( substTy, substTyVarBndr )
+
+import Type             ( Type, TvSubst(..), TvSubstEnv, isUnLiftedType, seqType, tyVarsOfType )
+import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
+			  UniqSupply
+			)
+import FiniteMap
+import BasicTypes	( TopLevelFlag, isTopLevel, isLoopBreaker,
+			  Activation, isActive, isAlwaysActive,
+			  OccInfo(..), isOneOcc, isFragileOcc
+			)
+import CmdLineOpts	( SimplifierSwitch(..), SimplifierMode(..),
+			  DynFlags, DynFlag(..), dopt, 
+			  opt_PprStyle_Debug, opt_HistorySize, opt_SimplNoPreInlining, opt_RulesOff
+			)
+import Unique		( Unique )
+import Util		( mapAccumL )
+import Outputable
+import FastTypes
+import FastString
+import Maybes		( expectJust )
+
+import GLAEXTS		( indexArray# )
+
+#if __GLASGOW_HASKELL__ < 503
+import PrelArr  ( Array(..) )
+#else
+import GHC.Arr  ( Array(..) )
+#endif
+
+import Array		( array, (//) )
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[Simplify-types]{Type declarations}
+%*									*
+%************************************************************************
+
+\begin{code}
+type InBinder  = CoreBndr
+type InId      = Id			-- Not yet cloned
+type InType    = Type			-- Ditto
+type InBind    = CoreBind
+type InExpr    = CoreExpr
+type InAlt     = CoreAlt
+type InArg     = CoreArg
+
+type OutBinder  = CoreBndr
+type OutId	= Id			-- Cloned
+type OutTyVar	= TyVar			-- Cloned
+type OutType	= Type			-- Cloned
+type OutBind	= CoreBind
+type OutExpr	= CoreExpr
+type OutAlt	= CoreAlt
+type OutArg	= CoreArg
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{The @SimplEnv@ type}
+%*									*
+%************************************************************************
+
+
+\begin{code}
+data SimplEnv
+  = SimplEnv {
+	seMode 	    :: SimplifierMode,
+	seChkr      :: SwitchChecker,
+	seCC        :: CostCentreStack,	-- The enclosing CCS (when profiling)
+
+	-- Rules from other modules
+	seExtRules  :: RuleBase,
+
+	-- The current set of in-scope variables
+	-- They are all OutVars, and all bound in this module
+	seInScope   :: InScopeSet,	-- OutVars only
+
+	-- The current substitution
+	seTvSubst   :: TvSubstEnv,	-- InTyVar |--> OutType
+	seIdSubst   :: SimplIdSubst	-- InId    |--> OutExpr
+    }
+
+type SimplIdSubst = IdEnv SimplSR	-- IdId |--> OutExpr
+
+data SimplSR
+  = DoneEx OutExpr		-- Completed term
+  | DoneId OutId OccInfo	-- Completed term variable, with occurrence info
+  | ContEx TvSubstEnv	 	-- A suspended substitution
+	   SimplIdSubst
+	   InExpr 	 
+\end{code}
+
+
+seInScope: 
+	The in-scope part of Subst includes *all* in-scope TyVars and Ids
+	The elements of the set may have better IdInfo than the
+	occurrences of in-scope Ids, and (more important) they will
+	have a correctly-substituted type.  So we use a lookup in this
+	set to replace occurrences
+
+	The Ids in the InScopeSet are replete with their Rules,
+	and as we gather info about the unfolding of an Id, we replace
+	it in the in-scope set.  
+
+	The in-scope set is actually a mapping OutVar -> OutVar, and
+	in case expressions we sometimes bind 
+
+seIdSubst:
+	The substitution is *apply-once* only, because InIds and OutIds can overlap.
+	For example, we generally omit mappings 
+		a77 -> a77
+	from the substitution, when we decide not to clone a77, but it's quite 
+	legitimate to put the mapping in the substitution anyway.
+	
+	Indeed, we do so when we want to pass fragile OccInfo to the
+	occurrences of the variable; we add a substitution
+		x77 -> DoneId x77 occ
+	to record x's occurrence information.]
+
+	Furthermore, consider 
+		let x = case k of I# x77 -> ... in
+		let y = case k of I# x77 -> ... in ...
+	and suppose the body is strict in both x and y.  Then the simplifier
+	will pull the first (case k) to the top; so the second (case k) will
+	cancel out, mapping x77 to, well, x77!  But one is an in-Id and the 
+	other is an out-Id. 
+
+	Of course, the substitution *must* applied! Things in its domain 
+	simply aren't necessarily bound in the result.
+
+* substId adds a binding (DoneId new_id occ) to the substitution if 
+	EITHER the Id's unique has changed
+	OR     the Id has interesting occurrence information
+  So in effect you can only get to interesting occurrence information
+  by looking up the *old* Id; it's not really attached to the new id
+  at all.
+
+  Note, though that the substitution isn't necessarily extended
+  if the type changes.  Why not?  Because of the next point:
+
+* We *always, always* finish by looking up in the in-scope set 
+  any variable that doesn't get a DoneEx or DoneVar hit in the substitution.
+  Reason: so that we never finish up with a "old" Id in the result.  
+  An old Id might point to an old unfolding and so on... which gives a space leak.
+
+  [The DoneEx and DoneVar hits map to "new" stuff.]
+
+* It follows that substExpr must not do a no-op if the substitution is empty.
+  substType is free to do so, however.
+
+* When we come to a let-binding (say) we generate new IdInfo, including an
+  unfolding, attach it to the binder, and add this newly adorned binder to
+  the in-scope set.  So all subsequent occurrences of the binder will get mapped
+  to the full-adorned binder, which is also the one put in the binding site.
+
+* The in-scope "set" usually maps x->x; we use it simply for its domain.
+  But sometimes we have two in-scope Ids that are synomyms, and should
+  map to the same target:  x->x, y->x.  Notably:
+	case y of x { ... }
+  That's why the "set" is actually a VarEnv Var
+
+
+Note [GADT type refinement]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we come to a GADT pattern match that refines the in-scope types, we
+  a) Refine the types of the Ids in the in-scope set, seInScope.  
+     For exmaple, consider
+	data T a where
+		Foo :: T (Bool -> Bool)
+
+	(\ (x::T a) (y::a) -> case x of { Foo -> y True }
+
+     Technically this is well-typed, but exprType will barf on the
+     (y True) unless we refine the type on y's occurrence.
+
+  b) Refine the range of the type substitution, seTvSubst. 
+     Very similar reason to (a).
+
+  NB: we don't refine the range of the SimplIdSubst, because it's always
+  interpreted relative to the seInScope (see substId)
+
+For (b) we need to be a little careful.  Specifically, we compose the refinement 
+with the type substitution.  Suppose 
+  The substitution was	  [a->b, b->a]
+  and the refinement was  [b->Int]
+  Then we want [a->Int, b->a]
+
+But also if
+  The substitution was	  [a->b]
+  and the refinement was  [b->Int]
+  Then we want [a->Int, b->Int]
+	becuase b might be both an InTyVar and OutTyVar
+
+
+\begin{code}
+mkSimplEnv :: SimplifierMode -> SwitchChecker -> RuleBase -> SimplEnv
+mkSimplEnv mode switches rules
+  = SimplEnv { seChkr = switches, seCC = subsumedCCS, 
+	       seMode = mode, seInScope = emptyInScopeSet, 
+	       seExtRules = rules,
+	       seTvSubst = emptyVarEnv, seIdSubst = emptyVarEnv }
+	-- The top level "enclosing CC" is "SUBSUMED".
+
+---------------------
+getSwitchChecker :: SimplEnv -> SwitchChecker
+getSwitchChecker env = seChkr env
+
+---------------------
+getMode :: SimplEnv -> SimplifierMode
+getMode env = seMode env
+
+setMode :: SimplifierMode -> SimplEnv -> SimplEnv
+setMode mode env = env { seMode = mode }
+
+---------------------
+getEnclosingCC :: SimplEnv -> CostCentreStack
+getEnclosingCC env = seCC env
+
+setEnclosingCC :: SimplEnv -> CostCentreStack -> SimplEnv
+setEnclosingCC env cc = env {seCC = cc}
+
+---------------------
+extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
+extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
+  = env {seIdSubst = extendVarEnv subst var res}
+
+extendTvSubst :: SimplEnv -> TyVar -> Type -> SimplEnv
+extendTvSubst env@(SimplEnv {seTvSubst = subst}) var res
+  = env {seTvSubst = extendVarEnv subst var res}
+
+---------------------
+getInScope :: SimplEnv -> InScopeSet
+getInScope env = seInScope env
+
+setInScopeSet :: SimplEnv -> InScopeSet -> SimplEnv
+setInScopeSet env in_scope = env {seInScope = in_scope}
+
+setInScope :: SimplEnv -> SimplEnv -> SimplEnv
+setInScope env env_with_in_scope = setInScopeSet env (getInScope env_with_in_scope)
+
+addNewInScopeIds :: SimplEnv -> [CoreBndr] -> SimplEnv
+	-- The new Ids are guaranteed to be freshly allocated
+addNewInScopeIds env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) vs
+  = env { seInScope = in_scope `extendInScopeSetList` vs,
+	  seIdSubst = id_subst `delVarEnvList` vs }	-- Why delete?
+
+modifyInScope :: SimplEnv -> CoreBndr -> CoreBndr -> SimplEnv
+modifyInScope env@(SimplEnv {seInScope = in_scope}) v v'
+  = env {seInScope = modifyInScopeSet in_scope v v'}
+
+---------------------
+zapSubstEnv :: SimplEnv -> SimplEnv
+zapSubstEnv env = env {seTvSubst = emptyVarEnv, seIdSubst = emptyVarEnv}
+
+setSubstEnv :: SimplEnv -> TvSubstEnv -> SimplIdSubst -> SimplEnv
+setSubstEnv env tvs ids = env { seTvSubst = tvs, seIdSubst = ids }
+
+mkContEx :: SimplEnv -> InExpr -> SimplSR
+mkContEx (SimplEnv { seTvSubst = tvs, seIdSubst = ids }) e = ContEx tvs ids e
+
+isEmptySimplSubst :: SimplEnv -> Bool
+isEmptySimplSubst (SimplEnv { seTvSubst = tvs, seIdSubst = ids })
+  = isEmptyVarEnv tvs && isEmptyVarEnv ids
+
+---------------------
+getRules :: SimplEnv -> RuleBase
+getRules = seExtRules
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Substitution of Vars
+%*									*
+%************************************************************************
+
+
+\begin{code}
+substId :: SimplEnv -> Id -> SimplSR
+substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v 
+  | not (isLocalId v) 
+  = DoneId v NoOccInfo
+  | otherwise	-- A local Id
+  = case lookupVarEnv ids v of
+	Just (DoneId v occ) -> DoneId (refine v) occ
+	Just res	    -> res
+	Nothing		    -> let v' = refine v
+			       in DoneId v' (idOccInfo v')
+		-- We don't put LoopBreakers in the substitution (unless then need
+		-- to be cloned for name-clash rasons), so the idOccInfo is
+		-- very important!  If isFragileOcc returned True for
+		-- loop breakers we could avoid this call, but at the expense
+		-- of adding more to the substitution, and building new Ids
+		-- a bit more often than really necessary
+  where
+	-- Get the most up-to-date thing from the in-scope set
+	-- Even though it isn't in the substitution, it may be in
+	-- the in-scope set with a different type (we only use the
+	-- substitution if the unique changes).
+    refine v = case lookupInScope in_scope v of
+		 Just v' -> v'
+		 Nothing -> WARN( True, ppr v ) v	-- This is an error!
+	
+\end{code}
+
+
+%************************************************************************
+%*									*
+\section{Substituting an Id binder}
+%*									*
+%************************************************************************
+
+
+These functions are in the monad only so that they can be made strict via seq.
+
+\begin{code}
+simplBinders, simplLamBndrs, simplLetBndrs 
+	:: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
+simplBinders  env bndrs = mapAccumLSmpl simplBinder  env bndrs
+simplLamBndrs env bndrs = mapAccumLSmpl simplLamBndr env bndrs
+simplLetBndrs env bndrs = mapAccumLSmpl simplLetBndr env bndrs
+
+-------------
+simplBinder :: SimplEnv -> InBinder -> SimplM (SimplEnv, OutBinder)
+-- Used for lambda and case-bound variables
+-- Clone Id if necessary, substitute type
+-- Return with IdInfo already substituted, but (fragile) occurrence info zapped
+-- The substitution is extended only if the variable is cloned, because
+-- we *don't* need to use it to track occurrence info.
+simplBinder env bndr
+  | isTyVar bndr  = do	{ let (env', tv) = substTyVarBndr env bndr
+			; seqTyVar tv `seq` return (env', tv) }
+  | otherwise     = do	{ let (env', id) = substIdBndr False env env bndr
+			; seqId id `seq` return (env', id) }
+
+-------------
+simplLetBndr :: SimplEnv -> Var -> SimplM (SimplEnv, Var)
+simplLetBndr env id = do { let (env', id') = substLetId env id
+			 ; seqId id' `seq` return (env', id') }
+
+-------------
+simplLamBndr :: SimplEnv -> Var -> SimplM (SimplEnv, Var)
+-- Used for lambda binders.  These sometimes have unfoldings added by
+-- the worker/wrapper pass that must be preserved, becuase they can't
+-- be reconstructed from context.  For example:
+--	f x = case x of (a,b) -> fw a b x
+--	fw a b x{=(a,b)} = ...
+-- The "{=(a,b)}" is an unfolding we can't reconstruct otherwise.
+simplLamBndr env bndr
+  | not (isId bndr && hasSomeUnfolding old_unf) = simplBinder env bndr	-- Normal case
+  | otherwise					= seqId id2 `seq` return (env', id2)
+  where
+    old_unf = idUnfolding bndr
+    (env', id1) = substIdBndr False env env bndr
+    id2 = id1 `setIdUnfolding` substUnfolding env old_unf
+
+-------------
+seqTyVar :: TyVar -> ()
+seqTyVar b = b `seq` ()
+
+seqId :: Id -> ()
+seqId id = seqType (idType id)	`seq`
+	   idInfo id		`seq`
+	   ()
+\end{code}
+
+\begin{code}
+-- substBndr and friends are used when doing expression substitution only
+-- In this case we can *preserve* occurrence information, and indeed we *want*
+-- to do so else lose useful occ info in rules. 
+
+substBndr :: SimplEnv -> Var -> (SimplEnv, Var)
+substBndr subst bndr
+  | isTyVar bndr  = substTyVarBndr subst bndr
+  | otherwise     = substIdBndr True {- keep fragile info -} subst subst bndr
+
+substBndrs :: SimplEnv -> [Var] -> (SimplEnv, [Var])
+substBndrs subst bndrs = mapAccumL substBndr subst bndrs
+
+substRecBndrs :: SimplEnv -> [Id] -> (SimplEnv, [Id])
+-- Substitute a mutually recursive group
+substRecBndrs subst bndrs 
+  = (new_subst, new_bndrs)
+  where
+	-- Here's the reason we need to pass rec_subst to substIdBndr
+    (new_subst, new_bndrs) = mapAccumL (substIdBndr True {- keep fragile info -} new_subst) 
+			 	       subst bndrs
+\end{code}
+
+
+\begin{code}
+substIdBndr :: Bool		-- True <=> keep fragile info
+	 -> SimplEnv		-- Substitution to use for the IdInfo
+	 -> SimplEnv -> Id 	-- Substitition and Id to transform
+	 -> (SimplEnv, Id)	-- Transformed pair
+
+-- Returns with:
+--	* Unique changed if necessary
+--	* Type substituted
+-- 	* Unfolding zapped
+--	* Rules, worker, lbvar info all substituted 
+--	* Occurrence info zapped if is_fragile_occ returns True
+--	* The in-scope set extended with the returned Id
+--	* The substitution extended with a DoneId if unique changed
+--	  In this case, the var in the DoneId is the same as the
+--	  var returned
+
+substIdBndr keep_fragile rec_env 
+	    env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst})
+	    old_id
+  = (env { seInScope = in_scope `extendInScopeSet` new_id,
+	   seIdSubst = new_subst }, new_id)
+  where
+	-- id1 is cloned if necessary
+    id1 = uniqAway in_scope old_id
+
+	-- id2 has its type zapped
+    id2 = substIdType env id1
+
+	-- new_id has the right IdInfo
+	-- The lazy-set is because we're in a loop here, with 
+	-- rec_env, when dealing with a mutually-recursive group
+    new_id = maybeModifyIdInfo (substIdInfo keep_fragile rec_env) id2
+
+	-- Extend the substitution if the unique has changed
+	-- See the notes with substTyVarBndr for the delSubstEnv
+    new_subst | new_id /= old_id
+	      = extendVarEnv id_subst old_id (DoneId new_id (idOccInfo old_id))
+	      | otherwise 
+	      = delVarEnv id_subst old_id
+
+substLetId :: SimplEnv -> Id -> (SimplEnv, Id)
+-- A variant for let-bound Ids
+-- Clone Id if necessary
+-- Substitute its type
+-- Return an Id with completely zapped IdInfo
+-- 	[A subsequent substIdInfo will restore its IdInfo]
+-- Augment the subtitution 
+--	if the unique changed, *or* 
+--	if there's interesting occurrence info
+
+substLetId env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) old_id
+  = (env { seInScope = in_scope `extendInScopeSet` new_id, 
+	   seIdSubst = new_subst }, new_id)
+  where
+    old_info = idInfo old_id
+    id1	    = uniqAway in_scope old_id
+    id2     = substIdType env id1
+    new_id  = setIdInfo id2 vanillaIdInfo
+
+	-- Extend the substitution if the unique has changed,
+	-- or there's some useful occurrence information
+	-- See the notes with substTyVarBndr for the delSubstEnv
+    occ_info = occInfo old_info
+    new_subst | new_id /= old_id || isFragileOcc occ_info
+	      = extendVarEnv id_subst old_id (DoneId new_id occ_info)
+	      | otherwise 
+	      = delVarEnv id_subst old_id
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Impedence matching to type substitution
+%*									*
+%************************************************************************
+
+\begin{code}
+substTy :: SimplEnv -> Type -> Type 
+substTy (SimplEnv { seInScope = in_scope, seTvSubst = tv_env }) ty
+  = Type.substTy (TvSubst in_scope tv_env) ty
+
+substTyVarBndr :: SimplEnv -> TyVar -> (SimplEnv, TyVar)
+substTyVarBndr env@(SimplEnv { seInScope = in_scope, seTvSubst = tv_env }) tv
+  = case Type.substTyVarBndr (TvSubst in_scope tv_env) tv of
+	(TvSubst in_scope' tv_env', tv') 
+	   -> (env { seInScope = in_scope', seTvSubst = tv_env'}, tv')
+
+-- When substituting in rules etc we can get CoreSubst to do the work
+-- But CoreSubst uses a simpler form of IdSubstEnv, so we must impedence-match
+-- here.  I think the this will not usually result in a lot of work;
+-- the substitutions are typically small, and laziness will avoid work in many cases.
+
+mkCoreSubst  :: SimplEnv -> CoreSubst.Subst
+mkCoreSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seIdSubst = id_env })
+  = mk_subst tv_env id_env
+  where
+    mk_subst tv_env id_env = CoreSubst.mkSubst in_scope tv_env (mapVarEnv fiddle id_env)
+
+    fiddle (DoneEx e)       = e
+    fiddle (DoneId v occ)   = Var v
+    fiddle (ContEx tv id e) = CoreSubst.substExpr (mk_subst tv id) e
+
+substExpr :: SimplEnv -> CoreExpr -> CoreExpr
+substExpr env expr
+  | isEmptySimplSubst env = expr
+  | otherwise	          = CoreSubst.substExpr (mkCoreSubst env) expr
+\end{code}
+
+
+%************************************************************************
+%*									*
+\section{IdInfo substitution}
+%*									*
+%************************************************************************
+
+\begin{code}
+simplIdInfo :: SimplEnv -> IdInfo -> IdInfo
+  -- Used by the simplifier to compute new IdInfo for a let(rec) binder,
+  -- subsequent to simplLetId having zapped its IdInfo
+simplIdInfo env old_info
+  = case substIdInfo False env old_info of 
+	Just new_info -> new_info
+	Nothing       -> old_info
+
+substIdInfo :: Bool	-- True <=> keep even fragile info
+	    -> SimplEnv
+	    -> IdInfo
+	    -> Maybe IdInfo
+-- The keep_fragile flag is True when we are running a simple expression
+-- substitution that preserves all structure, so that arity and occurrence
+-- info are unaffected.  The False state is used more often.
+--
+-- Substitute the 
+--	rules
+--	worker info
+-- Zap the unfolding 
+-- If keep_fragile then
+--	keep OccInfo
+--	keep Arity
+-- else
+--	keep only 'robust' OccInfo
+--	zap Arity
+-- 
+-- Seq'ing on the returned IdInfo is enough to cause all the 
+-- substitutions to happen completely
+
+substIdInfo keep_fragile env info
+  | nothing_to_do = Nothing
+  | otherwise     = Just (info `setOccInfo`    	  (if keep_occ then old_occ else NoOccInfo)
+			       `setArityInfo`     (if keep_arity then old_arity else unknownArity)
+			       `setSpecInfo`   	  CoreSubst.substRules  subst old_rules
+			       `setWorkerInfo` 	  CoreSubst.substWorker subst old_wrkr
+			       `setUnfoldingInfo` noUnfolding)
+			-- setSpecInfo does a seq
+			-- setWorkerInfo does a seq
+  where
+    subst = mkCoreSubst env
+    nothing_to_do = keep_occ && keep_arity &&
+		    isEmptyCoreRules old_rules &&
+		    not (workerExists old_wrkr) &&
+		    not (hasUnfolding (unfoldingInfo info))
+    
+    keep_occ   = keep_fragile || not (isFragileOcc old_occ)
+    keep_arity = keep_fragile || old_arity == unknownArity
+    old_arity = arityInfo info
+    old_occ   = occInfo info
+    old_rules = specInfo info
+    old_wrkr  = workerInfo info
+
+------------------
+substIdType :: SimplEnv -> Id -> Id
+substIdType env@(SimplEnv { seInScope = in_scope,  seTvSubst = tv_env}) id
+  | isEmptyVarEnv tv_env || isEmptyVarSet (tyVarsOfType old_ty) = id
+  | otherwise	= setIdType id (Type.substTy (TvSubst in_scope tv_env) old_ty)
+		-- The tyVarsOfType is cheaper than it looks
+		-- because we cache the free tyvars of the type
+		-- in a Note in the id's type itself
+  where
+    old_ty = idType id
+
+------------------
+substUnfolding env NoUnfolding     	       = NoUnfolding
+substUnfolding env (OtherCon cons) 	       = OtherCon cons
+substUnfolding env (CompulsoryUnfolding rhs)   = CompulsoryUnfolding (substExpr env rhs)
+substUnfolding env (CoreUnfolding rhs t v w g) = CoreUnfolding (substExpr env rhs) t v w g
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Floats}
+%*									*
+%************************************************************************
+
+\begin{code}
+type FloatsWithExpr = FloatsWith OutExpr
+type FloatsWith a   = (Floats, a)
+	-- We return something equivalent to (let b in e), but
+	-- in pieces to avoid the quadratic blowup when floating 
+	-- incrementally.  Comments just before simplExprB in Simplify.lhs
+
+data Floats = Floats (OrdList OutBind) 
+		     InScopeSet		-- Environment "inside" all the floats
+		     Bool		-- True <=> All bindings are lifted
+
+allLifted :: Floats -> Bool
+allLifted (Floats _ _ is_lifted) = is_lifted
+
+wrapFloats :: Floats -> OutExpr -> OutExpr
+wrapFloats (Floats bs _ _) body = foldrOL Let body bs
+
+isEmptyFloats :: Floats -> Bool
+isEmptyFloats (Floats bs _ _) = isNilOL bs 
+
+floatBinds :: Floats -> [OutBind]
+floatBinds (Floats bs _ _) = fromOL bs
+
+flattenFloats :: Floats -> Floats
+-- Flattens into a single Rec group
+flattenFloats (Floats bs is is_lifted) 
+  = ASSERT2( is_lifted, ppr (fromOL bs) )
+    Floats (unitOL (Rec (flattenBinds (fromOL bs)))) is is_lifted
+\end{code}
+
+\begin{code}
+emptyFloats :: SimplEnv -> Floats
+emptyFloats env = Floats nilOL (getInScope env) True
+
+unitFloat :: SimplEnv -> OutId -> OutExpr -> Floats
+-- A single non-rec float; extend the in-scope set
+unitFloat env var rhs = Floats (unitOL (NonRec var rhs))
+			       (extendInScopeSet (getInScope env) var)
+			       (not (isUnLiftedType (idType var)))
+
+addFloats :: SimplEnv -> Floats 
+	  -> (SimplEnv -> SimplM (FloatsWith a))
+	  -> SimplM (FloatsWith a)
+addFloats env (Floats b1 is1 l1) thing_inside
+  | isNilOL b1 
+  = thing_inside env
+  | otherwise
+  = thing_inside (setInScopeSet env is1)	`thenSmpl` \ (Floats b2 is2 l2, res) ->
+    returnSmpl (Floats (b1 `appOL` b2) is2 (l1 && l2), res)
+
+addLetBind :: OutBind -> Floats -> Floats
+addLetBind bind (Floats binds in_scope lifted) 
+  = Floats (bind `consOL` binds) in_scope (lifted && is_lifted_bind bind)
+
+is_lifted_bind (Rec _)      = True
+is_lifted_bind (NonRec b r) = not (isUnLiftedType (idType b))
+
+-- addAuxiliaryBind 	* takes already-simplified things (bndr and rhs)
+--			* extends the in-scope env
+--			* assumes it's a let-bindable thing
+addAuxiliaryBind :: SimplEnv -> OutBind
+		 -> (SimplEnv -> SimplM (FloatsWith a))
+	 	 -> SimplM (FloatsWith a)
+	-- Extends the in-scope environment as well as wrapping the bindings
+addAuxiliaryBind env bind thing_inside
+  = ASSERT( case bind of { NonRec b r -> not (needsCaseBinding (idType b) r) ; Rec _ -> True } )
+    thing_inside (addNewInScopeIds env (bindersOf bind))	`thenSmpl` \ (floats, x) ->
+    returnSmpl (addLetBind bind floats, x)
+\end{code}
+
+
