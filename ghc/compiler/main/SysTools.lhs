@@ -273,11 +273,11 @@ initSysTools minusB_args
 		     destructArray len buf
 		     return s
 		let
-	  	  -- strip the trailing slash (awful, but 
+	  	  -- strip the trailing backslash (awful, but 
 		  -- we only do this once).
 		  tmpdir =
 	            case last tdir of
-		      '/' -> init tdir
+		      '\\' -> init tdir
 		      _   -> tdir
 		setTmpDir tmpdir
 		return ())
