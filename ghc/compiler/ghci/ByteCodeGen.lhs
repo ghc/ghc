@@ -30,7 +30,8 @@ import CoreFVs		( freeVars )
 import Type		( typePrimRep, isUnLiftedType, splitTyConApp_maybe, 
 			  isTyVarTy )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon, 
-                          dataConWrapId, isUnboxedTupleCon )
+                          isUnboxedTupleCon, isNullaryDataCon,
+			  dataConRepArity )
 import TyCon		( tyConFamilySize, isDataTyCon, tyConDataCons,
 			  isFunTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
@@ -53,6 +54,7 @@ import PprType		( pprType )
 import SMRep		( arrWordsHdrSize, arrPtrsHdrSize )
 import OrdList
 import Constants	( wORD_SIZE )
+import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel )
 
 import Data.List	( intersperse, sortBy, zip4, zip5, partition )
 import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8 )
@@ -77,14 +79,11 @@ byteCodeGen dflags (ModGuts { mg_binds = binds, mg_types = type_env })
 	     local_classes = typeEnvClasses type_env
 	     tycs = local_tycons ++ map classTyCon local_classes
 
-        let flatBinds = concatMap getBind binds
-            getBind (NonRec bndr rhs) = [(bndr, freeVars rhs)]
-            getBind (Rec binds)       = [(bndr, freeVars rhs) | (bndr,rhs) <- binds]
+        let flatBinds = [ (bndr, freeVars rhs) 
+			| (bndr, rhs) <- flattenBinds binds]
 
         (BcM_State final_ctr mallocd, proto_bcos)
-           <- runBc (BcM_State 0 []) (mapM (schemeR True []) flatBinds)
-			--                               ^^
-			-- better be no free vars in these top-level bindings
+           <- runBc (mapM schemeTopBind flatBinds)
 
         when (notNull mallocd)
              (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
@@ -107,14 +106,11 @@ coreExprToBCOs dflags expr
 
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
-      let invented_name = mkSystemName (mkPseudoUnique3 0) FSLIT("ExprTopLevel")
-          invented_id   = mkLocalId invented_name (panic "invented_id's type")
-      	  annexpr       = freeVars expr
-	  fvs 		= filter (not.isTyVar) (varSetElems (fst annexpr))
-
+      let invented_name  = mkSystemName (mkPseudoUnique3 0) FSLIT("ExprTopLevel")
+          invented_id    = mkLocalId invented_name (panic "invented_id's type")
+	  
       (BcM_State final_ctr mallocd, proto_bco) 
-         <- runBc (BcM_State 0 []) 
-                  (schemeR True fvs (invented_id, annexpr))
+         <- runBc (schemeTopBind (invented_id, freeVars expr))
 
       when (notNull mallocd)
            (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
@@ -230,15 +226,47 @@ intsToBitmap size slots{- must be sorted -}
 wORD_SIZE_IN_BITS = wORD_SIZE * 8 :: Int
 
 -- -----------------------------------------------------------------------------
+-- schemeTopBind
+
+-- Compile code for the right-hand side of a top-level binding
+
+schemeTopBind :: (Id, AnnExpr Id VarSet) -> BcM (ProtoBCO Name)
+
+
+schemeTopBind (id, rhs)
+  | Just data_con <- isDataConWrapId_maybe id,
+    isNullaryDataCon data_con
+  = 	-- Special case for the wrapper of a nullary data con.
+	-- It'll look like this:	Nil = /\a -> $wNil a
+	-- If we feed it into schemeR, we'll get 
+	--	Nil = Nil
+	-- because mkConAppCode treats nullary constructor applications
+	-- by just re-using the single top-level definition.  So
+	-- for the wrapper itself, we must allocate it directly.
+    emitBc (mkProtoBCO (getName id) (toOL [PACK data_con 0, ENTER])
+                       (Right rhs) 0 0 [{-no bitmap-}])
+
+  | otherwise
+  = schemeR [{- No free variables -}] (id, rhs)
+
+-- -----------------------------------------------------------------------------
 -- schemeR
 
--- Compile code for the right hand side of a let binding.
+-- Compile code for a right-hand side, to give a BCO that,
+-- when executed with the free variables and arguments on top of the stack,
+-- will return with a pointer to the result on top of the stack, after
+-- removing the free variables and arguments.
+--
 -- Park the resulting BCO in the monad.  Also requires the
 -- variable to which this value was bound, so as to give the
--- resulting BCO a name.  Bool indicates top-levelness.
+-- resulting BCO a name. 
 
-schemeR :: Bool -> [Id] -> (Id, AnnExpr Id VarSet) -> BcM (ProtoBCO Name)
-schemeR is_top fvs (nm, rhs) 
+schemeR :: [Id] 		-- Free vars of the RHS, ordered as they
+				-- will appear in the thunk.  Empty for
+				-- top-level things, which have no free vars.
+	-> (Id, AnnExpr Id VarSet)
+	-> BcM (ProtoBCO Name)
+schemeR fvs (nm, rhs) 
 {-
    | trace (showSDoc (
               (char ' '
@@ -247,30 +275,19 @@ schemeR is_top fvs (nm, rhs)
                $$ char ' '
               ))) False
    = undefined
+   | otherwise
 -}
-   | otherwise
-   = schemeR_wrk is_top fvs rhs nm (collect [] rhs)
+   = schemeR_wrk fvs nm rhs (collect [] rhs)
 
+collect xs (_, AnnNote note e) = collect xs e
+collect xs (_, AnnLam x e)     = collect (if isTyVar x then xs else (x:xs)) e
+collect xs (_, not_lambda)     = (reverse xs, not_lambda)
 
-collect xs (_, AnnNote note e)
-   = collect xs e
-collect xs (_, AnnLam x e) 
-   = collect (if isTyVar x then xs else (x:xs)) e
-collect xs not_lambda
-   = (reverse xs, not_lambda)
-
-schemeR_wrk is_top fvs original_body nm (args, body)
-   | Just dcon <- maybe_toplevel_null_con_rhs
-   = --trace ("nullary constructor! " ++ showSDocDebug (ppr nm)) $
-     ASSERT(null fvs)
-     emitBc (mkProtoBCO (getName nm) (toOL [PACK dcon 0, ENTER])
-                       (Right original_body) 0 0 [{-no bitmap-}])
-
-   | otherwise
+schemeR_wrk fvs nm original_body (args, body)
    = let 
 	 all_args  = reverse args ++ fvs
 	 arity     = length all_args
-	 -- these are the args in reverse order.  We're compiling a function
+	 -- all_args are the args in reverse order.  We're compiling a function
 	 -- \fv1..fvn x1..xn -> e 
 	 -- i.e. the fvs come first
 
@@ -287,40 +304,35 @@ schemeR_wrk is_top fvs original_body nm (args, body)
      emitBc (mkProtoBCO (getName nm) body_code (Right original_body)
 		arity bitmap_size bitmap)
 
-     where
-        maybe_toplevel_null_con_rhs
-           | is_top && null args
-           = case nukeTyArgs (snd body) of
-                AnnVar v_wrk 
-                   -> case isDataConId_maybe v_wrk of
-                         Nothing -> Nothing
-                         Just dc_wrk |  nm == dataConWrapId dc_wrk
-                                     -> Just dc_wrk
-                                     |  otherwise 
-                                     -> Nothing
-                other -> Nothing
-           | otherwise
-           = Nothing
 
-        nukeTyArgs (AnnApp f (_, AnnType _)) = nukeTyArgs (snd f)
-        nukeTyArgs other                     = other
-
+fvsToEnv :: BCEnv -> VarSet -> [Id]
+-- Takes the free variables of a right-hand side, and
+-- delivers an ordered list of the local variables that will
+-- be captured in the thunk for the RHS
+-- The BCEnv argument tells which variables are in the local
+-- environment: these are the ones that should be captured
+--
+-- The code that constructs the thunk, and the code that executes
+-- it, have to agree about this layout
+fvsToEnv p fvs = [v | v <- varSetElems fvs, 
+		      isId v,		-- Could be a type variable
+		      v `elemFM` p]
 
 -- -----------------------------------------------------------------------------
 -- schemeE
 
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
-schemeE :: Int -> Sequel -> BCEnv -> AnnExpr Id VarSet -> BcM BCInstrList
+schemeE :: Int -> Sequel -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
 
 -- Delegate tail-calls to schemeT.
-schemeE d s p e@(fvs, AnnApp f a) 
-   = schemeT d s p (fvs, AnnApp f a)
+schemeE d s p e@(AnnApp f a) 
+   = schemeT d s p e
 
-schemeE d s p e@(fvs, AnnVar v)
+schemeE d s p e@(AnnVar v)
    | not (isUnLiftedType v_type)
    =  -- Lifted-type thing; push it in the normal way
-     schemeT d s p (fvs, AnnVar v)
+     schemeT d s p e
 
    | otherwise
    = -- Returning an unlifted value.  
@@ -333,7 +345,7 @@ schemeE d s p e@(fvs, AnnVar v)
       v_type = idType v
       v_rep = typePrimRep v_type
 
-schemeE d s p (fvs, AnnLit literal)
+schemeE d s p (AnnLit literal)
    = pushAtom d p (AnnLit literal)	`thenBc` \ (push, szw) ->
      let l_rep = literalPrimRep literal
      in  returnBc (push 			-- value onto stack
@@ -341,97 +353,24 @@ schemeE d s p (fvs, AnnLit literal)
                    `snocOL` RETURN_UBX l_rep)	-- go
 
 
-#if 0
-{-
-   Disabled for now --SDM  (TODO: reinstate later, but do it better)
-
-   Deal specially with the cases
-      let x = fn atom1 .. atomn  in B
-   and
-      let x = Con atom1 .. atomn  in B
-              (Con must be saturated)
-
-   In these cases, generate code to allocate in-line.
-
-   This is optimisation of the general case for let, which follows
-   this one; this case can safely be omitted.  The reduction in
-   interpreter execution time seems to be around 5% for some programs,
-   with a similar drop in allocations.
-
-   This optimisation should be done more cleanly.  As-is, it is
-   inapplicable to RHSs in letrecs, and needlessly duplicates code in
-   schemeR and schemeT.  Some refactoring of the machinery would cure
-   both ills.  
--}
-schemeE d s p ee@(fvs, AnnLet (AnnNonRec x rhs) b)
-   | ok_to_go
-   = let d_init = if is_con then d else d'
-     in
-     mkPushes d_init args_r_to_l_reordered	`thenBc` \ (d_final, push_code) ->
-     schemeE d' s p' b				`thenBc` \ body_code ->
-     let size  = d_final - d_init
-         alloc = if is_con then nilOL else unitOL (ALLOC size)
-         pack  = unitOL (if is_con then PACK the_dcon size else MKAP size size)
-     in
-         returnBc (alloc `appOL` push_code `appOL` pack
-                   `appOL` body_code)
-     where
-        -- Decide whether we can do this or not
-        (ok_to_go, is_con, the_dcon, the_fn)
-            = case maybe_fn of
-                 Nothing        -> (False, bomb 1, bomb 2, bomb 3)
-                 Just (Left fn) -> (True,  False,  bomb 5, fn)
-                 Just (Right dcon)
-                    |  dataConRepArity dcon <= length args_r_to_l
-                    -> (True, True, dcon, bomb 6)
-                    |  otherwise
-                    -> (False, bomb 7, bomb 8, bomb 9)
-        bomb n = panic ("schemeE.is_con(hacky hack hack) " ++ show n)
-
-        -- Extract the args (R -> L) and fn
-        args_r_to_l_reordered
-           | not is_con
-           = args_r_to_l
-           | otherwise
-           = filter (not.isPtr.snd) args_r_to_l ++ filter (isPtr.snd) args_r_to_l
-             where isPtr = isFollowableRep . atomRep
-
-        args_r_to_l = filter (not.isTypeAtom.snd) args_r_to_l_raw
-        isTypeAtom (AnnType _) = True
-        isTypeAtom _           = False
-
-        (args_r_to_l_raw, maybe_fn) = chomp rhs
-        chomp expr
-           = case snd expr of
-                AnnVar v 
-                   |  isFCallId v || isPrimOpId v  
-                   -> ([], Nothing)
-                   |  otherwise
-                   -> case isDataConId_maybe v of
-                         Just dcon -> ([], Just (Right dcon))
-                         Nothing   -> ([], Just (Left v))
-                AnnApp f a  -> case chomp f of (az, f) -> (a:az, f)
-                AnnNote n e -> chomp e
-                other       -> ([], Nothing)
-
-        -- This is the env in which to translate the body
-        p' = addToFM p x d
-        d' = d + 1
-
-        -- Shove the args on the stack, including the fn in the non-dcon case
-        tag_when_push = not is_con
-
-#endif
+schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
+   | (AnnVar v, args_r_to_l) <- splitApp rhs,
+     Just data_con <- isDataConId_maybe v
+   = 	-- Special case for a non-recursive let whose RHS is a 
+	-- (guaranteed saturatred) constructor application
+	-- Just allocate the constructor and carry on
+     mkConAppCode d s p data_con args_r_to_l	`thenBc` \ alloc_code ->
+     schemeE (d+1) s (addToFM p x d) body	`thenBc` \ body_code ->
+     returnBc (alloc_code `appOL` body_code)
 
 -- General case for let.  Generates correct, if inefficient, code in
 -- all situations.
-schemeE d s p (fvs, AnnLet binds b)
+schemeE d s p (AnnLet binds (_,body))
    = let (xs,rhss) = case binds of AnnNonRec x rhs  -> ([x],[rhs])
                                    AnnRec xs_n_rhss -> unzip xs_n_rhss
          n_binds = length xs
 
-	 is_local id = not (isTyVar id) && elemFM id p'
-         fvss  = map (filter is_local . varSetElems . fst) rhss
+         fvss  = map (fvsToEnv p' . fst) rhss
 
          -- Sizes of free vars, + 1 for the fn
          sizes = map (\rhs_fvs -> 1 + sum (map idSizeW rhs_fvs)) fvss
@@ -461,7 +400,7 @@ schemeE d s p (fvs, AnnLet binds b)
 		 mkAlloc sz arity = ALLOC_PAP arity sz
 
 	 compile_bind d' fvs x rhs size off = do
-		bco <- schemeR False fvs (x,rhs)
+		bco <- schemeR fvs (x,rhs)
 		build_thunk d' fvs size bco off
 
 	 compile_binds = 
@@ -470,13 +409,13 @@ schemeE d s p (fvs, AnnLet binds b)
 		zip5 fvss xs rhss sizes [n_binds, n_binds-1 .. 1]
 	    ]
      in do
-     body_code <- schemeE d' s p' b
+     body_code <- schemeE d' s p' body
      thunk_codes <- sequence compile_binds
      returnBc (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
 
 
 
-schemeE d s p (fvs, AnnCase scrut bndr [(DataAlt dc, [bind1, bind2], rhs)])
+schemeE d s p (AnnCase scrut bndr [(DataAlt dc, [bind1, bind2], rhs)])
    | isUnboxedTupleCon dc && VoidRep == typePrimRep (idType bind1)
 	-- Convert 
 	--	case .... of x { (# VoidRep'd-thing, a #) -> ... }
@@ -494,7 +433,7 @@ schemeE d s p (fvs, AnnCase scrut bndr [(DataAlt dc, [bind1, bind2], rhs)])
    = --trace "automagic mashing of case alts (# a, VoidRep #)" $
      doCase d s p scrut bind1 [(DEFAULT, [], rhs)] True{-unboxed tuple-}
 
-schemeE d s p (fvs, AnnCase scrut bndr [(DataAlt dc, [bind1], rhs)])
+schemeE d s p (AnnCase scrut bndr [(DataAlt dc, [bind1], rhs)])
    | isUnboxedTupleCon dc
 	-- Similarly, convert
 	--	case .... of x { (# a #) -> ... }
@@ -503,15 +442,15 @@ schemeE d s p (fvs, AnnCase scrut bndr [(DataAlt dc, [bind1], rhs)])
    = --trace "automagic mashing of case alts (# a #)"  $
      doCase d s p scrut bind1 [(DEFAULT, [], rhs)] True{-unboxed tuple-}
 
-schemeE d s p (fvs, AnnCase scrut bndr alts)
+schemeE d s p (AnnCase scrut bndr alts)
    = doCase d s p scrut bndr alts False{-not an unboxed tuple-}
 
-schemeE d s p (fvs, AnnNote note body)
+schemeE d s p (AnnNote note (_, body))
    = schemeE d s p body
 
 schemeE d s p other
    = pprPanic "ByteCodeGen.schemeE: unhandled case" 
-               (pprCoreExpr (deAnnotate other))
+               (pprCoreExpr (deAnnotate' other))
 
 
 -- Compile code to do a tail call.  Specifically, push the fn,
@@ -523,27 +462,24 @@ schemeE d s p other
 --     The int will be on the stack.  Generate a code sequence
 --     to convert it to the relevant constructor, SLIDE and ENTER.
 --
--- 1.  A nullary constructor.  Push its closure on the stack 
---     and SLIDE and RETURN.
+-- 1.  The fn denotes a ccall.  Defer to generateCCall.
 --
 -- 2.  (Another nasty hack).  Spot (# a::VoidRep, b #) and treat
 --     it simply as  b  -- since the representations are identical
 --     (the VoidRep takes up zero stack space).  Also, spot
 --     (# b #) and treat it as  b.
 --
--- 3.  The fn denotes a ccall.  Defer to generateCCall.
---
--- 4.  Application of a non-nullary constructor, by defn saturated.
+-- 3.  Application of a constructor, by defn saturated.
 --     Split the args into ptrs and non-ptrs, and push the nonptrs, 
 --     then the ptrs, and then do PACK and RETURN.
 --
--- 5.  Otherwise, it must be a function call.  Push the args
+-- 4.  Otherwise, it must be a function call.  Push the args
 --     right to left, SLIDE and ENTER.
 
 schemeT :: Int 		-- Stack depth
         -> Sequel 	-- Sequel depth
         -> BCEnv 	-- stack env
-        -> AnnExpr Id VarSet 
+        -> AnnExpr' Id VarSet 
         -> BcM BCInstrList
 
 schemeT d s p app
@@ -551,7 +487,7 @@ schemeT d s p app
 --   | trace ("schemeT: env in = \n" ++ showSDocDebug (ppBCEnv p)) False
 --   = panic "schemeT ?!?!"
 
---   | trace ("\nschemeT\n" ++ showSDoc (pprCoreExpr (deAnnotate app)) ++ "\n") False
+--   | trace ("\nschemeT\n" ++ showSDoc (pprCoreExpr (deAnnotate' app)) ++ "\n") False
 --   = error "?!?!" 
 
    -- Case 0
@@ -563,28 +499,27 @@ schemeT d s p app
                     `snocOL` ENTER)
 
    -- Case 1
-   | Just con <- maybe_dcon, null args_r_to_l
-   = returnBc (
-        (PUSH_G (getName con) `consOL` mkSLIDE 1 (d-s))
-        `snocOL` ENTER
-     )
-
-   -- Case 3
    | Just (CCall ccall_spec) <- isFCallId_maybe fn
    = generateCCall d s p ccall_spec fn args_r_to_l
 
-   -- Case 4: Constructor application
-   | Just con <- maybe_dcon
-   = if isUnboxedTupleCon con
-	then case args_r_to_l of
-		[arg1,arg2] | isVoidRepAtom arg1 -> 
-		   unboxedTupleReturn d s p arg2
-		[arg1,arg2] | isVoidRepAtom arg2 -> 
-		   unboxedTupleReturn d s p arg1
-		_other -> unboxedTupleException
-	else doConstructorApp d s p con args_r_to_l
+   -- Case 2: Constructor application
+   | Just con <- maybe_dcon,
+     isUnboxedTupleCon con
+   = case args_r_to_l of
+	[arg1,arg2] | isVoidRepAtom arg1 -> 
+		  unboxedTupleReturn d s p arg2
+	[arg1,arg2] | isVoidRepAtom arg2 -> 
+		  unboxedTupleReturn d s p arg1
+	_other -> unboxedTupleException
 
-   -- Case 5: Tail call of function 
+   -- Case 3: Ordinary data constructor
+   | Just con <- maybe_dcon
+   = mkConAppCode d s p con args_r_to_l	`thenBc` \ alloc_con ->
+     returnBc (alloc_con	 `appOL` 
+               mkSLIDE 1 (d - s) `snocOL`
+               ENTER)
+
+   -- Case 4: Tail call of function 
    | otherwise
    = doTailCall d s p fn args_r_to_l
 
@@ -598,24 +533,16 @@ schemeT d s p app
                        other -> panic "maybe_is_tagToEnum_call.extract_constr_Ids"
            in 
            case app of
-              (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType t)) arg)
+              (AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType t)) arg)
                  -> case isPrimOpId_maybe v of
                        Just TagToEnumOp -> Just (snd arg, extract_constr_Names t)
 		       other		-> Nothing
               other -> Nothing
 
-      -- Extract the args (R->L) and fn
-      (args_r_to_l, fn) = chomp app
-      chomp expr
-         = case snd expr of
-              AnnVar v    -> ([], v)
-              AnnApp f (_,a)
-		 | isTypeAtom a -> chomp f
-		 | otherwise    -> case chomp f of (az, f) -> (a:az, f)
-              AnnNote n e -> chomp e
-              other       -> pprPanic "schemeT" 
-                               (ppr (deAnnotate (panic "schemeT.chomp", other)))
-
+	-- Extract the args (R->L) and fn
+	-- The function will necessarily be a variable, 
+	-- because we are compiling a tail call
+      (AnnVar fn, args_r_to_l) = splitApp app
       n_args = length args_r_to_l
 
       -- only consider this to be a constructor application iff it is
@@ -625,31 +552,38 @@ schemeT d s p app
 			_ -> Nothing
 
 -- -----------------------------------------------------------------------------
--- Generate code to build a constructor application and enter/return it.
+-- Generate code to build a constructor application, 
+-- leaving it on top of the stack
 
-doConstructorApp
-	:: Int -> Sequel -> BCEnv
-	-> DataCon -> [AnnExpr' Id VarSet] -- args, in *reverse* order
-	-> BcM BCInstrList
-doConstructorApp d s p con args = do_pushery d con_args
+mkConAppCode :: Int -> Sequel -> BCEnv
+	     -> DataCon 		-- The data constructor
+	     -> [AnnExpr' Id VarSet] 	-- Args, in *reverse* order
+	     -> BcM BCInstrList
+
+mkConAppCode orig_d s p con []	-- Nullary constructor
+  = ASSERT( isNullaryDataCon con )
+    returnBc (unitOL (PUSH_G (getName con)))
+	-- Instead of doing a PACK, which would allocate a fresh
+	-- copy of this constructor, use the single shared version.
+	-- The name of the constructor is the name of its wrapper function
+
+mkConAppCode orig_d s p con args_r_to_l 
+  = ASSERT( dataConRepArity con == length args_r_to_l )
+    do_pushery orig_d (non_ptr_args ++ ptr_args)
  where
 	-- The args are already in reverse order, which is the way PACK
 	-- expects them to be.  We must push the non-ptrs after the ptrs.
-      con_args = nptrs ++ ptrs
-           where (ptrs, nptrs) = partition isPtr args
-	         isPtr = isFollowableRep . atomRep
-
-      narg_words = sum (map (getPrimRepSize.atomRep) con_args)
+      (ptr_args, non_ptr_args) = partition isPtrAtom args_r_to_l
 
       do_pushery d (arg:args)
          = pushAtom d p arg			`thenBc` \ (push, arg_words) ->
            do_pushery (d+arg_words) args	`thenBc` \ more_push_code ->
            returnBc (push `appOL` more_push_code)
       do_pushery d []
-         = returnBc ( (PACK con narg_words `consOL`
-                       mkSLIDE 1 (d - narg_words - s)) `snocOL`
-                       ENTER
-                     )
+         = returnBc (unitOL (PACK con n_arg_words))
+	 where
+	   n_arg_words = d - orig_d
+
 
 -- -----------------------------------------------------------------------------
 -- Returning an unboxed tuple with one non-void component (the only
@@ -733,7 +667,8 @@ doCase  :: Int -> Sequel -> BCEnv
 	-> AnnExpr Id VarSet -> Id -> [AnnAlt Id VarSet]
 	-> Bool  -- True <=> is an unboxed tuple case, don't enter the result
 	-> BcM BCInstrList
-doCase d s p scrut bndr alts is_unboxed_tuple
+doCase d s p (_,scrut)
+ bndr alts is_unboxed_tuple
   = let
         -- Top of stack is the return itbl, as usual.
         -- underneath it is the pointer to the alt_code BCO.
@@ -762,10 +697,10 @@ doCase d s p scrut bndr alts is_unboxed_tuple
         isAlgCase = not (isUnLiftedType bndr_ty) && not is_unboxed_tuple
 
         -- given an alt, return a discr and code for it.
-	codeALt alt@(DEFAULT, _, rhs)
+	codeALt alt@(DEFAULT, _, (_,rhs))
 	   = schemeE d_alts s p_alts rhs	`thenBc` \ rhs_code ->
 	     returnBc (NoDiscr, rhs_code)
-        codeAlt alt@(discr, bndrs, rhs)
+        codeAlt alt@(discr, bndrs, (_,rhs))
 	   -- primitive or nullary constructor alt: no need to UNPACK
 	   | null real_bndrs = do
 		rhs_code <- schemeE d_alts s p_alts rhs
@@ -1363,6 +1298,16 @@ unboxedTupleException
 mkSLIDE n d = if d == 0 then nilOL else unitOL (SLIDE n d)
 bind x f    = f x
 
+splitApp :: AnnExpr' id ann -> (AnnExpr' id ann, [AnnExpr' id ann])
+	-- The arguments are returned in *right-to-left* order
+splitApp (AnnApp (_,f) (_,a))
+	       | isTypeAtom a = splitApp f
+	       | otherwise    = case splitApp f of 
+				     (f', as) -> (f', a:as)
+splitApp (AnnNote n (_,e))    = splitApp e
+splitApp e		      = (e, [])
+
+
 isTypeAtom :: AnnExpr' id ann -> Bool
 isTypeAtom (AnnType _) = True
 isTypeAtom _           = False
@@ -1379,6 +1324,9 @@ atomRep (AnnNote n b) = atomRep (snd b)
 atomRep (AnnApp f (_, AnnType _)) = atomRep (snd f)
 atomRep (AnnLam x e) | isTyVar x = atomRep (snd e)
 atomRep other = pprPanic "atomRep" (ppr (deAnnotate (undefined,other)))
+
+isPtrAtom :: AnnExpr' Id ann -> Bool
+isPtrAtom e = isFollowableRep (atomRep e)
 
 -- Let szsw be the sizes in words of some items pushed onto the stack,
 -- which has initial depth d'.  Return the values which the stack environment
@@ -1403,10 +1351,8 @@ ioToBc io = BcM $ \st -> do
   x <- io 
   return (st, x)
 
-runBc :: BcM_State -> BcM r -> IO (BcM_State, r)
-runBc st0 (BcM m) = do 
-  (st1, res) <- m st0
-  return (st1, res)
+runBc :: BcM r -> IO (BcM_State, r)
+runBc (BcM m) = m (BcM_State 0 []) 
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do
