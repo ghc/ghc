@@ -599,9 +599,12 @@ new env@(Env _ pairs) typ args Nothing =
 new env typ [] (Just inner) =
   -- anon. inner class
   do { innerName <- genAnonInnerClassName 
-     ; frees <- liftClass env innerName inner [] []
-     ; return (mkNew env typ [ Var name | name <- frees ])
+     ; frees <- liftClass env innerName inner [unType typ] []
+     ; return (New (Type [innerName]) [ Var name | name <- frees ] Nothing)
      }
+  where unType (Type [name]) = name
+	unType _             = error "incorrect type style"
+	
 new env typ _ (Just inner) = error "cant handle inner class with args"
 
 liftClass :: Env -> Name -> [Decl] -> [Name] -> [Name] -> LifterM [ Name ]
