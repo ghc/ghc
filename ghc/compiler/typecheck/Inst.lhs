@@ -41,7 +41,7 @@ import TcHsSyn	( TcExpr, TcId, TypecheckedHsExpr,
 import TcMonad
 import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupId )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
-import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType,
+import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zapToType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType,
 		)
 import TcType	( Type, TcType, TcThetaType, TcPredType, TcTauType, TcTyVarSet,
@@ -415,16 +415,19 @@ newOverloadedLit :: InstOrigin
 		 -> HsOverLit
 		 -> TcType
 		 -> NF_TcM (TcExpr, LIE)
-newOverloadedLit orig lit ty
-  | Just expr <- shortCutLit lit ty
+newOverloadedLit orig lit expected_ty
+  | Just expr <- shortCutLit lit expected_ty
   = returnNF_Tc (expr, emptyLIE)
 
   | otherwise
   = tcGetInstLoc orig		`thenNF_Tc` \ loc ->
     tcGetUnique			`thenNF_Tc` \ new_uniq ->
+    zapToType expected_ty	`thenNF_Tc_` 
+	-- The expected type might be a 'hole' type variable, 
+	-- in which case we must zap it to an ordinary type variable
     let
-	lit_inst = LitInst lit_id lit ty loc
-	lit_id   = mkSysLocal FSLIT("lit") new_uniq ty
+	lit_inst = LitInst lit_id lit expected_ty loc
+	lit_id   = mkSysLocal FSLIT("lit") new_uniq expected_ty
     in
     returnNF_Tc (HsVar (instToId lit_inst), unitLIE lit_inst)
 
