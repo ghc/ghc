@@ -17,7 +17,7 @@ import HsExpr		( HsExpr, Stmt )
 import HsBinds		( HsBinds, nullBinds )
 
 -- Others
-import Outputable	( ifPprShowAll, PprStyle )
+import Outputable	( ifPprShowAll, PprStyle, interpp'SP )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty
 import SrcLoc		( SrcLoc{-instances-} )
@@ -160,7 +160,7 @@ pprGRHS sty is_case (GRHS [] expr locn)
  =  text (if is_case then "->" else "=") <+> ppr sty expr
 
 pprGRHS sty is_case (GRHS guard expr locn)
- = sep [char '|' <+> ppr sty guard, 
+ = sep [char '|' <+> interpp'SP sty guard,
 	text (if is_case then "->" else "=") <+> ppr sty expr
    ]
 
