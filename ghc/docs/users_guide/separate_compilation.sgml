@@ -619,10 +619,14 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
       <para>This doesn't work any more.  Suppose module
       <literal>C</literal> imports module <literal>B</literal>, and
       <literal>B</literal> imports module <literal>A</literal>.  So
-      changes to <filename>A.hi</filename> should force a
-      recompilation of <literal>C</literal>.  And some changes to
-      <literal>A</literal> (changing the definition of a function that
-      appears in an inlining of a function exported by
+      changes to module <literal>A</literal> might require module
+      <literal>C</literal> to be recompiled, and hence when
+      <filename>A.hi</filename> changes we should check whether
+      <literal>C</literal> should be recompiled.  However, the
+      dependencies of <literal>C</literal> will only list
+      <literal>B.hi</literal>, not <literal>A.hi</literal>, and some
+      changes to <literal>A</literal> (changing the definition of a
+      function that appears in an inlining of a function exported by
       <literal>B</literal>, say) may conceivably not change
       <filename>B.hi</filename> one jot.  So now&hellip;</para>
 
