@@ -132,7 +132,7 @@ import TcHsSyn		( TcExpr, TcId,
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  tyVarsOfInst, tyVarsOfInsts,
-			  isDict, isClassDict, isStdClassTyVarDict,
+			  isDict, isClassDict, isMethod, isStdClassTyVarDict,
 			  isMethodFor, notFunDep,
 			  instToId, instBindingRequired, instCanBeGeneralised,
 			  newDictFromOld,
@@ -299,6 +299,7 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
     try_me inst 
       -- Does not constrain a local tyvar
       | isEmptyVarSet (tyVarsOfInst inst `intersectVarSet` local_tvs)
+        && (not (isMethod inst) || null (getIPs inst))
       = Free
 
       -- When checking against a given signature we always reduce

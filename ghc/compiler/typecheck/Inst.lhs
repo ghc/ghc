@@ -25,7 +25,8 @@ module Inst (
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
-	isDict, isClassDict, isTyVarDict, isStdClassTyVarDict, isMethodFor, notFunDep,
+	isDict, isClassDict, isMethod,
+	isTyVarDict, isStdClassTyVarDict, isMethodFor, notFunDep,
 	instBindingRequired, instCanBeGeneralised,
 
 	zonkInst, zonkInsts, zonkFunDeps, zonkTvFunDeps,
@@ -302,10 +303,14 @@ Predicates
 \begin{code}
 isDict :: Inst -> Bool
 isDict (Dict _ _ _) = True
-isDict other	      = False
+isDict other	    = False
 isClassDict :: Inst -> Bool
 isClassDict (Dict _ (Class _ _) _) = True
-isClassDict other	      = False
+isClassDict other		   = False
+
+isMethod :: Inst -> Bool
+isMethod (Method _ _ _ _ _ _) = True
+isMethod other		      = False
 
 isMethodFor :: TcIdSet -> Inst -> Bool
 isMethodFor ids (Method uniq id tys _ _ loc) 
@@ -574,10 +579,10 @@ pprInst (Dict u pred loc) = pprPred pred <+> show_uniq u
 
 pprInst m@(Method u id tys theta tau loc)
   = hsep [ppr id, ptext SLIT("at"), 
-	  brackets (interppSP tys),
+	  brackets (interppSP tys) {- ,
 	  ppr theta, ppr tau,
 	  show_uniq u,
-	  ppr (instToId m)]
+	  ppr (instToId m) -}]
 
 pprInst (FunDep clas fds loc)
   = hsep [ppr clas, ppr fds]
