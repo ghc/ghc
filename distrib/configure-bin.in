@@ -89,24 +89,32 @@ else
    exit 1
 fi
 rm -f conftest
-#
-dnl ** check if perl library is properly installed
-# (by seeing if a "do 'getopts.pl'" works...
-if $PerlCmd -e 'do "getopts.pl" || exit(1); exit(0);' > /dev/null 2>&1 ; then
-    :
-else
-    echo "I think your perl library is misinstalled."
-    echo "The following script did not work:"
-    echo '      do "getopts.pl" || exit(1); exit(0);'
-    echo "But, nevermind, let us continue.."
-fi
 
-dnl ** figure out how to do a BSD-ish install
+#
+dnl ** figure out how to do a BSD-ish install **
 #
 AC_PROG_INSTALL
-AC_PROG_LN_S()
+
 #
+dnl ** how to do symlinks **
+#
+AC_PROG_LN_S()
 
+#
+dnl ** Find the path to sed **
+#
+AC_PATH_PROG(SedCmd,sed)
 
+#
+dnl ** How to invoke cpp directly **
+#
+AC_PROG_GNUCPP
+
+#
 AC_OUTPUT(Makefile)
 
+echo "**************************************************"
+echo "Configuration done, ready to either `make install' "
+echo ""
+echo "(see README and INSTALL files for more info.)"
+echo "**************************************************"
