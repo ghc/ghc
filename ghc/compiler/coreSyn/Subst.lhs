@@ -43,6 +43,7 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			  Unfolding(..)
 			)
 import CoreFVs		( exprFreeVars )
+import CoreUtils	( exprIsTrivial )
 import TypeRep		( Type(..), TyNote(..) )  -- friend
 import Type		( ThetaType, PredType(..), 
 			  tyVarsOfType, tyVarsOfTypes, mkAppTy, 
@@ -798,8 +799,10 @@ substWorker subst (HasWorker w a)
   = case lookupIdSubst subst w of
 	(DoneId w1 _)     -> HasWorker w1 a
 	(DoneEx (Var w1)) -> HasWorker w1 a
-	(DoneEx other)    -> WARN( True, text "substWorker: DoneEx" <+> ppr w )
+	(DoneEx other)    -> WARN( not (exprIsTrivial other), text "substWorker: DoneEx" <+> ppr w )
 				  NoWorker	-- Worker has got substituted away altogether
+						-- This can happen if it's trivial, 
+						-- via postInlineUnconditionally
 	(ContEx se1 e)    -> WARN( True, text "substWorker: ContEx" <+> ppr w <+> ppr e)
 				  NoWorker	-- Ditto
 			
