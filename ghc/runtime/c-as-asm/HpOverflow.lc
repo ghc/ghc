@@ -159,6 +159,11 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
                 displacement); */
     }
 
+    /* Add the stable pointer table to the roots list */
+#ifndef PAR
+   StorageMgrInfo.roots[num_ptr_roots++] = StorageMgrInfo.StablePointerTable;
+#endif
+
     ASSERT(num_ptr_roots <= SM_MAXROOTS);
     StorageMgrInfo.rootno = num_ptr_roots;
 
@@ -212,6 +217,11 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
 
     /* root restoring ------------------------------- */
     /* must do all the restoring exactly backwards to the storing! */
+
+    /* remove the stable pointer table first */
+#ifndef PAR
+    StorageMgrInfo.StablePointerTable = StorageMgrInfo.roots[--num_ptr_roots];
+#endif
 
     /* now the general regs, in *backwards* order */
 
