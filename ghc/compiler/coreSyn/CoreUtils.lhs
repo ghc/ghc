@@ -43,10 +43,11 @@ import VarEnv
 import Name		( isLocallyDefined, hashName )
 import Literal		( Literal, hashLiteral, literalType )
 import DataCon		( DataCon, dataConRepArity )
-import PrimOp		( primOpOkForSpeculation, primOpIsCheap )
-import Id		( Id, idType, idFlavour, idStrictness, idLBVarInfo, mkWildId,
-			  idArity, idName, idUnfolding, idInfo, isDataConId_maybe
-
+import PrimOp		( primOpOkForSpeculation, primOpIsCheap, 
+			  primOpIsDupable )
+import Id		( Id, idType, idFlavour, idStrictness, idLBVarInfo, 
+			  mkWildId, idArity, idName, idUnfolding, idInfo, 
+			  isDataConId_maybe, isPrimOpId_maybe
 			)
 import IdInfo		( arityLowerBound, InlinePragInfo(..),
 			  LBVarInfo(..),  
@@ -226,21 +227,25 @@ mkIfThenElse guard then_expr else_expr
 %*									*
 %************************************************************************
 
-@exprIsTrivial@	is true of expressions we are unconditionally 
-		happy to duplicate; simple variables and constants,
-		and type applications.
+@exprIsTrivial@ is true of expressions we are unconditionally happy to
+		duplicate; simple variables and constants, and type
+		applications.  Note that primop Ids aren't considered
+		trivial unless 
+
 
 @exprIsBottom@	is true of expressions that are guaranteed to diverge
 
 
 \begin{code}
-exprIsTrivial (Type _)	     = True
-exprIsTrivial (Lit lit)      = True
-exprIsTrivial (Var v) 	     = True
-exprIsTrivial (App e arg)    = isTypeArg arg && exprIsTrivial e
-exprIsTrivial (Note _ e)     = exprIsTrivial e
-exprIsTrivial (Lam b body)   | isTyVar b = exprIsTrivial body
-exprIsTrivial other	     = False
+exprIsTrivial (Var v)
+  | Just op <- isPrimOpId_maybe v      = primOpIsDupable op
+  | otherwise                          = True
+exprIsTrivial (Type _)	      	       = True
+exprIsTrivial (Lit lit)       	       = True
+exprIsTrivial (App e arg)     	       = isTypeArg arg && exprIsTrivial e
+exprIsTrivial (Note _ e)      	       = exprIsTrivial e
+exprIsTrivial (Lam b body) | isTyVar b = exprIsTrivial body
+exprIsTrivial other	      	       = False
 \end{code}
 
 
@@ -692,22 +697,27 @@ exprSize :: CoreExpr -> Int
 	-- A measure of the size of the expressions
 	-- It also forces the expression pretty drastically as a side effect
 exprSize (Var v)       = varSize v 
-exprSize (Lit lit)     = 1
+exprSize (Lit lit)     = lit `seq` 1
 exprSize (App f a)     = exprSize f + exprSize a
 exprSize (Lam b e)     = varSize b + exprSize e
 exprSize (Let b e)     = bindSize b + exprSize e
-exprSize (Case e b as) = exprSize e + varSize b + foldr ((+) . altSize) 0  as
-exprSize (Note n e)    = exprSize e
-exprSize (Type t)      = seqType t `seq`
-			 1
+exprSize (Case e b as) = exprSize e + varSize b + foldr ((+) . altSize) 0 as
+exprSize (Note n e)    = noteSize n + exprSize e
+exprSize (Type t)      = seqType t `seq` 1
+
+noteSize (SCC cc)       = cc `seq` 1
+noteSize (Coerce t1 t2) = seqType t1 `seq` seqType t2 `seq` 1
+noteSize InlineCall     = 1
+noteSize InlineMe       = 1
+noteSize (TermUsg usg)  = usg `seq` 1
 
 exprsSize = foldr ((+) . exprSize) 0 
 
 varSize :: Var -> Int
-varSize b | isTyVar b = 1
-	  | otherwise = seqType (idType b)		`seq`
-			megaSeqIdInfo (idInfo b) 	`seq`
-			1
+varSize b  | isTyVar b = 1
+	   | otherwise = seqType (idType b)		`seq`
+			 megaSeqIdInfo (idInfo b) 	`seq`
+			 1
 
 varsSize = foldr ((+) . varSize) 0
 
