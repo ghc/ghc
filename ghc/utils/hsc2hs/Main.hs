@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.13 2001/01/15 07:33:02 qrczak Exp $
+-- $Id: Main.hs,v 1.14 2001/01/24 22:37:15 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -410,14 +410,15 @@ outTokenC (pos, key, arg) =
         _ -> ""
 
 conditional :: String -> Bool
-conditional "if"     = True
-conditional "ifdef"  = True
-conditional "ifndef" = True
-conditional "elif"   = True
-conditional "else"   = True
-conditional "endif"  = True
-conditional "error"  = True
-conditional _        = False
+conditional "if"      = True
+conditional "ifdef"   = True
+conditional "ifndef"  = True
+conditional "elif"    = True
+conditional "else"    = True
+conditional "endif"   = True
+conditional "error"   = True
+conditional "warning" = True
+conditional _         = False
 
 sourceFileName :: SourcePos -> String
 sourceFileName pos = fileName (sourceName pos)

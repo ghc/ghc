@@ -311,6 +311,7 @@ tags:
 	  <term><literal>#else</literal></term>
 	  <term><literal>#endif</literal></term>
 	  <term><literal>#error message</literal></term>
+	  <term><literal>#warning message</literal></term>
 	  <listitem>
 	    <para>Conditional compilation directives are passed
             unmodified to the C program, C file, and C header. Putting
