@@ -185,6 +185,7 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoStrictness
   | CoreDoWorkerWrapper
   | CoreDoSpecialising
+  | CoreDoSpecConstr
   | CoreDoUSPInf
   | CoreDoCPResult
   | CoreDoGlomBinds

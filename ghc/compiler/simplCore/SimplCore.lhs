@@ -37,6 +37,7 @@ import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
 import Specialise	( specProgram)
+import SpecConstr	( specConstrProgram)
 import UsageSPInf       ( doUsageSPInf )
 import StrictAnal	( saBinds )
 import WorkWrap	        ( wwTopBinds )
@@ -157,6 +158,8 @@ doCorePass dfs rb us binds CoreDoWorkerWrapper
    = _scc_ "WorkWrap"      noStats dfs (wwTopBinds dfs us binds)
 doCorePass dfs rb us binds CoreDoSpecialising       
    = _scc_ "Specialise"    noStats dfs (specProgram dfs us binds)
+doCorePass dfs rb us binds CoreDoSpecConstr
+   = _scc_ "SpecConstr"    noStats dfs (specConstrProgram dfs us binds)
 doCorePass dfs rb us binds CoreDoCPResult	        
    = _scc_ "CPResult"      noStats dfs (cprAnalyse dfs binds)
 doCorePass dfs rb us binds CoreDoPrintCore	        

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.29 2001/02/21 11:36:01 simonmar Exp $
+-- $Id: DriverState.hs,v 1.30 2001/02/28 11:48:34 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -278,6 +278,10 @@ buildCoreToDo = do
 
 	if opt_level >= 2 then
 	   CoreLiberateCase
+	else
+	   CoreDoNothing,
+	if opt_level >= 2 then
+	   CoreDoSpecConstr
 	else
 	   CoreDoNothing,
 

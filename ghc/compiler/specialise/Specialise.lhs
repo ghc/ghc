@@ -34,7 +34,7 @@ import PprCore		( pprCoreRules )
 import Rules		( addIdSpecialisations, lookupRule )
 
 import UniqSupply	( UniqSupply,
-			  UniqSM, initUs_, thenUs, thenUs_, returnUs, getUniqueUs, 
+			  UniqSM, initUs_, thenUs, thenUs, returnUs, getUniqueUs, 
 			  withUs, mapUs
 			)
 import Name		( nameOccName, mkSpecOcc, getSrcLoc )
@@ -800,9 +800,9 @@ specDefn subst calls (fn, rhs)
       -- Make a specialised version for each call in calls_for_me
     mapSM spec_call calls_for_me		`thenSM` \ stuff ->
     let
-	(spec_defns, spec_uds, spec_env_stuff) = unzip3 stuff
+	(spec_defns, spec_uds, spec_rules) = unzip3 stuff
 
-	fn' = addIdSpecialisations zapped_fn spec_env_stuff
+	fn' = addIdSpecialisations zapped_fn spec_rules
     in
     returnSM ((fn',rhs'), 
 	      spec_defns, 
@@ -835,10 +835,10 @@ specDefn subst calls (fn, rhs)
 
     ----------------------------------------------------------
 	-- Specialise to one particular call pattern
-    spec_call :: ([Maybe Type], ([DictExpr], VarSet))		-- Call instance
-              -> SpecM ((Id,CoreExpr),				-- Specialised definition
-	                UsageDetails, 				-- Usage details from specialised body
-                	([CoreBndr], [CoreExpr], CoreExpr))	-- Info for the Id's SpecEnv
+    spec_call :: ([Maybe Type], ([DictExpr], VarSet))	-- Call instance
+              -> SpecM ((Id,CoreExpr),			-- Specialised definition
+	                UsageDetails, 			-- Usage details from specialised body
+                	CoreRule)			-- Info for the Id's SpecEnv
     spec_call (call_ts, (call_ds, call_fvs))
       = ASSERT( length call_ts == n_tyvars && length call_ds == n_dicts )
 		-- Calls are only recorded for properly-saturated applications
@@ -880,9 +880,10 @@ specDefn subst calls (fn, rhs)
 	let
 		-- The rule to put in the function's specialisation is:
 		--	forall b,d, d1',d2'.  f t1 b t3 d d1' d2' = f1 b d  
-           spec_env_rule = (poly_tyvars ++ rhs_dicts',
-			    inst_args, 
-			    mkTyApps (Var spec_f) (map mkTyVarTy poly_tyvars))
+           spec_env_rule = Rule (_PK_ ("SPEC " ++ showSDoc (ppr fn)))
+			        (poly_tyvars ++ rhs_dicts')
+				inst_args 
+				(mkTyApps (Var spec_f) (map mkTyVarTy poly_tyvars))
 
 		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
 	   final_uds = foldr addDictBind rhs_uds (my_zipEqual "spec_call" rhs_dicts' call_ds)

@@ -423,13 +423,12 @@ insertRule rules new_rule@(Rule _ tpl_vars tpl_args _)
 
     new_is_more_specific rule = maybeToBool (matchRule tpl_var_set rule tpl_args)
 
-addIdSpecialisations :: Id -> [([CoreBndr], [CoreExpr], CoreExpr)] -> Id
-addIdSpecialisations id spec_stuff
-  = setIdSpecialisation id new_rules
+addIdSpecialisations :: Id -> [CoreRule] -> Id
+addIdSpecialisations id rules
+  = setIdSpecialisation id new_specs
   where
-    rule_name = _PK_ ("SPEC " ++ showSDoc (ppr id))
-    new_rules = foldr add (idSpecialisation id) spec_stuff
-    add (vars, args, rhs) rules = addRule rules id (Rule rule_name vars args rhs)
+    new_specs = foldr add (idSpecialisation id) rules
+    add rule rules = addRule rules id rule
 \end{code}
 
 
