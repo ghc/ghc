@@ -1078,14 +1078,16 @@ check_main ghci_mode tcg_env
  | mod_name /= mAIN_Name
  = return (tcg_env, emptyFVs)
 
+	-- Check that 'main' is in scope
+	-- It might be imported from another module!
+	-- 
+	-- We use a guard for this (rather than letting lookupSrcName fail)
+	-- because it's not an error in ghci)
  | not (main_RDR_Unqual `elemRdrEnv` rdr_env)
  = do { complain_no_main; return (tcg_env, emptyFVs) }
 
  | otherwise
- = do { 	-- Check that 'main' is in scope
-		-- It might be imported from another module!
-	main_name <- lookupSrcName main_RDR_Unqual ;
-	failIfErrsM ;
+ = do { main_name <- lookupSrcName main_RDR_Unqual ;
 
 	tcg_env <- importSupportingDecls (unitFV runIOName) ;
 	setGblEnv tcg_env $ do {
@@ -1116,8 +1118,10 @@ check_main ghci_mode tcg_env
     rdr_env  = tcg_rdr_env tcg_env
  
     complain_no_main | ghci_mode == Interactive = return ()
-		     | otherwise 		= addErr noMainMsg
+		     | otherwise 		= failWithTc noMainMsg
 	-- In interactive mode, don't worry about the absence of 'main'
+	-- In other modes, fail altogether, so that we don't go on
+	-- and complain a second time when processing the export list.
 
     mainCtxt  = ptext SLIT("When checking the type of 'main'")
     noMainMsg = ptext SLIT("No 'main' defined in module Main")
