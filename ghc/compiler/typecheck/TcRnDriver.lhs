@@ -126,6 +126,7 @@ import Panic		( ghcError, GhcException(..) )
 import SrcLoc		( SrcLoc )
 #endif
 
+import FastString	( mkFastString )
 import Util		( sortLe )
 import Bag		( unionBags, snocBag )
 
