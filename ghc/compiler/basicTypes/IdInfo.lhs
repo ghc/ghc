@@ -473,7 +473,7 @@ this to".
 data WorkerInfo = NoWorker
 		| HasWorker Id Arity
 	-- The Arity is the arity of the *wrapper* at the moment of the
-	-- w/w split. See comments in MkIface.ifaceId, with the 'Worker' code.
+	-- w/w split.  See notes above.
 
 seqWorker :: WorkerInfo -> ()
 seqWorker (HasWorker id a) = id `seq` a `seq` ()

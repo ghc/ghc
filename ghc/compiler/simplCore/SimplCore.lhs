@@ -197,11 +197,7 @@ noStats dfs thing = do { binds <- thing; return (zeroSimplCount dfs, binds) }
 
 -- prepareLocalRuleBase takes the CoreBinds and rules defined in this module.
 -- It attaches those rules that are for local Ids to their binders, and
--- returns the remainder attached to Ids in an IdSet.  It also returns
--- Ids mentioned on LHS of some rule; these should be blacklisted.
-
--- The rule Ids and LHS Ids are black-listed; that is, they aren't inlined
--- so that the opportunity to apply the rule isn't lost too soon
+-- returns the remainder attached to Ids in an IdSet.  
 
 \begin{code}
 prepareRules :: HscEnv 
