@@ -1,2 +1,2 @@
 
-read021.hs:1: Variable not in scope: `main'
+read021.hs:1: No 'main' defined in module Main

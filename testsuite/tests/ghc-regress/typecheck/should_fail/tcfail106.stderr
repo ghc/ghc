@@ -1,10 +1,10 @@
 
-tcfail106.hs:10:
+tcfail106.hs:11:
     No instance for (S Int)
-    arising from the instance declaration at tcfail106.hs:10
+    arising from the instance declaration at tcfail106.hs:11
     In the instance declaration for `C Int'
 
-tcfail106.hs:13:
+tcfail106.hs:14:
     No instance for (S Int)
-    arising from the instance declaration at tcfail106.hs:13
+    arising from the instance declaration at tcfail106.hs:14
     In the instance declaration for `D Int'

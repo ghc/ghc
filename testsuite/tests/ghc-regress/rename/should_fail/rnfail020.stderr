@@ -1,7 +1,7 @@
 
-./rnfail020.hs:12:
+rnfail020.hs:12:
     All of the type variables in the constraint `Eq a' are already in scope
-	At least one must be universally quantified here
+	(at least one must be universally quantified here)
     In the type: (Eq a) => Set a -> Set a -> Set a
     While checking the type signature for `unionSets'
     In the definition of `unionSetB':
