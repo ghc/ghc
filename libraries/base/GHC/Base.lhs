@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Base.lhs,v 1.7 2002/02/27 14:33:09 simonmar Exp $
+% $Id: Base.lhs,v 1.8 2002/04/24 16:10:21 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2002
 %
@@ -599,8 +599,10 @@ instance CReturnable () -- Why, exactly?
 
 \begin{code}
 data Unit = Unit
+#ifndef __HADDOCK__
 data (:+:) a b = Inl a | Inr b
 data (:*:) a b = a :*: b
+#endif
 \end{code}
 
 
