@@ -4,13 +4,13 @@ The Glasgow Haskell Compiler
 (this file is fptools/ghc/README in a source distribution, and
 fptools/README in a binary distribution).
 
-GHC is a batch compiler for Haskell 1.4.  See the file ANNOUNCE for
+GHC is a batch compiler for Haskell 98.  See the file ANNOUNCE for
 information on the current version.
 
 Haskell is "the" standard lazy functional programming language.
-Haskell 1.4 is the current version of the language, released in 
-April 1997.  The language definition is on the Web at
-http://www.haskell.org/report/index.html.
+Haskell 98 is the current version of the language, released in 
+December 1998.  The language definition is on the Web at
+http://research.microsoft.com/Users/simonpj/Haskell/haskell98.html
 
 More information on GHC can be found on its web page
 
@@ -41,6 +41,7 @@ Current GHC team:
     Simon Peyton Jones	( simonpj@microsoft.com)    [our Fearless Leader]
     Sigbjorn Finne	(v-sfinne@microsoft.com)    [hired hand]
     Simon Marlow	(t-simonm@microsoft.com)    [hired hand]
+    Julian Seward       (v-julsew@microsoft.com)    [hired hand]
 
 Past contributors and/or continuing advisors (all @dcs.gla.ac.uk):
 
