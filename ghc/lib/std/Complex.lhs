@@ -71,7 +71,7 @@ polar z		 =  (magnitude z, phase z)
 
 magnitude :: (RealFloat a) => Complex a -> a
 magnitude (x:+y) =  scaleFloat k
-		     (sqrt ((scaleFloat mk x)^2 + (scaleFloat mk y)^2))
+		     (sqrt ((scaleFloat mk x)^(2::Int) + (scaleFloat mk y)^(2::Int)))
 		    where k  = max (exponent x) (exponent y)
 		          mk = - k
 
