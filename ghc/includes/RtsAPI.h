@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.35 2003/08/22 22:38:02 sof Exp $
+ * $Id: RtsAPI.h,v 1.36 2003/09/21 22:20:52 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -113,17 +113,14 @@ rts_eval_ ( HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret );
 SchedulerStatus 
 rts_evalIO ( HaskellObj p, /*out*/HaskellObj *ret );
 
-#if defined(COMPILING_RTS_MAIN)
-/* Used by the RTS' main() only */
-SchedulerStatus 
-rts_mainLazyIO ( HaskellObj p, /*out*/HaskellObj *ret );
-#endif
-
 SchedulerStatus
 rts_evalStableIO ( HsStablePtr s, /*out*/HsStablePtr *ret );
 
 SchedulerStatus 
-rts_evalLazyIO ( HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret );
+rts_evalLazyIO ( HaskellObj p, /*out*/HaskellObj *ret );
+
+SchedulerStatus 
+rts_evalLazyIO_ ( HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret );
 
 void
 rts_checkSchedStatus ( char* site, SchedulerStatus rc);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.17 2002/12/27 12:33:21 panne Exp $
+ * $Id: SchedAPI.h,v 1.18 2003/09/21 22:20:53 wolfgang Exp $
  *
  * (c) The GHC Team 1998-2002
  *
@@ -16,7 +16,8 @@
 #define NO_PRI  0
 #endif
 
-extern SchedulerStatus waitThread(StgTSO *main_thread, /*out*/StgClosure **ret);
+extern SchedulerStatus waitThread(StgTSO *main_thread, /*out*/StgClosure **ret,
+                                  Capability *initialCapability);
 
 /* 
  * Creating threads
@@ -30,7 +31,8 @@ extern StgTSO *createThread(nat stack_size);
 extern void taskStart(void);
 #endif
 extern void scheduleThread(StgTSO *tso);
-extern SchedulerStatus scheduleWaitThread(StgTSO *tso, /*out*/HaskellObj* ret);
+extern SchedulerStatus scheduleWaitThread(StgTSO *tso, /*out*/HaskellObj* ret,
+                                          Capability *initialCapability);
 
 static inline void pushClosure   (StgTSO *tso, StgWord c) {
   tso->sp--;

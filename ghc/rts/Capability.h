@@ -39,9 +39,9 @@ extern nat rts_n_free_capabilities;
 extern nat rts_n_waiting_workers;
 
 extern void grabReturnCapability(Mutex* pMutex, Capability** pCap);
-extern void yieldToReturningWorker(Mutex* pMutex, Capability** pCap);
-extern void waitForWorkCapability(Mutex* pMutex, Capability** pCap, rtsBool runnable);
-
+extern void yieldToReturningWorker(Mutex* pMutex, Capability** pCap, Condition *pThreadCond);
+extern void waitForWorkCapability(Mutex* pMutex, Capability** pCap, Condition *pThreadCond);
+extern void passCapability(Mutex* pMutex, Capability* cap, Condition *pTargetThreadCond);
 
 static inline rtsBool needToYieldToReturningWorker(void)
 {

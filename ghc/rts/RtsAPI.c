@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.45 2003/08/28 16:33:42 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.46 2003/09/21 22:20:56 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -20,6 +20,8 @@
 #include "Capability.h"
 
 #include <stdlib.h>
+
+static Capability *rtsApiCapability = NULL;
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
@@ -385,7 +387,7 @@ rts_eval (HaskellObj p, /*out*/HaskellObj *ret)
     StgTSO *tso;
 
     tso = createGenThread(RtsFlags.GcFlags.initialStkSize, p);
-    return scheduleWaitThread(tso,ret);
+    return scheduleWaitThread(tso,ret,rtsApiCapability);
 }
 
 SchedulerStatus
@@ -394,7 +396,7 @@ rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
     StgTSO *tso;
     
     tso = createGenThread(stack_size, p);
-    return scheduleWaitThread(tso,ret);
+    return scheduleWaitThread(tso,ret,rtsApiCapability);
 }
 
 /*
@@ -407,22 +409,7 @@ rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
     StgTSO* tso; 
     
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
-    return scheduleWaitThread(tso,ret);
-}
-
-/*
- * Identical to rts_evalLazyIO(), but won't create a new task/OS thread
- * to evaluate the Haskell thread. Used by main() only. Hack.
- */
- 
-SchedulerStatus
-rts_mainLazyIO(HaskellObj p, /*out*/HaskellObj *ret)
-{
-    StgTSO* tso;
-    
-    tso = createIOThread(RtsFlags.GcFlags.initialStkSize, p);
-    scheduleThread(tso);
-    return waitThread(tso, ret);
+    return scheduleWaitThread(tso,ret,rtsApiCapability);
 }
 
 /*
@@ -440,9 +427,9 @@ rts_evalStableIO (HsStablePtr s, /*out*/HsStablePtr *ret)
     
     p = (StgClosure *)deRefStablePtr(s);
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
-    stat = scheduleWaitThread(tso,&r);
+    stat = scheduleWaitThread(tso,&r,rtsApiCapability);
 
-    if (stat == Success) {
+    if (stat == Success && ret != NULL) {
 	ASSERT(r != NULL);
 	*ret = getStablePtr((StgPtr)r);
     }
@@ -454,12 +441,21 @@ rts_evalStableIO (HsStablePtr s, /*out*/HsStablePtr *ret)
  * Like rts_evalIO(), but doesn't force the action's result.
  */
 SchedulerStatus
-rts_evalLazyIO (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
+rts_evalLazyIO (HaskellObj p, /*out*/HaskellObj *ret)
+{
+    StgTSO *tso;
+
+    tso = createIOThread(RtsFlags.GcFlags.initialStkSize, p);
+    return scheduleWaitThread(tso,ret,rtsApiCapability);
+}
+
+SchedulerStatus
+rts_evalLazyIO_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 {
     StgTSO *tso;
 
     tso = createIOThread(stack_size, p);
-    return scheduleWaitThread(tso,ret);
+    return scheduleWaitThread(tso,ret,rtsApiCapability);
 }
 
 /* Convenience function for decoding the returned status. */
@@ -486,18 +482,13 @@ void
 rts_lock()
 {
 #ifdef RTS_SUPPORTS_THREADS
-	Capability *cap;
 	ACQUIRE_LOCK(&sched_mutex);
 	
 		// we request to get the capability immediately, in order to
 		// a) stop other threads from using allocate()
 		// b) wake the current worker thread from awaitEvent()
 		//       (so that a thread started by rts_eval* will start immediately)
-	grabReturnCapability(&sched_mutex,&cap);
-	
-		// now that we have the capability, we don't need it anymore
-		// (other threads will continue to run as soon as we release the sched_mutex)
-	releaseCapability(cap);
+	grabReturnCapability(&sched_mutex,&rtsApiCapability);
 	
 		// In the RTS hasn't been entered yet,
 		// start a RTS task.
@@ -511,6 +502,7 @@ void
 rts_unlock()
 {
 #ifdef RTS_SUPPORTS_THREADS
+	rtsApiCapability = NULL;
 	RELEASE_LOCK(&sched_mutex);
 #endif
 }

@@ -110,11 +110,17 @@ ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
 endif
 
-# Currently, you only get 'threads support' in the normal
-# way.
+# You get 'threads support' in the normal
+# and profiling ways.
 ifeq "$(GhcRtsThreaded)" "YES"
 ifeq "$(way)" ""
 SRC_CC_OPTS += -DTHREADED_RTS
+SRC_HC_OPTS += -optc-DTHREADED_RTS
+PACKAGE_CPP_OPTS += -DTHREADED_RTS
+endif
+ifeq "$(way)" "p"
+SRC_CC_OPTS += -DTHREADED_RTS
+SRC_HC_OPTS += -optc-DTHREADED_RTS
 PACKAGE_CPP_OPTS += -DTHREADED_RTS
 endif
 endif

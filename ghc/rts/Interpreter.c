@@ -26,6 +26,11 @@
 #include "Disassembler.h"
 #include "Interpreter.h"
 
+#include <string.h>     /* for memcpy */
+#ifdef HAVE_ERRNO_H
+#include <errno.h>
+#endif
+
 
 /* --------------------------------------------------------------------------
  * The bytecode interpreter
@@ -1172,6 +1177,9 @@ run_BCO:
 	    memcpy(arguments, Sp, sizeof(W_) * stk_offset);
 #endif
 
+	    // Restore the Haskell thread's current value of errno
+	    errno = cap->r.rCurrentTSO->saved_errno;
+
 	    // There are a bunch of non-ptr words on the stack (the
 	    // ccall args, the ccall fun address and space for the
 	    // result), which we need to cover with an info table
@@ -1208,6 +1216,9 @@ run_BCO:
 	    LOAD_STACK_POINTERS;
 	    Sp += ret_dyn_size;
 	    
+	    // Save the Haskell thread's current value of errno
+	    cap->r.rCurrentTSO->saved_errno = errno;
+		
 #ifdef RTS_SUPPORTS_THREADS
 	    // Threaded RTS:
 	    // Copy the "arguments", which might include a return value,

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.129 2003/09/11 15:12:25 wolfgang Exp $
+ * $Id: Linker.c,v 1.130 2003/09/21 22:20:54 wolfgang Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -381,6 +381,7 @@ typedef struct _RtsSymbolVal {
       SymX(int2Integerzh_fast)			\
       SymX(integer2Intzh_fast)			\
       SymX(integer2Wordzh_fast)			\
+      SymX(isCurrentThreadBoundzh_fast)		\
       SymX(isDoubleDenormalized)		\
       SymX(isDoubleInfinite)			\
       SymX(isDoubleNaN)				\
@@ -422,6 +423,7 @@ typedef struct _RtsSymbolVal {
       SymX(rts_eval)				\
       SymX(rts_evalIO)				\
       SymX(rts_evalLazyIO)			\
+      SymX(rts_evalStableIO)			\
       SymX(rts_eval_)				\
       SymX(rts_getBool)				\
       SymX(rts_getChar)				\
@@ -455,6 +457,7 @@ typedef struct _RtsSymbolVal {
       SymX(rts_mkWord64)			\
       SymX(rts_mkWord8)				\
       SymX(rts_unlock)				\
+      SymX(rtsSupportsBoundThreads)		\
       SymX(run_queue_hd)			\
       SymX(setProgArgv)				\
       SymX(startupHaskell)			\

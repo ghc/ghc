@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.28 2003/07/03 15:14:56 sof Exp $
+-- $Id: primops.txt.pp,v 1.29 2003/09/21 22:20:51 wolfgang Exp $
 --
 -- Primitive Operations
 --
@@ -1494,6 +1494,11 @@ primop LabelThreadOp "labelThread#" GenPrimOp
    with
    has_side_effects = True
    out_of_line      = True
+   
+primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
+   State# RealWorld -> (# State# RealWorld, Int# #)
+   with
+   out_of_line = True
 
 ------------------------------------------------------------------------
 section "Weak pointers"

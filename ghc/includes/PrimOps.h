@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.103 2003/07/03 15:14:57 sof Exp $
+ * $Id: PrimOps.h,v 1.104 2003/09/21 22:20:52 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -281,6 +281,7 @@ EXTFUN_RTS(blockAsyncExceptionszh_fast);
 EXTFUN_RTS(unblockAsyncExceptionszh_fast);
 EXTFUN_RTS(myThreadIdzh_fast);
 EXTFUN_RTS(labelThreadzh_fast);
+EXTFUN_RTS(isCurrentThreadBoundzh_fast);
 
 extern int cmp_thread(StgPtr tso1, StgPtr tso2);
 extern int rts_getThreadId(StgPtr tso);
@@ -416,5 +417,6 @@ EXTFUN_RTS(mkApUpd0zh_fast);
    ForeignObj - the C backend still needs this. 
    -------------------------------------------------------------------------- */
 #define ForeignObj_CLOSURE_DATA(c)  (((StgForeignObj *)c)->data)
+
 
 #endif /* PRIMOPS_H */

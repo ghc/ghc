@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.112 2003/09/12 16:32:13 sof Exp $
+ * $Id: PrimOps.hc,v 1.113 2003/09/21 22:20:55 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -1095,6 +1095,15 @@ FN_(labelThreadzh_fast)
   FE_
 }
 
+FN_(isCurrentThreadBoundzh_fast)
+{
+  /* no args */
+  I_ r;
+  FB_
+  r = (I_)(RET_STGCALL1(StgBool, isThreadBound, CurrentTSO));
+  RET_N(r);
+  FE_
+}
 
 /* -----------------------------------------------------------------------------
  * MVar primitives
@@ -1736,3 +1745,4 @@ FN_(asyncDoProczh_fast)
   FE_
 }
 #endif
+

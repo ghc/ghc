@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.38 2003/03/17 14:47:48 simonmar Exp $
+ * $Id: Schedule.h,v 1.39 2003/09/21 22:20:56 wolfgang Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -149,6 +149,8 @@ extern nat         rts_n_waiting_workers;
 extern nat         rts_n_waiting_tasks;
 #endif
 
+StgBool rtsSupportsBoundThreads(void);
+StgBool isThreadBound(StgTSO *tso);
 StgInt forkProcess(StgTSO *tso);
 
 extern SchedulerStatus rts_mainLazyIO(HaskellObj p, /*out*/HaskellObj *ret);
@@ -166,11 +168,13 @@ void resurrectThreads( StgTSO * );
  *
  * These are the threads which clients have requested that we run.  
  *
- * In a 'threaded' build, we might have several concurrent clients all
- * waiting for results, and each one will wait on a condition variable
- * until the result is available.
+ * In a 'threaded' build, each of these corresponds to one bound thread.
+ * The pointer to the StgMainThread is passed as a parameter to schedule;
+ * this invocation of schedule will always pass this main thread's
+ * bound_thread_cond to waitForkWorkCapability; OS-thread-switching
+ * takes place using passCapability.
  *
- * In non-SMP, clients are strictly nested: the first client calls
+ * In non-threaded builds, clients are strictly nested: the first client calls
  * into the RTS, which might call out again to C with a _ccall_GC, and
  * eventually re-enter the RTS.
  *
@@ -188,7 +192,6 @@ typedef struct StgMainThread_ {
 #if defined(RTS_SUPPORTS_THREADS)
   Condition        wakeup;
 #if defined(THREADED_RTS)
-  rtsBool          thread_bound;
   Condition        bound_thread_cond;
 #endif
 #endif

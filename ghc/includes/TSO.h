@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.31 2003/07/03 15:14:58 sof Exp $
+ * $Id: TSO.h,v 1.32 2003/09/21 22:20:53 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -194,7 +194,8 @@ typedef struct StgTSO_ {
   StgTSOBlockInfo    block_info;
   struct StgTSO_*    blocked_exceptions;
   StgThreadID        id;
-
+  int                saved_errno;
+  
   StgTSOTickyInfo    ticky; 
   StgTSOProfInfo     prof;
   StgTSOParInfo      par;
