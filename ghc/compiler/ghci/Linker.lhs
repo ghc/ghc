@@ -594,7 +594,7 @@ data LibrarySpec
 -- just to get the DLL handle into the list.
 partOfGHCi 
 #          ifndef mingw32_TARGET_OS
-           = [ "base", "concurrent", "posix", "text", "util" ]
+           = [ "base", "haskell98", "haskell-src", "readline" ]
 #          else
 	   = [ ]
 #          endif
