@@ -885,7 +885,7 @@ tags TAGS:: $(TAGS_HS_SRCS) $(TAGS_C_SRCS)
 	@$(RM) TAGS
 	@touch TAGS
 ifneq "$(TAGS_HS_SRCS)" ""
-	$(HSTAGS) $(HSTAGS_OPTS) -- $(TAGS_HS_SRCS)
+	$(HSTAGS) $(HSTAGS_OPTS) $(TAGS_HS_SRCS)
 endif
 ifneq "$(TAGS_C_SRCS)" ""
 	etags -a $(TAGS_C_SRCS)
