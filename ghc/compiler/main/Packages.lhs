@@ -14,7 +14,6 @@ where
 #include "HsVersions.h"
 import Pretty
 
-import SysTools		( dosifyPath )
 import CmdLineOpts	( dynFlag, verbosity )
 import DriverUtil	( my_prefix_match )
 import ErrUtils		( dumpIfSet )
@@ -38,9 +37,8 @@ import Outputable	( docToSDoc, trace )
 
 \begin{code}
 mungePackagePaths :: String -> [PackageConfig] -> [PackageConfig]
--- a) replace the string "$libdir" at the beginning of a path with the
---    current libdir (obtained from the -B option).
--- b) dosify the paths [paths in the package-conf file aren't DOS style]
+-- Replace the string "$libdir" at the beginning of a path
+-- with the current libdir (obtained from the -B option).
 mungePackagePaths top_dir ps = map munge_pkg ps
  where 
   munge_pkg p = p{ import_dirs  = munge_paths (import_dirs p),
@@ -50,7 +48,7 @@ mungePackagePaths top_dir ps = map munge_pkg ps
   munge_paths = map munge_path
 
   munge_path p 
-	  | Just p' <- my_prefix_match "$libdir" p = dosifyPath (top_dir ++ p')
+	  | Just p' <- my_prefix_match "$libdir" p = top_dir ++ p'
 	  | otherwise				   = trace ("not: " ++ p) p
 \end{code}
 

@@ -38,7 +38,6 @@ module SysTools (
 	-- Misc
 	showGhcUsage,		-- IO ()	Shows usage message and exits
 	getSysMan,		-- IO String	Parallel system only
-	dosifyPath,		-- String -> String
 
 	runSomething	-- ToDo: make private
  ) where
@@ -119,6 +118,9 @@ Config.hs contains two sorts of things
 %*									*
 %************************************************************************
 
+All these pathnames are maintained in Unix format. 
+(See remarks under pathnames below)
+
 \begin{code}
 GLOBAL_VAR(v_Pgm_L,   	error "pgm_L",   String)	-- unlit
 GLOBAL_VAR(v_Pgm_P,   	error "pgm_P",   String)	-- cpp
@@ -164,7 +166,7 @@ initSysTools minusB_args
 
 	; let installed_bin pgm   =  top_dir `slash` "bin" `slash` pgm
 	      installed     file  =  top_dir `slash` file
-	      inplace dir   pgm   =  top_dir `slash` dosifyPath dir `slash` pgm
+	      inplace dir   pgm   =  top_dir `slash` dir `slash` pgm
 
 	; let pkgconfig_path
 		| am_installed = installed "package.conf"
@@ -313,32 +315,33 @@ getTopDir :: [String]
 	         String)	-- TopDir
 
 getTopDir minusbs
-  = do { proto_top_dir <- get_proto
+  = do { top_dir1 <- get_proto
+       ; let top_dir2 = unDosifyPath top_dir1	-- Convert to standard internal form
 
 	-- Discover whether we're running in a build tree or in an installation,
 	-- by looking for the package configuration file.
-       ; am_installed <- doesFileExist (proto_top_dir `slash` "package.conf")
+       ; am_installed <- doesFileExist (top_dir2 `slash` "package.conf")
 
        ; if am_installed then
-	    return (True, proto_top_dir)
+	    return (True, top_dir2)
 	 else
-	    return (False, remove_suffix proto_top_dir)
+	    return (False, remove_suffix top_dir2)
        }
   where
     get_proto | not (null minusbs) 
-	      = return (dosifyPath (drop 2 (last minusbs)))
+	      = return (drop 2 (last minusbs))	-- 2 for "-B"
 	      | otherwise	   
 	      = do { maybe_exec_dir <- getExecDir -- Get directory of executable
-		   ; case maybe_exec_dir of	  -- (only works on Windows)
-			Nothing  -> throwDyn (InstallationError 
-						"missing -B<dir> option")
+		   ; case maybe_exec_dir of	  -- (only works on Windows; 
+						  --  returns Nothing on Unix)
+			Nothing  -> throwDyn (InstallationError "missing -B<dir> option")
 			Just dir -> return dir
 		   }
 
     remove_suffix dir	-- "/...stuff.../ghc/compiler" --> "/...stuff..."
 	= ASSERT2( not (null p1) && 
 		   not (null p2) && 
-		   dosifyPath dir == dosifyPath (top_dir ++ "/ghc/compiler"),
+		   dir == top_dir ++ "/ghc/compiler",
 		   text dir )
 	  top_dir
 	where
@@ -516,7 +519,13 @@ runSomething phase_name pgm args
   	  else return ()
 	}
   where
-    cmd_line = unwords (pgm : dosifyPaths args)
+-- Don't convert paths to DOS format when using the kludged
+-- version of 'system' on mingw32.  See comments with 'system' below.
+#if __GLASGOW_HASKELL__ > 501
+    cmd_line = unwords (dosifyPaths (pgm : args))
+#else
+    cmd_line = unwords (pgm : args)
+#endif
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
@@ -543,22 +552,37 @@ traceCmd phase_name cmd_line action
 
 %************************************************************************
 %*									*
-\subsection{Support code}
+\subsection{Path names}
 %*									*
 %************************************************************************
 
+We maintain path names in Unix form ('/'-separated) right until 
+the last moment.  On Windows we dos-ify them just before passing them
+to the Windows command.
+
+The alternative, of using '/' consistently on Unix and '\' on Windows,
+proved quite awkward.  There were a lot more calls to dosifyPath,
+and even on Windows we might invoke a unix-like utility (eg 'sh'), which
+interpreted a command line 'foo\baz' as 'foobaz'.
 
 \begin{code}
 -----------------------------------------------------------------------------
 -- Convert filepath into MSDOS form.
 
-dosifyPaths :: [String] -> [String]
 dosifyPath  :: String -> String
+dosifyPaths :: [String] -> [String]
 -- dosifyPath does two things
 -- a) change '/' to '\'
 -- b) remove initial '/cygdrive/'
 
+unDosifyPath :: String -> String
+-- Just change '\' to '/'
+
 #if defined(mingw32_TARGET_OS)
+
+--------------------- Windows version ------------------
+unDosifyPath xs = xs
+
 dosifyPaths xs = map dosifyPath xs
 
 dosifyPath stuff
@@ -572,22 +596,27 @@ dosifyPath stuff
     | cygdrive_prefix `isPrefixOf` stuff = drop (length cygdrive_prefix) stuff
     | otherwise = stuff
    
-  subst a b ls = map (\ x -> if x == a then b else x) ls
 #else
-dosifyPaths xs = xs
-dosifyPath  xs = xs
+
+--------------------- Unix version ---------------------
+dosifyPaths  xs = xs
+dosifyPaths  xs = xs
+unDosifyPath xs = subst '\\' '/' xs
+--------------------------------------------------------
 #endif
 
------------------------------------------------------------------------------
--- Path name construction
--- 	At the moment, we always use '/' and rely on dosifyPath 
---	to switch to DOS pathnames when necessary
+subst a b ls = map (\ x -> if x == a then b else x) ls
+\end{code}
 
+
+-----------------------------------------------------------------------------
+   Path name construction
+
+\begin{code}
 slash		 :: String -> String -> String
 absPath, relPath :: [String] -> String
 
 isSlash '/'   = True
-isSlash '\\'  = True
 isSlash other = False
 
 relPath [] = ""
@@ -595,12 +624,17 @@ relPath xs = foldr1 slash xs
 
 absPath xs = "" `slash` relPath xs
 
-#if defined(mingw32_TARGET_OS)
-slash s1 s2 = s1 ++ ('\\' : s2)
-#else
 slash s1 s2 = s1 ++ ('/' : s2)
-#endif
+\end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Support code}
+%*									*
+%************************************************************************
+
+\begin{code}
 -----------------------------------------------------------------------------
 -- Define	myGetProcessId :: IO Int
 --		getExecDir     :: IO (Maybe String)
