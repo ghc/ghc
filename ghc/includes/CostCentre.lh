@@ -415,7 +415,7 @@ We don't want to attribute costs to an unregistered cost-centre:
 	do {	/* beware of cc name-capture */					\
 	CostCentre c_c = (CostCentre) (cc);					\
 	if (c_c->registered == NOT_REGISTERED) { 				\
-	    fprintf(stderr,"Entering unregistered CC: %s\n",c_c->label);	\
+	    fprintf(stderr,"Entering unregistered CC: %s %s\n",c_c->module, c_c->label);	\
 	    /* unsafe c-call, BTW */						\
 	}									\
 	if ( (chk_not_overhead) && c_c == STATIC_CC_REF(CC_OVERHEAD) ) {	\
