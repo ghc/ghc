@@ -1513,6 +1513,10 @@ FPTOOLS_LD_X
 
 FP_EMPTY_STRUCTS
 
+dnl ** Check for idiosyncracies in some mingw impls of directory handling.
+FP_READDIR_EOF_ERRNO
+FP_DIRENT_FLAT_LAYOUT
+
 AC_MSG_CHECKING([for SIGPOLL])
 AC_EGREP_CPP(we_have_sigpoll,
 [#include <signal.h>
