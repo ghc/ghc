@@ -19,7 +19,7 @@
 
 module Data.HashTable (
 	-- * Basic hash table operations
-	HashTable, new, insert, delete, lookup,
+	HashTable, new, insert, delete, lookup, update,
 	-- * Converting to and from lists
 	fromList, toList,
 	-- * Hash functions
@@ -209,7 +209,14 @@ new cmp hash_fn = do
 -- -----------------------------------------------------------------------------
 -- Inserting a key\/value pair into the hash table
 
--- | Inserts an key\/value mapping into the hash table.
+-- | Inserts an key\/value mapping into the hash table.  
+--
+-- Note that 'insert' doesn't remove the old entry from the table -
+-- the behaviour is like an association list, where 'lookup' returns
+-- the most-recently-inserted mapping for a key in the table.  The
+-- reason for this is to keep 'insert' as efficient as possible.  If
+-- you need to update a mapping, then we provide 'update'.
+--
 insert :: HashTable key val -> key -> val -> IO ()
 
 insert (HashTable ref) key val = do
@@ -309,6 +316,43 @@ delete (HashTable ref) key = do
   bucket <- myReadArray segment segment_offset
   myWriteArray segment segment_offset (filter (not.(key `cmp`).fst) bucket)
   return ()
+
+-- -----------------------------------------------------------------------------
+-- Deleting a mapping from the hash table
+
+-- | Updates an entry in the hash table, returning 'True' if there was
+-- already an entry for this key, or 'False' otherwise.  After 'update'
+-- there will always be exactly one entry for the given key in the table.
+--
+-- 'insert' is more efficient than 'update' if you don't care about
+-- multiple entries, or you know for sure that multiple entries can't
+-- occur.  However, 'update' is more efficient than 'delete' followed
+-- by 'insert'.
+update :: HashTable key val -> key -> val -> IO Bool
+
+update (HashTable ref) key val = do
+  table@HT{ kcount=k, bcount=b, dir=dir, cmp=cmp } <- readIORef ref
+  let table1 = table{ kcount = k+1 }
+  -- optimistically expand the table
+  table2 <-
+	if (k > hLOAD * b)
+	   then expandHashTable table1
+	   else return table1
+  writeIORef ref table2
+  (segment_index,segment_offset) <- tableLocation table2 key
+  segment <- myReadArray dir segment_index
+  bucket <- myReadArray segment segment_offset
+  let 
+    (deleted,bucket') = foldr filt (0,[]) bucket
+    filt pair@(k,v) (deleted,bucket)
+	| key `cmp` k = (deleted+1, bucket)
+	| otherwise   = (deleted,   pair:bucket)
+  -- in  
+  myWriteArray segment segment_offset ((key,val):bucket')
+  -- update the table load, taking into account the number of
+  -- items we just deleted.
+  writeIORef ref table2{ kcount = kcount table2 - deleted }
+  return (deleted /= 0)
 
 -- -----------------------------------------------------------------------------
 -- Looking up an entry in the hash table
