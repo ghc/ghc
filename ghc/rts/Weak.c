@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.22 2002/04/19 10:23:43 simonmar Exp $
+ * $Id: Weak.c,v 1.23 2002/04/26 22:31:31 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -8,13 +8,14 @@
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
+#define COMPILING_RTS_MAIN
 #include "Rts.h"
-#include "RtsAPI.h"
 #include "SchedAPI.h"
 #include "RtsFlags.h"
 #include "Weak.h"
 #include "Storage.h"
 #include "Prelude.h"
+#include "RtsAPI.h"
 
 StgWeak *weak_ptr_list;
 
@@ -39,7 +40,7 @@ finalizeWeakPointersNow(void)
 	w->header.info = &stg_DEAD_WEAK_info;
 	IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
 	if (w->finalizer != &stg_NO_FINALIZER_closure) {
-	    rts_evalIO(w->finalizer,NULL);
+	    rts_mainEvalIO(w->finalizer,NULL);
 	}
     }
   }
