@@ -494,9 +494,11 @@ removeTmpFiles verb fs
 	     ("Deleting: " ++ unwords fs)
 	     (mapM_ rm fs)
   where
-    rm f = removeFile f `catchAllIO`
-		(\exn -> hPutStrLn stderr ("Warning: deleting non-existent " ++ f) >>
-		         return ())
+    rm f = removeFile f `catchAllIO` 
+		(\_ignored -> 
+		    when (verb >= 2) $
+		      hPutStrLn stderr ("Warning: deleting non-existent " ++ f)
+		)
 
 \end{code}
 
