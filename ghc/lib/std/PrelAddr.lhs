@@ -15,6 +15,7 @@ module PrelAddr (
 
 	, Word(..)
 	, wordToInt
+	, intToWord
 
 	, Word64(..)
 	, Int64(..)
@@ -42,6 +43,9 @@ instance CReturnable Word
 
 wordToInt :: Word -> Int
 wordToInt (W# w#) = I# (word2Int# w#)
+
+intToWord :: Int -> Word
+intToWord (I# i#) = W# (int2Word# i#)
 
 #if WORD_SIZE_IN_BYTES == 8
 data Word64 = W64# Word#

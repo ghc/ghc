@@ -56,7 +56,7 @@ module Directory
 
 import Prelude		-- Just to get it in the dependencies
 
-import PrelGHC		( RealWorld, int2Word#, or#, and# )
+import PrelGHC		( RealWorld, or#, and# )
 import PrelByteArr	( ByteArray, MutableByteArray,
 			  newWordArray, readWordArray, newCharArray,
 			  unsafeFreezeByteArray
@@ -66,7 +66,7 @@ import PrelIOBase	( stToIO,
 			  constructErrorAndFail, constructErrorAndFailWithInfo,
 			  IOError(IOError), IOErrorType(SystemError) )
 import Time             ( ClockTime(..) )
-import PrelAddr		( Addr, nullAddr, Word(..), wordToInt )
+import PrelAddr		( Addr, nullAddr, Word(..), wordToInt, intToWord )
 #endif
 
 \end{code}
@@ -545,8 +545,7 @@ emptyFileMode     = primIntToWord 0
 unionFileMode     = primOrWord
 intersectFileMode = primAndWord
 #else
---ToDo: tidy up.
-emptyFileMode     = W# (int2Word# 0#)
+emptyFileMode     = intToWord 0
 unionFileMode     = orWord
 intersectFileMode = andWord
 #endif
