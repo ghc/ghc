@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.164 2003/11/26 12:14:26 simonmar Exp $
+ * $Id: GC.c,v 1.165 2004/05/07 21:19:21 panne Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -142,10 +142,12 @@ static void         mark_root               ( StgClosure **root );
 
 // Use a register argument for evacuate, if available.
 #if __GNUC__ >= 2
-static StgClosure * evacuate (StgClosure *q) __attribute__((regparm(1)));
+#define REGPARM1 __attribute__((regparm(1)))
 #else
-static StgClosure * evacuate (StgClosure *q);
+#define REGPARM1
 #endif
+
+REGPARM1 static StgClosure * evacuate (StgClosure *q);
 
 static void         zero_static_object_list ( StgClosure* first_static );
 static void         zero_mutable_list       ( StgMutClosure *first );
@@ -1659,7 +1661,7 @@ mkMutCons(StgClosure *ptr, generation *gen)
    extra reads/writes than we save.
    -------------------------------------------------------------------------- */
 
-static StgClosure *
+REGPARM1 static StgClosure *
 evacuate(StgClosure *q)
 {
   StgClosure *to;
