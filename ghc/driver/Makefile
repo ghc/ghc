@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.53 2001/02/11 17:01:46 simonmar Exp $
+# $Id: Makefile,v 1.54 2001/02/26 16:50:30 simonmar Exp $
 #
 
 TOP=..
@@ -89,13 +89,15 @@ INPLACE_SCRIPT_PROG    = ghci-inplace
 
 SCRIPT_OBJS	  = ghci.sh
 INTERP		  = $(SHELL)
-SCRIPT_SUBST_VARS = GHCBIN
+SCRIPT_SUBST_VARS = GHCBIN TOPDIROPT
 INSTALL_SCRIPTS  += $(SCRIPT_PROG)
 
 ifeq "$(INSTALLING)" "1"
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
+TOPDIROPT	=  
 LINK 		=  ghci
 else
+TOPDIROPT	=  -B$(FPTOOLS_TOP_ABS)
 SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
 endif
 
